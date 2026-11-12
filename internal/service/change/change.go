@@ -57,6 +57,7 @@ func (s *changeSvc) CreateChange(_ context.Context, r *v1.CreateChangeRequest) (
 	if spec.WindowHours == 0 {
 		spec.WindowHours = 4
 	}
+	creada := "" // carpeta que creó el núcleo: se borra si la petición no valida
 	if spec.OutputDir == "" {
 		// Una subcarpeta propia por cambio (0700): outputs/cambios puede existir con otro modo y no se corrige.
 		root := filepath.Join(s.d.Outputs(), "cambios")
@@ -67,7 +68,7 @@ func (s *changeSvc) CreateChange(_ context.Context, r *v1.CreateChangeRequest) (
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
 		}
-		spec.OutputDir = dir
+		spec.OutputDir, creada = dir, dir
 	}
 	// PRE y POST deben ser comparables: una ronda, un archivo por ronda, sin borrar los sueltos.
 	spec.Schedule, spec.Split, spec.Zip, spec.DeleteLooseFiles = nil, v1.SplitStrategy_SPLIT_STRATEGY_PER_ROUND, v1.ZipPolicy_ZIP_POLICY_AT_END, false
@@ -75,6 +76,9 @@ func (s *changeSvc) CreateChange(_ context.Context, r *v1.CreateChangeRequest) (
 	probe := proto.Clone(spec).(*v1.JobSpec)
 	probe.Name += "-pre"
 	if err := s.d.ValidateJob(probe); err != nil {
+		if creada != "" {
+			os.Remove(creada) // vacía: os.Remove no toca una con contenido
+		}
 		return nil, err
 	}
 	rec := &changeRec{id: service.NewID(), spec: spec}

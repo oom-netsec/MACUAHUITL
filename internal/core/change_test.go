@@ -167,3 +167,16 @@ func TestCreateChangeConCarpetaCambiosAbierta(t *testing.T) {
 		t.Fatalf("CreateChange con outputs/cambios en 0755: %v", err)
 	}
 }
+
+// Un CreateChange que no valida no deja una carpeta cambio-* vacía creada por el núcleo.
+func TestCreateChangeInvalidoNoDejaCarpeta(t *testing.T) {
+	h := newHarness(t, nil)
+	h.ready(t)
+	_, err := v1.NewChangeServiceClient(h.conn).CreateChange(ctx(t), &v1.CreateChangeRequest{Spec: &v1.JobSpec{Name: "c", Targets: []*v1.Target{h.target}, DefaultCredentialId: "no-existe"}})
+	if err == nil {
+		t.Fatal("debía fallar")
+	}
+	if sobras, _ := filepath.Glob(filepath.Join(h.out, "cambios", "cambio-*")); len(sobras) != 0 {
+		t.Fatalf("quedaron carpetas: %v", sobras)
+	}
+}
