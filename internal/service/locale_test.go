@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -26,7 +25,7 @@ func (fakePrefs) GetPreference(ctx context.Context, _ *v1.GetPreferenceRequest) 
 	return nil, service.Err(ctx, codes.AlreadyExists, "file.exists", i18n.A("path", "/x/a.txt", "secreto", "hunter2"))
 }
 
-func (fakePrefs) Flows(_ *v1.FlowsRequest, s grpc.ServerStreamingServer[v1.FlowsResponse]) error {
+func (fakePrefs) Flows(_ *v1.FlowsRequest, s v1.VisibilityService_FlowsServer) error {
 	return service.Err(s.Context(), codes.AlreadyExists, "file.exists", i18n.A("path", "/x/a.txt"))
 }
 
@@ -42,7 +41,7 @@ func conn(t *testing.T) *ipc.ClientConn {
 	go ipc.Serve(ctx, l, func(r ipc.Registrar) {
 		v1.RegisterPrefsServiceServer(r, fakePrefs{})
 		v1.RegisterVisibilityServiceServer(r, fakePrefs{})
-	}, grpc.ChainUnaryInterceptor(service.LocaleUnary), grpc.ChainStreamInterceptor(service.LocaleStream))
+	}, ipc.LocaleOptions()...)
 	c, err := ipc.DialPath(sock)
 	if err != nil {
 		t.Fatal(err)

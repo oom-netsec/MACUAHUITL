@@ -10,7 +10,6 @@ import (
 	"sync"
 	"testing"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -68,7 +67,7 @@ func i18nBridge(t *testing.T, lang string, localize bool) (*Bridge, *i18nCore) {
 	go ipc.Serve(ctx, l, func(r ipc.Registrar) {
 		v1.RegisterPrefsServiceServer(r, f)
 		v1.RegisterPatrolServiceServer(r, f)
-	}, grpc.ChainUnaryInterceptor(service.LocaleUnary), grpc.ChainStreamInterceptor(service.LocaleStream))
+	}, ipc.LocaleOptions()...)
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
 	b.Localize = localize
 	Start(ctx, b)

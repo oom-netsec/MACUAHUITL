@@ -3,12 +3,9 @@ package service
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -16,30 +13,6 @@ import (
 
 // ErrDomain es el dominio de los ErrorInfo del núcleo.
 const ErrDomain = "macuahuitl"
-
-// localeOf lee el metadato accept-language; ausente o desconocido es es.
-func localeOf(ctx context.Context) string {
-	md, _ := metadata.FromIncomingContext(ctx)
-	return i18n.Parse(strings.Join(md.Get("accept-language"), ","))
-}
-
-// LocaleUnary deja el idioma pedido (metadato accept-language) en el contexto de cada llamada.
-func LocaleUnary(ctx context.Context, req any, _ *grpc.UnaryServerInfo, h grpc.UnaryHandler) (any, error) {
-	return h(i18n.WithLocale(ctx, localeOf(ctx)), req)
-}
-
-type localeStream struct {
-	grpc.ServerStream
-	ctx context.Context
-}
-
-func (s localeStream) Context() context.Context { return s.ctx }
-
-// LocaleStream es LocaleUnary para los streams.
-func LocaleStream(srv any, ss grpc.ServerStream, _ *grpc.StreamServerInfo, h grpc.StreamHandler) error {
-	ctx := ss.Context()
-	return h(srv, localeStream{ss, i18n.WithLocale(ctx, localeOf(ctx))})
-}
 
 // Err arma el error gRPC de un código del catálogo: el texto en el idioma del contexto y, como detalles,
 // el ErrorInfo (reason, dominio y metadata) y el LocalizedMessage.
