@@ -152,11 +152,11 @@ func Load(dir string, now time.Time, extra ...string) (*Fleet, error) {
 	for i, r := range append([]string{dir}, extra...) {
 		fi, err := os.Stat(r)
 		if err == nil && !fi.IsDir() {
-			err = fmt.Errorf("%s no es una carpeta", r)
+			err = i18n.New("fleet.err.not_dir", i18n.A("path", r))
 		}
 		if err != nil {
 			if i == 0 {
-				first = fmt.Errorf("flota: %w", err)
+				first = i18n.Wrap("fleet.err.load", err, nil)
 			}
 			continue
 		}
@@ -216,7 +216,7 @@ func Load(dir string, now time.Time, extra ...string) (*Fleet, error) {
 	}
 	f.Warnings, f.WarnTx = w.list, w.txs
 	if len(devs) == 0 {
-		return nil, fmt.Errorf("flota: %s no contiene salidas de Patrol (carpetas <equipo>_<ip> con encabezados =====)", dir)
+		return nil, i18n.New("fleet.err.no_outputs", i18n.A("dir", dir))
 	}
 	for _, d := range devs {
 		if e, ok := d.Get("show version"); ok && !rejected(e) {

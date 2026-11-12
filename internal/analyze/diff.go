@@ -70,7 +70,7 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 		rounds[n] = true
 	}
 	if !rounds[from] || !rounds[to] {
-		return r, fmt.Errorf("analyze: el trabajo tiene las rondas %v; no hay %d o %d", b.Rounds(""), from, to)
+		return r, i18n.New("analyze.err.rounds", i18n.A("have", b.Rounds(""), "from", from, "to", to))
 	}
 	for _, dev := range b.Devices() {
 		if !matchDevice(dev, device) {

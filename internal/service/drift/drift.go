@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
@@ -28,7 +27,7 @@ type driftSvc struct {
 }
 
 // bundle acepta el ID de un trabajo de esta sesión o la ruta absoluta de su carpeta.
-func (s *driftSvc) bundle(job string) (*analyze.Bundle, error) {
+func (s *driftSvc) bundle(ctx context.Context, job string) (*analyze.Bundle, error) {
 	dir := filepath.Clean(job)
 	if !filepath.IsAbs(job) {
 		j, err := s.d.Job(job)
@@ -36,20 +35,20 @@ func (s *driftSvc) bundle(job string) (*analyze.Bundle, error) {
 			return nil, err
 		}
 		if j.Dir == "" {
-			return nil, status.Error(codes.FailedPrecondition, "el trabajo aún no tiene salidas: ármalo y espera la primera ronda")
+			return nil, service.Err(ctx, codes.FailedPrecondition, "analyze.err.job_no_outputs", nil)
 		}
 		dir = j.Dir
 	}
 	b, err := analyze.Load(dir)
 	if err != nil {
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
+		return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
 	return b, nil
 }
 
 func (s *driftSvc) Drift(ctx context.Context, r *v1.DriftRequest) (*v1.DriftResponse, error) {
 	s.d.MarkActive()
-	b, err := s.bundle(r.Job)
+	b, err := s.bundle(ctx, r.Job)
 	if err != nil {
 		return nil, err
 	}

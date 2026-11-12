@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/fleet"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
@@ -20,7 +20,7 @@ type fleetSvc struct {
 	d service.Deps
 }
 
-func (s *fleetSvc) load(action, dir, detail string) (*fleet.Fleet, error) {
+func (s *fleetSvc) load(ctx context.Context, action, dir, detail string) (*fleet.Fleet, error) {
 	s.d.MarkActive()
 	var extra []string
 	if dir == "" { // sin carpeta explícita: outputs/ y los output_dir de los trabajos
@@ -28,11 +28,11 @@ func (s *fleetSvc) load(action, dir, detail string) (*fleet.Fleet, error) {
 		extra = service.JobOutputRoots(s.d)
 	}
 	if !filepath.IsAbs(dir) {
-		return nil, status.Errorf(codes.InvalidArgument, "la ruta %q debe ser absoluta", dir)
+		return nil, service.Err(ctx, codes.InvalidArgument, "fleet.err.relative_path", i18n.A("path", dir))
 	}
 	f, err := fleet.Load(dir, time.Now().UTC(), extra...)
 	if err != nil {
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
+		return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
 	s.d.Audit("fleet."+action, dir, detail)
 	return f, nil
@@ -40,9 +40,9 @@ func (s *fleetSvc) load(action, dir, detail string) (*fleet.Fleet, error) {
 
 func (s *fleetSvc) Find(ctx context.Context, r *v1.FindRequest) (*v1.FindResponse, error) {
 	if r.Query == "" {
-		return nil, status.Error(codes.InvalidArgument, "indica una IP, MAC o nombre")
+		return nil, service.Err(ctx, codes.InvalidArgument, "fleet.err.empty_query", nil)
 	}
-	f, err := s.load("find", r.Dir, r.Query)
+	f, err := s.load(ctx, "find", r.Dir, r.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -52,9 +52,9 @@ func (s *fleetSvc) Find(ctx context.Context, r *v1.FindRequest) (*v1.FindRespons
 
 func (s *fleetSvc) Trace(ctx context.Context, r *v1.TraceRequest) (*v1.TraceResponse, error) {
 	if r.Query == "" {
-		return nil, status.Error(codes.InvalidArgument, "indica una MAC o una IP")
+		return nil, service.Err(ctx, codes.InvalidArgument, "fleet.err.empty_trace", nil)
 	}
-	f, err := s.load("trace", r.Dir, r.Query)
+	f, err := s.load(ctx, "trace", r.Dir, r.Query)
 	if err != nil {
 		return nil, err
 	}
@@ -64,9 +64,9 @@ func (s *fleetSvc) Trace(ctx context.Context, r *v1.TraceRequest) (*v1.TraceResp
 
 func (s *fleetSvc) Path(ctx context.Context, r *v1.PathRequest) (*v1.PathResponse, error) {
 	if r.Query == "" || r.Dst == "" {
-		return nil, status.Error(codes.InvalidArgument, "indica origen y destino")
+		return nil, service.Err(ctx, codes.InvalidArgument, "fleet.err.empty_path", nil)
 	}
-	f, err := s.load("path", r.Dir, r.Query+" -> "+r.Dst)
+	f, err := s.load(ctx, "path", r.Dir, r.Query+" -> "+r.Dst)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (s *fleetSvc) Path(ctx context.Context, r *v1.PathRequest) (*v1.PathRespons
 }
 
 func (s *fleetSvc) Health(ctx context.Context, r *v1.HealthRequest) (*v1.HealthResponse, error) {
-	f, err := s.load("health", r.Dir, "")
+	f, err := s.load(ctx, "health", r.Dir, "")
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (s *fleetSvc) Health(ctx context.Context, r *v1.HealthRequest) (*v1.HealthR
 }
 
 func (s *fleetSvc) Summary(ctx context.Context, r *v1.SummaryRequest) (*v1.SummaryResponse, error) {
-	f, err := s.load("summary", r.Dir, "")
+	f, err := s.load(ctx, "summary", r.Dir, "")
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +97,11 @@ func (s *fleetSvc) Capacity(ctx context.Context, r *v1.CapacityRequest) (*v1.Cap
 	if r.Need != "" {
 		n, err := fleet.ParseSize(r.Need)
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 		need = n
 	}
-	f, err := s.load("capacity", r.Dir, r.Need)
+	f, err := s.load(ctx, "capacity", r.Dir, r.Need)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (s *fleetSvc) Capacity(ctx context.Context, r *v1.CapacityRequest) (*v1.Cap
 }
 
 func (s *fleetSvc) Inventory(ctx context.Context, r *v1.InventoryRequest) (*v1.InventoryResponse, error) {
-	f, err := s.load("inventory", r.Dir, "")
+	f, err := s.load(ctx, "inventory", r.Dir, "")
 	if err != nil {
 		return nil, err
 	}

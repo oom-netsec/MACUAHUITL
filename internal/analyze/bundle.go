@@ -9,7 +9,6 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"path"
@@ -119,16 +118,16 @@ func LoadUpTo(dir string, upTo int) (*Bundle, error) { return loadWith(dir, upTo
 func loadWith(dir string, upTo int, skip func(string, int64) bool) (*Bundle, error) {
 	fi, err := os.Stat(dir)
 	if err != nil {
-		return nil, fmt.Errorf("analyze: %w", err)
+		return nil, i18n.Wrap("analyze.err.read", err, nil)
 	}
 	if !fi.IsDir() {
-		return nil, fmt.Errorf("analyze: %s no es una carpeta", dir)
+		return nil, i18n.New("analyze.err.not_dir", i18n.A("path", dir))
 	}
 	b := &Bundle{Dir: dir, upTo: upTo, Files: map[string]int64{}}
 	seen := map[string]bool{}
 	devs, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("analyze: %w", err)
+		return nil, i18n.Wrap("analyze.err.read", err, nil)
 	}
 	for _, d := range devs {
 		if !d.IsDir() {
@@ -170,7 +169,7 @@ func loadWith(dir string, upTo int, skip func(string, int64) bool) (*Bundle, err
 		}
 	}
 	if len(b.Sections) == 0 && b.skipped == 0 {
-		return nil, fmt.Errorf("analyze: %s no contiene salidas de Patrol", dir)
+		return nil, i18n.New("analyze.err.no_outputs", i18n.A("path", dir))
 	}
 	sort.SliceStable(b.Sections, func(i, j int) bool {
 		x, y := b.Sections[i], b.Sections[j]

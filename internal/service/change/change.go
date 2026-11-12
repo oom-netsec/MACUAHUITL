@@ -16,6 +16,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
 	"github.com/oom-netsec/MACUAHUITL/internal/change"
 	"github.com/oom-netsec/MACUAHUITL/internal/compliance"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/upgrade"
@@ -41,10 +42,10 @@ type changeSvc struct {
 
 const defaultChangePlaybook = "ios-xe/pre-post"
 
-func (s *changeSvc) CreateChange(_ context.Context, r *v1.CreateChangeRequest) (*v1.CreateChangeResponse, error) {
+func (s *changeSvc) CreateChange(ctx context.Context, r *v1.CreateChangeRequest) (*v1.CreateChangeResponse, error) {
 	s.d.MarkActive()
 	if r.Spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "falta la definición del cambio")
+		return nil, service.Err(ctx, codes.InvalidArgument, "change.err.no_spec", nil)
 	}
 	spec := proto.Clone(r.Spec).(*v1.JobSpec)
 	spec.Kind = "change"
@@ -62,11 +63,11 @@ func (s *changeSvc) CreateChange(_ context.Context, r *v1.CreateChangeRequest) (
 		// Una subcarpeta propia por cambio (0700): outputs/cambios puede existir con otro modo y no se corrige.
 		root := filepath.Join(s.d.Outputs(), "cambios")
 		if err := os.MkdirAll(root, 0o700); err != nil {
-			return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+			return nil, service.Err(ctx, codes.Internal, "change.err.output_dir", i18n.A("error", err))
 		}
 		dir, err := os.MkdirTemp(root, "cambio-")
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+			return nil, service.Err(ctx, codes.Internal, "change.err.output_dir", i18n.A("error", err))
 		}
 		spec.OutputDir, creada = dir, dir
 	}
@@ -89,12 +90,12 @@ func (s *changeSvc) CreateChange(_ context.Context, r *v1.CreateChangeRequest) (
 	return &v1.CreateChangeResponse{ChangeId: rec.id}, nil
 }
 
-func (s *changeSvc) get(id string) (*changeRec, error) {
+func (s *changeSvc) get(ctx context.Context, id string) (*changeRec, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rec, ok := s.changes[id]
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "cambio %s no existe", id)
+		return nil, service.Err(ctx, codes.NotFound, "change.err.not_found", i18n.A("id", id))
 	}
 	return rec, nil
 }
@@ -114,22 +115,22 @@ var phaseName = map[v1.ChangePhase]string{v1.ChangePhase_CHANGE_PHASE_PRE: "pre"
 
 func (s *changeSvc) CaptureChange(ctx context.Context, r *v1.CaptureChangeRequest) (*v1.CaptureChangeResponse, error) {
 	s.d.MarkActive()
-	rec, err := s.get(r.ChangeId)
+	rec, err := s.get(ctx, r.ChangeId)
 	if err != nil {
 		return nil, err
 	}
 	name, ok := phaseName[r.Phase]
 	if !ok {
-		return nil, status.Error(codes.InvalidArgument, "fase no indicada (pre o post)")
+		return nil, service.Err(ctx, codes.InvalidArgument, "change.err.no_phase", nil)
 	}
 	s.mu.Lock()
 	cur, pre := rec.jobs[r.Phase], rec.jobs[v1.ChangePhase_CHANGE_PHASE_PRE]
 	s.mu.Unlock()
 	if st := s.jobState(cur); st == "arming" || st == "armed" {
-		return nil, status.Errorf(codes.FailedPrecondition, "la captura %s ya está en curso (trabajo %s)", name, cur)
+		return nil, service.Err(ctx, codes.FailedPrecondition, "change.err.in_progress", i18n.A("name", name, "job", cur))
 	}
 	if r.Phase == v1.ChangePhase_CHANGE_PHASE_POST && s.jobState(pre) != "completed" {
-		return nil, status.Error(codes.FailedPrecondition, "primero termina la captura PRE: sin línea base no hay comparación")
+		return nil, service.Err(ctx, codes.FailedPrecondition, "change.err.need_pre", nil)
 	}
 	spec := proto.Clone(rec.spec).(*v1.JobSpec)
 	spec.Name += "-" + name
@@ -168,16 +169,16 @@ func (s *changeSvc) ListChanges(context.Context, *v1.ListChangesRequest) (*v1.Li
 }
 
 // outputDir: carpeta de un trabajo terminado.
-func (s *changeSvc) outputDir(jobID, phase string) (string, error) {
+func (s *changeSvc) outputDir(ctx context.Context, jobID, phase string) (string, error) {
 	if jobID == "" {
-		return "", status.Errorf(codes.FailedPrecondition, "falta la captura %s", phase)
+		return "", service.Err(ctx, codes.FailedPrecondition, "change.err.missing_capture", i18n.A("phase", phase))
 	}
 	j, err := s.d.Job(jobID)
 	if err != nil {
 		return "", err
 	}
 	if j.State != "completed" || j.Dir == "" {
-		return "", status.Errorf(codes.FailedPrecondition, "la captura %s está %s", phase, j.State)
+		return "", service.Err(ctx, codes.FailedPrecondition, "change.err.capture_state", i18n.A("phase", phase, "state", j.State))
 	}
 	return j.Dir, nil
 }
@@ -185,21 +186,21 @@ func (s *changeSvc) outputDir(jobID, phase string) (string, error) {
 func (s *changeSvc) GetChangeReport(ctx context.Context, r *v1.GetChangeReportRequest) (*v1.GetChangeReportResponse, error) {
 	preDir, postDir := r.PreDir, r.PostDir
 	if r.ChangeId != "" {
-		rec, err := s.get(r.ChangeId)
+		rec, err := s.get(ctx, r.ChangeId)
 		if err != nil {
 			return nil, err
 		}
 		s.mu.Lock()
 		pre, post := rec.jobs[v1.ChangePhase_CHANGE_PHASE_PRE], rec.jobs[v1.ChangePhase_CHANGE_PHASE_POST]
 		s.mu.Unlock()
-		if preDir, err = s.outputDir(pre, "PRE"); err != nil {
+		if preDir, err = s.outputDir(ctx, pre, "PRE"); err != nil {
 			return nil, err
 		}
-		if postDir, err = s.outputDir(post, "POST"); err != nil {
+		if postDir, err = s.outputDir(ctx, post, "POST"); err != nil {
 			return nil, err
 		}
 	} else if !filepath.IsAbs(preDir) || !filepath.IsAbs(postDir) {
-		return nil, status.Error(codes.InvalidArgument, "indica el cambio o las dos carpetas (rutas absolutas)")
+		return nil, service.Err(ctx, codes.InvalidArgument, "change.err.no_input", nil)
 	}
 	a, err := capture.ReadDir(preDir)
 	if err != nil {
@@ -218,7 +219,7 @@ func (s *changeSvc) CheckUpgrade(ctx context.Context, r *v1.CheckUpgradeRequest)
 	s.d.MarkActive()
 	outs := capture.Split(r.Outputs)
 	if len(outs) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "no se reconocieron salidas: usa un archivo de Patrol o una sesión con prompts (SW1#show version)")
+		return nil, service.Err(ctx, codes.InvalidArgument, "upgrade.err.no_outputs", nil)
 	}
 	rep, err := upgrade.Check(outs, upgrade.Image{File: r.ImageFile, Size: r.ImageSize, MD5: r.ImageMd5}, r.VerifyOutput)
 	if err != nil {

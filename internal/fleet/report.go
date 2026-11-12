@@ -292,7 +292,7 @@ var sizeRe = regexp.MustCompile(`^(\d+(?:\.\d+)?)\s*([kmgt]?)i?b?$`)
 func ParseSize(s string) (int64, error) {
 	m := sizeRe.FindStringSubmatch(strings.ToLower(strings.TrimSpace(s)))
 	if m == nil {
-		return 0, fmt.Errorf("tamaño %q inválido: usa 800M, 1.2G, 500000", s)
+		return 0, i18n.New("fleet.err.bad_size", i18n.A("size", s))
 	}
 	v, _ := strconv.ParseFloat(m[1], 64)
 	mul := map[string]float64{"": 1, "k": 1 << 10, "m": 1 << 20, "g": 1 << 30, "t": 1 << 40}[m[2]]

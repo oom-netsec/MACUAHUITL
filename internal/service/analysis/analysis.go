@@ -34,7 +34,7 @@ const maxSyslogBytes = 64 << 20
 
 // bundle acepta el ID de un trabajo de esta sesión o la ruta absoluta de su carpeta.
 // upTo > 0 carga solo hasta esa ronda.
-func (s *analysisSvc) bundle(job string, upTo int) (*analyze.Bundle, error) {
+func (s *analysisSvc) bundle(ctx context.Context, job string, upTo int) (*analyze.Bundle, error) {
 	dir := filepath.Clean(job)
 	if !filepath.IsAbs(job) {
 		j, err := s.d.Job(job)
@@ -42,13 +42,13 @@ func (s *analysisSvc) bundle(job string, upTo int) (*analyze.Bundle, error) {
 			return nil, err
 		}
 		if j.Dir == "" {
-			return nil, status.Error(codes.FailedPrecondition, "el trabajo aún no tiene salidas: ármalo y espera la primera ronda")
+			return nil, service.Err(ctx, codes.FailedPrecondition, "analyze.err.job_no_outputs", nil)
 		}
 		dir = j.Dir
 	}
 	b, err := analyze.LoadUpTo(dir, upTo)
 	if err != nil {
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
+		return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
 	return b, nil
 }
@@ -63,7 +63,7 @@ func rulesOrErr() ([]analyze.Rule, error) {
 
 func (s *analysisSvc) AnalyzeJob(ctx context.Context, r *v1.AnalyzeJobRequest) (*v1.AnalyzeJobResponse, error) {
 	s.d.MarkActive()
-	b, err := s.bundle(r.Job, int(r.Round))
+	b, err := s.bundle(ctx, r.Job, int(r.Round))
 	if err != nil {
 		return nil, err
 	}
@@ -78,13 +78,13 @@ func (s *analysisSvc) AnalyzeJob(ctx context.Context, r *v1.AnalyzeJobRequest) (
 
 func (s *analysisSvc) DiffRounds(ctx context.Context, r *v1.DiffRoundsRequest) (*v1.DiffRoundsResponse, error) {
 	s.d.MarkActive()
-	b, err := s.bundle(r.Job, int(max(r.From, r.To)))
+	b, err := s.bundle(ctx, r.Job, int(max(r.From, r.To)))
 	if err != nil {
 		return nil, err
 	}
 	rep, err := analyze.Diff(b, int(r.From), int(r.To), r.Device)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	s.d.Audit("analysis.diff", b.Dir, fmt.Sprintf("from=%d to=%d device=%q", r.From, r.To, r.Device))
 	return &v1.DiffRoundsResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
@@ -93,9 +93,9 @@ func (s *analysisSvc) DiffRounds(ctx context.Context, r *v1.DiffRoundsRequest) (
 func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.TimelineResponse, error) {
 	s.d.MarkActive()
 	if r.PcapPath != "" && !filepath.IsAbs(r.PcapPath) {
-		return nil, status.Error(codes.InvalidArgument, "la ruta de la captura debe ser absoluta")
+		return nil, service.Err(ctx, codes.InvalidArgument, "analyze.err.pcap_path", nil)
 	}
-	b, err := s.bundle(r.Job, 0)
+	b, err := s.bundle(ctx, r.Job, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.
 	if r.PcapPath != "" {
 		pr, err := pcapan.Analyze(ctx, r.PcapPath, pcapan.Options{})
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 		extra = append(extra, analyze.PcapEvents(pr)...)
 		for i, w := range pr.Warnings {
