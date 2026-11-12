@@ -108,20 +108,34 @@ func TestNextRoundAndCancelPhase(t *testing.T) {
 		t.Fatal(err)
 	}
 	var s *v1.JobSummary
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
-		if s = h.summary(t, job); s.DevicesOk == 1 {
-			break
-		}
-	}
+	// Con la máquina cargada la primera ronda tarda: se espera por estado, no por un plazo corto.
+	s = h.summaryUntil(t, job, func(s *v1.JobSummary) bool { return s.DevicesOk == 1 })
 	if s.Round != 1 || s.NextRoundAt == nil || time.Until(s.NextRoundAt.AsTime()) < 29*time.Minute {
 		t.Fatalf("summary = %+v", s)
 	}
-	h.patrol.CancelJob(ctx(t), &v1.CancelJobRequest{JobId: job})
-	h.waitJob(t, job, "closed")
-	s = h.summary(t, job)
-	if last := s.Phases[len(s.Phases)-1]; last.Kind != v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED || s.NextRoundAt != nil {
+	if _, err := h.patrol.CancelJob(ctx(t), &v1.CancelJobRequest{JobId: job}); err != nil {
+		t.Fatal(err)
+	}
+	// Suscribirse después de cancelar perdía el "closed" si el trabajo cerraba antes: se lee el resumen.
+	s = h.summaryUntil(t, job, func(s *v1.JobSummary) bool {
+		return len(s.Phases) > 0 && s.Phases[len(s.Phases)-1].Kind == v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED
+	})
+	if s.NextRoundAt != nil {
 		t.Fatalf("fases = %v next=%v", phaseLines(s.Phases), s.NextRoundAt)
 	}
+}
+
+// summaryUntil relee el resumen hasta que ok se cumple; falla con el último visto a los 60 s.
+func (h *harness) summaryUntil(t *testing.T, job string, ok func(*v1.JobSummary) bool) *v1.JobSummary {
+	t.Helper()
+	var s *v1.JobSummary
+	for deadline := time.Now().Add(60 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if s = h.summary(t, job); ok(s) {
+			return s
+		}
+	}
+	t.Fatalf("summary = %+v fases = %v", s, phaseLines(s.Phases))
+	return nil
 }
 
 func TestPhasesPersistAcrossRestart(t *testing.T) {
