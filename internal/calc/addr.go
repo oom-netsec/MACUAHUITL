@@ -124,35 +124,37 @@ func specials(pairs ...string) []special {
 	return out
 }
 
-// Gana el primer bloque que contiene la dirección: los específicos van antes.
+// Gana el primer bloque que contiene la dirección: los específicos van antes. El nombre es una clave calc.val.kind.*.
 var specials4 = specials(
-	"0.0.0.0/8", `"esta red" (RFC 791)`, "10.0.0.0/8", "privada (RFC 1918)", "100.64.0.0/10", "CGNAT (RFC 6598)",
-	"127.0.0.0/8", "loopback (RFC 1122)", "169.254.0.0/16", "enlace local (RFC 3927)", "172.16.0.0/12", "privada (RFC 1918)",
-	"192.0.0.0/24", "asignaciones de protocolo IETF (RFC 6890)", "192.0.2.0/24", "documentación (RFC 5737)",
-	"192.88.99.0/24", "relé 6to4 obsoleto (RFC 7526)", "192.168.0.0/16", "privada (RFC 1918)",
-	"198.18.0.0/15", "pruebas de rendimiento (RFC 2544)", "198.51.100.0/24", "documentación (RFC 5737)",
-	"203.0.113.0/24", "documentación (RFC 5737)", "224.0.0.0/24", "multicast local (RFC 5771)",
-	"232.0.0.0/8", "multicast SSM (RFC 4607)", "239.0.0.0/8", "multicast administrativo (RFC 2365)",
-	"224.0.0.0/4", "multicast (RFC 5771)", "255.255.255.255/32", "broadcast limitado (RFC 919)", "240.0.0.0/4", "reservada (RFC 1112)",
+	"0.0.0.0/8", "this_network", "10.0.0.0/8", "private", "100.64.0.0/10", "cgnat",
+	"127.0.0.0/8", "loopback4", "169.254.0.0/16", "linklocal4", "172.16.0.0/12", "private",
+	"192.0.0.0/24", "ietf_protocol", "192.0.2.0/24", "doc4",
+	"192.88.99.0/24", "relay6to4", "192.168.0.0/16", "private",
+	"198.18.0.0/15", "benchmark", "198.51.100.0/24", "doc4",
+	"203.0.113.0/24", "doc4", "224.0.0.0/24", "mcast_local",
+	"232.0.0.0/8", "mcast_ssm", "239.0.0.0/8", "mcast_admin",
+	"224.0.0.0/4", "mcast4", "255.255.255.255/32", "limited_bcast", "240.0.0.0/4", "reserved",
 )
 
 var specials6 = specials(
-	"::/128", "no especificada", "::1/128", "loopback", "::ffff:0:0/96", "IPv4 mapeada (RFC 4291)",
-	"64:ff9b::/96", "NAT64 (RFC 6052)", "100::/64", "descarte (RFC 6666)", "2001::/32", "Teredo (RFC 4380)",
-	"2001:db8::/32", "documentación (RFC 3849)", "2002::/16", "6to4 (RFC 3056)", "2000::/3", "unicast global (RFC 4291)",
-	"fc00::/7", "local única ULA (RFC 4193)", "fe80::/10", "enlace local (RFC 4291)", "fec0::/10", "site-local obsoleta (RFC 3879)",
-	"ff02::1:ff00:0/104", "multicast nodo solicitado (RFC 4291)", "ff00::/8", "multicast",
+	"::/128", "unspecified", "::1/128", "loopback6", "::ffff:0:0/96", "v4mapped",
+	"64:ff9b::/96", "nat64", "100::/64", "discard", "2001::/32", "teredo",
+	"2001:db8::/32", "doc6", "2002::/16", "sixtofour", "2000::/3", "global6",
+	"fc00::/7", "ula", "fe80::/10", "linklocal6", "fec0::/10", "sitelocal",
+	"ff02::1:ff00:0/104", "solicited_node", "ff00::/8", "mcast6",
 )
 
-var mcastScope = map[byte]string{1: "interfaz", 2: "enlace", 3: "red", 4: "administración", 5: "sitio", 8: "organización", 0xe: "global"}
+// mcastScope son los alcances de multicast IPv6 que el catálogo conoce (calc.val.kind.mcast6_<n>).
+var mcastScope = map[byte]string{1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 8: "8", 0xe: "e"}
 
-func kind(a netip.Addr) string { return prefixKind(netip.PrefixFrom(a, a.BitLen())) }
+func kindKey(a netip.Addr) string { return prefixKindKey(netip.PrefixFrom(a, a.BitLen())) }
 
-// prefixKind etiqueta el prefijo completo: un bloque especial solo cuenta si lo contiene
+// prefixKindKey etiqueta el prefijo completo (clave calc.val.kind.*): un bloque especial solo cuenta si lo contiene
 // entero; si el prefijo cubre bloques especiales sin caber en uno, es mixto.
-func prefixKind(p netip.Prefix) string {
+func prefixKindKey(p netip.Prefix) string {
+	const pre = "calc.val.kind."
 	if p.Bits() == 0 {
-		return "cualquiera (ruta por defecto)"
+		return pre + "any"
 	}
 	a := p.Addr()
 	list := specials4
@@ -165,22 +167,25 @@ func prefixKind(p netip.Prefix) string {
 			mixed = true
 		}
 		if s.p.Bits() <= p.Bits() && s.p.Contains(a) {
-			if s.name == "multicast" {
+			if s.name == "mcast6" {
 				if sc, ok := mcastScope[a.As16()[1]&0x0f]; ok {
-					return "multicast, alcance " + sc
+					return pre + "mcast6_" + sc
 				}
 			}
-			return s.name
+			return pre + s.name
 		}
 	}
 	if mixed {
-		return "mixta (cubre bloques de distinto tipo)"
+		return pre + "mixed"
 	}
 	if a.Is6() {
-		return "sin asignar (fuera de 2000::/3)"
+		return pre + "unassigned6"
 	}
-	return "pública"
+	return pre + "public"
 }
+
+// kindText es el texto en español de una clave de tipo, el que va en el JSON de siempre.
+func kindText(key string) string { return i18n.Msg(i18n.Es, key, nil) }
 
 func class4(a netip.Addr) string {
 	switch o := a.As4()[0]; {
@@ -199,18 +204,19 @@ func class4(a netip.Addr) string {
 // ---- información de subred ----
 
 type SubnetInfo struct {
-	Input       string   `json:"input"`
-	Prefix      string   `json:"prefix"`
-	PrefixLen   int      `json:"prefixLen"`
-	Network     string   `json:"network"`
-	Broadcast   string   `json:"broadcast,omitempty"`
-	FirstUsable string   `json:"firstUsable"`
-	LastUsable  string   `json:"lastUsable"`
-	Mask        string   `json:"mask,omitempty"`
-	Wildcard    string   `json:"wildcard,omitempty"`
-	Total       string   `json:"total"`
-	Usable      string   `json:"usable"`
-	Kind        string   `json:"kind"`
+	Input       string `json:"input"`
+	Prefix      string `json:"prefix"`
+	PrefixLen   int    `json:"prefixLen"`
+	Network     string `json:"network"`
+	Broadcast   string `json:"broadcast,omitempty"`
+	FirstUsable string `json:"firstUsable"`
+	LastUsable  string `json:"lastUsable"`
+	Mask        string `json:"mask,omitempty"`
+	Wildcard    string `json:"wildcard,omitempty"`
+	Total       string `json:"total"`
+	Usable      string `json:"usable"`
+	Kind        string `json:"kind"`
+	kindKey     string
 	Class       string   `json:"class,omitempty"`
 	Notes       []string `json:"notes,omitempty"`
 	notes       []Note
@@ -222,7 +228,7 @@ func Subnet(in string) (SubnetInfo, error) {
 		return SubnetInfo{}, err
 	}
 	n, net, last := p.Bits(), p.Addr(), lastAddr(p)
-	s := SubnetInfo{Input: in, Prefix: p.String(), PrefixLen: n, Network: net.String(), Total: size(p).String(), Kind: prefixKind(p)}
+	s := SubnetInfo{Input: in, Prefix: p.String(), PrefixLen: n, Network: net.String(), Total: size(p).String(), Kind: kindText(prefixKindKey(p)), kindKey: prefixKindKey(p)}
 	if given != net {
 		addNote(&s.Notes, &s.notes, "calc.note.host_in_subnet", "addr", given, "prefix", p)
 	}
@@ -256,7 +262,7 @@ func (s SubnetInfo) Report() Report {
 	return Report{Tables: []Table{kv("calc.title.subnet", i18n.A("prefix", s.Prefix),
 		"calc.row.network", s.Network, "calc.row.broadcast", s.Broadcast, "calc.row.first_usable", s.FirstUsable, "calc.row.last_usable", s.LastUsable,
 		"calc.row.addresses", s.Total, "calc.row.usable_hosts", s.Usable, "calc.row.prefix", "/"+strconv.Itoa(s.PrefixLen), "calc.row.mask", s.Mask,
-		"calc.row.wildcard", s.Wildcard, "calc.row.class", s.Class, "calc.row.kind", s.Kind)}, Notes: s.Notes, NoteItems: s.notes}
+		"calc.row.wildcard", s.Wildcard, "calc.row.class", s.Class, "calc.row.kind", val{key: s.kindKey})}, Notes: s.Notes, NoteItems: s.notes}
 }
 
 // ---- VLSM ----
@@ -595,6 +601,7 @@ type IPv6Info struct {
 	Expanded      string `json:"expanded"`
 	Prefix        string `json:"prefix,omitempty"`
 	Kind          string `json:"kind"`
+	kindKey       string
 	SolicitedNode string `json:"solicitedNode,omitempty"`
 	InterfaceID   string `json:"interfaceId,omitempty"`
 	EUI64         string `json:"eui64,omitempty"`
@@ -657,7 +664,7 @@ func IPv6(addr, mac string) (IPv6Info, error) {
 	}
 	a = a.WithZone("")
 	b := a.As16()
-	r := IPv6Info{Compressed: a.String(), Expanded: a.StringExpanded(), Prefix: prefix, Kind: kind(a)}
+	r := IPv6Info{Compressed: a.String(), Expanded: a.StringExpanded(), Prefix: prefix, Kind: kindText(kindKey(a)), kindKey: kindKey(a)}
 	if mac != "" {
 		r.EUI64 = r.Compressed
 	}
@@ -678,7 +685,7 @@ func IPv6(addr, mac string) (IPv6Info, error) {
 
 func (r IPv6Info) Report() Report {
 	rep := Report{Tables: []Table{kv("calc.title.ipv6", nil,
-		"calc.row.abbreviated", r.Compressed, "calc.row.expanded", r.Expanded, "calc.row.prefix", r.Prefix, "calc.row.kind", r.Kind, "calc.row.eui64", r.EUI64,
+		"calc.row.abbreviated", r.Compressed, "calc.row.expanded", r.Expanded, "calc.row.prefix", r.Prefix, "calc.row.kind", val{key: r.kindKey}, "calc.row.eui64", r.EUI64,
 		"calc.row.interface_id", r.InterfaceID, "calc.row.mac_eui64", r.MAC, "calc.row.solicited", r.SolicitedNode, "calc.row.ptr", r.ReverseDNS)}}
 	if r.MAC != "" && r.EUI64 == "" {
 		addNote(&rep.Notes, &rep.NoteItems, "calc.note.ipv6_eui64_mac")

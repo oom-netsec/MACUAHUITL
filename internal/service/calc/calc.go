@@ -37,6 +37,11 @@ func calcResult[T calc.Reporter](v T, err error) (*v1.CalcResult, error) {
 			if j < len(t.RowKeys) {
 				pr.LabelKey, pr.LabelArgs = t.RowKeys[j], t.RowArgs[j]
 			}
+			if j < len(t.Coded) {
+				for _, c := range t.Coded[j] {
+					pr.Coded = append(pr.Coded, &v1.CalcCoded{Col: uint32(c.Col), Key: c.Key, Args: c.Args})
+				}
+			}
 			pt.Rows = append(pt.Rows, pr)
 		}
 		out.Tables = append(out.Tables, pt)
@@ -69,6 +74,11 @@ func localize(ctx context.Context, r *v1.CalcResult) *v1.CalcResult {
 		for _, row := range t.Rows {
 			if row.LabelKey != "" && len(row.Cells) > 0 {
 				row.Cells[0] = i18n.Msg(loc, row.LabelKey, row.LabelArgs)
+			}
+			for _, c := range row.Coded {
+				if int(c.Col) < len(row.Cells) {
+					row.Cells[c.Col] = i18n.Msg(loc, c.Key, c.Args)
+				}
 			}
 			ct.Rows = append(ct.Rows, row.Cells)
 		}

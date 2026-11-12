@@ -38,17 +38,19 @@ type BGPOptions struct {
 }
 
 type BGPComparison struct {
-	A, B   string `json:"-"`
-	Pair   string `json:"pair"`
-	Step   string `json:"step"`
-	ValueA string `json:"valueA"`
-	ValueB string `json:"valueB"`
-	Winner string `json:"winner"`
+	A, B                string `json:"-"`
+	Pair                string `json:"pair"`
+	Step                string `json:"step"`
+	ValueA              string `json:"valueA"`
+	ValueB              string `json:"valueB"`
+	Winner              string `json:"winner"`
+	stepKey, keyA, keyB string // calc.val.step.* y, en el paso «originada localmente», el sí/no de cada lado
 }
 
 type BGPResult struct {
-	Best        string          `json:"best"`
-	DecidedBy   string          `json:"decidedBy"`
+	Best        string `json:"best"`
+	DecidedBy   string `json:"decidedBy"`
+	decidedKey  string
 	Comparisons []BGPComparison `json:"comparisons"`
 	Multipath   []string        `json:"multipath,omitempty"`
 	Excluded    []string        `json:"excluded,omitempty"`
@@ -146,7 +148,7 @@ func prep(r Route) (path, error) {
 }
 
 type step struct {
-	name string
+	key string // calc.val.step.*
 	// cmp < 0: gana a; > 0: gana b; 0: empate. skip: el paso no aplica a este par.
 	f func(a, b *path, o BGPOptions) (cmp int, va, vb string, skip bool)
 }
@@ -158,9 +160,21 @@ func itoa[T ~int | ~uint32 | ~int64](v T) string {
 }
 func yes(b bool) string {
 	if b {
-		return "sí"
+		return kindText("calc.val.yes")
 	}
-	return "no"
+	return kindText("calc.val.no")
+}
+
+const (
+	stepTie       = "calc.val.step.tie"
+	stepReachable = "calc.val.step.reachable"
+)
+
+func yesKey(b bool) string {
+	if b {
+		return "calc.val.yes"
+	}
+	return "calc.val.no"
 }
 func kindOf(p *path) string {
 	if p.EBGP {
@@ -171,53 +185,53 @@ func kindOf(p *path) string {
 
 // El orden de IOS/IOS-XE (Cisco: "BGP Best Path Selection Algorithm").
 var bgpSteps = []step{
-	{"weight", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.weight", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		return higher(a.Weight, b.Weight), itoa(a.Weight), itoa(b.Weight), false
 	}},
-	{"local-preference", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.local_pref", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		return higher(a.lp, b.lp), itoa(a.lp), itoa(b.lp), false
 	}},
-	{"originada localmente", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.local_origin", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		c := 0
 		if a.Local != b.Local {
 			c = map[bool]int{true: -1, false: 1}[a.Local]
 		}
-		return c, yes(a.Local), yes(b.Local), false
+		return c, yes(a.Local), yes(b.Local), false // sus claves las pone compare
 	}},
-	{"longitud de AS_PATH", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.as_path_len", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		return lower(uint32(a.asLen), uint32(b.asLen)), itoa(a.asLen), itoa(b.asLen), false
 	}},
-	{"origin", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.origin", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		return lower(uint32(a.origin), uint32(b.origin)), originNames[a.origin], originNames[b.origin], false
 	}},
-	{"MED", func(a, b *path, o BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.med", func(a, b *path, o BGPOptions) (int, string, string, bool) {
 		// Solo entre rutas del mismo AS vecino, salvo always-compare-med.
 		return lower(a.med, b.med), itoa(a.med), itoa(b.med), !o.AlwaysCompareMED && a.neighborAS != b.neighborAS
 	}},
-	{"eBGP sobre iBGP", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.ebgp_over_ibgp", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		c := 0
 		if a.EBGP != b.EBGP {
 			c = map[bool]int{true: -1, false: 1}[a.EBGP]
 		}
 		return c, kindOf(a), kindOf(b), false
 	}},
-	{"métrica IGP al next-hop", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.igp_metric", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		return lower(a.IGPMetric, b.IGPMetric), itoa(a.IGPMetric), itoa(b.IGPMetric), false
 	}},
-	{"ruta eBGP más antigua", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.oldest_ebgp", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		c := 0
 		if a.AgeSeconds != b.AgeSeconds {
 			c = map[bool]int{true: -1, false: 1}[a.AgeSeconds > b.AgeSeconds]
 		}
 		return c, itoa(a.AgeSeconds) + " s", itoa(b.AgeSeconds) + " s", !a.EBGP || !b.EBGP
 	}},
-	{"router-ID", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.router_id", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		return a.rid.Compare(b.rid), a.rid.String(), b.rid.String(), false
 	}},
-	{"longitud de CLUSTER_LIST", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.cluster_list", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		return lower(uint32(a.ClusterListLen), uint32(b.ClusterListLen)), itoa(a.ClusterListLen), itoa(b.ClusterListLen), false
 	}},
-	{"dirección del vecino", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
+	{"calc.val.step.neighbor_addr", func(a, b *path, _ BGPOptions) (int, string, string, bool) {
 		return a.nbr.Compare(b.nbr), a.nbr.String(), b.nbr.String(), false
 	}},
 }
@@ -233,7 +247,10 @@ func compare(a, b *path, o BGPOptions, upto int) (winner *path, c BGPComparison)
 		if skip || r == 0 {
 			continue
 		}
-		c.Step, c.ValueA, c.ValueB = s.name, va, vb
+		c.Step, c.stepKey, c.ValueA, c.ValueB = kindText(s.key), s.key, va, vb
+		if s.key == "calc.val.step.local_origin" {
+			c.keyA, c.keyB = yesKey(a.Local), yesKey(b.Local)
+		}
 		if r < 0 {
 			c.Winner = a.Name
 			return a, c
@@ -241,7 +258,7 @@ func compare(a, b *path, o BGPOptions, upto int) (winner *path, c BGPComparison)
 		c.Winner = b.Name
 		return b, c
 	}
-	c.Step, c.Winner = "empate total", a.Name
+	c.Step, c.stepKey, c.Winner = kindText(stepTie), stepTie, a.Name
 	return a, c
 }
 
@@ -304,10 +321,10 @@ func BGPBestPath(routes []Route, o BGPOptions) (BGPResult, error) {
 	} else {
 		winner = run(ps)
 	}
-	res.Best, res.DecidedBy = winner.Name, "next-hop accesible"
+	res.Best, res.DecidedBy, res.decidedKey = winner.Name, kindText(stepReachable), stepReachable
 	for i := len(res.Comparisons) - 1; i >= 0; i-- {
 		if c := res.Comparisons[i]; c.A == winner.Name || c.B == winner.Name {
-			res.DecidedBy = c.Step
+			res.DecidedBy, res.decidedKey = c.Step, c.stepKey
 			break
 		}
 	}
@@ -317,7 +334,7 @@ func BGPBestPath(routes []Route, o BGPOptions) (BGPResult, error) {
 			if p == winner || len(res.Multipath) >= o.MaximumPaths {
 				continue
 			}
-			if _, c := compare(winner, p, o, multipathSteps); c.Step != "empate total" {
+			if _, c := compare(winner, p, o, multipathSteps); c.stepKey != stepTie {
 				continue
 			}
 			if o.MultipathRelax || (p.ASPath == winner.ASPath && p.neighborAS == winner.neighborAS) {
@@ -333,7 +350,7 @@ func bgpNotes(r BGPResult) ([]string, []Note) {
 	var n []string
 	var items []Note
 	add := func(key string, kv ...any) { addNote(&n, &items, key, kv...) }
-	add("calc.note.bgp_winner", "best", r.Best, "step", r.DecidedBy)
+	add("calc.note.bgp_winner", "best", r.Best, "step", r.decidedKey)
 	if len(r.LocalWeight) > 0 {
 		add("calc.note.bgp_local_weight", "routes", strings.Join(r.LocalWeight, ", "))
 	}
@@ -371,12 +388,12 @@ func (r BGPResult) Report() Report {
 		if x.MED != nil {
 			med = itoa(*x.MED)
 		}
-		id, nh := x.RouterID, "accesible"
+		id, nh := x.RouterID, "calc.val.nexthop.reachable"
 		if x.OriginatorID != "" {
 			id += " (originator " + x.OriginatorID + ")"
 		}
 		if x.NextHopUnreachable {
-			nh = "inaccesible"
+			nh = "calc.val.nexthop.unreachable"
 		}
 		origin := x.Origin
 		if origin == "" {
@@ -386,11 +403,15 @@ func (r BGPResult) Report() Report {
 		if x.EBGP {
 			t = "eBGP"
 		}
-		rt.add("", nil, x.Name, itoa(x.Weight), lp, yes(x.Local), x.ASPath, origin, med, t, itoa(x.IGPMetric), id, itoa(x.ClusterListLen), x.Neighbor, itoa(x.AgeSeconds), nh)
+		rt.add("", nil, x.Name, itoa(x.Weight), lp, val{key: yesKey(x.Local)}, x.ASPath, origin, med, t, itoa(x.IGPMetric), id, itoa(x.ClusterListLen), x.Neighbor, itoa(x.AgeSeconds), val{key: nh})
 	}
 	ct := titled("calc.title.bgp_comparisons", nil, "calc.col.comparison", "calc.col.step", "calc.col.value_a", "calc.col.value_b", "calc.col.winner")
 	for _, c := range r.Comparisons {
-		ct.add("", nil, c.Pair, c.Step, c.ValueA, c.ValueB, c.Winner)
+		var va, vb any = c.ValueA, c.ValueB
+		if c.keyA != "" {
+			va, vb = val{key: c.keyA}, val{key: c.keyB}
+		}
+		ct.add("", nil, c.Pair, val{key: c.stepKey}, va, vb, c.Winner)
 	}
 	return Report{Tables: []Table{rt, ct}, Notes: r.Notes, NoteItems: r.notes}
 }

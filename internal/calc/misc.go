@@ -13,17 +13,18 @@ import (
 // ---- rendimiento TCP ----
 
 type TCPResult struct {
-	BandwidthBps   float64  `json:"bandwidthBps"`
-	RTTms          float64  `json:"rttMs"`
-	MSS            int      `json:"mss"`
-	WindowBytes    float64  `json:"windowBytes,omitempty"`
-	LossPct        float64  `json:"lossPct,omitempty"`
-	BDPBytes       float64  `json:"bdpBytes"`
-	WindowScale    int      `json:"windowScale"`
-	WindowLimitBps float64  `json:"windowLimitBps,omitempty"`
-	MathisBps      float64  `json:"mathisBps,omitempty"`
-	MaxBps         float64  `json:"maxBps"`
-	Limit          string   `json:"limit"`
+	BandwidthBps   float64 `json:"bandwidthBps"`
+	RTTms          float64 `json:"rttMs"`
+	MSS            int     `json:"mss"`
+	WindowBytes    float64 `json:"windowBytes,omitempty"`
+	LossPct        float64 `json:"lossPct,omitempty"`
+	BDPBytes       float64 `json:"bdpBytes"`
+	WindowScale    int     `json:"windowScale"`
+	WindowLimitBps float64 `json:"windowLimitBps,omitempty"`
+	MathisBps      float64 `json:"mathisBps,omitempty"`
+	MaxBps         float64 `json:"maxBps"`
+	Limit          string  `json:"limit"`
+	limitKey       string
 	Notes          []string `json:"notes"`
 	notes          []Note
 }
@@ -80,7 +81,7 @@ func TCP(bandwidth string, rttMs float64, window string, lossPct float64, mss in
 		mss = 1460
 	}
 	rtt := rttMs / 1000
-	r := TCPResult{BandwidthBps: bw, RTTms: rttMs, MSS: mss, LossPct: lossPct, BDPBytes: bw * rtt / 8, MaxBps: bw, Limit: "enlace"}
+	r := TCPResult{BandwidthBps: bw, RTTms: rttMs, MSS: mss, LossPct: lossPct, BDPBytes: bw * rtt / 8, MaxBps: bw, Limit: "enlace", limitKey: "calc.val.limit.link"}
 	for r.WindowScale < 14 && float64(int64(65535)<<r.WindowScale) < r.BDPBytes {
 		r.WindowScale++
 	}
@@ -89,12 +90,12 @@ func TCP(bandwidth string, rttMs float64, window string, lossPct float64, mss in
 			return TCPResult{}, fmt.Errorf("ventana: %w", err)
 		}
 		if r.WindowLimitBps = r.WindowBytes * 8 / rtt; r.WindowLimitBps < r.MaxBps {
-			r.MaxBps, r.Limit = r.WindowLimitBps, "ventana"
+			r.MaxBps, r.Limit, r.limitKey = r.WindowLimitBps, "ventana", "calc.val.limit.window"
 		}
 	}
 	if lossPct > 0 {
 		if r.MathisBps = float64(mss) * 8 / rtt * mathisC / math.Sqrt(lossPct/100); r.MathisBps < r.MaxBps {
-			r.MaxBps, r.Limit = r.MathisBps, "pérdida"
+			r.MaxBps, r.Limit, r.limitKey = r.MathisBps, "pérdida", "calc.val.limit.loss"
 		}
 	}
 	addNote(&r.Notes, &r.notes, "calc.note.tcp_bdp", "bandwidth", bps(bw), "rtt", fmt.Sprintf("%g", rttMs), "bdp", bytes(r.BDPBytes), "scale", r.WindowScale)
@@ -119,7 +120,7 @@ func (r TCPResult) Report() Report {
 		"calc.row.link", bps(r.BandwidthBps), "calc.row.rtt", strconv.FormatFloat(r.RTTms, 'f', -1, 64)+" ms",
 		"calc.row.bdp", fmt.Sprintf("%s (%.0f bytes)", bytes(r.BDPBytes), r.BDPBytes), "calc.row.window_scale", strconv.Itoa(r.WindowScale),
 		"calc.row.window_limit", opt(r.WindowLimitBps), "calc.row.loss_limit", opt(r.MathisBps),
-		"calc.row.max_flow", bps(r.MaxBps), "calc.row.limited_by", r.Limit)}, Notes: r.Notes, NoteItems: r.notes}
+		"calc.row.max_flow", bps(r.MaxBps), "calc.row.limited_by", val{key: r.limitKey})}, Notes: r.Notes, NoteItems: r.notes}
 }
 
 // ---- QoS: DSCP, ToS, CoS, EXP ----
@@ -135,6 +136,8 @@ type DSCPEntry struct {
 	EXP        int    `json:"exp"`
 	Class      string `json:"class"`
 	Drop       string `json:"drop,omitempty"`
+	classKey   string
+	dropKey    string
 }
 
 type DSCPResult struct {
@@ -148,26 +151,28 @@ var dscpNames = []struct {
 	dscp  int
 	class string
 }{
-	{"CS0", 0, "estándar (default, DF)"}, {"LE", 1, "menor esfuerzo (RFC 8622)"}, {"CS1", 8, "datos de baja prioridad (scavenger)"},
-	{"AF11", 10, "datos de alto volumen"}, {"AF12", 12, "datos de alto volumen"}, {"AF13", 14, "datos de alto volumen"},
-	{"CS2", 16, "OAM (gestión)"}, {"AF21", 18, "datos de baja latencia"}, {"AF22", 20, "datos de baja latencia"}, {"AF23", 22, "datos de baja latencia"},
-	{"CS3", 24, "video broadcast (Cisco: señalización)"}, {"AF31", 26, "streaming multimedia"}, {"AF32", 28, "streaming multimedia"}, {"AF33", 30, "streaming multimedia"},
-	{"CS4", 32, "interactivo en tiempo real"}, {"AF41", 34, "videoconferencia"}, {"AF42", 36, "videoconferencia"}, {"AF43", 38, "videoconferencia"},
-	{"CS5", 40, "señalización (Cisco: video broadcast)"}, {"VOICE-ADMIT", 44, "voz con control de admisión (RFC 5865)"}, {"EF", 46, "telefonía (voz)"},
-	{"CS6", 48, "control de red (enrutamiento)"}, {"CS7", 56, "reservado (control de red)"},
+	{"CS0", 0, "calc.val.dscp.default"}, {"LE", 1, "calc.val.dscp.le"}, {"CS1", 8, "calc.val.dscp.scavenger"},
+	{"AF11", 10, "calc.val.dscp.high_volume"}, {"AF12", 12, "calc.val.dscp.high_volume"}, {"AF13", 14, "calc.val.dscp.high_volume"},
+	{"CS2", 16, "calc.val.dscp.oam"}, {"AF21", 18, "calc.val.dscp.low_latency"}, {"AF22", 20, "calc.val.dscp.low_latency"}, {"AF23", 22, "calc.val.dscp.low_latency"},
+	{"CS3", 24, "calc.val.dscp.cs3"}, {"AF31", 26, "calc.val.dscp.streaming"}, {"AF32", 28, "calc.val.dscp.streaming"}, {"AF33", 30, "calc.val.dscp.streaming"},
+	{"CS4", 32, "calc.val.dscp.realtime"}, {"AF41", 34, "calc.val.dscp.video_conf"}, {"AF42", 36, "calc.val.dscp.video_conf"}, {"AF43", 38, "calc.val.dscp.video_conf"},
+	{"CS5", 40, "calc.val.dscp.cs5"}, {"VOICE-ADMIT", 44, "calc.val.dscp.voice_admit"}, {"EF", 46, "calc.val.dscp.voice"},
+	{"CS6", 48, "calc.val.dscp.network"}, {"CS7", 56, "calc.val.dscp.cs7"},
 }
 
 var dscpAliases = map[string]string{"DEFAULT": "CS0", "DF": "CS0", "BE": "CS0", "VA": "VOICE-ADMIT"}
 
 func dscpEntry(d int) DSCPEntry {
-	e := DSCPEntry{DSCP: d, Binary: fmt.Sprintf("%06b", d), ToS: d << 2, ToSHex: fmt.Sprintf("0x%02X", d<<2), Precedence: d >> 3, CoS: d >> 3, EXP: d >> 3, Class: "sin clase estándar"}
+	e := DSCPEntry{DSCP: d, Binary: fmt.Sprintf("%06b", d), ToS: d << 2, ToSHex: fmt.Sprintf("0x%02X", d<<2), Precedence: d >> 3, CoS: d >> 3, EXP: d >> 3, Class: kindText("calc.val.dscp.none"), classKey: "calc.val.dscp.none"}
 	for _, n := range dscpNames {
 		if n.dscp == d {
-			e.Name, e.Class = n.name, n.class
+			e.Name, e.classKey = n.name, n.class
+			e.Class = kindText(n.class)
 		}
 	}
 	if strings.HasPrefix(e.Name, "AF") {
-		e.Drop = []string{"baja", "media", "alta"}[e.Name[3]-'1']
+		e.dropKey = []string{"calc.val.drop.low", "calc.val.drop.medium", "calc.val.drop.high"}[e.Name[3]-'1']
+		e.Drop = kindText(e.dropKey)
 	}
 	return e
 }
@@ -254,8 +259,12 @@ func DSCP(query, by string) (DSCPResult, error) {
 func (r DSCPResult) Report() Report {
 	t := titled("calc.title.dscp", nil, "calc.col.name", "calc.col.dscp", "calc.col.binary", "calc.col.tos", "calc.col.tos_hex", "calc.col.precedence", "calc.col.cos", "calc.col.exp", "calc.col.af_drop", "calc.col.class")
 	for _, e := range r.Entries {
+		var drop any = e.Drop
+		if e.dropKey != "" {
+			drop = val{key: e.dropKey}
+		}
 		t.add("", nil, e.Name, strconv.Itoa(e.DSCP), e.Binary, strconv.Itoa(e.ToS), e.ToSHex, strconv.Itoa(e.Precedence),
-			strconv.Itoa(e.CoS), strconv.Itoa(e.EXP), e.Drop, e.Class)
+			strconv.Itoa(e.CoS), strconv.Itoa(e.EXP), drop, val{key: e.classKey})
 	}
 	return Report{Tables: []Table{t}, Notes: r.Notes, NoteItems: r.notes}
 }
@@ -323,12 +332,12 @@ func Optics(in OpticsInput) (OpticsResult, error) {
 
 func (r OpticsResult) Report() Report {
 	f := func(v float64, u string) string { return strconv.FormatFloat(v, 'f', 2, 64) + " " + u }
-	verdict := "sí cierra"
+	verdict := "calc.val.verdict.closes"
 	if !r.Closes {
-		verdict = "NO cierra"
+		verdict = "calc.val.verdict.not_closes"
 	}
 	if r.Overload {
-		verdict += ", pero satura el receptor"
+		verdict += "_overload"
 	}
 	loss := titled("calc.title.losses", nil, "calc.col.item", "calc.col.quantity", "calc.col.loss")
 	loss.add("calc.row.fiber", i18n.A("loss", fmt.Sprintf("%.2f", r.LossPerKm)), "", f(r.Km, "km"), f(r.FiberLossDb, "dB"))
@@ -337,7 +346,7 @@ func (r OpticsResult) Report() Report {
 	loss.add("calc.row.total", nil, "", "", f(r.TotalLossDb, "dB"))
 	return Report{Tables: []Table{loss,
 		kv("calc.title.budget", nil, "calc.row.tx", f(r.TxDbm, "dBm"), "calc.row.rx_sensitivity", f(r.RxSensDbm, "dBm"), "calc.row.budget", f(r.BudgetDb, "dB"),
-			"calc.row.rx_expected", f(r.ExpectedRxDbm, "dBm"), "calc.row.margin", f(r.MarginDb, "dB"), "calc.row.spare", f(r.RemainingDb, "dB"), "calc.row.verdict", verdict),
+			"calc.row.rx_expected", f(r.ExpectedRxDbm, "dBm"), "calc.row.margin", f(r.MarginDb, "dB"), "calc.row.spare", f(r.RemainingDb, "dB"), "calc.row.verdict", val{key: verdict}),
 	}, Notes: r.Notes, NoteItems: r.notes}
 }
 

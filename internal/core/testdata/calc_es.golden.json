@@ -1,4 +1,88 @@
 {
+ "bgp-age": {
+  "Json": "{\"best\":\"x\",\"decidedBy\":\"ruta eBGP más antigua\",\"comparisons\":[{\"pair\":\"x vs y\",\"step\":\"ruta eBGP más antigua\",\"valueA\":\"100 s\",\"valueB\":\"5 s\",\"winner\":\"x\"}],\"routes\":[{\"name\":\"x\",\"asPath\":\"1\",\"ebgp\":true,\"routerId\":\"1.0.0.1\",\"neighbor\":\"9.0.0.1\",\"ageSeconds\":100},{\"name\":\"y\",\"asPath\":\"1\",\"ebgp\":true,\"routerId\":\"1.0.0.2\",\"neighbor\":\"9.0.0.2\",\"ageSeconds\":5}],\"options\":{\"alwaysCompareMed\":false,\"deterministicMed\":false,\"multipathRelax\":false,\"maximumPaths\":0},\"notes\":[\"Gana x; lo decide el paso «ruta eBGP más antigua».\",\"Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.\",\"El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.\",\"Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst.\"]}",
+  "Text": "Rutas candidatas\nRuta  Weight  Local-pref  Local  AS_PATH  Origin  MED  Tipo  IGP  Router-ID  Cluster  Vecino   Edad (s)  Next-hop\nx     0       100         no     1        i       0    eBGP  0    1.0.0.1    0        9.0.0.1  100       accesible\ny     0       100         no     1        i       0    eBGP  0    1.0.0.2    0        9.0.0.2  5         accesible\n\nComparaciones paso a paso\nComparación  Paso decisivo          Valor A  Valor B  Gana\nx vs y       ruta eBGP más antigua  100 s    5 s      x\n\n• Gana x; lo decide el paso «ruta eBGP más antigua».\n• Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.\n• El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.\n• Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst.",
+  "Tables": [
+   [
+    [
+     "Rutas candidatas"
+    ],
+    [
+     "Ruta",
+     "Weight",
+     "Local-pref",
+     "Local",
+     "AS_PATH",
+     "Origin",
+     "MED",
+     "Tipo",
+     "IGP",
+     "Router-ID",
+     "Cluster",
+     "Vecino",
+     "Edad (s)",
+     "Next-hop"
+    ],
+    [
+     "x",
+     "0",
+     "100",
+     "no",
+     "1",
+     "i",
+     "0",
+     "eBGP",
+     "0",
+     "1.0.0.1",
+     "0",
+     "9.0.0.1",
+     "100",
+     "accesible"
+    ],
+    [
+     "y",
+     "0",
+     "100",
+     "no",
+     "1",
+     "i",
+     "0",
+     "eBGP",
+     "0",
+     "1.0.0.2",
+     "0",
+     "9.0.0.2",
+     "5",
+     "accesible"
+    ]
+   ],
+   [
+    [
+     "Comparaciones paso a paso"
+    ],
+    [
+     "Comparación",
+     "Paso decisivo",
+     "Valor A",
+     "Valor B",
+     "Gana"
+    ],
+    [
+     "x vs y",
+     "ruta eBGP más antigua",
+     "100 s",
+     "5 s",
+     "x"
+    ]
+   ]
+  ],
+  "Notes": [
+   "Gana x; lo decide el paso «ruta eBGP más antigua».",
+   "Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.",
+   "El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.",
+   "Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst."
+  ]
+ },
  "bgp-basic": {
   "Json": "{\"best\":\"B\",\"decidedBy\":\"local-preference\",\"comparisons\":[{\"pair\":\"A vs B\",\"step\":\"local-preference\",\"valueA\":\"100\",\"valueB\":\"200\",\"winner\":\"B\"}],\"excluded\":[\"C\"],\"localWeight\":[\"C\"],\"routes\":[{\"name\":\"A\",\"asPath\":\"65001\",\"ebgp\":true,\"routerId\":\"10.0.0.1\",\"neighbor\":\"1.1.1.1\"},{\"name\":\"B\",\"localPref\":200,\"asPath\":\"65001\",\"routerId\":\"10.0.0.2\",\"neighbor\":\"1.1.1.2\"},{\"name\":\"C\",\"weight\":32768,\"local\":true,\"routerId\":\"10.0.0.3\",\"originatorId\":\"9.9.9.9\",\"nextHopUnreachable\":true}],\"options\":{\"alwaysCompareMed\":false,\"deterministicMed\":false,\"multipathRelax\":false,\"maximumPaths\":0},\"notes\":[\"Gana B; lo decide el paso «local-preference».\",\"Weight 32768 (el de IOS para rutas originadas localmente) en: C. Escribe otro weight si la ruta lo tiene configurado.\",\"Descartadas por next-hop inaccesible: C.\",\"Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.\",\"El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.\",\"Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst.\"]}",
   "Text": "Rutas candidatas\nRuta  Weight  Local-pref  Local  AS_PATH  Origin  MED  Tipo  IGP  Router-ID                      Cluster  Vecino   Edad (s)  Next-hop\nA     0       100         no     65001    i       0    eBGP  0    10.0.0.1                       0        1.1.1.1  0         accesible\nB     0       200         no     65001    i       0    iBGP  0    10.0.0.2                       0        1.1.1.2  0         accesible\nC     32768   100         sí              i       0    iBGP  0    10.0.0.3 (originator 9.9.9.9)  0                 0         inaccesible\n\nComparaciones paso a paso\nComparación  Paso decisivo     Valor A  Valor B  Gana\nA vs B       local-preference  100      200      B\n\n• Gana B; lo decide el paso «local-preference».\n• Weight 32768 (el de IOS para rutas originadas localmente) en: C. Escribe otro weight si la ruta lo tiene configurado.\n• Descartadas por next-hop inaccesible: C.\n• Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.\n• El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.\n• Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst.",
@@ -287,6 +371,367 @@
    "El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.",
    "Multipath (maximum-paths 4): instaladas B. Empatan hasta la métrica IGP, son del mismo tipo (eBGP/iBGP) y con bgp bestpath as-path multipath-relax basta la misma longitud de AS_PATH, aunque vengan de AS vecinos distintos. multipath-relax no cambia la mejor ruta, solo quién comparte la carga.",
    "Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst."
+  ]
+ },
+ "bgp-steps": {
+  "Json": "{\"best\":\"w\",\"decidedBy\":\"weight\",\"comparisons\":[{\"pair\":\"w vs o\",\"step\":\"weight\",\"valueA\":\"10\",\"valueB\":\"0\",\"winner\":\"w\"},{\"pair\":\"w vs m\",\"step\":\"weight\",\"valueA\":\"10\",\"valueB\":\"0\",\"winner\":\"w\"},{\"pair\":\"w vs e\",\"step\":\"weight\",\"valueA\":\"10\",\"valueB\":\"0\",\"winner\":\"w\"},{\"pair\":\"w vs i\",\"step\":\"weight\",\"valueA\":\"10\",\"valueB\":\"0\",\"winner\":\"w\"},{\"pair\":\"w vs l\",\"step\":\"weight\",\"valueA\":\"10\",\"valueB\":\"0\",\"winner\":\"w\"},{\"pair\":\"w vs r\",\"step\":\"weight\",\"valueA\":\"10\",\"valueB\":\"0\",\"winner\":\"w\"}],\"routes\":[{\"name\":\"w\",\"weight\":10,\"asPath\":\"1 2\",\"routerId\":\"1.0.0.1\",\"neighbor\":\"9.0.0.1\"},{\"name\":\"o\",\"asPath\":\"1 2\",\"origin\":\"e\",\"routerId\":\"1.0.0.2\",\"neighbor\":\"9.0.0.2\"},{\"name\":\"m\",\"asPath\":\"1 2\",\"med\":200,\"routerId\":\"1.0.0.3\",\"neighbor\":\"9.0.0.3\"},{\"name\":\"e\",\"asPath\":\"1 2\",\"ebgp\":true,\"routerId\":\"1.0.0.4\",\"neighbor\":\"9.0.0.4\"},{\"name\":\"i\",\"asPath\":\"1 2\",\"igpMetric\":5,\"routerId\":\"1.0.0.5\",\"neighbor\":\"9.0.0.5\"},{\"name\":\"l\",\"asPath\":\"1 2 3 4\",\"routerId\":\"1.0.0.6\",\"neighbor\":\"9.0.0.6\"},{\"name\":\"r\",\"asPath\":\"1 2\",\"routerId\":\"1.0.0.7\",\"clusterListLen\":2,\"neighbor\":\"9.0.0.7\"}],\"options\":{\"alwaysCompareMed\":false,\"deterministicMed\":false,\"multipathRelax\":false,\"maximumPaths\":0},\"notes\":[\"Gana w; lo decide el paso «weight».\",\"Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.\",\"El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.\",\"Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst.\"]}",
+  "Text": "Rutas candidatas\nRuta  Weight  Local-pref  Local  AS_PATH  Origin  MED  Tipo  IGP  Router-ID  Cluster  Vecino   Edad (s)  Next-hop\nw     10      100         no     1 2      i       0    iBGP  0    1.0.0.1    0        9.0.0.1  0         accesible\no     0       100         no     1 2      e       0    iBGP  0    1.0.0.2    0        9.0.0.2  0         accesible\nm     0       100         no     1 2      i       200  iBGP  0    1.0.0.3    0        9.0.0.3  0         accesible\ne     0       100         no     1 2      i       0    eBGP  0    1.0.0.4    0        9.0.0.4  0         accesible\ni     0       100         no     1 2      i       0    iBGP  5    1.0.0.5    0        9.0.0.5  0         accesible\nl     0       100         no     1 2 3 4  i       0    iBGP  0    1.0.0.6    0        9.0.0.6  0         accesible\nr     0       100         no     1 2      i       0    iBGP  0    1.0.0.7    2        9.0.0.7  0         accesible\n\nComparaciones paso a paso\nComparación  Paso decisivo  Valor A  Valor B  Gana\nw vs o       weight         10       0        w\nw vs m       weight         10       0        w\nw vs e       weight         10       0        w\nw vs i       weight         10       0        w\nw vs l       weight         10       0        w\nw vs r       weight         10       0        w\n\n• Gana w; lo decide el paso «weight».\n• Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.\n• El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.\n• Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst.",
+  "Tables": [
+   [
+    [
+     "Rutas candidatas"
+    ],
+    [
+     "Ruta",
+     "Weight",
+     "Local-pref",
+     "Local",
+     "AS_PATH",
+     "Origin",
+     "MED",
+     "Tipo",
+     "IGP",
+     "Router-ID",
+     "Cluster",
+     "Vecino",
+     "Edad (s)",
+     "Next-hop"
+    ],
+    [
+     "w",
+     "10",
+     "100",
+     "no",
+     "1 2",
+     "i",
+     "0",
+     "iBGP",
+     "0",
+     "1.0.0.1",
+     "0",
+     "9.0.0.1",
+     "0",
+     "accesible"
+    ],
+    [
+     "o",
+     "0",
+     "100",
+     "no",
+     "1 2",
+     "e",
+     "0",
+     "iBGP",
+     "0",
+     "1.0.0.2",
+     "0",
+     "9.0.0.2",
+     "0",
+     "accesible"
+    ],
+    [
+     "m",
+     "0",
+     "100",
+     "no",
+     "1 2",
+     "i",
+     "200",
+     "iBGP",
+     "0",
+     "1.0.0.3",
+     "0",
+     "9.0.0.3",
+     "0",
+     "accesible"
+    ],
+    [
+     "e",
+     "0",
+     "100",
+     "no",
+     "1 2",
+     "i",
+     "0",
+     "eBGP",
+     "0",
+     "1.0.0.4",
+     "0",
+     "9.0.0.4",
+     "0",
+     "accesible"
+    ],
+    [
+     "i",
+     "0",
+     "100",
+     "no",
+     "1 2",
+     "i",
+     "0",
+     "iBGP",
+     "5",
+     "1.0.0.5",
+     "0",
+     "9.0.0.5",
+     "0",
+     "accesible"
+    ],
+    [
+     "l",
+     "0",
+     "100",
+     "no",
+     "1 2 3 4",
+     "i",
+     "0",
+     "iBGP",
+     "0",
+     "1.0.0.6",
+     "0",
+     "9.0.0.6",
+     "0",
+     "accesible"
+    ],
+    [
+     "r",
+     "0",
+     "100",
+     "no",
+     "1 2",
+     "i",
+     "0",
+     "iBGP",
+     "0",
+     "1.0.0.7",
+     "2",
+     "9.0.0.7",
+     "0",
+     "accesible"
+    ]
+   ],
+   [
+    [
+     "Comparaciones paso a paso"
+    ],
+    [
+     "Comparación",
+     "Paso decisivo",
+     "Valor A",
+     "Valor B",
+     "Gana"
+    ],
+    [
+     "w vs o",
+     "weight",
+     "10",
+     "0",
+     "w"
+    ],
+    [
+     "w vs m",
+     "weight",
+     "10",
+     "0",
+     "w"
+    ],
+    [
+     "w vs e",
+     "weight",
+     "10",
+     "0",
+     "w"
+    ],
+    [
+     "w vs i",
+     "weight",
+     "10",
+     "0",
+     "w"
+    ],
+    [
+     "w vs l",
+     "weight",
+     "10",
+     "0",
+     "w"
+    ],
+    [
+     "w vs r",
+     "weight",
+     "10",
+     "0",
+     "w"
+    ]
+   ]
+  ],
+  "Notes": [
+   "Gana w; lo decide el paso «weight».",
+   "Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.",
+   "El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.",
+   "Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst."
+  ]
+ },
+ "bgp-tie": {
+  "Json": "{\"best\":\"x\",\"decidedBy\":\"empate total\",\"comparisons\":[{\"pair\":\"x vs y\",\"step\":\"empate total\",\"valueA\":\"\",\"valueB\":\"\",\"winner\":\"x\"}],\"routes\":[{\"name\":\"x\",\"asPath\":\"1\",\"routerId\":\"1.0.0.1\",\"neighbor\":\"9.0.0.1\"},{\"name\":\"y\",\"asPath\":\"1\",\"routerId\":\"1.0.0.1\",\"neighbor\":\"9.0.0.1\"}],\"options\":{\"alwaysCompareMed\":false,\"deterministicMed\":false,\"multipathRelax\":false,\"maximumPaths\":0},\"notes\":[\"Gana x; lo decide el paso «empate total».\",\"Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.\",\"El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.\",\"Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst.\"]}",
+  "Text": "Rutas candidatas\nRuta  Weight  Local-pref  Local  AS_PATH  Origin  MED  Tipo  IGP  Router-ID  Cluster  Vecino   Edad (s)  Next-hop\nx     0       100         no     1        i       0    iBGP  0    1.0.0.1    0        9.0.0.1  0         accesible\ny     0       100         no     1        i       0    iBGP  0    1.0.0.1    0        9.0.0.1  0         accesible\n\nComparaciones paso a paso\nComparación  Paso decisivo  Valor A  Valor B  Gana\nx vs y       empate total                     x\n\n• Gana x; lo decide el paso «empate total».\n• Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.\n• El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.\n• Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst.",
+  "Tables": [
+   [
+    [
+     "Rutas candidatas"
+    ],
+    [
+     "Ruta",
+     "Weight",
+     "Local-pref",
+     "Local",
+     "AS_PATH",
+     "Origin",
+     "MED",
+     "Tipo",
+     "IGP",
+     "Router-ID",
+     "Cluster",
+     "Vecino",
+     "Edad (s)",
+     "Next-hop"
+    ],
+    [
+     "x",
+     "0",
+     "100",
+     "no",
+     "1",
+     "i",
+     "0",
+     "iBGP",
+     "0",
+     "1.0.0.1",
+     "0",
+     "9.0.0.1",
+     "0",
+     "accesible"
+    ],
+    [
+     "y",
+     "0",
+     "100",
+     "no",
+     "1",
+     "i",
+     "0",
+     "iBGP",
+     "0",
+     "1.0.0.1",
+     "0",
+     "9.0.0.1",
+     "0",
+     "accesible"
+    ]
+   ],
+   [
+    [
+     "Comparaciones paso a paso"
+    ],
+    [
+     "Comparación",
+     "Paso decisivo",
+     "Valor A",
+     "Valor B",
+     "Gana"
+    ],
+    [
+     "x vs y",
+     "empate total",
+     "",
+     "",
+     "x"
+    ]
+   ]
+  ],
+  "Notes": [
+   "Gana x; lo decide el paso «empate total».",
+   "Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.",
+   "El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.",
+   "Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst."
+  ]
+ },
+ "dscp-45": {
+  "Json": "{\"entries\":[{\"name\":\"\",\"dscp\":45,\"binary\":\"101101\",\"tos\":180,\"tosHex\":\"0xB4\",\"precedence\":5,\"cos\":5,\"exp\":5,\"class\":\"sin clase estándar\"}],\"notes\":[\"CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).\",\"Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5).\"]}",
+  "Text": "DSCP\nNombre  DSCP  Binario  ToS  ToS hex  Precedencia  CoS  EXP  Descarte AF  Clase (RFC 4594)\n        45    101101   180  0xB4     5            5    5                 sin clase estándar\n\n• CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).\n• Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5).",
+  "Tables": [
+   [
+    [
+     "DSCP"
+    ],
+    [
+     "Nombre",
+     "DSCP",
+     "Binario",
+     "ToS",
+     "ToS hex",
+     "Precedencia",
+     "CoS",
+     "EXP",
+     "Descarte AF",
+     "Clase (RFC 4594)"
+    ],
+    [
+     "",
+     "45",
+     "101101",
+     "180",
+     "0xB4",
+     "5",
+     "5",
+     "5",
+     "",
+     "sin clase estándar"
+    ]
+   ]
+  ],
+  "Notes": [
+   "CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).",
+   "Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5)."
+  ]
+ },
+ "dscp-af11": {
+  "Json": "{\"entries\":[{\"name\":\"AF11\",\"dscp\":10,\"binary\":\"001010\",\"tos\":40,\"tosHex\":\"0x28\",\"precedence\":1,\"cos\":1,\"exp\":1,\"class\":\"datos de alto volumen\",\"drop\":\"baja\"}],\"notes\":[\"CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).\",\"Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5).\"]}",
+  "Text": "DSCP\nNombre  DSCP  Binario  ToS  ToS hex  Precedencia  CoS  EXP  Descarte AF  Clase (RFC 4594)\nAF11    10    001010   40   0x28     1            1    1    baja         datos de alto volumen\n\n• CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).\n• Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5).",
+  "Tables": [
+   [
+    [
+     "DSCP"
+    ],
+    [
+     "Nombre",
+     "DSCP",
+     "Binario",
+     "ToS",
+     "ToS hex",
+     "Precedencia",
+     "CoS",
+     "EXP",
+     "Descarte AF",
+     "Clase (RFC 4594)"
+    ],
+    [
+     "AF11",
+     "10",
+     "001010",
+     "40",
+     "0x28",
+     "1",
+     "1",
+     "1",
+     "baja",
+     "datos de alto volumen"
+    ]
+   ]
+  ],
+  "Notes": [
+   "CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).",
+   "Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5)."
   ]
  },
  "dscp-all": {
@@ -592,6 +1037,45 @@
    "Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5)."
   ]
  },
+ "dscp-cs3": {
+  "Json": "{\"entries\":[{\"name\":\"CS3\",\"dscp\":24,\"binary\":\"011000\",\"tos\":96,\"tosHex\":\"0x60\",\"precedence\":3,\"cos\":3,\"exp\":3,\"class\":\"video broadcast (Cisco: señalización)\"}],\"notes\":[\"CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).\",\"Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5).\"]}",
+  "Text": "DSCP\nNombre  DSCP  Binario  ToS  ToS hex  Precedencia  CoS  EXP  Descarte AF  Clase (RFC 4594)\nCS3     24    011000   96   0x60     3            3    3                 video broadcast (Cisco: señalización)\n\n• CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).\n• Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5).",
+  "Tables": [
+   [
+    [
+     "DSCP"
+    ],
+    [
+     "Nombre",
+     "DSCP",
+     "Binario",
+     "ToS",
+     "ToS hex",
+     "Precedencia",
+     "CoS",
+     "EXP",
+     "Descarte AF",
+     "Clase (RFC 4594)"
+    ],
+    [
+     "CS3",
+     "24",
+     "011000",
+     "96",
+     "0x60",
+     "3",
+     "3",
+     "3",
+     "",
+     "video broadcast (Cisco: señalización)"
+    ]
+   ]
+  ],
+  "Notes": [
+   "CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).",
+   "Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5)."
+  ]
+ },
  "dscp-ef": {
   "Json": "{\"entries\":[{\"name\":\"EF\",\"dscp\":46,\"binary\":\"101110\",\"tos\":184,\"tosHex\":\"0xB8\",\"precedence\":5,\"cos\":5,\"exp\":5,\"class\":\"telefonía (voz)\"}],\"notes\":[\"CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).\",\"Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5).\"]}",
   "Text": "DSCP\nNombre  DSCP  Binario  ToS  ToS hex  Precedencia  CoS  EXP  Descarte AF  Clase (RFC 4594)\nEF      46    101110   184  0xB8     5            5    5                 telefonía (voz)\n\n• CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).\n• Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5).",
@@ -676,6 +1160,86 @@
   "Notes": [
    "El ID de interfaz tiene ff:fe en medio: parece EUI-64 y revela la MAC del equipo."
   ]
+ },
+ "ipv6-global": {
+  "Json": "{\"compressed\":\"2001:4860::1\",\"expanded\":\"2001:4860:0000:0000:0000:0000:0000:0001\",\"kind\":\"unicast global (RFC 4291)\",\"solicitedNode\":\"ff02::1:ff00:1\",\"interfaceId\":\"0000:0000:0000:0001\",\"reverseDns\":\"1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.6.8.4.1.0.0.2.ip6.arpa\"}",
+  "Text": "IPv6\nCampo                      Valor\nAbreviada                  2001:4860::1\nExpandida                  2001:4860:0000:0000:0000:0000:0000:0001\nTipo                       unicast global (RFC 4291)\nID de interfaz             0000:0000:0000:0001\nMulticast nodo solicitado  ff02::1:ff00:1\nPTR                        1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.6.8.4.1.0.0.2.ip6.arpa",
+  "Tables": [
+   [
+    [
+     "IPv6"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Abreviada",
+     "2001:4860::1"
+    ],
+    [
+     "Expandida",
+     "2001:4860:0000:0000:0000:0000:0000:0001"
+    ],
+    [
+     "Tipo",
+     "unicast global (RFC 4291)"
+    ],
+    [
+     "ID de interfaz",
+     "0000:0000:0000:0001"
+    ],
+    [
+     "Multicast nodo solicitado",
+     "ff02::1:ff00:1"
+    ],
+    [
+     "PTR",
+     "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.6.8.4.1.0.0.2.ip6.arpa"
+    ]
+   ]
+  ],
+  "Notes": null
+ },
+ "ipv6-loop": {
+  "Json": "{\"compressed\":\"::1\",\"expanded\":\"0000:0000:0000:0000:0000:0000:0000:0001\",\"kind\":\"loopback\",\"solicitedNode\":\"ff02::1:ff00:1\",\"interfaceId\":\"0000:0000:0000:0001\",\"reverseDns\":\"1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa\"}",
+  "Text": "IPv6\nCampo                      Valor\nAbreviada                  ::1\nExpandida                  0000:0000:0000:0000:0000:0000:0000:0001\nTipo                       loopback\nID de interfaz             0000:0000:0000:0001\nMulticast nodo solicitado  ff02::1:ff00:1\nPTR                        1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa",
+  "Tables": [
+   [
+    [
+     "IPv6"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Abreviada",
+     "::1"
+    ],
+    [
+     "Expandida",
+     "0000:0000:0000:0000:0000:0000:0000:0001"
+    ],
+    [
+     "Tipo",
+     "loopback"
+    ],
+    [
+     "ID de interfaz",
+     "0000:0000:0000:0001"
+    ],
+    [
+     "Multicast nodo solicitado",
+     "ff02::1:ff00:1"
+    ],
+    [
+     "PTR",
+     "1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa"
+    ]
+   ]
+  ],
+  "Notes": null
  },
  "ipv6-mac": {
   "Json": "{\"compressed\":\"fe80::250:56ff:feab:cdef\",\"expanded\":\"fe80:0000:0000:0000:0250:56ff:feab:cdef\",\"prefix\":\"fe80::/64\",\"kind\":\"enlace local (RFC 4291)\",\"solicitedNode\":\"ff02::1:ffab:cdef\",\"interfaceId\":\"0250:56ff:feab:cdef\",\"eui64\":\"fe80::250:56ff:feab:cdef\",\"mac\":\"00:50:56:ab:cd:ef\",\"reverseDns\":\"f.e.d.c.b.a.e.f.f.f.6.5.0.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.e.f.ip6.arpa\"}",
@@ -835,6 +1399,61 @@
    "Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360."
   ]
  },
+ "mtu-getvpn": {
+  "Json": "{\"physical\":1500,\"innerIpv6\":false,\"layers\":[{\"layer\":\"getvpn:aes-cbc:sha1:tbar\",\"detail\":\"IP copiada del original 20 (preservación de cabecera) + ESP 8 + IV 16 + cola 2 + ICV 12 + metadatos TBAR 12 + alineación 8 (bloque de 16)\",\"bytes\":78,\"remaining\":1422}],\"overhead\":78,\"effective\":1422,\"ipMtu\":1422,\"mss\":1382,\"physicalFor1500\":1572,\"notes\":[\"Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360.\"]}",
+  "Text": "Desglose sobre MTU física 1500\nCapa                      Detalle                                                                                                                                    Bytes  MTU restante\ngetvpn:aes-cbc:sha1:tbar  IP copiada del original 20 (preservación de cabecera) + ESP 8 + IV 16 + cola 2 + ICV 12 + metadatos TBAR 12 + alineación 8 (bloque de 16)  78     1422\n\nResultado\nCampo                                Valor\nSobrecarga total                     78\nMTU efectiva                         1422\nip mtu                               1422\nip tcp adjust-mss (IPv4 + TCP 40)    1382\nMTU física para 1500 sin fragmentar  1572\n\n• Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360.",
+  "Tables": [
+   [
+    [
+     "Desglose sobre MTU física 1500"
+    ],
+    [
+     "Capa",
+     "Detalle",
+     "Bytes",
+     "MTU restante"
+    ],
+    [
+     "getvpn:aes-cbc:sha1:tbar",
+     "IP copiada del original 20 (preservación de cabecera) + ESP 8 + IV 16 + cola 2 + ICV 12 + metadatos TBAR 12 + alineación 8 (bloque de 16)",
+     "78",
+     "1422"
+    ]
+   ],
+   [
+    [
+     "Resultado"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Sobrecarga total",
+     "78"
+    ],
+    [
+     "MTU efectiva",
+     "1422"
+    ],
+    [
+     "ip mtu",
+     "1422"
+    ],
+    [
+     "ip tcp adjust-mss (IPv4 + TCP 40)",
+     "1382"
+    ],
+    [
+     "MTU física para 1500 sin fragmentar",
+     "1572"
+    ]
+   ]
+  ],
+  "Notes": [
+   "Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360."
+  ]
+ },
  "mtu-gre": {
   "Json": "{\"physical\":1500,\"innerIpv6\":false,\"layers\":[{\"layer\":\"gre\",\"detail\":\"IP externa 20 + GRE 4\",\"bytes\":24,\"remaining\":1476}],\"overhead\":24,\"effective\":1476,\"ipMtu\":1476,\"mss\":1436,\"physicalFor1500\":1524}",
   "Text": "Desglose sobre MTU física 1500\nCapa  Detalle                Bytes  MTU restante\ngre   IP externa 20 + GRE 4  24     1476\n\nResultado\nCampo                                Valor\nSobrecarga total                     24\nMTU efectiva                         1476\nip mtu                               1476\nip tcp adjust-mss (IPv4 + TCP 40)    1436\nMTU física para 1500 sin fragmentar  1524",
@@ -887,6 +1506,201 @@
    ]
   ],
   "Notes": null
+ },
+ "mtu-mpls-qinq": {
+  "Json": "{\"physical\":1500,\"innerIpv6\":false,\"layers\":[{\"layer\":\"mpls\",\"detail\":\"3 etiqueta(s) × 4\",\"bytes\":12,\"remaining\":1488},{\"layer\":\"vxlan\",\"detail\":\"IP externa 20 + UDP 8 + VXLAN 8 + Ethernet interna 14\",\"bytes\":50,\"remaining\":1438},{\"layer\":\"qinq\",\"detail\":\"etiqueta en la trama interna 8\",\"bytes\":8,\"remaining\":1430},{\"layer\":\"pppoe\",\"detail\":\"PPPoE 6 + PPP 2\",\"bytes\":8,\"remaining\":1422},{\"layer\":\"lisp\",\"detail\":\"IP externa 20 + UDP 8 + LISP 8\",\"bytes\":36,\"remaining\":1386}],\"overhead\":114,\"effective\":1386,\"ipMtu\":1386,\"mss\":1346,\"physicalFor1500\":1614,\"notes\":[\"VXLAN no fragmenta: sube la MTU del underlay en vez de bajar la de los hosts.\"]}",
+  "Text": "Desglose sobre MTU física 1500\nCapa   Detalle                                                Bytes  MTU restante\nmpls   3 etiqueta(s) × 4                                      12     1488\nvxlan  IP externa 20 + UDP 8 + VXLAN 8 + Ethernet interna 14  50     1438\nqinq   etiqueta en la trama interna 8                         8      1430\npppoe  PPPoE 6 + PPP 2                                        8      1422\nlisp   IP externa 20 + UDP 8 + LISP 8                         36     1386\n\nResultado\nCampo                                Valor\nSobrecarga total                     114\nMTU efectiva                         1386\nip mtu                               1386\nip tcp adjust-mss (IPv4 + TCP 40)    1346\nMTU física para 1500 sin fragmentar  1614\n\n• VXLAN no fragmenta: sube la MTU del underlay en vez de bajar la de los hosts.",
+  "Tables": [
+   [
+    [
+     "Desglose sobre MTU física 1500"
+    ],
+    [
+     "Capa",
+     "Detalle",
+     "Bytes",
+     "MTU restante"
+    ],
+    [
+     "mpls",
+     "3 etiqueta(s) × 4",
+     "12",
+     "1488"
+    ],
+    [
+     "vxlan",
+     "IP externa 20 + UDP 8 + VXLAN 8 + Ethernet interna 14",
+     "50",
+     "1438"
+    ],
+    [
+     "qinq",
+     "etiqueta en la trama interna 8",
+     "8",
+     "1430"
+    ],
+    [
+     "pppoe",
+     "PPPoE 6 + PPP 2",
+     "8",
+     "1422"
+    ],
+    [
+     "lisp",
+     "IP externa 20 + UDP 8 + LISP 8",
+     "36",
+     "1386"
+    ]
+   ],
+   [
+    [
+     "Resultado"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Sobrecarga total",
+     "114"
+    ],
+    [
+     "MTU efectiva",
+     "1386"
+    ],
+    [
+     "ip mtu",
+     "1386"
+    ],
+    [
+     "ip tcp adjust-mss (IPv4 + TCP 40)",
+     "1346"
+    ],
+    [
+     "MTU física para 1500 sin fragmentar",
+     "1614"
+    ]
+   ]
+  ],
+  "Notes": [
+   "VXLAN no fragmenta: sube la MTU del underlay en vez de bajar la de los hosts."
+  ]
+ },
+ "mtu-tr-alone": {
+  "Json": "{\"physical\":1500,\"innerIpv6\":false,\"layers\":[{\"layer\":\"esp-transport:aes-cbc:sha256\",\"detail\":\"IP del paquete protegido (es la suya) + ESP 8 + IV 16 + cola 2 + ICV 16 + alineación 0 (bloque de 16)\",\"bytes\":42,\"remaining\":1458}],\"overhead\":42,\"effective\":1458,\"ipMtu\":1458,\"mss\":1418,\"physicalFor1500\":1548,\"notes\":[\"Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360.\"]}",
+  "Text": "Desglose sobre MTU física 1500\nCapa                          Detalle                                                                                                Bytes  MTU restante\nesp-transport:aes-cbc:sha256  IP del paquete protegido (es la suya) + ESP 8 + IV 16 + cola 2 + ICV 16 + alineación 0 (bloque de 16)  42     1458\n\nResultado\nCampo                                Valor\nSobrecarga total                     42\nMTU efectiva                         1458\nip mtu                               1458\nip tcp adjust-mss (IPv4 + TCP 40)    1418\nMTU física para 1500 sin fragmentar  1548\n\n• Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360.",
+  "Tables": [
+   [
+    [
+     "Desglose sobre MTU física 1500"
+    ],
+    [
+     "Capa",
+     "Detalle",
+     "Bytes",
+     "MTU restante"
+    ],
+    [
+     "esp-transport:aes-cbc:sha256",
+     "IP del paquete protegido (es la suya) + ESP 8 + IV 16 + cola 2 + ICV 16 + alineación 0 (bloque de 16)",
+     "42",
+     "1458"
+    ]
+   ],
+   [
+    [
+     "Resultado"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Sobrecarga total",
+     "42"
+    ],
+    [
+     "MTU efectiva",
+     "1458"
+    ],
+    [
+     "ip mtu",
+     "1458"
+    ],
+    [
+     "ip tcp adjust-mss (IPv4 + TCP 40)",
+     "1418"
+    ],
+    [
+     "MTU física para 1500 sin fragmentar",
+     "1548"
+    ]
+   ]
+  ],
+  "Notes": [
+   "Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360."
+  ]
+ },
+ "mtu-transport": {
+  "Json": "{\"physical\":1500,\"innerIpv6\":false,\"layers\":[{\"layer\":\"gre-key\",\"detail\":\"IP externa 20 + GRE 4 + clave 4\",\"bytes\":28,\"remaining\":1472},{\"layer\":\"esp-transport:aes-gcm\",\"detail\":\"IP del paquete protegido (es la suya) + ESP 8 + IV 8 + cola 2 + ICV 16 + alineación 0 (bloque de 4)\",\"bytes\":34,\"remaining\":1438}],\"overhead\":62,\"effective\":1438,\"ipMtu\":1438,\"mss\":1398,\"physicalFor1500\":1564,\"notes\":[\"Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360.\"]}",
+  "Text": "Desglose sobre MTU física 1500\nCapa                   Detalle                                                                                              Bytes  MTU restante\ngre-key                IP externa 20 + GRE 4 + clave 4                                                                      28     1472\nesp-transport:aes-gcm  IP del paquete protegido (es la suya) + ESP 8 + IV 8 + cola 2 + ICV 16 + alineación 0 (bloque de 4)  34     1438\n\nResultado\nCampo                                Valor\nSobrecarga total                     62\nMTU efectiva                         1438\nip mtu                               1438\nip tcp adjust-mss (IPv4 + TCP 40)    1398\nMTU física para 1500 sin fragmentar  1564\n\n• Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360.",
+  "Tables": [
+   [
+    [
+     "Desglose sobre MTU física 1500"
+    ],
+    [
+     "Capa",
+     "Detalle",
+     "Bytes",
+     "MTU restante"
+    ],
+    [
+     "gre-key",
+     "IP externa 20 + GRE 4 + clave 4",
+     "28",
+     "1472"
+    ],
+    [
+     "esp-transport:aes-gcm",
+     "IP del paquete protegido (es la suya) + ESP 8 + IV 8 + cola 2 + ICV 16 + alineación 0 (bloque de 4)",
+     "34",
+     "1438"
+    ]
+   ],
+   [
+    [
+     "Resultado"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Sobrecarga total",
+     "62"
+    ],
+    [
+     "MTU efectiva",
+     "1438"
+    ],
+    [
+     "ip mtu",
+     "1438"
+    ],
+    [
+     "ip tcp adjust-mss (IPv4 + TCP 40)",
+     "1398"
+    ],
+    [
+     "MTU física para 1500 sin fragmentar",
+     "1564"
+    ]
+   ]
+  ],
+  "Notes": [
+   "Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360."
+  ]
  },
  "mtu-v6-small": {
   "Json": "{\"physical\":1400,\"innerIpv6\":true,\"layers\":[{\"layer\":\"gre\",\"detail\":\"IP externa 20 + GRE 4\",\"bytes\":24,\"remaining\":1376},{\"layer\":\"nat-t\",\"detail\":\"UDP 4500 8\",\"bytes\":8,\"remaining\":1368},{\"layer\":\"esp-tunnel:aes-cbc:sha256\",\"detail\":\"IP externa 20 + ESP 8 + IV 16 + cola 2 + ICV 16 + alineación 12 (bloque de 16)\",\"bytes\":74,\"remaining\":1294}],\"overhead\":106,\"effective\":1294,\"ipMtu\":1294,\"mss\":1234,\"physicalFor1500\":1596,\"notes\":[\"Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360.\"]}",
@@ -1069,6 +1883,82 @@
   ],
   "Notes": [
    "VXLAN no fragmenta: sube la MTU del underlay en vez de bajar la de los hosts."
+  ]
+ },
+ "optics-ok": {
+  "Json": "{\"txDbm\":4,\"rxSensDbm\":-15,\"km\":2,\"fiber\":\"smf-1310\",\"lossPerKm\":0.35,\"connectors\":2,\"connectorLoss\":0.5,\"splices\":0,\"spliceLoss\":0,\"marginDb\":3,\"budgetDb\":19,\"fiberLossDb\":0.7,\"totalLossDb\":1.7,\"expectedRxDbm\":2.3,\"remainingDb\":14.3,\"closes\":true,\"overload\":false,\"notes\":[\"Pérdidas por km y por conector son valores típicos de diseño: usa la hoja de la óptica y la medición OTDR cuando las tengas.\"]}",
+  "Text": "Pérdidas\nElemento                  Cantidad  Pérdida\nFibra (0.35 dB/km)        2.00 km   0.70 dB\nConectores (0.50 dB c/u)  2         1.00 dB\nEmpalmes (0.00 dB c/u)    0         0.00 dB\nTotal                               1.70 dB\n\nPresupuesto\nCampo            Valor\nTx               4.00 dBm\nSensibilidad Rx  -15.00 dBm\nPresupuesto      19.00 dB\nRx esperada      2.30 dBm\nMargen pedido    3.00 dB\nSobrante         14.30 dB\nVeredicto        sí cierra\n\n• Pérdidas por km y por conector son valores típicos de diseño: usa la hoja de la óptica y la medición OTDR cuando las tengas.",
+  "Tables": [
+   [
+    [
+     "Pérdidas"
+    ],
+    [
+     "Elemento",
+     "Cantidad",
+     "Pérdida"
+    ],
+    [
+     "Fibra (0.35 dB/km)",
+     "2.00 km",
+     "0.70 dB"
+    ],
+    [
+     "Conectores (0.50 dB c/u)",
+     "2",
+     "1.00 dB"
+    ],
+    [
+     "Empalmes (0.00 dB c/u)",
+     "0",
+     "0.00 dB"
+    ],
+    [
+     "Total",
+     "",
+     "1.70 dB"
+    ]
+   ],
+   [
+    [
+     "Presupuesto"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Tx",
+     "4.00 dBm"
+    ],
+    [
+     "Sensibilidad Rx",
+     "-15.00 dBm"
+    ],
+    [
+     "Presupuesto",
+     "19.00 dB"
+    ],
+    [
+     "Rx esperada",
+     "2.30 dBm"
+    ],
+    [
+     "Margen pedido",
+     "3.00 dB"
+    ],
+    [
+     "Sobrante",
+     "14.30 dB"
+    ],
+    [
+     "Veredicto",
+     "sí cierra"
+    ]
+   ]
+  ],
+  "Notes": [
+   "Pérdidas por km y por conector son valores típicos de diseño: usa la hoja de la óptica y la medición OTDR cuando las tengas."
   ]
  },
  "optics-overload": {
@@ -1366,6 +2256,66 @@
    "/32: una sola dirección (loopback, host o ruta de host)"
   ]
  },
+ "subnet-any": {
+  "Json": "{\"input\":\"0.0.0.0/0\",\"prefix\":\"0.0.0.0/0\",\"prefixLen\":0,\"network\":\"0.0.0.0\",\"broadcast\":\"255.255.255.255\",\"firstUsable\":\"0.0.0.1\",\"lastUsable\":\"255.255.255.254\",\"mask\":\"0.0.0.0\",\"wildcard\":\"255.255.255.255\",\"total\":\"4294967296\",\"usable\":\"4294967294\",\"kind\":\"cualquiera (ruta por defecto)\",\"class\":\"A\"}",
+  "Text": "Subred 0.0.0.0/0\nCampo           Valor\nRed             0.0.0.0\nBroadcast       255.255.255.255\nPrimera usable  0.0.0.1\nÚltima usable   255.255.255.254\nDirecciones     4294967296\nHosts usables   4294967294\nPrefijo         /0\nMáscara         0.0.0.0\nWildcard        255.255.255.255\nClase           A\nTipo            cualquiera (ruta por defecto)",
+  "Tables": [
+   [
+    [
+     "Subred 0.0.0.0/0"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Red",
+     "0.0.0.0"
+    ],
+    [
+     "Broadcast",
+     "255.255.255.255"
+    ],
+    [
+     "Primera usable",
+     "0.0.0.1"
+    ],
+    [
+     "Última usable",
+     "255.255.255.254"
+    ],
+    [
+     "Direcciones",
+     "4294967296"
+    ],
+    [
+     "Hosts usables",
+     "4294967294"
+    ],
+    [
+     "Prefijo",
+     "/0"
+    ],
+    [
+     "Máscara",
+     "0.0.0.0"
+    ],
+    [
+     "Wildcard",
+     "255.255.255.255"
+    ],
+    [
+     "Clase",
+     "A"
+    ],
+    [
+     "Tipo",
+     "cualquiera (ruta por defecto)"
+    ]
+   ]
+  ],
+  "Notes": null
+ },
  "subnet-host": {
   "Json": "{\"input\":\"10.0.0.5/24\",\"prefix\":\"10.0.0.0/24\",\"prefixLen\":24,\"network\":\"10.0.0.0\",\"broadcast\":\"10.0.0.255\",\"firstUsable\":\"10.0.0.1\",\"lastUsable\":\"10.0.0.254\",\"mask\":\"255.255.255.0\",\"wildcard\":\"0.0.0.255\",\"total\":\"256\",\"usable\":\"254\",\"kind\":\"privada (RFC 1918)\",\"class\":\"A\",\"notes\":[\"10.0.0.5 es un host dentro de 10.0.0.0/24\"]}",
   "Text": "Subred 10.0.0.0/24\nCampo           Valor\nRed             10.0.0.0\nBroadcast       10.0.0.255\nPrimera usable  10.0.0.1\nÚltima usable   10.0.0.254\nDirecciones     256\nHosts usables   254\nPrefijo         /24\nMáscara         255.255.255.0\nWildcard        0.0.0.255\nClase           A\nTipo            privada (RFC 1918)\n\n• 10.0.0.5 es un host dentro de 10.0.0.0/24",
@@ -1427,6 +2377,304 @@
   "Notes": [
    "10.0.0.5 es un host dentro de 10.0.0.0/24"
   ]
+ },
+ "subnet-mcast": {
+  "Json": "{\"input\":\"224.0.0.5/32\",\"prefix\":\"224.0.0.5/32\",\"prefixLen\":32,\"network\":\"224.0.0.5\",\"firstUsable\":\"224.0.0.5\",\"lastUsable\":\"224.0.0.5\",\"mask\":\"255.255.255.255\",\"wildcard\":\"0.0.0.0\",\"total\":\"1\",\"usable\":\"1\",\"kind\":\"multicast local (RFC 5771)\",\"class\":\"D\",\"notes\":[\"/32: una sola dirección (loopback, host o ruta de host)\"]}",
+  "Text": "Subred 224.0.0.5/32\nCampo           Valor\nRed             224.0.0.5\nPrimera usable  224.0.0.5\nÚltima usable   224.0.0.5\nDirecciones     1\nHosts usables   1\nPrefijo         /32\nMáscara         255.255.255.255\nWildcard        0.0.0.0\nClase           D\nTipo            multicast local (RFC 5771)\n\n• /32: una sola dirección (loopback, host o ruta de host)",
+  "Tables": [
+   [
+    [
+     "Subred 224.0.0.5/32"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Red",
+     "224.0.0.5"
+    ],
+    [
+     "Primera usable",
+     "224.0.0.5"
+    ],
+    [
+     "Última usable",
+     "224.0.0.5"
+    ],
+    [
+     "Direcciones",
+     "1"
+    ],
+    [
+     "Hosts usables",
+     "1"
+    ],
+    [
+     "Prefijo",
+     "/32"
+    ],
+    [
+     "Máscara",
+     "255.255.255.255"
+    ],
+    [
+     "Wildcard",
+     "0.0.0.0"
+    ],
+    [
+     "Clase",
+     "D"
+    ],
+    [
+     "Tipo",
+     "multicast local (RFC 5771)"
+    ]
+   ]
+  ],
+  "Notes": [
+   "/32: una sola dirección (loopback, host o ruta de host)"
+  ]
+ },
+ "subnet-mixed": {
+  "Json": "{\"input\":\"192.0.0.0/8\",\"prefix\":\"192.0.0.0/8\",\"prefixLen\":8,\"network\":\"192.0.0.0\",\"broadcast\":\"192.255.255.255\",\"firstUsable\":\"192.0.0.1\",\"lastUsable\":\"192.255.255.254\",\"mask\":\"255.0.0.0\",\"wildcard\":\"0.255.255.255\",\"total\":\"16777216\",\"usable\":\"16777214\",\"kind\":\"mixta (cubre bloques de distinto tipo)\",\"class\":\"C\"}",
+  "Text": "Subred 192.0.0.0/8\nCampo           Valor\nRed             192.0.0.0\nBroadcast       192.255.255.255\nPrimera usable  192.0.0.1\nÚltima usable   192.255.255.254\nDirecciones     16777216\nHosts usables   16777214\nPrefijo         /8\nMáscara         255.0.0.0\nWildcard        0.255.255.255\nClase           C\nTipo            mixta (cubre bloques de distinto tipo)",
+  "Tables": [
+   [
+    [
+     "Subred 192.0.0.0/8"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Red",
+     "192.0.0.0"
+    ],
+    [
+     "Broadcast",
+     "192.255.255.255"
+    ],
+    [
+     "Primera usable",
+     "192.0.0.1"
+    ],
+    [
+     "Última usable",
+     "192.255.255.254"
+    ],
+    [
+     "Direcciones",
+     "16777216"
+    ],
+    [
+     "Hosts usables",
+     "16777214"
+    ],
+    [
+     "Prefijo",
+     "/8"
+    ],
+    [
+     "Máscara",
+     "255.0.0.0"
+    ],
+    [
+     "Wildcard",
+     "0.255.255.255"
+    ],
+    [
+     "Clase",
+     "C"
+    ],
+    [
+     "Tipo",
+     "mixta (cubre bloques de distinto tipo)"
+    ]
+   ]
+  ],
+  "Notes": null
+ },
+ "subnet-private": {
+  "Json": "{\"input\":\"10.0.0.0/8\",\"prefix\":\"10.0.0.0/8\",\"prefixLen\":8,\"network\":\"10.0.0.0\",\"broadcast\":\"10.255.255.255\",\"firstUsable\":\"10.0.0.1\",\"lastUsable\":\"10.255.255.254\",\"mask\":\"255.0.0.0\",\"wildcard\":\"0.255.255.255\",\"total\":\"16777216\",\"usable\":\"16777214\",\"kind\":\"privada (RFC 1918)\",\"class\":\"A\"}",
+  "Text": "Subred 10.0.0.0/8\nCampo           Valor\nRed             10.0.0.0\nBroadcast       10.255.255.255\nPrimera usable  10.0.0.1\nÚltima usable   10.255.255.254\nDirecciones     16777216\nHosts usables   16777214\nPrefijo         /8\nMáscara         255.0.0.0\nWildcard        0.255.255.255\nClase           A\nTipo            privada (RFC 1918)",
+  "Tables": [
+   [
+    [
+     "Subred 10.0.0.0/8"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Red",
+     "10.0.0.0"
+    ],
+    [
+     "Broadcast",
+     "10.255.255.255"
+    ],
+    [
+     "Primera usable",
+     "10.0.0.1"
+    ],
+    [
+     "Última usable",
+     "10.255.255.254"
+    ],
+    [
+     "Direcciones",
+     "16777216"
+    ],
+    [
+     "Hosts usables",
+     "16777214"
+    ],
+    [
+     "Prefijo",
+     "/8"
+    ],
+    [
+     "Máscara",
+     "255.0.0.0"
+    ],
+    [
+     "Wildcard",
+     "0.255.255.255"
+    ],
+    [
+     "Clase",
+     "A"
+    ],
+    [
+     "Tipo",
+     "privada (RFC 1918)"
+    ]
+   ]
+  ],
+  "Notes": null
+ },
+ "subnet-public": {
+  "Json": "{\"input\":\"8.8.8.0/24\",\"prefix\":\"8.8.8.0/24\",\"prefixLen\":24,\"network\":\"8.8.8.0\",\"broadcast\":\"8.8.8.255\",\"firstUsable\":\"8.8.8.1\",\"lastUsable\":\"8.8.8.254\",\"mask\":\"255.255.255.0\",\"wildcard\":\"0.0.0.255\",\"total\":\"256\",\"usable\":\"254\",\"kind\":\"pública\",\"class\":\"A\"}",
+  "Text": "Subred 8.8.8.0/24\nCampo           Valor\nRed             8.8.8.0\nBroadcast       8.8.8.255\nPrimera usable  8.8.8.1\nÚltima usable   8.8.8.254\nDirecciones     256\nHosts usables   254\nPrefijo         /24\nMáscara         255.255.255.0\nWildcard        0.0.0.255\nClase           A\nTipo            pública",
+  "Tables": [
+   [
+    [
+     "Subred 8.8.8.0/24"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Red",
+     "8.8.8.0"
+    ],
+    [
+     "Broadcast",
+     "8.8.8.255"
+    ],
+    [
+     "Primera usable",
+     "8.8.8.1"
+    ],
+    [
+     "Última usable",
+     "8.8.8.254"
+    ],
+    [
+     "Direcciones",
+     "256"
+    ],
+    [
+     "Hosts usables",
+     "254"
+    ],
+    [
+     "Prefijo",
+     "/24"
+    ],
+    [
+     "Máscara",
+     "255.255.255.0"
+    ],
+    [
+     "Wildcard",
+     "0.0.0.255"
+    ],
+    [
+     "Clase",
+     "A"
+    ],
+    [
+     "Tipo",
+     "pública"
+    ]
+   ]
+  ],
+  "Notes": null
+ },
+ "subnet-this": {
+  "Json": "{\"input\":\"0.0.0.0/8\",\"prefix\":\"0.0.0.0/8\",\"prefixLen\":8,\"network\":\"0.0.0.0\",\"broadcast\":\"0.255.255.255\",\"firstUsable\":\"0.0.0.1\",\"lastUsable\":\"0.255.255.254\",\"mask\":\"255.0.0.0\",\"wildcard\":\"0.255.255.255\",\"total\":\"16777216\",\"usable\":\"16777214\",\"kind\":\"\\\"esta red\\\" (RFC 791)\",\"class\":\"A\"}",
+  "Text": "Subred 0.0.0.0/8\nCampo           Valor\nRed             0.0.0.0\nBroadcast       0.255.255.255\nPrimera usable  0.0.0.1\nÚltima usable   0.255.255.254\nDirecciones     16777216\nHosts usables   16777214\nPrefijo         /8\nMáscara         255.0.0.0\nWildcard        0.255.255.255\nClase           A\nTipo            \"esta red\" (RFC 791)",
+  "Tables": [
+   [
+    [
+     "Subred 0.0.0.0/8"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Red",
+     "0.0.0.0"
+    ],
+    [
+     "Broadcast",
+     "0.255.255.255"
+    ],
+    [
+     "Primera usable",
+     "0.0.0.1"
+    ],
+    [
+     "Última usable",
+     "0.255.255.254"
+    ],
+    [
+     "Direcciones",
+     "16777216"
+    ],
+    [
+     "Hosts usables",
+     "16777214"
+    ],
+    [
+     "Prefijo",
+     "/8"
+    ],
+    [
+     "Máscara",
+     "255.0.0.0"
+    ],
+    [
+     "Wildcard",
+     "0.255.255.255"
+    ],
+    [
+     "Clase",
+     "A"
+    ],
+    [
+     "Tipo",
+     "\"esta red\" (RFC 791)"
+    ]
+   ]
+  ],
+  "Notes": null
  },
  "subnet-v6": {
   "Json": "{\"input\":\"2001:db8::5/64\",\"prefix\":\"2001:db8::/64\",\"prefixLen\":64,\"network\":\"2001:db8::\",\"firstUsable\":\"2001:db8::\",\"lastUsable\":\"2001:db8::ffff:ffff:ffff:ffff\",\"total\":\"18446744073709551616\",\"usable\":\"18446744073709551616\",\"kind\":\"documentación (RFC 3849)\",\"notes\":[\"2001:db8::5 es un host dentro de 2001:db8::/64\",\"IPv6 no tiene broadcast; la primera dirección es la anycast del router de subred (RFC 4291)\"]}",
@@ -1519,6 +2767,187 @@
   ],
   "Notes": [
    "/127 punto a punto (RFC 6164): ambas direcciones son usables"
+  ]
+ },
+ "subnet-v6-mc-x": {
+  "Json": "{\"input\":\"ff07::1/128\",\"prefix\":\"ff07::1/128\",\"prefixLen\":128,\"network\":\"ff07::1\",\"firstUsable\":\"ff07::1\",\"lastUsable\":\"ff07::1\",\"total\":\"1\",\"usable\":\"1\",\"kind\":\"multicast\"}",
+  "Text": "Subred ff07::1/128\nCampo           Valor\nRed             ff07::1\nPrimera usable  ff07::1\nÚltima usable   ff07::1\nDirecciones     1\nHosts usables   1\nPrefijo         /128\nTipo            multicast",
+  "Tables": [
+   [
+    [
+     "Subred ff07::1/128"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Red",
+     "ff07::1"
+    ],
+    [
+     "Primera usable",
+     "ff07::1"
+    ],
+    [
+     "Última usable",
+     "ff07::1"
+    ],
+    [
+     "Direcciones",
+     "1"
+    ],
+    [
+     "Hosts usables",
+     "1"
+    ],
+    [
+     "Prefijo",
+     "/128"
+    ],
+    [
+     "Tipo",
+     "multicast"
+    ]
+   ]
+  ],
+  "Notes": null
+ },
+ "subnet-v6-mcast": {
+  "Json": "{\"input\":\"ff05::1/128\",\"prefix\":\"ff05::1/128\",\"prefixLen\":128,\"network\":\"ff05::1\",\"firstUsable\":\"ff05::1\",\"lastUsable\":\"ff05::1\",\"total\":\"1\",\"usable\":\"1\",\"kind\":\"multicast, alcance sitio\"}",
+  "Text": "Subred ff05::1/128\nCampo           Valor\nRed             ff05::1\nPrimera usable  ff05::1\nÚltima usable   ff05::1\nDirecciones     1\nHosts usables   1\nPrefijo         /128\nTipo            multicast, alcance sitio",
+  "Tables": [
+   [
+    [
+     "Subred ff05::1/128"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Red",
+     "ff05::1"
+    ],
+    [
+     "Primera usable",
+     "ff05::1"
+    ],
+    [
+     "Última usable",
+     "ff05::1"
+    ],
+    [
+     "Direcciones",
+     "1"
+    ],
+    [
+     "Hosts usables",
+     "1"
+    ],
+    [
+     "Prefijo",
+     "/128"
+    ],
+    [
+     "Tipo",
+     "multicast, alcance sitio"
+    ]
+   ]
+  ],
+  "Notes": null
+ },
+ "subnet-v6-ula": {
+  "Json": "{\"input\":\"fc00::1/64\",\"prefix\":\"fc00::/64\",\"prefixLen\":64,\"network\":\"fc00::\",\"firstUsable\":\"fc00::\",\"lastUsable\":\"fc00::ffff:ffff:ffff:ffff\",\"total\":\"18446744073709551616\",\"usable\":\"18446744073709551616\",\"kind\":\"local única ULA (RFC 4193)\",\"notes\":[\"fc00::1 es un host dentro de fc00::/64\",\"IPv6 no tiene broadcast; la primera dirección es la anycast del router de subred (RFC 4291)\"]}",
+  "Text": "Subred fc00::/64\nCampo           Valor\nRed             fc00::\nPrimera usable  fc00::\nÚltima usable   fc00::ffff:ffff:ffff:ffff\nDirecciones     18446744073709551616\nHosts usables   18446744073709551616\nPrefijo         /64\nTipo            local única ULA (RFC 4193)\n\n• fc00::1 es un host dentro de fc00::/64\n• IPv6 no tiene broadcast; la primera dirección es la anycast del router de subred (RFC 4291)",
+  "Tables": [
+   [
+    [
+     "Subred fc00::/64"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Red",
+     "fc00::"
+    ],
+    [
+     "Primera usable",
+     "fc00::"
+    ],
+    [
+     "Última usable",
+     "fc00::ffff:ffff:ffff:ffff"
+    ],
+    [
+     "Direcciones",
+     "18446744073709551616"
+    ],
+    [
+     "Hosts usables",
+     "18446744073709551616"
+    ],
+    [
+     "Prefijo",
+     "/64"
+    ],
+    [
+     "Tipo",
+     "local única ULA (RFC 4193)"
+    ]
+   ]
+  ],
+  "Notes": [
+   "fc00::1 es un host dentro de fc00::/64",
+   "IPv6 no tiene broadcast; la primera dirección es la anycast del router de subred (RFC 4291)"
+  ]
+ },
+ "subnet-v6-un": {
+  "Json": "{\"input\":\"4000::/16\",\"prefix\":\"4000::/16\",\"prefixLen\":16,\"network\":\"4000::\",\"firstUsable\":\"4000::\",\"lastUsable\":\"4000:ffff:ffff:ffff:ffff:ffff:ffff:ffff\",\"total\":\"5192296858534827628530496329220096\",\"usable\":\"5192296858534827628530496329220096\",\"kind\":\"sin asignar (fuera de 2000::/3)\",\"notes\":[\"IPv6 no tiene broadcast; la primera dirección es la anycast del router de subred (RFC 4291)\"]}",
+  "Text": "Subred 4000::/16\nCampo           Valor\nRed             4000::\nPrimera usable  4000::\nÚltima usable   4000:ffff:ffff:ffff:ffff:ffff:ffff:ffff\nDirecciones     5192296858534827628530496329220096\nHosts usables   5192296858534827628530496329220096\nPrefijo         /16\nTipo            sin asignar (fuera de 2000::/3)\n\n• IPv6 no tiene broadcast; la primera dirección es la anycast del router de subred (RFC 4291)",
+  "Tables": [
+   [
+    [
+     "Subred 4000::/16"
+    ],
+    [
+     "Campo",
+     "Valor"
+    ],
+    [
+     "Red",
+     "4000::"
+    ],
+    [
+     "Primera usable",
+     "4000::"
+    ],
+    [
+     "Última usable",
+     "4000:ffff:ffff:ffff:ffff:ffff:ffff:ffff"
+    ],
+    [
+     "Direcciones",
+     "5192296858534827628530496329220096"
+    ],
+    [
+     "Hosts usables",
+     "5192296858534827628530496329220096"
+    ],
+    [
+     "Prefijo",
+     "/16"
+    ],
+    [
+     "Tipo",
+     "sin asignar (fuera de 2000::/3)"
+    ]
+   ]
+  ],
+  "Notes": [
+   "IPv6 no tiene broadcast; la primera dirección es la anycast del router de subred (RFC 4291)"
   ]
  },
  "summarize": {

@@ -27,6 +27,16 @@ message CalcRow {
   // catálogo (calc.row.*) y sus argumentos; vacía si la celda es un dato.
   string label_key = 2;
   map<string, string> label_args = 3;
+  // Fase 30c: las celdas con palabras (veredicto, límite, tipo de dirección, clase DSCP, paso de BGP, capa de
+  // MTU, sí/no) como código cerrado; el texto de cells ya viene en el idioma pedido.
+  repeated CalcCoded coded = 4;
+}
+
+// Celda con palabras que viaja como clave del catálogo (calc.val.*): col es la columna (desde 0).
+message CalcCoded {
+  uint32 col = 1;
+  string key = 2;
+  map<string, string> args = 3;
 }
 
 // Columna de una tabla: su clave del catálogo (calc.col.*).

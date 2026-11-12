@@ -126,10 +126,38 @@ func Msg(loc, code string, args Args) string {
 	if !ok {
 		return code
 	}
+	args = resolveRefs(loc, args)
 	if loc == En {
 		return render(e.En, args)
 	}
 	return render(e.Es, args)
+}
+
+// ValPrefix marca los códigos que son un valor con palabras (calc.val.*): un argumento cuyo valor es uno de esos
+// códigos se escribe en el idioma pedido al armar el texto, así una nota puede citar un valor traducible.
+const ValPrefix = "calc.val."
+
+func resolveRefs(loc string, args Args) Args {
+	var out Args
+	for k, v := range args {
+		if !strings.HasPrefix(v, ValPrefix) {
+			continue
+		}
+		if _, ok := catalog[v]; !ok {
+			continue
+		}
+		if out == nil {
+			out = Args{}
+			for k2, v2 := range args {
+				out[k2] = v2
+			}
+		}
+		out[k] = Msg(loc, v, nil)
+	}
+	if out == nil {
+		return args
+	}
+	return out
 }
 
 // T es el texto del código en el idioma del contexto.
