@@ -1003,3 +1003,18 @@ Un argumento de una nota o de una celda cuyo valor es una clave `calc.val.*` (o 
 - `findings` de `dnssec` (`link.Error`, `Warnings`) y los errores de las sondas de DNS (`Probe.Error`, `Answer.Error`): siguen en español.
 - Los errores de validación que rechazan la petición (`InvalidArgument`) de DNS, TLS e IKE siguen su camino de 30a o su texto de siempre.
 - La vista que migre los slugs de RADIUS/TACACS+ y lea `rowCoded`, `findings` y `verifyCode`.
+
+### Recordatorio: slugs de RADIUS y TACACS+ (fase 30c-A)
+El front debe actualizar sus mapeos de `findings[].code`: ya no existen los slugs viejos.
+
+| Slug viejo | Slug nuevo |
+|---|---|
+| `sin-respuesta` | `no_response` (RADIUS y TACACS+) |
+| `respuesta-invalida` | `invalid_response` |
+| `blast-radius` | `blast_radius` |
+| `ma-invalido` | `ma_invalid` |
+| `reject` | `reject` (igual) |
+| `secreto` | `secret` |
+| `authen-fail` | `authen_fail` |
+| `author-fail` | `author_fail` |
+| `estado` | `status` |
