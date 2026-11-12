@@ -42,11 +42,21 @@ func TestTIdioma(t *testing.T) {
 func TestParse(t *testing.T) {
 	for in, want := range map[string]string{
 		"": Es, "es": Es, "en": En, "es-MX": Es, "en-US": En, "EN-gb": En, "fr": Es, "xx-yy": Es,
-		"fr, en;q=0.8": En, "en, es": En, "es, en": Es, "en;q=0.5, es;q=0.9": Es, "en;q=0": Es, "de, fr;q=0.9, en;q=0.1": En, "*": Es, "en;q=x": En,
+		"fr, en;q=0.8": En, "en, es": En, "es, en": Es, "en;q=0.5, es;q=0.9": Es, "en;q=0": Es, "de, fr;q=0.9, en;q=0.1": En, "*": Es, "en;q=x": Es, "en;q=NaN": Es, "en;q=2": Es, "en;foo=1;q=0.3, es;q=0.2": En, "en;foo=1;q=0": Es, "en;q=0.5;x=1, es;q=0.4": En,
 	} {
 		if got := Parse(in); got != want {
 			t.Errorf("Parse(%q)=%q want %q", in, got, want)
 		}
+	}
+}
+
+func TestParseCortaElHeader(t *testing.T) {
+	// El header se corta a 256 bytes: un en que queda después del corte no cuenta.
+	if got := Parse(strings.Repeat(" ", 300) + "en"); got != Es {
+		t.Fatalf("%q", got)
+	}
+	if got := Parse(strings.Repeat("x,", 100) + "en"); got != En {
+		t.Fatalf("antes del corte debe contar: %q", got)
 	}
 }
 

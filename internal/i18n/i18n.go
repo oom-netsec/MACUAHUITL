@@ -9,6 +9,7 @@ package i18n
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -81,24 +82,34 @@ func Normalize(tag string) string {
 // Parse elige el idioma de un valor Accept-Language (lista con q): el de mayor q entre es y en; ausente o
 // ninguno conocido, es. A igual q gana el primero de la lista.
 func Parse(header string) string {
+	if len(header) > maxHeader {
+		header = header[:maxHeader]
+	}
 	best, bestQ := Es, -1.0
 	for _, part := range strings.Split(header, ",") {
 		tag, params, _ := strings.Cut(part, ";")
 		tag = strings.ToLower(strings.TrimSpace(tag))
-		q := 1.0
-		if k, v, ok := strings.Cut(strings.TrimSpace(params), "="); ok && strings.TrimSpace(k) == "q" {
-			if f, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+		q, ok := 1.0, true
+		for _, p := range strings.Split(params, ";") {
+			if k, v, found := strings.Cut(strings.TrimSpace(p), "="); found && strings.TrimSpace(k) == "q" {
+				f, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+				if err != nil || math.IsNaN(f) || f < 0 || f > 1 {
+					ok = false // q inválido: se descarta la entrada
+				}
 				q = f
 			}
 		}
 		primary, _, _ := strings.Cut(strings.ReplaceAll(tag, "_", "-"), "-")
-		if q <= 0 || (primary != Es && primary != En) || q <= bestQ {
+		if !ok || q <= 0 || (primary != Es && primary != En) || q <= bestQ {
 			continue
 		}
 		best, bestQ = primary, q
 	}
 	return best
 }
+
+// maxHeader acota el Accept-Language que se analiza.
+const maxHeader = 256
 
 // Msg es el texto del código en el idioma dado; un código que no existe se devuelve tal cual.
 func Msg(loc, code string, args Args) string {
