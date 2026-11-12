@@ -106,13 +106,15 @@ test("la petición de envío separa carpeta y archivo, y solo manda credencial s
 });
 
 // El núcleo (remotePath) quita UNA "/" inicial: scp://h/tmp/x es "tmp/x" (relativa al home) y scp://h//tmp/x es "/tmp/x" (absoluta).
-test("en SCP y SFTP una ruta con / inicial sale como absoluta (//) y sin / como relativa al home", () => {
+test("en SCP, SFTP y FTP una ruta con / inicial sale como absoluta (//) y sin / como relativa al home", () => {
   expect(buildURL(f({ proto: "scp", path: "/tmp/x.bin" }))).toBe("scp://192.0.2.1//tmp/x.bin");
   expect(buildURL(f({ proto: "sftp", path: "/tmp/x.bin", port: "2200", portTouched: true }))).toBe("sftp://192.0.2.1:2200//tmp/x.bin");
   expect(buildURL(f({ proto: "scp", path: "dir/x.bin" }))).toBe("scp://192.0.2.1/dir/x.bin");
   // FTP igual que SCP y SFTP (decisión del 2026-11-12): "/" inicial = absoluta, sin "/" = relativa a la carpeta de inicio.
   expect(buildURL(f({ proto: "ftp", path: "/x/y.bin" }))).toBe("ftp://192.0.2.1//x/y.bin");
   expect(buildURL(f({ proto: "ftp", path: "x/y.bin" }))).toBe("ftp://192.0.2.1/x/y.bin");
+  expect(parseClientURL("ftp://h//x/y", "get")).toMatchObject({ path: "/x/y" });
+  expect(parseClientURL("ftp://h/x/y", "get")).toMatchObject({ path: "x/y" });
   expect(buildURL(f({ proto: "tftp", path: "x.bin" }))).toBe("tftp://192.0.2.1/x.bin");
 });
 

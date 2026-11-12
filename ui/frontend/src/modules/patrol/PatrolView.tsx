@@ -65,7 +65,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
   useEffect(() => core.onEvent((e) => {
     if (e.phaseAdded) {
       const p = e.phaseAdded;
-      setLivePhases((l) => ({ ...l, [e.jobId]: [...(l[e.jobId] ?? []), p] }));
+      setLivePhases((l) => (l[e.jobId] ?? []).some((q) => samePhase(p, q)) ? l : { ...l, [e.jobId]: [...(l[e.jobId] ?? []), p] }); // la suscripción reabierta repite eventos
     }
     if (e.phaseAdded || e.jobStateChanged) refreshJobs();
   }), [core, refreshJobs]);

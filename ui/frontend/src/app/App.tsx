@@ -39,11 +39,15 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [palette, setPalette] = useState(false);
   const [shortcuts, setShortcuts] = useState(false);
+  const content = useRef<HTMLDivElement>(null);
   const history = useRef({ back: [] as string[], fwd: [] as string[] });
   const shell = useShellStatus(core);
   // Marca de rendimiento: el shell ya está montado (la mide la prueba de presupuestos en WebKitGTK).
   useEffect(() => { performance.mark("macuahuitl:shell"); }, []);
 
+
+  // Cada módulo empieza arriba: el desplazamiento del anterior no se hereda.
+  useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [current]);
 
   const recheck = useCallback(() => { core.coreStatus().then(setStatus).catch(() => setStatus("disconnected")); }, [core]);
   useEffect(() => {
@@ -166,7 +170,7 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
             {owner && <button className="sm" onClick={() => go(owner)}>{t("shell.assist.go")}</button>}
           </div>
         )}
-        <div className="content">
+        <div className="content" ref={content}>
           {status === "disconnected" && (
             <div role="alert" className="notice error">
               <Icon name="error" /><div className="notice-body">{t("shell.coreDown")} <code>systemctl --user status macuahuitld</code></div>
