@@ -107,7 +107,7 @@ main { max-width: 1440px; }
 .status-live { display: contents; }
 
 /* Capas: paleta de comandos y menús de la barra de estado */
-.scrim { position: fixed; inset: 0; z-index: var(--z-overlay); background: rgb(0 0 0 / 0.18); display: grid; justify-items: center; align-items: start; padding-top: 12vh; animation: fade var(--t-in) var(--ease); }
+.scrim { position: fixed; inset: 0; z-index: var(--z-overlay); background: var(--scrim); display: grid; justify-items: center; align-items: start; padding-top: 12vh; animation: fade var(--t-in) var(--ease); }
 @keyframes fade { from { opacity: 0; } }
 .palette {
   width: min(600px, 92vw); max-height: 60vh; display: flex; flex-direction: column; overflow: hidden;
