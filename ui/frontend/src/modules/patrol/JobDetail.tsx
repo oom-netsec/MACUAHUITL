@@ -27,14 +27,23 @@ export function JobDetail({ core, job, phases, onChanged }: { core: CoreAPI; job
   // CPU de 1 min por ronda y por dirección, para las filas de la grilla.
   const cpu = useMemo(() => Object.fromEntries((metrics?.devices ?? []).map((d) => [d.address, perRound(d, metrics!, (s) => s.cpu?.oneMin).filter((v): v is number => v != null)])), [metrics]);
 
-  // Un trabajo ya armado reconstruye su grilla con el estado de la ronda actual.
+  // Un trabajo ya armado sin grilla (p. ej. al abrir la app) la reconstruye una vez; nunca pisa una grilla viva.
+  // El núcleo solo lista los equipos que ya terminaron la ronda: si la actual va vacía, la lista sale de la anterior.
   useEffect(() => {
-    if (job.state !== "armed") return;
-    core.getRun(job.id, job.round || 1).then((run) => setGrid({
-      devices: run.map((d) => d.target),
-      initial: Object.fromEntries(run.map((d) => [d.target, { state: d.state, progress: "", detail: d.detail }])),
-    })).catch(() => {});
-  }, [core, job.id, job.state, job.round]);
+    if (job.state !== "armed" || grid) return;
+    const r = job.round || 1;
+    let off = false;
+    (async () => {
+      const cur = await core.getRun(job.id, r);
+      const run = cur.length || r < 2 ? cur : await core.getRun(job.id, r - 1);
+      if (off || !run.length) return;
+      setGrid((g) => g ?? {
+        devices: run.map((d) => d.target),
+        initial: cur.length ? Object.fromEntries(cur.map((d) => [d.target, { state: d.state, progress: "", detail: d.detail }])) : undefined,
+      });
+    })().catch(() => {});
+    return () => { off = true; };
+  }, [core, job.id, job.state, job.round, grid]);
 
   const runLogin = async () => {
     setErr(""); setBusy("login"); setTrusted(new Set()); setExcluded(new Set());

@@ -106,7 +106,7 @@ test("el panel de trabajos muestra estado, tiempo, ronda y equipos", async () =>
   expect(job).toHaveTextContent("Armado");
   expect(job).toHaveTextContent("2 h 15 min");
   expect(job).toHaveTextContent("Ronda 2 de 6");
-  expect(job).toHaveTextContent("8 correctos · 1 con fallas · 10 equipos");
+  expect(job).toHaveTextContent("correctos: 8 · con fallas: 1 · 10 equipos");
   expect(within(panel).getByRole("button", { name: /previo/ })).toHaveTextContent("Finalizado");
   expect(core.subscribe).toHaveBeenCalledWith(["j9"]);
 });
@@ -260,7 +260,7 @@ test("un equipo se cuenta en singular", async () => {
   const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j1", name: "uno", state: "completed", round: 1, devicesTotal: 1, devicesOk: 1, devicesFailed: 0 }]) });
   render(<PatrolView core={core} />);
   const panel = await screen.findByRole("region", { name: "Trabajos" });
-  expect(await within(panel).findByRole("button", { name: /uno/ })).toHaveTextContent("1 correctos · 0 con fallas · 1 equipo");
+  expect(await within(panel).findByRole("button", { name: /uno/ })).toHaveTextContent("correctos: 1 · con fallas: 0 · 1 equipo");
   expect(panel).not.toHaveTextContent("1 equipos");
 });
 
@@ -301,4 +301,17 @@ test("un evento de fase repetido por la suscripción no duplica la línea", asyn
   act(() => core.emitEvent(ev));
   const phases = await screen.findByRole("list", { name: "Fases" });
   expect(within(phases).getAllByText("Ronda 2 iniciada")).toHaveLength(1);
+});
+
+test("la grilla de un trabajo armado sale de la ronda anterior si la actual va vacía y no se borra al empezar otra ronda", async () => {
+  let round = 2;
+  const getRun = vi.fn(async (_id: string, r: number) => (r === 1 ? [{ target: "10.0.0.7:22", state: "DEVICE_STATE_COMPLETED", detail: "" }] : []));
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j7", name: "noche", state: "armed", round, rounds: 0, phases: [] }]), getRun });
+  render(<PatrolView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /noche/ }));
+  expect(await screen.findByText("10.0.0.7:22")).toBeInTheDocument();
+  round = 3; // una ronda nueva arranca vacía en el núcleo: la grilla viva no se reemplaza por una vacía
+  act(() => core.emitEvent({ jobId: "j7", phaseAdded: { at: new Date().toISOString(), kind: "JOB_PHASE_KIND_ROUND_STARTED", round: 3 } }));
+  await act(async () => {});
+  expect(screen.getByText("10.0.0.7:22")).toBeInTheDocument();
 });

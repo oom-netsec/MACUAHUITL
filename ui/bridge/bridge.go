@@ -417,7 +417,7 @@ type RunDeviceDTO struct {
 // targetLabel es "dirección:puerto"; con puerto 0 (el núcleo no lo informó) solo la dirección.
 func targetLabel(addr string, port uint32) string {
 	if port == 0 {
-		return addr
+		port = 22 // como patrolHostport en el núcleo: así la fila coincide con el deviceId de los eventos
 	}
 	return fmt.Sprintf("%s:%d", addr, port)
 }

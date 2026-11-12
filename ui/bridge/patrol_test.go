@@ -147,10 +147,11 @@ func TestListPlaybooksJSON(t *testing.T) {
 }
 
 func TestTargetLabel(t *testing.T) {
-	if got := targetLabel("192.168.3.2", 0); got != "192.168.3.2" {
+	// Puerto 0 = el de omisión de SSH: igual que el deviceId de los eventos del núcleo (patrolHostport), si no la fila no se actualiza.
+	if got := targetLabel("192.168.3.2", 0); got != "192.168.3.2:22" {
 		t.Fatalf("puerto 0: %q", got)
 	}
-	if got := targetLabel("192.168.3.2", 22); got != "192.168.3.2:22" {
-		t.Fatalf("puerto 22: %q", got)
+	if got := targetLabel("192.168.3.2", 2222); got != "192.168.3.2:2222" {
+		t.Fatalf("puerto 2222: %q", got)
 	}
 }

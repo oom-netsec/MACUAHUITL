@@ -21,7 +21,8 @@ export function JobsPanel({ jobs, selected, onSelect, onNew }: { jobs: Job[]; se
   const [, tick] = useState(0);
   const [kind, setKind] = useState("");
   const kinds = [...new Set(jobs.map((j) => j.kind).filter((k): k is string => !!k))];
-  const shown = kind ? jobs.filter((j) => j.kind === kind) : jobs;
+  const k = kinds.length > 1 && kinds.includes(kind) ? kind : ""; // si el tipo elegido desaparece, el filtro se suelta
+  const shown = k ? jobs.filter((j) => j.kind === k) : jobs;
   const kindLabel = (k: string) => (["adhoc", "backup", "patrol", "change"].includes(k) ? t(`patrol.kind.${k}` as Key) : k);
   const live = jobs.some((j) => j.state === "armed");
   useEffect(() => {
@@ -36,7 +37,7 @@ export function JobsPanel({ jobs, selected, onSelect, onNew }: { jobs: Job[]; se
         <h3 id="jobs-h">{t("patrol.jobs")}</h3>
         <button className="sm" aria-pressed={selected === null} onClick={onNew}>{t("patrol.newJob")}</button>
       </header>
-      {kinds.length > 1 && <Segmented legend={t("patrol.filter.kind")} value={kinds.includes(kind) ? kind : ""} onChange={setKind} options={[["", t("patrol.kind.all")], ...kinds.map((k): [string, string] => [k, kindLabel(k)])]} />}
+      {kinds.length > 1 && <Segmented legend={t("patrol.filter.kind")} value={k} onChange={setKind} options={[["", t("patrol.kind.all")], ...kinds.map((k): [string, string] => [k, kindLabel(k)])]} />}
       {!jobs.length && <EmptyState icon="patrol" title={t("patrol.jobs.empty")}>{t("patrol.jobs.empty.hint")}</EmptyState>}
       <ul className="job-list">
         {shown.map((j) => (
