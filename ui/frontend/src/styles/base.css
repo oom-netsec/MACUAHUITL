@@ -73,7 +73,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent);
 }
-input:disabled, select:disabled, textarea:disabled { background: var(--surface-2); color: var(--text-3); }
+input:disabled, select:disabled, textarea:disabled { background-color: var(--surface-2); color: var(--text-3); } /* background-color: el select deshabilitado conserva su flecha */
 input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
 /* WebKitGTK pinta los nativos con el tema GTK (claro) aunque color-scheme sea dark: se dibujan con tokens. */
 select {
@@ -90,6 +90,14 @@ input[type="checkbox"]:checked { background: var(--accent); border-color: var(--
 input[type="checkbox"]:checked::after { opacity: 1; }
 input[type="checkbox"]:disabled { background: var(--surface-2); opacity: 0.6; }
 input[type="checkbox"]:disabled:checked { background: var(--text-3); border-color: var(--text-3); }
+/* El anillo de foco va por fuera: por dentro no se distingue en una casilla marcada (fondo y borde de acento). */
+input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outline-offset: 2px; }
+/* Radios con tokens, como las casillas: WebKitGTK los pinta con el tema GTK (claro sobre oscuro). */
+input[type="radio"] { appearance: none; display: inline-grid; place-content: center; flex: none; border: 1px solid var(--border-control); border-radius: 50%; background: var(--surface); }
+input[type="radio"]::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-fg); opacity: 0; }
+input[type="radio"]:checked { background: var(--accent); border-color: var(--accent); }
+input[type="radio"]:checked::after { opacity: 1; }
+input[type="radio"]:disabled { background-color: var(--surface-2); opacity: 0.6; }
 input[type="number"], .mono { font-variant-numeric: tabular-nums; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 
