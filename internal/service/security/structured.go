@@ -7,7 +7,9 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/radiustest"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/tacacstest"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/ikedec"
 	"github.com/oom-netsec/MACUAHUITL/internal/pki"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
 // Forma estructurada de los informes de seguridad (fase 30b): lo mismo que dice el texto, con claves estables.
@@ -90,4 +92,32 @@ func certificates(loc string, sums []pki.Summary) []*v1.PkiCertificate {
 		out = append(out, c)
 	}
 	return out
+}
+
+// ikeResponse arma la respuesta del decodificador IKE: el informe (texto y JSON) en el idioma pedido y su forma
+// estructurada. Las fases y los resultados salen como códigos cerrados en inglés.
+func ikeResponse(rep ikedec.Report, loc string) *v1.IkeDecodeResponse {
+	local := rep.In(loc)
+	k1, k2 := rep.PhaseKeys()
+	out := &v1.IkeDecodeResponse{Report: service.Report(local, rep.TextIn(loc)), Phase1: ikeCode(k1), Phase2: ikeCode(k2), Note: local.Note}
+	for i, f := range rep.Findings {
+		lf := local.Findings[i]
+		out.Findings = append(out.Findings, &v1.IkeFinding{Code: f.Code, Severity: ikeSeverity(f.Severity), Phase: int32(f.Phase), Key: f.Key(), ExplanationKey: f.ExplanationKey(),
+			Args: f.Args(), Title: lf.Title, Explanation: lf.Explanation, Action: lf.Action, Evidence: lf.Evidence})
+	}
+	for i, p := range rep.Proposals {
+		out.Proposals = append(out.Proposals, &v1.IkeProposal{Phase: int32(p.Phase), SourceKey: p.SourceKey(), SourceArgs: p.SourceArgs(), Source: local.Proposals[i].Source,
+			Detail: p.Detail, Result: ikeCode(p.ResultKey())})
+	}
+	return out
+}
+
+// ikeCode es el último tramo de una clave de valor (ike.val.phase.no_data da no_data).
+func ikeCode(key string) string { return key[strings.LastIndex(key, ".")+1:] }
+
+func ikeSeverity(s string) string {
+	if s == "aviso" {
+		return "warning"
+	}
+	return s
 }

@@ -294,3 +294,41 @@ func TestRadiusMschap2Verified(t *testing.T) {
 		t.Errorf("pap no debe traerlo: %v", *v)
 	}
 }
+
+// Fase 30c-A: IKE sale estructurado y en el idioma pedido; con es (o sin idioma) el texto y el JSON son los de siempre.
+func TestIkeDecodeEstructuradoYEn(t *testing.T) {
+	h := newHarness(t, nil)
+	c := v1.NewSecurityServiceClient(h.conn)
+	in := "ISAKMP:(0): Checking ISAKMP transform 1 against priority 10 policy\nISAKMP:      encryption DES-CBC\nISAKMP:(0): atts are not acceptable. Next payload is 0\nISAKMP:(0): phase 1 SA policy not acceptable! (local 192.0.2.1 remote 192.0.2.2)\n"
+	ask := func(lang string) *v1.IkeDecodeResponse {
+		r, err := c.IkeDecode(con(t, lang), &v1.IkeDecodeRequest{Text: in})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	base := ask("")
+	for _, lang := range []string{"es", "es-MX", "fr"} {
+		if r := ask(lang); r.Report.Text != base.Report.Text || r.Report.Json != base.Report.Json {
+			t.Errorf("%s difiere de sin idioma", lang)
+		}
+	}
+	if base.Phase1 != "failed" || base.Phase2 != "no_data" || len(base.Findings) != 1 || len(base.Proposals) != 1 {
+		t.Fatalf("%+v", base)
+	}
+	f := base.Findings[0]
+	if f.Code != "p1-propuesta" || f.Severity != "error" || f.Key != "ike.finding.p1_propuesta" || f.Phase != 1 ||
+		!strings.Contains(base.Report.Text, "[error] "+f.Title) || f.Title != i18n.Msg(i18n.Es, f.Key+".title", f.Args) ||
+		!strings.Contains(base.Report.Text, "  Acción: "+f.Action+"\n") || base.Proposals[0].Result != "rejected" || base.Proposals[0].SourceKey != "ike.proposal.source.v1_transform" ||
+		base.Proposals[0].SourceArgs["transform"] != "1" || !strings.HasPrefix(base.Note, "Reglas basadas") {
+		t.Errorf("%+v %+v", f, base.Proposals[0])
+	}
+	en := ask("en")
+	ef := en.Findings[0]
+	if ef.Title != "IKE phase 1 proposals do not match" || ef.Code != f.Code || ef.Key != f.Key || !strings.Contains(en.Report.Text, "[error] IKE phase 1 proposals do not match") ||
+		!strings.HasPrefix(en.Report.Text, "Detected: ") || !strings.Contains(en.Report.Text, "Phase 1: failed") || !strings.Contains(en.Report.Json, `"Phase1":"failed"`) ||
+		!strings.Contains(en.Report.Json, "IKE phase 1 proposals do not match") || en.Proposals[0].Source != "peer transform 1 vs policy 10" || en.Proposals[0].Result != "rejected" ||
+		en.Phase1 != "failed" || !strings.HasPrefix(en.Note, "Rules based on") || strings.Contains(en.Report.Text, "Acción") {
+		t.Errorf("en: %+v\n%s", ef, en.Report.Text)
+	}
+}

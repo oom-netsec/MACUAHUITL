@@ -2203,8 +2203,15 @@ func (x *IkeDecodeRequest) GetText() string {
 }
 
 type IkeDecodeResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Report        *ToolReport            `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Report *ToolReport            `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	// Fase 30c: lo mismo que dice el informe, con claves estables. El texto y el JSON del informe salen en el idioma
+	// pedido (el de siempre en español).
+	Phase1        string         `protobuf:"bytes,2,opt,name=phase1,proto3" json:"phase1,omitempty"` // established, failed, mixed, incomplete, no_data
+	Phase2        string         `protobuf:"bytes,3,opt,name=phase2,proto3" json:"phase2,omitempty"`
+	Findings      []*IkeFinding  `protobuf:"bytes,4,rep,name=findings,proto3" json:"findings,omitempty"`
+	Proposals     []*IkeProposal `protobuf:"bytes,5,rep,name=proposals,proto3" json:"proposals,omitempty"`
+	Note          string         `protobuf:"bytes,6,opt,name=note,proto3" json:"note,omitempty"` // la nota fija en el idioma pedido
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2244,6 +2251,245 @@ func (x *IkeDecodeResponse) GetReport() *ToolReport {
 		return x.Report
 	}
 	return nil
+}
+
+func (x *IkeDecodeResponse) GetPhase1() string {
+	if x != nil {
+		return x.Phase1
+	}
+	return ""
+}
+
+func (x *IkeDecodeResponse) GetPhase2() string {
+	if x != nil {
+		return x.Phase2
+	}
+	return ""
+}
+
+func (x *IkeDecodeResponse) GetFindings() []*IkeFinding {
+	if x != nil {
+		return x.Findings
+	}
+	return nil
+}
+
+func (x *IkeDecodeResponse) GetProposals() []*IkeProposal {
+	if x != nil {
+		return x.Proposals
+	}
+	return nil
+}
+
+func (x *IkeDecodeResponse) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+// Hallazgo del decodificador: code estable (p1-propuesta, psk…), severity cerrada (warning, error, info), key del
+// catálogo (ike.finding.<código>; con .title, .action y explanation_key para la explicación) y los args que
+// usan. Las evidencias son líneas del equipo y no se traducen, salvo el significado que sa-estado les agrega.
+type IkeFinding struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Code           string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Severity       string                 `protobuf:"bytes,2,opt,name=severity,proto3" json:"severity,omitempty"`
+	Phase          int32                  `protobuf:"varint,3,opt,name=phase,proto3" json:"phase,omitempty"` // 0 si no aplica
+	Key            string                 `protobuf:"bytes,4,opt,name=key,proto3" json:"key,omitempty"`
+	ExplanationKey string                 `protobuf:"bytes,5,opt,name=explanation_key,json=explanationKey,proto3" json:"explanation_key,omitempty"`
+	Args           map[string]string      `protobuf:"bytes,6,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Title          string                 `protobuf:"bytes,7,opt,name=title,proto3" json:"title,omitempty"`
+	Explanation    string                 `protobuf:"bytes,8,opt,name=explanation,proto3" json:"explanation,omitempty"`
+	Action         string                 `protobuf:"bytes,9,opt,name=action,proto3" json:"action,omitempty"`
+	Evidence       []string               `protobuf:"bytes,10,rep,name=evidence,proto3" json:"evidence,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *IkeFinding) Reset() {
+	*x = IkeFinding{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IkeFinding) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IkeFinding) ProtoMessage() {}
+
+func (x *IkeFinding) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IkeFinding.ProtoReflect.Descriptor instead.
+func (*IkeFinding) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *IkeFinding) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *IkeFinding) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *IkeFinding) GetPhase() int32 {
+	if x != nil {
+		return x.Phase
+	}
+	return 0
+}
+
+func (x *IkeFinding) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *IkeFinding) GetExplanationKey() string {
+	if x != nil {
+		return x.ExplanationKey
+	}
+	return ""
+}
+
+func (x *IkeFinding) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+func (x *IkeFinding) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *IkeFinding) GetExplanation() string {
+	if x != nil {
+		return x.Explanation
+	}
+	return ""
+}
+
+func (x *IkeFinding) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *IkeFinding) GetEvidence() []string {
+	if x != nil {
+		return x.Evidence
+	}
+	return nil
+}
+
+// Propuesta: source_key (ike.proposal.source.*) con sus source_args; result es accepted, rejected o vacío.
+type IkeProposal struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Phase         int32                  `protobuf:"varint,1,opt,name=phase,proto3" json:"phase,omitempty"`
+	SourceKey     string                 `protobuf:"bytes,2,opt,name=source_key,json=sourceKey,proto3" json:"source_key,omitempty"`
+	SourceArgs    map[string]string      `protobuf:"bytes,3,rep,name=source_args,json=sourceArgs,proto3" json:"source_args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Source        string                 `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`
+	Detail        string                 `protobuf:"bytes,5,opt,name=detail,proto3" json:"detail,omitempty"` // salida del equipo, tal cual
+	Result        string                 `protobuf:"bytes,6,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IkeProposal) Reset() {
+	*x = IkeProposal{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IkeProposal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IkeProposal) ProtoMessage() {}
+
+func (x *IkeProposal) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IkeProposal.ProtoReflect.Descriptor instead.
+func (*IkeProposal) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *IkeProposal) GetPhase() int32 {
+	if x != nil {
+		return x.Phase
+	}
+	return 0
+}
+
+func (x *IkeProposal) GetSourceKey() string {
+	if x != nil {
+		return x.SourceKey
+	}
+	return ""
+}
+
+func (x *IkeProposal) GetSourceArgs() map[string]string {
+	if x != nil {
+		return x.SourceArgs
+	}
+	return nil
+}
+
+func (x *IkeProposal) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *IkeProposal) GetDetail() string {
+	if x != nil {
+		return x.Detail
+	}
+	return ""
+}
+
+func (x *IkeProposal) GetResult() string {
+	if x != nil {
+		return x.Result
+	}
+	return ""
 }
 
 var File_macuahuitl_v1_security_proto protoreflect.FileDescriptor
@@ -2451,9 +2697,42 @@ const file_macuahuitl_v1_security_proto_rawDesc = "" +
 	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x12A\n" +
 	"\fcertificates\x18\x02 \x03(\v2\x1d.macuahuitl.v1.PkiCertificateR\fcertificates\"&\n" +
 	"\x10IkeDecodeRequest\x12\x12\n" +
-	"\x04text\x18\x01 \x01(\tR\x04text\"F\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\"\xfb\x01\n" +
 	"\x11IkeDecodeResponse\x121\n" +
-	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report2\xd5\x05\n" +
+	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x12\x16\n" +
+	"\x06phase1\x18\x02 \x01(\tR\x06phase1\x12\x16\n" +
+	"\x06phase2\x18\x03 \x01(\tR\x06phase2\x125\n" +
+	"\bfindings\x18\x04 \x03(\v2\x19.macuahuitl.v1.IkeFindingR\bfindings\x128\n" +
+	"\tproposals\x18\x05 \x03(\v2\x1a.macuahuitl.v1.IkeProposalR\tproposals\x12\x12\n" +
+	"\x04note\x18\x06 \x01(\tR\x04note\"\xeb\x02\n" +
+	"\n" +
+	"IkeFinding\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x1a\n" +
+	"\bseverity\x18\x02 \x01(\tR\bseverity\x12\x14\n" +
+	"\x05phase\x18\x03 \x01(\x05R\x05phase\x12\x10\n" +
+	"\x03key\x18\x04 \x01(\tR\x03key\x12'\n" +
+	"\x0fexplanation_key\x18\x05 \x01(\tR\x0eexplanationKey\x127\n" +
+	"\x04args\x18\x06 \x03(\v2#.macuahuitl.v1.IkeFinding.ArgsEntryR\x04args\x12\x14\n" +
+	"\x05title\x18\a \x01(\tR\x05title\x12 \n" +
+	"\vexplanation\x18\b \x01(\tR\vexplanation\x12\x16\n" +
+	"\x06action\x18\t \x01(\tR\x06action\x12\x1a\n" +
+	"\bevidence\x18\n" +
+	" \x03(\tR\bevidence\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x96\x02\n" +
+	"\vIkeProposal\x12\x14\n" +
+	"\x05phase\x18\x01 \x01(\x05R\x05phase\x12\x1d\n" +
+	"\n" +
+	"source_key\x18\x02 \x01(\tR\tsourceKey\x12K\n" +
+	"\vsource_args\x18\x03 \x03(\v2*.macuahuitl.v1.IkeProposal.SourceArgsEntryR\n" +
+	"sourceArgs\x12\x16\n" +
+	"\x06source\x18\x04 \x01(\tR\x06source\x12\x16\n" +
+	"\x06detail\x18\x05 \x01(\tR\x06detail\x12\x16\n" +
+	"\x06result\x18\x06 \x01(\tR\x06result\x1a=\n" +
+	"\x0fSourceArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\xd5\x05\n" +
 	"\x0fSecurityService\x12Q\n" +
 	"\n" +
 	"RadiusTest\x12 .macuahuitl.v1.RadiusTestRequest\x1a!.macuahuitl.v1.RadiusTestResponse\x12Q\n" +
@@ -2479,7 +2758,7 @@ func file_macuahuitl_v1_security_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_security_proto_rawDescData
 }
 
-var file_macuahuitl_v1_security_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
+var file_macuahuitl_v1_security_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_macuahuitl_v1_security_proto_goTypes = []any{
 	(*SecretSource)(nil),       // 0: macuahuitl.v1.SecretSource
 	(*RadiusTestRequest)(nil),  // 1: macuahuitl.v1.RadiusTestRequest
@@ -2511,65 +2790,73 @@ var file_macuahuitl_v1_security_proto_goTypes = []any{
 	(*PkiDecodeResponse)(nil),  // 27: macuahuitl.v1.PkiDecodeResponse
 	(*IkeDecodeRequest)(nil),   // 28: macuahuitl.v1.IkeDecodeRequest
 	(*IkeDecodeResponse)(nil),  // 29: macuahuitl.v1.IkeDecodeResponse
-	nil,                        // 30: macuahuitl.v1.SecText.ArgsEntry
-	nil,                        // 31: macuahuitl.v1.SecFinding.ArgsEntry
-	nil,                        // 32: macuahuitl.v1.PkiWarning.ArgsEntry
-	(*ToolReport)(nil),         // 33: macuahuitl.v1.ToolReport
+	(*IkeFinding)(nil),         // 30: macuahuitl.v1.IkeFinding
+	(*IkeProposal)(nil),        // 31: macuahuitl.v1.IkeProposal
+	nil,                        // 32: macuahuitl.v1.SecText.ArgsEntry
+	nil,                        // 33: macuahuitl.v1.SecFinding.ArgsEntry
+	nil,                        // 34: macuahuitl.v1.PkiWarning.ArgsEntry
+	nil,                        // 35: macuahuitl.v1.IkeFinding.ArgsEntry
+	nil,                        // 36: macuahuitl.v1.IkeProposal.SourceArgsEntry
+	(*ToolReport)(nil),         // 37: macuahuitl.v1.ToolReport
 }
 var file_macuahuitl_v1_security_proto_depIdxs = []int32{
 	0,  // 0: macuahuitl.v1.RadiusTestRequest.shared_secret:type_name -> macuahuitl.v1.SecretSource
 	0,  // 1: macuahuitl.v1.RadiusTestRequest.password:type_name -> macuahuitl.v1.SecretSource
-	30, // 2: macuahuitl.v1.SecText.args:type_name -> macuahuitl.v1.SecText.ArgsEntry
-	31, // 3: macuahuitl.v1.SecFinding.args:type_name -> macuahuitl.v1.SecFinding.ArgsEntry
+	32, // 2: macuahuitl.v1.SecText.args:type_name -> macuahuitl.v1.SecText.ArgsEntry
+	33, // 3: macuahuitl.v1.SecFinding.args:type_name -> macuahuitl.v1.SecFinding.ArgsEntry
 	2,  // 4: macuahuitl.v1.RadiusExchange.error:type_name -> macuahuitl.v1.SecText
 	4,  // 5: macuahuitl.v1.RadiusExchange.attrs:type_name -> macuahuitl.v1.RadiusAttribute
-	33, // 6: macuahuitl.v1.RadiusTestResponse.report:type_name -> macuahuitl.v1.ToolReport
+	37, // 6: macuahuitl.v1.RadiusTestResponse.report:type_name -> macuahuitl.v1.ToolReport
 	5,  // 7: macuahuitl.v1.RadiusTestResponse.exchanges:type_name -> macuahuitl.v1.RadiusExchange
 	3,  // 8: macuahuitl.v1.RadiusTestResponse.findings:type_name -> macuahuitl.v1.SecFinding
 	0,  // 9: macuahuitl.v1.TacacsTestRequest.shared_secret:type_name -> macuahuitl.v1.SecretSource
 	0,  // 10: macuahuitl.v1.TacacsTestRequest.password:type_name -> macuahuitl.v1.SecretSource
 	2,  // 11: macuahuitl.v1.TacacsStep.error:type_name -> macuahuitl.v1.SecText
 	8,  // 12: macuahuitl.v1.TacacsStep.av_pairs:type_name -> macuahuitl.v1.TacacsAvPair
-	33, // 13: macuahuitl.v1.TacacsTestResponse.report:type_name -> macuahuitl.v1.ToolReport
+	37, // 13: macuahuitl.v1.TacacsTestResponse.report:type_name -> macuahuitl.v1.ToolReport
 	9,  // 14: macuahuitl.v1.TacacsTestResponse.steps:type_name -> macuahuitl.v1.TacacsStep
 	3,  // 15: macuahuitl.v1.TacacsTestResponse.findings:type_name -> macuahuitl.v1.SecFinding
-	32, // 16: macuahuitl.v1.PkiWarning.args:type_name -> macuahuitl.v1.PkiWarning.ArgsEntry
+	34, // 16: macuahuitl.v1.PkiWarning.args:type_name -> macuahuitl.v1.PkiWarning.ArgsEntry
 	11, // 17: macuahuitl.v1.PkiCertificate.key:type_name -> macuahuitl.v1.PkiKey
 	12, // 18: macuahuitl.v1.PkiCertificate.signature:type_name -> macuahuitl.v1.PkiSignature
 	13, // 19: macuahuitl.v1.PkiCertificate.warnings:type_name -> macuahuitl.v1.PkiWarning
 	17, // 20: macuahuitl.v1.PkiCsrRequest.subject:type_name -> macuahuitl.v1.PkiSubject
-	33, // 21: macuahuitl.v1.PkiCsrResponse.report:type_name -> macuahuitl.v1.ToolReport
+	37, // 21: macuahuitl.v1.PkiCsrResponse.report:type_name -> macuahuitl.v1.ToolReport
 	14, // 22: macuahuitl.v1.PkiCsrResponse.certificates:type_name -> macuahuitl.v1.PkiCertificate
-	33, // 23: macuahuitl.v1.PkiCaInitResponse.report:type_name -> macuahuitl.v1.ToolReport
+	37, // 23: macuahuitl.v1.PkiCaInitResponse.report:type_name -> macuahuitl.v1.ToolReport
 	14, // 24: macuahuitl.v1.PkiCaInitResponse.certificates:type_name -> macuahuitl.v1.PkiCertificate
-	33, // 25: macuahuitl.v1.PkiCaSignResponse.report:type_name -> macuahuitl.v1.ToolReport
+	37, // 25: macuahuitl.v1.PkiCaSignResponse.report:type_name -> macuahuitl.v1.ToolReport
 	14, // 26: macuahuitl.v1.PkiCaSignResponse.certificates:type_name -> macuahuitl.v1.PkiCertificate
-	33, // 27: macuahuitl.v1.PkiDecodeResponse.report:type_name -> macuahuitl.v1.ToolReport
+	37, // 27: macuahuitl.v1.PkiDecodeResponse.report:type_name -> macuahuitl.v1.ToolReport
 	14, // 28: macuahuitl.v1.PkiDecodeResponse.certificates:type_name -> macuahuitl.v1.PkiCertificate
-	33, // 29: macuahuitl.v1.IkeDecodeResponse.report:type_name -> macuahuitl.v1.ToolReport
-	1,  // 30: macuahuitl.v1.SecurityService.RadiusTest:input_type -> macuahuitl.v1.RadiusTestRequest
-	7,  // 31: macuahuitl.v1.SecurityService.TacacsTest:input_type -> macuahuitl.v1.TacacsTestRequest
-	15, // 32: macuahuitl.v1.SecurityService.PkiKey:input_type -> macuahuitl.v1.PkiKeyRequest
-	18, // 33: macuahuitl.v1.SecurityService.PkiCsr:input_type -> macuahuitl.v1.PkiCsrRequest
-	20, // 34: macuahuitl.v1.SecurityService.PkiCaInit:input_type -> macuahuitl.v1.PkiCaInitRequest
-	22, // 35: macuahuitl.v1.SecurityService.PkiCaSign:input_type -> macuahuitl.v1.PkiCaSignRequest
-	24, // 36: macuahuitl.v1.SecurityService.PkiExport:input_type -> macuahuitl.v1.PkiExportRequest
-	26, // 37: macuahuitl.v1.SecurityService.PkiDecode:input_type -> macuahuitl.v1.PkiDecodeRequest
-	28, // 38: macuahuitl.v1.SecurityService.IkeDecode:input_type -> macuahuitl.v1.IkeDecodeRequest
-	6,  // 39: macuahuitl.v1.SecurityService.RadiusTest:output_type -> macuahuitl.v1.RadiusTestResponse
-	10, // 40: macuahuitl.v1.SecurityService.TacacsTest:output_type -> macuahuitl.v1.TacacsTestResponse
-	16, // 41: macuahuitl.v1.SecurityService.PkiKey:output_type -> macuahuitl.v1.PkiKeyResponse
-	19, // 42: macuahuitl.v1.SecurityService.PkiCsr:output_type -> macuahuitl.v1.PkiCsrResponse
-	21, // 43: macuahuitl.v1.SecurityService.PkiCaInit:output_type -> macuahuitl.v1.PkiCaInitResponse
-	23, // 44: macuahuitl.v1.SecurityService.PkiCaSign:output_type -> macuahuitl.v1.PkiCaSignResponse
-	25, // 45: macuahuitl.v1.SecurityService.PkiExport:output_type -> macuahuitl.v1.PkiExportResponse
-	27, // 46: macuahuitl.v1.SecurityService.PkiDecode:output_type -> macuahuitl.v1.PkiDecodeResponse
-	29, // 47: macuahuitl.v1.SecurityService.IkeDecode:output_type -> macuahuitl.v1.IkeDecodeResponse
-	39, // [39:48] is the sub-list for method output_type
-	30, // [30:39] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	37, // 29: macuahuitl.v1.IkeDecodeResponse.report:type_name -> macuahuitl.v1.ToolReport
+	30, // 30: macuahuitl.v1.IkeDecodeResponse.findings:type_name -> macuahuitl.v1.IkeFinding
+	31, // 31: macuahuitl.v1.IkeDecodeResponse.proposals:type_name -> macuahuitl.v1.IkeProposal
+	35, // 32: macuahuitl.v1.IkeFinding.args:type_name -> macuahuitl.v1.IkeFinding.ArgsEntry
+	36, // 33: macuahuitl.v1.IkeProposal.source_args:type_name -> macuahuitl.v1.IkeProposal.SourceArgsEntry
+	1,  // 34: macuahuitl.v1.SecurityService.RadiusTest:input_type -> macuahuitl.v1.RadiusTestRequest
+	7,  // 35: macuahuitl.v1.SecurityService.TacacsTest:input_type -> macuahuitl.v1.TacacsTestRequest
+	15, // 36: macuahuitl.v1.SecurityService.PkiKey:input_type -> macuahuitl.v1.PkiKeyRequest
+	18, // 37: macuahuitl.v1.SecurityService.PkiCsr:input_type -> macuahuitl.v1.PkiCsrRequest
+	20, // 38: macuahuitl.v1.SecurityService.PkiCaInit:input_type -> macuahuitl.v1.PkiCaInitRequest
+	22, // 39: macuahuitl.v1.SecurityService.PkiCaSign:input_type -> macuahuitl.v1.PkiCaSignRequest
+	24, // 40: macuahuitl.v1.SecurityService.PkiExport:input_type -> macuahuitl.v1.PkiExportRequest
+	26, // 41: macuahuitl.v1.SecurityService.PkiDecode:input_type -> macuahuitl.v1.PkiDecodeRequest
+	28, // 42: macuahuitl.v1.SecurityService.IkeDecode:input_type -> macuahuitl.v1.IkeDecodeRequest
+	6,  // 43: macuahuitl.v1.SecurityService.RadiusTest:output_type -> macuahuitl.v1.RadiusTestResponse
+	10, // 44: macuahuitl.v1.SecurityService.TacacsTest:output_type -> macuahuitl.v1.TacacsTestResponse
+	16, // 45: macuahuitl.v1.SecurityService.PkiKey:output_type -> macuahuitl.v1.PkiKeyResponse
+	19, // 46: macuahuitl.v1.SecurityService.PkiCsr:output_type -> macuahuitl.v1.PkiCsrResponse
+	21, // 47: macuahuitl.v1.SecurityService.PkiCaInit:output_type -> macuahuitl.v1.PkiCaInitResponse
+	23, // 48: macuahuitl.v1.SecurityService.PkiCaSign:output_type -> macuahuitl.v1.PkiCaSignResponse
+	25, // 49: macuahuitl.v1.SecurityService.PkiExport:output_type -> macuahuitl.v1.PkiExportResponse
+	27, // 50: macuahuitl.v1.SecurityService.PkiDecode:output_type -> macuahuitl.v1.PkiDecodeResponse
+	29, // 51: macuahuitl.v1.SecurityService.IkeDecode:output_type -> macuahuitl.v1.IkeDecodeResponse
+	43, // [43:52] is the sub-list for method output_type
+	34, // [34:43] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_security_proto_init() }
@@ -2587,7 +2874,7 @@ func file_macuahuitl_v1_security_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_security_proto_rawDesc), len(file_macuahuitl_v1_security_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   33,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

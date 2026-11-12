@@ -133,17 +133,26 @@ func Msg(loc, code string, args Args) string {
 	return render(e.Es, args)
 }
 
-// ValPrefix marca los códigos que son un valor con palabras (calc.val.*): un argumento cuyo valor es uno de esos
-// códigos se escribe en el idioma pedido al armar el texto, así una nota puede citar un valor traducible.
-const ValPrefix = "calc.val."
+// Los códigos que son un valor con palabras (calc.val.*, ike.val.*) pueden ir como valor de un argumento: al armar
+// el texto se escriben en el idioma pedido, así un mensaje cita un valor traducible. Varios códigos separados por
+// coma se escriben separados por «, ».
+func isValKey(v string) bool {
+	if !strings.HasPrefix(v, "calc.val.") && !strings.HasPrefix(v, "ike.val.") {
+		return false
+	}
+	_, ok := catalog[v]
+	return ok
+}
 
 func resolveRefs(loc string, args Args) Args {
 	var out Args
 	for k, v := range args {
-		if !strings.HasPrefix(v, ValPrefix) {
-			continue
+		parts := strings.Split(v, ",")
+		ok := v != ""
+		for _, p := range parts {
+			ok = ok && isValKey(p)
 		}
-		if _, ok := catalog[v]; !ok {
+		if !ok {
 			continue
 		}
 		if out == nil {
@@ -152,7 +161,10 @@ func resolveRefs(loc string, args Args) Args {
 				out[k2] = v2
 			}
 		}
-		out[k] = Msg(loc, v, nil)
+		for i, p := range parts {
+			parts[i] = Msg(loc, p, nil)
+		}
+		out[k] = strings.Join(parts, ", ")
 	}
 	if out == nil {
 		return args

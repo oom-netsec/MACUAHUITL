@@ -329,7 +329,8 @@ func (s *securitySvc) IkeDecode(ctx context.Context, r *v1.IkeDecodeRequest) (*v
 	if err != nil {
 		return nil, status.FromContextError(err).Err()
 	}
-	return &v1.IkeDecodeResponse{Report: service.Report(rep, rep.Text())}, nil
+	loc := i18n.Locale(ctx)
+	return ikeResponse(rep, loc), nil
 }
 
 // Module registra el servicio Security.

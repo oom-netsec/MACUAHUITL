@@ -263,4 +263,37 @@ message IkeDecodeRequest {
 
 message IkeDecodeResponse {
   ToolReport report = 1;
+  // Fase 30c: lo mismo que dice el informe, con claves estables. El texto y el JSON del informe salen en el idioma
+  // pedido (el de siempre en español).
+  string phase1 = 2; // established, failed, mixed, incomplete, no_data
+  string phase2 = 3;
+  repeated IkeFinding findings = 4;
+  repeated IkeProposal proposals = 5;
+  string note = 6; // la nota fija en el idioma pedido
+}
+
+// Hallazgo del decodificador: code estable (p1-propuesta, psk…), severity cerrada (warning, error, info), key del
+// catálogo (ike.finding.<código>; con .title, .action y explanation_key para la explicación) y los args que
+// usan. Las evidencias son líneas del equipo y no se traducen, salvo el significado que sa-estado les agrega.
+message IkeFinding {
+  string code = 1;
+  string severity = 2;
+  int32 phase = 3; // 0 si no aplica
+  string key = 4;
+  string explanation_key = 5;
+  map<string, string> args = 6;
+  string title = 7;
+  string explanation = 8;
+  string action = 9;
+  repeated string evidence = 10;
+}
+
+// Propuesta: source_key (ike.proposal.source.*) con sus source_args; result es accepted, rejected o vacío.
+message IkeProposal {
+  int32 phase = 1;
+  string source_key = 2;
+  map<string, string> source_args = 3;
+  string source = 4;
+  string detail = 5; // salida del equipo, tal cual
+  string result = 6;
 }
