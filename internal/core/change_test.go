@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -150,5 +151,19 @@ func TestUpgradeAndComplianceChecks(t *testing.T) {
 	txt := h.auditText(t)
 	if !strings.Contains(txt, `"action":"upgrade.check"`) || !strings.Contains(txt, `"action":"compliance.check"`) {
 		t.Fatal("checks not audited")
+	}
+}
+
+// Sin carpeta explícita, el cambio usa una subcarpeta propia 0700: outputs/cambios puede existir con otro modo
+// (creada a mano o restaurada con rsync) y no debe romper CreateChange.
+func TestCreateChangeConCarpetaCambiosAbierta(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	cambios := filepath.Join(h.out, "cambios")
+	os.MkdirAll(cambios, 0o755)
+	os.Chmod(cambios, 0o755)
+	_, err := v1.NewChangeServiceClient(h.conn).CreateChange(ctx(t), &v1.CreateChangeRequest{Spec: &v1.JobSpec{Name: "c", Targets: []*v1.Target{h.target}, DefaultCredentialId: cred}})
+	if err != nil {
+		t.Fatalf("CreateChange con outputs/cambios en 0755: %v", err)
 	}
 }

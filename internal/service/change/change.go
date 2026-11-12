@@ -58,10 +58,16 @@ func (s *changeSvc) CreateChange(_ context.Context, r *v1.CreateChangeRequest) (
 		spec.WindowHours = 4
 	}
 	if spec.OutputDir == "" {
-		spec.OutputDir = filepath.Join(s.d.Outputs(), "cambios")
-		if err := os.MkdirAll(spec.OutputDir, 0o700); err != nil {
+		// Una subcarpeta propia por cambio (0700): outputs/cambios puede existir con otro modo y no se corrige.
+		root := filepath.Join(s.d.Outputs(), "cambios")
+		if err := os.MkdirAll(root, 0o700); err != nil {
 			return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
 		}
+		dir, err := os.MkdirTemp(root, "cambio-")
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+		}
+		spec.OutputDir = dir
 	}
 	// PRE y POST deben ser comparables: una ronda, un archivo por ronda, sin borrar los sueltos.
 	spec.Schedule, spec.Split, spec.Zip, spec.DeleteLooseFiles = nil, v1.SplitStrategy_SPLIT_STRATEGY_PER_ROUND, v1.ZipPolicy_ZIP_POLICY_AT_END, false
