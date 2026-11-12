@@ -1,0 +1,14 @@
+{
+ "gnmi_ca_relativa": "ERROR: rpc error: code = InvalidArgument desc = la ruta de la CA debe ser absoluta",
+ "gnmi_host": "ERROR: rpc error: code = InvalidArgument desc = destino gNMI inválido",
+ "gnmi_sin_destino": "ERROR: rpc error: code = InvalidArgument desc = destino gNMI inválido",
+ "snmp_credencial_mala": "ERROR: rpc error: code = NotFound desc = vault: credencial no encontrada",
+ "snmp_host": "ERROR: rpc error: code = InvalidArgument desc = destino SNMP inválido",
+ "snmp_puerto": "ERROR: rpc error: code = InvalidArgument desc = puerto inválido",
+ "snmp_sin_boveda": "ERROR: rpc error: code = FailedPrecondition desc = no hay bóveda; crea una y guarda la credencial",
+ "snmp_sin_credencial": "ERROR: rpc error: code = InvalidArgument desc = falta la credencial",
+ "snmp_sin_destino": "ERROR: rpc error: code = InvalidArgument desc = destino SNMP inválido",
+ "topo_pcap_relativa": "ERROR: rpc error: code = InvalidArgument desc = la ruta \"x.pcap\" debe ser absoluta",
+ "topo_relativa": "ERROR: rpc error: code = InvalidArgument desc = la ruta \"relativa\" debe ser absoluta",
+ "topo_vacio": "ERROR: rpc error: code = InvalidArgument desc = indica un trabajo, una carpeta de salida o una captura"
+}
