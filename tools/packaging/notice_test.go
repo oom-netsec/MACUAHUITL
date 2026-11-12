@@ -75,7 +75,8 @@ func TestThirdPartyTraeModulosGo(t *testing.T) {
 		t.Error("THIRD_PARTY_LICENSES no trae la licencia de Go")
 	}
 	visto := map[string]bool{}
-	for _, m := range strings.Fields(list("./cmd/...") + list("-tags", "wails gtk3", "./ui")) {
+	// -e: sin la UI compilada (job go del CI) el //go:embed de frontend/dist falla, pero las dependencias son las mismas.
+	for _, m := range strings.Fields(list("./cmd/...") + list("-e", "-tags", "wails gtk3", "./ui")) {
 		if visto[m] {
 			continue
 		}

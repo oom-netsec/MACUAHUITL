@@ -7,7 +7,8 @@ cd "$(dirname "$0")/../.."
 export LC_ALL=C GOOS=linux
 shopt -s nullglob nocaseglob
 fmt='{{with .Module}}{{if not .Main}}{{.Path}} {{.Dir}}{{end}}{{end}}'
-mods=$( { go list -deps -f "$fmt" ./cmd/...; go list -tags 'wails gtk3' -deps -f "$fmt" ./ui; } | sort -u)
+# -e en ./ui: sin la UI compilada el //go:embed de frontend/dist falla, pero las dependencias son las mismas.
+mods=$( { go list -deps -f "$fmt" ./cmd/...; go list -e -tags 'wails gtk3' -deps -f "$fmt" ./ui; } | sort -u)
 seccion() { # nombre carpeta
   local files=("$2"/{LICEN[CS]E,COPYING,NOTICE}*)
   ((${#files[@]})) || { echo "sin archivo de licencia: $1 ($2)" >&2; exit 1; }
