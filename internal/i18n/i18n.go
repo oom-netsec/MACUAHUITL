@@ -83,8 +83,11 @@ func Normalize(tag string) string {
 // ninguno conocido, es. A igual q gana el primero de la lista.
 func Parse(header string) string {
 	if len(header) > maxHeader {
+		complete := header[maxHeader] == ',' // el corte cae justo antes de una coma: el último trozo está entero
 		header = header[:maxHeader]
-		if i := strings.LastIndexByte(header, ','); i >= 0 { // el último trozo pudo quedar sin su q: se descarta
+		if complete {
+			// se queda tal cual
+		} else if i := strings.LastIndexByte(header, ','); i >= 0 { // el último trozo pudo quedar sin su q: se descarta
 			header = header[:i]
 		} else {
 			header = ""

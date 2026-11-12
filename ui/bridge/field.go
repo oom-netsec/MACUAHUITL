@@ -124,7 +124,7 @@ func (b *Bridge) ConsoleBreak(id string) error {
 
 // ConsoleClose cierra el envío: el núcleo graba el cierre, lo audita y termina el stream.
 func (b *Bridge) ConsoleClose(id string) error {
-	return wrapErr(b.console(id, func(st v1.FieldService_ConsoleClient) error { return st.CloseSend() }))
+	return b.console(id, func(st v1.FieldService_ConsoleClient) error { return st.CloseSend() })
 }
 
 type ServeDTO struct {

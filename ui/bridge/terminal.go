@@ -102,5 +102,5 @@ func (b *Bridge) TerminalResize(id string, rows, cols uint32) error {
 
 // TerminalClose cierra el envío: el núcleo cierra SSH, revoca el guard, lo audita y termina el stream.
 func (b *Bridge) TerminalClose(id string) error {
-	return wrapErr(b.terminal(id, func(st v1.TerminalService_OpenTerminalClient) error { return st.CloseSend() }))
+	return b.terminal(id, func(st v1.TerminalService_OpenTerminalClient) error { return st.CloseSend() })
 }

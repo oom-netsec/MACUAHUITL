@@ -62,6 +62,10 @@ func TestParseCortaElHeader(t *testing.T) {
 	}
 	if got := Parse(strings.Repeat("x,", 100) + "en"); got != En {
 		t.Fatalf("antes del corte debe contar: %q", got)
+	} // El corte cae justo antes de una coma: el último trozo está entero y cuenta.
+	h = strings.Repeat(" ", 254) + "en" + ",es;q=0.1"
+	if got := Parse(h); got != En {
+		t.Fatalf("trozo entero antes de la coma: %q", got)
 	}
 }
 
