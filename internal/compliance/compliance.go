@@ -8,11 +8,11 @@
 package compliance
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
 )
 
@@ -31,6 +31,8 @@ type Finding struct {
 	Detail    string `json:"detail"`
 	Lines     []int  `json:"lines,omitempty"`
 	Reference string `json:"reference,omitempty"`
+	// TitleTx y DetailTx son Title y Detail como texto de catálogo (es/en); no viajan en el JSON.
+	TitleTx, DetailTx i18n.Text `json:"-"`
 }
 
 type Report struct {
@@ -40,17 +42,18 @@ type Report struct {
 	Fail      int       `json:"fail"`
 	Warn      int       `json:"warn"`
 	Note      string    `json:"note"`
+	NoteTx    i18n.Text `json:"-"`
 }
 
-const note = "Reglas basadas en la guía pública de Cisco para endurecer IOS/IOS-XE; sin validar en laboratorio. Con salidas enmascaradas por Patrol no se distinguen comunidades ni contraseñas por defecto."
+var noteTx = i18n.Tx("compliance.note")
 
 // Check evalúa config contra las reglas de endurecimiento y, si template no está vacía, contra la plantilla.
 func Check(config, template string) (Report, error) {
 	cfg := iosconf.Parse(config)
 	if len(cfg.Children) == 0 {
-		return Report{}, errors.New("compliance: la configuración está vacía")
+		return Report{}, i18n.New("compliance.err.empty", nil)
 	}
-	r := Report{Hardening: Hardening(cfg), Note: note}
+	r := Report{Hardening: Hardening(cfg), Note: noteTx.In(i18n.Es), NoteTx: noteTx}
 	if strings.TrimSpace(template) != "" {
 		t, err := ParseTemplate(template)
 		if err != nil {
@@ -71,26 +74,30 @@ func Check(config, template string) (Report, error) {
 	return r, nil
 }
 
-var statusText = map[Status]string{Pass: "OK", Fail: "FALLA", Warn: "REVISAR"}
+// Text es el informe legible, en español.
+func (r Report) Text() string { return r.TextIn(i18n.Es) }
 
-func (r Report) Text() string {
+// TextIn es el informe en el idioma pedido (con es, el de siempre); los títulos, detalles y la nota ya vienen
+// en ese idioma si el informe pasó por i18n.Localize.
+func (r Report) TextIn(loc string) string {
 	var b strings.Builder
+	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
 	section := func(title string, fs []Finding) {
 		if len(fs) == 0 {
 			return
 		}
 		b.WriteString(title + "\n")
 		for _, f := range fs {
-			fmt.Fprintf(&b, "  %-7s %-20s %s", statusText[f.Status], f.Rule, f.Title)
+			fmt.Fprintf(&b, "  %-7s %-20s %s", m("compliance.status."+string(f.Status)), f.Rule, f.Title)
 			if f.Status != Pass && f.Detail != "" {
 				b.WriteString(": " + f.Detail)
 			}
 			b.WriteString("\n")
 		}
 	}
-	section("Plantilla", r.Template)
-	section("Endurecimiento", r.Hardening)
-	fmt.Fprintf(&b, "%d OK, %d fallas, %d por revisar\n%s\n", r.Pass, r.Fail, r.Warn, r.Note)
+	section(m("compliance.text.template"), r.Template)
+	section(m("compliance.text.hardening"), r.Hardening)
+	fmt.Fprintf(&b, "%s\n%s\n", m("compliance.text.summary", "pass", r.Pass, "fail", r.Fail, "warn", r.Warn), r.Note)
 	return b.String()
 }
 
@@ -102,13 +109,33 @@ func lineNums(ns []*iosconf.Node) []int {
 	return out
 }
 
-// secretVal: el valor de password/secret nunca debe salir en el reporte.
-var secretVal = regexp.MustCompile(`\b(password|secret)( [0-9])? \S.*$`)
+// secretVals son los valores que nunca deben salir en el informe: password y secret (con su tipo), la comunidad
+// de snmp-server, el key-string de una cadena de llaves y la llave de ntp authentication-key.
+var secretVals = []struct {
+	re   *regexp.Regexp
+	repl string // con %s donde va la marca de «oculto»
+}{
+	{regexp.MustCompile(`\b(password|secret)( [0-9])? \S.*$`), "${1}${2} %s"},
+	{regexp.MustCompile(`^(snmp-server community) \S+`), "${1} %s"},
+	{regexp.MustCompile(`\b(key-string)( [0-9])? \S.*$`), "${1}${2} %s"},
+	{regexp.MustCompile(`^(ntp authentication-key \d+ \S+) \S+( [0-9])?$`), "${1} %s"},
+}
 
-func lineList(ns []*iosconf.Node) string {
-	var parts []string
-	for _, n := range ns {
-		parts = append(parts, fmt.Sprintf("línea %d: %s", n.Num, secretVal.ReplaceAllString(n.Path(), "${1}${2} <oculto>")))
+// maskSecrets cambia por hidden el valor de los secretos de una línea de configuración.
+func maskSecrets(line, hidden string) string {
+	for _, r := range secretVals {
+		line = r.re.ReplaceAllString(line, strings.Replace(r.repl, "%s", hidden, 1))
 	}
-	return strings.Join(parts, "; ")
+	return line
+}
+
+// lineListTx es la lista «línea N: texto» de los nodos, sin el valor de los secretos (la marca es <oculto> en es y
+// <hidden> en en).
+func lineListTx(ns []*iosconf.Node) i18n.Text {
+	var parts []i18n.Text
+	for _, n := range ns {
+		p := n.Path()
+		parts = append(parts, i18n.Tx("compliance.line", "n", n.Num).With("text", i18n.Lit(maskSecrets(p, "<oculto>"), maskSecrets(p, "<hidden>"))))
+	}
+	return i18n.Join("; ", parts...)
 }

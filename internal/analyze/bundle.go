@@ -9,7 +9,6 @@ import (
 	"archive/zip"
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"path"
@@ -20,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
@@ -49,11 +49,34 @@ type Bundle struct {
 }
 
 type Warning struct {
-	Device  string `json:"device,omitempty"`
-	Round   int    `json:"round,omitempty"`
-	Command string `json:"command,omitempty"`
-	Msg     string `json:"msg"`
+	Device  string    `json:"device,omitempty"`
+	Round   int       `json:"round,omitempty"`
+	Command string    `json:"command,omitempty"`
+	Msg     string    `json:"msg"`
+	MsgTx   i18n.Text `json:"-"` // Msg como texto de catálogo
 }
+
+// Warn arma un aviso con su texto de catálogo (Msg en español y MsgTx).
+func Warn(device string, round int, command, key string, kv ...any) Warning {
+	return warnTx(device, round, command, i18n.Tx(key, kv...))
+}
+
+// WarnText es Warn con el texto ya armado.
+func WarnText(device string, round int, command string, t i18n.Text) Warning {
+	return warnTx(device, round, command, t)
+}
+
+func warnTx(device string, round int, command string, t i18n.Text) Warning {
+	return Warning{Device: device, Round: round, Command: command, Msg: t.In(i18n.Es), MsgTx: t}
+}
+
+// wkey identifica un aviso para no repetirlo (Warning lleva un Text, que no se compara).
+type wkey struct {
+	device, command, msg string
+	round                int
+}
+
+func (w Warning) key() wkey { return wkey{w.Device, w.Command, w.Msg, w.Round} }
 
 // Límites para que un show tech enorme o un zip malicioso no agoten la memoria del núcleo.
 const maxFile = 256 << 20
@@ -95,16 +118,16 @@ func LoadUpTo(dir string, upTo int) (*Bundle, error) { return loadWith(dir, upTo
 func loadWith(dir string, upTo int, skip func(string, int64) bool) (*Bundle, error) {
 	fi, err := os.Stat(dir)
 	if err != nil {
-		return nil, fmt.Errorf("analyze: %w", err)
+		return nil, i18n.Wrap("analyze.err.read", err, nil)
 	}
 	if !fi.IsDir() {
-		return nil, fmt.Errorf("analyze: %s no es una carpeta", dir)
+		return nil, i18n.New("analyze.err.not_dir", i18n.A("path", dir))
 	}
 	b := &Bundle{Dir: dir, upTo: upTo, Files: map[string]int64{}}
 	seen := map[string]bool{}
 	devs, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("analyze: %w", err)
+		return nil, i18n.Wrap("analyze.err.read", err, nil)
 	}
 	for _, d := range devs {
 		if !d.IsDir() {
@@ -127,7 +150,7 @@ func loadWith(dir string, upTo int, skip func(string, int64) bool) (*Bundle, err
 			}
 			fh, err := sys.OpenRegular(filepath.Join(dir, d.Name(), f.Name()))
 			if err != nil {
-				b.Warnings = append(b.Warnings, Warning{Device: d.Name(), Msg: err.Error()})
+				b.Warnings = append(b.Warnings, Warn(d.Name(), 0, "", "analyze.warn.system", "error", err))
 				continue
 			}
 			full := b.parseFile(rel, io.LimitReader(fh, maxFile))
@@ -142,11 +165,11 @@ func loadWith(dir string, upTo int, skip func(string, int64) bool) (*Bundle, err
 	sort.Strings(zips)
 	for _, z := range zips {
 		if err := b.readZip(z, seen); err != nil {
-			b.Warnings = append(b.Warnings, Warning{Msg: fmt.Sprintf("%s: %v", filepath.Base(z), err)})
+			b.Warnings = append(b.Warnings, Warn("", 0, "", "analyze.warn.file_error", "file", filepath.Base(z), "error", err))
 		}
 	}
 	if len(b.Sections) == 0 && b.skipped == 0 {
-		return nil, fmt.Errorf("analyze: %s no contiene salidas de Patrol", dir)
+		return nil, i18n.New("analyze.err.no_outputs", i18n.A("path", dir))
 	}
 	sort.SliceStable(b.Sections, func(i, j int) bool {
 		x, y := b.Sections[i], b.Sections[j]
@@ -202,7 +225,7 @@ func (b *Bundle) overCap(extra int) bool {
 	}
 	if !b.capped {
 		b.capped = true
-		b.Warnings = append(b.Warnings, Warning{Msg: fmt.Sprintf("el paquete supera el tope de %d MiB descomprimidos: se leyó parcialmente y los hallazgos pueden estar incompletos (usa --round o --device)", maxTotal>>20)})
+		b.Warnings = append(b.Warnings, Warn("", 0, "", "analyze.warn.over_total", "mib", maxTotal>>20))
 	}
 	return true
 }
@@ -241,7 +264,7 @@ func (b *Bundle) parseFile(rel string, r io.Reader) (complete bool) {
 		b.total += int64(len(cur.Text))
 		if truncated {
 			partial = true
-			b.Warnings = append(b.Warnings, Warning{Device: dev, Round: cur.Round, Command: cur.Command, Msg: fmt.Sprintf("salida recortada a %d bytes", maxSection)})
+			b.Warnings = append(b.Warnings, Warn(dev, cur.Round, cur.Command, "analyze.warn.trimmed", "bytes", maxSection))
 		}
 		b.Sections = append(b.Sections, *cur)
 		cur, truncated = nil, false
@@ -280,7 +303,7 @@ func (b *Bundle) parseFile(rel string, r io.Reader) (complete bool) {
 	}
 	flush()
 	if err := sc.Err(); err != nil {
-		b.Warnings = append(b.Warnings, Warning{Device: dev, Msg: fmt.Sprintf("%s: %v", file, err)})
+		b.Warnings = append(b.Warnings, Warn(dev, 0, "", "analyze.warn.file_error", "file", file, "error", err))
 		return false
 	}
 	return !partial

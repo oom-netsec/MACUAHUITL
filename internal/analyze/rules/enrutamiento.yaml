@@ -9,6 +9,9 @@
   params: {mode: down}
   explanation: La sesión BGP no está establecida (State/PfxRcd no es un número). Los vecinos en Idle (Admin) se ignoran.
   action: Revisa alcanzabilidad a la dirección del vecino, AS remoto, autenticación y show ip bgp neighbors <ip> (último error/notificación).
+  title_en: "BGP neighbor down"
+  explanation_en: "The BGP session is not established (State/PfxRcd is not a number). Neighbors in Idle (Admin) are ignored."
+  action_en: "Check reachability to the neighbor address, remote AS, authentication and show ip bgp neighbors <ip> (last error/notification)."
 - id: bgp-vecino-flap
   title: Vecino BGP restablecido hace poco
   severity: media
@@ -17,6 +20,9 @@
   params: {mode: flap, below: 1h}
   explanation: La sesión está arriba pero su Up/Down es corto; se restableció hace poco.
   action: Busca %BGP-5-ADJCHANGE en el log y el syslog remoto para conocer la causa de la caída previa.
+  title_en: "BGP neighbor recently reset"
+  explanation_en: "The session is up but its Up/Down time is short; it was reset recently."
+  action_en: "Look for %BGP-5-ADJCHANGE in the log and the remote syslog to find the cause of the previous drop."
 - id: ospf-vecino-no-full
   title: Vecino OSPF sin llegar a FULL
   severity: alta
@@ -25,6 +31,9 @@
   params: {mode: stuck}
   explanation: La adyacencia está en un estado intermedio (INIT, EXSTART, EXCHANGE, LOADING); 2WAY con DROTHER es normal.
   action: EXSTART/EXCHANGE suele ser MTU distinta; INIT suele ser multicast filtrado o autenticación.
+  title_en: "OSPF neighbor not reaching FULL"
+  explanation_en: "The adjacency is in an intermediate state (INIT, EXSTART, EXCHANGE, LOADING); 2WAY with DROTHER is normal."
+  action_en: "EXSTART/EXCHANGE is usually an MTU mismatch; INIT is usually filtered multicast or authentication."
 - id: ospf-vecino-perdido
   title: Vecino OSPF desaparecido
   severity: alta
@@ -33,3 +42,6 @@
   params: {mode: lost}
   explanation: Un vecino visto en la ronda anterior ya no aparece.
   action: Revisa la interfaz indicada y %OSPF-5-ADJCHG en el log para saber por qué cayó.
+  title_en: "OSPF neighbor disappeared"
+  explanation_en: "A neighbor seen in the previous round no longer appears."
+  action_en: "Check the indicated interface and %OSPF-5-ADJCHG in the log to learn why it dropped."

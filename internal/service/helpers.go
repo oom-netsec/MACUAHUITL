@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
@@ -29,6 +31,22 @@ func Report(v any, text string) *v1.ToolReport {
 		text = string(ib)
 	}
 	return &v1.ToolReport{Json: string(b), Text: text}
+}
+
+// ReportL es Report para un informe con textos de catálogo (ver i18n.Localize): con en, el json trae esos textos
+// en inglés; siempre trae sus claves en Keys. text arma el texto ya con v localizado y el idioma del contexto.
+// Con es el json y el texto son los de siempre. v debe ser un puntero.
+func ReportL(ctx context.Context, v any, text func(loc string) string) *v1.ToolReport {
+	loc := i18n.Locale(ctx)
+	keys := i18n.Localize(v, loc)
+	rep := Report(v, text(loc))
+	if len(keys) > 0 {
+		rep.Keys = make(map[string]*v1.TextRef, len(keys))
+		for p, t := range keys {
+			rep.Keys[p] = &v1.TextRef{Key: t.Key, Args: t.Args}
+		}
+	}
+	return rep
 }
 
 // MS convierte milisegundos de una petición en Duration; <=0 toma def.

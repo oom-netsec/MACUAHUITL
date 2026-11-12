@@ -5,8 +5,6 @@
 package acl
 
 import (
-	"errors"
-	"fmt"
 	"net/netip"
 	"sort"
 	"strconv"
@@ -73,7 +71,7 @@ func parsePort(s string) (uint16, error) {
 	}
 	n, err := strconv.Atoi(s)
 	if err != nil || n < 0 || n > 65535 {
-		return 0, fmt.Errorf("puerto %q inválido", s)
+		return 0, eerr("bad_port", "port", s)
 	}
 	return uint16(n), nil
 }
@@ -85,7 +83,7 @@ func ParsePorts(op string, args ...string) ([]PortRange, error) {
 		need = 2
 	}
 	if len(args) != need {
-		return nil, fmt.Errorf("%s necesita %d argumento(s)", op, need)
+		return nil, eerr("need_args", "op", op, "n", need)
 	}
 	a, err := parsePort(args[0])
 	if err != nil {
@@ -105,12 +103,12 @@ func ParsePorts(op string, args ...string) ([]PortRange, error) {
 		return out, nil
 	case "gt":
 		if a == 65535 {
-			return nil, errors.New("gt 65535 no coincide con ningún puerto")
+			return nil, eerr("gt_max")
 		}
 		return []PortRange{{a + 1, 65535}}, nil
 	case "lt":
 		if a == 0 {
-			return nil, errors.New("lt 0 no coincide con ningún puerto")
+			return nil, eerr("lt_min")
 		}
 		return []PortRange{{0, a - 1}}, nil
 	case "range":
@@ -119,11 +117,11 @@ func ParsePorts(op string, args ...string) ([]PortRange, error) {
 			return nil, err
 		}
 		if b < a {
-			return nil, fmt.Errorf("range %d %d está vacío", a, b)
+			return nil, eerr("range_empty", "a", a, "b", b)
 		}
 		return []PortRange{{a, b}}, nil
 	}
-	return nil, fmt.Errorf("operador de puerto %q desconocido", op)
+	return nil, eerr("bad_op", "op", op)
 }
 
 // CanonProtocol devuelve el nombre IOS de un protocolo dado por nombre o número ("6" → "tcp").
@@ -167,32 +165,32 @@ func NormalizePorts(ps []PortRange) []PortRange {
 
 func (r Rule) Validate() error {
 	if _, ok := ProtocolNumber(r.Protocol); !ok {
-		return fmt.Errorf("protocolo %q desconocido", r.Protocol)
+		return eerr("bad_proto", "proto", r.Protocol)
 	}
 	if !r.Src.IsValid() || !r.Dst.IsValid() {
-		return errors.New("origen y destino son obligatorios")
+		return eerr("src_dst_required")
 	}
 	for _, p := range []netip.Prefix{r.Src, r.Dst} {
 		if !p.Addr().Is4() {
-			return fmt.Errorf("%s: solo IPv4 en esta versión", p)
+			return eerr("ipv4_only", "prefix", p)
 		}
 		if p != p.Masked() {
-			return fmt.Errorf("%s tiene bits de host; usa %s", p, p.Masked())
+			return eerr("host_bits", "prefix", p, "masked", p.Masked())
 		}
 	}
 	if strings.ContainsAny(r.Remark, "\r\n\x00") {
-		return errors.New("el remark no puede tener saltos de línea")
+		return eerr("remark_newline")
 	}
 	proto := CanonProtocol(r.Protocol)
 	if (len(r.SrcPorts) > 0 || len(r.DstPorts) > 0) && proto != "tcp" && proto != "udp" && proto != "sctp" {
-		return fmt.Errorf("los puertos solo aplican a tcp/udp, no a %s", r.Protocol)
+		return eerr("ports_proto", "proto", r.Protocol)
 	}
 	if r.Established && proto != "tcp" {
-		return errors.New("established solo aplica a tcp")
+		return eerr("established")
 	}
 	for _, p := range append(append([]PortRange{}, r.SrcPorts...), r.DstPorts...) {
 		if p.Hi < p.Lo {
-			return fmt.Errorf("rango de puertos %d-%d vacío", p.Lo, p.Hi)
+			return eerr("port_range_empty", "lo", p.Lo, "hi", p.Hi)
 		}
 	}
 	return nil

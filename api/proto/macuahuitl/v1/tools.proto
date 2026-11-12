@@ -18,6 +18,15 @@ service ToolsService {
 message ToolReport {
   string json = 1;
   string text = 2;
+  // Fase 30c: por cada texto libre del json que sale del catálogo, su clave y argumentos bajo su ruta JSON
+  // (rows.2.detail, warnings.0). Con accept-language en, el json ya trae ese texto en inglés; con es, el de siempre.
+  map<string, TextRef> keys = 3;
+}
+
+// Clave del catálogo y argumentos de un texto de un informe.
+message TextRef {
+  string key = 1;
+  map<string, string> args = 2;
 }
 
 // Fase 30b: el informe de la captura en forma estructurada. Es lo mismo que imprime el texto, con los

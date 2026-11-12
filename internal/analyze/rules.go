@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 	"gopkg.in/yaml.v3"
 )
@@ -32,8 +33,16 @@ type Rule struct {
 	Params      map[string]string `yaml:"params"`
 	Explanation string            `yaml:"explanation"`
 	Action      string            `yaml:"action"`
-	run         checker
+	// Los textos en inglés son opcionales (una regla propia puede omitirlos y sale en español).
+	TitleEn       string `yaml:"title_en"`
+	ExplanationEn string `yaml:"explanation_en"`
+	ActionEn      string `yaml:"action_en"`
+	run           checker
 }
+
+func (r *Rule) titleTx() i18n.Text       { return i18n.Lit(r.Title, r.TitleEn) }
+func (r *Rule) explanationTx() i18n.Text { return i18n.Lit(r.Explanation, r.ExplanationEn) }
+func (r *Rule) actionTx() i18n.Text      { return i18n.Lit(r.Action, r.ActionEn) }
 
 var sevRank = map[string]int{"critica": 5, "alta": 4, "media": 3, "baja": 2, "info": 1}
 
@@ -41,11 +50,11 @@ var sevRank = map[string]int{"critica": 5, "alta": 4, "media": 3, "baja": 2, "in
 type hit struct {
 	round    int
 	evidence []string
-	detail   string
+	detail   i18n.Text
 }
 
 // checker recorre las salidas del comando de un equipo, una por ronda y en orden.
-type checker func(series []Section, warn func(s Section, msg string)) []hit
+type checker func(series []Section, warn func(s Section, msg i18n.Text)) []hit
 
 // DefaultRules carga las reglas incrustadas.
 func DefaultRules() ([]Rule, error) {
@@ -205,8 +214,6 @@ var checks = map[string]func(*params) (checker, error){
 	"hsrp":           checkHSRP,
 }
 
-const formatoInesperado = "formato inesperado: sin datos para esta regla"
-
 // checkMatch busca líneas por expresión regular. Un mensaje ya reportado en una
 // ronda anterior no se repite (el búfer de log se arrastra entre rondas).
 // Con group, cuenta por el primer grupo de captura (p. ej. la interfaz).
@@ -234,7 +241,7 @@ func checkMatch(p *params) (checker, error) {
 		return nil, errors.New("group requiere un grupo de captura en pattern")
 	}
 	min := int(minF)
-	return func(series []Section, _ func(Section, string)) []hit {
+	return func(series []Section, _ func(Section, i18n.Text)) []hit {
 		seen := map[string]bool{}
 		var out []hit
 		for _, s := range series {
@@ -250,7 +257,8 @@ func checkMatch(p *params) (checker, error) {
 				}
 				groups[g] = append(groups[g], ln)
 			}
-			var ev, det []string
+			var ev []string
+			var det []i18n.Text
 			for _, g := range sortedKeys(groups) {
 				ls := groups[g]
 				fresh := false
@@ -267,13 +275,13 @@ func checkMatch(p *params) (checker, error) {
 					seen[ln] = true
 				}
 				if group {
-					det = append(det, fmt.Sprintf("%s: %d veces", g, len(ls)))
+					det = append(det, i18n.Tx("analyze.detail.group_count", "group", g, "n", len(ls)))
 				}
 			}
 			if len(ev) > 0 {
-				d := strings.Join(det, "; ")
+				d := i18n.Join("; ", det...)
 				if !group {
-					d = fmt.Sprintf("%d línea(s)", len(ev))
+					d = i18n.Tx("analyze.detail.lines", "n", len(ev))
 				}
 				out = append(out, hit{round: s.Round, evidence: ev, detail: d})
 			}
@@ -287,16 +295,16 @@ func checkCPUHigh(p *params) (checker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		for _, s := range series {
 			c, ok := iosxe.ParseCPU(s.Text)
 			if !ok {
-				warn(s, formatoInesperado+` (falta "CPU utilization for five seconds")`)
+				warn(s, i18n.Tx("analyze.warn.format_missing", "what", "CPU utilization for five seconds"))
 				continue
 			}
 			if c.FiveMin >= above {
-				out = append(out, hit{s.Round, []string{c.Line}, fmt.Sprintf("5 min: %.0f%% (umbral %.0f%%)", c.FiveMin, above)})
+				out = append(out, hit{s.Round, []string{c.Line}, i18n.Tx("analyze.detail.cpu_high", "pct", fmt.Sprintf("%.0f", c.FiveMin), "above", fmt.Sprintf("%.0f", above))})
 			}
 		}
 		return out
@@ -305,13 +313,13 @@ func checkCPUHigh(p *params) (checker, error) {
 
 // trend busca rachas estrictamente monótonas de al menos n rondas con salida
 // legible (una ronda omitida no corta la racha; una ilegible sí). up=true sube; up=false baja. Devuelve, por ronda final, la racha.
-func trend[T any](series []Section, parse func(string) (T, bool), val func(T) float64, up bool, n int, warn func(Section, string)) map[int][]T {
+func trend[T any](series []Section, parse func(string) (T, bool), val func(T) float64, up bool, n int, warn func(Section, i18n.Text)) map[int][]T {
 	out := map[int][]T{}
 	var run []T
 	for _, s := range series {
 		v, ok := parse(s.Text)
 		if !ok {
-			warn(s, formatoInesperado)
+			warn(s, i18n.Tx("analyze.warn.format"))
 			run = nil
 			continue
 		}
@@ -336,7 +344,7 @@ func checkCPUTrend(p *params) (checker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		runs := trend(series, iosxe.ParseCPU, func(c iosxe.CPU) float64 { return c.FiveMin }, true, int(rounds), warn)
 		for _, s := range series {
@@ -348,7 +356,7 @@ func checkCPUTrend(p *params) (checker, error) {
 			for _, c := range run {
 				vals = append(vals, fmt.Sprintf("%.0f%%", c.FiveMin))
 			}
-			out = append(out, hit{s.Round, []string{run[len(run)-1].Line}, "5 min por ronda: " + strings.Join(vals, " → ")})
+			out = append(out, hit{s.Round, []string{run[len(run)-1].Line}, i18n.Tx("analyze.detail.cpu_trend", "vals", strings.Join(vals, " → "))})
 		}
 		return out
 	}, nil
@@ -361,16 +369,16 @@ func checkMemLow(p *params) (checker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		for _, s := range series {
 			m, ok := iosxe.ParseMem(s.Text)
 			if !ok {
-				warn(s, formatoInesperado+" (falta el pool Processor)")
+				warn(s, i18n.Tx("analyze.warn.format_no_pool"))
 				continue
 			}
 			if pct(m) < below {
-				out = append(out, hit{s.Round, []string{m.Line}, fmt.Sprintf("libre %.1f%% de %d bytes (umbral %.0f%%)", pct(m), m.Total, below)})
+				out = append(out, hit{s.Round, []string{m.Line}, i18n.Tx("analyze.detail.mem_low", "pct", fmt.Sprintf("%.1f", pct(m)), "total", m.Total, "below", fmt.Sprintf("%.0f", below))})
 			}
 		}
 		return out
@@ -386,7 +394,7 @@ func checkMemLeak(p *params) (checker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		runs := trend(series, iosxe.ParseMem, func(m iosxe.Mem) float64 { return float64(m.Free) }, false, int(rounds), warn)
 		for _, s := range series {
@@ -403,7 +411,7 @@ func checkMemLeak(p *params) (checker, error) {
 			for _, m := range run {
 				vals = append(vals, fmt.Sprintf("%.1f%%", pct(m)))
 			}
-			out = append(out, hit{s.Round, []string{last.Line}, fmt.Sprintf("libre por ronda: %s (bajó %.1f puntos)", strings.Join(vals, " → "), lost)})
+			out = append(out, hit{s.Round, []string{last.Line}, i18n.Tx("analyze.detail.mem_leak", "vals", strings.Join(vals, " → "), "lost", fmt.Sprintf("%.1f", lost))})
 		}
 		return out
 	}, nil
@@ -423,7 +431,7 @@ func checkIfaceCounter(p *params) (checker, error) {
 		return nil, err
 	}
 	min := int64(minF)
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		reported := map[string]bool{}
 		var prev map[string]int64
@@ -431,12 +439,13 @@ func checkIfaceCounter(p *params) (checker, error) {
 		for _, s := range series {
 			ifs, ok := parseInterfaces(s.Text)
 			if !ok {
-				warn(s, formatoInesperado+" (ninguna interfaz reconocida)")
+				warn(s, i18n.Tx("analyze.warn.format_no_ifaces"))
 				prev = nil
 				continue
 			}
 			cur := map[string]int64{}
-			var ev, det []string
+			var ev []string
+			var det []i18n.Text
 			for _, i := range ifs {
 				v, ok := i.Values[counter]
 				if !ok {
@@ -447,16 +456,16 @@ func checkIfaceCounter(p *params) (checker, error) {
 					// Solo entre rondas consecutivas; si el contador bajó, se borró o el equipo recargó.
 					if pv, ok := prev[i.Name]; ok && prevRound == s.Round-1 && v-pv >= min {
 						ev = append(ev, i.Lines[counter])
-						det = append(det, fmt.Sprintf("%s: %d → %d (+%d)", i.Name, pv, v, v-pv))
+						det = append(det, i18n.Tx("analyze.detail.counter_grow", "name", i.Name, "from", pv, "to", v, "delta", v-pv))
 					}
 				} else if v >= min && !reported[i.Name] {
 					reported[i.Name] = true
 					ev = append(ev, i.Lines[counter])
-					det = append(det, fmt.Sprintf("%s: %d", i.Name, v))
+					det = append(det, i18n.Tx("analyze.detail.counter_val", "name", i.Name, "value", v))
 				}
 			}
 			if len(ev) > 0 {
-				out = append(out, hit{s.Round, dedupe(ev), counter + " — " + strings.Join(det, "; ")})
+				out = append(out, hit{s.Round, dedupe(ev), i18n.Join(" — ", i18n.Lit(counter, ""), i18n.Join("; ", det...))})
 			}
 			prev, prevRound = cur, s.Round
 		}
@@ -495,16 +504,16 @@ func checkUptime(p *params) (checker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		for _, s := range series {
 			u, ok := parseUptime(s.Text)
 			if !ok {
-				warn(s, formatoInesperado+` (falta "uptime is")`)
+				warn(s, i18n.Tx("analyze.warn.format_missing", "what", "uptime is"))
 				continue
 			}
 			if u.D < below {
-				out = append(out, hit{s.Round, append([]string{u.Line}, u.Reasons...), "arriba desde hace " + fmtDur(u.D)})
+				out = append(out, hit{s.Round, append([]string{u.Line}, u.Reasons...), i18n.Tx("analyze.detail.up_since", "dur", fmtDur(u.D))})
 			}
 		}
 		return out
@@ -512,18 +521,18 @@ func checkUptime(p *params) (checker, error) {
 }
 
 func checkUptimeReset(*params) (checker, error) {
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		var prev *uptimeInfo
 		for _, s := range series {
 			u, ok := parseUptime(s.Text)
 			if !ok {
-				warn(s, formatoInesperado+` (falta "uptime is")`)
+				warn(s, i18n.Tx("analyze.warn.format_missing", "what", "uptime is"))
 				prev = nil
 				continue
 			}
 			if prev != nil && u.D < prev.D {
-				out = append(out, hit{s.Round, append([]string{u.Line}, u.Reasons...), fmt.Sprintf("uptime %s → %s", fmtDur(prev.D), fmtDur(u.D))})
+				out = append(out, hit{s.Round, append([]string{u.Line}, u.Reasons...), i18n.Tx("analyze.detail.uptime_reset", "from", fmtDur(prev.D), "to", fmtDur(u.D))})
 			}
 			prev = &u
 		}
@@ -540,17 +549,18 @@ func checkSTP(p *params) (checker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		prev := map[string]int64{}
 		for _, s := range series {
 			insts, ok := iosxe.ParseSTPDetail(s.Text)
 			if !ok {
-				warn(s, formatoInesperado+` (falta "Number of topology changes")`)
+				warn(s, i18n.Tx("analyze.warn.format_missing", "what", "Number of topology changes"))
 				prev = map[string]int64{}
 				continue
 			}
-			var ev, det []string
+			var ev []string
+			var det []i18n.Text
 			cur := map[string]int64{}
 			for _, i := range insts {
 				cur[i.Name] = i.Changes
@@ -561,20 +571,20 @@ func checkSTP(p *params) (checker, error) {
 					continue
 				}
 				ev = append(ev, i.Lines...)
-				d := fmt.Sprintf("%s: %d cambios", i.Name, i.Changes)
+				d := []i18n.Text{i18n.Tx("analyze.detail.stp_changes", "name", i.Name, "n", i.Changes)}
 				if had {
-					d = fmt.Sprintf("%s: %d → %d cambios", i.Name, pv, i.Changes)
+					d[0] = i18n.Tx("analyze.detail.stp_grew", "name", i.Name, "from", pv, "to", i.Changes)
 				}
 				if i.SinceOK {
-					d += ", último hace " + i.Since.String()
+					d = append(d, i18n.Tx("analyze.detail.stp_last", "since", i.Since.String()))
 				}
 				if i.From != "" {
-					d += " desde " + i.From
+					d = append(d, i18n.Tx("analyze.detail.stp_from", "from", i.From))
 				}
-				det = append(det, d)
+				det = append(det, i18n.Join("", d...))
 			}
 			if len(ev) > 0 {
-				out = append(out, hit{s.Round, ev, strings.Join(det, "; ")})
+				out = append(out, hit{s.Round, ev, i18n.Join("; ", det...)})
 			}
 			prev = cur
 		}
@@ -591,27 +601,28 @@ func checkBGP(p *params) (checker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		for _, s := range series {
 			ns, ok := iosxe.ParseBGP(s.Text)
 			if !ok {
-				warn(s, formatoInesperado+" (falta la tabla de vecinos)")
+				warn(s, i18n.Tx("analyze.warn.format_no_nbrs"))
 				continue
 			}
-			var ev, det []string
+			var ev []string
+			var det []i18n.Text
 			for _, n := range ns {
 				switch {
 				case mode == "down" && !n.Established && !strings.Contains(n.State, "Admin"):
-					ev, det = append(ev, n.Lines...), append(det, fmt.Sprintf("%s (AS %s): %s desde hace %s", n.ID, n.AS, n.State, n.UpDown))
+					ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_down", "id", n.ID, "as", n.AS, "state", n.State, "updown", n.UpDown))
 				case mode == "flap" && n.Established:
 					if d, ok := iosxe.IOSDuration(n.UpDown); ok && d < below {
-						ev, det = append(ev, n.Lines...), append(det, fmt.Sprintf("%s (AS %s): arriba hace %s", n.ID, n.AS, n.UpDown))
+						ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_flap", "id", n.ID, "as", n.AS, "updown", n.UpDown))
 					}
 				}
 			}
 			if len(ev) > 0 {
-				out = append(out, hit{s.Round, ev, strings.Join(det, "; ")})
+				out = append(out, hit{s.Round, ev, i18n.Join("; ", det...)})
 			}
 		}
 		return out
@@ -623,29 +634,30 @@ func checkOSPF(p *params) (checker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		var prev map[string]iosxe.OSPFNeighbor
 		prevRound := 0
 		for _, s := range series {
 			ns, ok := iosxe.ParseOSPF(s.Text)
 			if !ok {
-				warn(s, formatoInesperado+" (falta la tabla de vecinos)")
+				warn(s, i18n.Tx("analyze.warn.format_no_nbrs"))
 				prev = nil
 				continue
 			}
 			cur := map[string]iosxe.OSPFNeighbor{}
-			var ev, det []string
+			var ev []string
+			var det []i18n.Text
 			for _, n := range ns {
 				cur[ospfKey(n)] = n
 				if mode == "stuck" && n.State != "FULL" && n.State != "2WAY" {
-					ev, det = append(ev, n.Line), append(det, fmt.Sprintf("%s en %s por %s", n.ID, n.State, n.Interface))
+					ev, det = append(ev, n.Line), append(det, i18n.Tx("analyze.detail.ospf_stuck", "id", n.ID, "state", n.State, "iface", n.Interface))
 				}
 			}
 			if mode == "lost" && prev != nil && prevRound == s.Round-1 {
 				for _, k := range sortedKeys(prev) {
 					if _, ok := cur[k]; !ok {
-						det = append(det, fmt.Sprintf("%s estaba en la ronda %d y ya no aparece", k, prevRound))
+						det = append(det, i18n.Tx("analyze.detail.ospf_lost", "round", prevRound).With("key", ospfLabel(prev[k])))
 					}
 				}
 				if len(det) > 0 {
@@ -659,7 +671,7 @@ func checkOSPF(p *params) (checker, error) {
 				}
 			}
 			if len(det) > 0 {
-				out = append(out, hit{s.Round, ev, strings.Join(det, "; ")})
+				out = append(out, hit{s.Round, ev, i18n.Join("; ", det...)})
 			}
 			prev, prevRound = cur, s.Round
 		}
@@ -683,32 +695,33 @@ func checkHSRP(p *params) (checker, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(series []Section, warn func(Section, string)) []hit {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		var prev map[string]string
 		prevRound := 0
 		for _, s := range series {
 			gs, ok := iosxe.ParseHSRP(s.Text)
 			if !ok {
-				warn(s, formatoInesperado+" (falta la tabla de grupos)")
+				warn(s, i18n.Tx("analyze.warn.format_no_groups"))
 				prev = nil
 				continue
 			}
 			cur := map[string]string{}
-			var ev, det []string
+			var ev []string
+			var det []i18n.Text
 			for _, g := range gs {
 				cur[hsrpKey(g)] = g.State
 				switch {
 				case mode == "changed" && prev != nil && prevRound == s.Round-1:
 					if ps, ok := prev[hsrpKey(g)]; ok && ps != g.State {
-						ev, det = append(ev, g.Line), append(det, fmt.Sprintf("%s: %s → %s", hsrpKey(g), ps, g.State))
+						ev, det = append(ev, g.Line), append(det, i18n.Tx("analyze.detail.hsrp_changed", "from", ps, "to", g.State).With("key", hsrpLabel(g)))
 					}
 				case mode == "bad" && (hsrpBad[strings.ToLower(g.State)] || g.Active == "unknown" || g.Standby == "unknown"):
-					ev, det = append(ev, g.Line), append(det, fmt.Sprintf("%s: %s (activo %s, respaldo %s)", hsrpKey(g), g.State, g.Active, g.Standby))
+					ev, det = append(ev, g.Line), append(det, i18n.Tx("analyze.detail.hsrp_bad", "state", g.State, "active", g.Active, "standby", g.Standby).With("key", hsrpLabel(g)))
 				}
 			}
 			if len(ev) > 0 {
-				out = append(out, hit{s.Round, ev, strings.Join(det, "; ")})
+				out = append(out, hit{s.Round, ev, i18n.Join("; ", det...)})
 			}
 			prev, prevRound = cur, s.Round
 		}

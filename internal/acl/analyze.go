@@ -1,12 +1,14 @@
 package acl
 
-import "fmt"
+import "github.com/oom-netsec/MACUAHUITL/internal/i18n"
 
 // Finding es un hallazgo sobre la regla Index (base 0).
 type Finding struct {
 	Index  int
 	Kind   string // shadowed, redundant, impossible
 	Detail string
+	// DetailTx es Detail con su código del catálogo (en el idioma pedido sale en inglés).
+	DetailTx i18n.Text `json:"-"`
 }
 
 // portsCover: el conjunto a (vacío = todos) contiene al conjunto b (vacío = todos).
@@ -56,7 +58,7 @@ func Analyze(a ACL) []Finding {
 	var out []Finding
 	for i, r := range a.Rules {
 		if err := r.Validate(); err != nil {
-			out = append(out, Finding{i, "impossible", err.Error()})
+			out = append(out, Finding{i, "impossible", err.Error(), i18n.FromErr(err)})
 			continue
 		}
 		for j := 0; j < i; j++ {
@@ -68,7 +70,8 @@ func Analyze(a ACL) []Finding {
 			if prev.Action != r.Action {
 				kind = "shadowed"
 			}
-			out = append(out, Finding{i, kind, fmt.Sprintf("la regla %d (%s) ya cubre todo lo que esta coincide", j+1, prev.Action)})
+			t := i18n.Tx("acl.finding.covered", "n", j+1, "action", prev.Action)
+			out = append(out, Finding{i, kind, t.In(i18n.Es), t})
 			break
 		}
 	}

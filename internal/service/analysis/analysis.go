@@ -12,6 +12,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/pcapan"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -33,7 +34,7 @@ const maxSyslogBytes = 64 << 20
 
 // bundle acepta el ID de un trabajo de esta sesión o la ruta absoluta de su carpeta.
 // upTo > 0 carga solo hasta esa ronda.
-func (s *analysisSvc) bundle(job string, upTo int) (*analyze.Bundle, error) {
+func (s *analysisSvc) bundle(ctx context.Context, job string, upTo int) (*analyze.Bundle, error) {
 	dir := filepath.Clean(job)
 	if !filepath.IsAbs(job) {
 		j, err := s.d.Job(job)
@@ -41,13 +42,13 @@ func (s *analysisSvc) bundle(job string, upTo int) (*analyze.Bundle, error) {
 			return nil, err
 		}
 		if j.Dir == "" {
-			return nil, status.Error(codes.FailedPrecondition, "el trabajo aún no tiene salidas: ármalo y espera la primera ronda")
+			return nil, service.Err(ctx, codes.FailedPrecondition, "analyze.err.job_no_outputs", nil)
 		}
 		dir = j.Dir
 	}
 	b, err := analyze.LoadUpTo(dir, upTo)
 	if err != nil {
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
+		return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
 	return b, nil
 }
@@ -60,9 +61,9 @@ func rulesOrErr() ([]analyze.Rule, error) {
 	return rs, nil
 }
 
-func (s *analysisSvc) AnalyzeJob(_ context.Context, r *v1.AnalyzeJobRequest) (*v1.AnalyzeJobResponse, error) {
+func (s *analysisSvc) AnalyzeJob(ctx context.Context, r *v1.AnalyzeJobRequest) (*v1.AnalyzeJobResponse, error) {
 	s.d.MarkActive()
-	b, err := s.bundle(r.Job, int(r.Round))
+	b, err := s.bundle(ctx, r.Job, int(r.Round))
 	if err != nil {
 		return nil, err
 	}
@@ -72,29 +73,29 @@ func (s *analysisSvc) AnalyzeJob(_ context.Context, r *v1.AnalyzeJobRequest) (*v
 	}
 	rep := analyze.Analyze(b, rs, analyze.Options{Round: int(r.Round), Device: r.Device})
 	s.d.Audit("analysis.run", b.Dir, fmt.Sprintf("round=%d device=%q findings=%d", r.Round, r.Device, len(rep.Findings)))
-	return &v1.AnalyzeJobResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.AnalyzeJobResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
-func (s *analysisSvc) DiffRounds(_ context.Context, r *v1.DiffRoundsRequest) (*v1.DiffRoundsResponse, error) {
+func (s *analysisSvc) DiffRounds(ctx context.Context, r *v1.DiffRoundsRequest) (*v1.DiffRoundsResponse, error) {
 	s.d.MarkActive()
-	b, err := s.bundle(r.Job, int(max(r.From, r.To)))
+	b, err := s.bundle(ctx, r.Job, int(max(r.From, r.To)))
 	if err != nil {
 		return nil, err
 	}
 	rep, err := analyze.Diff(b, int(r.From), int(r.To), r.Device)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	s.d.Audit("analysis.diff", b.Dir, fmt.Sprintf("from=%d to=%d device=%q", r.From, r.To, r.Device))
-	return &v1.DiffRoundsResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.DiffRoundsResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
 func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.TimelineResponse, error) {
 	s.d.MarkActive()
 	if r.PcapPath != "" && !filepath.IsAbs(r.PcapPath) {
-		return nil, status.Error(codes.InvalidArgument, "la ruta de la captura debe ser absoluta")
+		return nil, service.Err(ctx, codes.InvalidArgument, "analyze.err.pcap_path", nil)
 	}
-	b, err := s.bundle(r.Job, 0)
+	b, err := s.bundle(ctx, r.Job, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -124,17 +125,21 @@ func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.
 	b.Resolve(extra)
 	var buf bytes.Buffer
 	if err := s.d.ExportAudit(ctx, &buf, from, to); err != nil {
-		rep.Warnings = append(rep.Warnings, analyze.Warning{Msg: "auditoría: " + err.Error()})
+		rep.Warnings = append(rep.Warnings, analyze.Warn("", 0, "", "analyze.warn.audit", "error", err))
 	}
 	extra = append(extra, analyze.AuditEvents(&buf)...)
 	if r.PcapPath != "" {
 		pr, err := pcapan.Analyze(ctx, r.PcapPath, pcapan.Options{})
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 		extra = append(extra, analyze.PcapEvents(pr)...)
-		for _, w := range pr.Warnings {
-			rep.Warnings = append(rep.Warnings, analyze.Warning{Msg: "pcap: " + w})
+		for i, w := range pr.Warnings {
+			wt := i18n.Lit(w, "")
+			if i < len(pr.WarnItems) {
+				wt = pr.WarnItems[i]
+			}
+			rep.Warnings = append(rep.Warnings, analyze.WarnText("", 0, "", i18n.Tx("analyze.warn.pcap").With("message", wt)))
 		}
 	}
 	for _, e := range extra {
@@ -144,7 +149,7 @@ func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.
 	}
 	rep.Events = analyze.Timeline(evs, o)
 	s.d.Audit("analysis.timeline", b.Dir, fmt.Sprintf("device=%q around=%s window=%s pcap=%s events=%d", r.Device, fmtTime(o.Around), rep.Window, r.PcapPath, len(rep.Events)))
-	return &v1.TimelineResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.TimelineResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
 func fmtTime(t time.Time) string {

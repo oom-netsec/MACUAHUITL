@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
@@ -35,12 +36,13 @@ type Snapshot struct {
 	OSPF          map[string]string // "router-id @ interfaz" → estado (FULL, 2WAY, INIT…)
 	BGP           map[string]string // vecino → Established o el estado
 	BGPPfx        map[string]int
-	Routes        map[string]int    // origen ("ospf 1") → redes + subredes
-	MACs          map[string]int    // VLAN → MACs
-	ARP           map[string]int    // interfaz → entradas
-	HSRP          map[string]string // "Vl10 grupo 10" → estado
-	STPRoot       map[string]string // VLAN → "prioridad MAC" de la raíz
-	STPPort       map[string]string // VLAN → puerto raíz
+	Routes        map[string]int       // origen ("ospf 1") → redes + subredes
+	MACs          map[string]int       // VLAN → MACs
+	ARP           map[string]int       // interfaz → entradas
+	HSRP          map[string]string    // "Vl10 grupo 10" → estado (la clave es interna; se muestra HSRPLabel)
+	HSRPLabel     map[string]i18n.Text // clave → «Vl10 grupo 10» en el idioma pedido
+	STPRoot       map[string]string    // VLAN → "prioridad MAC" de la raíz
+	STPPort       map[string]string    // VLAN → puerto raíz
 	Config        *iosconf.Node
 	Have          map[string]bool // facetas con salida
 }
@@ -50,7 +52,7 @@ type Snapshot struct {
 func Parse(outputs map[string]string) Snapshot {
 	s := Snapshot{UptimeMinutes: -1, Have: map[string]bool{}, Interfaces: map[string]string{}, CDP: map[string]string{}, LLDP: map[string]string{},
 		OSPF: map[string]string{}, BGP: map[string]string{}, BGPPfx: map[string]int{}, Routes: map[string]int{}, MACs: map[string]int{},
-		ARP: map[string]int{}, HSRP: map[string]string{}, STPRoot: map[string]string{}, STPPort: map[string]string{}}
+		ARP: map[string]int{}, HSRP: map[string]string{}, HSRPLabel: map[string]i18n.Text{}, STPRoot: map[string]string{}, STPPort: map[string]string{}}
 	out := map[string]string{}
 	for f, cmd := range facetCmd {
 		if v, c := capture.Get(outputs, cmd); c != "" {
@@ -108,7 +110,7 @@ func Parse(outputs map[string]string) Snapshot {
 	}
 	hsrp, _ := iosxe.ParseHSRP(out["hsrp"])
 	for _, g := range hsrp {
-		s.HSRP[hsrpKey(g)] = g.State
+		s.HSRP[hsrpKey(g)], s.HSRPLabel[hsrpKey(g)] = g.State, i18n.Tx("change.key.hsrp", "iface", g.Interface, "group", g.Group)
 	}
 	stp, _ := iosxe.ParseSTPRootTable(out["stp"])
 	for _, r := range stp {
@@ -122,4 +124,6 @@ func Parse(outputs map[string]string) Snapshot {
 
 var numRe = regexp.MustCompile(`^\d+$`)
 
-func hsrpKey(g iosxe.HSRPGroup) string { return g.Interface + " grupo " + g.Group }
+func hsrpKey(g iosxe.HSRPGroup) string {
+	return i18n.Tx("change.key.hsrp", "iface", g.Interface, "group", g.Group).In(i18n.Es)
+}

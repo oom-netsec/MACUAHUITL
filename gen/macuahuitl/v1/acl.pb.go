@@ -277,10 +277,13 @@ func (x *AnalyzeRequest) GetAcl() *Acl {
 }
 
 type Finding struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RuleIndex     uint32                 `protobuf:"varint,1,opt,name=rule_index,json=ruleIndex,proto3" json:"rule_index,omitempty"`
-	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
-	Detail        string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RuleIndex uint32                 `protobuf:"varint,1,opt,name=rule_index,json=ruleIndex,proto3" json:"rule_index,omitempty"`
+	Kind      string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	Detail    string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"` // en el idioma pedido (accept-language)
+	// Fase 30c: el detalle como clave del catálogo (acl.finding.* o acl.err.*) y sus argumentos.
+	DetailKey     string            `protobuf:"bytes,4,opt,name=detail_key,json=detailKey,proto3" json:"detail_key,omitempty"`
+	DetailArgs    map[string]string `protobuf:"bytes,5,rep,name=detail_args,json=detailArgs,proto3" json:"detail_args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -334,6 +337,20 @@ func (x *Finding) GetDetail() string {
 		return x.Detail
 	}
 	return ""
+}
+
+func (x *Finding) GetDetailKey() string {
+	if x != nil {
+		return x.DetailKey
+	}
+	return ""
+}
+
+func (x *Finding) GetDetailArgs() map[string]string {
+	if x != nil {
+		return x.DetailArgs
+	}
+	return nil
 }
 
 type AnalyzeResponse struct {
@@ -592,12 +609,19 @@ const file_macuahuitl_v1_acl_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12,\n" +
 	"\x05rules\x18\x02 \x03(\v2\x16.macuahuitl.v1.AclRuleR\x05rules\"6\n" +
 	"\x0eAnalyzeRequest\x12$\n" +
-	"\x03acl\x18\x01 \x01(\v2\x12.macuahuitl.v1.AclR\x03acl\"T\n" +
+	"\x03acl\x18\x01 \x01(\v2\x12.macuahuitl.v1.AclR\x03acl\"\xfb\x01\n" +
 	"\aFinding\x12\x1d\n" +
 	"\n" +
 	"rule_index\x18\x01 \x01(\rR\truleIndex\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x16\n" +
-	"\x06detail\x18\x03 \x01(\tR\x06detail\"E\n" +
+	"\x06detail\x18\x03 \x01(\tR\x06detail\x12\x1d\n" +
+	"\n" +
+	"detail_key\x18\x04 \x01(\tR\tdetailKey\x12G\n" +
+	"\vdetail_args\x18\x05 \x03(\v2&.macuahuitl.v1.Finding.DetailArgsEntryR\n" +
+	"detailArgs\x1a=\n" +
+	"\x0fDetailArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"E\n" +
 	"\x0fAnalyzeResponse\x122\n" +
 	"\bfindings\x18\x01 \x03(\v2\x16.macuahuitl.v1.FindingR\bfindings\"O\n" +
 	"\x0fGenerateRequest\x12$\n" +
@@ -633,7 +657,7 @@ func file_macuahuitl_v1_acl_proto_rawDescGZIP() []byte {
 }
 
 var file_macuahuitl_v1_acl_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_macuahuitl_v1_acl_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_macuahuitl_v1_acl_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_macuahuitl_v1_acl_proto_goTypes = []any{
 	(AclAction)(0),           // 0: macuahuitl.v1.AclAction
 	(*AclRule)(nil),          // 1: macuahuitl.v1.AclRule
@@ -645,25 +669,27 @@ var file_macuahuitl_v1_acl_proto_goTypes = []any{
 	(*GenerateResponse)(nil), // 7: macuahuitl.v1.GenerateResponse
 	(*ImportRequest)(nil),    // 8: macuahuitl.v1.ImportRequest
 	(*ImportResponse)(nil),   // 9: macuahuitl.v1.ImportResponse
+	nil,                      // 10: macuahuitl.v1.Finding.DetailArgsEntry
 }
 var file_macuahuitl_v1_acl_proto_depIdxs = []int32{
-	0, // 0: macuahuitl.v1.AclRule.action:type_name -> macuahuitl.v1.AclAction
-	1, // 1: macuahuitl.v1.Acl.rules:type_name -> macuahuitl.v1.AclRule
-	2, // 2: macuahuitl.v1.AnalyzeRequest.acl:type_name -> macuahuitl.v1.Acl
-	4, // 3: macuahuitl.v1.AnalyzeResponse.findings:type_name -> macuahuitl.v1.Finding
-	2, // 4: macuahuitl.v1.GenerateRequest.acl:type_name -> macuahuitl.v1.Acl
-	2, // 5: macuahuitl.v1.ImportResponse.acl:type_name -> macuahuitl.v1.Acl
-	3, // 6: macuahuitl.v1.AclService.Analyze:input_type -> macuahuitl.v1.AnalyzeRequest
-	6, // 7: macuahuitl.v1.AclService.Generate:input_type -> macuahuitl.v1.GenerateRequest
-	8, // 8: macuahuitl.v1.AclService.Import:input_type -> macuahuitl.v1.ImportRequest
-	5, // 9: macuahuitl.v1.AclService.Analyze:output_type -> macuahuitl.v1.AnalyzeResponse
-	7, // 10: macuahuitl.v1.AclService.Generate:output_type -> macuahuitl.v1.GenerateResponse
-	9, // 11: macuahuitl.v1.AclService.Import:output_type -> macuahuitl.v1.ImportResponse
-	9, // [9:12] is the sub-list for method output_type
-	6, // [6:9] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	0,  // 0: macuahuitl.v1.AclRule.action:type_name -> macuahuitl.v1.AclAction
+	1,  // 1: macuahuitl.v1.Acl.rules:type_name -> macuahuitl.v1.AclRule
+	2,  // 2: macuahuitl.v1.AnalyzeRequest.acl:type_name -> macuahuitl.v1.Acl
+	10, // 3: macuahuitl.v1.Finding.detail_args:type_name -> macuahuitl.v1.Finding.DetailArgsEntry
+	4,  // 4: macuahuitl.v1.AnalyzeResponse.findings:type_name -> macuahuitl.v1.Finding
+	2,  // 5: macuahuitl.v1.GenerateRequest.acl:type_name -> macuahuitl.v1.Acl
+	2,  // 6: macuahuitl.v1.ImportResponse.acl:type_name -> macuahuitl.v1.Acl
+	3,  // 7: macuahuitl.v1.AclService.Analyze:input_type -> macuahuitl.v1.AnalyzeRequest
+	6,  // 8: macuahuitl.v1.AclService.Generate:input_type -> macuahuitl.v1.GenerateRequest
+	8,  // 9: macuahuitl.v1.AclService.Import:input_type -> macuahuitl.v1.ImportRequest
+	5,  // 10: macuahuitl.v1.AclService.Analyze:output_type -> macuahuitl.v1.AnalyzeResponse
+	7,  // 11: macuahuitl.v1.AclService.Generate:output_type -> macuahuitl.v1.GenerateResponse
+	9,  // 12: macuahuitl.v1.AclService.Import:output_type -> macuahuitl.v1.ImportResponse
+	10, // [10:13] is the sub-list for method output_type
+	7,  // [7:10] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_acl_proto_init() }
@@ -677,7 +703,7 @@ func file_macuahuitl_v1_acl_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_acl_proto_rawDesc), len(file_macuahuitl_v1_acl_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

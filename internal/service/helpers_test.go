@@ -2,11 +2,13 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
@@ -44,5 +46,26 @@ func TestBackupKeyIsCreatedOnceAndStaysInTheVault(t *testing.T) {
 	v.LockAll()
 	if _, err := BackupKey(v, true); !errors.Is(err, vault.ErrLocked) {
 		t.Fatalf("con la bóveda cerrada no hay llave: %v", err)
+	}
+}
+
+func TestReportLocalizaYTraeClaves(t *testing.T) {
+	type r struct {
+		Msg   string    `json:"msg"`
+		MsgTx i18n.Text `json:"-"`
+	}
+	mk := func() *r {
+		x := &r{}
+		i18n.Put(&x.Msg, &x.MsgTx, "security.yes")
+		return x
+	}
+	es := mk()
+	rep := ReportL(context.Background(), es, func(loc string) string { return "t-" + loc })
+	if rep.Json != `{"msg":"sí"}` || rep.Keys["msg"].Key != "security.yes" {
+		t.Errorf("es: %s %v", rep.Json, rep.Keys)
+	}
+	en := ReportL(i18n.WithLocale(context.Background(), "en"), mk(), func(loc string) string { return "t-" + loc })
+	if en.Json != `{"msg":"yes"}` || en.Keys["msg"].Key != "security.yes" || en.Text != "t-en" || rep.Text != "t-es" {
+		t.Errorf("en: %s %v", en.Json, en.Keys)
 	}
 }

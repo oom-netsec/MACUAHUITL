@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -27,6 +28,8 @@ type Problem struct {
 	Kind     string `json:"kind"` // err-disabled, half-duplex, crc, input_errors, output_errors, runts, giants, drops
 	Value    int64  `json:"value,omitempty"`
 	Evidence string `json:"evidence"`
+	// EvidenceTx es la evidencia como texto de catálogo cuando la arma la app (no cuando es salida del equipo).
+	EvidenceTx i18n.Text `json:"-"`
 }
 
 type IfIssue struct {
@@ -39,10 +42,11 @@ type IfIssue struct {
 }
 
 type HealthResult struct {
-	Issues   []IfIssue      `json:"issues"`
-	Devices  int            `json:"devices"`
-	Checked  map[string]int `json:"checked"` // equipos con dato por fuente: status, counters
-	Warnings []string       `json:"warnings"`
+	Issues     []IfIssue      `json:"issues"`
+	Devices    int            `json:"devices"`
+	Checked    map[string]int `json:"checked"` // equipos con dato por fuente: status, counters
+	Warnings   []string       `json:"warnings"`
+	WarningsTx []i18n.Text    `json:"-"`
 }
 
 var sevRank = map[string]int{"critica": 4, "alta": 3, "media": 2, "baja": 1}
@@ -74,7 +78,7 @@ func (f *Fleet) Health() HealthResult {
 		if ok {
 			res.Checked["status"]++
 		} else {
-			w.add("%s: sin evidencia utilizable de show interfaces status; no se evaluó err-disabled ni half-duplex", d.Name)
+			w.tx("fleet.warn.no_status", "dev", d.Name)
 		}
 		if ok {
 			for _, r := range st {
@@ -84,7 +88,9 @@ func (f *Fleet) Health() HealthResult {
 					i.Problems = append(i.Problems, Problem{Kind: "err-disabled", Evidence: fmt.Sprintf("%s %s %s", r.Port, r.Name, r.Status)})
 				case strings.Contains(r.Duplex, "half") && r.Status == "connected":
 					i := get(r.Port, "show interfaces status", e.At)
-					i.Problems = append(i.Problems, Problem{Kind: "half-duplex", Evidence: fmt.Sprintf("%s duplex %s velocidad %s", r.Port, r.Duplex, r.Speed)})
+					p := Problem{Kind: "half-duplex"}
+					i18n.Put(&p.Evidence, &p.EvidenceTx, "fleet.evidence.half", "port", r.Port, "duplex", r.Duplex, "speed", r.Speed)
+					i.Problems = append(i.Problems, p)
 				}
 			}
 		}
@@ -92,7 +98,7 @@ func (f *Fleet) Health() HealthResult {
 		if ok {
 			res.Checked["counters"]++
 		} else {
-			w.add("%s: sin evidencia utilizable de show interfaces; no se evaluaron CRC, errores ni drops", d.Name)
+			w.tx("fleet.warn.no_counters", "dev", d.Name)
 		}
 		if ok {
 			for _, r := range ifs {
@@ -160,7 +166,7 @@ func (f *Fleet) Health() HealthResult {
 		}
 		return x.Device+x.Port < y.Device+y.Port
 	})
-	res.Warnings = w.list
+	res.Warnings, res.WarningsTx = w.list, w.txs
 	return res
 }
 
@@ -173,13 +179,17 @@ type Row struct {
 	Detail string    `json:"detail,omitempty"`
 	Source string    `json:"source"`
 	At     time.Time `json:"at"`
+	// ValueTx y DetailTx son Value y Detail como texto de catálogo cuando traen palabras de la app.
+	ValueTx  i18n.Text `json:"-"`
+	DetailTx i18n.Text `json:"-"`
 }
 
 type SummaryResult struct {
-	Rows     []Row          `json:"rows"`
-	Checked  map[string]int `json:"checked"` // equipos con dato por revisión
-	Devices  int            `json:"devices"`
-	Warnings []string       `json:"warnings"`
+	Rows       []Row          `json:"rows"`
+	Checked    map[string]int `json:"checked"` // equipos con dato por revisión
+	Devices    int            `json:"devices"`
+	Warnings   []string       `json:"warnings"`
+	WarningsTx []i18n.Text    `json:"-"`
 }
 
 func (f *Fleet) Summary() SummaryResult {
@@ -189,35 +199,45 @@ func (f *Fleet) Summary() SummaryResult {
 		if c, e, ok := readOne(w, d, "show processes cpu", iosxe.ParseCPU); ok {
 			res.Checked["cpu"]++
 			if m := max(c.FiveSec, c.OneMin, c.FiveMin); m > CPUMax {
-				res.Rows = append(res.Rows, Row{d.Name, "cpu", fmt.Sprintf("%.0f %%", m), fmt.Sprintf("5 s %.0f %% · 1 min %.0f %% · 5 min %.0f %%", c.FiveSec, c.OneMin, c.FiveMin), "show processes cpu", e.At})
+				res.Rows = append(res.Rows, Row{Device: d.Name, Check: "cpu", Value: fmt.Sprintf("%.0f %%", m), Detail: fmt.Sprintf("5 s %.0f %% · 1 min %.0f %% · 5 min %.0f %%", c.FiveSec, c.OneMin, c.FiveMin), Source: "show processes cpu", At: e.At})
 			}
 		}
 		if n, e, ok := readOne(w, d, "show ntp status", iosxe.ParseNTP); ok {
 			res.Checked["ntp"]++
 			if !n.Synced {
-				res.Rows = append(res.Rows, Row{d.Name, "ntp", "no sincronizado", n.Line, "show ntp status", e.At})
+				row := Row{Device: d.Name, Check: "ntp", Detail: n.Line, Source: "show ntp status", At: e.At}
+				i18n.Put(&row.Value, &row.ValueTx, "fleet.value.ntp_unsynced")
+				res.Rows = append(res.Rows, row)
 			}
 		}
 		if v, e, ok := readOne(w, d, "show version", iosxe.ParseVersion); ok {
 			res.Checked["reboot"]++
 			if v.Uptime < RebootUnder {
-				res.Rows = append(res.Rows, Row{d.Name, "reboot", "uptime " + v.Uptime.Round(time.Minute).String(), "reinicio en las 24 h previas a la evidencia", "show version", e.At})
+				row := Row{Device: d.Name, Check: "reboot", Value: "uptime " + v.Uptime.Round(time.Minute).String(), Source: "show version", At: e.At}
+				i18n.Put(&row.Detail, &row.DetailTx, "fleet.detail.reboot")
+				res.Rows = append(res.Rows, row)
 			}
 		}
 		if m, e, ok := readOne(w, d, "show processes memory", iosxe.ParseMem); ok {
 			res.Checked["memory"]++
 			if used := 100 * float64(m.Total-m.Free) / float64(m.Total); used > MemUsedMax {
-				res.Rows = append(res.Rows, Row{d.Name, "memory", fmt.Sprintf("%.0f %% usada", used), fmt.Sprintf("libre %s de %s", Bytes(m.Free), Bytes(m.Total)), "show processes memory", e.At})
+				row := Row{Device: d.Name, Check: "memory", Source: "show processes memory", At: e.At}
+				i18n.Put(&row.Value, &row.ValueTx, "fleet.value.used", "pct", fmt.Sprintf("%.0f", used))
+				i18n.Put(&row.Detail, &row.DetailTx, "fleet.detail.mem_free", "free", Bytes(m.Free), "total", Bytes(m.Total))
+				res.Rows = append(res.Rows, row)
 			}
 		}
 		for _, fs := range flashes(w, d) {
 			res.Checked["flash"]++
 			if used := fs.UsedPct(); used > FlashUsedMax {
-				res.Rows = append(res.Rows, Row{d.Name, "flash", fmt.Sprintf("%.0f %% usada", used), fmt.Sprintf("%s libre de %s", Bytes(fs.Free), Bytes(fs.Total)), "dir " + fs.FS, fs.At})
+				row := Row{Device: d.Name, Check: "flash", Source: "dir " + fs.FS, At: fs.At}
+				i18n.Put(&row.Value, &row.ValueTx, "fleet.value.used", "pct", fmt.Sprintf("%.0f", used))
+				i18n.Put(&row.Detail, &row.DetailTx, "fleet.detail.flash_free", "free", Bytes(fs.Free), "total", Bytes(fs.Total))
+				res.Rows = append(res.Rows, row)
 			}
 		}
 	}
-	res.Warnings = w.list
+	res.Warnings, res.WarningsTx = w.list, w.txs
 	return res
 }
 
@@ -256,13 +276,14 @@ type DRAM struct {
 }
 
 type CapacityResult struct {
-	Need        int64    `json:"need,omitempty"`
-	Flash       []Flash  `json:"flash"`
-	DRAM        []DRAM   `json:"dram"`
-	FlashNoData []string `json:"flash_no_data"` // equipos sin dir flash:/bootflash: utilizable
-	DRAMNoData  []string `json:"dram_no_data"`
-	Devices     int      `json:"devices"`
-	Warnings    []string `json:"warnings"`
+	Need        int64       `json:"need,omitempty"`
+	Flash       []Flash     `json:"flash"`
+	DRAM        []DRAM      `json:"dram"`
+	FlashNoData []string    `json:"flash_no_data"` // equipos sin dir flash:/bootflash: utilizable
+	DRAMNoData  []string    `json:"dram_no_data"`
+	Devices     int         `json:"devices"`
+	Warnings    []string    `json:"warnings"`
+	WarningsTx  []i18n.Text `json:"-"`
 }
 
 var sizeRe = regexp.MustCompile(`^(\d+(?:\.\d+)?)\s*([kmgt]?)i?b?$`)
@@ -271,7 +292,7 @@ var sizeRe = regexp.MustCompile(`^(\d+(?:\.\d+)?)\s*([kmgt]?)i?b?$`)
 func ParseSize(s string) (int64, error) {
 	m := sizeRe.FindStringSubmatch(strings.ToLower(strings.TrimSpace(s)))
 	if m == nil {
-		return 0, fmt.Errorf("tamaño %q inválido: usa 800M, 1.2G, 500000", s)
+		return 0, i18n.New("fleet.err.bad_size", i18n.A("size", s))
 	}
 	v, _ := strconv.ParseFloat(m[1], 64)
 	mul := map[string]float64{"": 1, "k": 1 << 10, "m": 1 << 20, "g": 1 << 30, "t": 1 << 40}[m[2]]
@@ -286,7 +307,7 @@ func (f *Fleet) Capacity(need int64) CapacityResult {
 		fl := flashes(w, d)
 		if len(fl) == 0 {
 			res.FlashNoData = append(res.FlashNoData, d.Name)
-			w.add("%s: sin dato de flash (dir flash: / dir bootflash:); no se sabe si cabe", d.Name)
+			w.tx("fleet.warn.no_flash", "dev", d.Name)
 		}
 		for _, x := range fl {
 			if need > 0 {
@@ -305,7 +326,7 @@ func (f *Fleet) Capacity(need int64) CapacityResult {
 			res.DRAMNoData = append(res.DRAMNoData, d.Name)
 		}
 	}
-	res.Warnings = w.list
+	res.Warnings, res.WarningsTx = w.list, w.txs
 	return res
 }
 
@@ -341,9 +362,10 @@ type InvRow struct {
 }
 
 type InventoryResult struct {
-	Rows     []InvRow `json:"rows"`
-	Devices  int      `json:"devices"`
-	Warnings []string `json:"warnings"`
+	Rows       []InvRow    `json:"rows"`
+	Devices    int         `json:"devices"`
+	Warnings   []string    `json:"warnings"`
+	WarningsTx []i18n.Text `json:"-"`
 }
 
 var sfpRe = regexp.MustCompile(`(?i)^(SFP|GLC|QSFP|XCVR|DWDM|CWDM|CFP|QDD)|sfp|transceiver`)
@@ -366,7 +388,7 @@ func (f *Fleet) Inventory() InventoryResult {
 			}
 		}
 	}
-	res.Warnings = w.list
+	res.Warnings, res.WarningsTx = w.list, w.txs
 	return res
 }
 

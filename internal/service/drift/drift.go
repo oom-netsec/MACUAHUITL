@@ -10,11 +10,11 @@ import (
 	"strings"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
 	"github.com/oom-netsec/MACUAHUITL/internal/drift"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
@@ -27,7 +27,7 @@ type driftSvc struct {
 }
 
 // bundle acepta el ID de un trabajo de esta sesión o la ruta absoluta de su carpeta.
-func (s *driftSvc) bundle(job string) (*analyze.Bundle, error) {
+func (s *driftSvc) bundle(ctx context.Context, job string) (*analyze.Bundle, error) {
 	dir := filepath.Clean(job)
 	if !filepath.IsAbs(job) {
 		j, err := s.d.Job(job)
@@ -35,20 +35,20 @@ func (s *driftSvc) bundle(job string) (*analyze.Bundle, error) {
 			return nil, err
 		}
 		if j.Dir == "" {
-			return nil, status.Error(codes.FailedPrecondition, "el trabajo aún no tiene salidas: ármalo y espera la primera ronda")
+			return nil, service.Err(ctx, codes.FailedPrecondition, "analyze.err.job_no_outputs", nil)
 		}
 		dir = j.Dir
 	}
 	b, err := analyze.Load(dir)
 	if err != nil {
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
+		return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
 	return b, nil
 }
 
-func (s *driftSvc) Drift(_ context.Context, r *v1.DriftRequest) (*v1.DriftResponse, error) {
+func (s *driftSvc) Drift(ctx context.Context, r *v1.DriftRequest) (*v1.DriftResponse, error) {
 	s.d.MarkActive()
-	b, err := s.bundle(r.Job)
+	b, err := s.bundle(ctx, r.Job)
 	if err != nil {
 		return nil, err
 	}
@@ -66,6 +66,7 @@ func (s *driftSvc) Drift(_ context.Context, r *v1.DriftRequest) (*v1.DriftRespon
 	rep := drift.Report{Dir: b.Dir, From: max(int(r.Round)-1, 0), To: int(r.Round), Devices: []drift.DeviceDrift{}, Warnings: []string{}, Masked: masked(b.Dir)}
 	for _, w := range b.Warnings {
 		rep.Warnings = append(rep.Warnings, strings.Join(nonEmpty(w.Device, w.Command, w.Msg), ": "))
+		rep.WarningsTx = append(rep.WarningsTx, i18n.Join(": ", i18n.Lit(w.Device, w.Device), i18n.Lit(w.Command, w.Command), w.MsgTx))
 	}
 	var names []string
 	for dev := range cfg {
@@ -81,17 +82,18 @@ func (s *driftSvc) Drift(_ context.Context, r *v1.DriftRequest) (*v1.DriftRespon
 		}
 		from, to, ok := drift.Pair(have, int(r.Round))
 		if !ok {
-			rep.Warnings = append(rep.Warnings, fmt.Sprintf("%s: sin dos rondas con running-config (tiene %v)", dev, have))
+			wt := i18n.Tx("drift.warn.no_pair", "dev", dev, "have", fmt.Sprint(have))
+			rep.Warnings, rep.WarningsTx = append(rep.Warnings, wt.In(i18n.Es)), append(rep.WarningsTx, wt)
 			continue
 		}
 		cs, ign := drift.Compare(cfg[dev][from], cfg[dev][to])
 		rep.Devices = append(rep.Devices, drift.NewDevice(dev, from, to, cs, ign))
 	}
 	if len(rep.Devices) == 0 {
-		return nil, status.Error(codes.FailedPrecondition, "ningún equipo tiene dos rondas con show running-config; usa un playbook que lo recolecte y espera la segunda ronda")
+		return nil, service.Err(ctx, codes.FailedPrecondition, "drift.err.no_pair", nil)
 	}
 	s.d.Audit("drift.run", b.Dir, fmt.Sprintf("round=%d device=%q devices=%d", r.Round, r.Device, len(rep.Devices)))
-	return &v1.DriftResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.DriftResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
 func nonEmpty(ss ...string) (out []string) {

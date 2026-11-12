@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/msgkb"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/pcapan"
@@ -28,6 +29,8 @@ type Event struct {
 	Severity string    `json:"severity,omitempty"`
 	Text     string    `json:"text"`
 	Note     string    `json:"note,omitempty"`
+	TextTx   i18n.Text `json:"-"` // Text y Note como texto de catálogo (solo los que arma la app)
+	NoteTx   i18n.Text `json:"-"`
 	// KB es la ficha de la base de mensajes (internal/msgkb) del mnemónico del evento: qué significa y qué hacer.
 	KB string `json:"kb,omitempty"`
 }
@@ -81,21 +84,21 @@ func BundleEvents(b *Bundle, findings []Finding) ([]Event, []Warning) {
 			evs = append(evs, e)
 		}
 		if uptime > 0 {
-			warns = append(warns, Warning{Device: s.Device, Round: s.Round, Command: s.Command,
-				Msg: fmt.Sprintf("%d mensaje(s) con marca de uptime, sin hora absoluta: se omiten (configura service timestamps log datetime msec)", uptime)})
+			warns = append(warns, Warn(s.Device, s.Round, s.Command, "analyze.warn.uptime_stamps", "n", uptime))
 		}
 	}
 	for _, dev := range sortedKeys(noRef) {
 		if noRef[dev] {
-			warns = append(warns, Warning{Device: dev, Command: "show logging",
-				Msg: "hora del log sin referencia de zona: sin show clock detail se toma como UTC (recolecta show clock detail o usa show-timezone)"})
+			warns = append(warns, Warn(dev, 0, "show logging", "analyze.warn.log_no_zone"))
 		}
 	}
 	for k, at := range first {
-		evs = append(evs, Event{At: at, Source: "patrol", Device: k.dev, Text: fmt.Sprintf("ronda %d: %d comando(s)", k.round, count[k])})
+		t := i18n.Tx("analyze.event.round", "round", k.round, "n", count[k])
+		evs = append(evs, Event{At: at, Source: "patrol", Device: k.dev, Text: t.In(i18n.Es), TextTx: t})
 	}
 	for _, f := range findings {
-		evs = append(evs, Event{At: f.At, Source: "hallazgo", Device: f.Device, Severity: f.Severity, Text: fmt.Sprintf("%s (ronda %d): %s", f.Title, f.Round, f.Detail)})
+		t := i18n.Tx("analyze.event.finding", "round", f.Round).With("title", f.TitleTx).With("detail", f.DetailTx)
+		evs = append(evs, Event{At: f.At, Source: "hallazgo", Device: f.Device, Severity: f.Severity, Text: t.In(i18n.Es), TextTx: t})
 	}
 	return evs, warns
 }
@@ -179,17 +182,18 @@ func logEvent(ln string, ref time.Time, off time.Duration, hasOff bool) (e Event
 		at = at.AddDate(-1, 0, 0)
 	}
 	at = at.Add(-off)
-	var notes []string
+	var notes []i18n.Text
 	if l.Unsynced {
-		notes = append(notes, "reloj sin sincronizar en el equipo")
+		notes = append(notes, i18n.Tx("analyze.event.clock_unsync"))
 	}
 	switch {
 	case local && hasOff && off != 0:
-		notes = append(notes, "hora local del equipo pasada a UTC con show clock detail (desfase "+fmtOffset(off)+")")
+		notes = append(notes, i18n.Tx("analyze.event.local_to_utc", "offset", fmtOffset(off)))
 	case local && !hasOff && l.Zone != "":
-		notes = append(notes, "hora local del equipo ("+l.Zone+"), sin convertir a UTC")
+		notes = append(notes, i18n.Tx("analyze.event.local_raw", "zone", l.Zone))
 	}
-	e = Event{At: at, Source: "log-equipo", Text: l.Text, Note: strings.Join(notes, "; "), KB: kbNote(l.Text)}
+	note := i18n.Join("; ", notes...)
+	e = Event{At: at, Source: "log-equipo", Text: l.Text, Note: note.In(i18n.Es), NoteTx: note, KB: kbNote(l.Text)}
 	if l.Severity >= 0 {
 		e.Severity = syslogSev[l.Severity]
 	}
@@ -233,10 +237,10 @@ func SyslogEvents(r io.Reader, name string, from, to time.Time) ([]Event, []Warn
 	}
 	var warns []Warning
 	if bad > 0 {
-		warns = append(warns, Warning{Msg: fmt.Sprintf("%s: %d línea(s) sin el formato del receptor syslog", name, bad)})
+		warns = append(warns, Warn("", 0, "", "analyze.warn.syslog_bad_lines", "name", name, "n", bad))
 	}
 	if err := sc.Err(); err != nil {
-		warns = append(warns, Warning{Msg: fmt.Sprintf("%s: %v", name, err)})
+		warns = append(warns, Warn("", 0, "", "analyze.warn.file_error", "file", name, "error", err))
 	}
 	return evs, warns
 }
@@ -271,7 +275,7 @@ func SyslogFiles(paths []string, from, to time.Time, maxBytes int64) ([]Event, [
 		}
 		f, err := os.Open(p)
 		if err != nil {
-			warns = append(warns, Warning{Msg: err.Error()})
+			warns = append(warns, Warn("", 0, "", "analyze.warn.system", "error", err))
 			continue
 		}
 		cr := &countReader{r: f}
@@ -286,7 +290,7 @@ func SyslogFiles(paths []string, from, to time.Time, maxBytes int64) ([]Event, [
 		f.Close()
 		if left <= 0 {
 			if more {
-				warns = append(warns, Warning{Msg: fmt.Sprintf("syslog: tope de %d MiB leído; el resto de %s y los archivos siguientes se omiten", maxBytes>>20, filepath.Base(p))})
+				warns = append(warns, Warn("", 0, "", "analyze.warn.syslog_cap", "mib", maxBytes>>20, "file", filepath.Base(p)))
 			}
 			break
 		}
@@ -317,7 +321,8 @@ func AuditEvents(r io.Reader) []Event {
 		if err := dec.Decode(&rec); err != nil {
 			break // fin o línea dañada: lo leído hasta ahí sirve
 		}
-		evs = append(evs, Event{At: rec.At.UTC(), Source: "auditoria", Text: strings.TrimSpace(fmt.Sprintf("%s %s %s", rec.Action, rec.Target, rec.Detail)), Note: "por " + rec.Actor})
+		note := i18n.Tx("analyze.event.by", "actor", rec.Actor)
+		evs = append(evs, Event{At: rec.At.UTC(), Source: "auditoria", Text: strings.TrimSpace(fmt.Sprintf("%s %s %s", rec.Action, rec.Target, rec.Detail)), Note: note.In(i18n.Es), NoteTx: note})
 	}
 	return evs
 }
@@ -326,30 +331,31 @@ func AuditEvents(r io.Reader) []Event {
 // DNS lento, con error o sin respuesta, e ICMP inalcanzable o TTL excedido.
 func PcapEvents(rep pcapan.Report) []Event {
 	var evs []Event
-	add := func(at time.Time, sev, text string) {
-		evs = append(evs, Event{At: at.UTC(), Source: "pcap", Severity: sev, Text: text})
+	add := func(at time.Time, sev, key string, kv ...any) {
+		t := i18n.Tx(key, kv...)
+		evs = append(evs, Event{At: at.UTC(), Source: "pcap", Severity: sev, Text: t.In(i18n.Es), TextTx: t})
 	}
 	for _, e := range rep.TCP.Events {
-		kind := "RST"
+		key := "analyze.event.rst"
 		if e.Kind != "rst" {
-			kind = "retransmisión"
+			key = "analyze.event.retransmit"
 		}
-		add(e.At, "media", fmt.Sprintf("%s %s → %s", kind, e.Client, e.Server))
+		add(e.At, "media", key, "client", e.Client, "server", e.Server)
 	}
 	for _, q := range rep.DNS.Slow {
-		add(q.At, "media", fmt.Sprintf("DNS lento %s %s (%v) %s → %s", q.Name, q.Type, q.Latency, q.Client, q.Server))
+		add(q.At, "media", "analyze.event.dns_slow", "name", q.Name, "type", q.Type, "latency", q.Latency, "client", q.Client, "server", q.Server)
 	}
 	for _, q := range rep.DNS.Errors {
-		add(q.At, "baja", fmt.Sprintf("DNS %s %s %s", q.RCode, q.Name, q.Type))
+		add(q.At, "baja", "analyze.event.dns_error", "rcode", q.RCode, "name", q.Name, "type", q.Type)
 	}
 	for _, q := range rep.DNS.Unanswered {
-		add(q.At, "media", fmt.Sprintf("DNS sin respuesta %s %s %s → %s", q.Name, q.Type, q.Client, q.Server))
+		add(q.At, "media", "analyze.event.dns_none", "name", q.Name, "type", q.Type, "client", q.Client, "server", q.Server)
 	}
 	for _, x := range rep.ICMP.Unreachable {
-		add(x.At, "media", fmt.Sprintf("ICMP inalcanzable (código %d) de %s para %s", x.Code, x.From, x.Target))
+		add(x.At, "media", "analyze.event.icmp_unreach", "code", x.Code, "from", x.From, "target", x.Target)
 	}
 	for _, x := range rep.ICMP.TTLExceeded {
-		add(x.At, "baja", fmt.Sprintf("ICMP TTL excedido de %s para %s", x.From, x.Target))
+		add(x.At, "baja", "analyze.event.icmp_ttl", "from", x.From, "target", x.Target)
 	}
 	return evs
 }
@@ -397,12 +403,16 @@ type TimelineReport struct {
 	Warnings []Warning `json:"warnings"`
 }
 
-// Text es el resumen legible para mctl.
-func (r TimelineReport) Text() string {
+// Text es el resumen legible para mctl, en español.
+func (r TimelineReport) Text() string { return r.TextIn(i18n.Es) }
+
+// TextIn es el resumen en el idioma pedido (con es, el de siempre).
+func (r TimelineReport) TextIn(loc string) string {
 	var b strings.Builder
+	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
 	fmt.Fprintf(&b, "%s\n", r.Dir)
 	if !r.Around.IsZero() {
-		fmt.Fprintf(&b, "ventana: %s ± %s\n", r.Around.Format(time.RFC3339), r.Window)
+		fmt.Fprintf(&b, "%s\n", m("analyze.text.window", "around", r.Around.Format(time.RFC3339), "window", r.Window))
 	}
 	for _, e := range r.Events {
 		dev := e.Device
@@ -411,7 +421,7 @@ func (r TimelineReport) Text() string {
 		}
 		sev := ""
 		if e.Severity != "" {
-			sev = "[" + sevLabel[e.Severity] + "] "
+			sev = "[" + m("analyze.sev."+e.Severity) + "] "
 		}
 		fmt.Fprintf(&b, "%s  %-10s %-20s %s%s", e.At.Format("2006-01-02 15:04:05.000"), e.Source, dev, sev, e.Text)
 		if e.Note != "" {
@@ -423,7 +433,7 @@ func (r TimelineReport) Text() string {
 		b.WriteString("\n")
 	}
 	for _, w := range r.Warnings {
-		fmt.Fprintf(&b, "aviso: %s\n", w.String())
+		fmt.Fprintf(&b, "%s\n", m("analyze.text.warning", "message", w.in(loc)))
 	}
 	return b.String()
 }

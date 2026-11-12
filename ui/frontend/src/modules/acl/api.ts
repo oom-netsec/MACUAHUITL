@@ -1,7 +1,7 @@
 // Contrato del módulo con el puente (ui/bridge) y su implementación de Wails.
 export interface AclRule { action: string; protocol: string; source: string; destination: string; sourcePorts: string; destinationPorts: string; log: boolean; established: boolean; remark: string }
 export interface Acl { name: string; rules: AclRule[] }
-export interface AclFinding { index: number; kind: string; detail: string }
+export interface AclFinding { index: number; kind: string; detail: string; detailKey?: string; detailArgs?: Record<string, string> }
 
 export interface AclAPI {
   aclImport(vendor: string, text: string): Promise<Acl>;

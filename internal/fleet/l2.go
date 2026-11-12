@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -23,12 +24,13 @@ type Hit struct {
 }
 
 type FindResult struct {
-	Query    string         `json:"query"`
-	Mode     string         `json:"mode"` // mac, ip, name
-	Hits     []Hit          `json:"hits"`
-	Devices  int            `json:"devices"`
-	Checked  map[string]int `json:"checked"` // equipos con dato por fuente consultada
-	Warnings []string       `json:"warnings"`
+	Query      string         `json:"query"`
+	Mode       string         `json:"mode"` // mac, ip, name
+	Hits       []Hit          `json:"hits"`
+	Devices    int            `json:"devices"`
+	Checked    map[string]int `json:"checked"` // equipos con dato por fuente consultada
+	Warnings   []string       `json:"warnings"`
+	WarningsTx []i18n.Text    `json:"-"`
 }
 
 type tag struct {
@@ -266,10 +268,10 @@ func (f *Fleet) Find(q string) FindResult {
 			}
 		}
 		if len(miss) > 0 {
-			w.add("sin %s: %s (la búsqueda no cubre esos equipos en esa fuente)", c, strings.Join(miss, ", "))
+			w.tx("fleet.warn.no_source", "cmd", c, "devs", strings.Join(miss, ", "))
 		}
 	}
-	res.Warnings = w.list
+	res.Warnings, res.WarningsTx = w.list, w.txs
 	return res
 }
 
@@ -299,6 +301,7 @@ type TraceHop struct {
 	Neighbor     string    `json:"neighbor,omitempty"`
 	NeighborPort string    `json:"neighbor_port,omitempty"`
 	Note         string    `json:"note,omitempty"`
+	NoteTx       i18n.Text `json:"-"`
 	Source       string    `json:"source"`
 	At           time.Time `json:"at"`
 }
@@ -307,13 +310,14 @@ type TraceHop struct {
 // (vecino sin evidencia), trunk-sin-vecino (trunk o Po sin CDP/LLDP: no es acceso),
 // no-mac (el vecino no la tiene), not-found, max.
 type TraceResult struct {
-	Query    string     `json:"query"`
-	MAC      string     `json:"mac,omitempty"`
-	IP       string     `json:"ip,omitempty"`
-	Hops     []TraceHop `json:"hops"`
-	End      string     `json:"end"`
-	Access   *TraceHop  `json:"access,omitempty"`
-	Warnings []string   `json:"warnings"`
+	Query      string      `json:"query"`
+	MAC        string      `json:"mac,omitempty"`
+	IP         string      `json:"ip,omitempty"`
+	Hops       []TraceHop  `json:"hops"`
+	End        string      `json:"end"`
+	Access     *TraceHop   `json:"access,omitempty"`
+	Warnings   []string    `json:"warnings"`
+	WarningsTx []i18n.Text `json:"-"`
 }
 
 const maxTrace = 32
@@ -389,7 +393,7 @@ func (f *Fleet) walk(g *l2, w *ws, mac string, start *Dev) (hops []TraceHop, end
 			start = cands[0]
 		}
 		if start == nil {
-			w.add("la MAC %s no aparece en ninguna tabla de direcciones de la flota", mac)
+			w.tx("fleet.warn.mac_absent", "mac", mac)
 			return nil, "not-found", nil
 		}
 	}
@@ -398,34 +402,35 @@ func (f *Fleet) walk(g *l2, w *ws, mac string, start *Dev) (hops []TraceHop, end
 	for cur := start; len(hops) < maxTrace; {
 		e, ok := g.macEntry(cur, mac, vlan)
 		if !ok {
-			w.add("%s no tiene la MAC %s en su tabla (la entrada pudo expirar o la evidencia es de otra hora)", cur.Name, mac)
+			w.tx("fleet.warn.mac_missing", "dev", cur.Name, "mac", mac)
 			return hops, "no-mac", nil
 		}
 		h := TraceHop{Device: cur.Name, Port: e.Port, VLAN: e.VLAN, Source: "show mac address-table", At: e.At}
 		if e.Port == "CPU" {
-			h.Note = "la MAC es del propio equipo"
+			i18n.Put(&h.Note, &h.NoteTx, "fleet.note.self")
 			return append(hops, h), "self", nil
 		}
 		if k := cur.Key + "|" + e.Port; visited[k] {
-			w.add("bucle en el seguimiento: %s %s ya se visitó; se corta (revisa STP o evidencia de horas distintas)", cur.Name, e.Port)
-			h.Note = "bucle"
+			w.tx("fleet.warn.trace_loop", "dev", cur.Name, "port", e.Port)
+			i18n.Put(&h.Note, &h.NoteTx, "fleet.note.loop")
 			return append(hops, h), "loop", nil
 		} else {
 			visited[k] = true
 		}
 		nb, has := g.neighborOf(cur, e.Port)
 		if has && !nb.Infra() { // teléfono, AP u host publicado por CDP/LLDP: el puerto es de acceso
-			h.Neighbor, h.Note = nb.Device, "puerto de acceso (equipo extremo: "+strings.Join(nb.Capabilities, " ")+")"
+			h.Neighbor = nb.Device
+			i18n.Put(&h.Note, &h.NoteTx, "fleet.note.access_edge", "caps", strings.Join(nb.Capabilities, " "))
 			hops = append(hops, h)
 			return hops, "access", &hops[len(hops)-1]
 		}
 		if !has {
 			if st := g.stat[cur.Key][e.Port]; strings.HasPrefix(e.Port, "Po") || st.VLAN == "trunk" {
-				h.Note = "trunk sin vecino CDP/LLDP"
-				w.add("%s %s es un trunk o port-channel sin vecino CDP/LLDP: puede faltar evidencia de un equipo; el rastreo se corta ahí", cur.Name, e.Port)
+				i18n.Put(&h.Note, &h.NoteTx, "fleet.note.trunk")
+				w.tx("fleet.warn.trunk_no_nbr", "dev", cur.Name, "port", e.Port)
 				return append(hops, h), "trunk-sin-vecino", nil
 			}
-			h.Note = "puerto de acceso"
+			i18n.Put(&h.Note, &h.NoteTx, "fleet.note.access")
 			hops = append(hops, h)
 			return hops, "access", &hops[len(hops)-1]
 		}
@@ -433,12 +438,12 @@ func (f *Fleet) walk(g *l2, w *ws, mac string, start *Dev) (hops []TraceHop, end
 		hops = append(hops, h)
 		next := f.resolve(nb)
 		if next == nil {
-			w.add("el vecino %s (%s) no tiene evidencia en la flota: el rastreo se corta ahí", nb.Device, nb.MgmtIP)
+			w.tx("fleet.warn.nbr_no_evidence", "neighbor", nb.Device, "ip", nb.MgmtIP)
 			return hops, "no-neighbor", nil
 		}
 		cur, vlan = next, e.VLAN
 	}
-	w.add("el rastreo pasó de %d saltos; se corta", maxTrace)
+	w.tx("fleet.warn.trace_hops", "max", maxTrace)
 	return hops, "max", nil
 }
 
@@ -462,17 +467,17 @@ func (f *Fleet) Trace(q string) TraceResult {
 			}
 		}
 		if len(macs) > 1 {
-			w.add("la IP %s tiene %d MAC distintas en el ARP de la flota; se usa la de la evidencia más reciente (%s)", res.IP, len(macs), res.MAC)
+			w.tx("fleet.warn.ip_many_macs", "ip", res.IP, "n", len(macs), "mac", res.MAC)
 		}
 		if res.MAC == "" {
-			w.add("ningún equipo tiene la IP %s en su ARP: no se puede saber su MAC", res.IP)
-			res.End, res.Warnings = "not-found", w.list
+			w.tx("fleet.warn.ip_no_arp", "ip", res.IP)
+			res.End, res.Warnings, res.WarningsTx = "not-found", w.list, w.txs
 			return res
 		}
 	} else {
 		res.End = "not-found"
-		w.add("%q no es una MAC ni una IP", q)
-		res.Warnings = w.list
+		w.tx("fleet.warn.bad_query", "query", q)
+		res.Warnings, res.WarningsTx = w.list, w.txs
 		return res
 	}
 	res.Hops, res.End, res.Access = f.walk(g, w, res.MAC, nil)
@@ -482,10 +487,10 @@ func (f *Fleet) Trace(q string) TraceResult {
 	}
 	for _, r := range g.mac {
 		if r.MAC == res.MAC && !seen[r.Dev.Name] && r.Port != "CPU" {
-			w.add("la MAC también aparece en %s puerto %s, fuera de este recorrido", r.Dev.Name, r.Port)
+			w.tx("fleet.warn.mac_also", "dev", r.Dev.Name, "port", r.Port)
 			seen[r.Dev.Name] = true
 		}
 	}
-	res.Warnings = w.list
+	res.Warnings, res.WarningsTx = w.list, w.txs
 	return res
 }

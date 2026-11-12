@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -45,6 +46,7 @@ type Fleet struct {
 	Now      time.Time
 	Devs     []*Dev
 	Warnings []string
+	WarnTx   []i18n.Text `json:"-"` // los avisos como texto de catálogo (mismo orden)
 	lim      struct {
 		bytes   int64
 		entries int
@@ -57,11 +59,11 @@ type Fleet struct {
 func (f *Fleet) capped(w *ws) bool {
 	switch {
 	case f.lim.devs:
-		w.add("tope de %d equipos alcanzado: el resto de las carpetas no se cargó; la flota está incompleta", maxDevs)
+		w.tx("fleet.warn.cap_devs", "max", maxDevs)
 	case f.lim.entries > maxEntries:
-		w.add("tope de %d archivos alcanzado: el resto no se cargó; la flota está incompleta", maxEntries)
+		w.tx("fleet.warn.cap_entries", "max", maxEntries)
 	case f.lim.bytes >= maxTotal:
-		w.add("tope de lectura de %d MiB alcanzado: el resto no se cargó; la flota está incompleta", maxTotal>>20)
+		w.tx("fleet.warn.cap_bytes", "mib", maxTotal>>20)
 	default:
 		return false
 	}
@@ -150,11 +152,11 @@ func Load(dir string, now time.Time, extra ...string) (*Fleet, error) {
 	for i, r := range append([]string{dir}, extra...) {
 		fi, err := os.Stat(r)
 		if err == nil && !fi.IsDir() {
-			err = fmt.Errorf("%s no es una carpeta", r)
+			err = i18n.New("fleet.err.not_dir", i18n.A("path", r))
 		}
 		if err != nil {
 			if i == 0 {
-				first = fmt.Errorf("flota: %w", err)
+				first = i18n.Wrap("fleet.err.load", err, nil)
 			}
 			continue
 		}
@@ -170,7 +172,7 @@ func Load(dir string, now time.Time, extra ...string) (*Fleet, error) {
 	readJob = func(jd string, depth int) {
 		ents, err := os.ReadDir(jd)
 		if err != nil {
-			w.add("%s: no se pudo leer la carpeta: %v", jd, err)
+			w.tx("fleet.warn.dir_unreadable", "dir", jd, "error", err)
 		}
 		for _, e := range ents {
 			if !e.IsDir() {
@@ -192,29 +194,29 @@ func Load(dir string, now time.Time, extra ...string) (*Fleet, error) {
 				}
 				fh, err := os.Open(fn)
 				if err != nil {
-					w.add("%v", err)
+					w.tx("fleet.warn.system", "error", err)
 					continue
 				}
 				n += f.parse(w, devs, e.Name(), filepath.Base(jd), fh)
 				fh.Close()
 			}
 			if n == 0 && !f.lim.devs {
-				w.add("%s/%s: ningún archivo con salidas de Patrol (encabezados =====); se ignora", filepath.Base(jd), e.Name())
+				w.tx("fleet.warn.no_outputs", "job", filepath.Base(jd), "dir", e.Name())
 			}
 		}
 		zips, _ := filepath.Glob(filepath.Join(jd, "*.zip"))
 		for _, z := range zips {
 			if err := f.readZip(w, devs, z, filepath.Base(jd)); err != nil {
-				w.add("%s: %v", filepath.Base(z), err)
+				w.tx("fleet.warn.file_error", "file", filepath.Base(z), "error", err)
 			}
 		}
 	}
 	for _, r := range roots {
 		readJob(r, 0)
 	}
-	f.Warnings = w.list
+	f.Warnings, f.WarnTx = w.list, w.txs
 	if len(devs) == 0 {
-		return nil, fmt.Errorf("flota: %s no contiene salidas de Patrol (carpetas <equipo>_<ip> con encabezados =====)", dir)
+		return nil, i18n.New("fleet.err.no_outputs", i18n.A("dir", dir))
 	}
 	for _, d := range devs {
 		if e, ok := d.Get("show version"); ok && !rejected(e) {
@@ -245,7 +247,7 @@ func (f *Fleet) readZip(w *ws, devs map[string]*Dev, p, job string) error {
 		}
 		rc, err := zf.Open()
 		if err != nil {
-			w.add("%s · %s: %v", filepath.Base(p), n, err)
+			w.tx("fleet.warn.zip_entry", "file", filepath.Base(p), "entry", n, "error", err)
 			continue
 		}
 		f.parse(w, devs, path.Dir(n), job, rc)
@@ -304,7 +306,7 @@ func (f *Fleet) parse(w *ws, devs map[string]*Dev, key, job string, r io.Reader)
 		if cur != nil {
 			cur.Text = sb.String()
 			if cur.Truncated {
-				w.add("%s · %s: la salida pasa de los topes de lectura y quedó truncada; se ignora", key, cmd)
+				w.tx("fleet.warn.output_over", "key", key, "cmd", cmd)
 			}
 			d.set(cmd, *cur)
 		}
@@ -317,7 +319,7 @@ func (f *Fleet) parse(w *ws, devs map[string]*Dev, key, job string, r io.Reader)
 		ln, cut, err := readLine(rd)
 		if err != nil {
 			if err != io.EOF {
-				w.add("%s: error de lectura, el resto del archivo no se leyó: %v", key, err)
+				w.tx("fleet.warn.read_error", "key", key, "error", err)
 				if cur != nil {
 					cur.Truncated = true
 				}
@@ -351,7 +353,7 @@ func (f *Fleet) parse(w *ws, devs map[string]*Dev, key, job string, r io.Reader)
 		sb.WriteByte('\n')
 	}
 	if cr.over {
-		w.add("%s: se alcanzó un tope de lectura (archivo de más de %d MiB o carga total); el resto del archivo no se leyó", key, maxFile>>20)
+		w.tx("fleet.warn.file_cap", "key", key, "mib", maxFile>>20)
 		if cur != nil {
 			cur.Truncated = true
 		}
@@ -363,26 +365,37 @@ func (f *Fleet) parse(w *ws, devs map[string]*Dev, key, job string, r io.Reader)
 // newWS arranca los avisos de un resultado con los de la carga de la flota.
 func (f *Fleet) newWS() *ws {
 	w := &ws{}
-	for _, m := range f.Warnings {
-		w.add("%s", m)
+	for i, m := range f.Warnings {
+		tx := i18n.Lit(m, "") // sin su texto de catálogo, el aviso se conserva tal cual
+		if i < len(f.WarnTx) && !f.WarnTx[i].Empty() {
+			tx = f.WarnTx[i]
+		}
+		w.put(m, tx)
 	}
 	return w
 }
 
-// ws junta avisos sin repetirlos.
+// ws junta avisos sin repetirlos: el texto en español y su texto de catálogo, en el mismo orden.
 type ws struct {
 	seen map[string]bool
 	list []string
+	txs  []i18n.Text
 }
 
-func (w *ws) add(format string, a ...any) {
-	s := fmt.Sprintf(format, a...)
+// tx agrega un aviso del catálogo.
+func (w *ws) tx(key string, kv ...any) {
+	t := i18n.Tx(key, kv...)
+	w.put(t.In(i18n.Es), t)
+}
+
+func (w *ws) put(s string, t i18n.Text) {
 	if w.seen == nil {
 		w.seen = map[string]bool{}
 	}
 	if !w.seen[s] {
 		w.seen[s] = true
 		w.list = append(w.list, s)
+		w.txs = append(w.txs, t)
 	}
 }
 
@@ -398,25 +411,25 @@ func read[T any](w *ws, d *Dev, cmd string, p func(string) ([]T, bool)) ([]T, Ev
 	if fe, fok := d.filtered(cmd); fok {
 		switch {
 		case !ok:
-			w.add("%s · %s: solo hay salida filtrada con pipe (%s); no sirve como tabla completa, se ignora", d.Name, cmd, fe.At.Format("2006-01-02 15:04Z"))
+			w.tx("fleet.warn.only_filtered", "dev", d.Name, "cmd", cmd, "at", fe.At.Format("2006-01-02 15:04Z"))
 		case fe.At.After(e.At):
-			w.add("%s · %s: hay una salida filtrada con pipe más reciente (%s) que se ignora; se usa la completa de %s", d.Name, cmd, fe.At.Format("2006-01-02 15:04Z"), e.At.Format("2006-01-02 15:04Z"))
+			w.tx("fleet.warn.newer_filtered", "dev", d.Name, "cmd", cmd, "at", fe.At.Format("2006-01-02 15:04Z"), "full", e.At.Format("2006-01-02 15:04Z"))
 		}
 	}
 	if !ok {
 		return nil, e, false
 	}
 	if e.Truncated {
-		w.add("%s · %s: salida truncada por los topes de lectura (%s); se ignora", d.Name, cmd, e.At.Format("2006-01-02 15:04Z"))
+		w.tx("fleet.warn.truncated", "dev", d.Name, "cmd", cmd, "at", e.At.Format("2006-01-02 15:04Z"))
 		return nil, e, false
 	}
 	if rejected(e) {
-		w.add("%s · %s: el equipo rechazó el comando (%s); se ignora", d.Name, cmd, e.At.Format("2006-01-02 15:04Z"))
+		w.tx("fleet.warn.rejected", "dev", d.Name, "cmd", cmd, "at", e.At.Format("2006-01-02 15:04Z"))
 		return nil, e, false
 	}
 	rows, ok := p(e.Text)
 	if !ok {
-		w.add("%s · %s: formato inesperado, se ignora esta salida (%s)", d.Name, cmd, e.At.Format("2006-01-02 15:04Z"))
+		w.tx("fleet.warn.format", "dev", d.Name, "cmd", cmd, "at", e.At.Format("2006-01-02 15:04Z"))
 		return nil, e, false
 	}
 	return rows, e, true

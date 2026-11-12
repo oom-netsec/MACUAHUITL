@@ -15,6 +15,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
 )
 
@@ -35,6 +36,8 @@ type Change struct {
 	Rule string `json:"rule"`
 	Line int    `json:"line"`
 	Text string `json:"text"`
+	// TextTx es Text como texto de catálogo cuando lo arma la app (el reordenamiento); no viaja en el JSON.
+	TextTx i18n.Text `json:"-"`
 }
 
 // Orphan es una línea que apunta a algo que no existe (o una definición sin uso).
@@ -42,12 +45,36 @@ type Orphan struct {
 	Line int    `json:"line"`
 	Text string `json:"text"`
 	Why  string `json:"why"`
+	// WhyTx es Why como texto de catálogo; no viaja en el JSON.
+	WhyTx i18n.Text `json:"-"`
 }
 
 type Result struct {
-	Output  string   `json:"output"`
-	Changes []Change `json:"changes"`
-	Orphans []Orphan `json:"orphans"`
+	Output  string    `json:"output"`
+	Changes []Change  `json:"changes"`
+	Orphans []Orphan  `json:"orphans"`
+	lines   []outLine // la salida línea a línea, para poner las marcas de las huérfanas en el idioma pedido
+}
+
+// outLine es una línea de la salida y la marca de huérfana que la precede (vacía si no es huérfana).
+type outLine struct {
+	text string
+	mark i18n.Text
+}
+
+// OutputIn es la salida con las marcas de las huérfanas en el idioma pedido (con es, Output).
+func (r Result) OutputIn(loc string) string {
+	if r.lines == nil {
+		return r.Output
+	}
+	var b strings.Builder
+	for _, l := range r.lines {
+		if !l.mark.Empty() {
+			b.WriteString("! " + i18n.Msg(loc, "cleaner.mark", nil) + ": " + l.mark.In(loc) + "\n")
+		}
+		b.WriteString(l.text + "\n")
+	}
+	return b.String()
 }
 
 type line struct {
@@ -55,7 +82,7 @@ type line struct {
 	text      string
 	protected bool // cuerpo de banner o macro
 	verbatim  bool // apertura de un texto multilínea: el espacio final es parte del texto
-	mark      string
+	mark      i18n.Text
 }
 
 // bannerRe: textos con delimitador (banner, refuse/vacant-message de line, menu title/prompt/text).
@@ -116,20 +143,20 @@ func Clean(text string, o Options) Result {
 	for _, l := range ls {
 		if !l.protected {
 			if t := strings.TrimRight(l.text, " \t\r"); t != l.text && !l.verbatim {
-				r.Changes = append(r.Changes, Change{RuleTrail, l.no, l.text})
+				r.Changes = append(r.Changes, Change{Rule: RuleTrail, Line: l.no, Text: l.text})
 				l.text = t
 			}
 			switch {
 			case l.text == "":
-				r.Changes = append(r.Changes, Change{RuleBlank, l.no, ""})
+				r.Changes = append(r.Changes, Change{Rule: RuleBlank, Line: l.no})
 				continue
 			case isBang(l.text) && len(kept) > 0 && !kept[len(kept)-1].protected && isBang(kept[len(kept)-1].text):
-				r.Changes = append(r.Changes, Change{RuleBang, l.no, "!"})
+				r.Changes = append(r.Changes, Change{Rule: RuleBang, Line: l.no, Text: "!"})
 				continue
 			}
 		}
 		if o, ok := orph[l.no]; ok {
-			l.mark = o.Why
+			l.mark = o.WhyTx
 			r.Orphans = append(r.Orphans, o)
 		}
 		kept = append(kept, l)
@@ -137,14 +164,10 @@ func Clean(text string, o Options) Result {
 	if o.Sort {
 		kept = sortBlocks(kept, &r)
 	}
-	var b strings.Builder
 	for _, l := range kept {
-		if l.mark != "" {
-			b.WriteString("! HUERFANA: " + l.mark + "\n")
-		}
-		b.WriteString(l.text + "\n")
+		r.lines = append(r.lines, outLine{l.text, l.mark})
 	}
-	r.Output = b.String()
+	r.Output = r.OutputIn(i18n.Es)
 	sort.SliceStable(r.Orphans, func(i, j int) bool { return r.Orphans[i].Line < r.Orphans[j].Line })
 	return r
 }
@@ -211,13 +234,14 @@ func orphans(text string) map[int]Orphan {
 	out := map[int]Orphan{}
 	for _, r := range refs {
 		if !defined[r.kind][r.key] {
-			why := fmt.Sprintf("%s %s no existe (%s)", r.kind, r.key, r.via)
-			out[r.n.Num] = Orphan{r.n.Num, r.n.Line, why}
+			why := i18n.Tx("cleaner.why.missing", "kind", r.kind, "key", r.key, "via", r.via)
+			out[r.n.Num] = Orphan{r.n.Num, r.n.Line, why.In(i18n.Es), why}
 		}
 	}
 	for _, n := range cmDefs {
 		if k := cmDef.FindStringSubmatch(n.Line)[1]; !used[k] {
-			out[n.Num] = Orphan{n.Num, n.Line, fmt.Sprintf("class-map %s sin uso (ningún policy-map la usa)", k)}
+			why := i18n.Tx("cleaner.why.unused", "name", k)
+			out[n.Num] = Orphan{n.Num, n.Line, why.In(i18n.Es), why}
 		}
 	}
 	return out
@@ -272,7 +296,8 @@ func sortBlocks(ls []line, r *Result) []line {
 			sort.SliceStable(run, func(a, b int) bool { return natLess(run[a].lines[0].text, run[b].lines[0].text) })
 			for k := range run {
 				if run[k].lines[0].no != chunks[i+k].lines[0].no {
-					r.Changes = append(r.Changes, Change{RuleSort, chunks[i].lines[0].no, fmt.Sprintf("%d bloques %q reordenados", j-i, chunks[i].kind)})
+					t := i18n.Tx("cleaner.change.sort", "n", j-i, "kind", chunks[i].kind)
+					r.Changes = append(r.Changes, Change{RuleSort, chunks[i].lines[0].no, t.In(i18n.Es), t})
 					break
 				}
 			}
@@ -332,9 +357,15 @@ func ranges(ns []int) string {
 	return strings.Join(parts, ", ")
 }
 
-func (r Result) Text() string {
+// Text es el informe legible, en español.
+func (r Result) Text() string { return r.TextIn(i18n.Es) }
+
+// TextIn es el informe en el idioma pedido (con es, el de siempre); los motivos y el texto de los reordenamientos
+// ya vienen en ese idioma si el resultado pasó por i18n.Localize.
+func (r Result) TextIn(loc string) string {
 	var b strings.Builder
-	for _, g := range []struct{ rule, label string }{{RuleBlank, "líneas vacías quitadas"}, {RuleBang, "separadores ! repetidos quitados"}, {RuleTrail, "líneas con espacio final recortado"}} {
+	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
+	for _, g := range []struct{ rule, label string }{{RuleBlank, "cleaner.text.blank"}, {RuleBang, "cleaner.text.bang"}, {RuleTrail, "cleaner.text.trail"}} {
 		var ns []int
 		for _, c := range r.Changes {
 			if c.Rule == g.rule {
@@ -342,23 +373,23 @@ func (r Result) Text() string {
 			}
 		}
 		if len(ns) > 0 {
-			fmt.Fprintf(&b, "%d %s (líneas de origen: %s)\n", len(ns), g.label, ranges(ns))
+			fmt.Fprintf(&b, "%s\n", m("cleaner.text.group", "n", len(ns), "label", m(g.label), "ranges", ranges(ns)))
 		}
 	}
 	for _, c := range r.Changes {
 		if c.Rule == RuleSort {
-			fmt.Fprintf(&b, "orden: %s (desde la línea %d)\n", c.Text, c.Line)
+			fmt.Fprintf(&b, "%s\n", m("cleaner.text.sort", "text", c.Text, "line", c.Line))
 		}
 	}
 	if len(r.Changes) == 0 {
-		b.WriteString("Sin cambios de formato.\n")
+		b.WriteString(m("cleaner.text.none") + "\n")
 	}
 	if len(r.Orphans) > 0 {
-		fmt.Fprintf(&b, "\n%d HUÉRFANAS (marcadas con un comentario ! en la salida)\n", len(r.Orphans))
+		fmt.Fprintf(&b, "\n%s\n", m("cleaner.text.orphans", "n", len(r.Orphans)))
 		for _, o := range r.Orphans {
-			fmt.Fprintf(&b, "  línea %d: %s — %s\n", o.Line, o.Text, o.Why)
+			fmt.Fprintf(&b, "  %s\n", m("cleaner.text.orphan", "line", o.Line, "text", o.Text, "why", o.Why))
 		}
-		b.WriteString("Las huérfanas solo se marcan: la limpieza nunca las quita.\n")
+		b.WriteString(m("cleaner.text.footer") + "\n")
 	}
 	return b.String()
 }

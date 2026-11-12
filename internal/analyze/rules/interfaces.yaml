@@ -9,6 +9,9 @@
   params: {counter: crc}
   explanation: La interfaz acumula errores CRC desde el último borrado de contadores; suelen venir de cableado, transceptor o dúplex.
   action: Revisa si el contador sigue creciendo (regla interfaz-crc-creciente y mctl diff); si crece, cambia cable/transceptor y revisa el extremo remoto.
+  title_en: "CRC errors on interface"
+  explanation_en: "The interface has accumulated CRC errors since the counters were last cleared; they usually come from cabling, the transceiver or duplex."
+  action_en: "Check whether the counter keeps growing (rule interfaz-crc-creciente and mctl diff); if it grows, replace the cable/transceiver and check the remote end."
 - id: interfaz-crc-creciente
   title: CRC creciendo entre rondas
   severity: alta
@@ -17,6 +20,9 @@
   params: {counter: crc, growing: "true"}
   explanation: Los errores CRC aumentaron entre dos rondas consecutivas; el problema físico está activo.
   action: Revisa capa 1 en ambos extremos (cable, transceptor, show interfaces transceiver detail) y el dúplex/velocidad negociados.
+  title_en: "CRC growing between rounds"
+  explanation_en: "CRC errors increased between two consecutive rounds; the physical problem is active."
+  action_en: "Check layer 1 at both ends (cable, transceiver, show interfaces transceiver detail) and the negotiated duplex/speed."
 - id: interfaz-errores-entrada
   title: Errores de entrada creciendo
   severity: media
@@ -25,6 +31,9 @@
   params: {counter: input_errors, growing: "true"}
   explanation: Los input errors (CRC, frame, overrun, ignored) aumentaron entre rondas.
   action: Desglosa qué componente crece (CRC/frame es físico; overrun/ignored es saturación del equipo).
+  title_en: "Input errors growing"
+  explanation_en: "Input errors (CRC, frame, overrun, ignored) increased between rounds."
+  action_en: "Break down which component grows (CRC/frame is physical; overrun/ignored is device saturation)."
 - id: interfaz-errores-salida
   title: Errores de salida creciendo
   severity: media
@@ -33,6 +42,9 @@
   params: {counter: output_errors, growing: "true"}
   explanation: Los output errors aumentaron entre rondas; suele indicar colisiones o problemas de dúplex.
   action: Verifica dúplex en ambos extremos y el contador de colisiones.
+  title_en: "Output errors growing"
+  explanation_en: "Output errors increased between rounds; this usually indicates collisions or duplex problems."
+  action_en: "Verify duplex at both ends and the collisions counter."
 - id: interfaz-drops-salida
   title: Descartes de salida creciendo
   severity: media
@@ -41,6 +53,9 @@
   params: {counter: output_drops, growing: "true"}
   explanation: Total output drops aumentó entre rondas; la cola de salida se desborda (congestión o microrráfagas).
   action: Revisa la carga (txload, 5 minute output rate) y las colas (show platform hardware fed switch active qos queue stats interface).
+  title_en: "Output drops growing"
+  explanation_en: "Total output drops increased between rounds; the output queue is overflowing (congestion or microbursts)."
+  action_en: "Check the load (txload, 5 minute output rate) and the queues (show platform hardware fed switch active qos queue stats interface)."
 - id: interfaz-drops-entrada
   title: Descartes de entrada creciendo
   severity: media
@@ -49,3 +64,6 @@
   params: {counter: input_drops, growing: "true"}
   explanation: Los drops de la cola de entrada aumentaron entre rondas; el tráfico hacia el CPU no se atiende a tiempo.
   action: Correlaciona con CPU alta y con tráfico dirigido al equipo (ARP, TTL expirado, broadcast).
+  title_en: "Input drops growing"
+  explanation_en: "Input queue drops increased between rounds; traffic to the CPU is not being served in time."
+  action_en: "Correlate with high CPU and with traffic destined to the device (ARP, expired TTL, broadcast)."

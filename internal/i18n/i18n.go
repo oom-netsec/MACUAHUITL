@@ -261,17 +261,57 @@ type Coded interface {
 
 // Error es el error de un código del catálogo. Error() es el texto en es, el mismo de antes del catálogo.
 type Error struct {
-	Code string
-	Args Args
+	Code  string
+	Args  Args
+	Cause error // si hay causa, su texto entra en la plantilla como {cause}, en el mismo idioma
 }
 
 // New arma el error del código con sus argumentos.
 func New(code string, args Args) *Error { return &Error{Code: code, Args: args} }
 
-func (e *Error) Error() string               { return Msg(Es, e.Code, e.Args) }
-func (e *Error) Reason() string              { return Reason(e.Code) }
-func (e *Error) Metadata() map[string]string { return Metadata(e.Code, e.Args) }
-func (e *Error) Localize(loc string) string  { return Msg(loc, e.Code, e.Args) }
+// Wrap arma el error del código que envuelve una causa: la plantilla la usa como {cause} (no va a la metadata).
+func Wrap(code string, cause error, args Args) *Error {
+	return &Error{Code: code, Args: args, Cause: cause}
+}
+
+func (e *Error) Unwrap() error  { return e.Cause }
+func (e *Error) Error() string  { return e.Localize(Es) }
+func (e *Error) Reason() string { return Reason(e.Code) }
+
+// Metadata es la del código; con causa con código, suma su reason como cause_reason y su metadata (por ejemplo la
+// línea de un error de importación) sin pisar la propia.
+func (e *Error) Metadata() map[string]string {
+	m := Metadata(e.Code, e.Args)
+	var c Coded
+	if e.Cause != nil && errors.As(e.Cause, &c) {
+		m["cause_reason"] = c.Reason()
+		for k, v := range c.Metadata() {
+			if _, own := m[k]; !own {
+				m[k] = v
+			}
+		}
+	}
+	return m
+}
+func (e *Error) Localize(loc string) string {
+	if e.Cause == nil {
+		return Msg(loc, e.Code, e.Args)
+	}
+	args := Args{"cause": causeIn(e.Cause, loc)}
+	for k, v := range e.Args {
+		args[k] = v
+	}
+	return Msg(loc, e.Code, args)
+}
+
+// causeIn es el texto de una causa en el idioma pedido: con código, el del catálogo; sin él, el de siempre.
+func causeIn(err error, loc string) string {
+	var c Coded
+	if loc != Es && errors.As(err, &c) {
+		return c.Localize(loc)
+	}
+	return err.Error()
+}
 
 // Codes lista los códigos del catálogo en orden (para pruebas y documentación).
 func Codes() []string {
@@ -296,23 +336,93 @@ func English(err error) string {
 	return strings.Replace(err.Error(), c.Error(), c.Localize(En), 1)
 }
 
-// Text es un texto de catálogo ya elegido: su código y los argumentos. Los informes (RADIUS, TACACS+, PKI,
-// calculadoras) lo guardan junto al texto en español para poder darlo en el otro idioma o entregar la clave.
+// Text es un texto ya elegido, para poder darlo en el otro idioma o entregar su clave. Lo normal es un código
+// del catálogo con sus argumentos (Key y Args); además puede ser un literal es/en (Lit), la unión de otros
+// textos (Join) y llevar argumentos que a su vez son textos (With).
 type Text struct {
-	Key  string
-	Args Args
+	Key   string
+	Args  Args
+	Nest  map[string]Text // argumentos que son textos: se entregan en el idioma pedido
+	LitEs string          // texto literal (reglas YAML) cuando no hay clave
+	LitEn string          //
+	Parts []Text          // unión de textos
+	Sep   string          //
+	Err   error           // un error: con código sale en el idioma pedido, sin él es el mensaje de siempre
 }
+
+// FromErr es el texto de un error (vacío si es nil).
+func FromErr(err error) Text { return Text{Err: err} }
 
 // Tx arma un Text desde pares nombre, valor (como A).
 func Tx(key string, kv ...any) Text { return Text{Key: key, Args: A(kv...)} }
 
-// Empty indica que no hay texto.
-func (t Text) Empty() bool { return t.Key == "" }
+// Lit es un texto literal en los dos idiomas (sin clave); sin inglés, el español.
+func Lit(es, en string) Text { return Text{LitEs: es, LitEn: en} }
 
-// In es el texto en el idioma dado; vacío si no hay código.
-func (t Text) In(loc string) string {
-	if t.Key == "" {
-		return ""
+// Join une textos con sep, cada uno en el idioma pedido; los vacíos no cuentan.
+func Join(sep string, ts ...Text) Text { return Text{Parts: ts, Sep: sep} }
+
+// With agrega un argumento que es a su vez un texto (se traduce con el resto).
+func (t Text) With(name string, n Text) Text {
+	m := make(map[string]Text, len(t.Nest)+1)
+	for k, v := range t.Nest {
+		m[k] = v
 	}
-	return Msg(loc, t.Key, t.Args)
+	m[name] = n
+	t.Nest = m
+	return t
+}
+
+// KeyArgs es la clave del catálogo y los argumentos del texto: la propia, o la del error con código que trae.
+func (t Text) KeyArgs() (string, Args) {
+	var e *Error
+	switch {
+	case t.Key != "" && len(t.Nest) == 0:
+		return t.Key, t.Args
+	case t.Err != nil && errors.As(t.Err, &e):
+		if e.Cause == nil {
+			return e.Code, e.Args
+		}
+		args := Args{"cause": causeIn(e.Cause, Es)} // el texto de la causa en es: la plantilla lo pide como {cause}
+		for k, v := range e.Args {
+			args[k] = v
+		}
+		return e.Code, args
+	}
+	return "", nil
+}
+
+// Empty indica que no hay texto.
+func (t Text) Empty() bool { return t.Key == "" && t.LitEs == "" && len(t.Parts) == 0 && t.Err == nil }
+
+// In es el texto en el idioma dado; vacío si no hay nada.
+func (t Text) In(loc string) string {
+	switch {
+	case len(t.Parts) > 0:
+		var out []string
+		for _, p := range t.Parts {
+			if s := p.In(loc); s != "" {
+				out = append(out, s)
+			}
+		}
+		return strings.Join(out, t.Sep)
+	case t.Err != nil:
+		return causeIn(t.Err, loc)
+	case t.Key == "":
+		if loc == En && t.LitEn != "" {
+			return t.LitEn
+		}
+		return t.LitEs
+	}
+	args := t.Args
+	if len(t.Nest) > 0 {
+		args = Args{}
+		for k, v := range t.Args {
+			args[k] = v
+		}
+		for k, n := range t.Nest {
+			args[k] = n.In(loc)
+		}
+	}
+	return Msg(loc, t.Key, args)
 }

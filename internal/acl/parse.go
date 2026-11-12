@@ -1,21 +1,44 @@
 package acl
 
 import (
-	"errors"
 	"fmt"
 	"math/bits"
 	"net/netip"
 	"regexp"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-// LineError señala la línea del texto importado que no se entendió.
+// LineError señala la línea del texto importado que no se entendió. Msg es el motivo en español y Err el mismo
+// motivo con su código del catálogo (también es un i18n.Coded: con en, el mensaje sale en inglés).
 type LineError struct {
 	Line int
 	Msg  string
+	Err  error
 }
 
 func (e *LineError) Error() string { return fmt.Sprintf("línea %d: %s", e.Line, e.Msg) }
+
+// Reason, Metadata y Localize lo vuelven un i18n.Coded.
+func (e *LineError) Reason() string { return i18n.Reason("acl.err.line") }
+func (e *LineError) Metadata() map[string]string {
+	return i18n.Metadata("acl.err.line", i18n.A("line", e.Line))
+}
+func (e *LineError) Localize(loc string) string {
+	return i18n.Wrap("acl.err.line", e.Err, i18n.A("line", e.Line)).Localize(loc)
+}
+
+// lineErr arma el error de la línea n con su motivo.
+func lineErr(n int, cause error) *LineError {
+	return &LineError{Line: n, Msg: cause.Error(), Err: cause}
+}
+
+func eerr(code string, kv ...any) error { return i18n.New("acl.err."+code, i18n.A(kv...)) }
+
+func ewrap(code string, cause error, kv ...any) error {
+	return i18n.Wrap("acl.err."+code, cause, i18n.A(kv...))
+}
 
 var Vendors = []string{"ios-xe", "nx-os", "asa"}
 
@@ -40,14 +63,14 @@ func Parse(vendor, text string) (ACL, error) {
 	case "asa":
 		addr = asaAddr
 	default:
-		return ACL{}, fmt.Errorf("acl: fabricante %q no soportado (%s)", vendor, strings.Join(Vendors, ", "))
+		return ACL{}, eerr("vendor", "vendor", vendor, "list", strings.Join(Vendors, ", "))
 	}
 	var out ACL
 	var remarks []string
 	// setName rechaza una segunda ACL en el mismo texto: se mezclarían las reglas.
 	setName := func(name string, line int) error {
 		if out.Name != "" && out.Name != name {
-			return &LineError{line, fmt.Sprintf("el texto trae otra ACL (%s); importa una a la vez", name)}
+			return lineErr(line, eerr("other_acl", "name", name))
 		}
 		out.Name = name
 		return nil
@@ -62,7 +85,7 @@ func Parse(vendor, text string) (ACL, error) {
 		switch vendor {
 		case "ios-xe":
 			if iosStandard.MatchString(line) {
-				return ACL{}, &LineError{n, "ACL estándar no soportada; usa una extendida"}
+				return ACL{}, lineErr(n, eerr("std_acl"))
 			}
 			if m := iosHeader.FindStringSubmatch(line); m != nil {
 				if err := setName(m[1], n); err != nil {
@@ -89,13 +112,13 @@ func Parse(vendor, text string) (ACL, error) {
 				continue
 			}
 			if strings.HasPrefix(line, "fragments") {
-				return ACL{}, &LineError{n, "'fragments' cambia el trato de fragmentos y no se puede traducir; quítalo o tradúcelo a mano"}
+				return ACL{}, lineErr(n, eerr("fragments"))
 			}
 			body = seqPrefix.ReplaceAllString(line, "")
 		case "asa":
 			m := asaLine.FindStringSubmatch(line)
 			if m == nil {
-				return ACL{}, &LineError{n, "se esperaba 'access-list NOMBRE extended …' o 'remark …'"}
+				return ACL{}, lineErr(n, eerr("asa_form"))
 			}
 			if err := setName(m[1], n); err != nil {
 				return ACL{}, err
@@ -103,7 +126,7 @@ func Parse(vendor, text string) (ACL, error) {
 			body = strings.TrimPrefix(m[2], "extended ")
 		}
 		if out.Name == "" {
-			return ACL{}, &LineError{n, "falta el encabezado de la ACL"}
+			return ACL{}, lineErr(n, eerr("no_header"))
 		}
 		if r, ok := strings.CutPrefix(body, "remark "); ok {
 			remarks = append(remarks, strings.TrimSpace(r))
@@ -111,13 +134,13 @@ func Parse(vendor, text string) (ACL, error) {
 		}
 		rule, err := parseRule(strings.Fields(body), addr)
 		if err != nil {
-			return ACL{}, &LineError{n, err.Error()}
+			return ACL{}, lineErr(n, err)
 		}
 		rule.Remark, remarks = strings.Join(remarks, " / "), nil
 		out.Rules = append(out.Rules, rule)
 	}
 	if out.Name == "" {
-		return ACL{}, &LineError{1, "no se encontró ninguna ACL"}
+		return ACL{}, lineErr(1, eerr("none"))
 	}
 	return out, nil
 }
@@ -127,7 +150,7 @@ var portOps = map[string]bool{"eq": true, "neq": true, "gt": true, "lt": true, "
 // parseRule entiende: (permit|deny) PROTO ORIGEN [puertos] DESTINO [puertos] [log|log-input] [established]
 func parseRule(t []string, addr func([]string) (netip.Prefix, int, error)) (Rule, error) {
 	if len(t) < 2 {
-		return Rule{}, errors.New("regla incompleta")
+		return Rule{}, eerr("incomplete")
 	}
 	var r Rule
 	switch t[0] {
@@ -136,19 +159,19 @@ func parseRule(t []string, addr func([]string) (netip.Prefix, int, error)) (Rule
 	case "deny":
 		r.Action = Deny
 	default:
-		return Rule{}, fmt.Errorf("se esperaba permit o deny, no %q", t[0])
+		return Rule{}, eerr("expect_action", "got", t[0])
 	}
 	if _, ok := ProtocolNumber(t[1]); !ok {
-		return Rule{}, fmt.Errorf("protocolo %q desconocido", t[1])
+		return Rule{}, eerr("bad_proto", "proto", t[1])
 	}
 	r.Protocol = CanonProtocol(t[1])
 	t = t[2:]
 	var err error
 	if r.Src, t, err = addrAndPorts(t, addr, &r.SrcPorts); err != nil {
-		return Rule{}, fmt.Errorf("origen: %w", err)
+		return Rule{}, ewrap("src", err)
 	}
 	if r.Dst, t, err = addrAndPorts(t, addr, &r.DstPorts); err != nil {
-		return Rule{}, fmt.Errorf("destino: %w", err)
+		return Rule{}, ewrap("dst", err)
 	}
 	for _, flag := range t {
 		switch flag {
@@ -157,7 +180,7 @@ func parseRule(t []string, addr func([]string) (netip.Prefix, int, error)) (Rule
 		case "established":
 			r.Established = true
 		default:
-			return Rule{}, fmt.Errorf("no se entiende %q (tipos ICMP, time-range y objetos no están soportados todavía)", flag)
+			return Rule{}, eerr("unknown_flag", "flag", flag)
 		}
 	}
 	r.SrcPorts, r.DstPorts = NormalizePorts(r.SrcPorts), NormalizePorts(r.DstPorts)
@@ -169,7 +192,7 @@ func parseRule(t []string, addr func([]string) (netip.Prefix, int, error)) (Rule
 
 func addrAndPorts(t []string, addr func([]string) (netip.Prefix, int, error), ports *[]PortRange) (netip.Prefix, []string, error) {
 	if len(t) == 0 {
-		return netip.Prefix{}, nil, errors.New("falta la dirección")
+		return netip.Prefix{}, nil, eerr("no_address")
 	}
 	p, used, err := addr(t)
 	if err != nil {
@@ -184,13 +207,13 @@ func addrAndPorts(t []string, addr func([]string) (netip.Prefix, int, error), po
 			n = 2
 		}
 		if len(t) < n {
-			return netip.Prefix{}, nil, fmt.Errorf("%s sin argumentos", op)
+			return netip.Prefix{}, nil, eerr("no_args", "op", op)
 		}
 		args := t[:n]
 		t = t[n:]
 		if op == "neq" && len(t) > 0 {
 			if _, perr := parsePort(t[0]); perr == nil {
-				return netip.Prefix{}, nil, errors.New("neq con varios puertos no tiene una traducción segura; escribe una regla por puerto")
+				return netip.Prefix{}, nil, eerr("neq_multi")
 			}
 		}
 		// IOS admite "eq 80 443": se consumen más puertos mientras lo sean.
@@ -223,7 +246,7 @@ func addrAndPorts(t []string, addr func([]string) (netip.Prefix, int, error), po
 func ip4(s string) (netip.Addr, error) {
 	a, err := netip.ParseAddr(s)
 	if err != nil || !a.Is4() {
-		return netip.Addr{}, fmt.Errorf("dirección IPv4 %q inválida", s)
+		return netip.Addr{}, eerr("bad_ipv4", "addr", s)
 	}
 	return a, nil
 }
@@ -237,7 +260,7 @@ func u32(a netip.Addr) uint32 {
 func wildcardPrefix(net, wild netip.Addr) (netip.Prefix, error) {
 	w := u32(wild)
 	if w&(w+1) != 0 {
-		return netip.Prefix{}, fmt.Errorf("wildcard %s no es contigua; no se puede expresar como CIDR", wild)
+		return netip.Prefix{}, eerr("wild_noncontig", "wild", wild)
 	}
 	return netip.PrefixFrom(net, 32-bits.OnesCount32(w)).Masked(), nil
 }
@@ -246,7 +269,7 @@ func wildcardPrefix(net, wild netip.Addr) (netip.Prefix, error) {
 func netmaskPrefix(net, mask netip.Addr) (netip.Prefix, error) {
 	m := u32(mask)
 	if (^m)&(^m+1) != 0 {
-		return netip.Prefix{}, fmt.Errorf("máscara %s no es contigua", mask)
+		return netip.Prefix{}, eerr("mask_noncontig", "mask", mask)
 	}
 	return netip.PrefixFrom(net, bits.OnesCount32(m)).Masked(), nil
 }
@@ -257,7 +280,7 @@ func hostOrAny(t []string) (netip.Prefix, int, bool, error) {
 		return Any, 1, true, nil
 	case "host":
 		if len(t) < 2 {
-			return netip.Prefix{}, 0, true, errors.New("host sin dirección")
+			return netip.Prefix{}, 0, true, eerr("host_no_addr")
 		}
 		a, err := ip4(t[1])
 		if err != nil {
@@ -273,7 +296,7 @@ func iosAddr(t []string) (netip.Prefix, int, error) {
 		return p, n, err
 	}
 	if len(t) < 2 {
-		return netip.Prefix{}, 0, errors.New("falta la wildcard")
+		return netip.Prefix{}, 0, eerr("no_wildcard")
 	}
 	a, err := ip4(t[0])
 	if err != nil {
@@ -281,7 +304,7 @@ func iosAddr(t []string) (netip.Prefix, int, error) {
 	}
 	w, err := ip4(t[1])
 	if err != nil {
-		return netip.Prefix{}, 0, fmt.Errorf("wildcard: %w", err)
+		return netip.Prefix{}, 0, ewrap("wildcard", err)
 	}
 	p, err := wildcardPrefix(a, w)
 	return p, 2, err
@@ -294,7 +317,7 @@ func nxAddr(t []string) (netip.Prefix, int, error) {
 	if strings.Contains(t[0], "/") {
 		p, err := netip.ParsePrefix(t[0])
 		if err != nil || !p.Addr().Is4() {
-			return netip.Prefix{}, 0, fmt.Errorf("prefijo %q inválido", t[0])
+			return netip.Prefix{}, 0, eerr("bad_prefix", "prefix", t[0])
 		}
 		return p.Masked(), 1, nil
 	}
@@ -306,7 +329,7 @@ func asaAddr(t []string) (netip.Prefix, int, error) {
 		return p, n, err
 	}
 	if len(t) < 2 {
-		return netip.Prefix{}, 0, errors.New("falta la máscara")
+		return netip.Prefix{}, 0, eerr("no_mask")
 	}
 	a, err := ip4(t[0])
 	if err != nil {
@@ -314,7 +337,7 @@ func asaAddr(t []string) (netip.Prefix, int, error) {
 	}
 	m, err := ip4(t[1])
 	if err != nil {
-		return netip.Prefix{}, 0, fmt.Errorf("máscara: %w", err)
+		return netip.Prefix{}, 0, ewrap("mask", err)
 	}
 	p, err := netmaskPrefix(a, m)
 	return p, 2, err

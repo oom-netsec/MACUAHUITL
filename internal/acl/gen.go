@@ -14,7 +14,7 @@ var validName = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
 // NX-OS y ASA no lo aceptan, así que ahí se escribe una línea por puerto o rango.
 func Generate(vendor string, a ACL) (string, error) {
 	if !validName.MatchString(a.Name) {
-		return "", fmt.Errorf("acl: nombre %q inválido", a.Name)
+		return "", eerr("bad_name", "name", a.Name)
 	}
 	var addr func(netip.Prefix) string
 	switch vendor {
@@ -25,16 +25,16 @@ func Generate(vendor string, a ACL) (string, error) {
 	case "asa":
 		addr = asaAddrText
 	default:
-		return "", fmt.Errorf("acl: fabricante %q no soportado (%s)", vendor, strings.Join(Vendors, ", "))
+		return "", eerr("vendor", "vendor", vendor, "list", strings.Join(Vendors, ", "))
 	}
 	var lines []string
 	for i, r := range a.Rules {
 		r.SrcPorts, r.DstPorts = NormalizePorts(r.SrcPorts), NormalizePorts(r.DstPorts)
 		if err := r.Validate(); err != nil {
-			return "", fmt.Errorf("acl: regla %d: %w", i+1, err)
+			return "", ewrap("rule", err, "n", i+1)
 		}
 		if r.Established && vendor == "asa" {
-			return "", fmt.Errorf("acl: regla %d: ASA no tiene 'established'; usa inspección de estado", i+1)
+			return "", eerr("asa_established", "n", i+1)
 		}
 		for _, v := range expand(vendor, r) {
 			if v.Remark != "" {

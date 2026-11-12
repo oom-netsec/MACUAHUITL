@@ -1006,3 +1006,39 @@ Un argumento de una nota o de una celda cuyo valor es una clave `calc.val.*` (o 
 
 ### Recordatorio: slugs de RADIUS y TACACS+ (fase 30c-A)
 El front debe actualizar sus mapeos de `findings[].code`: ya no existen los slugs viejos. La tabla slug viejo → slug nuevo está arriba, en «Cambio que rompe: slugs de hallazgo de RADIUS y TACACS+».
+
+## Idioma del núcleo: flota, análisis, ACL, cambios, deriva y limpieza (fase 30c, bloque C)
+
+Los textos libres de estas áreas ya salen en el idioma pedido (`accept-language`, la bandera `core.localize` de 30a) y, además, cada texto que sale del catálogo viaja como clave. Sin idioma, o con `es`, el `json`, el `text` y los mensajes son **idénticos byte por byte** a los de antes (lo fijan pruebas de regresión por RPC y por dominio con golden generado antes del cambio).
+
+### Cómo leer lo nuevo
+- **`ToolReport.keys`** (proto, `map<string, TextRef>`; en el puente, `keys` en `FleetDTO`, `ReportDTO` y `CleanerDTO`): por cada texto libre del `json` que sale del catálogo, su clave (`fleet.warn.*`, `analyze.detail.*`…) y argumentos, bajo su **ruta JSON**: `rows.2.detail`, `warnings.0`, `hops.3.reason`, `findings.1.detail`. Los índices son los de las listas. Con `en`, el `json` ya trae ese texto en inglés; la clave sirve para dibujar sin leer el texto. Un texto sin clave plana (un literal de regla, una unión de varios textos como el detalle de varias interfaces) se traduce pero no trae clave.
+- Los **valores** (equipos, IPs, MAC, puertos, interfaces, comandos, salidas de equipos, líneas de config) no se traducen.
+- Los códigos cerrados en español que ya existían **no cambian** (la vista los mapea, `lib/vocab.ts`): `severity` (`critica`…), `kind` de inventario (`equipo`), `facet` de cambios (`versión`, `captura`…), `change` de vecinos en las diferencias (`cambió`, `apareció`, `desapareció`), `rule` de la limpieza (`linea-vacia`…), `source` de los eventos y de los resultados de búsqueda de flota (`log-equipo`, `auditoria`, `carpeta de Patrol`…) y `end` del rastreo (`trunk-sin-vecino`…). El **texto** de los cambios de vecino y los ids de vecino OSPF y grupo HSRP (`10.0.0.1 por Gi0/1`, `Vl10 grupo 10`) sí salen traducidos en el `text` y, el id, en `devices[].neighbors[].id` con `en`.
+
+### Puente
+| Método / DTO | Cambio |
+|---|---|
+| `FleetDTO`, `ReportDTO` (cambios, actualización, cumplimiento), `CleanerDTO` | ganan `keys?: Record<ruta, {key, args?}>` |
+| `AclFindingDTO` | gana `detailKey?`, `detailArgs?` (el `detail` sale en el idioma pedido) |
+| `analysisRunReport`, `analysisDiffReport`, `analysisTimelineReport`, `driftRunReport` | nuevos: devuelven `{report, text, keys?}`; `analysisRun`, `analysisDiff`, `analysisTimeline` y `driftRun` siguen devolviendo solo el JSON |
+
+En TS los métodos nuevos son opcionales en `AnalysisAPI` y `DriftAPI`; `keys?` y `detailKey?` son opcionales en los tipos.
+
+### Qué sale traducido, por área (claves nuevas)
+- **Flota** (`fleet.*`): `warnings[]` de todos los resultados (`fleet.warn.*`), `PathHop.reason` (`fleet.reason.*`, también `arrived`/`cut` con su motivo), `TraceHop.note` (`fleet.note.*`), `rows[].value`/`detail` del tablero (`fleet.value.*`, `fleet.detail.*`: «no sincronizado», «NN % usada», «libre X de Y», «reinicio en las 24 h previas a la evidencia») y `Problem.evidence` de half-duplex (`fleet.evidence.half`). La evidencia que es salida del equipo no se traduce.
+- **Análisis** (`analyze.*`): `Finding.title/explanation/action` (de la regla; los YAML ganan `title_en`, `explanation_en`, `action_en`, y una regla propia sin ellos sale en español), `Finding.detail` (`analyze.detail.*`), `warnings[].msg` (`analyze.warn.*`), `TimelineEvent.text/note` de los eventos que arma la app (`analyze.event.*`: rondas, hallazgos, pcap, marcas de reloj y «por <usuario>») y `TextDiff.note` (`analyze.diff.*`). Los mensajes del log del equipo y del syslog son datos; la ficha `kb` queda para el bloque D (msgkb).
+- **ACL** (`acl.*`): `Finding.detail` (`acl.finding.covered`, o el error de validación `acl.err.*`) y los errores gRPC de importar, analizar y generar, con código (`acl.err.import` envuelve la línea con `acl.err.line`).
+- **Cambios, actualización y cumplimiento** (`change.*`, `upgrade.*`, `compliance.*`): `findings[].detail`, la nota fija, `Item.title/detail`, los títulos y detalles de las reglas de endurecimiento y de la plantilla, y los errores de entrada con código (`upgrade.err.*`, `compliance.err.*`). Los comandos sugeridos y las líneas de config citadas no se traducen.
+- **Deriva y limpieza** (`drift.*`, `cleaner.*`): `warnings` de la deriva, `Orphan.why` y el texto de los reordenamientos; la marca de la salida es `! HUERFANA: …` con `es` y `! ORPHAN: …` con `en`; errores gRPC `drift.err.no_pair` y `cleaner.err.empty`.
+- El **texto del informe** (`text`) también sale en inglés en análisis, diferencias, línea de tiempo, cambios, actualización, cumplimiento, deriva y limpieza.
+
+### No cubierto en este bloque
+- El `text` de flota (encabezados, «AVISO», `Ago`/`Stamp` «hace 5 min», `DATO VIEJO`) y el CSV/Markdown del inventario siguen en español; los datos y avisos que trae adentro sí salen traducidos.
+- Los errores gRPC de los demás servicios y los de lectura de archivos del sistema (permisos, zip dañado) siguen como vienen. Los de flota, análisis, deriva, cambios, actualización, cumplimiento, ACL y limpieza llevan código (`fleet.err.*`, `analyze.err.*`, `change.err.*`, `upgrade.err.*`, `compliance.err.*`, `acl.err.*`, `drift.err.*`, `cleaner.err.*`) y metadata; con `es` el texto es el de siempre.
+- `kb` de la línea de tiempo (fase del bloque D) y los códigos cerrados en español de arriba.
+
+### Ajustes tras la revisión del bloque C
+- **Secretos.** El informe de cumplimiento oculta, además del valor de `password` y `secret`, la comunidad de `snmp-server community`, el `key-string` y la llave de `ntp authentication-key`. Eso cambia el texto en español de esos casos raros (por ejemplo, la línea citada de una regla prohibida de la plantilla) y cierra una fuga. La marca es `<oculto>` con `es` y `<hidden>` con `en`.
+- **Errores con causa.** Un error que envuelve a otro (`acl.err.import` sobre `acl.err.line`) trae en su metadata la de la causa (`line`) y `cause_reason`; los argumentos de `Finding.detail_key` traen la `cause` (en español) cuando la plantilla la pide.
+- **`fleetWails`** devuelve `keys` en cada resultado cuando el núcleo las manda.

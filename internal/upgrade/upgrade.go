@@ -7,12 +7,12 @@
 package upgrade
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -36,20 +36,30 @@ type Item struct {
 	Title  string `json:"title"`
 	Status Status `json:"status"`
 	Detail string `json:"detail"`
+	// TitleTx y DetailTx son Title y Detail como texto de catálogo (es/en); no viajan en el JSON.
+	TitleTx, DetailTx i18n.Text `json:"-"`
+}
+
+func (it *Item) title(key string, kv ...any) { i18n.Put(&it.Title, &it.TitleTx, key, kv...) }
+
+func (it *Item) det(st Status, key string, kv ...any) {
+	it.Status = st
+	i18n.Put(&it.Detail, &it.DetailTx, key, kv...)
 }
 
 type Report struct {
-	Hostname   string   `json:"hostname"`
-	Version    string   `json:"version"`
-	Mode       string   `json:"mode"` // install, bundle o ""
-	FileSystem string   `json:"file_system"`
-	Image      Image    `json:"image"`
-	Items      []Item   `json:"items"`
-	Commands   []string `json:"commands"` // comandos de lectura sugeridos; la app no los ejecuta aquí
-	Note       string   `json:"note"`
+	Hostname   string    `json:"hostname"`
+	Version    string    `json:"version"`
+	Mode       string    `json:"mode"` // install, bundle o ""
+	FileSystem string    `json:"file_system"`
+	Image      Image     `json:"image"`
+	Items      []Item    `json:"items"`
+	Commands   []string  `json:"commands"` // comandos de lectura sugeridos; la app no los ejecuta aquí
+	Note       string    `json:"note"`
+	NoteTx     i18n.Text `json:"-"`
 }
 
-const note = "Solo verificación: la app no copia, no cambia el boot ni recarga. Interpretación según la documentación pública de Cisco; sin validar en laboratorio."
+var noteTx = i18n.Tx("upgrade.note")
 
 var (
 	md5Re    = regexp.MustCompile(`^[0-9a-fA-F]{32}$`)
@@ -61,22 +71,22 @@ func Check(outputs map[string]string, img Image, verifyOut string) (Report, erro
 	if m := fsPrefix.FindStringSubmatch(img.File); m != nil {
 		img.File = m[2]
 		if img.File == "" {
-			return Report{}, errors.New("upgrade: falta el nombre de la imagen")
+			return Report{}, i18n.New("upgrade.err.no_name", nil)
 		}
 	}
 	switch {
 	case strings.TrimSpace(img.File) == "":
-		return Report{}, errors.New("upgrade: falta el nombre de la imagen")
+		return Report{}, i18n.New("upgrade.err.no_name", nil)
 	case strings.ContainsAny(img.File, "/\\ \t"):
-		return Report{}, errors.New("upgrade: el nombre de la imagen no lleva carpetas ni espacios")
+		return Report{}, i18n.New("upgrade.err.bad_name", nil)
 	case img.MD5 != "" && !md5Re.MatchString(img.MD5):
-		return Report{}, errors.New("upgrade: el MD5 esperado son 32 caracteres hexadecimales")
+		return Report{}, i18n.New("upgrade.err.bad_md5", nil)
 	case img.Size < 0:
-		return Report{}, errors.New("upgrade: tamaño negativo")
+		return Report{}, i18n.New("upgrade.err.neg_size", nil)
 	}
 	img.MD5 = strings.ToLower(img.MD5)
 	ver, _ := capture.Get(outputs, "show version")
-	r := Report{Image: img, Note: note, FileSystem: "flash:"}
+	r := Report{Image: img, Note: noteTx.In(i18n.Es), NoteTx: noteTx, FileSystem: "flash:"}
 	v, _ := iosxe.ParseVersion(ver)
 	r.Hostname, r.Version = v.Host, v.Version
 	sysImage := v.Image
@@ -121,23 +131,25 @@ func Check(outputs map[string]string, img Image, verifyOut string) (Report, erro
 }
 
 func (r Report) modeItem(ver string) Item {
-	it := Item{ID: "mode", Title: "Modo de arranque (install o bundle)"}
+	it := Item{ID: "mode"}
+	it.title("upgrade.title.mode")
 	switch r.Mode {
 	case "install":
-		it.Status, it.Detail = Pass, "modo install: el upgrade va por install add/activate/commit y el boot apunta a packages.conf"
+		it.det(Pass, "upgrade.detail.mode_install")
 	case "bundle":
-		it.Status, it.Detail = Pass, "modo bundle: arranca de un .bin; en Catalyst 9000 Cisco recomienda modo install"
+		it.det(Pass, "upgrade.detail.mode_bundle")
 	default:
-		it.Status, it.Detail = Unknown, "no se pudo deducir de show version"
+		it.det(Unknown, "upgrade.detail.mode_unknown")
 		if ver == "" {
-			it.Detail = "falta show version"
+			it.det(Unknown, "upgrade.detail.no_version")
 		}
 	}
 	return it
 }
 
 func spaceItem(mode string, img Image, present bool, free int64) Item {
-	it := Item{ID: "space", Title: "Espacio libre suficiente"}
+	it := Item{ID: "space"}
+	it.title("upgrade.title.space")
 	var need int64
 	if !present {
 		need += img.Size
@@ -147,34 +159,36 @@ func spaceItem(mode string, img Image, present bool, free int64) Item {
 	}
 	switch {
 	case free < 0:
-		it.Status, it.Detail = Unknown, "falta la salida de dir del sistema de archivos"
+		it.det(Unknown, "upgrade.detail.space_no_dir")
 	case img.Size == 0:
-		it.Status, it.Detail = Unknown, fmt.Sprintf("libre %s; indica el tamaño de la imagen para comparar", human(free))
+		it.det(Unknown, "upgrade.detail.space_no_size", "free", human(free))
 	case free >= need:
-		it.Status, it.Detail = Pass, fmt.Sprintf("libre %s, se necesitan ~%s", human(free), human(need))
+		it.det(Pass, "upgrade.detail.space_ok", "free", human(free), "need", human(need))
 	default:
-		it.Status, it.Detail = Fail, fmt.Sprintf("libre %s, se necesitan ~%s; libera espacio antes (en modo install: install remove inactive)", human(free), human(need))
+		it.det(Fail, "upgrade.detail.space_fail", "free", human(free), "need", human(need))
 	}
 	return it
 }
 
 func presentItem(fs string, img Image, haveDir, listed, present bool, size int64) Item {
-	it := Item{ID: "image-present", Title: "La imagen está en " + fs}
+	it := Item{ID: "image-present"}
+	it.title("upgrade.title.present", "fs", fs)
 	switch {
 	case !haveDir || !listed:
-		it.Status, it.Detail = Unknown, "falta la salida de dir "+fs
+		it.det(Unknown, "upgrade.detail.present_no_dir", "fs", fs)
 	case !present:
-		it.Status, it.Detail = Fail, img.File+" no está en "+fs+"; cópiala antes de la ventana"
+		it.det(Fail, "upgrade.detail.present_absent", "file", img.File, "fs", fs)
 	case img.Size > 0 && size != img.Size:
-		it.Status, it.Detail = Fail, fmt.Sprintf("mide %d bytes y se esperaban %d: copia incompleta o imagen equivocada", size, img.Size)
+		it.det(Fail, "upgrade.detail.present_size", "size", size, "want", img.Size)
 	default:
-		it.Status, it.Detail = Pass, fmt.Sprintf("%s (%d bytes)", img.File, size)
+		it.det(Pass, "upgrade.detail.present_ok", "file", img.File, "size", size)
 	}
 	return it
 }
 
 func md5Item(fs string, img Image, outputs map[string]string, verifyOut string) Item {
-	it := Item{ID: "md5", Title: "MD5 de la imagen coincide"}
+	it := Item{ID: "md5"}
+	it.title("upgrade.title.md5")
 	if verifyOut == "" {
 		for k, v := range outputs {
 			if strings.HasPrefix(k, "verify /md5") && strings.Contains(k, strings.ToLower(img.File)) {
@@ -183,7 +197,7 @@ func md5Item(fs string, img Image, outputs map[string]string, verifyOut string) 
 		}
 	}
 	if img.MD5 == "" {
-		it.Status, it.Detail = Unknown, "indica el MD5 esperado (está en la página de descarga de Cisco)"
+		it.det(Unknown, "upgrade.detail.md5_none")
 		return it
 	}
 	got := ""
@@ -192,11 +206,11 @@ func md5Item(fs string, img Image, outputs map[string]string, verifyOut string) 
 	}
 	switch {
 	case got == "":
-		it.Status, it.Detail = Unknown, fmt.Sprintf("pega la salida de: verify /md5 %s%s %s", fs, img.File, img.MD5)
+		it.det(Unknown, "upgrade.detail.md5_paste", "fs", fs, "file", img.File, "md5", img.MD5)
 	case got != img.MD5:
-		it.Status, it.Detail = Fail, fmt.Sprintf("el equipo calculó %s y se esperaba %s: imagen corrupta, vuelve a copiarla", got, img.MD5)
+		it.det(Fail, "upgrade.detail.md5_bad", "got", got, "want", img.MD5)
 	default:
-		it.Status, it.Detail = Pass, got
+		it.det(Pass, "upgrade.detail.md5_ok", "sum", got)
 	}
 	return it
 }
@@ -205,7 +219,8 @@ func md5Item(fs string, img Image, outputs map[string]string, verifyOut string) 
 var bootSystem = regexp.MustCompile(`(?m)^boot system (?:switch \S+ )?(\S+)`)
 
 func bootItem(mode string, img Image, outputs map[string]string) Item {
-	it := Item{ID: "boot", Title: "Variable de boot apunta a la imagen correcta"}
+	it := Item{ID: "boot"}
+	it.title("upgrade.title.boot")
 	out, _ := capture.Get(outputs, "show boot", "show bootvar")
 	run, _ := capture.Get(outputs, "show running-config | include boot", "show running-config")
 	boot, _ := iosxe.ParseBoot(out)
@@ -221,33 +236,34 @@ func bootItem(mode string, img Image, outputs map[string]string) Item {
 	}
 	switch {
 	case boot.Manual:
-		it.Status, it.Detail = Fail, "MANUAL_BOOT = yes: tras recargar se queda en ROMMON"
+		it.det(Fail, "upgrade.detail.boot_manual")
 	case first == "":
-		it.Status, it.Detail = Unknown, "falta show boot / show bootvar o la variable está vacía"
+		it.det(Unknown, "upgrade.detail.boot_empty")
 	case mode == "install" && strings.HasSuffix(first, "packages.conf"):
-		it.Status, it.Detail = Pass, first
+		it.det(Pass, "upgrade.detail.boot_ok", "first", first)
 	case mode == "install":
-		it.Status, it.Detail = Fail, "apunta a "+first+"; en modo install debe apuntar a packages.conf"
+		it.det(Fail, "upgrade.detail.boot_install", "first", first)
 	case mode == "bundle" && strings.HasSuffix(first, img.File):
-		it.Status, it.Detail = Pass, first
+		it.det(Pass, "upgrade.detail.boot_ok", "first", first)
 	case mode == "bundle":
-		it.Status, it.Detail = Fail, "apunta a "+first+"; en modo bundle cambia boot system a la imagen nueva y guarda antes de recargar"
+		it.det(Fail, "upgrade.detail.boot_bundle", "first", first)
 	default:
-		it.Status, it.Detail = Unknown, "apunta a "+first+", pero no se sabe el modo"
+		it.det(Unknown, "upgrade.detail.boot_nomode", "first", first)
 	}
 	return it
 }
 
 func installItem(mode string, outputs map[string]string) Item {
-	it := Item{ID: "install-state", Title: "Sin install pendiente (todo con commit)"}
+	it := Item{ID: "install-state"}
+	it.title("upgrade.title.install")
 	if mode == "bundle" {
-		it.Status, it.Detail = NotApplicable, "modo bundle"
+		it.det(NotApplicable, "upgrade.detail.install_bundle")
 		return it
 	}
 	out, _ := capture.Get(outputs, "show install summary")
 	rows, _ := iosxe.ParseInstallSummary(out)
 	if len(rows) == 0 {
-		it.Status, it.Detail = Unknown, "falta show install summary"
+		it.det(Unknown, "upgrade.detail.install_none")
 		return it
 	}
 	var pending, inactive []string
@@ -261,65 +277,68 @@ func installItem(mode string, outputs map[string]string) Item {
 	}
 	switch {
 	case len(pending) > 0:
-		it.Status, it.Detail = Fail, "operación sin commit: "+strings.Join(pending, ", ")+"; termina con install commit o install abort antes"
+		it.det(Fail, "upgrade.detail.install_pending", "list", strings.Join(pending, ", "))
 	case len(inactive) > 0:
-		it.Status, it.Detail = Pass, "paquetes inactivos ocupan espacio: "+strings.Join(inactive, ", ")
+		it.det(Pass, "upgrade.detail.install_inactive", "list", strings.Join(inactive, ", "))
 	default:
-		it.Status, it.Detail = Pass, "todo activado y con commit"
+		it.det(Pass, "upgrade.detail.install_ok")
 	}
 	return it
 }
 
 func savedItem(outputs map[string]string) Item {
-	it := Item{ID: "config-saved", Title: "Configuración guardada (running = startup)"}
+	it := Item{ID: "config-saved"}
+	it.title("upgrade.title.saved")
 	out, _ := capture.Get(outputs, "show running-config | include configuration change|NVRAM config", "show running-config")
 	h, _ := iosxe.ParseConfigHeader(out)
 	switch {
 	case h.NoChange:
-		it.Status, it.Detail = Pass, "sin cambios desde el último arranque"
+		it.det(Pass, "upgrade.detail.saved_clean")
 	case h.LastChange == "":
-		it.Status, it.Detail = Unknown, "falta la cabecera de show running-config (Last configuration change / NVRAM config)"
+		it.det(Unknown, "upgrade.detail.saved_no_header")
 	case h.Saved == "":
-		it.Status, it.Detail = Fail, "hay cambios ("+strings.TrimSpace(h.LastChange)+") y no consta que se haya guardado; usa write memory antes"
+		it.det(Fail, "upgrade.detail.saved_unsaved", "change", strings.TrimSpace(h.LastChange))
 	case h.LastChangeAt.IsZero() || h.SavedAt.IsZero():
-		it.Status, it.Detail = Unknown, "no se pudieron leer las fechas de la cabecera"
+		it.det(Unknown, "upgrade.detail.saved_dates")
 	case h.SavedAt.Before(h.LastChangeAt):
-		it.Status, it.Detail = Fail, fmt.Sprintf("último cambio %s, guardado %s: hay cambios sin guardar", strings.TrimSpace(h.LastChange), strings.TrimSpace(h.Saved))
+		it.det(Fail, "upgrade.detail.saved_before", "change", strings.TrimSpace(h.LastChange), "saved", strings.TrimSpace(h.Saved))
 	default:
-		it.Status, it.Detail = Pass, "guardada después del último cambio"
+		it.det(Pass, "upgrade.detail.saved_ok")
 	}
 	return it
 }
 
 // registerItem: 0x2102 (IOS-XE clásico) y 0x102 (valor de fábrica de Catalyst 9000) cargan la config guardada y arrancan de flash.
 func registerItem(reg string) Item {
-	it := Item{ID: "config-register", Title: "Configuration register de arranque normal"}
+	it := Item{ID: "config-register"}
+	it.title("upgrade.title.register")
 	switch {
 	case reg == "":
-		it.Status, it.Detail = Unknown, "falta la línea Configuration register de show version"
+		it.det(Unknown, "upgrade.detail.reg_missing")
 	case reg == "0x2102" || reg == "0x102":
-		it.Status, it.Detail = Pass, "register "+reg
+		it.det(Pass, "upgrade.detail.reg_ok", "reg", reg)
 	default:
-		it.Status, it.Detail = Fail, "register "+reg+": tras recargar puede ignorar la config guardada (0x2142) o quedar en ROMMON (0x0); corrígelo a 0x2102 antes"
+		it.det(Fail, "upgrade.detail.reg_bad", "reg", reg)
 	}
 	return it
 }
 
 func redundancyItem(outputs map[string]string) Item {
-	it := Item{ID: "redundancy", Title: "Redundancia SSO lista para ISSU"}
+	it := Item{ID: "redundancy"}
+	it.title("upgrade.title.redundancy")
 	out, _ := capture.Get(outputs, "show redundancy")
 	red, ok := iosxe.ParseRedundancy(out)
 	switch {
 	case !ok:
-		it.Status, it.Detail = Unknown, "falta show redundancy"
+		it.det(Unknown, "upgrade.detail.red_none")
 	case strings.EqualFold(red.Mode, "non-redundant") || red.Simplex:
-		it.Status, it.Detail = NotApplicable, "equipo sin supervisor redundante: el upgrade recarga el equipo (sin ISSU)"
+		it.det(NotApplicable, "upgrade.detail.red_single")
 	case !strings.EqualFold(red.Mode, "sso"):
-		it.Status, it.Detail = Fail, "modo "+red.Mode+"; ISSU requiere SSO"
+		it.det(Fail, "upgrade.detail.red_mode", "mode", red.Mode)
 	case red.StandbyHot:
-		it.Status, it.Detail = Pass, "SSO con el par en STANDBY HOT"
+		it.det(Pass, "upgrade.detail.red_hot")
 	default:
-		it.Status, it.Detail = Fail, "SSO pero el par no está en STANDBY HOT; espera a que sincronice"
+		it.det(Fail, "upgrade.detail.red_wait")
 	}
 	return it
 }
@@ -328,16 +347,20 @@ func human(b int64) string {
 	return fmt.Sprintf("%.2f GB", float64(b)/1e9)
 }
 
-var statusText = map[Status]string{Pass: "OK", Fail: "FALLA", Unknown: "NO DETERMINABLE", NotApplicable: "NO APLICA"}
+// Text es el informe legible, en español.
+func (r Report) Text() string { return r.TextIn(i18n.Es) }
 
-func (r Report) Text() string {
+// TextIn es el informe en el idioma pedido (con es, el de siempre); los títulos, detalles y la nota ya vienen
+// en ese idioma si el informe pasó por i18n.Localize.
+func (r Report) TextIn(loc string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s · IOS-XE %s · modo %s · imagen destino %s%s\n", or(r.Hostname, "equipo"), or(r.Version, "?"), or(r.Mode, "?"), r.FileSystem, r.Image.File)
+	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
+	fmt.Fprintf(&b, "%s\n", m("upgrade.text.head", "host", or(r.Hostname, m("upgrade.text.host")), "version", or(r.Version, "?"), "mode", or(r.Mode, "?"), "image", r.FileSystem+r.Image.File))
 	for _, i := range r.Items {
-		fmt.Fprintf(&b, "  %-15s %s: %s\n", statusText[i.Status], i.Title, i.Detail)
+		fmt.Fprintf(&b, "  %-15s %s: %s\n", m("upgrade.status."+string(i.Status)), i.Title, i.Detail)
 	}
 	for _, c := range r.Commands {
-		b.WriteString("  comando sugerido (lectura): " + c + "\n")
+		b.WriteString("  " + m("upgrade.text.command", "cmd", c) + "\n")
 	}
 	b.WriteString(r.Note + "\n")
 	return b.String()

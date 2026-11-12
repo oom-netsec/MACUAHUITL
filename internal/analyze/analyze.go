@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Finding es un hallazgo: la regla, dónde y cuándo se vio, y las líneas exactas que lo sustentan.
@@ -20,6 +22,8 @@ type Finding struct {
 	Detail      string    `json:"detail"`
 	Explanation string    `json:"explanation"`
 	Action      string    `json:"action"`
+	// Los textos de la regla y el detalle como texto (es/en); no viajan en el JSON.
+	TitleTx, DetailTx, ExplanationTx, ActionTx i18n.Text `json:"-"`
 }
 
 type Options struct {
@@ -40,10 +44,10 @@ type Report struct {
 // Analyze aplica las reglas a cada equipo del paquete.
 func Analyze(b *Bundle, rules []Rule, o Options) Report {
 	r := Report{Dir: b.Dir, Findings: []Finding{}, Warnings: []Warning{}, Missing: []string{}}
-	warned := map[Warning]bool{}
+	warned := map[wkey]bool{}
 	addWarn := func(w Warning) {
-		if (o.Round == 0 || w.Round == 0 || w.Round == o.Round) && !warned[w] {
-			warned[w] = true
+		if (o.Round == 0 || w.Round == 0 || w.Round == o.Round) && !warned[w.key()] {
+			warned[w.key()] = true
 			r.Warnings = append(r.Warnings, w)
 		}
 	}
@@ -68,15 +72,16 @@ func Analyze(b *Bundle, rules []Rule, o Options) Report {
 			for _, s := range series {
 				at[s.Round] = s
 			}
-			for _, h := range rule.run(series, func(s Section, msg string) {
-				addWarn(Warning{Device: s.Device, Round: s.Round, Command: s.Command, Msg: msg})
+			for _, h := range rule.run(series, func(s Section, msg i18n.Text) {
+				addWarn(warnTx(s.Device, s.Round, s.Command, msg))
 			}) {
 				if o.Round != 0 && h.round != o.Round {
 					continue
 				}
 				s := at[h.round]
 				r.Findings = append(r.Findings, Finding{Rule: rule.ID, Title: rule.Title, Severity: rule.Severity, Device: dev, Round: h.round,
-					At: s.At, Command: s.Command, Evidence: h.evidence, Detail: h.detail, Explanation: rule.Explanation, Action: rule.Action})
+					At: s.At, Command: s.Command, Evidence: h.evidence, Detail: h.detail.In(i18n.Es), Explanation: rule.Explanation, Action: rule.Action,
+					TitleTx: rule.titleTx(), DetailTx: h.detail, ExplanationTx: rule.explanationTx(), ActionTx: rule.actionTx()})
 			}
 		}
 	}
@@ -114,7 +119,7 @@ func seriesFor(b *Bundle, dev string, rule *Rule, upTo int, warn func(Warning)) 
 			continue
 		}
 		if s.Invalid {
-			warn(Warning{Device: dev, Round: s.Round, Command: s.Command, Msg: "el equipo rechazó el comando; sin datos para las reglas que lo usan"})
+			warn(Warn(dev, s.Round, s.Command, "analyze.warn.rejected"))
 			continue
 		}
 		out = append(out, s)
@@ -123,37 +128,43 @@ func seriesFor(b *Bundle, dev string, rule *Rule, upTo int, warn func(Warning)) 
 	return out
 }
 
-var sevLabel = map[string]string{"critica": "CRÍTICA", "alta": "ALTA", "media": "MEDIA", "baja": "BAJA", "info": "INFO"}
+// Text es el resumen legible para mctl, en español.
+func (r Report) Text() string { return r.TextIn(i18n.Es) }
 
-// Text es el resumen legible para mctl.
-func (r Report) Text() string {
+// TextIn es el resumen en el idioma pedido (con es, el de siempre). El detalle, el título y demás textos de los
+// hallazgos ya vienen en ese idioma si el informe pasó por i18n.Localize.
+func (r Report) TextIn(loc string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s\nequipos: %s · rondas: %v · hallazgos: %d\n", r.Dir, strings.Join(r.Devices, ", "), r.Rounds, len(r.Findings))
+	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
+	fmt.Fprintf(&b, "%s\n%s\n", r.Dir, m("analyze.text.summary", "devices", strings.Join(r.Devices, ", "), "rounds", r.Rounds, "n", len(r.Findings)))
 	for _, f := range r.Findings {
-		fmt.Fprintf(&b, "\n[%s] %s — %s · ronda %d · %s\n  %s\n", sevLabel[f.Severity], f.Title, f.Device, f.Round, f.At.Format(time.RFC3339), f.Detail)
-		fmt.Fprintf(&b, "  evidencia (%s):\n", f.Command)
+		fmt.Fprintf(&b, "\n%s\n  %s\n", m("analyze.text.finding", "sev", m("analyze.sev."+f.Severity), "title", f.Title, "device", f.Device, "round", f.Round, "at", f.At.Format(time.RFC3339)), f.Detail)
+		fmt.Fprintf(&b, "  %s\n", m("analyze.text.evidence", "cmd", f.Command))
 		for _, ln := range f.Evidence {
 			fmt.Fprintf(&b, "    | %s\n", ln)
 		}
-		fmt.Fprintf(&b, "  por qué: %s\n  qué hacer: %s\n", f.Explanation, f.Action)
+		fmt.Fprintf(&b, "  %s\n  %s\n", m("analyze.text.why", "text", f.Explanation), m("analyze.text.action", "text", f.Action))
 	}
 	if len(r.Missing) > 0 {
-		fmt.Fprintf(&b, "\nno recolectados (reglas sin datos): %s\n", strings.Join(r.Missing, ", "))
+		fmt.Fprintf(&b, "\n%s\n", m("analyze.text.missing", "cmds", strings.Join(r.Missing, ", ")))
 	}
 	for _, w := range r.Warnings {
-		fmt.Fprintf(&b, "aviso: %s\n", w.String())
+		fmt.Fprintf(&b, "%s\n", m("analyze.text.warning", "message", w.in(loc)))
 	}
-	b.WriteString("\nReglas sin validar en laboratorio: confirma cada hallazgo con la evidencia.\n")
+	b.WriteString("\n" + m("analyze.text.unvalidated") + "\n")
 	return b.String()
 }
 
-func (w Warning) String() string {
+func (w Warning) String() string { return w.in(i18n.Es) }
+
+// in es el aviso con su equipo, ronda y comando, en el idioma pedido (w.Msg ya debe estar en ese idioma).
+func (w Warning) in(loc string) string {
 	var p []string
 	if w.Device != "" {
 		p = append(p, w.Device)
 	}
 	if w.Round != 0 {
-		p = append(p, fmt.Sprintf("ronda %d", w.Round))
+		p = append(p, i18n.Msg(loc, "analyze.text.round", i18n.A("round", w.Round)))
 	}
 	if w.Command != "" {
 		p = append(p, w.Command)
