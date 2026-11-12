@@ -19,6 +19,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/assist"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -207,19 +208,19 @@ func connErr(err error) error {
 	return status.Error(codes.Unavailable, err.Error())
 }
 
-func (s *assistSvc) vault() error {
+func (s *assistSvc) vault(ctx context.Context) error {
 	if v := s.d.Vault(); v == nil || !v.Unlocked() {
-		return status.Error(codes.FailedPrecondition, "abre la bóveda: el modo asistido necesita las credenciales del equipo")
+		return service.Err(ctx, codes.FailedPrecondition, "assist.svc.abre_la_boveda_el_modo", nil)
 	}
 	return nil
 }
 
-func checkTarget(t *v1.AssistTarget) error {
+func checkTarget(ctx context.Context, t *v1.AssistTarget) error {
 	if t == nil || t.Address == "" || t.CredentialId == "" {
-		return status.Error(codes.InvalidArgument, "indica el equipo (dirección) y la credencial")
+		return service.Err(ctx, codes.InvalidArgument, "assist.svc.indica_el_equipo_direccion_y", nil)
 	}
 	if t.Port > 65535 {
-		return status.Error(codes.InvalidArgument, "puerto fuera de rango")
+		return service.Err(ctx, codes.InvalidArgument, "assist.svc.puerto_fuera_de_rango", nil)
 	}
 	return nil
 }
@@ -242,9 +243,9 @@ func planErr(ctx context.Context, err error, device string) error {
 	}
 	if errors.Is(err, assist.ErrPortRefused) || errors.Is(err, assist.ErrRotateRefused) ||
 		errors.Is(err, assist.ErrRestoreRefused) || errors.Is(err, assist.ErrNoDifference) {
-		return status.Error(codes.FailedPrecondition, err.Error())
+		return service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
-	return status.Error(codes.InvalidArgument, err.Error())
+	return service.ErrFrom(ctx, codes.InvalidArgument, err)
 }
 
 // planOn es lo común de planear: abre una sesión de solo lectura (ventana de guard plan-ID con defer Revoke), corre pre, deja que build arme el
@@ -258,7 +259,7 @@ func (s *assistSvc) planOn(ctx context.Context, t *v1.AssistTarget, accepted []s
 // lecturas extra que dependen de las primeras (more recibe lo leído en pre; restaurar pregunta por la salida hacia el origen de la sesión).
 func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted []string, pre []string, more func(map[string]string) []string, fnp *assist.Function, platforms []string, writeMem bool, detail string,
 	rot *rotation, build func(label string, byCmd map[string]string) (assist.DevicePlan, error)) (string, assist.Plan, error) {
-	if err := s.vault(); err != nil {
+	if err := s.vault(ctx); err != nil {
 		return "", assist.Plan{}, err
 	}
 	port := uint16(t.Port)
@@ -305,7 +306,7 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 		}
 	}
 	if p := ex.Platform(label); len(platforms) > 0 && !slices.Contains(platforms, p) {
-		return "", assist.Plan{}, status.Errorf(codes.FailedPrecondition, "la plantilla es de %s y el equipo es %q", strings.Join(platforms, ", "), p)
+		return "", assist.Plan{}, service.Err(ctx, codes.FailedPrecondition, "assist.svc.la_plantilla_es_de_y", i18n.A("platforms", strings.Join(platforms, ", "), "platform", p))
 	}
 	dp, err := build(label, byCmd)
 	if err != nil {
@@ -314,7 +315,7 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 	fn := *fnp // build puede haber puesto la función propia del plan
 	plan := assist.Plan{Function: fn.Name, WriteMemory: writeMem, Devices: []assist.DevicePlan{dp}}
 	if err := assist.Validate(plan, fn); err != nil {
-		return "", assist.Plan{}, status.Error(codes.InvalidArgument, err.Error())
+		return "", assist.Plan{}, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	s.mu.Lock()
 	now := s.d.Now()
@@ -327,13 +328,13 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 
 func (s *assistSvc) PlanPorts(ctx context.Context, r *v1.PlanPortsRequest) (*v1.PlanPortsResponse, error) {
 	s.d.MarkActive()
-	if err := checkTarget(r.Target); err != nil {
+	if err := checkTarget(ctx, r.Target); err != nil {
 		return nil, err
 	}
 	ch := assist.PortChange{Vlan: int(r.Vlan), Voice: int(r.Voice), Description: r.Description, Shutdown: r.Shutdown}
 	pre, err := assist.PortsPre(r.Interfaces, ch)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	id, plan, err := s.planOn(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, assist.Ports, r.WriteMemory, fmt.Sprintf("interfaces=%v", r.Interfaces), nil,
 		func(label string, outs map[string]string) (assist.DevicePlan, error) {
@@ -342,12 +343,12 @@ func (s *assistSvc) PlanPorts(ctx context.Context, r *v1.PlanPortsRequest) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	return &v1.PlanPortsResponse{PlanId: id, Plan: planToProto(assist.Redact(plan, assist.Ports))}, nil
+	return &v1.PlanPortsResponse{PlanId: id, Plan: planToProto(i18n.Locale(ctx), assist.Redact(plan, assist.Ports))}, nil
 }
 
 func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (*v1.PlanSnippetResponse, error) {
 	s.d.MarkActive()
-	if err := checkTarget(r.Target); err != nil {
+	if err := checkTarget(ctx, r.Target); err != nil {
 		return nil, err
 	}
 	var (
@@ -387,23 +388,23 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 		pre, err = t.Pre(vals)
 		build = func(l string, o map[string]string) (assist.DevicePlan, error) { return t.Plan(l, vals, o) }
 	default:
-		return nil, status.Error(codes.InvalidArgument, "indica el snippet: vlan, trunk, svi o una plantilla")
+		return nil, service.Err(ctx, codes.InvalidArgument, "assist.svc.indica_el_snippet_vlan_trunk", nil)
 	}
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, nil, &fn, platforms, r.WriteMemory, detail, nil, build)
 	if err != nil {
 		return nil, err
 	}
-	return &v1.PlanSnippetResponse{PlanId: id, Plan: planToProto(assist.Redact(plan, fn))}, nil
+	return &v1.PlanSnippetResponse{PlanId: id, Plan: planToProto(i18n.Locale(ctx), assist.Redact(plan, fn))}, nil
 }
 
 // templateOf busca la plantilla pedida y valida sus valores (la validación autoritativa: la de la UI es solo ayuda).
 func templateOf(ctx context.Context, ts *v1.TemplateSnippet) (assist.Template, assist.Values, error) {
 	t, ok := assist.TemplateByID(ts.GetId())
 	if !ok {
-		return assist.Template{}, nil, status.Errorf(codes.InvalidArgument, "no hay una plantilla %q en el catálogo", ts.GetId())
+		return assist.Template{}, nil, service.Err(ctx, codes.InvalidArgument, "assist.svc.no_hay_una_plantilla_en", i18n.A("id", ts.GetId()))
 	}
 	vals := assist.Values(ts.GetValues())
 	if err := assist.ValidateValues(t, vals); err != nil {
@@ -434,27 +435,27 @@ func (s *assistSvc) ListSnippetTemplates(_ context.Context, r *v1.ListSnippetTem
 // nueva no entrara no habría otra sesión por dónde revertir. El secreto (dado o generado) vive solo en el plan y en el ejecutor.
 func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequest) (*v1.PlanCredRotateResponse, error) {
 	s.d.MarkActive()
-	if err := checkTarget(r.Target); err != nil {
+	if err := checkTarget(ctx, r.Target); err != nil {
 		return nil, err
 	}
 	pre, err := assist.CredRotatePre(r.User)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	secret := r.NewSecret
 	switch {
 	case secret == "" && r.UpdateCredentialId == "":
-		return nil, status.Error(codes.InvalidArgument, "un secreto generado por el núcleo solo se puede recuperar desde la bóveda: indica la credencial que lo recibe")
+		return nil, service.Err(ctx, codes.InvalidArgument, "assist.svc.un_secreto_generado_por_el", nil)
 	case secret == "":
 		if secret, err = assist.GenerateSecret(); err != nil {
-			return nil, status.Error(codes.Internal, "no se pudo generar el secreto")
+			return nil, service.Err(ctx, codes.Internal, "assist.svc.no_se_pudo_generar_el", nil)
 		}
 	default:
 		if err := assist.ValidateSecret(secret); err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 	}
-	if err := s.vault(); err != nil {
+	if err := s.vault(ctx); err != nil {
 		return nil, err
 	}
 	connected, err := s.credUser(r.Target.CredentialId)
@@ -467,7 +468,7 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 			return nil, err
 		}
 		if u != r.User {
-			return nil, status.Errorf(codes.InvalidArgument, "la credencial %s es del usuario %q, no de %q", r.UpdateCredentialId, u, r.User)
+			return nil, service.Err(ctx, codes.InvalidArgument, "assist.svc.la_credencial_es_del_usuario", i18n.A("credential", r.UpdateCredentialId, "actual", u, "wanted", r.User))
 		}
 	}
 	rot := &rotation{user: r.User, secret: secret, updateCred: r.UpdateCredentialId}
@@ -478,7 +479,7 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 	if err != nil {
 		return nil, err
 	}
-	return &v1.PlanCredRotateResponse{PlanId: id, Plan: planToProto(assist.Redact(plan, assist.CredRotate))}, nil
+	return &v1.PlanCredRotateResponse{PlanId: id, Plan: planToProto(i18n.Locale(ctx), assist.Redact(plan, assist.CredRotate))}, nil
 }
 
 // credUser devuelve el usuario de una credencial de la bóveda, sin conservar sus secretos.
@@ -497,10 +498,10 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 	s.d.MarkActive()
 	// Regla 1: apagado por defecto. Nada se conecta ni se prepara sin esta bandera en esta petición.
 	if !r.Assisted {
-		return nil, status.Error(codes.FailedPrecondition, "el modo asistido está apagado: la petición debe traer assisted=true")
+		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.el_modo_asistido_esta_apagado", nil)
 	}
 	if s.ctx.Err() != nil {
-		return nil, status.Error(codes.Unavailable, "el núcleo se está cerrando")
+		return nil, service.Err(ctx, codes.Unavailable, "assist.svc.el_nucleo_se_esta_cerrando", nil)
 	}
 	s.mu.Lock()
 	rec, ok := s.plans[r.PlanId]
@@ -510,9 +511,9 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 	}
 	s.mu.Unlock()
 	if !ok {
-		return nil, status.Error(codes.NotFound, "el plan no existe, caducó o ya se usó: vuelve a planear")
+		return nil, service.Err(ctx, codes.NotFound, "assist.svc.el_plan_no_existe_caduco", nil)
 	}
-	if err := s.vault(); err != nil {
+	if err := s.vault(ctx); err != nil {
 		return nil, err
 	}
 	runID := service.NewID()
@@ -537,19 +538,19 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 		DecisionTimeout: s.decisionTimeout})
 	if err != nil {
 		release()
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	s.mu.Lock()
 	if _, ok := s.plans[r.PlanId]; !ok { // otro StartRun ganó la carrera
 		s.mu.Unlock()
 		release()
-		return nil, status.Error(codes.NotFound, "el plan ya se usó")
+		return nil, service.Err(ctx, codes.NotFound, "assist.svc.el_plan_ya_se_uso", nil)
 	}
 	keys := portKeys(rec)
 	if other, busy := s.busyLocked(keys); busy { // un puerto, una ejecución a la vez
 		s.mu.Unlock()
 		release()
-		return nil, status.Errorf(codes.FailedPrecondition, "la ejecución %s sigue activa sobre uno de esos puertos: termínala o abórtala antes", other)
+		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.la_ejecucion_sigue_activa_sobre", i18n.A("other", other))
 	}
 	delete(s.plans, r.PlanId)
 	now := s.d.Now()
@@ -569,68 +570,70 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 	return &v1.StartRunResponse{RunId: runID}, nil
 }
 
-func (s *assistSvc) get(id string) (*runRec, error) {
+func (s *assistSvc) get(ctx context.Context, id string) (*runRec, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rr, ok := s.runs[id]
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "la ejecución %s no existe", id)
+		return nil, service.Err(ctx, codes.NotFound, "assist.svc.la_ejecucion_no_existe", i18n.A("id", id))
 	}
 	return rr, nil
 }
 
-func stepErr(err error) error {
+func stepErr(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
-	return status.Error(codes.FailedPrecondition, err.Error())
+	return service.ErrFrom(ctx, codes.FailedPrecondition, err)
 }
 
-func (s *assistSvc) Confirm(_ context.Context, r *v1.ConfirmRequest) (*v1.ConfirmResponse, error) {
+func (s *assistSvc) Confirm(ctx context.Context, r *v1.ConfirmRequest) (*v1.ConfirmResponse, error) {
 	s.d.MarkActive()
-	rr, err := s.get(r.RunId)
+	rr, err := s.get(ctx, r.RunId)
 	if err != nil {
 		return nil, err
 	}
 	if err := rr.run.Confirm(r.StepId); err != nil {
-		return nil, stepErr(err)
+		return nil, stepErr(ctx, err)
 	}
-	return &v1.ConfirmResponse{Run: snapshot(rr)}, nil
+	return &v1.ConfirmResponse{Run: snapshot(i18n.Locale(ctx), rr)}, nil
 }
 
-func (s *assistSvc) Abort(_ context.Context, r *v1.AbortRequest) (*v1.AbortResponse, error) {
+func (s *assistSvc) Abort(ctx context.Context, r *v1.AbortRequest) (*v1.AbortResponse, error) {
 	s.d.MarkActive()
-	rr, err := s.get(r.RunId)
+	rr, err := s.get(ctx, r.RunId)
 	if err != nil {
 		return nil, err
 	}
 	if err := rr.run.Abort(); err != nil {
-		return nil, stepErr(err)
+		return nil, stepErr(ctx, err)
 	}
-	return &v1.AbortResponse{Run: snapshot(rr)}, nil
+	return &v1.AbortResponse{Run: snapshot(i18n.Locale(ctx), rr)}, nil
 }
 
-func (s *assistSvc) Rollback(_ context.Context, r *v1.RollbackRequest) (*v1.RollbackResponse, error) {
+func (s *assistSvc) Rollback(ctx context.Context, r *v1.RollbackRequest) (*v1.RollbackResponse, error) {
 	s.d.MarkActive()
-	rr, err := s.get(r.RunId)
+	rr, err := s.get(ctx, r.RunId)
 	if err != nil {
 		return nil, err
 	}
 	if err := rr.run.Rollback(); err != nil {
-		return nil, stepErr(err)
+		return nil, stepErr(ctx, err)
 	}
-	return &v1.RollbackResponse{Run: snapshot(rr)}, nil
+	return &v1.RollbackResponse{Run: snapshot(i18n.Locale(ctx), rr)}, nil
 }
 
 func (s *assistSvc) WatchRun(r *v1.WatchRunRequest, st v1.AssistService_WatchRunServer) error {
-	rr, err := s.get(r.RunId)
+	ctx := st.Context()
+	rr, err := s.get(ctx, r.RunId)
 	if err != nil {
 		return err
 	}
 	from := int(r.FromSeq)
+	loc := i18n.Locale(ctx)
 	send := func(evs []assist.Event) error {
 		for _, e := range evs {
-			if err := st.Send(&v1.WatchRunResponse{Event: eventToProto(e)}); err != nil {
+			if err := st.Send(&v1.WatchRunResponse{Event: eventToProto(loc, e)}); err != nil {
 				return err
 			}
 		}
@@ -654,7 +657,7 @@ func (s *assistSvc) WatchRun(r *v1.WatchRunRequest, st v1.AssistService_WatchRun
 }
 
 // ListRuns da las ejecuciones que el núcleo recuerda, las más recientes primero.
-func (s *assistSvc) ListRuns(_ context.Context, r *v1.ListRunsRequest) (*v1.ListRunsResponse, error) {
+func (s *assistSvc) ListRuns(ctx context.Context, r *v1.ListRunsRequest) (*v1.ListRunsResponse, error) {
 	s.mu.Lock()
 	recs := make([]*runRec, 0, len(s.runs))
 	for _, rr := range s.runs {
@@ -664,19 +667,19 @@ func (s *assistSvc) ListRuns(_ context.Context, r *v1.ListRunsRequest) (*v1.List
 	sort.Slice(recs, func(i, j int) bool { return recs[i].started.After(recs[j].started) })
 	out := &v1.ListRunsResponse{}
 	for _, rr := range recs {
-		if st := snapshot(rr); !r.ActiveOnly || st.Active {
+		if st := snapshot(i18n.Locale(ctx), rr); !r.ActiveOnly || st.Active {
 			out.Runs = append(out.Runs, st)
 		}
 	}
 	return out, nil
 }
 
-func (s *assistSvc) GetAssistRun(_ context.Context, r *v1.GetAssistRunRequest) (*v1.GetAssistRunResponse, error) {
-	rr, err := s.get(r.RunId)
+func (s *assistSvc) GetAssistRun(ctx context.Context, r *v1.GetAssistRunRequest) (*v1.GetAssistRunResponse, error) {
+	rr, err := s.get(ctx, r.RunId)
 	if err != nil {
 		return nil, err
 	}
-	return &v1.GetAssistRunResponse{Run: snapshot(rr)}, nil
+	return &v1.GetAssistRunResponse{Run: snapshot(i18n.Locale(ctx), rr)}, nil
 }
 
 // Module registra el servicio Assist.

@@ -423,7 +423,7 @@ func TestRestoreReadOutputIsMaskedInEventsAndAudit(t *testing.T) {
 	r.closeAndWait(runID)
 	r.waitDone(runID)
 	all := r.d.AuditText()
-	rec, _ := r.svc.get(runID)
+	rec, _ := r.svc.get(context.Background(), runID)
 	evs, _ := rec.run.Events(0)
 	for _, e := range evs {
 		all += e.Text + "\n"

@@ -88,11 +88,11 @@ func (r *rig) start(planID string) string {
 }
 
 func (r *rig) state(run string) *v1.AssistRunState {
-	rec, err := r.svc.get(run)
+	rec, err := r.svc.get(context.Background(), run)
 	if err != nil {
 		r.t.Fatal(err)
 	}
-	return snapshot(rec)
+	return snapshot("es", rec)
 }
 
 func (r *rig) waitState(run, want string) *v1.AssistRunState {
@@ -125,7 +125,7 @@ func (r *rig) closeAndWait(run string) {
 
 func (r *rig) waitDone(run string) {
 	r.t.Helper()
-	rec, _ := r.svc.get(run)
+	rec, _ := r.svc.get(context.Background(), run)
 	select {
 	case <-rec.finished:
 	case <-time.After(5 * time.Second):
