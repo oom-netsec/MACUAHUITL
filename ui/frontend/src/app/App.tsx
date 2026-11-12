@@ -15,7 +15,9 @@ import { vaultChanged } from "../lib/vaultSignal";
 // `chrome` son los controles de la ventana sin marco; las pruebas no los necesitan.
 // `initial` abre otro módulo al arrancar (vista previa y capturas).
 export function App(props: { core: CoreAPI; chrome?: ReactNode; initial?: string }) {
-  return <I18nProvider><Shell {...props} /></I18nProvider>;
+  // El núcleo habla el idioma de la interfaz; un fallo al avisarle no debe romper nada.
+  const sync = (l: string) => { try { void Promise.resolve(props.core.setPreference("ui.language", l)).catch(() => {}); } catch { /* núcleo sin la preferencia */ } };
+  return <I18nProvider onLang={sync}><Shell {...props} /></I18nProvider>;
 }
 
 const collapsedKey = "macuahuitl.barra-contraida";

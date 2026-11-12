@@ -25,6 +25,15 @@ test("cambiar a inglés traduce, actualiza lang y se recuerda", async () => {
   expect(screen.getByText("Core connected · 3 devices")).toBeInTheDocument();
 });
 
+test("onLang recibe el idioma vigente al arrancar y cada vez que cambia", async () => {
+  const onLang = vi.fn();
+  render(<I18nProvider onLang={onLang}><LanguageSwitch /></I18nProvider>);
+  expect(onLang).toHaveBeenLastCalledWith("es");
+  await userEvent.click(screen.getByRole("radio", { name: "English" }));
+  expect(onLang).toHaveBeenLastCalledWith("en");
+  expect(onLang).toHaveBeenCalledTimes(2);
+});
+
 test("sin proveedor usa español", () => {
   render(<Probe />);
   expect(screen.getByText(/Núcleo conectado/)).toBeInTheDocument();

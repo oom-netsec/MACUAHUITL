@@ -26,11 +26,14 @@ function initial(): Lang {
   return navigator.language.toLowerCase().startsWith("es") ? "es" : "en";
 }
 
-export function I18nProvider({ children }: { children: ReactNode }) {
+// `onLang` se llama con el idioma vigente al montar y en cada cambio (el shell lo pasa al núcleo).
+export function I18nProvider({ children, onLang }: { children: ReactNode; onLang?: (l: Lang) => void }) {
   const [lang, setLang] = useState<Lang>(initial);
   useLayoutEffect(() => {
     document.documentElement.lang = lang;
     try { localStorage.setItem(storageKey, lang); } catch { /* sin persistencia */ }
+    onLang?.(lang);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando cambia el idioma
   }, [lang]);
   return <Ctx.Provider value={{ lang, setLang, t: make(lang) }}>{children}</Ctx.Provider>;
 }
