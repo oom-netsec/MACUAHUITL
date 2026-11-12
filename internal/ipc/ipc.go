@@ -122,8 +122,8 @@ const MaxMsg = 16 << 20
 
 // NewServer crea el servidor gRPC del núcleo. Sin TLS: el canal es un socket Unix local
 // protegido por permisos y SO_PEERCRED.
-func NewServer() *grpc.Server {
-	return grpc.NewServer(grpc.MaxRecvMsgSize(MaxMsg), grpc.MaxSendMsgSize(MaxMsg))
+func NewServer(opts ...grpc.ServerOption) *grpc.Server {
+	return grpc.NewServer(append([]grpc.ServerOption{grpc.MaxRecvMsgSize(MaxMsg), grpc.MaxSendMsgSize(MaxMsg)}, opts...)...)
 }
 
 // Dial conecta al núcleo del usuario actual.
@@ -150,8 +150,8 @@ type (
 
 // Serve registra los servicios y atiende l hasta que ctx termine. Al terminar espera
 // a las llamadas en curso como máximo 2 s: un stream de eventos abierto no frena el apagado.
-func Serve(ctx context.Context, l Listener, register func(Registrar)) error {
-	s := NewServer()
+func Serve(ctx context.Context, l Listener, register func(Registrar), opts ...grpc.ServerOption) error {
+	s := NewServer(opts...)
 	register(s)
 	go func() {
 		<-ctx.Done()

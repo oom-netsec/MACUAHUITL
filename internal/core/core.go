@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -224,7 +225,7 @@ func (c *Core) Serve(ctx context.Context, l ipc.Listener) error {
 		for _, m := range modules(c) {
 			m.Register(s, d)
 		}
-	})
+	}, grpc.ChainUnaryInterceptor(service.LocaleUnary), grpc.ChainStreamInterceptor(service.LocaleStream))
 }
 
 func (c *Core) Close() {
