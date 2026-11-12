@@ -261,6 +261,9 @@ func SeverityCode(s string) string {
 }
 
 func localizeFindings(fs []Finding, loc string) []Finding {
+	if fs == nil { // nulo sigue nulo: el JSON en español no cambia
+		return nil
+	}
 	out := make([]Finding, len(fs))
 	for i, f := range fs {
 		if !f.Text.Empty() {

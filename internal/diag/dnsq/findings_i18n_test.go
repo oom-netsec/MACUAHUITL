@@ -206,3 +206,13 @@ func TestFindingsEnIngles(t *testing.T) {
 		t.Errorf("pocos hallazgos: %d datos, %d de catálogo", nData, nText)
 	}
 }
+
+// Localize(es) no cambia nada: el servicio la usa siempre, así que el JSON en español debe quedar igual (nulo
+// sigue nulo).
+func TestLocalizeEspanolEsIdentidad(t *testing.T) {
+	for n, r := range escenariosDNS(t) {
+		if a, b := viewDNS(r), viewDNS(Localize(r, "es")); a != b {
+			t.Errorf("%s: Localize(es) cambia el JSON:\n%s\n%s", n, a, b)
+		}
+	}
+}

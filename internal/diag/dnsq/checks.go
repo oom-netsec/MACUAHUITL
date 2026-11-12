@@ -232,7 +232,7 @@ type ExposureReport struct {
 
 // In devuelve el informe con los detalles en el idioma dado.
 func (r ExposureReport) In(loc string) ExposureReport {
-	if len(r.DetailTexts) == len(r.Details) {
+	if r.Details != nil && len(r.DetailTexts) == len(r.Details) {
 		r.Details = make([]string, len(r.DetailTexts))
 		for i, t := range r.DetailTexts {
 			r.Details[i] = t.In(loc)
