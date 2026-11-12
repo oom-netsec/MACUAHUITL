@@ -86,9 +86,12 @@ func (DnsMode) EnumDescriptor() ([]byte, []int) {
 }
 
 type ToolReport struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Json          string                 `protobuf:"bytes,1,opt,name=json,proto3" json:"json,omitempty"`
-	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Json  string                 `protobuf:"bytes,1,opt,name=json,proto3" json:"json,omitempty"`
+	Text  string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	// Fase 30c: por cada texto libre del json que sale del catálogo, su clave y argumentos bajo su ruta JSON
+	// (rows.2.detail, warnings.0). Con accept-language en, el json ya trae ese texto en inglés; con es, el de siempre.
+	Keys          map[string]*TextRef `protobuf:"bytes,3,rep,name=keys,proto3" json:"keys,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -137,6 +140,66 @@ func (x *ToolReport) GetText() string {
 	return ""
 }
 
+func (x *ToolReport) GetKeys() map[string]*TextRef {
+	if x != nil {
+		return x.Keys
+	}
+	return nil
+}
+
+// Clave del catálogo y argumentos de un texto de un informe.
+type TextRef struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Args          map[string]string      `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TextRef) Reset() {
+	*x = TextRef{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TextRef) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TextRef) ProtoMessage() {}
+
+func (x *TextRef) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TextRef.ProtoReflect.Descriptor instead.
+func (*TextRef) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TextRef) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *TextRef) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
 // Fase 30b: el informe de la captura en forma estructurada. Es lo mismo que imprime el texto, con los
 // encabezados como clave (pcap.section.*) para que la vista no lea el español. Duraciones en milisegundos;
 // fechas en RFC 3339 UTC.
@@ -153,7 +216,7 @@ type PcapSummary struct {
 
 func (x *PcapSummary) Reset() {
 	*x = PcapSummary{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[1]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -165,7 +228,7 @@ func (x *PcapSummary) String() string {
 func (*PcapSummary) ProtoMessage() {}
 
 func (x *PcapSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[1]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -178,7 +241,7 @@ func (x *PcapSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapSummary.ProtoReflect.Descriptor instead.
 func (*PcapSummary) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{1}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *PcapSummary) GetFile() string {
@@ -229,7 +292,7 @@ type PcapConversation struct {
 
 func (x *PcapConversation) Reset() {
 	*x = PcapConversation{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -241,7 +304,7 @@ func (x *PcapConversation) String() string {
 func (*PcapConversation) ProtoMessage() {}
 
 func (x *PcapConversation) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -254,7 +317,7 @@ func (x *PcapConversation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapConversation.ProtoReflect.Descriptor instead.
 func (*PcapConversation) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{2}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PcapConversation) GetProto() string {
@@ -303,7 +366,7 @@ type PcapTalker struct {
 
 func (x *PcapTalker) Reset() {
 	*x = PcapTalker{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -315,7 +378,7 @@ func (x *PcapTalker) String() string {
 func (*PcapTalker) ProtoMessage() {}
 
 func (x *PcapTalker) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -328,7 +391,7 @@ func (x *PcapTalker) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapTalker.ProtoReflect.Descriptor instead.
 func (*PcapTalker) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{3}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PcapTalker) GetIp() string {
@@ -364,7 +427,7 @@ type PcapProtocol struct {
 
 func (x *PcapProtocol) Reset() {
 	*x = PcapProtocol{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -376,7 +439,7 @@ func (x *PcapProtocol) String() string {
 func (*PcapProtocol) ProtoMessage() {}
 
 func (x *PcapProtocol) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -389,7 +452,7 @@ func (x *PcapProtocol) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapProtocol.ProtoReflect.Descriptor instead.
 func (*PcapProtocol) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{4}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PcapProtocol) GetProto() string {
@@ -427,7 +490,7 @@ type PcapNeighbor struct {
 
 func (x *PcapNeighbor) Reset() {
 	*x = PcapNeighbor{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -439,7 +502,7 @@ func (x *PcapNeighbor) String() string {
 func (*PcapNeighbor) ProtoMessage() {}
 
 func (x *PcapNeighbor) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -452,7 +515,7 @@ func (x *PcapNeighbor) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapNeighbor.ProtoReflect.Descriptor instead.
 func (*PcapNeighbor) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{5}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PcapNeighbor) GetProtocol() string {
@@ -508,7 +571,7 @@ type PcapFlow struct {
 
 func (x *PcapFlow) Reset() {
 	*x = PcapFlow{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -520,7 +583,7 @@ func (x *PcapFlow) String() string {
 func (*PcapFlow) ProtoMessage() {}
 
 func (x *PcapFlow) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -533,7 +596,7 @@ func (x *PcapFlow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapFlow.ProtoReflect.Descriptor instead.
 func (*PcapFlow) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{6}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *PcapFlow) GetClient() string {
@@ -574,7 +637,7 @@ type PcapTcp struct {
 
 func (x *PcapTcp) Reset() {
 	*x = PcapTcp{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -586,7 +649,7 @@ func (x *PcapTcp) String() string {
 func (*PcapTcp) ProtoMessage() {}
 
 func (x *PcapTcp) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -599,7 +662,7 @@ func (x *PcapTcp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapTcp.ProtoReflect.Descriptor instead.
 func (*PcapTcp) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{7}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PcapTcp) GetHandshakes() int64 {
@@ -679,7 +742,7 @@ type PcapDnsQuery struct {
 
 func (x *PcapDnsQuery) Reset() {
 	*x = PcapDnsQuery{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -691,7 +754,7 @@ func (x *PcapDnsQuery) String() string {
 func (*PcapDnsQuery) ProtoMessage() {}
 
 func (x *PcapDnsQuery) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -704,7 +767,7 @@ func (x *PcapDnsQuery) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapDnsQuery.ProtoReflect.Descriptor instead.
 func (*PcapDnsQuery) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{8}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *PcapDnsQuery) GetClient() string {
@@ -762,7 +825,7 @@ type PcapDns struct {
 
 func (x *PcapDns) Reset() {
 	*x = PcapDns{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -774,7 +837,7 @@ func (x *PcapDns) String() string {
 func (*PcapDns) ProtoMessage() {}
 
 func (x *PcapDns) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -787,7 +850,7 @@ func (x *PcapDns) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapDns.ProtoReflect.Descriptor instead.
 func (*PcapDns) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{9}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *PcapDns) GetQueries() int64 {
@@ -836,7 +899,7 @@ type PcapTlsHello struct {
 
 func (x *PcapTlsHello) Reset() {
 	*x = PcapTlsHello{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -848,7 +911,7 @@ func (x *PcapTlsHello) String() string {
 func (*PcapTlsHello) ProtoMessage() {}
 
 func (x *PcapTlsHello) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -861,7 +924,7 @@ func (x *PcapTlsHello) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapTlsHello.ProtoReflect.Descriptor instead.
 func (*PcapTlsHello) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{10}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *PcapTlsHello) GetClient() string {
@@ -896,7 +959,7 @@ type PcapIcmpEvent struct {
 
 func (x *PcapIcmpEvent) Reset() {
 	*x = PcapIcmpEvent{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[11]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -908,7 +971,7 @@ func (x *PcapIcmpEvent) String() string {
 func (*PcapIcmpEvent) ProtoMessage() {}
 
 func (x *PcapIcmpEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[11]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -921,7 +984,7 @@ func (x *PcapIcmpEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapIcmpEvent.ProtoReflect.Descriptor instead.
 func (*PcapIcmpEvent) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{11}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *PcapIcmpEvent) GetFrom() string {
@@ -955,7 +1018,7 @@ type PcapIcmp struct {
 
 func (x *PcapIcmp) Reset() {
 	*x = PcapIcmp{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[12]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -967,7 +1030,7 @@ func (x *PcapIcmp) String() string {
 func (*PcapIcmp) ProtoMessage() {}
 
 func (x *PcapIcmp) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[12]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -980,7 +1043,7 @@ func (x *PcapIcmp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapIcmp.ProtoReflect.Descriptor instead.
 func (*PcapIcmp) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{12}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *PcapIcmp) GetUnreachable() []*PcapIcmpEvent {
@@ -1007,7 +1070,7 @@ type PcapArpConflict struct {
 
 func (x *PcapArpConflict) Reset() {
 	*x = PcapArpConflict{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[13]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1019,7 +1082,7 @@ func (x *PcapArpConflict) String() string {
 func (*PcapArpConflict) ProtoMessage() {}
 
 func (x *PcapArpConflict) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[13]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1032,7 +1095,7 @@ func (x *PcapArpConflict) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapArpConflict.ProtoReflect.Descriptor instead.
 func (*PcapArpConflict) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{13}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *PcapArpConflict) GetIp() string {
@@ -1061,7 +1124,7 @@ type PcapSection struct {
 
 func (x *PcapSection) Reset() {
 	*x = PcapSection{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[14]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1073,7 +1136,7 @@ func (x *PcapSection) String() string {
 func (*PcapSection) ProtoMessage() {}
 
 func (x *PcapSection) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[14]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1086,7 +1149,7 @@ func (x *PcapSection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapSection.ProtoReflect.Descriptor instead.
 func (*PcapSection) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{14}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *PcapSection) GetKey() string {
@@ -1122,7 +1185,7 @@ type PcapWarning struct {
 
 func (x *PcapWarning) Reset() {
 	*x = PcapWarning{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1134,7 +1197,7 @@ func (x *PcapWarning) String() string {
 func (*PcapWarning) ProtoMessage() {}
 
 func (x *PcapWarning) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1147,7 +1210,7 @@ func (x *PcapWarning) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PcapWarning.ProtoReflect.Descriptor instead.
 func (*PcapWarning) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{15}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PcapWarning) GetKey() string {
@@ -1193,7 +1256,7 @@ type AnalyzePcapResponse struct {
 
 func (x *AnalyzePcapResponse) Reset() {
 	*x = AnalyzePcapResponse{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1205,7 +1268,7 @@ func (x *AnalyzePcapResponse) String() string {
 func (*AnalyzePcapResponse) ProtoMessage() {}
 
 func (x *AnalyzePcapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1218,7 +1281,7 @@ func (x *AnalyzePcapResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalyzePcapResponse.ProtoReflect.Descriptor instead.
 func (*AnalyzePcapResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{16}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *AnalyzePcapResponse) GetReport() *ToolReport {
@@ -1331,7 +1394,7 @@ type DnsResponse struct {
 
 func (x *DnsResponse) Reset() {
 	*x = DnsResponse{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1343,7 +1406,7 @@ func (x *DnsResponse) String() string {
 func (*DnsResponse) ProtoMessage() {}
 
 func (x *DnsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1356,7 +1419,7 @@ func (x *DnsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DnsResponse.ProtoReflect.Descriptor instead.
 func (*DnsResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{17}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *DnsResponse) GetReport() *ToolReport {
@@ -1388,7 +1451,7 @@ type DnsFinding struct {
 
 func (x *DnsFinding) Reset() {
 	*x = DnsFinding{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1400,7 +1463,7 @@ func (x *DnsFinding) String() string {
 func (*DnsFinding) ProtoMessage() {}
 
 func (x *DnsFinding) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1413,7 +1476,7 @@ func (x *DnsFinding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DnsFinding.ProtoReflect.Descriptor instead.
 func (*DnsFinding) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{18}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *DnsFinding) GetCode() string {
@@ -1465,7 +1528,7 @@ type InspectTlsResponse struct {
 
 func (x *InspectTlsResponse) Reset() {
 	*x = InspectTlsResponse{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1477,7 +1540,7 @@ func (x *InspectTlsResponse) String() string {
 func (*InspectTlsResponse) ProtoMessage() {}
 
 func (x *InspectTlsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1490,7 +1553,7 @@ func (x *InspectTlsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InspectTlsResponse.ProtoReflect.Descriptor instead.
 func (*InspectTlsResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{19}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *InspectTlsResponse) GetReport() *ToolReport {
@@ -1529,7 +1592,7 @@ type TlsFinding struct {
 
 func (x *TlsFinding) Reset() {
 	*x = TlsFinding{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1541,7 +1604,7 @@ func (x *TlsFinding) String() string {
 func (*TlsFinding) ProtoMessage() {}
 
 func (x *TlsFinding) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1554,7 +1617,7 @@ func (x *TlsFinding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TlsFinding.ProtoReflect.Descriptor instead.
 func (*TlsFinding) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{20}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *TlsFinding) GetCode() string {
@@ -1603,7 +1666,7 @@ type AnalyzePcapRequest struct {
 
 func (x *AnalyzePcapRequest) Reset() {
 	*x = AnalyzePcapRequest{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1615,7 +1678,7 @@ func (x *AnalyzePcapRequest) String() string {
 func (*AnalyzePcapRequest) ProtoMessage() {}
 
 func (x *AnalyzePcapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1628,7 +1691,7 @@ func (x *AnalyzePcapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalyzePcapRequest.ProtoReflect.Descriptor instead.
 func (*AnalyzePcapRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{21}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *AnalyzePcapRequest) GetPath() string {
@@ -1670,7 +1733,7 @@ type DnsRequest struct {
 
 func (x *DnsRequest) Reset() {
 	*x = DnsRequest{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[22]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1682,7 +1745,7 @@ func (x *DnsRequest) String() string {
 func (*DnsRequest) ProtoMessage() {}
 
 func (x *DnsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[22]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1695,7 +1758,7 @@ func (x *DnsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DnsRequest.ProtoReflect.Descriptor instead.
 func (*DnsRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{22}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *DnsRequest) GetMode() DnsMode {
@@ -1766,7 +1829,7 @@ type InspectTlsRequest struct {
 
 func (x *InspectTlsRequest) Reset() {
 	*x = InspectTlsRequest{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[23]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1778,7 +1841,7 @@ func (x *InspectTlsRequest) String() string {
 func (*InspectTlsRequest) ProtoMessage() {}
 
 func (x *InspectTlsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[23]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1791,7 +1854,7 @@ func (x *InspectTlsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InspectTlsRequest.ProtoReflect.Descriptor instead.
 func (*InspectTlsRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{23}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *InspectTlsRequest) GetHost() string {
@@ -1847,7 +1910,7 @@ type SyslogRequest struct {
 
 func (x *SyslogRequest) Reset() {
 	*x = SyslogRequest{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[24]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1859,7 +1922,7 @@ func (x *SyslogRequest) String() string {
 func (*SyslogRequest) ProtoMessage() {}
 
 func (x *SyslogRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[24]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1872,7 +1935,7 @@ func (x *SyslogRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyslogRequest.ProtoReflect.Descriptor instead.
 func (*SyslogRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{24}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SyslogRequest) GetAddr() string {
@@ -1993,7 +2056,7 @@ type SyslogResponse struct {
 
 func (x *SyslogResponse) Reset() {
 	*x = SyslogResponse{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[25]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2005,7 +2068,7 @@ func (x *SyslogResponse) String() string {
 func (*SyslogResponse) ProtoMessage() {}
 
 func (x *SyslogResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[25]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2018,7 +2081,7 @@ func (x *SyslogResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyslogResponse.ProtoReflect.Descriptor instead.
 func (*SyslogResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{25}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SyslogResponse) GetListening() string {
@@ -2070,7 +2133,7 @@ type SyslogDrops struct {
 
 func (x *SyslogDrops) Reset() {
 	*x = SyslogDrops{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[26]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2082,7 +2145,7 @@ func (x *SyslogDrops) String() string {
 func (*SyslogDrops) ProtoMessage() {}
 
 func (x *SyslogDrops) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[26]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2095,7 +2158,7 @@ func (x *SyslogDrops) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyslogDrops.ProtoReflect.Descriptor instead.
 func (*SyslogDrops) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{26}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *SyslogDrops) GetTotal() uint64 {
@@ -2150,7 +2213,7 @@ type SyslogSourceDrops struct {
 
 func (x *SyslogSourceDrops) Reset() {
 	*x = SyslogSourceDrops{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[27]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2162,7 +2225,7 @@ func (x *SyslogSourceDrops) String() string {
 func (*SyslogSourceDrops) ProtoMessage() {}
 
 func (x *SyslogSourceDrops) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[27]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2175,7 +2238,7 @@ func (x *SyslogSourceDrops) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyslogSourceDrops.ProtoReflect.Descriptor instead.
 func (*SyslogSourceDrops) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{27}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *SyslogSourceDrops) GetSource() string {
@@ -2196,11 +2259,21 @@ var File_macuahuitl_v1_tools_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_tools_proto_rawDesc = "" +
 	"\n" +
-	"\x19macuahuitl/v1/tools.proto\x12\rmacuahuitl.v1\"4\n" +
+	"\x19macuahuitl/v1/tools.proto\x12\rmacuahuitl.v1\"\xbe\x01\n" +
 	"\n" +
 	"ToolReport\x12\x12\n" +
 	"\x04json\x18\x01 \x01(\tR\x04json\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\"\x88\x01\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x127\n" +
+	"\x04keys\x18\x03 \x03(\v2#.macuahuitl.v1.ToolReport.KeysEntryR\x04keys\x1aO\n" +
+	"\tKeysEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.macuahuitl.v1.TextRefR\x05value:\x028\x01\"\x8a\x01\n" +
+	"\aTextRef\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x124\n" +
+	"\x04args\x18\x02 \x03(\v2 .macuahuitl.v1.TextRef.ArgsEntryR\x04args\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x88\x01\n" +
 	"\vPcapSummary\x12\x12\n" +
 	"\x04file\x18\x01 \x01(\tR\x04file\x12\x18\n" +
 	"\apackets\x18\x02 \x01(\x03R\apackets\x12\x14\n" +
@@ -2428,87 +2501,93 @@ func file_macuahuitl_v1_tools_proto_rawDescGZIP() []byte {
 }
 
 var file_macuahuitl_v1_tools_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_macuahuitl_v1_tools_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_macuahuitl_v1_tools_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_macuahuitl_v1_tools_proto_goTypes = []any{
 	(DnsMode)(0),                // 0: macuahuitl.v1.DnsMode
 	(*ToolReport)(nil),          // 1: macuahuitl.v1.ToolReport
-	(*PcapSummary)(nil),         // 2: macuahuitl.v1.PcapSummary
-	(*PcapConversation)(nil),    // 3: macuahuitl.v1.PcapConversation
-	(*PcapTalker)(nil),          // 4: macuahuitl.v1.PcapTalker
-	(*PcapProtocol)(nil),        // 5: macuahuitl.v1.PcapProtocol
-	(*PcapNeighbor)(nil),        // 6: macuahuitl.v1.PcapNeighbor
-	(*PcapFlow)(nil),            // 7: macuahuitl.v1.PcapFlow
-	(*PcapTcp)(nil),             // 8: macuahuitl.v1.PcapTcp
-	(*PcapDnsQuery)(nil),        // 9: macuahuitl.v1.PcapDnsQuery
-	(*PcapDns)(nil),             // 10: macuahuitl.v1.PcapDns
-	(*PcapTlsHello)(nil),        // 11: macuahuitl.v1.PcapTlsHello
-	(*PcapIcmpEvent)(nil),       // 12: macuahuitl.v1.PcapIcmpEvent
-	(*PcapIcmp)(nil),            // 13: macuahuitl.v1.PcapIcmp
-	(*PcapArpConflict)(nil),     // 14: macuahuitl.v1.PcapArpConflict
-	(*PcapSection)(nil),         // 15: macuahuitl.v1.PcapSection
-	(*PcapWarning)(nil),         // 16: macuahuitl.v1.PcapWarning
-	(*AnalyzePcapResponse)(nil), // 17: macuahuitl.v1.AnalyzePcapResponse
-	(*DnsResponse)(nil),         // 18: macuahuitl.v1.DnsResponse
-	(*DnsFinding)(nil),          // 19: macuahuitl.v1.DnsFinding
-	(*InspectTlsResponse)(nil),  // 20: macuahuitl.v1.InspectTlsResponse
-	(*TlsFinding)(nil),          // 21: macuahuitl.v1.TlsFinding
-	(*AnalyzePcapRequest)(nil),  // 22: macuahuitl.v1.AnalyzePcapRequest
-	(*DnsRequest)(nil),          // 23: macuahuitl.v1.DnsRequest
-	(*InspectTlsRequest)(nil),   // 24: macuahuitl.v1.InspectTlsRequest
-	(*SyslogRequest)(nil),       // 25: macuahuitl.v1.SyslogRequest
-	(*SyslogResponse)(nil),      // 26: macuahuitl.v1.SyslogResponse
-	(*SyslogDrops)(nil),         // 27: macuahuitl.v1.SyslogDrops
-	(*SyslogSourceDrops)(nil),   // 28: macuahuitl.v1.SyslogSourceDrops
-	nil,                         // 29: macuahuitl.v1.PcapSection.ArgsEntry
-	nil,                         // 30: macuahuitl.v1.PcapWarning.ArgsEntry
-	nil,                         // 31: macuahuitl.v1.DnsFinding.ArgsEntry
-	nil,                         // 32: macuahuitl.v1.TlsFinding.ArgsEntry
+	(*TextRef)(nil),             // 2: macuahuitl.v1.TextRef
+	(*PcapSummary)(nil),         // 3: macuahuitl.v1.PcapSummary
+	(*PcapConversation)(nil),    // 4: macuahuitl.v1.PcapConversation
+	(*PcapTalker)(nil),          // 5: macuahuitl.v1.PcapTalker
+	(*PcapProtocol)(nil),        // 6: macuahuitl.v1.PcapProtocol
+	(*PcapNeighbor)(nil),        // 7: macuahuitl.v1.PcapNeighbor
+	(*PcapFlow)(nil),            // 8: macuahuitl.v1.PcapFlow
+	(*PcapTcp)(nil),             // 9: macuahuitl.v1.PcapTcp
+	(*PcapDnsQuery)(nil),        // 10: macuahuitl.v1.PcapDnsQuery
+	(*PcapDns)(nil),             // 11: macuahuitl.v1.PcapDns
+	(*PcapTlsHello)(nil),        // 12: macuahuitl.v1.PcapTlsHello
+	(*PcapIcmpEvent)(nil),       // 13: macuahuitl.v1.PcapIcmpEvent
+	(*PcapIcmp)(nil),            // 14: macuahuitl.v1.PcapIcmp
+	(*PcapArpConflict)(nil),     // 15: macuahuitl.v1.PcapArpConflict
+	(*PcapSection)(nil),         // 16: macuahuitl.v1.PcapSection
+	(*PcapWarning)(nil),         // 17: macuahuitl.v1.PcapWarning
+	(*AnalyzePcapResponse)(nil), // 18: macuahuitl.v1.AnalyzePcapResponse
+	(*DnsResponse)(nil),         // 19: macuahuitl.v1.DnsResponse
+	(*DnsFinding)(nil),          // 20: macuahuitl.v1.DnsFinding
+	(*InspectTlsResponse)(nil),  // 21: macuahuitl.v1.InspectTlsResponse
+	(*TlsFinding)(nil),          // 22: macuahuitl.v1.TlsFinding
+	(*AnalyzePcapRequest)(nil),  // 23: macuahuitl.v1.AnalyzePcapRequest
+	(*DnsRequest)(nil),          // 24: macuahuitl.v1.DnsRequest
+	(*InspectTlsRequest)(nil),   // 25: macuahuitl.v1.InspectTlsRequest
+	(*SyslogRequest)(nil),       // 26: macuahuitl.v1.SyslogRequest
+	(*SyslogResponse)(nil),      // 27: macuahuitl.v1.SyslogResponse
+	(*SyslogDrops)(nil),         // 28: macuahuitl.v1.SyslogDrops
+	(*SyslogSourceDrops)(nil),   // 29: macuahuitl.v1.SyslogSourceDrops
+	nil,                         // 30: macuahuitl.v1.ToolReport.KeysEntry
+	nil,                         // 31: macuahuitl.v1.TextRef.ArgsEntry
+	nil,                         // 32: macuahuitl.v1.PcapSection.ArgsEntry
+	nil,                         // 33: macuahuitl.v1.PcapWarning.ArgsEntry
+	nil,                         // 34: macuahuitl.v1.DnsFinding.ArgsEntry
+	nil,                         // 35: macuahuitl.v1.TlsFinding.ArgsEntry
 }
 var file_macuahuitl_v1_tools_proto_depIdxs = []int32{
-	7,  // 0: macuahuitl.v1.PcapTcp.failed_handshakes:type_name -> macuahuitl.v1.PcapFlow
-	7,  // 1: macuahuitl.v1.PcapTcp.resets:type_name -> macuahuitl.v1.PcapFlow
-	9,  // 2: macuahuitl.v1.PcapDns.errors:type_name -> macuahuitl.v1.PcapDnsQuery
-	9,  // 3: macuahuitl.v1.PcapDns.slow:type_name -> macuahuitl.v1.PcapDnsQuery
-	9,  // 4: macuahuitl.v1.PcapDns.unanswered:type_name -> macuahuitl.v1.PcapDnsQuery
-	12, // 5: macuahuitl.v1.PcapIcmp.unreachable:type_name -> macuahuitl.v1.PcapIcmpEvent
-	12, // 6: macuahuitl.v1.PcapIcmp.ttl_exceeded:type_name -> macuahuitl.v1.PcapIcmpEvent
-	29, // 7: macuahuitl.v1.PcapSection.args:type_name -> macuahuitl.v1.PcapSection.ArgsEntry
-	30, // 8: macuahuitl.v1.PcapWarning.args:type_name -> macuahuitl.v1.PcapWarning.ArgsEntry
-	1,  // 9: macuahuitl.v1.AnalyzePcapResponse.report:type_name -> macuahuitl.v1.ToolReport
-	2,  // 10: macuahuitl.v1.AnalyzePcapResponse.summary:type_name -> macuahuitl.v1.PcapSummary
-	3,  // 11: macuahuitl.v1.AnalyzePcapResponse.conversations:type_name -> macuahuitl.v1.PcapConversation
-	4,  // 12: macuahuitl.v1.AnalyzePcapResponse.top_talkers:type_name -> macuahuitl.v1.PcapTalker
-	5,  // 13: macuahuitl.v1.AnalyzePcapResponse.protocols:type_name -> macuahuitl.v1.PcapProtocol
-	6,  // 14: macuahuitl.v1.AnalyzePcapResponse.neighbors:type_name -> macuahuitl.v1.PcapNeighbor
-	8,  // 15: macuahuitl.v1.AnalyzePcapResponse.tcp:type_name -> macuahuitl.v1.PcapTcp
-	10, // 16: macuahuitl.v1.AnalyzePcapResponse.dns:type_name -> macuahuitl.v1.PcapDns
-	11, // 17: macuahuitl.v1.AnalyzePcapResponse.tls:type_name -> macuahuitl.v1.PcapTlsHello
-	13, // 18: macuahuitl.v1.AnalyzePcapResponse.icmp:type_name -> macuahuitl.v1.PcapIcmp
-	14, // 19: macuahuitl.v1.AnalyzePcapResponse.arp_conflicts:type_name -> macuahuitl.v1.PcapArpConflict
-	16, // 20: macuahuitl.v1.AnalyzePcapResponse.warnings:type_name -> macuahuitl.v1.PcapWarning
-	15, // 21: macuahuitl.v1.AnalyzePcapResponse.sections:type_name -> macuahuitl.v1.PcapSection
-	1,  // 22: macuahuitl.v1.DnsResponse.report:type_name -> macuahuitl.v1.ToolReport
-	19, // 23: macuahuitl.v1.DnsResponse.findings:type_name -> macuahuitl.v1.DnsFinding
-	31, // 24: macuahuitl.v1.DnsFinding.args:type_name -> macuahuitl.v1.DnsFinding.ArgsEntry
-	1,  // 25: macuahuitl.v1.InspectTlsResponse.report:type_name -> macuahuitl.v1.ToolReport
-	21, // 26: macuahuitl.v1.InspectTlsResponse.findings:type_name -> macuahuitl.v1.TlsFinding
-	32, // 27: macuahuitl.v1.TlsFinding.args:type_name -> macuahuitl.v1.TlsFinding.ArgsEntry
-	0,  // 28: macuahuitl.v1.DnsRequest.mode:type_name -> macuahuitl.v1.DnsMode
-	27, // 29: macuahuitl.v1.SyslogResponse.drops:type_name -> macuahuitl.v1.SyslogDrops
-	28, // 30: macuahuitl.v1.SyslogDrops.top:type_name -> macuahuitl.v1.SyslogSourceDrops
-	22, // 31: macuahuitl.v1.ToolsService.AnalyzePcap:input_type -> macuahuitl.v1.AnalyzePcapRequest
-	23, // 32: macuahuitl.v1.ToolsService.Dns:input_type -> macuahuitl.v1.DnsRequest
-	24, // 33: macuahuitl.v1.ToolsService.InspectTls:input_type -> macuahuitl.v1.InspectTlsRequest
-	25, // 34: macuahuitl.v1.ToolsService.Syslog:input_type -> macuahuitl.v1.SyslogRequest
-	17, // 35: macuahuitl.v1.ToolsService.AnalyzePcap:output_type -> macuahuitl.v1.AnalyzePcapResponse
-	18, // 36: macuahuitl.v1.ToolsService.Dns:output_type -> macuahuitl.v1.DnsResponse
-	20, // 37: macuahuitl.v1.ToolsService.InspectTls:output_type -> macuahuitl.v1.InspectTlsResponse
-	26, // 38: macuahuitl.v1.ToolsService.Syslog:output_type -> macuahuitl.v1.SyslogResponse
-	35, // [35:39] is the sub-list for method output_type
-	31, // [31:35] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	30, // 0: macuahuitl.v1.ToolReport.keys:type_name -> macuahuitl.v1.ToolReport.KeysEntry
+	31, // 1: macuahuitl.v1.TextRef.args:type_name -> macuahuitl.v1.TextRef.ArgsEntry
+	8,  // 2: macuahuitl.v1.PcapTcp.failed_handshakes:type_name -> macuahuitl.v1.PcapFlow
+	8,  // 3: macuahuitl.v1.PcapTcp.resets:type_name -> macuahuitl.v1.PcapFlow
+	10, // 4: macuahuitl.v1.PcapDns.errors:type_name -> macuahuitl.v1.PcapDnsQuery
+	10, // 5: macuahuitl.v1.PcapDns.slow:type_name -> macuahuitl.v1.PcapDnsQuery
+	10, // 6: macuahuitl.v1.PcapDns.unanswered:type_name -> macuahuitl.v1.PcapDnsQuery
+	13, // 7: macuahuitl.v1.PcapIcmp.unreachable:type_name -> macuahuitl.v1.PcapIcmpEvent
+	13, // 8: macuahuitl.v1.PcapIcmp.ttl_exceeded:type_name -> macuahuitl.v1.PcapIcmpEvent
+	32, // 9: macuahuitl.v1.PcapSection.args:type_name -> macuahuitl.v1.PcapSection.ArgsEntry
+	33, // 10: macuahuitl.v1.PcapWarning.args:type_name -> macuahuitl.v1.PcapWarning.ArgsEntry
+	1,  // 11: macuahuitl.v1.AnalyzePcapResponse.report:type_name -> macuahuitl.v1.ToolReport
+	3,  // 12: macuahuitl.v1.AnalyzePcapResponse.summary:type_name -> macuahuitl.v1.PcapSummary
+	4,  // 13: macuahuitl.v1.AnalyzePcapResponse.conversations:type_name -> macuahuitl.v1.PcapConversation
+	5,  // 14: macuahuitl.v1.AnalyzePcapResponse.top_talkers:type_name -> macuahuitl.v1.PcapTalker
+	6,  // 15: macuahuitl.v1.AnalyzePcapResponse.protocols:type_name -> macuahuitl.v1.PcapProtocol
+	7,  // 16: macuahuitl.v1.AnalyzePcapResponse.neighbors:type_name -> macuahuitl.v1.PcapNeighbor
+	9,  // 17: macuahuitl.v1.AnalyzePcapResponse.tcp:type_name -> macuahuitl.v1.PcapTcp
+	11, // 18: macuahuitl.v1.AnalyzePcapResponse.dns:type_name -> macuahuitl.v1.PcapDns
+	12, // 19: macuahuitl.v1.AnalyzePcapResponse.tls:type_name -> macuahuitl.v1.PcapTlsHello
+	14, // 20: macuahuitl.v1.AnalyzePcapResponse.icmp:type_name -> macuahuitl.v1.PcapIcmp
+	15, // 21: macuahuitl.v1.AnalyzePcapResponse.arp_conflicts:type_name -> macuahuitl.v1.PcapArpConflict
+	17, // 22: macuahuitl.v1.AnalyzePcapResponse.warnings:type_name -> macuahuitl.v1.PcapWarning
+	16, // 23: macuahuitl.v1.AnalyzePcapResponse.sections:type_name -> macuahuitl.v1.PcapSection
+	1,  // 24: macuahuitl.v1.DnsResponse.report:type_name -> macuahuitl.v1.ToolReport
+	20, // 25: macuahuitl.v1.DnsResponse.findings:type_name -> macuahuitl.v1.DnsFinding
+	34, // 26: macuahuitl.v1.DnsFinding.args:type_name -> macuahuitl.v1.DnsFinding.ArgsEntry
+	1,  // 27: macuahuitl.v1.InspectTlsResponse.report:type_name -> macuahuitl.v1.ToolReport
+	22, // 28: macuahuitl.v1.InspectTlsResponse.findings:type_name -> macuahuitl.v1.TlsFinding
+	35, // 29: macuahuitl.v1.TlsFinding.args:type_name -> macuahuitl.v1.TlsFinding.ArgsEntry
+	0,  // 30: macuahuitl.v1.DnsRequest.mode:type_name -> macuahuitl.v1.DnsMode
+	28, // 31: macuahuitl.v1.SyslogResponse.drops:type_name -> macuahuitl.v1.SyslogDrops
+	29, // 32: macuahuitl.v1.SyslogDrops.top:type_name -> macuahuitl.v1.SyslogSourceDrops
+	2,  // 33: macuahuitl.v1.ToolReport.KeysEntry.value:type_name -> macuahuitl.v1.TextRef
+	23, // 34: macuahuitl.v1.ToolsService.AnalyzePcap:input_type -> macuahuitl.v1.AnalyzePcapRequest
+	24, // 35: macuahuitl.v1.ToolsService.Dns:input_type -> macuahuitl.v1.DnsRequest
+	25, // 36: macuahuitl.v1.ToolsService.InspectTls:input_type -> macuahuitl.v1.InspectTlsRequest
+	26, // 37: macuahuitl.v1.ToolsService.Syslog:input_type -> macuahuitl.v1.SyslogRequest
+	18, // 38: macuahuitl.v1.ToolsService.AnalyzePcap:output_type -> macuahuitl.v1.AnalyzePcapResponse
+	19, // 39: macuahuitl.v1.ToolsService.Dns:output_type -> macuahuitl.v1.DnsResponse
+	21, // 40: macuahuitl.v1.ToolsService.InspectTls:output_type -> macuahuitl.v1.InspectTlsResponse
+	27, // 41: macuahuitl.v1.ToolsService.Syslog:output_type -> macuahuitl.v1.SyslogResponse
+	38, // [38:42] is the sub-list for method output_type
+	34, // [34:38] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_tools_proto_init() }
@@ -2522,7 +2601,7 @@ func file_macuahuitl_v1_tools_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_tools_proto_rawDesc), len(file_macuahuitl_v1_tools_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   32,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
