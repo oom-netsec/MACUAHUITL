@@ -85,7 +85,7 @@ func TestSyslogStuckClientDoesNotHangCloseAndFileKeepsEverything(t *testing.T) {
 	if got := strings.Count(string(b), "<14>guardame\n"); got != 50 {
 		t.Fatalf("el archivo trae %d de 50 mensajes", got)
 	}
-	if a := d.AuditText(); !strings.Contains(a, "perdidos_en_la_interfaz=") || strings.Contains(a, "perdidos_en_la_interfaz=0") {
+	if a := d.AuditText(); !strings.Contains(a, "lost_on_interface=") || strings.Contains(a, "lost_on_interface=0") {
 		t.Fatalf("lo que no cupo hacia el cliente debía auditarse:\n%s", a)
 	}
 }
@@ -108,11 +108,11 @@ func TestSyslogUsaPreferenciasDelNucleo(t *testing.T) {
 	escucha(&v1.SyslogRequest{Addr: "127.0.0.1:0", DurationSeconds: 1, Save: true})
 	escucha(&v1.SyslogRequest{Addr: "127.0.0.1:0", DurationSeconds: 1, Save: true, MaxFiles: 3, Format: "crudo"})
 	a := d.AuditText()
-	if !strings.Contains(a, "rotar_mb=7 ") || !strings.Contains(a, "max_archivos=9 formato=jsonl") {
+	if !strings.Contains(a, "rotate_mb=7 ") || !strings.Contains(a, "max_files=9 format=jsonl") {
 		t.Fatalf("la escucha sin opciones debía usar las preferencias:\n%s", a)
 	}
-	if !strings.Contains(a, "max_archivos=3 formato=crudo") || !strings.Contains(a, "rotar_mb=7 ") {
-		t.Fatalf("lo explícito debía ganar (y rotar_mb sigue de las preferencias):\n%s", a)
+	if !strings.Contains(a, "max_files=3 format=crudo") || !strings.Contains(a, "rotate_mb=7 ") {
+		t.Fatalf("lo explícito debía ganar (y rotate_mb sigue de las preferencias):\n%s", a)
 	}
 }
 

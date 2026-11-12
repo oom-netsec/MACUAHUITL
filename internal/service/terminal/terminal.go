@@ -22,6 +22,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/terminal"
@@ -110,7 +111,7 @@ func (s *termSvc) recording(label, id string) (*os.File, error) {
 
 // refuse audita un rechazo anterior a la apertura: aún no hay sesión viva ni autorización en el guard.
 func (s *termSvc) refuse(label string, err error) error {
-	s.d.Audit("terminal.failed", label, fmt.Sprintf("razon=%q guard=sin autorizar", status.Convert(err).Message()))
+	s.d.Audit("terminal.failed", label, fmt.Sprintf("reason=%q guard=unauthorized", status.Convert(err).Message()))
 	return err
 }
 
@@ -175,6 +176,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		rec        *terminal.Recorder
 		opened     bool
 		reason     = "no se pudo abrir"
+		reasonEN   = "could not open" // lo mismo que reason, en inglés, para la auditoría
 		rx, tx     atomic.Int64
 		recordPath string
 	)
@@ -194,12 +196,12 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		if !opened {
 			action = "terminal.failed"
 		}
-		s.d.Audit(action, label, fmt.Sprintf("sesion=%s razon=%q recibidos=%d enviados=%d guard=revocado grabacion=%s", id, reason, rx.Load(), tx.Load(), recordPath))
+		s.d.Audit(action, label, fmt.Sprintf("session=%s reason=%q received=%d sent=%d guard=revoked recording=%s", id, reasonEN, rx.Load(), tx.Load(), recordPath))
 	}()
 
 	cred, err := v.Get(o.CredentialId)
 	if err != nil {
-		reason = err.Error()
+		reason, reasonEN = err.Error(), i18n.English(err)
 		return service.VaultErr(err)
 	}
 	user := cred.Username
@@ -211,26 +213,26 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	sess, err = transport.OpenSSH(ctx, s.d.Guard(), id, o.Address, port, cred, hk, transport.SSHOptions{})
 	cred.Enable.Destroy() // la terminal es manual: el usuario escribe enable por su cuenta
 	if err != nil {
-		reason = err.Error()
+		reason, reasonEN = err.Error(), i18n.English(err)
 		return connErr(err)
 	}
 	r, w, err := sess.ShellSize(clamp(o.Rows, 24, 1, 200), clamp(o.Cols, 200, 20, 500))
 	if err != nil {
-		reason = err.Error()
+		reason, reasonEN = err.Error(), i18n.English(err)
 		return connErr(err)
 	}
 	if f, err = s.recording(label, id); err != nil {
-		reason = err.Error()
+		reason, reasonEN = err.Error(), i18n.English(err)
 		return err
 	}
 	recordPath = f.Name()
 	rec = terminal.NewRecorder(f, s.d.Now)
 	summary := fmt.Sprintf("%s@%s:%d", user, o.Address, port)
 	rec.Mark("abierto " + summary)
-	opened, reason = true, "cerrada por el usuario"
-	s.d.Audit("terminal.open", label, fmt.Sprintf("sesion=%s usuario=%s grabacion=%s manual=true", id, user, recordPath))
+	opened, reason, reasonEN = true, "cerrada por el usuario", "closed by the user"
+	s.d.Audit("terminal.open", label, fmt.Sprintf("session=%s user=%s recording=%s manual=true", id, user, recordPath))
 	if err := st.Send(&v1.OpenTerminalResponse{Opened: summary, Recording: recordPath}); err != nil {
-		reason = err.Error()
+		reason, reasonEN = err.Error(), i18n.English(err)
 		return err
 	}
 
@@ -282,20 +284,20 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	select {
 	case <-clientDone:
 		if s.ctx.Err() != nil {
-			reason = "núcleo cerrándose"
+			reason, reasonEN = "núcleo cerrándose", "core shutting down"
 		} else if st.Context().Err() != nil {
 			// Recv devuelve en cuanto el contexto del stream se cancela, antes de que lo haga el derivado ctx.
-			reason = "cliente desconectado"
+			reason, reasonEN = "cliente desconectado", "client disconnected"
 		}
 	case <-ctx.Done():
-		reason = "cliente desconectado"
+		reason, reasonEN = "cliente desconectado", "client disconnected"
 		if s.ctx.Err() != nil {
-			reason = "núcleo cerrándose"
+			reason, reasonEN = "núcleo cerrándose", "core shutting down"
 		}
 	case lost = <-devDone:
-		reason = "el equipo cerró la sesión"
+		reason, reasonEN = "el equipo cerró la sesión", "the device closed the session"
 		if lost != nil && !errors.Is(lost, io.EOF) {
-			reason = "conexión perdida: " + lost.Error()
+			reason, reasonEN = "conexión perdida: "+lost.Error(), "connection lost: "+i18n.English(lost)
 		}
 	}
 	sess.Close() // desbloquea la lectura; el defer termina de cerrar y revoca

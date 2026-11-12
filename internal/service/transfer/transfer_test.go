@@ -162,14 +162,14 @@ func TestServerLifecycleAndAudit(t *testing.T) {
 	}
 	// Auditoría: apertura (sin contraseña), transferencias con ruta y hash, y cierre.
 	a := d.AuditText()
-	for _, want := range []string{"transfer.serve.open", "recibir_en=", "transfer.serve.transfer", "sentido=escritura", "sentido=lectura", sha(data), "transfer.serve.stop", "transfer.serve.close",
-		"transfer.put.start", "transfer.put", "transfer.get", "guard=revocado"} {
+	for _, want := range []string{"transfer.serve.open", "receive_into=", "transfer.serve.transfer", "direction=write", "direction=read", sha(data), "transfer.serve.stop", "transfer.serve.close",
+		"transfer.put.start", "transfer.put", "transfer.get", "guard=revoked"} {
 		if !strings.Contains(a, want) {
 			t.Errorf("falta %q en la auditoría", want)
 		}
 	}
 	// Cada trabajo de cliente revoca su autorización al terminar (defer Revoke).
-	jobs := regexp.MustCompile(`trabajo=(xfer-[0-9a-f]+)`).FindAllStringSubmatch(a, -1)
+	jobs := regexp.MustCompile(`job=(xfer-[0-9a-f]+)`).FindAllStringSubmatch(a, -1)
 	if len(jobs) < 2 {
 		t.Fatalf("trabajos auditados: %v", jobs)
 	}

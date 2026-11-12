@@ -58,7 +58,7 @@ func (s *svc) GetJobMetrics(_ context.Context, r *v1.GetJobMetricsRequest) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	s.d.Audit("metrics.job", dir, "equipo="+r.Device+" interfaces="+strings.Join(r.Interfaces, ","))
+	s.d.Audit("metrics.job", dir, "device="+r.Device+" interfaces="+strings.Join(r.Interfaces, ","))
 	res, err := metrics.Build(dir, metrics.Options{Device: r.Device, MaxPoints: int(r.MaxPoints), MaxIfaces: int(r.MaxInterfaces), Ifaces: r.Interfaces})
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())

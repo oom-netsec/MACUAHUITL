@@ -92,7 +92,7 @@ func (s *toolsSvc) Dns(ctx context.Context, r *v1.DnsRequest) (*v1.DnsResponse, 
 	if r.Deep {
 		s.d.Guard().AllowAnyOnPorts(id, []uint16{53, 853, 443})
 	}
-	s.d.Audit("dns.run", r.Name, fmt.Sprintf("run=%s modo=%s tipo=%s profundo=%t servidores=%q", id, r.Mode, dns(r.Type), r.Deep, hosts))
+	s.d.Audit("dns.run", r.Name, fmt.Sprintf("run=%s mode=%s type=%s deep=%t servers=%q", id, r.Mode, dns(r.Type), r.Deep, hosts))
 	o := dnsq.Options{Timeout: service.MS(r.TimeoutMs, 0), DNSSEC: r.Dnssec, OnContact: func(srv string) { s.d.Audit("dns.contact", srv, id) }}
 	d := dnsq.Dialer(s.d.Guard().DialerFor(id))
 	var out any
@@ -177,14 +177,14 @@ func (s *toolsSvc) Syslog(r *v1.SyslogRequest, st v1.ToolsService_SyslogServer) 
 		outDir = sink.Dir
 		sink.OnOpen = func(p string) { send(&v1.SyslogResponse{RotatedPath: p}) }
 		sink.OnRemove = func(p string) {
-			s.d.Audit("tools.syslog.retencion", p, "borrado por exceder max_archivos="+strconv.Itoa(sink.MaxFiles))
+			s.d.Audit("tools.syslog.retencion", p, "deleted for exceeding max_files="+strconv.Itoa(sink.MaxFiles))
 		}
 		cfg.Sink = &sink
 	}
 	var n int
 	var last syslogd.Drops
 	cfg.OnListening = func(a string) {
-		s.d.Audit("tools.syslog", a, fmt.Sprintf("proto=%s todas=%t salida=%s ", cfg.Proto, r.AllowAny, outDir)+service.IngestDetail(lim, sink, r.Save))
+		s.d.Audit("tools.syslog", a, fmt.Sprintf("proto=%s all=%t output=%s ", cfg.Proto, r.AllowAny, outDir)+service.IngestDetail(lim, sink, r.Save))
 		send(&v1.SyslogResponse{Listening: a, OutputPath: outDir})
 	}
 	cfg.OnMessage = func(m syslogd.Message) {
@@ -198,7 +198,7 @@ func (s *toolsSvc) Syslog(r *v1.SyslogRequest, st v1.ToolsService_SyslogServer) 
 	}
 	err = syslogd.Listen(ctx, cfg)
 	lost := pump.Close(closeGrace)
-	s.d.Audit("tools.syslog.done", addr, fmt.Sprintf("mensajes=%d descartes=%d por_origen=%d global=%d cola_llena=%d perdidos_en_la_interfaz=%d", n, last.Total, last.PorOrigen, last.Global, last.ColaLlena, lost))
+	s.d.Audit("tools.syslog.done", addr, fmt.Sprintf("messages=%d drops=%d per_origin=%d global=%d queue_full=%d lost_on_interface=%d", n, last.Total, last.PorOrigen, last.Global, last.ColaLlena, lost))
 	if err != nil {
 		return service.ErrFrom(st.Context(), codes.Unavailable, err)
 	}
