@@ -1,6 +1,6 @@
 // Doble del módulo para pruebas: registra llamadas y permite emitir eventos.
 import { vi } from "vitest";
-import type { PkiReportData, RadiusReportData, TacacsReportData } from "./api";
+import type { IkeReportData, PkiReportData, RadiusReportData, TacacsReportData } from "./api";
 
 export function fakeSecurity() {
   return {
@@ -15,5 +15,6 @@ export function fakeSecurity() {
     secRadiusReport: vi.fn(async () => ({ text: "", server: "", exchanges: [], findings: [] }) as RadiusReportData),
     secTacacsReport: vi.fn(async () => ({ text: "", server: "", steps: [], findings: [] }) as TacacsReportData),
     secPkiDecodeReport: vi.fn(async () => ({ text: "", certificates: [] }) as PkiReportData),
+    secIkeReport: vi.fn(async () => ({ text: "", json: "", phase1: "no_data", phase2: "no_data", findings: [], proposals: [], note: "" }) as IkeReportData),
   };
 }

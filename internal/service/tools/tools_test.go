@@ -8,8 +8,12 @@ import (
 	"testing"
 	"time"
 
+	mdns "github.com/miekg/dns"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/syslogd/syslogdtest"
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/tlsinspect"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
@@ -149,5 +153,68 @@ func TestSyslogCambiarLaCarpetaAplicaALaSiguiente(t *testing.T) {
 	}
 	if f, _ := filepath.Glob(filepath.Join(nueva, "syslog", "*.log")); len(f) != 1 {
 		t.Fatalf("la escucha nueva debía escribir en %s: %v", nueva, f)
+	}
+}
+
+// Fase 30c-A: los hallazgos de DNS salen estructurados y su detalle en el idioma pedido, también en el JSON.
+func TestDnsHallazgosEstructuradosYEn(t *testing.T) {
+	srv := &mdns.Server{Addr: "127.0.0.1:0", Net: "udp", Handler: mdns.HandlerFunc(func(w mdns.ResponseWriter, r *mdns.Msg) {
+		m := new(mdns.Msg)
+		m.SetReply(r)
+		w.WriteMsg(m) // sin OPT: no anuncia EDNS; solo UDP: TCP/53 no responde
+	})}
+	started := make(chan struct{})
+	srv.NotifyStartedFunc = func() { close(started) }
+	go srv.ListenAndServe()
+	<-started
+	t.Cleanup(func() { srv.Shutdown() })
+	d := servicetest.New(t)
+	ask := func(loc string) *v1.DnsResponse {
+		ctx, cancel := context.WithTimeout(i18n.WithLocale(context.Background(), loc), 20*time.Second)
+		defer cancel()
+		r, err := (&toolsSvc{d: d}).Dns(ctx, &v1.DnsRequest{Mode: v1.DnsMode_DNS_MODE_TRANSPORT, Name: "t.lab", Servers: []string{srv.PacketConn.LocalAddr().String()}, TimeoutMs: 400})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	es, en := ask("es"), ask("en")
+	if len(es.Findings) != 2 || len(en.Findings) != 2 {
+		t.Fatalf("%v / %v", es.Findings, en.Findings)
+	}
+	for i, want := range []struct{ code, sev, key, es, en string }{
+		{"tcp-bloqueado", "error", "dns.finding.tcp_blocked", "TCP/53 no responde: las respuestas grandes y DNSSEC fallarán", "TCP/53 does not respond: large responses and DNSSEC will fail"},
+		{"sin-edns", "info", "dns.finding.no_edns", "el servidor no anuncia EDNS(0)", "the server does not advertise EDNS(0)"},
+	} {
+		if f := es.Findings[i]; f.Code != want.code || f.Severity != want.sev || f.Key != want.key || f.Message != want.es {
+			t.Errorf("es %d: %v", i, f)
+		}
+		if f := en.Findings[i]; f.Code != want.code || f.Key != want.key || f.Message != want.en || !strings.Contains(en.Report.Json, want.en) || strings.Contains(en.Report.Json, want.es) {
+			t.Errorf("en %d: %v", i, f)
+		}
+		if !strings.Contains(es.Report.Json, want.es) {
+			t.Errorf("el JSON en español debe traer %q", want.es)
+		}
+	}
+}
+
+// Fase 30c-A: los hallazgos de TLS salen estructurados y en el idioma pedido; el error de verificación (texto de
+// la biblioteca x509) no se traduce pero trae su código.
+func TestTlsRespuestaEstructuradaYEn(t *testing.T) {
+	rep := tlsinspect.Report{VerifyError: "x509: certificate signed by unknown authority", VerifyCode: "unknown_authority",
+		Findings: []tlsinspect.Finding{{Severity: "aviso", Code: "autofirmado", Detail: "el certificado es autofirmado; los clientes no lo validarán sin fijarlo", Text: i18n.Tx("tls.finding.self_signed")}, {Severity: "info", Code: "x", Detail: "dato del servidor"}}}
+	const msgEs, msgEn = "el certificado es autofirmado; los clientes no lo validarán sin fijarlo", "the certificate is self-signed; clients will not validate it unless it is pinned"
+	es, en := tlsResponse(rep, i18n.Es), tlsResponse(rep, i18n.En)
+	if len(es.Findings) != 2 || es.Findings[0].Code != "autofirmado" || es.Findings[0].Severity != "warning" || es.Findings[0].Key != "tls.finding.self_signed" || es.Findings[0].Message != msgEs {
+		t.Fatalf("es: %v", es.Findings)
+	}
+	if en.Findings[1].Message != "dato del servidor" || en.Findings[1].Key != "" {
+		t.Errorf("dato: %v", en.Findings[1])
+	}
+	if en.Findings[0].Message != msgEn || !strings.Contains(en.Report.Json, msgEn) || strings.Contains(en.Report.Json, msgEs) {
+		t.Errorf("en: %v\n%s", en.Findings, en.Report.Json)
+	}
+	if !strings.Contains(es.Report.Json, msgEs) || es.VerifyCode != "unknown_authority" || en.VerifyCode != "unknown_authority" || !strings.Contains(en.Report.Json, "x509: certificate signed by unknown authority") {
+		t.Errorf("es: %s / %q", es.Report.Json, es.VerifyCode)
 	}
 }

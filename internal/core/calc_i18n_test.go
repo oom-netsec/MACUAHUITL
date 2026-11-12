@@ -108,6 +108,44 @@ func calcCases(t *testing.T) map[string]func(c v1.CalcServiceClient, ctx func() 
 		"bgp-basic":          bgp(&v1.BgpRequest{Routes: routes}),
 		"bgp-det":            bgp(&v1.BgpRequest{Routes: routes, DeterministicMed: true, AlwaysCompareMed: true, MaximumPaths: 2}),
 		"bgp-relax":          bgp(&v1.BgpRequest{Routes: routes[:2], MultipathRelax: true, MaximumPaths: 4}),
+		// Fase 30c-A: valores con palabras (Tipo de dirección, clases DSCP, pasos BGP, capas MTU, veredicto).
+		"subnet-any":      sub("0.0.0.0/0"),
+		"subnet-public":   sub("8.8.8.0/24"),
+		"subnet-private":  sub("10.0.0.0/8"),
+		"subnet-mixed":    sub("192.0.0.0/8"),
+		"subnet-mcast":    sub("224.0.0.5/32"),
+		"subnet-this":     sub("0.0.0.0/8"),
+		"subnet-v6-mcast": sub("ff05::1/128"),
+		"subnet-v6-mc-x":  sub("ff07::1/128"),
+		"subnet-v6-un":    sub("4000::/16"),
+		"subnet-v6-ula":   sub("fc00::1/64"),
+		"ipv6-global":     v6("2001:4860::1", ""),
+		"ipv6-loop":       v6("::1", ""),
+		"dscp-af11":       dscp("af11"),
+		"dscp-45":         dscp("45"),
+		"dscp-cs3":        dscp("cs3"),
+		"mtu-getvpn":      mtu(1500, false, "getvpn:aes-cbc:sha1:tbar"),
+		"mtu-transport":   mtu(1500, false, "gre-key", "esp-transport:aes-gcm"),
+		"mtu-tr-alone":    mtu(1500, false, "esp-transport:aes-cbc:sha256"),
+		"mtu-mpls-qinq":   mtu(1500, false, "mpls:3", "vxlan", "qinq", "pppoe", "lisp"),
+		"optics-ok":       opt(&v1.OpticsRequest{TxDbm: 4, RxSensitivityDbm: -15, Km: 2, Fiber: "smf-1310", Connectors: 2, ConnectorLossDb: 0.5, MarginDb: 3}),
+		"bgp-steps": bgp(&v1.BgpRequest{Routes: []*v1.BgpRoute{
+			{Name: "w", Weight: 10, AsPath: "1 2", RouterId: "1.0.0.1", Neighbor: "9.0.0.1"},
+			{Name: "o", AsPath: "1 2", Origin: "e", RouterId: "1.0.0.2", Neighbor: "9.0.0.2"},
+			{Name: "m", AsPath: "1 2", Med: &lp, RouterId: "1.0.0.3", Neighbor: "9.0.0.3"},
+			{Name: "e", AsPath: "1 2", Ebgp: true, RouterId: "1.0.0.4", Neighbor: "9.0.0.4"},
+			{Name: "i", AsPath: "1 2", IgpMetric: 5, RouterId: "1.0.0.5", Neighbor: "9.0.0.5"},
+			{Name: "l", AsPath: "1 2 3 4", RouterId: "1.0.0.6", Neighbor: "9.0.0.6"},
+			{Name: "r", AsPath: "1 2", RouterId: "1.0.0.7", Neighbor: "9.0.0.7", ClusterListLength: 2},
+		}}),
+		"bgp-age": bgp(&v1.BgpRequest{Routes: []*v1.BgpRoute{
+			{Name: "x", AsPath: "1", Ebgp: true, RouterId: "1.0.0.1", Neighbor: "9.0.0.1", AgeSeconds: 100},
+			{Name: "y", AsPath: "1", Ebgp: true, RouterId: "1.0.0.2", Neighbor: "9.0.0.2", AgeSeconds: 5},
+		}}),
+		"bgp-tie": bgp(&v1.BgpRequest{Routes: []*v1.BgpRoute{
+			{Name: "x", AsPath: "1", RouterId: "1.0.0.1", Neighbor: "9.0.0.1"},
+			{Name: "y", AsPath: "1", RouterId: "1.0.0.1", Neighbor: "9.0.0.1"},
+		}}),
 	}
 }
 
@@ -301,7 +339,7 @@ func TestCalcEnTraduce(t *testing.T) {
 				if row.LabelKey != "" && row.Cells[0] != i18n.Msg(i18n.En, row.LabelKey, row.LabelArgs) {
 					t.Errorf("%s: etiqueta %q", n, row.Cells[0])
 				}
-				if len(row.Cells) > 1 && row.Cells[len(row.Cells)-1] != es.Tables[ti].Rows[ri].Cells[len(row.Cells)-1] {
+				if len(row.Cells) > 1 && !codedCol(row, len(row.Cells)-1) && row.Cells[len(row.Cells)-1] != es.Tables[ti].Rows[ri].Cells[len(row.Cells)-1] {
 					t.Errorf("%s: el valor cambió: %q", n, row.Cells)
 				}
 			}
@@ -317,6 +355,75 @@ func TestCalcEnTraduce(t *testing.T) {
 	}
 	r, _ := calcCases(t)["subnet-host"](c, func() ctxT { return con(t, "en") })
 	if !strings.Contains(r.Text, "Subnet 10.0.0.0/24") || !strings.Contains(r.Text, "First usable") || !strings.Contains(r.Text, "10.0.0.5 is a host inside 10.0.0.0/24") {
+		t.Errorf("%s", r.Text)
+	}
+}
+
+func codedCol(row *v1.CalcRow, col int) bool {
+	for _, c := range row.Coded {
+		if int(c.Col) == col {
+			return true
+		}
+	}
+	return false
+}
+
+// Fase 30c-A: las celdas con palabras viajan como código (calc.val.*), el español del catálogo es la celda de
+// siempre y con en la celda sale en inglés (sin tocar los datos del resto de la fila).
+func TestCalcValoresConPalabrasEnCodigo(t *testing.T) {
+	h := newHarness(t, nil)
+	c := v1.NewCalcServiceClient(h.conn)
+	total := 0
+	for n, f := range calcCases(t) {
+		es, err := f(c, func() ctxT { return con(t, "") })
+		if err != nil {
+			t.Fatalf("%s: %v", n, err)
+		}
+		en, _ := f(c, func() ctxT { return con(t, "en") })
+		for ti, tb := range es.Tables {
+			for ri, row := range tb.Rows {
+				for _, cd := range row.Coded {
+					total++
+					if !strings.HasPrefix(cd.Key, "calc.val.") || i18n.Msg(i18n.Es, cd.Key, cd.Args) != row.Cells[cd.Col] {
+						t.Errorf("%s: celda %q con clave %s", n, row.Cells[cd.Col], cd.Key)
+					}
+					if got := en.Tables[ti].Rows[ri].Cells[cd.Col]; got != i18n.Msg(i18n.En, cd.Key, cd.Args) {
+						t.Errorf("%s: celda %q en inglés es %q", n, row.Cells[cd.Col], got)
+					}
+				}
+			}
+		}
+	}
+	if total < 100 {
+		t.Errorf("solo %d celdas con código", total)
+	}
+	one := func(name, lang, key string) string {
+		r, _ := calcCases(t)[name](c, func() ctxT { return con(t, lang) })
+		return valueOf(r, key)
+	}
+	for _, x := range []struct{ name, lang, key, want string }{
+		{"tcp-window", "", "calc.row.limited_by", "ventana"}, {"tcp-window", "en", "calc.row.limited_by", "window"},
+		{"tcp-loss", "en", "calc.row.limited_by", "loss"}, {"tcp-none", "en", "calc.row.limited_by", "link"},
+		{"optics-overload", "", "calc.row.verdict", "sí cierra, pero satura el receptor"}, {"optics-overload", "en", "calc.row.verdict", "it closes, but it overloads the receiver"},
+		{"optics-short", "en", "calc.row.verdict", "it does NOT close"},
+		{"subnet-private", "en", "calc.row.kind", "private (RFC 1918)"}, {"subnet-v6-mcast", "en", "calc.row.kind", "multicast, site scope"},
+		{"subnet-v6-mcast", "", "calc.row.kind", "multicast, alcance sitio"}, {"ipv6-global", "en", "calc.row.kind", "global unicast (RFC 4291)"},
+	} {
+		if got := one(x.name, x.lang, x.key); got != x.want {
+			t.Errorf("%s/%s %s: %q, esperaba %q", x.name, x.lang, x.key, got, x.want)
+		}
+	}
+	// el paso que decide viaja como código también dentro de la nota
+	r, _ := calcCases(t)["bgp-basic"](c, func() ctxT { return con(t, "en") })
+	if r.NotesStructured[0].Args["step"] != "calc.val.step.local_pref" || !strings.Contains(r.Notes[0], `step "local-preference"`) {
+		t.Errorf("%v / %s", r.NotesStructured[0], r.Notes[0])
+	}
+	r, _ = calcCases(t)["bgp-tie"](c, func() ctxT { return con(t, "en") })
+	if !strings.Contains(r.Text, "total tie") || strings.Contains(r.Text, "empate") {
+		t.Errorf("%s", r.Text)
+	}
+	r, _ = calcCases(t)["mtu-mpls-qinq"](c, func() ctxT { return con(t, "en") })
+	if !strings.Contains(r.Text, "3 label(s) × 4") || !strings.Contains(r.Text, "tag in the inner frame 8") || strings.Contains(r.Text, "etiqueta") {
 		t.Errorf("%s", r.Text)
 	}
 }

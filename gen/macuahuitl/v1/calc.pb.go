@@ -26,8 +26,11 @@ type CalcRow struct {
 	Cells []string               `protobuf:"bytes,1,rep,name=cells,proto3" json:"cells,omitempty"`
 	// Fase 30b: si la primera celda es una etiqueta fija (filas campo/valor, Total...), su clave del
 	// catálogo (calc.row.*) y sus argumentos; vacía si la celda es un dato.
-	LabelKey      string            `protobuf:"bytes,2,opt,name=label_key,json=labelKey,proto3" json:"label_key,omitempty"`
-	LabelArgs     map[string]string `protobuf:"bytes,3,rep,name=label_args,json=labelArgs,proto3" json:"label_args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	LabelKey  string            `protobuf:"bytes,2,opt,name=label_key,json=labelKey,proto3" json:"label_key,omitempty"`
+	LabelArgs map[string]string `protobuf:"bytes,3,rep,name=label_args,json=labelArgs,proto3" json:"label_args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Fase 30c: las celdas con palabras (veredicto, límite, tipo de dirección, clase DSCP, paso de BGP, capa de
+	// MTU, sí/no) como código cerrado; el texto de cells ya viene en el idioma pedido.
+	Coded         []*CalcCoded `protobuf:"bytes,4,rep,name=coded,proto3" json:"coded,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -83,6 +86,74 @@ func (x *CalcRow) GetLabelArgs() map[string]string {
 	return nil
 }
 
+func (x *CalcRow) GetCoded() []*CalcCoded {
+	if x != nil {
+		return x.Coded
+	}
+	return nil
+}
+
+// Celda con palabras que viaja como clave del catálogo (calc.val.*): col es la columna (desde 0).
+type CalcCoded struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Col           uint32                 `protobuf:"varint,1,opt,name=col,proto3" json:"col,omitempty"`
+	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Args          map[string]string      `protobuf:"bytes,3,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CalcCoded) Reset() {
+	*x = CalcCoded{}
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CalcCoded) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CalcCoded) ProtoMessage() {}
+
+func (x *CalcCoded) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CalcCoded.ProtoReflect.Descriptor instead.
+func (*CalcCoded) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *CalcCoded) GetCol() uint32 {
+	if x != nil {
+		return x.Col
+	}
+	return 0
+}
+
+func (x *CalcCoded) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *CalcCoded) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
 // Columna de una tabla: su clave del catálogo (calc.col.*).
 type CalcColumn struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -93,7 +164,7 @@ type CalcColumn struct {
 
 func (x *CalcColumn) Reset() {
 	*x = CalcColumn{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[1]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -105,7 +176,7 @@ func (x *CalcColumn) String() string {
 func (*CalcColumn) ProtoMessage() {}
 
 func (x *CalcColumn) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[1]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -118,7 +189,7 @@ func (x *CalcColumn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalcColumn.ProtoReflect.Descriptor instead.
 func (*CalcColumn) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{1}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CalcColumn) GetKey() string {
@@ -143,7 +214,7 @@ type CalcTable struct {
 
 func (x *CalcTable) Reset() {
 	*x = CalcTable{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -155,7 +226,7 @@ func (x *CalcTable) String() string {
 func (*CalcTable) ProtoMessage() {}
 
 func (x *CalcTable) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -168,7 +239,7 @@ func (x *CalcTable) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalcTable.ProtoReflect.Descriptor instead.
 func (*CalcTable) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{2}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CalcTable) GetTitle() string {
@@ -224,7 +295,7 @@ type CalcNote struct {
 
 func (x *CalcNote) Reset() {
 	*x = CalcNote{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -236,7 +307,7 @@ func (x *CalcNote) String() string {
 func (*CalcNote) ProtoMessage() {}
 
 func (x *CalcNote) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -249,7 +320,7 @@ func (x *CalcNote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalcNote.ProtoReflect.Descriptor instead.
 func (*CalcNote) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{3}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CalcNote) GetKey() string {
@@ -280,7 +351,7 @@ type CalcResult struct {
 
 func (x *CalcResult) Reset() {
 	*x = CalcResult{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -292,7 +363,7 @@ func (x *CalcResult) String() string {
 func (*CalcResult) ProtoMessage() {}
 
 func (x *CalcResult) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -305,7 +376,7 @@ func (x *CalcResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CalcResult.ProtoReflect.Descriptor instead.
 func (*CalcResult) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{4}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CalcResult) GetJson() string {
@@ -352,7 +423,7 @@ type SubnetRequest struct {
 
 func (x *SubnetRequest) Reset() {
 	*x = SubnetRequest{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -364,7 +435,7 @@ func (x *SubnetRequest) String() string {
 func (*SubnetRequest) ProtoMessage() {}
 
 func (x *SubnetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -377,7 +448,7 @@ func (x *SubnetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubnetRequest.ProtoReflect.Descriptor instead.
 func (*SubnetRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{5}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SubnetRequest) GetPrefix() string {
@@ -396,7 +467,7 @@ type SubnetResponse struct {
 
 func (x *SubnetResponse) Reset() {
 	*x = SubnetResponse{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -408,7 +479,7 @@ func (x *SubnetResponse) String() string {
 func (*SubnetResponse) ProtoMessage() {}
 
 func (x *SubnetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -421,7 +492,7 @@ func (x *SubnetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubnetResponse.ProtoReflect.Descriptor instead.
 func (*SubnetResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{6}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SubnetResponse) GetResult() *CalcResult {
@@ -441,7 +512,7 @@ type VlsmNeed struct {
 
 func (x *VlsmNeed) Reset() {
 	*x = VlsmNeed{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -453,7 +524,7 @@ func (x *VlsmNeed) String() string {
 func (*VlsmNeed) ProtoMessage() {}
 
 func (x *VlsmNeed) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -466,7 +537,7 @@ func (x *VlsmNeed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VlsmNeed.ProtoReflect.Descriptor instead.
 func (*VlsmNeed) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{7}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *VlsmNeed) GetName() string {
@@ -493,7 +564,7 @@ type VlsmRequest struct {
 
 func (x *VlsmRequest) Reset() {
 	*x = VlsmRequest{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -505,7 +576,7 @@ func (x *VlsmRequest) String() string {
 func (*VlsmRequest) ProtoMessage() {}
 
 func (x *VlsmRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -518,7 +589,7 @@ func (x *VlsmRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VlsmRequest.ProtoReflect.Descriptor instead.
 func (*VlsmRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{8}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *VlsmRequest) GetNetwork() string {
@@ -544,7 +615,7 @@ type VlsmResponse struct {
 
 func (x *VlsmResponse) Reset() {
 	*x = VlsmResponse{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -556,7 +627,7 @@ func (x *VlsmResponse) String() string {
 func (*VlsmResponse) ProtoMessage() {}
 
 func (x *VlsmResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -569,7 +640,7 @@ func (x *VlsmResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VlsmResponse.ProtoReflect.Descriptor instead.
 func (*VlsmResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{9}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *VlsmResponse) GetResult() *CalcResult {
@@ -588,7 +659,7 @@ type SummarizeRequest struct {
 
 func (x *SummarizeRequest) Reset() {
 	*x = SummarizeRequest{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -600,7 +671,7 @@ func (x *SummarizeRequest) String() string {
 func (*SummarizeRequest) ProtoMessage() {}
 
 func (x *SummarizeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -613,7 +684,7 @@ func (x *SummarizeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SummarizeRequest.ProtoReflect.Descriptor instead.
 func (*SummarizeRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{10}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SummarizeRequest) GetPrefixes() []string {
@@ -632,7 +703,7 @@ type SummarizeResponse struct {
 
 func (x *SummarizeResponse) Reset() {
 	*x = SummarizeResponse{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[11]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -644,7 +715,7 @@ func (x *SummarizeResponse) String() string {
 func (*SummarizeResponse) ProtoMessage() {}
 
 func (x *SummarizeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[11]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -657,7 +728,7 @@ func (x *SummarizeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SummarizeResponse.ProtoReflect.Descriptor instead.
 func (*SummarizeResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{11}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SummarizeResponse) GetResult() *CalcResult {
@@ -677,7 +748,7 @@ type WildcardRequest struct {
 
 func (x *WildcardRequest) Reset() {
 	*x = WildcardRequest{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[12]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -689,7 +760,7 @@ func (x *WildcardRequest) String() string {
 func (*WildcardRequest) ProtoMessage() {}
 
 func (x *WildcardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[12]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -702,7 +773,7 @@ func (x *WildcardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WildcardRequest.ProtoReflect.Descriptor instead.
 func (*WildcardRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{12}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *WildcardRequest) GetAddress() string {
@@ -728,7 +799,7 @@ type WildcardResponse struct {
 
 func (x *WildcardResponse) Reset() {
 	*x = WildcardResponse{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[13]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -740,7 +811,7 @@ func (x *WildcardResponse) String() string {
 func (*WildcardResponse) ProtoMessage() {}
 
 func (x *WildcardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[13]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -753,7 +824,7 @@ func (x *WildcardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WildcardResponse.ProtoReflect.Descriptor instead.
 func (*WildcardResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{13}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *WildcardResponse) GetResult() *CalcResult {
@@ -773,7 +844,7 @@ type Ipv6Request struct {
 
 func (x *Ipv6Request) Reset() {
 	*x = Ipv6Request{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[14]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -785,7 +856,7 @@ func (x *Ipv6Request) String() string {
 func (*Ipv6Request) ProtoMessage() {}
 
 func (x *Ipv6Request) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[14]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -798,7 +869,7 @@ func (x *Ipv6Request) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ipv6Request.ProtoReflect.Descriptor instead.
 func (*Ipv6Request) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{14}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Ipv6Request) GetAddress() string {
@@ -824,7 +895,7 @@ type Ipv6Response struct {
 
 func (x *Ipv6Response) Reset() {
 	*x = Ipv6Response{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -836,7 +907,7 @@ func (x *Ipv6Response) String() string {
 func (*Ipv6Response) ProtoMessage() {}
 
 func (x *Ipv6Response) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -849,7 +920,7 @@ func (x *Ipv6Response) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ipv6Response.ProtoReflect.Descriptor instead.
 func (*Ipv6Response) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{15}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *Ipv6Response) GetResult() *CalcResult {
@@ -872,7 +943,7 @@ type MtuRequest struct {
 
 func (x *MtuRequest) Reset() {
 	*x = MtuRequest{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -884,7 +955,7 @@ func (x *MtuRequest) String() string {
 func (*MtuRequest) ProtoMessage() {}
 
 func (x *MtuRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -897,7 +968,7 @@ func (x *MtuRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MtuRequest.ProtoReflect.Descriptor instead.
 func (*MtuRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{16}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *MtuRequest) GetPhysical() uint32 {
@@ -930,7 +1001,7 @@ type MtuResponse struct {
 
 func (x *MtuResponse) Reset() {
 	*x = MtuResponse{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -942,7 +1013,7 @@ func (x *MtuResponse) String() string {
 func (*MtuResponse) ProtoMessage() {}
 
 func (x *MtuResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -955,7 +1026,7 @@ func (x *MtuResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MtuResponse.ProtoReflect.Descriptor instead.
 func (*MtuResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{17}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *MtuResponse) GetResult() *CalcResult {
@@ -978,7 +1049,7 @@ type TcpRequest struct {
 
 func (x *TcpRequest) Reset() {
 	*x = TcpRequest{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -990,7 +1061,7 @@ func (x *TcpRequest) String() string {
 func (*TcpRequest) ProtoMessage() {}
 
 func (x *TcpRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1003,7 +1074,7 @@ func (x *TcpRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TcpRequest.ProtoReflect.Descriptor instead.
 func (*TcpRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{18}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *TcpRequest) GetBandwidth() string {
@@ -1050,7 +1121,7 @@ type TcpResponse struct {
 
 func (x *TcpResponse) Reset() {
 	*x = TcpResponse{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1062,7 +1133,7 @@ func (x *TcpResponse) String() string {
 func (*TcpResponse) ProtoMessage() {}
 
 func (x *TcpResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1075,7 +1146,7 @@ func (x *TcpResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TcpResponse.ProtoReflect.Descriptor instead.
 func (*TcpResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{19}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *TcpResponse) GetResult() *CalcResult {
@@ -1095,7 +1166,7 @@ type DscpRequest struct {
 
 func (x *DscpRequest) Reset() {
 	*x = DscpRequest{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1107,7 +1178,7 @@ func (x *DscpRequest) String() string {
 func (*DscpRequest) ProtoMessage() {}
 
 func (x *DscpRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1120,7 +1191,7 @@ func (x *DscpRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DscpRequest.ProtoReflect.Descriptor instead.
 func (*DscpRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{20}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DscpRequest) GetQuery() string {
@@ -1146,7 +1217,7 @@ type DscpResponse struct {
 
 func (x *DscpResponse) Reset() {
 	*x = DscpResponse{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1158,7 +1229,7 @@ func (x *DscpResponse) String() string {
 func (*DscpResponse) ProtoMessage() {}
 
 func (x *DscpResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1171,7 +1242,7 @@ func (x *DscpResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DscpResponse.ProtoReflect.Descriptor instead.
 func (*DscpResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{21}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *DscpResponse) GetResult() *CalcResult {
@@ -1201,7 +1272,7 @@ type OpticsRequest struct {
 
 func (x *OpticsRequest) Reset() {
 	*x = OpticsRequest{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[22]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1213,7 +1284,7 @@ func (x *OpticsRequest) String() string {
 func (*OpticsRequest) ProtoMessage() {}
 
 func (x *OpticsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[22]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1226,7 +1297,7 @@ func (x *OpticsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpticsRequest.ProtoReflect.Descriptor instead.
 func (*OpticsRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{22}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *OpticsRequest) GetConvert() string {
@@ -1322,7 +1393,7 @@ type OpticsResponse struct {
 
 func (x *OpticsResponse) Reset() {
 	*x = OpticsResponse{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[23]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1334,7 +1405,7 @@ func (x *OpticsResponse) String() string {
 func (*OpticsResponse) ProtoMessage() {}
 
 func (x *OpticsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[23]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1347,7 +1418,7 @@ func (x *OpticsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpticsResponse.ProtoReflect.Descriptor instead.
 func (*OpticsResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{23}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *OpticsResponse) GetResult() *CalcResult {
@@ -1380,7 +1451,7 @@ type BgpRoute struct {
 
 func (x *BgpRoute) Reset() {
 	*x = BgpRoute{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[24]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1392,7 +1463,7 @@ func (x *BgpRoute) String() string {
 func (*BgpRoute) ProtoMessage() {}
 
 func (x *BgpRoute) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[24]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1405,7 +1476,7 @@ func (x *BgpRoute) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BgpRoute.ProtoReflect.Descriptor instead.
 func (*BgpRoute) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{24}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *BgpRoute) GetName() string {
@@ -1526,7 +1597,7 @@ type BgpRequest struct {
 
 func (x *BgpRequest) Reset() {
 	*x = BgpRequest{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[25]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1538,7 +1609,7 @@ func (x *BgpRequest) String() string {
 func (*BgpRequest) ProtoMessage() {}
 
 func (x *BgpRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[25]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1551,7 +1622,7 @@ func (x *BgpRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BgpRequest.ProtoReflect.Descriptor instead.
 func (*BgpRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{25}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *BgpRequest) GetRoutes() []*BgpRoute {
@@ -1598,7 +1669,7 @@ type BgpResponse struct {
 
 func (x *BgpResponse) Reset() {
 	*x = BgpResponse{}
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[26]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1610,7 +1681,7 @@ func (x *BgpResponse) String() string {
 func (*BgpResponse) ProtoMessage() {}
 
 func (x *BgpResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_calc_proto_msgTypes[26]
+	mi := &file_macuahuitl_v1_calc_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1623,7 +1694,7 @@ func (x *BgpResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BgpResponse.ProtoReflect.Descriptor instead.
 func (*BgpResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{26}
+	return file_macuahuitl_v1_calc_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *BgpResponse) GetResult() *CalcResult {
@@ -1637,13 +1708,21 @@ var File_macuahuitl_v1_calc_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_calc_proto_rawDesc = "" +
 	"\n" +
-	"\x18macuahuitl/v1/calc.proto\x12\rmacuahuitl.v1\"\xc0\x01\n" +
+	"\x18macuahuitl/v1/calc.proto\x12\rmacuahuitl.v1\"\xf0\x01\n" +
 	"\aCalcRow\x12\x14\n" +
 	"\x05cells\x18\x01 \x03(\tR\x05cells\x12\x1b\n" +
 	"\tlabel_key\x18\x02 \x01(\tR\blabelKey\x12D\n" +
 	"\n" +
-	"label_args\x18\x03 \x03(\v2%.macuahuitl.v1.CalcRow.LabelArgsEntryR\tlabelArgs\x1a<\n" +
+	"label_args\x18\x03 \x03(\v2%.macuahuitl.v1.CalcRow.LabelArgsEntryR\tlabelArgs\x12.\n" +
+	"\x05coded\x18\x04 \x03(\v2\x18.macuahuitl.v1.CalcCodedR\x05coded\x1a<\n" +
 	"\x0eLabelArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa0\x01\n" +
+	"\tCalcCoded\x12\x10\n" +
+	"\x03col\x18\x01 \x01(\rR\x03col\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\x126\n" +
+	"\x04args\x18\x03 \x03(\v2\".macuahuitl.v1.CalcCoded.ArgsEntryR\x04args\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x1e\n" +
 	"\n" +
@@ -1795,84 +1874,88 @@ func file_macuahuitl_v1_calc_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_calc_proto_rawDescData
 }
 
-var file_macuahuitl_v1_calc_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
+var file_macuahuitl_v1_calc_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_macuahuitl_v1_calc_proto_goTypes = []any{
 	(*CalcRow)(nil),           // 0: macuahuitl.v1.CalcRow
-	(*CalcColumn)(nil),        // 1: macuahuitl.v1.CalcColumn
-	(*CalcTable)(nil),         // 2: macuahuitl.v1.CalcTable
-	(*CalcNote)(nil),          // 3: macuahuitl.v1.CalcNote
-	(*CalcResult)(nil),        // 4: macuahuitl.v1.CalcResult
-	(*SubnetRequest)(nil),     // 5: macuahuitl.v1.SubnetRequest
-	(*SubnetResponse)(nil),    // 6: macuahuitl.v1.SubnetResponse
-	(*VlsmNeed)(nil),          // 7: macuahuitl.v1.VlsmNeed
-	(*VlsmRequest)(nil),       // 8: macuahuitl.v1.VlsmRequest
-	(*VlsmResponse)(nil),      // 9: macuahuitl.v1.VlsmResponse
-	(*SummarizeRequest)(nil),  // 10: macuahuitl.v1.SummarizeRequest
-	(*SummarizeResponse)(nil), // 11: macuahuitl.v1.SummarizeResponse
-	(*WildcardRequest)(nil),   // 12: macuahuitl.v1.WildcardRequest
-	(*WildcardResponse)(nil),  // 13: macuahuitl.v1.WildcardResponse
-	(*Ipv6Request)(nil),       // 14: macuahuitl.v1.Ipv6Request
-	(*Ipv6Response)(nil),      // 15: macuahuitl.v1.Ipv6Response
-	(*MtuRequest)(nil),        // 16: macuahuitl.v1.MtuRequest
-	(*MtuResponse)(nil),       // 17: macuahuitl.v1.MtuResponse
-	(*TcpRequest)(nil),        // 18: macuahuitl.v1.TcpRequest
-	(*TcpResponse)(nil),       // 19: macuahuitl.v1.TcpResponse
-	(*DscpRequest)(nil),       // 20: macuahuitl.v1.DscpRequest
-	(*DscpResponse)(nil),      // 21: macuahuitl.v1.DscpResponse
-	(*OpticsRequest)(nil),     // 22: macuahuitl.v1.OpticsRequest
-	(*OpticsResponse)(nil),    // 23: macuahuitl.v1.OpticsResponse
-	(*BgpRoute)(nil),          // 24: macuahuitl.v1.BgpRoute
-	(*BgpRequest)(nil),        // 25: macuahuitl.v1.BgpRequest
-	(*BgpResponse)(nil),       // 26: macuahuitl.v1.BgpResponse
-	nil,                       // 27: macuahuitl.v1.CalcRow.LabelArgsEntry
-	nil,                       // 28: macuahuitl.v1.CalcTable.TitleArgsEntry
-	nil,                       // 29: macuahuitl.v1.CalcNote.ArgsEntry
+	(*CalcCoded)(nil),         // 1: macuahuitl.v1.CalcCoded
+	(*CalcColumn)(nil),        // 2: macuahuitl.v1.CalcColumn
+	(*CalcTable)(nil),         // 3: macuahuitl.v1.CalcTable
+	(*CalcNote)(nil),          // 4: macuahuitl.v1.CalcNote
+	(*CalcResult)(nil),        // 5: macuahuitl.v1.CalcResult
+	(*SubnetRequest)(nil),     // 6: macuahuitl.v1.SubnetRequest
+	(*SubnetResponse)(nil),    // 7: macuahuitl.v1.SubnetResponse
+	(*VlsmNeed)(nil),          // 8: macuahuitl.v1.VlsmNeed
+	(*VlsmRequest)(nil),       // 9: macuahuitl.v1.VlsmRequest
+	(*VlsmResponse)(nil),      // 10: macuahuitl.v1.VlsmResponse
+	(*SummarizeRequest)(nil),  // 11: macuahuitl.v1.SummarizeRequest
+	(*SummarizeResponse)(nil), // 12: macuahuitl.v1.SummarizeResponse
+	(*WildcardRequest)(nil),   // 13: macuahuitl.v1.WildcardRequest
+	(*WildcardResponse)(nil),  // 14: macuahuitl.v1.WildcardResponse
+	(*Ipv6Request)(nil),       // 15: macuahuitl.v1.Ipv6Request
+	(*Ipv6Response)(nil),      // 16: macuahuitl.v1.Ipv6Response
+	(*MtuRequest)(nil),        // 17: macuahuitl.v1.MtuRequest
+	(*MtuResponse)(nil),       // 18: macuahuitl.v1.MtuResponse
+	(*TcpRequest)(nil),        // 19: macuahuitl.v1.TcpRequest
+	(*TcpResponse)(nil),       // 20: macuahuitl.v1.TcpResponse
+	(*DscpRequest)(nil),       // 21: macuahuitl.v1.DscpRequest
+	(*DscpResponse)(nil),      // 22: macuahuitl.v1.DscpResponse
+	(*OpticsRequest)(nil),     // 23: macuahuitl.v1.OpticsRequest
+	(*OpticsResponse)(nil),    // 24: macuahuitl.v1.OpticsResponse
+	(*BgpRoute)(nil),          // 25: macuahuitl.v1.BgpRoute
+	(*BgpRequest)(nil),        // 26: macuahuitl.v1.BgpRequest
+	(*BgpResponse)(nil),       // 27: macuahuitl.v1.BgpResponse
+	nil,                       // 28: macuahuitl.v1.CalcRow.LabelArgsEntry
+	nil,                       // 29: macuahuitl.v1.CalcCoded.ArgsEntry
+	nil,                       // 30: macuahuitl.v1.CalcTable.TitleArgsEntry
+	nil,                       // 31: macuahuitl.v1.CalcNote.ArgsEntry
 }
 var file_macuahuitl_v1_calc_proto_depIdxs = []int32{
-	27, // 0: macuahuitl.v1.CalcRow.label_args:type_name -> macuahuitl.v1.CalcRow.LabelArgsEntry
-	0,  // 1: macuahuitl.v1.CalcTable.rows:type_name -> macuahuitl.v1.CalcRow
-	28, // 2: macuahuitl.v1.CalcTable.title_args:type_name -> macuahuitl.v1.CalcTable.TitleArgsEntry
-	1,  // 3: macuahuitl.v1.CalcTable.columns:type_name -> macuahuitl.v1.CalcColumn
-	29, // 4: macuahuitl.v1.CalcNote.args:type_name -> macuahuitl.v1.CalcNote.ArgsEntry
-	2,  // 5: macuahuitl.v1.CalcResult.tables:type_name -> macuahuitl.v1.CalcTable
-	3,  // 6: macuahuitl.v1.CalcResult.notes_structured:type_name -> macuahuitl.v1.CalcNote
-	4,  // 7: macuahuitl.v1.SubnetResponse.result:type_name -> macuahuitl.v1.CalcResult
-	7,  // 8: macuahuitl.v1.VlsmRequest.needs:type_name -> macuahuitl.v1.VlsmNeed
-	4,  // 9: macuahuitl.v1.VlsmResponse.result:type_name -> macuahuitl.v1.CalcResult
-	4,  // 10: macuahuitl.v1.SummarizeResponse.result:type_name -> macuahuitl.v1.CalcResult
-	4,  // 11: macuahuitl.v1.WildcardResponse.result:type_name -> macuahuitl.v1.CalcResult
-	4,  // 12: macuahuitl.v1.Ipv6Response.result:type_name -> macuahuitl.v1.CalcResult
-	4,  // 13: macuahuitl.v1.MtuResponse.result:type_name -> macuahuitl.v1.CalcResult
-	4,  // 14: macuahuitl.v1.TcpResponse.result:type_name -> macuahuitl.v1.CalcResult
-	4,  // 15: macuahuitl.v1.DscpResponse.result:type_name -> macuahuitl.v1.CalcResult
-	4,  // 16: macuahuitl.v1.OpticsResponse.result:type_name -> macuahuitl.v1.CalcResult
-	24, // 17: macuahuitl.v1.BgpRequest.routes:type_name -> macuahuitl.v1.BgpRoute
-	4,  // 18: macuahuitl.v1.BgpResponse.result:type_name -> macuahuitl.v1.CalcResult
-	5,  // 19: macuahuitl.v1.CalcService.Subnet:input_type -> macuahuitl.v1.SubnetRequest
-	8,  // 20: macuahuitl.v1.CalcService.Vlsm:input_type -> macuahuitl.v1.VlsmRequest
-	10, // 21: macuahuitl.v1.CalcService.Summarize:input_type -> macuahuitl.v1.SummarizeRequest
-	12, // 22: macuahuitl.v1.CalcService.Wildcard:input_type -> macuahuitl.v1.WildcardRequest
-	14, // 23: macuahuitl.v1.CalcService.Ipv6:input_type -> macuahuitl.v1.Ipv6Request
-	16, // 24: macuahuitl.v1.CalcService.Mtu:input_type -> macuahuitl.v1.MtuRequest
-	18, // 25: macuahuitl.v1.CalcService.Tcp:input_type -> macuahuitl.v1.TcpRequest
-	20, // 26: macuahuitl.v1.CalcService.Dscp:input_type -> macuahuitl.v1.DscpRequest
-	22, // 27: macuahuitl.v1.CalcService.Optics:input_type -> macuahuitl.v1.OpticsRequest
-	25, // 28: macuahuitl.v1.CalcService.Bgp:input_type -> macuahuitl.v1.BgpRequest
-	6,  // 29: macuahuitl.v1.CalcService.Subnet:output_type -> macuahuitl.v1.SubnetResponse
-	9,  // 30: macuahuitl.v1.CalcService.Vlsm:output_type -> macuahuitl.v1.VlsmResponse
-	11, // 31: macuahuitl.v1.CalcService.Summarize:output_type -> macuahuitl.v1.SummarizeResponse
-	13, // 32: macuahuitl.v1.CalcService.Wildcard:output_type -> macuahuitl.v1.WildcardResponse
-	15, // 33: macuahuitl.v1.CalcService.Ipv6:output_type -> macuahuitl.v1.Ipv6Response
-	17, // 34: macuahuitl.v1.CalcService.Mtu:output_type -> macuahuitl.v1.MtuResponse
-	19, // 35: macuahuitl.v1.CalcService.Tcp:output_type -> macuahuitl.v1.TcpResponse
-	21, // 36: macuahuitl.v1.CalcService.Dscp:output_type -> macuahuitl.v1.DscpResponse
-	23, // 37: macuahuitl.v1.CalcService.Optics:output_type -> macuahuitl.v1.OpticsResponse
-	26, // 38: macuahuitl.v1.CalcService.Bgp:output_type -> macuahuitl.v1.BgpResponse
-	29, // [29:39] is the sub-list for method output_type
-	19, // [19:29] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	28, // 0: macuahuitl.v1.CalcRow.label_args:type_name -> macuahuitl.v1.CalcRow.LabelArgsEntry
+	1,  // 1: macuahuitl.v1.CalcRow.coded:type_name -> macuahuitl.v1.CalcCoded
+	29, // 2: macuahuitl.v1.CalcCoded.args:type_name -> macuahuitl.v1.CalcCoded.ArgsEntry
+	0,  // 3: macuahuitl.v1.CalcTable.rows:type_name -> macuahuitl.v1.CalcRow
+	30, // 4: macuahuitl.v1.CalcTable.title_args:type_name -> macuahuitl.v1.CalcTable.TitleArgsEntry
+	2,  // 5: macuahuitl.v1.CalcTable.columns:type_name -> macuahuitl.v1.CalcColumn
+	31, // 6: macuahuitl.v1.CalcNote.args:type_name -> macuahuitl.v1.CalcNote.ArgsEntry
+	3,  // 7: macuahuitl.v1.CalcResult.tables:type_name -> macuahuitl.v1.CalcTable
+	4,  // 8: macuahuitl.v1.CalcResult.notes_structured:type_name -> macuahuitl.v1.CalcNote
+	5,  // 9: macuahuitl.v1.SubnetResponse.result:type_name -> macuahuitl.v1.CalcResult
+	8,  // 10: macuahuitl.v1.VlsmRequest.needs:type_name -> macuahuitl.v1.VlsmNeed
+	5,  // 11: macuahuitl.v1.VlsmResponse.result:type_name -> macuahuitl.v1.CalcResult
+	5,  // 12: macuahuitl.v1.SummarizeResponse.result:type_name -> macuahuitl.v1.CalcResult
+	5,  // 13: macuahuitl.v1.WildcardResponse.result:type_name -> macuahuitl.v1.CalcResult
+	5,  // 14: macuahuitl.v1.Ipv6Response.result:type_name -> macuahuitl.v1.CalcResult
+	5,  // 15: macuahuitl.v1.MtuResponse.result:type_name -> macuahuitl.v1.CalcResult
+	5,  // 16: macuahuitl.v1.TcpResponse.result:type_name -> macuahuitl.v1.CalcResult
+	5,  // 17: macuahuitl.v1.DscpResponse.result:type_name -> macuahuitl.v1.CalcResult
+	5,  // 18: macuahuitl.v1.OpticsResponse.result:type_name -> macuahuitl.v1.CalcResult
+	25, // 19: macuahuitl.v1.BgpRequest.routes:type_name -> macuahuitl.v1.BgpRoute
+	5,  // 20: macuahuitl.v1.BgpResponse.result:type_name -> macuahuitl.v1.CalcResult
+	6,  // 21: macuahuitl.v1.CalcService.Subnet:input_type -> macuahuitl.v1.SubnetRequest
+	9,  // 22: macuahuitl.v1.CalcService.Vlsm:input_type -> macuahuitl.v1.VlsmRequest
+	11, // 23: macuahuitl.v1.CalcService.Summarize:input_type -> macuahuitl.v1.SummarizeRequest
+	13, // 24: macuahuitl.v1.CalcService.Wildcard:input_type -> macuahuitl.v1.WildcardRequest
+	15, // 25: macuahuitl.v1.CalcService.Ipv6:input_type -> macuahuitl.v1.Ipv6Request
+	17, // 26: macuahuitl.v1.CalcService.Mtu:input_type -> macuahuitl.v1.MtuRequest
+	19, // 27: macuahuitl.v1.CalcService.Tcp:input_type -> macuahuitl.v1.TcpRequest
+	21, // 28: macuahuitl.v1.CalcService.Dscp:input_type -> macuahuitl.v1.DscpRequest
+	23, // 29: macuahuitl.v1.CalcService.Optics:input_type -> macuahuitl.v1.OpticsRequest
+	26, // 30: macuahuitl.v1.CalcService.Bgp:input_type -> macuahuitl.v1.BgpRequest
+	7,  // 31: macuahuitl.v1.CalcService.Subnet:output_type -> macuahuitl.v1.SubnetResponse
+	10, // 32: macuahuitl.v1.CalcService.Vlsm:output_type -> macuahuitl.v1.VlsmResponse
+	12, // 33: macuahuitl.v1.CalcService.Summarize:output_type -> macuahuitl.v1.SummarizeResponse
+	14, // 34: macuahuitl.v1.CalcService.Wildcard:output_type -> macuahuitl.v1.WildcardResponse
+	16, // 35: macuahuitl.v1.CalcService.Ipv6:output_type -> macuahuitl.v1.Ipv6Response
+	18, // 36: macuahuitl.v1.CalcService.Mtu:output_type -> macuahuitl.v1.MtuResponse
+	20, // 37: macuahuitl.v1.CalcService.Tcp:output_type -> macuahuitl.v1.TcpResponse
+	22, // 38: macuahuitl.v1.CalcService.Dscp:output_type -> macuahuitl.v1.DscpResponse
+	24, // 39: macuahuitl.v1.CalcService.Optics:output_type -> macuahuitl.v1.OpticsResponse
+	27, // 40: macuahuitl.v1.CalcService.Bgp:output_type -> macuahuitl.v1.BgpResponse
+	31, // [31:41] is the sub-list for method output_type
+	21, // [21:31] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_calc_proto_init() }
@@ -1880,15 +1963,15 @@ func file_macuahuitl_v1_calc_proto_init() {
 	if File_macuahuitl_v1_calc_proto != nil {
 		return
 	}
-	file_macuahuitl_v1_calc_proto_msgTypes[22].OneofWrappers = []any{}
-	file_macuahuitl_v1_calc_proto_msgTypes[24].OneofWrappers = []any{}
+	file_macuahuitl_v1_calc_proto_msgTypes[23].OneofWrappers = []any{}
+	file_macuahuitl_v1_calc_proto_msgTypes[25].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_calc_proto_rawDesc), len(file_macuahuitl_v1_calc_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   30,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

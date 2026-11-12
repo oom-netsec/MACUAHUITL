@@ -1,0 +1,10 @@
+{
+ "aun-no-valido": "{\"daysLeft\":100,\"findings\":[{\"Severity\":\"error\",\"Code\":\"aun-no-valido\",\"Detail\":\"el certificado es válido desde 2026-06-11T12:00:00Z\"}],\"verifyError\":\"x509: certificate has expired or is not yet valid: current time 2026-06-01T12:00:00Z is before 2026-06-11T12:00:00Z\"}",
+ "autofirmado": "{\"daysLeft\":100,\"findings\":[{\"Severity\":\"aviso\",\"Code\":\"autofirmado\",\"Detail\":\"el certificado es autofirmado; los clientes no lo validarán sin fijarlo\"}],\"verifyError\":\"x509: certificate signed by unknown authority\"}",
+ "cadena-incompleta": "{\"daysLeft\":100,\"findings\":[{\"Severity\":\"error\",\"Code\":\"cadena-incompleta\",\"Detail\":\"no se pudo construir la cadena hasta una raíz de confianza (¿falta el intermedio?)\"}],\"verifyError\":\"x509: certificate signed by unknown authority\"}",
+ "llave-debil": "{\"daysLeft\":100,\"findings\":[{\"Severity\":\"aviso\",\"Code\":\"llave-debil\",\"Detail\":\"certificado 0 con RSA de 1024 bits\"}],\"verifyError\":\"\"}",
+ "nombre": "{\"daysLeft\":100,\"findings\":[{\"Severity\":\"error\",\"Code\":\"nombre-no-coincide\",\"Detail\":\"el certificado no cubre \\\"ise.lab\\\" (SAN: otro.lab)\"}],\"verifyError\":\"x509: certificate is valid for otro.lab, not ise.lab\"}",
+ "ok": "{\"daysLeft\":100,\"findings\":null,\"verifyError\":\"\"}",
+ "vence-pronto": "{\"daysLeft\":10,\"findings\":[{\"Severity\":\"aviso\",\"Code\":\"vence-pronto\",\"Detail\":\"el certificado vence en 10 días\"}],\"verifyError\":\"\"}",
+ "vencido": "{\"daysLeft\":-2,\"findings\":[{\"Severity\":\"error\",\"Code\":\"vencido\",\"Detail\":\"el certificado venció el 2026-05-31T12:00:00Z\"}],\"verifyError\":\"x509: certificate has expired or is not yet valid: current time 2026-06-01T12:00:00Z is after 2026-05-31T12:00:00Z\"}"
+}

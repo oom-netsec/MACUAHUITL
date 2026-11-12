@@ -46,7 +46,18 @@ export interface PcapReportData {
   sections: PcapSection[];
 }
 
+// Fase 30c-A: hallazgos de DNS y TLS estructurados. text y json salen en el idioma de la interfaz; el code es estable;
+// severity warning|error|info; key y args son los del detalle (sin key si el detalle es un dato: un registro SPF, un nombre).
+export interface FindingData { code: string; severity: "warning" | "error" | "info"; key?: string; args?: Record<string, string>; message: string }
+export interface DnsReportData { text: string; json: string; findings: FindingData[] }
+/** verifyCode ∈ unknown_authority, hostname, expired, not_yet_valid, other; ausente si la cadena verificó. verifyError del json es el texto de x509, sin traducir. */
+export interface TlsReportData { text: string; json: string; findings: FindingData[]; verifyCode?: string }
+
 export interface ToolsAPI {
+  /** Como toolsDns, con los hallazgos estructurados. */
+  toolsDnsReport?(r: DnsRequest): Promise<DnsReportData>;
+  /** Como toolsTls, con los hallazgos estructurados y el motivo de verificación. */
+  toolsTlsReport?(host: string, port: number, sni: string): Promise<TlsReportData>;
   /** Como toolsPcap, con el informe estructurado. */
   toolsPcapReport?(path: string, top: number): Promise<PcapReportData>;
   toolsPcap(path: string, top: number): Promise<string>;
@@ -63,6 +74,8 @@ export const toolsWails = (call: Call): ToolsAPI => ({
   toolsPcapReport: (p, t) => call("ToolsPcapReport", p, t),
   toolsDns: (r) => call("ToolsDns", r),
   toolsTls: (h, p, s) => call("ToolsTls", h, p, s),
+  toolsDnsReport: (r) => call("ToolsDnsReport", r),
+  toolsTlsReport: (h, p, s) => call("ToolsTlsReport", h, p, s),
   syslogStart: (a, p, any, save, opts) => call("SyslogStart", a, p, any, save, opts ?? {}),
   onSyslog: (cb) => {
     const a = Events.On("syslog:msg", (e) => cb(e.data as SyslogEvent));

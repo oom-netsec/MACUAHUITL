@@ -121,7 +121,17 @@ func (s *toolsSvc) Dns(ctx context.Context, r *v1.DnsRequest) (*v1.DnsResponse, 
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, err.Error())
 	}
-	return &v1.DnsResponse{Report: service.Report(out, "")}, nil
+	loc := i18n.Locale(ctx)
+	resp := &v1.DnsResponse{}
+	for _, f := range dnsq.Findings(out) {
+		fd := &v1.DnsFinding{Code: f.Code, Severity: dnsq.SeverityCode(f.Severity), Key: f.Text.Key, Args: f.Text.Args, Message: f.Detail}
+		if !f.Text.Empty() {
+			fd.Message = f.Text.In(loc)
+		}
+		resp.Findings = append(resp.Findings, fd)
+	}
+	resp.Report = service.Report(dnsq.Localize(out, loc), "")
+	return resp, nil
 }
 
 func dns(t string) string {
@@ -152,7 +162,20 @@ func (s *toolsSvc) InspectTls(ctx context.Context, r *v1.InspectTlsRequest) (*v1
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, err.Error())
 	}
-	return &v1.InspectTlsResponse{Report: service.Report(rep, "")}, nil
+	return tlsResponse(rep, i18n.Locale(ctx)), nil
+}
+
+// tlsResponse arma la respuesta: el informe (texto y JSON) en el idioma pedido y sus hallazgos estructurados.
+func tlsResponse(rep tlsinspect.Report, loc string) *v1.InspectTlsResponse {
+	resp := &v1.InspectTlsResponse{Report: service.Report(rep.In(loc), ""), VerifyCode: rep.VerifyCode}
+	for _, f := range rep.Findings {
+		fd := &v1.TlsFinding{Code: f.Code, Severity: tlsinspect.SeverityCode(f.Severity), Key: f.Text.Key, Args: f.Text.Args, Message: f.Detail}
+		if !f.Text.Empty() {
+			fd.Message = f.Text.In(loc)
+		}
+		resp.Findings = append(resp.Findings, fd)
+	}
+	return resp
 }
 
 // Syslog escucha hasta que el cliente cancele o se cumpla la duración.

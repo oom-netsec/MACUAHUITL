@@ -10,10 +10,12 @@ import (
 )
 
 type MTULayer struct {
-	Layer     string `json:"layer"`
-	Detail    string `json:"detail"`
-	Bytes     int    `json:"bytes"`
-	Remaining int    `json:"remaining"`
+	Layer     string    `json:"layer"`
+	Detail    string    `json:"detail"`
+	Bytes     int       `json:"bytes"`
+	Remaining int       `json:"remaining"`
+	dkey      string    // calc.val.mtu.* del detalle
+	dargs     i18n.Args //
 }
 
 type MTUResult struct {
@@ -40,15 +42,15 @@ var espAuths = map[string]int{"md5": 12, "sha1": 12, "sha256": 16, "sha384": 24,
 // Capas simples: bytes y detalle. outerIP marca las que agregan su propia cabecera IPv4.
 var simpleLayers = map[string]struct {
 	bytes   int
-	detail  string
+	detail  string // sufijo de calc.val.mtu.*
 	outerIP bool
 }{
-	"gre":     {24, "IP externa 20 + GRE 4", true},
-	"gre-key": {28, "IP externa 20 + GRE 4 + clave 4", true},
-	"nat-t":   {8, "UDP 4500 8", false},
-	"vxlan":   {50, "IP externa 20 + UDP 8 + VXLAN 8 + Ethernet interna 14", true},
-	"lisp":    {36, "IP externa 20 + UDP 8 + LISP 8", true},
-	"pppoe":   {8, "PPPoE 6 + PPP 2", false},
+	"gre":     {24, "gre", true},
+	"gre-key": {28, "gre_key", true},
+	"nat-t":   {8, "nat_t", false},
+	"vxlan":   {50, "vxlan", true},
+	"lisp":    {36, "lisp", true},
+	"pppoe":   {8, "pppoe", false},
 }
 
 const mtuLayersHelp = "gre, gre-key, esp-tunnel:CIFRADO[:AUT], esp-transport:CIFRADO[:AUT], getvpn:CIFRADO[:AUT][:tbar], nat-t, vxlan, mpls[:N], dot1q, qinq, pppoe, lisp (CIFRADO: aes-cbc, aes-gcm, 3des, des; AUT: sha1, sha256, sha384, sha512, md5)"
@@ -92,9 +94,10 @@ func walk(phys int, stack []string) (MTUResult, error) {
 	r := MTUResult{Physical: phys}
 	avail, inL2, lifted, ipsec, vxlan := phys, false, false, false, false
 	liftIdx := -1 // capa ESP de transporte cuya IP protegida quedó por fuera
-	add := func(name, detail string, bytes int) {
+	add := func(name, key string, args i18n.Args, bytes int) {
 		avail -= bytes
-		r.Layers = append(r.Layers, MTULayer{Layer: name, Detail: detail, Bytes: bytes, Remaining: avail})
+		key = "calc.val.mtu." + key
+		r.Layers = append(r.Layers, MTULayer{Layer: name, Detail: i18n.Msg(i18n.Es, key, args), Bytes: bytes, Remaining: avail, dkey: key, dargs: args})
 	}
 	for i, raw := range stack {
 		f := strings.Split(strings.ToLower(strings.TrimSpace(raw)), ":")
@@ -104,11 +107,11 @@ func walk(phys int, stack []string) (MTUResult, error) {
 			return r, errors.New("nat-t va inmediatamente antes (por fuera) de una capa esp-tunnel o esp-transport")
 		}
 		if s, ok := simpleLayers[name]; ok && len(f) == 1 && (!lifted || s.outerIP) {
-			b, d := s.bytes, s.detail
+			b, ip := s.bytes, "calc.val.mtu.ip_outer"
 			if s.outerIP && lifted { // su IP quedó delante del ESP de transporte
-				b, d, lifted = b-20, strings.Replace(d, "IP externa 20", "IP externa (ya contada en ESP)", 1), false
+				b, ip, lifted = b-20, "calc.val.mtu.ip_counted", false
 			}
-			add(name, d, b)
+			add(name, s.detail, i18n.A("ip", ip), b)
 			inL2 = inL2 || name == "vxlan"
 			vxlan = vxlan || name == "vxlan"
 			continue
@@ -127,13 +130,13 @@ func walk(phys int, stack []string) (MTUResult, error) {
 			} else if len(f) > 2 {
 				return r, fmt.Errorf("capa %q inválida", raw)
 			}
-			add(name, fmt.Sprintf("%d etiqueta(s) × 4", n), 4*n)
+			add(name, "mpls", i18n.A("n", n), 4*n)
 		case "dot1q", "qinq":
 			b := map[string]int{"dot1q": 4, "qinq": 8}[name]
 			if inL2 {
-				add(name, fmt.Sprintf("etiqueta en la trama interna %d", b), b)
+				add(name, "tag_inner", i18n.A("bytes", b), b)
 			} else {
-				add(name, "fuera de la MTU IP: la trama crece, la MTU IP no", 0)
+				add(name, "tag_outer", nil, 0)
 				addNote(&r.Notes, &r.notes, "calc.note.mtu_outer_tag", "layer", name, "frame", phys+18+b)
 			}
 		case "esp-tunnel", "esp-transport", "getvpn":
@@ -157,12 +160,12 @@ func walk(phys int, stack []string) (MTUResult, error) {
 			if len(f) > 3 {
 				return r, fmt.Errorf("capa %q inválida", raw)
 			}
-			ipLabel := "IP externa 20"
+			ipLabel := "calc.val.mtu.ip_outer"
 			switch name {
 			case "esp-transport":
-				ipLabel, lifted, liftIdx = "IP del paquete protegido 20 (fuera del cifrado)", true, len(r.Layers)
+				ipLabel, lifted, liftIdx = "calc.val.mtu.ip_protected", true, len(r.Layers)
 			case "getvpn":
-				ipLabel = "IP copiada del original 20 (preservación de cabecera)"
+				ipLabel = "calc.val.mtu.ip_getvpn"
 			}
 			fixed := 20 + 8 + c.iv + icv
 			if tbar {
@@ -173,12 +176,11 @@ func walk(phys int, stack []string) (MTUResult, error) {
 				return r, fmt.Errorf("no cabe ESP en %d bytes", avail)
 			}
 			align := avail - fixed - ct
-			d := fmt.Sprintf("%s + ESP 8 + IV %d + cola 2 + ICV %d", ipLabel, c.iv, icv)
+			tb := ""
 			if tbar {
-				d += " + metadatos TBAR 12"
+				tb = "calc.val.mtu.tbar"
 			}
-			d += fmt.Sprintf(" + alineación %d (bloque de %d)", align, c.block)
-			add(raw, d, avail-(ct-2))
+			add(raw, "esp", i18n.A("ip", ipLabel, "iv", c.iv, "icv", icv, "tbar", tb, "align", align, "block", c.block), avail-(ct-2))
 			ipsec = true
 		default:
 			return r, fmt.Errorf("capa %q desconocida; usa %s", raw, mtuLayersHelp)
@@ -189,7 +191,8 @@ func walk(phys int, stack []string) (MTUResult, error) {
 		last.Bytes -= 20
 		avail += 20
 		last.Remaining = avail
-		last.Detail = strings.Replace(last.Detail, "IP del paquete protegido 20 (fuera del cifrado)", "IP del paquete protegido (es la suya)", 1)
+		last.dargs["ip"] = "calc.val.mtu.ip_own"
+		last.Detail = i18n.Msg(i18n.Es, last.dkey, last.dargs)
 	}
 	r.Effective, r.Overhead = avail, phys-avail
 	if ipsec {
@@ -211,7 +214,7 @@ func get(f []string, i int) string {
 func (r MTUResult) Report() Report {
 	t := titled("calc.title.mtu_breakdown", i18n.A("physical", r.Physical), "calc.col.layer", "calc.col.detail", "calc.col.bytes", "calc.col.remaining")
 	for _, l := range r.Layers {
-		t.add("", nil, l.Layer, l.Detail, strconv.Itoa(l.Bytes), strconv.Itoa(l.Remaining))
+		t.add("", nil, l.Layer, val{key: l.dkey, args: l.dargs}, strconv.Itoa(l.Bytes), strconv.Itoa(l.Remaining))
 	}
 	inner := "IPv4 + TCP 40"
 	if r.InnerIPv6 {

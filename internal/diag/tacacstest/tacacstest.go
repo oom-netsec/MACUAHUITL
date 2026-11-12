@@ -357,15 +357,15 @@ func (r *Report) findings() {
 	for _, s := range r.Steps {
 		switch {
 		case s.ErrText.Key == badSecretKey:
-			add("error", "secreto", i18n.Tx("security.tacacs.finding.secret", "kind", s.Kind), i18n.Text{})
+			add("error", "secret", i18n.Tx("security.tacacs.finding.secret", "kind", s.Kind), i18n.Text{})
 		case s.Error != "":
-			add("error", "sin-respuesta", i18n.Tx("security.tacacs.finding.no_response", "kind", s.Kind, "port", strings.TrimPrefix(r.Server[strings.LastIndex(r.Server, ":"):], ":")), s.ErrText)
+			add("error", "no_response", i18n.Tx("security.tacacs.finding.no_response", "kind", s.Kind, "port", strings.TrimPrefix(r.Server[strings.LastIndex(r.Server, ":"):], ":")), s.ErrText)
 		case s.Status == "FAIL" && s.Kind == "authentication":
-			add("info", "authen-fail", i18n.Tx("security.tacacs.finding.authen_fail"), i18n.Text{})
+			add("info", "authen_fail", i18n.Tx("security.tacacs.finding.authen_fail"), i18n.Text{})
 		case s.Status == "FAIL" && s.Kind == "authorization":
-			add("info", "author-fail", i18n.Tx("security.tacacs.finding.author_fail"), i18n.Text{})
+			add("info", "author_fail", i18n.Tx("security.tacacs.finding.author_fail"), i18n.Text{})
 		case s.Status == "ERROR" || s.Status == "FOLLOW":
-			add("aviso", "estado", i18n.Tx("security.tacacs.finding.state", "kind", s.Kind, "status", s.Status, "message", s.ServerMsg), i18n.Text{})
+			add("aviso", "status", i18n.Tx("security.tacacs.finding.state", "kind", s.Kind, "status", s.Status, "message", s.ServerMsg), i18n.Text{})
 		}
 	}
 }

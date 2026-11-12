@@ -117,7 +117,7 @@ func TestWrongSecretIsReported(t *testing.T) {
 	if e := r.Exchanges[0]; e.Code != "" || !strings.Contains(e.Error, "sin respuesta") || e.Attempts != 2 {
 		t.Fatalf("%+v", e)
 	}
-	if !hasFinding(r, "sin-respuesta") {
+	if !hasFinding(r, "no_response") {
 		t.Fatalf("findings = %+v", r.Findings)
 	}
 }
@@ -134,7 +134,7 @@ func TestResponseAuthenticatorMismatch(t *testing.T) {
 func TestMissingMessageAuthenticatorWarns(t *testing.T) {
 	h, p, _ := fake(t, FakeConfig{NoReplyMA: true})
 	r, _ := Run(context.Background(), direct, base(h, p))
-	if r.Exchanges[0].MessageAuthenticator != "ausente" || !hasFinding(r, "blast-radius") {
+	if r.Exchanges[0].MessageAuthenticator != "ausente" || !hasFinding(r, "blast_radius") {
 		t.Fatalf("%+v %+v", r.Exchanges[0], r.Findings)
 	}
 }
@@ -244,5 +244,14 @@ func TestForgedResponseIsSkipped(t *testing.T) {
 	r, _ := Run(context.Background(), direct, base(h, p))
 	if e := r.Exchanges[0]; e.Code != "Access-Accept" || e.Error != "" || attr(e, "Tunnel-Private-Group-ID") != "10" {
 		t.Fatalf("%+v", e)
+	}
+}
+
+// Un Message-Authenticator inválido en la respuesta da ma_invalid (error), sin blast_radius.
+func TestInvalidMessageAuthenticatorFinding(t *testing.T) {
+	r := Report{Exchanges: []Exchange{{Kind: "access-request", Code: "Access-Accept", MessageAuthenticator: "inválido"}}}
+	r.findings()
+	if len(r.Findings) != 1 || r.Findings[0].Code != "ma_invalid" || r.Findings[0].Severity != "error" || hasFinding(r, "blast_radius") {
+		t.Fatalf("%+v", r.Findings)
 	}
 }

@@ -79,3 +79,22 @@ func TestTextoEspanolRegresion(t *testing.T) {
 		}
 	}
 }
+
+// Fase 30c-A: los code de hallazgo son identificadores cerrados en inglés.
+func TestCodigosDeHallazgoEnIngles(t *testing.T) {
+	closed := map[string]bool{"secret": true, "no_response": true, "authen_fail": true, "author_fail": true, "status": true}
+	seen := map[string]bool{}
+	for n, r := range escenarios(t) {
+		for _, f := range r.Findings {
+			if !closed[f.Code] {
+				t.Errorf("%s: code %q fuera del conjunto cerrado", n, f.Code)
+			}
+			seen[f.Code] = true
+		}
+	}
+	for c := range closed {
+		if !seen[c] && c != "secret" { // «secret» lo produce un secreto distinto: lo cubre TestWrongSecretIsDiagnosed
+			t.Errorf("ningún escenario produce %q", c)
+		}
+	}
+}

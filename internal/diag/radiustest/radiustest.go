@@ -52,6 +52,9 @@ type Exchange struct {
 	Error                string `json:",omitempty"`
 	// ErrText es Error como texto de catálogo (para darlo en otro idioma); no viaja en el JSON.
 	ErrText i18n.Text `json:"-"`
+	// MSCHAP2Verified dice si el MS-CHAP2-Success verificó al servidor (autenticación mutua); nulo si no hubo.
+	// No viaja en el JSON, que lleva solo el texto de la verificación en Attrs.
+	MSCHAP2Verified *bool `json:"-"`
 }
 
 // fail registra el error del intercambio: el texto en español sale del catálogo.
@@ -218,6 +221,7 @@ func Run(ctx context.Context, d Dialer, c Config) (Report, error) {
 			for i, a := range e.Attrs {
 				if a.Name == "MS-CHAP2-Success" {
 					ok := strings.Contains(a.Value, want)
+					e.MSCHAP2Verified = &ok
 					e.Attrs[i].Value = map[bool]string{true: "respuesta del servidor verificada (autenticación mutua)", false: "NO verifica: el servidor no conoce la contraseña o hay un intermediario"}[ok]
 				}
 			}
@@ -341,16 +345,16 @@ func (r *Report) findings() {
 	for _, e := range r.Exchanges {
 		switch {
 		case e.ErrText.Key == "security.radius.err.no_response":
-			add("error", "sin-respuesta", i18n.Tx("security.radius.finding.no_response", "kind", e.Kind, "port", map[bool]string{true: "1813", false: "1812"}[strings.HasPrefix(e.Kind, "accounting")]), i18n.Text{})
+			add("error", "no_response", i18n.Tx("security.radius.finding.no_response", "kind", e.Kind, "port", map[bool]string{true: "1813", false: "1812"}[strings.HasPrefix(e.Kind, "accounting")]), i18n.Text{})
 		case e.Error != "":
-			add("error", "respuesta-invalida", i18n.Tx("security.radius.finding.invalid_response", "kind", e.Kind), e.ErrText)
+			add("error", "invalid_response", i18n.Tx("security.radius.finding.invalid_response", "kind", e.Kind), e.ErrText)
 		}
 		if e.Code != "" && e.Kind != "accounting-start" && e.Kind != "accounting-stop" {
 			switch e.MessageAuthenticator {
 			case "ausente":
-				add("aviso", "blast-radius", i18n.Tx("security.radius.finding.blast_radius", "kind", e.Kind), i18n.Text{})
+				add("aviso", "blast_radius", i18n.Tx("security.radius.finding.blast_radius", "kind", e.Kind), i18n.Text{})
 			case "inválido":
-				add("error", "ma-invalido", i18n.Tx("security.radius.finding.ma_invalid", "kind", e.Kind), i18n.Text{})
+				add("error", "ma_invalid", i18n.Tx("security.radius.finding.ma_invalid", "kind", e.Kind), i18n.Text{})
 			}
 		}
 		if e.Code == "Access-Reject" {

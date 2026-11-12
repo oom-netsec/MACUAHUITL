@@ -138,3 +138,49 @@ func TestEnglishFijaElIdiomaYConservaElEnvoltorio(t *testing.T) {
 		t.Fatalf("nil: %q", got)
 	}
 }
+
+// Un argumento que es un código de valor (calc.val.*, ike.val.*) se escribe en el idioma pedido; varios separados
+// por coma se unen con «, »; lo que no es un código del catálogo queda tal cual.
+func TestValoresComoArgumentos(t *testing.T) {
+	for _, c := range []struct{ loc, key, arg, want string }{
+		{Es, "ike.finding.p1_propuesta.explanation_attrs", "ike.val.attr.encryption,ike.val.attr.dh_group", "cifrado, grupo DH"},
+		{En, "ike.finding.p1_propuesta.explanation_attrs", "ike.val.attr.encryption,ike.val.attr.dh_group", "encryption, DH group"},
+		{En, "ike.finding.p1_propuesta.explanation_attrs", "ike.val.attr.hash", "hash"},
+		{En, "ike.finding.p1_propuesta.explanation_attrs", "ike.val.attr.hash,no-es-clave", "ike.val.attr.hash,no-es-clave"},
+		{En, "ike.finding.p1_propuesta.explanation_attrs", "ike.val.nada", "ike.val.nada"},
+	} {
+		if got := Msg(c.loc, c.key, A("attrs", c.arg)); !strings.HasSuffix(got, c.want+".") {
+			t.Errorf("%s %q: %q no termina en %q", c.loc, c.arg, got, c.want)
+		}
+	}
+}
+
+// Solo se resuelven los argumentos que la entrada declara en Refs: un dato que coincide con una clave sale literal.
+func TestDatosQueSeParecenAClavesSalenLiterales(t *testing.T) {
+	for _, loc := range []string{Es, En} {
+		if got := Msg(loc, "ike.text.proposal", A("phase", 1, "source", "s", "detail", "calc.val.yes")); !strings.HasSuffix(got, ": calc.val.yes") {
+			t.Errorf("%s: %q", loc, got)
+		}
+		if got := Msg(loc, "tls.finding.name_mismatch", A("name", "ike.val.result.rejected", "san", "calc.val.yes")); !strings.Contains(got, `"ike.val.result.rejected"`) || !strings.HasSuffix(got, "calc.val.yes)") {
+			t.Errorf("%s: %q", loc, got)
+		}
+		if got := Msg(loc, "dns.finding.no_ptr", A("ip", "ike.val.attr.hash,calc.val.no")); got != Msg(loc, "dns.finding.no_ptr", A("ip", "ike.val.attr.hash,calc.val.no")) || !strings.Contains(got, "ike.val.attr.hash,calc.val.no") {
+			t.Errorf("%s: %q", loc, got)
+		}
+		// el arg declarado sí se resuelve, también una lista
+		if got := Msg(loc, "ike.text.result", A("result", "ike.val.result.rejected,ike.val.attr.hash")); strings.Contains(got, "ike.val.") {
+			t.Errorf("%s: %q", loc, got)
+		}
+		// y un valor declarado que no es clave queda literal
+		if got := Msg(loc, "ike.text.result", A("result", "calc.val.nada")); !strings.Contains(got, "calc.val.nada") {
+			t.Errorf("%s: %q", loc, got)
+		}
+	}
+}
+
+// RFC 4291: el alcance 4 de multicast IPv6 es admin-local.
+func TestAlcanceMulticastAdminLocal(t *testing.T) {
+	if got := Msg(En, "calc.val.kind.mcast6_4", nil); got != "multicast, admin-local scope" {
+		t.Errorf("%q", got)
+	}
+}

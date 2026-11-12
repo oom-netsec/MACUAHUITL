@@ -75,7 +75,10 @@ func TestRespaldoDeExtremoAExtremo(t *testing.T) {
 	if ents, _ := os.ReadDir(filepath.Join(h.out, "respaldos", ".trabajos")); len(ents) != 0 {
 		t.Errorf("quedó la carpeta de Patrol: %v", ents)
 	}
-	actionsInOrder(t, h.auditText(t), "backup.start", "job.create", "job.arm", "job.finish", "backup.save")
+	// La colecta guarda cada ronda en cuanto la lee, así que backup.save puede quedar antes o después de job.finish.
+	audit := h.auditText(t)
+	actionsInOrder(t, audit, "backup.start", "job.create", "job.arm", "backup.save")
+	actionsInOrder(t, audit, "job.arm", "job.finish")
 }
 
 // Programado: el vigilante guarda cada ronda sin que nadie pregunte.

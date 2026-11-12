@@ -17,6 +17,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type Dialer func(ctx context.Context, network, host string, port uint16) (net.Conn, error)
@@ -39,7 +41,66 @@ type Cert struct {
 	IsCA            bool
 }
 
-type Finding struct{ Severity, Code, Detail string }
+type Finding struct {
+	Severity, Code, Detail string
+	Text                   i18n.Text `json:"-"` // Detail como texto de catálogo (para darlo en otro idioma)
+}
+
+// finding arma un hallazgo con el detalle de catálogo; Detail sale en español, el de siempre.
+func finding(sev, code, key string, kv ...any) Finding {
+	t := i18n.Tx(key, kv...)
+	return Finding{sev, code, t.In(i18n.Es), t}
+}
+
+// SeverityCode da la severidad cerrada en inglés (el JSON conserva aviso, error e info).
+func SeverityCode(s string) string {
+	if s == "aviso" {
+		return "warning"
+	}
+	return s
+}
+
+// In devuelve el informe con el detalle de cada hallazgo en el idioma dado (es es el de siempre). VerifyError es
+// el texto del sistema (el de la biblioteca x509) y no se traduce: VerifyCode lo clasifica.
+func (r Report) In(loc string) Report {
+	if r.Findings == nil { // nulo sigue nulo: el JSON en español no cambia
+		return r
+	}
+	fs := make([]Finding, len(r.Findings))
+	for i, f := range r.Findings {
+		if !f.Text.Empty() {
+			f.Detail = f.Text.In(loc)
+		}
+		fs[i] = f
+	}
+	r.Findings = fs
+	return r
+}
+
+// verifyCode clasifica el error de verificación de la cadena en un código cerrado.
+func verifyCode(err error, leaf *x509.Certificate, now time.Time) string {
+	var ua x509.UnknownAuthorityError
+	var ci x509.CertificateInvalidError
+	var he x509.HostnameError
+	switch {
+	case err == nil:
+		return ""
+	case errors.As(err, &ua):
+		return "unknown_authority"
+	case errors.As(err, &he):
+		return "hostname"
+	case errors.As(err, &ci) && ci.Reason == x509.Expired:
+		bad := ci.Cert // el certificado que falló puede ser un intermedio, no la hoja
+		if bad == nil {
+			bad = leaf
+		}
+		if now.Before(bad.NotBefore) {
+			return "not_yet_valid"
+		}
+		return "expired"
+	}
+	return "other"
+}
 
 type Report struct {
 	Target      string
@@ -51,6 +112,7 @@ type Report struct {
 	Chain       []Cert
 	Verified    bool
 	VerifyError string `json:",omitempty"`
+	VerifyCode  string `json:"-"` // unknown_authority, hostname, expired, not_yet_valid u other; vacío si verificó
 	NameMatches bool
 	DaysLeft    int
 	Findings    []Finding
@@ -110,7 +172,9 @@ func Inspect(ctx context.Context, d Dialer, host string, port uint16, sni string
 		sni = host
 	}
 	r := Report{Target: net.JoinHostPort(host, fmt.Sprint(port)), SNI: sni}
-	add := func(sev, code, detail string) { r.Findings = append(r.Findings, Finding{sev, code, detail}) }
+	add := func(sev, code, key string, kv ...any) {
+		r.Findings = append(r.Findings, finding(sev, code, key, kv...))
+	}
 
 	st, err := handshake(ctx, d, host, port, sni, tls.VersionTLS12, tls.VersionTLS13, o.Timeout)
 	if err != nil {
@@ -125,7 +189,7 @@ func Inspect(ctx context.Context, d Dialer, host string, port uint16, sni string
 		if _, err := handshake(ctx, d, host, port, sni, v.v, v.v, o.Timeout); err == nil {
 			r.Accepted = append(r.Accepted, v.name)
 			if v.v < tls.VersionTLS12 {
-				add("aviso", "tls-antiguo", v.name+" sigue habilitado; deshabilítalo")
+				add("aviso", "tls-antiguo", "tls.finding.legacy_version", "version", v.name)
 			}
 		}
 	}
@@ -148,33 +212,33 @@ func Inspect(ctx context.Context, d Dialer, host string, port uint16, sni string
 	_, verr := leaf.Verify(x509.VerifyOptions{DNSName: sni, Roots: o.Roots, Intermediates: inter, CurrentTime: now})
 	r.Verified = verr == nil
 	if verr != nil {
-		r.VerifyError = verr.Error()
+		r.VerifyError, r.VerifyCode = verr.Error(), verifyCode(verr, leaf, now)
 	}
 	switch {
 	case now.After(leaf.NotAfter):
-		add("error", "vencido", fmt.Sprintf("el certificado venció el %s", leaf.NotAfter.UTC().Format(time.RFC3339)))
+		add("error", "vencido", "tls.finding.expired", "date", leaf.NotAfter.UTC().Format(time.RFC3339))
 	case now.Before(leaf.NotBefore):
-		add("error", "aun-no-valido", fmt.Sprintf("el certificado es válido desde %s", leaf.NotBefore.UTC().Format(time.RFC3339)))
+		add("error", "aun-no-valido", "tls.finding.not_yet_valid", "date", leaf.NotBefore.UTC().Format(time.RFC3339))
 	case leaf.NotAfter.Sub(now) < 30*24*time.Hour:
-		add("aviso", "vence-pronto", fmt.Sprintf("el certificado vence en %d días", r.DaysLeft))
+		add("aviso", "vence-pronto", "tls.finding.expires_soon", "days", r.DaysLeft)
 	}
 	if !r.NameMatches {
-		add("error", "nombre-no-coincide", fmt.Sprintf("el certificado no cubre %q (SAN: %s)", sni, strings.Join(leaf.DNSNames, ", ")))
+		add("error", "nombre-no-coincide", "tls.finding.name_mismatch", "name", sni, "san", strings.Join(leaf.DNSNames, ", "))
 	}
 	// CheckSignatureFrom exige que el emisor sea CA; un autofirmado de servidor no lo es.
 	if leaf.Subject.String() == leaf.Issuer.String() && leaf.CheckSignature(leaf.SignatureAlgorithm, leaf.RawTBSCertificate, leaf.Signature) == nil {
-		add("aviso", "autofirmado", "el certificado es autofirmado; los clientes no lo validarán sin fijarlo")
+		add("aviso", "autofirmado", "tls.finding.self_signed")
 	}
 	var ua x509.UnknownAuthorityError
 	if errors.As(verr, &ua) && !hasCode(r.Findings, "autofirmado") {
-		add("error", "cadena-incompleta", "no se pudo construir la cadena hasta una raíz de confianza (¿falta el intermedio?)")
+		add("error", "cadena-incompleta", "tls.finding.incomplete_chain")
 	}
 	for i, c := range r.Chain {
 		if c.KeyType == "RSA" && c.KeyBits < 2048 {
-			add("aviso", "llave-debil", fmt.Sprintf("certificado %d con RSA de %d bits", i, c.KeyBits))
+			add("aviso", "llave-debil", "tls.finding.weak_key", "index", i, "bits", c.KeyBits)
 		}
 		if strings.Contains(c.SigAlg, "SHA1") || strings.Contains(c.SigAlg, "MD5") {
-			add("aviso", "firma-debil", fmt.Sprintf("certificado %d firmado con %s", i, c.SigAlg))
+			add("aviso", "firma-debil", "tls.finding.weak_signature", "index", i, "algorithm", c.SigAlg)
 		}
 	}
 	return r, nil

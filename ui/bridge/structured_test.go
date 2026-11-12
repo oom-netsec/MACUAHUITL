@@ -28,15 +28,15 @@ var cert = &v1.PkiCertificate{Kind: "certificate", Subject: "CN=a", Issuer: "CN=
 
 func (fakeStruct) RadiusTest(context.Context, *v1.RadiusTestRequest) (*v1.RadiusTestResponse, error) {
 	return &v1.RadiusTestResponse{Report: &v1.ToolReport{Text: "radius"}, Server: "10.0.0.1", Method: "PAP",
-		Exchanges: []*v1.RadiusExchange{{Kind: "access-request", Code: "Access-Accept", RttMs: 1.5, Attempts: 1, MessageAuthenticator: "absent", Attrs: []*v1.RadiusAttribute{{Name: "Filter-Id", Value: "x"}}},
+		Exchanges: []*v1.RadiusExchange{{Kind: "access-request", Code: "Access-Accept", RttMs: 1.5, Attempts: 1, MessageAuthenticator: "absent", Mschap2Verified: &yes, Attrs: []*v1.RadiusAttribute{{Name: "Filter-Id", Value: "x"}}},
 			{Kind: "accounting-start", Attempts: 2, Error: &v1.SecText{Key: "security.radius.err.no_response", Args: map[string]string{"attempts": "2"}, Text: "sin respuesta tras 2 intentos de 1s"}}},
-		Findings: []*v1.SecFinding{{Code: "blast-radius", Severity: "warning", Args: map[string]string{"kind": "access-request"}, Message: "m"}}}, nil
+		Findings: []*v1.SecFinding{{Code: "blast_radius", Severity: "warning", Args: map[string]string{"kind": "access-request"}, Message: "m"}}}, nil
 }
 
 func (fakeStruct) TacacsTest(context.Context, *v1.TacacsTestRequest) (*v1.TacacsTestResponse, error) {
 	return &v1.TacacsTestResponse{Report: &v1.ToolReport{Text: "tacacs"}, Server: "10.0.0.1:49",
 		Steps:    []*v1.TacacsStep{{Kind: "authorization", Status: "PASS_ADD", RttMs: 2, Prompts: []string{"Password: "}, AvPairs: []*v1.TacacsAvPair{{Direction: "sent", Value: "service=shell"}, {Direction: "received", Value: "priv-lvl=15"}}}},
-		Findings: []*v1.SecFinding{{Code: "authen-fail", Severity: "info", Message: "m"}}}, nil
+		Findings: []*v1.SecFinding{{Code: "authen_fail", Severity: "info", Message: "m"}}}, nil
 }
 
 func (fakeStruct) PkiDecode(context.Context, *v1.PkiDecodeRequest) (*v1.PkiDecodeResponse, error) {
@@ -62,7 +62,25 @@ func (fakeStruct) Subnet(context.Context, *v1.SubnetRequest) (*v1.SubnetResponse
 	return &v1.SubnetResponse{Result: &v1.CalcResult{Text: "t", Notes: []string{"n"}, NotesStructured: []*v1.CalcNote{{Key: "calc.note.host_in_subnet", Args: map[string]string{"addr": "a"}}},
 		Tables: []*v1.CalcTable{{Title: "Subred x", Head: []string{"Campo", "Valor"}, TitleKey: "calc.title.subnet", TitleArgs: map[string]string{"prefix": "x"},
 			Columns: []*v1.CalcColumn{{Key: "calc.col.field"}, {Key: "calc.col.value"}},
-			Rows:    []*v1.CalcRow{{Cells: []string{"Red", "10.0.0.0"}, LabelKey: "calc.row.network"}, {Cells: []string{"a", "b"}}}}}}}, nil
+			Rows:    []*v1.CalcRow{{Cells: []string{"Red", "10.0.0.0"}, LabelKey: "calc.row.network"}, {Cells: []string{"a", "sí"}, Coded: []*v1.CalcCoded{{Col: 1, Key: "calc.val.yes"}}}}}}}}, nil
+}
+
+func (fakeStruct) Dns(context.Context, *v1.DnsRequest) (*v1.DnsResponse, error) {
+	return &v1.DnsResponse{Report: &v1.ToolReport{Text: "dns", Json: "{}"}, Findings: []*v1.DnsFinding{
+		{Code: "sin-ptr", Severity: "warning", Key: "dns.finding.no_ptr", Args: map[string]string{"ip": "192.0.2.1"}, Message: "192.0.2.1 no tiene PTR"},
+		{Code: "spf", Severity: "info", Message: "v=spf1 -all"}}}, nil
+}
+
+func (fakeStruct) InspectTls(context.Context, *v1.InspectTlsRequest) (*v1.InspectTlsResponse, error) {
+	return &v1.InspectTlsResponse{Report: &v1.ToolReport{Text: "tls", Json: "{}"}, VerifyCode: "expired",
+		Findings: []*v1.TlsFinding{{Code: "vencido", Severity: "error", Key: "tls.finding.expired", Args: map[string]string{"date": "2026-01-01T00:00:00Z"}, Message: "m"}}}, nil
+}
+
+func (fakeStruct) IkeDecode(context.Context, *v1.IkeDecodeRequest) (*v1.IkeDecodeResponse, error) {
+	return &v1.IkeDecodeResponse{Report: &v1.ToolReport{Text: "ike", Json: "{}"}, Phase1: "failed", Phase2: "no_data", Note: "n",
+		Findings: []*v1.IkeFinding{{Code: "p1-propuesta", Severity: "error", Phase: 1, Key: "ike.finding.p1_propuesta", ExplanationKey: "ike.finding.p1_propuesta.explanation_attrs",
+			Args: map[string]string{"attrs": "ike.val.attr.hash"}, Title: "t", Explanation: "e", Action: "a", Evidence: []string{"ev"}}, {Code: "nat-t", Severity: "info", Key: "ike.finding.nat_t"}},
+		Proposals: []*v1.IkeProposal{{Phase: 1, SourceKey: "ike.proposal.source.v1_transform", SourceArgs: map[string]string{"transform": "1", "policy": "10"}, Source: "s", Detail: "d", Result: "rejected"}}}, nil
 }
 
 func asJSON(t *testing.T, v any) map[string]any {
@@ -111,7 +129,7 @@ func TestEstructuradoBridge(t *testing.T) {
 	if _, ok := e1["code"]; ok {
 		t.Errorf("code vacío debe omitirse: %v", e1)
 	}
-	if fd := m["findings"].([]any)[0].(map[string]any); fd["code"] != "blast-radius" || fd["severity"] != "warning" {
+	if fd := m["findings"].([]any)[0].(map[string]any); fd["code"] != "blast_radius" || fd["severity"] != "warning" {
 		t.Errorf("findings: %v", fd)
 	}
 	// TACACS
@@ -185,5 +203,78 @@ func TestDTOsSinCamposNuevosSiNoHayDato(t *testing.T) {
 	}
 	if strings.Contains(string(b), "certificates") {
 		t.Error("certificates sin dato")
+	}
+}
+
+// Fase 30c-A: IKE, DNS y TLS estructurados, el mschap2Verified de RADIUS y las celdas con código de las calculadoras.
+func TestEstructurado30cABridge(t *testing.T) {
+	d, _ := os.MkdirTemp("", "brg")
+	defer os.RemoveAll(d)
+	sock := filepath.Join(d, "core.sock")
+	l, _ := ipc.Listen(sock)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f := fakeStruct{}
+	go ipc.Serve(ctx, l, func(r ipc.Registrar) {
+		v1.RegisterSecurityServiceServer(r, f)
+		v1.RegisterToolsServiceServer(r, f)
+		v1.RegisterCalcServiceServer(r, f)
+	})
+	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
+	Start(ctx, b)
+
+	rr, err := b.SecRadiusReport(RadiusDTO{Host: "10.0.0.1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ex := asJSON(t, rr)["exchanges"].([]any)
+	if ex[0].(map[string]any)["mschap2Verified"] != true {
+		t.Errorf("mschap2Verified: %v", ex[0])
+	}
+	if _, ok := ex[1].(map[string]any)["mschap2Verified"]; ok {
+		t.Errorf("sin dato debe omitirse: %v", ex[1])
+	}
+	dr, err := b.ToolsDnsReport(DnsDTO{Mode: "hygiene", Name: "x"})
+	if err != nil || dr.Text != "dns" || len(dr.Findings) != 2 {
+		t.Fatalf("%+v %v", dr, err)
+	}
+	if m := asJSON(t, dr.Findings[0]); m["key"] != "dns.finding.no_ptr" || m["args"].(map[string]any)["ip"] != "192.0.2.1" || m["severity"] != "warning" {
+		t.Errorf("dns: %v", m)
+	}
+	if m := asJSON(t, dr.Findings[1]); m["key"] != nil || m["args"] != nil || m["message"] != "v=spf1 -all" {
+		t.Errorf("dns dato: %v", m)
+	}
+	if _, err := b.ToolsDnsReport(DnsDTO{Mode: "otro"}); err == nil {
+		t.Error("modo desconocido")
+	}
+	tr, err := b.ToolsTlsReport("h", 443, "")
+	if err != nil || tr.VerifyCode != "expired" || len(tr.Findings) != 1 || tr.Findings[0].Key != "tls.finding.expired" || tr.Findings[0].Args["date"] != "2026-01-01T00:00:00Z" {
+		t.Fatalf("%+v %v", tr, err)
+	}
+	if _, err := b.ToolsTlsReport("h", 70000, ""); err == nil {
+		t.Error("puerto inválido")
+	}
+	ik, err := b.SecIkeReport("x")
+	if err != nil || ik.Phase1 != "failed" || ik.Phase2 != "no_data" || ik.Note != "n" || len(ik.Findings) != 2 || len(ik.Proposals) != 1 {
+		t.Fatalf("%+v %v", ik, err)
+	}
+	im := asJSON(t, ik)
+	f0, f1 := im["findings"].([]any)[0].(map[string]any), im["findings"].([]any)[1].(map[string]any)
+	if f0["key"] != "ike.finding.p1_propuesta" || f0["explanationKey"] != "ike.finding.p1_propuesta.explanation_attrs" || f0["args"].(map[string]any)["attrs"] != "ike.val.attr.hash" || f0["phase"] != 1.0 || f0["evidence"].([]any)[0] != "ev" {
+		t.Errorf("ike: %v", f0)
+	}
+	if f1["evidence"] == nil || len(f1["evidence"].([]any)) != 0 || f1["phase"] != nil {
+		t.Errorf("ike sin evidencia ni fase: %v", f1)
+	}
+	if p := im["proposals"].([]any)[0].(map[string]any); p["sourceKey"] != "ike.proposal.source.v1_transform" || p["sourceArgs"].(map[string]any)["policy"] != "10" || p["result"] != "rejected" {
+		t.Errorf("propuesta: %v", p)
+	}
+	cr, err := b.Calc("subnet", `{"prefix":"x"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rc := asJSON(t, cr)["tables"].([]any)[0].(map[string]any)["rowCoded"].([]any)
+	if len(rc) != 2 || len(rc[0].([]any)) != 0 || rc[1].([]any)[0].(map[string]any)["col"] != 1.0 || rc[1].([]any)[0].(map[string]any)["key"] != "calc.val.yes" {
+		t.Errorf("rowCoded: %v", rc)
 	}
 }

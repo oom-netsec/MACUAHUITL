@@ -26,6 +26,21 @@ type Table struct {
 	Rows      [][]string  `json:"rows"`
 	RowKeys   []string    `json:"rowKeys,omitempty"` // uno por fila: clave de la etiqueta de la primera celda, o "" si es un dato
 	RowArgs   []i18n.Args `json:"rowArgs,omitempty"`
+	Coded     [][]Coded   `json:"-"` // por fila: las celdas que son un valor de catálogo (calc.val.*)
+}
+
+// Coded es una celda con palabras que viaja como código cerrado: Col es su columna, Key su clave (calc.val.*) y
+// Args sus argumentos. La celda de Rows ya trae el español.
+type Coded struct {
+	Col  int       `json:"col"`
+	Key  string    `json:"key"`
+	Args i18n.Args `json:"args,omitempty"`
+}
+
+// val es una celda que se escribe desde el catálogo (calc.val.*); add la pasa a español y la anota en Coded.
+type val struct {
+	key  string
+	args i18n.Args
 }
 
 // Note es una nota con su clave del catálogo (calc.note.*) y los valores de sus argumentos.
@@ -58,11 +73,25 @@ func titled(key string, args i18n.Args, headKeys ...string) Table {
 }
 
 // add agrega una fila; label es la clave de la etiqueta de la primera celda ("" si es un dato) y args sus argumentos.
-func (t *Table) add(label string, args i18n.Args, cells ...string) {
-	if label != "" {
-		cells[0] = i18n.Msg(i18n.Es, label, args)
+func (t *Table) add(label string, args i18n.Args, cells ...any) {
+	row := make([]string, len(cells))
+	var coded []Coded
+	for i, c := range cells {
+		switch v := c.(type) {
+		case string:
+			row[i] = v
+		case val:
+			row[i] = i18n.Msg(i18n.Es, v.key, v.args)
+			coded = append(coded, Coded{Col: i, Key: v.key, Args: v.args})
+		default:
+			panic(fmt.Sprintf("calc: celda inválida %T", c))
+		}
 	}
-	t.Rows = append(t.Rows, cells)
+	if label != "" {
+		row[0] = i18n.Msg(i18n.Es, label, args)
+	}
+	t.Rows = append(t.Rows, row)
+	t.Coded = append(t.Coded, coded)
 	t.RowKeys = append(t.RowKeys, label)
 	t.RowArgs = append(t.RowArgs, args)
 }
@@ -99,8 +128,8 @@ func (r Report) Text() string {
 func kv(titleKey string, titleArgs i18n.Args, pairs ...any) Table {
 	t := titled(titleKey, titleArgs, "calc.col.field", "calc.col.value")
 	for i := 0; i+1 < len(pairs); i += 2 {
-		v := pairs[i+1].(string)
-		if v == "" {
+		v := pairs[i+1]
+		if s, ok := v.(string); ok && s == "" {
 			continue
 		}
 		switch l := pairs[i].(type) {

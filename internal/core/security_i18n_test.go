@@ -117,7 +117,7 @@ func TestRadiusEstructuradoYEn(t *testing.T) {
 	if r.Exchanges[0].MessageAuthenticator != "absent" || r.Exchanges[0].Code != "Access-Accept" {
 		t.Errorf("MA: %+v", r.Exchanges[0])
 	}
-	if len(r.Findings) != 1 || r.Findings[0].Code != "blast-radius" || r.Findings[0].Severity != "warning" || r.Findings[0].Args["kind"] != "access-request" ||
+	if len(r.Findings) != 1 || r.Findings[0].Code != "blast_radius" || r.Findings[0].Severity != "warning" || r.Findings[0].Args["kind"] != "access-request" ||
 		js.Findings[0].Severity != "aviso" || !strings.Contains(r.Report.Text, "[aviso] "+r.Findings[0].Message) {
 		t.Errorf("hallazgos: %+v", r.Findings)
 	}
@@ -130,7 +130,7 @@ func TestRadiusEstructuradoYEn(t *testing.T) {
 		strings.Contains(en.Report.Text, "Servidor") || strings.Contains(en.Report.Text, "Hallazgos") || strings.Contains(en.String(), "MARCA") {
 		t.Errorf("en:\n%s", en.Report.Text)
 	}
-	if en.Findings[0].Message != i18n.Msg(i18n.En, "security.radius.finding.blast_radius", i18n.A("kind", "access-request")) || en.Findings[0].Code != "blast-radius" {
+	if en.Findings[0].Message != i18n.Msg(i18n.En, "security.radius.finding.blast_radius", i18n.A("kind", "access-request")) || en.Findings[0].Code != "blast_radius" {
 		t.Errorf("hallazgo en: %+v", en.Findings[0])
 	}
 	// Sin respuesta: el error es un texto con clave y el hallazgo lo cita en el idioma pedido.
@@ -140,7 +140,7 @@ func TestRadiusEstructuradoYEn(t *testing.T) {
 		t.Errorf("error: %+v", e)
 	}
 	if got := en2.Exchanges[0].Error.Text; got != "no response after 1 attempt (100ms each)" || !strings.Contains(en2.Report.Text, "! no response after 1 attempt (100ms each)") ||
-		!strings.Contains(en2.Report.Text, "UDP 1812 filtered") || en2.Findings[0].Code != "sin-respuesta" || en2.Findings[0].Args["port"] != "1812" {
+		!strings.Contains(en2.Report.Text, "UDP 1812 filtered") || en2.Findings[0].Code != "no_response" || en2.Findings[0].Args["port"] != "1812" {
 		t.Errorf("sin respuesta en: %+v\n%s", en2.Exchanges[0], en2.Report.Text)
 	}
 }
@@ -194,7 +194,7 @@ func TestTacacsEstructuradoYEn(t *testing.T) {
 		t.Errorf("%+v", r.Steps[1])
 	}
 	bad := ask("en", "otra", "show version")
-	if len(bad.Findings) != 1 || bad.Findings[0].Code != "authen-fail" || bad.Findings[0].Severity != "info" ||
+	if len(bad.Findings) != 1 || bad.Findings[0].Code != "authen_fail" || bad.Findings[0].Severity != "info" ||
 		bad.Findings[0].Message != i18n.Msg(i18n.En, "security.tacacs.finding.authen_fail", nil) ||
 		!strings.Contains(bad.Report.Text, "TACACS+ server ") || !strings.Contains(bad.Report.Text, "FAIL in ") || !strings.Contains(bad.Report.Text, "Findings:\n  [info] Authentication rejected") ||
 		strings.Contains(bad.String(), "MARCA") || strings.Contains(bad.String(), "otra") {
@@ -204,7 +204,7 @@ func TestTacacsEstructuradoYEn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cl.Steps[0].Error.GetKey() != "security.tacacs.err.system" || cl.Findings[0].Code != "sin-respuesta" || cl.Findings[0].Severity != "error" ||
+	if cl.Steps[0].Error.GetKey() != "security.tacacs.err.system" || cl.Findings[0].Code != "no_response" || cl.Findings[0].Severity != "error" ||
 		!strings.Contains(cl.Findings[0].Message, "Check connectivity to TCP 1 and that the device is registered.") || strings.Contains(cl.Report.Text, "Revisa") {
 		t.Errorf("cerrado: %+v %+v", cl.Steps[0], cl.Findings)
 	}
@@ -266,5 +266,69 @@ func TestPkiEstructuradoYEn(t *testing.T) {
 	}
 	if strings.Contains(cert.String()+ca.String()+csr.String(), "MARCA") && !strings.Contains(ca.SealedKeyPem, "MARCA") {
 		t.Fatal("contraseña en la respuesta")
+	}
+}
+
+// Fase 30c-A: mschap2_verified solo aparece con MS-CHAPv2 y dice si el servidor quedó verificado.
+func TestRadiusMschap2Verified(t *testing.T) {
+	h := newHarness(t, nil)
+	c := v1.NewSecurityServiceClient(h.conn)
+	f, err := radiustest.StartFake(radiustest.FakeConfig{Secret: "S", Users: map[string]string{"alice": "pw"}, Reply: radiustest.AuthzReply()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	host, port := split(t, f.Addr())
+	ask := func(method string) *v1.RadiusTestResponse {
+		r, err := c.RadiusTest(con(t, ""), &v1.RadiusTestRequest{Host: host, AuthPort: port, AcctPort: port, Username: "alice", Method: method, TimeoutMs: 500,
+			SharedSecret: &v1.SecretSource{Value: []byte("S")}, Password: &v1.SecretSource{Value: []byte("pw")}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	if v := ask("mschapv2").Exchanges[0].Mschap2Verified; v == nil || !*v {
+		t.Errorf("mschapv2: %v", v)
+	}
+	if v := ask("pap").Exchanges[0].Mschap2Verified; v != nil {
+		t.Errorf("pap no debe traerlo: %v", *v)
+	}
+}
+
+// Fase 30c-A: IKE sale estructurado y en el idioma pedido; con es (o sin idioma) el texto y el JSON son los de siempre.
+func TestIkeDecodeEstructuradoYEn(t *testing.T) {
+	h := newHarness(t, nil)
+	c := v1.NewSecurityServiceClient(h.conn)
+	in := "ISAKMP:(0): Checking ISAKMP transform 1 against priority 10 policy\nISAKMP:      encryption DES-CBC\nISAKMP:(0): atts are not acceptable. Next payload is 0\nISAKMP:(0): phase 1 SA policy not acceptable! (local 192.0.2.1 remote 192.0.2.2)\n"
+	ask := func(lang string) *v1.IkeDecodeResponse {
+		r, err := c.IkeDecode(con(t, lang), &v1.IkeDecodeRequest{Text: in})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	base := ask("")
+	for _, lang := range []string{"es", "es-MX", "fr"} {
+		if r := ask(lang); r.Report.Text != base.Report.Text || r.Report.Json != base.Report.Json {
+			t.Errorf("%s difiere de sin idioma", lang)
+		}
+	}
+	if base.Phase1 != "failed" || base.Phase2 != "no_data" || len(base.Findings) != 1 || len(base.Proposals) != 1 {
+		t.Fatalf("%+v", base)
+	}
+	f := base.Findings[0]
+	if f.Code != "p1-propuesta" || f.Severity != "error" || f.Key != "ike.finding.p1_propuesta" || f.Phase != 1 ||
+		!strings.Contains(base.Report.Text, "[error] "+f.Title) || f.Title != i18n.Msg(i18n.Es, f.Key+".title", f.Args) ||
+		!strings.Contains(base.Report.Text, "  Acción: "+f.Action+"\n") || base.Proposals[0].Result != "rejected" || base.Proposals[0].SourceKey != "ike.proposal.source.v1_transform" ||
+		base.Proposals[0].SourceArgs["transform"] != "1" || !strings.HasPrefix(base.Note, "Reglas basadas") {
+		t.Errorf("%+v %+v", f, base.Proposals[0])
+	}
+	en := ask("en")
+	ef := en.Findings[0]
+	if ef.Title != "IKE phase 1 proposals do not match" || ef.Code != f.Code || ef.Key != f.Key || !strings.Contains(en.Report.Text, "[error] IKE phase 1 proposals do not match") ||
+		!strings.HasPrefix(en.Report.Text, "Detected: ") || !strings.Contains(en.Report.Text, "Phase 1: failed") || !strings.Contains(en.Report.Json, `"Phase1":"failed"`) ||
+		!strings.Contains(en.Report.Json, "IKE phase 1 proposals do not match") || en.Proposals[0].Source != "peer transform 1 vs policy 10" || en.Proposals[0].Result != "rejected" ||
+		en.Phase1 != "failed" || !strings.HasPrefix(en.Note, "Rules based on") || strings.Contains(en.Report.Text, "Acción") {
+		t.Errorf("en: %+v\n%s", ef, en.Report.Text)
 	}
 }

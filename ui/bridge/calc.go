@@ -24,6 +24,15 @@ type CalcTableDTO struct {
 	TitleArgs map[string]string `json:"titleArgs,omitempty"`
 	Columns   []KeyArgsDTO      `json:"columns,omitempty"`
 	RowLabels []KeyArgsDTO      `json:"rowLabels,omitempty"`
+	// Fase 30c: por fila, las celdas con palabras (veredicto, límite, tipo, clase DSCP, paso de BGP, capa de MTU,
+	// sí/no) como código calc.val.*; col cuenta desde 0. Una lista por fila (vacía si no hay); ausente si ninguna fila trae.
+	RowCoded [][]CalcCodedDTO `json:"rowCoded,omitempty"`
+}
+
+type CalcCodedDTO struct {
+	Col  int               `json:"col"`
+	Key  string            `json:"key"`
+	Args map[string]string `json:"args,omitempty"`
 }
 
 type CalcResultDTO struct {
@@ -84,9 +93,19 @@ func (b *Bridge) Calc(kind, reqJSON string) (CalcResultDTO, error) {
 			for _, col := range t.Columns {
 				dt.Columns = append(dt.Columns, KeyArgsDTO{Key: col.Key})
 			}
+			anyCoded := false
 			for _, row := range t.Rows {
 				dt.Rows = append(dt.Rows, row.Cells)
 				dt.RowLabels = append(dt.RowLabels, KeyArgsDTO{Key: row.LabelKey, Args: row.LabelArgs})
+				coded := []CalcCodedDTO{}
+				for _, c := range row.Coded {
+					coded = append(coded, CalcCodedDTO{Col: int(c.Col), Key: c.Key, Args: c.Args})
+					anyCoded = true
+				}
+				dt.RowCoded = append(dt.RowCoded, coded)
+			}
+			if !anyCoded {
+				dt.RowCoded = nil
 			}
 			out.Tables = append(out.Tables, dt)
 		}

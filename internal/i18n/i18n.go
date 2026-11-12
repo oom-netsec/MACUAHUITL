@@ -41,6 +41,7 @@ type entry struct {
 	Es, En string            //
 	Args   []string          // argumentos que usan las plantillas (los mismos en es y en en)
 	Extra  []string          // argumentos que solo viajan en la metadata
+	Refs   []string          // argumentos cuyo valor es un código calc.val.* o ike.val.* (o varios con coma) que se escribe en el idioma pedido
 	Meta   map[string]string // metadata fija del código
 }
 
@@ -126,10 +127,58 @@ func Msg(loc, code string, args Args) string {
 	if !ok {
 		return code
 	}
+	args = resolveRefs(loc, args, e.Refs)
 	if loc == En {
 		return render(e.En, args)
 	}
 	return render(e.Es, args)
+}
+
+// Los códigos que son un valor con palabras (calc.val.*, ike.val.*) pueden ir como valor de un argumento: al armar
+// el texto se escriben en el idioma pedido, así un mensaje cita un valor traducible. Varios códigos separados por
+// coma se escriben separados por «, ».
+func isValKey(v string) bool {
+	if !strings.HasPrefix(v, "calc.val.") && !strings.HasPrefix(v, "ike.val.") {
+		return false
+	}
+	_, ok := catalog[v]
+	return ok
+}
+
+// withRefs marca los argumentos de la entrada que son códigos de valor. Solo esos se resuelven: un dato (un SAN, un
+// detalle del equipo) que coincida con una clave sale literal.
+func withRefs(e entry, refs ...string) entry { e.Refs = refs; return e }
+
+func resolveRefs(loc string, args Args, refs []string) Args {
+	var out Args
+	for _, k := range refs {
+		v, found := args[k]
+		if !found {
+			continue
+		}
+		parts := strings.Split(v, ",")
+		ok := v != ""
+		for _, p := range parts {
+			ok = ok && isValKey(p)
+		}
+		if !ok {
+			continue
+		}
+		if out == nil {
+			out = Args{}
+			for k2, v2 := range args {
+				out[k2] = v2
+			}
+		}
+		for i, p := range parts {
+			parts[i] = Msg(loc, p, nil)
+		}
+		out[k] = strings.Join(parts, ", ")
+	}
+	if out == nil {
+		return args
+	}
+	return out
 }
 
 // T es el texto del código en el idioma del contexto.

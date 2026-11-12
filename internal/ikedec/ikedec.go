@@ -12,12 +12,16 @@ import (
 	"fmt"
 	"regexp"
 	"regexp/syntax"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-const Note = "Reglas basadas en la documentación pública de Cisco, sin validar en laboratorio: confirma cada causa contra la configuración de ambos extremos."
+// Note es la nota fija del informe, en español (en otro idioma, ike.note).
+var Note = i18n.Msg(i18n.Es, "ike.note", nil)
 
 type Finding struct {
 	Severity    string // error, aviso, info
@@ -27,14 +31,62 @@ type Finding struct {
 	Explanation string
 	Action      string
 	Evidence    []string
+	x           findingX // texto de catálogo; no viaja en el JSON
+}
+
+// findingX es lo que hace falta para escribir el hallazgo en otro idioma: su clave (ike.finding.<código>), la
+// de su explicación si no es la normal, los argumentos y, por cada evidencia, la línea del equipo y la clave del
+// significado que se le agregó (vacía si no lleva).
+type findingX struct {
+	key, explKey string
+	args         i18n.Args
+	base         []string
+	meaning      []string
+}
+
+// Key es la clave de catálogo del hallazgo: Key()+".title", ".explanation" (o ExplanationKey) y ".action".
+func (f Finding) Key() string { return f.x.key }
+
+// ExplanationKey es la clave del catálogo de la explicación (con variantes: atributos que no coinciden, PFS).
+func (f Finding) ExplanationKey() string { return f.x.explKey }
+
+// Args son los argumentos de las claves del hallazgo (vacío si no lleva).
+func (f Finding) Args() i18n.Args { return f.x.args }
+
+// In escribe el hallazgo en el idioma dado; la evidencia es salida del equipo y solo cambia el significado que se
+// le agregó.
+func (f Finding) In(loc string) Finding {
+	f.Title = i18n.Msg(loc, f.x.key+".title", f.x.args)
+	f.Explanation = i18n.Msg(loc, f.x.explKey, f.x.args)
+	f.Action = i18n.Msg(loc, f.x.key+".action", f.x.args)
+	if f.Evidence != nil { // nulo sigue nulo: el JSON en español no cambia
+		ev := make([]string, len(f.Evidence))
+		for i := range ev {
+			ev[i] = f.Evidence[i]
+			if i < len(f.x.meaning) && i < len(f.x.base) && f.x.meaning[i] != "" {
+				ev[i] = f.x.base[i] + "  → " + i18n.Msg(loc, f.x.meaning[i], nil)
+			}
+		}
+		f.Evidence = ev
+	}
+	return f
 }
 
 type Proposal struct {
-	Phase  int
-	Source string // "transform 1 del par vs política 10", "recibida del par", "esperada (local)"…
-	Detail string
-	Result string `json:",omitempty"` // aceptada, rechazada
+	Phase   int
+	Source  string // "transform 1 del par vs política 10", "recibida del par", "esperada (local)"…
+	Detail  string
+	Result  string `json:",omitempty"` // aceptada, rechazada
+	srcKey  string
+	srcArgs i18n.Args
+	resKey  string
 }
+
+// SourceKey y SourceArgs son la clave de catálogo del origen de la propuesta y sus argumentos; ResultKey es
+// la del resultado (ike.val.result.accepted o rejected; vacía si no hubo).
+func (p Proposal) SourceKey() string     { return p.srcKey }
+func (p Proposal) SourceArgs() i18n.Args { return p.srcArgs }
+func (p Proposal) ResultKey() string     { return p.resKey }
 
 type SA struct {
 	Kind, Peer, Local, State string
@@ -50,14 +102,39 @@ type IPsecSA struct {
 }
 
 type Report struct {
-	Detected  []string
-	Phase1    string // establecida, falló, mixta, incompleta, sin datos
-	Phase2    string
-	Proposals []Proposal
-	SAs       []SA
-	IPsec     []IPsecSA
-	Findings  []Finding
-	Note      string
+	Detected       []string
+	Phase1         string // establecida, falló, mixta, incompleta, sin datos
+	Phase2         string
+	Proposals      []Proposal
+	SAs            []SA
+	IPsec          []IPsecSA
+	Findings       []Finding
+	Note           string
+	phase1, phase2 string // claves ike.val.phase.* de Phase1 y Phase2
+}
+
+// PhaseKeys son las claves de catálogo (ike.val.phase.*) del estado de las fases 1 y 2.
+func (r Report) PhaseKeys() (string, string) { return r.phase1, r.phase2 }
+
+// In devuelve el informe escrito en el idioma dado (es es el de siempre); lo que es salida del equipo no cambia.
+func (r Report) In(loc string) Report {
+	r.Phase1, r.Phase2 = i18n.Msg(loc, r.phase1, nil), i18n.Msg(loc, r.phase2, nil)
+	r.Proposals = slices.Clone(r.Proposals)
+	for i, p := range r.Proposals {
+		r.Proposals[i].Source = i18n.Msg(loc, p.srcKey, p.srcArgs)
+		if p.resKey != "" {
+			r.Proposals[i].Result = i18n.Msg(loc, p.resKey, nil)
+		}
+	}
+	if r.Findings != nil {
+		fs := make([]Finding, len(r.Findings))
+		for i, f := range r.Findings {
+			fs[i] = f.In(loc)
+		}
+		r.Findings = fs
+	}
+	r.Note = i18n.Msg(loc, "ike.note", nil)
+	return r
 }
 
 // pre es una regex con prefiltro: solo se evalúa si la línea contiene (sin distinguir
@@ -149,10 +226,9 @@ func (d *decoder) findAll(p *pre, line string) [][]string {
 }
 
 type rule struct {
-	code, sev, title string
-	phase            int // 0 = la fase del contexto
-	re               *pre
-	expl, action     string
+	code, sev string
+	phase     int // 0 = la fase del contexto
+	re        *pre
 }
 
 func re(s string) *pre {
@@ -165,50 +241,28 @@ func re(s string) *pre {
 }
 
 var rules = []rule{
-	{"p1-propuesta", "error", "Propuestas de fase 1 (IKE) no coinciden", 1,
-		re(`phase 1 SA policy not acceptable|no offers accepted|Failed to find a matching policy|All SA proposals found unacceptable|Mismatched attribute types|offered does not match policy`),
-		"Ninguna propuesta IKE del par coincide con las políticas locales (cifrado, hash/integridad, PRF, grupo DH, método de autenticación o lifetime).",
-		"Compara 'crypto isakmp policy' / 'crypto ikev2 proposal' (ASA: 'crypto ikev1|ikev2 policy') en ambos extremos y deja al menos una idéntica; evita DES/3DES/MD5/grupos 1, 2 y 5."},
-	{"p2-propuesta", "error", "Propuestas de fase 2 (IPsec) no coinciden", 2,
-		re(`transform proposal not supported|All IPSec SA proposals found unacceptable`),
-		"El transform-set / IPsec proposal ofrecido no coincide con el local (ESP cifrado, integridad, modo túnel/transporte).",
-		"Iguala 'crypto ipsec transform-set' (IKEv2/ASA: 'crypto ipsec ikev2 ipsec-proposal') en ambos extremos, incluido el modo."},
-	{"pfs", "error", "PFS o grupo DH de fase 2 distinto", 2,
-		re(`INVALID_KE_PAYLOAD|PFS.*(mismatch|does not match)`),
-		"Un extremo exige PFS (o un grupo DH distinto) para la fase 2 y el otro no; también falla el rekey de CREATE_CHILD_SA.",
-		"Configura 'set pfs groupN' igual en ambos crypto maps / perfiles IPsec, o quítalo de ambos."},
-	{"psk", "error", "Clave precompartida (PSK) incorrecta o falla de autenticación", 1,
-		re(`IKMP_BAD_MESSAGE|failed its sanity check or is malformed|IKMP_NOT_ENCRYPTED|reserved not zero on|Hash payload verification failed|PAYLOAD_MALFORMED|AUTHENTICATION_FAILED|authentication data FAILED|Auth exchange failed`),
-		"Los mensajes 5/6 de Main Mode (o IKE_AUTH en IKEv2) no se descifran o el hash/AUTH no verifica: casi siempre la PSK difiere, o el par usa otro método (certificados).",
-		"Vuelve a escribir la PSK en ambos extremos ('crypto isakmp key', keyring IKEv2 o tunnel-group ipsec-attributes) cuidando espacios finales y mayúsculas; verifica el método de autenticación."},
-	{"psk-ausente", "error", "No hay PSK configurada para el par", 1,
-		re(`No pre-shared key with|pre-?shared key not found`),
-		"El equipo no encuentra una clave para la dirección o identidad del par.",
-		"Agrega la PSK para la IP real del par (ojo con NAT: la IP pública) en el keyring o 'crypto isakmp key'."},
-	{"sin-respuesta", "error", "El par no responde (retransmisiones)", 1,
-		re(`Death by retransmission|Maximum number of retransmissions|retransmission count exceeded`),
-		"Se agotaron las retransmisiones sin respuesta: el par no recibe o no contesta IKE.",
-		"Comprueba alcance a la IP del par, que UDP 500 (y 4500 con NAT) no esté filtrado en el camino, que el par tenga crypto map/perfil en esa interfaz y la dirección de peer correcta."},
-	{"retrans-key-exch", "aviso", "Retransmisiones en MM_KEY_EXCH", 1,
-		re(`retransmitting phase 1 MM_KEY_EXCH`),
-		"La propuesta ya se aceptó y el DH terminó, pero los mensajes 5/6 no se completan: PSK distinta o, si hay NAT, UDP 4500 bloqueado.",
-		"Revisa la PSK y que UDP 4500 pase entre los pares."},
-	{"proxy-id", "error", "Proxy IDs / traffic selectors no coinciden", 2,
-		re(`proxy identities not supported|no matching crypto map entry for remote proxy|TS_UNACCEPTABLE|INVALID_ID_INFO|Invalid ID info|traffic selectors?.*(unacceptable|not acceptable|mismatch)`),
-		"Las redes protegidas (ACL de cripto / traffic selectors) que propone el par no son el espejo exacto de las locales.",
-		"Haz la ACL de cripto de un lado espejo exacto de la del otro (mismas redes y máscaras, mismo protocolo/puerto); en VTI usa 'any any'."},
-	{"identidad", "error", "Identidad del par no coincide con ningún perfil", 1,
-		re(`peer matches \*none\* of the profiles|Failed to locate an item in the database|Profile not found|Failed to find (a )?matching (IKEv2 )?profile|Can't find a valid tunnel group|Failed to locate group|identity.*(does not match|mismatch)`),
-		"La identidad que envía el par (IP, FQDN, DN) no coincide con 'match identity remote' de ningún perfil, o no existe el tunnel-group.",
-		"Revisa 'match identity remote address|fqdn' del perfil IKEv2/ISAKMP (o el tunnel-group en ASA) y la 'identity local' del otro extremo."},
-	{"nat-t", "info", "NAT-T: hay NAT entre los pares", 0,
-		re(`NAT found|NAT detected|NAT-T is detected|float to init port 4500|[:/ ]4500\b`),
-		"Se detectó NAT en el camino: IKE y ESP viajan encapsulados en UDP 4500.",
-		"Permite UDP 500 y UDP 4500 entre los pares; con NAT no basta abrir ESP (IP 50). Usa la IP pública del par en PSK y peer."},
-	{"lifetime", "info", "Lifetime distinto", 0,
-		re(`class Life\b|life(time)?\b.*(mismatch|not acceptable)`),
-		"Los lifetimes de fase 1 o 2 difieren; según la plataforma se toma el menor o se rechaza la propuesta.",
-		"Iguala 'lifetime' de la política IKE y 'set security-association lifetime' en ambos extremos."},
+	{"p1-propuesta", "error", 1,
+		re(`phase 1 SA policy not acceptable|no offers accepted|Failed to find a matching policy|All SA proposals found unacceptable|Mismatched attribute types|offered does not match policy`)},
+	{"p2-propuesta", "error", 2,
+		re(`transform proposal not supported|All IPSec SA proposals found unacceptable`)},
+	{"pfs", "error", 2,
+		re(`INVALID_KE_PAYLOAD|PFS.*(mismatch|does not match)`)},
+	{"psk", "error", 1,
+		re(`IKMP_BAD_MESSAGE|failed its sanity check or is malformed|IKMP_NOT_ENCRYPTED|reserved not zero on|Hash payload verification failed|PAYLOAD_MALFORMED|AUTHENTICATION_FAILED|authentication data FAILED|Auth exchange failed`)},
+	{"psk-ausente", "error", 1,
+		re(`No pre-shared key with|pre-?shared key not found`)},
+	{"sin-respuesta", "error", 1,
+		re(`Death by retransmission|Maximum number of retransmissions|retransmission count exceeded`)},
+	{"retrans-key-exch", "aviso", 1,
+		re(`retransmitting phase 1 MM_KEY_EXCH`)},
+	{"proxy-id", "error", 2,
+		re(`proxy identities not supported|no matching crypto map entry for remote proxy|TS_UNACCEPTABLE|INVALID_ID_INFO|Invalid ID info|traffic selectors?.*(unacceptable|not acceptable|mismatch)`)},
+	{"identidad", "error", 1,
+		re(`peer matches \*none\* of the profiles|Failed to locate an item in the database|Profile not found|Failed to find (a )?matching (IKEv2 )?profile|Can't find a valid tunnel group|Failed to locate group|identity.*(does not match|mismatch)`)},
+	{"nat-t", "info", 0,
+		re(`NAT found|NAT detected|NAT-T is detected|float to init port 4500|[:/ ]4500\b`)},
+	{"lifetime", "info", 0,
+		re(`class Life\b|life(time)?\b.*(mismatch|not acceptable)`)},
 }
 
 // Atributos que IOS y ASA nombran al rechazar una propuesta de fase 1.
@@ -216,11 +270,11 @@ var attrMismatch = []struct {
 	re   *pre
 	name string
 }{
-	{re(`Encryption algorithm offered does not match|class Encryption`), "cifrado"},
-	{re(`Hash algorithm offered does not match|class Hash`), "hash"},
-	{re(`Diffie-Hellman group offered does not match|class Group`), "grupo DH"},
-	{re(`Authentication method offered does not match|class Auth`), "método de autenticación"},
-	{re(`class Life\b`), "lifetime"},
+	{re(`Encryption algorithm offered does not match|class Encryption`), "ike.val.attr.encryption"},
+	{re(`Hash algorithm offered does not match|class Hash`), "ike.val.attr.hash"},
+	{re(`Diffie-Hellman group offered does not match|class Group`), "ike.val.attr.dh_group"},
+	{re(`Authentication method offered does not match|class Auth`), "ike.val.attr.auth_method"},
+	{re(`class Life\b`), "ike.val.attr.lifetime"},
 }
 
 var (
@@ -265,18 +319,19 @@ var (
 	}
 )
 
+// stateMeaning da, por estado de SA, la clave del catálogo (ike.state.*) de lo que significa.
 var stateMeaning = map[string]string{
-	"MM_NO_STATE":  "fase 1 detenida en el primer intercambio: el par no responde o rechaza la propuesta",
-	"MM_WAIT_MSG2": "fase 1 detenida en el primer intercambio: el par no responde o rechaza la propuesta",
-	"AG_INIT_EXCH": "Aggressive Mode sin respuesta: el par no contesta o rechaza la propuesta/identidad",
-	"IN-NEG":       "IKEv2 en negociación sin terminar: sin respuesta, propuestas o autenticación",
-	"MM_SA_SETUP":  "propuesta aceptada pero el intercambio DH no avanza",
-	"MM_WAIT_MSG3": "propuesta aceptada pero el intercambio DH no avanza",
-	"MM_WAIT_MSG4": "propuesta aceptada pero el intercambio DH no avanza",
-	"MM_KEY_EXCH":  "falla en la autenticación: PSK distinta o UDP 4500 bloqueado con NAT",
-	"MM_WAIT_MSG5": "falla en la autenticación: PSK distinta o UDP 4500 bloqueado con NAT",
-	"MM_WAIT_MSG6": "falla en la autenticación: PSK distinta o UDP 4500 bloqueado con NAT",
-	"DELETE":       "SA en borrado",
+	"MM_NO_STATE":  "ike.state.phase1_stalled",
+	"MM_WAIT_MSG2": "ike.state.phase1_stalled",
+	"AG_INIT_EXCH": "ike.state.aggressive",
+	"IN-NEG":       "ike.state.ikev2_neg",
+	"MM_SA_SETUP":  "ike.state.dh_stalled",
+	"MM_WAIT_MSG3": "ike.state.dh_stalled",
+	"MM_WAIT_MSG4": "ike.state.dh_stalled",
+	"MM_KEY_EXCH":  "ike.state.auth_failed",
+	"MM_WAIT_MSG5": "ike.state.auth_failed",
+	"MM_WAIT_MSG6": "ike.state.auth_failed",
+	"DELETE":       "ike.state.deleting",
 }
 
 const maxEvidence = 5
@@ -303,30 +358,50 @@ type decoder struct {
 	skipDet           bool
 }
 
-func (d *decoder) add(code, sev, title string, phase int, expl, action, ev string) {
+// mk arma un hallazgo con los textos de catálogo ike.finding.<código>.* en español.
+func mk(code, sev string, phase int, args i18n.Args) Finding {
+	key := "ike.finding." + strings.ReplaceAll(code, "-", "_")
+	f := Finding{Severity: sev, Code: code, Phase: phase, x: findingX{key: key, explKey: key + ".explanation", args: args}}
+	f.Title, f.Explanation, f.Action = i18n.Msg(i18n.Es, key+".title", args), i18n.Msg(i18n.Es, f.x.explKey, args), i18n.Msg(i18n.Es, key+".action", args)
+	return f
+}
+
+// add suma el hallazgo (o una evidencia más a uno que ya existe). meaning es la clave del significado que se
+// agrega a la línea de evidencia, o vacía.
+func (d *decoder) add(code, sev string, phase int, ev, meaning string) {
+	line := ev
+	if meaning != "" {
+		line = ev + "  → " + i18n.Msg(i18n.Es, meaning, nil)
+	}
 	if i, ok := d.idx[code]; ok {
 		f := &d.r.Findings[i]
 		if len(f.Evidence) < maxEvidence {
-			f.Evidence = append(f.Evidence, ev)
+			f.Evidence, f.x.base, f.x.meaning = append(f.Evidence, line), append(f.x.base, ev), append(f.x.meaning, meaning)
 		}
 		return
 	}
 	d.idx[code] = len(d.r.Findings)
-	d.r.Findings = append(d.r.Findings, Finding{Severity: sev, Code: code, Title: title, Phase: phase, Explanation: expl, Action: action, Evidence: []string{ev}})
+	f := mk(code, sev, phase, nil)
+	f.Evidence, f.x.base, f.x.meaning = []string{line}, []string{ev}, []string{meaning}
+	d.r.Findings = append(d.r.Findings, f)
 }
 
 func (d *decoder) addRule(code string, phase int, ev string) {
 	for _, r := range rules {
 		if r.code == code {
-			d.add(r.code, r.sev, r.title, phase, r.expl, r.action, ev)
+			d.add(r.code, r.sev, phase, ev, "")
 			return
 		}
 	}
 }
 
+// closeProposal cierra la propuesta abierta; result es ike.val.result.accepted, rejected o vacío.
 func (d *decoder) closeProposal(result string) {
 	if d.open != nil {
-		d.open.Result = result
+		d.open.resKey = result
+		if result != "" {
+			d.open.Result = i18n.Msg(i18n.Es, result, nil)
+		}
 		d.r.Proposals = append(d.r.Proposals, *d.open)
 		d.open = nil
 	}
@@ -379,7 +454,7 @@ func DecodeContext(ctx context.Context, text string) (Report, error) {
 				if p == 0 {
 					p = d.phase
 				}
-				d.add(r.code, r.sev, r.title, p, r.expl, r.action, ev)
+				d.add(r.code, r.sev, p, ev, "")
 			}
 		}
 		for _, a := range attrMismatch {
@@ -406,7 +481,7 @@ func DecodeContext(ctx context.Context, text string) (Report, error) {
 			d.dpdSent = append(d.dpdSent, ev)
 		}
 		if d.match(dpdDown, line) {
-			d.add("dpd", "aviso", "DPD: el par dejó de responder", 1, "", "", ev)
+			d.add("dpd", "aviso", 1, ev, "")
 		}
 		d.ok[1] = d.ok[1] || d.match(p1OK, line)
 		d.ok[2] = d.ok[2] || d.match(p2OK, line)
@@ -416,9 +491,7 @@ func DecodeContext(ctx context.Context, text string) (Report, error) {
 	d.aggregate()
 	d.r.Note = Note
 	if d.omitSA+d.omitIPsec > 0 {
-		d.r.Findings = append(d.r.Findings, Finding{Severity: "aviso", Code: "limite-sas", Title: "Se omitieron SAs por exceder el tope",
-			Explanation: fmt.Sprintf("El resultado lista como máximo %d SAs IKE y %d SAs IPsec; se omitieron %d SAs IKE y %d SAs IPsec.", maxSAs, maxSAs, d.omitSA, d.omitIPsec),
-			Action:      "Pega solo la salida del par o túnel que investigas."})
+		d.r.Findings = append(d.r.Findings, mk("limite-sas", "aviso", 0, i18n.A("max", maxSAs, "sa", d.omitSA, "ipsec", d.omitIPsec)))
 	}
 	return d.r, nil
 }
@@ -440,20 +513,24 @@ func contains(l []string, s string) bool {
 	return false
 }
 
+func newProposal(phase int, key string, args i18n.Args) *Proposal {
+	return &Proposal{Phase: phase, Source: i18n.Msg(i18n.Es, key, args), srcKey: key, srcArgs: args}
+}
+
 func (d *decoder) proposals(line string) {
 	if m := d.find(openV1P1, line); m != nil {
 		d.closeProposal("")
-		d.open = &Proposal{Phase: 1, Source: fmt.Sprintf("transform %s del par vs política %s", m[1], m[2])}
+		d.open = newProposal(1, "ike.proposal.source.v1_transform", i18n.A("transform", m[1], "policy", m[2]))
 		return
 	}
 	if m := d.find(openV1P2, line); m != nil {
 		d.closeProposal("")
-		d.open = &Proposal{Phase: 2, Source: "propuesta " + m[1] + " del par"}
+		d.open = newProposal(2, "ike.proposal.source.v1_proposal", i18n.A("n", m[1]))
 		return
 	}
 	if d.open != nil {
 		if m := d.find(attsResult, line); m != nil {
-			d.closeProposal(map[bool]string{true: "rechazada", false: "aceptada"}[m[1] != ""])
+			d.closeProposal(map[bool]string{true: "ike.val.result.rejected", false: "ike.val.result.accepted"}[m[1] != ""])
 			return
 		}
 		if m := d.find(v1Attr, line); m != nil && !strings.Contains(line, "attributes in transform") && len(d.open.Detail) < 400 {
@@ -465,11 +542,13 @@ func (d *decoder) proposals(line string) {
 		}
 	}
 	if m := d.find(v2Mode, line); m != nil {
-		d.v2Source = map[string]string{"received": "recibida del par", "expected": "esperada (local)"}[strings.ToLower(m[1])]
+		d.v2Source = "ike.proposal.source." + strings.ToLower(m[1])
 		return
 	}
 	if m := d.find(v2Prop, line); m != nil && d.v2Source != "" && len(d.r.Proposals) < 100 {
-		d.r.Proposals = append(d.r.Proposals, Proposal{Phase: max(d.phase, 1), Source: d.v2Source, Detail: strings.Join(strings.Fields(m[1]), " ")})
+		p := newProposal(max(d.phase, 1), d.v2Source, nil)
+		p.Detail = strings.Join(strings.Fields(m[1]), " ")
+		d.r.Proposals = append(d.r.Proposals, *p)
 	}
 }
 
@@ -527,9 +606,7 @@ func (d *decoder) tables(line, ev string) {
 
 func (d *decoder) stateFinding(state, ev string) {
 	if m, ok := stateMeaning[state]; ok {
-		d.add("sa-estado", "aviso", "SA atascadas en negociación", 1,
-			"Estados que no son QM_IDLE/MM_ACTIVE/READY indican en qué paso se detuvo la negociación.",
-			"Corre el debug de la fase indicada en ambos extremos mientras generas tráfico, y pégalo aquí.", ev+"  → "+m)
+		d.add("sa-estado", "aviso", 1, ev, m)
 	}
 }
 
@@ -548,21 +625,13 @@ func (d *decoder) finishIPsec() {
 	ev := fmt.Sprintf("peer %s  %s → %s  encaps %d / decaps %d", s.Peer, s.Local, s.Remote, s.Encaps, s.Decaps)
 	switch {
 	case !s.HasSA:
-		d.add("ipsec-sin-sa", "aviso", "Sin SA de IPsec para estas redes", 2,
-			"La entrada existe en el crypto map pero no hay SPI de entrada ni salida: la fase 2 no se ha negociado para este par de redes.",
-			"Genera tráfico interesante desde la LAN (ping con origen en la red protegida) y revisa el debug de fase 2 (proxy IDs, transform-set, PFS).", ev)
+		d.add("ipsec-sin-sa", "aviso", 2, ev, "")
 	case s.Encaps > 0 && s.Decaps == 0:
-		d.add("ipsec-unidireccional", "error", "Tráfico cifrado sale pero no regresa", 2,
-			"Se encapsula hacia el par pero no llega nada de vuelta: el otro extremo no responde por el túnel o el ESP de regreso se pierde.",
-			"En el par: ruta de regreso hacia esta LAN, NAT exemption (no NATear el tráfico del túnel), ACL de cripto espejo y sus contadores; en el camino: ESP (IP 50) o UDP 4500 filtrados.", ev)
+		d.add("ipsec-unidireccional", "error", 2, ev, "")
 	case s.Decaps > 0 && s.Encaps == 0:
-		d.add("ipsec-solo-entrada", "aviso", "Llega tráfico del túnel pero no sale nada", 2,
-			"Se desencapsula lo que manda el par pero las respuestas locales no entran al túnel.",
-			"Revisa que la ruta hacia la red remota salga por la interfaz con el crypto map / túnel, la NAT exemption local y la ACL de cripto.", ev)
+		d.add("ipsec-solo-entrada", "aviso", 2, ev, "")
 	case s.Encaps == 0 && s.Decaps == 0:
-		d.add("ipsec-sin-trafico", "info", "SA arriba sin tráfico", 2,
-			"La fase 2 está negociada pero no pasa tráfico en ningún sentido.",
-			"Confirma que el tráfico de prueba coincide con la ACL de cripto y que se enruta hacia la interfaz del túnel.", ev)
+		d.add("ipsec-sin-trafico", "info", 2, ev, "")
 	}
 	var errs []string
 	for k, v := range s.Counters {
@@ -573,21 +642,21 @@ func (d *decoder) finishIPsec() {
 	}
 	if len(errs) > 0 {
 		sort.Strings(errs)
-		d.add("ipsec-errores", "aviso", "Contadores de error de IPsec", 2,
-			"Hay errores de envío/recepción, de integridad o de anti-replay en la SA.",
-			"send errors suele ser falta de SA o de ruta; recv/verify/replay failed apuntan a pérdidas, reordenamiento (QoS) o llaves desincronizadas: limpia la SA y observa si vuelven a subir.",
-			"peer "+s.Peer+" "+s.Local+": "+strings.Join(errs, ", "))
+		d.add("ipsec-errores", "aviso", 2, "peer "+s.Peer+" "+s.Local+": "+strings.Join(errs, ", "), "")
 	}
 }
 
 func (d *decoder) aggregate() {
 	if i, ok := d.idx["p1-propuesta"]; ok && len(d.attrs) > 0 {
-		d.r.Findings[i].Explanation += " Atributos que no coinciden según el equipo: " + strings.Join(d.attrs, ", ") + "."
+		f := &d.r.Findings[i]
+		f.x.explKey, f.x.args = f.x.key+".explanation_attrs", i18n.A("attrs", strings.Join(d.attrs, ","))
+		f.Explanation = i18n.Msg(i18n.Es, f.x.explKey, f.x.args)
 	}
 	if _, ok := d.idx["p2-propuesta"]; ok && d.pfsLine != "" {
 		d.addRule("pfs", 2, d.pfsLine)
-		d.r.Findings[d.idx["pfs"]].Severity = "aviso"
-		d.r.Findings[d.idx["pfs"]].Explanation = "El par propone PFS (atributo 'group is N') en fase 2 y la propuesta fue rechazada: si el transform-set coincide, la causa es el PFS. " + d.r.Findings[d.idx["pfs"]].Explanation
+		f := &d.r.Findings[d.idx["pfs"]]
+		f.Severity, f.x.explKey = "aviso", f.x.key+".explanation_rejected"
+		f.Explanation = i18n.Msg(i18n.Es, f.x.explKey, nil)
 	}
 	if len(d.retrans) >= 3 {
 		for _, ev := range d.retrans[len(d.retrans)-min(len(d.retrans), maxEvidence):] {
@@ -596,18 +665,15 @@ func (d *decoder) aggregate() {
 	}
 	if _, down := d.idx["dpd"]; (len(d.dpdSent) >= 3 && d.dpdAcks == 0) || down {
 		for _, ev := range d.dpdSent[:min(len(d.dpdSent), maxEvidence)] {
-			d.add("dpd", "aviso", "DPD: el par dejó de responder", 1, "", "", ev)
+			d.add("dpd", "aviso", 1, ev, "")
 		}
-		f := &d.r.Findings[d.idx["dpd"]]
-		f.Explanation = "Se enviaron consultas DPD (R_U_THERE / liveness) sin respuesta: el par se reinició, perdió la SA o el camino se cortó."
-		f.Action = "Verifica alcance UDP 500/4500 y el estado de la SA en el par; con 'crypto isakmp keepalive' / 'dpd' en ambos lados la SA huérfana se limpia sola."
 	}
-	d.r.Phase1 = d.phaseStatus(1, []string{"p1-propuesta", "psk", "psk-ausente", "sin-respuesta", "identidad"})
-	d.r.Phase2 = d.phaseStatus(2, []string{"p2-propuesta", "pfs", "proxy-id"})
+	d.r.Phase1, d.r.phase1 = d.phaseStatus(1, []string{"p1-propuesta", "psk", "psk-ausente", "sin-respuesta", "identidad"})
+	d.r.Phase2, d.r.phase2 = d.phaseStatus(2, []string{"p2-propuesta", "pfs", "proxy-id"})
 	if d.r.Phase2 != "falló" && d.r.Phase2 != "mixta" {
 		for _, s := range d.r.IPsec {
 			if s.HasSA {
-				d.r.Phase2 = "establecida"
+				d.r.Phase2, d.r.phase2 = i18n.Msg(i18n.Es, "ike.val.phase.established", nil), "ike.val.phase.established"
 			}
 		}
 	}
@@ -616,45 +682,51 @@ func (d *decoder) aggregate() {
 
 var sevRank = map[string]int{"error": 0, "aviso": 1, "info": 2}
 
-func (d *decoder) phaseStatus(p int, fails []string) string {
+// phaseStatus da el estado de la fase en español y su clave ike.val.phase.*.
+func (d *decoder) phaseStatus(p int, fails []string) (string, string) {
 	failed := false
 	for _, c := range fails {
 		if _, ok := d.idx[c]; ok {
 			failed = true
 		}
 	}
+	key := "ike.val.phase.no_data"
 	switch {
 	case failed && d.ok[p]:
-		return "mixta"
+		key = "ike.val.phase.mixed"
 	case failed:
-		return "falló"
+		key = "ike.val.phase.failed"
 	case d.ok[p]:
-		return "establecida"
+		key = "ike.val.phase.established"
 	case d.activity[p]:
-		return "incompleta"
+		key = "ike.val.phase.incomplete"
 	}
-	return "sin datos"
+	return i18n.Msg(i18n.Es, key, nil), key
 }
 
-func (r Report) Text() string {
+// Text es el informe legible en español.
+func (r Report) Text() string { return r.TextIn(i18n.Es) }
+
+// TextIn es el informe legible en el idioma dado; el texto en español es el de siempre.
+func (r Report) TextIn(loc string) string {
 	var b strings.Builder
 	if len(r.Detected) == 0 {
-		b.WriteString("No se reconoció salida de IKE/IPsec. Pega debug crypto isakmp/ikev2/ipsec o show crypto isakmp sa / ikev2 sa detail / ipsec sa.\n")
+		b.WriteString(i18n.Msg(loc, "ike.text.unrecognized", nil) + "\n")
 		return b.String()
 	}
-	fmt.Fprintf(&b, "Detectado: %s\nFase 1: %s   Fase 2: %s\n", strings.Join(r.Detected, ", "), r.Phase1, r.Phase2)
+	b.WriteString(i18n.Msg(loc, "ike.text.detected", i18n.A("sources", strings.Join(r.Detected, ", "), "phase1", r.phase1, "phase2", r.phase2)) + "\n")
 	if len(r.Proposals) > 0 {
-		b.WriteString("\nPropuestas:\n")
+		b.WriteString("\n" + i18n.Msg(loc, "ike.text.proposals", nil) + "\n")
 		for _, p := range r.Proposals {
-			fmt.Fprintf(&b, "  F%d %s: %s", p.Phase, p.Source, p.Detail)
-			if p.Result != "" {
-				fmt.Fprintf(&b, "  → %s", p.Result)
+			fmt.Fprintf(&b, "  %s", i18n.Msg(loc, "ike.text.proposal", i18n.A("phase", p.Phase, "source", i18n.Msg(loc, p.srcKey, p.srcArgs), "detail", p.Detail)))
+			if p.resKey != "" {
+				fmt.Fprintf(&b, "  %s", i18n.Msg(loc, "ike.text.result", i18n.A("result", p.resKey)))
 			}
 			b.WriteString("\n")
 		}
 	}
 	if len(r.SAs) > 0 {
-		b.WriteString("\nSA:\n")
+		b.WriteString("\n" + i18n.Msg(loc, "ike.text.sas", nil) + "\n")
 		for _, s := range r.SAs {
 			fmt.Fprintf(&b, "  %-6s %-18s %s %s\n", s.Kind, s.Peer, s.State, s.Detail)
 		}
@@ -667,14 +739,15 @@ func (r Report) Text() string {
 		b.WriteString("\n")
 	}
 	if len(r.Findings) > 0 {
-		b.WriteString("\nHallazgos:\n")
+		b.WriteString("\n" + i18n.Msg(loc, "ike.text.findings", nil) + "\n")
 	}
 	for _, f := range r.Findings {
-		fmt.Fprintf(&b, "\n[%s] %s\n  %s\n  Acción: %s\n", f.Severity, f.Title, f.Explanation, f.Action)
+		f = f.In(loc)
+		fmt.Fprintf(&b, "\n[%s] %s\n  %s\n  %s\n", i18n.Msg(loc, "ike.val.severity."+f.Severity, nil), f.Title, f.Explanation, i18n.Msg(loc, "ike.text.action", i18n.A("action", f.Action)))
 		for _, e := range f.Evidence {
 			fmt.Fprintf(&b, "    > %s\n", e)
 		}
 	}
-	fmt.Fprintf(&b, "\nNota: %s\n", r.Note)
+	fmt.Fprintf(&b, "\n%s\n", i18n.Msg(loc, "ike.text.note", i18n.A("note", i18n.Msg(loc, "ike.note", nil))))
 	return b.String()
 }
