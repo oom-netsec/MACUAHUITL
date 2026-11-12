@@ -178,7 +178,7 @@ func (r *Request) scpGet(ctx context.Context, w io.Writer) error {
 		case strings.HasPrefix(line, "C"):
 			f := strings.SplitN(strings.TrimSpace(line[1:]), " ", 3)
 			if len(f) != 3 {
-				return errors.New("scp: orden C mal formada")
+				return i18n.New("xfer.err.scp_c_line", nil)
 			}
 			if size, err = strconv.ParseInt(f[1], 10, 64); err != nil || size < 0 {
 				return i18n.New("xfer.err.scp_size", nil)

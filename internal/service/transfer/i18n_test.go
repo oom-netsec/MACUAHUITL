@@ -236,3 +236,26 @@ func TestURLInvalidaNoFiltraLaContrasena(t *testing.T) {
 		}
 	}
 }
+
+// «Este servidor no lista» trae un código estable con el protocolo en la metadata (no texto traducido).
+func TestNoListaTieneCodigoEstable(t *testing.T) {
+	s, _ := newTest(t)
+	for lang, want := range map[string]string{"": "este servidor no permite listar: TFTP no tiene comando para listar carpetas", "en": "this server does not allow listing: TFTP has no command to list folders"} {
+		ctx := context.Background()
+		if lang != "" {
+			ctx = i18n.WithLocale(ctx, lang)
+		}
+		_, err := s.Browse(ctx, &v1.BrowseRequest{Url: "tftp://127.0.0.1/"})
+		st := status.Convert(err)
+		var reason string
+		var meta map[string]string
+		for _, d := range st.Details() {
+			if ei, ok := d.(*errdetails.ErrorInfo); ok {
+				reason, meta = ei.Reason, ei.Metadata
+			}
+		}
+		if st.Message() != want || reason != "xfer.no_listing.tftp" || len(meta) != 1 || meta["proto"] != "tftp" {
+			t.Errorf("%q: %q %q %v", lang, st.Message(), reason, meta)
+		}
+	}
+}

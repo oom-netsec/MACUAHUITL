@@ -42,12 +42,13 @@ type NoListingError struct{ Proto, Reason string }
 
 func (e *NoListingError) Error() string { return "este servidor no permite listar: " + e.Reason }
 
-// Why da el motivo en el idioma loc: el de TFTP o SCP del catálogo (xfer.no_listing.<proto>); otro texto va tal cual.
-func (e *NoListingError) Why(loc string) string {
-	if i18n.Msg(i18n.Es, "xfer.no_listing."+e.Proto, nil) == e.Reason {
-		return i18n.Msg(loc, "xfer.no_listing."+e.Proto, nil)
+// Code es el código del catálogo del motivo (xfer.no_listing.<proto>) si es uno de los de TFTP o SCP; vacío si no.
+func (e *NoListingError) Code() string {
+	k := "xfer.no_listing." + e.Proto
+	if i18n.Msg(i18n.Es, k, nil) == e.Error() {
+		return k
 	}
-	return e.Reason
+	return ""
 }
 
 // browsePath valida la carpeta que se pide: va como texto a un protocolo, así que sin control ni formato invisible.

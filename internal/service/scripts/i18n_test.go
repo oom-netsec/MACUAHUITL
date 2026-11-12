@@ -264,3 +264,21 @@ func TestScriptsEnVistaPreviaOrdenYUnicidad(t *testing.T) {
 		t.Fatalf("el nombre en inglés de fábrica debe chocar: %v", err)
 	}
 }
+
+// Las decisiones repetidas y el token de otro tipo nombran el tipo en inglés con en («collection», «collections»).
+func TestScriptsEnDecisionRepetidaYTokenDeOtroTipo(t *testing.T) {
+	en := i18n.WithLocale(context.Background(), "en")
+	_, err := decisionMap(en, []*v1.ImportDecision{{ScriptId: "a"}, {ScriptId: "a"}}, "collection")
+	if err == nil || status.Convert(err).Message() != "repeated decision for a (collection)" {
+		t.Fatalf("en: %v", err)
+	}
+	_, err = decisionMap(context.Background(), []*v1.ImportDecision{{ScriptId: "a"}, {ScriptId: "a"}}, "collection")
+	if err == nil || status.Convert(err).Message() != "decisión repetida para a (colección)" {
+		t.Fatalf("es: %v", err)
+	}
+	s, _ := nuevoSvc(t)
+	tok, _ := s.stash(pending{kind: pendCols})
+	if _, err = s.take(en, tok, pendScripts); err == nil || status.Convert(err).Message() != "the token is from a collections preview; use the other import step" {
+		t.Fatalf("token en: %v", err)
+	}
+}

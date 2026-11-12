@@ -426,7 +426,7 @@ func (s *svc) take(ctx context.Context, tok, kind string) (pending, error) {
 	}
 	if p.kind != kind {
 		s.pend.Restore(tok, p, exp)
-		return p, service.Err(ctx, codes.FailedPrecondition, "scripts.svc.token_kind", i18n.A("kind", p.kind))
+		return p, service.Err(ctx, codes.FailedPrecondition, "scripts.svc.token_kind", i18n.A("kind", p.kind, "kind_en", map[string]string{pendScripts: "scripts", pendCols: "collections"}[p.kind]))
 	}
 	if s.clock().After(exp) {
 		return p, service.Err(ctx, codes.FailedPrecondition, "scripts.svc.preview_expired", nil)

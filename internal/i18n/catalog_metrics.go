@@ -25,7 +25,7 @@ func init() {
 		"metrics.err.no_host":         e("metrics: el trabajo no tiene salidas del equipo {host}", "metrics: the job has no outputs for device {host}", "host"),
 		"metrics.err.too_big":         e("el archivo creció más allá del tope mientras se leía", "the file grew past the limit while it was being read"),
 
-		"metrics.svc.platform":     e("plataforma {platform:q} no soportada: la vista de frente lee IOS e IOS-XE", "platform {platform:q} is not supported: the front view reads IOS and IOS-XE", "platform"),
+		"metrics.svc.platform":     e("plataforma {platform:q} no soportada: la vista de frente lee IOS e IOS-XE", "platform {platform:q} is not supported: the front-panel view reads IOS and IOS-XE", "platform"),
 		"metrics.svc.job_empty":    e("el trabajo aún no tiene salidas", "the job has no outputs yet"),
 		"metrics.svc.no_source":    e("indica un trabajo o una carpeta de salida", "specify a job or an output folder"),
 		"metrics.svc.relative":     e("la ruta {path:q} debe ser absoluta", "the path {path:q} must be absolute", "path"),

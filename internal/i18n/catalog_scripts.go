@@ -39,7 +39,7 @@ func init() {
 		"scripts.svc.export_dup":        e("dos scripts seleccionados se llaman {name:q}: el archivo no se podría importar", "two selected scripts are named {name:q}: the file could not be imported", "name"),
 		"scripts.svc.export_big":        e("el archivo pasaría de 5 MB y el import lo rechazaría; exporta menos scripts", "the file would exceed 5 MB and the import would reject it; export fewer scripts"),
 		"scripts.svc.token_unknown":     e("token de importación desconocido; abre el archivo de nuevo", "unknown import token; open the file again"),
-		"scripts.svc.token_kind":        e("el token es de una vista previa de {kind}; usa el otro paso de importación", "the token is from a {kind} preview; use the other import step", "kind"),
+		"scripts.svc.token_kind":        e("el token es de una vista previa de {kind}; usa el otro paso de importación", "the token is from a {kind_en} preview; use the other import step", "kind", "kind_en"),
 		"scripts.svc.preview_expired":   e("la vista previa venció; vuelve a abrir el archivo", "the preview expired; open the file again"),
 		"scripts.svc.decision_dup":      e("decisión repetida para {id}", "repeated decision for {id}", "id"),
 		"scripts.svc.col_missing":       e("falta la colección", "the collection is missing"),
@@ -52,7 +52,7 @@ func init() {
 		"scripts.svc.pinned_order":      e("el orden debe traer cada script fijado una sola vez", "the order must list each pinned script exactly once"),
 		"scripts.svc.col_export_range":  e("se exportan de 1 a {max} colecciones", "export 1 to {max} collections", "max"),
 		"scripts.svc.col_export_big":    e("el archivo pasaría de 5 MB y el import lo rechazaría; exporta menos colecciones", "the file would exceed 5 MB and the import would reject it; export fewer collections"),
-		"scripts.svc.decision_dup_kind": e("decisión repetida para {id} ({what})", "repeated decision for {id} ({what})", "id", "what"),
+		"scripts.svc.decision_dup_kind": e("decisión repetida para {id} ({what})", "repeated decision for {id} ({what_en})", "id", "what", "what_en"),
 		"scripts.svc.col_total":         e("quedarían {total} colecciones; el tope es {max}", "that would leave {total} collections; the limit is {max}", "total", "max"),
 		"scripts.svc.kind_unknown":      e("tipo {kind:q} desconocido: {a} o {b}", "unknown type {kind:q}: {a} or {b}", "kind", "a", "b"),
 	})

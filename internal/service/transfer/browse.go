@@ -36,7 +36,7 @@ func (s *svc) Browse(ctx context.Context, r *v1.BrowseRequest) (*v1.BrowseRespon
 	}
 	if u, err := url.Parse(r.Url); err == nil && u.Scheme == "tftp" { // TFTP no lista: ni se pide autorización al guard
 		nl := &xfer.NoListingError{Proto: "tftp", Reason: "TFTP no tiene comando para listar carpetas"}
-		return nil, service.Err(ctx, codes.Unimplemented, "xfer.no_listing", i18n.A("reason", nl.Why(i18n.Locale(ctx))))
+		return nil, noListing(ctx, nl)
 	}
 	j, err := s.open(ctx, r.Url, r.CredentialId, r.AcceptedHostKeyFingerprints, r.LegacySsh)
 	if err != nil {
@@ -52,7 +52,7 @@ func (s *svc) Browse(ctx context.Context, r *v1.BrowseRequest) (*v1.BrowseRespon
 	var nl *xfer.NoListingError
 	if errors.As(err, &nl) {
 		s.d.Audit("transfer.browse.nolisting", j.label, fmt.Sprintf("job=%s folder=%q protocol=%s guard=revoked", j.id, r.Path, nl.Proto))
-		return nil, service.Err(ctx, codes.Unimplemented, "xfer.no_listing", i18n.A("reason", nl.Why(i18n.Locale(ctx))))
+		return nil, noListing(ctx, nl)
 	}
 	if err != nil {
 		s.d.Audit("transfer.browse.failed", j.label, fmt.Sprintf("job=%s folder=%q reason=%q guard=revoked", j.id, r.Path, j.errText(err)))
@@ -240,4 +240,12 @@ func (s *svc) GetMany(r *v1.GetManyRequest, st v1.TransferService_GetManyServer)
 	s.d.Audit("transfer.getmany", base.Host, fmt.Sprintf("done=%d failed=%d", ok, failed))
 	ev.send(&v1.GetManyResponse{Event: &v1.TransferEvent{Event: &v1.TransferEvent_Done{Done: &v1.BatchSummary{Ok: int32(ok), Failed: int32(failed)}}}})
 	return ev.err
+}
+
+// noListing es el error de «este servidor no lista»: con código estable y el protocolo en la metadata.
+func noListing(ctx context.Context, nl *xfer.NoListingError) error {
+	if k := nl.Code(); k != "" {
+		return service.Err(ctx, codes.Unimplemented, k, i18n.A("proto", nl.Proto))
+	}
+	return status.Error(codes.Unimplemented, nl.Error())
 }

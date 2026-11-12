@@ -508,7 +508,7 @@ func decisionMap(ctx context.Context, ds []*v1.ImportDecision, que string) (map[
 	out := map[string]string{}
 	for _, d := range ds {
 		if _, dup := out[d.ScriptId]; dup {
-			return nil, service.Err(ctx, codes.InvalidArgument, "scripts.svc.decision_dup_kind", i18n.A("id", d.ScriptId, "what", que))
+			return nil, service.Err(ctx, codes.InvalidArgument, "scripts.svc.decision_dup_kind", i18n.A("id", d.ScriptId, "what", map[string]string{"collection": "colección"}[que]+map[string]string{"script": "script"}[que], "what_en", que))
 		}
 		out[d.ScriptId] = d.Action
 	}
@@ -537,7 +537,7 @@ func (s *svc) ApplyImportCollections(ctx context.Context, r *v1.ApplyImportColle
 	var cres dom.ResultadoCol
 	var sdec, cdec map[string]string
 	if sdec, err = decisionMap(ctx, r.ScriptDecisions, "script"); err == nil {
-		cdec, err = decisionMap(ctx, r.CollectionDecisions, "colección")
+		cdec, err = decisionMap(ctx, r.CollectionDecisions, "collection")
 	}
 	if err != nil {
 		invalid = true

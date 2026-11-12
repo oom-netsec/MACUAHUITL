@@ -272,7 +272,7 @@ func Upload(ctx context.Context, r Request) (Result, error) {
 		return res, i18n.New("xfer.err.no_url", nil)
 	}
 	if r.URL.Scheme == "http" || r.URL.Scheme == "https" {
-		return res, errors.New("transfer: HTTP solo baja archivos")
+		return res, i18n.New("xfer.err.http_get_only", nil)
 	}
 	if _, err := Port(r.URL); err != nil {
 		return res, err

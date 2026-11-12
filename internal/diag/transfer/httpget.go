@@ -3,7 +3,6 @@ package transfer
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -37,7 +36,7 @@ func (r *Request) httpClient() (cl *http.Client, closeIdle func()) {
 	}
 	cl = &http.Client{Transport: tr, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
-			return errors.New("demasiadas redirecciones")
+			return i18n.New("xfer.err.redirects", nil)
 		}
 		if via[0].URL.Scheme == "https" && req.URL.Scheme != "https" { // no se baja de nivel: el contenido iría en claro
 			return i18n.New("xfer.err.https_http", nil)
