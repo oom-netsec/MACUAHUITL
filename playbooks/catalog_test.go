@@ -114,3 +114,28 @@ func TestSoloBootflashLlevaPlatforms(t *testing.T) {
 		}
 	}
 }
+
+// Todo playbook incrustado lleva su nombre en inglés, con la misma separación « · » que el español, para que la UI
+// agrupe igual en los dos idiomas (cobertura, como la del catálogo de mensajes).
+func TestNombresEnIngles(t *testing.T) {
+	pbs, err := playbook.Load(playbooks.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pbs) == 0 {
+		t.Fatal("sin playbooks")
+	}
+	for _, p := range pbs {
+		if strings.TrimSpace(p.NameEn) == "" {
+			t.Errorf("%s: falta name_en", p.ID)
+			continue
+		}
+		if p.NameEn == p.Name && strings.ContainsAny(p.Name, "áéíóúñ") {
+			t.Errorf("%s: name_en repite el nombre en español %q", p.ID, p.Name)
+		}
+		es, en := strings.Contains(p.Name, " · "), strings.Contains(p.NameEn, " · ")
+		if es != en {
+			t.Errorf("%s: el área antes de « · » debe estar en los dos nombres (%q, %q)", p.ID, p.Name, p.NameEn)
+		}
+	}
+}

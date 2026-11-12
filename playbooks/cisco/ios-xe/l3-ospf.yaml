@@ -5,6 +5,7 @@
 id: l3-ospf
 platform: ios-xe
 name: L3 · OSPF
+name_en: L3 · OSPF
 commands:
   - cmd: show clock
   - cmd: show ip protocols | section ospf

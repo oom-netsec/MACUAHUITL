@@ -5,6 +5,7 @@
 id: l3-hsrp-vrrp-glbp
 platform: ios-xe
 name: L3 · HSRP, VRRP y GLBP
+name_en: L3 · HSRP, VRRP and GLBP
 commands:
   - cmd: show clock
   - cmd: show standby brief

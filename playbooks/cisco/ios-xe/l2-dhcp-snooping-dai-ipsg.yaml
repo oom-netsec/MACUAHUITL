@@ -5,6 +5,7 @@
 id: l2-dhcp-snooping-dai-ipsg
 platform: ios-xe
 name: L2 · DHCP snooping, DAI e IPSG
+name_en: L2 · DHCP snooping, DAI and IPSG
 commands:
   - cmd: show clock
   - cmd: show ip dhcp snooping

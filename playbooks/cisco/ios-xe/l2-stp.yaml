@@ -5,6 +5,7 @@
 id: l2-stp
 platform: ios-xe
 name: L2 · STP
+name_en: L2 · STP
 commands:
   - cmd: show clock
   - cmd: show spanning-tree summary

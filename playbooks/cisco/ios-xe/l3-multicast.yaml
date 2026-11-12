@@ -5,6 +5,7 @@
 id: l3-multicast
 platform: ios-xe
 name: L3 · Multicast
+name_en: L3 · Multicast
 commands:
   - cmd: show clock
   - cmd: show ip multicast

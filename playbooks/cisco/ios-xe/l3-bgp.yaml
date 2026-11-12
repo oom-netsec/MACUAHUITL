@@ -5,6 +5,7 @@
 id: l3-bgp
 platform: ios-xe
 name: L3 · BGP
+name_en: L3 · BGP
 commands:
   - cmd: show clock
   - cmd: show ip bgp summary

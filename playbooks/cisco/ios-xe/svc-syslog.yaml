@@ -5,6 +5,7 @@
 id: svc-syslog
 platform: ios-xe
 name: Servicios · Syslog
+name_en: Services · Syslog
 commands:
   - cmd: show clock
   - cmd: show logging | include Syslog logging|Console logging|Monitor logging|Buffer logging|Trap logging|Logging to

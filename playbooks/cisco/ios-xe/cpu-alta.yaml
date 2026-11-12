@@ -1,6 +1,7 @@
 id: cpu-alta
 platform: ios-xe
 name: Plataforma · CPU alta
+name_en: Platform · High CPU
 commands:
   - cmd: show clock
   - cmd: show processes cpu sorted

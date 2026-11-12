@@ -5,6 +5,7 @@
 id: l1-port-security
 platform: ios-xe
 name: L1 · Port-security
+name_en: L1 · Port security
 commands:
   - cmd: show clock
   - cmd: show port-security

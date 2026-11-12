@@ -42,11 +42,12 @@ func Compatible(detected, pbPlatform string) bool {
 // knownPlatforms son las plataformas que un playbook puede nombrar en platforms: (las de playbooks/cisco).
 var knownPlatforms = []string{"ios", "ios-xe", "nx-os", "cat9k", "ftd", "ise", "sda", "wlc-9800", "wlc-aireos"}
 
-// Playbook tiene ID "<plataforma>/<id del archivo>" (p. ej. "ios-xe/tac-baseline").
+// Playbook tiene ID "<plataforma>/<id del archivo>" (p. ej. "ios-xe/tac-baseline"). NameEn es el nombre en inglés
+// (name_en); los playbooks del usuario pueden omitirlo y NameFor cae al nombre en español.
 type Playbook struct {
-	ID, Platform, Name string
-	Pre                []string
-	Commands           []Command
+	ID, Platform, Name, NameEn string
+	Pre                        []string
+	Commands                   []Command
 }
 
 type fileCommand struct {
@@ -60,6 +61,7 @@ type file struct {
 	ID       string        `yaml:"id"`
 	Platform string        `yaml:"platform"`
 	Name     string        `yaml:"name"`
+	NameEn   string        `yaml:"name_en"`
 	Pre      []string      `yaml:"pre"`
 	Commands []fileCommand `yaml:"commands"`
 }
@@ -98,7 +100,7 @@ func parse(b []byte) (Playbook, error) {
 	if len(f.Commands) == 0 {
 		return Playbook{}, errors.New("sin comandos")
 	}
-	p := Playbook{ID: f.Platform + "/" + f.ID, Platform: f.Platform, Name: f.Name, Pre: f.Pre}
+	p := Playbook{ID: f.Platform + "/" + f.ID, Platform: f.Platform, Name: f.Name, NameEn: f.NameEn, Pre: f.Pre}
 	for _, c := range append(f.Pre, cmdTexts(f.Commands)...) {
 		if err := CheckDenied(f.Platform, c); err != nil {
 			return Playbook{}, err
@@ -132,6 +134,14 @@ func cmdTexts(cs []fileCommand) []string {
 		out[i] = c.Cmd
 	}
 	return out
+}
+
+// NameFor da el nombre en el idioma loc ("en" usa name_en si lo hay; todo lo demás, el nombre en español).
+func (p Playbook) NameFor(loc string) string {
+	if loc == "en" && p.NameEn != "" {
+		return p.NameEn
+	}
+	return p.Name
 }
 
 // Ephemeral convierte comandos pegados (uno por línea) en un playbook.

@@ -5,6 +5,7 @@
 id: l1-transceptores-dom
 platform: ios-xe
 name: L1 · Transceptores (DOM)
+name_en: L1 · Transceivers (DOM)
 commands:
   - cmd: show clock
   - cmd: show interfaces status

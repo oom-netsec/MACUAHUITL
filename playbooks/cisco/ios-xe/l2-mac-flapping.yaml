@@ -5,6 +5,7 @@
 id: l2-mac-flapping
 platform: ios-xe
 name: L2 · MAC flapping
+name_en: L2 · MAC flapping
 commands:
   - cmd: show clock
   - cmd: show mac address-table count

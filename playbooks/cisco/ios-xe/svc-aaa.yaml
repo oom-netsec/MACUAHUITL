@@ -5,6 +5,7 @@
 id: svc-aaa
 platform: ios-xe
 name: Servicios · AAA, TACACS+ y RADIUS
+name_en: Services · AAA, TACACS+ and RADIUS
 commands:
   - cmd: show clock
   - cmd: show users

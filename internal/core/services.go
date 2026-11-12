@@ -527,13 +527,13 @@ func (s *patrolSvc) ListJobs(ctx context.Context, _ *v1.ListJobsRequest) (*v1.Li
 
 // ListPlaybooks devuelve los playbooks ya cargados (embebidos y de config/playbooks), ordenados por id;
 // el id es el mismo que CreateJob acepta en playbook_ids.
-func (s *patrolSvc) ListPlaybooks(_ context.Context, r *v1.ListPlaybooksRequest) (*v1.ListPlaybooksResponse, error) {
+func (s *patrolSvc) ListPlaybooks(ctx context.Context, r *v1.ListPlaybooksRequest) (*v1.ListPlaybooksResponse, error) {
 	out := &v1.ListPlaybooksResponse{}
 	for _, p := range s.c.pbs {
 		if r.GetPlatform() != "" && !playbook.Compatible(r.GetPlatform(), p.Platform) { // ios lista los de ios-xe
 			continue
 		}
-		info := &v1.PlaybookInfo{Id: p.ID, Platform: p.Platform, Name: p.Name, Commands: slices.Clone(p.Pre)} // los pre corren primero
+		info := &v1.PlaybookInfo{Id: p.ID, Platform: p.Platform, Name: p.NameFor(i18n.Locale(ctx)), Commands: slices.Clone(p.Pre)} // los pre corren primero
 		for _, c := range p.Commands {
 			if r.GetPlatform() == "" || c.Applies(r.GetPlatform()) { // sin plataforma, todos; con ella, los que corren ahí
 				info.Commands = append(info.Commands, c.Text)

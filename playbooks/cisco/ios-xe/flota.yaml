@@ -1,6 +1,7 @@
 id: flota
 platform: ios-xe
 name: Flota · Día a día (ARP, CAM, rutas, NTP, inventario, flash)
+name_en: Fleet · Day to day (ARP, CAM, routes, NTP, inventory, flash)
 commands:
   - cmd: show version
   - cmd: show ip arp

@@ -5,6 +5,7 @@
 id: plat-sdm-tcam
 platform: ios-xe
 name: Plataforma · SDM y TCAM
+name_en: Platform · SDM and TCAM
 commands:
   - cmd: show clock
   - cmd: show sdm prefer

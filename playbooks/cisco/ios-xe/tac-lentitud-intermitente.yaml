@@ -5,6 +5,7 @@
 id: tac-lentitud-intermitente
 platform: ios-xe
 name: TAC · Lentitud intermitente
+name_en: TAC · Intermittent slowness
 commands:
   - cmd: show clock
   - cmd: show processes cpu sorted
