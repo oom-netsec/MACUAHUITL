@@ -2545,4 +2545,7 @@ export const en: Record<Key, string> = {
   "fps.accepted.short": "Accepted fingerprints",
   "fps.accepted.hint": "SHA256:…, separated by spaces or commas",
   "patrol.phase.ARM_CHECK_DONE": "Login Test at arming",
+  "syslog.err.tplCh": "Character not allowed in the template: {ch}",
+  "syslog.err.coreValue": "Unsupported value: {value}",
+  "syslog.err.coreAddr": "Invalid listen address.",
 };

@@ -1,6 +1,7 @@
 // Opciones de los receptores syslog, traps y flujos: formulario en texto, validación en vivo con la regla del núcleo y el nombre de ejemplo.
 import type { SyslogOptions } from "../../modules/tools/api";
 import type { Key } from "../../lib/i18n/es";
+import type { ErrInfo } from "../../lib/coreError";
 
 /** Receptor al que sirven las opciones: cambian los defaults de tasa (flujos), la plantilla y las unidades. */
 export type IngestKind = "syslog" | "traps" | "flows";
@@ -95,6 +96,27 @@ const FIELD_PATTERNS: [RegExp, OptKey][] = [
   [/plantilla/, "nameTemplate"], [/formato ".*" no soportado/, "format"], [/dirección (de escucha )?inválida|puerto|el host debe/, "addr"],
 ];
 export const mapStartError = (msg: string): OptKey | null => FIELD_PATTERNS.find(([re]) => re.test(msg))?.[1] ?? null;
+
+const CORE_FIELDS: Record<string, OptKey> = {
+  rate_per_source: "ratePerSource", burst_per_source: "burstPerSource", rate_global: "rateGlobal", burst_global: "burstGlobal", queue_size: "queueSize",
+  rotate_mb: "rotateMb", rotate_minutes: "rotateMinutes", max_files: "maxFiles", name_template: "nameTemplate", format: "format", addr: "addr",
+};
+const TPL_PROBLEMS = { len: "tplLen", need: "tplNeed", tokens: "tplTokens", dots: "tplDots" } as const;
+type Tr = (k: Key, v?: Record<string, string | number>) => string;
+
+/** Campo del formulario y texto para un `ingest.invalid` del núcleo (por metadata, sin leer su texto); null si no es ese motivo o el campo no está en el formulario. */
+export function coreFieldError(info: ErrInfo, t: Tr): [OptKey, string] | null {
+  const m = info.metadata;
+  const k = info.reason === "ingest.invalid" ? CORE_FIELDS[m.field] : undefined;
+  if (!k) return null;
+  if (k === "nameTemplate") {
+    const p = m.template_problem;
+    return [k, p === "chars" ? t("syslog.err.tplCh", { ch: m.ch ?? "" }) : p in TPL_PROBLEMS ? t(`syslog.err.${TPL_PROBLEMS[p as keyof typeof TPL_PROBLEMS]}`) : t("syslog.err.coreValue", { value: m.value ?? "" })];
+  }
+  if (k === "format") return [k, t("syslog.err.coreValue", { value: m.value ?? "" })];
+  if (k === "addr") return [k, t("syslog.err.coreAddr")];
+  return [k, t("syslog.err.range", { lo: m.min, hi: m.max })];
+}
 
 // Textos que cambian según el receptor (unidades, a quién se refiere cada ayuda); el resto de las claves son `syslog.*` para los tres.
 export type KindText = "opt.ratePerSource" | "opt.rateGlobal" | "opts.floodHint" | "opt.tokens" | "fmt.texto" | "fmt.crudo" | "fmt.jsonl"

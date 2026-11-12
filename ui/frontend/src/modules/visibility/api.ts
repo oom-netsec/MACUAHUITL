@@ -2,6 +2,7 @@
 import { Events } from "@wailsio/runtime";
 // Los topes, el archivo y los descartes son los mismos que los del receptor syslog (fase 28a).
 import type { SyslogDrops, SyslogOptions } from "../tools/api";
+import type { ErrInfo } from "../../lib/coreError";
 
 // Destinos de visibilidad: solo el ID de la credencial de la bóveda, nunca el secreto.
 export interface SnmpTarget { host: string; port: number; version: string; credentialId: string; auth: string; priv: string }
@@ -10,7 +11,7 @@ export type VisKind = "snmp" | "traps" | "flows" | "gnmi";
 /** Los topes cuentan mensajes en traps y datagramas de exportación en flujos; el resto, igual que syslog. */
 export type VisOptions = SyslogOptions;
 export interface VisEvent {
-  runId: string; listening?: string; json?: string; final?: boolean; done?: boolean; error?: string;
+  runId: string; listening?: string; json?: string; final?: boolean; done?: boolean; error?: string; errorInfo?: ErrInfo;
   outputPath?: string; // con save: la carpeta de salida (outputs/snmp-traps u outputs/flows)
   rotatedPath?: string; // traps y flows con save: archivo nuevo abierto
   drops?: SyslogDrops;  // traps y flows: acumulado de descartes, cuando cambia

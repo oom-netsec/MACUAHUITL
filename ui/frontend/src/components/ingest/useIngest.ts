@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SyslogDrops } from "../../modules/tools/api";
 import { useT } from "../../lib/i18n";
 import { optErrorText, type OptMessages } from "./IngestOptions";
-import { buildOpts, emptyForm, mapStartError, validateOpts, type IngestKind, type OptForm, type OptKey } from "./ingestOpts";
+import type { ErrInfo } from "../../lib/coreError";
+import { buildOpts, coreFieldError, emptyForm, mapStartError, validateOpts, type IngestKind, type OptForm, type OptKey } from "./ingestOpts";
 
 export const MAX_LIVE = 5000; // filas que se conservan en pantalla; los archivos guardan todo
 export const FLUSH_MS = 100;
@@ -77,10 +78,12 @@ export function useIngestOpts(kind: IngestKind, save: boolean) {
       return false;
     },
     /** Un error de inicio (rechazo o done{error}): si nombra un campo, va junto a él y devuelve true; si no, lo maneja quien llama. */
-    mapError: (msg: string) => {
-      const k = mapStartError(msg);
+    mapError: (msg: string, info?: ErrInfo) => {
+      // Con motivo del núcleo se usa su metadata; el texto en español solo es respaldo para errores sin cause.
+      const c = info && coreFieldError(info, t);
+      const k = c ? c[0] : info?.reason ? null : mapStartError(msg);
       if (!k) return false;
-      setStartErr({ [k]: msg.replace(/^(syslogd|snmp traps|snmp|flows|traps|ingest): /, "") });
+      setStartErr({ [k]: c ? c[1] : msg.replace(/^(syslogd|snmp traps|snmp|flows|traps|ingest): /, "") });
       if (k !== "addr") setOpen(true);
       return true;
     },

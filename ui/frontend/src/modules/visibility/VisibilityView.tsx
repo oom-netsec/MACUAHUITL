@@ -4,6 +4,7 @@ import type { CoreAPI, Credential, GnmiTarget, SnmpTarget, Topo, VisEvent, VisKi
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section, Tabs, useResult } from "../../components/Page";
 import { useT } from "../../lib/i18n";
+import { errInfo, type ErrInfo } from "../../lib/coreError";
 import type { Key } from "../../lib/i18n/es";
 import { formatBytes } from "../../components/Files";
 import { Icon } from "../../components/Icon";
@@ -39,14 +40,14 @@ function useLive(core: CoreAPI, kind: VisKind, onData: (e: VisEvent) => void, in
   runCb.current = onRun;
   useEffect(() => { runCb.current?.(!!runId); }, [runId]); // la pestaña muestra «en curso» mientras haya escucha
   // Un error de inicio llega como done{error} (el RPC es un stream) o como rechazo del inicio: junto al campo que nombra, o en un aviso.
-  const fail = (raw: string) => {
+  const fail = (raw: string, info?: ErrInfo) => {
     const m = errorText(new Error(raw));
-    if (!ingRef.current?.o.mapError(m)) setErr(m);
+    if (!ingRef.current?.o.mapError(m, info)) setErr(m);
   };
   const apply = (e: VisEvent) => {
     if (e.done) {
       ingRef.current?.flush();
-      if (e.error) fail(e.error);
+      if (e.error) fail(e.error, e.errorInfo);
       setStatus({ key: "visibility.stopped" });
       runRef.current = "";
       setRunId("");
@@ -83,7 +84,7 @@ function useLive(core: CoreAPI, kind: VisKind, onData: (e: VisEvent) => void, in
       early.forEach(apply);
     } catch (e) {
       starting.current = false;
-      fail(errorText(e));
+      fail(errorText(e), errInfo(e));
     }
   };
   const stop = () => core.diagCancel(runId).catch((e) => setErr(errorText(e)));

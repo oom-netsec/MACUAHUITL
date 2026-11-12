@@ -1,5 +1,6 @@
 // Contrato del módulo con el puente (ui/bridge) y su implementación de Wails.
 import { Events } from "@wailsio/runtime";
+import type { ErrInfo } from "../../lib/coreError";
 
 export interface DnsRequest { mode: string; name: string; type: string; servers: string[]; deep: boolean; dnssec: boolean }
 /** Topes y archivo de la escucha. Cero o vacío = default del núcleo; fuera de rango, el inicio falla con el motivo. */
@@ -17,7 +18,7 @@ export interface SyslogSourceDrops { source: string; count: number } // IP, o "o
 /** Acumulado desde que empezó la escucha; llega a lo más una vez por segundo y solo si cambió. */
 export interface SyslogDrops { total: number; porOrigen: number; global: number; colaLlena: number; sinceMs: number; top: SyslogSourceDrops[] }
 export interface SyslogEvent {
-  runId: string; listening?: string; outputPath?: string; json?: string; done?: boolean; error?: string;
+  runId: string; listening?: string; outputPath?: string; json?: string; done?: boolean; error?: string; errorInfo?: ErrInfo;
   rotatedPath?: string; // archivo nuevo abierto (con save); outputPath es la carpeta
   drops?: SyslogDrops;
 }

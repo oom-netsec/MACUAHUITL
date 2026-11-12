@@ -2543,6 +2543,9 @@ export const es = {
   "fps.accepted.short": "Huellas aceptadas",
   "fps.accepted.hint": "SHA256:…, separadas por espacios o comas",
   "patrol.phase.ARM_CHECK_DONE": "Login Test al armar",
+  "syslog.err.tplCh": "Carácter no permitido en la plantilla: {ch}",
+  "syslog.err.coreValue": "Valor no admitido: {value}",
+  "syslog.err.coreAddr": "Dirección de escucha inválida.",
 };
 
 export type Key = keyof typeof es;
