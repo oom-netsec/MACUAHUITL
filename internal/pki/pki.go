@@ -315,8 +315,9 @@ type Summary struct {
 	WarnItems []i18n.Text `json:"-"` // Warnings como textos de catálogo (misma longitud y orden)
 }
 
-// LabWarning es el aviso de las CA de laboratorio, en español (el catálogo lo da también en inglés).
-var LabWarning = i18n.Msg(i18n.Es, "security.pki.lab_warning", nil)
+// LabWarning es el aviso de las CA de laboratorio, en español (el catálogo lo da también en inglés; una prueba
+// verifica que sean el mismo texto).
+const LabWarning = "CA SOLO DE LABORATORIO: no la instales como raíz de confianza fuera del laboratorio ni firmes con ella equipos de producción."
 
 // warn agrega un aviso del catálogo al texto en español y a su forma estructurada.
 func (s *Summary) warn(key string, kv ...any) {
