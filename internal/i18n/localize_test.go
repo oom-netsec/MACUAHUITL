@@ -17,7 +17,6 @@ type root struct {
 	Warnings []string `json:"warnings"`
 	// sidecar de lista: misma longitud que Warnings
 	WarningsTx []Text `json:"-"`
-	skip       leaf
 }
 
 func sample() *root {
