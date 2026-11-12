@@ -4,6 +4,8 @@ import { Check, Field, Notice, Select, TextArea } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section, Tabs, useResult } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
+import { tryReport } from "../../lib/structured";
+import type { PkiReportData, RadiusReportData, TacacsReportData } from "./api";
 import { CertChain, ResultCards } from "./SecCards";
 import "./security.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
@@ -72,6 +74,13 @@ function useSecrets(core: CoreAPI) {
   return { view, values, ready };
 }
 
+// Resultado de una prueba: el informe estructurado si el núcleo lo da y, si no, el texto de siempre.
+interface Probe<R> { text: string; report?: R }
+async function probe<A, R extends { text: string }>(report: ((a: A) => Promise<R>) | undefined, plain: (a: A) => Promise<string>, arg: A): Promise<Probe<R>> {
+  const rep = await tryReport(report && (() => report(arg)));
+  return rep ? { text: rep.text, report: rep } : { text: await plain(arg) };
+}
+
 const kbd = <kbd aria-hidden="true">Ctrl ↵</kbd>;
 const portTypes = (none: string): [string, string][] => [["ethernet", "Ethernet (15)"], ["wireless-802.11", "Wireless-802.11 (19)"], ["virtual", "Virtual (5)"], ["async", "Async (0)"], ["", none]];
 const serviceTypes = (none: string): [string, string][] => [["framed", "Framed (2)"], ["login", "Login (1)"], ["call-check", "Call-Check (10, MAB)"], ["nas-prompt", "NAS-Prompt (7)"], ["administrative", "Administrative (6)"], ["", none]];
@@ -91,8 +100,8 @@ function RadiusPanel({ core }: { core: CoreAPI }) {
   const [calling, setCalling] = useState("");
   const [statusServer, setStatusServer] = useState(false);
   const [accounting, setAccounting] = useState(false);
-  const r = useResult<string>();
-  const go = () => r.run(() => core.secRadius({ host, authPort: Number(authPort) || 1812, acctPort: Number(acctPort) || 1813, ...s.values, method,
+  const r = useResult<Probe<RadiusReportData>>();
+  const go = () => r.run(() => probe(core.secRadiusReport, core.secRadius, { host, authPort: Number(authPort) || 1812, acctPort: Number(acctPort) || 1813, ...s.values, method,
     nasIp, nasId, portType, serviceType, called, calling, statusServer, accounting }));
   return (
     <>
@@ -125,7 +134,7 @@ function RadiusPanel({ core }: { core: CoreAPI }) {
       )}
       <p className="hint">{t("security.radiusNote")}</p>
       <div className="actions"><button className="primary" disabled={!host || !s.ready(!statusServer) || r.busy} aria-busy={r.busy} onClick={go}>{t("security.test")}{kbd}</button></div>
-      <Outcome r={r} bare empty={t("security.radius.empty")}>{r.data && <ResultCards kind="radius" text={r.data} fallback={<Raw text={r.data} />} />}</Outcome>
+      <Outcome r={r} bare empty={t("security.radius.empty")}>{r.data && <ResultCards kind="radius" text={r.data.text} report={r.data.report} fallback={<Raw text={r.data.text} />} />}</Outcome>
     </>
   );
 }
@@ -138,7 +147,7 @@ function TacacsPanel({ core }: { core: CoreAPI }) {
   const [authenType, setAuthenType] = useState("ascii");
   const [command, setCommand] = useState("show running-config");
   const [accounting, setAccounting] = useState(true);
-  const r = useResult<string>();
+  const r = useResult<Probe<TacacsReportData>>();
   return (
     <>
       <Section title={t("security.sec.target")}>
@@ -157,9 +166,9 @@ function TacacsPanel({ core }: { core: CoreAPI }) {
       </Section>
       <div className="actions">
         <button className="primary" disabled={!host || !s.ready(true) || r.busy} aria-busy={r.busy}
-          onClick={() => r.run(() => core.secTacacs({ host, port: Number(port) || 49, ...s.values, authenType, command, accounting }))}>{t("security.test")}{kbd}</button>
+          onClick={() => r.run(() => probe(core.secTacacsReport, core.secTacacs, { host, port: Number(port) || 49, ...s.values, authenType, command, accounting }))}>{t("security.test")}{kbd}</button>
       </div>
-      <Outcome r={r} bare empty={t("security.tacacs.empty")}>{r.data && <ResultCards kind="tacacs" text={r.data} fallback={<Raw text={r.data} />} />}</Outcome>
+      <Outcome r={r} bare empty={t("security.tacacs.empty")}>{r.data && <ResultCards kind="tacacs" text={r.data.text} report={r.data.report} fallback={<Raw text={r.data.text} />} />}</Outcome>
     </>
   );
 }
@@ -320,14 +329,14 @@ function ExportCard({ core }: { core: CoreAPI }) {
 function DecodeCard({ core }: { core: CoreAPI }) {
   const t = useT();
   const [text, setText] = useState("");
-  const r = useResult<string>();
+  const r = useResult<Probe<PkiReportData>>();
   return (
     <>
       <Section title={t("security.decode")}>
         <TextArea label={t("security.decode.input")} value={text} onChange={setText} />
-        <div className="actions"><button disabled={!text || r.busy} aria-busy={r.busy} onClick={() => r.run(() => core.secPkiDecode(text))}>{t("security.decode.cert")}</button></div>
+        <div className="actions"><button disabled={!text || r.busy} aria-busy={r.busy} onClick={() => r.run(() => probe(core.secPkiDecodeReport, core.secPkiDecode, text))}>{t("security.decode.cert")}</button></div>
       </Section>
-      <Outcome r={r} bare>{r.data && <CertChain text={r.data} fallback={<Raw text={r.data} />} />}</Outcome>
+      <Outcome r={r} bare>{r.data && <CertChain text={r.data.text} report={r.data.report} fallback={<Raw text={r.data.text} />} />}</Outcome>
     </>
   );
 }

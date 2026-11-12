@@ -2569,4 +2569,11 @@ export const en: Record<Key, string> = {
   "patrol.phaseReason.phase.close_failed": "closing (manifest or zip): {error}",
   "patrol.phaseReason.phase.before_arming": "before arming",
   "patrol.phaseReason.phase.core_stopped": "the core stopped while the job was armed; it does not resume",
+  "vocab.findingSev.warning": "Warning",
+  "vocab.ma.absent": "missing",
+  "vocab.ma.valid": "valid",
+  "vocab.ma.invalid": "invalid",
+  "security.chain.usage": "Key usage",
+  "security.chain.selfSigned": "Self-signed",
+  "security.chain.sigInvalid": "CSR signature invalid",
 };

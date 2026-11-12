@@ -2567,6 +2567,13 @@ export const es = {
   "patrol.phaseReason.phase.close_failed": "cierre (manifest o zip): {error}",
   "patrol.phaseReason.phase.before_arming": "antes de armar",
   "patrol.phaseReason.phase.core_stopped": "el núcleo se detuvo con el trabajo armado; no se reanuda",
+  "vocab.findingSev.warning": "Aviso",
+  "vocab.ma.absent": "ausente",
+  "vocab.ma.valid": "válido",
+  "vocab.ma.invalid": "inválido",
+  "security.chain.usage": "Usos de la llave",
+  "security.chain.selfSigned": "Autofirmado",
+  "security.chain.sigInvalid": "Firma del CSR inválida",
 };
 
 export type Key = keyof typeof es;

@@ -1,27 +1,32 @@
-// El núcleo entrega estas pruebas como texto (Report.Text de radiustest y tacacstest, pki.Text). Aquí se lee ese
-// texto para dibujar tarjetas; si no tiene la forma esperada, devuelven null y la vista muestra la salida tal cual.
+// Tarjetas de RADIUS, TACACS+ y PKI. Con el informe estructurado (fase 30b) se convierte directo; sin él (núcleo anterior)
+// se lee el texto del núcleo (Report.Text de radiustest y tacacstest, pki.Text) y, si no tiene la forma esperada, devuelve
+// null y la vista muestra la salida tal cual. Los dos caminos dan los mismos códigos cerrados en inglés.
+import type { Certificate, PkiReportData, RadiusReportData, SecFindingData, TacacsReportData } from "./api";
 
-export interface Finding { severity: string; detail: string }
+export interface Finding { severity: "warning" | "error" | "info"; detail: string }
 export interface Attr { name: string; value: string }
 
-export interface RadiusExchange { kind: string; code: string; rttMs: number; attempts: number; messageAuthenticator: string; error: string; attrs: Attr[] }
+export interface RadiusExchange { kind: string; code: string; rttMs: number; attempts: number; messageAuthenticator: "absent" | "valid" | "invalid" | ""; error: string; attrs: Attr[] }
 export interface RadiusReport { server: string; method: string; exchanges: RadiusExchange[]; findings: Finding[] }
 
 export interface TacacsStep { kind: string; status: string; rttMs: number; error: string; prompts: string[]; message: string; data: string; sent: string[]; received: string[] }
 export interface TacacsReport { server: string; steps: TacacsStep[]; findings: Finding[] }
 
 export interface CertInfo {
-  kind: string; subject: string; issuer: string; serial: string; notBefore: string; notAfter: string; daysLeft: number | null;
+  kind: "certificate" | "csr"; subject: string; issuer: string; serial: string; notBefore: string; notAfter: string; daysLeft: number | null;
   keyType: string; sigAlg: string; san: string; isCA: boolean; sha1: string; sha256: string; warnings: string[];
+  usage: string; selfSigned: boolean; sigValid?: boolean; // solo del informe estructurado
 }
 
+const SEV: Record<string, Finding["severity"]> = { aviso: "warning", error: "error", info: "info" };
+const MA: Record<string, "absent" | "valid" | "invalid"> = { "ausente": "absent", "válido": "valid", "inválido": "invalid" };
 const FINDING = /^ {2}\[(.+?)\] (.*)$/;
 
 function split(text: string) {
   const lines = text.split("\n");
   const at = lines.indexOf("Hallazgos:");
   const body = at < 0 ? lines : lines.slice(0, at);
-  const findings = (at < 0 ? [] : lines.slice(at + 1)).flatMap((l) => { const m = FINDING.exec(l); return m ? [{ severity: m[1], detail: m[2] }] : []; });
+  const findings = (at < 0 ? [] : lines.slice(at + 1)).flatMap((l): Finding[] => { const m = FINDING.exec(l); return m ? [{ severity: SEV[m[1]] ?? "info", detail: m[2] }] : []; });
   return { body, findings };
 }
 
@@ -34,7 +39,7 @@ export function parseRadius(text: string): RadiusReport | null {
     const ex = /^(\S+): (.+)$/.exec(l);
     if (ex) {
       const r = /^(.+?) en ([\d.]+) ms \(intento (\d+), Message-Authenticator (.+)\)$/.exec(ex[2]);
-      exchanges.push({ kind: ex[1], code: r?.[1] ?? "", rttMs: r ? Number(r[2]) : 0, attempts: r ? Number(r[3]) : 0, messageAuthenticator: r?.[4] ?? "", error: "", attrs: [] });
+      exchanges.push({ kind: ex[1], code: r?.[1] ?? "", rttMs: r ? Number(r[2]) : 0, attempts: r ? Number(r[3]) : 0, messageAuthenticator: MA[r?.[4] ?? ""] ?? "", error: "", attrs: [] });
       continue;
     }
     const cur = exchanges[exchanges.length - 1];
@@ -75,7 +80,7 @@ export function parsePki(text: string): CertInfo[] | null {
   for (const l of text.split("\n")) {
     const h = /^(certificado|CSR): (.*)$/.exec(l);
     if (h) {
-      out.push({ kind: h[1], subject: h[2], issuer: "", serial: "", notBefore: "", notAfter: "", daysLeft: null, keyType: "", sigAlg: "", san: "", isCA: false, sha1: "", sha256: "", warnings: [] });
+      out.push({ kind: h[1] === "CSR" ? "csr" : "certificate", subject: h[2], issuer: "", serial: "", notBefore: "", notAfter: "", daysLeft: null, keyType: "", sigAlg: "", san: "", isCA: false, sha1: "", sha256: "", warnings: [], usage: "", selfSigned: false });
       continue;
     }
     const c = out[out.length - 1];
@@ -101,3 +106,28 @@ export function parsePki(text: string): CertInfo[] | null {
 
 /** Vigencia: aviso a menos de 30 días, mal a menos de 7 y vencido por debajo de 0. */
 export const daysState = (days: number): "ok" | "warn" | "bad" | "expired" => (days < 0 ? "expired" : days < 7 ? "bad" : days < 30 ? "warn" : "ok");
+
+const findings = (f: SecFindingData[]): Finding[] => f.map((x) => ({ severity: x.severity, detail: x.message }));
+
+export function radiusFromData(d: RadiusReportData): RadiusReport {
+  return {
+    server: d.server, method: d.method ?? "", findings: findings(d.findings),
+    exchanges: d.exchanges.map((e) => ({ kind: e.kind, code: e.code ?? "", rttMs: e.rttMs, attempts: e.attempts, messageAuthenticator: e.messageAuthenticator ?? "", error: e.error?.text ?? "", attrs: e.attrs })),
+  };
+}
+
+export function tacacsFromData(d: TacacsReportData): TacacsReport {
+  const dir = (s: TacacsReportData["steps"][number], w: "sent" | "received") => s.avPairs.filter((a) => a.direction === w).map((a) => a.value);
+  return {
+    server: d.server, findings: findings(d.findings),
+    steps: d.steps.map((s) => ({ kind: s.kind, status: s.status ?? "", rttMs: s.rttMs, error: s.error?.text ?? "", prompts: s.prompts, message: s.message ?? "", data: s.data ?? "", sent: dir(s, "sent"), received: dir(s, "received") })),
+  };
+}
+
+export function pkiFromData(d: PkiReportData): CertInfo[] {
+  return d.certificates.map((c: Certificate) => ({
+    kind: c.kind, subject: c.subject, issuer: c.issuer ?? "", serial: c.serial ?? "", notBefore: c.notBefore?.slice(0, 10) ?? "", notAfter: c.notAfter?.slice(0, 10) ?? "", daysLeft: c.daysLeft ?? null,
+    keyType: c.key.description, sigAlg: c.signature.algorithm, san: c.san.join(", "), isCA: c.isCa, sha1: c.sha1 ?? "", sha256: c.sha256 ?? "", warnings: c.warnings.map((w) => w.message),
+    usage: [...c.keyUsage, ...c.extKeyUsage].join(", "), selfSigned: c.selfSigned, sigValid: c.signature.valid,
+  }));
+}

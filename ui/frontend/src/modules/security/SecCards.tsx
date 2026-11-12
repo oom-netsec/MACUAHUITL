@@ -5,12 +5,13 @@ import { Meter } from "../../components/charts/Mini";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
 import { vocab } from "../../lib/vocab";
-import { daysState, parsePki, parseRadius, parseTacacs, type CertInfo, type Finding } from "./parse";
+import type { PkiReportData, RadiusReportData, TacacsReportData } from "./api";
+import { daysState, parsePki, parseRadius, parseTacacs, pkiFromData, radiusFromData, tacacsFromData, type CertInfo, type Finding } from "./parse";
 
-// Tarjetas de resultado de RADIUS y TACACS+ y cadena de certificados de PKI, a partir del texto del núcleo.
-// Si el texto no tiene la forma esperada, se muestra tal cual en la terminal.
+// Tarjetas de resultado de RADIUS y TACACS+ y cadena de certificados de PKI, a partir del informe estructurado del núcleo
+// o, sin él, de su texto. Si el texto no tiene la forma esperada, se muestra tal cual en la terminal.
 
-const findingTone = (s: string): Tone => (s === "error" ? "bad" : s === "aviso" || s === "warn" ? "warn" : "info");
+const findingTone = (s: string): Tone => (s === "error" ? "bad" : s === "warning" ? "warn" : "info");
 
 function Raw({ text }: { text: string }) {
   const t = useT();
@@ -31,7 +32,7 @@ function Head({ children }: { children: ReactNode }) {
   return <p className="meta mono">{children}</p>;
 }
 
-export function ResultCards({ kind, text, fallback }: { kind: "radius" | "tacacs"; text: string; fallback: ReactNode }) {
+export function ResultCards({ kind, text, report, fallback }: { kind: "radius" | "tacacs"; text: string; report?: RadiusReportData | TacacsReportData; fallback: ReactNode }) {
   const t = useT();
   const attrTable = (title: string, head: [string, string], rows: [string, string][]) => (
     rows.length ? (
@@ -44,7 +45,7 @@ export function ResultCards({ kind, text, fallback }: { kind: "radius" | "tacacs
     ) : null
   );
   if (kind === "radius") {
-    const r = parseRadius(text);
+    const r = report ? radiusFromData(report as RadiusReportData) : parseRadius(text);
     if (!r) return <>{fallback}</>;
     return (
       <div className="sec-cards">
@@ -65,7 +66,7 @@ export function ResultCards({ kind, text, fallback }: { kind: "radius" | "tacacs
       </div>
     );
   }
-  const r = parseTacacs(text);
+  const r = report ? tacacsFromData(report as TacacsReportData) : parseTacacs(text);
   if (!r) return <>{fallback}</>;
   return (
     <div className="sec-cards">
@@ -99,12 +100,14 @@ function Cert({ c }: { c: CertInfo }) {
     : st === "ok" ? <StatusPill tone="ok" label={t("security.chain.ok", { n: days })} />
     : <StatusPill tone={st === "bad" ? "bad" : "warn"} label={t("security.chain.soon", { n: days })} />;
   const rows: [string, string][] = [[t("security.chain.issuer"), c.issuer], [t("security.chain.valid"), c.notBefore && `${c.notBefore} → ${c.notAfter}`],
-    [t("security.chain.key"), [c.keyType, c.sigAlg].filter(Boolean).join(" · ")], [t("security.chain.san"), c.san]];
+    [t("security.chain.key"), [c.keyType, c.sigAlg].filter(Boolean).join(" · ")], [t("security.chain.san"), c.san], [t("security.chain.usage"), c.usage]];
   return (
     <li className="chain-item" data-state={st ?? undefined}>
       <div className="chain-head">
-        <Badge>{c.kind === "CSR" ? t("security.chain.csr") : t("security.chain.cert")}</Badge>
+        <Badge>{c.kind === "csr" ? t("security.chain.csr") : t("security.chain.cert")}</Badge>
         {c.isCA && <Badge tone="info">{t("security.chain.ca")}</Badge>}
+        {c.selfSigned && <Badge>{t("security.chain.selfSigned")}</Badge>}
+        {c.sigValid === false && <Badge tone="bad">{t("security.chain.sigInvalid")}</Badge>}
         <strong className="mono">{c.subject}</strong>
         {pill}
         {consumed != null && days != null && total > 0 && (
@@ -122,9 +125,9 @@ function Cert({ c }: { c: CertInfo }) {
   );
 }
 
-export function CertChain({ text, fallback }: { text: string; fallback: ReactNode }) {
+export function CertChain({ text, report, fallback }: { text: string; report?: PkiReportData; fallback: ReactNode }) {
   const t = useT();
-  const certs = parsePki(text);
+  const certs = report?.certificates.length ? pkiFromData(report) : parsePki(text);
   if (!certs) return <>{fallback}</>;
   return (
     <div className="sec-cards">
