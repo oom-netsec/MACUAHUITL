@@ -41,6 +41,7 @@ type entry struct {
 	Es, En string            //
 	Args   []string          // argumentos que usan las plantillas (los mismos en es y en en)
 	Extra  []string          // argumentos que solo viajan en la metadata
+	Refs   []string          // argumentos cuyo valor es un código calc.val.* o ike.val.* (o varios con coma) que se escribe en el idioma pedido
 	Meta   map[string]string // metadata fija del código
 }
 
@@ -126,7 +127,7 @@ func Msg(loc, code string, args Args) string {
 	if !ok {
 		return code
 	}
-	args = resolveRefs(loc, args)
+	args = resolveRefs(loc, args, e.Refs)
 	if loc == En {
 		return render(e.En, args)
 	}
@@ -144,9 +145,17 @@ func isValKey(v string) bool {
 	return ok
 }
 
-func resolveRefs(loc string, args Args) Args {
+// withRefs marca los argumentos de la entrada que son códigos de valor. Solo esos se resuelven: un dato (un SAN, un
+// detalle del equipo) que coincida con una clave sale literal.
+func withRefs(e entry, refs ...string) entry { e.Refs = refs; return e }
+
+func resolveRefs(loc string, args Args, refs []string) Args {
 	var out Args
-	for k, v := range args {
+	for _, k := range refs {
+		v, found := args[k]
+		if !found {
+			continue
+		}
 		parts := strings.Split(v, ",")
 		ok := v != ""
 		for _, p := range parts {

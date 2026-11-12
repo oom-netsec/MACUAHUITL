@@ -10,7 +10,7 @@ func init() {
 		"ike.finding.p1_propuesta.title":               e("Propuestas de fase 1 (IKE) no coinciden", "IKE phase 1 proposals do not match"),
 		"ike.finding.p1_propuesta.explanation":         e("Ninguna propuesta IKE del par coincide con las políticas locales (cifrado, hash/integridad, PRF, grupo DH, método de autenticación o lifetime).", "None of the peer's IKE proposals matches the local policies (encryption, hash/integrity, PRF, DH group, authentication method or lifetime)."),
 		"ike.finding.p1_propuesta.action":              e("Compara 'crypto isakmp policy' / 'crypto ikev2 proposal' (ASA: 'crypto ikev1|ikev2 policy') en ambos extremos y deja al menos una idéntica; evita DES/3DES/MD5/grupos 1, 2 y 5.", "Compare 'crypto isakmp policy' / 'crypto ikev2 proposal' (ASA: 'crypto ikev1|ikev2 policy') on both ends and leave at least one identical; avoid DES/3DES/MD5 and groups 1, 2 and 5."),
-		"ike.finding.p1_propuesta.explanation_attrs":   e("Ninguna propuesta IKE del par coincide con las políticas locales (cifrado, hash/integridad, PRF, grupo DH, método de autenticación o lifetime). Atributos que no coinciden según el equipo: {attrs}.", "None of the peer's IKE proposals matches the local policies (encryption, hash/integrity, PRF, DH group, authentication method or lifetime). Attributes that do not match according to the device: {attrs}.", "attrs"),
+		"ike.finding.p1_propuesta.explanation_attrs":   withRefs(e("Ninguna propuesta IKE del par coincide con las políticas locales (cifrado, hash/integridad, PRF, grupo DH, método de autenticación o lifetime). Atributos que no coinciden según el equipo: {attrs}.", "None of the peer's IKE proposals matches the local policies (encryption, hash/integrity, PRF, DH group, authentication method or lifetime). Attributes that do not match according to the device: {attrs}.", "attrs"), "attrs"),
 		"ike.finding.p2_propuesta.title":               e("Propuestas de fase 2 (IPsec) no coinciden", "IPsec phase 2 proposals do not match"),
 		"ike.finding.p2_propuesta.explanation":         e("El transform-set / IPsec proposal ofrecido no coincide con el local (ESP cifrado, integridad, modo túnel/transporte).", "The offered transform-set / IPsec proposal does not match the local one (ESP encryption, integrity, tunnel/transport mode)."),
 		"ike.finding.p2_propuesta.action":              e("Iguala 'crypto ipsec transform-set' (IKEv2/ASA: 'crypto ipsec ikev2 ipsec-proposal') en ambos extremos, incluido el modo.", "Make 'crypto ipsec transform-set' (IKEv2/ASA: 'crypto ipsec ikev2 ipsec-proposal') identical on both ends, including the mode."),
@@ -106,10 +106,10 @@ func init() {
 
 		// informe de texto
 		"ike.text.unrecognized": e("No se reconoció salida de IKE/IPsec. Pega debug crypto isakmp/ikev2/ipsec o show crypto isakmp sa / ikev2 sa detail / ipsec sa.", "No IKE/IPsec output was recognized. Paste debug crypto isakmp/ikev2/ipsec or show crypto isakmp sa / ikev2 sa detail / ipsec sa."),
-		"ike.text.detected":     e("Detectado: {sources}\nFase 1: {phase1}   Fase 2: {phase2}", "Detected: {sources}\nPhase 1: {phase1}   Phase 2: {phase2}", "sources", "phase1", "phase2"),
+		"ike.text.detected":     withRefs(e("Detectado: {sources}\nFase 1: {phase1}   Fase 2: {phase2}", "Detected: {sources}\nPhase 1: {phase1}   Phase 2: {phase2}", "sources", "phase1", "phase2"), "phase1", "phase2"),
 		"ike.text.proposals":    e("Propuestas:", "Proposals:"),
 		"ike.text.proposal":     e("F{phase} {source}: {detail}", "P{phase} {source}: {detail}", "phase", "source", "detail"),
-		"ike.text.result":       e("→ {result}", "→ {result}", "result"),
+		"ike.text.result":       withRefs(e("→ {result}", "→ {result}", "result"), "result"),
 		"ike.text.sas":          e("SA:", "SA:"),
 		"ike.text.findings":     e("Hallazgos:", "Findings:"),
 		"ike.text.action":       e("Acción: {action}", "Action: {action}", "action"),

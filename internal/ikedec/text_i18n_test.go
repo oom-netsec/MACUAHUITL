@@ -175,3 +175,16 @@ func TestInEspanolEsIdentidad(t *testing.T) {
 		}
 	}
 }
+
+// Una propuesta del equipo cuyo texto es igual a una clave del catálogo sale literal, en es y en en.
+func TestDetalleIgualAUnaClaveSaleLiteral(t *testing.T) {
+	r := Decode("IKEv2: Received Policies:\nProposal 1:  calc.val.yes\n")
+	if len(r.Proposals) != 1 || r.Proposals[0].Detail != "calc.val.yes" {
+		t.Fatalf("%+v", r.Proposals)
+	}
+	for _, loc := range []string{i18n.Es, i18n.En} {
+		if txt := r.TextIn(loc); !strings.Contains(txt, ": calc.val.yes") {
+			t.Errorf("%s: %s", loc, txt)
+		}
+	}
+}

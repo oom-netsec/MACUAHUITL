@@ -154,3 +154,26 @@ func TestValoresComoArgumentos(t *testing.T) {
 		}
 	}
 }
+
+// Solo se resuelven los argumentos que la entrada declara en Refs: un dato que coincide con una clave sale literal.
+func TestDatosQueSeParecenAClavesSalenLiterales(t *testing.T) {
+	for _, loc := range []string{Es, En} {
+		if got := Msg(loc, "ike.text.proposal", A("phase", 1, "source", "s", "detail", "calc.val.yes")); !strings.HasSuffix(got, ": calc.val.yes") {
+			t.Errorf("%s: %q", loc, got)
+		}
+		if got := Msg(loc, "tls.finding.name_mismatch", A("name", "ike.val.result.rejected", "san", "calc.val.yes")); !strings.Contains(got, `"ike.val.result.rejected"`) || !strings.HasSuffix(got, "calc.val.yes)") {
+			t.Errorf("%s: %q", loc, got)
+		}
+		if got := Msg(loc, "dns.finding.no_ptr", A("ip", "ike.val.attr.hash,calc.val.no")); got != Msg(loc, "dns.finding.no_ptr", A("ip", "ike.val.attr.hash,calc.val.no")) || !strings.Contains(got, "ike.val.attr.hash,calc.val.no") {
+			t.Errorf("%s: %q", loc, got)
+		}
+		// el arg declarado sí se resuelve, también una lista
+		if got := Msg(loc, "ike.text.result", A("result", "ike.val.result.rejected,ike.val.attr.hash")); strings.Contains(got, "ike.val.") {
+			t.Errorf("%s: %q", loc, got)
+		}
+		// y un valor declarado que no es clave queda literal
+		if got := Msg(loc, "ike.text.result", A("result", "calc.val.nada")); !strings.Contains(got, "calc.val.nada") {
+			t.Errorf("%s: %q", loc, got)
+		}
+	}
+}
