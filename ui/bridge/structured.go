@@ -19,6 +19,19 @@ type KeyArgsDTO struct {
 	Args map[string]string `json:"args,omitempty"`
 }
 
+// reportKeys son las claves de ToolReport.keys (fase 30c): por cada texto del json que sale del catálogo, su clave y
+// argumentos bajo su ruta JSON (rows.2.detail, warnings.0). Sin claves no viaja nada (omitempty).
+func reportKeys(r *v1.ToolReport) map[string]KeyArgsDTO {
+	if len(r.GetKeys()) == 0 {
+		return nil
+	}
+	out := make(map[string]KeyArgsDTO, len(r.Keys))
+	for p, k := range r.Keys {
+		out[p] = KeyArgsDTO{Key: k.Key, Args: k.Args}
+	}
+	return out
+}
+
 // SecTextDTO es un texto de catálogo con la clave, los argumentos y el texto en el idioma de la interfaz.
 type SecTextDTO struct {
 	Key  string            `json:"key"`

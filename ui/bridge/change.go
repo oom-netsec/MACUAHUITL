@@ -16,9 +16,13 @@ import (
 type ReportDTO struct {
 	Json string `json:"json"`
 	Text string `json:"text"`
+	// Keys son las claves de los textos del json (fase 30c), por ruta JSON.
+	Keys map[string]KeyArgsDTO `json:"keys,omitempty"`
 }
 
-func toReport(r *v1.ToolReport) ReportDTO { return ReportDTO{Json: r.GetJson(), Text: r.GetText()} }
+func toReport(r *v1.ToolReport) ReportDTO {
+	return ReportDTO{Json: r.GetJson(), Text: r.GetText(), Keys: reportKeys(r)}
+}
 
 // ChangeCreate recibe el JobSpec como JSON, igual que CreateJob.
 func (b *Bridge) ChangeCreate(specJSON string) (string, error) {

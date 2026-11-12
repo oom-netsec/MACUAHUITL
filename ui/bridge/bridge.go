@@ -489,6 +489,9 @@ type AclFindingDTO struct {
 	Index  int    `json:"index"`
 	Kind   string `json:"kind"`
 	Detail string `json:"detail"`
+	// DetailKey y DetailArgs son el detalle como clave del catálogo (fase 30c).
+	DetailKey  string            `json:"detailKey,omitempty"`
+	DetailArgs map[string]string `json:"detailArgs,omitempty"`
 }
 
 func aclToDTO(a *v1.Acl) AclDTO {
@@ -535,7 +538,7 @@ func (b *Bridge) AclAnalyze(a AclDTO) ([]AclFindingDTO, error) {
 		}
 		out := []AclFindingDTO{}
 		for _, f := range r.Findings {
-			out = append(out, AclFindingDTO{Index: int(f.RuleIndex), Kind: f.Kind, Detail: f.Detail})
+			out = append(out, AclFindingDTO{Index: int(f.RuleIndex), Kind: f.Kind, Detail: f.Detail, DetailKey: f.DetailKey, DetailArgs: f.DetailArgs})
 		}
 		return out, nil
 	})

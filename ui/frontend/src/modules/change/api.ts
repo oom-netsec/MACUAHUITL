@@ -2,7 +2,10 @@
 export interface ChangeSpec { name: string; targets: { address: string; port?: number }[]; defaultCredentialId: string; outputDir: string }
 export interface ChangeSummary { id: string; name: string; preJobId: string; preState: string; postJobId: string; postState: string }
 export interface CaptureResult { jobId: string; armed: boolean; detail: string }
-export interface Report { json: string; text: string }
+/** Clave del catálogo de un texto del json y sus argumentos (fase 30c), por ruta JSON: "rows.2.detail". */
+export interface ChangeTextKey { key: string; args?: Record<string, string> }
+export type ChangeTextKeys = Record<string, ChangeTextKey>;
+export interface Report { json: string; text: string; keys?: ChangeTextKeys }
 export interface UpgradeRequest { outputs: string; image: string; size: number; md5: string; verify: string }
 export interface Topo { text: string; json: string; svg: string }
 

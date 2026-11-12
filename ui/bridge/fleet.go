@@ -10,15 +10,16 @@ import (
 // ---- Flota (Fase 15): solo lee outputs/ en el núcleo ----
 
 type FleetDTO struct {
-	Json     string `json:"json"`
-	Text     string `json:"text"`
-	Svg      string `json:"svg,omitempty"`
-	Csv      string `json:"csv,omitempty"`
-	Markdown string `json:"markdown,omitempty"`
+	Json     string                `json:"json"`
+	Text     string                `json:"text"`
+	Svg      string                `json:"svg,omitempty"`
+	Csv      string                `json:"csv,omitempty"`
+	Markdown string                `json:"markdown,omitempty"`
+	Keys     map[string]KeyArgsDTO `json:"keys,omitempty"` // claves de los textos del json (fase 30c)
 }
 
 func fleetDTO(r *v1.ToolReport, err error) (FleetDTO, error) {
-	return FleetDTO{Json: r.GetJson(), Text: r.GetText()}, err
+	return FleetDTO{Json: r.GetJson(), Text: r.GetText(), Keys: reportKeys(r)}, err
 }
 
 func (b *Bridge) FleetFind(q string) (FleetDTO, error) {

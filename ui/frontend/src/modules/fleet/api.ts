@@ -17,7 +17,10 @@ export interface DramRow { device: string; total: number; pool_free?: number; po
 export interface CapacityResult { need?: number; flash: FlashRow[] | null; dram: DramRow[] | null; devices: number; warnings: string[] | null }
 export interface InvRow { device: string; kind: string; name?: string; descr?: string; pid?: string; vid?: string; serial?: string; model?: string; version?: string; source: string; at: string }
 export interface InventoryResult { rows: InvRow[] | null; devices: number; warnings: string[] | null }
-interface FleetDTO { json: string; text: string; svg?: string; csv?: string; markdown?: string }
+/** Clave del catálogo de un texto del json y sus argumentos (fase 30c), por ruta JSON: "rows.2.detail". */
+export interface FleetTextKey { key: string; args?: Record<string, string> }
+export type FleetTextKeys = Record<string, FleetTextKey>;
+interface FleetDTO { json: string; text: string; svg?: string; csv?: string; markdown?: string; keys?: FleetTextKeys }
 
 export interface FleetAPI {
   fleetFind(q: string): Promise<FindResult>;
