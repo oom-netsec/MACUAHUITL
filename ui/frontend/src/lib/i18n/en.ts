@@ -2548,4 +2548,10 @@ export const en: Record<Key, string> = {
   "syslog.err.tplCh": "Character not allowed in the template: {ch}",
   "syslog.err.coreValue": "Unsupported value: {value}",
   "syslog.err.coreAddr": "Invalid listen address.",
+  "snippets.why.required": "This value is missing.",
+  "snippets.why.range": "Out of range.",
+  "snippets.why.pattern": "Does not match the expected format.",
+  "snippets.why.choice": "Value not allowed.",
+  "snippets.why.type": "Invalid value type.",
+  "snippets.refused": "The device does not support this snippet: {why}",
 };

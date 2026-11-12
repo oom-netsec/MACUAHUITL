@@ -2546,6 +2546,12 @@ export const es = {
   "syslog.err.tplCh": "Carácter no permitido en la plantilla: {ch}",
   "syslog.err.coreValue": "Valor no admitido: {value}",
   "syslog.err.coreAddr": "Dirección de escucha inválida.",
+  "snippets.why.required": "Falta este valor.",
+  "snippets.why.range": "Fuera de rango.",
+  "snippets.why.pattern": "No cumple el formato esperado.",
+  "snippets.why.choice": "Valor no permitido.",
+  "snippets.why.type": "Tipo de valor no válido.",
+  "snippets.refused": "El equipo no admite este snippet: {why}",
 };
 
 export type Key = keyof typeof es;

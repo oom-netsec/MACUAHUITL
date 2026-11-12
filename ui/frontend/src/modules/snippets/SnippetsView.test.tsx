@@ -178,6 +178,27 @@ test("vlan, trunk y svi quedan cubiertos por el formulario genérico", async () 
   expect(core.assistPlanSnippet).not.toHaveBeenCalled();
 });
 
+const withReason = (e: Error, reason: string, metadata: Record<string, string>) => Object.assign(e, { cause: { message: e.message, code: e.message.match(/code = (\w+)/)?.[1] ?? "", reason, metadata } });
+
+test("assist.invalid_value: el primer problema se muestra por su motivo (i18n) y no por el texto del núcleo", async () => {
+  const msg = "assist: invalid snippet values: Max MAC (maximum): 5000 out of range; zz unknown";
+  await open({ planTemplateSnippet: vi.fn(async () => { throw withReason(rpc("InvalidArgument", msg), "assist.invalid_value", { template: "port-security", field: "maximum", why: "range" }); }) } as never);
+  await choose("Port-security en puertos de acceso");
+  await userEvent.type(screen.getByLabelText("Puertos *"), "Gi1/0/5");
+  await userEvent.click(planBtn());
+  expect(await screen.findByText("Fuera de rango.")).toBeInTheDocument();
+  expect(screen.getByLabelText("Máximo de direcciones MAC")).toBeInvalid();
+  expect(screen.queryByText(/out of range/)).not.toBeInTheDocument();
+});
+
+test("assist.refused: el aviso lleva el motivo sin el prefijo del núcleo, sea cual sea su idioma", async () => {
+  await open({ planTemplateSnippet: vi.fn(async () => { throw withReason(rpc("FailedPrecondition", "assist: device does not support this snippet: sin SVI"), "assist.refused", { template: "svi", device: "x" }); }) } as never);
+  await choose("Port-security en puertos de acceso");
+  await userEvent.type(screen.getByLabelText("Puertos *"), "Gi1/0/5");
+  await userEvent.click(planBtn());
+  expect(await screen.findByText("El equipo no admite este snippet: sin SVI")).toBeInTheDocument();
+});
+
 test("InvalidArgument del núcleo: cada motivo queda junto al campo que nombra y el resto en un aviso", async () => {
   const msg = "assist: valores del snippet inválidos: falta Puertos (interfaces); Máximo de direcciones MAC (maximum): 5000 fuera de rango; Acción ante violación (violation): valor no permitido; campo desconocido \"zz\"";
   const core = await open({ planTemplateSnippet: vi.fn(async () => { throw rpc("InvalidArgument", msg); }) } as never);

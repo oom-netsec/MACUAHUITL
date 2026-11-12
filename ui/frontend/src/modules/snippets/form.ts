@@ -1,6 +1,7 @@
 // Lógica del formulario genérico de plantillas: sin React, para probarla sola. La validación del cliente es solo ayuda; manda la del núcleo.
 import { countInterfaces, decimalOk, interfaceOk, intOk, ipv4Ok, maskOk, vlanOk } from "../../lib/validate";
 import type { SnippetField, SnippetTemplate } from "./api";
+import type { ErrInfo } from "../../lib/coreError";
 
 export const TECH_ORDER = ["l2", "l3", "gestion", "seguridad", "qos", "etherchannel"] as const;
 export const MAX_PORTS = 48;
@@ -78,6 +79,14 @@ export function parseCoreError(e: unknown): CoreError {
   const m = e instanceof Error ? e.message : String(e);
   const r = /^rpc error: code = (\w+) desc = ([\s\S]*)$/.exec(m);
   return r ? { code: r[1], desc: r[2] } : { code: "", desc: m };
+}
+
+const WHY = ["required", "range", "pattern", "choice", "type"] as const;
+/** Primer problema de un assist.invalid_value: campo del formulario y clave i18n de su motivo; null si el motivo no trae campo o `why` conocido. */
+export function firstInvalid(info: ErrInfo | undefined, fields: SnippetField[]): [string, `snippets.why.${typeof WHY[number]}`] | null {
+  const m = info?.metadata;
+  const why = WHY.find((w) => w === m?.why);
+  return info?.reason === "assist.invalid_value" && why && fields.some((f) => f.name === m?.field) ? [m!.field, `snippets.why.${why}`] : null;
 }
 
 // El núcleo junta los problemas con «; » y cada uno dice «Etiqueta (nombre): motivo». Se asigna cada pieza al campo que nombra.
