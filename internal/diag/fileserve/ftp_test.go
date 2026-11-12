@@ -223,13 +223,14 @@ func TestFTPDataConnOnlyFromClientIP(t *testing.T) {
 func TestFTPPassiveRange(t *testing.T) {
 	p, _ := image(t, "a.bin", 10)
 	// Rango de dos puertos: la tercera conexión pasiva abierta a la vez ya no cabe.
-	s, r := startCfg(t, Config{Proto: "ftp", Files: []string{p}, PassivePorts: [2]uint16{47100, 47101}})
+	lo := parLibre(t)
+	s, r := startCfg(t, Config{Proto: "ftp", Files: []string{p}, PassivePorts: [2]uint16{lo, lo + 1}})
 	f := ftpDial(t, s.addr)
 	f.login(r)
 	m := pasvRe.FindStringSubmatch(f.cmd(227, "PASV"))
 	port, _ := strconv.Atoi(m[5])
 	port = port*256 + atoi(m[6])
-	if port < 47100 || port > 47101 {
+	if port < int(lo) || port > int(lo)+1 {
 		t.Fatalf("puerto pasivo %d fuera del rango", port)
 	}
 	// Otro cliente toma el otro puerto; un tercero se queda sin.
@@ -242,6 +243,27 @@ func TestFTPPassiveRange(t *testing.T) {
 }
 
 func atoi(s string) int { n, _ := strconv.Atoi(s); return n }
+
+// parLibre busca dos puertos seguidos libres en 127.0.0.1. Un rango fijo (47100-47101) cae en el rango
+// efímero de Linux y fallaba en CI cuando otra conexión lo ocupaba.
+func parLibre(t *testing.T) uint16 {
+	t.Helper()
+	for range 50 {
+		a, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		lo := a.Addr().(*net.TCPAddr).Port
+		b, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", lo+1))
+		a.Close()
+		if err == nil {
+			b.Close()
+			return uint16(lo)
+		}
+	}
+	t.Fatal("sin dos puertos seguidos libres")
+	return 0
+}
 
 func TestFTPAuthLimitsAndAllowList(t *testing.T) {
 	p, _ := image(t, "a.bin", 10)
