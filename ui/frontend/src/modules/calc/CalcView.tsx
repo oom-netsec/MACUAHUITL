@@ -30,7 +30,7 @@ function ResultView({ r, kind }: { r: CalcResult; kind: string }) {
             <tbody>{t.rows.map((row, j) => (
               <tr key={j}>{row.map((c, k) => (
                 <td key={k} className={k > 0 ? "mono" : undefined}>
-                  {c}{k > 0 && ADDR.test(c) && <CopyButton value={c} label={t.head[0] === "Campo" ? row[0] : t.head[k]} />}
+                  {c}{k > 0 && ADDR.test(c) && <CopyButton value={c} label={(t.columns ? t.columns[0].key === "calc.col.field" : t.head[0] === "Campo") ? row[0] : t.head[k]} />}
                 </td>
               ))}</tr>
             ))}</tbody>
