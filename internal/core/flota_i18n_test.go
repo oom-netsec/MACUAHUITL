@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,7 +15,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
@@ -23,7 +23,7 @@ type flotaRec struct {
 	Json, Text, Err string `json:",omitempty"`
 	Extra           string `json:",omitempty"`
 	// Keys son las claves de textos del informe (ToolReport.keys); no entran en la comparación con el golden.
-	Keys map[string]*v1.TextRef `json:"-"`
+	Keys textRefs `json:"-"`
 }
 
 func (r flotaRec) same(o flotaRec) bool {
@@ -35,7 +35,7 @@ func recOf(r interface{ GetReport() *v1.ToolReport }, err error) flotaRec {
 	if err != nil {
 		return flotaRec{Err: err.Error()}
 	}
-	return flotaRec{Json: r.GetReport().GetJson(), Text: r.GetReport().GetText(), Keys: r.GetReport().GetKeys()}
+	return flotaRec{Json: r.GetReport().GetJson(), Text: r.GetReport().GetText(), Keys: keysOf(r.GetReport())}
 }
 
 // changeDirs arma dos trabajos de Patrol terminados (PRE y POST) con las salidas de prueba del paquete change.
@@ -180,8 +180,9 @@ func flotaCases(t *testing.T, h *harness, lang string, fx flotaFx) map[string]fl
 	rec := recOf(r, err)
 	rec.Extra = r.GetOutput()
 	out["cleaner.sucia"] = rec
+	extraCases(t, h, c, fx, out)
 	// las rutas de carpetas temporales cambian en cada corrida
-	rep := strings.NewReplacer(fx.pre, "<PRE>", fx.post, "<POST>", fx.empty, "<EMPTY>", fx.drift, "<DRIFT>", labDir(t), "<LAB>", fdir, "<FLEET>")
+	rep := strings.NewReplacer(fx.driftMasked, "<DRIFTM>", fx.diffJob, "<DIFFJOB>", fx.pcap, "<PCAP>", fx.pcapTrunc, "<PCAPT>", fx.pre, "<PRE>", fx.post, "<POST>", fx.empty, "<EMPTY>", fx.drift, "<DRIFT>", labDir(t), "<LAB>", fdir, "<FLEET>")
 	for k, v := range out {
 		out[k] = flotaRec{Json: rep.Replace(v.Json), Text: rep.Replace(v.Text), Err: rep.Replace(v.Err), Extra: rep.Replace(v.Extra), Keys: v.Keys}
 	}
@@ -189,11 +190,18 @@ func flotaCases(t *testing.T, h *harness, lang string, fx flotaFx) map[string]fl
 }
 
 // flotaFx son las carpetas de entrada, iguales en todas las corridas de una prueba.
-type flotaFx struct{ pre, post, empty, drift string }
+type flotaFx struct {
+	pre, post, empty, drift string
+	driftMasked, diffJob    string // deriva con secretos enmascarados; trabajo con diferencias enormes entre rondas
+	pcap, pcapTrunc         string // capturas de prueba (la segunda, truncada)
+}
 
 func newFlotaFx(t *testing.T) flotaFx {
 	pre, post := changeDirs(t)
-	return flotaFx{pre, post, t.TempDir(), driftDir(t)}
+	masked := driftDir(t)
+	mb, _ := json.Marshal(patrol.Manifest{Masked: true})
+	os.WriteFile(filepath.Join(masked, "manifest.json"), mb, 0o600)
+	return flotaFx{pre, post, t.TempDir(), driftDir(t), masked, diffJobDir(t), writePcap(t, false), writePcap(t, true)}
 }
 
 // aclRec es la respuesta de Analyze con los tres campos de siempre en el json; las claves de cada detalle van aparte.
@@ -204,15 +212,11 @@ func aclRec(fs []*v1.Finding, err error) flotaRec {
 		Detail    string `json:"detail,omitempty"`
 	}
 	var o []old
-	keys := map[string]*v1.TextRef{}
-	for i, f := range fs {
+	for _, f := range fs {
 		o = append(o, old{f.RuleIndex, f.Kind, f.Detail})
-		if f.DetailKey != "" {
-			keys[strconv.Itoa(i)+".detail"] = &v1.TextRef{Key: f.DetailKey, Args: f.DetailArgs}
-		}
 	}
 	bj, _ := json.Marshal(o)
-	return flotaRec{Json: string(bj), Err: errStr(err), Keys: keys}
+	return flotaRec{Json: string(bj), Err: errStr(err), Keys: aclKeysOf(fs)}
 }
 
 func errStr(err error) string {
@@ -256,6 +260,12 @@ func TestFlotaRegresionEs(t *testing.T) {
 	}
 	slices.Sort(names)
 	for _, n := range names {
+		if n == "compliance.plantilla.debil.txt" { // la fase 30c también oculta la comunidad de snmp-server: es lo único que cambia
+			w := want[n]
+			re := regexp.MustCompile(`(snmp-server community) [A-Za-z0-9_-]+`)
+			w.Json, w.Text = re.ReplaceAllString(w.Json, `$1 \u003coculto\u003e`), re.ReplaceAllString(w.Text, "$1 <oculto>")
+			want[n] = w
+		}
 		if !base[n].same(want[n]) {
 			t.Errorf("%s: el español cambió\n got: %+v\nwant: %+v", n, base[n], want[n])
 		}
@@ -265,45 +275,73 @@ func TestFlotaRegresionEs(t *testing.T) {
 	}
 }
 
-// jsonAt busca en un JSON decodificado la ruta rows.2.detail (índices numéricos para las listas).
-func jsonAt(v any, path string) (string, bool) {
-	for _, p := range strings.Split(path, ".") {
-		switch x := v.(type) {
-		case map[string]any:
-			v = x[p]
-		case []any:
-			i, err := strconv.Atoi(p)
-			if err != nil || i >= len(x) {
-				return "", false
-			}
-			v = x[i]
-		default:
-			return "", false
-		}
+// bigLines arma n líneas distintas con el prefijo p.
+func bigLines(n int, p string) string {
+	var l []string
+	for i := 0; i < n; i++ {
+		l = append(l, p+strconv.Itoa(i))
 	}
-	s, ok := v.(string)
-	return s, ok
+	return strings.Join(l, "\n")
 }
 
-// checkKeys: cada clave de ToolReport.keys cae sobre un texto del json que es exactamente su plantilla en el idioma pedido.
-func checkKeys(t *testing.T, lang string, cases map[string]flotaRec) (total int) {
+// diffJobDir arma un trabajo con dos rondas cuyas diferencias son demasiado grandes y demasiado largas.
+func diffJobDir(t *testing.T) string {
 	t.Helper()
-	loc := i18n.Normalize(lang)
-	for n, r := range cases {
-		var doc any
-		if r.Json == "" {
-			continue
-		}
-		if err := json.Unmarshal([]byte(r.Json), &doc); err != nil {
-			continue // algunas respuestas llevan otro JSON (hallazgos de ACL)
-		}
-		for path, ref := range r.Keys {
-			got, ok := jsonAt(doc, path)
-			if want := i18n.Msg(loc, ref.Key, ref.Args); !ok || got != want {
-				t.Errorf("%s %s (%s): json %q, clave da %q", n, path, ref.Key, got, want)
-			}
-			total++
-		}
+	d := t.TempDir()
+	put := func(dev, file, body string) {
+		p := filepath.Join(d, dev)
+		os.MkdirAll(p, 0o755)
+		os.WriteFile(filepath.Join(p, file), []byte(body), 0o600)
 	}
-	return total
+	sec := func(ts, cmd, body string) string { return "===== " + ts + " · " + cmd + " =====\n" + body + "\n" }
+	put("R1_10.0.0.1", "r001_20261104-100000.txt", sec("2026-11-04T10:00:01Z", "show alfa", "uno")+sec("2026-11-04T10:00:02Z", "show enorme", bigLines(2100, "a"))+sec("2026-11-04T10:00:03Z", "show largo", bigLines(10, "l")))
+	put("R1_10.0.0.1", "r002_20261104-101000.txt", sec("2026-11-04T10:10:01Z", "show beta", "dos")+sec("2026-11-04T10:10:02Z", "show enorme", bigLines(2100, "b"))+sec("2026-11-04T10:10:03Z", "show largo", bigLines(500, "m")))
+	put("R2_10.0.0.2", "r001_20261104-100000.txt", sec("2026-11-04T10:00:01Z", "show alfa", "uno"))
+	return d
+}
+
+// extraCases son los escenarios que los datos de ejemplo de arriba no alcanzan: limpieza con orden, deriva con
+// secretos enmascarados, línea de tiempo con captura y syslog, diferencias enormes y errores de entrada.
+func extraCases(t *testing.T, h *harness, c func() ctxT, fx flotaFx, out map[string]flotaRec) {
+	t.Helper()
+	cl := v1.NewCleanerServiceClient(h.conn)
+	b, _ := os.ReadFile("../cleaner/testdata/sucia.txt")
+	r, err := cl.Clean(c(), &v1.CleanRequest{Text: string(b), Sort: true})
+	rec := recOf(r, err)
+	rec.Extra = r.GetOutput()
+	out["cleaner.sucia-orden"] = rec
+	dc := v1.NewDriftServiceClient(h.conn)
+	dr, err := dc.Drift(c(), &v1.DriftRequest{Job: fx.driftMasked})
+	out["drift.enmascarada"] = recOf(dr, err)
+
+	ac := v1.NewAnalysisServiceClient(h.conn)
+	dd, err := ac.DiffRounds(c(), &v1.DiffRoundsRequest{Job: fx.diffJob, From: 1, To: 2})
+	out["analysis.diff.notas"] = recOf(dd, err)
+	// syslog del receptor, con una línea malformada, y una captura completa y otra truncada
+	dir := filepath.Join(h.out, "syslog")
+	os.MkdirAll(dir, 0o700)
+	os.WriteFile(filepath.Join(dir, "syslog_20261105-000000.log"), []byte("2026-11-06T18:00:03Z 10.0.0.2:514 <189>%BGP-5-ADJCHANGE: neighbor 10.0.13.1 Down\nmalformada\n"), 0o600)
+	around := timestamppb.New(time.Date(2026, 11, 6, 18, 0, 5, 0, time.UTC))
+	for name, p := range map[string]string{"pcap": fx.pcap, "pcap-truncada": fx.pcapTrunc} {
+		tr, err := ac.Timeline(c(), &v1.TimelineRequest{Job: labDir(t), Around: around, WindowSeconds: 3600, PcapPath: p})
+		out["analysis.timeline."+name] = recOf(tr, err)
+	}
+
+	cc := v1.NewChangeServiceClient(h.conn)
+	for i, img := range []*v1.CheckUpgradeRequest{{ImageFile: ""}, {ImageFile: "a/b.bin"}, {ImageFile: "x.bin", ImageMd5: "zz"}, {ImageFile: "x.bin", ImageSize: -1}} {
+		bb, _ := os.ReadFile("../upgrade/testdata/c9600-install-sso.txt")
+		img.Outputs = string(bb)
+		_, err := cc.CheckUpgrade(c(), img)
+		out["upgrade.err."+strconv.Itoa(i)] = flotaRec{Err: errStr(err)}
+	}
+	for i, q := range []*v1.CheckComplianceRequest{{Config: ""}, {Config: "hostname X\n", Template: "- foo\n bar\n"}, {Config: "hostname X\n", Template: "? foo\n"}, {Config: "hostname X\n", Template: "# nada\n"}} {
+		_, err := cc.CheckCompliance(c(), q)
+		out["compliance.err."+strconv.Itoa(i)] = flotaRec{Err: errStr(err)}
+	}
+	// más variantes de cambios: POST fallido, POST sin un comando y PRE y POST al revés
+	pre, post := fx.pre, fx.post
+	for name, q := range map[string]*v1.GetChangeReportRequest{"inverso": {PreDir: post, PostDir: pre}, "igual": {PreDir: pre, PostDir: pre}} {
+		rg, err := cc.GetChangeReport(c(), q)
+		out["change.report."+name] = recOf(rg, err)
+	}
 }
