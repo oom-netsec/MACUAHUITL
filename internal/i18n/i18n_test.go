@@ -3,6 +3,7 @@ package i18n
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -118,5 +119,22 @@ func TestCatalogoCobertura(t *testing.T) {
 				t.Errorf("%s: %s está en Args y en Extra", code, x)
 			}
 		}
+	}
+}
+
+func TestEnglishFijaElIdiomaYConservaElEnvoltorio(t *testing.T) {
+	e := New("ingest.invalid.addr.any", nil)
+	if got, want := English(e), e.Localize(En); got != want || got == e.Error() {
+		t.Fatalf("got %q want %q (es %q)", got, want, e.Error())
+	}
+	w := fmt.Errorf("syslog: %w", e)
+	if got, want := English(w), "syslog: "+e.Localize(En); got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if got := English(errors.New("sin código")); got != "sin código" {
+		t.Fatalf("got %q", got)
+	}
+	if got := English(nil); got != "" {
+		t.Fatalf("nil: %q", got)
 	}
 }

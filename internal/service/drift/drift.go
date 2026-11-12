@@ -90,7 +90,7 @@ func (s *driftSvc) Drift(_ context.Context, r *v1.DriftRequest) (*v1.DriftRespon
 	if len(rep.Devices) == 0 {
 		return nil, status.Error(codes.FailedPrecondition, "ningún equipo tiene dos rondas con show running-config; usa un playbook que lo recolecte y espera la segunda ronda")
 	}
-	s.d.Audit("drift.run", b.Dir, fmt.Sprintf("ronda=%d equipo=%q equipos=%d", r.Round, r.Device, len(rep.Devices)))
+	s.d.Audit("drift.run", b.Dir, fmt.Sprintf("round=%d device=%q devices=%d", r.Round, r.Device, len(rep.Devices)))
 	return &v1.DriftResponse{Report: service.Report(rep, rep.Text())}, nil
 }
 

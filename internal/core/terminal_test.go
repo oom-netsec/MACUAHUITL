@@ -53,7 +53,7 @@ func TestTerminalCerrarLaPestanaRevocaYAudita(t *testing.T) {
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(50 * time.Millisecond) {
 		a := h.auditText(t)
 		if strings.Contains(a, `"action":"terminal.close"`) {
-			if !strings.Contains(a, "guard=revocado") {
+			if !strings.Contains(a, "guard=revoked") {
 				t.Fatalf("sin revocar:\n%s", a)
 			}
 			break

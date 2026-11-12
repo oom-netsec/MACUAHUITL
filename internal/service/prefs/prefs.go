@@ -94,14 +94,15 @@ func (s *prefsSvc) SetCorePrefs(ctx context.Context, r *v1.SetCorePrefsRequest) 
 	}
 	st := s.d.Settings()
 	oldOut, oldIng := st.Configured()
-	req, issue := r.GetPrefs().GetOutputsDir(), ""
+	req, issue, issueAudit := r.GetPrefs().GetOutputsDir(), "", ""
 	out, err := service.CheckOutputs(req, st, true)
 	if err != nil {
 		if req == "" || req != oldOut {
 			return nil, err
 		}
 		// La carpeta no cambia pero ya no vale: el resto sí se guarda y el estado avisa (rige la de fábrica).
-		out, issue = oldOut, service.OutputsIssue(oldOut, status.Convert(err).Message())
+		msg := status.Convert(err).Message()
+		out, issue, issueAudit = oldOut, service.OutputsIssue(oldOut, msg), service.OutputsIssueAudit(oldOut, msg)
 	}
 	var ch []string
 	diff := func(name, a, b string) {
@@ -114,15 +115,26 @@ func (s *prefsSvc) SetCorePrefs(ctx context.Context, r *v1.SetCorePrefsRequest) 
 	diff("rotate_min", fmt.Sprint(oldIng.RotateMinutes), fmt.Sprint(ing.RotateMinutes))
 	diff("max_files", fmt.Sprint(oldIng.MaxFiles), fmt.Sprint(ing.MaxFiles))
 	diff("format", oldIng.Format, ing.Format)
-	diff("carpeta_invalida", st.Issue(), issue)
+	// La auditoría sigue a la carpeta y al código del motivo; el texto del aviso puede cambiar sin cambio de fondo
+	// (no_escribible trae el nombre temporal al azar) y entonces solo se pone al día la nota.
+	if st.IssueAudit() != issueAudit {
+		if issue != "" {
+			ch = append(ch, issueAudit)
+		} else {
+			ch = append(ch, "outputs_dir_invalid=cleared")
+		}
+	}
 	if len(ch) == 0 {
+		if st.Issue() != issue {
+			st.Mark(issue, issueAudit)
+		}
 		return &v1.SetCorePrefsResponse{State: s.state("")}, nil
 	}
 	if err := service.SaveCoreSettings(s.d.DB(), s.d.Now(), out, ing); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	st.Apply(out, ing)
-	st.Mark(issue)
+	st.Mark(issue, issueAudit)
 	s.d.Audit("prefs.core", "core", strings.Join(ch, " "))
 	note := ""
 	if oldOut != out {

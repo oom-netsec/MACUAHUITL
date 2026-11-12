@@ -168,3 +168,11 @@ func TestRecorderStampsEachLine(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", b.String(), want)
 	}
 }
+
+// AuditString va junto a String: mismo formato de línea pero con la clave en inglés para la bitácora.
+func TestConfigAuditString(t *testing.T) {
+	c := Config{Baud: 9600, DataBits: 8, Parity: "n", StopBits: 1, Flow: "none"}
+	if got, want := c.AuditString(), "9600 8N1 flow=none"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}

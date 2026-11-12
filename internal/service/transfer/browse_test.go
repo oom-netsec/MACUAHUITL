@@ -106,7 +106,7 @@ func TestBrowseSFTPConBovedaYLlaveEstricta(t *testing.T) {
 		t.Fatalf("r = %+v err = %v", r, err)
 	}
 	a := d.AuditText()
-	for _, want := range []string{"transfer.browse.start", `"action":"transfer.browse"`, "entradas=2", "guard=revocado", "transfer.browse.failed"} {
+	for _, want := range []string{"transfer.browse.start", `"action":"transfer.browse"`, "entries=2", "guard=revoked", "transfer.browse.failed"} {
 		if !strings.Contains(a, want) {
 			t.Errorf("falta %q en la auditoría", want)
 		}

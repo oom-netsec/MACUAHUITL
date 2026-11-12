@@ -65,11 +65,11 @@ func TestIngestOptsRejectsOutOfRange(t *testing.T) {
 func TestIngestDetail(t *testing.T) {
 	l, s, _ := IngestOpts{RatePerSource: 10}.Build(context.Background(), "/d", "x_{fecha}")
 	got := IngestDetail(l, s, true)
-	want := "tasa_origen=10 rafaga_origen=20 tasa_global=1000 rafaga_global=2000 cola=4096 rotar_mb=50 rotar_min=0 plantilla=x_{fecha} max_archivos=20 formato=texto"
+	want := "rate_per_origin=10 burst_per_origin=20 rate_global=1000 burst_global=2000 queue=4096 rotate_mb=50 rotate_min=0 template=x_{fecha} max_files=20 format=texto"
 	if got != want {
 		t.Fatalf("%q", got)
 	}
-	if got := IngestDetail(l, s, false); got != "tasa_origen=10 rafaga_origen=20 tasa_global=1000 rafaga_global=2000 cola=4096" {
+	if got := IngestDetail(l, s, false); got != "rate_per_origin=10 burst_per_origin=20 rate_global=1000 burst_global=2000 queue=4096" {
 		t.Fatalf("sin archivo: %q", got)
 	}
 }

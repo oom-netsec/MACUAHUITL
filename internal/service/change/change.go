@@ -85,7 +85,7 @@ func (s *changeSvc) CreateChange(_ context.Context, r *v1.CreateChangeRequest) (
 	s.mu.Lock()
 	s.changes[rec.id] = rec
 	s.mu.Unlock()
-	s.d.Audit("change.create", rec.id, fmt.Sprintf("nombre=%s equipos=%d playbooks=%v", spec.Name, len(spec.Targets), spec.PlaybookIds))
+	s.d.Audit("change.create", rec.id, fmt.Sprintf("name=%s devices=%d playbooks=%v", spec.Name, len(spec.Targets), spec.PlaybookIds))
 	return &v1.CreateChangeResponse{ChangeId: rec.id}, nil
 }
 
@@ -141,7 +141,7 @@ func (s *changeSvc) CaptureChange(ctx context.Context, r *v1.CaptureChangeReques
 	s.mu.Lock()
 	rec.jobs[r.Phase] = cj.JobId
 	s.mu.Unlock()
-	s.d.Audit("change.capture", rec.id, fmt.Sprintf("fase=%s trabajo=%s", name, cj.JobId))
+	s.d.Audit("change.capture", rec.id, fmt.Sprintf("phase=%s job=%s", name, cj.JobId))
 	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, ExcludedDeviceIds: r.ExcludedDeviceIds})
 	if err != nil {
 		// El trabajo queda creado: se revisa con LoginTest y se arma con ArmJob, como cualquier otro.
@@ -210,7 +210,7 @@ func (s *changeSvc) GetChangeReport(_ context.Context, r *v1.GetChangeReportRequ
 		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
 	rep := change.Compare(a, b)
-	s.d.Audit("change.report", r.ChangeId, fmt.Sprintf("pre=%s post=%s equipos=%d", preDir, postDir, len(rep.Devices)))
+	s.d.Audit("change.report", r.ChangeId, fmt.Sprintf("pre=%s post=%s devices=%d", preDir, postDir, len(rep.Devices)))
 	return &v1.GetChangeReportResponse{Report: service.Report(rep, rep.Text())}, nil
 }
 
@@ -224,7 +224,7 @@ func (s *changeSvc) CheckUpgrade(_ context.Context, r *v1.CheckUpgradeRequest) (
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.d.Audit("upgrade.check", rep.Hostname, fmt.Sprintf("imagen=%s comandos=%d", r.ImageFile, len(outs)))
+	s.d.Audit("upgrade.check", rep.Hostname, fmt.Sprintf("image=%s commands=%d", r.ImageFile, len(outs)))
 	return &v1.CheckUpgradeResponse{Report: service.Report(rep, rep.Text())}, nil
 }
 
@@ -234,7 +234,7 @@ func (s *changeSvc) CheckCompliance(_ context.Context, r *v1.CheckComplianceRequ
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.d.Audit("compliance.check", "", fmt.Sprintf("ok=%d fallas=%d revisar=%d plantilla=%t", rep.Pass, rep.Fail, rep.Warn, r.Template != ""))
+	s.d.Audit("compliance.check", "", fmt.Sprintf("ok=%d failures=%d warnings=%d template=%t", rep.Pass, rep.Fail, rep.Warn, r.Template != ""))
 	return &v1.CheckComplianceResponse{Report: service.Report(rep, rep.Text())}, nil
 }
 

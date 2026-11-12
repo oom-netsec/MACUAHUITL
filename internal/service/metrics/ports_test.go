@@ -118,7 +118,7 @@ func TestGetPortStatusEnVivo(t *testing.T) {
 		t.Fatalf("r = %v", r)
 	}
 	a := g.d.AuditText()
-	for _, want := range []string{"metrics.ports.live.start", `"action":"metrics.ports.live"`, "guard=revocado", "hostkey.accepted"} {
+	for _, want := range []string{"metrics.ports.live.start", `"action":"metrics.ports.live"`, "guard=revoked", "hostkey.accepted"} {
 		if !strings.Contains(a, want) {
 			t.Errorf("falta %q en la auditoría", want)
 		}

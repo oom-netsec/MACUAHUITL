@@ -25,7 +25,7 @@ func (s *cleanerSvc) Clean(_ context.Context, r *v1.CleanRequest) (*v1.CleanResp
 		return nil, status.Error(codes.InvalidArgument, "falta la configuración")
 	}
 	res := cleaner.Clean(r.Text, cleaner.Options{Sort: r.Sort})
-	s.d.Audit("cleaner.clean", "", fmt.Sprintf("bytes=%d orden=%v cambios=%d huerfanas=%d", len(r.Text), r.Sort, len(res.Changes), len(res.Orphans)))
+	s.d.Audit("cleaner.clean", "", fmt.Sprintf("bytes=%d sorted=%v changes=%d orphans=%d", len(r.Text), r.Sort, len(res.Changes), len(res.Orphans)))
 	out := res.Output
 	res.Output = "" // la salida viaja aparte; el informe no la repite
 	return &v1.CleanResponse{Report: service.Report(res, res.Text()), Output: out}, nil

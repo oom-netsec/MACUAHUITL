@@ -166,7 +166,7 @@ func TestRestoreDiffEndToEndLeavesRunningEqualToTheBackup(t *testing.T) {
 	if _, err := r.restore(id, nil); code(err) != codes.FailedPrecondition || !strings.Contains(err.Error(), "ya coincide") {
 		t.Fatalf("err = %v", err)
 	}
-	if !strings.Contains(r.d.AuditText(), "assist.line") || !strings.Contains(r.d.AuditText(), "respaldo="+id) {
+	if !strings.Contains(r.d.AuditText(), "assist.line") || !strings.Contains(r.d.AuditText(), "backup="+id) {
 		t.Error("la bitácora debe tener el plan con el respaldo y cada línea")
 	}
 }

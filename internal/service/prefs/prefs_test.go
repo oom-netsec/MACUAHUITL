@@ -3,6 +3,7 @@ package prefs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -341,7 +342,7 @@ func TestCambiarSoloIngestConLaCarpetaGuardadaInvalidaAvisa(t *testing.T) {
 	if !strings.Contains(g.State.Note, "chmod 700") || g.State.Prefs.OutputsDir != dir {
 		t.Fatalf("get = %+v", g.State)
 	}
-	if !strings.Contains(strings.ReplaceAll(d.AuditText(), `>`, ">"), "carpeta_invalida") {
+	if !strings.Contains(strings.ReplaceAll(d.AuditText(), `>`, ">"), "outputs_dir_invalid") {
 		t.Fatalf("auditoría sin el aviso:\n%s", d.AuditText())
 	}
 	// cambiar la carpeta a otra inválida sigue rechazándose
@@ -382,5 +383,65 @@ func TestUiLanguageSoloEsOEn(t *testing.T) {
 	}
 	if r, _ := s.GetPreference(ctx, &v1.GetPreferenceRequest{Key: "ui.language"}); r.Value != "en" {
 		t.Fatalf("un valor inválido cambió la preferencia: %q", r.Value)
+	}
+}
+
+// El aviso de carpeta inválida se actualiza aunque nada más cambie, y la auditoría dice la carpeta y el motivo
+// (el código prefs.outputs.X) en inglés.
+func TestAvisoDeCarpetaInvalidaCambiaDeMotivoYSeAudita(t *testing.T) {
+	s, d, root := montar(t)
+	dir := carpeta(t, filepath.Join(root, "salidas"), 0o700)
+	if err := fija(s, dir); err != nil {
+		t.Fatal(err)
+	}
+	guarda := func() *v1.SetCorePrefsResponse {
+		r, err := s.SetCorePrefs(context.Background(), &v1.SetCorePrefsRequest{Prefs: &v1.CorePrefs{OutputsDir: dir}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	os.RemoveAll(dir)
+	if r := guarda(); !strings.Contains(r.State.Note, "no_existe") {
+		t.Fatalf("nota = %q", r.State.Note)
+	}
+	if a := d.AuditText(); !strings.Contains(a, "outputs_dir_invalid dir=") || !strings.Contains(a, "reason=no_existe") {
+		t.Fatalf("auditoría sin carpeta y motivo:\n%s", a)
+	}
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.Chmod(dir, 0o755)
+	r := guarda() // sin otros cambios: el motivo cambió y el aviso debe ponerse al día
+	if !strings.Contains(r.State.Note, "permisos") || strings.Contains(r.State.Note, "no_existe") {
+		t.Fatalf("nota = %q", r.State.Note)
+	}
+	if a := d.AuditText(); !strings.Contains(a, "reason=permisos") || !strings.Contains(a, filepath.Base(dir)) {
+		t.Fatalf("auditoría sin el motivo nuevo:\n%s", a)
+	}
+}
+
+// Un motivo cuyo texto cambia en cada intento (no_escribible trae el nombre temporal al azar) no se vuelve a auditar
+// en cada guardado: la auditoría cambia solo si cambian la carpeta o el código del motivo.
+func TestAvisoNoEscribibleNoSeReauditaEnCadaGuardado(t *testing.T) {
+	s, d, root := montar(t)
+	dir := carpeta(t, filepath.Join(root, "salidas"), 0o700)
+	if err := fija(s, dir); err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	old := service.CreateTemp
+	service.CreateTemp = func(string, string) (*os.File, error) {
+		n++
+		return nil, fmt.Errorf("open %s/.mcw-%d: read-only file system", dir, n)
+	}
+	t.Cleanup(func() { service.CreateTemp = old })
+	for i := 0; i < 3; i++ {
+		if _, err := s.SetCorePrefs(context.Background(), &v1.SetCorePrefsRequest{Prefs: &v1.CorePrefs{OutputsDir: dir}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if c := strings.Count(d.AuditText(), "reason=no_escribible"); c != 1 {
+		t.Fatalf("no_escribible auditado %d veces, quería 1:\n%s", c, d.AuditText())
 	}
 }

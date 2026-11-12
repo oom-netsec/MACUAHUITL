@@ -48,9 +48,9 @@ func secretFrom(d service.Deps, src *v1.SecretSource) (user string, val []byte, 
 // origin dice de dónde vino un secreto, para la auditoría; nunca el valor.
 func origin(src *v1.SecretSource) string {
 	if id := src.GetCredentialId(); id != "" {
-		return "bóveda:" + id
+		return "vault:" + id
 	}
-	return "escrito"
+	return "typed"
 }
 
 func validHost(h string) error {
@@ -102,7 +102,7 @@ func (s *securitySvc) RadiusTest(ctx context.Context, r *v1.RadiusTestRequest) (
 		NASIP: r.NasIp, NASIdentifier: r.NasIdentifier, NASPortType: r.NasPortType, ServiceType: r.ServiceType,
 		CalledStationID: r.CalledStationId, CallingStationID: r.CallingStationId, StatusServer: r.StatusServer, Accounting: r.Accounting,
 		Timeout: service.MS(r.TimeoutMs, 0), Retries: int(r.Retries)}
-	s.d.Audit("security.radius", r.Host, fmt.Sprintf("run=%s puertos=%d/%d metodo=%s usuario=%q secreto=%s contraseña=%s status-server=%t accounting=%t",
+	s.d.Audit("security.radius", r.Host, fmt.Sprintf("run=%s ports=%d/%d method=%s user=%q secret=%s password=%s status-server=%t accounting=%t",
 		id, auth, acct, r.Method, user, origin(r.SharedSecret), origin(r.Password), r.StatusServer, r.Accounting))
 	rep, err := radiustest.Run(ctx, radiustest.Dialer(s.d.Guard().DialerFor(id)), cfg)
 	if err != nil {
@@ -110,7 +110,7 @@ func (s *securitySvc) RadiusTest(ctx context.Context, r *v1.RadiusTestRequest) (
 	}
 	var res []string
 	for _, e := range rep.Exchanges {
-		res = append(res, e.Kind+"="+map[bool]string{true: e.Code, false: "sin-respuesta"}[e.Code != ""])
+		res = append(res, e.Kind+"="+map[bool]string{true: e.Code, false: "no-response"}[e.Code != ""])
 	}
 	s.d.Audit("security.radius.result", r.Host, id+" "+strings.Join(res, " "))
 	return &v1.RadiusTestResponse{Report: service.Report(rep, rep.Text())}, nil
@@ -143,7 +143,7 @@ func (s *securitySvc) TacacsTest(ctx context.Context, r *v1.TacacsTestRequest) (
 	if err := s.d.Guard().Allow(ctx, id, []string{r.Host}); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.d.Audit("security.tacacs", r.Host, fmt.Sprintf("run=%s puerto=%d tipo=%s usuario=%q secreto=%s contraseña=%s comando=%q accounting=%t",
+	s.d.Audit("security.tacacs", r.Host, fmt.Sprintf("run=%s port=%d type=%s user=%q secret=%s password=%s command=%q accounting=%t",
 		id, port, r.AuthenType, user, origin(r.SharedSecret), origin(r.Password), r.Command, r.Accounting))
 	rep, err := tacacstest.Run(ctx, tacacstest.Dialer(s.d.Guard().DialerFor(id)), tacacstest.Config{Host: r.Host, Port: port, Secret: secret,
 		Username: user, Password: pw, AuthenType: r.AuthenType, PrivLvl: int(r.PrivLvl), Command: r.Command, Accounting: r.Accounting, Timeout: service.MS(r.TimeoutMs, 0)})
@@ -152,7 +152,7 @@ func (s *securitySvc) TacacsTest(ctx context.Context, r *v1.TacacsTestRequest) (
 	}
 	var res []string
 	for _, st := range rep.Steps {
-		res = append(res, st.Kind+"="+map[bool]string{true: st.Status, false: "sin-respuesta"}[st.Status != ""])
+		res = append(res, st.Kind+"="+map[bool]string{true: st.Status, false: "no-response"}[st.Status != ""])
 	}
 	s.d.Audit("security.tacacs.result", r.Host, id+" "+strings.Join(res, " "))
 	return &v1.TacacsTestResponse{Report: service.Report(rep, rep.Text())}, nil
@@ -201,7 +201,7 @@ func (s *securitySvc) PkiKey(_ context.Context, r *v1.PkiKeyRequest) (*v1.PkiKey
 	if err != nil {
 		return nil, err
 	}
-	s.d.Audit("pki.key", "", "algoritmo="+r.Algorithm)
+	s.d.Audit("pki.key", "", "algorithm="+r.Algorithm)
 	return &v1.PkiKeyResponse{SealedKeyPem: sealed}, nil
 }
 
@@ -224,7 +224,7 @@ func (s *securitySvc) PkiCsr(_ context.Context, r *v1.PkiCsrRequest) (*v1.PkiCsr
 	if err != nil {
 		return nil, pkiErr(err)
 	}
-	s.d.Audit("pki.csr", sub.GetCn(), fmt.Sprintf("llave=%s san=%d", keyOrigin, len(r.Dns)+len(r.Ips)))
+	s.d.Audit("pki.csr", sub.GetCn(), fmt.Sprintf("key=%s san=%d", keyOrigin, len(r.Dns)+len(r.Ips)))
 	return &v1.PkiCsrResponse{CsrPem: string(csr), SealedKeyPem: sealed, Report: s.decoded(csr, "")}, nil
 }
 
@@ -243,7 +243,7 @@ func (s *securitySvc) PkiCaInit(_ context.Context, r *v1.PkiCaInitRequest) (*v1.
 	if err != nil {
 		return nil, pkiErr(err)
 	}
-	s.d.Audit("pki.ca.init", r.Name, fmt.Sprintf("dias=%d algoritmo=%s", days, r.Algorithm))
+	s.d.Audit("pki.ca.init", r.Name, fmt.Sprintf("days=%d algorithm=%s", days, r.Algorithm))
 	return &v1.PkiCaInitResponse{CaCertPem: string(ca), SealedKeyPem: sealed, Report: s.decoded(ca, pki.LabWarning)}, nil
 }
 
@@ -267,7 +267,7 @@ func (s *securitySvc) PkiCaSign(_ context.Context, r *v1.PkiCaSignRequest) (*v1.
 	}
 	rep := s.decoded(cert, pki.LabWarning)
 	sums, _ := pki.Decode(cert, s.d.Now())
-	s.d.Audit("pki.ca.sign", sums[0].Subject, fmt.Sprintf("perfil=%s dias=%d serie=%s", profile, days, sums[0].Serial))
+	s.d.Audit("pki.ca.sign", sums[0].Subject, fmt.Sprintf("profile=%s days=%d serial=%s", profile, days, sums[0].Serial))
 	return &v1.PkiCaSignResponse{CertPem: string(cert), Report: rep}, nil
 }
 
@@ -291,7 +291,7 @@ func (s *securitySvc) PkiExport(_ context.Context, r *v1.PkiExportRequest) (*v1.
 	if err != nil {
 		return nil, pkiErr(err)
 	}
-	s.d.Audit("pki.export", "", fmt.Sprintf("formato=%s llave=%s", r.Format, map[bool]string{true: "incluida", false: "no"}[k != nil]))
+	s.d.Audit("pki.export", "", fmt.Sprintf("format=%s key=%s", r.Format, map[bool]string{true: "included", false: "no"}[k != nil]))
 	return &v1.PkiExportResponse{Data: out}, nil
 }
 

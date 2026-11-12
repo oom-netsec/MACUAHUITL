@@ -431,9 +431,9 @@ func TestRunAuditsEverything(t *testing.T) {
 	<-r.Done()
 	text := a.text()
 	for _, want := range []string{
-		"assist.start | run1", "assist.confirm | run1 | apply-1", "assist.line | SW1 | run=run1 línea=switchport access vlan 20",
-		"assist.line | SW2 | run=run1 línea=switchport access vlan 20 respuesta=% Invalid input", "assist.fail | run1",
-		"assist.rollback | run1", "assist.confirm | run1 | rollback-2", "assist.line | SW2 | run=run1 línea=switchport access vlan 10",
+		"assist.start | run1", "assist.confirm | run1 | apply-1", "assist.line | SW1 | run=run1 line=switchport access vlan 20",
+		"assist.line | SW2 | run=run1 line=switchport access vlan 20 response=% Invalid input", "assist.fail | run1",
+		"assist.rollback | run1", "assist.confirm | run1 | rollback-2", "assist.line | SW2 | run=run1 line=switchport access vlan 10",
 		"assist.abort | run1",
 	} {
 		if !strings.Contains(text, want) {
@@ -576,7 +576,7 @@ func TestRollbackFailureThenAbortReportsChanged(t *testing.T) {
 	if r.State() != Aborted || !reflect.DeepEqual(r.Changed(), []string{"SW1"}) {
 		t.Fatalf("estado %s cambiados %v", r.State(), r.Changed())
 	}
-	if !strings.Contains(a.text(), "cambiados=SW1") {
+	if !strings.Contains(a.text(), "changed=SW1") {
 		t.Fatalf("la auditoría no dice qué equipo quedó cambiado:\n%s", a.text())
 	}
 }
@@ -650,7 +650,7 @@ func TestRollbackStopsIfDeviceChangedSinceOurChange(t *testing.T) {
 	}
 	r.Abort()
 	<-r.Done()
-	if r.State() != Aborted || !reflect.DeepEqual(r.Changed(), []string{"SW1"}) || !strings.Contains(a.text(), "cambiados=SW1") {
+	if r.State() != Aborted || !reflect.DeepEqual(r.Changed(), []string{"SW1"}) || !strings.Contains(a.text(), "changed=SW1") {
 		t.Fatalf("%s %v", r.State(), r.Changed())
 	}
 }
@@ -682,7 +682,7 @@ func TestRunAbandonedOnTimeoutAndOnCancel(t *testing.T) {
 		if !reflect.DeepEqual(r.Changed(), []string{"SW1"}) || !ex.closed || r.Pending() != nil {
 			t.Fatalf("byCancel=%v changed=%v closed=%v", byCancel, r.Changed(), ex.closed)
 		}
-		if !strings.Contains(a.text(), "assist.abandoned") || !strings.Contains(a.text(), "cambiados=SW1") {
+		if !strings.Contains(a.text(), "assist.abandoned") || !strings.Contains(a.text(), "changed=SW1") {
 			t.Fatalf("auditoría:\n%s", a.text())
 		}
 		if err := r.Confirm("apply-2"); err == nil {
@@ -770,7 +770,7 @@ func aborted(t *testing.T, r *Run, a *auditRec, changed []string) {
 	case <-time.After(200 * time.Millisecond): // el tope de decisión es 300 ms: debe terminar antes
 		t.Fatalf("la ejecución no terminó sola: estado %s", r.State())
 	}
-	if r.State() != Aborted || !reflect.DeepEqual(r.Changed(), changed) || !strings.Contains(a.text(), "cambiados="+strings.Join(changed, ",")) {
+	if r.State() != Aborted || !reflect.DeepEqual(r.Changed(), changed) || !strings.Contains(a.text(), "changed="+strings.Join(changed, ",")) {
 		t.Fatalf("estado %s cambiados %v\n%s", r.State(), r.Changed(), a.text())
 	}
 }

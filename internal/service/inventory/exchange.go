@@ -224,7 +224,7 @@ func (s *svc) ApplyImportHosts(_ context.Context, r *v1.ApplyImportHostsRequest)
 		}
 		return nil, err
 	}
-	s.d.Audit("hosts.importar", pv.path, fmt.Sprintf("%d nuevos, %d reemplazados, %d renombrados, %d omitidos, %d inválidos",
+	s.d.Audit("hosts.importar", pv.path, fmt.Sprintf("%d new, %d replaced, %d renamed, %d skipped, %d invalid",
 		res.Created, res.Replaced, res.Renamed, res.Skipped, pv.invalid))
 	return &v1.ApplyImportHostsResponse{Created: int32(res.Created), Replaced: int32(res.Replaced), Renamed: int32(res.Renamed), Skipped: int32(res.Skipped + pv.invalid), Invalid: int32(pv.invalid)}, nil
 }

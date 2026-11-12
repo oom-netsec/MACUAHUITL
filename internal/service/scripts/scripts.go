@@ -307,7 +307,7 @@ func (s *svc) SetFavorite(_ context.Context, r *v1.SetFavoriteRequest) (*v1.SetF
 	if err != nil {
 		return nil, err
 	}
-	s.d.Audit("scripts.favorito", r.Id, map[bool]string{true: "marcado", false: "desmarcado"}[r.Favorite])
+	s.d.Audit("scripts.favorito", r.Id, map[bool]string{true: "marked", false: "unmarked"}[r.Favorite])
 	return &v1.SetFavoriteResponse{}, nil
 }
 
@@ -335,7 +335,7 @@ func (s *svc) DuplicateScript(_ context.Context, r *v1.DuplicateScriptRequest) (
 	if err != nil {
 		return nil, err
 	}
-	s.d.Audit("scripts.crear", c.ID, c.Name+" (copia de "+r.Id+")")
+	s.d.Audit("scripts.crear", c.ID, c.Name+" (copy of "+r.Id+")")
 	return &v1.DuplicateScriptResponse{Script: toPB(c, meta{})}, nil
 }
 
@@ -491,7 +491,7 @@ func (s *svc) ApplyImport(_ context.Context, r *v1.ApplyImportRequest) (*v1.Appl
 		}
 		return nil, err
 	}
-	s.d.Audit("scripts.importar", p.path, fmt.Sprintf("%d nuevos, %d reemplazados, %d renombrados, %d omitidos; decisiones: %s",
+	s.d.Audit("scripts.importar", p.path, fmt.Sprintf("%d new, %d replaced, %d renamed, %d skipped; decisions: %s",
 		res.Created, res.Replaced, res.Renamed, res.Skipped, resumen(dec)))
 	return &v1.ApplyImportResponse{Created: int32(res.Created), Replaced: int32(res.Replaced), Renamed: int32(res.Renamed), Skipped: int32(res.Skipped)}, nil
 }
@@ -499,7 +499,7 @@ func (s *svc) ApplyImport(_ context.Context, r *v1.ApplyImportRequest) (*v1.Appl
 // resumen lista las decisiones para la auditoría, con tope para que un archivo grande no infle la entrada.
 func resumen(dec map[string]string) string {
 	if len(dec) == 0 {
-		return "ninguna"
+		return "none"
 	}
 	ids := make([]string, 0, len(dec))
 	for id := range dec {
@@ -509,10 +509,10 @@ func resumen(dec map[string]string) string {
 	var parts []string
 	for i, id := range ids {
 		if i == 20 {
-			parts = append(parts, fmt.Sprintf("… y %d más", len(ids)-i))
+			parts = append(parts, fmt.Sprintf("… and %d more", len(ids)-i))
 			break
 		}
-		parts = append(parts, id+"="+dec[id])
+		parts = append(parts, id+"="+service.DecisionEN(dec[id]))
 	}
 	return strings.Join(parts, ", ")
 }

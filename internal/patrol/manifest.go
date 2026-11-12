@@ -107,7 +107,7 @@ func Finish(ctx context.Context, d Deps, w *Writer, s Spec, rounds int, results 
 		m.Files = append(m.Files, FileRef{Path: rel, SHA256: h})
 	}
 	if _, err := d.Audit.Append(ctx, audit.Entry{Actor: "patrol", Action: "job.finish", Target: s.Name,
-		Detail: fmt.Sprintf("rondas=%d archivos=%d enmascarado=%v", rounds, len(m.Files), m.Masked)}); err != nil {
+		Detail: fmt.Sprintf("rounds=%d files=%d masked=%v", rounds, len(m.Files), m.Masked)}); err != nil {
 		return m, err
 	}
 	head, err := d.Audit.Head(ctx)

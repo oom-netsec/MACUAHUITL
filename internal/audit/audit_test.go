@@ -258,3 +258,28 @@ func TestAppendConEscritorConcurrente(t *testing.T) {
 		t.Fatalf("cadena rota: %+v %v", res, err)
 	}
 }
+
+// Fase 30a-2: los registros viejos (detalle en español) no se reescriben; la cadena sigue íntegra con
+// registros viejos en español y nuevos en inglés en la misma base.
+func TestVerifyConRegistrosMixtosEspanolEIngles(t *testing.T) {
+	l, _ := newLog(t)
+	ctx := context.Background()
+	for _, e := range []Entry{
+		{Actor: "u", Action: "job.logintest", Target: "j1", Detail: "pasaron=1 de 2"},
+		{Actor: "u", Action: "job.logintest", Target: "j2", Detail: "passed=1 of 2"},
+		{Actor: "u", Action: "vault.lock", Detail: "usuario"},
+		{Actor: "u", Action: "vault.lock", Detail: "reason=user"},
+	} {
+		if _, err := l.Append(ctx, e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	v, err := l.Verify(ctx)
+	if err != nil || !v.Intact {
+		t.Fatalf("verify = %+v, %v", v, err)
+	}
+	var b bytes.Buffer
+	if err := l.Export(ctx, &b, time.Time{}, time.Now().Add(time.Hour)); err != nil || !bytes.Contains(b.Bytes(), []byte("pasaron=1 de 2")) || !bytes.Contains(b.Bytes(), []byte("passed=1 of 2")) {
+		t.Fatalf("export: %v\n%s", err, b.String())
+	}
+}

@@ -65,7 +65,7 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 		code = -1
 	}
 	// Lo que corrió de verdad: binario resuelto (tracepath por traceroute) y argv completo, entrecomillado.
-	s.d.Audit("diag.done", string(tool), fmt.Sprintf("exit=%d bin=%s argv=%q salida=%s", code, res.Bin, res.Argv, res.OutputPath))
+	s.d.Audit("diag.done", string(tool), fmt.Sprintf("exit=%d bin=%s argv=%q output=%s", code, res.Bin, res.Argv, res.OutputPath))
 	if errors.Is(err, diag.ErrNotInstalled) {
 		return status.Error(codes.FailedPrecondition, err.Error())
 	}

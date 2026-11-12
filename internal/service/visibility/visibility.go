@@ -178,7 +178,7 @@ func (s *visibilitySvc) SnmpPoll(r *v1.SnmpPollRequest, st v1.VisibilityService_
 	if r.IntervalSeconds <= 0 {
 		every = 10 * time.Second
 	}
-	s.d.Audit("visibility.snmp", t.Host, fmt.Sprintf("run=%s op=poll version=%s perfiles=%q intervalo=%s", id, t.Version, r.Profiles, every))
+	s.d.Audit("visibility.snmp", t.Host, fmt.Sprintf("run=%s op=poll version=%s profiles=%q interval=%s", id, t.Version, r.Profiles, every))
 	err = snmp.Poll(ctx, t, r.Profiles, every, int(r.Count), func(sm snmp.Sample) {
 		b, _ := json.Marshal(sm)
 		st.Send(&v1.SnmpPollResponse{Json: string(b)})
@@ -244,7 +244,7 @@ func (s *visibilitySvc) SnmpTraps(r *v1.SnmpTrapsRequest, st v1.VisibilityServic
 		outDir = sink.Dir
 		sink.OnOpen = func(p string) { send(&v1.SnmpTrapsResponse{RotatedPath: p}) }
 		sink.OnRemove = func(p string) {
-			s.d.Audit("visibility.traps.retencion", p, "borrado por exceder max_archivos="+strconv.Itoa(sink.MaxFiles))
+			s.d.Audit("visibility.traps.retencion", p, "deleted for exceeding max_files="+strconv.Itoa(sink.MaxFiles))
 		}
 		cfg.Sink = &sink
 	}
@@ -253,7 +253,7 @@ func (s *visibilitySvc) SnmpTraps(r *v1.SnmpTrapsRequest, st v1.VisibilityServic
 	listening := false
 	cfg.OnListening = func(a string) {
 		listening = true
-		s.d.Audit("visibility.traps", a, fmt.Sprintf("todas=%t v3=%t salida=%s ", r.AllowAny, cfg.V3 != nil, outDir)+service.IngestDetail(lim, sink, r.Save))
+		s.d.Audit("visibility.traps", a, fmt.Sprintf("all=%t v3=%t output=%s ", r.AllowAny, cfg.V3 != nil, outDir)+service.IngestDetail(lim, sink, r.Save))
 		send(&v1.SnmpTrapsResponse{Listening: a, OutputPath: outDir})
 	}
 	cfg.OnTrap = func(t snmp.Trap) {
@@ -270,7 +270,7 @@ func (s *visibilitySvc) SnmpTraps(r *v1.SnmpTrapsRequest, st v1.VisibilityServic
 	if !listening { // dirección, puerto o credencial rechazados antes de abrir el socket, o la carpeta de salida
 		return preListenErr(st.Context(), err)
 	}
-	s.d.Audit("visibility.traps.done", cfg.Addr, fmt.Sprintf("traps=%d descartes=%d por_origen=%d global=%d cola_llena=%d perdidos_en_la_interfaz=%d", n, last.Total, last.PorOrigen, last.Global, last.ColaLlena, lost))
+	s.d.Audit("visibility.traps.done", cfg.Addr, fmt.Sprintf("traps=%d drops=%d per_origin=%d global=%d queue_full=%d lost_on_interface=%d", n, last.Total, last.PorOrigen, last.Global, last.ColaLlena, lost))
 	if err != nil {
 		return service.ErrFrom(st.Context(), codes.Unavailable, err)
 	}
@@ -299,7 +299,7 @@ func (s *visibilitySvc) Flows(r *v1.FlowsRequest, st v1.VisibilityService_FlowsS
 		outDir = sink.Dir
 		sink.OnOpen = func(p string) { send(&v1.FlowsResponse{RotatedPath: p}) }
 		sink.OnRemove = func(p string) {
-			s.d.Audit("visibility.flows.retencion", p, "borrado por exceder max_archivos="+strconv.Itoa(sink.MaxFiles))
+			s.d.Audit("visibility.flows.retencion", p, "deleted for exceeding max_files="+strconv.Itoa(sink.MaxFiles))
 		}
 		cfg.Sink = &sink
 	}
@@ -315,7 +315,7 @@ func (s *visibilitySvc) Flows(r *v1.FlowsRequest, st v1.VisibilityService_FlowsS
 		if r.Save {
 			detail = service.IngestDetail(lim, sink, true)
 		}
-		s.d.Audit("visibility.flows", a, fmt.Sprintf("todas=%t salida=%s ", r.AllowAny, outDir)+detail)
+		s.d.Audit("visibility.flows", a, fmt.Sprintf("all=%t output=%s ", r.AllowAny, outDir)+detail)
 		send(&v1.FlowsResponse{Listening: a, OutputPath: outDir})
 	}
 	cfg.OnSnapshot = func(sn flows.Snapshot) { snap(sn, false) }
@@ -330,7 +330,7 @@ func (s *visibilitySvc) Flows(r *v1.FlowsRequest, st v1.VisibilityService_FlowsS
 	}
 	snap(sn, true)
 	lost := pump.Close(closeGrace)
-	s.d.Audit("visibility.flows.done", cfg.Addr, fmt.Sprintf("flujos=%d bytes=%d errores=%d descartes=%d por_origen=%d global=%d cola_llena=%d perdidos_en_la_interfaz=%d", sn.Flows, sn.Bytes, sn.Errors, last.Total, last.PorOrigen, last.Global, last.ColaLlena, lost))
+	s.d.Audit("visibility.flows.done", cfg.Addr, fmt.Sprintf("flows=%d bytes=%d errors=%d drops=%d per_origin=%d global=%d queue_full=%d lost_on_interface=%d", sn.Flows, sn.Bytes, sn.Errors, last.Total, last.PorOrigen, last.Global, last.ColaLlena, lost))
 	if err != nil {
 		return service.ErrFrom(st.Context(), codes.Unavailable, err)
 	}
@@ -382,7 +382,7 @@ func (s *visibilitySvc) GnmiGet(ctx context.Context, r *v1.GnmiGetRequest) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	s.d.Audit("visibility.gnmi", t.Host, fmt.Sprintf("run=%s op=get rutas=%q", id, r.Paths))
+	s.d.Audit("visibility.gnmi", t.Host, fmt.Sprintf("run=%s op=get paths=%q", id, r.Paths))
 	ups, err := gnmic.Get(ctx, gnmic.Dialer(s.d.Guard().DialerFor(id)), t, r.Paths, r.Encoding)
 	if err != nil {
 		return nil, gnmiErr(err)
@@ -400,7 +400,7 @@ func (s *visibilitySvc) GnmiSubscribe(r *v1.GnmiSubscribeRequest, st v1.Visibili
 	if err != nil {
 		return err
 	}
-	s.d.Audit("visibility.gnmi", t.Host, fmt.Sprintf("run=%s op=subscribe modo=%s rutas=%q", id, r.Mode, r.Paths))
+	s.d.Audit("visibility.gnmi", t.Host, fmt.Sprintf("run=%s op=subscribe mode=%s paths=%q", id, r.Mode, r.Paths))
 	err = gnmic.Subscribe(ctx, gnmic.Dialer(s.d.Guard().DialerFor(id)), t, r.Paths, r.Mode, time.Duration(r.IntervalSeconds)*time.Second, func(u gnmic.Update) {
 		b, _ := json.Marshal(u)
 		st.Send(&v1.GnmiSubscribeResponse{Json: string(b)})

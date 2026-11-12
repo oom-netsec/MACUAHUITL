@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
@@ -345,7 +346,7 @@ func (r *Run) Start(ctx context.Context) {
 
 func (r *Run) finish(s State) {
 	r.setState(s)
-	r.log2("assist."+string(s), r.id, "estado=%s", s)
+	r.log2("assist."+string(s), r.id, "state=%s", s)
 }
 
 func (r *Run) loop(ctx context.Context) {
@@ -355,9 +356,9 @@ func (r *Run) loop(ctx context.Context) {
 		r.mu.Lock()
 		st, ch := r.state, strings.Join(r.changedLocked(), ",")
 		r.mu.Unlock()
-		r.log2("assist.end", r.id, "estado=%s cambiados=%s", st, ch)
+		r.log2("assist.end", r.id, "state=%s changed=%s", st, ch)
 	}()
-	r.log2("assist.start", r.id, "función=%s equipos=%d write_memory=%t", r.plan.Function, len(r.plan.Devices), r.plan.WriteMemory)
+	r.log2("assist.start", r.id, "function=%s devices=%d write_memory=%t", r.plan.Function, len(r.plan.Devices), r.plan.WriteMemory)
 	o := r.forward(ctx)
 	if o == oFailed {
 		r.mu.Lock()
@@ -468,7 +469,7 @@ func (r *Run) Abort() error {
 	default:
 		return ErrBadState
 	}
-	r.audit("assist.abort", r.id, "pedido por el ingeniero")
+	r.audit("assist.abort", r.id, "requested by the engineer")
 	return nil
 }
 
@@ -482,7 +483,7 @@ func (r *Run) Rollback() error {
 	r.pending, r.waiting = nil, false
 	r.state = Running
 	r.emit(Event{Kind: EvState, State: Running})
-	r.audit("assist.rollback", r.id, "pedida por el ingeniero")
+	r.audit("assist.rollback", r.id, "requested by the engineer")
 	r.dec <- dRollback
 	return nil
 }
@@ -493,9 +494,14 @@ func (r *Run) takeAbort() bool {
 	return r.abort
 }
 
-// fail detiene la ejecución (regla 5).
-func (r *Run) fail(format string, a ...any) outcome {
-	msg := r.scrub(fmt.Sprintf(format, a...))
+// failT detiene la ejecución (regla 5): el texto para la pantalla (es) y el de la auditoría, en inglés.
+func (r *Run) failT(format, en string, a ...any) outcome {
+	return r.failMsg(fmt.Sprintf(format, a...), fmt.Sprintf(en, a...))
+}
+
+// failMsg es failT con los dos textos ya armados.
+func (r *Run) failMsg(es, en string) outcome {
+	msg := r.scrub(es)
 	r.mu.Lock()
 	r.state, r.reason = Failed, msg
 	o := oFailed
@@ -508,7 +514,7 @@ func (r *Run) fail(format string, a ...any) outcome {
 	}
 	r.emit(Event{Kind: EvFail, State: Failed, Text: msg})
 	r.mu.Unlock()
-	r.log2("assist.fail", r.id, "%s", msg)
+	r.log2("assist.fail", r.id, "%s", en)
 	return o
 }
 
@@ -518,33 +524,34 @@ func (r *Run) read(ctx context.Context, i int, cmds []string) (map[string]string
 	m := map[string]string{}
 	for _, o := range outs {
 		m[o.Command] = o.Text
-		r.log2("assist.read", dev, "run=%s comando=%s", r.id, o.Command)
+		r.log2("assist.read", dev, "run=%s command=%s", r.id, o.Command)
 		r.out(dev, "$ "+o.Command+"\n"+o.Text)
 	}
 	return m, err
 }
 
 // sent audita cada línea enviada con su respuesta (regla 6) y dice cuál falló.
-func (r *Run) sent(dev string, sent []Sent) (failed string) {
+func (r *Run) sent(dev string, sent []Sent) (failed, failedEN string) {
 	for _, s := range sent {
-		r.log2("assist.line", dev, "run=%s línea=%s respuesta=%s", r.id, s.Line, trim(s.Output))
+		r.log2("assist.line", dev, "run=%s line=%s response=%s", r.id, s.Line, trim(s.Output))
 		r.out(dev, "> "+s.Line+"\n"+s.Output)
 		if s.Failed && failed == "" {
 			failed = fmt.Sprintf("el equipo %s rechazó %q: %s", dev, s.Line, trim(s.Output))
+			failedEN = fmt.Sprintf("device %s rejected %q: %s", dev, s.Line, trim(s.Output))
 		}
 	}
-	return failed
+	return failed, failedEN
 }
 
 func (r *Run) forward(ctx context.Context) outcome {
 	for i, dp := range r.plan.Devices {
 		outs, err := r.read(ctx, i, dp.Pre)
 		if err != nil {
-			return r.fail("pre-check de %s: %v", dp.Device, err)
+			return r.failT("pre-check de %s: %v", "pre-check of %s: %v", dp.Device, err)
 		}
 		for cmd, was := range dp.Baseline {
 			if !sameOut(cmd, outs[cmd], was) {
-				return r.fail("%s cambió desde que se hizo el plan (%s); vuelve a planear", dp.Device, cmd)
+				return r.failT("%s cambió desde que se hizo el plan (%s); vuelve a planear", "%s changed since the plan was made (%s); plan again", dp.Device, cmd)
 			}
 		}
 		if r.takeAbort() {
@@ -562,21 +569,21 @@ func (r *Run) forward(ctx context.Context) outcome {
 			if d := r.await(ctx, &step, true); d != dConfirm {
 				if d == dAbort && dp.VerifyLogin {
 					// Sin write memory el equipo vuelve al hash anterior al reiniciar: no se da por terminada, se propone la reversa.
-					return r.fail("write memory rechazado en %s: la credencial nueva solo está en la configuración en ejecución y se perdería al reiniciar; propón la reversa", dp.Device)
+					return r.failT("write memory rechazado en %s: la credencial nueva solo está en la configuración en ejecución y se perdería al reiniciar; propón la reversa", "write memory refused on %s: the new credential is only in the running configuration and would be lost on reload; propose the rollback", dp.Device)
 				}
 				return stop(d)
 			}
 			text, err := r.exec.Save(ctx, dp.Device)
-			r.log2("assist.save", dp.Device, "run=%s respuesta=%s", r.id, trim(text))
+			r.log2("assist.save", dp.Device, "run=%s response=%s", r.id, trim(text))
 			if err != nil {
-				return r.fail("write memory en %s: %v", dp.Device, err)
+				return r.failT("write memory en %s: %v", "write memory on %s: %v", dp.Device, err)
 			}
 			r.out(dp.Device, "> write memory\n"+text)
 			if dp.VerifyLogin { // solo ahora la bóveda recibe la credencial nueva
 				msg, err := r.exec.(Verifier).Saved(ctx, dp.Device)
 				if err != nil {
-					r.log2("assist.verify", dp.Device, "run=%s la bóveda no se actualizó tras write memory", r.id)
-					return r.fail("write memory salió bien en %s pero la bóveda no quedó con la credencial nueva: %v; edítala a mano", dp.Device, err)
+					r.log2("assist.verify", dp.Device, "run=%s the vault was not updated after write memory", r.id)
+					return r.failT("write memory salió bien en %s pero la bóveda no quedó con la credencial nueva: %v; edítala a mano", "write memory succeeded on %s but the vault does not hold the new credential: %v; edit it by hand", dp.Device, err)
 				}
 				r.out(dp.Device, msg)
 			}
@@ -598,8 +605,8 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 		return stop(d), true
 	}
 	// Otra vez la línea base, ya con la confirmación dada: el equipo pudo cambiar mientras se decidía.
-	if msg := r.drift(ctx, i, dp.Baseline, "desde que se hizo el plan"); msg != "" {
-		return r.fail("%s", msg), true
+	if msg, en := r.drift(ctx, i, dp.Baseline, "desde que se hizo el plan", "since the plan was made"); msg != "" {
+		return r.failMsg(msg, en), true
 	}
 	// Desde aquí el equipo puede haber cambiado, aunque la línea que falle sea la primera.
 	r.mu.Lock()
@@ -609,31 +616,31 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 	if len(sent) == 0 { // ninguna línea llegó a mandarse (no se pudo conectar ni entrar a configuración): el equipo sigue igual
 		r.unchange(i)
 	}
-	failed := r.sent(dp.Device, sent)
+	failed, failedEN := r.sent(dp.Device, sent)
 	if (err != nil || failed != "") && len(sent) > 0 {
 		r.resync(ctx, i) // lo que quedó a medias es la referencia de una reversa tardía
 	}
 	if err != nil {
-		return r.fail("configuración de %s: %v", dp.Device, err), true
+		return r.failT("configuración de %s: %v", "configuration of %s: %v", dp.Device, err), true
 	}
 	if failed != "" {
-		return r.fail("%s", failed), true
+		return r.failMsg(failed, failedEN), true
 	}
 	outs, err := r.read(ctx, i, dp.Post)
 	r.remember(i, dp.Baseline, outs)
 	if err != nil {
-		return r.fail("post-check de %s: %v", dp.Device, err), true
+		return r.failT("post-check de %s: %v", "post-check of %s: %v", dp.Device, err), true
 	}
 	if fails := EvalExpect(dp.Expect, outs); len(fails) > 0 {
-		return r.fail("el post-check de %s no cumple lo esperado: %s", dp.Device, strings.Join(fails, "; ")), true
+		return r.failT("el post-check de %s no cumple lo esperado: %s", "the post-check of %s does not meet expectations: %s", dp.Device, strings.Join(fails, "; ")), true
 	}
 	if dp.VerifyLogin { // sesión nueva con la credencial nueva: si no entra, la original sigue abierta para revertir
 		msg, err := r.exec.(Verifier).Verify(ctx, dp.Device)
 		if err != nil {
-			r.log2("assist.verify", dp.Device, "run=%s resultado=falló", r.id)
-			return r.fail("la credencial nueva no entró a %s con una sesión nueva: %v; la sesión original sigue abierta: propón la reversa", dp.Device, err), true
+			r.log2("assist.verify", dp.Device, "run=%s result=failed", r.id)
+			return r.failT("la credencial nueva no entró a %s con una sesión nueva: %v; la sesión original sigue abierta: propón la reversa", "the new credential did not log in to %s with a new session: %v; the original session is still open: propose the rollback", dp.Device, err), true
 		}
-		r.log2("assist.verify", dp.Device, "run=%s resultado=ok", r.id)
+		r.log2("assist.verify", dp.Device, "run=%s result=ok", r.id)
 		r.out(dp.Device, msg)
 	}
 	if r.takeAbort() {
@@ -696,22 +703,22 @@ func (r *Run) resync(ctx context.Context, i int) bool {
 }
 
 // drift relee los comandos de want y dice (no vacío) si alguno ya no da lo mismo.
-func (r *Run) drift(ctx context.Context, i int, want map[string]string, since string) string {
+func (r *Run) drift(ctx context.Context, i int, want map[string]string, since, sinceEN string) (es, en string) {
 	if len(want) == 0 {
-		return ""
+		return "", ""
 	}
 	cmds := sortedCmds(want)
 	dev := r.plan.Devices[i].Device
 	outs, err := r.read(ctx, i, cmds)
 	if err != nil {
-		return fmt.Sprintf("no se pudo verificar %s antes de continuar: %v", dev, err)
+		return fmt.Sprintf("no se pudo verificar %s antes de continuar: %v", dev, err), fmt.Sprintf("could not verify %s before continuing: %v", dev, err)
 	}
 	for _, c := range cmds {
 		if !sameOut(c, outs[c], want[c]) {
-			return fmt.Sprintf("%s cambió %s (%s)", dev, since, c)
+			return fmt.Sprintf("%s cambió %s (%s)", dev, since, c), fmt.Sprintf("%s changed %s (%s)", dev, sinceEN, c)
 		}
 	}
-	return ""
+	return "", ""
 }
 
 // rollback aplica la reversa de los equipos cambiados, del último al primero, con confirmación.
@@ -757,8 +764,8 @@ func (r *Run) rollbackOne(ctx context.Context, i int) bool {
 		r.mu.Lock()
 		was := r.snap[i]
 		r.mu.Unlock()
-		if msg := r.drift(ctx, i, was, "desde nuestro cambio; la reversa pisaría un cambio ajeno"); msg != "" {
-			r.fail("%s", msg)
+		if msg, en := r.drift(ctx, i, was, "desde nuestro cambio; la reversa pisaría un cambio ajeno", "since our change; the rollback would overwrite someone else's change"); msg != "" {
+			r.failMsg(msg, en)
 		} else if r.revert(ctx, i) {
 			return true
 		}
@@ -785,21 +792,21 @@ func (r *Run) finishFor(d decision) {
 func (r *Run) revert(ctx context.Context, i int) bool {
 	dp := r.plan.Devices[i]
 	sent, err := r.exec.Configure(ctx, dp.Device, dp.Rollback)
-	failed := r.sent(dp.Device, sent)
+	failed, failedEN := r.sent(dp.Device, sent)
 	if err != nil {
-		failed = fmt.Sprintf("reversa de %s: %v", dp.Device, err)
+		failed, failedEN = fmt.Sprintf("reversa de %s: %v", dp.Device, err), fmt.Sprintf("rollback of %s: %v", dp.Device, err)
 	}
 	if failed != "" {
 		// Si se mandó alguna línea, el equipo ya no está como lo dejó el apply: se relee para que un reintento
 		// no lo tome por un cambio ajeno, y si ya coincide con la línea base la reversa sí se cumplió.
 		if len(sent) > 0 && r.resync(ctx, i) {
-			r.log2("assist.rollback", dp.Device, "run=%s la reversa falló (%s) pero el equipo ya coincide con la línea base", r.id, trim(failed))
+			r.log2("assist.rollback", dp.Device, "run=%s the rollback failed (%s) but the device already matches the baseline", r.id, trim(failedEN))
 			r.out(dp.Device, "la reversa falló ("+trim(failed)+") pero el equipo ya coincide con su línea base: se cuenta como revertido")
 			r.reverted(ctx, dp)
 			r.unchange(i)
 			return true
 		}
-		r.fail("%s", failed)
+		r.failMsg(failed, failedEN)
 		return false
 	}
 	// Evidencia del estado devuelto, y el running-config de la línea base para ver que la reversa de verdad lo dejó igual
@@ -807,14 +814,14 @@ func (r *Run) revert(ctx context.Context, i int) bool {
 	if outs, diffs, err := r.checkBase(ctx, i, dp.Post); err != nil {
 		if len(runningCmds(dp)) > 0 {
 			r.setRecheck(i)
-			r.fail("no se pudo verificar la reversa de %s: %v; reintenta la reversa o revísalo a mano", dp.Device, err)
+			r.failT("no se pudo verificar la reversa de %s: %v; reintenta la reversa o revísalo a mano", "could not verify the rollback of %s: %v; retry the rollback or check it by hand", dp.Device, err)
 			return false
 		}
 		r.out(dp.Device, "post-check tras la reversa: "+err.Error())
 	} else if len(diffs) > 0 {
 		r.remember(i, dp.Baseline, outs) // un reintento parte de aquí, no lo toma por un cambio ajeno
 		r.setRecheck(i)
-		r.fail("la reversa de %s no lo dejó como estaba (%s); reintenta la reversa o corrígelo a mano", dp.Device, strings.Join(diffs, "; "))
+		r.failT("la reversa de %s no lo dejó como estaba (%s); reintenta la reversa o corrígelo a mano", "the rollback of %s did not restore it (%s); retry the rollback or fix it by hand", dp.Device, strings.Join(diffs, "; "))
 		return false
 	}
 	r.reverted(ctx, dp)
@@ -947,7 +954,7 @@ func (r *Run) reverted(ctx context.Context, dp DevicePlan) {
 		return
 	}
 	if err := r.exec.(Verifier).Reverted(ctx, dp.Device); err != nil {
-		r.log2("assist.verify", dp.Device, "run=%s la bóveda no volvió a la credencial anterior: %v", r.id, err)
+		r.log2("assist.verify", dp.Device, "run=%s the vault did not return to the previous credential: %v", r.id, i18n.English(err))
 		r.out(dp.Device, "ATENCIÓN: la bóveda no volvió a la credencial anterior: "+err.Error())
 	}
 }

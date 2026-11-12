@@ -130,7 +130,7 @@ func wait(t *testing.T, done chan error) error {
 	}
 }
 
-var sessionRe = regexp.MustCompile(`sesion=(term-[0-9a-f]+)`)
+var sessionRe = regexp.MustCompile(`session=(term-[0-9a-f]+)`)
 
 // cerrada comprueba lo que toda salida debe dejar: auditoría de cierre y el guard sin autorización.
 func (r *rig) cerrada(wantAction, wantReason string) (id, recording string) {
@@ -141,8 +141,8 @@ func (r *rig) cerrada(wantAction, wantReason string) (id, recording string) {
 		r.t.Fatalf("la auditoría no trae la sesión:\n%s", a)
 	}
 	id = m[1]
-	if !strings.Contains(a, `"action":"`+wantAction+`"`) || !strings.Contains(a, "guard=revocado") || !strings.Contains(a, wantReason) {
-		r.t.Fatalf("falta %s / %q / guard=revocado:\n%s", wantAction, wantReason, a)
+	if !strings.Contains(a, `"action":"`+wantAction+`"`) || !strings.Contains(a, "guard=revoked") || !strings.Contains(a, wantReason) {
+		r.t.Fatalf("falta %s / %q / guard=revoked:\n%s", wantAction, wantReason, a)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -152,7 +152,7 @@ func (r *rig) cerrada(wantAction, wantReason string) (id, recording string) {
 		}
 		r.t.Fatalf("el guard sigue autorizando la sesión %s: %v", id, err)
 	}
-	if m := regexp.MustCompile(`grabacion=(\S+)`).FindStringSubmatch(a); m != nil {
+	if m := regexp.MustCompile(`recording=(\S+)`).FindStringSubmatch(a); m != nil {
 		recording = strings.Trim(m[1], `"\`)
 	}
 	return id, recording
@@ -174,7 +174,7 @@ func TestElClienteCierraLaPestana(t *testing.T) {
 	if err := wait(t, done); err != nil {
 		t.Fatal(err)
 	}
-	_, rec := r.cerrada("terminal.close", "cerrada por el usuario")
+	_, rec := r.cerrada("terminal.close", "closed by the user")
 	b, err := os.ReadFile(rec)
 	if err != nil || !strings.Contains(string(b), ">>> show version") || !strings.Contains(string(b), "Cisco") || !strings.Contains(string(b), "### cerrado") {
 		t.Fatalf("grabación %v:\n%s", err, b)
@@ -205,7 +205,7 @@ func TestNoGrabaLaContrasenaDelPrompt(t *testing.T) {
 	st.waitFor(t, "Cisco")
 	close(st.in)
 	wait(t, done)
-	_, rec := r.cerrada("terminal.close", "cerrada por el usuario")
+	_, rec := r.cerrada("terminal.close", "closed by the user")
 	b, _ := os.ReadFile(rec)
 	if strings.Contains(string(b), enableSecret) || strings.Contains(r.d.AuditText(), enableSecret) {
 		t.Fatalf("el secreto quedó grabado:\n%s", b)
@@ -225,7 +225,7 @@ func TestCierreDelNucleoConUnaSesionViva(t *testing.T) {
 	if err := wait(t, done); status.Code(err) != codes.Unavailable {
 		t.Fatalf("err = %v", err)
 	}
-	r.cerrada("terminal.close", "núcleo cerrándose")
+	r.cerrada("terminal.close", "core shutting down")
 	if err := r.svc.OpenTerminal(func() *fakeStream {
 		s := newStream(context.Background())
 		s.in <- &v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Open{Open: r.open}}
@@ -241,9 +241,9 @@ func TestElEquipoCortaLaSesion(t *testing.T) {
 		act  func(*fakeStream, context.CancelFunc)
 		want string
 	}{
-		"exit":         {simulator.Config{}, func(st *fakeStream, _ context.CancelFunc) { st.data("exit\r") }, "el equipo cerró la sesión"},
-		"exec-timeout": {simulator.Config{IdleTimeout: 300 * time.Millisecond}, func(*fakeStream, context.CancelFunc) {}, "el equipo cerró la sesión"},
-		"cliente-cae":  {simulator.Config{}, func(_ *fakeStream, cancel context.CancelFunc) { cancel() }, "cliente desconectado"},
+		"exit":         {simulator.Config{}, func(st *fakeStream, _ context.CancelFunc) { st.data("exit\r") }, "the device closed the session"},
+		"exec-timeout": {simulator.Config{IdleTimeout: 300 * time.Millisecond}, func(*fakeStream, context.CancelFunc) {}, "the device closed the session"},
+		"cliente-cae":  {simulator.Config{}, func(_ *fakeStream, cancel context.CancelFunc) { cancel() }, "client disconnected"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := newRig(t, tc.cfg)
@@ -301,8 +301,8 @@ func TestRechazosAlAbrirQuedanAuditados(t *testing.T) {
 		code   codes.Code
 		reason string
 	}{
-		"bóveda cerrada": {func(r *rig) { r.d.V.LockAll() }, func(r *rig) *v1.TerminalOpen { return r.open }, codes.FailedPrecondition, "bóveda"},
-		"límite":         {func(r *rig) { r.svc.live.Store(maxSessions) }, func(r *rig) *v1.TerminalOpen { return r.open }, codes.ResourceExhausted, "máximo"},
+		"bóveda cerrada": {func(r *rig) { r.d.V.LockAll() }, func(r *rig) *v1.TerminalOpen { return r.open }, codes.FailedPrecondition, "vault is closed"},
+		"límite":         {func(r *rig) { r.svc.live.Store(maxSessions) }, func(r *rig) *v1.TerminalOpen { return r.open }, codes.ResourceExhausted, "at most"},
 		"guard": {func(*rig) {}, func(r *rig) *v1.TerminalOpen {
 			return &v1.TerminalOpen{Name: "X", Address: "10.0.0.1/8", Port: 22, CredentialId: r.open.CredentialId}
 		}, codes.PermissionDenied, "bits de host"},

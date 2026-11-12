@@ -112,7 +112,7 @@ func TestToolsSyslogListensAndStops(t *testing.T) {
 	if !strings.Contains(a, `"action":"tools.syslog"`) {
 		t.Fatal("syslog not audited")
 	}
-	for _, want := range []string{"tasa_origen=100", "rafaga_origen=200", "tasa_global=1000", "rafaga_global=2000", "cola=4096", "rotar_mb=50", "rotar_min=0", "max_archivos=20", "plantilla=syslog_{fecha}_{hora}", "formato=texto"} {
+	for _, want := range []string{"rate_per_origin=100", "burst_per_origin=200", "rate_global=1000", "burst_global=2000", "queue=4096", "rotate_mb=50", "rotate_min=0", "max_files=20", "template=syslog_{fecha}_{hora}", "format=texto"} {
 		if !strings.Contains(a, want) {
 			t.Errorf("default sin auditar: %s", want)
 		}
@@ -208,8 +208,8 @@ func TestToolsSyslogAuditsConfigRetentionAndDrops(t *testing.T) {
 		t.Errorf("archivos = %v", left)
 	}
 	a := h.auditText(t)
-	for _, want := range []string{`"action":"tools.syslog"`, "tasa_origen=1", "rafaga_origen=1", "tasa_global=1000", "cola=4096", "rotar_mb=5", "max_archivos=1", "formato=jsonl", "plantilla=lab_{fecha}_{hora}",
-		`"action":"tools.syslog.retencion"`, "lab_20200101_000000.jsonl", "lab_20200102_000000.jsonl", `"action":"tools.syslog.done"`, "descartes=", "por_origen="} {
+	for _, want := range []string{`"action":"tools.syslog"`, "rate_per_origin=1", "burst_per_origin=1", "rate_global=1000", "queue=4096", "rotate_mb=5", "max_files=1", "format=jsonl", "template=lab_{fecha}_{hora}",
+		`"action":"tools.syslog.retencion"`, "lab_20200101_000000.jsonl", "lab_20200102_000000.jsonl", `"action":"tools.syslog.done"`, "drops=", "per_origin="} {
 		if !strings.Contains(a, want) {
 			t.Errorf("la auditoría no trae %q", want)
 		}

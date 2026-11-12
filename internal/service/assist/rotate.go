@@ -53,7 +53,7 @@ func (e *rotExec) Verify(ctx context.Context, dev string) (string, error) {
 	if err := drv.Open(ctx, r, w, cred.Enable); err != nil {
 		return "", err
 	}
-	e.d.Audit("assist.verify.session", dev, fmt.Sprintf("run=%s usuario=%s sesión nueva abierta", e.id, e.rot.user))
+	e.d.Audit("assist.verify.session", dev, fmt.Sprintf("run=%s user=%s new session opened", e.id, e.rot.user))
 	return "la sesión nueva con " + e.rot.user + " entró", nil
 }
 
@@ -89,7 +89,7 @@ func (e *rotExec) Saved(_ context.Context, _ string) (string, error) {
 	cur.Password.Destroy()
 	cur.Enable.Destroy()
 	cur.SSHKey.Destroy()
-	e.d.Audit("assist.vault.update", e.rot.updateCred, fmt.Sprintf("run=%s usuario=%s anterior conservada como %q", e.id, e.rot.user, prevLabel))
+	e.d.Audit("assist.vault.update", e.rot.updateCred, fmt.Sprintf("run=%s user=%s previous kept as %q", e.id, e.rot.user, prevLabel))
 	return fmt.Sprintf("la bóveda quedó con la credencial nueva; la anterior se conserva como %q (bórrala a mano cuando ya no haga falta)", prevLabel), nil
 }
 

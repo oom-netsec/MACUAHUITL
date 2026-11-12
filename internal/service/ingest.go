@@ -87,9 +87,9 @@ func (o IngestOpts) Build(ctx context.Context, dir, defTemplate string) (ingest.
 // IngestDetail es la configuración efectiva para la auditoría; con save agrega la del archivo.
 func IngestDetail(l ingest.Limits, s ingest.Sink, save bool) string {
 	e := l.Effective()
-	d := fmt.Sprintf("tasa_origen=%d rafaga_origen=%d tasa_global=%d rafaga_global=%d cola=%d", e.PerSource, e.PerSourceBurst, e.Global, e.GlobalBurst, e.Queue)
+	d := fmt.Sprintf("rate_per_origin=%d burst_per_origin=%d rate_global=%d burst_global=%d queue=%d", e.PerSource, e.PerSourceBurst, e.Global, e.GlobalBurst, e.Queue)
 	if save {
-		d += fmt.Sprintf(" rotar_mb=%d rotar_min=%d plantilla=%s max_archivos=%d formato=%s", s.RotateBytes>>20, int(s.RotateEvery/time.Minute), s.Template, s.MaxFiles, s.Format)
+		d += fmt.Sprintf(" rotate_mb=%d rotate_min=%d template=%s max_files=%d format=%s", s.RotateBytes>>20, int(s.RotateEvery/time.Minute), s.Template, s.MaxFiles, s.Format)
 	}
 	return d
 }

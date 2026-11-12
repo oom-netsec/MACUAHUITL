@@ -67,7 +67,7 @@ func isPerm(have, want []string) bool {
 // corta junta IDs para la auditoría, con tope para que una lista grande no infle la entrada.
 func corta(ids []string) string {
 	if len(ids) > 20 {
-		return strings.Join(ids[:20], ",") + fmt.Sprintf(",… y %d más", len(ids)-20)
+		return strings.Join(ids[:20], ",") + fmt.Sprintf(",… and %d more", len(ids)-20)
 	}
 	return strings.Join(ids, ",")
 }
@@ -271,7 +271,7 @@ func (s *svc) SetCollectionScripts(_ context.Context, r *v1.SetCollectionScripts
 	if err != nil {
 		return nil, err
 	}
-	s.d.Audit("scripts.coleccion.scripts", c.ID, fmt.Sprintf("%s: agregados [%s], quitados [%s], %d en total", c.Name, corta(added), corta(removed), len(c.ScriptIDs)))
+	s.d.Audit("scripts.coleccion.scripts", c.ID, fmt.Sprintf("%s: added [%s], removed [%s], %d in total", c.Name, corta(added), corta(removed), len(c.ScriptIDs)))
 	return &v1.SetCollectionScriptsResponse{Collection: colPB(c)}, nil
 }
 
@@ -333,7 +333,7 @@ func (s *svc) SetPinned(_ context.Context, r *v1.SetPinnedRequest) (*v1.SetPinne
 		return nil, err
 	}
 	if changed {
-		s.d.Audit("scripts.fijar", r.Id, map[bool]string{true: "fijado", false: "desfijado"}[r.Pinned])
+		s.d.Audit("scripts.fijar", r.Id, map[bool]string{true: "pinned", false: "unpinned"}[r.Pinned])
 	}
 	return &v1.SetPinnedResponse{}, nil
 }
@@ -445,7 +445,7 @@ func (s *svc) ExportCollections(ctx context.Context, r *v1.ExportCollectionsRequ
 	if err := service.WriteExport(ctx, path, b, r.Overwrite); err != nil {
 		return nil, err
 	}
-	s.d.Audit("scripts.coleccion.exportar", path, fmt.Sprintf("%d colecciones, %d scripts", len(sel), len(scripts)))
+	s.d.Audit("scripts.coleccion.exportar", path, fmt.Sprintf("%d collections, %d scripts", len(sel), len(scripts)))
 	return &v1.ExportCollectionsResponse{Collections: int32(len(sel)), Scripts: int32(len(scripts))}, nil
 }
 
@@ -589,7 +589,7 @@ func (s *svc) ApplyImportCollections(_ context.Context, r *v1.ApplyImportCollect
 		}
 		return nil, err
 	}
-	s.d.Audit("scripts.coleccion.importar", p.path, fmt.Sprintf("colecciones: %d nuevas, %d reemplazadas, %d renombradas, %d fusionadas, %d omitidas; scripts: %d nuevos, %d reemplazados, %d renombrados, %d omitidos; decisiones de colecciones: %s; de scripts: %s",
+	s.d.Audit("scripts.coleccion.importar", p.path, fmt.Sprintf("collections: %d new, %d replaced, %d renamed, %d merged, %d skipped; scripts: %d new, %d replaced, %d renamed, %d skipped; collection decisions: %s; script decisions: %s",
 		cres.Created, cres.Replaced, cres.Renamed, cres.Merged, cres.Skipped, sres.Created, sres.Replaced, sres.Renamed, sres.Skipped, resumen(cdec), resumen(sdec)))
 	return &v1.ApplyImportCollectionsResponse{
 		ScriptsCreated: int32(sres.Created), ScriptsReplaced: int32(sres.Replaced), ScriptsRenamed: int32(sres.Renamed), ScriptsSkipped: int32(sres.Skipped),

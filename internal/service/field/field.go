@@ -18,6 +18,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/serialcon"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/imgverify"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -90,7 +91,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	rec := serialcon.NewRecorder(f, s.d.Now)
 	summary := cfg.Path + " " + cfg.String()
 	rec.Mark("abierto " + summary)
-	s.d.Audit("field.console.open", cfg.Path, cfg.String()+" salida="+f.Name())
+	s.d.Audit("field.console.open", cfg.Path, cfg.AuditString()+" output="+f.Name())
 	if err := st.Send(&v1.ConsoleResponse{Opened: summary, OutputPath: f.Name()}); err != nil {
 		return err
 	}
@@ -139,12 +140,12 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	case lost = <-portErr: // cable desconectado o equipo apagado
 		p.Close()
 	}
-	reason := "cerrada por el usuario"
+	reason, reasonEN := "cerrada por el usuario", "closed by the user"
 	if lost != nil {
-		reason = "puerto perdido: " + lost.Error()
+		reason, reasonEN = "puerto perdido: "+lost.Error(), "port lost: "+i18n.English(lost)
 	}
 	rec.Mark("cerrado: " + reason)
-	s.d.Audit("field.console.close", cfg.Path, fmt.Sprintf("recibidos=%d enviados=%d break=%d %s", rx.Load(), tx.Load(), breaks.Load(), reason))
+	s.d.Audit("field.console.close", cfg.Path, fmt.Sprintf("received=%d sent=%d break=%d %s", rx.Load(), tx.Load(), breaks.Load(), reasonEN))
 	if lost != nil {
 		return status.Error(codes.Unavailable, reason)
 	}
@@ -175,12 +176,12 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	k := newServeSink(s.d.Audit, st.Send)
 	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, OnTransfer: k.onTransfer}
 	cfg.OnListening = func(a string) {
-		s.d.Audit("field.serve", a, fmt.Sprintf("proto=%s todas=%t archivos=%q duración=%s", r.Protocol, r.AllowAny, r.Files, service.SyslogDuration(r.DurationSeconds)))
+		s.d.Audit("field.serve", a, fmt.Sprintf("proto=%s all=%t files=%q duration=%s", r.Protocol, r.AllowAny, r.Files, service.SyslogDuration(r.DurationSeconds)))
 		k.events <- &v1.ServeFilesResponse{Listening: a, Hint: fileserve.Hint(r.Protocol, a, r.Files)}
 	}
 	err := fileserve.Serve(ctx, cfg)
 	n, rejected := k.stop()
-	s.d.Audit("field.serve.done", addr, fmt.Sprintf("transferencias=%d rechazos=%d", n, rejected))
+	s.d.Audit("field.serve.done", addr, fmt.Sprintf("transfers=%d rejected=%d", n, rejected))
 	if err != nil {
 		return status.Error(codes.Unavailable, err.Error())
 	}
@@ -220,7 +221,7 @@ func (k *serveSink) onTransfer(t fileserve.Transfer) {
 		return
 	}
 	k.n.Add(1)
-	k.audit("field.serve.transfer", t.Client, fmt.Sprintf("proto=%s archivo=%q bytes=%d duración=%s resultado=%s %s", t.Proto, t.File, t.Bytes, t.Duration.Round(1e6), t.Result, t.Error))
+	k.audit("field.serve.transfer", t.Client, fmt.Sprintf("proto=%s file=%q bytes=%d duration=%s result=%s %s", t.Proto, t.File, t.Bytes, t.Duration.Round(1e6), t.Result, t.Error))
 	k.events <- ev // viene del goroutine de la transferencia, no del de recepción
 }
 

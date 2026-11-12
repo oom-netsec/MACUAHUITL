@@ -61,6 +61,6 @@ func (s *forensicSvc) MemLeaks(_ context.Context, r *v1.MemLeaksRequest) (*v1.Me
 		logintel.LeakReport
 		Job string `json:"job"`
 	}{rep, b.Dir}
-	s.d.Audit("forensic.memleaks", b.Dir, fmt.Sprintf("equipo=%q muestras=%d sospechosos=%d", r.Device, len(ss), len(rep.Leaks)))
+	s.d.Audit("forensic.memleaks", b.Dir, fmt.Sprintf("device=%q samples=%d suspects=%d", r.Device, len(ss), len(rep.Leaks)))
 	return &v1.MemLeaksResponse{Report: service.Report(out, rep.Text())}, nil
 }

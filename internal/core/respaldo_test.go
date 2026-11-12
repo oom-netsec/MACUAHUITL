@@ -174,10 +174,10 @@ func TestRespaldoIdaYVuelta(t *testing.T) {
 		a := hh.auditText(t)
 		sinSecretos(t, a, "MARKER", "PW-CORE", "PW-BORDE", "EN-", "USR-", fraseResp, "otra-maestra", "HMAC")
 	}
-	if a := h.auditText(t); !strings.Contains(a, `"action":"vault.respaldo.exportar"`) || !strings.Contains(a, path) || !strings.Contains(a, "3 credenciales") {
+	if a := h.auditText(t); !strings.Contains(a, `"action":"vault.respaldo.exportar"`) || !strings.Contains(a, path) || !strings.Contains(a, "3 credentials") {
 		t.Fatalf("audit export:\n%s", a)
 	}
-	if a := o.auditText(t); !strings.Contains(a, `"action":"vault.respaldo.importar"`) || !strings.Contains(a, "3 nuevas") {
+	if a := o.auditText(t); !strings.Contains(a, `"action":"vault.respaldo.importar"`) || !strings.Contains(a, "3 new") {
 		t.Fatalf("audit import:\n%s", a)
 	}
 }
@@ -339,7 +339,7 @@ func TestRespaldoEstadosYDecisiones(t *testing.T) {
 	}
 	a := o.auditText(t)
 	sinSecretos(t, a, "PW-CORE", "OTRA", "USR-", fraseResp, "EN-")
-	if !strings.Contains(a, "reemplazar") || !strings.Contains(a, "renombrar") {
+	if !strings.Contains(a, "=replace") || !strings.Contains(a, "=rename") {
 		t.Fatalf("la auditoría no trae las decisiones:\n%s", a)
 	}
 }
