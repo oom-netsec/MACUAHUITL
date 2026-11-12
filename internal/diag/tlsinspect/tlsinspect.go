@@ -63,6 +63,9 @@ func SeverityCode(s string) string {
 // In devuelve el informe con el detalle de cada hallazgo en el idioma dado (es es el de siempre). VerifyError es
 // el texto del sistema (el de la biblioteca x509) y no se traduce: VerifyCode lo clasifica.
 func (r Report) In(loc string) Report {
+	if r.Findings == nil { // nulo sigue nulo: el JSON en español no cambia
+		return r
+	}
 	fs := make([]Finding, len(r.Findings))
 	for i, f := range r.Findings {
 		f.Detail = f.Text.In(loc)

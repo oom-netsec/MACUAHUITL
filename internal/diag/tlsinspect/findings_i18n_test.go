@@ -116,3 +116,14 @@ func TestFindingsEnYCodigoDeVerificacion(t *testing.T) {
 		t.Errorf("solo %d hallazgos", n)
 	}
 }
+
+// In(es) no cambia nada: el servicio la usa siempre, así que el JSON en español debe quedar igual (nulo sigue nulo).
+func TestInEspanolEsIdentidad(t *testing.T) {
+	for n, r := range escenariosTLS(t) {
+		a, _ := json.Marshal(r)
+		b, _ := json.Marshal(r.In("es"))
+		if string(a) != string(b) {
+			t.Errorf("%s: In(es) cambia el JSON:\n%s\n%s", n, a, b)
+		}
+	}
+}
