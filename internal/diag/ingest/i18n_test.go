@@ -109,3 +109,31 @@ func TestRetencionConSinonimos(t *testing.T) {
 		t.Fatalf("con max_files=2 deben quedar 2 archivos, hay %d", len(ents))
 	}
 }
+
+// La retención de t_{date} no toca archivos de otra plantilla ni de otro formato de fecha.
+func TestRetencionNoBorraArchivosAjenos(t *testing.T) {
+	dir := t.TempDir()
+	base := time.Date(2026, 11, 12, 10, 0, 0, 0, time.UTC)
+	ajenos := []string{"x_20261101.log", "t_20261101_000000.log"}
+	for _, name := range append(ajenos, "t_20261101.log", "t_20261102.log") {
+		p := filepath.Join(dir, name)
+		os.WriteFile(p, []byte("x"), 0o600)
+		os.Chtimes(p, base.Add(-72*time.Hour), base.Add(-72*time.Hour))
+	}
+	w, err := NewWriter(Sink{Dir: dir, Template: "t_{date}", MaxFiles: 1}, func() time.Time { return base })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.create("", base); err != nil {
+		t.Fatal(err)
+	}
+	w.Close()
+	for _, name := range ajenos {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("borró %s, que no es de la plantilla: %v", name, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "t_20261101.log")); err == nil {
+		t.Error("debía borrar t_20261101.log (es de la plantilla y excede max_files)")
+	}
+}
