@@ -2,6 +2,13 @@ package scripts
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"encoding/json"
 	"regexp"
 	"sort"
@@ -184,5 +191,53 @@ func TestGuionesEnIngles(t *testing.T) {
 	g, err := s.GetScript(en, &v1.GetScriptRequest{Id: "lib-cfg-ntp"})
 	if err != nil || g.Script.Name != "Config · NTP" || !strings.HasPrefix(g.Script.Description, "Synchronizes") {
 		t.Fatalf("%v %v", g, err)
+	}
+}
+
+// Un script de un archivo de import con el id de uno de fábrica, pero con otro nombre, no recibe el texto en inglés del
+// local; el listado en inglés sale ordenado por el nombre en inglés; y el nombre en inglés de uno de fábrica está ocupado.
+func TestScriptsEnVistaPreviaOrdenYUnicidad(t *testing.T) {
+	en := i18n.WithLocale(context.Background(), "en")
+	s, _ := nuevoSvc(t)
+	lib, _ := s.library()
+	var l dom.Script
+	for _, x := range lib {
+		if x.ID == "lib-cfg-ntp" {
+			l = x
+		}
+	}
+	ajeno := l
+	ajeno.Name, ajeno.Description = "Mi NTP propio", "otra cosa"
+	for _, x := range []dom.Script{ajeno, l} {
+		b, err := dom.Marshal([]dom.Script{x}, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := filepath.Join(t.TempDir(), "x.json")
+		os.WriteFile(p, b, 0o600)
+		r, err := s.PreviewImport(en, &v1.PreviewImportRequest{Path: p})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := "Config · NTP"
+		if x.Name == "Mi NTP propio" {
+			want = x.Name // el de otro nombre no se traduce
+		}
+		if got := r.Items[0].Script.Name; got != want {
+			t.Errorf("%q: sale %q, quiero %q", x.Name, got, want)
+		}
+	}
+	list, err := s.ListScripts(en, &v1.ListScriptsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i < len(list.Scripts); i++ {
+		if strings.ToLower(list.Scripts[i-1].Name) > strings.ToLower(list.Scripts[i].Name) {
+			t.Fatalf("sin ordenar por el nombre en inglés: %q > %q", list.Scripts[i-1].Name, list.Scripts[i].Name)
+		}
+	}
+	_, err = s.SaveScript(en, &v1.SaveScriptRequest{Script: &v1.Script{Name: "Config · NTP", Tech: "gestion", Platform: "ios-xe", Commands: []string{"show version"}}})
+	if status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("el nombre en inglés de fábrica debe chocar: %v", err)
 	}
 }

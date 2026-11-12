@@ -65,7 +65,7 @@ func (s *svc) clock() time.Time {
 	return s.d.Now()
 }
 
-func (s *svc) library(ctx context.Context) ([]dom.Script, error) {
+func (s *svc) library() ([]dom.Script, error) {
 	s.libMu.Do(func() { s.lib, s.libEN, s.libErr = dom.LibraryWithEN(playbooks.FS) })
 	if s.libErr != nil {
 		return nil, status.Error(codes.Internal, s.libErr.Error())
@@ -78,8 +78,17 @@ func (s *svc) in(ctx context.Context, x dom.Script) dom.Script {
 	if x.Origin != dom.OrigenBiblioteca {
 		return x
 	}
-	if _, err := s.library(ctx); err != nil {
+	lib, err := s.library()
+	if err != nil {
 		return x
+	}
+	for _, l := range lib { // un script de un archivo de import con el id de uno de fábrica solo se traduce si es idéntico en nombre y descripción
+		if l.ID == x.ID {
+			if l.Name != x.Name || l.Description != x.Description {
+				return x
+			}
+			break
+		}
 	}
 	return s.libEN[x.ID].In(i18n.Locale(ctx), x)
 }
@@ -102,7 +111,7 @@ func fromPB(p *v1.Script) dom.Script {
 // find busca un script en la biblioteca y luego en los del usuario.
 func (s *svc) find(ctx context.Context, q querier, id string) (dom.Script, error) {
 	if dom.IsLib(id) {
-		lib, err := s.library(ctx)
+		lib, err := s.library()
 		if err != nil {
 			return dom.Script{}, err
 		}
@@ -141,7 +150,7 @@ func (s *svc) tx(f func(tx *sql.Tx) error) error {
 // nameTaken dice si name ya lo tiene un script de all (salvo exceptID) o uno de la biblioteca: los nombres de
 // la biblioteca están ocupados para que un export de ambos siempre se pueda reimportar.
 func (s *svc) nameTaken(ctx context.Context, all []dom.Script, name, exceptID string) (bool, error) {
-	lib, err := s.library(ctx)
+	lib, err := s.library()
 	if err != nil {
 		return false, err
 	}
@@ -150,12 +159,17 @@ func (s *svc) nameTaken(ctx context.Context, all []dom.Script, name, exceptID st
 			return true, nil
 		}
 	}
+	for id, en := range s.libEN { // el nombre en inglés de uno de fábrica también está ocupado
+		if en.Name != "" && dom.NameKey(en.Name) == dom.NameKey(name) && id != exceptID {
+			return true, nil
+		}
+	}
 	return false, nil
 }
 
 func (s *svc) ListScripts(ctx context.Context, r *v1.ListScriptsRequest) (*v1.ListScriptsResponse, error) {
 	s.d.MarkActive()
-	lib, err := s.library(ctx)
+	lib, err := s.library()
 	if err != nil {
 		return nil, err
 	}
@@ -177,13 +191,13 @@ func (s *svc) ListScripts(ctx context.Context, r *v1.ListScriptsRequest) (*v1.Li
 		case r.Tag != "" && !has(x.Tags, r.Tag):
 		case text != "" && !strings.Contains(strings.ToLower(strings.Join([]string{x.Name, x.Description, strings.Join(x.Tags, " "), strings.Join(x.Commands, "\n")}, "\n")), text):
 		default:
-			all = append(all, x)
+			all = append(all, s.in(ctx, x)) // se traduce antes de ordenar: el orden sigue al idioma
 		}
 	}
 	sort.SliceStable(all, func(i, j int) bool { return strings.ToLower(all[i].Name) < strings.ToLower(all[j].Name) })
 	out := &v1.ListScriptsResponse{}
 	for _, x := range all {
-		out.Scripts = append(out.Scripts, toPB(s.in(ctx, x), m))
+		out.Scripts = append(out.Scripts, toPB(x, m))
 	}
 	return out, nil
 }
@@ -441,7 +455,7 @@ func (s *svc) PreviewImport(ctx context.Context, r *v1.PreviewImportRequest) (*v
 	if err != nil {
 		return nil, internal(err)
 	}
-	lib, err := s.library(ctx)
+	lib, err := s.library()
 	if err != nil {
 		return nil, err
 	}
@@ -460,7 +474,7 @@ func (s *svc) ApplyImport(ctx context.Context, r *v1.ApplyImportRequest) (*v1.Ap
 	if err != nil {
 		return nil, err
 	}
-	lib, err := s.library(ctx)
+	lib, err := s.library()
 	if err != nil {
 		return nil, err
 	}

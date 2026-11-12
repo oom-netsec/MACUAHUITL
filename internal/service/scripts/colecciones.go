@@ -21,7 +21,7 @@ import (
 // Colecciones y fijados de la bóveda de scripts (fase 29c). Las colecciones guardan IDs, nunca copias.
 
 func (s *svc) libSet(ctx context.Context) (map[string]bool, error) {
-	lib, err := s.library(ctx)
+	lib, err := s.library()
 	if err != nil {
 		return nil, err
 	}
@@ -485,7 +485,7 @@ func (s *svc) PreviewImportCollections(ctx context.Context, r *v1.PreviewImportC
 	if err != nil {
 		return nil, internal(err)
 	}
-	lib, err := s.library(ctx)
+	lib, err := s.library()
 	if err != nil {
 		return nil, err
 	}
@@ -522,7 +522,7 @@ func (s *svc) ApplyImportCollections(ctx context.Context, r *v1.ApplyImportColle
 	if err != nil {
 		return nil, err
 	}
-	lib, err := s.library(ctx)
+	lib, err := s.library()
 	if err != nil {
 		return nil, err
 	}
@@ -611,7 +611,7 @@ func (s *svc) ImportTemplate(ctx context.Context, r *v1.ImportTemplateRequest) (
 	if err := checkKind(ctx, r.Kind); err != nil {
 		return nil, err
 	}
-	lib, err := s.library(ctx)
+	lib, err := s.library()
 	if err != nil {
 		return nil, err
 	}
@@ -627,7 +627,7 @@ func (s *svc) ImportFormat(ctx context.Context, r *v1.ImportFormatRequest) (*v1.
 	if err := checkKind(ctx, r.Kind); err != nil {
 		return nil, err
 	}
-	lib, err := s.library(ctx)
+	lib, err := s.library()
 	if err != nil {
 		return nil, err
 	}
