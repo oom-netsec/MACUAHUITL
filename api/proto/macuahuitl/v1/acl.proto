@@ -43,7 +43,10 @@ message AnalyzeRequest {
 message Finding {
   uint32 rule_index = 1;
   string kind = 2;
-  string detail = 3;
+  string detail = 3; // en el idioma pedido (accept-language)
+  // Fase 30c: el detalle como clave del catálogo (acl.finding.* o acl.err.*) y sus argumentos.
+  string detail_key = 4;
+  map<string, string> detail_args = 5;
 }
 
 message AnalyzeResponse {

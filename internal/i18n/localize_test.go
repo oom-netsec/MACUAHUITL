@@ -1,6 +1,9 @@
 package i18n
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 type leaf struct {
 	Detail   string `json:"detail"`
@@ -31,6 +34,7 @@ func init() {
 	add(map[string]entry{
 		"test.l1":   {Es: "uno", En: "one"},
 		"test.l2":   {Es: "dos {n}", En: "two {n}", Args: []string{"n"}},
+		"test.wrap": {Es: "línea {line}: {cause}", En: "line {line}: {cause}", Args: []string{"line", "cause"}},
 		"test.nest": {Es: "{title} ({round})", En: "{title} ({round})", Args: []string{"title", "round"}},
 	})
 }
@@ -91,5 +95,28 @@ func TestTextAnidadoUnionYLiteral(t *testing.T) {
 	}{T: "CPU alta", TTx: titulo}
 	if keys := Localize(r, En); len(keys) != 0 || r.T != "High CPU" {
 		t.Errorf("literal: %v %q", keys, r.T)
+	}
+}
+
+func TestWrapYFromErr(t *testing.T) {
+	inner := New("test.l2", A("n", 7))
+	w := Wrap("test.wrap", inner, A("line", 3))
+	if w.Error() != "línea 3: dos 7" || w.Localize(En) != "line 3: two 7" || !errors.Is(w, inner) {
+		t.Errorf("wrap: %q %q", w.Error(), w.Localize(En))
+	}
+	// la causa sin código sale tal cual en los dos idiomas
+	plain := Wrap("test.wrap", errors.New("boom"), A("line", 1))
+	if plain.Error() != "línea 1: boom" || plain.Localize(En) != "line 1: boom" {
+		t.Errorf("sin código: %q %q", plain.Error(), plain.Localize(En))
+	}
+	if md := w.Metadata(); md["line"] != "3" || md["cause"] != "" {
+		t.Errorf("metadata: %v", md)
+	}
+	tx := FromErr(w)
+	if tx.In(Es) != "línea 3: dos 7" || tx.In(En) != "line 3: two 7" || tx.Empty() {
+		t.Errorf("FromErr: %q %q", tx.In(Es), tx.In(En))
+	}
+	if !FromErr(nil).Empty() {
+		t.Error("nil está vacío")
 	}
 }

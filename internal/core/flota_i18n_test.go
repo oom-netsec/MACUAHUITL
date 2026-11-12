@@ -111,8 +111,7 @@ func flotaCases(t *testing.T, h *harness, lang string, fx flotaFx) map[string]fl
 			continue
 		}
 		an, err := al.Analyze(c(), &v1.AnalyzeRequest{Acl: imp.Acl})
-		bj, _ := json.Marshal(an.GetFindings())
-		out["acl.analyze."+v] = flotaRec{Json: string(bj), Err: errStr(err)}
+		out["acl.analyze."+v] = aclRec(an.GetFindings(), err)
 		for _, tgt := range []string{"ios-xe", "nx-os", "asa", "junos"} {
 			g, err := al.Generate(c(), &v1.GenerateRequest{Acl: imp.Acl, Vendor: tgt})
 			out["acl.generate."+v+">"+tgt] = flotaRec{Text: g.GetScript(), Err: errStr(err)}
@@ -129,8 +128,7 @@ func flotaCases(t *testing.T, h *harness, lang string, fx flotaFx) map[string]fl
 		{Action: v1.AclAction_ACL_ACTION_PERMIT, Protocol: "icmp", Source: "10.0.0.0/8", Destination: "0.0.0.0/0", DestinationPorts: "eq 80"},
 	}}
 	an, err := al.Analyze(c(), &v1.AnalyzeRequest{Acl: shadow})
-	bj, _ := json.Marshal(an.GetFindings())
-	out["acl.analyze.shadow"] = flotaRec{Json: string(bj), Err: errStr(err)}
+	out["acl.analyze.shadow"] = aclRec(an.GetFindings(), err)
 	_, err = al.Analyze(c(), &v1.AnalyzeRequest{Acl: &v1.Acl{Rules: []*v1.AclRule{{Source: "mal", Destination: "0.0.0.0/0"}}}})
 	out["acl.analyze.err"] = flotaRec{Err: errStr(err)}
 
@@ -196,6 +194,25 @@ type flotaFx struct{ pre, post, empty, drift string }
 func newFlotaFx(t *testing.T) flotaFx {
 	pre, post := changeDirs(t)
 	return flotaFx{pre, post, t.TempDir(), driftDir(t)}
+}
+
+// aclRec es la respuesta de Analyze con los tres campos de siempre en el json; las claves de cada detalle van aparte.
+func aclRec(fs []*v1.Finding, err error) flotaRec {
+	type old struct {
+		RuleIndex uint32 `json:"rule_index,omitempty"`
+		Kind      string `json:"kind,omitempty"`
+		Detail    string `json:"detail,omitempty"`
+	}
+	var o []old
+	keys := map[string]*v1.TextRef{}
+	for i, f := range fs {
+		o = append(o, old{f.RuleIndex, f.Kind, f.Detail})
+		if f.DetailKey != "" {
+			keys[strconv.Itoa(i)+".detail"] = &v1.TextRef{Key: f.DetailKey, Args: f.DetailArgs}
+		}
+	}
+	bj, _ := json.Marshal(o)
+	return flotaRec{Json: string(bj), Err: errStr(err), Keys: keys}
 }
 
 func errStr(err error) string {

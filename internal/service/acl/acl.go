@@ -3,15 +3,14 @@ package acl
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/netip"
 	"strings"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/acl"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
@@ -31,7 +30,7 @@ func parsePortsText(s string) ([]acl.PortRange, error) {
 			n = 3
 		}
 		if len(f) < n {
-			return nil, fmt.Errorf("puertos %q incompletos", s)
+			return nil, i18n.New("acl.err.ports_incomplete", i18n.A("ports", s))
 		}
 		pr, err := acl.ParsePorts(f[0], f[1:n]...)
 		if err != nil {
@@ -61,16 +60,16 @@ func aclFromProto(p *v1.Acl) (acl.ACL, error) {
 		}
 		var err error
 		if r.Src, err = netip.ParsePrefix(pr.Source); err != nil {
-			return out, fmt.Errorf("regla %d: origen %q: %w", i+1, pr.Source, err)
+			return out, i18n.Wrap("acl.err.rule_src", err, i18n.A("n", i+1, "src", pr.Source))
 		}
 		if r.Dst, err = netip.ParsePrefix(pr.Destination); err != nil {
-			return out, fmt.Errorf("regla %d: destino %q: %w", i+1, pr.Destination, err)
+			return out, i18n.Wrap("acl.err.rule_dst", err, i18n.A("n", i+1, "dst", pr.Destination))
 		}
 		if r.SrcPorts, err = parsePortsText(pr.SourcePorts); err != nil {
-			return out, fmt.Errorf("regla %d: %w", i+1, err)
+			return out, i18n.Wrap("acl.err.rule_cause", err, i18n.A("n", i+1))
 		}
 		if r.DstPorts, err = parsePortsText(pr.DestinationPorts); err != nil {
-			return out, fmt.Errorf("regla %d: %w", i+1, err)
+			return out, i18n.Wrap("acl.err.rule_cause", err, i18n.A("n", i+1))
 		}
 		r.SrcPorts, r.DstPorts = acl.NormalizePorts(r.SrcPorts), acl.NormalizePorts(r.DstPorts)
 		out.Rules = append(out.Rules, r)
@@ -78,14 +77,14 @@ func aclFromProto(p *v1.Acl) (acl.ACL, error) {
 	return out, nil
 }
 
-func (aclSvc) Import(_ context.Context, r *v1.ImportRequest) (*v1.ImportResponse, error) {
+func (aclSvc) Import(ctx context.Context, r *v1.ImportRequest) (*v1.ImportResponse, error) {
 	a, err := acl.Parse(r.Vendor, r.Text)
 	if err != nil {
 		var le *acl.LineError
 		if errors.As(err, &le) {
-			return nil, status.Errorf(codes.InvalidArgument, "acl: %v", err)
+			return nil, service.ErrFrom(ctx, codes.InvalidArgument, i18n.Wrap("acl.err.import", err, nil))
 		}
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	out := &v1.Acl{Name: a.Name}
 	for _, rule := range a.Rules {
@@ -94,26 +93,27 @@ func (aclSvc) Import(_ context.Context, r *v1.ImportRequest) (*v1.ImportResponse
 	return &v1.ImportResponse{Acl: out}, nil
 }
 
-func (aclSvc) Analyze(_ context.Context, r *v1.AnalyzeRequest) (*v1.AnalyzeResponse, error) {
+func (aclSvc) Analyze(ctx context.Context, r *v1.AnalyzeRequest) (*v1.AnalyzeResponse, error) {
 	a, err := aclFromProto(r.Acl)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	out := &v1.AnalyzeResponse{}
 	for _, f := range acl.Analyze(a) {
-		out.Findings = append(out.Findings, &v1.Finding{RuleIndex: uint32(f.Index), Kind: f.Kind, Detail: f.Detail})
+		key, args := f.DetailTx.KeyArgs()
+		out.Findings = append(out.Findings, &v1.Finding{RuleIndex: uint32(f.Index), Kind: f.Kind, Detail: f.DetailTx.In(i18n.Locale(ctx)), DetailKey: key, DetailArgs: args})
 	}
 	return out, nil
 }
 
-func (aclSvc) Generate(_ context.Context, r *v1.GenerateRequest) (*v1.GenerateResponse, error) {
+func (aclSvc) Generate(ctx context.Context, r *v1.GenerateRequest) (*v1.GenerateResponse, error) {
 	a, err := aclFromProto(r.Acl)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	script, err := acl.Generate(r.Vendor, a)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	return &v1.GenerateResponse{Script: script}, nil
 }
