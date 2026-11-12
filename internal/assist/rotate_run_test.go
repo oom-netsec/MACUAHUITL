@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // verifyExec suma al ejecutor de pruebas la sesión nueva con la credencial nueva.

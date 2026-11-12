@@ -180,6 +180,10 @@ func itoa(n int32) string {
 }
 
 // OutputsIssue es el aviso de que la carpeta de salidas guardada ya no vale y rige la de fábrica.
+func OutputsIssue(dir, reason string) string {
+	return fmt.Sprintf("la carpeta de salidas guardada (%s) ya no es válida y se usa la de fábrica: %s", dir, reason)
+}
+
 // OutputsIssueAudit es OutputsIssue para la auditoría: la carpeta y el código del motivo (el prefijo prefs.outputs.X).
 func OutputsIssueAudit(dir, reason string) string {
 	code := "unknown"
@@ -187,8 +191,4 @@ func OutputsIssueAudit(dir, reason string) string {
 		code, _, _ = strings.Cut(c, ":")
 	}
 	return fmt.Sprintf("outputs_dir_invalid dir=%q reason=%s", dir, code)
-}
-
-func OutputsIssue(dir, reason string) string {
-	return fmt.Sprintf("la carpeta de salidas guardada (%s) ya no es válida y se usa la de fábrica: %s", dir, reason)
 }

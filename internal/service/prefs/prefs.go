@@ -115,7 +115,9 @@ func (s *prefsSvc) SetCorePrefs(ctx context.Context, r *v1.SetCorePrefsRequest) 
 	diff("rotate_min", fmt.Sprint(oldIng.RotateMinutes), fmt.Sprint(ing.RotateMinutes))
 	diff("max_files", fmt.Sprint(oldIng.MaxFiles), fmt.Sprint(ing.MaxFiles))
 	diff("format", oldIng.Format, ing.Format)
-	if st.Issue() != issue {
+	// La auditoría sigue a la carpeta y al código del motivo; el texto del aviso puede cambiar sin cambio de fondo
+	// (no_escribible trae el nombre temporal al azar) y entonces solo se pone al día la nota.
+	if st.IssueAudit() != issueAudit {
 		if issue != "" {
 			ch = append(ch, issueAudit)
 		} else {
@@ -123,6 +125,9 @@ func (s *prefsSvc) SetCorePrefs(ctx context.Context, r *v1.SetCorePrefsRequest) 
 		}
 	}
 	if len(ch) == 0 {
+		if st.Issue() != issue {
+			st.Mark(issue, issueAudit)
+		}
 		return &v1.SetCorePrefsResponse{State: s.state("")}, nil
 	}
 	if err := service.SaveCoreSettings(s.d.DB(), s.d.Now(), out, ing); err != nil {

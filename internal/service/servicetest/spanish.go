@@ -11,13 +11,13 @@ var (
 	// keys son las claves clave=valor del detalle viejo en español; fixed, textos fijos que tenía el detalle.
 	// Los mensajes de error sin código siguen en español (no se traducen), así que no se buscan palabras sueltas
 	// como «equipo» o «sesión»: solo el vocabulario propio del detalle.
-	keys = set(`pasaron razon equipos equipo carpeta trabajo destino archivos archivo credencial puerto puertos usuario secreto ronda rondas conservar hechos fallidos pendientes entradas truncado metodo sesion recibidos enviados transferencias rechazos servidor escribir origenes topes llave dias algoritmo perfil serie formato hallazgos muestras mensajes patrones lineas líneas ocultas anomalias resultados fase nombre imagen comandos fallas revisar plantilla salida todas alrededor ventana eventos canales filas tipo modo función respaldo duración contraseña descartes flujos errores enmascarado borrados motivo grabacion intervalo rutas perfiles servidores profundo cambios huerfanas orden ssh_antiguo cambiados estado resultado interfaz`)
+	keys = set(`pasaron razon equipos equipo carpeta trabajo destino archivos archivo credencial puerto puertos usuario secreto ronda rondas conservar hechos fallidos pendientes entradas truncado metodo sesion recibidos enviados transferencias rechazos servidor escribir origenes topes llave dias algoritmo perfil serie formato hallazgos muestras mensajes patrones lineas líneas ocultas anomalias resultados fase nombre imagen comandos fallas revisar plantilla salida todas alrededor ventana eventos canales filas tipo modo función respaldo duración contraseña descartes flujos errores enmascarado borrados motivo grabacion intervalo rutas perfiles servidores profundo cambios huerfanas orden ssh_antiguo cambiados estado resultado interfaz inválidos`)
 	// fixed son los textos fijos del detalle viejo, solo en la forma en que aparecían (un número delante,
 	// el detalle completo, o la frase): así un nombre de job, script o host con «nuevos» o «ninguna» no cuenta.
 	fixed = []*regexp.Regexp{
 		regexp.MustCompile(`\d+ (nuevos|nuevas|reemplazados|reemplazadas|renombrados|renombradas|omitidos|omitidas|fusionadas|inválidos|iguales|credenciales|colecciones)\b`),
 		regexp.MustCompile(`^(marcado|desmarcado|fijado|desfijado|inactividad|ninguna|usuario)$`),
-		regexp.MustCompile(`guard=(revocado|sin autorizar)|decisiones( de colecciones)?:|borrado por exceder|conservada( como)?|sesión nueva abierta|sesión inservible|bóveda cerrada y trabajos|pantalla bloqueada|pedid[oa] por el ingeniero|… y \d+ más`),
+		regexp.MustCompile(`guard=(revocado|sin autorizar)|decisiones( de colecciones)?:|borrado por exceder|conservada( como)?|sesión nueva abierta|sesión inservible|bóveda cerrada y trabajos|pantalla bloqueada|pedid[oa] por el ingeniero|… y \d+ más|=incluida\b`),
 	}
 )
 
