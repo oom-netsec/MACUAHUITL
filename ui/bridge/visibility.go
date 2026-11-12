@@ -78,10 +78,11 @@ func (b *Bridge) stream(name string, open func(ctx context.Context, c *ipc.Clien
 	if err != nil {
 		return "", err
 	}
+	base := b.callCtx() // antes del candado: puede leer la preferencia de idioma
 	b.mu.Lock()
 	b.runSeq++
 	id := fmt.Sprintf("run-%d", b.runSeq)
-	ctx, cancel := context.WithCancel(b.ctx)
+	ctx, cancel := context.WithCancel(base)
 	b.runs[id] = cancel
 	b.mu.Unlock()
 	recv, err := open(ctx, c)

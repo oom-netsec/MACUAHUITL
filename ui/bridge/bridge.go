@@ -25,7 +25,11 @@ import (
 type Emitter func(name string, data any)
 
 type Bridge struct {
-	Interval  time.Duration // reintento de conexión; 1 s por defecto
+	Interval time.Duration // reintento de conexión; 1 s por defecto
+	// Localize enciende el idioma del núcleo (core.localize): con true, las llamadas llevan accept-language con la
+	// preferencia ui.language. Apagado por omisión: el núcleo contesta en español, como antes.
+	Localize  bool
+	lang      langCache
 	dial      func() (*ipc.ClientConn, error)
 	emit      Emitter
 	mu        sync.Mutex
@@ -134,10 +138,11 @@ func call[T any](b *Bridge, f func(context.Context, *ipc.ClientConn) (T, error))
 	var zero T
 	c, err := b.client()
 	if err != nil {
-		return zero, err
+		return zero, wrapErr(err)
 	}
 	// Sin plazo: el Login Test y el armado de muchos equipos pueden tardar minutos.
-	return f(b.ctx, c)
+	r, err := f(b.callCtx(), c)
+	return r, wrapErr(err)
 }
 
 // ---- Bóveda ----
@@ -310,6 +315,9 @@ type PhaseDTO struct {
 	Kind   string `json:"kind"` // nombre del enum, p. ej. JOB_PHASE_KIND_ROUND_FINISHED
 	Round  uint32 `json:"round"`
 	Detail string `json:"detail"`
+	// Reason y Args son el código estable del detalle (phase.devices, phase.ok_failed, ...) y sus argumentos; vacíos si la fase no lleva detalle.
+	Reason string            `json:"reason,omitempty"`
+	Args   map[string]string `json:"args,omitempty"`
 }
 
 func rfc3339(t *timestamppb.Timestamp) string {
@@ -331,7 +339,7 @@ func (b *Bridge) ListJobs() ([]JobDTO, error) {
 				WindowEndsAt: rfc3339(j.WindowEndsAt), Round: j.Round, Rounds: j.Rounds, DevicesTotal: j.DevicesTotal, DevicesOK: j.DevicesOk,
 				DevicesFailed: j.DevicesFailed, OutputDir: j.OutputDir, Kind: j.Kind, Phases: []PhaseDTO{}}
 			for _, p := range j.Phases {
-				d.Phases = append(d.Phases, PhaseDTO{At: rfc3339(p.At), Kind: p.Kind.String(), Round: p.Round, Detail: p.Detail})
+				d.Phases = append(d.Phases, PhaseDTO{At: rfc3339(p.At), Kind: p.Kind.String(), Round: p.Round, Detail: p.Detail, Reason: p.Reason, Args: p.Args})
 			}
 			out = append(out, d)
 		}
@@ -361,8 +369,9 @@ func (b *Bridge) open(jobID string) error {
 	if err != nil {
 		return err
 	}
+	base := b.callCtx() // antes del candado: puede leer la preferencia de idioma
 	b.mu.Lock()
-	ctx, cancel := context.WithCancel(b.ctx)
+	ctx, cancel := context.WithCancel(base)
 	if old, ok := b.streams[jobID]; ok {
 		old.cancel()
 	}
@@ -551,10 +560,11 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 	for _, t := range targets {
 		req.Targets = append(req.Targets, &v1.Target{Address: t})
 	}
+	base := b.callCtx() // antes del candado: puede leer la preferencia de idioma
 	b.mu.Lock()
 	b.runSeq++
 	id := fmt.Sprintf("run-%d", b.runSeq)
-	ctx, cancel := context.WithCancel(b.ctx)
+	ctx, cancel := context.WithCancel(base)
 	b.runs[id] = cancel
 	b.mu.Unlock()
 	st, err := v1.NewDiagServiceClient(c).Run(ctx, req)
@@ -722,10 +732,11 @@ func (b *Bridge) SyslogStart(addr, proto string, allowAny, save bool, o SyslogOp
 	if err != nil {
 		return "", err
 	}
+	base := b.callCtx() // antes del candado: puede leer la preferencia de idioma
 	b.mu.Lock()
 	b.runSeq++
 	id := fmt.Sprintf("run-%d", b.runSeq)
-	ctx, cancel := context.WithCancel(b.ctx)
+	ctx, cancel := context.WithCancel(base)
 	b.runs[id] = cancel
 	b.mu.Unlock()
 	st, err := v1.NewToolsServiceClient(c).Syslog(ctx, &v1.SyslogRequest{

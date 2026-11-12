@@ -110,7 +110,7 @@ func (b *Bridge) AssistWatch(runID string) error {
 	if err != nil {
 		return err
 	}
-	st, err := v1.NewAssistServiceClient(c).WatchRun(b.ctx, &v1.WatchRunRequest{RunId: runID})
+	st, err := v1.NewAssistServiceClient(c).WatchRun(b.callCtx(), &v1.WatchRunRequest{RunId: runID})
 	if err != nil {
 		return err
 	}

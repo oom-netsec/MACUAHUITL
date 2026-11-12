@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // ---- Guardar un archivo que eligió la persona ----
@@ -39,7 +41,8 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 		return errors.New("guardar: el archivo pasa de 64 MiB")
 	}
 	if _, err := os.Lstat(path); err == nil && !overwrite {
-		return ErrFileExists
+		return &Error{err: ErrFileExists, msg: i18n.Msg(b.locale(), "file.exists.save", nil), Code: "AlreadyExists", Reason: "file.exists",
+			Metadata: i18n.Metadata("file.exists.save", i18n.A("path", path))}
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".guardar-*")
 	if err != nil {

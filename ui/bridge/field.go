@@ -34,11 +34,12 @@ type consoleSess struct {
 }
 
 func (b *Bridge) next() (string, context.Context, context.CancelFunc) {
+	base := b.callCtx() // antes del candado: puede leer la preferencia de idioma
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.runSeq++
 	id := fmt.Sprintf("run-%d", b.runSeq)
-	ctx, cancel := context.WithCancel(b.ctx)
+	ctx, cancel := context.WithCancel(base)
 	b.runs[id] = cancel
 	return id, ctx, cancel
 }

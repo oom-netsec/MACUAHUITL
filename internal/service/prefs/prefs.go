@@ -18,7 +18,7 @@ import (
 )
 
 // prefKeys es la lista cerrada de preferencias aceptadas; agregar una aquí al crear su pantalla.
-var prefKeys = map[string]bool{"terminal": true}
+var prefKeys = map[string]bool{"terminal": true, "ui.language": true}
 
 const maxPrefValue = 4096
 
