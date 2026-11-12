@@ -92,10 +92,10 @@ func serveTFTP(ctx context.Context, c Config, src *source, rcv *receiver) error 
 		}
 		fail := func(code uint16, msg string) {
 			pc.WriteTo(errPacket(code, msg), from)
-			c.OnTransfer(Transfer{Proto: "tftp", Client: from.String(), File: req.file, Result: "error", Error: msg, Rejected: true})
+			c.OnTransfer(Transfer{Proto: "tftp", Client: from.String(), File: req.file, Result: "error", Error: msg, ReasonT: lit(msg), Rejected: true})
 		}
 		if !c.permitsAddr(from) {
-			c.OnTransfer(Transfer{Proto: "tftp", Client: from.String(), File: req.file, Result: "error", Error: "origen no permitido", Rejected: true})
+			c.OnTransfer(Transfer{Proto: "tftp", Client: from.String(), File: req.file, Result: "error", Error: "origen no permitido", ReasonT: lit("origen no permitido"), Rejected: true})
 			continue // sin respuesta: no se confirma a un origen ajeno que hay un servidor
 		}
 		var name string
@@ -216,7 +216,7 @@ func sendFile(ctx context.Context, host string, peer net.Addr, name string, src 
 	// Cada transferencia usa un puerto propio (TID) en la misma IP de escucha.
 	conn, err := net.ListenPacket("udp", net.JoinHostPort(host, "0"))
 	if err != nil {
-		t.Error = err.Error()
+		t.setErr(err)
 		return t
 	}
 	defer conn.Close()
@@ -229,7 +229,7 @@ func sendFile(ctx context.Context, host string, peer net.Addr, name string, src 
 	f, st, err := src.open(name)
 	if err != nil {
 		conn.WriteTo(errPacket(1, "no se pudo abrir"), peer)
-		t.Error = err.Error()
+		t.setErr(err)
 		return t
 	}
 	defer f.Close()
@@ -262,7 +262,7 @@ func sendFile(ctx context.Context, host string, peer net.Addr, name string, src 
 	}
 	if len(oack) > 2 {
 		if err := x.exchange(oack, 0); err != nil {
-			t.Error = err.Error()
+			t.setErr(err)
 			return t
 		}
 		verified()
@@ -273,7 +273,7 @@ func sendFile(ctx context.Context, host string, peer net.Addr, name string, src 
 		n, err := io.ReadFull(f, buf[4:])
 		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 			conn.WriteTo(errPacket(0, "error de lectura"), peer)
-			t.Error = err.Error()
+			t.setErr(err)
 			return t
 		}
 		binary.BigEndian.PutUint16(buf[2:], block)
@@ -281,7 +281,7 @@ func sendFile(ctx context.Context, host string, peer net.Addr, name string, src 
 			if ctx.Err() != nil {
 				err = errors.New("servidor detenido")
 			}
-			t.Error = err.Error()
+			t.setErr(err)
 			return t
 		}
 		verified()
@@ -345,7 +345,7 @@ func recvFileTFTP(ctx context.Context, host string, peer net.Addr, name string, 
 	defer func() { t.Duration = time.Since(start) }()
 	conn, err := net.ListenPacket("udp", net.JoinHostPort(host, "0"))
 	if err != nil {
-		t.Error = err.Error()
+		t.setErr(err)
 		return t
 	}
 	defer conn.Close()
@@ -385,7 +385,7 @@ func recvFileTFTP(ctx context.Context, host string, peer net.Addr, name string, 
 	}
 	if announced > rcv.maxFile { // se rechaza antes de aceptar un archivo que no cabría
 		conn.WriteTo(errPacket(3, errTooBig.Error()), peer)
-		t.Error = errTooBig.Error()
+		t.setErr(errTooBig)
 		return t
 	}
 	pkt := ackPacket(0)
@@ -404,21 +404,21 @@ func recvFileTFTP(ctx context.Context, host string, peer net.Addr, name string, 
 			if ctx.Err() != nil {
 				err = errors.New("servidor detenido")
 			}
-			t.Error = err.Error()
+			t.setErr(err)
 			return t
 		}
 		x.timeout, x.tries = want, retries // el par ya está verificado
 		if rf == nil {
 			if rf, err = rcv.create(name, announced); err != nil {
 				conn.WriteTo(errPacket(tftpCode(err), err.Error()), peer)
-				t.Error = err.Error()
+				t.setErr(err)
 				return t
 			}
 		}
 		if _, err := rf.Write(data); err != nil {
 			rf.abort() // antes de avisar: quien reciba el error ya no ve el archivo a medias
 			conn.WriteTo(errPacket(3, err.Error()), peer)
-			t.Error = err.Error()
+			t.setErr(err)
 			return t
 		}
 		pkt = ackPacket(block)
@@ -427,7 +427,7 @@ func recvFileTFTP(ctx context.Context, host string, peer net.Addr, name string, 
 			sum, size, err := rf.commit()
 			t.Bytes, t.SHA256 = size, sum
 			if err != nil {
-				t.Error = err.Error()
+				t.setErr(err)
 				return t
 			}
 			t.Path, t.Result = rf.path, "ok"

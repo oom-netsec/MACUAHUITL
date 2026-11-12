@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
@@ -89,10 +90,11 @@ func TestMotivosEsRegresion(t *testing.T) {
 	i18ntest.Golden(t, "testdata/fileserve_es.golden.json", motivosEs(t))
 }
 
-// Todo motivo que el código escribe en Transfer.Error (o manda a reject/fail) tiene su traducción en el catálogo, y
-// ReasonIn respeta los motivos con argumentos.
+// Todo motivo fijo que el código usa (lit("…")) y toda clave con argumentos (why("clave", …)) está en el catálogo, y la
+// traducción sigue al Text del motivo, no al texto.
 func TestMotivosDelCodigoEstanEnElCatalogo(t *testing.T) {
-	re := regexp.MustCompile(`(?:\.Error\b[^=\n]*= |Error: |reject\(|rejected\(|fail\(\d+, |scpFail\(ch, )"([^"]+)"`)
+	litRe := regexp.MustCompile(`lit\("([^"]+)"\)`)
+	whyRe := regexp.MustCompile(`why\("(\w+)"`)
 	files, _ := filepath.Glob("*.go")
 	n := 0
 	for _, f := range files {
@@ -100,24 +102,52 @@ func TestMotivosDelCodigoEstanEnElCatalogo(t *testing.T) {
 			continue
 		}
 		b, _ := os.ReadFile(f)
-		for _, m := range re.FindAllStringSubmatch(string(b), -1) {
-			lit := m[1]
-			if strings.HasPrefix(lit, "método ") || strings.HasPrefix(lit, "exec ") || lit == "HTTP" || strings.HasPrefix(lit, "interrumpida") || strings.HasPrefix(lit, "AVISO") {
-				continue
-			}
+		for _, m := range litRe.FindAllStringSubmatch(string(b), -1) {
 			n++
-			if ReasonIn(i18n.En, lit) == lit {
-				t.Errorf("%s: el motivo %q no tiene traducción", f, lit)
+			if lit(m[1]).Empty() {
+				t.Errorf("%s: el motivo %q no tiene traducción", f, m[1])
+			}
+		}
+		for _, m := range whyRe.FindAllStringSubmatch(string(b), -1) {
+			n++
+			if why(m[1]).In(i18n.En) == reasonCodes+m[1] {
+				t.Errorf("%s: la clave %q no está en el catálogo", f, m[1])
 			}
 		}
 	}
-	if n < 10 {
-		t.Fatalf("la búsqueda de motivos encontró solo %d", n)
+	if n < 20 {
+		t.Fatalf("la búsqueda encontró solo %d motivos", n)
 	}
-	for es, want := range map[string]string{"método POST": "method POST", "interrumpida: i/o timeout": "interrupted: i/o timeout", "exec rechazado: ruta no permitida": "exec rejected: path not allowed", "opción -z no permitida": "option -z not allowed", "HTTP 404": "HTTP 404", "no such file": "no such file", "": ""} {
-		if got := ReasonIn(i18n.En, es); got != want || ReasonIn(i18n.Es, es) != es {
-			t.Errorf("%q: en %q (quiero %q)", es, got, want)
+	cases := map[string]Transfer{
+		"method POST":                     {Error: "método POST", ReasonT: why("method", "method", "POST")},
+		"shell rejected":                  {Error: "shell rechazado", ReasonT: why("request_rejected", "type", "shell")},
+		"channel direct-tcpip rejected":   {Error: "canal direct-tcpip rechazado", ReasonT: why("channel_rejected", "type", "direct-tcpip")},
+		"sftp Setstat rejected":           {Error: "sftp Setstat rechazado", ReasonT: why("sftp_rejected", "method", "Setstat")},
+		"STOR rejected":                   {Error: "STOR rechazado", ReasonT: why("request_rejected", "type", "STOR")},
+		"exec rejected: path not allowed": {Error: "exec rechazado: ruta no permitida", ReasonT: why("exec_rejected", "reason", "ruta no permitida", "reason_en", "path not allowed")},
+		"origin not allowed":              {Error: "origen no permitido", ReasonT: lit("origen no permitido")},
+		"HTTP 404":                        {Error: "HTTP 404"},
+	}
+	for want, tr := range cases {
+		if got := ReasonIn(i18n.En, tr); got != want || ReasonIn(i18n.Es, tr) != tr.Error {
+			t.Errorf("%q: en %q", tr.Error, got)
 		}
+	}
+}
+
+// Una entrada enorme del cliente (el tipo de una petición SSH llega a 256 KB) no cuesta más que su longitud.
+func TestMotivoConEntradaEnormeEsLineal(t *testing.T) {
+	big := strings.Repeat("exec rechazado: ", 16000)
+	start := time.Now()
+	for i := 0; i < 20; i++ {
+		tr := Transfer{Error: big + " rechazado", ReasonT: why("request_rejected", "type", big)}
+		if got := ReasonIn(i18n.En, tr); !strings.HasSuffix(got, " rejected") {
+			t.Fatalf("got %.40q", got)
+		}
+		_ = ReasonIn(i18n.En, Transfer{Error: big})
+	}
+	if d := time.Since(start); d > 2*time.Second {
+		t.Fatalf("tardó %s", d)
 	}
 }
 

@@ -260,7 +260,7 @@ func newSink(send func(*v1.StartServerResponse) error) *sink {
 // onTransfer reenvía la transferencia al cliente con su motivo en el idioma loc; la auditoría lo lleva en inglés.
 func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.Transfer, loc string) {
 	shown := t
-	shown.Error = fileserve.ReasonIn(loc, t.Error)
+	shown.Error = fileserve.ReasonIn(loc, t)
 	b, _ := json.Marshal(shown)
 	ev := &v1.StartServerResponse{Event: &v1.StartServerResponse_TransferJson{TransferJson: string(b)}}
 	if t.Rejected {
@@ -275,7 +275,7 @@ func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.T
 	k.n.Add(1)
 	srv.transfers.Add(1)
 	audit("transfer.serve.transfer", t.Client, fmt.Sprintf("server=%s proto=%s direction=%s file=%q path=%q bytes=%d sha256=%s duration=%s result=%s %s",
-		srv.id, t.Proto, service.DirEN(t.Dir), t.File, t.Path, t.Bytes, t.SHA256, t.Duration.Round(time.Millisecond), t.Result, fileserve.ReasonIn(i18n.En, t.Error)))
+		srv.id, t.Proto, service.DirEN(t.Dir), t.File, t.Path, t.Bytes, t.SHA256, t.Duration.Round(time.Millisecond), t.Result, fileserve.ReasonIn(i18n.En, t)))
 	k.events <- ev
 }
 

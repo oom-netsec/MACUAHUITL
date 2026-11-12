@@ -98,7 +98,7 @@ func serveFTP(ctx context.Context, c Config, src *source, rcv *receiver) error {
 		ip := hostOf(nc.RemoteAddr())
 		reject := func(why string) {
 			nc.Close()
-			c.OnTransfer(Transfer{Proto: "ftp", Client: nc.RemoteAddr().String(), Result: "error", Error: why, Rejected: true})
+			c.OnTransfer(Transfer{Proto: "ftp", Client: nc.RemoteAddr().String(), Result: "error", Error: why, ReasonT: lit(why), Rejected: true})
 		}
 		if !c.permitsAddr(nc.RemoteAddr()) {
 			reject("origen no permitido")
@@ -136,8 +136,8 @@ func (s *ftpSession) reply(code int, msg string) {
 	s.rw.Flush()
 }
 
-func (s *ftpSession) rejected(why string) {
-	s.c.OnTransfer(Transfer{Proto: "ftp", Client: s.client, Result: "error", Error: why, Rejected: true})
+func (s *ftpSession) rejected(x i18n.Text) {
+	s.c.OnTransfer(Transfer{Proto: "ftp", Client: s.client, Result: "error", Error: x.In(i18n.Es), ReasonT: x, Rejected: true})
 }
 
 func (s *ftpSession) run() {
@@ -260,7 +260,7 @@ func (s *ftpSession) authedCmd(cmd, arg string) bool {
 	case "STOR":
 		s.stor(arg)
 	case "APPE", "STOU", "DELE", "RNFR", "RNTO", "MKD", "XMKD", "RMD", "XRMD", "SITE", "REST", "ABOR":
-		s.rejected(cmd + " rechazado")
+		s.rejected(why("request_rejected", "type", cmd))
 		s.reply(550, "operación no permitida")
 	default:
 		s.reply(502, "orden no implementada")
@@ -376,14 +376,14 @@ func (s *ftpSession) retr(name string) {
 	t := Transfer{Proto: "ftp", Dir: "lectura", Client: s.client, File: name, Result: "error"}
 	if !s.src.enabled() {
 		s.reply(550, "lectura deshabilitada")
-		t.Error, t.Rejected = "lectura deshabilitada", true
+		t.Error, t.ReasonT, t.Rejected = "lectura deshabilitada", lit("lectura deshabilitada"), true
 		s.c.OnTransfer(t)
 		return
 	}
 	f, _, err := s.src.open(name)
 	if err != nil {
 		s.reply(550, "archivo no publicado")
-		t.Error, t.Rejected = "archivo no publicado", true
+		t.Error, t.ReasonT, t.Rejected = "archivo no publicado", lit("archivo no publicado"), true
 		s.c.OnTransfer(t)
 		return
 	}
@@ -398,7 +398,7 @@ func (s *ftpSession) retr(name string) {
 	dc, err := s.dataConn()
 	if err != nil {
 		s.reply(425, "sin conexión de datos")
-		t.Error = "sin conexión de datos"
+		t.Error, t.ReasonT = "sin conexión de datos", lit("sin conexión de datos")
 		s.c.OnTransfer(t)
 		return
 	}
@@ -406,7 +406,7 @@ func (s *ftpSession) retr(name string) {
 	dc.Close()
 	t.Bytes, t.Duration = n, time.Since(start)
 	if err != nil {
-		t.Error = err.Error()
+		t.setErr(err)
 		s.reply(426, "transferencia interrumpida")
 	} else {
 		t.Result = "ok"
@@ -419,7 +419,7 @@ func (s *ftpSession) stor(name string) {
 	t := Transfer{Proto: "ftp", Dir: "escritura", Client: s.client, File: name, Result: "error"}
 	fail := func(code int, msg string) {
 		s.reply(code, msg)
-		t.Error, t.Rejected = msg, true
+		t.Error, t.ReasonT, t.Rejected = msg, lit(msg), true
 		s.c.OnTransfer(t)
 	}
 	if s.rcv == nil {
@@ -456,7 +456,7 @@ func (s *ftpSession) stor(name string) {
 	t.Duration = time.Since(start)
 	if err != nil {
 		rf.abort()
-		t.Error = err.Error()
+		t.setErr(err)
 		code := 426
 		if errors.Is(err, errTooBig) || errors.Is(err, errTotal) {
 			code = 552
@@ -468,7 +468,7 @@ func (s *ftpSession) stor(name string) {
 	sum, n, err := rf.commit()
 	t.Bytes, t.SHA256, t.Path = n, sum, rf.path
 	if err != nil {
-		t.Error = err.Error()
+		t.setErr(err)
 		s.reply(451, "error al guardar")
 	} else {
 		t.Result = "ok"

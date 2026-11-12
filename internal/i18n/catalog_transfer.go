@@ -28,7 +28,7 @@ func init() {
 		"fileserve.reason.not_request":      e("no es una solicitud", "not a request"),
 		"fileserve.reason.exists":           e("el archivo ya existe", "the file already exists"),
 		"fileserve.reason.too_big":          e("excede el tope de tamaño por archivo", "exceeds the per-file size limit"),
-		"fileserve.reason.total":            e("excede el tope total de lo recibido", "exceeds the total limit of what is received"),
+		"fileserve.reason.total":            e("excede el tope total de lo recibido", "exceeds the total receive limit"),
 		"fileserve.reason.too_many_files":   e("demasiados archivos recibidos", "too many files received"),
 		"fileserve.reason.name_empty":       e("nombre de archivo vacío o inválido", "file name empty or invalid"),
 		"fileserve.reason.name_spaces":      e("el nombre empieza o termina con espacios", "the name starts or ends with spaces"),
@@ -50,8 +50,11 @@ func init() {
 		"fileserve.reason.empty_line":       e("línea vacía", "empty line"),
 		// motivos con argumentos y compuestos
 		"fileserve.reason.method":             e("método {method}", "method {method}", "method"),
+		"fileserve.reason.request_rejected":   e("{type} rechazado", "{type} rejected", "type"),
+		"fileserve.reason.channel_rejected":   e("canal {type} rechazado", "channel {type} rejected", "type"),
+		"fileserve.reason.sftp_rejected":      e("sftp {method} rechazado", "sftp {method} rejected", "method"),
 		"fileserve.reason.interrupted":        e("interrumpida: {error}", "interrupted: {error}", "error"),
-		"fileserve.reason.exec_rejected":      e("exec rechazado: {reason}", "exec rejected: {reason}", "reason"),
+		"fileserve.reason.exec_rejected":      e("exec rechazado: {reason}", "exec rejected: {reason_en}", "reason", "reason_en"),
 		"fileserve.reason.option_not_allowed": e("opción -{opt} no permitida", "option -{opt} not allowed", "opt"),
 
 		// errores de validación de fileserve
