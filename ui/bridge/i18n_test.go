@@ -10,8 +10,10 @@ import (
 	"sync"
 	"testing"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -212,5 +214,15 @@ func TestTodoErrorDelPuenteTieneLaForma(t *testing.T) {
 		if m["message"] != err.Error() || m["code"] == nil || m["reason"] == nil || m["metadata"] == nil {
 			t.Errorf("%d: forma incompleta %s", i, raw)
 		}
+	}
+}
+
+// Solo cuenta el ErrorInfo del dominio del núcleo; el de otro dominio se ignora.
+func TestWrapErrIgnoraOtroDominio(t *testing.T) {
+	st := status.New(codes.Internal, "x")
+	st, _ = st.WithDetails(&errdetails.ErrorInfo{Reason: "ajeno", Domain: "otro", Metadata: map[string]string{"a": "b"}})
+	e := wrapErr(st.Err()).(*Error)
+	if e.Reason != "" || len(e.Metadata) != 0 || e.Code != "Internal" {
+		t.Fatalf("%+v", e)
 	}
 }

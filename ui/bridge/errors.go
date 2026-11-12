@@ -61,7 +61,7 @@ func wrapErr(err error) error {
 	if st, ok := status.FromError(err); ok {
 		out.Code = st.Code().String()
 		for _, d := range st.Details() {
-			if ei, ok := d.(*errdetails.ErrorInfo); ok {
+			if ei, ok := d.(*errdetails.ErrorInfo); ok && ei.Domain == "macuahuitl" {
 				out.Reason, out.Metadata = ei.Reason, ei.Metadata
 			}
 		}
