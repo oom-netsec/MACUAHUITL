@@ -12,3 +12,9 @@ export function elapsed(ms: number): string {
 const lang = () => document.documentElement.lang || undefined;
 export const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(lang(), { dateStyle: "short", timeStyle: "short" }) : "");
 export const clock = (iso: string) => new Date(iso).toLocaleTimeString(lang(), { hour: "2-digit", minute: "2-digit" });
+
+// Tiempo activo: hasta el cierre del trabajo si ya terminó; si sigue armado, hasta ahora.
+export function activeMs(armedAt: string, state: string, phases: { at: string; kind: string }[], now = Date.now()): number {
+  const end = ["armed", "arming"].includes(state) ? undefined : phases.find((p) => /_(COMPLETED|CANCELLED|FAILED)$/.test(p.kind));
+  return (end ? Date.parse(end.at) : now) - Date.parse(armedAt);
+}

@@ -145,3 +145,16 @@ func TestListPlaybooksJSON(t *testing.T) {
 		t.Fatalf("json = %s", got)
 	}
 }
+
+func TestTargetLabel(t *testing.T) {
+	// Igual que el deviceId de los eventos del núcleo (patrol.hostport), si no la fila no se actualiza.
+	if got := targetLabel("192.168.3.2", 2222); got != "192.168.3.2:2222" {
+		t.Fatalf("puerto 2222: %q", got)
+	}
+	if got := targetLabel("fe80::1", 22); got != "[fe80::1]:22" {
+		t.Fatalf("IPv6: %q", got)
+	}
+	if got := targetLabel("sw-core", 22); got != "sw-core:22" {
+		t.Fatalf("nombre: %q", got)
+	}
+}

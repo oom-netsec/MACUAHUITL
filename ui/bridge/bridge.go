@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -424,6 +425,14 @@ type RunDeviceDTO struct {
 	Detail string `json:"detail"`
 }
 
+// targetLabel es "dirección:puerto" igual que patrol.hostport en el núcleo (IPv6 entre corchetes): así la fila coincide con el deviceId de los eventos.
+func targetLabel(addr string, port uint32) string {
+	if a, err := netip.ParseAddr(addr); err == nil {
+		return netip.AddrPortFrom(a, uint16(port)).String()
+	}
+	return fmt.Sprintf("%s:%d", addr, port)
+}
+
 // GetRun devuelve el estado por equipo de una ronda, para reconstruir la grilla al reabrir.
 func (b *Bridge) GetRun(jobID string, round uint32) ([]RunDeviceDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) ([]RunDeviceDTO, error) {
@@ -433,7 +442,7 @@ func (b *Bridge) GetRun(jobID string, round uint32) ([]RunDeviceDTO, error) {
 		}
 		out := []RunDeviceDTO{}
 		for _, d := range r.Devices {
-			out = append(out, RunDeviceDTO{Target: fmt.Sprintf("%s:%d", d.Target.GetAddress(), d.Target.GetPort()), State: d.State.String(), Detail: d.Detail})
+			out = append(out, RunDeviceDTO{Target: targetLabel(d.Target.GetAddress(), d.Target.GetPort()), State: d.State.String(), Detail: d.Detail})
 		}
 		return out, nil
 	})

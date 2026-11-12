@@ -3,6 +3,7 @@ import type { Job } from "../../lib/core";
 import { Badge, EmptyState, type Tone } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
+import { Segmented } from "../../components/Segmented";
 import { elapsed } from "./format";
 
 export const tones: Record<string, Tone> = { armed: "ok", arming: "ok", completed: "", cancelled: "", failed: "bad", created: "warn" };
@@ -18,6 +19,11 @@ export function JobsPanel({ jobs, selected, onSelect, onNew }: { jobs: Job[]; se
   const stateLabel = useStateLabel();
   // El tiempo activo se refresca cada 30 s solo si hay trabajos armados.
   const [, tick] = useState(0);
+  const [kind, setKind] = useState("");
+  const kinds = [...new Set(jobs.map((j) => j.kind).filter((k): k is string => !!k))];
+  const k = kinds.length > 1 && kinds.includes(kind) ? kind : ""; // si el tipo elegido desaparece, el filtro se suelta
+  const shown = k ? jobs.filter((j) => j.kind === k) : jobs;
+  const kindLabel = (k: string) => (["adhoc", "backup", "patrol", "change"].includes(k) ? t(`patrol.kind.${k}` as Key) : k);
   const live = jobs.some((j) => j.state === "armed");
   useEffect(() => {
     if (!live) return;
@@ -31,9 +37,10 @@ export function JobsPanel({ jobs, selected, onSelect, onNew }: { jobs: Job[]; se
         <h3 id="jobs-h">{t("patrol.jobs")}</h3>
         <button className="sm" aria-pressed={selected === null} onClick={onNew}>{t("patrol.newJob")}</button>
       </header>
+      {kinds.length > 1 && <Segmented legend={t("patrol.filter.kind")} value={k} onChange={setKind} options={[["", t("patrol.kind.all")], ...kinds.map((k): [string, string] => [k, kindLabel(k)])]} />}
       {!jobs.length && <EmptyState icon="patrol" title={t("patrol.jobs.empty")}>{t("patrol.jobs.empty.hint")}</EmptyState>}
       <ul className="job-list">
-        {jobs.map((j) => (
+        {shown.map((j) => (
           <li key={j.id}>
             <button className="job-item" aria-current={selected === j.id ? "true" : undefined} onClick={() => onSelect(j.id)}>
               <span className="job-top">
@@ -45,7 +52,7 @@ export function JobsPanel({ jobs, selected, onSelect, onNew }: { jobs: Job[]; se
                 <span className="meta">{j.rounds ? t("patrol.round", { n: j.round, total: j.rounds }) : t("patrol.roundOpen", { n: j.round })}</span>
               )}
               {!!j.round && !!j.devicesTotal && (
-                <span className="meta">{t("patrol.devices", { ok: j.devicesOk ?? 0, failed: j.devicesFailed ?? 0, total: j.devicesTotal })}</span>
+                <span className="meta">{t("patrol.devices", { ok: j.devicesOk ?? 0, failed: j.devicesFailed ?? 0, total: j.devicesTotal, n: j.devicesTotal })}</span>
               )}
             </button>
           </li>

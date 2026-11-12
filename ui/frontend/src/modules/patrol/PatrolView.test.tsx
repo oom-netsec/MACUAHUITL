@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PatrolView, parseTargets } from "./PatrolView";
 import { DeviceGrid } from "./DeviceGrid";
-import { elapsed } from "./format";
+import { activeMs, elapsed } from "./format";
 import { fakeCore } from "../../lib/fake";
 
 test("parseTargets normaliza comas, espacios, saltos y CIDR sin duplicados", () => {
@@ -106,7 +106,7 @@ test("el panel de trabajos muestra estado, tiempo, ronda y equipos", async () =>
   expect(job).toHaveTextContent("Armado");
   expect(job).toHaveTextContent("2 h 15 min");
   expect(job).toHaveTextContent("Ronda 2 de 6");
-  expect(job).toHaveTextContent("8 correctos · 1 con fallas · 10 equipos");
+  expect(job).toHaveTextContent("correctos: 8 · con fallas: 1 · 10 equipos");
   expect(within(panel).getByRole("button", { name: /previo/ })).toHaveTextContent("Finalizado");
   expect(core.subscribe).toHaveBeenCalledWith(["j9"]);
 });
@@ -250,6 +250,83 @@ test("el catálogo que falló se puede reintentar", async () => {
   render(<PatrolView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: "Reintentar" }));
   expect(await screen.findByRole("checkbox", { name: "STP" })).toBeInTheDocument();
+});
+
+test("el tiempo activo se detiene en la fase de cierre", () => {
+  const phases = [{ at: "2026-11-12T10:42:00Z", kind: "JOB_PHASE_KIND_COMPLETED" }];
+  expect(activeMs("2026-11-12T10:40:00Z", "completed", phases, Date.parse("2026-11-12T12:00:00Z"))).toBe(120_000);
+  expect(activeMs("2026-11-12T10:40:00Z", "armed", [], Date.parse("2026-11-12T10:50:00Z"))).toBe(600_000);
+});
+
+test("un equipo se cuenta en singular", async () => {
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j1", name: "uno", state: "completed", round: 1, devicesTotal: 1, devicesOk: 1, devicesFailed: 0 }]) });
+  render(<PatrolView core={core} />);
+  const panel = await screen.findByRole("region", { name: "Trabajos" });
+  expect(await within(panel).findByRole("button", { name: /uno/ })).toHaveTextContent("correctos: 1 · con fallas: 0 · 1 equipo");
+  expect(panel).not.toHaveTextContent("1 equipos");
+});
+
+test("filtra la lista por tipo de trabajo", async () => {
+  const core = fakeCore({ listJobs: vi.fn(async () => [
+    { id: "a", name: "uno-adhoc", state: "completed", kind: "adhoc" },
+    { id: "b", name: "dos-resp", state: "completed", kind: "backup" },
+  ]) });
+  render(<PatrolView core={core} />);
+  const panel = await screen.findByRole("region", { name: "Trabajos" });
+  await within(panel).findByRole("button", { name: /uno-adhoc/ });
+  expect(within(panel).getByLabelText("Todos")).toBeChecked();
+  await userEvent.click(within(panel).getByLabelText("Respaldo"));
+  expect(within(panel).queryByRole("button", { name: /uno-adhoc/ })).toBeNull();
+  expect(within(panel).getByRole("button", { name: /dos-resp/ })).toBeInTheDocument();
+});
+
+test("la grilla aparece cuando un trabajo seleccionado pasa a armado", async () => {
+  let state = "created";
+  const core = fakeCore({
+    listJobs: vi.fn(async () => [{ id: "j1", name: "nocturno", state, round: 1, rounds: 0 }]),
+    getRun: vi.fn(async () => [{ target: "10.0.0.1", state: "DEVICE_STATE_RUNNING", detail: "" }]),
+  });
+  render(<PatrolView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /nocturno/ }));
+  expect(screen.queryByText("10.0.0.1")).toBeNull();
+  state = "armed";
+  act(() => core.emitEvent({ jobId: "j1", jobStateChanged: { state: "armed" } }));
+  expect(await screen.findByText("10.0.0.1")).toBeInTheDocument();
+});
+
+test("un evento de fase repetido por la suscripción no duplica la línea", async () => {
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j9", name: "n", state: "armed", armedAt: ago(5), round: 2, rounds: 0, phases: [] }]) });
+  render(<PatrolView core={core} />);
+  await screen.findByText("Activo: 5 min"); // lista cargada
+  const ev = { jobId: "j9", phaseAdded: { at: ago(1), kind: "JOB_PHASE_KIND_ROUND_STARTED", round: 2 } };
+  act(() => core.emitEvent(ev));
+  act(() => core.emitEvent(ev));
+  const phases = await screen.findByRole("list", { name: "Fases" });
+  expect(within(phases).getAllByText("Ronda 2 iniciada")).toHaveLength(1);
+});
+
+test("la grilla de un trabajo armado sale de la ronda anterior si la actual va vacía y no se borra al empezar otra ronda", async () => {
+  let round = 2;
+  const getRun = vi.fn(async (_id: string, r: number) => (r === 1 ? [{ target: "10.0.0.7:22", state: "DEVICE_STATE_COMPLETED", detail: "" }] : []));
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j7", name: "noche", state: "armed", round, rounds: 0, phases: [] }]), getRun });
+  render(<PatrolView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /noche/ }));
+  expect(await screen.findByText("10.0.0.7:22")).toBeInTheDocument();
+  round = 3; // una ronda nueva arranca vacía en el núcleo: la grilla viva no se reemplaza por una vacía
+  act(() => core.emitEvent({ jobId: "j7", phaseAdded: { at: new Date().toISOString(), kind: "JOB_PHASE_KIND_ROUND_STARTED", round: 3 } }));
+  await act(async () => {});
+  expect(screen.getByText("10.0.0.7:22")).toBeInTheDocument();
+});
+
+test("al reabrir a mitad de ronda la grilla trae todos los equipos, no solo los que ya terminaron", async () => {
+  const getRun = vi.fn(async (_id: string, r: number) => (r === 1
+    ? [{ target: "10.0.0.1:22", state: "DEVICE_STATE_COMPLETED", detail: "" }, { target: "10.0.0.2:22", state: "DEVICE_STATE_COMPLETED", detail: "" }]
+    : [{ target: "10.0.0.1:22", state: "DEVICE_STATE_COMPLETED", detail: "" }]));
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j8", name: "parcial", state: "armed", round: 2, rounds: 0, phases: [] }]), getRun });
+  render(<PatrolView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /parcial/ }));
+  expect(await screen.findByText("10.0.0.1:22")).toBeInTheDocument();
+  expect(screen.getByText("10.0.0.2:22")).toBeInTheDocument();
 });
 
 test("el rechazo de la carpeta de salida se ve traducido, con la orden chmod", async () => {
