@@ -8,8 +8,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 const (
@@ -32,26 +35,34 @@ type Sink struct {
 	OnRemove    func(path string) // archivo borrado por la retención
 }
 
-// ValidateTemplate acepta {fecha}, {hora} y {origen} más [A-Za-z0-9_.-], de 1 a
-// 64 caracteres, y exige {fecha} o {hora} para que dos archivos no choquen.
+// canon lleva los tokens en inglés a su forma en español: {date}, {time} y {source} valen igual que {fecha}, {hora}
+// y {origen}. El nombre del archivo y la regex de retención salen de la forma canónica, así los dos idiomas
+// de la MISMA plantilla producen y reconocen los mismos archivos.
+var canon = strings.NewReplacer("{date}", "{fecha}", "{time}", "{hora}", "{source}", "{origen}")
+
+func bad(key string, args ...any) error { return i18n.New("ingest.invalid."+key, i18n.A(args...)) }
+
+// ValidateTemplate acepta {fecha}, {hora} y {origen} (o {date}, {time} y {source}) más [A-Za-z0-9_.-], de 1 a
+// 64 caracteres, y exige fecha u hora para que dos archivos no choquen.
 func ValidateTemplate(t string) error {
 	if t == "" || len(t) > maxName {
-		return fmt.Errorf("la plantilla debe tener entre 1 y %d caracteres", maxName)
+		return bad("name_template.len")
 	}
-	if !strings.Contains(t, "{fecha}") && !strings.Contains(t, "{hora}") {
-		return errors.New("la plantilla debe llevar {fecha} o {hora}")
+	c := canon.Replace(t)
+	if !strings.Contains(c, "{fecha}") && !strings.Contains(c, "{hora}") {
+		return bad("name_template.need")
 	}
-	s := strings.NewReplacer("{fecha}", "0", "{hora}", "0", "{origen}", "0").Replace(t)
+	s := strings.NewReplacer("{fecha}", "0", "{hora}", "0", "{origen}", "0").Replace(c)
 	if strings.ContainsAny(s, "{}") {
-		return errors.New("la plantilla solo admite los tokens {fecha}, {hora} y {origen}, bien cerrados")
+		return bad("name_template.tokens")
 	}
 	for _, r := range s {
 		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_' || r == '.' || r == '-') {
-			return fmt.Errorf("la plantilla solo admite letras, dígitos, _ . - y los tokens; no %q", r)
+			return bad("name_template.chars", "ch", strconv.QuoteRune(r))
 		}
 	}
 	if strings.Contains(s, "..") {
-		return errors.New("la plantilla no puede llevar \"..\"")
+		return bad("name_template.dots")
 	}
 	return nil
 }
@@ -59,25 +70,25 @@ func ValidateTemplate(t string) error {
 // Validate comprueba los rangos: 1 a 1024 MB, 1 min a 7 días y 1 a 1000 archivos.
 func (s Sink) Validate() error {
 	if s.Dir == "" {
-		return errors.New("falta la carpeta de salida")
+		return bad("dir")
 	}
 	if err := ValidateTemplate(s.Template); err != nil {
 		return err
 	}
 	if s.RotateBytes != 0 && (s.RotateBytes < 1<<20 || s.RotateBytes > 1024<<20) {
-		return errors.New("el tamaño de rotación debe estar entre 1 y 1024 MB")
+		return bad("rotate_mb")
 	}
 	if s.RotateEvery != 0 && (s.RotateEvery < time.Minute || s.RotateEvery > 7*24*time.Hour) {
-		return errors.New("la rotación por tiempo debe estar entre 1 minuto y 7 días")
+		return bad("rotate_minutes")
 	}
 	if s.MaxFiles < 1 || s.MaxFiles > 1000 {
-		return errors.New("el máximo de archivos debe estar entre 1 y 1000")
+		return bad("max_files")
 	}
 	switch s.Format {
 	case "", "texto", "crudo", "jsonl":
 		return nil
 	}
-	return fmt.Errorf("formato %q no soportado (texto, crudo o jsonl)", s.Format)
+	return bad("format", "value", s.Format)
 }
 
 // Record es lo que el archivo pide a cada evento: de qué origen ("ip:puerto" o IP)
@@ -133,12 +144,12 @@ func NewWriter(s Sink, now func() time.Time) (*Writer, error) {
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
 		return nil, &OutputError{fmt.Errorf("carpeta de salida: %w", err)}
 	}
-	w := &Writer{s: s, now: now, ext: ".log", perOrigin: strings.Contains(s.Template, "{origen}"), files: map[string]*outFile{}}
+	w := &Writer{s: s, now: now, ext: ".log", perOrigin: strings.Contains(canon.Replace(s.Template), "{origen}"), files: map[string]*outFile{}}
 	if s.Format == "jsonl" {
 		w.ext = ".jsonl"
 	}
 	// la plantilla escapada como regex; cada token solo encaja con lo que el propio writer produce
-	q := strings.NewReplacer(`\{fecha\}`, `[0-9]{8}`, `\{hora\}`, `[0-9]{6}`, `\{origen\}`, originRe).Replace(regexp.QuoteMeta(s.Template))
+	q := strings.NewReplacer(`\{fecha\}`, `[0-9]{8}`, `\{hora\}`, `[0-9]{6}`, `\{origen\}`, originRe).Replace(regexp.QuoteMeta(canon.Replace(s.Template)))
 	w.re = regexp.MustCompile("^" + q + `(?:_[1-9][0-9]{0,3})?` + regexp.QuoteMeta(w.ext) + "$") // el sufijo _N llega a maxSuffix (4 dígitos)
 	return w, nil
 }
@@ -221,7 +232,7 @@ func (w *Writer) reopen(of *outFile) error {
 // create abre un archivo nuevo con el nombre de la plantilla; si existe agrega _N.
 func (w *Writer) create(key string, now time.Time) (*outFile, error) {
 	w.room()
-	base := strings.NewReplacer("{fecha}", now.Format("20060102"), "{hora}", now.Format("150405"), "{origen}", key).Replace(w.s.Template)
+	base := strings.NewReplacer("{fecha}", now.Format("20060102"), "{hora}", now.Format("150405"), "{origen}", key).Replace(canon.Replace(w.s.Template))
 	for i := 0; i < maxSuffix; i++ {
 		name := base + w.ext
 		if i > 0 {

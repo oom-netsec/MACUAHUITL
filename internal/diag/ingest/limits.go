@@ -4,11 +4,12 @@
 package ingest
 
 import (
-	"fmt"
 	"net"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Defaults y rangos de los topes; 0 en Limits significa «el default».
@@ -62,18 +63,18 @@ func (l Limits) Effective() Limits {
 // Validate rechaza lo fuera de rango; 0 se acepta (default).
 func (l Limits) Validate() error {
 	for _, c := range []struct {
-		name   string
+		field  string
 		v      int
 		lo, hi int
 	}{
-		{"la tasa por origen", l.PerSource, 1, 10000},
-		{"la ráfaga por origen", l.PerSourceBurst, 1, maxBurst},
-		{"la tasa global", l.Global, 1, 100000},
-		{"la ráfaga global", l.GlobalBurst, 1, maxBurst},
-		{"la cola", l.Queue, 64, 65536},
+		{"rate_per_source", l.PerSource, 1, 10000},
+		{"burst_per_source", l.PerSourceBurst, 1, maxBurst},
+		{"rate_global", l.Global, 1, 100000},
+		{"burst_global", l.GlobalBurst, 1, maxBurst},
+		{"queue_size", l.Queue, 64, 65536},
 	} {
 		if c.v != 0 && (c.v < c.lo || c.v > c.hi) {
-			return fmt.Errorf("%s debe estar entre %d y %d (0 = default), no %d", c.name, c.lo, c.hi, c.v)
+			return i18n.New("ingest.invalid."+c.field, i18n.A("min", c.lo, "max", c.hi, "value", c.v))
 		}
 	}
 	return nil
