@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,17 +92,29 @@ func TestCreateJobTipoDeTrabajo(t *testing.T) {
 			t.Fatalf("kind %s: %v", k, err)
 		}
 	}
-	// un trabajo guardado antes de esta fase (sin kind en su spec) sale como patrol
-	h.core.mu.Lock()
-	h.core.jobs[vacio].spec.Kind = ""
-	h.core.mu.Unlock()
-	h.core.persistJob(h.core.jobs[vacio])
 	adhoc, _ := crear("adhoc")
-	h.restart(t)
-	if k := h.summary(t, adhoc).Kind; k != "adhoc" {
-		t.Fatalf("kind recargado = %q", k)
+	// un trabajo guardado antes de esta fase: su spec_json no trae la llave Kind
+	p := h.core.p
+	h.core.Close()
+	db := openDB(t, p)
+	if _, err := db.Exec(`INSERT INTO jobs(id,name,spec_json,state,created_at) VALUES('previo','p','{"Name":"p"}','completed','2026-01-01T00:00:00Z')`); err != nil {
+		t.Fatal(err)
 	}
-	if k := h.summary(t, vacio).Kind; k != "patrol" {
-		t.Fatalf("viejo recargado = %q", k)
+	db.Close()
+	c, err := New(p, Options{Actor: "tester"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	r, err := (&patrolSvc{c: c}).ListJobs(context.Background(), &v1.ListJobsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, j := range r.Jobs {
+		got[j.JobId] = j.Kind
+	}
+	if got[adhoc] != "adhoc" || got["previo"] != "patrol" {
+		t.Fatalf("kinds recargados = %v (adhoc=%s)", got, adhoc)
 	}
 }
