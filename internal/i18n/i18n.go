@@ -8,6 +8,7 @@ package i18n
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -231,4 +232,17 @@ func Codes() []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// English es el texto de err para la auditoría, que va siempre en inglés: si err (o algo que envuelve) trae
+// código del catálogo, ese tramo sale en inglés y el resto del mensaje queda tal cual; sin código, es err.Error().
+func English(err error) string {
+	if err == nil {
+		return ""
+	}
+	var c Coded
+	if !errors.As(err, &c) {
+		return err.Error()
+	}
+	return strings.Replace(err.Error(), c.Error(), c.Localize(En), 1)
 }
