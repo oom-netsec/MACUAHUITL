@@ -228,7 +228,7 @@ func init() {
 		"calc.val.kind.mcast6_1":       e("multicast, alcance interfaz", "multicast, interface scope"),
 		"calc.val.kind.mcast6_2":       e("multicast, alcance enlace", "multicast, link scope"),
 		"calc.val.kind.mcast6_3":       e("multicast, alcance red", "multicast, realm scope"),
-		"calc.val.kind.mcast6_4":       e("multicast, alcance administración", "multicast, admin scope"),
+		"calc.val.kind.mcast6_4":       e("multicast, alcance administración", "multicast, admin-local scope"),
 		"calc.val.kind.mcast6_5":       e("multicast, alcance sitio", "multicast, site scope"),
 		"calc.val.kind.mcast6_8":       e("multicast, alcance organización", "multicast, organization scope"),
 		"calc.val.kind.mcast6_e":       e("multicast, alcance global", "multicast, global scope"),

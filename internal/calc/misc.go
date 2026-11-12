@@ -163,16 +163,16 @@ var dscpNames = []struct {
 var dscpAliases = map[string]string{"DEFAULT": "CS0", "DF": "CS0", "BE": "CS0", "VA": "VOICE-ADMIT"}
 
 func dscpEntry(d int) DSCPEntry {
-	e := DSCPEntry{DSCP: d, Binary: fmt.Sprintf("%06b", d), ToS: d << 2, ToSHex: fmt.Sprintf("0x%02X", d<<2), Precedence: d >> 3, CoS: d >> 3, EXP: d >> 3, Class: kindText("calc.val.dscp.none"), classKey: "calc.val.dscp.none"}
+	e := DSCPEntry{DSCP: d, Binary: fmt.Sprintf("%06b", d), ToS: d << 2, ToSHex: fmt.Sprintf("0x%02X", d<<2), Precedence: d >> 3, CoS: d >> 3, EXP: d >> 3, Class: esText("calc.val.dscp.none"), classKey: "calc.val.dscp.none"}
 	for _, n := range dscpNames {
 		if n.dscp == d {
 			e.Name, e.classKey = n.name, n.class
-			e.Class = kindText(n.class)
+			e.Class = esText(n.class)
 		}
 	}
 	if strings.HasPrefix(e.Name, "AF") {
 		e.dropKey = []string{"calc.val.drop.low", "calc.val.drop.medium", "calc.val.drop.high"}[e.Name[3]-'1']
-		e.Drop = kindText(e.dropKey)
+		e.Drop = esText(e.dropKey)
 	}
 	return e
 }

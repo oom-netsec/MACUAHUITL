@@ -184,8 +184,8 @@ func prefixKindKey(p netip.Prefix) string {
 	return pre + "public"
 }
 
-// kindText es el texto en español de una clave de tipo, el que va en el JSON de siempre.
-func kindText(key string) string { return i18n.Msg(i18n.Es, key, nil) }
+// esText es el texto en español de una clave de tipo, el que va en el JSON de siempre.
+func esText(key string) string { return i18n.Msg(i18n.Es, key, nil) }
 
 func class4(a netip.Addr) string {
 	switch o := a.As4()[0]; {
@@ -228,7 +228,7 @@ func Subnet(in string) (SubnetInfo, error) {
 		return SubnetInfo{}, err
 	}
 	n, net, last := p.Bits(), p.Addr(), lastAddr(p)
-	s := SubnetInfo{Input: in, Prefix: p.String(), PrefixLen: n, Network: net.String(), Total: size(p).String(), Kind: kindText(prefixKindKey(p)), kindKey: prefixKindKey(p)}
+	s := SubnetInfo{Input: in, Prefix: p.String(), PrefixLen: n, Network: net.String(), Total: size(p).String(), Kind: esText(prefixKindKey(p)), kindKey: prefixKindKey(p)}
 	if given != net {
 		addNote(&s.Notes, &s.notes, "calc.note.host_in_subnet", "addr", given, "prefix", p)
 	}
@@ -664,7 +664,7 @@ func IPv6(addr, mac string) (IPv6Info, error) {
 	}
 	a = a.WithZone("")
 	b := a.As16()
-	r := IPv6Info{Compressed: a.String(), Expanded: a.StringExpanded(), Prefix: prefix, Kind: kindText(kindKey(a)), kindKey: kindKey(a)}
+	r := IPv6Info{Compressed: a.String(), Expanded: a.StringExpanded(), Prefix: prefix, Kind: esText(kindKey(a)), kindKey: kindKey(a)}
 	if mac != "" {
 		r.EUI64 = r.Compressed
 	}

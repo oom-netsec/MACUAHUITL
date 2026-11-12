@@ -26,7 +26,7 @@ type Table struct {
 	Rows      [][]string  `json:"rows"`
 	RowKeys   []string    `json:"rowKeys,omitempty"` // uno por fila: clave de la etiqueta de la primera celda, o "" si es un dato
 	RowArgs   []i18n.Args `json:"rowArgs,omitempty"`
-	Coded     [][]Coded   `json:"coded,omitempty"` // por fila: las celdas que son un valor de catálogo (calc.val.*)
+	Coded     [][]Coded   `json:"-"` // por fila: las celdas que son un valor de catálogo (calc.val.*)
 }
 
 // Coded es una celda con palabras que viaja como código cerrado: Col es su columna, Key su clave (calc.val.*) y
@@ -90,8 +90,7 @@ func (t *Table) add(label string, args i18n.Args, cells ...any) {
 	if label != "" {
 		row[0] = i18n.Msg(i18n.Es, label, args)
 	}
-	cells0 := row
-	t.Rows = append(t.Rows, cells0)
+	t.Rows = append(t.Rows, row)
 	t.Coded = append(t.Coded, coded)
 	t.RowKeys = append(t.RowKeys, label)
 	t.RowArgs = append(t.RowArgs, args)

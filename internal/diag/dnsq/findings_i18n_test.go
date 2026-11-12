@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"regexp"
-	"strings"
 	"testing"
 
 	"github.com/miekg/dns"
@@ -171,7 +170,6 @@ func TestFindingsEspanolRegresion(t *testing.T) {
 			t.Errorf("%s cambió:\n got: %s\nwant: %s", n, g, want[n])
 		}
 	}
-	_ = strings.TrimSpace
 }
 
 // Con en, cada hallazgo de catálogo sale en inglés (sin español en el detalle) y los de datos quedan tal cual.

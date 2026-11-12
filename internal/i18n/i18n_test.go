@@ -177,3 +177,10 @@ func TestDatosQueSeParecenAClavesSalenLiterales(t *testing.T) {
 		}
 	}
 }
+
+// RFC 4291: el alcance 4 de multicast IPv6 es admin-local.
+func TestAlcanceMulticastAdminLocal(t *testing.T) {
+	if got := Msg(En, "calc.val.kind.mcast6_4", nil); got != "multicast, admin-local scope" {
+		t.Errorf("%q", got)
+	}
+}

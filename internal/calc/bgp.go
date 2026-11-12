@@ -160,9 +160,9 @@ func itoa[T ~int | ~uint32 | ~int64](v T) string {
 }
 func yes(b bool) string {
 	if b {
-		return kindText("calc.val.yes")
+		return esText("calc.val.yes")
 	}
-	return kindText("calc.val.no")
+	return esText("calc.val.no")
 }
 
 const (
@@ -247,7 +247,7 @@ func compare(a, b *path, o BGPOptions, upto int) (winner *path, c BGPComparison)
 		if skip || r == 0 {
 			continue
 		}
-		c.Step, c.stepKey, c.ValueA, c.ValueB = kindText(s.key), s.key, va, vb
+		c.Step, c.stepKey, c.ValueA, c.ValueB = esText(s.key), s.key, va, vb
 		if s.key == "calc.val.step.local_origin" {
 			c.keyA, c.keyB = yesKey(a.Local), yesKey(b.Local)
 		}
@@ -258,7 +258,7 @@ func compare(a, b *path, o BGPOptions, upto int) (winner *path, c BGPComparison)
 		c.Winner = b.Name
 		return b, c
 	}
-	c.Step, c.stepKey, c.Winner = kindText(stepTie), stepTie, a.Name
+	c.Step, c.stepKey, c.Winner = esText(stepTie), stepTie, a.Name
 	return a, c
 }
 
@@ -321,7 +321,7 @@ func BGPBestPath(routes []Route, o BGPOptions) (BGPResult, error) {
 	} else {
 		winner = run(ps)
 	}
-	res.Best, res.DecidedBy, res.decidedKey = winner.Name, kindText(stepReachable), stepReachable
+	res.Best, res.DecidedBy, res.decidedKey = winner.Name, esText(stepReachable), stepReachable
 	for i := len(res.Comparisons) - 1; i >= 0; i-- {
 		if c := res.Comparisons[i]; c.A == winner.Name || c.B == winner.Name {
 			res.DecidedBy, res.decidedKey = c.Step, c.stepKey
