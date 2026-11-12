@@ -247,16 +247,295 @@ func (x *RadiusTestRequest) GetRetries() int32 {
 	return 0
 }
 
+// Texto de catálogo ya armado: key y args, y el texto en el idioma pedido (accept-language).
+type SecText struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Args          map[string]string      `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Text          string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SecText) Reset() {
+	*x = SecText{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SecText) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SecText) ProtoMessage() {}
+
+func (x *SecText) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SecText.ProtoReflect.Descriptor instead.
+func (*SecText) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *SecText) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SecText) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+func (x *SecText) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+// Hallazgo: code estable (sin-respuesta, blast-radius, secreto, authen-fail…), severity cerrada
+// (warning, error, info), args con los valores que cita y message con el detalle en el idioma pedido.
+type SecFinding struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Severity      string                 `protobuf:"bytes,2,opt,name=severity,proto3" json:"severity,omitempty"`
+	Args          map[string]string      `protobuf:"bytes,3,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SecFinding) Reset() {
+	*x = SecFinding{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SecFinding) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SecFinding) ProtoMessage() {}
+
+func (x *SecFinding) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SecFinding.ProtoReflect.Descriptor instead.
+func (*SecFinding) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SecFinding) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *SecFinding) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *SecFinding) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+func (x *SecFinding) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type RadiusAttribute struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RadiusAttribute) Reset() {
+	*x = RadiusAttribute{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RadiusAttribute) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RadiusAttribute) ProtoMessage() {}
+
+func (x *RadiusAttribute) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RadiusAttribute.ProtoReflect.Descriptor instead.
+func (*RadiusAttribute) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RadiusAttribute) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RadiusAttribute) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type RadiusExchange struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Kind                 string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"` // access-request, status-server, accounting-start, accounting-stop
+	Code                 string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"` // Access-Accept…; vacío si no hubo respuesta
+	RttMs                float64                `protobuf:"fixed64,3,opt,name=rtt_ms,json=rttMs,proto3" json:"rtt_ms,omitempty"`
+	Attempts             int32                  `protobuf:"varint,4,opt,name=attempts,proto3" json:"attempts,omitempty"`
+	MessageAuthenticator string                 `protobuf:"bytes,5,opt,name=message_authenticator,json=messageAuthenticator,proto3" json:"message_authenticator,omitempty"` // absent, valid, invalid; vacío si no hubo respuesta
+	Error                *SecText               `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`                                                           // ausente si no hubo error
+	Attrs                []*RadiusAttribute     `protobuf:"bytes,7,rep,name=attrs,proto3" json:"attrs,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *RadiusExchange) Reset() {
+	*x = RadiusExchange{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RadiusExchange) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RadiusExchange) ProtoMessage() {}
+
+func (x *RadiusExchange) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RadiusExchange.ProtoReflect.Descriptor instead.
+func (*RadiusExchange) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *RadiusExchange) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *RadiusExchange) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *RadiusExchange) GetRttMs() float64 {
+	if x != nil {
+		return x.RttMs
+	}
+	return 0
+}
+
+func (x *RadiusExchange) GetAttempts() int32 {
+	if x != nil {
+		return x.Attempts
+	}
+	return 0
+}
+
+func (x *RadiusExchange) GetMessageAuthenticator() string {
+	if x != nil {
+		return x.MessageAuthenticator
+	}
+	return ""
+}
+
+func (x *RadiusExchange) GetError() *SecText {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
+func (x *RadiusExchange) GetAttrs() []*RadiusAttribute {
+	if x != nil {
+		return x.Attrs
+	}
+	return nil
+}
+
 type RadiusTestResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Report        *ToolReport            `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	Server        string                 `protobuf:"bytes,2,opt,name=server,proto3" json:"server,omitempty"`
+	Method        string                 `protobuf:"bytes,3,opt,name=method,proto3" json:"method,omitempty"` // PAP, CHAP, MSCHAPV2 (como en el texto); vacío en Status-Server
+	Exchanges     []*RadiusExchange      `protobuf:"bytes,4,rep,name=exchanges,proto3" json:"exchanges,omitempty"`
+	Findings      []*SecFinding          `protobuf:"bytes,5,rep,name=findings,proto3" json:"findings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RadiusTestResponse) Reset() {
 	*x = RadiusTestResponse{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -268,7 +547,7 @@ func (x *RadiusTestResponse) String() string {
 func (*RadiusTestResponse) ProtoMessage() {}
 
 func (x *RadiusTestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -281,12 +560,40 @@ func (x *RadiusTestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RadiusTestResponse.ProtoReflect.Descriptor instead.
 func (*RadiusTestResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{2}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RadiusTestResponse) GetReport() *ToolReport {
 	if x != nil {
 		return x.Report
+	}
+	return nil
+}
+
+func (x *RadiusTestResponse) GetServer() string {
+	if x != nil {
+		return x.Server
+	}
+	return ""
+}
+
+func (x *RadiusTestResponse) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *RadiusTestResponse) GetExchanges() []*RadiusExchange {
+	if x != nil {
+		return x.Exchanges
+	}
+	return nil
+}
+
+func (x *RadiusTestResponse) GetFindings() []*SecFinding {
+	if x != nil {
+		return x.Findings
 	}
 	return nil
 }
@@ -309,7 +616,7 @@ type TacacsTestRequest struct {
 
 func (x *TacacsTestRequest) Reset() {
 	*x = TacacsTestRequest{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -321,7 +628,7 @@ func (x *TacacsTestRequest) String() string {
 func (*TacacsTestRequest) ProtoMessage() {}
 
 func (x *TacacsTestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -334,7 +641,7 @@ func (x *TacacsTestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TacacsTestRequest.ProtoReflect.Descriptor instead.
 func (*TacacsTestRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{3}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *TacacsTestRequest) GetHost() string {
@@ -407,16 +714,172 @@ func (x *TacacsTestRequest) GetTimeoutMs() int32 {
 	return 0
 }
 
+// AV pair de un paso: direction es sent (lo que mandó la prueba) o received (lo que devolvió el servidor).
+type TacacsAvPair struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Direction     string                 `protobuf:"bytes,1,opt,name=direction,proto3" json:"direction,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TacacsAvPair) Reset() {
+	*x = TacacsAvPair{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TacacsAvPair) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TacacsAvPair) ProtoMessage() {}
+
+func (x *TacacsAvPair) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TacacsAvPair.ProtoReflect.Descriptor instead.
+func (*TacacsAvPair) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *TacacsAvPair) GetDirection() string {
+	if x != nil {
+		return x.Direction
+	}
+	return ""
+}
+
+func (x *TacacsAvPair) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type TacacsStep struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`     // authentication, authorization, accounting-start, accounting-stop
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"` // PASS, FAIL, PASS_ADD…; vacío si no hubo respuesta
+	RttMs         float64                `protobuf:"fixed64,3,opt,name=rtt_ms,json=rttMs,proto3" json:"rtt_ms,omitempty"`
+	Error         *SecText               `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"` // ausente si no hubo error
+	Prompts       []string               `protobuf:"bytes,5,rep,name=prompts,proto3" json:"prompts,omitempty"`
+	Message       string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
+	Data          string                 `protobuf:"bytes,7,opt,name=data,proto3" json:"data,omitempty"`
+	AvPairs       []*TacacsAvPair        `protobuf:"bytes,8,rep,name=av_pairs,json=avPairs,proto3" json:"av_pairs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TacacsStep) Reset() {
+	*x = TacacsStep{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TacacsStep) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TacacsStep) ProtoMessage() {}
+
+func (x *TacacsStep) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TacacsStep.ProtoReflect.Descriptor instead.
+func (*TacacsStep) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *TacacsStep) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *TacacsStep) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *TacacsStep) GetRttMs() float64 {
+	if x != nil {
+		return x.RttMs
+	}
+	return 0
+}
+
+func (x *TacacsStep) GetError() *SecText {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
+func (x *TacacsStep) GetPrompts() []string {
+	if x != nil {
+		return x.Prompts
+	}
+	return nil
+}
+
+func (x *TacacsStep) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *TacacsStep) GetData() string {
+	if x != nil {
+		return x.Data
+	}
+	return ""
+}
+
+func (x *TacacsStep) GetAvPairs() []*TacacsAvPair {
+	if x != nil {
+		return x.AvPairs
+	}
+	return nil
+}
+
 type TacacsTestResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Report        *ToolReport            `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	Server        string                 `protobuf:"bytes,2,opt,name=server,proto3" json:"server,omitempty"` // host:puerto
+	Steps         []*TacacsStep          `protobuf:"bytes,3,rep,name=steps,proto3" json:"steps,omitempty"`
+	Findings      []*SecFinding          `protobuf:"bytes,4,rep,name=findings,proto3" json:"findings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TacacsTestResponse) Reset() {
 	*x = TacacsTestResponse{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -428,7 +891,7 @@ func (x *TacacsTestResponse) String() string {
 func (*TacacsTestResponse) ProtoMessage() {}
 
 func (x *TacacsTestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -441,12 +904,387 @@ func (x *TacacsTestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TacacsTestResponse.ProtoReflect.Descriptor instead.
 func (*TacacsTestResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{4}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *TacacsTestResponse) GetReport() *ToolReport {
 	if x != nil {
 		return x.Report
+	}
+	return nil
+}
+
+func (x *TacacsTestResponse) GetServer() string {
+	if x != nil {
+		return x.Server
+	}
+	return ""
+}
+
+func (x *TacacsTestResponse) GetSteps() []*TacacsStep {
+	if x != nil {
+		return x.Steps
+	}
+	return nil
+}
+
+func (x *TacacsTestResponse) GetFindings() []*SecFinding {
+	if x != nil {
+		return x.Findings
+	}
+	return nil
+}
+
+// Certificado o CSR, como lo describe el informe de texto. Fechas en RFC 3339 UTC; sin validez (CSR) no hay
+// days_left ni fechas. key.description es el texto «RSA 2048» o «ECDSA P-256».
+type PkiKey struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Algorithm     string                 `protobuf:"bytes,1,opt,name=algorithm,proto3" json:"algorithm,omitempty"` // RSA, ECDSA
+	Bits          uint32                 `protobuf:"varint,2,opt,name=bits,proto3" json:"bits,omitempty"`
+	Curve         string                 `protobuf:"bytes,3,opt,name=curve,proto3" json:"curve,omitempty"` // solo ECDSA
+	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PkiKey) Reset() {
+	*x = PkiKey{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PkiKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PkiKey) ProtoMessage() {}
+
+func (x *PkiKey) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PkiKey.ProtoReflect.Descriptor instead.
+func (*PkiKey) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *PkiKey) GetAlgorithm() string {
+	if x != nil {
+		return x.Algorithm
+	}
+	return ""
+}
+
+func (x *PkiKey) GetBits() uint32 {
+	if x != nil {
+		return x.Bits
+	}
+	return 0
+}
+
+func (x *PkiKey) GetCurve() string {
+	if x != nil {
+		return x.Curve
+	}
+	return ""
+}
+
+func (x *PkiKey) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+type PkiSignature struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Algorithm     string                 `protobuf:"bytes,1,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	Valid         *bool                  `protobuf:"varint,2,opt,name=valid,proto3,oneof" json:"valid,omitempty"` // solo en CSR
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PkiSignature) Reset() {
+	*x = PkiSignature{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PkiSignature) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PkiSignature) ProtoMessage() {}
+
+func (x *PkiSignature) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PkiSignature.ProtoReflect.Descriptor instead.
+func (*PkiSignature) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PkiSignature) GetAlgorithm() string {
+	if x != nil {
+		return x.Algorithm
+	}
+	return ""
+}
+
+func (x *PkiSignature) GetValid() bool {
+	if x != nil && x.Valid != nil {
+		return *x.Valid
+	}
+	return false
+}
+
+type PkiWarning struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"` // rsa_small, weak_sig, no_san, expired, not_yet, expires_soon, self_signed, csr_signature
+	Args          map[string]string      `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"` // en el idioma pedido
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PkiWarning) Reset() {
+	*x = PkiWarning{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PkiWarning) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PkiWarning) ProtoMessage() {}
+
+func (x *PkiWarning) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PkiWarning.ProtoReflect.Descriptor instead.
+func (*PkiWarning) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PkiWarning) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *PkiWarning) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+func (x *PkiWarning) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type PkiCertificate struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"` // certificate, csr
+	Subject       string                 `protobuf:"bytes,2,opt,name=subject,proto3" json:"subject,omitempty"`
+	Issuer        string                 `protobuf:"bytes,3,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	Serial        string                 `protobuf:"bytes,4,opt,name=serial,proto3" json:"serial,omitempty"`
+	NotBefore     string                 `protobuf:"bytes,5,opt,name=not_before,json=notBefore,proto3" json:"not_before,omitempty"`
+	NotAfter      string                 `protobuf:"bytes,6,opt,name=not_after,json=notAfter,proto3" json:"not_after,omitempty"`
+	DaysLeft      *int32                 `protobuf:"varint,7,opt,name=days_left,json=daysLeft,proto3,oneof" json:"days_left,omitempty"`
+	Key           *PkiKey                `protobuf:"bytes,8,opt,name=key,proto3" json:"key,omitempty"`
+	Signature     *PkiSignature          `protobuf:"bytes,9,opt,name=signature,proto3" json:"signature,omitempty"`
+	San           []string               `protobuf:"bytes,10,rep,name=san,proto3" json:"san,omitempty"`
+	KeyUsage      []string               `protobuf:"bytes,11,rep,name=key_usage,json=keyUsage,proto3" json:"key_usage,omitempty"`
+	ExtKeyUsage   []string               `protobuf:"bytes,12,rep,name=ext_key_usage,json=extKeyUsage,proto3" json:"ext_key_usage,omitempty"`
+	IsCa          bool                   `protobuf:"varint,13,opt,name=is_ca,json=isCa,proto3" json:"is_ca,omitempty"`
+	SelfSigned    bool                   `protobuf:"varint,14,opt,name=self_signed,json=selfSigned,proto3" json:"self_signed,omitempty"`
+	Sha1          string                 `protobuf:"bytes,15,opt,name=sha1,proto3" json:"sha1,omitempty"`
+	Sha256        string                 `protobuf:"bytes,16,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	Warnings      []*PkiWarning          `protobuf:"bytes,17,rep,name=warnings,proto3" json:"warnings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PkiCertificate) Reset() {
+	*x = PkiCertificate{}
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PkiCertificate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PkiCertificate) ProtoMessage() {}
+
+func (x *PkiCertificate) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PkiCertificate.ProtoReflect.Descriptor instead.
+func (*PkiCertificate) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *PkiCertificate) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *PkiCertificate) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *PkiCertificate) GetIssuer() string {
+	if x != nil {
+		return x.Issuer
+	}
+	return ""
+}
+
+func (x *PkiCertificate) GetSerial() string {
+	if x != nil {
+		return x.Serial
+	}
+	return ""
+}
+
+func (x *PkiCertificate) GetNotBefore() string {
+	if x != nil {
+		return x.NotBefore
+	}
+	return ""
+}
+
+func (x *PkiCertificate) GetNotAfter() string {
+	if x != nil {
+		return x.NotAfter
+	}
+	return ""
+}
+
+func (x *PkiCertificate) GetDaysLeft() int32 {
+	if x != nil && x.DaysLeft != nil {
+		return *x.DaysLeft
+	}
+	return 0
+}
+
+func (x *PkiCertificate) GetKey() *PkiKey {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
+func (x *PkiCertificate) GetSignature() *PkiSignature {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
+func (x *PkiCertificate) GetSan() []string {
+	if x != nil {
+		return x.San
+	}
+	return nil
+}
+
+func (x *PkiCertificate) GetKeyUsage() []string {
+	if x != nil {
+		return x.KeyUsage
+	}
+	return nil
+}
+
+func (x *PkiCertificate) GetExtKeyUsage() []string {
+	if x != nil {
+		return x.ExtKeyUsage
+	}
+	return nil
+}
+
+func (x *PkiCertificate) GetIsCa() bool {
+	if x != nil {
+		return x.IsCa
+	}
+	return false
+}
+
+func (x *PkiCertificate) GetSelfSigned() bool {
+	if x != nil {
+		return x.SelfSigned
+	}
+	return false
+}
+
+func (x *PkiCertificate) GetSha1() string {
+	if x != nil {
+		return x.Sha1
+	}
+	return ""
+}
+
+func (x *PkiCertificate) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+func (x *PkiCertificate) GetWarnings() []*PkiWarning {
+	if x != nil {
+		return x.Warnings
 	}
 	return nil
 }
@@ -461,7 +1299,7 @@ type PkiKeyRequest struct {
 
 func (x *PkiKeyRequest) Reset() {
 	*x = PkiKeyRequest{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -473,7 +1311,7 @@ func (x *PkiKeyRequest) String() string {
 func (*PkiKeyRequest) ProtoMessage() {}
 
 func (x *PkiKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -486,7 +1324,7 @@ func (x *PkiKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiKeyRequest.ProtoReflect.Descriptor instead.
 func (*PkiKeyRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{5}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *PkiKeyRequest) GetAlgorithm() string {
@@ -512,7 +1350,7 @@ type PkiKeyResponse struct {
 
 func (x *PkiKeyResponse) Reset() {
 	*x = PkiKeyResponse{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -524,7 +1362,7 @@ func (x *PkiKeyResponse) String() string {
 func (*PkiKeyResponse) ProtoMessage() {}
 
 func (x *PkiKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -537,7 +1375,7 @@ func (x *PkiKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiKeyResponse.ProtoReflect.Descriptor instead.
 func (*PkiKeyResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{6}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PkiKeyResponse) GetSealedKeyPem() string {
@@ -561,7 +1399,7 @@ type PkiSubject struct {
 
 func (x *PkiSubject) Reset() {
 	*x = PkiSubject{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -573,7 +1411,7 @@ func (x *PkiSubject) String() string {
 func (*PkiSubject) ProtoMessage() {}
 
 func (x *PkiSubject) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -586,7 +1424,7 @@ func (x *PkiSubject) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiSubject.ProtoReflect.Descriptor instead.
 func (*PkiSubject) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{7}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PkiSubject) GetCn() string {
@@ -645,7 +1483,7 @@ type PkiCsrRequest struct {
 
 func (x *PkiCsrRequest) Reset() {
 	*x = PkiCsrRequest{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -657,7 +1495,7 @@ func (x *PkiCsrRequest) String() string {
 func (*PkiCsrRequest) ProtoMessage() {}
 
 func (x *PkiCsrRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -670,7 +1508,7 @@ func (x *PkiCsrRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiCsrRequest.ProtoReflect.Descriptor instead.
 func (*PkiCsrRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{8}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PkiCsrRequest) GetSealedKeyPem() string {
@@ -720,13 +1558,14 @@ type PkiCsrResponse struct {
 	CsrPem        string                 `protobuf:"bytes,1,opt,name=csr_pem,json=csrPem,proto3" json:"csr_pem,omitempty"`
 	SealedKeyPem  string                 `protobuf:"bytes,2,opt,name=sealed_key_pem,json=sealedKeyPem,proto3" json:"sealed_key_pem,omitempty"` // la llave usada (nueva o la recibida)
 	Report        *ToolReport            `protobuf:"bytes,3,opt,name=report,proto3" json:"report,omitempty"`
+	Certificates  []*PkiCertificate      `protobuf:"bytes,4,rep,name=certificates,proto3" json:"certificates,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PkiCsrResponse) Reset() {
 	*x = PkiCsrResponse{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -738,7 +1577,7 @@ func (x *PkiCsrResponse) String() string {
 func (*PkiCsrResponse) ProtoMessage() {}
 
 func (x *PkiCsrResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -751,7 +1590,7 @@ func (x *PkiCsrResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiCsrResponse.ProtoReflect.Descriptor instead.
 func (*PkiCsrResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{9}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PkiCsrResponse) GetCsrPem() string {
@@ -775,6 +1614,13 @@ func (x *PkiCsrResponse) GetReport() *ToolReport {
 	return nil
 }
 
+func (x *PkiCsrResponse) GetCertificates() []*PkiCertificate {
+	if x != nil {
+		return x.Certificates
+	}
+	return nil
+}
+
 type PkiCaInitRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -787,7 +1633,7 @@ type PkiCaInitRequest struct {
 
 func (x *PkiCaInitRequest) Reset() {
 	*x = PkiCaInitRequest{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -799,7 +1645,7 @@ func (x *PkiCaInitRequest) String() string {
 func (*PkiCaInitRequest) ProtoMessage() {}
 
 func (x *PkiCaInitRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -812,7 +1658,7 @@ func (x *PkiCaInitRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiCaInitRequest.ProtoReflect.Descriptor instead.
 func (*PkiCaInitRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{10}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *PkiCaInitRequest) GetName() string {
@@ -848,13 +1694,15 @@ type PkiCaInitResponse struct {
 	CaCertPem     string                 `protobuf:"bytes,1,opt,name=ca_cert_pem,json=caCertPem,proto3" json:"ca_cert_pem,omitempty"`
 	SealedKeyPem  string                 `protobuf:"bytes,2,opt,name=sealed_key_pem,json=sealedKeyPem,proto3" json:"sealed_key_pem,omitempty"`
 	Report        *ToolReport            `protobuf:"bytes,3,opt,name=report,proto3" json:"report,omitempty"`
+	Certificates  []*PkiCertificate      `protobuf:"bytes,4,rep,name=certificates,proto3" json:"certificates,omitempty"`
+	LabWarning    bool                   `protobuf:"varint,5,opt,name=lab_warning,json=labWarning,proto3" json:"lab_warning,omitempty"` // el texto del informe abre con el aviso de CA de laboratorio
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PkiCaInitResponse) Reset() {
 	*x = PkiCaInitResponse{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[11]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -866,7 +1714,7 @@ func (x *PkiCaInitResponse) String() string {
 func (*PkiCaInitResponse) ProtoMessage() {}
 
 func (x *PkiCaInitResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[11]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -879,7 +1727,7 @@ func (x *PkiCaInitResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiCaInitResponse.ProtoReflect.Descriptor instead.
 func (*PkiCaInitResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{11}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *PkiCaInitResponse) GetCaCertPem() string {
@@ -903,6 +1751,20 @@ func (x *PkiCaInitResponse) GetReport() *ToolReport {
 	return nil
 }
 
+func (x *PkiCaInitResponse) GetCertificates() []*PkiCertificate {
+	if x != nil {
+		return x.Certificates
+	}
+	return nil
+}
+
+func (x *PkiCaInitResponse) GetLabWarning() bool {
+	if x != nil {
+		return x.LabWarning
+	}
+	return false
+}
+
 type PkiCaSignRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	CaCertPem      string                 `protobuf:"bytes,1,opt,name=ca_cert_pem,json=caCertPem,proto3" json:"ca_cert_pem,omitempty"`
@@ -917,7 +1779,7 @@ type PkiCaSignRequest struct {
 
 func (x *PkiCaSignRequest) Reset() {
 	*x = PkiCaSignRequest{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[12]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -929,7 +1791,7 @@ func (x *PkiCaSignRequest) String() string {
 func (*PkiCaSignRequest) ProtoMessage() {}
 
 func (x *PkiCaSignRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[12]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -942,7 +1804,7 @@ func (x *PkiCaSignRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiCaSignRequest.ProtoReflect.Descriptor instead.
 func (*PkiCaSignRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{12}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *PkiCaSignRequest) GetCaCertPem() string {
@@ -991,13 +1853,15 @@ type PkiCaSignResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CertPem       string                 `protobuf:"bytes,1,opt,name=cert_pem,json=certPem,proto3" json:"cert_pem,omitempty"`
 	Report        *ToolReport            `protobuf:"bytes,2,opt,name=report,proto3" json:"report,omitempty"`
+	Certificates  []*PkiCertificate      `protobuf:"bytes,3,rep,name=certificates,proto3" json:"certificates,omitempty"`
+	LabWarning    bool                   `protobuf:"varint,4,opt,name=lab_warning,json=labWarning,proto3" json:"lab_warning,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PkiCaSignResponse) Reset() {
 	*x = PkiCaSignResponse{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[13]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1009,7 +1873,7 @@ func (x *PkiCaSignResponse) String() string {
 func (*PkiCaSignResponse) ProtoMessage() {}
 
 func (x *PkiCaSignResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[13]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1022,7 +1886,7 @@ func (x *PkiCaSignResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiCaSignResponse.ProtoReflect.Descriptor instead.
 func (*PkiCaSignResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{13}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *PkiCaSignResponse) GetCertPem() string {
@@ -1037,6 +1901,20 @@ func (x *PkiCaSignResponse) GetReport() *ToolReport {
 		return x.Report
 	}
 	return nil
+}
+
+func (x *PkiCaSignResponse) GetCertificates() []*PkiCertificate {
+	if x != nil {
+		return x.Certificates
+	}
+	return nil
+}
+
+func (x *PkiCaSignResponse) GetLabWarning() bool {
+	if x != nil {
+		return x.LabWarning
+	}
+	return false
 }
 
 type PkiExportRequest struct {
@@ -1054,7 +1932,7 @@ type PkiExportRequest struct {
 
 func (x *PkiExportRequest) Reset() {
 	*x = PkiExportRequest{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[14]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1066,7 +1944,7 @@ func (x *PkiExportRequest) String() string {
 func (*PkiExportRequest) ProtoMessage() {}
 
 func (x *PkiExportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[14]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1079,7 +1957,7 @@ func (x *PkiExportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiExportRequest.ProtoReflect.Descriptor instead.
 func (*PkiExportRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{14}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *PkiExportRequest) GetFormat() string {
@@ -1140,7 +2018,7 @@ type PkiExportResponse struct {
 
 func (x *PkiExportResponse) Reset() {
 	*x = PkiExportResponse{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1152,7 +2030,7 @@ func (x *PkiExportResponse) String() string {
 func (*PkiExportResponse) ProtoMessage() {}
 
 func (x *PkiExportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1165,7 +2043,7 @@ func (x *PkiExportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiExportResponse.ProtoReflect.Descriptor instead.
 func (*PkiExportResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{15}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *PkiExportResponse) GetData() []byte {
@@ -1184,7 +2062,7 @@ type PkiDecodeRequest struct {
 
 func (x *PkiDecodeRequest) Reset() {
 	*x = PkiDecodeRequest{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1196,7 +2074,7 @@ func (x *PkiDecodeRequest) String() string {
 func (*PkiDecodeRequest) ProtoMessage() {}
 
 func (x *PkiDecodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1209,7 +2087,7 @@ func (x *PkiDecodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiDecodeRequest.ProtoReflect.Descriptor instead.
 func (*PkiDecodeRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{16}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *PkiDecodeRequest) GetData() []byte {
@@ -1222,13 +2100,14 @@ func (x *PkiDecodeRequest) GetData() []byte {
 type PkiDecodeResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Report        *ToolReport            `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	Certificates  []*PkiCertificate      `protobuf:"bytes,2,rep,name=certificates,proto3" json:"certificates,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PkiDecodeResponse) Reset() {
 	*x = PkiDecodeResponse{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1240,7 +2119,7 @@ func (x *PkiDecodeResponse) String() string {
 func (*PkiDecodeResponse) ProtoMessage() {}
 
 func (x *PkiDecodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1253,12 +2132,19 @@ func (x *PkiDecodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PkiDecodeResponse.ProtoReflect.Descriptor instead.
 func (*PkiDecodeResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{17}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *PkiDecodeResponse) GetReport() *ToolReport {
 	if x != nil {
 		return x.Report
+	}
+	return nil
+}
+
+func (x *PkiDecodeResponse) GetCertificates() []*PkiCertificate {
+	if x != nil {
+		return x.Certificates
 	}
 	return nil
 }
@@ -1272,7 +2158,7 @@ type IkeDecodeRequest struct {
 
 func (x *IkeDecodeRequest) Reset() {
 	*x = IkeDecodeRequest{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1284,7 +2170,7 @@ func (x *IkeDecodeRequest) String() string {
 func (*IkeDecodeRequest) ProtoMessage() {}
 
 func (x *IkeDecodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1297,7 +2183,7 @@ func (x *IkeDecodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IkeDecodeRequest.ProtoReflect.Descriptor instead.
 func (*IkeDecodeRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{18}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *IkeDecodeRequest) GetText() string {
@@ -1316,7 +2202,7 @@ type IkeDecodeResponse struct {
 
 func (x *IkeDecodeResponse) Reset() {
 	*x = IkeDecodeResponse{}
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1328,7 +2214,7 @@ func (x *IkeDecodeResponse) String() string {
 func (*IkeDecodeResponse) ProtoMessage() {}
 
 func (x *IkeDecodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_security_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_security_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1341,7 +2227,7 @@ func (x *IkeDecodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IkeDecodeResponse.ProtoReflect.Descriptor instead.
 func (*IkeDecodeResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{19}
+	return file_macuahuitl_v1_security_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *IkeDecodeResponse) GetReport() *ToolReport {
@@ -1380,9 +2266,40 @@ const file_macuahuitl_v1_security_proto_rawDesc = "" +
 	"accounting\x12\x1d\n" +
 	"\n" +
 	"timeout_ms\x18\x10 \x01(\x05R\ttimeoutMs\x12\x18\n" +
-	"\aretries\x18\x11 \x01(\x05R\aretries\"G\n" +
+	"\aretries\x18\x11 \x01(\x05R\aretries\"\x9e\x01\n" +
+	"\aSecText\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x124\n" +
+	"\x04args\x18\x02 \x03(\v2 .macuahuitl.v1.SecText.ArgsEntryR\x04args\x12\x12\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc8\x01\n" +
+	"\n" +
+	"SecFinding\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x1a\n" +
+	"\bseverity\x18\x02 \x01(\tR\bseverity\x127\n" +
+	"\x04args\x18\x03 \x03(\v2#.macuahuitl.v1.SecFinding.ArgsEntryR\x04args\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\";\n" +
+	"\x0fRadiusAttribute\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\x84\x02\n" +
+	"\x0eRadiusExchange\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x15\n" +
+	"\x06rtt_ms\x18\x03 \x01(\x01R\x05rttMs\x12\x1a\n" +
+	"\battempts\x18\x04 \x01(\x05R\battempts\x123\n" +
+	"\x15message_authenticator\x18\x05 \x01(\tR\x14messageAuthenticator\x12,\n" +
+	"\x05error\x18\x06 \x01(\v2\x16.macuahuitl.v1.SecTextR\x05error\x124\n" +
+	"\x05attrs\x18\a \x03(\v2\x1e.macuahuitl.v1.RadiusAttributeR\x05attrs\"\xeb\x01\n" +
 	"\x12RadiusTestResponse\x121\n" +
-	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\"\xe7\x02\n" +
+	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x12\x16\n" +
+	"\x06server\x18\x02 \x01(\tR\x06server\x12\x16\n" +
+	"\x06method\x18\x03 \x01(\tR\x06method\x12;\n" +
+	"\texchanges\x18\x04 \x03(\v2\x1d.macuahuitl.v1.RadiusExchangeR\texchanges\x125\n" +
+	"\bfindings\x18\x05 \x03(\v2\x19.macuahuitl.v1.SecFindingR\bfindings\"\xe7\x02\n" +
 	"\x11TacacsTestRequest\x12\x12\n" +
 	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12@\n" +
@@ -1398,9 +2315,65 @@ const file_macuahuitl_v1_security_proto_rawDesc = "" +
 	"\bpriv_lvl\x18\t \x01(\x05R\aprivLvl\x12\x1d\n" +
 	"\n" +
 	"timeout_ms\x18\n" +
-	" \x01(\x05R\ttimeoutMs\"G\n" +
+	" \x01(\x05R\ttimeoutMs\"B\n" +
+	"\fTacacsAvPair\x12\x1c\n" +
+	"\tdirection\x18\x01 \x01(\tR\tdirection\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xfd\x01\n" +
+	"\n" +
+	"TacacsStep\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12\x15\n" +
+	"\x06rtt_ms\x18\x03 \x01(\x01R\x05rttMs\x12,\n" +
+	"\x05error\x18\x04 \x01(\v2\x16.macuahuitl.v1.SecTextR\x05error\x12\x18\n" +
+	"\aprompts\x18\x05 \x03(\tR\aprompts\x12\x18\n" +
+	"\amessage\x18\x06 \x01(\tR\amessage\x12\x12\n" +
+	"\x04data\x18\a \x01(\tR\x04data\x126\n" +
+	"\bav_pairs\x18\b \x03(\v2\x1b.macuahuitl.v1.TacacsAvPairR\aavPairs\"\xc7\x01\n" +
 	"\x12TacacsTestResponse\x121\n" +
-	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\"P\n" +
+	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x12\x16\n" +
+	"\x06server\x18\x02 \x01(\tR\x06server\x12/\n" +
+	"\x05steps\x18\x03 \x03(\v2\x19.macuahuitl.v1.TacacsStepR\x05steps\x125\n" +
+	"\bfindings\x18\x04 \x03(\v2\x19.macuahuitl.v1.SecFindingR\bfindings\"r\n" +
+	"\x06PkiKey\x12\x1c\n" +
+	"\talgorithm\x18\x01 \x01(\tR\talgorithm\x12\x12\n" +
+	"\x04bits\x18\x02 \x01(\rR\x04bits\x12\x14\n" +
+	"\x05curve\x18\x03 \x01(\tR\x05curve\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\"Q\n" +
+	"\fPkiSignature\x12\x1c\n" +
+	"\talgorithm\x18\x01 \x01(\tR\talgorithm\x12\x19\n" +
+	"\x05valid\x18\x02 \x01(\bH\x00R\x05valid\x88\x01\x01B\b\n" +
+	"\x06_valid\"\xac\x01\n" +
+	"\n" +
+	"PkiWarning\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x127\n" +
+	"\x04args\x18\x02 \x03(\v2#.macuahuitl.v1.PkiWarning.ArgsEntryR\x04args\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xaa\x04\n" +
+	"\x0ePkiCertificate\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x18\n" +
+	"\asubject\x18\x02 \x01(\tR\asubject\x12\x16\n" +
+	"\x06issuer\x18\x03 \x01(\tR\x06issuer\x12\x16\n" +
+	"\x06serial\x18\x04 \x01(\tR\x06serial\x12\x1d\n" +
+	"\n" +
+	"not_before\x18\x05 \x01(\tR\tnotBefore\x12\x1b\n" +
+	"\tnot_after\x18\x06 \x01(\tR\bnotAfter\x12 \n" +
+	"\tdays_left\x18\a \x01(\x05H\x00R\bdaysLeft\x88\x01\x01\x12'\n" +
+	"\x03key\x18\b \x01(\v2\x15.macuahuitl.v1.PkiKeyR\x03key\x129\n" +
+	"\tsignature\x18\t \x01(\v2\x1b.macuahuitl.v1.PkiSignatureR\tsignature\x12\x10\n" +
+	"\x03san\x18\n" +
+	" \x03(\tR\x03san\x12\x1b\n" +
+	"\tkey_usage\x18\v \x03(\tR\bkeyUsage\x12\"\n" +
+	"\rext_key_usage\x18\f \x03(\tR\vextKeyUsage\x12\x13\n" +
+	"\x05is_ca\x18\r \x01(\bR\x04isCa\x12\x1f\n" +
+	"\vself_signed\x18\x0e \x01(\bR\n" +
+	"selfSigned\x12\x12\n" +
+	"\x04sha1\x18\x0f \x01(\tR\x04sha1\x12\x16\n" +
+	"\x06sha256\x18\x10 \x01(\tR\x06sha256\x125\n" +
+	"\bwarnings\x18\x11 \x03(\v2\x19.macuahuitl.v1.PkiWarningR\bwarningsB\f\n" +
+	"\n" +
+	"_days_left\"P\n" +
 	"\rPkiKeyRequest\x12\x1c\n" +
 	"\talgorithm\x18\x01 \x01(\tR\talgorithm\x12!\n" +
 	"\fkey_password\x18\x02 \x01(\fR\vkeyPassword\"6\n" +
@@ -1420,30 +2393,37 @@ const file_macuahuitl_v1_security_proto_rawDesc = "" +
 	"\fkey_password\x18\x03 \x01(\fR\vkeyPassword\x123\n" +
 	"\asubject\x18\x04 \x01(\v2\x19.macuahuitl.v1.PkiSubjectR\asubject\x12\x10\n" +
 	"\x03dns\x18\x05 \x03(\tR\x03dns\x12\x10\n" +
-	"\x03ips\x18\x06 \x03(\tR\x03ips\"\x82\x01\n" +
+	"\x03ips\x18\x06 \x03(\tR\x03ips\"\xc5\x01\n" +
 	"\x0ePkiCsrResponse\x12\x17\n" +
 	"\acsr_pem\x18\x01 \x01(\tR\x06csrPem\x12$\n" +
 	"\x0esealed_key_pem\x18\x02 \x01(\tR\fsealedKeyPem\x121\n" +
-	"\x06report\x18\x03 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\"{\n" +
+	"\x06report\x18\x03 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x12A\n" +
+	"\fcertificates\x18\x04 \x03(\v2\x1d.macuahuitl.v1.PkiCertificateR\fcertificates\"{\n" +
 	"\x10PkiCaInitRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04days\x18\x02 \x01(\x05R\x04days\x12\x1c\n" +
 	"\talgorithm\x18\x03 \x01(\tR\talgorithm\x12!\n" +
-	"\fkey_password\x18\x04 \x01(\fR\vkeyPassword\"\x8c\x01\n" +
+	"\fkey_password\x18\x04 \x01(\fR\vkeyPassword\"\xf0\x01\n" +
 	"\x11PkiCaInitResponse\x12\x1e\n" +
 	"\vca_cert_pem\x18\x01 \x01(\tR\tcaCertPem\x12$\n" +
 	"\x0esealed_key_pem\x18\x02 \x01(\tR\fsealedKeyPem\x121\n" +
-	"\x06report\x18\x03 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\"\xcc\x01\n" +
+	"\x06report\x18\x03 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x12A\n" +
+	"\fcertificates\x18\x04 \x03(\v2\x1d.macuahuitl.v1.PkiCertificateR\fcertificates\x12\x1f\n" +
+	"\vlab_warning\x18\x05 \x01(\bR\n" +
+	"labWarning\"\xcc\x01\n" +
 	"\x10PkiCaSignRequest\x12\x1e\n" +
 	"\vca_cert_pem\x18\x01 \x01(\tR\tcaCertPem\x12)\n" +
 	"\x11ca_sealed_key_pem\x18\x02 \x01(\tR\x0ecaSealedKeyPem\x12&\n" +
 	"\x0fca_key_password\x18\x03 \x01(\fR\rcaKeyPassword\x12\x17\n" +
 	"\acsr_pem\x18\x04 \x01(\tR\x06csrPem\x12\x18\n" +
 	"\aprofile\x18\x05 \x01(\tR\aprofile\x12\x12\n" +
-	"\x04days\x18\x06 \x01(\x05R\x04days\"a\n" +
+	"\x04days\x18\x06 \x01(\x05R\x04days\"\xc5\x01\n" +
 	"\x11PkiCaSignResponse\x12\x19\n" +
 	"\bcert_pem\x18\x01 \x01(\tR\acertPem\x121\n" +
-	"\x06report\x18\x02 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\"\x80\x02\n" +
+	"\x06report\x18\x02 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x12A\n" +
+	"\fcertificates\x18\x03 \x03(\v2\x1d.macuahuitl.v1.PkiCertificateR\fcertificates\x12\x1f\n" +
+	"\vlab_warning\x18\x04 \x01(\bR\n" +
+	"labWarning\"\x80\x02\n" +
 	"\x10PkiExportRequest\x12\x16\n" +
 	"\x06format\x18\x01 \x01(\tR\x06format\x12\x19\n" +
 	"\bcert_pem\x18\x02 \x01(\tR\acertPem\x12\x1b\n" +
@@ -1455,9 +2435,10 @@ const file_macuahuitl_v1_security_proto_rawDesc = "" +
 	"\x11PkiExportResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\"&\n" +
 	"\x10PkiDecodeRequest\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04data\"F\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\"\x89\x01\n" +
 	"\x11PkiDecodeResponse\x121\n" +
-	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\"&\n" +
+	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x12A\n" +
+	"\fcertificates\x18\x02 \x03(\v2\x1d.macuahuitl.v1.PkiCertificateR\fcertificates\"&\n" +
 	"\x10IkeDecodeRequest\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"F\n" +
 	"\x11IkeDecodeResponse\x121\n" +
@@ -1487,66 +2468,97 @@ func file_macuahuitl_v1_security_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_security_proto_rawDescData
 }
 
-var file_macuahuitl_v1_security_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_macuahuitl_v1_security_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_macuahuitl_v1_security_proto_goTypes = []any{
 	(*SecretSource)(nil),       // 0: macuahuitl.v1.SecretSource
 	(*RadiusTestRequest)(nil),  // 1: macuahuitl.v1.RadiusTestRequest
-	(*RadiusTestResponse)(nil), // 2: macuahuitl.v1.RadiusTestResponse
-	(*TacacsTestRequest)(nil),  // 3: macuahuitl.v1.TacacsTestRequest
-	(*TacacsTestResponse)(nil), // 4: macuahuitl.v1.TacacsTestResponse
-	(*PkiKeyRequest)(nil),      // 5: macuahuitl.v1.PkiKeyRequest
-	(*PkiKeyResponse)(nil),     // 6: macuahuitl.v1.PkiKeyResponse
-	(*PkiSubject)(nil),         // 7: macuahuitl.v1.PkiSubject
-	(*PkiCsrRequest)(nil),      // 8: macuahuitl.v1.PkiCsrRequest
-	(*PkiCsrResponse)(nil),     // 9: macuahuitl.v1.PkiCsrResponse
-	(*PkiCaInitRequest)(nil),   // 10: macuahuitl.v1.PkiCaInitRequest
-	(*PkiCaInitResponse)(nil),  // 11: macuahuitl.v1.PkiCaInitResponse
-	(*PkiCaSignRequest)(nil),   // 12: macuahuitl.v1.PkiCaSignRequest
-	(*PkiCaSignResponse)(nil),  // 13: macuahuitl.v1.PkiCaSignResponse
-	(*PkiExportRequest)(nil),   // 14: macuahuitl.v1.PkiExportRequest
-	(*PkiExportResponse)(nil),  // 15: macuahuitl.v1.PkiExportResponse
-	(*PkiDecodeRequest)(nil),   // 16: macuahuitl.v1.PkiDecodeRequest
-	(*PkiDecodeResponse)(nil),  // 17: macuahuitl.v1.PkiDecodeResponse
-	(*IkeDecodeRequest)(nil),   // 18: macuahuitl.v1.IkeDecodeRequest
-	(*IkeDecodeResponse)(nil),  // 19: macuahuitl.v1.IkeDecodeResponse
-	(*ToolReport)(nil),         // 20: macuahuitl.v1.ToolReport
+	(*SecText)(nil),            // 2: macuahuitl.v1.SecText
+	(*SecFinding)(nil),         // 3: macuahuitl.v1.SecFinding
+	(*RadiusAttribute)(nil),    // 4: macuahuitl.v1.RadiusAttribute
+	(*RadiusExchange)(nil),     // 5: macuahuitl.v1.RadiusExchange
+	(*RadiusTestResponse)(nil), // 6: macuahuitl.v1.RadiusTestResponse
+	(*TacacsTestRequest)(nil),  // 7: macuahuitl.v1.TacacsTestRequest
+	(*TacacsAvPair)(nil),       // 8: macuahuitl.v1.TacacsAvPair
+	(*TacacsStep)(nil),         // 9: macuahuitl.v1.TacacsStep
+	(*TacacsTestResponse)(nil), // 10: macuahuitl.v1.TacacsTestResponse
+	(*PkiKey)(nil),             // 11: macuahuitl.v1.PkiKey
+	(*PkiSignature)(nil),       // 12: macuahuitl.v1.PkiSignature
+	(*PkiWarning)(nil),         // 13: macuahuitl.v1.PkiWarning
+	(*PkiCertificate)(nil),     // 14: macuahuitl.v1.PkiCertificate
+	(*PkiKeyRequest)(nil),      // 15: macuahuitl.v1.PkiKeyRequest
+	(*PkiKeyResponse)(nil),     // 16: macuahuitl.v1.PkiKeyResponse
+	(*PkiSubject)(nil),         // 17: macuahuitl.v1.PkiSubject
+	(*PkiCsrRequest)(nil),      // 18: macuahuitl.v1.PkiCsrRequest
+	(*PkiCsrResponse)(nil),     // 19: macuahuitl.v1.PkiCsrResponse
+	(*PkiCaInitRequest)(nil),   // 20: macuahuitl.v1.PkiCaInitRequest
+	(*PkiCaInitResponse)(nil),  // 21: macuahuitl.v1.PkiCaInitResponse
+	(*PkiCaSignRequest)(nil),   // 22: macuahuitl.v1.PkiCaSignRequest
+	(*PkiCaSignResponse)(nil),  // 23: macuahuitl.v1.PkiCaSignResponse
+	(*PkiExportRequest)(nil),   // 24: macuahuitl.v1.PkiExportRequest
+	(*PkiExportResponse)(nil),  // 25: macuahuitl.v1.PkiExportResponse
+	(*PkiDecodeRequest)(nil),   // 26: macuahuitl.v1.PkiDecodeRequest
+	(*PkiDecodeResponse)(nil),  // 27: macuahuitl.v1.PkiDecodeResponse
+	(*IkeDecodeRequest)(nil),   // 28: macuahuitl.v1.IkeDecodeRequest
+	(*IkeDecodeResponse)(nil),  // 29: macuahuitl.v1.IkeDecodeResponse
+	nil,                        // 30: macuahuitl.v1.SecText.ArgsEntry
+	nil,                        // 31: macuahuitl.v1.SecFinding.ArgsEntry
+	nil,                        // 32: macuahuitl.v1.PkiWarning.ArgsEntry
+	(*ToolReport)(nil),         // 33: macuahuitl.v1.ToolReport
 }
 var file_macuahuitl_v1_security_proto_depIdxs = []int32{
 	0,  // 0: macuahuitl.v1.RadiusTestRequest.shared_secret:type_name -> macuahuitl.v1.SecretSource
 	0,  // 1: macuahuitl.v1.RadiusTestRequest.password:type_name -> macuahuitl.v1.SecretSource
-	20, // 2: macuahuitl.v1.RadiusTestResponse.report:type_name -> macuahuitl.v1.ToolReport
-	0,  // 3: macuahuitl.v1.TacacsTestRequest.shared_secret:type_name -> macuahuitl.v1.SecretSource
-	0,  // 4: macuahuitl.v1.TacacsTestRequest.password:type_name -> macuahuitl.v1.SecretSource
-	20, // 5: macuahuitl.v1.TacacsTestResponse.report:type_name -> macuahuitl.v1.ToolReport
-	7,  // 6: macuahuitl.v1.PkiCsrRequest.subject:type_name -> macuahuitl.v1.PkiSubject
-	20, // 7: macuahuitl.v1.PkiCsrResponse.report:type_name -> macuahuitl.v1.ToolReport
-	20, // 8: macuahuitl.v1.PkiCaInitResponse.report:type_name -> macuahuitl.v1.ToolReport
-	20, // 9: macuahuitl.v1.PkiCaSignResponse.report:type_name -> macuahuitl.v1.ToolReport
-	20, // 10: macuahuitl.v1.PkiDecodeResponse.report:type_name -> macuahuitl.v1.ToolReport
-	20, // 11: macuahuitl.v1.IkeDecodeResponse.report:type_name -> macuahuitl.v1.ToolReport
-	1,  // 12: macuahuitl.v1.SecurityService.RadiusTest:input_type -> macuahuitl.v1.RadiusTestRequest
-	3,  // 13: macuahuitl.v1.SecurityService.TacacsTest:input_type -> macuahuitl.v1.TacacsTestRequest
-	5,  // 14: macuahuitl.v1.SecurityService.PkiKey:input_type -> macuahuitl.v1.PkiKeyRequest
-	8,  // 15: macuahuitl.v1.SecurityService.PkiCsr:input_type -> macuahuitl.v1.PkiCsrRequest
-	10, // 16: macuahuitl.v1.SecurityService.PkiCaInit:input_type -> macuahuitl.v1.PkiCaInitRequest
-	12, // 17: macuahuitl.v1.SecurityService.PkiCaSign:input_type -> macuahuitl.v1.PkiCaSignRequest
-	14, // 18: macuahuitl.v1.SecurityService.PkiExport:input_type -> macuahuitl.v1.PkiExportRequest
-	16, // 19: macuahuitl.v1.SecurityService.PkiDecode:input_type -> macuahuitl.v1.PkiDecodeRequest
-	18, // 20: macuahuitl.v1.SecurityService.IkeDecode:input_type -> macuahuitl.v1.IkeDecodeRequest
-	2,  // 21: macuahuitl.v1.SecurityService.RadiusTest:output_type -> macuahuitl.v1.RadiusTestResponse
-	4,  // 22: macuahuitl.v1.SecurityService.TacacsTest:output_type -> macuahuitl.v1.TacacsTestResponse
-	6,  // 23: macuahuitl.v1.SecurityService.PkiKey:output_type -> macuahuitl.v1.PkiKeyResponse
-	9,  // 24: macuahuitl.v1.SecurityService.PkiCsr:output_type -> macuahuitl.v1.PkiCsrResponse
-	11, // 25: macuahuitl.v1.SecurityService.PkiCaInit:output_type -> macuahuitl.v1.PkiCaInitResponse
-	13, // 26: macuahuitl.v1.SecurityService.PkiCaSign:output_type -> macuahuitl.v1.PkiCaSignResponse
-	15, // 27: macuahuitl.v1.SecurityService.PkiExport:output_type -> macuahuitl.v1.PkiExportResponse
-	17, // 28: macuahuitl.v1.SecurityService.PkiDecode:output_type -> macuahuitl.v1.PkiDecodeResponse
-	19, // 29: macuahuitl.v1.SecurityService.IkeDecode:output_type -> macuahuitl.v1.IkeDecodeResponse
-	21, // [21:30] is the sub-list for method output_type
-	12, // [12:21] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	30, // 2: macuahuitl.v1.SecText.args:type_name -> macuahuitl.v1.SecText.ArgsEntry
+	31, // 3: macuahuitl.v1.SecFinding.args:type_name -> macuahuitl.v1.SecFinding.ArgsEntry
+	2,  // 4: macuahuitl.v1.RadiusExchange.error:type_name -> macuahuitl.v1.SecText
+	4,  // 5: macuahuitl.v1.RadiusExchange.attrs:type_name -> macuahuitl.v1.RadiusAttribute
+	33, // 6: macuahuitl.v1.RadiusTestResponse.report:type_name -> macuahuitl.v1.ToolReport
+	5,  // 7: macuahuitl.v1.RadiusTestResponse.exchanges:type_name -> macuahuitl.v1.RadiusExchange
+	3,  // 8: macuahuitl.v1.RadiusTestResponse.findings:type_name -> macuahuitl.v1.SecFinding
+	0,  // 9: macuahuitl.v1.TacacsTestRequest.shared_secret:type_name -> macuahuitl.v1.SecretSource
+	0,  // 10: macuahuitl.v1.TacacsTestRequest.password:type_name -> macuahuitl.v1.SecretSource
+	2,  // 11: macuahuitl.v1.TacacsStep.error:type_name -> macuahuitl.v1.SecText
+	8,  // 12: macuahuitl.v1.TacacsStep.av_pairs:type_name -> macuahuitl.v1.TacacsAvPair
+	33, // 13: macuahuitl.v1.TacacsTestResponse.report:type_name -> macuahuitl.v1.ToolReport
+	9,  // 14: macuahuitl.v1.TacacsTestResponse.steps:type_name -> macuahuitl.v1.TacacsStep
+	3,  // 15: macuahuitl.v1.TacacsTestResponse.findings:type_name -> macuahuitl.v1.SecFinding
+	32, // 16: macuahuitl.v1.PkiWarning.args:type_name -> macuahuitl.v1.PkiWarning.ArgsEntry
+	11, // 17: macuahuitl.v1.PkiCertificate.key:type_name -> macuahuitl.v1.PkiKey
+	12, // 18: macuahuitl.v1.PkiCertificate.signature:type_name -> macuahuitl.v1.PkiSignature
+	13, // 19: macuahuitl.v1.PkiCertificate.warnings:type_name -> macuahuitl.v1.PkiWarning
+	17, // 20: macuahuitl.v1.PkiCsrRequest.subject:type_name -> macuahuitl.v1.PkiSubject
+	33, // 21: macuahuitl.v1.PkiCsrResponse.report:type_name -> macuahuitl.v1.ToolReport
+	14, // 22: macuahuitl.v1.PkiCsrResponse.certificates:type_name -> macuahuitl.v1.PkiCertificate
+	33, // 23: macuahuitl.v1.PkiCaInitResponse.report:type_name -> macuahuitl.v1.ToolReport
+	14, // 24: macuahuitl.v1.PkiCaInitResponse.certificates:type_name -> macuahuitl.v1.PkiCertificate
+	33, // 25: macuahuitl.v1.PkiCaSignResponse.report:type_name -> macuahuitl.v1.ToolReport
+	14, // 26: macuahuitl.v1.PkiCaSignResponse.certificates:type_name -> macuahuitl.v1.PkiCertificate
+	33, // 27: macuahuitl.v1.PkiDecodeResponse.report:type_name -> macuahuitl.v1.ToolReport
+	14, // 28: macuahuitl.v1.PkiDecodeResponse.certificates:type_name -> macuahuitl.v1.PkiCertificate
+	33, // 29: macuahuitl.v1.IkeDecodeResponse.report:type_name -> macuahuitl.v1.ToolReport
+	1,  // 30: macuahuitl.v1.SecurityService.RadiusTest:input_type -> macuahuitl.v1.RadiusTestRequest
+	7,  // 31: macuahuitl.v1.SecurityService.TacacsTest:input_type -> macuahuitl.v1.TacacsTestRequest
+	15, // 32: macuahuitl.v1.SecurityService.PkiKey:input_type -> macuahuitl.v1.PkiKeyRequest
+	18, // 33: macuahuitl.v1.SecurityService.PkiCsr:input_type -> macuahuitl.v1.PkiCsrRequest
+	20, // 34: macuahuitl.v1.SecurityService.PkiCaInit:input_type -> macuahuitl.v1.PkiCaInitRequest
+	22, // 35: macuahuitl.v1.SecurityService.PkiCaSign:input_type -> macuahuitl.v1.PkiCaSignRequest
+	24, // 36: macuahuitl.v1.SecurityService.PkiExport:input_type -> macuahuitl.v1.PkiExportRequest
+	26, // 37: macuahuitl.v1.SecurityService.PkiDecode:input_type -> macuahuitl.v1.PkiDecodeRequest
+	28, // 38: macuahuitl.v1.SecurityService.IkeDecode:input_type -> macuahuitl.v1.IkeDecodeRequest
+	6,  // 39: macuahuitl.v1.SecurityService.RadiusTest:output_type -> macuahuitl.v1.RadiusTestResponse
+	10, // 40: macuahuitl.v1.SecurityService.TacacsTest:output_type -> macuahuitl.v1.TacacsTestResponse
+	16, // 41: macuahuitl.v1.SecurityService.PkiKey:output_type -> macuahuitl.v1.PkiKeyResponse
+	19, // 42: macuahuitl.v1.SecurityService.PkiCsr:output_type -> macuahuitl.v1.PkiCsrResponse
+	21, // 43: macuahuitl.v1.SecurityService.PkiCaInit:output_type -> macuahuitl.v1.PkiCaInitResponse
+	23, // 44: macuahuitl.v1.SecurityService.PkiCaSign:output_type -> macuahuitl.v1.PkiCaSignResponse
+	25, // 45: macuahuitl.v1.SecurityService.PkiExport:output_type -> macuahuitl.v1.PkiExportResponse
+	27, // 46: macuahuitl.v1.SecurityService.PkiDecode:output_type -> macuahuitl.v1.PkiDecodeResponse
+	29, // 47: macuahuitl.v1.SecurityService.IkeDecode:output_type -> macuahuitl.v1.IkeDecodeResponse
+	39, // [39:48] is the sub-list for method output_type
+	30, // [30:39] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_security_proto_init() }
@@ -1555,13 +2567,15 @@ func file_macuahuitl_v1_security_proto_init() {
 		return
 	}
 	file_macuahuitl_v1_tools_proto_init()
+	file_macuahuitl_v1_security_proto_msgTypes[12].OneofWrappers = []any{}
+	file_macuahuitl_v1_security_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_security_proto_rawDesc), len(file_macuahuitl_v1_security_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

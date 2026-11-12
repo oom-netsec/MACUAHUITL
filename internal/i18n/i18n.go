@@ -246,3 +246,24 @@ func English(err error) string {
 	}
 	return strings.Replace(err.Error(), c.Error(), c.Localize(En), 1)
 }
+
+// Text es un texto de catálogo ya elegido: su código y los argumentos. Los informes (RADIUS, TACACS+, PKI,
+// calculadoras) lo guardan junto al texto en español para poder darlo en el otro idioma o entregar la clave.
+type Text struct {
+	Key  string
+	Args Args
+}
+
+// Tx arma un Text desde pares nombre, valor (como A).
+func Tx(key string, kv ...any) Text { return Text{Key: key, Args: A(kv...)} }
+
+// Empty indica que no hay texto.
+func (t Text) Empty() bool { return t.Key == "" }
+
+// In es el texto en el idioma dado; vacío si no hay código.
+func (t Text) In(loc string) string {
+	if t.Key == "" {
+		return ""
+	}
+	return Msg(loc, t.Key, t.Args)
+}

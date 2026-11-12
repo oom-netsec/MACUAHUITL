@@ -18,6 +18,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type Dialer func(ctx context.Context, network, host string, port uint16) (net.Conn, error)
@@ -48,9 +50,47 @@ type Step struct {
 	AVPairs   []string `json:",omitempty"` // AV pairs devueltos
 	RTTMillis float64
 	Error     string `json:",omitempty"`
+	// ErrText es Error como texto de catálogo (para darlo en otro idioma); no viaja en el JSON.
+	ErrText i18n.Text `json:"-"`
 }
 
-type Finding struct{ Severity, Code, Detail string }
+// problem es un error de un paso con su texto de catálogo; Error() es el texto en español.
+type problem struct{ t i18n.Text }
+
+func (p problem) Error() string { return p.t.In(i18n.Es) }
+
+func prob(key string, kv ...any) error { return problem{i18n.Tx(key, kv...)} }
+
+// fail registra el error del paso: uno propio (problem) conserva su código; cualquier otro es un texto del sistema.
+func (s *Step) fail(err error) {
+	var p problem
+	if !errors.As(err, &p) {
+		p = problem{i18n.Tx("security.tacacs.err.system", "error", err.Error())}
+	}
+	s.ErrText, s.Error = p.t, p.Error()
+}
+
+// Finding es un hallazgo. Severity es aviso, error o info en el JSON y el texto en español de siempre.
+type Finding struct {
+	Severity, Code, Detail string
+	Text                   i18n.Text `json:"-"` // Detail como texto de catálogo
+	Err                    i18n.Text `json:"-"` // el error del paso que Detail cita, si lo cita
+}
+
+// ArgsIn son los argumentos del hallazgo; el error citado va en el idioma pedido.
+func (f Finding) ArgsIn(loc string) i18n.Args {
+	a := i18n.Args{}
+	for k, v := range f.Text.Args {
+		a[k] = v
+	}
+	if !f.Err.Empty() {
+		a["error"] = f.Err.In(loc)
+	}
+	return a
+}
+
+// DetailIn es el detalle en el idioma pedido.
+func (f Finding) DetailIn(loc string) string { return i18n.Msg(loc, f.Text.Key, f.ArgsIn(loc)) }
 
 type Report struct {
 	Server   string
@@ -173,15 +213,15 @@ func (s *session) roundTrip(body []byte) ([]byte, error) {
 	h, resp, err := readPacket(s.conn, s.c.Secret)
 	if err != nil {
 		if errors.Is(err, net.ErrClosed) || strings.Contains(err.Error(), "EOF") || strings.Contains(err.Error(), "reset") {
-			return nil, errors.New("el servidor cerró la conexión sin responder: este equipo no está dado de alta como cliente/dispositivo de red o el secreto compartido no coincide")
+			return nil, prob("security.tacacs.err.closed")
 		}
 		return nil, err
 	}
 	if h.Session != s.h.Session || h.Type != s.h.Type || h.Seq != s.h.Seq+1 {
-		return nil, fmt.Errorf("respuesta fuera de secuencia (sesión %08x tipo %d seq %d)", h.Session, h.Type, h.Seq)
+		return nil, prob("security.tacacs.err.out_of_sequence", "session", fmt.Sprintf("%08x", h.Session), "type", h.Type, "seq", h.Seq)
 	}
 	if h.Flags&flagUnencrypted != 0 {
-		return nil, errors.New("el servidor respondió sin cifrar (TAC_PLUS_UNENCRYPTED_FLAG): no tiene secreto configurado para este equipo")
+		return nil, prob("security.tacacs.err.unencrypted")
 	}
 	s.h.Seq++
 	return resp, nil
@@ -189,7 +229,7 @@ func (s *session) roundTrip(body []byte) ([]byte, error) {
 
 func (s *session) rtt() float64 { return float64(time.Since(s.start).Microseconds()) / 1000 }
 
-const badSecret = "no se pudo interpretar la respuesta descifrada: casi siempre es un secreto compartido distinto"
+const badSecretKey = "security.tacacs.err.bad_secret"
 
 func authenticate(ctx context.Context, d Dialer, c Config) Step {
 	st := Step{Kind: "authentication"}
@@ -199,7 +239,7 @@ func authenticate(ctx context.Context, d Dialer, c Config) Step {
 	}
 	s, err := open(ctx, d, c, typeAuthen, minor)
 	if err != nil {
-		st.Error = err.Error()
+		st.fail(err)
 		return st
 	}
 	defer s.conn.Close()
@@ -209,12 +249,12 @@ func authenticate(ctx context.Context, d Dialer, c Config) Step {
 	for range 5 { // GETUSER/GETPASS/GETDATA acotados
 		raw, err := s.roundTrip(body)
 		if err != nil {
-			st.Error = err.Error()
+			st.fail(err)
 			return st
 		}
 		rep, err := parseAuthenReply(raw)
 		if err != nil {
-			st.Error = badSecret
+			st.fail(prob(badSecretKey))
 			return st
 		}
 		st.RTTMillis += s.rtt()
@@ -233,7 +273,7 @@ func authenticate(ctx context.Context, d Dialer, c Config) Step {
 		body = binary.BigEndian.AppendUint16(nil, uint16(len(answer)))
 		body = append(append(binary.BigEndian.AppendUint16(body, 0), 0), answer...) // CONTINUE: user_msg, data vacío, flags
 	}
-	st.Error = "demasiadas preguntas del servidor"
+	st.fail(prob("security.tacacs.err.too_many_prompts"))
 	return st
 }
 
@@ -241,7 +281,7 @@ func authorize(ctx context.Context, d Dialer, c Config) Step {
 	st := Step{Kind: "authorization", Sent: commandArgs(c.Command)}
 	s, err := open(ctx, d, c, typeAuthor, 0)
 	if err != nil {
-		st.Error = err.Error()
+		st.fail(err)
 		return st
 	}
 	defer s.conn.Close()
@@ -251,12 +291,12 @@ func authorize(ctx context.Context, d Dialer, c Config) Step {
 	}
 	raw, err := s.roundTrip(requestBody([]byte{methodTACACS, byte(c.PrivLvl), typ, serviceLogin}, c.Username, c.NASPort, c.RemAddr, st.Sent))
 	if err != nil {
-		st.Error = err.Error()
+		st.fail(err)
 		return st
 	}
 	rep, err := parseAuthorResponse(raw)
 	if err != nil {
-		st.Error = badSecret
+		st.fail(prob(badSecretKey))
 		return st
 	}
 	st.RTTMillis = s.rtt()
@@ -280,18 +320,18 @@ func account(ctx context.Context, d Dialer, c Config, flag byte) Step {
 	}
 	s, err := open(ctx, d, c, typeAcct, 0)
 	if err != nil {
-		st.Error = err.Error()
+		st.fail(err)
 		return st
 	}
 	defer s.conn.Close()
 	raw, err := s.roundTrip(requestBody([]byte{flag, methodTACACS, byte(c.PrivLvl), authenASCII, serviceLogin}, c.Username, c.NASPort, c.RemAddr, st.Sent))
 	if err != nil {
-		st.Error = err.Error()
+		st.fail(err)
 		return st
 	}
 	rep, err := parseAcctReply(raw)
 	if err != nil {
-		st.Error = badSecret
+		st.fail(prob(badSecretKey))
 		return st
 	}
 	st.RTTMillis = s.rtt()
@@ -309,56 +349,81 @@ func printable(s string) string {
 }
 
 func (r *Report) findings() {
-	add := func(sev, code, d string) { r.Findings = append(r.Findings, Finding{sev, code, d}) }
+	add := func(sev, code string, t, errT i18n.Text) {
+		f := Finding{Severity: sev, Code: code, Text: t, Err: errT}
+		f.Detail = f.DetailIn(i18n.Es)
+		r.Findings = append(r.Findings, f)
+	}
 	for _, s := range r.Steps {
 		switch {
-		case s.Error == badSecret:
-			add("error", "secreto", s.Kind+": la respuesta no se descifra. Revisa que el secreto del equipo en el servidor (ISE: Network Devices > TACACS Authentication Settings) sea el mismo.")
+		case s.ErrText.Key == badSecretKey:
+			add("error", "secreto", i18n.Tx("security.tacacs.finding.secret", "kind", s.Kind), i18n.Text{})
 		case s.Error != "":
-			add("error", "sin-respuesta", s.Kind+": "+s.Error+". Revisa conectividad a TCP "+strings.TrimPrefix(r.Server[strings.LastIndex(r.Server, ":"):], ":")+" y que el equipo esté dado de alta.")
+			add("error", "sin-respuesta", i18n.Tx("security.tacacs.finding.no_response", "kind", s.Kind, "port", strings.TrimPrefix(r.Server[strings.LastIndex(r.Server, ":"):], ":")), s.ErrText)
 		case s.Status == "FAIL" && s.Kind == "authentication":
-			add("info", "authen-fail", "Autenticación rechazada: usuario o contraseña incorrectos, cuenta deshabilitada o la política (Device Admin) no permite este equipo.")
+			add("info", "authen-fail", i18n.Tx("security.tacacs.finding.authen_fail"), i18n.Text{})
 		case s.Status == "FAIL" && s.Kind == "authorization":
-			add("info", "author-fail", "El comando no está autorizado: revisa el Command Set / perfil de shell de la política de Device Admin.")
+			add("info", "author-fail", i18n.Tx("security.tacacs.finding.author_fail"), i18n.Text{})
 		case s.Status == "ERROR" || s.Status == "FOLLOW":
-			add("aviso", "estado", s.Kind+": estado "+s.Status+" "+s.ServerMsg)
+			add("aviso", "estado", i18n.Tx("security.tacacs.finding.state", "kind", s.Kind, "status", s.Status, "message", s.ServerMsg), i18n.Text{})
 		}
 	}
 }
 
-func (r Report) Text() string {
+// SeverityCode es la severidad como código cerrado en inglés: warning, error o info.
+func SeverityCode(sev string) string {
+	if sev == "aviso" {
+		return "warning"
+	}
+	return sev
+}
+
+// Text es el resumen legible en español.
+func (r Report) Text() string { return r.TextIn(i18n.Es) }
+
+// TextIn es el resumen legible en el idioma pedido. Los valores (servidor, estados, mensajes del servidor, AV
+// pairs) salen tal cual; con es es el texto de siempre.
+func (r Report) TextIn(loc string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Servidor TACACS+ %s\n", r.Server)
+	b.WriteString(i18n.Msg(loc, "security.tacacs.text.server", i18n.A("server", r.Server)) + "\n")
 	for _, s := range r.Steps {
 		fmt.Fprintf(&b, "\n%s: ", s.Kind)
 		if s.Status != "" {
-			fmt.Fprintf(&b, "%s en %.1f ms\n", s.Status, s.RTTMillis)
+			b.WriteString(i18n.Msg(loc, "security.tacacs.text.status", i18n.A("status", s.Status, "rtt", fmt.Sprintf("%.1f", s.RTTMillis))) + "\n")
 		} else {
-			b.WriteString("sin respuesta\n")
+			b.WriteString(i18n.Msg(loc, "security.tacacs.text.no_response", nil) + "\n")
 		}
 		if s.Error != "" {
-			fmt.Fprintf(&b, "  ! %s\n", s.Error)
+			msg := s.Error
+			if !s.ErrText.Empty() {
+				msg = s.ErrText.In(loc)
+			}
+			fmt.Fprintf(&b, "  ! %s\n", msg)
 		}
 		for _, p := range s.Prompts {
-			fmt.Fprintf(&b, "  servidor pidió: %q\n", p)
+			b.WriteString("  " + i18n.Msg(loc, "security.tacacs.text.prompt", i18n.A("prompt", p)) + "\n")
 		}
 		if s.ServerMsg != "" {
-			fmt.Fprintf(&b, "  mensaje: %s\n", s.ServerMsg)
+			b.WriteString("  " + i18n.Msg(loc, "security.tacacs.text.message", i18n.A("message", s.ServerMsg)) + "\n")
 		}
 		if s.Data != "" {
-			fmt.Fprintf(&b, "  datos: %s\n", s.Data)
+			b.WriteString("  " + i18n.Msg(loc, "security.tacacs.text.data", i18n.A("data", s.Data)) + "\n")
 		}
 		for _, a := range s.Sent {
-			fmt.Fprintf(&b, "  enviado  %s\n", a)
+			b.WriteString("  " + i18n.Msg(loc, "security.tacacs.text.sent", i18n.A("pair", a)) + "\n")
 		}
 		for _, a := range s.AVPairs {
-			fmt.Fprintf(&b, "  recibido %s\n", a)
+			b.WriteString("  " + i18n.Msg(loc, "security.tacacs.text.received", i18n.A("pair", a)) + "\n")
 		}
 	}
 	if len(r.Findings) > 0 {
-		b.WriteString("\nHallazgos:\n")
+		b.WriteString("\n" + i18n.Msg(loc, "security.findings_head", nil) + "\n")
 		for _, f := range r.Findings {
-			fmt.Fprintf(&b, "  [%s] %s\n", f.Severity, f.Detail)
+			detail := f.Detail
+			if !f.Text.Empty() {
+				detail = f.DetailIn(loc)
+			}
+			fmt.Fprintf(&b, "  [%s] %s\n", i18n.Msg(loc, "security.severity."+SeverityCode(f.Severity), nil), detail)
 		}
 	}
 	return b.String()

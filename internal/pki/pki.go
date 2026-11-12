@@ -27,12 +27,12 @@ import (
 
 	"software.sslmate.com/src/go-pkcs12"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
 const (
 	SealedPEMType = "MACUAHUITL SEALED PRIVATE KEY"
-	LabWarning    = "CA SOLO DE LABORATORIO: no la instales como raíz de confianza fuera del laboratorio ni firmes con ella equipos de producción."
 	maxLeafDays   = 3650
 	maxCADays     = 7300
 )
@@ -307,6 +307,32 @@ type Summary struct {
 	SHA1           string   `json:",omitempty"`
 	SHA256         string   `json:",omitempty"`
 	Warnings       []string `json:",omitempty"`
+
+	// Lo que sigue no viaja en el JSON: es lo mismo de arriba en forma estructurada.
+	KeyAlg    string      `json:"-"` // RSA o ECDSA
+	KeyBits   int         `json:"-"` // bits del módulo RSA o de la curva
+	KeyCurve  string      `json:"-"` // nombre de la curva ECDSA
+	WarnItems []i18n.Text `json:"-"` // Warnings como textos de catálogo (misma longitud y orden)
+}
+
+// LabWarning es el aviso de las CA de laboratorio, en español (el catálogo lo da también en inglés).
+var LabWarning = i18n.Msg(i18n.Es, "security.pki.lab_warning", nil)
+
+// warn agrega un aviso del catálogo al texto en español y a su forma estructurada.
+func (s *Summary) warn(key string, kv ...any) {
+	t := i18n.Tx(key, kv...)
+	s.Warnings = append(s.Warnings, t.In(i18n.Es))
+	s.WarnItems = append(s.WarnItems, t)
+}
+
+// setKey llena la llave en forma estructurada.
+func (s *Summary) setKey(k any) {
+	switch p := k.(type) {
+	case *rsa.PublicKey:
+		s.KeyAlg, s.KeyBits = "RSA", p.N.BitLen()
+	case *ecdsa.PublicKey:
+		s.KeyAlg, s.KeyBits, s.KeyCurve = "ECDSA", p.Curve.Params().BitSize, p.Curve.Params().Name
+	}
 }
 
 var kuNames = []struct {
@@ -344,13 +370,13 @@ func sans[IP ~[]byte](dns []string, ips []IP, emails []string) []string {
 
 func warnKey(k any, s *Summary) {
 	if r, ok := k.(*rsa.PublicKey); ok && r.N.BitLen() < 2048 {
-		s.Warnings = append(s.Warnings, "llave RSA de menos de 2048 bits: ISE y navegadores la rechazan")
+		s.warn("security.pki.warn.rsa_small")
 	}
 	if strings.Contains(strings.ToLower(s.SigAlg), "sha1") || strings.Contains(strings.ToLower(s.SigAlg), "md5") {
-		s.Warnings = append(s.Warnings, "firma con "+s.SigAlg+": algoritmo obsoleto")
+		s.warn("security.pki.warn.weak_sig", "algorithm", s.SigAlg)
 	}
 	if len(s.SANs) == 0 && !s.IsCA {
-		s.Warnings = append(s.Warnings, "sin SAN: los clientes modernos ignoran el CN; agrega el nombre DNS/IP como SAN")
+		s.warn("security.pki.warn.no_san")
 	}
 }
 
@@ -372,15 +398,16 @@ func summarizeCert(c *x509.Certificate, now time.Time) Summary {
 	s.SelfSigned = bytes.Equal(c.RawIssuer, c.RawSubject) && c.CheckSignatureFrom(c) == nil
 	switch {
 	case now.After(c.NotAfter):
-		s.Warnings = append(s.Warnings, "vencido")
+		s.warn("security.pki.warn.expired")
 	case now.Before(c.NotBefore):
-		s.Warnings = append(s.Warnings, "todavía no es válido (revisa el reloj/NTP)")
+		s.warn("security.pki.warn.not_yet")
 	case s.DaysLeft < 30:
-		s.Warnings = append(s.Warnings, fmt.Sprintf("vence en %d días", s.DaysLeft))
+		s.warn("security.pki.warn.expires_soon", "days", s.DaysLeft)
 	}
 	if s.SelfSigned && !c.IsCA {
-		s.Warnings = append(s.Warnings, "autofirmado")
+		s.warn("security.pki.warn.self_signed")
 	}
+	s.setKey(c.PublicKey)
 	warnKey(c.PublicKey, &s)
 	return s
 }
@@ -389,8 +416,9 @@ func summarizeCSR(r *x509.CertificateRequest) Summary {
 	s := Summary{Kind: "CSR", Subject: r.Subject.String(), KeyType: keyInfo(r.PublicKey), SigAlg: r.SignatureAlgorithm.String(),
 		SANs: sans(r.DNSNames, r.IPAddresses, r.EmailAddresses), SignatureValid: r.CheckSignature() == nil}
 	if !s.SignatureValid {
-		s.Warnings = append(s.Warnings, "la firma del CSR no verifica")
+		s.warn("security.pki.warn.csr_signature")
 	}
+	s.setKey(r.PublicKey)
 	warnKey(r.PublicKey, &s)
 	return s
 }
@@ -433,37 +461,54 @@ func Decode(in []byte, now time.Time) ([]Summary, error) {
 	return nil, errors.New("pki: no se reconoce un certificado ni un CSR (PEM o DER)")
 }
 
-func Text(sums []Summary) string {
+// Text es el informe legible en español.
+func Text(sums []Summary) string { return TextIn(sums, i18n.Es) }
+
+// TextIn es el informe legible en el idioma pedido (etiquetas, «sí/no» y avisos); los valores (nombres,
+// fechas, series, huellas, usos de llave) salen tal cual. Con es es el texto de siempre.
+func TextIn(sums []Summary, loc string) string {
 	var b strings.Builder
+	m := func(key string) string { return i18n.Msg(loc, key, nil) }
+	yesNo := func(v bool) string { return m(map[bool]string{true: "security.yes", false: "security.no"}[v]) }
 	for i, s := range sums {
 		if i > 0 {
 			b.WriteString("\n")
 		}
-		fmt.Fprintf(&b, "%s: %s\n", s.Kind, s.Subject)
+		kind := s.Kind
+		switch s.Kind {
+		case "certificado":
+			kind = m("security.pki.kind.certificate")
+		case "CSR":
+			kind = m("security.pki.kind.csr")
+		}
+		fmt.Fprintf(&b, "%s: %s\n", kind, s.Subject)
 		line := func(k, v string) {
 			if v != "" {
-				fmt.Fprintf(&b, "  %-16s %s\n", k, v)
+				fmt.Fprintf(&b, "  %-16s %s\n", m("security.pki.label."+k), v)
 			}
 		}
-		line("Emisor", s.Issuer)
-		line("Serie", s.Serial)
+		line("issuer", s.Issuer)
+		line("serial", s.Serial)
 		if s.NotAfter != "" {
-			line("Validez", fmt.Sprintf("%s → %s (%d días)", s.NotBefore, s.NotAfter, s.DaysLeft))
+			line("validity", i18n.Msg(loc, "security.pki.validity", i18n.A("from", s.NotBefore, "to", s.NotAfter, "days", s.DaysLeft)))
 		}
-		line("Llave", s.KeyType)
-		line("Firma", s.SigAlg)
-		line("SAN", strings.Join(s.SANs, ", "))
-		line("Uso de llave", strings.Join(s.KeyUsage, ", "))
-		line("Uso extendido", strings.Join(s.ExtKeyUsage, ", "))
+		line("key", s.KeyType)
+		line("signature", s.SigAlg)
+		line("san", strings.Join(s.SANs, ", "))
+		line("key_usage", strings.Join(s.KeyUsage, ", "))
+		line("ext_key_usage", strings.Join(s.ExtKeyUsage, ", "))
 		if s.IsCA {
-			line("CA", "sí")
+			line("ca", yesNo(true))
 		}
 		if s.Kind == "CSR" {
-			line("Firma válida", map[bool]string{true: "sí", false: "no"}[s.SignatureValid])
+			line("sig_valid", yesNo(s.SignatureValid))
 		}
-		line("SHA-1", s.SHA1)
-		line("SHA-256", s.SHA256)
-		for _, w := range s.Warnings {
+		line("sha1", s.SHA1)
+		line("sha256", s.SHA256)
+		for j, w := range s.Warnings {
+			if j < len(s.WarnItems) {
+				w = s.WarnItems[j].In(loc)
+			}
 			fmt.Fprintf(&b, "  ! %s\n", w)
 		}
 	}
