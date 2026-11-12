@@ -79,11 +79,12 @@ func TestCatalogoCobertura(t *testing.T) {
 		}
 		want := slices.Clone(e.Args)
 		slices.Sort(want)
-		if got := holders(e.Es); !slices.Equal(got, want) {
-			t.Errorf("%s: es usa %v y declara %v", code, got, want)
-		}
-		if got := holders(e.En); !slices.Equal(got, want) {
-			t.Errorf("%s: en usa %v y declara %v", code, got, want)
+		// Una plantilla puede omitir un argumento (la etiqueta en español no se repite en inglés), pero nunca usar uno
+		// no declarado, y todo declarado debe usarse en alguna de las dos.
+		es, en := holders(e.Es), holders(e.En)
+		union := slices.Compact(slices.Sorted(slices.Values(append(slices.Clone(es), en...))))
+		if !slices.Equal(union, want) {
+			t.Errorf("%s: es usa %v, en usa %v y declara %v", code, es, en, want)
 		}
 		for _, x := range e.Extra {
 			if slices.Contains(e.Args, x) {
