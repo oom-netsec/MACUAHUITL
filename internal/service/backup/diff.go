@@ -54,7 +54,7 @@ func (r diffReport) text() string {
 	return b.String()
 }
 
-func (s *backupSvc) DiffBackups(_ context.Context, r *v1.DiffBackupsRequest) (*v1.DiffBackupsResponse, error) {
+func (s *backupSvc) DiffBackups(ctx context.Context, r *v1.DiffBackupsRequest) (*v1.DiffBackupsResponse, error) {
 	s.d.MarkActive()
 	st := s.store()
 	from, a, err := st.Get(r.From)
@@ -66,7 +66,7 @@ func (s *backupSvc) DiffBackups(_ context.Context, r *v1.DiffBackupsRequest) (*v
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 	if from.Device != to.Device || from.Kind != to.Kind {
-		return nil, status.Error(codes.InvalidArgument, "compara dos respaldos del mismo equipo y del mismo tipo")
+		return nil, service.Err(ctx, codes.InvalidArgument, "backup.err.diff_mismatch", nil)
 	}
 	cs, ign := drift.Compare(a, b)
 	d := drift.NewDevice(to.Device, 0, 0, cs, ign)

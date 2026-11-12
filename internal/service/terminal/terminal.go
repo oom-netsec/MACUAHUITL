@@ -61,19 +61,23 @@ func (s *termSvc) close() {
 }
 
 // connErr traduce los errores de conexión a códigos gRPC; la huella de una llave nueva va en el mensaje.
-func connErr(err error) error {
+func connErr(ctx context.Context, err error) error {
 	var he *transport.HostKeyError
 	switch {
 	case errors.As(err, &he):
-		return status.Error(codes.FailedPrecondition, err.Error())
+		return service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	case errors.Is(err, transport.ErrAuth), errors.Is(err, transport.ErrEgressDenied):
-		return status.Error(codes.PermissionDenied, err.Error())
+		return service.ErrFrom(ctx, codes.PermissionDenied, err)
 	}
 	if s := service.VaultErr(err); status.Code(s) != codes.Internal {
 		return s
 	}
-	return status.Error(codes.Unavailable, err.Error())
+	return service.ErrFrom(ctx, codes.Unavailable, err)
 }
+
+// unavailable da el código del catálogo del motivo (en inglés, como queda en la auditoría) con que se cierra un stream
+// por el núcleo o el equipo; el mensaje en español es el de siempre.
+var unavailable = map[string]string{"core shutting down": "terminal.err.core_closing", "client disconnected": "terminal.err.client_gone", "the device closed the session": "terminal.err.device_closed"}
 
 func clamp(v, def, lo, hi uint32) int {
 	if v == 0 {
@@ -95,16 +99,16 @@ func safeName(s string) string {
 	return strings.TrimLeft(b.String(), ".-")
 }
 
-func (s *termSvc) recording(label, id string) (*os.File, error) {
+func (s *termSvc) recording(ctx context.Context, label, id string) (*os.File, error) {
 	dir := filepath.Join(s.d.Outputs(), "terminal")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+		return nil, service.Err(ctx, codes.Internal, "terminal.err.out_dir", i18n.A("error", err.Error()))
 	}
 	// O_EXCL: no pisa un archivo ni sigue un enlace puesto con el mismo nombre.
 	p := filepath.Join(dir, fmt.Sprintf("%s_%s_%s.log", safeName(label), s.d.Now().Format("20060102-150405"), id[len(id)-6:]))
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "archivo de grabación: %v", err)
+		return nil, service.Err(ctx, codes.Internal, "terminal.err.recording", i18n.A("error", err.Error()))
 	}
 	return f, nil
 }
@@ -123,13 +127,13 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	}
 	o := first.GetOpen()
 	if o == nil {
-		return status.Error(codes.InvalidArgument, "el primer mensaje debe abrir la sesión")
+		return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.first_open", nil)
 	}
 	if o.Address == "" || o.CredentialId == "" {
-		return status.Error(codes.InvalidArgument, "indica el equipo (dirección) y la credencial")
+		return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.no_address", nil)
 	}
 	if o.Port > 65535 {
-		return status.Error(codes.InvalidArgument, "puerto fuera de rango")
+		return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.port", nil)
 	}
 	port := uint16(o.Port)
 	if port == 0 {
@@ -141,17 +145,17 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	}
 	v := s.d.Vault()
 	if v == nil || !v.Unlocked() {
-		return s.refuse(label, status.Error(codes.FailedPrecondition, "abre la bóveda: la terminal necesita las credenciales del equipo"), "vault is closed: the terminal needs the device credentials")
+		return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.vault_closed", nil), "vault is closed: the terminal needs the device credentials")
 	}
 	if s.live.Add(1) > maxSessions {
 		s.live.Add(-1)
-		return s.refuse(label, status.Errorf(codes.ResourceExhausted, "máximo %d terminales abiertas", maxSessions), fmt.Sprintf("at most %d terminals open", maxSessions))
+		return s.refuse(label, service.Err(st.Context(), codes.ResourceExhausted, "terminal.err.max_sessions", i18n.A("max", maxSessions)), fmt.Sprintf("at most %d terminals open", maxSessions))
 	}
 	defer s.live.Add(-1)
 	s.wg.Add(1)
 	defer s.wg.Done()
 	if s.ctx.Err() != nil {
-		return s.refuse(label, status.Error(codes.Unavailable, "el núcleo se está cerrando"), "the core is shutting down")
+		return s.refuse(label, service.Err(st.Context(), codes.Unavailable, "terminal.err.core_closing2", nil), "the core is shutting down")
 	}
 
 	ctx, cancel := context.WithCancel(st.Context())
@@ -166,7 +170,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 
 	id := "term-" + service.NewID()
 	if err := s.d.Guard().Allow(ctx, id, []string{o.Address}); err != nil {
-		return s.refuse(label, status.Error(codes.PermissionDenied, err.Error()), i18n.English(err))
+		return s.refuse(label, service.ErrFrom(st.Context(), codes.PermissionDenied, err), i18n.English(err))
 	}
 	// A partir de aquí, todo camino de salida pasa por este defer: cierra SSH y grabación,
 	// revoca el guard y audita. Es lo que garantiza que no quede una autorización abierta.
@@ -214,14 +218,14 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	cred.Enable.Destroy() // la terminal es manual: el usuario escribe enable por su cuenta
 	if err != nil {
 		reason, reasonEN = err.Error(), i18n.English(err)
-		return connErr(err)
+		return connErr(st.Context(), err)
 	}
 	r, w, err := sess.ShellSize(clamp(o.Rows, 24, 1, 200), clamp(o.Cols, 200, 20, 500))
 	if err != nil {
 		reason, reasonEN = err.Error(), i18n.English(err)
-		return connErr(err)
+		return connErr(st.Context(), err)
 	}
-	if f, err = s.recording(label, id); err != nil {
+	if f, err = s.recording(st.Context(), label, id); err != nil {
 		reason, reasonEN = err.Error(), i18n.English(err)
 		return err
 	}
@@ -306,9 +310,12 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	case <-time.After(5 * time.Second):
 	}
 	if lost != nil && !errors.Is(lost, io.EOF) {
-		return status.Error(codes.Unavailable, reason)
+		return service.Err(st.Context(), codes.Unavailable, "terminal.err.lost", i18n.A("error", lost.Error()))
 	}
 	if s.ctx.Err() != nil {
+		if key, ok := unavailable[reasonEN]; ok {
+			return service.Err(st.Context(), codes.Unavailable, key, nil)
+		}
 		return status.Error(codes.Unavailable, reason)
 	}
 	return nil
