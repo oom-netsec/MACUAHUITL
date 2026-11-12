@@ -2547,7 +2547,8 @@ export const es = {
   "patrol.kind.all": "Todos",
   "patrol.kind.adhoc": "Ad hoc",
   "patrol.kind.backup": "Respaldo",
-  "patrol.kind.patrol": "Patrulla",
+  "patrol.kind.patrol": "Patrol",
+  "patrol.kind.change": "Cambio",
 };
 
 export type Key = keyof typeof es;

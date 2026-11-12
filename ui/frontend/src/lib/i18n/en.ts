@@ -2550,4 +2550,5 @@ export const en: Record<Key, string> = {
   "patrol.kind.adhoc": "Ad hoc",
   "patrol.kind.backup": "Backup",
   "patrol.kind.patrol": "Patrol",
+  "patrol.kind.change": "Change",
 };

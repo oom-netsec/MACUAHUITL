@@ -22,7 +22,7 @@ export function JobsPanel({ jobs, selected, onSelect, onNew }: { jobs: Job[]; se
   const [kind, setKind] = useState("");
   const kinds = [...new Set(jobs.map((j) => j.kind).filter((k): k is string => !!k))];
   const shown = kind ? jobs.filter((j) => j.kind === kind) : jobs;
-  const kindLabel = (k: string) => (["adhoc", "backup", "patrol"].includes(k) ? t(`patrol.kind.${k}` as Key) : k);
+  const kindLabel = (k: string) => (["adhoc", "backup", "patrol", "change"].includes(k) ? t(`patrol.kind.${k}` as Key) : k);
   const live = jobs.some((j) => j.state === "armed");
   useEffect(() => {
     if (!live) return;
