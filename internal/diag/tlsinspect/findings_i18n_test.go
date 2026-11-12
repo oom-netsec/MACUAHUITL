@@ -127,3 +127,41 @@ func TestInEspanolEsIdentidad(t *testing.T) {
 		}
 	}
 }
+
+// Un intermedio que todavía no es válido da not_yet_valid aunque la hoja sí lo sea (y uno vencido, expired).
+func TestVerifyCodeUsaElCertificadoDelError(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	day := 24 * time.Hour
+	root, rootKey, pool := newCAAt(t, now)
+	for name, c := range map[string]struct {
+		from, to time.Time
+		want     string
+	}{"futuro": {now.Add(10 * day), now.Add(100 * day), "not_yet_valid"}, "vencido": {now.Add(-100 * day), now.Add(-10 * day), "expired"}} {
+		ik, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		itmpl := &x509.Certificate{SerialNumber: big.NewInt(7), Subject: pkix.Name{CommonName: "intermedio"}, NotBefore: c.from, NotAfter: c.to,
+			IsCA: true, KeyUsage: x509.KeyUsageCertSign, BasicConstraintsValid: true}
+		ider, err := x509.CreateCertificate(rand.Reader, itmpl, root, &ik.PublicKey, rootKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		inter, _ := x509.ParseCertificate(ider)
+		leaf := issue(t, inter, ik, certSpec{name: "ise.lab", notBefore: now.Add(-day), notAfter: now.Add(100 * day)})
+		leaf.Certificate = append(leaf.Certificate, ider)
+		port := serve(t, leaf, tls.VersionTLS12, tls.VersionTLS13)
+		r, err := Inspect(context.Background(), dial, "127.0.0.1", port, "ise.lab", Options{Roots: pool, Now: func() time.Time { return now }})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.VerifyCode != c.want {
+			t.Errorf("%s: VerifyCode %q, esperaba %q (%s)", name, r.VerifyCode, c.want, r.VerifyError)
+		}
+	}
+}
+
+// Un hallazgo sin texto de catálogo conserva su Detail al cambiar de idioma.
+func TestInConservaElDetalleSinCatalogo(t *testing.T) {
+	r := Report{Findings: []Finding{{Severity: "info", Code: "x", Detail: "dato del servidor"}}}
+	if got := r.In("en").Findings[0].Detail; got != "dato del servidor" {
+		t.Errorf("%q", got)
+	}
+}

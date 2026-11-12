@@ -202,11 +202,14 @@ func TestDnsHallazgosEstructuradosYEn(t *testing.T) {
 // la biblioteca x509) no se traduce pero trae su código.
 func TestTlsRespuestaEstructuradaYEn(t *testing.T) {
 	rep := tlsinspect.Report{VerifyError: "x509: certificate signed by unknown authority", VerifyCode: "unknown_authority",
-		Findings: []tlsinspect.Finding{{Severity: "aviso", Code: "autofirmado", Detail: "el certificado es autofirmado; los clientes no lo validarán sin fijarlo", Text: i18n.Tx("tls.finding.self_signed")}}}
+		Findings: []tlsinspect.Finding{{Severity: "aviso", Code: "autofirmado", Detail: "el certificado es autofirmado; los clientes no lo validarán sin fijarlo", Text: i18n.Tx("tls.finding.self_signed")}, {Severity: "info", Code: "x", Detail: "dato del servidor"}}}
 	const msgEs, msgEn = "el certificado es autofirmado; los clientes no lo validarán sin fijarlo", "the certificate is self-signed; clients will not validate it unless it is pinned"
 	es, en := tlsResponse(rep, i18n.Es), tlsResponse(rep, i18n.En)
-	if len(es.Findings) != 1 || es.Findings[0].Code != "autofirmado" || es.Findings[0].Severity != "warning" || es.Findings[0].Key != "tls.finding.self_signed" || es.Findings[0].Message != msgEs {
+	if len(es.Findings) != 2 || es.Findings[0].Code != "autofirmado" || es.Findings[0].Severity != "warning" || es.Findings[0].Key != "tls.finding.self_signed" || es.Findings[0].Message != msgEs {
 		t.Fatalf("es: %v", es.Findings)
+	}
+	if en.Findings[1].Message != "dato del servidor" || en.Findings[1].Key != "" {
+		t.Errorf("dato: %v", en.Findings[1])
 	}
 	if en.Findings[0].Message != msgEn || !strings.Contains(en.Report.Json, msgEn) || strings.Contains(en.Report.Json, msgEs) {
 		t.Errorf("en: %v\n%s", en.Findings, en.Report.Json)

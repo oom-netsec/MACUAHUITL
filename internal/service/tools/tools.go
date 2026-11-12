@@ -169,7 +169,11 @@ func (s *toolsSvc) InspectTls(ctx context.Context, r *v1.InspectTlsRequest) (*v1
 func tlsResponse(rep tlsinspect.Report, loc string) *v1.InspectTlsResponse {
 	resp := &v1.InspectTlsResponse{Report: service.Report(rep.In(loc), ""), VerifyCode: rep.VerifyCode}
 	for _, f := range rep.Findings {
-		resp.Findings = append(resp.Findings, &v1.TlsFinding{Code: f.Code, Severity: tlsinspect.SeverityCode(f.Severity), Key: f.Text.Key, Args: f.Text.Args, Message: f.Text.In(loc)})
+		fd := &v1.TlsFinding{Code: f.Code, Severity: tlsinspect.SeverityCode(f.Severity), Key: f.Text.Key, Args: f.Text.Args, Message: f.Detail}
+		if !f.Text.Empty() {
+			fd.Message = f.Text.In(loc)
+		}
+		resp.Findings = append(resp.Findings, fd)
 	}
 	return resp
 }

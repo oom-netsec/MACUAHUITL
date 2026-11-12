@@ -68,7 +68,9 @@ func (r Report) In(loc string) Report {
 	}
 	fs := make([]Finding, len(r.Findings))
 	for i, f := range r.Findings {
-		f.Detail = f.Text.In(loc)
+		if !f.Text.Empty() {
+			f.Detail = f.Text.In(loc)
+		}
 		fs[i] = f
 	}
 	r.Findings = fs
@@ -88,7 +90,11 @@ func verifyCode(err error, leaf *x509.Certificate, now time.Time) string {
 	case errors.As(err, &he):
 		return "hostname"
 	case errors.As(err, &ci) && ci.Reason == x509.Expired:
-		if now.Before(leaf.NotBefore) {
+		bad := ci.Cert // el certificado que falló puede ser un intermedio, no la hoja
+		if bad == nil {
+			bad = leaf
+		}
+		if now.Before(bad.NotBefore) {
 			return "not_yet_valid"
 		}
 		return "expired"
