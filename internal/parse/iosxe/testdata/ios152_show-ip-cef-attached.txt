@@ -1,0 +1,4 @@
+192.0.2.0/24, version 14, epoch 0, attached, connected
+0 packets, 0 bytes
+  via Vlan99, 0 dependencies
+    valid glean adjacency

@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+import "google/protobuf/timestamp.proto";
+import "macuahuitl/v1/common.proto";
+import "macuahuitl/v1/tools.proto";
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Respaldos de configuración (Fase 16b): guardan show running-config (y startup-config) de cada
+// equipo en outputs/respaldos/<equipo>/ con permisos 0600 y retención. Solo lectura: la
+// recolección es un trabajo de Patrol (bóveda, Login Test, guard, planificador y auditoría de
+// Patrol). Restaurar no existe aquí.
+service BackupService {
+  // Crea y arma el trabajo de recolección; el núcleo guarda cada ronda al terminar.
+  rpc StartBackup(StartBackupRequest) returns (StartBackupResponse);
+  // Guarda lo que el trabajo lleva recolectado (idempotente). Done = el trabajo ya terminó.
+  rpc CollectBackups(CollectBackupsRequest) returns (CollectBackupsResponse);
+  rpc ListBackups(ListBackupsRequest) returns (ListBackupsResponse);
+  rpc GetBackup(GetBackupRequest) returns (GetBackupResponse);
+  rpc DiffBackups(DiffBackupsRequest) returns (DiffBackupsResponse);
+}
+
+message StartBackupRequest {
+  repeated Target targets = 1;
+  string credential_id = 2;
+  bool startup = 3;           // además de running-config
+  uint32 keep = 4;            // respaldos a conservar por equipo y tipo; 0 = 30
+  uint32 interval_seconds = 5; // 0 = una sola vez
+  uint32 rounds = 6;          // con intervalo: cuántas veces
+  bool include_secrets = 7;   // sin enmascarar; por defecto se enmascaran
+  repeated string accepted_host_key_fingerprints = 8;
+  repeated string excluded_device_ids = 9;
+}
+
+message StartBackupResponse {
+  string job_id = 1;
+  bool armed = 2;
+  string detail = 3; // por qué no se armó
+  google.protobuf.Timestamp window_ends_at = 4;
+}
+
+message CollectBackupsRequest {
+  string job_id = 1;
+  uint32 keep = 2; // 0 = 30
+}
+
+message CollectBackupsResponse {
+  string state = 1;
+  bool done = 2;
+  string error = 3;
+  ToolReport report = 4; // guardados, omitidos y avisos
+}
+
+message ListBackupsRequest {
+  string device = 1; // vacío = todos
+}
+
+message GetBackupRequest {
+  string id = 1; // equipo/sello-tipo, como lo devuelve List
+}
+
+message GetBackupResponse {
+  string meta_json = 1;
+  string text = 2;
+}
+
+message DiffBackupsRequest {
+  string from = 1;
+  string to = 2;
+}
+
+message ListBackupsResponse {
+  ToolReport report = 1;
+}
+
+message DiffBackupsResponse {
+  ToolReport report = 1;
+}

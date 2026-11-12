@@ -1,0 +1,28 @@
+VTP Version capable             : 1 to 3
+VTP version running             : 3
+VTP Domain Name                 : CAMPUS
+VTP Pruning Mode                : Disabled
+VTP Traps Generation            : Disabled
+Device ID                       : 0021.a0a6.f400
+
+Feature VLAN:
+--------------
+VTP Operating Mode                : Primary Server
+Number of existing VLANs          : 5
+Number of existing extended VLANs : 0
+Maximum VLANs supported locally   : 4096
+Configuration Revision            : 1
+Primary ID                        : 0021.a0a6.f400
+Primary Description               : SW-PRIMARIO
+MD5 digest                        : 0x7D 0x1E 0x3F 0x52 0x9A 0xB1 0x04 0xC6
+
+
+Feature MST:
+--------------
+VTP Operating Mode                : Transparent
+
+
+Feature UNKNOWN:
+--------------
+VTP Operating Mode                : Transparent
+

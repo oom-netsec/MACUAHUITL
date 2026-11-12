@@ -1,0 +1,14 @@
+/* Receptores de eventos (syslog, traps, flujos): opciones, estado de la escucha y descartes. Solo tokens. */
+.syslog-opts { margin: var(--s-3) 0 0; border-top: 1px solid var(--hairline); padding-top: var(--s-2); }
+.syslog-opts > summary { color: var(--text-2); font-weight: 500; cursor: pointer; }
+.syslog-group { margin: var(--s-3) 0 0; display: grid; gap: var(--s-2); }
+.syslog-group .grid-2 { align-items: start; }
+.syslog-group > legend { font-weight: 600; padding: 0; margin-bottom: var(--s-1); }
+.syslog-status { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--hairline); color: var(--text-2); font-size: var(--fs-small); }
+.syslog-drops { margin: 0; }
+.syslog-drops.live { font-weight: 600; }
+.syslog-top { margin-top: var(--s-2); }
+.syslog-top > summary { cursor: pointer; }
+.syslog-top table { border-collapse: collapse; margin-top: var(--s-2); font-size: var(--fs-small); }
+.syslog-top th, .syslog-top td { text-align: left; padding: 2px var(--s-4) 2px 0; }
+.syslog-top td:last-child, .syslog-top th:last-child { text-align: right; padding-right: 0; }

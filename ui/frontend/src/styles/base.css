@@ -1,0 +1,99 @@
+/* Elementos HTML con los tokens del ADR 0009. */
+*, *::before, *::after { box-sizing: border-box; }
+/* Variantes de glifo de Inter para todo el texto. Cada `font:` abreviado las reinicia, por eso van aquí con !important. */
+/* Variantes de Inter en todo menos lo monoespaciado (una fuente mono de respaldo daría otro sentido a ss01/ss03/cv11). */
+:where(*:not(.mono, code, pre, kbd, samp, .xterm, .xterm *)), :where(*:not(.mono, code, pre, kbd, samp, .xterm, .xterm *))::before, :where(*:not(.mono, code, pre, kbd, samp, .xterm, .xterm *))::after { font-feature-settings: "cv11", "ss01", "ss03" !important; }
+:root {
+  font: 400 var(--fs-body) / var(--lh-body) var(--font);
+  -webkit-font-smoothing: antialiased;
+  color: var(--text);
+  background: var(--canvas);
+}
+body { margin: 0; background: var(--canvas); }
+::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+
+h1, h2, h3, h4 { margin: 0; color: var(--text); }
+h2 { font: 600 var(--fs-title) / var(--lh-title) var(--font); letter-spacing: -0.2px; margin-bottom: var(--s-4); }
+h3 { font: 600 var(--fs-heading) / var(--lh-heading) var(--font); margin-bottom: var(--s-3); }
+h4 { font: 600 var(--fs-body) / var(--lh-body) var(--font); margin-bottom: var(--s-2); }
+p { margin: 0 0 var(--s-3); }
+a { color: var(--accent); }
+small { font-size: var(--fs-small); }
+code, kbd, samp, pre { font-family: var(--mono); }
+code { font-size: 0.95em; background: var(--surface-2); padding: 1px 5px; border-radius: var(--r-1); }
+pre { font-size: var(--fs-mono); line-height: var(--lh-mono); }
+kbd {
+  display: inline-block; font: 500 11px/16px var(--font); padding: 0 5px; border-radius: var(--r-1);
+  border: 1px solid var(--hairline); background: var(--surface); color: var(--text-2); box-shadow: 0 1px 0 var(--hairline);
+}
+details > summary { cursor: pointer; }
+hr { border: 0; border-top: 1px solid var(--hairline); margin: var(--s-4) 0; }
+
+/* Foco siempre visible. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Controles */
+button {
+  font: 500 var(--fs-body) / var(--lh-body) var(--font); height: var(--control-h); padding: 0 var(--s-3);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+  border: 1px solid var(--hairline); border-radius: var(--r-2); background: var(--surface); color: var(--text);
+  cursor: pointer; white-space: nowrap; box-shadow: 0 1px 1px rgb(0 0 0 / 0.04);
+  transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+button:where(:hover:not(:disabled)) { background: var(--surface-2); }
+button:where(:active:not(:disabled)) { background: var(--pressed); }
+button:where([type="submit"], .primary) { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+button:where([type="submit"], .primary):where(:hover:not(:disabled)) { background: var(--accent); filter: brightness(1.07); }
+button:where(.quiet) { border-color: transparent; background: none; box-shadow: none; color: var(--text-2); }
+button:where(.quiet):where(:hover:not(:disabled)) { background: var(--hover); color: var(--text); }
+button:where(.danger-text) { color: var(--critical); }
+button:where(.danger) { background: var(--critical-solid); border-color: var(--critical-solid); color: #fff; }
+button:where(.danger):where(:hover:not(:disabled)) { background: var(--critical-solid); filter: brightness(1.08); }
+/* Deshabilitado: fondo y texto atenuados con contraste legible (≥ 3:1), no opacidad. */
+button:where(:disabled) { background: var(--surface-2); border-color: var(--hairline); color: var(--text-3); box-shadow: none; cursor: default; }
+button:where(.quiet):where(:disabled) { background: none; border-color: transparent; }
+button:where(.sm) { height: var(--control-h-sm); padding: 0 var(--s-2); }
+button:where(.icon) { width: var(--control-h); padding: 0; }
+button svg { flex: none; }
+/* Ocupado: el giro existe solo mientras dura la espera. */
+button[aria-busy="true"]::after {
+  content: ""; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+input, select, textarea {
+  font: inherit; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border-control); border-radius: var(--r-2);
+}
+input:not([type="checkbox"], [type="radio"], [type="range"]), select { height: var(--control-h); padding: 0 10px; }
+textarea { padding: 6px 10px; resize: vertical; }
+textarea.mono { font-family: var(--mono); font-size: var(--fs-mono); line-height: var(--lh-mono); }
+input::placeholder, textarea::placeholder { color: var(--text-3); }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: -1px; border-color: var(--accent);
+}
+input:disabled, select:disabled, textarea:disabled { background: var(--surface-2); color: var(--text-3); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+input[type="number"], .mono { font-variant-numeric: tabular-nums; }
+fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+
+/* Tablas densas: filas de 32 px, números tabulares. */
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+caption { text-align: left; font: 600 var(--fs-heading) / var(--lh-heading) var(--font); padding: 0 0 var(--s-2); }
+th {
+  text-align: left; font: 500 var(--fs-small) / var(--lh-small) var(--font); color: var(--text-3);
+  padding: var(--s-2) var(--s-3); background: var(--surface-2); border-bottom: 1px solid var(--hairline);
+}
+td { text-align: left; padding: 6px var(--s-3); border-bottom: 1px solid var(--hairline); vertical-align: top; }
+tbody tr:hover td { background: var(--hover); }
+
+/* Barras de desplazamiento discretas, solo en lo que hace scroll: una regla universal con color-mix
+   costaba ~90 ms de estilo en la primera pintura de WebKitGTK. */
+.content, .sidebar, .console, .table-wrap, .palette-list, .grid-scroll, textarea { scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; }
+
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}

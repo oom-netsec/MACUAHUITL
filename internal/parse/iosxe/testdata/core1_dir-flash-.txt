@@ -1,0 +1,5 @@
+Directory of flash:/
+
+    2  -rw-   517619080  Oct 20 2026 10:44:12 +00:00  cat9k_iosxe.17.09.04a.SPA.bin
+
+11353194496 bytes total (8000000000 bytes free)

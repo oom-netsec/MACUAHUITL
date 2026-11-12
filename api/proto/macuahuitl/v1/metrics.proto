@@ -1,0 +1,148 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Datos para las gráficas y la vista de frente del switch (Fase 19). Todo de solo lectura:
+// las series salen de la evidencia que dejó Patrol; el estado de puertos, de la evidencia de
+// un trabajo o de una consulta en vivo por SSH (con el guard y la llave de host estricta).
+service MetricsService {
+  // CPU, memoria por pool y tráfico/errores por interfaz, ronda por ronda, de un trabajo de Patrol.
+  rpc GetJobMetrics(GetJobMetricsRequest) returns (GetJobMetricsResponse);
+  // Estado de los puertos físicos de un switch para dibujar su frente: de la evidencia de un trabajo
+  // (job_id o dir) o, sin ellos, en vivo por SSH (solo lectura, guard y llave de host estricta).
+  rpc GetPortStatus(GetPortStatusRequest) returns (GetPortStatusResponse);
+}
+
+message GetJobMetricsRequest {
+  string job_id = 1;                  // trabajo de Patrol de esta sesión del núcleo
+  string dir = 2;                     // o carpeta de salida de un trabajo (absoluta)
+  string device = 3;                  // dirección o nombre; vacío = todos
+  int32 max_points = 4;               // por serie, las rondas más recientes; 0 = 500, máximo 5000
+  int32 max_interfaces = 5;           // las de mayor utilización pico; 0 = 12, máximo 64
+  repeated string interfaces = 6;     // interfaces concretas (Gi1/0/1 o GigabitEthernet1/0/1); anula max_interfaces
+}
+
+message GetJobMetricsResponse {
+  repeated DeviceMetrics devices = 1;
+  repeated string warnings = 2;       // avisos del trabajo (equipo o interfaz que no aparece)
+}
+
+message DeviceMetrics {
+  string address = 1;
+  string hostname = 2;
+  int32 rounds = 3;                   // rondas con datos del equipo
+  repeated CpuPoint cpu = 4;
+  repeated MemorySeries memory = 5;
+  repeated InterfaceSeries interfaces = 6;
+  int32 interface_total = 7;          // interfaces con datos, antes del tope
+  repeated RebootEvent reboots = 8;
+  bool truncated = 9;                 // se recortó por max_points
+  repeated string warnings = 10;      // p. ej. «falta el comando show interfaces»; la serie viene vacía
+}
+
+message CpuPoint {
+  int32 round = 1;
+  int64 at_ms = 2;                    // unix ms de la salida del comando
+  double five_sec = 3;
+  double one_min = 4;
+  double five_min = 5;
+}
+
+message MemorySeries {
+  string pool = 1;                    // «Processor», «I/O», «lsmpi_io»… como lo imprime el equipo
+  repeated MemoryPoint points = 2;
+}
+
+message MemoryPoint {
+  int32 round = 1;
+  int64 at_ms = 2;
+  int64 used = 3;                     // bytes
+  int64 free = 4;
+  int64 total = 5;
+}
+
+message InterfaceSeries {
+  string name = 1;                    // abreviado: Gi1/0/1
+  string description = 2;
+  int64 bw_kbit = 3;                  // BW del equipo; 0 = no se conoce (sin porcentaje de utilización)
+  double peak_util_pct = 4;
+  repeated InterfacePoint points = 5;
+}
+
+message InterfacePoint {
+  int32 round = 1;
+  int64 at_ms = 2;
+  double in_bps = 3;
+  double out_bps = 4;
+  string source = 5;                  // «counters» (diferencia de contadores entre rondas), «5min» (promedio del equipo) o «» (sin dato)
+  double in_util_pct = 6;
+  double out_util_pct = 7;
+  bool delta_ok = 8;                  // las diferencias de abajo valen; false = primera ronda, reinicio o contador que bajó
+  int64 in_errors = 9;                // diferencias contra la ronda anterior
+  int64 out_errors = 10;
+  int64 crc = 11;
+  int64 resets = 12;
+  int64 in_drops = 13;
+  int64 out_drops = 14;
+  bool reboot = 15;                   // el equipo se reinició desde la ronda anterior
+}
+
+message RebootEvent {
+  int32 round = 1;
+  int64 boot_ms = 2;                  // hora de arranque estimada (hora de la salida menos el uptime)
+}
+
+message GetPortStatusRequest {
+  string job_id = 1;                  // evidencia de un trabajo de Patrol...
+  string dir = 2;                     // ...o su carpeta de salida (absoluta); sin ninguno de los dos, en vivo
+  string device = 3;                  // con trabajo: equipo (dirección o nombre) si tiene varios; en vivo: dirección o nombre del switch
+  uint32 port = 4;                    // en vivo: puerto SSH; 0 = 22
+  string credential_id = 5;           // en vivo: credencial de la bóveda
+  repeated string accepted_host_key_fingerprints = 6;
+  bool legacy_ssh = 7;                // en vivo: equipos con SSH antiguo (se audita)
+}
+
+message GetPortStatusResponse {
+  string source = 1;                  // «job» o «live»
+  string address = 2;
+  string hostname = 3;
+  int64 at_ms = 4;                    // unix ms de show interfaces status (de la evidencia, o el momento de la consulta)
+  repeated PortInfo ports = 5;        // solo puertos físicos (Gi, Fa, Te, Twe, Fo, Hu, Eth), en el orden del equipo
+  repeated PortChannel channels = 6;
+  repeated string warnings = 7;       // comandos que faltan o no se entendieron
+}
+
+message PortInfo {
+  string name = 1;                    // abreviado: Gi1/0/12
+  string kind = 2;                    // Gi, Fa, Te, Twe, Fo, Hu, Eth
+  int32 module = 3;                   // primer número del nombre: Gi1/0/12 → 1
+  int32 stack = 4;                    // segundo número (0 si el nombre solo trae dos): Gi1/0/12 → 0
+  int32 number = 5;                   // último número: Gi1/0/12 → 12
+  string description = 6;
+  string status = 7;                  // connected, notconnect, disabled, err-disabled, inactive…
+  string vlan = 8;                    // «10», «trunk» o «routed», como lo imprime el equipo
+  string duplex = 9;                  // como lo imprime: «a-full», «full», «auto»
+  string speed = 10;                  // como lo imprime: «a-1000», «10G», «auto»
+  string duplex_mode = 11;            // full, half o auto, sin el «a-»
+  int32 speed_mbps = 12;              // 0 si está en auto o no se sabe
+  bool auto_negotiated = 13;
+  string type = 14;                   // «10/100/1000BaseTX», «1000BaseSX SFP»; vacío si el equipo no lo da
+  bool trunk = 15;
+  string trunk_native = 16;           // VLAN nativa; vacío si show interfaces trunk no se recolectó
+  string channel = 17;                // Po1 si es miembro de un port-channel
+  string channel_flags = 18;          // P (en el canal), D (caído), s, I, w…
+}
+
+message PortChannel {
+  string name = 1;
+  string state = 2;                   // SU, SD, RU…
+  string protocol = 3;                // LACP, PAgP o «-»
+  repeated ChannelMember members = 4;
+}
+
+message ChannelMember {
+  string port = 1;
+  string flags = 2;
+}

@@ -1,0 +1,161 @@
+===== 2026-11-04T03:00:00Z · show version =====
+Cisco IOS XE Software, Version 17.12.04
+Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+
+DIST-01 uptime is 12 minutes
+Uptime for this control processor is 1 year, 2 weeks, 3 days, 4 hours, 7 minutes
+System returned to ROM by Reload Command
+System image file is "flash:packages.conf"
+===== 2026-11-04T03:00:01Z · show running-config =====
+Building configuration...
+
+Current configuration : 1520 bytes
+!
+! Last configuration change at 00:50:11 UTC Wed Nov 4 2026 by admin
+!
+version 17.9
+service password-encryption
+hostname DIST-01
+!
+ntp clock-period 36028797018963999
+!
+interface GigabitEthernet1/0/1
+ description ENLACE-ACC-01
+ switchport mode trunk
+!
+interface GigabitEthernet1/0/2
+ description ENLACE-ACC-02
+ switchport mode trunk
+!
+interface Vlan10
+ ip address 198.51.100.2 255.255.255.128
+ standby 10 ip 198.51.100.1
+ standby 10 priority 110
+ standby 10 preempt
+!
+interface Vlan20
+ ip address 198.51.100.130 255.255.255.128
+ standby 20 ip 198.51.100.129
+!
+router ospf 1
+ router-id 192.0.2.1
+ network 198.51.100.0 0.0.0.255 area 0
+!
+router bgp 65001
+ neighbor 192.0.2.9 remote-as 65002
+ neighbor 203.0.113.9 remote-as 65003
+!
+line vty 0 15
+ exec-timeout 10 0
+ transport input ssh
+!
+end
+===== 2026-11-04T03:00:02Z · show ip interface brief =====
+Interface              IP-Address      OK? Method Status                Protocol
+Vlan1                  unassigned      YES NVRAM  administratively down down    
+Vlan10                 198.51.100.2    YES NVRAM  up                    up      
+Vlan20                 198.51.100.130  YES NVRAM  up                    up      
+GigabitEthernet1/0/1   unassigned      YES unset  up                    up      
+GigabitEthernet1/0/2   unassigned      YES unset  down                  down    
+GigabitEthernet1/0/3   unassigned      YES unset  up                    up      
+===== 2026-11-04T03:00:03Z · show cdp neighbors detail =====
+-------------------------
+Device ID: ACC-01.ejemplo.lab
+Entry address(es): 
+  IP address: 192.0.2.21
+Platform: cisco C9300-48P,  Capabilities: Switch IGMP 
+Interface: GigabitEthernet1/0/1,  Port ID (outgoing port): GigabitEthernet1/1/1
+Holdtime : 150 sec
+
+Version :
+Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+
+
+Total cdp entries displayed : 1
+===== 2026-11-04T03:00:04Z · show lldp neighbors detail =====
+------------------------------------------------
+Local Intf: Gi1/0/1
+Chassis id: 00a3.d14f.0021
+Port id: Gi1/1/1
+Port Description: GigabitEthernet1/1/1
+System Name: ACC-01.ejemplo.lab
+
+Time remaining: 100 seconds
+System Capabilities: B,R
+Enabled Capabilities: B
+Management Addresses:
+    IP: 192.0.2.21
+---------------------------------------------
+Local Intf: Gi1/0/3
+Chassis id: 00a3.d14f.0023
+Port id: Gi1/1/1
+Port Description: GigabitEthernet1/1/1
+System Name: ACC-03.ejemplo.lab
+
+Time remaining: 110 seconds
+---------------------------------------------
+
+
+Total entries displayed: 2
+===== 2026-11-04T03:00:05Z · show ip ospf neighbor =====
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+192.0.2.2         1   FULL/BDR        00:00:35    198.51.100.3    Vlan10
+192.0.2.3         0   INIT/  -        00:00:38    203.0.113.2     GigabitEthernet1/0/24
+===== 2026-11-04T03:00:06Z · show ip bgp summary =====
+BGP router identifier 192.0.2.1, local AS number 65001
+BGP table version is 120, main routing table version 120
+118 network entries using 29264 bytes of memory
+
+Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+192.0.2.9       4        65002   12034   12001      120    0    0 1w2d          118
+203.0.113.9     4        65003       0       0        1    0    0 00:05:12 Idle
+===== 2026-11-04T03:00:07Z · show ip route summary =====
+IP routing table name is default (0x0)
+IP routing table maximum-paths is 32
+Route Source    Networks    Subnets     Replicates  Overhead    Memory (bytes)
+application     0           0           0           0           0
+connected       0           6           0           576         1824
+static          1           0           0           96          304
+ospf 1          3           2           0           1440        4560
+  Intra-area: 8 Inter-area: 7 External-1: 0 External-2: 0
+  NSSA External-1: 0 NSSA External-2: 0
+bgp 65001       118         0           0           13248       41952
+  External: 138 Internal: 0 Local: 0
+internal        5                                               23080
+Total           142         18          0           15360       71720
+===== 2026-11-04T03:00:08Z · show mac address-table =====
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+ All    0100.0ccc.cccc    STATIC      CPU
+ All    0100.0ccc.cccd    STATIC      CPU
+  10    0011.2233.4401    DYNAMIC     Gi1/0/1
+  10    0011.2233.4402    DYNAMIC     Gi1/0/1
+  10    0011.2233.4403    DYNAMIC     Gi1/0/1
+  20    0011.2233.4501    DYNAMIC     Gi1/0/2
+Total Mac Addresses for this criterion: 9
+===== 2026-11-04T03:00:09Z · show ip arp =====
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  198.51.100.2            -   00a3.d14f.0010  ARPA   Vlan10
+Internet  198.51.100.20          12   0011.2233.4401  ARPA   Vlan10
+Internet  198.51.100.21           3   0011.2233.4402  ARPA   Vlan10
+Internet  198.51.100.130          -   00a3.d14f.0011  ARPA   Vlan20
+Internet  198.51.100.140          5   0011.2233.4501  ARPA   Vlan20
+===== 2026-11-04T03:00:10Z · show standby brief =====
+                     P indicates configured to preempt.
+                     |
+Interface   Grp  Pri P State   Active          Standby         Virtual IP
+Vl10        10   110 P Active  local           198.51.100.3    198.51.100.1
+Vl20        20   100   Active  local           unknown         198.51.100.129
+===== 2026-11-04T03:00:11Z · show spanning-tree root =====
+
+                                        Root    Hello Max Fwd
+Vlan                   Root ID          Cost    Time  Age Dly  Root Port
+---------------- -------------------- --------- ----- --- ---  ------------
+VLAN0001         32769 00a3.d14f.0001         0    2   20  15               
+VLAN0010         24586 00a3.d14f.0099         4    2   20  15  Gi1/0/1      
+VLAN0020         24596 00a3.d14f.0001         0    2   20  15               

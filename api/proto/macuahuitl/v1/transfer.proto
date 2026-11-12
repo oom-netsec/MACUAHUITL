@@ -1,0 +1,234 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Transferencias (Fase 22a): servidores temporales de archivos (TFTP, FTP, SCP, SFTP y HTTP) y
+// clientes (TFTP, FTP, SCP, SFTP, HTTP/HTTPS). Los servidores escuchan en IP explícita y puerto
+// alto, con duración acotada; la app nunca abre puertos privilegiados (ADR 0004).
+service TransferService {
+  // Abre un servidor y emite sus eventos hasta que el cliente cancele, venza la duración
+  // o se llame a StopServer. El primer evento es `ready`.
+  rpc StartServer(StartServerRequest) returns (stream StartServerResponse);
+  rpc StopServer(StopServerRequest) returns (StopServerResponse);
+  rpc ListServers(ListServersRequest) returns (ListServersResponse);
+  // Descarga una URL a una carpeta elegida; la credencial viene de la bóveda.
+  rpc Get(GetRequest) returns (GetResponse);
+  // Envía un archivo de una carpeta elegida a una URL.
+  rpc Put(PutRequest) returns (PutResponse);
+  // Comandos para llegar a los puertos estándar (69, 21, 22) sin privilegios. Solo texto: la app no los ejecuta.
+  rpc RedirectHint(RedirectHintRequest) returns (RedirectHintResponse);
+  // Lista una carpeta remota: FTP (MLSD o LIST), SFTP, SCP (por el subsistema SFTP, si lo hay) y
+  // HTTP(S) (índice HTML). TFTP y un SCP sin SFTP no listan: la respuesta es UNIMPLEMENTED con
+  // «este servidor no permite listar».
+  rpc Browse(BrowseRequest) returns (BrowseResponse);
+  // Get y Put con avance: eventos `progress` (a lo más 10 por segundo) y, al terminar, `file`.
+  // Un error termina el stream con su código gRPC. Cancelar el stream cancela la transferencia.
+  rpc GetStream(GetStreamRequest) returns (stream GetStreamResponse);
+  rpc PutStream(PutStreamRequest) returns (stream PutStreamResponse);
+  // Descarga varios archivos de una misma carpeta remota hacia una carpeta local, uno tras otro, con
+  // avance por archivo. Un archivo que falla no detiene a los demás. Cancelar el stream detiene el lote.
+  rpc GetMany(GetManyRequest) returns (stream GetManyResponse);
+}
+
+message StartServerRequest {
+  string protocol = 1;                // tftp, ftp, scp, sftp o http
+  string listen = 2;                  // IP o IP:PUERTO; sin puerto: tftp 6969, ftp 2121, scp y sftp 2222, http 8080
+  bool allow_any = 3;                 // escuchar en 0.0.0.0 / :: (con escritura exige allow)
+  repeated string files = 4;          // archivos sueltos para leer (rutas absolutas, por nombre base)
+  string from_dir = 5;                // carpeta publicada para leer (archivos regulares de primer nivel)
+  bool write = 6;                     // acepta subidas (no aplica a http)
+  string recv_dir = 7;                // carpeta de recepción; vacío = outputs/recibidos/<sello>/
+  repeated string allow = 8;          // IP de origen permitidas; vacío = cualquiera
+  int64 max_file_bytes = 9;           // tope por archivo recibido; 0 = 512 MiB
+  int64 max_total_bytes = 10;         // tope de todo lo recibido; 0 = 2 GiB
+  int32 duration_seconds = 11;        // 0 = 30 min; máximo 24 h
+  bool legacy_ssh = 12;               // scp y sftp: ofrece también aes128-cbc, 3des-cbc, diffie-hellman-group14-sha1, hmac-sha1 y ssh-rsa (IOS 15.x); apagado por omisión
+  uint32 passive_port_min = 13;       // ftp: rango de puertos de datos; 0 = puerto+1 a puerto+32
+  uint32 passive_port_max = 14;
+}
+
+message ServerReady {
+  string server_id = 1;
+  string protocol = 2;
+  string listening = 3;               // dirección real
+  string hint = 4;                    // qué teclear en el equipo, con la redirección de puertos
+  string user = 5;                    // ftp, scp, sftp: generados para esta sesión
+  string password = 6;
+  repeated string fingerprints = 7;   // scp, sftp: huellas SHA256 de las llaves de host efímeras
+  string recv_dir = 8;                // vacío si no recibe
+  string from_dir = 9;
+  repeated string files = 10;         // nombres que se pueden leer ahora
+}
+
+message StartServerResponse {
+  oneof event {
+    ServerReady ready = 1;
+    string transfer_json = 2;         // una transferencia o un rechazo (campo Rejected)
+    ServerClosed closed = 3;          // último evento: el servidor se cerró
+  }
+}
+
+message ServerClosed {
+  string cleanup = 1;                 // comando para quitar la regla de nftables de este servidor ("" si no hay)
+}
+
+message StopServerRequest {
+  string server_id = 1;
+}
+
+message StopServerResponse {
+  bool stopped = 1; // falso si ya no estaba
+}
+
+message ListServersRequest {}
+
+message ServerInfo {
+  string server_id = 1;
+  string protocol = 2;
+  string listening = 3;
+  int64 started_unix = 4;
+  bool write = 5;
+  string recv_dir = 6;
+  string from_dir = 7;
+  int64 transfers = 8;
+  int64 rejected = 9;
+}
+
+message ListServersResponse {
+  repeated ServerInfo servers = 1;
+}
+
+message TransferResult {
+  string path = 1;      // archivo guardado (get) o enviado (put)
+  int64 bytes = 2;
+  string md5 = 3;
+  string sha256 = 4;
+  string verified = 5;  // "", "ok" o "distinto"
+  double seconds = 6;
+  string report = 7;    // texto para la CLI
+}
+
+message GetRequest {
+  string url = 1;                     // tftp://, ftp://, scp://, sftp://, http:// o https://
+  string dest_dir = 2;                // carpeta de destino; vacío = outputs/recibidos/<sello>/
+  string name = 3;                    // nombre local; vacío = el de la URL
+  string credential_id = 4;          // bóveda; obligatoria para scp y sftp, opcional en ftp
+  string sha256 = 5;                  // esperado (opcional)
+  string md5 = 6;
+  string sha512 = 7;
+  bool insecure = 8;                  // https sin verificar el certificado (se audita)
+  repeated string accepted_host_key_fingerprints = 9;
+  int64 max_bytes = 10;               // 0 = 2 GiB
+  int32 timeout_seconds = 11;         // 0 = 30 min; máximo 4 h
+  bool legacy_ssh = 12;               // scp y sftp hacia equipos con SSH antiguo (se audita)
+}
+
+message GetResponse {
+  TransferResult result = 1;
+}
+
+message PutRequest {
+  string url = 1;                     // tftp://, ftp://, scp:// o sftp://
+  string from_dir = 2;                // carpeta de donde sale el archivo
+  string name = 3;                    // archivo regular de primer nivel de from_dir
+  string credential_id = 4;
+  repeated string accepted_host_key_fingerprints = 5;
+  int64 max_bytes = 6;
+  int32 timeout_seconds = 7;
+  bool legacy_ssh = 8;
+}
+
+message PutResponse {
+  TransferResult result = 1;
+}
+
+message RedirectHintRequest {
+  string protocol = 1;                // tftp, ftp, scp o sftp
+  int32 port = 2;                     // el puerto alto en que escucha el servidor
+  string ip = 3;                      // IP de escucha: la regla solo redirige lo dirigido a ella
+}
+
+message RedirectHintResponse {
+  int32 standard_port = 1;
+  string nftables = 2;                // regla de redirección (recomendada)
+  string setcap = 3;                  // alternativa más amplia, con su advertencia
+  string remove = 4;                  // comando para quitar la regla al terminar
+}
+
+message BrowseRequest {
+  string url = 1;                     // ftp://, sftp://, scp://, http:// o https:// (tftp:// responde que no lista)
+  string credential_id = 2;           // bóveda; obligatoria para scp y sftp, opcional en ftp
+  string path = 3;                    // carpeta remota; vacío = la de la URL
+  repeated string accepted_host_key_fingerprints = 4;
+  bool insecure = 5;                  // https sin verificar el certificado (se audita)
+  bool legacy_ssh = 6;
+  int32 max_entries = 7;              // 0 = 2000; máximo 20000
+  int32 timeout_seconds = 8;          // 0 = 30 s; máximo 300
+}
+
+message RemoteEntry {
+  string name = 1;                    // saneado para mostrarlo (sin caracteres de control ni de formato)
+  string type = 2;                    // file, dir, link u other
+  int64 size = 3;                     // bytes; -1 si el servidor no lo dice
+  int64 modified_ms = 4;              // unix ms; 0 si no la dice
+  string perms = 5;                   // «rwxr-xr-x», «0644» o los permisos de MLSD; vacío si no los hay
+  bool downloadable = 6;              // archivo cuyo nombre Get puede pedir
+  bool unsafe_name = 7;               // el nombre original traía caracteres de control, invisibles o UTF-8 inválido
+}
+
+message BrowseResponse {
+  string path = 1;
+  repeated RemoteEntry entries = 2;   // carpetas primero, luego por nombre
+  bool truncated = 3;                 // se cortó por el tope de entradas o de bytes
+  string method = 4;                  // mlsd, list, sftp o http
+}
+
+message GetManyRequest {
+  string url = 1;                     // carpeta remota: ftp://host/dir/, sftp://, scp://, http:// o https://
+  repeated string names = 2;          // nombres base (sin «/»); máximo 200
+  string dest_dir = 3;                // carpeta local; vacío = outputs/recibidos/<sello>/
+  string credential_id = 4;
+  repeated string accepted_host_key_fingerprints = 5;
+  bool insecure = 6;
+  int64 max_bytes = 7;                // por archivo; 0 = 2 GiB
+  int32 timeout_seconds = 8;          // por archivo; 0 = 30 min
+  bool legacy_ssh = 9;
+}
+
+message GetStreamRequest { GetRequest request = 1; }
+message PutStreamRequest { PutRequest request = 1; }
+message GetStreamResponse { TransferEvent event = 1; }
+message PutStreamResponse { TransferEvent event = 1; }
+message GetManyResponse { TransferEvent event = 1; }
+
+message TransferEvent {
+  oneof event {
+    TransferProgress progress = 1;
+    FileResult file = 2;              // terminó un archivo (en Get y Put, el único)
+    BatchSummary done = 3;            // solo GetMany: el lote terminó
+  }
+}
+
+message TransferProgress {
+  int32 index = 1;                    // posición del archivo en el lote (0 en Get y Put)
+  int32 count = 2;
+  string name = 3;
+  int64 bytes = 4;
+  int64 total = 5;                    // 0 si no se conoce
+  double bytes_per_sec = 6;
+}
+
+message FileResult {
+  int32 index = 1;
+  string name = 2;
+  bool ok = 3;
+  string error = 4;
+  TransferResult result = 5;          // presente si ok
+}
+
+message BatchSummary {
+  int32 ok = 1;
+  int32 failed = 2;
+}

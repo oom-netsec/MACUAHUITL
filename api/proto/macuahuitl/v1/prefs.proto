@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Preferencias de la interfaz (Fase 15b): pares clave/valor pequeños guardados en el
+// store SQLite. Nunca guardan secretos. Una clave sin valor devuelve found=false.
+service PrefsService {
+  rpc GetPreference(GetPreferenceRequest) returns (GetPreferenceResponse);
+  rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
+  // Preferencias tipadas del núcleo (fase 29e). Se guardan con claves reservadas core.* que
+  // SetPreference no puede escribir.
+  rpc GetCorePrefs(GetCorePrefsRequest) returns (GetCorePrefsResponse);
+  rpc SetCorePrefs(SetCorePrefsRequest) returns (SetCorePrefsResponse);
+}
+
+message GetPreferenceRequest {
+  string key = 1;
+}
+
+message GetPreferenceResponse {
+  string value = 1;
+  bool found = 2;
+}
+
+message SetPreferenceRequest {
+  string key = 1;
+  string value = 2;
+}
+
+message SetPreferenceResponse {}
+
+// Defaults de archivo para syslog, traps y flujos cuando la petición deja el campo en 0 o vacío.
+// 0 o vacío = el de fábrica. Rangos de la fase 28a: rotate_mb 1-1024, rotate_minutes 1-10080,
+// max_files 1-1000, format texto|crudo|jsonl.
+message IngestDefaults {
+  int32 rotate_mb = 1;
+  int32 rotate_minutes = 2;
+  int32 max_files = 3;
+  string format = 4;
+}
+
+message CorePrefs {
+  // Carpeta base de salidas; vacía = la de fábrica. Absoluta, existente, del usuario, escribible y 0700.
+  // Los errores llevan el código prefs.outputs.<motivo> al inicio del mensaje.
+  string outputs_dir = 1;
+  IngestDefaults ingest_defaults = 2;
+}
+
+message GetCorePrefsRequest {}
+
+message SetCorePrefsRequest {
+  // Reemplaza todo: un campo en 0 o vacío vuelve al de fábrica.
+  CorePrefs prefs = 1;
+}
+
+message GetCorePrefsResponse {
+  CorePrefsState state = 1;
+}
+
+message SetCorePrefsResponse {
+  CorePrefsState state = 1;
+}
+
+message CorePrefsState {
+  CorePrefs prefs = 1;
+  string outputs_dir_effective = 2; // la carpeta que rige hoy (la de fábrica si outputs_dir va vacío)
+  string outputs_dir_default = 3;
+  // Aviso al cambiar la carpeta: aplica a lo que empiece después y los datos anteriores no se mueven.
+  string note = 4;
+}

@@ -1,0 +1,127 @@
+===== 2026-11-04T10:20:01Z · show version =====
+Cisco IOS XE Software, Version 17.09.04a
+Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2023 by Cisco Systems, Inc.
+Compiled Fri 20-Oct-23 10:44 by mcpre
+
+ROM: IOS-XE ROMMON
+BOOTLDR: System Bootstrap, Version 17.9.1r[FC2], RELEASE SOFTWARE (P)
+
+SW1 uptime is 4 minutes
+Uptime for this control processor is 6 minutes
+System returned to ROM by Critical software exception
+System image file is "flash:packages.conf"
+Last reload reason: Critical software exception
+
+cisco C9300-48P (X86) processor with 1419044K/6147K bytes of memory.
+===== 2026-11-04T10:20:02Z · show clock detail =====
+*10:20:02.105 UTC Wed Nov 4 2026
+No time source
+===== 2026-11-04T10:20:03Z · show logging =====
+Syslog logging: enabled (0 messages dropped, 3 messages rate-limited, 0 flushes, 0 overruns, xml disabled, filtering disabled)
+
+No Active Message Discriminator.
+
+    Console logging: disabled
+    Monitor logging: level debugging, 0 messages logged, xml disabled,
+    Buffer logging:  level debugging, 41 messages logged, xml disabled,
+                     filtering disabled
+
+Log Buffer (102400 bytes):
+
+Nov  4 2026 10:16:30.004 UTC: %SYS-5-RESTART: System restarted --
+Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+Nov  4 2026 10:16:41.220 UTC: %LINK-3-UPDOWN: Interface GigabitEthernet1/0/1, changed state to up
+Nov  4 2026 10:16:42.221 UTC: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet1/0/1, changed state to up
+===== 2026-11-04T10:20:05Z · show processes cpu sorted =====
+CPU utilization for five seconds: 95%/4%; one minute: 93%; five minutes: 91%
+ PID Runtime(ms)     Invoked      uSecs   5Sec   1Min   5Min TTY Process 
+  84     1234567      345678       3571 20.15% 19.80% 19.50%   0 IP Input         
+ 312      456789      234567       1947  8.31%  8.02%  7.90%   0 BGP Router       
+   1           0           1          0  0.00%  0.00%  0.00%   0 Chunk Manager    
+===== 2026-11-04T10:20:07Z · show processes memory sorted =====
+Processor Pool Total: 1557408352 Used: 1437408352 Free:  120000000
+reserve P Pool Total:     102404 Used:         88 Free:     102316
+ lsmpi_io Pool Total:    6295128 Used:    6294296 Free:        832
+
+ PID TTY  Allocated      Freed    Holding    Getbufs    Retbufs Process
+   0   0  678912344  234567812  401234560          0          0 *Init*          
+ 312   0   45678912    1234567   38912344          0          0 BGP Router      
+===== 2026-11-04T10:20:09Z · show interfaces =====
+GigabitEthernet1/0/1 is up, line protocol is up (connected) 
+  Hardware is Gigabit Ethernet, address is 7069.5a3b.1c01 (bia 7069.5a3b.1c01)
+  Description: Uplink-Core
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Full-duplex, 1000Mb/s, media type is 10/100/1000BaseTX
+  input flow-control is on, output flow-control is unsupported 
+  ARP type: ARPA, ARP Timeout 04:00:00
+  Last input 00:00:00, output 00:00:00, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 2000 bits/sec, 3 packets/sec
+  5 minute output rate 5000 bits/sec, 6 packets/sec
+     123456 packets input, 98765432 bytes, 0 no buffer
+     Received 1234 broadcasts (1000 multicasts)
+     0 runts, 0 giants, 0 throttles 
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 1000 multicast, 0 pause input
+     0 input packets with dribble condition detected
+     234567 packets output, 123456789 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+GigabitEthernet1/0/7 is up, line protocol is up (connected) 
+  Hardware is Gigabit Ethernet, address is 7069.5a3b.1c07 (bia 7069.5a3b.1c07)
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+     reliability 255/255, txload 1/255, rxload 1/255
+  Encapsulation ARPA, loopback not set
+  Keepalive set (10 sec)
+  Full-duplex, 1000Mb/s, media type is 10/100/1000BaseTX
+  Last input 00:00:01, output 00:00:00, output hang never
+  Last clearing of "show interface" counters never
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  Queueing strategy: fifo
+  Output queue: 0/40 (size/max)
+  5 minute input rate 1000 bits/sec, 1 packets/sec
+  5 minute output rate 900000000 bits/sec, 80000 packets/sec
+     5000 packets input, 640000 bytes, 0 no buffer
+     Received 12 broadcasts (0 multicasts)
+     0 runts, 0 giants, 0 throttles 
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 watchdog, 0 multicast, 0 pause input
+     0 input packets with dribble condition detected
+     99999999 packets output, 9876543210 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+     0 unknown protocol drops
+     0 babbles, 0 late collision, 0 deferred
+     0 lost carrier, 0 no carrier, 0 pause output
+     0 output buffer failures, 0 output buffers swapped out
+===== 2026-11-04T10:20:11Z · show spanning-tree detail =====
+
+ VLAN0010 is executing the rstp compatible Spanning Tree protocol
+  Bridge Identifier has priority 32768, sysid 10, address 7069.5a3b.1c00
+  Configured hello time 2, max age 20, forward delay 15, transmit hold-count 6
+  Current root has priority 24586, address 0011.2233.4455
+  Root port is 1 (GigabitEthernet1/0/1), cost of root path is 4
+  Topology change flag not set, detected flag not set
+  Number of topology changes 2 last change occurred 00:03:10 ago
+          from GigabitEthernet1/0/7
+  Times:  hold 1, topology change 35, notification 2
+          hello 2, max age 20, forward delay 15 
+  Timers: hello 0, topology change 0, notification 0, aging 300
+===== 2026-11-04T10:20:12Z · dir crashinfo: =====
+Directory of crashinfo:/
+
+   11  -rw-           245760  Nov 4 2026 10:16:02 +00:00  crashinfo_RP_00_00_20261104-101559-UTC
+   12  -rw-          8126464  Nov 4 2026 10:16:10 +00:00  system-report_RP_0_20261104-101559-UTC.tar.gz
+   13  -rw-              110  Nov 4 2026 10:16:02 +00:00  last_crashinfo
+
+1621966848 bytes total (1489240064 bytes free)

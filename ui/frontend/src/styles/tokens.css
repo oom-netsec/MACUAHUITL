@@ -1,0 +1,87 @@
+/* Tokens del sistema de diseño (ADR 0009). Los colores se definen una sola vez con light-dark();
+   data-theme fija el esquema y, sin él, manda el del sistema. Ningún componente usa un color directo. */
+@font-face {
+  font-family: "Inter";
+  src: url("../assets/fonts/InterVariable-latin.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("../assets/fonts/JetBrainsMono-latin.woff2") format("woff2");
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+
+  /* Superficies: la profundidad sale de esta escalera y de bordes finos, no de sombras. */
+  --canvas: light-dark(#f6f7f9, #0b0c0e);
+  --surface: light-dark(#ffffff, #121417);
+  --surface-2: light-dark(#f0f1f4, #191c20);
+  --surface-3: light-dark(#ffffff, #1e2126);
+  --sidebar: light-dark(#eef0f3, #0f1113);
+  --hairline: light-dark(#e3e5ea, #24272d);
+  --border-control: light-dark(#868c98, #62686f); /* ≥ 3:1: identifica campos y controles (WCAG 1.4.11) */
+  --hover: light-dark(rgb(0 0 0 / 0.045), rgb(255 255 255 / 0.055));
+  --pressed: light-dark(rgb(0 0 0 / 0.08), rgb(255 255 255 / 0.09));
+  --scrollbar: light-dark(#b9bdc6, #3a3e45);
+
+  /* Texto */
+  --text: light-dark(#16181d, #eceef2);
+  --text-2: light-dark(#4b5160, #a9aeb8);
+  --text-3: light-dark(#636978, #8a909b);
+
+  /* Acento: acción primaria, foco, selección y marca. Nunca significa "ok". */
+  --accent: light-dark(#0a7566, #45c9ad);
+  --accent-fg: light-dark(#ffffff, #05231d);
+  --accent-soft: light-dark(#e3f2ef, #12302a);
+
+  /* Estado: siempre con ícono o texto. El rojo es solo de fallos y del modo de cambio asistido. */
+  --critical: light-dark(#c42b2b, #ff6b63);
+  --critical-soft: light-dark(#fdecec, #2a1214);
+  --critical-solid: light-dark(#c42b2b, #c93a32); /* fondo con texto blanco */
+  --warning: light-dark(#8f5400, #f0b44a);
+  --warning-soft: light-dark(#fdf3e1, #2a2010);
+  --success: light-dark(#1c7344, #52cc8a);
+  --success-soft: light-dark(#e8f5ee, #10261a);
+  --info: light-dark(#2a5fc4, #79aaff);
+  --info-soft: light-dark(#eaf1fd, #121e33);
+
+  /* Series de gráficas: orden fijo, validado para daltonismo en ambos temas (skill dataviz). En claro, tres
+     quedan bajo 3:1 contra la superficie: por eso toda gráfica lleva leyenda y tabla de datos. */
+  --chart-1: light-dark(#2a78d6, #3987e5); --chart-2: light-dark(#eb6834, #d95926);
+  --chart-3: light-dark(#1baf7a, #199e70); --chart-4: light-dark(#eda100, #c98500);
+  --chart-5: light-dark(#e87ba4, #d55181); --chart-6: light-dark(#008300, #008300);
+  --chart-7: light-dark(#6250d6, #9085e9); --chart-8: light-dark(#e34948, #e66767);
+
+  /* Tipografía */
+  --font: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+  --fs-title: 20px; --lh-title: 28px;
+  --fs-heading: 15px; --lh-heading: 22px;
+  --fs-body: 13px; --lh-body: 20px;
+  --fs-small: 12px; --lh-small: 16px;
+  --fs-mono: 12.5px; --lh-mono: 19px;
+
+  /* Espacio (retícula de 4 px), forma y capas */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+  --control-h: 32px; --control-h-sm: 28px;
+  --r-1: 4px; --r-2: 6px; --r-3: 8px; --r-4: 12px;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.08), 0 4px 12px rgb(0 0 0 / 0.08);
+  --shadow-2: 0 2px 6px rgb(0 0 0 / 0.12), 0 16px 48px rgb(0 0 0 / 0.22);
+  --z-sticky: 10; --z-sidebar: 20; --z-flyout: 30; --z-toast: 40; --z-overlay: 50;
+
+  /* Movimiento: solo opacity y transform. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --t-fast: 120ms; --t-in: 160ms; --t-out: 100ms;
+
+  /* Alias de los nombres anteriores, mientras los módulos migran al sistema. */
+  --bg: var(--canvas); --fg: var(--text); --muted: var(--text-2); --line: var(--hairline); --field: var(--surface);
+  --danger: var(--critical); --danger-soft: var(--critical-soft); --alert-fg: var(--critical); --alert-bg: var(--critical-soft);
+  --warn-fg: var(--warning); --warn-bg: var(--warning-soft); --ok: var(--success);
+  --radius: var(--r-2); --radius-lg: var(--r-3); --shadow: none;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }

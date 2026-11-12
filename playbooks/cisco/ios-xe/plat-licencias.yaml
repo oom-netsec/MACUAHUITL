@@ -1,0 +1,19 @@
+# Propósito: Revisa el nivel de licencia, el uso y el estado de registro (Smart Licensing y clásico).
+# Cuándo usarlo: Una función no habilita, mensajes de licencia vencida o no registrada, o auditoría de licencias.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: plat-licencias
+platform: ios-xe
+name: Plataforma · Licencias
+commands:
+  - cmd: show clock
+  - cmd: show license summary
+  - cmd: show license status
+  - cmd: show license usage
+  - cmd: show license udi
+  - cmd: show license authorization
+  - cmd: show license feature
+  - cmd: show version | include License|Level|Package
+  - cmd: show logging | include SMART_LIC|LICENSE|SMART
+  - cmd: show license all
+    may_contain_secrets: true

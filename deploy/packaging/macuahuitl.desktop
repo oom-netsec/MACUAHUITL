@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MACUAHUITL
+Comment=Recolección TAC, bóveda de credenciales y diagnóstico de red Cisco
+Exec=/usr/bin/macuahuitl
+Icon=macuahuitl
+StartupWMClass=macuahuitl
+Terminal=false
+Categories=Network;System;
+Keywords=cisco;tac;ssh;acl;pcap;

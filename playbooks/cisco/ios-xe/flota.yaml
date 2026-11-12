@@ -1,0 +1,26 @@
+id: flota
+platform: ios-xe
+name: Flota · Día a día (ARP, CAM, rutas, NTP, inventario, flash)
+commands:
+  - cmd: show version
+  - cmd: show ip arp
+  - cmd: show mac address-table
+    timeout: 120s
+  - cmd: show ip dhcp snooping binding
+  - cmd: show cdp neighbors detail
+  - cmd: show lldp neighbors detail
+  - cmd: show etherchannel summary
+  - cmd: show ip route
+    timeout: 300s
+  - cmd: show ip cef
+    timeout: 120s
+  - cmd: show ip interface brief
+  - cmd: show interfaces
+    timeout: 120s
+  - cmd: show interfaces status
+  - cmd: show processes cpu
+  - cmd: show processes memory
+  - cmd: show ntp status
+  - cmd: show inventory
+  - cmd: "dir flash:"
+  - cmd: "dir bootflash:"

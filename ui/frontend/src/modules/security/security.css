@@ -1,0 +1,15 @@
+/* Seguridad: tarjetas de RADIUS y TACACS+ y cadena de certificados. */
+.sec-cards { display: grid; gap: var(--s-4); }
+.findings { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.raw-output summary { cursor: pointer; color: var(--text-2); padding: var(--s-1) 0; }
+.chain { list-style: none; margin: 0; padding: 0; display: grid; }
+.chain-item { position: relative; padding: var(--s-4); border: 1px solid var(--hairline); border-radius: var(--r-3); background: var(--surface); margin-bottom: var(--s-5); }
+.chain-item:not(:last-child)::after { content: ""; position: absolute; left: var(--s-6); bottom: calc(-1 * var(--s-5)); height: var(--s-5); border-left: 2px solid var(--border-control); }
+.chain-item[data-state="bad"], .chain-item[data-state="expired"] { border-color: var(--critical); }
+.chain-item[data-state="warn"] { border-color: var(--warning); }
+.chain-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); margin-bottom: var(--s-3); }
+.chain-kv { margin: 0; display: grid; gap: var(--s-1); }
+.chain-kv > div { display: grid; grid-template-columns: 110px 1fr; gap: var(--s-3); }
+.chain-kv dt { color: var(--text-2); }
+.chain-kv dd { margin: 0; overflow-wrap: anywhere; }
+.sec-cards table { table-layout: fixed; }

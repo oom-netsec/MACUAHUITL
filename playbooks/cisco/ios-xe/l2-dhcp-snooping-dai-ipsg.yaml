@@ -1,0 +1,21 @@
+# Propósito: Revisa DHCP snooping, la inspección dinámica de ARP y IP Source Guard con sus bindings y descartes.
+# Cuándo usarlo: Clientes sin IP, ARP bloqueado o tráfico descartado por IPSG; tras habilitar funciones de seguridad en acceso.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: l2-dhcp-snooping-dai-ipsg
+platform: ios-xe
+name: L2 · DHCP snooping, DAI e IPSG
+commands:
+  - cmd: show clock
+  - cmd: show ip dhcp snooping
+  - cmd: show ip dhcp snooping statistics
+  - cmd: show ip dhcp snooping database
+  - cmd: show ip arp inspection
+  - cmd: show ip arp inspection interfaces
+  - cmd: show ip arp inspection statistics
+  - cmd: show ip arp inspection log
+  - cmd: show ip verify source
+  - cmd: show ip source binding
+  - cmd: show errdisable recovery
+  - cmd: show logging | include DHCP_SNOOPING|SW_DAI|IPSG|RATE_LIMIT
+  - cmd: show ip dhcp snooping binding

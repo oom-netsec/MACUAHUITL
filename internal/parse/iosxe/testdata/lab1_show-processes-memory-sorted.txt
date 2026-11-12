@@ -1,0 +1,7 @@
+Processor Pool Total: 1557408352 Used:  495624528 Free: 1061783824
+reserve P Pool Total:     102404 Used:         88 Free:     102316
+ lsmpi_io Pool Total:    6295128 Used:    6294296 Free:        832
+
+ PID TTY  Allocated      Freed    Holding    Getbufs    Retbufs Process
+   0   0  678912344  234567812  401234560          0          0 *Init*          
+ 312   0   45678912    1234567   38912344          0          0 BGP Router      

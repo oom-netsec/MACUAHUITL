@@ -1,0 +1,18 @@
+/* Visibilidad: topología, tablas dentro del panel de resultado y enlaces de exportación. */
+img.topo { max-width: 100%; height: auto; background: #ffffff; border: 1px solid var(--hairline); border-radius: var(--r-3); } /* el grafo trae fondo claro propio */
+.export-links { display: flex; gap: var(--s-3); font-size: var(--fs-small); }
+.readings p { margin: 0 0 var(--s-1); }
+
+/* Gráficas por interfaz, barras de top talkers y tendencia en la fila. */
+.iface-charts { display: grid; gap: var(--s-4); }
+.rate { display: inline-flex; align-items: center; gap: var(--s-2); justify-content: flex-end; color: var(--text); }
+.rate .spark { color: var(--info); }
+.bars { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.bars li { display: grid; grid-template-columns: 200px 1fr 240px; align-items: center; gap: var(--s-3); }
+.bars .bar { display: block; height: 10px; background: var(--surface-2); border-radius: var(--r-1); overflow: hidden; }
+.bars .bar-fill { display: block; height: 100%; background: var(--chart-1); border-radius: var(--r-1); }
+.bars .bar-value { text-align: right; color: var(--text-2); }
+
+/* Paneles de pestaña que siguen montados: contents conserva el espaciado; hidden los oculta. */
+.vis-panel { display: contents; }
+.vis-panel[hidden] { display: none; }

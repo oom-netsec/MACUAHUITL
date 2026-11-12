@@ -1,0 +1,70 @@
+// Package platform define la interfaz común de los drivers por plataforma
+// Cisco (iosxe, nxos, aireos, ftd, ise, catcenter): prompts, paginación,
+// modos y detección (spec §7.1).
+//
+// No hace: abrir conexiones por su cuenta; recibe el shell de transport.
+package platform
+
+import (
+	"context"
+	"errors"
+	"io"
+	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/secret"
+)
+
+var (
+	ErrPromptTimeout   = errors.New("platform: el equipo no mostró prompt a tiempo")
+	ErrEnableFailed    = errors.New("platform: enable rechazado")
+	ErrUnknownPlatform = errors.New("platform: plataforma no reconocida")
+	ErrClosed          = errors.New("platform: el equipo cerró la sesión")
+)
+
+// Output es la salida limpia de un comando: sin eco, sin prompt y sin --More--.
+type Output struct {
+	Command        string
+	Text           string
+	Invalid        bool
+	Started, Ended time.Time
+}
+
+// ErrConfigLine: la línea no puede enviarse en modo configuración (cambiaría de modo o ejecutaría
+// un comando de exec).
+var ErrConfigLine = errors.New("platform: línea de configuración no permitida")
+
+// LineResult es una línea de configuración enviada y lo que el equipo respondió.
+type LineResult struct {
+	Line   string
+	Output string
+	Failed bool // la respuesta fue % Invalid input, % Incomplete command, % Ambiguous command o % Error
+}
+
+// ConfigResult es lo ocurrido en una sesión de configuración. Lines solo trae las líneas
+// enviadas: tras un error no se manda ninguna más y el modo se cierra con "end".
+type ConfigResult struct {
+	Lines  []LineResult
+	Failed bool
+}
+
+// Driver habla con un shell ya abierto.
+type Driver interface {
+	// Open espera el prompt, entra a privilegiado con enable y desactiva la paginación.
+	// Destruye enable al volver.
+	Open(ctx context.Context, r io.Reader, w io.Writer, enable *secret.Secret) error
+	Run(ctx context.Context, cmd string, timeout time.Duration) (Output, error)
+	// Configure entra con "configure terminal", manda las líneas una por una y sale con "end".
+	// Tras el primer error de configuración no manda las restantes. No decide qué líneas son
+	// aceptables: eso lo hace quien arma el plan; solo rechaza las que cambian de modo.
+	Configure(ctx context.Context, lines []string, timeout time.Duration) (ConfigResult, error)
+	// Detect devuelve el ID de plataforma de los playbooks (p. ej. "ios-xe").
+	Detect(ctx context.Context) (string, error)
+	// Hostname es el nombre que mostró el prompt; vacío antes de Open.
+	Hostname() string
+	// Err es nil si la sesión sigue utilizable. Detecta también un cierre que llegó mientras el
+	// driver estaba ocioso (exec-timeout del equipo): quien lo reciba debe reconectar.
+	Err() error
+	// Close suelta el lector del shell. Tras cualquier error el driver queda inservible
+	// y devuelve ese error en cada llamada: el worker debe reconectar.
+	Close()
+}

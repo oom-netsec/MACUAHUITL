@@ -1,0 +1,9 @@
+ciscoasa# debug crypto ikev1 127
+Apr 02 10:00:01 [IKEv1]IP = 192.0.2.50, IKE Initiator: New Phase 1, Intf outside, IKE Peer 192.0.2.50  local Proxy Address 10.10.10.0, remote Proxy Address 10.20.20.0,  Crypto map (outside_map)
+Apr 02 10:00:01 [IKEv1 DEBUG]IP = 192.0.2.50, processing SA payload
+Apr 02 10:00:01 [IKEv1]Phase 1 failure: Mismatched attribute types for class Group:  Rcv'd: Group 2  Cfg'd: Group 14
+Apr 02 10:00:01 [IKEv1 DEBUG]IP = 192.0.2.50, All SA proposals found unacceptable
+Apr 02 10:00:01 [IKEv1]IP = 192.0.2.50, Error processing payload: Payload ID: 1
+Apr 02 10:00:02 [IKEv1]Group = 192.0.2.60, IP = 192.0.2.60, Rejecting IPSec tunnel: no matching crypto map entry for remote proxy 10.30.30.0/255.255.255.0/0/0 local proxy 10.10.10.0/255.255.255.0/0/0 on interface outside
+Apr 02 10:00:03 [IKEv1]IP = 192.0.2.70, Received an un-encrypted PAYLOAD_MALFORMED notify message, dropping
+Apr 02 10:00:03 [IKEv1]IP = 192.0.2.70, Duplicate Phase 1 packet detected.  Retransmitting last packet.

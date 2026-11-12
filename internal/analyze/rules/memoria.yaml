@@ -1,0 +1,19 @@
+# SIN VALIDAR EN LABORATORIO: formatos y umbrales tomados de la documentación
+# pública de Cisco IOS-XE, sin transcripciones reales todavía. Ajustar con
+# salidas de equipos reales antes de confiar en los umbrales.
+- id: memoria-baja
+  title: Memoria de procesador baja
+  severity: alta
+  commands: [show processes memory sorted, show processes memory, show memory statistics]
+  check: mem_low
+  params: {below: "10"}
+  explanation: Queda menos memoria libre en el pool Processor que el umbral; las asignaciones pueden fallar (%SYS-2-MALLOCFAIL) y el equipo puede recargar.
+  action: Identifica el proceso con más Holding en show processes memory sorted y compáralo entre rondas; abre caso TAC con show tech-support si no se explica por la configuración.
+- id: memoria-fuga
+  title: Posible fuga de memoria
+  severity: alta
+  commands: [show processes memory sorted, show processes memory, show memory statistics]
+  check: mem_leak
+  params: {rounds: "3", drop: "5"}
+  explanation: La memoria libre del pool Processor baja en cada ronda y la caída total supera el umbral; es el patrón típico de una fuga.
+  action: Sigue el Holding por proceso entre rondas (show processes memory sorted) y busca el defecto conocido para la versión en el Bug Search Tool.

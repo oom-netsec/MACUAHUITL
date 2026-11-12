@@ -1,0 +1,12 @@
+id: cpu-alta
+platform: ios-xe
+name: Plataforma · CPU alta
+commands:
+  - cmd: show clock
+  - cmd: show processes cpu sorted
+  - cmd: show processes cpu history
+  - cmd: show processes cpu platform sorted
+  - cmd: show platform software process slot switch active r0 monitor
+  - cmd: show interfaces summary
+  - cmd: show platform hardware fed switch active qos queue stats internal cpu policer
+  - cmd: show logging | include CPU|HOG|MEM

@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Auditoría encadenada (spec §11).
+service AuditService {
+  rpc Verify(VerifyRequest) returns (VerifyResponse);
+  rpc Export(ExportRequest) returns (stream ExportResponse);
+}
+
+message VerifyRequest {}
+message VerifyResponse {
+  bool intact = 1;
+  // Primer registro roto, si lo hay.
+  uint64 first_broken_seq = 2;
+  string head_hash = 3;
+}
+
+message ExportRequest {
+  google.protobuf.Timestamp from = 1;
+  google.protobuf.Timestamp to = 2;
+}
+
+// Una línea JSON Lines del log.
+message ExportResponse {
+  string json_line = 1;
+}

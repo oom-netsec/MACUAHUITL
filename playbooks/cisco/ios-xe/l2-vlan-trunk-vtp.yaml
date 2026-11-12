@@ -1,0 +1,19 @@
+# Propósito: Verifica VLAN existentes, troncales, VLAN nativa y el estado de VTP.
+# Cuándo usarlo: VLAN que no pasa por un troncal, desajuste de VLAN nativa o cambios inesperados de la base de VLAN.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/command/lsw-cr-book.html
+# Sin validar en laboratorio.
+id: l2-vlan-trunk-vtp
+platform: ios-xe
+name: L2 · VLAN, trunks y VTP
+commands:
+  - cmd: show clock
+  - cmd: show vlan summary
+  - cmd: show vlan brief
+  - cmd: show interfaces trunk
+  - cmd: show vtp status
+  - cmd: show vtp counters
+  - cmd: show logging | include VTP|NATIVE_VLAN|TRUNK|DTP
+  - cmd: show interfaces switchport
+  - cmd: show vlan
+  - cmd: show running-config | include switchport trunk|^interface
+    may_contain_secrets: true

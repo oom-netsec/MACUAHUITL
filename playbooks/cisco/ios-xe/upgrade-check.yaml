@@ -1,0 +1,17 @@
+id: upgrade-check
+platform: ios-xe
+name: Cambio · Verificación previa a upgrade
+# Solo lectura. Las salidas alimentan mctl upgrade check; el verify /md5 depende de
+# la imagen y se pide aparte (también es de lectura).
+commands:
+  - cmd: show version
+  - cmd: "dir flash:"
+  - cmd: "dir bootflash:"
+  - cmd: show boot
+  - cmd: show bootvar
+  - cmd: show install summary
+  - cmd: show redundancy
+  - cmd: show running-config | include boot
+    may_contain_secrets: true
+  - cmd: show running-config | include configuration change|NVRAM config
+    may_contain_secrets: true

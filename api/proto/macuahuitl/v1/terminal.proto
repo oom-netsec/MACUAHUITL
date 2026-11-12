@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Terminal SSH interactiva (Fase 16b). Es manual: lo que el ingeniero teclea va directo al
+// equipo, sin pasar por el modo asistido ni por listas cerradas. La sesión usa el EgressGuard,
+// la credencial de la bóveda y la verificación estricta de la llave de host. Se graba lo que
+// devuelve el equipo y lo tecleado, salvo lo que se escribe en un prompt de contraseña o secreto.
+service TerminalService {
+  // El primer mensaje debe ser `open`; después, `data` o `resize`. Cerrar el envío (o cancelar,
+  // o cerrarse el núcleo, o cortarse el equipo) termina la sesión: cierra SSH, revoca el guard
+  // y lo audita.
+  rpc OpenTerminal(stream OpenTerminalRequest) returns (stream OpenTerminalResponse);
+}
+
+message TerminalOpen {
+  string name = 1;     // etiqueta de la pestaña; si va vacía, address:port
+  string address = 2;
+  uint32 port = 3;     // 0 = 22
+  string credential_id = 4;
+  repeated string accepted_host_key_fingerprints = 5;
+  uint32 rows = 6;     // 0 = 24
+  uint32 cols = 7;     // 0 = 200
+}
+
+message TerminalSize {
+  uint32 rows = 1;
+  uint32 cols = 2;
+}
+
+message OpenTerminalRequest {
+  oneof msg {
+    TerminalOpen open = 1;
+    bytes data = 2;
+    TerminalSize resize = 3;
+  }
+}
+
+message OpenTerminalResponse {
+  string opened = 1;     // primer evento: "usuario@host:puerto"
+  string recording = 2;  // archivo de la grabación
+  bytes data = 3;        // lo que devuelve el equipo
+}

@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+import "macuahuitl/v1/tools.proto";
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Herramientas de campo (Fase 10): consola serie, servidor temporal de archivos
+// y verificación de imágenes.
+service FieldService {
+  rpc ListSerialPorts(ListSerialPortsRequest) returns (ListSerialPortsResponse);
+  // El primer mensaje debe ser `open`; después, `data` o `send_break`. Cerrar el
+  // envío (o cancelar) termina la sesión. Se graba en outputs/console.
+  rpc Console(stream ConsoleRequest) returns (stream ConsoleResponse);
+  // Sirve hasta que el cliente cancele o pase duration_seconds (siempre acotado).
+  rpc ServeFiles(ServeFilesRequest) returns (stream ServeFilesResponse);
+  rpc HashFile(HashFileRequest) returns (HashFileResponse);
+}
+
+message ListSerialPortsRequest {}
+
+message ListSerialPortsResponse {
+  repeated string ports = 1;
+}
+
+message ConsoleOpen {
+  string port = 1;      // /dev/ttyUSB0
+  int32 baud = 2;       // 9600 por defecto
+  int32 data_bits = 3;  // 8
+  string parity = 4;    // none, even, odd
+  int32 stop_bits = 5;  // 1
+  string flow = 6;      // none, rtscts, xonxoff
+}
+
+message ConsoleRequest {
+  oneof msg {
+    ConsoleOpen open = 1;
+    bytes data = 2;
+    bool send_break = 3;
+  }
+}
+
+message ConsoleResponse {
+  string opened = 1;      // primer evento: "/dev/ttyUSB0 9600 8N1 flujo=none"
+  string output_path = 2; // grabación de la sesión
+  bytes data = 3;         // lo que devuelve el equipo
+}
+
+message ServeFilesRequest {
+  string protocol = 1;        // tftp o http
+  string addr = 2;            // IP:puerto (o solo IP: 6969 para TFTP, 8080 para HTTP)
+  bool allow_any = 3;         // escuchar en 0.0.0.0 / ::
+  repeated string files = 4;  // rutas absolutas; se publican por nombre base
+  int32 duration_seconds = 5; // 0 = 1 h; máximo 24 h
+}
+
+message ServeFilesResponse {
+  string listening = 1;     // primer evento: dirección real
+  string hint = 2;          // primer evento: cómo copiar desde el equipo (y redirección nftables para TFTP)
+  string transfer_json = 3; // una transferencia terminada
+}
+
+message HashFileRequest {
+  string path = 1;   // absoluta
+  string md5 = 2;    // esperado (opcional)
+  string sha512 = 3; // esperado (opcional)
+}
+
+message HashFileResponse {
+  ToolReport report = 1;
+  bool ok = 2; // falso si algún valor esperado no coincide
+}

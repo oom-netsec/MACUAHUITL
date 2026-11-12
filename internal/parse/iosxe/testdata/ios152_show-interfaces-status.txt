@@ -1,0 +1,11 @@
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/1   to-DIST1           connected    trunk      a-full  a-1000 10/100/1000BaseTX
+Gi1/0/2   to-DIST1           connected    trunk      a-full  a-1000 10/100/1000BaseTX
+Gi1/0/3   sala de juntas     connected    10         a-full  a-100  10/100/1000BaseTX
+Gi1/0/4                      notconnect   10         auto    auto   10/100/1000BaseTX
+Gi1/0/5   apagado            disabled     1          auto    auto   10/100/1000BaseTX
+Gi1/0/6   loop detectado     err-disabled 20         auto    auto   10/100/1000BaseTX
+Gi1/0/12  AP-piso2           connected    30         a-full  a-1000 10/100/1000BaseTX
+Gi1/1/1                      notconnect   1          full    1000   1000BaseSX SFP
+Te1/1/2                      connected    routed     full    10G    10GBase-SR
+Po1       uplink             connected    trunk      a-full  a-1000 

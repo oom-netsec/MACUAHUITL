@@ -1,0 +1,11 @@
+Processor Pool Total:   25834496 Used:   21246812 Free:    4587684
+      I/O Pool Total:    4194304 Used:    2531240 Free:    1663064
+
+ PID TTY  Allocated      Freed    Holding    Getbufs    Retbufs Process
+   0   0   17240512    2461460   13590116          0          0 *Init*          
+   0   0       2564     232120       2564          0          0 *Sched*         
+   0   0    4219860    1573824    1331216          0          0 *Dead*          
+  66   0    2305552     301696    2012188          0          0 HRPC qos request
+ 184   0     972312      56920     932716          0          0 IP Input        
+  95   0      68864       4512      66056          0          0 CDP Protocol    
+   1   0      12744       1800      12904          0          0 Chunk Manager   

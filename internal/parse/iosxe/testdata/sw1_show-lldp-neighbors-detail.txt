@@ -1,0 +1,23 @@
+------------------------------------------------
+Local Intf: Gi1/0/4
+Chassis id: 0011.2233.4455
+Port id: Gi1/0/24
+Port Description: GigabitEthernet1/0/24
+System Name: SW3
+
+System Description: 
+Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.6.5, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+
+Time remaining: 101 seconds
+System Capabilities: B,R
+Enabled Capabilities: B
+Management Addresses:
+    IP: 10.0.0.3
+Auto Negotiation - supported, enabled
+Physical media capabilities:
+    1000baseT(FD)
+Media Attachment Unit type: 30
+Vlan ID: 1
+
+Total entries displayed: 1

@@ -1,0 +1,7 @@
+/* Punto de entrada del CSS (ADR 0009). Las capas viven en styles/; el CSS propio de un módulo va en su carpeta.
+   Si hace falta una regla global nueva, agrégala al final de este archivo con los tokens de styles/tokens.css. */
+@import "./styles/tokens.css";
+@import "./styles/base.css";
+@import "./styles/components.css";
+@import "./styles/shell.css";
+@import "./styles/legacy.css";

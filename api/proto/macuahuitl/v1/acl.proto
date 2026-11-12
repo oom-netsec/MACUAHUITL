@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Generador de ACLs (spec §13). Se completa en la Fase 5.
+service AclService {
+  rpc Analyze(AnalyzeRequest) returns (AnalyzeResponse);
+  rpc Generate(GenerateRequest) returns (GenerateResponse);
+  rpc Import(ImportRequest) returns (ImportResponse);
+}
+
+enum AclAction {
+  ACL_ACTION_UNSPECIFIED = 0;
+  ACL_ACTION_PERMIT = 1;
+  ACL_ACTION_DENY = 2;
+}
+
+// Direcciones en CIDR (0.0.0.0/0 = any). Puertos con operador IOS: "eq 22", "range 1 100", "neq 25", "gt 1023".
+message AclRule {
+  AclAction action = 1;
+  string protocol = 2;
+  string source = 3;
+  string destination = 4;
+  string source_ports = 5;
+  string destination_ports = 6;
+  bool log = 7;
+  string remark = 8;
+  // Solo tcp (IOS/NX-OS). ASA no lo tiene: Generate falla en vez de omitirlo.
+  bool established = 9;
+}
+
+message Acl {
+  string name = 1;
+  repeated AclRule rules = 2;
+}
+
+message AnalyzeRequest {
+  Acl acl = 1;
+}
+
+message Finding {
+  uint32 rule_index = 1;
+  string kind = 2;
+  string detail = 3;
+}
+
+message AnalyzeResponse {
+  repeated Finding findings = 1;
+}
+
+message GenerateRequest {
+  Acl acl = 1;
+  // ios-xe, nx-os, asa; junos y eos después.
+  string vendor = 2;
+}
+message GenerateResponse {
+  string script = 1;
+}
+
+message ImportRequest {
+  string vendor = 1;
+  string text = 2;
+}
+message ImportResponse {
+  Acl acl = 1;
+}

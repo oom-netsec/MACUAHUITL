@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+import "macuahuitl/v1/common.proto";
+
+// Diagnóstico activo (spec §9). Se completa en la Fase 4.
+service DiagService {
+  rpc Run(RunRequest) returns (stream RunResponse);
+  // Interfaces locales, solo lectura: no genera tráfico de red.
+  rpc ListInterfaces(ListInterfacesRequest) returns (ListInterfacesResponse);
+}
+
+enum DiagTool {
+  DIAG_TOOL_UNSPECIFIED = 0;
+  DIAG_TOOL_PING = 1;
+  DIAG_TOOL_TRACEROUTE = 2;
+  DIAG_TOOL_NMAP = 3;
+  DIAG_TOOL_IPERF3 = 4;
+  DIAG_TOOL_PCAP = 5;
+}
+
+message RunRequest {
+  DiagTool tool = 1;
+  repeated Target targets = 2;
+  // Opciones estructuradas por herramienta; nunca una línea de comandos libre.
+  map<string, string> options = 3;
+  string output_dir = 4;
+}
+
+message RunResponse {
+  string output_line = 1;
+  bool done = 2;
+  int32 exit_code = 3;
+  string output_path = 4;
+}
+
+message ListInterfacesRequest {}
+
+message NetInterface {
+  string name = 1;
+  bool up = 2;
+  bool loopback = 3;
+  // Direcciones en notación CIDR.
+  repeated string addresses = 4;
+  string hardware_addr = 5;
+}
+
+message ListInterfacesResponse {
+  // Ordenadas por nombre.
+  repeated NetInterface interfaces = 1;
+}

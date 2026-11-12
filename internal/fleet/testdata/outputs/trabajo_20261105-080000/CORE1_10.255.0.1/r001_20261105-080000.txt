@@ -1,0 +1,126 @@
+===== 2026-11-05T08:00:01Z · show version =====
+Cisco IOS XE Software, Version 17.09.04a
+Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+
+CORE1 uptime is 6 weeks, 1 day, 2 hours, 15 minutes
+System returned to ROM by Reload
+cisco C9500-24Y4C (X86) processor with 2907628K/6147K bytes of memory.
+Processor board ID FCW2301A0AA
+===== 2026-11-05T08:00:02Z · show ip arp =====
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  10.1.10.1               -   aabb.cc00.0001  ARPA   Vlan10
+Internet  10.1.10.20              3   aabb.cc00.0a01  ARPA   Vlan10
+Internet  10.255.100.1            -   aabb.cc00.0002  ARPA   Vlan100
+Internet  10.255.100.2            5   aabb.cc00.0102  ARPA   Vlan100
+===== 2026-11-05T08:00:03Z · show mac address-table =====
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+  10    aabb.cc00.0a01    DYNAMIC     Po1
+ 100    aabb.cc00.0102    DYNAMIC     Po1
+  10    aabb.cc00.0001    STATIC      CPU
+ 100    aabb.cc00.0002    STATIC      CPU
+Total Mac Addresses for this criterion: 4
+===== 2026-11-05T08:00:04Z · show cdp neighbors detail =====
+-------------------------
+Device ID: DIST1.lab.local
+Entry address(es): 
+  IP address: 10.255.0.2
+Platform: cisco C9300-48P,  Capabilities: Switch IGMP 
+Interface: GigabitEthernet1/0/1,  Port ID (outgoing port): GigabitEthernet1/0/1
+Holdtime : 155 sec
+
+-------------------------
+Device ID: DIST1.lab.local
+Entry address(es): 
+  IP address: 10.255.0.2
+Platform: cisco C9300-48P,  Capabilities: Switch IGMP 
+Interface: GigabitEthernet1/0/2,  Port ID (outgoing port): GigabitEthernet1/0/2
+Holdtime : 150 sec
+
+-------------------------
+Device ID: ISP-EDGE
+Entry address(es): 
+  IP address: 10.255.0.254
+Platform: cisco ISR4331/K9,  Capabilities: Router 
+Interface: GigabitEthernet1/0/24,  Port ID (outgoing port): GigabitEthernet0/0/0
+Holdtime : 140 sec
+===== 2026-11-05T08:00:05Z · show etherchannel summary =====
+Flags:  D - down        P - bundled in port-channel
+Number of channel-groups in use: 1
+Number of aggregators:           1
+
+Group  Port-channel  Protocol    Ports
+------+-------------+-----------+-----------------------------------------------
+1      Po1(SU)         LACP      Gi1/0/1(P)  Gi1/0/2(P)
+===== 2026-11-05T08:00:06Z · show ip route =====
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+       * - candidate default, U - per-user static route
+
+Gateway of last resort is 10.255.0.254 to network 0.0.0.0
+
+S*    0.0.0.0/0 [1/0] via 10.255.0.254
+      10.0.0.0/8 is variably subnetted, 8 subnets, 3 masks
+C        10.1.10.0/24 is directly connected, Vlan10
+L        10.1.10.1/32 is directly connected, Vlan10
+O        10.1.20.0/24 [110/20] via 10.255.100.2, 00:40:12, Vlan100
+C        10.255.0.0/24 is directly connected, GigabitEthernet1/0/24
+L        10.255.0.1/32 is directly connected, GigabitEthernet1/0/24
+C        10.255.100.0/30 is directly connected, Vlan100
+L        10.255.100.1/32 is directly connected, Vlan100
+O        10.9.0.0/16 [110/30] via 10.255.100.2, 00:10:00, Vlan100
+                     [110/30] via 10.255.100.6, 00:10:00, Vlan100
+===== 2026-11-05T08:00:07Z · show ip cef =====
+Prefix               Next Hop             Interface
+0.0.0.0/0            10.255.0.254         GigabitEthernet1/0/24
+10.1.10.0/24         attached             Vlan10
+10.1.10.1/32         receive              Vlan10
+10.1.20.0/24         10.255.100.2         Vlan100
+===== 2026-11-05T08:00:08Z · show ip dhcp snooping binding =====
+MacAddress          IpAddress        Lease(sec)  Type           VLAN  Interface
+------------------  ---------------  ----------  -------------  ----  --------------------
+Total number of bindings: 0
+===== 2026-11-05T08:00:09Z · show ip interface brief =====
+Interface              IP-Address      OK? Method Status                Protocol
+Vlan10                 10.1.10.1       YES NVRAM  up                    up
+Vlan100                10.255.100.1    YES NVRAM  up                    up
+GigabitEthernet1/0/24  10.255.0.1      YES NVRAM  up                    up
+===== 2026-11-05T08:00:10Z · show processes cpu =====
+CPU utilization for five seconds: 92%/10%; one minute: 85%; five minutes: 70%
+ PID Runtime(ms)     Invoked      uSecs   5Sec   1Min   5Min TTY Process
+   1           0           1          0  0.00%  0.00%  0.00%   0 Chunk Manager
+===== 2026-11-05T08:00:11Z · show processes memory =====
+Processor Pool Total: 3000000000 Used: 1000000000 Free: 2000000000
+      I/O Pool Total:  200000000 Used:  100000000 Free:  100000000
+===== 2026-11-05T08:00:12Z · show ntp status =====
+Clock is synchronized, stratum 3, reference is 10.255.0.254
+nominal freq is 250.0000 Hz, actual freq is 250.0000 Hz, precision is 2**10
+===== 2026-11-05T08:00:13Z · show inventory =====
+NAME: "c95xx Stack", DESCR: "Cisco Catalyst 9500 Series Stack"
+PID: C9500-24Y4C       , VID: V02  , SN: FCW2301A0AA
+
+NAME: "Switch 1 - Power Supply A", DESCR: "Cisco 950W AC Power Supply"
+PID: C9K-PWR-950WAC-R  , VID: V01  , SN: DCC2301B0BB
+
+NAME: "TenGigabitEthernet1/0/1", DESCR: "SFP-10GBase-SR"
+PID: SFP-10G-SR        , VID: V03  , SN: JUR2301C0CC
+===== 2026-11-05T08:00:14Z · dir flash: =====
+Directory of flash:/
+
+    2  -rw-   517619080  Oct 20 2026 10:44:12 +00:00  cat9k_iosxe.17.09.04a.SPA.bin
+
+11353194496 bytes total (8000000000 bytes free)
+===== 2026-11-05T08:00:15Z · show interfaces status =====
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/1   to-DIST1           connected    trunk      a-full  a-1000 10/100/1000BaseTX
+Gi1/0/2   to-DIST1           connected    trunk      a-full  a-1000 10/100/1000BaseTX
+Gi1/0/24  to-ISP             connected    routed     a-full  a-1000 10/100/1000BaseTX
+===== 2026-11-05T08:00:16Z · show interfaces =====
+Vlan10 is up, line protocol is up 
+  Hardware is Ethernet SVI, address is aabb.cc00.0001 (bia aabb.cc00.0001)
+  Internet address is 10.1.10.1/24
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 output errors, 0 interface resets

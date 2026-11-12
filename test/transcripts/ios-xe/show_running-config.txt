@@ -1,0 +1,136 @@
+# command: show running-config
+Building configuration...
+
+Current configuration : 4210 bytes
+!
+version 17.9
+hostname SW-LAB-01
+!
+enable secret 9 $9$EXAMPLEsalt$EXAMPLEhashEXAMPLEhashEXAMPLEhash
+!
+username admin privilege 15 secret 9 $9$EXAMPLEsalt2$EXAMPLEhash2
+!
+interface GigabitEthernet1/0/1
+ description key 7 is broken
+ switchport mode access
+!
+interface GigabitEthernet1/0/2
+ description puerto 2
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/3
+ description puerto 3
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/4
+ description puerto 4
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/5
+ description puerto 5
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/6
+ description puerto 6
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/7
+ description puerto 7
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/8
+ description puerto 8
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/9
+ description puerto 9
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/10
+ description puerto 10
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/11
+ description puerto 11
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/12
+ description puerto 12
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/13
+ description puerto 13
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/14
+ description puerto 14
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/15
+ description puerto 15
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/16
+ description puerto 16
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/17
+ description puerto 17
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/18
+ description puerto 18
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/19
+ description puerto 19
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/20
+ description puerto 20
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/21
+ description puerto 21
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/22
+ description puerto 22
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/23
+ description puerto 23
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/24
+ description puerto 24
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/25
+ description puerto 25
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/26
+ description puerto 26
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/27
+ description puerto 27
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/28
+ description puerto 28
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/29
+ description puerto 29
+ switchport access vlan 10
+!
+snmp-server community MARKER-SNMP RO
+tacacs-server key 7 0822455D0A16
+!
+line vty 0 4
+ password 7 045802150C2E
+ transport input ssh
+!
+end

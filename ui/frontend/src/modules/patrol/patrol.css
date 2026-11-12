@@ -1,0 +1,90 @@
+/* Patrol: detalle del trabajo a la izquierda y lista de trabajos a la derecha (ADR 0009). Solo tokens. */
+.patrol { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--s-6); align-items: start; }
+.patrol-main { min-width: 0; }
+
+/* Lista de trabajos: separada del detalle por una línea fina, sin caja. */
+.jobs-panel { position: sticky; top: 0; padding-left: var(--s-6); border-left: 1px solid var(--hairline); }
+.jobs-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); margin-bottom: var(--s-3); }
+.jobs-head h3 { margin: 0; }
+.jobs-head button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.job-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.job-item {
+  width: 100%; height: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; justify-items: stretch; text-align: left; padding: 10px var(--s-3);
+  border-radius: var(--r-3); background: var(--surface); border: 1px solid var(--hairline); white-space: normal; box-shadow: none;
+}
+.job-item[aria-current="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.job-top { display: flex; justify-content: space-between; align-items: center; gap: var(--s-2); }
+.job-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-item .badge { margin: 0; }
+
+/* Detalle del trabajo */
+.job-head { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-3); min-height: var(--control-h); }
+.job-head h3 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.job-head button { margin-left: auto; }
+.job-detail .stats [data-wide] { grid-column: span 2; }
+.job-detail .stats { padding-bottom: var(--s-5); margin-bottom: var(--s-6); border-bottom: 1px solid var(--hairline); }
+
+/* Formulario del trabajo nuevo */
+.newjob > h3 { margin-bottom: var(--s-1); }
+.newjob > .desc { margin: 0 0 var(--s-6); color: var(--text-2); }
+.newjob .hint.count { margin: calc(-1 * var(--s-3)) 0 var(--s-4); }
+
+/* Línea de fases */
+.timeline { list-style: none; margin: var(--s-2) 0 0; padding: 0 0 0 4px; }
+.timeline li { position: relative; display: grid; grid-template-columns: 64px 1fr; column-gap: var(--s-3); padding: 0 0 var(--s-3) var(--s-4); border-left: 2px solid var(--hairline); }
+.timeline li:last-child { padding-bottom: 0; }
+.timeline li::before { content: ""; position: absolute; left: -6px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--text-3); border: 2px solid var(--canvas); }
+.timeline li[data-kind="ARMED"]::before, .timeline li[data-kind="ROUND_FINISHED"]::before, .timeline li[data-kind="COMPLETED"]::before { background: var(--success); }
+.timeline li[data-kind="FAILED"]::before { background: var(--critical); }
+.timeline li[data-kind="ROUND_SKIPPED"]::before { background: var(--warning); }
+.timeline time { color: var(--text-3); font: var(--fs-small) var(--mono); grid-row: span 2; }
+.timeline .meta { grid-column: 2; }
+
+/* Resultado del Login Test */
+tr[data-state="bad"] td:nth-child(2) { color: var(--critical); }
+.table-wrap .check { margin: 0; }
+
+/* Grilla virtualizada: filas en posición absoluta; encabezado y filas comparten un layout fijo. */
+.device-grid .meta { margin: 0 0 var(--s-2); }
+.grid-scroll { min-height: 280px; max-height: 480px; overflow: auto; border: 1px solid var(--hairline); border-radius: var(--r-3); background: var(--surface); }
+.grid { display: block; margin: 0; }
+.grid thead, .grid tbody { display: block; width: 100%; }
+.grid thead { position: sticky; top: 0; z-index: var(--z-sticky); }
+.grid tbody { position: relative; }
+.grid tr { display: table; width: 100%; table-layout: fixed; }
+.grid tbody tr { position: absolute; top: 0; left: 0; }
+.grid td { vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grid tr[data-state="DEVICE_STATE_FAILED"] td:nth-child(2) { color: var(--critical); }
+
+@media (max-width: 1100px) {
+  .patrol { grid-template-columns: 1fr; }
+  .jobs-panel { position: static; order: -1; padding-left: 0; border-left: 0; }
+}
+
+/* La regla suelta .warn de components.css la vuelve block: se restituye el flex del aviso. */
+
+/* Métricas por ronda y celda de CPU */
+.metrics { margin: 0 0 var(--s-6); }
+.metrics-bar { display: flex; align-items: end; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; margin-bottom: var(--s-4); }
+.metrics-bar .tabs { margin: 0; }
+.if-pick { border: 0; margin: 0 0 var(--s-4); padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); max-height: 120px; overflow: auto; }
+.if-pick legend { padding: 0; margin-bottom: var(--s-2); color: var(--text-3); font-size: var(--fs-small); }
+.if-pick .check { margin: 0; }
+.cpu-cell { display: inline-flex; align-items: center; gap: var(--s-2); }
+.grid th:nth-child(1), .grid td:nth-child(1) { width: 20%; overflow: visible; }
+.grid th:nth-child(2), .grid td:nth-child(2) { width: 14%; }
+.grid th:nth-child(3), .grid td:nth-child(3) { width: 30%; }
+.grid th:nth-child(4), .grid td:nth-child(4) { width: 18%; }
+.grid .meter { width: 64px; }
+/* Cada fila tiene su propia capa (transform): la que tiene el menú abierto sube sobre las demás. */
+.grid tbody tr:has([aria-expanded="true"]) { z-index: var(--z-flyout); }
+
+/* Selector de playbooks: grupos por área en columnas, comandos plegados bajo cada uno. */
+.pb-picker { display: grid; gap: 12px; margin-bottom: 16px; }
+.pb-group { border: 1px solid var(--hairline); border-radius: var(--radius, 8px); padding: 8px 12px 10px; margin: 0; }
+.pb-group > legend { padding: 0 6px; font-weight: 600; font-size: 0.8125rem; color: var(--text-2); }
+.pb-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; padding: 2px 0; }
+.pb-item details { justify-self: end; }
+.pb-item details[open] { grid-column: 1 / -1; justify-self: stretch; }
+.pb-cmds { margin: 4px 0 6px 28px; padding: 0; list-style: none; font-size: 0.8125rem; color: var(--text-2); }
+.pb-count { margin: 0 0 10px; }

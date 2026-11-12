@@ -1,0 +1,25 @@
+id: tac-baseline
+platform: ios-xe
+name: TAC · Línea base
+commands:
+  - cmd: show version
+  - cmd: show inventory
+  - cmd: show clock detail
+  - cmd: show running-config
+    may_contain_secrets: true
+  - cmd: show startup-config
+    may_contain_secrets: true
+  - cmd: show logging
+  - cmd: show processes cpu sorted
+  - cmd: show processes cpu history
+  - cmd: show processes memory sorted
+  - cmd: show platform resources
+  - cmd: show interfaces
+    timeout: 120s
+  - cmd: show ip interface brief
+  - cmd: show environment all
+  - cmd: show redundancy
+  - cmd: show switch
+  - cmd: show tech-support
+    timeout: 600s
+    may_contain_secrets: true

@@ -1,0 +1,17 @@
+Codes: L - local, C - connected, S - static, R - RIP, M - mobile, B - BGP
+       D - EIGRP, EX - EIGRP external, O - OSPF, IA - OSPF inter area
+       i - IS-IS, su - IS-IS summary, L1 - IS-IS level-1, L2 - IS-IS level-2
+       ia - IS-IS inter area, * - candidate default, U - per-user static route
+       o - ODR, l - LISP
+
+Gateway of last resort is 10.0.0.254 to network 0.0.0.0
+
+S*    0.0.0.0/0 [1/0] via 10.0.0.254
+      172.16.0.0/24 is subnetted, 3 subnets
+O        172.16.1.0 [110/20] via 10.0.0.2, 00:40:12, Vlan100
+C        172.16.2.0 is directly connected, Vlan20
+S        172.16.3.0 [1/0] via 10.0.0.9
+      192.168.0.0/16 is variably subnetted, 3 subnets, 2 masks
+i L1     192.168.1.0/24 [115/20] via 10.0.0.3, 00:01:00, Vlan101
+i L2     192.168.2.0/25 [115/30] via 10.0.0.3, 00:01:00, Vlan101
+i ia     192.168.3.0/24 [115/40] via 10.0.0.3, 00:01:00, Vlan101

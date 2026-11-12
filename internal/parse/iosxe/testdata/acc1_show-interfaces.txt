@@ -1,0 +1,14 @@
+GigabitEthernet1/0/5 is up, line protocol is up (connected) 
+  Hardware is Gigabit Ethernet, address is aabb.cc00.0005 (bia aabb.cc00.0005)
+  Half-duplex, 100Mb/s, media type is 10/100/1000BaseTX
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+     12 runts, 0 giants, 0 throttles
+     15240 input errors, 15234 CRC, 0 frame, 0 overrun, 0 ignored
+     0 output errors, 0 collisions, 3 interface resets
+GigabitEthernet1/0/10 is up, line protocol is up (connected) 
+  Hardware is Gigabit Ethernet, address is aabb.cc00.000a (bia aabb.cc00.000a)
+  Full-duplex, 1000Mb/s, media type is 10/100/1000BaseTX
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 output errors, 0 collisions, 0 interface resets

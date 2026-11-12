@@ -1,0 +1,4 @@
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/1   to-DIST1           connected    trunk      a-full  a-1000 10/100/1000BaseTX
+Gi1/0/2   to-DIST1           connected    trunk      a-full  a-1000 10/100/1000BaseTX
+Gi1/0/24  to-ISP             connected    routed     a-full  a-1000 10/100/1000BaseTX

@@ -1,0 +1,19 @@
+# Propósito: Comprueba el estado de UDLD, los vecinos bidireccionales y los puertos apagados por UDLD.
+# Cuándo usarlo: Enlace de fibra con un solo sentido, loops por enlaces unidireccionales o err-disabled por UDLD.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: l1-udld
+platform: ios-xe
+name: L1 · UDLD
+commands:
+  - cmd: show clock
+  - cmd: show udld
+  - cmd: show udld neighbors
+  - cmd: show errdisable detect
+  - cmd: show errdisable recovery
+  - cmd: show interfaces status err-disabled
+  - cmd: show cdp neighbors
+  - cmd: show interfaces transceiver detail
+  - cmd: show logging | include UDLD
+  - cmd: show running-config | include udld|^interface
+    may_contain_secrets: true

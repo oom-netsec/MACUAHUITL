@@ -1,0 +1,5 @@
+Prefix               Next Hop             Interface
+0.0.0.0/0            10.255.0.254         GigabitEthernet1/0/24
+10.1.10.0/24         attached             Vlan10
+10.1.10.1/32         receive              Vlan10
+10.1.20.0/24         10.255.100.2         Vlan100

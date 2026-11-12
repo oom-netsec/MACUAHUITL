@@ -1,0 +1,26 @@
+/* Reglas propias de módulos, ya con los tokens del ADR 0009. Cada módulo las mueve a su carpeta al migrar. */
+
+
+/* Análisis, seguridad y visibilidad */
+tr[data-sev="critica"] td, tr[data-sev="alta"] td { color: var(--critical); }
+tr[data-sev="media"] td { color: var(--warning); }
+.actions.wrap { flex-wrap: wrap; }
+
+/* Terminales (fase 15b): paleta de color solo dentro de .term */
+.term .console { background: var(--t-bg); color: var(--t-fg); border-color: var(--t-dim); }
+.term .console li[data-sev="0"], .term .console li[data-sev="1"], .term .console li[data-sev="2"], .term .console li[data-sev="3"] { color: var(--t-bad); }
+.term .console li[data-sev="4"] { color: var(--t-warn); }
+.term .t-ok { color: var(--t-ok); } .term .t-bad { color: var(--t-bad); font-weight: 600; } .term .t-warn { color: var(--t-warn); }
+.term .t-info { color: var(--t-info); } .term .t-addr { color: var(--t-addr); } .term .t-iface { color: var(--t-iface); }
+.term .t-prompt { color: var(--t-prompt); font-weight: 600; } .term .t-num { color: var(--t-num); } .term .t-dim { color: var(--t-dim); }
+.term .t-kw { color: var(--t-kw); } .term .t-str { color: var(--t-str); } .term .t-conn { color: var(--t-conn); }
+.term .t-ospf { color: var(--t-ospf); font-weight: 600; } .term .t-eigrp { color: var(--t-eigrp); font-weight: 600; } .term .t-bgp { color: var(--t-bgp); font-weight: 600; }
+.term .t-rip { color: var(--t-rip); font-weight: 600; } .term .t-static { color: var(--t-static); font-weight: 600; }
+.term .t-uprompt { color: var(--t-uprompt); font-weight: 600; } .term .t-cred { color: var(--t-cred); font-weight: 600; } .term .t-acl { color: var(--t-acl); }
+.term .t-svc { color: var(--t-svc); } .term .t-ver { color: var(--t-ver); }
+
+/* Modo de cambio asistido dentro del módulo: el aviso no se puede ocultar mientras haya una ejecución en curso. */
+.assist-banner {
+  position: sticky; top: 0; z-index: var(--z-sticky); display: flex; gap: 10px; align-items: center; margin: 0 0 var(--s-4);
+  padding: 10px var(--s-3); border-radius: var(--r-3); background: var(--critical-solid); color: #fff; font-weight: 600;
+}

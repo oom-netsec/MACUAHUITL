@@ -1,0 +1,11 @@
+id: errores-interfaz
+platform: ios-xe
+name: Interfaces · Errores
+commands:
+  - cmd: show clock
+  - cmd: show interfaces counters errors
+  - cmd: show interfaces
+    timeout: 120s
+  - cmd: show interfaces status err-disabled
+  - cmd: show errdisable recovery
+  - cmd: show logging | include LINK|LINEPROTO|ERR

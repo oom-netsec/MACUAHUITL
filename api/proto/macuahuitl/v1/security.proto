@@ -1,0 +1,160 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+import "macuahuitl/v1/tools.proto";
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Herramientas de seguridad y acceso (Fase 14): probadores RADIUS y TACACS+,
+// PKI de laboratorio y decodificador de IKE/IPsec. Los secretos solo viajan del
+// cliente al núcleo (o salen de la bóveda); nunca vuelven ni quedan en auditoría.
+service SecurityService {
+  rpc RadiusTest(RadiusTestRequest) returns (RadiusTestResponse);
+  rpc TacacsTest(TacacsTestRequest) returns (TacacsTestResponse);
+  rpc PkiKey(PkiKeyRequest) returns (PkiKeyResponse);
+  rpc PkiCsr(PkiCsrRequest) returns (PkiCsrResponse);
+  rpc PkiCaInit(PkiCaInitRequest) returns (PkiCaInitResponse);
+  rpc PkiCaSign(PkiCaSignRequest) returns (PkiCaSignResponse);
+  rpc PkiExport(PkiExportRequest) returns (PkiExportResponse);
+  rpc PkiDecode(PkiDecodeRequest) returns (PkiDecodeResponse);
+  rpc IkeDecode(IkeDecodeRequest) returns (IkeDecodeResponse);
+}
+
+// Origen de un secreto: una credencial de la bóveda (su contraseña) o el valor escrito.
+message SecretSource {
+  string credential_id = 1;
+  bytes value = 2;
+}
+
+message RadiusTestRequest {
+  string host = 1;
+  uint32 auth_port = 2; // 1812 por defecto
+  uint32 acct_port = 3; // 1813 por defecto
+  SecretSource shared_secret = 4;
+  // Usuario de prueba: con credential_id se toman usuario y contraseña de la bóveda.
+  string username = 5;
+  SecretSource password = 6;
+  string method = 7; // pap (por defecto), chap, mschapv2
+  string nas_ip = 8;
+  string nas_identifier = 9;
+  string nas_port_type = 10; // Ethernet, Wireless-802.11, Virtual… o número
+  string service_type = 11;  // Framed, Login, Call-Check… o número
+  string called_station_id = 12;
+  string calling_station_id = 13;
+  bool status_server = 14; // solo Status-Server (RFC 5997)
+  bool accounting = 15;    // Start y Stop después del Access-Request
+  int32 timeout_ms = 16;
+  int32 retries = 17;
+}
+
+message RadiusTestResponse {
+  ToolReport report = 1;
+}
+
+message TacacsTestRequest {
+  string host = 1;
+  uint32 port = 2; // 49 por defecto
+  SecretSource shared_secret = 3;
+  string username = 4;
+  SecretSource password = 5;
+  string authen_type = 6; // ascii (por defecto) o pap
+  string command = 7;     // p. ej. "show running-config"; vacío = sin autorización
+  bool accounting = 8;
+  int32 priv_lvl = 9;
+  int32 timeout_ms = 10;
+}
+
+message TacacsTestResponse {
+  ToolReport report = 1;
+}
+
+message PkiKeyRequest {
+  string algorithm = 1;    // rsa2048, rsa3072, rsa4096, p256, p384
+  bytes key_password = 2;  // sella la llave (Argon2id + AES-256-GCM)
+}
+
+message PkiKeyResponse {
+  string sealed_key_pem = 1;
+}
+
+message PkiSubject {
+  string cn = 1;
+  string o = 2;
+  string ou = 3;
+  string l = 4;
+  string st = 5;
+  string c = 6;
+}
+
+message PkiCsrRequest {
+  string sealed_key_pem = 1; // vacío = generar una llave nueva con algorithm
+  string algorithm = 2;
+  bytes key_password = 3;
+  PkiSubject subject = 4;
+  repeated string dns = 5;
+  repeated string ips = 6;
+}
+
+message PkiCsrResponse {
+  string csr_pem = 1;
+  string sealed_key_pem = 2; // la llave usada (nueva o la recibida)
+  ToolReport report = 3;
+}
+
+message PkiCaInitRequest {
+  string name = 1;
+  int32 days = 2; // 3650 por defecto
+  string algorithm = 3; // p256 por defecto
+  bytes key_password = 4;
+}
+
+message PkiCaInitResponse {
+  string ca_cert_pem = 1;
+  string sealed_key_pem = 2;
+  ToolReport report = 3;
+}
+
+message PkiCaSignRequest {
+  string ca_cert_pem = 1;
+  string ca_sealed_key_pem = 2;
+  bytes ca_key_password = 3;
+  string csr_pem = 4;
+  string profile = 5; // server, client, server-client
+  int32 days = 6;     // 365 por defecto
+}
+
+message PkiCaSignResponse {
+  string cert_pem = 1;
+  ToolReport report = 2;
+}
+
+message PkiExportRequest {
+  string format = 1; // pem, der, p12, p12-legacy
+  string cert_pem = 2;
+  string chain_pem = 3;
+  string sealed_key_pem = 4; // obligatorio para p12; en pem solo con include_plain_key
+  bytes key_password = 5;
+  bytes export_password = 6;
+  bool include_plain_key = 7; // pem: exportar la llave SIN cifrar (decisión explícita)
+}
+
+message PkiExportResponse {
+  bytes data = 1;
+}
+
+message PkiDecodeRequest {
+  bytes data = 1; // PEM (uno o varios bloques) o DER
+}
+
+message PkiDecodeResponse {
+  ToolReport report = 1;
+}
+
+message IkeDecodeRequest {
+  string text = 1;
+}
+
+message IkeDecodeResponse {
+  ToolReport report = 1;
+}

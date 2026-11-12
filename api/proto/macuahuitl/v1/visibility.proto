@@ -1,0 +1,173 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+import "macuahuitl/v1/tools.proto";
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Visibilidad de la red durante un caso (Fase 12): topología CDP/LLDP, SNMP,
+// traps, flujos y gNMI. Todo de solo lectura. Las comunidades y llaves viven en
+// la bóveda y se piden por credential_id; nunca viajan en estos mensajes.
+// Convención de la credencial: v2c → contraseña = comunidad; v3 → usuario,
+// contraseña = llave de autenticación, enable = llave de privacidad; gNMI →
+// usuario y contraseña.
+service VisibilityService {
+  rpc BuildTopology(BuildTopologyRequest) returns (BuildTopologyResponse);
+  rpc SnmpGet(SnmpGetRequest) returns (SnmpGetResponse);
+  rpc SnmpWalk(SnmpWalkRequest) returns (SnmpWalkResponse);
+  // Muestras periódicas hasta count, duration_seconds o que el cliente cancele.
+  rpc SnmpPoll(SnmpPollRequest) returns (stream SnmpPollResponse);
+  // Escuchas acotadas: hasta que el cliente cancele o pase duration_seconds.
+  rpc SnmpTraps(SnmpTrapsRequest) returns (stream SnmpTrapsResponse);
+  rpc Flows(FlowsRequest) returns (stream FlowsResponse);
+  rpc GnmiGet(GnmiGetRequest) returns (GnmiGetResponse);
+  rpc GnmiSubscribe(GnmiSubscribeRequest) returns (stream GnmiSubscribeResponse);
+}
+
+message BuildTopologyRequest {
+  string job_id = 1;    // trabajo de Patrol de esta sesión del núcleo
+  string dir = 2;       // o carpeta de salida de un trabajo (absoluta)
+  string pcap_path = 3; // y/o captura con tramas CDP/LLDP (absoluta)
+}
+
+message BuildTopologyResponse {
+  ToolReport report = 1; // json = grafo (nodos, enlaces, hallazgos)
+  string svg = 2;
+}
+
+message SnmpTarget {
+  string host = 1;
+  uint32 port = 2;    // 161 por defecto
+  string version = 3; // 2c o 3
+  string credential_id = 4;
+  string auth_protocol = 5; // v3: SHA, SHA224, SHA256, SHA384, SHA512
+  string priv_protocol = 6; // v3: AES, AES192, AES256
+  int32 timeout_ms = 7;
+}
+
+message SnmpGetRequest {
+  SnmpTarget target = 1;
+  repeated string oids = 2;
+}
+
+message SnmpGetResponse {
+  ToolReport report = 1;
+}
+
+message SnmpWalkRequest {
+  SnmpTarget target = 1;
+  string oid = 2;
+  bool bulk = 3;
+  int32 limit = 4; // 0 = 50000
+}
+
+message SnmpWalkResponse {
+  ToolReport report = 1;
+}
+
+message SnmpPollRequest {
+  SnmpTarget target = 1;
+  repeated string profiles = 2; // sistema, interfaces, cpu, memoria; vacío = sistema e interfaces
+  int32 interval_seconds = 3;   // 10 por defecto
+  int32 count = 4;              // 0 = hasta duration_seconds
+  int32 duration_seconds = 5;   // 0 = 1 h; máximo 24 h
+}
+
+message SnmpPollResponse {
+  string json = 1; // una muestra
+}
+
+message SnmpTrapsRequest {
+  string addr = 1; // 127.0.0.1:1162 por defecto
+  bool allow_any = 2;
+  int32 duration_seconds = 3;
+  bool save = 4;                 // guardar en outputs/snmp-traps (carpeta con archivos rotados)
+  string v3_credential_id = 5;   // para autenticar y descifrar traps v3
+  string auth_protocol = 6;
+  string priv_protocol = 7;
+  // Mismos topes y archivo que SyslogRequest; 0 = default, fuera de rango = InvalidArgument.
+  int32 rate_per_source = 8; // msg/s por IP de origen; default 100, 1–10000
+  int32 burst_per_source = 9; // default 2x la tasa
+  int32 rate_global = 10; // msg/s en total; default 1000, 1–100000
+  int32 burst_global = 11; // default 2x la tasa
+  int32 queue_size = 12; // en espera de escribirse; default 4096, 64–65536
+  // Archivo (solo con save).
+  int32 rotate_mb = 13; // rotar al llegar a N MB; default 50, 1–1024
+  int32 rotate_minutes = 14; // rotar cada N minutos; 0 = no, 1–10080
+  string name_template = 15; // {fecha} {hora} {origen}; default traps_{fecha}_{hora}
+  int32 max_files = 16; // archivos que se conservan; default 20, 1–1000
+  string format = 17; // texto (default), crudo o jsonl
+}
+
+message SnmpTrapsResponse {
+  string listening = 1;
+  string json = 2; // un trap
+  string output_path = 3; // si save: la carpeta de salida (outputs/snmp-traps)
+  SyslogDrops drops = 4;  // acumulado de descartes, cuando cambia
+  string rotated_path = 5; // archivo nuevo abierto
+}
+
+message FlowsRequest {
+  string addr = 1; // 127.0.0.1:2055 por defecto
+  bool allow_any = 2;
+  int32 duration_seconds = 3;
+  bool save = 4; // guardar cada flujo en outputs/flows (carpeta con archivos rotados)
+  int32 top = 5;
+  int32 every_seconds = 6; // resumen cada N s; 2 por defecto
+  // Los topes de tasa cuentan datagramas de exportación, no registros de flujo, y solo rigen con save.
+  // Con save los defaults son 1000 datagramas/s por exportador y 5000 global (ráfaga 2x); un datagrama de
+  // plantilla v9/IPFIX descartado retrasa la decodificación hasta que el exportador la repita.
+  // Mismos topes y archivo que SyslogRequest; 0 = default, fuera de rango = InvalidArgument.
+  int32 rate_per_source = 7; // msg/s por IP de origen; default 100, 1–10000
+  int32 burst_per_source = 8; // default 2x la tasa
+  int32 rate_global = 9; // msg/s en total; default 1000, 1–100000
+  int32 burst_global = 10; // default 2x la tasa
+  int32 queue_size = 11; // en espera de escribirse; default 4096, 64–65536
+  // Archivo (solo con save).
+  int32 rotate_mb = 12; // rotar al llegar a N MB; default 50, 1–1024
+  int32 rotate_minutes = 13; // rotar cada N minutos; 0 = no, 1–10080
+  string name_template = 14; // {fecha} {hora} {origen}; default flujos_{fecha}_{hora}
+  int32 max_files = 15; // archivos que se conservan; default 20, 1–1000
+  string format = 16; // texto (default), crudo o jsonl
+}
+
+message FlowsResponse {
+  string listening = 1;
+  string json = 2; // resumen agregado de la ventana
+  string output_path = 3; // si save: la carpeta de salida (outputs/flows)
+  bool final = 4;
+  SyslogDrops drops = 5;   // acumulado de descartes, cuando cambia
+  string rotated_path = 6; // archivo nuevo abierto
+}
+
+message GnmiTarget {
+  string host = 1;
+  uint32 port = 2; // 9339 por defecto
+  string credential_id = 3;
+  string ca_path = 4; // PEM absoluto; vacío = CAs del sistema
+  string server_name = 5;
+  int32 timeout_ms = 6;
+}
+
+message GnmiGetRequest {
+  GnmiTarget target = 1;
+  repeated string paths = 2;
+  string encoding = 3; // json_ietf por defecto
+}
+
+message GnmiGetResponse {
+  ToolReport report = 1;
+}
+
+message GnmiSubscribeRequest {
+  GnmiTarget target = 1;
+  repeated string paths = 2;
+  string mode = 3; // sample (por defecto) u on_change
+  int32 interval_seconds = 4;
+  int32 duration_seconds = 5;
+}
+
+message GnmiSubscribeResponse {
+  string json = 1; // una actualización
+}

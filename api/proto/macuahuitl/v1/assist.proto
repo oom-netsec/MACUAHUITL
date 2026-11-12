@@ -1,0 +1,287 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Modo de cambio asistido (ADR 0007): la única parte de MACUAHUITL que cambia la configuración
+// de un equipo. Apagado por defecto: StartRun exige assisted=true en cada petición.
+// Flujo: PlanPorts (solo lectura) devuelve el plan completo con su reversa; StartRun lo inicia;
+// el motor se detiene antes de cada paso que cambia la red y espera Confirm del paso exacto;
+// Abort no aplica nada más; Rollback aplica la reversa de los equipos ya cambiados (en orden
+// inverso y con confirmación por equipo). Todo queda en la bitácora con el id de la ejecución.
+service AssistService {
+  rpc PlanPorts(PlanPortsRequest) returns (PlanPortsResponse);
+  // Snippets (VLAN, trunk con add/remove, SVI y las plantillas del catálogo) y rotación de credenciales: mismo flujo que PlanPorts (planear solo lee).
+  rpc PlanSnippet(PlanSnippetRequest) returns (PlanSnippetResponse);
+  // Catálogo de plantillas (fase 28b): campos tipados para que la UI arme el formulario de cada snippet sin código por snippet.
+  rpc ListSnippetTemplates(ListSnippetTemplatesRequest) returns (ListSnippetTemplatesResponse);
+  rpc PlanCredRotate(PlanCredRotateRequest) returns (PlanCredRotateResponse);
+  // Restaurar un respaldo (fase 16c): PlanRestore calcula el diff contra el running actual y lo que no se restaura; planear solo lee.
+  rpc PlanRestore(PlanRestoreRequest) returns (PlanRestoreResponse);
+  rpc StartRun(StartRunRequest) returns (StartRunResponse);
+  rpc Confirm(ConfirmRequest) returns (ConfirmResponse);
+  rpc Abort(AbortRequest) returns (AbortResponse);
+  rpc Rollback(RollbackRequest) returns (RollbackResponse);
+  rpc WatchRun(WatchRunRequest) returns (stream WatchRunResponse);
+  // ListRuns y GetAssistRun permiten volver a una ejecución que sigue viva (la UI se cerró o mctl murió).
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
+  rpc GetAssistRun(GetAssistRunRequest) returns (GetAssistRunResponse);
+}
+
+message AssistTarget {
+  string name = 1; // etiqueta; si va vacía, address:port
+  string address = 2;
+  uint32 port = 3; // 0 = 22
+  string credential_id = 4;
+}
+
+message PlanPortsRequest {
+  AssistTarget target = 1;
+  repeated string interfaces = 2; // puertos físicos; nunca Port-channel ni trunk
+  uint32 vlan = 3;                // VLAN de acceso; 0 = no cambiar
+  uint32 voice = 4;               // VLAN de voz; 0 = no cambiar
+  optional string description = 5; // "" quita la descripción
+  optional bool shutdown = 6;     // true = shutdown, false = no shutdown
+  bool write_memory = 7;          // agrega el paso final write memory (apagado por defecto)
+  repeated string accepted_host_key_fingerprints = 8;
+}
+
+message AssistExpect {
+  string command = 1;
+  string line = 2;
+  bool present = 3;
+  bool prefix = 4;
+  string column = 5; // "status": evalúa la columna Status de show interfaces X status; line es un estado
+}
+
+message AssistDevicePlan {
+  string device = 1;
+  repeated string pre = 2;
+  repeated string apply = 3;
+  repeated string rollback = 4;
+  repeated string post = 5;
+  repeated AssistExpect expect = 6;
+  repeated string notes = 7; // avisos para el ingeniero (p. ej. que el enlace rebota); no se ejecutan
+}
+
+message AssistPlan {
+  string function = 1;
+  bool write_memory = 2;
+  repeated AssistDevicePlan devices = 3;
+}
+
+message PlanPortsResponse {
+  string plan_id = 1;
+  AssistPlan plan = 2;
+}
+
+message StartRunRequest {
+  string plan_id = 1;
+  bool assisted = 2; // debe ir en true en cada ejecución; no hay ajuste global que lo reemplace
+}
+
+message StartRunResponse {
+  string run_id = 1;
+}
+
+message ConfirmRequest {
+  string run_id = 1;
+  string step_id = 2; // el paso pendiente exacto
+}
+
+message ConfirmResponse {
+  AssistRunState run = 1;
+}
+
+message AbortRequest {
+  string run_id = 1;
+}
+
+message AbortResponse {
+  AssistRunState run = 1;
+}
+
+message RollbackRequest {
+  string run_id = 1;
+}
+
+message RollbackResponse {
+  AssistRunState run = 1;
+}
+
+message WatchRunRequest {
+  string run_id = 1;
+  uint32 from_seq = 2; // 0 = todo el historial; si no, solo los eventos con seq >= from_seq
+}
+
+message ListRunsRequest {
+  bool active_only = 1; // solo las que siguen vivas (corriendo o esperando una decisión)
+}
+
+message ListRunsResponse {
+  repeated AssistRunState runs = 1; // las más recientes primero
+}
+
+message GetAssistRunRequest {
+  string run_id = 1;
+}
+
+message GetAssistRunResponse {
+  AssistRunState run = 1;
+}
+
+message WatchRunResponse {
+  AssistEvent event = 1;
+}
+
+message AssistStep {
+  string id = 1;
+  string kind = 2; // apply | save | rollback
+  string device = 3;
+  repeated string lines = 4; // lo exacto que se enviará
+}
+
+message AssistRunState {
+  string run_id = 1;
+  string state = 2; // planned | waiting-confirm | running | done | aborted | failed | rolled-back | abandoned
+  AssistStep pending = 3;
+  string fail_reason = 4;
+  repeated string changed = 5; // equipos cambiados que siguen cambiados (también tras abortar, fallar o abandonar)
+  bool active = 6;             // la ejecución sigue viva
+  bool waiting = 7;            // el motor espera una decisión (Confirm, Abort o Rollback)
+  bool can_rollback = 8;       // Rollback es válido ahora
+  repeated string devices = 9;
+  int64 started_unix = 10;
+  uint32 event_count = 11;     // eventos emitidos hasta ahora: WatchRun con from_seq = event_count solo trae lo nuevo
+}
+
+message AssistEvent {
+  uint32 seq = 1;
+  string kind = 2; // state | pending | output | fail
+  string state = 3;
+  AssistStep step = 4;
+  string device = 5;
+  string text = 6;
+  repeated string changed = 7; // equipos cambiados al emitirse el evento
+}
+
+message VlanSnippet {
+  uint32 id = 1;         // 2-4094 salvo 1002-1005
+  string name = 2;       // vacío = nombre por omisión (solo al crear)
+  bool accept_vtp = 3;   // acepta que el cambio se propague si el equipo es VTP servidor o cliente
+  bool remove = 4;       // borra la VLAN (existente, activa y sin puertos asignados); no lleva name
+  bool accept_trunk = 5; // solo con remove: acepta borrar una VLAN que viaja por trunks (nunca la nativa ni la de una SVI)
+}
+
+message TrunkSnippet {
+  string interface = 1;  // puerto físico o Port-channel que ya sea trunk
+  string op = 2;         // add | remove: nunca reemplaza la lista permitida
+  uint32 vlan = 3;
+}
+
+message SviSnippet {
+  uint32 vlan = 1;
+  optional string description = 2;
+  string address = 3;
+  string mask = 4;       // 255.255.255.0
+}
+
+message PlanSnippetRequest {
+  AssistTarget target = 1;
+  oneof snippet {
+    VlanSnippet vlan = 2;
+    TrunkSnippet trunk = 3;
+    SviSnippet svi = 4;
+    TemplateSnippet template = 7; // una plantilla del catálogo (ListSnippetTemplates)
+  }
+  bool write_memory = 5;
+  repeated string accepted_host_key_fingerprints = 6;
+}
+
+// Una plantilla del catálogo con los valores de su formulario. El núcleo valida cada valor (tipo, rango, ASCII); los secret nunca salen en una respuesta.
+message TemplateSnippet {
+  string id = 1;
+  map<string, string> values = 2; // por nombre de campo; vacío = ausente
+}
+
+message ListSnippetTemplatesRequest {
+  string platform = 1; // ios | ios-xe; vacío = todas
+}
+
+message ListSnippetTemplatesResponse {
+  repeated SnippetTemplate templates = 1; // en orden de catálogo (l2, l3, gestion, seguridad, qos, etherchannel)
+}
+
+message SnippetTemplate {
+  string id = 1;
+  string tech = 2;
+  string name = 3;
+  repeated string platforms = 4;
+  repeated SnippetField fields = 5;
+}
+
+// type: text | int | decimal | bool | choice | ipv4 | ipv4_mask | interface | interfaces | vlan_id | secret.
+// min/max: valor en int, decimal y vlan_id; largo en text y secret. max 0 = sin tope.
+message SnippetField {
+  string name = 1;
+  string label = 2;
+  string type = 3;
+  bool required = 4;
+  double min = 5;
+  double max = 6;
+  string pattern = 7;
+  repeated string choices = 8;
+  string default_value = 9;
+  string help = 10;
+}
+
+message PlanSnippetResponse {
+  string plan_id = 1;
+  AssistPlan plan = 2;
+}
+
+// Rota la contraseña de un usuario local. target.credential_id es la credencial con la que se conecta y debe ser de otro usuario.
+// El secreto nuevo nunca vuelve en una respuesta, un evento ni la auditoría.
+message PlanCredRotateRequest {
+  AssistTarget target = 1;
+  string user = 2;
+  string new_secret = 3;           // vacío = lo genera el núcleo (exige update_credential_id)
+  string update_credential_id = 4; // credencial de la bóveda de ese usuario que recibe el secreto nuevo cuando entre con una sesión nueva
+  bool write_memory = 5;
+  repeated string accepted_host_key_fingerprints = 6;
+}
+
+message PlanCredRotateResponse {
+  string plan_id = 1;
+  AssistPlan plan = 2; // con el secreto y el hash previo ocultos
+}
+
+// Restaura por diff un respaldo de internal/backup (mismo equipo por número de serie, completo, con ficha firmada por la bóveda y sin
+// secretos enmascarados). Cambia solo las líneas que difieren; la reversa es el diff inverso. Solo se aplica una lista cerrada (hostname,
+// logging, ntp server, snmp location|contact, dominio, clock, spanning-tree, nombre de VLAN y, en puertos físicos de acceso, description,
+// VLAN de acceso y de voz, shutdown, portfast, bpduguard y storm-control); todo lo demás (rutas, router, ACL, vrf, trunk, canales, SVI, line,
+// aaa, usuarios, crypto, autenticación, la interfaz de gestión y las que llevan su VLAN) se rechaza y se lista; con allow_partial se aplica
+// solo lo permitido.
+message PlanRestoreRequest {
+  AssistTarget target = 1;
+  string backup_id = 2;             // equipo/AAAAMMDDTHHMMSSZ-running|startup
+  string management_interface = 3;  // interfaz por la que estás conectado; obligatoria si show users + show tcp brief no la identifican de forma única
+  uint32 max_lines = 4;             // tope de líneas de cambio; 0 = 200 (máximo 1000)
+  bool allow_partial = 5;
+  bool write_memory = 6;
+  repeated string accepted_host_key_fingerprints = 7;
+}
+
+message RestoreRefusal {
+  string path = 1;
+  string line = 2;
+  string why = 3;
+}
+
+message PlanRestoreResponse {
+  string plan_id = 1;                    // vacío si el plan se rechazó
+  AssistPlan plan = 2;
+  repeated RestoreRefusal refused = 3;   // lo que el diff tocaría y no se restaura
+  string reason = 4;                     // por qué se rechazó el plan
+}

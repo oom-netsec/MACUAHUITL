@@ -1,0 +1,6 @@
+/* Deriva: líneas agregadas y quitadas con el color de la paleta de la terminal (el signo las distingue sin color). */
+.drift-changes { margin: 0 0 var(--s-3); }
+.drift-changes .console { max-height: 360px; }
+.drift-changes li[data-op="+"] { color: var(--t-ok); }
+.drift-changes li[data-op="-"] { color: var(--t-bad); }
+.drift-warnings { list-style: none; margin: 0; padding: 0; }

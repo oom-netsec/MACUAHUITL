@@ -1,0 +1,9 @@
+id: topologia
+platform: ios-xe
+name: L2 · Topología (CDP, LLDP, STP, port-channels)
+commands:
+  - cmd: show version
+  - cmd: show cdp neighbors detail
+  - cmd: show lldp neighbors detail
+  - cmd: show spanning-tree
+  - cmd: show etherchannel summary

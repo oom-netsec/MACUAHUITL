@@ -1,0 +1,5 @@
+Cisco IOS XE Software, Version 17.06.05
+
+ACC1 uptime is 2 weeks, 3 days, 1 hour, 4 minutes
+cisco C9200-48P (ARM64) processor with 1000000K/6147K bytes of memory.
+Processor board ID FCW2310A0EE

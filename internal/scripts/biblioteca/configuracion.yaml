@@ -1,0 +1,135 @@
+# Scripts de configuración comunes de la biblioteca. Son plantillas: ajusta VLAN, interfaces, direcciones y
+# comunidades antes de usarlas. Ninguno se aplica solo (ADR 0007): se insertan en la terminal sin Enter.
+# Sin validar en laboratorio.
+- id: cfg-vlan-acceso
+  name: Config · VLAN y puerto de acceso
+  tech: l2
+  platform: ios-xe
+  description: Crea la VLAN 10 y deja un puerto en modo acceso con PortFast. Cambia la VLAN y la interfaz.
+  tags: [vlan, acceso]
+  commands:
+    - configure terminal
+    - vlan 10
+    - name USUARIOS
+    - exit
+    - interface GigabitEthernet1/0/1
+    - switchport mode access
+    - switchport access vlan 10
+    - spanning-tree portfast
+    - end
+- id: cfg-trunk
+  name: Config · Trunk 802.1Q
+  tech: l2
+  platform: ios-xe
+  description: Puerto troncal con VLANs permitidas y VLAN nativa explícita. Cambia la interfaz y las VLAN.
+  tags: [trunk, vlan]
+  commands:
+    - configure terminal
+    - interface GigabitEthernet1/0/48
+    - switchport mode trunk
+    - switchport trunk native vlan 999
+    - switchport trunk allowed vlan 10,20,30
+    - end
+- id: cfg-ntp
+  name: Config · NTP
+  tech: gestion
+  platform: ios-xe
+  description: Sincroniza la hora con un servidor NTP. Cambia la dirección del servidor.
+  tags: [ntp, hora]
+  commands:
+    - configure terminal
+    - ntp server 192.0.2.10
+    - clock timezone CST -6
+    - service timestamps log datetime msec localtime
+    - end
+- id: cfg-logging
+  name: Config · Logging a servidor syslog
+  tech: gestion
+  platform: ios-xe
+  description: Envía los registros a un servidor syslog. Cambia la dirección del servidor.
+  tags: [syslog, logging]
+  commands:
+    - configure terminal
+    - logging host 192.0.2.20
+    - logging trap informational
+    - logging buffered 65536
+    - service timestamps log datetime msec
+    - end
+- id: cfg-snmp-ro
+  name: Config · SNMP de solo lectura
+  tech: gestion
+  platform: ios-xe
+  description: Comunidad SNMP de solo lectura limitada por ACL. Cambia la comunidad (es solo un ejemplo) y la red.
+  tags: [snmp]
+  commands:
+    - configure terminal
+    - ip access-list standard SNMP-RO
+    - permit 192.0.2.0 0.0.0.255
+    - exit
+    - snmp-server community CAMBIAR-COMUNIDAD RO SNMP-RO
+    - end
+- id: cfg-banner
+  name: Config · Aviso de acceso (banner)
+  tech: seguridad
+  platform: ios-xe
+  description: Aviso legal al conectarse. El texto va entre delimitadores ^.
+  tags: [banner]
+  commands:
+    - configure terminal
+    - banner motd ^Acceso solo para personal autorizado. La actividad se registra.^
+    - end
+- id: cfg-bpduguard
+  name: Config · PortFast con BPDU Guard en acceso
+  tech: l2
+  platform: ios-xe
+  description: Protege los puertos de acceso contra BPDU de otro switch. Cambia el rango de interfaces.
+  tags: [stp, bpduguard]
+  commands:
+    - configure terminal
+    - interface range GigabitEthernet1/0/1 - 24
+    - spanning-tree portfast
+    - spanning-tree bpduguard enable
+    - end
+- id: cfg-etherchannel-lacp
+  name: Config · EtherChannel LACP
+  tech: etherchannel
+  platform: ios-xe
+  description: Agrupa dos puertos en un Port-channel con LACP. Cambia las interfaces y el número de grupo.
+  tags: [lacp, port-channel]
+  commands:
+    - configure terminal
+    - interface range GigabitEthernet1/0/47 - 48
+    - channel-group 1 mode active
+    - exit
+    - interface Port-channel1
+    - switchport mode trunk
+    - end
+- id: cfg-ssh
+  name: Config · SSH versión 2 en las líneas VTY
+  tech: seguridad
+  platform: ios-xe
+  description: Activa SSH 2 y deja solo SSH en las líneas VTY. Exige un usuario local y un nombre de dominio.
+  tags: [ssh, vty]
+  commands:
+    - configure terminal
+    - ip domain-name ejemplo.local
+    - crypto key generate rsa modulus 2048
+    - ip ssh version 2
+    - line vty 0 15
+    - transport input ssh
+    - login local
+    - end
+- id: cfg-puertos-sin-uso
+  name: Config · Apagar puertos sin uso
+  tech: seguridad
+  platform: ios-xe
+  description: Manda los puertos sin uso a una VLAN aislada y los apaga. Cambia el rango y la VLAN.
+  tags: [puertos, hardening]
+  commands:
+    - configure terminal
+    - interface range GigabitEthernet1/0/10 - 20
+    - switchport mode access
+    - switchport access vlan 999
+    - description SIN-USO
+    - shutdown
+    - end

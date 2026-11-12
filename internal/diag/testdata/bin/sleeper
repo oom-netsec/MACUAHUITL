@@ -1,0 +1,5 @@
+#!/bin/sh
+echo "ARGV: $*"
+trap 'exit 143' TERM
+sleep 30 &
+wait $!

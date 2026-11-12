@@ -1,0 +1,33 @@
+! Fixture sin validar en laboratorio: formato de la documentación pública de Cisco
+Building configuration...
+
+Current configuration : 2412 bytes
+!
+! Last configuration change at 09:00:00 UTC Thu Nov 5 2026
+! NVRAM config last updated at 09:00:05 UTC Thu Nov 5 2026
+!
+version 17.3
+hostname SW1
+!
+ntp clock-period 17179869
+ntp server 192.0.2.123
+!
+vlan 10
+ name USERS
+!
+interface GigabitEthernet1/0/1
+ description PC-01
+ switchport access vlan 10
+ switchport mode access
+!
+interface GigabitEthernet1/0/2
+ shutdown
+!
+banner motd ^C
+Acceso restringido
+^C
+!
+line vty 0 4
+ transport input ssh
+!
+end

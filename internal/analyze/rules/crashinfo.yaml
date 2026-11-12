@@ -1,0 +1,11 @@
+# SIN VALIDAR EN LABORATORIO: formatos y umbrales tomados de la documentación
+# pública de Cisco IOS-XE, sin transcripciones reales todavía. Ajustar con
+# salidas de equipos reales antes de confiar en los umbrales.
+- id: crashinfo-presente
+  title: Archivos de crash presentes
+  severity: alta
+  commands: ["dir crashinfo:", "dir crashinfo:/"]
+  check: match
+  params: {pattern: '\s(crashinfo_\S+|system-report_\S+|\S+\.core\.gz|fullcore\S*)\s*$'}
+  explanation: Hay archivos de crashinfo, system-report o core; el equipo registró una falla.
+  action: Copia los archivos con su fecha y adjúntalos al caso TAC; compara la fecha con la última recarga.

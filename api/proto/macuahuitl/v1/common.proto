@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Estado de un equipo dentro de una ronda (spec §6).
+enum DeviceState {
+  DEVICE_STATE_UNSPECIFIED = 0;
+  DEVICE_STATE_QUEUED = 1;
+  DEVICE_STATE_CONNECTING = 2;
+  DEVICE_STATE_AUTHENTICATING = 3;
+  DEVICE_STATE_DETECTING_PLATFORM = 4;
+  DEVICE_STATE_RUNNING = 5;
+  DEVICE_STATE_COMPLETED = 6;
+  DEVICE_STATE_FAILED = 7;
+  DEVICE_STATE_CANCELLED = 8;
+  // Omitido en la ronda: falló el Login Test silencioso o cambió la llave de host (spec §12.2).
+  DEVICE_STATE_SKIPPED = 9;
+}
+
+// Destino escrito por el ingeniero. address acepta IP, nombre DNS o CIDR (spec §6.1).
+message Target {
+  string address = 1;
+  uint32 port = 2;
+  string device_id = 3;
+}

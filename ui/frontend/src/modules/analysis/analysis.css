@@ -1,0 +1,13 @@
+/* Corridas: severidades, avisos y diferencias. */
+.sev { margin: 0 0 var(--s-4); }
+.sev h4 { margin-bottom: var(--s-2); }
+.sev[data-sev="critica"] h4, .sev[data-sev="alta"] h4 { color: var(--critical); }
+.sev[data-sev="media"] h4 { color: var(--warning); }
+.sev details.finding { margin: 6px 0; }
+.warnings { list-style: none; margin: 0; padding: 0; }
+.panel-body > .table-wrap { margin-bottom: var(--s-3); }
+.panel-body h4 { margin: 0 0 var(--s-2); }
+.diff-counters { border: 0; border-radius: 0; }
+/* El texto del evento ya lleva su severidad entre corchetes; el color solo la refuerza. */
+.data-table span[data-sev="critica"], .data-table span[data-sev="alta"] { color: var(--critical); }
+.data-table span[data-sev="media"] { color: var(--warning); }

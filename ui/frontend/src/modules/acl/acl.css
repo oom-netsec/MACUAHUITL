@@ -1,0 +1,4 @@
+/* Reglas de la ACL importada: la tabla ocupa el panel de resultado sin borde propio; los hallazgos se leen también en su columna. */
+.acl-rules { border: 0; border-radius: 0; margin: 0; }
+.acl-rules tr[data-kind="shadowed"] td, .acl-rules tr[data-kind="impossible"] td { color: var(--critical); }
+.acl-rules tr[data-kind="redundant"] td { color: var(--warning); }

@@ -1,0 +1,129 @@
+/* Terminal SSH: pestañas de sesión con el aspecto de .tabs, terminal y barra compacta de comandos (ADR 0009). */
+.ssh-tabs { margin-bottom: var(--s-3); }
+.ssh-tab { display: inline-flex; align-items: center; gap: 0; margin-bottom: -1px; border-bottom: 2px solid transparent; }
+.ssh-tab:has([role="tab"][aria-selected="true"]) { border-bottom-color: var(--accent); }
+/* La línea de selección es del grupo (pestaña + cerrar), no solo de la pestaña. */
+.tabs .ssh-tab [role="tab"], .tabs .ssh-tab [role="tab"][aria-selected="true"] { border-bottom-color: transparent; margin-bottom: 0; }
+
+.ssh-session > .meta { margin: 0 0 var(--s-2); }
+/* Emulador xterm: altura fija (fit calcula filas y columnas) y borde como las demás consolas. */
+.ssh-terms { border: 1px solid var(--border-control); border-radius: var(--r-3); padding: var(--s-2); }
+.ssh-term, .ssh-xterm { height: 60vh; min-height: 360px; }
+/* !important: las reglas de .split dan display:flex con más especificidad y la pestaña oculta tomaría el teclado. */
+.ssh-pane[hidden] { display: none !important; }
+.ssh-xterm .xterm { height: 100%; }
+.ssh-terms:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* La regla suelta .warn de components.css la vuelve block: se restituye el flex del aviso. */
+
+/* Búsqueda en la sesión, descarga y comandos rápidos */
+.ssh-tools { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--s-2) var(--s-4); margin-bottom: var(--s-2); }
+.ssh-find { display: flex; align-items: flex-end; gap: var(--s-1); }
+.ssh-find .field { margin: 0; }
+.ssh-find [role="status"] { align-self: flex-end; display: inline-flex; align-items: center; height: var(--control-h); min-width: 7ch; }
+.ssh-quick { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.ssh-quick { margin-bottom: var(--s-2); }
+
+/* Pantalla dividida 50/50: cada sesión conserva su emulador; solo cambia la columna. */
+.ssh-opts { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-2) var(--s-4); }
+.ssh-opts .check { align-self: center; }
+.ssh-pane { min-width: 0; }
+.ssh-terms.split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
+.ssh-terms.split .ssh-pane.left { grid-column: 1; grid-row: 1; }
+.ssh-terms.split .ssh-pane.right { grid-column: 2; grid-row: 1; }
+.ssh-pane-head { margin-bottom: var(--s-1); }
+.ssh-pane-head > p, .ssh-pane-head > strong { display: block; margin: 0 0 var(--s-1); overflow-wrap: anywhere; }
+.ssh-terms.split .ssh-term, .ssh-terms.split .ssh-xterm { height: 52vh; min-height: 320px; }
+.field.ssh-logpick[data-w] { width: 100%; max-width: 640px; }
+.ssh-logpick .path input { flex: 1; min-width: 0; }
+/* En dividida el fondo del emulador va en cada panel (la cabecera de estado queda sobre el fondo de la app). */
+.ssh-terms.split { border: 0; padding: 0; }
+.ssh-terms.split .ssh-term { border: 1px solid var(--border-control); border-radius: var(--r-3); padding: var(--s-2); }
+.ssh-terms.split .ssh-pane:focus-within .ssh-term { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ssh-terms.split:focus-within { outline: none; }
+
+/* Ventana de terminal (fase 19j): barra de pestañas, emulador y línea de estado, todo teñido con la paleta elegida
+   (--term-bg y --term-fg llegan de la vista), sin efectos retro: sin barras de escaneo, brillo ni bordes gruesos. */
+.ssh-window {
+  --tw-line: color-mix(in srgb, var(--term-bg) 84%, var(--term-fg));
+  --tw-strip: color-mix(in srgb, var(--term-bg) 91%, var(--term-fg));
+  /* Texto de la barra y pestañas inactivas: el fg tal cual; mezclado no llega a 4.5:1 en solarized ni en consola-clara. */
+  --tw-mute: var(--term-fg);
+  border: 1px solid var(--tw-line); border-radius: var(--r-3); overflow: hidden; background: var(--term-bg); color: var(--term-fg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.22), 0 10px 28px rgb(0 0 0 / 0.16);
+}
+.ssh-window:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ssh-window .ssh-terms:focus-within { outline: none; }
+.ssh-window .ssh-terms { border: 0; border-radius: 0; padding: 0; }
+.ssh-window .ssh-term { height: auto; min-height: 0; }
+.ssh-window .ssh-xterm { height: clamp(380px, 62vh, 880px); min-height: 0; padding: 10px 4px 6px 12px; }
+.ssh-window .ssh-terms.split .ssh-xterm { height: clamp(320px, 52vh, 760px); }
+.ssh-quick { margin-bottom: var(--s-3); }
+
+.ssh-window .ssh-tabs { margin: 0; gap: 2px; padding: 6px 8px 0; background: var(--tw-strip); border-bottom: 1px solid var(--tw-line); }
+.ssh-window .ssh-tab { margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-radius: var(--r-2) var(--r-2) 0 0; color: var(--tw-mute); }
+.ssh-window .ssh-tab:hover { color: var(--term-fg); }
+.ssh-window .ssh-tab:has([role="tab"][aria-selected="true"]) { background: var(--term-bg); border-color: var(--tw-line); color: var(--term-fg); box-shadow: inset 0 2px 0 var(--accent); }
+.ssh-window .tabs .ssh-tab [role="tab"], .ssh-window .tabs .ssh-tab [role="tab"][aria-selected="true"] {
+  display: inline-flex; align-items: center; gap: 8px; height: 32px; max-width: 220px; padding: 0 var(--s-2) 0 var(--s-3);
+  color: inherit; font-size: var(--fs-body); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ssh-window .ssh-tab button.quiet { color: inherit; opacity: 0.7; }
+.ssh-window .ssh-tab button.quiet:hover { opacity: 1; }
+
+/* Punto de estado: verde viva, ámbar conectando, rojo con error, gris cerrada. */
+.ssh-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--tw-mute, var(--text-3)); }
+[data-state="live"] > .ssh-dot, [data-state="live"] [role="tab"] > .ssh-dot { background: var(--success); }
+[data-state="connecting"] > .ssh-dot, [data-state="connecting"] [role="tab"] > .ssh-dot { background: var(--warning); }
+[data-state="error"] > .ssh-dot, [data-state="error"] [role="tab"] > .ssh-dot { background: var(--critical); }
+
+.ssh-status {
+  display: flex; align-items: center; gap: var(--s-2); height: 26px; padding: 0 var(--s-3); overflow: hidden; white-space: nowrap;
+  background: var(--tw-strip); border-top: 1px solid var(--tw-line); color: var(--tw-mute); font-size: var(--fs-small);
+}
+.ssh-status .ssh-state { overflow: hidden; text-overflow: ellipsis; }
+.ssh-status .ssh-log { display: inline-flex; align-items: center; gap: var(--s-2); margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
+.ssh-rec { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--critical); }
+
+/* Pantalla dividida: dos paneles de la misma ventana, separados por una línea fina. */
+.ssh-window .ssh-terms.split { gap: 1px; background: var(--tw-line); }
+.ssh-window .ssh-terms.split .ssh-pane { display: flex; flex-direction: column; background: var(--term-bg); }
+.ssh-window .ssh-terms.split .ssh-term { border: 0; border-radius: 0; padding: 0; flex: 1; }
+.ssh-window .ssh-terms.split .ssh-pane:focus-within .ssh-term { outline: none; box-shadow: inset 0 2px 0 var(--accent); }
+.ssh-window .ssh-pane-head { margin: 0; padding: var(--s-2) var(--s-3) 0; color: var(--tw-mute); }
+.ssh-window .ssh-pane-head strong { color: var(--term-fg); }
+
+/* El visor de xterm trae fondo negro propio y asoma unos píxeles bajo la última fila: se deja ver el de la paleta. */
+.ssh-xterm .xterm-viewport { background-color: transparent !important; }
+
+/* Fase 19l: como un emulador de terminal de escritorio, la terminal se queda con el alto visible (--ssh-xh lo calcula la vista) y el formulario
+   de sesión nueva se pliega en una línea cuando ya hay pestañas. Ventana sin sombra y con esquinas casi rectas. */
+.ssh-window .ssh-xterm, .ssh-window .ssh-terms.split .ssh-xterm { height: var(--ssh-xh, clamp(380px, 62vh, 880px)); }
+.ssh-window { border-radius: var(--r-1); box-shadow: none; }
+.ssh-new { margin-bottom: var(--s-2); }
+.ssh-new > summary { cursor: pointer; width: fit-content; font-weight: 600; padding: var(--s-1) 0; }
+.ssh-new[open] > summary { margin-bottom: var(--s-2); }
+.ssh-tools, .ssh-quick { margin-bottom: var(--s-1); }
+
+/* Sin WebGL la terminal no puede dibujar con la CSP estricta: el aviso va sobre el emulador, con los colores de la ventana. */
+.ssh-nogl { margin: 0; padding: var(--s-2) var(--s-3); color: var(--term-fg); border-bottom: 1px solid var(--tw-line); }
+/* La barra de desplazamiento de xterm toma su color de un <style> que la CSP rechaza: el mismo color (texto de la paleta
+   al 20/40/50 %) va aquí, en la hoja de la app. */
+.ssh-window .xterm .xterm-scrollable-element > .scrollbar > .slider { background: color-mix(in srgb, var(--term-fg) 20%, transparent); }
+.ssh-window .xterm .xterm-scrollable-element > .scrollbar > .slider:hover { background: color-mix(in srgb, var(--term-fg) 40%, transparent); }
+.ssh-window .xterm .xterm-scrollable-element > .scrollbar > .slider.active { background: color-mix(in srgb, var(--term-fg) 50%, transparent); }
+
+/* Fase 19n: «Cambiar tema». Menú de paletas con una muestra (fondo y cinco roles) junto al nombre. */
+.theme-menu { position: relative; display: inline-flex; align-self: center; }
+.theme-menu > .popover.menu { left: 0; right: auto; min-width: 230px; max-height: min(60vh, 420px); overflow-y: auto; }
+.theme-list [role="menuitemradio"] { display: grid; grid-template-columns: auto 1fr 1.2em; align-items: center; gap: var(--s-2); text-align: left; }
+.theme-check { text-align: right; }
+
+/* Fase 19v: «Scripts ▾», menú con búsqueda agrupado por colección. */
+.scripts-menu { position: relative; display: inline-flex; align-self: center; }
+.scripts-menu > .popover.menu { left: 0; right: auto; width: min(380px, 80vw); max-height: min(60vh, 440px); overflow-y: auto; }
+.scripts-q { width: 100%; margin-bottom: var(--s-1); }
+.scripts-group { padding: var(--s-1) var(--s-2) 2px; font-size: var(--fs-small); font-weight: 600; color: var(--text-3); }
+.scripts-pop [role="menuitem"] { display: flex; align-items: center; gap: var(--s-2); width: 100%; height: 30px; text-align: left; }
+.scripts-pop [role="menuitem"] > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scripts-none { padding: var(--s-2); }

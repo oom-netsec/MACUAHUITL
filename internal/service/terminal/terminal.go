@@ -1,0 +1,322 @@
+// Package terminal es el servicio gRPC de la terminal SSH interactiva. Es manual: lo que el
+// ingeniero teclea va directo al equipo, sin modo asistido. Toda sesión sale por el EgressGuard,
+// usa la credencial de la bóveda y la verificación estricta de la llave de host, y se cierra,
+// revoca el guard y se audita en todos los caminos (el cliente cierra, el núcleo se cierra o el equipo corta).
+package terminal
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
+	"github.com/oom-netsec/MACUAHUITL/internal/terminal"
+	"github.com/oom-netsec/MACUAHUITL/internal/transport"
+)
+
+const (
+	maxSessions = 8
+	closeWait   = 15 * time.Second
+)
+
+type termSvc struct {
+	v1.UnimplementedTerminalServiceServer
+	d      service.Deps
+	ctx    context.Context // vive mientras el núcleo: cancelarlo cierra todas las sesiones
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+	live   atomic.Int32
+}
+
+func newSvc(d service.Deps) *termSvc {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &termSvc{d: d, ctx: ctx, cancel: cancel}
+}
+
+// close cierra las sesiones vivas y espera a que cada una cierre SSH, revoque el guard y audite.
+// El núcleo lo llama antes de cerrar la base de datos.
+func (s *termSvc) close() {
+	s.cancel()
+	done := make(chan struct{})
+	go func() { s.wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(closeWait):
+	}
+}
+
+// connErr traduce los errores de conexión a códigos gRPC; la huella de una llave nueva va en el mensaje.
+func connErr(err error) error {
+	var he *transport.HostKeyError
+	switch {
+	case errors.As(err, &he):
+		return status.Error(codes.FailedPrecondition, err.Error())
+	case errors.Is(err, transport.ErrAuth), errors.Is(err, transport.ErrEgressDenied):
+		return status.Error(codes.PermissionDenied, err.Error())
+	}
+	if s := service.VaultErr(err); status.Code(s) != codes.Internal {
+		return s
+	}
+	return status.Error(codes.Unavailable, err.Error())
+}
+
+func clamp(v, def, lo, hi uint32) int {
+	if v == 0 {
+		return int(def)
+	}
+	return int(min(max(v, lo), hi))
+}
+
+// safeName deja en el nombre del archivo solo letras, números y . _ -
+func safeName(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r < 0x80 && (r == '.' || r == '-' || r == '_' || r >= '0' && r <= '9' || r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z') {
+			b.WriteRune(r)
+		} else {
+			b.WriteByte('_')
+		}
+	}
+	return strings.TrimLeft(b.String(), ".-")
+}
+
+func (s *termSvc) recording(label, id string) (*os.File, error) {
+	dir := filepath.Join(s.d.Outputs(), "terminal")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+	}
+	// O_EXCL: no pisa un archivo ni sigue un enlace puesto con el mismo nombre.
+	p := filepath.Join(dir, fmt.Sprintf("%s_%s_%s.log", safeName(label), s.d.Now().Format("20060102-150405"), id[len(id)-6:]))
+	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "archivo de grabación: %v", err)
+	}
+	return f, nil
+}
+
+// refuse audita un rechazo anterior a la apertura: aún no hay sesión viva ni autorización en el guard.
+func (s *termSvc) refuse(label string, err error) error {
+	s.d.Audit("terminal.failed", label, fmt.Sprintf("razon=%q guard=sin autorizar", status.Convert(err).Message()))
+	return err
+}
+
+func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
+	s.d.MarkActive()
+	first, err := st.Recv()
+	if err != nil {
+		return err
+	}
+	o := first.GetOpen()
+	if o == nil {
+		return status.Error(codes.InvalidArgument, "el primer mensaje debe abrir la sesión")
+	}
+	if o.Address == "" || o.CredentialId == "" {
+		return status.Error(codes.InvalidArgument, "indica el equipo (dirección) y la credencial")
+	}
+	if o.Port > 65535 {
+		return status.Error(codes.InvalidArgument, "puerto fuera de rango")
+	}
+	port := uint16(o.Port)
+	if port == 0 {
+		port = 22
+	}
+	label := o.Name
+	if label == "" {
+		label = o.Address + ":" + strconv.Itoa(int(port))
+	}
+	v := s.d.Vault()
+	if v == nil || !v.Unlocked() {
+		return s.refuse(label, status.Error(codes.FailedPrecondition, "abre la bóveda: la terminal necesita las credenciales del equipo"))
+	}
+	if s.live.Add(1) > maxSessions {
+		s.live.Add(-1)
+		return s.refuse(label, status.Errorf(codes.ResourceExhausted, "máximo %d terminales abiertas", maxSessions))
+	}
+	defer s.live.Add(-1)
+	s.wg.Add(1)
+	defer s.wg.Done()
+	if s.ctx.Err() != nil {
+		return s.refuse(label, status.Error(codes.Unavailable, "el núcleo se está cerrando"))
+	}
+
+	ctx, cancel := context.WithCancel(st.Context())
+	defer cancel()
+	go func() { // cierre del núcleo → termina esta sesión
+		select {
+		case <-s.ctx.Done():
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	id := "term-" + service.NewID()
+	if err := s.d.Guard().Allow(ctx, id, []string{o.Address}); err != nil {
+		return s.refuse(label, status.Error(codes.PermissionDenied, err.Error()))
+	}
+	// A partir de aquí, todo camino de salida pasa por este defer: cierra SSH y grabación,
+	// revoca el guard y audita. Es lo que garantiza que no quede una autorización abierta.
+	var (
+		sess       *transport.Session
+		f          *os.File
+		rec        *terminal.Recorder
+		opened     bool
+		reason     = "no se pudo abrir"
+		rx, tx     atomic.Int64
+		recordPath string
+	)
+	defer func() {
+		if sess != nil {
+			sess.Close()
+		}
+		if rec != nil {
+			rec.Mark("cerrado: " + reason)
+			rec.Close()
+		}
+		if f != nil {
+			f.Close()
+		}
+		s.d.Guard().Revoke(id)
+		action := "terminal.close"
+		if !opened {
+			action = "terminal.failed"
+		}
+		s.d.Audit(action, label, fmt.Sprintf("sesion=%s razon=%q recibidos=%d enviados=%d guard=revocado grabacion=%s", id, reason, rx.Load(), tx.Load(), recordPath))
+	}()
+
+	cred, err := v.Get(o.CredentialId)
+	if err != nil {
+		reason = err.Error()
+		return service.VaultErr(err)
+	}
+	user := cred.Username
+	accepted := map[string]bool{}
+	for _, fp := range o.AcceptedHostKeyFingerprints {
+		accepted[fp] = true
+	}
+	hk := s.d.Hosts().Callback(transport.HostKeyPolicy{Accepted: accepted}, func(en audit.Entry) { s.d.Audit(en.Action, en.Target, en.Detail) })
+	sess, err = transport.OpenSSH(ctx, s.d.Guard(), id, o.Address, port, cred, hk, transport.SSHOptions{})
+	cred.Enable.Destroy() // la terminal es manual: el usuario escribe enable por su cuenta
+	if err != nil {
+		reason = err.Error()
+		return connErr(err)
+	}
+	r, w, err := sess.ShellSize(clamp(o.Rows, 24, 1, 200), clamp(o.Cols, 200, 20, 500))
+	if err != nil {
+		reason = err.Error()
+		return connErr(err)
+	}
+	if f, err = s.recording(label, id); err != nil {
+		reason = err.Error()
+		return err
+	}
+	recordPath = f.Name()
+	rec = terminal.NewRecorder(f, s.d.Now)
+	summary := fmt.Sprintf("%s@%s:%d", user, o.Address, port)
+	rec.Mark("abierto " + summary)
+	opened, reason = true, "cerrada por el usuario"
+	s.d.Audit("terminal.open", label, fmt.Sprintf("sesion=%s usuario=%s grabacion=%s manual=true", id, user, recordPath))
+	if err := st.Send(&v1.OpenTerminalResponse{Opened: summary, Recording: recordPath}); err != nil {
+		reason = err.Error()
+		return err
+	}
+
+	devDone := make(chan error, 1)
+	readerExit := make(chan struct{})
+	go func() { // equipo → pantalla y grabación; solo este goroutine envía por el stream desde aquí
+		defer close(readerExit)
+		buf := make([]byte, 4096)
+		for {
+			n, err := r.Read(buf)
+			if n > 0 {
+				rx.Add(int64(n))
+				rec.Output(buf[:n])
+				if serr := st.Send(&v1.OpenTerminalResponse{Data: append([]byte(nil), buf[:n]...)}); serr != nil {
+					devDone <- serr
+					return
+				}
+			}
+			if err != nil {
+				devDone <- err
+				return
+			}
+		}
+	}()
+	clientDone := make(chan struct{})
+	go func() { // teclado → equipo
+		defer close(clientDone)
+		for {
+			m, err := st.Recv()
+			if err != nil {
+				return
+			}
+			switch {
+			case m.GetResize() != nil:
+				sz := m.GetResize()
+				sess.Resize(clamp(sz.Rows, 24, 1, 200), clamp(sz.Cols, 200, 20, 500))
+			case len(m.GetData()) > 0:
+				rec.Input(m.GetData())
+				if n, err := w.Write(m.GetData()); err != nil {
+					return
+				} else {
+					tx.Add(int64(n))
+				}
+			}
+		}
+	}()
+
+	var lost error
+	select {
+	case <-clientDone:
+		if s.ctx.Err() != nil {
+			reason = "núcleo cerrándose"
+		} else if st.Context().Err() != nil {
+			// Recv devuelve en cuanto el contexto del stream se cancela, antes de que lo haga el derivado ctx.
+			reason = "cliente desconectado"
+		}
+	case <-ctx.Done():
+		reason = "cliente desconectado"
+		if s.ctx.Err() != nil {
+			reason = "núcleo cerrándose"
+		}
+	case lost = <-devDone:
+		reason = "el equipo cerró la sesión"
+		if lost != nil && !errors.Is(lost, io.EOF) {
+			reason = "conexión perdida: " + lost.Error()
+		}
+	}
+	sess.Close() // desbloquea la lectura; el defer termina de cerrar y revoca
+	select {     // nadie envía por el stream después de volver el manejador
+	case <-readerExit:
+	case <-time.After(5 * time.Second):
+	}
+	if lost != nil && !errors.Is(lost, io.EOF) {
+		return status.Error(codes.Unavailable, reason)
+	}
+	if s.ctx.Err() != nil {
+		return status.Error(codes.Unavailable, reason)
+	}
+	return nil
+}
+
+// Module registra el servicio Terminal y, al cerrarse el núcleo, cierra las sesiones vivas.
+type Module struct{}
+
+func (Module) Register(r ipc.Registrar, d service.Deps) {
+	s := newSvc(d)
+	d.OnClose(s.close)
+	v1.RegisterTerminalServiceServer(r, s)
+}

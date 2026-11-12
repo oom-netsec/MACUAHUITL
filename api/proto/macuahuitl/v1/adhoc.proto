@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+import "google/protobuf/timestamp.proto";
+import "macuahuitl/v1/common.proto";
+import "macuahuitl/v1/tools.proto";
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Ejecutor ad-hoc en lote (Fase 16a): comandos de solo lectura en N equipos como un
+// trabajo de Patrol de una ronda (bóveda, Login Test, guard y auditoría de Patrol).
+// Todo comando pasa por CheckDenied: uno que no sea de lectura rechaza el lote entero.
+service AdhocService {
+  rpc StartAdhoc(StartAdhocRequest) returns (StartAdhocResponse);
+  rpc AdhocResult(AdhocResultRequest) returns (AdhocResultResponse);
+}
+
+message StartAdhocRequest {
+  repeated Target targets = 1;
+  string credential_id = 2;
+  // Un comando por línea.
+  string commands = 3;
+  repeated string accepted_host_key_fingerprints = 4;
+  repeated string excluded_device_ids = 5;
+}
+
+message StartAdhocResponse {
+  string job_id = 1;
+  bool armed = 2;
+  // Por qué no se armó (Login Test, bóveda…); vacío si se armó.
+  string detail = 3;
+  google.protobuf.Timestamp window_ends_at = 4;
+}
+
+message AdhocResultRequest {
+  string job_id = 1;
+}
+
+message AdhocResultResponse {
+  // Estado del trabajo de Patrol (armed, completed, cancelled…).
+  string state = 1;
+  // done: el trabajo terminó y sus salidas ya se pueden leer.
+  bool done = 2;
+  ToolReport report = 3;
+  string csv = 4;
+  string markdown = 5;
+  // error: el trabajo terminó pero no dejó un resultado legible (por ejemplo, falló el manifest); done es verdadero.
+  string error = 6;
+}

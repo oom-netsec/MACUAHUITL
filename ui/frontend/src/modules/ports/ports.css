@@ -1,0 +1,24 @@
+/* Vista de frente del switch: puerto = botón coloreado por estado, con la VLAN dentro (ADR 0009, solo tokens). */
+.port-groups { display: flex; flex-wrap: wrap; gap: var(--s-4) var(--s-6); padding: var(--s-4); background: var(--surface-2); border: 1px solid var(--hairline); border-radius: var(--r-3); }
+.port-group { display: grid; gap: var(--s-1); }
+.port-group-name { color: var(--text-3); font-size: var(--fs-small); }
+.port-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, 36px); grid-auto-columns: 40px; gap: var(--s-1); }
+
+.port {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: 40px; height: 36px; padding: 0;
+  border: 1px solid var(--border-control); border-radius: var(--r-2); background: var(--surface); color: var(--text); font: 600 var(--fs-small) / 1 var(--mono);
+}
+.port-no { font-size: 10px; font-weight: 400; color: var(--text-2); }
+.port[data-status="connected"], .port-swatch[data-status="connected"] { background: var(--success-soft); border-color: var(--success); }
+.port[data-status="notconnect"], .port-swatch[data-status="notconnect"] { background: var(--surface); border-color: var(--border-control); color: var(--text-2); }
+.port[data-status="disabled"], .port-swatch[data-status="disabled"] { background: var(--surface-2); border: 1px dashed var(--border-control); color: var(--text-3); }
+.port[data-status="err-disabled"], .port-swatch[data-status="err-disabled"] { background: var(--critical-soft); border-color: var(--critical); }
+.port[data-status="monitoring"], .port-swatch[data-status="monitoring"] { background: var(--info-soft); border-color: var(--info); }
+.port:disabled { cursor: default; opacity: 0.75; }
+/* Elegido: aro de acento y marca ✓, para que no dependa solo del color. */
+.port[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
+.port[aria-pressed="true"]::after { content: "✓"; position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; line-height: 14px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); font-size: 10px; text-align: center; }
+
+.port-legend { list-style: none; display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); margin: var(--s-3) 0 0; padding: 0; color: var(--text-2); font-size: var(--fs-small); }
+.port-legend li { display: inline-flex; align-items: center; gap: var(--s-2); }
+.port-swatch { width: 14px; height: 14px; border: 1px solid var(--border-control); border-radius: var(--r-1); }

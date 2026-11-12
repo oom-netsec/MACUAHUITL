@@ -1,0 +1,41 @@
+Building configuration...
+
+Current configuration : 2101 bytes
+!
+version 17.9
+no service password-encryption
+!
+hostname SW-ACC-02
+!
+enable password cisco123
+!
+no aaa new-model
+!
+username admin privilege 15 password 0 cisco123
+username oper privilege 1 secret 5 $1$EXAM$EXAMPLEEXAMPLEEXAMPLE.
+!
+interface GigabitEthernet1/0/1
+ switchport access vlan 10
+ switchport mode access
+!
+interface Vlan10
+ ip address 198.51.100.3 255.255.255.0
+!
+ip http server
+ip http secure-server
+!
+snmp-server community public RO
+snmp-server community GESTION RW
+!
+line con 0
+ exec-timeout 0 0
+line vty 0 4
+ password 7 EXAMPLE0123
+ login
+ transport input telnet ssh
+line vty 5 15
+ login
+!
+ntp server 192.0.2.30
+!
+end

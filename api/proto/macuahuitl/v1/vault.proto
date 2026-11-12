@@ -1,0 +1,131 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Bóveda local (spec §10). Los secretos solo viajan del cliente al núcleo, nunca de vuelta.
+service VaultService {
+  rpc Status(StatusRequest) returns (StatusResponse);
+  rpc Create(CreateRequest) returns (CreateResponse);
+  rpc Unlock(UnlockRequest) returns (UnlockResponse);
+  rpc Lock(LockRequest) returns (LockResponse);
+  rpc ChangeMasterPassword(ChangeMasterPasswordRequest) returns (ChangeMasterPasswordResponse);
+  rpc ListCredentials(ListCredentialsRequest) returns (ListCredentialsResponse);
+  rpc PutCredential(PutCredentialRequest) returns (PutCredentialResponse);
+  rpc DeleteCredential(DeleteCredentialRequest) returns (DeleteCredentialResponse);
+  // Respaldo cifrado (fase 29d): un archivo de bóveda nuevo con su propia frase; se importa en dos pasos.
+  rpc ExportBackup(ExportBackupRequest) returns (ExportBackupResponse);
+  rpc PreviewBackupImport(PreviewBackupImportRequest) returns (PreviewBackupImportResponse);
+  rpc ApplyBackupImport(ApplyBackupImportRequest) returns (ApplyBackupImportResponse);
+}
+
+enum VaultState {
+  VAULT_STATE_UNSPECIFIED = 0;
+  VAULT_STATE_ABSENT = 1;
+  VAULT_STATE_LOCKED = 2;
+  VAULT_STATE_UNLOCKED = 3;
+}
+
+message StatusRequest {}
+message StatusResponse {
+  VaultState state = 1;
+  // IDs de trabajos con ventana armada que mantienen la DEK en memoria (spec §10.4).
+  repeated string armed_job_ids = 2;
+}
+
+message CreateRequest {
+  bytes master_password = 1;
+}
+message CreateResponse {}
+
+message UnlockRequest {
+  bytes master_password = 1;
+}
+message UnlockResponse {}
+
+message LockRequest {}
+message LockResponse {}
+
+message ChangeMasterPasswordRequest {
+  bytes current_master_password = 1;
+  bytes new_master_password = 2;
+}
+message ChangeMasterPasswordResponse {}
+
+// Vista pública de una credencial: nunca incluye el secreto.
+message CredentialInfo {
+  string id = 1;
+  string label = 2;
+  string username = 3;
+  bool has_enable_secret = 4;
+  bool has_ssh_key = 5;
+}
+
+message ListCredentialsRequest {}
+message ListCredentialsResponse {
+  repeated CredentialInfo credentials = 1;
+}
+
+message PutCredentialRequest {
+  // Vacío crea una nueva; con valor la reemplaza.
+  string id = 1;
+  string label = 2;
+  string username = 3;
+  bytes password = 4;
+  bytes enable_secret = 5;
+  bytes ssh_private_key = 6;
+}
+message PutCredentialResponse {
+  string id = 1;
+}
+
+message DeleteCredentialRequest {
+  string id = 1;
+}
+message DeleteCredentialResponse {}
+
+// ---- Respaldo cifrado ----
+
+message ExportBackupRequest {
+  string path = 1;                     // absoluta; extensión sugerida .mcvault
+  bytes passphrase = 2;                // frase del respaldo: al menos 12 caracteres y distinta de la maestra; se borra al terminar
+  bool overwrite = 3;                  // sin ella no pisa un archivo existente
+  bool confirm = 4;                    // obligatoria: el respaldo contiene todas las credenciales
+}
+message ExportBackupResponse {
+  int32 count = 1;                     // credenciales guardadas (las reservadas del sistema no viajan)
+  bool no_permissions = 2;             // el sistema de archivos (p. ej. vfat) no admitió los permisos 0600: el archivo va cifrado igual
+}
+
+message PreviewBackupImportRequest {
+  string path = 1;                     // absoluta; respaldo .mcvault
+  bytes passphrase = 2;                // frase del respaldo; se borra al terminar
+}
+message VaultBackupItem {
+  string id = 1;                       // ID de la credencial dentro del respaldo (las decisiones van por él)
+  string label = 2;
+  string username = 3;
+  string state = 4;                    // nueva | igual | conflicto_etiqueta | reservada (se omite)
+}
+message PreviewBackupImportResponse {
+  string token = 1;                    // vale 10 minutos, se gasta al aplicar y se descarta si la bóveda se cierra
+  int64 expires_ms = 2;
+  repeated VaultBackupItem items = 3;  // sin secretos
+}
+
+message VaultBackupDecision {
+  string id = 1;                       // ID del item en la vista previa
+  string action = 2;                   // renombrar | reemplazar | omitir (obligatoria en conflicto_etiqueta)
+}
+message ApplyBackupImportRequest {
+  string token = 1;
+  repeated VaultBackupDecision decisions = 2;
+}
+message ApplyBackupImportResponse {
+  int32 created = 1;
+  int32 replaced = 2;
+  int32 renamed = 3;
+  int32 skipped = 4;                   // omitidas por decisión o por reservadas
+  int32 same = 5;                      // ya estaban idénticas
+}

@@ -1,0 +1,8 @@
+NAME: "c95xx Stack", DESCR: "Cisco Catalyst 9500 Series Stack"
+PID: C9500-24Y4C       , VID: V02  , SN: FCW2301A0AA
+
+NAME: "Switch 1 - Power Supply A", DESCR: "Cisco 950W AC Power Supply"
+PID: C9K-PWR-950WAC-R  , VID: V01  , SN: DCC2301B0BB
+
+NAME: "TenGigabitEthernet1/0/1", DESCR: "SFP-10GBase-SR"
+PID: SFP-10G-SR        , VID: V03  , SN: JUR2301C0CC

@@ -1,0 +1,19 @@
+# SIN VALIDAR EN LABORATORIO: formatos y umbrales tomados de la documentación
+# pública de Cisco IOS-XE, sin transcripciones reales todavía. Ajustar con
+# salidas de equipos reales antes de confiar en los umbrales.
+- id: hsrp-inestable
+  title: HSRP cambió de estado entre rondas
+  severity: alta
+  commands: [show standby brief]
+  check: hsrp
+  params: {mode: changed}
+  explanation: El grupo HSRP cambió de estado entre rondas; el gateway virtual se movió.
+  action: Revisa %HSRP-5-STATECHANGE en el log, el seguimiento (track) y la pérdida de hellos entre pares.
+- id: hsrp-estado-anomalo
+  title: HSRP en estado anómalo
+  severity: media
+  commands: [show standby brief]
+  check: hsrp
+  params: {mode: bad}
+  explanation: El grupo está en Init/Learn/Speak o no conoce al Active/Standby; no hay redundancia efectiva.
+  action: Verifica que la SVI esté arriba y que los pares se vean (misma versión, grupo y autenticación).

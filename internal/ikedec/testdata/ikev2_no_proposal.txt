@@ -1,0 +1,20 @@
+IKEv2:(SESSION ID = 1,SA ID = 1):Received Packet [From 198.51.100.2:500/To 198.51.100.1:500/VRF i0:f0]
+Initiator SPI : 6A1C5E4F7D1A2B3C - Responder SPI : 0000000000000000 Message id: 0
+IKEv2 IKE_SA_INIT Exchange REQUEST
+Payload contents:
+ SA KE N VID VID NOTIFY(NAT_DETECTION_SOURCE_IP) NOTIFY(NAT_DETECTION_DESTINATION_IP)
+
+IKEv2:(SESSION ID = 1,SA ID = 1):Processing IKE_SA_INIT message
+IKEv2:(SESSION ID = 1,SA ID = 1):Failed to find a matching policy
+IKEv2:(SESSION ID = 1,SA ID = 1):Received Policies:
+Proposal 1:  AES-CBC-128 SHA1 SHA96 DH_GROUP_1024_MODP/Group 2
+
+IKEv2:(SESSION ID = 1,SA ID = 1):Expected Policies:
+Proposal 1:  AES-CBC-256 SHA512 SHA512 DH_GROUP_2048_MODP/Group 14
+
+IKEv2:(SESSION ID = 1,SA ID = 1):Failed to find a matching policy
+IKEv2:(SESSION ID = 1,SA ID = 1):Sending Packet [To 198.51.100.2:500/From 198.51.100.1:500/VRF i0:f0]
+Initiator SPI : 6A1C5E4F7D1A2B3C - Responder SPI : 0000000000000000 Message id: 0
+IKEv2 IKE_SA_INIT Exchange RESPONSE
+Payload contents:
+ NOTIFY(NO_PROPOSAL_CHOSEN)

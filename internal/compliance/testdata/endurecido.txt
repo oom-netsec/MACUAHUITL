@@ -1,0 +1,108 @@
+Building configuration...
+
+Current configuration : 4210 bytes
+!
+! Last configuration change at 10:15:32 UTC Tue Nov 3 2026 by admin
+! NVRAM config last updated at 10:16:01 UTC Tue Nov 3 2026 by admin
+!
+version 17.9
+service timestamps debug datetime msec localtime show-timezone
+service timestamps log datetime msec localtime show-timezone
+service password-encryption
+service tcp-keepalives-in
+service tcp-keepalives-out
+no service pad
+service call-home
+platform punt-keepalive disable-kernel-core
+!
+hostname SW-ACC-01
+!
+vrf definition Mgmt-vrf
+ !
+ address-family ipv4
+ exit-address-family
+!
+logging buffered 64000 informational
+no logging console
+enable secret 9 $9$EXAMPLEEXAMPLEEX$EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEE
+!
+aaa new-model
+!
+aaa authentication login default group TACACS-GRP local
+aaa authorization exec default group TACACS-GRP local
+aaa accounting exec default start-stop group TACACS-GRP
+!
+aaa session-id common
+no ip source-route
+no ip domain lookup
+ip domain name ejemplo.lab
+!
+login block-for 120 attempts 5 within 60
+login on-failure log
+!
+username admin privilege 15 secret 9 $9$EXAMPLEEXAMPLEEX$EXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEEXAMPLEE
+!
+ip ssh version 2
+ip ssh time-out 60
+ip ssh authentication-retries 3
+!
+interface GigabitEthernet0/0
+ vrf forwarding Mgmt-vrf
+ ip address 192.0.2.10 255.255.255.0
+ negotiation auto
+!
+interface GigabitEthernet1/0/1
+ description PC-ACCESO
+ switchport access vlan 10
+ switchport mode access
+ spanning-tree portfast
+!
+interface Vlan10
+ ip address 198.51.100.2 255.255.255.0
+ no ip redirects
+ no ip proxy-arp
+!
+no ip http server
+ip http authentication local
+ip http secure-server
+ip http client source-interface GigabitEthernet0/0
+!
+ip access-list standard ACL-SNMP
+ 10 permit 192.0.2.0 0.0.0.255
+ip access-list standard ACL-VTY
+ 10 permit 192.0.2.0 0.0.0.255
+!
+logging host 192.0.2.50
+!
+snmp-server group GRP-V3 v3 priv read VISTA access ACL-SNMP
+snmp-server view VISTA iso included
+!
+tacacs server TAC1
+ address ipv4 192.0.2.40
+ key 7 EXAMPLE0123456789
+!
+control-plane
+ service-policy input system-cpp-policy
+!
+banner login ^C
+Acceso restringido a personal autorizado. Toda actividad queda registrada.
+^C
+!
+line con 0
+ exec-timeout 5 0
+ stopbits 1
+line vty 0 4
+ access-class ACL-VTY in vrf-also
+ exec-timeout 10 0
+ transport input ssh
+line vty 5 15
+ access-class ACL-VTY in vrf-also
+ exec-timeout 10 0
+ transport input ssh
+!
+ntp authentication-key 1 hmac-sha2-256 7 EXAMPLE0123456789ABCDEF
+ntp authenticate
+ntp trusted-key 1
+ntp server 192.0.2.30 key 1
+!
+end

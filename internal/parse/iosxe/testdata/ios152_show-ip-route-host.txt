@@ -1,0 +1,6 @@
+Routing entry for 10.50.0.0/16
+  Known via "ospf 1", distance 110, metric 20, type intra area
+  Last update from 10.10.0.2 on Vlan10, 00:10:12 ago
+  Routing Descriptor Blocks:
+  * 10.10.0.2, from 10.255.0.2, 00:10:12 ago, via Vlan10
+      Route metric is 20, traffic share count is 1

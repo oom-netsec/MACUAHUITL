@@ -1,0 +1,169 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Calculadoras de bolsillo (Fase 13): cálculo puro en el núcleo, sin red, archivos
+// ni auditoría. Cada respuesta trae el resultado completo en JSON (para --json y
+// scripts), las tablas ya armadas que muestran la UI y mctl, y las notas.
+service CalcService {
+  rpc Subnet(SubnetRequest) returns (SubnetResponse);
+  rpc Vlsm(VlsmRequest) returns (VlsmResponse);
+  rpc Summarize(SummarizeRequest) returns (SummarizeResponse);
+  // Sin dirección convierte prefijo/máscara/wildcard; con dirección muestra qué cubre la ACL.
+  rpc Wildcard(WildcardRequest) returns (WildcardResponse);
+  rpc Ipv6(Ipv6Request) returns (Ipv6Response);
+  rpc Mtu(MtuRequest) returns (MtuResponse);
+  rpc Tcp(TcpRequest) returns (TcpResponse);
+  rpc Dscp(DscpRequest) returns (DscpResponse);
+  rpc Optics(OpticsRequest) returns (OpticsResponse);
+  rpc Bgp(BgpRequest) returns (BgpResponse);
+}
+
+message CalcRow {
+  repeated string cells = 1;
+}
+
+message CalcTable {
+  string title = 1;
+  repeated string head = 2;
+  repeated CalcRow rows = 3;
+}
+
+message CalcResult {
+  string json = 1;
+  string text = 2;
+  repeated CalcTable tables = 3;
+  repeated string notes = 4;
+}
+
+message SubnetRequest {
+  string prefix = 1; // 10.0.0.1/24, 10.0.0.1 255.255.255.0 o 2001:db8::/64
+}
+
+message SubnetResponse {
+  CalcResult result = 1;
+}
+
+message VlsmNeed {
+  string name = 1;
+  uint64 hosts = 2;
+}
+
+message VlsmRequest {
+  string network = 1;
+  repeated VlsmNeed needs = 2;
+}
+
+message VlsmResponse {
+  CalcResult result = 1;
+}
+
+message SummarizeRequest {
+  repeated string prefixes = 1;
+}
+
+message SummarizeResponse {
+  CalcResult result = 1;
+}
+
+message WildcardRequest {
+  string address = 1; // vacío = solo conversión
+  string value = 2;   // /24, 24, máscara o wildcard
+}
+
+message WildcardResponse {
+  CalcResult result = 1;
+}
+
+message Ipv6Request {
+  string address = 1; // dirección o prefijo /64 para la EUI-64
+  string mac = 2;
+}
+
+message Ipv6Response {
+  CalcResult result = 1;
+}
+
+message MtuRequest {
+  uint32 physical = 1;
+  // De afuera hacia adentro: gre, gre-key, esp-tunnel:aes-cbc:sha256, esp-transport:aes-gcm,
+  // getvpn:aes-cbc:sha1[:tbar], nat-t, vxlan, mpls:3, dot1q, qinq, pppoe, lisp.
+  repeated string layers = 2;
+  bool inner_ipv6 = 3;
+}
+
+message MtuResponse {
+  CalcResult result = 1;
+}
+
+message TcpRequest {
+  string bandwidth = 1; // 1g, 100m, 10G
+  double rtt_ms = 2;
+  string window = 3; // bytes: 64k, 4m; vacío = sin límite de ventana
+  double loss_percent = 4;
+  uint32 mss = 5; // 0 = 1460
+}
+
+message TcpResponse {
+  CalcResult result = 1;
+}
+
+message DscpRequest {
+  string query = 1; // vacío = tabla completa
+  string field = 2; // name, dscp, binary, tos, precedence, cos, exp; vacío = nombre o DSCP
+}
+
+message DscpResponse {
+  CalcResult result = 1;
+}
+
+message OpticsRequest {
+  string convert = 1; // "-3dBm" o "0.5mW": solo conversión
+  double tx_dbm = 2;
+  double rx_sensitivity_dbm = 3;
+  optional double rx_overload_dbm = 4;
+  double km = 5;
+  string fiber = 6; // smf-1310, smf-1550, mmf-850, mmf-1300
+  double loss_per_km = 7; // > 0 reemplaza el valor típico de la fibra
+  uint32 connectors = 8;
+  double connector_loss_db = 9;
+  uint32 splices = 10;
+  double splice_loss_db = 11;
+  double margin_db = 12;
+}
+
+message OpticsResponse {
+  CalcResult result = 1;
+}
+
+message BgpRoute {
+  string name = 1;
+  uint32 weight = 2; // 0 = por defecto (32768 si locally_originated)
+  optional uint32 local_pref = 3; // ausente = 100
+  bool locally_originated = 4;
+  string as_path = 5;
+  string origin = 6; // i, e, ?
+  optional uint32 med = 7; // ausente = 0
+  bool ebgp = 8;
+  uint32 igp_metric = 9;
+  string router_id = 10;
+  string originator_id = 11;
+  uint32 cluster_list_length = 12;
+  string neighbor = 13;
+  int64 age_seconds = 14;
+  bool next_hop_unreachable = 15;
+}
+
+message BgpRequest {
+  repeated BgpRoute routes = 1; // en orden de llegada, la más nueva primero
+  bool always_compare_med = 2;
+  bool deterministic_med = 3;
+  bool multipath_relax = 4;
+  uint32 maximum_paths = 5;
+}
+
+message BgpResponse {
+  CalcResult result = 1;
+}

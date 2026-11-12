@@ -1,0 +1,5 @@
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/5   PC-juan            connected    10         a-half  a-100  10/100/1000BaseTX
+Gi1/0/9   sala-juntas        err-disabled 10         auto    auto 10/100/1000BaseTX
+Gi1/0/10  servidor-web       connected    20         a-full  a-1000 10/100/1000BaseTX
+Gi1/0/48  to-DIST1           connected    trunk      a-full  a-1000 10/100/1000BaseTX

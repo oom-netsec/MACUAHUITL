@@ -1,0 +1,18 @@
+# Propósito: Resume la topología de spanning-tree: raíz, puertos bloqueados, inconsistentes y cambios de topología.
+# Cuándo usarlo: Reconvergencias lentas, puerto bloqueado inesperado, cambio de raíz o pérdidas breves en toda una VLAN.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/command/lsw-cr-book.html
+# Sin validar en laboratorio.
+id: l2-stp
+platform: ios-xe
+name: L2 · STP
+commands:
+  - cmd: show clock
+  - cmd: show spanning-tree summary
+  - cmd: show spanning-tree root
+  - cmd: show spanning-tree bridge
+  - cmd: show spanning-tree blockedports
+  - cmd: show spanning-tree inconsistentports
+  - cmd: show spanning-tree mst
+  - cmd: show logging | include SPANTREE|STP|BPDU
+  - cmd: show spanning-tree detail | include occurred|from|Number of topology
+  - cmd: show spanning-tree

@@ -1,0 +1,20 @@
+id: pre-post
+platform: ios-xe
+name: Cambio · Pre y post de ventana de cambio
+# Solo lectura. Las mismas salidas se toman antes y después del cambio y
+# internal/change las compara (interfaces, vecinos, rutas, MAC/ARP, HSRP, STP, config).
+commands:
+  - cmd: show version
+  - cmd: show running-config
+    may_contain_secrets: true
+  - cmd: show ip interface brief
+  - cmd: show cdp neighbors detail
+  - cmd: show lldp neighbors detail
+  - cmd: show ip ospf neighbor
+  - cmd: show ip bgp summary
+  - cmd: show ip route summary
+  - cmd: show mac address-table
+    timeout: 120s
+  - cmd: show ip arp
+  - cmd: show standby brief
+  - cmd: show spanning-tree root

@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+import "macuahuitl/v1/tools.proto";
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Deriva de configuración (Fase 16a): compara el running-config de una ronda de Patrol con la
+// anterior, por equipo, sin las líneas volátiles. Solo lee la carpeta del trabajo; nada de red.
+service DriftService {
+  rpc Drift(DriftRequest) returns (DriftResponse);
+}
+
+message DriftRequest {
+  // ID de un trabajo de esta sesión o ruta absoluta de su carpeta.
+  string job = 1;
+  // Ronda a comparar con la anterior; 0 = la última de cada equipo.
+  uint32 round = 2;
+  // Filtra equipos por nombre, IP o parte de la carpeta; vacío = todos.
+  string device = 3;
+}
+
+message DriftResponse {
+  ToolReport report = 1;
+}

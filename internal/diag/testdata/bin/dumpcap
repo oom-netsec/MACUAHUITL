@@ -1,0 +1,7 @@
+#!/bin/sh
+echo "ARGV: $*" >&2
+out=""
+while [ $# -gt 0 ]; do [ "$1" = "-w" ] && out="$2"; shift; done
+printf '\012\015\015\012\000\000\000\034' > "$out"   # cabecera binaria pcapng
+echo "Packets captured: 3" >&2
+exit 0

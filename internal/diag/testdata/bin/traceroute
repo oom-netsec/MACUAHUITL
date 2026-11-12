@@ -1,0 +1,7 @@
+#!/bin/sh
+# Doble de prueba: imprime cómo lo llamaron y simula salida.
+echo "ARGV: $*"
+echo "línea 1 de traceroute"
+echo "línea 2 de traceroute"
+[ "$FAKE_EXIT" ] && exit "$FAKE_EXIT"
+exit 0

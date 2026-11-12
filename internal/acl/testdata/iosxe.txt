@@ -1,0 +1,6 @@
+ip access-list extended EDGE-IN
+ remark Gestion desde la red de NOC
+ permit tcp 10.10.0.0 0.0.0.255 host 192.0.2.1 eq 22 log
+ permit udp any eq 123 host 192.0.2.1 eq ntp
+ permit tcp 10.20.0.0 0.0.255.255 any gt 1023
+ deny ip any any log-input

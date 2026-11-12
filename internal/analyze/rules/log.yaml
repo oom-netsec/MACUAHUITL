@@ -1,0 +1,51 @@
+# SIN VALIDAR EN LABORATORIO: formatos y umbrales tomados de la documentación
+# pública de Cisco IOS-XE, sin transcripciones reales todavía. Ajustar con
+# salidas de equipos reales antes de confiar en los umbrales.
+- id: log-mallocfail
+  title: Falla de asignación de memoria
+  severity: critica
+  commands: [show logging]
+  check: match
+  params: {pattern: '%SYS-2-MALLOCFAIL'}
+  explanation: El equipo no pudo asignar memoria; procesos pueden fallar y el equipo puede recargar.
+  action: Revisa memoria-baja/memoria-fuga y el proceso indicado en -Process=; abre caso TAC con los tracebacks.
+- id: log-cpuhog
+  title: Proceso acaparando el CPU
+  severity: alta
+  commands: [show logging]
+  check: match
+  params: {pattern: '%SYS-3-CPUHOG'}
+  explanation: Un proceso retuvo el CPU más tiempo del permitido; otros procesos (keepalives, protocolos) se retrasan.
+  action: Anota el proceso de "process =" y busca el defecto para la versión; correlaciona con la CPU de esa ronda.
+- id: log-traceback
+  title: Traceback en el log
+  severity: alta
+  commands: [show logging]
+  check: match
+  params: {pattern: '^\s*-Traceback='}
+  explanation: Un traceback acompaña a un error de software; es la firma que TAC usa para identificar el defecto.
+  action: Copia el traceback completo con el mensaje que lo precede y búscalo en el Bug Search Tool o adjúntalo al caso TAC.
+- id: log-critico
+  title: Mensaje de severidad 0-2 en el log
+  severity: alta
+  commands: [show logging]
+  check: match
+  params: {pattern: '%[A-Z0-9_]+-[0-2]-[A-Z0-9_]+:', exclude: '%SYS-2-MALLOCFAIL'}
+  explanation: Hay mensajes de emergencia, alerta o crítico (severidad 0 a 2).
+  action: Lee cada mensaje con su mnemónico en la guía de mensajes de sistema de la versión.
+- id: log-flap-interfaz
+  title: Interfaz con flaps
+  severity: media
+  commands: [show logging]
+  check: match
+  params: {pattern: '%LINK-3-UPDOWN: Interface (\S+?),', group: "true", min: "4"}
+  explanation: La misma interfaz cambió de estado varias veces en el búfer de log.
+  action: Revisa capa 1 (errores CRC, transceptor) y el vecino; considera errdisable flap-setting si el flap afecta la topología.
+- id: log-adyacencia-caida
+  title: Adyacencia de enrutamiento caída
+  severity: media
+  commands: [show logging]
+  check: match
+  params: {pattern: '%BGP-5-ADJCHANGE: neighbor \S+ .*Down|%OSPF-5-ADJCHG: .* to DOWN'}
+  explanation: Una sesión BGP o una adyacencia OSPF se cayó.
+  action: Revisa el motivo indicado en el mensaje (notificación, dead timer, interfaz) y el estado actual con show ip bgp summary / show ip ospf neighbor.

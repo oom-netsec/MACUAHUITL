@@ -1,0 +1,35 @@
+# Núcleo de MACUAHUITL como servicio de usuario (spec §5.1).
+# Instalar en ~/.config/systemd/user/ y activar con:
+#   systemctl --user daemon-reload && systemctl --user enable --now macuahuitld
+[Unit]
+Description=MACUAHUITL núcleo
+Documentation=https://github.com/oom-netsec/MACUAHUITL
+# Si ya hay un núcleo corriendo (ErrAlreadyRunning) no tiene caso reintentar sin fin.
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+# La ruta real la fija el paquete (.deb/.rpm instala en /usr/bin).
+ExecStart=/usr/bin/macuahuitld
+Restart=on-failure
+RestartSec=5
+
+# Endurecimiento (spec §10.3, docs/security/THREAT_MODEL.md)
+NoNewPrivileges=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+LimitCORE=0
+# Permite bloquear toda la memoria del núcleo. Un servicio de usuario no puede subir
+# el límite duro por sí mismo: el administrador debe conceder DefaultLimitMEMLOCK=infinity
+# en /etc/systemd/user.conf.d/macuahuitl.conf (o en limits.conf). Sin eso el núcleo
+# arranca igual y deja un aviso en la auditoría (internal/sys).
+LimitMEMLOCK=infinity
+UMask=0077
+
+[Install]
+WantedBy=default.target

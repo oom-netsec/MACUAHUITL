@@ -1,0 +1,4 @@
+
+Neighbor ID     Pri   State           Dead Time   Address         Interface
+192.0.2.2         1   FULL/BDR        00:00:35    198.51.100.3    Vlan10
+192.0.2.3         0   FULL/  -        00:00:33    203.0.113.2     GigabitEthernet1/0/24

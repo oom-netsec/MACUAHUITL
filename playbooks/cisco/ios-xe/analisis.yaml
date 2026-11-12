@@ -1,0 +1,21 @@
+# Lo que necesitan las reglas de internal/analyze (mctl analyze/diff/timeline).
+# Pensado para varias rondas: las tendencias y los contadores que crecen salen
+# de comparar una ronda con la anterior.
+id: analisis
+platform: ios-xe
+name: Análisis · Evidencia para el analizador
+commands:
+  - cmd: show clock detail
+  - cmd: show version
+  - cmd: show logging
+  - cmd: show processes cpu sorted
+  - cmd: show processes memory sorted
+  - cmd: show memory statistics
+  - cmd: show interfaces
+    timeout: 120s
+  - cmd: show spanning-tree detail
+    timeout: 120s
+  - cmd: show ip bgp summary
+  - cmd: show ip ospf neighbor
+  - cmd: show standby brief
+  - cmd: "dir crashinfo:"

@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - name: vet
+        run: go vet ./...
+      - name: test
+        run: go test -race ./...
+      - name: noegress
+        run: go run ./tools/noegress/cmd/noegress ./...
+      - name: archcheck
+        run: go run ./tools/archcheck/cmd/archcheck ./...
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2 ./...
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: build reproducible
+        run: |
+          build() { rm -rf "$1" && CGO_ENABLED=0 go build -trimpath -ldflags "-buildid=" -o "$1/" ./cmd/... && (cd "$1" && sha256sum *); }
+          diff <(build /tmp/a) <(build /tmp/b)
+          build /tmp/a
+
+  ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui/frontend
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: main de Wails compila (sin WebKitGTK, etiqueta purego)
+        working-directory: .
+        run: CGO_ENABLED=0 go vet -tags 'wails purego' ./ui/
+
+  proto:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: bufbuild/buf-action@v1.6.0
+        with:
+          version: 1.75.0
+          lint: true
+          # Sin comentario en el PR: el workflow solo tiene permiso de lectura.
+          pr_comment: false
+          breaking: false
+          format: false
+          push: false
+      - uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: código generado al día
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+          buf generate
+          git diff --exit-code -- gen/

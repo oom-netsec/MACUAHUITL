@@ -1,0 +1,27 @@
+GigabitEthernet1/0/1 is up, line protocol is up (connected) 
+  Hardware is Gigabit Ethernet, address is 7069.5a3b.1c01 (bia 7069.5a3b.1c01)
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+  Last input 00:00:01, output 00:00:00, output hang never
+  Last clearing of "show interface" counters 00:05:12
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+  5 minute input rate 1000 bits/sec, 1 packets/sec
+  5 minute output rate 2000 bits/sec, 1 packets/sec
+     5000 packets input, 640000 bytes, 0 no buffer
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     5000 packets output, 640000 bytes, 0 underruns
+     0 output errors, 0 collisions, 0 interface resets
+GigabitEthernet1/0/2 is up, line protocol is up (connected) 
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+  Last clearing of "show interface" counters never
+  5 minute input rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     0 packets output, 0 bytes, 0 underruns
+GigabitEthernet1/0/3 is up, line protocol is up (connected) 
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+  Last clearing of "show interface" counters 2d03h
+  5 minute input rate 0 bits/sec, 0 packets/sec
+     0 packets input, 0 bytes, 0 no buffer
+     0 packets output, 0 bytes, 0 underruns
+GigabitEthernet1/0/4 is up, line protocol is up (connected) 
+  MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec, 
+  5 minute input rate 0 bits/sec, 0 packets/sec

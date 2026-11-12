@@ -1,0 +1,80 @@
+# Paquetes .deb y .rpm de MACUAHUITL. Se construye con: task package
+# Lee los binarios de bin/ (task release-build + task ui-build). VERSION = tag sin la v.
+name: macuahuitl
+arch: amd64
+platform: linux
+version: ${VERSION}
+section: net
+priority: optional
+maintainer: Os Ordonez <190461823+oom-netsec@users.noreply.github.com>
+description: |
+  Recolección automatizada de evidencia de equipos Cisco (nivel TAC), bóveda local
+  de credenciales, auditoría encadenada, diagnóstico de red y generador de ACLs.
+  Todo local: sin nube ni telemetría.
+vendor: MACUAHUITL
+homepage: https://github.com/oom-netsec/MACUAHUITL
+license: Apache-2.0
+
+depends:
+  - libwebkit2gtk-4.1-0
+  - libgtk-3-0
+  - iputils-ping
+  - iputils-tracepath
+recommends:
+  - nmap
+  - iperf3
+  - wireshark-common
+
+contents:
+  - src: bin/macuahuitld
+    dst: /usr/bin/macuahuitld
+    file_info:
+      mode: 0755
+  - src: bin/mctl
+    dst: /usr/bin/mctl
+    file_info:
+      mode: 0755
+  - src: bin/macuahuitl
+    dst: /usr/bin/macuahuitl
+    file_info:
+      mode: 0755
+  - src: deploy/systemd/macuahuitld.service
+    dst: /usr/lib/systemd/user/macuahuitld.service
+  - src: deploy/packaging/macuahuitl.desktop
+    dst: /usr/share/applications/macuahuitl.desktop
+  - src: ui/frontend/public/favicon.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/macuahuitl.svg
+  - src: deploy/packaging/icons/16/macuahuitl.png
+    dst: /usr/share/icons/hicolor/16x16/apps/macuahuitl.png
+  - src: deploy/packaging/icons/24/macuahuitl.png
+    dst: /usr/share/icons/hicolor/24x24/apps/macuahuitl.png
+  - src: deploy/packaging/icons/32/macuahuitl.png
+    dst: /usr/share/icons/hicolor/32x32/apps/macuahuitl.png
+  - src: deploy/packaging/icons/48/macuahuitl.png
+    dst: /usr/share/icons/hicolor/48x48/apps/macuahuitl.png
+  - src: deploy/packaging/icons/64/macuahuitl.png
+    dst: /usr/share/icons/hicolor/64x64/apps/macuahuitl.png
+  - src: deploy/packaging/icons/128/macuahuitl.png
+    dst: /usr/share/icons/hicolor/128x128/apps/macuahuitl.png
+  - src: deploy/packaging/icons/256/macuahuitl.png
+    dst: /usr/share/icons/hicolor/256x256/apps/macuahuitl.png
+  - src: deploy/packaging/icons/512/macuahuitl.png
+    dst: /usr/share/icons/hicolor/512x512/apps/macuahuitl.png
+  - src: LICENSE
+    dst: /usr/share/doc/macuahuitl/LICENSE
+  - src: NOTICE
+    dst: /usr/share/doc/macuahuitl/NOTICE
+  - src: docs/security/AUDIT_GUIDE.md
+    dst: /usr/share/doc/macuahuitl/AUDIT_GUIDE.md
+  - src: docs/security/THREAT_MODEL.md
+    dst: /usr/share/doc/macuahuitl/THREAT_MODEL.md
+
+scripts:
+  postinstall: deploy/packaging/postinstall.sh
+
+overrides:
+  rpm:
+    depends:
+      - webkit2gtk4.1
+      - gtk3
+      - iputils

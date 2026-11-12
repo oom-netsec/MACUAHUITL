@@ -1,0 +1,112 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Herramientas de diagnóstico en Go puro (Fase 7). Los reportes viajan como JSON
+// para que la UI y mctl los muestren sin duplicar cada estructura en el contrato;
+// `text` es el resumen legible.
+service ToolsService {
+  rpc AnalyzePcap(AnalyzePcapRequest) returns (AnalyzePcapResponse);
+  rpc Dns(DnsRequest) returns (DnsResponse);
+  rpc InspectTls(InspectTlsRequest) returns (InspectTlsResponse);
+  // Escucha hasta que el cliente cancele o pase duration_seconds (siempre acotado).
+  rpc Syslog(SyslogRequest) returns (stream SyslogResponse);
+}
+
+message ToolReport {
+  string json = 1;
+  string text = 2;
+}
+
+message AnalyzePcapResponse {
+  ToolReport report = 1;
+}
+
+message DnsResponse {
+  ToolReport report = 1;
+}
+
+message InspectTlsResponse {
+  ToolReport report = 1;
+}
+
+message AnalyzePcapRequest {
+  string path = 1; // absoluto
+  int32 top = 2;
+  int32 slow_dns_ms = 3;
+}
+
+enum DnsMode {
+  DNS_MODE_UNSPECIFIED = 0;
+  DNS_MODE_QUERY = 1;     // consulta a los servidores indicados (o comparación si son varios)
+  DNS_MODE_TRANSPORT = 2; // UDP/TCP/EDNS/DNSSEC/DoT/DoH contra un servidor
+  DNS_MODE_HYGIENE = 3;   // PTR, SPF, DMARC, DKIM, CAA, TTL
+  DNS_MODE_EXPOSURE = 4;  // resolvedor abierto, secuestro de NXDOMAIN
+  DNS_MODE_TRACE = 5;     // profundo: iterativa desde la raíz
+  DNS_MODE_ZONE = 6;      // profundo: consistencia de la zona en todos sus NS
+  DNS_MODE_DNSSEC = 7;    // profundo: cadena de confianza raíz → zona
+}
+
+message DnsRequest {
+  DnsMode mode = 1;
+  string name = 2;
+  string type = 3;             // A, AAAA, MX...; A por defecto
+  repeated string servers = 4; // udp://, tcp://, tls://, https:// o IP; vacío = resolvedor del sistema (o los públicos con deep)
+  // Autoriza contactar raíces, TLD y autoritativos (cualquier IP, solo puertos 53/853/443).
+  // Obligatorio en los modos profundos; cada servidor contactado queda auditado.
+  bool deep = 5;
+  bool dnssec = 6;
+  string dkim_selector = 7;
+  int32 timeout_ms = 8;
+}
+
+message InspectTlsRequest {
+  string host = 1;
+  uint32 port = 2; // 443 por defecto
+  string sni = 3;
+  int32 timeout_ms = 4;
+}
+
+message SyslogRequest {
+  string addr = 1;     // 127.0.0.1:5514 por defecto
+  string protocol = 2; // udp o tcp
+  bool allow_any = 3;  // escuchar en 0.0.0.0 / ::
+  int32 duration_seconds = 4; // 0 = 1 h; máximo 24 h
+  bool save = 5;       // guardar en outputs/syslog
+  // Tope de tasa y cola; 0 = default, fuera de rango = InvalidArgument.
+  int32 rate_per_source = 6;  // msg/s por IP de origen; default 100, 1–10000
+  int32 burst_per_source = 7; // default 2x la tasa
+  int32 rate_global = 8;      // msg/s en total; default 1000, 1–100000
+  int32 burst_global = 9;     // default 2x la tasa
+  int32 queue_size = 10;      // mensajes en espera de escribirse; default 4096, 64–65536
+  // Archivo (solo con save).
+  int32 rotate_mb = 11;       // rotar al llegar a N MB; default 50, 1–1024
+  int32 rotate_minutes = 12;  // rotar cada N minutos; 0 = no, 1–10080
+  string name_template = 13;  // {fecha} {hora} {origen}; default syslog_{fecha}_{hora}
+  int32 max_files = 14;       // archivos que se conservan; default 20, 1–1000
+  string format = 15;         // texto (default), crudo o jsonl
+}
+
+message SyslogResponse {
+  string listening = 1;   // primer evento: dirección real
+  string json = 2;        // un mensaje
+  string output_path = 3; // si save: la carpeta de salida
+  SyslogDrops drops = 4;  // acumulado de descartes, cuando cambia
+  string rotated_path = 5; // archivo nuevo abierto
+}
+
+message SyslogDrops {
+  uint64 total = 1;
+  uint64 por_origen = 2;
+  uint64 global = 3;
+  uint64 cola_llena = 4;
+  int64 since_ms = 5;     // primer descarte, ms desde 1970
+  repeated SyslogSourceDrops top = 6; // hasta 10, el mayor primero
+}
+
+message SyslogSourceDrops {
+  string source = 1; // IP, o "otros"
+  uint64 count = 2;
+}

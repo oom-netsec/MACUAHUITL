@@ -1,0 +1,6 @@
+Routing entry for 2001:DB8:99::/64
+  Known via "connected", distance 0, metric 0, type connected
+  Route count is 1/1, share count 0
+  Routing paths:
+    directly connected, Vlan99
+      Last updated 00:10:12 ago

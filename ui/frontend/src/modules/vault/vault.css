@@ -1,0 +1,9 @@
+/* Bóveda cerrada: tarjeta centrada tipo pantalla de bloqueo. */
+.lockscreen { min-height: calc(100vh - 160px); display: grid; place-items: center; }
+.lock-card { width: min(380px, 100%); text-align: center; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-4); padding: var(--s-8) var(--s-6); }
+.lock-card h2 { margin: var(--s-3) 0 var(--s-1); }
+.lock-card form { text-align: left; margin-top: var(--s-4); }
+.lock-card .field { max-width: none; }
+.lock-card button[type="submit"] { width: 100%; }
+.lock-glyph { display: inline-grid; place-items: center; width: 72px; height: 72px; border-radius: 18px; background: var(--accent-soft); color: var(--accent); }
+.vault-table td { vertical-align: middle; }

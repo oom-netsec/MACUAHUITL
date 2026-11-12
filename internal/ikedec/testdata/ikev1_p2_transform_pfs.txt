@@ -1,0 +1,14 @@
+*Mar  1 00:50:00.100: ISAKMP:(1003):Old State = IKE_I_MM6  New State = IKE_P1_COMPLETE
+*Mar  1 00:50:00.200: ISAKMP:(1003):Checking IPSec proposal 1
+*Mar  1 00:50:00.200: ISAKMP: transform 1, ESP_3DES
+*Mar  1 00:50:00.200: ISAKMP:   attributes in transform:
+*Mar  1 00:50:00.200: ISAKMP:      encaps is 1 (Tunnel)
+*Mar  1 00:50:00.200: ISAKMP:      SA life type in seconds
+*Mar  1 00:50:00.200: ISAKMP:      SA life duration (basic) of 3600
+*Mar  1 00:50:00.200: ISAKMP:      authenticator is HMAC-MD5
+*Mar  1 00:50:00.200: ISAKMP:      group is 5
+*Mar  1 00:50:00.200: ISAKMP:(1003):atts are not acceptable.
+*Mar  1 00:50:00.200: IPSEC(ipsec_process_proposal): transform proposal not supported for identity:
+    {esp-3des esp-md5-hmac }
+*Mar  1 00:50:00.200: ISAKMP:(1003): IPSec policy invalidated proposal with error 256
+*Mar  1 00:50:00.200: ISAKMP:(1003): phase 2 SA policy not acceptable! (local 192.0.2.1 remote 192.0.2.2)

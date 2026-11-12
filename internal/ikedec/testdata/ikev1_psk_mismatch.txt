@@ -1,0 +1,16 @@
+*Mar  1 00:20:01.001: ISAKMP:(0):Checking ISAKMP transform 1 against priority 10 policy
+*Mar  1 00:20:01.001: ISAKMP:      encryption AES-CBC
+*Mar  1 00:20:01.001: ISAKMP:      keylength of 256
+*Mar  1 00:20:01.001: ISAKMP:      hash SHA256
+*Mar  1 00:20:01.001: ISAKMP:      default group 14
+*Mar  1 00:20:01.001: ISAKMP:      auth pre-share
+*Mar  1 00:20:01.001: ISAKMP:(0):atts are acceptable. Next payload is 0
+*Mar  1 00:20:01.050: ISAKMP:(1001):Old State = IKE_I_MM2  New State = IKE_I_MM3
+*Mar  1 00:20:01.090: ISAKMP:(1001):Old State = IKE_I_MM4  New State = IKE_I_MM5
+*Mar  1 00:20:01.090: ISAKMP:(1001): sending packet to 192.0.2.2 my_port 500 peer_port 500 (I) MM_KEY_EXCH
+*Mar  1 00:20:11.090: ISAKMP:(1001): retransmitting phase 1 MM_KEY_EXCH...
+*Mar  1 00:20:11.090: ISAKMP (1001): incrementing error counter on sa, attempt 1 of 5: retransmit phase 1
+*Mar  1 00:20:11.150: ISAKMP (1001): received packet from 192.0.2.2 dport 500 sport 500 Global (I) MM_KEY_EXCH
+*Mar  1 00:20:11.150: %CRYPTO-4-IKMP_BAD_MESSAGE: IKE message from 192.0.2.2 failed its sanity check or is malformed
+*Mar  1 00:20:11.150: ISAKMP: reserved not zero on ID payload!
+*Mar  1 00:20:21.090: ISAKMP:(1001): retransmitting phase 1 MM_KEY_EXCH...

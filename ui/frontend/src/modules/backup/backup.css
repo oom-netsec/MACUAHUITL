@@ -1,0 +1,21 @@
+/* Respaldos: columnas numéricas, diff con marca por operación y el bloque de restauración separado de la lista. */
+.result .summary { margin: 0; border-bottom: 1px solid var(--hairline); }
+.term .console li[data-op="+"] { box-shadow: inset 2px 0 var(--success); padding-left: var(--s-2); }
+.term .console li[data-op="-"] { box-shadow: inset 2px 0 var(--critical); padding-left: var(--s-2); }
+.refused { margin: 0 0 var(--s-4); }
+.refused .console { min-height: 0; }
+.restore-block { border-top: 1px solid var(--hairline); padding-top: var(--s-6); }
+.backup-table td { vertical-align: middle; }
+
+/* Línea de tiempo por equipo: un carril vertical con un punto por respaldo. */
+.timeline-groups { display: grid; gap: var(--s-6); }
+.timeline h4 { margin: 0 0 var(--s-2); font-size: 13px; }
+.timeline ol { list-style: none; margin: 0; padding: 0 0 0 var(--s-4); border-left: 2px solid var(--hairline); display: grid; gap: var(--s-1); }
+.timeline li { position: relative; display: grid; grid-template-columns: 20px minmax(260px, 1fr) 72px 88px 112px auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-2); }
+.timeline li::before { content: ""; position: absolute; left: calc(-1 * var(--s-4) - 6px); top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%; background: var(--surface); border: 2px solid var(--border-control); }
+.timeline li[data-picked]::before { background: var(--accent); border-color: var(--accent); }
+.timeline li:hover { background: var(--surface-2); }
+.timeline .tl-when { display: flex; align-items: baseline; gap: var(--s-3); }
+.timeline .tl-when .meta { margin: 0; }
+.timeline .tl-size { text-align: right; }
+.timeline .row-actions { justify-self: end; display: inline-flex; gap: var(--s-2); }

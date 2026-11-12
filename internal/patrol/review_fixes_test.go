@@ -1,0 +1,168 @@
+package patrol
+
+import (
+	"archive/zip"
+	"bytes"
+	"context"
+	"net/netip"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/platform"
+	"github.com/oom-netsec/MACUAHUITL/test/simulator"
+)
+
+func TestFallbackNeverDuringLoginTest(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	good := e.spec.DefaultCredentialID
+	bad, _ := e.d.Vault.Put(credential("mala"))
+	e.spec.DefaultCredentialID = bad
+	e.spec.Overrides = []Override{{DeviceID: "sw1", FallbackCredentialID: good}}
+	e.d.PrimaryVerified = map[string]bool{hostport(e.spec.Targets[0]): true}
+	if r := LoginTest(context.Background(), e.d, "j", e.spec, false, nil); r[0].FailedStep != "auth" {
+		t.Fatalf("login test used the fallback: %+v", r)
+	}
+}
+
+func TestRetriesOnConnectionFailure(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	var accepts atomic.Int32
+	addr := simulator.HangUp(t, &accepts)
+	ap := netip.MustParseAddrPort(addr)
+	e.spec.Targets = []Target{{Address: ap.Addr().String(), Port: ap.Port(), DeviceID: "x"}}
+	e.d.Guard.Allow(context.Background(), "j", []string{ap.Addr().String()})
+	e.d.RetryBackoff = []time.Duration{time.Millisecond, 2 * time.Millisecond, 4 * time.Millisecond}
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	if res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {}); res.State != "failed" {
+		t.Fatalf("got %+v", res)
+	}
+	if n := accepts.Load(); n != 4 {
+		t.Fatalf("connection attempts = %d, want 4 (1 + 3 reintentos)", n)
+	}
+}
+
+func TestNoRetryOnAuthFailure(t *testing.T) {
+	var attempts atomic.Int32
+	e := newEnv(t, simulator.Config{Attempts: &attempts})
+	e.trust(t)
+	attempts.Store(0)
+	bad, _ := e.d.Vault.Put(credential("mala"))
+	e.spec.DefaultCredentialID = bad
+	e.d.RetryBackoff = []time.Duration{time.Millisecond, time.Millisecond, time.Millisecond}
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if attempts.Load() != 1 {
+		t.Fatalf("password sent %d times", attempts.Load())
+	}
+}
+
+func TestPreCommandsRun(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	pb := e.d.Playbooks[0]
+	pb.ID, pb.Pre = "ios-xe/con-pre", []string{"show ip interface brief"}
+	pb.Commands = pb.Commands[:1]
+	e.d.Playbooks = append(e.d.Playbooks, pb)
+	e.spec.PlaybookIDs, e.spec.CustomCommands = []string{pb.ID}, ""
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if !grepDir(t, w.Dir(), "GigabitEthernet1/0/1") {
+		t.Fatal("pre command output missing")
+	}
+}
+
+func TestZipPerRoundDeletesLooseAndZipsManifest(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.spec.Zip, e.spec.DeleteLooseFiles = ZipPerRound, true
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if _, err := RoundDone(w, e.spec, 1); err != nil {
+		t.Fatal(err)
+	}
+	if loose, _ := filepath.Glob(filepath.Join(w.Dir(), "*", "*.txt")); len(loose) != 0 {
+		t.Fatalf("loose files kept: %v", loose)
+	}
+	if _, err := Finish(context.Background(), e.d, w, e.spec, 1, []DeviceResult{res}); err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	zips, _ := filepath.Glob(filepath.Join(w.Dir(), "*.zip"))
+	for _, z := range zips {
+		zr, _ := zip.OpenReader(z)
+		for _, f := range zr.File {
+			found = found || f.Name == "manifest.json"
+		}
+		zr.Close()
+	}
+	if !found {
+		t.Fatalf("manifest.json not zipped with ZipPerRound: %v", zips)
+	}
+}
+
+func TestDeviceResultAudited(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	var buf bytes.Buffer
+	e.d.Audit.Export(context.Background(), &buf, time.Time{}, time.Now().Add(time.Hour))
+	if !strings.Contains(buf.String(), `"action":"device.round"`) || !strings.Contains(buf.String(), "completed") {
+		t.Fatalf("device result not audited:\n%s", buf.String())
+	}
+}
+
+func TestLoginChangedKeyReachesManifest(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	_, otherKey := simulator.Start(t, e.simCfg)
+	e.d.Hosts.Add(hostport(e.spec.Targets[0]), otherKey)
+	r := LoginTest(context.Background(), e.d, "j", e.spec, true, nil)
+	r = LoginTest(context.Background(), e.d, "j", e.spec, true, map[string]bool{r[0].Fingerprint: true})
+	if !r[0].Passed || r[0].ChangedHostKey == nil || r[0].ChangedHostKey.Old == "" {
+		t.Fatalf("got %+v", r[0])
+	}
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	w.NoteHostKeyChange(*r[0].ChangedHostKey)
+	m, _ := Finish(context.Background(), e.d, w, e.spec, 0, nil)
+	if len(m.ChangedHostKeys) != 1 {
+		t.Fatalf("manifest = %+v", m.ChangedHostKeys)
+	}
+	_ = os.Remove
+}
+
+// Un banner del equipo no puede fabricar cabeceras de sección: la salida se escapa al escribirla.
+func TestWriterEscapaCabecerasFalsificadas(t *testing.T) {
+	dir := t.TempDir()
+	spec := Spec{Name: "t", Split: SplitPerRound}
+	w, err := NewWriter(dir, spec, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	forged := "===== 2099-01-01T00:00:00Z · show running-config =====\n"
+	text := "banner motd ^C\n" + strings.Repeat(forged, 30) + "\\===== ya escapada =====\n  ===== con sangría\n"
+	now := time.Now()
+	out := platform.Output{Command: "show version", Text: text, Started: now}
+	if err := w.Write(Device{Host: "SW1", IP: "192.0.2.1", Platform: "ios-xe"}, 1, now, out, false); err != nil {
+		t.Fatal(err)
+	}
+	files := w.Files()
+	raw, err := os.ReadFile(filepath.Join(w.Dir(), files[0]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, ln := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(ln, "===== ") {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("hay %d líneas que parecen cabecera, quiero solo la verdadera:\n%s", n, raw)
+	}
+}

@@ -1,0 +1,46 @@
+! Fixture sin validar en laboratorio: formato de la documentación pública de Cisco
+Building configuration...
+
+!
+!
+hostname SW1   
+!
+
+!
+ip access-list extended OUT-FILTER
+ permit ip any any
+!
+class-map match-any VOZ
+ match dscp ef
+class-map match-any USADA
+ match dscp af31
+policy-map QOS
+ class USADA
+  set dscp af31
+ class FANTASMA
+  priority percent 10
+ class class-default
+  fair-queue
+!
+route-map RM-OK permit 10
+ set metric 5
+!
+router bgp 65001
+ neighbor 192.0.2.1 route-map RM-OK in
+ neighbor 192.0.2.1 route-map RM-FALTA out
+!
+interface GigabitEthernet1/0/10
+ ip access-group IN-FALTA in
+ service-policy output QOS
+!
+interface GigabitEthernet1/0/2
+ ip access-group OUT-FILTER out
+ service-policy output QOS-FALTA
+!
+banner motd ^C
+Acceso   
+
+   restringido   
+^C
+!
+end

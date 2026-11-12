@@ -1,0 +1,7 @@
+Flags:  D - Down        P - Up in port-channel (members)
+--------------------------------------------------------------------------------
+Group Port-       Type     Protocol  Member Ports
+      Channel
+--------------------------------------------------------------------------------
+10    Po10(SU)    Eth      LACP      Eth1/1(P)    Eth1/2(P)    Eth1/3(P)
+                                     Eth1/4(D)

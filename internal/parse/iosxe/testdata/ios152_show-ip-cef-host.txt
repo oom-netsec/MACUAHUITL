@@ -1,0 +1,5 @@
+10.50.0.0/16, version 120, epoch 0, cached adjacency 10.10.0.2
+0 packets, 0 bytes
+  via 10.10.0.2, Vlan10, 0 dependencies
+    next hop 10.10.0.2, Vlan10
+    valid cached adjacency

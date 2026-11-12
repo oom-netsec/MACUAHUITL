@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+import "macuahuitl/v1/common.proto";
+
+// Inventario local de equipos y perfiles (spec §7, §14). Se completa en la Fase 1.
+service InventoryService {
+  // Fase 19: equipos que la app ya conoce, juntados de los trabajos de Patrol, la flota y los respaldos,
+  // sin duplicados por dirección. Solo lee outputs/; nunca habla con los equipos.
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
+  // Fase 29b: PutDevice y DeleteDevice operan sobre los hosts de la libreta (fuente «manual»); borrar uno no
+  // borra la evidencia de las otras fuentes.
+  rpc PutDevice(PutDeviceRequest) returns (PutDeviceResponse);
+  rpc DeleteDevice(DeleteDeviceRequest) returns (DeleteDeviceResponse);
+  // Export e import de la libreta, en JSON versionado (suma SHA-256 opcional) o CSV; la credencial viaja solo como su etiqueta.
+  rpc ExportHosts(ExportHostsRequest) returns (ExportHostsResponse);
+  rpc PreviewImportHosts(PreviewImportHostsRequest) returns (PreviewImportHostsResponse);
+  rpc ApplyImportHosts(ApplyImportHostsRequest) returns (ApplyImportHostsResponse);
+  // Plantilla (encabezado y 3 filas válidas) y descripción de los campos, generadas de la misma tabla que valida el import.
+  rpc HostsImportTemplate(HostsImportTemplateRequest) returns (HostsImportTemplateResponse);
+  rpc HostsImportFormat(HostsImportFormatRequest) returns (HostsImportFormatResponse);
+}
+
+message DeviceProfile {
+  uint32 port = 1;
+  bool allow_legacy_algorithms = 2;
+  bool uses_enable = 3;
+}
+
+message Device {
+  string id = 1;
+  string hostname = 2;
+  Target target = 3;
+  string platform = 4;
+  DeviceProfile profile = 5;
+  int64 last_seen_ms = 6;             // ListDevices: unix ms de la evidencia más reciente; 0 si nunca se alcanzó
+  repeated string sources = 7;        // ListDevices: patrol (objetivo de un trabajo), flota (tiene evidencia), respaldos y/o manual (libreta)
+
+  // Fase 29b, libreta de hosts. Solo los hosts manuales los traen (en ListDevices, id = el id del host manual
+  // en vez de la dirección; el puerto va en profile.port y el nombre también en hostname).
+  string name = 8;
+  string folder = 9;                  // un solo nivel; vacío = sin carpeta
+  repeated string tags = 10;
+  string credential_id = 11;          // referencia a la bóveda; jamás un secreto. Vacío = sin credencial
+  string credential_label = 12;       // solo lectura: la etiqueta de credential_id; vacía si la bóveda está cerrada o ya no existe
+  string notes = 13;
+}
+
+message ListDevicesRequest {
+  string query = 1;                   // texto que debe contener la dirección, el nombre, la plataforma, la carpeta o una etiqueta; vacío = todos
+  string folder = 2;                  // solo hosts de esa carpeta (sin distinguir mayúsculas); vacío = todas
+  string tag = 3;                     // solo hosts con esa etiqueta; vacío = todas
+  // Solo los hosts de la libreta, con SUS valores (dirección, plataforma, nombre…), sin fusionar con lo descubierto:
+  // es lo que hay que leer para editarlos. Ordenados por nombre (sin importar mayúsculas); query busca solo en los
+  // valores del host; no lee outputs/, así que tampoco falla si aún no existe.
+  bool manual_only = 4;
+}
+message ListDevicesResponse {
+  repeated Device devices = 1;        // por dirección; los que solo tienen respaldos (sin dirección), al final
+  repeated string warnings = 2;       // p. ej. un manifest.json ilegible o un tope alcanzado
+}
+
+message PutDeviceRequest {
+  Device device = 1;                  // id vacío = crear; con id = editar ese host manual (NotFound si no existe). Se usan name, target.address, profile.port (0 = 22), platform, folder, tags, credential_id y notes
+}
+message PutDeviceResponse {
+  string id = 1;
+  repeated string warnings = 2;       // p. ej. la bóveda está cerrada y no se pudo validar la credencial
+}
+
+message DeleteDeviceRequest {
+  string id = 1;
+}
+message DeleteDeviceResponse {}
+
+message ExportHostsRequest {
+  string path = 1;                    // absoluta; el archivo queda 0600 y no sigue enlaces
+  bool overwrite = 2;
+  repeated string ids = 3;            // ids de hosts manuales; vacío = todos
+  string format = 4;                  // csv o json; vacío = por la extensión de path (.csv / .json). Más de 1000 hosts no se exportan: el import los rechazaría
+}
+message ExportHostsResponse {
+  int32 count = 1;
+  repeated string warnings = 2;       // credenciales sin etiqueta (bóveda cerrada o ya no existen): ese host sale sin credencial
+}
+
+message PreviewImportHostsRequest {
+  string path = 1;
+  string format = 2;                  // csv o json; vacío = por la extensión de path (.csv / .json)
+}
+// Una fila (CSV) o entrada (JSON) inválida; no bloquea las demás.
+message ImportHostError {
+  int32 line = 1;                     // CSV: línea del archivo (el encabezado es la 1); JSON: posición, desde 1, dentro de «hosts»
+  string field = 2;                   // name, address, port… ; vacío = la fila entera (columnas de menos, comillas, entrada ilegible)
+  string reason = 3;
+}
+message ImportHostItem {
+  Device host = 1;                    // el del archivo; credential_id vacío y credential_label la del archivo
+  string key = 2;                     // «dirección:puerto»: identifica al host en las decisiones
+  string state = 3;                   // nuevo, igual o conflicto
+  string reason = 4;                  // solo en conflicto: direccion (reemplazar u omitir) o nombre (también renombrar)
+  string conflicts_with = 5;          // id del host guardado con el que choca o coincide
+  bool credential_missing = 6;        // trae etiqueta pero no hay (o hay varias) credencial con esa etiqueta: quedaría sin credencial
+}
+message PreviewImportHostsResponse {
+  string token = 1;                   // vale 10 minutos y un solo uso
+  int64 expires_ms = 2;
+  repeated ImportHostItem items = 3;          // solo las filas válidas
+  repeated string warnings = 4;               // p. ej. «archivo sin suma de verificación» (JSON sin sha256)
+  repeated ImportHostError errors = 5;        // las filas inválidas; ApplyImportHosts las cuenta como omitidas
+  string format = 6;                          // el formato detectado: csv o json
+}
+message ImportHostDecision {
+  string key = 1;
+  string action = 2;                  // renombrar, reemplazar u omitir
+}
+message ApplyImportHostsRequest {
+  string token = 1;
+  repeated ImportHostDecision decisions = 2;  // una por conflicto; los nuevos entran solos
+}
+message ApplyImportHostsResponse {
+  int32 created = 1;
+  int32 replaced = 2;
+  int32 renamed = 3;
+  int32 skipped = 4;                  // incluye los igual y las filas inválidas
+  int32 invalid = 5;                  // de skipped, las filas inválidas de la vista previa
+}
+
+message HostsImportTemplateRequest {
+  string format = 1;                  // csv o json
+}
+message HostsImportTemplateResponse {
+  string format = 1;
+  string filename = 2;                // nombre sugerido, p. ej. hosts-plantilla.csv
+  string content = 3;                 // UTF-8; el JSON va sin sha256
+}
+
+message HostsImportFormatRequest {}
+message HostField {
+  string name = 1;                    // columna del CSV y clave del JSON
+  string type = 2;                    // texto, entero o lista
+  bool required = 3;
+  string example = 4;
+  string description = 5;
+}
+message HostsImportFormatResponse {
+  repeated HostField fields = 1;      // en el orden del encabezado del CSV
+  int32 max_rows = 2;                 // hosts por archivo
+  int64 max_bytes = 3;
+}

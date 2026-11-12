@@ -1,0 +1,285 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Bóveda de scripts (fase 28c): comandos del usuario más una biblioteca predefinida de solo lectura, con
+// favoritos y export/import a un archivo. Un script nunca se aplica a un equipo desde aquí (ADR 0007).
+service ScriptsService {
+  // Biblioteca y scripts del usuario juntos, ordenados por nombre.
+  rpc ListScripts(ListScriptsRequest) returns (ListScriptsResponse);
+  rpc GetScript(GetScriptRequest) returns (GetScriptResponse);
+  // Crea (id vacío) o edita (id de un script del usuario). Rechaza los «lib-*».
+  rpc SaveScript(SaveScriptRequest) returns (SaveScriptResponse);
+  rpc DeleteScript(DeleteScriptRequest) returns (DeleteScriptResponse);
+  // Marca o desmarca un favorito; vale también para la biblioteca.
+  rpc SetFavorite(SetFavoriteRequest) returns (SetFavoriteResponse);
+  // Copia un script (también de la biblioteca) como script del usuario.
+  rpc DuplicateScript(DuplicateScriptRequest) returns (DuplicateScriptResponse);
+  rpc ExportScripts(ExportScriptsRequest) returns (ExportScriptsResponse);
+  // Paso 1 del import: valida el archivo y devuelve el estado de cada script. No escribe nada.
+  rpc PreviewImport(PreviewImportRequest) returns (PreviewImportResponse);
+  // Paso 2: aplica con las decisiones de los conflictos, todo en una transacción.
+  rpc ApplyImport(ApplyImportRequest) returns (ApplyImportResponse);
+
+  // ---- Colecciones (fase 29c): un nivel, por ID de script (también de la biblioteca), sin copiar ----
+  // «favoritos» es la colección por defecto: no se borra ni se renombra, sí se reordena.
+  rpc ListCollections(ListCollectionsRequest) returns (ListCollectionsResponse);
+  rpc GetCollection(GetCollectionRequest) returns (GetCollectionResponse);
+  // Crea (id vacío) o edita nombre y descripción; los scripts van por SetCollectionScripts.
+  rpc SaveCollection(SaveCollectionRequest) returns (SaveCollectionResponse);
+  rpc DeleteCollection(DeleteCollectionRequest) returns (DeleteCollectionResponse);
+  // Nuevo orden de todas las colecciones (debe traer cada ID existente una sola vez).
+  rpc ReorderCollections(ReorderCollectionsRequest) returns (ReorderCollectionsResponse);
+  // Deja la colección con exactamente esos scripts y en ese orden: sirve para agregar, quitar y reordenar de una vez.
+  rpc SetCollectionScripts(SetCollectionScriptsRequest) returns (SetCollectionScriptsResponse);
+  // Fija o desfija un script para la barra corta de la terminal (máximo 5; el sexto da FailedPrecondition).
+  rpc SetPinned(SetPinnedRequest) returns (SetPinnedResponse);
+  // Los fijados, en su orden.
+  rpc ListPinned(ListPinnedRequest) returns (ListPinnedResponse);
+  // Nuevo orden de los fijados (debe traer cada fijado una sola vez).
+  rpc ReorderPinned(ReorderPinnedRequest) returns (ReorderPinnedResponse);
+  rpc ExportCollections(ExportCollectionsRequest) returns (ExportCollectionsResponse);
+  // Paso 1 del import de colecciones: no escribe nada. Aviso por cada «lib-*» que no existe en la biblioteca local.
+  rpc PreviewImportCollections(PreviewImportCollectionsRequest) returns (PreviewImportCollectionsResponse);
+  // Paso 2: scripts y colecciones se aplican en una sola transacción.
+  rpc ApplyImportCollections(ApplyImportCollectionsRequest) returns (ApplyImportCollectionsResponse);
+
+  // JSON de ejemplo de un archivo de import, sin sha256 (que es opcional al importar). Sale de los mismos tipos y reglas
+  // que validan el import, así que la vista previa lo acepta siempre.
+  rpc ImportTemplate(ImportTemplateRequest) returns (ImportTemplateResponse);
+  // Los campos del archivo (cabecera incluida) con tipo, si son obligatorios, un ejemplo y su descripción.
+  rpc ImportFormat(ImportFormatRequest) returns (ImportFormatResponse);
+}
+
+message Script {
+  string id = 1;                       // 32 hex (usuario) o «lib-<nombre>» (biblioteca)
+  string name = 2;                     // 1 a 64
+  string tech = 3;                     // l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro
+  string platform = 4;                 // ios, ios-xe, nx-os, asa, cualquiera
+  string description = 5;              // hasta 512
+  repeated string commands = 6;        // 1 a 200 líneas de hasta 512, ASCII imprimible
+  repeated string tags = 7;            // hasta 10, [a-z0-9-]{1,24}
+  string origin = 8;                   // biblioteca | usuario
+  int64 created_ms = 9;
+  int64 updated_ms = 10;
+  bool read_only = 11;                 // ios/ios-xe y todos sus comandos pasan CheckDenied (las líneas «!» se ignoran; otras plataformas: false). Lo calcula el núcleo
+  bool favorite = 12;                  // lo calcula el núcleo (está en la colección «favoritos»); no viaja en el export
+  bool pinned = 13;                    // fijado para la barra corta de la terminal; lo calcula el núcleo
+  repeated string collections = 14;    // IDs de las colecciones que lo contienen, en el orden de las colecciones; lo calcula el núcleo
+}
+
+message ListScriptsRequest {
+  string tech = 1;                     // vacío = todas
+  string platform = 2;                 // vacío = todas; con un valor también entran los «cualquiera»
+  string tag = 3;
+  string text = 4;                     // en nombre, descripción, etiquetas y comandos, sin importar mayúsculas
+  bool only_favorites = 5;
+}
+message ListScriptsResponse {
+  repeated Script scripts = 1;
+}
+
+message GetScriptRequest {
+  string id = 1;
+}
+message GetScriptResponse {
+  Script script = 1;
+}
+
+message SaveScriptRequest {
+  Script script = 1;                   // se ignoran origin, fechas, read_only y favorite
+}
+message SaveScriptResponse {
+  Script script = 1;
+}
+
+message DeleteScriptRequest {
+  string id = 1;
+}
+message DeleteScriptResponse {}
+
+message SetFavoriteRequest {
+  string id = 1;
+  bool favorite = 2;
+}
+message SetFavoriteResponse {}
+
+message DuplicateScriptRequest {
+  string id = 1;
+}
+message DuplicateScriptResponse {
+  Script script = 1;
+}
+
+message ExportScriptsRequest {
+  repeated string ids = 1;             // de usuario o de biblioteca; 1 a 1000
+  string path = 2;                     // absoluta; archivo nuevo 0600
+  bool overwrite = 3;                  // sin esto, una ruta que existe da AlreadyExists
+}
+message ExportScriptsResponse {
+  int32 count = 1;
+}
+
+message PreviewImportRequest {
+  string path = 1;                     // absoluta; archivo regular de hasta 5 MB
+}
+message ImportItem {
+  Script script = 1;                   // como viene en el archivo
+  string state = 2;                    // nuevo | igual | conflicto_id | conflicto_nombre
+  string conflicts_with = 3;           // ID guardado con el que choca o coincide; vacío si es nuevo
+}
+message PreviewImportResponse {
+  string token = 1;                    // vale 10 minutos y se gasta al aplicar
+  int64 expires_ms = 2;
+  repeated ImportItem items = 3;
+  repeated string warnings = 4;        // por ejemplo «archivo sin suma de verificación» (el sha256 es opcional)
+}
+
+message ImportDecision {
+  string script_id = 1;                // ID del script en el archivo
+  string action = 2;                   // renombrar | reemplazar | omitir
+}
+message ApplyImportRequest {
+  string token = 1;
+  repeated ImportDecision decisions = 2;
+}
+message ApplyImportResponse {
+  int32 created = 1;
+  int32 replaced = 2;
+  int32 renamed = 3;
+  int32 skipped = 4;
+}
+
+// ---- Colecciones ----
+
+message Collection {
+  string id = 1;                       // 32 hex, o «favoritos» (la colección por defecto)
+  string name = 2;                     // 1 a 64, único sin importar mayúsculas
+  string description = 3;              // hasta 512
+  int32 order = 4;                     // posición entre las colecciones, desde 0
+  repeated string script_ids = 5;      // en orden; de usuario o de biblioteca («lib-*»)
+  int64 created_ms = 6;
+  int64 updated_ms = 7;
+}
+
+message ListCollectionsRequest {}
+message ListCollectionsResponse {
+  repeated Collection collections = 1; // por orden
+}
+
+message GetCollectionRequest {
+  string id = 1;
+}
+message GetCollectionResponse {
+  Collection collection = 1;
+}
+
+message SaveCollectionRequest {
+  Collection collection = 1;           // solo id, name y description; «favoritos» no cambia de nombre
+}
+message SaveCollectionResponse {
+  Collection collection = 1;
+}
+
+message DeleteCollectionRequest {
+  string id = 1;                       // «favoritos» da FailedPrecondition
+}
+message DeleteCollectionResponse {}
+
+message ReorderCollectionsRequest {
+  repeated string ids = 1;
+}
+message ReorderCollectionsResponse {}
+
+message SetCollectionScriptsRequest {
+  string id = 1;
+  repeated string script_ids = 2;      // sin repetidos; cada uno debe existir
+}
+message SetCollectionScriptsResponse {
+  Collection collection = 1;
+}
+
+message SetPinnedRequest {
+  string id = 1;
+  bool pinned = 2;
+}
+message SetPinnedResponse {}
+
+message ListPinnedRequest {}
+message ListPinnedResponse {
+  repeated Script scripts = 1;
+}
+
+message ReorderPinnedRequest {
+  repeated string ids = 1;
+}
+message ReorderPinnedResponse {}
+
+message ExportCollectionsRequest {
+  repeated string ids = 1;             // colecciones; 1 a 100
+  string path = 2;                     // absoluta; archivo nuevo 0600
+  bool overwrite = 3;
+}
+message ExportCollectionsResponse {
+  int32 collections = 1;
+  int32 scripts = 2;                   // scripts de usuario que viajan dentro del archivo
+}
+
+message PreviewImportCollectionsRequest {
+  string path = 1;                     // absoluta; archivo regular de hasta 5 MB
+}
+message CollectionImportItem {
+  Collection collection = 1;           // como viene en el archivo
+  string state = 2;                    // nueva | igual | fusionar (solo favoritos) | conflicto_id | conflicto_nombre
+  string conflicts_with = 3;           // ID local con el que choca o coincide; vacío si es nueva
+}
+message PreviewImportCollectionsResponse {
+  string token = 1;                    // vale 10 minutos y se gasta al aplicar
+  int64 expires_ms = 2;
+  repeated CollectionImportItem collections = 3;
+  repeated ImportItem scripts = 4;     // los scripts de usuario del archivo, con el estado de Plan
+  repeated string warnings = 5;
+}
+
+message ApplyImportCollectionsRequest {
+  string token = 1;
+  repeated ImportDecision script_decisions = 2;      // por ID de script del archivo
+  repeated ImportDecision collection_decisions = 3;  // por ID de colección del archivo
+}
+message ApplyImportCollectionsResponse {
+  int32 scripts_created = 1;
+  int32 scripts_replaced = 2;
+  int32 scripts_renamed = 3;
+  int32 scripts_skipped = 4;
+  int32 collections_created = 5;
+  int32 collections_replaced = 6;
+  int32 collections_renamed = 7;
+  int32 collections_merged = 8;
+  int32 collections_skipped = 9;
+  repeated string warnings = 10;
+}
+
+// ---- Plantilla y descripción del formato de import ----
+
+message ImportTemplateRequest {
+  string kind = 1;                     // scripts | colecciones
+}
+message ImportTemplateResponse {
+  string json = 1;
+}
+
+message ImportFormatRequest {
+  string kind = 1;                     // scripts | colecciones
+}
+message FormatField {
+  string name = 1;                     // «formato», «scripts[].name»…
+  string type = 2;
+  bool required = 3;
+  string example = 4;                  // JSON, tomado de la plantilla
+  string description = 5;
+}
+message ImportFormatResponse {
+  repeated FormatField fields = 1;
+}

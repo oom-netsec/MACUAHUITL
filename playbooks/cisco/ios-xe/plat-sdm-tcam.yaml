@@ -1,0 +1,18 @@
+# Propósito: Revisa la plantilla SDM y el uso de TCAM y de tablas de hardware.
+# Cuándo usarlo: Mensajes de TCAM llena, rutas o ACL que no se programan en hardware o antes de cambiar la plantilla SDM.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: plat-sdm-tcam
+platform: ios-xe
+name: Plataforma · SDM y TCAM
+commands:
+  - cmd: show clock
+  - cmd: show sdm prefer
+  - cmd: show platform resources
+  - cmd: show platform hardware fed switch active fwd-asic resource tcam utilization
+  - cmd: show mac address-table count
+  - cmd: show ip route summary
+  - cmd: show ipv6 route summary
+  - cmd: show ip mroute count
+  - cmd: show ip cef summary
+  - cmd: show logging | include TCAM|SDM|RESOURCE|FED_

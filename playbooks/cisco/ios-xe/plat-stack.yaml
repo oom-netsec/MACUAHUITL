@@ -1,0 +1,18 @@
+# Propósito: Revisa los miembros del stack, sus puertos y roles, y los eventos del administrador de stack.
+# Cuándo usarlo: Un miembro del stack no se une o cambia de rol, puertos de stack caídos o sospecha de doble activo.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: plat-stack
+platform: ios-xe
+name: Plataforma · Stack
+commands:
+  - cmd: show clock
+  - cmd: show switch
+  - cmd: show switch detail
+  - cmd: show switch stack-ports
+  - cmd: show switch stack-ports summary
+  - cmd: show switch neighbors
+  - cmd: show inventory
+  - cmd: show module
+  - cmd: show redundancy
+  - cmd: show logging | include STACKMGR|STACK|SWITCH|RPS|DUAL

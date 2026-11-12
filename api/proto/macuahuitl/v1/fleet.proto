@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+import "macuahuitl/v1/tools.proto";
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// El día a día sobre la flota (Fase 15): la última salida de cada equipo entre
+// los trabajos de Patrol en outputs/. Solo lee archivos locales; nada de red.
+// Todo resultado trae la hora de su evidencia. dir vacío = la carpeta de outputs de la app.
+service FleetService {
+  rpc Find(FindRequest) returns (FindResponse); // query: IP, MAC (cualquier notación) o nombre
+  rpc Trace(TraceRequest) returns (TraceResponse); // query: MAC o IP del equipo final
+  rpc Path(PathRequest) returns (PathResponse); // query: origen; dst: destino; svg en la respuesta
+  rpc Health(HealthRequest) returns (HealthResponse); // interfaces con problema
+  rpc Summary(SummaryRequest) returns (SummaryResponse); // tablero matutino
+  rpc Capacity(CapacityRequest) returns (CapacityResponse); // flash y DRAM; need = tamaño (800M, 1.2G)
+  rpc Inventory(InventoryRequest) returns (InventoryResponse); // csv y markdown en la respuesta
+}
+
+message FindRequest {
+  string dir = 1;
+  string query = 2;
+}
+
+message FindResponse {
+  ToolReport report = 1;
+}
+
+message TraceRequest {
+  string dir = 1;
+  string query = 2;
+}
+
+message TraceResponse {
+  ToolReport report = 1;
+}
+
+message PathRequest {
+  string dir = 1;
+  string query = 2;
+  string dst = 3;
+}
+
+message PathResponse {
+  ToolReport report = 1;
+  string svg = 2;
+}
+
+message HealthRequest {
+  string dir = 1;
+}
+
+message HealthResponse {
+  ToolReport report = 1;
+}
+
+message SummaryRequest {
+  string dir = 1;
+}
+
+message SummaryResponse {
+  ToolReport report = 1;
+}
+
+message CapacityRequest {
+  string dir = 1;
+  string need = 2;
+}
+
+message CapacityResponse {
+  ToolReport report = 1;
+}
+
+message InventoryRequest {
+  string dir = 1;
+}
+
+message InventoryResponse {
+  ToolReport report = 1;
+  string csv = 2;
+  string markdown = 3;
+}

@@ -1,0 +1,5 @@
+0.0.0.0/0, version 8, epoch 0
+0 packets, 0 bytes
+  via 10.255.0.254, 0 dependencies, recursive
+    next hop 10.255.0.254, Vlan10 via 10.255.0.0/24
+    valid adjacency

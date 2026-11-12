@@ -1,0 +1,13 @@
+# Plantilla dorada de acceso (ejemplo)
++ service password-encryption
++ hostname SW-ACC-\d+
+- ip http server
+- snmp-server community .*
+line vty .*
+ + transport input ssh
+ + access-class ACL-VTY in( vrf-also)?
+ - transport input .*telnet.*
+? interface Vlan\d+
+ + no ip proxy-arp
+control-plane
+ + service-policy input .*

@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+import "google/protobuf/timestamp.proto";
+import "macuahuitl/v1/patrol.proto";
+import "macuahuitl/v1/tools.proto";
+
+// Ventana de cambio (Fase 11). La app nunca aplica configuración: recolecta con
+// Patrol (solo comandos de lectura) y compara. Los reportes viajan como ToolReport
+// (JSON + texto), igual que las herramientas.
+service ChangeService {
+  // Crea un cambio: los mismos equipos y la misma batería para PRE y POST.
+  rpc CreateChange(CreateChangeRequest) returns (CreateChangeResponse);
+  // Crea un trabajo de Patrol de una ronda para la fase y lo arma (Login Test incluido).
+  // Si el armado falla, el trabajo queda creado y se puede armar con PatrolService.ArmJob.
+  rpc CaptureChange(CaptureChangeRequest) returns (CaptureChangeResponse);
+  rpc ListChanges(ListChangesRequest) returns (ListChangesResponse);
+  // Compara PRE y POST: semáforo por equipo y detalle.
+  rpc GetChangeReport(GetChangeReportRequest) returns (GetChangeReportResponse);
+  // Lista de verificación previa a un upgrade sobre salidas ya recolectadas. No ejecuta nada.
+  rpc CheckUpgrade(CheckUpgradeRequest) returns (CheckUpgradeResponse);
+  // Plantilla dorada y reglas de endurecimiento contra una running-config.
+  rpc CheckCompliance(CheckComplianceRequest) returns (CheckComplianceResponse);
+}
+
+enum ChangePhase {
+  CHANGE_PHASE_UNSPECIFIED = 0;
+  CHANGE_PHASE_PRE = 1;
+  CHANGE_PHASE_POST = 2;
+}
+
+message CreateChangeRequest {
+  // Equipos, credenciales, carpeta y playbooks (vacío = ios-xe/pre-post). El núcleo
+  // fuerza una sola ronda, un archivo por ronda y conserva los archivos sueltos.
+  JobSpec spec = 1;
+}
+
+message CreateChangeResponse {
+  string change_id = 1;
+}
+
+message CaptureChangeRequest {
+  string change_id = 1;
+  ChangePhase phase = 2;
+  repeated string accepted_host_key_fingerprints = 3;
+  repeated string excluded_device_ids = 4;
+}
+
+message CaptureChangeResponse {
+  string job_id = 1;
+  bool armed = 2;
+  // Por qué no se armó (Login Test, bóveda…); vacío si se armó.
+  string detail = 3;
+  google.protobuf.Timestamp window_ends_at = 4;
+}
+
+message ChangeSummary {
+  string change_id = 1;
+  string name = 2;
+  string pre_job_id = 3;
+  string pre_state = 4;
+  string post_job_id = 5;
+  string post_state = 6;
+}
+
+message ListChangesRequest {}
+
+message ListChangesResponse {
+  repeated ChangeSummary changes = 1;
+}
+
+message GetChangeReportRequest {
+  // Un cambio de esta sesión del núcleo, o dos carpetas de trabajos de Patrol terminados.
+  string change_id = 1;
+  string pre_dir = 2;
+  string post_dir = 3;
+}
+
+message GetChangeReportResponse {
+  ToolReport report = 1;
+}
+
+message CheckUpgradeRequest {
+  // Salidas en formato de Patrol o una sesión pegada con prompts (SW1#show version).
+  string outputs = 1;
+  string image_file = 2;
+  int64 image_size = 3;
+  string image_md5 = 4;
+  // Salida de verify /md5; opcional si ya va en outputs.
+  string verify_output = 5;
+}
+
+message CheckUpgradeResponse {
+  ToolReport report = 1;
+}
+
+message CheckComplianceRequest {
+  string config = 1;
+  // Plantilla dorada; vacía = solo reglas de endurecimiento.
+  string template = 2;
+}
+
+message CheckComplianceResponse {
+  ToolReport report = 1;
+}

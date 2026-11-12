@@ -1,0 +1,22 @@
+/* Forense: avisos, fichas y carriles de flapping. Solo tokens. */
+
+.forensic-intro { color: var(--text-2); max-width: 72ch; margin: 0 0 var(--s-4); }
+.forensic-warnings { list-style: none; margin: 0; padding: 0; }
+.forensic-kv { border: 0; border-radius: 0; margin: 0; }
+.forensic-kv th[scope="row"] { width: 240px; background: none; color: var(--text-2); font-weight: 500; }
+.forensic-anomalies { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.forensic-anomalies p { margin: 0 0 var(--s-1); }
+.forensic-patterns details.finding { margin: 0 0 var(--s-2); }
+.forensic-patterns summary .badge { margin-right: var(--s-2); }
+
+/* Carriles de flapping: un tramo por cambio de estado; el símbolo y el texto dicen el estado, el color lo refuerza. */
+.flap-lanes { padding: var(--s-3) var(--s-4); border-bottom: 1px solid var(--hairline); }
+.flap-lanes ul { list-style: none; margin: var(--s-2) 0; padding: 0; display: grid; gap: var(--s-1); }
+.flap-lanes li { display: grid; grid-template-columns: minmax(140px, 240px) minmax(160px, 360px) auto; align-items: center; gap: var(--s-3); }
+.flap-lanes svg { width: 100%; height: 22px; }
+.flap-lanes g[data-state="up"] rect { fill: var(--success-soft); stroke: var(--success); }
+.flap-lanes g[data-state="down"] rect { fill: var(--critical-soft); stroke: var(--critical); }
+.flap-lanes g[data-state="up"] text { fill: var(--success); }
+.flap-lanes g[data-state="down"] text { fill: var(--critical); }
+.flap-lanes text { font-size: 10px; }
+.lane-legend { margin: 0; }

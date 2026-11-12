@@ -1,0 +1,8 @@
+/* Consola serie: parámetros del puerto, terminal y barra compacta de comandos (ADR 0009). */
+.port-scan { display: flex; align-items: center; gap: var(--s-2); margin: calc(-1 * var(--s-2)) 0 var(--s-4); }
+.defaults { margin: 0 0 var(--s-4); max-width: 72ch; }
+
+.serial-session > .meta { margin: 0 0 var(--s-2); }
+.serial-session .console { min-height: 320px; max-height: 60vh; }
+.serial-bar { display: flex; align-items: flex-end; gap: var(--s-2); margin-top: var(--s-3); }
+.serial-bar .field { flex: 1; margin: 0; }

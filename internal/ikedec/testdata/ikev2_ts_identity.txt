@@ -1,0 +1,14 @@
+IKEv2:(SESSION ID = 3,SA ID = 1):Processing IKE_AUTH message
+IKEv2:% Profile not found
+IKEv2:(SESSION ID = 3,SA ID = 1):: Failed to locate an item in the database
+IKEv2:(SESSION ID = 4,SA ID = 2):Processing IKE_AUTH message
+IKEv2:(SESSION ID = 4,SA ID = 2):Verification of peer's authentication data PASSED
+IKEv2:(SESSION ID = 4,SA ID = 2):Sending Packet [To 198.51.100.2:500/From 198.51.100.1:500/VRF i0:f0]
+IKEv2 IKE_AUTH Exchange RESPONSE
+Payload contents:
+ VID IDr AUTH NOTIFY(TS_UNACCEPTABLE)
+IKEv2:(SESSION ID = 4,SA ID = 2):Sending Packet [To 198.51.100.2:500/From 198.51.100.1:500/VRF i0:f0]
+IKEv2:(SESSION ID = 4,SA ID = 2):Sending DPD/liveness query
+IKEv2:(SESSION ID = 4,SA ID = 2):Sending DPD/liveness query
+IKEv2:(SESSION ID = 4,SA ID = 2):Sending DPD/liveness query
+IKEv2:(SESSION ID = 4,SA ID = 2):Retransmitting packet

@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+import "macuahuitl/v1/tools.proto";
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Limpiador de configuraciones (Fase 16a): ordena el texto de un running-config y marca las
+// líneas huérfanas. Recibe el texto y lo devuelve; no toca archivos ni equipos.
+service CleanerService {
+  rpc Clean(CleanRequest) returns (CleanResponse);
+}
+
+message CleanRequest {
+  string text = 1;
+  // Ordena grupos contiguos de interfaces, VLAN, rutas estáticas y usuarios.
+  bool sort = 2;
+}
+
+message CleanResponse {
+  // Informe con cada cambio y cada huérfana (JSON y texto).
+  ToolReport report = 1;
+  // La configuración limpia, con las huérfanas marcadas con un comentario "!".
+  string output = 2;
+}

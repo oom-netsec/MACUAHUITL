@@ -1,0 +1,15 @@
+# Propósito: Reúne el estado de alimentación PoE por puerto, el presupuesto de potencia y los eventos ILPOWER.
+# Cuándo usarlo: Un teléfono, AP o cámara no enciende o se reinicia; sospecha de presupuesto PoE agotado.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: l1-poe
+platform: ios-xe
+name: L1 · PoE
+commands:
+  - cmd: show clock
+  - cmd: show power inline
+  - cmd: show power inline police
+  - cmd: show environment power all
+  - cmd: show interfaces status
+  - cmd: show cdp neighbors
+  - cmd: show logging | include ILPOWER|POWER_GRANTED|POWER_DENY|POE

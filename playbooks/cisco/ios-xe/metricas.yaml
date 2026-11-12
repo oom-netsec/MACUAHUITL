@@ -1,0 +1,13 @@
+id: metricas
+platform: ios-xe
+name: Plataforma · Métricas para gráficas
+# Solo lectura. Con rondas repetidas (Patrol cada minuto o cada 5) alimenta las gráficas de CPU,
+# memoria por pool y tráfico/errores por interfaz. show version aporta el uptime para no graficar
+# tasas falsas tras un reinicio.
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show processes cpu sorted
+  - cmd: show memory statistics
+  - cmd: show interfaces
+    timeout: 120s

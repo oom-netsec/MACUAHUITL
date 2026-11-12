@@ -1,0 +1,195 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+import "google/protobuf/timestamp.proto";
+import "macuahuitl/v1/common.proto";
+
+// Recolección TAC (spec §12).
+service PatrolService {
+  rpc CreateJob(CreateJobRequest) returns (CreateJobResponse);
+  // Login Test obligatorio, un resultado por equipo en cuanto termina (spec §12.2).
+  rpc LoginTest(LoginTestRequest) returns (stream LoginTestResponse);
+  // Arma el trabajo: abre la ventana de bóveda y toma los bloqueos de suspensión (spec §10.4).
+  rpc ArmJob(ArmJobRequest) returns (ArmJobResponse);
+  rpc CancelJob(CancelJobRequest) returns (CancelJobResponse);
+  rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
+  rpc GetRun(GetRunRequest) returns (GetRunResponse);
+  // Catálogo de playbooks cargados (embebidos y de la carpeta de configuración); id es el que acepta CreateJob en playbook_ids.
+  rpc ListPlaybooks(ListPlaybooksRequest) returns (ListPlaybooksResponse);
+}
+
+enum SplitStrategy {
+  SPLIT_STRATEGY_UNSPECIFIED = 0;
+  SPLIT_STRATEGY_PER_ROUND = 1;
+  SPLIT_STRATEGY_CONSOLIDATED = 2;
+}
+
+enum ZipPolicy {
+  ZIP_POLICY_UNSPECIFIED = 0;
+  ZIP_POLICY_NONE = 1;
+  ZIP_POLICY_PER_ROUND = 2;
+  ZIP_POLICY_AT_END = 3;
+}
+
+message DeviceOverride {
+  string device_id = 1;
+  string credential_id = 2;
+  // Respaldo local: solo si la principal falla por conexión al servidor AAA (spec §10.2).
+  string fallback_credential_id = 3;
+}
+
+message Schedule {
+  uint32 interval_seconds = 1;
+  uint32 rounds = 2;
+  google.protobuf.Timestamp until = 3;
+  string cron = 4;
+}
+
+message JobSpec {
+  string name = 1;
+  repeated Target targets = 2;
+  string default_credential_id = 3;
+  repeated DeviceOverride overrides = 4;
+  repeated string playbook_ids = 5;
+  string custom_commands = 6;
+  string output_dir = 7;
+  SplitStrategy split = 8;
+  Schedule schedule = 9;
+  ZipPolicy zip = 10;
+  bool delete_loose_files = 11;
+  // Por defecto false: los outputs se enmascaran (spec §12.5). El valor cero es el seguro.
+  bool disable_masking = 12;
+  // Por defecto false: el equipo con llave de host nueva se omite (spec §12.2).
+  bool accept_changed_host_keys = 13;
+  // Duración de la ventana de bóveda. Máximo 96 h, validado en el núcleo (spec §10.4).
+  uint32 window_hours = 14;
+}
+
+message CreateJobRequest {
+  JobSpec spec = 1;
+}
+message CreateJobResponse {
+  string job_id = 1;
+}
+
+message LoginTestRequest {
+  string job_id = 1;
+}
+
+enum LoginTestStep {
+  LOGIN_TEST_STEP_UNSPECIFIED = 0;
+  LOGIN_TEST_STEP_TCP = 1;
+  LOGIN_TEST_STEP_HOST_KEY = 2;
+  LOGIN_TEST_STEP_AUTH = 3;
+  LOGIN_TEST_STEP_PRIVILEGE = 4;
+  LOGIN_TEST_STEP_PROMPT = 5;
+  LOGIN_TEST_STEP_PLATFORM = 6;
+}
+
+message LoginTestResponse {
+  Target target = 1;
+  bool passed = 2;
+  // Primer paso que falló, si alguno.
+  LoginTestStep failed_step = 3;
+  string detail = 4;
+  string detected_platform = 5;
+  // Huella SHA-256 de la llave de host, para confirmar en el primer uso.
+  string host_key_fingerprint = 6;
+}
+
+message ArmJobRequest {
+  string job_id = 1;
+  // Equipos excluidos de forma explícita tras fallar el Login Test (quedan en auditoría).
+  repeated string excluded_device_ids = 2;
+  // Huellas aceptadas por el ingeniero en este Login Test.
+  repeated string accepted_host_key_fingerprints = 3;
+}
+message ArmJobResponse {
+  google.protobuf.Timestamp window_ends_at = 1;
+  // Bloqueos de logind que no se pudieron tomar (spec §10.4).
+  repeated string missing_inhibitors = 2;
+}
+
+message CancelJobRequest {
+  string job_id = 1;
+}
+message CancelJobResponse {}
+
+message JobSummary {
+  string job_id = 1;
+  string name = 2;
+  string state = 3;
+  google.protobuf.Timestamp next_round_at = 4;
+  google.protobuf.Timestamp armed_at = 5;
+  google.protobuf.Timestamp window_ends_at = 6;
+  // Ronda en curso o la última; 0 si ninguna ha empezado.
+  uint32 round = 7;
+  // Rondas configuradas; 0 = hasta que termine la ventana.
+  uint32 rounds = 8;
+  // Conteos de la ronda en curso o la última.
+  uint32 devices_total = 9;
+  uint32 devices_ok = 10;
+  uint32 devices_failed = 11;
+  // Carpeta del trabajo (la de la corrida si ya se armó; si no, la raíz configurada).
+  string output_dir = 12;
+  // Historial de fases, de la más antigua a la más reciente (se guardan las últimas 200).
+  repeated JobPhase phases = 13;
+}
+
+enum JobPhaseKind {
+  JOB_PHASE_KIND_UNSPECIFIED = 0;
+  JOB_PHASE_KIND_CREATED = 1;
+  JOB_PHASE_KIND_LOGIN_TEST_DONE = 2;
+  JOB_PHASE_KIND_ARMED = 3;
+  JOB_PHASE_KIND_ROUND_STARTED = 4;
+  JOB_PHASE_KIND_ROUND_FINISHED = 5;
+  JOB_PHASE_KIND_ROUND_SKIPPED = 6;
+  JOB_PHASE_KIND_PACKAGED = 7;
+  JOB_PHASE_KIND_COMPLETED = 8;
+  JOB_PHASE_KIND_CANCELLED = 9;
+  JOB_PHASE_KIND_FAILED = 10;
+}
+
+message JobPhase {
+  google.protobuf.Timestamp at = 1;
+  JobPhaseKind kind = 2;
+  // 0 si la fase no pertenece a una ronda.
+  uint32 round = 3;
+  string detail = 4;
+}
+
+message ListJobsRequest {}
+message ListJobsResponse {
+  repeated JobSummary jobs = 1;
+}
+
+message RunDevice {
+  Target target = 1;
+  DeviceState state = 2;
+  string detail = 3;
+}
+
+message GetRunRequest {
+  string job_id = 1;
+  uint32 round = 2;
+}
+message GetRunResponse {
+  repeated RunDevice devices = 1;
+  string output_path = 2;
+}
+
+message ListPlaybooksRequest {
+  string platform = 1; // opcional; vacío = todas
+}
+message PlaybookInfo {
+  string id = 1; // "<plataforma>/<id>", p. ej. "ios-xe/tac-baseline"
+  string platform = 2;
+  string name = 3;
+  repeated string commands = 4; // texto de cada comando, en orden
+}
+message ListPlaybooksResponse {
+  repeated PlaybookInfo playbooks = 1;
+}

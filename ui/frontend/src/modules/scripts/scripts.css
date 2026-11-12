@@ -1,0 +1,36 @@
+/* Bóveda de scripts: lista con selección y detalle a su lado. */
+.scr-layout { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(320px, 1.2fr); gap: var(--s-4); align-items: start; }
+@media (max-width: 900px) { .scr-layout { grid-template-columns: 1fr; } }
+.scr-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--hairline); border-radius: var(--r-3); }
+.scr-list > li:first-child { border-radius: var(--r-3) var(--r-3) 0 0; }
+.scr-list > li:last-child { border-radius: 0 0 var(--r-3) var(--r-3); }
+.scr-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "pick name star" ". meta star"; column-gap: var(--s-3); row-gap: 2px; align-items: center; padding: var(--s-2) var(--s-3); border-bottom: 1px solid var(--hairline); }
+.scr-row:last-child { border-bottom: 0; }
+.scr-row[data-sel="true"] { background: var(--accent-soft); }
+.scr-row > input { grid-area: pick; margin: 0; }
+.scr-row > .scr-name { grid-area: name; }
+.scr-row > .scr-meta { grid-area: meta; }
+.scr-row > .scr-acts { grid-area: star; display: flex; align-items: center; gap: 2px; }
+.scr-name, .scr-name:hover { background: transparent; }
+.scr-name { justify-content: flex-start; text-align: left; height: auto; padding: 2px 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scr-meta { display: flex; flex-wrap: wrap; gap: var(--s-1); align-items: center; margin: 0 0 var(--s-3); }
+.scr-row > .scr-meta { margin: 0; }
+.scr-star[aria-pressed="true"] { color: var(--warning); }
+.scr-star[aria-pressed="true"] svg { fill: currentColor; }
+.scr-cmdhead { display: flex; align-items: center; gap: var(--s-2); margin: var(--s-3) 0 var(--s-1); }
+.scr-cmds { margin: 0; padding: var(--s-3); background: var(--surface-2); border-radius: var(--r-2, 6px); font: var(--fs-mono) / 1.5 var(--mono); overflow: auto; max-height: 360px; }
+.scr-line { display: block; white-space: pre-wrap; word-break: break-all; font: inherit; }
+
+/* Fase 19v: colecciones, fijados y menú «Agregar a colección». */
+.scr-pin[aria-pressed="true"] { color: var(--accent); }
+.scr-pin[aria-pressed="true"] svg { fill: currentColor; }
+.col-menu { position: relative; display: inline-flex; }
+.col-menu > .popover.menu { right: 0; left: auto; min-width: 220px; max-height: min(60vh, 360px); overflow-y: auto; }
+.col-list [role="menuitemcheckbox"] { display: grid; grid-template-columns: 1.2em 1fr; align-items: center; gap: var(--s-2); text-align: left; }
+.col-row { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-3); border-bottom: 1px solid var(--hairline); }
+.col-row:last-child { border-bottom: 0; }
+.col-row[data-sel="true"] { background: var(--accent-soft); }
+.col-row > input { margin: 0; }
+.col-row > .scr-name { flex: 1; min-width: 0; }
+.col-form { margin: 0 0 var(--s-4); }
+.col-add { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-2); margin-top: var(--s-3); }

@@ -1,0 +1,51 @@
+# SIN VALIDAR EN LABORATORIO: formatos y umbrales tomados de la documentación
+# pública de Cisco IOS-XE, sin transcripciones reales todavía. Ajustar con
+# salidas de equipos reales antes de confiar en los umbrales.
+- id: interfaz-crc
+  title: Errores CRC en interfaz
+  severity: baja
+  commands: [show interfaces]
+  check: iface_counter
+  params: {counter: crc}
+  explanation: La interfaz acumula errores CRC desde el último borrado de contadores; suelen venir de cableado, transceptor o dúplex.
+  action: Revisa si el contador sigue creciendo (regla interfaz-crc-creciente y mctl diff); si crece, cambia cable/transceptor y revisa el extremo remoto.
+- id: interfaz-crc-creciente
+  title: CRC creciendo entre rondas
+  severity: alta
+  commands: [show interfaces]
+  check: iface_counter
+  params: {counter: crc, growing: "true"}
+  explanation: Los errores CRC aumentaron entre dos rondas consecutivas; el problema físico está activo.
+  action: Revisa capa 1 en ambos extremos (cable, transceptor, show interfaces transceiver detail) y el dúplex/velocidad negociados.
+- id: interfaz-errores-entrada
+  title: Errores de entrada creciendo
+  severity: media
+  commands: [show interfaces]
+  check: iface_counter
+  params: {counter: input_errors, growing: "true"}
+  explanation: Los input errors (CRC, frame, overrun, ignored) aumentaron entre rondas.
+  action: Desglosa qué componente crece (CRC/frame es físico; overrun/ignored es saturación del equipo).
+- id: interfaz-errores-salida
+  title: Errores de salida creciendo
+  severity: media
+  commands: [show interfaces]
+  check: iface_counter
+  params: {counter: output_errors, growing: "true"}
+  explanation: Los output errors aumentaron entre rondas; suele indicar colisiones o problemas de dúplex.
+  action: Verifica dúplex en ambos extremos y el contador de colisiones.
+- id: interfaz-drops-salida
+  title: Descartes de salida creciendo
+  severity: media
+  commands: [show interfaces]
+  check: iface_counter
+  params: {counter: output_drops, growing: "true"}
+  explanation: Total output drops aumentó entre rondas; la cola de salida se desborda (congestión o microrráfagas).
+  action: Revisa la carga (txload, 5 minute output rate) y las colas (show platform hardware fed switch active qos queue stats interface).
+- id: interfaz-drops-entrada
+  title: Descartes de entrada creciendo
+  severity: media
+  commands: [show interfaces]
+  check: iface_counter
+  params: {counter: input_drops, growing: "true"}
+  explanation: Los drops de la cola de entrada aumentaron entre rondas; el tráfico hacia el CPU no se atiende a tiempo.
+  action: Correlaciona con CPU alta y con tráfico dirigido al equipo (ARP, TTL expirado, broadcast).

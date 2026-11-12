@@ -1,0 +1,3 @@
+/* Limpiador: la tabla de huérfanas llena su panel sin borde propio; las líneas largas se parten. */
+.cleaner-orphans { border: 0; border-radius: 0; margin: 0; }
+.cleaner-orphans td { white-space: normal; }

@@ -1,0 +1,6 @@
+Cisco IOS XE Software, Version 17.09.04a
+Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+core-1 uptime is 41 weeks, 2 days, 7 hours, 30 minutes
+Last reload reason: Critical process iosd fault on rp_0_0 (rc=139)
+%PMAN-3-PROCFAIL: The process iosd has failed (rc 139)
+%PMAN-3-PROCFAILCRIT: A critical process iosd has failed (rc 139)

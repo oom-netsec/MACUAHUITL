@@ -1,0 +1,21 @@
+Cisco IOS Software, C3560CX Software (C3560CX-UNIVERSALK9-M), Version 15.2(7)E3, RELEASE SOFTWARE (fc2)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2020 by Cisco Systems, Inc.
+Compiled Tue 28-Jul-20 14:42 by prod_rel_team
+
+Image text-base: 0x01010000, data-base: 0x02F00000
+
+sw-lab uptime is 2 weeks, 3 days, 4 hours, 12 minutes
+System returned to ROM by error - a SegV exception, PC 0x1A2B3C4, address 0x0
+
+*** System received a SegV exception ***
+signal= 0xb, code= 0x1200, context= 0x4F22A80
+PC = 0x1A2B3C4, Cause = 0x20, Status Reg = 0x3040FF01
+
+-Traceback= 1A2B3C4z 1A2C0F8z 1B90A12z 1B90B4Ez 0x1C0FFEE
+-Process= "IP Input", ipl= 0, pid= 58
+
+*Nov  4 09:58:12.345: %SYS-2-MALLOCFAIL: Memory allocation of 65552 bytes failed from 0x1A2B3C4, alignment 0
+Pool: Processor  Free: 1204  Cause: Memory fragmentation
+Processor Pool Total:   25834496 Used:   24629112 Free:    1205384
+CPU utilization for five seconds: 87%/12%; one minute: 76%; five minutes: 61%

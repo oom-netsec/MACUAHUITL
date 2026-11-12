@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+import "google/protobuf/timestamp.proto";
+import "macuahuitl/v1/tools.proto";
+
+// Análisis de la evidencia que guarda Patrol (Fase 9). Solo lee archivos
+// locales: nunca habla con los equipos. Los reportes viajan como JSON, igual
+// que en ToolsService; `text` es el resumen legible.
+//
+// `job` es el ID de un trabajo de esta sesión del núcleo o la ruta absoluta de
+// la carpeta de salida de un trabajo (para paquetes de sesiones anteriores).
+service AnalysisService {
+  // Hallazgos por reglas declarativas (sin validar en laboratorio).
+  rpc AnalyzeJob(AnalyzeJobRequest) returns (AnalyzeJobResponse);
+  // Diferencias por equipo entre dos rondas.
+  rpc DiffRounds(DiffRoundsRequest) returns (DiffRoundsResponse);
+  // Línea de tiempo correlacionada: rondas, hallazgos, log del equipo, syslog
+  // recibido, auditoría y, opcionalmente, un pcap.
+  rpc Timeline(TimelineRequest) returns (TimelineResponse);
+}
+
+message AnalyzeJobRequest {
+  string job = 1;
+  uint32 round = 2;   // 0 = todas
+  string device = 3;  // parte del nombre o la IP; vacío = todos
+}
+message AnalyzeJobResponse {
+  ToolReport report = 1;
+}
+
+message DiffRoundsRequest {
+  string job = 1;
+  uint32 from = 2;
+  uint32 to = 3;
+  string device = 4;
+}
+message DiffRoundsResponse {
+  ToolReport report = 1;
+}
+
+message TimelineRequest {
+  string job = 1;
+  google.protobuf.Timestamp around = 2; // sin valor = todo el trabajo
+  uint32 window_seconds = 3;            // ± alrededor de around; 30 por defecto
+  string device = 4;
+  string pcap_path = 5;                 // absoluto; opcional
+}
+message TimelineResponse {
+  ToolReport report = 1;
+}

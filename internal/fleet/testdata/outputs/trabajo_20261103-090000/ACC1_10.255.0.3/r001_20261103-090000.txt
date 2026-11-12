@@ -1,0 +1,6 @@
+===== 2026-11-03T09:00:01Z · show ntp status =====
+Clock is unsynchronized, stratum 16, no reference clock
+===== 2026-11-03T09:00:02Z · show mac address-table =====
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+  10    aabb.cc00.0a01    DYNAMIC     Gi1/0/6

@@ -1,0 +1,18 @@
+# Propósito: Revisa las sesiones de autenticación 802.1X y MAB, los servidores RADIUS y los fallos recientes.
+# Cuándo usarlo: Un usuario o dispositivo no autentica, cae a VLAN de invitados o hay tiempos de espera con RADIUS.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: l2-dot1x-mab
+platform: ios-xe
+name: L2 · 802.1X y MAB
+commands:
+  - cmd: show clock
+  - cmd: show authentication sessions
+  - cmd: show dot1x all summary
+  - cmd: show mab all
+  - cmd: show aaa servers
+  - cmd: show radius statistics
+  - cmd: show logging | include DOT1X|MAB|AUTHMGR|RADIUS
+  - cmd: show dot1x all details
+  - cmd: show running-config | section aaa|dot1x|radius
+    may_contain_secrets: true

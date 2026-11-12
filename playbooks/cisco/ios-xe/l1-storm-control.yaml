@@ -1,0 +1,17 @@
+# Propósito: Muestra los umbrales y las acciones de storm-control y los paquetes descartados por puerto.
+# Cuándo usarlo: Tormenta de broadcast o multicast, puertos apagados por storm-control o tráfico anómalo en un VLAN.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: l1-storm-control
+platform: ios-xe
+name: L1 · Storm control
+commands:
+  - cmd: show clock
+  - cmd: show storm-control
+  - cmd: show storm-control broadcast
+  - cmd: show storm-control multicast
+  - cmd: show storm-control unicast
+  - cmd: show interfaces status err-disabled
+  - cmd: show errdisable recovery
+  - cmd: show interfaces counters
+  - cmd: show logging | include STORM

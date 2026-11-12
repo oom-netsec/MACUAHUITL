@@ -1,0 +1,23 @@
+# Propósito: Busca señales de un loop: CPU alta, tormentas, cambios de topología STP y contadores desbordados.
+# Cuándo usarlo: Red lenta de golpe, CPU alta, enlaces saturados de broadcast o apagones tras conectar un cable.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/command/lsw-cr-book.html
+# Sin validar en laboratorio.
+id: l2-loops
+platform: ios-xe
+name: L2 · Loops de capa 2
+commands:
+  - cmd: show clock
+  - cmd: show spanning-tree summary
+  - cmd: show spanning-tree blockedports
+  - cmd: show spanning-tree inconsistentports
+  - cmd: show logging | include LOOP|FLAP|MACFLAP|STORM|SPANTREE|BPDU
+  - cmd: show storm-control
+  - cmd: show errdisable detect
+  - cmd: show interfaces status err-disabled
+  - cmd: show etherchannel summary
+  - cmd: show mac address-table count
+  - cmd: show processes cpu sorted
+  - cmd: show spanning-tree detail | include occurred|from|ieee
+  - cmd: show interfaces counters
+  - cmd: show interfaces | include line protocol|input rate|output rate|broadcasts
+    timeout: 120s

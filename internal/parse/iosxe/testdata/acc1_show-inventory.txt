@@ -1,0 +1,5 @@
+NAME: "c92xx Stack", DESCR: "Cisco Catalyst 9200 Series Stack"
+PID: C9200-48P         , VID: V01  , SN: FCW2310A0EE
+
+NAME: "GigabitEthernet1/1/1", DESCR: "1000BaseSX SFP"
+PID: GLC-SX-MMD        , VID: V01  , SN: FNS2310D0FF

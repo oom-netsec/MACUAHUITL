@@ -1,0 +1,54 @@
+R1#show crypto ipsec sa
+
+interface: GigabitEthernet0/0
+    Crypto map tag: VPN-MAP, local addr 192.0.2.1
+
+   protected vrf: (none)
+   local  ident (addr/mask/prot/port): (10.1.1.0/255.255.255.0/0/0)
+   remote ident (addr/mask/prot/port): (10.2.2.0/255.255.255.0/0/0)
+   current_peer 192.0.2.2 port 500
+     PERMIT, flags={origin_is_acl,}
+    #pkts encaps: 152, #pkts encrypt: 152, #pkts digest: 152
+    #pkts decaps: 0, #pkts decrypt: 0, #pkts verify: 0
+    #pkts compressed: 0, #pkts decompressed: 0
+    #pkts not compressed: 0, #pkts compr. failed: 0
+    #pkts not decompressed: 0, #pkts decompress failed: 0
+    #send errors 0, #recv errors 0
+
+     local crypto endpt.: 192.0.2.1, remote crypto endpt.: 192.0.2.2
+     plaintext mtu 1438, path mtu 1500, ip mtu 1500, ip mtu idb GigabitEthernet0/0
+     current outbound spi: 0xC3D2A1B0(3285360048)
+     PFS (Y/N): N, DH group: none
+
+     inbound esp sas:
+      spi: 0x9F8E7D6C(2676915564)
+        transform: esp-256-aes esp-sha-hmac ,
+        in use settings ={Tunnel, }
+        conn id: 2001, flow_id: SW:1, sibling_flags 80000046, crypto map: VPN-MAP
+        sa timing: remaining key lifetime (k/sec): (4608000/3412)
+        Status: ACTIVE(ACTIVE)
+
+     outbound esp sas:
+      spi: 0xC3D2A1B0(3285360048)
+        transform: esp-256-aes esp-sha-hmac ,
+        in use settings ={Tunnel, }
+        conn id: 2002, flow_id: SW:2, sibling_flags 80000046, crypto map: VPN-MAP
+        sa timing: remaining key lifetime (k/sec): (4607985/3412)
+        Status: ACTIVE(ACTIVE)
+
+   protected vrf: (none)
+   local  ident (addr/mask/prot/port): (10.1.3.0/255.255.255.0/0/0)
+   remote ident (addr/mask/prot/port): (10.2.3.0/255.255.255.0/0/0)
+   current_peer 192.0.2.2 port 500
+     PERMIT, flags={origin_is_acl,}
+    #pkts encaps: 0, #pkts encrypt: 0, #pkts digest: 0
+    #pkts decaps: 0, #pkts decrypt: 0, #pkts verify: 0
+    #send errors 3, #recv errors 0
+
+     local crypto endpt.: 192.0.2.1, remote crypto endpt.: 192.0.2.2
+     current outbound spi: 0x0(0)
+     PFS (Y/N): N, DH group: none
+
+     inbound esp sas:
+
+     outbound esp sas:

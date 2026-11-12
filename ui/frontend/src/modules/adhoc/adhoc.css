@@ -1,0 +1,16 @@
+/* Lotes: selector de vista del resultado, tabla sin caja propia dentro del panel y exportaciones. */
+.view-switch { display: flex; gap: 2px; }
+.view-switch button[aria-current="true"] { background: var(--surface-2); color: var(--text); }
+.adhoc-table.flat { border: 0; border-radius: 0; margin: 0; max-height: 520px; }
+.adhoc-table td, .adhoc-table th { white-space: normal; }
+.adhoc-table td pre.code { background: none; padding: 0; white-space: pre-wrap; }
+.adhoc-table tr[data-fail] td:nth-child(3) { color: var(--critical); }
+.result textarea.export { display: block; width: 100%; border: 0; border-radius: 0; background: var(--surface-2); padding: var(--s-3) var(--s-4); }
+
+/* Matriz: la celda es el botón; los encabezados de comando no se parten. */
+.adhoc-matrix { max-height: 420px; }
+.adhoc-matrix th[scope="row"] { white-space: nowrap; text-align: left; }
+.adhoc-matrix th[scope="col"] { white-space: nowrap; }
+.adhoc-matrix button.cell { padding: 0 var(--s-1); height: auto; }
+.adhoc-matrix button.cell[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cell-out { padding: var(--s-3); }

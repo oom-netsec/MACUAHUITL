@@ -1,0 +1,18 @@
+# Propósito: Obtiene el estado de CDP y LLDP, los vecinos descubiertos y los contadores de tramas.
+# Cuándo usarlo: Documentar la topología física, confirmar con quién se conecta un puerto o diagnosticar vecinos que no aparecen.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: l2-cdp-lldp
+platform: ios-xe
+name: L2 · CDP y LLDP
+commands:
+  - cmd: show clock
+  - cmd: show cdp
+  - cmd: show cdp interface
+  - cmd: show cdp traffic
+  - cmd: show cdp neighbors
+  - cmd: show lldp
+  - cmd: show lldp traffic
+  - cmd: show lldp neighbors
+  - cmd: show cdp neighbors detail
+  - cmd: show lldp neighbors detail

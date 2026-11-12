@@ -1,0 +1,29 @@
+# SIN VALIDAR EN LABORATORIO: formatos y umbrales tomados de la documentación
+# pública de Cisco IOS-XE, sin transcripciones reales todavía. Ajustar con
+# salidas de equipos reales antes de confiar en los umbrales.
+- id: reload-reciente
+  title: Recarga reciente
+  severity: media
+  commands: [show version]
+  check: uptime
+  params: {below: 24h}
+  explanation: El equipo lleva poco tiempo arriba; una recarga no planeada borra contadores y la evidencia previa.
+  action: Confirma si fue planeada con la causa (Last reload reason) y con la auditoría de cambios; si no, recolecta crashinfo y abre caso TAC.
+- id: reload-entre-rondas
+  title: Recarga entre rondas
+  severity: critica
+  commands: [show version]
+  check: uptime_reset
+  explanation: El uptime bajó entre dos rondas; el equipo recargó mientras Patrol lo observaba.
+  action: Revisa Last reload reason, dir crashinfo y el syslog remoto alrededor del momento de la recarga (mctl timeline).
+- id: reload-causa-falla
+  title: Última recarga por falla
+  severity: critica
+  commands: [show version]
+  check: match
+  # Falla: excepción, proceso crítico caído (rc=139), LocalSoft, pánico, watchdog.
+  # Ordenadas y fuera de esta regla: Reload Command, PowerOn, Image Install,
+  # Reload Slot Command, redundancy force-switchover.
+  params: {pattern: '(?i)^(last reload reason|system returned to rom by):?\s*.*(exception|crash|watchdog|error|abort|signal|kernel|segv|bus error|unknown|fault|critical process|localsoft|panic)'}
+  explanation: La causa de la última recarga indica una falla de software o hardware, no una recarga ordenada.
+  action: Recolecta crashinfo y system-report (dir crashinfo:) y abre caso TAC con show tech-support.

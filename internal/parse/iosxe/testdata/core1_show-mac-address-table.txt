@@ -1,0 +1,10 @@
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+  10    aabb.cc00.0a01    DYNAMIC     Po1
+ 100    aabb.cc00.0102    DYNAMIC     Po1
+  10    aabb.cc00.0001    STATIC      CPU
+ 100    aabb.cc00.0002    STATIC      CPU
+Total Mac Addresses for this criterion: 4

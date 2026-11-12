@@ -1,0 +1,26 @@
+/* Calculadoras: filas alineadas por el borde inferior (etiquetas largas de distinta altura), pila de capas y rutas BGP. */
+.result .table-wrap.flat td { white-space: normal; }
+.layers { list-style: none; margin: 0 0 var(--s-4); padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.layers li { display: inline-flex; align-items: center; gap: var(--s-1); padding: 2px 2px 2px var(--s-2); border: 1px solid var(--hairline); border-radius: var(--r-2); background: var(--surface); }
+.route { margin: 0 0 var(--s-3); }
+.route legend { padding: 0 var(--s-1); font: 600 var(--fs-body) / var(--lh-body) var(--font); }
+.route-flags { display: flex; flex-wrap: wrap; gap: 0 var(--s-5); align-items: center; }
+.route-flags .check { margin: 0; }
+.route-flags button { margin-left: auto; }
+
+/* Barras de reparto de Subred y VLSM: franjas con ancho proporcional (inline) y color por tono de la paleta de gráficas. */
+.seg-wrap { display: grid; gap: var(--s-3); border-bottom: 1px solid var(--hairline); }
+.seg-bar { list-style: none; margin: 0; padding: 0; display: flex; height: 36px; border-radius: var(--r-2); overflow: hidden; border: 1px solid var(--border-control); }
+.seg { flex-grow: 0; flex-shrink: 0; min-width: 2px; display: flex; align-items: center; padding: 0 var(--s-2); overflow: hidden; border-left: 3px solid var(--seg); background: color-mix(in srgb, var(--seg) 30%, var(--surface)); color: var(--text); }
+.seg:first-child { border-left-width: 0; }
+.seg + .seg { border-left: 3px solid var(--seg); }
+.seg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.seg[data-tone="0"], .seg-legend [data-tone="0"] { --seg: var(--chart-1); }
+.seg[data-tone="1"], .seg-legend [data-tone="1"] { --seg: var(--chart-3); }
+.seg[data-tone="2"], .seg-legend [data-tone="2"] { --seg: var(--chart-2); }
+.seg[data-tone="3"] { --seg: var(--chart-4); } .seg[data-tone="4"] { --seg: var(--chart-5); } .seg[data-tone="5"] { --seg: var(--chart-6); }
+.seg[data-tone="6"] { --seg: var(--chart-7); } .seg[data-tone="7"] { --seg: var(--chart-8); }
+.seg[data-tone="free"] { --seg: var(--border-control); background: repeating-linear-gradient(135deg, transparent 0 6px, var(--hairline) 6px 8px); color: var(--text-2); }
+.seg-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-5); font-family: var(--mono); }
+.seg-legend li { display: inline-flex; align-items: center; gap: var(--s-2); }
+.seg-legend li::before { content: ""; width: 10px; height: 10px; border-radius: 2px; background: var(--seg); }

@@ -1,0 +1,21 @@
+IKEv2:(SESSION ID = 2,SA ID = 1):Sending Packet [To 198.51.100.2:4500/From 198.51.100.1:4500/VRF i0:f0]
+Initiator SPI : 11AA22BB33CC44DD - Responder SPI : 55EE66FF77AA88BB Message id: 1
+IKEv2 IKE_AUTH Exchange REQUEST
+Payload contents:
+ ENCR
+IKEv2:(SESSION ID = 2,SA ID = 1):NAT detected float to init port 4500, resp port 4500
+IKEv2:(SESSION ID = 2,SA ID = 1):Received Packet [From 198.51.100.2:4500/To 198.51.100.1:4500/VRF i0:f0]
+IKEv2 IKE_AUTH Exchange RESPONSE
+IKEv2:(SESSION ID = 2,SA ID = 1):Processing IKE_AUTH message
+IKEv2:(SESSION ID = 2,SA ID = 1):Verify peer's authentication method
+IKEv2:(SESSION ID = 2,SA ID = 1):Peer's authentication method is 'PSK'
+IKEv2:(SESSION ID = 2,SA ID = 1):Get peer's preshared key for 198.51.100.2
+IKEv2:(SESSION ID = 2,SA ID = 1):Verify peer's authentication
+IKEv2:(SESSION ID = 2,SA ID = 1):[IKEv2 -> Crypto Engine] Generate IKEv2 authentication data
+IKEv2:(SESSION ID = 2,SA ID = 1):[Crypto Engine -> IKEv2] IKEv2 authentication data generation PASSED
+IKEv2:(SESSION ID = 2,SA ID = 1):Verification of peer's authentication data FAILED
+IKEv2:(SESSION ID = 2,SA ID = 1):Sending authentication failure notify
+IKEv2-ERROR:(SESSION ID = 2,SA ID = 1):: Auth exchange failed
+IKEv2:(SESSION ID = 2,SA ID = 1):Retransmitting packet
+IKEv2:(SESSION ID = 2,SA ID = 1):Retransmitting packet
+IKEv2:(SESSION ID = 2,SA ID = 1):Maximum number of retransmissions reached

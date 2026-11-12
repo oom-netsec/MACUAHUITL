@@ -1,0 +1,8 @@
+Cisco IOS Software, C3560CX Software (C3560CX-UNIVERSALK9-M), Version 15.2(7)E3, RELEASE SOFTWARE (fc2)
+cx-acc uptime is 3 days, 1 hour, 5 minutes
+System returned to ROM by Software-forced reload
+
+Unexpected exception to CPUvector 2000, PC = 0x2C4D5E6
+-Traceback= 2C4D5E6z 2C4E010z 2D00AA4z
+Process = "Spanning Tree"
+%SYS-3-CPUHOG: Task is running for (2004)msecs, more than (2000)msecs (0/0),process = Spanning Tree.

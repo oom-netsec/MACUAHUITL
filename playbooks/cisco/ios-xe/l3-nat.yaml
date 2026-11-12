@@ -1,0 +1,19 @@
+# Propósito: Revisa estadísticas, traducciones y ACL de NAT.
+# Cuándo usarlo: Usuarios sin salida a Internet por NAT, pool agotado o traducciones que no se crean.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipaddr/command/ipaddr-cr-book.html
+# Sin validar en laboratorio.
+id: l3-nat
+platform: ios-xe
+name: L3 · NAT
+commands:
+  - cmd: show clock
+  - cmd: show ip nat statistics
+  - cmd: show ip interface brief
+  - cmd: show access-lists
+  - cmd: show ip access-lists
+  - cmd: show logging | include NAT
+  - cmd: show ip nat translations total
+  - cmd: show running-config | include ip nat|access-list
+    may_contain_secrets: true
+  - cmd: show ip nat translations verbose
+    timeout: 120s

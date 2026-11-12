@@ -1,0 +1,10 @@
+/* Cambios: tabla de cambios con el seleccionado resaltado y hallazgos dentro del panel de resultado. */
+.change-table button[aria-current="true"] { color: var(--accent); font-weight: 600; }
+.result .table-wrap.flat td.wrap { white-space: normal; }
+.change-table td { vertical-align: middle; }
+
+/* Diferencia de configuración: una fila por línea, con la marca de la operación (el color no es lo único que la distingue). */
+.term .console li[data-op] { padding-left: var(--s-2); }
+.term .console li[data-op="+"] { background: color-mix(in srgb, var(--success) 22%, transparent); box-shadow: inset 2px 0 var(--success); }
+.term .console li[data-op="-"] { background: color-mix(in srgb, var(--critical) 26%, transparent); box-shadow: inset 2px 0 var(--critical); }
+.result .term .console { min-height: 0; }

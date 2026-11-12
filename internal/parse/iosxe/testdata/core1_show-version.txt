@@ -1,0 +1,7 @@
+Cisco IOS XE Software, Version 17.09.04a
+Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+
+CORE1 uptime is 6 weeks, 1 day, 2 hours, 15 minutes
+System returned to ROM by Reload
+cisco C9500-24Y4C (X86) processor with 2907628K/6147K bytes of memory.
+Processor board ID FCW2301A0AA

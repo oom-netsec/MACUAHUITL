@@ -1,0 +1,22 @@
+# Propósito: Revisa los port-channels, el estado de LACP/PAgP, los miembros y el balanceo de carga.
+# Cuándo usarlo: Miembros suspendidos o independientes, desbalanceo de tráfico o port-channel que no levanta.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/command/lsw-cr-book.html
+# Sin validar en laboratorio.
+id: l2-etherchannel
+platform: ios-xe
+name: L2 · EtherChannel
+commands:
+  - cmd: show clock
+  - cmd: show etherchannel summary
+  - cmd: show etherchannel port-channel
+  - cmd: show etherchannel load-balance
+  - cmd: show lacp sys-id
+  - cmd: show lacp neighbor
+  - cmd: show lacp counters
+  - cmd: show lacp internal
+  - cmd: show pagp neighbor
+  - cmd: show pagp counters
+  - cmd: show interfaces trunk
+  - cmd: show spanning-tree summary
+  - cmd: show logging | include LACP|PAGP|ETHCNT|EC-5|PM-4
+  - cmd: show etherchannel detail

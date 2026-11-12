@@ -1,0 +1,33 @@
+R1#show crypto isakmp sa
+IPv4 Crypto ISAKMP SA
+dst             src             state          conn-id status
+192.0.2.2       192.0.2.1       QM_IDLE           1001 ACTIVE
+203.0.113.9     192.0.2.1       MM_NO_STATE       1002 ACTIVE
+198.51.100.7    192.0.2.1       MM_KEY_EXCH       1003 ACTIVE
+
+R1#show crypto ikev2 sa detail
+ IPv4 Crypto IKEv2  SA
+
+Tunnel-id Local                 Remote                fvrf/ivrf            Status
+1         198.51.100.1/4500     198.51.100.2/4500     none/none            READY
+      Encr: AES-CBC, keysize: 256, PRF: SHA256, Hash: SHA256, DH Grp:14, Auth sign: PSK, Auth verify: PSK
+      Life/Active Time: 86400/1180 sec
+      CE id: 1001, Session-id: 1
+      Status Description: Negotiation done
+      Local spi: 2AE4C1E0B3A1F2C4       Remote spi: 9F3B2C1D0E4A5B6C
+      Local id: 198.51.100.1
+      Remote id: 198.51.100.2
+      Local req msg id:  2              Remote req msg id:  0
+      Local next msg id: 2              Remote next msg id: 0
+      Local req queued:  2              Remote req queued:  0
+      Local window:      5              Remote window:      5
+      DPD configured for 10 seconds, retry 2
+      Fragmentation not  configured.
+      Extended Authentication not configured.
+      NAT-T is detected inside
+      Cisco Trust Security SGT is disabled
+      Initiator of SA : Yes
+
+2         198.51.100.1/500      198.51.100.9/500      none/none            IN-NEG
+      Encr: Unknown - 0, PRF: Unknown - 0, Hash: None, DH Grp:0, Auth sign: Unknown - 0, Auth verify: Unknown - 0
+      Life/Active Time: 86400/0 sec

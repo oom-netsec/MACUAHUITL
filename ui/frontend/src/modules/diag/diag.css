@@ -1,0 +1,9 @@
+/* Diagnóstico: tablas de saltos y puertos, y su estado en texto además del color (ADR 0009). */
+.hops tr[data-state="bad"] td { background: var(--critical-soft); }
+.hops tr[data-state="bad"] td:nth-child(2) { color: var(--critical); }
+.hops tr[data-state="warn"] td:first-child { box-shadow: inset 3px 0 0 var(--warning); }
+.hops .meter { width: 160px; }
+.diag-viz { margin: var(--s-4) 0; }
+.diag-viz:empty { display: none; }
+.nmap-name { margin: 0; padding: var(--s-2) var(--s-3); font-weight: 600; border-bottom: 1px solid var(--hairline); }
+.nmap-host .meta { padding: var(--s-2) var(--s-3) 0; margin: 0; }

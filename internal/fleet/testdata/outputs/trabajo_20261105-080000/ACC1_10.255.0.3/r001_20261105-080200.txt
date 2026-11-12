@@ -1,0 +1,64 @@
+===== 2026-11-05T08:02:01Z · show version =====
+Cisco IOS XE Software, Version 17.06.05
+
+ACC1 uptime is 2 weeks, 3 days, 1 hour, 4 minutes
+cisco C9200-48P (ARM64) processor with 1000000K/6147K bytes of memory.
+Processor board ID FCW2310A0EE
+===== 2026-11-05T08:02:02Z · show ip arp =====
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+===== 2026-11-05T08:02:03Z · show mac address-table =====
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+  10    aabb.cc00.0a01    DYNAMIC     Gi1/0/5
+  20    aabb.cc00.1450    DYNAMIC     Gi1/0/10
+  10    aabb.cc00.0001    DYNAMIC     Gi1/0/48
+Total Mac Addresses for this criterion: 3
+===== 2026-11-05T08:02:04Z · show cdp neighbors detail =====
+-------------------------
+Device ID: DIST1.lab.local
+Entry address(es): 
+  IP address: 10.255.0.2
+Platform: cisco C9300-48P,  Capabilities: Switch IGMP 
+Interface: GigabitEthernet1/0/48,  Port ID (outgoing port): GigabitEthernet1/0/3
+Holdtime : 150 sec
+===== 2026-11-05T08:02:05Z · show ip dhcp snooping binding =====
+MacAddress          IpAddress        Lease(sec)  Type           VLAN  Interface
+------------------  ---------------  ----------  -------------  ----  --------------------
+AA:BB:CC:00:0A:01   10.1.10.20       86000       dhcp-snooping  10    GigabitEthernet1/0/5
+Total number of bindings: 1
+===== 2026-11-05T08:02:06Z · show interfaces status =====
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/5   PC-juan            connected    10         a-half  a-100  10/100/1000BaseTX
+Gi1/0/9   sala-juntas        err-disabled 10         auto    auto 10/100/1000BaseTX
+Gi1/0/10  servidor-web       connected    20         a-full  a-1000 10/100/1000BaseTX
+Gi1/0/48  to-DIST1           connected    trunk      a-full  a-1000 10/100/1000BaseTX
+===== 2026-11-05T08:02:07Z · show interfaces =====
+GigabitEthernet1/0/5 is up, line protocol is up (connected) 
+  Hardware is Gigabit Ethernet, address is aabb.cc00.0005 (bia aabb.cc00.0005)
+  Half-duplex, 100Mb/s, media type is 10/100/1000BaseTX
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+     12 runts, 0 giants, 0 throttles
+     15240 input errors, 15234 CRC, 0 frame, 0 overrun, 0 ignored
+     0 output errors, 0 collisions, 3 interface resets
+GigabitEthernet1/0/10 is up, line protocol is up (connected) 
+  Hardware is Gigabit Ethernet, address is aabb.cc00.000a (bia aabb.cc00.000a)
+  Full-duplex, 1000Mb/s, media type is 10/100/1000BaseTX
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 0
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 output errors, 0 collisions, 0 interface resets
+===== 2026-11-05T08:02:08Z · show inventory =====
+NAME: "c92xx Stack", DESCR: "Cisco Catalyst 9200 Series Stack"
+PID: C9200-48P         , VID: V01  , SN: FCW2310A0EE
+
+NAME: "GigabitEthernet1/1/1", DESCR: "1000BaseSX SFP"
+PID: GLC-SX-MMD        , VID: V01  , SN: FNS2310D0FF
+===== 2026-11-05T08:02:09Z · dir flash: =====
+Directory of flash:/
+
+4000000000 bytes total (1500000000 bytes free)
+===== 2026-11-05T08:02:10Z · show processes cpu =====
+CPU utilization for five seconds: 5%/1%; one minute: 4%; five minutes: 4%

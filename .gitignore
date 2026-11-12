@@ -1,0 +1,15 @@
+/bin/
+/dist/
+node_modules/
+*.db
+*.mcv
+.claude/worktrees/
+.claude/settings.local.json
+.worktrees/
+# binarios sueltos de go build dentro de cmd/
+/cmd/mctl/mctl
+/cmd/macuahuitld/macuahuitld
+
+# Guía local de las sesiones de desarrollo (no se publica)
+CLAUDE.md
+.claude/

@@ -1,0 +1,25 @@
+# Propósito: Recorre la ruta de un puerto de acceso: enlace, VLAN, autenticación, DHCP, seguridad y STP.
+# Cuándo usarlo: Un usuario reporta que no tiene red en un puerto; primera recolección antes de profundizar.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: tac-usuario-sin-red
+platform: ios-xe
+name: TAC · Usuario sin red
+commands:
+  - cmd: show clock
+  - cmd: show interfaces status
+  - cmd: show interfaces status err-disabled
+  - cmd: show interfaces counters errors
+  - cmd: show vlan brief
+  - cmd: show interfaces trunk
+  - cmd: show power inline
+  - cmd: show port-security
+  - cmd: show authentication sessions
+  - cmd: show dot1x all summary
+  - cmd: show spanning-tree blockedports
+  - cmd: show ip dhcp snooping binding
+  - cmd: show cdp neighbors
+  - cmd: show ip interface brief
+  - cmd: show logging | include UPDOWN|ERR_DISABLE|PSECURE|DOT1X|AUTHMGR|DHCP_SNOOPING|SPANTREE
+  - cmd: show mac address-table dynamic
+  - cmd: show ip arp

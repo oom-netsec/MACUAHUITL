@@ -1,0 +1,2 @@
+Processor Pool Total: 3000000000 Used: 1000000000 Free: 2000000000
+      I/O Pool Total:  200000000 Used:  100000000 Free:  100000000

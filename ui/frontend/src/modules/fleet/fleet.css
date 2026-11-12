@@ -1,0 +1,36 @@
+/* Flota: sangría del árbol de saltos, aviso de dato viejo, cadena de saltos y mapa de calor. Solo tokens. */
+.fleet-table .indent, .data-table .indent { display: inline-block; width: 16px; }
+/* Dato viejo: el texto lo dice; el color solo lo refuerza. */
+.stale { color: var(--warning); font-weight: 500; }
+.fleet-warnings { list-style: none; margin: 0; padding: 0; }
+.fleet-caption { padding: var(--s-3) var(--s-4) 0; margin: 0; }
+
+/* Cadena de saltos: equipo → interfaz → equipo, en horizontal y con salto de línea si no cabe. */
+.hop-chains { display: grid; gap: var(--s-3); margin: 0 0 var(--s-4); }
+.hop-chain { list-style: none; margin: 0; padding: var(--s-3) var(--s-4); display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) 0; border: 1px solid var(--hairline); border-radius: var(--r-3); background: var(--surface); }
+.hop-chain li { display: inline-flex; align-items: center; }
+.hop-link { display: inline-flex; flex-direction: column; align-items: center; padding: 0 var(--s-2); color: var(--text-2); font-size: var(--fs-small); max-width: 200px; text-align: center; }
+.hop-label { display: flex; flex-direction: column; overflow-wrap: anywhere; }
+.hop-arrow { color: var(--text-3); font-size: 18px; line-height: 1; }
+.hop-route { margin: 0 0 var(--s-1); }
+.hop-node { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-2); padding: var(--s-2) var(--s-3); border: 1px solid var(--border-control); border-radius: var(--r-2); background: var(--surface-2); }
+.hop-chain li[data-status="cut"] .hop-node { border-color: var(--critical); }
+.hop-chain li[data-status="arrived"] .hop-node { border-color: var(--success); }
+
+/* Mapa de calor: el texto de la celda lleva el dato; el fondo solo marca el nivel. */
+.heat-wrap { display: grid; gap: var(--s-2); padding: var(--s-3) var(--s-4) 0; margin-bottom: var(--s-4); }
+.heat-scroll { margin: 0; border: 0; }
+.heat { border-collapse: separate; border-spacing: 2px; width: auto; }
+.heat th, .heat td { padding: var(--s-1) var(--s-3); text-align: left; font-size: var(--fs-small); white-space: nowrap; border-radius: var(--r-1); }
+.heat thead th { color: var(--text-2); font-weight: 500; }
+.heat tbody th { font-weight: 500; color: var(--text); }
+.heat td { text-align: center; color: var(--text-3); background: var(--surface-2); min-width: 96px; }
+.heat td[data-level="bad"], .swatch[data-level="bad"] { background: var(--critical-soft); color: var(--critical); }
+.heat td[data-level="warn"], .swatch[data-level="warn"] { background: var(--warning-soft); color: var(--warning); }
+.heat td[data-level="info"], .swatch[data-level="info"] { background: var(--info-soft); color: var(--info); }
+.heat td[data-level="low"], .swatch[data-level="low"] { background: var(--surface); color: var(--text-2); }
+.heat td[data-level="low"] { box-shadow: inset 0 0 0 1px var(--hairline); }
+.heat td[data-level]:not([data-level="none"]) { font-weight: 500; }
+.heat-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); color: var(--text-2); font-size: var(--fs-small); }
+.heat-legend li { display: inline-flex; align-items: center; gap: var(--s-2); }
+.swatch { display: inline-block; width: 14px; height: 14px; border-radius: var(--r-1); background: var(--surface-2); color: var(--text-3); box-shadow: inset 0 0 0 1px currentColor; }

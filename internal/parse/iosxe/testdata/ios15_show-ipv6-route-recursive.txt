@@ -1,0 +1,6 @@
+Routing entry for ::/0
+  Known via "static", distance 1, metric 0
+  Route count is 1/1, share count 0
+  Routing paths:
+    2001:DB8:FF::1
+      Last updated 00:10:12 ago

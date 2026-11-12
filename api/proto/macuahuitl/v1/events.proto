@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+import "google/protobuf/timestamp.proto";
+import "macuahuitl/v1/common.proto";
+import "macuahuitl/v1/patrol.proto";
+
+// Eventos en tiempo real (spec §6, §12.3).
+service EventService {
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+}
+
+message SubscribeRequest {
+  // Vacío: todos los trabajos.
+  repeated string job_ids = 1;
+}
+
+message SubscribeResponse {
+  google.protobuf.Timestamp at = 1;
+  string job_id = 2;
+  oneof event {
+    DeviceStateChanged device_state_changed = 3;
+    CommandProgress command_progress = 4;
+    Heartbeat heartbeat = 5;
+    JobStateChanged job_state_changed = 6;
+    Warning warning = 7;
+    // Fase nueva en el historial del trabajo (la misma que luego aparece en JobSummary.phases).
+    JobPhase phase_added = 8;
+  }
+}
+
+message DeviceStateChanged {
+  string device_id = 1;
+  DeviceState state = 2;
+  string detail = 3;
+}
+
+message CommandProgress {
+  string device_id = 1;
+  string command = 2;
+  uint32 index = 3;
+  uint32 total = 4;
+  uint64 bytes_received = 5;
+}
+
+// Cada 5 s por trabajo, para distinguir lento de colgado.
+message Heartbeat {}
+
+message JobStateChanged {
+  string state = 1;
+}
+
+message Warning {
+  string code = 1;
+  string message = 2;
+}

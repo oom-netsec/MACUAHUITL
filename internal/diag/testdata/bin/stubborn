@@ -1,0 +1,5 @@
+#!/bin/sh
+# Hijo que ignora SIGTERM: solo SIGKILL al grupo lo mata.
+sh -c 'echo $$ > "$PIDFILE"; trap "" TERM; sleep 30' &
+trap '' TERM
+wait

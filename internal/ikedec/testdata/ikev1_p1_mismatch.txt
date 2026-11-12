@@ -1,0 +1,30 @@
+R1#debug crypto isakmp
+Crypto ISAKMP debugging is on
+*Mar  1 00:10:01.123: ISAKMP (0): received packet from 192.0.2.2 dport 500 sport 500 Global (N) NEW SA
+*Mar  1 00:10:01.123: ISAKMP: Created a peer struct for 192.0.2.2, peer port 500
+*Mar  1 00:10:01.123: ISAKMP:(0):Setting client config settings 66A1B2C3
+*Mar  1 00:10:01.127: ISAKMP:(0): processing SA payload. message ID = 0
+*Mar  1 00:10:01.127: ISAKMP:(0):found peer pre-shared key matching 192.0.2.2
+*Mar  1 00:10:01.127: ISAKMP:(0): local preshared key found
+*Mar  1 00:10:01.127: ISAKMP:(0):Checking ISAKMP transform 1 against priority 10 policy
+*Mar  1 00:10:01.127: ISAKMP:      encryption DES-CBC
+*Mar  1 00:10:01.127: ISAKMP:      hash MD5
+*Mar  1 00:10:01.127: ISAKMP:      default group 1
+*Mar  1 00:10:01.127: ISAKMP:      auth pre-share
+*Mar  1 00:10:01.127: ISAKMP:      life type in seconds
+*Mar  1 00:10:01.127: ISAKMP:      life duration (VPI) of  0x0 0x1 0x51 0x80
+*Mar  1 00:10:01.127: ISAKMP:(0):Encryption algorithm offered does not match policy!
+*Mar  1 00:10:01.127: ISAKMP:(0):atts are not acceptable. Next payload is 0
+*Mar  1 00:10:01.127: ISAKMP:(0):Checking ISAKMP transform 1 against priority 65535 policy
+*Mar  1 00:10:01.127: ISAKMP:      encryption DES-CBC
+*Mar  1 00:10:01.127: ISAKMP:      hash MD5
+*Mar  1 00:10:01.127: ISAKMP:      default group 1
+*Mar  1 00:10:01.127: ISAKMP:      auth pre-share
+*Mar  1 00:10:01.127: ISAKMP:(0):Hash algorithm offered does not match policy!
+*Mar  1 00:10:01.127: ISAKMP:(0):Diffie-Hellman group offered does not match policy!
+*Mar  1 00:10:01.127: ISAKMP:(0):atts are not acceptable. Next payload is 0
+*Mar  1 00:10:01.127: ISAKMP:(0):no offers accepted!
+*Mar  1 00:10:01.127: ISAKMP:(0): phase 1 SA policy not acceptable! (local 192.0.2.1 remote 192.0.2.2)
+*Mar  1 00:10:01.127: ISAKMP (0): incrementing error counter on sa, attempt 1 of 5: construct_fail_ag_init
+*Mar  1 00:10:01.127: ISAKMP:(0): sending packet to 192.0.2.2 my_port 500 peer_port 500 (R) MM_NO_STATE
+*Mar  1 00:10:01.127: %CRYPTO-6-IKMP_MODE_FAILURE: Processing of Main mode failed with peer at 192.0.2.2

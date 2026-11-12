@@ -1,0 +1,20 @@
+# Propósito: Revisa la configuración y el estado de SNMP: comunidades, grupos, usuarios, hosts y sesiones.
+# Cuándo usarlo: El NMS no consulta el equipo, traps que no llegan o errores de autenticación SNMP.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/snmp/command/nm-snmp-cr-book.html
+# Sin validar en laboratorio.
+id: svc-snmp
+platform: ios-xe
+name: Servicios · SNMP
+commands:
+  - cmd: show clock
+  - cmd: show snmp
+  - cmd: show snmp engineID
+  - cmd: show snmp group
+  - cmd: show snmp user
+  - cmd: show snmp view
+  - cmd: show snmp pending
+  - cmd: show snmp sessions
+  - cmd: show access-lists
+  - cmd: show logging | include SNMP
+  - cmd: show running-config | section snmp
+    may_contain_secrets: true

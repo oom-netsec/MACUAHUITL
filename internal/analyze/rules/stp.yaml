@@ -1,0 +1,11 @@
+# SIN VALIDAR EN LABORATORIO: formatos y umbrales tomados de la documentación
+# pública de Cisco IOS-XE, sin transcripciones reales todavía. Ajustar con
+# salidas de equipos reales antes de confiar en los umbrales.
+- id: stp-cambios-topologia
+  title: Cambios de topología STP
+  severity: media
+  commands: [show spanning-tree detail]
+  check: stp_changes
+  params: {min_delta: "1", recent: 5m}
+  explanation: Aumentaron los cambios de topología o el último fue hace muy poco; cada TCN vacía tablas MAC y provoca inundación.
+  action: Sigue el campo "from" hasta el puerto que origina los cambios; los puertos de acceso deben llevar portfast.

@@ -1,0 +1,25 @@
+*Mar  1 00:40:00.100: ISAKMP:(1002):Old State = IKE_R_MM5  New State = IKE_P1_COMPLETE
+*Mar  1 00:40:00.101: ISAKMP:(1002): processing SA payload. message ID = -1172394312
+*Mar  1 00:40:00.101: ISAKMP:(1002):Checking IPSec proposal 1
+*Mar  1 00:40:00.101: ISAKMP: transform 1, ESP_AES
+*Mar  1 00:40:00.101: ISAKMP:   attributes in transform:
+*Mar  1 00:40:00.101: ISAKMP:      encaps is 1 (Tunnel)
+*Mar  1 00:40:00.101: ISAKMP:      SA life type in seconds
+*Mar  1 00:40:00.101: ISAKMP:      SA life duration (basic) of 3600
+*Mar  1 00:40:00.101: ISAKMP:      authenticator is HMAC-SHA
+*Mar  1 00:40:00.101: ISAKMP:      key length is 256
+*Mar  1 00:40:00.101: ISAKMP:(1002):atts are acceptable.
+*Mar  1 00:40:00.101: IPSEC(validate_proposal_request): proposal part #1
+*Mar  1 00:40:00.101: IPSEC(validate_proposal_request): proposal part #1,
+  (key eng. msg.) INBOUND local= 192.0.2.1:0, remote= 192.0.2.2:0,
+    local_proxy= 10.1.1.0/255.255.255.0/256/0,
+    remote_proxy= 10.2.2.0/255.255.255.0/256/0,
+    protocol= ESP, transform= NONE  (Tunnel),
+*Mar  1 00:40:00.101: Crypto mapdb : proxy_match
+        src addr     : 10.1.1.0
+        dst addr     : 10.2.2.0
+*Mar  1 00:40:00.101: IPSEC(ipsec_process_proposal): proxy identities not supported
+*Mar  1 00:40:00.101: ISAKMP:(1002): IPSec policy invalidated proposal with error 32
+*Mar  1 00:40:00.101: ISAKMP:(1002): phase 2 SA policy not acceptable! (local 192.0.2.1 remote 192.0.2.2)
+*Mar  1 00:40:00.101: ISAKMP: set new node 1 to QM_IDLE
+*Mar  1 00:40:00.101: ISAKMP:(1002):Sending NOTIFY PROPOSAL_NOT_CHOSEN protocol 3

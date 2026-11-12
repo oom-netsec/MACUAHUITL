@@ -1,0 +1,20 @@
+# Propósito: Revisa políticas, clases y colas de QoS, y los descartes de salida por interfaz.
+# Cuándo usarlo: Pérdida de voz o video bajo carga, descartes de salida o políticas que no hacen match.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/qos/command/qos-cr-book.html
+# Sin validar en laboratorio.
+id: svc-qos
+platform: ios-xe
+name: Servicios · QoS
+commands:
+  - cmd: show clock
+  - cmd: show policy-map
+  - cmd: show class-map
+  - cmd: show mls qos
+  - cmd: show mls qos maps
+  - cmd: show mls qos queue-set
+  - cmd: show mls qos interface
+  - cmd: show interfaces | include line protocol|output drops|Total output drops|Queueing strategy
+  - cmd: show running-config | section policy-map|class-map|service-policy
+    may_contain_secrets: true
+  - cmd: show policy-map interface
+    timeout: 120s

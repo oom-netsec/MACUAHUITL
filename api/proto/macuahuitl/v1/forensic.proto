@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+import "macuahuitl/v1/tools.proto";
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Forense de logs y fallas (Fase 17): todo es de solo lectura. Lee texto pegado, archivos locales
+// o la carpeta de un trabajo de Patrol; nunca habla con los equipos.
+service ForensicService {
+  // Base de conocimiento de mensajes de Cisco: mnemónico exacto o con comodín.
+  rpc MsgLookup(MsgLookupRequest) returns (MsgLookupResponse);
+  // Analiza un crashinfo de texto (los core binarios solo se identifican).
+  rpc Crashinfo(CrashinfoRequest) returns (CrashinfoResponse);
+  // Syslog inteligente: agrupa por patrón, cuenta y marca ráfagas e inestabilidad.
+  rpc LogPatterns(LogPatternsRequest) returns (LogPatternsResponse);
+  // Detector de flapping: interfaces con varias transiciones en una ventana corta y, con un
+  // trabajo de Patrol, saltos de los contadores de show interfaces entre rondas.
+  rpc Flapping(FlappingRequest) returns (FlappingResponse);
+  // Filtro de debugs sobre texto o archivo (sin conexión en vivo): agrupa líneas repetidas,
+  // oculta el ruido y marca las anomalías.
+  rpc DebugFilter(DebugFilterRequest) returns (DebugFilterResponse);
+  // Fugas de memoria: procesos cuya memoria (show processes memory) crece sin bajar entre rondas de Patrol.
+  rpc MemLeaks(MemLeaksRequest) returns (MemLeaksResponse);
+}
+
+// De dónde salen los mensajes: exactamente una de las cuatro fuentes.
+message LogSource {
+  // Texto pegado (show logging o syslog).
+  string text = 1;
+  // Ruta absoluta de un archivo regular local.
+  string path = 2;
+  // Lo que guardó el receptor syslog (outputs/syslog/*.log).
+  bool capture = 3;
+  // ID de un trabajo de Patrol (o la ruta absoluta de su carpeta): sus show logging.
+  string job = 4;
+  // Con job: filtra equipos por nombre, IP o parte de la carpeta.
+  string device = 5;
+  // Con capture: lee a lo más max_kib KiB del final de la captura (lo más reciente); 0 = el tope normal.
+  // El modo en vivo de la UI lo usa para no releer 32 MiB en cada vuelta.
+  uint32 max_kib = 6;
+}
+
+message MsgLookupRequest {
+  // Mnemónico (%SYS-2-MALLOCFAIL) o patrón con * y ?; vacío lista todo.
+  string query = 1;
+}
+
+message MsgLookupResponse {
+  ToolReport report = 1;
+}
+
+message CrashinfoRequest {
+  // Texto del archivo (UI) o ruta absoluta de un archivo regular local; solo uno de los dos.
+  string text = 1;
+  string path = 2;
+}
+
+message CrashinfoResponse {
+  ToolReport report = 1;
+}
+
+message LogPatternsRequest {
+  LogSource source = 1;
+  // Ráfaga: burst_count mensajes del mismo patrón en burst_window_seconds; 0 = 5 en 60 s.
+  uint32 burst_count = 2;
+  uint32 burst_window_seconds = 3;
+}
+
+message LogPatternsResponse {
+  ToolReport report = 1;
+}
+
+message FlappingRequest {
+  LogSource source = 1;
+  // Flapping: count transiciones en window_seconds; 0 = 3 en 60 s.
+  uint32 count = 2;
+  uint32 window_seconds = 3;
+  // Con un trabajo: aviso si un contador sube min_delta o más entre rondas; 0 = 3.
+  uint32 min_delta = 4;
+}
+
+message FlappingResponse {
+  ToolReport report = 1;
+}
+
+message DebugFilterRequest {
+  // Texto pegado o ruta absoluta de un archivo regular local; solo uno de los dos.
+  string text = 1;
+  string path = 2;
+  // Líneas que contienen alguno de estos textos se ocultan (sin distinguir mayúsculas).
+  repeated string noise = 3;
+  // Una línea es rara si su patrón aparece rare_max veces o menos en una familia de family_min o más; 0 = 2 y 20.
+  uint32 family_min = 4;
+  uint32 rare_max = 5;
+  // Cuántos patrones frecuentes listar; 0 = 50.
+  uint32 top = 6;
+}
+
+message DebugFilterResponse {
+  ToolReport report = 1;
+}
+
+message MemLeaksRequest {
+  // ID de un trabajo de Patrol (o la ruta absoluta de su carpeta) que recolecte show processes memory sorted.
+  string job = 1;
+  // Filtra equipos por nombre, IP o parte de la carpeta; vacío = todos.
+  string device = 2;
+  // Rondas seguidas sin bajar (0 = 3) y crecimiento mínimo en KiB (0 = 1024).
+  uint32 min_rounds = 3;
+  uint32 min_growth_kib = 4;
+}
+
+message MemLeaksResponse {
+  ToolReport report = 1;
+}

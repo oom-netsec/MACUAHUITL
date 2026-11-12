@@ -1,0 +1,95 @@
+===== 2026-11-04T09:00:00Z · show version =====
+Cisco IOS XE Software, Version 17.09.04a
+Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2023 by Cisco Systems, Inc.
+Compiled Fri 20-Oct-23 10:44 by mcpre
+
+ROM: IOS-XE ROMMON
+BOOTLDR: System Bootstrap, Version 17.9.1r[FC1], RELEASE SOFTWARE (P)
+
+C9600-CORE-01 uptime is 12 weeks, 3 days, 4 hours, 10 minutes
+Uptime for this control processor is 12 weeks, 3 days, 4 hours, 12 minutes
+System returned to ROM by Reload Command
+System image file is "bootflash:packages.conf"
+Last reload reason: Reload Command
+
+cisco C9606R (X86) processor (revision V00) with 1868409K/6147K bytes of memory.
+Processor board ID FXS0000Q0AB
+2 Virtual Ethernet interfaces
+96 Forty/Hundred Gigabit Ethernet interfaces
+32768K bytes of non-volatile configuration memory.
+15958516K bytes of physical memory.
+11161600K bytes of Bootflash at bootflash:.
+
+Configuration register is 0x102
+
+Installation mode is INSTALL
+===== 2026-11-04T09:00:02Z · dir bootflash: =====
+Directory of bootflash:/
+
+  32641  -rw-       1197445748   Nov 3 2026 09:12:44 +00:00  cat9k_iosxe.17.12.04.SPA.bin
+  32642  -rw-             7520   Nov 3 2026 09:30:02 +00:00  packages.conf
+  32643  -rw-        610460372   Aug 1 2026 22:10:31 +00:00  cat9k-rpbase.17.09.04a.SPA.pkg
+  32644  drwx             4096   Aug 1 2026 22:14:02 +00:00  .installer
+
+11353194496 bytes total (8016261120 bytes free)
+===== 2026-11-04T09:00:03Z · show boot =====
+BOOT variable = bootflash:packages.conf;
+CONFIG_FILE variable = 
+BAUD variable = 9600
+ENABLE_BREAK variable does not exist
+MANUAL_BOOT variable = no
+
+Standby BOOT variable = bootflash:packages.conf;
+Standby CONFIG_FILE variable = 
+Standby BAUD variable = 9600
+Standby MANUAL_BOOT variable = no
+===== 2026-11-04T09:00:04Z · show install summary =====
+[ R0 R1 ] Installed Package(s) Information:
+State (St): I - Inactive, U - Activated & Uncommitted,
+            C - Activated & Committed, D - Deactivated & Uncommitted
+--------------------------------------------------------------------------------
+Type  St   Filename/Version
+--------------------------------------------------------------------------------
+IMG   C    17.09.04a.0.6
+
+--------------------------------------------------------------------------------
+Auto abort timer: inactive
+--------------------------------------------------------------------------------
+===== 2026-11-04T09:00:05Z · show redundancy =====
+Redundant System Information :
+------------------------------
+       Available system uptime = 12 weeks, 3 days, 4 hours, 10 minutes
+Switchovers system experienced = 0
+              Standby failures = 0
+        Last switchover reason = none
+
+                 Hardware Mode = Duplex
+    Configured Redundancy Mode = sso
+     Operating Redundancy Mode = sso
+              Maintenance Mode = Disabled
+                Communications = Up
+
+Current Processor Information :
+-------------------------------
+               Active Location = slot 3
+        Current Software state = ACTIVE
+       Uptime in current state = 12 weeks, 3 days, 4 hours, 10 minutes
+                 Image Version = Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+                          BOOT = bootflash:packages.conf;
+        Configuration register = 0x102
+
+Peer Processor Information :
+----------------------------
+              Standby Location = slot 4
+        Current Software state = STANDBY HOT
+       Uptime in current state = 12 weeks, 3 days, 3 hours, 58 minutes
+                 Image Version = Cisco IOS Software [Cupertino], Catalyst L3 Switch Software (CAT9K_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+                          BOOT = bootflash:packages.conf;
+        Configuration register = 0x102
+===== 2026-11-04T09:00:06Z · show running-config | include boot =====
+boot system bootflash:packages.conf
+===== 2026-11-04T09:00:07Z · show running-config | include configuration change|NVRAM config =====
+! Last configuration change at 09:40:11 UTC Tue Nov 3 2026 by admin
+! NVRAM config last updated at 09:41:02 UTC Tue Nov 3 2026 by admin

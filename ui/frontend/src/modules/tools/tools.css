@@ -1,0 +1,35 @@
+/* Herramientas: barras horizontales, árbol de traza DNS, cadena TLS y barra de syslog. Solo tokens. */
+.tools-report { display: grid; gap: var(--s-6); margin-bottom: var(--s-6); }
+.tools-report > section { margin: 0; }
+
+.bars { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-1); }
+.bars li { display: grid; grid-template-columns: minmax(150px, 190px) minmax(80px, 1fr) 200px; align-items: center; gap: var(--s-3); min-height: 28px; }
+.bars .bar-label { display: inline-flex; align-items: center; gap: var(--s-1); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bars .bar-track { display: block; height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.bars .bar-fill { display: block; height: 100%; background: var(--chart-1); border-radius: inherit; }
+.bars .bar-value { color: var(--text-2); font-size: var(--fs-small); text-align: right; white-space: nowrap; }
+.bars.compact li { grid-template-columns: 64px minmax(80px, 1fr) 200px; }
+
+/* Traza DNS: sangría por nivel de zona (raíz, TLD, autoritativo). */
+.dns-tree { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.dns-step { display: grid; gap: 2px; padding: var(--s-2) var(--s-3); border-left: 2px solid var(--hairline); margin-left: calc(var(--depth, 0) * var(--s-6)); }
+.dns-step > div { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.dns-step .zone { font-weight: 600; }
+.dns-step .detail { color: var(--text-2); font-size: var(--fs-small); overflow-wrap: anywhere; }
+.dns-final { margin-top: var(--s-3); }
+.dns-final .block { display: block; }
+
+/* Cadena TLS: del certificado del servidor a la raíz. */
+.tls-chain { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.tls-cert { display: grid; gap: var(--s-1); padding: var(--s-3) var(--s-4); border-left: 2px solid var(--border-control); margin-left: var(--s-2); position: relative; }
+.tls-cert + .tls-cert { margin-top: var(--s-2); }
+.tls-cert > div { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.tls-cert .role { font-weight: 600; }
+.tls-cert dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px var(--s-3); margin: 0; font-size: var(--fs-small); }
+.tls-cert dt { color: var(--text-3); }
+.tls-cert dd { margin: 0; min-width: 0; overflow-wrap: anywhere; display: inline-flex; align-items: center; gap: var(--s-1); flex-wrap: wrap; }
+
+/* Syslog en vivo. */
+.syslog-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--hairline); }
+.syslog-bar .chips { display: inline-flex; flex-wrap: wrap; gap: var(--s-1); }
+.syslog-bar .spark-box { margin-left: auto; display: inline-flex; align-items: center; gap: var(--s-2); color: var(--text-2); font-size: var(--fs-small); }

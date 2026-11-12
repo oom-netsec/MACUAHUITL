@@ -1,0 +1,21 @@
+.hosts-table { overflow-x: auto; }
+.hosts-table table, .hosts-data table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+.hosts-table th, .hosts-table td, .hosts-data th, .hosts-data td { text-align: left; padding: var(--s-1) var(--s-2); border-bottom: 1px solid var(--hairline); vertical-align: middle; }
+.hosts-table thead th, .hosts-data thead th { color: var(--text-2); font-weight: 600; white-space: nowrap; }
+.hosts-table .hosts-folder th { background: var(--surface-2); font-weight: 600; color: var(--text); }
+.hosts-table td .badge + .badge { margin-left: var(--s-1); }
+.hosts-actions { white-space: nowrap; text-align: right; }
+.hosts-filters { margin-bottom: var(--s-2); }
+.hosts-core { margin: var(--s-2) 0; color: var(--text-2); }
+.hosts-core span { color: var(--text); }
+.host-pick { margin-bottom: var(--s-2); }
+.hosts-data { border: 1px solid var(--hairline); border-radius: var(--r-3); background: var(--surface); padding: var(--s-4); display: grid; gap: var(--s-3); }
+.hosts-data h4, .hosts-data h5, .hosts-data h6, .hosts-data p { margin: 0; }
+.hosts-data ul { margin: var(--s-1) 0 0; padding-left: var(--s-4); }
+.hosts-export { border: 1px solid var(--hairline); border-radius: var(--r-2); padding: var(--s-3); margin: 0; min-width: 0; }
+.hosts-export legend { padding: 0 var(--s-1); font-weight: 600; }
+.hosts-pick-list { display: grid; gap: var(--s-1); max-height: 180px; overflow: auto; margin-bottom: var(--s-2); }
+.hosts-preview { display: grid; gap: var(--s-2); border-top: 1px solid var(--hairline); padding-top: var(--s-3); }
+.hosts-core-cell { color: var(--text-2); }
+.hosts-data h5 { font-size: var(--fs-body); font-weight: 600; display: flex; align-items: center; gap: var(--s-2); }
+.hosts-data h6 { font-size: var(--fs-body); font-weight: 600; margin-top: var(--s-2); }

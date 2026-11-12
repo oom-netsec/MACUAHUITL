@@ -1,0 +1,19 @@
+# SIN VALIDAR EN LABORATORIO: formatos y umbrales tomados de la documentación
+# pública de Cisco IOS-XE, sin transcripciones reales todavía. Ajustar con
+# salidas de equipos reales antes de confiar en los umbrales.
+- id: cpu-alta
+  title: CPU alta
+  severity: alta
+  commands: [show processes cpu sorted, show processes cpu]
+  check: cpu_high
+  params: {above: "80"}
+  explanation: El promedio de CPU de cinco minutos supera el umbral; el plano de control puede perder keepalives, adyacencias o la gestión.
+  action: Revisa los procesos con más 5Min en la misma salida; si domina "IP Input" o interrupciones (segundo valor tras la barra), busca tráfico conmutado por software (show processes cpu platform sorted, show platform hardware fed switch active qos queue stats internal cpu policer).
+- id: cpu-tendencia
+  title: CPU en tendencia de subida
+  severity: media
+  commands: [show processes cpu sorted, show processes cpu]
+  check: cpu_trend
+  params: {rounds: "3", rise: "20"}
+  explanation: El promedio de cinco minutos sube ronda tras ronda; aunque aún no rebase el umbral, la tendencia anticipa saturación.
+  action: Compara el top de procesos entre rondas para ver cuál crece; correlaciona con la línea de tiempo (cambios de topología, flaps, ejecuciones).

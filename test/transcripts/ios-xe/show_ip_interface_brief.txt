@@ -1,0 +1,7 @@
+# command: show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+Vlan1                  unassigned      YES NVRAM  administratively down down
+Vlan10                 192.0.2.10      YES NVRAM  up                    up
+GigabitEthernet0/0     198.51.100.2    YES NVRAM  up                    up
+GigabitEthernet1/0/1   unassigned      YES unset  up                    up
+GigabitEthernet1/0/2   unassigned      YES unset  down                  down

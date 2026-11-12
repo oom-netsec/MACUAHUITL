@@ -1,0 +1,93 @@
+===== 2026-11-05T08:01:01Z · show version =====
+Cisco IOS XE Software, Version 17.09.04a
+
+DIST1 uptime is 5 hours, 3 minutes
+System returned to ROM by Reload
+cisco C9300-48P (X86) processor with 1333688K/6147K bytes of memory.
+Processor board ID FCW2233A0DD
+===== 2026-11-05T08:01:02Z · show ip arp =====
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  10.255.100.2            -   aabb.cc00.0102  ARPA   Vlan100
+Internet  10.255.100.1            4   aabb.cc00.0002  ARPA   Vlan100
+Internet  10.1.20.1               -   aabb.cc00.0120  ARPA   Vlan20
+Internet  10.1.20.50              2   aabb.cc00.1450  ARPA   Vlan20
+===== 2026-11-05T08:01:03Z · show mac address-table =====
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+  10    aabb.cc00.0a01    DYNAMIC     Gi1/0/3
+  20    aabb.cc00.1450    DYNAMIC     Gi1/0/3
+ 100    aabb.cc00.0002    DYNAMIC     Po1
+ 100    aabb.cc00.0102    STATIC      CPU
+  20    aabb.cc00.0120    STATIC      CPU
+Total Mac Addresses for this criterion: 5
+===== 2026-11-05T08:01:04Z · show cdp neighbors detail =====
+-------------------------
+Device ID: CORE1.lab.local
+Entry address(es): 
+  IP address: 10.255.0.1
+Platform: cisco C9500-24Y4C,  Capabilities: Switch IGMP 
+Interface: GigabitEthernet1/0/1,  Port ID (outgoing port): GigabitEthernet1/0/1
+Holdtime : 155 sec
+
+-------------------------
+Device ID: CORE1.lab.local
+Entry address(es): 
+  IP address: 10.255.0.1
+Platform: cisco C9500-24Y4C,  Capabilities: Switch IGMP 
+Interface: GigabitEthernet1/0/2,  Port ID (outgoing port): GigabitEthernet1/0/2
+Holdtime : 150 sec
+
+-------------------------
+Device ID: ACC1.lab.local
+Entry address(es): 
+  IP address: 10.255.0.3
+Platform: cisco C9200-48P,  Capabilities: Switch IGMP 
+Interface: GigabitEthernet1/0/3,  Port ID (outgoing port): GigabitEthernet1/0/48
+Holdtime : 150 sec
+===== 2026-11-05T08:01:05Z · show etherchannel summary =====
+Group  Port-channel  Protocol    Ports
+------+-------------+-----------+-----------------------------------------------
+1      Po1(SU)         LACP      Gi1/0/1(P)  Gi1/0/2(P)
+===== 2026-11-05T08:01:06Z · show ip route =====
+Codes: L - local, C - connected, S - static, O - OSPF, * - candidate default
+
+Gateway of last resort is not set
+
+      10.0.0.0/8 is variably subnetted, 6 subnets, 3 masks
+O        10.1.10.0/24 [110/20] via 10.255.100.1, 00:40:12, Vlan100
+C        10.1.20.0/24 is directly connected, Vlan20
+L        10.1.20.1/32 is directly connected, Vlan20
+C        10.255.100.0/30 is directly connected, Vlan100
+L        10.255.100.2/32 is directly connected, Vlan100
+===== 2026-11-05T08:01:07Z · show ip interface brief =====
+Interface              IP-Address      OK? Method Status                Protocol
+Vlan20                 10.1.20.1       YES NVRAM  up                    up
+Vlan100                10.255.100.2    YES NVRAM  up                    up
+===== 2026-11-05T08:01:08Z · show ip dhcp snooping binding =====
+MacAddress          IpAddress        Lease(sec)  Type           VLAN  Interface
+------------------  ---------------  ----------  -------------  ----  --------------------
+Total number of bindings: 0
+===== 2026-11-05T08:01:09Z · show processes cpu =====
+CPU utilization for five seconds: 12%/2%; one minute: 10%; five minutes: 9%
+===== 2026-11-05T08:01:10Z · show processes memory =====
+Processor Pool Total: 1000000000 Used: 950000000 Free: 50000000
+===== 2026-11-05T08:01:11Z · show ntp status =====
+Clock is synchronized, stratum 4, reference is 10.255.0.254
+===== 2026-11-05T08:01:12Z · show inventory =====
+NAME: "c93xx Stack", DESCR: "Cisco Catalyst 9300 Series Stack"
+PID: C9300-48P         , VID: V03  , SN: FCW2233A0DD
+===== 2026-11-05T08:01:13Z · dir flash: =====
+Directory of flash:/
+
+11353194496 bytes total (300000000 bytes free)
+===== 2026-11-05T08:01:14Z · show interfaces =====
+Port-channel1 is up, line protocol is up (connected) 
+  Hardware is EtherChannel, address is aabb.cc00.0102 (bia aabb.cc00.0102)
+  Full-duplex, 2Gb/s, link type is auto, media type is N/A
+  Input queue: 0/2000/0/0 (size/max/drops/flushes); Total output drops: 2300
+     0 runts, 0 giants, 0 throttles
+     0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+     0 output errors, 0 collisions, 0 interface resets

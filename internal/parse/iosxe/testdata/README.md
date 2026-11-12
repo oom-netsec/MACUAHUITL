@@ -1,0 +1,10 @@
+Fixtures en el formato de la documentación pública de Cisco IOS-XE 17.x.
+Sin validar en laboratorio.
+Los archivos sw1_* y n9k1_* (CDP, LLDP, STP, port-channel) vienen de la topología de internal/topo; los n9k1_* están en formato NX-OS 9.3.
+Los sw3p_, sw3s_ y sw3c_ show-vtp-status (VTP v3: primario, secundario y cliente) siguen el formato de la documentación pública de Cisco; en v3 el modo aparece una vez por función (VLAN, MST, UNKNOWN). Sin validar en laboratorio.
+Los ios152_ e iosxe_ show-ip-cef-* y show-ip-route-* (salida hacia una dirección, para ParseEgress) siguen el formato de la documentación de IOS 15.2E y de IOS-XE: CEF con `via IP, Vlan10, 0 dependencies` o `nexthop IP Vlan10`, y la ruta con `via Vlan10`. Sin validar en laboratorio.
+Los ios152_show-ip-route-l2 y -norouting (switch con el enrutamiento apagado: `Default gateway is X` o `IP routing not enabled`) siguen la documentación de IOS 15.2E. Sin validar en laboratorio.
+Los ios15_show-ipv6-cef-* y show-ipv6-route-* (salida hacia una dirección IPv6, para ParseEgress) siguen el formato de la documentación de IOS 15.x e IOS-XE: CEF con `nexthop FE80::1 Vlan10` o `attached to Vlan99`, y la ruta con `Routing paths:` seguido de `FE80::1, Vlan10` o `directly connected, Vlan99`. Sin validar en laboratorio.
+Fase 19 (datos para gráficas y vista de frente): ios152_show-memory-statistics, iosxe_show-processes-memory (pools `lsmpi_io`), ios152_show-processes-cpu, ios152_show-interfaces-status (con la columna Type), ios152_show-interfaces-trunk e iosxe_show-etherchannel-summary siguen el formato de la documentación de Cisco para IOS 15.2E e IOS-XE 17.x. Sin validar en laboratorio.
+El ios152_show-interfaces-clear (línea `Last clearing of "show interface" counters` con `hh:mm:ss`, `never`, una forma larga `2d03h` y sin la línea) sigue la documentación de IOS 15.2E. Sin validar en laboratorio.
+El sw3560cx_show-interfaces-switchport (puerto Gi0/11 en dynamic auto y caído: Administrative Mode dynamic auto, Operational Mode down) tiene la forma de IOS 15.2 en Catalyst 3560CX, validada por el dueño en su switch; es solo la forma, sin datos de su red.

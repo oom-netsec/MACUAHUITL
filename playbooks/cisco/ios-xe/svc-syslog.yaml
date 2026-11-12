@@ -1,0 +1,17 @@
+# Propósito: Revisa la configuración del registro (consola, búfer, hosts) y los mensajes recientes de mayor severidad.
+# Cuándo usarlo: No llegan logs al servidor syslog, el búfer se llena rápido o hay que ver quién configuró algo.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/bsm/command/bsm-cr-book.html
+# Sin validar en laboratorio.
+id: svc-syslog
+platform: ios-xe
+name: Servicios · Syslog
+commands:
+  - cmd: show clock
+  - cmd: show logging | include Syslog logging|Console logging|Monitor logging|Buffer logging|Trap logging|Logging to
+  - cmd: show logging history
+  - cmd: show logging count
+  - cmd: show logging | include %SYS-5-CONFIG_I
+  - cmd: show logging | include ERR|CRIT|ALERT|EMERG
+  - cmd: show running-config | include logging
+    may_contain_secrets: true
+  - cmd: show logging

@@ -1,0 +1,11 @@
+*Mar  1 00:30:00.001: ISAKMP: Created a peer struct for 203.0.113.9, peer port 500
+*Mar  1 00:30:00.001: ISAKMP:(0): beginning Main Mode exchange
+*Mar  1 00:30:00.001: ISAKMP:(0): sending packet to 203.0.113.9 my_port 500 peer_port 500 (I) MM_NO_STATE
+*Mar  1 00:30:10.001: ISAKMP:(0): retransmitting phase 1 MM_NO_STATE...
+*Mar  1 00:30:10.001: ISAKMP (0): incrementing error counter on sa, attempt 1 of 5: retransmit phase 1
+*Mar  1 00:30:10.001: ISAKMP:(0): sending packet to 203.0.113.9 my_port 500 peer_port 500 (I) MM_NO_STATE
+*Mar  1 00:30:20.001: ISAKMP:(0): retransmitting phase 1 MM_NO_STATE...
+*Mar  1 00:30:20.001: ISAKMP (0): incrementing error counter on sa, attempt 2 of 5: retransmit phase 1
+*Mar  1 00:30:30.001: ISAKMP:(0): retransmitting phase 1 MM_NO_STATE...
+*Mar  1 00:30:40.001: ISAKMP:(0):peer does not do paranoid keepalives.
+*Mar  1 00:30:40.001: ISAKMP:(0):deleting SA reason "Death by retransmission P1" state (I) MM_NO_STATE (peer 203.0.113.9)

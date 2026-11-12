@@ -1,0 +1,35 @@
+# SIN VALIDAR EN LABORATORIO: formatos y umbrales tomados de la documentación
+# pública de Cisco IOS-XE, sin transcripciones reales todavía. Ajustar con
+# salidas de equipos reales antes de confiar en los umbrales.
+- id: bgp-vecino-caido
+  title: Vecino BGP caído
+  severity: alta
+  commands: [show ip bgp summary, show bgp summary, show bgp ipv4 unicast summary, show bgp ipv6 unicast summary]
+  check: bgp_neighbors
+  params: {mode: down}
+  explanation: La sesión BGP no está establecida (State/PfxRcd no es un número). Los vecinos en Idle (Admin) se ignoran.
+  action: Revisa alcanzabilidad a la dirección del vecino, AS remoto, autenticación y show ip bgp neighbors <ip> (último error/notificación).
+- id: bgp-vecino-flap
+  title: Vecino BGP restablecido hace poco
+  severity: media
+  commands: [show ip bgp summary, show bgp summary, show bgp ipv4 unicast summary, show bgp ipv6 unicast summary]
+  check: bgp_neighbors
+  params: {mode: flap, below: 1h}
+  explanation: La sesión está arriba pero su Up/Down es corto; se restableció hace poco.
+  action: Busca %BGP-5-ADJCHANGE en el log y el syslog remoto para conocer la causa de la caída previa.
+- id: ospf-vecino-no-full
+  title: Vecino OSPF sin llegar a FULL
+  severity: alta
+  commands: [show ip ospf neighbor]
+  check: ospf_neighbors
+  params: {mode: stuck}
+  explanation: La adyacencia está en un estado intermedio (INIT, EXSTART, EXCHANGE, LOADING); 2WAY con DROTHER es normal.
+  action: EXSTART/EXCHANGE suele ser MTU distinta; INIT suele ser multicast filtrado o autenticación.
+- id: ospf-vecino-perdido
+  title: Vecino OSPF desaparecido
+  severity: alta
+  commands: [show ip ospf neighbor]
+  check: ospf_neighbors
+  params: {mode: lost}
+  explanation: Un vecino visto en la ronda anterior ya no aparece.
+  action: Revisa la interfaz indicada y %OSPF-5-ADJCHG en el log para saber por qué cayó.

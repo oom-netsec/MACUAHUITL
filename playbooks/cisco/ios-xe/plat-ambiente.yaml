@@ -1,0 +1,17 @@
+# Propósito: Revisa temperatura, ventiladores y fuentes de poder, y los eventos ambientales del log.
+# Cuándo usarlo: Alarmas de temperatura o ventilador, fuente de poder caída o equipo que se reinicia por calor.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst9300/software/release/17-9/command_reference/b_179_9300_cr.html
+# Sin validar en laboratorio.
+id: plat-ambiente
+platform: ios-xe
+name: Plataforma · Ambiente
+commands:
+  - cmd: show clock
+  - cmd: show environment all
+  - cmd: show environment temperature
+  - cmd: show environment temperature status
+  - cmd: show environment fan
+  - cmd: show environment power
+  - cmd: show environment power all
+  - cmd: show inventory
+  - cmd: show logging | include ENVIRONMENT|FAN|TEMP|POWER|PWR|SUPPLY|THERMAL|RPS
