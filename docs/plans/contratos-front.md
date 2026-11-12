@@ -846,7 +846,7 @@ Las etiquetas de fila viven en las tablas campo/valor (subred, conversión, ACL,
   - Columnas: `calc.col.{field, value, name, hosts, prefix, prefixes, mask, first, last, broadcast, capacity, waste, type, octet, wildcard, binary, matching, dscp, tos, tos_hex, precedence, cos, exp, af_drop, class, item, quantity, loss, layer, detail, bytes, remaining, route, weight, local_pref, local, as_path, origin, med, igp, router_id, cluster, neighbor, age, next_hop, comparison, step, value_a, value_b, winner}`.
   - Filas: `calc.row.{network, broadcast, first_usable, last_usable, addresses, usable_hosts, prefix, mask, wildcard, class, kind, exact, single, matches, first, last, equals, prefixes_needed, abbreviated, expanded, eui64, interface_id, mac_eui64, solicited, ptr, link, rtt, bdp, window_scale, window_limit, loss_limit, max_flow, limited_by, fiber, connectors, splices, total, tx, rx_sensitivity, budget, rx_expected, margin, spare, verdict, dbm, mw, overhead, effective_mtu, ip_mtu, adjust_mss, physical_1500}`.
   - Notas: `calc.note.{host_in_subnet, p2p_v6, anycast_v6, single_host, p2p_v4, vlsm_unplaced, vlsm_free, summary_covered, summary_extra, wildcard_host_bits, wildcard_noncontiguous, ipv6_eui64_mac, tcp_bdp, tcp_window_limit, tcp_loss_limit, tcp_single_flow, dscp_cos_map, dscp_rfc4594, optics_overload, optics_short, optics_typical, mtu_ipv6_min, mtu_outer_tag, mtu_esp_padding, mtu_vxlan, bgp_winner, bgp_local_weight, bgp_excluded, bgp_det_med, bgp_no_det_med, bgp_always_med, bgp_med_same_as, bgp_multipath, bgp_multipath_relax, bgp_unvalidated}`.
-- **Siguen en español con `en`:** los valores con palabras (`Lo limita`: «ventana»/«pérdida»; el veredicto óptico; `Tipo` y `Clase` de una dirección; las clases de DSCP; los pasos de BGP; «sí/no», «accesible/inaccesible» y los nombres de capa de MTU). Son datos del cálculo, no etiquetas.
+- **Siguen en español con `en` (cambia en 30c-A, ver abajo):** los valores con palabras (`Lo limita`: «ventana»/«pérdida»; el veredicto óptico; `Tipo` y `Clase` de una dirección; las clases de DSCP; los pasos de BGP; «sí/no», «accesible/inaccesible» y los nombres de capa de MTU). Son datos del cálculo, no etiquetas.
 
 ### Seguridad
 ```ts
@@ -863,7 +863,7 @@ interface Certificate { kind: "certificate"|"csr"; subject; issuer?; serial?; no
 interface PkiReportData { text; certificates: Certificate[] }
 ```
 - Un intercambio sin respuesta no trae `code`; un paso sin respuesta no trae `status`. `avPairs` guarda el orden: primero lo enviado y luego lo recibido, igual que en el texto.
-- **`findings[].code`** (identificadores estables, en español como los de hoy): RADIUS `sin-respuesta {kind, port}`, `respuesta-invalida {kind, error}`, `blast-radius {kind}`, `ma-invalido {kind}`, `reject {reply}` (sin `reply` si el servidor no mandó Reply-Message); TACACS+ `secreto {kind}`, `sin-respuesta {kind, error, port}`, `authen-fail`, `author-fail`, `estado {kind, status, message}`. El `error` de los argumentos va en el idioma pedido.
+- **`findings[].code`** (identificadores estables, en español como los de hoy; cambia en 30c-A, ver abajo: pasan a inglés): RADIUS `sin-respuesta {kind, port}`, `respuesta-invalida {kind, error}`, `blast-radius {kind}`, `ma-invalido {kind}`, `reject {reply}` (sin `reply` si el servidor no mandó Reply-Message); TACACS+ `secreto {kind}`, `sin-respuesta {kind, error, port}`, `authen-fail`, `author-fail`, `estado {kind, status, message}`. El `error` de los argumentos va en el idioma pedido.
 - **`error.key`**: `security.radius.err.{system {error}, unauth {code}, no_response {attempts, timeout}}` y `security.tacacs.err.{system {error}, closed, out_of_sequence {session, type, seq}, unencrypted, bad_secret, too_many_prompts}`. `system` es un texto del sistema (por ejemplo «connection refused») y no se traduce.
 - **`warnings[].code`** de un certificado: `rsa_small`, `weak_sig {algorithm}`, `no_san`, `expired`, `not_yet`, `expires_soon {days}`, `self_signed`, `csr_signature`.
 - Claves del texto del informe: `security.{severity, ma}.*`, `security.findings_head`, `security.{yes, no}`, `security.radius.{text, err, finding}.*`, `security.tacacs.{text, err, finding}.*`, `security.pki.{kind, label, warn}.*`, `security.pki.validity` y `security.pki.lab_warning`.
@@ -894,7 +894,7 @@ interface PcapReportData { text;
 - `security/parse.ts`: servidor, método, intercambios (tipo, código, RTT, intentos, estado del Message-Authenticator, error, atributos), pasos TACACS+ (estado, RTT, error, preguntas, mensaje, datos, enviado/recibido), hallazgos (severidad y detalle) y los certificados (sujeto, emisor, serie, vigencia y días, llave, firma, SAN, CA, huellas, avisos), más lo nuevo (usos de llave, autofirmado, validez de la firma del CSR).
 - `calc/bars.ts`: título de la subred y del VLSM, las filas por clave, el prefijo y largo del padre, las columnas por clave y el espacio libre (`calc.note.vlsm_free`).
 - `tools/pcapParse.ts`: equipos con más tráfico, conversaciones y protocolos.
-- **No cubierto:** ver los «Siguen en español con `en`» de cada módulo; además, los errores de validación que rechazan la petición (`InvalidArgument`) siguen su propio camino de 30a, y IKE, DNS y TLS de `tools` quedan para otra fase.
+- **No cubierto:** ver los «Siguen en español con `en`» de cada módulo; además, los errores de validación que rechazan la petición (`InvalidArgument`) siguen su propio camino de 30a, y IKE, DNS y TLS de `tools` quedan para otra fase (cambia en 30c-A, ver abajo).
 
 ## Asistente de cambios y snippets en el idioma pedido (fase 30c, bloque B)
 
@@ -950,7 +950,7 @@ Bloque A del paso 3 de 3 (`docs/plans/2026-11-12-fase-30c-idioma-resto.md`). Mis
 Los argumentos de cada código no cambian. `severity` ya era cerrada en inglés (30b).
 
 ### RADIUS: `mschap2Verified`
-`RadiusExchangeData` gana `mschap2Verified?: boolean`: solo aparece en MS-CHAPv2 (en la solicitud de acceso), `true` si el `MS-CHAP2-Success` verificó al servidor (autenticación mutua) y `false` si no verificó. Ausente en PAP, CHAP, Status-Server y contabilidad. Antes solo estaba en el texto del atributo; el atributo `MS-CHAP2-Success` sigue trayendo ese texto del servidor, sin traducir.
+`RadiusExchangeData` gana `mschap2Verified?: boolean`: solo aparece en MS-CHAPv2 (en la solicitud de acceso), `true` si el `MS-CHAP2-Success` verificó al servidor (autenticación mutua) y `false` si llegó y no verificó. Ausente en PAP, CHAP, Status-Server y contabilidad, y también en MS-CHAPv2 cuando no llega `MS-CHAP2-Success` (la contraseña se rechazó o el servidor no respondió). Antes solo estaba en el texto del atributo; el atributo `MS-CHAP2-Success` sigue trayendo ese texto del servidor, sin traducir.
 
 ### Calculadoras: celdas con código
 Los valores con palabras dejan de ser texto libre: viajan como código cerrado y su texto sale traducido. `CalcTable` gana `rowCoded?: CalcCoded[][]`, una lista por fila (vacía si ninguna celda de esa fila es un código); falta si la tabla no tiene ninguna.
@@ -1005,16 +1005,4 @@ Un argumento de una nota o de una celda cuyo valor es una clave `calc.val.*` (o 
 - La vista que migre los slugs de RADIUS/TACACS+ y lea `rowCoded`, `findings` y `verifyCode`.
 
 ### Recordatorio: slugs de RADIUS y TACACS+ (fase 30c-A)
-El front debe actualizar sus mapeos de `findings[].code`: ya no existen los slugs viejos.
-
-| Slug viejo | Slug nuevo |
-|---|---|
-| `sin-respuesta` | `no_response` (RADIUS y TACACS+) |
-| `respuesta-invalida` | `invalid_response` |
-| `blast-radius` | `blast_radius` |
-| `ma-invalido` | `ma_invalid` |
-| `reject` | `reject` (igual) |
-| `secreto` | `secret` |
-| `authen-fail` | `authen_fail` |
-| `author-fail` | `author_fail` |
-| `estado` | `status` |
+El front debe actualizar sus mapeos de `findings[].code`: ya no existen los slugs viejos. La tabla slug viejo → slug nuevo está arriba, en «Cambio que rompe: slugs de hallazgo de RADIUS y TACACS+».
