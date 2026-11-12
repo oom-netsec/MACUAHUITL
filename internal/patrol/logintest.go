@@ -94,7 +94,7 @@ func connectOnce(ctx context.Context, d Deps, jobID string, s Spec, t Target, hk
 	open := func(id string) (*transport.Session, vault.Credential, error) {
 		cred, err := d.Vault.Get(id)
 		if err != nil {
-			return nil, cred, i18n.Wrap("patrol.err.credential", nil, err)
+			return nil, cred, i18n.Wrap("patrol.err.credential", err, nil)
 		}
 		sess, err := transport.OpenSSH(ctx, d.Guard, jobID, t.Address, port(t), cred, cb, transport.SSHOptions{})
 		if err != nil {

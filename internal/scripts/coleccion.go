@@ -364,7 +364,7 @@ func ParseColeccionesAvisos(b []byte) ([]Coleccion, []Script, []string, error) {
 	for i, c := range normalizaCol(cols) {
 		cols[i] = c
 		if err := c.Validate(); err != nil {
-			return nil, nil, nil, i18n.Wrap("scripts.imp.col", i18n.A("n", i+1, "name", c.Name), err)
+			return nil, nil, nil, i18n.Wrap("scripts.imp.col", err, i18n.A("n", i+1, "name", c.Name))
 		}
 		k := NameKey(c.Name)
 		if ids[c.ID] || nombres[k] {

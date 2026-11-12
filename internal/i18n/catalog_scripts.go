@@ -24,9 +24,9 @@ func init() {
 		"scripts.col.script_id":     e("id de script {id:q} inválido", "script id {id:q} is not valid", "id"),
 		"scripts.col.script_dup":    e("el script {id} está repetido en la colección", "the script {id} is repeated in the collection", "id"),
 
-		"scripts.imp.script":            e("script {n} ({name:q}): {error}", "script {n} ({name:q}): {error}", "n", "name", "error"),
+		"scripts.imp.script":            e("script {n} ({name:q}): {cause}", "script {n} ({name:q}): {cause}", "n", "name", "cause"),
 		"scripts.imp.script_dup":        e("script {n} ({name:q}): ID o nombre repetido dentro del archivo", "script {n} ({name:q}): ID or name repeated within the file", "n", "name"),
-		"scripts.imp.col":               e("colección {n} ({name:q}): {error}", "collection {n} ({name:q}): {error}", "n", "name", "error"),
+		"scripts.imp.col":               e("colección {n} ({name:q}): {cause}", "collection {n} ({name:q}): {cause}", "n", "name", "cause"),
 		"scripts.imp.col_dup":           e("colección {n} ({name:q}): ID o nombre repetido dentro del archivo", "collection {n} ({name:q}): ID or name repeated within the file", "n", "name"),
 		"scripts.svc.not_found":         e("no hay un script {id:q}", "there is no script {id:q}", "id"),
 		"scripts.svc.col_not_found":     e("no hay una colección {id:q}", "there is no collection {id:q}", "id"),

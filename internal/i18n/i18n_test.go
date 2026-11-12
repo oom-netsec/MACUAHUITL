@@ -205,7 +205,7 @@ func TestInTraduceElTramoConCodigoYConservaElEnvoltorio(t *testing.T) {
 // Wrap conserva la causa para errors.Is y la da en el idioma pedido; con es el texto es el de siempre.
 func TestWrapConservaLaCausaYLaTraduce(t *testing.T) {
 	cause := New("file.exists", nil)
-	w := Wrap("patrol.err.credential", nil, cause)
+	w := Wrap("patrol.err.credential", cause, nil)
 	if !errors.Is(w, cause) {
 		t.Fatal("errors.Is no ve la causa")
 	}

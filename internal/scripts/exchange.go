@@ -113,7 +113,7 @@ func validaScripts(scripts []Script) error {
 	for i, s := range normaliza(scripts) {
 		scripts[i] = s
 		if err := s.Validate(); err != nil {
-			return i18n.Wrap("scripts.imp.script", i18n.A("n", i+1, "name", s.Name), err)
+			return i18n.Wrap("scripts.imp.script", err, i18n.A("n", i+1, "name", s.Name))
 		}
 		k := NameKey(s.Name)
 		if ids[s.ID] || nombres[k] {

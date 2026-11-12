@@ -219,7 +219,7 @@ func writable(dir string) error {
 	}
 	f, err := os.CreateTemp(dir, ".macuahuitl-prueba-*")
 	if err != nil {
-		return i18n.Wrap("patrol.writable.no_write", nil, err)
+		return i18n.Wrap("patrol.writable.no_write", err, nil)
 	}
 	f.Close()
 	return os.Remove(f.Name())

@@ -216,7 +216,7 @@ func Hint(proto, listen string, files []string) string {
 func ValidateAddr(addr string, allowAny bool) error {
 	h, p, err := net.SplitHostPort(addr)
 	if err != nil {
-		return i18n.Wrap("fileserve.err.addr_invalid", i18n.A("addr", addr), err)
+		return i18n.Wrap("fileserve.err.addr_invalid", err, i18n.A("addr", addr))
 	}
 	port, err := strconv.ParseUint(p, 10, 16)
 	if err != nil {
