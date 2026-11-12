@@ -81,11 +81,11 @@ func (b *Bridge) terminal(id string, f func(st v1.TerminalService_OpenTerminalCl
 	s, ok := b.terminals[id]
 	b.mu.Unlock()
 	if !ok {
-		return fmt.Errorf("terminal %q no existe o ya terminó", id)
+		return wrapErr(fmt.Errorf("terminal %q no existe o ya terminó", id))
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return f(s.st)
+	return wrapErr(f(s.st))
 }
 
 func (b *Bridge) TerminalSend(id, data string) error {
@@ -102,5 +102,5 @@ func (b *Bridge) TerminalResize(id string, rows, cols uint32) error {
 
 // TerminalClose cierra el envío: el núcleo cierra SSH, revoca el guard, lo audita y termina el stream.
 func (b *Bridge) TerminalClose(id string) error {
-	return b.terminal(id, func(st v1.TerminalService_OpenTerminalClient) error { return st.CloseSend() })
+	return wrapErr(b.terminal(id, func(st v1.TerminalService_OpenTerminalClient) error { return st.CloseSend() }))
 }

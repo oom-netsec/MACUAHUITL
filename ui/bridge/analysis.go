@@ -16,7 +16,7 @@ import (
 
 func (b *Bridge) AnalysisRun(job string, round int, device string) (string, error) {
 	if round < 0 {
-		return "", fmt.Errorf("ronda %d inválida", round)
+		return "", wrapErr(fmt.Errorf("ronda %d inválida", round))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewAnalysisServiceClient(c).AnalyzeJob(ctx, &v1.AnalyzeJobRequest{Job: job, Round: uint32(round), Device: device})
@@ -26,7 +26,7 @@ func (b *Bridge) AnalysisRun(job string, round int, device string) (string, erro
 
 func (b *Bridge) AnalysisDiff(job string, from, to int, device string) (string, error) {
 	if from <= 0 || to <= 0 {
-		return "", fmt.Errorf("rondas %d y %d inválidas", from, to)
+		return "", wrapErr(fmt.Errorf("rondas %d y %d inválidas", from, to))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewAnalysisServiceClient(c).DiffRounds(ctx, &v1.DiffRoundsRequest{Job: job, From: uint32(from), To: uint32(to), Device: device})
@@ -43,7 +43,7 @@ func (b *Bridge) AnalysisTimeline(job, around string, windowSeconds int, device,
 	if around != "" {
 		t, err := time.Parse(time.RFC3339, around)
 		if err != nil {
-			return "", fmt.Errorf("instante %q inválido: usa RFC 3339 (2026-11-04T10:09:18Z)", around)
+			return "", wrapErr(fmt.Errorf("instante %q inválido: usa RFC 3339 (2026-11-04T10:09:18Z)", around))
 		}
 		req.Around = timestamppb.New(t)
 	}

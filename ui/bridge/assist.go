@@ -18,7 +18,7 @@ import (
 func (b *Bridge) AssistPlanPorts(reqJSON string) (string, error) {
 	var req v1.PlanPortsRequest
 	if err := protojson.Unmarshal([]byte(reqJSON), &req); err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewAssistServiceClient(c).PlanPorts(ctx, &req)
@@ -34,7 +34,7 @@ func (b *Bridge) AssistPlanPorts(reqJSON string) (string, error) {
 func (b *Bridge) AssistPlanSnippet(reqJSON string) (string, error) {
 	var req v1.PlanSnippetRequest
 	if err := protojson.Unmarshal([]byte(reqJSON), &req); err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewAssistServiceClient(c).PlanSnippet(ctx, &req)
@@ -63,7 +63,7 @@ func (b *Bridge) AssistListSnippetTemplates(platform string) (string, error) {
 func (b *Bridge) AssistPlanCredRotate(reqJSON string) (string, error) {
 	var req v1.PlanCredRotateRequest
 	if err := protojson.Unmarshal([]byte(reqJSON), &req); err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewAssistServiceClient(c).PlanCredRotate(ctx, &req)
@@ -80,7 +80,7 @@ func (b *Bridge) AssistPlanCredRotate(reqJSON string) (string, error) {
 func (b *Bridge) AssistPlanRestore(reqJSON string) (string, error) {
 	var req v1.PlanRestoreRequest
 	if err := protojson.Unmarshal([]byte(reqJSON), &req); err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewAssistServiceClient(c).PlanRestore(ctx, &req)

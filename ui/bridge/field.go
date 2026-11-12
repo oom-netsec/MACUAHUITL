@@ -103,11 +103,11 @@ func (b *Bridge) console(id string, f func(st v1.FieldService_ConsoleClient) err
 	s, ok := b.consoles[id]
 	b.mu.Unlock()
 	if !ok {
-		return fmt.Errorf("consola %q no existe o ya terminó", id)
+		return wrapErr(fmt.Errorf("consola %q no existe o ya terminó", id))
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return f(s.st)
+	return wrapErr(f(s.st))
 }
 
 func (b *Bridge) ConsoleSend(id, data string) error {
@@ -124,7 +124,7 @@ func (b *Bridge) ConsoleBreak(id string) error {
 
 // ConsoleClose cierra el envío: el núcleo graba el cierre, lo audita y termina el stream.
 func (b *Bridge) ConsoleClose(id string) error {
-	return b.console(id, func(st v1.FieldService_ConsoleClient) error { return st.CloseSend() })
+	return wrapErr(b.console(id, func(st v1.FieldService_ConsoleClient) error { return st.CloseSend() }))
 }
 
 type ServeDTO struct {

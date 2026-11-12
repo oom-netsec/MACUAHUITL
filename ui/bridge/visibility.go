@@ -52,7 +52,7 @@ func (t SnmpTargetDTO) proto() (*v1.SnmpTarget, error) {
 func (b *Bridge) SnmpGet(t SnmpTargetDTO, oids []string) (string, error) {
 	pt, err := t.proto()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewVisibilityServiceClient(c).SnmpGet(ctx, &v1.SnmpGetRequest{Target: pt, Oids: oids})
@@ -63,7 +63,7 @@ func (b *Bridge) SnmpGet(t SnmpTargetDTO, oids []string) (string, error) {
 func (b *Bridge) SnmpWalk(t SnmpTargetDTO, oid string, bulk bool) (string, error) {
 	pt, err := t.proto()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewVisibilityServiceClient(c).SnmpWalk(ctx, &v1.SnmpWalkRequest{Target: pt, Oid: oid, Bulk: bulk})
@@ -122,7 +122,7 @@ func (b *Bridge) stream(name string, open func(ctx context.Context, c *ipc.Clien
 func (b *Bridge) SnmpPollStart(t SnmpTargetDTO, profiles []string, every int) (string, error) {
 	pt, err := t.proto()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return b.stream("snmp", func(ctx context.Context, c *ipc.ClientConn) (func() (map[string]any, error), error) {
 		st, err := v1.NewVisibilityServiceClient(c).SnmpPoll(ctx, &v1.SnmpPollRequest{Target: pt, Profiles: profiles, IntervalSeconds: int32(every)})
@@ -205,7 +205,7 @@ func (t GnmiTargetDTO) proto() (*v1.GnmiTarget, error) {
 func (b *Bridge) GnmiGet(t GnmiTargetDTO, paths []string, encoding string) (string, error) {
 	pt, err := t.proto()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewVisibilityServiceClient(c).GnmiGet(ctx, &v1.GnmiGetRequest{Target: pt, Paths: paths, Encoding: encoding})
@@ -217,7 +217,7 @@ func (b *Bridge) GnmiGet(t GnmiTargetDTO, paths []string, encoding string) (stri
 func (b *Bridge) GnmiSubscribeStart(t GnmiTargetDTO, paths []string, mode string, every int) (string, error) {
 	pt, err := t.proto()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return b.stream("gnmi", func(ctx context.Context, c *ipc.ClientConn) (func() (map[string]any, error), error) {
 		st, err := v1.NewVisibilityServiceClient(c).GnmiSubscribe(ctx, &v1.GnmiSubscribeRequest{Target: pt, Paths: paths, Mode: mode, IntervalSeconds: int32(every)})

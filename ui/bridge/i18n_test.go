@@ -204,7 +204,11 @@ func TestTodoErrorDelPuenteTieneLaForma(t *testing.T) {
 	e3 := b.AssistWatch("r1")
 	e4 := b.WriteFile("relativa.txt", "x", "utf8", false)
 	e5 := b.WriteFile(filepath.Join(t.TempDir(), "a.txt"), "%%%", "base64", false)
-	for i, err := range []error{e1, e2, e3, e4, e5} {
+	_, e6 := b.AssistPlanPorts("{no es json")                              // protojson.Unmarshal
+	_, e7 := b.SnmpGet(SnmpTargetDTO{Host: "192.0.2.1", Port: 70000}, nil) // t.proto()
+	e8 := b.ConsoleSend("no-existe", "x")                                  // console()
+	e9 := b.TerminalSend("no-existe", "x")                                 // terminal()
+	for i, err := range []error{e1, e2, e3, e4, e5, e6, e7, e8, e9} {
 		if err == nil {
 			t.Fatalf("%d: sin error", i)
 		}

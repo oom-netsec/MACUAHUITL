@@ -230,7 +230,7 @@ func (b *Bridge) DeleteCredential(id string) error {
 func (b *Bridge) CreateJob(specJSON string) (string, error) {
 	var spec v1.JobSpec
 	if err := protojson.Unmarshal([]byte(specJSON), &spec); err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewPatrolServiceClient(c).CreateJob(ctx, &v1.CreateJobRequest{Spec: &spec})
@@ -357,7 +357,7 @@ func (b *Bridge) Subscribe(_ context.Context, jobIDs []string) error {
 		b.mu.Unlock()
 		if !has || st.dead {
 			if err := b.open(id); err != nil {
-				return err
+				return wrapErr(err)
 			}
 		}
 	}
@@ -624,7 +624,7 @@ func (b *Bridge) DiagCancel(runID string) error {
 	cancel, ok := b.runs[runID]
 	b.mu.Unlock()
 	if !ok {
-		return fmt.Errorf("ejecución %q no existe o ya terminó", runID)
+		return wrapErr(fmt.Errorf("ejecución %q no existe o ya terminó", runID))
 	}
 	cancel()
 	return nil
@@ -656,7 +656,7 @@ var dnsModes = map[string]v1.DnsMode{
 func (b *Bridge) ToolsDns(d DnsDTO) (string, error) {
 	mode, ok := dnsModes[d.Mode]
 	if !ok {
-		return "", fmt.Errorf("modo DNS %q desconocido", d.Mode)
+		return "", wrapErr(fmt.Errorf("modo DNS %q desconocido", d.Mode))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewToolsServiceClient(c).Dns(ctx, &v1.DnsRequest{Mode: mode, Name: d.Name, Type: d.Type, Servers: d.Servers, Deep: d.Deep, Dnssec: d.Dnssec})
@@ -666,7 +666,7 @@ func (b *Bridge) ToolsDns(d DnsDTO) (string, error) {
 
 func (b *Bridge) ToolsTls(host string, port int, sni string) (string, error) {
 	if port < 0 || port > 65535 {
-		return "", fmt.Errorf("puerto %d inválido", port)
+		return "", wrapErr(fmt.Errorf("puerto %d inválido", port))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewToolsServiceClient(c).InspectTls(ctx, &v1.InspectTlsRequest{Host: host, Port: uint32(port), Sni: sni})
