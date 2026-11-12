@@ -1085,3 +1085,12 @@ Los scripts de fábrica (origen `biblioteca`) salen con `name` y `description` e
 
 ### No cubierto en este bloque
 Instrucciones de `ServerReady.hint` (la explicación paso a paso del servidor de archivos), los textos del informe de respaldos (`collected.text`, avisos de `CollectBackups`) y de `ListBackups`, el análisis de las salidas de Patrol (`internal/analyze`, bloque C), los errores de importación de archivos de scripts (`importar.go`, `exchange.go`, `formato.go` y las decisiones de colecciones en `coleccion.go`), `service.VaultErr` y los textos de `internal/sys`, `internal/backup` y `internal/playbook`.
+
+### Ajustes tras la revisión del bloque D
+- **Texto en español que cambió (cierra una fuga):** `URL inválida "<url>"` (en `Get`, `Put`, `Browse` y `GetMany`) cita la URL sin contraseña (`ftp://admin:xxxxx@/a`) en el texto y en `metadata.url`, con es y con en. Antes salía completa.
+- **Puente:** `TransferListingDTO` gana `reasonCode` y `reasonArgs` (`omitempty`): el código estable del motivo de «no lista» (`xfer.no_listing.tftp`, `xfer.no_listing.scp`) y su metadata (`proto`). `reason` sigue siendo el texto.
+- **`GetRun` tras reiniciar el núcleo** sale en español y sin `reason`: el error del detalle (`DetailErr`) no se guarda en disco.
+- **Auditoría (siempre en inglés):** el detalle libre de `device.round` y de `transfer.serve.transfer` va como `error="…"`. El `target` de `forensic.patterns` y `forensic.flapping` es «pasted text», «syslog receiver capture», «show logging of job <carpeta>» o la ruta del archivo.
+- **Severidades de syslog** con `en`, como las nombra Cisco: emergencies, alerts, critical, errors, warnings, notifications, informational, debugging.
+- **Metadata de `ErrorInfo`** de los códigos nuevos: solo trae los argumentos declarados por el código (sin secretos); `xfer.no_listing.*` lleva `proto` y no texto traducido.
+- **Sigue en español con `en`:** los errores de `internal/core/respaldo.go` (exportar e importar el respaldo de la bóveda) y los textos de `internal/analyze`.
