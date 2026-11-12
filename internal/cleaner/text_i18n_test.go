@@ -36,3 +36,19 @@ func TestMotivoClassMapSinUso(t *testing.T) {
 		t.Error(w.In(i18n.Es), w.In(i18n.En))
 	}
 }
+
+// Los escenarios de la regresión recorren todos los motivos de huérfana y el reordenamiento.
+func TestEscenariosCubrenTodosLosMotivos(t *testing.T) {
+	_, ptrs := regCases(t)
+	used := map[string]bool{}
+	for _, r := range ptrs {
+		for k := range i18n.UsedKeys(r) {
+			used[k] = true
+		}
+	}
+	for _, k := range []string{"cleaner.why.missing", "cleaner.why.unused", "cleaner.change.sort"} {
+		if !used[k] {
+			t.Errorf("ningún escenario de la regresión produce %s", k)
+		}
+	}
+}

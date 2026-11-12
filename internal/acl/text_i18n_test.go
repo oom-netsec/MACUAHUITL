@@ -4,14 +4,13 @@ import (
 	"errors"
 	"net/netip"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 var spanish = regexp.MustCompile(`(?i)[áéíóúñ¿¡]|\b(línea|origen|destino|regla|puerto|puertos|máscara|dirección|falta|inválido|inválida|desconocido|soportado|esperaba|ninguna|sin|el|los|del|con)\b`)
-
-func mustPrefix(s string) netip.Prefix { return netip.MustParsePrefix(s) }
 
 // Cada error de importación, validación y generación: el español es el de siempre, con en sale sin español y
 // con el mismo código.
@@ -86,6 +85,34 @@ func TestErroresDeAclEsYEn(t *testing.T) {
 		}
 		if m := spanish.FindString(en); m != "" {
 			t.Errorf("%s: español (%s) en %q", c.name, m, en)
+		}
+	}
+}
+
+// Los escenarios de la regresión recorren todos los códigos de error de ACL.
+func TestEscenariosCubrenTodosLosErrores(t *testing.T) {
+	regCases(t)
+	used := map[string]bool{}
+	var mark func(err error)
+	mark = func(err error) {
+		var e *i18n.Error
+		if errors.As(err, &e) {
+			used[e.Code] = true
+			if e.Cause != nil {
+				mark(e.Cause)
+			}
+		}
+		var le *LineError
+		if errors.As(err, &le) {
+			mark(le.Err)
+		}
+	}
+	for _, err := range regErrs {
+		mark(err)
+	}
+	for _, k := range i18n.Codes() {
+		if strings.HasPrefix(k, "acl.err.") && !used[k] && !strings.HasPrefix(k, "acl.err.rule_") && k != "acl.err.import" && k != "acl.err.ports_incomplete" && k != "acl.err.line" {
+			t.Errorf("ningún escenario de la regresión produce %s", k)
 		}
 	}
 }
