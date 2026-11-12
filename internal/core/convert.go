@@ -56,7 +56,7 @@ var loginSteps = map[string]v1.LoginTestStep{
 	"prompt": v1.LoginTestStep_LOGIN_TEST_STEP_PROMPT, "platform": v1.LoginTestStep_LOGIN_TEST_STEP_PLATFORM,
 }
 
-func eventToProto(e engine.Event) *v1.SubscribeResponse {
+func eventToProto(loc string, e engine.Event) *v1.SubscribeResponse {
 	r := &v1.SubscribeResponse{At: timestamppb.New(e.At), JobId: e.JobID}
 	switch e.Kind {
 	case engine.DeviceState:
@@ -70,7 +70,7 @@ func eventToProto(e engine.Event) *v1.SubscribeResponse {
 	case engine.Warning:
 		r.Event = &v1.SubscribeResponse_Warning{Warning: &v1.Warning{Code: e.Detail, Message: e.State}}
 	case engine.Phase:
-		r.Event = &v1.SubscribeResponse_PhaseAdded{PhaseAdded: phaseToProto(phase{At: e.At, Kind: e.State, Round: e.Index, Detail: e.Detail})}
+		r.Event = &v1.SubscribeResponse_PhaseAdded{PhaseAdded: phaseToProto(loc, phase{At: e.At, Kind: e.State, Round: e.Index, Detail: e.Detail, Reason: e.Reason, Args: e.Args})}
 	}
 	return r
 }

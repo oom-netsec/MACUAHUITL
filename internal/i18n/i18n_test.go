@@ -16,6 +16,14 @@ func TestRenderEscapesYVerbo(t *testing.T) {
 	}
 }
 
+func TestRenderPlural(t *testing.T) {
+	for n, want := range map[string]string{"1": "1 equipo", "0": "0 equipos", "3": "3 equipos"} {
+		if got := render("{n} {n|equipo|equipos}", Args{"n": n}); got != want {
+			t.Errorf("n=%s: %q", n, got)
+		}
+	}
+}
+
 func TestTIdioma(t *testing.T) {
 	add(map[string]entry{"prueba.uno": {Es: "hola {n}", En: "hello {n}", Args: []string{"n"}}})
 	defer delete(catalog, "prueba.uno")
@@ -61,7 +69,7 @@ func TestErrorMetadataSoloDeclarados(t *testing.T) {
 
 // Cobertura: todo código lleva es y en, con los mismos argumentos, y ninguno sobra ni falta en la plantilla.
 func TestCatalogoCobertura(t *testing.T) {
-	re := regexp.MustCompile(`\{([a-z_0-9]+)(?::q)?\}`)
+	re := regexp.MustCompile(`\{([a-z_0-9]+)(?::q|\|[^}]*)?\}`)
 	holders := func(s string) []string {
 		s = strings.NewReplacer("{{", "", "}}", "").Replace(s)
 		var out []string

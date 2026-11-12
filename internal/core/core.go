@@ -23,6 +23,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/core/power"
 	"github.com/oom-netsec/MACUAHUITL/internal/engine"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
@@ -79,7 +80,10 @@ type phase struct {
 	At     time.Time `json:"at"`
 	Kind   string    `json:"kind"` // nombre de v1.JobPhaseKind: sobrevive a reordenar el enum
 	Round  int       `json:"round,omitempty"`
-	Detail string    `json:"detail,omitempty"`
+	Detail string    `json:"detail,omitempty"` // en es
+	// Reason es el código phase.* del catálogo y Args sus argumentos; vacíos en las fases guardadas antes del catálogo.
+	Reason string            `json:"reason,omitempty"`
+	Args   map[string]string `json:"args,omitempty"`
 }
 
 const maxPhases = 200
@@ -415,25 +419,35 @@ func (c *Core) loadJobs() {
 	}
 	rows.Close()
 	for _, j := range dead {
-		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, j.Round, "el núcleo se detuvo con el trabajo armado; no se reanuda")
+		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, j.Round, "phase.core_stopped", nil)
 	}
 }
 
 // addPhase agrega una fase al historial (acotado a maxPhases), la publica en vivo y guarda el trabajo.
-func (c *Core) addPhase(j *job, k v1.JobPhaseKind, round int, detail string) {
-	p := phase{At: c.o.Now(), Kind: k.String(), Round: round, Detail: detail}
+// code es un código phase.* del catálogo (vacío = sin detalle): el detalle se guarda en es, con su motivo y argumentos
+// para traducirlo al leerlo.
+func (c *Core) addPhase(j *job, k v1.JobPhaseKind, round int, code string, args i18n.Args) {
+	p := phase{At: c.o.Now(), Kind: k.String(), Round: round}
+	if code != "" {
+		p.Detail, p.Reason, p.Args = i18n.Msg(i18n.Es, code, args), code, i18n.Metadata(code, args)
+	}
 	c.mu.Lock()
 	j.Phases = append(j.Phases, p)
 	if n := len(j.Phases); n > maxPhases {
 		j.Phases = j.Phases[n-maxPhases:]
 	}
 	c.mu.Unlock()
-	c.bus.Publish(engine.Event{At: p.At, JobID: j.id, Kind: engine.Phase, State: p.Kind, Index: round, Detail: detail})
+	c.bus.Publish(engine.Event{At: p.At, JobID: j.id, Kind: engine.Phase, State: p.Kind, Index: round, Detail: p.Detail, Reason: p.Reason, Args: p.Args})
 	c.persistJob(j)
 }
 
-func phaseToProto(p phase) *v1.JobPhase {
-	return &v1.JobPhase{At: timestamppb.New(p.At), Kind: v1.JobPhaseKind(v1.JobPhaseKind_value[p.Kind]), Round: uint32(p.Round), Detail: p.Detail}
+// phaseToProto da la fase con su detalle en el idioma loc; las guardadas antes del catálogo no traen motivo y salen en es.
+func phaseToProto(loc string, p phase) *v1.JobPhase {
+	detail := p.Detail
+	if p.Reason != "" && loc != i18n.Es {
+		detail = i18n.Msg(loc, p.Reason, p.Args)
+	}
+	return &v1.JobPhase{At: timestamppb.New(p.At), Kind: v1.JobPhaseKind(v1.JobPhaseKind_value[p.Kind]), Round: uint32(p.Round), Detail: detail, Reason: p.Reason, Args: p.Args}
 }
 
 func tsOrNil(t time.Time) *timestamppb.Timestamp {
@@ -444,7 +458,7 @@ func tsOrNil(t time.Time) *timestamppb.Timestamp {
 }
 
 // summary arma el JobSummary. Requiere c.mu.
-func (c *Core) summary(j *job) *v1.JobSummary {
+func (c *Core) summary(loc string, j *job) *v1.JobSummary {
 	sc := j.spec.Schedule
 	rounds := sc.Rounds
 	if sc.IntervalSeconds == 0 && sc.Cron == "" {
@@ -458,7 +472,7 @@ func (c *Core) summary(j *job) *v1.JobSummary {
 		ArmedAt: tsOrNil(j.ArmedAt), WindowEndsAt: tsOrNil(j.Until), Round: uint32(j.Round), Rounds: rounds,
 		DevicesTotal: uint32(len(j.spec.Targets)), DevicesOk: uint32(j.OK), DevicesFailed: uint32(j.Failed), OutputDir: out, Kind: cmp.Or(j.spec.Kind, "patrol")}
 	for _, p := range j.Phases {
-		s.Phases = append(s.Phases, phaseToProto(p))
+		s.Phases = append(s.Phases, phaseToProto(loc, p))
 	}
 	return s
 }

@@ -33,7 +33,7 @@ func A(kv ...any) Args {
 }
 
 // entry es un código del catálogo. En la plantilla {x} inserta el argumento x, {x:q} lo inserta entre comillas
-// (como %q de fmt) y {{ o }} escriben una llave literal.
+// (como %q de fmt), {x|uno|varios} escribe «uno» si x vale 1 y «varios» si no, y {{ o }} escriben una llave literal.
 type entry struct {
 	Reason string            // motivo estable para el cliente; vacío = el propio código
 	Es, En string            //
@@ -154,10 +154,20 @@ func render(tpl string, args Args) string {
 				return b.String()
 			}
 			name, verb, _ := strings.Cut(tpl[i+1:i+end], ":")
+			if n, forms, ok := strings.Cut(tpl[i+1:i+end], "|"); ok { // {n|uno|varios}: singular si n vale 1
+				name, verb = n, forms
+			}
 			v, ok := args[name]
+			one, many, plural := strings.Cut(verb, "|")
 			switch {
 			case !ok:
 				b.WriteString("{" + name + "}")
+			case plural:
+				if v == "1" {
+					b.WriteString(one)
+				} else {
+					b.WriteString(many)
+				}
 			case verb == "q":
 				b.WriteString(strconv.Quote(v))
 			default:

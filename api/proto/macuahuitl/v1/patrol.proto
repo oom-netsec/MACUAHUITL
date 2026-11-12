@@ -164,7 +164,11 @@ message JobPhase {
   JobPhaseKind kind = 2;
   // 0 si la fase no pertenece a una ronda.
   uint32 round = 3;
+  // El texto de siempre en español; con accept-language en sale traducido.
   string detail = 4;
+  // Código estable del catálogo (phase.devices, phase.ok_failed, ...) y sus argumentos; vacío si la fase no lleva detalle.
+  string reason = 5;
+  map<string, string> args = 6;
 }
 
 message ListJobsRequest {}

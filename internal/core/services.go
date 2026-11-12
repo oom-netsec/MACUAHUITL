@@ -18,6 +18,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/engine"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
@@ -218,7 +219,7 @@ func (s *patrolSvc) CreateJob(_ context.Context, r *v1.CreateJobRequest) (*v1.Cr
 	s.c.mu.Lock()
 	s.c.jobs[j.id] = j
 	s.c.mu.Unlock()
-	s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CREATED, 0, "")
+	s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CREATED, 0, "", nil)
 	sum := sha256.Sum256([]byte(spec.CustomCommands))
 	s.c.audit("job.create", j.id, fmt.Sprintf("nombre=%s equipos=%d playbooks=%v comandos_pegados_sha256=%s enmascarado=%v",
 		spec.Name, len(spec.Targets), spec.PlaybookIDs, hex.EncodeToString(sum[:]), !spec.DisableMasking))
@@ -253,7 +254,7 @@ func (s *patrolSvc) LoginTest(r *v1.LoginTestRequest, st v1.PatrolService_LoginT
 		}
 	}
 	s.c.audit("job.logintest", j.id, fmt.Sprintf("pasaron=%d de %d", passed, len(res)))
-	s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_LOGIN_TEST_DONE, 0, okFailed(passed, len(res)-passed))
+	s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_LOGIN_TEST_DONE, 0, "phase.ok_failed", i18n.A("ok", passed, "failed", len(res)-passed))
 	return nil
 }
 
@@ -322,7 +323,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 	}
 	undo = append(undo, func() { c.guard.Revoke(j.id) })
-	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_CHECK_DONE, 0, okFailed(len(res)-len(failed), len(failed)))
+	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_CHECK_DONE, 0, "phase.ok_failed", i18n.A("ok", len(res)-len(failed), "failed", len(failed)))
 	if len(failed) > 0 {
 		return fail(status.Errorf(codes.FailedPrecondition, "Login Test falló; excluye o corrige: %s", strings.Join(failed, "; ")))
 	}
@@ -390,12 +391,12 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	c.mu.Lock()
 	j.state, j.ArmedAt = "armed", c.o.Now()
 	c.mu.Unlock()
-	armed := count(len(spec.Targets), "equipo", "equipos")
+	armed, armedArgs := "phase.devices", i18n.A("n", len(spec.Targets))
 	if n := len(r.ExcludedDeviceIds); n > 0 {
-		armed += ", " + count(n, "excluido", "excluidos")
+		armed, armedArgs = "phase.devices_excluded", i18n.A("n", len(spec.Targets), "excluded", n)
 	}
 	// Antes de lanzar watch: así ARMED queda antes de ROUND_STARTED de la primera ronda.
-	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARMED, 0, armed)
+	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARMED, 0, armed, armedArgs)
 	c.watchers.Add(1)
 	go c.watch(j, events, cancelSub)
 	c.audit("job.arm", j.id, fmt.Sprintf("ventana_hasta=%s excluidos=%v", until.UTC().Format(time.RFC3339), r.ExcludedDeviceIds))
@@ -416,7 +417,7 @@ func (c *Core) watch(j *job, events <-chan engine.Event, cancel func()) {
 			// Rondas perdidas por pausa o por una ronda anterior aún en curso (spec §10.4).
 			j.writer.NoteSkippedRound(e.Index)
 			c.audit("round.skipped", j.id, fmt.Sprintf("ronda=%d", e.Index))
-			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_SKIPPED, e.Index, "")
+			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_SKIPPED, e.Index, "", nil)
 			continue
 		}
 		if e.Kind != engine.JobState {
@@ -427,18 +428,18 @@ func (c *Core) watch(j *job, events <-chan engine.Event, cancel func()) {
 			c.mu.Lock()
 			j.enterRound(e.Index)
 			c.mu.Unlock()
-			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_STARTED, e.Index, "")
+			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_STARTED, e.Index, "", nil)
 		case "round.end":
 			c.mu.Lock()
 			j.rounds = e.Index
 			ok, failed := j.OK, j.Failed
 			c.mu.Unlock()
-			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_FINISHED, e.Index, okFailed(ok, failed))
+			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_FINISHED, e.Index, "phase.ok_failed", i18n.A("ok", ok, "failed", failed))
 			if zip, err := patrol.RoundDone(j.writer, j.spec, e.Index); err != nil {
 				c.audit("job.zip_failed", j.id, err.Error())
-				c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, e.Index, "zip de la ronda: "+err.Error())
+				c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, e.Index, "phase.round_zip_failed", i18n.A("error", err.Error()))
 			} else if zip != "" {
-				c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_PACKAGED, e.Index, zip)
+				c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_PACKAGED, e.Index, "phase.packaged", i18n.A("path", zip))
 			}
 		case "completed", "cancelled":
 			c.finish(j, e.State)
@@ -467,9 +468,9 @@ func (c *Core) finish(j *job, state string) {
 			c.mu.Lock()
 			j.FinishErr = err.Error()
 			c.mu.Unlock()
-			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, 0, "cierre (manifest o zip): "+err.Error())
+			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, 0, "phase.close_failed", i18n.A("error", err.Error()))
 		} else if zip := patrol.FinalZip(w, spec); zip != "" {
-			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_PACKAGED, 0, zip)
+			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_PACKAGED, 0, "phase.packaged", i18n.A("path", zip))
 		}
 	}
 	if v != nil {
@@ -481,7 +482,7 @@ func (c *Core) finish(j *job, state string) {
 		c.audit("power.release", j.id, "")
 	}
 	c.audit("job."+state, j.id, fmt.Sprintf("rondas=%d", rounds))
-	c.addPhase(j, endPhase[state], 0, count(rounds, "ronda", "rondas"))
+	c.addPhase(j, endPhase[state], 0, "phase.rounds", i18n.A("n", rounds))
 	// "closed" sale cuando el manifest y el zip ya existen: es lo que la UI espera para ofrecer el paquete.
 	detail := ""
 	if w != nil {
@@ -491,18 +492,6 @@ func (c *Core) finish(j *job, state string) {
 }
 
 var endPhase = map[string]v1.JobPhaseKind{"completed": v1.JobPhaseKind_JOB_PHASE_KIND_COMPLETED, "cancelled": v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED}
-
-func okFailed(ok, failed int) string {
-	return fmt.Sprintf("%s, %d con fallas", count(ok, "correcto", "correctos"), failed)
-}
-
-// count escribe "1 equipo" o "3 equipos": el detalle de las fases se muestra tal cual en la UI.
-func count(n int, one, many string) string {
-	if n == 1 {
-		return "1 " + one
-	}
-	return fmt.Sprintf("%d %s", n, many)
-}
 
 func (s *patrolSvc) CancelJob(_ context.Context, r *v1.CancelJobRequest) (*v1.CancelJobResponse, error) {
 	s.c.markActive()
@@ -519,19 +508,19 @@ func (s *patrolSvc) CancelJob(_ context.Context, r *v1.CancelJobRequest) (*v1.Ca
 	s.c.mu.Unlock()
 	if created {
 		s.c.guard.Revoke(j.id)
-		s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "antes de armar")
+		s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
 		return &v1.CancelJobResponse{}, nil
 	}
 	s.c.sched.Cancel(j.id)
 	return &v1.CancelJobResponse{}, nil
 }
 
-func (s *patrolSvc) ListJobs(context.Context, *v1.ListJobsRequest) (*v1.ListJobsResponse, error) {
+func (s *patrolSvc) ListJobs(ctx context.Context, _ *v1.ListJobsRequest) (*v1.ListJobsResponse, error) {
 	s.c.mu.Lock()
 	defer s.c.mu.Unlock()
 	r := &v1.ListJobsResponse{}
 	for _, j := range s.c.jobs {
-		r.Jobs = append(r.Jobs, s.c.summary(j))
+		r.Jobs = append(r.Jobs, s.c.summary(i18n.Locale(ctx), j))
 	}
 	return r, nil
 }
@@ -593,7 +582,7 @@ func (s *eventSvc) Subscribe(r *v1.SubscribeRequest, st v1.EventService_Subscrib
 			if !ok {
 				return nil
 			}
-			if err := st.Send(eventToProto(e)); err != nil {
+			if err := st.Send(eventToProto(i18n.Locale(st.Context()), e)); err != nil {
 				return err
 			}
 		}
