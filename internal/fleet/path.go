@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -21,27 +22,29 @@ type Segment struct {
 // PathHop es un equipo alcanzado. Parent -1 es la raíz. Via, OutIf y Segment
 // describen cómo se llegó desde el padre. Status: ok, arrived o cut.
 type PathHop struct {
-	ID      int       `json:"id"`
-	Parent  int       `json:"parent"`
-	Device  string    `json:"device"`
-	Via     string    `json:"via,omitempty"`
-	OutIf   string    `json:"out_if,omitempty"`
-	ECMP    bool      `json:"ecmp,omitempty"`
-	Route   string    `json:"route,omitempty"`
-	Segment *Segment  `json:"segment,omitempty"` // tramo L2 por el que se llegó
-	Final   *Segment  `json:"final,omitempty"`   // tramo L2 hasta el destino (último salto)
-	Status  string    `json:"status"`
-	Reason  string    `json:"reason,omitempty"`
-	Source  string    `json:"source,omitempty"`
-	At      time.Time `json:"at"`
+	ID       int       `json:"id"`
+	Parent   int       `json:"parent"`
+	Device   string    `json:"device"`
+	Via      string    `json:"via,omitempty"`
+	OutIf    string    `json:"out_if,omitempty"`
+	ECMP     bool      `json:"ecmp,omitempty"`
+	Route    string    `json:"route,omitempty"`
+	Segment  *Segment  `json:"segment,omitempty"` // tramo L2 por el que se llegó
+	Final    *Segment  `json:"final,omitempty"`   // tramo L2 hasta el destino (último salto)
+	Status   string    `json:"status"`
+	Reason   string    `json:"reason,omitempty"`
+	ReasonTx i18n.Text `json:"-"`
+	Source   string    `json:"source,omitempty"`
+	At       time.Time `json:"at"`
 }
 
 type PathResult struct {
-	Src      string    `json:"src"`
-	Dst      string    `json:"dst"`
-	Hops     []PathHop `json:"hops"`
-	Arrived  bool      `json:"arrived"`
-	Warnings []string  `json:"warnings"`
+	Src        string      `json:"src"`
+	Dst        string      `json:"dst"`
+	Hops       []PathHop   `json:"hops"`
+	Arrived    bool        `json:"arrived"`
+	Warnings   []string    `json:"warnings"`
+	WarningsTx []i18n.Text `json:"-"`
 }
 
 type rtab struct {
@@ -79,13 +82,13 @@ func (f *Fleet) endpoint(s string) (netip.Addr, bool) {
 // Path sigue la ruta L3 de src a dst con las tablas de rutas recolectadas.
 func (f *Fleet) Path(src, dst string) PathResult {
 	w := f.newWS()
-	w.add("solo tabla global; VRF, PBR y NAT no modelados")
+	w.tx("fleet.warn.global_only")
 	res := PathResult{Src: strings.TrimSpace(src), Dst: strings.TrimSpace(dst)}
 	sa, ok1 := f.endpoint(src)
 	da, ok2 := f.endpoint(dst)
 	if !ok1 || !ok2 {
-		w.add("origen y destino deben ser IP o el nombre de un equipo de la flota (%q → %q)", src, dst)
-		res.Warnings = w.list
+		w.tx("fleet.warn.bad_endpoints", "src", src, "dst", dst)
+		res.Warnings, res.WarningsTx = w.list, w.txs
 		return res
 	}
 	p := &pather{f: f, w: w, g: f.gather(w), rt: map[string]rtab{}, owners: map[string]*Dev{}, res: &res, dst: da}
@@ -93,11 +96,11 @@ func (f *Fleet) Path(src, dst string) PathResult {
 		if routes, e, ok := read(w, d, "show ip route", iosxe.ParseRoute); ok {
 			p.rt[d.Key] = rtab{routes, "show ip route", e.At}
 			for _, ln := range iosxe.RouteUnread(e.Text) {
-				w.add("%s · show ip route: línea con forma de ruta no leída, la tabla puede estar incompleta: %q", d.Name, strings.TrimSpace(ln))
+				w.tx("fleet.warn.route_unread", "dev", d.Name, "line", strings.TrimSpace(ln))
 			}
 		} else if routes, e, ok := read(w, d, "show ip cef", iosxe.ParseCEF); ok {
 			p.rt[d.Key] = rtab{routes, "show ip cef", e.At}
-			w.add("%s: sin show ip route; se usa show ip cef (sin distancia ni códigos de protocolo)", d.Name)
+			w.tx("fleet.warn.cef_fallback", "dev", d.Name)
 		}
 		p.owners[d.IP] = d
 		for _, r := range p.rt[d.Key].routes {
@@ -116,12 +119,13 @@ func (f *Fleet) Path(src, dst string) PathResult {
 	}
 	starts := p.gateways(sa)
 	if len(starts) == 0 {
-		res.Hops = []PathHop{{ID: 0, Parent: -1, Device: sa.String(), Status: "cut", Reason: "ningún equipo de la flota tiene una ruta conectada al origen " + sa.String() + " (sin evidencia del equipo de origen)"}}
-		res.Warnings = w.list
+		res.Hops = []PathHop{{ID: 0, Parent: -1, Device: sa.String(), Status: "cut"}}
+		i18n.Put(&res.Hops[0].Reason, &res.Hops[0].ReasonTx, "fleet.reason.no_source", "src", sa)
+		res.Warnings, res.WarningsTx = w.list, w.txs
 		return res
 	}
 	if len(starts) > 1 {
-		w.add("el origen %s tiene %d puertas de enlace en la flota (%s...); se sigue la primera con ARP del origen", sa, len(starts), starts[0].Name)
+		w.tx("fleet.warn.many_gateways", "src", sa, "n", len(starts), "first", starts[0].Name)
 	}
 	p.walk(starts[0], -1, map[string]bool{}, nil)
 	for _, h := range res.Hops {
@@ -129,7 +133,7 @@ func (f *Fleet) Path(src, dst string) PathResult {
 			res.Arrived = true
 		}
 	}
-	res.Warnings = w.list
+	res.Warnings, res.WarningsTx = w.list, w.txs
 	return res
 }
 
@@ -164,8 +168,22 @@ func (p *pather) add(h PathHop) int {
 	return h.ID
 }
 
-func (p *pather) cut(id int, why string) {
-	p.res.Hops[id].Status, p.res.Hops[id].Reason = "cut", why
+func (p *pather) cut(id int, key string, kv ...any) {
+	h := &p.res.Hops[id]
+	h.Status = "cut"
+	i18n.Put(&h.Reason, &h.ReasonTx, key, kv...)
+}
+
+// cutTx es cut con el motivo ya armado.
+func (p *pather) cutTx(id int, why i18n.Text) {
+	h := &p.res.Hops[id]
+	h.Status, h.Reason, h.ReasonTx = "cut", why.In(i18n.Es), why
+}
+
+func (p *pather) arrived(id int, key string, kv ...any) {
+	h := &p.res.Hops[id]
+	h.Status = "arrived"
+	i18n.Put(&h.Reason, &h.ReasonTx, key, kv...)
 }
 
 func (p *pather) arpMAC(d *Dev, ip string) (string, bool) {
@@ -191,7 +209,7 @@ func (p *pather) segment(d *Dev, iface, ip string) *Segment {
 	mac, ok := p.arpMAC(d, ip)
 	if !ok {
 		s.L2End = "no-arp"
-		p.w.add("%s no tiene %s en su ARP: no se puede ubicar el tramo L2", d.Name, ip)
+		p.w.tx("fleet.warn.no_arp_l2", "dev", d.Name, "ip", ip)
 		return s
 	}
 	s.L2, s.L2End, _ = p.f.walk(p.g, p.w, mac, d)
@@ -206,32 +224,32 @@ func (p *pather) walk(d *Dev, parent int, visited map[string]bool, in *PathHop) 
 	}
 	id := p.add(h)
 	if len(p.res.Hops) > maxPathHops {
-		p.w.add("el camino pasó de %d saltos (ramas ECMP); se corta", maxPathHops)
-		p.cut(id, "demasiados saltos")
+		p.w.tx("fleet.warn.path_hops", "max", maxPathHops)
+		p.cut(id, "fleet.reason.too_many_hops")
 		return
 	}
 	if p.owners[p.dst.String()] == d {
-		p.res.Hops[id].Status, p.res.Hops[id].Reason = "arrived", "el destino es una interfaz de este equipo"
+		p.arrived(id, "fleet.reason.local_dest")
 		return
 	}
 	visited = copySet(visited)
 	visited[d.Key] = true
 	if rt.routes == nil {
-		p.cut(id, "sin show ip route ni show ip cef de "+d.Name)
+		p.cut(id, "fleet.reason.no_routes", "dev", d.Name)
 		return
 	}
 	r, ok := iosxe.LongestMatch(rt.routes, p.dst)
 	if !ok {
-		p.cut(id, "sin ruta a "+p.dst.String()+" en "+d.Name)
+		p.cut(id, "fleet.reason.no_route", "dst", p.dst, "dev", d.Name)
 		return
 	}
 	p.res.Hops[id].Route = fmt.Sprintf("%s %s", r.Code, r.Prefix)
 	if discards(r) {
-		p.cut(id, "descartado (Null0/drop): la ruta "+r.Prefix.String()+" en "+d.Name+" no reenvía")
+		p.cut(id, "fleet.reason.discard", "prefix", r.Prefix, "dev", d.Name)
 		return
 	}
 	if len(r.Hops) == 0 {
-		p.cut(id, "la ruta "+r.Prefix.String()+" en "+d.Name+" no tiene siguiente salto ni interfaz")
+		p.cut(id, "fleet.reason.no_nexthop", "prefix", r.Prefix, "dev", d.Name)
 		return
 	}
 	if r.Connected {
@@ -241,22 +259,22 @@ func (p *pather) walk(d *Dev, parent int, visited map[string]bool, in *PathHop) 
 			p.res.Hops[id].Final = seg
 			if n := len(seg.L2); seg.L2End == "access" && n > 0 {
 				acc := seg.L2[n-1]
-				p.res.Hops[id].Status, p.res.Hops[id].Reason = "arrived", fmt.Sprintf("puerto de acceso %s %s VLAN %s", acc.Device, acc.Port, acc.VLAN)
+				p.arrived(id, "fleet.reason.access_port", "dev", acc.Device, "port", acc.Port, "vlan", acc.VLAN)
 				return
 			}
-			p.cut(id, "red conectada pero el rastreo L2 del destino terminó en: "+seg.L2End)
+			p.cut(id, "fleet.reason.l2_ended", "end", seg.L2End)
 			return
 		}
-		p.w.add("%s no tiene %s en su ARP", d.Name, p.dst)
+		p.w.tx("fleet.warn.no_arp", "dev", d.Name, "ip", p.dst)
 		p.res.Hops[id].Final = &Segment{Interface: iface, L2End: "no-arp"}
-		p.cut(id, "red conectada ("+iface+") pero sin entrada ARP del destino: no se sabe en qué puerto está")
+		p.cut(id, "fleet.reason.no_arp", "iface", iface)
 		return
 	}
 	for _, nh0 := range r.Hops {
 		nh, why := p.resolveHop(d, rt.routes, nh0)
-		if why != "" {
+		if !why.Empty() {
 			cid := p.add(PathHop{Parent: id, Device: nh0.IP, Via: nh0.IP})
-			p.cut(cid, "siguiente salto recursivo no resuelto: "+why)
+			p.cutTx(cid, why)
 			continue
 		}
 		iface := nh.Iface
@@ -268,10 +286,10 @@ func (p *pather) walk(d *Dev, parent int, visited map[string]bool, in *PathHop) 
 		switch {
 		case next == nil:
 			cid := p.add(PathHop{Parent: id, Device: nh.IP, Via: in.Via, OutIf: in.OutIf, ECMP: in.ECMP, Segment: in.Segment})
-			p.cut(cid, "sin evidencia del siguiente equipo (el salto "+nh.IP+" no es de ningún equipo recolectado)")
+			p.cut(cid, "fleet.reason.no_evidence", "nh", nh.IP)
 		case visited[next.Key]:
 			cid := p.add(PathHop{Parent: id, Device: next.Name, Via: in.Via, OutIf: in.OutIf, ECMP: in.ECMP, Segment: in.Segment})
-			p.cut(cid, "bucle de enrutamiento: vuelve a "+next.Name)
+			p.cut(cid, "fleet.reason.routing_loop", "dev", next.Name)
 		default:
 			p.walk(next, id, visited, in)
 		}
@@ -293,35 +311,35 @@ const maxRecurse = 8
 // resolveHop lleva un siguiente salto recursivo (iBGP a un loopback remoto) al
 // salto conectado real con LPM sobre la tabla del mismo equipo. Si no se puede,
 // devuelve el motivo: nunca se salta un equipo intermedio.
-func (p *pather) resolveHop(d *Dev, routes []iosxe.Route, nh iosxe.NextHop) (iosxe.NextHop, string) {
+func (p *pather) resolveHop(d *Dev, routes []iosxe.Route, nh iosxe.NextHop) (iosxe.NextHop, i18n.Text) {
 	cur := nh
 	for range maxRecurse {
 		if cur.Iface != "" {
 			if cur.IP != nh.IP {
-				p.w.add("%s: el siguiente salto %s es recursivo; se resolvió a %s por %s", d.Name, nh.IP, cur.IP, cur.Iface)
+				p.w.tx("fleet.warn.recursive", "dev", d.Name, "nh", nh.IP, "to", cur.IP, "iface", cur.Iface)
 			}
-			return cur, ""
+			return cur, i18n.Text{}
 		}
 		addr, err := netip.ParseAddr(cur.IP)
 		if err != nil {
-			return nh, "el salto " + cur.IP + " no es una IP"
+			return nh, i18n.Tx("fleet.reason.rec_not_ip", "ip", cur.IP)
 		}
 		r, ok := iosxe.LongestMatch(routes, addr)
 		switch {
 		case !ok:
-			return nh, "sin ruta a " + cur.IP + " en " + d.Name
+			return nh, i18n.Tx("fleet.reason.rec_no_route", "ip", cur.IP, "dev", d.Name)
 		case r.Connected:
 			cur.Iface = r.Hops[0].Iface
 		case len(r.Hops) == 0:
-			return nh, "la ruta a " + cur.IP + " no tiene siguiente salto"
+			return nh, i18n.Tx("fleet.reason.rec_no_nexthop", "ip", cur.IP)
 		default:
 			if len(r.Hops) > 1 {
-				p.w.add("%s: el salto recursivo %s tiene %d salidas ECMP; se sigue la primera", d.Name, cur.IP, len(r.Hops))
+				p.w.tx("fleet.warn.recursive_ecmp", "dev", d.Name, "nh", cur.IP, "n", len(r.Hops))
 			}
 			cur = r.Hops[0]
 		}
 	}
-	return nh, "más de " + fmt.Sprint(maxRecurse) + " niveles de recursión"
+	return nh, i18n.Tx("fleet.reason.rec_depth", "n", maxRecurse)
 }
 
 func copySet(m map[string]bool) map[string]bool {

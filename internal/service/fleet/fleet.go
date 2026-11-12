@@ -38,7 +38,7 @@ func (s *fleetSvc) load(action, dir, detail string) (*fleet.Fleet, error) {
 	return f, nil
 }
 
-func (s *fleetSvc) Find(_ context.Context, r *v1.FindRequest) (*v1.FindResponse, error) {
+func (s *fleetSvc) Find(ctx context.Context, r *v1.FindRequest) (*v1.FindResponse, error) {
 	if r.Query == "" {
 		return nil, status.Error(codes.InvalidArgument, "indica una IP, MAC o nombre")
 	}
@@ -47,10 +47,10 @@ func (s *fleetSvc) Find(_ context.Context, r *v1.FindRequest) (*v1.FindResponse,
 		return nil, err
 	}
 	res := f.Find(r.Query)
-	return &v1.FindResponse{Report: service.Report(res, f.FindText(res))}, nil
+	return &v1.FindResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.FindText(res) })}, nil
 }
 
-func (s *fleetSvc) Trace(_ context.Context, r *v1.TraceRequest) (*v1.TraceResponse, error) {
+func (s *fleetSvc) Trace(ctx context.Context, r *v1.TraceRequest) (*v1.TraceResponse, error) {
 	if r.Query == "" {
 		return nil, status.Error(codes.InvalidArgument, "indica una MAC o una IP")
 	}
@@ -59,10 +59,10 @@ func (s *fleetSvc) Trace(_ context.Context, r *v1.TraceRequest) (*v1.TraceRespon
 		return nil, err
 	}
 	res := f.Trace(r.Query)
-	return &v1.TraceResponse{Report: service.Report(res, f.TraceText(res))}, nil
+	return &v1.TraceResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.TraceText(res) })}, nil
 }
 
-func (s *fleetSvc) Path(_ context.Context, r *v1.PathRequest) (*v1.PathResponse, error) {
+func (s *fleetSvc) Path(ctx context.Context, r *v1.PathRequest) (*v1.PathResponse, error) {
 	if r.Query == "" || r.Dst == "" {
 		return nil, status.Error(codes.InvalidArgument, "indica origen y destino")
 	}
@@ -71,28 +71,28 @@ func (s *fleetSvc) Path(_ context.Context, r *v1.PathRequest) (*v1.PathResponse,
 		return nil, err
 	}
 	res := f.Path(r.Query, r.Dst)
-	return &v1.PathResponse{Report: service.Report(res, f.PathText(res)), Svg: res.SVG()}, nil
+	return &v1.PathResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.PathText(res) }), Svg: res.SVG()}, nil
 }
 
-func (s *fleetSvc) Health(_ context.Context, r *v1.HealthRequest) (*v1.HealthResponse, error) {
+func (s *fleetSvc) Health(ctx context.Context, r *v1.HealthRequest) (*v1.HealthResponse, error) {
 	f, err := s.load("health", r.Dir, "")
 	if err != nil {
 		return nil, err
 	}
 	res := f.Health()
-	return &v1.HealthResponse{Report: service.Report(res, f.HealthText(res))}, nil
+	return &v1.HealthResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.HealthText(res) })}, nil
 }
 
-func (s *fleetSvc) Summary(_ context.Context, r *v1.SummaryRequest) (*v1.SummaryResponse, error) {
+func (s *fleetSvc) Summary(ctx context.Context, r *v1.SummaryRequest) (*v1.SummaryResponse, error) {
 	f, err := s.load("summary", r.Dir, "")
 	if err != nil {
 		return nil, err
 	}
 	res := f.Summary()
-	return &v1.SummaryResponse{Report: service.Report(res, f.SummaryText(res))}, nil
+	return &v1.SummaryResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.SummaryText(res) })}, nil
 }
 
-func (s *fleetSvc) Capacity(_ context.Context, r *v1.CapacityRequest) (*v1.CapacityResponse, error) {
+func (s *fleetSvc) Capacity(ctx context.Context, r *v1.CapacityRequest) (*v1.CapacityResponse, error) {
 	var need int64
 	if r.Need != "" {
 		n, err := fleet.ParseSize(r.Need)
@@ -106,16 +106,16 @@ func (s *fleetSvc) Capacity(_ context.Context, r *v1.CapacityRequest) (*v1.Capac
 		return nil, err
 	}
 	res := f.Capacity(need)
-	return &v1.CapacityResponse{Report: service.Report(res, f.CapacityText(res))}, nil
+	return &v1.CapacityResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.CapacityText(res) })}, nil
 }
 
-func (s *fleetSvc) Inventory(_ context.Context, r *v1.InventoryRequest) (*v1.InventoryResponse, error) {
+func (s *fleetSvc) Inventory(ctx context.Context, r *v1.InventoryRequest) (*v1.InventoryResponse, error) {
 	f, err := s.load("inventory", r.Dir, "")
 	if err != nil {
 		return nil, err
 	}
 	res := f.Inventory()
-	return &v1.InventoryResponse{Report: service.Report(res, f.InventoryText(res)), Csv: res.CSV(), Markdown: res.Markdown()}, nil
+	return &v1.InventoryResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.InventoryText(res) }), Csv: res.CSV(), Markdown: res.Markdown()}, nil
 }
 
 // Module registra el servicio Fleet.
