@@ -38,7 +38,7 @@ type TransferServeDTO struct {
 func (b *Bridge) TransferServe(d TransferServeDTO) (string, error) {
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewTransferServiceClient(c).StartServer(ctx, &v1.StartServerRequest{Protocol: d.Protocol, Listen: d.Listen, AllowAny: d.AllowAny,
@@ -46,7 +46,7 @@ func (b *Bridge) TransferServe(d TransferServeDTO) (string, error) {
 		DurationSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH, PassivePortMin: uint32(d.PassiveMin), PassivePortMax: uint32(d.PassiveMax)})
 	if err != nil {
 		b.finish(id, cancel)
-		return "", err
+		return "", wrapErr(err)
 	}
 	go func() {
 		defer b.finish(id, cancel)
@@ -57,6 +57,7 @@ func (b *Bridge) TransferServe(d TransferServeDTO) (string, error) {
 				ev := map[string]any{"runId": id}
 				if ctx.Err() == nil && err != io.EOF {
 					ev["error"] = err.Error()
+					ev["errorInfo"] = errorInfo(err)
 				}
 				if cleanup != "" {
 					ev["cleanup"] = cleanup // cómo quitar la regla de nftables de este servidor
@@ -281,7 +282,7 @@ func (b *Bridge) runTransfer(id string, ctx context.Context, cancel context.Canc
 			case ctx.Err() != nil:
 				m["canceled"] = true
 			default:
-				m["error"] = err.Error()
+				m["error"], m["errorInfo"] = err.Error(), errorInfo(err)
 			}
 			b.emit("transfer:finished", m)
 			return
@@ -297,7 +298,7 @@ func (b *Bridge) runTransfer(id string, ctx context.Context, cancel context.Canc
 func (b *Bridge) TransferGetAsync(d TransferGetDTO) (string, error) {
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewTransferServiceClient(c).GetStream(ctx, &v1.GetStreamRequest{Request: &v1.GetRequest{Url: d.URL, DestDir: d.DestDir, Name: d.Name, CredentialId: d.CredentialID,
@@ -305,7 +306,7 @@ func (b *Bridge) TransferGetAsync(d TransferGetDTO) (string, error) {
 		TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH}})
 	if err != nil {
 		b.finish(id, cancel)
-		return "", err
+		return "", wrapErr(err)
 	}
 	go b.runTransfer(id, ctx, cancel, func() (*v1.TransferEvent, error) {
 		r, err := st.Recv()
@@ -317,14 +318,14 @@ func (b *Bridge) TransferGetAsync(d TransferGetDTO) (string, error) {
 func (b *Bridge) TransferPutAsync(d TransferPutDTO) (string, error) {
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewTransferServiceClient(c).PutStream(ctx, &v1.PutStreamRequest{Request: &v1.PutRequest{Url: d.URL, FromDir: d.FromDir, Name: d.Name, CredentialId: d.CredentialID,
 		AcceptedHostKeyFingerprints: d.HostKeys, MaxBytes: d.MaxBytes, TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH}})
 	if err != nil {
 		b.finish(id, cancel)
-		return "", err
+		return "", wrapErr(err)
 	}
 	go b.runTransfer(id, ctx, cancel, func() (*v1.TransferEvent, error) {
 		r, err := st.Recv()
@@ -338,14 +339,14 @@ func (b *Bridge) TransferPutAsync(d TransferPutDTO) (string, error) {
 func (b *Bridge) TransferGetMany(d TransferGetManyDTO) (string, error) {
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewTransferServiceClient(c).GetMany(ctx, &v1.GetManyRequest{Url: d.URL, Names: d.Names, DestDir: d.DestDir, CredentialId: d.CredentialID,
 		AcceptedHostKeyFingerprints: d.HostKeys, Insecure: d.Insecure, MaxBytes: d.MaxBytes, TimeoutSeconds: int32(d.Seconds), LegacySsh: d.LegacySSH})
 	if err != nil {
 		b.finish(id, cancel)
-		return "", err
+		return "", wrapErr(err)
 	}
 	go b.runTransfer(id, ctx, cancel, func() (*v1.TransferEvent, error) {
 		r, err := st.Recv()

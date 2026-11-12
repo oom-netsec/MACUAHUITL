@@ -5,6 +5,7 @@
 id: l1-err-disabled
 platform: ios-xe
 name: L1 · Err-disabled
+name_en: L1 · Err-disabled
 commands:
   - cmd: show clock
   - cmd: show interfaces status err-disabled

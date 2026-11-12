@@ -126,7 +126,7 @@ func (fn Function) allows(line string) bool {
 func asciiOnly(s string) error {
 	for _, r := range s {
 		if r < 0x20 || r > 0x7e {
-			return fmt.Errorf("%q: tiene caracteres fuera de ASCII imprimible (0x20-0x7e)", s)
+			return vbad("ascii", "value", s)
 		}
 	}
 	return nil

@@ -11,6 +11,7 @@ import (
 	"embed"
 	"io/fs"
 	"log"
+	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -25,6 +26,11 @@ var assets embed.FS
 //go:embed icon.png
 var icon []byte
 
+// coreLocalize es la bandera core.localize: con true el puente manda el idioma de la interfaz (preferencia ui.language) en
+// accept-language y el núcleo contesta en ese idioma. Apagada por omisión: la interfaz aún lee texto en español del núcleo.
+// El front la enciende aquí cuando termine de migrar; para probar sin recompilar, MACUAHUITL_CORE_LOCALIZE=1.
+const coreLocalize = false
+
 func main() {
 	dist, err := fs.Sub(assets, "frontend/dist")
 	if err != nil {
@@ -33,6 +39,7 @@ func main() {
 	var app *application.App
 	b := bridge.New(func() (*ipc.ClientConn, error) { return ipc.Dial(context.Background()) },
 		func(name string, data any) { app.Event.Emit(name, data) })
+	b.Localize = coreLocalize || os.Getenv("MACUAHUITL_CORE_LOCALIZE") == "1"
 	app = application.New(application.Options{
 		Name: "MACUAHUITL",
 		Icon: icon,

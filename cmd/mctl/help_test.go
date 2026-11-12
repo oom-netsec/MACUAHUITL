@@ -47,3 +47,18 @@ func TestAreasTable(t *testing.T) {
 		t.Errorf("faltan comandos: %d", len(seen))
 	}
 }
+
+// Con la bandera de idioma delante, --help, -h, help y --version siguen siendo ayuda y versión, no un error de uso.
+func TestAyudaConLang(t *testing.T) {
+	want, _ := os.ReadFile("testdata/help.golden")
+	for _, pre := range [][]string{{"--lang", "en"}, {"--lang=es"}, {"--no-color", "--lang", "en"}} {
+		for _, arg := range []string{"--help", "-h", "help"} {
+			if out := must(t, "", append(append([]string{}, pre...), arg)...); out != string(want) {
+				t.Errorf("mctl %v %s: no mostró la ayuda:\n%s", pre, arg, out)
+			}
+		}
+		if out := must(t, "", append(append([]string{}, pre...), "--version")...); out != must(t, "", "--version") {
+			t.Errorf("mctl %v --version: %q", pre, out)
+		}
+	}
+}

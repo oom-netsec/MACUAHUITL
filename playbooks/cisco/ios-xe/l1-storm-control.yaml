@@ -5,6 +5,7 @@
 id: l1-storm-control
 platform: ios-xe
 name: L1 · Storm control
+name_en: L1 · Storm control
 commands:
   - cmd: show clock
   - cmd: show storm-control

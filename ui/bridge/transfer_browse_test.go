@@ -99,7 +99,7 @@ func TestTransferAsyncBridge(t *testing.T) {
 	rec.waitFor(t, `transfer:file {"index":0,"name":"a.bin","ok":true,"result":{"path":"/d/a.bin","bytes":100,"md5":"","sha256":"","verified":"","seconds":0,"report":""},"runId":"`+id+`"}`)
 	rec.waitFor(t, `transfer:finished {"runId":"`+id+`"}`)
 	id, _ = b.TransferGetAsync(TransferGetDTO{URL: "ftp://10.0.0.1/falla"})
-	rec.waitFor(t, `transfer:finished {"error":"rpc error: code = Unavailable desc = se cayó","runId":"`+id+`"}`)
+	rec.waitFor(t, `transfer:finished {"error":"rpc error: code = Unavailable desc = se cayó","errorInfo":{"code":"Unavailable","metadata":{},"reason":""},"runId":"`+id+`"}`)
 	id, _ = b.TransferPutAsync(TransferPutDTO{URL: "ftp://10.0.0.1/x", FromDir: "/f", Name: "r1.cfg"})
 	rec.waitFor(t, `transfer:finished {"runId":"`+id+`"}`)
 }

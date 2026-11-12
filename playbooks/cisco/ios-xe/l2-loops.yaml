@@ -5,6 +5,7 @@
 id: l2-loops
 platform: ios-xe
 name: L2 · Loops de capa 2
+name_en: L2 · Layer 2 loops
 commands:
   - cmd: show clock
   - cmd: show spanning-tree summary

@@ -5,6 +5,7 @@
 id: plat-stack
 platform: ios-xe
 name: Plataforma · Stack
+name_en: Platform · Stack
 commands:
   - cmd: show clock
   - cmd: show switch

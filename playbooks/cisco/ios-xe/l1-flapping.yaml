@@ -5,6 +5,7 @@
 id: l1-flapping
 platform: ios-xe
 name: L1 · Flapping de enlace
+name_en: L1 · Link flapping
 commands:
   - cmd: show clock
   - cmd: show interfaces status

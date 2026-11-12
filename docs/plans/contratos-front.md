@@ -738,3 +738,58 @@ Para la pantalla Ajustes. Son preferencias tipadas, aparte de `getPreference`/`s
 - **Campo `platforms` por comando de un playbook.** Opcional: `platforms: [ios-xe]` hace que el comando solo corra si la plataforma detectada está en la lista; vacío = en todas las compatibles. Una plataforma desconocida hace fallar la carga con el nombre del archivo. El comando omitido no corre y queda en el `manifest.json`, en `devices[].Skipped` (texto de cada comando omitido por plataforma). `dir bootflash:` lo lleva en `upgrade-check`, `plat-flash-fs`, `flota` y `plat-reloads-crashinfo`. `listPlaybooks` con `platform: ios` devuelve los de `ios-xe` (misma regla que al ejecutar) y sin los comandos que ahí no corren.
 - **FTP: ruta remota con `/` inicial = absoluta** (decisión del 2026-11-12), igual que SCP y SFTP; sin `/` es relativa a la carpeta de inicio. En la URL la absoluta lleva `//` (`ftp://host//x/y`); la vista la arma así (`buildURL`) y `getMany` conserva el `//` de la carpeta del lote. El campo de listado `path` ya iba tal cual (`CWD /x/y` absoluta, `CWD x/y` relativa).
 - **Tipo de trabajo (`kind`).** `JobSpec.kind` (15) y `JobSummary.kind` (14), y `kind` en el DTO de `listJobs` del puente. Valores cerrados: `patrol` (vacío en la spec = patrol), `adhoc`, `backup`, `change`; cada servicio pone el suyo y `createJob` rechaza otro valor con `InvalidArgument`. Se persiste con el trabajo; uno guardado antes de la fase sale como `patrol`. El resumen siempre trae un valor (nunca vacío).
+
+## Idioma del núcleo: errores con código estable, fases y nombres de playbooks (fase 30a)
+
+Paso 1 de 3 del inventario `docs/plans/2026-11-07-idioma-nucleo.md`: la infraestructura y los primeros códigos. El núcleo ya no obliga a leer su texto en español para saber qué pasó: cada error migrado lleva un **reason** estable y su **metadata**, y con el idioma pedido el texto sale en inglés.
+
+### Regla de compatibilidad
+Sin el metadato `accept-language`, o con `es` (o con cualquier idioma que no sea `en`), cada respuesta del núcleo es **idéntica byte por byte** a la de antes de la fase: mismos mensajes de error, mismos detalles de fase, mismos nombres. Lo único que cambia son campos nuevos (`reason`, `args`, la metadata del error). Lo fijan pruebas de regresión con el texto en español literal. El front puede seguir parseando texto mientras no encienda la bandera.
+
+### Cómo se activa: `core.localize`
+- La bandera vive en el puente: `Bridge.Localize` (Go), apagada por omisión. En `ui/main.go` es la constante `coreLocalize` (`false`); la sesión de front la pasa a `true` cuando termine de migrar. Para probar sin recompilar: `MACUAHUITL_CORE_LOCALIZE=1` al lanzar la app.
+- Encendida, **toda** llamada y todo stream del puente lleva `accept-language` con el valor de la preferencia `ui.language` (`es` o `en`; sin valor guardado o desconocido = `es`). El puente la lee una vez y la mantiene al día cuando `setPreference("ui.language", v)` pasa por él; si la interfaz no guarda esa preferencia, no hay idioma que mandar y todo sale en español.
+- `ui.language` es una clave nueva de `getPreference`/`setPreference` (la lista cerrada la acepta; el núcleo solo guarda `es` o `en` y rechaza cualquier otro valor con `InvalidArgument`).
+- El núcleo acepta `es`, `en`, `es-MX`, `en-US`… y listas con `q` (`fr, en;q=0.8` da `en`); ausente o desconocido es `es`.
+- **La auditoría no depende del idioma** (decisión del 2026-11-12, rama 30a-2): su detalle irá fijo en inglés; esta fase no toca sus textos y la infraestructura no los pasa por el catálogo.
+- CLI: `mctl --lang es|en` (también `-lang`, `--lang=en` y etiquetas como `en-US`) es una bandera global que solo vale **antes** del comando; un valor que no sea idioma es un error (no se come el nombre del comando). **mctl no lee `LC_ALL`, `LC_MESSAGES` ni `LANG`**: mientras sus textos propios sigan en español, pedir un idioma solo con `--lang` evita mezclarlos; sin la bandera todo sale en español.
+
+### Forma exacta del error en TS
+Todo método del puente que devuelve `error` rechaza la promesa con un `RuntimeError` de Wails cuyo `message` es el texto de siempre (`rpc error: code = X desc = …` para lo que viene del núcleo) y cuyo **`cause`** es:
+
+```ts
+interface CoreError {
+  message: string;                   // el mismo texto que e.message
+  code: string;                      // código gRPC por nombre: "InvalidArgument", "AlreadyExists"…; "" si no vino del núcleo (p. ej. «núcleo desconectado»)
+  reason: string;                    // motivo estable de abajo; "" si el error aún no tiene código
+  metadata: Record<string, string>;  // argumentos del motivo; {} si no hay. Nunca trae secretos ni valores de campos secretos
+}
+// const info = (e as { cause?: CoreError }).cause;
+```
+`reason` y `metadata` salen del `ErrorInfo` (`domain: "macuahuitl"`) que el núcleo agrega a los detalles del error gRPC junto con un `LocalizedMessage`. Un error sin reason sigue siendo texto en español (o el del idioma pedido, si ya tiene código).
+
+**Eventos de cierre de los streams.** Los RPC de servidor (syslog, traps, flujos, diag, consola, serve, transferencias, terminal y asistente) devuelven su error de validación en el primer `Recv()`, y el puente lo emite en el evento `*:done` (`syslog:done`, `traps:done`, `flows:done`, `diag:done`, `console:done`, `serve:done`, `transfer:done`, `terminal:done`, `assist:done` y `transfer:finished`) como `{runId, error, errorInfo, ...}`. `error` sigue siendo el texto de siempre; `errorInfo` es `{code: string, reason: string, metadata: Record<string,string>}` (la misma forma que `CoreError` sin `message`; `metadata` nunca es `null`) y solo está cuando hay `error`.
+
+### Reasons y metadata de esta fase
+| reason | code gRPC | metadata |
+|---|---|---|
+| `ingest.invalid` | `InvalidArgument` (al validar; `Unavailable` si lo detecta la escucha ya abierta) | `field` y, según el campo, `min`, `max`, `value`, `template_problem` |
+| `file.exists` | `AlreadyExists` | `path` |
+| `assist.invalid_value` | `InvalidArgument` | `template`, `field` y `why` del **primer** problema |
+| `assist.refused` | `FailedPrecondition` | `template` (id de la plantilla del catálogo, el mismo que en `assist.invalid_value`; `vlan`, `trunk` y `svi` para esos snippets) y `device` |
+
+- **`ingest.invalid`** (syslog, traps SNMP, flujos y los defaults de `setCorePrefs`). `field` ∈ `rate_per_source`, `burst_per_source`, `rate_global`, `burst_global`, `queue_size` (con `min`, `max` y `value`), `rotate_mb` (`min` 1, `max` 1024), `rotate_minutes` (1, 10080), `max_files` (1, 1000), `format` (con `value`), `protocol` (con `value`; solo syslog), `addr` (dirección de escucha: formato, puerto, privilegiado, host, todas las interfaces) y `name_template`; además `dir` si falta la carpeta de salida (no lo manda la interfaz). Para `name_template` viene `template_problem` ∈ `len` (con `min` 1 y `max` 64), `need` (falta `{fecha}` o `{hora}`), `tokens`, `chars` (con `ch`, el carácter) y `dots`. Reemplaza el `grep` de «tasa por origen», «plantilla», «dirección inválida»… de `ingestOpts.ts`.
+- **Sinónimos de la plantilla del nombre:** `{date}`, `{time}` y `{source}` valen igual que `{fecha}`, `{hora}` y `{origen}`, en la validación, en el nombre del archivo y en la retención (que reconoce los archivos de la misma plantilla escrita de cualquiera de las dos formas, y también mezclada). Siguen siendo sintaxis del usuario; el núcleo no las traduce en lo que escribe.
+- **`file.exists`**: los export de scripts, colecciones, hosts y respaldo de bóveda con `overwrite: false`, y `writeFile` del puente. Reemplaza `/ya existe/` de `lib/core.ts`: usa `reason === "file.exists"`. Los textos de hoy se conservan (`el archivo ya existe`, `vault: el archivo de respaldo ya existe`, `guardar: el archivo ya existe`).
+- **`assist.invalid_value`**: `why` ∈ `required`, `range`, `pattern`, `choice`, `type`, `unknown_field`. El texto junta todos los problemas con «; » y lleva el prefijo `assist: valores del snippet inválidos: ` (en inglés, `assist: invalid snippet values: `); la metadata describe solo el primero. Los secretos nunca van en la metadata ni en el texto. **`assist.refused`**: el texto es `assist: el equipo no admite este snippet: <motivo>`; el motivo concreto sigue en español hasta su fase de traducción (pasos 2 y 3).
+
+**Prefijos de envoltorio.** Con `en` el mensaje es el del catálogo y se pierden los prefijos con que otras capas envuelven el error (`flows: `, `snmp traps: `, `syslogd: ` cuando no es parte del texto). Con `es` el texto es el de siempre, envoltorios incluidos. La interfaz no debe depender de esos prefijos: use `reason` y `metadata`.
+
+### Detalle de las fases del Job
+- `JobPhase` gana `reason` y `args` (campos 5 y 6, sin renumerar); el puente los expone en `PhaseDTO` como `reason` y `args` (ausentes si la fase no lleva detalle) y en los eventos `phaseAdded` (protojson).
+- `detail` sigue siendo el texto de hoy en `es` y sale traducido con `en`. Las fases guardadas antes de esta fase no traen `reason` y salen siempre en español.
+- Reasons y args: `phase.devices {n}`, `phase.devices_excluded {n, excluded}`, `phase.ok_failed {ok, failed}`, `phase.rounds {n}`, `phase.packaged {path}`, `phase.round_zip_failed {error}`, `phase.close_failed {error}`, `phase.before_arming {}`, `phase.core_stopped {}`. (`error` y `path` vienen tal cual del sistema; no se traducen.)
+- Quedan fuera de esta fase, y siguen en español: `DeviceStateChanged.detail`, los `detail` de los equipos de `GetRun` y los motivos de los demás servicios del inventario.
+
+### Nombres de playbooks
+Los YAML de `playbooks/` llevan `name_en` (obligatorio en los incrustados; una prueba falla si falta). `listPlaybooks` devuelve `name` en el idioma del contexto: `es` es el nombre de siempre y `en` es `name_en`, con la misma separación « · » entre el área y el nombre, así la agrupación del selector no cambia. Un playbook del usuario sin `name_en` sale con su nombre en los dos idiomas.

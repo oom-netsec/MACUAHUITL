@@ -5,6 +5,7 @@
 id: svc-acl
 platform: ios-xe
 name: Servicios · ACL
+name_en: Services · ACL
 commands:
   - cmd: show clock
   - cmd: show access-lists

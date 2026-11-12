@@ -5,6 +5,7 @@
 id: l3-nat
 platform: ios-xe
 name: L3 · NAT
+name_en: L3 · NAT
 commands:
   - cmd: show clock
   - cmd: show ip nat statistics

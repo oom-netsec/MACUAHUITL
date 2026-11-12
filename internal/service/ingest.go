@@ -2,12 +2,12 @@ package service
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
@@ -34,21 +34,24 @@ type IngestOpts struct {
 func minutes(n int32) time.Duration { return time.Duration(max(-1, min(n, 1<<20))) * time.Minute }
 
 // ValidateIngestDefaults comprueba los rangos de las preferencias con las mismas reglas del archivo.
-func ValidateIngestDefaults(d IngestDefaults) error {
+func ValidateIngestDefaults(ctx context.Context, d IngestDefaults) error {
 	s := ingest.Sink{Dir: "x", Template: "t_{fecha}", RotateBytes: int64(d.RotateMB) << 20,
 		RotateEvery: minutes(d.RotateMinutes), MaxFiles: int(d.MaxFiles), Format: d.Format}
 	if s.MaxFiles == 0 {
 		s.MaxFiles = 1
 	}
-	return s.Validate()
+	if err := s.Validate(); err != nil {
+		return ErrFrom(ctx, codes.InvalidArgument, err)
+	}
+	return nil
 }
 
 // Build valida los rangos y arma los topes y el archivo (en dir) con los defaults;
 // defTemplate es el nombre por omisión de cada receptor.
-func (o IngestOpts) Build(dir, defTemplate string) (ingest.Limits, ingest.Sink, error) {
+func (o IngestOpts) Build(ctx context.Context, dir, defTemplate string) (ingest.Limits, ingest.Sink, error) {
 	lim := ingest.Limits{PerSource: int(o.RatePerSource), PerSourceBurst: int(o.BurstPerSource), Global: int(o.RateGlobal), GlobalBurst: int(o.BurstGlobal), Queue: int(o.QueueSize)}
 	if err := lim.Validate(); err != nil {
-		return lim, ingest.Sink{}, status.Error(codes.InvalidArgument, err.Error())
+		return lim, ingest.Sink{}, ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	if lim.PerSource == 0 {
 		lim.PerSource = o.DefPerSource
@@ -76,7 +79,7 @@ func (o IngestOpts) Build(dir, defTemplate string) (ingest.Limits, ingest.Sink, 
 		sink.Format = cmp.Or(o.Prefs.Format, "texto")
 	}
 	if err := sink.Validate(); err != nil {
-		return lim, sink, status.Error(codes.InvalidArgument, err.Error())
+		return lim, sink, ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	return lim, sink, nil
 }

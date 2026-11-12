@@ -5,6 +5,7 @@
 id: vpn-ipsec-ike
 platform: ios-xe
 name: VPN · IPsec/IKE
+name_en: VPN · IPsec/IKE
 commands:
   - cmd: show clock
   - cmd: show crypto session

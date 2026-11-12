@@ -30,7 +30,7 @@ type termSess struct {
 func (b *Bridge) TerminalOpen(d TerminalDTO) (string, error) {
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewTerminalServiceClient(c).OpenTerminal(ctx)
@@ -40,7 +40,7 @@ func (b *Bridge) TerminalOpen(d TerminalDTO) (string, error) {
 	}
 	if err != nil {
 		b.finish(id, cancel)
-		return "", err
+		return "", wrapErr(err)
 	}
 	b.mu.Lock()
 	if b.terminals == nil {
@@ -61,6 +61,7 @@ func (b *Bridge) TerminalOpen(d TerminalDTO) (string, error) {
 				ev := map[string]any{"runId": id}
 				if ctx.Err() == nil && err != io.EOF {
 					ev["error"] = err.Error()
+					ev["errorInfo"] = errorInfo(err)
 				}
 				b.emit("terminal:done", ev)
 				return
@@ -80,11 +81,11 @@ func (b *Bridge) terminal(id string, f func(st v1.TerminalService_OpenTerminalCl
 	s, ok := b.terminals[id]
 	b.mu.Unlock()
 	if !ok {
-		return fmt.Errorf("terminal %q no existe o ya terminó", id)
+		return wrapErr(fmt.Errorf("terminal %q no existe o ya terminó", id))
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return f(s.st)
+	return wrapErr(f(s.st))
 }
 
 func (b *Bridge) TerminalSend(id, data string) error {

@@ -51,11 +51,11 @@ type RadiusDTO struct {
 func (b *Bridge) SecRadius(d RadiusDTO) (string, error) {
 	ap, err := port(d.AuthPort)
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	cp, err := port(d.AcctPort)
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewSecurityServiceClient(c).RadiusTest(ctx, &v1.RadiusTestRequest{Host: d.Host, AuthPort: ap, AcctPort: cp,
@@ -82,7 +82,7 @@ type TacacsDTO struct {
 func (b *Bridge) SecTacacs(d TacacsDTO) (string, error) {
 	p, err := port(d.Port)
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewSecurityServiceClient(c).TacacsTest(ctx, &v1.TacacsTestRequest{Host: d.Host, Port: p, SharedSecret: source(d.SecretCredID, d.Secret),
@@ -164,7 +164,7 @@ type ExportDTO struct {
 // una descarga confiable para binarios como PKCS#12.
 func (b *Bridge) SecPkiExport(d ExportDTO) (string, error) {
 	if !filepath.IsAbs(d.Path) {
-		return "", fmt.Errorf("la ruta de salida debe ser absoluta")
+		return "", wrapErr(fmt.Errorf("la ruta de salida debe ser absoluta"))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewSecurityServiceClient(c).PkiExport(ctx, &v1.PkiExportRequest{Format: d.Format, CertPem: d.Cert, ChainPem: d.Chain,

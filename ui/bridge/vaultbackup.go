@@ -56,19 +56,19 @@ func (b *Bridge) ExportVaultBackup(path, passphrase string, overwrite, confirm b
 // regular de 0 bytes en esa ruta exacta (sin seguir enlaces); cualquier otra cosa es un error y no se toca. Que ya no exista no es error.
 func (b *Bridge) RemoveEmptyFile(path string) error {
 	if !filepath.IsAbs(path) {
-		return errors.New("la ruta debe ser absoluta")
+		return wrapErr(errors.New("la ruta debe ser absoluta"))
 	}
 	fi, err := os.Lstat(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
 	if err != nil {
-		return err
+		return wrapErr(err)
 	}
 	if !fi.Mode().IsRegular() || fi.Size() != 0 {
-		return errors.New("solo se borra un archivo regular vacío")
+		return wrapErr(errors.New("solo se borra un archivo regular vacío"))
 	}
-	return os.Remove(path)
+	return wrapErr(os.Remove(path))
 }
 
 // PreviewVaultBackupImport abre el respaldo y da el estado de cada credencial; no escribe nada.

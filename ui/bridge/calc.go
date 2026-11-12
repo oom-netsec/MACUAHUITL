@@ -57,7 +57,7 @@ var calcRPCs = map[string]calcFn{
 func (b *Bridge) Calc(kind, reqJSON string) (CalcResultDTO, error) {
 	f, ok := calcRPCs[kind]
 	if !ok {
-		return CalcResultDTO{}, fmt.Errorf("calculadora %q desconocida", kind)
+		return CalcResultDTO{}, wrapErr(fmt.Errorf("calculadora %q desconocida", kind))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (CalcResultDTO, error) {
 		r, err := f(ctx, v1.NewCalcServiceClient(c), reqJSON)

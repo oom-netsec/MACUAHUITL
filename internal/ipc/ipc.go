@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 var ErrAlreadyRunning = errors.New("ipc: ya hay un núcleo escuchando en el socket")
@@ -122,23 +123,41 @@ const MaxMsg = 16 << 20
 
 // NewServer crea el servidor gRPC del núcleo. Sin TLS: el canal es un socket Unix local
 // protegido por permisos y SO_PEERCRED.
-func NewServer() *grpc.Server {
-	return grpc.NewServer(grpc.MaxRecvMsgSize(MaxMsg), grpc.MaxSendMsgSize(MaxMsg))
+func NewServer(opts ...grpc.ServerOption) *grpc.Server {
+	return grpc.NewServer(append([]grpc.ServerOption{grpc.MaxRecvMsgSize(MaxMsg), grpc.MaxSendMsgSize(MaxMsg)}, opts...)...)
 }
 
 // Dial conecta al núcleo del usuario actual.
-func Dial(ctx context.Context) (*grpc.ClientConn, error) {
+func Dial(ctx context.Context, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	p, err := SocketPath()
 	if err != nil {
 		return nil, err
 	}
-	return DialPath(p)
+	return DialPath(p, opts...)
 }
 
 // DialPath conecta a un socket concreto (pruebas y diagnóstico).
-func DialPath(path string) (*grpc.ClientConn, error) {
-	return grpc.NewClient("unix://"+path, grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MaxMsg), grpc.MaxCallSendMsgSize(MaxMsg)))
+func DialPath(path string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	return grpc.NewClient("unix://"+path, append([]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(MaxMsg), grpc.MaxCallSendMsgSize(MaxMsg))}, opts...)...)
+}
+
+// DialOption y WithLanguage dejan a un cliente pedir el idioma del núcleo sin tocar cada llamada: toda llamada,
+// unaria o de stream, lleva el metadato accept-language.
+type DialOption = grpc.DialOption
+
+func WithLanguage(lang string) []DialOption {
+	add := func(ctx context.Context) context.Context {
+		return metadata.AppendToOutgoingContext(ctx, "accept-language", lang)
+	}
+	return []DialOption{
+		grpc.WithChainUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+			return invoker(add(ctx), method, req, reply, cc, opts...)
+		}),
+		grpc.WithChainStreamInterceptor(func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+			return streamer(add(ctx), desc, cc, method, opts...)
+		}),
+	}
 }
 
 // Alias para que el núcleo y los clientes usen gRPC sin importar red (noegress).
@@ -150,8 +169,8 @@ type (
 
 // Serve registra los servicios y atiende l hasta que ctx termine. Al terminar espera
 // a las llamadas en curso como máximo 2 s: un stream de eventos abierto no frena el apagado.
-func Serve(ctx context.Context, l Listener, register func(Registrar)) error {
-	s := NewServer()
+func Serve(ctx context.Context, l Listener, register func(Registrar), opts ...grpc.ServerOption) error {
+	s := NewServer(opts...)
 	register(s)
 	go func() {
 		<-ctx.Done()

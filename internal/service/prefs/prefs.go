@@ -18,7 +18,7 @@ import (
 )
 
 // prefKeys es la lista cerrada de preferencias aceptadas; agregar una aquí al crear su pantalla.
-var prefKeys = map[string]bool{"terminal": true}
+var prefKeys = map[string]bool{"terminal": true, "ui.language": true}
 
 const maxPrefValue = 4096
 
@@ -52,6 +52,9 @@ func (s *prefsSvc) SetPreference(_ context.Context, r *v1.SetPreferenceRequest) 
 	if !okKey(r.Key) {
 		return nil, status.Error(codes.InvalidArgument, "clave de preferencia inválida")
 	}
+	if r.Key == "ui.language" && r.Value != "es" && r.Value != "en" {
+		return nil, status.Error(codes.InvalidArgument, "ui.language debe ser es o en")
+	}
 	if len(r.Value) > maxPrefValue {
 		return nil, status.Error(codes.InvalidArgument, "valor de preferencia mayor de 4 KiB")
 	}
@@ -81,13 +84,13 @@ func (s *prefsSvc) GetCorePrefs(context.Context, *v1.GetCorePrefsRequest) (*v1.G
 }
 
 // SetCorePrefs reemplaza las preferencias del núcleo: lo que va en 0 o vacío vuelve al de fábrica.
-func (s *prefsSvc) SetCorePrefs(_ context.Context, r *v1.SetCorePrefsRequest) (*v1.SetCorePrefsResponse, error) {
+func (s *prefsSvc) SetCorePrefs(ctx context.Context, r *v1.SetCorePrefsRequest) (*v1.SetCorePrefsResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	in := r.GetPrefs().GetIngestDefaults()
 	ing := service.IngestDefaults{RotateMB: in.GetRotateMb(), RotateMinutes: in.GetRotateMinutes(), MaxFiles: in.GetMaxFiles(), Format: in.GetFormat()}
-	if err := service.ValidateIngestDefaults(ing); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	if err := service.ValidateIngestDefaults(ctx, ing); err != nil {
+		return nil, err
 	}
 	st := s.d.Settings()
 	oldOut, oldIng := st.Configured()

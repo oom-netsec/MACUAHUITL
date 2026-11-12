@@ -5,6 +5,7 @@
 id: l3-eigrp
 platform: ios-xe
 name: L3 · EIGRP
+name_en: L3 · EIGRP
 commands:
   - cmd: show clock
   - cmd: show ip protocols | section eigrp

@@ -1,6 +1,7 @@
 id: upgrade-check
 platform: ios-xe
 name: Cambio · Verificación previa a upgrade
+name_en: Change · Pre-upgrade check
 # Solo lectura. Las salidas alimentan mctl upgrade check; el verify /md5 depende de
 # la imagen y se pide aparte (también es de lectura).
 commands:

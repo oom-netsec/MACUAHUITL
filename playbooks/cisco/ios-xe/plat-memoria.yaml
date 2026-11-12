@@ -5,6 +5,7 @@
 id: plat-memoria
 platform: ios-xe
 name: Plataforma · Memoria
+name_en: Platform · Memory
 commands:
   - cmd: show clock
   - cmd: show memory statistics

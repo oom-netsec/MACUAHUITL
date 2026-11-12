@@ -4,32 +4,32 @@
 package listen
 
 import (
-	"errors"
-	"fmt"
 	"net"
 	"net/netip"
 	"strconv"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // ValidateAddr exige host:puerto con IP local explícita y puerto ≥ 1024 (0 = el que asigne el sistema).
 func ValidateAddr(addr string, allowAny bool) error {
 	h, p, err := net.SplitHostPort(addr)
 	if err != nil {
-		return fmt.Errorf("dirección de escucha inválida %q: %w", addr, err)
+		return i18n.New("ingest.invalid.listen.parse", i18n.A("addr", addr, "detail", err))
 	}
 	port, err := strconv.ParseUint(p, 10, 16)
 	if err != nil {
-		return fmt.Errorf("puerto inválido %q", p)
+		return i18n.New("ingest.invalid.listen.port", i18n.A("port", p))
 	}
 	if port != 0 && port < 1024 {
-		return fmt.Errorf("el puerto %d es privilegiado; escucha en uno alto y, si el equipo no permite cambiar el destino, redirige con nftables (docs/plans/2026-11-04-fase-12-visibilidad.md)", port)
+		return i18n.New("ingest.invalid.listen.privileged", i18n.A("port", port))
 	}
 	ip, err := netip.ParseAddr(h)
 	if err != nil {
-		return fmt.Errorf("el host debe ser una IP local, no %q", h)
+		return i18n.New("ingest.invalid.listen.host", i18n.A("host", h))
 	}
 	if ip.IsUnspecified() && !allowAny {
-		return errors.New("escuchar en todas las interfaces requiere pedirlo explícitamente")
+		return i18n.New("ingest.invalid.listen.any", nil)
 	}
 	return nil
 }

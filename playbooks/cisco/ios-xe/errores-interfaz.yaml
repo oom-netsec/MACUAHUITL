@@ -1,6 +1,7 @@
 id: errores-interfaz
 platform: ios-xe
 name: Interfaces · Errores
+name_en: Interfaces · Errors
 commands:
   - cmd: show clock
   - cmd: show interfaces counters errors

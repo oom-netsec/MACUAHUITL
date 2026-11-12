@@ -5,6 +5,7 @@
 id: svc-span
 platform: ios-xe
 name: Servicios · SPAN
+name_en: Services · SPAN
 commands:
   - cmd: show clock
   - cmd: show monitor

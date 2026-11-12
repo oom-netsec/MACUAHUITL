@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Catálogo de plantillas (fase 28b): cada snippet declara sus campos tipados para que la UI arme el formulario sin código por snippet,
@@ -83,35 +85,82 @@ func compilePattern(p string) (*regexp.Regexp, error) { return regexp.Compile(p)
 
 var decimalRe = regexp.MustCompile(`^\d{1,3}(\.\d{1,2})?$`)
 
+// ValueErrors son los problemas de ValidateValues. Error() es el texto en es de siempre; Localize da el mismo en en,
+// y Metadata dice la plantilla y el campo y motivo (why) del primer problema, nunca un valor.
+type ValueErrors struct {
+	Template string
+	problems []valueProblem
+}
+
+type valueProblem struct {
+	field string
+	code  string    // código assist.invalid_value.<pieza>
+	args  i18n.Args // argumentos de la pieza
+	label string    // etiqueta en es del campo, solo para el texto
+}
+
+func (e *ValueErrors) Is(target error) bool { return target == ErrInvalidValues }
+func (e *ValueErrors) Error() string        { return e.Localize(i18n.Es) }
+func (e *ValueErrors) Reason() string       { return "assist.invalid_value" }
+
+func (e *ValueErrors) Metadata() map[string]string {
+	p := e.problems[0]
+	return i18n.Metadata("assist.invalid_value", i18n.A("template", e.Template, "field", p.field, "why", i18n.Metadata(p.code, nil)["why"]))
+}
+
+func (e *ValueErrors) Localize(loc string) string {
+	pieces := make([]string, len(e.problems))
+	for i, p := range e.problems {
+		switch {
+		case p.code == "assist.invalid_value.unknown_field" || p.code == "assist.invalid_value.required":
+			pieces[i] = i18n.Msg(loc, p.code, p.args)
+		case loc == i18n.En:
+			pieces[i] = p.field + ": " + i18n.Msg(loc, p.code, p.args)
+		default:
+			pieces[i] = fmt.Sprintf("%s (%s): %s", p.label, p.field, i18n.Msg(loc, p.code, p.args))
+		}
+	}
+	return i18n.Msg(loc, "assist.invalid_value", i18n.A("pieces", strings.Join(pieces, "; ")))
+}
+
+// vbad es el error de un valor con su código assist.invalid_value.<pieza>.
+func vbad(piece string, kv ...any) error {
+	return i18n.New("assist.invalid_value."+piece, i18n.A(kv...))
+}
+
 // ValidateValues revisa los valores de un formulario contra los campos de la plantilla: claves desconocidas, obligatorias que faltan,
 // tipo, rango, patrón y ASCII imprimible. Junta todos los problemas en un error. El valor de un secret jamás aparece en un mensaje.
 func ValidateValues(t Template, v Values) error {
-	var bad []string
+	var bad []valueProblem
 	byName := map[string]Field{}
 	for _, f := range t.Fields {
 		byName[f.Name] = f
 	}
 	for _, k := range sortedKeys(v) {
 		if _, ok := byName[k]; !ok {
-			bad = append(bad, fmt.Sprintf("campo desconocido %q", k)) // solo el nombre, nunca el valor
+			bad = append(bad, valueProblem{field: k, code: "assist.invalid_value.unknown_field", args: i18n.A("field", k)}) // solo el nombre, nunca el valor
 		}
 	}
 	for _, f := range t.Fields {
 		val, has := v[f.Name], strings.TrimSpace(v[f.Name]) != ""
 		if !has {
 			if f.Required {
-				bad = append(bad, fmt.Sprintf("falta %s (%s)", f.Label, f.Name))
+				bad = append(bad, valueProblem{field: f.Name, code: "assist.invalid_value.required", args: i18n.A("label", f.Label, "field", f.Name)})
 			}
 			continue
 		}
 		if err := checkValue(f, val); err != nil {
-			bad = append(bad, fmt.Sprintf("%s (%s): %v", f.Label, f.Name, err))
+			p := valueProblem{field: f.Name, label: f.Label, code: "assist.invalid_value.other", args: i18n.A("detail", err.Error())}
+			if ie, ok := err.(*i18n.Error); ok {
+				p.code, p.args = ie.Code, ie.Args
+			}
+			bad = append(bad, p)
 		}
 	}
 	if len(bad) == 0 {
 		return nil
 	}
-	return fmt.Errorf("%w: %s", ErrInvalidValues, strings.Join(bad, "; "))
+	return &ValueErrors{Template: t.ID, problems: bad}
 }
 
 func sortedKeys(v Values) []string {
@@ -132,10 +181,10 @@ func checkValue(f Field, val string) error {
 		return err
 	}
 	if strings.ContainsAny(val, "?\t") {
-		return fmt.Errorf("%q: '?' y el tabulador no se admiten", val)
+		return vbad("special", "value", val)
 	}
 	if strings.TrimSpace(val) != val && f.Type != TypeText {
-		return fmt.Errorf("%q: sin espacios al inicio ni al final", val)
+		return vbad("trim", "value", val)
 	}
 	switch f.Type {
 	case TypeText:
@@ -144,21 +193,21 @@ func checkValue(f Field, val string) error {
 			hi = int(f.Max)
 		}
 		if n := len(strings.TrimSpace(val)); n < int(f.Min) || n > hi {
-			return fmt.Errorf("mide %d caracteres y debe medir entre %d y %d", n, int(f.Min), hi)
+			return vbad("length", "n", n, "min", int(f.Min), "max", hi)
 		}
 		if f.Pattern != "" {
 			re, err := compilePattern(f.Pattern)
 			if err != nil {
-				return errors.New("patrón interno inválido")
+				return vbad("internal_pattern")
 			}
 			if !re.MatchString(strings.TrimSpace(val)) {
-				return fmt.Errorf("%q no cumple el formato esperado", val)
+				return vbad("format", "value", val)
 			}
 		}
 	case TypeInt, TypeVlanID:
 		n, err := strconv.Atoi(val)
 		if err != nil || ntoa(n) != val {
-			return fmt.Errorf("%q no es un entero (sin signo ni ceros a la izquierda)", val)
+			return vbad("not_int", "value", val)
 		}
 		lo, hi := f.Min, f.Max
 		if f.Type == TypeVlanID {
@@ -168,28 +217,28 @@ func checkValue(f Field, val string) error {
 			}
 		}
 		if float64(n) < lo || (hi > 0 && float64(n) > hi) {
-			return fmt.Errorf("%d fuera de %s", n, rangeText(lo, hi))
+			return vbad("out_of_range", "value", n, "range", rangeText(lo, hi))
 		}
 	case TypeDecimal:
 		if !decimalRe.MatchString(val) {
-			return fmt.Errorf("%q no es un número con hasta dos decimales", val)
+			return vbad("not_decimal", "value", val)
 		}
 		x, _ := strconv.ParseFloat(val, 64)
 		if x < f.Min || (f.Max > 0 && x > f.Max) {
-			return fmt.Errorf("%s fuera de %s", val, rangeText(f.Min, f.Max))
+			return vbad("out_of_range", "value", val, "range", rangeText(f.Min, f.Max))
 		}
 	case TypeBool:
 		if val != "true" && val != "false" {
-			return fmt.Errorf("%q: solo true o false", val)
+			return vbad("bool", "value", val)
 		}
 	case TypeChoice:
 		if !slices.Contains(f.Choices, val) {
-			return fmt.Errorf("%q: elige una de %s", val, strings.Join(f.Choices, ", "))
+			return vbad("choice", "value", val, "choices", strings.Join(f.Choices, ", "))
 		}
 	case TypeIPv4:
 		a, err := netip.ParseAddr(val)
 		if err != nil || !a.Is4() {
-			return fmt.Errorf("dirección IPv4 inválida %q", val)
+			return vbad("ipv4", "value", val)
 		}
 	case TypeIPv4Mask:
 		if _, err := maskBits(val); err != nil {
@@ -197,14 +246,14 @@ func checkValue(f Field, val string) error {
 		}
 	case TypeInterface:
 		if !ValidTrunkInterface(val) {
-			return fmt.Errorf("%q no es un puerto físico ni un Port-channel", val)
+			return vbad("interface", "value", val)
 		}
 	case TypeInterfaces:
 		if _, err := ParseInterfaceList(val); err != nil {
 			return err
 		}
 	default:
-		return fmt.Errorf("tipo de campo desconocido %q", f.Type)
+		return vbad("type_unknown", "value", f.Type)
 	}
 	return nil
 }
@@ -224,11 +273,11 @@ func checkSecretField(f Field, val string) error {
 	}
 	for _, r := range val {
 		if r <= 0x20 || r > 0x7e || r == '?' {
-			return errors.New("el secreto lleva caracteres no permitidos (solo ASCII visible, sin espacios ni '?')")
+			return vbad("secret_chars")
 		}
 	}
 	if len(val) < int(f.Min) || len(val) > hi {
-		return fmt.Errorf("el secreto debe medir entre %d y %d caracteres", int(f.Min), hi)
+		return vbad("secret_length", "min", int(f.Min), "max", hi)
 	}
 	return nil
 }
@@ -237,7 +286,7 @@ func checkSecretField(f Field, val string) error {
 func maskBits(m string) (int, error) {
 	a, err := netip.ParseAddr(m)
 	if err != nil || !a.Is4() {
-		return 0, fmt.Errorf("máscara inválida %q (usa la forma 255.255.255.0)", m)
+		return 0, vbad("mask", "value", m)
 	}
 	b := a.As4()
 	v := uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
@@ -246,7 +295,7 @@ func maskBits(m string) (int, error) {
 		ones++
 	}
 	if ones == 0 || v<<ones != 0 {
-		return 0, fmt.Errorf("máscara %q no contigua", m)
+		return 0, vbad("mask_gap", "value", m)
 	}
 	return ones, nil
 }
@@ -268,7 +317,7 @@ func ParseInterfaceList(s string) ([]string, error) {
 		lo, _ := strconv.Atoi(m[2])
 		hi, _ := strconv.Atoi(m[3])
 		if lo > hi || hi-lo >= maxIfaceList {
-			return nil, fmt.Errorf("rango %q inválido (de menor a mayor y hasta %d puertos)", tok, maxIfaceList)
+			return nil, vbad("iface_range", "value", tok, "max", maxIfaceList)
 		}
 		for n := lo; n <= hi; n++ {
 			names = append(names, m[1]+ntoa(n))
@@ -276,7 +325,7 @@ func ParseInterfaceList(s string) ([]string, error) {
 	}
 	out, err := normIfaces(names)
 	if err == nil && len(out) > maxIfaceList {
-		return nil, fmt.Errorf("más de %d puertos en un solo plan", maxIfaceList)
+		return nil, vbad("iface_count", "max", maxIfaceList)
 	}
 	return out, err
 }

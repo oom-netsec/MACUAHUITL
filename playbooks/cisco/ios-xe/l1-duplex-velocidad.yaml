@@ -5,6 +5,7 @@
 id: l1-duplex-velocidad
 platform: ios-xe
 name: L1 · Duplex y velocidad
+name_en: L1 · Duplex and speed
 commands:
   - cmd: show clock
   - cmd: show interfaces status

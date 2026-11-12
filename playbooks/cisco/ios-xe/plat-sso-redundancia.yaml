@@ -5,6 +5,7 @@
 id: plat-sso-redundancia
 platform: ios-xe
 name: Plataforma · SSO y redundancia
+name_en: Platform · SSO and redundancy
 commands:
   - cmd: show clock
   - cmd: show redundancy

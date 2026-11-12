@@ -1,6 +1,7 @@
 id: topologia
 platform: ios-xe
 name: L2 · Topología (CDP, LLDP, STP, port-channels)
+name_en: L2 · Topology (CDP, LLDP, STP, port-channels)
 commands:
   - cmd: show version
   - cmd: show cdp neighbors detail
