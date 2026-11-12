@@ -157,7 +157,7 @@ func New(p Paths, o Options) (*Core, error) {
 		return nil, fmt.Errorf("core: preferencias: %w", err)
 	}
 	if c.settings.Issue() != "" {
-		c.audit("prefs.core", "core", "outputs_dir_invalid: the saved outputs folder is no longer valid; the factory default is in use")
+		c.audit("prefs.core", "core", c.settings.IssueAudit())
 	}
 	c.guard = transport.NewGuard(nil, func(e audit.Entry) { c.audit(e.Action, e.Target, e.Detail) })
 	if c.hosts, err = transport.OpenKnownHosts(filepath.Join(p.Data, "known_hosts")); err != nil {
