@@ -1014,7 +1014,7 @@ Los textos libres de estas áreas ya salen en el idioma pedido (`accept-language
 ### Cómo leer lo nuevo
 - **`ToolReport.keys`** (proto, `map<string, TextRef>`; en el puente, `keys` en `FleetDTO`, `ReportDTO` y `CleanerDTO`): por cada texto libre del `json` que sale del catálogo, su clave (`fleet.warn.*`, `analyze.detail.*`…) y argumentos, bajo su **ruta JSON**: `rows.2.detail`, `warnings.0`, `hops.3.reason`, `findings.1.detail`. Los índices son los de las listas. Con `en`, el `json` ya trae ese texto en inglés; la clave sirve para dibujar sin leer el texto. Un texto sin clave plana (un literal de regla, una unión de varios textos como el detalle de varias interfaces) se traduce pero no trae clave.
 - Los **valores** (equipos, IPs, MAC, puertos, interfaces, comandos, salidas de equipos, líneas de config) no se traducen.
-- Los códigos cerrados en español que ya existían **no cambian**: `severity` (`critica`…), `kind` de inventario (`equipo`), `facet` de cambios (`versión`, `captura`…), `change` de vecinos en las diferencias (`cambió`…), `rule` de la limpieza (`linea-vacia`…), `source` de los eventos (`log-equipo`).
+- Los códigos cerrados en español que ya existían **no cambian** (la vista los mapea, `lib/vocab.ts`): `severity` (`critica`…), `kind` de inventario (`equipo`), `facet` de cambios (`versión`, `captura`…), `change` de vecinos en las diferencias (`cambió`, `apareció`, `desapareció`), `rule` de la limpieza (`linea-vacia`…), `source` de los eventos y de los resultados de búsqueda de flota (`log-equipo`, `auditoria`, `carpeta de Patrol`…) y `end` del rastreo (`trunk-sin-vecino`…). El **texto** de los cambios de vecino y los ids de vecino OSPF y grupo HSRP (`10.0.0.1 por Gi0/1`, `Vl10 grupo 10`) sí salen traducidos en el `text` y, el id, en `devices[].neighbors[].id` con `en`.
 
 ### Puente
 | Método / DTO | Cambio |
@@ -1035,5 +1035,10 @@ En TS los métodos nuevos son opcionales en `AnalysisAPI` y `DriftAPI`; `keys?` 
 
 ### No cubierto en este bloque
 - El `text` de flota (encabezados, «AVISO», `Ago`/`Stamp` «hace 5 min», `DATO VIEJO`) y el CSV/Markdown del inventario siguen en español; los datos y avisos que trae adentro sí salen traducidos.
-- Los errores gRPC de carga del servicio de flota, de análisis y de deriva (ruta relativa, trabajo sin salidas…) siguen sin código.
+- Los errores gRPC de los demás servicios y los de lectura de archivos del sistema (permisos, zip dañado) siguen como vienen. Los de flota, análisis, deriva, cambios, actualización, cumplimiento, ACL y limpieza llevan código (`fleet.err.*`, `analyze.err.*`, `change.err.*`, `upgrade.err.*`, `compliance.err.*`, `acl.err.*`, `drift.err.*`, `cleaner.err.*`) y metadata; con `es` el texto es el de siempre.
 - `kb` de la línea de tiempo (fase del bloque D) y los códigos cerrados en español de arriba.
+
+### Ajustes tras la revisión del bloque C
+- **Secretos.** El informe de cumplimiento oculta, además del valor de `password` y `secret`, la comunidad de `snmp-server community`, el `key-string` y la llave de `ntp authentication-key`. Eso cambia el texto en español de esos casos raros (por ejemplo, la línea citada de una regla prohibida de la plantilla) y cierra una fuga. La marca es `<oculto>` con `es` y `<hidden>` con `en`.
+- **Errores con causa.** Un error que envuelve a otro (`acl.err.import` sobre `acl.err.line`) trae en su metadata la de la causa (`line`) y `cause_reason`; los argumentos de `Finding.detail_key` traen la `cause` (en español) cuando la plantilla la pide.
+- **`fleetWails`** devuelve `keys` en cada resultado cuando el núcleo las manda.
