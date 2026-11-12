@@ -118,6 +118,7 @@ test("la línea de fases combina el historial y los eventos en vivo", async () =
       phases: [
         { at: ago(12), kind: "JOB_PHASE_KIND_CREATED" },
         { at: ago(11), kind: "JOB_PHASE_KIND_LOGIN_TEST_DONE", detail: "2 correctos, 0 con fallas" },
+        { at: ago(10.5), kind: "JOB_PHASE_KIND_ARM_CHECK_DONE", detail: "2 correctos, 0 con fallas" },
         { at: ago(10), kind: "JOB_PHASE_KIND_ARMED" },
         { at: ago(9), kind: "JOB_PHASE_KIND_ROUND_FINISHED", round: 1, detail: "2 correctos, 0 con fallas" },
       ],
@@ -126,7 +127,8 @@ test("la línea de fases combina el historial y los eventos en vivo", async () =
   render(<PatrolView core={core} />);
   const phases = await screen.findByRole("list", { name: "Fases" });
   expect(within(phases).getByText("Login Test completado")).toBeInTheDocument();
-  expect(within(phases).getAllByText("2 correctos, 0 con fallas")).toHaveLength(2);
+  expect(within(phases).getByText("Login Test al armar")).toBeInTheDocument();
+  expect(within(phases).getAllByText("2 correctos, 0 con fallas")).toHaveLength(3);
   expect(within(phases).getByText("Ronda 1 finalizada")).toBeInTheDocument();
   expect(screen.getByText("Hasta el fin de la ventana")).toBeInTheDocument();
   act(() => core.emitEvent({ jobId: "j9", phaseAdded: { at: new Date().toISOString(), kind: "JOB_PHASE_KIND_ROUND_STARTED", round: 2 } }));
@@ -325,4 +327,16 @@ test("al reabrir a mitad de ronda la grilla trae todos los equipos, no solo los 
   await userEvent.click(await screen.findByRole("button", { name: /parcial/ }));
   expect(await screen.findByText("10.0.0.1:22")).toBeInTheDocument();
   expect(screen.getByText("10.0.0.2:22")).toBeInTheDocument();
+});
+
+test("el rechazo de la carpeta de salida se ve traducido, con la orden chmod", async () => {
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => creds),
+    createJob: vi.fn(async () => { throw new Error("rpc error: code = InvalidArgument desc = prefs.outputs.permisos: la carpeta /home/u/ev tiene modo 0755 y debe ser 0700; corrígelo con: chmod 700 /home/u/ev"); }),
+  });
+  await fillForm(core);
+  await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
+  const alert = await screen.findByText(/más abiertos que 0700/);
+  expect(alert).toHaveTextContent("chmod 700 /home/u/ev");
+  expect(screen.queryByText(/prefs\.outputs/)).toBeNull();
 });

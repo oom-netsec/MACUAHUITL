@@ -375,7 +375,7 @@ export const en: Record<Key, string> = {
   "change.name": "Change name",
   "change.targets": "Devices (IP or name, comma-separated)",
   "change.pick": "Choose one",
-  "change.outDir": "Output folder (empty = outputs/cambios)",
+  "change.outDir": "Output folder (empty = a new subfolder in outputs/cambios)",
   "change.create": "Create change",
   "change.capture": "Capture {phase}",
   "change.trust": "I confirm fingerprint {fp} of {target}",
@@ -2531,7 +2531,7 @@ export const en: Record<Key, string> = {
   "settings.storage.err.no_directorio": "The path is not a folder.",
   "settings.storage.err.otro_dueno": "The folder is not owned by your user. Pick a folder you own.",
   "settings.storage.err.reservada": "That folder is reserved (data, configuration, your home folder or ~/.ssh) or contains one of them. Pick a subfolder of your own, for example inside your home folder.",
-  "settings.storage.err.permisos": "The folder has a mode more open than 0700. The application does not change it: run this command in a terminal and save again.",
+  "settings.storage.err.permisos": "The folder has a mode more open than 0700. The application does not change it: set it to 0700 (with chmod 700 in a terminal) and try again.",
   "settings.storage.err.ancestro_inseguro": "The folder hangs from one that other users can write (e.g. /tmp), so they could replace the path. Pick a folder under your home folder.",
   "settings.storage.err.no_escribible": "The folder cannot be written to. Check its permissions and the free space.",
   "settings.data.vault.open": "Open the vault",
@@ -2551,4 +2551,5 @@ export const en: Record<Key, string> = {
   "patrol.kind.backup": "Backup",
   "patrol.kind.patrol": "Patrol",
   "patrol.kind.change": "Change",
+  "patrol.phase.ARM_CHECK_DONE": "Login Test at arming",
 };

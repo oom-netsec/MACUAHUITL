@@ -23,9 +23,9 @@ func montar(t *testing.T) (*prefsSvc, *servicetest.Deps, string) {
 	root := t.TempDir()
 	d.S = service.NewCoreSettings(d.Out, root, filepath.Join(root, "n", "datos"), filepath.Join(root, "config"), filepath.Join(root, "run"))
 	// Las pruebas viven bajo /tmp, que es de todos: los ancestros se dan por seguros salvo los que cada prueba marque.
-	old := ancestorInfo
-	ancestorInfo = func(string) (os.FileMode, uint32, error) { return 0o755, uint32(os.Getuid()), nil }
-	t.Cleanup(func() { ancestorInfo = old })
+	old := service.AncestorInfo
+	service.AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o755, uint32(os.Getuid()), nil }
+	t.Cleanup(func() { service.AncestorInfo = old })
 	return &prefsSvc{d: d}, d, root
 }
 
@@ -95,18 +95,18 @@ func TestOutputsReglasDeValidacion(t *testing.T) {
 func TestOutputsOtroDuenoSeRechaza(t *testing.T) {
 	s, _, root := montar(t)
 	ok := carpeta(t, filepath.Join(root, "ok"), 0o700)
-	old := fileOwner
-	fileOwner = func(os.FileInfo) (uint32, bool) { return uint32(os.Getuid()) + 1, true }
-	defer func() { fileOwner = old }()
+	old := service.FileOwner
+	service.FileOwner = func(os.FileInfo) (uint32, bool) { return uint32(os.Getuid()) + 1, true }
+	defer func() { service.FileOwner = old }()
 	quiero(t, fija(s, ok), "otro_dueno")
 }
 
 func TestOutputsNoEscribibleSeRechaza(t *testing.T) {
 	s, _, root := montar(t)
 	ok := carpeta(t, filepath.Join(root, "ok"), 0o700)
-	old := createTemp
-	createTemp = func(string, string) (*os.File, error) { return nil, errors.New("solo lectura") }
-	defer func() { createTemp = old }()
+	old := service.CreateTemp
+	service.CreateTemp = func(string, string) (*os.File, error) { return nil, errors.New("solo lectura") }
+	defer func() { service.CreateTemp = old }()
 	quiero(t, fija(s, ok), "no_escribible")
 }
 
@@ -254,7 +254,7 @@ func TestOutputsAncestroEscribiblePorOtrosSeRechaza(t *testing.T) {
 			s, d, root := montar(t)
 			dir := carpeta(t, filepath.Join(root, "a", "b", "salidas"), 0o700)
 			malo := filepath.Join(root, "a")
-			ancestorInfo = func(p string) (os.FileMode, uint32, error) {
+			service.AncestorInfo = func(p string) (os.FileMode, uint32, error) {
 				if p == malo {
 					return c.mode, c.uid, nil
 				}
@@ -282,7 +282,7 @@ func TestOutputsBajoTmpCompartidoSeRechazaDeVerdad(t *testing.T) {
 		t.Skip("/tmp no es de todos en este sistema")
 	}
 	s, _, _ := montar(t)
-	ancestorInfo = realAncestorInfo
+	service.AncestorInfo = service.RealAncestorInfo
 	dir := carpeta(t, filepath.Join(t.TempDir(), "salidas"), 0o700)
 	quiero(t, fija(s, dir), "ancestro_inseguro")
 }
@@ -297,7 +297,7 @@ func TestCargarRevalidaLaCarpetaGuardada(t *testing.T) {
 	}
 	cargar := func() *service.CoreSettings {
 		st := service.NewCoreSettings("fabrica", root)
-		if err := st.Load(d.DB(), func(p string) error { _, err := CheckOutputs(p, st, false); return err }); err != nil {
+		if err := st.Load(d.DB(), func(p string) error { _, err := service.CheckOutputs(p, st, false); return err }); err != nil {
 			t.Fatal(err)
 		}
 		return st
@@ -315,7 +315,7 @@ func TestCargarRevalidaLaCarpetaGuardada(t *testing.T) {
 	}
 	// un ancestro que otros escriben también la invalida
 	os.Chmod(dir, 0o700)
-	ancestorInfo = func(string) (os.FileMode, uint32, error) { return 0o777, 0, nil }
+	service.AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o777, 0, nil }
 	if st = cargar(); st.Outputs() != "fabrica" || !strings.Contains(st.Issue(), "ancestro_inseguro") {
 		t.Fatalf("ancestro: %s %q", st.Outputs(), st.Issue())
 	}

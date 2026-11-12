@@ -17,6 +17,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/core"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 )
@@ -25,6 +26,8 @@ func ctx() context.Context { return context.Background() }
 
 func TestMain(m *testing.M) {
 	vault.MinMemoryKiB = 8192
+	// Las pruebas viven bajo /tmp (1777): sus ancestros se dan por seguros; la regla real la prueba prefs.
+	service.AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o755, uint32(os.Getuid()), nil }
 	os.Exit(m.Run())
 }
 

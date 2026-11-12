@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -53,6 +54,9 @@ func TestChangePrePostEndToEnd(t *testing.T) {
 	pre, err := ch.CaptureChange(ctx(t), &v1.CaptureChangeRequest{ChangeId: cr.ChangeId, Phase: v1.ChangePhase_CHANGE_PHASE_PRE})
 	if err != nil || pre.Armed || pre.JobId == "" || !strings.Contains(pre.Detail, "Login Test") {
 		t.Fatalf("pre = %+v %v", pre, err)
+	}
+	if k := h.summary(t, pre.JobId).Kind; k != "change" {
+		t.Fatalf("kind = %q, quería change", k)
 	}
 	fp := h.loginTest(t, pre.JobId)[0].HostKeyFingerprint
 	pre, err = ch.CaptureChange(ctx(t), &v1.CaptureChangeRequest{ChangeId: cr.ChangeId, Phase: v1.ChangePhase_CHANGE_PHASE_PRE, AcceptedHostKeyFingerprints: []string{fp}})
@@ -147,5 +151,32 @@ func TestUpgradeAndComplianceChecks(t *testing.T) {
 	txt := h.auditText(t)
 	if !strings.Contains(txt, `"action":"upgrade.check"`) || !strings.Contains(txt, `"action":"compliance.check"`) {
 		t.Fatal("checks not audited")
+	}
+}
+
+// Sin carpeta explícita, el cambio usa una subcarpeta propia 0700: outputs/cambios puede existir con otro modo
+// (creada a mano o restaurada con rsync) y no debe romper CreateChange.
+func TestCreateChangeConCarpetaCambiosAbierta(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	cambios := filepath.Join(h.out, "cambios")
+	os.MkdirAll(cambios, 0o755)
+	os.Chmod(cambios, 0o755)
+	_, err := v1.NewChangeServiceClient(h.conn).CreateChange(ctx(t), &v1.CreateChangeRequest{Spec: &v1.JobSpec{Name: "c", Targets: []*v1.Target{h.target}, DefaultCredentialId: cred}})
+	if err != nil {
+		t.Fatalf("CreateChange con outputs/cambios en 0755: %v", err)
+	}
+}
+
+// Un CreateChange que no valida no deja una carpeta cambio-* vacía creada por el núcleo.
+func TestCreateChangeInvalidoNoDejaCarpeta(t *testing.T) {
+	h := newHarness(t, nil)
+	h.ready(t)
+	_, err := v1.NewChangeServiceClient(h.conn).CreateChange(ctx(t), &v1.CreateChangeRequest{Spec: &v1.JobSpec{Name: "c", Targets: []*v1.Target{h.target}, DefaultCredentialId: "no-existe"}})
+	if err == nil {
+		t.Fatal("debía fallar")
+	}
+	if sobras, _ := filepath.Glob(filepath.Join(h.out, "cambios", "cambio-*")); len(sobras) != 0 {
+		t.Fatalf("quedaron carpetas: %v", sobras)
 	}
 }

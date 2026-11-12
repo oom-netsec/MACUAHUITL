@@ -25,6 +25,8 @@ import (
 
 func TestMain(m *testing.M) {
 	vault.MinMemoryKiB = 8192
+	// Las pruebas viven bajo /tmp (1777): sus ancestros se dan por seguros; la regla real la prueba prefs.
+	service.AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o755, uint32(os.Getuid()), nil }
 	os.Exit(m.Run())
 }
 

@@ -373,7 +373,7 @@ export const es = {
   "change.name": "Nombre del cambio",
   "change.targets": "Equipos (IP o nombre, separados por comas)",
   "change.pick": "Elige una",
-  "change.outDir": "Carpeta de salida (vacío = outputs/cambios)",
+  "change.outDir": "Carpeta de salida (vacío = una subcarpeta nueva en outputs/cambios)",
   "change.create": "Crear cambio",
   "change.capture": "Capturar {phase}",
   "change.trust": "Confirmo la huella {fp} de {target}",
@@ -2529,7 +2529,7 @@ export const es = {
   "settings.storage.err.no_directorio": "La ruta no es una carpeta.",
   "settings.storage.err.otro_dueno": "La carpeta no es de tu usuario. Elige una carpeta que te pertenezca.",
   "settings.storage.err.reservada": "Esa carpeta está reservada (datos, configuración, tu carpeta personal o ~/.ssh) o contiene a una de ellas. Elige una subcarpeta propia, por ejemplo dentro de tu carpeta personal.",
-  "settings.storage.err.permisos": "La carpeta tiene permisos más abiertos que 0700. La aplicación no los cambia: corre esta orden en una terminal y vuelve a guardar.",
+  "settings.storage.err.permisos": "La carpeta tiene permisos más abiertos que 0700. La aplicación no los cambia: déjala en 0700 (con chmod 700 en una terminal) y vuelve a intentarlo.",
   "settings.storage.err.ancestro_inseguro": "La carpeta cuelga de otra que otros usuarios pueden escribir (p. ej. /tmp), y podrían reemplazar la ruta. Elige una carpeta bajo tu carpeta personal.",
   "settings.storage.err.no_escribible": "No se puede escribir en la carpeta. Revisa sus permisos y el espacio disponible.",
   "settings.data.vault.open": "Abrir la bóveda",
@@ -2549,6 +2549,7 @@ export const es = {
   "patrol.kind.backup": "Respaldo",
   "patrol.kind.patrol": "Patrol",
   "patrol.kind.change": "Cambio",
+  "patrol.phase.ARM_CHECK_DONE": "Login Test al armar",
 };
 
 export type Key = keyof typeof es;

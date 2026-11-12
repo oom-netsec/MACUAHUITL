@@ -435,6 +435,9 @@ func TestCambiarLaCarpetaAMitadDeUnRespaldoNoPartePorLaMitad(t *testing.T) {
 	if _, err := s.StartBackup(context.Background(), &v1.StartBackupRequest{Targets: []*v1.Target{{Address: "192.0.2.1"}}, IntervalSeconds: 60, Rounds: 2}); err != nil {
 		t.Fatal(err)
 	}
+	if fp.spec.Kind != "backup" {
+		t.Fatalf("kind = %q, quería backup", fp.spec.Kind)
+	}
 	lote := fp.spec.OutputDir
 	if !strings.HasPrefix(lote, vieja) {
 		t.Fatalf("lote = %s", lote)

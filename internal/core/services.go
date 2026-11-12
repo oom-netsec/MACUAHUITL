@@ -19,6 +19,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/engine"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
+	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
@@ -174,6 +175,9 @@ type patrolSvc struct {
 	c *Core
 }
 
+// jobKinds son los tipos de trabajo; vacío es patrol (specs viejas, mctl y la UI).
+var jobKinds = []string{"", "patrol", "adhoc", "backup", "change"}
+
 // validate traduce y revisa un JobSpec; también la usa la ventana de cambio.
 func (s *patrolSvc) validate(p *v1.JobSpec) (patrol.Spec, error) {
 	spec := specFromProto(p)
@@ -182,6 +186,17 @@ func (s *patrolSvc) validate(p *v1.JobSpec) (patrol.Spec, error) {
 	s.c.mu.Unlock()
 	if v == nil {
 		return spec, status.Error(codes.FailedPrecondition, "no hay bóveda")
+	}
+	if !slices.Contains(jobKinds, spec.Kind) {
+		return spec, status.Errorf(codes.InvalidArgument, "tipo de trabajo %q no válido (patrol, adhoc, backup o change)", spec.Kind)
+	}
+	// Un output_dir explícito pasa por la validación de Ajustes → Almacenamiento; vacío = la carpeta vigente.
+	if spec.OutputDir == "" {
+		spec.OutputDir = s.c.settings.Outputs()
+	} else if dir, err := service.CheckOutputs(spec.OutputDir, s.c.settings, true); err != nil {
+		return spec, err
+	} else {
+		spec.OutputDir = dir
 	}
 	if err := patrol.Validate(spec, s.c.pbs, v); err != nil {
 		var fe *patrol.FieldError
@@ -307,7 +322,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 	}
 	undo = append(undo, func() { c.guard.Revoke(j.id) })
-	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_LOGIN_TEST_DONE, 0, okFailed(len(res)-len(failed), len(failed)))
+	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_CHECK_DONE, 0, okFailed(len(res)-len(failed), len(failed)))
 	if len(failed) > 0 {
 		return fail(status.Errorf(codes.FailedPrecondition, "Login Test falló; excluye o corrige: %s", strings.Join(failed, "; ")))
 	}
@@ -389,11 +404,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 }
 
 func patrolHostport(t patrol.Target) string {
-	p := t.Port
-	if p == 0 {
-		p = 22
-	}
-	return fmt.Sprintf("%s:%d", t.Address, p)
+	return fmt.Sprintf("%s:%d", t.Address, patrol.EffectivePort(t.Port))
 }
 
 // watch empaqueta cada ronda y cierra el trabajo al terminar.
@@ -530,12 +541,14 @@ func (s *patrolSvc) ListJobs(context.Context, *v1.ListJobsRequest) (*v1.ListJobs
 func (s *patrolSvc) ListPlaybooks(_ context.Context, r *v1.ListPlaybooksRequest) (*v1.ListPlaybooksResponse, error) {
 	out := &v1.ListPlaybooksResponse{}
 	for _, p := range s.c.pbs {
-		if r.GetPlatform() != "" && p.Platform != r.GetPlatform() {
+		if r.GetPlatform() != "" && !playbook.Compatible(r.GetPlatform(), p.Platform) { // ios lista los de ios-xe
 			continue
 		}
 		info := &v1.PlaybookInfo{Id: p.ID, Platform: p.Platform, Name: p.Name, Commands: slices.Clone(p.Pre)} // los pre corren primero
 		for _, c := range p.Commands {
-			info.Commands = append(info.Commands, c.Text)
+			if r.GetPlatform() == "" || c.Applies(r.GetPlatform()) { // sin plataforma, todos; con ella, los que corren ahí
+				info.Commands = append(info.Commands, c.Text)
+			}
 		}
 		out.Playbooks = append(out.Playbooks, info)
 	}
@@ -555,7 +568,7 @@ func (s *patrolSvc) GetRun(_ context.Context, r *v1.GetRunRequest) (*v1.GetRunRe
 		out.OutputPath = j.writer.Dir()
 	}
 	for _, d := range j.results[int(r.Round)] {
-		out.Devices = append(out.Devices, &v1.RunDevice{Target: &v1.Target{Address: d.Target.Address, Port: uint32(d.Target.Port), DeviceId: d.Target.DeviceID},
+		out.Devices = append(out.Devices, &v1.RunDevice{Target: &v1.Target{Address: d.Target.Address, Port: uint32(patrol.EffectivePort(d.Target.Port)), DeviceId: d.Target.DeviceID},
 			State: deviceStates[d.State], Detail: d.Detail})
 	}
 	return out, nil

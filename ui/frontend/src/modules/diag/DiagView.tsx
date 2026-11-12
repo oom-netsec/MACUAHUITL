@@ -6,6 +6,7 @@ import { Terminal } from "../../components/Terminal";
 import { Icon } from "../../components/Icon";
 import { ModuleIdContext, useBusy, useInbox, useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
+import { outputsErrorText } from "../../lib/outputsError";
 import { DiagViz } from "./DiagViz";
 import "./diag.css";
 
@@ -92,7 +93,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       early.forEach(apply);
     } catch (e) {
       starting.current = false;
-      setErr(errorText(e));
+      setErr(outputsErrorText(errorText(e), t));
     }
   };
   const cancel = () => core.diagCancel(runId).catch((e) => setErr(errorText(e)));

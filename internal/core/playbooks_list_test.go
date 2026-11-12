@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -88,5 +89,27 @@ func TestLoadPlaybooksUserOverridesEmbedded(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Name != "TAC · Mi línea base" || !reflect.DeepEqual(got[0].Commands, []string{"terminal width 200", "show version"}) {
 		t.Fatalf("tac-baseline = %+v", got)
+	}
+}
+
+// Un equipo ios clásico lista los playbooks de ios-xe, sin los comandos que solo corren en ios-xe (dir bootflash:).
+func TestListPlaybooksIOSListaLosDeIOSXE(t *testing.T) {
+	h := newHarness(t, nil)
+	xe, _ := h.patrol.ListPlaybooks(ctx(t), &v1.ListPlaybooksRequest{Platform: "ios-xe"})
+	ios, err := h.patrol.ListPlaybooks(ctx(t), &v1.ListPlaybooksRequest{Platform: "ios"})
+	if err != nil || len(ios.Playbooks) == 0 || len(ios.Playbooks) != len(xe.Playbooks) {
+		t.Fatalf("ios lista %d y ios-xe %d: %v", len(ios.Playbooks), len(xe.Playbooks), err)
+	}
+	tiene := func(r *v1.ListPlaybooksResponse, id, cmd string) bool {
+		for _, p := range r.Playbooks {
+			if p.Id == id {
+				return slices.Contains(p.Commands, cmd)
+			}
+		}
+		t.Fatalf("%s no está", id)
+		return false
+	}
+	if !tiene(xe, "ios-xe/flota", "dir bootflash:") || tiene(ios, "ios-xe/flota", "dir bootflash:") {
+		t.Fatal("dir bootflash: debe verse en ios-xe y no en ios")
 	}
 }

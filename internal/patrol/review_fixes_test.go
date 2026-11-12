@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -164,5 +165,44 @@ func TestWriterEscapaCabecerasFalsificadas(t *testing.T) {
 	}
 	if n != 1 {
 		t.Fatalf("hay %d líneas que parecen cabecera, quiero solo la verdadera:\n%s", n, raw)
+	}
+}
+
+// Un equipo ios clásico omite los comandos marcados platforms: [ios-xe] (dir bootflash:) y lo anota; en ios-xe corren.
+func TestComandosPorPlataformaSeOmitenYSeAnotan(t *testing.T) {
+	for _, c := range []struct {
+		nombre, carpeta string
+		omitido         []string
+	}{{"ios", "ios", []string{"dir bootflash:"}}, {"ios-xe", "ios-xe", nil}} {
+		t.Run(c.nombre, func(t *testing.T) {
+			e := newEnv(t, simulator.Config{Transcripts: transcripts(c.carpeta)})
+			e.trust(t)
+			e.spec.CustomCommands, e.spec.PlaybookIDs = "", []string{"ios-xe/plat-flash-fs"}
+			w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+			res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+			if res.State != "completed" || res.Platform != c.nombre {
+				t.Fatalf("res = %+v", res)
+			}
+			if !slices.Equal(res.Skipped, c.omitido) {
+				t.Fatalf("omitidos = %v, quería %v", res.Skipped, c.omitido)
+			}
+			m, err := Finish(context.Background(), e.d, w, e.spec, 1, []DeviceResult{res})
+			if err != nil {
+				t.Fatal(err)
+			}
+			b, _ := os.ReadFile(filepath.Join(w.Dir(), "manifest.json"))
+			if got := strings.Contains(string(b), "dir bootflash:"); got != (c.omitido != nil) {
+				t.Fatalf("manifest anota el omitido = %v: %s", got, b)
+			}
+			var corrio bool
+			for _, rel := range w.Files() {
+				txt, _ := os.ReadFile(filepath.Join(w.Dir(), rel))
+				corrio = corrio || strings.Contains(string(txt), "dir bootflash:")
+			}
+			if corrio == (c.omitido != nil) {
+				t.Fatalf("dir bootflash: corrió = %v con omitidos %v", corrio, c.omitido)
+			}
+			_ = m
+		})
 	}
 }

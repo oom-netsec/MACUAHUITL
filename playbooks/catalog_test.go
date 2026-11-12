@@ -87,3 +87,30 @@ func TestCatalogo(t *testing.T) {
 		t.Fatal("no se encontró ningún archivo del catálogo")
 	}
 }
+
+// dir bootflash: no existe en IOS clásico: los cuatro playbooks que lo piden lo marcan solo para ios-xe, y nada más lleva platforms.
+func TestSoloBootflashLlevaPlatforms(t *testing.T) {
+	pbs, err := playbook.Load(playbooks.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	con := map[string]bool{}
+	for _, p := range pbs {
+		for _, c := range p.Commands {
+			if c.Text == "dir bootflash:" && (len(c.Platforms) != 1 || c.Platforms[0] != "ios-xe") {
+				t.Errorf("%s: %q debe llevar platforms: [ios-xe]: %v", p.ID, c.Text, c.Platforms)
+			}
+			if len(c.Platforms) > 0 {
+				con[p.ID] = true
+				if c.Text != "dir bootflash:" {
+					t.Errorf("%s: %q lleva platforms sin evidencia", p.ID, c.Text)
+				}
+			}
+		}
+	}
+	for _, id := range []string{"upgrade-check", "plat-flash-fs", "flota", "plat-reloads-crashinfo"} {
+		if !con["ios-xe/"+id] {
+			t.Errorf("ios-xe/%s no marca dir bootflash:", id)
+		}
+	}
+}

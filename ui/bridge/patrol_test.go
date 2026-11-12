@@ -76,7 +76,7 @@ type fakePatrol struct {
 func (fakePatrol) ListJobs(context.Context, *v1.ListJobsRequest) (*v1.ListJobsResponse, error) {
 	return &v1.ListJobsResponse{Jobs: []*v1.JobSummary{
 		{JobId: "j1", Name: "caso-1", State: "armed", NextRoundAt: timestamppb.New(t0.Add(time.Hour)), ArmedAt: timestamppb.New(t0),
-			WindowEndsAt: timestamppb.New(t0.Add(4 * time.Hour)), Round: 1, Rounds: 3, DevicesTotal: 4, DevicesOk: 3, DevicesFailed: 1, OutputDir: "/o/caso-1_x",
+			WindowEndsAt: timestamppb.New(t0.Add(4 * time.Hour)), Round: 1, Rounds: 3, DevicesTotal: 4, DevicesOk: 3, DevicesFailed: 1, OutputDir: "/o/caso-1_x", Kind: "backup",
 			Phases: []*v1.JobPhase{{At: timestamppb.New(t0), Kind: v1.JobPhaseKind_JOB_PHASE_KIND_ARMED, Detail: "4 equipos"},
 				{At: timestamppb.New(t0.Add(time.Minute)), Kind: v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_FINISHED, Round: 1, Detail: "3 correctos, 1 con fallas"}}},
 		{JobId: "j2", Name: "nuevo", State: "created", Rounds: 1},
@@ -104,11 +104,11 @@ func TestJobDTOAndPhaseEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := `[{"id":"j1","name":"caso-1","state":"armed","nextRoundAt":"2026-11-04T19:00:00Z","armedAt":"2026-11-04T18:00:00Z",` +
-		`"windowEndsAt":"2026-11-04T22:00:00Z","round":1,"rounds":3,"devicesTotal":4,"devicesOk":3,"devicesFailed":1,"outputDir":"/o/caso-1_x",` +
+		`"windowEndsAt":"2026-11-04T22:00:00Z","round":1,"rounds":3,"devicesTotal":4,"devicesOk":3,"devicesFailed":1,"outputDir":"/o/caso-1_x","kind":"backup",` +
 		`"phases":[{"at":"2026-11-04T18:00:00Z","kind":"JOB_PHASE_KIND_ARMED","round":0,"detail":"4 equipos"},` +
 		`{"at":"2026-11-04T18:01:00Z","kind":"JOB_PHASE_KIND_ROUND_FINISHED","round":1,"detail":"3 correctos, 1 con fallas"}]},` +
 		`{"id":"j2","name":"nuevo","state":"created","nextRoundAt":"","armedAt":"","windowEndsAt":"","round":0,"rounds":1,` +
-		`"devicesTotal":0,"devicesOk":0,"devicesFailed":0,"outputDir":"","phases":[]}]`
+		`"devicesTotal":0,"devicesOk":0,"devicesFailed":0,"outputDir":"","kind":"","phases":[]}]`
 	if s := jsonOf(t, jobs); s != want {
 		t.Fatalf("json =\n%s\nwant\n%s", s, want)
 	}
@@ -147,17 +147,14 @@ func TestListPlaybooksJSON(t *testing.T) {
 }
 
 func TestTargetLabel(t *testing.T) {
-	// Puerto 0 = el de omisión de SSH: igual que el deviceId de los eventos del núcleo (patrolHostport), si no la fila no se actualiza.
-	if got := targetLabel("192.168.3.2", 0); got != "192.168.3.2:22" {
-		t.Fatalf("puerto 0: %q", got)
-	}
+	// Igual que el deviceId de los eventos del núcleo (patrol.hostport), si no la fila no se actualiza.
 	if got := targetLabel("192.168.3.2", 2222); got != "192.168.3.2:2222" {
 		t.Fatalf("puerto 2222: %q", got)
 	}
-	if got := targetLabel("fe80::1", 0); got != "[fe80::1]:22" {
+	if got := targetLabel("fe80::1", 22); got != "[fe80::1]:22" {
 		t.Fatalf("IPv6: %q", got)
 	}
-	if got := targetLabel("sw-core", 0); got != "sw-core:22" {
+	if got := targetLabel("sw-core", 22); got != "sw-core:22" {
 		t.Fatalf("nombre: %q", got)
 	}
 }
