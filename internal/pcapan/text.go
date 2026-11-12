@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // parseSNI extrae server_name de un ClientHello TLS. Devuelve "" si el registro
@@ -60,72 +62,106 @@ func parseSNI(b []byte) string {
 	return ""
 }
 
-// Text es el resumen para leer en la terminal o guardar junto a la captura.
-func (r Report) Text() string {
+// Section es un encabezado de sección del resumen, con su clave del catálogo (pcap.section.*) y sus argumentos.
+type Section struct {
+	Key  string
+	Args i18n.Args
+}
+
+// Sections son los encabezados del resumen en el orden en que se imprimen (los de las secciones que aparecen).
+func (r Report) Sections() []Section {
+	var out []Section
+	if len(r.Neighbors) > 0 {
+		out = append(out, Section{Key: "pcap.section.neighbors"})
+	}
+	out = append(out, Section{Key: "pcap.section.tcp"}, Section{Key: "pcap.section.dns"})
+	if len(r.TLS) > 0 {
+		out = append(out, Section{Key: "pcap.section.tls"})
+	}
+	if len(r.ICMP.Unreachable)+len(r.ICMP.TTLExceeded) > 0 {
+		out = append(out, Section{Key: "pcap.section.icmp"})
+	}
+	for _, c := range r.ARPConflicts {
+		out = append(out, Section{Key: "pcap.section.arp_conflict", Args: i18n.A("ip", c.IP, "macs", strings.Join(c.MACs, ", "))})
+	}
+	return append(out, Section{Key: "pcap.section.conversations"}, Section{Key: "pcap.section.top_talkers"})
+}
+
+// Text es el resumen para leer en la terminal o guardar junto a la captura, en español.
+func (r Report) Text() string { return r.TextIn(i18n.Es) }
+
+// TextIn es el resumen en el idioma pedido; los valores (IPs, nombres, cifras) salen tal cual y con es es el
+// texto de siempre.
+func (r Report) TextIn(loc string) string {
 	var b strings.Builder
 	w := func(format string, a ...any) { fmt.Fprintf(&b, format+"\n", a...) }
-	w("Captura: %s", r.File)
-	w("Paquetes: %d · Bytes: %d · Duración: %s · Desde %s", r.Packets, r.Bytes, r.Duration.Round(time.Millisecond), r.Start.UTC().Format(time.RFC3339))
-	for _, x := range r.Warnings {
-		w("AVISO: %s", x)
+	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
+	head := func(key string, kv ...any) { w("\n== %s", m(key, kv...)) }
+	w("%s", m("pcap.text.file", "file", r.File))
+	w("%s", m("pcap.text.summary", "packets", r.Packets, "bytes", r.Bytes, "duration", r.Duration.Round(time.Millisecond), "start", r.Start.UTC().Format(time.RFC3339)))
+	for i, x := range r.Warnings {
+		if i < len(r.WarnItems) {
+			x = r.WarnItems[i].In(loc)
+		}
+		w("%s", m("pcap.text.warning", "message", x))
 	}
 	if len(r.Neighbors) > 0 {
-		w("\n== Vecinos (¿a dónde estoy conectado?)")
+		head("pcap.section.neighbors")
 		for _, n := range r.Neighbors {
-			w("  %s  %s  puerto %s  %s  gestión %s  vlan nativa %d", strings.ToUpper(n.Protocol), n.DeviceID, n.Port, n.Platform, n.MgmtIP, n.NativeVLAN)
+			w("  %s", m("pcap.text.neighbor", "protocol", strings.ToUpper(n.Protocol), "device", n.DeviceID, "port", n.Port, "platform", n.Platform, "mgmt", n.MgmtIP, "vlan", n.NativeVLAN))
 		}
 	}
-	w("\n== TCP")
-	w("  Handshakes completos: %d · RTT de handshake min/prom/máx: %s / %s / %s", r.TCP.Handshakes, r.TCP.HandshakeRTT.Min, r.TCP.HandshakeRTT.Avg, r.TCP.HandshakeRTT.Max)
-	w("  Retransmisiones: %d · Ventana cero: %d", r.TCP.Retransmissions, r.TCP.ZeroWindow)
+	head("pcap.section.tcp")
+	w("  %s", m("pcap.text.handshakes", "n", r.TCP.Handshakes, "min", r.TCP.HandshakeRTT.Min, "avg", r.TCP.HandshakeRTT.Avg, "max", r.TCP.HandshakeRTT.Max))
+	w("  %s", m("pcap.text.retransmits", "retransmissions", r.TCP.Retransmissions, "zero_window", r.TCP.ZeroWindow))
 	if r.TCP.FailedHandshakesTotal > 0 {
-		w("  SYN sin respuesta (%d):", r.TCP.FailedHandshakesTotal)
+		w("  %s", m("pcap.text.failed_syn", "n", r.TCP.FailedHandshakesTotal))
 		for _, f := range r.TCP.FailedHandshakes {
-			w("    %s → %s  (%d intentos)", f.Client, f.Server, f.Attempts)
+			w("    %s", m("pcap.text.failed_flow", "client", f.Client, "server", f.Server, "attempts", f.Attempts))
 		}
 	}
 	for _, f := range r.TCP.Resets {
-		w("  RST: %s ↔ %s  (%d)", f.Client, f.Server, f.Count)
+		w("  %s", m("pcap.text.reset", "client", f.Client, "server", f.Server, "count", f.Count))
 	}
-	w("\n== DNS")
-	w("  Consultas: %d · Respuestas: %d", r.DNS.Queries, r.DNS.Responses)
+	head("pcap.section.dns")
+	w("  %s", m("pcap.text.dns_counts", "queries", r.DNS.Queries, "responses", r.DNS.Responses))
 	for _, q := range r.DNS.Errors {
-		w("  %s  %s %s  servidor %s", q.RCode, q.Name, q.Type, q.Server)
+		w("  %s", m("pcap.text.dns_error", "rcode", q.RCode, "name", q.Name, "type", q.Type, "server", q.Server))
 	}
 	for _, q := range r.DNS.Slow {
-		w("  LENTA %s  %s %s  servidor %s", q.Latency.Round(time.Millisecond), q.Name, q.Type, q.Server)
+		w("  %s", m("pcap.text.dns_slow", "latency", q.Latency.Round(time.Millisecond), "name", q.Name, "type", q.Type, "server", q.Server))
 	}
 	for _, q := range r.DNS.Unanswered {
-		w("  SIN RESPUESTA  %s %s  servidor %s", q.Name, q.Type, q.Server)
+		w("  %s", m("pcap.text.dns_unanswered", "name", q.Name, "type", q.Type, "server", q.Server))
 	}
 	if len(r.TLS) > 0 {
-		w("\n== TLS (SNI)")
+		head("pcap.section.tls")
 		for _, t := range r.TLS {
 			w("  %s → %s  %s", t.Client, t.Server, t.SNI)
 		}
 	}
 	if len(r.ICMP.Unreachable)+len(r.ICMP.TTLExceeded) > 0 {
-		w("\n== ICMP")
+		head("pcap.section.icmp")
 		for _, e := range r.ICMP.Unreachable {
-			w("  Inalcanzable (código %d): %s avisa que %s no se alcanza", e.Code, e.From, e.Target)
+			w("  %s", m("pcap.text.icmp_unreach", "code", e.Code, "from", e.From, "target", e.Target))
 		}
 		for _, e := range r.ICMP.TTLExceeded {
-			w("  TTL excedido: %s hacia %s", e.From, e.Target)
+			w("  %s", m("pcap.text.icmp_ttl", "from", e.From, "target", e.Target))
 		}
 	}
 	for _, c := range r.ARPConflicts {
-		w("\n== CONFLICTO ARP: %s anunciada por %s", c.IP, strings.Join(c.MACs, ", "))
+		head("pcap.section.arp_conflict", "ip", c.IP, "macs", strings.Join(c.MACs, ", "))
 	}
 	if r.Fragments > 0 {
-		w("\nFragmentos IP: %d (revisa MTU o túneles)", r.Fragments)
+		w("\n%s", m("pcap.text.fragments", "n", r.Fragments))
 	}
-	w("\n== Conversaciones con más bytes")
+	head("pcap.section.conversations")
 	for _, c := range r.Conversations {
-		w("  %-4s %s ↔ %s  %d paquetes  %d bytes", c.Proto, c.A, c.B, c.Packets, c.Bytes)
+		w("  %-4s %s ↔ %s  %s", c.Proto, c.A, c.B, m("pcap.text.counts", "packets", c.Packets, "bytes", c.Bytes))
 	}
-	w("\n== Equipos con más tráfico")
+	head("pcap.section.top_talkers")
 	for _, t := range r.Talkers {
-		w("  %s  %d paquetes  %d bytes", t.IP, t.Packets, t.Bytes)
+		w("  %s  %s", t.IP, m("pcap.text.counts", "packets", t.Packets, "bytes", t.Bytes))
 	}
 	return b.String()
 }

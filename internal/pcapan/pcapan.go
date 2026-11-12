@@ -19,6 +19,7 @@ import (
 	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/pcapgo"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
@@ -47,6 +48,15 @@ type Report struct {
 	ARPConflicts  []ARPConflict
 	Fragments     int
 	Warnings      []string
+	// WarnItems es Warnings como textos de catálogo (misma longitud y orden); no viaja en el JSON.
+	WarnItems []i18n.Text `json:"-"`
+}
+
+// warn agrega un aviso del catálogo al texto en español y a su forma estructurada.
+func (r *Report) warn(key string, kv ...any) {
+	t := i18n.Tx(key, kv...)
+	r.Warnings = append(r.Warnings, t.In(i18n.Es))
+	r.WarnItems = append(r.WarnItems, t)
 }
 
 type Conversation struct {
@@ -189,9 +199,9 @@ func Analyze(ctx context.Context, path string, o Options) (Report, error) {
 		}
 		if err != nil {
 			if errors.Is(err, io.ErrUnexpectedEOF) {
-				a.r.Warnings = append(a.r.Warnings, fmt.Sprintf("archivo truncado tras %d paquetes; el reporte es parcial", a.r.Packets))
+				a.r.warn("pcap.warn.truncated", "packets", a.r.Packets)
 			} else {
-				a.r.Warnings = append(a.r.Warnings, fmt.Sprintf("lectura interrumpida tras %d paquetes: %v", a.r.Packets, err))
+				a.r.warn("pcap.warn.interrupted", "packets", a.r.Packets, "error", err)
 			}
 			break
 		}
@@ -563,7 +573,7 @@ func (a *analyzer) addNeighbor(n Neighbor) {
 func (a *analyzer) finish() Report {
 	r := a.r
 	if a.limited {
-		r.Warnings = append(r.Warnings, fmt.Sprintf("la captura superó el límite de %d flujos por tabla; los conteos por flujo son parciales", a.o.MaxFlows))
+		r.warn("pcap.warn.flow_limit", "max", a.o.MaxFlows)
 	}
 	r.Duration = r.End.Sub(r.Start)
 	for _, c := range a.convs {

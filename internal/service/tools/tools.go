@@ -16,6 +16,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/dnsq"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/syslogd"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/tlsinspect"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/pcapan"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -38,7 +39,10 @@ func (s *toolsSvc) AnalyzePcap(ctx context.Context, r *v1.AnalyzePcapRequest) (*
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	return &v1.AnalyzePcapResponse{Report: service.Report(rep, rep.Text())}, nil
+	loc := i18n.Locale(ctx)
+	out := pcapResponse(loc, rep)
+	out.Report = service.Report(rep, rep.TextIn(loc))
+	return out, nil
 }
 
 var deepModes = map[v1.DnsMode]bool{v1.DnsMode_DNS_MODE_TRACE: true, v1.DnsMode_DNS_MODE_ZONE: true, v1.DnsMode_DNS_MODE_DNSSEC: true}
