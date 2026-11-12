@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/metrics"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -29,41 +29,41 @@ func (Module) Register(s ipc.Registrar, d service.Deps) {
 }
 
 // jobDir resuelve la carpeta de salida de un trabajo por su ID o por una ruta absoluta.
-func (s *svc) jobDir(jobID, dir string) (string, error) {
+func (s *svc) jobDir(ctx context.Context, jobID, dir string) (string, error) {
 	if jobID != "" {
 		j, err := s.d.Job(jobID)
 		if err != nil {
 			return "", err
 		}
 		if j.Dir == "" {
-			return "", status.Error(codes.FailedPrecondition, "el trabajo aún no tiene salidas")
+			return "", service.Err(ctx, codes.FailedPrecondition, "metrics.svc.job_empty", nil)
 		}
 		return j.Dir, nil
 	}
 	if dir == "" {
-		return "", status.Error(codes.InvalidArgument, "indica un trabajo o una carpeta de salida")
+		return "", service.Err(ctx, codes.InvalidArgument, "metrics.svc.no_source", nil)
 	}
 	if !filepath.IsAbs(dir) {
-		return "", status.Errorf(codes.InvalidArgument, "la ruta %q debe ser absoluta", dir)
+		return "", service.Err(ctx, codes.InvalidArgument, "metrics.svc.relative", i18n.A("path", dir))
 	}
 	return dir, nil
 }
 
-func (s *svc) GetJobMetrics(_ context.Context, r *v1.GetJobMetricsRequest) (*v1.GetJobMetricsResponse, error) {
+func (s *svc) GetJobMetrics(ctx context.Context, r *v1.GetJobMetricsRequest) (*v1.GetJobMetricsResponse, error) {
 	s.d.MarkActive()
 	if r.MaxPoints < 0 || r.MaxInterfaces < 0 || len(r.Interfaces) > metrics.MaxIfaces {
-		return nil, status.Error(codes.InvalidArgument, "topes inválidos")
+		return nil, service.Err(ctx, codes.InvalidArgument, "metrics.svc.bad_limits", nil)
 	}
-	dir, err := s.jobDir(r.JobId, r.Dir)
+	dir, err := s.jobDir(ctx, r.JobId, r.Dir)
 	if err != nil {
 		return nil, err
 	}
 	s.d.Audit("metrics.job", dir, "device="+r.Device+" interfaces="+strings.Join(r.Interfaces, ","))
 	res, err := metrics.Build(dir, metrics.Options{Device: r.Device, MaxPoints: int(r.MaxPoints), MaxIfaces: int(r.MaxInterfaces), Ifaces: r.Interfaces})
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
-	return toProto(res), nil
+	return toProto(res.Localize(i18n.Locale(ctx))), nil
 }
 
 func toProto(res metrics.Result) *v1.GetJobMetricsResponse {

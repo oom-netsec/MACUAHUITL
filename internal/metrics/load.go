@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
@@ -66,6 +67,7 @@ type rawDevice struct {
 	Host, IP string
 	Secs     []section
 	Warnings []string
+	WarnT    []i18n.Text // los Warnings como texto de catálogo, en paralelo
 }
 
 // parseFn interpreta la salida de un comando que se quiere leer.
@@ -175,11 +177,11 @@ func loadDevice(dir string, dd devDir, want map[string]bool, parse parseFn, last
 			readHook(f.path)
 		}
 		if f.size > maxFile {
-			d.Warnings = append(d.Warnings, fmt.Sprintf("no se leyó %s: supera %s", filepath.Base(f.path), size(maxFile)))
+			i18n.Note(&d.Warnings, &d.WarnT, "metrics.warn.file_big", "file", filepath.Base(f.path), "size", size(maxFile))
 			continue
 		}
 		if used += f.size; used > maxTotal {
-			d.Warnings = append(d.Warnings, fmt.Sprintf("el equipo pasa del tope de %s de texto: se dejó de leer en %s", size(maxTotal), filepath.Base(f.path)))
+			i18n.Note(&d.Warnings, &d.WarnT, "metrics.warn.total_cap", "size", size(maxTotal), "file", filepath.Base(f.path))
 			break
 		}
 		fileLatest := map[string]section{}
@@ -191,7 +193,11 @@ func loadDevice(dir string, dd devDir, want map[string]bool, parse parseFn, last
 			}
 		})
 		if err != nil {
-			d.Warnings = append(d.Warnings, fmt.Sprintf("no se pudo leer %s: %v", filepath.Base(f.path), err))
+			if errors.Is(err, errTooBig) {
+				i18n.Note(&d.Warnings, &d.WarnT, "metrics.warn.read_too_big", "file", filepath.Base(f.path))
+			} else {
+				i18n.Note(&d.Warnings, &d.WarnT, "metrics.warn.read_failed", "file", filepath.Base(f.path), "error", err)
+			}
 		}
 		for c, s := range fileLatest {
 			if _, ok := latest[c]; !ok {
@@ -247,7 +253,7 @@ func size(n int64) string {
 	return fmt.Sprintf("%d KiB", (n+1023)>>10)
 }
 
-var errTooBig = errors.New("el archivo creció más allá del tope mientras se leía")
+var errTooBig error = i18n.New("metrics.err.too_big", nil)
 
 // capReader falla en vez de truncar si el archivo (que puede estar creciendo) pasa del tope.
 type capReader struct {
