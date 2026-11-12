@@ -37,7 +37,7 @@ jobs:
           mkdir -p dist
           nfpm package -p deb -f deploy/packaging/nfpm.yaml -t dist/
           nfpm package -p rpm -f deploy/packaging/nfpm.yaml -t dist/
-          cp bin/macuahuitld bin/mctl bin/macuahuitl dist/
+          cp bin/macuahuitld bin/mctl bin/macuahuitl LICENSE NOTICE THIRD_PARTY_LICENSES dist/
       - name: SBOM
         uses: anchore/sbom-action@v0.24.3
         with:
