@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/status"
+
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
@@ -180,4 +183,43 @@ func startServerIn(t *testing.T, s *svc, base context.Context, req *v1.StartServ
 	}
 	t.Cleanup(func() { cancel(); <-r.done })
 	return r
+}
+
+// Una URL inválida con contraseña no deja la contraseña ni en el texto ni en la metadata, con es y con en.
+func TestURLInvalidaNoFiltraLaContrasena(t *testing.T) {
+	s, _ := newTest(t)
+	for _, lang := range []string{"", "en"} {
+		ctx := context.Background()
+		if lang != "" {
+			ctx = i18n.WithLocale(ctx, lang)
+		}
+		for n, f := range map[string]func() error{
+			"get": func() error {
+				_, err := s.Get(ctx, &v1.GetRequest{Url: "ftp://admin:Secreto@/a", DestDir: t.TempDir()})
+				return err
+			},
+			"muchos": func() error {
+				return s.GetMany(&v1.GetManyRequest{Url: "ftp://admin:Secreto@/", Names: []string{"a"}}, &getManyStream{ctx: ctx})
+			},
+			"malformada": func() error {
+				_, err := s.Get(ctx, &v1.GetRequest{Url: "ftp://admin:Secreto@%zz/a", DestDir: t.TempDir()})
+				return err
+			},
+		} {
+			err := f()
+			st := status.Convert(err)
+			if err == nil || strings.Contains(st.Message(), "Secreto") {
+				t.Errorf("%s %q: %v", n, lang, err)
+			}
+			for _, d := range st.Details() {
+				if ei, ok := d.(*errdetails.ErrorInfo); ok {
+					for k, v := range ei.Metadata {
+						if strings.Contains(v, "Secreto") {
+							t.Errorf("%s %q: metadata %s=%s", n, lang, k, v)
+						}
+					}
+				}
+			}
+		}
+	}
 }

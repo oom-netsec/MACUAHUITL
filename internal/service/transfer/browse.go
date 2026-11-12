@@ -180,7 +180,7 @@ func (s *svc) GetMany(r *v1.GetManyRequest, st v1.TransferService_GetManyServer)
 	}
 	base, err := url.Parse(r.Url)
 	if err != nil || base.Hostname() == "" {
-		return bad(ctx, "transfer.svc.bad_url", "url", r.Url)
+		return bad(ctx, "transfer.svc.bad_url", "url", redacted(r.Url))
 	}
 	if base.Scheme == "tftp" {
 		return bad(ctx, "transfer.svc.tftp_no_list")

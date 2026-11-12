@@ -12,8 +12,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -294,3 +296,13 @@ func (Module) Register(r ipc.Registrar, d service.Deps) {
 	d.OnClose(s.close)
 	v1.RegisterTransferServiceServer(r, s)
 }
+
+// redacted es la URL sin contraseña, para citarla en un error: una URL que no se pudo leer pierde todo su userinfo.
+func redacted(raw string) string {
+	if u, err := url.Parse(raw); err == nil {
+		return u.Redacted()
+	}
+	return userinfoRe.ReplaceAllString(raw, "://")
+}
+
+var userinfoRe = regexp.MustCompile(`://[^/@]*@`)

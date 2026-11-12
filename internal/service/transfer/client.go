@@ -69,7 +69,7 @@ func connErr(ctx context.Context, err error) error {
 func (s *svc) open(ctx context.Context, rawURL, credID string, accepted []string, legacy bool) (*job, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil || u.Hostname() == "" {
-		return nil, bad(ctx, "transfer.svc.bad_url", "url", rawURL)
+		return nil, bad(ctx, "transfer.svc.bad_url", "url", redacted(rawURL))
 	}
 	if _, err := xfer.Port(u); err != nil {
 		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
