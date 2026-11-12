@@ -12,7 +12,14 @@ export function parseOutputsError(msg: string): { code: string; path: string } |
 }
 
 // La ruta va entre comillas solo si lo necesita, para que la orden se pueda pegar tal cual.
-export const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replaceAll("'", "'\\''")}'`);
+const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replaceAll("'", "'\\''")}'`);
+
+/** La orden `chmod 700 <ruta>` lista para pegar; vacía si la ruta trae `\`, `'` o un carácter de control (en fish `\'` escapa dentro de comillas simples: no hay cita segura). */
+export function chmodCommand(path: string): string {
+  // eslint-disable-next-line no-control-regex
+  if (!path || /[\\'\x00-\x1f\x7f]/.test(path)) return "";
+  return `chmod 700 ${shellQuote(path)}`;
+}
 
 /** La clave traducida de un motivo del núcleo. */
 export const outputsReasonKey = (code: string): Key => (OUTPUTS_REASONS.includes(code) ? (`settings.storage.err.${code}` as Key) : "settings.storage.err.other");
@@ -21,5 +28,6 @@ export const outputsReasonKey = (code: string): Key => (OUTPUTS_REASONS.includes
 export function outputsErrorText(msg: string, t: (k: Key) => string): string {
   const p = parseOutputsError(msg);
   if (!p) return msg;
-  return t(outputsReasonKey(p.code)) + (p.code === "permisos" && p.path ? ` chmod 700 ${shellQuote(p.path)}` : "");
+  const cmd = p.code === "permisos" ? chmodCommand(p.path) : "";
+  return t(outputsReasonKey(p.code)) + (cmd ? ` ${cmd}` : "");
 }

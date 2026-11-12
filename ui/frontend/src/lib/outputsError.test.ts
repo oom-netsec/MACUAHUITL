@@ -1,0 +1,21 @@
+import { expect, test } from "vitest";
+import { chmodCommand, outputsErrorText } from "./outputsError";
+
+const t = (k: string) => `[${k}]`;
+const msg = (p: string) => `prefs.outputs.permisos: la carpeta ${p} tiene modo 0755 y debe ser 0700; corrígelo con: chmod 700 ${p}`;
+
+test("la orden chmod cita lo raro y no se genera con \\, ' o control", () => {
+  expect(chmodCommand("/home/u/salidas")).toBe("chmod 700 /home/u/salidas");
+  expect(chmodCommand("/home/u/$(id)")).toBe("chmod 700 '/home/u/$(id)'");
+  expect(chmodCommand("/x\\';echo pwned;#")).toBe("");
+  expect(chmodCommand("/x'y")).toBe("");
+  expect(chmodCommand("/x\ny")).toBe("");
+  expect(chmodCommand("")).toBe("");
+});
+
+test("el texto de un rechazo de permisos lleva la orden solo si es segura", () => {
+  expect(outputsErrorText(msg("/home/u/salidas"), t as never)).toBe("[settings.storage.err.permisos] chmod 700 /home/u/salidas");
+  expect(outputsErrorText(msg("/home/u/$(id)"), t as never)).toBe("[settings.storage.err.permisos] chmod 700 '/home/u/$(id)'");
+  expect(outputsErrorText(msg("/x\\';echo pwned;#"), t as never)).toBe("[settings.storage.err.permisos]");
+  expect(outputsErrorText("otra cosa", t as never)).toBe("otra cosa");
+});

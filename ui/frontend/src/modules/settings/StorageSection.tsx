@@ -4,7 +4,7 @@ import { Field, Notice, PathField, Select, errorText } from "../../components/Fi
 import { CopyButton } from "../../components/Data";
 import { RANGES, emptyForm, validateOpts, type NumKey, type SyslogFormat } from "../../components/ingest/ingestOpts";
 import { useLang, useT } from "../../lib/i18n";
-import { outputsReasonKey, parseOutputsError, shellQuote } from "../../lib/outputsError";
+import { chmodCommand, outputsReasonKey, parseOutputsError } from "../../lib/outputsError";
 import type { Key } from "../../lib/i18n/es";
 import type { CorePrefs, CorePrefsState } from "./api";
 
@@ -54,7 +54,7 @@ export function StorageSection({ core }: { core: CoreAPI }) {
   // La carpeta guardada ya no cumple y rige la de fábrica (el núcleo lo dice en `note`, en español).
   const fellBack = !!state.outputsDir && state.outputsDirEffective !== state.outputsDir;
   const noteText = lang === "es" && state.note ? state.note : fellBack ? t("settings.storage.noteFallback", { path: state.outputsDir }) : t("settings.storage.noteMoved");
-  const chmod = saveErr?.parsed?.code === "permisos" ? `chmod 700 ${shellQuote(saveErr.parsed.path || form.outputsDir.trim())}` : "";
+  const chmod = saveErr?.parsed?.code === "permisos" ? chmodCommand(saveErr.parsed.path) : "";
 
   // Los rechazos del núcleo por la carpeta van bajo su campo; el resto (p. ej. fallo al guardar) junto a Guardar.
   const parsedErr = saveErr?.parsed;
