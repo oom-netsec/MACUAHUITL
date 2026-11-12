@@ -25,7 +25,7 @@ func init() {
 		"pcap.text.handshakes":     e("Handshakes completos: {n} · RTT de handshake min/prom/máx: {min} / {avg} / {max}", "Complete handshakes: {n} · Handshake RTT min/avg/max: {min} / {avg} / {max}", "n", "min", "avg", "max"),
 		"pcap.text.retransmits":    e("Retransmisiones: {retransmissions} · Ventana cero: {zero_window}", "Retransmissions: {retransmissions} · Zero window: {zero_window}", "retransmissions", "zero_window"),
 		"pcap.text.failed_syn":     e("SYN sin respuesta ({n}):", "Unanswered SYN ({n}):", "n"),
-		"pcap.text.failed_flow":    e("{client} → {server}  ({attempts} intentos)", "{client} → {server}  ({attempts} attempts)", "client", "server", "attempts"),
+		"pcap.text.failed_flow":    e("{client} → {server}  ({attempts} intentos)", "{client} → {server}  ({attempts} {attempts|attempt|attempts})", "client", "server", "attempts"),
 		"pcap.text.reset":          e("RST: {client} ↔ {server}  ({count})", "RST: {client} ↔ {server}  ({count})", "client", "server", "count"),
 		"pcap.text.dns_counts":     e("Consultas: {queries} · Respuestas: {responses}", "Queries: {queries} · Responses: {responses}", "queries", "responses"),
 		"pcap.text.dns_error":      e("{rcode}  {name} {type}  servidor {server}", "{rcode}  {name} {type}  server {server}", "rcode", "name", "type", "server"),
@@ -34,6 +34,6 @@ func init() {
 		"pcap.text.icmp_unreach":   e("Inalcanzable (código {code}): {from} avisa que {target} no se alcanza", "Unreachable (code {code}): {from} reports that {target} cannot be reached", "code", "from", "target"),
 		"pcap.text.icmp_ttl":       e("TTL excedido: {from} hacia {target}", "TTL exceeded: {from} towards {target}", "from", "target"),
 		"pcap.text.fragments":      e("Fragmentos IP: {n} (revisa MTU o túneles)", "IP fragments: {n} (check MTU or tunnels)", "n"),
-		"pcap.text.counts":         e("{packets} paquetes  {bytes} bytes", "{packets} packets  {bytes} bytes", "packets", "bytes"),
+		"pcap.text.counts":         e("{packets} paquetes  {bytes} bytes", "{packets} {packets|packet|packets}  {bytes} {bytes|byte|bytes}", "packets", "bytes"),
 	})
 }

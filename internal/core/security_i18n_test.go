@@ -139,7 +139,7 @@ func TestRadiusEstructuradoYEn(t *testing.T) {
 	if e.Error.GetKey() != "security.radius.err.no_response" || e.Error.Args["attempts"] != "1" || e.Error.Text != "sin respuesta tras 1 intentos de 100ms" || e.Code != "" || e.MessageAuthenticator != "" {
 		t.Errorf("error: %+v", e)
 	}
-	if got := en2.Exchanges[0].Error.Text; got != "no response after 1 attempts of 100ms" || !strings.Contains(en2.Report.Text, "! no response after 1 attempts of 100ms") ||
+	if got := en2.Exchanges[0].Error.Text; got != "no response after 1 attempt (100ms each)" || !strings.Contains(en2.Report.Text, "! no response after 1 attempt (100ms each)") ||
 		!strings.Contains(en2.Report.Text, "UDP 1812 filtered") || en2.Findings[0].Code != "sin-respuesta" || en2.Findings[0].Args["port"] != "1812" {
 		t.Errorf("sin respuesta en: %+v\n%s", en2.Exchanges[0], en2.Report.Text)
 	}

@@ -147,7 +147,7 @@ func TestPcapEstructuradoYEn(t *testing.T) {
 	// en: encabezados y frases en inglés, mismos valores.
 	en := ask("en-US", p)
 	for _, want := range []string{"Capture: " + p + "\n", "Packets: 5 · Bytes: ", "\n== TCP\n  Complete handshakes: 1 · Handshake RTT min/avg/max: 4ms / 4ms / 4ms\n",
-		"  Unanswered SYN (1):\n    10.0.0.1:40001 → 10.0.0.3:443  (1 attempts)\n", "  NO RESPONSE  mudo.example.com A  server 10.0.0.53:53\n",
+		"  Unanswered SYN (1):\n    10.0.0.1:40001 → 10.0.0.3:443  (1 attempt)\n", "  NO RESPONSE  mudo.example.com A  server 10.0.0.53:53\n",
 		"\n== Top conversations by bytes\n  tcp  10.0.0.1:40000 ↔ 10.0.0.2:22  3 packets  ", "\n== Top talkers\n  10.0.0.1  "} {
 		if !strings.Contains(en.Report.Text, want) {
 			t.Errorf("en: falta %q en\n%s", want, en.Report.Text)
