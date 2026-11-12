@@ -59,14 +59,16 @@ func (f Finding) In(loc string) Finding {
 	f.Title = i18n.Msg(loc, f.x.key+".title", f.x.args)
 	f.Explanation = i18n.Msg(loc, f.x.explKey, f.x.args)
 	f.Action = i18n.Msg(loc, f.x.key+".action", f.x.args)
-	ev := make([]string, len(f.Evidence))
-	for i := range ev {
-		ev[i] = f.Evidence[i]
-		if f.x.meaning[i] != "" {
-			ev[i] = f.x.base[i] + "  → " + i18n.Msg(loc, f.x.meaning[i], nil)
+	if f.Evidence != nil { // nulo sigue nulo: el JSON en español no cambia
+		ev := make([]string, len(f.Evidence))
+		for i := range ev {
+			ev[i] = f.Evidence[i]
+			if f.x.meaning[i] != "" {
+				ev[i] = f.x.base[i] + "  → " + i18n.Msg(loc, f.x.meaning[i], nil)
+			}
 		}
+		f.Evidence = ev
 	}
-	f.Evidence = ev
 	return f
 }
 
@@ -124,11 +126,13 @@ func (r Report) In(loc string) Report {
 			r.Proposals[i].Result = i18n.Msg(loc, p.resKey, nil)
 		}
 	}
-	fs := make([]Finding, len(r.Findings))
-	for i, f := range r.Findings {
-		fs[i] = f.In(loc)
+	if r.Findings != nil {
+		fs := make([]Finding, len(r.Findings))
+		for i, f := range r.Findings {
+			fs[i] = f.In(loc)
+		}
+		r.Findings = fs
 	}
-	r.Findings = fs
 	r.Note = i18n.Msg(loc, "ike.note", nil)
 	return r
 }
