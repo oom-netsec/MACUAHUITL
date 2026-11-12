@@ -33,10 +33,10 @@ test("la vista usa el informe estructurado y no llama al método de texto", asyn
   expect(core.toolsPcap).not.toHaveBeenCalled();
 });
 
-test("si el método nuevo falla, cae al texto", async () => {
-  const core = fakeCore({ toolsPcapReport: vi.fn(async () => { throw new Error("unknown method"); }),
-    toolsPcap: vi.fn(async () => "== Equipos con más tráfico\n  10.0.0.1  3 paquetes  30 bytes\n") });
+test("si el informe falla se muestra el error, sin repetir con el método de texto", async () => {
+  const core = fakeCore({ toolsPcapReport: vi.fn(async () => { throw new Error("rpc error: code = InvalidArgument desc = no es una captura"); }),
+    toolsPcap: vi.fn(async () => "no debe llamarse") });
   await analyze(core);
-  expect(await screen.findByRole("list", { name: "Equipos con más tráfico" })).toBeInTheDocument();
-  expect(core.toolsPcap).toHaveBeenCalled();
+  expect(await screen.findByText(/no es una captura/)).toBeInTheDocument();
+  expect(core.toolsPcap).not.toHaveBeenCalled();
 });

@@ -15,7 +15,6 @@ import { MAX_LIVE, useBatch, useIngestOpts } from "../../components/ingest/useIn
 import type { OptKey } from "../../components/ingest/ingestOpts";
 import { toMsg, type SysMsg, type WireMsg } from "./syslogStats";
 import { parsePcap, pcapFromReport } from "./pcapParse";
-import { tryReport } from "../../lib/structured";
 import type { PcapReportData } from "./api";
 import { PcapReport } from "./PcapReport";
 import { parseTrace } from "./dnsTrace";
@@ -61,9 +60,11 @@ export function PcapPanel({ core }: { core: CoreAPI }) {
   const pick = () => core.pickPath({ title: t("pcap.path"), filters: [{ name: t("pcap.filter"), pattern: "*.pcap;*.pcapng" }] });
   const run = async () => {
     const n = Number(top) || 20;
-    const d = await tryReport(core.toolsPcapReport && (() => core.toolsPcapReport!(path, n)));
+    setRep(null);
+    const d = core.toolsPcapReport && await core.toolsPcapReport(path, n); // un error se muestra, sin repetir con el método de texto
+    if (!d?.text) return core.toolsPcap(path, n);
     setRep(d);
-    return d ? d.text : core.toolsPcap(path, n);
+    return d.text;
   };
   return (
     <Page title={t("pcap.title")} description={t("pcap.desc")}>

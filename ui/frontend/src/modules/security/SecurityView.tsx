@@ -4,7 +4,6 @@ import { Check, Field, Notice, Select, TextArea } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section, Tabs, useResult } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
-import { tryReport } from "../../lib/structured";
 import type { PkiReportData, RadiusReportData, TacacsReportData } from "./api";
 import { CertChain, ResultCards } from "./SecCards";
 import "./security.css";
@@ -74,11 +73,12 @@ function useSecrets(core: CoreAPI) {
   return { view, values, ready };
 }
 
-// Resultado de una prueba: el informe estructurado si el núcleo lo da y, si no, el texto de siempre.
+// Resultado de una prueba: el informe estructurado y, si no lo hay o llega sin texto (doble de pruebas), el texto de siempre.
+// Un error del informe NO cae al texto: repetiría la prueba contra el servidor (dos intentos de autenticación).
 interface Probe<R> { text: string; report?: R }
 async function probe<A, R extends { text: string }>(report: ((a: A) => Promise<R>) | undefined, plain: (a: A) => Promise<string>, arg: A): Promise<Probe<R>> {
-  const rep = await tryReport(report && (() => report(arg)));
-  return rep ? { text: rep.text, report: rep } : { text: await plain(arg) };
+  const rep = report && await report(arg);
+  return rep?.text ? { text: rep.text, report: rep } : { text: await plain(arg) };
 }
 
 const kbd = <kbd aria-hidden="true">Ctrl ↵</kbd>;

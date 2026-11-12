@@ -29,9 +29,19 @@ test("radius usa el informe estructurado: severidad y Message-Authenticator por 
   expect(core.secRadius).not.toHaveBeenCalled();
 });
 
-test("radius cae al texto si el método nuevo falla", async () => {
-  const core = fakeCore({ secRadiusReport: vi.fn(async () => { throw new Error("unknown method"); }),
-    secRadius: vi.fn(async () => "Servidor RADIUS 10.0.0.20:1812\n\naccess-request: Access-Accept en 3.0 ms (intento 1, Message-Authenticator válido)\n") });
+// Un error del informe se muestra y NO se repite con el método de texto: serían dos intentos de autenticación contra el servidor.
+test("radius: si el informe falla se muestra el error y la prueba no se repite", async () => {
+  const core = fakeCore({ secRadiusReport: vi.fn(async () => { throw new Error("rpc error: code = Unavailable desc = sin respuesta del servidor"); }),
+    secRadius: vi.fn(async () => "no debe llamarse") });
+  render(<SecurityView core={core} />);
+  await fillRadius();
+  expect(await screen.findByText(/sin respuesta del servidor/)).toBeInTheDocument();
+  expect(core.secRadiusReport).toHaveBeenCalledTimes(1);
+  expect(core.secRadius).not.toHaveBeenCalled();
+});
+
+test("radius cae al texto si el informe llega sin texto", async () => {
+  const core = fakeCore({ secRadius: vi.fn(async () => "Servidor RADIUS 10.0.0.20:1812\n\naccess-request: Access-Accept en 3.0 ms (intento 1, Message-Authenticator válido)\n") });
   render(<SecurityView core={core} />);
   await fillRadius();
   expect((await screen.findAllByText(/Message-Authenticator válido/)).length).toBeGreaterThan(0);
