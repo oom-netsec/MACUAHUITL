@@ -117,7 +117,7 @@ func TestWrongSecretIsReported(t *testing.T) {
 	if e := r.Exchanges[0]; e.Code != "" || !strings.Contains(e.Error, "sin respuesta") || e.Attempts != 2 {
 		t.Fatalf("%+v", e)
 	}
-	if !hasFinding(r, "sin-respuesta") {
+	if !hasFinding(r, "no_response") {
 		t.Fatalf("findings = %+v", r.Findings)
 	}
 }
@@ -134,7 +134,7 @@ func TestResponseAuthenticatorMismatch(t *testing.T) {
 func TestMissingMessageAuthenticatorWarns(t *testing.T) {
 	h, p, _ := fake(t, FakeConfig{NoReplyMA: true})
 	r, _ := Run(context.Background(), direct, base(h, p))
-	if r.Exchanges[0].MessageAuthenticator != "ausente" || !hasFinding(r, "blast-radius") {
+	if r.Exchanges[0].MessageAuthenticator != "ausente" || !hasFinding(r, "blast_radius") {
 		t.Fatalf("%+v %+v", r.Exchanges[0], r.Findings)
 	}
 }

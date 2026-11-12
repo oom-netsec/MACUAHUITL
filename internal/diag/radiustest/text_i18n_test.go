@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -84,5 +85,40 @@ func TestTextoEspanolRegresion(t *testing.T) {
 				t.Errorf("%s/%s cambió\n got: %s\nwant: %s", n, k, v, want[n][k])
 			}
 		}
+	}
+}
+
+// Fase 30c-A: los code de hallazgo son identificadores cerrados en inglés (la interfaz no lee el español).
+func TestCodigosDeHallazgoEnIngles(t *testing.T) {
+	closed := map[string]bool{"no_response": true, "invalid_response": true, "blast_radius": true, "ma_invalid": true, "reject": true}
+	seen := map[string]bool{}
+	for n, r := range escenarios(t) {
+		for _, f := range r.Findings {
+			if !closed[f.Code] {
+				t.Errorf("%s: code %q fuera del conjunto cerrado", n, f.Code)
+			}
+			seen[f.Code] = true
+		}
+	}
+	for _, c := range []string{"no_response", "invalid_response", "blast_radius", "reject"} {
+		if !seen[c] {
+			t.Errorf("ningún escenario produce %q", c)
+		}
+	}
+}
+
+// mschap2_verified: nulo salvo en MS-CHAPv2; verdadero con el servidor de mentira (conoce la contraseña) y el
+// texto de la verificación sigue igual en el JSON (el campo no viaja en él).
+func TestMSCHAP2Verified(t *testing.T) {
+	sc := escenarios(t)
+	ms := sc["mschapv2"].Exchanges[0]
+	if ms.MSCHAP2Verified == nil || !*ms.MSCHAP2Verified {
+		t.Fatalf("mschapv2: %v", ms.MSCHAP2Verified)
+	}
+	if sc["accept-acct"].Exchanges[0].MSCHAP2Verified != nil {
+		t.Error("PAP no debe traer mschap2_verified")
+	}
+	if b, _ := json.Marshal(ms); strings.Contains(string(b), "MSCHAP2") {
+		t.Errorf("el campo no debe viajar en el JSON: %s", b)
 	}
 }

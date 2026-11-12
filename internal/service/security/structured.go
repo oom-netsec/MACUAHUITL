@@ -25,6 +25,7 @@ func radiusExchanges(loc string, r radiustest.Report) []*v1.RadiusExchange {
 	for _, e := range r.Exchanges {
 		x := &v1.RadiusExchange{Kind: e.Kind, Code: e.Code, RttMs: e.RTTMillis, Attempts: int32(e.Attempts),
 			MessageAuthenticator: radiustest.MACode(e.MessageAuthenticator), Error: secText(loc, e.ErrText)}
+		x.Mschap2Verified = e.MSCHAP2Verified
 		for _, a := range e.Attrs {
 			x.Attrs = append(x.Attrs, &v1.RadiusAttribute{Name: a.Name, Value: a.Value})
 		}

@@ -439,8 +439,10 @@ type RadiusExchange struct {
 	MessageAuthenticator string                 `protobuf:"bytes,5,opt,name=message_authenticator,json=messageAuthenticator,proto3" json:"message_authenticator,omitempty"` // absent, valid, invalid; vacío si no hubo respuesta
 	Error                *SecText               `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`                                                           // ausente si no hubo error
 	Attrs                []*RadiusAttribute     `protobuf:"bytes,7,rep,name=attrs,proto3" json:"attrs,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Fase 30c: en MS-CHAPv2, si el MS-CHAP2-Success verificó al servidor (autenticación mutua); ausente si no hubo.
+	Mschap2Verified *bool `protobuf:"varint,8,opt,name=mschap2_verified,json=mschap2Verified,proto3,oneof" json:"mschap2_verified,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *RadiusExchange) Reset() {
@@ -520,6 +522,13 @@ func (x *RadiusExchange) GetAttrs() []*RadiusAttribute {
 		return x.Attrs
 	}
 	return nil
+}
+
+func (x *RadiusExchange) GetMschap2Verified() bool {
+	if x != nil && x.Mschap2Verified != nil {
+		return *x.Mschap2Verified
+	}
+	return false
 }
 
 type RadiusTestResponse struct {
@@ -2285,7 +2294,7 @@ const file_macuahuitl_v1_security_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\";\n" +
 	"\x0fRadiusAttribute\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"\x84\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xc9\x02\n" +
 	"\x0eRadiusExchange\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x12\n" +
 	"\x04code\x18\x02 \x01(\tR\x04code\x12\x15\n" +
@@ -2293,7 +2302,9 @@ const file_macuahuitl_v1_security_proto_rawDesc = "" +
 	"\battempts\x18\x04 \x01(\x05R\battempts\x123\n" +
 	"\x15message_authenticator\x18\x05 \x01(\tR\x14messageAuthenticator\x12,\n" +
 	"\x05error\x18\x06 \x01(\v2\x16.macuahuitl.v1.SecTextR\x05error\x124\n" +
-	"\x05attrs\x18\a \x03(\v2\x1e.macuahuitl.v1.RadiusAttributeR\x05attrs\"\xeb\x01\n" +
+	"\x05attrs\x18\a \x03(\v2\x1e.macuahuitl.v1.RadiusAttributeR\x05attrs\x12.\n" +
+	"\x10mschap2_verified\x18\b \x01(\bH\x00R\x0fmschap2Verified\x88\x01\x01B\x13\n" +
+	"\x11_mschap2_verified\"\xeb\x01\n" +
 	"\x12RadiusTestResponse\x121\n" +
 	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x12\x16\n" +
 	"\x06server\x18\x02 \x01(\tR\x06server\x12\x16\n" +
@@ -2567,6 +2578,7 @@ func file_macuahuitl_v1_security_proto_init() {
 		return
 	}
 	file_macuahuitl_v1_tools_proto_init()
+	file_macuahuitl_v1_security_proto_msgTypes[5].OneofWrappers = []any{}
 	file_macuahuitl_v1_security_proto_msgTypes[12].OneofWrappers = []any{}
 	file_macuahuitl_v1_security_proto_msgTypes[14].OneofWrappers = []any{}
 	type x struct{}

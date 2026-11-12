@@ -80,6 +80,8 @@ message RadiusExchange {
   string message_authenticator = 5; // absent, valid, invalid; vacío si no hubo respuesta
   SecText error = 6;            // ausente si no hubo error
   repeated RadiusAttribute attrs = 7;
+  // Fase 30c: en MS-CHAPv2, si el MS-CHAP2-Success verificó al servidor (autenticación mutua); ausente si no hubo.
+  optional bool mschap2_verified = 8;
 }
 
 message RadiusTestResponse {

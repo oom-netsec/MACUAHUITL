@@ -30,13 +30,13 @@ func (fakeStruct) RadiusTest(context.Context, *v1.RadiusTestRequest) (*v1.Radius
 	return &v1.RadiusTestResponse{Report: &v1.ToolReport{Text: "radius"}, Server: "10.0.0.1", Method: "PAP",
 		Exchanges: []*v1.RadiusExchange{{Kind: "access-request", Code: "Access-Accept", RttMs: 1.5, Attempts: 1, MessageAuthenticator: "absent", Attrs: []*v1.RadiusAttribute{{Name: "Filter-Id", Value: "x"}}},
 			{Kind: "accounting-start", Attempts: 2, Error: &v1.SecText{Key: "security.radius.err.no_response", Args: map[string]string{"attempts": "2"}, Text: "sin respuesta tras 2 intentos de 1s"}}},
-		Findings: []*v1.SecFinding{{Code: "blast-radius", Severity: "warning", Args: map[string]string{"kind": "access-request"}, Message: "m"}}}, nil
+		Findings: []*v1.SecFinding{{Code: "blast_radius", Severity: "warning", Args: map[string]string{"kind": "access-request"}, Message: "m"}}}, nil
 }
 
 func (fakeStruct) TacacsTest(context.Context, *v1.TacacsTestRequest) (*v1.TacacsTestResponse, error) {
 	return &v1.TacacsTestResponse{Report: &v1.ToolReport{Text: "tacacs"}, Server: "10.0.0.1:49",
 		Steps:    []*v1.TacacsStep{{Kind: "authorization", Status: "PASS_ADD", RttMs: 2, Prompts: []string{"Password: "}, AvPairs: []*v1.TacacsAvPair{{Direction: "sent", Value: "service=shell"}, {Direction: "received", Value: "priv-lvl=15"}}}},
-		Findings: []*v1.SecFinding{{Code: "authen-fail", Severity: "info", Message: "m"}}}, nil
+		Findings: []*v1.SecFinding{{Code: "authen_fail", Severity: "info", Message: "m"}}}, nil
 }
 
 func (fakeStruct) PkiDecode(context.Context, *v1.PkiDecodeRequest) (*v1.PkiDecodeResponse, error) {
@@ -111,7 +111,7 @@ func TestEstructuradoBridge(t *testing.T) {
 	if _, ok := e1["code"]; ok {
 		t.Errorf("code vacío debe omitirse: %v", e1)
 	}
-	if fd := m["findings"].([]any)[0].(map[string]any); fd["code"] != "blast-radius" || fd["severity"] != "warning" {
+	if fd := m["findings"].([]any)[0].(map[string]any); fd["code"] != "blast_radius" || fd["severity"] != "warning" {
 		t.Errorf("findings: %v", fd)
 	}
 	// TACACS
