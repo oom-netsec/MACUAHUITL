@@ -25,8 +25,9 @@ var (
 	CreateTemp   = os.CreateTemp
 )
 
-// safeShellPath son las rutas que se pueden poner en una orden de terminal sin citar.
-var safeShellPath = regexp.MustCompile(`^[A-Za-z0-9/._+,@%=:-]+$`)
+// safeShellPath son las rutas que se pueden poner en una orden de terminal sin citar: letras (también con acento),
+// números y unos pocos signos; nada de espacios, comillas, $ ni caracteres de formato (bidi).
+var safeShellPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N}/._+,@%=:-]+$`)
 
 // outputsErr arma el error con el código estable prefs.outputs.<motivo> al inicio (el paso de idioma de la
 // fase 30a lo traduce); el texto va en español.

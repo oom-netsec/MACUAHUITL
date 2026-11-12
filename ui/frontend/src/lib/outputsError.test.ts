@@ -11,6 +11,10 @@ test("la orden chmod cita lo raro y no se genera con \\, ' o control", () => {
   expect(chmodCommand("/x'y")).toBe("");
   expect(chmodCommand("/x\ny")).toBe("");
   expect(chmodCommand("")).toBe("");
+  // Un C1 o un bidi no se ejecuta entre comillas, pero puede hacer que la orden se vea distinta de lo que se pega.
+  expect(chmodCommand("/x\u0085y")).toBe("");
+  expect(chmodCommand("/x\u202ey")).toBe("");
+  expect(chmodCommand("/home/u/Música/salidas")).toBe("chmod 700 '/home/u/Música/salidas'");
 });
 
 test("el texto de un rechazo de permisos lleva la orden solo si es segura", () => {
@@ -30,6 +34,9 @@ test("los textos sirven en Ajustes, Job, Cambio y Diagnóstico", async () => {
   const { en } = await import("./i18n/en");
   expect(es["settings.storage.err.permisos"]).not.toMatch(/guardar/);
   expect(en["settings.storage.err.permisos"]).not.toMatch(/save/i);
+  // Sin orden (ruta que no se puede citar segura), el texto no debe pedir "esta orden".
+  expect(es["settings.storage.err.permisos"]).not.toMatch(/esta orden/);
+  expect(en["settings.storage.err.permisos"]).not.toMatch(/this command/);
   expect(es["change.outDir"]).toMatch(/subcarpeta/);
   expect(en["change.outDir"]).toMatch(/subfolder/);
 });

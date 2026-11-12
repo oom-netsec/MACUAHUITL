@@ -16,7 +16,7 @@ func TestSugerenciaChmodSoloConRutaSegura(t *testing.T) {
 	for nombre, c := range map[string]struct {
 		dir string
 		con bool
-	}{"normal": {"salidas", true}, "espacio": {"mis salidas", false}, "subshell": {"$(id)", false}, "comilla": {"it's", false}, "punto y coma": {"a;b", false}} {
+	}{"normal": {"salidas", true}, "espacio": {"mis salidas", false}, "subshell": {"$(id)", false}, "comilla": {"it's", false}, "punto y coma": {"a;b", false}, "acentos": {"Música", true}, "bidi": {"a\u202eb", false}} {
 		t.Run(nombre, func(t *testing.T) {
 			dir := filepath.Join(t.TempDir(), c.dir)
 			os.Mkdir(dir, 0o700)

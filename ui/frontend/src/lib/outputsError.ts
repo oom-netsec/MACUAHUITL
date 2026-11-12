@@ -17,7 +17,7 @@ const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replac
 /** La orden `chmod 700 <ruta>` lista para pegar; vacía si la ruta trae `\`, `'` o un carácter de control (en fish `\'` escapa dentro de comillas simples: no hay cita segura). */
 export function chmodCommand(path: string): string {
   // eslint-disable-next-line no-control-regex
-  if (!path || /[\\'\x00-\x1f\x7f]/.test(path)) return "";
+  if (!path || /[\\'\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/.test(path)) return "";
   return `chmod 700 ${shellQuote(path)}`;
 }
 
