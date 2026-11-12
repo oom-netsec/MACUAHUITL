@@ -31,7 +31,7 @@ func init() {
 		"forensic.source.text":     e("texto pegado", "pasted text"),
 		"forensic.source.capture":  e("captura del receptor syslog", "syslog receiver capture"),
 		"forensic.source.job":      e("show logging del trabajo {dir}", "show logging of job {dir}", "dir"),
-		"forensic.crash.counters":  e("Contadores entre rondas:", "Counters between rounds:"),
+		"forensic.flap.counters":   e("Contadores entre rondas:", "Counters between rounds:"),
 		"forensic.warn.file_cap":   e("el archivo supera 32 MiB: solo se leyó el principio", "the file exceeds 32 MiB: only the beginning was read"),
 		"forensic.warn.more_caps":  e("hay más capturas de las que caben en el tope; se leyeron las más recientes", "there are more captures than fit in the limit; the most recent were read"),
 		"forensic.warn.cap_tail":   e("{file} supera el tope: solo se leyó el final (lo más reciente)", "{file} exceeds the limit: only the end (the most recent part) was read", "file"),

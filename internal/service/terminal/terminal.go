@@ -155,7 +155,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	s.wg.Add(1)
 	defer s.wg.Done()
 	if s.ctx.Err() != nil {
-		return s.refuse(label, service.Err(st.Context(), codes.Unavailable, "terminal.err.core_closing2", nil), "the core is shutting down")
+		return s.refuse(label, service.Err(st.Context(), codes.Unavailable, "terminal.err.shutting_down", nil), "the core is shutting down")
 	}
 
 	ctx, cancel := context.WithCancel(st.Context())

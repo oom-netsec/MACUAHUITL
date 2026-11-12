@@ -19,7 +19,7 @@ func init() {
 		"terminal.err.vault_closed":  e("abre la bóveda: la terminal necesita las credenciales del equipo", "unlock the vault: the terminal needs the device credentials"),
 		"terminal.err.max_sessions":  e("máximo {max} terminales abiertas", "at most {max} terminals open", "max"),
 		"terminal.err.core_closing":  e("núcleo cerrándose", "core shutting down"),
-		"terminal.err.core_closing2": e("el núcleo se está cerrando", "the core is shutting down"),
+		"terminal.err.shutting_down": e("el núcleo se está cerrando", "the core is shutting down"),
 		"terminal.err.client_gone":   e("cliente desconectado", "client disconnected"),
 		"terminal.err.device_closed": e("el equipo cerró la sesión", "the device closed the session"),
 		"terminal.err.lost":          e("conexión perdida: {error}", "connection lost: {error}", "error"),

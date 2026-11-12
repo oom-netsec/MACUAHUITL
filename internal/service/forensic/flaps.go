@@ -84,7 +84,7 @@ func (s *forensicSvc) Flapping(ctx context.Context, r *v1.FlappingRequest) (*v1.
 			i18n.Note(&extra, &extraT, "forensic.warn.no_ifaces")
 		} else {
 			jumps = logintel.CounterJumps(ss, int64(min(r.MinDelta, 1<<20)))
-			jtxt = "\n\n" + i18n.Msg(loc, "forensic.crash.counters", nil) + "\n" + logintel.JumpsTextIn(loc, jumps)
+			jtxt = "\n\n" + i18n.Msg(loc, "forensic.flap.counters", nil) + "\n" + logintel.JumpsTextIn(loc, jumps)
 		}
 	}
 	s.d.Audit("forensic.flapping", l.source.in(i18n.En), fmt.Sprintf("messages=%d flaps=%d jumps=%d", len(l.entries), len(rep.Flaps), len(jumps)))
