@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
 )
 
@@ -139,6 +140,8 @@ type Report struct {
 	To       int           `json:"to"`
 	Devices  []DeviceDrift `json:"devices"`
 	Warnings []string      `json:"warnings"`
+	// WarningsTx son los avisos como texto (mismo largo y orden); no viajan en el JSON.
+	WarningsTx []i18n.Text `json:"-"`
 	// Masked: el trabajo enmascaró secretos, así que un cambio de enable secret, snmp community o key-string no se ve.
 	Masked bool `json:"masked"`
 }
@@ -146,18 +149,24 @@ type Report struct {
 // MaskedNotice es el aviso que acompaña al informe cuando Masked es verdadero.
 const MaskedNotice = "los cambios en secretos no son visibles porque el trabajo enmascara secretos"
 
-func (r Report) Text() string {
+// Text es el informe legible, en español.
+func (r Report) Text() string { return r.TextIn(i18n.Es) }
+
+// TextIn es el informe en el idioma pedido (con es, el de siempre); los avisos ya vienen en ese idioma si el
+// informe pasó por i18n.Localize.
+func (r Report) TextIn(loc string) string {
 	var b strings.Builder
+	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
 	n := 0
 	if r.Masked {
-		fmt.Fprintf(&b, "AVISO: %s\n\n", MaskedNotice)
+		fmt.Fprintf(&b, "%s\n\n", m("drift.text.warning", "message", m("drift.masked_notice")))
 	}
 	for _, d := range r.Devices {
 		if len(d.Changes) == 0 {
-			fmt.Fprintf(&b, "%s: sin deriva (ronda %d contra %d)\n", d.Device, d.To, d.From)
+			fmt.Fprintf(&b, "%s\n", m("drift.text.none", "device", d.Device, "to", d.To, "from", d.From))
 		} else {
 			n++
-			fmt.Fprintf(&b, "%s: %d cambios (%d agregadas, %d quitadas), ronda %d contra %d\n", d.Device, len(d.Changes), d.Added, d.Removed, d.To, d.From)
+			fmt.Fprintf(&b, "%s\n", m("drift.text.changes", "device", d.Device, "n", len(d.Changes), "added", d.Added, "removed", d.Removed, "to", d.To, "from", d.From))
 			last := "\x00"
 			for _, c := range d.Changes {
 				if c.Path != last {
@@ -170,13 +179,13 @@ func (r Report) Text() string {
 			}
 		}
 		if len(d.Ignored) > 0 {
-			fmt.Fprintf(&b, "  ignoradas por volátiles: %s\n", strings.Join(d.Ignored, "; "))
+			fmt.Fprintf(&b, "  %s\n", m("drift.text.ignored", "list", strings.Join(d.Ignored, "; ")))
 		}
 	}
 	for _, w := range r.Warnings {
-		fmt.Fprintf(&b, "Aviso: %s\n", w)
+		fmt.Fprintf(&b, "%s\n", m("drift.text.warn", "message", w))
 	}
-	fmt.Fprintf(&b, "\n%d de %d equipos con deriva\n", n, len(r.Devices))
+	fmt.Fprintf(&b, "\n%s\n", m("drift.text.total", "n", n, "total", len(r.Devices)))
 	return b.String()
 }
 

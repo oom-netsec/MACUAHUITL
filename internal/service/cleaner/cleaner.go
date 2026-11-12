@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/cleaner"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
@@ -19,16 +19,16 @@ type cleanerSvc struct {
 	d service.Deps
 }
 
-func (s *cleanerSvc) Clean(_ context.Context, r *v1.CleanRequest) (*v1.CleanResponse, error) {
+func (s *cleanerSvc) Clean(ctx context.Context, r *v1.CleanRequest) (*v1.CleanResponse, error) {
 	s.d.MarkActive()
 	if r.Text == "" {
-		return nil, status.Error(codes.InvalidArgument, "falta la configuración")
+		return nil, service.Err(ctx, codes.InvalidArgument, "cleaner.err.empty", nil)
 	}
 	res := cleaner.Clean(r.Text, cleaner.Options{Sort: r.Sort})
 	s.d.Audit("cleaner.clean", "", fmt.Sprintf("bytes=%d sorted=%v changes=%d orphans=%d", len(r.Text), r.Sort, len(res.Changes), len(res.Orphans)))
-	out := res.Output
+	out := res.OutputIn(i18n.Locale(ctx))
 	res.Output = "" // la salida viaja aparte; el informe no la repite
-	return &v1.CleanResponse{Report: service.Report(res, res.Text()), Output: out}, nil
+	return &v1.CleanResponse{Report: service.ReportL(ctx, &res, func(loc string) string { return res.TextIn(loc) }), Output: out}, nil
 }
 
 // Module registra el servicio Cleaner.
