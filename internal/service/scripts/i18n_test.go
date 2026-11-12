@@ -100,7 +100,7 @@ func guionesCasos(t *testing.T, ctx context.Context) map[string]string {
 	put("duplicar_no_existe", err)
 	_, err = s.SetFavorite(ctx, &v1.SetFavoriteRequest{Id: "lib-no-existe", Favorite: true})
 	put("favorito_no_existe", err)
-	_, err = s.ExportScripts(ctx, &v1.ExportScriptsRequest{})
+	_, err = s.ExportScripts(ctx, &v1.ExportScriptsRequest{Path: filepath.Join(t.TempDir(), "x.json")})
 	put("exportar_vacio", err)
 	_, err = s.ExportScripts(ctx, &v1.ExportScriptsRequest{Ids: make([]string, 2000), Path: "/tmp/x"})
 	put("exportar_muchos", err)
@@ -131,12 +131,35 @@ func guionesCasos(t *testing.T, ctx context.Context) map[string]string {
 	put("fijar_no_existe", err)
 	_, err = s.ReorderPinned(ctx, &v1.ReorderPinnedRequest{Ids: []string{"x"}})
 	put("fijar_orden", err)
-	_, err = s.ExportCollections(ctx, &v1.ExportCollectionsRequest{})
+	_, err = s.ExportCollections(ctx, &v1.ExportCollectionsRequest{Path: filepath.Join(t.TempDir(), "x.json")})
 	put("col_exportar_vacio", err)
 	_, err = s.ExportCollections(ctx, &v1.ExportCollectionsRequest{Ids: []string{"0123456789abcdef0123456789abcdef"}, Path: "/tmp/x"})
 	put("col_exportar_no_existe", err)
 	_, err = s.ApplyImportCollections(ctx, &v1.ApplyImportCollectionsRequest{Token: "no-existe"})
 	put("col_importar_token", err)
+	// Archivos de import con ids inválidos: llegan a las reglas de validación de cada script y colección.
+	mal := dom.Script{ID: "zzz", Name: "Mal", Tech: "gestion", Platform: "ios-xe", Commands: []string{"show version"}, Tags: []string{}, Origin: dom.OrigenUsuario}
+	malLib := mal
+	malLib.ID, malLib.Name, malLib.Origin = "lib-@@", "Mal lib", dom.OrigenBiblioteca
+	for n, sc := range map[string]dom.Script{"importar_id_usuario": mal, "importar_id_lib": malLib} {
+		b, err := dom.Marshal([]dom.Script{sc}, time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC))
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := filepath.Join(t.TempDir(), n+".json")
+		os.WriteFile(p, b, 0o600)
+		_, err = s.PreviewImport(ctx, &v1.PreviewImportRequest{Path: p})
+		put(n, err)
+	}
+	colMala := dom.Coleccion{ID: "zz", Name: "Mala", ScriptIDs: []string{}}
+	if b, err := dom.MarshalColecciones([]dom.Coleccion{colMala}, nil, time.Date(2026, 11, 6, 0, 0, 0, 0, time.UTC)); err == nil {
+		p := filepath.Join(t.TempDir(), "col.json")
+		os.WriteFile(p, b, 0o600)
+		_, err = s.PreviewImportCollections(ctx, &v1.PreviewImportCollectionsRequest{Path: p})
+		put("importar_col_id", err)
+	} else {
+		t.Fatal(err)
+	}
 	_, err = s.ImportTemplate(ctx, &v1.ImportTemplateRequest{Kind: "raro"})
 	put("plantilla_tipo", err)
 	_, err = s.ImportFormat(ctx, &v1.ImportFormatRequest{Kind: "raro"})

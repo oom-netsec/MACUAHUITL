@@ -449,7 +449,7 @@ func (s *svc) PreviewImport(ctx context.Context, r *v1.PreviewImportRequest) (*v
 	}
 	incoming, avisos, err := dom.ParseAvisos(b)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	user, err := loadUser(s.d.DB())
 	if err != nil {
@@ -502,7 +502,7 @@ func (s *svc) ApplyImport(ctx context.Context, r *v1.ApplyImportRequest) (*v1.Ap
 			}
 			if res, err = dom.Apply(dom.Plan(p.scripts, user, lib), dec, user, lib, now.UTC().Truncate(time.Second)); err != nil {
 				invalid = true
-				return status.Error(codes.InvalidArgument, err.Error())
+				return service.ErrFrom(ctx, codes.InvalidArgument, err)
 			}
 			for _, x := range res.Writes {
 				if err := put(tx, x); err != nil {

@@ -305,13 +305,7 @@ func (e *Error) Localize(loc string) string {
 }
 
 // causeIn es el texto de una causa en el idioma pedido: con código, el del catálogo; sin él, el de siempre.
-func causeIn(err error, loc string) string {
-	var c Coded
-	if loc != Es && errors.As(err, &c) {
-		return c.Localize(loc)
-	}
-	return err.Error()
-}
+func causeIn(err error, loc string) string { return In(loc, err) }
 
 // Codes lista los códigos del catálogo en orden (para pruebas y documentación).
 func Codes() []string {

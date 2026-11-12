@@ -2,7 +2,6 @@ package transfer
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -73,7 +72,7 @@ func transferenciaCasos(t *testing.T, ctx context.Context) map[string]string {
 		"get_insecure": {Url: "http://127.0.0.1/a", DestDir: dest, Insecure: true}, "get_destino_sensible": {Url: "http://127.0.0.1/a", DestDir: "/etc"},
 		"get_tiempo": {Url: "http://127.0.0.1/a", DestDir: dest, TimeoutSeconds: 99999}, "get_tope": {Url: "http://127.0.0.1/a", DestDir: dest, MaxBytes: -1},
 		"get_sin_credencial": {Url: "scp://127.0.0.1/a", DestDir: dest}, "get_boveda": {Url: "scp://127.0.0.1/a", DestDir: dest, CredentialId: "x"},
-		"get_url_mala": {Url: "%zz", DestDir: dest}, "get_ruta_larga": {Url: "http://127.0.0.1/a b", DestDir: dest},
+		"get_url_mala": {Url: "%zz", DestDir: dest},
 	} {
 		_, err := s.Get(ctx, r)
 		put(n, err)
@@ -87,6 +86,10 @@ func transferenciaCasos(t *testing.T, ctx context.Context) map[string]string {
 		"browse_insecure": {Url: "ftp://127.0.0.1/", Insecure: true}, "browse_sin_credencial": {Url: "sftp://127.0.0.1/"},
 	} {
 		_, err := s.Browse(ctx, r)
+		put(n, err)
+	}
+	for n, p := range map[string]string{"browse_ruta_larga": strings.Repeat("a", 5000), "browse_ruta_control": "a\x01b"} {
+		_, err := s.Browse(ctx, &v1.BrowseRequest{Url: "ftp://127.0.0.1/", Path: p})
 		put(n, err)
 	}
 	for n, r := range map[string]*v1.GetManyRequest{
@@ -106,24 +109,34 @@ func transferenciaCasos(t *testing.T, ctx context.Context) map[string]string {
 	if err != nil {
 		put("descarga", err)
 	} else {
-		b, _ := json.Marshal(resp.Result)
 		out["descarga_informe"] = resp.Result.Report
-		out["descarga_resultado"] = resp.Result.Verified
-		_ = b
 	}
+	// Con el SHA-256 publicado el informe trae «verificado: …»; con otro, se descarta el archivo.
+	pub256 := sha([]byte("hostname R1\n"))
+	ver, err := s.Get(ctx, &v1.GetRequest{Url: "http://" + run.ready.Listening + "/r1.cfg", DestDir: tmp(), Sha256: pub256})
+	if err != nil {
+		put("descarga_verificada", err)
+	} else {
+		out["descarga_verificada"] = ver.Result.Report
+		out["descarga_verificada_codigo"] = ver.Result.Verified
+	}
+	_, err = s.Get(ctx, &v1.GetRequest{Url: "http://" + run.ready.Listening + "/r1.cfg", DestDir: tmp(), Sha256: strings.Repeat("0", 64)})
+	put("descarga_sha256_malo", err)
 	_, err = s.Get(ctx, &v1.GetRequest{Url: "http://" + run.ready.Listening + "/nope.cfg", DestDir: tmp()})
 	put("descarga_no_publicada", err)
-	run.transfers(t, 2)
+	for _, ev := range run.transfers(t, 4) { // la descarga buena, la no publicada, la verificada y la de SHA-256 malo
+		if ev["Rejected"] == true {
+			out["rechazo_no_publicado"] = ev["Error"].(string)
+		}
+	}
 	closed := startServerIn(t, s, ctx, &v1.StartServerRequest{Protocol: "http", Listen: "127.0.0.1:0", FromDir: pub, Allow: []string{"10.9.9.9"}})
 	_, err = s.Get(ctx, &v1.GetRequest{Url: "http://" + closed.ready.Listening + "/r1.cfg", DestDir: tmp()})
 	put("descarga_origen", err)
-	for i, ev := range closed.transfers(t, 1) {
+	for _, ev := range closed.transfers(t, 1) {
 		out["rechazo_origen"] = ev["Error"].(string)
-		_ = i
 	}
-	sum, err := s.Get(ctx, &v1.GetRequest{Url: "http://" + run.ready.Listening + "/r1.cfg", DestDir: tmp(), Sha512: strings.Repeat("0", 128)})
+	_, err = s.Get(ctx, &v1.GetRequest{Url: "http://" + run.ready.Listening + "/r1.cfg", DestDir: tmp(), Sha512: strings.Repeat("0", 128)})
 	put("descarga_sha512", err)
-	_ = sum
 	return out
 }
 

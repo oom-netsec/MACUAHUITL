@@ -10,6 +10,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 const (
@@ -111,11 +113,11 @@ func validaScripts(scripts []Script) error {
 	for i, s := range normaliza(scripts) {
 		scripts[i] = s
 		if err := s.Validate(); err != nil {
-			return fmt.Errorf("script %d (%q): %w", i+1, s.Name, err)
+			return i18n.Wrap("scripts.imp.script", i18n.A("n", i+1, "name", s.Name), err)
 		}
 		k := NameKey(s.Name)
 		if ids[s.ID] || nombres[k] {
-			return fmt.Errorf("script %d (%q): ID o nombre repetido dentro del archivo", i+1, s.Name)
+			return i18n.New("scripts.imp.script_dup", i18n.A("n", i+1, "name", s.Name))
 		}
 		ids[s.ID], nombres[k] = true, true
 	}

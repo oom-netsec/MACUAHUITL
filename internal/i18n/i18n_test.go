@@ -201,3 +201,18 @@ func TestInTraduceElTramoConCodigoYConservaElEnvoltorio(t *testing.T) {
 		t.Fatal("sin código o nil")
 	}
 }
+
+// Wrap conserva la causa para errors.Is y la da en el idioma pedido; con es el texto es el de siempre.
+func TestWrapConservaLaCausaYLaTraduce(t *testing.T) {
+	cause := New("file.exists", nil)
+	w := Wrap("patrol.err.credential", nil, cause)
+	if !errors.Is(w, cause) {
+		t.Fatal("errors.Is no ve la causa")
+	}
+	if got := w.Error(); got != "patrol: credencial: el archivo ya existe" {
+		t.Fatalf("es: %q", got)
+	}
+	if got := In(En, fmt.Errorf("x: %w", w)); got != "x: patrol: credential: the file already exists" {
+		t.Fatalf("en: %q", got)
+	}
+}

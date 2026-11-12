@@ -130,7 +130,7 @@ func fieldErr(f, key string, kv ...any) error {
 // fieldErrOf es fieldErr para un error ya armado: con código del catálogo lo conserva; sin él, va como texto de sistema.
 func fieldErrOf(f string, err error) error {
 	var ie *i18n.Error
-	if errors.As(err, &ie) {
+	if errors.As(err, &ie) && ie.Error() == err.Error() { // solo si el error es el del catálogo, sin envoltorio propio
 		return fieldErr(f, ie.Code, kvOf(ie.Args)...)
 	}
 	return fieldErr(f, "patrol.field.error", "error", err.Error())
@@ -219,7 +219,7 @@ func writable(dir string) error {
 	}
 	f, err := os.CreateTemp(dir, ".macuahuitl-prueba-*")
 	if err != nil {
-		return i18n.New("patrol.writable.no_write", i18n.A("error", err.Error()))
+		return i18n.Wrap("patrol.writable.no_write", nil, err)
 	}
 	f.Close()
 	return os.Remove(f.Name())

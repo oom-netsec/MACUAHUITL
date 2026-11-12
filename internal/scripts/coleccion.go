@@ -364,11 +364,11 @@ func ParseColeccionesAvisos(b []byte) ([]Coleccion, []Script, []string, error) {
 	for i, c := range normalizaCol(cols) {
 		cols[i] = c
 		if err := c.Validate(); err != nil {
-			return nil, nil, nil, fmt.Errorf("colección %d (%q): %w", i+1, c.Name, err)
+			return nil, nil, nil, i18n.Wrap("scripts.imp.col", i18n.A("n", i+1, "name", c.Name), err)
 		}
 		k := NameKey(c.Name)
 		if ids[c.ID] || nombres[k] {
-			return nil, nil, nil, fmt.Errorf("colección %d (%q): ID o nombre repetido dentro del archivo", i+1, c.Name)
+			return nil, nil, nil, i18n.New("scripts.imp.col_dup", i18n.A("n", i+1, "name", c.Name))
 		}
 		ids[c.ID], nombres[k] = true, true
 		for _, id := range c.ScriptIDs {

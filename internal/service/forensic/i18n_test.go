@@ -76,8 +76,10 @@ func forenseCasos(t *testing.T, ctx context.Context) map[string]string {
 	rep("patrones_sin_capturas", lp, err)
 	lp, err = s.LogPatterns(ctx, &v1.LogPatternsRequest{Source: &v1.LogSource{}})
 	rep("patrones_sin_fuente", lp, err)
-	lp, err = s.LogPatterns(ctx, &v1.LogPatternsRequest{Source: &v1.LogSource{Job: "j1"}})
+	lp, err = (&forensicSvc{d: jobDeps{sd, ""}}).LogPatterns(ctx, &v1.LogPatternsRequest{Source: &v1.LogSource{Job: "j1"}})
 	rep("patrones_job_sin_dir", lp, err)
+	lp, err = s.LogPatterns(ctx, &v1.LogPatternsRequest{Source: &v1.LogSource{Job: "j1"}})
+	rep("patrones_sin_patrol", lp, err)
 
 	fl, err := s.Flapping(ctx, &v1.FlappingRequest{Source: srcText(b.String())})
 	rep("flap_texto", fl, err)
@@ -156,7 +158,7 @@ func TestForenseEnSinEspanol(t *testing.T) {
 	got := forenseCasos(t, i18n.WithLocale(context.Background(), "en"))
 	base := forenseCasos(t, context.Background())
 	for k, v := range got {
-		if k == "crash_err_directorio" || k == "patrones_job_sin_dir" { // el texto viene de internal/sys (fuera del bloque D)
+		if k == "crash_err_directorio" || k == "patrones_sin_patrol" { // el texto viene de internal/sys (fuera del bloque D)
 			continue
 		}
 		if v == base[k] && !strings.HasPrefix(k, "crash_err_no_existe") && !strings.Contains(k, "dir_malo") {

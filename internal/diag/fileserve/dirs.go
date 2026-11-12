@@ -75,7 +75,7 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	clean := filepath.Clean(dir)
 	st, err := os.Lstat(clean)
 	if err != nil {
-		return "", nil, i18n.New("fileserve.err.dir_unreadable", i18n.A("error", err.Error()))
+		return "", nil, i18n.Wrap("fileserve.err.dir_unreadable", nil, err)
 	}
 	if st.Mode()&os.ModeSymlink != 0 {
 		return "", nil, i18n.New("fileserve.err.dir_symlink", i18n.A("dir", clean))
