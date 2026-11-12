@@ -28,6 +28,10 @@ func TestMain(m *testing.M) {
 	vault.MinMemoryKiB = 8192
 	// Las pruebas viven bajo /tmp (1777): sus ancestros se dan por seguros; la regla real la prueba prefs.
 	service.AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o755, uint32(os.Getuid()), nil }
+	// Las pruebas esperan los mensajes en español: el idioma de la sesión de quien las corre no debe cambiarlos.
+	for _, k := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
+		os.Unsetenv(k)
+	}
 	os.Exit(m.Run())
 }
 
@@ -417,5 +421,40 @@ func TestCalcFlagsDoNotLeakBetweenRuns(t *testing.T) {
 	base := must(t, "", "calc", "optics", "--tx", "-8.2", "--rx", "-14.4", "--km", "10")
 	if with == without || without != base {
 		t.Fatalf("--overload se arrastró:\nCON:\n%s\nSIN:\n%s", with, without)
+	}
+}
+
+// --lang (o LC_ALL, LC_MESSAGES y LANG) pide el idioma del núcleo: el error de validación sale en es o en en.
+func TestLangPideElIdiomaDelNucleo(t *testing.T) {
+	startCore(t)
+	args := []string{"syslog", "listen", "--addr", "127.0.0.1:0", "--for", "1", "--rate", "20000"}
+	const es, en = "la tasa por origen debe estar entre 1 y 10000", "the per-source rate must be between 1 and 10000"
+	t.Setenv("LC_ALL", "")
+	t.Setenv("LC_MESSAGES", "")
+	t.Setenv("LANG", "")
+	for name, tc := range map[string]struct {
+		pre  []string
+		env  [3]string // LC_ALL, LC_MESSAGES, LANG
+		want string
+	}{
+		"sin idioma":          {nil, [3]string{}, es},
+		"--lang en":           {[]string{"--lang", "en"}, [3]string{}, en},
+		"--lang=en":           {[]string{"--lang=en"}, [3]string{}, en},
+		"--lang es gana":      {[]string{"--lang", "es"}, [3]string{"", "", "en_US.UTF-8"}, es},
+		"LANG en":             {nil, [3]string{"", "", "en_US.UTF-8"}, en},
+		"LC_ALL sobre LANG":   {nil, [3]string{"es_MX.UTF-8", "", "en_US.UTF-8"}, es},
+		"--lang tras comando": {nil, [3]string{}, es},
+	} {
+		t.Setenv("LC_ALL", tc.env[0])
+		t.Setenv("LC_MESSAGES", tc.env[1])
+		t.Setenv("LANG", tc.env[2])
+		_, err := mctl(t, "", append(append([]string{}, tc.pre...), args...)...)
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	// La bandera puede ir en cualquier lugar del comando.
+	if _, err := mctl(t, "", append(args, "--lang", "en")...); err == nil || !strings.Contains(err.Error(), en) {
+		t.Errorf("al final: %v", err)
 	}
 }

@@ -98,6 +98,10 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if len(args) < 1 {
 		return errors.New(usage)
 	}
+	args, langFlag, _ := cli.StripValueFlag(args, "--lang")
+	if len(args) < 1 {
+		return errors.New(usage)
+	}
 	cmd, rest, ok := cli.Find(areas, args)
 	if !ok {
 		return errors.New(usage)
@@ -107,7 +111,7 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 		c.TTY = f
 	}
 	// Conectar solo cuando el comando es válido: un error de uso no debe hablar del socket.
-	conn, err := ipc.Dial(context.Background())
+	conn, err := ipc.Dial(context.Background(), ipc.WithLanguage(cli.Lang(langFlag, os.Getenv))...)
 	if err != nil {
 		return err
 	}

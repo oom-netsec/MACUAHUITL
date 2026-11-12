@@ -162,4 +162,5 @@ func (l *List) String() string     { return strings.Join(*l, ",") }
 func (l *List) Set(v string) error { *l = append(*l, v); return nil }
 
 // Common es la nota de las banderas comunes: no tiene comandos, solo su línea en la ayuda.
-var Common = Area{Usage: `  (cualquier comando: --no-color o NO_COLOR desactivan el color; con --json o sin TTY no hay color)`}
+var Common = Area{Usage: `  (cualquier comando: --no-color o NO_COLOR desactivan el color; con --json o sin TTY no hay color)
+  (cualquier comando: --lang es|en pide los mensajes del núcleo en ese idioma; si no, LC_ALL, LC_MESSAGES o LANG; por defecto es)`}
