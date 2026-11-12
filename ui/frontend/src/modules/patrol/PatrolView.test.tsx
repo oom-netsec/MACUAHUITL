@@ -4,6 +4,7 @@ import { PatrolView, parseTargets } from "./PatrolView";
 import { DeviceGrid } from "./DeviceGrid";
 import { elapsed } from "./format";
 import { fakeCore } from "../../lib/fake";
+import { I18nProvider, LanguageSwitch } from "../../lib/i18n";
 
 test("parseTargets normaliza comas, espacios, saltos y CIDR sin duplicados", () => {
   expect(parseTargets("10.0.0.1, 10.0.0.2\n10.0.1.0/30  sw1\n10.0.0.1")).toEqual(["10.0.0.1", "10.0.0.2", "10.0.1.0/30", "sw1"]);
@@ -265,6 +266,16 @@ test("si el núcleo no da el catálogo, se avisa y los comandos pegados siguen f
   expect(await screen.findByText(/No se pudo leer el catálogo/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
   await waitFor(() => expect(core.createJob).toHaveBeenCalled());
+});
+
+test("el catálogo de playbooks se vuelve a pedir al cambiar de idioma (el núcleo devuelve los nombres en ese idioma)", async () => {
+  const listPlaybooks = vi.fn().mockResolvedValue([{ id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: [] }]);
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks });
+  render(<I18nProvider><LanguageSwitch /><PatrolView core={core} /></I18nProvider>);
+  await screen.findByRole("checkbox", { name: "STP" });
+  expect(listPlaybooks).toHaveBeenCalledTimes(1);
+  await userEvent.click(screen.getByRole("radio", { name: "English" }));
+  await waitFor(() => expect(listPlaybooks).toHaveBeenCalledTimes(2));
 });
 
 test("el catálogo que falló se puede reintentar", async () => {

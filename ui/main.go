@@ -27,9 +27,9 @@ var assets embed.FS
 var icon []byte
 
 // coreLocalize es la bandera core.localize: con true el puente manda el idioma de la interfaz (preferencia ui.language) en
-// accept-language y el núcleo contesta en ese idioma. Apagada por omisión: la interfaz aún lee texto en español del núcleo.
-// El front la enciende aquí cuando termine de migrar; para probar sin recompilar, MACUAHUITL_CORE_LOCALIZE=1.
-const coreLocalize = false
+// accept-language y el núcleo contesta en ese idioma. Encendida: la interfaz usa reason/metadata y manda ui.language;
+// MACUAHUITL_CORE_LOCALIZE=1 sigue forzándola por si se vuelve a apagar la constante.
+const coreLocalize = true
 
 func main() {
 	dist, err := fs.Sub(assets, "frontend/dist")
