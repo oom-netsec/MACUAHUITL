@@ -13,6 +13,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/radiustest"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/tacacstest"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ikedec"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/pki"
@@ -48,9 +49,9 @@ func secretFrom(d service.Deps, src *v1.SecretSource) (user string, val []byte, 
 // origin dice de dónde vino un secreto, para la auditoría; nunca el valor.
 func origin(src *v1.SecretSource) string {
 	if id := src.GetCredentialId(); id != "" {
-		return "bóveda:" + id
+		return "vault:" + id
 	}
-	return "escrito"
+	return "typed"
 }
 
 func validHost(h string) error {
@@ -102,7 +103,7 @@ func (s *securitySvc) RadiusTest(ctx context.Context, r *v1.RadiusTestRequest) (
 		NASIP: r.NasIp, NASIdentifier: r.NasIdentifier, NASPortType: r.NasPortType, ServiceType: r.ServiceType,
 		CalledStationID: r.CalledStationId, CallingStationID: r.CallingStationId, StatusServer: r.StatusServer, Accounting: r.Accounting,
 		Timeout: service.MS(r.TimeoutMs, 0), Retries: int(r.Retries)}
-	s.d.Audit("security.radius", r.Host, fmt.Sprintf("run=%s puertos=%d/%d metodo=%s usuario=%q secreto=%s contraseña=%s status-server=%t accounting=%t",
+	s.d.Audit("security.radius", r.Host, fmt.Sprintf("run=%s ports=%d/%d method=%s user=%q secret=%s password=%s status-server=%t accounting=%t",
 		id, auth, acct, r.Method, user, origin(r.SharedSecret), origin(r.Password), r.StatusServer, r.Accounting))
 	rep, err := radiustest.Run(ctx, radiustest.Dialer(s.d.Guard().DialerFor(id)), cfg)
 	if err != nil {
@@ -110,10 +111,12 @@ func (s *securitySvc) RadiusTest(ctx context.Context, r *v1.RadiusTestRequest) (
 	}
 	var res []string
 	for _, e := range rep.Exchanges {
-		res = append(res, e.Kind+"="+map[bool]string{true: e.Code, false: "sin-respuesta"}[e.Code != ""])
+		res = append(res, e.Kind+"="+map[bool]string{true: e.Code, false: "no-response"}[e.Code != ""])
 	}
 	s.d.Audit("security.radius.result", r.Host, id+" "+strings.Join(res, " "))
-	return &v1.RadiusTestResponse{Report: service.Report(rep, rep.Text())}, nil
+	loc := i18n.Locale(ctx)
+	return &v1.RadiusTestResponse{Report: service.Report(rep, rep.TextIn(loc)), Server: rep.Server, Method: strings.ToUpper(rep.Method),
+		Exchanges: radiusExchanges(loc, rep), Findings: radiusFindings(loc, rep)}, nil
 }
 
 func (s *securitySvc) TacacsTest(ctx context.Context, r *v1.TacacsTestRequest) (*v1.TacacsTestResponse, error) {
@@ -143,7 +146,7 @@ func (s *securitySvc) TacacsTest(ctx context.Context, r *v1.TacacsTestRequest) (
 	if err := s.d.Guard().Allow(ctx, id, []string{r.Host}); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.d.Audit("security.tacacs", r.Host, fmt.Sprintf("run=%s puerto=%d tipo=%s usuario=%q secreto=%s contraseña=%s comando=%q accounting=%t",
+	s.d.Audit("security.tacacs", r.Host, fmt.Sprintf("run=%s port=%d type=%s user=%q secret=%s password=%s command=%q accounting=%t",
 		id, port, r.AuthenType, user, origin(r.SharedSecret), origin(r.Password), r.Command, r.Accounting))
 	rep, err := tacacstest.Run(ctx, tacacstest.Dialer(s.d.Guard().DialerFor(id)), tacacstest.Config{Host: r.Host, Port: port, Secret: secret,
 		Username: user, Password: pw, AuthenType: r.AuthenType, PrivLvl: int(r.PrivLvl), Command: r.Command, Accounting: r.Accounting, Timeout: service.MS(r.TimeoutMs, 0)})
@@ -152,10 +155,12 @@ func (s *securitySvc) TacacsTest(ctx context.Context, r *v1.TacacsTestRequest) (
 	}
 	var res []string
 	for _, st := range rep.Steps {
-		res = append(res, st.Kind+"="+map[bool]string{true: st.Status, false: "sin-respuesta"}[st.Status != ""])
+		res = append(res, st.Kind+"="+map[bool]string{true: st.Status, false: "no-response"}[st.Status != ""])
 	}
 	s.d.Audit("security.tacacs.result", r.Host, id+" "+strings.Join(res, " "))
-	return &v1.TacacsTestResponse{Report: service.Report(rep, rep.Text())}, nil
+	loc := i18n.Locale(ctx)
+	return &v1.TacacsTestResponse{Report: service.Report(rep, rep.TextIn(loc)), Server: rep.Server, Steps: tacacsSteps(loc, rep),
+		Findings: tacacsFindings(loc, rep)}, nil
 }
 
 // ---- PKI de laboratorio (sin red) ----
@@ -185,13 +190,15 @@ func (s *securitySvc) newSealedKey(alg string, pw []byte) (crypto.Signer, string
 	return k, string(sealed), nil
 }
 
-func (s *securitySvc) decoded(pemText []byte, extra string) *v1.ToolReport {
+// decoded arma el informe de un PEM recién generado; con lab, el texto abre con el aviso de CA de laboratorio.
+func (s *securitySvc) decoded(ctx context.Context, pemText []byte, lab bool) (*v1.ToolReport, []*v1.PkiCertificate) {
+	loc := i18n.Locale(ctx)
 	sums, _ := pki.Decode(pemText, s.d.Now())
-	txt := pki.Text(sums)
-	if extra != "" {
-		txt = extra + "\n\n" + txt
+	txt := pki.TextIn(sums, loc)
+	if lab {
+		txt = i18n.Msg(loc, "security.pki.lab_warning", nil) + "\n\n" + txt
 	}
-	return service.Report(sums, txt)
+	return service.Report(sums, txt), certificates(loc, sums)
 }
 
 func (s *securitySvc) PkiKey(_ context.Context, r *v1.PkiKeyRequest) (*v1.PkiKeyResponse, error) {
@@ -201,11 +208,11 @@ func (s *securitySvc) PkiKey(_ context.Context, r *v1.PkiKeyRequest) (*v1.PkiKey
 	if err != nil {
 		return nil, err
 	}
-	s.d.Audit("pki.key", "", "algoritmo="+r.Algorithm)
+	s.d.Audit("pki.key", "", "algorithm="+r.Algorithm)
 	return &v1.PkiKeyResponse{SealedKeyPem: sealed}, nil
 }
 
-func (s *securitySvc) PkiCsr(_ context.Context, r *v1.PkiCsrRequest) (*v1.PkiCsrResponse, error) {
+func (s *securitySvc) PkiCsr(ctx context.Context, r *v1.PkiCsrRequest) (*v1.PkiCsrResponse, error) {
 	s.d.MarkActive()
 	defer clear(r.KeyPassword)
 	var k crypto.Signer
@@ -224,11 +231,12 @@ func (s *securitySvc) PkiCsr(_ context.Context, r *v1.PkiCsrRequest) (*v1.PkiCsr
 	if err != nil {
 		return nil, pkiErr(err)
 	}
-	s.d.Audit("pki.csr", sub.GetCn(), fmt.Sprintf("llave=%s san=%d", keyOrigin, len(r.Dns)+len(r.Ips)))
-	return &v1.PkiCsrResponse{CsrPem: string(csr), SealedKeyPem: sealed, Report: s.decoded(csr, "")}, nil
+	s.d.Audit("pki.csr", sub.GetCn(), fmt.Sprintf("key=%s san=%d", keyOrigin, len(r.Dns)+len(r.Ips)))
+	rep, certs := s.decoded(ctx, csr, false)
+	return &v1.PkiCsrResponse{CsrPem: string(csr), SealedKeyPem: sealed, Report: rep, Certificates: certs}, nil
 }
 
-func (s *securitySvc) PkiCaInit(_ context.Context, r *v1.PkiCaInitRequest) (*v1.PkiCaInitResponse, error) {
+func (s *securitySvc) PkiCaInit(ctx context.Context, r *v1.PkiCaInitRequest) (*v1.PkiCaInitResponse, error) {
 	s.d.MarkActive()
 	defer clear(r.KeyPassword)
 	days := int(r.Days)
@@ -243,11 +251,12 @@ func (s *securitySvc) PkiCaInit(_ context.Context, r *v1.PkiCaInitRequest) (*v1.
 	if err != nil {
 		return nil, pkiErr(err)
 	}
-	s.d.Audit("pki.ca.init", r.Name, fmt.Sprintf("dias=%d algoritmo=%s", days, r.Algorithm))
-	return &v1.PkiCaInitResponse{CaCertPem: string(ca), SealedKeyPem: sealed, Report: s.decoded(ca, pki.LabWarning)}, nil
+	s.d.Audit("pki.ca.init", r.Name, fmt.Sprintf("days=%d algorithm=%s", days, r.Algorithm))
+	rep, certs := s.decoded(ctx, ca, true)
+	return &v1.PkiCaInitResponse{CaCertPem: string(ca), SealedKeyPem: sealed, Report: rep, Certificates: certs, LabWarning: true}, nil
 }
 
-func (s *securitySvc) PkiCaSign(_ context.Context, r *v1.PkiCaSignRequest) (*v1.PkiCaSignResponse, error) {
+func (s *securitySvc) PkiCaSign(ctx context.Context, r *v1.PkiCaSignRequest) (*v1.PkiCaSignResponse, error) {
 	s.d.MarkActive()
 	defer clear(r.CaKeyPassword)
 	k, err := pki.OpenKey([]byte(r.CaSealedKeyPem), r.CaKeyPassword)
@@ -265,10 +274,10 @@ func (s *securitySvc) PkiCaSign(_ context.Context, r *v1.PkiCaSignRequest) (*v1.
 	if err != nil {
 		return nil, pkiErr(err)
 	}
-	rep := s.decoded(cert, pki.LabWarning)
+	rep, certs := s.decoded(ctx, cert, true)
 	sums, _ := pki.Decode(cert, s.d.Now())
-	s.d.Audit("pki.ca.sign", sums[0].Subject, fmt.Sprintf("perfil=%s dias=%d serie=%s", profile, days, sums[0].Serial))
-	return &v1.PkiCaSignResponse{CertPem: string(cert), Report: rep}, nil
+	s.d.Audit("pki.ca.sign", sums[0].Subject, fmt.Sprintf("profile=%s days=%d serial=%s", profile, days, sums[0].Serial))
+	return &v1.PkiCaSignResponse{CertPem: string(cert), Report: rep, Certificates: certs, LabWarning: true}, nil
 }
 
 func (s *securitySvc) PkiExport(_ context.Context, r *v1.PkiExportRequest) (*v1.PkiExportResponse, error) {
@@ -291,13 +300,13 @@ func (s *securitySvc) PkiExport(_ context.Context, r *v1.PkiExportRequest) (*v1.
 	if err != nil {
 		return nil, pkiErr(err)
 	}
-	s.d.Audit("pki.export", "", fmt.Sprintf("formato=%s llave=%s", r.Format, map[bool]string{true: "incluida", false: "no"}[k != nil]))
+	s.d.Audit("pki.export", "", fmt.Sprintf("format=%s key=%s", r.Format, map[bool]string{true: "included", false: "no"}[k != nil]))
 	return &v1.PkiExportResponse{Data: out}, nil
 }
 
 const maxPaste = 4 << 20
 
-func (s *securitySvc) PkiDecode(_ context.Context, r *v1.PkiDecodeRequest) (*v1.PkiDecodeResponse, error) {
+func (s *securitySvc) PkiDecode(ctx context.Context, r *v1.PkiDecodeRequest) (*v1.PkiDecodeResponse, error) {
 	if len(r.Data) > maxPaste {
 		return nil, status.Error(codes.InvalidArgument, "entrada demasiado grande")
 	}
@@ -305,7 +314,8 @@ func (s *securitySvc) PkiDecode(_ context.Context, r *v1.PkiDecodeRequest) (*v1.
 	if err != nil {
 		return nil, pkiErr(err)
 	}
-	return &v1.PkiDecodeResponse{Report: service.Report(sums, pki.Text(sums))}, nil
+	loc := i18n.Locale(ctx)
+	return &v1.PkiDecodeResponse{Report: service.Report(sums, pki.TextIn(sums, loc)), Certificates: certificates(loc, sums)}, nil
 }
 
 // maxIkePaste acota el texto de debug IKE: el decodificador cuesta ~0,1 ms por línea.

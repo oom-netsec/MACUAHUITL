@@ -45,18 +45,18 @@ func (s *svc) Browse(ctx context.Context, r *v1.BrowseRequest) (*v1.BrowseRespon
 		return nil, bad("--insecure solo aplica a https")
 	}
 	j.req.Insecure, j.req.Timeout = r.Insecure, to
-	s.d.Audit("transfer.browse.start", j.label, fmt.Sprintf("trabajo=%s carpeta=%q credencial=%q insecure=%t ssh_antiguo=%t", j.id, r.Path, r.CredentialId, r.Insecure, r.LegacySsh))
+	s.d.Audit("transfer.browse.start", j.label, fmt.Sprintf("job=%s folder=%q credential=%q insecure=%t legacy_ssh=%t", j.id, r.Path, r.CredentialId, r.Insecure, r.LegacySsh))
 	ls, err := xfer.Browse(ctx, j.req, r.Path, int(r.MaxEntries))
 	var nl *xfer.NoListingError
 	if errors.As(err, &nl) {
-		s.d.Audit("transfer.browse.nolisting", j.label, fmt.Sprintf("trabajo=%s carpeta=%q protocolo=%s guard=revocado", j.id, r.Path, nl.Proto))
+		s.d.Audit("transfer.browse.nolisting", j.label, fmt.Sprintf("job=%s folder=%q protocol=%s guard=revoked", j.id, r.Path, nl.Proto))
 		return nil, status.Error(codes.Unimplemented, err.Error())
 	}
 	if err != nil {
-		s.d.Audit("transfer.browse.failed", j.label, fmt.Sprintf("trabajo=%s carpeta=%q razon=%q guard=revocado", j.id, r.Path, j.errText(err)))
+		s.d.Audit("transfer.browse.failed", j.label, fmt.Sprintf("job=%s folder=%q reason=%q guard=revoked", j.id, r.Path, j.errText(err)))
 		return nil, connErr(err)
 	}
-	s.d.Audit("transfer.browse", j.label, fmt.Sprintf("trabajo=%s carpeta=%q entradas=%d metodo=%s truncado=%t guard=revocado", j.id, ls.Path, len(ls.Entries), ls.Method, ls.Truncated))
+	s.d.Audit("transfer.browse", j.label, fmt.Sprintf("job=%s folder=%q entries=%d method=%s truncated=%t guard=revoked", j.id, ls.Path, len(ls.Entries), ls.Method, ls.Truncated))
 	out := &v1.BrowseResponse{Path: ls.Path, Truncated: ls.Truncated, Method: ls.Method}
 	for _, e := range ls.Entries {
 		re := &v1.RemoteEntry{Name: e.Name, Type: e.Type, Size: e.Size, Perms: e.Perms, Downloadable: e.Downloadable, UnsafeName: e.Unsafe}
@@ -205,11 +205,11 @@ func (s *svc) GetMany(r *v1.GetManyRequest, st v1.TransferService_GetManyServer)
 	}
 	ev := &events{st: st}
 	var pace paceLimiter // un solo límite de avisos para todo el lote; el fin de cada archivo va en su propio evento
-	s.d.Audit("transfer.getmany.start", base.Scheme+"://"+base.Host+base.Path, fmt.Sprintf("archivos=%d destino=%q credencial=%q", len(names), dest, r.CredentialId))
+	s.d.Audit("transfer.getmany.start", base.Scheme+"://"+base.Host+base.Path, fmt.Sprintf("files=%d destination=%q credential=%q", len(names), dest, r.CredentialId))
 	ok, failed := 0, 0
 	for i, n := range names {
 		if ctx.Err() != nil {
-			s.d.Audit("transfer.getmany.canceled", base.Host, fmt.Sprintf("hechos=%d fallidos=%d pendientes=%d", ok, failed, len(names)-i))
+			s.d.Audit("transfer.getmany.canceled", base.Host, fmt.Sprintf("done=%d failed=%d pending=%d", ok, failed, len(names)-i))
 			return status.FromContextError(ctx.Err()).Err()
 		}
 		var res *v1.GetResponse
@@ -235,7 +235,7 @@ func (s *svc) GetMany(r *v1.GetManyRequest, st v1.TransferService_GetManyServer)
 			return ev.err
 		}
 	}
-	s.d.Audit("transfer.getmany", base.Host, fmt.Sprintf("hechos=%d fallidos=%d", ok, failed))
+	s.d.Audit("transfer.getmany", base.Host, fmt.Sprintf("done=%d failed=%d", ok, failed))
 	ev.send(&v1.GetManyResponse{Event: &v1.TransferEvent{Event: &v1.TransferEvent_Done{Done: &v1.BatchSummary{Ok: int32(ok), Failed: int32(failed)}}}})
 	return ev.err
 }

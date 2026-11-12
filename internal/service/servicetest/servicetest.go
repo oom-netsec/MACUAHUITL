@@ -79,6 +79,9 @@ func (d *Deps) AuditText() string {
 }
 
 func (d *Deps) Audit(action, target, detail string) {
+	if w := SpanishWords(detail); len(w) > 0 {
+		d.T.Errorf("auditoría %s: detalle con español %v: %q", action, w, detail)
+	}
 	d.Log.Append(context.Background(), audit.Entry{Actor: "tester", Action: action, Target: target, Detail: detail})
 }
 func (d *Deps) ExportAudit(ctx context.Context, w io.Writer, from, to time.Time) error {

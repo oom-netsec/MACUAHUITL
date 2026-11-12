@@ -24,6 +24,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
@@ -168,7 +169,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 			names = names[:maxNamesShown]
 		}
 		// Ni la contraseña ni la llave privada se auditan: solo qué se abrió, dónde y con qué reglas.
-		s.d.Audit("transfer.serve.open", rd.Addr, fmt.Sprintf("servidor=%s proto=%s leer_desde=%q archivos=%q escribir=%t recibir_en=%q origenes=%v todas=%t duración=%s ssh_antiguo=%t topes=%d/%d",
+		s.d.Audit("transfer.serve.open", rd.Addr, fmt.Sprintf("server=%s proto=%s read_from=%q files=%q write=%t receive_into=%q origins=%v all=%t duration=%s legacy_ssh=%t limits=%d/%d",
 			id, r.Protocol, from, r.Files, r.Write, recv, r.Allow, r.AllowAny, dur, cfg.Legacy && (r.Protocol == "scp" || r.Protocol == "sftp"), cfg.MaxFile, cfg.MaxTotal))
 		k.events <- &v1.StartServerResponse{Event: &v1.StartServerResponse_Ready{Ready: &v1.ServerReady{
 			ServerId: id, Protocol: r.Protocol, Listening: rd.Addr, Hint: fileserve.ServerHint(cfg, rd, names),
@@ -180,11 +181,11 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	s.mu.Unlock()
 	k.events <- &v1.StartServerResponse{Event: &v1.StartServerResponse_Closed{Closed: &v1.ServerClosed{Cleanup: fileserve.RedirectCleanupAddr(r.Protocol, listening)}}}
 	n, rejected := k.stop()
-	reason := "vencida la duración o cancelado"
+	reason := "duration expired or canceled"
 	if err != nil {
-		reason = "error: " + err.Error()
+		reason = "error: " + i18n.English(err)
 	}
-	s.d.Audit("transfer.serve.close", listening, fmt.Sprintf("servidor=%s proto=%s transferencias=%d rechazos=%d motivo=%q", id, r.Protocol, n, rejected, reason))
+	s.d.Audit("transfer.serve.close", listening, fmt.Sprintf("server=%s proto=%s transfers=%d rejected=%d reason=%q", id, r.Protocol, n, rejected, reason))
 	if err != nil {
 		return status.Error(codes.Unavailable, err.Error())
 	}
@@ -203,7 +204,7 @@ func (s *svc) StopServer(_ context.Context, r *v1.StopServerRequest) (*v1.StopSe
 	if srv == nil {
 		return &v1.StopServerResponse{}, nil
 	}
-	s.d.Audit("transfer.serve.stop", listening, "servidor="+srv.id)
+	s.d.Audit("transfer.serve.stop", listening, "server="+srv.id)
 	srv.cancel()
 	return &v1.StopServerResponse{Stopped: true}, nil
 }
@@ -266,8 +267,8 @@ func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.T
 	}
 	k.n.Add(1)
 	srv.transfers.Add(1)
-	audit("transfer.serve.transfer", t.Client, fmt.Sprintf("servidor=%s proto=%s sentido=%s archivo=%q ruta=%q bytes=%d sha256=%s duración=%s resultado=%s %s",
-		srv.id, t.Proto, t.Dir, t.File, t.Path, t.Bytes, t.SHA256, t.Duration.Round(time.Millisecond), t.Result, t.Error))
+	audit("transfer.serve.transfer", t.Client, fmt.Sprintf("server=%s proto=%s direction=%s file=%q path=%q bytes=%d sha256=%s duration=%s result=%s %s",
+		srv.id, t.Proto, service.DirEN(t.Dir), t.File, t.Path, t.Bytes, t.SHA256, t.Duration.Round(time.Millisecond), t.Result, t.Error))
 	k.events <- ev
 }
 

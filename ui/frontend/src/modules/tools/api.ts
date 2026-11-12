@@ -23,7 +23,32 @@ export interface SyslogEvent {
   drops?: SyslogDrops;
 }
 
+// Fase 30b: el informe de la captura estructurado. Duraciones en ms, fechas RFC 3339 UTC. Los encabezados de sección
+// llegan como clave (pcap.section.*) con su título ya en el idioma de la interfaz; protocols suma las conversaciones listadas.
+export interface PcapSection { key: string; args?: Record<string, string>; title: string }
+export interface PcapFlowData { client: string; server: string; count: number }
+export interface PcapDnsQueryData { client: string; server: string; name: string; type: string; rcode?: string; latencyMs: number }
+export interface PcapIcmpEventData { from: string; target: string; code: number }
+export interface PcapReportData {
+  text: string;
+  summary: { file: string; packets: number; bytes: number; durationMs: number; start: string };
+  conversations: { proto: string; a: string; b: string; packets: number; bytes: number }[];
+  topTalkers: { ip: string; packets: number; bytes: number }[];
+  protocols: { proto: string; packets: number; bytes: number }[];
+  neighbors: { protocol: string; deviceId: string; port: string; platform: string; mgmtIp: string; nativeVlan: number }[];
+  tcp: { handshakes: number; rttMinMs: number; rttAvgMs: number; rttMaxMs: number; retransmissions: number; zeroWindow: number; failedHandshakesTotal: number; failedHandshakes: PcapFlowData[]; resets: PcapFlowData[] };
+  dns: { queries: number; responses: number; errors: PcapDnsQueryData[]; slow: PcapDnsQueryData[]; unanswered: PcapDnsQueryData[] };
+  tls: { client: string; server: string; sni: string }[];
+  icmp: { unreachable: PcapIcmpEventData[]; ttlExceeded: PcapIcmpEventData[] };
+  arpConflicts: { ip: string; macs: string[] }[];
+  fragments: number;
+  warnings: { key: string; args?: Record<string, string>; text: string }[];
+  sections: PcapSection[];
+}
+
 export interface ToolsAPI {
+  /** Como toolsPcap, con el informe estructurado. */
+  toolsPcapReport?(path: string, top: number): Promise<PcapReportData>;
   toolsPcap(path: string, top: number): Promise<string>;
   toolsDns(r: DnsRequest): Promise<string>;
   toolsTls(host: string, port: number, sni: string): Promise<string>;
@@ -35,6 +60,7 @@ type Call = <T>(method: string, ...args: unknown[]) => Promise<T>;
 
 export const toolsWails = (call: Call): ToolsAPI => ({
   toolsPcap: (p, t) => call("ToolsPcap", p, t),
+  toolsPcapReport: (p, t) => call("ToolsPcapReport", p, t),
   toolsDns: (r) => call("ToolsDns", r),
   toolsTls: (h, p, s) => call("ToolsTls", h, p, s),
   syslogStart: (a, p, any, save, opts) => call("SyslogStart", a, p, any, save, opts ?? {}),

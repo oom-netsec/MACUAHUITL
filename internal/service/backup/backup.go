@@ -23,6 +23,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
 	"github.com/oom-netsec/MACUAHUITL/internal/backup"
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -137,7 +138,7 @@ func (s *backupSvc) StartBackup(ctx context.Context, r *v1.StartBackupRequest) (
 	s.mu.Lock()
 	s.jobs[cj.JobId] = &tracked{masked: !r.IncludeSecrets, keep: keep, lote: lote, root: out, from: now.Add(-time.Minute), until: now.Add(win)}
 	s.mu.Unlock()
-	s.d.Audit("backup.start", cj.JobId, fmt.Sprintf("equipos=%d startup=%v conservar=%d intervalo=%ds rondas=%d enmascarado=%v", len(r.Targets), r.Startup, keep, r.IntervalSeconds, r.Rounds, !r.IncludeSecrets))
+	s.d.Audit("backup.start", cj.JobId, fmt.Sprintf("devices=%d startup=%v keep=%d interval=%ds rounds=%d masked=%v", len(r.Targets), r.Startup, keep, r.IntervalSeconds, r.Rounds, !r.IncludeSecrets))
 	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, ExcludedDeviceIds: r.ExcludedDeviceIds})
 	if err != nil {
 		os.Remove(lote) // vacía; Patrol la recrea si luego se arma
@@ -163,7 +164,7 @@ func (s *backupSvc) watch(job string) {
 			}
 			r, err := s.collect(job, 0)
 			if err != nil {
-				s.d.Audit("backup.failed", job, err.Error())
+				s.d.Audit("backup.failed", job, i18n.English(err))
 				return
 			}
 			if r.done {
@@ -331,7 +332,7 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 			continue
 		}
 		res.Saved = append(res.Saved, e.ID)
-		s.d.Audit("backup.save", e.ID, fmt.Sprintf("job=%s ronda=%d bytes=%d sha256=%s enmascarado=%v", job, sec.Round, e.Bytes, e.SHA256, mk))
+		s.d.Audit("backup.save", e.ID, fmt.Sprintf("job=%s round=%d bytes=%d sha256=%s masked=%v", job, sec.Round, e.Bytes, e.SHA256, mk))
 	}
 	if tr != nil && !failed {
 		// Todo lo leído se guardó: la próxima vuelta no vuelve a abrir esos archivos.
@@ -349,7 +350,7 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 		}
 		if n > 0 {
 			res.Pruned += n
-			s.d.Audit("backup.prune", dev, fmt.Sprintf("borrados=%d conservar=%d", n, keep))
+			s.d.Audit("backup.prune", dev, fmt.Sprintf("deleted=%d keep=%d", n, keep))
 		}
 	}
 	s.auditWarnings(job, tr, res.Warnings)
@@ -364,7 +365,7 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 		// Si algo no se pudo guardar o leer entero, la carpeta de Patrol queda como única copia.
 		clean := !failed && j.FinishErr == ""
 		if !clean && tr != nil {
-			s.d.Audit("backup.kept", job, "carpeta de Patrol conservada: "+tr.lote)
+			s.d.Audit("backup.kept", job, "Patrol folder kept: "+tr.lote)
 		}
 		s.forget(job, tr, clean)
 	}
@@ -456,7 +457,7 @@ func (s *backupSvc) GetBackup(_ context.Context, r *v1.GetBackupRequest) (*v1.Ge
 	if err != nil {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
-	s.d.Audit("backup.export", e.ID, fmt.Sprintf("bytes=%d enmascarado=%v", e.Bytes, e.Masked))
+	s.d.Audit("backup.export", e.ID, fmt.Sprintf("bytes=%d masked=%v", e.Bytes, e.Masked))
 	meta, _ := json.Marshal(e)
 	return &v1.GetBackupResponse{MetaJson: string(meta), Text: text}, nil
 }

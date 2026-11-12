@@ -100,7 +100,7 @@ func (s *vaultSvc) Lock(context.Context, *v1.LockRequest) (*v1.LockResponse, err
 		return nil, err
 	}
 	v.Lock()
-	s.c.audit("vault.lock", "", "usuario")
+	s.c.audit("vault.lock", "", "reason=user")
 	return &v1.LockResponse{}, nil
 }
 
@@ -221,7 +221,7 @@ func (s *patrolSvc) CreateJob(_ context.Context, r *v1.CreateJobRequest) (*v1.Cr
 	s.c.mu.Unlock()
 	s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CREATED, 0, "", nil)
 	sum := sha256.Sum256([]byte(spec.CustomCommands))
-	s.c.audit("job.create", j.id, fmt.Sprintf("nombre=%s equipos=%d playbooks=%v comandos_pegados_sha256=%s enmascarado=%v",
+	s.c.audit("job.create", j.id, fmt.Sprintf("name=%s devices=%d playbooks=%v pasted_commands_sha256=%s masked=%v",
 		spec.Name, len(spec.Targets), spec.PlaybookIDs, hex.EncodeToString(sum[:]), !spec.DisableMasking))
 	return &v1.CreateJobResponse{JobId: j.id}, nil
 }
@@ -253,7 +253,7 @@ func (s *patrolSvc) LoginTest(r *v1.LoginTestRequest, st v1.PatrolService_LoginT
 			return err
 		}
 	}
-	s.c.audit("job.logintest", j.id, fmt.Sprintf("pasaron=%d de %d", passed, len(res)))
+	s.c.audit("job.logintest", j.id, fmt.Sprintf("passed=%d of %d", passed, len(res)))
 	s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_LOGIN_TEST_DONE, 0, "phase.ok_failed", i18n.A("ok", passed, "failed", len(res)-passed))
 	return nil
 }
@@ -276,7 +276,8 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	spec, v := j.spec, c.vault
 	c.mu.Unlock()
 	var undo []func()
-	fail := func(err error) (*v1.ArmJobResponse, error) {
+	// reason es el motivo en inglés para la auditoría (no depende del idioma del cliente).
+	fail := func(err error, reason string) (*v1.ArmJobResponse, error) {
 		for i := len(undo) - 1; i >= 0; i-- {
 			undo[i]()
 		}
@@ -284,7 +285,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		j.state = "created"
 		c.mu.Unlock()
 		c.persistJob(j) // la fase del Login Test ya guardó "arming"; al recargar no debe verse como caído
-		c.audit("job.arm_failed", j.id, status.Convert(err).Message())
+		c.audit("job.arm_failed", j.id, reason)
 		return nil, err
 	}
 
@@ -300,7 +301,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 	}
 	if len(keep) == 0 {
-		return fail(status.Error(codes.FailedPrecondition, "no quedan equipos"))
+		return fail(status.Error(codes.FailedPrecondition, "no quedan equipos"), "no devices left")
 	}
 	spec.Targets = keep // copia local: un armado fallido no altera el trabajo
 	accepted := map[string]bool{}
@@ -325,7 +326,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	undo = append(undo, func() { c.guard.Revoke(j.id) })
 	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_CHECK_DONE, 0, "phase.ok_failed", i18n.A("ok", len(res)-len(failed), "failed", len(failed)))
 	if len(failed) > 0 {
-		return fail(status.Errorf(codes.FailedPrecondition, "Login Test falló; excluye o corrige: %s", strings.Join(failed, "; ")))
+		return fail(status.Errorf(codes.FailedPrecondition, "Login Test falló; excluye o corrige: %s", strings.Join(failed, "; ")), "login test failed: "+strings.Join(failed, "; "))
 	}
 	until := c.o.Now().Add(time.Duration(spec.WindowHours) * time.Hour)
 	creds := []string{spec.DefaultCredentialID}
@@ -337,12 +338,12 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 	}
 	if err := v.Arm(j.id, until, creds); err != nil {
-		return fail(service.VaultErr(err))
+		return fail(service.VaultErr(err), i18n.English(err))
 	}
 	undo = append(undo, func() { v.Disarm(j.id) })
 	w, err := patrol.NewWriter(spec.OutputDir, spec, c.o.Now())
 	if err != nil {
-		return fail(status.Error(codes.FailedPrecondition, err.Error()))
+		return fail(status.Error(codes.FailedPrecondition, err.Error()), i18n.English(err))
 	}
 	for _, ch := range changes {
 		w.NoteHostKeyChange(ch)
@@ -386,7 +387,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	events, cancelSub := c.bus.Subscribe([]string{j.id})
 	if err := c.sched.Arm(j.id, engineSchedule(spec.Schedule), until, targets, run); err != nil {
 		cancelSub()
-		return fail(status.Error(codes.InvalidArgument, err.Error()))
+		return fail(status.Error(codes.InvalidArgument, err.Error()), i18n.English(err))
 	}
 	c.mu.Lock()
 	j.state, j.ArmedAt = "armed", c.o.Now()
@@ -399,8 +400,8 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARMED, 0, armed, armedArgs)
 	c.watchers.Add(1)
 	go c.watch(j, events, cancelSub)
-	c.audit("job.arm", j.id, fmt.Sprintf("ventana_hasta=%s excluidos=%v", until.UTC().Format(time.RFC3339), r.ExcludedDeviceIds))
-	c.audit("power.inhibit", j.id, fmt.Sprintf("faltan=%v", missing))
+	c.audit("job.arm", j.id, fmt.Sprintf("window_until=%s excluded=%v", until.UTC().Format(time.RFC3339), r.ExcludedDeviceIds))
+	c.audit("power.inhibit", j.id, fmt.Sprintf("missing=%v", missing))
 	return &v1.ArmJobResponse{WindowEndsAt: timestamppb.New(until), MissingInhibitors: missing}, nil
 }
 
@@ -416,7 +417,7 @@ func (c *Core) watch(j *job, events <-chan engine.Event, cancel func()) {
 		if e.Kind == engine.Warning && e.Detail == "round.skipped" {
 			// Rondas perdidas por pausa o por una ronda anterior aún en curso (spec §10.4).
 			j.writer.NoteSkippedRound(e.Index)
-			c.audit("round.skipped", j.id, fmt.Sprintf("ronda=%d", e.Index))
+			c.audit("round.skipped", j.id, fmt.Sprintf("round=%d", e.Index))
 			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_SKIPPED, e.Index, "", nil)
 			continue
 		}
@@ -436,7 +437,7 @@ func (c *Core) watch(j *job, events <-chan engine.Event, cancel func()) {
 			c.mu.Unlock()
 			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_FINISHED, e.Index, "phase.ok_failed", i18n.A("ok", ok, "failed", failed))
 			if zip, err := patrol.RoundDone(j.writer, j.spec, e.Index); err != nil {
-				c.audit("job.zip_failed", j.id, err.Error())
+				c.audit("job.zip_failed", j.id, i18n.English(err))
 				c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, e.Index, "phase.round_zip_failed", i18n.A("error", err.Error()))
 			} else if zip != "" {
 				c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_PACKAGED, e.Index, "phase.packaged", i18n.A("path", zip))
@@ -464,7 +465,7 @@ func (c *Core) finish(j *job, state string) {
 	c.mu.Unlock()
 	if w != nil {
 		if _, err := patrol.Finish(context.Background(), c.deps(j), w, spec, rounds, all); err != nil {
-			c.audit("job.finish_failed", j.id, err.Error())
+			c.audit("job.finish_failed", j.id, i18n.English(err))
 			c.mu.Lock()
 			j.FinishErr = err.Error()
 			c.mu.Unlock()
@@ -481,7 +482,7 @@ func (c *Core) finish(j *job, state string) {
 		release()
 		c.audit("power.release", j.id, "")
 	}
-	c.audit("job."+state, j.id, fmt.Sprintf("rondas=%d", rounds))
+	c.audit("job."+state, j.id, fmt.Sprintf("rounds=%d", rounds))
 	c.addPhase(j, endPhase[state], 0, "phase.rounds", i18n.A("n", rounds))
 	// "closed" sale cuando el manifest y el zip ya existen: es lo que la UI espera para ofrecer el paquete.
 	detail := ""

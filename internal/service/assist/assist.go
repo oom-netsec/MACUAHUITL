@@ -321,7 +321,7 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 	s.prunePlansLocked(now)
 	s.plans[planID] = &planRec{plan: plan, fn: fn, label: label, t: tg, created: now, rot: rot}
 	s.mu.Unlock()
-	s.d.Audit("assist.plan", planID, fmt.Sprintf("función=%s equipo=%s %s líneas=%d reversa=%d", fn.Name, label, detail, len(dp.Apply), len(dp.Rollback)))
+	s.d.Audit("assist.plan", planID, fmt.Sprintf("function=%s device=%s %s lines=%d rollback=%d", fn.Name, label, detail, len(dp.Apply), len(dp.Rollback)))
 	return planID, plan, nil
 }
 
@@ -368,7 +368,7 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 	case *v1.PlanSnippetRequest_Trunk:
 		ctx = context.WithValue(ctx, templateKey{}, "trunk")
 		ch := assist.TrunkChange{Interface: sn.Trunk.Interface, Op: sn.Trunk.Op, Vlan: int(sn.Trunk.Vlan)}
-		fn, detail = assist.SnippetTrunk, fmt.Sprintf("interfaz=%s %s vlan=%d", ch.Interface, ch.Op, ch.Vlan)
+		fn, detail = assist.SnippetTrunk, fmt.Sprintf("interface=%s %s vlan=%d", ch.Interface, ch.Op, ch.Vlan)
 		pre, err = assist.TrunkPre(ch)
 		build = func(l string, o map[string]string) (assist.DevicePlan, error) { return assist.TrunkPlan(l, ch, o) }
 	case *v1.PlanSnippetRequest_Svi:
@@ -471,7 +471,7 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 		}
 	}
 	rot := &rotation{user: r.User, secret: secret, updateCred: r.UpdateCredentialId}
-	id, plan, err := s.planOn(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, assist.CredRotate, true /* write memory es obligatorio */, "usuario="+r.User, rot,
+	id, plan, err := s.planOn(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, assist.CredRotate, true /* write memory es obligatorio */, "user="+r.User, rot,
 		func(label string, outs map[string]string) (assist.DevicePlan, error) {
 			return assist.CredRotatePlan(label, assist.CredRotateChange{User: r.User, NewSecret: secret, ConnectedUser: connected}, outs)
 		})

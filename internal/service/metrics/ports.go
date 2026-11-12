@@ -12,6 +12,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/metrics"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
@@ -28,7 +29,7 @@ func (s *svc) GetPortStatus(ctx context.Context, r *v1.GetPortStatusRequest) (*v
 		if err != nil {
 			return nil, err
 		}
-		s.d.Audit("metrics.ports", dir, "equipo="+r.Device)
+		s.d.Audit("metrics.ports", dir, "device="+r.Device)
 		pd, err := metrics.PortsFromJob(dir, r.Device)
 		if err != nil {
 			return nil, status.Error(codes.FailedPrecondition, err.Error())
@@ -109,9 +110,9 @@ func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.Ge
 		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 	defer g.Revoke(run)
-	s.d.Audit("metrics.ports.live.start", host, fmt.Sprintf("run=%s puerto=%d credencial=%q ssh_antiguo=%t", run, port, r.CredentialId, r.LegacySsh))
+	s.d.Audit("metrics.ports.live.start", host, fmt.Sprintf("run=%s port=%d credential=%q legacy_ssh=%t", run, port, r.CredentialId, r.LegacySsh))
 	fail := func(err error) (*v1.GetPortStatusResponse, error) {
-		s.d.Audit("metrics.ports.live.failed", host, fmt.Sprintf("run=%s razon=%q guard=revocado", run, err.Error()))
+		s.d.Audit("metrics.ports.live.failed", host, fmt.Sprintf("run=%s reason=%q guard=revoked", run, i18n.English(err)))
 		return nil, connErr(err)
 	}
 	acc := map[string]bool{}
@@ -165,6 +166,6 @@ func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.Ge
 		}
 	}
 	ps := metrics.BuildPorts(in)
-	s.d.Audit("metrics.ports.live", host, fmt.Sprintf("run=%s puertos=%d canales=%d guard=revocado", run, len(ps.Ports), len(ps.Channels)))
+	s.d.Audit("metrics.ports.live", host, fmt.Sprintf("run=%s ports=%d channels=%d guard=revoked", run, len(ps.Ports), len(ps.Channels)))
 	return portResponse("live", metrics.PortDevice{PortStatus: ps, Address: host, Hostname: drv.Hostname(), At: at}), nil
 }

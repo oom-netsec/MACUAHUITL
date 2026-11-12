@@ -15,6 +15,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/adhoc"
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
@@ -32,7 +33,7 @@ func (s *adhocSvc) StartAdhoc(ctx context.Context, r *v1.StartAdhocRequest) (*v1
 	s.d.MarkActive()
 	cmds, err := adhoc.Commands(r.Commands)
 	if err != nil {
-		s.d.Audit("adhoc.denied", "", err.Error())
+		s.d.Audit("adhoc.denied", "", i18n.English(err))
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	if len(r.Targets) == 0 {
@@ -59,7 +60,7 @@ func (s *adhocSvc) StartAdhoc(ctx context.Context, r *v1.StartAdhocRequest) (*v1
 	s.mu.Lock()
 	s.cmds[cj.JobId] = cmds
 	s.mu.Unlock()
-	s.d.Audit("adhoc.start", cj.JobId, fmt.Sprintf("equipos=%d comandos=%q", len(r.Targets), cmds))
+	s.d.Audit("adhoc.start", cj.JobId, fmt.Sprintf("devices=%d commands=%q", len(r.Targets), cmds))
 	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, ExcludedDeviceIds: r.ExcludedDeviceIds})
 	if err != nil {
 		// El trabajo queda creado: se revisa con LoginTest y se arma con ArmJob, como cualquier otro.
@@ -120,7 +121,7 @@ func (s *adhocSvc) AdhocResult(_ context.Context, r *v1.AdhocResultRequest) (*v1
 		sort.Strings(cmds)
 	}
 	rep := adhoc.Build(devs, cmds)
-	s.d.Audit("adhoc.result", r.JobId, fmt.Sprintf("equipos=%d filas=%d", len(devs), len(rep.Rows)))
+	s.d.Audit("adhoc.result", r.JobId, fmt.Sprintf("devices=%d rows=%d", len(devs), len(rep.Rows)))
 	out.Done, out.Report, out.Csv, out.Markdown = true, service.Report(rep, rep.Text()), rep.CSV(), rep.Markdown()
 	return out, nil
 }

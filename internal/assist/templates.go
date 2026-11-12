@@ -355,7 +355,7 @@ func DescribeValues(t Template, v Values) string {
 			parts = append(parts, f.Name+"="+v.Str(f.Name))
 		}
 	}
-	return "plantilla=" + t.ID + " " + strings.Join(parts, " ")
+	return "template=" + t.ID + " " + strings.Join(parts, " ")
 }
 
 var bothPlatforms = []string{"ios", "ios-xe"}

@@ -496,7 +496,7 @@ func TestRunAbandonedAfterDecisionTimeout(t *testing.T) {
 		t.Fatalf("cambiados = %v", s.Changed)
 	}
 	r.waitDone(run)
-	if txt := r.d.AuditText(); !strings.Contains(txt, "assist.abandoned") || !strings.Contains(txt, "cambiados=SW1") {
+	if txt := r.d.AuditText(); !strings.Contains(txt, "assist.abandoned") || !strings.Contains(txt, "changed=SW1") {
 		t.Fatalf("la bitácora no dice qué quedó cambiado:\n%s", txt)
 	}
 	if _, err := r.d.G.Dial(context.Background(), run, r.target.Address, uint16(r.target.Port)); err == nil {
@@ -526,7 +526,7 @@ func TestCloseAbandonsAndAuditsRuns(t *testing.T) {
 	if s := r.state(run); s.State != "abandoned" || s.Active {
 		t.Fatalf("estado %s activa=%v", s.State, s.Active)
 	}
-	if txt := r.d.AuditText(); !strings.Contains(txt, "assist.end") || !strings.Contains(txt, "cambiados=SW1") {
+	if txt := r.d.AuditText(); !strings.Contains(txt, "assist.end") || !strings.Contains(txt, "changed=SW1") {
 		t.Fatalf("falta la auditoría de cierre:\n%s", txt)
 	}
 	if len(r.d.V.Windows()) != 0 {

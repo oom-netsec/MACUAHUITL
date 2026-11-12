@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,11 +32,12 @@ type IngestDefaults struct {
 // CoreSettings es el valor vigente de las preferencias del núcleo. Los servicios lo leen en cada
 // operación (nunca lo guardan en caché), así que un cambio aplica a lo que empiece después.
 type CoreSettings struct {
-	mu      sync.RWMutex
-	factory string
-	outputs string // vacío = factory
-	ingest  IngestDefaults
-	issue   string // por qué la carpeta guardada no rige (vacío = rige); mientras tanto vale la de fábrica
+	mu         sync.RWMutex
+	factory    string
+	outputs    string // vacío = factory
+	ingest     IngestDefaults
+	issue      string // por qué la carpeta guardada no rige (vacío = rige); mientras tanto vale la de fábrica
+	issueAudit string // el mismo aviso para la bitácora (en inglés)
 
 	// Home es la carpeta personal y Inside las carpetas del núcleo (datos, configuración, estado):
 	// la carpeta de salidas no puede ser Home ni estar dentro de ninguna de Inside.
@@ -65,10 +67,17 @@ func (s *CoreSettings) Issue() string {
 	return s.issue
 }
 
-// Mark anota que la carpeta guardada no rige (issue vacío la rehabilita).
-func (s *CoreSettings) Mark(issue string) {
+// IssueAudit es el mismo aviso para la auditoría (siempre en inglés, con la carpeta y el código del motivo).
+func (s *CoreSettings) IssueAudit() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.issueAudit
+}
+
+// Mark anota que la carpeta guardada no rige (issue vacío la rehabilita); audit es su versión para la bitácora.
+func (s *CoreSettings) Mark(issue, audit string) {
 	s.mu.Lock()
-	s.issue = issue
+	s.issue, s.issueAudit = issue, audit
 	s.mu.Unlock()
 }
 
@@ -131,7 +140,8 @@ func (s *CoreSettings) Load(db *sql.DB, check func(dir string) error) error {
 	s.Apply(out, ing)
 	if out != "" && check != nil {
 		if err := check(out); err != nil {
-			s.Mark(OutputsIssue(out, status.Convert(err).Message()))
+			msg := status.Convert(err).Message()
+			s.Mark(OutputsIssue(out, msg), OutputsIssueAudit(out, msg))
 		}
 	}
 	return nil
@@ -172,4 +182,13 @@ func itoa(n int32) string {
 // OutputsIssue es el aviso de que la carpeta de salidas guardada ya no vale y rige la de fábrica.
 func OutputsIssue(dir, reason string) string {
 	return fmt.Sprintf("la carpeta de salidas guardada (%s) ya no es válida y se usa la de fábrica: %s", dir, reason)
+}
+
+// OutputsIssueAudit es OutputsIssue para la auditoría: la carpeta y el código del motivo (el prefijo prefs.outputs.X).
+func OutputsIssueAudit(dir, reason string) string {
+	code := "unknown"
+	if c, ok := strings.CutPrefix(reason, "prefs.outputs."); ok {
+		code, _, _ = strings.Cut(c, ":")
+	}
+	return fmt.Sprintf("outputs_dir_invalid dir=%q reason=%s", dir, code)
 }

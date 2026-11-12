@@ -16,6 +16,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
 	xfer "github.com/oom-netsec/MACUAHUITL/internal/diag/transfer"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/imgverify"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
@@ -42,7 +43,7 @@ func (j *job) errText(err error) string {
 			err = &url.Error{Op: ue.Op, URL: u.String(), Err: ue.Err}
 		}
 	}
-	msg := err.Error()
+	msg := i18n.English(err)
 	if q := j.u.RawQuery; q != "" {
 		msg = strings.ReplaceAll(strings.ReplaceAll(msg, "?"+q, ""), q, "")
 	}
@@ -188,7 +189,7 @@ func (s *svc) get(ctx context.Context, r *v1.GetRequest, onProgress func(xfer.Pr
 	}
 	j.req.DestDir, j.req.Name, j.req.WantSHA256, j.req.WantMD5 = dest, r.Name, r.Sha256, r.Md5
 	j.req.MaxBytes, j.req.Timeout, j.req.Insecure, j.req.OnProgress = max, to, r.Insecure, onProgress
-	s.d.Audit("transfer.get.start", j.label, fmt.Sprintf("trabajo=%s destino=%q credencial=%q insecure=%t ssh_antiguo=%t", j.id, dest, r.CredentialId, r.Insecure, r.LegacySsh))
+	s.d.Audit("transfer.get.start", j.label, fmt.Sprintf("job=%s destination=%q credential=%q insecure=%t legacy_ssh=%t", j.id, dest, r.CredentialId, r.Insecure, r.LegacySsh))
 	res, err := xfer.Download(ctx, j.req)
 	if err == nil && r.Sha512 != "" { // SHA-512 de Cisco: lo verifica imgverify, el mismo de field hash
 		var ir imgverify.Result
@@ -203,10 +204,10 @@ func (s *svc) get(ctx context.Context, r *v1.GetRequest, onProgress func(xfer.Pr
 		}
 	}
 	if err != nil {
-		s.d.Audit("transfer.get.failed", j.label, fmt.Sprintf("trabajo=%s destino=%q razon=%q verificado=%s guard=revocado", j.id, dest, j.errText(err), res.Verified))
+		s.d.Audit("transfer.get.failed", j.label, fmt.Sprintf("job=%s destination=%q reason=%q verified=%s guard=revoked", j.id, dest, j.errText(err), res.Verified))
 		return nil, connErr(err)
 	}
-	s.d.Audit("transfer.get", j.label, fmt.Sprintf("trabajo=%s ruta=%q bytes=%d sha256=%s md5=%s verificado=%s duración=%s guard=revocado", j.id, res.Path, res.Bytes, res.SHA256, res.MD5, res.Verified, res.Duration.Round(time.Millisecond)))
+	s.d.Audit("transfer.get", j.label, fmt.Sprintf("job=%s path=%q bytes=%d sha256=%s md5=%s verified=%s duration=%s guard=revoked", j.id, res.Path, res.Bytes, res.SHA256, res.MD5, res.Verified, res.Duration.Round(time.Millisecond)))
 	return &v1.GetResponse{Result: result(res, "guardado")}, nil
 }
 
@@ -231,13 +232,13 @@ func (s *svc) put(ctx context.Context, r *v1.PutRequest, onProgress func(xfer.Pr
 	}
 	defer j.done()
 	j.req.FromDir, j.req.Name, j.req.MaxBytes, j.req.Timeout, j.req.OnProgress = r.FromDir, r.Name, max, to, onProgress
-	s.d.Audit("transfer.put.start", j.label, fmt.Sprintf("trabajo=%s carpeta=%q archivo=%q credencial=%q ssh_antiguo=%t", j.id, r.FromDir, r.Name, r.CredentialId, r.LegacySsh))
+	s.d.Audit("transfer.put.start", j.label, fmt.Sprintf("job=%s folder=%q file=%q credential=%q legacy_ssh=%t", j.id, r.FromDir, r.Name, r.CredentialId, r.LegacySsh))
 	res, err := xfer.Upload(ctx, j.req)
 	if err != nil {
-		s.d.Audit("transfer.put.failed", j.label, fmt.Sprintf("trabajo=%s carpeta=%q archivo=%q razon=%q guard=revocado", j.id, r.FromDir, r.Name, j.errText(err)))
+		s.d.Audit("transfer.put.failed", j.label, fmt.Sprintf("job=%s folder=%q file=%q reason=%q guard=revoked", j.id, r.FromDir, r.Name, j.errText(err)))
 		return nil, connErr(err)
 	}
-	s.d.Audit("transfer.put", j.label, fmt.Sprintf("trabajo=%s ruta=%q bytes=%d sha256=%s md5=%s duración=%s guard=revocado", j.id, res.Path, res.Bytes, res.SHA256, res.MD5, res.Duration.Round(time.Millisecond)))
+	s.d.Audit("transfer.put", j.label, fmt.Sprintf("job=%s path=%q bytes=%d sha256=%s md5=%s duration=%s guard=revoked", j.id, res.Path, res.Bytes, res.SHA256, res.MD5, res.Duration.Round(time.Millisecond)))
 	return &v1.PutResponse{Result: result(res, "enviado")}, nil
 }
 

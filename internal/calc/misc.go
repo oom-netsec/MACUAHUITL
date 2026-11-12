@@ -6,6 +6,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // ---- rendimiento TCP ----
@@ -23,6 +25,7 @@ type TCPResult struct {
 	MaxBps         float64  `json:"maxBps"`
 	Limit          string   `json:"limit"`
 	Notes          []string `json:"notes"`
+	notes          []Note
 }
 
 // parseQty lee "1g", "100M", "1.5gbps", "64k"; base 1000 para bits/s y 1024 para bytes.
@@ -94,16 +97,14 @@ func TCP(bandwidth string, rttMs float64, window string, lossPct float64, mss in
 			r.MaxBps, r.Limit = r.MathisBps, "pérdida"
 		}
 	}
-	r.Notes = []string{
-		fmt.Sprintf("Un flujo TCP no pasa de ventana/RTT: para llenar %s a %g ms hacen falta %s en vuelo (escala de ventana %d o más).", bps(bw), rttMs, bytes(r.BDPBytes), r.WindowScale),
-	}
+	addNote(&r.Notes, &r.notes, "calc.note.tcp_bdp", "bandwidth", bps(bw), "rtt", fmt.Sprintf("%g", rttMs), "bdp", bytes(r.BDPBytes), "scale", r.WindowScale)
 	switch r.Limit {
 	case "ventana":
-		r.Notes = append(r.Notes, fmt.Sprintf("La ventana de %s limita a %s: sube el búfer (iperf3 -w %.0fK; en Linux net.core.rmem_max/wmem_max y net.ipv4.tcp_rmem).", bytes(r.WindowBytes), bps(r.WindowLimitBps), math.Ceil(r.BDPBytes/1024)))
+		addNote(&r.Notes, &r.notes, "calc.note.tcp_window_limit", "window", bytes(r.WindowBytes), "limit", bps(r.WindowLimitBps), "buffer", fmt.Sprintf("%.0f", math.Ceil(r.BDPBytes/1024)))
 	case "pérdida":
-		r.Notes = append(r.Notes, fmt.Sprintf("Con %g %% de pérdida, Mathis limita cada flujo a %s; harían falta unos %.0f flujos en paralelo (iperf3 -P) o quitar la pérdida.", lossPct, bps(r.MathisBps), math.Ceil(bw/r.MathisBps)))
+		addNote(&r.Notes, &r.notes, "calc.note.tcp_loss_limit", "loss", fmt.Sprintf("%g", lossPct), "limit", bps(r.MathisBps), "flows", fmt.Sprintf("%.0f", math.Ceil(bw/r.MathisBps)))
 	}
-	r.Notes = append(r.Notes, "Además, un solo flujo cae en un único miembro de port-channel o ruta ECMP (hash por flujo) y en un solo núcleo de CPU: mide con iperf3 -P 4 a 8 antes de culpar al enlace.")
+	addNote(&r.Notes, &r.notes, "calc.note.tcp_single_flow")
 	return r, nil
 }
 
@@ -114,11 +115,11 @@ func (r TCPResult) Report() Report {
 		}
 		return bps(v)
 	}
-	return Report{Tables: []Table{kv("Rendimiento TCP de un flujo",
-		"Enlace", bps(r.BandwidthBps), "RTT", strconv.FormatFloat(r.RTTms, 'f', -1, 64)+" ms",
-		"BDP (ventana necesaria)", fmt.Sprintf("%s (%.0f bytes)", bytes(r.BDPBytes), r.BDPBytes), "Escala de ventana mínima", strconv.Itoa(r.WindowScale),
-		"Límite por ventana", opt(r.WindowLimitBps), "Límite por pérdida (Mathis)", opt(r.MathisBps),
-		"Máximo de un flujo", bps(r.MaxBps), "Lo limita", r.Limit)}, Notes: r.Notes}
+	return Report{Tables: []Table{kv("calc.title.tcp", nil,
+		"calc.row.link", bps(r.BandwidthBps), "calc.row.rtt", strconv.FormatFloat(r.RTTms, 'f', -1, 64)+" ms",
+		"calc.row.bdp", fmt.Sprintf("%s (%.0f bytes)", bytes(r.BDPBytes), r.BDPBytes), "calc.row.window_scale", strconv.Itoa(r.WindowScale),
+		"calc.row.window_limit", opt(r.WindowLimitBps), "calc.row.loss_limit", opt(r.MathisBps),
+		"calc.row.max_flow", bps(r.MaxBps), "calc.row.limited_by", r.Limit)}, Notes: r.Notes, NoteItems: r.notes}
 }
 
 // ---- QoS: DSCP, ToS, CoS, EXP ----
@@ -139,6 +140,7 @@ type DSCPEntry struct {
 type DSCPResult struct {
 	Entries []DSCPEntry `json:"entries"`
 	Notes   []string    `json:"notes"`
+	notes   []Note
 }
 
 var dscpNames = []struct {
@@ -174,10 +176,9 @@ func dscpEntry(d int) DSCPEntry {
 // CoS y EXP siguen el mapeo Cisco por defecto: los 3 bits altos (la precedencia).
 func DSCP(query, by string) (DSCPResult, error) {
 	q, by := strings.ToUpper(strings.TrimSpace(query)), strings.ToLower(strings.TrimSpace(by))
-	r := DSCPResult{Notes: []string{
-		"CoS y MPLS EXP por defecto en Cisco = precedencia IP (3 bits altos del DSCP). El mapa cos-dscp por defecto es 0 8 16 24 32 40 48 56; para voz se suele cambiar CoS 5 → 46 (mls qos map cos-dscp 0 8 16 24 32 46 48 56).",
-		"Clases según RFC 4594; Cisco intercambia CS3 y CS5 (señalización en CS3, video broadcast en CS5).",
-	}}
+	r := DSCPResult{}
+	addNote(&r.Notes, &r.notes, "calc.note.dscp_cos_map")
+	addNote(&r.Notes, &r.notes, "calc.note.dscp_rfc4594")
 	num := func(base int, max int) (int, error) {
 		s := q
 		if base == 16 {
@@ -251,12 +252,12 @@ func DSCP(query, by string) (DSCPResult, error) {
 }
 
 func (r DSCPResult) Report() Report {
-	t := Table{Title: "DSCP", Head: []string{"Nombre", "DSCP", "Binario", "ToS", "ToS hex", "Precedencia", "CoS", "EXP", "Descarte AF", "Clase (RFC 4594)"}}
+	t := titled("calc.title.dscp", nil, "calc.col.name", "calc.col.dscp", "calc.col.binary", "calc.col.tos", "calc.col.tos_hex", "calc.col.precedence", "calc.col.cos", "calc.col.exp", "calc.col.af_drop", "calc.col.class")
 	for _, e := range r.Entries {
-		t.Rows = append(t.Rows, []string{e.Name, strconv.Itoa(e.DSCP), e.Binary, strconv.Itoa(e.ToS), e.ToSHex, strconv.Itoa(e.Precedence),
-			strconv.Itoa(e.CoS), strconv.Itoa(e.EXP), e.Drop, e.Class})
+		t.add("", nil, e.Name, strconv.Itoa(e.DSCP), e.Binary, strconv.Itoa(e.ToS), e.ToSHex, strconv.Itoa(e.Precedence),
+			strconv.Itoa(e.CoS), strconv.Itoa(e.EXP), e.Drop, e.Class)
 	}
-	return Report{Tables: []Table{t}, Notes: r.Notes}
+	return Report{Tables: []Table{t}, Notes: r.Notes, NoteItems: r.notes}
 }
 
 // ---- óptica ----
@@ -289,6 +290,7 @@ type OpticsResult struct {
 	Overload      bool     `json:"overload"`
 	AttenuatorDb  float64  `json:"attenuatorDb,omitempty"`
 	Notes         []string `json:"notes,omitempty"`
+	notes         []Note
 }
 
 func Optics(in OpticsInput) (OpticsResult, error) {
@@ -310,12 +312,12 @@ func Optics(in OpticsInput) (OpticsResult, error) {
 	r.Closes = r.RemainingDb >= 0
 	if in.RxOverloadDbm != nil && r.ExpectedRxDbm > *in.RxOverloadDbm {
 		r.Overload, r.AttenuatorDb = true, r.ExpectedRxDbm-*in.RxOverloadDbm
-		r.Notes = append(r.Notes, fmt.Sprintf("La potencia recibida (%.2f dBm) supera la saturación del receptor (%.2f dBm): pon un atenuador de al menos %.1f dB.", r.ExpectedRxDbm, *in.RxOverloadDbm, r.AttenuatorDb))
+		addNote(&r.Notes, &r.notes, "calc.note.optics_overload", "rx", fmt.Sprintf("%.2f", r.ExpectedRxDbm), "overload", fmt.Sprintf("%.2f", *in.RxOverloadDbm), "attenuator", fmt.Sprintf("%.1f", r.AttenuatorDb))
 	}
 	if !r.Closes {
-		r.Notes = append(r.Notes, fmt.Sprintf("Faltan %.2f dB: el enlace no cierra con el margen pedido. Revisa conectores sucios, la óptica (LR→ER) o la distancia.", -r.RemainingDb))
+		addNote(&r.Notes, &r.notes, "calc.note.optics_short", "missing", fmt.Sprintf("%.2f", -r.RemainingDb))
 	}
-	r.Notes = append(r.Notes, "Pérdidas por km y por conector son valores típicos de diseño: usa la hoja de la óptica y la medición OTDR cuando las tengas.")
+	addNote(&r.Notes, &r.notes, "calc.note.optics_typical")
 	return r, nil
 }
 
@@ -328,16 +330,15 @@ func (r OpticsResult) Report() Report {
 	if r.Overload {
 		verdict += ", pero satura el receptor"
 	}
-	return Report{Tables: []Table{
-		Table{Title: "Pérdidas", Head: []string{"Elemento", "Cantidad", "Pérdida"}, Rows: [][]string{
-			{fmt.Sprintf("Fibra (%.2f dB/km)", r.LossPerKm), f(r.Km, "km"), f(r.FiberLossDb, "dB")},
-			{fmt.Sprintf("Conectores (%.2f dB c/u)", r.ConnectorLoss), strconv.Itoa(r.Connectors), f(float64(r.Connectors)*r.ConnectorLoss, "dB")},
-			{fmt.Sprintf("Empalmes (%.2f dB c/u)", r.SpliceLoss), strconv.Itoa(r.Splices), f(float64(r.Splices)*r.SpliceLoss, "dB")},
-			{"Total", "", f(r.TotalLossDb, "dB")},
-		}},
-		kv("Presupuesto", "Tx", f(r.TxDbm, "dBm"), "Sensibilidad Rx", f(r.RxSensDbm, "dBm"), "Presupuesto", f(r.BudgetDb, "dB"),
-			"Rx esperada", f(r.ExpectedRxDbm, "dBm"), "Margen pedido", f(r.MarginDb, "dB"), "Sobrante", f(r.RemainingDb, "dB"), "Veredicto", verdict),
-	}, Notes: r.Notes}
+	loss := titled("calc.title.losses", nil, "calc.col.item", "calc.col.quantity", "calc.col.loss")
+	loss.add("calc.row.fiber", i18n.A("loss", fmt.Sprintf("%.2f", r.LossPerKm)), "", f(r.Km, "km"), f(r.FiberLossDb, "dB"))
+	loss.add("calc.row.connectors", i18n.A("loss", fmt.Sprintf("%.2f", r.ConnectorLoss)), "", strconv.Itoa(r.Connectors), f(float64(r.Connectors)*r.ConnectorLoss, "dB"))
+	loss.add("calc.row.splices", i18n.A("loss", fmt.Sprintf("%.2f", r.SpliceLoss)), "", strconv.Itoa(r.Splices), f(float64(r.Splices)*r.SpliceLoss, "dB"))
+	loss.add("calc.row.total", nil, "", "", f(r.TotalLossDb, "dB"))
+	return Report{Tables: []Table{loss,
+		kv("calc.title.budget", nil, "calc.row.tx", f(r.TxDbm, "dBm"), "calc.row.rx_sensitivity", f(r.RxSensDbm, "dBm"), "calc.row.budget", f(r.BudgetDb, "dB"),
+			"calc.row.rx_expected", f(r.ExpectedRxDbm, "dBm"), "calc.row.margin", f(r.MarginDb, "dB"), "calc.row.spare", f(r.RemainingDb, "dB"), "calc.row.verdict", verdict),
+	}, Notes: r.Notes, NoteItems: r.notes}
 }
 
 type PowerResult struct {
@@ -366,5 +367,5 @@ func Power(s string) (PowerResult, error) {
 }
 
 func (p PowerResult) Report() Report {
-	return Report{Tables: []Table{kv("Potencia", "dBm", strconv.FormatFloat(p.Dbm, 'f', 3, 64), "mW", strconv.FormatFloat(p.Mw, 'g', 6, 64))}}
+	return Report{Tables: []Table{kv("calc.title.power", nil, "calc.row.dbm", strconv.FormatFloat(p.Dbm, 'f', 3, 64), "calc.row.mw", strconv.FormatFloat(p.Mw, 'g', 6, 64))}}
 }

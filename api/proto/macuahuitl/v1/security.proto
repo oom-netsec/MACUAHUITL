@@ -48,8 +48,46 @@ message RadiusTestRequest {
   int32 retries = 17;
 }
 
+// Fase 30b: lo mismo que dice el texto del informe, con claves estables. Ningún campo trae el secreto
+// compartido, la contraseña ni sus longitudes.
+
+// Texto de catálogo ya armado: key y args, y el texto en el idioma pedido (accept-language).
+message SecText {
+  string key = 1;
+  map<string, string> args = 2;
+  string text = 3;
+}
+
+// Hallazgo: code estable (sin-respuesta, blast-radius, secreto, authen-fail…), severity cerrada
+// (warning, error, info), args con los valores que cita y message con el detalle en el idioma pedido.
+message SecFinding {
+  string code = 1;
+  string severity = 2;
+  map<string, string> args = 3;
+  string message = 4;
+}
+
+message RadiusAttribute {
+  string name = 1;
+  string value = 2;
+}
+
+message RadiusExchange {
+  string kind = 1;              // access-request, status-server, accounting-start, accounting-stop
+  string code = 2;              // Access-Accept…; vacío si no hubo respuesta
+  double rtt_ms = 3;
+  int32 attempts = 4;
+  string message_authenticator = 5; // absent, valid, invalid; vacío si no hubo respuesta
+  SecText error = 6;            // ausente si no hubo error
+  repeated RadiusAttribute attrs = 7;
+}
+
 message RadiusTestResponse {
   ToolReport report = 1;
+  string server = 2;
+  string method = 3; // PAP, CHAP, MSCHAPV2 (como en el texto); vacío en Status-Server
+  repeated RadiusExchange exchanges = 4;
+  repeated SecFinding findings = 5;
 }
 
 message TacacsTestRequest {
@@ -65,8 +103,68 @@ message TacacsTestRequest {
   int32 timeout_ms = 10;
 }
 
+// AV pair de un paso: direction es sent (lo que mandó la prueba) o received (lo que devolvió el servidor).
+message TacacsAvPair {
+  string direction = 1;
+  string value = 2;
+}
+
+message TacacsStep {
+  string kind = 1;   // authentication, authorization, accounting-start, accounting-stop
+  string status = 2; // PASS, FAIL, PASS_ADD…; vacío si no hubo respuesta
+  double rtt_ms = 3;
+  SecText error = 4; // ausente si no hubo error
+  repeated string prompts = 5;
+  string message = 6;
+  string data = 7;
+  repeated TacacsAvPair av_pairs = 8;
+}
+
 message TacacsTestResponse {
   ToolReport report = 1;
+  string server = 2; // host:puerto
+  repeated TacacsStep steps = 3;
+  repeated SecFinding findings = 4;
+}
+
+// Certificado o CSR, como lo describe el informe de texto. Fechas en RFC 3339 UTC; sin validez (CSR) no hay
+// days_left ni fechas. key.description es el texto «RSA 2048» o «ECDSA P-256».
+message PkiKey {
+  string algorithm = 1; // RSA, ECDSA
+  uint32 bits = 2;
+  string curve = 3;     // solo ECDSA
+  string description = 4;
+}
+
+message PkiSignature {
+  string algorithm = 1;
+  optional bool valid = 2; // solo en CSR
+}
+
+message PkiWarning {
+  string code = 1;               // rsa_small, weak_sig, no_san, expired, not_yet, expires_soon, self_signed, csr_signature
+  map<string, string> args = 2;
+  string message = 3;            // en el idioma pedido
+}
+
+message PkiCertificate {
+  string kind = 1; // certificate, csr
+  string subject = 2;
+  string issuer = 3;
+  string serial = 4;
+  string not_before = 5;
+  string not_after = 6;
+  optional int32 days_left = 7;
+  PkiKey key = 8;
+  PkiSignature signature = 9;
+  repeated string san = 10;
+  repeated string key_usage = 11;
+  repeated string ext_key_usage = 12;
+  bool is_ca = 13;
+  bool self_signed = 14;
+  string sha1 = 15;
+  string sha256 = 16;
+  repeated PkiWarning warnings = 17;
 }
 
 message PkiKeyRequest {
@@ -100,6 +198,7 @@ message PkiCsrResponse {
   string csr_pem = 1;
   string sealed_key_pem = 2; // la llave usada (nueva o la recibida)
   ToolReport report = 3;
+  repeated PkiCertificate certificates = 4;
 }
 
 message PkiCaInitRequest {
@@ -113,6 +212,8 @@ message PkiCaInitResponse {
   string ca_cert_pem = 1;
   string sealed_key_pem = 2;
   ToolReport report = 3;
+  repeated PkiCertificate certificates = 4;
+  bool lab_warning = 5; // el texto del informe abre con el aviso de CA de laboratorio
 }
 
 message PkiCaSignRequest {
@@ -127,6 +228,8 @@ message PkiCaSignRequest {
 message PkiCaSignResponse {
   string cert_pem = 1;
   ToolReport report = 2;
+  repeated PkiCertificate certificates = 3;
+  bool lab_warning = 4;
 }
 
 message PkiExportRequest {
@@ -149,6 +252,7 @@ message PkiDecodeRequest {
 
 message PkiDecodeResponse {
   ToolReport report = 1;
+  repeated PkiCertificate certificates = 2;
 }
 
 message IkeDecodeRequest {

@@ -31,8 +31,8 @@ Para cada caso: ID, fecha y hora, comando exacto, resultado (PASA / FALLA / PARC
 | A1 | Crear bóveda | `mctl vault create` | Archivo `vault.mcv` con permisos 0600; `vault.create` en auditoría con parámetros Argon2id |
 | A2 | Contraseña maestra incorrecta | `mctl vault unlock` con otra contraseña | Rechazo; `vault.unlock_failed` en auditoría; sin bloqueo de cuenta |
 | A3 | Credencial sin rastro en disco | Guardar credencial con contraseña única (`LAB-MARKER-…`); `grep -r` del marcador, su base64 y su hex en `~/.local/share/macuahuitl`, `~/.local/state/macuahuitl`, `~/.config/macuahuitl` y la carpeta de outputs | Cero coincidencias |
-| A4 | Cierre por inactividad | Dejar la bóveda abierta 16 minutos sin tocar la UI ni `mctl` | `mctl vault status` → cerrada; `vault.lock` con detalle `inactividad` |
-| A5 | Bloqueo de pantalla | Abrir la bóveda y bloquear la sesión con `loginctl lock-session` | Bóveda cerrada; `vault.lock` con detalle `pantalla bloqueada` |
+| A4 | Cierre por inactividad | Dejar la bóveda abierta 16 minutos sin tocar la UI ni `mctl` | `mctl vault status` → cerrada; `vault.lock` con detalle `reason=idle` (antes de la fase 30a-2: `inactividad`) |
+| A5 | Bloqueo de pantalla | Abrir la bóveda y bloquear la sesión con `loginctl lock-session` | Bóveda cerrada; `vault.lock` con detalle `reason=screen_locked` (antes de la fase 30a-2: `pantalla bloqueada`) |
 | A6 | Cambio de contraseña maestra | `mctl vault passwd`; intentar abrir con la vieja | Rechazo con la vieja; `vault.mcv.bak` tampoco abre con la vieja |
 
 ## B. Conexión y llaves de host
@@ -156,7 +156,7 @@ El simulador no responde `show startup-config` (lo trata como inválido) ni repr
 | K4 | Programado | `--every 5m --rounds 3` | Tres respaldos sin intervención; el núcleo sigue guardando con la UI cerrada |
 | K5 | Prompts de contraseña | En la terminal: `enable`, `Old password:` (`username X password`), `Enter secret:` en `enable secret` interactivo | La grabación trae `>>> [oculto]` y nada de lo tecleado |
 | K6 | Prompt con otra palabra | TACACS que pide `Token:` o `Passcode:` | `Passcode:` se oculta; `Token:` no (límite conocido: ampliar `secretPrompt` en `internal/terminal`) |
-| K7 | Corte del equipo | Reiniciar el equipo con la terminal abierta | La pestaña queda «cerrada», `terminal.close` en la bitácora con `guard=revocado` |
+| K7 | Corte del equipo | Reiniciar el equipo con la terminal abierta | La pestaña queda «cerrada», `terminal.close` en la bitácora con `guard=revoked` (antes de la fase 30a-2: `guard=revocado`) |
 | K8 | exec-timeout | Dejar la sesión inactiva hasta el exec-timeout | Igual que J7 |
 | K9 | Paginación | `show running-config` en la terminal | Aparece `--More--`; el botón Espacio avanza; `terminal length 0` lo evita |
 
@@ -247,7 +247,7 @@ Equipo de laboratorio: Catalyst 3560CX con IOS clásico 15.2(x)E; repetir en IOS
 | N22 | FTP y HTTP(S), cliente | Servidor FTP del equipo si existe (`ip ftp`), o la laptop; `ip http server` / `ip http secure-server` en el equipo; `mctl transfer get http://IP-EQUIPO/...` y `https://...` | `https` con el certificado autofirmado del equipo falla sin `--insecure` y funciona con él; la bitácora marca `insecure=true`. Un `404` no deja archivos |
 | N23 | Hash esperado | `mctl transfer get ... --sha256 H` con el valor bueno y con uno cambiado; `--sha512` con el publicado por Cisco | Con el bueno `verificado: ok`; con el malo el comando falla y no queda archivo en la carpeta |
 | N24 | Destino | Descargar dos veces al mismo destino; a un enlace simbólico; a `/etc`; con `--max-bytes` menor que el archivo | La segunda no sobrescribe; enlace y `/etc` se rechazan; el tope corta y no deja archivo parcial |
-| N25 | Salida solo a lo escrito | Con el pcap abierto, `get` a un nombre de host; `get http://` con redirección a otra IP | El pcap solo muestra tráfico hacia la IP escrita (y la redirección a otra IP se niega con `egress.denied` en la bitácora); tras cada trabajo, `Revoke` (`guard=revocado`) |
+| N25 | Salida solo a lo escrito | Con el pcap abierto, `get` a un nombre de host; `get http://` con redirección a otra IP | El pcap solo muestra tráfico hacia la IP escrita (y la redirección a otra IP se niega con `egress.denied` en la bitácora); tras cada trabajo, `Revoke` (`guard=revoked`; antes de la fase 30a-2: `guard=revocado`) |
 | N26 | Contraseña fuera de lugar | `mctl transfer get ftp://U:P@IP/x` y revisar la bitácora, `ps` y el historial | La URL con contraseña se rechaza («usa una credencial de la bóveda»); en ninguna parte aparece una contraseña |
 
 **Revisión de seguridad de la fase** (se repite después de cualquier cambio en `fileserve`)

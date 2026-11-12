@@ -8,6 +8,7 @@ package i18n
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -231,4 +232,38 @@ func Codes() []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// English es el texto de err para la auditoría, que va siempre en inglés: si err (o algo que envuelve) trae
+// código del catálogo, ese tramo sale en inglés y el resto del mensaje queda tal cual; sin código, es err.Error().
+func English(err error) string {
+	if err == nil {
+		return ""
+	}
+	var c Coded
+	if !errors.As(err, &c) {
+		return err.Error()
+	}
+	return strings.Replace(err.Error(), c.Error(), c.Localize(En), 1)
+}
+
+// Text es un texto de catálogo ya elegido: su código y los argumentos. Los informes (RADIUS, TACACS+, PKI,
+// calculadoras) lo guardan junto al texto en español para poder darlo en el otro idioma o entregar la clave.
+type Text struct {
+	Key  string
+	Args Args
+}
+
+// Tx arma un Text desde pares nombre, valor (como A).
+func Tx(key string, kv ...any) Text { return Text{Key: key, Args: A(kv...)} }
+
+// Empty indica que no hay texto.
+func (t Text) Empty() bool { return t.Key == "" }
+
+// In es el texto en el idioma dado; vacío si no hay código.
+func (t Text) In(loc string) string {
+	if t.Key == "" {
+		return ""
+	}
+	return Msg(loc, t.Key, t.Args)
 }

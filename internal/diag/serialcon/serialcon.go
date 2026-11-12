@@ -54,6 +54,11 @@ func (c Config) String() string {
 	return fmt.Sprintf("%d %d%c%d flujo=%s", c.Baud, c.DataBits, strings.ToUpper(c.Parity)[0], c.StopBits, c.Flow)
 }
 
+// AuditString es String para la auditoría, que va siempre en inglés (flow en vez de flujo).
+func (c Config) AuditString() string {
+	return fmt.Sprintf("%d %d%c%d flow=%s", c.Baud, c.DataBits, strings.ToUpper(c.Parity)[0], c.StopBits, c.Flow)
+}
+
 func (c Config) validate() error {
 	if !filepath.IsAbs(c.Path) || !strings.HasPrefix(filepath.Clean(c.Path), "/dev/") {
 		return fmt.Errorf("serialcon: %q no es un dispositivo bajo /dev", c.Path)
