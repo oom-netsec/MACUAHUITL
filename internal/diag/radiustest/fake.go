@@ -171,7 +171,7 @@ func (f *Fake) checkPassword(req *Packet, pw []byte, resp *Packet) bool {
 	}
 	ar := authenticatorResponse(pw, nt, peer, authCh, string(user))
 	if f.cfg.BadMSSuccess {
-		ar = ar[:len(ar)-1] + "0" + ar[len(ar)-1:len(ar)] // cambia el valor sin dejar de ser un texto
+		ar = ar[:len(ar)-1] + "0" + ar[len(ar)-1:] // cambia el valor sin dejar de ser un texto
 	}
 	resp.Add(AttrVendorSpecific, vsa(311, 26, append([]byte{msResp[0]}, ar...)))
 	return true
