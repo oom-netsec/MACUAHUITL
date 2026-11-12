@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"encoding/json"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -169,6 +170,33 @@ func TestFrasesDeAnalisisFueraDeLosDatosDePrueba(t *testing.T) {
 		}
 		if got := c.tx.In(i18n.En); got != c.want {
 			t.Errorf("%s en inglés: %q, quería %q", c.tx.Key, got, c.want)
+		}
+	}
+}
+
+// Los escenarios de la regresión recorren todas las claves de detalle, avisos, eventos y notas del análisis.
+func TestEscenariosCubrenTodasLasClavesDeAnalisis(t *testing.T) {
+	_, ptrs := regCases(t)
+	used := map[string]bool{}
+	for _, v := range ptrs {
+		for k := range i18n.UsedKeys(v) {
+			used[k] = true
+		}
+	}
+	sinDatos := map[string]string{
+		"analyze.warn.audit": "lo arma el servicio cuando falla la exportación de la auditoría (no es del dominio)",
+		"analyze.warn.pcap":  "lo arma el servicio con los avisos de la captura (la regresión por RPC lo cubre)",
+	}
+	if os.Geteuid() == 0 {
+		sinDatos["analyze.warn.system"] = "exige un archivo ilegible, y como root todo se lee"
+	}
+	for _, prefix := range []string{"analyze.detail.", "analyze.warn.", "analyze.event.", "analyze.diff.", "analyze.key."} {
+		for _, k := range i18n.Codes() {
+			if strings.HasPrefix(k, prefix) && !used[k] {
+				if _, ok := sinDatos[k]; !ok {
+					t.Errorf("ningún escenario de la regresión produce %s", k)
+				}
+			}
 		}
 	}
 }
