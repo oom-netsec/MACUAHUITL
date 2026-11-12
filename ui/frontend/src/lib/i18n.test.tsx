@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { I18nProvider, LanguageSwitch, useT } from "./i18n";
+import { I18nProvider, LanguageSwitch, useCoreLang, useT } from "./i18n";
 
 function Probe() {
   const t = useT();
@@ -32,6 +32,20 @@ test("onLang recibe el idioma vigente al arrancar y cada vez que cambia", async 
   await userEvent.click(screen.getByRole("radio", { name: "English" }));
   expect(onLang).toHaveBeenLastCalledWith("en");
   expect(onLang).toHaveBeenCalledTimes(2);
+});
+
+// Lo que pide el idioma al núcleo (nombres de playbooks) espera a que el núcleo lo tenga: dos llamadas de Wails no llegan en orden.
+test("useCoreLang cambia cuando el núcleo confirmó el idioma, no antes", async () => {
+  let done = () => {};
+  const onLang = vi.fn(() => new Promise<void>((r) => { done = r; }));
+  function Core() { return <output>{useCoreLang() ?? "-"}</output>; }
+  render(<I18nProvider onLang={onLang}><LanguageSwitch /><Core /></I18nProvider>);
+  await act(async () => done());
+  expect(screen.getByRole("status")).toHaveTextContent("es");
+  await userEvent.click(screen.getByRole("radio", { name: "English" }));
+  expect(screen.getByRole("status")).toHaveTextContent("es");
+  await act(async () => done());
+  expect(screen.getByRole("status")).toHaveTextContent("en");
 });
 
 test("sin proveedor usa español", () => {

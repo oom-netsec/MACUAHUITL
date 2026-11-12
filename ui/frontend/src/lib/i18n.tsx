@@ -16,7 +16,7 @@ const make = (lang: Lang): T => (key, vars) => {
   return text.replace(/\{(\w+)\}/g, (_, v: string) => String(vars?.[v] ?? `{${v}}`));
 };
 
-const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void; t: T }>({ lang: "es", setLang: () => {}, t: make("es") });
+const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void; t: T; coreLang?: Lang }>({ lang: "es", setLang: () => {}, t: make("es"), coreLang: "es" });
 
 function initial(): Lang {
   try {
@@ -26,16 +26,20 @@ function initial(): Lang {
   return navigator.language.toLowerCase().startsWith("es") ? "es" : "en";
 }
 
-// `onLang` se llama con el idioma vigente al montar y en cada cambio (el shell lo pasa al núcleo).
-export function I18nProvider({ children, onLang }: { children: ReactNode; onLang?: (l: Lang) => void }) {
+// `onLang` se llama con el idioma vigente al montar y en cada cambio (el shell lo pasa al núcleo); `coreLang` es el
+// idioma que el núcleo ya tiene: cambia cuando la promesa de onLang termina, con éxito o no.
+export function I18nProvider({ children, onLang }: { children: ReactNode; onLang?: (l: Lang) => unknown }) {
   const [lang, setLang] = useState<Lang>(initial);
+  const [coreLang, setCoreLang] = useState<Lang>();
   useLayoutEffect(() => {
     document.documentElement.lang = lang;
     try { localStorage.setItem(storageKey, lang); } catch { /* sin persistencia */ }
-    onLang?.(lang);
+    let off = false;
+    void Promise.resolve(onLang?.(lang)).catch(() => {}).finally(() => { if (!off) setCoreLang(lang); });
+    return () => { off = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando cambia el idioma
   }, [lang]);
-  return <Ctx.Provider value={{ lang, setLang, t: make(lang) }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ lang, setLang, t: make(lang), coreLang }}>{children}</Ctx.Provider>;
 }
 
 export const useT = () => useContext(Ctx).t;
@@ -43,6 +47,8 @@ export const useT = () => useContext(Ctx).t;
 export const tr: T = (key, vars) => make(document.documentElement.lang === "en" ? "en" : "es")(key, vars);
 export const useLang = () => useContext(Ctx).lang;
 export const useSetLang = () => useContext(Ctx).setLang;
+// Idioma que el núcleo ya confirmó (undefined hasta la primera confirmación): dependencia de lo que el núcleo traduce.
+export const useCoreLang = () => useContext(Ctx).coreLang;
 
 export function LanguageSwitch() {
   const { lang, setLang, t } = useContext(Ctx);

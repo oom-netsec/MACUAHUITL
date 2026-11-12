@@ -16,7 +16,7 @@ import { vaultChanged } from "../lib/vaultSignal";
 // `initial` abre otro módulo al arrancar (vista previa y capturas).
 export function App(props: { core: CoreAPI; chrome?: ReactNode; initial?: string }) {
   // El núcleo habla el idioma de la interfaz; un fallo al avisarle no debe romper nada.
-  const sync = (l: string) => { try { void Promise.resolve(props.core.setPreference("ui.language", l)).catch(() => {}); } catch { /* núcleo sin la preferencia */ } };
+  const sync = (l: string) => { try { return props.core.setPreference("ui.language", l); } catch { /* núcleo sin la preferencia */ } };
   return <I18nProvider onLang={sync}><Shell {...props} /></I18nProvider>;
 }
 
