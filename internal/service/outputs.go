@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -23,6 +24,9 @@ var (
 	AncestorInfo = RealAncestorInfo
 	CreateTemp   = os.CreateTemp
 )
+
+// safeShellPath son las rutas que se pueden poner en una orden de terminal sin citar.
+var safeShellPath = regexp.MustCompile(`^[A-Za-z0-9/._+,@%=:-]+$`)
 
 // outputsErr arma el error con el código estable prefs.outputs.<motivo> al inicio (el paso de idioma de la
 // fase 30a lo traduce); el texto va en español.
@@ -89,7 +93,11 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 		return "", outputsErr("otro_dueno", "la carpeta %s no es del usuario que corre el núcleo", real)
 	}
 	if m := fi.Mode().Perm(); m != 0o700 {
-		return "", outputsErr("permisos", "la carpeta %s tiene modo %04o y debe ser 0700; corrígelo con: chmod 700 %s", real, m, real)
+		hint := ""
+		if safeShellPath.MatchString(real) { // sin comillas ni metacaracteres: la orden se puede pegar tal cual
+			hint = "; corrígelo con: chmod 700 " + real
+		}
+		return "", outputsErr("permisos", "la carpeta %s tiene modo %04o y debe ser 0700%s", real, m, hint)
 	}
 	// Un ancestro que otros pueden escribir (grupo u otros) deja que alguien reemplace la ruta, o la cree 0777 tras
 	// una limpieza de tmpfiles: no se acepta si no es del usuario (/tmp, /var/tmp y /dev/shm caen aquí).
