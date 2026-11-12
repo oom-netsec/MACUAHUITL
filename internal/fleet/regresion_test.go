@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -103,6 +104,14 @@ func regCases(t *testing.T) (map[string]golden, map[string]any) {
 	fp := New([]*Dev{pd}, now)
 	pp := fp.Path("10.0.0.1", "8.8.8.8")
 	add("path-weird", &pp, fp.PathText(pp))
+	tmpDirs = nil
+	extraCases(t, add)
+	for k, g := range out { // solo el escenario con carpetas ilegibles lleva rutas
+		for _, d := range tmpDirs {
+			g = golden{strings.ReplaceAll(g.JSON, d, "<DIR>"), strings.ReplaceAll(g.Text, d, "<DIR>")}
+		}
+		out[k] = g
+	}
 	return out, ptrs
 }
 

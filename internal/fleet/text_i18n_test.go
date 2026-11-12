@@ -29,8 +29,8 @@ func TestLocalizarFlotaEnYClaves(t *testing.T) {
 			t.Errorf("%s: %d claves con es y %d con en", name, len(es), len(keys))
 		}
 		after, _ := json.Marshal(v)
-		// "equipo" como kind de inventario es un código cerrado que la vista ya mapea
-		if m := spanish.FindString(strings.ReplaceAll(string(after), `"kind":"equipo"`, "")); m != "" {
+		// "equipo" (kind de inventario) y "trunk-sin-vecino" (fin del rastreo) son códigos cerrados que la vista ya mapea
+		if m := spanish.FindString(strings.NewReplacer(`"kind":"equipo"`, "", `"end":"trunk-sin-vecino"`, "").Replace(string(after))); m != "" {
 			t.Errorf("%s: queda español sin clave en el JSON en inglés: %q\n%s", name, m, after)
 		}
 		if len(es) > 0 && string(before) == string(after) {
@@ -90,5 +90,33 @@ func TestNewWSConservaAvisosSinTexto(t *testing.T) {
 	w := f.newWS()
 	if len(w.list) != 3 || len(w.txs) != 3 || w.txs[0].Key != "fleet.warn.system" || w.txs[1].In(i18n.Es) != "dos" || w.txs[2].In(i18n.En) != "tres" {
 		t.Errorf("%v %v", w.list, w.txs)
+	}
+}
+
+// Los escenarios de la regresión recorren todas las claves de avisos, motivos, notas y filas de la flota
+// (salvo las que ningún dato de prueba alcanza, con su motivo).
+func TestEscenariosCubrenTodasLasClavesDeFlota(t *testing.T) {
+	_, ptrs := regCases(t)
+	used := map[string]bool{}
+	for _, v := range ptrs {
+		for _, tx := range i18n.Localize(v, i18n.Es) {
+			used[tx.Key] = true
+		}
+	}
+	sinDatos := map[string]string{
+		"fleet.warn.read_error":       "un error de E/S a mitad de un archivo no se puede fabricar en una prueba portable",
+		"fleet.warn.zip_entry":        "una entrada de zip que no abre exige un zip corrupto por dentro",
+		"fleet.reason.rec_not_ip":     "el siguiente salto siempre es una IP legible",
+		"fleet.reason.rec_no_nexthop": "una ruta sin siguiente salto ni interfaz no sale del parser",
+		"fleet.warn.dir_unreadable":   "exige un usuario sin privilegios (se omite si corre como root)",
+	}
+	for _, prefix := range []string{"fleet.warn.", "fleet.reason.", "fleet.note.", "fleet.value.", "fleet.detail.", "fleet.evidence."} {
+		for _, k := range i18n.Codes() {
+			if strings.HasPrefix(k, prefix) && !used[k] {
+				if _, ok := sinDatos[k]; !ok {
+					t.Errorf("ningún escenario de la regresión produce %s", k)
+				}
+			}
+		}
 	}
 }
