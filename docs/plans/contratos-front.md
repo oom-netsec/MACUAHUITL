@@ -768,7 +768,7 @@ interface CoreError {
 ```
 `reason` y `metadata` salen del `ErrorInfo` (`domain: "macuahuitl"`) que el núcleo agrega a los detalles del error gRPC junto con un `LocalizedMessage`. Un error sin reason sigue siendo texto en español (o el del idioma pedido, si ya tiene código).
 
-**Eventos de cierre de los streams.** Los RPC de servidor (syslog, traps, flujos, diag, consola, serve, transferencias, terminal y asistente) devuelven su error de validación en el primer `Recv()`, y el puente lo emite en el evento `*:done` (`syslog:done`, `traps:done`, `flows:done`, `diag:done`, `console:done`, `serve:done`, `transfer:done`, `terminal:done`, `assist:done`) como `{runId, error, errorInfo, ...}`. `error` sigue siendo el texto de siempre; `errorInfo` es `{code: string, reason: string, metadata: Record<string,string>}` (la misma forma que `CoreError` sin `message`; `metadata` nunca es `null`) y solo está cuando hay `error`.
+**Eventos de cierre de los streams.** Los RPC de servidor (syslog, traps, flujos, diag, consola, serve, transferencias, terminal y asistente) devuelven su error de validación en el primer `Recv()`, y el puente lo emite en el evento `*:done` (`syslog:done`, `traps:done`, `flows:done`, `diag:done`, `console:done`, `serve:done`, `transfer:done`, `terminal:done`, `assist:done` y `transfer:finished`) como `{runId, error, errorInfo, ...}`. `error` sigue siendo el texto de siempre; `errorInfo` es `{code: string, reason: string, metadata: Record<string,string>}` (la misma forma que `CoreError` sin `message`; `metadata` nunca es `null`) y solo está cuando hay `error`.
 
 ### Reasons y metadata de esta fase
 | reason | code gRPC | metadata |

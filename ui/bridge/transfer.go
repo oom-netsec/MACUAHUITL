@@ -282,7 +282,7 @@ func (b *Bridge) runTransfer(id string, ctx context.Context, cancel context.Canc
 			case ctx.Err() != nil:
 				m["canceled"] = true
 			default:
-				m["error"] = err.Error()
+				m["error"], m["errorInfo"] = err.Error(), errorInfo(err)
 			}
 			b.emit("transfer:finished", m)
 			return
