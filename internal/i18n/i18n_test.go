@@ -55,6 +55,11 @@ func TestParseCortaElHeader(t *testing.T) {
 	if got := Parse(strings.Repeat(" ", 300) + "en"); got != Es {
 		t.Fatalf("%q", got)
 	}
+	// El corte deja «en» sin su «;q=0.1»: la entrada incompleta se descarta en vez de valer q=1.
+	h := "es;q=0.5," + strings.Repeat(" ", 245) + "en;q=0.1"
+	if got := Parse(h); got != Es {
+		t.Fatalf("entrada cortada: %q", got)
+	}
 	if got := Parse(strings.Repeat("x,", 100) + "en"); got != En {
 		t.Fatalf("antes del corte debe contar: %q", got)
 	}

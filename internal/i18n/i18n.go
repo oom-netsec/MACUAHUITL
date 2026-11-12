@@ -84,6 +84,11 @@ func Normalize(tag string) string {
 func Parse(header string) string {
 	if len(header) > maxHeader {
 		header = header[:maxHeader]
+		if i := strings.LastIndexByte(header, ','); i >= 0 { // el último trozo pudo quedar sin su q: se descarta
+			header = header[:i]
+		} else {
+			header = ""
+		}
 	}
 	best, bestQ := Es, -1.0
 	for _, part := range strings.Split(header, ",") {
