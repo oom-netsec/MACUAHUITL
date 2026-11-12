@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
-	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 )
 
 // motivosEs reúne los motivos de rechazo y los errores de validación de fileserve, en español.
@@ -36,7 +36,7 @@ func motivosEs(t *testing.T) map[string]string {
 			out[n] = err.Error()
 		}
 	}
-	for n, raw := range map[string]string{"vacio": "  ", "espacios": " a", "punto": ".bashrc", "largo": strings.Repeat("a", 201), "utf8": "a\xffb", "control": "a\x01b", "formato": "a‮b", "ok": "r1.cfg"} {
+	for n, raw := range map[string]string{"vacio": "  ", "espacios": " a", "punto": ".bashrc", "largo": strings.Repeat("a", 201), "utf8": "a\xffb", "control": "a\x01b", "formato": "a\u202eb", "ok": "r1.cfg"} {
 		_, err := SafeName(raw)
 		put("nombre_"+n, err)
 	}
@@ -86,7 +86,7 @@ func motivosEs(t *testing.T) map[string]string {
 }
 
 func TestMotivosEsRegresion(t *testing.T) {
-	servicetest.Golden(t, "testdata/fileserve_es.golden.json", motivosEs(t))
+	i18ntest.Golden(t, "testdata/fileserve_es.golden.json", motivosEs(t))
 }
 
 // Todo motivo que el código escribe en Transfer.Error (o manda a reject/fail) tiene su traducción en el catálogo, y

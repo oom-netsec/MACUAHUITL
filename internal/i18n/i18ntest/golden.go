@@ -1,4 +1,5 @@
-package servicetest
+// Package i18ntest da a las pruebas de regresión de texto un golden compartido (sin dependencias del núcleo).
+package i18ntest
 
 import (
 	"encoding/json"

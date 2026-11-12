@@ -11,6 +11,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
 
@@ -101,7 +102,7 @@ func metricasCasos(t *testing.T, ctx context.Context) map[string]string {
 // Regresión: sin idioma, con es o con uno desconocido, cada RPC de métricas devuelve lo mismo que antes del catálogo.
 func TestMetricasRegresionEs(t *testing.T) {
 	base := metricasCasos(t, context.Background())
-	servicetest.Golden(t, "testdata/metricas_es.golden.json", base)
+	i18ntest.Golden(t, "testdata/metricas_es.golden.json", base)
 	for _, loc := range []string{"es", "es-MX", "fr"} {
 		for k, v := range metricasCasos(t, i18n.WithLocale(context.Background(), loc)) {
 			if base[k] != v {

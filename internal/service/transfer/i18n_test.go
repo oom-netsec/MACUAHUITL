@@ -12,7 +12,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
-	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 )
 
 var (
@@ -133,7 +133,7 @@ func (g *getManyStream) Context() context.Context { return g.ctx }
 
 func TestTransferenciasRegresionEs(t *testing.T) {
 	base := transferenciaCasos(t, context.Background())
-	servicetest.Golden(t, "testdata/transferencias_es.golden.json", base)
+	i18ntest.Golden(t, "testdata/transferencias_es.golden.json", base)
 	for _, loc := range []string{"es", "es-MX", "fr"} {
 		for k, v := range transferenciaCasos(t, i18n.WithLocale(context.Background(), loc)) {
 			if base[k] != v {

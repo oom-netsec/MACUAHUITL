@@ -7,6 +7,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
@@ -58,7 +59,7 @@ func visibilidadCasos(t *testing.T, ctx context.Context) map[string]string {
 
 func TestVisibilidadRegresionEs(t *testing.T) {
 	base := visibilidadCasos(t, context.Background())
-	servicetest.Golden(t, "testdata/visibilidad_es.golden.json", base)
+	i18ntest.Golden(t, "testdata/visibilidad_es.golden.json", base)
 	for _, loc := range []string{"es", "es-MX", "fr"} {
 		for k, v := range visibilidadCasos(t, i18n.WithLocale(context.Background(), loc)) {
 			if base[k] != v {

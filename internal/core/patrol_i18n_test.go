@@ -17,7 +17,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
-	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 )
 
@@ -172,9 +172,9 @@ func failingRun(t *testing.T, lang string, reasons ...map[string]string) map[str
 // Regresión: sin idioma, con es o con uno desconocido, los RPC de Patrol devuelven lo mismo que antes del catálogo.
 func TestPatrolRegresionEs(t *testing.T) {
 	base := patrolCasos(t, "")
-	servicetest.Golden(t, "testdata/patrol_es.golden.json", base)
+	i18ntest.Golden(t, "testdata/patrol_es.golden.json", base)
 	fb := failingRun(t, "")
-	servicetest.Golden(t, "testdata/patrol_fallo_es.golden.json", fb)
+	i18ntest.Golden(t, "testdata/patrol_fallo_es.golden.json", fb)
 	for _, lang := range []string{"es", "fr"} {
 		for k, v := range patrolCasos(t, lang) {
 			if base[k] != v {
@@ -214,7 +214,7 @@ func bovedaCasos(t *testing.T, lang string) map[string]string {
 
 func TestBovedaRegresionEs(t *testing.T) {
 	base := bovedaCasos(t, "")
-	servicetest.Golden(t, "testdata/boveda_es.golden.json", base)
+	i18ntest.Golden(t, "testdata/boveda_es.golden.json", base)
 	for _, lang := range []string{"es", "fr"} {
 		for k, v := range bovedaCasos(t, lang) {
 			if base[k] != v {

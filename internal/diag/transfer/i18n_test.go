@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 )
 
 // erroresEs reúne los errores de validación de transfer, en español.
@@ -60,5 +60,5 @@ func erroresEs(t *testing.T) map[string]string {
 }
 
 func TestErroresEsRegresion(t *testing.T) {
-	servicetest.Golden(t, "testdata/transfer_es.golden.json", erroresEs(t))
+	i18ntest.Golden(t, "testdata/transfer_es.golden.json", erroresEs(t))
 }

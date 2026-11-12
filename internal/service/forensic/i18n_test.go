@@ -10,6 +10,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 	"github.com/oom-netsec/MACUAHUITL/internal/logintel"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
@@ -29,10 +30,10 @@ func forenseCasos(t *testing.T, ctx context.Context) map[string]string {
 	}()
 	rep := func(n string, r interface{ GetReport() *v1.ToolReport }, err error) {
 		if err != nil {
-			out[n] = servicetest.Dump("", "", err)
+			out[n] = i18ntest.Dump("", "", err)
 			return
 		}
-		out[n] = servicetest.Dump(r.GetReport().Json, r.GetReport().Text, nil)
+		out[n] = i18ntest.Dump(r.GetReport().Json, r.GetReport().Text, nil)
 	}
 	sd := servicetest.New(t)
 	s := &forensicSvc{d: sd}
@@ -131,7 +132,7 @@ func forenseCasos(t *testing.T, ctx context.Context) map[string]string {
 
 // Regresión: sin idioma, con es o con uno desconocido, cada RPC de forense devuelve lo mismo que antes del catálogo.
 func TestForenseRegresionEs(t *testing.T) {
-	servicetest.Golden(t, "testdata/forense_es.golden.json", forenseCasos(t, context.Background()))
+	i18ntest.Golden(t, "testdata/forense_es.golden.json", forenseCasos(t, context.Background()))
 	for _, loc := range []string{"es", "es-MX", "fr"} {
 		got := forenseCasos(t, i18n.WithLocale(context.Background(), loc))
 		base := forenseCasos(t, context.Background())

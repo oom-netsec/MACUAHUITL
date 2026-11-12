@@ -10,8 +10,8 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 	dom "github.com/oom-netsec/MACUAHUITL/internal/scripts"
-	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
 
 // guionesCasos recorre la biblioteca de fábrica y los errores de validación y de los RPC de scripts y colecciones;
@@ -137,11 +137,9 @@ func guionesCasos(t *testing.T, ctx context.Context) map[string]string {
 	return out
 }
 
-var volatileIDs = regexp.MustCompile(`[0-9a-f]{32}`)
-
 func TestGuionesRegresionEs(t *testing.T) {
 	base := guionesCasos(t, context.Background())
-	servicetest.Golden(t, "testdata/guiones_es.golden.json", base)
+	i18ntest.Golden(t, "testdata/guiones_es.golden.json", base)
 	for _, loc := range []string{"es", "es-MX", "fr"} {
 		for k, v := range guionesCasos(t, i18n.WithLocale(context.Background(), loc)) {
 			if base[k] != v {
