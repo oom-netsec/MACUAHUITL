@@ -341,7 +341,7 @@ func TestCambiarSoloIngestConLaCarpetaGuardadaInvalidaAvisa(t *testing.T) {
 	if !strings.Contains(g.State.Note, "chmod 700") || g.State.Prefs.OutputsDir != dir {
 		t.Fatalf("get = %+v", g.State)
 	}
-	if !strings.Contains(strings.ReplaceAll(d.AuditText(), `>`, ">"), "carpeta_invalida") {
+	if !strings.Contains(strings.ReplaceAll(d.AuditText(), `>`, ">"), "outputs_dir_invalid") {
 		t.Fatalf("auditoría sin el aviso:\n%s", d.AuditText())
 	}
 	// cambiar la carpeta a otra inválida sigue rechazándose

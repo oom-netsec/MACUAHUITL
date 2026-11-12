@@ -114,7 +114,7 @@ func (s *prefsSvc) SetCorePrefs(ctx context.Context, r *v1.SetCorePrefsRequest) 
 	diff("rotate_min", fmt.Sprint(oldIng.RotateMinutes), fmt.Sprint(ing.RotateMinutes))
 	diff("max_files", fmt.Sprint(oldIng.MaxFiles), fmt.Sprint(ing.MaxFiles))
 	diff("format", oldIng.Format, ing.Format)
-	diff("carpeta_invalida", st.Issue(), issue)
+	diff("outputs_dir_invalid", fmt.Sprint(st.Issue() != ""), fmt.Sprint(issue != ""))
 	if len(ch) == 0 {
 		return &v1.SetCorePrefsResponse{State: s.state("")}, nil
 	}

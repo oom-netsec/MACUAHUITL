@@ -195,15 +195,15 @@ func TestSnmpTrapsAuditsConfigRetentionAndDrops(t *testing.T) {
 		}
 	}
 	if rotated != 1 || lastDrops == nil || lastDrops.PorOrigen < 15 || lastDrops.Top[0].Source != "127.0.0.1" {
-		t.Fatalf("archivos nuevos=%d descartes=%+v", rotated, lastDrops)
+		t.Fatalf("archivos nuevos=%d drops=%+v", rotated, lastDrops)
 	}
 	fs := files(t, dir)
 	if len(fs) != 3 || fs["notas.log"] != "viejo" {
 		t.Fatalf("archivos = %v", fs)
 	}
 	a := d.AuditText()
-	for _, want := range []string{`"action":"visibility.traps"`, "tasa_origen=1 rafaga_origen=1", "max_archivos=2 formato=crudo", "salida=" + dir,
-		`"action":"visibility.traps.retencion"`, "traps_20260101_000000.log", "traps_20260102_000000.log", `"action":"visibility.traps.done"`, "por_origen="} {
+	for _, want := range []string{`"action":"visibility.traps"`, "rate_per_origin=1 burst_per_origin=1", "max_files=2 format=crudo", "output=" + dir,
+		`"action":"visibility.traps.retencion"`, "traps_20260101_000000.log", "traps_20260102_000000.log", `"action":"visibility.traps.done"`, "per_origin="} {
 		if !strings.Contains(a, want) {
 			t.Errorf("la auditoría no trae %q:\n%s", want, a)
 		}
@@ -248,15 +248,15 @@ func TestFlowsAuditsConfigRetentionAndDrops(t *testing.T) {
 		final = final || m.Final
 	}
 	if rotated != 1 || !final || lastDrops == nil || lastDrops.PorOrigen < 15 {
-		t.Fatalf("archivos nuevos=%d final=%v descartes=%+v", rotated, final, lastDrops)
+		t.Fatalf("archivos nuevos=%d final=%v drops=%+v", rotated, final, lastDrops)
 	}
 	fs := files(t, dir)
 	if len(fs) != 2 || fs["otro.jsonl"] != "viejo" {
 		t.Fatalf("archivos = %v", fs)
 	}
 	a := d.AuditText()
-	for _, want := range []string{`"action":"visibility.flows"`, "max_archivos=1 formato=jsonl", `"action":"visibility.flows.retencion"`,
-		"flujos_20260101_000000.jsonl", "flujos_20260102_000000.jsonl", `"action":"visibility.flows.done"`, "por_origen="} {
+	for _, want := range []string{`"action":"visibility.flows"`, "max_files=1 format=jsonl", `"action":"visibility.flows.retencion"`,
+		"flujos_20260101_000000.jsonl", "flujos_20260102_000000.jsonl", `"action":"visibility.flows.done"`, "per_origin="} {
 		if !strings.Contains(a, want) {
 			t.Errorf("la auditoría no trae %q:\n%s", want, a)
 		}
@@ -297,7 +297,7 @@ func TestSnmpTrapsStuckClientDoesNotHangCloseAndFileKeepsEverything(t *testing.T
 	if got := n; got != 50 {
 		t.Fatalf("el archivo trae %d de 50 traps:\n%s", got, all)
 	}
-	if a := d.AuditText(); !strings.Contains(a, "perdidos_en_la_interfaz=") || strings.Contains(a, "perdidos_en_la_interfaz=0") {
+	if a := d.AuditText(); !strings.Contains(a, "lost_on_interface=") || strings.Contains(a, "lost_on_interface=0") {
 		t.Fatalf("lo que no cupo hacia el cliente debía auditarse:\n%s", a)
 	}
 }
@@ -329,7 +329,7 @@ func TestFlowsStuckClientDoesNotHangCloseAndFileKeepsEverything(t *testing.T) {
 	if got := strings.Count(all, "tcp 10.0.0.1:51000 -> 10.0.0.2:443 bytes=1500 packets=10 exp=127.0.0.1\n"); got != 50 {
 		t.Fatalf("el archivo trae %d de 50 flujos:\n%s", got, all)
 	}
-	if a := d.AuditText(); !strings.Contains(a, "perdidos_en_la_interfaz=") {
+	if a := d.AuditText(); !strings.Contains(a, "lost_on_interface=") {
 		t.Fatalf("falta el conteo de lo perdido hacia el cliente:\n%s", a)
 	}
 }
@@ -372,7 +372,7 @@ func TestFlowsRateDefaultsAndNoLimitWithoutSave(t *testing.T) {
 		return d.AuditText()
 	}
 	a := run(true)
-	if !strings.Contains(a, "tasa_origen=1000 rafaga_origen=2000 tasa_global=5000 rafaga_global=10000") {
+	if !strings.Contains(a, "rate_per_origin=1000 burst_per_origin=2000 rate_global=5000 burst_global=10000") {
 		t.Errorf("defaults de flujos:\n%s", a)
 	}
 	if a = run(false); !strings.Contains(a, "sin tope de tasa (sin archivo)") {
@@ -448,13 +448,13 @@ func TestTrapsYFlowsUsanPreferenciasDelNucleo(t *testing.T) {
 			t.Fatalf("falta %s:\n%s", want, a)
 		}
 	}
-	if n := strings.Count(a, "rotar_mb=7 "); n != 3 {
-		t.Fatalf("rotar_mb=7 debía estar en las 3 escuchas, está en %d:\n%s", n, a)
+	if n := strings.Count(a, "rotate_mb=7 "); n != 3 {
+		t.Fatalf("rotate_mb=7 debía estar en las 3 escuchas, está en %d:\n%s", n, a)
 	}
-	if n := strings.Count(a, "max_archivos=9 formato=jsonl"); n != 2 {
+	if n := strings.Count(a, "max_files=9 format=jsonl"); n != 2 {
 		t.Fatalf("las 2 escuchas sin opciones usan las preferencias, salieron %d:\n%s", n, a)
 	}
-	if !strings.Contains(a, "max_archivos=3 formato=jsonl") {
+	if !strings.Contains(a, "max_files=3 format=jsonl") {
 		t.Fatalf("lo explícito (max_files=3) debía ganar:\n%s", a)
 	}
 }
