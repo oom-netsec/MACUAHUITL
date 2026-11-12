@@ -15,7 +15,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
-// Inyectables para las pruebas (los usan prefs, core y quien valide una carpeta del cliente): dueño de un archivo, uid del proceso y creación del temporal de la prueba de escritura.
+// Solo para pruebas: el código de producción no los asigna. Inyectables (los usan prefs, core y las pruebas de quien valide una carpeta del cliente): dueño de un archivo, uid del proceso y creación del temporal de la prueba de escritura.
 var (
 	FileOwner = sys.Owner
 	ProcUID   = os.Getuid
