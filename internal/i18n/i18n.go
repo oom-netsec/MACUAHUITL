@@ -274,9 +274,10 @@ func Wrap(code string, cause error, args Args) *Error {
 	return &Error{Code: code, Args: args, Cause: cause}
 }
 
-func (e *Error) Unwrap() error               { return e.Cause }
-func (e *Error) Error() string               { return e.Localize(Es) }
-func (e *Error) Reason() string              { return Reason(e.Code) }
+func (e *Error) Unwrap() error  { return e.Cause }
+func (e *Error) Error() string  { return e.Localize(Es) }
+func (e *Error) Reason() string { return Reason(e.Code) }
+
 // Metadata es la del código; con causa con código, suma su reason como cause_reason y su metadata (por ejemplo la
 // línea de un error de importación) sin pisar la propia.
 func (e *Error) Metadata() map[string]string {

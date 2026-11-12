@@ -50,9 +50,9 @@ type Orphan struct {
 }
 
 type Result struct {
-	Output  string                  `json:"output"`
-	Changes []Change                `json:"changes"`
-	Orphans []Orphan                `json:"orphans"`
+	Output  string    `json:"output"`
+	Changes []Change  `json:"changes"`
+	Orphans []Orphan  `json:"orphans"`
 	lines   []outLine // la salida línea a línea, para poner las marcas de las huérfanas en el idioma pedido
 }
 
