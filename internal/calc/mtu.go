@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type MTULayer struct {
@@ -24,6 +26,7 @@ type MTUResult struct {
 	MSS             int        `json:"mss"`
 	PhysicalFor1500 int        `json:"physicalFor1500,omitempty"`
 	Notes           []string   `json:"notes,omitempty"`
+	notes           []Note
 }
 
 // Cifrados ESP: IV, bloque al que se alinea lo cifrado e ICV propio (AEAD).
@@ -72,7 +75,7 @@ func MTU(phys int, stack []string, inner6 bool) (MTUResult, error) {
 	}
 	r.InnerIPv6, r.IPMTU, r.MSS = inner6, r.Effective, r.Effective-hdr
 	if r.Effective < minMTU {
-		r.Notes = append(r.Notes, fmt.Sprintf("IPv6 exige al menos 1280 bytes de MTU y quedan %d: el túnel no sirve para IPv6 sin subir la MTU física.", r.Effective))
+		addNote(&r.Notes, &r.notes, "calc.note.mtu_ipv6_min", "effective", r.Effective)
 	}
 	if r.Effective < 1500 {
 		for p := phys + 1; p <= 65535; p++ {
@@ -131,7 +134,7 @@ func walk(phys int, stack []string) (MTUResult, error) {
 				add(name, fmt.Sprintf("etiqueta en la trama interna %d", b), b)
 			} else {
 				add(name, "fuera de la MTU IP: la trama crece, la MTU IP no", 0)
-				r.Notes = append(r.Notes, fmt.Sprintf("%s en el enlace físico no resta MTU IP (la trama crece a %d); solo resta si el equipo intermedio limita la trama a 1518.", name, phys+18+b))
+				addNote(&r.Notes, &r.notes, "calc.note.mtu_outer_tag", "layer", name, "frame", phys+18+b)
 			}
 		case "esp-tunnel", "esp-transport", "getvpn":
 			tbar := name == "getvpn" && len(f) > 2 && f[len(f)-1] == "tbar"
@@ -190,10 +193,10 @@ func walk(phys int, stack []string) (MTUResult, error) {
 	}
 	r.Effective, r.Overhead = avail, phys-avail
 	if ipsec {
-		r.Notes = append(r.Notes, "Con ESP un byte más de carga puede costar un bloque entero de relleno: la cifra es exacta para esta MTU física. Si la ruta no se conoce, Cisco sugiere ip mtu 1400 / adjust-mss 1360.")
+		addNote(&r.Notes, &r.notes, "calc.note.mtu_esp_padding")
 	}
 	if vxlan {
-		r.Notes = append(r.Notes, "VXLAN no fragmenta: sube la MTU del underlay en vez de bajar la de los hosts.")
+		addNote(&r.Notes, &r.notes, "calc.note.mtu_vxlan")
 	}
 	return r, nil
 }
@@ -206,9 +209,9 @@ func get(f []string, i int) string {
 }
 
 func (r MTUResult) Report() Report {
-	t := Table{Title: fmt.Sprintf("Desglose sobre MTU física %d", r.Physical), Head: []string{"Capa", "Detalle", "Bytes", "MTU restante"}}
+	t := titled("calc.title.mtu_breakdown", i18n.A("physical", r.Physical), "calc.col.layer", "calc.col.detail", "calc.col.bytes", "calc.col.remaining")
 	for _, l := range r.Layers {
-		t.Rows = append(t.Rows, []string{l.Layer, l.Detail, strconv.Itoa(l.Bytes), strconv.Itoa(l.Remaining)})
+		t.add("", nil, l.Layer, l.Detail, strconv.Itoa(l.Bytes), strconv.Itoa(l.Remaining))
 	}
 	inner := "IPv4 + TCP 40"
 	if r.InnerIPv6 {
@@ -218,7 +221,7 @@ func (r MTUResult) Report() Report {
 	if r.PhysicalFor1500 > 0 {
 		need = strconv.Itoa(r.PhysicalFor1500)
 	}
-	res := kv("Resultado", "Sobrecarga total", strconv.Itoa(r.Overhead), "MTU efectiva", strconv.Itoa(r.Effective),
-		"ip mtu", strconv.Itoa(r.IPMTU), "ip tcp adjust-mss ("+inner+")", strconv.Itoa(r.MSS), "MTU física para 1500 sin fragmentar", need)
-	return Report{Tables: []Table{t, res}, Notes: r.Notes}
+	res := kv("calc.title.result", nil, "calc.row.overhead", strconv.Itoa(r.Overhead), "calc.row.effective_mtu", strconv.Itoa(r.Effective),
+		"calc.row.ip_mtu", strconv.Itoa(r.IPMTU), lbl{"calc.row.adjust_mss", i18n.A("inner", inner)}, strconv.Itoa(r.MSS), "calc.row.physical_1500", need)
+	return Report{Tables: []Table{t, res}, Notes: r.Notes, NoteItems: r.notes}
 }

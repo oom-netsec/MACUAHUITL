@@ -56,6 +56,7 @@ type BGPResult struct {
 	Routes      []Route         `json:"routes"`
 	Options     BGPOptions      `json:"options"`
 	Notes       []string        `json:"notes"`
+	notes       []Note
 }
 
 type path struct {
@@ -324,42 +325,44 @@ func BGPBestPath(routes []Route, o BGPOptions) (BGPResult, error) {
 			}
 		}
 	}
-	res.Notes = bgpNotes(res)
+	res.Notes, res.notes = bgpNotes(res)
 	return res, nil
 }
 
-func bgpNotes(r BGPResult) []string {
-	n := []string{fmt.Sprintf("Gana %s; lo decide el paso «%s».", r.Best, r.DecidedBy)}
+func bgpNotes(r BGPResult) ([]string, []Note) {
+	var n []string
+	var items []Note
+	add := func(key string, kv ...any) { addNote(&n, &items, key, kv...) }
+	add("calc.note.bgp_winner", "best", r.Best, "step", r.DecidedBy)
 	if len(r.LocalWeight) > 0 {
-		n = append(n, "Weight 32768 (el de IOS para rutas originadas localmente) en: "+strings.Join(r.LocalWeight, ", ")+". Escribe otro weight si la ruta lo tiene configurado.")
+		add("calc.note.bgp_local_weight", "routes", strings.Join(r.LocalWeight, ", "))
 	}
 	if len(r.Excluded) > 0 {
-		n = append(n, "Descartadas por next-hop inaccesible: "+strings.Join(r.Excluded, ", ")+".")
+		add("calc.note.bgp_excluded", "routes", strings.Join(r.Excluded, ", "))
 	}
 	if r.Options.DeterministicMED {
-		n = append(n, "bgp deterministic-med: se agrupa por AS vecino, se elige el mejor de cada grupo (ahí sí cuenta el MED) y luego se comparan los ganadores; el resultado ya no depende del orden de llegada.")
+		add("calc.note.bgp_det_med")
 	} else {
-		n = append(n, "Sin bgp deterministic-med la comparación va por pares en orden de llegada (la más nueva primero): con MED de varios AS vecinos el ganador puede cambiar según el orden.")
+		add("calc.note.bgp_no_det_med")
 	}
 	if r.Options.AlwaysCompareMED {
-		n = append(n, "bgp always-compare-med: el MED se compara aunque las rutas vengan de AS vecinos distintos.")
+		add("calc.note.bgp_always_med")
 	} else {
-		n = append(n, "El MED solo se compara entre rutas del mismo AS vecino (primer AS del AS_PATH); una ruta sin MED cuenta como 0.")
+		add("calc.note.bgp_med_same_as")
 	}
 	if r.Options.MaximumPaths > 1 {
-		relax := "deben tener el AS_PATH idéntico"
+		key := "calc.note.bgp_multipath"
 		if r.Options.MultipathRelax {
-			relax = "con bgp bestpath as-path multipath-relax basta la misma longitud de AS_PATH, aunque vengan de AS vecinos distintos"
+			key = "calc.note.bgp_multipath_relax"
 		}
-		n = append(n, fmt.Sprintf("Multipath (maximum-paths %d): instaladas %s. Empatan hasta la métrica IGP, son del mismo tipo (eBGP/iBGP) y %s. multipath-relax no cambia la mejor ruta, solo quién comparte la carga.",
-			r.Options.MaximumPaths, strings.Join(r.Multipath, ", "), relax))
+		add(key, "max", r.Options.MaximumPaths, "routes", strings.Join(r.Multipath, ", "))
 	}
-	n = append(n, "Orden de IOS/IOS-XE según la documentación pública de Cisco; sin validar en laboratorio para casos de confederación, AIGP ni bestpath med missing-as-worst.")
-	return n
+	add("calc.note.bgp_unvalidated")
+	return n, items
 }
 
 func (r BGPResult) Report() Report {
-	rt := Table{Title: "Rutas candidatas", Head: []string{"Ruta", "Weight", "Local-pref", "Local", "AS_PATH", "Origin", "MED", "Tipo", "IGP", "Router-ID", "Cluster", "Vecino", "Edad (s)", "Next-hop"}}
+	rt := titled("calc.title.bgp_routes", nil, "calc.col.route", "calc.col.weight", "calc.col.local_pref", "calc.col.local", "calc.col.as_path", "calc.col.origin", "calc.col.med", "calc.col.type", "calc.col.igp", "calc.col.router_id", "calc.col.cluster", "calc.col.neighbor", "calc.col.age", "calc.col.next_hop")
 	for _, x := range r.Routes {
 		lp, med := "100", "0"
 		if x.LocalPref != nil {
@@ -383,11 +386,11 @@ func (r BGPResult) Report() Report {
 		if x.EBGP {
 			t = "eBGP"
 		}
-		rt.Rows = append(rt.Rows, []string{x.Name, itoa(x.Weight), lp, yes(x.Local), x.ASPath, origin, med, t, itoa(x.IGPMetric), id, itoa(x.ClusterListLen), x.Neighbor, itoa(x.AgeSeconds), nh})
+		rt.add("", nil, x.Name, itoa(x.Weight), lp, yes(x.Local), x.ASPath, origin, med, t, itoa(x.IGPMetric), id, itoa(x.ClusterListLen), x.Neighbor, itoa(x.AgeSeconds), nh)
 	}
-	ct := Table{Title: "Comparaciones paso a paso", Head: []string{"Comparación", "Paso decisivo", "Valor A", "Valor B", "Gana"}}
+	ct := titled("calc.title.bgp_comparisons", nil, "calc.col.comparison", "calc.col.step", "calc.col.value_a", "calc.col.value_b", "calc.col.winner")
 	for _, c := range r.Comparisons {
-		ct.Rows = append(ct.Rows, []string{c.Pair, c.Step, c.ValueA, c.ValueB, c.Winner})
+		ct.add("", nil, c.Pair, c.Step, c.ValueA, c.ValueB, c.Winner)
 	}
-	return Report{Tables: []Table{rt, ct}, Notes: r.Notes}
+	return Report{Tables: []Table{rt, ct}, Notes: r.Notes, NoteItems: r.notes}
 }
