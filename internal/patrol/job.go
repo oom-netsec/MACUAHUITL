@@ -6,7 +6,6 @@ package patrol
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/robfig/cron/v3"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
@@ -102,91 +102,124 @@ func (d Deps) driver() platform.Driver {
 	return iosxe.New()
 }
 
-type FieldError struct{ Field, Msg string }
+// FieldError es un campo inválido del trabajo. Msg es el texto en español de siempre; T es el mismo mensaje como
+// texto de catálogo, con lo que el error es un i18n.Coded (reason = la clave de T, metadata = sus argumentos y el campo).
+type FieldError struct {
+	Field, Msg string
+	T          i18n.Text
+}
 
 func (e *FieldError) Error() string { return "patrol: " + e.Field + ": " + e.Msg }
 
-func fieldErr(f, format string, a ...any) error {
-	return &FieldError{Field: f, Msg: fmt.Sprintf(format, a...)}
+func (e *FieldError) Reason() string { return i18n.Reason(e.T.Key) }
+
+func (e *FieldError) Metadata() map[string]string {
+	m := i18n.Metadata(e.T.Key, e.T.Args)
+	m["field"] = e.Field
+	return m
+}
+
+func (e *FieldError) Localize(loc string) string { return "patrol: " + e.Field + ": " + e.T.In(loc) }
+
+// fieldErr arma el error del campo f con el mensaje del código key (patrol.field.*) y sus argumentos.
+func fieldErr(f, key string, kv ...any) error {
+	t := i18n.Tx(key, kv...)
+	return &FieldError{Field: f, Msg: t.In(i18n.Es), T: t}
+}
+
+// fieldErrOf es fieldErr para un error ya armado: con código del catálogo lo conserva; sin él, va como texto de sistema.
+func fieldErrOf(f string, err error) error {
+	var ie *i18n.Error
+	if errors.As(err, &ie) {
+		return fieldErr(f, ie.Code, kvOf(ie.Args)...)
+	}
+	return fieldErr(f, "patrol.field.error", "error", err.Error())
+}
+
+func kvOf(a i18n.Args) (kv []any) {
+	for k, v := range a {
+		kv = append(kv, k, v)
+	}
+	return kv
 }
 
 // Validate revisa el trabajo antes de crearlo, para no fallar a mitad de la primera ronda.
 // v debe estar abierta; con v nil no se revisan las credenciales.
 func Validate(s Spec, pbs []playbook.Playbook, v *vault.Vault) error {
 	if len(s.Targets) == 0 {
-		return fieldErr("targets", "sin equipos")
+		return fieldErr("targets", "patrol.field.no_targets")
 	}
 	if s.DefaultCredentialID == "" {
-		return fieldErr("credential", "sin credencial por defecto")
+		return fieldErr("credential", "patrol.field.no_credential")
 	}
 	if s.WindowHours == 0 || s.WindowHours > 96 {
-		return fieldErr("window_hours", "debe estar entre 1 y 96, es %d", s.WindowHours)
+		return fieldErr("window_hours", "patrol.field.window", "n", s.WindowHours)
 	}
 	if err := writable(s.OutputDir); err != nil {
-		return fieldErr("output_dir", "%v", err)
+		return fieldErrOf("output_dir", err)
 	}
 	if s.CustomCommands == "" && len(s.PlaybookIDs) == 0 {
-		return fieldErr("commands", "sin playbooks ni comandos")
+		return fieldErr("commands", "patrol.field.no_commands")
 	}
 	if s.CustomCommands != "" {
 		if _, err := playbook.Ephemeral("ios-xe", s.CustomCommands); err != nil {
-			return fieldErr("custom_commands", "%v", err)
+			return fieldErrOf("custom_commands", err)
 		}
 	}
 	for _, id := range s.PlaybookIDs {
 		if find(pbs, id) == nil {
-			return fieldErr("playbook_ids", "%s no existe", id)
+			return fieldErr("playbook_ids", "patrol.field.no_playbook", "id", id)
 		}
 	}
 	if v != nil {
 		infos, err := v.List()
 		if err != nil {
-			return fieldErr("credential", "%v", err)
+			return fieldErrOf("credential", err)
 		}
 		have := map[string]bool{}
 		for _, i := range infos {
 			have[i.ID] = true
 		}
 		if !have[s.DefaultCredentialID] {
-			return fieldErr("credential", "%s no está en la bóveda", s.DefaultCredentialID)
+			return fieldErr("credential", "patrol.field.cred_missing", "id", s.DefaultCredentialID)
 		}
 		for _, o := range s.Overrides {
 			for _, id := range []string{o.CredentialID, o.FallbackCredentialID} {
 				if id != "" && !have[id] {
-					return fieldErr("overrides", "%s (equipo %s) no está en la bóveda", id, o.DeviceID)
+					return fieldErr("overrides", "patrol.field.override_missing", "id", id, "device", o.DeviceID)
 				}
 			}
 		}
 	}
 	sc := s.Schedule
 	if sc.IntervalSeconds > 0 && sc.Cron != "" {
-		return fieldErr("schedule", "intervalo y cron son excluyentes")
+		return fieldErr("schedule", "patrol.field.schedule_exclusive")
 	}
 	if sc.Cron != "" {
 		if _, err := cron.ParseStandard(sc.Cron); err != nil {
-			return fieldErr("schedule", "cron: %v", err)
+			return fieldErr("schedule", "patrol.field.cron", "error", err.Error())
 		}
 	}
 	if !sc.Until.IsZero() && !sc.Until.After(time.Now()) {
-		return fieldErr("schedule", "la fecha de fin ya pasó")
+		return fieldErr("schedule", "patrol.field.until_past")
 	}
 	return nil
 }
 
 func writable(dir string) error {
 	if dir == "" {
-		return errors.New("vacía")
+		return i18n.New("patrol.writable.empty", nil)
 	}
 	fi, err := os.Stat(dir)
 	if err != nil {
 		return err
 	}
 	if !fi.IsDir() {
-		return errors.New("no es una carpeta")
+		return i18n.New("patrol.writable.not_dir", nil)
 	}
 	f, err := os.CreateTemp(dir, ".macuahuitl-prueba-*")
 	if err != nil {
-		return fmt.Errorf("sin permiso de escritura: %w", err)
+		return i18n.New("patrol.writable.no_write", i18n.A("error", err.Error()))
 	}
 	f.Close()
 	return os.Remove(f.Name())
@@ -207,10 +240,10 @@ func commands(s Spec, detected string, pbs []playbook.Playbook) (out []playbook.
 	for _, id := range s.PlaybookIDs {
 		p := find(pbs, id)
 		if p == nil {
-			return nil, nil, fieldErr("playbook_ids", "%s no existe", id)
+			return nil, nil, fieldErr("playbook_ids", "patrol.field.no_playbook", "id", id)
 		}
 		if !playbook.Compatible(detected, p.Platform) {
-			return nil, nil, fmt.Errorf("patrol: el playbook %s es para %s y el equipo es %s", id, p.Platform, detected)
+			return nil, nil, i18n.New("patrol.err.playbook_platform", i18n.A("id", id, "platform", p.Platform, "detected", detected))
 		}
 		for _, pre := range p.Pre {
 			out = append(out, playbook.Command{Text: pre, Timeout: 60 * time.Second})

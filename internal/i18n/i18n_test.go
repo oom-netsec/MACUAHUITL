@@ -184,3 +184,20 @@ func TestAlcanceMulticastAdminLocal(t *testing.T) {
 		t.Errorf("%q", got)
 	}
 }
+
+// In traduce el tramo con código y conserva el envoltorio; con es, o sin código, es el mensaje de siempre.
+func TestInTraduceElTramoConCodigoYConservaElEnvoltorio(t *testing.T) {
+	e := New("file.exists", nil)
+	w := fmt.Errorf("guardar: %w", e)
+	if got := In(En, w); got != "guardar: the file already exists" {
+		t.Fatalf("en: %q", got)
+	}
+	for _, loc := range []string{Es, "fr", ""} {
+		if got := In(loc, w); got != w.Error() {
+			t.Fatalf("%q: %q", loc, got)
+		}
+	}
+	if In(En, errors.New("boom")) != "boom" || In(En, nil) != "" {
+		t.Fatal("sin código o nil")
+	}
+}

@@ -11,14 +11,15 @@ import (
 	"io"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 )
 
 var (
-	ErrPromptTimeout   = errors.New("platform: el equipo no mostró prompt a tiempo")
-	ErrEnableFailed    = errors.New("platform: enable rechazado")
-	ErrUnknownPlatform = errors.New("platform: plataforma no reconocida")
-	ErrClosed          = errors.New("platform: el equipo cerró la sesión")
+	ErrPromptTimeout   error = i18n.New("platform.err.prompt_timeout", nil)
+	ErrEnableFailed    error = i18n.New("platform.err.enable_failed", nil)
+	ErrUnknownPlatform error = i18n.New("platform.err.unknown", nil)
+	ErrClosed          error = i18n.New("platform.err.closed", nil)
 )
 
 // Output es la salida limpia de un comando: sin eco, sin prompt y sin --More--.

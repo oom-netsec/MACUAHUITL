@@ -3,6 +3,8 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"io"
 	"net/netip"
 	"path/filepath"
@@ -115,7 +117,7 @@ func patrolCasos(t *testing.T, lang string) map[string]string {
 }
 
 // failingRun arma un trabajo contra un equipo que corta la sesión a media salida y devuelve el detalle del evento y de GetRun.
-func failingRun(t *testing.T, lang string) map[string]string {
+func failingRun(t *testing.T, lang string, reasons ...map[string]string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
 	h := newHarness(t, nil)
@@ -143,6 +145,9 @@ func failingRun(t *testing.T, lang string) map[string]string {
 		}
 		if d := e.GetDeviceStateChanged(); d != nil && d.Detail != "" {
 			details = append(details, d.Detail)
+			if len(reasons) > 0 {
+				reasons[0]["evento"] = d.Reason
+			}
 		}
 		if e.GetJobStateChanged().GetState() == "closed" {
 			break
@@ -158,6 +163,9 @@ func failingRun(t *testing.T, lang string) map[string]string {
 		t.Fatalf("%v %v", run, err)
 	}
 	out["getrun"] = norm(run.Devices[0].Detail)
+	if len(reasons) > 0 {
+		reasons[0]["getrun"] = run.Devices[0].Reason
+	}
 	return out
 }
 
@@ -212,6 +220,64 @@ func TestBovedaRegresionEs(t *testing.T) {
 			if base[k] != v {
 				t.Errorf("%s con %q difiere de sin idioma: %q vs %q", k, lang, v, base[k])
 			}
+		}
+	}
+}
+
+var spanishRe = regexp.MustCompile(`[áéíóúñ¿]|\b(bóveda|equipos?|trabajo|falló|sin|hay|quedan|está|armar|debe)\b`)
+
+// Con en, lo que traduce Patrol sale sin español; los textos de otros dominios (playbook, Ajustes) quedan fuera.
+func TestPatrolEnSinEspanol(t *testing.T) {
+	skip := map[string]bool{"crear_comando_malo": true, "crear_salida_no_dir": true}
+	for _, set := range []map[string]string{patrolCasos(t, "en"), failingRun(t, "en"), bovedaCasos(t, "en")} {
+		for k, v := range set {
+			if m := spanishRe.FindString(v); m != "" && !skip[k] {
+				t.Errorf("%s: queda español (%q): %s", k, m, v)
+			}
+		}
+	}
+}
+
+// El código y los argumentos del error viajan en cualquier idioma; el texto sigue al idioma.
+func TestPatrolCodigosYArgumentos(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	s := h.spec(cred)
+	s.WindowHours = 0
+	for lang, want := range map[string]string{"": "patrol: window_hours: debe estar entre 1 y 96, es 0", "en": "patrol: window_hours: must be between 1 and 96, it is 0"} {
+		_, err := h.patrol.CreateJob(con(t, lang), &v1.CreateJobRequest{Spec: s})
+		if status.Code(err) != codes.InvalidArgument || status.Convert(err).Message() != want {
+			t.Errorf("%q: %v", lang, err)
+		}
+		if r, m := reasonOf(err); r != "patrol.field.window" || m["field"] != "window_hours" || m["n"] != "0" {
+			t.Errorf("%q: reason %q metadata %v", lang, r, m)
+		}
+	}
+	cj, _ := h.patrol.CreateJob(con(t, ""), &v1.CreateJobRequest{Spec: h.spec(cred)})
+	for lang, want := range map[string]string{"": "transport: llave de host desconocida de", "en": "transport: unknown host key from"} {
+		st, err := h.patrol.LoginTest(con(t, lang), &v1.LoginTestRequest{JobId: cj.JobId})
+		if err != nil {
+			t.Fatal(err)
+		}
+		r, err := st.Recv()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(r.Detail, want) || r.Reason != "transport.hostkey.unknown" || r.Args["fingerprint"] != r.HostKeyFingerprint || r.Args["host"] == "" {
+			t.Errorf("%q: %+v", lang, r)
+		}
+		for st.RecvMsg(new(v1.LoginTestResponse)) == nil {
+		}
+	}
+}
+
+// El equipo que corta la sesión: el detalle del evento y de GetRun sale en el idioma pedido y trae su código.
+func TestPatrolDetalleDeEquipoEnYCodigo(t *testing.T) {
+	reasons := map[string]string{}
+	got := failingRun(t, "en", reasons)
+	for _, k := range []string{"evento", "getrun"} {
+		if reasons[k] != "platform.err.closed" || !strings.Contains(got[k], "platform: the device closed the session: EOF") {
+			t.Errorf("%s: reason %q detalle %q", k, reasons[k], got[k])
 		}
 	}
 }

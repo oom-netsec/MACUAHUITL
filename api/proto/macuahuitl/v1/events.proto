@@ -35,7 +35,11 @@ message SubscribeResponse {
 message DeviceStateChanged {
   string device_id = 1;
   DeviceState state = 2;
+  // El texto de siempre en español; con accept-language en sale traducido.
   string detail = 3;
+  // Código estable del catálogo del error (transport.err.auth, platform.err.closed, ...) y sus argumentos; vacío si el detalle es texto de sistema.
+  string reason = 4;
+  map<string, string> args = 5;
 }
 
 message CommandProgress {

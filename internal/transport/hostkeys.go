@@ -3,7 +3,6 @@ package transport
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type HostKeyStatus int
@@ -29,7 +29,7 @@ func (s HostKeyStatus) String() string {
 }
 
 // ErrKnownHosts: el archivo no se pudo leer o está dañado. Nunca se trata como "llave desconocida".
-var ErrKnownHosts = errors.New("transport: known_hosts ilegible o dañado")
+var ErrKnownHosts error = i18n.New("transport.err.known_hosts", nil)
 
 // HostKeyError lleva la huella para que el ingeniero la confirme en el Login Test.
 type HostKeyError struct {
@@ -41,6 +41,19 @@ type HostKeyError struct {
 func (e *HostKeyError) Error() string {
 	return fmt.Sprintf("transport: llave de host %s de %s: %s", e.Status, e.Host, e.Fingerprint)
 }
+
+// Reason, Metadata y Localize hacen de HostKeyError un error con código del catálogo (i18n.Coded).
+func (e *HostKeyError) Reason() string { return "transport.hostkey." + e.status() }
+
+func (e *HostKeyError) Metadata() map[string]string {
+	return map[string]string{"host": e.Host, "fingerprint": e.Fingerprint}
+}
+
+func (e *HostKeyError) Localize(loc string) string {
+	return i18n.Msg(loc, "transport.hostkey."+e.status(), i18n.A("host", e.Host, "fingerprint", e.Fingerprint))
+}
+
+func (e *HostKeyError) status() string { return [...]string{"known", "unknown", "changed"}[e.Status] }
 
 // HostKeyPolicy es la decisión del trabajo sobre llaves no conocidas.
 type HostKeyPolicy struct {

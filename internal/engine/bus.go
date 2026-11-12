@@ -30,6 +30,8 @@ type Event struct {
 	Index, Total int
 	Bytes        int64
 	Detail       string
+	// Err es el error de Detail (un equipo que falló), para darlo en el idioma de cada suscriptor; nil si Detail no sale de un error.
+	Err error
 	// Reason y Args son el código del catálogo y los argumentos del Detail (fases de Patrol); vacíos en el resto.
 	Reason string
 	Args   map[string]string

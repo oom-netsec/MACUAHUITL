@@ -12,10 +12,11 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
-var ErrAuth = errors.New("transport: autenticación rechazada")
+var ErrAuth error = i18n.New("transport.err.auth", nil)
 
 var errAlreadySent = errors.New("transport: contraseña ya enviada; no se reintenta")
 

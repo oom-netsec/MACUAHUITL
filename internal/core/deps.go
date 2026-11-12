@@ -36,7 +36,7 @@ func (d coreDeps) OnClose(f func()) {
 }
 func (d coreDeps) Patrol() v1.PatrolServiceServer { return &patrolSvc{c: d.c} }
 func (d coreDeps) ValidateJob(p *v1.JobSpec) error {
-	_, err := (&patrolSvc{c: d.c}).validate(p)
+	_, err := (&patrolSvc{c: d.c}).validate(context.Background(), p) // shortcut: sin el idioma de la llamada (Deps no lo trae); es el de la ventana de cambio, el bloque C
 	return err
 }
 
