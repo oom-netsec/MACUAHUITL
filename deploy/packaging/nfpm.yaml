@@ -64,6 +64,8 @@ contents:
     dst: /usr/share/doc/macuahuitl/LICENSE
   - src: NOTICE
     dst: /usr/share/doc/macuahuitl/NOTICE
+  - src: THIRD_PARTY_LICENSES
+    dst: /usr/share/doc/macuahuitl/THIRD_PARTY_LICENSES
   - src: docs/security/AUDIT_GUIDE.md
     dst: /usr/share/doc/macuahuitl/AUDIT_GUIDE.md
   - src: docs/security/THREAT_MODEL.md

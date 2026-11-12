@@ -77,7 +77,7 @@ func TestReproducibleAndPackaged(t *testing.T) {
 	}
 	contents := run(t, "", nil, "dpkg-deb", "-c", debs[0])
 	for _, want := range []string{"./usr/bin/macuahuitld", "./usr/bin/mctl", "./usr/bin/macuahuitl", "./usr/lib/systemd/user/macuahuitld.service",
-		"./usr/share/applications/macuahuitl.desktop", "./usr/share/icons/hicolor/scalable/apps/macuahuitl.svg", "./usr/share/icons/hicolor/48x48/apps/macuahuitl.png", "./usr/share/doc/macuahuitl/LICENSE", "./usr/share/doc/macuahuitl/AUDIT_GUIDE.md"} {
+		"./usr/share/applications/macuahuitl.desktop", "./usr/share/icons/hicolor/scalable/apps/macuahuitl.svg", "./usr/share/icons/hicolor/48x48/apps/macuahuitl.png", "./usr/share/doc/macuahuitl/LICENSE", "./usr/share/doc/macuahuitl/THIRD_PARTY_LICENSES", "./usr/share/doc/macuahuitl/AUDIT_GUIDE.md"} {
 		if !strings.Contains(contents, want) {
 			t.Errorf("el .deb no trae %s", want)
 		}
