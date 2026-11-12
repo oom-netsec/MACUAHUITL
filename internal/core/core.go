@@ -330,7 +330,7 @@ func (c *Core) OnLock() {
 	c.mu.Unlock()
 	if v != nil {
 		v.Lock()
-		c.audit("vault.lock", "", "reason=screen locked")
+		c.audit("vault.lock", "", "reason=screen_locked")
 	}
 }
 

@@ -110,8 +110,8 @@ func (s *termSvc) recording(label, id string) (*os.File, error) {
 }
 
 // refuse audita un rechazo anterior a la apertura: aún no hay sesión viva ni autorización en el guard.
-func (s *termSvc) refuse(label string, err error) error {
-	s.d.Audit("terminal.failed", label, fmt.Sprintf("reason=%q guard=unauthorized", status.Convert(err).Message()))
+func (s *termSvc) refuse(label string, err error, reason string) error {
+	s.d.Audit("terminal.failed", label, fmt.Sprintf("reason=%q guard=unauthorized", reason))
 	return err
 }
 
@@ -141,17 +141,17 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	}
 	v := s.d.Vault()
 	if v == nil || !v.Unlocked() {
-		return s.refuse(label, status.Error(codes.FailedPrecondition, "abre la bóveda: la terminal necesita las credenciales del equipo"))
+		return s.refuse(label, status.Error(codes.FailedPrecondition, "abre la bóveda: la terminal necesita las credenciales del equipo"), "vault is closed: the terminal needs the device credentials")
 	}
 	if s.live.Add(1) > maxSessions {
 		s.live.Add(-1)
-		return s.refuse(label, status.Errorf(codes.ResourceExhausted, "máximo %d terminales abiertas", maxSessions))
+		return s.refuse(label, status.Errorf(codes.ResourceExhausted, "máximo %d terminales abiertas", maxSessions), fmt.Sprintf("at most %d terminals open", maxSessions))
 	}
 	defer s.live.Add(-1)
 	s.wg.Add(1)
 	defer s.wg.Done()
 	if s.ctx.Err() != nil {
-		return s.refuse(label, status.Error(codes.Unavailable, "el núcleo se está cerrando"))
+		return s.refuse(label, status.Error(codes.Unavailable, "el núcleo se está cerrando"), "the core is shutting down")
 	}
 
 	ctx, cancel := context.WithCancel(st.Context())
@@ -166,7 +166,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 
 	id := "term-" + service.NewID()
 	if err := s.d.Guard().Allow(ctx, id, []string{o.Address}); err != nil {
-		return s.refuse(label, status.Error(codes.PermissionDenied, err.Error()))
+		return s.refuse(label, status.Error(codes.PermissionDenied, err.Error()), i18n.English(err))
 	}
 	// A partir de aquí, todo camino de salida pasa por este defer: cierra SSH y grabación,
 	// revoca el guard y audita. Es lo que garantiza que no quede una autorización abierta.

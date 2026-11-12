@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +20,7 @@ type verifyExec struct {
 	saved     int    // veces que el motor avisó que write memory salió bien (la bóveda se actualiza ahí)
 	saveText  string // respuesta de write memory; vacío = [OK]
 	savedErr  error
+	revertErr error // lo que devuelve Reverted
 }
 
 func (v *verifyExec) Save(_ context.Context, dev string) (string, error) {
@@ -50,7 +52,7 @@ func (v *verifyExec) Reverted(_ context.Context, dev string) error {
 	defer v.mu.Unlock()
 	v.reverted++
 	v.fakeExec.log("reverted " + dev)
-	return nil
+	return v.revertErr
 }
 
 const newHash = "$9$NUEVO$hashquenuncadebeverse0123456789"
@@ -346,4 +348,23 @@ func TestRotationVaultFailureAfterSaveIsAFailure(t *testing.T) {
 	}
 	r.Abort()
 	<-r.Done()
+}
+
+// Si la bóveda no vuelve a la credencial anterior, el error con código va a la auditoría en inglés
+// (la pantalla lo recibe en español).
+func TestRotationRevertedErrorGoesToAuditInEnglish(t *testing.T) {
+	coded := i18n.New("ingest.invalid.addr.any", nil)
+	r, _, a := rotationRunWith(t, errors.New("autenticación rechazada"), func(v *verifyExec) { v.revertErr = coded })
+	r.Start(context.Background())
+	pending(t, r, "apply-1")
+	r.Confirm("apply-1")
+	wait(t, r, Failed)
+	r.Rollback()
+	pending(t, r, "rollback-1")
+	r.Confirm("rollback-1")
+	wait(t, r, RolledBack)
+	<-r.Done()
+	if txt := a.text(); !strings.Contains(txt, coded.Localize(i18n.En)) || strings.Contains(txt, coded.Error()) {
+		t.Fatalf("la auditoría debe traer el texto en inglés del error:\n%s", txt)
+	}
 }

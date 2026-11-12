@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
@@ -953,7 +954,7 @@ func (r *Run) reverted(ctx context.Context, dp DevicePlan) {
 		return
 	}
 	if err := r.exec.(Verifier).Reverted(ctx, dp.Device); err != nil {
-		r.log2("assist.verify", dp.Device, "run=%s the vault did not return to the previous credential: %v", r.id, err)
+		r.log2("assist.verify", dp.Device, "run=%s the vault did not return to the previous credential: %v", r.id, i18n.English(err))
 		r.out(dp.Device, "ATENCIÓN: la bóveda no volvió a la credencial anterior: "+err.Error())
 	}
 }
