@@ -209,7 +209,7 @@ test("una credencial creada después de abrir la vista aparece sin reabrirla", a
 test("una llave de host nueva ofrece aceptar la huella y reintenta con ella; la huella sin prefijo también vale", async () => {
   const fp = "pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU";
   const core = setup();
-  await userEvent.type(screen.getByLabelText(/Huellas SHA256 aceptadas/), "AAAAbbbbCCCCddddEEEEffffGGGGhhhhIIIIjjjjKKK"); // otra huella, sin prefijo
+  await userEvent.type(screen.getByLabelText(/Huellas aceptadas/), "AAAAbbbbCCCCddddEEEEffffGGGGhhhhIIIIjjjjKKK"); // otra huella, sin prefijo
   await abrir("192.168.3.2");
   expect(core.terminalOpen).toHaveBeenLastCalledWith(expect.objectContaining({ accept: ["SHA256:AAAAbbbbCCCCddddEEEEffffGGGGhhhhIIIIjjjjKKK"] }));
   act(() => { core.emitTerminal({ runId: "t1", done: true, error: `transport: llave de host desconocida de 192.168.3.2:22: SHA256:${fp}` }); });

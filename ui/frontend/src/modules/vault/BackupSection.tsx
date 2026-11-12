@@ -83,7 +83,7 @@ export function BackupSection({ core, setMsg, onImported, onPreview, onClosed }:
         <Field label={t("vault.backup.import.phrase")} type="password" value={imp} onChange={setImp} autoComplete="off" w="md" />
       </div>
       <div className="actions">
-        <button type="button" disabled={busy} aria-busy={busy} onClick={importBackup}><Icon name="upload" />{t("vault.backup.import")}</button>
+        <button type="button" disabled={!imp || busy} aria-busy={busy} onClick={importBackup}><Icon name="upload" />{t("vault.backup.import")}</button>
       </div>
       {preview && <PreviewPanel core={core} preview={preview} onClose={end} onExpired={expired} onClosed={() => { setPreview(null); onClosed(); }} setMsg={setMsg} />}
     </Section>

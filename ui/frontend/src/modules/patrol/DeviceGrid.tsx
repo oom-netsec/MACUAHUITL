@@ -43,12 +43,13 @@ export function DeviceGrid({ core, jobId, devices, initial, cpu }: { core: CoreA
     observeElementRect: (inst, cb) => observeElementRect(inst, (r) => cb(r.height ? r : { width: r.width || 900, height: 480 })),
   });
   const items = v.getVirtualItems();
+  const hasProgress = Object.values(rows).some((r) => r.progress); // sin datos de avance, la columna no se muestra
   return (
     <div className="device-grid">
       {beat && <p className="meta" aria-live="polite">{t("patrol.grid.heartbeat", { time: beat })}</p>}
       <div ref={parent} className="grid-scroll">
         <table className="grid" aria-rowcount={devices.length + 1}>
-          <thead><tr><th>{t("patrol.grid.device")}</th><th>{t("patrol.grid.state")}</th><th>{t("patrol.grid.cpu")}</th><th>{t("patrol.grid.progress")}</th><th>{t("patrol.grid.detail")}</th></tr></thead>
+          <thead><tr><th>{t("patrol.grid.device")}</th><th>{t("patrol.grid.state")}</th><th>{t("patrol.grid.cpu")}</th>{hasProgress && <th>{t("patrol.grid.progress")}</th>}<th>{t("patrol.grid.detail")}</th></tr></thead>
           <tbody style={{ height: v.getTotalSize() }}>
             {items.map((it) => {
               const dev = devices[it.index];
@@ -59,7 +60,7 @@ export function DeviceGrid({ core, jobId, devices, initial, cpu }: { core: CoreA
                   <td className="mono"><DeviceMenu name={dev} address={addressOf(dev)}>{dev}</DeviceMenu></td>
                   <td>{label(r.state)}</td>
                   <td>{cpuCell(cpu?.[addressOf(dev)], t("patrol.grid.cpuLabel", { device: addressOf(dev) }))}</td>
-                  <td className="mono">{r.progress}</td>
+                  {hasProgress && <td className="mono">{r.progress}</td>}
                   <td>{r.detail}</td>
                 </tr>
               );

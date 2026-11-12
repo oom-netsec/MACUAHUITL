@@ -32,11 +32,11 @@ export function SyslogTable({ msgs }: { msgs: SysMsg[] }) {
   }, [rows.length, frozen]);
 
   const cols: Column<SysMsg>[] = [
-    { id: "time", header: t("syslog.col.time"), value: (m) => m.at, render: (m) => new Date(m.at).toLocaleTimeString(lang), mono: true, width: 130 },
-    { id: "from", header: t("syslog.col.source"), value: (m) => m.from, mono: true, width: 150 },
-    { id: "sev", header: t("syslog.col.sev"), value: (m) => m.sev, render: (m) => (m.sev < 0 ? "—" : <SeverityBadge sev={m.sev} />), width: 150 },
-    { id: "mnemonic", header: t("syslog.col.mnemonic"), value: (m) => m.mnemonic, mono: true, width: 270 },
-    { id: "text", header: t("syslog.col.message"), value: (m) => m.text, mono: true },
+    { id: "time", header: t("syslog.col.time"), value: (m) => m.at, render: (m) => new Date(m.at).toLocaleTimeString(lang), mono: true, width: 130, minWidth: 96 },
+    { id: "from", header: t("syslog.col.source"), value: (m) => m.from, mono: true, width: 150, minWidth: 110 },
+    { id: "sev", header: t("syslog.col.sev"), value: (m) => m.sev, render: (m) => (m.sev < 0 ? "—" : <SeverityBadge sev={m.sev} />), width: 180, minWidth: 170 },
+    { id: "mnemonic", header: t("syslog.col.mnemonic"), value: (m) => m.mnemonic, mono: true, width: 270, minWidth: 110 },
+    { id: "text", header: t("syslog.col.message"), value: (m) => m.text, mono: true, minWidth: 280 },
   ];
   return (
     <div ref={wrap}>

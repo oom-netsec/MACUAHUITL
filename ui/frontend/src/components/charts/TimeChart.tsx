@@ -43,6 +43,9 @@ function resolve(el: HTMLElement, vars: string[]): string[] {
   return out;
 }
 
+// Con huecos, un valor aislado no forma línea: se dibujan los puntos para que no desaparezca.
+export const hasGaps = (v: (number | null)[]) => v.some((x) => x == null);
+
 export default function TimeChart({ title, times, series, unit = "", thresholds = [], marks = [], syncKey, height = 220, fileName }: TimeChartProps) {
   const t = useT();
   const lang = useLang();
@@ -81,7 +84,7 @@ export default function TimeChart({ title, times, series, unit = "", thresholds 
       scales: { x: { time: true } },
       padding: [marks.length ? 18 : null, null, null, null] as uPlot.Padding, // franja superior para las etiquetas de ronda
       axes: [{ ...axis, incrs: TIME_INCRS, values: (_u: uPlot, vals: number[], _ax: number, _sp: number, incr: number) => vals.map((v) => clock(v, incr < 60)) }, { ...axis, values: (_u, vals) => vals.map((v) => `${fmt(v)}${unit ? ` ${unit}` : ""}`), size: unit.length > 2 ? 88 : 64 }],
-      series: [{ label: t("chart.time"), value: (_u: uPlot, v: number | null) => (v == null ? "—" : clock(v)) }, ...series.map((s, i) => ({ label: s.label, stroke: palette[i], width: 2, points: { show: false }, value: (_u: uPlot, v: number | null) => (v == null ? "—" : `${fmt(v)}${unit ? ` ${unit}` : ""}`) }))],
+      series: [{ label: t("chart.time"), value: (_u: uPlot, v: number | null) => (v == null ? "—" : clock(v)) }, ...series.map((s, i) => ({ label: s.label, stroke: palette[i], width: 2, points: { show: (u: uPlot, si: number) => hasGaps(u.data[si] as (number | null)[]), size: 6 }, value: (_u: uPlot, v: number | null) => (v == null ? "—" : `${fmt(v)}${unit ? ` ${unit}` : ""}`) }))],
       hooks: {
         draw: [(u: uPlot) => {
           const c = u.ctx;

@@ -300,7 +300,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       <div className="field-row">
         <Select label={t("ssh.cred")} value={cred} onChange={(v) => { setCred(v); setNoCred(false); }} w="md" placeholder={noCred ? t("ssh.credPick") : undefined} hint={noCred ? t("hosts.pick.noCred") : undefined} options={creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])} />
         <Field label={t("ssh.device")} value={device} onChange={setDevice} w="lg" mono />
-        <Field label={t("fps.accepted")} value={accept} onChange={setAccept} w="md" mono />
+        <Field label={t("fps.accepted.short")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="md" mono />
       </div>
       <div className="field ssh-logpick" data-w="lg">
         <label htmlFor={logId}>{t("ssh.logTo")}</label>

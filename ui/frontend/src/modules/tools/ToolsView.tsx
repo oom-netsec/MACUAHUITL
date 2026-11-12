@@ -237,7 +237,7 @@ export function SyslogPanel({ core }: { core: CoreAPI }) {
       {o.drops && <IngestDropsBanner drops={o.drops} />}
       {started && (
         <ResultPanel title={t("syslog.messages")}
-          status={runId ? { tone: "info", label: status || t("diag.status.running") } : status ? { tone: "", label: status } : undefined}
+          status={runId ? { tone: status ? "ok" : "info", label: status || t("diag.status.running") } : status ? { tone: "", label: status } : undefined}
           meta={t("syslog.count", { n: received })}>
           <IngestStatusLine received={received} file={o.run.save ? { name: o.file, folder: o.folder, perSource: o.run.perSource } : null} />
           {msgs.length === 0 ? <p className="empty panel-body">{t("syslog.empty")}</p> : <SyslogTable msgs={msgs} />}

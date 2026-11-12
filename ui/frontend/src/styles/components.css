@@ -262,6 +262,7 @@ pre.code .t-kw, pre.code .t-iface, pre.code .t-prompt, pre.code .t-cred { font-w
 .progress[data-state="ok"] span { background: var(--success); } .progress[data-state="bad"] span { background: var(--critical); }
 .device-menu { position: relative; display: inline-flex; align-items: center; gap: 2px; }
 .device-menu > .popover.menu { left: 0; right: auto; }
+.popover.menu.fixed { position: fixed; right: auto; }
 .error-state { border-color: color-mix(in srgb, var(--critical) 35%, transparent); }
 .error-state svg { color: var(--critical); }
 
@@ -290,3 +291,4 @@ th.num, td.num { text-align: right; }
 .dialog-body th, .dialog-body td { text-align: left; padding: var(--s-1) var(--s-2); border-bottom: 1px solid var(--hairline); vertical-align: top; }
 .dialog-body thead th { color: var(--text-2); font-weight: 600; white-space: nowrap; background: var(--surface); }
 .dialog-body code { white-space: nowrap; }
+.grid-2 .field { align-content: start; } /* una pista de dos líneas no estira las filas de sus vecinos */

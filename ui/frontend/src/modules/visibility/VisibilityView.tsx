@@ -344,7 +344,7 @@ function CounterTable({ title, rows }: { title: string; rows?: Counter[] }) {
   if (!rows || rows.length === 0) return null;
   return (
     <div className="table-wrap flat">
-      <table>
+      <table className="counters">
         <caption>{title}</caption>
         <thead><tr><th>{t("visibility.col.key")}</th><th className="num">Bytes</th><th className="num">{t("visibility.col.packets")}</th><th className="num">{t("visibility.sub.flows")}</th></tr></thead>
         <tbody>{rows.map((r) => <tr key={r.Key}><td className="mono">{r.Key}</td><td className="mono num">{formatBytes(r.Bytes)}</td><td className="mono num">{r.Packets}</td><td className="mono num">{r.Flows}</td></tr>)}</tbody>

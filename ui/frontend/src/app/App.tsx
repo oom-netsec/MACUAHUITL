@@ -106,7 +106,7 @@ function Shell({ core, chrome, initial }: { core: CoreAPI; chrome?: ReactNode; i
         const view = document.querySelector(".view:not([hidden])");
         if (!view || view.querySelector("[data-assist]")) return;
         // Un primario dentro de un <details> plegado no está a la vista: no se dispara sin que la persona lo vea.
-        const pick = (root: Element | null | undefined) => [...(root?.querySelectorAll<HTMLButtonElement>("button.primary:not(:disabled):not(.danger), button[type=submit]:not(:disabled):not(.danger)") ?? [])].find((b) => !b.closest("details:not([open])"));
+        const pick = (root: Element | null | undefined) => [...(root?.querySelectorAll<HTMLButtonElement>("button.primary:not(:disabled):not(.danger), button[type=submit]:not(:disabled):not(.danger)") ?? [])].find((b) => !b.closest("details:not([open]), [hidden]")); // ni plegado ni en un panel oculto (p. ej. la otra pestaña de Transferencias)
         // Primero el primario de la sección o el formulario donde está el foco; si no hay, el de la vista.
         const near = document.activeElement?.closest("form, section:not(.page)");
         const b = (near && view.contains(near) && pick(near)) || pick(view);

@@ -62,7 +62,7 @@ test("traps: escucha en 1162, muestra solo su ejecución y se detiene", async ()
   });
   expect(await screen.findByRole("cell", { name: /GigabitEthernet1\/0\/7 oper down/ })).toBeInTheDocument();
   expect(screen.queryByRole("cell", { name: /ajeno/ })).not.toBeInTheDocument();
-  expect(screen.getByText(/escuchando en 127.0.0.1:1162/)).toBeInTheDocument();
+  expect(screen.getByText(/Escuchando en 127.0.0.1:1162/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Detener" }));
   expect(core.diagCancel).toHaveBeenCalledWith("t1");
   act(() => core.emitVis("traps", { runId: "t1", done: true }));

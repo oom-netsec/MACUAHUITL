@@ -180,3 +180,18 @@ test("con el foco dentro de una terminal xterm los atajos globales no actúan: l
   await userEvent.keyboard("{Control>}k{/Control}"); // fuera de la terminal sí
   expect(await screen.findByRole("dialog", { name: "Paleta de comandos" })).toBeInTheDocument();
 });
+
+test("Ctrl+Enter no pulsa el primario de un panel oculto (la pestaña Cliente de Transferencias mientras se ve Servidor)", async () => {
+  const core = fakeCore();
+  render(<App core={core} initial="transfer" />);
+  // El caso peligroso: un formulario de cliente ya lleno en la pestaña que queda oculta.
+  await userEvent.click(await screen.findByRole("tab", { name: /Cliente/ }));
+  await userEvent.type(await screen.findByLabelText(/Equipo remoto/), "10.0.0.1");
+  await userEvent.type(screen.getByLabelText(/Ruta remota/), "c9300.bin");
+  await userEvent.click(screen.getByRole("tab", { name: /Servidor/ }));
+  await userEvent.keyboard("{Control>}{Enter}{/Control}");
+  await act(async () => {});
+  expect(core.transferGet).not.toHaveBeenCalled();
+  expect(core.transferGetAsync).not.toHaveBeenCalled();
+  expect(core.transferPut).not.toHaveBeenCalled();
+});

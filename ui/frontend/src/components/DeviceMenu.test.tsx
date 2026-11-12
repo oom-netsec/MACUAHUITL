@@ -48,3 +48,16 @@ test("ErrorState dice qué pasó y ofrece la acción siguiente", () => {
   expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cargar la flota");
   expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
 });
+
+test("placeMenu abre hacia abajo si cabe y hacia arriba si no", async () => {
+  const { placeMenu } = await import("./DeviceMenu");
+  expect(placeMenu({ top: 100, bottom: 120, left: 50 }, 226, 768, 1366)).toEqual({ top: 124, left: 50 });
+  expect(placeMenu({ top: 600, bottom: 620, left: 50 }, 226, 768, 1366)).toEqual({ top: 370, left: 50 });
+  expect(placeMenu({ top: 10, bottom: 30, left: 1360 }, 226, 200, 1366).left).toBe(1182);
+});
+
+test("el menú se dibuja en el body (fuera de contenedores con scroll o transform)", async () => {
+  setup();
+  await userEvent.click(screen.getByRole("button", { name: "Acciones de SW1-ACC-03" }));
+  expect(screen.getByRole("menu").parentElement).toBe(document.body);
+});

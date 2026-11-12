@@ -49,6 +49,7 @@ const WRAP_ROW = 56; // filas que envuelven el texto: hasta 3 líneas
 const tableH = (n: number) => Math.min(420, 40 + 32 * n);
 // Cada fila necesita una clave única aunque dos coincidencias sean idénticas.
 const keyer = <R,>(rows: R[]) => { const m = new Map(rows.map((r, i) => [r, String(i)])); return (r: R) => m.get(r)!; };
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const whenText = (at: string, source?: string) => `${source ? `${source} · ` : ""}${at}`;
 const srcOf = (t: Parameters<typeof vocab>[0], s?: string) => (s ? vocab(t, "source", s) : s);
 
@@ -183,7 +184,7 @@ function Health({ core }: { core: CoreAPI }) {
   useEffect(() => { void q.run(() => core.fleetHealth()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const issues = q.data?.issues ?? [];
   const cols: Column<(typeof issues)[number]>[] = [
-    { id: "sev", header: t("fleet.col.severity"), value: (i) => t(`fleet.sev.${i.severity}`), width: W.sm },
+    { id: "sev", header: t("fleet.col.severity"), value: (i) => cap(t(`fleet.sev.${i.severity}`)), width: W.sm },
     { id: "device", header: t("fleet.col.device"), value: (i) => i.device, width: W.md },
     { id: "port", header: t("fleet.col.iface"), value: (i) => i.port, mono: true, width: W.md },
     { id: "problems", header: t("fleet.col.problems"), width: 320, wrap: true, value: (i) => i.problems.map((p) => `${vocab(t, "problem", p.kind)}${p.value ? ` ${p.value}` : ""} ${p.evidence}`).join(" · "),

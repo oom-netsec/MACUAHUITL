@@ -25,8 +25,7 @@ async function openServer(core: ReturnType<typeof setup>) {
 
 test("el formulario inválido no abre nada y el válido usa el puerto alto por omisión", async () => {
   const core = setup();
-  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("Elige la IP de escucha.");
+  expect(screen.getByRole("button", { name: "Abrir servidor" })).toBeDisabled(); // sin IP ni carpeta o archivos
   expect(core.transferServe).not.toHaveBeenCalled();
   await openServer(core);
   expect(core.transferServe).toHaveBeenCalledWith({
@@ -39,6 +38,7 @@ test("el puerto cambia con el protocolo y uno privilegiado se rechaza", async ()
   await userEvent.selectOptions(screen.getByLabelText("Protocolo"), "scp");
   expect(screen.getByLabelText("Puerto")).toHaveValue(2222);
   await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
+  await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
   await userEvent.clear(screen.getByLabelText("Puerto"));
   await userEvent.type(screen.getByLabelText("Puerto"), "22");
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));

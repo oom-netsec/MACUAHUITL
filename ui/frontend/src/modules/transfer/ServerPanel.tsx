@@ -124,6 +124,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
 
   const ssh = proto === "scp" || proto === "sftp";
   const form = { proto, any, listen, port, write, recvDir, fromDir, files, allow, minutes };
+  const missing = (!any && !listen) || (!write && !fromDir && splitList(files).length === 0); // datos requeridos; el resto lo explica serveProblem al abrir
   const start = async () => {
     const p = serveProblem(form);
     if (p) { setErr(t(p)); return; }
@@ -163,7 +164,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         <Field label={t("transfer.allow")} hint={t("transfer.allow.hint")} value={allow} onChange={setAllow} />
         {ssh && <Check label={t("transfer.legacy.server")} checked={legacy} onChange={setLegacy} />}
         {ssh && <p className="hint">{t("transfer.legacy.server.hint")}</p>}
-        <div className="actions"><button className="primary" onClick={start}>{t("transfer.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>
+        <div className="actions"><button className="primary" disabled={missing} onClick={start}>{t("transfer.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>
         {err && <Notice kind="error">{err}</Notice>}
       </Section>
       {servers.length === 0 && <EmptyState icon="upload" title={t("transfer.servers.none")} />}

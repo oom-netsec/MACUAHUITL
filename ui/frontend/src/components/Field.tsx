@@ -7,7 +7,7 @@ import { Icon } from "./Icon";
 export type Width = "xs" | "sm" | "md" | "lg" | "full";
 
 // Etiqueta + control + ayuda opcional (anunciada como descripción del control).
-function Labeled({ label, hint, error, w, children }: { label: string; hint?: string; error?: string; w?: Width; children: (id: string, describedBy?: string) => ReactNode }) {
+function Labeled({ label, hint, error, w, children }: { label: string; hint?: string; error?: ReactNode; w?: Width; children: (id: string, describedBy?: string) => ReactNode }) {
   const id = useId();
   const hintId = hint ? `${id}-h` : undefined;
   const errId = error ? `${id}-e` : undefined;
@@ -16,7 +16,7 @@ function Labeled({ label, hint, error, w, children }: { label: string; hint?: st
       <label htmlFor={id}>{label}</label>
       {children(id, [hintId, errId].filter(Boolean).join(" ") || undefined)}
       {hint && <p id={hintId} className="hint">{hint}</p>}
-      {error && <p id={errId} className="field-error">{error}</p>}
+      {error && <div id={errId} className="field-error">{error}</div>}
     </div>
   );
 }
@@ -48,7 +48,7 @@ export function TextArea({ label, hint, error, value, onChange, rows = 5, readOn
 }
 
 // Ruta escrita a mano o elegida con el diálogo nativo; cancelar el diálogo conserva lo que había.
-export function PathField({ label, hint, error, value, onChange, pick }: { label: string; hint?: string; error?: string; value: string; onChange: (v: string) => void; pick: () => Promise<string> }) {
+export function PathField({ label, hint, error, value, onChange, pick }: { label: string; hint?: string; error?: ReactNode; value: string; onChange: (v: string) => void; pick: () => Promise<string> }) {
   const t = useT();
   return (
     <Labeled label={label} hint={hint} error={error}>
