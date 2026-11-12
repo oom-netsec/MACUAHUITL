@@ -6,3 +6,9 @@ export function errInfo(e: unknown): ErrInfo | undefined {
   const c = (e as { cause?: Partial<ErrInfo> } | null)?.cause;
   return c?.reason ? { code: c.code ?? "", reason: c.reason, metadata: c.metadata ?? {} } : undefined;
 }
+
+/** «El archivo ya existe»: por reason; el texto en español solo sirve de respaldo si el error no trae cause. */
+export function fileExists(e: unknown): boolean {
+  const i = errInfo(e);
+  return i ? i.reason === "file.exists" : /ya existe/.test(String(e));
+}

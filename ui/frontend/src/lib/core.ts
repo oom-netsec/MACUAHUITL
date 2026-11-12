@@ -2,6 +2,7 @@
 import { Call, Clipboard, Dialogs, Events } from "@wailsio/runtime";
 import { tr } from "./i18n";
 import { errorText } from "../components/Field";
+import { fileExists } from "./coreError";
 import { portsWails, type PortsAPI } from "../modules/ports/api";
 import { snippetsWails, type SnippetsAPI } from "../modules/snippets/api";
 import { credRotateWails, type CredRotateAPI } from "../modules/credrotate/api";
@@ -147,7 +148,7 @@ export const wailsCore: CoreAPI = {
       try {
         await call("WriteFile", path, data, encoding, false);
       } catch (e) {
-        if (!/ya existe/.test(String(e))) throw e;
+        if (!fileExists(e)) throw e;
         if (!(await confirmReplace(path))) return "";
         await call("WriteFile", path, data, encoding, true);
       }
@@ -166,7 +167,7 @@ export const wailsCore: CoreAPI = {
       try {
         await call("WriteFile", path, "", "utf8", false);
       } catch (e) {
-        if (!/ya existe/.test(String(e))) throw e;
+        if (!fileExists(e)) throw e;
         if (!(await confirmReplace(path))) return "";
       }
       return path;

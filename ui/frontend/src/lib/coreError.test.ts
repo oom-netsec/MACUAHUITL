@@ -1,4 +1,12 @@
-import { errInfo } from "./coreError";
+import { errInfo, fileExists } from "./coreError";
+
+test("fileExists usa el reason y solo cae al texto si no hay cause", () => {
+  const con = (reason: string, message = "x") => Object.assign(new Error(message), { cause: { code: "A", reason, metadata: {} } });
+  expect(fileExists(con("file.exists", "the file already exists"))).toBe(true);
+  expect(fileExists(con("ingest.invalid", "el archivo ya existe"))).toBe(false);
+  expect(fileExists(new Error("rpc error: code = AlreadyExists desc = el archivo ya existe"))).toBe(true);
+  expect(fileExists(new Error("otra cosa"))).toBe(false);
+});
 
 test("errInfo lee el cause del error del puente", () => {
   const e = Object.assign(new Error("rpc error: code = AlreadyExists desc = el archivo ya existe"), {
