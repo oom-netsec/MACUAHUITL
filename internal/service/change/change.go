@@ -47,6 +47,7 @@ func (s *changeSvc) CreateChange(_ context.Context, r *v1.CreateChangeRequest) (
 		return nil, status.Error(codes.InvalidArgument, "falta la definición del cambio")
 	}
 	spec := proto.Clone(r.Spec).(*v1.JobSpec)
+	spec.Kind = "change"
 	if spec.Name == "" {
 		spec.Name = "cambio"
 	}

@@ -61,3 +61,47 @@ func TestCreateJobValidaOutputDirComoAjustes(t *testing.T) {
 		t.Fatalf("output_dir = %q, quería %q", s.OutputDir, h.out)
 	}
 }
+
+// El tipo de trabajo es un valor cerrado: vacío = patrol; otro valor se rechaza; el tipo se persiste con el trabajo.
+func TestCreateJobTipoDeTrabajo(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	crear := func(kind string) (string, error) {
+		sp := h.spec(cred)
+		sp.Kind = kind
+		r, err := h.patrol.CreateJob(ctx(t), &v1.CreateJobRequest{Spec: sp})
+		if err != nil {
+			return "", err
+		}
+		return r.JobId, nil
+	}
+	if _, err := crear("otro"); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("kind inválido debía rechazarse: %v", err)
+	}
+	vacio, err := crear("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if k := h.summary(t, vacio).Kind; k != "patrol" {
+		t.Fatalf("vacío = %q, quería patrol", k)
+	}
+	for _, k := range []string{"patrol", "adhoc", "backup", "change"} {
+		id, err := crear(k)
+		if err != nil || h.summary(t, id).Kind != k {
+			t.Fatalf("kind %s: %v", k, err)
+		}
+	}
+	// un trabajo guardado antes de esta fase (sin kind en su spec) sale como patrol
+	h.core.mu.Lock()
+	h.core.jobs[vacio].spec.Kind = ""
+	h.core.mu.Unlock()
+	h.core.persistJob(h.core.jobs[vacio])
+	adhoc, _ := crear("adhoc")
+	h.restart(t)
+	if k := h.summary(t, adhoc).Kind; k != "adhoc" {
+		t.Fatalf("kind recargado = %q", k)
+	}
+	if k := h.summary(t, vacio).Kind; k != "patrol" {
+		t.Fatalf("viejo recargado = %q", k)
+	}
+}

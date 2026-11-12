@@ -175,6 +175,9 @@ type patrolSvc struct {
 	c *Core
 }
 
+// jobKinds son los tipos de trabajo; vacío es patrol (specs viejas, mctl y la UI).
+var jobKinds = []string{"", "patrol", "adhoc", "backup", "change"}
+
 // validate traduce y revisa un JobSpec; también la usa la ventana de cambio.
 func (s *patrolSvc) validate(p *v1.JobSpec) (patrol.Spec, error) {
 	spec := specFromProto(p)
@@ -183,6 +186,9 @@ func (s *patrolSvc) validate(p *v1.JobSpec) (patrol.Spec, error) {
 	s.c.mu.Unlock()
 	if v == nil {
 		return spec, status.Error(codes.FailedPrecondition, "no hay bóveda")
+	}
+	if !slices.Contains(jobKinds, spec.Kind) {
+		return spec, status.Errorf(codes.InvalidArgument, "tipo de trabajo %q no válido (patrol, adhoc, backup o change)", spec.Kind)
 	}
 	// Un output_dir explícito pasa por la validación de Ajustes → Almacenamiento; vacío = la carpeta vigente.
 	if spec.OutputDir == "" {

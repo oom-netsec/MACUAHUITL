@@ -408,7 +408,9 @@ type JobSpec struct {
 	// Por defecto false: el equipo con llave de host nueva se omite (spec §12.2).
 	AcceptChangedHostKeys bool `protobuf:"varint,13,opt,name=accept_changed_host_keys,json=acceptChangedHostKeys,proto3" json:"accept_changed_host_keys,omitempty"`
 	// Duración de la ventana de bóveda. Máximo 96 h, validado en el núcleo (spec §10.4).
-	WindowHours   uint32 `protobuf:"varint,14,opt,name=window_hours,json=windowHours,proto3" json:"window_hours,omitempty"`
+	WindowHours uint32 `protobuf:"varint,14,opt,name=window_hours,json=windowHours,proto3" json:"window_hours,omitempty"`
+	// Tipo de trabajo: patrol (vacío = patrol), adhoc, backup o change. Cada servicio pone el suyo.
+	Kind          string `protobuf:"bytes,15,opt,name=kind,proto3" json:"kind,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -539,6 +541,13 @@ func (x *JobSpec) GetWindowHours() uint32 {
 		return x.WindowHours
 	}
 	return 0
+}
+
+func (x *JobSpec) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
 }
 
 type CreateJobRequest struct {
@@ -973,7 +982,9 @@ type JobSummary struct {
 	// Carpeta del trabajo (la de la corrida si ya se armó; si no, la raíz configurada).
 	OutputDir string `protobuf:"bytes,12,opt,name=output_dir,json=outputDir,proto3" json:"output_dir,omitempty"`
 	// Historial de fases, de la más antigua a la más reciente (se guardan las últimas 200).
-	Phases        []*JobPhase `protobuf:"bytes,13,rep,name=phases,proto3" json:"phases,omitempty"`
+	Phases []*JobPhase `protobuf:"bytes,13,rep,name=phases,proto3" json:"phases,omitempty"`
+	// patrol, adhoc, backup o change (un trabajo guardado antes de existir el campo sale como patrol).
+	Kind          string `protobuf:"bytes,14,opt,name=kind,proto3" json:"kind,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1097,6 +1108,13 @@ func (x *JobSummary) GetPhases() []*JobPhase {
 		return x.Phases
 	}
 	return nil
+}
+
+func (x *JobSummary) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
 }
 
 type JobPhase struct {
@@ -1581,7 +1599,7 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x10interval_seconds\x18\x01 \x01(\rR\x0fintervalSeconds\x12\x16\n" +
 	"\x06rounds\x18\x02 \x01(\rR\x06rounds\x120\n" +
 	"\x05until\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x05until\x12\x12\n" +
-	"\x04cron\x18\x04 \x01(\tR\x04cron\"\xf2\x04\n" +
+	"\x04cron\x18\x04 \x01(\tR\x04cron\"\x86\x05\n" +
 	"\aJobSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12/\n" +
 	"\atargets\x18\x02 \x03(\v2\x15.macuahuitl.v1.TargetR\atargets\x122\n" +
@@ -1598,7 +1616,8 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x12delete_loose_files\x18\v \x01(\bR\x10deleteLooseFiles\x12'\n" +
 	"\x0fdisable_masking\x18\f \x01(\bR\x0edisableMasking\x127\n" +
 	"\x18accept_changed_host_keys\x18\r \x01(\bR\x15acceptChangedHostKeys\x12!\n" +
-	"\fwindow_hours\x18\x0e \x01(\rR\vwindowHours\">\n" +
+	"\fwindow_hours\x18\x0e \x01(\rR\vwindowHours\x12\x12\n" +
+	"\x04kind\x18\x0f \x01(\tR\x04kind\">\n" +
 	"\x10CreateJobRequest\x12*\n" +
 	"\x04spec\x18\x01 \x01(\v2\x16.macuahuitl.v1.JobSpecR\x04spec\"*\n" +
 	"\x11CreateJobResponse\x12\x15\n" +
@@ -1622,7 +1641,7 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x12missing_inhibitors\x18\x02 \x03(\tR\x11missingInhibitors\")\n" +
 	"\x10CancelJobRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"\x13\n" +
-	"\x11CancelJobResponse\"\xef\x03\n" +
+	"\x11CancelJobResponse\"\x83\x04\n" +
 	"\n" +
 	"JobSummary\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x12\n" +
@@ -1640,7 +1659,8 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x0edevices_failed\x18\v \x01(\rR\rdevicesFailed\x12\x1d\n" +
 	"\n" +
 	"output_dir\x18\f \x01(\tR\toutputDir\x12/\n" +
-	"\x06phases\x18\r \x03(\v2\x17.macuahuitl.v1.JobPhaseR\x06phases\"\x95\x01\n" +
+	"\x06phases\x18\r \x03(\v2\x17.macuahuitl.v1.JobPhaseR\x06phases\x12\x12\n" +
+	"\x04kind\x18\x0e \x01(\tR\x04kind\"\x95\x01\n" +
 	"\bJobPhase\x12*\n" +
 	"\x02at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12/\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x1b.macuahuitl.v1.JobPhaseKindR\x04kind\x12\x14\n" +

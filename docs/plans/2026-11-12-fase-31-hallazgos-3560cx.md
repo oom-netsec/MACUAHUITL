@@ -56,5 +56,22 @@ Decisión del dueño del 2026-11-12: en el cliente de transferencias (área `tra
 - Revisa cómo la trata hoy el cliente FTP (`internal/diag/...` o donde viva). Si ya es así, deja solo la prueba que lo fija. Si no, corrígelo.
 - Pruebas: con el servidor FTP de prueba, `/x/y` es absoluta, `x/y` es relativa y la descarga y el listado se comportan igual que en SFTP.
 
+## 6. Tipo de trabajo en la lista (pedido del dueño vía front)
+La lista de trabajos tiene un filtro por tipo, pero `JobSummary` no lo manda.
+- `JobSpec` gana `string kind = 15;` y `JobSummary` gana `string kind = 14;`, sin renumerar.
+- Valores cerrados:
+  - `patrol` (vacío = patrol, para las specs viejas y para mctl y la UI);
+  - `adhoc` (`internal/service/adhoc`);
+  - `backup` (`internal/service/backup`);
+  - `change` (`internal/service/change`).
+- Cada servicio que crea su trabajo pone su valor. `CreateJob` rechaza cualquier otro valor con InvalidArgument.
+- Se persiste con el trabajo: un trabajo recargado conserva su tipo, y uno guardado antes de esta fase sale como `patrol`.
+- El puente pasa `kind` en el DTO de la lista de trabajos, con el nombre que ya espera `modules/patrol/api.ts` (`kind?: string`).
+- Pruebas:
+  - cada servicio crea su trabajo con su tipo;
+  - un valor inválido se rechaza;
+  - la persistencia sobrevive a reabrir el núcleo;
+  - el puente lo pasa.
+
 ## Contrato
 Sección nueva al final de `docs/plans/contratos-front.md`: la fase `ARM_CHECK_DONE`, el puerto efectivo en GetRun, la validación de `output_dir` y el campo `platforms` (incluida la nota de omitido en el manifest).

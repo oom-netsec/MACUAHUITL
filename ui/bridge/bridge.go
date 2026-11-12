@@ -301,6 +301,7 @@ type JobDTO struct {
 	DevicesOK     uint32     `json:"devicesOk"`
 	DevicesFailed uint32     `json:"devicesFailed"`
 	OutputDir     string     `json:"outputDir"`
+	Kind          string     `json:"kind"` // patrol, adhoc, backup o change
 	Phases        []PhaseDTO `json:"phases"`
 }
 
@@ -328,7 +329,7 @@ func (b *Bridge) ListJobs() ([]JobDTO, error) {
 		for _, j := range r.Jobs {
 			d := JobDTO{ID: j.JobId, Name: j.Name, State: j.State, NextRoundAt: rfc3339(j.NextRoundAt), ArmedAt: rfc3339(j.ArmedAt),
 				WindowEndsAt: rfc3339(j.WindowEndsAt), Round: j.Round, Rounds: j.Rounds, DevicesTotal: j.DevicesTotal, DevicesOK: j.DevicesOk,
-				DevicesFailed: j.DevicesFailed, OutputDir: j.OutputDir, Phases: []PhaseDTO{}}
+				DevicesFailed: j.DevicesFailed, OutputDir: j.OutputDir, Kind: j.Kind, Phases: []PhaseDTO{}}
 			for _, p := range j.Phases {
 				d.Phases = append(d.Phases, PhaseDTO{At: rfc3339(p.At), Kind: p.Kind.String(), Round: p.Round, Detail: p.Detail})
 			}

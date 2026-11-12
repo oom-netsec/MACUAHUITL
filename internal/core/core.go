@@ -1,6 +1,7 @@
 package core
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -454,7 +455,7 @@ func (c *Core) summary(j *job) *v1.JobSummary {
 	}
 	s := &v1.JobSummary{JobId: j.id, Name: j.spec.Name, State: j.state, NextRoundAt: tsOrNil(c.sched.NextRound(j.id)),
 		ArmedAt: tsOrNil(j.ArmedAt), WindowEndsAt: tsOrNil(j.Until), Round: uint32(j.Round), Rounds: rounds,
-		DevicesTotal: uint32(len(j.spec.Targets)), DevicesOk: uint32(j.OK), DevicesFailed: uint32(j.Failed), OutputDir: out}
+		DevicesTotal: uint32(len(j.spec.Targets)), DevicesOk: uint32(j.OK), DevicesFailed: uint32(j.Failed), OutputDir: out, Kind: cmp.Or(j.spec.Kind, "patrol")}
 	for _, p := range j.Phases {
 		s.Phases = append(s.Phases, phaseToProto(p))
 	}

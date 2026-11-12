@@ -157,7 +157,13 @@ func TestJobRecargadoConservaSuCarpeta(t *testing.T) {
 	job, wait := h.adhocLote(t, cred, h.target)
 	wait()
 	before, _ := coreDeps{h.core}.Job(job)
+	if k := h.summary(t, job).Kind; k != "adhoc" {
+		t.Fatalf("kind = %q, quería adhoc", k)
+	}
 	h.restart(t)
+	if k := h.summary(t, job).Kind; k != "adhoc" { // el tipo se persiste con el trabajo
+		t.Fatalf("kind recargado = %q, quería adhoc", k)
+	}
 	info, err := coreDeps{h.core}.Job(job)
 	if err != nil || info.Dir == "" || info.Dir != before.Dir || info.State != "completed" {
 		t.Fatalf("recargado = %+v %v, antes = %+v", info, err, before)

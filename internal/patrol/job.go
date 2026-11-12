@@ -54,13 +54,15 @@ type Schedule struct {
 
 // Spec es el espejo Go de JobSpec (api/proto/macuahuitl/v1/patrol.proto).
 type Spec struct {
-	Name                  string
-	Targets               []Target
-	DefaultCredentialID   string
-	Overrides             []Override
-	PlaybookIDs           []string
-	CustomCommands        string
-	OutputDir             string
+	Name                string
+	Targets             []Target
+	DefaultCredentialID string
+	Overrides           []Override
+	PlaybookIDs         []string
+	CustomCommands      string
+	OutputDir           string
+	// Kind: patrol (vacío), adhoc, backup o change; lo pone el servicio que crea el trabajo.
+	Kind                  string
 	Split                 SplitStrategy
 	Schedule              Schedule
 	Zip                   ZipPolicy

@@ -54,6 +54,9 @@ func TestChangePrePostEndToEnd(t *testing.T) {
 	if err != nil || pre.Armed || pre.JobId == "" || !strings.Contains(pre.Detail, "Login Test") {
 		t.Fatalf("pre = %+v %v", pre, err)
 	}
+	if k := h.summary(t, pre.JobId).Kind; k != "change" {
+		t.Fatalf("kind = %q, quería change", k)
+	}
 	fp := h.loginTest(t, pre.JobId)[0].HostKeyFingerprint
 	pre, err = ch.CaptureChange(ctx(t), &v1.CaptureChangeRequest{ChangeId: cr.ChangeId, Phase: v1.ChangePhase_CHANGE_PHASE_PRE, AcceptedHostKeyFingerprints: []string{fp}})
 	if err != nil || !pre.Armed {

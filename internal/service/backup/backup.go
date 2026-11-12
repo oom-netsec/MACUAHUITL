@@ -107,7 +107,7 @@ func (s *backupSvc) StartBackup(ctx context.Context, r *v1.StartBackupRequest) (
 	if r.Startup {
 		cmds += "\nshow startup-config"
 	}
-	spec := &v1.JobSpec{Name: "respaldo", Targets: r.Targets, DefaultCredentialId: r.CredentialId, CustomCommands: cmds,
+	spec := &v1.JobSpec{Kind: "backup", Name: "respaldo", Targets: r.Targets, DefaultCredentialId: r.CredentialId, CustomCommands: cmds,
 		WindowHours: 1, Split: v1.SplitStrategy_SPLIT_STRATEGY_PER_ROUND, Zip: v1.ZipPolicy_ZIP_POLICY_NONE, DisableMasking: r.IncludeSecrets}
 	if r.IntervalSeconds > 0 {
 		if r.Rounds < 2 {
