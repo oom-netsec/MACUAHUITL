@@ -2,6 +2,7 @@ package forensic
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"maps"
@@ -15,7 +16,9 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/logintel"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
@@ -26,13 +29,14 @@ const maxLogBytes = 32 << 20
 type loaded struct {
 	entries  []logintel.Entry
 	stats    logintel.Stats
-	source   string
+	source   srcName
 	warnings []string
+	warnT    []i18n.Text     // los warnings como texto de catálogo, en paralelo
 	bundle   *analyze.Bundle // solo con un trabajo de Patrol
 }
 
 // bundle acepta el ID de un trabajo de esta sesión o la ruta absoluta de su carpeta.
-func (s *forensicSvc) bundle(job string) (*analyze.Bundle, error) {
+func (s *forensicSvc) bundle(ctx context.Context, job string) (*analyze.Bundle, error) {
 	dir := filepath.Clean(job)
 	if !filepath.IsAbs(job) {
 		j, err := s.d.Job(job)
@@ -40,7 +44,7 @@ func (s *forensicSvc) bundle(job string) (*analyze.Bundle, error) {
 			return nil, err
 		}
 		if j.Dir == "" {
-			return nil, status.Error(codes.FailedPrecondition, "el trabajo aún no tiene salidas: ármalo y espera la primera ronda")
+			return nil, service.Err(ctx, codes.FailedPrecondition, "forensic.err.job_empty", nil)
 		}
 		dir = j.Dir
 	}
@@ -50,6 +54,21 @@ func (s *forensicSvc) bundle(job string) (*analyze.Bundle, error) {
 	}
 	return b, nil
 }
+
+// srcName es el nombre de la fuente: una ruta (dato) o un texto de catálogo.
+type srcName struct {
+	raw string
+	t   i18n.Text
+}
+
+func (n srcName) in(loc string) string {
+	if n.raw != "" {
+		return n.raw
+	}
+	return n.t.In(loc)
+}
+
+func (l *loaded) warn(key string, kv ...any) { i18n.Note(&l.warnings, &l.warnT, key, kv...) }
 
 func (l *loaded) add(es []logintel.Entry, st logintel.Stats) {
 	l.entries = append(l.entries, es...)
@@ -90,7 +109,7 @@ func readTail(path string, max int64) (b []byte, cut bool, err error) {
 }
 
 // loadLogs lee la fuente pedida (exactamente una) y la lleva a mensajes.
-func (s *forensicSvc) loadLogs(src *v1.LogSource) (*loaded, error) {
+func (s *forensicSvc) loadLogs(ctx context.Context, src *v1.LogSource) (*loaded, error) {
 	n := 0
 	for _, on := range []bool{src.GetText() != "", src.GetPath() != "", src.GetCapture(), src.GetJob() != ""} {
 		if on {
@@ -98,27 +117,27 @@ func (s *forensicSvc) loadLogs(src *v1.LogSource) (*loaded, error) {
 		}
 	}
 	if n != 1 {
-		return nil, status.Error(codes.InvalidArgument, "elige exactamente una fuente: texto, archivo, captura del receptor syslog o trabajo de Patrol")
+		return nil, service.Err(ctx, codes.InvalidArgument, "forensic.err.one_source", nil)
 	}
 	o := logintel.ParseOptions{Now: s.d.Now()}
 	l := &loaded{}
 	switch {
 	case src.Text != "" || src.Path != "":
-		text, err := readSource(src.Text, src.Path, maxLogBytes)
+		text, err := readSource(ctx, src.Text, src.Path, maxLogBytes)
 		if err != nil {
 			return nil, err
 		}
 		if len(text) > maxLogBytes {
 			text = text[:maxLogBytes]
-			l.warnings = append(l.warnings, "el archivo supera 32 MiB: solo se leyó el principio")
+			l.warn("forensic.warn.file_cap")
 		}
-		l.source = "texto pegado"
+		l.source = srcName{t: i18n.Tx("forensic.source.text")}
 		if src.Path != "" {
-			l.source = src.Path
+			l.source = srcName{raw: src.Path}
 		}
 		l.add(logintel.ParseLines(text, o))
 	case src.Capture:
-		l.source = "captura del receptor syslog"
+		l.source = srcName{t: i18n.Tx("forensic.source.capture")}
 		files, _ := filepath.Glob(filepath.Join(s.d.Outputs(), "syslog", "*.log"))
 		sort.Sort(sort.Reverse(sort.StringSlice(files))) // los nombres llevan la hora: primero los más nuevos
 		left := s.logBytes()
@@ -127,29 +146,29 @@ func (s *forensicSvc) loadLogs(src *v1.LogSource) (*loaded, error) {
 		}
 		for _, f := range files {
 			if left <= 0 || len(l.entries) >= logintel.MaxLines {
-				l.warnings = append(l.warnings, "hay más capturas de las que caben en el tope; se leyeron las más recientes")
+				l.warn("forensic.warn.more_caps")
 				break
 			}
 			b, cut, err := readTail(f, left)
 			if err != nil {
-				l.warnings = append(l.warnings, err.Error())
+				l.warnings, l.warnT = append(l.warnings, err.Error()), append(l.warnT, i18n.Text{}) // texto del sistema
 				continue
 			}
 			if cut {
-				l.warnings = append(l.warnings, fmt.Sprintf("%s supera el tope: solo se leyó el final (lo más reciente)", filepath.Base(f)))
+				l.warn("forensic.warn.cap_tail", "file", filepath.Base(f))
 			}
 			left -= int64(len(b))
 			l.add(logintel.ParseLines(string(b), o))
 		}
 		if len(files) == 0 {
-			l.warnings = append(l.warnings, "no hay capturas del receptor syslog: escucha con «Herramientas → Syslog» guardando la salida")
+			l.warn("forensic.warn.no_caps")
 		}
 	default:
-		b, err := s.bundle(src.Job)
+		b, err := s.bundle(ctx, src.Job)
 		if err != nil {
 			return nil, err
 		}
-		l.source = "show logging del trabajo " + b.Dir
+		l.source = srcName{t: i18n.Tx("forensic.source.job", "dir", b.Dir)}
 		l.bundle = b
 		seen := map[string]bool{}     // mensajes con hora: una vez por equipo, hora y texto
 		prev := map[string][]string{} // textos sin hora de la ronda anterior de cada equipo
@@ -196,14 +215,14 @@ func (s *forensicSvc) loadLogs(src *v1.LogSource) (*loaded, error) {
 			l.add(kept, st)
 		}
 		for _, dev := range slices.Sorted(maps.Keys(noZone)) {
-			l.warnings = append(l.warnings, fmt.Sprintf("%s: hora sin zona, se asume la del equipo: el trabajo no tiene show clock detail y las horas de show logging se tomaron tal cual (como UTC); agrégalo al playbook para correlacionar equipos", dev))
+			l.warn("forensic.warn.no_zone", "device", dev)
 		}
 		if len(l.entries) == 0 {
-			l.warnings = append(l.warnings, "el trabajo no tiene show logging con mensajes; agrega ese comando al playbook")
+			l.warn("forensic.warn.no_logging")
 		}
 	}
 	if l.stats.Truncated {
-		l.warnings = append(l.warnings, fmt.Sprintf("se leyeron solo las primeras %d líneas", logintel.MaxLines))
+		l.warn("logintel.warn.max_lines", "max", logintel.MaxLines)
 	}
 	return l, nil
 }

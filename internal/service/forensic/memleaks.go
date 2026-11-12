@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/logintel"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -20,17 +20,18 @@ func isProcMem(cmd string) bool {
 	return (strings.HasPrefix(c, "show processes memory") || strings.HasPrefix(c, "show process memory")) && !strings.Contains(c, "platform")
 }
 
-func (s *forensicSvc) MemLeaks(_ context.Context, r *v1.MemLeaksRequest) (*v1.MemLeaksResponse, error) {
+func (s *forensicSvc) MemLeaks(ctx context.Context, r *v1.MemLeaksRequest) (*v1.MemLeaksResponse, error) {
 	s.d.MarkActive()
 	if r.Job == "" {
-		return nil, status.Error(codes.InvalidArgument, "falta el trabajo de Patrol")
+		return nil, service.Err(ctx, codes.InvalidArgument, "forensic.err.no_job", nil)
 	}
-	b, err := s.bundle(r.Job)
+	b, err := s.bundle(ctx, r.Job)
 	if err != nil {
 		return nil, err
 	}
 	var ss []logintel.MemSample
 	var warns []string
+	var warnsT []i18n.Text
 	seen := map[string]bool{}
 	for _, sec := range b.Sections {
 		if sec.Invalid || !isProcMem(sec.Command) {
@@ -46,7 +47,7 @@ func (s *forensicSvc) MemLeaks(_ context.Context, r *v1.MemLeaksRequest) (*v1.Me
 		seen[k] = true
 		ps, ok := iosxe.ParseProcessMemory(sec.Text)
 		if !ok {
-			warns = append(warns, fmt.Sprintf("%s ronda %d: show processes memory con un formato que no se reconoce", sec.Device, sec.Round))
+			i18n.Note(&warns, &warnsT, "forensic.warn.mem_format", "device", sec.Device, "round", sec.Round)
 			continue
 		}
 		m := logintel.MemSample{Host: sec.Device, Round: sec.Round, At: sec.At}
@@ -56,11 +57,13 @@ func (s *forensicSvc) MemLeaks(_ context.Context, r *v1.MemLeaksRequest) (*v1.Me
 		ss = append(ss, m)
 	}
 	rep := logintel.MemLeaks(ss, logintel.LeakOptions{MinRounds: int(min(r.MinRounds, 1000)), MinGrowth: int64(min(r.MinGrowthKib, 1<<30)) << 10})
-	rep.Warnings = append(warns, rep.Warnings...)
+	rep.Warnings, rep.WarnT = append(warns, rep.Warnings...), append(warnsT, rep.WarnT...)
+	loc := i18n.Locale(ctx)
+	rep = rep.Localize(loc)
 	out := struct {
 		logintel.LeakReport
 		Job string `json:"job"`
 	}{rep, b.Dir}
 	s.d.Audit("forensic.memleaks", b.Dir, fmt.Sprintf("device=%q samples=%d suspects=%d", r.Device, len(ss), len(rep.Leaks)))
-	return &v1.MemLeaksResponse{Report: service.Report(out, rep.Text())}, nil
+	return &v1.MemLeaksResponse{Report: service.Report(out, rep.TextIn(loc))}, nil
 }

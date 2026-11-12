@@ -7,12 +7,12 @@
 package crashinfo
 
 import (
-	"errors"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -31,7 +31,7 @@ const (
 )
 
 // ErrEmpty: no hay nada que leer.
-var ErrEmpty = errors.New("crashinfo: el archivo está vacío")
+var ErrEmpty error = i18n.New("crash.err.empty", nil)
 
 type CPU struct {
 	FiveSec float64 `json:"five_sec"`
@@ -65,6 +65,22 @@ type Report struct {
 	Mnemonics []string `json:"mnemonics,omitempty"`
 	Hint      string   `json:"hint,omitempty"`
 	Warnings  []string `json:"warnings,omitempty"`
+
+	// Los textos de catálogo de Hint y Warnings (en paralelo) para entregarlos en otro idioma; no viajan en el JSON.
+	HintT i18n.Text   `json:"-"`
+	WarnT []i18n.Text `json:"-"`
+}
+
+// Localize da el informe con Hint y Warnings en el idioma dado; con es devuelve el informe tal cual.
+func (r Report) Localize(loc string) Report {
+	if loc != i18n.En {
+		return r
+	}
+	if !r.HintT.Empty() {
+		r.Hint = r.HintT.In(loc)
+	}
+	r.Warnings = i18n.Notes(loc, r.Warnings, r.WarnT)
+	return r
 }
 
 var (
@@ -90,14 +106,15 @@ func Parse(text string) (Report, error) {
 	r := Report{Kind: KindUnknown, Bytes: len(text)}
 	if len(text) > MaxBytes {
 		text, r.Truncated = text[:MaxBytes], true
-		r.Warnings = append(r.Warnings, "el archivo supera 4 MiB: solo se leyó el principio")
+		i18n.Note(&r.Warnings, &r.WarnT, "crash.warn.too_big")
 	}
 	if strings.TrimSpace(text) == "" {
 		return r, ErrEmpty
 	}
 	if isBinary(text) {
 		r.Kind, r.Binary = KindCore, true
-		r.Hint = "volcado binario (core): no se analiza aquí; consérvalo con su fecha y abre un caso con TAC"
+		r.HintT = i18n.Tx("crash.hint.core")
+		r.Hint = r.HintT.In(i18n.Es)
 		return r, nil
 	}
 	if !utf8.ValidString(text) {
@@ -106,7 +123,7 @@ func Parse(text string) (Report, error) {
 	ls := strings.Split(text, "\n")
 	if len(ls) > maxLines {
 		ls, r.Truncated = ls[:maxLines], true
-		r.Warnings = append(r.Warnings, "demasiadas líneas: solo se leyeron las primeras 200000")
+		i18n.Note(&r.Warnings, &r.WarnT, "crash.warn.too_many")
 	}
 	seen := map[string]bool{}
 	var cut []string
@@ -137,7 +154,7 @@ func Parse(text string) (Report, error) {
 	if r.Reason != "" || r.Process != "" || len(r.Traceback) > 0 || r.Version != "" {
 		r.Kind = KindCrashinfo
 	} else {
-		r.Warnings = append(r.Warnings, "no se reconoce como crashinfo de IOS o IOS-XE: no hay motivo, proceso, traceback ni versión")
+		i18n.Note(&r.Warnings, &r.WarnT, "crash.warn.not_crash")
 	}
 	return r, nil
 }
@@ -214,40 +231,49 @@ func isBinary(s string) bool {
 	return bad*10 > len(head)*3
 }
 
-// Text arma el resumen legible del reporte.
-func (r Report) Text() string {
+// Text arma el resumen legible del reporte en español.
+func (r Report) Text() string { return r.TextIn(i18n.Es) }
+
+// TextIn arma el resumen legible en el idioma dado (r ya viene en ese idioma: ver Localize).
+func (r Report) TextIn(loc string) string {
 	var b strings.Builder
 	line := func(k, v string) {
 		if v != "" {
-			b.WriteString(k + ": " + v + "\n")
+			b.WriteString(i18n.Msg(loc, k, nil) + ": " + v + "\n")
 		}
 	}
-	line("Tipo", r.Kind)
-	line("Aviso", r.Hint)
-	line("Motivo", r.Reason)
-	line("PC", r.PC)
+	kind := r.Kind
+	if kind == KindUnknown {
+		kind = i18n.Msg(loc, "crash.kind.unknown", nil)
+	}
+	line("crash.label.type", kind)
+	line("crash.label.notice", r.Hint)
+	line("crash.label.reason", r.Reason)
+	if r.PC != "" {
+		b.WriteString("PC: " + r.PC + "\n")
+	}
 	if r.Process != "" {
 		p := r.Process
 		if r.PID > 0 {
 			p += " (pid " + strconv.Itoa(r.PID) + ")"
 		}
-		line("Proceso", p)
+		line("crash.label.process", p)
 	}
-	line("Equipo", strings.TrimSpace(r.Host+" "+r.Model))
-	line("Versión", r.Version)
-	line("Tiempo en línea antes de la falla", r.Uptime)
+	line("crash.label.device", strings.TrimSpace(r.Host+" "+r.Model))
+	line("crash.label.version", r.Version)
+	line("crash.label.uptime", r.Uptime)
 	if len(r.Traceback) > 0 {
-		line("Traceback", strings.Join(r.Traceback, " "))
+		b.WriteString("Traceback: " + strings.Join(r.Traceback, " ") + "\n")
 	}
 	if r.CPU != nil {
-		line("CPU al fallar", strconv.FormatFloat(r.CPU.FiveSec, 'f', -1, 64)+"% (5 s), "+strconv.FormatFloat(r.CPU.OneMin, 'f', -1, 64)+"% (1 min), "+strconv.FormatFloat(r.CPU.FiveMin, 'f', -1, 64)+"% (5 min)")
+		line("crash.label.cpu", strconv.FormatFloat(r.CPU.FiveSec, 'f', -1, 64)+"% (5 s), "+strconv.FormatFloat(r.CPU.OneMin, 'f', -1, 64)+"% (1 min), "+strconv.FormatFloat(r.CPU.FiveMin, 'f', -1, 64)+"% (5 min)")
 	}
 	if r.Memory != nil {
-		line("Memoria al fallar", strconv.FormatFloat(r.Memory.FreePct, 'f', 1, 64)+"% libre ("+strconv.FormatInt(r.Memory.Free, 10)+" de "+strconv.FormatInt(r.Memory.Total, 10)+" bytes)")
+		line("crash.label.memory", i18n.Msg(loc, "crash.text.memory", i18n.A("pct", strconv.FormatFloat(r.Memory.FreePct, 'f', 1, 64), "free", r.Memory.Free, "total", r.Memory.Total)))
 	}
-	line("Mensajes en el archivo", strings.Join(r.Mnemonics, ", "))
+	line("crash.label.messages", strings.Join(r.Mnemonics, ", "))
 	for _, w := range r.Warnings {
-		b.WriteString("Aviso: " + w + "\n")
+		b.WriteString(i18n.Msg(loc, "crash.label.warning", nil) + ": " + w + "\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

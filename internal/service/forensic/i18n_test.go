@@ -3,12 +3,14 @@ package forensic
 import (
 	"context"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/logintel"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
 
@@ -145,4 +147,35 @@ func tmp(dirs *[]string, t *testing.T) string {
 	d := t.TempDir()
 	*dirs = append(*dirs, d)
 	return d
+}
+
+// Con en, ningún RPC de forense deja español en lo que traduce el núcleo (el texto de sistema y los datos no cuentan).
+func TestForenseEnSinEspanol(t *testing.T) {
+	es := regexp.MustCompile(`[áéíóúñ¿¡]|\b(mensajes?|línea|ronda|rondas|aviso|Aviso|equipo|equipos|interfaz|archivo|trabajo|falta|Causa|Acción|Significado|Fuente|ninguna|Ninguna|texto|captura|hacen|solo|hay|sin|con)\b`)
+	got := forenseCasos(t, i18n.WithLocale(context.Background(), "en"))
+	base := forenseCasos(t, context.Background())
+	for k, v := range got {
+		if k == "crash_err_directorio" || k == "patrones_job_sin_dir" { // el texto viene de internal/sys (fuera del bloque D)
+			continue
+		}
+		if v == base[k] && !strings.HasPrefix(k, "crash_err_no_existe") && !strings.Contains(k, "dir_malo") {
+			t.Errorf("%s: en igual a es", k)
+		}
+		v = strings.ReplaceAll(v, "%SYS-2-MALLOCFAIL: sin hora", "") // dato de la entrada, no texto del núcleo
+		if m := es.FindString(v); m != "" {
+			i := strings.Index(v, m)
+			t.Errorf("%s: queda español (%q) en: ...%s...", k, m, v[max(0, i-40):min(len(v), i+60)])
+		}
+	}
+}
+
+// Los avisos en paralelo (es y Text) nunca se desalinean: con en, cada aviso del informe es el de su propio código.
+func TestForenseAvisosAlineados(t *testing.T) {
+	rep := logintel.FilterDebug(strings.Repeat("OSPF-1 ADJ x\n", 30), logintel.DebugOptions{})
+	if len(rep.Warnings) != len(rep.WarnT) {
+		t.Fatalf("%d avisos y %d textos", len(rep.Warnings), len(rep.WarnT))
+	}
+	if got := i18n.Notes(i18n.En, []string{"a", "b"}, []i18n.Text{i18n.Tx("forensic.warn.no_logging")}); got[0] != "a" || got[1] != "b" {
+		t.Fatalf("listas desparejas deben quedar en es: %v", got)
+	}
 }

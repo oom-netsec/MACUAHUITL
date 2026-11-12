@@ -199,3 +199,22 @@ func TestFichasDeAccionesLasHaceUnHumano(t *testing.T) {
 		}
 	}
 }
+
+// Toda ficha de la base trae su versión en inglés, distinta del español y sin letras del español.
+func TestFichasTienenIngles(t *testing.T) {
+	k, err := Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range k.Search("") {
+		en := e.In("en")
+		for n, p := range map[string][2]string{"meaning": {e.Meaning, en.Meaning}, "cause": {e.Cause, en.Cause}, "action": {e.Action, en.Action}} {
+			if p[1] == "" || p[1] == p[0] || strings.ContainsAny(p[1], "áéíóúñ¿") {
+				t.Errorf("%s %s: sin traducción al inglés: %q", e.ID, n, p[1])
+			}
+		}
+		if en.Source != "Cisco public documentation (not validated in the lab)" || e.In("es").Source != source {
+			t.Errorf("%s: fuente %q / %q", e.ID, en.Source, e.Source)
+		}
+	}
+}

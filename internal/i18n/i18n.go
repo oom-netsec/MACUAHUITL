@@ -426,3 +426,26 @@ func (t Text) In(loc string) string {
 	}
 	return Msg(loc, t.Key, args)
 }
+
+// Note agrega un aviso a dos listas paralelas: su texto en es (el de siempre, el que va en el JSON) y su Text.
+func Note(es *[]string, ts *[]Text, key string, kv ...any) {
+	t := Tx(key, kv...)
+	*es = append(*es, t.In(Es))
+	*ts = append(*ts, t)
+}
+
+// Notes da los avisos en el idioma dado. Con es, o si las listas paralelas no coinciden (un aviso se agregó sin su
+// Text), devuelve es tal cual: nunca mezcla un aviso con la traducción de otro.
+func Notes(loc string, es []string, ts []Text) []string {
+	if loc != En || len(es) != len(ts) {
+		return es
+	}
+	out := make([]string, len(es))
+	for i, t := range ts {
+		out[i] = es[i]
+		if !t.Empty() {
+			out[i] = t.In(En)
+		}
+	}
+	return out
+}
