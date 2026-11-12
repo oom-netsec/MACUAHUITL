@@ -33,6 +33,15 @@ func main() {
 }
 
 func run(privPath, pubPath string) error {
+	// El repo es público: la privada solo con ruta absoluta y fuera del directorio de trabajo
+	// (`-priv=~/x` no se expande en bash y caería dentro del repo).
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	if rel, err := filepath.Rel(cwd, privPath); !filepath.IsAbs(privPath) || err != nil || filepath.IsLocal(rel) {
+		return fmt.Errorf("-priv tiene que ser una ruta absoluta fuera de %s", cwd)
+	}
 	pk, sk, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return err
@@ -44,25 +53,40 @@ func run(privPath, pubPath string) error {
 	if err := os.MkdirAll(filepath.Dir(privPath), 0o700); err != nil {
 		return err
 	}
-	if err := escribe(privPath, sk, 0o600); err != nil {
+	if err := os.MkdirAll(filepath.Dir(pubPath), 0o755); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(pubPath), 0o755); err != nil {
+	if err := escribe(privPath, sk, 0o600); err != nil {
 		return err
 	}
 	if err := escribe(pubPath, pk, 0o644); err != nil {
 		os.Remove(privPath) // sin pública la privada no sirve; no dejes una a medias
 		return err
 	}
-	return verifica(privPath, pubPath)
+	if err := verifica(privPath, pubPath); err != nil {
+		os.Remove(privPath)
+		os.Remove(pubPath)
+		return err
+	}
+	return nil
 }
 
-func escribe(path string, key []byte, perm os.FileMode) error {
+// escribe crea el archivo (nunca pisa) y lo borra si no queda completo en disco.
+func escribe(path string, key []byte, perm os.FileMode) (err error) {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
 	if err != nil {
 		return err
 	}
-	if _, err := f.WriteString(base64.StdEncoding.EncodeToString(key) + "\n"); err != nil {
+	defer func() {
+		if err != nil {
+			os.Remove(path)
+		}
+	}()
+	if _, err = f.WriteString(base64.StdEncoding.EncodeToString(key) + "\n"); err != nil {
+		f.Close()
+		return err
+	}
+	if err = f.Sync(); err != nil {
 		f.Close()
 		return err
 	}
