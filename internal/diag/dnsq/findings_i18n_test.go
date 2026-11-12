@@ -70,6 +70,33 @@ func (bigAnswer) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	w.WriteMsg(m)
 }
 
+// openOnly es un resolvedor abierto que no inventa respuestas: resuelve example.com y da NXDOMAIN al resto.
+type openOnly struct{}
+
+func (openOnly) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+	m := new(dns.Msg)
+	m.SetReply(r)
+	m.RecursionAvailable = true
+	if r.Question[0].Name == "example.com." {
+		rr, _ := dns.NewRR("example.com. 60 IN A 192.0.2.66")
+		m.Answer = append(m.Answer, rr)
+	} else {
+		m.Rcode = dns.RcodeNameError
+	}
+	w.WriteMsg(m)
+}
+
+// hijackOnly inventa direcciones para todo pero no anuncia recursión: solo secuestro de NXDOMAIN.
+type hijackOnly struct{}
+
+func (hijackOnly) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+	m := new(dns.Msg)
+	m.SetReply(r)
+	rr, _ := dns.NewRR(r.Question[0].Name + " 60 IN A 192.0.2.66")
+	m.Answer = append(m.Answer, rr)
+	w.WriteMsg(m)
+}
+
 // escenariosDNS corre cada revisión del diagnóstico DNS contra servidores de juguete y devuelve los informes.
 func escenariosDNS(t *testing.T) map[string]any {
 	t.Helper()
@@ -124,12 +151,8 @@ func escenariosDNS(t *testing.T) map[string]any {
 
 	// exposición
 	le := &lab{ports: map[string]uint16{}}
-	open := newZone("x.lab.")
-	open.recursive = true
-	hij := newZone("y.lab.")
-	hij.hijack = true
-	le.serve(t, "127.0.0.50", open)
-	le.serve(t, "127.0.0.51", hij)
+	le.serve(t, "127.0.0.50", openOnly{})
+	le.serve(t, "127.0.0.51", hijackOnly{})
 	out["exposure-open"] = CheckExposure(ctx, le.dial, srv("127.0.0.50"), opts())
 	out["exposure-hijack"] = CheckExposure(ctx, le.dial, srv("127.0.0.51"), opts())
 	return out
