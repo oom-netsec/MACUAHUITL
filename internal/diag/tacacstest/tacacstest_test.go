@@ -114,6 +114,13 @@ func TestWrongSecretIsDiagnosed(t *testing.T) {
 	if !strings.Contains(r.Steps[0].Error, "secreto") {
 		t.Fatalf("%+v", r.Steps[0])
 	}
+	found := false
+	for _, f := range r.Findings {
+		found = found || f.Code == "secret"
+	}
+	if !found {
+		t.Fatalf("hallazgos: %+v", r.Findings)
+	}
 }
 
 func TestUnreachable(t *testing.T) {

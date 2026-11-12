@@ -93,7 +93,7 @@ func TestCodigosDeHallazgoEnIngles(t *testing.T) {
 		}
 	}
 	for c := range closed {
-		if !seen[c] && c != "secret" { // «secret» lo produce un servidor con secreto distinto: lo cubre la prueba del núcleo
+		if !seen[c] && c != "secret" { // «secret» lo produce un secreto distinto: lo cubre TestWrongSecretIsDiagnosed
 			t.Errorf("ningún escenario produce %q", c)
 		}
 	}

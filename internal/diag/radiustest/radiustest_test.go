@@ -246,3 +246,12 @@ func TestForgedResponseIsSkipped(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 }
+
+// Un Message-Authenticator inválido en la respuesta da ma_invalid (error), sin blast_radius.
+func TestInvalidMessageAuthenticatorFinding(t *testing.T) {
+	r := Report{Exchanges: []Exchange{{Kind: "access-request", Code: "Access-Accept", MessageAuthenticator: "inválido"}}}
+	r.findings()
+	if len(r.Findings) != 1 || r.Findings[0].Code != "ma_invalid" || r.Findings[0].Severity != "error" || hasFinding(r, "blast_radius") {
+		t.Fatalf("%+v", r.Findings)
+	}
+}
