@@ -168,6 +168,21 @@ message DnsFinding {
 
 message InspectTlsResponse {
   ToolReport report = 1;
+  // Fase 30c: hallazgos estructurados y el motivo cerrado del error de verificación de la cadena
+  // (unknown_authority, hostname, expired, not_yet_valid, other; vacío si verificó). VerifyError del informe
+  // sigue siendo el texto de la biblioteca x509, sin traducir.
+  repeated TlsFinding findings = 2;
+  string verify_code = 3;
+}
+
+// Hallazgo de TLS: code estable (vencido, autofirmado…), severity cerrada (warning, error, info), key y args del
+// detalle del catálogo y message en el idioma pedido.
+message TlsFinding {
+  string code = 1;
+  string severity = 2;
+  string key = 3;
+  map<string, string> args = 4;
+  string message = 5;
 }
 
 message AnalyzePcapRequest {

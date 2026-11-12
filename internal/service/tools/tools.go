@@ -162,7 +162,12 @@ func (s *toolsSvc) InspectTls(ctx context.Context, r *v1.InspectTlsRequest) (*v1
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, err.Error())
 	}
-	return &v1.InspectTlsResponse{Report: service.Report(rep, "")}, nil
+	loc := i18n.Locale(ctx)
+	resp := &v1.InspectTlsResponse{Report: service.Report(rep.In(loc), ""), VerifyCode: rep.VerifyCode}
+	for _, f := range rep.Findings {
+		resp.Findings = append(resp.Findings, &v1.TlsFinding{Code: f.Code, Severity: tlsinspect.SeverityCode(f.Severity), Key: f.Text.Key, Args: f.Text.Args, Message: f.Text.In(loc)})
+	}
+	return resp, nil
 }
 
 // Syslog escucha hasta que el cliente cancele o se cumpla la duración.
