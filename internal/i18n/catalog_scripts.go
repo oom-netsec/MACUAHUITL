@@ -1,0 +1,55 @@
+package i18n
+
+// Biblioteca de scripts (Fase 30c, bloque D): errores de validación (scripts.err.*, scripts.col.*) y errores gRPC del
+// servicio de scripts y colecciones (scripts.svc.*). Nombres, comandos y etiquetas que escribió el usuario son datos.
+func init() {
+	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
+	add(map[string]entry{
+		"scripts.err.name":          e("el nombre va de 1 a 64 caracteres, sin espacios en los extremos ni caracteres de control", "the name must be 1 to 64 characters, with no leading or trailing spaces and no control characters"),
+		"scripts.err.lib_id":        e("id {id:q} inválido para un script de la biblioteca", "id {id:q} is not valid for a library script", "id"),
+		"scripts.err.user_id":       e("id {id:q} inválido: son 32 caracteres hexadecimales", "id {id:q} is not valid: it is 32 hexadecimal characters", "id"),
+		"scripts.err.origin":        e("origen {origin:q} desconocido", "unknown origin {origin:q}", "origin"),
+		"scripts.err.tech":          e("tecnología {tech:q} fuera de la lista ({list})", "technology {tech:q} is not in the list ({list})", "tech", "list"),
+		"scripts.err.platform":      e("plataforma {platform:q} fuera de la lista ({list})", "platform {platform:q} is not in the list ({list})", "platform", "list"),
+		"scripts.err.description":   e("la descripción pasa de {max} caracteres o trae caracteres de control", "the description exceeds {max} characters or has control characters", "max"),
+		"scripts.err.commands":      e("el script lleva de 1 a {max} comandos", "the script must have 1 to {max} commands", "max"),
+		"scripts.err.command_empty": e("comando {n}: vacío o de más de {max} caracteres", "command {n}: empty or longer than {max} characters", "n", "max"),
+		"scripts.err.command_ascii": e("comando {n}: solo ASCII imprimible, sin tabuladores ni caracteres de control", "command {n}: printable ASCII only, no tabs or control characters", "n"),
+		"scripts.err.tags_max":      e("máximo {max} etiquetas", "at most {max} tags", "max"),
+		"scripts.err.tag_bad":       e("etiqueta {tag:q} inválida: minúsculas, dígitos y guion, de 1 a 24", "tag {tag:q} is not valid: lowercase letters, digits and hyphen, 1 to 24", "tag"),
+		"scripts.err.tag_dup":       e("etiqueta {tag:q} repetida", "tag {tag:q} is repeated", "tag"),
+		"scripts.col.id":            e("id {id:q} inválido para una colección: son 32 caracteres hexadecimales", "id {id:q} is not valid for a collection: it is 32 hexadecimal characters", "id"),
+		"scripts.col.no_rename":     e("la colección {id} no se renombra", "the collection {id} cannot be renamed", "id"),
+		"scripts.col.scripts_max":   e("una colección lleva hasta {max} scripts", "a collection holds up to {max} scripts", "max"),
+		"scripts.col.script_id":     e("id de script {id:q} inválido", "script id {id:q} is not valid", "id"),
+		"scripts.col.script_dup":    e("el script {id} está repetido en la colección", "the script {id} is repeated in the collection", "id"),
+
+		"scripts.svc.not_found":        e("no hay un script {id:q}", "there is no script {id:q}", "id"),
+		"scripts.svc.col_not_found":    e("no hay una colección {id:q}", "there is no collection {id:q}", "id"),
+		"scripts.svc.no_script":        e("falta el script", "the script is missing"),
+		"scripts.svc.lib_no_edit":      e("los scripts de la biblioteca no se editan; duplícalo para tener una copia propia", "library scripts cannot be edited; duplicate it to get a copy of your own"),
+		"scripts.svc.lib_no_delete":    e("los scripts de la biblioteca no se borran", "library scripts cannot be deleted"),
+		"scripts.svc.name_taken":       e("ya hay un script llamado {name:q} (los nombres de la biblioteca también cuentan)", "there is already a script named {name:q} (library names count too)", "name"),
+		"scripts.svc.fav_max":          e("favoritos ya lleva {max} scripts, el máximo; quita alguno antes", "favorites already holds {max} scripts, the maximum; remove one first", "max"),
+		"scripts.svc.export_range":     e("se exportan de 1 a {max} scripts", "export 1 to {max} scripts", "max"),
+		"scripts.svc.export_dup":       e("dos scripts seleccionados se llaman {name:q}: el archivo no se podría importar", "two selected scripts are named {name:q}: the file could not be imported", "name"),
+		"scripts.svc.export_big":       e("el archivo pasaría de 5 MB y el import lo rechazaría; exporta menos scripts", "the file would exceed 5 MB and the import would reject it; export fewer scripts"),
+		"scripts.svc.token_unknown":    e("token de importación desconocido; abre el archivo de nuevo", "unknown import token; open the file again"),
+		"scripts.svc.token_kind":       e("el token es de una vista previa de {kind}; usa el otro paso de importación", "the token is from a {kind} preview; use the other import step", "kind"),
+		"scripts.svc.preview_expired":  e("la vista previa venció; vuelve a abrir el archivo", "the preview expired; open the file again"),
+		"scripts.svc.decision_dup":     e("decisión repetida para {id}", "repeated decision for {id}", "id"),
+		"scripts.svc.col_missing":      e("falta la colección", "the collection is missing"),
+		"scripts.svc.col_max":          e("ya hay {max} colecciones, el tope", "there are already {max} collections, the limit", "max"),
+		"scripts.svc.col_name_taken":   e("ya hay una colección llamada {name:q}", "there is already a collection named {name:q}", "name"),
+		"scripts.svc.col_no_delete":    e("la colección {id} no se borra", "the collection {id} cannot be deleted", "id"),
+		"scripts.svc.col_order":        e("el orden debe traer cada colección existente (también favoritos) una sola vez", "the order must list each existing collection (favorites too) exactly once"),
+		"scripts.svc.script_dup":       e("el script {id} está repetido", "the script {id} is repeated", "id"),
+		"scripts.svc.pinned_max":       e("ya hay {max} scripts fijados, el máximo; desfija uno antes", "there are already {max} pinned scripts, the maximum; unpin one first", "max"),
+		"scripts.svc.pinned_order":     e("el orden debe traer cada script fijado una sola vez", "the order must list each pinned script exactly once"),
+		"scripts.svc.col_export_range": e("se exportan de 1 a {max} colecciones", "export 1 to {max} collections", "max"),
+		"scripts.svc.col_export_big":   e("el archivo pasaría de 5 MB y el import lo rechazaría; exporta menos colecciones", "the file would exceed 5 MB and the import would reject it; export fewer collections"),
+		"scripts.svc.decision_dup2":    e("decisión repetida para {id} ({what})", "repeated decision for {id} ({what})", "id", "what"),
+		"scripts.svc.col_total":        e("quedarían {total} colecciones; el tope es {max}", "that would leave {total} collections; the limit is {max}", "total", "max"),
+		"scripts.svc.kind_unknown":     e("tipo {kind:q} desconocido: {a} o {b}", "unknown type {kind:q}: {a} or {b}", "kind", "a", "b"),
+	})
+}

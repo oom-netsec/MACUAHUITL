@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Colecciones (fase 29c): listas ordenadas de IDs de script, de un solo nivel. Guardan referencias, nunca copias,
@@ -51,27 +53,27 @@ func ValidName(n string) error {
 // «favoritos» conserva su nombre.
 func (c Coleccion) Validate() error {
 	if c.ID != FavoritosID && !userID.MatchString(c.ID) {
-		return fmt.Errorf("id %q inválido para una colección: son 32 caracteres hexadecimales", c.ID)
+		return i18n.New("scripts.col.id", i18n.A("id", c.ID))
 	}
 	if err := ValidName(c.Name); err != nil {
 		return err
 	}
 	if c.ID == FavoritosID && c.Name != FavoritosNombre {
-		return fmt.Errorf("la colección %s no se renombra", FavoritosID)
+		return i18n.New("scripts.col.no_rename", i18n.A("id", FavoritosID))
 	}
 	if utf8.RuneCountInString(c.Description) > MaxDescription || hasControl(c.Description, true) {
-		return fmt.Errorf("la descripción pasa de %d caracteres o trae caracteres de control", MaxDescription)
+		return i18n.New("scripts.err.description", i18n.A("max", MaxDescription))
 	}
 	if len(c.ScriptIDs) > MaxScriptsColeccion {
-		return fmt.Errorf("una colección lleva hasta %d scripts", MaxScriptsColeccion)
+		return i18n.New("scripts.col.scripts_max", i18n.A("max", MaxScriptsColeccion))
 	}
 	seen := map[string]bool{}
 	for _, id := range c.ScriptIDs {
 		if !userID.MatchString(id) && !libID.MatchString(id) {
-			return fmt.Errorf("id de script %q inválido", id)
+			return i18n.New("scripts.col.script_id", i18n.A("id", id))
 		}
 		if seen[id] {
-			return fmt.Errorf("el script %s está repetido en la colección", id)
+			return i18n.New("scripts.col.script_dup", i18n.A("id", id))
 		}
 		seen[id] = true
 	}

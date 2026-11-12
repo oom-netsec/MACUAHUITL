@@ -484,7 +484,7 @@ func TestImportMismoTokenEnParaleloSeAplicaUnaVez(t *testing.T) {
 
 func TestNombresDeLaBibliotecaEstanOcupados(t *testing.T) {
 	s, _ := nuevoSvc(t)
-	lib, _ := s.library()
+	lib, _ := s.library(bg)
 	nombre := lib[0].Name
 	_, err := s.SaveScript(bg, &v1.SaveScriptRequest{Script: &v1.Script{Name: strings.ToUpper(nombre), Tech: "l2", Platform: "ios-xe", Commands: []string{"show clock"}}})
 	codigo(t, err, codes.AlreadyExists)

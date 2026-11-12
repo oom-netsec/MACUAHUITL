@@ -150,3 +150,41 @@ func TestGuionesRegresionEs(t *testing.T) {
 		}
 	}
 }
+
+// Con en, los scripts de fábrica salen con nombre y descripción en inglés y los errores de validación sin español;
+// los scripts del usuario no se traducen.
+func TestGuionesEnIngles(t *testing.T) {
+	es := regexp.MustCompile(`[áéíóúñ¿]|\b(el|la|los|las|de|del|con|sin|para|solo|hay|ya|falta|una|un)\b`)
+	ids := regexp.MustCompile(`lib-[a-z0-9-]+|ios-xe/[a-z0-9-]+`)
+	en := i18n.WithLocale(context.Background(), "en")
+	base := guionesCasos(t, context.Background())
+	for k, v := range guionesCasos(t, en) {
+		if k == "biblioteca" {
+			var got, was []string
+			json.Unmarshal([]byte(v), &got)
+			json.Unmarshal([]byte(base[k]), &was)
+			for i := range got {
+				if got[i] == was[i] || es.MatchString(ids.ReplaceAllString(got[i], "")) {
+					t.Errorf("biblioteca sin traducir: %q (es %q)", got[i], was[i])
+				}
+			}
+			continue
+		}
+		if k == "col_exportar_vacio" || k == "exportar_vacio" || k == "importar_ruta" || k == "guardar_nombre_de_lib" { // texto de service o dato de la biblioteca
+			continue
+		}
+		if m := es.FindString(ids.ReplaceAllString(v, "")); m != "" {
+			t.Errorf("%s: queda español (%q): %s", k, m, v)
+		}
+	}
+	s, _ := nuevoSvc(t)
+	mio := guardar(t, s, "Mi guion útil")
+	r, err := s.GetScript(en, &v1.GetScriptRequest{Id: mio.Id})
+	if err != nil || r.Script.Name != "Mi guion útil" {
+		t.Fatalf("un script del usuario no se traduce: %v %v", r, err)
+	}
+	g, err := s.GetScript(en, &v1.GetScriptRequest{Id: "lib-cfg-ntp"})
+	if err != nil || g.Script.Name != "Config · NTP" || !strings.HasPrefix(g.Script.Description, "Synchronizes") {
+		t.Fatalf("%v %v", g, err)
+	}
+}
