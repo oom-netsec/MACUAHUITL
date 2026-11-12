@@ -7,7 +7,17 @@ Object.defineProperty(navigator, "language", { value: "es-MX", configurable: tru
 import { configure } from "@testing-library/react";
 configure({ asyncUtilTimeout: 3000 });
 
-// El runtime de Wails, al importarse, arranca un temporizador de 50 ms que toca `window` (drag.js). Si un archivo de
-// pruebas termina antes, jsdom ya se cerró y vitest reporta un error suelto: se espera ese tic antes de cerrar.
-import { afterAll } from "vitest";
-afterAll(() => new Promise((r) => setTimeout(r, 60)));
+// El runtime real de Wails, al importarse, arranca un temporizador que toca `window` (drag.js); si un archivo de pruebas
+// termina antes, jsdom ya se cerró y vitest reporta un error suelto (con la máquina cargada no basta con esperar).
+// Las pruebas usan los dobles de lib/fake.ts: aquí el runtime es un doble y nada lo carga. Un archivo puede poner el suyo.
+import { vi } from "vitest";
+vi.mock("@wailsio/runtime", () => {
+  const sinPuente = async () => { throw new Error("sin puente de Wails en las pruebas"); };
+  return {
+    Call: { ByName: vi.fn(sinPuente) },
+    Clipboard: { SetText: vi.fn(sinPuente), Text: vi.fn(sinPuente) },
+    Dialogs: { Error: vi.fn(sinPuente), OpenFile: vi.fn(sinPuente), Question: vi.fn(sinPuente), SaveFile: vi.fn(sinPuente) },
+    Events: { On: vi.fn(() => () => {}) },
+    Window: { Close: vi.fn(sinPuente), Minimise: vi.fn(sinPuente), ToggleMaximise: vi.fn(sinPuente) },
+  };
+});
