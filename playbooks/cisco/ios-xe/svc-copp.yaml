@@ -5,6 +5,7 @@
 id: svc-copp
 platform: ios-xe
 name: Servicios · CoPP
+name_en: Services · CoPP
 commands:
   - cmd: show clock
   - cmd: show policy-map control-plane

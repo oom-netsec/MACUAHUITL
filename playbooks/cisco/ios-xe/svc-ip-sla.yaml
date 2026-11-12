@@ -5,6 +5,7 @@
 id: svc-ip-sla
 platform: ios-xe
 name: Servicios · IP SLA
+name_en: Services · IP SLA
 commands:
   - cmd: show clock
   - cmd: show ip sla summary

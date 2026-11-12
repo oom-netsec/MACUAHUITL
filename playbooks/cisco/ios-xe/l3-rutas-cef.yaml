@@ -5,6 +5,7 @@
 id: l3-rutas-cef
 platform: ios-xe
 name: L3 · Rutas y CEF
+name_en: L3 · Routes and CEF
 commands:
   - cmd: show clock
   - cmd: show ip interface brief

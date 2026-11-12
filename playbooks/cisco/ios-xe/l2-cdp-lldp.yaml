@@ -5,6 +5,7 @@
 id: l2-cdp-lldp
 platform: ios-xe
 name: L2 · CDP y LLDP
+name_en: L2 · CDP and LLDP
 commands:
   - cmd: show clock
   - cmd: show cdp

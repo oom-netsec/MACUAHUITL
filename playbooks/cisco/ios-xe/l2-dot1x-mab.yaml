@@ -5,6 +5,7 @@
 id: l2-dot1x-mab
 platform: ios-xe
 name: L2 · 802.1X y MAB
+name_en: L2 · 802.1X and MAB
 commands:
   - cmd: show clock
   - cmd: show authentication sessions

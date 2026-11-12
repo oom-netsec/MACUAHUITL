@@ -1,6 +1,7 @@
 id: tac-baseline
 platform: ios-xe
 name: TAC · Línea base
+name_en: TAC · Baseline
 commands:
   - cmd: show version
   - cmd: show inventory

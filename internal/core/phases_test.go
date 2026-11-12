@@ -11,6 +11,7 @@ import (
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/engine"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/store"
 )
@@ -192,7 +193,7 @@ func TestPhasesCapped(t *testing.T) {
 	job, _ := h.created(t, cred, nil)
 	j, _ := h.core.getJob(job)
 	for i := 0; i < maxPhases+50; i++ {
-		h.core.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_SKIPPED, i+1, "")
+		h.core.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_SKIPPED, i+1, "", nil)
 	}
 	s := h.summary(t, job)
 	if len(s.Phases) != maxPhases || s.Phases[len(s.Phases)-1].Round != uint32(maxPhases+50) {
@@ -250,5 +251,59 @@ func TestGetRunPuertoEfectivo(t *testing.T) {
 	}
 	if p := run.Devices[1].Target.Port; p != 2222 {
 		t.Fatalf("puerto 2222 salió como %d", p)
+	}
+}
+
+// En: el detalle de cada fase sale traducido y toda fase con detalle lleva su reason y sus args; en es, el
+// detalle es el de siempre (lo fija TestJobSummaryAndPhases).
+func TestPhasesIdiomaYCodigos(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	job, _ := h.arm(t, cred)
+	h.waitJob(t, job, "closed")
+	list := func(lang string) *v1.JobSummary {
+		r, err := h.patrol.ListJobs(con(t, lang), &v1.ListJobsRequest{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, j := range r.Jobs {
+			if j.JobId == job {
+				return j
+			}
+		}
+		t.Fatal("sin trabajo")
+		return nil
+	}
+	en := strings.Join(phaseLines(list("en").Phases), "|")
+	want := "CREATED|LOGIN_TEST_DONE 0 successful, 1 failed|ARM_CHECK_DONE 1 successful, 0 failed|ARMED 1 device|ROUND_STARTED r1|ROUND_FINISHED r1 1 successful, 0 failed|ROUND_STARTED r2|ROUND_FINISHED r2 1 successful, 0 failed|PACKAGED|COMPLETED 2 rounds"
+	if en != want {
+		t.Fatalf("en:\n%s\nquiero:\n%s", en, want)
+	}
+	if es, sin := strings.Join(phaseLines(list("es").Phases), "|"), strings.Join(phaseLines(list("").Phases), "|"); es != sin || !strings.Contains(es, "1 correcto, 0 con fallas") {
+		t.Fatalf("es y sin metadato deben ser iguales y en español:\n%s\n%s", es, sin)
+	}
+	byKind := map[v1.JobPhaseKind]*v1.JobPhase{}
+	for _, p := range list("en").Phases {
+		byKind[p.Kind] = p
+	}
+	if p := byKind[v1.JobPhaseKind_JOB_PHASE_KIND_ARMED]; p.Reason != "phase.devices" || p.Args["n"] != "1" {
+		t.Fatalf("ARMED: %+v", p)
+	}
+	if p := byKind[v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_FINISHED]; p.Reason != "phase.ok_failed" || p.Args["ok"] != "1" || p.Args["failed"] != "0" {
+		t.Fatalf("ROUND_FINISHED: %+v", p)
+	}
+	if p := byKind[v1.JobPhaseKind_JOB_PHASE_KIND_COMPLETED]; p.Reason != "phase.rounds" || p.Args["n"] != "2" {
+		t.Fatalf("COMPLETED: %+v", p)
+	}
+	if p := byKind[v1.JobPhaseKind_JOB_PHASE_KIND_CREATED]; p.Reason != "" || len(p.Args) != 0 {
+		t.Fatalf("CREATED no lleva detalle: %+v", p)
+	}
+	// En vivo: la conversión del evento respeta el idioma.
+	ev := eventToProto("en", engine.Event{Kind: engine.Phase, State: "JOB_PHASE_KIND_COMPLETED", Detail: "3 rondas", Reason: "phase.rounds", Args: map[string]string{"n": "3"}})
+	if p := ev.GetPhaseAdded(); p.Detail != "3 rounds" || p.Reason != "phase.rounds" {
+		t.Fatalf("evento en: %+v", p)
+	}
+	if p := eventToProto("es", engine.Event{Kind: engine.Phase, State: "JOB_PHASE_KIND_COMPLETED", Detail: "3 rondas", Reason: "phase.rounds", Args: map[string]string{"n": "3"}}).GetPhaseAdded(); p.Detail != "3 rondas" {
+		t.Fatalf("evento es: %+v", p)
 	}
 }

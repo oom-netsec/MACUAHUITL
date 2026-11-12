@@ -5,6 +5,7 @@
 id: plat-reloads-crashinfo
 platform: ios-xe
 name: Plataforma · Reinicios y crashinfo
+name_en: Platform · Reloads and crashinfo
 commands:
   - cmd: show clock
   - cmd: show version

@@ -5,6 +5,7 @@
 id: tac-ssh-snmp
 platform: ios-xe
 name: TAC · No responde a SSH/SNMP
+name_en: TAC · Not responding to SSH/SNMP
 commands:
   - cmd: show clock
   - cmd: show users

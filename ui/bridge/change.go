@@ -24,7 +24,7 @@ func toReport(r *v1.ToolReport) ReportDTO { return ReportDTO{Json: r.GetJson(), 
 func (b *Bridge) ChangeCreate(specJSON string) (string, error) {
 	var spec v1.JobSpec
 	if err := protojson.Unmarshal([]byte(specJSON), &spec); err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewChangeServiceClient(c).CreateChange(ctx, &v1.CreateChangeRequest{Spec: &spec})
@@ -43,7 +43,7 @@ var changePhases = map[string]v1.ChangePhase{"pre": v1.ChangePhase_CHANGE_PHASE_
 func (b *Bridge) ChangeCapture(changeID, phase string, accept, exclude []string) (CaptureDTO, error) {
 	ph, ok := changePhases[phase]
 	if !ok {
-		return CaptureDTO{}, fmt.Errorf("fase %q desconocida", phase)
+		return CaptureDTO{}, wrapErr(fmt.Errorf("fase %q desconocida", phase))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (CaptureDTO, error) {
 		r, err := v1.NewChangeServiceClient(c).CaptureChange(ctx, &v1.CaptureChangeRequest{ChangeId: changeID, Phase: ph, AcceptedHostKeyFingerprints: accept, ExcludedDeviceIds: exclude})

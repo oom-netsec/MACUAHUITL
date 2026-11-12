@@ -13,7 +13,7 @@ import (
 // DriftRun devuelve el JSON del reporte; la UI pinta los cambios por equipo.
 func (b *Bridge) DriftRun(job string, round int, device string) (string, error) {
 	if round < 0 {
-		return "", fmt.Errorf("ronda %d inválida", round)
+		return "", wrapErr(fmt.Errorf("ronda %d inválida", round))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewDriftServiceClient(c).Drift(ctx, &v1.DriftRequest{Job: job, Round: uint32(round), Device: device})

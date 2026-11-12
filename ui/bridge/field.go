@@ -34,11 +34,12 @@ type consoleSess struct {
 }
 
 func (b *Bridge) next() (string, context.Context, context.CancelFunc) {
+	base := b.callCtx() // antes del candado: puede leer la preferencia de idioma
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.runSeq++
 	id := fmt.Sprintf("run-%d", b.runSeq)
-	ctx, cancel := context.WithCancel(b.ctx)
+	ctx, cancel := context.WithCancel(base)
 	b.runs[id] = cancel
 	return id, ctx, cancel
 }
@@ -56,7 +57,7 @@ func (b *Bridge) finish(id string, cancel context.CancelFunc) {
 func (b *Bridge) ConsoleOpen(d ConsoleDTO) (string, error) {
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewFieldServiceClient(c).Console(ctx)
@@ -66,7 +67,7 @@ func (b *Bridge) ConsoleOpen(d ConsoleDTO) (string, error) {
 	}
 	if err != nil {
 		b.finish(id, cancel)
-		return "", err
+		return "", wrapErr(err)
 	}
 	b.mu.Lock()
 	if b.consoles == nil {
@@ -82,6 +83,7 @@ func (b *Bridge) ConsoleOpen(d ConsoleDTO) (string, error) {
 				ev := map[string]any{"runId": id}
 				if ctx.Err() == nil && err != io.EOF {
 					ev["error"] = err.Error()
+					ev["errorInfo"] = errorInfo(err)
 				}
 				b.emit("console:done", ev)
 				return
@@ -101,11 +103,11 @@ func (b *Bridge) console(id string, f func(st v1.FieldService_ConsoleClient) err
 	s, ok := b.consoles[id]
 	b.mu.Unlock()
 	if !ok {
-		return fmt.Errorf("consola %q no existe o ya terminó", id)
+		return wrapErr(fmt.Errorf("consola %q no existe o ya terminó", id))
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return f(s.st)
+	return wrapErr(f(s.st))
 }
 
 func (b *Bridge) ConsoleSend(id, data string) error {
@@ -138,14 +140,14 @@ type ServeDTO struct {
 func (b *Bridge) ServeStart(d ServeDTO) (string, error) {
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewFieldServiceClient(c).ServeFiles(ctx, &v1.ServeFilesRequest{Protocol: d.Protocol, Addr: d.Addr, Files: d.Files,
 		AllowAny: d.AllowAny, DurationSeconds: int32(d.Seconds)})
 	if err != nil {
 		b.finish(id, cancel)
-		return "", err
+		return "", wrapErr(err)
 	}
 	go func() {
 		defer b.finish(id, cancel)
@@ -155,6 +157,7 @@ func (b *Bridge) ServeStart(d ServeDTO) (string, error) {
 				ev := map[string]any{"runId": id}
 				if ctx.Err() == nil && err != io.EOF {
 					ev["error"] = err.Error()
+					ev["errorInfo"] = errorInfo(err)
 				}
 				b.emit("serve:done", ev)
 				return

@@ -5,6 +5,7 @@
 id: l3-vrf
 platform: ios-xe
 name: L3 · VRF
+name_en: L3 · VRF
 commands:
   - cmd: show clock
   - cmd: show vrf

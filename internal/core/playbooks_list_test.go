@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
@@ -111,5 +112,32 @@ func TestListPlaybooksIOSListaLosDeIOSXE(t *testing.T) {
 	}
 	if !tiene(xe, "ios-xe/flota", "dir bootflash:") || tiene(ios, "ios-xe/flota", "dir bootflash:") {
 		t.Fatal("dir bootflash: debe verse en ios-xe y no en ios")
+	}
+}
+
+// El nombre sale en el idioma del contexto: es (o sin idioma) es el de siempre; en usa name_en y cae al español si no lo hay.
+func TestListPlaybooksNombreSegunIdioma(t *testing.T) {
+	s := &patrolSvc{c: &Core{pbs: []playbook.Playbook{
+		{ID: "ios-xe/a", Platform: "ios-xe", Name: "Plataforma · CPU alta", NameEn: "Platform · High CPU", Commands: []playbook.Command{{Text: "show a"}}},
+		{ID: "ios-xe/b", Platform: "ios-xe", Name: "Mío · Propio", Commands: []playbook.Command{{Text: "show b"}}},
+	}}}
+	name := func(loc string, i int) string {
+		ctx := context.Background()
+		if loc != "" {
+			ctx = i18n.WithLocale(ctx, loc)
+		}
+		r, err := s.ListPlaybooks(ctx, &v1.ListPlaybooksRequest{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r.Playbooks[i].Name
+	}
+	for loc, want := range map[string]string{"": "Plataforma · CPU alta", "es": "Plataforma · CPU alta", "en": "Platform · High CPU"} {
+		if got := name(loc, 0); got != want {
+			t.Errorf("%q: %q, quiero %q", loc, got, want)
+		}
+	}
+	if got := name("en", 1); got != "Mío · Propio" {
+		t.Errorf("sin name_en cae al español: %q", got)
 	}
 }

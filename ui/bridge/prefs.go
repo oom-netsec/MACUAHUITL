@@ -22,6 +22,9 @@ func (b *Bridge) SetPreference(key, value string) error {
 		_, err := v1.NewPrefsServiceClient(c).SetPreference(ctx, &v1.SetPreferenceRequest{Key: key, Value: value})
 		return struct{}{}, err
 	})
+	if err == nil && key == langPref {
+		b.setLanguage(value)
+	}
 	return err
 }
 

@@ -439,7 +439,7 @@ func previewDe(t *testing.T, s *svc, scs ...dom.Script) *v1.PreviewImportRespons
 		t.Fatal(err)
 	}
 	p := filepath.Join(t.TempDir(), "x.json")
-	if err := service.WriteExport(p, b, false); err != nil {
+	if err := service.WriteExport(context.Background(), p, b, false); err != nil {
 		t.Fatal(err)
 	}
 	pr, err := s.PreviewImport(bg, &v1.PreviewImportRequest{Path: p})

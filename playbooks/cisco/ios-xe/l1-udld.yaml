@@ -5,6 +5,7 @@
 id: l1-udld
 platform: ios-xe
 name: L1 · UDLD
+name_en: L1 · UDLD
 commands:
   - cmd: show clock
   - cmd: show udld

@@ -339,7 +339,7 @@ func (s *svc) DuplicateScript(_ context.Context, r *v1.DuplicateScriptRequest) (
 	return &v1.DuplicateScriptResponse{Script: toPB(c, meta{})}, nil
 }
 
-func (s *svc) ExportScripts(_ context.Context, r *v1.ExportScriptsRequest) (*v1.ExportScriptsResponse, error) {
+func (s *svc) ExportScripts(ctx context.Context, r *v1.ExportScriptsRequest) (*v1.ExportScriptsResponse, error) {
 	s.d.MarkActive()
 	path, err := service.AbsPath(r.Path)
 	if err != nil {
@@ -376,7 +376,7 @@ func (s *svc) ExportScripts(_ context.Context, r *v1.ExportScriptsRequest) (*v1.
 	if len(b) > dom.MaxImportBytes {
 		return nil, status.Error(codes.InvalidArgument, "el archivo pasaría de 5 MB y el import lo rechazaría; exporta menos scripts")
 	}
-	if err := service.WriteExport(path, b, r.Overwrite); err != nil {
+	if err := service.WriteExport(ctx, path, b, r.Overwrite); err != nil {
 		return nil, err
 	}
 	s.d.Audit("scripts.exportar", path, fmt.Sprintf("%d scripts", len(sel)))

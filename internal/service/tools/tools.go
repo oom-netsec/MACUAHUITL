@@ -159,10 +159,10 @@ func (s *toolsSvc) Syslog(r *v1.SyslogRequest, st v1.ToolsService_SyslogServer) 
 		addr = "127.0.0.1:5514"
 	}
 	if err := syslogd.ValidateAddr(addr, r.AllowAny); err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	}
 	lim, sink, err := service.IngestOpts{RatePerSource: r.RatePerSource, BurstPerSource: r.BurstPerSource, RateGlobal: r.RateGlobal, BurstGlobal: r.BurstGlobal, QueueSize: r.QueueSize,
-		RotateMB: r.RotateMb, RotateMinutes: r.RotateMinutes, MaxFiles: r.MaxFiles, NameTemplate: r.NameTemplate, Format: r.Format, Prefs: s.d.Settings().Ingest()}.Build(filepath.Join(s.d.Outputs(), "syslog"), defTemplate)
+		RotateMB: r.RotateMb, RotateMinutes: r.RotateMinutes, MaxFiles: r.MaxFiles, NameTemplate: r.NameTemplate, Format: r.Format, Prefs: s.d.Settings().Ingest()}.Build(st.Context(), filepath.Join(s.d.Outputs(), "syslog"), defTemplate)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (s *toolsSvc) Syslog(r *v1.SyslogRequest, st v1.ToolsService_SyslogServer) 
 	lost := pump.Close(closeGrace)
 	s.d.Audit("tools.syslog.done", addr, fmt.Sprintf("mensajes=%d descartes=%d por_origen=%d global=%d cola_llena=%d perdidos_en_la_interfaz=%d", n, last.Total, last.PorOrigen, last.Global, last.ColaLlena, lost))
 	if err != nil {
-		return status.Error(codes.Unavailable, err.Error())
+		return service.ErrFrom(st.Context(), codes.Unavailable, err)
 	}
 	return nil
 }

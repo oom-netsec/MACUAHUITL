@@ -5,6 +5,7 @@
 id: l2-vlan-trunk-vtp
 platform: ios-xe
 name: L2 · VLAN, trunks y VTP
+name_en: L2 · VLANs, trunks and VTP
 commands:
   - cmd: show clock
   - cmd: show vlan summary

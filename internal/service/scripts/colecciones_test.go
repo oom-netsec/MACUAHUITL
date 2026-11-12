@@ -1,6 +1,7 @@
 package scripts
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -491,7 +492,7 @@ func TestImportColeccionesReflejaLosIDsReasignadosOmitidosYLibInexistente(t *tes
 		t.Fatal(err)
 	}
 	path := filepath.Join(t.TempDir(), "k.json")
-	if err := service.WriteExport(path, raw, false); err != nil {
+	if err := service.WriteExport(context.Background(), path, raw, false); err != nil {
 		t.Fatal(err)
 	}
 	p := previewCol(t, b, path)
@@ -629,7 +630,7 @@ func archivoCol(t *testing.T, s *svc, cols []dom.Coleccion, scs []dom.Script) st
 		t.Fatal(err)
 	}
 	path := filepath.Join(t.TempDir(), "x.json")
-	if err := service.WriteExport(path, raw, false); err != nil {
+	if err := service.WriteExport(context.Background(), path, raw, false); err != nil {
 		t.Fatal(err)
 	}
 	return path
@@ -869,7 +870,7 @@ func sinSuma(b []byte) []byte {
 func escribe(t *testing.T, b []byte) string {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "x.json")
-	if err := service.WriteExport(p, b, false); err != nil {
+	if err := service.WriteExport(context.Background(), p, b, false); err != nil {
 		t.Fatal(err)
 	}
 	return p

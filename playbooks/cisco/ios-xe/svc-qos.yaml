@@ -5,6 +5,7 @@
 id: svc-qos
 platform: ios-xe
 name: Servicios · QoS
+name_en: Services · QoS
 commands:
   - cmd: show clock
   - cmd: show policy-map

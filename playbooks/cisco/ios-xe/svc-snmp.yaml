@@ -5,6 +5,7 @@
 id: svc-snmp
 platform: ios-xe
 name: Servicios · SNMP
+name_en: Services · SNMP
 commands:
   - cmd: show clock
   - cmd: show snmp

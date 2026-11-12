@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"io"
 	"io/fs"
@@ -10,6 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
@@ -24,11 +26,11 @@ func AbsPath(p string) (string, error) {
 // WriteExport escribe el archivo de export con 0600. Sin overwrite la ruta debe ser nueva (O_EXCL no sigue
 // enlaces ni pisa nada). Con overwrite solo reemplaza un archivo regular: se escribe a un temporal en la misma
 // carpeta y se renombra, así un enlace simbólico en la ruta no desvía la escritura y un fallo no destruye el anterior.
-func WriteExport(path string, data []byte, overwrite bool) error {
+func WriteExport(ctx context.Context, path string, data []byte, overwrite bool) error {
 	if !overwrite {
 		f, err := sys.OpenNew(path)
 		if errors.Is(err, fs.ErrExist) {
-			return status.Error(codes.AlreadyExists, "el archivo ya existe")
+			return Err(ctx, codes.AlreadyExists, "file.exists", i18n.A("path", path))
 		}
 		if err != nil {
 			return status.Error(codes.FailedPrecondition, err.Error())
