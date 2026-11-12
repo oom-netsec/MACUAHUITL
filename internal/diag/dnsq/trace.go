@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Root es un servidor raíz (o el punto de partida de una traza en pruebas).
@@ -236,6 +238,43 @@ type Finding struct {
 	Severity string // error, aviso, info
 	Code     string
 	Detail   string
+	// Text es Detail como texto de catálogo (para darlo en otro idioma); vacío si Detail es un dato (un registro
+	// SPF, un nombre…). No viaja en el JSON.
+	Text i18n.Text `json:"-"`
+}
+
+// finding arma un hallazgo con el detalle de catálogo; Detail sale en español, el de siempre.
+func finding(sev, code, key string, kv ...any) Finding {
+	t := i18n.Tx(key, kv...)
+	return Finding{sev, code, t.In(i18n.Es), t}
+}
+
+// dataFinding es un hallazgo cuyo detalle es un dato y no se traduce.
+func dataFinding(sev, code, detail string) Finding { return Finding{sev, code, detail, i18n.Text{}} }
+
+// Severidades cerradas en inglés para quien dibuja los hallazgos (el JSON conserva aviso, error e info).
+func SeverityCode(s string) string {
+	if s == "aviso" {
+		return "warning"
+	}
+	return s
+}
+
+func localizeFindings(fs []Finding, loc string) []Finding {
+	out := make([]Finding, len(fs))
+	for i, f := range fs {
+		if !f.Text.Empty() {
+			f.Detail = f.Text.In(loc)
+		}
+		out[i] = f
+	}
+	return out
+}
+
+// In devuelve el informe con el detalle de cada hallazgo en el idioma dado (es es el de siempre).
+func (r ZoneReport) In(loc string) ZoneReport {
+	r.Findings = localizeFindings(r.Findings, loc)
+	return r
 }
 
 type ZoneServer struct {
@@ -279,11 +318,11 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 	}
 	sort.Strings(rep.ChildNS)
 	if len(rep.ParentNS) == 0 {
-		rep.Findings = append(rep.Findings, Finding{"error", "sin-delegacion", "el padre no delega la zona"})
+		rep.Findings = append(rep.Findings, finding("error", "sin-delegacion", "dns.finding.no_delegation"))
 		return rep, nil
 	}
 	if strings.Join(rep.ParentNS, ",") != strings.Join(rep.ChildNS, ",") {
-		rep.Findings = append(rep.Findings, Finding{"aviso", "ns-padre-hijo", fmt.Sprintf("el padre anuncia %v y la zona anuncia %v", rep.ParentNS, rep.ChildNS)})
+		rep.Findings = append(rep.Findings, finding("aviso", "ns-padre-hijo", "dns.finding.ns_parent_child", "parent", rep.ParentNS, "child", rep.ChildNS))
 	}
 	all := append(append([]string{}, rep.ParentNS...), rep.ChildNS...)
 	sort.Strings(all)
@@ -299,7 +338,7 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 		ips := glue[name]
 		if len(ips) == 0 {
 			if dns.IsSubDomain(zone, name) {
-				rep.Findings = append(rep.Findings, Finding{"error", "glue-faltante", name + " está dentro de la zona y el padre no da su dirección"})
+				rep.Findings = append(rep.Findings, finding("error", "glue-faltante", "dns.finding.missing_glue", "name", name))
 			}
 			sub, err := Trace(ctx, d, name, dns.TypeA, roots, o)
 			if err == nil {
@@ -314,7 +353,7 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 		}
 		if len(ips) == 0 {
 			rep.Servers = append(rep.Servers, ZoneServer{Name: name, Error: "sin dirección"})
-			rep.Findings = append(rep.Findings, Finding{"error", "ns-sin-direccion", name})
+			rep.Findings = append(rep.Findings, dataFinding("error", "ns-sin-direccion", name))
 			continue
 		}
 		for _, ip := range ips {
@@ -325,10 +364,10 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 			switch {
 			case err != nil:
 				zs.Error = err.Error()
-				rep.Findings = append(rep.Findings, Finding{"error", "ns-lame", fmt.Sprintf("%s (%s) no responde: %v", name, ip, err)})
+				rep.Findings = append(rep.Findings, finding("error", "ns-lame", "dns.finding.ns_unreachable", "name", name, "ip", ip, "error", err))
 			case r.Rcode != dns.RcodeSuccess || !r.Authoritative:
 				zs.Error = dns.RcodeToString[r.Rcode]
-				rep.Findings = append(rep.Findings, Finding{"error", "ns-lame", fmt.Sprintf("%s (%s) no es autoritativo para la zona (%s, AA=%v)", name, ip, dns.RcodeToString[r.Rcode], r.Authoritative)})
+				rep.Findings = append(rep.Findings, finding("error", "ns-lame", "dns.finding.ns_not_auth", "name", name, "ip", ip, "rcode", dns.RcodeToString[r.Rcode], "aa", r.Authoritative))
 			default:
 				zs.AA = true
 				for _, rr := range r.Answer {
@@ -339,7 +378,7 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 				}
 				zs.AXFR = axfrOpen(ctx, d, ip, zone, o2)
 				if zs.AXFR {
-					rep.Findings = append(rep.Findings, Finding{"aviso", "axfr-abierto", fmt.Sprintf("%s (%s) entrega la zona completa por AXFR a cualquiera", name, ip)})
+					rep.Findings = append(rep.Findings, finding("aviso", "axfr-abierto", "dns.finding.axfr_open", "name", name, "ip", ip))
 				}
 			}
 			rep.Servers = append(rep.Servers, zs)
@@ -352,7 +391,7 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 				parts = append(parts, fmt.Sprintf("%s=%d", s.Name, s.Serial))
 			}
 		}
-		rep.Findings = append(rep.Findings, Finding{"aviso", "serial-distinto", "los autoritativos no están sincronizados: " + strings.Join(parts, ", ")})
+		rep.Findings = append(rep.Findings, finding("aviso", "serial-distinto", "dns.finding.serial_mismatch", "servers", strings.Join(parts, ", ")))
 	}
 	return rep, nil
 }

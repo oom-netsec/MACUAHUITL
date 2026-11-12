@@ -151,6 +151,19 @@ message AnalyzePcapResponse {
 
 message DnsResponse {
   ToolReport report = 1;
+  // Fase 30c: los hallazgos de transporte, higiene y zona en forma estructurada (los de exposición van en el
+  // informe). El detalle también viene en el JSON del informe, en el idioma pedido.
+  repeated DnsFinding findings = 2;
+}
+
+// Hallazgo de DNS: code estable (tcp-bloqueado, ns-lame…), severity cerrada (warning, error, info), key y args del
+// detalle del catálogo (vacíos si el detalle es un dato: un registro SPF, un nombre) y message en el idioma pedido.
+message DnsFinding {
+  string code = 1;
+  string severity = 2;
+  string key = 3;
+  map<string, string> args = 4;
+  string message = 5;
 }
 
 message InspectTlsResponse {

@@ -8,8 +8,11 @@ import (
 	"testing"
 	"time"
 
+	mdns "github.com/miekg/dns"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/syslogd/syslogdtest"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
@@ -149,5 +152,47 @@ func TestSyslogCambiarLaCarpetaAplicaALaSiguiente(t *testing.T) {
 	}
 	if f, _ := filepath.Glob(filepath.Join(nueva, "syslog", "*.log")); len(f) != 1 {
 		t.Fatalf("la escucha nueva debía escribir en %s: %v", nueva, f)
+	}
+}
+
+// Fase 30c-A: los hallazgos de DNS salen estructurados y su detalle en el idioma pedido, también en el JSON.
+func TestDnsHallazgosEstructuradosYEn(t *testing.T) {
+	srv := &mdns.Server{Addr: "127.0.0.1:0", Net: "udp", Handler: mdns.HandlerFunc(func(w mdns.ResponseWriter, r *mdns.Msg) {
+		m := new(mdns.Msg)
+		m.SetReply(r)
+		w.WriteMsg(m) // sin OPT: no anuncia EDNS; solo UDP: TCP/53 no responde
+	})}
+	started := make(chan struct{})
+	srv.NotifyStartedFunc = func() { close(started) }
+	go srv.ListenAndServe()
+	<-started
+	t.Cleanup(func() { srv.Shutdown() })
+	d := servicetest.New(t)
+	ask := func(loc string) *v1.DnsResponse {
+		ctx, cancel := context.WithTimeout(i18n.WithLocale(context.Background(), loc), 20*time.Second)
+		defer cancel()
+		r, err := (&toolsSvc{d: d}).Dns(ctx, &v1.DnsRequest{Mode: v1.DnsMode_DNS_MODE_TRANSPORT, Name: "t.lab", Servers: []string{srv.PacketConn.LocalAddr().String()}, TimeoutMs: 400})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	es, en := ask("es"), ask("en")
+	if len(es.Findings) != 2 || len(en.Findings) != 2 {
+		t.Fatalf("%v / %v", es.Findings, en.Findings)
+	}
+	for i, want := range []struct{ code, sev, key, es, en string }{
+		{"tcp-bloqueado", "error", "dns.finding.tcp_blocked", "TCP/53 no responde: las respuestas grandes y DNSSEC fallarán", "TCP/53 does not respond: large responses and DNSSEC will fail"},
+		{"sin-edns", "info", "dns.finding.no_edns", "el servidor no anuncia EDNS(0)", "the server does not advertise EDNS(0)"},
+	} {
+		if f := es.Findings[i]; f.Code != want.code || f.Severity != want.sev || f.Key != want.key || f.Message != want.es {
+			t.Errorf("es %d: %v", i, f)
+		}
+		if f := en.Findings[i]; f.Code != want.code || f.Key != want.key || f.Message != want.en || !strings.Contains(en.Report.Json, want.en) || strings.Contains(en.Report.Json, want.es) {
+			t.Errorf("en %d: %v", i, f)
+		}
+		if !strings.Contains(es.Report.Json, want.es) {
+			t.Errorf("el JSON en español debe traer %q", want.es)
+		}
 	}
 }

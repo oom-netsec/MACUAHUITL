@@ -4,11 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/miekg/dns"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type Probe struct {
@@ -64,16 +65,16 @@ func CheckTransport(ctx context.Context, d Dialer, s Server, name string, o Opti
 				rep.UDP512Truncated = true
 			}
 			if v.tr == "udp" && v.size == 4096 && size > 1232 && !r.Truncated {
-				rep.Findings = append(rep.Findings, Finding{"aviso", "fragmentacion", fmt.Sprintf("respuesta UDP de %d bytes: se fragmenta y muchos firewalls la descartan", size)})
+				rep.Findings = append(rep.Findings, finding("aviso", "fragmentacion", "dns.finding.fragmentation", "size", size))
 			}
 		}
 		rep.Probes = append(rep.Probes, p)
 	}
 	if !rep.TCPWorks {
-		rep.Findings = append(rep.Findings, Finding{"error", "tcp-bloqueado", "TCP/53 no responde: las respuestas grandes y DNSSEC fallarán"})
+		rep.Findings = append(rep.Findings, finding("error", "tcp-bloqueado", "dns.finding.tcp_blocked"))
 	}
 	if !rep.EDNS {
-		rep.Findings = append(rep.Findings, Finding{"info", "sin-edns", "el servidor no anuncia EDNS(0)"})
+		rep.Findings = append(rep.Findings, finding("info", "sin-edns", "dns.finding.no_edns"))
 	}
 	return rep
 }
@@ -95,7 +96,10 @@ type HygieneReport struct {
 func CheckHygiene(ctx context.Context, d Dialer, res Server, name string, h HygieneOptions, o Options) HygieneReport {
 	name = dns.Fqdn(name)
 	rep := HygieneReport{Name: name, PTR: map[string][]string{}}
-	add := func(sev, code, detail string) { rep.Findings = append(rep.Findings, Finding{sev, code, detail}) }
+	add := func(sev, code, key string, kv ...any) {
+		rep.Findings = append(rep.Findings, finding(sev, code, key, kv...))
+	}
+	data := func(sev, code, detail string) { rep.Findings = append(rep.Findings, dataFinding(sev, code, detail)) }
 	for _, qt := range []uint16{dns.TypeA, dns.TypeAAAA} {
 		a, err := Query(ctx, d, res, name, qt, o)
 		if err != nil || a.msg == nil {
@@ -113,12 +117,12 @@ func CheckHygiene(ctx context.Context, d Dialer, res Server, name string, h Hygi
 				}
 			}
 			if rr.Header().Ttl < 60 && rr.Header().Rrtype != dns.TypeCNAME {
-				add("aviso", "ttl-bajo", fmt.Sprintf("%s con TTL %d s", rr.Header().Name, rr.Header().Ttl))
+				add("aviso", "ttl-bajo", "dns.finding.low_ttl", "name", rr.Header().Name, "ttl", rr.Header().Ttl)
 			}
 		}
 	}
 	if len(rep.CNAMEs) > 3 {
-		add("aviso", "cname-larga", fmt.Sprintf("cadena de %d CNAME", len(rep.CNAMEs)))
+		add("aviso", "cname-larga", "dns.finding.long_cname", "n", len(rep.CNAMEs))
 	}
 	rev := res
 	if h.ReverseServer != nil {
@@ -131,7 +135,7 @@ func CheckHygiene(ctx context.Context, d Dialer, res Server, name string, h Hygi
 		}
 		a, err := Query(ctx, d, rev, arpa, dns.TypePTR, o)
 		if err != nil || a.msg == nil || len(a.msg.Answer) == 0 {
-			add("aviso", "sin-ptr", ip+" no tiene PTR")
+			add("aviso", "sin-ptr", "dns.finding.no_ptr", "ip", ip)
 			continue
 		}
 		confirmed := false
@@ -154,7 +158,7 @@ func CheckHygiene(ctx context.Context, d Dialer, res Server, name string, h Hygi
 			}
 		}
 		if !confirmed {
-			add("aviso", "ptr-no-coincide", fmt.Sprintf("%s → PTR %v, pero ese nombre no resuelve de vuelta a %s", ip, rep.PTR[ip], ip))
+			add("aviso", "ptr-no-coincide", "dns.finding.ptr_mismatch", "ip", ip, "ptr", rep.PTR[ip])
 		}
 	}
 	txt := func(n string) []string {
@@ -178,11 +182,11 @@ func CheckHygiene(ctx context.Context, d Dialer, res Server, name string, h Hygi
 	}
 	switch len(spf) {
 	case 0:
-		add("info", "sin-spf", "no hay registro SPF")
+		add("info", "sin-spf", "dns.finding.no_spf")
 	case 1:
-		add("info", "spf", spf[0])
+		data("info", "spf", spf[0])
 	default:
-		add("error", "spf-multiple", "hay varios SPF; los receptores lo tratan como error permanente")
+		add("error", "spf-multiple", "dns.finding.multiple_spf")
 	}
 	dmarc := ""
 	for _, t := range txt("_dmarc." + name) {
@@ -191,16 +195,16 @@ func CheckHygiene(ctx context.Context, d Dialer, res Server, name string, h Hygi
 		}
 	}
 	if dmarc == "" {
-		add("aviso", "sin-dmarc", "no hay registro DMARC en _dmarc."+name)
+		add("aviso", "sin-dmarc", "dns.finding.no_dmarc", "name", name)
 	} else {
-		add("info", "dmarc", dmarc)
+		data("info", "dmarc", dmarc)
 	}
 	if h.DKIMSelector != "" {
 		k := h.DKIMSelector + "._domainkey." + name
 		if v := txt(k); len(v) == 0 {
-			add("aviso", "sin-dkim", "no hay llave DKIM en "+k)
+			add("aviso", "sin-dkim", "dns.finding.no_dkim", "key", k)
 		} else {
-			add("info", "dkim", k)
+			data("info", "dkim", k)
 		}
 	}
 	if a, err := Query(ctx, d, res, name, dns.TypeCAA, o); err == nil && a.msg != nil && len(a.msg.Answer) > 0 {
@@ -210,9 +214,9 @@ func CheckHygiene(ctx context.Context, d Dialer, res Server, name string, h Hygi
 				v = append(v, c.Tag+" "+c.Value)
 			}
 		}
-		add("info", "caa", strings.Join(v, "; "))
+		data("info", "caa", strings.Join(v, "; "))
 	} else {
-		add("info", "sin-caa", "sin CAA: cualquier autoridad puede emitir certificados para este nombre")
+		add("info", "sin-caa", "dns.finding.no_caa")
 	}
 	return rep
 }
@@ -222,6 +226,58 @@ type ExposureReport struct {
 	OpenResolver   bool
 	NXDomainHijack bool
 	Details        []string
+	// DetailTexts son Details como texto de catálogo; no viajan en el JSON.
+	DetailTexts []i18n.Text `json:"-"`
+}
+
+// In devuelve el informe con los detalles en el idioma dado.
+func (r ExposureReport) In(loc string) ExposureReport {
+	if len(r.DetailTexts) == len(r.Details) {
+		r.Details = make([]string, len(r.DetailTexts))
+		for i, t := range r.DetailTexts {
+			r.Details[i] = t.In(loc)
+		}
+	}
+	return r
+}
+
+// In devuelve el informe con el detalle de cada hallazgo en el idioma dado (es es el de siempre).
+func (r TransportReport) In(loc string) TransportReport {
+	r.Findings = localizeFindings(r.Findings, loc)
+	return r
+}
+
+func (r HygieneReport) In(loc string) HygieneReport {
+	r.Findings = localizeFindings(r.Findings, loc)
+	return r
+}
+
+// Localize aplica In al informe que corresponda; los demás informes pasan tal cual.
+func Localize(v any, loc string) any {
+	switch r := v.(type) {
+	case TransportReport:
+		return r.In(loc)
+	case HygieneReport:
+		return r.In(loc)
+	case ExposureReport:
+		return r.In(loc)
+	case ZoneReport:
+		return r.In(loc)
+	}
+	return v
+}
+
+// Findings devuelve los hallazgos de un informe, o nil si el informe no tiene.
+func Findings(v any) []Finding {
+	switch r := v.(type) {
+	case TransportReport:
+		return r.Findings
+	case HygieneReport:
+		return r.Findings
+	case ZoneReport:
+		return r.Findings
+	}
+	return nil
 }
 
 // CheckExposure revisa si un servidor resuelve para cualquiera y si inventa respuestas para nombres inexistentes.
@@ -231,14 +287,16 @@ func CheckExposure(ctx context.Context, d Dialer, s Server, o Options) ExposureR
 	oo.NoRecurse = false
 	if a, err := Query(ctx, d, s, "example.com.", dns.TypeA, oo); err == nil && a.Flags.RA && a.RCode == "NOERROR" && len(a.Answer) > 0 {
 		rep.OpenResolver = true
-		rep.Details = append(rep.Details, "resuelve nombres ajenos con recursión: resolvedor abierto (riesgo de amplificación)")
+		t := i18n.Tx("dns.exposure.open_resolver")
+		rep.Details, rep.DetailTexts = append(rep.Details, t.In(i18n.Es)), append(rep.DetailTexts, t)
 	}
 	b := make([]byte, 6)
 	rand.Read(b)
 	nx := "mcu-" + hex.EncodeToString(b) + ".invalid." // .invalid nunca existe (RFC 6761)
 	if a, err := Query(ctx, d, s, nx, dns.TypeA, oo); err == nil && a.RCode == "NOERROR" && len(a.Answer) > 0 {
 		rep.NXDomainHijack = true
-		rep.Details = append(rep.Details, "responde con direcciones para un nombre que no puede existir: secuestro de NXDOMAIN")
+		t := i18n.Tx("dns.exposure.nx_hijack")
+		rep.Details, rep.DetailTexts = append(rep.Details, t.In(i18n.Es)), append(rep.DetailTexts, t)
 	}
 	return rep
 }

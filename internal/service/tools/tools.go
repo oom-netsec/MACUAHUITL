@@ -121,7 +121,17 @@ func (s *toolsSvc) Dns(ctx context.Context, r *v1.DnsRequest) (*v1.DnsResponse, 
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, err.Error())
 	}
-	return &v1.DnsResponse{Report: service.Report(out, "")}, nil
+	loc := i18n.Locale(ctx)
+	resp := &v1.DnsResponse{}
+	for _, f := range dnsq.Findings(out) {
+		fd := &v1.DnsFinding{Code: f.Code, Severity: dnsq.SeverityCode(f.Severity), Key: f.Text.Key, Args: f.Text.Args, Message: f.Detail}
+		if !f.Text.Empty() {
+			fd.Message = f.Text.In(loc)
+		}
+		resp.Findings = append(resp.Findings, fd)
+	}
+	resp.Report = service.Report(dnsq.Localize(out, loc), "")
+	return resp, nil
 }
 
 func dns(t string) string {
