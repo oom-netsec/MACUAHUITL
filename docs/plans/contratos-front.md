@@ -783,6 +783,8 @@ interface CoreError {
 - **`file.exists`**: los export de scripts, colecciones, hosts y respaldo de bóveda con `overwrite: false`, y `writeFile` del puente. Reemplaza `/ya existe/` de `lib/core.ts`: usa `reason === "file.exists"`. Los textos de hoy se conservan (`el archivo ya existe`, `vault: el archivo de respaldo ya existe`, `guardar: el archivo ya existe`).
 - **`assist.invalid_value`**: `why` ∈ `required`, `range`, `pattern`, `choice`, `type`, `unknown_field`. El texto junta todos los problemas con «; » y lleva el prefijo `assist: valores del snippet inválidos: ` (en inglés, `assist: invalid snippet values: `); la metadata describe solo el primero. Los secretos nunca van en la metadata ni en el texto. **`assist.refused`**: el texto es `assist: el equipo no admite este snippet: <motivo>`; el motivo concreto sigue en español hasta su fase de traducción (pasos 2 y 3).
 
+**Prefijos de envoltorio.** Con `en` el mensaje es el del catálogo y se pierden los prefijos con que otras capas envuelven el error (`flows: `, `snmp traps: `, `syslogd: ` cuando no es parte del texto). Con `es` el texto es el de siempre, envoltorios incluidos. La interfaz no debe depender de esos prefijos: use `reason` y `metadata`.
+
 ### Detalle de las fases del Job
 - `JobPhase` gana `reason` y `args` (campos 5 y 6, sin renumerar); el puente los expone en `PhaseDTO` como `reason` y `args` (ausentes si la fase no lleva detalle) y en los eventos `phaseAdded` (protojson).
 - `detail` sigue siendo el texto de hoy en `es` y sale traducido con `en`. Las fases guardadas antes de esta fase no traen `reason` y salen siempre en español.
