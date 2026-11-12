@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -34,13 +35,16 @@ type l2Scope struct {
 
 // assembleL2 arma el DevicePlan: apply en orden, reversa en orden inverso (también entre puertos), post y expect. Un alcance sin cambios no
 // entra; si ninguno cambia no hay plan.
-func assembleL2(device string, fn Function, pre []string, scopes []l2Scope, notes ...string) (DevicePlan, error) {
+func assembleL2(device string, fn Function, pre []string, scopes []l2Scope, notes ...i18n.Text) (DevicePlan, error) {
 	return assembleG(device, fn, pre, scopes, notes, nil)
 }
 
 // assembleG es assembleL2 con los secretos del plan (fase 28d): Validate los quita de sus errores, así que tienen que estar antes.
-func assembleG(device string, fn Function, pre []string, scopes []l2Scope, notes, secrets []string) (DevicePlan, error) {
-	dp := DevicePlan{Device: device, Pre: pre, Baseline: map[string]string{}, Notes: notes, Secrets: secrets}
+func assembleG(device string, fn Function, pre []string, scopes []l2Scope, notes []i18n.Text, secrets []string) (DevicePlan, error) {
+	dp := DevicePlan{Device: device, Pre: pre, Baseline: map[string]string{}, NoteItems: notes, Secrets: secrets}
+	for _, n := range notes {
+		dp.Notes = append(dp.Notes, n.In(i18n.Es))
+	}
 	var back [][]string
 	for _, sc := range scopes {
 		if len(sc.feats) == 0 {
@@ -76,7 +80,7 @@ func assembleG(device string, fn Function, pre []string, scopes []l2Scope, notes
 		}
 	}
 	if len(back) == 0 {
-		return DevicePlan{}, errors.New("no hay nada que cambiar: la configuración pedida ya está así")
+		return DevicePlan{}, cerr("assist.err.nothing_to_change")
 	}
 	for i := len(back) - 1; i >= 0; i-- {
 		dp.Rollback = append(dp.Rollback, back[i]...)
@@ -101,16 +105,16 @@ func l2Capture(names []string, outs map[string]string) ([]l2Port, error) {
 	for _, n := range names {
 		text, ok := outs[showCfg(n)]
 		if !ok {
-			return nil, fmt.Errorf("falta la configuración capturada de %s", n)
+			return nil, cerr("assist.err.capture_missing", "port", n)
 		}
 		cur, ok := iosxe.ParseInterfaceConfig(text)
 		switch {
 		case !ok:
-			return nil, refuseSnippet("%s no existe en el equipo (o no se pudo leer su configuración)", n)
+			return nil, refuseSnippet("assist.refused.no_existe_en_el_equipo", "port", n)
 		case !strings.EqualFold(iosxe.ShortIf(cur.Name), iosxe.ShortIf(n)):
-			return nil, fmt.Errorf("la captura de %s no es la configuración de esa interfaz", n)
+			return nil, cerr("assist.err.capture_mismatch", "port", n)
 		case cur.ChannelGroup:
-			return nil, refuseSnippet("%s es miembro de un canal: cambia el Port-channel, no el miembro", n)
+			return nil, refuseSnippet("assist.refused.es_miembro_de_un_canal", "port", n)
 		}
 		caps = append(caps, l2Port{name: n, text: text, switchport: outs[showSwitchport(n)], cur: cur, l2: iosxe.ParseL2Port(cur)})
 	}
@@ -120,7 +124,7 @@ func l2Capture(names []string, outs map[string]string) ([]l2Port, error) {
 // l2Routed rechaza un puerto ruteado o de capa 3, donde estas funciones de capa 2 no aplican.
 func l2Routed(p l2Port) error {
 	if p.cur.Routed || p.cur.L3 {
-		return refuseSnippet("%s es un puerto ruteado o de capa 3", p.name)
+		return refuseSnippet("assist.refused.es_un_puerto_ruteado_o", "port", p.name)
 	}
 	return nil
 }
@@ -133,7 +137,8 @@ const (
 	statusGuard            // puede dejar el puerto err-disabled: el estado entra a Pre y a la línea base, y se espera que no quede inactive ni err-disabled
 )
 
-const errdisabledNote = "La reversa no saca un puerto de err-disabled: si el cambio lo dejó así, haz shutdown y no shutdown a mano (el motor lo avisa y no da la reversa por cumplida)."
+// errdisabledNote avisa que la reversa no saca un puerto de err-disabled.
+var errdisabledNote = note("assist.note.errdisabled")
 
 func l2Pre(mode statusMode) func(Values) ([]string, error) {
 	return func(v Values) ([]string, error) {
@@ -153,7 +158,7 @@ func l2Pre(mode statusMode) func(Values) ([]string, error) {
 }
 
 // l2PortTemplate arma la plantilla de un cambio por puerto a partir de lo que cada una decide: qué líneas lleva cada puerto.
-func l2PortTemplate(id, name string, fields []Field, fn Function, mode statusMode, notes []string, build func(Values, l2Port) ([]l2Feature, error)) Template {
+func l2PortTemplate(id, name string, fields []Field, fn Function, mode statusMode, notes []i18n.Text, build func(Values, l2Port) ([]l2Feature, error)) Template {
 	fields = append([]Field{{Name: "interfaces", Label: "Puertos", Type: TypeInterfaces, Required: true,
 		Help: "Lista separada por comas o rangos como Gi1/0/1-4; solo puertos físicos."}}, fields...)
 	pre := l2Pre(mode)
@@ -179,11 +184,11 @@ func l2PortTemplate(id, name string, fields []Field, fn Function, mode statusMod
 					st := showStatus(p.name)
 					text, ok := outs[st]
 					if !ok {
-						return DevicePlan{}, fmt.Errorf("falta la salida de %q", st)
+						return DevicePlan{}, cerr("assist.err.output_missing", "command", st)
 					}
 					rows, _ := iosxe.ParseIfStatus(text)
 					if len(rows) == 0 {
-						return DevicePlan{}, refuseSnippet("no se pudo leer %q de %s: sin saber cómo está el puerto no se puede verificar que la reversa lo deje igual", st, p.name)
+						return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_de", "command", st, "port", p.name)
 					}
 					sc.post = append(sc.post, st)
 					sc.status, sc.base = st, map[string]string{st: text}
@@ -350,7 +355,7 @@ var SnippetSpeedDuplex = Function{
 		case len(f) == 2 && f[0] == "duplex" && oneOf(f[1], "auto", "full", "half"):
 		case len(f) == 2 && f[0] == "no" && oneOf(f[1], "speed", "duplex"):
 		default:
-			return errors.New("solo speed auto|10|100|1000, duplex auto|full|half y su no")
+			return cerr("assist.err.speed_duplex_form")
 		}
 		return nil
 	},
@@ -360,18 +365,18 @@ var SnippetSpeedDuplex = Function{
 func speedDuplexBuild(v Values, p l2Port) ([]l2Feature, error) {
 	speed, duplex := v.Str("speed"), v.Str("duplex")
 	if speed == "" && duplex == "" {
-		return nil, errors.New("indica la velocidad, el duplex o ambos")
+		return nil, cerr("assist.err.speed_duplex_required")
 	}
 	if err := l2Routed(p); err != nil {
 		return nil, err
 	}
 	for _, c := range []struct{ what, val string }{{"speed", p.l2.Speed}, {"duplex", p.l2.Duplex}} {
 		if c.val != "" && !oneOf(c.val, "auto", "10", "100", "1000", "full", "half") {
-			return nil, refuseSnippet("%s tiene «%s %s», que la reversa no sabría restaurar", p.name, c.what, c.val)
+			return nil, refuseSnippet("assist.refused.tiene_que_la_reversa_no", "port", p.name, "what", c.what, "val", c.val)
 		}
 	}
 	if effSpeed, effDuplex := ifElse(speed != "", speed, p.l2.Speed), ifElse(duplex != "", duplex, p.l2.Duplex); effSpeed == "1000" && effDuplex == "half" {
-		return nil, refuseSnippet("%s: IOS no admite duplex half a 1000 Mb/s", p.name)
+		return nil, refuseSnippet("assist.refused.ios_no_admite_duplex_half", "port", p.name)
 	}
 	var out []l2Feature
 	add := func(kw, want, was string) {
@@ -417,13 +422,13 @@ var SnippetStormControl = Function{
 		case f[0] == "storm-control" && len(f) >= 4 && f[2] == "level" && oneOf(f[1], "broadcast", "multicast", "unicast"):
 			m := stormLevelRe.FindStringSubmatch(strings.Join(f[3:], " "))
 			if m == nil || !stormPct(m[1]) || m[2] != "" && !stormPct(m[2]) {
-				return errors.New("el umbral es un porcentaje de 0.00 a 100.00 (y, opcional, el de bajada); nada de bps ni pps")
+				return cerr("assist.err.storm_threshold")
 			}
 		case f[0] == "storm-control" && len(f) == 3 && f[1] == "action" && oneOf(f[2], "shutdown", "trap"):
 		case len(f) == 4 && f[0] == "no" && f[1] == "storm-control" && f[3] == "level" && oneOf(f[2], "broadcast", "multicast", "unicast"):
 		case len(f) == 4 && f[0] == "no" && f[1] == "storm-control" && f[2] == "action" && oneOf(f[3], "shutdown", "trap"):
 		default:
-			return errors.New("solo storm-control broadcast|multicast|unicast level P, storm-control action shutdown|trap y su no")
+			return cerr("assist.err.storm_form")
 		}
 		return nil
 	},
@@ -439,7 +444,7 @@ func decimal2(s string) string {
 
 func stormBuild(v Values, p l2Port) ([]l2Feature, error) {
 	if !v.Has("broadcast") && !v.Has("multicast") && !v.Has("unicast") && !v.Has("action") {
-		return nil, errors.New("indica al menos un umbral o la acción")
+		return nil, cerr("assist.err.storm_need_threshold")
 	}
 	if err := l2Routed(p); err != nil {
 		return nil, err
@@ -453,7 +458,7 @@ func stormBuild(v Values, p l2Port) ([]l2Feature, error) {
 		if raw := p.l2.Storm[t]; raw != "" {
 			m := stormWasRe.FindStringSubmatch(raw)
 			if m == nil {
-				return nil, refuseSnippet("%s tiene «storm-control %s %s» (umbral en bps/pps u otro formato) y la reversa no sabría restaurarlo", p.name, t, raw)
+				return nil, refuseSnippet("assist.refused.tiene_storm_control_umbral_en", "port", p.name, "t", t, "raw", raw)
 			}
 			was = m[1]
 		}
@@ -469,7 +474,7 @@ func stormBuild(v Values, p l2Port) ([]l2Feature, error) {
 	}
 	for _, was := range p.l2.StormActions {
 		if !oneOf(was, "shutdown", "trap") {
-			return nil, refuseSnippet("%s tiene «storm-control action %s» y la reversa no sabría restaurarlo", p.name, was)
+			return nil, refuseSnippet("assist.refused.tiene_storm_control_action_y", "port", p.name, "was", was)
 		}
 	}
 	// Cada acción es una bandera: la que ya estaba no se toca, y la que se agrega se quita con su propio no.
@@ -498,7 +503,7 @@ var SnippetPortfast = Function{
 		case len(f) == 3 && f[0] == "spanning-tree" && f[1] == "bpduguard" && oneOf(f[2], "enable", "disable"):
 		case len(f) == 3 && f[0] == "no" && f[1] == "spanning-tree" && f[2] == "bpduguard":
 		default:
-			return errors.New("solo spanning-tree portfast, spanning-tree bpduguard enable|disable y su no")
+			return cerr("assist.err.spanning_tree_form")
 		}
 		return nil
 	},
@@ -509,17 +514,17 @@ var SnippetPortfast = Function{
 func l2Access(p l2Port) error {
 	toAccess, err := accessPort(p.name, p.cur, p.switchport)
 	if err != nil {
-		return refuseSnippet("%s", strings.TrimPrefix(err.Error(), ErrPortRefused.Error()+": "))
+		return refusalOf(err)
 	}
 	if toAccess {
-		return refuseSnippet("%s está en modo dynamic: esta función solo cambia puertos de acceso (pon switchport mode access aparte)", p.name)
+		return refuseSnippet("assist.refused.esta_en_modo_dynamic_esta", "port", p.name)
 	}
 	return nil
 }
 
 func portfastBuild(v Values, p l2Port) ([]l2Feature, error) {
 	if !v.Bool("portfast") && !v.Bool("bpduguard") {
-		return nil, errors.New("elige portfast, BPDU guard o ambos")
+		return nil, cerr("assist.err.portfast_choose")
 	}
 	if err := l2Access(p); err != nil {
 		return nil, err
@@ -528,7 +533,7 @@ func portfastBuild(v Values, p l2Port) ([]l2Feature, error) {
 	if v.Bool("portfast") {
 		switch {
 		case p.l2.HasPortfast && !oneOf(p.l2.Portfast, "", "edge"):
-			return nil, refuseSnippet("%s tiene «spanning-tree portfast %s», que la reversa no sabría restaurar", p.name, p.l2.Portfast)
+			return nil, refuseSnippet("assist.refused.tiene_spanning_tree_portfast_que", "port", p.name, "portfast", p.l2.Portfast)
 		case !p.l2.HasPortfast:
 			// IOS puede mostrar la línea como «portfast edge»: la reversa «no spanning-tree portfast» quita las dos formas (regla de #47).
 			out = append(out, l2Feature{apply: "spanning-tree portfast", back: "no spanning-tree portfast",
@@ -538,7 +543,7 @@ func portfastBuild(v Values, p l2Port) ([]l2Feature, error) {
 	if v.Bool("bpduguard") {
 		switch was := p.l2.Bpduguard; {
 		case was != "" && !oneOf(was, "enable", "disable"):
-			return nil, refuseSnippet("%s tiene «spanning-tree bpduguard %s», que la reversa no sabría restaurar", p.name, was)
+			return nil, refuseSnippet("assist.refused.tiene_spanning_tree_bpduguard_que", "port", p.name, "was", was)
 		case was != "enable":
 			out = append(out, l2Feature{apply: "spanning-tree bpduguard enable", back: ifElse(was != "", "spanning-tree bpduguard "+was, "no spanning-tree bpduguard"),
 				exp: Expect{Line: "spanning-tree bpduguard enable", Present: true}})
@@ -571,7 +576,7 @@ var SnippetPortSecurity = Function{
 		case rest[0] == "violation" && (neg && len(rest) == 1 || !neg && len(rest) == 2 && oneOf(rest[1], "protect", "restrict", "shutdown")):
 		case rest[0] == "aging" && len(rest) >= 2 && rest[1] == "time" && (neg && len(rest) == 2 || !neg && len(rest) == 3 && intIn(rest[2], 0, 1440)):
 		default:
-			return errors.New("solo switchport port-security [maximum 1-3072 | violation protect|restrict|shutdown | aging time 0-1440] y su no")
+			return cerr("assist.err.port_security_form")
 		}
 		return nil
 	},
@@ -584,11 +589,11 @@ func portSecurityBuild(v Values, p l2Port) ([]l2Feature, error) {
 	}
 	switch {
 	case p.cur.Trunk:
-		return nil, refuseSnippet("%s es trunk: port-security solo va en puertos de acceso", p.name)
+		return nil, refuseSnippet("assist.refused.es_trunk_port_security_solo", "port", p.name)
 	case p.cur.Mode != "access":
-		return nil, refuseSnippet("%s no está en «switchport mode access» explícito: IOS rechaza port-security en un puerto dynamic", p.name)
+		return nil, refuseSnippet("assist.refused.no_esta_en_switchport_mode", "port", p.name)
 	case len(p.l2.PortSecurity) > 0:
-		return nil, refuseSnippet("%s ya tiene port-security (%s): la reversa no restauraría las direcciones MAC aprendidas o sticky", p.name, p.l2.PortSecurity[0])
+		return nil, refuseSnippet("assist.refused.ya_tiene_port_security_la", "port", p.name, "config", p.l2.PortSecurity[0])
 	}
 	var out []l2Feature
 	// Los valores de fábrica (1, shutdown, 0) no salen en el running-config.
@@ -654,16 +659,16 @@ var SnippetErrdisable = Function{
 func errdisablePlan(device string, v Values, outs map[string]string) (DevicePlan, error) {
 	text, ok := outs[errdisableCmd]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la salida de %q", errdisableCmd)
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", errdisableCmd)
 	}
 	cur, ok := iosxe.ParseErrdisableRecovery(text)
 	if !ok {
-		return DevicePlan{}, refuseSnippet("no se pudo leer %q en %s", errdisableCmd, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_en", "command", errdisableCmd, "device", device)
 	}
 	on := map[string]bool{}
 	for _, c := range cur.Causes {
 		if c == "all" {
-			return DevicePlan{}, refuseSnippet("%s tiene «errdisable recovery cause all»: la reversa no sabría dejar las causas como estaban", device)
+			return DevicePlan{}, refuseSnippet("assist.refused.tiene_errdisable_recovery_cause_all", "device", device)
 		}
 		on[c] = true
 	}
@@ -683,7 +688,7 @@ func errdisablePlan(device string, v Values, outs map[string]string) (DevicePlan
 		feats = append(feats, f)
 	}
 	if len(feats) == 0 && !hasErrdisableRequest(v) {
-		return DevicePlan{}, errors.New("elige al menos una causa o el intervalo")
+		return DevicePlan{}, cerr("assist.err.errdisable_choose")
 	}
 	return assembleL2(device, SnippetErrdisable, []string{errdisableCmd},
 		[]l2Scope{{baseCmd: errdisableCmd, baseText: text, post: []string{errdisableCmd}, feats: feats}})
@@ -771,15 +776,15 @@ func portModeNow(p l2Port, toDynamic bool) (string, error) {
 		return "", err
 	}
 	if p.cur.Trunk {
-		return "", refuseSnippet("%s tiene trunk configurado: esta función no toca puertos trunk", p.name)
+		return "", refuseSnippet("assist.refused.tiene_trunk_configurado_esta_funcion", "port", p.name)
 	}
 	for _, l := range p.cur.Lines {
 		low := strings.ToLower(l)
 		switch {
 		case strings.HasPrefix(low, "switchport private-vlan "):
-			return "", refuseSnippet("%s usa private-vlan", p.name)
+			return "", refuseSnippet("assist.refused.usa_private_vlan", "port", p.name)
 		case toDynamic && oneOfPrefix(low, "switchport nonegotiate", "switchport port-security", "authentication port-control", "dot1x pae"):
-			return "", refuseSnippet("%s tiene «%s», que IOS no admite con un puerto dynamic: quítalo antes", p.name, l)
+			return "", refuseSnippet("assist.refused.tiene_que_ios_no_admite", "port", p.name, "line", l)
 		}
 	}
 	mode := p.cur.Mode
@@ -789,23 +794,23 @@ func portModeNow(p l2Port, toDynamic bool) (string, error) {
 		admin, ok := iosxe.ParseSwitchportMode(p.switchport)
 		switch {
 		case !ok:
-			return "", refuseSnippet("%s no tiene línea de modo y no se pudo leer su Administrative Mode en show interfaces switchport", p.name)
+			return "", refuseSnippet("assist.refused.no_tiene_linea_de_modo", "port", p.name)
 		case admin != "dynamic auto":
-			return "", refuseSnippet("%s está en modo administrativo %q sin línea switchport mode: la reversa no sabría restaurarlo", p.name, admin)
+			return "", refuseSnippet("assist.refused.esta_en_modo_administrativo_sin", "port", p.name, "admin", admin)
 		}
 		mode = admin
 	case mode != "access" && !isDynamicMode(mode):
-		return "", refuseSnippet("%s está en modo %q: solo se cambian puertos access o dynamic", p.name, mode)
+		return "", refuseSnippet("assist.refused.esta_en_modo_solo_se", "port", p.name, "mode", mode)
 	}
 	if mode != "access" {
 		// Un dynamic que negoció un trunk (DTP no sale en el running-config) pierde tráfico si se cambia.
 		switch oper, ok := iosxe.ParseSwitchportOperMode(p.switchport); {
 		case !ok:
-			return "", refuseSnippet("%s está en modo dynamic y no se pudo leer su Operational Mode: no se sabe si negoció un trunk", p.name)
+			return "", refuseSnippet("assist.refused.esta_en_modo_dynamic_y", "port", p.name)
 		case oper == "trunk":
-			return "", refuseSnippet("%s está en modo dynamic y opera como trunk: cambiarlo corta tráfico", p.name)
+			return "", refuseSnippet("assist.refused.esta_en_modo_dynamic_y2", "port", p.name)
 		case oper != "down" && oper != "static access":
-			return "", refuseSnippet("%s está en modo dynamic y opera como %q, no como acceso", p.name, oper)
+			return "", refuseSnippet("assist.refused.esta_en_modo_dynamic_y3", "port", p.name, "oper", oper)
 		}
 	}
 	return mode, nil
@@ -814,7 +819,7 @@ func portModeNow(p l2Port, toDynamic bool) (string, error) {
 // showSwitchportMode son solo las líneas de modo de show interfaces X switchport.
 func showSwitchportMode(iface string) string { return showSwitchport(iface) + " | include Mode:" }
 
-const portModeNote = "Pasar de access a dynamic permite que un vecino negocie un trunk (DTP) y el enlace puede rebotar; dynamic auto no se ve en el running-config porque es el valor de fábrica. El post-check busca un trunk negociado a mejor esfuerzo: DTP puede tardar más que la lectura."
+var portModeNote = note("assist.note.port_mode")
 
 func portModePlan(device string, v Values, outs map[string]string) (DevicePlan, error) {
 	names, err := ParseInterfaceList(v.Str("interfaces"))
@@ -828,7 +833,7 @@ func portModePlan(device string, v Values, outs map[string]string) (DevicePlan, 
 	pre, _ := l2Pre(statusNone)(v)
 	want := v.Str("mode")
 	target := ifElse(want == "fabrica", "dynamic auto", want)
-	notes := []string{portModeNote}
+	notes := []i18n.Text{portModeNote}
 	var scopes []l2Scope
 	for _, p := range caps {
 		now, err := portModeNow(p, want != "access")
@@ -836,7 +841,7 @@ func portModePlan(device string, v Values, outs map[string]string) (DevicePlan, 
 			return DevicePlan{}, err
 		}
 		if now == target && (want != "fabrica" || p.cur.Mode == "") {
-			notes = append(notes, p.name+": ya estaba en modo "+now+" (sin cambios)")
+			notes = append(notes, note("assist.note.port_mode_same", "port", p.name, "mode", now))
 			continue
 		}
 		f := l2Feature{apply: ifElse(want == "fabrica", "no switchport mode", "switchport mode "+want),
@@ -879,23 +884,23 @@ func l2PortTemplates() []Template {
 			{Name: "duplex", Label: "Duplex", Type: TypeChoice, Choices: []string{"auto", "full", "half"}, Help: "Vacío no lo toca."},
 		}, SnippetSpeedDuplex, statusNone,
 			// Sin Expect de estado: el post-check corre en cuanto termina el apply y el enlace sigue renegociando.
-			[]string{"Cambiar speed o duplex reinicia el enlace: el puerto pierde tráfico unos segundos, y la reversa lo reinicia otra vez. Si el otro extremo no coincide, el enlace queda abajo o con errores de duplex: revisa que vuelva a connected antes de cerrar."},
+			[]i18n.Text{note("assist.note.speed_duplex")},
 			speedDuplexBuild),
 		l2PortTemplate("storm-control", "Storm-control de puertos", []Field{
 			{Name: "broadcast", Label: "Umbral de difusión (%)", Type: TypeDecimal, Min: 0, Max: 100, Help: "0.00-100.00; vacío no lo toca."},
 			{Name: "multicast", Label: "Umbral de multicast (%)", Type: TypeDecimal, Min: 0, Max: 100},
 			{Name: "unicast", Label: "Umbral de unicast (%)", Type: TypeDecimal, Min: 0, Max: 100},
 			{Name: "action", Label: "Acción al superarlo", Type: TypeChoice, Choices: []string{"shutdown", "trap"}, Help: "Vacío no la toca. shutdown y trap son independientes: se pueden tener las dos."},
-		}, SnippetStormControl, statusGuard, []string{errdisabledNote}, stormBuild),
+		}, SnippetStormControl, statusGuard, []i18n.Text{errdisabledNote}, stormBuild),
 		l2PortTemplate("portfast-bpduguard", "Portfast y BPDU guard en puertos de acceso", []Field{
 			{Name: "portfast", Label: "Portfast", Type: TypeBool, Default: "true", Help: "Solo puertos de acceso hacia equipos finales."},
 			{Name: "bpduguard", Label: "BPDU guard", Type: TypeBool, Default: "true"},
-		}, SnippetPortfast, statusGuard, []string{errdisabledNote}, portfastBuild),
+		}, SnippetPortfast, statusGuard, []i18n.Text{errdisabledNote}, portfastBuild),
 		l2PortTemplate("port-security", "Port-security en puertos de acceso", []Field{
 			{Name: "maximum", Label: "Máximo de direcciones MAC", Type: TypeInt, Min: 1, Max: 3072, Default: "1"},
 			{Name: "violation", Label: "Acción ante violación", Type: TypeChoice, Choices: []string{"protect", "restrict", "shutdown"}, Default: "shutdown"},
 			{Name: "aging_time", Label: "Envejecimiento (minutos)", Type: TypeInt, Min: 0, Max: 1440, Help: "0 = no envejece."},
-		}, SnippetPortSecurity, statusGuard, []string{errdisabledNote}, portSecurityBuild),
+		}, SnippetPortSecurity, statusGuard, []i18n.Text{errdisabledNote}, portSecurityBuild),
 		{ID: "errdisable-recovery", Tech: "l2", Name: "Recuperación automática de errdisable", Platforms: bothPlatforms, Fn: SnippetErrdisable,
 			Fields: append(func() []Field {
 				var fs []Field

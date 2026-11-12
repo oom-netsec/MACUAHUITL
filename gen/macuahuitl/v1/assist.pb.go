@@ -266,16 +266,17 @@ func (x *AssistExpect) GetColumn() string {
 }
 
 type AssistDevicePlan struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Device        string                 `protobuf:"bytes,1,opt,name=device,proto3" json:"device,omitempty"`
-	Pre           []string               `protobuf:"bytes,2,rep,name=pre,proto3" json:"pre,omitempty"`
-	Apply         []string               `protobuf:"bytes,3,rep,name=apply,proto3" json:"apply,omitempty"`
-	Rollback      []string               `protobuf:"bytes,4,rep,name=rollback,proto3" json:"rollback,omitempty"`
-	Post          []string               `protobuf:"bytes,5,rep,name=post,proto3" json:"post,omitempty"`
-	Expect        []*AssistExpect        `protobuf:"bytes,6,rep,name=expect,proto3" json:"expect,omitempty"`
-	Notes         []string               `protobuf:"bytes,7,rep,name=notes,proto3" json:"notes,omitempty"` // avisos para el ingeniero (p. ej. que el enlace rebota); no se ejecutan
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Device          string                 `protobuf:"bytes,1,opt,name=device,proto3" json:"device,omitempty"`
+	Pre             []string               `protobuf:"bytes,2,rep,name=pre,proto3" json:"pre,omitempty"`
+	Apply           []string               `protobuf:"bytes,3,rep,name=apply,proto3" json:"apply,omitempty"`
+	Rollback        []string               `protobuf:"bytes,4,rep,name=rollback,proto3" json:"rollback,omitempty"`
+	Post            []string               `protobuf:"bytes,5,rep,name=post,proto3" json:"post,omitempty"`
+	Expect          []*AssistExpect        `protobuf:"bytes,6,rep,name=expect,proto3" json:"expect,omitempty"`
+	Notes           []string               `protobuf:"bytes,7,rep,name=notes,proto3" json:"notes,omitempty"`                                            // avisos para el ingeniero (p. ej. que el enlace rebota); no se ejecutan
+	NotesStructured []*AssistNote          `protobuf:"bytes,8,rep,name=notes_structured,json=notesStructured,proto3" json:"notes_structured,omitempty"` // los mismos avisos como clave del catálogo (assist.note.*) con sus argumentos; mismo orden que notes
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AssistDevicePlan) Reset() {
@@ -357,6 +358,66 @@ func (x *AssistDevicePlan) GetNotes() []string {
 	return nil
 }
 
+func (x *AssistDevicePlan) GetNotesStructured() []*AssistNote {
+	if x != nil {
+		return x.NotesStructured
+	}
+	return nil
+}
+
+// AssistNote es un aviso del plan como código del catálogo: key (assist.note.*) y args con nombre.
+type AssistNote struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Args          map[string]string      `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssistNote) Reset() {
+	*x = AssistNote{}
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistNote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistNote) ProtoMessage() {}
+
+func (x *AssistNote) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistNote.ProtoReflect.Descriptor instead.
+func (*AssistNote) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AssistNote) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *AssistNote) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
 type AssistPlan struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Function      string                 `protobuf:"bytes,1,opt,name=function,proto3" json:"function,omitempty"`
@@ -368,7 +429,7 @@ type AssistPlan struct {
 
 func (x *AssistPlan) Reset() {
 	*x = AssistPlan{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -380,7 +441,7 @@ func (x *AssistPlan) String() string {
 func (*AssistPlan) ProtoMessage() {}
 
 func (x *AssistPlan) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -393,7 +454,7 @@ func (x *AssistPlan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistPlan.ProtoReflect.Descriptor instead.
 func (*AssistPlan) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{4}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AssistPlan) GetFunction() string {
@@ -427,7 +488,7 @@ type PlanPortsResponse struct {
 
 func (x *PlanPortsResponse) Reset() {
 	*x = PlanPortsResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -439,7 +500,7 @@ func (x *PlanPortsResponse) String() string {
 func (*PlanPortsResponse) ProtoMessage() {}
 
 func (x *PlanPortsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -452,7 +513,7 @@ func (x *PlanPortsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanPortsResponse.ProtoReflect.Descriptor instead.
 func (*PlanPortsResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{5}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PlanPortsResponse) GetPlanId() string {
@@ -479,7 +540,7 @@ type StartRunRequest struct {
 
 func (x *StartRunRequest) Reset() {
 	*x = StartRunRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -491,7 +552,7 @@ func (x *StartRunRequest) String() string {
 func (*StartRunRequest) ProtoMessage() {}
 
 func (x *StartRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -504,7 +565,7 @@ func (x *StartRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartRunRequest.ProtoReflect.Descriptor instead.
 func (*StartRunRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{6}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *StartRunRequest) GetPlanId() string {
@@ -530,7 +591,7 @@ type StartRunResponse struct {
 
 func (x *StartRunResponse) Reset() {
 	*x = StartRunResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -542,7 +603,7 @@ func (x *StartRunResponse) String() string {
 func (*StartRunResponse) ProtoMessage() {}
 
 func (x *StartRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -555,7 +616,7 @@ func (x *StartRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartRunResponse.ProtoReflect.Descriptor instead.
 func (*StartRunResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{7}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *StartRunResponse) GetRunId() string {
@@ -575,7 +636,7 @@ type ConfirmRequest struct {
 
 func (x *ConfirmRequest) Reset() {
 	*x = ConfirmRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -587,7 +648,7 @@ func (x *ConfirmRequest) String() string {
 func (*ConfirmRequest) ProtoMessage() {}
 
 func (x *ConfirmRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -600,7 +661,7 @@ func (x *ConfirmRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmRequest.ProtoReflect.Descriptor instead.
 func (*ConfirmRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{8}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ConfirmRequest) GetRunId() string {
@@ -626,7 +687,7 @@ type ConfirmResponse struct {
 
 func (x *ConfirmResponse) Reset() {
 	*x = ConfirmResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -638,7 +699,7 @@ func (x *ConfirmResponse) String() string {
 func (*ConfirmResponse) ProtoMessage() {}
 
 func (x *ConfirmResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -651,7 +712,7 @@ func (x *ConfirmResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConfirmResponse.ProtoReflect.Descriptor instead.
 func (*ConfirmResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{9}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ConfirmResponse) GetRun() *AssistRunState {
@@ -670,7 +731,7 @@ type AbortRequest struct {
 
 func (x *AbortRequest) Reset() {
 	*x = AbortRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -682,7 +743,7 @@ func (x *AbortRequest) String() string {
 func (*AbortRequest) ProtoMessage() {}
 
 func (x *AbortRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -695,7 +756,7 @@ func (x *AbortRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AbortRequest.ProtoReflect.Descriptor instead.
 func (*AbortRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{10}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *AbortRequest) GetRunId() string {
@@ -714,7 +775,7 @@ type AbortResponse struct {
 
 func (x *AbortResponse) Reset() {
 	*x = AbortResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[11]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -726,7 +787,7 @@ func (x *AbortResponse) String() string {
 func (*AbortResponse) ProtoMessage() {}
 
 func (x *AbortResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[11]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -739,7 +800,7 @@ func (x *AbortResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AbortResponse.ProtoReflect.Descriptor instead.
 func (*AbortResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{11}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *AbortResponse) GetRun() *AssistRunState {
@@ -758,7 +819,7 @@ type RollbackRequest struct {
 
 func (x *RollbackRequest) Reset() {
 	*x = RollbackRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[12]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -770,7 +831,7 @@ func (x *RollbackRequest) String() string {
 func (*RollbackRequest) ProtoMessage() {}
 
 func (x *RollbackRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[12]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -783,7 +844,7 @@ func (x *RollbackRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackRequest.ProtoReflect.Descriptor instead.
 func (*RollbackRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{12}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RollbackRequest) GetRunId() string {
@@ -802,7 +863,7 @@ type RollbackResponse struct {
 
 func (x *RollbackResponse) Reset() {
 	*x = RollbackResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[13]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -814,7 +875,7 @@ func (x *RollbackResponse) String() string {
 func (*RollbackResponse) ProtoMessage() {}
 
 func (x *RollbackResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[13]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -827,7 +888,7 @@ func (x *RollbackResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackResponse.ProtoReflect.Descriptor instead.
 func (*RollbackResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{13}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RollbackResponse) GetRun() *AssistRunState {
@@ -847,7 +908,7 @@ type WatchRunRequest struct {
 
 func (x *WatchRunRequest) Reset() {
 	*x = WatchRunRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[14]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -859,7 +920,7 @@ func (x *WatchRunRequest) String() string {
 func (*WatchRunRequest) ProtoMessage() {}
 
 func (x *WatchRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[14]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -872,7 +933,7 @@ func (x *WatchRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchRunRequest.ProtoReflect.Descriptor instead.
 func (*WatchRunRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{14}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *WatchRunRequest) GetRunId() string {
@@ -898,7 +959,7 @@ type ListRunsRequest struct {
 
 func (x *ListRunsRequest) Reset() {
 	*x = ListRunsRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -910,7 +971,7 @@ func (x *ListRunsRequest) String() string {
 func (*ListRunsRequest) ProtoMessage() {}
 
 func (x *ListRunsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[15]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -923,7 +984,7 @@ func (x *ListRunsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRunsRequest.ProtoReflect.Descriptor instead.
 func (*ListRunsRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{15}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListRunsRequest) GetActiveOnly() bool {
@@ -942,7 +1003,7 @@ type ListRunsResponse struct {
 
 func (x *ListRunsResponse) Reset() {
 	*x = ListRunsResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -954,7 +1015,7 @@ func (x *ListRunsResponse) String() string {
 func (*ListRunsResponse) ProtoMessage() {}
 
 func (x *ListRunsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[16]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -967,7 +1028,7 @@ func (x *ListRunsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRunsResponse.ProtoReflect.Descriptor instead.
 func (*ListRunsResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{16}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ListRunsResponse) GetRuns() []*AssistRunState {
@@ -986,7 +1047,7 @@ type GetAssistRunRequest struct {
 
 func (x *GetAssistRunRequest) Reset() {
 	*x = GetAssistRunRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -998,7 +1059,7 @@ func (x *GetAssistRunRequest) String() string {
 func (*GetAssistRunRequest) ProtoMessage() {}
 
 func (x *GetAssistRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[17]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1011,7 +1072,7 @@ func (x *GetAssistRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssistRunRequest.ProtoReflect.Descriptor instead.
 func (*GetAssistRunRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{17}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetAssistRunRequest) GetRunId() string {
@@ -1030,7 +1091,7 @@ type GetAssistRunResponse struct {
 
 func (x *GetAssistRunResponse) Reset() {
 	*x = GetAssistRunResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1042,7 +1103,7 @@ func (x *GetAssistRunResponse) String() string {
 func (*GetAssistRunResponse) ProtoMessage() {}
 
 func (x *GetAssistRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[18]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1055,7 +1116,7 @@ func (x *GetAssistRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssistRunResponse.ProtoReflect.Descriptor instead.
 func (*GetAssistRunResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{18}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetAssistRunResponse) GetRun() *AssistRunState {
@@ -1074,7 +1135,7 @@ type WatchRunResponse struct {
 
 func (x *WatchRunResponse) Reset() {
 	*x = WatchRunResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1086,7 +1147,7 @@ func (x *WatchRunResponse) String() string {
 func (*WatchRunResponse) ProtoMessage() {}
 
 func (x *WatchRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[19]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1099,7 +1160,7 @@ func (x *WatchRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchRunResponse.ProtoReflect.Descriptor instead.
 func (*WatchRunResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{19}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *WatchRunResponse) GetEvent() *AssistEvent {
@@ -1121,7 +1182,7 @@ type AssistStep struct {
 
 func (x *AssistStep) Reset() {
 	*x = AssistStep{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1133,7 +1194,7 @@ func (x *AssistStep) String() string {
 func (*AssistStep) ProtoMessage() {}
 
 func (x *AssistStep) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[20]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1146,7 +1207,7 @@ func (x *AssistStep) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistStep.ProtoReflect.Descriptor instead.
 func (*AssistStep) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{20}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *AssistStep) GetId() string {
@@ -1196,7 +1257,7 @@ type AssistRunState struct {
 
 func (x *AssistRunState) Reset() {
 	*x = AssistRunState{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1208,7 +1269,7 @@ func (x *AssistRunState) String() string {
 func (*AssistRunState) ProtoMessage() {}
 
 func (x *AssistRunState) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[21]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1221,7 +1282,7 @@ func (x *AssistRunState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistRunState.ProtoReflect.Descriptor instead.
 func (*AssistRunState) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{21}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *AssistRunState) GetRunId() string {
@@ -1316,7 +1377,7 @@ type AssistEvent struct {
 
 func (x *AssistEvent) Reset() {
 	*x = AssistEvent{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[22]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1328,7 +1389,7 @@ func (x *AssistEvent) String() string {
 func (*AssistEvent) ProtoMessage() {}
 
 func (x *AssistEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[22]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1341,7 +1402,7 @@ func (x *AssistEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistEvent.ProtoReflect.Descriptor instead.
 func (*AssistEvent) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{22}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *AssistEvent) GetSeq() uint32 {
@@ -1406,7 +1467,7 @@ type VlanSnippet struct {
 
 func (x *VlanSnippet) Reset() {
 	*x = VlanSnippet{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[23]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1418,7 +1479,7 @@ func (x *VlanSnippet) String() string {
 func (*VlanSnippet) ProtoMessage() {}
 
 func (x *VlanSnippet) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[23]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1431,7 +1492,7 @@ func (x *VlanSnippet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VlanSnippet.ProtoReflect.Descriptor instead.
 func (*VlanSnippet) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{23}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *VlanSnippet) GetId() uint32 {
@@ -1480,7 +1541,7 @@ type TrunkSnippet struct {
 
 func (x *TrunkSnippet) Reset() {
 	*x = TrunkSnippet{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[24]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1492,7 +1553,7 @@ func (x *TrunkSnippet) String() string {
 func (*TrunkSnippet) ProtoMessage() {}
 
 func (x *TrunkSnippet) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[24]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1505,7 +1566,7 @@ func (x *TrunkSnippet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TrunkSnippet.ProtoReflect.Descriptor instead.
 func (*TrunkSnippet) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{24}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *TrunkSnippet) GetInterface() string {
@@ -1541,7 +1602,7 @@ type SviSnippet struct {
 
 func (x *SviSnippet) Reset() {
 	*x = SviSnippet{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[25]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1553,7 +1614,7 @@ func (x *SviSnippet) String() string {
 func (*SviSnippet) ProtoMessage() {}
 
 func (x *SviSnippet) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[25]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1566,7 +1627,7 @@ func (x *SviSnippet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SviSnippet.ProtoReflect.Descriptor instead.
 func (*SviSnippet) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{25}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SviSnippet) GetVlan() uint32 {
@@ -1615,7 +1676,7 @@ type PlanSnippetRequest struct {
 
 func (x *PlanSnippetRequest) Reset() {
 	*x = PlanSnippetRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[26]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1627,7 +1688,7 @@ func (x *PlanSnippetRequest) String() string {
 func (*PlanSnippetRequest) ProtoMessage() {}
 
 func (x *PlanSnippetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[26]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1640,7 +1701,7 @@ func (x *PlanSnippetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanSnippetRequest.ProtoReflect.Descriptor instead.
 func (*PlanSnippetRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{26}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *PlanSnippetRequest) GetTarget() *AssistTarget {
@@ -1746,7 +1807,7 @@ type TemplateSnippet struct {
 
 func (x *TemplateSnippet) Reset() {
 	*x = TemplateSnippet{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[27]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1758,7 +1819,7 @@ func (x *TemplateSnippet) String() string {
 func (*TemplateSnippet) ProtoMessage() {}
 
 func (x *TemplateSnippet) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[27]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1771,7 +1832,7 @@ func (x *TemplateSnippet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TemplateSnippet.ProtoReflect.Descriptor instead.
 func (*TemplateSnippet) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{27}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *TemplateSnippet) GetId() string {
@@ -1797,7 +1858,7 @@ type ListSnippetTemplatesRequest struct {
 
 func (x *ListSnippetTemplatesRequest) Reset() {
 	*x = ListSnippetTemplatesRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[28]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1809,7 +1870,7 @@ func (x *ListSnippetTemplatesRequest) String() string {
 func (*ListSnippetTemplatesRequest) ProtoMessage() {}
 
 func (x *ListSnippetTemplatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[28]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1822,7 +1883,7 @@ func (x *ListSnippetTemplatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSnippetTemplatesRequest.ProtoReflect.Descriptor instead.
 func (*ListSnippetTemplatesRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{28}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListSnippetTemplatesRequest) GetPlatform() string {
@@ -1841,7 +1902,7 @@ type ListSnippetTemplatesResponse struct {
 
 func (x *ListSnippetTemplatesResponse) Reset() {
 	*x = ListSnippetTemplatesResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[29]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1853,7 +1914,7 @@ func (x *ListSnippetTemplatesResponse) String() string {
 func (*ListSnippetTemplatesResponse) ProtoMessage() {}
 
 func (x *ListSnippetTemplatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[29]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1866,7 +1927,7 @@ func (x *ListSnippetTemplatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSnippetTemplatesResponse.ProtoReflect.Descriptor instead.
 func (*ListSnippetTemplatesResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{29}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListSnippetTemplatesResponse) GetTemplates() []*SnippetTemplate {
@@ -1889,7 +1950,7 @@ type SnippetTemplate struct {
 
 func (x *SnippetTemplate) Reset() {
 	*x = SnippetTemplate{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[30]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1901,7 +1962,7 @@ func (x *SnippetTemplate) String() string {
 func (*SnippetTemplate) ProtoMessage() {}
 
 func (x *SnippetTemplate) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[30]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1914,7 +1975,7 @@ func (x *SnippetTemplate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnippetTemplate.ProtoReflect.Descriptor instead.
 func (*SnippetTemplate) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{30}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SnippetTemplate) GetId() string {
@@ -1972,7 +2033,7 @@ type SnippetField struct {
 
 func (x *SnippetField) Reset() {
 	*x = SnippetField{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[31]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1984,7 +2045,7 @@ func (x *SnippetField) String() string {
 func (*SnippetField) ProtoMessage() {}
 
 func (x *SnippetField) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[31]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1997,7 +2058,7 @@ func (x *SnippetField) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnippetField.ProtoReflect.Descriptor instead.
 func (*SnippetField) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{31}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *SnippetField) GetName() string {
@@ -2080,7 +2141,7 @@ type PlanSnippetResponse struct {
 
 func (x *PlanSnippetResponse) Reset() {
 	*x = PlanSnippetResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[32]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2092,7 +2153,7 @@ func (x *PlanSnippetResponse) String() string {
 func (*PlanSnippetResponse) ProtoMessage() {}
 
 func (x *PlanSnippetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[32]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2105,7 +2166,7 @@ func (x *PlanSnippetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanSnippetResponse.ProtoReflect.Descriptor instead.
 func (*PlanSnippetResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{32}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *PlanSnippetResponse) GetPlanId() string {
@@ -2138,7 +2199,7 @@ type PlanCredRotateRequest struct {
 
 func (x *PlanCredRotateRequest) Reset() {
 	*x = PlanCredRotateRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[33]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2150,7 +2211,7 @@ func (x *PlanCredRotateRequest) String() string {
 func (*PlanCredRotateRequest) ProtoMessage() {}
 
 func (x *PlanCredRotateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[33]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2163,7 +2224,7 @@ func (x *PlanCredRotateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanCredRotateRequest.ProtoReflect.Descriptor instead.
 func (*PlanCredRotateRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{33}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *PlanCredRotateRequest) GetTarget() *AssistTarget {
@@ -2218,7 +2279,7 @@ type PlanCredRotateResponse struct {
 
 func (x *PlanCredRotateResponse) Reset() {
 	*x = PlanCredRotateResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[34]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2230,7 +2291,7 @@ func (x *PlanCredRotateResponse) String() string {
 func (*PlanCredRotateResponse) ProtoMessage() {}
 
 func (x *PlanCredRotateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[34]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2243,7 +2304,7 @@ func (x *PlanCredRotateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanCredRotateResponse.ProtoReflect.Descriptor instead.
 func (*PlanCredRotateResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{34}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *PlanCredRotateResponse) GetPlanId() string {
@@ -2281,7 +2342,7 @@ type PlanRestoreRequest struct {
 
 func (x *PlanRestoreRequest) Reset() {
 	*x = PlanRestoreRequest{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[35]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2293,7 +2354,7 @@ func (x *PlanRestoreRequest) String() string {
 func (*PlanRestoreRequest) ProtoMessage() {}
 
 func (x *PlanRestoreRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[35]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2306,7 +2367,7 @@ func (x *PlanRestoreRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanRestoreRequest.ProtoReflect.Descriptor instead.
 func (*PlanRestoreRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{35}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *PlanRestoreRequest) GetTarget() *AssistTarget {
@@ -2369,7 +2430,7 @@ type RestoreRefusal struct {
 
 func (x *RestoreRefusal) Reset() {
 	*x = RestoreRefusal{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[36]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2381,7 +2442,7 @@ func (x *RestoreRefusal) String() string {
 func (*RestoreRefusal) ProtoMessage() {}
 
 func (x *RestoreRefusal) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[36]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2394,7 +2455,7 @@ func (x *RestoreRefusal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestoreRefusal.ProtoReflect.Descriptor instead.
 func (*RestoreRefusal) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{36}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *RestoreRefusal) GetPath() string {
@@ -2430,7 +2491,7 @@ type PlanRestoreResponse struct {
 
 func (x *PlanRestoreResponse) Reset() {
 	*x = PlanRestoreResponse{}
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[37]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2442,7 +2503,7 @@ func (x *PlanRestoreResponse) String() string {
 func (*PlanRestoreResponse) ProtoMessage() {}
 
 func (x *PlanRestoreResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_assist_proto_msgTypes[37]
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2455,7 +2516,7 @@ func (x *PlanRestoreResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanRestoreResponse.ProtoReflect.Descriptor instead.
 func (*PlanRestoreResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{37}
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *PlanRestoreResponse) GetPlanId() string {
@@ -2514,7 +2575,7 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\x04line\x18\x02 \x01(\tR\x04line\x12\x18\n" +
 	"\apresent\x18\x03 \x01(\bR\apresent\x12\x16\n" +
 	"\x06prefix\x18\x04 \x01(\bR\x06prefix\x12\x16\n" +
-	"\x06column\x18\x05 \x01(\tR\x06column\"\xcd\x01\n" +
+	"\x06column\x18\x05 \x01(\tR\x06column\"\x93\x02\n" +
 	"\x10AssistDevicePlan\x12\x16\n" +
 	"\x06device\x18\x01 \x01(\tR\x06device\x12\x10\n" +
 	"\x03pre\x18\x02 \x03(\tR\x03pre\x12\x14\n" +
@@ -2522,7 +2583,15 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\brollback\x18\x04 \x03(\tR\brollback\x12\x12\n" +
 	"\x04post\x18\x05 \x03(\tR\x04post\x123\n" +
 	"\x06expect\x18\x06 \x03(\v2\x1b.macuahuitl.v1.AssistExpectR\x06expect\x12\x14\n" +
-	"\x05notes\x18\a \x03(\tR\x05notes\"\x86\x01\n" +
+	"\x05notes\x18\a \x03(\tR\x05notes\x12D\n" +
+	"\x10notes_structured\x18\b \x03(\v2\x19.macuahuitl.v1.AssistNoteR\x0fnotesStructured\"\x90\x01\n" +
+	"\n" +
+	"AssistNote\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x127\n" +
+	"\x04args\x18\x02 \x03(\v2#.macuahuitl.v1.AssistNote.ArgsEntryR\x04args\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x86\x01\n" +
 	"\n" +
 	"AssistPlan\x12\x1a\n" +
 	"\bfunction\x18\x01 \x01(\tR\bfunction\x12!\n" +
@@ -2704,104 +2773,108 @@ func file_macuahuitl_v1_assist_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_assist_proto_rawDescData
 }
 
-var file_macuahuitl_v1_assist_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_macuahuitl_v1_assist_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_macuahuitl_v1_assist_proto_goTypes = []any{
 	(*AssistTarget)(nil),                 // 0: macuahuitl.v1.AssistTarget
 	(*PlanPortsRequest)(nil),             // 1: macuahuitl.v1.PlanPortsRequest
 	(*AssistExpect)(nil),                 // 2: macuahuitl.v1.AssistExpect
 	(*AssistDevicePlan)(nil),             // 3: macuahuitl.v1.AssistDevicePlan
-	(*AssistPlan)(nil),                   // 4: macuahuitl.v1.AssistPlan
-	(*PlanPortsResponse)(nil),            // 5: macuahuitl.v1.PlanPortsResponse
-	(*StartRunRequest)(nil),              // 6: macuahuitl.v1.StartRunRequest
-	(*StartRunResponse)(nil),             // 7: macuahuitl.v1.StartRunResponse
-	(*ConfirmRequest)(nil),               // 8: macuahuitl.v1.ConfirmRequest
-	(*ConfirmResponse)(nil),              // 9: macuahuitl.v1.ConfirmResponse
-	(*AbortRequest)(nil),                 // 10: macuahuitl.v1.AbortRequest
-	(*AbortResponse)(nil),                // 11: macuahuitl.v1.AbortResponse
-	(*RollbackRequest)(nil),              // 12: macuahuitl.v1.RollbackRequest
-	(*RollbackResponse)(nil),             // 13: macuahuitl.v1.RollbackResponse
-	(*WatchRunRequest)(nil),              // 14: macuahuitl.v1.WatchRunRequest
-	(*ListRunsRequest)(nil),              // 15: macuahuitl.v1.ListRunsRequest
-	(*ListRunsResponse)(nil),             // 16: macuahuitl.v1.ListRunsResponse
-	(*GetAssistRunRequest)(nil),          // 17: macuahuitl.v1.GetAssistRunRequest
-	(*GetAssistRunResponse)(nil),         // 18: macuahuitl.v1.GetAssistRunResponse
-	(*WatchRunResponse)(nil),             // 19: macuahuitl.v1.WatchRunResponse
-	(*AssistStep)(nil),                   // 20: macuahuitl.v1.AssistStep
-	(*AssistRunState)(nil),               // 21: macuahuitl.v1.AssistRunState
-	(*AssistEvent)(nil),                  // 22: macuahuitl.v1.AssistEvent
-	(*VlanSnippet)(nil),                  // 23: macuahuitl.v1.VlanSnippet
-	(*TrunkSnippet)(nil),                 // 24: macuahuitl.v1.TrunkSnippet
-	(*SviSnippet)(nil),                   // 25: macuahuitl.v1.SviSnippet
-	(*PlanSnippetRequest)(nil),           // 26: macuahuitl.v1.PlanSnippetRequest
-	(*TemplateSnippet)(nil),              // 27: macuahuitl.v1.TemplateSnippet
-	(*ListSnippetTemplatesRequest)(nil),  // 28: macuahuitl.v1.ListSnippetTemplatesRequest
-	(*ListSnippetTemplatesResponse)(nil), // 29: macuahuitl.v1.ListSnippetTemplatesResponse
-	(*SnippetTemplate)(nil),              // 30: macuahuitl.v1.SnippetTemplate
-	(*SnippetField)(nil),                 // 31: macuahuitl.v1.SnippetField
-	(*PlanSnippetResponse)(nil),          // 32: macuahuitl.v1.PlanSnippetResponse
-	(*PlanCredRotateRequest)(nil),        // 33: macuahuitl.v1.PlanCredRotateRequest
-	(*PlanCredRotateResponse)(nil),       // 34: macuahuitl.v1.PlanCredRotateResponse
-	(*PlanRestoreRequest)(nil),           // 35: macuahuitl.v1.PlanRestoreRequest
-	(*RestoreRefusal)(nil),               // 36: macuahuitl.v1.RestoreRefusal
-	(*PlanRestoreResponse)(nil),          // 37: macuahuitl.v1.PlanRestoreResponse
-	nil,                                  // 38: macuahuitl.v1.TemplateSnippet.ValuesEntry
+	(*AssistNote)(nil),                   // 4: macuahuitl.v1.AssistNote
+	(*AssistPlan)(nil),                   // 5: macuahuitl.v1.AssistPlan
+	(*PlanPortsResponse)(nil),            // 6: macuahuitl.v1.PlanPortsResponse
+	(*StartRunRequest)(nil),              // 7: macuahuitl.v1.StartRunRequest
+	(*StartRunResponse)(nil),             // 8: macuahuitl.v1.StartRunResponse
+	(*ConfirmRequest)(nil),               // 9: macuahuitl.v1.ConfirmRequest
+	(*ConfirmResponse)(nil),              // 10: macuahuitl.v1.ConfirmResponse
+	(*AbortRequest)(nil),                 // 11: macuahuitl.v1.AbortRequest
+	(*AbortResponse)(nil),                // 12: macuahuitl.v1.AbortResponse
+	(*RollbackRequest)(nil),              // 13: macuahuitl.v1.RollbackRequest
+	(*RollbackResponse)(nil),             // 14: macuahuitl.v1.RollbackResponse
+	(*WatchRunRequest)(nil),              // 15: macuahuitl.v1.WatchRunRequest
+	(*ListRunsRequest)(nil),              // 16: macuahuitl.v1.ListRunsRequest
+	(*ListRunsResponse)(nil),             // 17: macuahuitl.v1.ListRunsResponse
+	(*GetAssistRunRequest)(nil),          // 18: macuahuitl.v1.GetAssistRunRequest
+	(*GetAssistRunResponse)(nil),         // 19: macuahuitl.v1.GetAssistRunResponse
+	(*WatchRunResponse)(nil),             // 20: macuahuitl.v1.WatchRunResponse
+	(*AssistStep)(nil),                   // 21: macuahuitl.v1.AssistStep
+	(*AssistRunState)(nil),               // 22: macuahuitl.v1.AssistRunState
+	(*AssistEvent)(nil),                  // 23: macuahuitl.v1.AssistEvent
+	(*VlanSnippet)(nil),                  // 24: macuahuitl.v1.VlanSnippet
+	(*TrunkSnippet)(nil),                 // 25: macuahuitl.v1.TrunkSnippet
+	(*SviSnippet)(nil),                   // 26: macuahuitl.v1.SviSnippet
+	(*PlanSnippetRequest)(nil),           // 27: macuahuitl.v1.PlanSnippetRequest
+	(*TemplateSnippet)(nil),              // 28: macuahuitl.v1.TemplateSnippet
+	(*ListSnippetTemplatesRequest)(nil),  // 29: macuahuitl.v1.ListSnippetTemplatesRequest
+	(*ListSnippetTemplatesResponse)(nil), // 30: macuahuitl.v1.ListSnippetTemplatesResponse
+	(*SnippetTemplate)(nil),              // 31: macuahuitl.v1.SnippetTemplate
+	(*SnippetField)(nil),                 // 32: macuahuitl.v1.SnippetField
+	(*PlanSnippetResponse)(nil),          // 33: macuahuitl.v1.PlanSnippetResponse
+	(*PlanCredRotateRequest)(nil),        // 34: macuahuitl.v1.PlanCredRotateRequest
+	(*PlanCredRotateResponse)(nil),       // 35: macuahuitl.v1.PlanCredRotateResponse
+	(*PlanRestoreRequest)(nil),           // 36: macuahuitl.v1.PlanRestoreRequest
+	(*RestoreRefusal)(nil),               // 37: macuahuitl.v1.RestoreRefusal
+	(*PlanRestoreResponse)(nil),          // 38: macuahuitl.v1.PlanRestoreResponse
+	nil,                                  // 39: macuahuitl.v1.AssistNote.ArgsEntry
+	nil,                                  // 40: macuahuitl.v1.TemplateSnippet.ValuesEntry
 }
 var file_macuahuitl_v1_assist_proto_depIdxs = []int32{
 	0,  // 0: macuahuitl.v1.PlanPortsRequest.target:type_name -> macuahuitl.v1.AssistTarget
 	2,  // 1: macuahuitl.v1.AssistDevicePlan.expect:type_name -> macuahuitl.v1.AssistExpect
-	3,  // 2: macuahuitl.v1.AssistPlan.devices:type_name -> macuahuitl.v1.AssistDevicePlan
-	4,  // 3: macuahuitl.v1.PlanPortsResponse.plan:type_name -> macuahuitl.v1.AssistPlan
-	21, // 4: macuahuitl.v1.ConfirmResponse.run:type_name -> macuahuitl.v1.AssistRunState
-	21, // 5: macuahuitl.v1.AbortResponse.run:type_name -> macuahuitl.v1.AssistRunState
-	21, // 6: macuahuitl.v1.RollbackResponse.run:type_name -> macuahuitl.v1.AssistRunState
-	21, // 7: macuahuitl.v1.ListRunsResponse.runs:type_name -> macuahuitl.v1.AssistRunState
-	21, // 8: macuahuitl.v1.GetAssistRunResponse.run:type_name -> macuahuitl.v1.AssistRunState
-	22, // 9: macuahuitl.v1.WatchRunResponse.event:type_name -> macuahuitl.v1.AssistEvent
-	20, // 10: macuahuitl.v1.AssistRunState.pending:type_name -> macuahuitl.v1.AssistStep
-	20, // 11: macuahuitl.v1.AssistEvent.step:type_name -> macuahuitl.v1.AssistStep
-	0,  // 12: macuahuitl.v1.PlanSnippetRequest.target:type_name -> macuahuitl.v1.AssistTarget
-	23, // 13: macuahuitl.v1.PlanSnippetRequest.vlan:type_name -> macuahuitl.v1.VlanSnippet
-	24, // 14: macuahuitl.v1.PlanSnippetRequest.trunk:type_name -> macuahuitl.v1.TrunkSnippet
-	25, // 15: macuahuitl.v1.PlanSnippetRequest.svi:type_name -> macuahuitl.v1.SviSnippet
-	27, // 16: macuahuitl.v1.PlanSnippetRequest.template:type_name -> macuahuitl.v1.TemplateSnippet
-	38, // 17: macuahuitl.v1.TemplateSnippet.values:type_name -> macuahuitl.v1.TemplateSnippet.ValuesEntry
-	30, // 18: macuahuitl.v1.ListSnippetTemplatesResponse.templates:type_name -> macuahuitl.v1.SnippetTemplate
-	31, // 19: macuahuitl.v1.SnippetTemplate.fields:type_name -> macuahuitl.v1.SnippetField
-	4,  // 20: macuahuitl.v1.PlanSnippetResponse.plan:type_name -> macuahuitl.v1.AssistPlan
-	0,  // 21: macuahuitl.v1.PlanCredRotateRequest.target:type_name -> macuahuitl.v1.AssistTarget
-	4,  // 22: macuahuitl.v1.PlanCredRotateResponse.plan:type_name -> macuahuitl.v1.AssistPlan
-	0,  // 23: macuahuitl.v1.PlanRestoreRequest.target:type_name -> macuahuitl.v1.AssistTarget
-	4,  // 24: macuahuitl.v1.PlanRestoreResponse.plan:type_name -> macuahuitl.v1.AssistPlan
-	36, // 25: macuahuitl.v1.PlanRestoreResponse.refused:type_name -> macuahuitl.v1.RestoreRefusal
-	1,  // 26: macuahuitl.v1.AssistService.PlanPorts:input_type -> macuahuitl.v1.PlanPortsRequest
-	26, // 27: macuahuitl.v1.AssistService.PlanSnippet:input_type -> macuahuitl.v1.PlanSnippetRequest
-	28, // 28: macuahuitl.v1.AssistService.ListSnippetTemplates:input_type -> macuahuitl.v1.ListSnippetTemplatesRequest
-	33, // 29: macuahuitl.v1.AssistService.PlanCredRotate:input_type -> macuahuitl.v1.PlanCredRotateRequest
-	35, // 30: macuahuitl.v1.AssistService.PlanRestore:input_type -> macuahuitl.v1.PlanRestoreRequest
-	6,  // 31: macuahuitl.v1.AssistService.StartRun:input_type -> macuahuitl.v1.StartRunRequest
-	8,  // 32: macuahuitl.v1.AssistService.Confirm:input_type -> macuahuitl.v1.ConfirmRequest
-	10, // 33: macuahuitl.v1.AssistService.Abort:input_type -> macuahuitl.v1.AbortRequest
-	12, // 34: macuahuitl.v1.AssistService.Rollback:input_type -> macuahuitl.v1.RollbackRequest
-	14, // 35: macuahuitl.v1.AssistService.WatchRun:input_type -> macuahuitl.v1.WatchRunRequest
-	15, // 36: macuahuitl.v1.AssistService.ListRuns:input_type -> macuahuitl.v1.ListRunsRequest
-	17, // 37: macuahuitl.v1.AssistService.GetAssistRun:input_type -> macuahuitl.v1.GetAssistRunRequest
-	5,  // 38: macuahuitl.v1.AssistService.PlanPorts:output_type -> macuahuitl.v1.PlanPortsResponse
-	32, // 39: macuahuitl.v1.AssistService.PlanSnippet:output_type -> macuahuitl.v1.PlanSnippetResponse
-	29, // 40: macuahuitl.v1.AssistService.ListSnippetTemplates:output_type -> macuahuitl.v1.ListSnippetTemplatesResponse
-	34, // 41: macuahuitl.v1.AssistService.PlanCredRotate:output_type -> macuahuitl.v1.PlanCredRotateResponse
-	37, // 42: macuahuitl.v1.AssistService.PlanRestore:output_type -> macuahuitl.v1.PlanRestoreResponse
-	7,  // 43: macuahuitl.v1.AssistService.StartRun:output_type -> macuahuitl.v1.StartRunResponse
-	9,  // 44: macuahuitl.v1.AssistService.Confirm:output_type -> macuahuitl.v1.ConfirmResponse
-	11, // 45: macuahuitl.v1.AssistService.Abort:output_type -> macuahuitl.v1.AbortResponse
-	13, // 46: macuahuitl.v1.AssistService.Rollback:output_type -> macuahuitl.v1.RollbackResponse
-	19, // 47: macuahuitl.v1.AssistService.WatchRun:output_type -> macuahuitl.v1.WatchRunResponse
-	16, // 48: macuahuitl.v1.AssistService.ListRuns:output_type -> macuahuitl.v1.ListRunsResponse
-	18, // 49: macuahuitl.v1.AssistService.GetAssistRun:output_type -> macuahuitl.v1.GetAssistRunResponse
-	38, // [38:50] is the sub-list for method output_type
-	26, // [26:38] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	4,  // 2: macuahuitl.v1.AssistDevicePlan.notes_structured:type_name -> macuahuitl.v1.AssistNote
+	39, // 3: macuahuitl.v1.AssistNote.args:type_name -> macuahuitl.v1.AssistNote.ArgsEntry
+	3,  // 4: macuahuitl.v1.AssistPlan.devices:type_name -> macuahuitl.v1.AssistDevicePlan
+	5,  // 5: macuahuitl.v1.PlanPortsResponse.plan:type_name -> macuahuitl.v1.AssistPlan
+	22, // 6: macuahuitl.v1.ConfirmResponse.run:type_name -> macuahuitl.v1.AssistRunState
+	22, // 7: macuahuitl.v1.AbortResponse.run:type_name -> macuahuitl.v1.AssistRunState
+	22, // 8: macuahuitl.v1.RollbackResponse.run:type_name -> macuahuitl.v1.AssistRunState
+	22, // 9: macuahuitl.v1.ListRunsResponse.runs:type_name -> macuahuitl.v1.AssistRunState
+	22, // 10: macuahuitl.v1.GetAssistRunResponse.run:type_name -> macuahuitl.v1.AssistRunState
+	23, // 11: macuahuitl.v1.WatchRunResponse.event:type_name -> macuahuitl.v1.AssistEvent
+	21, // 12: macuahuitl.v1.AssistRunState.pending:type_name -> macuahuitl.v1.AssistStep
+	21, // 13: macuahuitl.v1.AssistEvent.step:type_name -> macuahuitl.v1.AssistStep
+	0,  // 14: macuahuitl.v1.PlanSnippetRequest.target:type_name -> macuahuitl.v1.AssistTarget
+	24, // 15: macuahuitl.v1.PlanSnippetRequest.vlan:type_name -> macuahuitl.v1.VlanSnippet
+	25, // 16: macuahuitl.v1.PlanSnippetRequest.trunk:type_name -> macuahuitl.v1.TrunkSnippet
+	26, // 17: macuahuitl.v1.PlanSnippetRequest.svi:type_name -> macuahuitl.v1.SviSnippet
+	28, // 18: macuahuitl.v1.PlanSnippetRequest.template:type_name -> macuahuitl.v1.TemplateSnippet
+	40, // 19: macuahuitl.v1.TemplateSnippet.values:type_name -> macuahuitl.v1.TemplateSnippet.ValuesEntry
+	31, // 20: macuahuitl.v1.ListSnippetTemplatesResponse.templates:type_name -> macuahuitl.v1.SnippetTemplate
+	32, // 21: macuahuitl.v1.SnippetTemplate.fields:type_name -> macuahuitl.v1.SnippetField
+	5,  // 22: macuahuitl.v1.PlanSnippetResponse.plan:type_name -> macuahuitl.v1.AssistPlan
+	0,  // 23: macuahuitl.v1.PlanCredRotateRequest.target:type_name -> macuahuitl.v1.AssistTarget
+	5,  // 24: macuahuitl.v1.PlanCredRotateResponse.plan:type_name -> macuahuitl.v1.AssistPlan
+	0,  // 25: macuahuitl.v1.PlanRestoreRequest.target:type_name -> macuahuitl.v1.AssistTarget
+	5,  // 26: macuahuitl.v1.PlanRestoreResponse.plan:type_name -> macuahuitl.v1.AssistPlan
+	37, // 27: macuahuitl.v1.PlanRestoreResponse.refused:type_name -> macuahuitl.v1.RestoreRefusal
+	1,  // 28: macuahuitl.v1.AssistService.PlanPorts:input_type -> macuahuitl.v1.PlanPortsRequest
+	27, // 29: macuahuitl.v1.AssistService.PlanSnippet:input_type -> macuahuitl.v1.PlanSnippetRequest
+	29, // 30: macuahuitl.v1.AssistService.ListSnippetTemplates:input_type -> macuahuitl.v1.ListSnippetTemplatesRequest
+	34, // 31: macuahuitl.v1.AssistService.PlanCredRotate:input_type -> macuahuitl.v1.PlanCredRotateRequest
+	36, // 32: macuahuitl.v1.AssistService.PlanRestore:input_type -> macuahuitl.v1.PlanRestoreRequest
+	7,  // 33: macuahuitl.v1.AssistService.StartRun:input_type -> macuahuitl.v1.StartRunRequest
+	9,  // 34: macuahuitl.v1.AssistService.Confirm:input_type -> macuahuitl.v1.ConfirmRequest
+	11, // 35: macuahuitl.v1.AssistService.Abort:input_type -> macuahuitl.v1.AbortRequest
+	13, // 36: macuahuitl.v1.AssistService.Rollback:input_type -> macuahuitl.v1.RollbackRequest
+	15, // 37: macuahuitl.v1.AssistService.WatchRun:input_type -> macuahuitl.v1.WatchRunRequest
+	16, // 38: macuahuitl.v1.AssistService.ListRuns:input_type -> macuahuitl.v1.ListRunsRequest
+	18, // 39: macuahuitl.v1.AssistService.GetAssistRun:input_type -> macuahuitl.v1.GetAssistRunRequest
+	6,  // 40: macuahuitl.v1.AssistService.PlanPorts:output_type -> macuahuitl.v1.PlanPortsResponse
+	33, // 41: macuahuitl.v1.AssistService.PlanSnippet:output_type -> macuahuitl.v1.PlanSnippetResponse
+	30, // 42: macuahuitl.v1.AssistService.ListSnippetTemplates:output_type -> macuahuitl.v1.ListSnippetTemplatesResponse
+	35, // 43: macuahuitl.v1.AssistService.PlanCredRotate:output_type -> macuahuitl.v1.PlanCredRotateResponse
+	38, // 44: macuahuitl.v1.AssistService.PlanRestore:output_type -> macuahuitl.v1.PlanRestoreResponse
+	8,  // 45: macuahuitl.v1.AssistService.StartRun:output_type -> macuahuitl.v1.StartRunResponse
+	10, // 46: macuahuitl.v1.AssistService.Confirm:output_type -> macuahuitl.v1.ConfirmResponse
+	12, // 47: macuahuitl.v1.AssistService.Abort:output_type -> macuahuitl.v1.AbortResponse
+	14, // 48: macuahuitl.v1.AssistService.Rollback:output_type -> macuahuitl.v1.RollbackResponse
+	20, // 49: macuahuitl.v1.AssistService.WatchRun:output_type -> macuahuitl.v1.WatchRunResponse
+	17, // 50: macuahuitl.v1.AssistService.ListRuns:output_type -> macuahuitl.v1.ListRunsResponse
+	19, // 51: macuahuitl.v1.AssistService.GetAssistRun:output_type -> macuahuitl.v1.GetAssistRunResponse
+	40, // [40:52] is the sub-list for method output_type
+	28, // [28:40] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_assist_proto_init() }
@@ -2810,8 +2883,8 @@ func file_macuahuitl_v1_assist_proto_init() {
 		return
 	}
 	file_macuahuitl_v1_assist_proto_msgTypes[1].OneofWrappers = []any{}
-	file_macuahuitl_v1_assist_proto_msgTypes[25].OneofWrappers = []any{}
-	file_macuahuitl_v1_assist_proto_msgTypes[26].OneofWrappers = []any{
+	file_macuahuitl_v1_assist_proto_msgTypes[26].OneofWrappers = []any{}
+	file_macuahuitl_v1_assist_proto_msgTypes[27].OneofWrappers = []any{
 		(*PlanSnippetRequest_Vlan)(nil),
 		(*PlanSnippetRequest_Trunk)(nil),
 		(*PlanSnippetRequest_Svi)(nil),
@@ -2823,7 +2896,7 @@ func file_macuahuitl_v1_assist_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_assist_proto_rawDesc), len(file_macuahuitl_v1_assist_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   39,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

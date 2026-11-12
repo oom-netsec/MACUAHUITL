@@ -22,10 +22,10 @@ const DefaultDecisionTimeout = 30 * time.Minute
 
 var (
 	// ErrNotAssisted: regla 1; una ejecución solo existe si la petición la pidió de forma explícita.
-	ErrNotAssisted = errors.New("assist: el modo asistido no está habilitado para esta ejecución")
-	ErrBadState    = errors.New("assist: la ejecución no está en un estado que admita eso")
-	ErrNoPending   = errors.New("assist: no hay un paso esperando confirmación")
-	ErrWrongStep   = errors.New("assist: ese no es el paso pendiente")
+	ErrNotAssisted = cerr("assist.not_assisted")
+	ErrBadState    = cerr("assist.bad_state")
+	ErrNoPending   = cerr("assist.no_pending")
+	ErrWrongStep   = cerr("assist.wrong_step")
 )
 
 // Output es la salida de un comando de lectura.
@@ -110,6 +110,8 @@ type Event struct {
 	Step   *Step
 	Device string
 	Text   string
+	// TextEN es el texto en inglés cuando lo hay (el motivo de un fallo y los avisos del propio motor); vacío = es salida del equipo, que no se traduce.
+	TextEN string
 	// Changed son los equipos que la ejecución cambió y siguen cambiados al emitirse el evento.
 	Changed []string
 }
@@ -148,26 +150,27 @@ const (
 // Run es una ejecución asistida: avanza sola en lo que solo lee y se detiene a esperar
 // Confirm antes de cada paso que cambia la red (regla 4).
 type Run struct {
-	id      string
-	plan    Plan
-	exec    Executor
-	audit   func(action, target, detail string)
-	done    chan struct{}
-	dec     chan decision
-	mu      sync.Mutex
-	state   State
-	pending *Step
-	waiting bool // el motor espera una decisión (Confirm, Abort o Rollback)
-	canRoll bool
-	abort   bool  // Abort pedido mientras corría un paso
-	changed []int // equipos que siguen cambiados, en el orden en que se aplicaron
-	reason  string
-	inRoll  bool // ya está revirtiendo
-	log     []Event
-	notify  chan struct{}
-	timeout time.Duration
-	fn      Function
-	secrets []string // de todos los equipos: lo que scrub quita de todo lo que sale del motor
+	id       string
+	plan     Plan
+	exec     Executor
+	audit    func(action, target, detail string)
+	done     chan struct{}
+	dec      chan decision
+	mu       sync.Mutex
+	state    State
+	pending  *Step
+	waiting  bool // el motor espera una decisión (Confirm, Abort o Rollback)
+	canRoll  bool
+	abort    bool  // Abort pedido mientras corría un paso
+	changed  []int // equipos que siguen cambiados, en el orden en que se aplicaron
+	reason   string
+	reasonEN string // el mismo motivo en inglés
+	inRoll   bool   // ya está revirtiendo
+	log      []Event
+	notify   chan struct{}
+	timeout  time.Duration
+	fn       Function
+	secrets  []string // de todos los equipos: lo que scrub quita de todo lo que sale del motor
 	// snap guarda, por equipo, la salida de los comandos de la línea base tras aplicar: si cambia antes de la reversa, alguien más tocó el puerto.
 	snap map[int]map[string]string
 	// recheck: equipos cuya reversa ya se mandó y no se pudo dar por buena; el reintento primero mira si ya están en su línea base.
@@ -192,7 +195,7 @@ func NewRun(o Options) (*Run, error) {
 	for _, d := range o.Plan.Devices {
 		secrets = append(secrets, d.Secrets...)
 		if _, ok := o.Exec.(Verifier); d.VerifyLogin && !ok {
-			return nil, errors.New("assist: el plan exige verificar la credencial nueva y el ejecutor no sabe hacerlo")
+			return nil, cerr("assist.no_verifier")
 		}
 	}
 	r := &Run{id: o.ID, plan: o.Plan, exec: o.Exec, state: Planned, timeout: o.DecisionTimeout, fn: o.Fn, secrets: secrets,
@@ -247,6 +250,7 @@ type Snapshot struct {
 	State       State
 	Pending     *Step
 	Reason      string
+	ReasonEN    string // el motivo en inglés
 	Changed     []string
 	Devices     []string
 	Waiting     bool // el motor espera una decisión
@@ -258,7 +262,7 @@ type Snapshot struct {
 func (r *Run) Snapshot() Snapshot {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	sn := Snapshot{State: r.state, Reason: r.reason, Changed: r.changedLocked(), Waiting: r.waiting,
+	sn := Snapshot{State: r.state, Reason: r.reason, ReasonEN: r.reasonEN, Changed: r.changedLocked(), Waiting: r.waiting,
 		CanRollback: r.waiting && r.canRoll, Events: len(r.log)}
 	if r.pending != nil {
 		p := *r.pending
@@ -295,9 +299,12 @@ func (r *Run) Events(from int) ([]Event, <-chan struct{}) {
 // emit anota un evento. Requiere r.mu.
 func (r *Run) emit(e Event) {
 	e.Seq = len(r.log)
-	e.Text = r.scrub(e.Text)
+	e.Text, e.TextEN = r.scrub(e.Text), r.scrub(e.TextEN)
 	if e.Kind == EvOutput && !r.fn.Scrub { // la salida cruda de una lectura puede traer llaves y contraseñas de otras secciones del running
 		e.Text, _ = mask.Apply("ios-xe", e.Text)
+		if e.TextEN != "" {
+			e.TextEN, _ = mask.Apply("ios-xe", e.TextEN)
+		}
 	}
 	e.Changed = r.changedLocked()
 	r.log = append(r.log, e)
@@ -315,6 +322,14 @@ func (r *Run) setState(s State) {
 func (r *Run) out(device, text string) {
 	r.mu.Lock()
 	r.emit(Event{Kind: EvOutput, Device: device, Text: text})
+	r.mu.Unlock()
+}
+
+// say emite un texto del propio motor (no salida del equipo) con su versión en inglés: key del catálogo y los argumentos de cada idioma
+// (difieren cuando un argumento es un texto en es; un error con código entra en inglés al texto en inglés).
+func (r *Run) say(device, key string, es, en i18n.Args) {
+	r.mu.Lock()
+	r.emit(Event{Kind: EvOutput, Device: device, Text: i18n.Msg(i18n.Es, key, es), TextEN: i18n.Msg(i18n.En, key, en)})
 	r.mu.Unlock()
 }
 
@@ -414,14 +429,14 @@ func (r *Run) await(ctx context.Context, step *Step, canRoll bool) decision {
 	// step nil: fail ya dejó el motor esperando, en la misma sección en que publicó el fallo.
 	t := time.NewTimer(r.timeout)
 	defer t.Stop()
-	var why string
+	var why, whyEN string
 	select {
 	case d := <-r.dec:
 		return d
 	case <-ctx.Done():
-		why = "la ejecución se canceló (cierre del núcleo)"
+		why, whyEN = "la ejecución se canceló (cierre del núcleo)", "the run was canceled (the core is closing)"
 	case <-t.C:
-		why = fmt.Sprintf("nadie decidió en %s", r.timeout)
+		why, whyEN = fmt.Sprintf("nadie decidió en %s", r.timeout), fmt.Sprintf("nobody decided within %s", r.timeout)
 	}
 	r.mu.Lock()
 	if !r.waiting { // una decisión llegó justo ahora
@@ -429,7 +444,7 @@ func (r *Run) await(ctx context.Context, step *Step, canRoll bool) decision {
 		return <-r.dec
 	}
 	r.pending, r.waiting = nil, false
-	r.reason = why
+	r.reason, r.reasonEN = why, whyEN
 	r.mu.Unlock()
 	return dAbandon
 }
@@ -442,7 +457,7 @@ func (r *Run) Confirm(id string) error {
 		return ErrNoPending
 	}
 	if r.pending.ID != id {
-		return fmt.Errorf("%w: espera %s, no %s", ErrWrongStep, r.pending.ID, id)
+		return newRefusal(ErrWrongStep, "assist.wrong_step_why", i18n.Tx("assist.wrong_step_why.expects", "pending", r.pending.ID, "id", id))
 	}
 	r.audit("assist.confirm", r.id, id)
 	r.pending, r.waiting = nil, false
@@ -478,7 +493,7 @@ func (r *Run) Rollback() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.waiting || !r.canRoll {
-		return fmt.Errorf("%w: no hay equipos cambiados que revertir o la ejecución no está detenida", ErrBadState)
+		return newRefusal(ErrBadState, "assist.bad_state_why", i18n.Tx("assist.bad_state_why.nothing_to_revert"))
 	}
 	r.pending, r.waiting = nil, false
 	r.state = Running
@@ -496,14 +511,21 @@ func (r *Run) takeAbort() bool {
 
 // failT detiene la ejecución (regla 5): el texto para la pantalla (es) y el de la auditoría, en inglés.
 func (r *Run) failT(format, en string, a ...any) outcome {
-	return r.failMsg(fmt.Sprintf(format, a...), fmt.Sprintf(en, a...))
+	ea := make([]any, len(a)) // un error con código del catálogo entra en inglés al texto en inglés
+	for i, x := range a {
+		if e, ok := x.(error); ok {
+			x = i18n.English(e)
+		}
+		ea[i] = x
+	}
+	return r.failMsg(fmt.Sprintf(format, a...), fmt.Sprintf(en, ea...))
 }
 
 // failMsg es failT con los dos textos ya armados.
 func (r *Run) failMsg(es, en string) outcome {
-	msg := r.scrub(es)
+	msg, msgEN := r.scrub(es), r.scrub(en)
 	r.mu.Lock()
-	r.state, r.reason = Failed, msg
+	r.state, r.reason, r.reasonEN = Failed, msg, msgEN
 	o := oFailed
 	switch {
 	case r.abort: // un Abort aceptado mientras corría el paso: no hay nada que esperar
@@ -512,7 +534,7 @@ func (r *Run) failMsg(es, en string) outcome {
 		// Quien vea el estado failed ya puede pedir la reversa (o reintentarla) o abortar: la espera se arma en esta misma sección.
 		r.pending, r.waiting, r.canRoll = nil, true, true
 	}
-	r.emit(Event{Kind: EvFail, State: Failed, Text: msg})
+	r.emit(Event{Kind: EvFail, State: Failed, Text: msg, TextEN: msgEN})
 	r.mu.Unlock()
 	r.log2("assist.fail", r.id, "%s", en)
 	return o
@@ -631,8 +653,16 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 	if err != nil {
 		return r.failT("post-check de %s: %v", "post-check of %s: %v", dp.Device, err), true
 	}
-	if fails := EvalExpect(dp.Expect, outs); len(fails) > 0 {
-		return r.failT("el post-check de %s no cumple lo esperado: %s", "the post-check of %s does not meet expectations: %s", dp.Device, strings.Join(fails, "; ")), true
+	if fails := evalExpect(dp.Expect, outs); len(fails) > 0 {
+		join := func(loc string) string {
+			parts := make([]string, len(fails))
+			for i, f := range fails {
+				parts[i] = f.In(loc)
+			}
+			return strings.Join(parts, "; ")
+		}
+		return r.failMsg(fmt.Sprintf("el post-check de %s no cumple lo esperado: %s", dp.Device, join(i18n.Es)),
+			fmt.Sprintf("the post-check of %s does not meet expectations: %s", dp.Device, join(i18n.En))), true
 	}
 	if dp.VerifyLogin { // sesión nueva con la credencial nueva: si no entra, la original sigue abierta para revertir
 		msg, err := r.exec.(Verifier).Verify(ctx, dp.Device)
@@ -755,7 +785,7 @@ func (r *Run) rollbackOne(ctx context.Context, i int) bool {
 		r.mu.Unlock()
 		if again {
 			if _, diffs, err := r.checkBase(ctx, i, nil); err == nil && len(diffs) == 0 {
-				r.out(dp.Device, "el equipo ya coincide con su línea base: se cuenta como revertido")
+				r.say(dp.Device, "assist.run.matches_baseline", nil, nil)
 				r.reverted(ctx, dp)
 				r.unchange(i)
 				return true
@@ -794,14 +824,14 @@ func (r *Run) revert(ctx context.Context, i int) bool {
 	sent, err := r.exec.Configure(ctx, dp.Device, dp.Rollback)
 	failed, failedEN := r.sent(dp.Device, sent)
 	if err != nil {
-		failed, failedEN = fmt.Sprintf("reversa de %s: %v", dp.Device, err), fmt.Sprintf("rollback of %s: %v", dp.Device, err)
+		failed, failedEN = fmt.Sprintf("reversa de %s: %v", dp.Device, err), fmt.Sprintf("rollback of %s: %v", dp.Device, i18n.English(err))
 	}
 	if failed != "" {
 		// Si se mandó alguna línea, el equipo ya no está como lo dejó el apply: se relee para que un reintento
 		// no lo tome por un cambio ajeno, y si ya coincide con la línea base la reversa sí se cumplió.
 		if len(sent) > 0 && r.resync(ctx, i) {
 			r.log2("assist.rollback", dp.Device, "run=%s the rollback failed (%s) but the device already matches the baseline", r.id, trim(failedEN))
-			r.out(dp.Device, "la reversa falló ("+trim(failed)+") pero el equipo ya coincide con su línea base: se cuenta como revertido")
+			r.say(dp.Device, "assist.run.rollback_failed_matches", i18n.A("failed", trim(failed)), i18n.A("failed", trim(failedEN)))
 			r.reverted(ctx, dp)
 			r.unchange(i)
 			return true
@@ -817,7 +847,7 @@ func (r *Run) revert(ctx context.Context, i int) bool {
 			r.failT("no se pudo verificar la reversa de %s: %v; reintenta la reversa o revísalo a mano", "could not verify the rollback of %s: %v; retry the rollback or check it by hand", dp.Device, err)
 			return false
 		}
-		r.out(dp.Device, "post-check tras la reversa: "+err.Error())
+		r.say(dp.Device, "assist.run.post_check_after_rollback", i18n.A("error", err.Error()), i18n.A("error", i18n.English(err)))
 	} else if len(diffs) > 0 {
 		r.remember(i, dp.Baseline, outs) // un reintento parte de aquí, no lo toma por un cambio ajeno
 		r.setRecheck(i)
@@ -874,7 +904,7 @@ func (r *Run) checkBase(ctx context.Context, i int, cmds []string) (map[string]s
 	for _, c := range run {
 		got, ok := outs[c]
 		if !ok {
-			return nil, nil, fmt.Errorf("no llegó la salida de %s", c)
+			return nil, nil, cerr("assist.err.output_not_received", "command", c)
 		}
 		if d := residue(dp.Baseline[c], got); d != "" {
 			diffs = append(diffs, c+": "+d)
@@ -883,11 +913,11 @@ func (r *Run) checkBase(ctx context.Context, i int, cmds []string) (map[string]s
 	for _, c := range statusCmds(dp) {
 		got, ok := outs[c]
 		if !ok {
-			return nil, nil, fmt.Errorf("no llegó la salida de %s", c)
+			return nil, nil, cerr("assist.err.output_not_received", "command", c)
 		}
 		now, _ := iosxe.ParseIfStatus(got)
 		if len(now) == 0 {
-			return nil, nil, fmt.Errorf("no se pudo leer el estado del puerto en %s", c)
+			return nil, nil, cerr("assist.err.port_status_unreadable", "command", c)
 		}
 		was, _ := iosxe.ParseIfStatus(dp.Baseline[c])
 		if now[0].Status == "err-disabled" && (len(was) == 0 || was[0].Status != "err-disabled") {
@@ -955,7 +985,7 @@ func (r *Run) reverted(ctx context.Context, dp DevicePlan) {
 	}
 	if err := r.exec.(Verifier).Reverted(ctx, dp.Device); err != nil {
 		r.log2("assist.verify", dp.Device, "run=%s the vault did not return to the previous credential: %v", r.id, i18n.English(err))
-		r.out(dp.Device, "ATENCIÓN: la bóveda no volvió a la credencial anterior: "+err.Error())
+		r.say(dp.Device, "assist.run.vault_not_restored", i18n.A("error", err.Error()), i18n.A("error", i18n.English(err)))
 	}
 }
 

@@ -895,3 +895,35 @@ interface PcapReportData { text;
 - `calc/bars.ts`: título de la subred y del VLSM, las filas por clave, el prefijo y largo del padre, las columnas por clave y el espacio libre (`calc.note.vlsm_free`).
 - `tools/pcapParse.ts`: equipos con más tráfico, conversaciones y protocolos.
 - **No cubierto:** ver los «Siguen en español con `en`» de cada módulo; además, los errores de validación que rechazan la petición (`InvalidArgument`) siguen su propio camino de 30a, y IKE, DNS y TLS de `tools` quedan para otra fase.
+
+## Asistente de cambios y snippets en el idioma pedido (fase 30c, bloque B)
+
+Cubre `internal/assist` y `internal/service/assist`. Compatibilidad: sin `accept-language`, o con `es`, todo texto es idéntico byte por byte (lo fija un golden de regresión por RPC). La auditoría no cambia. Las líneas de configuración de IOS y los comandos `show` no se traducen; tampoco las IP, interfaces, VLAN, usuarios ni nombres, que viajan como argumentos.
+
+### Campos nuevos
+- `AssistDevicePlan.notes_structured` (campo 8; en el puente `notesStructured`, ausente si no hay): una `{key, args}` por aviso, en el mismo orden que `notes`. `notes` sale en el idioma pedido. En TS: `DevicePlan.notesStructured?: AssistNote[] | null`.
+- Claves `assist.note.*`: `errdisabled`, `port_mode`, `port_mode_same {port, mode}`, `speed_duplex`, `snmpv3`, `vty_acl {acl, ip1, what1}` y `vty_acl_two {acl, ip1, what1, ip2, what2}`. `what1` y `what2` valen `"1"` (la IP que ve el equipo) o `"2"` (la IP local de la app); el catálogo escribe la frase en cada idioma.
+- `AssistRunState.fail_reason`, `AssistEvent.text` del evento `fail` y `PlanRestoreResponse.reason` salen en el idioma pedido. `AssistEvent.text` de los eventos `output` es salida del equipo y no se traduce.
+
+### Códigos nuevos (reason y metadata)
+Los códigos con argumentos declaran sus `args` en el catálogo; la metadata solo trae esos argumentos (nunca secretos: la community, las contraseñas y los hashes no se citan).
+- **`assist.refused`** (ya existía): su motivo concreto ahora también se traduce; su texto y su metadata (`template`, `device`) no cambian. Los textos en inglés ya existentes de `assist.invalid_value`, `assist.refused` y sus piezas no se tocaron.
+- **`assist.port_refused`**, **`assist.rotate_refused`** y **`assist.restore_refused`** (`FailedPrecondition`): antes sin reason. El texto es `<centinela>: <motivo>`; metadata vacía.
+- **Estado de la ejecución** (`FailedPrecondition`): `assist.not_assisted`, `assist.bad_state`, `assist.no_pending`, `assist.wrong_step`, `assist.wrong_step_why` y `assist.bad_state_why` (con la razón detrás de `: `).
+- **Errores de armado** (`InvalidArgument`): `assist.err.*`, con nombres estables en inglés (por ejemplo `assist.err.nothing_to_change`, `assist.err.not_physical_port {port}`, `assist.err.interface_required`, `assist.err.output_missing {command}`, `assist.err.vlan_range {vlan}`). El reason es el propio código.
+- **Errores del servicio**: `assist.svc.*` (bóveda cerrada, objetivo, plan inexistente o usado, ejecución inexistente, respaldos no restaurables…), con el código gRPC de siempre.
+- Los motivos de cada negativa viven en `assist.refused.*`, `assist.port_refused.*`, `assist.rotate_refused.*` y `assist.restore_refused.*`; viajan dentro del mensaje, no como reason.
+
+### Qué no cambió
+- Con `en`, los errores con código pierden los prefijos de envoltorio de otras capas (como en 30a).
+- La forma del error de `assist.invalid_value` que reconoce `mapInvalid` del front («campo: …» y «campo is required») no cambió.
+
+### No cubierto
+- Los motivos por línea de la restauración por diff (`RestoreRefusal.why`, sus ~45 frases) siguen en español: viajan como texto plano por todo el motor y cambiarlos exige un tipo nuevo; queda para otra fase.
+- Los errores de validación internos del plan (`ErrInvalidPlan`, las funciones `Check`/`CheckDevice` y los `parse*Line`) siguen en español: solo se disparan ante un fallo del propio núcleo, no por entrada del usuario.
+- `rotate.go` del servicio (errores de la bóveda al rotar) y las partes de `fail_reason` que repiten texto de otra capa (`%v` de un error sin código) siguen como vienen.
+
+### Revisión del bloque B
+- **Descripción no válida** (la de `PlanPorts` y la del SVI): reason `assist.err.description_invalid` con metadata `{field: "description"}`; ya no usa `assist.invalid_value` ni lleva `why`.
+- **Texto de auditoría de los fallos:** el detalle de `assist.fail` (lo que arma `failT`/`failMsg`) sale ahora en inglés completo, también cuando el fallo cita fallos del post-check o errores con código del catálogo.
+- **Eventos del motor:** los textos propios del motor que viajan como evento `output` (`assist.run.matches_baseline`, `assist.run.rollback_failed_matches`, `assist.run.post_check_after_rollback`, `assist.run.vault_not_restored`) salen en el idioma pedido; la salida del equipo no se traduce.

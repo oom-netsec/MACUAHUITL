@@ -1,5 +1,5 @@
 import { snippetsWails } from "./api";
-import { fakeSnippets, sampleTemplates } from "./fake";
+import { fakeSnippets, samplePortSecurityPlan, sampleTemplates } from "./fake";
 
 const target = { name: "SW1", address: "10.0.0.1", credentialId: "c1" };
 
@@ -32,4 +32,13 @@ test("el doble de pruebas trae plantillas de varias tecnologías con campos tipa
   expect(list.map((t) => t.id)).toEqual(["speed-duplex", "storm-control", "port-security", "svi", "trunk", "vlan"]);
   expect(list[1].fields.find((f) => f.name === "broadcast")?.type).toBe("decimal");
   expect((await fake.planTemplateSnippet({ id: "trunk" })).plan.devices).toHaveLength(1);
+});
+
+test("los avisos estructurados del plan (fase 30c) llevan su clave assist.note.* y argumentos de texto", () => {
+  const d = samplePortSecurityPlan.plan.devices[0];
+  expect(d.notesStructured?.length).toBeGreaterThan(0);
+  for (const n of d.notesStructured ?? []) {
+    expect(n.key.startsWith("assist.note.")).toBe(true);
+    for (const v of Object.values(n.args ?? {})) expect(typeof v).toBe("string");
+  }
 });

@@ -94,7 +94,7 @@ func (e *devExec) conn(ctx context.Context, dev string) (*conn, error) {
 	if err != nil || (p != "ios-xe" && p != "ios") {
 		c.close()
 		if err == nil {
-			err = fmt.Errorf("plataforma %q no soportada por el modo asistido", p)
+			err = i18n.New("assist.err.platform_unsupported", i18n.A("platform", p))
 		}
 		return nil, err
 	}
@@ -191,12 +191,12 @@ func saveErr(text string) error {
 	for _, l := range strings.Split(text, "\n") {
 		l = strings.TrimSpace(l)
 		if strings.HasPrefix(l, "%") {
-			return fmt.Errorf("el equipo respondió %q", l)
+			return i18n.New("assist.err.device_replied", i18n.A("line", l))
 		}
 		ok = ok || strings.Contains(l, "[OK]")
 	}
 	if !ok {
-		return errors.New("el equipo no confirmó con [OK]")
+		return i18n.New("assist.err.no_ok", nil)
 	}
 	return nil
 }

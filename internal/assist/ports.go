@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -19,7 +20,7 @@ func ValidInterface(name string) bool { return ifaceRe.MatchString(name) }
 func vlanOK(s string) error {
 	n, err := strconv.Atoi(s)
 	if err != nil || n < 1 || n > 4094 {
-		return fmt.Errorf("VLAN %q fuera de 1-4094", s)
+		return cerr("assist.err.vlan_range_quoted", "value", s)
 	}
 	return nil
 }
@@ -37,11 +38,11 @@ var Ports = Function{
 		switch {
 		case strings.EqualFold(f[0], "interface"):
 			if len(f) != 2 || !ValidInterface(f[1]) {
-				return errors.New("solo un puerto físico (nada de Port-channel, Vlan, rangos ni subinterfaces)")
+				return cerr("assist.err.single_physical_port")
 			}
 		case strings.HasPrefix(l, "switchport access vlan ") || strings.HasPrefix(l, "switchport voice vlan "):
 			if len(f) != 4 {
-				return errors.New("falta la VLAN o sobran argumentos")
+				return cerr("assist.err.vlan_missing_or_extra")
 			}
 			// La reversa restaura tal cual la VLAN de voz que tenía el puerto (dot1p, untagged o none).
 			if f[1] == "voice" && (f[3] == "dot1p" || f[3] == "untagged" || f[3] == "none") {
@@ -53,23 +54,23 @@ var Ports = Function{
 			switch strings.Join(strings.Fields(l), " ") {
 			case "switchport mode access", "switchport mode dynamic auto", "switchport mode dynamic desirable":
 			default:
-				return errors.New("solo access, dynamic auto o dynamic desirable")
+				return cerr("assist.err.mode_values")
 			}
 		case strings.HasPrefix(l, "no switchport mode"):
 			if strings.Join(strings.Fields(l), " ") != "no switchport mode" {
-				return errors.New("no switchport mode va sin argumentos") // con argumento también devuelve el puerto a dynamic
+				return cerr("assist.err.no_switchport_mode_args") // con argumento también devuelve el puerto a dynamic
 			}
 		case strings.HasPrefix(l, "no switchport "):
 			if len(f) != 4 {
-				return errors.New("sin argumentos")
+				return cerr("assist.err.no_arguments")
 			}
 		case l == "shutdown" || l == "no shutdown" || l == "no description" || strings.Join(f, " ") == "no spanning-tree portfast":
 		case strings.HasPrefix(l, "description"):
 			if len(line) > len("description ")+200 {
-				return errors.New("descripción de más de 200 caracteres")
+				return cerr("assist.err.description_too_long")
 			}
 		default:
-			return errors.New("no reconocida")
+			return cerr("assist.err.not_recognized")
 		}
 		return nil
 	},
@@ -97,13 +98,13 @@ func showVlan(id int) string             { return fmt.Sprintf("show vlan id %d",
 // son el mismo): se conserva la primera escritura.
 func normIfaces(ifaces []string) ([]string, error) {
 	if len(ifaces) == 0 {
-		return nil, errors.New("indica al menos una interfaz")
+		return nil, cerr("assist.err.interface_required")
 	}
 	seen := map[string]bool{}
 	var out []string
 	for _, n := range ifaces {
 		if !ValidInterface(n) {
-			return nil, fmt.Errorf("%q no es un puerto físico (se rechazan Port-channel, Vlan, Loopback, rangos y subinterfaces)", n)
+			return nil, cerr("assist.err.not_physical_port", "port", n)
 		}
 		if k := strings.ToLower(iosxe.ShortIf(n)); !seen[k] {
 			seen[k] = true
@@ -116,7 +117,7 @@ func normIfaces(ifaces []string) ([]string, error) {
 func checkVlans(ch PortChange) error {
 	for _, v := range []int{ch.Vlan, ch.Voice} {
 		if v < 0 || v > 4094 {
-			return fmt.Errorf("VLAN %d fuera de 1-4094", v)
+			return cerr("assist.err.vlan_range", "vlan", v)
 		}
 	}
 	return nil
@@ -154,8 +155,8 @@ func PortsPre(ifaces []string, ch PortChange) ([]string, error) {
 	return pre, nil
 }
 
-func refuse(format string, a ...any) error {
-	return fmt.Errorf("%w: %s", ErrPortRefused, fmt.Sprintf(format, a...))
+func refuse(code string, kv ...any) error {
+	return newRefusal(ErrPortRefused, "assist.port_refused", i18n.Tx(code, kv...))
 }
 
 // accessPort exige un puerto de acceso: switchport mode access en la captura, o Administrative
@@ -165,36 +166,36 @@ func refuse(format string, a ...any) error {
 func accessPort(n string, cur iosxe.InterfaceConfig, switchport string) (toAccess bool, err error) {
 	switch {
 	case cur.Trunk || cur.ChannelGroup || cur.Routed:
-		return false, refuse("%s es trunk, miembro de un canal o puerto ruteado", n)
+		return false, refuse("assist.port_refused.es_trunk_miembro_de_un", "port", n)
 	case cur.L3:
-		return false, refuse("%s tiene dirección IP, VRF o NAT: es un puerto de capa 3 (¿administración?)", n)
+		return false, refuse("assist.port_refused.tiene_direccion_ip_vrf_o", "port", n)
 	case cur.AccessVlan != "" && cur.AccessVlan != "dynamic" && !digits(cur.AccessVlan):
-		return false, refuse("%s tiene una VLAN de acceso que no se puede restaurar (%s)", n, cur.AccessVlan)
+		return false, refuse("assist.port_refused.tiene_una_vlan_de_acceso", "port", n, "vlan", cur.AccessVlan)
 	case cur.AccessVlan == "dynamic":
-		return false, refuse("%s usa VLAN de acceso dinámica (VMPS)", n)
+		return false, refuse("assist.port_refused.usa_vlan_de_acceso_dinamica", "port", n)
 	case cur.Mode == "access":
 		return false, nil
 	case cur.Mode != "" && !isDynamicMode(cur.Mode):
-		return false, refuse("%s está en modo %q, no en acceso", n, cur.Mode)
+		return false, refuse("assist.port_refused.esta_en_modo_no_en", "port", n, "mode", cur.Mode)
 	}
 	admin, ok := iosxe.ParseSwitchportMode(switchport)
 	switch {
 	case cur.Mode == "" && ok && admin == "static access":
 		return false, nil
 	case cur.Mode == "" && !ok:
-		return false, refuse("%s no es un puerto de acceso: sin switchport mode access ni Administrative Mode static access", n)
+		return false, refuse("assist.port_refused.no_es_un_puerto_de", "port", n)
 	case cur.Mode == "" && !isDynamicMode(admin):
-		return false, refuse("%s está en modo administrativo %q, no es un puerto de acceso (pon switchport mode access)", n, admin)
+		return false, refuse("assist.port_refused.esta_en_modo_administrativo_no", "port", n, "admin", admin)
 	}
 	// dynamic auto/desirable: solo si no negoció un trunk (cambiarlo podría cortar tráfico).
 	oper, ok := iosxe.ParseSwitchportOperMode(switchport)
 	switch {
 	case !ok:
-		return false, refuse("%s está en modo dynamic y no se pudo leer su Operational Mode en show interfaces switchport: no se sabe si negoció un trunk", n)
+		return false, refuse("assist.port_refused.esta_en_modo_dynamic_y", "port", n)
 	case oper == "trunk":
-		return false, refuse("%s está en modo dynamic y opera como trunk (un vecino negoció el enlace): cambiarlo podría cortar tráfico", n)
+		return false, refuse("assist.port_refused.esta_en_modo_dynamic_y2", "port", n)
 	case oper != "down" && oper != "static access": // lista cerrada: otro modo operativo (private-vlan, tunnel...) no se toca
-		return false, refuse("%s está en modo dynamic y opera como %q, no como acceso", n, oper)
+		return false, refuse("assist.port_refused.esta_en_modo_dynamic_y3", "port", n, "oper", oper)
 	}
 	return true, nil
 }
@@ -211,9 +212,9 @@ func vlanExists(device string, id int, out string) error {
 	st, found := iosxe.ParseVlanID(out, id)
 	switch {
 	case !found:
-		return refuse("la VLAN %d no existe en %s: IOS la crearía y, si el equipo es servidor VTP, la propagaría al dominio; créala por separado", id, device)
+		return refuse("assist.port_refused.la_vlan_no_existe_en", "id", id, "device", device)
 	case st != "active":
-		return refuse("la VLAN %d de %s está en estado %q, no activa: el puerto quedaría inactivo", id, device, st)
+		return refuse("assist.port_refused.la_vlan_de_esta_en", "id", id, "device", device, "status", st)
 	}
 	return nil
 }
@@ -227,12 +228,12 @@ func PortsPlan(device string, ifaces []string, ch PortChange, outs map[string]st
 	}
 	names, _ := normIfaces(ifaces)
 	if ch.Vlan == 0 && ch.Voice == 0 && ch.Description == nil && ch.Shutdown == nil {
-		return DevicePlan{}, errors.New("no hay nada que cambiar: indica VLAN, VLAN de voz, descripción o shut/no shut")
+		return DevicePlan{}, cerr("assist.err.ports_nothing_to_change")
 	}
 	for _, v := range vlansToCheck(ch) {
 		out, ok := outs[showVlan(v)]
 		if !ok {
-			return DevicePlan{}, fmt.Errorf("falta la salida de %q", showVlan(v))
+			return DevicePlan{}, cerr("assist.err.output_missing", "command", showVlan(v))
 		}
 		if err := vlanExists(device, v, out); err != nil {
 			return DevicePlan{}, err
@@ -241,10 +242,10 @@ func PortsPlan(device string, ifaces []string, ch PortChange, outs map[string]st
 	var desc string
 	if ch.Description != nil {
 		if err := asciiOnly(*ch.Description); err != nil { // antes de recortar: "x\r" no puede quedar como "x"
-			return DevicePlan{}, fmt.Errorf("descripción: %w", err)
+			return DevicePlan{}, withPrefix("assist.err.description_invalid", err)
 		}
 		if desc = strings.TrimSpace(*ch.Description); strings.ContainsAny(desc, "?\r\n\t") || len(desc) > 200 {
-			return DevicePlan{}, errors.New("la descripción no admite '?' ni saltos de línea y mide como máximo 200 caracteres")
+			return DevicePlan{}, cerr("assist.err.description_rule_lines")
 		}
 	}
 	dp := DevicePlan{Device: device, Pre: pre, Baseline: map[string]string{}}
@@ -252,11 +253,11 @@ func PortsPlan(device string, ifaces []string, ch PortChange, outs map[string]st
 	for _, n := range names {
 		text, ok := outs[showCfg(n)]
 		if !ok {
-			return DevicePlan{}, fmt.Errorf("falta la configuración capturada de %s", n)
+			return DevicePlan{}, cerr("assist.err.capture_missing", "port", n)
 		}
 		cur, ok := iosxe.ParseInterfaceConfig(text)
 		if !ok || !strings.EqualFold(iosxe.ShortIf(cur.Name), iosxe.ShortIf(n)) {
-			return DevicePlan{}, fmt.Errorf("la captura de %s no es la configuración de esa interfaz", n)
+			return DevicePlan{}, cerr("assist.err.capture_mismatch", "port", n)
 		}
 		toAccess, err := accessPort(n, cur, outs[showSwitchport(n)])
 		if err != nil {

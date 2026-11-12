@@ -63,6 +63,13 @@ message AssistDevicePlan {
   repeated string post = 5;
   repeated AssistExpect expect = 6;
   repeated string notes = 7; // avisos para el ingeniero (p. ej. que el enlace rebota); no se ejecutan
+  repeated AssistNote notes_structured = 8; // los mismos avisos como clave del catálogo (assist.note.*) con sus argumentos; mismo orden que notes
+}
+
+// AssistNote es un aviso del plan como código del catálogo: key (assist.note.*) y args con nombre.
+message AssistNote {
+  string key = 1;
+  map<string, string> args = 2;
 }
 
 message AssistPlan {

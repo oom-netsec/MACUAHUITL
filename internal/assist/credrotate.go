@@ -3,12 +3,12 @@ package assist
 import (
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
@@ -74,7 +74,7 @@ func scrubAll(lines, secrets []string, generic bool) []string {
 
 func checkSecret(s string) error {
 	if !secretRe.MatchString(s) {
-		return errors.New("el secreto nuevo mide de 8 a 64 caracteres y solo lleva letras, números y ._~@%^&*()+=:,-")
+		return cerr("assist.err.secret_format")
 	}
 	return nil
 }
@@ -180,7 +180,7 @@ type CredRotateChange struct{ User, NewSecret, ConnectedUser string }
 // CredRotatePre: los usuarios locales del running-config y la versión (de ahí sale el algoritmo).
 func CredRotatePre(user string) ([]string, error) {
 	if !userRe.MatchString(user) {
-		return nil, fmt.Errorf("usuario %q inválido (letras, números, . _ -; hasta 32)", user)
+		return nil, cerr("assist.err.user_invalid", "user", user)
 	}
 	return []string{credUsersCmd, "show version"}, nil
 }
@@ -214,11 +214,11 @@ func CredRotatePlan(device string, c CredRotateChange, outs map[string]string) (
 		return DevicePlan{}, err
 	}
 	if c.ConnectedUser == "" || strings.EqualFold(c.ConnectedUser, c.User) {
-		return DevicePlan{}, fmt.Errorf("%w: el usuario %q es el de la sesión que ejecuta el cambio; conéctate con otra credencial para poder revertir", ErrRotateRefused, c.User)
+		return DevicePlan{}, newRefusal(ErrRotateRefused, "assist.rotate_refused", i18n.Tx("assist.rotate_refused.session_user", "user", c.User))
 	}
 	text, ok := outs[credUsersCmd]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la salida de %q", credUsersCmd)
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", credUsersCmd)
 	}
 	var found []iosxe.UserLine
 	for _, u := range iosxe.ParseUsernames(text) {
@@ -227,14 +227,14 @@ func CredRotatePlan(device string, c CredRotateChange, outs map[string]string) (
 		}
 	}
 	if len(found) != 1 {
-		return DevicePlan{}, fmt.Errorf("%w: %s tiene %d líneas username para %q (se necesita exactamente una; crear usuarios no es rotar)", ErrRotateRefused, device, len(found), c.User)
+		return DevicePlan{}, newRefusal(ErrRotateRefused, "assist.rotate_refused", i18n.Tx("assist.rotate_refused.user_lines", "device", device, "count", len(found), "user", c.User))
 	}
 	u := found[0]
 	if u.NoPassword || u.Kind != "secret" || (u.Type != "5" && u.Type != "8" && u.Type != "9") || u.Hash == "" {
-		return DevicePlan{}, fmt.Errorf("%w: %q no usa `secret` con hash 5, 8 o 9 (con password la reversa no dejaría el equipo igual)", ErrRotateRefused, c.User)
+		return DevicePlan{}, newRefusal(ErrRotateRefused, "assist.rotate_refused", i18n.Tx("assist.rotate_refused.not_secret", "user", c.User))
 	}
 	if len(u.Extra) > 0 {
-		return DevicePlan{}, fmt.Errorf("%w: la línea de %q trae atributos que la reversa no repetiría (view, autocommand, algorithm-type u otros): no se rota", ErrRotateRefused, c.User)
+		return DevicePlan{}, newRefusal(ErrRotateRefused, "assist.rotate_refused", i18n.Tx("assist.rotate_refused.extra_attrs", "user", c.User))
 	}
 	alg := credAlgorithm(u.Type, outs["show version"])
 	priv := ""

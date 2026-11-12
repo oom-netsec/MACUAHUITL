@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
@@ -681,14 +682,14 @@ func onLink(n *iosconf.Node, origin netip.Addr) bool {
 func managementOf(root *iosconf.Node, outs map[string]string, explicit string) (ifaces, vlans map[string]bool, err error) {
 	ifaces, vlans = map[string]bool{}, map[string]bool{}
 	have := ifaceNodes(root)
-	fail := func(format string, a ...any) (map[string]bool, map[string]bool, error) {
-		return nil, nil, fmt.Errorf("%w: "+format, append([]any{ErrRestoreRefused}, a...)...)
+	fail := func(code string, kv ...any) (map[string]bool, map[string]bool, error) {
+		return nil, nil, newRefusal(ErrRestoreRefused, "assist.restore_refused", i18n.Tx(code, kv...))
 	}
 	e := strings.TrimSpace(explicit)
 	if e != "" {
 		k := strings.ToLower(iosxe.ShortIf(e))
 		if have[k] == nil {
-			return fail("la interfaz de gestión indicada (%s) no existe en el equipo", e)
+			return fail("assist.restore_refused.la_interfaz_de_gestion_indicada", "interface", e)
 		}
 		ifaces[k] = true
 	}
@@ -698,10 +699,10 @@ func managementOf(root *iosconf.Node, outs map[string]string, explicit string) (
 		if len(carry) == 1 {
 			ifaces[carry[0]] = true
 		} else if e == "" {
-			return fail("no se pudo identificar la interfaz de gestión (por la que estás conectado): la IP de la sesión (%s) la llevan %d interfaces; indícala con --mgmt-if", locals[0], len(carry))
+			return fail("assist.restore_refused.no_se_pudo_identificar_la", "ip", locals[0], "count", len(carry))
 		}
 	case e == "":
-		return fail("no se pudo identificar la interfaz de gestión (por la que estás conectado): show users y show tcp brief dan %d direcciones locales para tu sesión; indícala con --mgmt-if", len(locals))
+		return fail("assist.restore_refused.no_se_pudo_identificar_la2", "count", len(locals))
 	}
 	// ¿Enruta? Un router trae `ip routing` activo y no lo imprime, así que se decide por la salida misma: una tabla de rutas = enruta; `Default
 	// gateway is X` o `IP routing not enabled` = un switch L2, y la gestión es la IP local; `no ip routing` también es sin enrutamiento. Si no se
@@ -726,7 +727,7 @@ func managementOf(root *iosconf.Node, outs map[string]string, explicit string) (
 			}
 		case off && vrf == "" && !origin.Is6() && !hasGlobal(root, "ip routing"):
 		case e == "":
-			return fail("no se pudo saber si el equipo enruta ni por qué interfaz sale el tráfico hacia tu sesión (show ip cef / show ip route, con su VRF o en IPv6 si la sesión la usa; sin una respuesta de «Default gateway» o «IP routing not enabled» de un switch L2): la salida puede no ser la que lleva la IP local; indica la interfaz de gestión con --mgmt-if")
+			return fail("assist.restore_refused.no_se_pudo_saber_si")
 		}
 	}
 	// Toda interfaz cuya subred contiene al origen responde por él (un switch L2 con varias SVI, un router con dos redes en el segmento): se
