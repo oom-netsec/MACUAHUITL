@@ -23,7 +23,7 @@ var ErrFileExists = errors.New("guardar: el archivo ya existe")
 // (disco lleno) no destruye el archivo anterior. Lo usan las exportaciones: CSV, PNG, .cfg, .txt y Markdown.
 func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 	if !filepath.IsAbs(path) {
-		return errors.New("guardar: la ruta debe ser absoluta")
+		return wrapErr(errors.New("guardar: la ruta debe ser absoluta"))
 	}
 	var raw []byte
 	switch encoding {
@@ -32,13 +32,13 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 	case "base64":
 		var err error
 		if raw, err = base64.StdEncoding.DecodeString(data); err != nil {
-			return fmt.Errorf("guardar: base64 inválido: %w", err)
+			return wrapErr(fmt.Errorf("guardar: base64 inválido: %w", err))
 		}
 	default:
-		return fmt.Errorf("guardar: codificación %q desconocida", encoding)
+		return wrapErr(fmt.Errorf("guardar: codificación %q desconocida", encoding))
 	}
 	if len(raw) > maxSaveBytes {
-		return errors.New("guardar: el archivo pasa de 64 MiB")
+		return wrapErr(errors.New("guardar: el archivo pasa de 64 MiB"))
 	}
 	if _, err := os.Lstat(path); err == nil && !overwrite {
 		return &Error{err: ErrFileExists, msg: i18n.Msg(b.locale(), "file.exists.save", nil), Code: "AlreadyExists", Reason: "file.exists",
@@ -46,15 +46,15 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".guardar-*")
 	if err != nil {
-		return err
+		return wrapErr(err)
 	}
 	defer os.Remove(tmp.Name()) // tras el rename ya no existe
 	if _, err := tmp.Write(raw); err != nil {
 		tmp.Close()
-		return err
+		return wrapErr(err)
 	}
 	if err := tmp.Close(); err != nil {
-		return err
+		return wrapErr(err)
 	}
-	return os.Rename(tmp.Name(), path) // CreateTemp ya deja 0600
+	return wrapErr(os.Rename(tmp.Name(), path)) // CreateTemp ya deja 0600
 }

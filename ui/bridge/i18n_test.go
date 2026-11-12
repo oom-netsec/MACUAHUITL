@@ -192,3 +192,25 @@ func TestStreamDoneLlevaErrorInfo(t *testing.T) {
 		`"errorInfo":{"code":"InvalidArgument","metadata":{"field":"queue_size","max":"65536","min":"64","value":"10"},"reason":"ingest.invalid"},"runId":"run-1"}`
 	f.rec.waitFor(t, want)
 }
+
+// Todo error que el puente devuelve tiene la forma {message, code, reason, metadata}, con reason "" y metadata {}
+// cuando no hay código, nunca ausentes.
+func TestTodoErrorDelPuenteTieneLaForma(t *testing.T) {
+	b := New(func() (*ipc.ClientConn, error) { return nil, errors.New("sin socket") }, (&recorder{}).emit)
+	_, e1 := b.SyslogStart("127.0.0.1:0", "udp", false, false, SyslogOptions{})
+	_, e2 := b.SyslogStart("127.0.0.1:0", "udp", false, false, SyslogOptions{RatePerSource: 4294967396}) // check()
+	e3 := b.AssistWatch("r1")
+	e4 := b.WriteFile("relativa.txt", "x", "utf8", false)
+	e5 := b.WriteFile(filepath.Join(t.TempDir(), "a.txt"), "%%%", "base64", false)
+	for i, err := range []error{e1, e2, e3, e4, e5} {
+		if err == nil {
+			t.Fatalf("%d: sin error", i)
+		}
+		raw, _ := json.Marshal(&err)
+		var m map[string]any
+		json.Unmarshal(raw, &m)
+		if m["message"] != err.Error() || m["code"] == nil || m["reason"] == nil || m["metadata"] == nil {
+			t.Errorf("%d: forma incompleta %s", i, raw)
+		}
+	}
+}

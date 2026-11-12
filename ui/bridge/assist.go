@@ -108,11 +108,11 @@ func (b *Bridge) AssistStart(planID string, assisted bool) (string, error) {
 func (b *Bridge) AssistWatch(runID string) error {
 	c, err := b.client()
 	if err != nil {
-		return err
+		return wrapErr(err)
 	}
 	st, err := v1.NewAssistServiceClient(c).WatchRun(b.callCtx(), &v1.WatchRunRequest{RunId: runID})
 	if err != nil {
-		return err
+		return wrapErr(err)
 	}
 	go func() {
 		for {

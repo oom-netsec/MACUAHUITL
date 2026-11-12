@@ -367,7 +367,7 @@ func (b *Bridge) Subscribe(_ context.Context, jobIDs []string) error {
 func (b *Bridge) open(jobID string) error {
 	c, err := b.client()
 	if err != nil {
-		return err
+		return wrapErr(err)
 	}
 	base := b.callCtx() // antes del candado: puede leer la preferencia de idioma
 	b.mu.Lock()
@@ -390,7 +390,7 @@ func (b *Bridge) open(jobID string) error {
 			return nil
 		}
 		markDead()
-		return err
+		return wrapErr(err)
 	}
 	go func() {
 		for {
@@ -550,11 +550,11 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 	enum, ok := map[string]v1.DiagTool{"ping": v1.DiagTool_DIAG_TOOL_PING, "traceroute": v1.DiagTool_DIAG_TOOL_TRACEROUTE,
 		"nmap": v1.DiagTool_DIAG_TOOL_NMAP, "iperf3": v1.DiagTool_DIAG_TOOL_IPERF3, "pcap": v1.DiagTool_DIAG_TOOL_PCAP}[tool]
 	if !ok {
-		return "", fmt.Errorf("herramienta %q desconocida", tool)
+		return "", wrapErr(fmt.Errorf("herramienta %q desconocida", tool))
 	}
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	req := &v1.RunRequest{Tool: enum, Options: options}
 	for _, t := range targets {
@@ -570,7 +570,7 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 	st, err := v1.NewDiagServiceClient(c).Run(ctx, req)
 	if err != nil {
 		cancel()
-		return "", err
+		return "", wrapErr(err)
 	}
 	go func() {
 		defer func() {
@@ -693,7 +693,7 @@ func (o SyslogOptions) check() error {
 	for name, v := range map[string]int{"ratePerSource": o.RatePerSource, "burstPerSource": o.BurstPerSource, "rateGlobal": o.RateGlobal, "burstGlobal": o.BurstGlobal,
 		"queueSize": o.QueueSize, "rotateMb": o.RotateMB, "rotateMinutes": o.RotateMinutes, "maxFiles": o.MaxFiles} {
 		if int(int32(v)) != v {
-			return fmt.Errorf("%s fuera de rango: %d", name, v)
+			return wrapErr(fmt.Errorf("%s fuera de rango: %d", name, v))
 		}
 	}
 	return nil
@@ -726,11 +726,11 @@ func dropsDTO(d *v1.SyslogDrops) syslogDropsDTO {
 // drops es el acumulado de descartes; rotatedPath, un archivo nuevo. Se detiene con DiagCancel(id).
 func (b *Bridge) SyslogStart(addr, proto string, allowAny, save bool, o SyslogOptions) (string, error) {
 	if err := o.check(); err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	base := b.callCtx() // antes del candado: puede leer la preferencia de idioma
 	b.mu.Lock()
@@ -746,7 +746,7 @@ func (b *Bridge) SyslogStart(addr, proto string, allowAny, save bool, o SyslogOp
 	})
 	if err != nil {
 		cancel()
-		return "", err
+		return "", wrapErr(err)
 	}
 	go func() {
 		defer func() {

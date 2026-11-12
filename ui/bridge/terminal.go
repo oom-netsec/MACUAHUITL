@@ -30,7 +30,7 @@ type termSess struct {
 func (b *Bridge) TerminalOpen(d TerminalDTO) (string, error) {
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewTerminalServiceClient(c).OpenTerminal(ctx)
@@ -40,7 +40,7 @@ func (b *Bridge) TerminalOpen(d TerminalDTO) (string, error) {
 	}
 	if err != nil {
 		b.finish(id, cancel)
-		return "", err
+		return "", wrapErr(err)
 	}
 	b.mu.Lock()
 	if b.terminals == nil {

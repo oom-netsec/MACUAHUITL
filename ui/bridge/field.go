@@ -57,7 +57,7 @@ func (b *Bridge) finish(id string, cancel context.CancelFunc) {
 func (b *Bridge) ConsoleOpen(d ConsoleDTO) (string, error) {
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewFieldServiceClient(c).Console(ctx)
@@ -67,7 +67,7 @@ func (b *Bridge) ConsoleOpen(d ConsoleDTO) (string, error) {
 	}
 	if err != nil {
 		b.finish(id, cancel)
-		return "", err
+		return "", wrapErr(err)
 	}
 	b.mu.Lock()
 	if b.consoles == nil {
@@ -140,14 +140,14 @@ type ServeDTO struct {
 func (b *Bridge) ServeStart(d ServeDTO) (string, error) {
 	c, err := b.client()
 	if err != nil {
-		return "", err
+		return "", wrapErr(err)
 	}
 	id, ctx, cancel := b.next()
 	st, err := v1.NewFieldServiceClient(c).ServeFiles(ctx, &v1.ServeFilesRequest{Protocol: d.Protocol, Addr: d.Addr, Files: d.Files,
 		AllowAny: d.AllowAny, DurationSeconds: int32(d.Seconds)})
 	if err != nil {
 		b.finish(id, cancel)
-		return "", err
+		return "", wrapErr(err)
 	}
 	go func() {
 		defer b.finish(id, cancel)
