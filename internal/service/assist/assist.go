@@ -224,8 +224,13 @@ func checkTarget(t *v1.AssistTarget) error {
 	return nil
 }
 
+// templateKey lleva en el contexto el id de la plantilla del catálogo (vlan, trunk, svi o el de la plantilla) para
+// la metadata `template` de assist.refused, igual que en assist.invalid_value.
+type templateKey struct{}
+
 // planErr traduce el rechazo de una función a un código: las negativas por el estado del equipo son FailedPrecondition.
-func planErr(ctx context.Context, err error, template, device string) error {
+func planErr(ctx context.Context, err error, device string) error {
+	template, _ := ctx.Value(templateKey{}).(string)
 	var sr *assist.SnippetRefusal
 	if errors.As(err, &sr) {
 		sr.Template, sr.Device = template, device
@@ -304,7 +309,7 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 	}
 	dp, err := build(label, byCmd)
 	if err != nil {
-		return "", assist.Plan{}, planErr(ctx, err, fnp.Name, label)
+		return "", assist.Plan{}, planErr(ctx, err, label)
 	}
 	fn := *fnp // build puede haber puesto la función propia del plan
 	plan := assist.Plan{Function: fn.Name, WriteMemory: writeMem, Devices: []assist.DevicePlan{dp}}
@@ -355,21 +360,25 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 	)
 	switch sn := r.Snippet.(type) {
 	case *v1.PlanSnippetRequest_Vlan:
+		ctx = context.WithValue(ctx, templateKey{}, "vlan")
 		ch := assist.VlanChange{ID: int(sn.Vlan.Id), Name: sn.Vlan.Name, AcceptVTP: sn.Vlan.AcceptVtp, Remove: sn.Vlan.Remove, AcceptTrunk: sn.Vlan.AcceptTrunk}
 		fn, detail = assist.SnippetVlan, fmt.Sprintf("vlan=%d", sn.Vlan.Id)
 		pre, err = assist.VlanPre(ch)
 		build = func(l string, o map[string]string) (assist.DevicePlan, error) { return assist.VlanPlan(l, ch, o) }
 	case *v1.PlanSnippetRequest_Trunk:
+		ctx = context.WithValue(ctx, templateKey{}, "trunk")
 		ch := assist.TrunkChange{Interface: sn.Trunk.Interface, Op: sn.Trunk.Op, Vlan: int(sn.Trunk.Vlan)}
 		fn, detail = assist.SnippetTrunk, fmt.Sprintf("interfaz=%s %s vlan=%d", ch.Interface, ch.Op, ch.Vlan)
 		pre, err = assist.TrunkPre(ch)
 		build = func(l string, o map[string]string) (assist.DevicePlan, error) { return assist.TrunkPlan(l, ch, o) }
 	case *v1.PlanSnippetRequest_Svi:
+		ctx = context.WithValue(ctx, templateKey{}, "svi")
 		ch := assist.SVIChange{VlanID: int(sn.Svi.Vlan), Description: sn.Svi.Description, Address: sn.Svi.Address, Mask: sn.Svi.Mask}
 		fn, detail = assist.SnippetSVI, fmt.Sprintf("svi=Vlan%d", sn.Svi.Vlan)
 		pre, err = assist.SVIPre(ch)
 		build = func(l string, o map[string]string) (assist.DevicePlan, error) { return assist.SVIPlan(l, ch, o) }
 	case *v1.PlanSnippetRequest_Template:
+		ctx = context.WithValue(ctx, templateKey{}, sn.Template.GetId())
 		t, vals, e := templateOf(ctx, sn.Template)
 		if e != nil {
 			return nil, e
