@@ -17,6 +17,7 @@ type FakeConfig struct {
 	NoReplyMA     bool   // responder sin Message-Authenticator (servidor sin parche Blast-RADIUS)
 	ReplySecret   string // firmar las respuestas con otro secreto
 	PadReply      int    // bytes extra tras Length (RFC 2865 §3: el receptor los ignora)
+	BadMSSuccess  bool   // MS-CHAP2-Success que no verifica (servidor que no conoce la contraseña)
 	SpoofFirst    bool   // antes de la respuesta real, manda una falsificada (otro secreto)
 }
 
@@ -168,6 +169,10 @@ func (f *Fake) checkPassword(req *Packet, pw []byte, resp *Packet) bool {
 	if !bytes.Equal(nt, ntResponse(authCh, peer, string(user), pw)) {
 		return false
 	}
-	resp.Add(AttrVendorSpecific, vsa(311, 26, append([]byte{msResp[0]}, authenticatorResponse(pw, nt, peer, authCh, string(user))...)))
+	ar := authenticatorResponse(pw, nt, peer, authCh, string(user))
+	if f.cfg.BadMSSuccess {
+		ar = ar[:len(ar)-1] + "0" + ar[len(ar)-1:len(ar)] // cambia el valor sin dejar de ser un texto
+	}
+	resp.Add(AttrVendorSpecific, vsa(311, 26, append([]byte{msResp[0]}, ar...)))
 	return true
 }

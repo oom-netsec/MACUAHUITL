@@ -122,3 +122,27 @@ func TestMSCHAP2Verified(t *testing.T) {
 		t.Errorf("el campo no debe viajar en el JSON: %s", b)
 	}
 }
+
+// mschap2_verified: false si el MS-CHAP2-Success no verifica; nulo si no llega (rechazo de la contraseña).
+func TestMSCHAP2VerifiedFalseYNulo(t *testing.T) {
+	h, p, _ := fake(t, FakeConfig{Reply: AuthzReply(), BadMSSuccess: true})
+	c := base(h, p)
+	c.Method = "mschapv2"
+	r, err := Run(context.Background(), direct, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := r.Exchanges[0].MSCHAP2Verified; v == nil || *v {
+		t.Errorf("Success que no verifica: %v", v)
+	}
+	h, p, _ = fake(t, FakeConfig{Reply: AuthzReply()})
+	c = base(h, p)
+	c.Method, c.Password = "mschapv2", []byte("mala")
+	r, err = Run(context.Background(), direct, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Exchanges[0].MSCHAP2Verified != nil {
+		t.Errorf("rechazo: no debe haber mschap2_verified")
+	}
+}
