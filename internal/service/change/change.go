@@ -182,7 +182,7 @@ func (s *changeSvc) outputDir(jobID, phase string) (string, error) {
 	return j.Dir, nil
 }
 
-func (s *changeSvc) GetChangeReport(_ context.Context, r *v1.GetChangeReportRequest) (*v1.GetChangeReportResponse, error) {
+func (s *changeSvc) GetChangeReport(ctx context.Context, r *v1.GetChangeReportRequest) (*v1.GetChangeReportResponse, error) {
 	preDir, postDir := r.PreDir, r.PostDir
 	if r.ChangeId != "" {
 		rec, err := s.get(r.ChangeId)
@@ -211,10 +211,10 @@ func (s *changeSvc) GetChangeReport(_ context.Context, r *v1.GetChangeReportRequ
 	}
 	rep := change.Compare(a, b)
 	s.d.Audit("change.report", r.ChangeId, fmt.Sprintf("pre=%s post=%s devices=%d", preDir, postDir, len(rep.Devices)))
-	return &v1.GetChangeReportResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.GetChangeReportResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
-func (s *changeSvc) CheckUpgrade(_ context.Context, r *v1.CheckUpgradeRequest) (*v1.CheckUpgradeResponse, error) {
+func (s *changeSvc) CheckUpgrade(ctx context.Context, r *v1.CheckUpgradeRequest) (*v1.CheckUpgradeResponse, error) {
 	s.d.MarkActive()
 	outs := capture.Split(r.Outputs)
 	if len(outs) == 0 {
@@ -222,20 +222,20 @@ func (s *changeSvc) CheckUpgrade(_ context.Context, r *v1.CheckUpgradeRequest) (
 	}
 	rep, err := upgrade.Check(outs, upgrade.Image{File: r.ImageFile, Size: r.ImageSize, MD5: r.ImageMd5}, r.VerifyOutput)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	s.d.Audit("upgrade.check", rep.Hostname, fmt.Sprintf("image=%s commands=%d", r.ImageFile, len(outs)))
-	return &v1.CheckUpgradeResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.CheckUpgradeResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
-func (s *changeSvc) CheckCompliance(_ context.Context, r *v1.CheckComplianceRequest) (*v1.CheckComplianceResponse, error) {
+func (s *changeSvc) CheckCompliance(ctx context.Context, r *v1.CheckComplianceRequest) (*v1.CheckComplianceResponse, error) {
 	s.d.MarkActive()
 	rep, err := compliance.Check(r.Config, r.Template)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	s.d.Audit("compliance.check", "", fmt.Sprintf("ok=%d failures=%d warnings=%d template=%t", rep.Pass, rep.Fail, rep.Warn, r.Template != ""))
-	return &v1.CheckComplianceResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.CheckComplianceResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
 // Module registra el servicio Change.

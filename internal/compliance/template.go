@@ -1,11 +1,11 @@
 package compliance
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
 )
 
@@ -44,7 +44,7 @@ func ParseTemplate(text string) (Template, error) {
 		return Template{}, err
 	}
 	if len(rules) == 0 {
-		return Template{}, errors.New("compliance: la plantilla no tiene reglas")
+		return Template{}, i18n.New("compliance.err.no_rules", nil)
 	}
 	return Template{rules}, nil
 }
@@ -66,14 +66,14 @@ func build(ns []*iosconf.Node) ([]tplRule, error) {
 			r.kind = 's'
 		}
 		if r.kind == '-' && len(n.Children) > 0 {
-			return nil, fmt.Errorf("compliance: plantilla línea %d: una línea prohibida no puede tener hijos", n.Num)
+			return nil, i18n.New("compliance.err.forbidden_children", i18n.A("n", n.Num))
 		}
 		if r.kind == '?' && len(n.Children) == 0 {
-			return nil, fmt.Errorf("compliance: plantilla línea %d: una sección opcional necesita reglas", n.Num)
+			return nil, i18n.New("compliance.err.optional_empty", i18n.A("n", n.Num))
 		}
 		re, err := iosconf.Compile(pat)
 		if err != nil {
-			return nil, fmt.Errorf("compliance: plantilla línea %d: %v", n.Num, err)
+			return nil, i18n.New("compliance.err.regex", i18n.A("n", n.Num, "error", err))
 		}
 		r.re = re
 		if r.children, err = build(n.Children); err != nil {
@@ -87,12 +87,12 @@ func build(ns []*iosconf.Node) ([]tplRule, error) {
 // Check devuelve un hallazgo por regla hoja; el título lleva sus secciones ("line vty .* > + transport input ssh").
 func (t Template) Check(cfg *iosconf.Node) []Finding {
 	var out []Finding
-	eval(t.rules, []*iosconf.Node{cfg}, "", "", &out)
+	eval(t.rules, []*iosconf.Node{cfg}, "", i18n.Text{}, &out)
 	return out
 }
 
 // eval aplica rules a cada sección de scopes. missing explica por qué no hay secciones.
-func eval(rules []tplRule, scopes []*iosconf.Node, prefix, missing string, out *[]Finding) {
+func eval(rules []tplRule, scopes []*iosconf.Node, prefix string, missing i18n.Text, out *[]Finding) {
 	for _, r := range rules {
 		title := prefix + r.text
 		if r.kind == 's' || r.kind == '?' {
@@ -101,30 +101,30 @@ func eval(rules []tplRule, scopes []*iosconf.Node, prefix, missing string, out *
 				sub = append(sub, s.FindRe(r.re)...)
 			}
 			why := missing
-			if len(sub) == 0 && why == "" && r.kind == 's' {
-				why = fmt.Sprintf("la sección %q no existe", strings.TrimPrefix(r.text, "+ "))
+			if len(sub) == 0 && why.Empty() && r.kind == 's' {
+				why = i18n.Tx("compliance.detail.tpl_no_section", "name", strings.TrimPrefix(r.text, "+ "))
 			}
-			if len(sub) == 0 && r.kind == '?' && why == "" {
-				why = "-" // opcional ausente: no aplica
+			if len(sub) == 0 && r.kind == '?' && why.Empty() {
+				why = optionalAbsent
 			}
 			eval(r.children, sub, title+" > ", why, out)
 			continue
 		}
 		f := Finding{Rule: fmt.Sprintf("plantilla:%d", r.num), Title: title, Status: Pass}
 		switch {
-		case missing == "-":
-			f.Detail = "la sección opcional no existe; no aplica"
-		case missing != "":
-			f.Status, f.Detail = Fail, missing
+		case missing.Key == optionalAbsent.Key:
+			f.DetailTx = i18n.Tx("compliance.detail.tpl_optional")
+		case !missing.Empty():
+			f.Status, f.DetailTx = Fail, missing
 		case r.kind == '+':
-			var lacking []string
+			var lacking []i18n.Text
 			for _, s := range scopes {
 				if len(s.FindRe(r.re)) == 0 {
 					lacking = append(lacking, scopeName(s))
 				}
 			}
 			if len(lacking) > 0 {
-				f.Status, f.Detail = Fail, "falta en "+strings.Join(lacking, "; ")
+				f.Status, f.DetailTx = Fail, i18n.Tx("compliance.detail.tpl_lacking").With("scopes", i18n.Join("; ", lacking...))
 			}
 		case r.kind == '-':
 			var hits []*iosconf.Node
@@ -132,16 +132,20 @@ func eval(rules []tplRule, scopes []*iosconf.Node, prefix, missing string, out *
 				hits = append(hits, s.FindRe(r.re)...)
 			}
 			if len(hits) > 0 {
-				f.Status, f.Detail, f.Lines = Fail, "presente en "+lineList(hits), lineNums(hits)
+				f.Status, f.DetailTx, f.Lines = Fail, i18n.Tx("compliance.detail.tpl_present").With("lines", lineListTx(hits)), lineNums(hits)
 			}
 		}
+		f.Detail = f.DetailTx.In(i18n.Es)
 		*out = append(*out, f)
 	}
 }
 
-func scopeName(n *iosconf.Node) string {
+// optionalAbsent marca «sección opcional ausente: no aplica» al bajar por la plantilla.
+var optionalAbsent = i18n.Tx("compliance.optional_absent")
+
+func scopeName(n *iosconf.Node) i18n.Text {
 	if n.Parent == nil {
-		return "la configuración global"
+		return i18n.Tx("compliance.scope.global")
 	}
-	return fmt.Sprintf("%q (línea %d)", n.Path(), n.Num)
+	return i18n.Tx("compliance.scope.section", "path", n.Path(), "n", n.Num)
 }

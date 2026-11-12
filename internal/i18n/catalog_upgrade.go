@@ -1,0 +1,77 @@
+package i18n
+
+// Verificación previa a un cambio de imagen: títulos y detalle de cada punto, nota fija, errores de
+// validación y texto del informe. Los valores (archivos, tamaños, sumas MD5, rutas de boot) viajan como
+// argumentos; los comandos sugeridos no se traducen.
+func init() {
+	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
+	add(map[string]entry{
+		"upgrade.note": e("Solo verificación: la app no copia, no cambia el boot ni recarga. Interpretación según la documentación pública de Cisco; sin validar en laboratorio.",
+			"Verification only: the app does not copy, change the boot or reload. Interpretation based on public Cisco documentation; not validated in the lab."),
+
+		"upgrade.err.no_name":  e("upgrade: falta el nombre de la imagen", "upgrade: the image name is missing"),
+		"upgrade.err.bad_name": e("upgrade: el nombre de la imagen no lleva carpetas ni espacios", "upgrade: the image name cannot contain folders or spaces"),
+		"upgrade.err.bad_md5":  e("upgrade: el MD5 esperado son 32 caracteres hexadecimales", "upgrade: the expected MD5 is 32 hexadecimal characters"),
+		"upgrade.err.neg_size": e("upgrade: tamaño negativo", "upgrade: negative size"),
+
+		"upgrade.title.mode":       e("Modo de arranque (install o bundle)", "Boot mode (install or bundle)"),
+		"upgrade.title.space":      e("Espacio libre suficiente", "Enough free space"),
+		"upgrade.title.present":    e("La imagen está en {fs}", "The image is on {fs}", "fs"),
+		"upgrade.title.md5":        e("MD5 de la imagen coincide", "Image MD5 matches"),
+		"upgrade.title.boot":       e("Variable de boot apunta a la imagen correcta", "Boot variable points to the right image"),
+		"upgrade.title.install":    e("Sin install pendiente (todo con commit)", "No pending install (everything committed)"),
+		"upgrade.title.saved":      e("Configuración guardada (running = startup)", "Configuration saved (running = startup)"),
+		"upgrade.title.register":   e("Configuration register de arranque normal", "Configuration register for a normal boot"),
+		"upgrade.title.redundancy": e("Redundancia SSO lista para ISSU", "SSO redundancy ready for ISSU"),
+
+		"upgrade.detail.mode_install":     e("modo install: el upgrade va por install add/activate/commit y el boot apunta a packages.conf", "install mode: the upgrade goes through install add/activate/commit and the boot points to packages.conf"),
+		"upgrade.detail.mode_bundle":      e("modo bundle: arranca de un .bin; en Catalyst 9000 Cisco recomienda modo install", "bundle mode: boots from a .bin; on Catalyst 9000 Cisco recommends install mode"),
+		"upgrade.detail.mode_unknown":     e("no se pudo deducir de show version", "could not be deduced from show version"),
+		"upgrade.detail.no_version":       e("falta show version", "show version is missing"),
+		"upgrade.detail.space_no_dir":     e("falta la salida de dir del sistema de archivos", "the dir output of the file system is missing"),
+		"upgrade.detail.space_no_size":    e("libre {free}; indica el tamaño de la imagen para comparar", "{free} free; give the image size to compare", "free"),
+		"upgrade.detail.space_ok":         e("libre {free}, se necesitan ~{need}", "{free} free, ~{need} needed", "free", "need"),
+		"upgrade.detail.space_fail":       e("libre {free}, se necesitan ~{need}; libera espacio antes (en modo install: install remove inactive)", "{free} free, ~{need} needed; free up space first (in install mode: install remove inactive)", "free", "need"),
+		"upgrade.detail.present_no_dir":   e("falta la salida de dir {fs}", "the dir {fs} output is missing", "fs"),
+		"upgrade.detail.present_absent":   e("{file} no está en {fs}; cópiala antes de la ventana", "{file} is not on {fs}; copy it before the window", "file", "fs"),
+		"upgrade.detail.present_size":     e("mide {size} bytes y se esperaban {want}: copia incompleta o imagen equivocada", "it is {size} bytes and {want} were expected: incomplete copy or wrong image", "size", "want"),
+		"upgrade.detail.present_ok":       e("{file} ({size} bytes)", "{file} ({size} bytes)", "file", "size"),
+		"upgrade.detail.md5_none":         e("indica el MD5 esperado (está en la página de descarga de Cisco)", "give the expected MD5 (it is on the Cisco download page)"),
+		"upgrade.detail.md5_paste":        e("pega la salida de: verify /md5 {fs}{file} {md5}", "paste the output of: verify /md5 {fs}{file} {md5}", "fs", "file", "md5"),
+		"upgrade.detail.md5_bad":          e("el equipo calculó {got} y se esperaba {want}: imagen corrupta, vuelve a copiarla", "the device computed {got} and {want} was expected: corrupt image, copy it again", "got", "want"),
+		"upgrade.detail.md5_ok":           e("{sum}", "{sum}", "sum"),
+		"upgrade.detail.boot_manual":      e("MANUAL_BOOT = yes: tras recargar se queda en ROMMON", "MANUAL_BOOT = yes: after a reload it stays in ROMMON"),
+		"upgrade.detail.boot_empty":       e("falta show boot / show bootvar o la variable está vacía", "show boot / show bootvar is missing or the variable is empty"),
+		"upgrade.detail.boot_ok":          e("{first}", "{first}", "first"),
+		"upgrade.detail.boot_install":     e("apunta a {first}; en modo install debe apuntar a packages.conf", "points to {first}; in install mode it must point to packages.conf", "first"),
+		"upgrade.detail.boot_bundle":      e("apunta a {first}; en modo bundle cambia boot system a la imagen nueva y guarda antes de recargar", "points to {first}; in bundle mode change boot system to the new image and save before reloading", "first"),
+		"upgrade.detail.boot_nomode":      e("apunta a {first}, pero no se sabe el modo", "points to {first}, but the mode is not known", "first"),
+		"upgrade.detail.install_bundle":   e("modo bundle", "bundle mode"),
+		"upgrade.detail.install_none":     e("falta show install summary", "show install summary is missing"),
+		"upgrade.detail.install_pending":  e("operación sin commit: {list}; termina con install commit o install abort antes", "operation without commit: {list}; finish with install commit or install abort first", "list"),
+		"upgrade.detail.install_inactive": e("paquetes inactivos ocupan espacio: {list}", "inactive packages take up space: {list}", "list"),
+		"upgrade.detail.install_ok":       e("todo activado y con commit", "everything activated and committed"),
+		"upgrade.detail.saved_clean":      e("sin cambios desde el último arranque", "no changes since the last boot"),
+		"upgrade.detail.saved_no_header":  e("falta la cabecera de show running-config (Last configuration change / NVRAM config)", "the show running-config header is missing (Last configuration change / NVRAM config)"),
+		"upgrade.detail.saved_unsaved":    e("hay cambios ({change}) y no consta que se haya guardado; usa write memory antes", "there are changes ({change}) and it is not recorded as saved; use write memory first", "change"),
+		"upgrade.detail.saved_dates":      e("no se pudieron leer las fechas de la cabecera", "the header dates could not be read"),
+		"upgrade.detail.saved_before":     e("último cambio {change}, guardado {saved}: hay cambios sin guardar", "last change {change}, saved {saved}: there are unsaved changes", "change", "saved"),
+		"upgrade.detail.saved_ok":         e("guardada después del último cambio", "saved after the last change"),
+		"upgrade.detail.reg_missing":      e("falta la línea Configuration register de show version", "the Configuration register line of show version is missing"),
+		"upgrade.detail.reg_ok":           e("register {reg}", "register {reg}", "reg"),
+		"upgrade.detail.reg_bad":          e("register {reg}: tras recargar puede ignorar la config guardada (0x2142) o quedar en ROMMON (0x0); corrígelo a 0x2102 antes", "register {reg}: after a reload it may ignore the saved config (0x2142) or stay in ROMMON (0x0); fix it to 0x2102 first", "reg"),
+		"upgrade.detail.red_none":         e("falta show redundancy", "show redundancy is missing"),
+		"upgrade.detail.red_single":       e("equipo sin supervisor redundante: el upgrade recarga el equipo (sin ISSU)", "device without a redundant supervisor: the upgrade reloads the device (no ISSU)"),
+		"upgrade.detail.red_mode":         e("modo {mode}; ISSU requiere SSO", "mode {mode}; ISSU requires SSO", "mode"),
+		"upgrade.detail.red_hot":          e("SSO con el par en STANDBY HOT", "SSO with the peer in STANDBY HOT"),
+		"upgrade.detail.red_wait":         e("SSO pero el par no está en STANDBY HOT; espera a que sincronice", "SSO but the peer is not in STANDBY HOT; wait for it to synchronize"),
+
+		"upgrade.status.pass":    e("OK", "OK"),
+		"upgrade.status.fail":    e("FALLA", "FAIL"),
+		"upgrade.status.unknown": e("NO DETERMINABLE", "UNDETERMINED"),
+		"upgrade.status.na":      e("NO APLICA", "NOT APPLICABLE"),
+		"upgrade.text.head":      e("{host} · IOS-XE {version} · modo {mode} · imagen destino {image}", "{host} · IOS-XE {version} · mode {mode} · target image {image}", "host", "version", "mode", "image"),
+		"upgrade.text.host":      e("equipo", "device"),
+		"upgrade.text.command":   e("comando sugerido (lectura): {cmd}", "suggested command (read-only): {cmd}", "cmd"),
+	})
+}
