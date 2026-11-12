@@ -24,7 +24,7 @@ func refuseSnippet(format string, a ...any) error {
 // servicio, que los conoce. Detail sigue en español hasta que se traduzcan los motivos de cada negativa.
 type SnippetRefusal struct{ Detail, Template, Device string }
 
-func (e *SnippetRefusal) Error() string       { return ErrSnippetRefused.Error() + ": " + e.Detail }
+func (e *SnippetRefusal) Error() string        { return ErrSnippetRefused.Error() + ": " + e.Detail }
 func (e *SnippetRefusal) Is(target error) bool { return target == ErrSnippetRefused }
 func (e *SnippetRefusal) Reason() string       { return "assist.refused" }
 func (e *SnippetRefusal) Localize(loc string) string {
