@@ -276,7 +276,7 @@ func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.T
 	}
 	k.n.Add(1)
 	srv.transfers.Add(1)
-	audit("transfer.serve.transfer", t.Client, fmt.Sprintf("server=%s proto=%s direction=%s file=%q path=%q bytes=%d sha256=%s duration=%s result=%s %s",
+	audit("transfer.serve.transfer", t.Client, fmt.Sprintf("server=%s proto=%s direction=%s file=%q path=%q bytes=%d sha256=%s duration=%s result=%s error=%q",
 		srv.id, t.Proto, service.DirEN(t.Dir), t.File, t.Path, t.Bytes, t.SHA256, t.Duration.Round(time.Millisecond), t.Result, fileserve.ReasonIn(i18n.En, t)))
 	k.events <- ev
 }

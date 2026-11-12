@@ -112,7 +112,6 @@ func patrolCasos(t *testing.T, lang string) map[string]string {
 	_, err = h.patrol.ArmJob(con(t, lang), &v1.ArmJobRequest{JobId: cj.JobId})
 	put("armar_armado", err)
 	h.waitJob(t, cj.JobId, "closed")
-	_ = netip.Addr{}
 	return out
 }
 
@@ -165,6 +164,7 @@ func failingRun(t *testing.T, lang string, reasons ...map[string]string) map[str
 	out["getrun"] = norm(run.Devices[0].Detail)
 	if len(reasons) > 0 {
 		reasons[0]["getrun"] = run.Devices[0].Reason
+		reasons[0]["auditoria"] = h.auditText(t)
 	}
 	return out
 }
@@ -275,6 +275,9 @@ func TestPatrolCodigosYArgumentos(t *testing.T) {
 func TestPatrolDetalleDeEquipoEnYCodigo(t *testing.T) {
 	reasons := map[string]string{}
 	got := failingRun(t, "en", reasons)
+	if a := reasons["auditoria"]; !strings.Contains(a, `error=\"platform: the device closed the session`) || strings.Contains(a, "cerró la sesión") {
+		t.Errorf("la auditoría del equipo debe ir en inglés:\n%s", a)
+	}
 	for _, k := range []string{"evento", "getrun"} {
 		if reasons[k] != "platform.err.closed" || !strings.Contains(got[k], "platform: the device closed the session: EOF") {
 			t.Errorf("%s: reason %q detalle %q", k, reasons[k], got[k])

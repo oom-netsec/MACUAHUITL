@@ -153,7 +153,7 @@ func TestMotivoConEntradaEnormeEsLineal(t *testing.T) {
 
 // Con en, los errores de validación y los nombres rechazados salen en inglés, con su código.
 func TestValidacionEnIngles(t *testing.T) {
-	es := motivosEs(t)
+
 	ctxEn := func(err error) string { return i18n.In(i18n.En, err) }
 	for n, f := range map[string]func() error{
 		"dir": func() error { _, e := ValidateDir("/etc"); return e }, "nombre": func() error { _, e := SafeName(".x"); return e },
@@ -165,5 +165,4 @@ func TestValidacionEnIngles(t *testing.T) {
 			t.Errorf("%s: %v / %q", n, err, ctxEn(err))
 		}
 	}
-	_ = es
 }

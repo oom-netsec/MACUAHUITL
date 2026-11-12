@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 )
@@ -257,5 +258,18 @@ func TestNoListaTieneCodigoEstable(t *testing.T) {
 		if st.Message() != want || reason != "xfer.no_listing.tftp" || len(meta) != 1 || meta["proto"] != "tftp" {
 			t.Errorf("%q: %q %q %v", lang, st.Message(), reason, meta)
 		}
+	}
+}
+
+// La auditoría de una transferencia con falla lleva el motivo en inglés como error="…", con cualquier idioma de la llamada.
+func TestAuditoriaDeTransferenciaVaEnIngles(t *testing.T) {
+	var got []string
+	audit := func(a, tg, d string) { got = append(got, d) }
+	k := newSink(func(*v1.StartServerResponse) error { return nil })
+	defer k.stop()
+	tr := fileserve.Transfer{Proto: "tftp", Client: "10.0.0.1", Dir: "escritura", Result: "error", Error: "excede el tope de tamaño por archivo", ReasonT: i18n.Tx("fileserve.reason.too_big")}
+	k.onTransfer(audit, &server{}, tr, "es")
+	if len(got) != 1 || !strings.Contains(got[0], `error="exceeds the per-file size limit"`) {
+		t.Fatalf("auditoría: %v", got)
 	}
 }

@@ -39,7 +39,7 @@ func visibilidadCasos(t *testing.T, ctx context.Context) map[string]string {
 	put("snmp_puerto", err)
 	_, err = s.SnmpGet(ctx, &v1.SnmpGetRequest{Target: &v1.SnmpTarget{Host: "192.0.2.1"}})
 	put("snmp_sin_boveda", err)
-	id, perr := d.CreateVault().Put(vault.Credential{Label: "snmp", Username: "snmp", Password: secret.New([]byte("x")), Enable: secret.New(nil), SSHKey: secret.New(nil)})
+	_, perr := d.CreateVault().Put(vault.Credential{Label: "snmp", Username: "snmp", Password: secret.New([]byte("x")), Enable: secret.New(nil), SSHKey: secret.New(nil)})
 	if perr != nil {
 		t.Fatal(perr)
 	}
@@ -47,7 +47,6 @@ func visibilidadCasos(t *testing.T, ctx context.Context) map[string]string {
 	put("snmp_sin_credencial", err)
 	_, err = s.SnmpWalk(ctx, &v1.SnmpWalkRequest{Target: &v1.SnmpTarget{Host: "192.0.2.1", CredentialId: "no-existe"}})
 	put("snmp_credencial_mala", err)
-	_ = id
 	_, err = s.GnmiGet(ctx, &v1.GnmiGetRequest{})
 	put("gnmi_sin_destino", err)
 	_, err = s.GnmiGet(ctx, &v1.GnmiGetRequest{Target: &v1.GnmiTarget{Host: "-x"}})

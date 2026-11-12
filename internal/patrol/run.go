@@ -43,7 +43,7 @@ func auditResult(ctx context.Context, d Deps, jobID string, res DeviceResult) De
 		detail = i18n.English(res.DetailErr)
 	}
 	_, err := d.Audit.Append(ctx, audit.Entry{Actor: "patrol", Action: "device.round", Target: hostport(res.Target),
-		Detail: fmt.Sprintf("job=%s round=%d state=%s commands=%d invalid=%d %s", jobID, res.Round, res.State, res.Commands, res.Invalid, detail)})
+		Detail: fmt.Sprintf("job=%s round=%d state=%s commands=%d invalid=%d error=%q", jobID, res.Round, res.State, res.Commands, res.Invalid, detail)})
 	if err != nil {
 		res.State, res.DetailErr = "failed", i18n.New("patrol.err.audit", i18n.A("error", err.Error()))
 		res.Detail = res.DetailErr.Error()

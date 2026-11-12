@@ -49,7 +49,7 @@ type PortStatus struct {
 	Ports    []Port
 	Channels []Channel
 	Warnings []string
-	WarnT    []i18n.Text // los Warnings como texto de catálogo, en paralelo
+	WarnT    []i18n.Text `json:"-"` // los Warnings como texto de catálogo, en paralelo
 }
 
 // Localize da el estado con los avisos en el idioma dado; con es, tal cual.

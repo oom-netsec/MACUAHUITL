@@ -83,13 +83,13 @@ type Device struct {
 	Reboots           []Reboot
 	Truncated         bool
 	Warnings          []string
-	WarnT             []i18n.Text // los Warnings como texto de catálogo, en paralelo
+	WarnT             []i18n.Text `json:"-"` // los Warnings como texto de catálogo, en paralelo
 }
 
 type Result struct {
 	Devices  []Device
 	Warnings []string
-	WarnT    []i18n.Text // los Warnings como texto de catálogo, en paralelo
+	WarnT    []i18n.Text `json:"-"` // los Warnings como texto de catálogo, en paralelo
 }
 
 // Localize da el resultado con los avisos (los suyos y los de cada equipo) en el idioma dado; con es, tal cual.
