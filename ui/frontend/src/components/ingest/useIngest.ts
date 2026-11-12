@@ -83,7 +83,7 @@ export function useIngestOpts(kind: IngestKind, save: boolean) {
       const c = info && coreFieldError(info, t);
       const k = c ? c[0] : info?.reason ? null : mapStartError(msg);
       if (!k) return false;
-      setStartErr({ [k]: c ? c[1] : msg.replace(/^(syslogd|snmp traps|snmp|flows|traps|ingest): /, "") });
+      setStartErr({ [k]: c?.[1] || msg.replace(/^(syslogd|snmp traps|snmp|flows|traps|ingest): /, "") });
       if (k !== "addr") setOpen(true);
       return true;
     },

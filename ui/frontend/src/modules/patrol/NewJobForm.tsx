@@ -26,7 +26,13 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
   const [pbs, setPbs] = useState<string[]>([]);
   const [pbTry, setPbTry] = useState(0); // el núcleo pudo estar arrancando: reintentar sin rehacer el formulario
   // Los nombres vienen en el idioma del núcleo: se piden cuando el núcleo ya tiene el de la interfaz.
-  useEffect(() => { if (!coreLang) return; setPbErr(false); core.listPlaybooks().then(setCatalog).catch(() => setPbErr(true)); }, [core, pbTry, coreLang]);
+  useEffect(() => {
+    if (!coreLang) return;
+    let off = false; // una respuesta tardía en el idioma anterior no pisa la nueva
+    setPbErr(false);
+    core.listPlaybooks().then((c) => { if (!off) setCatalog(c); }).catch(() => { if (!off) setPbErr(true); });
+    return () => { off = true; };
+  }, [core, pbTry, coreLang]);
   const [out, setOut] = useState("");
   const [minutes, setMinutes] = useState("0");
   const [rounds, setRounds] = useState("1");

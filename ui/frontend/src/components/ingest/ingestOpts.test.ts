@@ -70,10 +70,10 @@ test("coreFieldError mapea metadata.field de ingest.invalid al campo y arma el t
   const inv = (metadata: Record<string, string>) => ({ code: "InvalidArgument", reason: "ingest.invalid", metadata });
   expect(coreFieldError(inv({ field: "rate_per_source", min: "1", max: "10000", value: "20000" }), t)).toEqual(["ratePerSource", 'syslog.err.range{"lo":"1","hi":"10000"}']);
   expect(coreFieldError(inv({ field: "queue_size", min: "64", max: "65536" }), t)?.[0]).toBe("queueSize");
-  expect(coreFieldError(inv({ field: "name_template", template_problem: "chars", ch: "/" }), t)).toEqual(["nameTemplate", 'syslog.err.tplCh{"ch":"/"}']);
+  expect(coreFieldError(inv({ field: "name_template", template_problem: "chars", ch: "'/'" }), t)).toEqual(["nameTemplate", `syslog.err.tplCh{"ch":"'/'"}`]); // el núcleo cita el carácter (strconv.QuoteRune)
   expect(coreFieldError(inv({ field: "name_template", template_problem: "need" }), t)).toEqual(["nameTemplate", "syslog.err.tplNeed"]);
   expect(coreFieldError(inv({ field: "format", value: "x" }), t)).toEqual(["format", 'syslog.err.coreValue{"value":"x"}']);
-  expect(coreFieldError(inv({ field: "addr" }), t)).toEqual(["addr", "syslog.err.coreAddr"]);
+  expect(coreFieldError(inv({ field: "addr" }), t)).toEqual(["addr", ""]); // se muestra el texto del núcleo
   expect(coreFieldError(inv({ field: "protocol", value: "x" }), t)).toBeNull(); // no es campo del formulario
   expect(coreFieldError({ code: "InvalidArgument", reason: "otro", metadata: { field: "addr" } }, t)).toBeNull();
 });

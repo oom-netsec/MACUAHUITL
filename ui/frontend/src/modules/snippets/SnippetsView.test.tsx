@@ -180,15 +180,37 @@ test("vlan, trunk y svi quedan cubiertos por el formulario genérico", async () 
 
 const withReason = (e: Error, reason: string, metadata: Record<string, string>) => Object.assign(e, { cause: { message: e.message, code: e.message.match(/code = (\w+)/)?.[1] ?? "", reason, metadata } });
 
-test("assist.invalid_value: el primer problema se muestra por su motivo (i18n) y no por el texto del núcleo", async () => {
-  const msg = "assist: invalid snippet values: Max MAC (maximum): 5000 out of range; zz unknown";
+// Textos tal como los arma el núcleo (internal/assist/templates.go): en inglés «campo: motivo» y «campo is required».
+test("assist.invalid_value en inglés: cada problema va junto a su campo con el texto del núcleo", async () => {
+  const msg = 'assist: invalid snippet values: maximum: 5000 is outside 1-3072; violation: "x": choose one of protect, restrict, shutdown';
+  await open({ planTemplateSnippet: vi.fn(async () => { throw withReason(rpc("InvalidArgument", msg), "assist.invalid_value", { template: "port-security", field: "maximum", why: "range" }); }) } as never);
+  await choose("Port-security en puertos de acceso");
+  await userEvent.type(screen.getByLabelText("Puertos *"), "Gi1/0/5");
+  await userEvent.click(planBtn());
+  expect(await screen.findByText("5000 is outside 1-3072")).toBeInTheDocument();
+  expect(screen.getByLabelText("Máximo de direcciones MAC")).toBeInvalid();
+  expect(screen.getByLabelText("Acción ante violación")).toBeInvalid();
+  expect(screen.queryByText(/invalid snippet values/)).not.toBeInTheDocument();
+});
+
+test("assist.invalid_value: el texto del núcleo en español conserva el valor y el rango", async () => {
+  const msg = "assist: valores del snippet inválidos: Máximo de direcciones MAC (maximum): 5000 fuera de 1-3072";
+  await open({ planTemplateSnippet: vi.fn(async () => { throw withReason(rpc("InvalidArgument", msg), "assist.invalid_value", { template: "port-security", field: "maximum", why: "range" }); }) } as never);
+  await choose("Port-security en puertos de acceso");
+  await userEvent.type(screen.getByLabelText("Puertos *"), "Gi1/0/5");
+  await userEvent.click(planBtn());
+  expect(await screen.findByText("5000 fuera de 1-3072")).toBeInTheDocument();
+  expect(screen.queryByText("Fuera de rango.")).not.toBeInTheDocument();
+});
+
+test("assist.invalid_value: si el texto no nombra el campo, el motivo lo ubica", async () => {
+  const msg = "assist: invalid snippet values: something odd";
   await open({ planTemplateSnippet: vi.fn(async () => { throw withReason(rpc("InvalidArgument", msg), "assist.invalid_value", { template: "port-security", field: "maximum", why: "range" }); }) } as never);
   await choose("Port-security en puertos de acceso");
   await userEvent.type(screen.getByLabelText("Puertos *"), "Gi1/0/5");
   await userEvent.click(planBtn());
   expect(await screen.findByText("Fuera de rango.")).toBeInTheDocument();
   expect(screen.getByLabelText("Máximo de direcciones MAC")).toBeInvalid();
-  expect(screen.queryByText(/out of range/)).not.toBeInTheDocument();
 });
 
 test("assist.refused: el aviso lleva el motivo sin el prefijo del núcleo, sea cual sea su idioma", async () => {

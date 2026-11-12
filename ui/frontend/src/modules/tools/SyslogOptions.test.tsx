@@ -240,6 +240,14 @@ test("un done{error} de dirección marca la dirección sin abrir las opciones", 
   expect(screen.getByText("Opciones").closest("details")).not.toHaveAttribute("open");
 });
 
+test("un done{error} de dirección con errorInfo muestra el texto del núcleo, que dice qué hacer", async () => {
+  const core = setup();
+  await listen();
+  act(() => core.emitSyslog({ runId: "s1", done: true, error: "rpc error: code = InvalidArgument desc = syslogd: port 514 is privileged; use a high one (e.g. 5514)",
+    errorInfo: { code: "InvalidArgument", reason: "ingest.invalid", metadata: { field: "addr", port: "514" } } }));
+  expect(screen.getByLabelText("Dirección de escucha")).toHaveAccessibleDescription("port 514 is privileged; use a high one (e.g. 5514)");
+});
+
 test("un done{error} que no nombra campo va en un aviso", async () => {
   const core = setup();
   await listen();

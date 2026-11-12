@@ -2545,7 +2545,6 @@ export const es = {
   "patrol.phase.ARM_CHECK_DONE": "Login Test al armar",
   "syslog.err.tplCh": "Carácter no permitido en la plantilla: {ch}",
   "syslog.err.coreValue": "Valor no admitido: {value}",
-  "syslog.err.coreAddr": "Dirección de escucha inválida.",
   "snippets.why.required": "Falta este valor.",
   "snippets.why.range": "Fuera de rango.",
   "snippets.why.pattern": "No cumple el formato esperado.",

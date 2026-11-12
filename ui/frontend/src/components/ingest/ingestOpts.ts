@@ -104,7 +104,7 @@ const CORE_FIELDS: Record<string, OptKey> = {
 const TPL_PROBLEMS = { len: "tplLen", need: "tplNeed", tokens: "tplTokens", dots: "tplDots" } as const;
 type Tr = (k: Key, v?: Record<string, string | number>) => string;
 
-/** Campo del formulario y texto para un `ingest.invalid` del núcleo (por metadata, sin leer su texto); null si no es ese motivo o el campo no está en el formulario. */
+/** Campo del formulario y texto para un `ingest.invalid` del núcleo (por metadata); texto "" = usar el del núcleo; null si no es ese motivo o el campo no está en el formulario. */
 export function coreFieldError(info: ErrInfo, t: Tr): [OptKey, string] | null {
   const m = info.metadata;
   const k = info.reason === "ingest.invalid" ? CORE_FIELDS[m.field] : undefined;
@@ -114,7 +114,7 @@ export function coreFieldError(info: ErrInfo, t: Tr): [OptKey, string] | null {
     return [k, p === "chars" ? t("syslog.err.tplCh", { ch: m.ch ?? "" }) : p in TPL_PROBLEMS ? t(`syslog.err.${TPL_PROBLEMS[p as keyof typeof TPL_PROBLEMS]}`) : t("syslog.err.coreValue", { value: m.value ?? "" })];
   }
   if (k === "format") return [k, t("syslog.err.coreValue", { value: m.value ?? "" })];
-  if (k === "addr") return [k, t("syslog.err.coreAddr")];
+  if (k === "addr") return [k, ""]; // el texto del núcleo dice qué hacer (p. ej. puerto privilegiado → uno alto) y ya viene en el idioma pedido
   return [k, t("syslog.err.range", { lo: m.min, hi: m.max })];
 }
 

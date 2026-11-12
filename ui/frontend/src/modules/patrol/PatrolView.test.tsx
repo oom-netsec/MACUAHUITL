@@ -271,10 +271,14 @@ test("si el núcleo no da el catálogo, se avisa y los comandos pegados siguen f
 test("el catálogo de playbooks se vuelve a pedir al cambiar de idioma (el núcleo devuelve los nombres en ese idioma)", async () => {
   const listPlaybooks = vi.fn().mockResolvedValue([{ id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: [] }]);
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks });
-  render(<I18nProvider><LanguageSwitch /><PatrolView core={core} /></I18nProvider>);
+  let confirm = () => {};
+  const onLang = (l: string) => (l === "en" ? new Promise<void>((r) => { confirm = r; }) : undefined);
+  render(<I18nProvider onLang={onLang}><LanguageSwitch /><PatrolView core={core} /></I18nProvider>);
   await screen.findByRole("checkbox", { name: "STP" });
   expect(listPlaybooks).toHaveBeenCalledTimes(1);
   await userEvent.click(screen.getByRole("radio", { name: "English" }));
+  expect(listPlaybooks).toHaveBeenCalledTimes(1); // aún no: el núcleo no confirmó el idioma y contestaría en el anterior
+  await act(async () => confirm());
   await waitFor(() => expect(listPlaybooks).toHaveBeenCalledTimes(2));
 });
 

@@ -2547,7 +2547,6 @@ export const en: Record<Key, string> = {
   "patrol.phase.ARM_CHECK_DONE": "Login Test at arming",
   "syslog.err.tplCh": "Character not allowed in the template: {ch}",
   "syslog.err.coreValue": "Unsupported value: {value}",
-  "syslog.err.coreAddr": "Invalid listen address.",
   "snippets.why.required": "This value is missing.",
   "snippets.why.range": "Out of range.",
   "snippets.why.pattern": "Does not match the expected format.",

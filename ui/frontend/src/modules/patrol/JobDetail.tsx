@@ -190,6 +190,6 @@ function Phases({ phases }: { phases: JobPhase[] }) {
 const phaseReasonKeys = Object.fromEntries(
   ["devices", "devices_excluded", "ok_failed", "rounds", "packaged", "round_zip_failed", "close_failed", "before_arming", "core_stopped"].map((r) => [`patrol.phaseReason.phase.${r}`, true]),
 );
-const phaseKeys =Object.fromEntries(
+const phaseKeys = Object.fromEntries(
   ["CREATED", "LOGIN_TEST_DONE", "ARMED", "ROUND_STARTED", "ROUND_FINISHED", "ROUND_SKIPPED", "PACKAGED", "COMPLETED", "CANCELLED", "FAILED", "ARM_CHECK_DONE"].map((k) => [`patrol.phase.${k}`, true]),
 );

@@ -87,8 +87,8 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
       const info = errInfo(e);
       if (code === "InvalidArgument") {
         const { byField, rest } = mapInvalid(desc, sel.fields);
-        const first = firstInvalid(info, sel.fields); // con motivo del núcleo, el primer problema sale del catálogo propio y no de su texto
-        if (first) byField[first[0]] = t(first[1]);
+        const first = firstInvalid(info, sel.fields); // el texto del núcleo (con valor y rango) manda; el motivo solo ubica el campo si el texto no lo nombra
+        if (first && !byField[first[0]]) byField[first[0]] = t(first[1]);
         setFieldErr(byField);
         if (rest.length) setErr(rest.join("; "));
       } else if (info?.reason === "assist.refused") setWarn(t("snippets.refused", { why: desc.replace(/^assist: [^:]+: /, "") }));

@@ -8,22 +8,24 @@ import { CommandPalette, rememberRecent, type PaletteAction } from "./CommandPal
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { assistOwner, useShellStatus } from "./useShellStatus";
 import { Icon } from "../components/Icon";
-import { I18nProvider, useSetLang, useT } from "../lib/i18n";
+import { I18nProvider, useLang, useSetLang, useT } from "../lib/i18n";
 import { setTheme } from "../lib/theme";
 import { vaultChanged } from "../lib/vaultSignal";
 
 // `chrome` son los controles de la ventana sin marco; las pruebas no los necesitan.
 // `initial` abre otro módulo al arrancar (vista previa y capturas).
 export function App(props: { core: CoreAPI; chrome?: ReactNode; initial?: string }) {
-  // El núcleo habla el idioma de la interfaz; un fallo al avisarle no debe romper nada.
-  const sync = (l: string) => { try { return props.core.setPreference("ui.language", l); } catch { /* núcleo sin la preferencia */ } };
-  return <I18nProvider onLang={sync}><Shell {...props} /></I18nProvider>;
+  // El núcleo habla el idioma de la interfaz; un fallo al avisarle no debe romper nada. Las llamadas van en fila: dos llamadas de
+  // Wails no llegan en orden y el núcleo debe quedar con el último idioma elegido.
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const sync = (l: string) => (queue.current = queue.current.then(() => props.core.setPreference("ui.language", l)).catch(() => {}));
+  return <I18nProvider onLang={sync}><Shell {...props} resync={sync} /></I18nProvider>;
 }
 
 const collapsedKey = "macuahuitl.barra-contraida";
 const readCollapsed = () => { try { return localStorage.getItem(collapsedKey) === "1"; } catch { return false; } };
 
-function Shell({ core, chrome, initial }: { core: CoreAPI; chrome?: ReactNode; initial?: string }) {
+function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: ReactNode; initial?: string; resync: (l: string) => unknown }) {
   const t = useT();
   const setLang = useSetLang();
   const [status, setStatus] = useState<CoreStatus>("connected");
@@ -49,6 +51,14 @@ function Shell({ core, chrome, initial }: { core: CoreAPI; chrome?: ReactNode; i
     recheck(); // el primer core:status pudo salir antes de que existiera la ventana
     return off;
   }, [core, recheck]);
+  // El núcleo pudo no estar al arrancar o reiniciarse: al volver se le manda otra vez el idioma.
+  const lang = useLang();
+  const down = useRef(false);
+  useEffect(() => {
+    if (status !== "connected") down.current = true;
+    else if (down.current) { down.current = false; void resync(lang); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando cambia el estado del núcleo
+  }, [status]);
 
   const busySetter = (id: string) => {
     let f = busySetters.current.get(id);
