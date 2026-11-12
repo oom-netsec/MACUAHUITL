@@ -793,3 +793,11 @@ interface CoreError {
 
 ### Nombres de playbooks
 Los YAML de `playbooks/` llevan `name_en` (obligatorio en los incrustados; una prueba falla si falta). `listPlaybooks` devuelve `name` en el idioma del contexto: `es` es el nombre de siempre y `en` es `name_en`, con la misma separación « · » entre el área y el nombre, así la agrupación del selector no cambia. Un playbook del usuario sin `name_en` sale con su nombre en los dos idiomas.
+
+## Auditoría siempre en inglés (fase 30a-2)
+- El `detail` de cada registro de auditoría se escribe en inglés fijo, con formato `clave=valor` (`passed=1 of 2`, `reason=user`, `guard=revoked`, `devices=2`). No depende de `accept-language` ni de ningún idioma del cliente.
+- La acción (`job.logintest`, `vault.respaldo.exportar`, `hosts.importar`, …) no cambia: sigue siendo el identificador fijo que usan la interfaz y las búsquedas, aunque lleve palabras en español.
+- Los valores que son datos (rutas, IPs, usuarios, ids, nombres) salen tal cual. Los verbos de decisión de importación (`reemplazar`, `renombrar`, `omitir`, `fusionar`) siguen siendo así en el cable y se auditan como `replace`, `rename`, `skip` y `merge`.
+- Cuando el detalle lleva el texto de un error del núcleo con código del catálogo, sale el texto en inglés del catálogo. Un error sin código se audita con su texto original (puede estar en español): es el caso de los mensajes de errores de otras capas, de las advertencias de respaldo y del `detail` de equipos que ya traen los trabajos.
+- Los registros anteriores a esta fase no se reescriben (la cadena de hashes no se toca): una misma bitácora mezcla detalles en español (viejos) y en inglés (nuevos), y `audit verify` sigue íntegro.
+- La interfaz no interpreta el detalle de auditoría (la vista solo verifica la cadena y copia el comando de exportación), así que no hay cambio de pantalla. Quien lea la exportación por su cuenta debe aceptar las dos formas para los registros anteriores: por ejemplo `razon=`/`reason=`, `pasaron=1 de 2`/`passed=1 of 2`, `guard=revocado`/`guard=revoked`.
