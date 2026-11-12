@@ -11,6 +11,7 @@ import (
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/store"
 )
 
@@ -227,5 +228,27 @@ func TestPersistJobConcurrenteNoRetrocede(t *testing.T) {
 		if db != mem {
 			t.Fatalf("vuelta %d: base = %q, memoria = %q", i, db, mem)
 		}
+	}
+}
+
+// GetRun manda el puerto efectivo: 0 en la spec (el de omisión) sale como 22.
+func TestGetRunPuertoEfectivo(t *testing.T) {
+	h := newHarness(t, nil)
+	j := &job{id: "j-puerto", state: "completed", results: map[int][]patrol.DeviceResult{1: {
+		{Target: patrol.Target{Address: "192.168.3.2", Port: 0, DeviceID: "a"}, State: "completed"},
+		{Target: patrol.Target{Address: "192.168.3.3", Port: 2222, DeviceID: "b"}, State: "completed"},
+	}}}
+	h.core.mu.Lock()
+	h.core.jobs[j.id] = j
+	h.core.mu.Unlock()
+	run, err := h.patrol.GetRun(ctx(t), &v1.GetRunRequest{JobId: j.id, Round: 1})
+	if err != nil || len(run.Devices) != 2 {
+		t.Fatalf("run = %+v %v", run, err)
+	}
+	if p := run.Devices[0].Target.Port; p != 22 {
+		t.Fatalf("puerto 0 salió como %d, quería 22", p)
+	}
+	if p := run.Devices[1].Target.Port; p != 2222 {
+		t.Fatalf("puerto 2222 salió como %d", p)
 	}
 }

@@ -388,12 +388,16 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	return &v1.ArmJobResponse{WindowEndsAt: timestamppb.New(until), MissingInhibitors: missing}, nil
 }
 
-func patrolHostport(t patrol.Target) string {
-	p := t.Port
+// effectivePort es el puerto SSH que se usa de verdad: 0 en la spec significa el de omisión (22).
+func effectivePort(p uint16) uint16 {
 	if p == 0 {
-		p = 22
+		return 22
 	}
-	return fmt.Sprintf("%s:%d", t.Address, p)
+	return p
+}
+
+func patrolHostport(t patrol.Target) string {
+	return fmt.Sprintf("%s:%d", t.Address, effectivePort(t.Port))
 }
 
 // watch empaqueta cada ronda y cierra el trabajo al terminar.
@@ -555,7 +559,7 @@ func (s *patrolSvc) GetRun(_ context.Context, r *v1.GetRunRequest) (*v1.GetRunRe
 		out.OutputPath = j.writer.Dir()
 	}
 	for _, d := range j.results[int(r.Round)] {
-		out.Devices = append(out.Devices, &v1.RunDevice{Target: &v1.Target{Address: d.Target.Address, Port: uint32(d.Target.Port), DeviceId: d.Target.DeviceID},
+		out.Devices = append(out.Devices, &v1.RunDevice{Target: &v1.Target{Address: d.Target.Address, Port: uint32(effectivePort(d.Target.Port)), DeviceId: d.Target.DeviceID},
 			State: deviceStates[d.State], Detail: d.Detail})
 	}
 	return out, nil
