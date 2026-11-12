@@ -582,7 +582,7 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 		for {
 			r, err := st.Recv()
 			if err != nil {
-				b.emit("diag:done", map[string]any{"runId": id, "exitCode": -1, "outputPath": "", "error": err.Error()})
+				b.emit("diag:done", map[string]any{"runId": id, "exitCode": -1, "outputPath": "", "error": err.Error(), "errorInfo": errorInfo(err)})
 				return
 			}
 			if r.Done {
@@ -761,6 +761,7 @@ func (b *Bridge) SyslogStart(addr, proto string, allowAny, save bool, o SyslogOp
 				ev := map[string]any{"runId": id}
 				if ctx.Err() == nil && err != io.EOF {
 					ev["error"] = err.Error()
+					ev["errorInfo"] = errorInfo(err)
 				}
 				b.emit("syslog:done", ev)
 				return

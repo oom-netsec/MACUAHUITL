@@ -25,6 +25,8 @@ import (
 type i18nCore struct {
 	v1.UnimplementedPrefsServiceServer
 	v1.UnimplementedPatrolServiceServer
+	v1.UnimplementedToolsServiceServer
+	rec       *recorder
 	mu        sync.Mutex
 	lang      string
 	langReads int
@@ -67,8 +69,10 @@ func i18nBridge(t *testing.T, lang string, localize bool) (*Bridge, *i18nCore) {
 	go ipc.Serve(ctx, l, func(r ipc.Registrar) {
 		v1.RegisterPrefsServiceServer(r, f)
 		v1.RegisterPatrolServiceServer(r, f)
+		v1.RegisterToolsServiceServer(r, f)
 	}, ipc.LocaleOptions()...)
-	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
+	f.rec = &recorder{}
+	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, f.rec.emit)
 	b.Localize = localize
 	Start(ctx, b)
 	return b, f
@@ -172,4 +176,19 @@ func TestWriteFileExistsLlevaReasonYRuta(t *testing.T) {
 	if err == nil || err.Error() != "save: the file already exists" || !errors.Is(err, ErrFileExists) {
 		t.Fatalf("en: %v", err)
 	}
+}
+
+func (f *i18nCore) Syslog(_ *v1.SyslogRequest, st v1.ToolsService_SyslogServer) error {
+	return service.Err(st.Context(), codes.InvalidArgument, "ingest.invalid.queue_size", i18n.A("min", 64, "max", 65536, "value", 10))
+}
+
+// El stream que falla al validar cierra con error (texto de siempre) y errorInfo {code, reason, metadata}.
+func TestStreamDoneLlevaErrorInfo(t *testing.T) {
+	b, f := i18nBridge(t, "", false)
+	if _, err := b.SyslogStart("127.0.0.1:0", "udp", false, false, SyslogOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	want := `syslog:done {"error":"rpc error: code = InvalidArgument desc = la cola debe estar entre 64 y 65536 (0 = default), no 10",` +
+		`"errorInfo":{"code":"InvalidArgument","metadata":{"field":"queue_size","max":"65536","min":"64","value":"10"},"reason":"ingest.invalid"},"runId":"run-1"}`
+	f.rec.waitFor(t, want)
 }

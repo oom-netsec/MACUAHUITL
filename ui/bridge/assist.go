@@ -119,7 +119,7 @@ func (b *Bridge) AssistWatch(runID string) error {
 			m, err := st.Recv()
 			if err != nil {
 				if err != io.EOF {
-					b.emit("assist:done", map[string]any{"runId": runID, "error": err.Error()})
+					b.emit("assist:done", map[string]any{"runId": runID, "error": err.Error(), "errorInfo": errorInfo(err)})
 				} else {
 					b.emit("assist:done", map[string]any{"runId": runID})
 				}

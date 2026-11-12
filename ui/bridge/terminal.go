@@ -61,6 +61,7 @@ func (b *Bridge) TerminalOpen(d TerminalDTO) (string, error) {
 				ev := map[string]any{"runId": id}
 				if ctx.Err() == nil && err != io.EOF {
 					ev["error"] = err.Error()
+					ev["errorInfo"] = errorInfo(err)
 				}
 				b.emit("terminal:done", ev)
 				return

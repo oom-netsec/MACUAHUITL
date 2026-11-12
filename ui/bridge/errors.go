@@ -125,3 +125,16 @@ func (b *Bridge) locale() string {
 	}
 	return b.language()
 }
+
+// errorInfo es el {code, reason, metadata} de un error para los eventos *:done; metadata nunca es nil.
+func errorInfo(err error) map[string]any {
+	var be *Error
+	if !errors.As(wrapErr(err), &be) {
+		return nil
+	}
+	m := be.Metadata
+	if m == nil {
+		m = map[string]string{}
+	}
+	return map[string]any{"code": be.Code, "reason": be.Reason, "metadata": m}
+}

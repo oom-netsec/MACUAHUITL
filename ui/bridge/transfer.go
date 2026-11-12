@@ -57,6 +57,7 @@ func (b *Bridge) TransferServe(d TransferServeDTO) (string, error) {
 				ev := map[string]any{"runId": id}
 				if ctx.Err() == nil && err != io.EOF {
 					ev["error"] = err.Error()
+					ev["errorInfo"] = errorInfo(err)
 				}
 				if cleanup != "" {
 					ev["cleanup"] = cleanup // cómo quitar la regla de nftables de este servidor

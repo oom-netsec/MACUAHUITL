@@ -83,6 +83,7 @@ func (b *Bridge) ConsoleOpen(d ConsoleDTO) (string, error) {
 				ev := map[string]any{"runId": id}
 				if ctx.Err() == nil && err != io.EOF {
 					ev["error"] = err.Error()
+					ev["errorInfo"] = errorInfo(err)
 				}
 				b.emit("console:done", ev)
 				return
@@ -156,6 +157,7 @@ func (b *Bridge) ServeStart(d ServeDTO) (string, error) {
 				ev := map[string]any{"runId": id}
 				if ctx.Err() == nil && err != io.EOF {
 					ev["error"] = err.Error()
+					ev["errorInfo"] = errorInfo(err)
 				}
 				b.emit("serve:done", ev)
 				return

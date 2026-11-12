@@ -106,6 +106,7 @@ func (b *Bridge) stream(name string, open func(ctx context.Context, c *ipc.Clien
 				done := map[string]any{"runId": id}
 				if ctx.Err() == nil && err != io.EOF {
 					done["error"] = err.Error()
+					done["errorInfo"] = errorInfo(err)
 				}
 				b.emit(name+":done", done)
 				return
