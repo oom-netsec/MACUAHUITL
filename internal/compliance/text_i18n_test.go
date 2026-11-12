@@ -85,3 +85,21 @@ func TestNingunSecretoEnElInforme(t *testing.T) {
 		t.Error("la línea de la comunidad no se citó con su valor oculto")
 	}
 }
+
+// Los escenarios de la regresión recorren todos los títulos y detalles de las reglas y de la plantilla.
+func TestEscenariosCubrenTodosLosDetalles(t *testing.T) {
+	_, ptrs := regCases(t)
+	used := map[string]bool{}
+	for _, v := range ptrs {
+		for k := range i18n.UsedKeys(v) {
+			used[k] = true
+		}
+	}
+	for _, k := range i18n.Codes() {
+		for _, prefix := range []string{"compliance.detail.", "compliance.title.", "compliance.scope."} {
+			if strings.HasPrefix(k, prefix) && !used[k] {
+				t.Errorf("ningún escenario de la regresión produce %s", k)
+			}
+		}
+	}
+}

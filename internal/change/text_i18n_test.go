@@ -1,6 +1,7 @@
 package change
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -29,5 +30,21 @@ func TestMasLineasDeConfig(t *testing.T) {
 	more := i18n.Tx("change.diff.more", "n", 3)
 	if more.In(i18n.Es) != "… 3 líneas más" || more.In(i18n.En) != "… 3 more lines" {
 		t.Errorf("%q %q", more.In(i18n.Es), more.In(i18n.En))
+	}
+}
+
+// Los escenarios de la regresión recorren todos los hallazgos del cambio.
+func TestEscenariosCubrenTodosLosHallazgos(t *testing.T) {
+	_, ptrs := regCases(t)
+	used := map[string]bool{}
+	for _, v := range ptrs {
+		for k := range i18n.UsedKeys(v) {
+			used[k] = true
+		}
+	}
+	for _, k := range i18n.Codes() {
+		if strings.HasPrefix(k, "change.detail.") && !used[k] {
+			t.Errorf("ningún escenario de la regresión produce %s", k)
+		}
 	}
 }

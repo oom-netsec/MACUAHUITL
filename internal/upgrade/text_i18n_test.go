@@ -2,6 +2,7 @@ package upgrade
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -46,6 +47,22 @@ func TestErroresDeEntradaCodificados(t *testing.T) {
 		co, ok := err.(i18n.Coded)
 		if err == nil || !ok || err.Error() != c.es || co.Localize(i18n.En) != c.en {
 			t.Errorf("%+v: %v", c.img, err)
+		}
+	}
+}
+
+// Los escenarios de la regresión recorren todos los detalles de la verificación.
+func TestEscenariosCubrenTodosLosDetalles(t *testing.T) {
+	_, ptrs := regCases(t)
+	used := map[string]bool{}
+	for _, v := range ptrs {
+		for k := range i18n.UsedKeys(v) {
+			used[k] = true
+		}
+	}
+	for _, k := range i18n.Codes() {
+		if strings.HasPrefix(k, "upgrade.detail.") && !used[k] {
+			t.Errorf("ningún escenario de la regresión produce %s", k)
 		}
 	}
 }
