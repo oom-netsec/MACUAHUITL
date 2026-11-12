@@ -98,7 +98,10 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if len(args) < 1 {
 		return errors.New(usage)
 	}
-	args, langFlag, _ := cli.StripValueFlag(args, "--lang")
+	args, lang, err := cli.StripLang(args)
+	if err != nil {
+		return err
+	}
 	if len(args) < 1 {
 		return errors.New(usage)
 	}
@@ -111,7 +114,12 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 		c.TTY = f
 	}
 	// Conectar solo cuando el comando es válido: un error de uso no debe hablar del socket.
-	conn, err := ipc.Dial(context.Background(), ipc.WithLanguage(cli.Lang(langFlag, os.Getenv))...)
+	// Solo --lang explícito pide idioma: mctl no lee LC_ALL, LC_MESSAGES ni LANG mientras sus textos sigan en español.
+	var dialOpts []ipc.DialOption
+	if lang != "" {
+		dialOpts = ipc.WithLanguage(lang)
+	}
+	conn, err := ipc.Dial(context.Background(), dialOpts...)
 	if err != nil {
 		return err
 	}

@@ -1,38 +1,45 @@
 package cli
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-// StripValueFlag quita --nombre valor y --nombre=valor de args y devuelve el último valor. Sin valor (la bandera al final) da "".
-func StripValueFlag(args []string, name string) (rest []string, value string, found bool) {
-	for i := 0; i < len(args); i++ {
-		switch a := args[i]; {
-		case a == name:
-			found, value = true, ""
-			if i+1 < len(args) {
-				value = args[i+1]
-				i++
-			}
-		case strings.HasPrefix(a, name+"="):
-			found, value = true, strings.TrimPrefix(a, name+"=")
-		default:
-			rest = append(rest, a)
-		}
-	}
-	return rest, value, found
+// validLang acepta es, en o una etiqueta con guion (es-MX, en-US).
+func validLang(v string) bool {
+	v = strings.ToLower(v)
+	return v == "es" || v == "en" || (strings.Contains(v, "-") && !strings.HasPrefix(v, "-") && !strings.HasSuffix(v, "-"))
 }
 
-// Lang es el idioma que mctl pide al núcleo (es o en): la bandera --lang; si no, LC_ALL, LC_MESSAGES y LANG por ese orden
-// (lo primero que no esté vacío); si no, es. «C» y «POSIX» y lo desconocido valen es. Los textos propios de mctl no se traducen.
-func Lang(flag string, getenv func(string) string) string {
-	v := flag
-	for _, k := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
-		if v == "" {
-			v = getenv(k)
+// StripLang quita la bandera global --lang X, --lang=X, -lang X o -lang=X, que solo vale ANTES del subcomando (se
+// detiene en el primer argumento que no es bandera y en «--»). Nunca se come el nombre del comando: el valor debe ser
+// es, en o una etiqueta con guion; otro valor es un error («mctl --lang vault status» no se come «vault»).
+// Devuelve el idioma normalizado (es o en), o "" si no se pidió.
+func StripLang(args []string) (rest []string, lang string, err error) {
+	i := 0
+	for ; i < len(args); i++ {
+		a := args[i]
+		if a == "--" || !strings.HasPrefix(a, "-") {
+			break
 		}
+		name, val, hasVal := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(a, "-"), "-"), "=")
+		if name != "lang" {
+			rest = append(rest, a)
+			continue
+		}
+		if !hasVal {
+			if i+1 >= len(args) {
+				return nil, "", fmt.Errorf("--lang pide un idioma (es o en)")
+			}
+			i++
+			val = args[i]
+		}
+		if !validLang(val) {
+			return nil, "", fmt.Errorf("idioma inválido %q (usa es o en)", val)
+		}
+		lang = i18n.Parse(val)
 	}
-	return i18n.Parse(v)
+	return append(rest, args[i:]...), lang, nil
 }

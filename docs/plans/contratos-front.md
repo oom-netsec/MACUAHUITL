@@ -752,7 +752,7 @@ Sin el metadato `accept-language`, o con `es` (o con cualquier idioma que no sea
 - `ui.language` es una clave nueva de `getPreference`/`setPreference` (la lista cerrada la acepta; el valor es `es` o `en`).
 - El núcleo acepta `es`, `en`, `es-MX`, `en-US`… y listas con `q` (`fr, en;q=0.8` da `en`); ausente o desconocido es `es`.
 - **La auditoría no depende del idioma** (decisión del 2026-11-12, rama 30a-2): su detalle irá fijo en inglés; esta fase no toca sus textos y la infraestructura no los pasa por el catálogo.
-- CLI: `mctl --lang es|en` (en cualquier posición); si no, `LC_ALL`, `LC_MESSAGES` y `LANG` por ese orden; si no, `es`. Los textos propios de mctl no se traducen.
+- CLI: `mctl --lang es|en` (también `-lang`, `--lang=en` y etiquetas como `en-US`) es una bandera global que solo vale **antes** del comando; un valor que no sea idioma es un error (no se come el nombre del comando). **mctl no lee `LC_ALL`, `LC_MESSAGES` ni `LANG`**: mientras sus textos propios sigan en español, pedir un idioma solo con `--lang` evita mezclarlos; sin la bandera todo sale en español.
 
 ### Forma exacta del error en TS
 Todo método del puente que devuelve `error` rechaza la promesa con un `RuntimeError` de Wails cuyo `message` es el texto de siempre (`rpc error: code = X desc = …` para lo que viene del núcleo) y cuyo **`cause`** es:
