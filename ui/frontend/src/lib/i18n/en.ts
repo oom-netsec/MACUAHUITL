@@ -374,7 +374,7 @@ export const en: Record<Key, string> = {
   "change.name": "Change name",
   "change.targets": "Devices (IP or name, comma-separated)",
   "change.pick": "Choose one",
-  "change.outDir": "Output folder (empty = outputs/cambios)",
+  "change.outDir": "Output folder (empty = a new subfolder in outputs/cambios)",
   "change.create": "Create change",
   "change.capture": "Capture {phase}",
   "change.trust": "I confirm fingerprint {fp} of {target}",

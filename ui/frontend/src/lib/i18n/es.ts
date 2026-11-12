@@ -372,7 +372,7 @@ export const es = {
   "change.name": "Nombre del cambio",
   "change.targets": "Equipos (IP o nombre, separados por comas)",
   "change.pick": "Elige una",
-  "change.outDir": "Carpeta de salida (vacío = outputs/cambios)",
+  "change.outDir": "Carpeta de salida (vacío = una subcarpeta nueva en outputs/cambios)",
   "change.create": "Crear cambio",
   "change.capture": "Capturar {phase}",
   "change.trust": "Confirmo la huella {fp} de {target}",

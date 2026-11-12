@@ -24,3 +24,12 @@ test("la ruta es lo que sigue al sufijo «corrígelo con: chmod 700 », no una m
   const m = "prefs.outputs.permisos: la carpeta /a/chmod 700 /b tiene modo 0755 y debe ser 0700; corrígelo con: chmod 700 /a/chmod 700 /b";
   expect(parseOutputsError(m)).toEqual({ code: "permisos", path: "/a/chmod 700 /b" });
 });
+
+test("los textos sirven en Ajustes, Job, Cambio y Diagnóstico", async () => {
+  const { es } = await import("./i18n/es");
+  const { en } = await import("./i18n/en");
+  expect(es["settings.storage.err.permisos"]).not.toMatch(/guardar/);
+  expect(en["settings.storage.err.permisos"]).not.toMatch(/save/i);
+  expect(es["change.outDir"]).toMatch(/subcarpeta/);
+  expect(en["change.outDir"]).toMatch(/subfolder/);
+});
