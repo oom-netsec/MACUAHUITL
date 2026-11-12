@@ -110,6 +110,9 @@ type PkiResultDTO struct {
 	Pem  string `json:"pem"`
 	Key  string `json:"key"`
 	Text string `json:"text"`
+	// Fase 30b: el certificado o CSR generado, estructurado, y si el texto abre con el aviso de CA de laboratorio.
+	Certificates []CertificateDTO `json:"certificates,omitempty"`
+	LabWarning   bool             `json:"labWarning,omitempty"`
 }
 
 type CsrDTO struct {
@@ -130,14 +133,14 @@ func (b *Bridge) SecPkiCsr(d CsrDTO) (PkiResultDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PkiResultDTO, error) {
 		r, err := v1.NewSecurityServiceClient(c).PkiCsr(ctx, &v1.PkiCsrRequest{SealedKeyPem: d.SealedKey, Algorithm: d.Algorithm, KeyPassword: []byte(d.KeyPassword),
 			Subject: &v1.PkiSubject{Cn: d.Cn, O: d.O, Ou: d.Ou, L: d.L, St: d.St, C: d.C}, Dns: d.Dns, Ips: d.Ips})
-		return PkiResultDTO{Pem: r.GetCsrPem(), Key: r.GetSealedKeyPem(), Text: r.GetReport().GetText()}, err
+		return PkiResultDTO{Pem: r.GetCsrPem(), Key: r.GetSealedKeyPem(), Text: r.GetReport().GetText(), Certificates: certificates(r.GetCertificates())}, err
 	})
 }
 
 func (b *Bridge) SecPkiCaInit(name string, days int, algorithm, keyPassword string) (PkiResultDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PkiResultDTO, error) {
 		r, err := v1.NewSecurityServiceClient(c).PkiCaInit(ctx, &v1.PkiCaInitRequest{Name: name, Days: int32(days), Algorithm: algorithm, KeyPassword: []byte(keyPassword)})
-		return PkiResultDTO{Pem: r.GetCaCertPem(), Key: r.GetSealedKeyPem(), Text: r.GetReport().GetText()}, err
+		return PkiResultDTO{Pem: r.GetCaCertPem(), Key: r.GetSealedKeyPem(), Text: r.GetReport().GetText(), Certificates: certificates(r.GetCertificates()), LabWarning: r.GetLabWarning()}, err
 	})
 }
 
@@ -145,7 +148,7 @@ func (b *Bridge) SecPkiCaSign(caCert, caKey, caKeyPassword, csr, profile string,
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PkiResultDTO, error) {
 		r, err := v1.NewSecurityServiceClient(c).PkiCaSign(ctx, &v1.PkiCaSignRequest{CaCertPem: caCert, CaSealedKeyPem: caKey,
 			CaKeyPassword: []byte(caKeyPassword), CsrPem: csr, Profile: profile, Days: int32(days)})
-		return PkiResultDTO{Pem: r.GetCertPem(), Text: r.GetReport().GetText()}, err
+		return PkiResultDTO{Pem: r.GetCertPem(), Text: r.GetReport().GetText(), Certificates: certificates(r.GetCertificates()), LabWarning: r.GetLabWarning()}, err
 	})
 }
 

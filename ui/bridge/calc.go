@@ -13,16 +13,24 @@ import (
 
 // ---- Calculadoras ----
 
+// Fase 30b: los campos nuevos son aditivos y salen solo si hay dato (omitempty). titleKey/titleArgs, columns (una
+// clave por celda de head) y rowLabels (una por fila, con key vacía si la primera celda es un dato) son las claves
+// del catálogo; notesStructured repite notes con clave y argumentos.
 type CalcTableDTO struct {
-	Title string     `json:"title"`
-	Head  []string   `json:"head"`
-	Rows  [][]string `json:"rows"`
+	Title     string            `json:"title"`
+	Head      []string          `json:"head"`
+	Rows      [][]string        `json:"rows"`
+	TitleKey  string            `json:"titleKey,omitempty"`
+	TitleArgs map[string]string `json:"titleArgs,omitempty"`
+	Columns   []KeyArgsDTO      `json:"columns,omitempty"`
+	RowLabels []KeyArgsDTO      `json:"rowLabels,omitempty"`
 }
 
 type CalcResultDTO struct {
-	Text   string         `json:"text"`
-	Tables []CalcTableDTO `json:"tables"`
-	Notes  []string       `json:"notes"`
+	Text            string         `json:"text"`
+	Tables          []CalcTableDTO `json:"tables"`
+	Notes           []string       `json:"notes"`
+	NotesStructured []KeyArgsDTO   `json:"notesStructured,omitempty"`
 }
 
 type calcFn func(context.Context, v1.CalcServiceClient, string) (*v1.CalcResult, error)
@@ -68,10 +76,17 @@ func (b *Bridge) Calc(kind, reqJSON string) (CalcResultDTO, error) {
 		if out.Notes == nil {
 			out.Notes = []string{}
 		}
+		for _, n := range r.NotesStructured {
+			out.NotesStructured = append(out.NotesStructured, KeyArgsDTO{Key: n.Key, Args: n.Args})
+		}
 		for _, t := range r.Tables {
-			dt := CalcTableDTO{Title: t.Title, Head: t.Head, Rows: [][]string{}}
+			dt := CalcTableDTO{Title: t.Title, Head: t.Head, Rows: [][]string{}, TitleKey: t.TitleKey, TitleArgs: t.TitleArgs}
+			for _, col := range t.Columns {
+				dt.Columns = append(dt.Columns, KeyArgsDTO{Key: col.Key})
+			}
 			for _, row := range t.Rows {
 				dt.Rows = append(dt.Rows, row.Cells)
+				dt.RowLabels = append(dt.RowLabels, KeyArgsDTO{Key: row.LabelKey, Args: row.LabelArgs})
 			}
 			out.Tables = append(out.Tables, dt)
 		}

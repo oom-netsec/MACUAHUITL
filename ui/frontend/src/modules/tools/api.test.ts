@@ -24,3 +24,14 @@ describe("tools api: syslog", () => {
     expect(got).toEqual([{ runId: "s1", drops: sampleSyslogDrops }, { runId: "s1", rotatedPath: "/o/syslog/a.log" }]);
   });
 });
+
+describe("tools api: informe de captura estructurado (fase 30b)", () => {
+  it("toolsPcapReport llama a ToolsPcapReport y el doble trae la forma vacía", async () => {
+    const call = vi.fn(async () => ({}));
+    await toolsWails(call as never).toolsPcapReport!("/x.pcap", 5);
+    expect(call).toHaveBeenCalledWith("ToolsPcapReport", "/x.pcap", 5);
+    const r = await fakeTools().toolsPcapReport();
+    expect(r.sections).toEqual([]);
+    expect(r.summary.packets).toBe(0);
+  });
+});
