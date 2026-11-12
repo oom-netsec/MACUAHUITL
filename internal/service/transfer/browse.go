@@ -185,6 +185,8 @@ func (s *svc) GetMany(r *v1.GetManyRequest, st v1.TransferService_GetManyServer)
 		if dest, err = s.receiveDir(service.NewID()); err != nil {
 			return err
 		}
+	} else if dest, err = s.clientDir(dest); err != nil {
+		return err
 	}
 	if _, err := fileserve.ValidateDir(dest); err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())

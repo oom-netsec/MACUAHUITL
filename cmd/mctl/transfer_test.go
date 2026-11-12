@@ -27,6 +27,9 @@ func waitFor(t *testing.T, out *syncBuf, re *regexp.Regexp) string {
 func TestTransferServeGetPut(t *testing.T) {
 	startCore(t)
 	pub, recv, dest := t.TempDir(), t.TempDir(), t.TempDir()
+	for _, d := range []string{recv, dest} { // la validación de carpetas del cliente exige 0700; Go crea 0775
+		os.Chmod(d, 0o700)
+	}
 	data := bytes.Repeat([]byte("router\n"), 400)
 	os.WriteFile(filepath.Join(pub, "r1.cfg"), data, 0o600)
 	var out syncBuf
@@ -54,6 +57,7 @@ func TestTransferServeGetPut(t *testing.T) {
 	}
 	// Hash equivocado: error y nada queda.
 	d2 := t.TempDir()
+	os.Chmod(d2, 0o700)
 	if _, err := mctl(t, "", "transfer", "get", "tftp://"+addr+"/r1.cfg", "--dir", d2, "--sha256", strings.Repeat("0", 64)); err == nil {
 		t.Fatal("hash distinto aceptado")
 	}

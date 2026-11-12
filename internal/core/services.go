@@ -183,6 +183,14 @@ func (s *patrolSvc) validate(p *v1.JobSpec) (patrol.Spec, error) {
 	if v == nil {
 		return spec, status.Error(codes.FailedPrecondition, "no hay bóveda")
 	}
+	// Un output_dir explícito pasa por la validación de Ajustes → Almacenamiento; vacío = la carpeta vigente.
+	if spec.OutputDir == "" {
+		spec.OutputDir = s.c.settings.Outputs()
+	} else if dir, err := service.CheckOutputs(spec.OutputDir, s.c.settings, true); err != nil {
+		return spec, err
+	} else {
+		spec.OutputDir = dir
+	}
 	if err := patrol.Validate(spec, s.c.pbs, v); err != nil {
 		var fe *patrol.FieldError
 		if errors.As(err, &fe) {

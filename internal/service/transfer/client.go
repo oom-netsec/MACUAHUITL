@@ -174,6 +174,8 @@ func (s *svc) get(ctx context.Context, r *v1.GetRequest, onProgress func(xfer.Pr
 		if dest, err = s.receiveDir(service.NewID()); err != nil {
 			return nil, err
 		}
+	} else if dest, err = s.clientDir(dest); err != nil {
+		return nil, err
 	}
 	if _, err := fileserve.ValidateDir(dest); err != nil { // errores de uso antes de tocar la red
 		return nil, status.Error(codes.InvalidArgument, err.Error())
