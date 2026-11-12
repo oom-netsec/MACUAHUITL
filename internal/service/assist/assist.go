@@ -225,8 +225,17 @@ func checkTarget(t *v1.AssistTarget) error {
 }
 
 // planErr traduce el rechazo de una función a un código: las negativas por el estado del equipo son FailedPrecondition.
-func planErr(err error) error {
-	if errors.Is(err, assist.ErrPortRefused) || errors.Is(err, assist.ErrSnippetRefused) || errors.Is(err, assist.ErrRotateRefused) ||
+func planErr(ctx context.Context, err error, template, device string) error {
+	var sr *assist.SnippetRefusal
+	if errors.As(err, &sr) {
+		sr.Template, sr.Device = template, device
+		return service.ErrFrom(ctx, codes.FailedPrecondition, err)
+	}
+	var ve *assist.ValueErrors
+	if errors.As(err, &ve) {
+		return service.ErrFrom(ctx, codes.InvalidArgument, err)
+	}
+	if errors.Is(err, assist.ErrPortRefused) || errors.Is(err, assist.ErrRotateRefused) ||
 		errors.Is(err, assist.ErrRestoreRefused) || errors.Is(err, assist.ErrNoDifference) {
 		return status.Error(codes.FailedPrecondition, err.Error())
 	}
@@ -295,7 +304,7 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 	}
 	dp, err := build(label, byCmd)
 	if err != nil {
-		return "", assist.Plan{}, planErr(err)
+		return "", assist.Plan{}, planErr(ctx, err, fnp.Name, label)
 	}
 	fn := *fnp // build puede haber puesto la función propia del plan
 	plan := assist.Plan{Function: fn.Name, WriteMemory: writeMem, Devices: []assist.DevicePlan{dp}}
@@ -361,7 +370,7 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 		pre, err = assist.SVIPre(ch)
 		build = func(l string, o map[string]string) (assist.DevicePlan, error) { return assist.SVIPlan(l, ch, o) }
 	case *v1.PlanSnippetRequest_Template:
-		t, vals, e := templateOf(sn.Template)
+		t, vals, e := templateOf(ctx, sn.Template)
 		if e != nil {
 			return nil, e
 		}
@@ -382,14 +391,14 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 }
 
 // templateOf busca la plantilla pedida y valida sus valores (la validación autoritativa: la de la UI es solo ayuda).
-func templateOf(ts *v1.TemplateSnippet) (assist.Template, assist.Values, error) {
+func templateOf(ctx context.Context, ts *v1.TemplateSnippet) (assist.Template, assist.Values, error) {
 	t, ok := assist.TemplateByID(ts.GetId())
 	if !ok {
 		return assist.Template{}, nil, status.Errorf(codes.InvalidArgument, "no hay una plantilla %q en el catálogo", ts.GetId())
 	}
 	vals := assist.Values(ts.GetValues())
 	if err := assist.ValidateValues(t, vals); err != nil {
-		return assist.Template{}, nil, status.Error(codes.InvalidArgument, err.Error())
+		return assist.Template{}, nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	return t, vals, nil
 }

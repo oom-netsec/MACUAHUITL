@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -16,7 +17,23 @@ import (
 var ErrSnippetRefused = errors.New("assist: el equipo no admite este snippet")
 
 func refuseSnippet(format string, a ...any) error {
-	return fmt.Errorf("%w: %s", ErrSnippetRefused, fmt.Sprintf(format, a...))
+	return &SnippetRefusal{Detail: fmt.Sprintf(format, a...)}
+}
+
+// SnippetRefusal es ErrSnippetRefused con su motivo. Template (nombre de la función del snippet) y Device los llena el
+// servicio, que los conoce. Detail sigue en español hasta que se traduzcan los motivos de cada negativa.
+type SnippetRefusal struct{ Detail, Template, Device string }
+
+func (e *SnippetRefusal) Error() string       { return ErrSnippetRefused.Error() + ": " + e.Detail }
+func (e *SnippetRefusal) Is(target error) bool { return target == ErrSnippetRefused }
+func (e *SnippetRefusal) Reason() string       { return "assist.refused" }
+func (e *SnippetRefusal) Localize(loc string) string {
+	return i18n.Msg(loc, "assist.refused", i18n.A("detail", e.Detail))
+}
+
+// Metadata dice la plantilla y el equipo; el motivo (Detail) viaja solo en el mensaje.
+func (e *SnippetRefusal) Metadata() map[string]string {
+	return i18n.Metadata("assist.refused", i18n.A("template", e.Template, "device", e.Device))
 }
 
 func ntoa(n int) string { return strconv.Itoa(n) }
