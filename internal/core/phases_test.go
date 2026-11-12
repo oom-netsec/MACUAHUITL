@@ -77,7 +77,7 @@ func TestJobSummaryAndPhases(t *testing.T) {
 	if !strings.Contains(s.OutputDir, "caso-1_") || s.NextRoundAt != nil {
 		t.Fatalf("output_dir=%q next=%v", s.OutputDir, s.NextRoundAt)
 	}
-	want := []string{"CREATED", "LOGIN_TEST_DONE 0 correctos, 1 con fallas", "LOGIN_TEST_DONE 1 correcto, 0 con fallas", "ARMED 1 equipo",
+	want := []string{"CREATED", "LOGIN_TEST_DONE 0 correctos, 1 con fallas", "ARM_CHECK_DONE 1 correcto, 0 con fallas", "ARMED 1 equipo",
 		"ROUND_STARTED r1", "ROUND_FINISHED r1 1 correcto, 0 con fallas", "ROUND_STARTED r2", "ROUND_FINISHED r2 1 correcto, 0 con fallas",
 		"PACKAGED", "COMPLETED 2 rondas"}
 	if got := strings.Join(phaseLines(s.Phases), "|"); got != strings.Join(want, "|") {

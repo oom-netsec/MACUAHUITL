@@ -307,7 +307,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 	}
 	undo = append(undo, func() { c.guard.Revoke(j.id) })
-	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_LOGIN_TEST_DONE, 0, okFailed(len(res)-len(failed), len(failed)))
+	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_CHECK_DONE, 0, okFailed(len(res)-len(failed), len(failed)))
 	if len(failed) > 0 {
 		return fail(status.Errorf(codes.FailedPrecondition, "Login Test falló; excluye o corrige: %s", strings.Join(failed, "; ")))
 	}

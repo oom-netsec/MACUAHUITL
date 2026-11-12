@@ -2542,6 +2542,7 @@ export const es = {
   "fps.accepted": "Huellas SHA256 aceptadas (SHA256:…, separadas por espacios o comas)",
   "fps.accepted.short": "Huellas aceptadas",
   "fps.accepted.hint": "SHA256:…, separadas por espacios o comas",
+  "patrol.phase.ARM_CHECK_DONE": "Login Test al armar",
 };
 
 export type Key = keyof typeof es;

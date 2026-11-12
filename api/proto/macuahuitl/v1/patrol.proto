@@ -151,6 +151,8 @@ enum JobPhaseKind {
   JOB_PHASE_KIND_COMPLETED = 8;
   JOB_PHASE_KIND_CANCELLED = 9;
   JOB_PHASE_KIND_FAILED = 10;
+  // El Login Test que repite el armado, sin interacción, justo antes de armar.
+  JOB_PHASE_KIND_ARM_CHECK_DONE = 11;
 }
 
 message JobPhase {

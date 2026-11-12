@@ -730,3 +730,7 @@ Para la pantalla Ajustes. Son preferencias tipadas, aparte de `getPreference`/`s
 - **Revalidación al arrancar y avisos.** Al abrir el núcleo se revalida la carpeta guardada (dueño, 0700, ancestros y reservadas; sin la prueba de escritura). Si ya no vale, rige la de fábrica (`outputsDirEffective` lo dice, `outputsDir` sigue mostrando lo guardado), queda una entrada `prefs.core` en la auditoría con el motivo y `note` de `getCorePrefs` lo avisa. Lo mismo si la persona guarda solo los defaults de ingest con la carpeta guardada ya inválida: el cambio de ingest se aplica, no se rechaza, y `note` avisa; al corregir la carpeta y volver a guardar, rige otra vez.
 - Los defaults de archivo rigen cuando la petición deja el campo en 0 o vacío (`syslogStart`, `trapsStart`, `flowsStart` con `{}`); lo explícito en `opts` los ignora. Persisten entre reinicios del núcleo.
 - Auditoría: `prefs.core` con cada campo cambiado, `campo: anterior -> nuevo` (rutas sí; no se audita si nada cambió).
+
+## Hallazgos del 3560CX (fase 31)
+- **Fase `JOB_PHASE_KIND_ARM_CHECK_DONE` (11).** El Login Test que `ArmJob` repite, sin interacción, justo antes de armar. El Login Test manual sigue registrando `LOGIN_TEST_DONE`; un trabajo armado trae cada una una vez. Etiqueta `patrol.phase.ARM_CHECK_DONE`.
+- **`getRun` manda el puerto efectivo.** `devices[].target.port` es el puerto con que se conectó (0 en la spec sale como 22); la vista ya no muestra `host:0`.

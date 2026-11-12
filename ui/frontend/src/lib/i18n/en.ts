@@ -2544,4 +2544,5 @@ export const en: Record<Key, string> = {
   "fps.accepted": "Accepted SHA256 fingerprints (SHA256:…, separated by spaces or commas)",
   "fps.accepted.short": "Accepted fingerprints",
   "fps.accepted.hint": "SHA256:…, separated by spaces or commas",
+  "patrol.phase.ARM_CHECK_DONE": "Login Test at arming",
 };
