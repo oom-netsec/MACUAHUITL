@@ -95,7 +95,7 @@ func sha(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:
 
 func TestServerLifecycleAndAudit(t *testing.T) {
 	s, d := newTest(t)
-	pub := dir700(t)
+	pub := t.TempDir()
 	data := bytes.Repeat([]byte("hostname R1\n"), 300)
 	os.WriteFile(filepath.Join(pub, "r1.cfg"), data, 0o600)
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "tftp", Listen: "127.0.0.1:0", FromDir: pub, Write: true, Allow: []string{"127.0.0.1"}})
@@ -121,7 +121,7 @@ func TestServerLifecycleAndAudit(t *testing.T) {
 	if got, _ := os.ReadFile(filepath.Join(rd.RecvDir, "subida.cfg")); !bytes.Equal(got, data) {
 		t.Fatal("el servidor no recibió el archivo")
 	}
-	dest := dir700(t)
+	dest := t.TempDir()
 	resp, err := s.Get(context.Background(), &v1.GetRequest{Url: "tftp://" + rd.Listening + "/r1.cfg", DestDir: dest, Sha256: sha(data)})
 	if err != nil {
 		t.Fatal(err)
@@ -189,7 +189,7 @@ func TestServerLifecycleAndAudit(t *testing.T) {
 
 func TestStartServerValidation(t *testing.T) {
 	s, _ := newTest(t)
-	pub := dir700(t)
+	pub := t.TempDir()
 	for name, req := range map[string]*v1.StartServerRequest{
 		"protocolo":            {Protocol: "gopher", Listen: "127.0.0.1"},
 		"sin nada":             {Protocol: "tftp", Listen: "127.0.0.1"},
@@ -218,7 +218,7 @@ func TestStartServerValidation(t *testing.T) {
 }
 
 func linkTo(t *testing.T, dir string) string {
-	l := filepath.Join(dir700(t), "l")
+	l := filepath.Join(t.TempDir(), "l")
 	os.Symlink(dir, l)
 	return l
 }
@@ -239,7 +239,7 @@ func TestDefaultPortsAreHigh(t *testing.T) {
 
 func TestMaxServers(t *testing.T) {
 	s, _ := newTest(t)
-	pub := dir700(t)
+	pub := t.TempDir()
 	for i := 0; i < maxServers; i++ {
 		startServer(t, s, &v1.StartServerRequest{Protocol: "tftp", Listen: "127.0.0.1:0", FromDir: pub})
 	}
@@ -255,7 +255,7 @@ func TestSSHClientWithVaultAndStrictHostKey(t *testing.T) {
 		t.Run(proto, func(t *testing.T) {
 			s, d := newTest(t)
 			v := d.CreateVault()
-			pub, recv := dir700(t), dir700(t)
+			pub, recv := t.TempDir(), t.TempDir()
 			data := []byte("imagen " + proto)
 			os.WriteFile(filepath.Join(pub, "i.bin"), data, 0o600)
 			run := startServer(t, s, &v1.StartServerRequest{Protocol: proto, Listen: "127.0.0.1:0", FromDir: pub, Write: true, RecvDir: recv, Allow: []string{"127.0.0.1"}})
@@ -271,7 +271,7 @@ func TestSSHClientWithVaultAndStrictHostKey(t *testing.T) {
 				t.Fatal(err)
 			}
 			url := proto + "://" + rd.Listening + "/i.bin"
-			dest := dir700(t)
+			dest := t.TempDir()
 			// Sin credencial, o sin aceptar la huella de una llave nueva, no entra.
 			if _, err := s.Get(context.Background(), &v1.GetRequest{Url: url, DestDir: dest}); code(err) != codes.InvalidArgument {
 				t.Fatalf("sin --cred: %v", err)
@@ -308,7 +308,7 @@ func TestSSHClientWithVaultAndStrictHostKey(t *testing.T) {
 			}
 			// Credencial equivocada.
 			bad, _ := v.Put(vault.Credential{Label: "mala", Username: rd.User, Password: secret.New([]byte("no"))})
-			if _, err := s.Get(context.Background(), &v1.GetRequest{Url: url, DestDir: dir700(t), CredentialId: bad}); code(err) != codes.PermissionDenied {
+			if _, err := s.Get(context.Background(), &v1.GetRequest{Url: url, DestDir: t.TempDir(), CredentialId: bad}); code(err) != codes.PermissionDenied {
 				t.Fatalf("credencial mala: %v", err)
 			}
 			a := d.AuditText()
@@ -327,22 +327,22 @@ func TestSSHClientWithVaultAndStrictHostKey(t *testing.T) {
 func TestFTPClientUsesVaultCredential(t *testing.T) {
 	s, d := newTest(t)
 	v := d.CreateVault()
-	pub := dir700(t)
+	pub := t.TempDir()
 	os.WriteFile(filepath.Join(pub, "a.bin"), []byte("ftp"), 0o600)
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "ftp", Listen: "127.0.0.1:0", FromDir: pub})
 	id, _ := v.Put(vault.Credential{Label: "ftp", Username: run.ready.User, Password: secret.New([]byte(run.ready.Password))})
-	if _, err := s.Get(context.Background(), &v1.GetRequest{Url: "ftp://" + run.ready.Listening + "/a.bin", DestDir: dir700(t), CredentialId: id}); err != nil {
+	if _, err := s.Get(context.Background(), &v1.GetRequest{Url: "ftp://" + run.ready.Listening + "/a.bin", DestDir: t.TempDir(), CredentialId: id}); err != nil {
 		t.Fatal(err)
 	}
 	// Anónimo no entra a este servidor.
-	if _, err := s.Get(context.Background(), &v1.GetRequest{Url: "ftp://" + run.ready.Listening + "/a.bin", DestDir: dir700(t)}); err == nil {
+	if _, err := s.Get(context.Background(), &v1.GetRequest{Url: "ftp://" + run.ready.Listening + "/a.bin", DestDir: t.TempDir()}); err == nil {
 		t.Fatal("anónimo aceptado")
 	}
 }
 
 func TestClientValidation(t *testing.T) {
 	s, d := newTest(t)
-	dest := dir700(t)
+	dest := t.TempDir()
 	cases := map[string]*v1.GetRequest{
 		"contraseña en la URL": {Url: "ftp://u:p@127.0.0.1/a", DestDir: dest},
 		"esquema":              {Url: "gopher://127.0.0.1/a", DestDir: dest},
@@ -374,13 +374,13 @@ func TestClientValidation(t *testing.T) {
 
 func TestGetDefaultsToReceiveFolderAndSha512(t *testing.T) {
 	s, d := newTest(t)
-	pub := dir700(t)
+	pub := t.TempDir()
 	data := []byte("imagen")
 	os.WriteFile(filepath.Join(pub, "i.bin"), data, 0o600)
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "http", Listen: "127.0.0.1:0", FromDir: pub})
 	url := "http://" + run.ready.Listening + "/i.bin"
 	// SHA-512 equivocado: se descarta lo bajado.
-	dest := dir700(t)
+	dest := t.TempDir()
 	if _, err := s.Get(context.Background(), &v1.GetRequest{Url: url, DestDir: dest, Sha512: strings.Repeat("0", 128)}); err == nil {
 		t.Fatal("SHA-512 distinto aceptado")
 	}
@@ -423,7 +423,7 @@ var _ = io.EOF
 // La bitácora no guarda la query string de la URL (suele llevar tokens): ni en el objetivo ni en los errores.
 func TestAuditDropsURLQuery(t *testing.T) {
 	s, d := newTest(t)
-	dest := dir700(t)
+	dest := t.TempDir()
 	if _, err := s.Get(context.Background(), &v1.GetRequest{Url: "http://127.0.0.1:1/x.bin?token=SECRETO123&sig=ABC", DestDir: dest}); err == nil {
 		t.Fatal("el puerto 1 respondió")
 	}
@@ -436,40 +436,4 @@ func TestAuditDropsURLQuery(t *testing.T) {
 			t.Errorf("la bitácora guarda %q:\n%s", leak, a)
 		}
 	}
-}
-
-// Las carpetas de recepción y destino del cliente pasan por la validación de Ajustes (fase 31): 0755 y /tmp se
-// rechazan con el código prefs.outputs.*; una 0700 propia se acepta.
-func TestCarpetasDelClienteSeValidanComoAjustes(t *testing.T) {
-	s, _ := newTest(t)
-	laxa := filepath.Join(dir700(t), "laxa")
-	os.Mkdir(laxa, 0o755)
-	os.Chmod(laxa, 0o755)
-	quiero := func(err error, codigo string) {
-		t.Helper()
-		if code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "prefs.outputs."+codigo+":") {
-			t.Fatalf("esperaba prefs.outputs.%s, salió: %v", codigo, err)
-		}
-	}
-	st := func() *fakeStream {
-		return &fakeStream{ctx: context.Background(), out: make(chan *v1.StartServerResponse, 4)}
-	}
-	quiero(s.StartServer(&v1.StartServerRequest{Protocol: "ftp", Listen: "127.0.0.1", Write: true, RecvDir: laxa}, st()), "permisos")
-	quiero(s.StartServer(&v1.StartServerRequest{Protocol: "ftp", Listen: "127.0.0.1", Write: true, RecvDir: "/tmp"}, st()), "reservada")
-	_, err := s.Get(context.Background(), &v1.GetRequest{Url: "ftp://127.0.0.1:1/a", DestDir: laxa})
-	quiero(err, "permisos")
-	_, err = s.Get(context.Background(), &v1.GetRequest{Url: "ftp://127.0.0.1:1/a", DestDir: "/tmp"})
-	quiero(err, "reservada")
-	err = s.GetMany(&v1.GetManyRequest{Url: "ftp://127.0.0.1:1/", Names: []string{"a"}, DestDir: laxa}, batchStream{&evStream{ctx: context.Background()}})
-	quiero(err, "permisos")
-}
-
-// dir700 es t.TempDir() con modo 0700: Go lo crea 0775 y la validación de carpetas del cliente lo exige 0700.
-func dir700(t *testing.T) string {
-	t.Helper()
-	d := t.TempDir()
-	if err := os.Chmod(d, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	return d
 }

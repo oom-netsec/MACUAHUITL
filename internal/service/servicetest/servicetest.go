@@ -7,7 +7,6 @@ import (
 	"context"
 	"database/sql"
 	"io"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -48,10 +47,6 @@ func New(t *testing.T) *Deps {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	// Las pruebas viven bajo /tmp (1777): sus ancestros se dan por seguros; la regla real la prueba prefs.
-	old := service.AncestorInfo
-	service.AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o755, uint32(os.Getuid()), nil }
-	t.Cleanup(func() { service.AncestorInfo = old })
 	d := &Deps{T: t, db: db, Out: filepath.Join(root, "o"), clock: time.Now}
 	d.S = service.NewCoreSettings(d.Out, root, filepath.Join(root, "data"))
 	if d.H, err = transport.OpenKnownHosts(filepath.Join(root, "known_hosts")); err != nil {

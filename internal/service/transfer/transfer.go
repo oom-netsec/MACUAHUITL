@@ -85,13 +85,6 @@ func (s *svc) receiveDir(id string) (string, error) {
 	return dir, nil
 }
 
-// clientDir valida una carpeta explícita del cliente con la misma regla que Ajustes → Almacenamiento (fase 31);
-// y devuelve la ruta tal como llegó: el rechazo de enlaces es de fileserve.ValidateDir, que mira la ruta sin resolver.
-func (s *svc) clientDir(dir string) (string, error) {
-	_, err := service.CheckOutputs(dir, s.d.Settings(), true)
-	return dir, err
-}
-
 func bad(format string, a ...any) error { return status.Errorf(codes.InvalidArgument, format, a...) }
 
 // listenAddr completa el puerto alto por omisión cuando solo llega la IP.
@@ -129,10 +122,6 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	}
 	if r.Write && r.RecvDir == "" {
 		if cfg.RecvDir, err = s.receiveDir(id); err != nil {
-			return err
-		}
-	} else if r.Write {
-		if cfg.RecvDir, err = s.clientDir(r.RecvDir); err != nil {
 			return err
 		}
 	}

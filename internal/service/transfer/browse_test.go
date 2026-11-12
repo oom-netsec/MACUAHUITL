@@ -81,7 +81,7 @@ func (f *evStream) files() (ok, bad []*v1.FileResult) {
 func TestBrowseSFTPConBovedaYLlaveEstricta(t *testing.T) {
 	s, d := newTest(t)
 	v := d.CreateVault()
-	pub := dir700(t)
+	pub := t.TempDir()
 	os.WriteFile(filepath.Join(pub, "i.bin"), bytes.Repeat([]byte("x"), 1000), 0o600)
 	os.WriteFile(filepath.Join(pub, "r1.cfg"), []byte("hostname r1"), 0o600)
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "sftp", Listen: "127.0.0.1:0", FromDir: pub, Allow: []string{"127.0.0.1"}})
@@ -119,7 +119,7 @@ func TestBrowseSFTPConBovedaYLlaveEstricta(t *testing.T) {
 func TestBrowseFTPYSinListado(t *testing.T) {
 	s, d := newTest(t)
 	v := d.CreateVault()
-	pub := dir700(t)
+	pub := t.TempDir()
 	os.WriteFile(filepath.Join(pub, "a.bin"), []byte("ftp"), 0o600)
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "ftp", Listen: "127.0.0.1:0", FromDir: pub})
 	id, _ := v.Put(vault.Credential{Label: "ftp", Username: run.ready.User, Password: secret.New([]byte(run.ready.Password))})
@@ -170,13 +170,13 @@ func TestBrowseValidacion(t *testing.T) {
 func TestGetStreamInformaAvance(t *testing.T) {
 	s, d := newTest(t)
 	v := d.CreateVault()
-	pub := dir700(t)
+	pub := t.TempDir()
 	data := bytes.Repeat([]byte("0123456789"), 5000)
 	os.WriteFile(filepath.Join(pub, "a.bin"), data, 0o600)
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "ftp", Listen: "127.0.0.1:0", FromDir: pub})
 	id, _ := v.Put(vault.Credential{Label: "ftp", Username: run.ready.User, Password: secret.New([]byte(run.ready.Password))})
 	st := &evStream{ctx: context.Background()}
-	err := s.GetStream(&v1.GetStreamRequest{Request: &v1.GetRequest{Url: "ftp://" + run.ready.Listening + "/a.bin", DestDir: dir700(t), CredentialId: id}}, getStream{st})
+	err := s.GetStream(&v1.GetStreamRequest{Request: &v1.GetRequest{Url: "ftp://" + run.ready.Listening + "/a.bin", DestDir: t.TempDir(), CredentialId: id}}, getStream{st})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestGetStreamInformaAvance(t *testing.T) {
 		t.Fatalf("avance final = %+v", lastProg)
 	}
 	// un error termina el stream con su código
-	err = s.GetStream(&v1.GetStreamRequest{Request: &v1.GetRequest{Url: "ftp://" + run.ready.Listening + "/nada.bin", DestDir: dir700(t), CredentialId: id}}, getStream{&evStream{ctx: context.Background()}})
+	err = s.GetStream(&v1.GetStreamRequest{Request: &v1.GetRequest{Url: "ftp://" + run.ready.Listening + "/nada.bin", DestDir: t.TempDir(), CredentialId: id}}, getStream{&evStream{ctx: context.Background()}})
 	if err == nil {
 		t.Fatal("un archivo inexistente debe fallar")
 	}
@@ -203,7 +203,7 @@ func TestGetStreamInformaAvance(t *testing.T) {
 func TestPutStreamInformaAvance(t *testing.T) {
 	s, d := newTest(t)
 	v := d.CreateVault()
-	pub, recv := dir700(t), dir700(t)
+	pub, recv := t.TempDir(), t.TempDir()
 	data := bytes.Repeat([]byte("0123456789"), 5000)
 	os.WriteFile(filepath.Join(pub, "a.bin"), data, 0o600)
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "ftp", Listen: "127.0.0.1:0", Write: true, RecvDir: recv})
@@ -222,13 +222,13 @@ func TestPutStreamInformaAvance(t *testing.T) {
 func TestGetManyConFallasYCancelacion(t *testing.T) {
 	s, d := newTest(t)
 	v := d.CreateVault()
-	pub := dir700(t)
+	pub := t.TempDir()
 	for _, n := range []string{"a.cfg", "b.cfg", "c.cfg"} {
 		os.WriteFile(filepath.Join(pub, n), []byte("hostname "+n), 0o600)
 	}
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "ftp", Listen: "127.0.0.1:0", FromDir: pub})
 	id, _ := v.Put(vault.Credential{Label: "ftp", Username: run.ready.User, Password: secret.New([]byte(run.ready.Password))})
-	dest := dir700(t)
+	dest := t.TempDir()
 	st := &evStream{ctx: context.Background()}
 	err := s.GetMany(&v1.GetManyRequest{Url: "ftp://" + run.ready.Listening + "/", Names: []string{"a.cfg", "falta.cfg", "../etc/passwd", "b.cfg", "a.cfg"}, DestDir: dest, CredentialId: id}, batchStream{st})
 	if err != nil {
@@ -257,7 +257,7 @@ func TestGetManyConFallasYCancelacion(t *testing.T) {
 		}
 	}
 	// cancelar tras el primer archivo: no baja el resto
-	dest2 := dir700(t)
+	dest2 := t.TempDir()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	st2 := &evStream{ctx: ctx, onEvent: func(e *v1.TransferEvent) {
@@ -286,7 +286,7 @@ func TestGetManyValidacion(t *testing.T) {
 		"tftp":          {Url: "tftp://127.0.0.1/", Names: []string{"a"}},
 		"carpeta mala":  {Url: "ftp://127.0.0.1/", Names: []string{"a"}, DestDir: "relativa"},
 		"demasiados":    {Url: "ftp://127.0.0.1/", Names: make([]string, 201)},
-		"tope negativo": {Url: "ftp://127.0.0.1/", Names: []string{"a"}, DestDir: dir700(t), MaxBytes: -1},
+		"tope negativo": {Url: "ftp://127.0.0.1/", Names: []string{"a"}, DestDir: t.TempDir(), MaxBytes: -1},
 	} {
 		if err := s.GetMany(r, st); code(err) != codes.InvalidArgument {
 			t.Errorf("%s: %v", name, err)
@@ -313,7 +313,7 @@ func TestBatchURL(t *testing.T) {
 func TestGetManyTopeDeAvisosEsDelLoteNoDeCadaArchivo(t *testing.T) {
 	s, d := newTest(t)
 	v := d.CreateVault()
-	pub := dir700(t)
+	pub := t.TempDir()
 	var names []string
 	for i := 0; i < maxBatch; i++ {
 		n := fmt.Sprintf("f%03d.cfg", i)
@@ -324,7 +324,7 @@ func TestGetManyTopeDeAvisosEsDelLoteNoDeCadaArchivo(t *testing.T) {
 	id, _ := v.Put(vault.Credential{Label: "ftp", Username: run.ready.User, Password: secret.New([]byte(run.ready.Password))})
 	st := &evStream{ctx: context.Background()}
 	start := time.Now()
-	if err := s.GetMany(&v1.GetManyRequest{Url: "ftp://" + run.ready.Listening + "/", Names: names, DestDir: dir700(t), CredentialId: id}, batchStream{st}); err != nil {
+	if err := s.GetMany(&v1.GetManyRequest{Url: "ftp://" + run.ready.Listening + "/", Names: names, DestDir: t.TempDir(), CredentialId: id}, batchStream{st}); err != nil {
 		t.Fatal(err)
 	}
 	elapsed := time.Since(start)
