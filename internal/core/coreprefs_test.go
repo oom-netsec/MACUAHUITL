@@ -89,7 +89,7 @@ func TestArranqueRevalidaLaCarpetaGuardada(t *testing.T) {
 	if err := h.core.log.Export(context.Background(), &b, time.Time{}, time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
-	if a := b.String(); !strings.Contains(a, `"action":"prefs.core"`) || !strings.Contains(a, "ya no es válida") {
+	if a := b.String(); !strings.Contains(a, `"action":"prefs.core"`) || !strings.Contains(a, "outputs_dir_invalid") {
 		t.Fatalf("auditoría sin el motivo:\n%s", a)
 	}
 }

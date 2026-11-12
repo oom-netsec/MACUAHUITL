@@ -36,9 +36,9 @@ type DeviceResult struct {
 // no se puede escribir, el equipo cuenta como fallido: no hay evidencia sin rastro.
 func auditResult(ctx context.Context, d Deps, jobID string, res DeviceResult) DeviceResult {
 	_, err := d.Audit.Append(ctx, audit.Entry{Actor: "patrol", Action: "device.round", Target: hostport(res.Target),
-		Detail: fmt.Sprintf("trabajo=%s ronda=%d estado=%s comandos=%d inválidos=%d %s", jobID, res.Round, res.State, res.Commands, res.Invalid, res.Detail)})
+		Detail: fmt.Sprintf("job=%s round=%d state=%s commands=%d invalid=%d %s", jobID, res.Round, res.State, res.Commands, res.Invalid, res.Detail)})
 	if err != nil {
-		res.State, res.Detail = "failed", "auditoría: "+err.Error()
+		res.State, res.Detail = "failed", "audit: "+err.Error()
 	}
 	return res
 }

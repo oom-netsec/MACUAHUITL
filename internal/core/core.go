@@ -156,8 +156,8 @@ func New(p Paths, o Options) (*Core, error) {
 		db.Close()
 		return nil, fmt.Errorf("core: preferencias: %w", err)
 	}
-	if is := c.settings.Issue(); is != "" {
-		c.audit("prefs.core", "core", is)
+	if c.settings.Issue() != "" {
+		c.audit("prefs.core", "core", "outputs_dir_invalid: the saved outputs folder is no longer valid; the factory default is in use")
 	}
 	c.guard = transport.NewGuard(nil, func(e audit.Entry) { c.audit(e.Action, e.Target, e.Detail) })
 	if c.hosts, err = transport.OpenKnownHosts(filepath.Join(p.Data, "known_hosts")); err != nil {
@@ -289,7 +289,7 @@ func (c *Core) idleLoop() {
 		}
 		c.mu.Unlock()
 		if locked {
-			c.audit("vault.lock", "", "inactividad")
+			c.audit("vault.lock", "", "reason=idle")
 		}
 	}
 }
@@ -320,7 +320,7 @@ func (c *Core) OnSleep() {
 		}
 	}
 	c.mu.Unlock()
-	c.audit("power.sleep", "", "bóveda cerrada y trabajos en pausa")
+	c.audit("power.sleep", "", "vault locked and jobs paused")
 }
 
 // OnLock: pantalla bloqueada. Cierre interactivo; las ventanas armadas siguen.
@@ -330,7 +330,7 @@ func (c *Core) OnLock() {
 	c.mu.Unlock()
 	if v != nil {
 		v.Lock()
-		c.audit("vault.lock", "", "pantalla bloqueada")
+		c.audit("vault.lock", "", "reason=screen locked")
 	}
 }
 
@@ -347,7 +347,7 @@ func (c *Core) resumePaused() {
 	c.mu.Unlock()
 	for _, j := range paused {
 		if err := v.Arm(j.id, j.Until, j.creds); err != nil {
-			c.audit("job.resume_failed", j.id, err.Error())
+			c.audit("job.resume_failed", j.id, i18n.English(err))
 			continue
 		}
 		c.mu.Lock()
@@ -394,19 +394,19 @@ func (c *Core) persistJob(j *job) {
 func (c *Core) loadJobs() {
 	rows, err := c.db.Query(`SELECT id, spec_json, state, history_json FROM jobs`)
 	if err != nil {
-		c.audit("job.load_failed", "", err.Error())
+		c.audit("job.load_failed", "", i18n.English(err))
 		return
 	}
 	var dead []*job
 	for rows.Next() {
 		var id, spec, state, hist string
 		if err := rows.Scan(&id, &spec, &state, &hist); err != nil {
-			c.audit("job.load_failed", "", err.Error())
+			c.audit("job.load_failed", "", i18n.English(err))
 			continue
 		}
 		j := &job{id: id, state: state, results: map[int][]patrol.DeviceResult{}}
 		if err := json.Unmarshal([]byte(spec), &j.spec); err != nil {
-			c.audit("job.load_failed", id, err.Error())
+			c.audit("job.load_failed", id, i18n.English(err))
 			continue
 		}
 		json.Unmarshal([]byte(hist), &j.jobHistory) // '{}' en trabajos guardados antes del historial

@@ -196,9 +196,9 @@ func (s *vaultSvc) ExportBackup(ctx context.Context, r *v1.ExportBackupRequest) 
 	if err != nil {
 		return nil, respaldoErr(err)
 	}
-	detail := fmt.Sprintf("%d credenciales", n)
+	detail := fmt.Sprintf("%d credentials", n)
 	if noPerms {
-		detail += "; el sistema de archivos no admitió los permisos 0600"
+		detail += "; the file system did not support 0600 permissions"
 	}
 	s.c.audit("vault.respaldo.exportar", path, detail)
 	return &v1.ExportBackupResponse{Count: int32(n), NoPermissions: noPerms}, nil
@@ -427,7 +427,7 @@ func (s *vaultSvc) ApplyBackupImport(_ context.Context, r *v1.ApplyBackupImportR
 			return nil, service.VaultErr(err)
 		}
 	}
-	s.c.audit("vault.respaldo.importar", p.path, fmt.Sprintf("%d nuevas, %d reemplazadas, %d renombradas, %d omitidas, %d iguales; decisiones: %s",
+	s.c.audit("vault.respaldo.importar", p.path, fmt.Sprintf("%d new, %d replaced, %d renamed, %d skipped, %d identical; decisions: %s",
 		res.Created, res.Replaced, res.Renamed, res.Skipped, res.Same, resumenDecisiones(dec, label)))
 	return &res, nil
 }
@@ -435,15 +435,15 @@ func (s *vaultSvc) ApplyBackupImport(_ context.Context, r *v1.ApplyBackupImportR
 // resumenDecisiones lista «etiqueta=acción» para la auditoría, con tope para que un respaldo grande no infle la entrada.
 func resumenDecisiones(dec, label map[string]string) string {
 	if len(dec) == 0 {
-		return "ninguna"
+		return "none"
 	}
 	parts := make([]string, 0, len(dec))
 	for id, a := range dec {
-		parts = append(parts, fmt.Sprintf("%q=%s", label[id], a))
+		parts = append(parts, fmt.Sprintf("%q=%s", label[id], service.DecisionEN(a)))
 	}
 	sort.Strings(parts)
 	if len(parts) > 20 {
-		parts = append(parts[:20], fmt.Sprintf("… y %d más", len(parts)-20))
+		parts = append(parts[:20], fmt.Sprintf("… and %d more", len(parts)-20))
 	}
 	return strings.Join(parts, ", ")
 }

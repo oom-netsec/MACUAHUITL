@@ -14,22 +14,22 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Harden se llama al arrancar el núcleo. Devuelve avisos para la UI y la auditoría; nunca falla.
+// Harden se llama al arrancar el núcleo. Devuelve avisos para la auditoría (en inglés, como toda la auditoría); nunca falla.
 func Harden() []string {
 	var warns []string
 	if err := unix.Prctl(unix.PR_SET_DUMPABLE, 0, 0, 0, 0); err != nil {
-		warns = append(warns, "no se pudo marcar el proceso como no volcable: "+err.Error())
+		warns = append(warns, "could not mark the process as non-dumpable: "+err.Error())
 	}
 	if err := unix.Setrlimit(unix.RLIMIT_CORE, &unix.Rlimit{}); err != nil {
-		warns = append(warns, "no se pudo desactivar core dumps: "+err.Error())
+		warns = append(warns, "could not disable core dumps: "+err.Error())
 	}
 	var lim unix.Rlimit
 	if err := unix.Getrlimit(unix.RLIMIT_MEMLOCK, &lim); err != nil {
-		warns = append(warns, "no se pudo leer RLIMIT_MEMLOCK: "+err.Error())
+		warns = append(warns, "could not read RLIMIT_MEMLOCK: "+err.Error())
 	} else if w := mlockWarning(lim.Cur); w != "" {
 		warns = append(warns, w)
 	} else if err := unix.Mlockall(unix.MCL_CURRENT | unix.MCL_FUTURE); err != nil {
-		warns = append(warns, "mlockall falló; la memoria del núcleo podría ir a swap: "+err.Error())
+		warns = append(warns, "mlockall failed; core memory could be swapped out: "+err.Error())
 	}
 	warns = append(warns, swapWarnings("/proc/swaps")...)
 	return append(warns, hibernationWarnings("/sys/power/resume")...)
@@ -41,7 +41,7 @@ func mlockWarning(cur uint64) string {
 	if cur == unix.RLIM_INFINITY {
 		return ""
 	}
-	return fmt.Sprintf("RLIMIT_MEMLOCK es %d bytes; no se bloquea toda la memoria. Configura LimitMEMLOCK=infinity en la unidad systemd", cur)
+	return fmt.Sprintf("RLIMIT_MEMLOCK is %d bytes; not all memory is locked. Set LimitMEMLOCK=infinity in the systemd unit", cur)
 }
 
 // swapWarnings avisa por cada swap que no esté en RAM (zram) ni sobre device-mapper (normalmente cifrado).
@@ -63,7 +63,7 @@ func swapWarnings(path string) []string {
 		if strings.HasPrefix(dev, "/dev/zram") || strings.HasPrefix(dev, "/dev/mapper/") || strings.HasPrefix(dev, "/dev/dm-") {
 			continue
 		}
-		warns = append(warns, "swap posiblemente sin cifrar: "+dev)
+		warns = append(warns, "swap possibly unencrypted: "+dev)
 	}
 	return warns
 }
@@ -75,7 +75,7 @@ func hibernationWarnings(resumePath string) []string {
 		return nil
 	}
 	if v := strings.TrimSpace(string(b)); v != "" && v != "0:0" {
-		return []string{"hibernación configurada (resume=" + v + "): la memoria podría escribirse a disco"}
+		return []string{"hibernation configured (resume=" + v + "): memory could be written to disk"}
 	}
 	return nil
 }
