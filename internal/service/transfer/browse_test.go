@@ -300,6 +300,8 @@ func TestBatchURL(t *testing.T) {
 		"ftp://h/imagenes/":               "ftp://h/imagenes/a.cfg",
 		"sftp://u@h/dir/sub?token=x#frag": "sftp://h/dir/sub/a.cfg",
 		"https://h:8443/pub/?k=v":         "https://h:8443/pub/a.cfg",
+		"ftp://h//abs/dir/":               "ftp://h//abs/dir/a.cfg", // «//» = ruta absoluta en FTP, SCP y SFTP
+		"sftp://h//abs":                   "sftp://h//abs/a.cfg",
 	} {
 		u, _ := url.Parse(in)
 		if got := batchURL(u, "a.cfg"); got != want {
