@@ -12,6 +12,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/pcapan"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -60,7 +61,7 @@ func rulesOrErr() ([]analyze.Rule, error) {
 	return rs, nil
 }
 
-func (s *analysisSvc) AnalyzeJob(_ context.Context, r *v1.AnalyzeJobRequest) (*v1.AnalyzeJobResponse, error) {
+func (s *analysisSvc) AnalyzeJob(ctx context.Context, r *v1.AnalyzeJobRequest) (*v1.AnalyzeJobResponse, error) {
 	s.d.MarkActive()
 	b, err := s.bundle(r.Job, int(r.Round))
 	if err != nil {
@@ -72,10 +73,10 @@ func (s *analysisSvc) AnalyzeJob(_ context.Context, r *v1.AnalyzeJobRequest) (*v
 	}
 	rep := analyze.Analyze(b, rs, analyze.Options{Round: int(r.Round), Device: r.Device})
 	s.d.Audit("analysis.run", b.Dir, fmt.Sprintf("round=%d device=%q findings=%d", r.Round, r.Device, len(rep.Findings)))
-	return &v1.AnalyzeJobResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.AnalyzeJobResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
-func (s *analysisSvc) DiffRounds(_ context.Context, r *v1.DiffRoundsRequest) (*v1.DiffRoundsResponse, error) {
+func (s *analysisSvc) DiffRounds(ctx context.Context, r *v1.DiffRoundsRequest) (*v1.DiffRoundsResponse, error) {
 	s.d.MarkActive()
 	b, err := s.bundle(r.Job, int(max(r.From, r.To)))
 	if err != nil {
@@ -86,7 +87,7 @@ func (s *analysisSvc) DiffRounds(_ context.Context, r *v1.DiffRoundsRequest) (*v
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	s.d.Audit("analysis.diff", b.Dir, fmt.Sprintf("from=%d to=%d device=%q", r.From, r.To, r.Device))
-	return &v1.DiffRoundsResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.DiffRoundsResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
 func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.TimelineResponse, error) {
@@ -124,7 +125,7 @@ func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.
 	b.Resolve(extra)
 	var buf bytes.Buffer
 	if err := s.d.ExportAudit(ctx, &buf, from, to); err != nil {
-		rep.Warnings = append(rep.Warnings, analyze.Warning{Msg: "auditoría: " + err.Error()})
+		rep.Warnings = append(rep.Warnings, analyze.Warn("", 0, "", "analyze.warn.audit", "error", err))
 	}
 	extra = append(extra, analyze.AuditEvents(&buf)...)
 	if r.PcapPath != "" {
@@ -133,8 +134,12 @@ func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 		extra = append(extra, analyze.PcapEvents(pr)...)
-		for _, w := range pr.Warnings {
-			rep.Warnings = append(rep.Warnings, analyze.Warning{Msg: "pcap: " + w})
+		for i, w := range pr.Warnings {
+			wt := i18n.Lit(w, "")
+			if i < len(pr.WarnItems) {
+				wt = pr.WarnItems[i]
+			}
+			rep.Warnings = append(rep.Warnings, analyze.WarnText("", 0, "", i18n.Tx("analyze.warn.pcap").With("message", wt)))
 		}
 	}
 	for _, e := range extra {
@@ -144,7 +149,7 @@ func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.
 	}
 	rep.Events = analyze.Timeline(evs, o)
 	s.d.Audit("analysis.timeline", b.Dir, fmt.Sprintf("device=%q around=%s window=%s pcap=%s events=%d", r.Device, fmtTime(o.Around), rep.Window, r.PcapPath, len(rep.Events)))
-	return &v1.TimelineResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.TimelineResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }
 
 func fmtTime(t time.Time) string {

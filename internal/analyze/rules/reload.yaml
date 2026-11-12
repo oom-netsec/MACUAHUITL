@@ -9,6 +9,9 @@
   params: {below: 24h}
   explanation: El equipo lleva poco tiempo arriba; una recarga no planeada borra contadores y la evidencia previa.
   action: Confirma si fue planeada con la causa (Last reload reason) y con la auditoría de cambios; si no, recolecta crashinfo y abre caso TAC.
+  title_en: "Recent reload"
+  explanation_en: "The device has been up for a short time; an unplanned reload erases counters and prior evidence."
+  action_en: "Confirm whether it was planned using the cause (Last reload reason) and the change audit; if not, collect crashinfo and open a TAC case."
 - id: reload-entre-rondas
   title: Recarga entre rondas
   severity: critica
@@ -16,6 +19,9 @@
   check: uptime_reset
   explanation: El uptime bajó entre dos rondas; el equipo recargó mientras Patrol lo observaba.
   action: Revisa Last reload reason, dir crashinfo y el syslog remoto alrededor del momento de la recarga (mctl timeline).
+  title_en: "Reload between rounds"
+  explanation_en: "Uptime dropped between two rounds; the device reloaded while Patrol was watching it."
+  action_en: "Check Last reload reason, dir crashinfo and the remote syslog around the time of the reload (mctl timeline)."
 - id: reload-causa-falla
   title: Última recarga por falla
   severity: critica
@@ -27,3 +33,6 @@
   params: {pattern: '(?i)^(last reload reason|system returned to rom by):?\s*.*(exception|crash|watchdog|error|abort|signal|kernel|segv|bus error|unknown|fault|critical process|localsoft|panic)'}
   explanation: La causa de la última recarga indica una falla de software o hardware, no una recarga ordenada.
   action: Recolecta crashinfo y system-report (dir crashinfo:) y abre caso TAC con show tech-support.
+  title_en: "Last reload caused by a failure"
+  explanation_en: "The cause of the last reload indicates a software or hardware failure, not an ordered reload."
+  action_en: "Collect crashinfo and system-report (dir crashinfo:) and open a TAC case with show tech-support."

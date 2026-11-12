@@ -9,6 +9,9 @@
   params: {pattern: '%SYS-2-MALLOCFAIL'}
   explanation: El equipo no pudo asignar memoria; procesos pueden fallar y el equipo puede recargar.
   action: Revisa memoria-baja/memoria-fuga y el proceso indicado en -Process=; abre caso TAC con los tracebacks.
+  title_en: "Memory allocation failure"
+  explanation_en: "The device could not allocate memory; processes may fail and the device may reload."
+  action_en: "Check memoria-baja/memoria-fuga and the process shown in -Process=; open a TAC case with the tracebacks."
 - id: log-cpuhog
   title: Proceso acaparando el CPU
   severity: alta
@@ -17,6 +20,9 @@
   params: {pattern: '%SYS-3-CPUHOG'}
   explanation: Un proceso retuvo el CPU más tiempo del permitido; otros procesos (keepalives, protocolos) se retrasan.
   action: Anota el proceso de "process =" y busca el defecto para la versión; correlaciona con la CPU de esa ronda.
+  title_en: "Process hogging the CPU"
+  explanation_en: "A process held the CPU longer than allowed; other processes (keepalives, protocols) are delayed."
+  action_en: "Note the process from \"process =\" and look for the defect for the version; correlate with the CPU of that round."
 - id: log-traceback
   title: Traceback en el log
   severity: alta
@@ -25,6 +31,9 @@
   params: {pattern: '^\s*-Traceback='}
   explanation: Un traceback acompaña a un error de software; es la firma que TAC usa para identificar el defecto.
   action: Copia el traceback completo con el mensaje que lo precede y búscalo en el Bug Search Tool o adjúntalo al caso TAC.
+  title_en: "Traceback in the log"
+  explanation_en: "A traceback accompanies a software error; it is the signature TAC uses to identify the defect."
+  action_en: "Copy the full traceback with the message that precedes it and search for it in the Bug Search Tool or attach it to the TAC case."
 - id: log-critico
   title: Mensaje de severidad 0-2 en el log
   severity: alta
@@ -33,6 +42,9 @@
   params: {pattern: '%[A-Z0-9_]+-[0-2]-[A-Z0-9_]+:', exclude: '%SYS-2-MALLOCFAIL'}
   explanation: Hay mensajes de emergencia, alerta o crítico (severidad 0 a 2).
   action: Lee cada mensaje con su mnemónico en la guía de mensajes de sistema de la versión.
+  title_en: "Severity 0-2 message in the log"
+  explanation_en: "There are emergency, alert or critical messages (severity 0 to 2)."
+  action_en: "Read each message with its mnemonic in the system message guide for the version."
 - id: log-flap-interfaz
   title: Interfaz con flaps
   severity: media
@@ -41,6 +53,9 @@
   params: {pattern: '%LINK-3-UPDOWN: Interface (\S+?),', group: "true", min: "4"}
   explanation: La misma interfaz cambió de estado varias veces en el búfer de log.
   action: Revisa capa 1 (errores CRC, transceptor) y el vecino; considera errdisable flap-setting si el flap afecta la topología.
+  title_en: "Interface flapping"
+  explanation_en: "The same interface changed state several times in the log buffer."
+  action_en: "Check layer 1 (CRC errors, transceiver) and the neighbor; consider errdisable flap-setting if the flap affects the topology."
 - id: log-adyacencia-caida
   title: Adyacencia de enrutamiento caída
   severity: media
@@ -49,3 +64,6 @@
   params: {pattern: '%BGP-5-ADJCHANGE: neighbor \S+ .*Down|%OSPF-5-ADJCHG: .* to DOWN'}
   explanation: Una sesión BGP o una adyacencia OSPF se cayó.
   action: Revisa el motivo indicado en el mensaje (notificación, dead timer, interfaz) y el estado actual con show ip bgp summary / show ip ospf neighbor.
+  title_en: "Routing adjacency down"
+  explanation_en: "A BGP session or an OSPF adjacency went down."
+  action_en: "Check the reason given in the message (notification, dead timer, interface) and the current state with show ip bgp summary / show ip ospf neighbor."

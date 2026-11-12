@@ -24,7 +24,9 @@ func TestCatalogoFlotaEnIngles(t *testing.T) {
 		if m := españolEnIngles.FindString(plain); m != "" {
 			t.Errorf("%s: español en el inglés: %q (%s)", code, e.En, m)
 		}
-		if e.Es == e.En && strings.Trim(regexp.MustCompile(`\{[^}]*\}`).ReplaceAllString(e.Es, ""), " :·/()-") != "" {
+		// un texto igual en los dos idiomas solo puede ser datos y términos técnicos (uptime, DNS, RST…)
+		left := regexp.MustCompile(`\{[^}]*\}|\b(uptime|DNS|RST|AS|INFO|pcap)\b|[^\p{L}]`).ReplaceAllString(e.Es, "")
+		if e.Es == e.En && left != "" {
 			t.Errorf("%s: el inglés es igual al español: %q", code, e.En)
 		}
 	}

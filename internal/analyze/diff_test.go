@@ -110,7 +110,7 @@ func TestLineDiff(t *testing.T) {
 	for i := range big {
 		big[i], other[i] = fmt.Sprint(i), fmt.Sprint(-i-1)
 	}
-	if _, note := lineDiff(big, other); note == "" {
+	if _, note := lineDiff(big, other); note.Empty() {
 		t.Fatal("huge diff not capped")
 	}
 }

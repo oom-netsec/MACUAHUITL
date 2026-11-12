@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -37,9 +38,10 @@ type UptimeChange struct {
 
 // TextDiff es el respaldo línea a línea de un comando: "- " sale, "+ " entra.
 type TextDiff struct {
-	Command string   `json:"command"`
-	Lines   []string `json:"lines"`
-	Note    string   `json:"note,omitempty"`
+	Command string    `json:"command"`
+	Lines   []string  `json:"lines"`
+	Note    string    `json:"note,omitempty"`
+	NoteTx  i18n.Text `json:"-"`
 }
 
 type DeviceDiff struct {
@@ -75,7 +77,7 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 		}
 		a, z := byCommand(b, dev, from), byCommand(b, dev, to)
 		if len(a) == 0 || len(z) == 0 {
-			r.Warnings = append(r.Warnings, Warning{Device: dev, Msg: fmt.Sprintf("sin salidas en la ronda %d o %d", from, to)})
+			r.Warnings = append(r.Warnings, Warn(dev, 0, "", "analyze.warn.no_outputs", "from", from, "to", to))
 			continue
 		}
 		d := DeviceDiff{Device: dev, Counters: []CounterDelta{}, Neighbors: []NeighborChange{}, Prefixes: []PrefixChange{}, Text: []TextDiff{}}
@@ -89,12 +91,14 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 			y, oky := z[cmd]
 			switch {
 			case !okx:
-				d.Text = append(d.Text, TextDiff{Command: cmd, Lines: []string{}, Note: fmt.Sprintf("solo en la ronda %d", to)})
+				n := i18n.Tx("analyze.diff.only_in", "round", to)
+				d.Text = append(d.Text, TextDiff{Command: cmd, Lines: []string{}, Note: n.In(i18n.Es), NoteTx: n})
 			case !oky:
-				d.Text = append(d.Text, TextDiff{Command: cmd, Lines: []string{}, Note: fmt.Sprintf("solo en la ronda %d", from)})
+				n := i18n.Tx("analyze.diff.only_in", "round", from)
+				d.Text = append(d.Text, TextDiff{Command: cmd, Lines: []string{}, Note: n.In(i18n.Es), NoteTx: n})
 			case x != y:
 				ls, note := lineDiff(lines(x), lines(y))
-				d.Text = append(d.Text, TextDiff{Command: cmd, Lines: ls, Note: note})
+				d.Text = append(d.Text, TextDiff{Command: cmd, Lines: ls, Note: note.In(i18n.Es), NoteTx: note})
 			}
 		}
 		r.Devices = append(r.Devices, d)
@@ -245,7 +249,7 @@ const (
 )
 
 // lineDiff da las líneas que salen ("- ") y entran ("+ ") por LCS, sin contexto.
-func lineDiff(a, b []string) ([]string, string) {
+func lineDiff(a, b []string) ([]string, i18n.Text) {
 	for len(a) > 0 && len(b) > 0 && a[0] == b[0] {
 		a, b = a[1:], b[1:]
 	}
@@ -253,7 +257,7 @@ func lineDiff(a, b []string) ([]string, string) {
 		a, b = a[:len(a)-1], b[:len(b)-1]
 	}
 	if len(a)*len(b) > maxDiffCells {
-		return []string{}, fmt.Sprintf("demasiado distinto para comparar línea a línea (%d contra %d líneas)", len(a), len(b))
+		return []string{}, i18n.Tx("analyze.diff.too_big", "a", len(a), "b", len(b))
 	}
 	// lcs[i][j] = longitud de la LCS de a[i:] y b[j:].
 	lcs := make([][]int32, len(a)+1)
@@ -283,35 +287,39 @@ func lineDiff(a, b []string) ([]string, string) {
 			j++
 		}
 	}
-	note := ""
+	var note i18n.Text
 	if len(out) > maxDiffLines {
-		note = fmt.Sprintf("%d líneas más sin mostrar", len(out)-maxDiffLines)
+		note = i18n.Tx("analyze.diff.more_lines", "n", len(out)-maxDiffLines)
 		out = out[:maxDiffLines]
 	}
 	return out, note
 }
 
-// Text es el resumen legible para mctl.
-func (r DiffReport) Text() string {
+// Text es el resumen legible para mctl, en español.
+func (r DiffReport) Text() string { return r.TextIn(i18n.Es) }
+
+// TextIn es el resumen en el idioma pedido (con es, el de siempre).
+func (r DiffReport) TextIn(loc string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s\nronda %d → ronda %d\n", r.Dir, r.From, r.To)
+	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
+	fmt.Fprintf(&b, "%s\n%s\n", r.Dir, m("analyze.text.rounds", "from", r.From, "to", r.To))
 	for _, d := range r.Devices {
 		fmt.Fprintf(&b, "\n== %s ==\n", d.Device)
 		if d.Uptime != nil {
 			reset := ""
 			if d.Uptime.Reset {
-				reset = "  ← RECARGÓ"
+				reset = m("analyze.text.reload")
 			}
 			fmt.Fprintf(&b, "uptime: %s → %s%s\n", d.Uptime.From, d.Uptime.To, reset)
 		}
 		for _, c := range d.Counters {
-			fmt.Fprintf(&b, "contador %s %s: %d → %d (%+d)\n", c.Interface, c.Counter, c.From, c.To, c.Delta)
+			fmt.Fprintf(&b, "%s\n", m("analyze.text.counter", "iface", c.Interface, "counter", c.Counter, "from", c.From, "to", c.To, "delta", fmt.Sprintf("%+d", c.Delta)))
 		}
 		for _, n := range d.Neighbors {
 			fmt.Fprintf(&b, "%s %s %s %s\n", n.Protocol, n.ID, n.Change, strings.Trim(n.From+" → "+n.To, " →"))
 		}
 		for _, p := range d.Prefixes {
-			fmt.Fprintf(&b, "prefijos de %s: %d → %d\n", p.Neighbor, p.From, p.To)
+			fmt.Fprintf(&b, "%s\n", m("analyze.text.prefixes", "neighbor", p.Neighbor, "from", p.From, "to", p.To))
 		}
 		for _, t := range d.Text {
 			fmt.Fprintf(&b, "--- %s", t.Command)
@@ -325,7 +333,7 @@ func (r DiffReport) Text() string {
 		}
 	}
 	for _, w := range r.Warnings {
-		fmt.Fprintf(&b, "aviso: %s\n", w.String())
+		fmt.Fprintf(&b, "%s\n", m("analyze.text.warning", "message", w.in(loc)))
 	}
 	return b.String()
 }

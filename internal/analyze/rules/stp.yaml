@@ -9,3 +9,6 @@
   params: {min_delta: "1", recent: 5m}
   explanation: Aumentaron los cambios de topología o el último fue hace muy poco; cada TCN vacía tablas MAC y provoca inundación.
   action: Sigue el campo "from" hasta el puerto que origina los cambios; los puertos de acceso deben llevar portfast.
+  title_en: "STP topology changes"
+  explanation_en: "Topology changes increased or the last one was very recent; each TCN flushes MAC tables and causes flooding."
+  action_en: "Follow the \"from\" field to the port that originates the changes; access ports should have portfast."

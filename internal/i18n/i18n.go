@@ -296,23 +296,68 @@ func English(err error) string {
 	return strings.Replace(err.Error(), c.Error(), c.Localize(En), 1)
 }
 
-// Text es un texto de catálogo ya elegido: su código y los argumentos. Los informes (RADIUS, TACACS+, PKI,
-// calculadoras) lo guardan junto al texto en español para poder darlo en el otro idioma o entregar la clave.
+// Text es un texto ya elegido, para poder darlo en el otro idioma o entregar su clave. Lo normal es un código
+// del catálogo con sus argumentos (Key y Args); además puede ser un literal es/en (Lit), la unión de otros
+// textos (Join) y llevar argumentos que a su vez son textos (With).
 type Text struct {
-	Key  string
-	Args Args
+	Key   string
+	Args  Args
+	Nest  map[string]Text // argumentos que son textos: se entregan en el idioma pedido
+	LitEs string          // texto literal (reglas YAML) cuando no hay clave
+	LitEn string          //
+	Parts []Text          // unión de textos
+	Sep   string          //
 }
 
 // Tx arma un Text desde pares nombre, valor (como A).
 func Tx(key string, kv ...any) Text { return Text{Key: key, Args: A(kv...)} }
 
-// Empty indica que no hay texto.
-func (t Text) Empty() bool { return t.Key == "" }
+// Lit es un texto literal en los dos idiomas (sin clave); sin inglés, el español.
+func Lit(es, en string) Text { return Text{LitEs: es, LitEn: en} }
 
-// In es el texto en el idioma dado; vacío si no hay código.
-func (t Text) In(loc string) string {
-	if t.Key == "" {
-		return ""
+// Join une textos con sep, cada uno en el idioma pedido; los vacíos no cuentan.
+func Join(sep string, ts ...Text) Text { return Text{Parts: ts, Sep: sep} }
+
+// With agrega un argumento que es a su vez un texto (se traduce con el resto).
+func (t Text) With(name string, n Text) Text {
+	m := make(map[string]Text, len(t.Nest)+1)
+	for k, v := range t.Nest {
+		m[k] = v
 	}
-	return Msg(loc, t.Key, t.Args)
+	m[name] = n
+	t.Nest = m
+	return t
+}
+
+// Empty indica que no hay texto.
+func (t Text) Empty() bool { return t.Key == "" && t.LitEs == "" && len(t.Parts) == 0 }
+
+// In es el texto en el idioma dado; vacío si no hay nada.
+func (t Text) In(loc string) string {
+	switch {
+	case len(t.Parts) > 0:
+		var out []string
+		for _, p := range t.Parts {
+			if s := p.In(loc); s != "" {
+				out = append(out, s)
+			}
+		}
+		return strings.Join(out, t.Sep)
+	case t.Key == "":
+		if loc == En && t.LitEn != "" {
+			return t.LitEn
+		}
+		return t.LitEs
+	}
+	args := t.Args
+	if len(t.Nest) > 0 {
+		args = Args{}
+		for k, v := range t.Args {
+			args[k] = v
+		}
+		for k, n := range t.Nest {
+			args[k] = n.In(loc)
+		}
+	}
+	return Msg(loc, t.Key, args)
 }

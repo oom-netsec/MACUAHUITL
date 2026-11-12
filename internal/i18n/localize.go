@@ -68,7 +68,9 @@ func setText(dst reflect.Value, t Text, path, loc string, keys map[string]Text) 
 	if t.Empty() {
 		return
 	}
-	keys[path] = t
+	if t.Key != "" && len(t.Nest) == 0 { // un literal, una unión o un texto con textos dentro no tienen clave plana
+		keys[path] = t
+	}
 	if loc == En && dst.CanSet() {
 		dst.SetString(t.In(En))
 	}

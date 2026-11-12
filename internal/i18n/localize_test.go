@@ -29,8 +29,9 @@ func sample() *root {
 
 func init() {
 	add(map[string]entry{
-		"test.l1": {Es: "uno", En: "one"},
-		"test.l2": {Es: "dos {n}", En: "two {n}", Args: []string{"n"}},
+		"test.l1":   {Es: "uno", En: "one"},
+		"test.l2":   {Es: "dos {n}", En: "two {n}", Args: []string{"n"}},
+		"test.nest": {Es: "{title} ({round})", En: "{title} ({round})", Args: []string{"title", "round"}},
 	})
 }
 
@@ -61,5 +62,34 @@ func TestLocalizeEnReemplazaSoloLoQueTieneClave(t *testing.T) {
 	}
 	if r.Rows[1].Detail != "sin clave" || r.Warnings[1] != "b" || r.Rows[0].Plain != "" {
 		t.Errorf("lo demás debe quedar igual: %+v", r)
+	}
+}
+
+func TestTextAnidadoUnionYLiteral(t *testing.T) {
+	titulo := Lit("CPU alta", "High CPU")
+	if titulo.In(Es) != "CPU alta" || titulo.In(En) != "High CPU" || titulo.Empty() {
+		t.Errorf("literal: %q %q", titulo.In(Es), titulo.In(En))
+	}
+	if sinEn := Lit("solo es", ""); sinEn.In(En) != "solo es" {
+		t.Errorf("sin inglés cae al español: %q", sinEn.In(En))
+	}
+	anidado := Tx("test.nest", "round", 3).With("title", titulo)
+	if anidado.In(Es) != "CPU alta (3)" || anidado.In(En) != "High CPU (3)" {
+		t.Errorf("anidado: %q %q", anidado.In(Es), anidado.In(En))
+	}
+	u := Join("; ", Tx("test.l1"), Tx("test.l2", "n", 4))
+	if u.In(Es) != "uno; dos 4" || u.In(En) != "one; two 4" || u.Empty() {
+		t.Errorf("unión: %q %q", u.In(Es), u.In(En))
+	}
+	if !Join("; ").Empty() {
+		t.Error("una unión sin partes está vacía")
+	}
+	// solo lo que tiene clave viaja como clave; el literal y la unión solo se traducen
+	r := &struct {
+		T   string `json:"t"`
+		TTx Text   `json:"-"`
+	}{T: "CPU alta", TTx: titulo}
+	if keys := Localize(r, En); len(keys) != 0 || r.T != "High CPU" {
+		t.Errorf("literal: %v %q", keys, r.T)
 	}
 }

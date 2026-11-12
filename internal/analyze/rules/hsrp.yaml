@@ -9,6 +9,9 @@
   params: {mode: changed}
   explanation: El grupo HSRP cambió de estado entre rondas; el gateway virtual se movió.
   action: Revisa %HSRP-5-STATECHANGE en el log, el seguimiento (track) y la pérdida de hellos entre pares.
+  title_en: "HSRP changed state between rounds"
+  explanation_en: "The HSRP group changed state between rounds; the virtual gateway moved."
+  action_en: "Check %HSRP-5-STATECHANGE in the log, tracking (track) and hello loss between peers."
 - id: hsrp-estado-anomalo
   title: HSRP en estado anómalo
   severity: media
@@ -17,3 +20,6 @@
   params: {mode: bad}
   explanation: El grupo está en Init/Learn/Speak o no conoce al Active/Standby; no hay redundancia efectiva.
   action: Verifica que la SVI esté arriba y que los pares se vean (misma versión, grupo y autenticación).
+  title_en: "HSRP in an abnormal state"
+  explanation_en: "The group is in Init/Learn/Speak or does not know the Active/Standby; there is no effective redundancy."
+  action_en: "Verify the SVI is up and the peers can see each other (same version, group and authentication)."

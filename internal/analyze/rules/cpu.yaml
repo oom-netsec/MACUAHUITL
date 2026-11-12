@@ -9,6 +9,9 @@
   params: {above: "80"}
   explanation: El promedio de CPU de cinco minutos supera el umbral; el plano de control puede perder keepalives, adyacencias o la gestión.
   action: Revisa los procesos con más 5Min en la misma salida; si domina "IP Input" o interrupciones (segundo valor tras la barra), busca tráfico conmutado por software (show processes cpu platform sorted, show platform hardware fed switch active qos queue stats internal cpu policer).
+  title_en: "High CPU"
+  explanation_en: "The five-minute CPU average is above the threshold; the control plane may drop keepalives, adjacencies or management access."
+  action_en: "Check the processes with the highest 5Min in the same output; if \"IP Input\" or interrupts dominate (second value after the slash), look for software-switched traffic (show processes cpu platform sorted, show platform hardware fed switch active qos queue stats internal cpu policer)."
 - id: cpu-tendencia
   title: CPU en tendencia de subida
   severity: media
@@ -17,3 +20,6 @@
   params: {rounds: "3", rise: "20"}
   explanation: El promedio de cinco minutos sube ronda tras ronda; aunque aún no rebase el umbral, la tendencia anticipa saturación.
   action: Compara el top de procesos entre rondas para ver cuál crece; correlaciona con la línea de tiempo (cambios de topología, flaps, ejecuciones).
+  title_en: "CPU trending up"
+  explanation_en: "The five-minute average rises round after round; even if it has not crossed the threshold yet, the trend anticipates saturation."
+  action_en: "Compare the top processes between rounds to see which one grows; correlate with the timeline (topology changes, flaps, runs)."

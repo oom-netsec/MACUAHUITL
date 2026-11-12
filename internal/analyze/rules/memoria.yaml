@@ -9,6 +9,9 @@
   params: {below: "10"}
   explanation: Queda menos memoria libre en el pool Processor que el umbral; las asignaciones pueden fallar (%SYS-2-MALLOCFAIL) y el equipo puede recargar.
   action: Identifica el proceso con más Holding en show processes memory sorted y compáralo entre rondas; abre caso TAC con show tech-support si no se explica por la configuración.
+  title_en: "Low processor memory"
+  explanation_en: "Less free memory remains in the Processor pool than the threshold; allocations may fail (%SYS-2-MALLOCFAIL) and the device may reload."
+  action_en: "Identify the process with the most Holding in show processes memory sorted and compare it between rounds; open a TAC case with show tech-support if the configuration does not explain it."
 - id: memoria-fuga
   title: Posible fuga de memoria
   severity: alta
@@ -17,3 +20,6 @@
   params: {rounds: "3", drop: "5"}
   explanation: La memoria libre del pool Processor baja en cada ronda y la caída total supera el umbral; es el patrón típico de una fuga.
   action: Sigue el Holding por proceso entre rondas (show processes memory sorted) y busca el defecto conocido para la versión en el Bug Search Tool.
+  title_en: "Possible memory leak"
+  explanation_en: "Free memory in the Processor pool drops every round and the total drop exceeds the threshold; this is the typical pattern of a leak."
+  action_en: "Track Holding per process between rounds (show processes memory sorted) and look for the known defect for the version in the Bug Search Tool."

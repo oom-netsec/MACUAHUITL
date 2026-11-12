@@ -9,3 +9,6 @@
   params: {pattern: '\s(crashinfo_\S+|system-report_\S+|\S+\.core\.gz|fullcore\S*)\s*$'}
   explanation: Hay archivos de crashinfo, system-report o core; el equipo registró una falla.
   action: Copia los archivos con su fecha y adjúntalos al caso TAC; compara la fecha con la última recarga.
+  title_en: "Crash files present"
+  explanation_en: "There are crashinfo, system-report or core files; the device recorded a failure."
+  action_en: "Copy the files with their dates and attach them to the TAC case; compare the date with the last reload."
