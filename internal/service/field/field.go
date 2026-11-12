@@ -91,7 +91,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	rec := serialcon.NewRecorder(f, s.d.Now)
 	summary := cfg.Path + " " + cfg.String()
 	rec.Mark("abierto " + summary)
-	s.d.Audit("field.console.open", cfg.Path, fmt.Sprintf("%d %d%c%d flow=%s output=%s", cfg.Baud, cfg.DataBits, strings.ToUpper(cfg.Parity)[0], cfg.StopBits, cfg.Flow, f.Name()))
+	s.d.Audit("field.console.open", cfg.Path, cfg.AuditString()+" output="+f.Name())
 	if err := st.Send(&v1.ConsoleResponse{Opened: summary, OutputPath: f.Name()}); err != nil {
 		return err
 	}
