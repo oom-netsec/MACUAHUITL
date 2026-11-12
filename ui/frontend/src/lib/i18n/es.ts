@@ -502,8 +502,8 @@ export const es = {
   "visibility.sub.flows": "Flujos",
   "visibility.sub.gnmi": "gNMI",
   "visibility.stopped": "detenido",
-  "visibility.listening": "escuchando en {addr}/udp",
-  "visibility.listeningSaving": "escuchando en {addr}/udp (guardando en {path})",
+  "visibility.listening": "Escuchando en {addr}/udp",
+  "visibility.listeningSaving": "Escuchando en {addr}/udp (guardando en {path})",
   "visibility.none": "(ninguna)",
   "visibility.host": "Equipo",
   "visibility.port": "Puerto",
@@ -2540,6 +2540,8 @@ export const es = {
   "audit.empty.title": "Aún no se ha verificado la cadena",
   "audit.empty": "Pulsa «Verificar cadena» (Ctrl ↵) para comprobar que ningún registro de auditoría fue editado o eliminado.",
   "fps.accepted": "Huellas SHA256 aceptadas (SHA256:…, separadas por espacios o comas)",
+  "fps.accepted.short": "Huellas aceptadas",
+  "fps.accepted.hint": "SHA256:…, separadas por espacios o comas",
 };
 
 export type Key = keyof typeof es;

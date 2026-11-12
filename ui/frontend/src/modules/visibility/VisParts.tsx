@@ -91,8 +91,8 @@ export function TrapsTable({ rows }: { rows: TrapRow[] }) {
   const t = useT();
   const lang = useLang();
   const cols: Column<TrapRow>[] = useMemo(() => [
-    { id: "at", header: t("visibility.traps.col.time"), value: (r) => r.at, width: 96, mono: true, render: (r) => new Date(r.at).toLocaleTimeString(lang) },
-    { id: "sev", header: t("visibility.traps.col.sev"), value: (r) => trapSeverity(r), width: 150, render: (r) => <SeverityBadge sev={trapSeverity(r)} /> },
+    { id: "at", header: t("visibility.traps.col.time"), value: (r) => r.at, width: 130, minWidth: 96, mono: true, render: (r) => new Date(r.at).toLocaleTimeString(lang) },
+    { id: "sev", header: t("visibility.traps.col.sev"), value: (r) => trapSeverity(r), width: 180, minWidth: 170, render: (r) => <SeverityBadge sev={trapSeverity(r)} /> },
     { id: "from", header: t("visibility.traps.col.from"), value: (r) => host(r.From), width: 170, mono: true, render: (r) => <>{host(r.From)}{r.From && <CopyButton value={host(r.From)} label={t("visibility.copyIp", { ip: host(r.From) })} />}</> },
     { id: "name", header: t("visibility.traps.col.trap"), value: (r) => r.Name ?? "", width: 150 },
     { id: "summary", header: t("visibility.traps.col.summary"), value: (r) => trapSummary(r, t, lang), mono: true },

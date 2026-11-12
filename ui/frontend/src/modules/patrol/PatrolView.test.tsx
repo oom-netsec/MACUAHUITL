@@ -145,11 +145,13 @@ test("la grilla virtualiza 1000 equipos y un evento actualiza solo su fila", asy
   const devices = Array.from({ length: 1000 }, (_, i) => `10.0.${Math.floor(i / 250)}.${i % 250}:22`);
   render(<DeviceGrid core={core} jobId="j1" devices={devices} />);
   expect(screen.getAllByRole("row").length).toBeLessThan(50);
+  expect(screen.queryByRole("columnheader", { name: "Progreso" })).not.toBeInTheDocument(); // sin datos de avance no hay columna
   act(() => core.emitEvent({ jobId: "j1", deviceStateChanged: { deviceId: devices[0], state: "DEVICE_STATE_RUNNING" } }));
   act(() => core.emitEvent({ jobId: "j1", commandProgress: { deviceId: devices[0], command: "show version", index: 1, total: 3 } }));
   const row = screen.getByRole("row", { name: new RegExp(devices[0].replace(/\./g, "\\.")) });
   expect(within(row).getByText("Ejecutando")).toBeInTheDocument();
   expect(within(row).getByText("1/3 show version")).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "Progreso" })).toBeInTheDocument();
   act(() => core.emitEvent({ jobId: "otro", deviceStateChanged: { deviceId: devices[1], state: "DEVICE_STATE_FAILED" } }));
   expect(screen.queryByText("Fallido")).not.toBeInTheDocument();
 });

@@ -88,3 +88,12 @@ test("el campo de ir a la fila tiene etiqueta visible", () => {
   expect(label.tagName).toBe("LABEL");
   expect(label).toContainElement(screen.getByLabelText("Ir a la fila"));
 });
+
+test("trackOf: ancho exacto, o mínimo que cede en ventanas angostas", async () => {
+  const { trackOf } = await import("./DataTable");
+  expect(trackOf({ width: 130 })).toBe("130px");
+  expect(trackOf({ width: 130, minWidth: 96 })).toBe("minmax(96px, 130px)");
+  expect(trackOf({ minWidth: 280 })).toBe("minmax(280px, 1fr)");
+  expect(trackOf({})).toBe("minmax(96px, 1fr)");
+  expect(trackOf({ width: 130, minWidth: 96 }, 200)).toBe("200px");
+});

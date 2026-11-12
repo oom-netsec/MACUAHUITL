@@ -98,3 +98,9 @@ test("el eje de tiempo y la leyenda usan la hora en el idioma de la app", () => 
   expect(o.axes[0].values(null, [times[0]])).toEqual([want]);
   expect(o.series[0].value?.(null, times[0])).toBe(want);
 });
+
+test("hasGaps detecta series con huecos (puntos aislados deben verse)", async () => {
+  const { hasGaps } = await import("./TimeChart");
+  expect(hasGaps([null, 4, null])).toBe(true);
+  expect(hasGaps([1, 2, 3])).toBe(false);
+});

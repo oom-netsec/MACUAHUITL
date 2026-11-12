@@ -85,6 +85,7 @@ test("salud, tablero, flash e inventario cargan al abrir y muestran la antigüed
   render(<FleetView core={core} />);
   await userEvent.click(screen.getByRole("tab", { name: "Salud" }));
   expect(await screen.findByText("Gi1/0/9")).toBeInTheDocument();
+  expect(screen.getAllByRole("cell").some((c) => /^(Crítica|Alta|Media|Baja)$/.test(c.textContent ?? ""))).toBe(true); // gravedad con mayúscula
   await userEvent.click(screen.getByRole("tab", { name: "Tablero" }));
   expect(await screen.findByText("NTP sin sincronizar")).toBeInTheDocument();
   expect(screen.getByText(/DATO VIEJO/)).toBeInTheDocument();

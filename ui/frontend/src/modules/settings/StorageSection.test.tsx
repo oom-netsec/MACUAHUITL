@@ -161,6 +161,15 @@ describe("motivos de rechazo", () => {
     expect(core.copyText).toHaveBeenCalledWith("chmod 700 '/home/u/mi salidas'");
   });
 
+  test("el rechazo por la carpeta queda bajo su campo, marcado inválido y descrito", async () => {
+    view(failing("permisos"));
+    await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));
+    const input = await screen.findByRole("textbox", { name: "Carpeta de salidas" });
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+    const err = document.getElementById(input.getAttribute("aria-describedby")!.split(" ").pop()!)!;
+    expect(err).toHaveTextContent(/permisos/i);
+  });
+
   test("otros motivos no muestran chmod", async () => {
     view(failing("no_existe"));
     await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));

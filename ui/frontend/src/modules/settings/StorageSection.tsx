@@ -65,6 +65,15 @@ export function StorageSection({ core }: { core: CoreAPI }) {
   const noteText = lang === "es" && state.note ? state.note : fellBack ? t("settings.storage.noteFallback", { path: state.outputsDir }) : t("settings.storage.noteMoved");
   const chmod = saveErr?.parsed?.code === "permisos" ? `chmod 700 ${shellQuote(saveErr.parsed.path || form.outputsDir.trim())}` : "";
 
+  // Los rechazos del núcleo por la carpeta van bajo su campo; el resto (p. ej. fallo al guardar) junto a Guardar.
+  const parsedErr = saveErr?.parsed;
+  const dirErr = parsedErr && (
+    <div role="alert">
+      {t(REASONS.includes(parsedErr.code) ? (`settings.storage.err.${parsedErr.code}` as Key) : "settings.storage.err.other")}
+      {chmod && <div className="storage-cmd"><code>{chmod}</code><CopyButton value={chmod} label={t("settings.storage.chmod")} /></div>}
+    </div>
+  );
+
   return (
     <div className="storage">
       <h4>{t("settings.storage.outputs")}</h4>
@@ -73,7 +82,7 @@ export function StorageSection({ core }: { core: CoreAPI }) {
         <dt>{t("settings.storage.effective")}</dt><dd><code>{state.outputsDirEffective}</code></dd>
         <dt>{t("settings.storage.default")}</dt><dd><code>{state.outputsDirDefault}</code></dd>
       </dl>
-      <PathField label={t("settings.storage.folder")} hint={t("settings.storage.folder.hint", { path: state.outputsDirDefault })} value={form.outputsDir} onChange={(v) => set("outputsDir", v)}
+      <PathField label={t("settings.storage.folder")} hint={t("settings.storage.folder.hint", { path: state.outputsDirDefault })} value={form.outputsDir} onChange={(v) => set("outputsDir", v)} error={dirErr}
         pick={() => core.pickPath({ title: t("settings.storage.folder"), directory: true })} />
       <div className="actions">
         <button type="button" disabled={!form.outputsDir} onClick={() => set("outputsDir", "")}>{t("settings.storage.factory")}</button>
@@ -98,16 +107,7 @@ export function StorageSection({ core }: { core: CoreAPI }) {
       </fieldset>
 
       {(!!state.note || fellBack) && <Notice kind="warn">{noteText}</Notice>}
-      {saveErr && (
-        <Notice kind="error">
-          {saveErr.parsed ? (
-            <>
-              {t(REASONS.includes(saveErr.parsed.code) ? (`settings.storage.err.${saveErr.parsed.code}` as Key) : "settings.storage.err.other")}
-              {chmod && <div className="storage-cmd"><code>{chmod}</code><CopyButton value={chmod} label={t("settings.storage.chmod")} /></div>}
-            </>
-          ) : lang === "es" ? saveErr.msg : t("settings.storage.err.save")}
-        </Notice>
-      )}
+      {saveErr && !parsedErr && <Notice kind="error">{lang === "es" ? saveErr.msg : t("settings.storage.err.save")}</Notice>}
       {saved && !saveErr && <Notice kind="ok">{t("settings.storage.saved")}</Notice>}
       <div className="actions">
         <button type="button" className="primary" disabled={busy || Object.keys(errs).length > 0} onClick={() => void save()}>{t("settings.storage.save")}</button>

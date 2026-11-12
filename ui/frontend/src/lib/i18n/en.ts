@@ -504,8 +504,8 @@ export const en: Record<Key, string> = {
   "visibility.sub.flows": "Flows",
   "visibility.sub.gnmi": "gNMI",
   "visibility.stopped": "stopped",
-  "visibility.listening": "listening on {addr}/udp",
-  "visibility.listeningSaving": "listening on {addr}/udp (saving to {path})",
+  "visibility.listening": "Listening on {addr}/udp",
+  "visibility.listeningSaving": "Listening on {addr}/udp (saving to {path})",
   "visibility.none": "(none)",
   "visibility.host": "Device",
   "visibility.port": "Port",
@@ -2542,4 +2542,6 @@ export const en: Record<Key, string> = {
   "audit.empty.title": "The chain has not been verified yet",
   "audit.empty": "Press “Verify chain” (Ctrl ↵) to check that no audit record was edited or removed.",
   "fps.accepted": "Accepted SHA256 fingerprints (SHA256:…, separated by spaces or commas)",
+  "fps.accepted.short": "Accepted fingerprints",
+  "fps.accepted.hint": "SHA256:…, separated by spaces or commas",
 };

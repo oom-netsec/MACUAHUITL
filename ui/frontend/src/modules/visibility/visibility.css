@@ -16,3 +16,5 @@ img.topo { max-width: 100%; height: auto; background: #ffffff; border: 1px solid
 /* Paneles de pestaña que siguen montados: contents conserva el espaciado; hidden los oculta. */
 .vis-panel { display: contents; }
 .vis-panel[hidden] { display: none; }
+.counters { table-layout: fixed; }
+.counters th.num { width: 128px; }

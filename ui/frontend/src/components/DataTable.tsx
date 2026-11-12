@@ -16,6 +16,7 @@ export interface Column<T> {
   mono?: boolean;
   wrap?: boolean;                      // el texto envuelve (la tabla debe tener rowHeight para varias líneas)
   width?: number;                      // px inicial; sin él la columna reparte el espacio
+  minWidth?: number;                   // px mínimos: en ventanas angostas la columna se encoge hasta aquí (las de minWidth menor ceden antes que las de sin ancho)
 }
 
 interface Props<T> {
@@ -31,6 +32,9 @@ interface Props<T> {
 }
 
 const ROW = 32;
+// Redimensionada a mano: ancho exacto. Con minWidth el ancho es un máximo que cede al faltar espacio.
+export const trackOf = (c: { width?: number; minWidth?: number }, manual?: number) =>
+  manual ? `${manual}px` : c.width ? (c.minWidth ? `minmax(${c.minWidth}px, ${c.width}px)` : `${c.width}px`) : `minmax(${c.minWidth ?? 96}px, 1fr)`;
 const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const cmp = (a: string | number, b: string | number) =>
   typeof a === "number" && typeof b === "number" ? a - b : String(a).localeCompare(String(b), undefined, { numeric: true });
@@ -70,7 +74,7 @@ export function DataTable<T>({ label, columns, rows, rowKey, selectable, actions
     observeElementRect: (inst, cb) => observeElementRect(inst, (r) => cb(r.height ? r : { width: r.width || 900, height })),
   });
 
-  const grid = [selectable ? "36px" : "", ...visible.map((c) => (widths[c.id] ?? c.width) ? `${widths[c.id] ?? c.width}px` : "minmax(96px, 1fr)")].filter(Boolean).join(" ");
+  const grid = [selectable ? "36px" : "", ...visible.map((c) => trackOf(c, widths[c.id]))].filter(Boolean).join(" ");
   const selected = rows.filter((r) => sel.has(rowKey(r)));
   const toggle = (k: string) => setSel((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const allOn = shown.length > 0 && shown.every((r) => sel.has(rowKey(r)));

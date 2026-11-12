@@ -189,6 +189,14 @@ describe("respaldo cifrado", () => {
     expect(core.removeEmptyFile).not.toHaveBeenCalled();
   });
 
+  test("Importar respaldo… sigue deshabilitado hasta que hay frase", async () => {
+    render(<VaultView core={fakeCore()} />);
+    const b = await screen.findByRole("button", { name: "Importar respaldo…" });
+    expect(b).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("Frase del respaldo a importar"), "x");
+    expect(b).toBeEnabled();
+  });
+
   async function abrirVistaPrevia(core: ReturnType<typeof fakeCore>) {
     render(<VaultView core={core} />);
     const f = await screen.findByLabelText("Frase del respaldo a importar");
