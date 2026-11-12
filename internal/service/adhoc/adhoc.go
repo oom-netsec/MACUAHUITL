@@ -49,7 +49,7 @@ func (s *adhocSvc) StartAdhoc(ctx context.Context, r *v1.StartAdhocRequest) (*v1
 	}
 	// Una ronda, un archivo por ronda y sin borrar sueltos: capture.ReadDir lee así.
 	spec := &v1.JobSpec{Name: "adhoc", Targets: r.Targets, DefaultCredentialId: r.CredentialId, CustomCommands: strings.Join(cmds, "\n"),
-		OutputDir: dir, WindowHours: 1, Split: v1.SplitStrategy_SPLIT_STRATEGY_PER_ROUND, Zip: v1.ZipPolicy_ZIP_POLICY_AT_END}
+		OutputDir: dir, Kind: "adhoc", WindowHours: 1, Split: v1.SplitStrategy_SPLIT_STRATEGY_PER_ROUND, Zip: v1.ZipPolicy_ZIP_POLICY_AT_END}
 	p := s.d.Patrol()
 	cj, err := p.CreateJob(ctx, &v1.CreateJobRequest{Spec: spec})
 	if err != nil {

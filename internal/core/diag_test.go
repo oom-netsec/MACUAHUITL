@@ -154,3 +154,38 @@ func TestListInterfacesSortedWithLoopback(t *testing.T) {
 		t.Fatalf("loopback = %+v", lo)
 	}
 }
+
+// El output_dir de una herramienta de diagnóstico se valida como el de Ajustes: 0755 se rechaza; 0700 propia sirve.
+func TestDiagValidaOutputDirComoAjustes(t *testing.T) {
+	h := newHarness(t, withFakeTools)
+	d := v1.NewDiagServiceClient(h.conn)
+	correr := func(dir string) error {
+		st, err := d.Run(ctx(t), &v1.RunRequest{Tool: v1.DiagTool_DIAG_TOOL_PING, Targets: []*v1.Target{{Address: "192.0.2.1"}}, OutputDir: dir})
+		if err != nil {
+			return err
+		}
+		for {
+			if _, err := st.Recv(); err != nil {
+				if err == io.EOF {
+					return nil
+				}
+				return err
+			}
+		}
+	}
+	laxa := filepath.Join(h.out, "laxa")
+	os.Mkdir(laxa, 0o700)
+	os.Chmod(laxa, 0o755)
+	err := correr(laxa)
+	if status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "prefs.outputs.permisos:") || !strings.Contains(err.Error(), "chmod 700 "+laxa) {
+		t.Fatalf("0755 debía rechazarse con el chmod sugerido: %v", err)
+	}
+	if err := correr("/tmp"); status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "prefs.outputs.reservada:") {
+		t.Fatalf("/tmp debía rechazarse: %v", err)
+	}
+	propia := filepath.Join(h.out, "propia")
+	os.Mkdir(propia, 0o700)
+	if err := correr(propia); err != nil {
+		t.Fatalf("0700 propia debía aceptarse: %v", err)
+	}
+}

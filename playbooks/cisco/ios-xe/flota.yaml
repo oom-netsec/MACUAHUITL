@@ -24,3 +24,4 @@ commands:
   - cmd: show inventory
   - cmd: "dir flash:"
   - cmd: "dir bootflash:"
+    platforms: [ios-xe] # IOS clásico no tiene bootflash:

@@ -66,6 +66,8 @@ message JobSpec {
   bool accept_changed_host_keys = 13;
   // Duración de la ventana de bóveda. Máximo 96 h, validado en el núcleo (spec §10.4).
   uint32 window_hours = 14;
+  // Tipo de trabajo: patrol (vacío = patrol), adhoc, backup o change. Cada servicio pone el suyo.
+  string kind = 15;
 }
 
 message CreateJobRequest {
@@ -137,6 +139,8 @@ message JobSummary {
   string output_dir = 12;
   // Historial de fases, de la más antigua a la más reciente (se guardan las últimas 200).
   repeated JobPhase phases = 13;
+  // patrol, adhoc, backup o change (un trabajo guardado antes de existir el campo sale como patrol).
+  string kind = 14;
 }
 
 enum JobPhaseKind {
@@ -151,6 +155,8 @@ enum JobPhaseKind {
   JOB_PHASE_KIND_COMPLETED = 8;
   JOB_PHASE_KIND_CANCELLED = 9;
   JOB_PHASE_KIND_FAILED = 10;
+  // El Login Test que repite el armado, sin interacción, justo antes de armar.
+  JOB_PHASE_KIND_ARM_CHECK_DONE = 11;
 }
 
 message JobPhase {

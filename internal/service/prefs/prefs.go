@@ -92,7 +92,7 @@ func (s *prefsSvc) SetCorePrefs(_ context.Context, r *v1.SetCorePrefsRequest) (*
 	st := s.d.Settings()
 	oldOut, oldIng := st.Configured()
 	req, issue := r.GetPrefs().GetOutputsDir(), ""
-	out, err := CheckOutputs(req, st, true)
+	out, err := service.CheckOutputs(req, st, true)
 	if err != nil {
 		if req == "" || req != oldOut {
 			return nil, err

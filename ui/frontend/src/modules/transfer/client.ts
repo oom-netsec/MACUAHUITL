@@ -16,8 +16,8 @@ export interface ClientForm {
 
 export const MAX_MB = 1048576;
 export const usesSsh = (p: ClientProto) => p === "scp" || p === "sftp";
-// SCP, SFTP y FTP: una "/" inicial es ruta absoluta (el núcleo quita una y manda el resto).
-export const absPath = (p: ClientProto) => usesSsh(p) || p === "ftp";
+// En estos protocolos una ruta con "/" inicial es absoluta y sin ella es relativa a la carpeta de inicio.
+export const absoluteSlash = (p: ClientProto) => usesSsh(p) || p === "ftp";
 export const usesCred = (p: ClientProto) => usesSsh(p) || p === "ftp";
 // Mientras la persona no toque el puerto, vale el estándar del protocolo.
 export const portOf = (f: ClientForm) => (f.portTouched ? f.port : defaultClientPort[f.proto]);
@@ -32,8 +32,8 @@ export function buildURL(f: ClientForm): string {
   const web = f.proto === "http" || f.proto === "https";
   const raw = web && q >= 0 ? f.path.slice(0, q) : f.path; // la query de una URL web (tokens) viaja tal cual
   const enc = raw.split("/").map(encodeURIComponent).join("/");
-  // El núcleo quita una "/" inicial de la ruta (remotePath): en SCP/SFTP/FTP "/tmp/x" debe viajar como "//tmp/x" para ser absoluta; sin "/" queda relativa al home.
-  const path = absPath(f.proto) ? `/${enc}` : enc.replace(/^\/?/, "/");
+  // El núcleo quita una "/" inicial de la ruta (remotePath): en SCP, SFTP y FTP "/tmp/x" debe viajar como "//tmp/x" para ser absoluta; sin "/" queda relativa al home.
+  const path = absoluteSlash(f.proto) ? `/${enc}` : enc.replace(/^\/?/, "/");
   return `${f.proto}://${bracket(host)}${port && port !== defaultClientPort[f.proto] ? `:${port}` : ""}${path}${web && q >= 0 ? f.path.slice(q) : ""}`;
 }
 
@@ -48,7 +48,7 @@ export function parseClientURL(text: string, dir: "get" | "put"): ParsedClientUR
   const host = u.hostname.replace(/^\[|\]$/g, "");
   let path = u.pathname;
   try { path = decodeURIComponent(path); } catch { /* % suelto: se deja como vino */ }
-  if (absPath(proto)) path = path.replace(/^\//, ""); // inversa de buildURL: "//tmp/x" → "/tmp/x", "/x" → "x"
+  if (absoluteSlash(proto)) path = path.replace(/^\//, ""); // inversa de buildURL: "//tmp/x" → "/tmp/x", "/x" → "x"
   return { proto, host, port: u.port, path: path + u.search };
 }
 

@@ -1,4 +1,4 @@
-package prefs
+package service
 
 import (
 	"errors"
@@ -6,24 +6,28 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
-// Inyectables para las pruebas: dueño de un archivo, uid del proceso y creación del temporal de la prueba de escritura.
+// Solo para pruebas: el código de producción no los asigna. Inyectables (los usan prefs, core y las pruebas de quien valide una carpeta del cliente): dueño de un archivo, uid del proceso y creación del temporal de la prueba de escritura.
 var (
-	fileOwner = sys.Owner
-	procUID   = os.Getuid
-	// ancestorInfo da el modo y el dueño de un ancestro de la carpeta (sin seguir enlaces).
-	ancestorInfo = realAncestorInfo
-	createTemp   = os.CreateTemp
+	FileOwner = sys.Owner
+	ProcUID   = os.Getuid
+	// AncestorInfo da el modo y el dueño de un ancestro de la carpeta (sin seguir enlaces).
+	AncestorInfo = RealAncestorInfo
+	CreateTemp   = os.CreateTemp
 )
+
+// safeShellPath son las rutas que se pueden poner en una orden de terminal sin citar: letras (también con acento),
+// números y unos pocos signos; nada de espacios, comillas, $ ni caracteres de formato (bidi).
+var safeShellPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N}/._+,@%=:-]+$`)
 
 // outputsErr arma el error con el código estable prefs.outputs.<motivo> al inicio (el paso de idioma de la
 // fase 30a lo traduce); el texto va en español.
@@ -39,15 +43,11 @@ func resolve(p string) string {
 	return filepath.Clean(p)
 }
 
-func inside(p, dir string) bool {
-	return p == dir || strings.HasPrefix(p, dir+string(filepath.Separator))
-}
-
-// CheckOutputs comprueba la carpeta base de salidas y devuelve la ruta resuelta (sin enlaces). Vacía = la de
+// CheckOutputs comprueba una carpeta de salidas (la de Ajustes o la que el cliente pasa en un RPC) y devuelve la ruta resuelta (sin enlaces). Vacía = la de
 // fábrica y no se comprueba nada. El núcleo no cambia los permisos del usuario: si la carpeta es más abierta que
 // 0700, la rechaza y sugiere la orden. Con probe prueba además la escritura (crea y borra un temporal); al arrancar
 // se llama sin probe.
-func CheckOutputs(dir string, st *service.CoreSettings, probe bool) (string, error) {
+func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 	if dir == "" {
 		return "", nil
 	}
@@ -90,20 +90,24 @@ func CheckOutputs(dir string, st *service.CoreSettings, probe bool) (string, err
 			return "", outputsErr("reservada", "%s contiene la carpeta reservada %s", real, r)
 		}
 	}
-	if uid, ok := fileOwner(fi); !ok || uid != uint32(procUID()) {
+	if uid, ok := FileOwner(fi); !ok || uid != uint32(ProcUID()) {
 		return "", outputsErr("otro_dueno", "la carpeta %s no es del usuario que corre el núcleo", real)
 	}
 	if m := fi.Mode().Perm(); m != 0o700 {
-		return "", outputsErr("permisos", "la carpeta %s tiene modo %04o y debe ser 0700; corrígelo con: chmod 700 %s", real, m, real)
+		hint := ""
+		if safeShellPath.MatchString(real) { // sin comillas ni metacaracteres: la orden se puede pegar tal cual
+			hint = "; corrígelo con: chmod 700 " + real
+		}
+		return "", outputsErr("permisos", "la carpeta %s tiene modo %04o y debe ser 0700%s", real, m, hint)
 	}
 	// Un ancestro que otros pueden escribir (grupo u otros) deja que alguien reemplace la ruta, o la cree 0777 tras
 	// una limpieza de tmpfiles: no se acepta si no es del usuario (/tmp, /var/tmp y /dev/shm caen aquí).
 	for a := filepath.Dir(real); ; a = filepath.Dir(a) {
-		mode, uid, err := ancestorInfo(a)
+		mode, uid, err := AncestorInfo(a)
 		if err != nil {
 			return "", outputsErr("ilegible", "no se pudo leer %s: %v", a, err)
 		}
-		if mode&0o022 != 0 && uid != uint32(procUID()) {
+		if mode&0o022 != 0 && uid != uint32(ProcUID()) {
 			return "", outputsErr("ancestro_inseguro", "%s cuelga de %s, que otros usuarios pueden escribir (modo %s, dueño uid %d): otro usuario podría reemplazar la ruta; elige una carpeta bajo tu carpeta personal", real, a, mode, uid)
 		}
 		if a == "/" || a == filepath.Dir(a) {
@@ -113,7 +117,7 @@ func CheckOutputs(dir string, st *service.CoreSettings, probe bool) (string, err
 	if !probe {
 		return real, nil
 	}
-	f, err := createTemp(real, ".mcw-")
+	f, err := CreateTemp(real, ".mcw-")
 	if err != nil {
 		return "", outputsErr("no_escribible", "no se puede escribir en %s: %v", real, err)
 	}
@@ -122,11 +126,11 @@ func CheckOutputs(dir string, st *service.CoreSettings, probe bool) (string, err
 	return real, nil
 }
 
-func realAncestorInfo(p string) (os.FileMode, uint32, error) {
+func RealAncestorInfo(p string) (os.FileMode, uint32, error) {
 	fi, err := os.Lstat(p)
 	if err != nil {
 		return 0, 0, err
 	}
-	uid, _ := fileOwner(fi)
+	uid, _ := FileOwner(fi)
 	return fi.Mode(), uid, nil
 }

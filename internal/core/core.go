@@ -1,6 +1,7 @@
 package core
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -25,7 +26,6 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
-	"github.com/oom-netsec/MACUAHUITL/internal/service/prefs"
 	"github.com/oom-netsec/MACUAHUITL/internal/store"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
@@ -148,7 +148,7 @@ func New(p Paths, o Options) (*Core, error) {
 	c.settings = service.NewCoreSettings(p.Outputs, p.Home, p.Config, p.Data, p.State, p.Runtime)
 	c.log = audit.New(db, o.Now)
 	// Se revalida la carpeta de salidas guardada (dueño, 0700, ancestros): si ya no vale rige la de fábrica y queda en la auditoría.
-	if err := c.settings.Load(db, func(dir string) error { _, err := prefs.CheckOutputs(dir, c.settings, false); return err }); err != nil {
+	if err := c.settings.Load(db, func(dir string) error { _, err := service.CheckOutputs(dir, c.settings, false); return err }); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("core: preferencias: %w", err)
 	}
@@ -455,7 +455,7 @@ func (c *Core) summary(j *job) *v1.JobSummary {
 	}
 	s := &v1.JobSummary{JobId: j.id, Name: j.spec.Name, State: j.state, NextRoundAt: tsOrNil(c.sched.NextRound(j.id)),
 		ArmedAt: tsOrNil(j.ArmedAt), WindowEndsAt: tsOrNil(j.Until), Round: uint32(j.Round), Rounds: rounds,
-		DevicesTotal: uint32(len(j.spec.Targets)), DevicesOk: uint32(j.OK), DevicesFailed: uint32(j.Failed), OutputDir: out}
+		DevicesTotal: uint32(len(j.spec.Targets)), DevicesOk: uint32(j.OK), DevicesFailed: uint32(j.Failed), OutputDir: out, Kind: cmp.Or(j.spec.Kind, "patrol")}
 	for _, p := range j.Phases {
 		s.Phases = append(s.Phases, phaseToProto(p))
 	}

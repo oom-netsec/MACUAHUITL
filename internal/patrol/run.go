@@ -27,7 +27,9 @@ type DeviceResult struct {
 	State              string // completed, failed, skipped
 	Detail             string
 	Commands, Invalid  int
-	ChangedHostKey     *HostKeyChange `json:",omitempty"`
+	// Skipped: comandos que no corren en la plataforma detectada (platforms: del playbook); van en el manifest.
+	Skipped        []string       `json:",omitempty"`
+	ChangedHostKey *HostKeyChange `json:",omitempty"`
 }
 
 // auditResult registra el resultado del equipo en la ronda (spec §12.2). Si la auditoría
@@ -65,12 +67,13 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	}
 	defer c.close()
 	res.Hostname, res.Platform = c.drv.Hostname(), c.platform
-	cmds, err := commands(s, c.platform, d.Playbooks)
+	cmds, skipped, err := commands(s, c.platform, d.Playbooks)
 	if err != nil {
 		res.State, res.Detail = "failed", err.Error()
 		emit(Progress{Target: hp, State: res.State, Detail: res.Detail})
 		return res
 	}
+	res.Skipped = skipped
 	dev := Device{Host: res.Hostname, IP: t.Address, Platform: c.platform}
 	roundStart := d.Now()
 	var bytes int64

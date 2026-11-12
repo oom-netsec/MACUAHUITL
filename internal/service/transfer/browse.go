@@ -161,6 +161,9 @@ func batchName(n string) error {
 func batchURL(dir *url.URL, name string) string {
 	u := *dir
 	u.Path, u.RawPath = path.Join("/", dir.Path, name), ""
+	if strings.HasPrefix(dir.Path, "//") { // la «/» extra marca ruta absoluta (remotePath quita una sola): path.Join la colapsa
+		u.Path = "/" + u.Path
+	}
 	u.User, u.RawQuery, u.ForceQuery, u.Fragment = nil, "", false, ""
 	return u.String()
 }

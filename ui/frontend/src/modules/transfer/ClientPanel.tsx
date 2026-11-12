@@ -7,7 +7,7 @@ import type { CoreAPI, Credential } from "../../lib/core";
 import { ResultPanel, Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { TransferResult } from "./api";
-import { absPath, buildURL, clientErrors, clientProtos, getParams, parseClientURL, portOf, putParams, putProtos, usesCred, usesSsh, type ClientForm, type ClientProto } from "./client";
+import { absoluteSlash, buildURL, clientErrors, clientProtos, getParams, parseClientURL, portOf, putParams, putProtos, usesCred, usesSsh, type ClientForm, type ClientProto } from "./client";
 import { hostKeyFromError } from "./validate";
 import { useVaultVersion } from "../../lib/vaultSignal";
 
@@ -96,7 +96,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
         <Field label={t("transfer.c.host")} hint={t("transfer.c.host.hint")} error={shown("host")} value={f.host} onChange={(host) => set({ host })} w="lg" mono />
         <Field label={t("transfer.c.port")} hint={t("transfer.c.port.hint")} error={shown("port")} value={portOf(f)} onChange={(port) => set({ port, portTouched: true })} w="sm" mono />
       </div>
-      <Field label={t("transfer.c.path")} hint={absPath(f.proto) ? t("transfer.c.path.hint.ssh") : t("transfer.c.path.hint")} error={shown("path")} value={f.path} onChange={(path) => set({ path })} w="full" mono />
+      <Field label={t("transfer.c.path")} hint={absoluteSlash(f.proto) ? t("transfer.c.path.hint.ssh") : t("transfer.c.path.hint")} error={shown("path")} value={f.path} onChange={(path) => set({ path })} w="full" mono />
       <div className="field" data-w="full">
         <label htmlFor={outId}>{t("transfer.url.out")}</label>
         <div className="path">
