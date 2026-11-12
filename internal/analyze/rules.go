@@ -657,7 +657,7 @@ func checkOSPF(p *params) (checker, error) {
 			if mode == "lost" && prev != nil && prevRound == s.Round-1 {
 				for _, k := range sortedKeys(prev) {
 					if _, ok := cur[k]; !ok {
-						det = append(det, i18n.Tx("analyze.detail.ospf_lost", "key", k, "round", prevRound))
+						det = append(det, i18n.Tx("analyze.detail.ospf_lost", "round", prevRound).With("key", ospfLabel(prev[k])))
 					}
 				}
 				if len(det) > 0 {
@@ -714,10 +714,10 @@ func checkHSRP(p *params) (checker, error) {
 				switch {
 				case mode == "changed" && prev != nil && prevRound == s.Round-1:
 					if ps, ok := prev[hsrpKey(g)]; ok && ps != g.State {
-						ev, det = append(ev, g.Line), append(det, i18n.Tx("analyze.detail.hsrp_changed", "key", hsrpKey(g), "from", ps, "to", g.State))
+						ev, det = append(ev, g.Line), append(det, i18n.Tx("analyze.detail.hsrp_changed", "from", ps, "to", g.State).With("key", hsrpLabel(g)))
 					}
 				case mode == "bad" && (hsrpBad[strings.ToLower(g.State)] || g.Active == "unknown" || g.Standby == "unknown"):
-					ev, det = append(ev, g.Line), append(det, i18n.Tx("analyze.detail.hsrp_bad", "key", hsrpKey(g), "state", g.State, "active", g.Active, "standby", g.Standby))
+					ev, det = append(ev, g.Line), append(det, i18n.Tx("analyze.detail.hsrp_bad", "state", g.State, "active", g.Active, "standby", g.Standby).With("key", hsrpLabel(g)))
 				}
 			}
 			if len(ev) > 0 {

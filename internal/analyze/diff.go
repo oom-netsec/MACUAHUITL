@@ -17,11 +17,12 @@ type CounterDelta struct {
 }
 
 type NeighborChange struct {
-	Protocol string `json:"protocol"` // bgp, ospf, hsrp
-	ID       string `json:"id"`
-	Change   string `json:"change"` // apareció, desapareció, cambió
-	From     string `json:"from"`
-	To       string `json:"to"`
+	Protocol string    `json:"protocol"` // bgp, ospf, hsrp
+	ID       string    `json:"id"`
+	IDTx     i18n.Text `json:"-"`      // ID en el idioma pedido (vecino OSPF y grupo HSRP); vacío si es un dato (BGP)
+	Change   string    `json:"change"` // apareció, desapareció, cambió
+	From     string    `json:"from"`
+	To       string    `json:"to"`
 }
 
 type PrefixChange struct {
@@ -173,17 +174,17 @@ func diffUptime(d *DeviceDiff, a, z string) {
 }
 
 // states compara dos mapas id → estado y anota lo que aparece, desaparece o cambia.
-func states(d *DeviceDiff, proto string, a, z map[string]string) {
+func states(d *DeviceDiff, proto string, a, z map[string]string, labels map[string]i18n.Text) {
 	for _, id := range sortedKeys(union(a, z)) {
 		x, okx := a[id]
 		y, oky := z[id]
 		switch {
 		case !okx:
-			d.Neighbors = append(d.Neighbors, NeighborChange{Protocol: proto, ID: id, Change: "apareció", To: y})
+			d.Neighbors = append(d.Neighbors, NeighborChange{Protocol: proto, ID: id, IDTx: labels[id], Change: "apareció", To: y})
 		case !oky:
-			d.Neighbors = append(d.Neighbors, NeighborChange{Protocol: proto, ID: id, Change: "desapareció", From: x})
+			d.Neighbors = append(d.Neighbors, NeighborChange{Protocol: proto, ID: id, IDTx: labels[id], Change: "desapareció", From: x})
 		case x != y:
-			d.Neighbors = append(d.Neighbors, NeighborChange{Protocol: proto, ID: id, Change: "cambió", From: x, To: y})
+			d.Neighbors = append(d.Neighbors, NeighborChange{Protocol: proto, ID: id, IDTx: labels[id], Change: "cambió", From: x, To: y})
 		}
 	}
 }
@@ -208,7 +209,7 @@ func diffBGP(d *DeviceDiff, a, z string) {
 			d.Prefixes = append(d.Prefixes, PrefixChange{Neighbor: n.ID, From: p, To: n.Prefixes})
 		}
 	}
-	states(d, "bgp", sa, sz)
+	states(d, "bgp", sa, sz, nil)
 }
 
 func diffOSPF(d *DeviceDiff, a, z string) {
@@ -218,13 +219,14 @@ func diffOSPF(d *DeviceDiff, a, z string) {
 		return
 	}
 	sa, sz := map[string]string{}, map[string]string{}
+	labels := map[string]i18n.Text{}
 	for _, n := range na {
-		sa[ospfKey(n)] = n.State
+		sa[ospfKey(n)], labels[ospfKey(n)] = n.State, ospfLabel(n)
 	}
 	for _, n := range nz {
-		sz[ospfKey(n)] = n.State
+		sz[ospfKey(n)], labels[ospfKey(n)] = n.State, ospfLabel(n)
 	}
-	states(d, "ospf", sa, sz)
+	states(d, "ospf", sa, sz, labels)
 }
 
 func diffHSRP(d *DeviceDiff, a, z string) {
@@ -234,13 +236,14 @@ func diffHSRP(d *DeviceDiff, a, z string) {
 		return
 	}
 	sa, sz := map[string]string{}, map[string]string{}
+	labels := map[string]i18n.Text{}
 	for _, g := range ga {
-		sa[hsrpKey(g)] = g.State
+		sa[hsrpKey(g)], labels[hsrpKey(g)] = g.State, hsrpLabel(g)
 	}
 	for _, g := range gz {
-		sz[hsrpKey(g)] = g.State
+		sz[hsrpKey(g)], labels[hsrpKey(g)] = g.State, hsrpLabel(g)
 	}
-	states(d, "hsrp", sa, sz)
+	states(d, "hsrp", sa, sz, labels)
 }
 
 const (
@@ -298,6 +301,9 @@ func lineDiff(a, b []string) ([]string, i18n.Text) {
 // Text es el resumen legible para mctl, en español.
 func (r DiffReport) Text() string { return r.TextIn(i18n.Es) }
 
+// changeCode traduce el código cerrado del JSON (apareció, desapareció, cambió) a la clave de su texto.
+var changeCode = map[string]string{"apareció": "appeared", "desapareció": "disappeared", "cambió": "changed"}
+
 // TextIn es el resumen en el idioma pedido (con es, el de siempre).
 func (r DiffReport) TextIn(loc string) string {
 	var b strings.Builder
@@ -316,7 +322,7 @@ func (r DiffReport) TextIn(loc string) string {
 			fmt.Fprintf(&b, "%s\n", m("analyze.text.counter", "iface", c.Interface, "counter", c.Counter, "from", c.From, "to", c.To, "delta", fmt.Sprintf("%+d", c.Delta)))
 		}
 		for _, n := range d.Neighbors {
-			fmt.Fprintf(&b, "%s %s %s %s\n", n.Protocol, n.ID, n.Change, strings.Trim(n.From+" → "+n.To, " →"))
+			fmt.Fprintf(&b, "%s %s %s %s\n", n.Protocol, n.ID, m("analyze.change."+changeCode[n.Change]), strings.Trim(n.From+" → "+n.To, " →"))
 		}
 		for _, p := range d.Prefixes {
 			fmt.Fprintf(&b, "%s\n", m("analyze.text.prefixes", "neighbor", p.Neighbor, "from", p.From, "to", p.To))

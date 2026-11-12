@@ -90,3 +90,14 @@ func init() {
 		"analyze.text.window":      e("ventana: {around} ± {window}", "window: {around} ± {window}", "around", "window"),
 	})
 }
+
+func init() {
+	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
+	add(map[string]entry{
+		"analyze.key.ospf":           e("{id} por {iface}", "{id} on {iface}", "id", "iface"),
+		"analyze.key.hsrp":           e("{iface} grupo {group}", "{iface} group {group}", "iface", "group"),
+		"analyze.change.appeared":    e("apareció", "appeared"),
+		"analyze.change.disappeared": e("desapareció", "disappeared"),
+		"analyze.change.changed":     e("cambió", "changed"),
+	})
+}

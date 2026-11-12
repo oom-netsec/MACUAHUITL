@@ -11,7 +11,7 @@ import (
 )
 
 // spanish encuentra palabras sueltas de español en un texto que ya debe estar en inglés.
-var spanish = regexp.MustCompile(`(?i)[áéíóúñ¿¡]|\b(sin|ningún|equipo|equipos|hay|ronda|rondas|línea|líneas|umbral|libre|bajó|desde|hace|arriba|recargó|aviso|evidencia|por qué|qué hacer|hallazgos|veces|cambios|solo|comando|comandos|mensaje|mensajes|del|las|los|una|para|con)\b`)
+var spanish = regexp.MustCompile(`(?i)[áéíóúñ¿¡]|\b(sin|ningún|equipo|equipos|hay|ronda|rondas|línea|líneas|umbral|libre|bajó|desde|hace|arriba|recargó|aviso|evidencia|por qué|qué hacer|hallazgos|veces|cambios|grupo|por|solo|comando|comandos|mensaje|mensajes|del|las|los|una|para|con)\b`)
 
 func labReports(t *testing.T) (Report, DiffReport, DiffReport, TimelineReport) {
 	t.Helper()
@@ -37,10 +37,10 @@ func sinKB(j []byte) string {
 }
 
 // cerrados quita los códigos cerrados en español que la fase no migra: la fuente de un evento (log-equipo,
-// auditoria), el cambio de un vecino (cambió, apareció, desapareció) y las claves de vecino y grupo HSRP.
+// auditoria) y el cambio de un vecino (cambió, apareció, desapareció) en el JSON.
 func cerrados(s string) string {
 	s = regexp.MustCompile(`"rule":"[^"]*"`).ReplaceAllString(s, "") // el id de la regla es un código estable
-	return strings.NewReplacer("log-equipo", "", "auditoria", "", "cambió", "", "apareció", "", "desapareció", "", " por ", " ", " grupo ", " ").Replace(s)
+	return strings.NewReplacer("log-equipo", "", "auditoria", "", "cambió", "", "apareció", "", "desapareció", "").Replace(s)
 }
 
 func TestLocalizarAnalisisEn(t *testing.T) {
@@ -75,7 +75,7 @@ func TestLocalizarAnalisisEn(t *testing.T) {
 			if i := strings.Index(ln, "  ["); i > 0 && strings.HasSuffix(ln, "]") {
 				ln = ln[:i] // ficha de msgkb
 			}
-			if m := spanish.FindString(cerrados(ln)); m != "" {
+			if m := spanish.FindString(strings.NewReplacer("log-equipo", "", "auditoria", "").Replace(ln)); m != "" {
 				t.Errorf("%s: español en %q (%s)", name, ln, m)
 			}
 		}

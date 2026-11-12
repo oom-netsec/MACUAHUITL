@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -16,8 +17,18 @@ func lines(text string) []string { return strings.Split(strings.TrimRight(text, 
 // ospfHeaderRe localiza el encabezado de la tabla para citarlo como evidencia.
 var ospfHeaderRe = regexp.MustCompile(`^Neighbor ID\s+Pri\s+State`)
 
-func ospfKey(n iosxe.OSPFNeighbor) string { return n.ID + " por " + n.Interface }
-func hsrpKey(g iosxe.HSRPGroup) string    { return g.Interface + " grupo " + g.Group }
+// ospfKey y hsrpKey son la clave interna con que se comparan rondas (y el id en español del JSON); para mostrar
+// se usan ospfLabel y hsrpLabel, que salen en el idioma pedido.
+func ospfKey(n iosxe.OSPFNeighbor) string { return ospfLabel(n).In(i18n.Es) }
+func hsrpKey(g iosxe.HSRPGroup) string    { return hsrpLabel(g).In(i18n.Es) }
+
+func ospfLabel(n iosxe.OSPFNeighbor) i18n.Text {
+	return i18n.Tx("analyze.key.ospf", "id", n.ID, "iface", n.Interface)
+}
+
+func hsrpLabel(g iosxe.HSRPGroup) i18n.Text {
+	return i18n.Tx("analyze.key.hsrp", "iface", g.Interface, "group", g.Group)
+}
 
 // CounterNames son los contadores que entiende iface_counter y el diff.
 var CounterNames = []string{"crc", "input_errors", "output_errors", "output_drops", "input_drops", "resets"}

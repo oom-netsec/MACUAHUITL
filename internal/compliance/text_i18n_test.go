@@ -1,6 +1,7 @@
 package compliance
 
 import (
+	"encoding/json"
 	"os"
 	"regexp"
 	"strings"
@@ -30,8 +31,13 @@ func TestInformeEnInglesYClaves(t *testing.T) {
 			t.Errorf("%s: español en %q", f.Rule, f.Detail)
 		}
 	}
-	if m := spanish.FindString(r.TextIn(i18n.En)); m != "" && !strings.Contains(r.TextIn(i18n.En), "<oculto>") {
-		t.Logf("revisa: %s", m)
+	// la marca de secreto oculto también sale en inglés
+	en := r.TextIn(i18n.En)
+	if strings.Contains(en, "<oculto>") || !strings.Contains(en, "<hidden>") {
+		t.Errorf("la marca de oculto en el texto en inglés:\n%s", en)
+	}
+	if es := (func() string { r2, _ := Check(string(cfg), string(tpl)); return r2.Text() })(); !strings.Contains(es, "<oculto>") || strings.Contains(es, "<hidden>") {
+		t.Errorf("la marca de oculto en el texto en español:\n%s", es)
 	}
 }
 
@@ -51,5 +57,31 @@ func TestPlantillaErroresCodificados(t *testing.T) {
 		if err == nil || !ok || err.Error() != c.es || co.Localize(i18n.En) != c.en {
 			t.Errorf("%q: %v", c.tpl, err)
 		}
+	}
+}
+
+// Ningún secreto sale en el informe, en ningún idioma: contraseñas, comunidades SNMP, key-string y llaves de NTP.
+func TestNingunSecretoEnElInforme(t *testing.T) {
+	cfg := "hostname R1\nenable password 7 SECRETO1\nsnmp-server community COMUNIDAD2 RO\nkey chain K\n key 1\n  key-string 7 SECRETO3\nntp authentication-key 1 md5 SECRETO4 7\nntp server 10.0.0.1\n"
+	tpl := "- enable password .*\n- snmp-server community .*\n- ntp authentication-key .*\nkey chain K\n key 1\n  - key-string .*\n- ntp server .*\n"
+	r, err := Check(cfg, tpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found int
+	for _, loc := range []string{i18n.Es, i18n.En} {
+		rr := r
+		i18n.Localize(&rr, loc)
+		raw, _ := json.Marshal(rr)
+		all := string(raw) + rr.TextIn(loc)
+		for _, sec := range []string{"SECRETO1", "COMUNIDAD2", "SECRETO3", "SECRETO4"} {
+			if strings.Contains(all, sec) {
+				t.Errorf("%s: el secreto %s sale en el informe:\n%s", loc, sec, all)
+			}
+		}
+		found += strings.Count(all, "snmp-server community <")
+	}
+	if found == 0 {
+		t.Error("la línea de la comunidad no se citó con su valor oculto")
 	}
 }

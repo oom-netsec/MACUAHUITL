@@ -109,14 +109,33 @@ func lineNums(ns []*iosconf.Node) []int {
 	return out
 }
 
-// secretVal: el valor de password/secret nunca debe salir en el reporte.
-var secretVal = regexp.MustCompile(`\b(password|secret)( [0-9])? \S.*$`)
+// secretVals son los valores que nunca deben salir en el informe: password y secret (con su tipo), la comunidad
+// de snmp-server, el key-string de una cadena de llaves y la llave de ntp authentication-key.
+var secretVals = []struct {
+	re   *regexp.Regexp
+	repl string // con %s donde va la marca de «oculto»
+}{
+	{regexp.MustCompile(`\b(password|secret)( [0-9])? \S.*$`), "${1}${2} %s"},
+	{regexp.MustCompile(`^(snmp-server community) \S+`), "${1} %s"},
+	{regexp.MustCompile(`\b(key-string)( [0-9])? \S.*$`), "${1}${2} %s"},
+	{regexp.MustCompile(`^(ntp authentication-key \d+ \S+) \S+( [0-9])?$`), "${1} %s"},
+}
 
-// lineListTx es la lista «línea N: texto» de los nodos, sin el valor de los secretos.
+// maskSecrets cambia por hidden el valor de los secretos de una línea de configuración.
+func maskSecrets(line, hidden string) string {
+	for _, r := range secretVals {
+		line = r.re.ReplaceAllString(line, strings.Replace(r.repl, "%s", hidden, 1))
+	}
+	return line
+}
+
+// lineListTx es la lista «línea N: texto» de los nodos, sin el valor de los secretos (la marca es <oculto> en es y
+// <hidden> en en).
 func lineListTx(ns []*iosconf.Node) i18n.Text {
 	var parts []i18n.Text
 	for _, n := range ns {
-		parts = append(parts, i18n.Tx("compliance.line", "n", n.Num, "text", secretVal.ReplaceAllString(n.Path(), "${1}${2} <oculto>")))
+		p := n.Path()
+		parts = append(parts, i18n.Tx("compliance.line", "n", n.Num).With("text", i18n.Lit(maskSecrets(p, "<oculto>"), maskSecrets(p, "<hidden>"))))
 	}
 	return i18n.Join("; ", parts...)
 }
