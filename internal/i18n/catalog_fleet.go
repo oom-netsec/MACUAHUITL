@@ -90,3 +90,18 @@ func init() {
 		"fleet.evidence.half":      e("{port} duplex {duplex} velocidad {speed}", "{port} duplex {duplex} speed {speed}", "port", "duplex", "speed"),
 	})
 }
+
+// Errores gRPC y de carga de la flota.
+func init() {
+	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
+	add(map[string]entry{
+		"fleet.err.relative_path": e("la ruta {path:q} debe ser absoluta", "the path {path:q} must be absolute", "path"),
+		"fleet.err.empty_query":   e("indica una IP, MAC o nombre", "give an IP, MAC or name"),
+		"fleet.err.empty_trace":   e("indica una MAC o una IP", "give a MAC or an IP"),
+		"fleet.err.empty_path":    e("indica origen y destino", "give a source and a destination"),
+		"fleet.err.bad_size":      e("tamaño {size:q} inválido: usa 800M, 1.2G, 500000", "invalid size {size:q}: use 800M, 1.2G, 500000", "size"),
+		"fleet.err.not_dir":       e("{path} no es una carpeta", "{path} is not a folder", "path"),
+		"fleet.err.load":          e("flota: {cause}", "fleet: {cause}", "cause"),
+		"fleet.err.no_outputs":    e("flota: {dir} no contiene salidas de Patrol (carpetas <equipo>_<ip> con encabezados =====)", "fleet: {dir} has no Patrol outputs (<device>_<ip> folders with ===== headers)", "dir"),
+	})
+}

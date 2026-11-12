@@ -101,3 +101,16 @@ func init() {
 		"analyze.change.changed":     e("cambió", "changed"),
 	})
 }
+
+// Errores gRPC y de carga del análisis y de la deriva (comparten el paquete de salidas de un trabajo).
+func init() {
+	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
+	add(map[string]entry{
+		"analyze.err.job_no_outputs": e("el trabajo aún no tiene salidas: ármalo y espera la primera ronda", "the job has no outputs yet: arm it and wait for the first round"),
+		"analyze.err.pcap_path":      e("la ruta de la captura debe ser absoluta", "the capture path must be absolute"),
+		"analyze.err.rounds":         e("analyze: el trabajo tiene las rondas {have}; no hay {from} o {to}", "analyze: the job has rounds {have}; there is no {from} or {to}", "have", "from", "to"),
+		"analyze.err.not_dir":        e("analyze: {path} no es una carpeta", "analyze: {path} is not a folder", "path"),
+		"analyze.err.no_outputs":     e("analyze: {path} no contiene salidas de Patrol", "analyze: {path} has no Patrol outputs", "path"),
+		"analyze.err.read":           e("analyze: {cause}", "analyze: {cause}", "cause"),
+	})
+}

@@ -245,3 +245,16 @@ func TestWrapMetadataYKeyArgs(t *testing.T) {
 		t.Errorf("metadata interna: %v", md)
 	}
 }
+
+func TestUsedKeysIncluyeAnidadosYUniones(t *testing.T) {
+	r := &struct {
+		T   string `json:"t"`
+		TTx Text   `json:"-"`
+	}{TTx: Join("; ", Tx("test.l1"), Tx("test.nest", "round", 1).With("title", Tx("test.l2", "n", 1)))}
+	u := UsedKeys(r)
+	for _, k := range []string{"test.l1", "test.nest", "test.l2"} {
+		if !u[k] {
+			t.Errorf("falta %s en %v", k, u)
+		}
+	}
+}

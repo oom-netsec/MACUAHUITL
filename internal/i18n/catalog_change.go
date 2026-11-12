@@ -55,3 +55,24 @@ func init() {
 		"change.text.level.regression":   e("REGRESIÓN", "REGRESSION"),
 	})
 }
+
+// Errores gRPC del servicio de cambios.
+func init() {
+	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
+	add(map[string]entry{
+		"change.err.no_spec":         e("falta la definición del cambio", "the change definition is missing"),
+		"change.err.output_dir":      e("carpeta de salida: {error}", "output folder: {error}", "error"),
+		"change.err.not_found":       e("cambio {id} no existe", "change {id} does not exist", "id"),
+		"change.err.no_phase":        e("fase no indicada (pre o post)", "phase not given (pre or post)"),
+		"change.err.in_progress":     e("la captura {name} ya está en curso (trabajo {job})", "the {name} capture is already running (job {job})", "name", "job"),
+		"change.err.need_pre":        e("primero termina la captura PRE: sin línea base no hay comparación", "finish the PRE capture first: without a baseline there is nothing to compare"),
+		"change.err.missing_capture": e("falta la captura {phase}", "the {phase} capture is missing", "phase"),
+		"change.err.capture_state":   e("la captura {phase} está {state}", "the {phase} capture is {state}", "phase", "state"),
+		"change.err.no_input":        e("indica el cambio o las dos carpetas (rutas absolutas)", "give the change or the two folders (absolute paths)"),
+		"upgrade.err.no_outputs":     e("no se reconocieron salidas: usa un archivo de Patrol o una sesión con prompts (SW1#show version)", "no outputs were recognized: use a Patrol file or a session with prompts (SW1#show version)"),
+	})
+}
+
+func init() {
+	add(map[string]entry{"change.key.hsrp": {Es: "{iface} grupo {group}", En: "{iface} group {group}", Args: []string{"iface", "group"}}})
+}

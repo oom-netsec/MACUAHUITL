@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -163,6 +164,7 @@ func checkType(t reflect.Type, seen map[reflect.Type]bool) error {
 type walker struct {
 	loc   string
 	keys  map[string]Text
+	used  map[string]bool // si no es nil, recoge todas las claves de catálogo que aparecen (UsedKeys)
 	stack []string
 	seen  map[uintptr]bool
 }
@@ -226,6 +228,9 @@ func (w *walker) walk(v reflect.Value) {
 }
 
 func (w *walker) set(dst reflect.Value, t Text) {
+	if w.used != nil {
+		t.collect(w.used)
+	}
 	if t.Empty() || !dst.CanSet() { // un valor que no se puede cambiar no se registra: la clave diría otra cosa
 		return
 	}
@@ -235,4 +240,32 @@ func (w *walker) set(dst reflect.Value, t Text) {
 	if w.loc == En {
 		dst.SetString(t.In(En))
 	}
+}
+
+// collect anota todas las claves de catálogo de un texto, también las de sus uniones y argumentos anidados.
+func (t Text) collect(into map[string]bool) {
+	if t.Key != "" {
+		into[t.Key] = true
+	}
+	for _, p := range t.Parts {
+		p.collect(into)
+	}
+	for _, n := range t.Nest {
+		n.collect(into)
+	}
+	var e *Error
+	if t.Err != nil && errors.As(t.Err, &e) {
+		into[e.Code] = true
+	}
+}
+
+// UsedKeys son las claves de catálogo de todos los textos de un informe (v, un puntero), con los anidados y las
+// uniones. Es para pruebas: comprobar que los escenarios recorren todo el catálogo de un área.
+func UsedKeys(v any) map[string]bool {
+	used := map[string]bool{}
+	rv := reflect.ValueOf(v)
+	if rv.IsValid() && planOf(rv.Type()).hasTx {
+		(&walker{loc: Es, keys: map[string]Text{}, used: used}).walk(rv)
+	}
+	return used
 }
