@@ -40,3 +40,13 @@ test("si el informe falla se muestra el error, sin repetir con el método de tex
   expect(await screen.findByText(/no es una captura/)).toBeInTheDocument();
   expect(core.toolsPcap).not.toHaveBeenCalled();
 });
+
+test("una segunda corrida que cae al texto no deja las tarjetas del informe anterior", async () => {
+  const report = vi.fn(async () => rep).mockResolvedValueOnce(rep).mockResolvedValueOnce({ ...rep, text: "" });
+  const core = fakeCore({ toolsPcapReport: report, toolsPcap: vi.fn(async () => "Capture: texto plano") });
+  await analyze(core);
+  await screen.findByRole("list", { name: "Equipos con más tráfico" });
+  await userEvent.click(screen.getByRole("button", { name: "Analizar" }));
+  expect(await screen.findByText(/texto plano/)).toBeInTheDocument();
+  expect(screen.queryByRole("list", { name: "Equipos con más tráfico" })).toBeNull();
+});

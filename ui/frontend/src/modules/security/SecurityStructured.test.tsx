@@ -42,9 +42,11 @@ test("radius: si el informe falla se muestra el error y la prueba no se repite",
 
 test("radius cae al texto si el informe llega sin texto", async () => {
   const core = fakeCore({ secRadius: vi.fn(async () => "Servidor RADIUS 10.0.0.20:1812\n\naccess-request: Access-Accept en 3.0 ms (intento 1, Message-Authenticator válido)\n") });
+  const report = vi.spyOn(core, "secRadiusReport");
   render(<SecurityView core={core} />);
   await fillRadius();
   expect((await screen.findAllByText(/Message-Authenticator válido/)).length).toBeGreaterThan(0);
+  expect(report).toHaveBeenCalled();
 });
 
 test("tacacs usa el informe estructurado", async () => {
