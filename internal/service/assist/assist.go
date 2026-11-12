@@ -368,7 +368,7 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 	case *v1.PlanSnippetRequest_Trunk:
 		ctx = context.WithValue(ctx, templateKey{}, "trunk")
 		ch := assist.TrunkChange{Interface: sn.Trunk.Interface, Op: sn.Trunk.Op, Vlan: int(sn.Trunk.Vlan)}
-		fn, detail = assist.SnippetTrunk, fmt.Sprintf("interfaz=%s %s vlan=%d", ch.Interface, ch.Op, ch.Vlan)
+		fn, detail = assist.SnippetTrunk, fmt.Sprintf("interface=%s %s vlan=%d", ch.Interface, ch.Op, ch.Vlan)
 		pre, err = assist.TrunkPre(ch)
 		build = func(l string, o map[string]string) (assist.DevicePlan, error) { return assist.TrunkPlan(l, ch, o) }
 	case *v1.PlanSnippetRequest_Svi:

@@ -639,7 +639,7 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 			r.log2("assist.verify", dp.Device, "run=%s result=failed", r.id)
 			return r.failT("la credencial nueva no entró a %s con una sesión nueva: %v; la sesión original sigue abierta: propón la reversa", "the new credential did not log in to %s with a new session: %v; the original session is still open: propose the rollback", dp.Device, err), true
 		}
-		r.log2("assist.verify", dp.Device, "run=%s resultado=ok", r.id)
+		r.log2("assist.verify", dp.Device, "run=%s result=ok", r.id)
 		r.out(dp.Device, msg)
 	}
 	if r.takeAbort() {
