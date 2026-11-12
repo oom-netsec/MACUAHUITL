@@ -20,8 +20,133 @@ message ToolReport {
   string text = 2;
 }
 
+// Fase 30b: el informe de la captura en forma estructurada. Es lo mismo que imprime el texto, con los
+// encabezados como clave (pcap.section.*) para que la vista no lea el español. Duraciones en milisegundos;
+// fechas en RFC 3339 UTC.
+message PcapSummary {
+  string file = 1;
+  int64 packets = 2;
+  int64 bytes = 3;
+  double duration_ms = 4;
+  string start = 5;
+}
+
+message PcapConversation {
+  string proto = 1;
+  string a = 2;
+  string b = 3;
+  int64 packets = 4;
+  int64 bytes = 5;
+}
+
+message PcapTalker {
+  string ip = 1;
+  int64 packets = 2;
+  int64 bytes = 3;
+}
+
+// Suma por protocolo de las conversaciones listadas (las mismas que trae conversations).
+message PcapProtocol {
+  string proto = 1;
+  int64 packets = 2;
+  int64 bytes = 3;
+}
+
+message PcapNeighbor {
+  string protocol = 1; // cdp, lldp
+  string device_id = 2;
+  string port = 3;
+  string platform = 4;
+  string mgmt_ip = 5;
+  uint32 native_vlan = 6;
+}
+
+message PcapFlow {
+  string client = 1;
+  string server = 2;
+  int64 count = 3; // intentos (SYN sin respuesta) o cantidad (RST)
+}
+
+message PcapTcp {
+  int64 handshakes = 1;
+  double rtt_min_ms = 2;
+  double rtt_avg_ms = 3;
+  double rtt_max_ms = 4;
+  int64 retransmissions = 5;
+  int64 zero_window = 6;
+  int64 failed_handshakes_total = 7;
+  repeated PcapFlow failed_handshakes = 8;
+  repeated PcapFlow resets = 9;
+}
+
+message PcapDnsQuery {
+  string client = 1;
+  string server = 2;
+  string name = 3;
+  string type = 4;
+  string rcode = 5;
+  double latency_ms = 6;
+}
+
+message PcapDns {
+  int64 queries = 1;
+  int64 responses = 2;
+  repeated PcapDnsQuery errors = 3;
+  repeated PcapDnsQuery slow = 4;
+  repeated PcapDnsQuery unanswered = 5;
+}
+
+message PcapTlsHello {
+  string client = 1;
+  string server = 2;
+  string sni = 3;
+}
+
+message PcapIcmpEvent {
+  string from = 1;
+  string target = 2;
+  int32 code = 3;
+}
+
+message PcapIcmp {
+  repeated PcapIcmpEvent unreachable = 1;
+  repeated PcapIcmpEvent ttl_exceeded = 2;
+}
+
+message PcapArpConflict {
+  string ip = 1;
+  repeated string macs = 2;
+}
+
+// Encabezado de sección que el texto imprime: key pcap.section.* y sus argumentos (el conflicto ARP lleva ip y macs).
+message PcapSection {
+  string key = 1;
+  map<string, string> args = 2;
+  string title = 3; // en el idioma pedido
+}
+
+// Aviso del análisis: key pcap.warn.* con sus argumentos y el texto en el idioma pedido.
+message PcapWarning {
+  string key = 1;
+  map<string, string> args = 2;
+  string text = 3;
+}
+
 message AnalyzePcapResponse {
   ToolReport report = 1;
+  PcapSummary summary = 2;
+  repeated PcapConversation conversations = 3;
+  repeated PcapTalker top_talkers = 4;
+  repeated PcapProtocol protocols = 5;
+  repeated PcapNeighbor neighbors = 6;
+  PcapTcp tcp = 7;
+  PcapDns dns = 8;
+  repeated PcapTlsHello tls = 9;
+  PcapIcmp icmp = 10;
+  repeated PcapArpConflict arp_conflicts = 11;
+  int64 fragments = 12;
+  repeated PcapWarning warnings = 13;
+  repeated PcapSection sections = 14;
 }
 
 message DnsResponse {

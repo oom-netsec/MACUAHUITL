@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // ---- utilidades de direcciones ----
@@ -211,6 +213,7 @@ type SubnetInfo struct {
 	Kind        string   `json:"kind"`
 	Class       string   `json:"class,omitempty"`
 	Notes       []string `json:"notes,omitempty"`
+	notes       []Note
 }
 
 func Subnet(in string) (SubnetInfo, error) {
@@ -221,15 +224,15 @@ func Subnet(in string) (SubnetInfo, error) {
 	n, net, last := p.Bits(), p.Addr(), lastAddr(p)
 	s := SubnetInfo{Input: in, Prefix: p.String(), PrefixLen: n, Network: net.String(), Total: size(p).String(), Kind: prefixKind(p)}
 	if given != net {
-		s.Notes = append(s.Notes, fmt.Sprintf("%s es un host dentro de %s", given, p))
+		addNote(&s.Notes, &s.notes, "calc.note.host_in_subnet", "addr", given, "prefix", p)
 	}
 	if net.Is6() {
 		s.FirstUsable, s.LastUsable, s.Usable = net.String(), last.String(), s.Total
 		switch {
 		case n == 127:
-			s.Notes = append(s.Notes, "/127 punto a punto (RFC 6164): ambas direcciones son usables")
+			addNote(&s.Notes, &s.notes, "calc.note.p2p_v6")
 		case n < 127:
-			s.Notes = append(s.Notes, "IPv6 no tiene broadcast; la primera dirección es la anycast del router de subred (RFC 4291)")
+			addNote(&s.Notes, &s.notes, "calc.note.anycast_v6")
 		}
 		return s, nil
 	}
@@ -238,10 +241,10 @@ func Subnet(in string) (SubnetInfo, error) {
 	switch n {
 	case 32:
 		s.FirstUsable, s.LastUsable, s.Usable = net.String(), net.String(), "1"
-		s.Notes = append(s.Notes, "/32: una sola dirección (loopback, host o ruta de host)")
+		addNote(&s.Notes, &s.notes, "calc.note.single_host")
 	case 31:
 		s.FirstUsable, s.LastUsable, s.Usable = net.String(), last.String(), "2"
-		s.Notes = append(s.Notes, "/31 punto a punto (RFC 3021): sin dirección de red ni broadcast")
+		addNote(&s.Notes, &s.notes, "calc.note.p2p_v4")
 	default:
 		s.Broadcast, s.FirstUsable, s.LastUsable = last.String(), net.Next().String(), last.Prev().String()
 		s.Usable = new(big.Int).Sub(size(p), big.NewInt(2)).String()
@@ -250,10 +253,10 @@ func Subnet(in string) (SubnetInfo, error) {
 }
 
 func (s SubnetInfo) Report() Report {
-	return Report{Tables: []Table{kv("Subred "+s.Prefix,
-		"Red", s.Network, "Broadcast", s.Broadcast, "Primera usable", s.FirstUsable, "Última usable", s.LastUsable,
-		"Direcciones", s.Total, "Hosts usables", s.Usable, "Prefijo", "/"+strconv.Itoa(s.PrefixLen), "Máscara", s.Mask,
-		"Wildcard", s.Wildcard, "Clase", s.Class, "Tipo", s.Kind)}, Notes: s.Notes}
+	return Report{Tables: []Table{kv("calc.title.subnet", i18n.A("prefix", s.Prefix),
+		"calc.row.network", s.Network, "calc.row.broadcast", s.Broadcast, "calc.row.first_usable", s.FirstUsable, "calc.row.last_usable", s.LastUsable,
+		"calc.row.addresses", s.Total, "calc.row.usable_hosts", s.Usable, "calc.row.prefix", "/"+strconv.Itoa(s.PrefixLen), "calc.row.mask", s.Mask,
+		"calc.row.wildcard", s.Wildcard, "calc.row.class", s.Class, "calc.row.kind", s.Kind)}, Notes: s.Notes, NoteItems: s.notes}
 }
 
 // ---- VLSM ----
@@ -353,16 +356,16 @@ func cmpU(a, b uint64) int {
 }
 
 func (v VLSMResult) Report() Report {
-	t := Table{Title: "VLSM sobre " + v.Parent, Head: []string{"Nombre", "Hosts", "Prefijo", "Máscara", "Primera", "Última", "Broadcast", "Capacidad", "Sobrante"}}
+	t := titled("calc.title.vlsm", i18n.A("parent", v.Parent), "calc.col.name", "calc.col.hosts", "calc.col.prefix", "calc.col.mask", "calc.col.first", "calc.col.last", "calc.col.broadcast", "calc.col.capacity", "calc.col.waste")
 	for _, a := range v.Allocations {
-		t.Rows = append(t.Rows, []string{a.Name, strconv.FormatUint(a.Hosts, 10), a.Prefix, a.Mask, a.First, a.Last, a.Broadcast, a.Capacity, a.Waste})
+		t.add("", nil, a.Name, strconv.FormatUint(a.Hosts, 10), a.Prefix, a.Mask, a.First, a.Last, a.Broadcast, a.Capacity, a.Waste)
 	}
 	r := Report{Tables: []Table{t}}
 	if len(v.Unplaced) > 0 {
-		r.Notes = append(r.Notes, "No caben: "+strings.Join(v.Unplaced, ", "))
+		addNote(&r.Notes, &r.NoteItems, "calc.note.vlsm_unplaced", "names", strings.Join(v.Unplaced, ", "))
 	}
 	if len(v.Free) > 0 {
-		r.Notes = append(r.Notes, "Espacio libre: "+strings.Join(v.Free, " "))
+		addNote(&r.Notes, &r.NoteItems, "calc.note.vlsm_free", "free", strings.Join(v.Free, " "))
 	}
 	return r
 }
@@ -428,13 +431,13 @@ func Summarize(in []string) (Summary, error) {
 }
 
 func (s Summary) Report() Report {
-	t := Table{Title: "Sumarización", Head: []string{"Tipo", "Prefijos"}, Rows: [][]string{
-		{"Exacta (mínima sin direcciones ajenas)", strings.Join(s.Exact, " ")},
-		{"Una sola ruta", s.Single},
-	}}
-	r := Report{Tables: []Table{t}, Notes: []string{"La lista cubre " + s.Covered + " direcciones."}}
+	t := titled("calc.title.summary", nil, "calc.col.type", "calc.col.prefixes")
+	t.add("calc.row.exact", nil, "", strings.Join(s.Exact, " "))
+	t.add("calc.row.single", nil, "", s.Single)
+	r := Report{Tables: []Table{t}}
+	addNote(&r.Notes, &r.NoteItems, "calc.note.summary_covered", "covered", s.Covered)
 	if s.Extra != "0" {
-		r.Notes = append(r.Notes, fmt.Sprintf("%s también anuncia %s direcciones que no están en la lista: cuidado con atraer tráfico ajeno (usa null0 o la exacta).", s.Single, s.Extra))
+		addNote(&r.Notes, &r.NoteItems, "calc.note.summary_extra", "single", s.Single, "extra", s.Extra)
 	}
 	return r
 }
@@ -462,6 +465,7 @@ type WildcardInfo struct {
 	Prefixes    []string     `json:"prefixes,omitempty"`
 	Octets      []OctetMatch `json:"octets,omitempty"`
 	Notes       []string     `json:"notes,omitempty"`
+	notes       []Note
 }
 
 const maxListed = 16
@@ -497,7 +501,7 @@ func Wildcard(addr, value string) (WildcardInfo, error) {
 		info.PrefixLen, info.Mask = strconv.Itoa(plen), fromV4(^w).String()
 	}
 	if base != v4(a) {
-		info.Notes = append(info.Notes, fmt.Sprintf("%s tiene bits encendidos donde la wildcard dice \"no importa\": IOS guarda la entrada como %s", a, info.Base))
+		addNote(&info.Notes, &info.notes, "calc.note.wildcard_host_bits", "addr", a, "base", info.Base)
 	}
 	for sub := uint32(0); len(info.Prefixes) < maxListed; {
 		info.Prefixes = append(info.Prefixes, fmt.Sprintf("%s/%d", fromV4(base|sub), plen))
@@ -510,7 +514,7 @@ func Wildcard(addr, value string) (WildcardInfo, error) {
 		info.Octets = append(info.Octets, OctetMatch{Value: v, Wildcard: wo, Binary: fmt.Sprintf("%08b", wo), Values: octetValues(v, wo)})
 	}
 	if !info.Contiguous {
-		info.Notes = append(info.Notes, "Wildcard no contigua: no equivale a un solo prefijo. IOS/IOS-XE la acepta tal cual; en ASA (máscara de red) hay que expandirla en los prefijos listados.")
+		addNote(&info.Notes, &info.notes, "calc.note.wildcard_noncontiguous")
 	}
 	return info, nil
 }
@@ -558,27 +562,27 @@ func convertMask(v string) (WildcardInfo, error) {
 }
 
 func (w WildcardInfo) Report() Report {
-	r := Report{Notes: w.Notes}
+	r := Report{Notes: w.Notes, NoteItems: w.notes}
 	if w.Address == "" {
-		r.Tables = []Table{kv("Conversión", "Prefijo", "/"+w.PrefixLen, "Máscara", w.Mask, "Wildcard", w.Wildcard, "Direcciones", w.Matches)}
+		r.Tables = []Table{kv("calc.title.conversion", nil, "calc.row.prefix", "/"+w.PrefixLen, "calc.row.mask", w.Mask, "calc.row.wildcard", w.Wildcard, "calc.row.addresses", w.Matches)}
 		return r
 	}
 	pl := ""
 	if w.PrefixLen != "" {
 		pl = w.Base + "/" + w.PrefixLen
 	}
-	r.Tables = append(r.Tables, kv("ACL "+w.Base+" "+w.Wildcard, "Direcciones que coinciden", w.Matches, "Primera", w.First, "Última", w.Last,
-		"Equivale a", pl, "Prefijos necesarios", w.PrefixCount))
-	ot := Table{Title: "Por octeto", Head: []string{"Octeto", "Valor", "Wildcard", "Binario", "Valores que coinciden"}}
+	r.Tables = append(r.Tables, kv("calc.title.acl", i18n.A("base", w.Base, "wildcard", w.Wildcard), "calc.row.matches", w.Matches, "calc.row.first", w.First, "calc.row.last", w.Last,
+		"calc.row.equals", pl, "calc.row.prefixes_needed", w.PrefixCount))
+	ot := titled("calc.title.octets", nil, "calc.col.octet", "calc.col.value", "calc.col.wildcard", "calc.col.binary", "calc.col.matching")
 	for i, o := range w.Octets {
-		ot.Rows = append(ot.Rows, []string{strconv.Itoa(i + 1), strconv.Itoa(o.Value), strconv.Itoa(o.Wildcard), o.Binary, o.Values})
+		ot.add("", nil, strconv.Itoa(i+1), strconv.Itoa(o.Value), strconv.Itoa(o.Wildcard), o.Binary, o.Values)
 	}
-	pt := Table{Title: "Prefijos cubiertos", Head: []string{"Prefijo"}}
-	for _, p := range w.Prefixes {
-		pt.Rows = append(pt.Rows, []string{p})
-	}
+	pt := titled("calc.title.covered", nil, "calc.col.prefix")
 	if w.PrefixCount != strconv.Itoa(len(w.Prefixes)) {
-		pt.Title += fmt.Sprintf(" (primeros %d de %s)", len(w.Prefixes), w.PrefixCount)
+		pt = titled("calc.title.covered_partial", i18n.A("shown", len(w.Prefixes), "total", w.PrefixCount), "calc.col.prefix")
+	}
+	for _, p := range w.Prefixes {
+		pt.add("", nil, p)
 	}
 	r.Tables = append(r.Tables, ot, pt)
 	return r
@@ -673,11 +677,11 @@ func IPv6(addr, mac string) (IPv6Info, error) {
 }
 
 func (r IPv6Info) Report() Report {
-	rep := Report{Tables: []Table{kv("IPv6",
-		"Abreviada", r.Compressed, "Expandida", r.Expanded, "Prefijo", r.Prefix, "Tipo", r.Kind, "EUI-64", r.EUI64,
-		"ID de interfaz", r.InterfaceID, "MAC (de la EUI-64)", r.MAC, "Multicast nodo solicitado", r.SolicitedNode, "PTR", r.ReverseDNS)}}
+	rep := Report{Tables: []Table{kv("calc.title.ipv6", nil,
+		"calc.row.abbreviated", r.Compressed, "calc.row.expanded", r.Expanded, "calc.row.prefix", r.Prefix, "calc.row.kind", r.Kind, "calc.row.eui64", r.EUI64,
+		"calc.row.interface_id", r.InterfaceID, "calc.row.mac_eui64", r.MAC, "calc.row.solicited", r.SolicitedNode, "calc.row.ptr", r.ReverseDNS)}}
 	if r.MAC != "" && r.EUI64 == "" {
-		rep.Notes = append(rep.Notes, "El ID de interfaz tiene ff:fe en medio: parece EUI-64 y revela la MAC del equipo.")
+		addNote(&rep.Notes, &rep.NoteItems, "calc.note.ipv6_eui64_mac")
 	}
 	return rep
 }

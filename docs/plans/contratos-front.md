@@ -801,3 +801,97 @@ Los YAML de `playbooks/` llevan `name_en` (obligatorio en los incrustados; una p
 - Cuando el detalle lleva el texto de un error del núcleo con código del catálogo, sale el texto en inglés del catálogo. Un error sin código se audita con su texto original (puede estar en español): es el caso de los mensajes de errores de otras capas, de las advertencias de respaldo y del `detail` de equipos que ya traen los trabajos.
 - Los registros anteriores a esta fase no se reescriben (la cadena de hashes no se toca): una misma bitácora mezcla detalles en español (viejos) y en inglés (nuevos), y `audit verify` sigue íntegro.
 - La interfaz no interpreta el detalle de auditoría (la vista solo verifica la cadena y copia el comando de exportación), así que no hay cambio de pantalla. Quien lea la exportación por su cuenta debe aceptar las dos formas para los registros anteriores: por ejemplo `razon=`/`reason=`, `pasaron=1 de 2`/`passed=1 of 2`, `guard=revocado`/`guard=revoked`.
+
+
+## Datos estructurados: calculadoras, seguridad y captura (fase 30b)
+
+Paso 2 de 3 del inventario `docs/plans/2026-11-07-idioma-nucleo.md`. Los tres módulos que dibujaban sus tarjetas leyendo el español del núcleo (`security/parse.ts`, `calc/bars.ts`, `tools/pcapParse.ts`) reciben los mismos datos en forma estructurada, con claves estables. Esta fase no toca la vista: la migración es de la sesión de front.
+
+### Reglas
+- **Compatibilidad.** Sin `accept-language`, o con `es`, el texto de siempre (`text`, `json`, tablas, notas) es idéntico byte por byte; lo fijan pruebas de regresión por RPC y por dominio. Solo se suman campos de proto (sin renumerar) y de DTO (con `omitempty`). Los métodos de texto del puente (`secRadius`, `secTacacs`, `secPkiDecode`, `toolsPcap`) no cambian.
+- **Con `en`** el texto de esos RPC y los campos `text`/`message`/`title` salen en inglés. La bandera `core.localize` de 30a decide si el puente manda el idioma.
+- **Claves y valores.** Títulos, encabezados, etiquetas de fila, notas y avisos viajan como clave del catálogo (`internal/i18n`) con sus `args`; los **valores** (IPs, cifras, fechas, nombres, atributos del servidor) viajan tal cual y no se traducen.
+- **Códigos cerrados en inglés:** `severity` ∈ `warning`, `error`, `info` (el texto en español sigue diciendo `aviso`); `messageAuthenticator` ∈ `absent`, `valid`, `invalid`; `direction` ∈ `sent`, `received`; `kind` de un certificado ∈ `certificate`, `csr`. `lib/vocab.ts` mapea hoy `aviso`/`ausente`/`válido`/`inválido`: la vista que migre debe pasar a estos códigos.
+- **Sin secretos.** Ningún campo nuevo trae el secreto compartido, la contraseña, llaves privadas ni sus longitudes (una prueba lo verifica).
+
+### Puente (métodos nuevos y campos nuevos)
+| Método / DTO | Devuelve |
+|---|---|
+| `calc(kind, req)` → `CalcResultDTO` | gana `notesStructured` y, en cada tabla, `titleKey`, `titleArgs`, `columns`, `rowLabels` |
+| `secRadiusReport(RadiusDTO)` → `RadiusReportDTO` | `text`, `server`, `method`, `exchanges`, `findings` |
+| `secTacacsReport(TacacsDTO)` → `TacacsReportDTO` | `text`, `server`, `steps`, `findings` |
+| `secPkiDecodeReport(text)` → `PkiReportDTO` | `text`, `certificates` |
+| `secPkiCsr`, `secPkiCaInit`, `secPkiCaSign` → `PkiResultDTO` | ganan `certificates` y `labWarning` (con `omitempty`) |
+| `toolsPcapReport(path, top)` → `PcapReportDTO` | `text` y todas las secciones de abajo |
+
+En TS los métodos nuevos son opcionales en `SecurityAPI` y `ToolsAPI` (`secRadiusReport?`…), y los tipos nuevos de `api.ts` son opcionales en `CalcResult`/`CalcTable`.
+
+### Calculadoras
+```ts
+interface CalcKey { key: string; args?: Record<string,string> }
+interface CalcTable {
+  title: string; head: string[]; rows: string[][];      // lo de siempre, en el idioma pedido
+  titleKey?: string; titleArgs?: Record<string,string>; // calc.title.*
+  columns?: CalcKey[];                                  // una por celda de head (calc.col.*)
+  rowLabels?: CalcKey[];                                // una por fila (calc.row.*); key "" si la primera celda es un dato
+}
+interface CalcResult { text: string; tables: CalcTable[]; notes: string[]; notesStructured?: CalcKey[] } // calc.note.*, mismo orden que notes
+```
+Las etiquetas de fila viven en las tablas campo/valor (subred, conversión, ACL, IPv6, TCP, presupuesto óptico, potencia, resultado de MTU) y en las filas fijas «Exacta/Una sola ruta» de la sumarización y las de pérdidas de óptica; el valor es la última celda. En las demás tablas (VLSM, octetos, DSCP, desglose de MTU, BGP) lo fijo son las columnas.
+
+- **Subred** (lo que lee `bars.ts`): título `calc.title.subnet {prefix}`; filas `calc.row.network`, `broadcast`, `first_usable`, `last_usable`, `addresses`, `usable_hosts`, `prefix`, `mask`, `wildcard`, `class`, `kind`.
+- **VLSM:** título `calc.title.vlsm {parent}` (el largo del prefijo es lo que sigue a `/` en `parent`); columnas `calc.col.name`, `hosts`, `prefix`, `mask`, `first`, `last`, `broadcast`, `capacity`, `waste`; notas `calc.note.vlsm_free {free}` (prefijos separados por espacio, como en el texto) y `vlsm_unplaced {names}`.
+- **Claves, por área:**
+  - Títulos: `calc.title.{subnet, vlsm, summary, conversion, acl, octets, covered, covered_partial, ipv6, tcp, dscp, losses, budget, power, mtu_breakdown, result, bgp_routes, bgp_comparisons}`.
+  - Columnas: `calc.col.{field, value, name, hosts, prefix, prefixes, mask, first, last, broadcast, capacity, waste, type, octet, wildcard, binary, matching, dscp, tos, tos_hex, precedence, cos, exp, af_drop, class, item, quantity, loss, layer, detail, bytes, remaining, route, weight, local_pref, local, as_path, origin, med, igp, router_id, cluster, neighbor, age, next_hop, comparison, step, value_a, value_b, winner}`.
+  - Filas: `calc.row.{network, broadcast, first_usable, last_usable, addresses, usable_hosts, prefix, mask, wildcard, class, kind, exact, single, matches, first, last, equals, prefixes_needed, abbreviated, expanded, eui64, interface_id, mac_eui64, solicited, ptr, link, rtt, bdp, window_scale, window_limit, loss_limit, max_flow, limited_by, fiber, connectors, splices, total, tx, rx_sensitivity, budget, rx_expected, margin, spare, verdict, dbm, mw, overhead, effective_mtu, ip_mtu, adjust_mss, physical_1500}`.
+  - Notas: `calc.note.{host_in_subnet, p2p_v6, anycast_v6, single_host, p2p_v4, vlsm_unplaced, vlsm_free, summary_covered, summary_extra, wildcard_host_bits, wildcard_noncontiguous, ipv6_eui64_mac, tcp_bdp, tcp_window_limit, tcp_loss_limit, tcp_single_flow, dscp_cos_map, dscp_rfc4594, optics_overload, optics_short, optics_typical, mtu_ipv6_min, mtu_outer_tag, mtu_esp_padding, mtu_vxlan, bgp_winner, bgp_local_weight, bgp_excluded, bgp_det_med, bgp_no_det_med, bgp_always_med, bgp_med_same_as, bgp_multipath, bgp_multipath_relax, bgp_unvalidated}`.
+- **Siguen en español con `en`:** los valores con palabras (`Lo limita`: «ventana»/«pérdida»; el veredicto óptico; `Tipo` y `Clase` de una dirección; las clases de DSCP; los pasos de BGP; «sí/no», «accesible/inaccesible» y los nombres de capa de MTU). Son datos del cálculo, no etiquetas.
+
+### Seguridad
+```ts
+interface SecText { key: string; args?: Record<string,string>; text: string }          // text en el idioma pedido
+interface SecFindingData { code: string; severity: "warning"|"error"|"info"; args?: Record<string,string>; message: string }
+interface RadiusReportData { text; server; method?: string /* PAP, CHAP, MSCHAPV2 como en el texto */;
+  exchanges: { kind; code?; rttMs; attempts; messageAuthenticator?: "absent"|"valid"|"invalid"; error?: SecText; attrs: {name; value}[] }[]; findings: SecFindingData[] }
+interface TacacsReportData { text; server /* host:puerto */;
+  steps: { kind; status?; rttMs; error?: SecText; prompts: string[]; message?; data?; avPairs: { direction: "sent"|"received"; value }[] }[]; findings: SecFindingData[] }
+interface Certificate { kind: "certificate"|"csr"; subject; issuer?; serial?; notBefore?; notAfter?; daysLeft?: number;
+  key: { algorithm /* RSA, ECDSA */; bits; curve?; description /* «RSA 2048» */ }; signature: { algorithm; valid?: boolean /* solo CSR */ };
+  san: string[]; keyUsage: string[]; extKeyUsage: string[]; isCa: boolean; selfSigned: boolean; sha1?; sha256?;
+  warnings: { code; args?; message }[] }
+interface PkiReportData { text; certificates: Certificate[] }
+```
+- Un intercambio sin respuesta no trae `code`; un paso sin respuesta no trae `status`. `avPairs` guarda el orden: primero lo enviado y luego lo recibido, igual que en el texto.
+- **`findings[].code`** (identificadores estables, en español como los de hoy): RADIUS `sin-respuesta {kind, port}`, `respuesta-invalida {kind, error}`, `blast-radius {kind}`, `ma-invalido {kind}`, `reject {reply}` (sin `reply` si el servidor no mandó Reply-Message); TACACS+ `secreto {kind}`, `sin-respuesta {kind, error, port}`, `authen-fail`, `author-fail`, `estado {kind, status, message}`. El `error` de los argumentos va en el idioma pedido.
+- **`error.key`**: `security.radius.err.{system {error}, unauth {code}, no_response {attempts, timeout}}` y `security.tacacs.err.{system {error}, closed, out_of_sequence {session, type, seq}, unencrypted, bad_secret, too_many_prompts}`. `system` es un texto del sistema (por ejemplo «connection refused») y no se traduce.
+- **`warnings[].code`** de un certificado: `rsa_small`, `weak_sig {algorithm}`, `no_san`, `expired`, `not_yet`, `expires_soon {days}`, `self_signed`, `csr_signature`.
+- Claves del texto del informe: `security.{severity, ma}.*`, `security.findings_head`, `security.{yes, no}`, `security.radius.{text, err, finding}.*`, `security.tacacs.{text, err, finding}.*`, `security.pki.{kind, label, warn}.*`, `security.pki.validity` y `security.pki.lab_warning`.
+- `labWarning` (en `PkiResult`) indica que el texto abre con el aviso de CA de laboratorio.
+- **Siguen como vienen del servidor:** los valores de los atributos RADIUS (incluido el veredicto de MS-CHAP2-Success y «(truncado)»), los mensajes y datos del servidor TACACS+ y los nombres de usos de llave.
+
+### Captura (pcap)
+```ts
+interface PcapReportData { text;
+  summary: { file; packets; bytes; durationMs; start /* RFC 3339 UTC */ };
+  conversations: { proto; a; b; packets; bytes }[];          // las del texto, en su orden
+  topTalkers: { ip; packets; bytes }[];
+  protocols: { proto; packets; bytes }[];                     // suma de conversations por proto, de más a menos bytes (lo que hoy calcula pcapParse.ts)
+  neighbors: { protocol /* cdp, lldp */; deviceId; port; platform; mgmtIp; nativeVlan }[];
+  tcp: { handshakes; rttMinMs; rttAvgMs; rttMaxMs; retransmissions; zeroWindow; failedHandshakesTotal; failedHandshakes: {client; server; count /* intentos */}[]; resets: {client; server; count}[] };
+  dns: { queries; responses; errors; slow; unanswered: { client; server; name; type; rcode?; latencyMs }[] };
+  tls: { client; server; sni }[]; icmp: { unreachable; ttlExceeded: { from; target; code }[] };
+  arpConflicts: { ip; macs: string[] }[]; fragments: number;
+  warnings: { key; args?; text }[];                           // pcap.warn.*
+  sections: { key; args?; title }[] }                         // encabezados que imprime el texto, en orden
+```
+- `sections[].key` ∈ `pcap.section.{neighbors, tcp, dns, tls, icmp, arp_conflict {ip, macs}, conversations, top_talkers}`; `title` es el encabezado en el idioma pedido (sin el «== »). El front deja de buscar «== Conversaciones» y usa `conversations` y `topTalkers`.
+- Avisos: `pcap.warn.truncated {packets}`, `pcap.warn.interrupted {packets, error}` (`error` es del sistema), `pcap.warn.flow_limit {max}`.
+- Frases del texto: `pcap.text.*` (no las necesita la vista; salen en el `text`).
+- Los números de 64 bits viajan como número JSON (exactos hasta 2^53).
+
+### Qué cubre cada archivo del front
+- `security/parse.ts`: servidor, método, intercambios (tipo, código, RTT, intentos, estado del Message-Authenticator, error, atributos), pasos TACACS+ (estado, RTT, error, preguntas, mensaje, datos, enviado/recibido), hallazgos (severidad y detalle) y los certificados (sujeto, emisor, serie, vigencia y días, llave, firma, SAN, CA, huellas, avisos), más lo nuevo (usos de llave, autofirmado, validez de la firma del CSR).
+- `calc/bars.ts`: título de la subred y del VLSM, las filas por clave, el prefijo y largo del padre, las columnas por clave y el espacio libre (`calc.note.vlsm_free`).
+- `tools/pcapParse.ts`: equipos con más tráfico, conversaciones y protocolos.
+- **No cubierto:** ver los «Siguen en español con `en`» de cada módulo; además, los errores de validación que rechazan la petición (`InvalidArgument`) siguen su propio camino de 30a, y IKE, DNS y TLS de `tools` quedan para otra fase.

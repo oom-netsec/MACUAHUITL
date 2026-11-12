@@ -16,6 +16,8 @@ import (
 	"net/netip"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type Dialer func(ctx context.Context, network, host string, port uint16) (net.Conn, error)
@@ -48,9 +50,39 @@ type Exchange struct {
 	MessageAuthenticator string `json:",omitempty"` // válido, ausente, inválido
 	Attrs                []Decoded
 	Error                string `json:",omitempty"`
+	// ErrText es Error como texto de catálogo (para darlo en otro idioma); no viaja en el JSON.
+	ErrText i18n.Text `json:"-"`
 }
 
-type Finding struct{ Severity, Code, Detail string }
+// fail registra el error del intercambio: el texto en español sale del catálogo.
+func (e *Exchange) fail(key string, kv ...any) {
+	e.ErrText = i18n.Tx(key, kv...)
+	e.Error = e.ErrText.In(i18n.Es)
+}
+
+func (e *Exchange) failSystem(err error) { e.fail("security.radius.err.system", "error", err.Error()) }
+
+// Finding es un hallazgo. Severity es aviso, error o info en el JSON y el texto en español de siempre.
+type Finding struct {
+	Severity, Code, Detail string
+	Text                   i18n.Text `json:"-"` // Detail como texto de catálogo
+	Err                    i18n.Text `json:"-"` // el error del paso que Detail cita, si lo cita
+}
+
+// ArgsIn son los argumentos del hallazgo; el error citado va en el idioma pedido.
+func (f Finding) ArgsIn(loc string) i18n.Args {
+	a := i18n.Args{}
+	for k, v := range f.Text.Args {
+		a[k] = v
+	}
+	if !f.Err.Empty() {
+		a["error"] = f.Err.In(loc)
+	}
+	return a
+}
+
+// DetailIn es el detalle en el idioma pedido.
+func (f Finding) DetailIn(loc string) string { return i18n.Msg(loc, f.Text.Key, f.ArgsIn(loc)) }
 
 type Report struct {
 	Server    string
@@ -229,7 +261,7 @@ func exchange(ctx context.Context, d Dialer, c Config, port uint16, kind string,
 	copy(req.Authenticator[:], wire[4:20]) // accounting lo calcula al firmar
 	conn, err := d(ctx, "udp", c.Host, port)
 	if err != nil {
-		e.Error = err.Error()
+		e.failSystem(err)
 		return e
 	}
 	defer conn.Close()
@@ -238,7 +270,7 @@ func exchange(ctx context.Context, d Dialer, c Config, port uint16, kind string,
 	for e.Attempts = 1; e.Attempts <= c.Retries+1; e.Attempts++ {
 		start := time.Now()
 		if _, err := conn.Write(wire); err != nil {
-			e.Error = err.Error()
+			e.failSystem(err)
 			return e
 		}
 		deadline := start.Add(c.Timeout)
@@ -271,11 +303,11 @@ func exchange(ctx context.Context, d Dialer, c Config, port uint16, kind string,
 	}
 	if unauth != "" {
 		e.Attempts = min(e.Attempts, c.Retries+1)
-		e.Error = fmt.Sprintf("llegó una respuesta (%s) cuyo autenticador no verifica: el secreto compartido no coincide con el del servidor (o la respuesta es falsificada); se descarta", unauth)
+		e.fail("security.radius.err.unauth", "code", unauth)
 		return e
 	}
 	e.Attempts = min(e.Attempts, c.Retries+1)
-	e.Error = fmt.Sprintf("sin respuesta tras %d intentos de %s", e.Attempts, c.Timeout)
+	e.fail("security.radius.err.no_response", "attempts", e.Attempts, "timeout", c.Timeout)
 	return e
 }
 
@@ -301,63 +333,105 @@ func (e Exchange) fill(raw []byte, resp, req *Packet, secret []byte) Exchange {
 }
 
 func (r *Report) findings() {
-	add := func(sev, code, detail string) { r.Findings = append(r.Findings, Finding{sev, code, detail}) }
+	add := func(sev, code string, t, errT i18n.Text) {
+		f := Finding{Severity: sev, Code: code, Text: t, Err: errT}
+		f.Detail = f.DetailIn(i18n.Es)
+		r.Findings = append(r.Findings, f)
+	}
 	for _, e := range r.Exchanges {
 		switch {
-		case strings.HasPrefix(e.Error, "sin respuesta"):
-			add("error", "sin-respuesta", e.Kind+": el servidor no respondió. Causas usuales: este equipo no está dado de alta como NAS/dispositivo de red en el servidor, secreto compartido distinto (la petición se descarta por Message-Authenticator), UDP "+map[bool]string{true: "1813", false: "1812"}[strings.HasPrefix(e.Kind, "accounting")]+" filtrado o puerto equivocado (1645/1646 heredados).")
+		case e.ErrText.Key == "security.radius.err.no_response":
+			add("error", "sin-respuesta", i18n.Tx("security.radius.finding.no_response", "kind", e.Kind, "port", map[bool]string{true: "1813", false: "1812"}[strings.HasPrefix(e.Kind, "accounting")]), i18n.Text{})
 		case e.Error != "":
-			add("error", "respuesta-invalida", e.Kind+": "+e.Error)
+			add("error", "respuesta-invalida", i18n.Tx("security.radius.finding.invalid_response", "kind", e.Kind), e.ErrText)
 		}
 		if e.Code != "" && e.Kind != "accounting-start" && e.Kind != "accounting-stop" {
 			switch e.MessageAuthenticator {
 			case "ausente":
-				add("aviso", "blast-radius", e.Kind+": la respuesta no trae Message-Authenticator; el servidor es vulnerable a Blast-RADIUS (CVE-2024-3596). Actualízalo y exige Message-Authenticator.")
+				add("aviso", "blast-radius", i18n.Tx("security.radius.finding.blast_radius", "kind", e.Kind), i18n.Text{})
 			case "inválido":
-				add("error", "ma-invalido", e.Kind+": Message-Authenticator inválido en la respuesta (secreto distinto o paquete alterado).")
+				add("error", "ma-invalido", i18n.Tx("security.radius.finding.ma_invalid", "kind", e.Kind), i18n.Text{})
 			}
 		}
 		if e.Code == "Access-Reject" {
-			add("info", "reject", "El servidor rechazó la autenticación. Revisa en el servidor (ISE: Operations > RADIUS > Live Logs) el motivo exacto; Reply-Message: "+valueOf(e, "Reply-Message"))
+			if reply, ok := valueOf(e, "Reply-Message"); ok {
+				add("info", "reject", i18n.Tx("security.radius.finding.reject", "reply", reply), i18n.Text{})
+			} else {
+				add("info", "reject", i18n.Tx("security.radius.finding.reject_none"), i18n.Text{})
+			}
 		}
 	}
 }
 
-func valueOf(e Exchange, name string) string {
+func valueOf(e Exchange, name string) (string, bool) {
 	for _, a := range e.Attrs {
 		if a.Name == name {
-			return a.Value
+			return a.Value, true
 		}
 	}
-	return "(ninguno)"
+	return "", false
 }
 
-// Text es el resumen legible.
-func (r Report) Text() string {
+// Text es el resumen legible en español.
+func (r Report) Text() string { return r.TextIn(i18n.Es) }
+
+// sevText es la severidad (aviso, error, info) en el idioma pedido.
+func sevText(loc, sev string) string {
+	return i18n.Msg(loc, "security.severity."+SeverityCode(sev), nil)
+}
+
+// SeverityCode es la severidad como código cerrado en inglés: warning, error o info.
+func SeverityCode(sev string) string {
+	if sev == "aviso" {
+		return "warning"
+	}
+	return sev
+}
+
+// MACode es el estado del Message-Authenticator como código cerrado: absent, valid o invalid ("" si no hubo respuesta).
+func MACode(ma string) string {
+	return map[string]string{"ausente": "absent", "válido": "valid", "inválido": "invalid"}[ma]
+}
+
+// TextIn es el resumen legible en el idioma pedido. Los valores (servidor, atributos, mensajes del servidor)
+// salen tal cual; con es es el texto de siempre.
+func (r Report) TextIn(loc string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Servidor RADIUS %s", r.Server)
+	b.WriteString(i18n.Msg(loc, "security.radius.text.server", i18n.A("server", r.Server)))
 	if r.Method != "" {
-		fmt.Fprintf(&b, " (método %s)", strings.ToUpper(r.Method))
+		b.WriteString(i18n.Msg(loc, "security.radius.text.method", i18n.A("method", strings.ToUpper(r.Method))))
 	}
 	b.WriteString("\n")
 	for _, e := range r.Exchanges {
 		fmt.Fprintf(&b, "\n%s: ", e.Kind)
 		if e.Code != "" {
-			fmt.Fprintf(&b, "%s en %.1f ms (intento %d, Message-Authenticator %s)\n", e.Code, e.RTTMillis, e.Attempts, e.MessageAuthenticator)
+			ma := e.MessageAuthenticator
+			if c := MACode(ma); c != "" {
+				ma = i18n.Msg(loc, "security.ma."+c, nil)
+			}
+			b.WriteString(i18n.Msg(loc, "security.radius.text.exchange", i18n.A("code", e.Code, "rtt", fmt.Sprintf("%.1f", e.RTTMillis), "attempt", e.Attempts, "ma", ma)) + "\n")
 		} else {
-			b.WriteString("sin respuesta\n")
+			b.WriteString(i18n.Msg(loc, "security.radius.text.no_response", nil) + "\n")
 		}
 		if e.Error != "" {
-			fmt.Fprintf(&b, "  ! %s\n", e.Error)
+			msg := e.Error
+			if !e.ErrText.Empty() {
+				msg = e.ErrText.In(loc)
+			}
+			fmt.Fprintf(&b, "  ! %s\n", msg)
 		}
 		for _, a := range e.Attrs {
 			fmt.Fprintf(&b, "  %-26s %s\n", a.Name, a.Value)
 		}
 	}
 	if len(r.Findings) > 0 {
-		b.WriteString("\nHallazgos:\n")
+		b.WriteString("\n" + i18n.Msg(loc, "security.findings_head", nil) + "\n")
 		for _, f := range r.Findings {
-			fmt.Fprintf(&b, "  [%s] %s\n", f.Severity, f.Detail)
+			detail := f.Detail
+			if !f.Text.Empty() {
+				detail = f.DetailIn(loc)
+			}
+			fmt.Fprintf(&b, "  [%s] %s\n", sevText(loc, f.Severity), detail)
 		}
 	}
 	return b.String()

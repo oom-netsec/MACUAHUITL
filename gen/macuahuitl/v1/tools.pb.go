@@ -137,16 +137,1063 @@ func (x *ToolReport) GetText() string {
 	return ""
 }
 
+// Fase 30b: el informe de la captura en forma estructurada. Es lo mismo que imprime el texto, con los
+// encabezados como clave (pcap.section.*) para que la vista no lea el español. Duraciones en milisegundos;
+// fechas en RFC 3339 UTC.
+type PcapSummary struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	File          string                 `protobuf:"bytes,1,opt,name=file,proto3" json:"file,omitempty"`
+	Packets       int64                  `protobuf:"varint,2,opt,name=packets,proto3" json:"packets,omitempty"`
+	Bytes         int64                  `protobuf:"varint,3,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	DurationMs    float64                `protobuf:"fixed64,4,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	Start         string                 `protobuf:"bytes,5,opt,name=start,proto3" json:"start,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapSummary) Reset() {
+	*x = PcapSummary{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapSummary) ProtoMessage() {}
+
+func (x *PcapSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapSummary.ProtoReflect.Descriptor instead.
+func (*PcapSummary) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *PcapSummary) GetFile() string {
+	if x != nil {
+		return x.File
+	}
+	return ""
+}
+
+func (x *PcapSummary) GetPackets() int64 {
+	if x != nil {
+		return x.Packets
+	}
+	return 0
+}
+
+func (x *PcapSummary) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+func (x *PcapSummary) GetDurationMs() float64 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *PcapSummary) GetStart() string {
+	if x != nil {
+		return x.Start
+	}
+	return ""
+}
+
+type PcapConversation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Proto         string                 `protobuf:"bytes,1,opt,name=proto,proto3" json:"proto,omitempty"`
+	A             string                 `protobuf:"bytes,2,opt,name=a,proto3" json:"a,omitempty"`
+	B             string                 `protobuf:"bytes,3,opt,name=b,proto3" json:"b,omitempty"`
+	Packets       int64                  `protobuf:"varint,4,opt,name=packets,proto3" json:"packets,omitempty"`
+	Bytes         int64                  `protobuf:"varint,5,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapConversation) Reset() {
+	*x = PcapConversation{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapConversation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapConversation) ProtoMessage() {}
+
+func (x *PcapConversation) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapConversation.ProtoReflect.Descriptor instead.
+func (*PcapConversation) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PcapConversation) GetProto() string {
+	if x != nil {
+		return x.Proto
+	}
+	return ""
+}
+
+func (x *PcapConversation) GetA() string {
+	if x != nil {
+		return x.A
+	}
+	return ""
+}
+
+func (x *PcapConversation) GetB() string {
+	if x != nil {
+		return x.B
+	}
+	return ""
+}
+
+func (x *PcapConversation) GetPackets() int64 {
+	if x != nil {
+		return x.Packets
+	}
+	return 0
+}
+
+func (x *PcapConversation) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+type PcapTalker struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ip            string                 `protobuf:"bytes,1,opt,name=ip,proto3" json:"ip,omitempty"`
+	Packets       int64                  `protobuf:"varint,2,opt,name=packets,proto3" json:"packets,omitempty"`
+	Bytes         int64                  `protobuf:"varint,3,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapTalker) Reset() {
+	*x = PcapTalker{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapTalker) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapTalker) ProtoMessage() {}
+
+func (x *PcapTalker) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapTalker.ProtoReflect.Descriptor instead.
+func (*PcapTalker) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PcapTalker) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *PcapTalker) GetPackets() int64 {
+	if x != nil {
+		return x.Packets
+	}
+	return 0
+}
+
+func (x *PcapTalker) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+// Suma por protocolo de las conversaciones listadas (las mismas que trae conversations).
+type PcapProtocol struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Proto         string                 `protobuf:"bytes,1,opt,name=proto,proto3" json:"proto,omitempty"`
+	Packets       int64                  `protobuf:"varint,2,opt,name=packets,proto3" json:"packets,omitempty"`
+	Bytes         int64                  `protobuf:"varint,3,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapProtocol) Reset() {
+	*x = PcapProtocol{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapProtocol) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapProtocol) ProtoMessage() {}
+
+func (x *PcapProtocol) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapProtocol.ProtoReflect.Descriptor instead.
+func (*PcapProtocol) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *PcapProtocol) GetProto() string {
+	if x != nil {
+		return x.Proto
+	}
+	return ""
+}
+
+func (x *PcapProtocol) GetPackets() int64 {
+	if x != nil {
+		return x.Packets
+	}
+	return 0
+}
+
+func (x *PcapProtocol) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+type PcapNeighbor struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Protocol      string                 `protobuf:"bytes,1,opt,name=protocol,proto3" json:"protocol,omitempty"` // cdp, lldp
+	DeviceId      string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	Port          string                 `protobuf:"bytes,3,opt,name=port,proto3" json:"port,omitempty"`
+	Platform      string                 `protobuf:"bytes,4,opt,name=platform,proto3" json:"platform,omitempty"`
+	MgmtIp        string                 `protobuf:"bytes,5,opt,name=mgmt_ip,json=mgmtIp,proto3" json:"mgmt_ip,omitempty"`
+	NativeVlan    uint32                 `protobuf:"varint,6,opt,name=native_vlan,json=nativeVlan,proto3" json:"native_vlan,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapNeighbor) Reset() {
+	*x = PcapNeighbor{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapNeighbor) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapNeighbor) ProtoMessage() {}
+
+func (x *PcapNeighbor) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapNeighbor.ProtoReflect.Descriptor instead.
+func (*PcapNeighbor) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *PcapNeighbor) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
+	}
+	return ""
+}
+
+func (x *PcapNeighbor) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *PcapNeighbor) GetPort() string {
+	if x != nil {
+		return x.Port
+	}
+	return ""
+}
+
+func (x *PcapNeighbor) GetPlatform() string {
+	if x != nil {
+		return x.Platform
+	}
+	return ""
+}
+
+func (x *PcapNeighbor) GetMgmtIp() string {
+	if x != nil {
+		return x.MgmtIp
+	}
+	return ""
+}
+
+func (x *PcapNeighbor) GetNativeVlan() uint32 {
+	if x != nil {
+		return x.NativeVlan
+	}
+	return 0
+}
+
+type PcapFlow struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Client        string                 `protobuf:"bytes,1,opt,name=client,proto3" json:"client,omitempty"`
+	Server        string                 `protobuf:"bytes,2,opt,name=server,proto3" json:"server,omitempty"`
+	Count         int64                  `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"` // intentos (SYN sin respuesta) o cantidad (RST)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapFlow) Reset() {
+	*x = PcapFlow{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapFlow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapFlow) ProtoMessage() {}
+
+func (x *PcapFlow) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapFlow.ProtoReflect.Descriptor instead.
+func (*PcapFlow) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *PcapFlow) GetClient() string {
+	if x != nil {
+		return x.Client
+	}
+	return ""
+}
+
+func (x *PcapFlow) GetServer() string {
+	if x != nil {
+		return x.Server
+	}
+	return ""
+}
+
+func (x *PcapFlow) GetCount() int64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+type PcapTcp struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Handshakes            int64                  `protobuf:"varint,1,opt,name=handshakes,proto3" json:"handshakes,omitempty"`
+	RttMinMs              float64                `protobuf:"fixed64,2,opt,name=rtt_min_ms,json=rttMinMs,proto3" json:"rtt_min_ms,omitempty"`
+	RttAvgMs              float64                `protobuf:"fixed64,3,opt,name=rtt_avg_ms,json=rttAvgMs,proto3" json:"rtt_avg_ms,omitempty"`
+	RttMaxMs              float64                `protobuf:"fixed64,4,opt,name=rtt_max_ms,json=rttMaxMs,proto3" json:"rtt_max_ms,omitempty"`
+	Retransmissions       int64                  `protobuf:"varint,5,opt,name=retransmissions,proto3" json:"retransmissions,omitempty"`
+	ZeroWindow            int64                  `protobuf:"varint,6,opt,name=zero_window,json=zeroWindow,proto3" json:"zero_window,omitempty"`
+	FailedHandshakesTotal int64                  `protobuf:"varint,7,opt,name=failed_handshakes_total,json=failedHandshakesTotal,proto3" json:"failed_handshakes_total,omitempty"`
+	FailedHandshakes      []*PcapFlow            `protobuf:"bytes,8,rep,name=failed_handshakes,json=failedHandshakes,proto3" json:"failed_handshakes,omitempty"`
+	Resets                []*PcapFlow            `protobuf:"bytes,9,rep,name=resets,proto3" json:"resets,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *PcapTcp) Reset() {
+	*x = PcapTcp{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapTcp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapTcp) ProtoMessage() {}
+
+func (x *PcapTcp) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapTcp.ProtoReflect.Descriptor instead.
+func (*PcapTcp) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *PcapTcp) GetHandshakes() int64 {
+	if x != nil {
+		return x.Handshakes
+	}
+	return 0
+}
+
+func (x *PcapTcp) GetRttMinMs() float64 {
+	if x != nil {
+		return x.RttMinMs
+	}
+	return 0
+}
+
+func (x *PcapTcp) GetRttAvgMs() float64 {
+	if x != nil {
+		return x.RttAvgMs
+	}
+	return 0
+}
+
+func (x *PcapTcp) GetRttMaxMs() float64 {
+	if x != nil {
+		return x.RttMaxMs
+	}
+	return 0
+}
+
+func (x *PcapTcp) GetRetransmissions() int64 {
+	if x != nil {
+		return x.Retransmissions
+	}
+	return 0
+}
+
+func (x *PcapTcp) GetZeroWindow() int64 {
+	if x != nil {
+		return x.ZeroWindow
+	}
+	return 0
+}
+
+func (x *PcapTcp) GetFailedHandshakesTotal() int64 {
+	if x != nil {
+		return x.FailedHandshakesTotal
+	}
+	return 0
+}
+
+func (x *PcapTcp) GetFailedHandshakes() []*PcapFlow {
+	if x != nil {
+		return x.FailedHandshakes
+	}
+	return nil
+}
+
+func (x *PcapTcp) GetResets() []*PcapFlow {
+	if x != nil {
+		return x.Resets
+	}
+	return nil
+}
+
+type PcapDnsQuery struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Client        string                 `protobuf:"bytes,1,opt,name=client,proto3" json:"client,omitempty"`
+	Server        string                 `protobuf:"bytes,2,opt,name=server,proto3" json:"server,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	Rcode         string                 `protobuf:"bytes,5,opt,name=rcode,proto3" json:"rcode,omitempty"`
+	LatencyMs     float64                `protobuf:"fixed64,6,opt,name=latency_ms,json=latencyMs,proto3" json:"latency_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapDnsQuery) Reset() {
+	*x = PcapDnsQuery{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapDnsQuery) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapDnsQuery) ProtoMessage() {}
+
+func (x *PcapDnsQuery) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapDnsQuery.ProtoReflect.Descriptor instead.
+func (*PcapDnsQuery) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *PcapDnsQuery) GetClient() string {
+	if x != nil {
+		return x.Client
+	}
+	return ""
+}
+
+func (x *PcapDnsQuery) GetServer() string {
+	if x != nil {
+		return x.Server
+	}
+	return ""
+}
+
+func (x *PcapDnsQuery) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PcapDnsQuery) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *PcapDnsQuery) GetRcode() string {
+	if x != nil {
+		return x.Rcode
+	}
+	return ""
+}
+
+func (x *PcapDnsQuery) GetLatencyMs() float64 {
+	if x != nil {
+		return x.LatencyMs
+	}
+	return 0
+}
+
+type PcapDns struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Queries       int64                  `protobuf:"varint,1,opt,name=queries,proto3" json:"queries,omitempty"`
+	Responses     int64                  `protobuf:"varint,2,opt,name=responses,proto3" json:"responses,omitempty"`
+	Errors        []*PcapDnsQuery        `protobuf:"bytes,3,rep,name=errors,proto3" json:"errors,omitempty"`
+	Slow          []*PcapDnsQuery        `protobuf:"bytes,4,rep,name=slow,proto3" json:"slow,omitempty"`
+	Unanswered    []*PcapDnsQuery        `protobuf:"bytes,5,rep,name=unanswered,proto3" json:"unanswered,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapDns) Reset() {
+	*x = PcapDns{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapDns) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapDns) ProtoMessage() {}
+
+func (x *PcapDns) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapDns.ProtoReflect.Descriptor instead.
+func (*PcapDns) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *PcapDns) GetQueries() int64 {
+	if x != nil {
+		return x.Queries
+	}
+	return 0
+}
+
+func (x *PcapDns) GetResponses() int64 {
+	if x != nil {
+		return x.Responses
+	}
+	return 0
+}
+
+func (x *PcapDns) GetErrors() []*PcapDnsQuery {
+	if x != nil {
+		return x.Errors
+	}
+	return nil
+}
+
+func (x *PcapDns) GetSlow() []*PcapDnsQuery {
+	if x != nil {
+		return x.Slow
+	}
+	return nil
+}
+
+func (x *PcapDns) GetUnanswered() []*PcapDnsQuery {
+	if x != nil {
+		return x.Unanswered
+	}
+	return nil
+}
+
+type PcapTlsHello struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Client        string                 `protobuf:"bytes,1,opt,name=client,proto3" json:"client,omitempty"`
+	Server        string                 `protobuf:"bytes,2,opt,name=server,proto3" json:"server,omitempty"`
+	Sni           string                 `protobuf:"bytes,3,opt,name=sni,proto3" json:"sni,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapTlsHello) Reset() {
+	*x = PcapTlsHello{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapTlsHello) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapTlsHello) ProtoMessage() {}
+
+func (x *PcapTlsHello) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapTlsHello.ProtoReflect.Descriptor instead.
+func (*PcapTlsHello) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *PcapTlsHello) GetClient() string {
+	if x != nil {
+		return x.Client
+	}
+	return ""
+}
+
+func (x *PcapTlsHello) GetServer() string {
+	if x != nil {
+		return x.Server
+	}
+	return ""
+}
+
+func (x *PcapTlsHello) GetSni() string {
+	if x != nil {
+		return x.Sni
+	}
+	return ""
+}
+
+type PcapIcmpEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	From          string                 `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
+	Target        string                 `protobuf:"bytes,2,opt,name=target,proto3" json:"target,omitempty"`
+	Code          int32                  `protobuf:"varint,3,opt,name=code,proto3" json:"code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapIcmpEvent) Reset() {
+	*x = PcapIcmpEvent{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapIcmpEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapIcmpEvent) ProtoMessage() {}
+
+func (x *PcapIcmpEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapIcmpEvent.ProtoReflect.Descriptor instead.
+func (*PcapIcmpEvent) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *PcapIcmpEvent) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *PcapIcmpEvent) GetTarget() string {
+	if x != nil {
+		return x.Target
+	}
+	return ""
+}
+
+func (x *PcapIcmpEvent) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+type PcapIcmp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Unreachable   []*PcapIcmpEvent       `protobuf:"bytes,1,rep,name=unreachable,proto3" json:"unreachable,omitempty"`
+	TtlExceeded   []*PcapIcmpEvent       `protobuf:"bytes,2,rep,name=ttl_exceeded,json=ttlExceeded,proto3" json:"ttl_exceeded,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapIcmp) Reset() {
+	*x = PcapIcmp{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapIcmp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapIcmp) ProtoMessage() {}
+
+func (x *PcapIcmp) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapIcmp.ProtoReflect.Descriptor instead.
+func (*PcapIcmp) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PcapIcmp) GetUnreachable() []*PcapIcmpEvent {
+	if x != nil {
+		return x.Unreachable
+	}
+	return nil
+}
+
+func (x *PcapIcmp) GetTtlExceeded() []*PcapIcmpEvent {
+	if x != nil {
+		return x.TtlExceeded
+	}
+	return nil
+}
+
+type PcapArpConflict struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ip            string                 `protobuf:"bytes,1,opt,name=ip,proto3" json:"ip,omitempty"`
+	Macs          []string               `protobuf:"bytes,2,rep,name=macs,proto3" json:"macs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapArpConflict) Reset() {
+	*x = PcapArpConflict{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapArpConflict) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapArpConflict) ProtoMessage() {}
+
+func (x *PcapArpConflict) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapArpConflict.ProtoReflect.Descriptor instead.
+func (*PcapArpConflict) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PcapArpConflict) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *PcapArpConflict) GetMacs() []string {
+	if x != nil {
+		return x.Macs
+	}
+	return nil
+}
+
+// Encabezado de sección que el texto imprime: key pcap.section.* y sus argumentos (el conflicto ARP lleva ip y macs).
+type PcapSection struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Args          map[string]string      `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"` // en el idioma pedido
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapSection) Reset() {
+	*x = PcapSection{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapSection) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapSection) ProtoMessage() {}
+
+func (x *PcapSection) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapSection.ProtoReflect.Descriptor instead.
+func (*PcapSection) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *PcapSection) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *PcapSection) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+func (x *PcapSection) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+// Aviso del análisis: key pcap.warn.* con sus argumentos y el texto en el idioma pedido.
+type PcapWarning struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Args          map[string]string      `protobuf:"bytes,2,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Text          string                 `protobuf:"bytes,3,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PcapWarning) Reset() {
+	*x = PcapWarning{}
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PcapWarning) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PcapWarning) ProtoMessage() {}
+
+func (x *PcapWarning) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PcapWarning.ProtoReflect.Descriptor instead.
+func (*PcapWarning) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *PcapWarning) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *PcapWarning) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+func (x *PcapWarning) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
 type AnalyzePcapResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Report        *ToolReport            `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	Summary       *PcapSummary           `protobuf:"bytes,2,opt,name=summary,proto3" json:"summary,omitempty"`
+	Conversations []*PcapConversation    `protobuf:"bytes,3,rep,name=conversations,proto3" json:"conversations,omitempty"`
+	TopTalkers    []*PcapTalker          `protobuf:"bytes,4,rep,name=top_talkers,json=topTalkers,proto3" json:"top_talkers,omitempty"`
+	Protocols     []*PcapProtocol        `protobuf:"bytes,5,rep,name=protocols,proto3" json:"protocols,omitempty"`
+	Neighbors     []*PcapNeighbor        `protobuf:"bytes,6,rep,name=neighbors,proto3" json:"neighbors,omitempty"`
+	Tcp           *PcapTcp               `protobuf:"bytes,7,opt,name=tcp,proto3" json:"tcp,omitempty"`
+	Dns           *PcapDns               `protobuf:"bytes,8,opt,name=dns,proto3" json:"dns,omitempty"`
+	Tls           []*PcapTlsHello        `protobuf:"bytes,9,rep,name=tls,proto3" json:"tls,omitempty"`
+	Icmp          *PcapIcmp              `protobuf:"bytes,10,opt,name=icmp,proto3" json:"icmp,omitempty"`
+	ArpConflicts  []*PcapArpConflict     `protobuf:"bytes,11,rep,name=arp_conflicts,json=arpConflicts,proto3" json:"arp_conflicts,omitempty"`
+	Fragments     int64                  `protobuf:"varint,12,opt,name=fragments,proto3" json:"fragments,omitempty"`
+	Warnings      []*PcapWarning         `protobuf:"bytes,13,rep,name=warnings,proto3" json:"warnings,omitempty"`
+	Sections      []*PcapSection         `protobuf:"bytes,14,rep,name=sections,proto3" json:"sections,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AnalyzePcapResponse) Reset() {
 	*x = AnalyzePcapResponse{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[1]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -158,7 +1205,7 @@ func (x *AnalyzePcapResponse) String() string {
 func (*AnalyzePcapResponse) ProtoMessage() {}
 
 func (x *AnalyzePcapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[1]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -171,12 +1218,103 @@ func (x *AnalyzePcapResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalyzePcapResponse.ProtoReflect.Descriptor instead.
 func (*AnalyzePcapResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{1}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AnalyzePcapResponse) GetReport() *ToolReport {
 	if x != nil {
 		return x.Report
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetSummary() *PcapSummary {
+	if x != nil {
+		return x.Summary
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetConversations() []*PcapConversation {
+	if x != nil {
+		return x.Conversations
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetTopTalkers() []*PcapTalker {
+	if x != nil {
+		return x.TopTalkers
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetProtocols() []*PcapProtocol {
+	if x != nil {
+		return x.Protocols
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetNeighbors() []*PcapNeighbor {
+	if x != nil {
+		return x.Neighbors
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetTcp() *PcapTcp {
+	if x != nil {
+		return x.Tcp
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetDns() *PcapDns {
+	if x != nil {
+		return x.Dns
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetTls() []*PcapTlsHello {
+	if x != nil {
+		return x.Tls
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetIcmp() *PcapIcmp {
+	if x != nil {
+		return x.Icmp
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetArpConflicts() []*PcapArpConflict {
+	if x != nil {
+		return x.ArpConflicts
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetFragments() int64 {
+	if x != nil {
+		return x.Fragments
+	}
+	return 0
+}
+
+func (x *AnalyzePcapResponse) GetWarnings() []*PcapWarning {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
+}
+
+func (x *AnalyzePcapResponse) GetSections() []*PcapSection {
+	if x != nil {
+		return x.Sections
 	}
 	return nil
 }
@@ -190,7 +1328,7 @@ type DnsResponse struct {
 
 func (x *DnsResponse) Reset() {
 	*x = DnsResponse{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -202,7 +1340,7 @@ func (x *DnsResponse) String() string {
 func (*DnsResponse) ProtoMessage() {}
 
 func (x *DnsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[2]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -215,7 +1353,7 @@ func (x *DnsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DnsResponse.ProtoReflect.Descriptor instead.
 func (*DnsResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{2}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *DnsResponse) GetReport() *ToolReport {
@@ -234,7 +1372,7 @@ type InspectTlsResponse struct {
 
 func (x *InspectTlsResponse) Reset() {
 	*x = InspectTlsResponse{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -246,7 +1384,7 @@ func (x *InspectTlsResponse) String() string {
 func (*InspectTlsResponse) ProtoMessage() {}
 
 func (x *InspectTlsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[3]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -259,7 +1397,7 @@ func (x *InspectTlsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InspectTlsResponse.ProtoReflect.Descriptor instead.
 func (*InspectTlsResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{3}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *InspectTlsResponse) GetReport() *ToolReport {
@@ -280,7 +1418,7 @@ type AnalyzePcapRequest struct {
 
 func (x *AnalyzePcapRequest) Reset() {
 	*x = AnalyzePcapRequest{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -292,7 +1430,7 @@ func (x *AnalyzePcapRequest) String() string {
 func (*AnalyzePcapRequest) ProtoMessage() {}
 
 func (x *AnalyzePcapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[4]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -305,7 +1443,7 @@ func (x *AnalyzePcapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalyzePcapRequest.ProtoReflect.Descriptor instead.
 func (*AnalyzePcapRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{4}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AnalyzePcapRequest) GetPath() string {
@@ -347,7 +1485,7 @@ type DnsRequest struct {
 
 func (x *DnsRequest) Reset() {
 	*x = DnsRequest{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -359,7 +1497,7 @@ func (x *DnsRequest) String() string {
 func (*DnsRequest) ProtoMessage() {}
 
 func (x *DnsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[5]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -372,7 +1510,7 @@ func (x *DnsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DnsRequest.ProtoReflect.Descriptor instead.
 func (*DnsRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{5}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *DnsRequest) GetMode() DnsMode {
@@ -443,7 +1581,7 @@ type InspectTlsRequest struct {
 
 func (x *InspectTlsRequest) Reset() {
 	*x = InspectTlsRequest{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -455,7 +1593,7 @@ func (x *InspectTlsRequest) String() string {
 func (*InspectTlsRequest) ProtoMessage() {}
 
 func (x *InspectTlsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[6]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -468,7 +1606,7 @@ func (x *InspectTlsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InspectTlsRequest.ProtoReflect.Descriptor instead.
 func (*InspectTlsRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{6}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *InspectTlsRequest) GetHost() string {
@@ -524,7 +1662,7 @@ type SyslogRequest struct {
 
 func (x *SyslogRequest) Reset() {
 	*x = SyslogRequest{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -536,7 +1674,7 @@ func (x *SyslogRequest) String() string {
 func (*SyslogRequest) ProtoMessage() {}
 
 func (x *SyslogRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[7]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -549,7 +1687,7 @@ func (x *SyslogRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyslogRequest.ProtoReflect.Descriptor instead.
 func (*SyslogRequest) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{7}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SyslogRequest) GetAddr() string {
@@ -670,7 +1808,7 @@ type SyslogResponse struct {
 
 func (x *SyslogResponse) Reset() {
 	*x = SyslogResponse{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -682,7 +1820,7 @@ func (x *SyslogResponse) String() string {
 func (*SyslogResponse) ProtoMessage() {}
 
 func (x *SyslogResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[8]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -695,7 +1833,7 @@ func (x *SyslogResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyslogResponse.ProtoReflect.Descriptor instead.
 func (*SyslogResponse) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{8}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *SyslogResponse) GetListening() string {
@@ -747,7 +1885,7 @@ type SyslogDrops struct {
 
 func (x *SyslogDrops) Reset() {
 	*x = SyslogDrops{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -759,7 +1897,7 @@ func (x *SyslogDrops) String() string {
 func (*SyslogDrops) ProtoMessage() {}
 
 func (x *SyslogDrops) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[9]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -772,7 +1910,7 @@ func (x *SyslogDrops) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyslogDrops.ProtoReflect.Descriptor instead.
 func (*SyslogDrops) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{9}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *SyslogDrops) GetTotal() uint64 {
@@ -827,7 +1965,7 @@ type SyslogSourceDrops struct {
 
 func (x *SyslogSourceDrops) Reset() {
 	*x = SyslogSourceDrops{}
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -839,7 +1977,7 @@ func (x *SyslogSourceDrops) String() string {
 func (*SyslogSourceDrops) ProtoMessage() {}
 
 func (x *SyslogSourceDrops) ProtoReflect() protoreflect.Message {
-	mi := &file_macuahuitl_v1_tools_proto_msgTypes[10]
+	mi := &file_macuahuitl_v1_tools_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -852,7 +1990,7 @@ func (x *SyslogSourceDrops) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyslogSourceDrops.ProtoReflect.Descriptor instead.
 func (*SyslogSourceDrops) Descriptor() ([]byte, []int) {
-	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{10}
+	return file_macuahuitl_v1_tools_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *SyslogSourceDrops) GetSource() string {
@@ -877,9 +2015,118 @@ const file_macuahuitl_v1_tools_proto_rawDesc = "" +
 	"\n" +
 	"ToolReport\x12\x12\n" +
 	"\x04json\x18\x01 \x01(\tR\x04json\x12\x12\n" +
-	"\x04text\x18\x02 \x01(\tR\x04text\"H\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\"\x88\x01\n" +
+	"\vPcapSummary\x12\x12\n" +
+	"\x04file\x18\x01 \x01(\tR\x04file\x12\x18\n" +
+	"\apackets\x18\x02 \x01(\x03R\apackets\x12\x14\n" +
+	"\x05bytes\x18\x03 \x01(\x03R\x05bytes\x12\x1f\n" +
+	"\vduration_ms\x18\x04 \x01(\x01R\n" +
+	"durationMs\x12\x14\n" +
+	"\x05start\x18\x05 \x01(\tR\x05start\"t\n" +
+	"\x10PcapConversation\x12\x14\n" +
+	"\x05proto\x18\x01 \x01(\tR\x05proto\x12\f\n" +
+	"\x01a\x18\x02 \x01(\tR\x01a\x12\f\n" +
+	"\x01b\x18\x03 \x01(\tR\x01b\x12\x18\n" +
+	"\apackets\x18\x04 \x01(\x03R\apackets\x12\x14\n" +
+	"\x05bytes\x18\x05 \x01(\x03R\x05bytes\"L\n" +
+	"\n" +
+	"PcapTalker\x12\x0e\n" +
+	"\x02ip\x18\x01 \x01(\tR\x02ip\x12\x18\n" +
+	"\apackets\x18\x02 \x01(\x03R\apackets\x12\x14\n" +
+	"\x05bytes\x18\x03 \x01(\x03R\x05bytes\"T\n" +
+	"\fPcapProtocol\x12\x14\n" +
+	"\x05proto\x18\x01 \x01(\tR\x05proto\x12\x18\n" +
+	"\apackets\x18\x02 \x01(\x03R\apackets\x12\x14\n" +
+	"\x05bytes\x18\x03 \x01(\x03R\x05bytes\"\xb1\x01\n" +
+	"\fPcapNeighbor\x12\x1a\n" +
+	"\bprotocol\x18\x01 \x01(\tR\bprotocol\x12\x1b\n" +
+	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x12\x12\n" +
+	"\x04port\x18\x03 \x01(\tR\x04port\x12\x1a\n" +
+	"\bplatform\x18\x04 \x01(\tR\bplatform\x12\x17\n" +
+	"\amgmt_ip\x18\x05 \x01(\tR\x06mgmtIp\x12\x1f\n" +
+	"\vnative_vlan\x18\x06 \x01(\rR\n" +
+	"nativeVlan\"P\n" +
+	"\bPcapFlow\x12\x16\n" +
+	"\x06client\x18\x01 \x01(\tR\x06client\x12\x16\n" +
+	"\x06server\x18\x02 \x01(\tR\x06server\x12\x14\n" +
+	"\x05count\x18\x03 \x01(\x03R\x05count\"\xfd\x02\n" +
+	"\aPcapTcp\x12\x1e\n" +
+	"\n" +
+	"handshakes\x18\x01 \x01(\x03R\n" +
+	"handshakes\x12\x1c\n" +
+	"\n" +
+	"rtt_min_ms\x18\x02 \x01(\x01R\brttMinMs\x12\x1c\n" +
+	"\n" +
+	"rtt_avg_ms\x18\x03 \x01(\x01R\brttAvgMs\x12\x1c\n" +
+	"\n" +
+	"rtt_max_ms\x18\x04 \x01(\x01R\brttMaxMs\x12(\n" +
+	"\x0fretransmissions\x18\x05 \x01(\x03R\x0fretransmissions\x12\x1f\n" +
+	"\vzero_window\x18\x06 \x01(\x03R\n" +
+	"zeroWindow\x126\n" +
+	"\x17failed_handshakes_total\x18\a \x01(\x03R\x15failedHandshakesTotal\x12D\n" +
+	"\x11failed_handshakes\x18\b \x03(\v2\x17.macuahuitl.v1.PcapFlowR\x10failedHandshakes\x12/\n" +
+	"\x06resets\x18\t \x03(\v2\x17.macuahuitl.v1.PcapFlowR\x06resets\"\x9b\x01\n" +
+	"\fPcapDnsQuery\x12\x16\n" +
+	"\x06client\x18\x01 \x01(\tR\x06client\x12\x16\n" +
+	"\x06server\x18\x02 \x01(\tR\x06server\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\x12\x14\n" +
+	"\x05rcode\x18\x05 \x01(\tR\x05rcode\x12\x1d\n" +
+	"\n" +
+	"latency_ms\x18\x06 \x01(\x01R\tlatencyMs\"\xe4\x01\n" +
+	"\aPcapDns\x12\x18\n" +
+	"\aqueries\x18\x01 \x01(\x03R\aqueries\x12\x1c\n" +
+	"\tresponses\x18\x02 \x01(\x03R\tresponses\x123\n" +
+	"\x06errors\x18\x03 \x03(\v2\x1b.macuahuitl.v1.PcapDnsQueryR\x06errors\x12/\n" +
+	"\x04slow\x18\x04 \x03(\v2\x1b.macuahuitl.v1.PcapDnsQueryR\x04slow\x12;\n" +
+	"\n" +
+	"unanswered\x18\x05 \x03(\v2\x1b.macuahuitl.v1.PcapDnsQueryR\n" +
+	"unanswered\"P\n" +
+	"\fPcapTlsHello\x12\x16\n" +
+	"\x06client\x18\x01 \x01(\tR\x06client\x12\x16\n" +
+	"\x06server\x18\x02 \x01(\tR\x06server\x12\x10\n" +
+	"\x03sni\x18\x03 \x01(\tR\x03sni\"O\n" +
+	"\rPcapIcmpEvent\x12\x12\n" +
+	"\x04from\x18\x01 \x01(\tR\x04from\x12\x16\n" +
+	"\x06target\x18\x02 \x01(\tR\x06target\x12\x12\n" +
+	"\x04code\x18\x03 \x01(\x05R\x04code\"\x8b\x01\n" +
+	"\bPcapIcmp\x12>\n" +
+	"\vunreachable\x18\x01 \x03(\v2\x1c.macuahuitl.v1.PcapIcmpEventR\vunreachable\x12?\n" +
+	"\fttl_exceeded\x18\x02 \x03(\v2\x1c.macuahuitl.v1.PcapIcmpEventR\vttlExceeded\"5\n" +
+	"\x0fPcapArpConflict\x12\x0e\n" +
+	"\x02ip\x18\x01 \x01(\tR\x02ip\x12\x12\n" +
+	"\x04macs\x18\x02 \x03(\tR\x04macs\"\xa8\x01\n" +
+	"\vPcapSection\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x128\n" +
+	"\x04args\x18\x02 \x03(\v2$.macuahuitl.v1.PcapSection.ArgsEntryR\x04args\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa6\x01\n" +
+	"\vPcapWarning\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x128\n" +
+	"\x04args\x18\x02 \x03(\v2$.macuahuitl.v1.PcapWarning.ArgsEntryR\x04args\x12\x12\n" +
+	"\x04text\x18\x03 \x01(\tR\x04text\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xfa\x05\n" +
 	"\x13AnalyzePcapResponse\x121\n" +
-	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\"@\n" +
+	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x124\n" +
+	"\asummary\x18\x02 \x01(\v2\x1a.macuahuitl.v1.PcapSummaryR\asummary\x12E\n" +
+	"\rconversations\x18\x03 \x03(\v2\x1f.macuahuitl.v1.PcapConversationR\rconversations\x12:\n" +
+	"\vtop_talkers\x18\x04 \x03(\v2\x19.macuahuitl.v1.PcapTalkerR\n" +
+	"topTalkers\x129\n" +
+	"\tprotocols\x18\x05 \x03(\v2\x1b.macuahuitl.v1.PcapProtocolR\tprotocols\x129\n" +
+	"\tneighbors\x18\x06 \x03(\v2\x1b.macuahuitl.v1.PcapNeighborR\tneighbors\x12(\n" +
+	"\x03tcp\x18\a \x01(\v2\x16.macuahuitl.v1.PcapTcpR\x03tcp\x12(\n" +
+	"\x03dns\x18\b \x01(\v2\x16.macuahuitl.v1.PcapDnsR\x03dns\x12-\n" +
+	"\x03tls\x18\t \x03(\v2\x1b.macuahuitl.v1.PcapTlsHelloR\x03tls\x12+\n" +
+	"\x04icmp\x18\n" +
+	" \x01(\v2\x17.macuahuitl.v1.PcapIcmpR\x04icmp\x12C\n" +
+	"\rarp_conflicts\x18\v \x03(\v2\x1e.macuahuitl.v1.PcapArpConflictR\farpConflicts\x12\x1c\n" +
+	"\tfragments\x18\f \x01(\x03R\tfragments\x126\n" +
+	"\bwarnings\x18\r \x03(\v2\x1a.macuahuitl.v1.PcapWarningR\bwarnings\x126\n" +
+	"\bsections\x18\x0e \x03(\v2\x1a.macuahuitl.v1.PcapSectionR\bsections\"@\n" +
 	"\vDnsResponse\x121\n" +
 	"\x06report\x18\x01 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\"G\n" +
 	"\x12InspectTlsResponse\x121\n" +
@@ -972,41 +2219,79 @@ func file_macuahuitl_v1_tools_proto_rawDescGZIP() []byte {
 }
 
 var file_macuahuitl_v1_tools_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_macuahuitl_v1_tools_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_macuahuitl_v1_tools_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_macuahuitl_v1_tools_proto_goTypes = []any{
 	(DnsMode)(0),                // 0: macuahuitl.v1.DnsMode
 	(*ToolReport)(nil),          // 1: macuahuitl.v1.ToolReport
-	(*AnalyzePcapResponse)(nil), // 2: macuahuitl.v1.AnalyzePcapResponse
-	(*DnsResponse)(nil),         // 3: macuahuitl.v1.DnsResponse
-	(*InspectTlsResponse)(nil),  // 4: macuahuitl.v1.InspectTlsResponse
-	(*AnalyzePcapRequest)(nil),  // 5: macuahuitl.v1.AnalyzePcapRequest
-	(*DnsRequest)(nil),          // 6: macuahuitl.v1.DnsRequest
-	(*InspectTlsRequest)(nil),   // 7: macuahuitl.v1.InspectTlsRequest
-	(*SyslogRequest)(nil),       // 8: macuahuitl.v1.SyslogRequest
-	(*SyslogResponse)(nil),      // 9: macuahuitl.v1.SyslogResponse
-	(*SyslogDrops)(nil),         // 10: macuahuitl.v1.SyslogDrops
-	(*SyslogSourceDrops)(nil),   // 11: macuahuitl.v1.SyslogSourceDrops
+	(*PcapSummary)(nil),         // 2: macuahuitl.v1.PcapSummary
+	(*PcapConversation)(nil),    // 3: macuahuitl.v1.PcapConversation
+	(*PcapTalker)(nil),          // 4: macuahuitl.v1.PcapTalker
+	(*PcapProtocol)(nil),        // 5: macuahuitl.v1.PcapProtocol
+	(*PcapNeighbor)(nil),        // 6: macuahuitl.v1.PcapNeighbor
+	(*PcapFlow)(nil),            // 7: macuahuitl.v1.PcapFlow
+	(*PcapTcp)(nil),             // 8: macuahuitl.v1.PcapTcp
+	(*PcapDnsQuery)(nil),        // 9: macuahuitl.v1.PcapDnsQuery
+	(*PcapDns)(nil),             // 10: macuahuitl.v1.PcapDns
+	(*PcapTlsHello)(nil),        // 11: macuahuitl.v1.PcapTlsHello
+	(*PcapIcmpEvent)(nil),       // 12: macuahuitl.v1.PcapIcmpEvent
+	(*PcapIcmp)(nil),            // 13: macuahuitl.v1.PcapIcmp
+	(*PcapArpConflict)(nil),     // 14: macuahuitl.v1.PcapArpConflict
+	(*PcapSection)(nil),         // 15: macuahuitl.v1.PcapSection
+	(*PcapWarning)(nil),         // 16: macuahuitl.v1.PcapWarning
+	(*AnalyzePcapResponse)(nil), // 17: macuahuitl.v1.AnalyzePcapResponse
+	(*DnsResponse)(nil),         // 18: macuahuitl.v1.DnsResponse
+	(*InspectTlsResponse)(nil),  // 19: macuahuitl.v1.InspectTlsResponse
+	(*AnalyzePcapRequest)(nil),  // 20: macuahuitl.v1.AnalyzePcapRequest
+	(*DnsRequest)(nil),          // 21: macuahuitl.v1.DnsRequest
+	(*InspectTlsRequest)(nil),   // 22: macuahuitl.v1.InspectTlsRequest
+	(*SyslogRequest)(nil),       // 23: macuahuitl.v1.SyslogRequest
+	(*SyslogResponse)(nil),      // 24: macuahuitl.v1.SyslogResponse
+	(*SyslogDrops)(nil),         // 25: macuahuitl.v1.SyslogDrops
+	(*SyslogSourceDrops)(nil),   // 26: macuahuitl.v1.SyslogSourceDrops
+	nil,                         // 27: macuahuitl.v1.PcapSection.ArgsEntry
+	nil,                         // 28: macuahuitl.v1.PcapWarning.ArgsEntry
 }
 var file_macuahuitl_v1_tools_proto_depIdxs = []int32{
-	1,  // 0: macuahuitl.v1.AnalyzePcapResponse.report:type_name -> macuahuitl.v1.ToolReport
-	1,  // 1: macuahuitl.v1.DnsResponse.report:type_name -> macuahuitl.v1.ToolReport
-	1,  // 2: macuahuitl.v1.InspectTlsResponse.report:type_name -> macuahuitl.v1.ToolReport
-	0,  // 3: macuahuitl.v1.DnsRequest.mode:type_name -> macuahuitl.v1.DnsMode
-	10, // 4: macuahuitl.v1.SyslogResponse.drops:type_name -> macuahuitl.v1.SyslogDrops
-	11, // 5: macuahuitl.v1.SyslogDrops.top:type_name -> macuahuitl.v1.SyslogSourceDrops
-	5,  // 6: macuahuitl.v1.ToolsService.AnalyzePcap:input_type -> macuahuitl.v1.AnalyzePcapRequest
-	6,  // 7: macuahuitl.v1.ToolsService.Dns:input_type -> macuahuitl.v1.DnsRequest
-	7,  // 8: macuahuitl.v1.ToolsService.InspectTls:input_type -> macuahuitl.v1.InspectTlsRequest
-	8,  // 9: macuahuitl.v1.ToolsService.Syslog:input_type -> macuahuitl.v1.SyslogRequest
-	2,  // 10: macuahuitl.v1.ToolsService.AnalyzePcap:output_type -> macuahuitl.v1.AnalyzePcapResponse
-	3,  // 11: macuahuitl.v1.ToolsService.Dns:output_type -> macuahuitl.v1.DnsResponse
-	4,  // 12: macuahuitl.v1.ToolsService.InspectTls:output_type -> macuahuitl.v1.InspectTlsResponse
-	9,  // 13: macuahuitl.v1.ToolsService.Syslog:output_type -> macuahuitl.v1.SyslogResponse
-	10, // [10:14] is the sub-list for method output_type
-	6,  // [6:10] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	7,  // 0: macuahuitl.v1.PcapTcp.failed_handshakes:type_name -> macuahuitl.v1.PcapFlow
+	7,  // 1: macuahuitl.v1.PcapTcp.resets:type_name -> macuahuitl.v1.PcapFlow
+	9,  // 2: macuahuitl.v1.PcapDns.errors:type_name -> macuahuitl.v1.PcapDnsQuery
+	9,  // 3: macuahuitl.v1.PcapDns.slow:type_name -> macuahuitl.v1.PcapDnsQuery
+	9,  // 4: macuahuitl.v1.PcapDns.unanswered:type_name -> macuahuitl.v1.PcapDnsQuery
+	12, // 5: macuahuitl.v1.PcapIcmp.unreachable:type_name -> macuahuitl.v1.PcapIcmpEvent
+	12, // 6: macuahuitl.v1.PcapIcmp.ttl_exceeded:type_name -> macuahuitl.v1.PcapIcmpEvent
+	27, // 7: macuahuitl.v1.PcapSection.args:type_name -> macuahuitl.v1.PcapSection.ArgsEntry
+	28, // 8: macuahuitl.v1.PcapWarning.args:type_name -> macuahuitl.v1.PcapWarning.ArgsEntry
+	1,  // 9: macuahuitl.v1.AnalyzePcapResponse.report:type_name -> macuahuitl.v1.ToolReport
+	2,  // 10: macuahuitl.v1.AnalyzePcapResponse.summary:type_name -> macuahuitl.v1.PcapSummary
+	3,  // 11: macuahuitl.v1.AnalyzePcapResponse.conversations:type_name -> macuahuitl.v1.PcapConversation
+	4,  // 12: macuahuitl.v1.AnalyzePcapResponse.top_talkers:type_name -> macuahuitl.v1.PcapTalker
+	5,  // 13: macuahuitl.v1.AnalyzePcapResponse.protocols:type_name -> macuahuitl.v1.PcapProtocol
+	6,  // 14: macuahuitl.v1.AnalyzePcapResponse.neighbors:type_name -> macuahuitl.v1.PcapNeighbor
+	8,  // 15: macuahuitl.v1.AnalyzePcapResponse.tcp:type_name -> macuahuitl.v1.PcapTcp
+	10, // 16: macuahuitl.v1.AnalyzePcapResponse.dns:type_name -> macuahuitl.v1.PcapDns
+	11, // 17: macuahuitl.v1.AnalyzePcapResponse.tls:type_name -> macuahuitl.v1.PcapTlsHello
+	13, // 18: macuahuitl.v1.AnalyzePcapResponse.icmp:type_name -> macuahuitl.v1.PcapIcmp
+	14, // 19: macuahuitl.v1.AnalyzePcapResponse.arp_conflicts:type_name -> macuahuitl.v1.PcapArpConflict
+	16, // 20: macuahuitl.v1.AnalyzePcapResponse.warnings:type_name -> macuahuitl.v1.PcapWarning
+	15, // 21: macuahuitl.v1.AnalyzePcapResponse.sections:type_name -> macuahuitl.v1.PcapSection
+	1,  // 22: macuahuitl.v1.DnsResponse.report:type_name -> macuahuitl.v1.ToolReport
+	1,  // 23: macuahuitl.v1.InspectTlsResponse.report:type_name -> macuahuitl.v1.ToolReport
+	0,  // 24: macuahuitl.v1.DnsRequest.mode:type_name -> macuahuitl.v1.DnsMode
+	25, // 25: macuahuitl.v1.SyslogResponse.drops:type_name -> macuahuitl.v1.SyslogDrops
+	26, // 26: macuahuitl.v1.SyslogDrops.top:type_name -> macuahuitl.v1.SyslogSourceDrops
+	20, // 27: macuahuitl.v1.ToolsService.AnalyzePcap:input_type -> macuahuitl.v1.AnalyzePcapRequest
+	21, // 28: macuahuitl.v1.ToolsService.Dns:input_type -> macuahuitl.v1.DnsRequest
+	22, // 29: macuahuitl.v1.ToolsService.InspectTls:input_type -> macuahuitl.v1.InspectTlsRequest
+	23, // 30: macuahuitl.v1.ToolsService.Syslog:input_type -> macuahuitl.v1.SyslogRequest
+	17, // 31: macuahuitl.v1.ToolsService.AnalyzePcap:output_type -> macuahuitl.v1.AnalyzePcapResponse
+	18, // 32: macuahuitl.v1.ToolsService.Dns:output_type -> macuahuitl.v1.DnsResponse
+	19, // 33: macuahuitl.v1.ToolsService.InspectTls:output_type -> macuahuitl.v1.InspectTlsResponse
+	24, // 34: macuahuitl.v1.ToolsService.Syslog:output_type -> macuahuitl.v1.SyslogResponse
+	31, // [31:35] is the sub-list for method output_type
+	27, // [27:31] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_tools_proto_init() }
@@ -1020,7 +2305,7 @@ func file_macuahuitl_v1_tools_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_tools_proto_rawDesc), len(file_macuahuitl_v1_tools_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   11,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -23,12 +23,31 @@ service CalcService {
 
 message CalcRow {
   repeated string cells = 1;
+  // Fase 30b: si la primera celda es una etiqueta fija (filas campo/valor, Total...), su clave del
+  // catálogo (calc.row.*) y sus argumentos; vacía si la celda es un dato.
+  string label_key = 2;
+  map<string, string> label_args = 3;
+}
+
+// Columna de una tabla: su clave del catálogo (calc.col.*).
+message CalcColumn {
+  string key = 1;
 }
 
 message CalcTable {
   string title = 1;
   repeated string head = 2;
   repeated CalcRow rows = 3;
+  // Fase 30b: título como clave (calc.title.*) con sus argumentos, y una columna por cada celda de head.
+  string title_key = 4;
+  map<string, string> title_args = 5;
+  repeated CalcColumn columns = 6;
+}
+
+// Nota con clave del catálogo (calc.note.*) y sus argumentos.
+message CalcNote {
+  string key = 1;
+  map<string, string> args = 2;
 }
 
 message CalcResult {
@@ -36,6 +55,8 @@ message CalcResult {
   string text = 2;
   repeated CalcTable tables = 3;
   repeated string notes = 4;
+  // Fase 30b: las mismas notas, una por una, con clave y argumentos (misma longitud y orden que notes).
+  repeated CalcNote notes_structured = 5;
 }
 
 message SubnetRequest {
