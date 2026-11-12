@@ -174,6 +174,13 @@ function Phases({ phases }: { phases: JobPhase[] }) {
     const key = `patrol.phase.${k}` as Key;
     return key in phaseKeys ? t(key, { round: p.round ?? 0 }) : k;
   };
+  // Con reason conocido el detalle sale de i18n; las fases viejas o un reason nuevo muestran el texto del núcleo.
+  const detail = (p: JobPhase) => {
+    const key = `patrol.phaseReason.${p.reason}` as Key;
+    if (!p.reason || !(key in phaseReasonKeys)) return p.detail;
+    const a = p.args ?? {};
+    return t(key, { ...a, n: Number(a.n), ok: t("patrol.phaseReason.ok", { n: Number(a.ok) }), excl: t("patrol.phaseReason.excluded", { n: Number(a.excluded) }) });
+  };
   return (
     <Section title={t("patrol.phases")}>
       {phases.length ? (
@@ -182,7 +189,7 @@ function Phases({ phases }: { phases: JobPhase[] }) {
             <li key={`${p.at}-${p.kind}-${p.round ?? 0}-${i}`} data-kind={p.kind.replace("JOB_PHASE_KIND_", "")}>
               <time dateTime={p.at}>{clock(p.at)}</time>
               <span className="phase-label">{label(p)}</span>
-              {p.detail && <span className="meta">{p.detail}</span>}
+              {detail(p) && <span className="meta">{detail(p)}</span>}
             </li>
           ))}
         </ol>
@@ -191,6 +198,9 @@ function Phases({ phases }: { phases: JobPhase[] }) {
   );
 }
 
+const phaseReasonKeys = Object.fromEntries(
+  ["devices", "devices_excluded", "ok_failed", "rounds", "packaged", "round_zip_failed", "close_failed", "before_arming", "core_stopped"].map((r) => [`patrol.phaseReason.phase.${r}`, true]),
+);
 const phaseKeys = Object.fromEntries(
   ["CREATED", "LOGIN_TEST_DONE", "ARMED", "ROUND_STARTED", "ROUND_FINISHED", "ROUND_SKIPPED", "PACKAGED", "COMPLETED", "CANCELLED", "FAILED", "ARM_CHECK_DONE"].map((k) => [`patrol.phase.${k}`, true]),
 );

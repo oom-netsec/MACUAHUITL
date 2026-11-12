@@ -1,6 +1,7 @@
 // Lógica del formulario genérico de plantillas: sin React, para probarla sola. La validación del cliente es solo ayuda; manda la del núcleo.
 import { countInterfaces, decimalOk, interfaceOk, intOk, ipv4Ok, maskOk, vlanOk } from "../../lib/validate";
 import type { SnippetField, SnippetTemplate } from "./api";
+import type { ErrInfo } from "../../lib/coreError";
 
 export const TECH_ORDER = ["l2", "l3", "gestion", "seguridad", "qos", "etherchannel"] as const;
 export const MAX_PORTS = 48;
@@ -80,17 +81,26 @@ export function parseCoreError(e: unknown): CoreError {
   return r ? { code: r[1], desc: r[2] } : { code: "", desc: m };
 }
 
-// El núcleo junta los problemas con «; » y cada uno dice «Etiqueta (nombre): motivo». Se asigna cada pieza al campo que nombra.
-// Lo que no nombre un campo conocido queda en `rest` para mostrarlo como aviso.
+const WHY = ["required", "range", "pattern", "choice", "type"] as const;
+/** Primer problema de un assist.invalid_value: campo del formulario y clave i18n de su motivo; null si el motivo no trae campo o `why` conocido. */
+export function firstInvalid(info: ErrInfo | undefined, fields: SnippetField[]): [string, `snippets.why.${typeof WHY[number]}`] | null {
+  const m = info?.metadata;
+  const why = WHY.find((w) => w === m?.why);
+  return info?.reason === "assist.invalid_value" && why && fields.some((f) => f.name === m?.field) ? [m!.field, `snippets.why.${why}`] : null;
+}
+
+// El núcleo junta los problemas con «; »; cada uno dice «Etiqueta (nombre): motivo» (es) o «nombre: motivo» / «nombre is required» (en).
+// Se asigna cada pieza al campo que nombra; lo que no nombre un campo conocido queda en `rest` para mostrarlo como aviso.
 export function mapInvalid(desc: string, fields: SnippetField[]): { byField: Record<string, string>; rest: string[] } {
   const byField: Record<string, string> = {};
   const rest: string[] = [];
   // «assist: valores del snippet inválidos: » precede a la primera pieza y la separaría de su campo.
   for (const piece of desc.replace(/^assist: [^:]+: /, "").split(/;\s+/).map((p) => p.trim()).filter(Boolean)) {
-    const f = fields.find((x) => piece.includes(`(${x.name})`)) ?? fields.find((x) => piece.includes(`"${x.name}"`));
+    const f = fields.find((x) => piece.includes(`(${x.name})`)) ?? fields.find((x) => piece.startsWith(`${x.name}: `) || piece === `${x.name} is required`)
+      ?? fields.find((x) => piece.includes(`"${x.name}"`));
     if (!f) { rest.push(piece); continue; }
     const after = piece.indexOf(`(${f.name}):`);
-    const text = after >= 0 ? piece.slice(after + f.name.length + 3).trim() : piece;
+    const text = after >= 0 ? piece.slice(after + f.name.length + 3).trim() : piece.startsWith(`${f.name}: `) ? piece.slice(f.name.length + 2) : piece;
     byField[f.name] = byField[f.name] ? `${byField[f.name]}; ${text}` : text;
   }
   return { byField, rest };

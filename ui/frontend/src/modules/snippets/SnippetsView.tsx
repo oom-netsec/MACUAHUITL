@@ -9,7 +9,8 @@ import type { PortsPlanResult } from "../ports/api";
 import { useVaultVersion } from "../../lib/vaultSignal";
 import type { SnippetTemplate } from "./api";
 import { FieldInput, useTx } from "./FieldInput";
-import { formReady, groupTemplates, initialValues, mapInvalid, parseCoreError, valuesToSend } from "./form";
+import { errInfo } from "../../lib/coreError";
+import { firstInvalid, formReady, groupTemplates, initialValues, mapInvalid, parseCoreError, valuesToSend } from "./form";
 
 const techLabel: Record<string, Key> = {
   l2: "snippets.tech.l2", l3: "snippets.tech.l3", gestion: "snippets.tech.gestion", seguridad: "snippets.tech.seguridad", qos: "snippets.tech.qos", etherchannel: "snippets.tech.etherchannel",
@@ -83,11 +84,15 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
     } catch (e) {
       if (mine !== seq.current) return;
       const { code, desc } = parseCoreError(e);
+      const info = errInfo(e);
       if (code === "InvalidArgument") {
         const { byField, rest } = mapInvalid(desc, sel.fields);
+        const first = firstInvalid(info, sel.fields); // el texto del núcleo (con valor y rango) manda; el motivo solo ubica el campo si el texto no lo nombra
+        if (first && !byField[first[0]]) byField[first[0]] = t(first[1]);
         setFieldErr(byField);
         if (rest.length) setErr(rest.join("; "));
-      } else if (code === "FailedPrecondition") setWarn(desc); // el equipo no puede recibir el cambio: se muestra el motivo tal cual
+      } else if (info?.reason === "assist.refused") setWarn(t("snippets.refused", { why: desc.replace(/^assist: [^:]+: /, "") }));
+      else if (code === "FailedPrecondition") setWarn(desc); // el equipo no puede recibir el cambio: se muestra el motivo tal cual
       else setErr(desc);
     }
   };

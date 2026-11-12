@@ -4,6 +4,7 @@ import { PatrolView, parseTargets } from "./PatrolView";
 import { DeviceGrid } from "./DeviceGrid";
 import { activeMs, elapsed } from "./format";
 import { fakeCore } from "../../lib/fake";
+import { I18nProvider, LanguageSwitch } from "../../lib/i18n";
 
 test("parseTargets normaliza comas, espacios, saltos y CIDR sin duplicados", () => {
   expect(parseTargets("10.0.0.1, 10.0.0.2\n10.0.1.0/30  sw1\n10.0.0.1")).toEqual(["10.0.0.1", "10.0.0.2", "10.0.1.0/30", "sw1"]);
@@ -109,6 +110,29 @@ test("el panel de trabajos muestra estado, tiempo, ronda y equipos", async () =>
   expect(job).toHaveTextContent("correctos: 8 · con fallas: 1 · 10 equipos");
   expect(within(panel).getByRole("button", { name: /previo/ })).toHaveTextContent("Finalizado");
   expect(core.subscribe).toHaveBeenCalledWith(["j9"]);
+});
+
+test("las fases con reason se arman con i18n (plurales incluidos); sin reason o desconocido sale p.detail", async () => {
+  const core = fakeCore({
+    listJobs: vi.fn(async () => [{
+      id: "j8", name: "con-reason", state: "armed", armedAt: ago(10), round: 1, rounds: 0,
+      phases: [
+        { at: ago(12), kind: "JOB_PHASE_KIND_CREATED", detail: "texto del núcleo", reason: "phase.devices", args: { n: "1" } },
+        { at: ago(11), kind: "JOB_PHASE_KIND_LOGIN_TEST_DONE", detail: "x", reason: "phase.ok_failed", args: { ok: "1", failed: "3" } },
+        { at: ago(10), kind: "JOB_PHASE_KIND_ARMED", detail: "3 equipos, 2 excluidos", reason: "phase.devices_excluded", args: { n: "3", excluded: "2" } },
+        { at: ago(9), kind: "JOB_PHASE_KIND_ROUND_FINISHED", round: 1, detail: "detalle crudo", reason: "phase.futura", args: {} },
+        { at: ago(8), kind: "JOB_PHASE_KIND_PACKAGED", detail: "/tmp/x.zip", reason: "phase.packaged", args: { path: "/tmp/x.zip" } },
+      ],
+    }] as never),
+  });
+  render(<PatrolView core={core} />);
+  const phases = await screen.findByRole("list", { name: "Fases" });
+  expect(within(phases).getByText("1 equipo")).toBeInTheDocument();
+  expect(within(phases).getByText("1 correcto, 3 con fallas")).toBeInTheDocument();
+  expect(within(phases).getByText("3 equipos, 2 excluidos")).toBeInTheDocument();
+  expect(within(phases).getByText("detalle crudo")).toBeInTheDocument();
+  expect(within(phases).getByText("/tmp/x.zip")).toBeInTheDocument();
+  expect(within(phases).queryByText("texto del núcleo")).not.toBeInTheDocument();
 });
 
 test("la línea de fases combina el historial y los eventos en vivo", async () => {
@@ -242,6 +266,20 @@ test("si el núcleo no da el catálogo, se avisa y los comandos pegados siguen f
   expect(await screen.findByText(/No se pudo leer el catálogo/)).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
   await waitFor(() => expect(core.createJob).toHaveBeenCalled());
+});
+
+test("el catálogo de playbooks se vuelve a pedir al cambiar de idioma (el núcleo devuelve los nombres en ese idioma)", async () => {
+  const listPlaybooks = vi.fn().mockResolvedValue([{ id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: [] }]);
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks });
+  let confirm = () => {};
+  const onLang = (l: string) => (l === "en" ? new Promise<void>((r) => { confirm = r; }) : undefined);
+  render(<I18nProvider onLang={onLang}><LanguageSwitch /><PatrolView core={core} /></I18nProvider>);
+  await screen.findByRole("checkbox", { name: "STP" });
+  expect(listPlaybooks).toHaveBeenCalledTimes(1);
+  await userEvent.click(screen.getByRole("radio", { name: "English" }));
+  expect(listPlaybooks).toHaveBeenCalledTimes(1); // aún no: el núcleo no confirmó el idioma y contestaría en el anterior
+  await act(async () => confirm());
+  await waitFor(() => expect(listPlaybooks).toHaveBeenCalledTimes(2));
 });
 
 test("el catálogo que falló se puede reintentar", async () => {

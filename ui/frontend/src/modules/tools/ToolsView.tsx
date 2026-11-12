@@ -6,6 +6,7 @@ import { Icon } from "../../components/Icon";
 import { Terminal } from "../../components/Terminal";
 import { useBusy, useInbox } from "../../app/activity";
 import { useT } from "../../lib/i18n";
+import { errInfo, type ErrInfo } from "../../lib/coreError";
 import type { Key } from "../../lib/i18n/es";
 import { SyslogTable } from "./SyslogTable";
 import { IngestOptionsBox } from "../../components/ingest/IngestOptions";
@@ -156,15 +157,15 @@ export function SyslogPanel({ core }: { core: CoreAPI }) {
   useBusy(!!runId);
 
   // Un error de inicio llega como done{error} (el RPC es un stream) o como rechazo de syslogStart: se marca junto al campo que nombra, o va en un aviso.
-  const showError = (raw: string) => {
+  const showError = (raw: string, info?: ErrInfo) => {
     const m = errorText(new Error(raw));
-    if (!o.mapError(m)) setErr(m);
+    if (!o.mapError(m, info)) setErr(m);
   };
 
   const apply = (e: SyslogEvent) => {
     if (e.done) {
       batch.flush();
-      if (e.error) showError(e.error);
+      if (e.error) showError(e.error, e.errorInfo);
       setStatus(t("syslog.stopped"));
       runRef.current = "";
       setRunId("");
@@ -209,7 +210,7 @@ export function SyslogPanel({ core }: { core: CoreAPI }) {
       early.forEach(apply);
     } catch (e) {
       starting.current = false;
-      showError(errorText(e));
+      showError(errorText(e), errInfo(e));
     }
   };
   const stop = () => core.diagCancel(runId).catch((e) => setErr(errorText(e)));

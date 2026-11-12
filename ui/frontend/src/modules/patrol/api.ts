@@ -4,7 +4,7 @@ import { Events } from "@wailsio/runtime";
 export interface LoginResult { target: string; passed: boolean; failedStep: string; detail: string; platform: string; fingerprint: string }
 export interface ArmResult { windowEndsAt: string; missingInhibitors: string[] | null }
 // Fase del historial de un trabajo; kind es el nombre del enum (JOB_PHASE_KIND_*).
-export interface JobPhase { at: string; kind: string; round?: number; detail?: string }
+export interface JobPhase { at: string; kind: string; round?: number; detail?: string; reason?: string; args?: Record<string, string> }
 // Los campos opcionales vienen del núcleo; un núcleo anterior no los manda.
 export interface Job {
   id: string; name: string; state: string;

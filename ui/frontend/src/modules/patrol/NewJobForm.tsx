@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { CoreAPI, Credential, JobSpec } from "../../lib/core";
 import { Check, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
 import { Section } from "../../components/Page";
-import { useT } from "../../lib/i18n";
+import { useCoreLang, useT } from "../../lib/i18n";
 import { outputsErrorText } from "../../lib/outputsError";
 import type { Key } from "../../lib/i18n/es";
 import type { PlaybookInfo } from "./api";
@@ -16,6 +16,7 @@ export function parseTargets(text: string): string[] {
 // Crea el trabajo; el Login Test y el armado se hacen después, desde el detalle del trabajo.
 export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: Credential[]; onCreated: (id: string) => void }) {
   const t = useT();
+  const coreLang = useCoreLang();
   const [name, setName] = useState("");
   const [targets, setTargets] = useState("");
   const [cred, setCred] = useState("");
@@ -24,7 +25,14 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
   const [pbErr, setPbErr] = useState(false);
   const [pbs, setPbs] = useState<string[]>([]);
   const [pbTry, setPbTry] = useState(0); // el núcleo pudo estar arrancando: reintentar sin rehacer el formulario
-  useEffect(() => { setPbErr(false); core.listPlaybooks().then(setCatalog).catch(() => setPbErr(true)); }, [core, pbTry]);
+  // Los nombres vienen en el idioma del núcleo: se piden cuando el núcleo ya tiene el de la interfaz.
+  useEffect(() => {
+    if (!coreLang) return;
+    let off = false; // una respuesta tardía en el idioma anterior no pisa la nueva
+    setPbErr(false);
+    core.listPlaybooks().then((c) => { if (!off) setCatalog(c); }).catch(() => { if (!off) setPbErr(true); });
+    return () => { off = true; };
+  }, [core, pbTry, coreLang]);
   const [out, setOut] = useState("");
   const [minutes, setMinutes] = useState("0");
   const [rounds, setRounds] = useState("1");

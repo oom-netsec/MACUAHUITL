@@ -1,4 +1,4 @@
-import { buildOpts, emptyForm, mapStartError, previewName, rangeOf, validateOpts, type OptForm } from "./ingestOpts";
+import { buildOpts, coreFieldError, emptyForm, mapStartError, previewName, rangeOf, validateOpts, type OptForm } from "./ingestOpts";
 
 const form = (p: Partial<OptForm>): OptForm => ({ ...emptyForm, ...p });
 
@@ -63,6 +63,19 @@ test("mapStartError reconoce el campo que nombra el núcleo", () => {
   expect(m("syslogd: el host debe ser una IP local, no \"8.8.8.8\"")).toBe("addr");
   expect(m("flows: dirección de escucha inválida \"x\": address x: missing port in address")).toBe("addr"); // texto real de internal/diag/listen
   expect(m("syslogd: archivo de salida: permiso denegado")).toBeNull();
+});
+
+test("coreFieldError mapea metadata.field de ingest.invalid al campo y arma el texto con i18n", () => {
+  const t = (k: string, v?: Record<string, string | number>) => `${k}${v ? JSON.stringify(v) : ""}`;
+  const inv = (metadata: Record<string, string>) => ({ code: "InvalidArgument", reason: "ingest.invalid", metadata });
+  expect(coreFieldError(inv({ field: "rate_per_source", min: "1", max: "10000", value: "20000" }), t)).toEqual(["ratePerSource", 'syslog.err.range{"lo":"1","hi":"10000"}']);
+  expect(coreFieldError(inv({ field: "queue_size", min: "64", max: "65536" }), t)?.[0]).toBe("queueSize");
+  expect(coreFieldError(inv({ field: "name_template", template_problem: "chars", ch: "'/'" }), t)).toEqual(["nameTemplate", `syslog.err.tplCh{"ch":"'/'"}`]); // el núcleo cita el carácter (strconv.QuoteRune)
+  expect(coreFieldError(inv({ field: "name_template", template_problem: "need" }), t)).toEqual(["nameTemplate", "syslog.err.tplNeed"]);
+  expect(coreFieldError(inv({ field: "format", value: "x" }), t)).toEqual(["format", 'syslog.err.coreValue{"value":"x"}']);
+  expect(coreFieldError(inv({ field: "addr" }), t)).toEqual(["addr", ""]); // se muestra el texto del núcleo
+  expect(coreFieldError(inv({ field: "protocol", value: "x" }), t)).toBeNull(); // no es campo del formulario
+  expect(coreFieldError({ code: "InvalidArgument", reason: "otro", metadata: { field: "addr" } }, t)).toBeNull();
 });
 
 test("flujos: defaults de tasa propios, plantilla propia y sin topes cuando no se guarda", () => {

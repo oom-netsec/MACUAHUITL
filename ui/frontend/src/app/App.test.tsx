@@ -10,6 +10,19 @@ import { useNav } from "./activity";
 const nav = () => screen.getByRole("navigation", { name: "Secciones" });
 const item = (name: RegExp) => within(nav()).getByRole("button", { name });
 
+// El núcleo pudo no estar al arrancar (o reiniciarse): al volver se le manda otra vez el idioma, si no contesta en español.
+test("al reconectar el núcleo se le manda otra vez el idioma de la interfaz", async () => {
+  const core = fakeCore();
+  render(<App core={core} />);
+  await act(async () => {});
+  expect(core.setPreference).toHaveBeenCalledTimes(1);
+  act(() => core.emitStatus("disconnected"));
+  act(() => core.emitStatus("connected"));
+  await act(async () => {}); // la llamada sale en fila, tras la anterior
+  expect(core.setPreference).toHaveBeenCalledTimes(2);
+  expect(core.setPreference).toHaveBeenLastCalledWith("ui.language", "es");
+});
+
 test("muestra el aviso de núcleo desconectado y lo quita al reconectar", async () => {
   const core = fakeCore();
   render(<App core={core} />);
