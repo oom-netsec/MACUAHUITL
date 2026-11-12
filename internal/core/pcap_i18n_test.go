@@ -3,7 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,9 +29,9 @@ func writePcap(t *testing.T, truncate bool) string {
 	w := pcapgo.NewWriter(f)
 	w.WriteFileHeader(65535, layers.LinkTypeEthernet)
 	at := time.Date(2026, 11, 6, 18, 0, 0, 0, time.UTC)
-	macA, macB := net.HardwareAddr{0, 1, 2, 3, 4, 5}, net.HardwareAddr{0, 1, 2, 3, 4, 6}
+	macA, macB := []byte{0, 1, 2, 3, 4, 5}, []byte{0, 1, 2, 3, 4, 6}
 	send := func(d time.Duration, src, dst string, l4 gopacket.SerializableLayer, extra ...gopacket.SerializableLayer) {
-		ip := &layers.IPv4{Version: 4, IHL: 5, TTL: 64, SrcIP: net.ParseIP(src).To4(), DstIP: net.ParseIP(dst).To4()}
+		ip := &layers.IPv4{Version: 4, IHL: 5, TTL: 64, SrcIP: netip.MustParseAddr(src).AsSlice(), DstIP: netip.MustParseAddr(dst).AsSlice()}
 		switch x := l4.(type) {
 		case *layers.TCP:
 			ip.Protocol = layers.IPProtocolTCP
