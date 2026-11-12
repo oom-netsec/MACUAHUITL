@@ -7,10 +7,10 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-// validLang acepta es, en o una etiqueta con guion (es-MX, en-US).
+// validLang acepta es, en o una etiqueta cuyo idioma principal sea es o en (es-MX, en-US).
 func validLang(v string) bool {
-	v = strings.ToLower(v)
-	return v == "es" || v == "en" || (strings.Contains(v, "-") && !strings.HasPrefix(v, "-") && !strings.HasSuffix(v, "-"))
+	primary, _, _ := strings.Cut(strings.ToLower(v), "-")
+	return primary == "es" || primary == "en"
 }
 
 // StripLang quita la bandera global --lang X, --lang=X, -lang X o -lang=X, que solo vale ANTES del subcomando (se

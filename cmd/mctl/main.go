@@ -83,12 +83,19 @@ var outIsTTY = func(w io.Writer) bool {
 
 func run(args []string, stdin io.Reader, out io.Writer) error {
 	usage := cli.Help(areas)
-	if len(args) == 1 && (args[0] == "--version" || args[0] == "-version") {
-		fmt.Fprintln(out, version.String())
-		return nil
+	// Ayuda y versión también valen con las banderas globales delante (--lang en --help).
+	info := func(args []string) (done bool) {
+		switch {
+		case len(args) == 1 && (args[0] == "--version" || args[0] == "-version"):
+			fmt.Fprintln(out, version.String())
+		case len(args) == 1 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help"):
+			fmt.Fprintln(out, usage)
+		default:
+			return false
+		}
+		return true
 	}
-	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help") {
-		fmt.Fprintln(out, usage)
+	if info(args) {
 		return nil
 	}
 	if len(args) < 1 {
@@ -101,6 +108,9 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	args, lang, err := cli.StripLang(args)
 	if err != nil {
 		return err
+	}
+	if info(args) {
+		return nil
 	}
 	if len(args) < 1 {
 		return errors.New(usage)
