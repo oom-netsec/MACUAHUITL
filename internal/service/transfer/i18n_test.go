@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -97,7 +98,7 @@ func transferenciaCasos(t *testing.T, ctx context.Context) map[string]string {
 	put("redirigir_protocolo", err)
 
 	// Una descarga buena: el informe de texto. Un servidor que rechaza el origen y otro archivo no publicado.
-	run := startServer(t, s, &v1.StartServerRequest{Protocol: "http", Listen: "127.0.0.1:0", FromDir: pub})
+	run := startServerIn(t, s, ctx, &v1.StartServerRequest{Protocol: "http", Listen: "127.0.0.1:0", FromDir: pub})
 	resp, err := s.Get(ctx, &v1.GetRequest{Url: "http://" + run.ready.Listening + "/r1.cfg", DestDir: tmp()})
 	if err != nil {
 		put("descarga", err)
@@ -110,7 +111,7 @@ func transferenciaCasos(t *testing.T, ctx context.Context) map[string]string {
 	_, err = s.Get(ctx, &v1.GetRequest{Url: "http://" + run.ready.Listening + "/nope.cfg", DestDir: tmp()})
 	put("descarga_no_publicada", err)
 	run.transfers(t, 2)
-	closed := startServer(t, s, &v1.StartServerRequest{Protocol: "http", Listen: "127.0.0.1:0", FromDir: pub, Allow: []string{"10.9.9.9"}})
+	closed := startServerIn(t, s, ctx, &v1.StartServerRequest{Protocol: "http", Listen: "127.0.0.1:0", FromDir: pub, Allow: []string{"10.9.9.9"}})
 	_, err = s.Get(ctx, &v1.GetRequest{Url: "http://" + closed.ready.Listening + "/r1.cfg", DestDir: tmp()})
 	put("descarga_origen", err)
 	for i, ev := range closed.transfers(t, 1) {
@@ -140,4 +141,43 @@ func TestTransferenciasRegresionEs(t *testing.T) {
 			}
 		}
 	}
+}
+
+// Con en, los errores, el informe y los motivos de rechazo salen en inglés, sin español.
+func TestTransferenciasEnSinEspanol(t *testing.T) {
+	es := regexp.MustCompile(`[áéíóúñ¿]|\b(el|la|los|las|de|del|con|sin|para|solo|hay|ya|falta|una|un|abre|usa|indica|tope|máximo|bytes en|guardado|permitido)\b`)
+	base := transferenciaCasos(t, context.Background())
+	for k, v := range transferenciaCasos(t, i18n.WithLocale(context.Background(), "en")) {
+		if v == base[k] && strings.HasPrefix(v, "ERROR") && !strings.Contains(v, "HTTP 40") && k != "get_ruta_larga" && k != "servidor_archivo_no_existe" {
+			t.Errorf("%s: en igual a es: %s", k, v)
+		}
+		if m := es.FindString(v); m != "" {
+			i := strings.Index(v, m)
+			t.Errorf("%s: queda español (%q): ...%s...", k, m, v[max(0, i-30):min(len(v), i+50)])
+		}
+	}
+	got := transferenciaCasos(t, i18n.WithLocale(context.Background(), "en"))
+	if got["rechazo_origen"] != "origin not allowed" || !strings.HasPrefix(got["descarga_informe"], "saved  <dir>/r1.cfg (12 bytes in <t>)\nMD5 ") {
+		t.Errorf("rechazo %q informe %q", got["rechazo_origen"], got["descarga_informe"])
+	}
+}
+
+// startServerIn es startServer con el idioma de base en el contexto del stream.
+func startServerIn(t *testing.T, s *svc, base context.Context, req *v1.StartServerRequest) *running {
+	t.Helper()
+	ctx, cancel := context.WithCancel(base)
+	st := &fakeStream{ctx: ctx, out: make(chan *v1.StartServerResponse, 64)}
+	r := &running{out: st.out, done: make(chan error, 1), stop: cancel}
+	go func() { r.done <- s.StartServer(req, st) }()
+	select {
+	case ev := <-st.out:
+		r.ready = ev.GetReady()
+	case err := <-r.done:
+		cancel()
+		t.Fatalf("StartServer: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("el servidor no abrió")
+	}
+	t.Cleanup(func() { cancel(); <-r.done })
+	return r
 }

@@ -20,6 +20,8 @@ import (
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Servidor SSH efímero con solo dos usos: `scp` (fuente -f y destino -t) y el subsistema
@@ -250,7 +252,7 @@ func payloadString(p []byte) string {
 func parseSCP(cmd string) (mode byte, path string, err error) {
 	f := strings.Split(cmd, " ")
 	if len(f) < 3 || f[0] != "scp" {
-		return 0, "", errors.New("solo se permite scp")
+		return 0, "", i18n.New("fileserve.reason.scp_only", nil)
 	}
 	i := 1
 	for ; i < len(f) && strings.HasPrefix(f[i], "-"); i++ {
@@ -259,34 +261,34 @@ func parseSCP(cmd string) (mode byte, path string, err error) {
 			break
 		}
 		if len(f[i]) < 2 {
-			return 0, "", errors.New("opción inválida")
+			return 0, "", i18n.New("fileserve.reason.bad_option", nil)
 		}
 		for _, o := range f[i][1:] {
 			switch o {
 			case 't', 'f':
 				if mode != 0 && mode != byte(o) {
-					return 0, "", errors.New("-t y -f a la vez")
+					return 0, "", i18n.New("fileserve.reason.t_and_f", nil)
 				}
 				mode = byte(o)
 			case 'v', 'p', 'd', 'q':
 			default:
-				return 0, "", fmt.Errorf("opción -%c no permitida", o)
+				return 0, "", i18n.New("fileserve.reason.option_not_allowed", i18n.A("opt", string(o)))
 			}
 		}
 	}
 	if mode == 0 || len(f)-i != 1 {
-		return 0, "", errors.New("se esperaba -t o -f y una sola ruta")
+		return 0, "", i18n.New("fileserve.reason.expected_tf", nil)
 	}
 	path = f[i]
 	if n := len(path); n >= 2 && (path[0] == '\'' && path[n-1] == '\'' || path[0] == '"' && path[n-1] == '"') {
 		path = path[1 : n-1]
 	}
 	if strings.ContainsAny(path, "'\"\\`$;&|<>") || path == "" {
-		return 0, "", errors.New("ruta no permitida")
+		return 0, "", i18n.New("fileserve.reason.path_not_allowed", nil)
 	}
 	for _, r := range path {
 		if r < 0x20 || r == 0x7f {
-			return 0, "", errors.New("ruta con caracteres de control")
+			return 0, "", i18n.New("fileserve.reason.path_control", nil)
 		}
 	}
 	return mode, path, nil
@@ -316,7 +318,7 @@ func readScpLine(br *bufio.Reader) (string, error) {
 		}
 		b = append(b, c)
 	}
-	return "", errors.New("línea de control demasiado larga")
+	return "", i18n.New("fileserve.reason.ctl_line_long", nil)
 }
 
 // scpSink recibe archivos (scp -t): el equipo sube, p. ej. `copy running-config scp://…`.
@@ -338,7 +340,7 @@ func (s *sshConn) scpSink(ch ssh.Channel, target, client string) error {
 		}
 		if line == "" {
 			scpFail(ch, "línea vacía")
-			return errors.New("línea vacía")
+			return i18n.New("fileserve.reason.empty_line", nil)
 		}
 		switch line[0] {
 		case 'T': // fecha y hora: se ignoran
@@ -379,7 +381,7 @@ func (s *sshConn) scpSink(ch ssh.Channel, target, client string) error {
 		if err == nil {
 			var ack byte
 			if ack, err = br.ReadByte(); err == nil && ack != 0 {
-				err = errors.New("el cliente abortó")
+				err = i18n.New("fileserve.reason.client_abort", nil)
 			}
 		}
 		if err != nil {
@@ -410,7 +412,7 @@ func (s *sshConn) scpSource(ch ssh.Channel, path, client string) error {
 			return err
 		}
 		if one[0] != 0 {
-			return errors.New("el cliente abortó")
+			return i18n.New("fileserve.reason.client_abort", nil)
 		}
 		return nil
 	}
@@ -422,7 +424,7 @@ func (s *sshConn) scpSource(ch ssh.Channel, path, client string) error {
 	if !s.src.enabled() {
 		scpFail(ch, "lectura deshabilitada")
 		s.reject(client, "lectura deshabilitada")
-		return errors.New("lectura deshabilitada")
+		return i18n.New("fileserve.reason.read_disabled", nil)
 	}
 	f, fi, err := s.src.open(name)
 	if err != nil {
@@ -502,7 +504,7 @@ func (h *sftpHandler) abortOpen() {
 	h.mu.Unlock()
 	for c := range open {
 		if w, ok := c.(*sftpWriter); ok {
-			w.fail(errors.New("sesión cerrada antes de terminar"))
+			w.fail(i18n.New("fileserve.reason.session_closed", nil))
 		}
 		c.Close()
 	}

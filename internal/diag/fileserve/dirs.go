@@ -1,11 +1,12 @@
 package fileserve
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // sensitiveDirs son carpetas donde ni se publica ni se recibe nada: ni ellas ni lo que
@@ -61,7 +62,7 @@ func OpenDir(dir string, extraDeny ...string) (*os.Root, string, error) {
 	}
 	if rst, err := root.Stat("."); err != nil || !os.SameFile(st, rst) {
 		root.Close()
-		return nil, "", fmt.Errorf("fileserve: la carpeta %s cambió mientras se abría", real)
+		return nil, "", i18n.New("fileserve.err.dir_changed", i18n.A("dir", real))
 	}
 	return root, real, nil
 }
@@ -69,18 +70,18 @@ func OpenDir(dir string, extraDeny ...string) (*os.Root, string, error) {
 // validateDir devuelve también el Lstat de la carpeta validada (para compararlo con lo que se abre).
 func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	if !filepath.IsAbs(dir) {
-		return "", nil, fmt.Errorf("fileserve: la carpeta %q debe ser una ruta absoluta", dir)
+		return "", nil, i18n.New("fileserve.err.dir_relative", i18n.A("dir", dir))
 	}
 	clean := filepath.Clean(dir)
 	st, err := os.Lstat(clean)
 	if err != nil {
-		return "", nil, fmt.Errorf("fileserve: la carpeta no existe o no se puede leer: %w", err)
+		return "", nil, i18n.New("fileserve.err.dir_unreadable", i18n.A("error", err.Error()))
 	}
 	if st.Mode()&os.ModeSymlink != 0 {
-		return "", nil, fmt.Errorf("fileserve: %s es un enlace simbólico; indica la ruta real de la carpeta", clean)
+		return "", nil, i18n.New("fileserve.err.dir_symlink", i18n.A("dir", clean))
 	}
 	if !st.IsDir() {
-		return "", nil, fmt.Errorf("fileserve: %s no es una carpeta", clean)
+		return "", nil, i18n.New("fileserve.err.dir_not_dir", i18n.A("dir", clean))
 	}
 	real, err := filepath.EvalSymlinks(clean)
 	if err != nil {
@@ -89,16 +90,16 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	for _, d := range denyList(extraDeny) {
 		for _, p := range []string{clean, real} {
 			if inside(p, d) {
-				return "", nil, fmt.Errorf("fileserve: la carpeta %s es sensible (%s): elige otra", p, d)
+				return "", nil, i18n.New("fileserve.err.dir_sensitive", i18n.A("dir", p, "deny", d))
 			}
 		}
 	}
 	if real == "/" || clean == "/" {
-		return "", nil, errors.New("fileserve: la carpeta raíz no se puede usar: elige otra")
+		return "", nil, i18n.New("fileserve.err.dir_root", nil)
 	}
 	if home, err := os.UserHomeDir(); err == nil && filepath.IsAbs(home) {
 		if hr, err := filepath.EvalSymlinks(home); err == nil && (real == hr || clean == filepath.Clean(home)) {
-			return "", nil, errors.New("fileserve: tu carpeta personal completa no se puede usar (tiene los archivos que el shell y el escritorio cargan solos): elige una subcarpeta")
+			return "", nil, i18n.New("fileserve.err.dir_home", nil)
 		}
 	}
 	return real, st, nil

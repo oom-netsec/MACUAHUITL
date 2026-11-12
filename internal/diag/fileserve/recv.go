@@ -13,6 +13,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
@@ -21,10 +22,10 @@ import (
 // sistema de archivos por su cuenta.
 
 var (
-	errExists  = errors.New("el archivo ya existe")
-	errTooBig  = errors.New("excede el tope de tamaño por archivo")
-	errTotal   = errors.New("excede el tope total de lo recibido")
-	errTooMany = errors.New("demasiados archivos recibidos")
+	errExists  = i18n.New("fileserve.reason.exists", nil)
+	errTooBig  = i18n.New("fileserve.reason.too_big", nil)
+	errTotal   = i18n.New("fileserve.reason.total", nil)
+	errTooMany = i18n.New("fileserve.reason.too_many_files", nil)
 )
 
 // SafeName deja solo el nombre base de lo que pide el equipo: lo que haya antes del último
@@ -38,26 +39,26 @@ func SafeName(raw string) (string, error) {
 		raw = raw[i+1:]
 	}
 	if strings.TrimSpace(raw) == "" {
-		return "", errors.New("nombre de archivo vacío o inválido")
+		return "", i18n.New("fileserve.reason.name_empty", nil)
 	}
 	if raw != strings.TrimSpace(raw) {
-		return "", errors.New("el nombre empieza o termina con espacios")
+		return "", i18n.New("fileserve.reason.name_spaces", nil)
 	}
 	if raw[0] == '.' {
-		return "", errors.New("el nombre no puede empezar con punto")
+		return "", i18n.New("fileserve.reason.name_dot", nil)
 	}
 	if len(raw) > 200 {
-		return "", errors.New("nombre de archivo demasiado largo")
+		return "", i18n.New("fileserve.reason.name_long", nil)
 	}
 	if !utf8.ValidString(raw) {
-		return "", errors.New("el nombre no es UTF-8 válido")
+		return "", i18n.New("fileserve.reason.name_utf8", nil)
 	}
 	for _, r := range raw {
 		if unicode.IsControl(r) {
-			return "", errors.New("el nombre tiene caracteres de control")
+			return "", i18n.New("fileserve.reason.name_control", nil)
 		}
 		if unicode.Is(unicode.Cf, r) {
-			return "", errors.New("el nombre tiene caracteres de formato invisibles")
+			return "", i18n.New("fileserve.reason.name_format", nil)
 		}
 	}
 	return raw, nil
@@ -76,7 +77,7 @@ type receiver struct {
 // newReceiver abre dir (ya validada) como Root; prepare usa newReceiverIn con la que abrió OpenDir.
 func newReceiver(dir string, maxFile, maxTotal int64) (*receiver, error) {
 	if !filepath.IsAbs(dir) {
-		return nil, fmt.Errorf("fileserve: la carpeta de recepción %q debe ser absoluta", dir)
+		return nil, i18n.New("fileserve.err.recv_relative", i18n.A("dir", dir))
 	}
 	root, err := os.OpenRoot(dir)
 	if err != nil {
@@ -179,7 +180,7 @@ func (w *recvFile) WriteAt(p []byte, off int64) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.done || off < 0 || end < off {
-		return 0, errors.New("archivo cerrado o desplazamiento inválido")
+		return 0, i18n.New("fileserve.reason.bad_offset", nil)
 	}
 	if end > w.size {
 		if end > w.r.maxFile {

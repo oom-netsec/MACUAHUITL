@@ -225,14 +225,14 @@ func linkTo(t *testing.T, dir string) string {
 
 func TestDefaultPortsAreHigh(t *testing.T) {
 	for p, want := range map[string]string{"tftp": "127.0.0.1:6969", "ftp": "127.0.0.1:2121", "scp": "127.0.0.1:2222", "sftp": "127.0.0.1:2222", "http": "127.0.0.1:8080"} {
-		if got, err := listenAddr(p, "127.0.0.1"); err != nil || got != want {
+		if got, err := listenAddr(context.Background(), p, "127.0.0.1"); err != nil || got != want {
 			t.Errorf("%s: %q %v", p, got, err)
 		}
-		if got, _ := listenAddr(p, "127.0.0.1"); strings.HasSuffix(got, ":69") || strings.HasSuffix(got, ":21") || strings.HasSuffix(got, ":22") {
+		if got, _ := listenAddr(context.Background(), p, "127.0.0.1"); strings.HasSuffix(got, ":69") || strings.HasSuffix(got, ":21") || strings.HasSuffix(got, ":22") {
 			t.Errorf("%s: puerto privilegiado por omisión", p)
 		}
 	}
-	if got, _ := listenAddr("tftp", "::1"); got != "[::1]:6969" {
+	if got, _ := listenAddr(context.Background(), "tftp", "::1"); got != "[::1]:6969" {
 		t.Errorf("IPv6: %q", got)
 	}
 }

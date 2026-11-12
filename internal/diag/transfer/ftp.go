@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type ftpConn struct {
@@ -45,7 +47,7 @@ func (c *lineCapConn) Read(p []byte) (int, error) {
 
 func cleanFTP(s string) error {
 	if strings.ContainsAny(s, "\r\n\x00") {
-		return errors.New("transfer: texto con saltos de línea o NUL")
+		return i18n.New("xfer.err.ftp_text", nil)
 	}
 	return nil
 }
@@ -78,7 +80,7 @@ func (r *Request) ftpLogin(ctx context.Context) (*ftpConn, error) {
 	}
 	if code == 331 {
 		if _, _, err := c.cmd(230, 0, "PASS %s", pass); err != nil {
-			return fail(errors.New("el servidor FTP rechazó las credenciales"))
+			return fail(i18n.New("xfer.err.ftp_creds", nil))
 		}
 	}
 	if _, _, err := c.cmd(200, 0, "TYPE I"); err != nil {
@@ -102,23 +104,32 @@ func (c *ftpConn) cmd(a, b int, format string, args ...any) (int, string, error)
 
 // ftpReplyError es una respuesta del servidor que no era la esperada; Code deja decidir (p. ej. MLSD no soportado → LIST).
 type ftpReplyError struct {
-	Code int
-	msg  string
+	Code  int
+	msg   string
+	cause error // el error con código del catálogo, si la respuesta no era la esperada
 }
 
 func (e *ftpReplyError) Error() string { return e.msg }
+
+// Unwrap deja ver el error con código del catálogo (si lo hay) para darlo en otro idioma.
+func (e *ftpReplyError) Unwrap() error { return e.cause }
+
+func newUnexpected(code int, msg string, want int) *ftpReplyError {
+	c := i18n.New("xfer.err.ftp_reply", i18n.A("code", code, "message", msg, "want", want))
+	return &ftpReplyError{code, c.Error(), c}
+}
 
 func (c *ftpConn) resp(a, b int) (int, string, error) {
 	code, msg, err := c.tp.ReadResponse(0)
 	if err != nil {
 		var pe *textproto.Error
 		if errors.As(err, &pe) {
-			return pe.Code, pe.Msg, &ftpReplyError{pe.Code, fmt.Sprintf("FTP %d %s", pe.Code, pe.Msg)}
+			return pe.Code, pe.Msg, &ftpReplyError{pe.Code, fmt.Sprintf("FTP %d %s", pe.Code, pe.Msg), nil}
 		}
 		return 0, "", err
 	}
 	if code != a && (b == 0 || code != b) {
-		return code, msg, &ftpReplyError{code, fmt.Sprintf("FTP respondió %d %s (esperaba %d)", code, msg, a)}
+		return code, msg, newUnexpected(code, msg, a)
 	}
 	return code, msg, nil
 }
@@ -142,7 +153,7 @@ func (c *ftpConn) data(ctx context.Context) (net.Conn, error) {
 		}
 	}
 	if port <= 0 || port > 65535 {
-		return nil, errors.New("el servidor FTP no ofreció un puerto pasivo")
+		return nil, i18n.New("xfer.err.ftp_passive", nil)
 	}
 	dc, err := c.r.Net.Dial(ctx, "tcp", c.host, uint16(port))
 	if err != nil {

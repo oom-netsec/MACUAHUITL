@@ -23,12 +23,14 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 )
@@ -40,7 +42,7 @@ const (
 	MaxTimeout      = 4 * time.Hour
 )
 
-var errTooBig = errors.New("la transferencia excede el tope de tamaño")
+var errTooBig = i18n.New("xfer.err.too_big", nil)
 
 // Net es la única puerta de salida. Dial es TCP; Packet abre un socket UDP sin conectar
 // (TFTP contesta desde otro puerto). En la app, ambas pasan por el EgressGuard.
@@ -106,7 +108,7 @@ func Port(u *url.URL) (uint16, error) {
 	if p := u.Port(); p != "" {
 		var n uint16
 		if _, err := fmt.Sscanf(p, "%d", &n); err != nil || n == 0 {
-			return 0, fmt.Errorf("transfer: puerto inválido %q", p)
+			return 0, i18n.New("xfer.err.port", i18n.A("port", p))
 		}
 		return n, nil
 	}
@@ -122,12 +124,12 @@ func Port(u *url.URL) (uint16, error) {
 	case "https":
 		return 443, nil
 	}
-	return 0, fmt.Errorf("transfer: esquema %q no soportado (tftp, ftp, scp, sftp, http, https)", u.Scheme)
+	return 0, i18n.New("xfer.err.scheme_all", i18n.A("scheme", u.Scheme))
 }
 
 func (r *Request) limits() (int64, error) {
 	if r.Timeout > MaxTimeout {
-		return 0, fmt.Errorf("transfer: el tiempo máximo es %s", MaxTimeout)
+		return 0, i18n.New("xfer.err.max_time", i18n.A("max", MaxTimeout))
 	}
 	if r.MaxBytes <= 0 {
 		return DefaultMaxBytes, nil
@@ -140,12 +142,12 @@ func (r *Request) limits() (int64, error) {
 func remotePath(u *url.URL) (string, error) {
 	p := strings.TrimPrefix(u.Path, "/")
 	if p == "" || strings.HasSuffix(p, "/") || strings.HasPrefix(p, "-") { // "-" inicial sería una opción de scp
-		return "", errors.New("transfer: la URL debe nombrar un archivo")
+		return "", i18n.New("xfer.err.name_url", nil)
 	}
 	for _, c := range p {
 		ok := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune("._-/:@+,=~", c)
 		if !ok {
-			return "", fmt.Errorf("transfer: carácter %q no permitido en la ruta remota", c)
+			return "", i18n.New("xfer.err.char", i18n.A("char", strconv.QuoteRune(c)))
 		}
 	}
 	return p, nil
@@ -182,7 +184,7 @@ func Download(ctx context.Context, r Request) (Result, error) {
 		return res, err
 	}
 	if r.URL == nil {
-		return res, errors.New("transfer: falta la URL")
+		return res, i18n.New("xfer.err.no_url", nil)
 	}
 	if _, err := Port(r.URL); err != nil {
 		return res, err
@@ -209,7 +211,7 @@ func Download(ctx context.Context, r Request) (Result, error) {
 	dst := filepath.Join(dir, name)
 	f, err := sys.OpenNewIn(root, name)
 	if errors.Is(err, os.ErrExist) {
-		return res, fmt.Errorf("transfer: %s ya existe: no se sobrescribe", dst)
+		return res, i18n.New("xfer.err.exists", i18n.A("path", dst))
 	}
 	if err != nil {
 		return res, fmt.Errorf("transfer: %w", err)
@@ -237,7 +239,7 @@ func Download(ctx context.Context, r Request) (Result, error) {
 		if (r.WantSHA256 != "" && normHex(r.WantSHA256) != res.SHA256) || (r.WantMD5 != "" && normHex(r.WantMD5) != res.MD5) {
 			res.Verified = "distinto"
 			root.Remove(name) // una imagen que no coincide no se deja lista para instalar
-			return res, fmt.Errorf("transfer: el resumen no coincide (SHA-256 %s, MD5 %s): se descartó el archivo", res.SHA256, res.MD5)
+			return res, i18n.New("xfer.err.digest", i18n.A("sha256", res.SHA256, "md5", res.MD5))
 		}
 	}
 	return res, nil
@@ -256,7 +258,7 @@ func (r *Request) fetch(ctx context.Context, w io.Writer) error {
 	case "http", "https":
 		return r.httpGet(ctx, w)
 	}
-	return fmt.Errorf("transfer: esquema %q no soportado", r.URL.Scheme)
+	return i18n.New("xfer.err.scheme", i18n.A("scheme", r.URL.Scheme))
 }
 
 // Upload envía FromDir/Name a la URL.
@@ -267,7 +269,7 @@ func Upload(ctx context.Context, r Request) (Result, error) {
 		return res, err
 	}
 	if r.URL == nil {
-		return res, errors.New("transfer: falta la URL")
+		return res, i18n.New("xfer.err.no_url", nil)
 	}
 	if r.URL.Scheme == "http" || r.URL.Scheme == "https" {
 		return res, errors.New("transfer: HTTP solo baja archivos")

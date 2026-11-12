@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 const (
@@ -37,7 +39,7 @@ func parseRequest(b []byte) (request, error) {
 	}
 	r := request{op: binary.BigEndian.Uint16(b)}
 	if r.op != opRRQ && r.op != opWRQ {
-		return request{}, errors.New("no es una solicitud")
+		return request{}, i18n.New("fileserve.reason.not_request", nil)
 	}
 	f := bytes.Split(b[2:], []byte{0})
 	if len(f) < 3 || len(f[len(f)-1]) != 0 { // debe terminar en \0
@@ -168,7 +170,7 @@ type xfer struct {
 	tries   int
 }
 
-var errPeer = errors.New("el cliente abortó")
+var errPeer = i18n.New("fileserve.reason.client_abort", nil)
 
 // exchange envía pkt y espera el ACK del bloque indicado; reenvía al vencer el plazo.
 // Los ACK duplicados se ignoran sin reenviar (síndrome del aprendiz de brujo, RFC 1123).
@@ -324,7 +326,7 @@ func (x *xfer) awaitData(pkt []byte, block uint16, blk int) ([]byte, error) {
 				}
 				if n > 4+blk {
 					x.conn.WriteTo(errPacket(4, "bloque mayor que blksize"), x.peer)
-					return nil, errors.New("bloque mayor que blksize")
+					return nil, i18n.New("fileserve.reason.block_size", nil)
 				}
 				return append([]byte(nil), buf[4:n]...), nil
 			case opERROR:

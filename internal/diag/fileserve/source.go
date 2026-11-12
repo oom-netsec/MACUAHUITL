@@ -1,17 +1,16 @@
 package fileserve
 
 import (
-	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"slices"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
-var errNotPublished = errors.New("archivo no publicado")
+var errNotPublished = i18n.New("fileserve.reason.not_published", nil)
 
 const maxListed = 1000
 
@@ -157,7 +156,7 @@ func OpenFrom(dir, name string, deny ...string) (*os.File, os.FileInfo, error) {
 	defer root.Close() // el archivo abierto sigue siendo válido
 	f, fi, err := (&source{dir: real, root: root}).open(name)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fileserve: %q no es un archivo regular de %s", name, real)
+		return nil, nil, i18n.New("fileserve.err.not_regular_in", i18n.A("name", name, "dir", real))
 	}
 	return f, fi, nil
 }

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // FTP pasivo mínimo (RFC 959 con EPSV de RFC 2428). Solo: USER/PASS, TYPE, PASV/EPSV,
@@ -31,21 +33,21 @@ const (
 func parseFTP(line string) (cmd, arg string, err error) {
 	line = strings.TrimRight(line, "\r\n")
 	if len(line) > maxFTPLine {
-		return "", "", errors.New("línea demasiado larga")
+		return "", "", i18n.New("fileserve.reason.line_long", nil)
 	}
 	for _, r := range line {
 		if r < 0x20 || r == 0x7f {
-			return "", "", errors.New("caracteres de control")
+			return "", "", i18n.New("fileserve.reason.control_chars", nil)
 		}
 	}
 	cmd, arg, _ = strings.Cut(line, " ")
 	cmd = strings.ToUpper(cmd)
 	if len(cmd) < 3 || len(cmd) > 4 {
-		return "", "", errors.New("orden inválida")
+		return "", "", i18n.New("fileserve.reason.bad_command", nil)
 	}
 	for _, r := range cmd {
 		if r < 'A' || r > 'Z' {
-			return "", "", errors.New("orden inválida")
+			return "", "", i18n.New("fileserve.reason.bad_command", nil)
 		}
 	}
 	return cmd, strings.TrimLeft(arg, " "), nil
@@ -64,7 +66,7 @@ func readFTPLine(br *bufio.Reader) (string, error) {
 		}
 		b = append(b, c)
 	}
-	return "", errors.New("línea demasiado larga")
+	return "", i18n.New("fileserve.reason.line_long", nil)
 }
 
 func serveFTP(ctx context.Context, c Config, src *source, rcv *receiver) error {

@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
@@ -78,21 +77,24 @@ func (s *svc) close() {
 }
 
 // receiveDir crea la carpeta de recepción por omisión: outputs/recibidos/<sello>-<id>/.
-func (s *svc) receiveDir(id string) (string, error) {
+func (s *svc) receiveDir(ctx context.Context, id string) (string, error) {
 	dir := filepath.Join(s.d.Outputs(), "recibidos", s.d.Now().Format("20060102-150405")+"-"+id[len(id)-6:])
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return "", status.Errorf(codes.Internal, "carpeta de recepción: %v", err)
+		return "", service.Err(ctx, codes.Internal, "transfer.svc.recv_dir", i18n.A("error", err.Error()))
 	}
 	return dir, nil
 }
 
-func bad(format string, a ...any) error { return status.Errorf(codes.InvalidArgument, format, a...) }
+// bad es el error de uso de la petición: el código del catálogo (transfer.svc.*) y sus argumentos.
+func bad(ctx context.Context, key string, kv ...any) error {
+	return service.Err(ctx, codes.InvalidArgument, key, i18n.A(kv...))
+}
 
 // listenAddr completa el puerto alto por omisión cuando solo llega la IP.
-func listenAddr(proto, listen string) (string, error) {
+func listenAddr(ctx context.Context, proto, listen string) (string, error) {
 	port, ok := defaultPort[proto]
 	if !ok {
-		return "", bad("protocolo %q no soportado (tftp, ftp, scp, sftp o http)", proto)
+		return "", bad(ctx, "transfer.svc.bad_proto", "proto", proto)
 	}
 	if ip, err := netip.ParseAddr(strings.Trim(listen, "[]")); err == nil {
 		return netip.AddrPortFrom(ip, port).String(), nil
@@ -102,7 +104,8 @@ func listenAddr(proto, listen string) (string, error) {
 
 func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartServerServer) error {
 	s.d.MarkActive()
-	addr, err := listenAddr(r.Protocol, r.Listen)
+	ctx := st.Context()
+	addr, err := listenAddr(ctx, r.Protocol, r.Listen)
 	if err != nil {
 		return err
 	}
@@ -110,7 +113,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	for _, a := range r.Allow {
 		ip, err := netip.ParseAddr(strings.TrimSpace(a))
 		if err != nil {
-			return bad("IP de origen inválida %q", a)
+			return bad(ctx, "transfer.svc.bad_origin", "ip", a)
 		}
 		allow = append(allow, ip)
 	}
@@ -119,29 +122,29 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 		Write: r.Write, RecvDir: r.RecvDir, MaxFile: r.MaxFileBytes, MaxTotal: r.MaxTotalBytes, Allow: allow,
 		Legacy: r.LegacySsh, PassivePorts: [2]uint16{uint16(r.PassivePortMin), uint16(r.PassivePortMax)}}
 	if r.PassivePortMin > 65535 || r.PassivePortMax > 65535 || r.PassivePortMin > r.PassivePortMax {
-		return bad("rango de puertos pasivos inválido")
+		return bad(ctx, "transfer.svc.passive")
 	}
 	if r.Write && r.RecvDir == "" {
-		if cfg.RecvDir, err = s.receiveDir(id); err != nil {
+		if cfg.RecvDir, err = s.receiveDir(ctx, id); err != nil {
 			return err
 		}
 	}
 	if err := fileserve.Check(cfg); err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	if s.ctx.Err() != nil {
-		return status.Error(codes.Unavailable, "el núcleo se está cerrando")
+		return service.Err(ctx, codes.Unavailable, "transfer.svc.closing", nil)
 	}
 	s.mu.Lock()
 	if len(s.servers) >= maxServers {
 		s.mu.Unlock()
-		return status.Errorf(codes.ResourceExhausted, "máximo %d servidores abiertos", maxServers)
+		return service.Err(ctx, codes.ResourceExhausted, "transfer.svc.max_servers", i18n.A("max", maxServers))
 	}
 	dur := defaultServeFor
 	if r.DurationSeconds > 0 {
 		dur = min(time.Duration(r.DurationSeconds)*time.Second, maxServeFor)
 	}
-	ctx, cancel := context.WithTimeout(st.Context(), dur)
+	sctx, cancel := context.WithTimeout(ctx, dur)
 	defer cancel()
 	srv := &server{id: id, proto: r.Protocol, started: s.d.Now(), write: r.Write, cancel: cancel}
 	s.servers[id] = srv
@@ -153,12 +156,13 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 		select {
 		case <-s.ctx.Done():
 			cancel()
-		case <-ctx.Done():
+		case <-sctx.Done():
 		}
 	}()
 
 	k := newSink(st.Send)
-	cfg.OnTransfer = func(t fileserve.Transfer) { k.onTransfer(s.d.Audit, srv, t) }
+	loc := i18n.Locale(ctx)
+	cfg.OnTransfer = func(t fileserve.Transfer) { k.onTransfer(s.d.Audit, srv, t, loc) }
 	cfg.OnReady = func(rd fileserve.Ready) {
 		from, recv := fileserve.Folders(cfg)
 		s.mu.Lock()
@@ -175,7 +179,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 			ServerId: id, Protocol: r.Protocol, Listening: rd.Addr, Hint: fileserve.ServerHint(cfg, rd, names),
 			User: rd.User, Password: rd.Pass, Fingerprints: rd.Fingerprints, RecvDir: recv, FromDir: from, Files: names}}}
 	}
-	err = fileserve.Serve(ctx, cfg)
+	err = fileserve.Serve(sctx, cfg)
 	s.mu.Lock()
 	listening := srv.listening
 	s.mu.Unlock()
@@ -187,7 +191,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	}
 	s.d.Audit("transfer.serve.close", listening, fmt.Sprintf("server=%s proto=%s transfers=%d rejected=%d reason=%q", id, r.Protocol, n, rejected, reason))
 	if err != nil {
-		return status.Error(codes.Unavailable, err.Error())
+		return service.ErrFrom(ctx, codes.Unavailable, err)
 	}
 	return nil
 }
@@ -220,15 +224,15 @@ func (s *svc) ListServers(context.Context, *v1.ListServersRequest) (*v1.ListServ
 	return out, nil
 }
 
-func (s *svc) RedirectHint(_ context.Context, r *v1.RedirectHintRequest) (*v1.RedirectHintResponse, error) {
+func (s *svc) RedirectHint(ctx context.Context, r *v1.RedirectHintRequest) (*v1.RedirectHintResponse, error) {
 	if r.Ip != "" {
 		if _, err := netip.ParseAddr(strings.Trim(r.Ip, "[]")); err != nil {
-			return nil, bad("IP de escucha inválida %q", r.Ip)
+			return nil, bad(ctx, "transfer.svc.bad_listen", "ip", r.Ip)
 		}
 	}
 	h := fileserve.RedirectHint(r.Protocol, r.Ip, int(r.Port))
 	if h == "" || r.Port <= 0 || r.Port > 65535 {
-		return nil, bad("protocolo %q sin puerto privilegiado o puerto inválido", r.Protocol)
+		return nil, bad(ctx, "transfer.svc.no_redirect", "proto", r.Protocol)
 	}
 	std := map[string]int32{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22}[r.Protocol]
 	return &v1.RedirectHintResponse{StandardPort: std, Nftables: h, Setcap: fileserve.SetcapHint("RUTA-DEL-SERVIDOR"), Remove: fileserve.RedirectCleanup(r.Protocol, r.Ip, int(r.Port))}, nil
@@ -253,8 +257,11 @@ func newSink(send func(*v1.StartServerResponse) error) *sink {
 	return k
 }
 
-func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.Transfer) {
-	b, _ := json.Marshal(t)
+// onTransfer reenvía la transferencia al cliente con su motivo en el idioma loc; la auditoría lo lleva en inglés.
+func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.Transfer, loc string) {
+	shown := t
+	shown.Error = fileserve.ReasonIn(loc, t.Error)
+	b, _ := json.Marshal(shown)
 	ev := &v1.StartServerResponse{Event: &v1.StartServerResponse_TransferJson{TransferJson: string(b)}}
 	if t.Rejected {
 		k.rejected.Add(1)
@@ -268,7 +275,7 @@ func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.T
 	k.n.Add(1)
 	srv.transfers.Add(1)
 	audit("transfer.serve.transfer", t.Client, fmt.Sprintf("server=%s proto=%s direction=%s file=%q path=%q bytes=%d sha256=%s duration=%s result=%s %s",
-		srv.id, t.Proto, service.DirEN(t.Dir), t.File, t.Path, t.Bytes, t.SHA256, t.Duration.Round(time.Millisecond), t.Result, t.Error))
+		srv.id, t.Proto, service.DirEN(t.Dir), t.File, t.Path, t.Bytes, t.SHA256, t.Duration.Round(time.Millisecond), t.Result, fileserve.ReasonIn(i18n.En, t.Error)))
 	k.events <- ev
 }
 

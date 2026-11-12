@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // httpClient arma el cliente HTTP(S). El certificado se verifica salvo Insecure. Cada conexión,
@@ -38,7 +40,7 @@ func (r *Request) httpClient() (cl *http.Client, closeIdle func()) {
 			return errors.New("demasiadas redirecciones")
 		}
 		if via[0].URL.Scheme == "https" && req.URL.Scheme != "https" { // no se baja de nivel: el contenido iría en claro
-			return errors.New("redirección de https a http rechazada")
+			return i18n.New("xfer.err.https_http", nil)
 		}
 		return nil
 	}}
