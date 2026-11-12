@@ -12,6 +12,7 @@ uso: mctl <comando>
   (cualquier comando: --no-color o NO_COLOR desactivan el color; con --json o sin TTY no hay color)
   acl   convert --from F --to F -f acl.txt | analyze --vendor F -f acl.txt   (F: ios-xe, nx-os, asa)
   diag  ping|traceroute|nmap|iperf3|pcap [DESTINO] [-o clave=valor]... [--out CARPETA]
+        --out: la carpeta debe existir y tener modo 0700, como la de Ajustes → Almacenamiento
         interfaces   (interfaces locales, sin tráfico de red)
   pcap  analyze ARCHIVO [--top N] [--json]
   dns   query|transport|hygiene|exposure NOMBRE [-t TIPO] [-s SERVIDOR]... [--dnssec] [--dkim SEL]

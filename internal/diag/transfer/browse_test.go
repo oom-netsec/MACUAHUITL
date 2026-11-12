@@ -413,3 +413,33 @@ func TestBrowseHTTP(t *testing.T) {
 		t.Fatalf("enorme: truncado=%v err=%v entradas=%d", ls.Truncated, err, len(ls.Entries))
 	}
 }
+
+// Decisión del 2026-11-12: en FTP una ruta remota con «/» inicial es absoluta (como en SCP y SFTP) y sin «/» es
+// relativa a la carpeta de inicio. En la URL la absoluta va con «//» (remotePath quita solo una «/»).
+func TestFTPRutaAbsolutaYRelativa(t *testing.T) {
+	f := newFakeFTP(t, "", "")
+	for _, c := range []struct{ path, want string }{{"//x/y.cfg", "/x/y.cfg"}, {"/x/y.cfg", "x/y.cfg"}} {
+		r := f.req()
+		r.URL.Path, r.DestDir = c.path, t.TempDir()
+		Download(context.Background(), r) // el servidor falso rechaza el RETR; importa lo que se le pidió
+		f.mu.Lock()
+		got := strings.Join(f.cmds, "|")
+		f.mu.Unlock()
+		if !strings.Contains(got, "SIZE "+c.want+"|") && !strings.HasSuffix(got, "SIZE "+c.want) && !strings.Contains(got, "RETR "+c.want) {
+			t.Errorf("URL %q: se esperaba pedir %q, se mandó %s", c.path, c.want, got)
+		}
+		f.mu.Lock()
+		f.cmds = nil
+		f.mu.Unlock()
+	}
+	for _, c := range []struct{ path, want string }{{"/x/y", "CWD /x/y"}, {"x/y", "CWD x/y"}} {
+		Browse(context.Background(), f.req(), c.path, 0)
+		f.mu.Lock()
+		got := strings.Join(f.cmds, "|")
+		f.cmds = nil
+		f.mu.Unlock()
+		if !strings.Contains(got, c.want) {
+			t.Errorf("listado %q: se esperaba %q, se mandó %s", c.path, c.want, got)
+		}
+	}
+}

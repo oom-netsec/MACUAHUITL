@@ -19,7 +19,7 @@ func diag(tool string) func(*cli.Env, []string) error {
 		var out string
 		fs, err := cli.Flags("diag "+tool, args, func(fs *flag.FlagSet) {
 			fs.Var(&opts, "o", "opción clave=valor (repetible)")
-			fs.StringVar(&out, "out", "", "carpeta de salida")
+			fs.StringVar(&out, "out", "", "carpeta de salida (debe existir y tener modo 0700)")
 		})
 		if err != nil {
 			return err
@@ -76,6 +76,7 @@ func interfaces(c *cli.Env, args []string) error {
 
 // help son las líneas de este área en mctl --help.
 const help = `  diag  ping|traceroute|nmap|iperf3|pcap [DESTINO] [-o clave=valor]... [--out CARPETA]
+        --out: la carpeta debe existir y tener modo 0700, como la de Ajustes → Almacenamiento
         interfaces   (interfaces locales, sin tráfico de red)`
 
 // Area registra "diag HERRAMIENTA".

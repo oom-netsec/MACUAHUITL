@@ -114,7 +114,7 @@ test("el envío por FTP sin credencial es anónimo y manda el tiempo límite", a
   await userEvent.type(screen.getByLabelText("Tiempo límite (minutos, opcional)"), "2");
   await userEvent.click(screen.getByRole("button", { name: /Examinar.*Archivo de origen/ }));
   await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
-  expect(core.transferPut).toHaveBeenCalledWith({ url: "ftp://192.0.2.1/r1.txt", fromDir: "/home/u", name: "r1.txt", credentialId: "", acceptedHostKeys: [], legacySsh: false, seconds: 120 });
+  expect(core.transferPut).toHaveBeenCalledWith({ url: "ftp://192.0.2.1//r1.txt", fromDir: "/home/u", name: "r1.txt", credentialId: "", acceptedHostKeys: [], legacySsh: false, seconds: 120 });
 });
 
 const adv = () => screen.getByText("Opciones avanzadas").closest("details")!;

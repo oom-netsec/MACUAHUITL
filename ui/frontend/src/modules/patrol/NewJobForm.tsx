@@ -3,6 +3,7 @@ import type { CoreAPI, Credential, JobSpec } from "../../lib/core";
 import { Check, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
+import { outputsErrorText } from "../../lib/outputsError";
 import type { Key } from "../../lib/i18n/es";
 import type { PlaybookInfo } from "./api";
 import { PlaybookPicker } from "./PlaybookPicker";
@@ -53,7 +54,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
     try {
       onCreated(await core.createJob(spec));
     } catch (e) {
-      setErr(errorText(e));
+      setErr(outputsErrorText(errorText(e), t));
     } finally {
       setBusy(false);
     }

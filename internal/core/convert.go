@@ -13,7 +13,7 @@ import (
 func specFromProto(p *v1.JobSpec) patrol.Spec {
 	s := patrol.Spec{
 		Name: p.GetName(), DefaultCredentialID: p.GetDefaultCredentialId(), PlaybookIDs: p.GetPlaybookIds(),
-		CustomCommands: p.GetCustomCommands(), OutputDir: p.GetOutputDir(), DeleteLooseFiles: p.GetDeleteLooseFiles(),
+		CustomCommands: p.GetCustomCommands(), OutputDir: p.GetOutputDir(), Kind: p.GetKind(), DeleteLooseFiles: p.GetDeleteLooseFiles(),
 		DisableMasking: p.GetDisableMasking(), AcceptChangedHostKeys: p.GetAcceptChangedHostKeys(), WindowHours: p.GetWindowHours(),
 	}
 	for _, t := range p.GetTargets() {

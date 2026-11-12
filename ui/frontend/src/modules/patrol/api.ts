@@ -11,6 +11,7 @@ export interface Job {
   armedAt?: string; windowEndsAt?: string; nextRoundAt?: string;
   round?: number; rounds?: number; devicesTotal?: number; devicesOk?: number; devicesFailed?: number;
   outputDir?: string; phases?: JobPhase[];
+  kind?: string; // patrol, adhoc, backup o change; un núcleo anterior no lo manda
 }
 // Evento de core:event: JSON de SubscribeResponse (protojson, camelCase).
 export interface CoreEvent {

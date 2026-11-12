@@ -14,12 +14,12 @@ test("la URL sale de los campos: puerto estándar se omite, el no estándar se p
 
 test("IPv6 va entre corchetes, con o sin puerto, y no se duplican", () => {
   expect(buildURL(f({ proto: "sftp", host: "2001:db8::1", port: "2222", portTouched: true }))).toBe("sftp://[2001:db8::1]:2222//c4.bin");
-  expect(buildURL(f({ proto: "ftp", host: "[2001:db8::1]" }))).toBe("ftp://[2001:db8::1]/c4.bin");
+  expect(buildURL(f({ proto: "ftp", host: "[2001:db8::1]" }))).toBe("ftp://[2001:db8::1]//c4.bin");
 });
 
 test("la query de HTTP(S) no se codifica; en otros protocolos sí", () => {
   expect(buildURL(f({ proto: "http", host: "h", path: "/f.bin?token=a&b=1" }))).toBe("http://h/f.bin?token=a&b=1");
-  expect(buildURL(f({ proto: "ftp", path: "/f?x" }))).toBe("ftp://192.0.2.1/f%3Fx");
+  expect(buildURL(f({ proto: "ftp", path: "/f?x" }))).toBe("ftp://192.0.2.1//f%3Fx");
 });
 
 test("sin equipo no hay URL", () => {
@@ -31,6 +31,8 @@ test("una URL pegada llena los campos, con IPv6 y sin contraseña", () => {
   expect(parseClientURL("tftp://192.0.2.1/c4.bin", "get")).toEqual({ proto: "tftp", host: "192.0.2.1", port: "", path: "/c4.bin" });
   expect(parseClientURL("https://h.example:443/a%20b.bin?t=1", "get")).toEqual({ proto: "https", host: "h.example", port: "", path: "/a b.bin?t=1" });
   expect(parseClientURL("ftp://mac:pw@h/x", "get")).toBe("password");
+  expect(parseClientURL("ftp://h//x/y", "get")).toMatchObject({ proto: "ftp", path: "/x/y" });
+  expect(parseClientURL("ftp://h/x/y", "get")).toMatchObject({ proto: "ftp", path: "x/y" });
   expect(parseClientURL("gopher://h/x", "get")).toBeNull();
   expect(parseClientURL("no es url", "get")).toBeNull();
 });
@@ -69,7 +71,7 @@ test("el puerto por omisión sigue al protocolo hasta que el usuario lo edita", 
   // editado: el 2200 se queda aunque cambie el protocolo
   expect(buildURL(f({ proto: "sftp", port: "2200", portTouched: true }))).toBe("sftp://192.0.2.1:2200//c4.bin");
   // editado a mano al estándar de otro protocolo: ahora es no estándar y se escribe
-  expect(buildURL(f({ proto: "ftp", port: "69", portTouched: true }))).toBe("ftp://192.0.2.1:69/c4.bin");
+  expect(buildURL(f({ proto: "ftp", port: "69", portTouched: true }))).toBe("ftp://192.0.2.1:69//c4.bin");
 });
 
 test("la petición de descarga lleva credencial, huellas, segundos, bytes, hash por largo, SSH antiguo e insecure", () => {
@@ -108,7 +110,9 @@ test("en SCP y SFTP una ruta con / inicial sale como absoluta (//) y sin / como 
   expect(buildURL(f({ proto: "scp", path: "/tmp/x.bin" }))).toBe("scp://192.0.2.1//tmp/x.bin");
   expect(buildURL(f({ proto: "sftp", path: "/tmp/x.bin", port: "2200", portTouched: true }))).toBe("sftp://192.0.2.1:2200//tmp/x.bin");
   expect(buildURL(f({ proto: "scp", path: "dir/x.bin" }))).toBe("scp://192.0.2.1/dir/x.bin");
-  expect(buildURL(f({ proto: "ftp", path: "/x.bin" }))).toBe("ftp://192.0.2.1/x.bin");
+  // FTP igual que SCP y SFTP (decisión del 2026-11-12): "/" inicial = absoluta, sin "/" = relativa a la carpeta de inicio.
+  expect(buildURL(f({ proto: "ftp", path: "/x/y.bin" }))).toBe("ftp://192.0.2.1//x/y.bin");
+  expect(buildURL(f({ proto: "ftp", path: "x/y.bin" }))).toBe("ftp://192.0.2.1/x/y.bin");
   expect(buildURL(f({ proto: "tftp", path: "x.bin" }))).toBe("tftp://192.0.2.1/x.bin");
 });
 

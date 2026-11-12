@@ -4,23 +4,14 @@ import { Field, Notice, PathField, Select, errorText } from "../../components/Fi
 import { CopyButton } from "../../components/Data";
 import { RANGES, emptyForm, validateOpts, type NumKey, type SyslogFormat } from "../../components/ingest/ingestOpts";
 import { useLang, useT } from "../../lib/i18n";
+import { chmodCommand, outputsReasonKey, parseOutputsError } from "../../lib/outputsError";
 import type { Key } from "../../lib/i18n/es";
 import type { CorePrefs, CorePrefsState } from "./api";
 
-// Motivos estables del núcleo (internal/service/prefs/outputs.go): cada uno tiene su explicación traducida.
-const REASONS = ["relativa", "punto_punto", "no_existe", "ilegible", "no_directorio", "otro_dueno", "reservada", "permisos", "ancestro_inseguro", "no_escribible"];
 const FORMATS: SyslogFormat[] = ["texto", "crudo", "jsonl"];
 const NUMS = ["rotateMb", "rotateMinutes", "maxFiles"] as const;
 
-/** Código del rechazo y, si trae la orden `chmod 700 <ruta>`, la ruta (vacía si no). */
-export function parseOutputsError(msg: string): { code: string; path: string } | null {
-  const m = /^prefs\.outputs\.([a-z_]+):/.exec(msg);
-  if (!m) return null;
-  // Sin trim: una carpeta que termina en espacio es otra carpeta.
-  return { code: m[1], path: /chmod 700 (\S.*)$/.exec(msg)?.[1] ?? "" };
-}
-// La ruta va entre comillas solo si lo necesita, para que la orden se pueda pegar tal cual.
-const shellQuote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replaceAll("'", "'\\''")}'`);
+export { parseOutputsError };
 
 type Form = { outputsDir: string; rotateMb: string; rotateMinutes: string; maxFiles: string; format: CorePrefs["format"] };
 type SaveErr = { msg: string; parsed: ReturnType<typeof parseOutputsError> };
@@ -63,13 +54,13 @@ export function StorageSection({ core }: { core: CoreAPI }) {
   // La carpeta guardada ya no cumple y rige la de fábrica (el núcleo lo dice en `note`, en español).
   const fellBack = !!state.outputsDir && state.outputsDirEffective !== state.outputsDir;
   const noteText = lang === "es" && state.note ? state.note : fellBack ? t("settings.storage.noteFallback", { path: state.outputsDir }) : t("settings.storage.noteMoved");
-  const chmod = saveErr?.parsed?.code === "permisos" ? `chmod 700 ${shellQuote(saveErr.parsed.path || form.outputsDir.trim())}` : "";
+  const chmod = saveErr?.parsed?.code === "permisos" ? chmodCommand(saveErr.parsed.path) : "";
 
   // Los rechazos del núcleo por la carpeta van bajo su campo; el resto (p. ej. fallo al guardar) junto a Guardar.
   const parsedErr = saveErr?.parsed;
   const dirErr = parsedErr && (
     <div role="alert">
-      {t(REASONS.includes(parsedErr.code) ? (`settings.storage.err.${parsedErr.code}` as Key) : "settings.storage.err.other")}
+      {t(outputsReasonKey(parsedErr.code))}
       {chmod && <div className="storage-cmd"><code>{chmod}</code><CopyButton value={chmod} label={t("settings.storage.chmod")} /></div>}
     </div>
   );

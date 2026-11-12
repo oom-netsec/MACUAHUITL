@@ -39,24 +39,22 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	for _, t := range r.Targets {
 		req.Targets = append(req.Targets, t.GetAddress())
 	}
-	if req.OutputDir == "" {
+	factory := req.OutputDir == ""
+	if factory {
 		req.OutputDir = filepath.Join(s.d.Outputs(), "diag")
-	}
-	if !filepath.IsAbs(req.OutputDir) {
-		return status.Error(codes.InvalidArgument, "la carpeta de salida debe ser absoluta")
+	} else if dir, err := service.CheckOutputs(req.OutputDir, s.d.Settings(), true); err != nil { // la misma validación que Ajustes
+		return err
+	} else {
+		req.OutputDir = dir
 	}
 	bin, argv, err := diag.Build(req)
 	if err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
-	if err := os.MkdirAll(req.OutputDir, 0o700); err != nil {
-		return status.Errorf(codes.InvalidArgument, "carpeta de salida: %v", err)
-	}
-	if f, err := os.CreateTemp(req.OutputDir, ".macuahuitl-prueba-*"); err != nil {
-		return status.Errorf(codes.InvalidArgument, "carpeta de salida sin permiso de escritura: %v", err)
-	} else {
-		f.Close()
-		os.Remove(f.Name())
+	if factory { // la de fábrica la crea el núcleo (0700), ya con la petición válida
+		if err := os.MkdirAll(req.OutputDir, 0o700); err != nil {
+			return status.Errorf(codes.InvalidArgument, "carpeta de salida: %v", err)
+		}
 	}
 	s.d.Audit("diag.run", string(tool), fmt.Sprintf("%s %q", bin, argv))
 	res, err := diag.Runner{LookPath: s.d.DiagLookPath()}.Run(st.Context(), req, func(line string) {

@@ -7,6 +7,7 @@ import { ExportMenu } from "../../components/Files";
 import { levelKey, reportMarkdown, verdictCounts, verdictKey, diffCounts, type DeviceReport } from "./report";
 import { parseTargets } from "../patrol/PatrolView";
 import { useT } from "../../lib/i18n";
+import { outputsErrorText } from "../../lib/outputsError";
 import { jobState } from "../../lib/vocab";
 import type { Key } from "../../lib/i18n/es";
 import "./change.css";
@@ -56,7 +57,7 @@ function PrePost({ core }: { core: CoreAPI }) {
     try {
       await f();
     } catch (e) {
-      setErr(errorText(e));
+      setErr(outputsErrorText(errorText(e), t));
     }
   };
   const create = () => guard(async () => {
