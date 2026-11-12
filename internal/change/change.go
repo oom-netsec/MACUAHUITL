@@ -122,6 +122,20 @@ func finish(d Device) Device {
 func compareDevice(a, b Snapshot) ([]Finding, []string, []i18n.Text) {
 	var out []Finding
 	add := func(facet string, l Level, key string, kv ...any) { out = append(out, finding(facet, l, key, kv...)) }
+	// addN es add con el nombre ({name}) como texto, para el grupo HSRP, que lleva una palabra («grupo»)
+	addN := func(facet string, l Level, key string, name i18n.Text, kv ...any) {
+		t := i18n.Tx("change.detail."+key, kv...).With("name", name)
+		out = append(out, Finding{facet, l, t.In(i18n.Es), t})
+	}
+	name := func(k string) i18n.Text {
+		if t, ok := b.HSRPLabel[k]; ok {
+			return t
+		}
+		if t, ok := a.HSRPLabel[k]; ok {
+			return t
+		}
+		return i18n.Lit(k, k)
+	}
 	for _, f := range []string{"versión", "config", "interfaces", "cdp", "lldp", "ospf", "bgp", "rutas", "mac", "arp", "hsrp", "stp"} {
 		if a.Have[f] && !b.Have[f] {
 			add(f, Review, "missing_post", "cmd", facetCmd[f])
@@ -243,18 +257,18 @@ func compareDevice(a, b Snapshot) ([]Finding, []string, []i18n.Text) {
 			sa, sb := a.HSRP[k], b.HSRP[k]
 			switch {
 			case sa != "" && sb == "":
-				add("hsrp", Regression, "hsrp_gone", "name", k, "state", sa)
+				addN("hsrp", Regression, "hsrp_gone", name(k), "state", sa)
 			case sa != sb && (sb == "Init" || sb == "Listen"):
 				if sa == "" {
-					add("hsrp", Regression, "hsrp_new", "name", k, "to", sb)
+					addN("hsrp", Regression, "hsrp_new", name(k), "to", sb)
 				} else {
-					add("hsrp", Regression, "state", "name", k, "from", sa, "to", sb)
+					addN("hsrp", Regression, "state", name(k), "from", sa, "to", sb)
 				}
 			case sa != sb:
 				if sa == "" {
-					add("hsrp", Review, "hsrp_new", "name", k, "to", sb)
+					addN("hsrp", Review, "hsrp_new", name(k), "to", sb)
 				} else {
-					add("hsrp", Review, "state", "name", k, "from", sa, "to", sb)
+					addN("hsrp", Review, "state", name(k), "from", sa, "to", sb)
 				}
 			}
 		}
