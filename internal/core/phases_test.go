@@ -275,7 +275,7 @@ func TestPhasesIdiomaYCodigos(t *testing.T) {
 		return nil
 	}
 	en := strings.Join(phaseLines(list("en").Phases), "|")
-	want := "CREATED|LOGIN_TEST_DONE 0 successful, 1 failed|LOGIN_TEST_DONE 1 successful, 0 failed|ARMED 1 device|ROUND_STARTED r1|ROUND_FINISHED r1 1 successful, 0 failed|ROUND_STARTED r2|ROUND_FINISHED r2 1 successful, 0 failed|PACKAGED|COMPLETED 2 rounds"
+	want := "CREATED|LOGIN_TEST_DONE 0 successful, 1 failed|ARM_CHECK_DONE 1 successful, 0 failed|ARMED 1 device|ROUND_STARTED r1|ROUND_FINISHED r1 1 successful, 0 failed|ROUND_STARTED r2|ROUND_FINISHED r2 1 successful, 0 failed|PACKAGED|COMPLETED 2 rounds"
 	if en != want {
 		t.Fatalf("en:\n%s\nquiero:\n%s", en, want)
 	}
