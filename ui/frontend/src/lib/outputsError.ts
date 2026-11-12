@@ -8,7 +8,7 @@ export function parseOutputsError(msg: string): { code: string; path: string } |
   const m = /^prefs\.outputs\.([a-z_]+):/.exec(msg);
   if (!m) return null;
   // Sin trim: una carpeta que termina en espacio es otra carpeta.
-  return { code: m[1], path: /chmod 700 (\S.*)$/.exec(msg)?.[1] ?? "" };
+  return { code: m[1], path: /corrígelo con: chmod 700 (\S.*)$/.exec(msg)?.[1] ?? "" };
 }
 
 // La ruta va entre comillas solo si lo necesita, para que la orden se pueda pegar tal cual.
