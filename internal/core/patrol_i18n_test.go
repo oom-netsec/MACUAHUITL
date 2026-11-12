@@ -181,3 +181,37 @@ func TestPatrolRegresionEs(t *testing.T) {
 	}
 	_ = i18n.En
 }
+
+// bovedaCasos recorre los errores del servicio de la bóveda que llevan texto; lang fija el idioma.
+func bovedaCasos(t *testing.T, lang string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	put := func(n string, err error) {
+		out[n] = "ok"
+		if err != nil {
+			out[n] = "ERROR: " + err.Error()
+		}
+	}
+	h := newHarness(t, nil)
+	_, err := h.vault.ListCredentials(con(t, lang), &v1.ListCredentialsRequest{})
+	put("sin_boveda", err)
+	_, err = h.vault.Create(con(t, lang), &v1.CreateRequest{MasterPassword: []byte("maestra")})
+	put("crear", err)
+	_, err = h.vault.Create(con(t, lang), &v1.CreateRequest{MasterPassword: []byte("maestra")})
+	put("crear_otra_vez", err)
+	_, err = h.vault.PutCredential(con(t, lang), &v1.PutCredentialRequest{Label: "macuahuitl:x", Username: "a", Password: []byte("b")})
+	put("etiqueta_reservada", err)
+	return out
+}
+
+func TestBovedaRegresionEs(t *testing.T) {
+	base := bovedaCasos(t, "")
+	servicetest.Golden(t, "testdata/boveda_es.golden.json", base)
+	for _, lang := range []string{"es", "fr"} {
+		for k, v := range bovedaCasos(t, lang) {
+			if base[k] != v {
+				t.Errorf("%s con %q difiere de sin idioma: %q vs %q", k, lang, v, base[k])
+			}
+		}
+	}
+}

@@ -1,0 +1,6 @@
+{
+ "crear": "ok",
+ "crear_otra_vez": "ERROR: rpc error: code = AlreadyExists desc = la bóveda ya existe",
+ "etiqueta_reservada": "ERROR: rpc error: code = InvalidArgument desc = la etiqueta \"macuahuitl:x\" está reservada para el sistema",
+ "sin_boveda": "ERROR: rpc error: code = FailedPrecondition desc = no hay bóveda; créala primero"
+}
