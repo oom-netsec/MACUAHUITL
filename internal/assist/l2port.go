@@ -105,14 +105,14 @@ func l2Capture(names []string, outs map[string]string) ([]l2Port, error) {
 	for _, n := range names {
 		text, ok := outs[showCfg(n)]
 		if !ok {
-			return nil, cerr("assist.err.falta_la_configuracion_capturada_de", "port", n)
+			return nil, cerr("assist.err.capture_missing", "port", n)
 		}
 		cur, ok := iosxe.ParseInterfaceConfig(text)
 		switch {
 		case !ok:
 			return nil, refuseSnippet("assist.refused.no_existe_en_el_equipo", "port", n)
 		case !strings.EqualFold(iosxe.ShortIf(cur.Name), iosxe.ShortIf(n)):
-			return nil, cerr("assist.err.la_captura_de_no_es", "port", n)
+			return nil, cerr("assist.err.capture_mismatch", "port", n)
 		case cur.ChannelGroup:
 			return nil, refuseSnippet("assist.refused.es_miembro_de_un_canal", "port", n)
 		}
@@ -184,7 +184,7 @@ func l2PortTemplate(id, name string, fields []Field, fn Function, mode statusMod
 					st := showStatus(p.name)
 					text, ok := outs[st]
 					if !ok {
-						return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", st)
+						return DevicePlan{}, cerr("assist.err.output_missing", "command", st)
 					}
 					rows, _ := iosxe.ParseIfStatus(text)
 					if len(rows) == 0 {
@@ -355,7 +355,7 @@ var SnippetSpeedDuplex = Function{
 		case len(f) == 2 && f[0] == "duplex" && oneOf(f[1], "auto", "full", "half"):
 		case len(f) == 2 && f[0] == "no" && oneOf(f[1], "speed", "duplex"):
 		default:
-			return cerr("assist.err.solo_speed_auto_10_100")
+			return cerr("assist.err.speed_duplex_form")
 		}
 		return nil
 	},
@@ -365,7 +365,7 @@ var SnippetSpeedDuplex = Function{
 func speedDuplexBuild(v Values, p l2Port) ([]l2Feature, error) {
 	speed, duplex := v.Str("speed"), v.Str("duplex")
 	if speed == "" && duplex == "" {
-		return nil, cerr("assist.err.indica_la_velocidad_el_duplex")
+		return nil, cerr("assist.err.speed_duplex_required")
 	}
 	if err := l2Routed(p); err != nil {
 		return nil, err
@@ -422,13 +422,13 @@ var SnippetStormControl = Function{
 		case f[0] == "storm-control" && len(f) >= 4 && f[2] == "level" && oneOf(f[1], "broadcast", "multicast", "unicast"):
 			m := stormLevelRe.FindStringSubmatch(strings.Join(f[3:], " "))
 			if m == nil || !stormPct(m[1]) || m[2] != "" && !stormPct(m[2]) {
-				return cerr("assist.err.el_umbral_es_un_porcentaje")
+				return cerr("assist.err.storm_threshold")
 			}
 		case f[0] == "storm-control" && len(f) == 3 && f[1] == "action" && oneOf(f[2], "shutdown", "trap"):
 		case len(f) == 4 && f[0] == "no" && f[1] == "storm-control" && f[3] == "level" && oneOf(f[2], "broadcast", "multicast", "unicast"):
 		case len(f) == 4 && f[0] == "no" && f[1] == "storm-control" && f[2] == "action" && oneOf(f[3], "shutdown", "trap"):
 		default:
-			return cerr("assist.err.solo_storm_control_broadcast_multicast")
+			return cerr("assist.err.storm_form")
 		}
 		return nil
 	},
@@ -444,7 +444,7 @@ func decimal2(s string) string {
 
 func stormBuild(v Values, p l2Port) ([]l2Feature, error) {
 	if !v.Has("broadcast") && !v.Has("multicast") && !v.Has("unicast") && !v.Has("action") {
-		return nil, cerr("assist.err.indica_al_menos_un_umbral")
+		return nil, cerr("assist.err.storm_need_threshold")
 	}
 	if err := l2Routed(p); err != nil {
 		return nil, err
@@ -503,7 +503,7 @@ var SnippetPortfast = Function{
 		case len(f) == 3 && f[0] == "spanning-tree" && f[1] == "bpduguard" && oneOf(f[2], "enable", "disable"):
 		case len(f) == 3 && f[0] == "no" && f[1] == "spanning-tree" && f[2] == "bpduguard":
 		default:
-			return cerr("assist.err.solo_spanning_tree_portfast_spanning")
+			return cerr("assist.err.spanning_tree_form")
 		}
 		return nil
 	},
@@ -524,7 +524,7 @@ func l2Access(p l2Port) error {
 
 func portfastBuild(v Values, p l2Port) ([]l2Feature, error) {
 	if !v.Bool("portfast") && !v.Bool("bpduguard") {
-		return nil, cerr("assist.err.elige_portfast_bpdu_guard_o")
+		return nil, cerr("assist.err.portfast_choose")
 	}
 	if err := l2Access(p); err != nil {
 		return nil, err
@@ -576,7 +576,7 @@ var SnippetPortSecurity = Function{
 		case rest[0] == "violation" && (neg && len(rest) == 1 || !neg && len(rest) == 2 && oneOf(rest[1], "protect", "restrict", "shutdown")):
 		case rest[0] == "aging" && len(rest) >= 2 && rest[1] == "time" && (neg && len(rest) == 2 || !neg && len(rest) == 3 && intIn(rest[2], 0, 1440)):
 		default:
-			return cerr("assist.err.solo_switchport_port_security_maximum")
+			return cerr("assist.err.port_security_form")
 		}
 		return nil
 	},
@@ -659,7 +659,7 @@ var SnippetErrdisable = Function{
 func errdisablePlan(device string, v Values, outs map[string]string) (DevicePlan, error) {
 	text, ok := outs[errdisableCmd]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", errdisableCmd)
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", errdisableCmd)
 	}
 	cur, ok := iosxe.ParseErrdisableRecovery(text)
 	if !ok {
@@ -688,7 +688,7 @@ func errdisablePlan(device string, v Values, outs map[string]string) (DevicePlan
 		feats = append(feats, f)
 	}
 	if len(feats) == 0 && !hasErrdisableRequest(v) {
-		return DevicePlan{}, cerr("assist.err.elige_al_menos_una_causa")
+		return DevicePlan{}, cerr("assist.err.errdisable_choose")
 	}
 	return assembleL2(device, SnippetErrdisable, []string{errdisableCmd},
 		[]l2Scope{{baseCmd: errdisableCmd, baseText: text, post: []string{errdisableCmd}, feats: feats}})

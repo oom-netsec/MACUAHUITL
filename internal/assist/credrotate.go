@@ -74,7 +74,7 @@ func scrubAll(lines, secrets []string, generic bool) []string {
 
 func checkSecret(s string) error {
 	if !secretRe.MatchString(s) {
-		return cerr("assist.err.el_secreto_nuevo_mide_de")
+		return cerr("assist.err.secret_format")
 	}
 	return nil
 }
@@ -180,7 +180,7 @@ type CredRotateChange struct{ User, NewSecret, ConnectedUser string }
 // CredRotatePre: los usuarios locales del running-config y la versión (de ahí sale el algoritmo).
 func CredRotatePre(user string) ([]string, error) {
 	if !userRe.MatchString(user) {
-		return nil, cerr("assist.err.usuario_invalido_letras_numeros_hasta", "user", user)
+		return nil, cerr("assist.err.user_invalid", "user", user)
 	}
 	return []string{credUsersCmd, "show version"}, nil
 }
@@ -218,7 +218,7 @@ func CredRotatePlan(device string, c CredRotateChange, outs map[string]string) (
 	}
 	text, ok := outs[credUsersCmd]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", credUsersCmd)
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", credUsersCmd)
 	}
 	var found []iosxe.UserLine
 	for _, u := range iosxe.ParseUsernames(text) {

@@ -74,10 +74,10 @@ func showACL(name string) string { return "show ip access-lists " + name }
 func unicastIPv4(what, s string) error {
 	a, err := netip.ParseAddr(s)
 	if err != nil || !a.Is4() {
-		return cerr("assist.err.direccion_ipv4_invalida", "what", what, "s", s)
+		return cerr("assist.err.ipv4_invalid_for", "what", what, "value", s)
 	}
 	if a.IsUnspecified() || a.IsLoopback() || a.IsMulticast() || a.IsLinkLocalUnicast() || a.As4()[0] >= 240 {
-		return cerr("assist.err.no_es_una_direccion_unicast", "what", what, "s", s)
+		return cerr("assist.err.unicast_unusable", "what", what, "value", s)
 	}
 	return nil
 }
@@ -271,7 +271,7 @@ func routePlan(device string, v Values, outs map[string]string) (DevicePlan, err
 	}
 	text, ok := outs[routeCmd]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", routeCmd)
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", routeCmd)
 	}
 	routes, ok := iosxe.ParseStaticRoutes(text)
 	if !ok {
@@ -363,11 +363,11 @@ func checkLoopbackAddress(addr, mask string) error {
 	}
 	ones, err := maskBits(mask)
 	if err != nil || ones < 8 {
-		return cerr("assist.err.mascara_contigua_de_8_a")
+		return cerr("assist.err.mask_range_loopback")
 	}
 	a := netip.MustParseAddr(addr)
 	if p, _ := a.Prefix(ones); ones < 31 && (p.Addr() == a || lastOf(p) == a) {
-		return cerr("assist.err.es_la_direccion_de_red", "addr", addr, "ones", ones)
+		return cerr("assist.err.network_or_broadcast", "addr", addr, "ones", ones)
 	}
 	return nil
 }
@@ -381,29 +381,29 @@ var SnippetLoopback = Function{
 		switch l := strings.ToLower(line); {
 		case f[0] == "interface" && len(f) == 2, f[0] == "no" && len(f) == 3 && f[1] == "interface":
 			if _, ok := loopID(f[len(f)-1]); !ok {
-				return cerr("assist.err.solo_una_interfaz_loopbackn")
+				return cerr("assist.err.single_loopback")
 			}
 		case strings.HasPrefix(l, "ip address ") && len(f) == 4:
 			return checkLoopbackAddress(f[2], f[3])
 		case strings.HasPrefix(l, "description"):
 			return descOK(strings.TrimSpace(line[len("description"):]))
 		default:
-			return cerr("assist.err.solo_interface_loopbackn_description_ip")
+			return cerr("assist.err.loopback_form")
 		}
 		return nil
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) == 0 || !strings.HasPrefix(strings.ToLower(d.Apply[0]), "interface ") {
-			return cerr("assist.err.el_apply_empieza_con_interface")
+			return cerr("assist.err.apply_starts_loopback")
 		}
 		name := strings.Fields(d.Apply[0])[1]
 		for _, l := range d.Apply[1:] {
 			if lw := strings.ToLower(l); strings.HasPrefix(lw, "interface ") || strings.HasPrefix(lw, "no ") {
-				return cerr("assist.err.el_apply_toca_una_sola")
+				return cerr("assist.err.apply_single_interface_no_remove")
 			}
 		}
 		if len(d.Rollback) != 1 || squash(d.Rollback[0]) != "no interface "+name {
-			return cerr("assist.err.la_reversa_es_solo_no", "port", name)
+			return cerr("assist.err.rollback_loopback_only", "port", name)
 		}
 		return nil
 	},
@@ -427,7 +427,7 @@ func loopPlan(device string, v Values, outs map[string]string) (DevicePlan, erro
 	text, ok := outs[pre[0]]
 	brief, ok2 := outs[showIPBrief]
 	if !ok || !ok2 {
-		return DevicePlan{}, cerr("assist.err.faltan_las_salidas_de_y", "command1", pre[0], "command2", showIPBrief)
+		return DevicePlan{}, cerr("assist.err.outputs_missing", "command1", pre[0], "command2", showIPBrief)
 	}
 	rows, ok := iosxe.ParseIPBrief(brief)
 	if !ok {
@@ -496,7 +496,7 @@ var SnippetHelper = Function{
 func helperPre(v Values) ([]string, error) {
 	n := v.Str("interface")
 	if !routedIfaceRe.MatchString(n) {
-		return nil, cerr("assist.err.no_es_una_svi_un", "port", n)
+		return nil, cerr("assist.err.not_svi_or_port", "port", n)
 	}
 	if err := unicastIPv4("helper", v.Str("address")); err != nil {
 		return nil, err
@@ -516,21 +516,21 @@ func helperPlan(device string, v Values, outs map[string]string) (DevicePlan, er
 	n, addr := v.Str("interface"), v.Str("address")
 	text, ok := outs[pre[0]]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_salida_de4", "command", pre[0])
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", pre[0])
 	}
 	cur, ok := iosxe.ParseInterfaceConfig(text)
 	switch {
 	case !ok:
 		return DevicePlan{}, refuseSnippet("assist.refused.no_existe_en_o_no", "port", n, "device", device)
 	case !ifaceEq(cur.Name, n):
-		return DevicePlan{}, cerr("assist.err.la_captura_de_no_es", "port", n)
+		return DevicePlan{}, cerr("assist.err.capture_mismatch", "port", n)
 	case cur.ChannelGroup:
 		return DevicePlan{}, refuseSnippet("assist.refused.es_miembro_de_un_canal2", "port", n)
 	}
 	if len(pre) > 1 {
 		sw, ok := outs[pre[1]]
 		if !ok {
-			return DevicePlan{}, cerr("assist.err.falta_la_salida_de4", "command", pre[1])
+			return DevicePlan{}, cerr("assist.err.output_missing", "command", pre[1])
 		}
 		if _, l2 := iosxe.ParseSwitchportMode(sw); l2 {
 			return DevicePlan{}, refuseSnippet("assist.refused.es_un_puerto_de_capa", "port", n)
@@ -566,7 +566,7 @@ var SnippetNTP = Function{
 		case f[0] == "ntp" && (len(f) == 3 || len(f) == 4 && f[3] == "prefer"):
 		case f[0] == "no" && len(f) == 4:
 		default:
-			return cerr("assist.err.solo_ntp_server_a_prefer")
+			return cerr("assist.err.ntp_form")
 		}
 		return unicastIPv4("servidor NTP", f[len(f)-1-ifElseInt(f[len(f)-1] == "prefer", 1, 0)])
 	},
@@ -593,7 +593,7 @@ func ntpPlan(device string, v Values, outs map[string]string) (DevicePlan, error
 	}
 	text, ok := outs[ntpCmd]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", ntpCmd)
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", ntpCmd)
 	}
 	servers, ok := iosxe.ParseNTPServers(text)
 	if !ok {
@@ -713,7 +713,7 @@ func loggingPre(v Values) ([]string, error) {
 		return nil, err
 	}
 	if t, p := v.Str("transport"), v.Int("port"); t != "" && t != "udp" && t != "tcp" || p < 0 || p > 65535 || v.Has("port") && p == 0 {
-		return nil, cerr("assist.err.transporte_udp_o_tcp_y")
+		return nil, cerr("assist.err.logging_transport")
 	}
 	return []string{loggingCmd}, nil
 }
@@ -724,7 +724,7 @@ func loggingPlan(device string, v Values, outs map[string]string) (DevicePlan, e
 	}
 	text, ok := outs[loggingCmd]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", loggingCmd)
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", loggingCmd)
 	}
 	cfg, ok := iosxe.ParseLoggingCfg(text)
 	if !ok {
@@ -779,7 +779,7 @@ var communityRe = regexp.MustCompile(`^[\x21-\x7e]{4,32}$`)
 
 func checkCommunity(c string) error {
 	if !communityRe.MatchString(c) || strings.Contains(c, "@") || strings.Contains(c, "?") {
-		return cerr("assist.err.la_community_mide_de_4") // sin citarla
+		return cerr("assist.err.community_format") // sin citarla
 	}
 	return nil
 }
@@ -797,13 +797,13 @@ var SnippetSNMPCommunity = Function{
 			f = f[1:]
 		}
 		if len(f) < 3 || checkCommunity(f[2]) != nil {
-			return cerr("assist.err.snmp_server_community_nombre_ro")
+			return cerr("assist.err.community_line_form")
 		}
 		switch {
 		case neg && len(f) == 3:
 		case !neg && (len(f) == 4 || len(f) == 5) && f[3] == "RO" && (len(f) == 4 || aclNameRe.MatchString(f[4])):
 		default:
-			return cerr("assist.err.solo_snmp_server_community_nombre")
+			return cerr("assist.err.community_form")
 		}
 		return nil
 	},
@@ -829,7 +829,7 @@ func snmpCommPlan(device string, v Values, outs map[string]string) (DevicePlan, 
 	name, acl := v.Str("community"), v.Str("acl")
 	text, ok := outs[snmpCommCmd]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", snmpCommCmd)
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", snmpCommCmd)
 	}
 	comms, ok := iosxe.ParseSNMPCommunities(text)
 	if !ok {
@@ -841,7 +841,7 @@ func snmpCommPlan(device string, v Values, outs map[string]string) (DevicePlan, 
 	if acl != "" {
 		out, ok := outs[showACL(acl)]
 		if !ok {
-			return DevicePlan{}, cerr("assist.err.falta_la_salida_de8", "acl", showACL(acl))
+			return DevicePlan{}, cerr("assist.err.output_missing", "command", showACL(acl))
 		}
 		lists, ok := iosxe.ParseAccessLists(out)
 		if !ok {
@@ -869,24 +869,24 @@ var SnippetBanner = Function{
 		t, ok := strings.CutPrefix(line, "banner motd #")
 		t, ok2 := strings.CutSuffix(t, "#")
 		if !ok || !ok2 || t == "" || len(t) > maxText || strings.ContainsAny(t, "#^") {
-			return cerr("assist.err.solo_banner_motd_texto_de")
+			return cerr("assist.err.banner_form")
 		}
 		return nil
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) != 1 || len(d.Rollback) != 1 || !strings.HasPrefix(d.Apply[0], "banner motd #") {
-			return cerr("assist.err.un_banner_una_linea_de")
+			return cerr("assist.err.banner_lines")
 		}
 		old, ok := iosxe.ParseBannerMOTD(d.Baseline[bannerCmd])
 		switch {
 		case !ok || old.Multi:
-			return cerr("assist.err.el_banner_actual_no_se")
+			return cerr("assist.err.banner_unreadable")
 		case !old.Present:
 			if d.Rollback[0] != "no banner motd" {
-				return cerr("assist.err.el_equipo_no_tenia_banner")
+				return cerr("assist.err.banner_none_before")
 			}
 		case strings.ContainsAny(old.Text, "#^") || d.Rollback[0] != "banner motd #"+old.Text+"#":
-			return cerr("assist.err.la_reversa_debe_restaurar_el")
+			return cerr("assist.err.rollback_banner")
 		}
 		return nil
 	},
@@ -897,7 +897,7 @@ func bannerPre(Values) ([]string, error) { return []string{bannerCmd}, nil }
 func bannerPlan(device string, v Values, outs map[string]string) (DevicePlan, error) {
 	text, ok := outs[bannerCmd]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", bannerCmd)
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", bannerCmd)
 	}
 	old, ok := iosxe.ParseBannerMOTD(text)
 	switch {
@@ -1008,7 +1008,7 @@ func snmpv3Plan(device string, v Values, outs map[string]string) (DevicePlan, er
 	userText, ok1 := outs[snmpUserCmd]
 	groupText, ok2 := outs[snmpGroupCmd]
 	if !ok1 || !ok2 {
-		return DevicePlan{}, cerr("assist.err.faltan_las_salidas_de_y", "command1", snmpUserCmd, "command2", snmpGroupCmd)
+		return DevicePlan{}, cerr("assist.err.outputs_missing", "command1", snmpUserCmd, "command2", snmpGroupCmd)
 	}
 	users, ok1 := iosxe.ParseSNMPUsers(userText)
 	groups, ok2 := iosxe.ParseSNMPGroups(groupText)
@@ -1128,7 +1128,7 @@ var SnippetVtyACL = Function{
 
 func vtyRange(v Values) (lo, hi int, err error) {
 	if _, err := fmt.Sscanf(v.Str("lines"), "%d %d", &lo, &hi); err != nil || lo != 0 || (hi != 4 && hi != 15) {
-		return 0, 0, cerr("assist.err.lineas_vty_0_4_o")
+		return 0, 0, cerr("assist.err.vty_lines")
 	}
 	return lo, hi, nil
 }
@@ -1169,7 +1169,7 @@ func vtyPlan(device string, v Values, outs map[string]string) (DevicePlan, error
 	}
 	aclText, ok := outs[pre[1]]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_salida_de4", "command", pre[1])
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", pre[1])
 	}
 	lists, ok := iosxe.ParseAccessLists(aclText)
 	if !ok {
@@ -1189,7 +1189,7 @@ func vtyPlan(device string, v Values, outs map[string]string) (DevicePlan, error
 	}
 	vtyText, ok := outs[vtyCmd]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", vtyCmd)
+		return DevicePlan{}, cerr("assist.err.output_missing", "command", vtyCmd)
 	}
 	blocks, ok := iosxe.ParseVtyBlocks(vtyText)
 	if !ok {

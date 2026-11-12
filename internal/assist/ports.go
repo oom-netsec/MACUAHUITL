@@ -20,7 +20,7 @@ func ValidInterface(name string) bool { return ifaceRe.MatchString(name) }
 func vlanOK(s string) error {
 	n, err := strconv.Atoi(s)
 	if err != nil || n < 1 || n > 4094 {
-		return cerr("assist.err.vlan_fuera_de_1_4094", "s", s)
+		return cerr("assist.err.vlan_range_quoted", "value", s)
 	}
 	return nil
 }
@@ -38,11 +38,11 @@ var Ports = Function{
 		switch {
 		case strings.EqualFold(f[0], "interface"):
 			if len(f) != 2 || !ValidInterface(f[1]) {
-				return cerr("assist.err.solo_un_puerto_fisico_nada")
+				return cerr("assist.err.single_physical_port")
 			}
 		case strings.HasPrefix(l, "switchport access vlan ") || strings.HasPrefix(l, "switchport voice vlan "):
 			if len(f) != 4 {
-				return cerr("assist.err.falta_la_vlan_o_sobran")
+				return cerr("assist.err.vlan_missing_or_extra")
 			}
 			// La reversa restaura tal cual la VLAN de voz que tenía el puerto (dot1p, untagged o none).
 			if f[1] == "voice" && (f[3] == "dot1p" || f[3] == "untagged" || f[3] == "none") {
@@ -54,23 +54,23 @@ var Ports = Function{
 			switch strings.Join(strings.Fields(l), " ") {
 			case "switchport mode access", "switchport mode dynamic auto", "switchport mode dynamic desirable":
 			default:
-				return cerr("assist.err.solo_access_dynamic_auto_o")
+				return cerr("assist.err.mode_values")
 			}
 		case strings.HasPrefix(l, "no switchport mode"):
 			if strings.Join(strings.Fields(l), " ") != "no switchport mode" {
-				return cerr("assist.err.no_switchport_mode_va_sin") // con argumento también devuelve el puerto a dynamic
+				return cerr("assist.err.no_switchport_mode_args") // con argumento también devuelve el puerto a dynamic
 			}
 		case strings.HasPrefix(l, "no switchport "):
 			if len(f) != 4 {
-				return cerr("assist.err.sin_argumentos")
+				return cerr("assist.err.no_arguments")
 			}
 		case l == "shutdown" || l == "no shutdown" || l == "no description" || strings.Join(f, " ") == "no spanning-tree portfast":
 		case strings.HasPrefix(l, "description"):
 			if len(line) > len("description ")+200 {
-				return cerr("assist.err.descripcion_de_mas_de_200")
+				return cerr("assist.err.description_too_long")
 			}
 		default:
-			return cerr("assist.err.no_reconocida")
+			return cerr("assist.err.not_recognized")
 		}
 		return nil
 	},
@@ -98,13 +98,13 @@ func showVlan(id int) string             { return fmt.Sprintf("show vlan id %d",
 // son el mismo): se conserva la primera escritura.
 func normIfaces(ifaces []string) ([]string, error) {
 	if len(ifaces) == 0 {
-		return nil, cerr("assist.err.indica_al_menos_una_interfaz")
+		return nil, cerr("assist.err.interface_required")
 	}
 	seen := map[string]bool{}
 	var out []string
 	for _, n := range ifaces {
 		if !ValidInterface(n) {
-			return nil, cerr("assist.err.no_es_un_puerto_fisico", "port", n)
+			return nil, cerr("assist.err.not_physical_port", "port", n)
 		}
 		if k := strings.ToLower(iosxe.ShortIf(n)); !seen[k] {
 			seen[k] = true
@@ -117,7 +117,7 @@ func normIfaces(ifaces []string) ([]string, error) {
 func checkVlans(ch PortChange) error {
 	for _, v := range []int{ch.Vlan, ch.Voice} {
 		if v < 0 || v > 4094 {
-			return cerr("assist.err.vlan_fuera_de_1_40942", "vlan", v)
+			return cerr("assist.err.vlan_range", "vlan", v)
 		}
 	}
 	return nil
@@ -228,12 +228,12 @@ func PortsPlan(device string, ifaces []string, ch PortChange, outs map[string]st
 	}
 	names, _ := normIfaces(ifaces)
 	if ch.Vlan == 0 && ch.Voice == 0 && ch.Description == nil && ch.Shutdown == nil {
-		return DevicePlan{}, cerr("assist.err.no_hay_nada_que_cambiar")
+		return DevicePlan{}, cerr("assist.err.ports_nothing_to_change")
 	}
 	for _, v := range vlansToCheck(ch) {
 		out, ok := outs[showVlan(v)]
 		if !ok {
-			return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", showVlan(v))
+			return DevicePlan{}, cerr("assist.err.output_missing", "command", showVlan(v))
 		}
 		if err := vlanExists(device, v, out); err != nil {
 			return DevicePlan{}, err
@@ -242,10 +242,10 @@ func PortsPlan(device string, ifaces []string, ch PortChange, outs map[string]st
 	var desc string
 	if ch.Description != nil {
 		if err := asciiOnly(*ch.Description); err != nil { // antes de recortar: "x\r" no puede quedar como "x"
-			return DevicePlan{}, withPrefix("assist.err.description_prefix", err)
+			return DevicePlan{}, withPrefix("assist.err.description_invalid", err)
 		}
 		if desc = strings.TrimSpace(*ch.Description); strings.ContainsAny(desc, "?\r\n\t") || len(desc) > 200 {
-			return DevicePlan{}, cerr("assist.err.la_descripcion_no_admite_ni")
+			return DevicePlan{}, cerr("assist.err.description_rule_lines")
 		}
 	}
 	dp := DevicePlan{Device: device, Pre: pre, Baseline: map[string]string{}}
@@ -253,11 +253,11 @@ func PortsPlan(device string, ifaces []string, ch PortChange, outs map[string]st
 	for _, n := range names {
 		text, ok := outs[showCfg(n)]
 		if !ok {
-			return DevicePlan{}, cerr("assist.err.falta_la_configuracion_capturada_de", "port", n)
+			return DevicePlan{}, cerr("assist.err.capture_missing", "port", n)
 		}
 		cur, ok := iosxe.ParseInterfaceConfig(text)
 		if !ok || !strings.EqualFold(iosxe.ShortIf(cur.Name), iosxe.ShortIf(n)) {
-			return DevicePlan{}, cerr("assist.err.la_captura_de_no_es", "port", n)
+			return DevicePlan{}, cerr("assist.err.capture_mismatch", "port", n)
 		}
 		toAccess, err := accessPort(n, cur, outs[showSwitchport(n)])
 		if err != nil {

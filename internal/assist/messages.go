@@ -45,7 +45,8 @@ func refusalOf(err error) error {
 	return refuseSnippet("assist.refused.raw", "detail", err.Error())
 }
 
-// prefixed antepone el código (con {detail}) al texto de err, en el idioma que se pida; conserva el motivo y la metadata de err.
+// prefixed antepone el código (con {detail}) al texto de err, en el idioma que se pida. Tiene su propio motivo y metadata (la del código),
+// no los del error de dentro: el valor no cumple una regla de armado, no la validación de campos de assist.invalid_value.
 type prefixed struct {
 	code  string
 	inner error
@@ -63,17 +64,5 @@ func (e *prefixed) Localize(loc string) string {
 	}
 	return i18n.Msg(loc, e.code, i18n.A("detail", d))
 }
-func (e *prefixed) Reason() string {
-	var c i18n.Coded
-	if errors.As(e.inner, &c) {
-		return c.Reason()
-	}
-	return e.code
-}
-func (e *prefixed) Metadata() map[string]string {
-	var c i18n.Coded
-	if errors.As(e.inner, &c) {
-		return c.Metadata()
-	}
-	return i18n.Metadata(e.code, nil)
-}
+func (e *prefixed) Reason() string              { return i18n.Reason(e.code) }
+func (e *prefixed) Metadata() map[string]string { return i18n.Metadata(e.code, nil) }

@@ -56,7 +56,7 @@ var vlanNameRe = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,32}$`)
 // vlanIDOK acepta 2-4094 salvo las reservadas 1002-1005 (IOS no deja crearlas ni borrarlas).
 func vlanIDOK(id int) error {
 	if id < 2 || id > 4094 || (id >= 1002 && id <= 1005) {
-		return cerr("assist.err.vlan_fuera_de_2_4094", "id", id)
+		return cerr("assist.err.vlan_range_reserved", "id", id)
 	}
 	return nil
 }
@@ -245,7 +245,7 @@ func VlanPlan(device string, c VlanChange, outs map[string]string) (DevicePlan, 
 	}
 	for _, cmd := range pre {
 		if _, ok := outs[cmd]; !ok {
-			return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", cmd)
+			return DevicePlan{}, cerr("assist.err.output_missing", "command", cmd)
 		}
 	}
 	vtp, ok := iosxe.ParseVTP(outs[showVtp()])
@@ -279,7 +279,7 @@ func VlanPlan(device string, c VlanChange, outs map[string]string) (DevicePlan, 
 	want := c.Name
 	switch {
 	case c.Remove && cur == nil:
-		return DevicePlan{}, cerr("assist.err.la_vlan_no_existe_en", "id", c.ID, "device", device)
+		return DevicePlan{}, cerr("assist.err.vlan_missing_on_device", "id", c.ID, "device", device)
 	case c.Remove:
 		if err := vlanRemoveBlockers(device, c, cur, outs); err != nil {
 			return DevicePlan{}, err
@@ -299,7 +299,7 @@ func VlanPlan(device string, c VlanChange, outs map[string]string) (DevicePlan, 
 		}
 		dp.Rollback = []string{"no vlan " + ntoa(c.ID)}
 	case c.Name == "" || c.Name == cur.Name:
-		return DevicePlan{}, cerr("assist.err.la_vlan_ya_existe_con", "id", c.ID, "cur", cur.Name)
+		return DevicePlan{}, cerr("assist.err.vlan_already_named", "id", c.ID, "cur", cur.Name)
 	default:
 		dp.Apply = []string{"vlan " + ntoa(c.ID), "name " + c.Name}
 		dp.Rollback = []string{"vlan " + ntoa(c.ID), "name " + cur.Name}
@@ -406,11 +406,11 @@ func TrunkPlan(device string, c TrunkChange, outs map[string]string) (DevicePlan
 	}
 	text, ok := outs[showCfg(c.Interface)]
 	if !ok {
-		return DevicePlan{}, cerr("assist.err.falta_la_configuracion_capturada_de2", "interface", c.Interface)
+		return DevicePlan{}, cerr("assist.err.capture_missing", "port", c.Interface)
 	}
 	cur, ok := iosxe.ParseInterfaceConfig(text)
 	if !ok || !strings.EqualFold(iosxe.ShortIf(cur.Name), iosxe.ShortIf(c.Interface)) {
-		return DevicePlan{}, cerr("assist.err.la_captura_de_no_es2", "interface", c.Interface)
+		return DevicePlan{}, cerr("assist.err.capture_mismatch", "port", c.Interface)
 	}
 	swMode, _ := iosxe.ParseSwitchportMode(outs[showSwitchport(c.Interface)])
 	switch {
@@ -425,9 +425,9 @@ func TrunkPlan(device string, c TrunkChange, outs map[string]string) (DevicePlan
 	allowed := all || set[c.Vlan]
 	switch {
 	case c.Op == "add" && allowed:
-		return DevicePlan{}, cerr("assist.err.la_vlan_ya_esta_permitida", "vlan", c.Vlan, "interface", c.Interface)
+		return DevicePlan{}, cerr("assist.err.vlan_already_allowed", "vlan", c.Vlan, "interface", c.Interface)
 	case c.Op == "remove" && !allowed:
-		return DevicePlan{}, cerr("assist.err.la_vlan_no_esta_permitida", "vlan", c.Vlan, "interface", c.Interface)
+		return DevicePlan{}, cerr("assist.err.vlan_not_allowed", "vlan", c.Vlan, "interface", c.Interface)
 	}
 	inverse := map[string]string{"add": "remove", "remove": "add"}[c.Op]
 	line := func(op string) string { return fmt.Sprintf("switchport trunk allowed vlan %s %d", op, c.Vlan) }
@@ -459,7 +459,7 @@ func sviID(name string) (int, bool) {
 func parseMask(m string) (netip.Addr, int, error) {
 	a, err := netip.ParseAddr(m)
 	if err != nil || !a.Is4() {
-		return netip.Addr{}, 0, cerr("assist.err.mascara_invalida_usa_la_forma")
+		return netip.Addr{}, 0, cerr("assist.err.mask_invalid")
 	}
 	b := a.As4()
 	v := uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
@@ -468,7 +468,7 @@ func parseMask(m string) (netip.Addr, int, error) {
 		ones++
 	}
 	if ones < 8 || ones > 30 || v<<ones != 0 {
-		return netip.Addr{}, 0, cerr("assist.err.mascara_no_contigua_o_fuera")
+		return netip.Addr{}, 0, cerr("assist.err.mask_not_contiguous")
 	}
 	return a, ones, nil
 }
@@ -477,14 +477,14 @@ func parseMask(m string) (netip.Addr, int, error) {
 func checkAddress(addr, mask string) error {
 	a, err := netip.ParseAddr(addr)
 	if err != nil || !a.Is4() || strings.ContainsAny(addr, "/% ") {
-		return cerr("assist.err.direccion_ipv4_invalida2", "addr", addr)
+		return cerr("assist.err.ipv4_invalid", "addr", addr)
 	}
 	if _, ones, err := parseMask(mask); err != nil {
 		return err
 	} else if a.IsUnspecified() || a.IsLoopback() || a.IsMulticast() || a.IsLinkLocalUnicast() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255}) {
-		return cerr("assist.err.no_es_una_direccion_unicast2", "addr", addr)
+		return cerr("assist.err.unicast_invalid", "addr", addr)
 	} else if p, _ := a.Prefix(ones); p.Addr() == a || lastOf(p) == a {
-		return cerr("assist.err.es_la_direccion_de_red", "addr", addr, "ones", ones)
+		return cerr("assist.err.network_or_broadcast", "addr", addr, "ones", ones)
 	}
 	return nil
 }
@@ -498,10 +498,10 @@ func lastOf(p netip.Prefix) netip.Addr {
 
 func descOK(d string) error {
 	if err := asciiOnly(d); err != nil {
-		return withPrefix("assist.err.description_prefix", err)
+		return withPrefix("assist.err.description_invalid", err)
 	}
 	if strings.ContainsAny(d, "?\t") || len(strings.TrimSpace(d)) > 200 {
-		return cerr("assist.err.la_descripcion_no_admite_y")
+		return cerr("assist.err.description_rule")
 	}
 	return nil
 }
@@ -516,35 +516,35 @@ var SnippetSVI = Function{
 		switch {
 		case strings.EqualFold(f[0], "interface"), strings.HasPrefix(l, "no interface "):
 			if len(f) != map[bool]int{true: 2, false: 3}[strings.EqualFold(f[0], "interface")] {
-				return cerr("assist.err.sobran_argumentos")
+				return cerr("assist.err.extra_arguments")
 			}
 			if _, ok := sviID(f[len(f)-1]); !ok {
-				return cerr("assist.err.solo_una_interfaz_vlann")
+				return cerr("assist.err.single_svi")
 			}
 		case strings.HasPrefix(l, "ip address "):
 			if len(f) != 4 {
-				return cerr("assist.err.ip_address_a_m_sin")
+				return cerr("assist.err.ip_address_form")
 			}
 			return checkAddress(f[2], f[3])
 		case l == "no ip address" || l == "shutdown" || l == "no shutdown" || l == "no description":
 		case strings.HasPrefix(l, "description"):
 			return descOK(strings.TrimSpace(line[len("description"):]))
 		default:
-			return cerr("assist.err.no_reconocida")
+			return cerr("assist.err.not_recognized")
 		}
 		return nil
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) == 0 || !strings.HasPrefix(strings.ToLower(d.Apply[0]), "interface ") {
-			return cerr("assist.err.el_apply_empieza_con_interface2")
+			return cerr("assist.err.apply_starts_svi")
 		}
 		iface := strings.Fields(d.Apply[0])[1]
 		for _, l := range d.Apply {
 			if strings.HasPrefix(strings.ToLower(l), "no interface") || strings.HasPrefix(strings.ToLower(l), "no ip address") {
-				return cerr("assist.err.el_apply_no_borra_interfaces")
+				return cerr("assist.err.apply_no_delete")
 			}
 			if strings.HasPrefix(strings.ToLower(l), "interface ") && !strings.EqualFold(strings.Fields(l)[1], iface) {
-				return cerr("assist.err.el_apply_toca_una_sola2")
+				return cerr("assist.err.apply_single_interface")
 			}
 		}
 		if len(d.Rollback) == 0 {
@@ -554,16 +554,16 @@ var SnippetSVI = Function{
 		switch {
 		case len(first) == 3 && strings.EqualFold(first[0], "no") && strings.EqualFold(first[1], "interface"):
 			if len(d.Rollback) != 1 || !strings.EqualFold(first[2], iface) {
-				return cerr("assist.err.no_interface_solo_puede_borrar", "iface", iface)
+				return cerr("assist.err.no_interface_only", "iface", iface)
 			}
 		case len(first) == 2 && strings.EqualFold(first[0], "interface") && strings.EqualFold(first[1], iface):
 			for _, l := range d.Rollback[1:] {
 				if strings.HasPrefix(strings.ToLower(l), "interface") || strings.HasPrefix(strings.ToLower(l), "no interface") {
-					return cerr("assist.err.la_reversa_restaura_una_sola")
+					return cerr("assist.err.rollback_single_interface")
 				}
 			}
 		default:
-			return cerr("assist.err.la_reversa_debe_borrar_o", "iface", iface)
+			return cerr("assist.err.rollback_must_delete", "iface", iface)
 		}
 		return nil
 	},
@@ -610,7 +610,7 @@ func SVIPlan(device string, c SVIChange, outs map[string]string) (DevicePlan, er
 	text, ok := outs[pre[0]]
 	brief, ok2 := outs[showIPBrief]
 	if !ok || !ok2 {
-		return DevicePlan{}, cerr("assist.err.faltan_las_salidas_de_y", "command1", pre[0], "command2", showIPBrief)
+		return DevicePlan{}, cerr("assist.err.outputs_missing", "command1", pre[0], "command2", showIPBrief)
 	}
 	rows, ok := iosxe.ParseIPBrief(brief)
 	if !ok {

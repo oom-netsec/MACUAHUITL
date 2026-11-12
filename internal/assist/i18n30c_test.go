@@ -77,17 +77,20 @@ func TestNotasDelPlanTienenClave(t *testing.T) {
 	}
 	// La frase de la IP de origen cambia con el idioma, la IP no.
 	v := note("assist.note.vty_acl", "acl", "MGMT", "ip1", "10.0.0.5", "what1", "2")
-	if !strings.Contains(v.In(i18n.Es), "10.0.0.5 (la IP local de la sesión)") || !strings.Contains(v.In(i18n.En), "10.0.0.5 (the app's local IP of the session)") {
+	if !strings.Contains(v.In(i18n.Es), "10.0.0.5 (la IP local de la sesión)") || !strings.Contains(v.In(i18n.En), "10.0.0.5 (the session's local IP (app side))") {
 		t.Fatalf("%q", v.In(i18n.En))
 	}
 }
 
 // withPrefix conserva el motivo del error de dentro y antepone la palabra en el idioma pedido.
 func TestWithPrefixLocaliza(t *testing.T) {
-	err := withPrefix("assist.err.description_prefix", vbad("ascii", "value", "á"))
+	err := withPrefix("assist.err.description_invalid", vbad("ascii", "value", "á"))
 	var c i18n.Coded
-	if !errors.As(err, &c) || c.Reason() != "assist.invalid_value.ascii" && c.Reason() != "assist.invalid_value" {
+	if !errors.As(err, &c) || c.Reason() != "assist.err.description_invalid" || c.Metadata()["field"] != "description" {
 		t.Fatalf("reason %v", c)
+	}
+	if _, ok := c.Metadata()["why"]; ok {
+		t.Fatalf("la metadata no es la de assist.invalid_value: %v", c.Metadata())
 	}
 	if !strings.HasPrefix(err.Error(), "descripción: ") || !strings.HasPrefix(c.Localize(i18n.En), "description: ") {
 		t.Fatalf("%q / %q", err.Error(), c.Localize(i18n.En))
