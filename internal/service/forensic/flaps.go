@@ -84,7 +84,7 @@ func (s *forensicSvc) Flapping(_ context.Context, r *v1.FlappingRequest) (*v1.Fl
 			jtxt = "\n\nContadores entre rondas:\n" + logintel.JumpsText(jumps)
 		}
 	}
-	s.d.Audit("forensic.flapping", l.source, fmt.Sprintf("mensajes=%d flaps=%d saltos=%d", len(l.entries), len(rep.Flaps), len(jumps)))
+	s.d.Audit("forensic.flapping", l.source, fmt.Sprintf("messages=%d flaps=%d jumps=%d", len(l.entries), len(rep.Flaps), len(jumps)))
 	return &v1.FlappingResponse{Report: s.fitReport(len(rep.Flaps), func(n int, warn string) (any, string) {
 		fr := rep
 		fr.Flaps = rep.Flaps[:n]

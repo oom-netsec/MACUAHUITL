@@ -71,6 +71,6 @@ func (s *backupSvc) DiffBackups(_ context.Context, r *v1.DiffBackupsRequest) (*v
 	cs, ign := drift.Compare(a, b)
 	d := drift.NewDevice(to.Device, 0, 0, cs, ign)
 	rep := diffReport{From: from, To: to, Added: d.Added, Removed: d.Removed, Changes: d.Changes, Ignored: d.Ignored, Masked: from.Masked || to.Masked}
-	s.d.Audit("backup.diff", to.Device, fmt.Sprintf("de=%s a=%s cambios=%d", from.ID, to.ID, len(cs)))
+	s.d.Audit("backup.diff", to.Device, fmt.Sprintf("from=%s to=%s changes=%d", from.ID, to.ID, len(cs)))
 	return &v1.DiffBackupsResponse{Report: service.Report(rep, rep.text())}, nil
 }

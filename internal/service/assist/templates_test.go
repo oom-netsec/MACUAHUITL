@@ -118,7 +118,7 @@ func TestPlanSnippetTemplatePortSecurityAppliesAndAuditsValues(t *testing.T) {
 	if got := strings.Join(r.rec.Lines(), "|"); got != "interface "+gi1+"|switchport port-security maximum 3|switchport port-security violation restrict|switchport port-security|end" {
 		t.Fatalf("el equipo recibió %s", got)
 	}
-	if a := r.d.AuditText(); !strings.Contains(a, "plantilla=port-security") || !strings.Contains(a, "maximum=3") {
+	if a := r.d.AuditText(); !strings.Contains(a, "template=port-security") || !strings.Contains(a, "maximum=3") {
 		t.Fatalf("la auditoría no dice qué plantilla ni con qué valores: %s", a)
 	}
 	// Con port-security ya puesto, el siguiente plan lo rechaza: la reversa no restauraría lo aprendido.
@@ -287,7 +287,7 @@ func TestPlanSnippetSNMPCommunityEndToEndNeverLeaksTheCommunity(t *testing.T) {
 	if got := strings.Join(r.rec.Lines(), "|"); got != "snmp-server community "+comm+" RO|end|no snmp-server community "+comm+"|end" {
 		t.Fatalf("el equipo recibió %s", got)
 	}
-	if a := r.d.AuditText(); strings.Contains(a, comm) || !strings.Contains(a, "plantilla=snmp-community") {
+	if a := r.d.AuditText(); strings.Contains(a, comm) || !strings.Contains(a, "template=snmp-community") {
 		t.Fatalf("auditoría: %s", a)
 	}
 	// Una community que ya existe se rechaza sin citarla.

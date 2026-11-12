@@ -57,7 +57,7 @@ func (s *assistSvc) PlanRestore(ctx context.Context, r *v1.PlanRestoreRequest) (
 	var buildErr error
 	var fn assist.Function
 	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, assist.RestoreDiffPre(), assist.RestoreEgressPre, &fn, nil, r.WriteMemory,
-		fmt.Sprintf("respaldo=%s parcial=%t", r.BackupId, r.AllowPartial), nil,
+		fmt.Sprintf("backup=%s partial=%t", r.BackupId, r.AllowPartial), nil,
 		func(label string, outs map[string]string) (assist.DevicePlan, error) {
 			rp, buildErr = assist.RestoreDiffPlan(label, ch, outs)
 			fn = rp.Fn
@@ -65,7 +65,7 @@ func (s *assistSvc) PlanRestore(ctx context.Context, r *v1.PlanRestoreRequest) (
 		})
 	if err != nil {
 		if buildErr != nil && len(rp.Refused) > 0 && errors.Is(buildErr, assist.ErrRestoreRefused) {
-			s.d.Audit("assist.plan.refused", r.Target.Address, fmt.Sprintf("función=%s respaldo=%s rechazados=%d", assist.RestoreDiff, r.BackupId, len(rp.Refused)))
+			s.d.Audit("assist.plan.refused", r.Target.Address, fmt.Sprintf("function=%s backup=%s refused=%d", assist.RestoreDiff, r.BackupId, len(rp.Refused)))
 			return &v1.PlanRestoreResponse{Refused: refusalsToProto(rp.Refused), Reason: buildErr.Error()}, nil
 		}
 		return nil, err

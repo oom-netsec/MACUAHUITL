@@ -124,7 +124,7 @@ func (s *forensicSvc) MsgLookup(_ context.Context, r *v1.MsgLookupRequest) (*v1.
 	if es == nil {
 		es = []msgkb.Entry{}
 	}
-	s.d.Audit("forensic.msg", r.Query, fmt.Sprintf("resultados=%d", len(es)))
+	s.d.Audit("forensic.msg", r.Query, fmt.Sprintf("results=%d", len(es)))
 	return &v1.MsgLookupResponse{Report: service.Report(es, msgkb.Text(es))}, nil
 }
 
@@ -163,7 +163,7 @@ func (s *forensicSvc) Crashinfo(_ context.Context, r *v1.CrashinfoRequest) (*v1.
 	if len(out.Messages) > 0 {
 		txt += "\n\nMensajes conocidos:\n" + msgkb.Text(out.Messages)
 	}
-	s.d.Audit("forensic.crashinfo", strings.TrimSpace(r.Path), fmt.Sprintf("bytes=%d tipo=%s", rep.Bytes, rep.Kind))
+	s.d.Audit("forensic.crashinfo", strings.TrimSpace(r.Path), fmt.Sprintf("bytes=%d type=%s", rep.Bytes, rep.Kind))
 	return &v1.CrashinfoResponse{Report: service.Report(out, txt)}, nil
 }
 
@@ -183,7 +183,7 @@ func (s *forensicSvc) LogPatterns(_ context.Context, r *v1.LogPatternsRequest) (
 	o := logintel.GroupOptions{BurstCount: int(min(r.BurstCount, 1000)), BurstWindow: time.Duration(min(r.BurstWindowSeconds, 86400)) * time.Second}
 	rep := logintel.Group(l.entries, o)
 	rep.Warnings = append(l.warnings, rep.Warnings...)
-	s.d.Audit("forensic.patterns", l.source, fmt.Sprintf("mensajes=%d patrones=%d", len(l.entries), len(rep.Patterns)))
+	s.d.Audit("forensic.patterns", l.source, fmt.Sprintf("messages=%d patterns=%d", len(l.entries), len(rep.Patterns)))
 	return &v1.LogPatternsResponse{Report: s.fitReport(len(rep.Patterns), func(n int, warn string) (any, string) {
 		r := rep
 		r.Patterns = rep.Patterns[:n]
@@ -215,6 +215,6 @@ func (s *forensicSvc) DebugFilter(_ context.Context, r *v1.DebugFilterRequest) (
 	}
 	rep := logintel.FilterDebug(text, logintel.DebugOptions{Noise: r.Noise, FamilyMin: int(min(r.FamilyMin, 1<<20)), RareMax: int(min(r.RareMax, 1<<20)), Top: int(min(r.Top, 500))})
 	rep.Warnings = append(warns, rep.Warnings...)
-	s.d.Audit("forensic.debugs", strings.TrimSpace(r.Path), fmt.Sprintf("lineas=%d ocultas=%d patrones=%d anomalias=%d", rep.Lines, rep.Hidden, rep.GroupsTotal, len(rep.Anomalies)))
+	s.d.Audit("forensic.debugs", strings.TrimSpace(r.Path), fmt.Sprintf("lines=%d hidden=%d patterns=%d anomalies=%d", rep.Lines, rep.Hidden, rep.GroupsTotal, len(rep.Anomalies)))
 	return &v1.DebugFilterResponse{Report: service.Report(rep, rep.Text())}, nil
 }

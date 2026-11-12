@@ -11,6 +11,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/assist"
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
@@ -54,7 +55,7 @@ func (e *devExec) conn(ctx context.Context, dev string) (*conn, error) {
 			return c, nil
 		}
 		// La sesión murió (exec-timeout del equipo, corte o un timeout del driver): se abre otra por el guard.
-		e.d.Audit("assist.reconnect", dev, fmt.Sprintf("run=%s sesión inservible: %v", e.id, err))
+		e.d.Audit("assist.reconnect", dev, fmt.Sprintf("run=%s unusable session: %v", e.id, i18n.English(err)))
 		c.close()
 		delete(e.conns, dev)
 	}

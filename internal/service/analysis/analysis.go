@@ -71,7 +71,7 @@ func (s *analysisSvc) AnalyzeJob(_ context.Context, r *v1.AnalyzeJobRequest) (*v
 		return nil, err
 	}
 	rep := analyze.Analyze(b, rs, analyze.Options{Round: int(r.Round), Device: r.Device})
-	s.d.Audit("analysis.run", b.Dir, fmt.Sprintf("ronda=%d equipo=%q hallazgos=%d", r.Round, r.Device, len(rep.Findings)))
+	s.d.Audit("analysis.run", b.Dir, fmt.Sprintf("round=%d device=%q findings=%d", r.Round, r.Device, len(rep.Findings)))
 	return &v1.AnalyzeJobResponse{Report: service.Report(rep, rep.Text())}, nil
 }
 
@@ -85,7 +85,7 @@ func (s *analysisSvc) DiffRounds(_ context.Context, r *v1.DiffRoundsRequest) (*v
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	s.d.Audit("analysis.diff", b.Dir, fmt.Sprintf("de=%d a=%d equipo=%q", r.From, r.To, r.Device))
+	s.d.Audit("analysis.diff", b.Dir, fmt.Sprintf("from=%d to=%d device=%q", r.From, r.To, r.Device))
 	return &v1.DiffRoundsResponse{Report: service.Report(rep, rep.Text())}, nil
 }
 
@@ -143,7 +143,7 @@ func (s *analysisSvc) Timeline(ctx context.Context, r *v1.TimelineRequest) (*v1.
 		}
 	}
 	rep.Events = analyze.Timeline(evs, o)
-	s.d.Audit("analysis.timeline", b.Dir, fmt.Sprintf("equipo=%q alrededor=%s ventana=%s pcap=%s eventos=%d", r.Device, fmtTime(o.Around), rep.Window, r.PcapPath, len(rep.Events)))
+	s.d.Audit("analysis.timeline", b.Dir, fmt.Sprintf("device=%q around=%s window=%s pcap=%s events=%d", r.Device, fmtTime(o.Around), rep.Window, r.PcapPath, len(rep.Events)))
 	return &v1.TimelineResponse{Report: service.Report(rep, rep.Text())}, nil
 }
 
