@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PatrolView, parseTargets } from "./PatrolView";
 import { DeviceGrid } from "./DeviceGrid";
-import { elapsed } from "./format";
+import { activeMs, elapsed } from "./format";
 import { fakeCore } from "../../lib/fake";
 
 test("parseTargets normaliza comas, espacios, saltos y CIDR sin duplicados", () => {
@@ -248,4 +248,57 @@ test("el catálogo que falló se puede reintentar", async () => {
   render(<PatrolView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: "Reintentar" }));
   expect(await screen.findByRole("checkbox", { name: "STP" })).toBeInTheDocument();
+});
+
+test("el tiempo activo se detiene en la fase de cierre", () => {
+  const phases = [{ at: "2026-11-12T10:42:00Z", kind: "JOB_PHASE_KIND_COMPLETED" }];
+  expect(activeMs("2026-11-12T10:40:00Z", "completed", phases, Date.parse("2026-11-12T12:00:00Z"))).toBe(120_000);
+  expect(activeMs("2026-11-12T10:40:00Z", "armed", [], Date.parse("2026-11-12T10:50:00Z"))).toBe(600_000);
+});
+
+test("un equipo se cuenta en singular", async () => {
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j1", name: "uno", state: "completed", round: 1, devicesTotal: 1, devicesOk: 1, devicesFailed: 0 }]) });
+  render(<PatrolView core={core} />);
+  const panel = await screen.findByRole("region", { name: "Trabajos" });
+  expect(await within(panel).findByRole("button", { name: /uno/ })).toHaveTextContent("1 correctos · 0 con fallas · 1 equipo");
+  expect(panel).not.toHaveTextContent("1 equipos");
+});
+
+test("filtra la lista por tipo de trabajo", async () => {
+  const core = fakeCore({ listJobs: vi.fn(async () => [
+    { id: "a", name: "uno-adhoc", state: "completed", kind: "adhoc" },
+    { id: "b", name: "dos-resp", state: "completed", kind: "backup" },
+  ]) });
+  render(<PatrolView core={core} />);
+  const panel = await screen.findByRole("region", { name: "Trabajos" });
+  await within(panel).findByRole("button", { name: /uno-adhoc/ });
+  expect(within(panel).getByLabelText("Todos")).toBeChecked();
+  await userEvent.click(within(panel).getByLabelText("Respaldo"));
+  expect(within(panel).queryByRole("button", { name: /uno-adhoc/ })).toBeNull();
+  expect(within(panel).getByRole("button", { name: /dos-resp/ })).toBeInTheDocument();
+});
+
+test("la grilla aparece cuando un trabajo seleccionado pasa a armado", async () => {
+  let state = "created";
+  const core = fakeCore({
+    listJobs: vi.fn(async () => [{ id: "j1", name: "nocturno", state, round: 1, rounds: 0 }]),
+    getRun: vi.fn(async () => [{ target: "10.0.0.1", state: "DEVICE_STATE_RUNNING", detail: "" }]),
+  });
+  render(<PatrolView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /nocturno/ }));
+  expect(screen.queryByText("10.0.0.1")).toBeNull();
+  state = "armed";
+  act(() => core.emitEvent({ jobId: "j1", jobStateChanged: { state: "armed" } }));
+  expect(await screen.findByText("10.0.0.1")).toBeInTheDocument();
+});
+
+test("un evento de fase repetido por la suscripción no duplica la línea", async () => {
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j9", name: "n", state: "armed", armedAt: ago(5), round: 2, rounds: 0, phases: [] }]) });
+  render(<PatrolView core={core} />);
+  await screen.findByText("Activo: 5 min"); // lista cargada
+  const ev = { jobId: "j9", phaseAdded: { at: ago(1), kind: "JOB_PHASE_KIND_ROUND_STARTED", round: 2 } };
+  act(() => core.emitEvent(ev));
+  act(() => core.emitEvent(ev));
+  const phases = await screen.findByRole("list", { name: "Fases" });
+  expect(within(phases).getAllByText("Ronda 2 iniciada")).toHaveLength(1);
 });

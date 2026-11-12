@@ -145,3 +145,12 @@ func TestListPlaybooksJSON(t *testing.T) {
 		t.Fatalf("json = %s", got)
 	}
 }
+
+func TestTargetLabel(t *testing.T) {
+	if got := targetLabel("192.168.3.2", 0); got != "192.168.3.2" {
+		t.Fatalf("puerto 0: %q", got)
+	}
+	if got := targetLabel("192.168.3.2", 22); got != "192.168.3.2:22" {
+		t.Fatalf("puerto 22: %q", got)
+	}
+}

@@ -212,6 +212,7 @@ export const es = {
   "patrol.round": "Ronda {n} de {total}",
   "patrol.roundOpen": "Ronda {n}",
   "patrol.devices": "{ok} correctos · {failed} con fallas · {total} equipos",
+  "patrol.devices.one": "{ok} correctos · {failed} con fallas · 1 equipo",
   "patrol.step.targets": "Equipos y credencial",
   "patrol.step.commands": "Comandos y salida",
   "patrol.step.schedule": "Programación",
@@ -2542,6 +2543,11 @@ export const es = {
   "fps.accepted": "Huellas SHA256 aceptadas (SHA256:…, separadas por espacios o comas)",
   "fps.accepted.short": "Huellas aceptadas",
   "fps.accepted.hint": "SHA256:…, separadas por espacios o comas",
+  "patrol.filter.kind": "Tipo de trabajo",
+  "patrol.kind.all": "Todos",
+  "patrol.kind.adhoc": "Ad hoc",
+  "patrol.kind.backup": "Respaldo",
+  "patrol.kind.patrol": "Patrulla",
 };
 
 export type Key = keyof typeof es;

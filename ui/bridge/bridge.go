@@ -414,6 +414,14 @@ type RunDeviceDTO struct {
 	Detail string `json:"detail"`
 }
 
+// targetLabel es "dirección:puerto"; con puerto 0 (el núcleo no lo informó) solo la dirección.
+func targetLabel(addr string, port uint32) string {
+	if port == 0 {
+		return addr
+	}
+	return fmt.Sprintf("%s:%d", addr, port)
+}
+
 // GetRun devuelve el estado por equipo de una ronda, para reconstruir la grilla al reabrir.
 func (b *Bridge) GetRun(jobID string, round uint32) ([]RunDeviceDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) ([]RunDeviceDTO, error) {
@@ -423,7 +431,7 @@ func (b *Bridge) GetRun(jobID string, round uint32) ([]RunDeviceDTO, error) {
 		}
 		out := []RunDeviceDTO{}
 		for _, d := range r.Devices {
-			out = append(out, RunDeviceDTO{Target: fmt.Sprintf("%s:%d", d.Target.GetAddress(), d.Target.GetPort()), State: d.State.String(), Detail: d.Detail})
+			out = append(out, RunDeviceDTO{Target: targetLabel(d.Target.GetAddress(), d.Target.GetPort()), State: d.State.String(), Detail: d.Detail})
 		}
 		return out, nil
 	})
