@@ -20,7 +20,7 @@ func refuseSnippet(format string, a ...any) error {
 	return &SnippetRefusal{Detail: fmt.Sprintf(format, a...)}
 }
 
-// SnippetRefusal es ErrSnippetRefused con su motivo. Template (nombre de la función del snippet) y Device los llena el
+// SnippetRefusal es ErrSnippetRefused con su motivo. Template (id de la plantilla del catálogo) y Device los llena el
 // servicio, que los conoce. Detail sigue en español hasta que se traduzcan los motivos de cada negativa.
 type SnippetRefusal struct{ Detail, Template, Device string }
 
