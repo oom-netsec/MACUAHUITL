@@ -12,7 +12,9 @@ export interface PortsRequest {
   acceptedHostKeyFingerprints?: string[];
 }
 export interface PlanExpect { command: string; line: string; present?: boolean; prefix?: boolean }
-export interface DevicePlan { device: string; pre: string[]; apply: string[]; rollback: string[]; post: string[]; expect?: PlanExpect[] | null; notes?: string[] | null }
+// Un aviso del plan como clave del catálogo del núcleo (assist.note.*) con sus argumentos; mismo orden que notes (fase 30c).
+export interface AssistNote { key: string; args?: Record<string, string> }
+export interface DevicePlan { device: string; pre: string[]; apply: string[]; rollback: string[]; post: string[]; expect?: PlanExpect[] | null; notes?: string[] | null; notesStructured?: AssistNote[] | null }
 export interface AssistPlan { function: string; writeMemory?: boolean; devices: DevicePlan[] }
 export interface PortsPlanResult { planId: string; plan: AssistPlan }
 // protojson omite device y lines vacíos (el paso close no trae ninguno).

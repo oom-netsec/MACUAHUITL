@@ -38,6 +38,10 @@ func (f *fakeAssist) PlanSnippet(_ context.Context, r *v1.PlanSnippetRequest) (*
 		kind = "template " + t.Id + " " + t.Values["speed"]
 	}
 	d := &v1.AssistDevicePlan{Device: r.Target.Name, Apply: []string{kind}, Rollback: []string{"x"}}
+	if r.GetTemplate() != nil { // fase 30c: los avisos viajan también como clave del catálogo
+		d.Notes = []string{"aviso"}
+		d.NotesStructured = []*v1.AssistNote{{Key: "assist.note.port_mode_same", Args: map[string]string{"port": "Gi1/0/1", "mode": "access"}}}
+	}
 	return &v1.PlanSnippetResponse{PlanId: "s1", Plan: &v1.AssistPlan{Function: "snippet", Devices: []*v1.AssistDevicePlan{d}}}, nil
 }
 
@@ -119,6 +123,21 @@ func TestAssistBridge(t *testing.T) {
 	tp, err := b.AssistPlanSnippet(`{"target":{"name":"SW1","address":"10.0.0.1","credentialId":"c1"},"template":{"id":"speed-duplex","values":{"interfaces":"Gi1/0/1","speed":"100"}}}`)
 	if err != nil || !strings.Contains(tp, "template speed-duplex 100") {
 		t.Fatalf("plantilla %q %v", tp, err)
+	}
+	var plan struct {
+		Plan struct {
+			Devices []struct {
+				Notes           []string
+				NotesStructured []struct {
+					Key  string
+					Args map[string]string
+				}
+			}
+		}
+	}
+	if err := json.Unmarshal([]byte(tp), &plan); err != nil || len(plan.Plan.Devices) != 1 || len(plan.Plan.Devices[0].NotesStructured) != 1 ||
+		plan.Plan.Devices[0].NotesStructured[0].Key != "assist.note.port_mode_same" || plan.Plan.Devices[0].NotesStructured[0].Args["port"] != "Gi1/0/1" {
+		t.Fatalf("notesStructured no llega al front: %q %v", tp, err)
 	}
 	lt, err := b.AssistListSnippetTemplates("ios-xe")
 	var cat struct {

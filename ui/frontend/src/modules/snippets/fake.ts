@@ -92,6 +92,7 @@ export const samplePortSecurityPlan: PortsPlanResult = {
         "Con violation shutdown, una violación deja el puerto en err-disabled.",
         "La reversa no saca un puerto de err-disabled: hay que hacer shutdown y no shutdown a mano.",
       ],
+      notesStructured: [{ key: "assist.note.errdisabled" }, { key: "assist.note.port_mode_same", args: { port: "Gi1/0/5", mode: "access" } }],
     }],
   },
 };
