@@ -21,6 +21,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // MaxMessage es el tamaño máximo que se conserva de cada mensaje; el resto se descarta.
@@ -78,21 +79,21 @@ var dropInterval = time.Second
 func ValidateAddr(addr string, allowAny bool) error {
 	h, p, err := net.SplitHostPort(addr)
 	if err != nil {
-		return fmt.Errorf("syslogd: dirección inválida %q: %w", addr, err)
+		return i18n.New("ingest.invalid.addr.parse", i18n.A("addr", addr, "detail", err))
 	}
 	port, err := strconv.ParseUint(p, 10, 16)
 	if err != nil {
-		return fmt.Errorf("syslogd: puerto inválido %q", p)
+		return i18n.New("ingest.invalid.addr.port", i18n.A("port", p))
 	}
 	if port != 0 && port < 1024 {
-		return fmt.Errorf("syslogd: el puerto %d es privilegiado; usa uno alto (p. ej. 5514) y redirige si hace falta", port)
+		return i18n.New("ingest.invalid.addr.privileged", i18n.A("port", port))
 	}
 	ip, err := netip.ParseAddr(h)
 	if err != nil {
-		return fmt.Errorf("syslogd: el host debe ser una IP local, no %q", h)
+		return i18n.New("ingest.invalid.addr.host", i18n.A("host", h))
 	}
 	if ip.IsUnspecified() && !allowAny {
-		return errors.New("syslogd: escuchar en todas las interfaces requiere pedirlo explícitamente")
+		return i18n.New("ingest.invalid.addr.any", nil)
 	}
 	return nil
 }
@@ -108,7 +109,7 @@ func Listen(ctx context.Context, c Config) error {
 		return err
 	}
 	if c.Proto != "" && c.Proto != "udp" && c.Proto != "tcp" {
-		return fmt.Errorf("syslogd: protocolo %q no soportado (udp o tcp)", c.Proto)
+		return i18n.New("ingest.invalid.protocol", i18n.A("value", c.Proto))
 	}
 	if err := c.Limits.Validate(); err != nil {
 		return err

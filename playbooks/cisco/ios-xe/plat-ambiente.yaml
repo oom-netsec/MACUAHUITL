@@ -5,6 +5,7 @@
 id: plat-ambiente
 platform: ios-xe
 name: Plataforma · Ambiente
+name_en: Platform · Environment
 commands:
   - cmd: show clock
   - cmd: show environment all

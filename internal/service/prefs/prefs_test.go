@@ -361,3 +361,26 @@ func TestOutputsQueContieneElHomeSeRechaza(t *testing.T) {
 	carpeta(t, filepath.Join(root, "casa", "usuario"), 0o700)
 	quiero(t, fija(s, carpeta(t, filepath.Join(root, "casa"), 0o700)), "reservada")
 }
+
+// ui.language solo acepta es o en; otro valor es InvalidArgument y no se guarda.
+func TestUiLanguageSoloEsOEn(t *testing.T) {
+	s, _, _ := montar(t)
+	ctx := context.Background()
+	for _, v := range []string{"es", "en"} {
+		if _, err := s.SetPreference(ctx, &v1.SetPreferenceRequest{Key: "ui.language", Value: v}); err != nil {
+			t.Fatalf("%s: %v", v, err)
+		}
+		if r, _ := s.GetPreference(ctx, &v1.GetPreferenceRequest{Key: "ui.language"}); r.Value != v {
+			t.Fatalf("no guardó %s: %q", v, r.Value)
+		}
+	}
+	for _, v := range []string{"", "fr", "EN", "en-US", "en "} {
+		_, err := s.SetPreference(ctx, &v1.SetPreferenceRequest{Key: "ui.language", Value: v})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Errorf("%q: %v", v, err)
+		}
+	}
+	if r, _ := s.GetPreference(ctx, &v1.GetPreferenceRequest{Key: "ui.language"}); r.Value != "en" {
+		t.Fatalf("un valor inválido cambió la preferencia: %q", r.Value)
+	}
+}

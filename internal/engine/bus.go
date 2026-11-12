@@ -30,6 +30,9 @@ type Event struct {
 	Index, Total int
 	Bytes        int64
 	Detail       string
+	// Reason y Args son el código del catálogo y los argumentos del Detail (fases de Patrol); vacíos en el resto.
+	Reason string
+	Args   map[string]string
 }
 
 // Bus reparte eventos sin bloquear nunca a quien publica. Por suscriptor, los

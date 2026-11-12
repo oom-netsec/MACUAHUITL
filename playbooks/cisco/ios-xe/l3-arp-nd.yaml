@@ -5,6 +5,7 @@
 id: l3-arp-nd
 platform: ios-xe
 name: L3 · ARP e IPv6 ND
+name_en: L3 · ARP and IPv6 ND
 commands:
   - cmd: show clock
   - cmd: show ip interface brief

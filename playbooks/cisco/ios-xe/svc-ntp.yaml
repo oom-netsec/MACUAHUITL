@@ -5,6 +5,7 @@
 id: svc-ntp
 platform: ios-xe
 name: Servicios · NTP
+name_en: Services · NTP
 commands:
   - cmd: show clock detail
   - cmd: show calendar

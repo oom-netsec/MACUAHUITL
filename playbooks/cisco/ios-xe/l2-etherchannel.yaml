@@ -5,6 +5,7 @@
 id: l2-etherchannel
 platform: ios-xe
 name: L2 · EtherChannel
+name_en: L2 · EtherChannel
 commands:
   - cmd: show clock
   - cmd: show etherchannel summary

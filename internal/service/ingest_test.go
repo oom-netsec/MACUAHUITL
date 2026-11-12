@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 )
 
 func TestIngestOptsDefaults(t *testing.T) {
-	l, s, err := IngestOpts{}.Build("/o/x", "traps_{fecha}_{hora}")
+	l, s, err := IngestOpts{}.Build(context.Background(), "/o/x", "traps_{fecha}_{hora}")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +22,7 @@ func TestIngestOptsDefaults(t *testing.T) {
 	if s.Dir != "/o/x" || s.Template != "traps_{fecha}_{hora}" || s.RotateBytes != 50<<20 || s.RotateEvery != 0 || s.MaxFiles != 20 || s.Format != "texto" {
 		t.Fatalf("sink = %+v", s)
 	}
-	l, s, err = IngestOpts{RatePerSource: 5, BurstPerSource: 6, RateGlobal: 7, BurstGlobal: 8, QueueSize: 64, RotateMB: 3, RotateMinutes: 2, MaxFiles: 4, NameTemplate: "t_{origen}_{fecha}", Format: "jsonl"}.Build("/d", "x_{fecha}")
+	l, s, err = IngestOpts{RatePerSource: 5, BurstPerSource: 6, RateGlobal: 7, BurstGlobal: 8, QueueSize: 64, RotateMB: 3, RotateMinutes: 2, MaxFiles: 4, NameTemplate: "t_{origen}_{fecha}", Format: "jsonl"}.Build(context.Background(), "/d", "x_{fecha}")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,14 +34,14 @@ func TestIngestOptsDefaults(t *testing.T) {
 
 // Flows usa otros defaults de tasa (un exportador manda muchos más datagramas que un equipo syslog); lo explícito manda.
 func TestIngestOptsRateDefaultsOverride(t *testing.T) {
-	l, _, err := IngestOpts{DefPerSource: 1000, DefGlobal: 5000}.Build("/d", "x_{fecha}")
+	l, _, err := IngestOpts{DefPerSource: 1000, DefGlobal: 5000}.Build(context.Background(), "/d", "x_{fecha}")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if e := l.Effective(); e.PerSource != 1000 || e.PerSourceBurst != 2000 || e.Global != 5000 || e.GlobalBurst != 10000 {
 		t.Fatalf("%+v", e)
 	}
-	l, _, _ = IngestOpts{DefPerSource: 1000, DefGlobal: 5000, RatePerSource: 7, RateGlobal: 9}.Build("/d", "x_{fecha}")
+	l, _, _ = IngestOpts{DefPerSource: 1000, DefGlobal: 5000, RatePerSource: 7, RateGlobal: 9}.Build(context.Background(), "/d", "x_{fecha}")
 	if e := l.Effective(); e.PerSource != 7 || e.Global != 9 {
 		t.Fatalf("lo explícito debía mandar: %+v", e)
 	}
@@ -54,7 +55,7 @@ func TestIngestOptsRejectsOutOfRange(t *testing.T) {
 		"minutos de preferencia enormes": {Prefs: IngestDefaults{RotateMinutes: 307445736}}, "minutos de preferencia negativos": {Prefs: IngestDefaults{RotateMinutes: -307445733}}, "archivos": {MaxFiles: 1001}, "archivos negativo": {MaxFiles: -2},
 		"plantilla": {NameTemplate: "../x"}, "sin fecha": {NameTemplate: "solo"}, "formato": {Format: "xml"},
 	} {
-		_, _, err := o.Build("/d", "x_{fecha}")
+		_, _, err := o.Build(context.Background(), "/d", "x_{fecha}")
 		if status.Code(err) != codes.InvalidArgument {
 			t.Errorf("%s: err = %v", name, err)
 		}
@@ -62,7 +63,7 @@ func TestIngestOptsRejectsOutOfRange(t *testing.T) {
 }
 
 func TestIngestDetail(t *testing.T) {
-	l, s, _ := IngestOpts{RatePerSource: 10}.Build("/d", "x_{fecha}")
+	l, s, _ := IngestOpts{RatePerSource: 10}.Build(context.Background(), "/d", "x_{fecha}")
 	got := IngestDetail(l, s, true)
 	want := "tasa_origen=10 rafaga_origen=20 tasa_global=1000 rafaga_global=2000 cola=4096 rotar_mb=50 rotar_min=0 plantilla=x_{fecha} max_archivos=20 formato=texto"
 	if got != want {
@@ -122,14 +123,14 @@ func TestPumpDeliversEverythingWhenClientKeepsUp(t *testing.T) {
 // Las preferencias del núcleo rigen donde el campo viene en 0 o vacío; lo explícito las ignora.
 func TestIngestOptsUsaLasPreferencias(t *testing.T) {
 	p := IngestDefaults{RotateMB: 7, RotateMinutes: 15, MaxFiles: 9, Format: "crudo"}
-	_, s, err := IngestOpts{Prefs: p}.Build("/d", "x_{fecha}")
+	_, s, err := IngestOpts{Prefs: p}.Build(context.Background(), "/d", "x_{fecha}")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if s.RotateBytes != 7<<20 || s.RotateEvery != 15*time.Minute || s.MaxFiles != 9 || s.Format != "crudo" {
 		t.Fatalf("sink = %+v", s)
 	}
-	_, s, err = IngestOpts{Prefs: p, RotateMB: 3, RotateMinutes: 2, MaxFiles: 4, Format: "jsonl"}.Build("/d", "x_{fecha}")
+	_, s, err = IngestOpts{Prefs: p, RotateMB: 3, RotateMinutes: 2, MaxFiles: 4, Format: "jsonl"}.Build(context.Background(), "/d", "x_{fecha}")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,15 +140,15 @@ func TestIngestOptsUsaLasPreferencias(t *testing.T) {
 }
 
 func TestValidateIngestDefaults(t *testing.T) {
-	if err := ValidateIngestDefaults(IngestDefaults{}); err != nil {
+	if err := ValidateIngestDefaults(context.Background(), IngestDefaults{}); err != nil {
 		t.Fatalf("todo en fábrica es válido: %v", err)
 	}
 	for _, d := range []IngestDefaults{{RotateMB: 1025}, {RotateMB: -1}, {RotateMinutes: 10081}, {RotateMinutes: -5}, {RotateMinutes: 307445736}, {RotateMinutes: -307445733}, {MaxFiles: 1001}, {MaxFiles: -1}, {Format: "xml"}} {
-		if ValidateIngestDefaults(d) == nil {
+		if ValidateIngestDefaults(context.Background(), d) == nil {
 			t.Errorf("%+v debía rechazarse", d)
 		}
 	}
-	if err := ValidateIngestDefaults(IngestDefaults{RotateMB: 1024, RotateMinutes: 10080, MaxFiles: 1000, Format: "jsonl"}); err != nil {
+	if err := ValidateIngestDefaults(context.Background(), IngestDefaults{RotateMB: 1024, RotateMinutes: 10080, MaxFiles: 1000, Format: "jsonl"}); err != nil {
 		t.Fatalf("los topes del rango valen: %v", err)
 	}
 }

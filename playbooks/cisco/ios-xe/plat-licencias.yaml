@@ -5,6 +5,7 @@
 id: plat-licencias
 platform: ios-xe
 name: Plataforma · Licencias
+name_en: Platform · Licensing
 commands:
   - cmd: show clock
   - cmd: show license summary

@@ -5,6 +5,7 @@
 id: plat-flash-fs
 platform: ios-xe
 name: Plataforma · Flash y sistemas de archivos
+name_en: Platform · Flash and file systems
 commands:
   - cmd: show clock
   - cmd: show file systems

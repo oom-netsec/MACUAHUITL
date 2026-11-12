@@ -25,7 +25,7 @@ type previa struct {
 
 // ExportHosts escribe los hosts (todos, o los ids dados) a un JSON versionado. La credencial sale solo como su
 // etiqueta; si no se puede resolver (bóveda cerrada, credencial ya borrada) el host sale sin ella y se avisa.
-func (s *svc) ExportHosts(_ context.Context, r *v1.ExportHostsRequest) (*v1.ExportHostsResponse, error) {
+func (s *svc) ExportHosts(ctx context.Context, r *v1.ExportHostsRequest) (*v1.ExportHostsResponse, error) {
 	s.d.MarkActive()
 	path, err := service.AbsPath(r.Path)
 	if err != nil {
@@ -88,7 +88,7 @@ func (s *svc) ExportHosts(_ context.Context, r *v1.ExportHostsRequest) (*v1.Expo
 	if len(b) > devices.MaxImportBytes {
 		return nil, status.Error(codes.InvalidArgument, "el archivo pasaría de 5 MB y el import lo rechazaría; exporta menos hosts")
 	}
-	if err := service.WriteExport(path, b, r.Overwrite); err != nil {
+	if err := service.WriteExport(ctx, path, b, r.Overwrite); err != nil {
 		return nil, err
 	}
 	s.d.Audit("hosts.exportar", path, fmt.Sprintf("%d hosts (%s)", len(sel), format))

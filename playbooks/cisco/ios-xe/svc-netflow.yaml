@@ -5,6 +5,7 @@
 id: svc-netflow
 platform: ios-xe
 name: Servicios · NetFlow
+name_en: Services · NetFlow
 commands:
   - cmd: show clock
   - cmd: show flow exporter

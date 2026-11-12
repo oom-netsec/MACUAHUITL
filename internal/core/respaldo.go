@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
@@ -171,7 +172,7 @@ func respaldoErr(err error) error {
 }
 
 // ExportBackup escribe un respaldo cifrado con una frase distinta de la maestra (internal/vault.WriteBackup).
-func (s *vaultSvc) ExportBackup(_ context.Context, r *v1.ExportBackupRequest) (*v1.ExportBackupResponse, error) {
+func (s *vaultSvc) ExportBackup(ctx context.Context, r *v1.ExportBackupRequest) (*v1.ExportBackupResponse, error) {
 	defer clear(r.Passphrase)
 	s.c.markActive()
 	if !r.Confirm {
@@ -189,6 +190,9 @@ func (s *vaultSvc) ExportBackup(_ context.Context, r *v1.ExportBackupRequest) (*
 		return nil, status.Error(codes.InvalidArgument, "el respaldo no puede guardarse dentro de la carpeta de datos del núcleo (ahí viven la bóveda y su copia): elige otra carpeta")
 	}
 	n, noPerms, err := vault.WriteBackupWarn(v, path, r.Passphrase, r.Overwrite)
+	if errors.Is(err, vault.ErrBackupExists) {
+		return nil, service.Err(ctx, codes.AlreadyExists, "file.exists.vault", i18n.A("path", path))
+	}
 	if err != nil {
 		return nil, respaldoErr(err)
 	}

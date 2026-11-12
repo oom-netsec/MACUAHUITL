@@ -4,6 +4,7 @@
 id: analisis
 platform: ios-xe
 name: Análisis · Evidencia para el analizador
+name_en: Analysis · Evidence for the analyzer
 commands:
   - cmd: show clock detail
   - cmd: show version

@@ -5,6 +5,7 @@
 id: l3-dhcp
 platform: ios-xe
 name: L3 · DHCP
+name_en: L3 · DHCP
 commands:
   - cmd: show clock
   - cmd: show ip dhcp server statistics

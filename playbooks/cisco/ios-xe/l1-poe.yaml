@@ -5,6 +5,7 @@
 id: l1-poe
 platform: ios-xe
 name: L1 · PoE
+name_en: L1 · PoE
 commands:
   - cmd: show clock
   - cmd: show power inline
