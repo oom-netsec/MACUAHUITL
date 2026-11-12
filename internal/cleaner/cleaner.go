@@ -53,15 +53,28 @@ type Result struct {
 	Output  string                  `json:"output"`
 	Changes []Change                `json:"changes"`
 	Orphans []Orphan                `json:"orphans"`
-	render  func(loc string) string // la salida con las marcas de huérfanas en el idioma pedido
+	lines   []outLine // la salida línea a línea, para poner las marcas de las huérfanas en el idioma pedido
+}
+
+// outLine es una línea de la salida y la marca de huérfana que la precede (vacía si no es huérfana).
+type outLine struct {
+	text string
+	mark i18n.Text
 }
 
 // OutputIn es la salida con las marcas de las huérfanas en el idioma pedido (con es, Output).
 func (r Result) OutputIn(loc string) string {
-	if r.render == nil {
+	if r.lines == nil {
 		return r.Output
 	}
-	return r.render(loc)
+	var b strings.Builder
+	for _, l := range r.lines {
+		if !l.mark.Empty() {
+			b.WriteString("! " + i18n.Msg(loc, "cleaner.mark", nil) + ": " + l.mark.In(loc) + "\n")
+		}
+		b.WriteString(l.text + "\n")
+	}
+	return b.String()
 }
 
 type line struct {
@@ -151,17 +164,10 @@ func Clean(text string, o Options) Result {
 	if o.Sort {
 		kept = sortBlocks(kept, &r)
 	}
-	r.render = func(loc string) string {
-		var b strings.Builder
-		for _, l := range kept {
-			if !l.mark.Empty() {
-				b.WriteString("! " + i18n.Msg(loc, "cleaner.mark", nil) + ": " + l.mark.In(loc) + "\n")
-			}
-			b.WriteString(l.text + "\n")
-		}
-		return b.String()
+	for _, l := range kept {
+		r.lines = append(r.lines, outLine{l.text, l.mark})
 	}
-	r.Output = r.render(i18n.Es)
+	r.Output = r.OutputIn(i18n.Es)
 	sort.SliceStable(r.Orphans, func(i, j int) bool { return r.Orphans[i].Line < r.Orphans[j].Line })
 	return r
 }

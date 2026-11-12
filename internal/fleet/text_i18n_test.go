@@ -83,3 +83,12 @@ func TestAvisosDeFlotaTodosTienenClave(t *testing.T) {
 		}
 	}
 }
+
+// Si los avisos de carga traen menos textos de catálogo que avisos, ninguno se pierde.
+func TestNewWSConservaAvisosSinTexto(t *testing.T) {
+	f := &Fleet{Warnings: []string{"uno", "dos", "tres"}, WarnTx: []i18n.Text{i18n.Tx("fleet.warn.system", "error", "uno")}}
+	w := f.newWS()
+	if len(w.list) != 3 || len(w.txs) != 3 || w.txs[0].Key != "fleet.warn.system" || w.txs[1].In(i18n.Es) != "dos" || w.txs[2].In(i18n.En) != "tres" {
+		t.Errorf("%v %v", w.list, w.txs)
+	}
+}

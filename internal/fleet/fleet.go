@@ -46,7 +46,7 @@ type Fleet struct {
 	Now      time.Time
 	Devs     []*Dev
 	Warnings []string
-	WarnTx   []i18n.Text // los avisos como texto de catálogo (mismo orden)
+	WarnTx   []i18n.Text `json:"-"` // los avisos como texto de catálogo (mismo orden)
 	lim      struct {
 		bytes   int64
 		entries int
@@ -366,9 +366,11 @@ func (f *Fleet) parse(w *ws, devs map[string]*Dev, key, job string, r io.Reader)
 func (f *Fleet) newWS() *ws {
 	w := &ws{}
 	for i, m := range f.Warnings {
-		if i < len(f.WarnTx) {
-			w.put(m, f.WarnTx[i])
+		tx := i18n.Lit(m, "") // sin su texto de catálogo, el aviso se conserva tal cual
+		if i < len(f.WarnTx) && !f.WarnTx[i].Empty() {
+			tx = f.WarnTx[i]
 		}
+		w.put(m, tx)
 	}
 	return w
 }

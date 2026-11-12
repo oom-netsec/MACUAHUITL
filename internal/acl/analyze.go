@@ -8,7 +8,7 @@ type Finding struct {
 	Kind   string // shadowed, redundant, impossible
 	Detail string
 	// DetailTx es Detail con su código del catálogo (en el idioma pedido sale en inglés).
-	DetailTx i18n.Text
+	DetailTx i18n.Text `json:"-"`
 }
 
 // portsCover: el conjunto a (vacío = todos) contiene al conjunto b (vacío = todos).

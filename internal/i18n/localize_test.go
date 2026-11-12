@@ -119,3 +119,129 @@ func TestWrapYFromErr(t *testing.T) {
 		t.Error("nil está vacío")
 	}
 }
+
+type base struct {
+	Note   string `json:"note"`
+	NoteTx Text   `json:"-"`
+}
+
+type withEmbed struct {
+	base
+	Pub
+}
+
+type Pub struct {
+	Detail   string `json:"detail"`
+	DetailTx Text   `json:"-"`
+}
+
+type node struct {
+	Msg   string `json:"msg"`
+	MsgTx Text   `json:"-"`
+	Next  *node  `json:"next,omitempty"`
+}
+
+// Un campo anónimo sin tag no pone segmento en la ruta (su JSON queda aplanado, así que la ruta también).
+func TestLocalizeAnonimosYNoAsignables(t *testing.T) {
+	v := &withEmbed{base: base{"a", Tx("test.l1")}, Pub: Pub{"b", Tx("test.l1")}}
+	keys := Localize(v, En)
+	if _, ok := keys["detail"]; !ok || len(keys) != 2 || keys["note"].Key != "test.l1" || v.Detail != "one" || v.Note != "one" {
+		t.Errorf("%v %+v", keys, v)
+	}
+	// un valor (no puntero) no se puede cambiar: ni claves ni cambios
+	l := leaf{Detail: "uno", DetailTx: Tx("test.l1")}
+	if k := Localize(l, En); len(k) != 0 || l.Detail != "uno" {
+		t.Errorf("valor: %v %q", k, l.Detail)
+	}
+	val := sample()
+	if err := CheckLocalizable(l); err == nil {
+		t.Error("un valor con textos no es localizable")
+	}
+	if err := CheckLocalizable(val); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestLocalizeCicloDePunteros(t *testing.T) {
+	a := &node{Msg: "uno", MsgTx: Tx("test.l1")}
+	a.Next = a
+	keys := Localize(a, En)
+	if len(keys) != 1 || a.Msg != "one" {
+		t.Errorf("%v %+v", keys, a)
+	}
+}
+
+func TestCheckLocalizableRechazaMapasEInterfaces(t *testing.T) {
+	type conMapa struct {
+		M map[string]leaf
+		N leaf
+	}
+	type conIface struct {
+		I any
+		N leaf
+	}
+	type sinTextos struct {
+		M map[string]string
+		I any
+	}
+	for name, v := range map[string]any{"mapa": &conMapa{}, "interfaz": &conIface{}} {
+		if CheckLocalizable(v) == nil {
+			t.Errorf("%s con textos debía rechazarse", name)
+		}
+	}
+	if err := CheckLocalizable(&sinTextos{}); err != nil {
+		t.Errorf("mapas e interfaces sin textos son datos: %v", err)
+	}
+}
+
+func BenchmarkLocalizeEsSinTextos(b *testing.B) {
+	type row struct {
+		A, B string
+		N    int
+	}
+	rows := make([]row, 50000)
+	r := &struct{ Rows []row }{rows}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		Localize(r, Es)
+	}
+}
+
+func BenchmarkLocalizeEsConTextos(b *testing.B) {
+	rows := make([]leaf, 50000)
+	for i := range rows {
+		rows[i] = leaf{Detail: "uno", DetailTx: Tx("test.l1")}
+	}
+	r := &struct{ Rows []leaf }{rows}
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		Localize(r, Es)
+	}
+}
+
+// Un tipo que se contiene a sí mismo por puntero se traduce en toda su cadena.
+func TestLocalizeListaEnlazada(t *testing.T) {
+	a := &node{Msg: "uno", MsgTx: Tx("test.l1")}
+	a.Next = &node{Msg: "dos", MsgTx: Tx("test.l1")}
+	keys := Localize(a, En)
+	if a.Next.Msg != "one" || keys["next.msg"].Key != "test.l1" {
+		t.Errorf("%v %+v", keys, a.Next)
+	}
+}
+
+// Una causa con código aporta su reason y su metadata (la línea) a la metadata del error que la envuelve, y
+// KeyArgs trae la causa para la plantilla.
+func TestWrapMetadataYKeyArgs(t *testing.T) {
+	inner := Wrap("test.wrap", New("test.l2", A("n", 7)), A("line", 3))
+	outer := Wrap("test.wrap", inner, A("line", 9))
+	md := outer.Metadata()
+	if md["line"] != "9" || md["cause_reason"] != "test.wrap" {
+		t.Errorf("metadata: %v", md)
+	}
+	if k, args := FromErr(outer).KeyArgs(); k != "test.wrap" || args["line"] != "9" || args["cause"] != "línea 3: dos 7" {
+		t.Errorf("KeyArgs: %q %v", k, args)
+	}
+	if md := inner.Metadata(); md["cause_reason"] != "test.l2" || md["n"] != "7" {
+		t.Errorf("metadata interna: %v", md)
+	}
+}

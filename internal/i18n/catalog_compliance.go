@@ -68,8 +68,3 @@ func init() {
 		"compliance.text.summary":   e("{pass} OK, {fail} fallas, {warn} por revisar", "{pass} OK, {fail} {fail|failure|failures}, {warn} to review", "pass", "fail", "warn"),
 	})
 }
-
-func init() {
-	// marca interna del recorrido de la plantilla: no se muestra
-	add(map[string]entry{"compliance.optional_absent": {Es: "-", En: "-"}})
-}

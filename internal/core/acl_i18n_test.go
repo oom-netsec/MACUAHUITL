@@ -25,7 +25,7 @@ func TestAclIdiomaYErrores(t *testing.T) {
 		if m := españolFlota.FindString(status.Convert(err).Message()); m != "" {
 			t.Errorf("%d: español (%s) en %q", i, m, status.Convert(err).Message())
 		}
-		if why, md := reasonOf(err); i < 4 && (why != "acl.err.import" || md["line"] != "") {
+		if why, md := reasonOf(err); i < 4 && (why != "acl.err.import" || md["line"] != "1" || md["cause_reason"] != "acl.err.line") {
 			t.Errorf("%d: reason %q %v", i, why, md)
 		}
 		_, esErr := al.Import(con(t, ""), &v1.ImportRequest{Vendor: "asa", Text: txt})

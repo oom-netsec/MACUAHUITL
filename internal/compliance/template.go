@@ -112,7 +112,7 @@ func eval(rules []tplRule, scopes []*iosconf.Node, prefix string, missing i18n.T
 		}
 		f := Finding{Rule: fmt.Sprintf("plantilla:%d", r.num), Title: title, Status: Pass}
 		switch {
-		case missing.Key == optionalAbsent.Key:
+		case missing.Key == "" && missing.LitEs == optionalAbsent.LitEs:
 			f.DetailTx = i18n.Tx("compliance.detail.tpl_optional")
 		case !missing.Empty():
 			f.Status, f.DetailTx = Fail, missing
@@ -141,7 +141,7 @@ func eval(rules []tplRule, scopes []*iosconf.Node, prefix string, missing i18n.T
 }
 
 // optionalAbsent marca «sección opcional ausente: no aplica» al bajar por la plantilla.
-var optionalAbsent = i18n.Tx("compliance.optional_absent")
+var optionalAbsent = i18n.Lit("-", "")
 
 func scopeName(n *iosconf.Node) i18n.Text {
 	if n.Parent == nil {

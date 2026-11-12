@@ -146,8 +146,9 @@ type Report struct {
 	Masked bool `json:"masked"`
 }
 
-// MaskedNotice es el aviso que acompaña al informe cuando Masked es verdadero.
-const MaskedNotice = "los cambios en secretos no son visibles porque el trabajo enmascara secretos"
+// MaskedNotice es el aviso (en español) que acompaña al informe cuando Masked es verdadero. Su texto vive en el
+// catálogo (drift.masked_notice), la única fuente: el respaldo y la deriva leen de ahí.
+var MaskedNotice = i18n.Msg(i18n.Es, "drift.masked_notice", nil)
 
 // Text es el informe legible, en español.
 func (r Report) Text() string { return r.TextIn(i18n.Es) }

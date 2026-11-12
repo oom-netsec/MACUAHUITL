@@ -277,7 +277,21 @@ func Wrap(code string, cause error, args Args) *Error {
 func (e *Error) Unwrap() error               { return e.Cause }
 func (e *Error) Error() string               { return e.Localize(Es) }
 func (e *Error) Reason() string              { return Reason(e.Code) }
-func (e *Error) Metadata() map[string]string { return Metadata(e.Code, e.Args) }
+// Metadata es la del código; con causa con código, suma su reason como cause_reason y su metadata (por ejemplo la
+// línea de un error de importación) sin pisar la propia.
+func (e *Error) Metadata() map[string]string {
+	m := Metadata(e.Code, e.Args)
+	var c Coded
+	if e.Cause != nil && errors.As(e.Cause, &c) {
+		m["cause_reason"] = c.Reason()
+		for k, v := range c.Metadata() {
+			if _, own := m[k]; !own {
+				m[k] = v
+			}
+		}
+	}
+	return m
+}
 func (e *Error) Localize(loc string) string {
 	if e.Cause == nil {
 		return Msg(loc, e.Code, e.Args)
@@ -365,7 +379,14 @@ func (t Text) KeyArgs() (string, Args) {
 	case t.Key != "" && len(t.Nest) == 0:
 		return t.Key, t.Args
 	case t.Err != nil && errors.As(t.Err, &e):
-		return e.Code, e.Args
+		if e.Cause == nil {
+			return e.Code, e.Args
+		}
+		args := Args{"cause": causeIn(e.Cause, Es)} // el texto de la causa en es: la plantilla lo pide como {cause}
+		for k, v := range e.Args {
+			args[k] = v
+		}
+		return e.Code, args
 	}
 	return "", nil
 }
