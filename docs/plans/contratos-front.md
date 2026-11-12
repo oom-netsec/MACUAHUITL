@@ -910,7 +910,7 @@ Los códigos con argumentos declaran sus `args` en el catálogo; la metadata sol
 - **`assist.refused`** (ya existía): su motivo concreto ahora también se traduce; su texto y su metadata (`template`, `device`) no cambian. Los textos en inglés ya existentes de `assist.invalid_value`, `assist.refused` y sus piezas no se tocaron.
 - **`assist.port_refused`**, **`assist.rotate_refused`** y **`assist.restore_refused`** (`FailedPrecondition`): antes sin reason. El texto es `<centinela>: <motivo>`; metadata vacía.
 - **Estado de la ejecución** (`FailedPrecondition`): `assist.not_assisted`, `assist.bad_state`, `assist.no_pending`, `assist.wrong_step`, `assist.wrong_step_why` y `assist.bad_state_why` (con la razón detrás de `: `).
-- **Errores de armado** (`InvalidArgument`): `assist.err.*` (por ejemplo `assist.err.nothing_to_change`, `assist.err.no_es_un_puerto_fisico {port}`, `assist.err.indica_al_menos_una_interfaz`). El reason es el propio código.
+- **Errores de armado** (`InvalidArgument`): `assist.err.*`, con nombres estables en inglés (por ejemplo `assist.err.nothing_to_change`, `assist.err.not_physical_port {port}`, `assist.err.interface_required`, `assist.err.output_missing {command}`, `assist.err.vlan_range {vlan}`). El reason es el propio código.
 - **Errores del servicio**: `assist.svc.*` (bóveda cerrada, objetivo, plan inexistente o usado, ejecución inexistente, respaldos no restaurables…), con el código gRPC de siempre.
 - Los motivos de cada negativa viven en `assist.refused.*`, `assist.port_refused.*`, `assist.rotate_refused.*` y `assist.restore_refused.*`; viajan dentro del mensaje, no como reason.
 
@@ -922,3 +922,8 @@ Los códigos con argumentos declaran sus `args` en el catálogo; la metadata sol
 - Los motivos por línea de la restauración por diff (`RestoreRefusal.why`, sus ~45 frases) siguen en español: viajan como texto plano por todo el motor y cambiarlos exige un tipo nuevo; queda para otra fase.
 - Los errores de validación internos del plan (`ErrInvalidPlan`, las funciones `Check`/`CheckDevice` y los `parse*Line`) siguen en español: solo se disparan ante un fallo del propio núcleo, no por entrada del usuario.
 - `rotate.go` del servicio (errores de la bóveda al rotar) y las partes de `fail_reason` que repiten texto de otra capa (`%v` de un error sin código) siguen como vienen.
+
+### Revisión del bloque B
+- **Descripción no válida** (la de `PlanPorts` y la del SVI): reason `assist.err.description_invalid` con metadata `{field: "description"}`; ya no usa `assist.invalid_value` ni lleva `why`.
+- **Texto de auditoría de los fallos:** el detalle de `assist.fail` (lo que arma `failT`/`failMsg`) sale ahora en inglés completo, también cuando el fallo cita fallos del post-check o errores con código del catálogo.
+- **Eventos del motor:** los textos propios del motor que viajan como evento `output` (`assist.run.matches_baseline`, `assist.run.rollback_failed_matches`, `assist.run.post_check_after_rollback`, `assist.run.vault_not_restored`) salen en el idioma pedido; la salida del equipo no se traduce.

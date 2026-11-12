@@ -89,8 +89,8 @@ export const samplePortSecurityPlan: PortsPlanResult = {
       post: ["show port-security interface GigabitEthernet1/0/5"],
       expect: [{ command: "show port-security interface GigabitEthernet1/0/5", line: "Port Security : Enabled", present: true }],
       notes: [
-        "Con violation shutdown, una violación deja el puerto en err-disabled.",
-        "La reversa no saca un puerto de err-disabled: hay que hacer shutdown y no shutdown a mano.",
+        "La reversa no saca un puerto de err-disabled: si el cambio lo dejó así, haz shutdown y no shutdown a mano (el motor lo avisa y no da la reversa por cumplida).",
+        "Gi1/0/5: ya estaba en modo access (sin cambios)",
       ],
       notesStructured: [{ key: "assist.note.errdisabled" }, { key: "assist.note.port_mode_same", args: { port: "Gi1/0/5", mode: "access" } }],
     }],

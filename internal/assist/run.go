@@ -110,7 +110,7 @@ type Event struct {
 	Step   *Step
 	Device string
 	Text   string
-	// TextEN es el texto en inglés cuando lo hay (hoy solo el motivo de un fallo); vacío = no hay otra versión.
+	// TextEN es el texto en inglés cuando lo hay (el motivo de un fallo y los avisos del propio motor); vacío = es salida del equipo, que no se traduce.
 	TextEN string
 	// Changed son los equipos que la ejecución cambió y siguen cambiados al emitirse el evento.
 	Changed []string
@@ -299,9 +299,12 @@ func (r *Run) Events(from int) ([]Event, <-chan struct{}) {
 // emit anota un evento. Requiere r.mu.
 func (r *Run) emit(e Event) {
 	e.Seq = len(r.log)
-	e.Text = r.scrub(e.Text)
+	e.Text, e.TextEN = r.scrub(e.Text), r.scrub(e.TextEN)
 	if e.Kind == EvOutput && !r.fn.Scrub { // la salida cruda de una lectura puede traer llaves y contraseñas de otras secciones del running
 		e.Text, _ = mask.Apply("ios-xe", e.Text)
+		if e.TextEN != "" {
+			e.TextEN, _ = mask.Apply("ios-xe", e.TextEN)
+		}
 	}
 	e.Changed = r.changedLocked()
 	r.log = append(r.log, e)
@@ -319,6 +322,14 @@ func (r *Run) setState(s State) {
 func (r *Run) out(device, text string) {
 	r.mu.Lock()
 	r.emit(Event{Kind: EvOutput, Device: device, Text: text})
+	r.mu.Unlock()
+}
+
+// say emite un texto del propio motor (no salida del equipo) con su versión en inglés: key del catálogo y los argumentos de cada idioma
+// (difieren cuando un argumento es un texto en es; un error con código entra en inglés al texto en inglés).
+func (r *Run) say(device, key string, es, en i18n.Args) {
+	r.mu.Lock()
+	r.emit(Event{Kind: EvOutput, Device: device, Text: i18n.Msg(i18n.Es, key, es), TextEN: i18n.Msg(i18n.En, key, en)})
 	r.mu.Unlock()
 }
 
@@ -774,7 +785,7 @@ func (r *Run) rollbackOne(ctx context.Context, i int) bool {
 		r.mu.Unlock()
 		if again {
 			if _, diffs, err := r.checkBase(ctx, i, nil); err == nil && len(diffs) == 0 {
-				r.out(dp.Device, "el equipo ya coincide con su línea base: se cuenta como revertido")
+				r.say(dp.Device, "assist.run.matches_baseline", nil, nil)
 				r.reverted(ctx, dp)
 				r.unchange(i)
 				return true
@@ -813,14 +824,14 @@ func (r *Run) revert(ctx context.Context, i int) bool {
 	sent, err := r.exec.Configure(ctx, dp.Device, dp.Rollback)
 	failed, failedEN := r.sent(dp.Device, sent)
 	if err != nil {
-		failed, failedEN = fmt.Sprintf("reversa de %s: %v", dp.Device, err), fmt.Sprintf("rollback of %s: %v", dp.Device, err)
+		failed, failedEN = fmt.Sprintf("reversa de %s: %v", dp.Device, err), fmt.Sprintf("rollback of %s: %v", dp.Device, i18n.English(err))
 	}
 	if failed != "" {
 		// Si se mandó alguna línea, el equipo ya no está como lo dejó el apply: se relee para que un reintento
 		// no lo tome por un cambio ajeno, y si ya coincide con la línea base la reversa sí se cumplió.
 		if len(sent) > 0 && r.resync(ctx, i) {
 			r.log2("assist.rollback", dp.Device, "run=%s the rollback failed (%s) but the device already matches the baseline", r.id, trim(failedEN))
-			r.out(dp.Device, "la reversa falló ("+trim(failed)+") pero el equipo ya coincide con su línea base: se cuenta como revertido")
+			r.say(dp.Device, "assist.run.rollback_failed_matches", i18n.A("failed", trim(failed)), i18n.A("failed", trim(failedEN)))
 			r.reverted(ctx, dp)
 			r.unchange(i)
 			return true
@@ -836,7 +847,7 @@ func (r *Run) revert(ctx context.Context, i int) bool {
 			r.failT("no se pudo verificar la reversa de %s: %v; reintenta la reversa o revísalo a mano", "could not verify the rollback of %s: %v; retry the rollback or check it by hand", dp.Device, err)
 			return false
 		}
-		r.out(dp.Device, "post-check tras la reversa: "+err.Error())
+		r.say(dp.Device, "assist.run.post_check_after_rollback", i18n.A("error", err.Error()), i18n.A("error", i18n.English(err)))
 	} else if len(diffs) > 0 {
 		r.remember(i, dp.Baseline, outs) // un reintento parte de aquí, no lo toma por un cambio ajeno
 		r.setRecheck(i)
@@ -893,7 +904,7 @@ func (r *Run) checkBase(ctx context.Context, i int, cmds []string) (map[string]s
 	for _, c := range run {
 		got, ok := outs[c]
 		if !ok {
-			return nil, nil, cerr("assist.err.no_output", "command", c)
+			return nil, nil, cerr("assist.err.output_not_received", "command", c)
 		}
 		if d := residue(dp.Baseline[c], got); d != "" {
 			diffs = append(diffs, c+": "+d)
@@ -902,11 +913,11 @@ func (r *Run) checkBase(ctx context.Context, i int, cmds []string) (map[string]s
 	for _, c := range statusCmds(dp) {
 		got, ok := outs[c]
 		if !ok {
-			return nil, nil, cerr("assist.err.no_output", "command", c)
+			return nil, nil, cerr("assist.err.output_not_received", "command", c)
 		}
 		now, _ := iosxe.ParseIfStatus(got)
 		if len(now) == 0 {
-			return nil, nil, cerr("assist.err.status_unreadable", "command", c)
+			return nil, nil, cerr("assist.err.port_status_unreadable", "command", c)
 		}
 		was, _ := iosxe.ParseIfStatus(dp.Baseline[c])
 		if now[0].Status == "err-disabled" && (len(was) == 0 || was[0].Status != "err-disabled") {
@@ -974,7 +985,7 @@ func (r *Run) reverted(ctx context.Context, dp DevicePlan) {
 	}
 	if err := r.exec.(Verifier).Reverted(ctx, dp.Device); err != nil {
 		r.log2("assist.verify", dp.Device, "run=%s the vault did not return to the previous credential: %v", r.id, i18n.English(err))
-		r.out(dp.Device, "ATENCIÓN: la bóveda no volvió a la credencial anterior: "+err.Error())
+		r.say(dp.Device, "assist.run.vault_not_restored", i18n.A("error", err.Error()), i18n.A("error", i18n.English(err)))
 	}
 }
 

@@ -369,3 +369,44 @@ func TestRotationRevertedErrorGoesToAuditInEnglish(t *testing.T) {
 		t.Fatalf("la auditoría debe traer el texto en inglés del error:\n%s", txt)
 	}
 }
+
+// El aviso del motor de que la bóveda no volvió a la credencial anterior sale con su texto es y su versión en inglés (30c), y el error
+// con código entra en inglés al texto en inglés.
+func TestRotationVaultWarningEventHasEnglishText(t *testing.T) {
+	coded := i18n.New("ingest.invalid.addr.any", nil)
+	r, _, _ := rotationRunWith(t, errors.New("autenticación rechazada"), func(v *verifyExec) { v.revertErr = coded })
+	r.Start(context.Background())
+	pending(t, r, "apply-1")
+	r.Confirm("apply-1")
+	wait(t, r, Failed)
+	r.Rollback()
+	pending(t, r, "rollback-1")
+	r.Confirm("rollback-1")
+	wait(t, r, RolledBack)
+	<-r.Done()
+	evs, _ := r.Events(0)
+	found := false
+	for _, e := range evs {
+		if strings.HasPrefix(e.Text, "ATENCIÓN: la bóveda no volvió a la credencial anterior: ") {
+			found = true
+			if e.TextEN != "WARNING: the vault did not return to the previous credential: "+coded.Localize(i18n.En) || strings.Contains(e.TextEN, coded.Error()) {
+				t.Errorf("TextEN = %q", e.TextEN)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("falta el aviso de la bóveda en los eventos")
+	}
+}
+
+// emit pasa los secretos también por la versión en inglés de un texto del motor.
+func TestEmitScrubsEnglishTextToo(t *testing.T) {
+	r, _, _ := rotationRun(t, nil)
+	r.mu.Lock()
+	r.emit(Event{Kind: EvOutput, Text: "x " + newSec, TextEN: "x " + newSec})
+	e := r.log[len(r.log)-1]
+	r.mu.Unlock()
+	if strings.Contains(e.Text, newSec) || strings.Contains(e.TextEN, newSec) {
+		t.Fatalf("el secreto salió: %q / %q", e.Text, e.TextEN)
+	}
+}
