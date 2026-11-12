@@ -154,4 +154,10 @@ func TestTargetLabel(t *testing.T) {
 	if got := targetLabel("192.168.3.2", 2222); got != "192.168.3.2:2222" {
 		t.Fatalf("puerto 2222: %q", got)
 	}
+	if got := targetLabel("fe80::1", 0); got != "[fe80::1]:22" {
+		t.Fatalf("IPv6: %q", got)
+	}
+	if got := targetLabel("sw-core", 0); got != "sw-core:22" {
+		t.Fatalf("nombre: %q", got)
+	}
 }

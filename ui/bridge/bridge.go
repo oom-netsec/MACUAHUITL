@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -417,7 +418,11 @@ type RunDeviceDTO struct {
 // targetLabel es "dirección:puerto"; con puerto 0 (el núcleo no lo informó) solo la dirección.
 func targetLabel(addr string, port uint32) string {
 	if port == 0 {
-		port = 22 // como patrolHostport en el núcleo: así la fila coincide con el deviceId de los eventos
+		port = 22
+	}
+	// Igual que patrol.hostport en el núcleo (IPv6 entre corchetes): así la fila coincide con el deviceId de los eventos.
+	if a, err := netip.ParseAddr(addr); err == nil {
+		return netip.AddrPortFrom(a, uint16(port)).String()
 	}
 	return fmt.Sprintf("%s:%d", addr, port)
 }

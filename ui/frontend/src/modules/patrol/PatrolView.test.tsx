@@ -315,3 +315,14 @@ test("la grilla de un trabajo armado sale de la ronda anterior si la actual va v
   await act(async () => {});
   expect(screen.getByText("10.0.0.7:22")).toBeInTheDocument();
 });
+
+test("al reabrir a mitad de ronda la grilla trae todos los equipos, no solo los que ya terminaron", async () => {
+  const getRun = vi.fn(async (_id: string, r: number) => (r === 1
+    ? [{ target: "10.0.0.1:22", state: "DEVICE_STATE_COMPLETED", detail: "" }, { target: "10.0.0.2:22", state: "DEVICE_STATE_COMPLETED", detail: "" }]
+    : [{ target: "10.0.0.1:22", state: "DEVICE_STATE_COMPLETED", detail: "" }]));
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j8", name: "parcial", state: "armed", round: 2, rounds: 0, phases: [] }]), getRun });
+  render(<PatrolView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /parcial/ }));
+  expect(await screen.findByText("10.0.0.1:22")).toBeInTheDocument();
+  expect(screen.getByText("10.0.0.2:22")).toBeInTheDocument();
+});
