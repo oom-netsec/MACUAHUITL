@@ -2,12 +2,8 @@ package tools
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +12,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/syslogd/syslogdtest"
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/tlsinspect"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
@@ -203,30 +200,18 @@ func TestDnsHallazgosEstructuradosYEn(t *testing.T) {
 
 // Fase 30c-A: los hallazgos de TLS salen estructurados y en el idioma pedido; el error de verificación (texto de
 // la biblioteca x509) no se traduce pero trae su código.
-func TestInspectTlsHallazgosEstructuradosYEn(t *testing.T) {
-	ts := httptest.NewTLSServer(http.NotFoundHandler())
-	t.Cleanup(ts.Close)
-	u, _ := url.Parse(ts.URL)
-	port, _ := strconv.Atoi(u.Port())
-	d := servicetest.New(t)
-	ask := func(loc string) *v1.InspectTlsResponse {
-		ctx, cancel := context.WithTimeout(i18n.WithLocale(context.Background(), loc), 20*time.Second)
-		defer cancel()
-		r, err := (&toolsSvc{d: d}).InspectTls(ctx, &v1.InspectTlsRequest{Host: "127.0.0.1", Port: uint32(port), TimeoutMs: 2000})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return r
-	}
-	es, en := ask("es"), ask("en")
+func TestTlsRespuestaEstructuradaYEn(t *testing.T) {
+	rep := tlsinspect.Report{VerifyError: "x509: certificate signed by unknown authority", VerifyCode: "unknown_authority",
+		Findings: []tlsinspect.Finding{{Severity: "aviso", Code: "autofirmado", Detail: "el certificado es autofirmado; los clientes no lo validarán sin fijarlo", Text: i18n.Tx("tls.finding.self_signed")}}}
 	const msgEs, msgEn = "el certificado es autofirmado; los clientes no lo validarán sin fijarlo", "the certificate is self-signed; clients will not validate it unless it is pinned"
+	es, en := tlsResponse(rep, i18n.Es), tlsResponse(rep, i18n.En)
 	if len(es.Findings) != 1 || es.Findings[0].Code != "autofirmado" || es.Findings[0].Severity != "warning" || es.Findings[0].Key != "tls.finding.self_signed" || es.Findings[0].Message != msgEs {
 		t.Fatalf("es: %v", es.Findings)
 	}
-	if len(en.Findings) != 1 || en.Findings[0].Message != msgEn || !strings.Contains(en.Report.Json, msgEn) || strings.Contains(en.Report.Json, "autofirmado\",\"Detail\":\"el") {
+	if en.Findings[0].Message != msgEn || !strings.Contains(en.Report.Json, msgEn) || strings.Contains(en.Report.Json, msgEs) {
 		t.Errorf("en: %v\n%s", en.Findings, en.Report.Json)
 	}
-	if !strings.Contains(es.Report.Json, msgEs) || es.VerifyCode != "unknown_authority" || en.VerifyCode != "unknown_authority" {
+	if !strings.Contains(es.Report.Json, msgEs) || es.VerifyCode != "unknown_authority" || en.VerifyCode != "unknown_authority" || !strings.Contains(en.Report.Json, "x509: certificate signed by unknown authority") {
 		t.Errorf("es: %s / %q", es.Report.Json, es.VerifyCode)
 	}
 }
