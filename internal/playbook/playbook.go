@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -24,7 +25,22 @@ type Command struct {
 	Text       string
 	Timeout    time.Duration
 	MaySecrets bool
+	// Platforms: solo corre en esas plataformas detectadas; vacío = en todas las compatibles.
+	Platforms []string
 }
+
+// Applies dice si el comando corre en la plataforma detectada.
+func (c Command) Applies(detected string) bool {
+	return len(c.Platforms) == 0 || slices.Contains(c.Platforms, detected)
+}
+
+// Compatible: un IOS clásico usa los playbooks de IOS-XE; lo que no exista queda marcado inválido.
+func Compatible(detected, pbPlatform string) bool {
+	return detected == pbPlatform || (detected == "ios" && pbPlatform == "ios-xe")
+}
+
+// knownPlatforms son las plataformas que un playbook puede nombrar en platforms: (las de playbooks/cisco).
+var knownPlatforms = []string{"ios", "ios-xe", "nx-os", "cat9k", "ftd", "ise", "sda", "wlc-9800", "wlc-aireos"}
 
 // Playbook tiene ID "<plataforma>/<id del archivo>" (p. ej. "ios-xe/tac-baseline").
 type Playbook struct {
@@ -34,9 +50,10 @@ type Playbook struct {
 }
 
 type fileCommand struct {
-	Cmd        string `yaml:"cmd"`
-	Timeout    string `yaml:"timeout"`
-	MaySecrets bool   `yaml:"may_contain_secrets"`
+	Cmd        string   `yaml:"cmd"`
+	Timeout    string   `yaml:"timeout"`
+	MaySecrets bool     `yaml:"may_contain_secrets"`
+	Platforms  []string `yaml:"platforms"`
 }
 
 type file struct {
@@ -88,7 +105,12 @@ func parse(b []byte) (Playbook, error) {
 		}
 	}
 	for _, c := range f.Commands {
-		cmd := Command{Text: strings.TrimSpace(c.Cmd), Timeout: defaultTimeout, MaySecrets: c.MaySecrets}
+		cmd := Command{Text: strings.TrimSpace(c.Cmd), Timeout: defaultTimeout, MaySecrets: c.MaySecrets, Platforms: c.Platforms}
+		for _, pl := range c.Platforms {
+			if !slices.Contains(knownPlatforms, pl) {
+				return Playbook{}, fmt.Errorf("plataforma desconocida %q en platforms de %q", pl, cmd.Text)
+			}
+		}
 		if cmd.Text == "" {
 			return Playbook{}, errors.New("comando vacío")
 		}

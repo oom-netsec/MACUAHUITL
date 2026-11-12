@@ -129,3 +129,42 @@ func keys(m map[string]Playbook) []string {
 	}
 	return out
 }
+
+func TestCampoPlatformsPorComando(t *testing.T) {
+	yaml := func(extra string) fstest.MapFS {
+		return fstest.MapFS{"cisco/ios-xe/x.yaml": {Data: []byte("id: x\nplatform: ios-xe\nname: X\ncommands:\n  - cmd: show version\n  - cmd: \"dir bootflash:\"\n" + extra + "\n")}}
+	}
+	pbs, err := Load(yaml("    platforms: [ios-xe]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var libre, solo Command
+	for _, c := range pbs[0].Commands {
+		if c.Text == "show version" {
+			libre = c
+		} else {
+			solo = c
+		}
+	}
+	if !libre.Applies("ios") || !libre.Applies("ios-xe") {
+		t.Errorf("sin platforms corre en todas: %+v", libre)
+	}
+	if solo.Applies("ios") || !solo.Applies("ios-xe") {
+		t.Errorf("platforms [ios-xe]: ios no, ios-xe sí: %+v", solo)
+	}
+	_, err = Load(yaml("    platforms: [ios-xe, ios-raro]"))
+	if err == nil || !strings.Contains(err.Error(), "x.yaml") || !strings.Contains(err.Error(), "ios-raro") {
+		t.Fatalf("plataforma desconocida debía fallar con el nombre del archivo: %v", err)
+	}
+}
+
+func TestCompatible(t *testing.T) {
+	for _, c := range []struct {
+		det, pb string
+		ok      bool
+	}{{"ios-xe", "ios-xe", true}, {"ios", "ios-xe", true}, {"ios", "ios", true}, {"ios-xe", "ios", false}, {"nx-os", "ios-xe", false}} {
+		if got := Compatible(c.det, c.pb); got != c.ok {
+			t.Errorf("Compatible(%q, %q) = %v", c.det, c.pb, got)
+		}
+	}
+}

@@ -199,35 +199,36 @@ func find(pbs []playbook.Playbook, id string) *playbook.Playbook {
 	return nil
 }
 
-// compatible: un IOS clásico usa los playbooks de IOS-XE; lo que no exista queda marcado inválido.
-func compatible(detected, pbPlatform string) bool {
-	return detected == pbPlatform || (detected == "ios" && pbPlatform == "ios-xe")
-}
-
-// commands arma la lista para la plataforma detectada: playbooks elegidos y luego los pegados.
-func commands(s Spec, detected string, pbs []playbook.Playbook) ([]playbook.Command, error) {
-	var out []playbook.Command
+// commands arma la lista para la plataforma detectada: playbooks elegidos y luego los pegados. Los comandos
+// marcados para otras plataformas (platforms:) no entran; skipped trae su texto, para anotarlo en el manifest.
+func commands(s Spec, detected string, pbs []playbook.Playbook) (out []playbook.Command, skipped []string, err error) {
 	for _, id := range s.PlaybookIDs {
 		p := find(pbs, id)
 		if p == nil {
-			return nil, fieldErr("playbook_ids", "%s no existe", id)
+			return nil, nil, fieldErr("playbook_ids", "%s no existe", id)
 		}
-		if !compatible(detected, p.Platform) {
-			return nil, fmt.Errorf("patrol: el playbook %s es para %s y el equipo es %s", id, p.Platform, detected)
+		if !playbook.Compatible(detected, p.Platform) {
+			return nil, nil, fmt.Errorf("patrol: el playbook %s es para %s y el equipo es %s", id, p.Platform, detected)
 		}
 		for _, pre := range p.Pre {
 			out = append(out, playbook.Command{Text: pre, Timeout: 60 * time.Second})
 		}
-		out = append(out, p.Commands...)
+		for _, c := range p.Commands {
+			if c.Applies(detected) {
+				out = append(out, c)
+			} else {
+				skipped = append(skipped, c.Text)
+			}
+		}
 	}
 	if s.CustomCommands != "" {
 		p, err := playbook.Ephemeral(detected, s.CustomCommands)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		out = append(out, p.Commands...)
 	}
-	return out, nil
+	return out, skipped, nil
 }
 
 func credentialsFor(s Spec, t Target) (primary, fallback string) {
@@ -243,12 +244,15 @@ func credentialsFor(s Spec, t Target) (primary, fallback string) {
 	return primary, fallback
 }
 
-func port(t Target) uint16 {
-	if t.Port == 0 {
+// EffectivePort es el puerto SSH que se usa de verdad: 0 en la spec significa el de omisión (22).
+func EffectivePort(p uint16) uint16 {
+	if p == 0 {
 		return 22
 	}
-	return t.Port
+	return p
 }
+
+func port(t Target) uint16 { return EffectivePort(t.Port) }
 
 func dirName(s string) string {
 	b := []byte(s)
