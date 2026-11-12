@@ -26,6 +26,8 @@
   --border-control: light-dark(#868c98, #62686f); /* ≥ 3:1: identifica campos y controles (WCAG 1.4.11) */
   --hover: light-dark(rgb(0 0 0 / 0.045), rgb(255 255 255 / 0.055));
   --pressed: light-dark(rgb(0 0 0 / 0.08), rgb(255 255 255 / 0.09));
+  --scrim: light-dark(rgb(0 0 0 / 0.18), rgb(0 0 0 / 0.5));
+  --scrim-modal: light-dark(rgb(0 0 0 / 0.32), rgb(0 0 0 / 0.65));
   --scrollbar: light-dark(#b9bdc6, #3a3e45);
 
   /* Texto */

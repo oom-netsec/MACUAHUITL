@@ -195,3 +195,12 @@ test("Ctrl+Enter no pulsa el primario de un panel oculto (la pestaña Cliente de
   expect(core.transferGetAsync).not.toHaveBeenCalled();
   expect(core.transferPut).not.toHaveBeenCalled();
 });
+
+test("al cambiar de módulo el área de contenido vuelve arriba", async () => {
+  const { container } = render(<App core={fakeCore()} />);
+  const content = container.querySelector<HTMLElement>(".content")!;
+  content.scrollTop = 300;
+  await userEvent.click(screen.getAllByRole("button", { name: /Bóveda/ })[0]);
+  await screen.findByRole("heading", { name: /Bóveda/ });
+  expect(content.scrollTop).toBe(0);
+});
