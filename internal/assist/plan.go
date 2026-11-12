@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
@@ -49,6 +50,8 @@ type DevicePlan struct {
 	Secrets []string
 	// Notes son avisos para el ingeniero (p. ej. que el enlace rebota); no se ejecutan ni se verifican.
 	Notes []string
+	// NoteItems son las mismas notas como código del catálogo con sus argumentos (una por nota, en el mismo orden).
+	NoteItems []i18n.Text
 	// VerifyLogin: tras aplicar y pasar el post-check, el ejecutor abre una sesión nueva con la credencial nueva (Verifier).
 	VerifyLogin bool
 }
@@ -230,9 +233,18 @@ func Validate(p Plan, fn Function) error {
 	return fmt.Errorf("%w: %s", ErrInvalidPlan, Scrub(strings.Join(bad, "; "), secrets, fn.Scrub))
 }
 
-// EvalExpect devuelve cada condición que no se cumple, con la salida de cada comando de Post.
+// EvalExpect devuelve cada condición que no se cumple, con la salida de cada comando de Post (en es).
 func EvalExpect(ex []Expect, outputs map[string]string) []string {
-	var fails []string
+	var out []string
+	for _, f := range evalExpect(ex, outputs) {
+		out = append(out, f.In(i18n.Es))
+	}
+	return out
+}
+
+// evalExpect es EvalExpect con cada fallo como código del catálogo, para darlo en el idioma pedido.
+func evalExpect(ex []Expect, outputs map[string]string) []i18n.Text {
+	var fails []i18n.Text
 	parsed := map[string]*iosconf.Node{}
 	states := map[string]cfgState{}
 	for _, e := range ex {
@@ -251,7 +263,7 @@ func EvalExpect(ex []Expect, outputs map[string]string) []string {
 				if len(path) > 0 {
 					where = strings.Join(path, " > ")
 				}
-				fails = append(fails, fmt.Sprintf("en %q la sección %q no quedó como se esperaba tras aplicar (alguna otra línea cambió o falta)", e.Command, where))
+				fails = append(fails, note("assist.post.section_changed", "command", e.Command, "where", where))
 			}
 			continue
 		}
@@ -264,9 +276,9 @@ func EvalExpect(ex []Expect, outputs map[string]string) []string {
 			}
 			shown := strings.ReplaceAll(e.Line, expectSep, " > ")
 			if found := sectionHas(root, strings.Split(e.Line, expectSep)); found != e.Present && e.Present {
-				fails = append(fails, fmt.Sprintf("en %q debía aparecer %q", e.Command, shown))
+				fails = append(fails, note("assist.post.must_appear", "command", e.Command, "line", shown))
 			} else if found != e.Present {
-				fails = append(fails, fmt.Sprintf("en %q no debía aparecer %q", e.Command, shown))
+				fails = append(fails, note("assist.post.must_not_appear", "command", e.Command, "line", shown))
 			}
 			continue
 		}
@@ -274,22 +286,22 @@ func EvalExpect(ex []Expect, outputs map[string]string) []string {
 			rows, _ := iosxe.ParseIfStatus(text)
 			switch {
 			case len(rows) == 0:
-				fails = append(fails, fmt.Sprintf("en %q no se pudo leer el estado del puerto", e.Command))
+				fails = append(fails, note("assist.post.port_unreadable", "command", e.Command))
 			case (rows[0].Status == e.Line) != e.Present && e.Present:
-				fails = append(fails, fmt.Sprintf("en %q el estado debía ser %q y es %q", e.Command, e.Line, rows[0].Status))
+				fails = append(fails, note("assist.post.state_expected", "command", e.Command, "line", e.Line, "status", rows[0].Status))
 			case (rows[0].Status == e.Line) != e.Present:
-				fails = append(fails, fmt.Sprintf("en %q el puerto quedó %q", e.Command, rows[0].Status))
+				fails = append(fails, note("assist.post.port_left", "command", e.Command, "status", rows[0].Status))
 			}
 			continue
 		}
 		if m, ok := columnMatch(e, text); ran && e.Column != "" {
 			switch {
 			case !ok:
-				fails = append(fails, fmt.Sprintf("en %q no se pudo leer %s", e.Command, e.Column))
+				fails = append(fails, note("assist.post.column_unreadable", "command", e.Command, "column", e.Column))
 			case m != e.Present && e.Present:
-				fails = append(fails, fmt.Sprintf("en %q debía cumplirse %s %q", e.Command, e.Column, e.Line))
+				fails = append(fails, note("assist.post.column_must", "command", e.Command, "column", e.Column, "line", e.Line))
 			case m != e.Present:
-				fails = append(fails, fmt.Sprintf("en %q no debía cumplirse %s %q", e.Command, e.Column, e.Line))
+				fails = append(fails, note("assist.post.column_must_not", "command", e.Command, "column", e.Column, "line", e.Line))
 			}
 			continue
 		}
@@ -303,11 +315,11 @@ func EvalExpect(ex []Expect, outputs map[string]string) []string {
 		}
 		switch {
 		case !ran:
-			fails = append(fails, fmt.Sprintf("%q no corrió", e.Command))
+			fails = append(fails, note("assist.post.not_run", "command", e.Command))
 		case found != e.Present && e.Present:
-			fails = append(fails, fmt.Sprintf("en %q debía aparecer %q", e.Command, e.Line))
+			fails = append(fails, note("assist.post.must_appear", "command", e.Command, "line", e.Line))
 		case found != e.Present:
-			fails = append(fails, fmt.Sprintf("en %q no debía aparecer %q", e.Command, e.Line))
+			fails = append(fails, note("assist.post.must_not_appear", "command", e.Command, "line", e.Line))
 		}
 	}
 	return fails

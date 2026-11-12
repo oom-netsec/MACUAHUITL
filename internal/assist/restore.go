@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
@@ -549,32 +550,32 @@ func headerName(h string) string {
 // recortado, de otro equipo o con cambios que la lista cerrada no admite se rechaza (ErrRestoreRefused) y lo rechazado va en
 // RestorePlan.Refused; con Partial se aplica solo lo permitido.
 func RestoreDiffPlan(device string, c RestoreChange, outs map[string]string) (RestorePlan, error) {
-	refuseAll := func(format string, a ...any) (RestorePlan, error) {
-		return RestorePlan{}, fmt.Errorf("%w: "+format, append([]any{ErrRestoreRefused}, a...)...)
+	refuseAll := func(code string, kv ...any) (RestorePlan, error) {
+		return RestorePlan{}, newRefusal(ErrRestoreRefused, "assist.restore_refused", i18n.Tx(code, kv...))
 	}
 	if c.BackupMasked || maskRe.MatchString(c.Backup) {
-		return refuseAll("el respaldo se tomó con secretos enmascarados (o trae marcas de enmascarado): restaurarlo borraría contraseñas y llaves; toma un respaldo sin enmascarar")
+		return refuseAll("assist.restore_refused.el_respaldo_se_tomo_con")
 	}
 	if c.BackupTruncated {
-		return refuseAll("el respaldo está marcado como recortado: no es la configuración completa")
+		return refuseAll("assist.restore_refused.el_respaldo_esta_marcado_como")
 	}
 	if strings.TrimSpace(c.Backup) == "" || !completeBackup(c.Backup) {
-		return refuseAll("el respaldo no termina en end: está cortado o incompleto")
+		return refuseAll("assist.restore_refused.el_respaldo_no_termina_en")
 	}
 	max := c.MaxLines
 	if max < 0 || max > MaxRestoreLines {
-		return refuseAll("el tope de líneas va de 1 a %d", MaxRestoreLines)
+		return refuseAll("assist.restore_refused.el_tope_de_lineas_va", "max", MaxRestoreLines)
 	}
 	if max == 0 {
 		max = DefaultRestoreLines
 	}
 	run, ok := outs[runningCmd]
 	if !ok || strings.TrimSpace(run) == "" {
-		return refuseAll("falta el running-config del equipo")
+		return refuseAll("assist.restore_refused.falta_el_running_config_del")
 	}
 	curRoot, wantRoot := parseCfg(run), parseCfg(c.Backup)
 	if len(wantRoot.Children) == 0 {
-		return refuseAll("el respaldo está vacío")
+		return refuseAll("assist.restore_refused.el_respaldo_esta_vacio")
 	}
 	hn := func(r *iosconf.Node) string {
 		for _, n := range r.Find(`hostname .+`) {
@@ -583,11 +584,11 @@ func RestoreDiffPlan(device string, c RestoreChange, outs map[string]string) (Re
 		return ""
 	}
 	if a, b := hn(curRoot), hn(wantRoot); a == "" || b == "" || a != b {
-		return refuseAll("el respaldo es del equipo %q y este es %q (sin hostname en alguno no se puede comprobar que sea el mismo equipo)", b, a)
+		return refuseAll("assist.restore_refused.el_respaldo_es_del_equipo", "backup", b, "device", a)
 	}
 	ver, _ := iosxe.ParseVersion(outs["show version"])
 	if c.BackupSerial == "" || ver.Serial == "" || !strings.EqualFold(c.BackupSerial, ver.Serial) {
-		return refuseAll("el número de serie del respaldo (%q) no coincide con el del equipo (%q): el hostname no basta para saber que es el mismo equipo; sin serie en la ficha o en show version no se restaura", c.BackupSerial, ver.Serial)
+		return refuseAll("assist.restore_refused.el_numero_de_serie_del", "backup_serial", c.BackupSerial, "serial", ver.Serial)
 	}
 	mgI, mgV, err := managementOf(curRoot, outs, c.Management)
 	if err != nil {
@@ -653,7 +654,7 @@ func RestoreDiffPlan(device string, c RestoreChange, outs map[string]string) (Re
 	}
 	rp := RestorePlan{Refused: d.refs}
 	if len(d.refs) > 0 && !c.Partial {
-		return rp, fmt.Errorf("%w: el diff toca %d cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial", ErrRestoreRefused, len(d.refs))
+		return rp, newRefusal(ErrRestoreRefused, "assist.restore_refused", i18n.Tx("assist.restore_refused.diff_touches", "count", len(d.refs)))
 	}
 	if len(keep) == 0 {
 		return rp, ErrNoDifference
@@ -661,11 +662,11 @@ func RestoreDiffPlan(device string, c RestoreChange, outs map[string]string) (Re
 	apply, n, expect := render(keep)
 	rollback, _, _ := render(flip(keep))
 	if n > max {
-		return rp, fmt.Errorf("%w: el plan tiene %d líneas de cambio y el tope es %d", ErrRestoreRefused, n, max)
+		return rp, newRefusal(ErrRestoreRefused, "assist.restore_refused", i18n.Tx("assist.restore_refused.plan_too_long", "count", n, "max", max))
 	}
 	after, touched, err := simulate(curSt, apply)
 	if err != nil {
-		return rp, fmt.Errorf("%w: %v", ErrRestoreRefused, err)
+		return rp, newRefusal(ErrRestoreRefused, "assist.restore_refused", raw("assist.restore_refused", err.Error()))
 	}
 	expect = append(expect, sectionExpects(after, touched)...)
 	rp.Fn = restoreFn(rc)

@@ -16,19 +16,26 @@ import (
 // es trunk, SVI con IP, existencia dudosa...). Es una negativa, no un error de uso.
 var ErrSnippetRefused = errors.New("assist: el equipo no admite este snippet")
 
-func refuseSnippet(format string, a ...any) error {
-	return &SnippetRefusal{Detail: fmt.Sprintf(format, a...)}
+func refuseSnippet(code string, kv ...any) error {
+	t := i18n.Tx(code, kv...)
+	return &SnippetRefusal{Detail: t.In(i18n.Es), Why: t}
 }
 
 // SnippetRefusal es ErrSnippetRefused con su motivo. Template (id de la plantilla del catálogo) y Device los llena el
-// servicio, que los conoce. Detail sigue en español hasta que se traduzcan los motivos de cada negativa.
-type SnippetRefusal struct{ Detail, Template, Device string }
+// servicio, que los conoce. Detail es el motivo en es; Why es el mismo motivo como código del catálogo, para darlo en el otro idioma.
+type SnippetRefusal struct {
+	Detail, Template, Device string
+	Why                      i18n.Text
+}
 
 func (e *SnippetRefusal) Error() string        { return ErrSnippetRefused.Error() + ": " + e.Detail }
 func (e *SnippetRefusal) Is(target error) bool { return target == ErrSnippetRefused }
 func (e *SnippetRefusal) Reason() string       { return "assist.refused" }
 func (e *SnippetRefusal) Localize(loc string) string {
-	return i18n.Msg(loc, "assist.refused", i18n.A("detail", e.Detail))
+	if e.Why.Empty() {
+		return i18n.Msg(loc, "assist.refused", i18n.A("detail", e.Detail))
+	}
+	return i18n.Msg(loc, "assist.refused", i18n.A("detail", e.Why.In(loc)))
 }
 
 // Metadata dice la plantilla y el equipo; el motivo (Detail) viaja solo en el mensaje.
@@ -49,7 +56,7 @@ var vlanNameRe = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,32}$`)
 // vlanIDOK acepta 2-4094 salvo las reservadas 1002-1005 (IOS no deja crearlas ni borrarlas).
 func vlanIDOK(id int) error {
 	if id < 2 || id > 4094 || (id >= 1002 && id <= 1005) {
-		return fmt.Errorf("VLAN %d fuera de 2-4094 o reservada (1, 1002-1005)", id)
+		return cerr("assist.err.vlan_fuera_de_2_4094", "id", id)
 	}
 	return nil
 }
@@ -184,11 +191,11 @@ func vlanRemoveBlockers(device string, c VlanChange, cur *iosxe.VlanRow, outs ma
 	id := ntoa(c.ID)
 	svis, ok := iosxe.ParseIPBrief(outs[showIPBrief])
 	if !ok {
-		return refuseSnippet("no se pudo leer show ip interface brief de %s: sin saber si la VLAN %s tiene SVI no se borra", device, id)
+		return refuseSnippet("assist.refused.no_se_pudo_leer_show2", "device", device, "id", id)
 	}
 	for _, i := range svis {
 		if strings.EqualFold(i.Raw, "Vlan"+id) {
-			return refuseSnippet("la VLAN %s de %s tiene SVI (interface Vlan%s): quítala primero; si es la de gestión, borrar la VLAN cortaría tu sesión", id, device, id)
+			return refuseSnippet("assist.refused.la_vlan_de_tiene_svi", "id", id, "device", device, "svi", id)
 		}
 	}
 	var onTrunk []string
@@ -196,11 +203,11 @@ func vlanRemoveBlockers(device string, c VlanChange, cur *iosxe.VlanRow, outs ma
 		trs, ok1 := iosxe.ParseTrunks(tout)
 		act, ok2 := iosxe.ParseTrunkActive(tout)
 		if !ok1 || !ok2 {
-			return refuseSnippet("no se pudo leer show interfaces trunk de %s: sin saber si la VLAN %s viaja por un trunk no se borra", device, id)
+			return refuseSnippet("assist.refused.no_se_pudo_leer_show3", "device", device, "id", id)
 		}
 		for _, t := range trs {
 			if t.Native == id {
-				return refuseSnippet("la VLAN %s es la nativa del trunk %s de %s: no se borra", id, t.Port, device)
+				return refuseSnippet("assist.refused.la_vlan_es_la_nativa", "id", id, "port", t.Port, "device", device)
 			}
 		}
 		for _, t := range act {
@@ -210,21 +217,21 @@ func vlanRemoveBlockers(device string, c VlanChange, cur *iosxe.VlanRow, outs ma
 		}
 	}
 	if len(cur.Ports) > 0 {
-		return refuseSnippet("la VLAN %s de %s tiene puertos asignados (%s): muévelos a otra VLAN antes, porque borrarla los dejaría inactivos", id, device, strings.Join(cur.Ports, ", "))
+		return refuseSnippet("assist.refused.la_vlan_de_tiene_puertos", "id", id, "device", device, "ports", strings.Join(cur.Ports, ", "))
 	}
 	if len(onTrunk) > 0 && !c.AcceptTrunk {
-		return refuseSnippet("la VLAN %s de %s viaja por los trunks %s: borrarla corta su tráfico (acéptalo de forma explícita si es lo que quieres)", id, device, strings.Join(onTrunk, ", "))
+		return refuseSnippet("assist.refused.la_vlan_de_viaja_por", "id", id, "device", device, "trunks", strings.Join(onTrunk, ", "))
 	}
 	if cur.Status != "active" {
-		return refuseSnippet("la VLAN %s de %s está en estado %q, no activa: la reversa no podría restaurarla igual", id, device, cur.Status)
+		return refuseSnippet("assist.refused.la_vlan_de_esta_en", "id", id, "device", device, "status", cur.Status)
 	}
 	if d, ok := iosxe.ParseVlanDetail(outs[showVlan(c.ID)], c.ID); !ok {
-		return refuseSnippet("no se pudo leer el tipo y el MTU de la VLAN %s en %s: la reversa no puede garantizar restaurarla igual", id, device)
+		return refuseSnippet("assist.refused.no_se_pudo_leer_el", "id", id, "device", device)
 	} else if d.Type != "enet" || d.MTU != 1500 || d.RSPAN || d.Private {
-		return refuseSnippet("la VLAN %s de %s no es una VLAN Ethernet común (tipo %s, MTU %d, Remote SPAN %v, privada %v): la reversa no podría restaurarla igual", id, device, d.Type, d.MTU, d.RSPAN, d.Private)
+		return refuseSnippet("assist.refused.la_vlan_de_no_es", "id", id, "device", device, "type", d.Type, "mtu", d.MTU, "rspan", d.RSPAN, "private", d.Private)
 	}
 	if !vlanNameRe.MatchString(cur.Name) {
-		return refuseSnippet("el nombre %q de la VLAN %s no se puede restaurar con la reversa", cur.Name, id)
+		return refuseSnippet("assist.refused.el_nombre_de_la_vlan", "cur", cur.Name, "id", id)
 	}
 	return nil
 }
@@ -238,7 +245,7 @@ func VlanPlan(device string, c VlanChange, outs map[string]string) (DevicePlan, 
 	}
 	for _, cmd := range pre {
 		if _, ok := outs[cmd]; !ok {
-			return DevicePlan{}, fmt.Errorf("falta la salida de %q", cmd)
+			return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", cmd)
 		}
 	}
 	vtp, ok := iosxe.ParseVTP(outs[showVtp()])
@@ -248,14 +255,14 @@ func VlanPlan(device string, c VlanChange, outs map[string]string) (DevicePlan, 
 	switch {
 	case !ok || unclear:
 		if !c.AcceptVTP {
-			return DevicePlan{}, refuseSnippet("no se pudo leer con certeza el modo VTP de %s: con VTP servidor o cliente el cambio se propagaría al dominio", device)
+			return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_con", "device", device)
 		}
 	case prop && vtp.Domain != "" && !c.AcceptVTP:
-		return DevicePlan{}, refuseSnippet("%s es VTP %s del dominio %q: el cambio se propagaría a todo el dominio (acéptalo de forma explícita si es lo que quieres)", device, vtp.Mode, vtp.Domain)
+		return DevicePlan{}, refuseSnippet("assist.refused.es_vtp_del_dominio_el", "device", device, "mode", vtp.Mode, "domain", vtp.Domain)
 	}
 	rows, ok := iosxe.ParseVlanBrief(outs["show vlan brief"])
 	if !ok {
-		return DevicePlan{}, refuseSnippet("no se pudo leer show vlan brief de %s", device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_show4", "device", device)
 	}
 	var cur *iosxe.VlanRow
 	for i := range rows {
@@ -266,13 +273,13 @@ func VlanPlan(device string, c VlanChange, outs map[string]string) (DevicePlan, 
 	// La reversa borra la VLAN si "no existía": ese dato se confirma con un segundo comando.
 	byID, idOK := iosxe.ParseVlanBrief(outs[showVlan(c.ID)])
 	if (cur != nil) != (idOK && len(byID) > 0) {
-		return DevicePlan{}, refuseSnippet("show vlan brief y show vlan id %d no coinciden sobre si la VLAN existe en %s", c.ID, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.show_vlan_brief_y_show", "id", c.ID, "device", device)
 	}
 	dp := DevicePlan{Device: device, Pre: pre, Post: []string{showVlan(c.ID)}, Baseline: map[string]string{showVlan(c.ID): outs[showVlan(c.ID)]}}
 	want := c.Name
 	switch {
 	case c.Remove && cur == nil:
-		return DevicePlan{}, fmt.Errorf("la VLAN %d no existe en %s", c.ID, device)
+		return DevicePlan{}, cerr("assist.err.la_vlan_no_existe_en", "id", c.ID, "device", device)
 	case c.Remove:
 		if err := vlanRemoveBlockers(device, c, cur, outs); err != nil {
 			return DevicePlan{}, err
@@ -292,7 +299,7 @@ func VlanPlan(device string, c VlanChange, outs map[string]string) (DevicePlan, 
 		}
 		dp.Rollback = []string{"no vlan " + ntoa(c.ID)}
 	case c.Name == "" || c.Name == cur.Name:
-		return DevicePlan{}, fmt.Errorf("la VLAN %d ya existe con ese nombre (%s): no hay nada que cambiar", c.ID, cur.Name)
+		return DevicePlan{}, cerr("assist.err.la_vlan_ya_existe_con", "id", c.ID, "cur", cur.Name)
 	default:
 		dp.Apply = []string{"vlan " + ntoa(c.ID), "name " + c.Name}
 		dp.Rollback = []string{"vlan " + ntoa(c.ID), "name " + cur.Name}
@@ -399,28 +406,28 @@ func TrunkPlan(device string, c TrunkChange, outs map[string]string) (DevicePlan
 	}
 	text, ok := outs[showCfg(c.Interface)]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la configuración capturada de %s", c.Interface)
+		return DevicePlan{}, cerr("assist.err.falta_la_configuracion_capturada_de2", "interface", c.Interface)
 	}
 	cur, ok := iosxe.ParseInterfaceConfig(text)
 	if !ok || !strings.EqualFold(iosxe.ShortIf(cur.Name), iosxe.ShortIf(c.Interface)) {
-		return DevicePlan{}, fmt.Errorf("la captura de %s no es la configuración de esa interfaz", c.Interface)
+		return DevicePlan{}, cerr("assist.err.la_captura_de_no_es2", "interface", c.Interface)
 	}
 	swMode, _ := iosxe.ParseSwitchportMode(outs[showSwitchport(c.Interface)])
 	switch {
 	case cur.Routed || cur.L3:
-		return DevicePlan{}, refuseSnippet("%s es un puerto ruteado o de capa 3", c.Interface)
+		return DevicePlan{}, refuseSnippet("assist.refused.es_un_puerto_ruteado_o2", "interface", c.Interface)
 	case cur.ChannelGroup:
-		return DevicePlan{}, refuseSnippet("%s es miembro de un canal: cambia el Port-channel, no el miembro", c.Interface)
+		return DevicePlan{}, refuseSnippet("assist.refused.es_miembro_de_un_canal3", "interface", c.Interface)
 	case cur.Mode == "access" || !(cur.Mode == "trunk" || swMode == "trunk"):
-		return DevicePlan{}, refuseSnippet("%s no es un trunk (ni switchport mode trunk ni Administrative Mode: trunk)", c.Interface)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_es_un_trunk_ni", "interface", c.Interface)
 	}
 	set, all := iosxe.TrunkAllowedSet(cur.TrunkAllowed)
 	allowed := all || set[c.Vlan]
 	switch {
 	case c.Op == "add" && allowed:
-		return DevicePlan{}, fmt.Errorf("la VLAN %d ya está permitida en %s: no hay nada que cambiar", c.Vlan, c.Interface)
+		return DevicePlan{}, cerr("assist.err.la_vlan_ya_esta_permitida", "vlan", c.Vlan, "interface", c.Interface)
 	case c.Op == "remove" && !allowed:
-		return DevicePlan{}, fmt.Errorf("la VLAN %d no está permitida en %s: no hay nada que cambiar", c.Vlan, c.Interface)
+		return DevicePlan{}, cerr("assist.err.la_vlan_no_esta_permitida", "vlan", c.Vlan, "interface", c.Interface)
 	}
 	inverse := map[string]string{"add": "remove", "remove": "add"}[c.Op]
 	line := func(op string) string { return fmt.Sprintf("switchport trunk allowed vlan %s %d", op, c.Vlan) }
@@ -452,7 +459,7 @@ func sviID(name string) (int, bool) {
 func parseMask(m string) (netip.Addr, int, error) {
 	a, err := netip.ParseAddr(m)
 	if err != nil || !a.Is4() {
-		return netip.Addr{}, 0, errors.New("máscara inválida (usa la forma 255.255.255.0)")
+		return netip.Addr{}, 0, cerr("assist.err.mascara_invalida_usa_la_forma")
 	}
 	b := a.As4()
 	v := uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
@@ -461,7 +468,7 @@ func parseMask(m string) (netip.Addr, int, error) {
 		ones++
 	}
 	if ones < 8 || ones > 30 || v<<ones != 0 {
-		return netip.Addr{}, 0, errors.New("máscara no contigua o fuera de /8-/30")
+		return netip.Addr{}, 0, cerr("assist.err.mascara_no_contigua_o_fuera")
 	}
 	return a, ones, nil
 }
@@ -470,14 +477,14 @@ func parseMask(m string) (netip.Addr, int, error) {
 func checkAddress(addr, mask string) error {
 	a, err := netip.ParseAddr(addr)
 	if err != nil || !a.Is4() || strings.ContainsAny(addr, "/% ") {
-		return fmt.Errorf("dirección IPv4 inválida %q", addr)
+		return cerr("assist.err.direccion_ipv4_invalida2", "addr", addr)
 	}
 	if _, ones, err := parseMask(mask); err != nil {
 		return err
 	} else if a.IsUnspecified() || a.IsLoopback() || a.IsMulticast() || a.IsLinkLocalUnicast() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255}) {
-		return fmt.Errorf("%s no es una dirección unicast válida", addr)
+		return cerr("assist.err.no_es_una_direccion_unicast2", "addr", addr)
 	} else if p, _ := a.Prefix(ones); p.Addr() == a || lastOf(p) == a {
-		return fmt.Errorf("%s es la dirección de red o de difusión de /%d", addr, ones)
+		return cerr("assist.err.es_la_direccion_de_red", "addr", addr, "ones", ones)
 	}
 	return nil
 }
@@ -491,10 +498,10 @@ func lastOf(p netip.Prefix) netip.Addr {
 
 func descOK(d string) error {
 	if err := asciiOnly(d); err != nil {
-		return fmt.Errorf("descripción: %w", err)
+		return withPrefix("assist.err.description_prefix", err)
 	}
 	if strings.ContainsAny(d, "?\t") || len(strings.TrimSpace(d)) > 200 {
-		return errors.New("la descripción no admite '?' y mide como máximo 200 caracteres")
+		return cerr("assist.err.la_descripcion_no_admite_y")
 	}
 	return nil
 }
@@ -509,35 +516,35 @@ var SnippetSVI = Function{
 		switch {
 		case strings.EqualFold(f[0], "interface"), strings.HasPrefix(l, "no interface "):
 			if len(f) != map[bool]int{true: 2, false: 3}[strings.EqualFold(f[0], "interface")] {
-				return errors.New("sobran argumentos")
+				return cerr("assist.err.sobran_argumentos")
 			}
 			if _, ok := sviID(f[len(f)-1]); !ok {
-				return errors.New("solo una interfaz VlanN")
+				return cerr("assist.err.solo_una_interfaz_vlann")
 			}
 		case strings.HasPrefix(l, "ip address "):
 			if len(f) != 4 {
-				return errors.New("`ip address A M`, sin secundarias ni otras formas")
+				return cerr("assist.err.ip_address_a_m_sin")
 			}
 			return checkAddress(f[2], f[3])
 		case l == "no ip address" || l == "shutdown" || l == "no shutdown" || l == "no description":
 		case strings.HasPrefix(l, "description"):
 			return descOK(strings.TrimSpace(line[len("description"):]))
 		default:
-			return errors.New("no reconocida")
+			return cerr("assist.err.no_reconocida")
 		}
 		return nil
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) == 0 || !strings.HasPrefix(strings.ToLower(d.Apply[0]), "interface ") {
-			return errors.New("el apply empieza con `interface VlanN`")
+			return cerr("assist.err.el_apply_empieza_con_interface2")
 		}
 		iface := strings.Fields(d.Apply[0])[1]
 		for _, l := range d.Apply {
 			if strings.HasPrefix(strings.ToLower(l), "no interface") || strings.HasPrefix(strings.ToLower(l), "no ip address") {
-				return errors.New("el apply no borra interfaces ni direcciones")
+				return cerr("assist.err.el_apply_no_borra_interfaces")
 			}
 			if strings.HasPrefix(strings.ToLower(l), "interface ") && !strings.EqualFold(strings.Fields(l)[1], iface) {
-				return errors.New("el apply toca una sola interfaz")
+				return cerr("assist.err.el_apply_toca_una_sola2")
 			}
 		}
 		if len(d.Rollback) == 0 {
@@ -547,16 +554,16 @@ var SnippetSVI = Function{
 		switch {
 		case len(first) == 3 && strings.EqualFold(first[0], "no") && strings.EqualFold(first[1], "interface"):
 			if len(d.Rollback) != 1 || !strings.EqualFold(first[2], iface) {
-				return fmt.Errorf("`no interface` solo puede borrar %s, la interfaz que el apply crea", iface)
+				return cerr("assist.err.no_interface_solo_puede_borrar", "iface", iface)
 			}
 		case len(first) == 2 && strings.EqualFold(first[0], "interface") && strings.EqualFold(first[1], iface):
 			for _, l := range d.Rollback[1:] {
 				if strings.HasPrefix(strings.ToLower(l), "interface") || strings.HasPrefix(strings.ToLower(l), "no interface") {
-					return errors.New("la reversa restaura una sola interfaz")
+					return cerr("assist.err.la_reversa_restaura_una_sola")
 				}
 			}
 		default:
-			return fmt.Errorf("la reversa debe borrar %s o restaurarla", iface)
+			return cerr("assist.err.la_reversa_debe_borrar_o", "iface", iface)
 		}
 		return nil
 	},
@@ -603,11 +610,11 @@ func SVIPlan(device string, c SVIChange, outs map[string]string) (DevicePlan, er
 	text, ok := outs[pre[0]]
 	brief, ok2 := outs[showIPBrief]
 	if !ok || !ok2 {
-		return DevicePlan{}, fmt.Errorf("faltan las salidas de %q y %q", pre[0], showIPBrief)
+		return DevicePlan{}, cerr("assist.err.faltan_las_salidas_de_y", "command1", pre[0], "command2", showIPBrief)
 	}
 	rows, ok := iosxe.ParseIPBrief(brief)
 	if !ok {
-		return DevicePlan{}, refuseSnippet("no se pudo leer show ip interface brief de %s", device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_show", "device", device)
 	}
 	inBrief := false
 	for _, r := range rows {
@@ -615,19 +622,19 @@ func SVIPlan(device string, c SVIChange, outs map[string]string) (DevicePlan, er
 			inBrief = true
 		}
 		if r.IP == c.Address {
-			return DevicePlan{}, refuseSnippet("%s ya tiene la dirección %s asignada a %s", device, c.Address, r.Raw)
+			return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_la_direccion_asignada2", "device", device, "address", c.Address, "owner", r.Raw)
 		}
 	}
 	cur, exists := iosxe.ParseInterfaceConfig(text)
 	switch {
 	case exists && !strings.EqualFold(cur.Name, name):
-		return DevicePlan{}, refuseSnippet("la captura no es la configuración de %s", name)
+		return DevicePlan{}, refuseSnippet("assist.refused.la_captura_no_es_la", "name", name)
 	case !exists && !strings.Contains(text, "% Invalid input") && !strings.Contains(text, "not found"):
-		return DevicePlan{}, refuseSnippet("la captura de %s no es una interfaz ni el aviso de IOS de que no existe", name)
+		return DevicePlan{}, refuseSnippet("assist.refused.la_captura_de_no_es", "port", name)
 	case exists != inBrief:
-		return DevicePlan{}, refuseSnippet("la configuración y show ip interface brief no coinciden sobre si %s existe en %s", name, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.la_configuracion_y_show_ip", "name", name, "device", device)
 	case exists && (cur.L3 || cur.Routed):
-		return DevicePlan{}, refuseSnippet("%s ya tiene dirección IP (o VRF/NAT): no se sobrescribe", name)
+		return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_direccion_ip_o", "name", name)
 	}
 	dp := DevicePlan{Device: device, Pre: pre, Post: []string{showCfg(name)}, Baseline: map[string]string{showCfg(name): text}}
 	dp.Apply = []string{"interface " + name}

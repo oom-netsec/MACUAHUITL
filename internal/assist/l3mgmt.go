@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -33,6 +34,7 @@ const (
 )
 
 // origin es una IP de origen de la sesión con la que se explica un rechazo.
+// what es "1" para la IP que ve el equipo y "2" para la local de la app: el catálogo escribe la frase en cada idioma ({what|uno|dos}).
 type origin struct {
 	addr netip.Addr
 	what string
@@ -43,11 +45,11 @@ type origin struct {
 func sessionOrigins(device string, outs map[string]string) ([]origin, error) {
 	seen, ok := sessionOrigin(outs[showUsersCmd])
 	if !ok || seen.IsUnspecified() {
-		return nil, refuseSnippet("no se pudo obtener la IP de origen de la sesión con %s (show users no la muestra): sin ella no se puede comprobar que el cambio no te deje fuera", device)
+		return nil, refuseSnippet("assist.refused.no_se_pudo_obtener_la", "device", device)
 	}
-	out := []origin{{seen, "la IP que ve el equipo"}}
+	out := []origin{{seen, "1"}}
 	if local, err := netip.ParseAddr(outs[SessionSourceKey]); err == nil && !local.IsUnspecified() && local.Unmap() != seen {
-		out = append(out, origin{local.Unmap(), "la IP local de la sesión"})
+		out = append(out, origin{local.Unmap(), "2"})
 	}
 	return out, nil
 }
@@ -60,7 +62,7 @@ func coversSession(device string, p netip.Prefix, outs map[string]string) error 
 	}
 	for _, o := range origins {
 		if p.Contains(o.addr) {
-			return refuseSnippet("%s contiene %s (%s): el tráfico de regreso de tu sesión SSH iría por ahí y te dejaría fuera", p, o.addr, o.what)
+			return refuseSnippet("assist.refused.contiene_el_trafico_de_regreso", "where", p, "addr", o.addr, "what", o.what)
 		}
 	}
 	return nil
@@ -72,10 +74,10 @@ func showACL(name string) string { return "show ip access-lists " + name }
 func unicastIPv4(what, s string) error {
 	a, err := netip.ParseAddr(s)
 	if err != nil || !a.Is4() {
-		return fmt.Errorf("%s: dirección IPv4 inválida %q", what, s)
+		return cerr("assist.err.direccion_ipv4_invalida", "what", what, "s", s)
 	}
 	if a.IsUnspecified() || a.IsLoopback() || a.IsMulticast() || a.IsLinkLocalUnicast() || a.As4()[0] >= 240 {
-		return fmt.Errorf("%s: %s no es una dirección unicast utilizable", what, s)
+		return cerr("assist.err.no_es_una_direccion_unicast", "what", what, "s", s)
 	}
 	return nil
 }
@@ -269,11 +271,11 @@ func routePlan(device string, v Values, outs map[string]string) (DevicePlan, err
 	}
 	text, ok := outs[routeCmd]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la salida de %q", routeCmd)
+		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", routeCmd)
 	}
 	routes, ok := iosxe.ParseStaticRoutes(text)
 	if !ok {
-		return DevicePlan{}, refuseSnippet("no se pudo leer %q en %s", routeCmd, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_en", "command", routeCmd, "device", device)
 	}
 	ones, _ := maskBits(s.mask)
 	if err := coversSession(device, netip.PrefixFrom(netip.MustParseAddr(s.net), ones), outs); err != nil {
@@ -286,7 +288,7 @@ func routePlan(device string, v Values, outs map[string]string) (DevicePlan, err
 			continue
 		}
 		if exists = true; r.Distance != s.ad || r.Name != s.name || len(r.Other) > 0 {
-			return DevicePlan{}, refuseSnippet("%s ya tiene una ruta a %s por ese salto con otros atributos (distancia, nombre u otros): la reversa no la restauraría", device, s.net+"/"+s.mask)
+			return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_una_ruta_a", "device", device, "net", s.net+"/"+s.mask)
 		}
 	}
 	if !exists {
@@ -361,11 +363,11 @@ func checkLoopbackAddress(addr, mask string) error {
 	}
 	ones, err := maskBits(mask)
 	if err != nil || ones < 8 {
-		return errors.New("máscara contigua de /8 a /32")
+		return cerr("assist.err.mascara_contigua_de_8_a")
 	}
 	a := netip.MustParseAddr(addr)
 	if p, _ := a.Prefix(ones); ones < 31 && (p.Addr() == a || lastOf(p) == a) {
-		return fmt.Errorf("%s es la dirección de red o de difusión de /%d", addr, ones)
+		return cerr("assist.err.es_la_direccion_de_red", "addr", addr, "ones", ones)
 	}
 	return nil
 }
@@ -379,29 +381,29 @@ var SnippetLoopback = Function{
 		switch l := strings.ToLower(line); {
 		case f[0] == "interface" && len(f) == 2, f[0] == "no" && len(f) == 3 && f[1] == "interface":
 			if _, ok := loopID(f[len(f)-1]); !ok {
-				return errors.New("solo una interfaz LoopbackN")
+				return cerr("assist.err.solo_una_interfaz_loopbackn")
 			}
 		case strings.HasPrefix(l, "ip address ") && len(f) == 4:
 			return checkLoopbackAddress(f[2], f[3])
 		case strings.HasPrefix(l, "description"):
 			return descOK(strings.TrimSpace(line[len("description"):]))
 		default:
-			return errors.New("solo interface LoopbackN, description, ip address A M y no interface LoopbackN")
+			return cerr("assist.err.solo_interface_loopbackn_description_ip")
 		}
 		return nil
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) == 0 || !strings.HasPrefix(strings.ToLower(d.Apply[0]), "interface ") {
-			return errors.New("el apply empieza con `interface LoopbackN`")
+			return cerr("assist.err.el_apply_empieza_con_interface")
 		}
 		name := strings.Fields(d.Apply[0])[1]
 		for _, l := range d.Apply[1:] {
 			if lw := strings.ToLower(l); strings.HasPrefix(lw, "interface ") || strings.HasPrefix(lw, "no ") {
-				return errors.New("el apply toca una sola interfaz y no quita nada")
+				return cerr("assist.err.el_apply_toca_una_sola")
 			}
 		}
 		if len(d.Rollback) != 1 || squash(d.Rollback[0]) != "no interface "+name {
-			return fmt.Errorf("la reversa es solo `no interface %s`, la interfaz que el apply crea", name)
+			return cerr("assist.err.la_reversa_es_solo_no", "port", name)
 		}
 		return nil
 	},
@@ -425,24 +427,24 @@ func loopPlan(device string, v Values, outs map[string]string) (DevicePlan, erro
 	text, ok := outs[pre[0]]
 	brief, ok2 := outs[showIPBrief]
 	if !ok || !ok2 {
-		return DevicePlan{}, fmt.Errorf("faltan las salidas de %q y %q", pre[0], showIPBrief)
+		return DevicePlan{}, cerr("assist.err.faltan_las_salidas_de_y", "command1", pre[0], "command2", showIPBrief)
 	}
 	rows, ok := iosxe.ParseIPBrief(brief)
 	if !ok {
-		return DevicePlan{}, refuseSnippet("no se pudo leer show ip interface brief de %s", device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_show", "device", device)
 	}
 	for _, r := range rows {
 		if strings.EqualFold(r.Raw, name) || strings.EqualFold(r.Iface, "Lo"+v.Str("number")) {
-			return DevicePlan{}, refuseSnippet("%s ya existe en %s", name, device)
+			return DevicePlan{}, refuseSnippet("assist.refused.ya_existe_en", "name", name, "device", device)
 		}
 		if r.IP == addr {
-			return DevicePlan{}, refuseSnippet("%s ya tiene la dirección %s asignada a %s", device, addr, r.Raw)
+			return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_la_direccion_asignada", "device", device, "addr", addr, "owner", r.Raw)
 		}
 	}
 	if cur, exists := iosxe.ParseInterfaceConfig(text); exists {
-		return DevicePlan{}, refuseSnippet("%s ya existe en %s (configuración de %s)", name, device, cur.Name)
+		return DevicePlan{}, refuseSnippet("assist.refused.ya_existe_en_configuracion_de", "name", name, "device", device, "cur", cur.Name)
 	} else if !strings.Contains(text, "% Invalid input") && !strings.Contains(text, "not found") {
-		return DevicePlan{}, refuseSnippet("la captura de %s no es una interfaz ni el aviso de IOS de que no existe", name)
+		return DevicePlan{}, refuseSnippet("assist.refused.la_captura_de_no_es", "port", name)
 	}
 	ones, _ := maskBits(mask)
 	subnet, _ := netip.MustParseAddr(addr).Prefix(ones)
@@ -494,7 +496,7 @@ var SnippetHelper = Function{
 func helperPre(v Values) ([]string, error) {
 	n := v.Str("interface")
 	if !routedIfaceRe.MatchString(n) {
-		return nil, fmt.Errorf("%q no es una SVI, un puerto físico, un Port-channel ni una subinterfaz", n)
+		return nil, cerr("assist.err.no_es_una_svi_un", "port", n)
 	}
 	if err := unicastIPv4("helper", v.Str("address")); err != nil {
 		return nil, err
@@ -514,24 +516,24 @@ func helperPlan(device string, v Values, outs map[string]string) (DevicePlan, er
 	n, addr := v.Str("interface"), v.Str("address")
 	text, ok := outs[pre[0]]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la salida de %q", pre[0])
+		return DevicePlan{}, cerr("assist.err.falta_la_salida_de4", "command", pre[0])
 	}
 	cur, ok := iosxe.ParseInterfaceConfig(text)
 	switch {
 	case !ok:
-		return DevicePlan{}, refuseSnippet("%s no existe en %s (o no se pudo leer su configuración)", n, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_existe_en_o_no", "port", n, "device", device)
 	case !ifaceEq(cur.Name, n):
-		return DevicePlan{}, fmt.Errorf("la captura de %s no es la configuración de esa interfaz", n)
+		return DevicePlan{}, cerr("assist.err.la_captura_de_no_es", "port", n)
 	case cur.ChannelGroup:
-		return DevicePlan{}, refuseSnippet("%s es miembro de un canal: pon el helper en el Port-channel", n)
+		return DevicePlan{}, refuseSnippet("assist.refused.es_miembro_de_un_canal2", "port", n)
 	}
 	if len(pre) > 1 {
 		sw, ok := outs[pre[1]]
 		if !ok {
-			return DevicePlan{}, fmt.Errorf("falta la salida de %q", pre[1])
+			return DevicePlan{}, cerr("assist.err.falta_la_salida_de4", "command", pre[1])
 		}
 		if _, l2 := iosxe.ParseSwitchportMode(sw); l2 {
-			return DevicePlan{}, refuseSnippet("%s es un puerto de capa 2 (switchport): el helper va en una interfaz de capa 3", n)
+			return DevicePlan{}, refuseSnippet("assist.refused.es_un_puerto_de_capa", "port", n)
 		}
 	}
 	var feats []l2Feature
@@ -539,7 +541,7 @@ func helperPlan(device string, v Values, outs map[string]string) (DevicePlan, er
 	for _, h := range iosxe.ParseHelpers(cur) {
 		if h.Addr == addr {
 			if exists = true; len(h.Options) > 0 {
-				return DevicePlan{}, refuseSnippet("%s ya tiene el helper %s con opciones (%s): la reversa no lo restauraría", n, addr, strings.Join(h.Options, " "))
+				return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_el_helper_con", "port", n, "addr", addr, "options", strings.Join(h.Options, " "))
 			}
 		}
 	}
@@ -564,7 +566,7 @@ var SnippetNTP = Function{
 		case f[0] == "ntp" && (len(f) == 3 || len(f) == 4 && f[3] == "prefer"):
 		case f[0] == "no" && len(f) == 4:
 		default:
-			return errors.New("solo ntp server A [prefer] y no ntp server A")
+			return cerr("assist.err.solo_ntp_server_a_prefer")
 		}
 		return unicastIPv4("servidor NTP", f[len(f)-1-ifElseInt(f[len(f)-1] == "prefer", 1, 0)])
 	},
@@ -591,11 +593,11 @@ func ntpPlan(device string, v Values, outs map[string]string) (DevicePlan, error
 	}
 	text, ok := outs[ntpCmd]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la salida de %q", ntpCmd)
+		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", ntpCmd)
 	}
 	servers, ok := iosxe.ParseNTPServers(text)
 	if !ok {
-		return DevicePlan{}, refuseSnippet("no se pudo leer %q en %s", ntpCmd, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_en", "command", ntpCmd, "device", device)
 	}
 	addr, prefer := v.Str("address"), v.Bool("prefer")
 	var feats []l2Feature
@@ -605,7 +607,7 @@ func ntpPlan(device string, v Values, outs map[string]string) (DevicePlan, error
 			continue
 		}
 		if exists = true; !slices.Equal(s.Options, ifElseSlice(prefer, []string{"prefer"})) {
-			return DevicePlan{}, refuseSnippet("%s ya tiene el servidor NTP %s con otras opciones (%s): la reversa no las restauraría", device, addr, strings.Join(s.Options, " "))
+			return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_el_servidor_ntp", "device", device, "addr", addr, "options", strings.Join(s.Options, " "))
 		}
 	}
 	if !exists {
@@ -711,7 +713,7 @@ func loggingPre(v Values) ([]string, error) {
 		return nil, err
 	}
 	if t, p := v.Str("transport"), v.Int("port"); t != "" && t != "udp" && t != "tcp" || p < 0 || p > 65535 || v.Has("port") && p == 0 {
-		return nil, errors.New("transporte udp o tcp y puerto 1-65535")
+		return nil, cerr("assist.err.transporte_udp_o_tcp_y")
 	}
 	return []string{loggingCmd}, nil
 }
@@ -722,11 +724,11 @@ func loggingPlan(device string, v Values, outs map[string]string) (DevicePlan, e
 	}
 	text, ok := outs[loggingCmd]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la salida de %q", loggingCmd)
+		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", loggingCmd)
 	}
 	cfg, ok := iosxe.ParseLoggingCfg(text)
 	if !ok {
-		return DevicePlan{}, refuseSnippet("no se pudo leer %q en %s", loggingCmd, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_en", "command", loggingCmd, "device", device)
 	}
 	addr := v.Str("address")
 	apply, opts, wantT, wantP := loggingSpec(v)
@@ -738,7 +740,7 @@ func loggingPlan(device string, v Values, outs map[string]string) (DevicePlan, e
 		}
 		// La misma IP con otro transporte, puerto u opciones: la llave del plan (loggingKey) es por IP, un solo destino por IP.
 		if t, p, ok := h.Transport(); !ok || t != wantT || p != wantP {
-			return DevicePlan{}, refuseSnippet("%s ya tiene un destino de syslog para %s (%s); este snippet maneja un solo destino por IP: quítalo antes o usa el mismo transporte y puerto", device, addr, strings.TrimSpace("logging host "+addr+" "+strings.Join(h.Options, " ")))
+			return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_un_destino_de", "device", device, "addr", addr, "existing", strings.TrimSpace("logging host "+addr+" "+strings.Join(h.Options, " ")))
 		}
 		exists = true
 	}
@@ -747,10 +749,10 @@ func loggingPlan(device string, v Values, outs map[string]string) (DevicePlan, e
 	}
 	if level := v.Str("level"); level != "" {
 		if cfg.Trap != "" && !slices.Contains(logLevels, cfg.Trap) {
-			return DevicePlan{}, refuseSnippet("%s tiene «logging trap %s», que la reversa no sabría restaurar", device, cfg.Trap)
+			return DevicePlan{}, refuseSnippet("assist.refused.tiene_logging_trap_que_la", "device", device, "trap", cfg.Trap)
 		}
 		if cfg.NoTrap && cfg.Trap != "" {
-			return DevicePlan{}, refuseSnippet("%s trae `no logging trap` y a la vez `logging trap %s`: la reversa no sabría cuál restaurar", device, cfg.Trap)
+			return DevicePlan{}, refuseSnippet("assist.refused.trae_no_logging_trap_y", "device", device, "trap", cfg.Trap)
 		}
 		eff, back := "informational", "logging trap informational"
 		switch {
@@ -777,7 +779,7 @@ var communityRe = regexp.MustCompile(`^[\x21-\x7e]{4,32}$`)
 
 func checkCommunity(c string) error {
 	if !communityRe.MatchString(c) || strings.Contains(c, "@") || strings.Contains(c, "?") {
-		return errors.New("la community mide de 4 a 32 caracteres ASCII visibles (con menos, ocultarla volvería ilegibles los eventos), sin '@' (IOS la tomaría como community@VLAN) ni '?'") // sin citarla
+		return cerr("assist.err.la_community_mide_de_4") // sin citarla
 	}
 	return nil
 }
@@ -795,13 +797,13 @@ var SnippetSNMPCommunity = Function{
 			f = f[1:]
 		}
 		if len(f) < 3 || checkCommunity(f[2]) != nil {
-			return errors.New("snmp-server community NOMBRE RO [ACL] o su no: el nombre sin '@' ni '?'")
+			return cerr("assist.err.snmp_server_community_nombre_ro")
 		}
 		switch {
 		case neg && len(f) == 3:
 		case !neg && (len(f) == 4 || len(f) == 5) && f[3] == "RO" && (len(f) == 4 || aclNameRe.MatchString(f[4])):
 		default:
-			return errors.New("solo snmp-server community NOMBRE RO [ACL] (RW nunca) y no snmp-server community NOMBRE")
+			return cerr("assist.err.solo_snmp_server_community_nombre")
 		}
 		return nil
 	},
@@ -827,26 +829,26 @@ func snmpCommPlan(device string, v Values, outs map[string]string) (DevicePlan, 
 	name, acl := v.Str("community"), v.Str("acl")
 	text, ok := outs[snmpCommCmd]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la salida de %q", snmpCommCmd)
+		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", snmpCommCmd)
 	}
 	comms, ok := iosxe.ParseSNMPCommunities(text)
 	if !ok {
-		return DevicePlan{}, refuseSnippet("no se pudo leer %q en %s", snmpCommCmd, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_en", "command", snmpCommCmd, "device", device)
 	}
 	if slices.ContainsFunc(comms, func(c iosxe.SNMPCommunity) bool { return c.Name == name }) { // jamás se cita la community
-		return DevicePlan{}, refuseSnippet("%s ya tiene una community con ese nombre (no se muestra): la reversa no restauraría su permiso ni su ACL", device)
+		return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_una_community_con", "device", device)
 	}
 	if acl != "" {
 		out, ok := outs[showACL(acl)]
 		if !ok {
-			return DevicePlan{}, fmt.Errorf("falta la salida de %q", showACL(acl))
+			return DevicePlan{}, cerr("assist.err.falta_la_salida_de8", "acl", showACL(acl))
 		}
 		lists, ok := iosxe.ParseAccessLists(out)
 		if !ok {
-			return DevicePlan{}, refuseSnippet("no se pudo leer %q en %s", showACL(acl), device)
+			return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_en6", "acl", showACL(acl), "device", device)
 		}
 		if !slices.ContainsFunc(lists, func(l iosxe.AccessList) bool { return l.Name == acl }) {
-			return DevicePlan{}, refuseSnippet("la ACL %s no existe en %s: una community con una ACL inexistente queda abierta a todos", acl, device)
+			return DevicePlan{}, refuseSnippet("assist.refused.la_acl_no_existe_en", "acl", acl, "device", device)
 		}
 	}
 	line := "snmp-server community " + name + " RO" + ifElse(acl != "", " "+acl, "")
@@ -867,24 +869,24 @@ var SnippetBanner = Function{
 		t, ok := strings.CutPrefix(line, "banner motd #")
 		t, ok2 := strings.CutSuffix(t, "#")
 		if !ok || !ok2 || t == "" || len(t) > maxText || strings.ContainsAny(t, "#^") {
-			return errors.New("solo banner motd #TEXTO# de una línea (sin # ni ^ en el texto) y no banner motd")
+			return cerr("assist.err.solo_banner_motd_texto_de")
 		}
 		return nil
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) != 1 || len(d.Rollback) != 1 || !strings.HasPrefix(d.Apply[0], "banner motd #") {
-			return errors.New("un banner: una línea de apply y una de reversa")
+			return cerr("assist.err.un_banner_una_linea_de")
 		}
 		old, ok := iosxe.ParseBannerMOTD(d.Baseline[bannerCmd])
 		switch {
 		case !ok || old.Multi:
-			return errors.New("el banner actual no se pudo leer o ocupa varias líneas: la reversa no lo restauraría")
+			return cerr("assist.err.el_banner_actual_no_se")
 		case !old.Present:
 			if d.Rollback[0] != "no banner motd" {
-				return errors.New("el equipo no tenía banner: la reversa es `no banner motd`")
+				return cerr("assist.err.el_equipo_no_tenia_banner")
 			}
 		case strings.ContainsAny(old.Text, "#^") || d.Rollback[0] != "banner motd #"+old.Text+"#":
-			return errors.New("la reversa debe restaurar el banner de una línea que tenía el equipo")
+			return cerr("assist.err.la_reversa_debe_restaurar_el")
 		}
 		return nil
 	},
@@ -895,16 +897,16 @@ func bannerPre(Values) ([]string, error) { return []string{bannerCmd}, nil }
 func bannerPlan(device string, v Values, outs map[string]string) (DevicePlan, error) {
 	text, ok := outs[bannerCmd]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la salida de %q", bannerCmd)
+		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", bannerCmd)
 	}
 	old, ok := iosxe.ParseBannerMOTD(text)
 	switch {
 	case !ok:
-		return DevicePlan{}, refuseSnippet("no se pudo leer %q en %s", bannerCmd, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_en", "command", bannerCmd, "device", device)
 	case old.Multi:
-		return DevicePlan{}, refuseSnippet("%s tiene un banner motd de varias líneas: la reversa de una línea no lo restauraría", device)
+		return DevicePlan{}, refuseSnippet("assist.refused.tiene_un_banner_motd_de", "device", device)
 	case strings.ContainsAny(old.Text, "#^"):
-		return DevicePlan{}, refuseSnippet("el banner motd actual de %s lleva # o ^: la reversa no podría escribirlo", device)
+		return DevicePlan{}, refuseSnippet("assist.refused.el_banner_motd_actual_de", "device", device)
 	}
 	var feats []l2Feature
 	if t := v.Str("text"); !old.Present || old.Text != t {
@@ -1006,16 +1008,16 @@ func snmpv3Plan(device string, v Values, outs map[string]string) (DevicePlan, er
 	userText, ok1 := outs[snmpUserCmd]
 	groupText, ok2 := outs[snmpGroupCmd]
 	if !ok1 || !ok2 {
-		return DevicePlan{}, fmt.Errorf("faltan las salidas de %q y %q", snmpUserCmd, snmpGroupCmd)
+		return DevicePlan{}, cerr("assist.err.faltan_las_salidas_de_y", "command1", snmpUserCmd, "command2", snmpGroupCmd)
 	}
 	users, ok1 := iosxe.ParseSNMPUsers(userText)
 	groups, ok2 := iosxe.ParseSNMPGroups(groupText)
 	if !ok1 || !ok2 {
-		return DevicePlan{}, refuseSnippet("no se pudo leer %q o %q en %s: IOS no escribe los usuarios SNMPv3 en el running-config, así que sin show snmp user no se puede verificar que la reversa los quite", snmpUserCmd, snmpGroupCmd, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_o", "command1", snmpUserCmd, "command2", snmpGroupCmd, "device", device)
 	}
 	user, group := v.Str("user"), v.Str("group")
 	if slices.ContainsFunc(users, func(u iosxe.SNMPUser) bool { return u.Name == user }) {
-		return DevicePlan{}, refuseSnippet("%s ya tiene el usuario SNMPv3 %s: la reversa no restauraría su contraseña ni su grupo", device, user)
+		return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_el_usuario_snmpv3", "device", device, "user", user)
 	}
 	groupExists := false
 	for _, g := range groups {
@@ -1023,7 +1025,7 @@ func snmpv3Plan(device string, v Values, outs map[string]string) (DevicePlan, er
 			continue
 		}
 		if g.Level != "priv" {
-			return DevicePlan{}, refuseSnippet("%s ya tiene el grupo %s v3 con nivel %q, no priv: un usuario authPriv no entraría y la reversa no lo cambiaría", device, group, g.Level)
+			return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_el_grupo_v3", "device", device, "group", group, "level", g.Level)
 		}
 		groupExists = true
 	}
@@ -1037,7 +1039,7 @@ func snmpv3Plan(device string, v Values, outs map[string]string) (DevicePlan, er
 	return assembleG(device, SnippetSNMPv3, []string{snmpUserCmd, snmpGroupCmd}, []l2Scope{{
 		baseCmd: snmpGroupCmd, baseText: groupText, post: []string{snmpGroupCmd, snmpUserCmd}, base: map[string]string{snmpUserCmd: userText},
 		expect: []Expect{{Command: snmpUserCmd, Line: user + " " + group, Present: true, Column: "snmp-user"}}, feats: feats,
-	}}, []string{"IOS no escribe los usuarios SNMPv3 en el running-config: el post-check y la verificación de la reversa leen show snmp user."},
+	}}, []i18n.Text{note("assist.note.snmpv3")},
 		[]string{v.Str("auth_password"), v.Str("priv_password")})
 }
 
@@ -1126,7 +1128,7 @@ var SnippetVtyACL = Function{
 
 func vtyRange(v Values) (lo, hi int, err error) {
 	if _, err := fmt.Sscanf(v.Str("lines"), "%d %d", &lo, &hi); err != nil || lo != 0 || (hi != 4 && hi != 15) {
-		return 0, 0, errors.New("líneas vty: 0 4 o 0 15")
+		return 0, 0, cerr("assist.err.lineas_vty_0_4_o")
 	}
 	return lo, hi, nil
 }
@@ -1162,36 +1164,36 @@ func vtyPlan(device string, v Values, outs map[string]string) (DevicePlan, error
 	}
 	for _, o := range origins {
 		if !o.addr.Is4() {
-			return DevicePlan{}, refuseSnippet("%s es %s y una ACL estándar de IPv4 no se puede comprobar contra ella", o.addr, o.what)
+			return DevicePlan{}, refuseSnippet("assist.refused.es_y_una_acl_estandar", "addr", o.addr, "what", o.what)
 		}
 	}
 	aclText, ok := outs[pre[1]]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la salida de %q", pre[1])
+		return DevicePlan{}, cerr("assist.err.falta_la_salida_de4", "command", pre[1])
 	}
 	lists, ok := iosxe.ParseAccessLists(aclText)
 	if !ok {
-		return DevicePlan{}, refuseSnippet("no se pudo leer %q en %s", pre[1], device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_en", "command", pre[1], "device", device)
 	}
 	i := slices.IndexFunc(lists, func(l iosxe.AccessList) bool { return l.Name == acl })
 	switch {
 	case i < 0:
-		return DevicePlan{}, refuseSnippet("la ACL %s no existe en %s", acl, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.la_acl_no_existe_en2", "acl", acl, "device", device)
 	case !lists[i].Standard:
-		return DevicePlan{}, refuseSnippet("la ACL %s es extendida: para las líneas vty usa una estándar (sin puertos ni destino)", acl)
+		return DevicePlan{}, refuseSnippet("assist.refused.la_acl_es_extendida_para", "acl", acl)
 	}
 	for _, o := range origins {
 		if !aclAllows(lists[i], o.addr) {
-			return DevicePlan{}, refuseSnippet("la ACL %s no permite %s (%s): te dejaría fuera de las líneas vty", acl, o.what, o.addr)
+			return DevicePlan{}, refuseSnippet("assist.refused.la_acl_no_permite_te", "acl", acl, "what", o.what, "addr", o.addr)
 		}
 	}
 	vtyText, ok := outs[vtyCmd]
 	if !ok {
-		return DevicePlan{}, fmt.Errorf("falta la salida de %q", vtyCmd)
+		return DevicePlan{}, cerr("assist.err.falta_la_salida_de", "command", vtyCmd)
 	}
 	blocks, ok := iosxe.ParseVtyBlocks(vtyText)
 	if !ok {
-		return DevicePlan{}, refuseSnippet("no se pudo leer %q en %s", vtyCmd, device)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_en", "command", vtyCmd, "device", device)
 	}
 	// Los bloques que cubren exactamente el rango pedido: ninguno puede quedar partido, y no puede haber huecos.
 	var sel []iosxe.VtyBlock
@@ -1199,7 +1201,7 @@ func vtyPlan(device string, v Values, outs map[string]string) (DevicePlan, error
 		switch {
 		case b.Hi < lo || b.Lo > hi:
 		case b.Lo < lo || b.Hi > hi:
-			return DevicePlan{}, refuseSnippet("%s tiene %s, que desborda las líneas vty %d-%d pedidas: aplicarlo partiría el bloque y la reversa no lo volvería a unir", device, vtyHead(b.Lo, b.Hi), lo, hi)
+			return DevicePlan{}, refuseSnippet("assist.refused.tiene_que_desborda_las_lineas", "device", device, "block", vtyHead(b.Lo, b.Hi), "lo", lo, "hi", hi)
 		default:
 			sel = append(sel, b)
 		}
@@ -1208,18 +1210,18 @@ func vtyPlan(device string, v Values, outs map[string]string) (DevicePlan, error
 	next := lo
 	for _, b := range sel {
 		if b.Lo != next {
-			return DevicePlan{}, refuseSnippet("%s no tiene un bloque para las líneas vty %d-%d: se rechaza en vez de suponer su configuración", device, next, b.Lo-1)
+			return DevicePlan{}, refuseSnippet("assist.refused.no_tiene_un_bloque_para", "device", device, "next", next, "hi", b.Lo-1)
 		}
 		next = b.Hi + 1
 	}
 	if next != hi+1 {
-		return DevicePlan{}, refuseSnippet("%s no tiene un bloque para las líneas vty %d-%d: se rechaza en vez de suponer su configuración", device, next, hi)
+		return DevicePlan{}, refuseSnippet("assist.refused.no_tiene_un_bloque_para", "device", device, "next", next, "hi", hi)
 	}
 	var scopes []l2Scope
 	for _, b := range sel {
 		switch {
 		case b.HasAccessIn && b.AccessIn != acl:
-			return DevicePlan{}, refuseSnippet("%s ya tiene el access-class %s in: la reversa no lo restauraría", vtyHead(b.Lo, b.Hi), b.AccessIn)
+			return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_el_access_class", "block", vtyHead(b.Lo, b.Hi), "acl", b.AccessIn)
 		case b.HasAccessIn:
 			continue
 		}
@@ -1233,11 +1235,11 @@ func vtyPlan(device string, v Values, outs map[string]string) (DevicePlan, error
 		}
 		scopes = append(scopes, sc)
 	}
-	var seenIPs []string
-	for _, o := range origins {
-		seenIPs = append(seenIPs, o.addr.String()+" ("+o.what+")")
+	n := note("assist.note.vty_acl", "acl", acl, "ip1", origins[0].addr, "what1", origins[0].what)
+	if len(origins) > 1 {
+		n = note("assist.note.vty_acl_two", "acl", acl, "ip1", origins[0].addr, "what1", origins[0].what, "ip2", origins[1].addr, "what2", origins[1].what)
 	}
-	return assembleG(device, SnippetVtyACL, pre, scopes, []string{fmt.Sprintf("Se comprobó que la ACL %s permite %s. Con NAT o VPN la local de la app no es la que ve el equipo; las dos se revisaron. El access-class vale para sesiones nuevas: la actual sigue abierta.", acl, strings.Join(seenIPs, " y "))}, nil)
+	return assembleG(device, SnippetVtyACL, pre, scopes, []i18n.Text{n}, nil)
 }
 
 func l3MgmtTemplates() []Template {
