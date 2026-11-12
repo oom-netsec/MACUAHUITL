@@ -63,7 +63,7 @@ func (f Finding) In(loc string) Finding {
 		ev := make([]string, len(f.Evidence))
 		for i := range ev {
 			ev[i] = f.Evidence[i]
-			if f.x.meaning[i] != "" {
+			if i < len(f.x.meaning) && i < len(f.x.base) && f.x.meaning[i] != "" {
 				ev[i] = f.x.base[i] + "  → " + i18n.Msg(loc, f.x.meaning[i], nil)
 			}
 		}

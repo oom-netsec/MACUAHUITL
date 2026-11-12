@@ -188,3 +188,12 @@ func TestDetalleIgualAUnaClaveSaleLiteral(t *testing.T) {
 		}
 	}
 }
+
+// Un Finding armado a mano (sin datos de catálogo para la evidencia) no truena al traducirse.
+func TestFindingInSinDatosDeEvidencia(t *testing.T) {
+	f := Finding{Code: "x", Evidence: []string{"a", "b"}, x: findingX{key: "ike.finding.psk", explKey: "ike.finding.psk.explanation"}}
+	g := f.In(i18n.En)
+	if len(g.Evidence) != 2 || g.Evidence[0] != "a" || g.Title != "Pre-shared key (PSK) is wrong or authentication fails" {
+		t.Errorf("%+v", g)
+	}
+}
