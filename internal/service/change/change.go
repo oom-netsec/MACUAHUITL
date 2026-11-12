@@ -76,7 +76,7 @@ func (s *changeSvc) CreateChange(ctx context.Context, r *v1.CreateChangeRequest)
 	// Validar ya, con las mismas reglas que CreateJob, para no fallar en plena ventana.
 	probe := proto.Clone(spec).(*v1.JobSpec)
 	probe.Name += "-pre"
-	if err := s.d.ValidateJob(probe); err != nil {
+	if err := s.d.ValidateJob(ctx, probe); err != nil {
 		if creada != "" {
 			os.Remove(creada) // vacía: os.Remove no toca una con contenido
 		}

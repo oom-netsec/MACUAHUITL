@@ -281,3 +281,16 @@ func TestPatrolDetalleDeEquipoEnYCodigo(t *testing.T) {
 		}
 	}
 }
+
+// CreateChange valida con el idioma de la llamada: con en, el error de validación sale en inglés.
+func TestCreateChangeValidaEnElIdiomaPedido(t *testing.T) {
+	h := newHarness(t, nil)
+	h.ready(t)
+	ch := v1.NewChangeServiceClient(h.conn)
+	for lang, want := range map[string]string{"": "patrol: credential: sin credencial por defecto", "en": "patrol: credential: no default credential"} {
+		_, err := ch.CreateChange(con(t, lang), &v1.CreateChangeRequest{Spec: &v1.JobSpec{Targets: []*v1.Target{h.target}}})
+		if status.Code(err) != codes.InvalidArgument || status.Convert(err).Message() != want {
+			t.Errorf("%q: %v", lang, err)
+		}
+	}
+}

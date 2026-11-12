@@ -109,7 +109,9 @@ func (d *Deps) CloseAll() {
 	d.closers = nil
 }
 func (d *Deps) Patrol() v1.PatrolServiceServer { return v1.UnimplementedPatrolServiceServer{} }
-func (d *Deps) ValidateJob(*v1.JobSpec) error  { return status.Error(codes.Unimplemented, "sin Patrol") }
+func (d *Deps) ValidateJob(context.Context, *v1.JobSpec) error {
+	return status.Error(codes.Unimplemented, "sin Patrol")
+}
 func (d *Deps) Job(string) (service.JobInfo, error) {
 	return service.JobInfo{}, status.Error(codes.NotFound, "sin Patrol")
 }
