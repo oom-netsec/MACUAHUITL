@@ -139,3 +139,24 @@ func TestNombresEnIngles(t *testing.T) {
 		}
 	}
 }
+
+// Cada grupo en español (lo que va antes de « · ») corresponde a un único grupo en inglés y al revés: el selector
+// agrupa igual en los dos idiomas.
+func TestGruposUnoAUno(t *testing.T) {
+	pbs, err := playbook.Load(playbooks.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	group := func(n string) string { g, _, _ := strings.Cut(n, " · "); return g }
+	esEn, enEs := map[string]string{}, map[string]string{}
+	for _, p := range pbs {
+		es, en := group(p.Name), group(p.NameEn)
+		if prev, ok := esEn[es]; ok && prev != en {
+			t.Errorf("el grupo %q tiene dos traducciones: %q y %q (%s)", es, prev, en, p.ID)
+		}
+		if prev, ok := enEs[en]; ok && prev != es {
+			t.Errorf("el grupo %q viene de dos grupos en español: %q y %q (%s)", en, prev, es, p.ID)
+		}
+		esEn[es], enEs[en] = en, es
+	}
+}

@@ -5,7 +5,7 @@
 id: tac-usuario-sin-red
 platform: ios-xe
 name: TAC · Usuario sin red
-name_en: TAC · User without network
+name_en: TAC · User with no connectivity
 commands:
   - cmd: show clock
   - cmd: show interfaces status
