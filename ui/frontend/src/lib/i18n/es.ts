@@ -2353,7 +2353,6 @@ export const es = {
   "vocab.assistState.rolled-back": "Revertida",
   "vocab.assistState.abandoned": "Abandonada",
   "vocab.findingSev.error": "Error",
-  "vocab.findingSev.aviso": "Aviso",
   "vocab.findingSev.info": "Info",
   "vocab.exchange.access-request": "Access-Request",
   "vocab.exchange.status-server": "Status-Server",
@@ -2361,9 +2360,6 @@ export const es = {
   "vocab.exchange.accounting-stop": "Accounting-Stop",
   "vocab.exchange.authentication": "Autenticación",
   "vocab.exchange.authorization": "Autorización",
-  "vocab.ma.ausente": "ausente",
-  "vocab.ma.valido": "válido",
-  "vocab.ma.invalido": "inválido",
   "vocab.source.patrol": "Patrol",
   "vocab.source.hallazgo": "Hallazgo",
   "vocab.source.log-equipo": "Registro del equipo",
@@ -2574,6 +2570,13 @@ export const es = {
   "patrol.phaseReason.phase.close_failed": "cierre (manifest o zip): {error}",
   "patrol.phaseReason.phase.before_arming": "antes de armar",
   "patrol.phaseReason.phase.core_stopped": "el núcleo se detuvo con el trabajo armado; no se reanuda",
+  "vocab.findingSev.warning": "Aviso",
+  "vocab.ma.absent": "ausente",
+  "vocab.ma.valid": "válido",
+  "vocab.ma.invalid": "inválido",
+  "security.chain.usage": "Usos de la llave",
+  "security.chain.selfSigned": "Autofirmado",
+  "security.chain.sigInvalid": "Firma del CSR inválida",
 };
 
 export type Key = keyof typeof es;

@@ -5,9 +5,9 @@ import type { Key } from "./i18n/es";
 // un valor nuevo del núcleo que aún no tenga clave se muestra tal cual, sin romper la vista.
 export const VOCAB = {
   assistState: ["planned", "waiting-confirm", "running", "done", "aborted", "failed", "rolled-back", "abandoned"],
-  findingSev: ["error", "aviso", "info"],
+  findingSev: ["error", "warning", "info"],
   exchange: ["access-request", "status-server", "accounting-start", "accounting-stop", "authentication", "authorization"],
-  ma: ["ausente", "válido", "inválido"],
+  ma: ["absent", "valid", "invalid"],
   source: ["patrol", "hallazgo", "log-equipo", "syslog", "auditoria", "pcap", "carpeta de Patrol"],
   hit: ["mac-table", "arp", "dhcp-snooping", "interface", "device"],
   inv: ["equipo", "modulo", "sfp"],

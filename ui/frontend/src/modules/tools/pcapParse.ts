@@ -1,5 +1,6 @@
-// Extrae del informe de texto del análisis de capturas (pcapan.Report.Text) las secciones con formato fijo:
-// equipos con más tráfico y conversaciones. El informe no trae el conteo por protocolo: se suma por las conversaciones listadas.
+// Equipos con más tráfico, conversaciones y protocolos de una captura: del informe estructurado (fase 30b) o, sin él,
+// del texto (pcapan.Report.Text), donde el conteo por protocolo se suma por las conversaciones listadas.
+import type { PcapReportData } from "./api";
 export interface PcapTalker { ip: string; packets: number; bytes: number }
 export interface PcapConv { proto: string; a: string; b: string; packets: number; bytes: number }
 export interface PcapProto { proto: string; packets: number; bytes: number }
@@ -30,4 +31,8 @@ export function parsePcap(text: string): PcapSummary | null {
     by.set(c.proto, p);
   }
   return { talkers, conversations, protocols: [...by.values()].sort((x, y) => y.bytes - x.bytes) };
+}
+
+export function pcapFromReport(d: PcapReportData): PcapSummary | null {
+  return d.topTalkers.length || d.conversations.length ? { talkers: d.topTalkers, conversations: d.conversations, protocols: d.protocols } : null;
 }

@@ -19,10 +19,10 @@ test("radius: separa servidor, intercambios, atributos y hallazgos", () => {
   expect(r.server).toBe("10.0.0.20:1812");
   expect(r.method).toBe("PAP");
   expect(r.exchanges).toHaveLength(2);
-  expect(r.exchanges[0]).toMatchObject({ kind: "access-request", code: "Access-Reject", rttMs: 3.1, attempts: 2, messageAuthenticator: "válido", error: "" });
+  expect(r.exchanges[0]).toMatchObject({ kind: "access-request", code: "Access-Reject", rttMs: 3.1, attempts: 2, messageAuthenticator: "valid", error: "" });
   expect(r.exchanges[0].attrs).toEqual([{ name: "Reply-Message", value: "Usuario desconocido" }, { name: "Tunnel-Private-Group-ID", value: "10" }]);
   expect(r.exchanges[1]).toMatchObject({ kind: "status-server", code: "", error: "sin respuesta tras 3 intentos de 5s" });
-  expect(r.findings).toEqual([{ severity: "aviso", detail: "access-request: la respuesta no trae Message-Authenticator" }, { severity: "error", detail: "status-server: el servidor no respondió" }]);
+  expect(r.findings).toEqual([{ severity: "warning", detail: "access-request: la respuesta no trae Message-Authenticator" }, { severity: "error", detail: "status-server: el servidor no respondió" }]);
 });
 
 test("radius: un texto que no es el informe del núcleo no se interpreta", () => {
@@ -77,7 +77,7 @@ certificado: CN=Lab CA
 test("pki: cadena de certificados con vigencia, huellas y avisos", () => {
   const c = parsePki(pki)!;
   expect(c).toHaveLength(2);
-  expect(c[0]).toMatchObject({ kind: "certificado", subject: "CN=ise01.lab,O=Lab", issuer: "CN=Lab CA", daysLeft: 55, sha256: "CC:DD", sha1: "AA:BB", san: "ise01.lab, 10.0.0.10", warnings: ["vence en 55 días"] });
+  expect(c[0]).toMatchObject({ kind: "certificate", subject: "CN=ise01.lab,O=Lab", issuer: "CN=Lab CA", daysLeft: 55, sha256: "CC:DD", sha1: "AA:BB", san: "ise01.lab, 10.0.0.10", warnings: ["vence en 55 días"] });
   expect(c[0].notBefore).toBe("2026-01-01T00:00:00Z");
   expect(c[1]).toMatchObject({ daysLeft: -36, isCA: true });
   expect(parsePki("SHA-256 ABC")).toBeNull();

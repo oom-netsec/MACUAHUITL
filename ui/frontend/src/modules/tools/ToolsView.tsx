@@ -14,7 +14,8 @@ import { IngestDropsBanner, IngestStatusLine } from "../../components/ingest/Ing
 import { MAX_LIVE, useBatch, useIngestOpts } from "../../components/ingest/useIngest";
 import type { OptKey } from "../../components/ingest/ingestOpts";
 import { toMsg, type SysMsg, type WireMsg } from "./syslogStats";
-import { parsePcap } from "./pcapParse";
+import { parsePcap, pcapFromReport } from "./pcapParse";
+import type { PcapReportData } from "./api";
 import { PcapReport } from "./PcapReport";
 import { parseTrace } from "./dnsTrace";
 import { DnsTree } from "./DnsTree";
@@ -54,8 +55,17 @@ export function PcapPanel({ core }: { core: CoreAPI }) {
   const [path, setPath] = useState("");
   const [top, setTop] = useState("20");
   const r = useResult<string>();
+  const [rep, setRep] = useState<PcapReportData | null>(null); // el informe estructurado de la última corrida
   useInbox("pcap", setPath);
   const pick = () => core.pickPath({ title: t("pcap.path"), filters: [{ name: t("pcap.filter"), pattern: "*.pcap;*.pcapng" }] });
+  const run = async () => {
+    const n = Number(top) || 20;
+    setRep(null);
+    const d = core.toolsPcapReport && await core.toolsPcapReport(path, n); // un error se muestra, sin repetir con el método de texto
+    if (!d?.text) return core.toolsPcap(path, n);
+    setRep(d);
+    return d.text;
+  };
   return (
     <Page title={t("pcap.title")} description={t("pcap.desc")}>
       <PathField label={t("pcap.path")} hint={t("pcap.path.hint")} value={path} onChange={setPath} pick={pick} />
@@ -63,9 +73,9 @@ export function PcapPanel({ core }: { core: CoreAPI }) {
         <Field label={t("pcap.top")} type="number" value={top} onChange={setTop} w="sm" />
       </div>
       <div className="actions">
-        <button className="primary" disabled={!path || r.busy} aria-busy={r.busy} onClick={() => r.run(() => core.toolsPcap(path, Number(top) || 20))}>{t("pcap.analyze")}{runKbd}</button>
+        <button className="primary" disabled={!path || r.busy} aria-busy={r.busy} onClick={() => r.run(run)}>{t("pcap.analyze")}{runKbd}</button>
       </div>
-      <TextResult core={core} r={r} view={(s) => { const p = parsePcap(s); return p && <PcapReport p={p} />; }}
+      <TextResult core={core} r={r} view={(s) => { const p = rep ? pcapFromReport(rep) : parsePcap(s); return p && <PcapReport p={p} />; }}
         empty={<EmptyState icon="pulse" title={t("pcap.empty.title")}>{t("pcap.empty")}</EmptyState>} />
     </Page>
   );
