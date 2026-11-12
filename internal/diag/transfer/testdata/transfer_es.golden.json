@@ -1,0 +1,19 @@
+{
+ "descargar_esquema": "transfer: esquema \"gopher\" no soportado (tftp, ftp, scp, sftp, http, https)",
+ "descargar_existe": "transfer: \u003cdir\u003e/a.cfg ya existe: no se sobrescribe",
+ "descargar_sin_url": "transfer: falta la URL",
+ "listar_esquema": "transfer: esquema \"gopher\" no soportado (tftp, ftp, scp, sftp, http, https)",
+ "listar_ruta_control": "transfer: la ruta tiene caracteres de control o invisibles",
+ "listar_ruta_larga": "transfer: la ruta es demasiado larga",
+ "listar_sin_url": "transfer: falta la URL",
+ "listar_tftp": "este servidor no permite listar: TFTP no tiene comando para listar carpetas",
+ "puerto_cero": "transfer: puerto inválido \"0\"",
+ "puerto_esquema": "transfer: esquema \"gopher\" no soportado (tftp, ftp, scp, sftp, http, https)",
+ "puerto_puerto": "transfer: puerto inválido \"99999\"",
+ "ruta_caracter": "transfer: carácter ' ' no permitido en la ruta remota",
+ "ruta_ok": "ok",
+ "ruta_opcion": "transfer: la URL debe nombrar un archivo",
+ "ruta_vacia": "transfer: la URL debe nombrar un archivo",
+ "subir_sin_url": "transfer: falta la URL",
+ "tiempo": "transfer: el tiempo máximo es 4h0m0s"
+}
