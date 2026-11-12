@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"fmt"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
@@ -60,6 +61,7 @@ type RadiusExchangeDTO struct {
 	MessageAuthenticator string         `json:"messageAuthenticator,omitempty"` // absent, valid, invalid
 	Error                *SecTextDTO    `json:"error,omitempty"`
 	Attrs                []NameValueDTO `json:"attrs"`
+	Mschap2Verified      *bool          `json:"mschap2Verified,omitempty"` // fase 30c: solo MS-CHAPv2; true si el MS-CHAP2-Success verificó al servidor
 }
 
 type RadiusReportDTO struct {
@@ -89,7 +91,7 @@ func (b *Bridge) SecRadiusReport(d RadiusDTO) (RadiusReportDTO, error) {
 		}
 		out := RadiusReportDTO{Text: r.GetReport().GetText(), Server: r.Server, Method: r.Method, Exchanges: []RadiusExchangeDTO{}, Findings: findings(r.Findings)}
 		for _, e := range r.Exchanges {
-			x := RadiusExchangeDTO{Kind: e.Kind, Code: e.Code, RttMs: e.RttMs, Attempts: int(e.Attempts), MessageAuthenticator: e.MessageAuthenticator, Error: secText(e.Error), Attrs: []NameValueDTO{}}
+			x := RadiusExchangeDTO{Kind: e.Kind, Code: e.Code, RttMs: e.RttMs, Attempts: int(e.Attempts), MessageAuthenticator: e.MessageAuthenticator, Error: secText(e.Error), Attrs: []NameValueDTO{}, Mschap2Verified: e.Mschap2Verified}
 			for _, a := range e.Attrs {
 				x.Attrs = append(x.Attrs, NameValueDTO{Name: a.Name, Value: a.Value})
 			}
@@ -418,5 +420,119 @@ func (b *Bridge) ToolsPcapReport(path string, top int) (PcapReportDTO, error) {
 			return PcapReportDTO{}, err
 		}
 		return pcapReport(r), nil
+	})
+}
+
+// ---- Fase 30c-A: IKE, DNS y TLS estructurados ----
+
+// FindingDTO es un hallazgo de DNS o TLS: code estable, severity cerrada, la clave del detalle (vacía si el detalle
+// es un dato) con sus argumentos y el mensaje en el idioma de la interfaz.
+type FindingDTO struct {
+	Code     string            `json:"code"`
+	Severity string            `json:"severity"` // warning, error, info
+	Key      string            `json:"key,omitempty"`
+	Args     map[string]string `json:"args,omitempty"`
+	Message  string            `json:"message"`
+}
+
+// DnsReportDTO: text y json son los del informe, con el detalle de los hallazgos en el idioma de la interfaz.
+type DnsReportDTO struct {
+	Text     string       `json:"text"`
+	Json     string       `json:"json"`
+	Findings []FindingDTO `json:"findings"`
+}
+
+func (b *Bridge) ToolsDnsReport(d DnsDTO) (DnsReportDTO, error) {
+	mode, ok := dnsModes[d.Mode]
+	if !ok {
+		return DnsReportDTO{}, wrapErr(fmt.Errorf("modo DNS %q desconocido", d.Mode))
+	}
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (DnsReportDTO, error) {
+		r, err := v1.NewToolsServiceClient(c).Dns(ctx, &v1.DnsRequest{Mode: mode, Name: d.Name, Type: d.Type, Servers: d.Servers, Deep: d.Deep, Dnssec: d.Dnssec})
+		if err != nil {
+			return DnsReportDTO{}, err
+		}
+		out := DnsReportDTO{Text: r.GetReport().GetText(), Json: r.GetReport().GetJson(), Findings: []FindingDTO{}}
+		for _, f := range r.Findings {
+			out.Findings = append(out.Findings, FindingDTO{Code: f.Code, Severity: f.Severity, Key: f.Key, Args: f.Args, Message: f.Message})
+		}
+		return out, nil
+	})
+}
+
+// TlsReportDTO gana verifyCode: unknown_authority, hostname, expired, not_yet_valid, other; ausente si verificó. El
+// verifyError del json es el texto de la biblioteca x509 y no se traduce.
+type TlsReportDTO struct {
+	Text       string       `json:"text"`
+	Json       string       `json:"json"`
+	Findings   []FindingDTO `json:"findings"`
+	VerifyCode string       `json:"verifyCode,omitempty"`
+}
+
+func (b *Bridge) ToolsTlsReport(host string, port int, sni string) (TlsReportDTO, error) {
+	if port < 0 || port > 65535 {
+		return TlsReportDTO{}, wrapErr(fmt.Errorf("puerto %d inválido", port))
+	}
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (TlsReportDTO, error) {
+		r, err := v1.NewToolsServiceClient(c).InspectTls(ctx, &v1.InspectTlsRequest{Host: host, Port: uint32(port), Sni: sni})
+		if err != nil {
+			return TlsReportDTO{}, err
+		}
+		out := TlsReportDTO{Text: r.GetReport().GetText(), Json: r.GetReport().GetJson(), Findings: []FindingDTO{}, VerifyCode: r.VerifyCode}
+		for _, f := range r.Findings {
+			out.Findings = append(out.Findings, FindingDTO{Code: f.Code, Severity: f.Severity, Key: f.Key, Args: f.Args, Message: f.Message})
+		}
+		return out, nil
+	})
+}
+
+type IkeFindingDTO struct {
+	Code           string            `json:"code"`
+	Severity       string            `json:"severity"` // warning, error, info
+	Phase          int               `json:"phase,omitempty"`
+	Key            string            `json:"key"` // ike.finding.<código>; .title y .action; ver explanationKey
+	ExplanationKey string            `json:"explanationKey"`
+	Args           map[string]string `json:"args,omitempty"`
+	Title          string            `json:"title"`
+	Explanation    string            `json:"explanation"`
+	Action         string            `json:"action"`
+	Evidence       []string          `json:"evidence"`
+}
+
+type IkeProposalDTO struct {
+	Phase      int               `json:"phase"`
+	SourceKey  string            `json:"sourceKey"`
+	SourceArgs map[string]string `json:"sourceArgs,omitempty"`
+	Source     string            `json:"source"`
+	Detail     string            `json:"detail"`
+	Result     string            `json:"result,omitempty"` // accepted, rejected
+}
+
+// IkeReportDTO: phase1 y phase2 ∈ established, failed, mixed, incomplete, no_data.
+type IkeReportDTO struct {
+	Text      string           `json:"text"`
+	Json      string           `json:"json"`
+	Phase1    string           `json:"phase1"`
+	Phase2    string           `json:"phase2"`
+	Findings  []IkeFindingDTO  `json:"findings"`
+	Proposals []IkeProposalDTO `json:"proposals"`
+	Note      string           `json:"note"`
+}
+
+func (b *Bridge) SecIkeReport(text string) (IkeReportDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (IkeReportDTO, error) {
+		r, err := v1.NewSecurityServiceClient(c).IkeDecode(ctx, &v1.IkeDecodeRequest{Text: text})
+		if err != nil {
+			return IkeReportDTO{}, err
+		}
+		out := IkeReportDTO{Text: r.GetReport().GetText(), Json: r.GetReport().GetJson(), Phase1: r.Phase1, Phase2: r.Phase2, Note: r.Note, Findings: []IkeFindingDTO{}, Proposals: []IkeProposalDTO{}}
+		for _, f := range r.Findings {
+			out.Findings = append(out.Findings, IkeFindingDTO{Code: f.Code, Severity: f.Severity, Phase: int(f.Phase), Key: f.Key, ExplanationKey: f.ExplanationKey, Args: f.Args,
+				Title: f.Title, Explanation: f.Explanation, Action: f.Action, Evidence: append([]string{}, f.Evidence...)})
+		}
+		for _, p := range r.Proposals {
+			out.Proposals = append(out.Proposals, IkeProposalDTO{Phase: int(p.Phase), SourceKey: p.SourceKey, SourceArgs: p.SourceArgs, Source: p.Source, Detail: p.Detail, Result: p.Result})
+		}
+		return out, nil
 	})
 }

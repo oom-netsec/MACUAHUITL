@@ -927,3 +927,79 @@ Los códigos con argumentos declaran sus `args` en el catálogo; la metadata sol
 - **Descripción no válida** (la de `PlanPorts` y la del SVI): reason `assist.err.description_invalid` con metadata `{field: "description"}`; ya no usa `assist.invalid_value` ni lleva `why`.
 - **Texto de auditoría de los fallos:** el detalle de `assist.fail` (lo que arma `failT`/`failMsg`) sale ahora en inglés completo, también cuando el fallo cita fallos del post-check o errores con código del catálogo.
 - **Eventos del motor:** los textos propios del motor que viajan como evento `output` (`assist.run.matches_baseline`, `assist.run.rollback_failed_matches`, `assist.run.post_check_after_rollback`, `assist.run.vault_not_restored`) salen en el idioma pedido; la salida del equipo no se traduce.
+
+## Valores de las calculadoras, RADIUS/TACACS+, DNS, TLS e IKE (fase 30c, bloque A)
+
+Bloque A del paso 3 de 3 (`docs/plans/2026-11-12-fase-30c-idioma-resto.md`). Misma regla de compatibilidad que 30a y 30b: sin `accept-language`, o con `es`, el texto y el JSON de cada RPC son idénticos byte por byte a los de antes (lo fijan pruebas de regresión con golden generado antes del cambio), con **una excepción deliberada**: los `code` de hallazgo de RADIUS y TACACS+ pasan a inglés (ver abajo). Lo demás son campos nuevos (proto sin renumerar; DTO con `omitempty`). Con `en` el texto sale en inglés; la bandera `core.localize` decide si el puente manda el idioma. Esta fase no toca ninguna vista: no hay claves nuevas en `i18n/{es,en}.ts`.
+
+### Cambio que rompe: slugs de hallazgo de RADIUS y TACACS+
+`findings[].code` de `secRadiusReport` y `secTacacsReport` (y el `Code` del JSON del informe de texto) cambian. **El front debe cambiar los slugs que compare**:
+
+| Antes | Ahora | Prueba |
+|---|---|---|
+| `sin-respuesta` | `no_response` | RADIUS y TACACS+ |
+| `respuesta-invalida` | `invalid_response` | RADIUS |
+| `blast-radius` | `blast_radius` | RADIUS |
+| `ma-invalido` | `ma_invalid` | RADIUS |
+| `reject` | `reject` (igual) | RADIUS |
+| `secreto` | `secret` | TACACS+ |
+| `authen-fail` | `authen_fail` | TACACS+ |
+| `author-fail` | `author_fail` | TACACS+ |
+| `estado` | `status` | TACACS+ |
+
+Los argumentos de cada código no cambian. `severity` ya era cerrada en inglés (30b).
+
+### RADIUS: `mschap2Verified`
+`RadiusExchangeData` gana `mschap2Verified?: boolean`: solo aparece en MS-CHAPv2 (en la solicitud de acceso), `true` si el `MS-CHAP2-Success` verificó al servidor (autenticación mutua) y `false` si no verificó. Ausente en PAP, CHAP, Status-Server y contabilidad. Antes solo estaba en el texto del atributo; el atributo `MS-CHAP2-Success` sigue trayendo ese texto del servidor, sin traducir.
+
+### Calculadoras: celdas con código
+Los valores con palabras dejan de ser texto libre: viajan como código cerrado y su texto sale traducido. `CalcTable` gana `rowCoded?: CalcCoded[][]`, una lista por fila (vacía si ninguna celda de esa fila es un código); falta si la tabla no tiene ninguna.
+```ts
+interface CalcCoded { col: number; key: string; args?: Record<string,string> } // col desde 0; key calc.val.*
+```
+La celda de `rows` ya viene en el idioma pedido; la clave dice qué es. El `json` de cada calculadora no cambia (sigue en español: `"limit":"ventana"`); el código está en la clave de la celda.
+
+| Valor | Dónde | Claves `calc.val.*` |
+|---|---|---|
+| Veredicto óptico | fila `calc.row.verdict` | `verdict.closes`, `verdict.closes_overload`, `verdict.not_closes`, `verdict.not_closes_overload` |
+| «Lo limita» (TCP) | fila `calc.row.limited_by` | `limit.link`, `limit.window`, `limit.loss` |
+| sí/no | columna «Local» de las rutas BGP y los valores del paso «originada localmente» | `yes`, `no` |
+| next-hop | última columna de las rutas BGP | `nexthop.reachable`, `nexthop.unreachable` |
+| Tipo de dirección o prefijo | fila `calc.row.kind` (subred e IPv6) | `kind.*`: `any`, `this_network`, `private`, `cgnat`, `loopback4`, `linklocal4`, `ietf_protocol`, `doc4`, `relay6to4`, `benchmark`, `mcast_local`, `mcast_ssm`, `mcast_admin`, `mcast4`, `limited_bcast`, `reserved`, `mixed`, `public`, `unassigned6`, `unspecified`, `loopback6`, `v4mapped`, `nat64`, `discard`, `teredo`, `doc6`, `sixtofour`, `global6`, `ula`, `linklocal6`, `sitelocal`, `solicited_node`, `mcast6` y `mcast6_{1,2,3,4,5,8,e}` (alcance) |
+| Clase DSCP y descarte AF | últimas columnas de la tabla DSCP | `dscp.*` (`none`, `default`, `le`, `scavenger`, `high_volume`, `oam`, `low_latency`, `cs3`, `streaming`, `realtime`, `video_conf`, `cs5`, `voice_admit`, `voice`, `network`, `cs7`) y `drop.{low,medium,high}` |
+| Paso de BGP | columna «Paso» de las comparaciones, y el argumento `step` de la nota `calc.note.bgp_winner` | `step.{weight, local_pref, local_origin, as_path_len, origin, med, ebgp_over_ibgp, igp_metric, oldest_ebgp, router_id, cluster_list, neighbor_addr, tie, reachable}` |
+| Detalle de capa de MTU | columna «Detalle» del desglose | `mtu.{gre, gre_key, nat_t, vxlan, lisp, pppoe, mpls, tag_inner, tag_outer, esp}` con sus `args` (`ip`, `iv`, `icv`, `tbar`, `align`, `block`, `n`, `bytes`); `ip` y `tbar` valen otras claves `calc.val.mtu.*` |
+
+Un argumento de una nota o de una celda cuyo valor es una clave `calc.val.*` (o varias separadas por coma) se escribe en el idioma pedido al armar el texto; en `notesStructured[].args` llega la clave (p. ej. `step: "calc.val.step.local_pref"`). Los nombres de capa (`gre`, `esp-tunnel:aes-cbc:sha256`), los nombres de ruta y los valores numéricos son datos y no cambian.
+
+### DNS
+- `toolsDnsReport(DnsRequest) → DnsReportData { text, json, findings }`, método nuevo y opcional en `ToolsAPI`; `toolsDns` (texto) no cambia.
+- `findings[]`: `{ code, severity: "warning"|"error"|"info", key?, args?, message }`. `code` es el de siempre (`fragmentacion`, `tcp-bloqueado`, `sin-edns`, `ttl-bajo`, `cname-larga`, `sin-ptr`, `ptr-no-coincide`, `sin-spf`, `spf`, `spf-multiple`, `sin-dmarc`, `dmarc`, `sin-dkim`, `dkim`, `sin-caa`, `caa`, `sin-delegacion`, `ns-padre-hijo`, `glue-faltante`, `ns-sin-direccion`, `ns-lame`, `axfr-abierto`, `serial-distinto`; siguen en español, ya eran estables). `key` y `args` son los del detalle (`dns.finding.*`); **no hay `key` cuando el detalle es un dato** (`spf`, `dmarc`, `dkim`, `caa`, `ns-sin-direccion`).
+- Solo hay `findings` en los modos transporte, higiene y zona. Exposición no los trae: sus dos líneas de `Details` del `json` salen traducidas (`dns.exposure.*`).
+- El `json` y el `text` del informe traen el detalle (`Detail` / `Details`) en el idioma pedido. El `json` en español es idéntico al de siempre.
+
+### TLS
+- `toolsTlsReport(host, port, sni) → TlsReportData { text, json, findings, verifyCode? }`, método nuevo y opcional; `toolsTls` no cambia.
+- `findings[]` igual que DNS (`tls.finding.*`; `code`: `tls-antiguo`, `vencido`, `aun-no-valido`, `vence-pronto`, `nombre-no-coincide`, `autofirmado`, `cadena-incompleta`, `llave-debil`, `firma-debil`). Las fechas, nombres y algoritmos de los `args` son datos.
+- **`verifyError` NO se traduce**: es el texto de la biblioteca x509 de Go (inglés) y con `es` ya era así. Se agrega `verifyCode` ∈ `unknown_authority`, `hostname`, `expired`, `not_yet_valid`, `other` (ausente si la cadena verificó) para que la vista no lea el texto.
+
+### IKE
+- `secIkeReport(text) → IkeReportData { text, json, phase1, phase2, findings, proposals, note }`, método nuevo y opcional en `SecurityAPI`; `secIkeDecode` (texto) no cambia.
+- `phase1` y `phase2` ∈ `established`, `failed`, `mixed`, `incomplete`, `no_data` (el `json` conserva `establecida`, `falló`… en español con `es`).
+- `findings[]`: `{ code, severity, phase?, key, explanationKey, args?, title, explanation, action, evidence }`. `code` es el de siempre (19, en español: `p1-propuesta`, `p2-propuesta`, `pfs`, `psk`, `psk-ausente`, `sin-respuesta`, `retrans-key-exch`, `proxy-id`, `identidad`, `nat-t`, `lifetime`, `dpd`, `sa-estado`, `ipsec-sin-sa`, `ipsec-unidireccional`, `ipsec-solo-entrada`, `ipsec-sin-trafico`, `ipsec-errores`, `limite-sas`). `key` es `ike.finding.<código con _>` (con `.title` y `.action`); `explanationKey` es la de la explicación, que tiene variantes: `…p1_propuesta.explanation_attrs` (arg `attrs`: claves `ike.val.attr.*` separadas por coma), `…pfs.explanation_rejected`; `limite-sas` lleva `max`, `sa` e `ipsec`. `evidence` son líneas del equipo, sin traducir, salvo que `sa-estado` agrega «  → significado» (`ike.state.*`).
+- `proposals[]`: `{ phase, sourceKey, sourceArgs?, source, detail, result? }`; `sourceKey` ∈ `ike.proposal.source.{v1_transform {transform, policy}, v1_proposal {n}, received, expected}`; `detail` es salida del equipo; `result` ∈ `accepted`, `rejected`.
+- **Siguen como vienen:** los nombres de fuente detectada («debug crypto isakmp (IOS/IOS-XE)»), los estados de SA (`MM_NO_STATE`, `QM_IDLE`…), el detalle de las propuestas y las SA, y la línea «IPsec peer … encaps / decaps» del texto.
+
+### Puente
+| Método / DTO | Cambio |
+|---|---|
+| `calc(kind, req)` → `CalcResultDTO` | cada tabla gana `rowCoded` (`omitempty`) |
+| `secRadiusReport` | cada intercambio gana `mschap2Verified` (`omitempty`) |
+| `toolsDnsReport(DnsDTO)` → `DnsReportDTO` | nuevo |
+| `toolsTlsReport(host, port, sni)` → `TlsReportDTO` | nuevo |
+| `secIkeReport(text)` → `IkeReportDTO` | nuevo |
+
+### Qué queda para otra fase
+- `findings` de `dnssec` (`link.Error`, `Warnings`) y los errores de las sondas de DNS (`Probe.Error`, `Answer.Error`): siguen en español.
+- Los errores de validación que rechazan la petición (`InvalidArgument`) de DNS, TLS e IKE siguen su camino de 30a o su texto de siempre.
+- La vista que migre los slugs de RADIUS/TACACS+ y lea `rowCoded`, `findings` y `verifyCode`.

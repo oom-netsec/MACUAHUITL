@@ -35,3 +35,17 @@ describe("tools api: informe de captura estructurado (fase 30b)", () => {
     expect(r.summary.packets).toBe(0);
   });
 });
+
+describe("tools api: hallazgos de DNS y TLS estructurados (fase 30c)", () => {
+  it("toolsDnsReport y toolsTlsReport llaman a sus métodos del puente y el doble trae la forma vacía", async () => {
+    const call = vi.fn(async () => ({}));
+    const api = toolsWails(call as never);
+    const r = { mode: "hygiene", name: "x", type: "A", servers: [], deep: false, dnssec: false };
+    await api.toolsDnsReport!(r);
+    await api.toolsTlsReport!("h", 443, "");
+    expect(call.mock.calls).toEqual([["ToolsDnsReport", r], ["ToolsTlsReport", "h", 443, ""]]);
+    const f = fakeTools();
+    expect(await f.toolsDnsReport()).toEqual({ text: "", json: "", findings: [] });
+    expect(await f.toolsTlsReport()).toEqual({ text: "", json: "", findings: [] });
+  });
+});

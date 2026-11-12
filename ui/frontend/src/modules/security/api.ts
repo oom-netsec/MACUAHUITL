@@ -16,10 +16,12 @@ export interface ExportRequest { format: string; cert: string; chain: string; se
 // kind (certificado) certificate|csr.
 /** Texto de catálogo: clave, argumentos y el texto en el idioma de la interfaz. */
 export interface SecText { key: string; args?: Record<string, string>; text: string }
-/** code estable (sin-respuesta, respuesta-invalida, blast-radius, ma-invalido, reject, secreto, authen-fail, author-fail, estado). */
+/** code estable en inglés desde 30c: no_response, invalid_response, blast_radius, ma_invalid, reject (RADIUS); secret, no_response, authen_fail, author_fail, status (TACACS+). Antes eran sin-respuesta, respuesta-invalida, blast-radius, ma-invalido, reject, secreto, authen-fail, author-fail, estado. */
 export interface SecFindingData { code: string; severity: "warning" | "error" | "info"; args?: Record<string, string>; message: string }
 export interface RadiusExchangeData {
   kind: string; code?: string; rttMs: number; attempts: number; messageAuthenticator?: "absent" | "valid" | "invalid"; error?: SecText; attrs: { name: string; value: string }[];
+  /** Fase 30c: solo en MS-CHAPv2: true si el MS-CHAP2-Success verificó al servidor (autenticación mutua). Ausente en los demás métodos. */
+  mschap2Verified?: boolean;
 }
 export interface RadiusReportData { text: string; server: string; method?: string; exchanges: RadiusExchangeData[]; findings: SecFindingData[] }
 export interface TacacsStepData {
@@ -35,7 +37,21 @@ export interface Certificate {
 }
 export interface PkiReportData { text: string; certificates: Certificate[] }
 
+// Fase 30c-A: el decodificador IKE estructurado. Textos y json en el idioma de la interfaz; phase1 y phase2 ∈ established,
+// failed, mixed, incomplete, no_data; severity warning|error|info. key es ike.finding.<código> (con .title y .action) y
+// explanationKey la de la explicación (con variantes); las evidencias son líneas del equipo.
+export interface IkeFindingData {
+  code: string; severity: "warning" | "error" | "info"; phase?: number; key: string; explanationKey: string; args?: Record<string, string>;
+  title: string; explanation: string; action: string; evidence: string[];
+}
+export interface IkeProposalData { phase: number; sourceKey: string; sourceArgs?: Record<string, string>; source: string; detail: string; result?: "accepted" | "rejected" }
+export interface IkeReportData {
+  text: string; json: string; phase1: string; phase2: string; findings: IkeFindingData[]; proposals: IkeProposalData[]; note: string;
+}
+
 export interface SecurityAPI {
+  /** Como secIkeDecode, con el informe estructurado. */
+  secIkeReport?(text: string): Promise<IkeReportData>;
   /** Como secRadius, con el informe estructurado. */
   secRadiusReport?(r: RadiusRequest): Promise<RadiusReportData>;
   secTacacsReport?(r: TacacsRequest): Promise<TacacsReportData>;
@@ -64,4 +80,5 @@ export const securityWails = (call: Call): SecurityAPI => ({
   secRadiusReport: (r) => call("SecRadiusReport", r),
   secTacacsReport: (r) => call("SecTacacsReport", r),
   secPkiDecodeReport: (t) => call("SecPkiDecodeReport", t),
+  secIkeReport: (t) => call("SecIkeReport", t),
 });

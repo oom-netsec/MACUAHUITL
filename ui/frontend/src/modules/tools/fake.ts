@@ -1,6 +1,6 @@
 // Doble del módulo para pruebas: registra llamadas y permite emitir eventos.
 import { vi } from "vitest";
-import type { PcapReportData, SyslogDrops, SyslogEvent, ToolsAPI } from "./api";
+import type { DnsReportData, PcapReportData, SyslogDrops, SyslogEvent, TlsReportData, ToolsAPI } from "./api";
 
 /** Descartes de ejemplo: un origen inunda y la cola llegó a llenarse. */
 export const sampleSyslogDrops: SyslogDrops = {
@@ -17,6 +17,8 @@ export function fakeTools() {
       dns: { queries: 0, responses: 0, errors: [], slow: [], unanswered: [] }, tls: [], icmp: { unreachable: [], ttlExceeded: [] }, arpConflicts: [], fragments: 0, warnings: [], sections: [] }) as PcapReportData),
     toolsDns: vi.fn(async () => ""),
     toolsTls: vi.fn(async () => ""),
+    toolsDnsReport: vi.fn(async () => ({ text: "", json: "", findings: [] }) as DnsReportData),
+    toolsTlsReport: vi.fn(async () => ({ text: "", json: "", findings: [] }) as TlsReportData),
     syslogStart: vi.fn<ToolsAPI["syslogStart"]>(async () => "s1"),
     onSyslog: (cb: (e: SyslogEvent) => void) => (syslog.add(cb), () => syslog.delete(cb)),
     emitSyslog: (e: SyslogEvent) => syslog.forEach((cb) => cb(e)),

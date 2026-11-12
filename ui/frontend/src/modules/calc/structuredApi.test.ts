@@ -16,3 +16,19 @@ it("un resultado con claves sigue siendo un CalcResult y bars.ts lo lee igual", 
   expect(subnetFacts(r)?.network).toBe("10.0.0.0");
   expect(r.tables[0].rowLabels).toHaveLength(r.tables[0].rows.length);
 });
+
+// Fase 30c-A: las celdas con palabras llegan como código; la tabla sin ninguna no trae rowCoded.
+it("rowCoded trae una lista por fila y es opcional", () => {
+  const r: CalcResult = {
+    text: "", notes: [],
+    tables: [{
+      title: "Presupuesto", head: ["Campo", "Valor"], rows: [["Veredicto", "it closes"], ["Margen", "3.00 dB"]],
+      rowLabels: [{ key: "calc.row.verdict" }, { key: "calc.row.margin" }],
+      rowCoded: [[{ col: 1, key: "calc.val.verdict.closes" }], []],
+    }],
+  };
+  expect(r.tables[0].rowCoded).toHaveLength(r.tables[0].rows.length);
+  expect(r.tables[0].rowCoded![0][0].key).toBe("calc.val.verdict.closes");
+  const plain: CalcResult = { text: "", notes: [], tables: [{ title: "x", head: [], rows: [] }] };
+  expect(plain.tables[0].rowCoded).toBeUndefined();
+});
