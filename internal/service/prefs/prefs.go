@@ -52,6 +52,9 @@ func (s *prefsSvc) SetPreference(_ context.Context, r *v1.SetPreferenceRequest) 
 	if !okKey(r.Key) {
 		return nil, status.Error(codes.InvalidArgument, "clave de preferencia inválida")
 	}
+	if r.Key == "ui.language" && r.Value != "es" && r.Value != "en" {
+		return nil, status.Error(codes.InvalidArgument, "ui.language debe ser es o en")
+	}
 	if len(r.Value) > maxPrefValue {
 		return nil, status.Error(codes.InvalidArgument, "valor de preferencia mayor de 4 KiB")
 	}
