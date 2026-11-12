@@ -25,7 +25,7 @@ func TestInformeYSalidaEnIngles(t *testing.T) {
 			t.Errorf("español %q en:\n%s", bad, en)
 		}
 	}
-	if strings.Contains(out, "HUERFANA") || !strings.Contains(out, "! ORPHAN: ") || es == en {
+	if strings.Contains(out, "HUERFANA") || !strings.Contains(out, "! ORPHAN: route-map RM-FALTA does not exist") || es == en {
 		t.Errorf("salida en inglés:\n%s", out)
 	}
 }
