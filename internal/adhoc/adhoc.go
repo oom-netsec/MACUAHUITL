@@ -65,8 +65,10 @@ func Build(devs []capture.Device, cmds []string) Report {
 				row.OK, row.Output = true, strings.TrimRight(out, "\r\n")
 			} else if d.State != "completed" && d.Detail != "" {
 				row.Note = d.Detail
+			} else if d.State == "completed" {
+				row.Note = "sin salida (comando inválido en el equipo)"
 			} else {
-				row.Note = "sin salida (comando inválido en el equipo o equipo " + or(d.State, "sin ronda") + ")"
+				row.Note = "sin salida (equipo " + or(d.State, "sin ronda") + ")"
 			}
 			r.Rows = append(r.Rows, row)
 		}

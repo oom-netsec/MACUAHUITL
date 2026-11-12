@@ -93,3 +93,15 @@ func TestMarkdownEscapaHTMLYComillas(t *testing.T) {
 		}
 	}
 }
+
+// Un equipo que terminó bien y no trae el comando lo rechazó; el estado crudo (completed) no va en la nota.
+func TestBuildSinSalidaNoMezclaElEstado(t *testing.T) {
+	devs := []capture.Device{
+		{Hostname: "SW1", Address: "192.0.2.1", State: "completed", Outputs: map[string]string{}},
+		{Hostname: "SW2", Address: "192.0.2.2", State: "failed", Outputs: map[string]string{}},
+	}
+	r := Build(devs, []string{"show environment all"})
+	if r.Rows[0].Note != "sin salida (comando inválido en el equipo)" || r.Rows[1].Note != "sin salida (equipo failed)" {
+		t.Fatalf("notas = %q, %q", r.Rows[0].Note, r.Rows[1].Note)
+	}
+}
