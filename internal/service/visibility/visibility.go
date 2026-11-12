@@ -202,11 +202,11 @@ const (
 )
 
 // preListenErr distingue el fallo del disco al preparar la salida (interno) de una petición inválida.
-func preListenErr(err error) error {
+func preListenErr(ctx context.Context, err error) error {
 	if errors.As(err, new(*ingest.OutputError)) {
-		return status.Error(codes.Internal, err.Error())
+		return service.ErrFrom(ctx, codes.Internal, err)
 	}
-	return status.Error(codes.InvalidArgument, err.Error())
+	return service.ErrFrom(ctx, codes.InvalidArgument, err)
 }
 
 // ingestOpts pasa los campos de topes y archivo de la petición a los que comparten los receptores.
@@ -218,7 +218,7 @@ func ingestOpts(prefs service.IngestDefaults, rate, burst, rateG, burstG, queue,
 func (s *visibilitySvc) SnmpTraps(r *v1.SnmpTrapsRequest, st v1.VisibilityService_SnmpTrapsServer) error {
 	s.d.MarkActive()
 	lim, sink, err := ingestOpts(s.d.Settings().Ingest(), r.RatePerSource, r.BurstPerSource, r.RateGlobal, r.BurstGlobal, r.QueueSize, r.RotateMb, r.RotateMinutes, r.MaxFiles, r.NameTemplate, r.Format).
-		Build(filepath.Join(s.d.Outputs(), "snmp-traps"), "traps_{fecha}_{hora}")
+		Build(st.Context(), filepath.Join(s.d.Outputs(), "snmp-traps"), "traps_{fecha}_{hora}")
 	if err != nil {
 		return err
 	}
@@ -268,11 +268,11 @@ func (s *visibilitySvc) SnmpTraps(r *v1.SnmpTrapsRequest, st v1.VisibilityServic
 	err = snmp.ListenTraps(ctx, cfg)
 	lost := pump.Close(closeGrace)
 	if !listening { // dirección, puerto o credencial rechazados antes de abrir el socket, o la carpeta de salida
-		return preListenErr(err)
+		return preListenErr(st.Context(), err)
 	}
 	s.d.Audit("visibility.traps.done", cfg.Addr, fmt.Sprintf("traps=%d descartes=%d por_origen=%d global=%d cola_llena=%d perdidos_en_la_interfaz=%d", n, last.Total, last.PorOrigen, last.Global, last.ColaLlena, lost))
 	if err != nil {
-		return status.Error(codes.Unavailable, err.Error())
+		return service.ErrFrom(st.Context(), codes.Unavailable, err)
 	}
 	return nil
 }
@@ -282,7 +282,7 @@ func (s *visibilitySvc) Flows(r *v1.FlowsRequest, st v1.VisibilityService_FlowsS
 	// Un exportador NetFlow/IPFIX manda muchos más datagramas que un equipo syslog: defaults más altos que los de syslog y traps.
 	fo := ingestOpts(s.d.Settings().Ingest(), r.RatePerSource, r.BurstPerSource, r.RateGlobal, r.BurstGlobal, r.QueueSize, r.RotateMb, r.RotateMinutes, r.MaxFiles, r.NameTemplate, r.Format)
 	fo.DefPerSource, fo.DefGlobal = flowsRatePerSource, flowsRateGlobal
-	lim, sink, err := fo.Build(filepath.Join(s.d.Outputs(), "flows"), "flujos_{fecha}_{hora}")
+	lim, sink, err := fo.Build(st.Context(), filepath.Join(s.d.Outputs(), "flows"), "flujos_{fecha}_{hora}")
 	if err != nil {
 		return err
 	}
@@ -326,13 +326,13 @@ func (s *visibilitySvc) Flows(r *v1.FlowsRequest, st v1.VisibilityService_FlowsS
 	sn, err := flows.Listen(ctx, cfg)
 	if !listening {
 		pump.Close(closeGrace)
-		return preListenErr(err)
+		return preListenErr(st.Context(), err)
 	}
 	snap(sn, true)
 	lost := pump.Close(closeGrace)
 	s.d.Audit("visibility.flows.done", cfg.Addr, fmt.Sprintf("flujos=%d bytes=%d errores=%d descartes=%d por_origen=%d global=%d cola_llena=%d perdidos_en_la_interfaz=%d", sn.Flows, sn.Bytes, sn.Errors, last.Total, last.PorOrigen, last.Global, last.ColaLlena, lost))
 	if err != nil {
-		return status.Error(codes.Unavailable, err.Error())
+		return service.ErrFrom(st.Context(), codes.Unavailable, err)
 	}
 	return nil
 }
