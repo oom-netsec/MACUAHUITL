@@ -556,7 +556,7 @@ func (x *PackServiceRemoveResponse) GetFavoritesRemoved() int32 {
 type PackServiceExportRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	EditorName       string                 `protobuf:"bytes,1,opt,name=editor_name,json=editorName,proto3" json:"editor_name,omitempty"`                    // "<editor>/<nombre>"; editor [a-z0-9]{1,16}, sin los reservados
-	ScriptIds        []string               `protobuf:"bytes,2,rep,name=script_ids,json=scriptIds,proto3" json:"script_ids,omitempty"`                       // scripts del usuario (hasta 1000)
+	ScriptIds        []string               `protobuf:"bytes,2,rep,name=script_ids,json=scriptIds,proto3" json:"script_ids,omitempty"`                       // scripts del usuario (0 a 1000; con include_playbooks pueden ser 0)
 	IncludePlaybooks bool                   `protobuf:"varint,3,opt,name=include_playbooks,json=includePlaybooks,proto3" json:"include_playbooks,omitempty"` // todos los de <config>/playbooks exportables
 	License          string                 `protobuf:"bytes,4,opt,name=license,proto3" json:"license,omitempty"`                                            // SPDX; vacío = NOASSERTION
 	Path             string                 `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`                                                  // absoluta; archivo nuevo 0600
@@ -680,7 +680,7 @@ func (x *PackServiceExportRequest) GetAuthor() string {
 type PackServiceExportResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Version          string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"` // AAAA.MMDD.HHMM de la hora local
+	Version          string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"` // AAAA.MMDD.HHMMSS de la hora local
 	Sha256           string                 `protobuf:"bytes,3,opt,name=sha256,proto3" json:"sha256,omitempty"`   // del archivo escrito
 	Scripts          int32                  `protobuf:"varint,4,opt,name=scripts,proto3" json:"scripts,omitempty"`
 	Playbooks        int32                  `protobuf:"varint,5,opt,name=playbooks,proto3" json:"playbooks,omitempty"`
@@ -818,6 +818,7 @@ type PackServiceImportRequest struct {
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`        // absoluta; el .mpack no debe tener firma oficial
 	Confirm       bool                   `protobuf:"varint,2,opt,name=confirm,proto3" json:"confirm,omitempty"` // false = vista previa (no escribe nada); true = aplica con decisions
 	Decisions     []*PackImportDecision  `protobuf:"bytes,3,rep,name=decisions,proto3" json:"decisions,omitempty"`
+	Sha256        string                 `protobuf:"bytes,4,opt,name=sha256,proto3" json:"sha256,omitempty"` // opcional: el de la vista previa; con confirm, si no coincide con el archivo, falla (pack.err.import.changed)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -871,6 +872,13 @@ func (x *PackServiceImportRequest) GetDecisions() []*PackImportDecision {
 		return x.Decisions
 	}
 	return nil
+}
+
+func (x *PackServiceImportRequest) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
 }
 
 type PackImportItem struct {
@@ -953,7 +961,6 @@ type PackServiceImportResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Pack             *PackInfo              `protobuf:"bytes,1,opt,name=pack,proto3" json:"pack,omitempty"`
 	Items            []*PackImportItem      `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
-	Warnings         []string               `protobuf:"bytes,3,rep,name=warnings,proto3" json:"warnings,omitempty"`
 	Applied          bool                   `protobuf:"varint,4,opt,name=applied,proto3" json:"applied,omitempty"` // false en la vista previa
 	ScriptsCreated   int32                  `protobuf:"varint,5,opt,name=scripts_created,json=scriptsCreated,proto3" json:"scripts_created,omitempty"`
 	ScriptsRenamed   int32                  `protobuf:"varint,6,opt,name=scripts_renamed,json=scriptsRenamed,proto3" json:"scripts_renamed,omitempty"`
@@ -962,6 +969,7 @@ type PackServiceImportResponse struct {
 	PlaybooksRenamed int32                  `protobuf:"varint,9,opt,name=playbooks_renamed,json=playbooksRenamed,proto3" json:"playbooks_renamed,omitempty"`
 	PlaybooksSkipped int32                  `protobuf:"varint,10,opt,name=playbooks_skipped,json=playbooksSkipped,proto3" json:"playbooks_skipped,omitempty"`
 	PlaybookIds      []string               `protobuf:"bytes,11,rep,name=playbook_ids,json=playbookIds,proto3" json:"playbook_ids,omitempty"` // IDs con los que quedaron escritos los playbooks
+	Sha256           string                 `protobuf:"bytes,12,opt,name=sha256,proto3" json:"sha256,omitempty"`                              // del archivo; pásalo en el Import con confirm para atar la vista previa a lo que se aplica
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -1006,13 +1014,6 @@ func (x *PackServiceImportResponse) GetPack() *PackInfo {
 func (x *PackServiceImportResponse) GetItems() []*PackImportItem {
 	if x != nil {
 		return x.Items
-	}
-	return nil
-}
-
-func (x *PackServiceImportResponse) GetWarnings() []string {
-	if x != nil {
-		return x.Warnings
 	}
 	return nil
 }
@@ -1071,6 +1072,13 @@ func (x *PackServiceImportResponse) GetPlaybookIds() []string {
 		return x.PlaybookIds
 	}
 	return nil
+}
+
+func (x *PackServiceImportResponse) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
 }
 
 var File_macuahuitl_v1_pack_proto protoreflect.FileDescriptor
@@ -1139,21 +1147,21 @@ const file_macuahuitl_v1_pack_proto_rawDesc = "" +
 	"\x11omitted_playbooks\x18\x06 \x03(\tR\x10omittedPlaybooks\"E\n" +
 	"\x12PackImportDecision\x12\x17\n" +
 	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x16\n" +
-	"\x06action\x18\x02 \x01(\tR\x06action\"\x89\x01\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\"\xa1\x01\n" +
 	"\x18PackServiceImportRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
 	"\aconfirm\x18\x02 \x01(\bR\aconfirm\x12?\n" +
-	"\tdecisions\x18\x03 \x03(\v2!.macuahuitl.v1.PackImportDecisionR\tdecisions\"\x85\x01\n" +
+	"\tdecisions\x18\x03 \x03(\v2!.macuahuitl.v1.PackImportDecisionR\tdecisions\x12\x16\n" +
+	"\x06sha256\x18\x04 \x01(\tR\x06sha256\"\x85\x01\n" +
 	"\x0ePackImportItem\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
 	"\x05state\x18\x04 \x01(\tR\x05state\x12%\n" +
-	"\x0econflicts_with\x18\x05 \x01(\tR\rconflictsWith\"\xd8\x03\n" +
+	"\x0econflicts_with\x18\x05 \x01(\tR\rconflictsWith\"\xda\x03\n" +
 	"\x19PackServiceImportResponse\x12+\n" +
 	"\x04pack\x18\x01 \x01(\v2\x17.macuahuitl.v1.PackInfoR\x04pack\x123\n" +
-	"\x05items\x18\x02 \x03(\v2\x1d.macuahuitl.v1.PackImportItemR\x05items\x12\x1a\n" +
-	"\bwarnings\x18\x03 \x03(\tR\bwarnings\x12\x18\n" +
+	"\x05items\x18\x02 \x03(\v2\x1d.macuahuitl.v1.PackImportItemR\x05items\x12\x18\n" +
 	"\aapplied\x18\x04 \x01(\bR\aapplied\x12'\n" +
 	"\x0fscripts_created\x18\x05 \x01(\x05R\x0escriptsCreated\x12'\n" +
 	"\x0fscripts_renamed\x18\x06 \x01(\x05R\x0escriptsRenamed\x12'\n" +
@@ -1162,7 +1170,8 @@ const file_macuahuitl_v1_pack_proto_rawDesc = "" +
 	"\x11playbooks_renamed\x18\t \x01(\x05R\x10playbooksRenamed\x12+\n" +
 	"\x11playbooks_skipped\x18\n" +
 	" \x01(\x05R\x10playbooksSkipped\x12!\n" +
-	"\fplaybook_ids\x18\v \x03(\tR\vplaybookIds2\xb2\x04\n" +
+	"\fplaybook_ids\x18\v \x03(\tR\vplaybookIds\x12\x16\n" +
+	"\x06sha256\x18\f \x01(\tR\x06sha256J\x04\b\x03\x10\x042\xb2\x04\n" +
 	"\vPackService\x12^\n" +
 	"\aInstall\x12(.macuahuitl.v1.PackServiceInstallRequest\x1a).macuahuitl.v1.PackServiceInstallResponse\x12U\n" +
 	"\x04List\x12%.macuahuitl.v1.PackServiceListRequest\x1a&.macuahuitl.v1.PackServiceListResponse\x12U\n" +

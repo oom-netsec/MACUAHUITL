@@ -237,7 +237,8 @@ func (c *Core) openPacks() (err error) {
 	return nil
 }
 
-// loadUser lee <config>/playbooks y deja esa lista como la vigente (sin tocar el catálogo).
+// loadUser lee <config>/playbooks y deja esa lista como la vigente (sin tocar el catálogo). Quien llama tiene catMu
+// o aún no hay otro que lo use (arranque).
 func (c *Core) loadUser() error {
 	var pbs []playbook.Playbook
 	if user := filepath.Join(c.p.Config, "playbooks"); dirExists(user) {
@@ -252,10 +253,12 @@ func (c *Core) loadUser() error {
 
 // reloadUser vuelve a leer <config>/playbooks y recarga el catálogo en caliente. Si la carpeta no se puede leer queda lo anterior.
 func (c *Core) reloadUser() error {
+	c.catMu.Lock()
+	defer c.catMu.Unlock()
 	if err := c.loadUser(); err != nil {
 		return err
 	}
-	c.rebuildCatalog()
+	c.buildCatalog()
 	return nil
 }
 
@@ -274,6 +277,11 @@ func dirExists(p string) bool { fi, err := os.Stat(p); return err == nil && fi.I
 func (c *Core) rebuildCatalog() {
 	c.catMu.Lock()
 	defer c.catMu.Unlock()
+	c.buildCatalog()
+}
+
+// buildCatalog arma y publica el catálogo; quien llama tiene catMu.
+func (c *Core) buildCatalog() {
 	pbs := slices.Clone(c.basePbs)
 	merge := func(extra []playbook.Playbook) {
 		for _, e := range extra {

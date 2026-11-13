@@ -94,6 +94,9 @@ func TestPackExportImport(t *testing.T) {
 	if _, err := mctl(t, "", "pack", "import", f, "--decision", "x=reemplazar"); err == nil {
 		t.Fatal("reemplazar no existe aquí")
 	}
+	if _, err := mctl(t, "", "pack", "import", f, "--decision", "ninguno=omitir"); err == nil || !strings.Contains(err.Error(), "ninguno") {
+		t.Fatalf("una decisión de un ID que no está debe fallar: %v", err)
+	}
 	if _, err := mctl(t, "", "pack", "import"); err == nil || !strings.Contains(err.Error(), "uso:") {
 		t.Fatalf("sin archivo: %v", err)
 	}

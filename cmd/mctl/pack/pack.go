@@ -23,7 +23,7 @@ const help = `  pack install <archivo.mpack> [--allow-unsigned]  |  pack list  |
   pack export <editor/nombre> [ID...] --out <archivo.mpack> [--playbooks] [--license SPDX] [--name N] [--description D] [--author A] [--overwrite]
         (arma un paquete personal SIN firma con los scripts del usuario ID... y, con --playbooks, los de <config>/playbooks de ios, ios-xe y wlc-9800.
          Los scripts salen como lib-<editor>-… y los playbooks con el editor como prefijo; los demás playbooks se omiten y se avisa. El editor es
-         [a-z0-9]{1,16}, sin los reservados. Versión AAAA.MMDD.HHMM; licencia NOASSERTION si no das otra; los favoritos no viajan)
+         [a-z0-9]{1,16}, sin los reservados. Versión AAAA.MMDD.HHMMSS (hora local); licencia NOASSERTION si no das otra; los favoritos no viajan)
   pack import <archivo.mpack> [--decision ID=renombrar|omitir]... [--all=renombrar|omitir] [--preview]
         (copia un .mpack sin firma oficial a «Mis scripts» y a <config>/playbooks, editables, sin instalarlo. Muestra el estado de cada elemento:
          nuevo, igual, conflicto_id o conflicto_nombre; cada conflicto pide decisión y nunca se sobrescribe nada. Un playbook importado conserva su ID con
@@ -194,8 +194,14 @@ func importCmd(c *cli.Env, args []string) error {
 		}
 	}
 	tw.Flush()
-	for _, w := range pv.Warnings {
-		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+	known := map[string]bool{}
+	for _, it := range pv.Items {
+		known[it.Id] = true
+	}
+	for id := range dec {
+		if !known[id] {
+			return fmt.Errorf("la decisión nombra %q, que no está en el paquete", id)
+		}
 	}
 	if preview {
 		return nil
@@ -203,7 +209,7 @@ func importCmd(c *cli.Env, args []string) error {
 	if len(missing) > 0 {
 		return fmt.Errorf("no se importó nada: falta decidir %d conflicto(s); use --decision ID=renombrar|omitir o --all=ACCIÓN: %s", len(missing), strings.Join(missing, ", "))
 	}
-	r, err := cl.Import(context.Background(), &v1.PackServiceImportRequest{Path: path, Confirm: true, Decisions: req})
+	r, err := cl.Import(context.Background(), &v1.PackServiceImportRequest{Path: path, Confirm: true, Decisions: req, Sha256: pv.Sha256})
 	if err != nil {
 		return err
 	}

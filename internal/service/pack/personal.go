@@ -88,7 +88,7 @@ func (s *svc) Export(ctx context.Context, r *v1.PackServiceExportRequest) (*v1.P
 		return nil, err
 	}
 	if len(r.GetScriptIds()) > scripts.MaxImportScripts {
-		return nil, service.Err(ctx, codes.InvalidArgument, "scripts.svc.export_range", i18n.A("max", scripts.MaxImportScripts))
+		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.export.range", i18n.A("max", scripts.MaxImportScripts))
 	}
 	var sel []scripts.Script
 	if len(r.GetScriptIds()) > 0 {
@@ -118,7 +118,7 @@ func (s *svc) Export(ctx context.Context, r *v1.PackServiceExportRequest) (*v1.P
 		pbs = s.cfg.UserPlaybooks()
 	}
 	res, err := dom.Export(dom.ExportInput{ID: r.GetEditorName(), Name: r.GetName(), NameEn: r.GetNameEn(), Description: r.GetDescription(),
-		DescriptionEn: r.GetDescriptionEn(), Author: r.GetAuthor(), License: r.GetLicense(), Core: s.store.CoreVersion(),
+		DescriptionEn: r.GetDescriptionEn(), Author: r.GetAuthor(), License: r.GetLicense(), Core: s.store.CoreVersion(), TakenNames: s.store.TakenScriptNames(),
 		Now: s.d.Now().Local(), Scripts: sel, Playbooks: pbs})
 	if err != nil {
 		return nil, fail(ctx, err)
@@ -138,6 +138,9 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 	if r.GetPath() == "" {
 		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.path", nil)
 	}
+	if s.cfg.ConfigDir == "" {
+		return nil, service.Err(ctx, codes.Unavailable, "pack.err.import.unavailable", nil)
+	}
 	path, err := service.AbsPath(ctx, r.GetPath())
 	if err != nil {
 		return nil, err
@@ -147,6 +150,9 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 		return nil, s.reject(ctx, err, nil, "none", path)
 	}
 	sum := dom.SHA256(data)
+	if r.GetConfirm() && r.GetSha256() != "" && !strings.EqualFold(r.GetSha256(), sum) {
+		return nil, service.Err(ctx, codes.FailedPrecondition, "pack.err.import.changed", nil)
+	}
 	p, err := s.store.VerifyImport(data)
 	if err != nil {
 		return nil, s.reject(ctx, err, p, sum, path)
@@ -160,7 +166,7 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 	if s.userIDs != nil {
 		userIDs = s.userIDs()
 	}
-	out := &v1.PackServiceImportResponse{Pack: s.info(p)}
+	out := &v1.PackServiceImportResponse{Pack: s.info(p), Sha256: sum}
 	if !r.GetConfirm() {
 		user, err := loadUser(s.d.DB())
 		if err != nil {
@@ -209,6 +215,8 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 			return nil, internal(err)
 		}
 	}
+	// shortcut: los playbooks se escriben antes del commit de la base; si el proceso cae entre los dos quedan archivos sin
+	// scripts (no se pierde nada, y reimportar los ve como conflicto y pide decisión). Mejorar con un diario si hiciera falta.
 	if pbRes, err = s.store.ImportPlaybooks(p, dir, userIDs, pbDec); err != nil {
 		tx.Rollback() // la auditoría escribe en la misma base: no puede haber una transacción abierta
 		return nil, s.reject(ctx, err, p, sum, path)

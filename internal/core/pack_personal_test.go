@@ -154,9 +154,9 @@ func TestPackPersonalExportInstalable(t *testing.T) {
 	if err != nil || r.Pack.Official || r.Pack.ScriptCount != 1 {
 		t.Fatalf("%+v %v", r, err)
 	}
-	// Con el paquete instalado, importarlo choca por nombre con su script derivado: no se duplica, se pide decisión.
+	// Con el paquete instalado, el script ya está (mismo contenido y nombre): sale «igual» y no se duplica.
 	pv, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: out})
-	if err != nil || pv.Items[0].State == "nuevo" && len(h.userScripts(t)) != 1 {
+	if err != nil || pv.Items[0].State != "igual" || !strings.HasPrefix(pv.Items[0].ConflictsWith, "lib-acme-") {
 		t.Fatalf("%+v %v", pv, err)
 	}
 }
@@ -345,5 +345,69 @@ func TestPackImportNuncaReemplazaScripts(t *testing.T) {
 	ap, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: pv.Items[0].Id, Action: "renombrar"}}})
 	if err != nil || ap.ScriptsRenamed != 1 || len(h.userScripts(t)) != 2 || h.userScripts(t)["Uno"].Commands[0] != "show clock" {
 		t.Fatalf("%+v %v", ap, err)
+	}
+}
+
+// Dos imports a la vez con playbooks distintos: los dos quedan en el catálogo (leer, guardar y armar van bajo un solo lock).
+func TestPackImportsConcurrentesConservanTodo(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	mk := func(id string) string {
+		return hostile(t, func(f map[string][]byte) {
+			delete(f, "playbooks/acme-evil.yaml")
+			f["playbooks/"+id+".yaml"] = []byte("id: " + id + "\nplatform: ios\nname: P\nname_en: P\ncommands:\n  - cmd: show clock\n")
+			f["manifest.yaml"] = []byte(strings.Replace(string(f["manifest.yaml"]), "[ios-xe]", "[ios]", 1))
+		})
+	}
+	for i := range 15 {
+		a, b := mk(fmt.Sprintf("acme-a%d", i)), mk(fmt.Sprintf("acme-b%d", i))
+		var wg sync.WaitGroup
+		for _, p := range []string{a, b} {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if _, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: p, Confirm: true}); err != nil {
+					t.Error(err)
+				}
+			}()
+		}
+		wg.Wait()
+		ids := h.playbookIDs(t)
+		if !slices.Contains(ids, fmt.Sprintf("ios/acme-a%d", i)) || !slices.Contains(ids, fmt.Sprintf("ios/acme-b%d", i)) {
+			t.Fatalf("ronda %d: falta un playbook importado", i)
+		}
+	}
+}
+
+// La vista previa se ata a lo que se aplica: si el archivo cambió entre las dos llamadas, no se aplica nada.
+func TestPackImportSha256AtaLaVistaPrevia(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	path := hostile(t, func(map[string][]byte) {})
+	pv, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: path})
+	if err != nil || len(pv.Sha256) != 64 {
+		t.Fatalf("%+v %v", pv, err)
+	}
+	_, err = pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: path, Confirm: true, Sha256: strings.Repeat("0", 64)})
+	if r, _ := reasonOf(err); r != "pack.err.import.changed" {
+		t.Fatalf("%v", err)
+	}
+	if es, _ := os.ReadDir(filepath.Join(h.p.Config, "playbooks")); len(es) != 0 {
+		t.Fatal("aplicó con otra suma")
+	}
+	if _, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: path, Confirm: true, Sha256: pv.Sha256}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Solo playbooks (0 scripts) se exporta; con 0 de todo, no.
+func TestPackExportSoloPlaybooks(t *testing.T) {
+	h := newHarness(t, nil)
+	h.userPlaybookFile(t, "mio.yaml", "mio", "ios-xe")
+	h.restart(t)
+	pk := v1.NewPackServiceClient(h.conn)
+	r, err := pk.Export(ctx(t), &v1.PackServiceExportRequest{EditorName: "acme/mio", IncludePlaybooks: true, Path: filepath.Join(t.TempDir(), "p.mpack")})
+	if err != nil || r.Playbooks != 1 || r.Scripts != 0 {
+		t.Fatalf("%+v %v", r, err)
 	}
 }

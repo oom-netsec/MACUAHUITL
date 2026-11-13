@@ -76,7 +76,7 @@ message PackServiceRemoveResponse {
 
 message PackServiceExportRequest {
   string editor_name = 1;           // "<editor>/<nombre>"; editor [a-z0-9]{1,16}, sin los reservados
-  repeated string script_ids = 2;   // scripts del usuario (hasta 1000)
+  repeated string script_ids = 2;   // scripts del usuario (0 a 1000; con include_playbooks pueden ser 0)
   bool include_playbooks = 3;       // todos los de <config>/playbooks exportables
   string license = 4;               // SPDX; vacío = NOASSERTION
   string path = 5;                  // absoluta; archivo nuevo 0600
@@ -90,7 +90,7 @@ message PackServiceExportRequest {
 
 message PackServiceExportResponse {
   string id = 1;
-  string version = 2;               // AAAA.MMDD.HHMM de la hora local
+  string version = 2;               // AAAA.MMDD.HHMMSS de la hora local
   string sha256 = 3;                // del archivo escrito
   int32 scripts = 4;
   int32 playbooks = 5;
@@ -106,6 +106,7 @@ message PackServiceImportRequest {
   string path = 1;                  // absoluta; el .mpack no debe tener firma oficial
   bool confirm = 2;                 // false = vista previa (no escribe nada); true = aplica con decisions
   repeated PackImportDecision decisions = 3;
+  string sha256 = 4;                // opcional: el de la vista previa; con confirm, si no coincide con el archivo, falla (pack.err.import.changed)
 }
 
 message PackImportItem {
@@ -119,7 +120,7 @@ message PackImportItem {
 message PackServiceImportResponse {
   PackInfo pack = 1;
   repeated PackImportItem items = 2;
-  repeated string warnings = 3;
+  reserved 3;                       // era warnings
   bool applied = 4;                 // false en la vista previa
   int32 scripts_created = 5;
   int32 scripts_renamed = 6;
@@ -128,4 +129,5 @@ message PackServiceImportResponse {
   int32 playbooks_renamed = 9;
   int32 playbooks_skipped = 10;
   repeated string playbook_ids = 11;  // IDs con los que quedaron escritos los playbooks
+  string sha256 = 12;               // del archivo; pásalo en el Import con confirm para atar la vista previa a lo que se aplica
 }

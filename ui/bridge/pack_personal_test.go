@@ -18,7 +18,7 @@ type fakePackPersonal struct {
 }
 
 func (fakePackPersonal) Export(_ context.Context, r *v1.PackServiceExportRequest) (*v1.PackServiceExportResponse, error) {
-	return &v1.PackServiceExportResponse{Id: r.EditorName, Version: "2026.1113.1405", Sha256: "ab", Scripts: int32(len(r.ScriptIds)), OmittedPlaybooks: []string{"nx-os/x"}}, nil
+	return &v1.PackServiceExportResponse{Id: r.EditorName, Version: "2026.1113.140500", Sha256: "ab", Scripts: int32(len(r.ScriptIds)), OmittedPlaybooks: []string{"nx-os/x"}}, nil
 }
 
 func (f *fakePackPersonal) Import(_ context.Context, r *v1.PackServiceImportRequest) (*v1.PackServiceImportResponse, error) {
@@ -47,12 +47,12 @@ func TestPackPersonalBridge(t *testing.T) {
 	if err != nil || pv.Applied || f.got.Confirm || pv.Items[0].ConflictsWith != "user" {
 		t.Fatalf("%+v %v", pv, err)
 	}
-	ap, err := b.PackImport("/x.mpack", []PackImportDecisionDTO{{ItemID: "ios/acme-x", Action: "renombrar"}})
-	if err != nil || !ap.Applied || !f.got.Confirm || f.got.Decisions[0].Action != "renombrar" || ap.PlaybooksRenamed != 1 {
+	ap, err := b.PackImport("/x.mpack", "ab", []PackImportDecisionDTO{{ItemID: "ios/acme-x", Action: "renombrar"}})
+	if err != nil || !ap.Applied || !f.got.Confirm || f.got.Decisions[0].Action != "renombrar" || f.got.Sha256 != "ab" || ap.PlaybooksRenamed != 1 {
 		t.Fatalf("%+v %v", ap, err)
 	}
 	j, _ := json.Marshal(packImportDTO(&v1.PackServiceImportResponse{}))
-	if !strings.Contains(string(j), `"items":[]`) || !strings.Contains(string(j), `"playbookIds":[]`) || !strings.Contains(string(j), `"warnings":[]`) {
+	if !strings.Contains(string(j), `"items":[]`) || !strings.Contains(string(j), `"playbookIds":[]`) {
 		t.Fatalf("json = %s", j)
 	}
 }

@@ -39,7 +39,7 @@ func TestExportPasaVerifyComoNoOficial(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Official || p.ID != "acme/mio" || p.Version != "2026.1113.1405" || p.MinCore != "0.3.0" || p.License != "NOASSERTION" ||
+	if p.Official || p.ID != "acme/mio" || p.Version != "2026.1113.140500" || p.MinCore != "0.3.0" || p.License != "NOASSERTION" ||
 		p.NameEn != p.Name || p.DescriptionEn != p.Description || len(p.Scripts) != 2 || len(p.Playbooks) != 2 {
 		t.Fatalf("%+v", p.Manifest)
 	}
@@ -133,5 +133,18 @@ func TestExportREADMEConTopeDeLista(t *testing.T) {
 	}
 	if _, err := Verify(r.Data, "v0.3.0", nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Un playbook propio cuyo script derivado se llama como uno de la base o de un instalado se omite: Install lo rechazaría por colisión.
+func TestExportOmiteNombreOcupado(t *testing.T) {
+	in := exportIn(nil, []playbook.Playbook{userPB("ios", "uno", "show clock"), userPB("ios", "dos", "show version")})
+	in.TakenNames = []string{"pb UNO"}
+	r, err := Export(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(r.Omitted) != "[ios/uno]" || r.Playbooks != 1 {
+		t.Fatal(r.Omitted, r.Playbooks)
 	}
 }

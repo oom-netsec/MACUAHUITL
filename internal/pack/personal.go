@@ -19,6 +19,7 @@ type ExportInput struct {
 	Name, NameEn, Description, DescriptionEn, Author, License string
 	Core                                                      string // versión del núcleo; «dev» o no semver = min_core 0.0.0
 	Now                                                       time.Time
+	TakenNames                                                []string            // nombres de script ya ocupados (base e instalados): un playbook cuyo script derivado se llame igual se omite
 	Scripts                                                   []scripts.Script    // los del usuario que se exportan
 	Playbooks                                                 []playbook.Playbook // los de <config>/playbooks; los que no sean exportables se omiten con aviso
 }
@@ -52,6 +53,7 @@ func Export(in ExportInput) (*ExportResult, error) {
 	res := &ExportResult{}
 	plats := map[string]bool{}
 	names := map[string]bool{}
+	taken := map[string]bool{}
 
 	var out []scripts.Script
 	used := map[string]bool{}
@@ -75,9 +77,12 @@ func Export(in ExportInput) (*ExportResult, error) {
 		files[fileScripts] = raw
 	}
 
+	for _, n := range in.TakenNames {
+		taken[scripts.NameKey(n)] = true
+	}
 	var pbs []playbook.Playbook
 	for _, pb := range in.Playbooks {
-		pb, ok := exportPlaybook(pb, editor, files, names)
+		pb, ok := exportPlaybook(pb, editor, files, names, taken)
 		if !ok {
 			res.Omitted = append(res.Omitted, pb.ID)
 			continue
@@ -90,7 +95,7 @@ func Export(in ExportInput) (*ExportResult, error) {
 		return nil, rej("export.empty")
 	}
 
-	man := Manifest{ID: in.ID, Version: in.Now.Format("2006.0102.1504"), MinCore: "0.0.0", Name: in.Name, NameEn: in.NameEn,
+	man := Manifest{ID: in.ID, Version: in.Now.Format("2006.0102.150405"), MinCore: "0.0.0", Name: in.Name, NameEn: in.NameEn,
 		Description: in.Description, DescriptionEn: in.DescriptionEn, Author: in.Author, License: in.License}
 	if v, ok := semver(in.Core); ok && in.Core != "dev" {
 		man.MinCore = fmt.Sprintf("%d.%d.%d", v[0], v[1], v[2])
@@ -149,7 +154,7 @@ func exportScriptID(editor, orig string, used map[string]bool) string {
 // exportPlaybook le pone al playbook su ID con prefijo de editor y agrega su archivo a files. ok=false (y pb.ID con el ID
 // original) si no se puede exportar: plataforma que no es instalable, ID que el instalador rechazaría, script derivado
 // inválido o un archivo playbooks/<id>.yaml ya tomado.
-func exportPlaybook(pb playbook.Playbook, editor string, files map[string][]byte, names map[string]bool) (playbook.Playbook, bool) {
+func exportPlaybook(pb playbook.Playbook, editor string, files map[string][]byte, names, taken map[string]bool) (playbook.Playbook, bool) {
 	orig := pb
 	if !slices.Contains(Installable, pb.Platform) {
 		return orig, false
@@ -164,7 +169,7 @@ func exportPlaybook(pb playbook.Playbook, editor string, files map[string][]byte
 	}
 	pb.ID, pb.Pack = pb.Platform+"/"+id, ""
 	for _, s := range scripts.Derived([]playbook.Playbook{pb}) {
-		if s.Validate() != nil || names[scripts.NameKey(s.Name)] {
+		if s.Validate() != nil || names[scripts.NameKey(s.Name)] || taken[scripts.NameKey(s.Name)] {
 			return orig, false
 		}
 		names[scripts.NameKey(s.Name)] = true

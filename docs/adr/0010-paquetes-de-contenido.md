@@ -137,11 +137,11 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
   - Si es un script derivado, la copia lleva los comandos de `pre` más los del playbook.
 - **Paquete personal (export).** `mctl pack export` y Ajustes → Paquetes → Exportar arman un `.mpack` sin firma con los scripts del usuario que se elijan (con su tecnología, plataforma y etiquetas), sus playbooks de `<config>/playbooks` si se piden, y un README generado.
   - El usuario da `<editor>/<nombre>`, con las reglas de editores reservados.
-  - Versión: `AAAA.MMDD.HHMM` de la hora local, así que crece sola en cada export.
+  - Versión: `AAAA.MMDD.HHMMSS` de la hora local (con segundos para que dos exports en el mismo minuto no den la misma versión; son tres números, así que pasa `semverRe`), así que crece sola en cada export.
   - `min_core`: la versión del núcleo, o `0.0.0` si el núcleo es `dev`.
   - `license`: `NOASSERTION` si el usuario no da otra. `name_en` y `description_en` copian el texto en español si falta.
   - IDs: los scripts salen como `lib-<editor>-<12 hex>`, únicos dentro del paquete, para no pasar el tope de `Validate`. Los playbooks salen con el prefijo de editor, cada uno en `playbooks/<id con prefijo>.yaml`.
-  - Los playbooks que no sean `ios` ni `ios-xe` no se exportan, y se avisa cuáles quedaron fuera.
+  - Solo se exportan los playbooks de `ios`, `ios-xe` y `wlc-9800`; los demás no se exportan, y se avisa cuáles quedaron fuera.
   - Los favoritos no viajan, igual que en el export de scripts.
 - **Importar a «Mis scripts» (respaldo).**
   - Cualquier `.mpack` sin firma, personal o no (no se distinguen), se puede instalar como paquete de solo lectura o importar. Importar pide la misma confirmación y pasa las mismas validaciones del instalador (pasos 1 a 6).
@@ -172,3 +172,6 @@ Se implementa tal como lo describe «Selección por elemento y paquete personal�
 
 - **Plataformas del export:** `ios`, `ios-xe` y `wlc-9800` (wlc-9800 es instalable desde la fase 34). Los playbooks de otras plataformas, y los que un paquete no aceptaría (ID con caracteres fuera de `a-z0-9-` o script derivado inválido), se omiten y se avisa por ID.
 - **El import es de dos pasos sin token** (`Import` sin y con `confirm`) y se revalida completo en cada uno. Un `.mpack` con firma oficial no se importa: se instala. Un playbook que choca (ID de la base, de los movidos, de un paquete instalado o de `<config>/playbooks`, o archivo existente) pide renombrar (`<id>-2`…) u omitir; `reemplazar` se rechaza. Los archivos se crean con `O_EXCL` y sin seguir enlaces dentro de un `os.Root` sobre `<config>/playbooks`, y la escritura es todo o nada junto con la base de scripts.
+- **Versión con segundos:** el export usa `AAAA.MMDD.HHMMSS` en vez de `AAAA.MMDD.HHMM`; sigue siendo semver de tres números y crece dentro del día.
+- **Un paquete instalado después de un import** con los mismos IDs de playbook queda tapado por la copia importada en `<config>/playbooks` (`Shadowed`); es de diseño, igual que con cualquier playbook del usuario.
+- **Vista previa atada a lo aplicado:** `Import` acepta el `sha256` de la vista previa y con `confirm` falla (`pack.err.import.changed`) si el archivo cambió.

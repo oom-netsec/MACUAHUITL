@@ -16,6 +16,18 @@ import (
 // CoreVersion es la versión del núcleo con la que el almacén valida min_core.
 func (s *Store) CoreVersion() string { return s.core }
 
+// TakenScriptNames son los nombres de script de la base y de los paquetes instalados: el export no deja que un script derivado
+// de un playbook propio los repita, porque Install lo rechazaría por colisión.
+func (s *Store) TakenScriptNames() []string {
+	names := slices.Clone(s.base.ScriptNames)
+	for _, p := range s.snap.Load().Packs {
+		for _, sc := range append(scripts.Derived(p.Playbooks), p.Scripts...) {
+			names = append(names, sc.Name)
+		}
+	}
+	return names
+}
+
 // VerifyImport hace los pasos 2 a 6 del ADR para importar a «Mis scripts» (fase 32b). Solo vale un paquete sin firma:
 // uno con firma oficial se instala, no se importa, porque sus IDs van sin prefijo de editor.
 func (s *Store) VerifyImport(data []byte) (*Pack, error) {
@@ -201,6 +213,10 @@ func writePlaybooks(dir string, files map[string][]byte) ([]string, error) {
 		if err != nil {
 			return fail(err, name)
 		}
+	}
+	if d, err := root.Open("."); err == nil { // que los archivos nuevos sobrevivan a una caída
+		d.Sync()
+		d.Close()
 	}
 	return done, nil
 }

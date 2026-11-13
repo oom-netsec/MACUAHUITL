@@ -123,7 +123,7 @@ type PackImportDecisionDTO struct {
 type PackImportResultDTO struct {
 	Pack             PackInfoDTO         `json:"pack"`
 	Items            []PackImportItemDTO `json:"items"`
-	Warnings         []string            `json:"warnings"`
+	SHA256           string              `json:"sha256"` // del archivo: pásalo a PackImport para atar la vista previa
 	Applied          bool                `json:"applied"`
 	ScriptsCreated   int                 `json:"scriptsCreated"`
 	ScriptsRenamed   int                 `json:"scriptsRenamed"`
@@ -146,7 +146,7 @@ func (b *Bridge) PackExport(req PackExportRequestDTO) (PackExportResultDTO, erro
 }
 
 func packImportDTO(r *v1.PackServiceImportResponse) PackImportResultDTO {
-	out := PackImportResultDTO{Pack: packInfoDTO(r.GetPack()), Items: []PackImportItemDTO{}, Warnings: strs(r.GetWarnings()), Applied: r.GetApplied(),
+	out := PackImportResultDTO{Pack: packInfoDTO(r.GetPack()), Items: []PackImportItemDTO{}, SHA256: r.GetSha256(), Applied: r.GetApplied(),
 		ScriptsCreated: int(r.GetScriptsCreated()), ScriptsRenamed: int(r.GetScriptsRenamed()), ScriptsSkipped: int(r.GetScriptsSkipped()),
 		PlaybooksCreated: int(r.GetPlaybooksCreated()), PlaybooksRenamed: int(r.GetPlaybooksRenamed()), PlaybooksSkipped: int(r.GetPlaybooksSkipped()),
 		PlaybookIDs: strs(r.GetPlaybookIds())}
@@ -165,9 +165,9 @@ func (b *Bridge) PackImportPreview(path string) (PackImportResultDTO, error) {
 }
 
 // PackImport aplica el import con las decisiones del diálogo (un conflicto sin decisión falla sin escribir nada).
-func (b *Bridge) PackImport(path string, decisions []PackImportDecisionDTO) (PackImportResultDTO, error) {
+func (b *Bridge) PackImport(path, sha256 string, decisions []PackImportDecisionDTO) (PackImportResultDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PackImportResultDTO, error) {
-		req := &v1.PackServiceImportRequest{Path: path, Confirm: true}
+		req := &v1.PackServiceImportRequest{Path: path, Confirm: true, Sha256: sha256}
 		for _, d := range decisions {
 			req.Decisions = append(req.Decisions, &v1.PackImportDecision{ItemId: d.ItemID, Action: d.Action})
 		}
