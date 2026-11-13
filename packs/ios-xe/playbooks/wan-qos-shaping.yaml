@@ -1,0 +1,24 @@
+# Propósito: Revisa el shaping jerárquico y las colas del plano de reenvío: políticas, contadores por clase, descartes y sobresuscripción.
+# Cuándo usarlo: La WAN se satura, la voz o las clases críticas pierden paquetes o el shaper no limita como se espera.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/routers/asr-1000-series-ios-xe-sd-wan/224129-troubleshoot-interface-packet-drops-in.html
+# Sin validar en laboratorio.
+id: wan-qos-shaping
+platform: ios-xe
+name: WAN · QoS de WAN (shaping jerárquico)
+name_en: WAN · WAN QoS (hierarchical shaping)
+commands:
+  - cmd: show clock
+  - cmd: show policy-map
+  - cmd: show class-map
+  - cmd: show interfaces summary
+  - cmd: show interfaces | include line protocol|output drops|Total output drops|Queueing strategy|txload
+  - cmd: show platform hardware qfp active statistics drop
+  - cmd: show platform hardware qfp active datapath utilization summary
+  - cmd: show platform hardware qfp active feature lic-bw oversubscription
+  - cmd: show platform hardware throughput level
+  - cmd: show running-config | section policy-map|class-map|service-policy
+    may_contain_secrets: true
+  - cmd: show policy-map interface
+    timeout: 120s
+  - cmd: show platform hardware qfp active infrastructure bqs queue output default all
+    timeout: 120s

@@ -1,0 +1,22 @@
+# Propósito: Revisa el ruteo por política: route-maps, ACL de selección, interfaces con política y política local, y las rutas estáticas.
+# Cuándo usarlo: El tráfico no toma la salida esperada o una route-map no coincide con lo que se espera.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/command/iri-cr-book/iri-cr-s1.html
+# Sin validar en laboratorio.
+id: wan-pbr-route-maps
+platform: ios-xe
+name: WAN · PBR y route-maps
+name_en: WAN · PBR and route-maps
+commands:
+  - cmd: show clock
+  - cmd: show ip policy
+  - cmd: show ip local policy
+  - cmd: show route-map
+  - cmd: show ip access-lists
+  - cmd: show ip interface | include line protocol|olicy
+  - cmd: show ip route summary
+  - cmd: show ip route static
+  - cmd: show ip route track-table
+  - cmd: show platform hardware qfp active statistics drop
+  - cmd: show logging | include ROUTE_MAP|PBR|TRACK
+  - cmd: show running-config | section route-map|ip policy|ip local policy|access-list
+    may_contain_secrets: true

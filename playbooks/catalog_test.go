@@ -16,7 +16,7 @@ import (
 )
 
 // Archivos del catálogo por área (los playbooks anteriores no llevan estos prefijos; tac-baseline es anterior).
-var catalogFile = regexp.MustCompile(`^(l1|l2|l3|svc|plat|vpn|tac)-`)
+var catalogFile = regexp.MustCompile(`^(l1|l2|l3|svc|plat|vpn|wan|tac)-`)
 
 // Comandos que pueden imprimir secretos (el enmascarado solo corre si el comando lo declara).
 var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp comm|archive log)|more )`)

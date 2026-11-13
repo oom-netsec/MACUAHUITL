@@ -1,0 +1,18 @@
+# Propósito: Revisa la dirección, la puerta de enlace y el arrendamiento que una interfaz WAN obtiene por DHCP.
+# Cuándo usarlo: Una interfaz WAN no obtiene dirección, pierde la ruta por defecto o renueva el arrendamiento con fallas.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipaddr/command/ipaddr-cr-book/ipaddr-l1.html
+# Sin validar en laboratorio.
+id: wan-dhcp-cliente
+platform: ios-xe
+name: WAN · DHCP de WAN
+name_en: WAN · WAN DHCP client
+commands:
+  - cmd: show clock
+  - cmd: show dhcp lease
+  - cmd: show ip interface brief
+  - cmd: show ip interface | include line protocol|Internet address|Address determined
+  - cmd: show ip route summary
+  - cmd: show ip route static
+  - cmd: show logging | include DHCP|ADDRESS
+  - cmd: show running-config | section interface|ip dhcp client
+    may_contain_secrets: true

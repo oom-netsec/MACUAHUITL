@@ -1,0 +1,25 @@
+# Propósito: Recorre un túnel que no sube: enlace, ruteo al peer, IKE/IPsec, NHRP, ACL, certificados, hora y descartes.
+# Cuándo usarlo: Un túnel GRE, DMVPN, FlexVPN o IPsec está caído o no pasa tráfico; primera recolección antes de profundizar.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/security/dynamic-multipoint-vpn-dmvpn/221665-troubleshoot-dmvpn-phase-2-spoke-to-spok.html
+# Sin validar en laboratorio.
+id: tac-tunel-vpn-no-levanta
+platform: ios-xe
+name: TAC · El túnel o la VPN no levanta
+name_en: TAC · Tunnel or VPN does not come up
+commands:
+  - cmd: show clock
+  - cmd: show ntp status
+  - cmd: show ip interface brief | include Tunnel
+  - cmd: show crypto session
+  - cmd: show crypto isakmp sa
+  - cmd: show crypto ikev2 sa
+  - cmd: show crypto ipsec sa
+  - cmd: show dmvpn
+  - cmd: show ip nhrp nhs detail
+  - cmd: show ip route static
+  - cmd: show ip access-lists
+  - cmd: show crypto pki certificates
+  - cmd: show platform hardware qfp active statistics drop
+  - cmd: show logging | include IKE|CRYPTO|IPSEC|NHRP|TUN|LINEPROTO
+  - cmd: show running-config | section crypto|tunnel
+    may_contain_secrets: true

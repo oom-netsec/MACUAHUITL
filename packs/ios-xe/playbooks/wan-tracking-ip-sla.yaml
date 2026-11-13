@@ -1,0 +1,20 @@
+# Propósito: Revisa los objetos track, las operaciones IP SLA que los alimentan y las rutas condicionadas por ellos.
+# Cuándo usarlo: Una ruta flotante o un failover no reacciona porque el track o la medición IP SLA no cambia de estado.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipsla/command/sla-cr-book.html
+# Sin validar en laboratorio.
+id: wan-tracking-ip-sla
+platform: ios-xe
+name: WAN · Tracking e IP SLA
+name_en: WAN · Tracking and IP SLA
+commands:
+  - cmd: show clock
+  - cmd: show track
+  - cmd: show track brief
+  - cmd: show ip sla summary
+  - cmd: show ip sla statistics
+  - cmd: show ip sla configuration
+  - cmd: show ip route track-table
+  - cmd: show ip route static
+  - cmd: show logging | include TRACK|SLA
+  - cmd: show running-config | section track|ip sla|ip route
+    may_contain_secrets: true

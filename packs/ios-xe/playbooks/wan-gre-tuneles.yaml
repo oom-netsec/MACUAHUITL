@@ -1,0 +1,21 @@
+# Propósito: Revisa los túneles GRE: estado, origen y destino, MTU, recursividad de ruteo y contadores.
+# Cuándo usarlo: Un túnel GRE cae, rebota (TUN-RECURDOWN) o los vecinos de ruteo que lo cruzan se reinician.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/routers/ios/config/17-x/ip-routing/b-ip-routing/m_ir-impl-tun-xe.html
+# Sin validar en laboratorio.
+id: wan-gre-tuneles
+platform: ios-xe
+name: WAN · Túneles GRE
+name_en: WAN · GRE tunnels
+commands:
+  - cmd: show clock
+  - cmd: show ip interface brief | include Tunnel
+  - cmd: show logging | include TUN|LINEPROTO|TUNNEL|ADJCHG
+  - cmd: show ip route summary
+  - cmd: show ip route static
+  - cmd: show ip protocols
+  - cmd: show ip interface | include line protocol|MTU
+  - cmd: show ip traffic
+  - cmd: show platform hardware qfp active statistics drop
+  - cmd: show interfaces | include Tunnel|Tunnel source|Tunnel protocol|packets input|packets output
+  - cmd: show running-config | section interface Tunnel
+    may_contain_secrets: true

@@ -1,0 +1,23 @@
+# Propósito: Revisa NAT en el borde (incluida su pertenencia a VRF): estadísticas, traducciones, descartes y carga del plano de reenvío.
+# Cuándo usarlo: Un sitio no sale a Internet por NAT, se agotan las traducciones o hay descartes en el borde.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/ip/network-address-translation-nat/221448-asr1k-nat-intermittently-fails-to-transl.html
+# Sin validar en laboratorio.
+id: wan-nat-borde-vrf
+platform: ios-xe
+name: WAN · NAT de borde con VRF
+name_en: WAN · Edge NAT with VRF
+commands:
+  - cmd: show clock
+  - cmd: show ip nat statistics
+  - cmd: show ip nat translations total
+  - cmd: show vrf
+  - cmd: show ip cef summary
+  - cmd: show ip access-lists
+  - cmd: show drops nat
+  - cmd: show platform hardware qfp active statistics drop
+  - cmd: show platform hardware qfp active datapath utilization summary
+  - cmd: show platform packet-trace statistics
+  - cmd: show platform packet-trace summary
+  - cmd: show logging | include NAT
+  - cmd: show running-config | include ip nat|vrf|access-list
+    may_contain_secrets: true

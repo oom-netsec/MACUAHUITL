@@ -1,0 +1,26 @@
+# Propósito: Recorre una WAN lenta: errores y descartes de interfaz, colas, shaping, carga del QFP, licencia de ancho de banda y SLA.
+# Cuándo usarlo: Los usuarios reportan lentitud o pérdida por la WAN; primera recolección antes de profundizar.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/routers/asr-1000-series-ios-xe-sd-wan/224129-troubleshoot-interface-packet-drops-in.html
+# Sin validar en laboratorio.
+id: tac-wan-lenta-perdida
+platform: ios-xe
+name: TAC · WAN lenta o con pérdida
+name_en: TAC · Slow or lossy WAN
+commands:
+  - cmd: show clock
+  - cmd: show interfaces summary
+  - cmd: show ip sla statistics
+  - cmd: show ip traffic
+  - cmd: show ip nat statistics
+  - cmd: show platform hardware qfp active statistics drop
+  - cmd: show platform hardware qfp active datapath utilization summary
+  - cmd: show platform hardware throughput level
+  - cmd: show platform hardware qfp active feature lic-bw oversubscription
+  - cmd: show platform hardware qfp active infrastructure punt statistics type per-cause
+  - cmd: show logging | include UPDOWN|LINK|DUPLEX|QOS|BFD
+  - cmd: show interfaces | include line protocol|input errors|CRC|output drops|Total output drops|rate
+    timeout: 120s
+  - cmd: show policy-map interface
+    timeout: 120s
+  - cmd: show platform hardware qfp active infrastructure bqs queue output default all
+    timeout: 120s

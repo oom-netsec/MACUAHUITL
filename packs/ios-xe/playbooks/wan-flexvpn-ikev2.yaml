@@ -1,0 +1,26 @@
+# Propósito: Revisa FlexVPN: sesiones IKEv2, autorización y atributos empujados, PKI, interfaces virtuales y IPsec.
+# Cuándo usarlo: Un cliente o sitio FlexVPN no autentica, no recibe su política o la interfaz virtual no sube.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/security/s1/sec-s1-cr-book/sec-cr-s3.html
+# Sin validar en laboratorio.
+id: wan-flexvpn-ikev2
+platform: ios-xe
+name: WAN · FlexVPN e IKEv2
+name_en: WAN · FlexVPN and IKEv2
+commands:
+  - cmd: show clock
+  - cmd: show crypto ikev2 session
+  - cmd: show crypto ikev2 sa
+  - cmd: show crypto ikev2 stats
+  - cmd: show crypto ikev2 diagnose error
+  - cmd: show crypto ikev2 profile
+  - cmd: show crypto ikev2 authorization policy
+  - cmd: show crypto session detail
+  - cmd: show crypto ipsec sa
+  - cmd: show crypto pki trustpoints
+  - cmd: show crypto pki certificates
+  - cmd: show crypto key mypubkey rsa
+  - cmd: show interface virtual-access
+  - cmd: show ip interface brief | include Virtual-Access|Tunnel
+  - cmd: show logging | include IKEV2|CRYPTO|PKI|IPSEC
+  - cmd: show running-config | section crypto ikev2|crypto ipsec|Virtual-Template|interface Tunnel
+    may_contain_secrets: true

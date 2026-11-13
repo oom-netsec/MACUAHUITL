@@ -1,0 +1,24 @@
+# Propósito: Recorre un failover que no ocurre: track, IP SLA, rutas, PBR, HSRP, BFD y registros.
+# Cuándo usarlo: El enlace principal cayó o se degradó y el tráfico no pasó al respaldo (o no regresó).
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipsla/command/sla-cr-book.html
+# Sin validar en laboratorio.
+id: tac-failover-wan-no-funciona
+platform: ios-xe
+name: TAC · El failover WAN no funciona
+name_en: TAC · WAN failover does not work
+commands:
+  - cmd: show clock
+  - cmd: show track
+  - cmd: show ip sla summary
+  - cmd: show ip sla statistics
+  - cmd: show ip route track-table
+  - cmd: show ip route static
+  - cmd: show ip route summary
+  - cmd: show ip policy
+  - cmd: show route-map
+  - cmd: show standby brief
+  - cmd: show bfd neighbors
+  - cmd: show ip protocols
+  - cmd: show logging | include TRACK|SLA|STANDBY|BFD|ROUTE_MAP|LINEPROTO
+  - cmd: show running-config | section track|ip sla|route-map|ip route|standby
+    may_contain_secrets: true
