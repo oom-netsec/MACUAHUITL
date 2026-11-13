@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
@@ -106,7 +107,7 @@ func metaPath(cfg string) string { return strings.TrimSuffix(cfg, ".cfg") + ".js
 // Name valida el nombre de equipo que llega de fuera: sin separadores, sin punto inicial.
 func Name(device string) (string, error) {
 	if !nameRe.MatchString(device) {
-		return "", fmt.Errorf("backup: nombre de equipo %q inválido", device)
+		return "", i18n.New("backup.store.bad_device", i18n.A("device", device))
 	}
 	return device, nil
 }
@@ -162,7 +163,7 @@ func (s Store) dir(device string, create bool) (string, error) {
 	case err != nil:
 		return "", fmt.Errorf("backup: %w", err)
 	case !fi.IsDir():
-		return "", fmt.Errorf("backup: %s no es una carpeta de verdad (¿enlace simbólico?)", d)
+		return "", i18n.New("backup.store.not_dir", i18n.A("dir", d))
 	}
 	return d, nil
 }
@@ -171,7 +172,7 @@ func (s Store) dir(device string, create bool) (string, error) {
 func (s Store) Save(e Entry, text string) (Entry, bool, error) {
 	e.Device = Sanitize(e.Device)
 	if e.Kind != Running && e.Kind != Startup {
-		return e, false, fmt.Errorf("backup: tipo %q inválido", e.Kind)
+		return e, false, i18n.New("backup.store.bad_kind", i18n.A("kind", string(e.Kind)))
 	}
 	e.At = e.At.UTC().Truncate(time.Second)
 	e.ID = e.Device + "/" + e.At.Format(stampLayout) + "-" + string(e.Kind)
@@ -207,7 +208,7 @@ func (s Store) Save(e Entry, text string) (Entry, bool, error) {
 func writeNew(p string, b []byte, replace bool) error {
 	if fi, err := os.Lstat(p); err == nil && replace {
 		if !fi.Mode().IsRegular() {
-			return fmt.Errorf("backup: %s no es un archivo regular", p)
+			return i18n.New("backup.store.not_regular", i18n.A("path", p))
 		}
 		os.Remove(p)
 	}
@@ -275,7 +276,7 @@ func (s Store) entries(device string) ([]Entry, error) {
 func readSmall(p string) ([]byte, error) {
 	fi, err := os.Lstat(p)
 	if err != nil || !fi.Mode().IsRegular() || fi.Size() > 1<<20 {
-		return nil, errors.New("ficha no válida")
+		return nil, i18n.New("backup.store.bad_meta", nil)
 	}
 	return os.ReadFile(p)
 }
@@ -312,7 +313,7 @@ func ParseID(id string) (device string, at time.Time, kind Kind, err error) {
 	dev, rest, ok := strings.Cut(id, "/")
 	m := idRe.FindStringSubmatch(rest)
 	if _, nerr := Name(dev); !ok || nerr != nil || m == nil {
-		return "", time.Time{}, "", fmt.Errorf("backup: identificador %q inválido (equipo/AAAAMMDDTHHMMSSZ-running|startup)", id)
+		return "", time.Time{}, "", i18n.New("backup.store.bad_id", i18n.A("id", id))
 	}
 	at, err = time.Parse(stampLayout, m[1])
 	return dev, at, Kind(m[2]), err
@@ -339,14 +340,14 @@ func (s Store) Get(id string) (Entry, string, error) {
 			return e, string(b), err
 		}
 	}
-	return Entry{}, "", fmt.Errorf("backup: no existe %s", id)
+	return Entry{}, "", i18n.New("backup.store.not_found", i18n.A("id", id))
 }
 
 // Prune deja los keep respaldos más nuevos de cada tipo del equipo y borra el resto (.cfg y ficha).
 // Solo toca archivos regulares con nombre de respaldo dentro de la carpeta del equipo.
 func (s Store) Prune(device string, keep int) (int, error) {
 	if keep < 1 {
-		return 0, errors.New("backup: la retención mínima es 1")
+		return 0, i18n.New("backup.store.min_keep", nil)
 	}
 	es, err := s.entries(device)
 	if err != nil {

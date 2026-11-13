@@ -182,20 +182,31 @@ type collected struct {
 	Skipped  int      `json:"skipped"`
 	Pruned   int      `json:"pruned"`
 	Warnings []string `json:"warnings"`
+	// WarningTexts son Warnings como texto de catálogo (mismo orden); no viajan en el JSON.
+	WarningTexts []i18n.Text `json:"-"`
 }
 
-func (c collected) text() string {
+// warn agrega un aviso: en español para el JSON de siempre y como texto para darlo en otro idioma.
+func (c *collected) warn(t i18n.Text) {
+	c.Warnings, c.WarningTexts = append(c.Warnings, t.In(i18n.Es)), append(c.WarningTexts, t)
+}
+
+// text es el informe en el idioma dado (es es el de siempre).
+func (c collected) text(loc string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d respaldo(s) guardado(s), %d ya existían", len(c.Saved), c.Skipped)
+	b.WriteString(i18n.Msg(loc, "backup.rep.saved", i18n.A("saved", len(c.Saved), "skipped", c.Skipped)))
 	if c.Pruned > 0 {
-		fmt.Fprintf(&b, ", %d borrado(s) por retención", c.Pruned)
+		b.WriteString(i18n.Msg(loc, "backup.rep.pruned", i18n.A("n", c.Pruned)))
 	}
 	b.WriteString("\n")
 	for _, id := range c.Saved {
 		fmt.Fprintf(&b, "  %s\n", id)
 	}
-	for _, w := range c.Warnings {
-		fmt.Fprintf(&b, "Aviso: %s\n", w)
+	for i, w := range c.Warnings {
+		if i < len(c.WarningTexts) {
+			w = c.WarningTexts[i].In(loc)
+		}
+		b.WriteString(i18n.Msg(loc, "backup.rep.warning", i18n.A("w", w)) + "\n")
 	}
 	return b.String()
 }
@@ -266,7 +277,11 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 	// Un aviso del lector (tope de tamaño, recorte, archivo ilegible) significa que algo no se leyó entero.
 	failed := len(b.Warnings) > 0
 	for _, w := range b.Warnings {
-		res.Warnings = append(res.Warnings, strings.Join(nonEmpty(w.Device, w.Command, w.Msg), ": "))
+		msg := w.MsgTx
+		if msg.Empty() {
+			msg = i18n.Lit(w.Msg, w.Msg)
+		}
+		res.warn(i18n.Join(": ", i18n.Lit(w.Device, w.Device), i18n.Lit(w.Command, w.Command), msg))
 	}
 	type slot struct {
 		dev   string
@@ -280,11 +295,12 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 		case !ok:
 		case sec.Invalid:
 			if kind == backup.Startup {
-				res.Warnings = append(res.Warnings, fmt.Sprintf("%s: el equipo no devolvió startup-config", sec.Device))
+				res.warn(i18n.Tx("backup.warn.no_startup", "device", sec.Device))
 			}
 		case !tr.inWindow(sec.At):
 			// Solo puede venir de texto del equipo que imita una cabecera: no es un respaldo.
-			res.Warnings, failed = append(res.Warnings, fmt.Sprintf("%s: sección de %s fuera de la ventana del trabajo (%s): se descartó", sec.Device, sec.Command, sec.At.Format(time.RFC3339))), true
+			res.warn(i18n.Tx("backup.warn.outside", "device", sec.Device, "cmd", sec.Command, "at", sec.At.Format(time.RFC3339)))
+			failed = true
 		default:
 			count[slot{sec.Device, sec.Round, kind}]++
 			valid = append(valid, sec)
@@ -295,7 +311,7 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 	if key, err := service.BackupKey(s.d.Vault(), true); err == nil {
 		st.Key = key
 	} else if len(valid) > 0 {
-		res.Warnings = append(res.Warnings, "respaldos guardados sin firma: la bóveda está cerrada y la ficha no se puede firmar; se pueden ver y comparar, pero no restaurar")
+		res.warn(i18n.Tx("backup.warn.unsigned"))
 	}
 	serials := map[[2]string]string{} // (equipo, ronda) -> número de serie de show version
 	for _, sec := range b.Sections {
@@ -312,7 +328,7 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 		if count[k] > 1 {
 			if !dup[k] {
 				dup[k], failed = true, true
-				res.Warnings = append(res.Warnings, fmt.Sprintf("%s: más de una sección de %s en la ronda %d: no se sabe cuál es la real, se descartaron todas", sec.Device, sec.Command, sec.Round))
+				res.warn(i18n.Tx("backup.warn.dup_section", "device", sec.Device, "cmd", sec.Command, "round", sec.Round))
 			}
 			continue
 		}
@@ -323,7 +339,8 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 		e, created, err := st.Save(backup.Entry{Device: sec.Device, Kind: kind, At: at, Masked: mk, Job: job, Round: sec.Round,
 			Serial: serials[[2]string{sec.Device, strconv.Itoa(sec.Round)}], Truncated: sec.Truncated}, sec.Text)
 		if err != nil {
-			res.Warnings, failed = append(res.Warnings, fmt.Sprintf("%s: %v", sec.Device, err)), true
+			res.warn(i18n.Tx("backup.warn.device_cause", "device", sec.Device).With("cause", i18n.FromErr(err)))
+			failed = true
 			continue
 		}
 		touched[e.Device] = true
@@ -346,7 +363,7 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 	for dev := range touched {
 		n, err := st.Prune(dev, keep)
 		if err != nil {
-			res.Warnings = append(res.Warnings, fmt.Sprintf("%s: retención: %v", dev, err))
+			res.warn(i18n.Tx("backup.warn.prune", "device", dev).With("cause", i18n.FromErr(err)))
 		}
 		if n > 0 {
 			res.Pruned += n
@@ -419,14 +436,15 @@ func (s *backupSvc) CollectBackups(ctx context.Context, r *v1.CollectBackupsRequ
 	if err != nil {
 		return nil, err
 	}
-	return &v1.CollectBackupsResponse{State: c.state, Done: c.done, Error: c.errMsg, Report: service.Report(c, c.text())}, nil
+	return &v1.CollectBackupsResponse{State: c.state, Done: c.done, Error: c.errMsg, Report: service.Report(c, c.text(i18n.Locale(ctx)))}, nil
 }
 
-func (s *backupSvc) ListBackups(_ context.Context, r *v1.ListBackupsRequest) (*v1.ListBackupsResponse, error) {
+func (s *backupSvc) ListBackups(ctx context.Context, r *v1.ListBackupsRequest) (*v1.ListBackupsResponse, error) {
 	s.d.MarkActive()
+	loc := i18n.Locale(ctx)
 	es, err := s.store().List(r.Device)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	if es == nil {
 		es = []backup.Entry{}
@@ -436,26 +454,24 @@ func (s *backupSvc) ListBackups(_ context.Context, r *v1.ListBackupsRequest) (*v
 	for _, e := range es {
 		m := ""
 		if e.Masked {
-			m, anyMasked = " enmascarado", true
+			m, anyMasked = i18n.Msg(loc, "backup.list.masked", nil), true
 		}
 		fmt.Fprintf(&b, "%s  %s  %s  %d bytes%s\n", e.ID, e.At.Format("2006-01-02 15:04:05Z"), e.Kind, e.Bytes, m)
 	}
 	if len(es) == 0 {
-		b.WriteString("sin respaldos\n")
+		b.WriteString(i18n.Msg(loc, "backup.list.none", nil) + "\n")
 	}
 	if anyMasked {
-		fmt.Fprintf(&b, "\nAVISO: %s\n", maskedNotice)
+		b.WriteString("\n" + i18n.Msg(loc, "backup.rep.notice", i18n.A("w", i18n.Msg(loc, "backup.list.masked_notice", nil))) + "\n")
 	}
 	return &v1.ListBackupsResponse{Report: service.Report(map[string]any{"backups": es, "masked": anyMasked}, b.String())}, nil
 }
 
-const maskedNotice = "los respaldos marcados «enmascarado» se tomaron con secretos enmascarados: sirven para ver y comparar, no para recuperar contraseñas ni llaves"
-
-func (s *backupSvc) GetBackup(_ context.Context, r *v1.GetBackupRequest) (*v1.GetBackupResponse, error) {
+func (s *backupSvc) GetBackup(ctx context.Context, r *v1.GetBackupRequest) (*v1.GetBackupResponse, error) {
 	s.d.MarkActive()
 	e, text, err := s.store().Get(r.Id)
 	if err != nil {
-		return nil, status.Error(codes.NotFound, err.Error())
+		return nil, service.ErrFrom(ctx, codes.NotFound, err)
 	}
 	s.d.Audit("backup.export", e.ID, fmt.Sprintf("bytes=%d masked=%v", e.Bytes, e.Masked))
 	meta, _ := json.Marshal(e)
