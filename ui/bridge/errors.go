@@ -98,10 +98,12 @@ type langCache struct {
 // language devuelve el idioma de la interfaz (preferencia ui.language), o "" si no se pudo leer. Se guarda en memoria
 // y SetPreference lo renueva.
 func (b *Bridge) language() string {
+	// lang.mu no se retiene durante client() ni el RPC: client() puede llamar a disconnected(), que también lo toma.
 	b.lang.mu.Lock()
-	defer b.lang.mu.Unlock()
-	if b.lang.loaded {
-		return b.lang.value
+	loaded, v := b.lang.loaded, b.lang.value
+	b.lang.mu.Unlock()
+	if loaded {
+		return v
 	}
 	c, err := b.client()
 	if err != nil {
@@ -113,8 +115,11 @@ func (b *Bridge) language() string {
 	if err != nil {
 		return ""
 	}
-	b.lang.value, b.lang.loaded = i18n.Normalize(r.GetValue()), true
-	return b.lang.value
+	v = i18n.Normalize(r.GetValue())
+	b.lang.mu.Lock()
+	b.lang.value, b.lang.loaded = v, true
+	b.lang.mu.Unlock()
+	return v
 }
 
 func (b *Bridge) setLanguage(v string) {
