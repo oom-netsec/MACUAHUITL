@@ -1,0 +1,18 @@
+{
+ "deny-ascii": "playbook: comando no permitido en una recolección (solo lectura): \"show version\\rconfigure terminal\" (solo ASCII imprimible; un retorno de carro o un carácter de 8 bits ejecutaría otro comando)",
+ "deny-escritura": "playbook: comando no permitido en una recolección (solo lectura): \"configure terminal\" (no es un comando de lectura)",
+ "deny-filtro": "playbook: comando no permitido en una recolección (solo lectura): \"show version | foo bar\" (solo include, exclude, begin, section y count tras |)",
+ "deny-no-ascii": "playbook: comando no permitido en una recolección (solo lectura): \"show versión\" (solo ASCII imprimible; un retorno de carro o un carácter de 8 bits ejecutaría otro comando)",
+ "deny-pipe-vacio": "playbook: comando no permitido en una recolección (solo lectura): \"show version |\" (pipe vacío)",
+ "deny-redirect": "playbook: comando no permitido en una recolección (solo lectura): \"show version | redirect flash:x\" (redirect, tee y append escriben fuera de la sesión)",
+ "deny-terminal": "playbook: comando no permitido en una recolección (solo lectura): \"terminal shell\" (solo terminal length y terminal width)",
+ "ephemeral-cr": "playbook: comando no permitido en una recolección (solo lectura): \"show a\\rshow b\" (retorno de carro dentro de la línea)",
+ "ephemeral-deny": "playbook: comando no permitido en una recolección (solo lectura): \"configure terminal\" (no es un comando de lectura)",
+ "ephemeral-vacio": "playbook: no hay comandos",
+ "load-denegado": "playbook a.yaml: playbook: comando no permitido en una recolección (solo lectura): \"configure terminal\" (no es un comando de lectura)",
+ "load-obligatorios": "playbook a.yaml: id, platform y name son obligatorios",
+ "load-plataforma": "playbook a.yaml: plataforma desconocida \"nope\" en platforms de \"show clock\"",
+ "load-sin-comandos": "playbook a.yaml: sin comandos",
+ "load-timeout": "playbook a.yaml: timeout \"abc\" inválido en \"show clock\"",
+ "load-vacio": "playbook a.yaml: comando vacío"
+}

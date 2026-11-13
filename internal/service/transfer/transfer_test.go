@@ -19,6 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
@@ -435,5 +436,19 @@ func TestAuditDropsURLQuery(t *testing.T) {
 		if strings.Contains(a, leak) {
 			t.Errorf("la bitácora guarda %q:\n%s", leak, a)
 		}
+	}
+}
+
+// Fase 30d: RedirectHint sale en el idioma pedido; los comandos no cambian y con es el texto es el de siempre.
+func TestRedirectHintRPCEn(t *testing.T) {
+	s, _ := newTest(t)
+	req := &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"}
+	en, err := s.RedirectHint(i18n.WithLocale(context.Background(), "en"), req)
+	if err != nil || !strings.Contains(en.Setcap, "WARNING") || !strings.Contains(en.Nftables, "(remove when done: sudo nft delete table ip macuahuitl_ftp_2121)") || !strings.Contains(en.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") {
+		t.Fatalf("%+v %v", en, err)
+	}
+	es, _ := s.RedirectHint(context.Background(), req)
+	if !strings.Contains(es.Nftables, "(quitar al terminar: sudo nft delete table ip macuahuitl_ftp_2121)") {
+		t.Errorf("es cambió: %s", es.Nftables)
 	}
 }

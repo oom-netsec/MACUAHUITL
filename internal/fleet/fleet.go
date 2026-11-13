@@ -10,7 +10,6 @@ package fleet
 import (
 	"archive/zip"
 	"bufio"
-	"fmt"
 	"io"
 	"os"
 	"path"
@@ -42,6 +41,7 @@ type Dev struct {
 
 // Fleet es la última evidencia de cada equipo.
 type Fleet struct {
+	loc      string // idioma de los textos de los informes (vacío = es); ver In
 	Dir      string
 	Now      time.Time
 	Devs     []*Dev
@@ -448,24 +448,27 @@ func readOne[T any](w *ws, d *Dev, cmd string, p func(string) (T, bool)) (T, Evi
 }
 
 // Ago escribe la antigüedad de una evidencia.
-func Ago(now, at time.Time) string {
+func Ago(now, at time.Time) string { return AgoIn(i18n.Es, now, at) }
+
+// AgoIn es Ago en el idioma dado.
+func AgoIn(loc string, now, at time.Time) string {
 	d := now.Sub(at)
 	switch {
 	case d < time.Minute:
-		return "ahora"
+		return i18n.Msg(loc, "fleet.ago.now", nil)
 	case d < time.Hour:
-		return fmt.Sprintf("hace %d min", int(d.Minutes()))
+		return i18n.Msg(loc, "fleet.ago.min", i18n.A("n", int(d.Minutes())))
 	case d < 48*time.Hour:
-		return fmt.Sprintf("hace %d h", int(d.Hours()))
+		return i18n.Msg(loc, "fleet.ago.h", i18n.A("n", int(d.Hours())))
 	}
-	return fmt.Sprintf("hace %d d", int(d.Hours()/24))
+	return i18n.Msg(loc, "fleet.ago.d", i18n.A("n", int(d.Hours()/24)))
 }
 
 // Stamp: hora de la evidencia con su antigüedad; avisa si pasa de un día.
 func (f *Fleet) Stamp(at time.Time) string {
-	s := at.UTC().Format("2006-01-02 15:04Z") + " (" + Ago(f.Now, at) + ")"
+	s := at.UTC().Format("2006-01-02 15:04Z") + " (" + AgoIn(f.loc, f.Now, at) + ")"
 	if f.Now.Sub(at) > 24*time.Hour {
-		s += " DATO VIEJO"
+		s += " " + f.t("fleet.stale")
 	}
 	return s
 }

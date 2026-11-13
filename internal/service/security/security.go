@@ -28,18 +28,18 @@ type securitySvc struct {
 
 // secretFrom resuelve un secreto: la contraseña de una credencial de la bóveda
 // (y su usuario) o el valor escrito. done lo borra; siempre es seguro llamarlo.
-func secretFrom(d service.Deps, src *v1.SecretSource) (user string, val []byte, done func(), err error) {
+func secretFrom(ctx context.Context, d service.Deps, src *v1.SecretSource) (user string, val []byte, done func(), err error) {
 	if src.GetCredentialId() == "" {
 		v := src.GetValue()
 		return "", v, func() { clear(v) }, nil
 	}
 	v := d.Vault()
 	if v == nil {
-		return "", nil, func() {}, status.Error(codes.FailedPrecondition, "no hay bóveda")
+		return "", nil, func() {}, service.Err(ctx, codes.FailedPrecondition, "security.err.no_vault", nil)
 	}
 	cr, err := v.Get(src.CredentialId)
 	if err != nil {
-		return "", nil, func() {}, service.VaultErr(err)
+		return "", nil, func() {}, service.VaultErr(ctx, err)
 	}
 	cr.Enable.Destroy()
 	cr.SSHKey.Destroy()
@@ -54,39 +54,39 @@ func origin(src *v1.SecretSource) string {
 	return "typed"
 }
 
-func validHost(h string) error {
+func validHost(ctx context.Context, h string) error {
 	if strings.TrimSpace(h) == "" || strings.HasPrefix(h, "-") {
-		return status.Error(codes.InvalidArgument, "servidor inválido")
+		return service.Err(ctx, codes.InvalidArgument, "security.err.bad_server", nil)
 	}
 	return nil
 }
 
-func port16(p uint32) (uint16, error) {
+func port16(ctx context.Context, p uint32) (uint16, error) {
 	if p > 0xffff {
-		return 0, status.Error(codes.InvalidArgument, "puerto inválido")
+		return 0, service.Err(ctx, codes.InvalidArgument, "security.err.bad_port", nil)
 	}
 	return uint16(p), nil
 }
 
 func (s *securitySvc) RadiusTest(ctx context.Context, r *v1.RadiusTestRequest) (*v1.RadiusTestResponse, error) {
 	s.d.MarkActive()
-	if err := validHost(r.Host); err != nil {
+	if err := validHost(ctx, r.Host); err != nil {
 		return nil, err
 	}
-	auth, err := port16(r.AuthPort)
+	auth, err := port16(ctx, r.AuthPort)
 	if err != nil {
 		return nil, err
 	}
-	acct, err := port16(r.AcctPort)
+	acct, err := port16(ctx, r.AcctPort)
 	if err != nil {
 		return nil, err
 	}
-	_, secret, sdone, err := secretFrom(s.d, r.SharedSecret)
+	_, secret, sdone, err := secretFrom(ctx, s.d, r.SharedSecret)
 	defer sdone()
 	if err != nil {
 		return nil, err
 	}
-	user, pw, pdone, err := secretFrom(s.d, r.Password)
+	user, pw, pdone, err := secretFrom(ctx, s.d, r.Password)
 	defer pdone()
 	if err != nil {
 		return nil, err
@@ -121,19 +121,19 @@ func (s *securitySvc) RadiusTest(ctx context.Context, r *v1.RadiusTestRequest) (
 
 func (s *securitySvc) TacacsTest(ctx context.Context, r *v1.TacacsTestRequest) (*v1.TacacsTestResponse, error) {
 	s.d.MarkActive()
-	if err := validHost(r.Host); err != nil {
+	if err := validHost(ctx, r.Host); err != nil {
 		return nil, err
 	}
-	port, err := port16(r.Port)
+	port, err := port16(ctx, r.Port)
 	if err != nil {
 		return nil, err
 	}
-	_, secret, sdone, err := secretFrom(s.d, r.SharedSecret)
+	_, secret, sdone, err := secretFrom(ctx, s.d, r.SharedSecret)
 	defer sdone()
 	if err != nil {
 		return nil, err
 	}
-	user, pw, pdone, err := secretFrom(s.d, r.Password)
+	user, pw, pdone, err := secretFrom(ctx, s.d, r.Password)
 	defer pdone()
 	if err != nil {
 		return nil, err
@@ -165,27 +165,27 @@ func (s *securitySvc) TacacsTest(ctx context.Context, r *v1.TacacsTestRequest) (
 
 // ---- PKI de laboratorio (sin red) ----
 
-func pkiErr(err error) error {
+func pkiErr(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, vault.ErrWrongPassword):
-		return status.Error(codes.PermissionDenied, "contraseña de la llave incorrecta")
+		return service.Err(ctx, codes.PermissionDenied, "security.err.key_password", nil)
 	case errors.Is(err, vault.ErrWeakParams):
 		return status.Error(codes.Internal, err.Error())
 	}
 	return status.Error(codes.InvalidArgument, err.Error())
 }
 
-func (s *securitySvc) newSealedKey(alg string, pw []byte) (crypto.Signer, string, error) {
+func (s *securitySvc) newSealedKey(ctx context.Context, alg string, pw []byte) (crypto.Signer, string, error) {
 	if alg == "" {
 		alg = "p256"
 	}
 	k, err := pki.GenerateKey(alg)
 	if err != nil {
-		return nil, "", pkiErr(err)
+		return nil, "", pkiErr(ctx, err)
 	}
 	sealed, err := pki.SealKey(k, pw, s.d.SealParams())
 	if err != nil {
-		return nil, "", pkiErr(err)
+		return nil, "", pkiErr(ctx, err)
 	}
 	return k, string(sealed), nil
 }
@@ -201,10 +201,10 @@ func (s *securitySvc) decoded(ctx context.Context, pemText []byte, lab bool) (*v
 	return service.Report(sums, txt), certificates(loc, sums)
 }
 
-func (s *securitySvc) PkiKey(_ context.Context, r *v1.PkiKeyRequest) (*v1.PkiKeyResponse, error) {
+func (s *securitySvc) PkiKey(ctx context.Context, r *v1.PkiKeyRequest) (*v1.PkiKeyResponse, error) {
 	s.d.MarkActive()
 	defer clear(r.KeyPassword)
-	_, sealed, err := s.newSealedKey(r.Algorithm, r.KeyPassword)
+	_, sealed, err := s.newSealedKey(ctx, r.Algorithm, r.KeyPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -219,17 +219,17 @@ func (s *securitySvc) PkiCsr(ctx context.Context, r *v1.PkiCsrRequest) (*v1.PkiC
 	sealed, keyOrigin := r.SealedKeyPem, "existente"
 	var err error
 	if sealed == "" {
-		if k, sealed, err = s.newSealedKey(r.Algorithm, r.KeyPassword); err != nil {
+		if k, sealed, err = s.newSealedKey(ctx, r.Algorithm, r.KeyPassword); err != nil {
 			return nil, err
 		}
 		keyOrigin = "nueva:" + r.Algorithm
 	} else if k, err = pki.OpenKey([]byte(sealed), r.KeyPassword); err != nil {
-		return nil, pkiErr(err)
+		return nil, pkiErr(ctx, err)
 	}
 	sub := r.GetSubject()
 	csr, err := pki.CreateCSR(k, pki.CSRRequest{Subject: pki.Subject{CN: sub.GetCn(), O: sub.GetO(), OU: sub.GetOu(), L: sub.GetL(), ST: sub.GetSt(), C: sub.GetC()}, DNS: r.Dns, IPs: r.Ips})
 	if err != nil {
-		return nil, pkiErr(err)
+		return nil, pkiErr(ctx, err)
 	}
 	s.d.Audit("pki.csr", sub.GetCn(), fmt.Sprintf("key=%s san=%d", keyOrigin, len(r.Dns)+len(r.Ips)))
 	rep, certs := s.decoded(ctx, csr, false)
@@ -243,13 +243,13 @@ func (s *securitySvc) PkiCaInit(ctx context.Context, r *v1.PkiCaInitRequest) (*v
 	if days == 0 {
 		days = 3650
 	}
-	k, sealed, err := s.newSealedKey(r.Algorithm, r.KeyPassword)
+	k, sealed, err := s.newSealedKey(ctx, r.Algorithm, r.KeyPassword)
 	if err != nil {
 		return nil, err
 	}
 	ca, err := pki.InitCA(k, r.Name, days, s.d.Now())
 	if err != nil {
-		return nil, pkiErr(err)
+		return nil, pkiErr(ctx, err)
 	}
 	s.d.Audit("pki.ca.init", r.Name, fmt.Sprintf("days=%d algorithm=%s", days, r.Algorithm))
 	rep, certs := s.decoded(ctx, ca, true)
@@ -261,7 +261,7 @@ func (s *securitySvc) PkiCaSign(ctx context.Context, r *v1.PkiCaSignRequest) (*v
 	defer clear(r.CaKeyPassword)
 	k, err := pki.OpenKey([]byte(r.CaSealedKeyPem), r.CaKeyPassword)
 	if err != nil {
-		return nil, pkiErr(err)
+		return nil, pkiErr(ctx, err)
 	}
 	profile, days := r.Profile, int(r.Days)
 	if profile == "" {
@@ -272,7 +272,7 @@ func (s *securitySvc) PkiCaSign(ctx context.Context, r *v1.PkiCaSignRequest) (*v
 	}
 	cert, err := pki.Sign([]byte(r.CaCertPem), k, []byte(r.CsrPem), profile, days, s.d.Now())
 	if err != nil {
-		return nil, pkiErr(err)
+		return nil, pkiErr(ctx, err)
 	}
 	rep, certs := s.decoded(ctx, cert, true)
 	sums, _ := pki.Decode(cert, s.d.Now())
@@ -280,25 +280,25 @@ func (s *securitySvc) PkiCaSign(ctx context.Context, r *v1.PkiCaSignRequest) (*v
 	return &v1.PkiCaSignResponse{CertPem: string(cert), Report: rep, Certificates: certs, LabWarning: true}, nil
 }
 
-func (s *securitySvc) PkiExport(_ context.Context, r *v1.PkiExportRequest) (*v1.PkiExportResponse, error) {
+func (s *securitySvc) PkiExport(ctx context.Context, r *v1.PkiExportRequest) (*v1.PkiExportResponse, error) {
 	s.d.MarkActive()
 	defer clear(r.KeyPassword)
 	defer clear(r.ExportPassword)
 	keyNeeded := r.Format == "p12" || r.Format == "p12-legacy" || (r.Format == "pem" && r.IncludePlainKey)
 	if r.Format == "pem" && r.SealedKeyPem != "" && !r.IncludePlainKey {
-		return nil, status.Error(codes.InvalidArgument, "exportar la llave en claro requiere marcar include_plain_key")
+		return nil, service.Err(ctx, codes.InvalidArgument, "security.err.plain_key", nil)
 	}
 	var k crypto.Signer
 	if keyNeeded {
 		var err error
 		if k, err = pki.OpenKey([]byte(r.SealedKeyPem), r.KeyPassword); err != nil {
-			return nil, pkiErr(err)
+			return nil, pkiErr(ctx, err)
 		}
 	}
 	// shortcut: go-pkcs12 recibe la contraseña de exportación como string; esa copia no se puede borrar.
 	out, err := pki.Export(r.Format, []byte(r.CertPem), []byte(r.ChainPem), k, string(r.ExportPassword))
 	if err != nil {
-		return nil, pkiErr(err)
+		return nil, pkiErr(ctx, err)
 	}
 	s.d.Audit("pki.export", "", fmt.Sprintf("format=%s key=%s", r.Format, map[bool]string{true: "included", false: "no"}[k != nil]))
 	return &v1.PkiExportResponse{Data: out}, nil
@@ -308,11 +308,11 @@ const maxPaste = 4 << 20
 
 func (s *securitySvc) PkiDecode(ctx context.Context, r *v1.PkiDecodeRequest) (*v1.PkiDecodeResponse, error) {
 	if len(r.Data) > maxPaste {
-		return nil, status.Error(codes.InvalidArgument, "entrada demasiado grande")
+		return nil, service.Err(ctx, codes.InvalidArgument, "security.err.too_big", nil)
 	}
 	sums, err := pki.Decode(r.Data, s.d.Now())
 	if err != nil {
-		return nil, pkiErr(err)
+		return nil, pkiErr(ctx, err)
 	}
 	loc := i18n.Locale(ctx)
 	return &v1.PkiDecodeResponse{Report: service.Report(sums, pki.TextIn(sums, loc)), Certificates: certificates(loc, sums)}, nil
@@ -323,7 +323,7 @@ const maxIkePaste = 1 << 20
 
 func (s *securitySvc) IkeDecode(ctx context.Context, r *v1.IkeDecodeRequest) (*v1.IkeDecodeResponse, error) {
 	if len(r.Text) > maxIkePaste {
-		return nil, status.Error(codes.InvalidArgument, "entrada demasiado grande: el máximo es 1 MiB de texto de debug")
+		return nil, service.Err(ctx, codes.InvalidArgument, "security.err.debug_too_big", nil)
 	}
 	rep, err := ikedec.DecodeContext(ctx, r.Text)
 	if err != nil {

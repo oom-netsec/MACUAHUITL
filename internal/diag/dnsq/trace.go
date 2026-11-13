@@ -2,7 +2,6 @@ package dnsq
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -44,6 +43,8 @@ type Step struct {
 	Glue         map[string][]string
 	Answer       []string
 	Error        string `json:",omitempty"`
+	// ErrorText es Error como texto de catálogo; no viaja en el JSON.
+	ErrorText i18n.Text `json:"-"`
 }
 
 type TraceResult struct {
@@ -53,6 +54,27 @@ type TraceResult struct {
 	Final      []string
 	RCode      string
 	Warnings   []string
+	// WarningTexts son Warnings como texto de catálogo; no viajan en el JSON.
+	WarningTexts []i18n.Text `json:"-"`
+}
+
+// In devuelve el resultado con los avisos en el idioma dado (es es el de siempre).
+func (r TraceResult) In(loc string) TraceResult {
+	if r.Steps != nil {
+		r.Steps = append([]Step(nil), r.Steps...)
+		for i := range r.Steps {
+			if !r.Steps[i].ErrorText.Empty() {
+				r.Steps[i].Error = r.Steps[i].ErrorText.In(loc)
+			}
+		}
+	}
+	if len(r.WarningTexts) == len(r.Warnings) && r.Warnings != nil {
+		r.Warnings = make([]string, len(r.WarningTexts))
+		for i, t := range r.WarningTexts {
+			r.Warnings[i] = t.In(loc)
+		}
+	}
+	return r
 }
 
 const (
@@ -95,7 +117,7 @@ func (t *tracer) run(res *TraceResult, qname string, qtype uint16, nsDepth int) 
 	for {
 		t.steps++
 		if t.steps > maxSteps {
-			return errors.New("dnsq: traza abortada: profundidad máxima alcanzada")
+			return i18n.New("dns.trace.err.depth", nil)
 		}
 		r, step, err := t.ask(servers, zone, qname, qtype)
 		res.Steps = append(res.Steps, step)
@@ -122,7 +144,7 @@ func (t *tracer) run(res *TraceResult, qname string, qtype uint16, nsDepth int) 
 			if cname != "" {
 				res.CNAMEs = append(res.CNAMEs, qname+" → "+cname)
 				if len(res.CNAMEs) > maxCNAME {
-					return errors.New("dnsq: demasiados CNAME encadenados")
+					return i18n.New("dns.trace.err.cname", nil)
 				}
 				qname, servers, zone, seen = dns.Fqdn(cname), t.start(), ".", map[string]bool{}
 				continue
@@ -133,14 +155,14 @@ func (t *tracer) run(res *TraceResult, qname string, qtype uint16, nsDepth int) 
 			return nil
 		}
 		if r.Rcode != dns.RcodeSuccess {
-			return fmt.Errorf("dnsq: %s respondió %s para %s", step.Server, dns.RcodeToString[r.Rcode], qname)
+			return i18n.New("dns.trace.err.rcode", i18n.A("server", step.Server, "rcode", dns.RcodeToString[r.Rcode], "name", qname))
 		}
 		child, names, glue := referral(r)
 		if child == "" {
-			return fmt.Errorf("dnsq: %s no respondió ni delegó %s", step.Server, qname)
+			return i18n.New("dns.trace.err.no_answer", i18n.A("server", step.Server, "name", qname))
 		}
 		if !dns.IsSubDomain(zone, child) || strings.EqualFold(child, zone) && zone != "." || seen[child] {
-			return fmt.Errorf("dnsq: bucle de delegación: %s vuelve a delegar %s", step.Server, child)
+			return i18n.New("dns.trace.err.loop", i18n.A("server", step.Server, "zone", child))
 		}
 		seen[child] = true
 		next := []nsAddr{}
@@ -151,7 +173,7 @@ func (t *tracer) run(res *TraceResult, qname string, qtype uint16, nsDepth int) 
 		}
 		if len(next) == 0 { // sin glue: hay que resolver el nombre del NS aparte
 			if nsDepth >= maxNSHops {
-				return fmt.Errorf("dnsq: no hay glue para %s y se alcanzó el límite de resoluciones de NS", child)
+				return i18n.New("dns.trace.err.ns_limit", i18n.A("zone", child))
 			}
 			for _, n := range names {
 				sub := TraceResult{}
@@ -169,9 +191,10 @@ func (t *tracer) run(res *TraceResult, qname string, qtype uint16, nsDepth int) 
 				}
 			}
 			if len(next) == 0 {
-				return fmt.Errorf("dnsq: no se pudo obtener la dirección de ningún NS de %s", child)
+				return i18n.New("dns.trace.err.no_ns_addr", i18n.A("zone", child))
 			}
-			res.Warnings = append(res.Warnings, fmt.Sprintf("%s se delega sin glue; se resolvió el NS aparte", child))
+			w := i18n.Tx("dns.trace.warn.no_glue", "zone", child)
+			res.Warnings, res.WarningTexts = append(res.Warnings, w.In(i18n.Es)), append(res.WarningTexts, w)
 		}
 		servers, zone = next, child
 	}
@@ -201,9 +224,9 @@ func (t *tracer) ask(servers []nsAddr, zone, qname string, qtype uint16) (*dns.M
 		return r, step, nil
 	}
 	if lastErr == nil {
-		lastErr = fmt.Errorf("dnsq: no hay servidores para %s", zone)
+		lastErr = i18n.New("dns.trace.err.no_servers", i18n.A("zone", zone))
 	}
-	step.Error = lastErr.Error()
+	step.Error, step.ErrorText = lastErr.Error(), i18n.FromErr(lastErr)
 	return nil, step, lastErr
 }
 
@@ -276,6 +299,14 @@ func localizeFindings(fs []Finding, loc string) []Finding {
 
 // In devuelve el informe con el detalle de cada hallazgo en el idioma dado (es es el de siempre).
 func (r ZoneReport) In(loc string) ZoneReport {
+	if r.Servers != nil {
+		r.Servers = append([]ZoneServer(nil), r.Servers...)
+		for i := range r.Servers {
+			if !r.Servers[i].ErrorText.Empty() {
+				r.Servers[i].Error = r.Servers[i].ErrorText.In(loc)
+			}
+		}
+	}
 	r.Findings = localizeFindings(r.Findings, loc)
 	return r
 }
@@ -287,6 +318,8 @@ type ZoneServer struct {
 	RTT      time.Duration
 	AXFR     bool
 	Error    string `json:",omitempty"`
+	// ErrorText es Error como texto de catálogo; no viaja en el JSON.
+	ErrorText i18n.Text `json:"-"`
 }
 
 type ZoneReport struct {
@@ -355,7 +388,7 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 			}
 		}
 		if len(ips) == 0 {
-			rep.Servers = append(rep.Servers, ZoneServer{Name: name, Error: "sin dirección"})
+			rep.Servers = append(rep.Servers, ZoneServer{Name: name, Error: "sin dirección", ErrorText: i18n.Tx("dns.zone.no_address")})
 			rep.Findings = append(rep.Findings, dataFinding("error", "ns-sin-direccion", name))
 			continue
 		}
@@ -366,7 +399,7 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 			zs.RTT = rtt
 			switch {
 			case err != nil:
-				zs.Error = err.Error()
+				zs.Error, zs.ErrorText = err.Error(), i18n.FromErr(err)
 				rep.Findings = append(rep.Findings, finding("error", "ns-lame", "dns.finding.ns_unreachable", "name", name, "ip", ip, "error", err))
 			case r.Rcode != dns.RcodeSuccess || !r.Authoritative:
 				zs.Error = dns.RcodeToString[r.Rcode]

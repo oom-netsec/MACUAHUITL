@@ -178,7 +178,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 		s.d.Audit("transfer.serve.open", rd.Addr, fmt.Sprintf("server=%s proto=%s read_from=%q files=%q write=%t receive_into=%q origins=%v all=%t duration=%s legacy_ssh=%t limits=%d/%d",
 			id, r.Protocol, from, r.Files, r.Write, recv, r.Allow, r.AllowAny, dur, cfg.Legacy && (r.Protocol == "scp" || r.Protocol == "sftp"), cfg.MaxFile, cfg.MaxTotal))
 		k.events <- &v1.StartServerResponse{Event: &v1.StartServerResponse_Ready{Ready: &v1.ServerReady{
-			ServerId: id, Protocol: r.Protocol, Listening: rd.Addr, Hint: fileserve.ServerHint(cfg, rd, names),
+			ServerId: id, Protocol: r.Protocol, Listening: rd.Addr, Hint: fileserve.ServerHintIn(loc, cfg, rd, names),
 			User: rd.User, Password: rd.Pass, Fingerprints: rd.Fingerprints, RecvDir: recv, FromDir: from, Files: names}}}
 	}
 	err = fileserve.Serve(sctx, cfg)
@@ -232,12 +232,13 @@ func (s *svc) RedirectHint(ctx context.Context, r *v1.RedirectHintRequest) (*v1.
 			return nil, bad(ctx, "transfer.svc.bad_listen", "ip", r.Ip)
 		}
 	}
-	h := fileserve.RedirectHint(r.Protocol, r.Ip, int(r.Port))
+	loc := i18n.Locale(ctx)
+	h := fileserve.RedirectHintIn(loc, r.Protocol, r.Ip, int(r.Port))
 	if h == "" || r.Port <= 0 || r.Port > 65535 {
 		return nil, bad(ctx, "transfer.svc.no_redirect", "proto", r.Protocol)
 	}
 	std := map[string]int32{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22}[r.Protocol]
-	return &v1.RedirectHintResponse{StandardPort: std, Nftables: h, Setcap: fileserve.SetcapHint("RUTA-DEL-SERVIDOR"), Remove: fileserve.RedirectCleanup(r.Protocol, r.Ip, int(r.Port))}, nil
+	return &v1.RedirectHintResponse{StandardPort: std, Nftables: h, Setcap: fileserve.SetcapHintIn(loc, i18n.Msg(loc, "fileserve.hint.server_path", nil)), Remove: fileserve.RedirectCleanup(r.Protocol, r.Ip, int(r.Port))}, nil
 }
 
 // sink: las transferencias reales se auditan; los rechazos (escáneres, nombres equivocados)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"net/netip"
@@ -659,5 +660,19 @@ func TestPortKeysTreatsEquivalentNamesAsOnePort(t *testing.T) {
 	a, b := portKeys(mk("GigabitEthernet1/0/1")), portKeys(mk("gi1/0/1"))
 	if len(a) != 1 || !reflect.DeepEqual(a, b) {
 		t.Fatalf("%v %v", a, b)
+	}
+}
+
+// Fase 30d: un comando fuera de ASCII se rechaza con el motivo del catálogo (reason y texto en el idioma pedido).
+func TestExecReadRechazaNoASCIIConMotivoDeCatalogo(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	ex := newExec(r.d, "x", nil, transport.HostKeyPolicy{})
+	_, err := ex.Read(context.Background(), "SW1", []string{"show clock\r"})
+	var ce i18n.Coded
+	if !errors.Is(err, playbook.ErrDenied) || !errors.As(err, &ce) || ce.Reason() != "playbook.err.denied_cmd" {
+		t.Fatalf("err = %v", err)
+	}
+	if got := i18n.In("en", err); !strings.Contains(got, "printable ASCII only") {
+		t.Errorf("en: %q", got)
 	}
 }

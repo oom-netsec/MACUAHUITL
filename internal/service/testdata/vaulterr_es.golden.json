@@ -1,0 +1,20 @@
+{
+ "bexists": "AlreadyExists|vault: el archivo de respaldo ya existe",
+ "corrupt": "Internal|vault: archivo dañado o alterado",
+ "empty": "InvalidArgument|vault: contraseña maestra vacía",
+ "exists": "AlreadyExists|vault: la bóveda ya existe",
+ "locked": "FailedPrecondition|vault: bóveda cerrada",
+ "many": "InvalidArgument|vault: el respaldo trae demasiadas credenciales",
+ "notbackup": "InvalidArgument|vault: no es un respaldo de bóveda de MACUAHUITL",
+ "notfound": "NotFound|vault: credencial no encontrada",
+ "notregular": "FailedPrecondition|vault: la ruta existe y no es un archivo regular",
+ "other": "Internal|algo raro",
+ "params": "FailedPrecondition|vault: los parámetros de Argon2id de la bóveda pasan de lo que admite un respaldo",
+ "reserved": "InvalidArgument|vault: entrada reservada del sistema, no es una credencial de conexión",
+ "same": "InvalidArgument|vault: la frase del respaldo debe ser distinta de la contraseña maestra",
+ "short": "InvalidArgument|vault: la frase del respaldo debe tener al menos 12 caracteres",
+ "weak": "Internal|vault: parámetros de Argon2id por debajo del mínimo",
+ "window": "InvalidArgument|vault: la ventana debe terminar en el futuro y durar como máximo 96 h",
+ "wrapped": "FailedPrecondition|abrir: vault: bóveda cerrada",
+ "wrong": "PermissionDenied|vault: contraseña maestra incorrecta"
+}

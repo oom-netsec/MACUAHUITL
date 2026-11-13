@@ -1,16 +1,17 @@
 package vault
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // MaxWindow es la duración máxima de una ventana armada (spec §10.4).
 const MaxWindow = 96 * time.Hour
 
-var ErrWindowTooLong = errors.New("vault: la ventana debe terminar en el futuro y durar como máximo 96 h")
+var ErrWindowTooLong = i18n.New("vault.err.window_too_long", nil)
 
 // Window autoriza a un trabajo armado a descifrar ciertas credenciales hasta Until (excluido).
 type Window struct {

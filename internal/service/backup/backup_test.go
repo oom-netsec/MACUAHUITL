@@ -3,6 +3,7 @@ package backup
 import (
 	"context"
 	"fmt"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"os"
 	"path/filepath"
 	"strings"
@@ -467,5 +468,18 @@ func TestCambiarLaCarpetaAMitadDeUnRespaldoNoPartePorLaMitad(t *testing.T) {
 	}
 	if _, err := os.Stat(lote); err == nil {
 		t.Error("el lote temporal no se borró")
+	}
+}
+
+// Fase 30d: si los avisos y sus textos se desparejan, el informe en inglés no mezcla un aviso con la traducción de otro.
+func TestCollectedTextNuncaMezclaAvisos(t *testing.T) {
+	c := collected{Warnings: []string{"uno", "dos"}, WarningTexts: []i18n.Text{i18n.Tx("backup.warn.unsigned")}}
+	if got := c.text("en"); !strings.Contains(got, "uno") || !strings.Contains(got, "dos") || strings.Contains(got, "signature") {
+		t.Errorf("mezcló avisos: %q", got)
+	}
+	c = collected{}
+	c.warn(i18n.Tx("backup.warn.unsigned"))
+	if en := c.text("en"); !strings.Contains(en, "without a signature") {
+		t.Errorf("pareados: %q", en)
 	}
 }

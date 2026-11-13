@@ -33,7 +33,7 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	s.d.MarkActive()
 	tool, ok := diagTools[r.Tool]
 	if !ok {
-		return status.Error(codes.InvalidArgument, "herramienta no indicada")
+		return service.Err(st.Context(), codes.InvalidArgument, "diag.err.no_tool", nil)
 	}
 	req := diag.Request{Tool: tool, Options: r.Options, OutputDir: r.OutputDir}
 	for _, t := range r.Targets {

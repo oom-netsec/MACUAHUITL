@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
@@ -443,5 +444,24 @@ func TestAvisoNoEscribibleNoSeReauditaEnCadaGuardado(t *testing.T) {
 	}
 	if c := strings.Count(d.AuditText(), "reason=no_escribible"); c != 1 {
 		t.Fatalf("no_escribible auditado %d veces, quería 1:\n%s", c, d.AuditText())
+	}
+}
+
+// Fase 30d: los rechazos de preferencias salen en el idioma pedido; con es, el texto de siempre.
+func TestPreferenciasRechazosEsYEn(t *testing.T) {
+	s, _, _ := montar(t)
+	for loc, want := range map[string][3]string{
+		"es": {"clave de preferencia inválida", "ui.language debe ser es o en", "valor de preferencia mayor de 4 KiB"},
+		"en": {"invalid preference key", "ui.language must be es or en", "preference value larger than 4 KiB"},
+	} {
+		c := i18n.WithLocale(context.Background(), loc)
+		_, e0 := s.GetPreference(c, &v1.GetPreferenceRequest{Key: "no.existe"})
+		_, e1 := s.SetPreference(c, &v1.SetPreferenceRequest{Key: "ui.language", Value: "fr"})
+		_, e2 := s.SetPreference(c, &v1.SetPreferenceRequest{Key: "terminal", Value: strings.Repeat("x", 5000)})
+		for i, err := range []error{e0, e1, e2} {
+			if m := status.Convert(err).Message(); m != want[i] || status.Code(err) != codes.InvalidArgument {
+				t.Errorf("%s %d: %v, quería %q", loc, i, err, want[i])
+			}
+		}
 	}
 }

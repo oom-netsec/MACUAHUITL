@@ -2,10 +2,13 @@ package sys
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 func TestOpenRegular(t *testing.T) {
@@ -93,5 +96,15 @@ func TestOwner(t *testing.T) {
 	}
 	if uid, ok := Owner(fi); !ok || uid != uint32(os.Getuid()) {
 		t.Fatalf("dueño = %d, %v; quería %d", uid, ok, os.Getuid())
+	}
+}
+
+// Fase 30d: ErrNotRegular lleva código; el texto en español es el de siempre y con en sale en inglés.
+func TestErrNotRegularEsYEn(t *testing.T) {
+	if ErrNotRegular.Error() != "la ruta no es un archivo regular" {
+		t.Errorf("es: %q", ErrNotRegular.Error())
+	}
+	if en := i18n.In("en", fmt.Errorf("abrir: %w", ErrNotRegular)); en != "abrir: the path is not a regular file" {
+		t.Errorf("en: %q", en)
 	}
 }

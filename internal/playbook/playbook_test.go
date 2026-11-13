@@ -9,6 +9,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/playbooks"
 )
 
@@ -243,5 +244,15 @@ func TestVisibleWLC9800(t *testing.T) {
 	n := func(det string) int { return len(Visible(det, pbs)) }
 	if n("wlc-9800") != 2 || n("ios-xe") != 1 || n("ios") != 1 {
 		t.Errorf("%d %d %d", n("wlc-9800"), n("ios-xe"), n("ios"))
+	}
+}
+
+// El error del timeout máximo conserva el texto en español del núcleo anterior y tiene versión en inglés.
+func TestTimeoutMaximoEnEsYEn(t *testing.T) {
+	_, err := Load(fstest.MapFS{"x.yaml": {Data: []byte("id: x\nplatform: ios-xe\nname: X\ncommands:\n  - cmd: show x\n    timeout: 31m\n")}})
+	es := `playbook x.yaml: timeout "31m" de "show x" pasa el máximo de 30m0s`
+	en := `playbook x.yaml: timeout "31m" of "show x" exceeds the maximum of 30m0s`
+	if err == nil || err.Error() != es || i18n.In(i18n.En, err) != en {
+		t.Fatalf("es %q\nen %q", err, i18n.In(i18n.En, err))
 	}
 }

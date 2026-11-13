@@ -5,8 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -66,20 +64,20 @@ func Marshal(scripts []Script, now time.Time) ([]byte, error) {
 // puede traer campos que esta no conoce. que es lo que contiene el archivo, para los mensajes.
 func leerCabecera(b []byte, formato, que string) error {
 	if len(b) > MaxImportBytes {
-		return errors.New("el archivo pasa de 5 MB")
+		return i18n.New("scripts.imp.too_big", nil)
 	}
 	var cab struct {
 		Formato string `json:"formato"`
 		Version int    `json:"version"`
 	}
 	if err := json.NewDecoder(bytes.NewReader(b)).Decode(&cab); err != nil {
-		return fmt.Errorf("no es un archivo de %s: %w", que, err)
+		return i18n.Wrap("scripts.imp.not_file."+que, err, nil)
 	}
 	if cab.Formato != formato {
-		return fmt.Errorf("formato %q: se esperaba %q", cab.Formato, formato)
+		return i18n.New("scripts.imp.format", i18n.A("got", cab.Formato, "want", formato))
 	}
 	if cab.Version != Version {
-		return fmt.Errorf("versión %d no soportada (solo la %d)", cab.Version, Version)
+		return i18n.New("scripts.imp.version", i18n.A("got", cab.Version, "want", Version))
 	}
 	return nil
 }
@@ -89,10 +87,10 @@ func decodifica(b []byte, dst any, que string) error {
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
-		return fmt.Errorf("no es un archivo de %s: %w", que, err)
+		return i18n.Wrap("scripts.imp.not_file."+que, err, nil)
 	}
 	if err := dec.Decode(&struct{}{}); err != io.EOF {
-		return errors.New("hay datos después del JSON del archivo")
+		return i18n.New("scripts.imp.trailing", nil)
 	}
 	return nil
 }
@@ -102,7 +100,7 @@ func decodificaLista[T any](raw json.RawMessage, que string) ([]T, error) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&out); err != nil {
-		return nil, fmt.Errorf("%s ilegibles: %w", que, err)
+		return nil, i18n.Wrap("scripts.imp.unreadable."+que, err, nil)
 	}
 	return out, nil
 }
@@ -148,7 +146,7 @@ func ParseAvisos(b []byte) ([]Script, []string, error) {
 		return nil, nil, err
 	}
 	if len(scripts) > MaxImportScripts {
-		return nil, nil, fmt.Errorf("el archivo trae %d scripts; el tope es %d", len(scripts), MaxImportScripts)
+		return nil, nil, i18n.New("scripts.imp.max_scripts", i18n.A("n", len(scripts), "max", MaxImportScripts))
 	}
 	avisos, err := verificaSuma(a.SHA256, func() (string, error) { _, sum, err := suma(scripts); return sum, err })
 	if err != nil {
@@ -171,4 +169,4 @@ func verificaSuma(dada string, calcula func() (string, error)) ([]string, error)
 	return nil, nil
 }
 
-var errSuma = errors.New("la suma de verificación no coincide: el archivo está dañado o fue modificado")
+var errSuma = i18n.New("scripts.imp.checksum", nil)

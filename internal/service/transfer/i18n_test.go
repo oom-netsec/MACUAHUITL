@@ -273,3 +273,11 @@ func TestAuditoriaDeTransferenciaVaEnIngles(t *testing.T) {
 		t.Fatalf("auditoría: %v", got)
 	}
 }
+
+func TestRedirectHintMarcadorRutaEn(t *testing.T) {
+	s, _ := newTest(t)
+	r, err := s.RedirectHint(i18n.WithLocale(context.Background(), "en"), &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"})
+	if err != nil || strings.Contains(r.Setcap, "RUTA-DEL-SERVIDOR") || !strings.Contains(r.Setcap, "SERVER-PATH") {
+		t.Fatalf("%+v %v", r, err)
+	}
+}

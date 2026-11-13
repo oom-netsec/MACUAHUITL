@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Link es un eslabón de la cadena DNSSEC: la zona, sus llaves y el DS que la ata a su padre.
@@ -19,6 +21,13 @@ type Link struct {
 	Valid   bool
 	Expires time.Time // la firma verificada que vence primero
 	Error   string    `json:",omitempty"`
+	// ErrorText es Error como texto de catálogo; no viaja en el JSON.
+	ErrorText i18n.Text `json:"-"`
+}
+
+// fail marca el eslabón con el error: Error es el texto en español de siempre y ErrorText lo da en otro idioma.
+func (l *Link) fail(err error) {
+	l.Error, l.ErrorText = err.Error(), i18n.FromErr(err)
 }
 
 type DNSSECReport struct {
@@ -28,6 +37,31 @@ type DNSSECReport struct {
 	Chain    []Link
 	Denial   string // NSEC, NSEC3 o ninguna
 	Warnings []string
+	// WarningTexts y DenialText son Warnings y Denial como texto de catálogo; no viajan en el JSON.
+	WarningTexts []i18n.Text `json:"-"`
+	DenialText   i18n.Text   `json:"-"`
+}
+
+// In devuelve el informe con los errores, avisos y la prueba de inexistencia en el idioma dado (es es el de siempre).
+func (r DNSSECReport) In(loc string) DNSSECReport {
+	if r.Chain != nil {
+		r.Chain = append([]Link(nil), r.Chain...)
+		for i := range r.Chain {
+			if !r.Chain[i].ErrorText.Empty() {
+				r.Chain[i].Error = r.Chain[i].ErrorText.In(loc)
+			}
+		}
+	}
+	if r.Warnings != nil && len(r.WarningTexts) == len(r.Warnings) {
+		r.Warnings = make([]string, len(r.WarningTexts))
+		for i, t := range r.WarningTexts {
+			r.Warnings[i] = t.In(loc)
+		}
+	}
+	if !r.DenialText.Empty() {
+		r.Denial = r.DenialText.In(loc)
+	}
+	return r
 }
 
 // CheckDNSSEC verifica la cadena de confianza desde la raíz hasta zone. anchors son
@@ -42,7 +76,7 @@ func CheckDNSSEC(ctx context.Context, d Dialer, zone string, roots []Root, ancho
 	for _, a := range anchors {
 		rr, err := dns.NewRR(a)
 		if err != nil {
-			return rep, fmt.Errorf("dnsq: ancla inválida %q: %w", a, err)
+			return rep, i18n.Wrap("dns.dnssec.err.anchor", err, i18n.A("anchor", a))
 		}
 		if ds, ok := rr.(*dns.DS); ok {
 			trust = append(trust, ds)
@@ -79,13 +113,13 @@ func CheckDNSSEC(ctx context.Context, d Dialer, zone string, roots []Root, ancho
 	for i, z := range zones {
 		link := Link{Zone: z, Server: server[z]}
 		if link.Server == "" {
-			link.Error = "no se encontró un servidor autoritativo en la traza"
+			link.fail(i18n.New("dns.dnssec.link.no_server", nil))
 			rep.Chain = append(rep.Chain, link)
 			return rep, nil
 		}
 		keys, keySigs, err := fetch(ctx, d, link.Server, z, dns.TypeDNSKEY, o2)
 		if err != nil {
-			link.Error = err.Error()
+			link.fail(err)
 			rep.Chain = append(rep.Chain, link)
 			return rep, nil
 		}
@@ -104,22 +138,22 @@ func CheckDNSSEC(ctx context.Context, d Dialer, zone string, roots []Root, ancho
 			parent := zones[i-1]
 			ds, dsSigs, err := fetch(ctx, d, server[parent], z, dns.TypeDS, o2)
 			if err != nil {
-				link.Error = "DS del padre: " + err.Error()
+				link.fail(i18n.Wrap("dns.dnssec.link.ds_fetch", err, nil))
 				rep.Chain = append(rep.Chain, link)
 				return rep, nil
 			}
 			if len(ds) == 0 {
 				if len(dnskeys) == 0 {
 					rep.Unsigned = true
-					link.Error = "la zona no está firmada y el padre no publica DS (delegación insegura)"
+					link.fail(i18n.New("dns.dnssec.link.unsigned", nil))
 				} else {
-					link.Error = "la zona tiene llaves pero el padre no publica DS: la cadena se rompe aquí"
+					link.fail(i18n.New("dns.dnssec.link.broken", nil))
 				}
 				rep.Chain = append(rep.Chain, link)
 				return rep, nil
 			}
 			if _, err := verify(ds, dsSigs, parentKeys, now); err != nil {
-				link.Error = "firma del DS en el padre: " + err.Error()
+				link.fail(i18n.Wrap("dns.dnssec.link.ds_sig", err, nil))
 				rep.Chain = append(rep.Chain, link)
 				return rep, nil
 			}
@@ -135,15 +169,15 @@ func CheckDNSSEC(ctx context.Context, d Dialer, zone string, roots []Root, ancho
 		if len(dnskeys) == 0 {
 			if z == "." {
 				rep.Unsigned = true
-				link.Error = "la raíz de esta traza no publica DNSKEY"
+				link.fail(i18n.New("dns.dnssec.link.root_nokey", nil))
 			} else {
-				link.Error = "el padre publica DS pero la zona no tiene DNSKEY: la resolución validada falla"
+				link.fail(i18n.New("dns.dnssec.link.no_dnskey", nil))
 			}
 			rep.Chain = append(rep.Chain, link)
 			return rep, nil
 		}
 		if !dsMatches(dsSet, dnskeys) {
-			link.Error = "ninguna llave de la zona coincide con el DS (o con el ancla de confianza)"
+			link.fail(i18n.New("dns.dnssec.link.no_match", nil))
 			rep.Chain = append(rep.Chain, link)
 			return rep, nil
 		}
@@ -157,25 +191,27 @@ func CheckDNSSEC(ctx context.Context, d Dialer, zone string, roots []Root, ancho
 		}
 		exp, err := verify(keys, keySigs, anchored, now)
 		if err != nil {
-			link.Error = "firma del DNSKEY: " + err.Error()
+			link.fail(i18n.Wrap("dns.dnssec.link.key_sig", err, nil))
 			rep.Chain = append(rep.Chain, link)
 			return rep, nil
 		}
 		link.Valid, link.Expires = true, exp
 		if exp.Sub(now) < 7*24*time.Hour {
-			rep.Warnings = append(rep.Warnings, fmt.Sprintf("la firma del DNSKEY de %s vence el %s", z, exp.UTC().Format(time.RFC3339)))
+			w := i18n.Tx("dns.dnssec.warn.expiring", "zone", z, "when", exp.UTC().Format(time.RFC3339))
+			rep.Warnings, rep.WarningTexts = append(rep.Warnings, w.In(i18n.Es)), append(rep.WarningTexts, w)
 		}
 		// La firma de la SOA de la zona final dice si la ZSK firma de verdad.
 		if z == last {
 			soa, soaSigs, err := fetch(ctx, d, link.Server, z, dns.TypeSOA, o2)
 			if err == nil {
 				if e2, err := verify(soa, soaSigs, dnskeys, now); err != nil {
-					link.Valid, link.Error = false, "firma de la SOA: "+err.Error()
+					link.Valid = false
+					link.fail(i18n.Wrap("dns.dnssec.link.soa_sig", err, nil))
 				} else if e2.Before(link.Expires) {
 					link.Expires = e2
 				}
 			}
-			rep.Denial = denial(ctx, d, link.Server, z, o2)
+			rep.Denial, rep.DenialText = denial(ctx, d, link.Server, z, o2)
 		}
 		rep.Chain = append(rep.Chain, link)
 		parentKeys = dnskeys
@@ -218,12 +254,12 @@ func fetch(ctx context.Context, d Dialer, ip, name string, qtype uint16, o Optio
 // verify comprueba que alguna firma vigente del rrset verifique con alguna llave.
 func verify(set []dns.RR, sigs []*dns.RRSIG, keys []*dns.DNSKEY, now time.Time) (time.Time, error) {
 	if len(set) == 0 {
-		return time.Time{}, fmt.Errorf("rrset vacío")
+		return time.Time{}, i18n.New("dns.dnssec.verify.empty", nil)
 	}
 	if len(sigs) == 0 {
-		return time.Time{}, fmt.Errorf("sin RRSIG")
+		return time.Time{}, i18n.New("dns.dnssec.verify.no_sig", nil)
 	}
-	var last error = fmt.Errorf("ninguna llave verifica la firma")
+	var last error = i18n.New("dns.dnssec.verify.no_key", nil)
 	for _, s := range sigs {
 		for _, k := range keys {
 			if k.KeyTag() != s.KeyTag || k.Algorithm != s.Algorithm {
@@ -236,9 +272,9 @@ func verify(set []dns.RR, sigs []*dns.RRSIG, keys []*dns.DNSKEY, now time.Time) 
 			if !s.ValidityPeriod(now) {
 				exp := time.Unix(int64(s.Expiration), 0)
 				if now.After(exp) {
-					last = fmt.Errorf("firma vencida el %s", exp.UTC().Format(time.RFC3339))
+					last = i18n.New("dns.dnssec.verify.expired", i18n.A("when", exp.UTC().Format(time.RFC3339)))
 				} else {
-					last = fmt.Errorf("firma aún no válida")
+					last = i18n.New("dns.dnssec.verify.not_yet", nil)
 				}
 				continue
 			}
@@ -263,18 +299,18 @@ func dsMatches(ds []*dns.DS, keys []*dns.DNSKEY) bool {
 }
 
 // denial pregunta un nombre inexistente y dice qué prueba de inexistencia usa la zona.
-func denial(ctx context.Context, d Dialer, ip, zone string, o Options) string {
+func denial(ctx context.Context, d Dialer, ip, zone string, o Options) (string, i18n.Text) {
 	r, _, _, err := exchange(ctx, d, Server{Transport: "udp", Host: ip, Port: 53}, newMsg("mcu-nx-7f3a."+zone, dns.TypeA, o), o)
 	if err != nil {
-		return "desconocido"
+		return "desconocido", i18n.Tx("dns.dnssec.denial.unknown")
 	}
 	for _, rr := range r.Ns {
 		switch rr.(type) {
 		case *dns.NSEC3:
-			return "NSEC3"
+			return "NSEC3", i18n.Text{}
 		case *dns.NSEC:
-			return "NSEC"
+			return "NSEC", i18n.Text{}
 		}
 	}
-	return "ninguna"
+	return "ninguna", i18n.Tx("dns.dnssec.denial.none")
 }

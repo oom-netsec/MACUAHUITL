@@ -142,11 +142,7 @@ func (c *conn) close() { c.drv.Close(); c.sess.Close() }
 // Read corre comandos de lectura; cada uno pasa por CheckDenied también aquí.
 func (e *devExec) Read(ctx context.Context, dev string, cmds []string) ([]assist.Output, error) {
 	for _, cmd := range cmds {
-		for _, r := range cmd { // exec-character-bits 7: ver internal/assist.asciiOnly
-			if r < 0x20 || r > 0x7e {
-				return nil, fmt.Errorf("%w: %q tiene caracteres fuera de ASCII imprimible", playbook.ErrDenied, cmd)
-			}
-		}
+		// CheckDenied ya rechaza lo que no sea ASCII imprimible (exec-character-bits 7: ver internal/assist.asciiOnly).
 		if err := playbook.CheckDenied("ios-xe", cmd); err != nil {
 			return nil, err
 		}

@@ -34,10 +34,10 @@ func (s *adhocSvc) StartAdhoc(ctx context.Context, r *v1.StartAdhocRequest) (*v1
 	cmds, err := adhoc.Commands(r.Commands)
 	if err != nil {
 		s.d.Audit("adhoc.denied", "", i18n.English(err))
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	if len(r.Targets) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "indica al menos un equipo")
+		return nil, service.Err(ctx, codes.InvalidArgument, "adhoc.err.no_targets", nil)
 	}
 	root := filepath.Join(s.d.Outputs(), "adhoc")
 	if err := os.MkdirAll(root, 0o700); err != nil {

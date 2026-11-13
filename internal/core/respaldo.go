@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -85,17 +84,17 @@ func (st *respaldoStore) stash(v *vault.Vault, now time.Time, p respaldoPend) (s
 }
 
 // take saca el token del mapa bajo el lock: dos aplicaciones a la vez no pueden usar la misma vista previa. Uno vencido se gasta y se borra.
-func (st *respaldoStore) take(tok string, now time.Time) (respaldoPend, error) {
+func (st *respaldoStore) take(ctx context.Context, tok string, now time.Time) (respaldoPend, error) {
 	st.mu.Lock()
 	p, ok := st.pend[tok]
 	delete(st.pend, tok)
 	st.mu.Unlock()
 	if !ok {
-		return p, status.Error(codes.NotFound, "token de importación desconocido; abre el respaldo de nuevo")
+		return p, service.Err(ctx, codes.NotFound, "respaldo.err.token", nil)
 	}
 	if now.After(p.expires) {
 		p.destroy()
-		return p, status.Error(codes.FailedPrecondition, "la vista previa venció; vuelve a abrir el respaldo")
+		return p, service.Err(ctx, codes.FailedPrecondition, "respaldo.err.expired", nil)
 	}
 	return p, nil
 }
@@ -151,24 +150,17 @@ const (
 	decOmitir     = "omitir"
 )
 
-func respaldoPath(p string) (string, error) {
-	if !filepath.IsAbs(p) {
-		return "", status.Error(codes.InvalidArgument, "la ruta debe ser absoluta")
-	}
-	return filepath.Clean(p), nil
-}
-
 // respaldoErr traduce los errores del respaldo a gRPC sin repetir nunca lo que se escribió (frase, secretos).
-func respaldoErr(err error) error {
+func respaldoErr(ctx context.Context, err error) error {
 	switch {
 	case errors.Is(err, vault.ErrWrongPassword):
-		return status.Error(codes.PermissionDenied, "la frase del respaldo es incorrecta (o el archivo está alterado)")
+		return service.Err(ctx, codes.PermissionDenied, "respaldo.err.wrong_phrase", nil)
 	case errors.Is(err, vault.ErrCorrupt):
-		return status.Error(codes.InvalidArgument, "el respaldo está dañado o alterado")
+		return service.Err(ctx, codes.InvalidArgument, "respaldo.err.corrupt", nil)
 	case errors.Is(err, fs.ErrNotExist):
-		return status.Error(codes.NotFound, err.Error())
+		return service.ErrFrom(ctx, codes.NotFound, err)
 	}
-	return service.VaultErr(err)
+	return service.VaultErr(ctx, err)
 }
 
 // ExportBackup escribe un respaldo cifrado con una frase distinta de la maestra (internal/vault.WriteBackup).
@@ -176,9 +168,9 @@ func (s *vaultSvc) ExportBackup(ctx context.Context, r *v1.ExportBackupRequest) 
 	defer clear(r.Passphrase)
 	s.c.markActive()
 	if !r.Confirm {
-		return nil, status.Error(codes.FailedPrecondition, "el respaldo contiene todas tus credenciales en un solo archivo: quien tenga el archivo y la frase las tiene todas; confirma para continuar")
+		return nil, service.Err(ctx, codes.FailedPrecondition, "respaldo.err.confirm", nil)
 	}
-	path, err := respaldoPath(r.Path)
+	path, err := service.AbsPathReason(ctx, r.Path, "respaldo.err.path_abs")
 	if err != nil {
 		return nil, err
 	}
@@ -187,14 +179,14 @@ func (s *vaultSvc) ExportBackup(ctx context.Context, r *v1.ExportBackupRequest) 
 		return nil, err
 	}
 	if s.c.inDataDir(path) {
-		return nil, status.Error(codes.InvalidArgument, "el respaldo no puede guardarse dentro de la carpeta de datos del núcleo (ahí viven la bóveda y su copia): elige otra carpeta")
+		return nil, service.Err(ctx, codes.InvalidArgument, "respaldo.err.in_data_dir", nil)
 	}
 	n, noPerms, err := vault.WriteBackupWarn(v, path, r.Passphrase, r.Overwrite)
 	if errors.Is(err, vault.ErrBackupExists) {
 		return nil, service.Err(ctx, codes.AlreadyExists, "file.exists.vault", i18n.A("path", path))
 	}
 	if err != nil {
-		return nil, respaldoErr(err)
+		return nil, respaldoErr(ctx, err)
 	}
 	detail := fmt.Sprintf("%d credentials", n)
 	if noPerms {
@@ -271,7 +263,7 @@ func planImport(v *vault.Vault, in []vault.Credential) (map[string]planned, map[
 func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupImportRequest) (*v1.PreviewBackupImportResponse, error) {
 	defer clear(r.Passphrase)
 	s.c.markActive()
-	path, err := respaldoPath(r.Path)
+	path, err := service.AbsPathReason(ctx, r.Path, "respaldo.err.path_abs")
 	if err != nil {
 		return nil, err
 	}
@@ -280,16 +272,16 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 		return nil, err
 	}
 	if !v.Unlocked() {
-		return nil, service.VaultErr(vault.ErrLocked)
+		return nil, service.VaultErr(ctx, vault.ErrLocked)
 	}
 	b, err := vault.OpenBackup(path, r.Passphrase)
 	if err != nil {
-		return nil, respaldoErr(err)
+		return nil, respaldoErr(ctx, err)
 	}
 	defer b.LockAll()
 	infos, err := b.ListAll()
 	if err != nil {
-		return nil, respaldoErr(err)
+		return nil, respaldoErr(ctx, err)
 	}
 	p := respaldoPend{path: path}
 	stored := false
@@ -307,7 +299,7 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 		} else {
 			c, err := b.Get(i.ID)
 			if err != nil {
-				return nil, respaldoErr(err)
+				return nil, respaldoErr(ctx, err)
 			}
 			p.creds = append(p.creds, c)
 		}
@@ -315,7 +307,7 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 	}
 	plan, _, err := planImport(v, p.creds)
 	if err != nil {
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	for _, it := range items {
 		if it.State == "" {
@@ -326,7 +318,7 @@ func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupI
 	tok, ok := s.c.respaldos.stash(v, now, p)
 	stored = true // stash se quedó con ella (o ya la destruyó)
 	if !ok {
-		return nil, service.VaultErr(vault.ErrLocked)
+		return nil, service.VaultErr(ctx, vault.ErrLocked)
 	}
 	return &v1.PreviewBackupImportResponse{Token: tok, ExpiresMs: now.Add(respaldoTTL).UnixMilli(), Items: items}, nil
 }
@@ -349,9 +341,9 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 	}
 	// Cerrada la bóveda, cerrar ya borró lo descifrado; no se gasta el token.
 	if !v.Unlocked() {
-		return nil, status.Error(codes.FailedPrecondition, "la bóveda está cerrada: desbloquéala y abre el respaldo de nuevo")
+		return nil, service.Err(ctx, codes.FailedPrecondition, "respaldo.err.locked", nil)
 	}
-	p, err := s.c.respaldos.take(r.Token, s.c.o.Now())
+	p, err := s.c.respaldos.take(ctx, r.Token, s.c.o.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -362,10 +354,10 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 		}
 	}()
 	// Una decisión mala devuelve el token para corregirla; un fallo al escribir no.
-	bad := func(format string, a ...any) error {
+	bad := func(code string, kv ...any) error {
 		s.c.respaldos.restore(v, r.Token, p)
 		restored = true
-		return status.Errorf(codes.InvalidArgument, format, a...)
+		return service.Err(ctx, codes.InvalidArgument, code, i18n.A(kv...))
 	}
 	label := map[string]string{}
 	for _, c := range p.creds {
@@ -374,20 +366,20 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 	dec := map[string]string{}
 	for _, d := range r.Decisions {
 		if _, ok := label[d.Id]; !ok {
-			return nil, bad("decisión para una credencial que no está en el respaldo")
+			return nil, bad("respaldo.err.decision_unknown")
 		}
 		if _, dup := dec[d.Id]; dup {
-			return nil, bad("decisión repetida para %q", label[d.Id])
+			return nil, bad("respaldo.err.decision_dup", "label", label[d.Id])
 		}
 		if d.Action != decRenombrar && d.Action != decReemplazar && d.Action != decOmitir {
-			return nil, bad("acción %q desconocida; usa renombrar, reemplazar u omitir", d.Action)
+			return nil, bad("respaldo.err.action", "action", d.Action)
 		}
 		dec[d.Id] = d.Action
 	}
 	// Se vuelve a comparar contra lo guardado ahora: entre la vista previa y aquí pudo cambiar.
 	plan, used, err := planImport(v, p.creds)
 	if err != nil {
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	var batch []vault.Credential
 	reemplazados := map[string]string{} // ID local -> etiqueta de la credencial del respaldo que ya lo reemplaza
@@ -400,10 +392,10 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 		case act == decOmitir:
 			res.Skipped++
 		case pl.state == estConflicto && act == "":
-			return nil, bad("falta decidir qué hacer con %q: renombrar, reemplazar u omitir", c.Label)
+			return nil, bad("respaldo.err.undecided", "label", c.Label)
 		case pl.state == estConflicto && act == decReemplazar:
 			if _, dup := reemplazados[pl.target]; dup {
-				return nil, bad("dos credenciales del respaldo reemplazarían la misma credencial de la bóveda (%q): elige otra decisión para una de ellas", c.Label)
+				return nil, bad("respaldo.err.double_replace", "label", c.Label)
 			}
 			reemplazados[pl.target] = c.Label
 			c.ID = pl.target
@@ -424,7 +416,7 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 	res.Skipped += int32(p.reserved)
 	if len(batch) > 0 {
 		if _, err := v.PutBatch(batch); err != nil {
-			return nil, service.VaultErr(err)
+			return nil, service.VaultErr(ctx, err)
 		}
 	}
 	s.c.audit("vault.respaldo.importar", p.path, fmt.Sprintf("%d new, %d replaced, %d renamed, %d skipped, %d identical; decisions: %s",

@@ -164,26 +164,26 @@ func Analyze(ctx context.Context, path string, o Options) (Report, error) {
 	}
 	f, err := sys.OpenRegular(path)
 	if err != nil {
-		return Report{}, fmt.Errorf("pcapan: %w", err)
+		return Report{}, i18n.Wrap("pcap.err.read", err, nil)
 	}
 	defer f.Close()
 	br := bufio.NewReaderSize(f, 1<<20)
 	magic, err := br.Peek(4)
 	if err != nil {
-		return Report{}, fmt.Errorf("pcapan: archivo vacío o ilegible: %w", err)
+		return Report{}, i18n.Wrap("pcap.err.empty", err, nil)
 	}
 	var next func() ([]byte, gopacket.CaptureInfo, error)
 	var link layers.LinkType
 	if magic[0] == 0x0a && magic[1] == 0x0d && magic[2] == 0x0d && magic[3] == 0x0a {
 		r, err := pcapgo.NewNgReader(br, pcapgo.DefaultNgReaderOptions)
 		if err != nil {
-			return Report{}, fmt.Errorf("pcapan: pcapng inválido: %w", err)
+			return Report{}, i18n.Wrap("pcap.err.pcapng", err, nil)
 		}
 		next, link = r.ReadPacketData, r.LinkType()
 	} else {
 		r, err := pcapgo.NewReader(br)
 		if err != nil {
-			return Report{}, fmt.Errorf("pcapan: no es un pcap/pcapng: %w", err)
+			return Report{}, i18n.Wrap("pcap.err.not_pcap", err, nil)
 		}
 		next, link = r.ReadPacketData, r.LinkType()
 	}

@@ -27,7 +27,7 @@ type previa struct {
 // etiqueta; si no se puede resolver (bóveda cerrada, credencial ya borrada) el host sale sin ella y se avisa.
 func (s *svc) ExportHosts(ctx context.Context, r *v1.ExportHostsRequest) (*v1.ExportHostsResponse, error) {
 	s.d.MarkActive()
-	path, err := service.AbsPath(r.Path)
+	path, err := service.AbsPath(ctx, r.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (s *svc) ExportHosts(ctx context.Context, r *v1.ExportHostsRequest) (*v1.Ex
 		}
 	}
 	if len(sel) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "no hay hosts que exportar")
+		return nil, service.Err(ctx, codes.InvalidArgument, "hosts.err.nothing_to_export", nil)
 	}
 	if len(sel) > devices.MaxImportHosts {
 		return nil, status.Errorf(codes.InvalidArgument, "son más de %d hosts y el import no los aceptaría en un solo archivo: parte el export en varios archivos eligiendo los hosts por ids (por ejemplo, los de cada carpeta, que da la lista de la libreta)", devices.MaxImportHosts)
@@ -86,7 +86,7 @@ func (s *svc) ExportHosts(ctx context.Context, r *v1.ExportHostsRequest) (*v1.Ex
 		return nil, internal(err)
 	}
 	if len(b) > devices.MaxImportBytes {
-		return nil, status.Error(codes.InvalidArgument, "el archivo pasaría de 5 MB y el import lo rechazaría; exporta menos hosts")
+		return nil, service.Err(ctx, codes.InvalidArgument, "hosts.err.export_too_big", nil)
 	}
 	if err := service.WriteExport(ctx, path, b, r.Overwrite); err != nil {
 		return nil, err
@@ -127,9 +127,9 @@ func devicePB(h devices.Host, label string) *v1.Device {
 }
 
 // PreviewImportHosts lee y valida el archivo entero sin tocar la libreta y deja un token de un solo uso.
-func (s *svc) PreviewImportHosts(_ context.Context, r *v1.PreviewImportHostsRequest) (*v1.PreviewImportHostsResponse, error) {
+func (s *svc) PreviewImportHosts(ctx context.Context, r *v1.PreviewImportHostsRequest) (*v1.PreviewImportHostsResponse, error) {
 	s.d.MarkActive()
-	path, err := service.AbsPath(r.Path)
+	path, err := service.AbsPath(ctx, r.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +137,7 @@ func (s *svc) PreviewImportHosts(_ context.Context, r *v1.PreviewImportHostsRequ
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	b, err := service.ReadImport(path, devices.MaxImportBytes)
+	b, err := service.ReadImport(ctx, path, devices.MaxImportBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -178,15 +178,15 @@ func (s *svc) PreviewImportHosts(_ context.Context, r *v1.PreviewImportHostsRequ
 
 // ApplyImportHosts aplica una decisión por conflicto en una sola transacción. El token se saca al tomarlo, así
 // dos llamadas a la vez no aplican la misma vista previa; una decisión mala lo devuelve para corregirla.
-func (s *svc) ApplyImportHosts(_ context.Context, r *v1.ApplyImportHostsRequest) (*v1.ApplyImportHostsResponse, error) {
+func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsRequest) (*v1.ApplyImportHostsResponse, error) {
 	s.d.MarkActive()
 	now := s.clock()
 	pv, exp, ok := s.pend.Take(r.Token)
 	if !ok {
-		return nil, status.Error(codes.NotFound, "token de importación desconocido; abre el archivo de nuevo")
+		return nil, service.Err(ctx, codes.NotFound, "hosts.err.token", nil)
 	}
 	if now.After(exp) {
-		return nil, status.Error(codes.FailedPrecondition, "la vista previa venció; vuelve a abrir el archivo")
+		return nil, service.Err(ctx, codes.FailedPrecondition, "hosts.err.expired", nil)
 	}
 	dec := map[string]string{}
 	invalid := false
@@ -230,11 +230,11 @@ func (s *svc) ApplyImportHosts(_ context.Context, r *v1.ApplyImportHostsRequest)
 }
 
 // HostsImportTemplate da el archivo de ejemplo (encabezado y 3 filas válidas) generado de la tabla de campos del import.
-func (s *svc) HostsImportTemplate(_ context.Context, r *v1.HostsImportTemplateRequest) (*v1.HostsImportTemplateResponse, error) {
+func (s *svc) HostsImportTemplate(ctx context.Context, r *v1.HostsImportTemplateRequest) (*v1.HostsImportTemplateResponse, error) {
 	s.d.MarkActive()
 	format, err := devices.ImportFormat("", r.Format)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "pida el formato csv o json")
+		return nil, service.Err(ctx, codes.InvalidArgument, "hosts.err.format", nil)
 	}
 	b, err := devices.Template(format, s.clock())
 	if err != nil {
