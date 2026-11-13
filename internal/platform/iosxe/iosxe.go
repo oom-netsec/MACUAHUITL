@@ -16,6 +16,9 @@ import (
 
 const openTimeout = 15 * time.Second
 
+// maxRun es lo más que corre un comando aunque su salida siga llegando (el timeout de Run es de inactividad).
+var maxRun = 30 * time.Minute
+
 var (
 	anyPrompt = regexp.MustCompile(`(?:^|\n)([\w.\-@/:]{1,63})([>#]) ?$`)
 	more      = regexp.MustCompile(` ?--More-- ?`)
@@ -173,6 +176,19 @@ func (d *driver) atPrompt(s string) bool {
 
 // until acumula salida normalizada hasta que done la acepta. Responde a --More-- con espacio.
 func (d *driver) until(ctx context.Context, done func(string) bool) (string, error) {
+	return d.untilIdle(ctx, 0, done)
+}
+
+// untilIdle es until con plazo de inactividad: con idle > 0 falla si pasa idle sin que llegue nada, y cada pedazo
+// de salida reinicia el reloj (una salida grande y lenta no se corta mientras siga llegando). ctx es el tope absoluto.
+func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(string) bool) (string, error) {
+	var quiet <-chan time.Time
+	var timer *time.Timer
+	if idle > 0 {
+		timer = time.NewTimer(idle)
+		defer timer.Stop()
+		quiet = timer.C
+	}
 	for {
 		raw := string(d.buf)
 		if strings.HasSuffix(strings.TrimRight(raw, " "), "--More--") {
@@ -189,6 +205,8 @@ func (d *driver) until(ctx context.Context, done func(string) bool) (string, err
 		select {
 		case <-ctx.Done():
 			return clean(string(d.buf)), platform.ErrPromptTimeout
+		case <-quiet:
+			return clean(string(d.buf)), platform.ErrPromptTimeout
 		case c, ok := <-d.chunks:
 			if !ok {
 				err := <-d.readErr
@@ -196,6 +214,9 @@ func (d *driver) until(ctx context.Context, done func(string) bool) (string, err
 				return clean(string(d.buf)), fmt.Errorf("%w: %v", platform.ErrClosed, err)
 			}
 			d.buf = append(d.buf, c...)
+			if timer != nil {
+				timer.Reset(idle)
+			}
 		}
 	}
 }
@@ -215,12 +236,12 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	if strings.ContainsAny(cmd, "\r\n") {
 		return out, fmt.Errorf("platform: el comando %q tiene saltos de línea", cmd)
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, max(maxRun, timeout)) // timeout es de inactividad; maxRun, el tope
 	defer cancel()
 	if _, err := io.WriteString(d.w, cmd+"\n"); err != nil {
 		return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
 	}
-	text, err := d.until(ctx, d.atPrompt)
+	text, err := d.untilIdle(ctx, timeout, d.atPrompt)
 	out.Ended = time.Now()
 	if err != nil {
 		d.fail(err)

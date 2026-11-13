@@ -39,6 +39,8 @@ type Config struct {
 	Attempts                             *atomic.Int32 // si no es nil, cuenta cada contraseña recibida (password o KI)
 	SlowCommand                          string        // este comando tarda SlowDelay en responder
 	SlowDelay                            time.Duration
+	StreamCommand                        string // este comando manda StreamLines líneas, una cada SlowDelay (una salida grande y lenta)
+	StreamLines                          int
 	SlowConfigLine                       string        // esta línea de configuración tarda SlowDelay en terminar (el prompt llega tarde)
 	WriteMemoryOutput                    string        // si no está vacío, es la respuesta de write memory
 	IdleTimeout                          time.Duration // cierra la sesión si pasa este tiempo sin recibir una línea (exec-timeout)
@@ -370,6 +372,11 @@ func (s *session) run() {
 		case cmd == s.c.SlowCommand && cmd != "":
 			time.Sleep(s.c.SlowDelay)
 			s.write("SALIDA LENTA DE " + cmd + "\n")
+		case cmd == s.c.StreamCommand && cmd != "":
+			for i := range s.c.StreamLines {
+				time.Sleep(s.c.SlowDelay)
+				s.write(fmt.Sprintf("linea %d de %s\n", i+1, cmd))
+			}
 		case cmd == s.c.DropDuringCommand:
 			out := s.outputs[cmd]
 			s.write(out[:len(out)/2])

@@ -105,11 +105,43 @@ func TestKeepaliveTimeoutCloses(t *testing.T) {
 	closed := make(chan struct{})
 	stop := make(chan struct{})
 	defer close(stop)
-	go keepaliveLoop(20*time.Millisecond, func() error { select {} }, func() { close(closed) }, stop)
+	go keepaliveLoop(20*time.Millisecond, func() error { select {} }, func() int64 { return 0 }, func() { close(closed) }, stop)
 	select {
 	case <-closed:
 	case <-time.After(time.Second):
 		t.Fatal("hung keepalive never closed the session")
+	}
+}
+
+// Un equipo ocupado mandando una salida grande (show memory summary en un 3560CX) no contesta el keepalive, pero
+// los datos siguen llegando: la sesión está viva y no se cierra. Cuando dejan de llegar, sí.
+func TestKeepaliveConDatosNoCierra(t *testing.T) {
+	closed := make(chan struct{})
+	stop := make(chan struct{})
+	defer close(stop)
+	var rx atomic.Int64
+	streaming := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-streaming:
+				return
+			case <-time.After(2 * time.Millisecond):
+				rx.Add(100)
+			}
+		}
+	}()
+	go keepaliveLoop(20*time.Millisecond, func() error { select {} }, rx.Load, func() { close(closed) }, stop)
+	select {
+	case <-closed:
+		t.Fatal("cerró una sesión que seguía recibiendo datos")
+	case <-time.After(300 * time.Millisecond):
+	}
+	close(streaming)
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("sin datos ni respuesta, debía cerrar")
 	}
 }
 

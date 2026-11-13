@@ -180,3 +180,31 @@ func TestCleanEraseSequences(t *testing.T) {
 		t.Fatalf("clean = %q", got)
 	}
 }
+
+// Una salida grande y lenta (show memory summary en un 3560CX) que sigue llegando no se corta por el plazo: el
+// plazo es de inactividad. Mientras llegan líneas, el comando sigue.
+func TestPlazoEsDeInactividad(t *testing.T) {
+	d, err := open(t, simulator.Config{StreamCommand: "show memory summary", StreamLines: 20, SlowDelay: 50 * time.Millisecond}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := d.Run(context.Background(), "show memory summary", 300*time.Millisecond)
+	if err != nil || strings.Count(out.Text, "\n") != 20 || !strings.Contains(out.Text, "linea 20 de") {
+		t.Fatalf("err = %v, salida %q", err, out.Text)
+	}
+}
+
+// Aun con datos llegando (cada 20 ms, menos que el plazo de inactividad), ningún comando corre más que maxRun.
+func TestTopeAbsolutoDelComando(t *testing.T) {
+	old := maxRun
+	maxRun = 400 * time.Millisecond
+	defer func() { maxRun = old }()
+	d, err := open(t, simulator.Config{StreamCommand: "show sin fin", StreamLines: 1000, SlowDelay: 20 * time.Millisecond}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	if _, err := d.Run(context.Background(), "show sin fin", 100*time.Millisecond); !errors.Is(err, platform.ErrPromptTimeout) || time.Since(start) > 2*time.Second {
+		t.Fatalf("err = %v tras %s", err, time.Since(start))
+	}
+}

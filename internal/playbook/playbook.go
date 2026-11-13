@@ -23,7 +23,7 @@ const defaultTimeout = 60 * time.Second
 
 type Command struct {
 	Text       string
-	Timeout    time.Duration
+	Timeout    time.Duration // de inactividad: el driver lo reinicia mientras llega salida
 	MaySecrets bool
 	// Platforms: solo corre en esas plataformas detectadas; vacío = en todas las compatibles.
 	Platforms []string
