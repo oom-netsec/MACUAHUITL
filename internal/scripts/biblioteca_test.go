@@ -1,18 +1,31 @@
 package scripts
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/playbooks"
 )
 
-func TestBibliotecaCargaYSusScriptsSonValidos(t *testing.T) {
-	lib, err := Library(playbooks.FS)
+// conPaquete es la biblioteca con el contenido del paquete oficial oom/ios-xe, como la ve un núcleo que lo instaló.
+func conPaquete(t *testing.T) []Script {
+	t.Helper()
+	pbs, err := playbook.Load(os.DirFS("../../packs/ios-xe/playbooks"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	lib, _, err := LibraryWith(playbooks.FS, []Contenido{{Playbooks: pbs}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return lib
+}
+
+func TestBibliotecaCargaYSusScriptsSonValidos(t *testing.T) {
+	lib := conPaquete(t)
 	if len(lib) < 60 {
 		t.Fatalf("faltan scripts de la biblioteca: %d", len(lib))
 	}
@@ -49,7 +62,7 @@ func TestBibliotecaCargaYSusScriptsSonValidos(t *testing.T) {
 
 // Los scripts de diagnóstico siguen en sincronía con los playbooks porque se derivan de ellos al cargar.
 func TestBibliotecaDiagnosticoCoincideConElPlaybook(t *testing.T) {
-	lib, _ := Library(playbooks.FS)
+	lib := conPaquete(t)
 	for _, s := range lib {
 		if s.ID != "lib-l2-stp" {
 			continue
@@ -113,5 +126,31 @@ func TestTechDeUnPlaybook(t *testing.T) {
 		if got := techDe(id); got != want {
 			t.Errorf("techDe(%q) = %q, quiero %q", id, got, want)
 		}
+	}
+}
+
+// Derived devuelve solo los scripts derivados de playbooks; los de configuración entran una sola vez, con la base,
+// aunque haya varios paquetes (si se llamara LibraryWithEN por paquete saldrían duplicados).
+func TestDerivedNoTraeConfiguracionYLaBibliotecaNoLaDuplica(t *testing.T) {
+	pbs, err := playbook.Load(os.DirFS("../../packs/ios-xe/playbooks"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range Derived(pbs) {
+		if strings.HasPrefix(s.ID, "lib-cfg-") {
+			t.Fatalf("Derived trajo un script de configuración: %s", s.ID)
+		}
+	}
+	otro := []playbook.Playbook{{ID: "ios-xe/acme-a", Platform: "ios-xe", Name: "Acme · A", Commands: []playbook.Command{{Text: "show clock"}}}}
+	lib, _, err := LibraryWith(playbooks.FS, []Contenido{{Playbooks: pbs}, {Playbooks: otro}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := map[string]int{}
+	for _, s := range lib {
+		n[s.ID]++
+	}
+	if n["lib-cfg-ntp"] != 1 || n["lib-acme-a"] != 1 || n["lib-l2-stp"] != 1 {
+		t.Fatalf("duplicados: cfg-ntp=%d acme-a=%d l2-stp=%d", n["lib-cfg-ntp"], n["lib-acme-a"], n["lib-l2-stp"])
 	}
 }

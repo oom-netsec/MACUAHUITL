@@ -82,6 +82,11 @@ func newEnv(t *testing.T, c simulator.Config) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pack, err := playbook.Load(os.DirFS("../../packs/ios-xe/playbooks")) // los movidos al paquete oficial oom/ios-xe
+	if err != nil {
+		t.Fatal(err)
+	}
+	pbs = append(pbs, pack...)
 	return &env{
 		d: Deps{Guard: transport.NewGuard(nil, nil), Hosts: hosts, Vault: v, Audit: audit.New(db, time.Now), Now: time.Now, Playbooks: pbs},
 		spec: Spec{
@@ -127,13 +132,13 @@ func TestValidateRejects(t *testing.T) {
 		"schedule ambos":         func(s *Spec) { s.Schedule = Schedule{IntervalSeconds: 60, Cron: "* * * * *"} },
 		"schedule until":         func(s *Spec) { s.Schedule.Until = time.Now().Add(-time.Hour) },
 	}
-	if err := Validate(e.spec, e.d.Playbooks, e.d.Vault); err != nil {
+	if err := ValidateWith(e.spec, e.d.Playbooks, e.d.Vault, nil); err != nil {
 		t.Fatalf("valid spec rejected: %v", err)
 	}
 	for name, mut := range cases {
 		s := e.spec
 		mut(&s)
-		err := Validate(s, e.d.Playbooks, e.d.Vault)
+		err := ValidateWith(s, e.d.Playbooks, e.d.Vault, nil)
 		var fe *FieldError
 		if !errors.As(err, &fe) || !strings.HasPrefix(name, fe.Field) {
 			t.Errorf("%s: err = %v", name, err)

@@ -2,10 +2,13 @@ package playbooks_test
 
 import (
 	"io/fs"
+	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
@@ -21,8 +24,31 @@ var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp comm|archive log
 // Salidas sin acotar: tabla completa de rutas/BGP/CEF/MAC o todas las interfaces.
 var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces)$`)
 
+// catalogFS junta el contenido embebido con el de packs/ios-xe (en cisco/ios-xe), para que estas pruebas sigan
+// cubriendo los playbooks que salieron del binario al paquete oficial.
+func catalogFS(t testing.TB) fs.FS {
+	t.Helper()
+	m := fstest.MapFS{}
+	add := func(root fs.FS, prefix string) {
+		err := fs.WalkDir(root, ".", func(name string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			b, err := fs.ReadFile(root, name)
+			m[path.Join(prefix, name)] = &fstest.MapFile{Data: b}
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	add(playbooks.FS, "")
+	add(os.DirFS("../packs/ios-xe/playbooks"), "cisco/ios-xe")
+	return m
+}
+
 func TestCatalogo(t *testing.T) {
-	pbs, err := playbook.Load(playbooks.FS) // todo playbook carga; Load ya aplica CheckDenied
+	pbs, err := playbook.Load(catalogFS(t)) // todo playbook carga; Load ya aplica CheckDenied
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,13 +72,13 @@ func TestCatalogo(t *testing.T) {
 	}
 
 	nuevos := 0
-	err = fs.WalkDir(playbooks.FS, ".", func(name string, d fs.DirEntry, err error) error {
+	err = fs.WalkDir(catalogFS(t), ".", func(name string, d fs.DirEntry, err error) error {
 		base := strings.TrimSuffix(path.Base(name), ".yaml")
 		if err != nil || d.IsDir() || path.Ext(name) != ".yaml" || !catalogFile.MatchString(base) || base == "tac-baseline" {
 			return err
 		}
 		nuevos++
-		raw, err := fs.ReadFile(playbooks.FS, name)
+		raw, err := fs.ReadFile(catalogFS(t), name)
 		if err != nil {
 			return err
 		}
@@ -90,7 +116,7 @@ func TestCatalogo(t *testing.T) {
 
 // dir bootflash: no existe en IOS clásico: los cuatro playbooks que lo piden lo marcan solo para ios-xe, y nada más lleva platforms.
 func TestSoloBootflashLlevaPlatforms(t *testing.T) {
-	pbs, err := playbook.Load(playbooks.FS)
+	pbs, err := playbook.Load(catalogFS(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +144,7 @@ func TestSoloBootflashLlevaPlatforms(t *testing.T) {
 // Todo playbook incrustado lleva su nombre en inglés, con la misma separación « · » que el español, para que la UI
 // agrupe igual en los dos idiomas (cobertura, como la del catálogo de mensajes).
 func TestNombresEnIngles(t *testing.T) {
-	pbs, err := playbook.Load(playbooks.FS)
+	pbs, err := playbook.Load(catalogFS(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +169,7 @@ func TestNombresEnIngles(t *testing.T) {
 // Cada grupo en español (lo que va antes de « · ») corresponde a un único grupo en inglés y al revés: el selector
 // agrupa igual en los dos idiomas.
 func TestGruposUnoAUno(t *testing.T) {
-	pbs, err := playbook.Load(playbooks.FS)
+	pbs, err := playbook.Load(catalogFS(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,5 +184,32 @@ func TestGruposUnoAUno(t *testing.T) {
 			t.Errorf("el grupo %q viene de dos grupos en español: %q y %q (%s)", en, prev, es, p.ID)
 		}
 		esEn[es], enEs[en] = en, es
+	}
+}
+
+// MovedToIOSXE es exactamente lo que hay en packs/ios-xe/playbooks, y el paquete no repite nada de la base.
+func TestMovedToIOSXECoincideConElPaquete(t *testing.T) {
+	ents, err := os.ReadDir("../packs/ios-xe/playbooks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for _, e := range ents {
+		want = append(want, "ios-xe/"+strings.TrimSuffix(e.Name(), ".yaml"))
+	}
+	got := append([]string{}, playbooks.MovedToIOSXE...)
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Fatalf("MovedToIOSXE = %v\npackage    = %v", got, want)
+	}
+	base, err := playbook.Load(playbooks.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range base {
+		if slices.Contains(got, p.ID) {
+			t.Errorf("%s está en la base y en el paquete", p.ID)
+		}
 	}
 }

@@ -1,0 +1,170 @@
+// Package pack es el servicio gRPC de los paquetes de contenido (.mpack, fase 32, ADR 0010): instala desde una ruta
+// local, lista, muestra y quita. Nunca descarga nada; la validación y el almacén viven en internal/pack.
+package pack
+
+import (
+	"context"
+	"fmt"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	dom "github.com/oom-netsec/MACUAHUITL/internal/pack"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
+)
+
+// Module registra el servicio. Store es el almacén del núcleo; UserIDs da los IDs de playbook de
+// <config>/playbooks (para marcar los tapados); puede ser nil.
+type Module struct {
+	Store   *dom.Store
+	UserIDs func() map[string]bool
+}
+
+func (m Module) Register(s ipc.Registrar, d service.Deps) {
+	v1.RegisterPackServiceServer(s, &svc{d: d, store: m.Store, userIDs: m.UserIDs})
+}
+
+type svc struct {
+	v1.UnimplementedPackServiceServer
+	d       service.Deps
+	store   *dom.Store
+	userIDs func() map[string]bool
+}
+
+// fail traduce un error del paquete a gRPC: el código del catálogo viaja como reason.
+func fail(ctx context.Context, err error) error {
+	c := codes.InvalidArgument
+	switch dom.Reason(err) {
+	case "unsigned", "collision", "version", "official_replace":
+		c = codes.FailedPrecondition
+	case "not_found":
+		c = codes.NotFound
+	}
+	return service.ErrFrom(ctx, c, err)
+}
+
+func (s *svc) info(p *dom.Pack) *v1.PackInfo {
+	i := &v1.PackInfo{Id: p.ID, Version: p.Version, MinCore: p.MinCore, Name: p.Name, NameEn: p.NameEn, Description: p.Description,
+		DescriptionEn: p.DescriptionEn, Platforms: p.Platforms, Author: p.Author, License: p.License, Official: p.Official,
+		PlaybookCount: int32(len(p.Playbooks)), ScriptCount: int32(len(p.ScriptIDs()))}
+	if s.userIDs != nil {
+		u := s.userIDs()
+		for _, pb := range p.Playbooks {
+			if u[pb.ID] {
+				i.Shadowed = append(i.Shadowed, pb.ID)
+			}
+		}
+	}
+	return i
+}
+
+func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1.PackServiceInstallResponse, error) {
+	s.d.MarkActive()
+	if r.GetPath() == "" {
+		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.path", nil)
+	}
+	path, err := service.AbsPath(r.GetPath())
+	if err != nil {
+		return nil, err
+	}
+	// Auditoría en inglés: id, versión, sha256 del archivo, origen y, si se rechaza, el motivo.
+	reject := func(err error, p *dom.Pack, sum string) error {
+		id, version, origin := "unknown", "unknown", "unknown"
+		if p != nil {
+			id, version, origin = p.ID, p.Version, p.Origin()
+		}
+		s.d.Audit("pack.rejected", id, fmt.Sprintf("id=%s version=%s sha256=%s origin=%s reason=%s path=%q", id, version, sum, origin, dom.Reason(err), path))
+		return fail(ctx, err)
+	}
+	data, err := dom.ReadArchive(path)
+	if err != nil {
+		return nil, reject(err, nil, "none")
+	}
+	sum := dom.SHA256(data)
+	res, err := s.store.Install(data, r.GetAllowUnsigned())
+	if err != nil {
+		var p *dom.Pack
+		if res != nil {
+			p = res.Pack
+		}
+		return nil, reject(err, p, sum)
+	}
+	p := res.Pack
+	detail := fmt.Sprintf("id=%s version=%s sha256=%s origin=%s playbooks=%d scripts=%d", p.ID, p.Version, sum, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()))
+	if res.Replaced != "" {
+		detail += " replaced=" + res.Replaced
+	}
+	if p.DevCore {
+		detail += " min_core_unchecked=true"
+	}
+	s.d.Audit("pack.install", p.ID, detail)
+	return &v1.PackServiceInstallResponse{Pack: s.info(p), ReplacedVersion: res.Replaced}, nil
+}
+
+func (s *svc) List(ctx context.Context, _ *v1.PackServiceListRequest) (*v1.PackServiceListResponse, error) {
+	out := &v1.PackServiceListResponse{}
+	for _, p := range s.store.Snapshot().Packs {
+		out.Packs = append(out.Packs, s.info(p))
+	}
+	return out, nil
+}
+
+func (s *svc) Show(ctx context.Context, r *v1.PackServiceShowRequest) (*v1.PackServiceShowResponse, error) {
+	p := s.store.Snapshot().Find(r.GetId())
+	if p == nil {
+		return nil, fail(ctx, dom.NotFound(r.GetId()))
+	}
+	out := &v1.PackServiceShowResponse{Pack: s.info(p), Readme: p.Readme, ScriptIds: p.ScriptIDs()}
+	for _, pb := range p.Playbooks {
+		out.PlaybookIds = append(out.PlaybookIds, pb.ID)
+	}
+	return out, nil
+}
+
+func (s *svc) Remove(ctx context.Context, r *v1.PackServiceRemoveRequest) (*v1.PackServiceRemoveResponse, error) {
+	s.d.MarkActive()
+	// Buscar y quitar es una sola operación bajo el lock del almacén: lo que se limpia después es lo que de verdad se quitó.
+	p, err := s.store.Remove(r.GetId())
+	if err != nil {
+		return nil, fail(ctx, err)
+	}
+	favs, err := s.cleanup(p)
+	s.d.Audit("pack.remove", p.ID, fmt.Sprintf("id=%s version=%s origin=%s playbooks=%d scripts=%d favorites_removed=%d",
+		p.ID, p.Version, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()), favs))
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &v1.PackServiceRemoveResponse{FavoritesRemoved: int32(favs)}, nil
+}
+
+// cleanup borra de colecciones y fijados los scripts del paquete quitado y anota sus IDs de playbook para pack.missing.
+func (s *svc) cleanup(p *dom.Pack) (int, error) {
+	tx, err := s.d.DB().Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	favs := 0
+	for _, id := range p.ScriptIDs() {
+		n := int64(0)
+		for _, q := range []string{`DELETE FROM script_collection_items WHERE script_id = ?`, `DELETE FROM script_pins WHERE script_id = ?`} {
+			res, err := tx.Exec(q, id)
+			if err != nil {
+				return 0, err
+			}
+			k, _ := res.RowsAffected()
+			n += k
+		}
+		if n > 0 {
+			favs++
+		}
+	}
+	for _, pb := range p.Playbooks {
+		if _, err := tx.Exec(`INSERT OR REPLACE INTO pack_removed(playbook_id, pack) VALUES(?, ?)`, pb.ID, p.ID); err != nil {
+			return 0, err
+		}
+	}
+	return favs, tx.Commit()
+}

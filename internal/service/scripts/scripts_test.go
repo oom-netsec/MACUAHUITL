@@ -17,6 +17,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/pack"
+	"github.com/oom-netsec/MACUAHUITL/internal/pack/packtest"
 	dom "github.com/oom-netsec/MACUAHUITL/internal/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
@@ -29,7 +31,21 @@ var bg = context.Background()
 func nuevoSvc(t *testing.T) (*svc, *servicetest.Deps) {
 	t.Helper()
 	d := servicetest.New(t)
-	return &svc{d: d}, d
+	return &svc{d: d, packs: iosxe(t)}, d
+}
+
+// iosxe es un almacén de paquetes con oom/ios-xe instalado (firmado con la llave de pruebas): los playbooks que
+// salieron del binario, y con ellos sus scripts lib-<id>, viven ahí.
+func iosxe(t *testing.T) *pack.Store {
+	t.Helper()
+	st, _, err := pack.Open(t.TempDir(), "dev", packtest.Keys(), pack.Base{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Install(packtest.IOSXE(t), false); err != nil {
+		t.Fatal(err)
+	}
+	return st
 }
 
 func codigo(t *testing.T, err error, want codes.Code) {
@@ -251,7 +267,7 @@ func TestPersistenciaTrasReabrirElStore(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return &svc{d: dbDeps{d, db}}, db
+		return &svc{d: dbDeps{d, db}, packs: iosxe(t)}, db
 	}
 	s, db := abrir()
 	a := guardar(t, s, "Persistente", "show clock")

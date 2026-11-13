@@ -46,27 +46,22 @@ type Texto struct{ Name, Description string }
 
 // LibraryWithEN es Library junto con el texto en inglés de cada script de fábrica, por ID. Los playbooks sin
 // name_en no traen nombre en inglés: ese script queda con el español (In).
-func LibraryWithEN(pb fs.FS) ([]Script, map[string]Texto, error) {
+func LibraryWithEN(pb fs.FS) ([]Script, map[string]Texto, error) { return LibraryWith(pb, nil) }
+
+// Contenido es lo que un paquete instalado suma a la biblioteca: un script derivado por playbook y los de scripts.json.
+type Contenido struct {
+	Playbooks []playbook.Playbook
+	Scripts   []Script
+}
+
+// LibraryWith es LibraryWithEN más el contenido de los paquetes instalados, en el orden dado. Un ID o nombre que
+// choque da error, igual que dentro de la biblioteca base (el instalador ya lo rechaza al instalar).
+func LibraryWith(pb fs.FS, packs []Contenido) ([]Script, map[string]Texto, error) {
 	pbs, err := playbook.Load(pb)
 	if err != nil {
 		return nil, nil, err
 	}
-	en := map[string]Texto{}
-	var out []Script
-	for _, p := range pbs {
-		id := p.ID[strings.Index(p.ID, "/")+1:]
-		if p.Platform != "ios-xe" { // los IDs de ios-xe no cambian; el resto lleva su plataforma para no chocar
-			id = p.Platform + "-" + id
-		}
-		cmds := append([]string{}, p.Pre...)
-		for _, c := range p.Commands {
-			cmds = append(cmds, c.Text)
-		}
-		out = append(out, Script{ID: "lib-" + id, Name: p.Name, Tech: techDe(id), Platform: p.Platform,
-			Description: "Diagnóstico de solo lectura del playbook " + p.ID + ".",
-			Commands:    cmds, Tags: []string{}, Origin: OrigenBiblioteca, CreatedAt: fechaBiblioteca, UpdatedAt: fechaBiblioteca})
-		en["lib-"+id] = Texto{p.NameEn, "Read-only diagnostic of playbook " + p.ID + "."}
-	}
+	out, en := Derived(pbs), DerivedTexts(pbs)
 	b, err := bibliotecaFS.ReadFile("biblioteca/configuracion.yaml")
 	if err != nil {
 		return nil, nil, err
@@ -86,6 +81,12 @@ func LibraryWithEN(pb fs.FS) ([]Script, map[string]Texto, error) {
 			Commands: c.Commands, Tags: nonNil(c.Tags), Origin: OrigenBiblioteca, CreatedAt: fechaBiblioteca, UpdatedAt: fechaBiblioteca})
 		en["lib-"+id] = Texto{c.NameEN, c.DescriptionEN}
 	}
+	for _, c := range packs {
+		out = append(append(out, Derived(c.Playbooks)...), c.Scripts...)
+		for k, v := range DerivedTexts(c.Playbooks) {
+			en[k] = v
+		}
+	}
 	ids, nombres := map[string]bool{}, map[string]bool{}
 	for _, s := range out {
 		if err := s.Validate(); err != nil {
@@ -97,6 +98,41 @@ func LibraryWithEN(pb fs.FS) ([]Script, map[string]Texto, error) {
 		ids[s.ID], nombres[NameKey(s.Name)] = true, true
 	}
 	return out, en, nil
+}
+
+// Derived arma el script de diagnóstico «lib-<id>» de cada playbook (los comandos son los del playbook), y solo esos:
+// nunca los de configuración. Lo usan la biblioteca y los paquetes de contenido: un playbook movido a un paquete
+// conserva su ID.
+func Derived(pbs []playbook.Playbook) []Script {
+	var out []Script
+	for _, p := range pbs {
+		id := derivedID(p)
+		cmds := append([]string{}, p.Pre...)
+		for _, c := range p.Commands {
+			cmds = append(cmds, c.Text)
+		}
+		out = append(out, Script{ID: "lib-" + id, Name: p.Name, Tech: techDe(id), Platform: p.Platform,
+			Description: "Diagnóstico de solo lectura del playbook " + p.ID + ".",
+			Commands:    cmds, Tags: []string{}, Origin: OrigenBiblioteca, CreatedAt: fechaBiblioteca, UpdatedAt: fechaBiblioteca})
+	}
+	return out
+}
+
+// DerivedTexts es el texto en inglés de los scripts de Derived, por ID.
+func DerivedTexts(pbs []playbook.Playbook) map[string]Texto {
+	en := map[string]Texto{}
+	for _, p := range pbs {
+		en["lib-"+derivedID(p)] = Texto{p.NameEn, "Read-only diagnostic of playbook " + p.ID + "."}
+	}
+	return en
+}
+
+func derivedID(p playbook.Playbook) string {
+	id := p.ID[strings.Index(p.ID, "/")+1:]
+	if p.Platform != "ios-xe" { // los IDs de ios-xe no cambian; el resto lleva su plataforma para no chocar
+		id = p.Platform + "-" + id
+	}
+	return id
 }
 
 // In da el script de fábrica en el idioma loc: con en, su nombre y descripción en inglés (los que falten quedan en

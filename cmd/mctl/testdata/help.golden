@@ -177,4 +177,8 @@ uso: mctl <comando>
   prefs show [--json]  |  prefs set [--outputs DIR] [--rotate-mb N] [--rotate-min N] [--max-files N] [--format F]
         (set cambia solo lo que se pide; 0 o "" devuelve ese valor al de fábrica. La carpeta debe ser absoluta, existir, ser tuya, escribible y de modo 0700;
          aplica a lo que empiece después y los datos de la anterior no se mueven. rotate-mb 1-1024, rotate-min 1-10080, max-files 1-1000, format texto|crudo|jsonl)
+  pack install <archivo.mpack> [--allow-unsigned]  |  pack list  |  pack show <id>  |  pack remove <id>
+        (paquetes de contenido: playbooks y scripts por tecnología; se bajan a mano de los releases y nada se descarga solo.
+         Un paquete sin firma oficial es de terceros y solo se instala con --allow-unsigned; trae únicamente comandos de lectura.
+         remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README)
   --version

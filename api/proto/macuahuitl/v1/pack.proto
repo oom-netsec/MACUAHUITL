@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Paquetes de contenido (.mpack, fase 32, ADR 0010). Se instalan a mano desde un archivo local; el núcleo nunca
+// descarga nada. Un paquete solo trae contenido de lectura. Los errores llevan reason pack.err.* (ver
+// docs/plans/contratos-front.md); texto, README y nombres son texto plano.
+service PackService {
+  // Valida e instala el .mpack de path (lectura única, tope de 20 MB). Un paquete sin firma oficial exige allow_unsigned.
+  rpc Install(PackServiceInstallRequest) returns (PackServiceInstallResponse);
+  // Paquetes instalados, ordenados por id.
+  rpc List(PackServiceListRequest) returns (PackServiceListResponse);
+  // Manifiesto, README y contenido de un paquete instalado.
+  rpc Show(PackServiceShowRequest) returns (PackServiceShowResponse);
+  // Quita el paquete id y los favoritos de sus scripts.
+  rpc Remove(PackServiceRemoveRequest) returns (PackServiceRemoveResponse);
+}
+
+message PackServiceInstallRequest {
+  string path = 1;            // ruta absoluta del .mpack
+  bool allow_unsigned = 2;    // confirmación explícita para un paquete de terceros
+}
+
+message PackServiceInstallResponse {
+  PackInfo pack = 1;
+  string replaced_version = 2;   // versión anterior que reemplazó; vacío si era nuevo
+}
+
+message PackServiceListRequest {}
+
+message PackServiceListResponse {
+  repeated PackInfo packs = 1;
+}
+
+message PackInfo {
+  string id = 1;                   // <editor>/<nombre>
+  string version = 2;
+  string min_core = 3;
+  string name = 4;                 // texto plano
+  string name_en = 5;
+  string description = 6;          // texto plano
+  string description_en = 7;
+  repeated string platforms = 8;
+  string author = 9;
+  string license = 10;
+  bool official = 11;              // firma oficial válida (derivada al arrancar, nunca guardada)
+  int32 playbook_count = 12;
+  int32 script_count = 13;         // los derivados de playbooks más los de scripts.json
+  repeated string shadowed = 14;   // IDs de playbook que un playbook de <config>/playbooks tapa
+}
+
+message PackServiceShowRequest {
+  string id = 1;
+}
+
+message PackServiceShowResponse {
+  PackInfo pack = 1;
+  string readme = 2;               // texto plano o Markdown sin HTML: el front no lo interpreta como HTML
+  repeated string playbook_ids = 3;
+  repeated string script_ids = 4;
+}
+
+message PackServiceRemoveRequest {
+  string id = 1;
+}
+
+message PackServiceRemoveResponse {
+  int32 favorites_removed = 1;     // scripts del paquete que estaban en colecciones o fijados
+}

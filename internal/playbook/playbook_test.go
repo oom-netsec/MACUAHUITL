@@ -2,6 +2,7 @@ package playbook
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -15,6 +16,12 @@ func TestLoadEmbedded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Los de ios-xe que salieron del binario viven en el paquete oficial packs/ios-xe: se siguen verificando aquí.
+	pack, err := Load(os.DirFS("../../packs/ios-xe/playbooks"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pbs = append(pbs, pack...)
 	ids := map[string]Playbook{}
 	for _, p := range pbs {
 		ids[p.ID] = p

@@ -19,6 +19,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/pack"
 	dom "github.com/oom-netsec/MACUAHUITL/internal/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/playbooks"
@@ -44,18 +45,21 @@ type svc struct {
 	v1.UnimplementedScriptsServiceServer
 	d      service.Deps
 	now    func() time.Time // nil = d.Now; las pruebas lo fijan para vencer tokens
-	libMu  sync.Once
+	packs  *pack.Store      // paquetes instalados; nil = solo la biblioteca base
+	libMu  sync.Mutex
+	libFor *pack.Snapshot // foto de paquetes con la que se armó lib; una foto nueva (instalar o quitar) invalida la caché
 	lib    []dom.Script
 	libEN  map[string]dom.Texto
 	libErr error
 	pend   service.Pending[pending]
 }
 
-// Module registra el servicio de scripts.
-type Module struct{}
+// Module registra el servicio de scripts. Packs es el almacén de paquetes de contenido, de donde salen los scripts
+// de la biblioteca que no vienen en el binario; puede ser nil.
+type Module struct{ Packs *pack.Store }
 
-func (Module) Register(s ipc.Registrar, d service.Deps) {
-	v1.RegisterScriptsServiceServer(s, &svc{d: d})
+func (m Module) Register(s ipc.Registrar, d service.Deps) {
+	v1.RegisterScriptsServiceServer(s, &svc{d: d, packs: m.Packs})
 }
 
 func (s *svc) clock() time.Time {
@@ -66,11 +70,39 @@ func (s *svc) clock() time.Time {
 }
 
 func (s *svc) library() ([]dom.Script, error) {
-	s.libMu.Do(func() { s.lib, s.libEN, s.libErr = dom.LibraryWithEN(playbooks.FS) })
-	if s.libErr != nil {
-		return nil, status.Error(codes.Internal, s.libErr.Error())
+	lib, _, err := s.libraryEN()
+	return lib, err
+}
+
+// BaseLibrary son los IDs y nombres de los scripts de la biblioteca base (la del binario, sin paquetes): con ellos el
+// almacén de paquetes detecta choques. Lo pide el núcleo, que no importa el dominio de scripts (ADR 0008).
+func BaseLibrary() (ids, names []string, err error) {
+	lib, _, err := dom.LibraryWithEN(playbooks.FS)
+	for _, x := range lib {
+		ids, names = append(ids, x.ID), append(names, x.Name)
 	}
-	return s.lib, nil
+	return ids, names, err
+}
+
+// libraryEN arma la biblioteca (base más paquetes instalados) y su texto en inglés; se vuelve a armar cuando cambia
+// la foto de paquetes.
+func (s *svc) libraryEN() ([]dom.Script, map[string]dom.Texto, error) {
+	var snap *pack.Snapshot
+	var extra []dom.Contenido
+	if s.packs != nil {
+		snap = s.packs.Snapshot()
+		extra = snap.Contenido()
+	}
+	s.libMu.Lock()
+	defer s.libMu.Unlock()
+	if s.lib == nil && s.libErr == nil || s.libFor != snap {
+		s.lib, s.libEN, s.libErr = dom.LibraryWith(playbooks.FS, extra)
+		s.libFor = snap
+	}
+	if s.libErr != nil {
+		return nil, nil, status.Error(codes.Internal, s.libErr.Error())
+	}
+	return s.lib, s.libEN, nil
 }
 
 // in da el script en el idioma de la llamada: los de fábrica con su nombre y descripción en inglés; los del usuario, tal cual.
@@ -90,7 +122,8 @@ func (s *svc) in(ctx context.Context, x dom.Script) dom.Script {
 			break
 		}
 	}
-	return s.libEN[x.ID].In(i18n.Locale(ctx), x)
+	_, en, _ := s.libraryEN()
+	return en[x.ID].In(i18n.Locale(ctx), x)
 }
 
 func internal(err error) error { return status.Error(codes.Internal, err.Error()) }
@@ -150,7 +183,7 @@ func (s *svc) tx(f func(tx *sql.Tx) error) error {
 // nameTaken dice si name ya lo tiene un script de all (salvo exceptID) o uno de la biblioteca: los nombres de
 // la biblioteca están ocupados para que un export de ambos siempre se pueda reimportar.
 func (s *svc) nameTaken(ctx context.Context, all []dom.Script, name, exceptID string) (bool, error) {
-	lib, err := s.library()
+	lib, libEN, err := s.libraryEN()
 	if err != nil {
 		return false, err
 	}
@@ -159,7 +192,7 @@ func (s *svc) nameTaken(ctx context.Context, all []dom.Script, name, exceptID st
 			return true, nil
 		}
 	}
-	for id, en := range s.libEN { // el nombre en inglés de uno de fábrica también está ocupado
+	for id, en := range libEN { // el nombre en inglés de uno de fábrica también está ocupado
 		if en.Name != "" && dom.NameKey(en.Name) == dom.NameKey(name) && id != exceptID {
 			return true, nil
 		}

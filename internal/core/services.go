@@ -199,7 +199,7 @@ func (s *patrolSvc) validate(ctx context.Context, p *v1.JobSpec) (patrol.Spec, e
 	} else {
 		spec.OutputDir = dir
 	}
-	if err := patrol.Validate(spec, s.c.pbs, v); err != nil {
+	if err := patrol.ValidateWith(spec, s.c.catalog(), v, s.c.missingPack); err != nil {
 		var fe *patrol.FieldError
 		if errors.As(err, &fe) {
 			return spec, service.ErrFrom(ctx, codes.InvalidArgument, err)
@@ -215,7 +215,7 @@ func (s *patrolSvc) CreateJob(ctx context.Context, r *v1.CreateJobRequest) (*v1.
 	if err != nil {
 		return nil, err
 	}
-	j := &job{id: service.NewID(), spec: spec, state: "created", results: map[int][]patrol.DeviceResult{}}
+	j := &job{id: service.NewID(), spec: spec, state: "created", pbs: s.c.catalog(), results: map[int][]patrol.DeviceResult{}}
 	s.c.mu.Lock()
 	s.c.jobs[j.id] = j
 	s.c.mu.Unlock()
@@ -527,11 +527,11 @@ func (s *patrolSvc) ListJobs(ctx context.Context, _ *v1.ListJobsRequest) (*v1.Li
 	return r, nil
 }
 
-// ListPlaybooks devuelve los playbooks ya cargados (embebidos y de config/playbooks), ordenados por id;
+// ListPlaybooks devuelve los playbooks ya cargados (embebidos, de paquetes y de config/playbooks), ordenados por id;
 // el id es el mismo que CreateJob acepta en playbook_ids.
 func (s *patrolSvc) ListPlaybooks(ctx context.Context, r *v1.ListPlaybooksRequest) (*v1.ListPlaybooksResponse, error) {
 	out := &v1.ListPlaybooksResponse{}
-	for _, p := range s.c.pbs {
+	for _, p := range s.c.catalog() {
 		if r.GetPlatform() != "" && !playbook.Compatible(r.GetPlatform(), p.Platform) { // ios lista los de ios-xe
 			continue
 		}

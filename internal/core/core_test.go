@@ -18,6 +18,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/pack/packtest"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
@@ -77,7 +78,7 @@ func newHarness(t *testing.T, mut func(*Options)) *harness {
 	t.Cleanup(func() { os.RemoveAll(sock) })
 	p := Paths{Config: filepath.Join(root, "c"), Data: filepath.Join(root, "d"), State: filepath.Join(root, "s"), Runtime: sock, Outputs: filepath.Join(root, "o")}
 	inh := &fakeInhibitor{}
-	o := Options{Inhibitor: inh, VaultParams: &vault.Params{MemoryKiB: 8192, Iterations: 1, Threads: 1}, Actor: "tester", RetryBackoff: []time.Duration{}}
+	o := Options{Inhibitor: inh, VaultParams: &vault.Params{MemoryKiB: 8192, Iterations: 1, Threads: 1}, Actor: "tester", RetryBackoff: []time.Duration{}, PackKeys: packtest.Keys()}
 	if mut != nil {
 		mut(&o)
 	}

@@ -28,6 +28,7 @@ import { fakeMetrics } from "../modules/metrics/fake";
 import { fakeInventory } from "../modules/inventory/fake";
 import { fakeScripts } from "../modules/scripts/fake";
 import { fakeSettings } from "../modules/settings/fake";
+import { fakePacks } from "../modules/packs/fake";
 import type { CoreAPI, CoreStatus } from "./core";
 
 export function fakeCore(over: Partial<CoreAPI> = {}) {
@@ -77,6 +78,7 @@ export function fakeCore(over: Partial<CoreAPI> = {}) {
     ...fakeInventory(),
     ...fakeScripts(),
     ...fakeSettings(),
+    ...fakePacks(),
     ...over,
     emitStatus: (s: CoreStatus) => status.forEach((cb) => cb(s)),
   };
