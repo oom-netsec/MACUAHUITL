@@ -3,6 +3,7 @@ package patrol
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
