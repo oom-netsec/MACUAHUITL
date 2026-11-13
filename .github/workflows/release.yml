@@ -23,13 +23,15 @@ jobs:
       - name: paquetes de contenido, reglas del repo (sin el secret)
         run: |
           go test ./internal/pack/ -run 'TestPacksDelRepoSonValidos|TestSegmentosOficialesEstanReservados|TestBuildEsDeterminista'
-          prev=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
           [ -z "$prev" ] && exit 0
           for d in packs/*/; do
             git diff --quiet "$prev" -- "$d" && continue
-            old=$(git show "$prev:${d}manifest.yaml" 2>/dev/null | grep '^version:' || true)
-            new=$(grep '^version:' "${d}manifest.yaml")
-            [ "$old" != "$new" ] || { echo "::error::${d} cambió desde $prev sin subir version ($new)"; exit 1; }
+            old=$(git show "$prev:${d}manifest.yaml" 2>/dev/null | sed -n 's/^version: *//p' || true)
+            new=$(sed -n 's/^version: *//p' "${d}manifest.yaml")
+            # mayor, no solo distinta: el núcleo rechaza instalar una versión igual o más vieja
+            [ -z "$old" ] || { [ "$old" != "$new" ] && [ "$(printf '%s\n%s\n' "$old" "$new" | sort -V | tail -1)" = "$new" ]; } ||
+              { echo "::error::${d} cambió desde $prev sin subir version ($old -> $new)"; exit 1; }
           done
       # Antes de Node y npm ci: el secret solo vive en el entorno de este paso y ningún script de npm lo ve.
       - name: paquetes de contenido firmados (.mpack)
@@ -68,7 +70,7 @@ jobs:
           upload-artifact: false
       - name: sumas
         run: |
-          (cd dist && sha256sum -c --quiet "$RUNNER_TEMP/mpack.sha256") # nada tocó los .mpack desde que se firmaron
+          (cd dist && sha256sum -c --quiet "$RUNNER_TEMP/mpack.sha256") # contra accidentes; contra alteraciones protege la firma
           cd dist && sha256sum * > SHA256SUMS
           { echo "go: $(go version)"; echo "tag: ${GITHUB_REF_NAME}"; echo "commit: ${GITHUB_SHA}"; echo "reproducible: macuahuitld, mctl (CGO_ENABLED=0 -trimpath -ldflags '-s -w -buildid=')"; echo "no reproducible byte a byte: macuahuitl (UI con cgo/WebKitGTK)"; } > BUILD-INFO.txt
       - uses: softprops/action-gh-release@v3.0.3
