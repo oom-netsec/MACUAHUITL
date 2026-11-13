@@ -1,13 +1,14 @@
 package sys
 
 import (
-	"errors"
 	"os"
 	"syscall"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // ErrNotRegular: la ruta existe pero no es un archivo regular (FIFO, dispositivo, directorio).
-var ErrNotRegular = errors.New("la ruta no es un archivo regular")
+var ErrNotRegular = i18n.New("sys.err.not_regular", nil)
 
 // OpenRegular abre path solo para lectura sin quedarse bloqueado en una FIFO sin escritor
 // (O_NONBLOCK) y rechaza lo que no sea un archivo regular. Úsalo con toda ruta que venga de fuera.

@@ -10,25 +10,26 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // Un respaldo es un archivo de bóveda nuevo (mismo formato) con su propio VaultID, su propia sal y una DEK nueva sellada con la frase del respaldo:
 // no comparte llaves con la bóveda viva, así que una frase débil en el respaldo no la compromete. No hay criptografía aparte de la de este paquete.
 var (
-	ErrNotBackup    = errors.New("vault: no es un respaldo de bóveda de MACUAHUITL")
-	ErrShortPhrase  = errors.New("vault: la frase del respaldo debe tener al menos 12 caracteres")
-	ErrSamePhrase   = errors.New("vault: la frase del respaldo debe ser distinta de la contraseña maestra")
-	ErrBackupExists = errors.New("vault: el archivo de respaldo ya existe")
-	ErrNotRegular   = errors.New("vault: la ruta existe y no es un archivo regular")
+	ErrNotBackup    = i18n.New("vault.err.not_backup", nil)
+	ErrShortPhrase  = i18n.New("vault.err.short_phrase", nil)
+	ErrSamePhrase   = i18n.New("vault.err.same_phrase", nil)
+	ErrBackupExists = i18n.New("vault.err.backup_exists", nil)
+	ErrNotRegular   = i18n.New("vault.err.not_regular", nil)
 )
 
-var ErrBackupParams = errors.New("vault: los parámetros de Argon2id de la bóveda pasan de lo que admite un respaldo")
+var ErrBackupParams = i18n.New("vault.err.backup_params", nil)
 
 // MaxBackupEntries acota las credenciales de un respaldo que se abre.
 const MaxBackupEntries = 10000
 
-var ErrTooManyEntries = errors.New("vault: el respaldo trae demasiadas credenciales")
+var ErrTooManyEntries = i18n.New("vault.err.too_many", nil)
 
 // deriveFn es variable para que las pruebas vean cuándo se deriva y desde qué lock.
 var deriveFn = deriveKEK

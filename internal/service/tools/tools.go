@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/dnsq"
@@ -32,12 +31,12 @@ var resolvConf = "/etc/resolv.conf" // las pruebas lo apuntan a un archivo propi
 func (s *toolsSvc) AnalyzePcap(ctx context.Context, r *v1.AnalyzePcapRequest) (*v1.AnalyzePcapResponse, error) {
 	s.d.MarkActive()
 	if !filepath.IsAbs(r.Path) {
-		return nil, status.Error(codes.InvalidArgument, "la ruta de la captura debe ser absoluta")
+		return nil, service.Err(ctx, codes.InvalidArgument, "tools.svc.pcap_path", nil)
 	}
 	s.d.Audit("tools.pcap", r.Path, "")
 	rep, err := pcapan.Analyze(ctx, r.Path, pcapan.Options{Top: int(r.Top), SlowDNS: service.MS(r.SlowDnsMs, 0)})
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	loc := i18n.Locale(ctx)
 	out := pcapResponse(loc, rep)
@@ -53,17 +52,17 @@ var deepModes = map[v1.DnsMode]bool{v1.DnsMode_DNS_MODE_TRACE: true, v1.DnsMode_
 func (s *toolsSvc) Dns(ctx context.Context, r *v1.DnsRequest) (*v1.DnsResponse, error) {
 	s.d.MarkActive()
 	if r.Mode == v1.DnsMode_DNS_MODE_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "modo DNS no indicado")
+		return nil, service.Err(ctx, codes.InvalidArgument, "tools.svc.dns_mode", nil)
 	}
 	if deepModes[r.Mode] && !r.Deep {
-		return nil, status.Error(codes.FailedPrecondition, "este modo contacta raíces y autoritativos: requiere activar el modo profundo")
+		return nil, service.Err(ctx, codes.FailedPrecondition, "tools.svc.dns_deep", nil)
 	}
 	if r.Mode != v1.DnsMode_DNS_MODE_EXPOSURE && strings.TrimSpace(r.Name) == "" {
-		return nil, status.Error(codes.InvalidArgument, "nombre no indicado")
+		return nil, service.Err(ctx, codes.InvalidArgument, "tools.svc.dns_name", nil)
 	}
 	qtype, err := dnsq.ParseType(r.Type)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	var servers []dnsq.Server
 	switch {
@@ -71,7 +70,7 @@ func (s *toolsSvc) Dns(ctx context.Context, r *v1.DnsRequest) (*v1.DnsResponse, 
 		for _, v := range r.Servers {
 			sv, err := dnsq.ParseServer(v)
 			if err != nil {
-				return nil, status.Error(codes.InvalidArgument, err.Error())
+				return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 			}
 			servers = append(servers, sv)
 		}
@@ -79,7 +78,7 @@ func (s *toolsSvc) Dns(ctx context.Context, r *v1.DnsRequest) (*v1.DnsResponse, 
 		servers = append(servers, dnsq.PublicResolvers...)
 	default:
 		if servers, err = dnsq.SystemResolvers(resolvConf); err != nil {
-			return nil, status.Error(codes.FailedPrecondition, err.Error())
+			return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 		}
 	}
 	id := service.RunID("dns")
@@ -90,7 +89,7 @@ func (s *toolsSvc) Dns(ctx context.Context, r *v1.DnsRequest) (*v1.DnsResponse, 
 	}
 	if !deepModes[r.Mode] {
 		if err := s.d.Guard().Allow(ctx, id, hosts); err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 	}
 	if r.Deep {
@@ -116,10 +115,10 @@ func (s *toolsSvc) Dns(ctx context.Context, r *v1.DnsRequest) (*v1.DnsResponse, 
 	case v1.DnsMode_DNS_MODE_DNSSEC:
 		out, err = dnsq.CheckDNSSEC(ctx, d, r.Name, dnsq.RootServers, dnsq.RootAnchors, o)
 	default:
-		return nil, status.Error(codes.InvalidArgument, "modo DNS desconocido")
+		return nil, service.Err(ctx, codes.InvalidArgument, "tools.svc.dns_unknown", nil)
 	}
 	if err != nil {
-		return nil, status.Error(codes.Unavailable, err.Error())
+		return nil, service.ErrFrom(ctx, codes.Unavailable, err)
 	}
 	loc := i18n.Locale(ctx)
 	resp := &v1.DnsResponse{}
@@ -144,23 +143,23 @@ func dns(t string) string {
 func (s *toolsSvc) InspectTls(ctx context.Context, r *v1.InspectTlsRequest) (*v1.InspectTlsResponse, error) {
 	s.d.MarkActive()
 	if strings.TrimSpace(r.Host) == "" || strings.HasPrefix(r.Host, "-") {
-		return nil, status.Error(codes.InvalidArgument, "host inválido")
+		return nil, service.Err(ctx, codes.InvalidArgument, "tools.svc.tls_host", nil)
 	}
 	port := uint16(443)
 	if r.Port > 0xffff {
-		return nil, status.Error(codes.InvalidArgument, "puerto inválido")
+		return nil, service.Err(ctx, codes.InvalidArgument, "tools.svc.tls_port", nil)
 	} else if r.Port != 0 {
 		port = uint16(r.Port)
 	}
 	id := service.RunID("tls")
 	defer s.d.Guard().Revoke(id)
 	if err := s.d.Guard().Allow(ctx, id, []string{r.Host}); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	s.d.Audit("tools.tls", fmt.Sprintf("%s:%d", r.Host, port), "sni="+r.Sni)
 	rep, err := tlsinspect.Inspect(ctx, tlsinspect.Dialer(s.d.Guard().DialerFor(id)), r.Host, port, r.Sni, tlsinspect.Options{Timeout: service.MS(r.TimeoutMs, 0)})
 	if err != nil {
-		return nil, status.Error(codes.Unavailable, err.Error())
+		return nil, service.ErrFrom(ctx, codes.Unavailable, err)
 	}
 	return tlsResponse(rep, i18n.Locale(ctx)), nil
 }

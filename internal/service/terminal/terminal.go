@@ -69,7 +69,7 @@ func connErr(ctx context.Context, err error) error {
 	case errors.Is(err, transport.ErrAuth), errors.Is(err, transport.ErrEgressDenied):
 		return service.ErrFrom(ctx, codes.PermissionDenied, err)
 	}
-	if s := service.VaultErr(err); status.Code(s) != codes.Internal {
+	if s := service.VaultErr(ctx, err); status.Code(s) != codes.Internal {
 		return s
 	}
 	return service.ErrFrom(ctx, codes.Unavailable, err)
@@ -206,7 +206,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	cred, err := v.Get(o.CredentialId)
 	if err != nil {
 		reason, reasonEN = err.Error(), i18n.English(err)
-		return service.VaultErr(err)
+		return service.VaultErr(ctx, err)
 	}
 	user := cred.Username
 	accepted := map[string]bool{}

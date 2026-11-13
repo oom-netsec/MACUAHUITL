@@ -192,7 +192,7 @@ func (s *assistSvc) busyLocked(keys []string) (string, bool) {
 }
 
 // connErr traduce los errores de conexión a códigos gRPC. La huella de una llave nueva va en el mensaje.
-func connErr(err error) error {
+func connErr(ctx context.Context, err error) error {
 	var he *transport.HostKeyError
 	switch {
 	case err == nil:
@@ -202,7 +202,7 @@ func connErr(err error) error {
 	case errors.Is(err, transport.ErrAuth), errors.Is(err, transport.ErrEgressDenied):
 		return status.Error(codes.PermissionDenied, err.Error())
 	}
-	if s := service.VaultErr(err); status.Code(s) != codes.Internal {
+	if s := service.VaultErr(ctx, err); status.Code(s) != codes.Internal {
 		return s
 	}
 	return status.Error(codes.Unavailable, err.Error())
@@ -285,7 +285,7 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 	defer ex.Close()
 	outs, err := ex.Read(ctx, label, pre)
 	if err != nil {
-		return "", assist.Plan{}, connErr(err)
+		return "", assist.Plan{}, connErr(ctx, err)
 	}
 	byCmd := map[string]string{}
 	for _, o := range outs {
@@ -298,7 +298,7 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 		if extra := more(byCmd); len(extra) > 0 {
 			outs, err = ex.Read(ctx, label, extra)
 			if err != nil {
-				return "", assist.Plan{}, connErr(err)
+				return "", assist.Plan{}, connErr(ctx, err)
 			}
 			for _, o := range outs {
 				byCmd[o.Command] = o.Text
@@ -458,12 +458,12 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 	if err := s.vault(ctx); err != nil {
 		return nil, err
 	}
-	connected, err := s.credUser(r.Target.CredentialId)
+	connected, err := s.credUser(ctx, r.Target.CredentialId)
 	if err != nil {
 		return nil, err
 	}
 	if r.UpdateCredentialId != "" {
-		u, err := s.credUser(r.UpdateCredentialId)
+		u, err := s.credUser(ctx, r.UpdateCredentialId)
 		if err != nil {
 			return nil, err
 		}
@@ -483,10 +483,10 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 }
 
 // credUser devuelve el usuario de una credencial de la bóveda, sin conservar sus secretos.
-func (s *assistSvc) credUser(id string) (string, error) {
+func (s *assistSvc) credUser(ctx context.Context, id string) (string, error) {
 	c, err := s.d.Vault().Get(id)
 	if err != nil {
-		return "", service.VaultErr(err)
+		return "", service.VaultErr(ctx, err)
 	}
 	defer c.Password.Destroy()
 	defer c.Enable.Destroy()
@@ -527,7 +527,7 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 	}
 	if err := v.Arm(runID, s.d.Now().Add(runWindow), creds); err != nil {
 		s.d.Guard().Revoke(runID)
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	release := func() { s.d.Guard().Revoke(runID); v.Disarm(runID) }
 	var ex assist.Executor = newExec(s.d, runID, map[string]target{rec.label: rec.t}, transport.HostKeyPolicy{})

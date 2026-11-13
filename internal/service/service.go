@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
@@ -76,24 +75,24 @@ func NewID() string {
 	return hex.EncodeToString(b)
 }
 
-// VaultErr traduce los errores de la bóveda a códigos gRPC.
-func VaultErr(err error) error {
+// VaultErr traduce los errores de la bóveda a códigos gRPC; el texto sale en el idioma del contexto.
+func VaultErr(ctx context.Context, err error) error {
 	switch {
 	case err == nil:
 		return nil
 	case errors.Is(err, vault.ErrWrongPassword):
-		return status.Error(codes.PermissionDenied, err.Error())
+		return ErrFrom(ctx, codes.PermissionDenied, err)
 	case errors.Is(err, vault.ErrLocked):
-		return status.Error(codes.FailedPrecondition, err.Error())
+		return ErrFrom(ctx, codes.FailedPrecondition, err)
 	case errors.Is(err, vault.ErrNotFound):
-		return status.Error(codes.NotFound, err.Error())
+		return ErrFrom(ctx, codes.NotFound, err)
 	case errors.Is(err, vault.ErrEmptyPassword), errors.Is(err, vault.ErrWindowTooLong), errors.Is(err, vault.ErrReserved),
 		errors.Is(err, vault.ErrNotBackup), errors.Is(err, vault.ErrShortPhrase), errors.Is(err, vault.ErrSamePhrase), errors.Is(err, vault.ErrTooManyEntries):
-		return status.Error(codes.InvalidArgument, err.Error())
+		return ErrFrom(ctx, codes.InvalidArgument, err)
 	case errors.Is(err, vault.ErrNotRegular), errors.Is(err, vault.ErrBackupParams):
-		return status.Error(codes.FailedPrecondition, err.Error())
+		return ErrFrom(ctx, codes.FailedPrecondition, err)
 	case errors.Is(err, vault.ErrExists), errors.Is(err, vault.ErrBackupExists):
-		return status.Error(codes.AlreadyExists, err.Error())
+		return ErrFrom(ctx, codes.AlreadyExists, err)
 	}
-	return status.Error(codes.Internal, err.Error())
+	return ErrFrom(ctx, codes.Internal, err)
 }

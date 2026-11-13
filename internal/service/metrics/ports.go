@@ -69,7 +69,7 @@ func connErr(ctx context.Context, err error) error {
 	case errors.Is(err, transport.ErrAuth), errors.Is(err, transport.ErrEgressDenied):
 		return service.ErrFrom(ctx, codes.PermissionDenied, err)
 	}
-	if s := service.VaultErr(err); status.Code(s) != codes.Internal {
+	if s := service.VaultErr(ctx, err); status.Code(s) != codes.Internal {
 		return s
 	}
 	return service.ErrFrom(ctx, codes.Unavailable, err)
@@ -99,7 +99,7 @@ func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.Ge
 	}
 	cred, err := v.Get(r.CredentialId)
 	if err != nil {
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	port := uint16(r.Port)
 	if port == 0 {

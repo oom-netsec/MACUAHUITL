@@ -47,7 +47,7 @@ func (s *assistSvc) PlanRestore(ctx context.Context, r *v1.PlanRestoreRequest) (
 	// La ficha debe traer la firma de la llave de la bóveda: sin ella (respaldo viejo, ficha editada o de otra bóveda) se puede ver y comparar, no restaurar.
 	key, err := service.BackupKey(s.d.Vault(), false)
 	if err != nil && !errors.Is(err, vault.ErrNotFound) {
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	if err != nil || !e.Verify(key) {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.el_respaldo_no_tiene_una", i18n.A("backup", r.BackupId))

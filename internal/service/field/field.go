@@ -70,7 +70,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	}
 	o := first.GetOpen()
 	if o == nil {
-		return status.Error(codes.InvalidArgument, "el primer mensaje debe abrir el puerto")
+		return service.Err(st.Context(), codes.InvalidArgument, "field.err.first_open", nil)
 	}
 	cfg, err := serialcon.Config{Path: o.Port, Baud: int(o.Baud), DataBits: int(o.DataBits), Parity: o.Parity, StopBits: int(o.StopBits), Flow: o.Flow}.Normalize()
 	if err != nil {
@@ -177,7 +177,7 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, OnTransfer: k.onTransfer}
 	cfg.OnListening = func(a string) {
 		s.d.Audit("field.serve", a, fmt.Sprintf("proto=%s all=%t files=%q duration=%s", r.Protocol, r.AllowAny, r.Files, service.SyslogDuration(r.DurationSeconds)))
-		k.events <- &v1.ServeFilesResponse{Listening: a, Hint: fileserve.Hint(r.Protocol, a, r.Files)}
+		k.events <- &v1.ServeFilesResponse{Listening: a, Hint: fileserve.HintIn(i18n.Locale(st.Context()), r.Protocol, a, r.Files)}
 	}
 	err := fileserve.Serve(ctx, cfg)
 	n, rejected := k.stop()

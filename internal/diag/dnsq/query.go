@@ -11,7 +11,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -24,6 +23,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Dialer abre una conexión tcp o udp hacia host:port. En producción la arma el
@@ -57,18 +58,18 @@ func mustAddr(s string) netip.Addr { a, _ := netip.ParseAddr(s); return a }
 // ParseServer entiende "192.0.2.1", "192.0.2.1:5353", "tcp://…", "tls://IP#nombre" y "https://host/ruta".
 func ParseServer(s string) (Server, error) {
 	if s == "" || strings.HasPrefix(s, "-") || strings.ContainsAny(s, " \t\n") {
-		return Server{}, fmt.Errorf("dnsq: servidor %q inválido", s)
+		return Server{}, i18n.New("dns.parse.err.server", i18n.A("server", s))
 	}
 	if strings.HasPrefix(s, "https://") {
 		u, err := url.Parse(s)
 		if err != nil || u.Hostname() == "" {
-			return Server{}, fmt.Errorf("dnsq: URL DoH %q inválida", s)
+			return Server{}, i18n.New("dns.parse.err.doh_url", i18n.A("server", s))
 		}
 		port := uint16(443)
 		if p := u.Port(); p != "" {
 			n, err := strconv.Atoi(p)
 			if err != nil || n < 1 || n > 65535 {
-				return Server{}, fmt.Errorf("dnsq: puerto %q inválido", p)
+				return Server{}, i18n.New("dns.parse.err.port", i18n.A("port", p))
 			}
 			port = uint16(n)
 		}
@@ -86,19 +87,19 @@ func ParseServer(s string) (Server, error) {
 		}
 	}
 	if strings.Contains(rest, "://") {
-		return Server{}, fmt.Errorf("dnsq: esquema de %q no soportado (udp, tcp, tls, https)", s)
+		return Server{}, i18n.New("dns.parse.err.scheme", i18n.A("server", s))
 	}
 	if srv.Transport == "dot" {
 		srv.Port = 853
 		host, name, ok := strings.Cut(rest, "#")
 		if !ok || name == "" {
-			return Server{}, fmt.Errorf("dnsq: DoT necesita el nombre del certificado: tls://IP#nombre")
+			return Server{}, i18n.New("dns.parse.err.dot_name", nil)
 		}
 		srv.TLSName, rest = name, host
 	}
 	if ap, err := netip.ParseAddrPort(rest); err == nil {
 		if ap.Port() == 0 {
-			return Server{}, errors.New("dnsq: puerto 0 inválido")
+			return Server{}, i18n.New("dns.parse.err.port_zero", nil)
 		}
 		srv.Host, srv.Port = ap.Addr().String(), ap.Port()
 		return srv, nil
@@ -110,14 +111,14 @@ func ParseServer(s string) (Server, error) {
 	if h, p, err := net.SplitHostPort(rest); err == nil {
 		n, err := strconv.Atoi(p)
 		if err != nil || n < 1 || n > 65535 {
-			return Server{}, fmt.Errorf("dnsq: puerto %q inválido", p)
+			return Server{}, i18n.New("dns.parse.err.port", i18n.A("port", p))
 		}
 		srv.Host, srv.Port = h, uint16(n)
 	} else {
 		srv.Host = rest
 	}
 	if _, ok := dns.IsDomainName(srv.Host); !ok || srv.Host == "" {
-		return Server{}, fmt.Errorf("dnsq: servidor %q inválido", s)
+		return Server{}, i18n.New("dns.parse.err.server", i18n.A("server", s))
 	}
 	return srv, nil
 }
@@ -165,7 +166,9 @@ type Answer struct {
 	RetriedTCP bool
 	EDNS       bool
 	Error      string `json:",omitempty"`
-	msg        *dns.Msg
+	// ErrorText es Error como texto de catálogo; no viaja en el JSON.
+	ErrorText i18n.Text `json:"-"`
+	msg       *dns.Msg
 }
 
 func newMsg(name string, qtype uint16, o Options) *dns.Msg {
@@ -202,17 +205,17 @@ func exchange(ctx context.Context, d Dialer, s Server, m *dns.Msg, o Options) (*
 	case "doh":
 		r, size, err = exchangeDoH(ctx, d, s, m, o)
 	default:
-		err = fmt.Errorf("transporte %q desconocido", s.Transport)
+		err = i18n.New("dns.exch.transport", i18n.A("transport", s.Transport))
 	}
 	rtt := time.Since(start)
 	if err != nil {
-		return nil, rtt, 0, fmt.Errorf("dnsq: %s: %w", s, err)
+		return nil, rtt, 0, i18n.Wrap("dns.exch.wrap", err, i18n.A("server", s.String()))
 	}
 	if r.Id != m.Id && s.Transport != "doh" { // DoH usa ID 0 por RFC 8484
-		return nil, rtt, size, fmt.Errorf("dnsq: %s: respuesta con ID %d, esperaba %d", s, r.Id, m.Id)
+		return nil, rtt, size, i18n.New("dns.exch.bad_id", i18n.A("server", s.String(), "got", r.Id, "want", m.Id))
 	}
 	if len(r.Question) != 1 || !strings.EqualFold(r.Question[0].Name, m.Question[0].Name) || r.Question[0].Qtype != m.Question[0].Qtype || r.Question[0].Qclass != m.Question[0].Qclass {
-		return nil, rtt, size, fmt.Errorf("dnsq: %s: la respuesta no corresponde a la pregunta (posible suplantación)", s)
+		return nil, rtt, size, i18n.New("dns.exch.mismatch", i18n.A("server", s.String()))
 	}
 	return r, rtt, size, nil
 }
@@ -278,7 +281,7 @@ func exchangeDoH(ctx context.Context, d Dialer, s Server, m *dns.Msg, o Options)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, 0, fmt.Errorf("DoH respondió HTTP %d", resp.StatusCode)
+		return nil, 0, i18n.New("dns.exch.doh_http", i18n.A("status", resp.StatusCode))
 	}
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 65536))
 	if err != nil {
@@ -286,7 +289,7 @@ func exchangeDoH(ctx context.Context, d Dialer, s Server, m *dns.Msg, o Options)
 	}
 	r := new(dns.Msg)
 	if err := r.Unpack(raw); err != nil {
-		return nil, 0, fmt.Errorf("DoH: respuesta ilegible: %w", err)
+		return nil, 0, i18n.Wrap("dns.exch.doh_unreadable", err, nil)
 	}
 	return r, len(raw), nil
 }
@@ -314,7 +317,7 @@ func Query(ctx context.Context, d Dialer, s Server, name string, qtype uint16, o
 	m := newMsg(name, qtype, o)
 	r, rtt, size, err := exchange(ctx, d, s, m, o)
 	if err != nil {
-		return Answer{Server: s.String(), Name: dns.Fqdn(name), Type: dns.TypeToString[qtype], Error: err.Error()}, err
+		return Answer{Server: s.String(), Name: dns.Fqdn(name), Type: dns.TypeToString[qtype], Error: err.Error(), ErrorText: i18n.FromErr(err)}, err
 	}
 	if s.Transport == "udp" && r.Truncated {
 		ts := s
@@ -322,7 +325,8 @@ func Query(ctx context.Context, d Dialer, s Server, name string, qtype uint16, o
 		r2, rtt2, size2, err := exchange(ctx, d, ts, newMsg(name, qtype, o), o)
 		if err != nil {
 			a := toAnswer(s, name, qtype, r, rtt, size)
-			a.Truncated, a.Error = true, "truncada por UDP y TCP falló: "+err.Error()
+			e := i18n.Wrap("dns.exch.trunc_failed", err, nil)
+			a.Truncated, a.Error, a.ErrorText = true, e.Error(), i18n.FromErr(e)
 			return a, err
 		}
 		a := toAnswer(s, name, qtype, r2, rtt+rtt2, size2)
@@ -330,6 +334,20 @@ func Query(ctx context.Context, d Dialer, s Server, name string, qtype uint16, o
 		return a, nil
 	}
 	return toAnswer(s, name, qtype, r, rtt, size), nil
+}
+
+// In devuelve el resultado con el error de cada respuesta en el idioma dado (es es el de siempre).
+func (r CompareResult) In(loc string) CompareResult {
+	if r.Answers == nil {
+		return r
+	}
+	r.Answers = append([]Answer(nil), r.Answers...)
+	for i := range r.Answers {
+		if !r.Answers[i].ErrorText.Empty() {
+			r.Answers[i].Error = r.Answers[i].ErrorText.In(loc)
+		}
+	}
+	return r
 }
 
 // CompareResult es la misma pregunta hecha a varios servidores.
@@ -390,7 +408,7 @@ func ParseType(s string) (uint16, error) {
 	if t, ok := dns.StringToType[strings.ToUpper(s)]; ok {
 		return t, nil
 	}
-	return 0, fmt.Errorf("dnsq: tipo de registro desconocido %q", s)
+	return 0, i18n.New("dns.parse.err.type", i18n.A("type", s))
 }
 
 // SystemResolvers lee los nameserver de un resolv.conf (normalmente /etc/resolv.conf).
@@ -404,7 +422,7 @@ func SystemResolvers(path string) ([]Server, error) {
 		out = append(out, Server{Transport: "udp", Host: s, Port: 53})
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("dnsq: %s no tiene nameserver", path)
+		return nil, i18n.New("dns.parse.err.no_nameserver", i18n.A("path", path))
 	}
 	return out, nil
 }

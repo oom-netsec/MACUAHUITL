@@ -13,6 +13,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/devices"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
@@ -74,10 +75,10 @@ func (s *svc) auditHost(action string, h devices.Host) {
 }
 
 // PutDevice crea (id vacío) o edita un host de la libreta. El nombre y el destino (dirección y puerto) no se repiten.
-func (s *svc) PutDevice(_ context.Context, r *v1.PutDeviceRequest) (*v1.PutDeviceResponse, error) {
+func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDeviceResponse, error) {
 	s.d.MarkActive()
 	if r.Device == nil {
-		return nil, status.Error(codes.InvalidArgument, "falta el host")
+		return nil, service.Err(ctx, codes.InvalidArgument, "hosts.err.missing", nil)
 	}
 	h, err := devices.Clean(hostFromPB(r.Device))
 	if err != nil {
@@ -90,7 +91,7 @@ func (s *svc) PutDevice(_ context.Context, r *v1.PutDeviceRequest) (*v1.PutDevic
 		case !ok:
 			out.Warnings = append(out.Warnings, "la bóveda está cerrada: la credencial se guardó sin validar")
 		case labelOf(infos, h.CredentialID) == "":
-			return nil, status.Error(codes.InvalidArgument, "la credencial no existe en la bóveda (o es una entrada del sistema)")
+			return nil, service.Err(ctx, codes.InvalidArgument, "hosts.err.no_credential", nil)
 		}
 	}
 	now := s.clock().UTC().Truncate(time.Second)

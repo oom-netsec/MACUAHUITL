@@ -84,9 +84,6 @@ type Config struct {
 	OnTransfer   func(Transfer)
 }
 
-// udpAllowNote es el aviso que acompaña a --allow en TFTP.
-const udpAllowNote = "en UDP la lista de IP no autentica: la IP de origen se puede falsificar; úsala como filtro, no como seguridad, y solo en una red de confianza"
-
 // Topes por omisión de lo que se recibe.
 const (
 	DefaultMaxFile  = 512 << 20
@@ -127,10 +124,10 @@ var standard = map[string]struct {
 
 // redirTarget separa lo que cambia según la IP de escucha: la familia de nftables y la IP
 // (si es 0.0.0.0, :: o no es una IP, se pide la de la máquina: la regla no queda ancha).
-func redirTarget(ip string) (family, addr string) {
+func redirTarget(loc, ip string) (family, addr string) {
 	a, err := netip.ParseAddr(strings.Trim(ip, "[]"))
 	if err != nil || a.IsUnspecified() {
-		return "ip", "IP-DE-ESTA-MÁQUINA"
+		return "ip", i18n.Msg(loc, "fileserve.hint.this_host", nil)
 	}
 	if a = a.Unmap(); a.Is6() {
 		return "ip6", a.String()
@@ -145,17 +142,20 @@ func nftTable(proto string, port int) string { return fmt.Sprintf("macuahuitl_%s
 // equipos usen el puerto estándar (69, 21, 22) sin que la app tenga privilegios (ADR 0004).
 // Solo redirige lo dirigido a la IP de escucha, en una tabla propia de ese servidor, y trae
 // cómo quitarla. La app nunca la ejecuta. En FTP solo se redirige el puerto de control.
-func RedirectHint(proto, ip string, port int) string {
+func RedirectHint(proto, ip string, port int) string { return RedirectHintIn(i18n.Es, proto, ip, port) }
+
+// RedirectHintIn es RedirectHint con el texto en el idioma dado.
+func RedirectHintIn(loc, proto, ip string, port int) string {
 	s, ok := standard[proto]
 	if !ok {
 		return ""
 	}
-	fam, addr := redirTarget(ip)
+	fam, addr := redirTarget(loc, ip)
 	t := nftTable(proto, port)
 	return fmt.Sprintf("sudo nft add table %[1]s %[2]s; "+
 		"sudo nft add chain %[1]s %[2]s pre '{ type nat hook prerouting priority dstnat; }'; "+
 		"sudo nft add rule %[1]s %[2]s pre %[1]s daddr %[3]s %[4]s dport %[5]d redirect to :%[6]d   "+
-		"(quitar al terminar: %[7]s)", fam, t, addr, s.trans, s.port, port, RedirectCleanup(proto, ip, port))
+		"%[7]s", fam, t, addr, s.trans, s.port, port, i18n.Msg(loc, "fileserve.hint.nft_remove", i18n.A("cmd", RedirectCleanup(proto, ip, port))))
 }
 
 // RedirectCleanup es el comando que quita la regla de RedirectHint ("" si el protocolo no
@@ -164,7 +164,7 @@ func RedirectCleanup(proto, ip string, port int) string {
 	if _, ok := standard[proto]; !ok {
 		return ""
 	}
-	fam, _ := redirTarget(ip)
+	fam, _ := redirTarget(i18n.Es, ip)
 	return fmt.Sprintf("sudo nft delete table %s %s", fam, nftTable(proto, port))
 }
 
@@ -181,21 +181,25 @@ func RedirectCleanupAddr(proto, listening string) string {
 // SetcapHint es la alternativa a la redirección para quien prefiera que un binario suyo
 // (otro servidor, no esta app, que siempre escucha en puerto alto por el ADR 0004) abra
 // puertos bajos. Es más amplia que la redirección: se explica, nunca se ejecuta.
-func SetcapHint(binary string) string {
-	return fmt.Sprintf("sudo setcap cap_net_bind_service=+ep %s   "+
-		"(ADVERTENCIA: ese binario podrá abrir cualquier puerto menor a 1024 mientras conserve el permiso; "+
-		"quitar: sudo setcap -r %s)", binary, binary)
+func SetcapHint(binary string) string { return SetcapHintIn(i18n.Es, binary) }
+
+// SetcapHintIn es SetcapHint con el texto en el idioma dado.
+func SetcapHintIn(loc, binary string) string {
+	return "sudo setcap cap_net_bind_service=+ep " + binary + "   " + i18n.Msg(loc, "fileserve.hint.setcap_warn", i18n.A("bin", binary))
 }
 
 // Hint explica cómo copiar desde el equipo. IOS no deja elegir el puerto TFTP:
 // para TFTP la redirección del 69 es necesaria. Sintaxis sin validar en laboratorio.
-func Hint(proto, listen string, files []string) string {
+func Hint(proto, listen string, files []string) string { return HintIn(i18n.Es, proto, listen, files) }
+
+// HintIn es Hint con el texto en el idioma dado.
+func HintIn(loc, proto, listen string, files []string) string {
 	h, p, _ := net.SplitHostPort(listen)
 	if ip, err := netip.ParseAddr(h); err == nil && ip.IsUnspecified() {
-		h = "IP-DE-ESTA-MÁQUINA"
+		h = i18n.Msg(loc, "fileserve.hint.this_host", nil)
 	}
 	var b strings.Builder
-	b.WriteString("En el equipo:\n")
+	b.WriteString(i18n.Msg(loc, "fileserve.hint.head", nil) + "\n")
 	for _, f := range files {
 		name := filepath.Base(f)
 		if proto == "tftp" {
@@ -206,7 +210,7 @@ func Hint(proto, listen string, files []string) string {
 	}
 	if proto == "tftp" {
 		port, _ := strconv.Atoi(p)
-		b.WriteString("IOS siempre usa el puerto 69; redirígelo a este servidor (sin privilegios para la app):\n  " + TFTPRedirectHint(h, port) + "\n")
+		b.WriteString(i18n.Msg(loc, "fileserve.hint.tftp_redir", nil) + "\n  " + RedirectHintIn(loc, "tftp", h, port) + "\n")
 	}
 	return b.String()
 }

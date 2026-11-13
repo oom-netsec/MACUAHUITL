@@ -59,7 +59,7 @@ func connErr(ctx context.Context, err error) error {
 	case errors.Is(err, transport.ErrAuth), errors.Is(err, transport.ErrEgressDenied):
 		return service.ErrFrom(ctx, codes.PermissionDenied, err)
 	}
-	if s := service.VaultErr(err); status.Code(s) != codes.Internal {
+	if s := service.VaultErr(ctx, err); status.Code(s) != codes.Internal {
 		return s
 	}
 	return service.ErrFrom(ctx, codes.Unavailable, err)
@@ -118,7 +118,7 @@ func (s *svc) open(ctx context.Context, rawURL, credID string, accepted []string
 	cred, err := v.Get(credID)
 	if err != nil {
 		j.done()
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	j.wipe = func() { cred.Password.Destroy(); cred.SSHKey.Destroy(); cred.Enable.Destroy() }
 	cred.Enable.Destroy()

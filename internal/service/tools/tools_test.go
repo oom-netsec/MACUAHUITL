@@ -16,6 +16,8 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/status"
 )
 
 // Revisión final: sin servidores, el modo ligero usa el resolvedor del sistema, no terceros.
@@ -216,5 +218,72 @@ func TestTlsRespuestaEstructuradaYEn(t *testing.T) {
 	}
 	if !strings.Contains(es.Report.Json, msgEs) || es.VerifyCode != "unknown_authority" || en.VerifyCode != "unknown_authority" || !strings.Contains(en.Report.Json, "x509: certificate signed by unknown authority") {
 		t.Errorf("es: %s / %q", es.Report.Json, es.VerifyCode)
+	}
+}
+
+// Fase 30d: los errores de validación de DNS, TLS y pcap llevan código y salen en el idioma pedido; con es el
+// texto es el de siempre.
+func TestErroresDeValidacionEnYEs(t *testing.T) {
+	d := servicetest.New(t)
+	for _, c := range []struct {
+		name   string
+		call   func(ctx context.Context) error
+		es, en string
+		reason string
+	}{
+		{"pcap", func(ctx context.Context) error {
+			_, err := (&toolsSvc{d: d}).AnalyzePcap(ctx, &v1.AnalyzePcapRequest{Path: "x.pcap"})
+			return err
+		}, "la ruta de la captura debe ser absoluta", "the capture path must be absolute", "tools.svc.pcap_path"},
+		{"modo", func(ctx context.Context) error {
+			_, err := (&toolsSvc{d: d}).Dns(ctx, &v1.DnsRequest{})
+			return err
+		}, "modo DNS no indicado", "DNS mode not given", "tools.svc.dns_mode"},
+		{"profundo", func(ctx context.Context) error {
+			_, err := (&toolsSvc{d: d}).Dns(ctx, &v1.DnsRequest{Mode: v1.DnsMode_DNS_MODE_TRACE})
+			return err
+		}, "este modo contacta raíces y autoritativos: requiere activar el modo profundo", "this mode contacts roots and authoritative servers: it requires deep mode", "tools.svc.dns_deep"},
+		{"nombre", func(ctx context.Context) error {
+			_, err := (&toolsSvc{d: d}).Dns(ctx, &v1.DnsRequest{Mode: v1.DnsMode_DNS_MODE_QUERY})
+			return err
+		}, "nombre no indicado", "name not given", "tools.svc.dns_name"},
+		{"tipo", func(ctx context.Context) error {
+			_, err := (&toolsSvc{d: d}).Dns(ctx, &v1.DnsRequest{Mode: v1.DnsMode_DNS_MODE_QUERY, Name: "a", Type: "ZZZ"})
+			return err
+		}, `dnsq: tipo de registro desconocido "ZZZ"`, `dnsq: unknown record type "ZZZ"`, "dns.parse.err.type"},
+		{"servidor", func(ctx context.Context) error {
+			_, err := (&toolsSvc{d: d}).Dns(ctx, &v1.DnsRequest{Mode: v1.DnsMode_DNS_MODE_QUERY, Name: "a", Servers: []string{"a b"}})
+			return err
+		}, `dnsq: servidor "a b" inválido`, `dnsq: invalid server "a b"`, "dns.parse.err.server"},
+		{"host", func(ctx context.Context) error {
+			_, err := (&toolsSvc{d: d}).InspectTls(ctx, &v1.InspectTlsRequest{})
+			return err
+		}, "host inválido", "invalid host", "tools.svc.tls_host"},
+		{"puerto", func(ctx context.Context) error {
+			_, err := (&toolsSvc{d: d}).InspectTls(ctx, &v1.InspectTlsRequest{Host: "h", Port: 70000})
+			return err
+		}, "puerto inválido", "invalid port", "tools.svc.tls_port"},
+	} {
+		for _, loc := range []string{"es", "en"} {
+			err := c.call(i18n.WithLocale(context.Background(), loc))
+			st, _ := status.FromError(err)
+			want := c.es
+			if loc == "en" {
+				want = c.en
+			}
+			if st == nil || st.Message() != want {
+				t.Errorf("%s/%s: %v, quería %q", c.name, loc, err, want)
+				continue
+			}
+			var ok bool
+			for _, dt := range st.Details() {
+				if ei, is := dt.(*errdetails.ErrorInfo); is && ei.Reason == c.reason {
+					ok = true
+				}
+			}
+			if !ok {
+				t.Errorf("%s/%s: sin reason %s", c.name, loc, c.reason)
+			}
+		}
 	}
 }

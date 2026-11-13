@@ -2,8 +2,6 @@ package scripts
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -130,6 +128,13 @@ type ResultadoCol struct {
 	Writes                                      []Coleccion
 	Created, Replaced, Renamed, Merged, Skipped int
 	Warnings                                    []string
+	// WarningTexts son Warnings como texto de catálogo (mismo orden), para darlos en otro idioma.
+	WarningTexts []i18n.Text `json:"-"`
+}
+
+func (r *ResultadoCol) warn(key string, kv ...any) {
+	t := i18n.Tx(key, kv...)
+	r.Warnings, r.WarningTexts = append(r.Warnings, t.In(i18n.Es)), append(r.WarningTexts, t)
 }
 
 // ApplyColecciones convierte el plan y las decisiones (por ID del archivo) en escrituras. mapa lleva el ID de cada
@@ -151,24 +156,24 @@ func ApplyColecciones(items []ItemCol, dec map[string]string, locales []Coleccio
 	}
 	if len(sobran) > 0 {
 		sort.Strings(sobran)
-		return r, fmt.Errorf("decisión para colecciones que no están en el archivo: %s", strings.Join(sobran, ", "))
+		return r, i18n.New("scripts.imp.dec_cols", i18n.A("ids", strings.Join(sobran, ", ")))
 	}
 	var faltan []string
 	for _, it := range items {
 		d, hay := dec[it.Col.ID]
 		if hay && d != Renombrar && d != Reemplazar && d != Omitir {
-			return r, fmt.Errorf("decisión %q desconocida para %s", d, it.Col.ID)
+			return r, i18n.New("scripts.imp.dec_unknown", i18n.A("dec", d, "id", it.Col.ID))
 		}
 		conflicto := it.Estado == ConflictoID || it.Estado == ConflictoNombre
 		if !hay && conflicto {
 			faltan = append(faltan, it.Col.ID)
 		}
 		if hay && !conflicto && d != Omitir {
-			return r, fmt.Errorf("%s es %q: solo se puede omitir", it.Col.ID, it.Estado)
+			return r, i18n.New("scripts.imp.only_skip", i18n.A("id", it.Col.ID, "state", it.Estado))
 		}
 	}
 	if len(faltan) > 0 {
-		return r, fmt.Errorf("falta la decisión de %d conflicto(s) de colecciones: %s", len(faltan), strings.Join(faltan, ", "))
+		return r, i18n.New("scripts.imp.missing_cols", i18n.A("n", len(faltan), "ids", strings.Join(faltan, ", ")))
 	}
 	porID, nombres := map[string]Coleccion{}, map[string]string{} // clave de nombre -> ID
 	for _, l := range locales {
@@ -186,13 +191,13 @@ func ApplyColecciones(items []ItemCol, dec map[string]string, locales []Coleccio
 			nuevo := id
 			if IsLib(id) {
 				if !lib[id] {
-					r.Warnings = append(r.Warnings, fmt.Sprintf("colección %q: el script %s no está en la biblioteca local; se omitió", c.Name, id))
+					r.warn("scripts.imp.warn_lib_skipped", "name", c.Name, "id", id)
 					continue
 				}
 			} else if m, ok := mapa[id]; ok {
 				nuevo = m
 			} else {
-				r.Warnings = append(r.Warnings, fmt.Sprintf("colección %q: el script %s no se importó; se quitó de la colección", c.Name, id))
+				r.warn("scripts.imp.warn_not_imported", "name", c.Name, "id", id)
 				continue
 			}
 			if !seen[nuevo] {
@@ -235,14 +240,14 @@ func ApplyColecciones(items []ItemCol, dec map[string]string, locales []Coleccio
 		case d == Reemplazar:
 			old, ok := porID[it.Con]
 			if !ok || old.ID == FavoritosID {
-				return r, fmt.Errorf("%s choca con %s, que no se reemplaza: renómbrala u omítela", c.Name, FavoritosID)
+				return r, i18n.New("scripts.imp.fav_clash", i18n.A("name", c.Name, "id", FavoritosID))
 			}
 			if reemplazadas[old.ID] {
-				return r, fmt.Errorf("dos decisiones reemplazan la misma colección guardada (%s)", old.ID)
+				return r, i18n.New("scripts.imp.dup_replace_col", i18n.A("id", old.ID))
 			}
 			reemplazadas[old.ID] = true
 			if id, ok := nombres[NameKey(c.Name)]; ok && id != old.ID {
-				return r, fmt.Errorf("reemplazar %s dejaría dos colecciones con el nombre %q", old.ID, c.Name)
+				return r, i18n.New("scripts.imp.replace_dup_col", i18n.A("id", old.ID, "name", c.Name))
 			}
 			delete(nombres, NameKey(old.Name))
 			c.ID, c.CreatedAt, c.Order = old.ID, old.CreatedAt, old.Order
@@ -255,13 +260,13 @@ func ApplyColecciones(items []ItemCol, dec map[string]string, locales []Coleccio
 			r.Renamed++
 		default: // nueva
 			if _, ok := nombres[NameKey(c.Name)]; ok {
-				return r, fmt.Errorf("el nombre %q ya existe", c.Name)
+				return r, i18n.New("scripts.imp.name_exists", i18n.A("name", c.Name))
 			}
 			c.ScriptIDs = refs(c)
 			r.Created++
 		}
 		if err := c.Validate(); err != nil {
-			return r, fmt.Errorf("%s: %w", c.Name, err)
+			return r, i18n.Wrap("scripts.imp.item", err, i18n.A("name", c.Name))
 		}
 		nombres[NameKey(c.Name)] = c.ID
 		r.Writes = append(r.Writes, c)
@@ -341,10 +346,10 @@ func ParseColeccionesAvisos(b []byte) ([]Coleccion, []Script, []string, error) {
 		return nil, nil, nil, err
 	}
 	if len(cols) > MaxColecciones {
-		return nil, nil, nil, fmt.Errorf("el archivo trae %d colecciones; el tope es %d", len(cols), MaxColecciones)
+		return nil, nil, nil, i18n.New("scripts.imp.max_cols", i18n.A("n", len(cols), "max", MaxColecciones))
 	}
 	if len(scripts) > MaxImportScripts {
-		return nil, nil, nil, fmt.Errorf("el archivo trae %d scripts; el tope es %d", len(scripts), MaxImportScripts)
+		return nil, nil, nil, i18n.New("scripts.imp.max_scripts", i18n.A("n", len(scripts), "max", MaxImportScripts))
 	}
 	avisos, err := verificaSuma(a.SHA256, func() (string, error) { _, _, sum, err := canonCol(cols, scripts); return sum, err })
 	if err != nil {
@@ -356,7 +361,7 @@ func ParseColeccionesAvisos(b []byte) ([]Coleccion, []Script, []string, error) {
 	enArchivo := map[string]bool{}
 	for _, s := range scripts {
 		if s.Origin != OrigenUsuario {
-			return nil, nil, nil, fmt.Errorf("script %q: los de la biblioteca viajan solo por ID", s.Name)
+			return nil, nil, nil, i18n.New("scripts.imp.lib_by_id", i18n.A("name", s.Name))
 		}
 		enArchivo[s.ID] = true
 	}
@@ -373,7 +378,7 @@ func ParseColeccionesAvisos(b []byte) ([]Coleccion, []Script, []string, error) {
 		ids[c.ID], nombres[k] = true, true
 		for _, id := range c.ScriptIDs {
 			if !IsLib(id) && !enArchivo[id] {
-				return nil, nil, nil, errors.New("la colección " + c.Name + " referencia al script " + id + ", que no viaja en el archivo")
+				return nil, nil, nil, i18n.New("scripts.imp.ref_missing", i18n.A("name", c.Name, "id", id))
 			}
 		}
 	}

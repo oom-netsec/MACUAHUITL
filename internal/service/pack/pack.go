@@ -65,7 +65,7 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	if r.GetPath() == "" {
 		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.path", nil)
 	}
-	path, err := service.AbsPath(r.GetPath())
+	path, err := service.AbsPath(ctx, r.GetPath())
 	if err != nil {
 		return nil, err
 	}

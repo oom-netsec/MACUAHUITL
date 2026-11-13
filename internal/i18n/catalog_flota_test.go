@@ -43,3 +43,16 @@ func anyOf(l []string, f func(string) bool) bool {
 	}
 	return false
 }
+
+// Fase 30d (revisión): textos en inglés corregidos.
+func TestTextosEnInglesCorregidos(t *testing.T) {
+	for key, want := range map[string]string{
+		"fileserve.hint.this_host": "IP-OF-THIS-MACHINE",
+		"adhoc.err.no_targets":     "specify at least one device",
+		"backup.store.bad_meta":    "invalid metadata file",
+	} {
+		if got := Msg(En, key, nil); got != want {
+			t.Errorf("%s: %q, quería %q", key, got, want)
+		}
+	}
+}

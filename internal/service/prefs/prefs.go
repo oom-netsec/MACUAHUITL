@@ -33,9 +33,9 @@ type prefsSvc struct {
 // (GetCorePrefs/SetCorePrefs) y este camino genérico nunca lo toca, aunque alguien lo agregue a prefKeys.
 func okKey(k string) bool { return prefKeys[k] && !strings.HasPrefix(k, service.CorePrefix) }
 
-func (s *prefsSvc) GetPreference(_ context.Context, r *v1.GetPreferenceRequest) (*v1.GetPreferenceResponse, error) {
+func (s *prefsSvc) GetPreference(ctx context.Context, r *v1.GetPreferenceRequest) (*v1.GetPreferenceResponse, error) {
 	if !okKey(r.Key) {
-		return nil, status.Error(codes.InvalidArgument, "clave de preferencia inválida")
+		return nil, service.Err(ctx, codes.InvalidArgument, "prefs.err.bad_key", nil)
 	}
 	var v string
 	err := s.d.DB().QueryRow(`SELECT value FROM preferences WHERE key = ?`, r.Key).Scan(&v)
@@ -48,15 +48,15 @@ func (s *prefsSvc) GetPreference(_ context.Context, r *v1.GetPreferenceRequest) 
 	return &v1.GetPreferenceResponse{Value: v, Found: true}, nil
 }
 
-func (s *prefsSvc) SetPreference(_ context.Context, r *v1.SetPreferenceRequest) (*v1.SetPreferenceResponse, error) {
+func (s *prefsSvc) SetPreference(ctx context.Context, r *v1.SetPreferenceRequest) (*v1.SetPreferenceResponse, error) {
 	if !okKey(r.Key) {
-		return nil, status.Error(codes.InvalidArgument, "clave de preferencia inválida")
+		return nil, service.Err(ctx, codes.InvalidArgument, "prefs.err.bad_key", nil)
 	}
 	if r.Key == "ui.language" && r.Value != "es" && r.Value != "en" {
-		return nil, status.Error(codes.InvalidArgument, "ui.language debe ser es o en")
+		return nil, service.Err(ctx, codes.InvalidArgument, "prefs.err.bad_language", nil)
 	}
 	if len(r.Value) > maxPrefValue {
-		return nil, status.Error(codes.InvalidArgument, "valor de preferencia mayor de 4 KiB")
+		return nil, service.Err(ctx, codes.InvalidArgument, "prefs.err.too_big", nil)
 	}
 	_, err := s.d.DB().Exec(`INSERT INTO preferences(key,value,updated_at) VALUES(?,?,?)
 		ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,
