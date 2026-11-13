@@ -8,8 +8,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"io/fs"
 	"path"
 	"slices"
@@ -17,6 +15,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 const defaultTimeout = 60 * time.Second
@@ -120,11 +120,11 @@ func Load(fsys fs.FS) ([]Playbook, error) {
 		}
 		b, err := fs.ReadFile(fsys, name)
 		if err != nil {
-			return fmt.Errorf("playbook %s: %w", name, err)
+			return i18n.Wrap("playbook.err.file", err, i18n.A("name", name))
 		}
 		p, err := parse(b)
 		if err != nil {
-			return fmt.Errorf("playbook %s: %w", name, err)
+			return i18n.Wrap("playbook.err.file", err, i18n.A("name", name))
 		}
 		out = append(out, p)
 		return nil
@@ -140,10 +140,10 @@ func parse(b []byte) (Playbook, error) {
 		return Playbook{}, err
 	}
 	if f.ID == "" || f.Platform == "" || f.Name == "" {
-		return Playbook{}, errors.New("id, platform y name son obligatorios")
+		return Playbook{}, i18n.New("playbook.err.required", nil)
 	}
 	if len(f.Commands) == 0 {
-		return Playbook{}, errors.New("sin comandos")
+		return Playbook{}, i18n.New("playbook.err.no_commands", nil)
 	}
 	p := Playbook{ID: f.Platform + "/" + f.ID, Platform: f.Platform, Name: f.Name, NameEn: f.NameEn, Pre: f.Pre}
 	for _, c := range append(f.Pre, cmdTexts(f.Commands)...) {
@@ -155,16 +155,16 @@ func parse(b []byte) (Playbook, error) {
 		cmd := Command{Text: strings.TrimSpace(c.Cmd), Timeout: defaultTimeout, MaySecrets: c.MaySecrets, Platforms: c.Platforms}
 		for _, pl := range c.Platforms {
 			if !slices.Contains(knownPlatforms, pl) {
-				return Playbook{}, fmt.Errorf("plataforma desconocida %q en platforms de %q", pl, cmd.Text)
+				return Playbook{}, i18n.New("playbook.err.platform", i18n.A("platform", pl, "cmd", cmd.Text))
 			}
 		}
 		if cmd.Text == "" {
-			return Playbook{}, errors.New("comando vacío")
+			return Playbook{}, i18n.New("playbook.err.empty_command", nil)
 		}
 		if c.Timeout != "" {
 			d, err := time.ParseDuration(c.Timeout)
 			if err != nil || d <= 0 {
-				return Playbook{}, fmt.Errorf("timeout %q inválido en %q", c.Timeout, cmd.Text)
+				return Playbook{}, i18n.New("playbook.err.timeout", i18n.A("timeout", c.Timeout, "cmd", cmd.Text))
 			}
 			if d > MaxTimeout {
 				return Playbook{}, fmt.Errorf("timeout %q de %q pasa el máximo de %s", c.Timeout, cmd.Text, MaxTimeout)
@@ -200,7 +200,7 @@ func Ephemeral(platform, text string) (Playbook, error) {
 	for _, ln := range strings.Split(text, "\n") {
 		ln = strings.TrimSpace(strings.TrimSuffix(ln, "\r")) // CRLF pegado; un \r interno lo rechaza CheckDenied
 		if strings.ContainsRune(ln, '\r') {
-			return Playbook{}, denied(ln, "retorno de carro dentro de la línea")
+			return Playbook{}, denied(ln, "playbook.why.cr_in_line")
 		}
 		if ln == "" || strings.HasPrefix(ln, "!") {
 			continue
@@ -211,7 +211,7 @@ func Ephemeral(platform, text string) (Playbook, error) {
 		p.Commands = append(p.Commands, Command{Text: ln, Timeout: defaultTimeout, MaySecrets: true})
 	}
 	if len(p.Commands) == 0 {
-		return Playbook{}, errors.New("playbook: no hay comandos")
+		return Playbook{}, i18n.New("playbook.err.none", nil)
 	}
 	return p, nil
 }

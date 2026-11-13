@@ -1,12 +1,23 @@
 package playbook
 
 import (
-	"errors"
-	"fmt"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-var ErrDenied = errors.New("playbook: comando no permitido en una recolección (solo lectura)")
+// ErrDenied es el centinela de un comando rechazado: errors.Is lo reconoce en cualquier error de denied.
+var ErrDenied = i18n.New("playbook.err.denied", nil)
+
+// deniedErr es el error de un comando rechazado: con código del catálogo y errors.Is(ErrDenied).
+type deniedErr struct{ e *i18n.Error }
+
+func (d deniedErr) Error() string               { return d.e.Error() }
+func (d deniedErr) Reason() string              { return d.e.Reason() }
+func (d deniedErr) Metadata() map[string]string { return d.e.Metadata() }
+func (d deniedErr) Localize(loc string) string  { return d.e.Localize(loc) }
+func (d deniedErr) Unwrap() error               { return d.e }
+func (deniedErr) Is(target error) bool          { return target == ErrDenied }
 
 // word es una palabra de IOS con su abreviatura mínima aceptada: IOS ejecuta
 // cualquier prefijo único, así que la comparación es por prefijo.
@@ -33,8 +44,9 @@ var pipeSinks = []word{{"redirect", "r"}, {"tee", "t"}, {"append", "a"}}
 // cualquier prefijo único. Lo comparten las listas negras del modo asistido.
 func Abbrev(tok, full string) bool { return tok != "" && strings.HasPrefix(full, tok) }
 
+// denied arma el rechazo de cmd; why es el código del motivo (playbook.why.*).
 func denied(cmd, why string) error {
-	return fmt.Errorf("%w: %q (%s)", ErrDenied, strings.TrimSpace(cmd), why)
+	return deniedErr{i18n.Wrap("playbook.err.denied_cmd", i18n.New(why, nil), i18n.A("cmd", strings.TrimSpace(cmd)))}
 }
 
 func matchAny(ws []word, s string) bool {
@@ -52,7 +64,7 @@ func CheckDenied(platform, cmd string) error {
 	for _, r := range cmd {
 		// Con exec-character-bits 7 el equipo quita el bit alto: Í (C3 8D) llega como C+CR.
 		if r < 0x20 || r > 0x7e {
-			return denied(cmd, "solo ASCII imprimible; un retorno de carro o un carácter de 8 bits ejecutaría otro comando")
+			return denied(cmd, "playbook.why.ascii")
 		}
 	}
 	segs := strings.Split(strings.ToLower(cmd), "|")
@@ -64,24 +76,24 @@ func CheckDenied(platform, cmd string) error {
 	case matchAny(allowedFirst, fields[0]):
 	case (word{"terminal", "ter"}).matches(fields[0]):
 		if len(fields) < 2 || !matchAny(allowedTerminal, fields[1]) {
-			return denied(cmd, "solo terminal length y terminal width")
+			return denied(cmd, "playbook.why.terminal")
 		}
 	default:
-		return denied(cmd, "no es un comando de lectura")
+		return denied(cmd, "playbook.why.not_read")
 	}
 	for i, seg := range segs[1:] {
 		f := strings.Fields(seg)
 		if len(f) == 0 {
 			if i == 0 {
-				return denied(cmd, "pipe vacío")
+				return denied(cmd, "playbook.why.empty_pipe")
 			}
 			continue // parte de una expresión regular
 		}
 		if matchAny(pipeSinks, f[0]) {
-			return denied(cmd, "redirect, tee y append escriben fuera de la sesión")
+			return denied(cmd, "playbook.why.pipe_sink")
 		}
 		if i == 0 && !matchAny(allowedPipe, f[0]) {
-			return denied(cmd, "solo include, exclude, begin, section y count tras |")
+			return denied(cmd, "playbook.why.pipe_filter")
 		}
 	}
 	return nil

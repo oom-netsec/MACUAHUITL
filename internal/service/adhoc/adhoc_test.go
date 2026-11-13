@@ -6,7 +6,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
@@ -44,5 +49,30 @@ func TestResultadoConFinishFallidoTerminaConError(t *testing.T) {
 	s.d = jobDeps{servicetest.New(t), service.JobInfo{State: "completed", Dir: t.TempDir()}}
 	if r, _ = s.AdhocResult(context.Background(), &v1.AdhocResultRequest{JobId: "j1"}); r.Done {
 		t.Errorf("sin manifest ni error no está listo: %+v", r)
+	}
+}
+
+// Fase 30d: los rechazos de StartAdhoc salen en el idioma pedido; con es el texto es el de siempre.
+func TestStartAdhocRechazosEsYEn(t *testing.T) {
+	s := &adhocSvc{d: servicetest.New(t), cmds: map[string][]string{}}
+	for _, c := range []struct {
+		req    *v1.StartAdhocRequest
+		es, en string
+		reason string
+	}{
+		{&v1.StartAdhocRequest{Commands: "configure terminal"}, `playbook: comando no permitido en una recolección (solo lectura): "configure terminal" (no es un comando de lectura)`,
+			`playbook: command not allowed in a collection (read-only): "configure terminal" (not a read command)`, "playbook.err.denied_cmd"},
+		{&v1.StartAdhocRequest{Commands: "show clock"}, "indica al menos un equipo", "give at least one device", "adhoc.err.no_targets"},
+	} {
+		for loc, want := range map[string]string{"es": c.es, "en": c.en} {
+			_, err := s.StartAdhoc(i18n.WithLocale(context.Background(), loc), c.req)
+			st := status.Convert(err)
+			if st.Code() != codes.InvalidArgument || st.Message() != want {
+				t.Errorf("%s: %v, quería %q", loc, err, want)
+			}
+			if ei, _ := st.Details()[0].(*errdetails.ErrorInfo); ei == nil || ei.Reason != c.reason {
+				t.Errorf("%s: sin reason %s: %v", loc, c.reason, st.Details())
+			}
+		}
 	}
 }
