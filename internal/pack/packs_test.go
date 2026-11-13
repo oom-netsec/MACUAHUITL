@@ -19,21 +19,7 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 	if len(dirs) == 0 {
 		t.Fatal("no hay packs/*")
 	}
-	base := pack.Base{}
-	pbs, err := playbook.Load(playbooks.FS)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, p := range pbs {
-		base.PlaybookIDs = append(base.PlaybookIDs, p.ID)
-	}
-	lib, _, err := scripts.LibraryWithEN(playbooks.FS)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, s := range lib {
-		base.ScriptIDs, base.ScriptNames = append(base.ScriptIDs, s.ID), append(base.ScriptNames, s.Name)
-	}
+	base := repoBase(t)
 	for _, d := range dirs {
 		t.Run(filepath.Base(d), func(t *testing.T) {
 			p, err := pack.ValidateSource(d, "v0.3.0")
@@ -54,6 +40,43 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+// repoBase es el contenido base embebido, contra el que se instala cada paquete.
+func repoBase(t *testing.T) pack.Base {
+	t.Helper()
+	base := pack.Base{}
+	pbs, err := playbook.Load(playbooks.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range pbs {
+		base.PlaybookIDs = append(base.PlaybookIDs, p.ID)
+	}
+	lib, _, err := scripts.LibraryWithEN(playbooks.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range lib {
+		base.ScriptIDs, base.ScriptNames = append(base.ScriptIDs, s.ID), append(base.ScriptNames, s.Name)
+	}
+	return base
+}
+
+// oom/ios y oom/ios-xe conviven en el mismo almacén: playbooks distintos por plataforma y scripts por el prefijo ios-.
+func TestIOSEIOSXEConviven(t *testing.T) {
+	st, _, err := pack.Open(t.TempDir(), "v0.3.0", packtest.Keys(), repoBase(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"ios-xe", "ios"} {
+		if _, err := st.Install(packtest.Signed(t, filepath.Join(packtest.RepoDir(), "packs", n)), false); err != nil {
+			t.Fatalf("oom/%s: %v", n, err)
+		}
+	}
+	if st.Snapshot().Find("oom/ios") == nil || st.Snapshot().Find("oom/ios-xe") == nil {
+		t.Fatal("deben quedar instalados los dos")
 	}
 }
 
