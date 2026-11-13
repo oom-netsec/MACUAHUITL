@@ -145,12 +145,19 @@ func TestImportEnlaceNoDesvia(t *testing.T) {
 	if plan := s.PlanPlaybooks(p, dir, nil); plan[0].State != scripts.ConflictoID {
 		t.Fatalf("%+v", plan)
 	}
-	// Aunque la decisión no llegara (carrera), O_EXCL|O_NOFOLLOW no escribe por el enlace.
-	if _, err := writePlaybooks(dir, map[string][]byte{"acme-uno.yaml": []byte("x")}); Reason(err) != "import.exists" {
+	// Aunque la decisión no llegara (carrera), Publish (enlace sin sobrescribir) no escribe por el enlace.
+	done, err := writePlaybooks(dir, map[string][]byte{"acme-uno.yaml": []byte("x")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&PlaybookResult{files: done}).Publish(dir); Reason(err) != "import.exists" {
 		t.Fatal(err)
 	}
 	if len(ls(t, fuera)) != 0 {
 		t.Fatal("escribió fuera")
+	}
+	if got := strings.Join(ls(t, dir), ","); got != "acme-uno.yaml" { // solo el enlace ajeno: sin temporales
+		t.Fatal(got)
 	}
 }
 

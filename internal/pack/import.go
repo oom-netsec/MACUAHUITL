@@ -90,14 +90,17 @@ func (s *Store) plan(p *Pack, dir string, userIDs map[string]bool) []PlaybookPla
 	return out
 }
 
-// PlaybookResult es lo que ImportPlaybooks escribió: Written son los IDs finales.
+// PlaybookResult es lo que StagePlaybooks preparó: Written son los IDs finales. files son los nombres finales de los
+// archivos preparados (con sufijo .tmp, que el catálogo no lee) y published los que Publish ya dejó con su nombre final.
 type PlaybookResult struct {
 	Written                   []string
 	Created, Renamed, Skipped int
-	files                     []string
+	files, published          []string
 }
 
-// Undo borra de dir los archivos que ImportPlaybooks creó (para cuando lo que iba junto con ellos falla).
+const tmpSuffix = ".tmp"
+
+// Undo borra de dir lo que este import creó: los archivos preparados y los ya publicados (nunca uno que ya existía).
 func (r *PlaybookResult) Undo(dir string) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
@@ -105,15 +108,59 @@ func (r *PlaybookResult) Undo(dir string) {
 	}
 	defer root.Close()
 	for _, n := range r.files {
+		root.Remove(n + tmpSuffix)
+	}
+	for _, n := range r.published {
 		root.Remove(n)
 	}
 }
 
-// ImportPlaybooks escribe en dir (<config>/playbooks) los playbooks de p según dec (ID del archivo → renombrar u omitir).
+// Publish da a los archivos preparados su nombre final con un enlace duro dentro del os.Root (atómico y sin sobrescribir:
+// si el nombre ya existe falla) y quita el temporal. Si algo falla deshace lo hecho. El catálogo nunca ve un archivo a medias.
+func (r *PlaybookResult) Publish(dir string) error {
+	if len(r.files) == 0 {
+		return nil
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return readErr(err)
+	}
+	defer root.Close()
+	for _, n := range r.files {
+		if err := root.Link(n+tmpSuffix, n); err != nil {
+			r.Undo(dir)
+			if errors.Is(err, fs.ErrExist) {
+				return rej("import.exists", "file", n)
+			}
+			return readErr(err)
+		}
+		r.published = append(r.published, n)
+		root.Remove(n + tmpSuffix)
+	}
+	if d, err := root.Open("."); err == nil { // que los archivos nuevos sobrevivan a una caída
+		d.Sync()
+		d.Close()
+	}
+	return nil
+}
+
+// ImportPlaybooks prepara y publica de una vez (StagePlaybooks + Publish).
+func (s *Store) ImportPlaybooks(p *Pack, dir string, userIDs map[string]bool, dec map[string]string) (*PlaybookResult, error) {
+	res, err := s.StagePlaybooks(p, dir, userIDs, dec)
+	if err != nil {
+		return nil, err
+	}
+	if err := res.Publish(dir); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// StagePlaybooks prepara en dir (<config>/playbooks) los playbooks de p, con nombre temporal hasta Publish, según dec (ID del archivo → renombrar u omitir).
 // Un choque sin decisión, una decisión que no cabe (reemplazar, o algo distinto de omitir en un playbook nuevo) o un
 // ID que no está en p falla sin escribir nada. Nunca sobrescribe: cada archivo se crea con O_EXCL y sin seguir enlaces,
 // y si uno falla se borran los ya escritos.
-func (s *Store) ImportPlaybooks(p *Pack, dir string, userIDs map[string]bool, dec map[string]string) (*PlaybookResult, error) {
+func (s *Store) StagePlaybooks(p *Pack, dir string, userIDs map[string]bool, dec map[string]string) (*PlaybookResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	plan := s.plan(p, dir, userIDs)
@@ -174,7 +221,7 @@ func (s *Store) ImportPlaybooks(p *Pack, dir string, userIDs map[string]bool, de
 	return res, nil
 }
 
-// writePlaybooks crea cada archivo nuevo dentro de dir (que se crea si falta) con un os.Root: un nombre o un enlace no
+// writePlaybooks crea cada archivo nuevo con sufijo .tmp dentro de dir (que se crea si falta) con un os.Root: un nombre o un enlace no
 // pueden sacar la escritura de la carpeta, y nada existente se sobrescribe. Si algo falla, borra lo que había escrito.
 func writePlaybooks(dir string, files map[string][]byte) ([]string, error) {
 	if len(files) == 0 {
@@ -191,7 +238,7 @@ func writePlaybooks(dir string, files map[string][]byte) ([]string, error) {
 	var done []string
 	fail := func(err error, name string) ([]string, error) {
 		for _, n := range done {
-			root.Remove(n)
+			root.Remove(n + tmpSuffix)
 		}
 		if errors.Is(err, fs.ErrExist) {
 			return nil, rej("import.exists", "file", name)
@@ -199,7 +246,7 @@ func writePlaybooks(dir string, files map[string][]byte) ([]string, error) {
 		return nil, readErr(err)
 	}
 	for name, b := range files {
-		f, err := sys.OpenNewIn(root, name)
+		f, err := sys.OpenNewIn(root, name+tmpSuffix)
 		if err != nil {
 			return fail(err, name)
 		}
