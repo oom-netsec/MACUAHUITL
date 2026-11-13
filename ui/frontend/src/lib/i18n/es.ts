@@ -2582,6 +2582,11 @@ export const es = {
   "patrol.param.ap": "Nombre del AP, como aparece en el controlador.",
   "patrol.param.interface": "Interfaz, por ejemplo Gi1/0/1.",
   "patrol.param.ip": "Dirección IPv4 o IPv6.",
+  "patrol.param.check": "Revisa los datos que piden los playbooks elegidos.",
+  "patrol.param.kind.mac": "Dirección MAC",
+  "patrol.param.kind.ap": "AP",
+  "patrol.param.kind.interface": "Interfaz",
+  "patrol.param.kind.ip": "Dirección IP",
 };
 
 export type Key = keyof typeof es;

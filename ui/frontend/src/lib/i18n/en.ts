@@ -2584,4 +2584,9 @@ export const en: Record<Key, string> = {
   "patrol.param.ap": "AP name, as shown on the controller.",
   "patrol.param.interface": "Interface, for example Gi1/0/1.",
   "patrol.param.ip": "IPv4 or IPv6 address.",
+  "patrol.param.check": "Check the data the selected playbooks ask for.",
+  "patrol.param.kind.mac": "MAC address",
+  "patrol.param.kind.ap": "AP",
+  "patrol.param.kind.interface": "Interface",
+  "patrol.param.kind.ip": "IP address",
 };

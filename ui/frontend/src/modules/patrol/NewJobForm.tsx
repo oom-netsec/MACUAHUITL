@@ -59,7 +59,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
     const missing = ([[!name.trim(), "name"], [!devices.length, "targets"], [!cred, "cred"], [!pbs.length && !cmds.trim(), "commands"], [!out.trim(), "outDir"]] as const)
       .filter(([m]) => m).map(([, k]) => t(`patrol.missing.${k}` as Key));
     if (missing.length) return setErr(t("patrol.missing", { list: missing.join(", ") }));
-    if (noVal.length) return setErr("");
+    if (noVal.length) return setErr(t("patrol.param.check"));
     const spec: JobSpec = {
       name, targets: devices.map((a) => ({ address: a, deviceId: a })), defaultCredentialId: cred, customCommands: cmds, playbookIds: pbs,
       outputDir: out, split, zip, deleteLooseFiles: delLoose, disableMasking: !mask, acceptChangedHostKeys: acceptChanged,
@@ -73,8 +73,8 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
     } catch (e) {
       const i = errInfo(e);
       if (i?.metadata.field === "params" && i.metadata.name && asked.some(([n]) => n === i.metadata.name)) {
-        setParamErr({ [i.metadata.name]: errorText(e) });
-        setErr("");
+        setParamErr({ [i.metadata.name]: errorText(e).replace(/^patrol: params: /, "") }); // el prefijo interno no aporta junto al campo
+        setErr(t("patrol.param.check")); // aviso junto al botón (role=alert): el campo puede estar fuera de la vista
       } else setErr(outputsErrorText(errorText(e), t));
     } finally {
       setBusy(false);
@@ -99,7 +99,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
         <p className="hint">{t("patrol.pb.hint")}</p>
         {pbErr ? <Notice kind="warn">{t("patrol.pb.unavailable")} <button type="button" className="sm" onClick={() => setPbTry((n) => n + 1)}>{t("common.retry")}</button></Notice> : catalog && <PlaybookPicker playbooks={catalog} selected={pbs} onChange={setPbs} />}
         {asked.map(([n, k]) => (
-          <Field key={n} label={n} hint={t(`patrol.param.${k}` as Key)} value={vals[n] ?? ""} error={paramErr[n]} onChange={(v) => setVals({ ...vals, [n]: v })} w="md" mono />
+          <Field key={n} label={`${t(`patrol.param.kind.${k}` as Key)} (${n})`} hint={t(`patrol.param.${k}` as Key)} value={vals[n] ?? ""} error={paramErr[n]} onChange={(v) => setVals({ ...vals, [n]: v })} w="md" mono />
         ))}
         <TextArea label={t("patrol.commands")} hint={t("patrol.commands.hint")} value={cmds} onChange={setCmds} rows={4} mono />
         <PathField label={t("patrol.outDir")} value={out} onChange={setOut} pick={() => core.pickPath({ title: t("patrol.outDir"), directory: true })} />
