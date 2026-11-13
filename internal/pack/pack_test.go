@@ -89,6 +89,9 @@ func TestOficialValido(t *testing.T) {
 	if !p.Official || p.Origin() != "official" || len(p.Playbooks) != 1 || p.Playbooks[0].ID != "ios-xe/oom-stp" || p.SHA256 == "" || p.Readme != "# Demo\n" {
 		t.Fatalf("%+v", p)
 	}
+	if got := p.Playbooks[0].Pack; got != p.ID {
+		t.Fatalf("Pack del playbook %q, quiero el ID del paquete %q", got, p.ID)
+	}
 }
 
 func TestOficialSinPrefijoDeEditor(t *testing.T) {

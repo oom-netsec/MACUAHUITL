@@ -296,6 +296,9 @@ func loadPlaybooks(p *Pack, files map[string][]byte) error {
 		}
 	}
 	slices.SortFunc(pbs, func(a, b playbook.Playbook) int { return strings.Compare(a.ID, b.ID) })
+	for i := range pbs {
+		pbs[i].Pack = p.ID
+	}
 	p.Playbooks = pbs
 	return nil
 }
