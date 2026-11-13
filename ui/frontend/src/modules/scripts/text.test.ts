@@ -15,6 +15,7 @@ test("fieldOfError ubica el campo por el reason, en cualquier idioma", () => {
 
 test("fieldOfError sin reason usa el texto en español de siempre", () => {
   expect(fieldOfError(new Error('ya hay un script llamado "a"'))).toBe("name");
+  expect(fieldOfError(new Error("rpc error: code = InvalidArgument desc = el nombre va de 1 a 64 caracteres"))).toBe("name");
   expect(fieldOfError(new Error("etiqueta repetida"))).toBe("tags");
   expect(fieldOfError(new Error("otra cosa"))).toBe("");
 });

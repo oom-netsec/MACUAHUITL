@@ -1,5 +1,6 @@
 import type { Key } from "../../lib/i18n/es";
 import { errInfo } from "../../lib/coreError";
+import { errorText } from "../../components/Field";
 
 // Lo que se inserta en la terminal: los comandos tal cual, incluidas las líneas «!» (dentro de un banner son texto).
 export const scriptText = (commands: string[]) => commands.join("\n");
@@ -72,7 +73,7 @@ const REASON_FIELD: Record<string, FormField> = {
 export function fieldOfError(e: unknown): FormField | "" {
   const info = errInfo(e);
   if (info) return REASON_FIELD[info.reason] ?? "";
-  const msg = e instanceof Error ? e.message : String(e);
+  const msg = errorText(e);
   if (/llamado|^el nombre/i.test(msg)) return "name";
   if (/etiqueta/i.test(msg)) return "tags";
   if (/descripci/i.test(msg)) return "desc";

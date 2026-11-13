@@ -21,5 +21,7 @@ test("hostKeyFromError lee el texto en inglés y el reason del núcleo", () => {
   expect(hostKeyFromError("cualquier texto", info("transport.hostkey.changed"))).toEqual({ fp: `SHA256:${b64}`, changed: true });
   expect(hostKeyFromError("cualquier texto", info("transport.hostkey.unknown"))).toEqual({ fp: `SHA256:${b64}`, changed: false });
   expect(hostKeyFromError("cualquier texto", info("transport.hostkey.known"))).toBeNull();
+  expect(hostKeyFromError("x", { code: "", reason: "patrol.svc.login", metadata: { cause_reason: "transport.hostkey.unknown", fingerprint: `SHA256:${b64}` } })).toEqual({ fp: `SHA256:${b64}`, changed: false });
+  expect(hostKeyFromError("x", { code: "", reason: "transport.hostkey.unknown", metadata: {} })).toBeNull(); // sin huella no hay qué aceptar
   expect(hostKeyFromError("transport: known host key from x: SHA256:AbC")).toBeNull();
 });
