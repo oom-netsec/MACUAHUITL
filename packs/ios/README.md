@@ -11,7 +11,7 @@ con el equivalente clásico cuando existe (`show platform tcam utilization`, `sh
 Los scripts de biblioteca derivados llevan el prefijo `lib-ios-`, así que conviven con los de `oom/ios-xe`. Con los dos
 paquetes instalados, un equipo detectado como IOS clásico corre el playbook de este paquete aunque se haya elegido el
 de `oom/ios-xe` con el mismo nombre (y al revés en IOS-XE), así una ronda sobre una flota mixta usa en cada equipo sus
-comandos. Los comandos de switch (`mls qos`, `sdm`, `power inline`, stack) darán inválido en un ISR.
+comandos. Al crear el trabajo se acepta un ID faltante si tiene gemelo; en los equipos de la otra plataforma ese playbook falla al correr con `pack.missing`. Los comandos de switch (`mls qos`, `sdm`, `power inline`, stack) darán inválido en un ISR.
 
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
