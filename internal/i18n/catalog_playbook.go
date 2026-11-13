@@ -20,6 +20,7 @@ func init() {
 		"playbook.err.platform":      e("plataforma desconocida {platform:q} en platforms de {cmd:q}", "unknown platform {platform:q} in platforms of {cmd:q}", "platform", "cmd"),
 		"playbook.err.empty_command": e("comando vacío", "empty command"),
 		"playbook.err.timeout":       e("timeout {timeout:q} inválido en {cmd:q}", "invalid timeout {timeout:q} in {cmd:q}", "timeout", "cmd"),
+		"playbook.err.timeout_max":   e("timeout {timeout:q} de {cmd:q} pasa el máximo de {max}", "timeout {timeout:q} of {cmd:q} exceeds the maximum of {max}", "timeout", "cmd", "max"),
 		"sys.err.not_regular":        e("la ruta no es un archivo regular", "the path is not a regular file"),
 		"adhoc.err.no_targets":       e("indica al menos un equipo", "specify at least one device"),
 		"playbook.err.none":          e("playbook: no hay comandos", "playbook: there are no commands"),

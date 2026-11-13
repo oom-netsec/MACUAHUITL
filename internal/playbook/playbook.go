@@ -167,7 +167,7 @@ func parse(b []byte) (Playbook, error) {
 				return Playbook{}, i18n.New("playbook.err.timeout", i18n.A("timeout", c.Timeout, "cmd", cmd.Text))
 			}
 			if d > MaxTimeout {
-				return Playbook{}, fmt.Errorf("timeout %q de %q pasa el máximo de %s", c.Timeout, cmd.Text, MaxTimeout)
+				return Playbook{}, i18n.New("playbook.err.timeout_max", i18n.A("timeout", c.Timeout, "cmd", cmd.Text, "max", MaxTimeout.String()))
 			}
 			cmd.Timeout = d
 		}
