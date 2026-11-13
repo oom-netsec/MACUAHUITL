@@ -130,3 +130,34 @@ func init() {
 		"patrol.err.job_missing": {Es: "trabajo {id} no existe", En: "job {id} does not exist", Args: []string{"id"}},
 	})
 }
+
+// Puente de la app (ui/bridge): validaciones propias que llegan a la UI.
+func init() {
+	e := func(es, en string) entry { return entry{Es: es, En: en, Args: tplArgs(es, en)} }
+	add(map[string]entry{
+		"bridge.err.disconnected":   e("núcleo desconectado", "core disconnected"),
+		"bridge.err.round":          e("ronda {round} inválida", "invalid round {round}"),
+		"bridge.err.rounds":         e("rondas {from} y {to} inválidas", "invalid rounds {from} and {to}"),
+		"bridge.err.instant":        e("instante {value:q} inválido: usa RFC 3339 (2026-11-04T10:09:18Z)", "invalid instant {value:q}: use RFC 3339 (2026-11-04T10:09:18Z)"),
+		"bridge.err.phase":          e("fase {phase:q} desconocida", "unknown phase {phase:q}"),
+		"bridge.err.request":        e("solicitud inválida: {cause}", "invalid request: {cause}"),
+		"bridge.err.calc":           e("calculadora {kind:q} desconocida", "unknown calculator {kind:q}"),
+		"bridge.err.burst":          e("ráfaga inválida: {burst} en {window} s", "invalid burst: {burst} in {window} s"),
+		"bridge.err.threshold_full": e("umbral inválido: {count} en {window} s, delta {delta}", "invalid threshold: {count} in {window} s, delta {delta}"),
+		"bridge.err.threshold":      e("umbral inválido", "invalid threshold"),
+		"bridge.err.save_abs":       e("guardar: la ruta debe ser absoluta", "save: the path must be absolute"),
+		"bridge.err.save_base64":    e("guardar: base64 inválido: {cause}", "save: invalid base64: {cause}"),
+		"bridge.err.save_encoding":  e("guardar: codificación {encoding:q} desconocida", "save: unknown encoding {encoding:q}"),
+		"bridge.err.save_big":       e("guardar: el archivo pasa de 64 MiB", "save: the file exceeds 64 MiB"),
+		"bridge.err.tool":           e("herramienta {tool:q} desconocida", "unknown tool {tool:q}"),
+		"bridge.err.run_gone":       e("ejecución {id:q} no existe o ya terminó", "run {id:q} does not exist or has already finished"),
+		"bridge.err.dns_mode":       e("modo DNS {mode:q} desconocido", "unknown DNS mode {mode:q}"),
+		"bridge.err.port":           e("puerto {port} inválido", "invalid port {port}"),
+		"bridge.err.range":          e("{name} fuera de rango: {value}", "{name} out of range: {value}"),
+		"bridge.err.console_gone":   e("consola {id:q} no existe o ya terminó", "console {id:q} does not exist or has already finished"),
+		"bridge.err.terminal_gone":  e("terminal {id:q} no existe o ya terminó", "terminal {id:q} does not exist or has already finished"),
+		"bridge.err.out_abs":        e("la ruta de salida debe ser absoluta", "the output path must be absolute"),
+		"bridge.err.top":            e("top fuera de rango: {value}", "top out of range: {value}"),
+		"bridge.err.only_empty":     e("solo se borra un archivo regular vacío", "only an empty regular file is deleted"),
+	})
+}

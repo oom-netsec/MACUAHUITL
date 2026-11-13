@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 )
 
@@ -56,7 +57,7 @@ func (b *Bridge) ExportVaultBackup(path, passphrase string, overwrite, confirm b
 // regular de 0 bytes en esa ruta exacta (sin seguir enlaces); cualquier otra cosa es un error y no se toca. Que ya no exista no es error.
 func (b *Bridge) RemoveEmptyFile(path string) error {
 	if !filepath.IsAbs(path) {
-		return wrapErr(errors.New("la ruta debe ser absoluta"))
+		return b.bridgeErr(i18n.New("file.err.path_abs", nil))
 	}
 	fi, err := os.Lstat(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -66,7 +67,7 @@ func (b *Bridge) RemoveEmptyFile(path string) error {
 		return wrapErr(err)
 	}
 	if !fi.Mode().IsRegular() || fi.Size() != 0 {
-		return wrapErr(errors.New("solo se borra un archivo regular vacío"))
+		return b.bridgeErr(i18n.New("bridge.err.only_empty", nil))
 	}
 	return wrapErr(os.Remove(path))
 }

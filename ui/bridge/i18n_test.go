@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -17,7 +18,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )

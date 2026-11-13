@@ -1,11 +1,11 @@
 package bridge
 
 import (
-	"fmt"
 	"io"
 	"sync"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // ---- Terminal SSH (Fase 16b): manual, una sesión por pestaña ----
@@ -81,7 +81,7 @@ func (b *Bridge) terminal(id string, f func(st v1.TerminalService_OpenTerminalCl
 	s, ok := b.terminals[id]
 	b.mu.Unlock()
 	if !ok {
-		return wrapErr(fmt.Errorf("terminal %q no existe o ya terminó", id))
+		return b.bridgeErr(i18n.New("bridge.err.terminal_gone", i18n.A("id", id)))
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
