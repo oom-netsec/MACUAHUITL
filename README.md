@@ -19,6 +19,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
   <a href="#install"><b>Install</b></a> &nbsp;·&nbsp;
   <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
   <a href="#everything-inside">Everything inside</a> &nbsp;·&nbsp;
+  <a href="#content-packs">Content packs</a> &nbsp;·&nbsp;
   <a href="#security">Security</a> &nbsp;·&nbsp;
   <a href="#what-it-does-not-do">What it does not do</a> &nbsp;·&nbsp;
   <a href="docs/roadmap.md">Roadmap</a>
@@ -52,7 +53,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 
 - **One core, two clients.** `macuahuitld` runs as a systemd user service and does all the work. The desktop app (Wails + React) and `mctl` are thin clients over gRPC on a Unix socket (mode `0600`, caller UID checked with `SO_PEERCRED`).
 - **Local storage only.** Metadata and the audit log live in SQLite (pure Go, no cgo). Evidence lives in the output folder you choose.
-- **Playbooks** define what gets collected (`tac-baseline`, `cpu-alta`, `errores-interfaz`, `topologia`, `upgrade-check`, …). Every command passes a per-platform deny list, so a collection can never change configuration.
+- **Playbooks** define what gets collected (`tac-baseline`, `cpu-alta`, `errores-interfaz`, `topologia`, `upgrade-check`, …). Every command passes a per-platform deny list, so a collection can never change configuration. A few ship inside the binary; the rest come in [content packs](#content-packs) you install per technology.
 
 ## More screens
 
@@ -97,6 +98,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 | **Field tools** | Temporary TFTP/HTTP/FTP/SCP/SFTP servers and clients, MD5/SHA-512 verification. |
 | **Calculators** | Subnets, VLSM, summarization, wildcards, IPv6, MTU/MSS, TCP throughput, DSCP/QoS, optical budget, BGP best path. |
 | **Syslog** | Local receiver that feeds the timeline. |
+| **Content packs** | Playbooks and scripts per technology in `.mpack` bundles, official ones signed. Install only what you use; read-only playbooks, checked on install and at every start. |
 
 ### A Patrol job, step by step
 
@@ -105,6 +107,27 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 3. **Arm** it. The vault stays usable for the window and the laptop is kept awake while rounds run.
 4. **Watch** it live: per-device status, progress and phases.
 5. **Collect** the package: evidence, masked secrets and a `manifest.json` anchored to the audit chain.
+
+## Content packs
+
+Playbooks and scripts come in **content packs** (`.mpack`), one per technology. Install the ones for the platforms you work on and leave the rest out. Each pack has its own version, so newer content installs on the core you already have.
+
+```sh
+mctl pack install oom-ios-xe-1.0.0.mpack    # from the release page; the app never downloads anything
+mctl pack list                              # installed packs, version, official or third-party
+mctl pack show oom/ios-xe                   # manifest and the pack's own README
+mctl pack remove oom/ios-xe
+```
+
+- **Official packs** (`oom/*`) are signed with Ed25519 and published as release assets with their README and checksum. The public key is compiled into the core.
+- **Third-party packs** install only with `--allow-unsigned` (or a confirmation in the app) and carry their publisher prefix in every ID, so they can never take over an official playbook.
+- **Playbooks stay read-only.** Every playbook command in a pack passes the same deny list as the built-in ones, on install and again at every start. Scripts are never run: the terminal pastes them without pressing Enter, like the built-in library. Nothing executable travels in a pack, and change templates stay in the core.
+- **Each pack carries its own README** with what it contains and how to load it.
+
+Official packs today: `oom/ios-xe`. Classic IOS is next; NX-OS, ASA/FTD, ACI, wireless, ISE and SD-Access follow as each platform gets its driver and read-only rules. The format is defined in [ADR 0010](docs/adr/0010-paquetes-de-contenido.md).
+
+> [!NOTE]
+> Content packs arrive with **v0.3.0**. From that version, 52 IOS-XE playbooks move out of the binary into `oom/ios-xe`: install it after upgrading. A job that asks for a playbook from a missing pack fails with a message naming the pack to install.
 
 ## Security
 
@@ -115,13 +138,13 @@ Promises anyone can verify with the [auditor's guide](docs/security/AUDIT_GUIDE.
 3. The app only connects to destinations the engineer typed. No telemetry, no update checks.
 4. The master password is never stored. Lose it and the vault cannot be recovered, by design.
 
-Under the hood: Argon2id tuned to about 1 s and 256 MiB, AES-256-GCM with associated data, the data key in locked memory, core dumps disabled, a `Secret` type redacted by every formatter, a no-egress check in CI and an egress guard at runtime, reproducible builds with SBOM, pinned dependencies and `govulncheck`. No project code runs with privileges: capture and scans use the system's `dumpcap`, `nmap`, `iperf3` and `tracepath`.
+Under the hood: Argon2id tuned to about 1 s and 256 MiB, AES-256-GCM with associated data, the data key in locked memory, core dumps disabled, a `Secret` type redacted by every formatter, a no-egress check in CI and an egress guard at runtime, reproducible builds with SBOM, pinned dependencies and `govulncheck`, and official content packs signed with Ed25519. No project code runs with privileges: capture and scans use the system's `dumpcap`, `nmap`, `iperf3` and `tracepath`.
 
 Known limits are declared, not hidden, in the [threat model](docs/security/THREAT_MODEL.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## What it does not do
 
-- **No cloud.** No account, no sync, no telemetry, no automatic updates.
+- **No cloud.** No account, no sync, no telemetry, no automatic updates. Content packs are downloaded by hand.
 - **Not a 24/7 NMS.** It is an engineer's tool on a laptop. Patrol collects while a job is armed and the machine is on.
 - **Never changes configuration on its own.** Patrol and batches are read-only. Every change goes through assisted mode, with your confirmation.
 - **No privileged code.** No setuid helpers, no raw sockets of its own, no embedded Wireshark or tshark.
@@ -160,6 +183,7 @@ systemctl --user enable --now macuahuitld     # as the user who will use it
 ## Quick start
 
 ```sh
+mctl pack install oom-ios-xe-1.0.0.mpack    # v0.3.0+: the IOS-XE playbooks (from the release page)
 mctl vault create                           # set the master password (no echo)
 mctl cred add --label lab --user admin      # device credential
 mctl job create -f job.yaml                 # returns the job ID
