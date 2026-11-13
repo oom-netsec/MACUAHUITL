@@ -9,16 +9,15 @@ import (
 	"path/filepath"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // AbsPath exige una ruta absoluta (la de un archivo de export/import) y la limpia.
-func AbsPath(p string) (string, error) {
+func AbsPath(ctx context.Context, p string) (string, error) {
 	if !filepath.IsAbs(p) {
-		return "", status.Error(codes.InvalidArgument, "la ruta debe ser absoluta")
+		return "", Err(ctx, codes.InvalidArgument, "respaldo.err.path_abs", nil)
 	}
 	return filepath.Clean(p), nil
 }
@@ -33,7 +32,7 @@ func WriteExport(ctx context.Context, path string, data []byte, overwrite bool) 
 			return Err(ctx, codes.AlreadyExists, "file.exists", i18n.A("path", path))
 		}
 		if err != nil {
-			return status.Error(codes.FailedPrecondition, err.Error())
+			return ErrFrom(ctx, codes.FailedPrecondition, err)
 		}
 		_, err = f.Write(data)
 		if cerr := f.Close(); err == nil {
@@ -41,16 +40,16 @@ func WriteExport(ctx context.Context, path string, data []byte, overwrite bool) 
 		}
 		if err != nil {
 			os.Remove(path)
-			return status.Error(codes.Internal, err.Error())
+			return ErrFrom(ctx, codes.Internal, err)
 		}
 		return nil
 	}
 	if fi, err := os.Lstat(path); err == nil && !fi.Mode().IsRegular() {
-		return status.Error(codes.FailedPrecondition, "la ruta existe y no es un archivo regular")
+		return Err(ctx, codes.FailedPrecondition, "file.err.export_not_regular", nil)
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".export-*") // 0600
 	if err != nil {
-		return status.Error(codes.FailedPrecondition, err.Error())
+		return ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
 	defer os.Remove(tmp.Name()) // tras el rename ya no existe
 	_, err = tmp.Write(data)
@@ -61,21 +60,21 @@ func WriteExport(ctx context.Context, path string, data []byte, overwrite bool) 
 		err = os.Rename(tmp.Name(), path)
 	}
 	if err != nil {
-		return status.Error(codes.Internal, err.Error())
+		return ErrFrom(ctx, codes.Internal, err)
 	}
 	return nil
 }
 
 // ReadImport lee el archivo de import: regular, sin quedarse en una FIFO, y de a lo más max bytes (más uno, para que quien llama detecte el exceso).
-func ReadImport(path string, max int64) ([]byte, error) {
+func ReadImport(ctx context.Context, path string, max int64) ([]byte, error) {
 	f, err := sys.OpenRegular(path)
 	if err != nil {
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
+		return nil, ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
 	defer f.Close()
 	b, err := io.ReadAll(io.LimitReader(f, max+1))
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, ErrFrom(ctx, codes.Internal, err)
 	}
 	return b, nil
 }

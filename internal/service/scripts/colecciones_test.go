@@ -745,7 +745,7 @@ func TestColeccionesOmitenLibInexistentes(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "v.json")
 	exportarCol(t, s, path, c.Id)
-	raw, _ := service.ReadImport(path, dom.MaxImportBytes)
+	raw, _ := service.ReadImport(context.Background(), path, dom.MaxImportBytes)
 	cols, _, err := dom.ParseColecciones(raw)
 	if err != nil || unidos(cols[0].ScriptIDs) != "lib-l2-stp" {
 		t.Errorf("export = %v %v", cols, err)

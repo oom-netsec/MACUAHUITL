@@ -70,7 +70,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	}
 	o := first.GetOpen()
 	if o == nil {
-		return status.Error(codes.InvalidArgument, "el primer mensaje debe abrir el puerto")
+		return service.Err(st.Context(), codes.InvalidArgument, "field.err.first_open", nil)
 	}
 	cfg, err := serialcon.Config{Path: o.Port, Baud: int(o.Baud), DataBits: int(o.DataBits), Parity: o.Parity, StopBits: int(o.StopBits), Flow: o.Flow}.Normalize()
 	if err != nil {

@@ -425,7 +425,7 @@ func (s *svc) DuplicateScript(ctx context.Context, r *v1.DuplicateScriptRequest)
 
 func (s *svc) ExportScripts(ctx context.Context, r *v1.ExportScriptsRequest) (*v1.ExportScriptsResponse, error) {
 	s.d.MarkActive()
-	path, err := service.AbsPath(r.Path)
+	path, err := service.AbsPath(ctx, r.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -496,11 +496,11 @@ func (s *svc) restore(tok string, p pending) { s.pend.Restore(tok, p, p.expires)
 
 func (s *svc) PreviewImport(ctx context.Context, r *v1.PreviewImportRequest) (*v1.PreviewImportResponse, error) {
 	s.d.MarkActive()
-	path, err := service.AbsPath(r.Path)
+	path, err := service.AbsPath(ctx, r.Path)
 	if err != nil {
 		return nil, err
 	}
-	b, err := service.ReadImport(path, dom.MaxImportBytes)
+	b, err := service.ReadImport(ctx, path, dom.MaxImportBytes)
 	if err != nil {
 		return nil, err
 	}

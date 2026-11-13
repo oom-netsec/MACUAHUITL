@@ -150,13 +150,6 @@ const (
 	decOmitir     = "omitir"
 )
 
-func respaldoPath(ctx context.Context, p string) (string, error) {
-	if !filepath.IsAbs(p) {
-		return "", service.Err(ctx, codes.InvalidArgument, "respaldo.err.path_abs", nil)
-	}
-	return filepath.Clean(p), nil
-}
-
 // respaldoErr traduce los errores del respaldo a gRPC sin repetir nunca lo que se escribió (frase, secretos).
 func respaldoErr(ctx context.Context, err error) error {
 	switch {
@@ -177,7 +170,7 @@ func (s *vaultSvc) ExportBackup(ctx context.Context, r *v1.ExportBackupRequest) 
 	if !r.Confirm {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "respaldo.err.confirm", nil)
 	}
-	path, err := respaldoPath(ctx, r.Path)
+	path, err := service.AbsPath(ctx, r.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +263,7 @@ func planImport(v *vault.Vault, in []vault.Credential) (map[string]planned, map[
 func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupImportRequest) (*v1.PreviewBackupImportResponse, error) {
 	defer clear(r.Passphrase)
 	s.c.markActive()
-	path, err := respaldoPath(ctx, r.Path)
+	path, err := service.AbsPath(ctx, r.Path)
 	if err != nil {
 		return nil, err
 	}

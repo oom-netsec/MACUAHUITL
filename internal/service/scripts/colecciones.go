@@ -464,7 +464,7 @@ func (s *svc) ReorderPinned(ctx context.Context, r *v1.ReorderPinnedRequest) (*v
 
 func (s *svc) ExportCollections(ctx context.Context, r *v1.ExportCollectionsRequest) (*v1.ExportCollectionsResponse, error) {
 	s.d.MarkActive()
-	path, err := service.AbsPath(r.Path)
+	path, err := service.AbsPath(ctx, r.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -535,11 +535,11 @@ func libAvisos(loc string, cols []dom.Coleccion, lib map[string]bool) []string {
 
 func (s *svc) PreviewImportCollections(ctx context.Context, r *v1.PreviewImportCollectionsRequest) (*v1.PreviewImportCollectionsResponse, error) {
 	s.d.MarkActive()
-	path, err := service.AbsPath(r.Path)
+	path, err := service.AbsPath(ctx, r.Path)
 	if err != nil {
 		return nil, err
 	}
-	b, err := service.ReadImport(path, dom.MaxImportBytes)
+	b, err := service.ReadImport(ctx, path, dom.MaxImportBytes)
 	if err != nil {
 		return nil, err
 	}
