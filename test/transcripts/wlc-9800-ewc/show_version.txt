@@ -1,0 +1,11 @@
+# command: show version
+Cisco IOS XE Software, Version 17.09.04a
+Cisco IOS Software [Cupertino], C9800-AP Software (C9800-AP-K9_IOSXE), Version 17.9.4a, RELEASE SOFTWARE (fc3)
+Technical Support: http://www.cisco.com/techsupport
+Copyright (c) 1986-2023 by Cisco Systems, Inc.
+
+EWC-LAB uptime is 1 week, 1 day, 2 hours, 8 minutes
+System image file is "flash:c9800-ap.bin"
+
+cisco C9120AXI-A (ARM) processor with 1024000K bytes of memory.
+Processor board ID FJC0000A0AA

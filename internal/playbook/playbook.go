@@ -38,9 +38,9 @@ func (c Command) Applies(detected string) bool {
 	return len(c.Platforms) == 0 || slices.Contains(c.Platforms, detected)
 }
 
-// Compatible: un IOS clásico usa los playbooks de IOS-XE; lo que no exista queda marcado inválido.
+// Compatible: un IOS clásico y un WLC 9800 (que es IOS-XE) usan también los playbooks de IOS-XE; lo que no exista queda marcado inválido.
 func Compatible(detected, pbPlatform string) bool {
-	return detected == pbPlatform || (detected == "ios" && pbPlatform == "ios-xe")
+	return detected == pbPlatform || (pbPlatform == "ios-xe" && (detected == "ios" || detected == "wlc-9800"))
 }
 
 func officialPack(p string) bool { return p == "" || strings.HasPrefix(p, "oom/") }

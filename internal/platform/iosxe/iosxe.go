@@ -291,6 +291,8 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 		return "", err
 	}
 	switch {
+	case strings.Contains(out.Text, "C9800") && strings.Contains(out.Text, "Cisco IOS XE Software"): // antes de la regla genérica
+		return "wlc-9800", nil
 	case strings.Contains(out.Text, "Cisco IOS XE Software"):
 		return "ios-xe", nil
 	case strings.Contains(out.Text, "Cisco IOS Software"):

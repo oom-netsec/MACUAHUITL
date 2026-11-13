@@ -91,7 +91,7 @@ func (e *devExec) conn(ctx context.Context, dev string) (*conn, error) {
 	}
 	// Solo IOS e IOS-XE: las líneas de la lista cerrada son de esa sintaxis.
 	p, err := drv.Detect(ctx)
-	if err != nil || (p != "ios-xe" && p != "ios") {
+	if err != nil || (p != "ios-xe" && p != "ios" && p != "wlc-9800") {
 		c.close()
 		if err == nil {
 			err = i18n.New("assist.err.platform_unsupported", i18n.A("platform", p))

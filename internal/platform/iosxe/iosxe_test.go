@@ -264,3 +264,16 @@ func TestDetectTieneTopeTotal(t *testing.T) {
 		t.Fatalf("err = %v tras %s", err, time.Since(start))
 	}
 }
+
+// Fixtures de la documentación de Cisco (9800-CL y EWC en AP), sin validar en laboratorio.
+func TestDetectWLC9800(t *testing.T) {
+	for _, f := range []string{"wlc-9800-cl", "wlc-9800-ewc"} {
+		d, err := open(t, simulator.Config{Transcripts: dir(f)}, "en", context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p, err := d.Detect(context.Background()); err != nil || p != "wlc-9800" {
+			t.Fatalf("%s: Detect = %q, %v", f, p, err)
+		}
+	}
+}

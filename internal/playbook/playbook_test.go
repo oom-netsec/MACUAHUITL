@@ -170,7 +170,7 @@ func TestCompatible(t *testing.T) {
 	for _, c := range []struct {
 		det, pb string
 		ok      bool
-	}{{"ios-xe", "ios-xe", true}, {"ios", "ios-xe", true}, {"ios", "ios", true}, {"ios-xe", "ios", false}, {"nx-os", "ios-xe", false}} {
+	}{{"ios-xe", "ios-xe", true}, {"ios", "ios-xe", true}, {"ios", "ios", true}, {"ios-xe", "ios", false}, {"nx-os", "ios-xe", false}, {"wlc-9800", "ios-xe", true}, {"wlc-9800", "wlc-9800", true}, {"ios-xe", "wlc-9800", false}, {"ios", "wlc-9800", false}} {
 		if got := Compatible(c.det, c.pb); got != c.ok {
 			t.Errorf("Compatible(%q, %q) = %v", c.det, c.pb, got)
 		}
@@ -234,5 +234,14 @@ func TestGemeloNoCruzaPaquetes(t *testing.T) {
 	}
 	if slices.Contains(got, "ios-xe/a") || !slices.Contains(got, "ios-xe/acme-b") || slices.Contains(got, "ios-xe/acme-c") {
 		t.Errorf("Visible: %v", got)
+	}
+}
+
+// Un 9800 ve los suyos y los genéricos de ios-xe; un switch no ve los del 9800.
+func TestVisibleWLC9800(t *testing.T) {
+	pbs := []Playbook{{ID: "ios-xe/cpu-alta", Platform: "ios-xe"}, {ID: "wlc-9800/ap-resumen", Platform: "wlc-9800"}, {ID: "nx-os/x", Platform: "nx-os"}}
+	n := func(det string) int { return len(Visible(det, pbs)) }
+	if n("wlc-9800") != 2 || n("ios-xe") != 1 || n("ios") != 1 {
+		t.Errorf("%d %d %d", n("wlc-9800"), n("ios-xe"), n("ios"))
 	}
 }
