@@ -3,10 +3,10 @@ package pack
 import (
 	"crypto/ed25519"
 	"fmt"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 )
@@ -492,7 +492,7 @@ func TestErrorDeLecturaSinRutas(t *testing.T) {
 
 func TestReadArchiveNoSeCuelgaConUnFIFO(t *testing.T) {
 	f := filepath.Join(t.TempDir(), "x.mpack")
-	if err := syscall.Mkfifo(f, 0o600); err != nil {
+	if err := sys.Mkfifo(f); err != nil {
 		t.Skip(err)
 	}
 	done := make(chan error, 1)

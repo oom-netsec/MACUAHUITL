@@ -394,7 +394,7 @@ func TestScriptsDePaqueteOficialExigenBibliotecaYLib(t *testing.T) {
 }
 
 func TestPlainRechazaFormato(t *testing.T) {
-	if plain("a‮b", 10) || !plain("ab", 10) {
+	if plain("a\u202eb", 10) || !plain("ab", 10) {
 		t.Fatal("plain debe rechazar caracteres de formato (bidi)")
 	}
 }

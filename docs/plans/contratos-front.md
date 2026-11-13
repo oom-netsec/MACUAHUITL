@@ -1102,7 +1102,7 @@ Instrucciones de `ServerReady.hint` (la explicación paso a paso del servidor de
 ### Métodos del puente
 | Método | Argumentos | Devuelve |
 |---|---|---|
-| `PackInstall(path, allowUnsigned)` | ruta absoluta del `.mpack` que eligió el usuario; `allowUnsigned` es la confirmación del diálogo con aviso | `{pack, replacedVersion}` (`replacedVersion` vacío si era nuevo) |
+| `PackInstall(path, allowUnsigned)` | ruta absoluta del `.mpack` (una relativa falla) que eligió el usuario; `allowUnsigned` es la confirmación del diálogo con aviso | `{pack, replacedVersion}` (`replacedVersion` vacío si era nuevo) |
 | `PackList()` | | `PackInfo[]`, ordenados por id (nunca `null`) |
 | `PackShow(id)` | id del paquete instalado | `{pack, readme, playbookIds, scriptIds}` |
 | `PackRemove(id)` | id del paquete instalado | número de scripts del paquete que estaban en colecciones o fijados y se quitaron |
@@ -1132,10 +1132,10 @@ Instrucciones de `ServerReady.hint` (la explicación paso a paso del servidor de
 | `pack.err.signature.invalid` | | InvalidArgument |
 | `pack.err.manifest.invalid` | `field` | InvalidArgument |
 | `pack.err.core.too_old` | `min_core`, `core` | InvalidArgument |
-| `pack.err.playbook.denied`, `pack.err.playbook.invalid`, `pack.err.script.invalid` | `cause_reason` si la causa trae código | InvalidArgument |
+| `pack.err.playbook.denied`, `pack.err.playbook.invalid` (incluye un id que no sea `a-z0-9-` o distinto del nombre del archivo, o que haría inválido el script `lib-<id>`), `pack.err.script.invalid` | `cause_reason` si la causa trae código | InvalidArgument |
 | `pack.err.playbook.platform` | `id`, `platform` | InvalidArgument |
 | `pack.err.id.prefix` | `id`, `want` | InvalidArgument |
-| `pack.err.editor.reserved` | `editor` | InvalidArgument |
+| `pack.err.editor.reserved` | `editor` | InvalidArgument (`oom`, nombres de plataforma y los prefijos de ID del contenido base y del movido a `oom/ios-xe` están reservados para paquetes con firma oficial) |
 | `pack.err.unsigned` | | FailedPrecondition |
 | `pack.err.collision` | `id`, `with` (`base` o el id del otro paquete) | FailedPrecondition |
 | `pack.err.version` | `id`, `installed`, `version` | FailedPrecondition |
@@ -1143,7 +1143,7 @@ Instrucciones de `ServerReady.hint` (la explicación paso a paso del servidor de
 | `pack.err.not_found` | `id` | NotFound |
 | `pack.missing` | `playbook`, `pack`, más `field = playbook_ids` | InvalidArgument (en `CreateJob`) |
 
-`pack.missing` sale de `CreateJob` (y de la ronda de un trabajo recargado) cuando el playbook pedido viene en un paquete que no está instalado: los movidos a `oom/ios-xe` o los de un paquete quitado. Dice qué paquete instalar (`pack`). Un ID inexistente que no es de ningún paquete sigue con `patrol.field.no_playbook`. Un trabajo ya creado conserva los playbooks que tenía.
+`pack.missing` sale de `CreateJob` (y de la ronda de un trabajo recargado) cuando el playbook pedido viene en un paquete que no está instalado: los movidos a `oom/ios-xe` o los de un paquete quitado. Dice qué paquete instalar (`pack`). Un ID inexistente que no es de ningún paquete sigue con `patrol.field.no_playbook`. Un trabajo ya creado conserva los playbooks que tenía: la foto del catálogo se toma al crear el trabajo (`CreateJob`), no al armarlo ni en cada ronda; instalar o quitar un paquete después no la cambia. Un trabajo recargado tras reiniciar el núcleo toma el catálogo vigente.
 
 ### README y textos del paquete
 `readme`, `name`, `description`, `author` y los demás textos son **texto plano** (o Markdown sin interpretar). La vista no usa `dangerouslySetInnerHTML`, no carga imágenes y no hace clicables los enlaces: nada del paquete pide recursos a la red ni mete HTML en el webview. Se muestra `name`/`description` o `nameEn`/`descriptionEn` según el idioma de la interfaz; el README viene en español e inglés en el mismo texto.
@@ -1151,7 +1151,7 @@ Instrucciones de `ServerReady.hint` (la explicación paso a paso del servidor de
 ### Auditoría (siempre en inglés)
 - `pack.install`: `id=… version=… sha256=<del archivo> origin=official|third-party playbooks=N scripts=N [replaced=<versión>] [min_core_unchecked=true]`.
 - `pack.remove`: `id=… version=… origin=… playbooks=N scripts=N favorites_removed=N`.
-- `pack.rejected`: `id=… sha256=… origin=… reason=<motivo sin el prefijo pack.err.> path="<la ruta que pasó el usuario>"`; al arrancar, `id=… dir=… reason=… stage=startup` por cada paquete instalado que no pasó la revalidación (se omite y el núcleo sigue).
+- `pack.rejected`: `id=… version=… sha256=… origin=… reason=<motivo sin el prefijo pack.err.> path="<la ruta que pasó el usuario>"`; al arrancar, `id=… dir=… reason=… stage=startup` por cada paquete instalado que no pasó la revalidación (se omite y el núcleo sigue).
 
 ### Compatibilidad
-Los IDs de los playbooks movidos a `oom/ios-xe`, sus scripts `lib-<id>` y los favoritos no cambian. Quien venga de una versión anterior no tiene esos playbooks ni scripts hasta que instale el paquete; los favoritos de scripts de un paquete ausente quedan apuntando a un ID que no existe.
+Los IDs de los playbooks movidos a `oom/ios-xe`, sus scripts `lib-<id>` y los favoritos no cambian. Quien venga de una versión anterior no tiene esos playbooks ni scripts hasta que instale el paquete. Los fijados y las colecciones que ya tenían `lib-<id>` de esos scripts se conservan (no se podan ni se ocultan) mientras el paquete no está instalado: la vista puede recibir IDs `lib-*` que todavía no resuelven a un script y debe tolerarlo; al instalar el paquete vuelven a verse. Lo mismo vale para los scripts de playbooks de un paquete quitado.

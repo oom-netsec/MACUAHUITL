@@ -59,8 +59,8 @@ export type * from "../modules/transfer/api";
 export type * from "../modules/metrics/api";
 export type * from "../modules/inventory/api";
 export type * from "../modules/scripts/api";
-export type * from "../modules/packs/api";
 export type * from "../modules/settings/api";
+export type * from "../modules/packs/api";
 
 // Lo compartido por todos los módulos: estado del núcleo, preferencias, diálogo de archivos y portapapeles.
 export interface BaseAPI {

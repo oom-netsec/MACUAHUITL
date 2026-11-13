@@ -13,10 +13,10 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 const fileIndex = "INDEX" // el índice calculado al instalar; revalida el contenido al arrancar
@@ -282,14 +282,14 @@ func (s *Store) collides(p *Pack, others []*Pack) error {
 // ReadArchive lee el .mpack una sola vez, con tope de 20 MB. Abre sin bloquear y mira el tipo antes de leer: un FIFO
 // o un dispositivo no cuelgan al núcleo.
 func ReadArchive(path string) ([]byte, error) {
-	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	f, err := sys.OpenRegular(path)
+	if errors.Is(err, sys.ErrNotRegular) {
+		return nil, rej("zip.invalid")
+	}
 	if err != nil {
 		return nil, readErr(err)
 	}
 	defer f.Close()
-	if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
-		return nil, rej("zip.invalid")
-	}
 	b, err := io.ReadAll(io.LimitReader(f, MaxArchive+1))
 	if err != nil {
 		return nil, readErr(err)
