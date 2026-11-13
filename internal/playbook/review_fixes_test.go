@@ -2,6 +2,8 @@ package playbook
 
 import (
 	"errors"
+	"strings"
+	"testing/fstest"
 	"testing"
 )
 
@@ -59,5 +61,18 @@ func TestDenySinksTrasElPrimerPipe(t *testing.T) {
 	}
 	if err := CheckDenied("ios-xe", "sh run | i x"); err != nil {
 		t.Errorf("denied: %v", err)
+	}
+}
+
+func TestTimeoutMayorAlTopeSeRechazaConElArchivo(t *testing.T) {
+	yml := func(to string) fstest.MapFS {
+		return fstest.MapFS{"mio.yaml": {Data: []byte("id: x\nplatform: ios-xe\nname: X\ncommands:\n  - cmd: show version\n    timeout: " + to + "\n")}}
+	}
+	if _, err := Load(yml("30m")); err != nil {
+		t.Fatalf("30m debe aceptarse: %v", err)
+	}
+	_, err := Load(yml("31m"))
+	if err == nil || !strings.Contains(err.Error(), "mio.yaml") {
+		t.Fatalf("err = %v, quiero error que nombre mio.yaml", err)
 	}
 }

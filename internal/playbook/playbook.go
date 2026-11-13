@@ -21,6 +21,10 @@ import (
 
 const defaultTimeout = 60 * time.Second
 
+// MaxTimeout es el timeout más largo que acepta un playbook. Debe coincidir con maxRun de internal/platform/iosxe
+// (el tope fijo por comando del driver); no se importa de allá para no acoplar los paquetes.
+const MaxTimeout = 30 * time.Minute
+
 type Command struct {
 	Text       string
 	Timeout    time.Duration // de inactividad: el driver lo reinicia mientras llega salida
@@ -126,6 +130,9 @@ func parse(b []byte) (Playbook, error) {
 			d, err := time.ParseDuration(c.Timeout)
 			if err != nil || d <= 0 {
 				return Playbook{}, fmt.Errorf("timeout %q inválido en %q", c.Timeout, cmd.Text)
+			}
+			if d > MaxTimeout {
+				return Playbook{}, fmt.Errorf("timeout %q de %q pasa el máximo de %s", c.Timeout, cmd.Text, MaxTimeout)
 			}
 			cmd.Timeout = d
 		}
