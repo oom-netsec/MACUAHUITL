@@ -28,7 +28,7 @@ type securitySvc struct {
 
 // secretFrom resuelve un secreto: la contraseña de una credencial de la bóveda
 // (y su usuario) o el valor escrito. done lo borra; siempre es seguro llamarlo.
-func secretFrom(d service.Deps, src *v1.SecretSource) (user string, val []byte, done func(), err error) {
+func secretFrom(ctx context.Context, d service.Deps, src *v1.SecretSource) (user string, val []byte, done func(), err error) {
 	if src.GetCredentialId() == "" {
 		v := src.GetValue()
 		return "", v, func() { clear(v) }, nil
@@ -39,7 +39,7 @@ func secretFrom(d service.Deps, src *v1.SecretSource) (user string, val []byte, 
 	}
 	cr, err := v.Get(src.CredentialId)
 	if err != nil {
-		return "", nil, func() {}, service.VaultErr(err)
+		return "", nil, func() {}, service.VaultErr(ctx, err)
 	}
 	cr.Enable.Destroy()
 	cr.SSHKey.Destroy()
@@ -81,12 +81,12 @@ func (s *securitySvc) RadiusTest(ctx context.Context, r *v1.RadiusTestRequest) (
 	if err != nil {
 		return nil, err
 	}
-	_, secret, sdone, err := secretFrom(s.d, r.SharedSecret)
+	_, secret, sdone, err := secretFrom(ctx, s.d, r.SharedSecret)
 	defer sdone()
 	if err != nil {
 		return nil, err
 	}
-	user, pw, pdone, err := secretFrom(s.d, r.Password)
+	user, pw, pdone, err := secretFrom(ctx, s.d, r.Password)
 	defer pdone()
 	if err != nil {
 		return nil, err
@@ -128,12 +128,12 @@ func (s *securitySvc) TacacsTest(ctx context.Context, r *v1.TacacsTestRequest) (
 	if err != nil {
 		return nil, err
 	}
-	_, secret, sdone, err := secretFrom(s.d, r.SharedSecret)
+	_, secret, sdone, err := secretFrom(ctx, s.d, r.SharedSecret)
 	defer sdone()
 	if err != nil {
 		return nil, err
 	}
-	user, pw, pdone, err := secretFrom(s.d, r.Password)
+	user, pw, pdone, err := secretFrom(ctx, s.d, r.Password)
 	defer pdone()
 	if err != nil {
 		return nil, err

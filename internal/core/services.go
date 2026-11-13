@@ -66,7 +66,7 @@ func (s *vaultSvc) Create(ctx context.Context, r *v1.CreateRequest) (*v1.CreateR
 	}
 	v, err := vault.Create(s.c.vaultPath(), r.MasterPassword, p)
 	if err != nil {
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	v.SetClock(s.c.o.Now)
 	v.OnLock(s.c.respaldos.wipeAll)
@@ -86,7 +86,7 @@ func (s *vaultSvc) Unlock(ctx context.Context, r *v1.UnlockRequest) (*v1.UnlockR
 	}
 	if err := v.Unlock(r.MasterPassword); err != nil {
 		s.c.audit("vault.unlock_failed", "", "")
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	s.c.markActive()
 	s.c.audit("vault.unlock", "", "")
@@ -111,7 +111,7 @@ func (s *vaultSvc) ChangeMasterPassword(ctx context.Context, r *v1.ChangeMasterP
 		return nil, err
 	}
 	if err := v.ChangeMasterPassword(r.CurrentMasterPassword, r.NewMasterPassword); err != nil {
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	s.c.audit("vault.change_master", "", "")
 	return &v1.ChangeMasterPasswordResponse{}, nil
@@ -124,7 +124,7 @@ func (s *vaultSvc) ListCredentials(ctx context.Context, _ *v1.ListCredentialsReq
 	}
 	infos, err := v.List()
 	if err != nil {
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	r := &v1.ListCredentialsResponse{}
 	for _, i := range infos {
@@ -150,7 +150,7 @@ func (s *vaultSvc) PutCredential(ctx context.Context, r *v1.PutCredentialRequest
 	defer c.SSHKey.Destroy()
 	id, err := v.Put(c)
 	if err != nil {
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	s.c.audit("credential.put", id, "")
 	return &v1.PutCredentialResponse{Id: id}, nil
@@ -163,7 +163,7 @@ func (s *vaultSvc) DeleteCredential(ctx context.Context, r *v1.DeleteCredentialR
 		return nil, err
 	}
 	if err := v.Delete(r.Id); err != nil {
-		return nil, service.VaultErr(err)
+		return nil, service.VaultErr(ctx, err)
 	}
 	s.c.audit("credential.delete", r.Id, "")
 	return &v1.DeleteCredentialResponse{}, nil
@@ -339,7 +339,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 	}
 	if err := v.Arm(j.id, until, creds); err != nil {
-		return fail(service.VaultErr(err), i18n.English(err))
+		return fail(service.VaultErr(ctx, err), i18n.English(err))
 	}
 	undo = append(undo, func() { v.Disarm(j.id) })
 	w, err := patrol.NewWriter(spec.OutputDir, spec, c.o.Now())

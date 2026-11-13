@@ -20,18 +20,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 )
 
 var (
-	ErrEmptyPassword = errors.New("vault: contraseña maestra vacía")
-	ErrWrongPassword = errors.New("vault: contraseña maestra incorrecta")
-	ErrLocked        = errors.New("vault: bóveda cerrada")
-	ErrNotFound      = errors.New("vault: credencial no encontrada")
-	ErrCorrupt       = errors.New("vault: archivo dañado o alterado")
-	ErrExists        = errors.New("vault: la bóveda ya existe")
-	ErrWeakParams    = errors.New("vault: parámetros de Argon2id por debajo del mínimo")
-	ErrReserved      = errors.New("vault: entrada reservada del sistema, no es una credencial de conexión")
+	ErrEmptyPassword = i18n.New("vault.err.empty_password", nil)
+	ErrWrongPassword = i18n.New("vault.err.wrong_password", nil)
+	ErrLocked        = i18n.New("vault.err.locked", nil)
+	ErrNotFound      = i18n.New("vault.err.not_found", nil)
+	ErrCorrupt       = i18n.New("vault.err.corrupt", nil)
+	ErrExists        = i18n.New("vault.err.exists", nil)
+	ErrWeakParams    = i18n.New("vault.err.weak_params", nil)
+	ErrReserved      = i18n.New("vault.err.reserved", nil)
 )
 
 // ReservedPrefix marca las entradas que guarda el sistema (por ejemplo la llave de las fichas de respaldo): no salen en List, Get las rechaza

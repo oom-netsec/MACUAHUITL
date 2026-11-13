@@ -83,7 +83,7 @@ func (s *visibilitySvc) credential(ctx context.Context, id string) (vault.Creden
 		return vault.Credential{}, service.Err(ctx, codes.InvalidArgument, "visibility.err.no_cred", nil)
 	}
 	c, err := v.Get(id)
-	return c, service.VaultErr(err)
+	return c, service.VaultErr(ctx, err)
 }
 
 func destroy(c vault.Credential) {
