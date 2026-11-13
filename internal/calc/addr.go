@@ -1,7 +1,6 @@
 package calc
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"math/bits"
@@ -55,28 +54,28 @@ func parsePrefix(s string) (netip.Prefix, netip.Addr, error) {
 	if !ok {
 		f := strings.Fields(s)
 		if len(f) != 2 {
-			return netip.Prefix{}, netip.Addr{}, fmt.Errorf("%q: indica el prefijo (10.0.0.0/24 o 10.0.0.0 255.255.255.0)", s)
+			return netip.Prefix{}, netip.Addr{}, i18n.New("calc.err.prefix_missing", i18n.A("input", s))
 		}
 		addr, rest = f[0], f[1]
 	}
 	a, err := netip.ParseAddr(strings.TrimSpace(addr))
 	if err != nil {
-		return netip.Prefix{}, netip.Addr{}, fmt.Errorf("dirección %q inválida", addr)
+		return netip.Prefix{}, netip.Addr{}, i18n.New("calc.err.addr_invalid", i18n.A("addr", addr))
 	}
 	a = a.WithZone("")
 	n, err := strconv.Atoi(rest)
 	if err != nil {
 		m, merr := netip.ParseAddr(rest)
 		if merr != nil || !a.Is4() || !m.Is4() {
-			return netip.Prefix{}, netip.Addr{}, fmt.Errorf("prefijo o máscara %q inválido", rest)
+			return netip.Prefix{}, netip.Addr{}, i18n.New("calc.err.mask_invalid", i18n.A("value", rest))
 		}
 		var ok bool
 		if n, ok = contiguousLen(v4(m)); !ok {
-			return netip.Prefix{}, netip.Addr{}, fmt.Errorf("máscara %s no contigua", rest)
+			return netip.Prefix{}, netip.Addr{}, i18n.New("calc.err.mask_noncontig", i18n.A("mask", rest))
 		}
 	}
 	if n < 0 || n > a.BitLen() {
-		return netip.Prefix{}, netip.Addr{}, fmt.Errorf("longitud /%s fuera de rango", rest)
+		return netip.Prefix{}, netip.Addr{}, i18n.New("calc.err.len_range", i18n.A("len", rest))
 	}
 	return netip.PrefixFrom(a, n).Masked(), a, nil
 }
@@ -310,12 +309,12 @@ func VLSM(parent string, needs []Need) (VLSMResult, error) {
 		return VLSMResult{}, err
 	}
 	if len(needs) == 0 {
-		return VLSMResult{}, errors.New("indica al menos una necesidad de hosts")
+		return VLSMResult{}, i18n.New("calc.err.vlsm_none", nil)
 	}
 	sorted := slices.Clone(needs)
 	for i, n := range sorted {
 		if n.Hosts == 0 {
-			return VLSMResult{}, fmt.Errorf("%q pide 0 hosts", n.Name)
+			return VLSMResult{}, i18n.New("calc.err.vlsm_zero", i18n.A("name", n.Name))
 		}
 		if n.Name == "" {
 			sorted[i].Name = fmt.Sprintf("red %d", i+1)
@@ -400,12 +399,12 @@ func Summarize(in []string) (Summary, error) {
 			return Summary{}, err
 		}
 		if len(rs) > 0 && rs[0].a.Is4() != p.Addr().Is4() {
-			return Summary{}, errors.New("no se pueden mezclar IPv4 e IPv6")
+			return Summary{}, i18n.New("calc.err.sum_mixed", nil)
 		}
 		rs = append(rs, rng{p.Addr(), lastAddr(p)})
 	}
 	if len(rs) == 0 {
-		return Summary{}, errors.New("indica al menos un prefijo")
+		return Summary{}, i18n.New("calc.err.sum_none", nil)
 	}
 	slices.SortFunc(rs, func(x, y rng) int { return x.a.Compare(y.a) })
 	merged := []rng{rs[0]}
@@ -455,6 +454,7 @@ type OctetMatch struct {
 	Wildcard int    `json:"wildcard"`
 	Binary   string `json:"binary"`
 	Values   string `json:"values"`
+	vals     val
 }
 
 type WildcardInfo struct {
@@ -485,11 +485,11 @@ func Wildcard(addr, value string) (WildcardInfo, error) {
 	}
 	a, err := netip.ParseAddr(strings.TrimSpace(addr))
 	if err != nil || !a.Is4() {
-		return WildcardInfo{}, fmt.Errorf("dirección IPv4 %q inválida (las ACL IPv6 usan prefijos, no wildcards)", addr)
+		return WildcardInfo{}, i18n.New("calc.err.wc_addr", i18n.A("addr", addr))
 	}
 	m, err := netip.ParseAddr(value)
 	if err != nil || !m.Is4() {
-		return WildcardInfo{}, fmt.Errorf("wildcard %q inválida", value)
+		return WildcardInfo{}, i18n.New("calc.err.wc_value", i18n.A("value", value))
 	}
 	w, base := v4(m), v4(a)&^v4(m)
 	t := bits.TrailingZeros32(^w) // bits bajos libres contiguos
@@ -517,7 +517,8 @@ func Wildcard(addr, value string) (WildcardInfo, error) {
 	}
 	for i := 0; i < 4; i++ {
 		v, wo := int(base>>(24-8*i))&0xff, int(w>>(24-8*i))&0xff
-		info.Octets = append(info.Octets, OctetMatch{Value: v, Wildcard: wo, Binary: fmt.Sprintf("%08b", wo), Values: octetValues(v, wo)})
+		ov := octetValues(v, wo)
+		info.Octets = append(info.Octets, OctetMatch{Value: v, Wildcard: wo, Binary: fmt.Sprintf("%08b", wo), Values: i18n.Msg(i18n.Es, ov.key, ov.args), vals: ov})
 	}
 	if !info.Contiguous {
 		addNote(&info.Notes, &info.notes, "calc.note.wildcard_noncontiguous")
@@ -525,16 +526,17 @@ func Wildcard(addr, value string) (WildcardInfo, error) {
 	return info, nil
 }
 
-func octetValues(v, w int) string {
+// octetValues describe qué valores de un octeto coinciden: el texto es y el código de catálogo (calc.val.octet.*).
+func octetValues(v, w int) val {
 	switch {
 	case w == 0:
-		return "solo " + strconv.Itoa(v)
+		return val{"calc.val.octet.only", i18n.A("v", v)}
 	case w&(w+1) == 0:
-		return fmt.Sprintf("de %d a %d", v, v|w)
+		return val{"calc.val.octet.range", i18n.A("from", v, "to", v|w)}
 	case w == 0xfe && v == 0:
-		return "pares de 0 a 254"
+		return val{"calc.val.octet.even", nil}
 	case w == 0xfe:
-		return "impares de 1 a 255"
+		return val{"calc.val.octet.odd", nil}
 	}
 	var vals []string
 	for x := 0; x < 256 && len(vals) < 8; x++ {
@@ -542,7 +544,7 @@ func octetValues(v, w int) string {
 			vals = append(vals, strconv.Itoa(x))
 		}
 	}
-	return fmt.Sprintf("%s… (%d valores)", strings.Join(vals, ", "), 1<<bits.OnesCount8(uint8(w)))
+	return val{"calc.val.octet.list", i18n.A("list", strings.Join(vals, ", "), "n", 1<<bits.OnesCount8(uint8(w)))}
 }
 
 func convertMask(v string) (WildcardInfo, error) {
@@ -550,17 +552,17 @@ func convertMask(v string) (WildcardInfo, error) {
 	if err != nil {
 		m, perr := netip.ParseAddr(v)
 		if perr != nil || !m.Is4() {
-			return WildcardInfo{}, fmt.Errorf("%q no es prefijo, máscara ni wildcard IPv4", v)
+			return WildcardInfo{}, i18n.New("calc.err.wc_unknown", i18n.A("value", v))
 		}
 		var ok bool
 		if n, ok = contiguousLen(v4(m)); !ok { // ¿máscara? si no, ¿wildcard?
 			if n, ok = contiguousLen(^v4(m)); !ok {
-				return WildcardInfo{}, fmt.Errorf("%s no es contigua: indica la dirección de la ACL para ver qué cubre", v)
+				return WildcardInfo{}, i18n.New("calc.err.wc_noncontig", i18n.A("value", v))
 			}
 		}
 	}
 	if n < 0 || n > 32 {
-		return WildcardInfo{}, fmt.Errorf("prefijo /%d fuera de rango", n)
+		return WildcardInfo{}, i18n.New("calc.err.wc_prefix_range", i18n.A("len", n))
 	}
 	m := mask4(n)
 	return WildcardInfo{PrefixLen: strconv.Itoa(n), Mask: fromV4(m).String(), Wildcard: fromV4(^m).String(), Contiguous: true,
@@ -581,7 +583,7 @@ func (w WildcardInfo) Report() Report {
 		"calc.row.equals", pl, "calc.row.prefixes_needed", w.PrefixCount))
 	ot := titled("calc.title.octets", nil, "calc.col.octet", "calc.col.value", "calc.col.wildcard", "calc.col.binary", "calc.col.matching")
 	for i, o := range w.Octets {
-		ot.add("", nil, strconv.Itoa(i+1), strconv.Itoa(o.Value), strconv.Itoa(o.Wildcard), o.Binary, o.Values)
+		ot.add("", nil, strconv.Itoa(i+1), strconv.Itoa(o.Value), strconv.Itoa(o.Wildcard), o.Binary, o.vals)
 	}
 	pt := titled("calc.title.covered", nil, "calc.col.prefix")
 	if w.PrefixCount != strconv.Itoa(len(w.Prefixes)) {
@@ -613,12 +615,12 @@ func parseMAC(s string) ([6]byte, error) {
 	var m [6]byte
 	h := strings.NewReplacer(":", "", "-", "", ".", "").Replace(strings.TrimSpace(s))
 	if len(h) != 12 {
-		return m, fmt.Errorf("MAC %q inválida", s)
+		return m, i18n.New("calc.err.mac_invalid", i18n.A("mac", s))
 	}
 	for i := range m {
 		b, err := strconv.ParseUint(h[2*i:2*i+2], 16, 8)
 		if err != nil {
-			return m, fmt.Errorf("MAC %q inválida", s)
+			return m, i18n.New("calc.err.mac_invalid", i18n.A("mac", s))
 		}
 		m[i] = byte(b)
 	}
@@ -630,7 +632,7 @@ func parseMAC(s string) ([6]byte, error) {
 func IPv6(addr, mac string) (IPv6Info, error) {
 	addr, mac = strings.TrimSpace(addr), strings.TrimSpace(mac)
 	if addr == "" && mac == "" {
-		return IPv6Info{}, errors.New("indica una dirección IPv6 o una MAC")
+		return IPv6Info{}, i18n.New("calc.err.ipv6_none", nil)
 	}
 	var a netip.Addr
 	var prefix string
@@ -642,7 +644,7 @@ func IPv6(addr, mac string) (IPv6Info, error) {
 		p := netip.MustParsePrefix("fe80::/64")
 		if addr != "" {
 			if p, _, err = parsePrefix(addr); err != nil || !p.Addr().Is6() || p.Bits() != 64 {
-				return IPv6Info{}, fmt.Errorf("EUI-64 requiere un prefijo IPv6 /64 (recibí %q)", addr)
+				return IPv6Info{}, i18n.New("calc.err.ipv6_eui_prefix", i18n.A("addr", addr))
 			}
 		}
 		b := p.Addr().As16()
@@ -652,7 +654,7 @@ func IPv6(addr, mac string) (IPv6Info, error) {
 		s, _, _ := strings.Cut(addr, "/")
 		var err error
 		if a, err = netip.ParseAddr(s); err != nil || !a.Is6() {
-			return IPv6Info{}, fmt.Errorf("dirección IPv6 %q inválida", addr)
+			return IPv6Info{}, i18n.New("calc.err.ipv6_invalid", i18n.A("addr", addr))
 		}
 		if strings.Contains(addr, "/") {
 			p, _, err := parsePrefix(addr)

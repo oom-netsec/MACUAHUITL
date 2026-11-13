@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/calc"
@@ -20,9 +19,18 @@ type calcSvc struct {
 	v1.UnimplementedCalcServiceServer
 }
 
+// invalid es el error de la entrada en el idioma del contexto (el texto es de un error sin código no cambia).
+func invalid(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	return service.ErrFrom(ctx, codes.InvalidArgument, err)
+}
+
+// calcResult arma la respuesta; el error de la calculadora sale tal cual para que invalid lo ponga en el idioma.
 func calcResult[T calc.Reporter](v T, err error) (*v1.CalcResult, error) {
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, err
 	}
 	b, _ := json.Marshal(v)
 	full := v.Report()
@@ -50,6 +58,14 @@ func calcResult[T calc.Reporter](v T, err error) (*v1.CalcResult, error) {
 		out.NotesStructured = append(out.NotesStructured, &v1.CalcNote{Key: n.Key, Args: n.Args})
 	}
 	return out, nil
+}
+
+// nameOr da el nombre por defecto (red 1, ruta 2…) en el idioma del contexto a lo que llegó sin nombre.
+func nameOr(ctx context.Context, name, key string, i int) string {
+	if name != "" {
+		return name
+	}
+	return i18n.T(ctx, key, i18n.A("n", i+1))
 }
 
 // localize pone en el idioma del contexto los textos de la respuesta (título, encabezados, etiquetas de fila,
@@ -96,46 +112,46 @@ func localize(ctx context.Context, r *v1.CalcResult) *v1.CalcResult {
 
 func (calcSvc) Subnet(ctx context.Context, r *v1.SubnetRequest) (*v1.SubnetResponse, error) {
 	res, err := calcResult(calc.Subnet(r.Prefix))
-	return &v1.SubnetResponse{Result: localize(ctx, res)}, err
+	return &v1.SubnetResponse{Result: localize(ctx, res)}, invalid(ctx, err)
 }
 
 func (calcSvc) Vlsm(ctx context.Context, r *v1.VlsmRequest) (*v1.VlsmResponse, error) {
 	needs := make([]calc.Need, 0, len(r.Needs))
-	for _, n := range r.Needs {
-		needs = append(needs, calc.Need{Name: n.Name, Hosts: n.Hosts})
+	for i, n := range r.Needs {
+		needs = append(needs, calc.Need{Name: nameOr(ctx, n.Name, "calc.val.name.network", i), Hosts: n.Hosts})
 	}
 	res, err := calcResult(calc.VLSM(r.Network, needs))
-	return &v1.VlsmResponse{Result: localize(ctx, res)}, err
+	return &v1.VlsmResponse{Result: localize(ctx, res)}, invalid(ctx, err)
 }
 
 func (calcSvc) Summarize(ctx context.Context, r *v1.SummarizeRequest) (*v1.SummarizeResponse, error) {
 	res, err := calcResult(calc.Summarize(r.Prefixes))
-	return &v1.SummarizeResponse{Result: localize(ctx, res)}, err
+	return &v1.SummarizeResponse{Result: localize(ctx, res)}, invalid(ctx, err)
 }
 
 func (calcSvc) Wildcard(ctx context.Context, r *v1.WildcardRequest) (*v1.WildcardResponse, error) {
 	res, err := calcResult(calc.Wildcard(r.Address, r.Value))
-	return &v1.WildcardResponse{Result: localize(ctx, res)}, err
+	return &v1.WildcardResponse{Result: localize(ctx, res)}, invalid(ctx, err)
 }
 
 func (calcSvc) Ipv6(ctx context.Context, r *v1.Ipv6Request) (*v1.Ipv6Response, error) {
 	res, err := calcResult(calc.IPv6(r.Address, r.Mac))
-	return &v1.Ipv6Response{Result: localize(ctx, res)}, err
+	return &v1.Ipv6Response{Result: localize(ctx, res)}, invalid(ctx, err)
 }
 
 func (calcSvc) Mtu(ctx context.Context, r *v1.MtuRequest) (*v1.MtuResponse, error) {
 	res, err := calcResult(calc.MTU(int(min(r.Physical, 1<<20)), r.Layers, r.InnerIpv6))
-	return &v1.MtuResponse{Result: localize(ctx, res)}, err
+	return &v1.MtuResponse{Result: localize(ctx, res)}, invalid(ctx, err)
 }
 
 func (calcSvc) Tcp(ctx context.Context, r *v1.TcpRequest) (*v1.TcpResponse, error) {
 	res, err := calcResult(calc.TCP(r.Bandwidth, r.RttMs, r.Window, r.LossPercent, int(min(r.Mss, 1<<20))))
-	return &v1.TcpResponse{Result: localize(ctx, res)}, err
+	return &v1.TcpResponse{Result: localize(ctx, res)}, invalid(ctx, err)
 }
 
 func (calcSvc) Dscp(ctx context.Context, r *v1.DscpRequest) (*v1.DscpResponse, error) {
 	res, err := calcResult(calc.DSCP(r.Query, r.Field))
-	return &v1.DscpResponse{Result: localize(ctx, res)}, err
+	return &v1.DscpResponse{Result: localize(ctx, res)}, invalid(ctx, err)
 }
 
 func (calcSvc) Optics(ctx context.Context, r *v1.OpticsRequest) (*v1.OpticsResponse, error) {
@@ -148,19 +164,19 @@ func (calcSvc) Optics(ctx context.Context, r *v1.OpticsRequest) (*v1.OpticsRespo
 			Fiber: r.Fiber, LossPerKm: r.LossPerKm, Connectors: int(min(r.Connectors, 1000)), ConnectorLoss: r.ConnectorLossDb,
 			Splices: int(min(r.Splices, 1000)), SpliceLoss: r.SpliceLossDb, MarginDb: r.MarginDb}))
 	}
-	return &v1.OpticsResponse{Result: localize(ctx, res)}, err
+	return &v1.OpticsResponse{Result: localize(ctx, res)}, invalid(ctx, err)
 }
 
 func (calcSvc) Bgp(ctx context.Context, r *v1.BgpRequest) (*v1.BgpResponse, error) {
 	routes := make([]calc.Route, 0, len(r.Routes))
-	for _, p := range r.Routes {
-		routes = append(routes, calc.Route{Name: p.Name, Weight: p.Weight, LocalPref: p.LocalPref, Local: p.LocallyOriginated, ASPath: p.AsPath,
+	for i, p := range r.Routes {
+		routes = append(routes, calc.Route{Name: nameOr(ctx, p.Name, "calc.val.name.route", i), Weight: p.Weight, LocalPref: p.LocalPref, Local: p.LocallyOriginated, ASPath: p.AsPath,
 			Origin: p.Origin, MED: p.Med, EBGP: p.Ebgp, IGPMetric: p.IgpMetric, RouterID: p.RouterId, OriginatorID: p.OriginatorId,
 			ClusterListLen: int(min(p.ClusterListLength, 1000)), Neighbor: p.Neighbor, AgeSeconds: p.AgeSeconds, NextHopUnreachable: p.NextHopUnreachable})
 	}
 	res, err := calcResult(calc.BGPBestPath(routes, calc.BGPOptions{AlwaysCompareMED: r.AlwaysCompareMed, DeterministicMED: r.DeterministicMed,
 		MultipathRelax: r.MultipathRelax, MaximumPaths: int(min(r.MaximumPaths, 64))}))
-	return &v1.BgpResponse{Result: localize(ctx, res)}, err
+	return &v1.BgpResponse{Result: localize(ctx, res)}, invalid(ctx, err)
 }
 
 // Module registra el servicio Calc.
