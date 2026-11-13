@@ -9,6 +9,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 )
 
@@ -60,9 +61,10 @@ func auditResult(ctx context.Context, d Deps, jobID string, res DeviceResult) De
 // lo que siga corriendo se corta y el equipo falla con este error.
 var ErrWindowEnded = i18n.New("patrol.err.window_ended", nil)
 
-// windowEnded sustituye el error de un comando o conexión cortados por el fin de la ventana.
+// windowEnded sustituye el error de un comando o conexión cortados por el fin de la ventana. El driver devuelve
+// ErrPromptTimeout (no el error del contexto) cuando el contexto vence esperando el prompt.
 func windowEnded(ctx context.Context, err error) error {
-	if (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) && errors.Is(context.Cause(ctx), ErrWindowEnded) {
+	if (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || errors.Is(err, platform.ErrPromptTimeout)) && errors.Is(context.Cause(ctx), ErrWindowEnded) {
 		return ErrWindowEnded
 	}
 	return err
