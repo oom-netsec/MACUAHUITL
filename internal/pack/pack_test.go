@@ -191,6 +191,10 @@ func TestRechazos(t *testing.T) {
 			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[ios-xe, nx-os]", 1))
 			setPB(f, strings.Replace(goodPlaybook, "ios-xe", "nx-os", 1))
 		}), "dev", "playbook.platform"},
+		{"wlc-9800 es instalable", signed(func(f map[string][]byte) {
+			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[wlc-9800]", 1))
+			setPB(f, strings.Replace(goodPlaybook, "ios-xe", "wlc-9800", 1))
+		}), "dev", ""},
 		{"plataforma fuera de platforms", signed(func(f map[string][]byte) {
 			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[ios]", 1))
 		}), "dev", "playbook.platform"},

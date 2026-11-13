@@ -62,7 +62,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
 5. **Playbooks.**
    - Se cargan con `playbook.Load` sobre `playbooks/`.
    - Cada comando pasa por `CheckDenied`: un solo comando que no sea de lectura rechaza el paquete entero.
-   - Solo se aceptan plataformas que ya tengan driver de Patrol y reglas propias de `CheckDenied`; hoy son `ios` e `ios-xe`. Las demás se rechazan hasta que su fase les dé driver y reglas, porque, por ejemplo, NX-OS encadena comandos con `;` y redirige con `>`.
+   - Solo se aceptan plataformas que ya tengan driver de Patrol y driver de Patrol; `CheckDenied` es el mismo de `ios-xe` (hoy `ios`, `ios-xe` y `wlc-9800`, sin reglas propias para ninguna). Las demás se rechazan hasta que su fase les dé driver y reglas, porque, por ejemplo, NX-OS encadena comandos con `;` y redirige con `>`.
    - La plataforma de cada playbook debe estar en `platforms` del manifiesto.
    - El script derivado `lib-…` de cada playbook pasa `Validate`; si no, se rechaza el paquete, porque uno solo inválido tumbaría la biblioteca entera.
 6. **Scripts.**
@@ -116,7 +116,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
 - **Fuente:** `packs/<nombre>/` en el repo, con la misma estructura del zip pero sin `SIGNATURE`.
 - **Paquetes oficiales:**
   - Primeros: `ios-xe`, que sale de la migración, e `ios`, nuevo, para IOS clásico.
-  - Después, cada uno tras la fase que le dé driver y reglas de `CheckDenied` a su plataforma: `nx-os`, `fw` (ASA/FTD), `aci`, `wireless` (9800/AireOS), `ise` y `sda`.
+  - Después, cada uno tras la fase que le dé driver y reglas de `CheckDenied` a su plataforma (reglas propias de `CheckDenied` cuando la plataforma las necesite): `nx-os`, `fw` (ASA/FTD), `aci`, `wireless` (9800/AireOS), `ise` y `sda`.
   - Un paquete sin playbooks no se publica.
 - **Firma en CI:** el job de release arma cada paquete con un zip determinista (orden fijo y fechas fijas), lo firma con la llave privada del secret `MPACK_SIGNING_KEY` y lo sube como asset (`oom-<nombre>-<versión>.mpack`) con su entrada en `SHA256SUMS`.
 - **La llave es del dueño:**
@@ -161,3 +161,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
 ### Gemelo de playbook
 
 Un playbook elegido corre en su gemelo (`ios/x` por `ios-xe/x` y al revés) solo entre `ios` e `ios-xe`, y solo si los dos son del mismo paquete o los dos oficiales (base, propios del usuario u `oom/*`).
+
+## Enmienda (fase 34): wlc-9800 como plataforma instalable
+
+`wlc-9800` entra en las plataformas instalables de un paquete porque tiene driver: el de IOS-XE, con detección propia por «C9800» en `show version`. Sus playbooks pasan por el mismo `CheckDenied` que los de `ios-xe`, sin reglas propias. El gemelo `ios/ios-xe` no aplica a `wlc-9800`: un 9800 usa los playbooks de `ios-xe` directamente. Los playbooks pueden además declarar datos (`params`: MAC, AP, interfaz, IP) que el núcleo valida y sustituye antes de volver a pasar `CheckDenied`. El paquete oficial `oom/wlc-9800` los usa para los casos de un cliente o un AP puntual.

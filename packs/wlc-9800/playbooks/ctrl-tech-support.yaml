@@ -1,0 +1,22 @@
+# Propósito: Reúne el estado y la configuración del controlador, con el show tech inalámbrico al final.
+# Cuándo usarlo: Se abre un caso con Cisco TAC y piden el show tech del controlador.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: ctrl-tech-support
+platform: wlc-9800
+name: Controlador · Recolección completa para TAC
+name_en: Controller · Full TAC collection
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show wireless summary
+  - cmd: show ap summary
+    timeout: 180s
+  - cmd: show wireless client summary
+    timeout: 180s
+  - cmd: show running-config
+    may_contain_secrets: true
+    timeout: 120s
+  - cmd: show tech wireless
+    may_contain_secrets: true
+    timeout: 600s

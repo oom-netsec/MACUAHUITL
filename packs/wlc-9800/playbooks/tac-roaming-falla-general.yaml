@@ -1,0 +1,19 @@
+# Propósito: Estado de la movilidad, capacidades por WLAN y causas de desconexión.
+# Cuándo usarlo: Varios usuarios reportan cortes al desplazarse.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13), salvo los marcados «no existe en EWC».
+id: tac-roaming-falla-general
+platform: wlc-9800
+name: TAC · Roaming falla (general)
+name_en: TAC · Roaming failure (general)
+commands:
+  - cmd: show clock
+  - cmd: show wireless client summary
+    timeout: 180s
+  - cmd: show wlan all
+  - cmd: show wireless mobility summary  # no existe en EWC
+  - cmd: show wireless stats mobility  # no existe en EWC
+  - cmd: show wireless stats client delete reasons
+  - cmd: show wireless stats client detail
+  - cmd: show ap rf-profile summary
+  - cmd: show logging | include MOBILITY|ROAM|FT_|DOT11

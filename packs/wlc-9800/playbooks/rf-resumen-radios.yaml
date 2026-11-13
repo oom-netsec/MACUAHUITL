@@ -1,0 +1,21 @@
+# Propósito: Radios, canales, potencia y estado de cada banda.
+# Cuándo usarlo: Auditar el plan de canales y la potencia de las tres bandas.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: rf-resumen-radios
+platform: wlc-9800
+name: RF · Resumen de radios 2.4/5/6 GHz
+name_en: RF · 2.4/5/6 GHz radio summary
+commands:
+  - cmd: show clock
+  - cmd: show ap dot11 24ghz summary
+  - cmd: show ap dot11 5ghz summary
+  - cmd: show ap dot11 24ghz network
+  - cmd: show ap dot11 5ghz network
+  - cmd: show ap dot11 24ghz channel
+  - cmd: show ap dot11 5ghz channel
+  - cmd: show wireless country configured
+  - cmd: show ap dot11 dual-band summary
+  - cmd: show ap dot11 24ghz txpower
+  - cmd: show ap dot11 5ghz txpower
+  - cmd: show ap fra

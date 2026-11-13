@@ -140,7 +140,7 @@ func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.Ge
 	if err := drv.Open(ctx, rd, wr, cred.Enable); err != nil {
 		return fail(err)
 	}
-	if p, err := drv.Detect(ctx); err != nil || (p != "ios-xe" && p != "ios") {
+	if p, err := drv.Detect(ctx); err != nil || (p != "ios-xe" && p != "ios" && p != "wlc-9800") {
 		if err == nil {
 			err = i18n.New("metrics.svc.platform", i18n.A("platform", p))
 		}

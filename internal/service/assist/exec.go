@@ -89,7 +89,7 @@ func (e *devExec) conn(ctx context.Context, dev string) (*conn, error) {
 		c.close()
 		return nil, err
 	}
-	// Solo IOS e IOS-XE: las líneas de la lista cerrada son de esa sintaxis.
+	// Solo IOS e IOS-XE: las líneas de la lista cerrada son de esa sintaxis; un 9800 (wlc-9800) queda fuera (ADR 0007).
 	p, err := drv.Detect(ctx)
 	if err != nil || (p != "ios-xe" && p != "ios") {
 		c.close()

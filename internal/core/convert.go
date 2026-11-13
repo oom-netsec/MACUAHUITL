@@ -17,6 +17,7 @@ func specFromProto(p *v1.JobSpec) patrol.Spec {
 		Name: p.GetName(), DefaultCredentialID: p.GetDefaultCredentialId(), PlaybookIDs: p.GetPlaybookIds(),
 		CustomCommands: p.GetCustomCommands(), OutputDir: p.GetOutputDir(), Kind: p.GetKind(), DeleteLooseFiles: p.GetDeleteLooseFiles(),
 		DisableMasking: p.GetDisableMasking(), AcceptChangedHostKeys: p.GetAcceptChangedHostKeys(), WindowHours: p.GetWindowHours(),
+		Params: p.GetParams(),
 	}
 	for _, t := range p.GetTargets() {
 		s.Targets = append(s.Targets, patrol.Target{Address: t.GetAddress(), Port: uint16(t.GetPort()), DeviceID: t.GetDeviceId()})

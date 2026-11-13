@@ -33,14 +33,15 @@ type Command struct {
 	Platforms []string
 }
 
-// Applies dice si el comando corre en la plataforma detectada.
+// Applies dice si el comando corre en la plataforma detectada; un 9800 es IOS-XE, así que corre los marcados ios-xe.
 func (c Command) Applies(detected string) bool {
-	return len(c.Platforms) == 0 || slices.Contains(c.Platforms, detected)
+	return len(c.Platforms) == 0 || slices.Contains(c.Platforms, detected) ||
+		(detected == "wlc-9800" && slices.Contains(c.Platforms, "ios-xe"))
 }
 
-// Compatible: un IOS clásico usa los playbooks de IOS-XE; lo que no exista queda marcado inválido.
+// Compatible: un IOS clásico y un WLC 9800 (que es IOS-XE) usan también los playbooks de IOS-XE; lo que no exista queda marcado inválido.
 func Compatible(detected, pbPlatform string) bool {
-	return detected == pbPlatform || (detected == "ios" && pbPlatform == "ios-xe")
+	return detected == pbPlatform || (pbPlatform == "ios-xe" && (detected == "ios" || detected == "wlc-9800"))
 }
 
 func officialPack(p string) bool { return p == "" || strings.HasPrefix(p, "oom/") }
@@ -93,6 +94,8 @@ type Playbook struct {
 	Pack                       string // ID del paquete que lo trae; vacío = contenido base o playbooks del usuario (no se serializa)
 	Pre                        []string
 	Commands                   []Command
+	// Params son los datos que el playbook pide (MAC, AP...); vacío = el playbook de siempre.
+	Params []Param
 }
 
 type fileCommand struct {
@@ -102,12 +105,18 @@ type fileCommand struct {
 	Platforms  []string `yaml:"platforms"`
 }
 
+type fileParam struct {
+	Name string `yaml:"name"`
+	Kind string `yaml:"kind"`
+}
+
 type file struct {
 	ID       string        `yaml:"id"`
 	Platform string        `yaml:"platform"`
 	Name     string        `yaml:"name"`
 	NameEn   string        `yaml:"name_en"`
 	Pre      []string      `yaml:"pre"`
+	Params   []fileParam   `yaml:"params"`
 	Commands []fileCommand `yaml:"commands"`
 }
 
@@ -146,6 +155,12 @@ func parse(b []byte) (Playbook, error) {
 		return Playbook{}, i18n.New("playbook.err.no_commands", nil)
 	}
 	p := Playbook{ID: f.Platform + "/" + f.ID, Platform: f.Platform, Name: f.Name, NameEn: f.NameEn, Pre: f.Pre}
+	for _, q := range f.Params {
+		p.Params = append(p.Params, Param(q))
+	}
+	if err := checkParams(p.Params, f.Pre, f.Commands); err != nil {
+		return Playbook{}, err
+	}
 	for _, c := range append(f.Pre, cmdTexts(f.Commands)...) {
 		if err := CheckDenied(f.Platform, c); err != nil {
 			return Playbook{}, err

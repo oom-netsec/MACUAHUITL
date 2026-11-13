@@ -1,0 +1,21 @@
+# Propósito: Revisa APs unidos, estadísticas de unión y descubrimiento, hora, certificados y registros CAPWAP.
+# Cuándo usarlo: Un AP no se une o se desune; primera recolección general sobre la unión de APs.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218396-troubleshoot-catalyst-9800-ap-join-or-di.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: ap-union-capwap
+platform: wlc-9800
+name: AP · Unión CAPWAP
+name_en: AP · CAPWAP join
+commands:
+  - cmd: show clock
+  - cmd: show ap summary
+    timeout: 180s
+  - cmd: show ap uptime
+  - cmd: show wireless stats ap join summary
+  - cmd: show wireless stats ap discovery
+  - cmd: show ntp status
+  - cmd: show wireless country configured
+  - cmd: show ap tag summary
+  - cmd: show logging | include CAPWAP|DTLS|AP_JOIN|APMGR|PKI|DISJOIN|AP_DISCONNECT
+  - cmd: show wireless stats ap history
+  - cmd: show wireless dtls connections

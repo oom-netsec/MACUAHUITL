@@ -1,0 +1,19 @@
+# Propósito: Compara la imagen del controlador con la de los APs y el estado de la actualización.
+# Cuándo usarlo: Tras un upgrade hay APs que no se unen, descargan la imagen sin terminar o quedaron en otra versión.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218396-troubleshoot-catalyst-9800-ap-join-or-di.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: ap-imagenes
+platform: wlc-9800
+name: AP · Imágenes y actualización
+name_en: AP · Images and upgrade
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show install summary
+  - cmd: show ap image
+  - cmd: show ap summary
+    timeout: 180s
+  - cmd: show ap uptime
+  - cmd: show wireless stats ap join summary
+  - cmd: show file systems
+  - cmd: show logging | include CAPWAP|DTLS|AP_JOIN|APMGR|PKI|DISJOIN|AP_DISCONNECT

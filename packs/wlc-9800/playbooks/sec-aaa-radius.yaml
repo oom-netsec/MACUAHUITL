@@ -1,0 +1,20 @@
+# Propósito: Servidores RADIUS, listas de métodos y contadores.
+# Cuándo usarlo: Autenticación 802.1X/MAB fallan, el servidor RADIUS aparece caído o hay lentitud en el login.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: sec-aaa-radius
+platform: wlc-9800
+name: Seguridad · AAA y RADIUS
+name_en: Security · AAA and RADIUS
+commands:
+  - cmd: show clock
+  - cmd: show aaa servers
+  - cmd: show radius statistics
+  - cmd: show radius server-group all
+  - cmd: show aaa method-lists authentication
+  - cmd: show aaa method-lists authorization
+  - cmd: show aaa method-lists accounting
+  - cmd: show wireless stats client delete reasons
+  - cmd: show logging | include RADIUS|AAA|DOT1X|EAP
+  - cmd: show running-config | section aaa|radius
+    may_contain_secrets: true

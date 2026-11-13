@@ -1,0 +1,20 @@
+# Propósito: Parámetros webauth, ACL de redirección y servicio HTTP para portal cautivo.
+# Cuándo usarlo: El portal cautivo no aparece, no redirige o el cliente se queda sin autorizar.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: sec-webauth-cwa
+platform: wlc-9800
+name: Seguridad · Web Auth y CWA
+name_en: Security · Web Auth and CWA
+commands:
+  - cmd: show clock
+  - cmd: show wlan summary
+  - cmd: show wireless profile policy summary
+  - cmd: show parameter-map type webauth all
+  - cmd: show ip http server status
+  - cmd: show ip access-lists
+  - cmd: show aaa servers
+  - cmd: show wireless client summary
+    timeout: 180s
+  - cmd: show wireless exclusionlist
+  - cmd: show logging | include WEBAUTH|CWA|HTTP

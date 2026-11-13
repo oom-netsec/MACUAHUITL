@@ -1,0 +1,19 @@
+# Propósito: Revisa versión, modo de instalación, inventario y licencias del controlador y de los APs.
+# Cuándo usarlo: Cuota de APs excedida, licencia en evaluación o duda sobre la imagen que corre.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13), salvo los marcados «no existe en EWC».
+id: ctrl-version-licencias
+platform: wlc-9800
+name: Controlador · Versión y licencias
+name_en: Controller · Version and licensing
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show install summary
+  - cmd: show inventory
+  - cmd: show license summary  # no existe en EWC
+  - cmd: show license status  # no existe en EWC
+  - cmd: show license usage  # no existe en EWC
+  - cmd: show ntp status
+  - cmd: show ap summary
+    timeout: 180s

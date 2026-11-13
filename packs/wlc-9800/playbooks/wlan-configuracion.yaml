@@ -1,0 +1,20 @@
+# Propósito: Extrae la configuración de WLANs, perfiles y tags de la configuración activa.
+# Cuándo usarlo: Revisar a mano la configuración antes de un cambio o para un caso TAC.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: wlan-configuracion
+platform: wlc-9800
+name: WLAN · Configuración inalámbrica
+name_en: WLAN · Wireless configuration
+commands:
+  - cmd: show clock
+  - cmd: show running-config | section ^wlan
+    may_contain_secrets: true
+  - cmd: show running-config | section wireless profile
+    may_contain_secrets: true
+  - cmd: show running-config | section wireless tag
+    may_contain_secrets: true
+  - cmd: show running-config | section ap dot11
+    may_contain_secrets: true
+  - cmd: show running-config | section aaa|radius
+    may_contain_secrets: true

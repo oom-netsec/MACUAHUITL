@@ -1,0 +1,18 @@
+# Propósito: Muestra qué tags usa cada AP y cómo están definidos.
+# Cuándo usarlo: Un AP sirve las WLANs equivocadas, en el modo equivocado (local/FlexConnect) o con el perfil RF incorrecto.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: ap-tags
+platform: wlc-9800
+name: AP · Tags de política, sitio y RF
+name_en: AP · Policy, site and RF tags
+commands:
+  - cmd: show clock
+  - cmd: show ap tag summary
+  - cmd: show wireless tag policy summary
+  - cmd: show wireless tag site summary
+  - cmd: show wireless tag rf summary
+  - cmd: show wireless profile policy summary
+  - cmd: show wireless profile flex summary
+  - cmd: show ap rf-profile summary
+  - cmd: show wlan summary

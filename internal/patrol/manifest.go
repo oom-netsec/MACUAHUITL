@@ -28,19 +28,20 @@ type PlaybookRef struct {
 }
 
 type Manifest struct {
-	Name            string          `json:"name"`
-	AppVersion      string          `json:"app_version"`
-	StartedAt       time.Time       `json:"started_at"`
-	EndedAt         time.Time       `json:"ended_at"`
-	Playbooks       []PlaybookRef   `json:"playbooks"`
-	CustomCommands  string          `json:"custom_commands_sha256,omitempty"`
-	Devices         []DeviceResult  `json:"devices"`
-	Rounds          int             `json:"rounds"`
-	SkippedRounds   []int           `json:"skipped_rounds"`
-	Masked          bool            `json:"masked"`
-	MaskCounts      map[string]int  `json:"mask_counts"`
-	Files           []FileRef       `json:"files"`
-	ChangedHostKeys []HostKeyChange `json:"changed_host_keys"`
+	Name            string            `json:"name"`
+	AppVersion      string            `json:"app_version"`
+	StartedAt       time.Time         `json:"started_at"`
+	EndedAt         time.Time         `json:"ended_at"`
+	Playbooks       []PlaybookRef     `json:"playbooks"`
+	CustomCommands  string            `json:"custom_commands_sha256,omitempty"`
+	Params          map[string]string `json:"params,omitempty"` // datos de los playbooks (no son secretos)
+	Devices         []DeviceResult    `json:"devices"`
+	Rounds          int               `json:"rounds"`
+	SkippedRounds   []int             `json:"skipped_rounds"`
+	Masked          bool              `json:"masked"`
+	MaskCounts      map[string]int    `json:"mask_counts"`
+	Files           []FileRef         `json:"files"`
+	ChangedHostKeys []HostKeyChange   `json:"changed_host_keys"`
 	// AuditHead ancla el log de auditoría en lo que se entrega (spec §11).
 	AuditHead string `json:"audit_head"`
 }
@@ -95,6 +96,7 @@ func Finish(ctx context.Context, d Deps, w *Writer, s Spec, rounds int, results 
 			}
 		}
 	}
+	m.Params = s.Params
 	if s.CustomCommands != "" {
 		m.CustomCommands = sha([]byte(s.CustomCommands))
 	}

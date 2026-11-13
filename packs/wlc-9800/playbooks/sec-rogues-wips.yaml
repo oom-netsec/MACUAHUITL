@@ -1,0 +1,17 @@
+# Propósito: APs y clientes rogue, wIPS y MFP.
+# Cuándo usarlo: Sospecha de AP no autorizado, ataques de desautenticación o alertas de seguridad.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: sec-rogues-wips
+platform: wlc-9800
+name: Seguridad · Rogues y wIPS
+name_en: Security · Rogues and wIPS
+commands:
+  - cmd: show clock
+  - cmd: show wireless wps summary
+  - cmd: show wireless wps rogue ap summary
+  - cmd: show wireless wps rogue client summary
+  - cmd: show wireless wps rogue stats
+  - cmd: show wireless wps mfp summary
+  - cmd: show wireless exclusionlist
+  - cmd: show logging | include ROGUE|WIPS|WPS|ATTACK

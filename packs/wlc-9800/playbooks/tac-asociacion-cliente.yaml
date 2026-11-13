@@ -1,0 +1,24 @@
+# Propósito: Detalle del cliente, exclusión, WLAN, AP y causas de desconexión.
+# Cuándo usarlo: Un cliente ve la SSID pero no logra asociarse o se desasocia enseguida.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: tac-asociacion-cliente
+platform: wlc-9800
+name: TAC · Asociación de cliente falla
+name_en: TAC · Client association failure
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show wireless client mac-address {mac} detail
+    timeout: 120s
+  - cmd: show wireless exclusionlist
+  - cmd: show wireless stats client delete reasons
+  - cmd: show wireless client summary
+    timeout: 180s
+  - cmd: show wlan summary
+  - cmd: show wireless profile policy summary
+  - cmd: show ap tag summary
+  - cmd: show ap dot11 5ghz network
+  - cmd: show logging | include {mac}|ASSOC|DOT11

@@ -264,3 +264,38 @@ func TestDetectTieneTopeTotal(t *testing.T) {
 		t.Fatalf("err = %v tras %s", err, time.Since(start))
 	}
 }
+
+// Fixtures de la documentación de Cisco (9800-CL y EWC en AP), sin validar en laboratorio.
+func TestDetectWLC9800(t *testing.T) {
+	for _, f := range []string{"wlc-9800-cl", "wlc-9800-ewc"} {
+		d, err := open(t, simulator.Config{Transcripts: dir(f)}, "en", context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p, err := d.Detect(context.Background()); err != nil || p != "wlc-9800" {
+			t.Fatalf("%s: Detect = %q, %v", f, p, err)
+		}
+	}
+}
+
+// Un Catalyst 9300 cuyo hostname lleva «C9800» sigue siendo ios-xe: la marca se busca en la línea del software.
+func TestDetectHostnameC9800NoEsWLC(t *testing.T) {
+	tmp := t.TempDir()
+	for _, n := range []string{"show_version.txt", "show_ip_interface_brief.txt", "show_running-config.txt"} {
+		b, err := os.ReadFile(filepath.Join(dir("ios-xe"), n))
+		if err != nil {
+			t.Fatal(err)
+		}
+		b = []byte(strings.ReplaceAll(string(b), "SW-LAB-01", "SW-C9800-UPLINK"))
+		if err := os.WriteFile(filepath.Join(tmp, n), b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d, err := open(t, simulator.Config{Transcripts: tmp}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p, err := d.Detect(context.Background()); err != nil || p != "ios-xe" {
+		t.Fatalf("Detect = %q, %v", p, err)
+	}
+}

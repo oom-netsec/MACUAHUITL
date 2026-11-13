@@ -102,12 +102,15 @@ func TestEphemeralID(t *testing.T) {
 func TestDenyVariants(t *testing.T) {
 	for _, c := range []string{"conf t", "  CONF T", "configure terminal", "config t", "wr", "write mem", "copy run start", "copy tftp: flash:",
 		"reload in 5", "clear counters", "debug ip packet", "undebug all", "delete flash:x", "erase startup-config", "format flash:",
-		"test cable-diagnostics tdr int gi1/0/1", "install add file x", "request platform software", "license boot level", "Reload"} {
+		"test cable-diagnostics tdr int gi1/0/1", "install add file x", "request platform software", "license boot level", "Reload",
+		"show logging profile wireless filter mac aaaa.bbbb.cccc to-file bootflash:ra.txt", "show logging process wncd to-file bootflash:x",
+		"sh log prof wir to-f flash:x", "SHOW LOG TO-FILE flash:x", "show tech to- flash:x", "show tech to-fi flash:x"} {
 		if err := CheckDenied("ios-xe", c); !errors.Is(err, ErrDenied) {
 			t.Errorf("%q not denied", c)
 		}
 	}
-	for _, c := range []string{"show running-config", "show clock", "show configuration", "dir flash:", "show debug", "show license"} {
+	for _, c := range []string{"show running-config", "show clock", "show configuration", "dir flash:", "show debug", "show license",
+		"show topology", "show spanning-tree top", "show spanning-tree topology detail"} {
 		if err := CheckDenied("ios-xe", c); err != nil {
 			t.Errorf("%q denied: %v", c, err)
 		}
@@ -171,7 +174,7 @@ func TestCompatible(t *testing.T) {
 	for _, c := range []struct {
 		det, pb string
 		ok      bool
-	}{{"ios-xe", "ios-xe", true}, {"ios", "ios-xe", true}, {"ios", "ios", true}, {"ios-xe", "ios", false}, {"nx-os", "ios-xe", false}} {
+	}{{"ios-xe", "ios-xe", true}, {"ios", "ios-xe", true}, {"ios", "ios", true}, {"ios-xe", "ios", false}, {"nx-os", "ios-xe", false}, {"wlc-9800", "ios-xe", true}, {"wlc-9800", "wlc-9800", true}, {"ios-xe", "wlc-9800", false}, {"ios", "wlc-9800", false}} {
 		if got := Compatible(c.det, c.pb); got != c.ok {
 			t.Errorf("Compatible(%q, %q) = %v", c.det, c.pb, got)
 		}
@@ -235,6 +238,15 @@ func TestGemeloNoCruzaPaquetes(t *testing.T) {
 	}
 	if slices.Contains(got, "ios-xe/a") || !slices.Contains(got, "ios-xe/acme-b") || slices.Contains(got, "ios-xe/acme-c") {
 		t.Errorf("Visible: %v", got)
+	}
+}
+
+// Un 9800 ve los suyos y los genéricos de ios-xe; un switch no ve los del 9800.
+func TestVisibleWLC9800(t *testing.T) {
+	pbs := []Playbook{{ID: "ios-xe/cpu-alta", Platform: "ios-xe"}, {ID: "wlc-9800/ap-resumen", Platform: "wlc-9800"}, {ID: "nx-os/x", Platform: "nx-os"}}
+	n := func(det string) int { return len(Visible(det, pbs)) }
+	if n("wlc-9800") != 2 || n("ios-xe") != 1 || n("ios") != 1 {
+		t.Errorf("%d %d %d", n("wlc-9800"), n("ios-xe"), n("ios"))
 	}
 }
 

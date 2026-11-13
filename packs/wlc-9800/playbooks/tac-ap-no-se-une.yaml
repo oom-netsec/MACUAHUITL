@@ -1,0 +1,22 @@
+# Propósito: Descubrimiento, unión, certificados, hora, país y registros de un AP que no aparece.
+# Cuándo usarlo: Un AP nuevo o existente no se une al controlador.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218396-troubleshoot-catalyst-9800-ap-join-or-di.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
+id: tac-ap-no-se-une
+platform: wlc-9800
+name: TAC · AP no se une
+name_en: TAC · AP does not join
+commands:
+  - cmd: show clock
+  - cmd: show ap summary
+    timeout: 180s
+  - cmd: show wireless stats ap join summary
+  - cmd: show wireless stats ap discovery
+  - cmd: show crypto pki trustpoints
+  - cmd: show ntp status
+  - cmd: show wireless country configured
+  - cmd: show ip interface brief
+  - cmd: show ap tag summary
+  - cmd: show logging | include CAPWAP|DTLS|AP_JOIN|APMGR|PKI|DISJOIN|AP_DISCONNECT
+  - cmd: show wireless stats ap history
+  - cmd: show wireless dtls connections

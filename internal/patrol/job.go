@@ -6,8 +6,10 @@ package patrol
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -70,6 +72,8 @@ type Spec struct {
 	DisableMasking        bool // valor cero = enmascarado (spec §12.5)
 	AcceptChangedHostKeys bool // valor cero = omitir el equipo (spec §12.2)
 	WindowHours           uint32
+	// Params son los datos de los playbooks elegidos (nombre -> valor); no son secretos. Vacío = ninguno.
+	Params map[string]string `json:",omitempty"`
 }
 
 // Deps son los servicios que Patrol usa; el núcleo los arma.
@@ -198,6 +202,9 @@ func ValidateWith(s Spec, pbs []playbook.Playbook, v *vault.Vault, missing func(
 			return noPlaybook(id, missing)
 		}
 	}
+	if err := checkParams(s, pbs); err != nil {
+		return fieldErrOf("params", err)
+	}
 	if v != nil {
 		infos, err := v.List()
 		if err != nil {
@@ -261,6 +268,45 @@ func find(pbs []playbook.Playbook, id string) *playbook.Playbook {
 	return nil
 }
 
+// paramsOf deja de los datos del trabajo solo los que declara p.
+func paramsOf(p *playbook.Playbook, vals map[string]string) map[string]string {
+	var out map[string]string
+	for _, q := range p.Params {
+		if v, ok := vals[q.Name]; ok {
+			if out == nil {
+				out = map[string]string{}
+			}
+			out[q.Name] = v
+		}
+	}
+	return out
+}
+
+// checkParams: cada playbook elegido recibe sus datos (Expand los valida) y ningún dato queda sin dueño.
+func checkParams(s Spec, pbs []playbook.Playbook) error {
+	owned := map[string]bool{}
+	for _, id := range s.PlaybookIDs {
+		// como ValidateWith: el propio y su gemelo ios/ios-xe son candidatos
+		for _, p := range []*playbook.Playbook{find(pbs, id), playbook.Twin(pbs, id, "ios"), playbook.Twin(pbs, id, "ios-xe")} {
+			if p == nil {
+				continue
+			}
+			if _, err := p.Expand(paramsOf(p, s.Params)); err != nil {
+				return err
+			}
+			for _, q := range p.Params {
+				owned[q.Name] = true
+			}
+		}
+	}
+	for _, k := range slices.Sorted(maps.Keys(s.Params)) {
+		if !owned[k] {
+			return i18n.New("playbook.err.param_unknown", i18n.A("name", k))
+		}
+	}
+	return nil
+}
+
 func iosFamily(p string) bool { return p == "ios" || p == "ios-xe" }
 
 // resolve da los playbooks que corren en la plataforma detectada, en orden y sin repetir: cada ID elegido pasa a su
@@ -270,8 +316,12 @@ func resolve(s Spec, detected string, pbs []playbook.Playbook, missing func(stri
 	seen := map[string]bool{}
 	for _, id := range s.PlaybookIDs {
 		p := find(pbs, id)
-		if iosFamily(detected) && (p == nil || iosFamily(p.Platform)) { // flota mixta
-			if twin := playbook.Twin(pbs, id, detected); twin != nil {
+		look := detected
+		if look == "wlc-9800" { // un 9800 es IOS-XE: su gemelo es el de ios-xe
+			look = "ios-xe"
+		}
+		if iosFamily(look) && (p == nil || iosFamily(p.Platform)) { // flota mixta
+			if twin := playbook.Twin(pbs, id, look); twin != nil {
 				p = twin
 			}
 		}
@@ -300,7 +350,11 @@ func commands(s Spec, detected string, pbs []playbook.Playbook, missing func(str
 		for _, pre := range p.Pre {
 			out = append(out, playbook.Command{Text: pre, Timeout: 60 * time.Second})
 		}
-		for _, c := range p.Commands {
+		cmds, err := p.Expand(paramsOf(p, s.Params))
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, c := range cmds {
 			if c.Applies(detected) {
 				out = append(out, c)
 			} else {

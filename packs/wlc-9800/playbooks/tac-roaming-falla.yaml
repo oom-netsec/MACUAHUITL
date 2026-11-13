@@ -1,0 +1,22 @@
+# Propósito: Historial de movilidad, capacidades 11k/v/r del cliente y estado de la movilidad.
+# Cuándo usarlo: Un cliente pierde la conexión o tarda en roamear entre APs o controladores.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13), salvo los marcados «no existe en EWC».
+id: tac-roaming-falla
+platform: wlc-9800
+name: TAC · Roaming falla
+name_en: TAC · Roaming failure
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show wireless client mac-address {mac} detail
+    timeout: 120s
+  - cmd: show wireless client mac-address {mac} mobility history  # no existe en EWC
+  - cmd: show wlan all
+  - cmd: show wireless mobility summary  # no existe en EWC
+  - cmd: show wireless stats mobility  # no existe en EWC
+  - cmd: show wireless stats client delete reasons
+  - cmd: show ap dot11 5ghz network
+  - cmd: show logging | include {mac}
