@@ -1155,3 +1155,30 @@ Instrucciones de `ServerReady.hint` (la explicación paso a paso del servidor de
 
 ### Compatibilidad
 Los IDs de los playbooks movidos a `oom/ios-xe`, sus scripts `lib-<id>` y los favoritos no cambian. Quien venga de una versión anterior no tiene esos playbooks ni scripts hasta que instale el paquete. Las colecciones y los fijados que ya tenían `lib-<id>` de esos scripts se conservan en la base (no se podan) mientras el paquete no está instalado. En las colecciones la vista puede recibir IDs `lib-*` que todavía no resuelven a un script y debe tolerarlo. Los fijados retenidos NO aparecen en `ListPinned`, no cuentan para el tope de fijados y no hay que enviarlos en `ReorderPinned` (se comparan solo los visibles; los retenidos quedan al final, en su orden); al instalar el paquete vuelven a verse. Lo mismo vale para los scripts de playbooks de un paquete quitado.
+
+## Idioma: pendientes de 30a-30c (fase 30d)
+
+Cierra lo que 30a-30c dejaron en español. Misma regla de compatibilidad: sin `accept-language`, o con `es`, el texto y el JSON de cada RPC son idénticos byte por byte a los de antes (lo fijan pruebas de regresión con golden generado antes del cambio); con `en` el texto sale en inglés. Todo son campos que ya existían: no hay campos nuevos en proto ni en el puente, y los JSON de los informes no ganan campos. La auditoría sigue en inglés y no cambia.
+
+### Qué sale ahora en el idioma pedido
+- **DNS (RPC `Dns`, modos profundos).** En el informe de `dnssec`: `Chain[].Error`, `Warnings` y `Denial` (`ninguna`/`desconocido` con es; `none`/`unknown` con en; `NSEC` y `NSEC3` no cambian). En la traza: `Warnings` y `Steps[].Error`. En la consulta: `Answers[].Error`. En transporte: `Probes[].Error`. En zona: `Servers[].Error`. Los errores que rechazan la petición (servidor, tipo de registro, puerto, esquema DoT/DoH inválidos) y los de la traza abortada llevan `ErrorInfo.reason` (`dns.parse.err.*`, `dns.trace.err.*`). Los textos del sistema (`connection refused`, `lab: … no existe`) se citan tal cual.
+- **Errores de validación de `tools`.** `tools.svc.{pcap_path, dns_mode, dns_deep, dns_name, dns_unknown, tls_host, tls_port}`, los errores del lector de capturas (`pcap.err.*`) y los de TLS (`tls.err.*`).
+- **Servidor de archivos.** `ServerReady.hint` (`transfer`), `ServeFilesResponse.hint` (`field`) y `RedirectHintResponse.{nftables, setcap}` salen en el idioma pedido. Los comandos de IOS, nftables y setcap no cambian; con `en` el marcador de IP es `THIS-MACHINE-IP` (con es sigue siendo `IP-DE-ESTA-MÁQUINA`).
+- **Bóveda y respaldo cifrado.** Los errores de la bóveda (`vault.err.*`: contraseña incorrecta, bóveda cerrada, credencial no encontrada, frase corta…) y los del respaldo (`respaldo.err.*`: confirmar, ruta absoluta, frase incorrecta, token desconocido o vencido, decisiones) llevan reason y salen en el idioma pedido en todos los servicios que los devuelven (`service.VaultErr` ahora recibe el contexto). Las etiquetas de credencial viajan como argumentos; nunca se citan frases ni secretos.
+- **Flota.** El `text` de cada informe (encabezados, `AVISO`/`WARNING`, `LLEGÓ`/`ARRIVED`, `CABE`/`FITS`, «hace 5 min»/«5 min ago», `DATO VIEJO`/`OLD DATA`), y el CSV y el Markdown del inventario (encabezado y tipo: `equipo`→`device`, `modulo`→`module`; `sfp` igual). El JSON de flota no cambia: `kind` sigue siendo el código `equipo`/`modulo`/`sfp`.
+- **Respaldos de configuración.** El `text` de `CollectBackups` (resumen y avisos), `ListBackups` y `DiffBackups`; los errores del almacén (`backup.store.*`: nombre de equipo, identificador, retención) llevan reason. Los avisos del lector de Patrol se traducen con su clave de `internal/analyze`.
+- **Importación de scripts y colecciones.** Errores del archivo y de las decisiones (`scripts.imp.*`: formato, versión, suma, tope, decisión desconocida o faltante, choques de nombre) y avisos de la vista previa y de la aplicación (`archivo sin suma de verificación`, script de biblioteca ausente o no importado). Cuando el error envuelve una validación, la causa sale en el mismo idioma.
+- **Lectura de playbooks y ad hoc.** El rechazo de un comando que no es de lectura (`playbook.err.denied_cmd`, con el motivo como causa: `playbook.why.*`), los errores de los archivos YAML de playbooks (`playbook.err.*`) y los de `StartAdhoc`. `errors.Is(err, playbook.ErrDenied)` sigue valiendo.
+- `sys.ErrNotRegular` («la ruta no es un archivo regular») lleva reason `sys.err.not_regular`.
+
+### Qué cambia para el front
+- Nada que rompa. Lo que antes eran errores gRPC de texto plano en estas áreas ahora traen `ErrorInfo` (reason y metadata) y `LocalizedMessage`; el mensaje con es es el mismo texto de siempre. Quien comparaba texto sigue funcionando con es; con `en` debe usar el reason.
+- No hay claves nuevas en `i18n/{es,en}.ts`: son textos que llegan ya traducidos del núcleo.
+
+### Qué sigue sin cubrir
+- `RestoreRefusal.why` (motivos por línea de la restauración por diff): exige un tipo nuevo, ver 30c-B.
+- Lo que el servidor de archivos manda por el cable al equipo (respuestas FTP, errores TFTP y SCP): lo lee el equipo, no la UI.
+- Los argumentos `error` de los hallazgos `ns-lame` de DNS y los textos del sistema que citan los errores (`connection refused`, mensajes de la biblioteca TLS o de JSON).
+- `rotate.go` del servicio de cambio asistido (errores de la bóveda al rotar), las partes de `fail_reason` con `%v` de un error sin código, y los errores internos de `ErrInvalidPlan`/`Check`.
+- Los errores de lectura de archivos del sistema (permisos, zip dañado) y los de `internal/analyze` que no pasan por una clave de catálogo.
+- Los datos que vienen de los equipos (salida de `show`, nombres, descripciones) y los scripts del usuario.
