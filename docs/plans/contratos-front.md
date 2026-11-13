@@ -1231,3 +1231,24 @@ Spec: ADR 0010, «Selección por elemento y paquete personal». Aquí solo lo qu
 
 ### CLI
 `mctl pack inspect <archivo.mpack> [--allow-unsigned]`, `mctl pack items <id> [--hide ITEM]... [--show ITEM]...`, `mctl pack install … [--hide ITEM]...`, `mctl scripts copy <id>`; `pack list` marca cuántos ocultos y `pack show` los lista.
+
+## Idioma: cierre (fase 30e) — asistido
+
+Cierra los «No cubierto» del bloque B de 30c para el modo asistido. Misma regla: sin `accept-language`, o con `es`, todo texto es idéntico byte por byte (lo fijan el golden por RPC de 30c y un golden nuevo de los motivos de restauración, `internal/assist/testdata/restore_es.json`, generado antes del cambio). La auditoría sigue en inglés. No hay campos nuevos en el proto ni claves nuevas en `i18n/{es,en}.ts`.
+
+### Qué cambia con `en`
+- **`RestoreRefusal.why`** (los ~45 motivos por línea de la restauración por diff) sale en el idioma pedido. En el núcleo, `assist.Refusal` conserva `Why` (es) y suma `WhyT` (`i18n.Text`); `path` y `line` no cambian (son configuración del equipo).
+- **Rechazo del plan** (`ErrInvalidPlan`, las funciones `Check`/`CheckDevice` y los `parse*Line`): ahora es un error con código, reason `assist.invalid_plan` (`InvalidArgument`, sin metadata). Con es el mensaje es el mismo; con `en` cada pieza sale en inglés. `errors.Is(err, ErrInvalidPlan)` sigue valiendo.
+- **Sin diferencia** (`ErrNoDifference`): código `assist.no_difference` (`FailedPrecondition`), antes sin reason.
+- **Rotación de credenciales**: los errores de la bóveda y del ejecutor (`assist.svc.unknown_device {device}`, `assist.svc.no_vault`, `assist.svc.vault_read_failed`, `assist.svc.vault_save_prev_failed`, `assist.svc.vault_save_new_failed {prev}`) y los textos que la rotación manda como salida de la ejecución (`assist.run.new_session_ok {user}`, `assist.run.saved_no_credential`, `assist.run.saved_vault_updated {prev}`) salen en el idioma pedido; en el evento `output` y en `fail_reason` el texto en inglés ya no mezcla español. El marcador de lo oculto sale como `<hidden>` en los mensajes en inglés (en los errores del plan y los textos de fallo).
+- El error interno de arranque del ejecutor (`assist.run.missing_runner_parts`) tiene su texto en inglés.
+
+### Para quien implementa
+- `assist.Verifier.Verify` y `Saved` devuelven `i18n.Text` (antes `string`).
+- Los errores internos del plan se arman con `lerr(es, en, args...)`; el motivo de una negativa de restauración, con `lt(es, en, args...)`.
+
+### Sigue sin cubrir
+- El marcador `<oculto>` dentro de las líneas de configuración (`Apply`, `Rollback`, `Expect`, `RestoreRefusal.line`): es dato de configuración y la vista y el detector de respaldos enmascarados lo conocen así.
+- Los nombres, etiquetas y ayudas de las plantillas (`ListSnippetTemplates`: `name`, `label`, `help`): la vista los traduce con sus claves `snippet.<id>.*`; el CLI `mctl snippet` los muestra en español (rama de mctl).
+- Los textos propios de `cmd/mctl/cli/assistrun.go` (errores del CLI: puerto inválido, estado final de la ejecución): son del CLI, no del núcleo.
+- Errores de la bóveda anidados en los de rotación (el texto de la causa viene de la bóveda).

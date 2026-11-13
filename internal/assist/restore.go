@@ -37,7 +37,11 @@ const (
 )
 
 // Refusal es algo que el diff tocaría y la función no restaura: se lista para hacerlo a mano (ya sin secretos).
-type Refusal struct{ Path, Line, Why string }
+// Why es el motivo en es; WhyT es el mismo motivo para darlo en el idioma pedido.
+type Refusal struct {
+	Path, Line, Why string
+	WhyT            i18n.Text
+}
 
 // RestoreChange son los datos de una restauración por diff.
 type RestoreChange struct {
@@ -111,13 +115,13 @@ type differ struct {
 	refs []Refusal
 }
 
-func (d *differ) refuse(path []string, line, why string) {
+func (d *differ) refuse(path []string, line string, why i18n.Text) {
 	hs := make([]string, len(path))
 	for i, h := range path {
 		hs[i] = redact(h)
 	}
-	r := Refusal{Path: strings.Join(hs, " > "), Line: redact(line), Why: why}
-	if !slices.Contains(d.refs, r) { // quitar la llave vieja y poner la nueva son la misma cosa a mano
+	r := Refusal{Path: strings.Join(hs, " > "), Line: redact(line), Why: why.In(i18n.Es), WhyT: why}
+	if !slices.ContainsFunc(d.refs, func(x Refusal) bool { return x.Path == r.Path && x.Line == r.Line && x.Why == r.Why }) { // quitar la llave vieja y poner la nueva son la misma cosa a mano
 		d.refs = append(d.refs, r)
 	}
 }
@@ -147,16 +151,11 @@ func (d *differ) diffNode(path []string, cur, want *iosconf.Node) {
 		}
 	}
 	d.leaves(path, curLeaves, wantLeaves)
-	why := func(l, base string) string {
-		if f := forbiddenWhy(tokens(l)); f != "" {
-			return base + "; " + f
-		}
-		return base
-	}
+	why := func(l string, base i18n.Text) i18n.Text { return i18n.Join("; ", base, forbiddenWhy(tokens(l))) }
 	for _, l := range order {
 		cs, ok := curSec[l]
 		if !ok {
-			d.refuse(path, l, why(l, "sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano"))
+			d.refuse(path, l, why(l, lt("sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano", "new section in the backup: to roll it back it would have to be deleted whole; create it by hand")))
 			continue
 		}
 		d.diffNode(append(slices.Clone(path), l), cs, wantSec[l])
@@ -169,7 +168,7 @@ func (d *differ) diffNode(path []string, cur, want *iosconf.Node) {
 	}
 	sort.Strings(gone)
 	for _, l := range gone {
-		d.refuse(path, l, why(l, "sección que el respaldo no tiene: habría que borrarla completa; hazlo a mano"))
+		d.refuse(path, l, why(l, lt("sección que el respaldo no tiene: habría que borrarla completa; hazlo a mano", "section that the backup does not have: it would have to be deleted whole; do it by hand")))
 	}
 }
 
@@ -186,7 +185,7 @@ func (d *differ) leaves(path []string, cur, want []*iosconf.Node) {
 	for _, n := range cur {
 		have[n.Line]++
 		if b, ok := wantBody[n.Line]; ok && n.Body != b {
-			d.refuse(path, n.Line, "el texto (banner o macro) es distinto: no se inversa con certeza")
+			d.refuse(path, n.Line, lt("el texto (banner o macro) es distinto: no se inversa con certeza", "the text (banner or macro) is different: it cannot be reversed with certainty"))
 		}
 		if left[n.Line] > 0 {
 			left[n.Line]--
@@ -440,7 +439,7 @@ func simulate(st cfgState, lines []string) (cfgState, []touch, error) {
 			continue
 		}
 		if sectionLike(line) {
-			return st, touched, fmt.Errorf("%q abre o borra una sección que el equipo no tiene tal cual", line)
+			return st, touched, lerr("%q abre o borra una sección que el equipo no tiene tal cual", "%q opens or deletes a section that the device does not have as is", line)
 		}
 		touched = append(touched, touch{path: slices.Clone(ctx), line: line})
 		k := pathKey(ctx)
@@ -488,40 +487,40 @@ func restoreCheck(rc *rctx) func(DevicePlan) error {
 	return func(d DevicePlan) error {
 		run, ok := d.Baseline[runningCmd]
 		if !ok || strings.TrimSpace(run) == "" {
-			return errors.New("falta la línea base (el running-config capturado)")
+			return lerr("falta la línea base (el running-config capturado)", "the baseline is missing (the captured running-config)")
 		}
 		base := stateOf(parseCfg(run))
 		after, t1, err := simulate(base, d.Apply)
 		if err != nil {
-			return fmt.Errorf("en el Apply: %v", err)
+			return lerr("en el Apply: %v", "in the Apply: %v", err)
 		}
 		back, t2, err := simulate(after, d.Rollback)
 		if err != nil {
-			return fmt.Errorf("en la reversa: %v", err)
+			return lerr("en la reversa: %v", "in the rollback: %v", err)
 		}
 		sides := []cfgState{base, after, back}
 		for _, t := range append(slices.Clone(t1), t2...) {
-			if why := rc.refuse(t.path, t.line, sides); why != "" {
-				return fmt.Errorf("%q (en %q): %s", redact(t.line), redact(strings.Join(t.path, " > ")), why)
+			if why := rc.refuse(t.path, t.line, sides); !why.Empty() {
+				return &whyErr{redact(t.line), redact(strings.Join(t.path, " > ")), why}
 			}
 		}
 		if len(t1) > rc.max || len(t2) > rc.max {
-			return fmt.Errorf("más de %d líneas de cambio (tope del plan)", rc.max)
+			return lerr("más de %d líneas de cambio (tope del plan)", "more than %d change lines (plan limit)", rc.max)
 		}
 		if after.canon() == base.canon() {
 			for i, l := range d.Apply {
 				if i > 0 && slices.Contains(d.Apply[:i], l) {
-					return fmt.Errorf("el Apply no cambia nada: repite la línea %q y la segunda copia no cambia nada", redact(l))
+					return lerr("el Apply no cambia nada: repite la línea %q y la segunda copia no cambia nada", "the Apply changes nothing: it repeats the line %q and the second copy changes nothing", redact(l))
 				}
 			}
-			return errors.New("el Apply no cambia nada")
+			return lerr("el Apply no cambia nada", "the Apply changes nothing")
 		}
 		if back.canon() != base.canon() {
-			return errors.New("la reversa no es la inversa exacta del Apply: no devuelve el equipo a la línea base")
+			return lerr("la reversa no es la inversa exacta del Apply: no devuelve el equipo a la línea base", "the rollback is not the exact inverse of the Apply: it does not return the device to the baseline")
 		}
 		for _, e := range sectionExpects(after, t1) {
 			if !slices.Contains(d.Expect, e) {
-				return fmt.Errorf("el post-check no compara la sección %q completa contra el estado esperado", strings.Join(t1[0].path, " > "))
+				return lerr("el post-check no compara la sección %q completa contra el estado esperado", "the post-check does not compare the whole section %q against the expected state", strings.Join(t1[0].path, " > "))
 			}
 		}
 		return nil
@@ -620,15 +619,15 @@ func RestoreDiffPlan(device string, c RestoreChange, outs map[string]string) (Re
 	sides := []cfgState{curSt, wantSt}
 	for _, o := range d.ops {
 		why := rc.refuse(o.path, o.line, sides)
-		if why == "" && !paired(d.ops, o) {
+		if why.Empty() && !paired(d.ops, o) {
 			// Sin pareja, la línea se manda al aplicar o al revertir con `no`: esa forma también debe ser de la lista cerrada y exacta en IOS.
-			if why = rc.refuse(o.path, inverse(o.line), sides); why == "" {
+			if why = rc.refuse(o.path, inverse(o.line), sides); why.Empty() {
 				if f, ok := famOf(o.path, o.line); ok && f.keepNo {
-					why = "IOS conserva la forma `no` en el running en lugar de quitar la línea: no se puede aplicar ni revertir con certeza; hazlo a mano"
+					why = lt("IOS conserva la forma `no` en el running en lugar de quitar la línea: no se puede aplicar ni revertir con certeza; hazlo a mano", "IOS keeps the `no` form in the running-config instead of removing the line: it cannot be applied or rolled back with certainty; do it by hand")
 				}
 			}
 		}
-		if why != "" {
+		if !why.Empty() {
 			d.refuse(o.path, o.line, why)
 			continue
 		}
@@ -647,7 +646,7 @@ func RestoreDiffPlan(device string, c RestoreChange, outs map[string]string) (Re
 			}
 		}
 		if named != "" {
-			d.refuse(o.path, o.line, fmt.Sprintf("nombra %q, que se rechaza", named))
+			d.refuse(o.path, o.line, lt("nombra %q, que se rechaza", "names %q, which is refused", named))
 			continue
 		}
 		keep = append(keep, o)
@@ -657,7 +656,7 @@ func RestoreDiffPlan(device string, c RestoreChange, outs map[string]string) (Re
 		return rp, newRefusal(ErrRestoreRefused, "assist.restore_refused", i18n.Tx("assist.restore_refused.diff_touches", "count", len(d.refs)))
 	}
 	if len(keep) == 0 {
-		return rp, ErrNoDifference
+		return rp, sentinel{ErrNoDifference, i18n.New("assist.no_difference", nil)}
 	}
 	apply, n, expect := render(keep)
 	rollback, _, _ := render(flip(keep))
@@ -666,7 +665,7 @@ func RestoreDiffPlan(device string, c RestoreChange, outs map[string]string) (Re
 	}
 	after, touched, err := simulate(curSt, apply)
 	if err != nil {
-		return rp, newRefusal(ErrRestoreRefused, "assist.restore_refused", raw("assist.restore_refused", err.Error()))
+		return rp, newRefusal(ErrRestoreRefused, "assist.restore_refused", errText(err))
 	}
 	expect = append(expect, sectionExpects(after, touched)...)
 	rp.Fn = restoreFn(rc)

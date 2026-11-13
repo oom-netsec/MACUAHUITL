@@ -2,7 +2,6 @@ package assist
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"regexp"
@@ -51,8 +50,8 @@ type Executor interface {
 // bóveda recibe la credencial nueva (la anterior se conserva aparte); Reverted se llama cuando la reversa se cumplió, para que la
 // bóveda vuelva a como estaba. Ninguno recibe ni devuelve el secreto.
 type Verifier interface {
-	Verify(ctx context.Context, device string) (string, error)
-	Saved(ctx context.Context, device string) (string, error)
+	Verify(ctx context.Context, device string) (i18n.Text, error)
+	Saved(ctx context.Context, device string) (i18n.Text, error)
 	Reverted(ctx context.Context, device string) error
 }
 
@@ -183,7 +182,7 @@ func NewRun(o Options) (*Run, error) {
 		return nil, ErrNotAssisted
 	}
 	if o.Exec == nil || o.Audit == nil || o.ID == "" {
-		return nil, errors.New("assist: faltan el ejecutor, la auditoría o el identificador")
+		return nil, i18n.New("assist.run.missing_runner_parts", nil)
 	}
 	if err := Validate(o.Plan, o.Fn); err != nil {
 		return nil, err
@@ -207,6 +206,8 @@ func NewRun(o Options) (*Run, error) {
 
 // scrub quita de s los secretos del plan (y lo que IOS imprime tras secret/password si la función lo pide).
 func (r *Run) scrub(s string) string { return Scrub(s, r.secrets, r.fn.Scrub) }
+
+func (r *Run) scrubEN(s string) string { return scrubEN(s, r.secrets, r.fn.Scrub) }
 
 func (r *Run) scrubLines(lines []string) []string { return scrubAll(lines, r.secrets, r.fn.Scrub) }
 
@@ -299,7 +300,7 @@ func (r *Run) Events(from int) ([]Event, <-chan struct{}) {
 // emit anota un evento. Requiere r.mu.
 func (r *Run) emit(e Event) {
 	e.Seq = len(r.log)
-	e.Text, e.TextEN = r.scrub(e.Text), r.scrub(e.TextEN)
+	e.Text, e.TextEN = r.scrub(e.Text), r.scrubEN(e.TextEN)
 	if e.Kind == EvOutput && !r.fn.Scrub { // la salida cruda de una lectura puede traer llaves y contraseñas de otras secciones del running
 		e.Text, _ = mask.Apply("ios-xe", e.Text)
 		if e.TextEN != "" {
@@ -316,6 +317,13 @@ func (r *Run) setState(s State) {
 	r.mu.Lock()
 	r.state = s
 	r.emit(Event{Kind: EvState, State: s})
+	r.mu.Unlock()
+}
+
+// outT emite un texto propio del motor (no salida del equipo) en los dos idiomas.
+func (r *Run) outT(device string, t i18n.Text) {
+	r.mu.Lock()
+	r.emit(Event{Kind: EvOutput, Device: device, Text: t.In(i18n.Es), TextEN: t.In(i18n.En)})
 	r.mu.Unlock()
 }
 
@@ -514,7 +522,7 @@ func (r *Run) failT(format, en string, a ...any) outcome {
 	ea := make([]any, len(a)) // un error con código del catálogo entra en inglés al texto en inglés
 	for i, x := range a {
 		if e, ok := x.(error); ok {
-			x = i18n.English(e)
+			x = errIn(i18n.En, e)
 		}
 		ea[i] = x
 	}
@@ -523,7 +531,7 @@ func (r *Run) failT(format, en string, a ...any) outcome {
 
 // failMsg es failT con los dos textos ya armados.
 func (r *Run) failMsg(es, en string) outcome {
-	msg, msgEN := r.scrub(es), r.scrub(en)
+	msg, msgEN := r.scrub(es), r.scrubEN(en)
 	r.mu.Lock()
 	r.state, r.reason, r.reasonEN = Failed, msg, msgEN
 	o := oFailed
@@ -607,7 +615,7 @@ func (r *Run) forward(ctx context.Context) outcome {
 					r.log2("assist.verify", dp.Device, "run=%s the vault was not updated after write memory", r.id)
 					return r.failT("write memory salió bien en %s pero la bóveda no quedó con la credencial nueva: %v; edítala a mano", "write memory succeeded on %s but the vault does not hold the new credential: %v; edit it by hand", dp.Device, err)
 				}
-				r.out(dp.Device, msg)
+				r.outT(dp.Device, msg)
 			}
 		}
 	} else {
@@ -671,7 +679,7 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 			return r.failT("la credencial nueva no entró a %s con una sesión nueva: %v; la sesión original sigue abierta: propón la reversa", "the new credential did not log in to %s with a new session: %v; the original session is still open: propose the rollback", dp.Device, err), true
 		}
 		r.log2("assist.verify", dp.Device, "run=%s result=ok", r.id)
-		r.out(dp.Device, msg)
+		r.outT(dp.Device, msg)
 	}
 	if r.takeAbort() {
 		return oAborted, true

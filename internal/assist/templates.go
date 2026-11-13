@@ -379,13 +379,13 @@ func baseTemplates() []Template {
 	descChange := func(v Values) (PortChange, error) {
 		switch {
 		case v.Has("description") && v.Bool("remove"):
-			return PortChange{}, errors.New("indica la descripción o marca quitarla, no las dos")
+			return PortChange{}, lerr("indica la descripción o marca quitarla, no las dos", "give the description or mark it for removal, not both")
 		case v.Bool("remove"):
 			return PortChange{Description: strPtr("")}, nil
 		case v.Has("description"):
 			return PortChange{Description: strPtr(v.Str("description"))}, nil
 		}
-		return PortChange{}, errors.New("indica la descripción o marca quitarla")
+		return PortChange{}, lerr("indica la descripción o marca quitarla", "give the description or mark it for removal")
 	}
 	return []Template{
 		{ID: "vlan", Tech: "l2", Name: "Crear, nombrar o borrar una VLAN", Platforms: bothPlatforms, Fn: SnippetVlan,
