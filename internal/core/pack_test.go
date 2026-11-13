@@ -255,3 +255,37 @@ func TestPackRechazoNoFiltraRutas(t *testing.T) {
 		t.Fatalf("auditoría:\n%s", au)
 	}
 }
+
+// Precedencia: base < paquetes < <config>/playbooks. Un playbook del usuario con el ID de uno del paquete lo tapa
+// (la lista lo marca en shadowed) y no cuenta como choque.
+func TestPackPrecedenciaYTapados(t *testing.T) {
+	h := newHarness(t, nil)
+	h.installIOSXE(t)
+	dir := filepath.Join(h.p.Config, "playbooks")
+	os.MkdirAll(dir, 0o700)
+	y := "id: l2-stp\nplatform: ios-xe\nname: Mío · STP\ncommands:\n  - cmd: show clock\n"
+	if err := os.WriteFile(filepath.Join(dir, "mio.yaml"), []byte(y), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h.restart(t)
+	r, err := h.patrol.ListPlaybooks(ctx(t), &v1.ListPlaybooksRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, p := range r.Playbooks {
+		if p.Id == "ios-xe/l2-stp" {
+			n++
+			if p.Name != "Mío · STP" {
+				t.Fatalf("debía ganar el del usuario: %+v", p)
+			}
+		}
+	}
+	if n != 1 {
+		t.Fatalf("el ID sale %d veces", n)
+	}
+	l, err := v1.NewPackServiceClient(h.conn).List(ctx(t), &v1.PackServiceListRequest{})
+	if err != nil || len(l.Packs) != 1 || !slices.Equal(l.Packs[0].Shadowed, []string{"ios-xe/l2-stp"}) {
+		t.Fatalf("%+v %v", l, err)
+	}
+}

@@ -29,8 +29,8 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/pack"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
-	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
+	scriptsvc "github.com/oom-netsec/MACUAHUITL/internal/service/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/store"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
@@ -209,12 +209,8 @@ func (c *Core) openPacks() (err error) {
 	for _, p := range c.basePbs {
 		base.PlaybookIDs = append(base.PlaybookIDs, p.ID)
 	}
-	lib, _, err := scripts.LibraryWithEN(playbooks.FS)
-	if err != nil {
+	if base.ScriptIDs, base.ScriptNames, err = scriptsvc.BaseLibrary(); err != nil {
 		return err
-	}
-	for _, s := range lib {
-		base.ScriptIDs, base.ScriptNames = append(base.ScriptIDs, s.ID), append(base.ScriptNames, s.Name)
 	}
 	keys, coreVersion := c.o.PackKeys, c.o.CoreVersion
 	if keys == nil {
