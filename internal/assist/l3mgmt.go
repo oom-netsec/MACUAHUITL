@@ -1035,10 +1035,12 @@ func snmpv3Plan(device string, v Values, outs map[string]string) (DevicePlan, er
 	if !groupExists {
 		feats = append(feats, l2Feature{apply: groupLine, back: "no " + groupLine, exp: Expect{Line: groupLine, Present: true}})
 	}
-	feats = append(feats, l2Feature{apply: userLine, back: "no snmp-server user " + user + " " + group + " v3", exp: Expect{Line: groupLine, Present: true, Prefix: true}})
+	// IOS no escribe el usuario en el running: su comprobación es show snmp user (una sola vez en «Se espera ver»).
+	feats = append(feats, l2Feature{apply: userLine, back: "no snmp-server user " + user + " " + group + " v3",
+		exp: Expect{Command: snmpUserCmd, Line: user + " " + group, Present: true, Column: "snmp-user"}})
 	return assembleG(device, SnippetSNMPv3, []string{snmpUserCmd, snmpGroupCmd}, []l2Scope{{
 		baseCmd: snmpGroupCmd, baseText: groupText, post: []string{snmpGroupCmd, snmpUserCmd}, base: map[string]string{snmpUserCmd: userText},
-		expect: []Expect{{Command: snmpUserCmd, Line: user + " " + group, Present: true, Column: "snmp-user"}}, feats: feats,
+		feats: feats,
 	}}, []i18n.Text{note("assist.note.snmpv3")},
 		[]string{v.Str("auth_password"), v.Str("priv_password")})
 }

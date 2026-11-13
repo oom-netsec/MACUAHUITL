@@ -55,6 +55,24 @@ func TestSNMPv3ExistingGroupIsReusedAndKept(t *testing.T) {
 	}
 }
 
+// «Se espera ver» lista cada comprobación una sola vez: la línea del grupo (si se crea) y el usuario en show snmp user.
+func TestSNMPv3ExpectSinRepetidos(t *testing.T) {
+	user := Expect{Command: snmpUserCmd, Line: "tech ADMINS", Present: true, Column: "snmp-user"}
+	for _, c := range []struct {
+		name string
+		dev  *l3Dev
+		want []Expect
+	}{
+		{"grupo nuevo", newL3("snmp-server group OTRO v3 auth"), []Expect{{Command: snmpGroupCmd, Line: "snmp-server group ADMINS v3 priv", Present: true}, user}},
+		{"grupo existente", newL3("snmp-server group ADMINS v3 priv read VISTA"), []Expect{user}},
+	} {
+		dp := l3RoundTrip(t, "snmpv3-usuario", v3Vals(), c.dev)
+		if !slices.Equal(dp.Expect, c.want) {
+			t.Errorf("%s: Expect = %+v", c.name, dp.Expect)
+		}
+	}
+}
+
 func TestSNMPv3Refusals(t *testing.T) {
 	v := v3Vals()
 	has := newL3()
