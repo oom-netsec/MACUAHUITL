@@ -181,6 +181,10 @@ func keepaliveLoop(every time.Duration, send func() error, rx func() int64, clos
 // Cerrar la Session la cierra.
 func (s *Session) Client() *ssh.Client { return s.client }
 
+// Activity anota n bytes movidos por un canal propio (scp, sftp) para el keepalive: leídos o escritos,
+// si el canal progresa la sesión está viva aunque el equipo (ocupado escribiendo en flash) no conteste.
+func (s *Session) Activity(n int) { s.rx.Add(int64(n)) }
+
 // Shell abre un shell interactivo con PTY vt100 de 200×24.
 func (s *Session) Shell() (io.Reader, io.Writer, error) { return s.ShellSize(24, 200) }
 

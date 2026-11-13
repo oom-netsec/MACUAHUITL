@@ -212,3 +212,34 @@ func TestShellCuentaBytesRecibidos(t *testing.T) {
 		t.Fatal("rx sigue en 0 tras leer del shell")
 	}
 }
+
+// Un canal propio (scp/sftp) que progresa avisa con Activity y el keepalive no cierra; sin progreso, sí.
+func TestKeepaliveActivityDeCanalPropio(t *testing.T) {
+	s := &Session{}
+	closed := make(chan struct{})
+	stop := make(chan struct{})
+	defer close(stop)
+	end := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-end:
+				return
+			case <-time.After(2 * time.Millisecond):
+				s.Activity(100)
+			}
+		}
+	}()
+	go keepaliveLoop(20*time.Millisecond, func() error { select {} }, s.rx.Load, func() { close(closed) }, stop)
+	select {
+	case <-closed:
+		t.Fatal("cerró con un canal que progresa")
+	case <-time.After(300 * time.Millisecond):
+	}
+	close(end)
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("sin progreso debía cerrar")
+	}
+}

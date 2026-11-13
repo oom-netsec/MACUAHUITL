@@ -6,42 +6,72 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"path"
 	"strconv"
 	"strings"
 
-	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-func (r *Request) sshOpen(ctx context.Context) (*ssh.Client, string, func(), error) {
+// tap avisa cuántos bytes pasan por un canal (keepalive de la sesión); la nula no hace nada.
+type tap func(int)
+
+type tapR struct {
+	r io.Reader
+	t tap
+}
+
+func (x tapR) Read(p []byte) (int, error) {
+	n, err := x.r.Read(p)
+	x.t(n)
+	return n, err
+}
+
+type tapW struct {
+	w io.WriteCloser
+	t tap
+}
+
+func (x tapW) Write(p []byte) (int, error) {
+	n, err := x.w.Write(p)
+	x.t(n)
+	return n, err
+}
+func (x tapW) Close() error { return x.w.Close() }
+
+func (r *Request) sshOpen(ctx context.Context) (*ssh.Client, string, tap, func(), error) {
 	file, err := remotePath(r.URL)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, nil, err
 	}
 	if r.SSH == nil {
-		return nil, "", nil, i18n.New("xfer.err.no_ssh", nil)
+		return nil, "", nil, nil, i18n.New("xfer.err.no_ssh", nil)
 	}
 	sess, err := r.SSH(ctx)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, nil, err
 	}
 	c := sess.Client()
 	stop := closeOnDone(ctx, c)
-	return c, file, func() { stop(); sess.Close() }, nil
+	t := tap(func(int) {})
+	if a, ok := sess.(interface{ Activity(int) }); ok {
+		t = a.Activity
+	}
+	return c, file, t, func() { stop(); sess.Close() }, nil
 }
 
 // ---- SFTP ----
 
 func (r *Request) sftpGet(ctx context.Context, w io.Writer) error {
-	c, file, done, err := r.sshOpen(ctx)
+	c, file, t, done, err := r.sshOpen(ctx)
 	if err != nil {
 		return err
 	}
 	defer done()
-	cl, err := sftp.NewClient(c)
+	cl, err := sftpOpen(c, math.MaxInt64, t)
 	if err != nil {
 		return err
 	}
@@ -63,12 +93,12 @@ func (r *Request) sftpGet(ctx context.Context, w io.Writer) error {
 }
 
 func (r *Request) sftpPut(ctx context.Context, rd io.Reader) error {
-	c, file, done, err := r.sshOpen(ctx)
+	c, file, t, done, err := r.sshOpen(ctx)
 	if err != nil {
 		return err
 	}
 	defer done()
-	cl, err := sftp.NewClient(c)
+	cl, err := sftpOpen(c, math.MaxInt64, t)
 	if err != nil {
 		return err
 	}
@@ -92,7 +122,7 @@ type scpSession struct {
 	s   *ssh.Session
 }
 
-func scpStart(c *ssh.Client, flag, file string) (*scpSession, error) {
+func scpStart(c *ssh.Client, flag, file string, t tap) (*scpSession, error) {
 	s, err := c.NewSession()
 	if err != nil {
 		return nil, err
@@ -111,7 +141,7 @@ func scpStart(c *ssh.Client, flag, file string) (*scpSession, error) {
 		s.Close()
 		return nil, err
 	}
-	return &scpSession{in: in, out: bufio.NewReaderSize(out, maxCtlLine), s: s}, nil
+	return &scpSession{in: tapW{in, t}, out: bufio.NewReaderSize(tapR{out, t}, maxCtlLine), s: s}, nil
 }
 
 // maxCtlLine es el tope de una línea de control (scp y FTP): un servidor no nos hace leer sin fin.
@@ -147,12 +177,12 @@ func (s *scpSession) ack() error {
 func (s *scpSession) send0() error { _, err := s.in.Write([]byte{0}); return err }
 
 func (r *Request) scpGet(ctx context.Context, w io.Writer) error {
-	c, file, done, err := r.sshOpen(ctx)
+	c, file, t, done, err := r.sshOpen(ctx)
 	if err != nil {
 		return err
 	}
 	defer done()
-	s, err := scpStart(c, "-f", file)
+	s, err := scpStart(c, "-f", file, t)
 	if err != nil {
 		return err
 	}
@@ -205,12 +235,12 @@ func (r *Request) scpGet(ctx context.Context, w io.Writer) error {
 }
 
 func (r *Request) scpPut(ctx context.Context, rd io.Reader, size int64) error {
-	c, file, done, err := r.sshOpen(ctx)
+	c, file, t, done, err := r.sshOpen(ctx)
 	if err != nil {
 		return err
 	}
 	defer done()
-	s, err := scpStart(c, "-t", file)
+	s, err := scpStart(c, "-t", file, t)
 	if err != nil {
 		return err
 	}
