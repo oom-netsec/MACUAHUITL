@@ -253,7 +253,7 @@ func (s *svc) SetItems(ctx context.Context, r *v1.PackServiceSetItemsRequest) (*
 		return nil, fail(ctx, dom.NotFound(r.GetPackId()))
 	}
 	if len(r.GetHide())+len(r.GetShow()) == 0 {
-		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.item", i18n.A("id", "", "pack", p.ID))
+		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.items_empty", nil)
 	}
 	for _, id := range append(slices.Clone(r.GetHide()), r.GetShow()...) {
 		if !p.HasItem(id) || slices.Contains(r.GetHide(), id) && slices.Contains(r.GetShow(), id) {

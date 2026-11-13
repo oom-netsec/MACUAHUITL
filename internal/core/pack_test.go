@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 
+	"google.golang.org/grpc/status"
+
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/pack"
 	"github.com/oom-netsec/MACUAHUITL/internal/pack/packtest"
@@ -665,10 +667,15 @@ func TestPackSetItemsAuditaSoloCambios(t *testing.T) {
 	h := newHarness(t, nil)
 	h.installIOSXE(t)
 	pk := v1.NewPackServiceClient(h.conn)
-	if _, err := pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe"}); err == nil {
-		t.Fatal("hide y show vacíos debían fallar")
-	} else if r, _ := reasonOf(err); r != "pack.err.item" {
-		t.Fatalf("%v", err)
+	for lang, want := range map[string]string{"": "indica al menos un elemento para ocultar o mostrar", "es": "indica al menos un elemento para ocultar o mostrar",
+		"en": "give at least one item to hide or show"} {
+		_, err := pk.SetItems(con(t, lang), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe"})
+		if err == nil {
+			t.Fatal("hide y show vacíos debían fallar")
+		}
+		if r, _ := reasonOf(err); r != "pack.err.items_empty" || status.Convert(err).Message() != want {
+			t.Fatalf("%q: %v", lang, err)
+		}
 	}
 	for i := 0; i < 3; i++ {
 		if _, err := pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l1-poe"}}); err != nil {
