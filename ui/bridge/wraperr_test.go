@@ -128,29 +128,68 @@ func okExpr(e ast.Expr, safe map[string]bool, multi bool) bool {
 // safeVars son las variables de error cuyas asignaciones, todas, vienen de call(...) o wrapErr(...).
 func safeVars(body *ast.BlockStmt) map[string]bool {
 	ok, bad := map[string]bool{}, map[string]bool{}
-	ast.Inspect(body, func(nd ast.Node) bool {
-		if _, lit := nd.(*ast.FuncLit); lit {
-			return false
-		}
-		as, isAs := nd.(*ast.AssignStmt)
-		if !isAs {
-			return true
-		}
-		for i, l := range as.Lhs {
+	mark := func(lhs []ast.Expr, rhs []ast.Expr) {
+		for i, l := range lhs {
 			id, isID := l.(*ast.Ident)
 			if !isID || id.Name == "_" {
 				continue
 			}
-			var rhs ast.Expr
-			if len(as.Rhs) == len(as.Lhs) {
-				rhs = as.Rhs[i]
-			} else if len(as.Rhs) == 1 && i == len(as.Lhs)-1 {
-				rhs = as.Rhs[0] // x, err := f()
+			var r ast.Expr
+			if len(rhs) == len(lhs) {
+				r = rhs[i]
+			} else if len(rhs) == 1 && i == len(lhs)-1 {
+				r = rhs[0] // x, err := f()
 			}
-			if _, n := calleeName(rhs); rhs != nil && (n == "call" || n == "wrapErr") {
+			if _, n := calleeName(r); r != nil && (n == "call" || n == "wrapErr") {
 				ok[id.Name] = true
 			} else {
 				bad[id.Name] = true
+			}
+		}
+	}
+	// En un cierre solo cuenta `x = …` sobre un nombre que el cierre no declara: ese pisa la variable del método;
+	// un `err :=` del cierre es otra variable.
+	ast.Inspect(body, func(nd ast.Node) bool {
+		switch x := nd.(type) {
+		case *ast.FuncLit:
+			own := map[string]bool{}
+			ast.Inspect(x.Body, func(n ast.Node) bool {
+				switch y := n.(type) {
+				case *ast.AssignStmt:
+					if y.Tok == token.DEFINE {
+						for _, l := range y.Lhs {
+							if id, ok := l.(*ast.Ident); ok {
+								own[id.Name] = true
+							}
+						}
+					}
+				case *ast.ValueSpec:
+					for _, id := range y.Names {
+						own[id.Name] = true
+					}
+				}
+				return true
+			})
+			ast.Inspect(x.Body, func(n ast.Node) bool {
+				if y, ok := n.(*ast.AssignStmt); ok && y.Tok != token.DEFINE {
+					for _, l := range y.Lhs {
+						if id, ok := l.(*ast.Ident); ok && !own[id.Name] && id.Name != "_" {
+							bad[id.Name] = true
+						}
+					}
+				}
+				return true
+			})
+			return false
+		case *ast.AssignStmt:
+			mark(x.Lhs, x.Rhs)
+		case *ast.ValueSpec: // var err = f(); sin valor arranca en nil y no cuenta
+			if len(x.Values) > 0 {
+				lhs := make([]ast.Expr, len(x.Names))
+				for i, n := range x.Names {
+					lhs[i] = n
+				}
+				mark(lhs, x.Values)
 			}
 		}
 		return true
@@ -159,4 +198,29 @@ func safeVars(body *ast.BlockStmt) map[string]bool {
 		delete(ok, k)
 	}
 	return ok
+}
+
+// safeVars no se deja engañar: una asignación dentro de un cierre o una declaración var con otro origen hacen que la
+// variable deje de ser segura.
+func TestSafeVarsVeCierresYDeclaracionesVar(t *testing.T) {
+	for _, c := range []struct {
+		name, body string
+		safe       bool
+	}{
+		{"solo call", `err := call(); return err`, true},
+		{"cierre que la pisa", `err := call(); func() { err = errors.New("x") }(); return err`, false},
+		{"cierre con su propio err", `err := call(); func() { err := call(); err = errors.New("x"); _ = err }(); return err`, true},
+		{"var con otro origen", `var err = errors.New("x"); err = call(); return err`, false},
+		{"var con call", `var err = call(); return err`, true},
+		{"var sin valor y luego call", `var err error; err = call(); return err`, true},
+	} {
+		f, err := parser.ParseFile(token.NewFileSet(), "x.go", "package p\nfunc f() error {\n"+c.body+"\n}\n", 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := f.Decls[0].(*ast.FuncDecl).Body
+		if got := safeVars(body)["err"]; got != c.safe {
+			t.Errorf("%s: seguro = %v, se esperaba %v", c.name, got, c.safe)
+		}
+	}
 }
