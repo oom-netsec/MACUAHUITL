@@ -28,7 +28,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
 )
 
-// Installable son las plataformas con driver de Patrol y reglas propias de CheckDenied (ADR 0010).
+// Installable son las plataformas con driver de Patrol; todas usan el mismo CheckDenied que ios-xe, sin reglas propias (ADR 0010). El gemelo ios/ios-xe no aplica a wlc-9800.
 var Installable = []string{"ios", "ios-xe", "wlc-9800"}
 
 var (

@@ -30,11 +30,11 @@ func TestParamsLoad(t *testing.T) {
 		t.Fatalf("%v %+v", err, p.Params)
 	}
 	for name, y := range map[string]string{
-		"sin usar":     strings.Replace(withMAC, "{mac} detail", "x detail", 1),
-		"tipo malo":    strings.Replace(withMAC, "kind: mac", "kind: otro", 1),
-		"nombre malo":  strings.Replace(strings.Replace(withMAC, "name: mac", "name: M-1", 1), "{mac}", "{M-1}", 1),
-		"repetido":     strings.Replace(withMAC, "- {name: mac, kind: mac}", "- {name: mac, kind: mac}\n  - {name: mac, kind: ip}", 1),
-		"en pre":       strings.Replace(withMAC, "commands:", "pre: [\"show clock {mac}\"]\ncommands:", 1),
+		"sin usar":    strings.Replace(withMAC, "{mac} detail", "x detail", 1),
+		"tipo malo":   strings.Replace(withMAC, "kind: mac", "kind: otro", 1),
+		"nombre malo": strings.Replace(strings.Replace(withMAC, "name: mac", "name: M-1", 1), "{mac}", "{M-1}", 1),
+		"repetido":    strings.Replace(withMAC, "- {name: mac, kind: mac}", "- {name: mac, kind: mac}\n  - {name: mac, kind: ip}", 1),
+		"en pre":      strings.Replace(withMAC, "commands:", "pre: [\"show clock {mac}\"]\ncommands:", 1),
 	} {
 		if _, err := loadOne(t, y); err == nil || !strings.Contains(err.Error(), "x.yaml") {
 			t.Errorf("%s: %v", name, err)

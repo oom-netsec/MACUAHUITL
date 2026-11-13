@@ -1191,5 +1191,5 @@ Cierra lo que 30a-30c dejaron en español. Misma regla de compatibilidad: sin `a
 
 ## Playbooks con datos (fase 34)
 - `PlaybookInfo.params` (`PlaybookParam{name, kind}`; kind = `mac`, `ap`, `interface` o `ip`): lo que el playbook pide al armar el trabajo. Sus `commands` traen la plantilla con `{nombre}`; no se ejecutan tal cual.
-- `JobSpec.params` (`map<string,string>`): un valor por dato de los playbooks elegidos. El núcleo valida (la MAC se normaliza a `aaaa.bbbb.cccc`) y rechaza datos faltantes, desconocidos o inválidos en `CreateJob` con `field = params` y códigos `playbook.err.param_*` (`name`, `kind` en la metadata). Sin datos, un trabajo se comporta como antes.
+- `JobSpec.params` (`map<string,string>`): un valor por dato de los playbooks elegidos. El núcleo valida (la MAC se normaliza a `aaaa.bbbb.cccc`) y rechaza datos faltantes, desconocidos o inválidos en `CreateJob` con `field = params` y códigos `playbook.err.param_*` (`name`, `kind` en la metadata). Sin datos, un trabajo se comporta como antes. Mientras la UI no pida los datos, un playbook con `params` no se puede usar desde la app: `CreateJob` falla por el dato que falta.
 - Los datos quedan en el manifest (`params`) y en la auditoría de `job.create`; no son secretos. Los playbooks con datos no generan script `lib-<id>` en la biblioteca.
