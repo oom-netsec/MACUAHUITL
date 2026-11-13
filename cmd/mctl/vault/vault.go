@@ -19,10 +19,10 @@ func vaultStatus(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	name := map[v1.VaultState]string{v1.VaultState_VAULT_STATE_ABSENT: "no existe", v1.VaultState_VAULT_STATE_LOCKED: "cerrada", v1.VaultState_VAULT_STATE_UNLOCKED: "abierta"}[r.State]
-	fmt.Fprintf(c.Out, "bóveda %s\n", name)
+	name := map[v1.VaultState]string{v1.VaultState_VAULT_STATE_ABSENT: "absent", v1.VaultState_VAULT_STATE_LOCKED: "locked", v1.VaultState_VAULT_STATE_UNLOCKED: "unlocked"}[r.State]
+	fmt.Fprintln(c.Out, cli.T("mctl.vault.status", "state", cli.T("mctl.vault.state_"+name)))
 	for _, j := range r.ArmedJobIds {
-		fmt.Fprintf(c.Out, "ventana armada: %s\n", j)
+		fmt.Fprintln(c.Out, cli.T("mctl.vault.armed", "job", j))
 	}
 	return nil
 }
@@ -31,17 +31,17 @@ func vaultCreate(c *cli.Env, args []string) error {
 	if _, err := cli.Flags("vault create", args, nil); err != nil {
 		return err
 	}
-	a, err := c.Secret("Contraseña maestra nueva: ")
+	a, err := c.Secret(cli.T("mctl.vault.prompt_new_master"))
 	if err != nil {
 		return err
 	}
-	b, err := c.Secret("Repite la contraseña: ")
+	b, err := c.Secret(cli.T("mctl.vault.prompt_repeat"))
 	if err != nil {
 		return err
 	}
 	defer cli.Wipe(a, b)
 	if string(a) != string(b) {
-		return errors.New("las contraseñas no coinciden")
+		return cli.Err("mctl.vault.mismatch")
 	}
 	_, err = v1.NewVaultServiceClient(c.Conn).Create(context.Background(), &v1.CreateRequest{MasterPassword: a})
 	return err
@@ -51,7 +51,7 @@ func vaultUnlock(c *cli.Env, args []string) error {
 	if _, err := cli.Flags("vault unlock", args, nil); err != nil {
 		return err
 	}
-	pw, err := c.Secret("Contraseña maestra: ")
+	pw, err := c.Secret(cli.T("mctl.vault.prompt_master"))
 	if err != nil {
 		return err
 	}
@@ -72,21 +72,21 @@ func vaultPasswd(c *cli.Env, args []string) error {
 	if _, err := cli.Flags("vault passwd", args, nil); err != nil {
 		return err
 	}
-	cur, err := c.Secret("Contraseña actual: ")
+	cur, err := c.Secret(cli.T("mctl.vault.prompt_current"))
 	if err != nil {
 		return err
 	}
-	a, err := c.Secret("Contraseña nueva: ")
+	a, err := c.Secret(cli.T("mctl.vault.prompt_new"))
 	if err != nil {
 		return err
 	}
-	b, err := c.Secret("Repite la nueva: ")
+	b, err := c.Secret(cli.T("mctl.vault.prompt_repeat_new"))
 	if err != nil {
 		return err
 	}
 	defer cli.Wipe(cur, a, b)
 	if string(a) != string(b) {
-		return errors.New("las contraseñas no coinciden")
+		return cli.Err("mctl.vault.mismatch")
 	}
 	_, err = v1.NewVaultServiceClient(c.Conn).ChangeMasterPassword(context.Background(), &v1.ChangeMasterPasswordRequest{CurrentMasterPassword: cur, NewMasterPassword: a})
 	return err
@@ -106,7 +106,7 @@ func credList(c *cli.Env, args []string) error {
 			extra += " +enable"
 		}
 		if i.HasSshKey {
-			extra += " +llave"
+			extra += cli.T("mctl.vault.cred_key")
 		}
 		fmt.Fprintf(c.Out, "%s  %s  %s%s\n", i.Id, i.Label, i.Username, extra)
 	}
@@ -127,9 +127,9 @@ func credAdd(c *cli.Env, args []string) error {
 		return err
 	}
 	if user == "" {
-		return errors.New("falta --user")
+		return cli.Err("mctl.vault.missing_user")
 	}
-	pw, err := c.Secret("Contraseña del equipo: ")
+	pw, err := c.Secret(cli.T("mctl.vault.prompt_device"))
 	if err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func credAdd(c *cli.Env, args []string) error {
 	var en []byte
 	if !noEnable {
 		// Un guion que no trae la línea de enable (EOF) quiere decir «sin enable»; la contraseña de login sí es obligatoria.
-		if en, err = c.Secret("Enable (vacío si no aplica): "); err != nil && !errors.Is(err, io.EOF) {
+		if en, err = c.Secret(cli.T("mctl.vault.prompt_enable")); err != nil && !errors.Is(err, io.EOF) {
 			return err
 		}
 	}

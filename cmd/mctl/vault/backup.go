@@ -21,12 +21,12 @@ func confirmed(c *cli.Env, yes bool) error {
 		return nil
 	}
 	if c.TTY == nil {
-		return errors.New("el respaldo contiene todas tus credenciales: confirma con --yes")
+		return cli.Err("mctl.vault.backup_confirm_yes")
 	}
-	fmt.Fprint(c.Out, "El respaldo contiene todas tus credenciales. ¿Continuar? [s/N] ")
+	fmt.Fprint(c.Out, cli.T("mctl.vault.backup_confirm_prompt"))
 	line, _ := c.In.ReadString('\n')
-	if l := strings.ToLower(strings.TrimSpace(line)); l != "s" && l != "si" && l != "sí" {
-		return errors.New("cancelado")
+	if l := strings.ToLower(strings.TrimSpace(line)); l != "s" && l != "si" && l != "sí" && l != "y" && l != "yes" {
+		return cli.Err("mctl.vault.cancelled")
 	}
 	return nil
 }
@@ -51,26 +51,26 @@ func backupExport(c *cli.Env, args []string) error {
 	if err := confirmed(c, yes); err != nil {
 		return err
 	}
-	a, err := c.Secret("Frase del respaldo (distinta de la maestra, 12 caracteres o más): ")
+	a, err := c.Secret(cli.T("mctl.vault.prompt_backup_phrase_new"))
 	if err != nil {
 		return err
 	}
 	defer wipe(a)
-	b, err := c.Secret("Repite la frase: ")
+	b, err := c.Secret(cli.T("mctl.vault.prompt_backup_repeat"))
 	if err != nil {
 		return err
 	}
 	defer wipe(b)
 	if string(a) != string(b) {
-		return errors.New("las frases no coinciden")
+		return cli.Err("mctl.vault.phrase_mismatch")
 	}
 	r, err := v1.NewVaultServiceClient(c.Conn).ExportBackup(context.Background(), &v1.ExportBackupRequest{Path: path, Passphrase: a, Overwrite: overwrite, Confirm: true})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "respaldo de %d credenciales en %s\n", r.Count, path)
+	fmt.Fprintln(c.Out, cli.T("mctl.vault.backup_done", "n", r.Count, "path", path))
 	if r.NoPermissions {
-		fmt.Fprintln(c.Out, "aviso: el sistema de archivos no admitió los permisos 0600; el contenido va cifrado, pero cuida quién puede leer el archivo")
+		fmt.Fprintln(c.Out, cli.T("mctl.vault.backup_no_perms"))
 	}
 	return nil
 }
@@ -92,13 +92,13 @@ func backupImport(c *cli.Env, args []string) error {
 		return errors.New("uso: mctl cred backup import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]")
 	}
 	if all != "" && !acciones[all] {
-		return fmt.Errorf("--all=%q: use renombrar, reemplazar u omitir", all)
+		return cli.Err("mctl.import_a.bad_all", "value", all)
 	}
 	dec := map[string]string{}
 	for _, d := range decs {
 		k, act, ok := strings.Cut(d, "=")
 		if !ok || k == "" || !acciones[act] {
-			return fmt.Errorf("--decision %q: use ID=renombrar|reemplazar|omitir", d)
+			return cli.Err("mctl.import_a.bad_decision", "value", d)
 		}
 		dec[k] = act
 	}
@@ -106,7 +106,7 @@ func backupImport(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	phrase, err := c.Secret("Frase del respaldo: ")
+	phrase, err := c.Secret(cli.T("mctl.vault.prompt_backup_phrase"))
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func backupImport(c *cli.Env, args []string) error {
 		return err
 	}
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tETIQUETA\tESTADO")
+	fmt.Fprintln(tw, cli.T("mctl.vault.import_header"))
 	var req []*v1.VaultBackupDecision
 	var missing []string
 	for _, it := range p.Items {
@@ -141,12 +141,12 @@ func backupImport(c *cli.Env, args []string) error {
 		return nil
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("no se importó nada: falta decidir %d conflicto(s); use --decision ID=renombrar|reemplazar|omitir o --all=ACCIÓN: %s", len(missing), strings.Join(missing, ", "))
+		return cli.Err("mctl.import_a.missing", "n", len(missing), "ids", strings.Join(missing, ", "))
 	}
 	r, err := cl.ApplyBackupImport(context.Background(), &v1.ApplyBackupImportRequest{Token: p.Token, Decisions: req})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "importadas: %d nuevas, %d reemplazadas, %d renombradas, %d omitidas, %d iguales\n", r.Created, r.Replaced, r.Renamed, r.Skipped, r.Same)
+	fmt.Fprintln(c.Out, cli.T("mctl.vault.imported", "created", r.Created, "replaced", r.Replaced, "renamed", r.Renamed, "skipped", r.Skipped, "same", r.Same))
 	return nil
 }
