@@ -162,7 +162,7 @@ func (s *backupSvc) watch(job string) {
 				return
 			case <-t.C:
 			}
-			r, err := s.collect(job, 0)
+			r, err := s.collect(s.ctx, job, 0)
 			if err != nil {
 				s.d.Audit("backup.failed", job, i18n.English(err))
 				return
@@ -238,10 +238,10 @@ func masked(t *tracked, dir string) bool {
 	return m.Masked
 }
 
-func (s *backupSvc) collect(job string, keep int) (collected, error) {
+func (s *backupSvc) collect(ctx context.Context, job string, keep int) (collected, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	j, err := s.d.Job(job)
+	j, err := s.d.Job(ctx, job)
 	if err != nil {
 		return collected{}, err
 	}
@@ -429,7 +429,7 @@ func (s *backupSvc) CollectBackups(ctx context.Context, r *v1.CollectBackupsRequ
 			return nil, err
 		}
 	}
-	c, err := s.collect(r.JobId, keep)
+	c, err := s.collect(ctx, r.JobId, keep)
 	if err != nil {
 		return nil, err
 	}

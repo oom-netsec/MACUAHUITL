@@ -35,7 +35,7 @@ func (s *visibilitySvc) BuildTopology(ctx context.Context, r *v1.BuildTopologyRe
 	s.d.MarkActive()
 	dir := r.Dir
 	if r.JobId != "" {
-		j, err := s.d.Job(r.JobId)
+		j, err := s.d.Job(ctx, r.JobId)
 		if err != nil {
 			return nil, err
 		}

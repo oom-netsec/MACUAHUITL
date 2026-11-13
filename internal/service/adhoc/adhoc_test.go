@@ -22,7 +22,7 @@ type jobDeps struct {
 	info service.JobInfo
 }
 
-func (d jobDeps) Job(string) (service.JobInfo, error) { return d.info, nil }
+func (d jobDeps) Job(context.Context, string) (service.JobInfo, error) { return d.info, nil }
 
 func TestResultadoFinalLiberaLosComandos(t *testing.T) {
 	dir := t.TempDir()

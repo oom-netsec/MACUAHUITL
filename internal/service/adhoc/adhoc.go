@@ -69,9 +69,9 @@ func (s *adhocSvc) StartAdhoc(ctx context.Context, r *v1.StartAdhocRequest) (*v1
 	return &v1.StartAdhocResponse{JobId: cj.JobId, Armed: true, WindowEndsAt: ar.WindowEndsAt}, nil
 }
 
-func (s *adhocSvc) AdhocResult(_ context.Context, r *v1.AdhocResultRequest) (*v1.AdhocResultResponse, error) {
+func (s *adhocSvc) AdhocResult(ctx context.Context, r *v1.AdhocResultRequest) (*v1.AdhocResultResponse, error) {
 	s.d.MarkActive()
-	j, err := s.d.Job(r.JobId)
+	j, err := s.d.Job(ctx, r.JobId)
 	if err != nil {
 		return nil, err
 	}

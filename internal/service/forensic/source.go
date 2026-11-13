@@ -38,7 +38,7 @@ type loaded struct {
 func (s *forensicSvc) bundle(ctx context.Context, job string) (*analyze.Bundle, error) {
 	dir := filepath.Clean(job)
 	if !filepath.IsAbs(job) {
-		j, err := s.d.Job(job)
+		j, err := s.d.Job(ctx, job)
 		if err != nil {
 			return nil, err
 		}

@@ -25,7 +25,7 @@ type jobDeps struct {
 	info *service.JobInfo
 }
 
-func (d jobDeps) Job(string) (service.JobInfo, error) { return *d.info, nil }
+func (d jobDeps) Job(context.Context, string) (service.JobInfo, error) { return *d.info, nil }
 
 // carpeta arma la salida de Patrol de un equipo con dos rondas.
 func carpeta(t *testing.T, dir string, cfgs ...string) {

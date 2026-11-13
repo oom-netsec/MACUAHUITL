@@ -104,7 +104,7 @@ func (s *changeSvc) jobState(id string) string {
 	if id == "" {
 		return ""
 	}
-	j, err := s.d.Job(id)
+	j, err := s.d.Job(context.Background(), id) // solo el estado: el error no se muestra
 	if err != nil {
 		return ""
 	}
@@ -173,7 +173,7 @@ func (s *changeSvc) outputDir(ctx context.Context, jobID, phase string) (string,
 	if jobID == "" {
 		return "", service.Err(ctx, codes.FailedPrecondition, "change.err.missing_capture", i18n.A("phase", phase))
 	}
-	j, err := s.d.Job(jobID)
+	j, err := s.d.Job(ctx, jobID)
 	if err != nil {
 		return "", err
 	}

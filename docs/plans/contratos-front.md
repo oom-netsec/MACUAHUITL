@@ -1278,7 +1278,7 @@ Con `en`, nada visible de esta área sale en español; sin idioma o con `es` el 
 - `HostsImportFormat`: `description` y `type` de cada campo salen en el idioma (`hostfield.desc.<campo>`, `hostfield.type.<tipo>`); el nombre del archivo de la plantilla (`hosts-plantilla.csv|json`) y el `state`/`reason` de cada fila (`nuevo`, `conflicto`, `nombre`…) siguen siendo valores técnicos.
 
 ### Salida, protocolo, trabajos y paquetes
-- `out.err.dir|file|busy` (carpeta y archivo de salida de adhoc, diag y field), `field.err.protocol`, `field.err.port_lost`, `patrol.err.job_missing` («trabajo X no existe»; `Deps.Job` conserva su firma sin contexto) y `pack.err.hidden_save|hidden_read`.
+- `out.err.dir|file` (carpeta y archivo de salida de adhoc), `ingest.err.out_dir|out_file`, `field.err.names_busy|proto|port_lost` (diag y field), `patrol.err.job_missing` («trabajo X no existe») y `pack.err.hidden_save|hidden_read`.
 - Snippets: `ListSnippetTemplates` entrega `name`, `label` y `help` en el idioma del contexto (`snippet.<id>.name|field.<campo>[.help]`, mismas claves y textos en inglés de la app). Una prueba compara el español del catálogo con el de las plantillas del núcleo.
 
 ### Puente (`ui/bridge`)
@@ -1289,7 +1289,7 @@ Con `en`, nada visible de esta área sale en español; sin idioma o con `es` el 
 - Se queda en español a propósito: la ayuda (`--help`, `help.golden`), los errores `uso: mctl …`, los nombres y textos de las banderas, los valores aceptados (`renombrar|reemplazar|omitir`), CSV/JSON, y los errores de `--lang` mismo (se dan antes de conocer el idioma).
 
 ### Qué sigue sin cubrir
-- `Deps.Job` (sin contexto): el «trabajo X no existe» que devuelven visibility, analysis, forensic, drift, metrics, backup, change y adhoc por ese camino sigue en es.
+- `Deps.Job` recibe ahora el contexto de la petición: el «trabajo X no existe» de visibility, analysis, forensic, drift, metrics, backup, change y adhoc sale en el idioma pedido.
 - Los `status.Error(err.Error())` que envuelven errores de SQLite o del sistema (`internal()` de inventory y scripts, prefs, pack, diag `ListInterfaces`, `audit Verify/Export`) y los `core: …` del arranque del demonio: texto de la biblioteca, no de la app.
 - La marca `abierto/cerrado:` del log de la consola serie (es contenido del archivo de evidencia) y `HashFile` (rama 30e-b).
 - `hosts-plantilla.*` (nombre de archivo) y los valores técnicos `state/reason` de las filas del import.

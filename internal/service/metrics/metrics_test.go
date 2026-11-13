@@ -23,7 +23,7 @@ type jobDeps struct {
 	dir string
 }
 
-func (d jobDeps) Job(id string) (service.JobInfo, error) {
+func (d jobDeps) Job(_ context.Context, id string) (service.JobInfo, error) {
 	if id != "trabajo1" {
 		return service.JobInfo{}, status.Error(codes.NotFound, "no existe")
 	}
