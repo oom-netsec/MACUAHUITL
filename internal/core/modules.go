@@ -54,7 +54,7 @@ func modules(c *Core) []service.Module {
 		transfer.Module{},
 		metrics.Module{},
 		inventory.Module{},
-		scripts.Module{Packs: c.packs},
+		scripts.Module{Packs: c.packs, UserIDs: c.userIDs},
 		packsvc.Module{Store: c.packs, UserIDs: c.userIDs},
 	}
 }

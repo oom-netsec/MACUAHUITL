@@ -120,6 +120,14 @@ func (b *Bridge) DuplicateScript(id string) (ScriptDTO, error) {
 	})
 }
 
+// CopyFromPack copia un script de un paquete instalado (también oculto) a «Mis scripts»: ID nuevo, editable, nombre «<nombre> (copia)».
+func (b *Bridge) CopyFromPack(id string) (ScriptDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (ScriptDTO, error) {
+		r, err := scriptsClient(c).CopyFromPack(ctx, &v1.CopyFromPackRequest{Id: id})
+		return scriptDTO(r.GetScript()), err
+	})
+}
+
 // ExportScripts escribe los scripts elegidos en path (absoluta; el núcleo la crea 0600 y no sobrescribe sin overwrite).
 // Devuelve cuántos exportó.
 func (b *Bridge) ExportScripts(ids []string, path string, overwrite bool) (int, error) {
@@ -156,13 +164,14 @@ func (b *Bridge) ApplyScriptsImport(token string, decisions []ImportDecisionDTO)
 // ---- Colecciones y fijados (fase 29c) ----
 
 type CollectionDTO struct {
-	ID          string   `json:"id"` // 32 hex, o «favoritos» (no se borra ni se renombra)
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Order       int      `json:"order"` // desde 0, entre todas las colecciones
-	ScriptIDs   []string `json:"scriptIds"`
-	CreatedMs   int64    `json:"createdMs"`
-	UpdatedMs   int64    `json:"updatedMs"`
+	ID              string   `json:"id"` // 32 hex, o «favoritos» (no se borra ni se renombra)
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	Order           int      `json:"order"` // desde 0, entre todas las colecciones
+	ScriptIDs       []string `json:"scriptIds"`
+	CreatedMs       int64    `json:"createdMs"`
+	UpdatedMs       int64    `json:"updatedMs"`
+	HiddenScriptIDs []string `json:"hiddenScriptIds"` // fase 32b: subconjunto de scriptIds que un paquete tiene oculto; siguen en scriptIds
 }
 
 type CollectionImportItemDTO struct {
@@ -199,7 +208,7 @@ type CollectionsExportResultDTO struct {
 
 func collectionDTO(c *v1.Collection) CollectionDTO {
 	return CollectionDTO{ID: c.GetId(), Name: c.GetName(), Description: c.GetDescription(), Order: int(c.GetOrder()), ScriptIDs: strs(c.GetScriptIds()),
-		CreatedMs: c.GetCreatedMs(), UpdatedMs: c.GetUpdatedMs()}
+		CreatedMs: c.GetCreatedMs(), UpdatedMs: c.GetUpdatedMs(), HiddenScriptIDs: strs(c.GetHiddenScriptIds())}
 }
 
 func importItemsDTO(items []*v1.ImportItem) []ImportItemDTO {

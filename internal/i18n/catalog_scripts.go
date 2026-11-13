@@ -28,6 +28,7 @@ func init() {
 		"scripts.imp.script_dup":        e("script {n} ({name:q}): ID o nombre repetido dentro del archivo", "script {n} ({name:q}): ID or name repeated within the file", "n", "name"),
 		"scripts.imp.col":               e("colección {n} ({name:q}): {cause}", "collection {n} ({name:q}): {cause}", "n", "name", "cause"),
 		"scripts.imp.col_dup":           e("colección {n} ({name:q}): ID o nombre repetido dentro del archivo", "collection {n} ({name:q}): ID or name repeated within the file", "n", "name"),
+		"scripts.svc.not_from_pack":     e("{id:q} no es un script de un paquete instalado", "{id:q} is not a script of an installed package", "id"),
 		"scripts.svc.not_found":         e("no hay un script {id:q}", "there is no script {id:q}", "id"),
 		"scripts.svc.col_not_found":     e("no hay una colección {id:q}", "there is no collection {id:q}", "id"),
 		"scripts.svc.no_script":         e("falta el script", "the script is missing"),

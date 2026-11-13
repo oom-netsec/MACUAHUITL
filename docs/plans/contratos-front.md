@@ -1193,3 +1193,41 @@ Cierra lo que 30a-30c dejaron en español. Misma regla de compatibilidad: sin `a
 - `PlaybookInfo.params` (`PlaybookParam{name, kind}`; kind = `mac`, `ap`, `interface` o `ip`): lo que el playbook pide al armar el trabajo. Sus `commands` traen la plantilla con `{nombre}`; no se ejecutan tal cual.
 - `JobSpec.params` (`map<string,string>`): un valor por dato de los playbooks elegidos. El núcleo valida (la MAC se normaliza a `aaaa.bbbb.cccc`) y rechaza datos faltantes, desconocidos o inválidos en `CreateJob` con `field = params` y códigos `playbook.err.param_*` (`name`, `kind` en la metadata). Sin datos, un trabajo se comporta como antes. Mientras la UI no pida los datos, un playbook con `params` no se puede usar desde la app: `CreateJob` falla por el dato que falta.
 - Los datos quedan en el manifest (`params`) y en la auditoría de `job.create`; no son secretos. Los playbooks con datos no generan script `lib-<id>` en la biblioteca.
+
+## Paquetes: selección por elemento y copia a «Mis scripts» (fase 32b)
+Spec: ADR 0010, «Selección por elemento y paquete personal». Aquí solo lo que ya está en el núcleo, el proto y el puente; export e import del paquete personal llegan en la fase 32c.
+
+### Activar u ocultar
+- `PackInfo.hidden` (`hidden` en `PackInfoDTO`, siempre arreglo): IDs de playbook o de script del paquete que el usuario ocultó, ordenados. Viene en `PackList`, `PackShow`, `PackInstall` y `PackSetItems`.
+- `PackSetItems(packId, hide[], show[])` → `PackInfoDTO`. Un ID que no es playbook ni script del paquete, o que viene en `hide` y `show` a la vez, falla con `pack.err.item` (`id`, `pack`; InvalidArgument). Un paquete no instalado, `pack.err.not_found`.
+- `PackInstallHiding(path, allowUnsigned, hide[], replaceHidden)`: igual que `PackInstall` (que se queda con su firma de siempre) pero con la selección del diálogo. Con `replaceHidden = true` (lo que manda el diálogo), `hide` es el conjunto EXACTO de ocultos del paquete tras instalar: lo que el usuario desmarcó queda visible aunque estuviera oculto de una versión anterior. Sin él, una actualización conserva lo ya oculto y `hide` solo suma (así actúa `mctl pack install` sin `--hide`; con `--hide`, el CLI manda `replaceHidden`). Los IDs de `hide` que el paquete no trae se ignoran. El diálogo lista playbooks y scripts con las casillas que da `PackInspect` (precargadas con `pack.hidden`) y manda como `hide` lo desmarcado.
+- Lo oculto se guarda antes de publicar el paquete, en una sola transacción: si no se puede guardar, el error dice «no se instaló nada» y no queda instalado. Si el paquete se instaló y lo único que falla es leer lo oculto para responder, el error dice «el paquete quedó instalado»: el front debe refrescar con `PackList`.
+- Al instalar solo se podan las filas de IDs que la versión ya no trae; no se borra la elección de un paquete que la revalidación de arranque omitió (solo quitarlo con `PackRemove` la borra).
+- Ocultar un playbook oculta también su script `lib-<id>`; ocultar solo el script no toca al playbook. Mostrar un `lib-<id>` cuyo playbook sigue oculto no tiene efecto: hay que mostrar el playbook.
+- Un playbook del paquete que uno de `<config>/playbooks` tapa (`PackInfo.shadowed`) no se oculta: lo que se vería es el del usuario. La fila se guarda, pero no filtra ni a él ni a su `lib-<id>`.
+- `SetItems` con `hide` y `show` vacíos falla con `pack.err.items_empty` (sin metadata), y solo audita (`pack.items`) si cambió algo de verdad.
+- Un fijado de la terminal cuyo script está oculto no cuenta para el tope de fijados ni para `ReorderPinned` (se manda la lista de los visibles, que es la que devuelve `ListPinned`); se conserva y vuelve al mostrarlo.
+- La elección se poda al instalar: se borran las filas de IDs que la versión ya no trae (si una versión posterior lo vuelve a traer, entra visible). Quitar el paquete la borra entera.
+- Qué filtra: `ListPlaybooks` (Patrol), `ListScripts` y `ListPinned`. Qué no: `GetScript`, la resolución por ID (`CreateJob`, `mctl`), los trabajos guardados y programados, y las colecciones: éstas siguen devolviendo el ID en `scriptIds` y lo repiten en `Collection.hiddenScriptIds` (`CollectionDTO.hiddenScriptIds`, siempre arreglo) para que la vista lo marque como oculto.
+- La elección sobrevive a una versión nueva del paquete (un ID nuevo entra visible; uno que la versión quitó deja de contar) y se borra al quitar el paquete.
+- Auditoría (inglés): `pack.items` con `hidden=<n> shown=<n>` (`at=install` si vino de `hide[]`).
+
+### Vista previa de la instalación
+- `PackInspect(path, allowUnsigned)` → `PackInspectDTO {pack, playbookIds, scriptIds, replacedVersion}` (`PackService.Inspect`): lee el `.mpack` una sola vez (mismo tope de 20 MB) y lo valida con los mismos pasos y los mismos errores que `PackInstall` (`pack.err.*`), pero no instala nada, no toca el almacén y no audita. Sirve para llenar las casillas del diálogo y mandar después `PackInstallHiding`.
+- `pack.official` dice si la firma oficial es válida; `replacedVersion` es la versión instalada que reemplazaría (vacío si es nuevo); `pack.hidden` trae lo que el usuario ya tenía oculto de esa versión instalada, para precargar las casillas.
+- Un paquete de terceros sin `allowUnsigned` falla con `pack.err.unsigned`, igual que `PackInstall`: el diálogo debe pasar `allowUnsigned = true` para poder mostrar el contenido y dejar la confirmación para el botón Instalar.
+- Un paquete que `PackInstall` rechazaría (versión igual o menor, choque de IDs, firma inválida) también se rechaza aquí con el mismo reason.
+
+### Copiar a «Mis scripts»
+- `CopyFromPack(id)` → `ScriptDTO` (puente) / `ScriptsService.CopyFromPack`: copia un script de un paquete instalado, también uno oculto, como script del usuario con ID nuevo, editable, nombre `<nombre> (copia)` (o `(copia 2)`…). Si es derivado de un playbook lleva `pre` más sus comandos. Un ID que no es de un paquete instalado (base, del usuario o inexistente) falla con `scripts.svc.not_from_pack` (`id`; InvalidArgument) o `scripts.svc.not_found`.
+- Quitar el paquete no borra las copias. Auditoría: `scripts.copy`. `DuplicateScript` sigue igual.
+
+### Reasons nuevos
+| Reason | Metadata | Código gRPC |
+|---|---|---|
+| `pack.err.item` | `id`, `pack` | InvalidArgument |
+| `pack.err.items_empty` | | InvalidArgument |
+| `scripts.svc.not_from_pack` | `id` | InvalidArgument |
+
+### CLI
+`mctl pack inspect <archivo.mpack> [--allow-unsigned]`, `mctl pack items <id> [--hide ITEM]... [--show ITEM]...`, `mctl pack install … [--hide ITEM]...`, `mctl scripts copy <id>`; `pack list` marca cuántos ocultos y `pack show` los lista.

@@ -79,6 +79,17 @@ func colPB(c dom.Coleccion) *v1.Collection {
 		CreatedMs: ms(c.CreatedAt), UpdatedMs: ms(c.UpdatedAt)}
 }
 
+// colPBHidden es colPB marcando los scripts que un paquete tiene oculto; siguen en script_ids.
+func colPBHidden(c dom.Coleccion, hidden map[string]bool) *v1.Collection {
+	out := colPB(c)
+	for _, id := range c.ScriptIDs {
+		if hidden[id] {
+			out.HiddenScriptIds = append(out.HiddenScriptIds, id)
+		}
+	}
+	return out
+}
+
 func nonNil(l []string) []string {
 	if l == nil {
 		return []string{}
@@ -119,9 +130,13 @@ func (s *svc) ListCollections(ctx context.Context, _ *v1.ListCollectionsRequest)
 	if err != nil {
 		return nil, internal(err)
 	}
+	_, hidden, err := s.hiddenSets()
+	if err != nil {
+		return nil, internal(err)
+	}
 	out := &v1.ListCollectionsResponse{}
 	for _, c := range cols {
-		out.Collections = append(out.Collections, colPB(cleanCol(c, lib)))
+		out.Collections = append(out.Collections, colPBHidden(cleanCol(c, lib), hidden))
 	}
 	return out, nil
 }
@@ -139,7 +154,11 @@ func (s *svc) GetCollection(ctx context.Context, r *v1.GetCollectionRequest) (*v
 	if err != nil {
 		return nil, internal(err)
 	}
-	return &v1.GetCollectionResponse{Collection: colPB(cleanCol(c, lib))}, nil
+	_, hidden, err := s.hiddenSets()
+	if err != nil {
+		return nil, internal(err)
+	}
+	return &v1.GetCollectionResponse{Collection: colPBHidden(cleanCol(c, lib), hidden)}, nil
 }
 
 // colNameTaken dice si otra colección (no exceptID) ya usa name, sin importar mayúsculas.
@@ -197,7 +216,11 @@ func (s *svc) SaveCollection(ctx context.Context, r *v1.SaveCollectionRequest) (
 		return nil, err
 	}
 	s.d.Audit(action, out.ID, out.Name)
-	return &v1.SaveCollectionResponse{Collection: colPB(out)}, nil
+	_, hidden, err := s.hiddenSets()
+	if err != nil {
+		return nil, internal(err)
+	}
+	return &v1.SaveCollectionResponse{Collection: colPBHidden(out, hidden)}, nil
 }
 
 func (s *svc) DeleteCollection(ctx context.Context, r *v1.DeleteCollectionRequest) (*v1.DeleteCollectionResponse, error) {
@@ -313,7 +336,11 @@ func (s *svc) SetCollectionScripts(ctx context.Context, r *v1.SetCollectionScrip
 		return nil, err
 	}
 	s.d.Audit("scripts.coleccion.scripts", c.ID, fmt.Sprintf("%s: added [%s], removed [%s], %d in total", c.Name, corta(added), corta(removed), len(c.ScriptIDs)))
-	return &v1.SetCollectionScriptsResponse{Collection: colPB(c)}, nil
+	_, hidden, err := s.hiddenSets()
+	if err != nil {
+		return nil, internal(err)
+	}
+	return &v1.SetCollectionScriptsResponse{Collection: colPBHidden(c, hidden)}, nil
 }
 
 // prunePins quita de los fijados los «lib-*» que esta biblioteca ya no trae (salvo los retenidos de paquetes): no se ven, pero contarían para el tope
@@ -338,7 +365,7 @@ func (s *svc) prunePins(ctx context.Context, tx *sql.Tx) error {
 }
 
 // splitPins separa los fijados guardados en visibles y ocultos: un «lib-*» retenido de un paquete que no está instalado
-// no resuelve a ningún script (ListPinned no lo muestra). Los ocultos no cuentan para el tope ni para reordenar, y se
+// no resuelve a ningún script y uno oculto por el usuario no se muestra (ListPinned no los muestra). Los ocultos no cuentan para el tope ni para reordenar, y se
 // conservan en la base, al final, hasta que se instale el paquete.
 func (s *svc) splitPins(pins []string) (visible, hidden []string, err error) {
 	lib, err := s.library()
@@ -349,8 +376,12 @@ func (s *svc) splitPins(pins []string) (visible, hidden []string, err error) {
 	for _, x := range lib {
 		have[x.ID] = true
 	}
+	_, ocultos, err := s.hiddenSets() // los que un paquete tiene oculto tampoco cuentan: no se ven ni se pueden reordenar
+	if err != nil {
+		return nil, nil, err
+	}
 	for _, id := range pins {
-		if dom.IsLib(id) && !have[id] {
+		if dom.IsLib(id) && !have[id] || ocultos[id] {
 			hidden = append(hidden, id)
 		} else {
 			visible = append(visible, id)
@@ -415,8 +446,15 @@ func (s *svc) ListPinned(ctx context.Context, _ *v1.ListPinnedRequest) (*v1.List
 	if err != nil {
 		return nil, internal(err)
 	}
+	_, hidden, err := s.hiddenSets()
+	if err != nil {
+		return nil, internal(err)
+	}
 	out := &v1.ListPinnedResponse{}
 	for _, id := range pins {
+		if hidden[id] {
+			continue
+		}
 		x, err := s.find(ctx, s.d.DB(), id)
 		if status.Code(err) == codes.NotFound { // un «lib-*» que esta biblioteca ya no trae
 			continue

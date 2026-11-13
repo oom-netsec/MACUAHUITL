@@ -1170,16 +1170,17 @@ func (x *ApplyImportResponse) GetSkipped() int32 {
 }
 
 type Collection struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                // 32 hex, o «favoritos» (la colección por defecto)
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`                            // 1 a 64, único sin importar mayúsculas
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`              // hasta 512
-	Order         int32                  `protobuf:"varint,4,opt,name=order,proto3" json:"order,omitempty"`                         // posición entre las colecciones, desde 0
-	ScriptIds     []string               `protobuf:"bytes,5,rep,name=script_ids,json=scriptIds,proto3" json:"script_ids,omitempty"` // en orden; de usuario o de biblioteca («lib-*»)
-	CreatedMs     int64                  `protobuf:"varint,6,opt,name=created_ms,json=createdMs,proto3" json:"created_ms,omitempty"`
-	UpdatedMs     int64                  `protobuf:"varint,7,opt,name=updated_ms,json=updatedMs,proto3" json:"updated_ms,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`                                // 32 hex, o «favoritos» (la colección por defecto)
+	Name            string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`                            // 1 a 64, único sin importar mayúsculas
+	Description     string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`              // hasta 512
+	Order           int32                  `protobuf:"varint,4,opt,name=order,proto3" json:"order,omitempty"`                         // posición entre las colecciones, desde 0
+	ScriptIds       []string               `protobuf:"bytes,5,rep,name=script_ids,json=scriptIds,proto3" json:"script_ids,omitempty"` // en orden; de usuario o de biblioteca («lib-*»)
+	CreatedMs       int64                  `protobuf:"varint,6,opt,name=created_ms,json=createdMs,proto3" json:"created_ms,omitempty"`
+	UpdatedMs       int64                  `protobuf:"varint,7,opt,name=updated_ms,json=updatedMs,proto3" json:"updated_ms,omitempty"`
+	HiddenScriptIds []string               `protobuf:"bytes,8,rep,name=hidden_script_ids,json=hiddenScriptIds,proto3" json:"hidden_script_ids,omitempty"` // subconjunto de script_ids que un paquete tiene oculto (fase 32b); siguen en script_ids
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Collection) Reset() {
@@ -1259,6 +1260,13 @@ func (x *Collection) GetUpdatedMs() int64 {
 		return x.UpdatedMs
 	}
 	return 0
+}
+
+func (x *Collection) GetHiddenScriptIds() []string {
+	if x != nil {
+		return x.HiddenScriptIds
+	}
+	return nil
 }
 
 type ListCollectionsRequest struct {
@@ -2741,6 +2749,94 @@ func (x *ImportFormatResponse) GetFields() []*FormatField {
 	return nil
 }
 
+type CopyFromPackRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // ID de un script de un paquete instalado (derivado «lib-*» o de scripts.json)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CopyFromPackRequest) Reset() {
+	*x = CopyFromPackRequest{}
+	mi := &file_macuahuitl_v1_scripts_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CopyFromPackRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CopyFromPackRequest) ProtoMessage() {}
+
+func (x *CopyFromPackRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_scripts_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CopyFromPackRequest.ProtoReflect.Descriptor instead.
+func (*CopyFromPackRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_scripts_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *CopyFromPackRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type CopyFromPackResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Script        *Script                `protobuf:"bytes,1,opt,name=script,proto3" json:"script,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CopyFromPackResponse) Reset() {
+	*x = CopyFromPackResponse{}
+	mi := &file_macuahuitl_v1_scripts_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CopyFromPackResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CopyFromPackResponse) ProtoMessage() {}
+
+func (x *CopyFromPackResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_scripts_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CopyFromPackResponse.ProtoReflect.Descriptor instead.
+func (*CopyFromPackResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_scripts_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *CopyFromPackResponse) GetScript() *Script {
+	if x != nil {
+		return x.Script
+	}
+	return nil
+}
+
 var File_macuahuitl_v1_scripts_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_scripts_proto_rawDesc = "" +
@@ -2820,7 +2916,7 @@ const file_macuahuitl_v1_scripts_proto_rawDesc = "" +
 	"\acreated\x18\x01 \x01(\x05R\acreated\x12\x1a\n" +
 	"\breplaced\x18\x02 \x01(\x05R\breplaced\x12\x18\n" +
 	"\arenamed\x18\x03 \x01(\x05R\arenamed\x12\x18\n" +
-	"\askipped\x18\x04 \x01(\x05R\askipped\"\xc5\x01\n" +
+	"\askipped\x18\x04 \x01(\x05R\askipped\"\xf1\x01\n" +
 	"\n" +
 	"Collection\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -2832,7 +2928,8 @@ const file_macuahuitl_v1_scripts_proto_rawDesc = "" +
 	"\n" +
 	"created_ms\x18\x06 \x01(\x03R\tcreatedMs\x12\x1d\n" +
 	"\n" +
-	"updated_ms\x18\a \x01(\x03R\tupdatedMs\"\x18\n" +
+	"updated_ms\x18\a \x01(\x03R\tupdatedMs\x12*\n" +
+	"\x11hidden_script_ids\x18\b \x03(\tR\x0fhiddenScriptIds\"\x18\n" +
 	"\x16ListCollectionsRequest\"V\n" +
 	"\x17ListCollectionsResponse\x12;\n" +
 	"\vcollections\x18\x01 \x03(\v2\x19.macuahuitl.v1.CollectionR\vcollections\"&\n" +
@@ -2925,7 +3022,11 @@ const file_macuahuitl_v1_scripts_proto_rawDesc = "" +
 	"\aexample\x18\x04 \x01(\tR\aexample\x12 \n" +
 	"\vdescription\x18\x05 \x01(\tR\vdescription\"J\n" +
 	"\x14ImportFormatResponse\x122\n" +
-	"\x06fields\x18\x01 \x03(\v2\x1a.macuahuitl.v1.FormatFieldR\x06fields2\x99\x11\n" +
+	"\x06fields\x18\x01 \x03(\v2\x1a.macuahuitl.v1.FormatFieldR\x06fields\"%\n" +
+	"\x13CopyFromPackRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"E\n" +
+	"\x14CopyFromPackResponse\x12-\n" +
+	"\x06script\x18\x01 \x01(\v2\x15.macuahuitl.v1.ScriptR\x06script2\xf2\x11\n" +
 	"\x0eScriptsService\x12T\n" +
 	"\vListScripts\x12!.macuahuitl.v1.ListScriptsRequest\x1a\".macuahuitl.v1.ListScriptsResponse\x12N\n" +
 	"\tGetScript\x12\x1f.macuahuitl.v1.GetScriptRequest\x1a .macuahuitl.v1.GetScriptResponse\x12Q\n" +
@@ -2951,7 +3052,8 @@ const file_macuahuitl_v1_scripts_proto_rawDesc = "" +
 	"\x18PreviewImportCollections\x12..macuahuitl.v1.PreviewImportCollectionsRequest\x1a/.macuahuitl.v1.PreviewImportCollectionsResponse\x12u\n" +
 	"\x16ApplyImportCollections\x12,.macuahuitl.v1.ApplyImportCollectionsRequest\x1a-.macuahuitl.v1.ApplyImportCollectionsResponse\x12]\n" +
 	"\x0eImportTemplate\x12$.macuahuitl.v1.ImportTemplateRequest\x1a%.macuahuitl.v1.ImportTemplateResponse\x12W\n" +
-	"\fImportFormat\x12\".macuahuitl.v1.ImportFormatRequest\x1a#.macuahuitl.v1.ImportFormatResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
+	"\fImportFormat\x12\".macuahuitl.v1.ImportFormatRequest\x1a#.macuahuitl.v1.ImportFormatResponse\x12W\n" +
+	"\fCopyFromPack\x12\".macuahuitl.v1.CopyFromPackRequest\x1a#.macuahuitl.v1.CopyFromPackResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
 
 var (
 	file_macuahuitl_v1_scripts_proto_rawDescOnce sync.Once
@@ -2965,7 +3067,7 @@ func file_macuahuitl_v1_scripts_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_scripts_proto_rawDescData
 }
 
-var file_macuahuitl_v1_scripts_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
+var file_macuahuitl_v1_scripts_proto_msgTypes = make([]protoimpl.MessageInfo, 54)
 var file_macuahuitl_v1_scripts_proto_goTypes = []any{
 	(*Script)(nil),                           // 0: macuahuitl.v1.Script
 	(*ListScriptsRequest)(nil),               // 1: macuahuitl.v1.ListScriptsRequest
@@ -3019,6 +3121,8 @@ var file_macuahuitl_v1_scripts_proto_goTypes = []any{
 	(*ImportFormatRequest)(nil),              // 49: macuahuitl.v1.ImportFormatRequest
 	(*FormatField)(nil),                      // 50: macuahuitl.v1.FormatField
 	(*ImportFormatResponse)(nil),             // 51: macuahuitl.v1.ImportFormatResponse
+	(*CopyFromPackRequest)(nil),              // 52: macuahuitl.v1.CopyFromPackRequest
+	(*CopyFromPackResponse)(nil),             // 53: macuahuitl.v1.CopyFromPackResponse
 }
 var file_macuahuitl_v1_scripts_proto_depIdxs = []int32{
 	0,  // 0: macuahuitl.v1.ListScriptsResponse.scripts:type_name -> macuahuitl.v1.Script
@@ -3041,57 +3145,60 @@ var file_macuahuitl_v1_scripts_proto_depIdxs = []int32{
 	18, // 17: macuahuitl.v1.ApplyImportCollectionsRequest.script_decisions:type_name -> macuahuitl.v1.ImportDecision
 	18, // 18: macuahuitl.v1.ApplyImportCollectionsRequest.collection_decisions:type_name -> macuahuitl.v1.ImportDecision
 	50, // 19: macuahuitl.v1.ImportFormatResponse.fields:type_name -> macuahuitl.v1.FormatField
-	1,  // 20: macuahuitl.v1.ScriptsService.ListScripts:input_type -> macuahuitl.v1.ListScriptsRequest
-	3,  // 21: macuahuitl.v1.ScriptsService.GetScript:input_type -> macuahuitl.v1.GetScriptRequest
-	5,  // 22: macuahuitl.v1.ScriptsService.SaveScript:input_type -> macuahuitl.v1.SaveScriptRequest
-	7,  // 23: macuahuitl.v1.ScriptsService.DeleteScript:input_type -> macuahuitl.v1.DeleteScriptRequest
-	9,  // 24: macuahuitl.v1.ScriptsService.SetFavorite:input_type -> macuahuitl.v1.SetFavoriteRequest
-	11, // 25: macuahuitl.v1.ScriptsService.DuplicateScript:input_type -> macuahuitl.v1.DuplicateScriptRequest
-	13, // 26: macuahuitl.v1.ScriptsService.ExportScripts:input_type -> macuahuitl.v1.ExportScriptsRequest
-	15, // 27: macuahuitl.v1.ScriptsService.PreviewImport:input_type -> macuahuitl.v1.PreviewImportRequest
-	19, // 28: macuahuitl.v1.ScriptsService.ApplyImport:input_type -> macuahuitl.v1.ApplyImportRequest
-	22, // 29: macuahuitl.v1.ScriptsService.ListCollections:input_type -> macuahuitl.v1.ListCollectionsRequest
-	24, // 30: macuahuitl.v1.ScriptsService.GetCollection:input_type -> macuahuitl.v1.GetCollectionRequest
-	26, // 31: macuahuitl.v1.ScriptsService.SaveCollection:input_type -> macuahuitl.v1.SaveCollectionRequest
-	28, // 32: macuahuitl.v1.ScriptsService.DeleteCollection:input_type -> macuahuitl.v1.DeleteCollectionRequest
-	30, // 33: macuahuitl.v1.ScriptsService.ReorderCollections:input_type -> macuahuitl.v1.ReorderCollectionsRequest
-	32, // 34: macuahuitl.v1.ScriptsService.SetCollectionScripts:input_type -> macuahuitl.v1.SetCollectionScriptsRequest
-	34, // 35: macuahuitl.v1.ScriptsService.SetPinned:input_type -> macuahuitl.v1.SetPinnedRequest
-	36, // 36: macuahuitl.v1.ScriptsService.ListPinned:input_type -> macuahuitl.v1.ListPinnedRequest
-	38, // 37: macuahuitl.v1.ScriptsService.ReorderPinned:input_type -> macuahuitl.v1.ReorderPinnedRequest
-	40, // 38: macuahuitl.v1.ScriptsService.ExportCollections:input_type -> macuahuitl.v1.ExportCollectionsRequest
-	42, // 39: macuahuitl.v1.ScriptsService.PreviewImportCollections:input_type -> macuahuitl.v1.PreviewImportCollectionsRequest
-	45, // 40: macuahuitl.v1.ScriptsService.ApplyImportCollections:input_type -> macuahuitl.v1.ApplyImportCollectionsRequest
-	47, // 41: macuahuitl.v1.ScriptsService.ImportTemplate:input_type -> macuahuitl.v1.ImportTemplateRequest
-	49, // 42: macuahuitl.v1.ScriptsService.ImportFormat:input_type -> macuahuitl.v1.ImportFormatRequest
-	2,  // 43: macuahuitl.v1.ScriptsService.ListScripts:output_type -> macuahuitl.v1.ListScriptsResponse
-	4,  // 44: macuahuitl.v1.ScriptsService.GetScript:output_type -> macuahuitl.v1.GetScriptResponse
-	6,  // 45: macuahuitl.v1.ScriptsService.SaveScript:output_type -> macuahuitl.v1.SaveScriptResponse
-	8,  // 46: macuahuitl.v1.ScriptsService.DeleteScript:output_type -> macuahuitl.v1.DeleteScriptResponse
-	10, // 47: macuahuitl.v1.ScriptsService.SetFavorite:output_type -> macuahuitl.v1.SetFavoriteResponse
-	12, // 48: macuahuitl.v1.ScriptsService.DuplicateScript:output_type -> macuahuitl.v1.DuplicateScriptResponse
-	14, // 49: macuahuitl.v1.ScriptsService.ExportScripts:output_type -> macuahuitl.v1.ExportScriptsResponse
-	17, // 50: macuahuitl.v1.ScriptsService.PreviewImport:output_type -> macuahuitl.v1.PreviewImportResponse
-	20, // 51: macuahuitl.v1.ScriptsService.ApplyImport:output_type -> macuahuitl.v1.ApplyImportResponse
-	23, // 52: macuahuitl.v1.ScriptsService.ListCollections:output_type -> macuahuitl.v1.ListCollectionsResponse
-	25, // 53: macuahuitl.v1.ScriptsService.GetCollection:output_type -> macuahuitl.v1.GetCollectionResponse
-	27, // 54: macuahuitl.v1.ScriptsService.SaveCollection:output_type -> macuahuitl.v1.SaveCollectionResponse
-	29, // 55: macuahuitl.v1.ScriptsService.DeleteCollection:output_type -> macuahuitl.v1.DeleteCollectionResponse
-	31, // 56: macuahuitl.v1.ScriptsService.ReorderCollections:output_type -> macuahuitl.v1.ReorderCollectionsResponse
-	33, // 57: macuahuitl.v1.ScriptsService.SetCollectionScripts:output_type -> macuahuitl.v1.SetCollectionScriptsResponse
-	35, // 58: macuahuitl.v1.ScriptsService.SetPinned:output_type -> macuahuitl.v1.SetPinnedResponse
-	37, // 59: macuahuitl.v1.ScriptsService.ListPinned:output_type -> macuahuitl.v1.ListPinnedResponse
-	39, // 60: macuahuitl.v1.ScriptsService.ReorderPinned:output_type -> macuahuitl.v1.ReorderPinnedResponse
-	41, // 61: macuahuitl.v1.ScriptsService.ExportCollections:output_type -> macuahuitl.v1.ExportCollectionsResponse
-	44, // 62: macuahuitl.v1.ScriptsService.PreviewImportCollections:output_type -> macuahuitl.v1.PreviewImportCollectionsResponse
-	46, // 63: macuahuitl.v1.ScriptsService.ApplyImportCollections:output_type -> macuahuitl.v1.ApplyImportCollectionsResponse
-	48, // 64: macuahuitl.v1.ScriptsService.ImportTemplate:output_type -> macuahuitl.v1.ImportTemplateResponse
-	51, // 65: macuahuitl.v1.ScriptsService.ImportFormat:output_type -> macuahuitl.v1.ImportFormatResponse
-	43, // [43:66] is the sub-list for method output_type
-	20, // [20:43] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	0,  // 20: macuahuitl.v1.CopyFromPackResponse.script:type_name -> macuahuitl.v1.Script
+	1,  // 21: macuahuitl.v1.ScriptsService.ListScripts:input_type -> macuahuitl.v1.ListScriptsRequest
+	3,  // 22: macuahuitl.v1.ScriptsService.GetScript:input_type -> macuahuitl.v1.GetScriptRequest
+	5,  // 23: macuahuitl.v1.ScriptsService.SaveScript:input_type -> macuahuitl.v1.SaveScriptRequest
+	7,  // 24: macuahuitl.v1.ScriptsService.DeleteScript:input_type -> macuahuitl.v1.DeleteScriptRequest
+	9,  // 25: macuahuitl.v1.ScriptsService.SetFavorite:input_type -> macuahuitl.v1.SetFavoriteRequest
+	11, // 26: macuahuitl.v1.ScriptsService.DuplicateScript:input_type -> macuahuitl.v1.DuplicateScriptRequest
+	13, // 27: macuahuitl.v1.ScriptsService.ExportScripts:input_type -> macuahuitl.v1.ExportScriptsRequest
+	15, // 28: macuahuitl.v1.ScriptsService.PreviewImport:input_type -> macuahuitl.v1.PreviewImportRequest
+	19, // 29: macuahuitl.v1.ScriptsService.ApplyImport:input_type -> macuahuitl.v1.ApplyImportRequest
+	22, // 30: macuahuitl.v1.ScriptsService.ListCollections:input_type -> macuahuitl.v1.ListCollectionsRequest
+	24, // 31: macuahuitl.v1.ScriptsService.GetCollection:input_type -> macuahuitl.v1.GetCollectionRequest
+	26, // 32: macuahuitl.v1.ScriptsService.SaveCollection:input_type -> macuahuitl.v1.SaveCollectionRequest
+	28, // 33: macuahuitl.v1.ScriptsService.DeleteCollection:input_type -> macuahuitl.v1.DeleteCollectionRequest
+	30, // 34: macuahuitl.v1.ScriptsService.ReorderCollections:input_type -> macuahuitl.v1.ReorderCollectionsRequest
+	32, // 35: macuahuitl.v1.ScriptsService.SetCollectionScripts:input_type -> macuahuitl.v1.SetCollectionScriptsRequest
+	34, // 36: macuahuitl.v1.ScriptsService.SetPinned:input_type -> macuahuitl.v1.SetPinnedRequest
+	36, // 37: macuahuitl.v1.ScriptsService.ListPinned:input_type -> macuahuitl.v1.ListPinnedRequest
+	38, // 38: macuahuitl.v1.ScriptsService.ReorderPinned:input_type -> macuahuitl.v1.ReorderPinnedRequest
+	40, // 39: macuahuitl.v1.ScriptsService.ExportCollections:input_type -> macuahuitl.v1.ExportCollectionsRequest
+	42, // 40: macuahuitl.v1.ScriptsService.PreviewImportCollections:input_type -> macuahuitl.v1.PreviewImportCollectionsRequest
+	45, // 41: macuahuitl.v1.ScriptsService.ApplyImportCollections:input_type -> macuahuitl.v1.ApplyImportCollectionsRequest
+	47, // 42: macuahuitl.v1.ScriptsService.ImportTemplate:input_type -> macuahuitl.v1.ImportTemplateRequest
+	49, // 43: macuahuitl.v1.ScriptsService.ImportFormat:input_type -> macuahuitl.v1.ImportFormatRequest
+	52, // 44: macuahuitl.v1.ScriptsService.CopyFromPack:input_type -> macuahuitl.v1.CopyFromPackRequest
+	2,  // 45: macuahuitl.v1.ScriptsService.ListScripts:output_type -> macuahuitl.v1.ListScriptsResponse
+	4,  // 46: macuahuitl.v1.ScriptsService.GetScript:output_type -> macuahuitl.v1.GetScriptResponse
+	6,  // 47: macuahuitl.v1.ScriptsService.SaveScript:output_type -> macuahuitl.v1.SaveScriptResponse
+	8,  // 48: macuahuitl.v1.ScriptsService.DeleteScript:output_type -> macuahuitl.v1.DeleteScriptResponse
+	10, // 49: macuahuitl.v1.ScriptsService.SetFavorite:output_type -> macuahuitl.v1.SetFavoriteResponse
+	12, // 50: macuahuitl.v1.ScriptsService.DuplicateScript:output_type -> macuahuitl.v1.DuplicateScriptResponse
+	14, // 51: macuahuitl.v1.ScriptsService.ExportScripts:output_type -> macuahuitl.v1.ExportScriptsResponse
+	17, // 52: macuahuitl.v1.ScriptsService.PreviewImport:output_type -> macuahuitl.v1.PreviewImportResponse
+	20, // 53: macuahuitl.v1.ScriptsService.ApplyImport:output_type -> macuahuitl.v1.ApplyImportResponse
+	23, // 54: macuahuitl.v1.ScriptsService.ListCollections:output_type -> macuahuitl.v1.ListCollectionsResponse
+	25, // 55: macuahuitl.v1.ScriptsService.GetCollection:output_type -> macuahuitl.v1.GetCollectionResponse
+	27, // 56: macuahuitl.v1.ScriptsService.SaveCollection:output_type -> macuahuitl.v1.SaveCollectionResponse
+	29, // 57: macuahuitl.v1.ScriptsService.DeleteCollection:output_type -> macuahuitl.v1.DeleteCollectionResponse
+	31, // 58: macuahuitl.v1.ScriptsService.ReorderCollections:output_type -> macuahuitl.v1.ReorderCollectionsResponse
+	33, // 59: macuahuitl.v1.ScriptsService.SetCollectionScripts:output_type -> macuahuitl.v1.SetCollectionScriptsResponse
+	35, // 60: macuahuitl.v1.ScriptsService.SetPinned:output_type -> macuahuitl.v1.SetPinnedResponse
+	37, // 61: macuahuitl.v1.ScriptsService.ListPinned:output_type -> macuahuitl.v1.ListPinnedResponse
+	39, // 62: macuahuitl.v1.ScriptsService.ReorderPinned:output_type -> macuahuitl.v1.ReorderPinnedResponse
+	41, // 63: macuahuitl.v1.ScriptsService.ExportCollections:output_type -> macuahuitl.v1.ExportCollectionsResponse
+	44, // 64: macuahuitl.v1.ScriptsService.PreviewImportCollections:output_type -> macuahuitl.v1.PreviewImportCollectionsResponse
+	46, // 65: macuahuitl.v1.ScriptsService.ApplyImportCollections:output_type -> macuahuitl.v1.ApplyImportCollectionsResponse
+	48, // 66: macuahuitl.v1.ScriptsService.ImportTemplate:output_type -> macuahuitl.v1.ImportTemplateResponse
+	51, // 67: macuahuitl.v1.ScriptsService.ImportFormat:output_type -> macuahuitl.v1.ImportFormatResponse
+	53, // 68: macuahuitl.v1.ScriptsService.CopyFromPack:output_type -> macuahuitl.v1.CopyFromPackResponse
+	45, // [45:69] is the sub-list for method output_type
+	21, // [21:45] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_scripts_proto_init() }
@@ -3105,7 +3212,7 @@ func file_macuahuitl_v1_scripts_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_scripts_proto_rawDesc), len(file_macuahuitl_v1_scripts_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   52,
+			NumMessages:   54,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

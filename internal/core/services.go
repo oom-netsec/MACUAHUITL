@@ -19,6 +19,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/engine"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/pack"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
@@ -541,7 +542,18 @@ func (s *patrolSvc) ListPlaybooks(ctx context.Context, r *v1.ListPlaybooksReques
 	if r.GetPlatform() != "" {
 		pbs = playbook.Visible(r.GetPlatform(), pbs) // ios lista los de ios-xe que oom/ios no reemplaza
 	}
+	var hidden map[string]bool
+	if s.c.packs != nil && s.c.db != nil { // sin almacén o sin base (núcleo mínimo de prueba) no hay nada oculto
+		h, _, err := pack.HiddenSets(s.c.db, s.c.packs.Snapshot(), s.c.userIDs()) // ocultos: fuera de la lista; CreateJob los sigue resolviendo
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		hidden = h
+	}
 	for _, p := range pbs {
+		if hidden[p.ID] {
+			continue
+		}
 		info := &v1.PlaybookInfo{Id: p.ID, Platform: p.Platform, Name: p.NameFor(i18n.Locale(ctx)), Commands: slices.Clone(p.Pre)} // los pre corren primero
 		for _, c := range p.Commands {
 			if r.GetPlatform() == "" || c.Applies(r.GetPlatform()) { // sin plataforma, todos; con ella, los que corren ahí
