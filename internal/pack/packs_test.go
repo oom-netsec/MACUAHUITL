@@ -35,7 +35,7 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 	}
 	for _, d := range dirs {
 		t.Run(filepath.Base(d), func(t *testing.T) {
-			p, err := pack.ValidateSource(d, "v0.2.0")
+			p, err := pack.ValidateSource(d, "v0.3.0")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -45,7 +45,7 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(d, "SIGNATURE")); err == nil {
 				t.Fatal("la fuente no lleva SIGNATURE")
 			}
-			st, _, err := pack.Open(t.TempDir(), "v0.2.0", packtest.Keys(), base)
+			st, _, err := pack.Open(t.TempDir(), "v0.3.0", packtest.Keys(), base)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -66,7 +66,7 @@ func TestBuildEsDeterminista(t *testing.T) {
 	if string(a) != string(b) {
 		t.Fatal("Build no es determinista")
 	}
-	if _, err := pack.Verify(a, "v0.2.0", nil); pack.Reason(err) != "editor.reserved" {
+	if _, err := pack.Verify(a, "v0.3.0", nil); pack.Reason(err) != "editor.reserved" {
 		t.Fatalf("sin firma, oom está reservado: %v", err)
 	}
 }

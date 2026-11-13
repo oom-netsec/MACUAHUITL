@@ -12,6 +12,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -208,6 +209,11 @@ func (c *Core) openPacks() (err error) {
 	base := pack.Base{}
 	for _, p := range c.basePbs {
 		base.PlaybookIDs = append(base.PlaybookIDs, p.ID)
+	}
+	// Lo movido a oom/ios-xe sigue reservado para los paquetes que no son oficiales, esté o no instalado el oficial.
+	for _, id := range playbooks.MovedToIOSXE {
+		base.ReservedPlaybooks = append(base.ReservedPlaybooks, id)
+		base.ReservedScripts = append(base.ReservedScripts, "lib-"+strings.TrimPrefix(id, "ios-xe/"))
 	}
 	if base.ScriptIDs, base.ScriptNames, err = scriptsvc.BaseLibrary(); err != nil {
 		return err

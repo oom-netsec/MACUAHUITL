@@ -65,22 +65,31 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	if r.GetPath() == "" {
 		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.path", nil)
 	}
+	path, err := service.AbsPath(r.GetPath())
+	if err != nil {
+		return nil, err
+	}
 	// Auditoría en inglés: id, versión, sha256 del archivo, origen y, si se rechaza, el motivo.
-	reject := func(err error, id, sum, origin string) error {
-		s.d.Audit("pack.rejected", id, fmt.Sprintf("id=%s sha256=%s origin=%s reason=%s path=%q", id, sum, origin, dom.Reason(err), r.Path))
+	reject := func(err error, p *dom.Pack, sum string) error {
+		id, version, origin := "unknown", "unknown", "unknown"
+		if p != nil {
+			id, version, origin = p.ID, p.Version, p.Origin()
+		}
+		s.d.Audit("pack.rejected", id, fmt.Sprintf("id=%s version=%s sha256=%s origin=%s reason=%s path=%q", id, version, sum, origin, dom.Reason(err), path))
 		return fail(ctx, err)
 	}
-	data, err := dom.ReadArchive(r.Path)
+	data, err := dom.ReadArchive(path)
 	if err != nil {
-		return nil, reject(err, "unknown", "none", "unknown")
+		return nil, reject(err, nil, "none")
 	}
 	sum := dom.SHA256(data)
 	res, err := s.store.Install(data, r.GetAllowUnsigned())
 	if err != nil {
-		if res != nil && res.Pack != nil {
-			return nil, reject(err, res.Pack.ID, sum, res.Pack.Origin())
+		var p *dom.Pack
+		if res != nil {
+			p = res.Pack
 		}
-		return nil, reject(err, "unknown", sum, "unknown")
+		return nil, reject(err, p, sum)
 	}
 	p := res.Pack
 	detail := fmt.Sprintf("id=%s version=%s sha256=%s origin=%s playbooks=%d scripts=%d", p.ID, p.Version, sum, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()))
@@ -116,13 +125,25 @@ func (s *svc) Show(ctx context.Context, r *v1.PackServiceShowRequest) (*v1.PackS
 
 func (s *svc) Remove(ctx context.Context, r *v1.PackServiceRemoveRequest) (*v1.PackServiceRemoveResponse, error) {
 	s.d.MarkActive()
-	p := s.store.Snapshot().Find(r.GetId())
-	if p == nil {
-		return nil, fail(ctx, dom.NotFound(r.GetId()))
+	// Buscar y quitar es una sola operación bajo el lock del almacén: lo que se limpia después es lo que de verdad se quitó.
+	p, err := s.store.Remove(r.GetId())
+	if err != nil {
+		return nil, fail(ctx, err)
 	}
-	tx, err := s.d.DB().Begin()
+	favs, err := s.cleanup(p)
+	s.d.Audit("pack.remove", p.ID, fmt.Sprintf("id=%s version=%s origin=%s playbooks=%d scripts=%d favorites_removed=%d",
+		p.ID, p.Version, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()), favs))
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &v1.PackServiceRemoveResponse{FavoritesRemoved: int32(favs)}, nil
+}
+
+// cleanup borra de colecciones y fijados los scripts del paquete quitado y anota sus IDs de playbook para pack.missing.
+func (s *svc) cleanup(p *dom.Pack) (int, error) {
+	tx, err := s.d.DB().Begin()
+	if err != nil {
+		return 0, err
 	}
 	defer tx.Rollback()
 	favs := 0
@@ -131,7 +152,7 @@ func (s *svc) Remove(ctx context.Context, r *v1.PackServiceRemoveRequest) (*v1.P
 		for _, q := range []string{`DELETE FROM script_collection_items WHERE script_id = ?`, `DELETE FROM script_pins WHERE script_id = ?`} {
 			res, err := tx.Exec(q, id)
 			if err != nil {
-				return nil, status.Error(codes.Internal, err.Error())
+				return 0, err
 			}
 			k, _ := res.RowsAffected()
 			n += k
@@ -142,16 +163,8 @@ func (s *svc) Remove(ctx context.Context, r *v1.PackServiceRemoveRequest) (*v1.P
 	}
 	for _, pb := range p.Playbooks {
 		if _, err := tx.Exec(`INSERT OR REPLACE INTO pack_removed(playbook_id, pack) VALUES(?, ?)`, pb.ID, p.ID); err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
+			return 0, err
 		}
 	}
-	if _, err := s.store.Remove(p.ID); err != nil {
-		return nil, fail(ctx, err)
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	s.d.Audit("pack.remove", p.ID, fmt.Sprintf("id=%s version=%s origin=%s playbooks=%d scripts=%d favorites_removed=%d",
-		p.ID, p.Version, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()), favs))
-	return &v1.PackServiceRemoveResponse{FavoritesRemoved: int32(favs)}, nil
+	return favs, tx.Commit()
 }

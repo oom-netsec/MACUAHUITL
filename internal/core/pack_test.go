@@ -140,9 +140,9 @@ func TestPackMissingDeUnPaqueteQuitado(t *testing.T) {
 	h := newHarness(t, nil)
 	cred := h.ready(t)
 	files := map[string][]byte{
-		"manifest.yaml":    []byte("id: acme/demo\nversion: 1.0.0\nmin_core: 0.2.0\nname: Demo\nname_en: Demo\ndescription: d\ndescription_en: d\nplatforms: [ios-xe]\nauthor: a\nlicense: MIT\n"),
-		"README.md":        []byte("x"),
-		"playbooks/a.yaml": []byte("id: acme-a\nplatform: ios-xe\nname: \"Acme · A\"\nname_en: \"Acme · A\"\ncommands:\n  - cmd: show clock\n"),
+		"manifest.yaml":         []byte("id: acme/demo\nversion: 1.0.0\nmin_core: 0.3.0\nname: Demo\nname_en: Demo\ndescription: d\ndescription_en: d\nplatforms: [ios-xe]\nauthor: a\nlicense: MIT\n"),
+		"README.md":             []byte("x"),
+		"playbooks/acme-a.yaml": []byte("id: acme-a\nplatform: ios-xe\nname: \"Acme · A\"\nname_en: \"Acme · A\"\ncommands:\n  - cmd: show clock\n"),
 	}
 	zb, err := pack.Zip(files)
 	if err != nil {
@@ -167,7 +167,7 @@ func TestPackMissingDeUnPaqueteQuitado(t *testing.T) {
 		t.Fatalf("%q %v %v", r, md, err)
 	}
 	au := h.auditText(t)
-	if !strings.Contains(au, "origin=third-party") || !strings.Contains(au, "reason=unsigned") || !strings.Contains(au, `"action":"pack.rejected"`) {
+	if !strings.Contains(au, "id=acme/demo version=1.0.0") || !strings.Contains(au, "origin=third-party") || !strings.Contains(au, "reason=unsigned") || !strings.Contains(au, `"action":"pack.rejected"`) {
 		t.Fatalf("auditoría:\n%s", au)
 	}
 }
@@ -287,5 +287,43 @@ func TestPackPrecedenciaYTapados(t *testing.T) {
 	l, err := v1.NewPackServiceClient(h.conn).List(ctx(t), &v1.PackServiceListRequest{})
 	if err != nil || len(l.Packs) != 1 || !slices.Equal(l.Packs[0].Shadowed, []string{"ios-xe/l2-stp"}) {
 		t.Fatalf("%+v %v", l, err)
+	}
+}
+
+// La ruta debe ser absoluta (como en los demás servicios de archivos); el rechazo por versión audita el id y la versión reales.
+func TestPackRutaRelativaYAuditoriaDeRechazos(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: "x.mpack"}); err == nil || !strings.Contains(err.Error(), "absoluta") {
+		t.Fatalf("%v", err)
+	}
+	h.installIOSXE(t)
+	_, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t))})
+	if r, _ := reasonOf(err); r != "pack.err.version" {
+		t.Fatalf("%v", err)
+	}
+	if au := h.auditText(t); !strings.Contains(au, "id=oom/ios-xe version=1.0.0") || !strings.Contains(au, "reason=version") {
+		t.Fatalf("auditoría:\n%s", au)
+	}
+}
+
+// C1 de punta a punta: un tercero no ocupa un ID movido a oom/ios-xe aunque el paquete oficial no esté instalado.
+func TestPackTerceroNoOcupaIDsMovidos(t *testing.T) {
+	h := newHarness(t, nil)
+	files := map[string][]byte{
+		"manifest.yaml":         []byte("id: l2/evil\nversion: 1.0.0\nmin_core: 0.3.0\nname: E\nname_en: E\ndescription: d\ndescription_en: d\nplatforms: [ios-xe]\nauthor: a\nlicense: MIT\n"),
+		"README.md":             []byte("x"),
+		"playbooks/l2-stp.yaml": []byte("id: l2-stp\nplatform: ios-xe\nname: \"Evil\"\nname_en: \"Evil\"\ncommands:\n  - cmd: show clock\n"),
+	}
+	zb, err := pack.Zip(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = v1.NewPackServiceClient(h.conn).Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, zb), AllowUnsigned: true})
+	if r, _ := reasonOf(err); r != "pack.err.editor.reserved" {
+		t.Fatalf("%v", err)
+	}
+	if slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
+		t.Fatal("el tercero ocupó ios-xe/l2-stp")
 	}
 }

@@ -1,6 +1,6 @@
 id: oom/ios-xe
 version: 1.0.0
-min_core: 0.2.0
+min_core: 0.3.0
 name: IOS-XE, diagnóstico TAC
 name_en: IOS-XE, TAC diagnostics
 description: Playbooks de solo lectura de capa 1, 2, 3, plataforma, servicios y VPN para IOS-XE, con su biblioteca de scripts.
