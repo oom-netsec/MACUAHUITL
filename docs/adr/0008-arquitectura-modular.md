@@ -46,3 +46,7 @@ Cada área (patrol, acl, diag, tools, analysis, field, change, visibility, calc,
 ## Enmienda (2026-11-06)
 
 `patrol` es el motor del núcleo (ejecuta los trabajos), no un dominio: queda fuera de la lista de dominios junto con `audit`. `capture`, `iosconf`, `pcapan` y `parse` son compartidos: cualquier dominio puede importarlos. `tools/archcheck` además exige que la raíz de un dominio no importe `ipc` ni `transport`, que solo los subpaquetes de `internal/diag` sean capa de red, y que un servicio no importe `core` ni el servicio de otra área.
+
+## Enmienda (2026-11-12)
+
+El formato de scripts de `internal/scripts` es compartido: lo usan la importación de scripts, la biblioteca y los paquetes de contenido (ADR 0010). Comprende `Script`, `Validate`, `Parse`, `NameKey`, el formato de export y `Derived(pbs []playbook.Playbook) []Script`. Esta última se extrae de `LibraryWithEN` y devuelve solo los `lib-<id>` derivados de playbooks, sin los de configuración. `internal/pack`, que es infraestructura del núcleo como `playbook`, puede importarlo. El resto de `internal/scripts` sigue siendo del área de Scripts. `archcheck` no lo hace cumplir, porque `internal/pack` no es un dominio; la regla se revisa en la revisión de código.

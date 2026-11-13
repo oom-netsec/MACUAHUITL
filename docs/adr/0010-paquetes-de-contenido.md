@@ -30,10 +30,16 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
   - `name` y `name_en`, `description` y `description_en`.
   - `platforms`: plataformas de los playbooks, de la lista `knownPlatforms` de `internal/playbook`, y de los scripts, de `scripts.Platforms`.
   - `author` y `license` (identificador SPDX).
-- **Índice:** una línea `sha256  ruta` por cada archivo menos `SIGNATURE`, ordenadas por ruta en orden de bytes y terminadas en `\n`.
+- **Índice:** no viaja en el zip: se calcula de sus entradas como una línea `sha256  ruta` por cada archivo menos `SIGNATURE`, ordenadas por ruta en orden de bytes y terminadas en `\n`. Eso es lo que se firma.
 - **`SIGNATURE`:** la firma Ed25519 de ese índice, en base64 y en una sola línea. Se usa `crypto/ed25519` de la biblioteca estándar, sin dependencias nuevas.
 - **Editor `oom` reservado:** solo pueden usar `oom/*` los paquetes con firma oficial válida.
-- **IDs de terceros con prefijo:** en un paquete de terceros, el `id` de cada playbook va como `<plataforma>/<editor>-<id>` y el de cada script como `lib-<editor>-<id>`. Los IDs sin prefijo de editor quedan reservados para el contenido base y los paquetes oficiales; así un tercero no puede ocupar un ID que un trabajo ya usa o que un paquete oficial usará después.
+- **IDs de terceros con prefijo:** en un paquete de terceros, el `id` de cada playbook va como `<plataforma>/<editor>-<id>` y el de cada script como `lib-<editor>-<id>`, para que un tercero no ocupe un ID que un trabajo ya usa o que un paquete oficial usará después.
+- **Editores reservados:**
+  - Como los IDs oficiales también llevan `-` (`l2-stp`, `svc-aaa`), el prefijo solo no basta.
+  - El editor de un paquete de terceros cumple `^[a-z0-9]{1,16}$`, sin guion; así `l2-stp` no puede ser editor.
+  - Tampoco puede ser `oom` ni un segmento reservado. Los segmentos reservados son una lista compilada en el binario: los nombres de plataforma, el primer segmento de los IDs de la base y de los movidos a `oom/ios-xe` (`l1`, `l2`, `l3`, `plat`, `svc`, `tac`, `vpn`…) y los previstos para paquetes oficiales.
+  - CI rechaza un paquete oficial que use un segmento fuera de esa lista.
+  - Los IDs movidos y sus `lib-<id>` quedan reservados para paquetes oficiales aunque `oom/ios-xe` no esté instalado.
 
 ### Instalación (todo o nada)
 
@@ -44,7 +50,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
    - Solo las rutas de la sección Formato.
    - Sin nombres repetidos ni enlaces.
    - Como máximo 2000 entradas y 20 MB descomprimidos, contados con los bytes que realmente se leen (`io.LimitReader`), no con las cabeceras del zip.
-   - Las entradas coinciden una a una con el índice: no puede haber archivo fuera del índice ni línea del índice sin archivo, y cada sha256 debe coincidir.
+   - El índice se calcula de las entradas leídas (sha256 de los bytes reales, no de las cabeceras), así que cubre todo archivo del zip.
 3. **Firma.**
    - Si hay `SIGNATURE` y valida con la llave oficial compilada en el binario, el paquete es **oficial**.
    - Si hay `SIGNATURE` y no valida, se rechaza con el motivo `signature.invalid`.
@@ -58,6 +64,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
    - Cada comando pasa por `CheckDenied`: un solo comando que no sea de lectura rechaza el paquete entero.
    - Solo se aceptan plataformas que ya tengan driver de Patrol y reglas propias de `CheckDenied`; hoy son `ios` e `ios-xe`. Las demás se rechazan hasta que su fase les dé driver y reglas, porque, por ejemplo, NX-OS encadena comandos con `;` y redirige con `>`.
    - La plataforma de cada playbook debe estar en `platforms` del manifiesto.
+   - El script derivado `lib-…` de cada playbook pasa `Validate`; si no, se rechaza el paquete, porque uno solo inválido tumbaría la biblioteca entera.
 6. **Scripts.**
    - Llevan `origin: biblioteca` e ID `lib-…`, así que quedan de solo lectura por `IsLib`.
    - Se validan con las mismas reglas que un archivo importado a mano (`Validate`, ASCII imprimible, topes).
@@ -67,7 +74,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
    - La única excepción es una versión más nueva del mismo paquete, que reemplaza a la anterior. Un paquete oficial instalado solo lo reemplaza otro con firma oficial.
    - Para instalar una versión igual o más vieja que la instalada, primero se quita la instalada.
 8. **Extracción atómica.**
-   - Se extrae a `<datos>/packs/.tmp-*`, conservando `SIGNATURE` y `manifest.yaml`.
+   - Se extrae a `<datos>/packs/.tmp-*`, conservando `SIGNATURE` y `manifest.yaml`, y el instalador escribe ahí el índice calculado como `INDEX`.
    - Entra con `rename` a `<datos>/packs/<editor>/<nombre>/`.
    - La versión anterior se borra solo después del `rename`.
    - Al arrancar se limpian los `.tmp-*` que hayan quedado.
@@ -76,7 +83,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
 
 ### Carga y catálogo
 
-- **Al arrancar** se revalida cada paquete instalado: sha256, índice, firma, sin archivos de más y sin enlaces. El origen (oficial o de terceros) se deriva de esa revalidación, nunca de un campo guardado. Si un paquete no pasa, se omite y se avisa; el núcleo sigue funcionando.
+- **Al arrancar** se revalida cada paquete instalado: se recalculan los sha256 contra `INDEX` (sin archivos de más ni de menos; `INDEX` y `SIGNATURE` no cuentan), se verifica la firma de `INDEX`, que no haya enlaces, y se reaplican los pasos 4 a 7 en orden estable (oficiales primero), así un `oom/*` alterado a mano o una regla nueva del núcleo también se revisan. El origen (oficial o de terceros) se deriva de esa revalidación, nunca de un campo guardado. Si un paquete no pasa, se omite y se avisa; el núcleo sigue funcionando.
 - **Precedencia:** contenido base < paquetes < `<config>/playbooks`. Los playbooks del usuario siguen reemplazando por ID y no cuentan como choque al instalar. `pack list` marca los IDs que quedan tapados.
 - **Scripts derivados:** cada playbook de un paquete genera su script `lib-<id>` igual que hoy, con el mismo ID que tenía embebido, así que los favoritos sobreviven al mover `ios-xe` a un paquete.
 - **En caliente:** instalar y quitar recargan el catálogo sin reiniciar el núcleo. Se arma una copia nueva y se publica bajo lock, y se invalida la caché de la biblioteca de scripts. Un trabajo armado conserva los playbooks que tenía al armarse.
@@ -116,6 +123,32 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
   - Se genera una sola vez con `go run ./tools/packaging/mpack-keygen`. La pública se sube al repo (`internal/pack/oom.pub`); la privada vive solo en el secret y en un respaldo fuera de línea del dueño.
   - **Si se rota:** el núcleo nuevo acepta la llave anterior durante una versión, y en ese tiempo se vuelven a firmar los paquetes oficiales.
 - **CI en cada PR:** valida cada `packs/*` con las mismas reglas del instalador, salvo la firma.
+
+### Selección por elemento y paquete personal (fase 32b)
+
+- **Activar u ocultar.**
+  - Al instalar, la app muestra la lista de playbooks y scripts del paquete con casillas. Lo que no se marque se instala igual y solo queda oculto, y el diálogo lo dice. Después se cambia en Ajustes → Paquetes o con `mctl pack items <id> --hide|--show <item>…`.
+  - Ocultar solo afecta listas y selectores. El ID sigue resolviéndose (`mctl` y los trabajos lo pueden pedir), cuenta para los choques y se revalida al arrancar, porque la firma cubre el paquete entero.
+  - Ocultar un playbook oculta también su `lib-<id>`. En las colecciones, un script oculto se ve marcado como oculto.
+  - La elección se guarda por paquete y por ID y se respeta al instalar una versión nueva; un elemento nuevo de esa versión entra visible. Al quitar el paquete se borra la elección junto con sus favoritos.
+- **Copiar a «Mis scripts».**
+  - Cualquier script de un paquete se copia a la colección del usuario con un ID nuevo de usuario y queda editable. Así se toma 1 script de un paquete y 3 de otro. Quitar el paquete no borra las copias.
+  - Como el nombre original sigue ocupado mientras el paquete esté instalado, la copia recibe el nombre libre `<nombre> (copia)` (`NombreLibre`).
+  - Si es un script derivado, la copia lleva los comandos de `pre` más los del playbook.
+- **Paquete personal (export).** `mctl pack export` y Ajustes → Paquetes → Exportar arman un `.mpack` sin firma con los scripts del usuario que se elijan (con su tecnología, plataforma y etiquetas), sus playbooks de `<config>/playbooks` si se piden, y un README generado.
+  - El usuario da `<editor>/<nombre>`, con las reglas de editores reservados.
+  - Versión: `AAAA.MMDD.HHMM` de la hora local, así que crece sola en cada export.
+  - `min_core`: la versión del núcleo, o `0.0.0` si el núcleo es `dev`.
+  - `license`: `NOASSERTION` si el usuario no da otra. `name_en` y `description_en` copian el texto en español si falta.
+  - IDs: los scripts salen como `lib-<editor>-<12 hex>`, únicos dentro del paquete, para no pasar el tope de `Validate`. Los playbooks salen con el prefijo de editor, cada uno en `playbooks/<id con prefijo>.yaml`.
+  - Los playbooks que no sean `ios` ni `ios-xe` no se exportan, y se avisa cuáles quedaron fuera.
+  - Los favoritos no viajan, igual que en el export de scripts.
+- **Importar a «Mis scripts» (respaldo).**
+  - Cualquier `.mpack` sin firma, personal o no (no se distinguen), se puede instalar como paquete de solo lectura o importar. Importar pide la misma confirmación y pasa las mismas validaciones del instalador (pasos 1 a 6).
+  - Los scripts entran editables por el import de scripts de siempre.
+  - Los playbooks van a `<config>/playbooks` **con su ID con prefijo**; el import no restaura IDs sin prefijo, porque eso dejaría a cualquier paquete sin firma tapar la base. Ningún playbook importado puede tener un ID de la base, de los movidos ni de un paquete instalado.
+  - Si ya existe el mismo archivo o el mismo ID, se pide renombrar u omitir, igual que en el import de scripts; nunca se sobrescribe.
+  - Se audita `pack.import` (id, sha256 y origen) y el catálogo se recarga en caliente, igual que al instalar.
 
 ## Consecuencias
 
