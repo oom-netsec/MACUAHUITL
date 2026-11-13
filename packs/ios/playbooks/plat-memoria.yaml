@@ -13,3 +13,5 @@ commands:
   - cmd: show logging | include MALLOCFAIL|MEMORY|MEM
   - cmd: show memory allocating-process totals
   - cmd: show processes memory sorted
+  - cmd: show memory summary  # pendiente de validar en 3560CX: salida grande y lenta (72 KB), al final
+    timeout: 300s
