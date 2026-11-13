@@ -16,8 +16,13 @@ import (
 
 // AbsPath exige una ruta absoluta (la de un archivo de export/import) y la limpia.
 func AbsPath(ctx context.Context, p string) (string, error) {
+	return AbsPathReason(ctx, p, "file.err.path_abs")
+}
+
+// AbsPathReason es AbsPath con el código del error de ruta relativa (el respaldo cifrado conserva el suyo).
+func AbsPathReason(ctx context.Context, p, reason string) (string, error) {
 	if !filepath.IsAbs(p) {
-		return "", Err(ctx, codes.InvalidArgument, "respaldo.err.path_abs", nil)
+		return "", Err(ctx, codes.InvalidArgument, reason, nil)
 	}
 	return filepath.Clean(p), nil
 }

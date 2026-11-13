@@ -170,7 +170,7 @@ func (s *vaultSvc) ExportBackup(ctx context.Context, r *v1.ExportBackupRequest) 
 	if !r.Confirm {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "respaldo.err.confirm", nil)
 	}
-	path, err := service.AbsPath(ctx, r.Path)
+	path, err := service.AbsPathReason(ctx, r.Path, "respaldo.err.path_abs")
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +263,7 @@ func planImport(v *vault.Vault, in []vault.Credential) (map[string]planned, map[
 func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupImportRequest) (*v1.PreviewBackupImportResponse, error) {
 	defer clear(r.Passphrase)
 	s.c.markActive()
-	path, err := service.AbsPath(ctx, r.Path)
+	path, err := service.AbsPathReason(ctx, r.Path, "respaldo.err.path_abs")
 	if err != nil {
 		return nil, err
 	}

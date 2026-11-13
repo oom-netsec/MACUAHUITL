@@ -25,7 +25,7 @@ func TestIntercambioErroresEsYEn(t *testing.T) {
 		name, reason, es, en string
 		call                 func(ctx context.Context) error
 	}{
-		{"ruta relativa", "respaldo.err.path_abs", "la ruta debe ser absoluta", "the path must be absolute",
+		{"ruta relativa", "file.err.path_abs", "la ruta debe ser absoluta", "the path must be absolute",
 			func(ctx context.Context) error { _, err := AbsPath(ctx, "rel"); return err }},
 		{"destino no regular", "file.err.export_not_regular", "la ruta existe y no es un archivo regular", "the path exists and is not a regular file",
 			func(ctx context.Context) error { return WriteExport(ctx, fifo, []byte("x"), true) }},
