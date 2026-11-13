@@ -94,12 +94,31 @@ func firma(dir, out, core string, priv ed25519.PrivateKey, oficiales []ed25519.P
 	if !p.Official {
 		return "", fmt.Errorf("la firma no valida con la llave oficial (internal/pack/oom.pub): ¿el secret es otra llave?")
 	}
+	if want := "oom/" + filepath.Base(dir); p.ID != want {
+		return "", fmt.Errorf("el id del manifiesto es %q y la carpeta pide %q", p.ID, want)
+	}
+	if len(p.Playbooks) == 0 {
+		return "", fmt.Errorf("sin playbooks: un paquete oficial vacío no se publica (ADR 0010)")
+	}
 	base := strings.ReplaceAll(p.ID, "/", "-") + "-" + p.Version
-	if err := os.WriteFile(filepath.Join(out, base+".mpack"), data, 0o644); err != nil {
+	if err := nuevo(filepath.Join(out, base+".mpack"), data); err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(filepath.Join(out, base+".README.md"), []byte(p.Readme), 0o644); err != nil {
+	if err := nuevo(filepath.Join(out, base+".README.md"), []byte(p.Readme)); err != nil {
 		return "", err
 	}
 	return base + ".mpack", nil
+}
+
+// nuevo escribe un archivo que no existía: dos carpetas con el mismo id y versión no se pisan en silencio.
+func nuevo(path string, b []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(b); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }

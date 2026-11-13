@@ -54,3 +54,42 @@ func TestLlaveMalFormada(t *testing.T) {
 		}
 	}
 }
+
+// copia arma una carpeta packs/ temporal con la fuente de ios-xe bajo otro nombre de carpeta, sin tocar el id.
+func copia(t *testing.T, carpeta string) string {
+	t.Helper()
+	src := t.TempDir()
+	files, err := pack.ReadSource("../../../packs/ios-xe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, b := range files {
+		p := filepath.Join(src, carpeta, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return src
+}
+
+func TestRechazaIDQueNoEsLaCarpeta(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	src := copia(t, "ios")
+	if _, err := firmaTodos(src, t.TempDir(), "0.3.0", priv, []ed25519.PublicKey{pub}); err == nil {
+		t.Fatal("firmó packs/ios con id oom/ios-xe")
+	}
+}
+
+func TestNoPisaUnAssetExistente(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	out := t.TempDir()
+	if _, err := firmaTodos("../../../packs", out, "0.3.0", priv, []ed25519.PublicKey{pub}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := firmaTodos("../../../packs", out, "0.3.0", priv, []ed25519.PublicKey{pub}); err == nil {
+		t.Fatal("pisó oom-ios-xe-1.0.0.mpack")
+	}
+}
