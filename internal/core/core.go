@@ -247,6 +247,9 @@ func (c *Core) loadUser() error {
 		if pbs, err = playbook.Load(os.DirFS(user)); err != nil {
 			return err
 		}
+		for i := range pbs {
+			pbs[i].Pack = playbook.PackUsuario // el origen distingue a un playbook del usuario de uno oficial con Pack vacío
+		}
 	}
 	c.userPbs.Store(&pbs)
 	return nil
