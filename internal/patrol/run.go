@@ -62,7 +62,7 @@ var ErrWindowEnded = i18n.New("patrol.err.window_ended", nil)
 
 // windowEnded sustituye el error de un comando o conexión cortados por el fin de la ventana.
 func windowEnded(ctx context.Context, err error) error {
-	if err != nil && errors.Is(context.Cause(ctx), ErrWindowEnded) {
+	if (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) && errors.Is(context.Cause(ctx), ErrWindowEnded) {
 		return ErrWindowEnded
 	}
 	return err
@@ -73,7 +73,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	res = DeviceResult{Target: t, Round: round}
 	hp := hostport(t)
 	emit(Progress{Target: hp, State: "connecting"})
-	base := auditor(ctx, d)
+	base := auditor(context.WithoutCancel(ctx), d) // un corte en pleno handshake no debe dejar eventos sin auditar
 	onEvent := func(e audit.Entry) {
 		if ch := changeOf(e, hp); ch != nil {
 			res.ChangedHostKey = ch

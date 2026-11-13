@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -278,5 +279,18 @@ func TestRunDeviceCortaAlFinDeLaVentana(t *testing.T) {
 	}
 	if time.Since(t0) > 3*time.Second {
 		t.Fatalf("tardó %s", time.Since(t0))
+	}
+}
+
+// Solo un corte por plazo/cancelación se vuelve window_ended: una llave de host cambiada sigue siendo ella.
+func TestWindowEndedSoloConvierteErroresDeContexto(t *testing.T) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	cancel(ErrWindowEnded)
+	hk := &transport.HostKeyError{}
+	if got := windowEnded(ctx, hk); got != error(hk) {
+		t.Fatalf("convirtió %v", got)
+	}
+	if got := windowEnded(ctx, context.DeadlineExceeded); !errors.Is(got, ErrWindowEnded) {
+		t.Fatalf("no convirtió el plazo: %v", got)
 	}
 }
