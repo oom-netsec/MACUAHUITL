@@ -20,6 +20,9 @@ const openTimeout = 15 * time.Second
 // maxRun es lo más que corre un comando aunque su salida siga llegando (el timeout de Run es de inactividad).
 var maxRun = 30 * time.Minute
 
+// maxDetect es lo más que tarda Detect: una reconexión no debe quedar retenida por un equipo que contesta a goteo.
+var maxDetect = 2 * time.Minute
+
 var (
 	anyPrompt = regexp.MustCompile(`(?:^|\n)([\w.\-@/:]{1,63})([>#]) ?$`)
 	more      = regexp.MustCompile(` ?--More-- ?`)
@@ -281,6 +284,8 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 func (d *driver) Hostname() string { return d.hostname }
 
 func (d *driver) Detect(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, maxDetect)
+	defer cancel()
 	out, err := d.Run(ctx, "show version", 60*time.Second)
 	if err != nil {
 		return "", err

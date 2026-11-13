@@ -249,3 +249,18 @@ func TestPlazoConCanalCerradoDaErrClosed(t *testing.T) {
 		}
 	}
 }
+
+// Detect tiene tope total: un "show version" a goteo no lo retiene más que maxDetect.
+func TestDetectTieneTopeTotal(t *testing.T) {
+	old := maxDetect
+	maxDetect = 400 * time.Millisecond
+	defer func() { maxDetect = old }()
+	d, err := open(t, simulator.Config{StreamCommand: "show version", StreamLines: 1000, SlowDelay: 20 * time.Millisecond}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	if _, err := d.Detect(context.Background()); !errors.Is(err, platform.ErrPromptTimeout) || time.Since(start) > 2*time.Second {
+		t.Fatalf("err = %v tras %s", err, time.Since(start))
+	}
+}
