@@ -521,12 +521,12 @@ func (s *svc) ExportCollections(ctx context.Context, r *v1.ExportCollectionsRequ
 }
 
 // libAvisos avisa de cada «lib-*» que las colecciones del archivo referencian y esta biblioteca no trae.
-func libAvisos(cols []dom.Coleccion, lib map[string]bool) []string {
+func libAvisos(loc string, cols []dom.Coleccion, lib map[string]bool) []string {
 	var out []string
 	for _, c := range cols {
 		for _, id := range c.ScriptIDs {
 			if dom.IsLib(id) && !lib[id] {
-				out = append(out, fmt.Sprintf("colección %q: el script %s no está en la biblioteca local; se omitirá", c.Name, id))
+				out = append(out, i18n.Msg(loc, "scripts.imp.warn_lib_skip", i18n.A("name", c.Name, "id", id)))
 			}
 		}
 	}
@@ -564,7 +564,7 @@ func (s *svc) PreviewImportCollections(ctx context.Context, r *v1.PreviewImportC
 		return nil, err
 	}
 	tok, exp := s.stash(pending{kind: pendCols, scripts: scripts, cols: cols, path: path})
-	out := &v1.PreviewImportCollectionsResponse{Token: tok, ExpiresMs: ms(exp), Warnings: append(avisos, libAvisos(cols, libIDs)...)}
+	out := &v1.PreviewImportCollectionsResponse{Token: tok, ExpiresMs: ms(exp), Warnings: append(avisosIn(i18n.Locale(ctx), avisos), libAvisos(i18n.Locale(ctx), cols, libIDs)...)}
 	for _, it := range dom.PlanColecciones(cols, local) {
 		out.Collections = append(out.Collections, &v1.CollectionImportItem{Collection: colPB(it.Col), State: it.Estado, ConflictsWith: it.Con})
 	}
@@ -665,7 +665,7 @@ func (s *svc) ApplyImportCollections(ctx context.Context, r *v1.ApplyImportColle
 	return &v1.ApplyImportCollectionsResponse{
 		ScriptsCreated: int32(sres.Created), ScriptsReplaced: int32(sres.Replaced), ScriptsRenamed: int32(sres.Renamed), ScriptsSkipped: int32(sres.Skipped),
 		CollectionsCreated: int32(cres.Created), CollectionsReplaced: int32(cres.Replaced), CollectionsRenamed: int32(cres.Renamed),
-		CollectionsMerged: int32(cres.Merged), CollectionsSkipped: int32(cres.Skipped), Warnings: cres.Warnings,
+		CollectionsMerged: int32(cres.Merged), CollectionsSkipped: int32(cres.Skipped), Warnings: warnsIn(i18n.Locale(ctx), cres.Warnings, cres.WarningTexts),
 	}, nil
 }
 

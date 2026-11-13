@@ -126,6 +126,30 @@ func (s *svc) in(ctx context.Context, x dom.Script) dom.Script {
 	return en[x.ID].In(i18n.Locale(ctx), x)
 }
 
+// avisosIn escribe en el idioma pedido los avisos del lector de archivos (el de siempre es el de es).
+func avisosIn(loc string, avisos []string) []string {
+	out := make([]string, len(avisos))
+	for i, a := range avisos {
+		out[i] = a
+		if a == dom.AvisoSinSuma {
+			out[i] = i18n.Msg(loc, "scripts.imp.no_sum", nil)
+		}
+	}
+	return out
+}
+
+// warnsIn da los avisos en el idioma pedido cuando traen su texto de catálogo.
+func warnsIn(loc string, es []string, tx []i18n.Text) []string {
+	if len(tx) != len(es) {
+		return es
+	}
+	out := make([]string, len(tx))
+	for i, t := range tx {
+		out[i] = t.In(loc)
+	}
+	return out
+}
+
 func internal(err error) error { return status.Error(codes.Internal, err.Error()) }
 
 func ms(t time.Time) int64 { return t.UnixMilli() }
@@ -493,7 +517,7 @@ func (s *svc) PreviewImport(ctx context.Context, r *v1.PreviewImportRequest) (*v
 		return nil, err
 	}
 	tok, exp := s.stash(pending{kind: pendScripts, scripts: incoming, path: path})
-	out := &v1.PreviewImportResponse{Token: tok, ExpiresMs: ms(exp), Warnings: avisos}
+	out := &v1.PreviewImportResponse{Token: tok, ExpiresMs: ms(exp), Warnings: avisosIn(i18n.Locale(ctx), avisos)}
 	for _, it := range dom.Plan(incoming, user, lib) {
 		out.Items = append(out.Items, &v1.ImportItem{Script: toPB(s.in(ctx, it.Script), meta{}), State: it.Estado, ConflictsWith: it.Con})
 	}

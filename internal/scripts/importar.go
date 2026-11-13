@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Estados de un script del archivo frente a los guardados.
@@ -106,7 +108,7 @@ func Apply(items []Item, dec map[string]string, guardados, biblioteca []Script, 
 	}
 	if len(sobran) > 0 {
 		sort.Strings(sobran)
-		return r, fmt.Errorf("decisión para IDs que no están en el archivo: %s", strings.Join(sobran, ", "))
+		return r, i18n.New("scripts.imp.dec_ids", i18n.A("ids", strings.Join(sobran, ", ")))
 	}
 	porID, nombres := map[string]Script{}, map[string]string{} // clave de nombre -> ID
 	for _, g := range guardados {
@@ -124,18 +126,18 @@ func Apply(items []Item, dec map[string]string, guardados, biblioteca []Script, 
 	for _, it := range items {
 		d, hay := dec[it.Script.ID]
 		if hay && d != Renombrar && d != Reemplazar && d != Omitir {
-			return r, fmt.Errorf("decisión %q desconocida para %s", d, it.Script.ID)
+			return r, i18n.New("scripts.imp.dec_unknown", i18n.A("dec", d, "id", it.Script.ID))
 		}
 		conflicto := it.Estado == ConflictoID || it.Estado == ConflictoNombre
 		if !hay && conflicto {
 			faltan = append(faltan, it.Script.ID)
 		}
 		if hay && !conflicto && d != Omitir {
-			return r, fmt.Errorf("%s es %q: solo se puede omitir", it.Script.ID, it.Estado)
+			return r, i18n.New("scripts.imp.only_skip", i18n.A("id", it.Script.ID, "state", it.Estado))
 		}
 	}
 	if len(faltan) > 0 {
-		return r, fmt.Errorf("falta la decisión de %d conflicto(s): %s", len(faltan), strings.Join(faltan, ", "))
+		return r, i18n.New("scripts.imp.missing", i18n.A("n", len(faltan), "ids", strings.Join(faltan, ", ")))
 	}
 	for _, it := range items {
 		s := it.Script
@@ -152,14 +154,14 @@ func Apply(items []Item, dec map[string]string, guardados, biblioteca []Script, 
 		case d == Reemplazar:
 			old, ok := porID[it.Con]
 			if !ok {
-				return r, fmt.Errorf("%s choca con un script de la biblioteca, que no se reemplaza: renómbralo u omítelo", s.Name)
+				return r, i18n.New("scripts.imp.lib_clash", i18n.A("name", s.Name))
 			}
 			if reemplazados[old.ID] {
-				return r, fmt.Errorf("dos decisiones reemplazan el mismo script guardado (%s)", old.ID)
+				return r, i18n.New("scripts.imp.dup_replace", i18n.A("id", old.ID))
 			}
 			reemplazados[old.ID] = true
 			if id, ok := nombres[NameKey(s.Name)]; ok && id != old.ID {
-				return r, fmt.Errorf("reemplazar %s dejaría dos scripts con el nombre %q", old.ID, s.Name)
+				return r, i18n.New("scripts.imp.replace_dup_name", i18n.A("id", old.ID, "name", s.Name))
 			}
 			delete(nombres, NameKey(old.Name))
 			s.ID, s.CreatedAt = old.ID, old.CreatedAt
@@ -173,12 +175,12 @@ func Apply(items []Item, dec map[string]string, guardados, biblioteca []Script, 
 				s.ID = NewID()
 			}
 			if _, ok := nombres[NameKey(s.Name)]; ok {
-				return r, fmt.Errorf("el nombre %q ya existe", s.Name)
+				return r, i18n.New("scripts.imp.name_exists", i18n.A("name", s.Name))
 			}
 			r.Created++
 		}
 		if err := s.Validate(); err != nil {
-			return r, fmt.Errorf("%s: %w", s.Name, err)
+			return r, i18n.Wrap("scripts.imp.item", err, i18n.A("name", s.Name))
 		}
 		nombres[NameKey(s.Name)] = s.ID
 		r.IDs[archivoID] = s.ID
