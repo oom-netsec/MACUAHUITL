@@ -651,11 +651,13 @@ func TestPackOcultosNoSeHeredan(t *testing.T) {
 	if !slices.Contains(h.playbookIDs(t), "ios-xe/l1-poe") {
 		t.Fatal("el ID que vuelve en la v3 debía entrar visible")
 	}
-	// Fila vieja de una instalación anterior: una instalación nueva parte de cero.
+	// Quitar el paquete borra su elección: reinstalar no la hereda.
+	if _, err := pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l1-poe"}}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := pk.Remove(ctx(t), &v1.PackServiceRemoveRequest{Id: "oom/ios-xe"}); err != nil {
 		t.Fatal(err)
 	}
-	h.core.db.Exec(`INSERT INTO pack_hidden(pack, item_id) VALUES('oom/ios-xe', 'ios-xe/l1-poe')`)
 	h.installIOSXE(t)
 	if !slices.Contains(h.playbookIDs(t), "ios-xe/l1-poe") {
 		t.Fatal("reinstalar heredó lo oculto")
@@ -685,5 +687,64 @@ func TestPackSetItemsAuditaSoloCambios(t *testing.T) {
 	pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Show: []string{"ios-xe/l1-flapping"}}) // no estaba oculto
 	if got := strings.Count(h.auditText(t), `"action":"pack.items"`); got != 1 {
 		t.Fatalf("pack.items = %d, want 1", got)
+	}
+}
+
+// Un paquete que la revalidación omitió al arrancar (sin pasar por Remove) y se reinstala conserva lo oculto.
+func TestPackOmitidoAlArrancarConservaOcultos(t *testing.T) {
+	h := newHarness(t, nil)
+	h.installIOSXE(t)
+	if _, err := v1.NewPackServiceClient(h.conn).SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l1-poe"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(h.p.Data, "packs", "oom", "ios-xe", "README.md"), []byte("alterado"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h.restart(t)
+	h.installIOSXE(t)
+	if slices.Contains(h.playbookIDs(t), "ios-xe/l1-poe") {
+		t.Fatal("la elección se perdió por la revalidación al arrancar")
+	}
+}
+
+// replace_hidden: hide es el conjunto exacto; sin él se conserva lo oculto y hide suma.
+func TestPackInstallReplaceHidden(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}}); err != nil {
+		t.Fatal(err)
+	}
+	// Sin replace_hidden: se conserva y suma.
+	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1")), Hide: []string{"ios-xe/l1-poe"}})
+	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l1-poe", "ios-xe/l2-stp"}) {
+		t.Fatalf("%+v %v", r, err)
+	}
+	// Con replace_hidden y hide vacío: nada oculto.
+	r, err = pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.2")), ReplaceHidden: true})
+	if err != nil || len(r.Pack.Hidden) != 0 || !slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
+		t.Fatalf("%+v %v", r, err)
+	}
+	// Con replace_hidden y hide: exactamente eso.
+	r, err = pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.3")), Hide: []string{"ios-xe/l1-poe"}, ReplaceHidden: true})
+	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l1-poe"}) {
+		t.Fatalf("%+v %v", r, err)
+	}
+}
+
+// SaveCollection y SetCollectionScripts también marcan los scripts ocultos.
+func TestPackColeccionesMarcanOcultosAlGuardar(t *testing.T) {
+	h := newHarness(t, nil)
+	h.installIOSXE(t)
+	sc := v1.NewScriptsServiceClient(h.conn)
+	if _, err := v1.NewPackServiceClient(h.conn).SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l2-stp"}}); err != nil {
+		t.Fatal(err)
+	}
+	r, err := sc.SetCollectionScripts(ctx(t), &v1.SetCollectionScriptsRequest{Id: "favoritos", ScriptIds: []string{"lib-l2-stp", "lib-tac-baseline"}})
+	if err != nil || !slices.Equal(r.Collection.HiddenScriptIds, []string{"lib-l2-stp"}) {
+		t.Fatalf("%+v %v", r, err)
+	}
+	sv, err := sc.SaveCollection(ctx(t), &v1.SaveCollectionRequest{Collection: &v1.Collection{Id: "favoritos", Name: "Favoritos"}})
+	if err != nil || !slices.Equal(sv.Collection.HiddenScriptIds, []string{"lib-l2-stp"}) {
+		t.Fatalf("%+v %v", sv, err)
 	}
 }

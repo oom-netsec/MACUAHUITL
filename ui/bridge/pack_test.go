@@ -24,7 +24,7 @@ func (fakePack) Install(_ context.Context, r *v1.PackServiceInstallRequest) (*v1
 	if !r.AllowUnsigned {
 		return nil, status.Error(codes.FailedPrecondition, "sin firma")
 	}
-	return &v1.PackServiceInstallResponse{ReplacedVersion: "0.9.0", Pack: &v1.PackInfo{Id: r.Path, Version: "1.0.0"}}, nil
+	return &v1.PackServiceInstallResponse{ReplacedVersion: "0.9.0", Pack: &v1.PackInfo{Id: r.Path, Version: "1.0.0", Hidden: map[bool][]string{true: {"replace"}}[r.ReplaceHidden]}}, nil
 }
 
 func (fakePack) List(context.Context, *v1.PackServiceListRequest) (*v1.PackServiceListResponse, error) {
@@ -92,7 +92,7 @@ func TestPackBridge(t *testing.T) {
 	if p, err := b.PackSetItems("oom/ios-xe", nil, []string{"ios-xe/x"}); err != nil || p.Hidden == nil {
 		t.Fatalf("hidden nunca es null: %+v %v", p, err)
 	}
-	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}); err != nil || ins.Pack.ID != "/y.mpack" {
+	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}, true); err != nil || ins.Pack.ID != "/y.mpack" || len(ins.Pack.Hidden) != 1 { // replace_hidden viaja
 		t.Fatalf("%+v %v", ins, err)
 	}
 	if in, err := b.PackInspect("/z.mpack", true); err != nil || in.Pack.ID != "/z.mpack" || in.ReplacedVersion != "0.9.0" || in.PlaybookIDs == nil || in.ScriptIDs == nil {

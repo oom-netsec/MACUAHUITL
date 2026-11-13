@@ -32,15 +32,20 @@ func hiddenRows(q Querier) (map[string][]string, error) {
 	return out, rows.Err()
 }
 
-// HasItem dice si id es un playbook o un script (derivado o propio) del paquete.
-func (p *Pack) HasItem(id string) bool {
+// Items son los IDs de playbook y de script (derivado o propio) que el paquete trae; se calcula una vez por llamada.
+func (p *Pack) Items() map[string]bool {
+	m := map[string]bool{}
 	for _, pb := range p.Playbooks {
-		if pb.ID == id {
-			return true
-		}
+		m[pb.ID] = true
 	}
-	return slices.Contains(p.ScriptIDs(), id)
+	for _, id := range p.ScriptIDs() {
+		m[id] = true
+	}
+	return m
 }
+
+// HasItem dice si id es un playbook o un script (derivado o propio) del paquete.
+func (p *Pack) HasItem(id string) bool { return p.Items()[id] }
 
 // Hidden son los IDs ocultos de p que el paquete todavía trae (la elección de un ID que una versión nueva quitó no cuenta).
 func (p *Pack) Hidden(q Querier) ([]string, error) {
@@ -48,7 +53,8 @@ func (p *Pack) Hidden(q Querier) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return slices.DeleteFunc(m[p.ID], func(id string) bool { return !p.HasItem(id) }), nil
+	items := p.Items()
+	return slices.DeleteFunc(m[p.ID], func(id string) bool { return !items[id] }), nil
 }
 
 // HiddenSets son los IDs de playbook y de script que las listas no deben mostrar, de todos los paquetes de sn. Un
@@ -62,8 +68,12 @@ func HiddenSets(q Querier, sn *Snapshot, shadowed map[string]bool) (playbooks, s
 	}
 	playbooks, scriptIDs = map[string]bool{}, map[string]bool{}
 	for _, p := range sn.Packs {
+		if len(m[p.ID]) == 0 {
+			continue
+		}
+		items := p.Items() // una vez por paquete y por llamada
 		for _, id := range m[p.ID] {
-			if !p.HasItem(id) {
+			if !items[id] {
 				continue
 			}
 			isPB := false
@@ -111,23 +121,29 @@ func SetHidden(q Querier, packID string, hide, show []string) (changed int, err 
 	return changed, nil
 }
 
-// ResetHidden prepara la elección de p al instalarlo: una instalación nueva (fresh) parte de cero y siempre se borran
-// las filas de IDs que el paquete ya no trae, para que uno que vuelva en una versión posterior entre visible.
-func ResetHidden(q Querier, p *Pack, fresh bool) error {
-	if fresh {
-		_, err := q.Exec(`DELETE FROM pack_hidden WHERE pack = ?`, p.ID)
-		return err
-	}
+// PruneHidden borra las filas de p de IDs que el paquete ya no trae, para que uno que vuelva en una versión
+// posterior entre visible. No toca el resto: quitar el paquete (Remove) es quien borra todo.
+func PruneHidden(q Querier, p *Pack) error {
 	rows, err := hiddenRows(q)
 	if err != nil {
 		return err
 	}
+	items := p.Items()
 	for _, id := range rows[p.ID] {
-		if !p.HasItem(id) {
+		if !items[id] {
 			if _, err := q.Exec(`DELETE FROM pack_hidden WHERE pack = ? AND item_id = ?`, p.ID, id); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// ReplaceHidden deja exactamente hide como los ocultos de p.
+func ReplaceHidden(q Querier, p *Pack, hide []string) error {
+	if _, err := q.Exec(`DELETE FROM pack_hidden WHERE pack = ?`, p.ID); err != nil {
+		return err
+	}
+	_, err := SetHidden(q, p.ID, hide, nil)
+	return err
 }

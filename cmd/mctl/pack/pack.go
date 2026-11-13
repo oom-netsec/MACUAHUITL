@@ -18,7 +18,8 @@ const help = `  pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM]...
         (paquetes de contenido: playbooks y scripts por tecnología; se bajan a mano de los releases y nada se descarga solo.
          Un paquete sin firma oficial es de terceros y solo se instala con --allow-unsigned; trae únicamente comandos de lectura.
          remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README.
-         --hide ITEM instala el paquete con ese playbook o script oculto, y se repite)
+         --hide ITEM instala el paquete con ese playbook o script oculto, y se repite; con --hide, lo oculto queda
+         exactamente en esos ITEM, y sin --hide una actualización conserva lo que ya estaba oculto)
   pack inspect <archivo.mpack> [--allow-unsigned]
         (vista previa de install: valida el paquete y muestra qué trae y qué reemplazaría, sin instalar nada)
   pack items <id> [--hide ITEM]... [--show ITEM]...
@@ -57,7 +58,7 @@ func install(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	r, err := v1.NewPackServiceClient(c.Conn).Install(context.Background(), &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: unsigned, Hide: hide})
+	r, err := v1.NewPackServiceClient(c.Conn).Install(context.Background(), &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: unsigned, Hide: hide, ReplaceHidden: len(hide) > 0})
 	if err != nil {
 		return err
 	}

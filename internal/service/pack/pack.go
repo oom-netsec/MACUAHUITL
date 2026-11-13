@@ -87,7 +87,23 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		return nil, reject(err, nil, "none")
 	}
 	sum := dom.SHA256(data)
-	res, err := s.store.Install(data, r.GetAllowUnsigned())
+	// Lo oculto se guarda antes de publicar el paquete (en una sola transacción): si falla, no se instala nada.
+	// shortcut: si el disco falla justo después, la elección ya guardada queda aplicada a la versión que seguía instalada.
+	hide := []string{}
+	var prepErr error
+	res, err := s.store.InstallWith(data, r.GetAllowUnsigned(), func(p *dom.Pack, _ string) error {
+		items := p.Items()
+		for _, id := range r.GetHide() { // los IDs que el paquete no trae se ignoran
+			if items[id] {
+				hide = append(hide, id)
+			}
+		}
+		prepErr = s.applyInstallHidden(p, hide, r.GetReplaceHidden())
+		return prepErr
+	})
+	if prepErr != nil {
+		return nil, status.Error(codes.Internal, "no se instaló nada: no se pudo guardar lo oculto: "+prepErr.Error())
+	}
 	if err != nil {
 		var p *dom.Pack
 		if res != nil {
@@ -104,23 +120,12 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		detail += " min_core_unchecked=true"
 	}
 	s.d.Audit("pack.install", p.ID, detail)
-	// En una sola transacción: una instalación nueva parte sin ocultos, una versión nueva conserva lo oculto que sigue
-	// existiendo, y se aplica hide (los IDs que el paquete no trae se ignoran).
-	var hide []string
-	for _, id := range r.GetHide() {
-		if p.HasItem(id) {
-			hide = append(hide, id)
-		}
-	}
-	if err := s.applyInstallHidden(p, res.Replaced == "", hide); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
 	if len(hide) > 0 {
 		s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=0 at=install", p.ID, len(hide)))
 	}
 	info, err := s.info(p)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, status.Error(codes.Internal, "el paquete quedó instalado, pero no se pudo leer lo oculto: "+err.Error())
 	}
 	return &v1.PackServiceInstallResponse{Pack: info, ReplacedVersion: res.Replaced}, nil
 }
@@ -154,16 +159,22 @@ func (s *svc) Inspect(ctx context.Context, r *v1.PackServiceInspectRequest) (*v1
 	return out, nil
 }
 
-func (s *svc) applyInstallHidden(p *dom.Pack, fresh bool, hide []string) error {
+// applyInstallHidden guarda lo oculto de una instalación: poda los IDs que el paquete ya no trae y, con replace, deja
+// hide como el conjunto exacto; sin replace, lo que ya estaba oculto se conserva y hide suma.
+func (s *svc) applyInstallHidden(p *dom.Pack, hide []string, replace bool) error {
 	tx, err := s.d.DB().Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err := dom.ResetHidden(tx, p, fresh); err != nil {
+	if err := dom.PruneHidden(tx, p); err != nil {
 		return err
 	}
-	if _, err := dom.SetHidden(tx, p.ID, hide, nil); err != nil {
+	if replace {
+		if err := dom.ReplaceHidden(tx, p, hide); err != nil {
+			return err
+		}
+	} else if _, err := dom.SetHidden(tx, p.ID, hide, nil); err != nil {
 		return err
 	}
 	return tx.Commit()

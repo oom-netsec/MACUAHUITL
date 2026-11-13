@@ -26,6 +26,7 @@ type PackServiceInstallRequest struct {
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`                                         // ruta absoluta del .mpack
 	AllowUnsigned bool                   `protobuf:"varint,2,opt,name=allow_unsigned,json=allowUnsigned,proto3" json:"allow_unsigned,omitempty"` // confirmación explícita para un paquete de terceros
 	Hide          []string               `protobuf:"bytes,3,rep,name=hide,proto3" json:"hide,omitempty"`                                         // IDs de playbook o script del paquete que quedan ocultos al instalar; los que no existan se ignoran (fase 32b)
+	ReplaceHidden bool                   `protobuf:"varint,4,opt,name=replace_hidden,json=replaceHidden,proto3" json:"replace_hidden,omitempty"` // con true, hide es el conjunto exacto de ocultos tras instalar; sin él se conserva lo oculto y hide suma
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -79,6 +80,13 @@ func (x *PackServiceInstallRequest) GetHide() []string {
 		return x.Hide
 	}
 	return nil
+}
+
+func (x *PackServiceInstallRequest) GetReplaceHidden() bool {
+	if x != nil {
+		return x.ReplaceHidden
+	}
+	return false
 }
 
 type PackServiceInstallResponse struct {
@@ -797,11 +805,12 @@ var File_macuahuitl_v1_pack_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_pack_proto_rawDesc = "" +
 	"\n" +
-	"\x18macuahuitl/v1/pack.proto\x12\rmacuahuitl.v1\"j\n" +
+	"\x18macuahuitl/v1/pack.proto\x12\rmacuahuitl.v1\"\x91\x01\n" +
 	"\x19PackServiceInstallRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12%\n" +
 	"\x0eallow_unsigned\x18\x02 \x01(\bR\rallowUnsigned\x12\x12\n" +
-	"\x04hide\x18\x03 \x03(\tR\x04hide\"t\n" +
+	"\x04hide\x18\x03 \x03(\tR\x04hide\x12%\n" +
+	"\x0ereplace_hidden\x18\x04 \x01(\bR\rreplaceHidden\"t\n" +
 	"\x1aPackServiceInstallResponse\x12+\n" +
 	"\x04pack\x18\x01 \x01(\v2\x17.macuahuitl.v1.PackInfoR\x04pack\x12)\n" +
 	"\x10replaced_version\x18\x02 \x01(\tR\x0freplacedVersion\"\x18\n" +

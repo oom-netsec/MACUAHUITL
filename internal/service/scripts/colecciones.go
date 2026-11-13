@@ -216,7 +216,11 @@ func (s *svc) SaveCollection(ctx context.Context, r *v1.SaveCollectionRequest) (
 		return nil, err
 	}
 	s.d.Audit(action, out.ID, out.Name)
-	return &v1.SaveCollectionResponse{Collection: colPB(out)}, nil
+	_, hidden, err := s.hiddenSets()
+	if err != nil {
+		return nil, internal(err)
+	}
+	return &v1.SaveCollectionResponse{Collection: colPBHidden(out, hidden)}, nil
 }
 
 func (s *svc) DeleteCollection(ctx context.Context, r *v1.DeleteCollectionRequest) (*v1.DeleteCollectionResponse, error) {
@@ -332,7 +336,11 @@ func (s *svc) SetCollectionScripts(ctx context.Context, r *v1.SetCollectionScrip
 		return nil, err
 	}
 	s.d.Audit("scripts.coleccion.scripts", c.ID, fmt.Sprintf("%s: added [%s], removed [%s], %d in total", c.Name, corta(added), corta(removed), len(c.ScriptIDs)))
-	return &v1.SetCollectionScriptsResponse{Collection: colPB(c)}, nil
+	_, hidden, err := s.hiddenSets()
+	if err != nil {
+		return nil, internal(err)
+	}
+	return &v1.SetCollectionScriptsResponse{Collection: colPBHidden(c, hidden)}, nil
 }
 
 // prunePins quita de los fijados los «lib-*» que esta biblioteca ya no trae (salvo los retenidos de paquetes): no se ven, pero contarían para el tope

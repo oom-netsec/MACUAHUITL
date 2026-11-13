@@ -26,6 +26,7 @@ message PackServiceInstallRequest {
   string path = 1;            // ruta absoluta del .mpack
   bool allow_unsigned = 2;    // confirmación explícita para un paquete de terceros
   repeated string hide = 3;   // IDs de playbook o script del paquete que quedan ocultos al instalar; los que no existan se ignoran (fase 32b)
+  bool replace_hidden = 4;    // con true, hide es el conjunto exacto de ocultos tras instalar; sin él se conserva lo oculto y hide suma
 }
 
 message PackServiceInstallResponse {

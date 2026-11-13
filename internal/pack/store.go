@@ -361,6 +361,13 @@ func (s *Store) Inspect(data []byte, allowUnsigned bool) (*Result, error) { // s
 // Install hace los pasos 2 a 8 del ADR sobre bytes ya leídos. allowUnsigned es la confirmación explícita para un
 // paquete de terceros.
 func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
+	return s.InstallWith(data, allowUnsigned, nil)
+}
+
+// InstallWith es Install con un paso previo: prepare corre con el paquete ya validado y bajo el lock, antes de tocar
+// el disco y de publicar la foto; si falla, no se instala nada. Sirve para guardar lo que debe estar listo cuando el
+// paquete se vea (lo oculto). replaced es la versión que reemplazaría ("" si es nuevo).
+func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) error) (*Result, error) {
 	s.mu.Lock()
 	p, old, cur, err := s.check(data, allowUnsigned)
 	if err != nil {
@@ -369,6 +376,16 @@ func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
 			return nil, err
 		}
 		return &Result{Pack: p}, err
+	}
+	if prepare != nil {
+		replaced := ""
+		if old != nil {
+			replaced = old.Version
+		}
+		if err := prepare(p, replaced); err != nil {
+			s.mu.Unlock()
+			return &Result{Pack: p}, err
+		}
 	}
 	if err := s.extract(p); err != nil {
 		s.mu.Unlock()

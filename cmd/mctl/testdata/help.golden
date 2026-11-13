@@ -183,7 +183,8 @@ uso: mctl <comando>
         (paquetes de contenido: playbooks y scripts por tecnología; se bajan a mano de los releases y nada se descarga solo.
          Un paquete sin firma oficial es de terceros y solo se instala con --allow-unsigned; trae únicamente comandos de lectura.
          remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README.
-         --hide ITEM instala el paquete con ese playbook o script oculto, y se repite)
+         --hide ITEM instala el paquete con ese playbook o script oculto, y se repite; con --hide, lo oculto queda
+         exactamente en esos ITEM, y sin --hide una actualización conserva lo que ya estaba oculto)
   pack inspect <archivo.mpack> [--allow-unsigned]
         (vista previa de install: valida el paquete y muestra qué trae y qué reemplazaría, sin instalar nada)
   pack items <id> [--hide ITEM]... [--show ITEM]...
