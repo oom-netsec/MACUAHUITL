@@ -221,8 +221,12 @@ func (s *patrolSvc) CreateJob(ctx context.Context, r *v1.CreateJobRequest) (*v1.
 	s.c.mu.Unlock()
 	s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CREATED, 0, "", nil)
 	sum := sha256.Sum256([]byte(spec.CustomCommands))
-	s.c.audit("job.create", j.id, fmt.Sprintf("name=%s devices=%d playbooks=%v pasted_commands_sha256=%s masked=%v",
-		spec.Name, len(spec.Targets), spec.PlaybookIDs, hex.EncodeToString(sum[:]), !spec.DisableMasking))
+	detail := fmt.Sprintf("name=%s devices=%d playbooks=%v pasted_commands_sha256=%s masked=%v",
+		spec.Name, len(spec.Targets), spec.PlaybookIDs, hex.EncodeToString(sum[:]), !spec.DisableMasking)
+	if len(spec.Params) > 0 {
+		detail += fmt.Sprintf(" params=%v", spec.Params) // validados; no son secretos
+	}
+	s.c.audit("job.create", j.id, detail)
 	return &v1.CreateJobResponse{JobId: j.id}, nil
 }
 
@@ -541,6 +545,9 @@ func (s *patrolSvc) ListPlaybooks(ctx context.Context, r *v1.ListPlaybooksReques
 			if r.GetPlatform() == "" || c.Applies(r.GetPlatform()) { // sin plataforma, todos; con ella, los que corren ahí
 				info.Commands = append(info.Commands, c.Text)
 			}
+		}
+		for _, q := range p.Params {
+			info.Params = append(info.Params, &v1.PlaybookParam{Name: q.Name, Kind: q.Kind})
 		}
 		out.Playbooks = append(out.Playbooks, info)
 	}

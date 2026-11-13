@@ -1155,3 +1155,8 @@ Instrucciones de `ServerReady.hint` (la explicación paso a paso del servidor de
 
 ### Compatibilidad
 Los IDs de los playbooks movidos a `oom/ios-xe`, sus scripts `lib-<id>` y los favoritos no cambian. Quien venga de una versión anterior no tiene esos playbooks ni scripts hasta que instale el paquete. Las colecciones y los fijados que ya tenían `lib-<id>` de esos scripts se conservan en la base (no se podan) mientras el paquete no está instalado. En las colecciones la vista puede recibir IDs `lib-*` que todavía no resuelven a un script y debe tolerarlo. Los fijados retenidos NO aparecen en `ListPinned`, no cuentan para el tope de fijados y no hay que enviarlos en `ReorderPinned` (se comparan solo los visibles; los retenidos quedan al final, en su orden); al instalar el paquete vuelven a verse. Lo mismo vale para los scripts de playbooks de un paquete quitado.
+
+## Playbooks con datos (fase 34)
+- `PlaybookInfo.params` (`PlaybookParam{name, kind}`; kind = `mac`, `ap`, `interface` o `ip`): lo que el playbook pide al armar el trabajo. Sus `commands` traen la plantilla con `{nombre}`; no se ejecutan tal cual.
+- `JobSpec.params` (`map<string,string>`): un valor por dato de los playbooks elegidos. El núcleo valida (la MAC se normaliza a `aaaa.bbbb.cccc`) y rechaza datos faltantes, desconocidos o inválidos en `CreateJob` con `field = params` y códigos `playbook.err.param_*` (`name`, `kind` en la metadata). Sin datos, un trabajo se comporta como antes.
+- Los datos quedan en el manifest (`params`) y en la auditoría de `job.create`; no son secretos. Los playbooks con datos no generan script `lib-<id>` en la biblioteca.
