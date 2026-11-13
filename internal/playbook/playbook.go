@@ -42,6 +42,9 @@ func Compatible(detected, pbPlatform string) bool {
 // knownPlatforms son las plataformas que un playbook puede nombrar en platforms: (las de playbooks/cisco).
 var knownPlatforms = []string{"ios", "ios-xe", "nx-os", "cat9k", "ftd", "ise", "sda", "wlc-9800", "wlc-aireos"}
 
+// KnownPlatform dice si s es una plataforma que un playbook puede nombrar.
+func KnownPlatform(s string) bool { return slices.Contains(knownPlatforms, s) }
+
 // Playbook tiene ID "<plataforma>/<id del archivo>" (p. ej. "ios-xe/tac-baseline"). NameEn es el nombre en inglés
 // (name_en); los playbooks del usuario pueden omitirlo y NameFor cae al nombre en español.
 type Playbook struct {
