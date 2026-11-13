@@ -84,9 +84,6 @@ type Config struct {
 	OnTransfer   func(Transfer)
 }
 
-// udpAllowNote es el aviso que acompaña a --allow en TFTP.
-const udpAllowNote = "en UDP la lista de IP no autentica: la IP de origen se puede falsificar; úsala como filtro, no como seguridad, y solo en una red de confianza"
-
 // Topes por omisión de lo que se recibe.
 const (
 	DefaultMaxFile  = 512 << 20

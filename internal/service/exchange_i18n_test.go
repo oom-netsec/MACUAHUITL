@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"path/filepath"
-	"syscall"
 	"testing"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -22,11 +20,7 @@ func razon(t *testing.T, err error) string {
 
 // Fase 30d: los errores de export/import llevan reason y salen en el idioma pedido; con es, el texto de siempre.
 func TestIntercambioErroresEsYEn(t *testing.T) {
-	dir := t.TempDir()
-	fifo := filepath.Join(dir, "fifo")
-	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
-		t.Skip(err)
-	}
+	fifo := t.TempDir() // un directorio tampoco es archivo regular (noegress no deja usar syscall.Mkfifo aquí)
 	cases := []struct {
 		name, reason, es, en string
 		call                 func(ctx context.Context) error

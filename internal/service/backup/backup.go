@@ -475,15 +475,6 @@ func (s *backupSvc) GetBackup(ctx context.Context, r *v1.GetBackupRequest) (*v1.
 	return &v1.GetBackupResponse{MetaJson: string(meta), Text: text}, nil
 }
 
-func nonEmpty(ss ...string) (out []string) {
-	for _, s := range ss {
-		if s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
 func firstNonEmpty(ss ...string) string {
 	for _, s := range ss {
 		if s != "" {
