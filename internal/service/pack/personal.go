@@ -166,7 +166,11 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 	if s.userIDs != nil {
 		userIDs = s.userIDs()
 	}
-	out := &v1.PackServiceImportResponse{Pack: s.info(p), Sha256: sum}
+	info, err := s.info(p)
+	if err != nil {
+		return nil, internal(err)
+	}
+	out := &v1.PackServiceImportResponse{Pack: info, Sha256: sum}
 	if !r.GetConfirm() {
 		user, err := loadUser(s.d.DB())
 		if err != nil {

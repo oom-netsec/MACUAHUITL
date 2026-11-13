@@ -2,6 +2,7 @@ package patrol
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -55,21 +56,34 @@ func auditResult(ctx context.Context, d Deps, jobID string, res DeviceResult) De
 	return res
 }
 
+// ErrWindowEnded es la causa del contexto de un equipo cuando llega el fin de la ventana del trabajo:
+// lo que siga corriendo se corta y el equipo falla con este error.
+var ErrWindowEnded = i18n.New("patrol.err.window_ended", nil)
+
+// windowEnded sustituye el error de un comando o conexión cortados por el fin de la ventana.
+func windowEnded(ctx context.Context, err error) error {
+	if (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) && errors.Is(context.Cause(ctx), ErrWindowEnded) {
+		return ErrWindowEnded
+	}
+	return err
+}
+
 // RunDevice corre una ronda contra un equipo y escribe sus outputs en w.
 func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, round int, t Target, emit func(Progress)) (res DeviceResult) {
 	res = DeviceResult{Target: t, Round: round}
 	hp := hostport(t)
 	emit(Progress{Target: hp, State: "connecting"})
-	base := auditor(ctx, d)
+	base := auditor(context.WithoutCancel(ctx), d) // un corte en pleno handshake no debe dejar eventos sin auditar
 	onEvent := func(e audit.Entry) {
 		if ch := changeOf(e, hp); ch != nil {
 			res.ChangedHostKey = ch
 		}
 		base(e)
 	}
-	defer func() { res = auditResult(ctx, d, jobID, res) }()
+	defer func() { res = auditResult(context.WithoutCancel(ctx), d, jobID, res) }() // con la ventana vencida también debe quedar rastro
 	c, err := connect(ctx, d, jobID, s, t, transport.HostKeyPolicy{AcceptChanged: s.AcceptChangedHostKeys}, onEvent, d.PrimaryVerified[hp], d.backoff())
 	if err != nil {
+		err = windowEnded(ctx, err)
 		res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
 		if step(err) == "host_key" {
 			res.State = "skipped"
@@ -102,6 +116,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		cctx, cancel := context.WithTimeout(ctx, maxCmd(cmd.Timeout)) // el timeout es de inactividad: esto es el tope total
 		out, runErr := c.drv.Run(cctx, cmd.Text, cmd.Timeout)
 		cancel()
+		runErr = windowEnded(ctx, runErr)
 		bytes += int64(len(out.Text))
 		if out.Invalid {
 			res.Invalid++

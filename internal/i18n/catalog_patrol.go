@@ -21,6 +21,7 @@ func init() {
 		"patrol.writable.not_dir":         e("no es una carpeta", "it is not a folder"),
 		"patrol.writable.no_write":        e("sin permiso de escritura: {cause}", "no write permission: {cause}", "cause"),
 		"patrol.err.credential":           e("patrol: credencial: {cause}", "patrol: credential: {cause}", "cause"),
+		"patrol.err.window_ended":         e("terminó la ventana del trabajo con el equipo a medias", "the job window ended while the device was still being processed"),
 		"patrol.err.audit":                e("auditoría: {error}", "audit: {error}", "error"),
 		"patrol.err.playbook_platform":    e("patrol: el playbook {id} es para {platform} y el equipo es {detected}", "patrol: playbook {id} is for {platform} and the device is {detected}", "id", "platform", "detected"),
 		"transport.err.not_authorized":    e("transport: destino no autorizado", "transport: destination not authorized"),

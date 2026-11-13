@@ -2,6 +2,7 @@ package pack
 
 import (
 	"crypto/ed25519"
+	"errors"
 	"fmt"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"os"
@@ -580,5 +581,29 @@ func TestArranqueReaplicaLasReservas(t *testing.T) {
 	_, rej := openStore(t, dir, pub, Base{})
 	if len(rej) != 1 || rej[0].Reason != "editor.reserved" {
 		t.Fatalf("%+v", rej)
+	}
+}
+
+// Si el paso previo de InstallWith falla, no se instala nada: ni disco, ni foto, ni OnChange; si sale bien, corre
+// con el paquete ya validado y antes de publicarlo.
+func TestInstallWithPrepare(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	changes := 0
+	s.OnChange = func() { changes++ }
+	boom := errors.New("boom")
+	if _, err := s.InstallWith(signedZip(t, priv, nil), false, func(*Pack, string) error { return boom }); !errors.Is(err, boom) {
+		t.Fatalf("err = %v", err)
+	}
+	if ents, _ := os.ReadDir(dir); len(ents) != 0 || len(s.Snapshot().Packs) != 0 || changes != 0 {
+		t.Fatalf("quedó %v %d", ents, changes)
+	}
+	visto := true
+	if _, err := s.InstallWith(signedZip(t, priv, nil), false, func(p *Pack, _ string) error {
+		visto = s.Snapshot().Find(p.ID) != nil // todavía no está publicado
+		return nil
+	}); err != nil || visto || s.Snapshot().Find("oom/demo") == nil {
+		t.Fatalf("%v visto=%v", err, visto)
 	}
 }

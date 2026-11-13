@@ -157,6 +157,8 @@ uso: mctl <comando>
          tech: l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro; platform: ios, ios-xe, nx-os, asa, cualquiera)
   scripts rm ID  |  scripts fav ID [--off]  |  scripts dup ID
         (borra uno tuyo, marca o quita un favorito (también en la biblioteca), o copia cualquiera como script tuyo)
+  scripts copy ID
+        (copia un script de un paquete instalado, también uno oculto, a tus scripts: ID nuevo, editable, nombre «<nombre> (copia)»; quitar el paquete no la borra)
   scripts export --out RUTA [--overwrite] ID...
         (archivo JSON 0600 con la suma SHA-256 de los scripts (integridad, no autenticidad); no sobrescribe sin --overwrite; los favoritos no viajan)
   scripts import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
@@ -177,10 +179,17 @@ uso: mctl <comando>
   prefs show [--json]  |  prefs set [--outputs DIR] [--rotate-mb N] [--rotate-min N] [--max-files N] [--format F]
         (set cambia solo lo que se pide; 0 o "" devuelve ese valor al de fábrica. La carpeta debe ser absoluta, existir, ser tuya, escribible y de modo 0700;
          aplica a lo que empiece después y los datos de la anterior no se mueven. rotate-mb 1-1024, rotate-min 1-10080, max-files 1-1000, format texto|crudo|jsonl)
-  pack install <archivo.mpack> [--allow-unsigned]  |  pack list  |  pack show <id>  |  pack remove <id>
+  pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM]...  |  pack list  |  pack show <id>  |  pack remove <id>
         (paquetes de contenido: playbooks y scripts por tecnología; se bajan a mano de los releases y nada se descarga solo.
          Un paquete sin firma oficial es de terceros y solo se instala con --allow-unsigned; trae únicamente comandos de lectura.
-         remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README)
+         remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README.
+         --hide ITEM instala el paquete con ese playbook o script oculto, y se repite; con --hide, lo oculto queda
+         exactamente en esos ITEM, y sin --hide una actualización conserva lo que ya estaba oculto)
+  pack inspect <archivo.mpack> [--allow-unsigned]
+        (vista previa de install: valida el paquete y muestra qué trae y qué reemplazaría, sin instalar nada)
+  pack items <id> [--hide ITEM]... [--show ITEM]...
+        (oculta o muestra playbooks y scripts de un paquete instalado: solo quita de las listas, el ID se sigue
+         resolviendo y los trabajos lo pueden pedir; lo oculto sobrevive a las versiones nuevas y se borra con el paquete)
   pack export <editor/nombre> [ID...] --out <archivo.mpack> [--playbooks] [--license SPDX] [--name N] [--description D] [--author A] [--overwrite]
         (arma un paquete personal SIN firma con los scripts del usuario ID... y, con --playbooks, los de <config>/playbooks de ios, ios-xe y wlc-9800.
          Los scripts salen como lib-<editor>-… y los playbooks con el editor como prefijo; los demás playbooks se omiten y se avisa. El editor es

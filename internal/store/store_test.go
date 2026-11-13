@@ -119,9 +119,9 @@ func TestMigrateFromEitherBranch(t *testing.T) {
 			if _, err := db.Exec(`INSERT INTO hosts VALUES('h2','N','10.0.0.2',22,'','','[]','','','t','t')`); err == nil {
 				t.Fatal("el nombre de un host no se repite aunque cambien las mayúsculas")
 			}
-			want := 7 // 0001, preferences, historial, scripts, colecciones, hosts, paquetes quitados
+			want := 8 // 0001, preferences, historial, scripts, colecciones, hosts, paquetes quitados, ocultos de paquetes
 			if applied != nil && applied[1] == "0002_job_history.sql" {
-				want = 8 // además queda la fila con el nombre viejo
+				want = 9 // además queda la fila con el nombre viejo
 			}
 			if n != want {
 				t.Fatalf("migraciones registradas = %d, want %d", n, want)

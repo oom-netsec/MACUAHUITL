@@ -16,6 +16,10 @@ service PackService {
   rpc Show(PackServiceShowRequest) returns (PackServiceShowResponse);
   // Quita el paquete id y los favoritos de sus scripts.
   rpc Remove(PackServiceRemoveRequest) returns (PackServiceRemoveResponse);
+  // Oculta o muestra playbooks y scripts de un paquete instalado (fase 32b). Ocultar solo quita de las listas: el ID se sigue resolviendo.
+  rpc SetItems(PackServiceSetItemsRequest) returns (PackServiceSetItemsResponse);
+  // Vista previa de Install (fase 32b): valida el .mpack igual y con los mismos errores, pero no instala, no toca el almacén ni audita.
+  rpc Inspect(PackServiceInspectRequest) returns (PackServiceInspectResponse);
   // Fase 32c. Arma un paquete personal sin firma con scripts del usuario y, si se pide, sus playbooks.
   rpc Export(PackServiceExportRequest) returns (PackServiceExportResponse);
   // Fase 32c. Importa un .mpack sin firma a «Mis scripts» y a <config>/playbooks. Sin confirm es solo la vista previa.
@@ -25,6 +29,8 @@ service PackService {
 message PackServiceInstallRequest {
   string path = 1;            // ruta absoluta del .mpack
   bool allow_unsigned = 2;    // confirmación explícita para un paquete de terceros
+  repeated string hide = 3;   // IDs de playbook o script del paquete que quedan ocultos al instalar; los que no existan se ignoran (fase 32b)
+  bool replace_hidden = 4;    // con true, hide es el conjunto exacto de ocultos tras instalar; sin él se conserva lo oculto y hide suma
 }
 
 message PackServiceInstallResponse {
@@ -53,6 +59,7 @@ message PackInfo {
   int32 playbook_count = 12;
   int32 script_count = 13;         // los derivados de playbooks más los de scripts.json
   repeated string shadowed = 14;   // IDs de playbook que un playbook de <config>/playbooks tapa
+  repeated string hidden = 15;     // IDs de playbook o de script que el usuario ocultó, ordenados (fase 32b)
 }
 
 message PackServiceShowRequest {
@@ -72,6 +79,28 @@ message PackServiceRemoveRequest {
 
 message PackServiceRemoveResponse {
   int32 favorites_removed = 1;     // scripts del paquete que estaban en colecciones o fijados
+}
+
+message PackServiceSetItemsRequest {
+  string pack_id = 1;
+  repeated string hide = 2;        // IDs de playbook o de script del paquete; un ID que no es suyo da pack.err.item
+  repeated string show = 3;        // un ID en hide y show a la vez da pack.err.item
+}
+
+message PackServiceSetItemsResponse {
+  PackInfo pack = 1;               // con hidden al día
+}
+
+message PackServiceInspectRequest {
+  string path = 1;            // ruta absoluta del .mpack
+  bool allow_unsigned = 2;    // igual que en Install: sin ella, un paquete de terceros da pack.err.unsigned
+}
+
+message PackServiceInspectResponse {
+  PackInfo pack = 1;               // official indica si la firma oficial es válida; hidden trae lo ya oculto de una versión instalada
+  repeated string playbook_ids = 2;
+  repeated string script_ids = 3;  // los derivados de playbooks más los de scripts.json
+  string replaced_version = 4;     // versión instalada que reemplazaría; vacío si es nuevo
 }
 
 message PackServiceExportRequest {

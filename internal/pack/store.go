@@ -314,35 +314,78 @@ type Result struct {
 	Replaced string // versión anterior que reemplazó; vacío si era nuevo
 }
 
+// check hace los pasos 2 a 7 del ADR sobre bytes ya leídos y devuelve el paquete y el instalado que reemplazaría
+// (nil si es nuevo). Con el error, el paquete viaja igual si ya se pudo leer. Install lo llama con s.mu; Inspect sin él.
+func (s *Store) check(data []byte, allowUnsigned bool) (p, old *Pack, cur *Snapshot, err error) {
+	if p, err = Verify(data, s.core, s.keys); err != nil {
+		return nil, nil, nil, err
+	}
+	if !p.Official && !allowUnsigned {
+		return p, nil, nil, rej("unsigned")
+	}
+	if err = s.checkReserved(p); err != nil {
+		return p, nil, nil, err
+	}
+	cur = s.snap.Load()
+	if old = cur.Find(p.ID); old != nil {
+		switch {
+		case old.Official && !p.Official:
+			return p, nil, nil, rej("official_replace", "id", p.ID)
+		case CompareVersions(p.Version, old.Version) <= 0:
+			return p, nil, nil, rej("version", "id", p.ID, "installed", old.Version, "version", p.Version)
+		}
+	}
+	if err = s.collides(p, cur.Packs); err != nil {
+		return p, nil, nil, err
+	}
+	return p, old, cur, nil
+}
+
+// Inspect valida el paquete igual que Install (mismos pasos y mismos errores) sin instalar nada: no toca el disco
+// ni la foto vigente. Devuelve el paquete y la versión que reemplazaría.
+func (s *Store) Inspect(data []byte, allowUnsigned bool) (*Result, error) { // sin s.mu: la foto es atómica y no escribe
+	p, old, _, err := s.check(data, allowUnsigned)
+	if err != nil {
+		if p == nil {
+			return nil, err
+		}
+		return &Result{Pack: p}, err
+	}
+	res := &Result{Pack: p}
+	if old != nil {
+		res.Replaced = old.Version
+	}
+	return res, nil
+}
+
 // Install hace los pasos 2 a 8 del ADR sobre bytes ya leídos. allowUnsigned es la confirmación explícita para un
 // paquete de terceros.
 func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
-	p, err := Verify(data, s.core, s.keys)
-	if err != nil {
-		return nil, err
-	}
-	if !p.Official && !allowUnsigned {
-		return &Result{Pack: p}, rej("unsigned")
-	}
-	if err := s.checkReserved(p); err != nil {
-		return &Result{Pack: p}, err
-	}
+	return s.InstallWith(data, allowUnsigned, nil)
+}
+
+// InstallWith es Install con un paso previo: prepare corre con el paquete ya validado y bajo el lock, antes de tocar
+// el disco y de publicar la foto; si falla, no se instala nada. Sirve para guardar lo que debe estar listo cuando el
+// paquete se vea (lo oculto). replaced es la versión que reemplazaría ("" si es nuevo).
+func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) error) (*Result, error) {
 	s.mu.Lock()
-	cur := s.snap.Load()
-	old := cur.Find(p.ID)
-	if old != nil {
-		switch {
-		case old.Official && !p.Official:
-			s.mu.Unlock()
-			return &Result{Pack: p}, rej("official_replace", "id", p.ID)
-		case CompareVersions(p.Version, old.Version) <= 0:
-			s.mu.Unlock()
-			return &Result{Pack: p}, rej("version", "id", p.ID, "installed", old.Version, "version", p.Version)
-		}
-	}
-	if err := s.collides(p, cur.Packs); err != nil {
+	p, old, cur, err := s.check(data, allowUnsigned)
+	if err != nil {
 		s.mu.Unlock()
+		if p == nil {
+			return nil, err
+		}
 		return &Result{Pack: p}, err
+	}
+	if prepare != nil {
+		replaced := ""
+		if old != nil {
+			replaced = old.Version
+		}
+		if err := prepare(p, replaced); err != nil {
+			s.mu.Unlock()
+			return &Result{Pack: p}, err
+		}
 	}
 	if err := s.extract(p); err != nil {
 		s.mu.Unlock()

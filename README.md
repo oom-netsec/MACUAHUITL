@@ -124,7 +124,7 @@ mctl pack remove oom/ios-xe
 - **Playbooks stay read-only.** Every playbook command in a pack passes the same deny list as the built-in ones, on install and again at every start. Scripts are never run: the terminal pastes them without pressing Enter, like the built-in library. Nothing executable travels in a pack, and change templates stay in the core.
 - **Each pack carries its own README** with what it contains and how to load it.
 
-Official packs today: `oom/ios-xe`. Classic IOS is next; NX-OS, ASA/FTD, ACI, wireless, ISE and SD-Access follow as each platform gets its driver and read-only rules. The format is defined in [ADR 0010](docs/adr/0010-paquetes-de-contenido.md).
+Official packs today: `oom/ios-xe` and `oom/ios` (classic IOS). `oom/wlc-9800` (Catalyst 9800 and EWC) is in main, not yet released. NX-OS, ASA/FTD, ACI, AireOS, ISE and SD-Access follow as each platform gets its driver and read-only rules. The format is defined in [ADR 0010](docs/adr/0010-paquetes-de-contenido.md).
 
 > [!NOTE]
 > Content packs arrive with **v0.3.0**. From that version, 52 IOS-XE playbooks move out of the binary into `oom/ios-xe`: install it after upgrading. A job that asks for a playbook from a missing pack fails with a message naming the pack to install.
@@ -150,7 +150,7 @@ Known limits are declared, not hidden, in the [threat model](docs/security/THREA
 - **No privileged code.** No setuid helpers, no raw sockets of its own, no embedded Wireshark or tshark.
 - **Cannot protect you from malware running as your own user** while the vault is open. No user-space app can.
 - **Cannot recover a lost master password.**
-- **Linux only**, for now.
+- **Linux only**, for now. Windows and macOS are on the [roadmap](docs/roadmap.md), after the content packs for every technology.
 
 ## Supported platforms
 
@@ -158,8 +158,9 @@ Known limits are declared, not hidden, in the [threat model](docs/security/THREA
 |---|---|
 | Cisco IOS / IOS-XE | ✅ Patrol, analysis, fleet, operations |
 | ACLs: IOS-XE, NX-OS, ASA | ✅ Import, analysis, translation |
+| WLC 9800 / EWC | ✅ `oom/wlc-9800` content pack, in main (not yet released) |
 | NX-OS, Catalyst 9000, ASA | 🔜 Next, needs real device transcripts |
-| WLC 9800 / AireOS, ISE, FTD/Firepower, SD-Access | 🗺️ Planned |
+| AireOS, ISE, FTD/Firepower, SD-Access | 🗺️ Planned |
 
 > [!NOTE]
 > **Pre-1.0.** Parsers and analysis rules are being validated against real devices. Expect rough edges, and please report any output that is parsed wrong.
@@ -241,7 +242,7 @@ task ui-build   # desktop app
 
 ## Docs
 
-- [Roadmap](docs/roadmap.md): what is built and the phases ahead (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging)
+- [Roadmap](docs/roadmap.md): what is built and the phases ahead (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging, then Windows and macOS)
 - [Architecture design](docs/architecture/2026-11-02-macuahuitl-architecture-design.md) · [Decision records](docs/adr/)
 - [Threat model](docs/security/THREAT_MODEL.md) · [Cryptography](docs/security/CRYPTO.md) · [Auditor's guide](docs/security/AUDIT_GUIDE.md)
 
