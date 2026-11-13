@@ -2577,6 +2577,11 @@ export const es = {
   "security.chain.usage": "Usos de la llave",
   "security.chain.selfSigned": "Autofirmado",
   "security.chain.sigInvalid": "Firma del CSR inválida",
+  "patrol.param.required": "Obligatorio.",
+  "patrol.param.mac": "Formato de MAC: aa:bb:cc:dd:ee:ff o aaaa.bbbb.cccc.",
+  "patrol.param.ap": "Nombre del AP, como aparece en el controlador.",
+  "patrol.param.interface": "Interfaz, por ejemplo Gi1/0/1.",
+  "patrol.param.ip": "Dirección IPv4 o IPv6.",
 };
 
 export type Key = keyof typeof es;

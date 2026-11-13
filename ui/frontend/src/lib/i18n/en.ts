@@ -2579,4 +2579,9 @@ export const en: Record<Key, string> = {
   "security.chain.usage": "Key usage",
   "security.chain.selfSigned": "Self-signed",
   "security.chain.sigInvalid": "CSR signature invalid",
+  "patrol.param.required": "Required.",
+  "patrol.param.mac": "MAC format: aa:bb:cc:dd:ee:ff or aaaa.bbbb.cccc.",
+  "patrol.param.ap": "AP name, as shown on the controller.",
+  "patrol.param.interface": "Interface, for example Gi1/0/1.",
+  "patrol.param.ip": "IPv4 or IPv6 address.",
 };
