@@ -1094,3 +1094,64 @@ Instrucciones de `ServerReady.hint` (la explicación paso a paso del servidor de
 - **Severidades de syslog** con `en`, como las nombra Cisco: emergencies, alerts, critical, errors, warnings, notifications, informational, debugging.
 - **Metadata de `ErrorInfo`** de los códigos nuevos: solo trae los argumentos declarados por el código (sin secretos); `xfer.no_listing.*` lleva `proto` y no texto traducido.
 - **Sigue en español con `en`:** los errores de `internal/core/respaldo.go` (exportar e importar el respaldo de la bóveda) y los textos de `internal/analyze`.
+
+## Paquetes de contenido (fase 32, ADR 0010)
+
+`PackService` (gRPC) y `ui/bridge/pack.go`; tipos y Wails en `modules/packs/api.ts` (con su `fake.ts`). La vista, Ajustes → Paquetes, es de front.
+
+### Métodos del puente
+| Método | Argumentos | Devuelve |
+|---|---|---|
+| `PackInstall(path, allowUnsigned)` | ruta absoluta del `.mpack` que eligió el usuario; `allowUnsigned` es la confirmación del diálogo con aviso | `{pack, replacedVersion}` (`replacedVersion` vacío si era nuevo) |
+| `PackList()` | | `PackInfo[]`, ordenados por id (nunca `null`) |
+| `PackShow(id)` | id del paquete instalado | `{pack, readme, playbookIds, scriptIds}` |
+| `PackRemove(id)` | id del paquete instalado | número de scripts del paquete que estaban en colecciones o fijados y se quitaron |
+
+`PackInfo`: `id` (`<editor>/<nombre>`), `version`, `minCore`, `name`, `nameEn`, `description`, `descriptionEn`, `platforms`, `author`, `license`, `official`, `playbookCount`, `scriptCount` (derivados de playbooks más `scripts.json`) y `shadowed` (IDs de playbook que uno de `<config>/playbooks` tapa).
+
+### Qué muestra la lista
+- id, versión, origen (**oficial** si `official`, **de terceros** si no), cuántos playbooks y scripts trae.
+- Si `shadowed` no viene vacío, avisa qué IDs quedan tapados por los playbooks propios del usuario.
+- `official` se deriva en cada arranque de la firma; nunca es un dato guardado.
+
+### Instalar
+- El núcleo lee la ruta una sola vez (tope de 20 MB) y valida todo; la instalación es todo o nada y se refleja en caliente (playbooks, biblioteca de scripts) sin reiniciar.
+- Un paquete sin firma oficial es de terceros: sin `allowUnsigned` falla con `pack.err.unsigned`. El diálogo debe avisar que el paquete no está firmado y que solo trae comandos de lectura.
+- Para una versión igual o más vieja que la instalada, o para un oficial instalado reemplazado por uno de terceros, hay que quitar el instalado primero (`pack.err.version`, `pack.err.official_replace`).
+
+### Reasons (`ErrorInfo.reason`; texto es/en en el catálogo, metadata solo con los argumentos declarados)
+| Reason | Metadata | Código gRPC |
+|---|---|---|
+| `pack.err.path` | | InvalidArgument |
+| `pack.err.read` | | InvalidArgument (archivo ilegible; el texto del sistema va en el mensaje, no en la metadata) |
+| `pack.err.zip.invalid` | | InvalidArgument |
+| `pack.err.zip.path`, `pack.err.zip.dup` | `name` | InvalidArgument |
+| `pack.err.zip.too_big` | `what` (`archive`, `entries` o el nombre del archivo) | InvalidArgument |
+| `pack.err.zip.missing` | `name` | InvalidArgument |
+| `pack.err.index.mismatch` | `name` | InvalidArgument |
+| `pack.err.signature.invalid` | | InvalidArgument |
+| `pack.err.manifest.invalid` | `field` | InvalidArgument |
+| `pack.err.core.too_old` | `min_core`, `core` | InvalidArgument |
+| `pack.err.playbook.denied`, `pack.err.playbook.invalid`, `pack.err.script.invalid` | `cause_reason` si la causa trae código | InvalidArgument |
+| `pack.err.playbook.platform` | `id`, `platform` | InvalidArgument |
+| `pack.err.id.prefix` | `id`, `want` | InvalidArgument |
+| `pack.err.editor.reserved` | `editor` | InvalidArgument |
+| `pack.err.unsigned` | | FailedPrecondition |
+| `pack.err.collision` | `id`, `with` (`base` o el id del otro paquete) | FailedPrecondition |
+| `pack.err.version` | `id`, `installed`, `version` | FailedPrecondition |
+| `pack.err.official_replace` | `id` | FailedPrecondition |
+| `pack.err.not_found` | `id` | NotFound |
+| `pack.missing` | `playbook`, `pack`, más `field = playbook_ids` | InvalidArgument (en `CreateJob`) |
+
+`pack.missing` sale de `CreateJob` (y de la ronda de un trabajo recargado) cuando el playbook pedido viene en un paquete que no está instalado: los movidos a `oom/ios-xe` o los de un paquete quitado. Dice qué paquete instalar (`pack`). Un ID inexistente que no es de ningún paquete sigue con `patrol.field.no_playbook`. Un trabajo ya creado conserva los playbooks que tenía.
+
+### README y textos del paquete
+`readme`, `name`, `description`, `author` y los demás textos son **texto plano** (o Markdown sin interpretar). La vista no usa `dangerouslySetInnerHTML`, no carga imágenes y no hace clicables los enlaces: nada del paquete pide recursos a la red ni mete HTML en el webview. Se muestra `name`/`description` o `nameEn`/`descriptionEn` según el idioma de la interfaz; el README viene en español e inglés en el mismo texto.
+
+### Auditoría (siempre en inglés)
+- `pack.install`: `id=… version=… sha256=<del archivo> origin=official|third-party playbooks=N scripts=N [replaced=<versión>] [min_core_unchecked=true]`.
+- `pack.remove`: `id=… version=… origin=… playbooks=N scripts=N favorites_removed=N`.
+- `pack.rejected`: `id=… sha256=… origin=… reason=<motivo sin el prefijo pack.err.> path="<la ruta que pasó el usuario>"`; al arrancar, `id=… dir=… reason=… stage=startup` por cada paquete instalado que no pasó la revalidación (se omite y el núcleo sigue).
+
+### Compatibilidad
+Los IDs de los playbooks movidos a `oom/ios-xe`, sus scripts `lib-<id>` y los favoritos no cambian. Quien venga de una versión anterior no tiene esos playbooks ni scripts hasta que instale el paquete; los favoritos de scripts de un paquete ausente quedan apuntando a un ID que no existe.

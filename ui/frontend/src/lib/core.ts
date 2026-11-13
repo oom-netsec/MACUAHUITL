@@ -31,6 +31,7 @@ import { metricsWails, type MetricsAPI } from "../modules/metrics/api";
 import { inventoryWails, type InventoryAPI } from "../modules/inventory/api";
 import { scriptsWails, type ScriptsAPI } from "../modules/scripts/api";
 import { settingsWails, type SettingsAPI } from "../modules/settings/api";
+import { packsWails, type PacksAPI } from "../modules/packs/api";
 
 export type CoreStatus = "connected" | "disconnected";
 
@@ -58,6 +59,7 @@ export type * from "../modules/transfer/api";
 export type * from "../modules/metrics/api";
 export type * from "../modules/inventory/api";
 export type * from "../modules/scripts/api";
+export type * from "../modules/packs/api";
 export type * from "../modules/settings/api";
 
 // Lo compartido por todos los módulos: estado del núcleo, preferencias, diálogo de archivos y portapapeles.
@@ -115,7 +117,8 @@ export interface CoreAPI extends
   MetricsAPI,
   InventoryAPI,
   ScriptsAPI,
-  SettingsAPI {}
+  SettingsAPI,
+  PacksAPI {}
 
 const svc = "github.com/oom-netsec/MACUAHUITL/ui/bridge.Bridge.";
 const call = <T,>(m: string, ...a: unknown[]) => Call.ByName(svc + m, ...a) as Promise<T>;
@@ -212,4 +215,5 @@ export const wailsCore: CoreAPI = {
   ...inventoryWails(call),
   ...scriptsWails(call),
   ...settingsWails(call),
+  ...packsWails(call),
 };

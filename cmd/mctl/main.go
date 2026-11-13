@@ -33,6 +33,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/fleet"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/forensic"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/metrics"
+	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/pack"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/patrol"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/ports"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/prefs"
@@ -66,6 +67,7 @@ var areas = []cli.Area{
 	devices.Area(),
 	scripts.Area(),
 	prefs.Area(),
+	pack.Area(),
 }
 
 func main() {
