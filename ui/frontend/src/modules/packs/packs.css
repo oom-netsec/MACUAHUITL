@@ -1,0 +1,8 @@
+/* Fase 21f: Ajustes → Paquetes. */
+.packs { display: grid; gap: var(--s-3); }
+.pack-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.pack-card { border: 1px solid var(--hairline); border-radius: var(--r-3); padding: var(--s-3) var(--s-4); background: var(--surface); min-width: 0; }
+.pack-card h4 { margin: 0 0 var(--s-1); overflow-wrap: anywhere; }
+.pack-readme { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 14rem; overflow: auto; }
+.pack-items { display: grid; gap: var(--s-1); }
+.pack-items h4 { margin: var(--s-2) 0 0; }
