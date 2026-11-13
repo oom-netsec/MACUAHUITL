@@ -95,3 +95,19 @@ func (b *Bridge) PackSetItems(packID string, hide, show []string) (PackInfoDTO, 
 		return packInfoDTO(r.GetPack()), err
 	})
 }
+
+type PackInspectDTO struct {
+	Pack            PackInfoDTO `json:"pack"`
+	PlaybookIDs     []string    `json:"playbookIds"`
+	ScriptIDs       []string    `json:"scriptIds"`
+	ReplacedVersion string      `json:"replacedVersion"`
+}
+
+// PackInspect es la vista previa de PackInstall para el diálogo con casillas: valida el .mpack igual y no instala nada.
+func (b *Bridge) PackInspect(path string, allowUnsigned bool) (PackInspectDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PackInspectDTO, error) {
+		r, err := v1.NewPackServiceClient(c).Inspect(ctx, &v1.PackServiceInspectRequest{Path: path, AllowUnsigned: allowUnsigned})
+		return PackInspectDTO{Pack: packInfoDTO(r.GetPack()), PlaybookIDs: strs(r.GetPlaybookIds()), ScriptIDs: strs(r.GetScriptIds()),
+			ReplacedVersion: r.GetReplacedVersion()}, err
+	})
+}

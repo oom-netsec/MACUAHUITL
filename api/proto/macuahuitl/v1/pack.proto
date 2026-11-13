@@ -18,6 +18,8 @@ service PackService {
   rpc Remove(PackServiceRemoveRequest) returns (PackServiceRemoveResponse);
   // Oculta o muestra playbooks y scripts de un paquete instalado (fase 32b). Ocultar solo quita de las listas: el ID se sigue resolviendo.
   rpc SetItems(PackServiceSetItemsRequest) returns (PackServiceSetItemsResponse);
+  // Vista previa de Install (fase 32b): valida el .mpack igual y con los mismos errores, pero no instala, no toca el almacén ni audita.
+  rpc Inspect(PackServiceInspectRequest) returns (PackServiceInspectResponse);
 }
 
 message PackServiceInstallRequest {
@@ -82,4 +84,16 @@ message PackServiceSetItemsRequest {
 
 message PackServiceSetItemsResponse {
   PackInfo pack = 1;               // con hidden al día
+}
+
+message PackServiceInspectRequest {
+  string path = 1;            // ruta absoluta del .mpack
+  bool allow_unsigned = 2;    // igual que en Install: sin ella, un paquete de terceros da pack.err.unsigned
+}
+
+message PackServiceInspectResponse {
+  PackInfo pack = 1;               // official indica si la firma oficial es válida; hidden trae lo ya oculto de una versión instalada
+  repeated string playbook_ids = 2;
+  repeated string script_ids = 3;  // los derivados de playbooks más los de scripts.json
+  string replaced_version = 4;     // versión instalada que reemplazaría; vacío si es nuevo
 }

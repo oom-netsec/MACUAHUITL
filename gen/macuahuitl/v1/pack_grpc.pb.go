@@ -24,6 +24,7 @@ const (
 	PackService_Show_FullMethodName     = "/macuahuitl.v1.PackService/Show"
 	PackService_Remove_FullMethodName   = "/macuahuitl.v1.PackService/Remove"
 	PackService_SetItems_FullMethodName = "/macuahuitl.v1.PackService/SetItems"
+	PackService_Inspect_FullMethodName  = "/macuahuitl.v1.PackService/Inspect"
 )
 
 // PackServiceClient is the client API for PackService service.
@@ -44,6 +45,8 @@ type PackServiceClient interface {
 	Remove(ctx context.Context, in *PackServiceRemoveRequest, opts ...grpc.CallOption) (*PackServiceRemoveResponse, error)
 	// Oculta o muestra playbooks y scripts de un paquete instalado (fase 32b). Ocultar solo quita de las listas: el ID se sigue resolviendo.
 	SetItems(ctx context.Context, in *PackServiceSetItemsRequest, opts ...grpc.CallOption) (*PackServiceSetItemsResponse, error)
+	// Vista previa de Install (fase 32b): valida el .mpack igual y con los mismos errores, pero no instala, no toca el almacén ni audita.
+	Inspect(ctx context.Context, in *PackServiceInspectRequest, opts ...grpc.CallOption) (*PackServiceInspectResponse, error)
 }
 
 type packServiceClient struct {
@@ -104,6 +107,16 @@ func (c *packServiceClient) SetItems(ctx context.Context, in *PackServiceSetItem
 	return out, nil
 }
 
+func (c *packServiceClient) Inspect(ctx context.Context, in *PackServiceInspectRequest, opts ...grpc.CallOption) (*PackServiceInspectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PackServiceInspectResponse)
+	err := c.cc.Invoke(ctx, PackService_Inspect_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PackServiceServer is the server API for PackService service.
 // All implementations must embed UnimplementedPackServiceServer
 // for forward compatibility.
@@ -122,6 +135,8 @@ type PackServiceServer interface {
 	Remove(context.Context, *PackServiceRemoveRequest) (*PackServiceRemoveResponse, error)
 	// Oculta o muestra playbooks y scripts de un paquete instalado (fase 32b). Ocultar solo quita de las listas: el ID se sigue resolviendo.
 	SetItems(context.Context, *PackServiceSetItemsRequest) (*PackServiceSetItemsResponse, error)
+	// Vista previa de Install (fase 32b): valida el .mpack igual y con los mismos errores, pero no instala, no toca el almacén ni audita.
+	Inspect(context.Context, *PackServiceInspectRequest) (*PackServiceInspectResponse, error)
 	mustEmbedUnimplementedPackServiceServer()
 }
 
@@ -146,6 +161,9 @@ func (UnimplementedPackServiceServer) Remove(context.Context, *PackServiceRemove
 }
 func (UnimplementedPackServiceServer) SetItems(context.Context, *PackServiceSetItemsRequest) (*PackServiceSetItemsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetItems not implemented")
+}
+func (UnimplementedPackServiceServer) Inspect(context.Context, *PackServiceInspectRequest) (*PackServiceInspectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Inspect not implemented")
 }
 func (UnimplementedPackServiceServer) mustEmbedUnimplementedPackServiceServer() {}
 func (UnimplementedPackServiceServer) testEmbeddedByValue()                     {}
@@ -258,6 +276,24 @@ func _PackService_SetItems_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PackService_Inspect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PackServiceInspectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PackServiceServer).Inspect(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PackService_Inspect_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PackServiceServer).Inspect(ctx, req.(*PackServiceInspectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PackService_ServiceDesc is the grpc.ServiceDesc for PackService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -284,6 +320,10 @@ var PackService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetItems",
 			Handler:    _PackService_SetItems_Handler,
+		},
+		{
+			MethodName: "Inspect",
+			Handler:    _PackService_Inspect_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -1206,6 +1206,12 @@ Spec: ADR 0010, «Selección por elemento y paquete personal». Aquí solo lo qu
 - La elección sobrevive a una versión nueva del paquete (un ID nuevo entra visible; uno que la versión quitó deja de contar) y se borra al quitar el paquete.
 - Auditoría (inglés): `pack.items` con `hidden=<n> shown=<n>` (`at=install` si vino de `hide[]`).
 
+### Vista previa de la instalación
+- `PackInspect(path, allowUnsigned)` → `PackInspectDTO {pack, playbookIds, scriptIds, replacedVersion}` (`PackService.Inspect`): lee el `.mpack` una sola vez (mismo tope de 20 MB) y lo valida con los mismos pasos y los mismos errores que `PackInstall` (`pack.err.*`), pero no instala nada, no toca el almacén y no audita. Sirve para llenar las casillas del diálogo y mandar después `PackInstallHiding`.
+- `pack.official` dice si la firma oficial es válida; `replacedVersion` es la versión instalada que reemplazaría (vacío si es nuevo); `pack.hidden` trae lo que el usuario ya tenía oculto de esa versión instalada, para precargar las casillas.
+- Un paquete de terceros sin `allowUnsigned` falla con `pack.err.unsigned`, igual que `PackInstall`: el diálogo debe pasar `allowUnsigned = true` para poder mostrar el contenido y dejar la confirmación para el botón Instalar.
+- Un paquete que `PackInstall` rechazaría (versión igual o menor, choque de IDs, firma inválida) también se rechaza aquí con el mismo reason.
+
 ### Copiar a «Mis scripts»
 - `CopyFromPack(id)` → `ScriptDTO` (puente) / `ScriptsService.CopyFromPack`: copia un script de un paquete instalado, también uno oculto, como script del usuario con ID nuevo, editable, nombre `<nombre> (copia)` (o `(copia 2)`…). Si es derivado de un playbook lleva `pre` más sus comandos. Un ID que no es de un paquete instalado (base, del usuario o inexistente) falla con `scripts.svc.not_from_pack` (`id`; InvalidArgument) o `scripts.svc.not_found`.
 - Quitar el paquete no borra las copias. Auditoría: `scripts.copy`. `DuplicateScript` sigue igual.
@@ -1217,4 +1223,4 @@ Spec: ADR 0010, «Selección por elemento y paquete personal». Aquí solo lo qu
 | `scripts.svc.not_from_pack` | `id` | InvalidArgument |
 
 ### CLI
-`mctl pack items <id> [--hide <item>…] [--show <item>…]`, `mctl pack install … --hide <item>…`, `mctl scripts copy <id>`; `pack list` marca cuántos ocultos y `pack show` los lista.
+`mctl pack inspect <archivo.mpack> [--allow-unsigned]`, `mctl pack items <id> [--hide <item>…] [--show <item>…]`, `mctl pack install … --hide <item>…`, `mctl scripts copy <id>`; `pack list` marca cuántos ocultos y `pack show` los lista.

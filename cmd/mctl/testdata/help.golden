@@ -180,6 +180,8 @@ uso: mctl <comando>
         (set cambia solo lo que se pide; 0 o "" devuelve ese valor al de fábrica. La carpeta debe ser absoluta, existir, ser tuya, escribible y de modo 0700;
          aplica a lo que empiece después y los datos de la anterior no se mueven. rotate-mb 1-1024, rotate-min 1-10080, max-files 1-1000, format texto|crudo|jsonl)
   pack install <archivo.mpack> [--allow-unsigned] [--hide <item>…]  |  pack list  |  pack show <id>  |  pack remove <id>
+  pack inspect <archivo.mpack> [--allow-unsigned]
+        (vista previa de install: valida el paquete y muestra qué trae y qué reemplazaría, sin instalar nada)
   pack items <id> [--hide <item>…] [--show <item>…]
         (items oculta o muestra playbooks y scripts de un paquete instalado: solo quita de las listas, el ID se sigue
          resolviendo y los trabajos lo pueden pedir; lo oculto sobrevive a las versiones nuevas y se borra con el paquete)

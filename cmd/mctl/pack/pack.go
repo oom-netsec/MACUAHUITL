@@ -15,6 +15,8 @@ import (
 )
 
 const help = `  pack install <archivo.mpack> [--allow-unsigned] [--hide <item>…]  |  pack list  |  pack show <id>  |  pack remove <id>
+  pack inspect <archivo.mpack> [--allow-unsigned]
+        (vista previa de install: valida el paquete y muestra qué trae y qué reemplazaría, sin instalar nada)
   pack items <id> [--hide <item>…] [--show <item>…]
         (items oculta o muestra playbooks y scripts de un paquete instalado: solo quita de las listas, el ID se sigue
          resolviendo y los trabajos lo pueden pedir; lo oculto sobrevive a las versiones nuevas y se borra con el paquete)
@@ -63,6 +65,30 @@ func install(c *cli.Env, args []string) error {
 		verb = "actualizado (antes " + r.ReplacedVersion + ")"
 	}
 	fmt.Fprintf(c.Out, "%s: %s\n", verb, line(r.Pack))
+	return nil
+}
+
+func inspect(c *cli.Env, args []string) error {
+	var unsigned bool
+	fs, err := cli.Flags("pack inspect", args, func(fs *flag.FlagSet) {
+		fs.BoolVar(&unsigned, "allow-unsigned", false, "acepta un paquete de terceros (sin firma oficial)")
+	})
+	if err != nil || fs.NArg() != 1 {
+		return errors.New("uso: mctl pack inspect <archivo.mpack> [--allow-unsigned]")
+	}
+	path, err := filepath.Abs(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	r, err := v1.NewPackServiceClient(c.Conn).Inspect(context.Background(), &v1.PackServiceInspectRequest{Path: path, AllowUnsigned: unsigned})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(c.Out, "%s\n", line(r.Pack))
+	if r.ReplacedVersion != "" {
+		fmt.Fprintf(c.Out, "reemplazaría la versión %s\n", r.ReplacedVersion)
+	}
+	fmt.Fprintf(c.Out, "playbooks:\n  %s\nscripts:\n  %s\n", strings.Join(r.PlaybookIds, "\n  "), strings.Join(r.ScriptIds, "\n  "))
 	return nil
 }
 
@@ -138,5 +164,5 @@ func remove(c *cli.Env, args []string) error {
 // Area registra pack install, list, show y remove.
 func Area() cli.Area {
 	return cli.Area{Usage: help, Commands: []cli.Command{{Name: "pack install", Run: install}, {Name: "pack list", Run: list},
-		{Name: "pack show", Run: show}, {Name: "pack remove", Run: remove}, {Name: "pack items", Run: items}}}
+		{Name: "pack show", Run: show}, {Name: "pack remove", Run: remove}, {Name: "pack items", Run: items}, {Name: "pack inspect", Run: inspect}}}
 }

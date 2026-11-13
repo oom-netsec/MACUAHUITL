@@ -521,3 +521,46 @@ func TestPackCopiarAMisScripts(t *testing.T) {
 		t.Fatalf("falta scripts.copy:\n%s", au)
 	}
 }
+
+// Inspect valida como Install pero no instala nada ni audita la instalación.
+func TestPackInspectNoInstala(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	path := writeMpack(t, packtest.IOSXE(t))
+	r, err := pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: path})
+	if err != nil || r.Pack.Id != "oom/ios-xe" || !r.Pack.Official || r.ReplacedVersion != "" ||
+		!slices.Contains(r.PlaybookIds, "ios-xe/l2-stp") || !slices.Contains(r.ScriptIds, "lib-l2-stp") {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if l, _ := pk.List(ctx(t), &v1.PackServiceListRequest{}); len(l.Packs) != 0 {
+		t.Fatal("Inspect instaló")
+	}
+	if slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
+		t.Fatal("Inspect cambió el catálogo")
+	}
+	if au := h.auditText(t); strings.Contains(au, "pack.install") || strings.Contains(au, "pack.rejected") {
+		t.Fatalf("Inspect no audita:\n%s", au)
+	}
+	// Con una versión instalada dice cuál reemplazaría; la igual da el mismo error que Install.
+	h.installIOSXE(t)
+	r, err = pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1"))})
+	if err != nil || r.ReplacedVersion != "1.1.0" {
+		t.Fatalf("%+v %v", r, err)
+	}
+	_, ei := pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: path})
+	_, ein := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: path})
+	ri, _ := reasonOf(ei)
+	rn, _ := reasonOf(ein)
+	if ri != "pack.err.version" || ri != rn {
+		t.Fatalf("inspect %v / install %v", ei, ein)
+	}
+	// Un archivo que no es zip: el mismo error.
+	bad := writeMpack(t, []byte("no soy un zip"))
+	_, ei = pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: bad})
+	_, ein = pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: bad})
+	ri, _ = reasonOf(ei)
+	rn, _ = reasonOf(ein)
+	if ri == "" || ri != rn {
+		t.Fatalf("inspect %v / install %v", ei, ein)
+	}
+}

@@ -124,6 +124,35 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	return &v1.PackServiceInstallResponse{Pack: info, ReplacedVersion: res.Replaced}, nil
 }
 
+// Inspect es la vista previa de Install: lee y valida igual, pero no instala ni audita.
+func (s *svc) Inspect(ctx context.Context, r *v1.PackServiceInspectRequest) (*v1.PackServiceInspectResponse, error) {
+	s.d.MarkActive()
+	if r.GetPath() == "" {
+		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.path", nil)
+	}
+	path, err := service.AbsPath(ctx, r.GetPath())
+	if err != nil {
+		return nil, err
+	}
+	data, err := dom.ReadArchive(path)
+	if err != nil {
+		return nil, fail(ctx, err)
+	}
+	res, err := s.store.Inspect(data, r.GetAllowUnsigned())
+	if err != nil {
+		return nil, fail(ctx, err)
+	}
+	info, err := s.info(res.Pack)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	out := &v1.PackServiceInspectResponse{Pack: info, ScriptIds: res.Pack.ScriptIDs(), ReplacedVersion: res.Replaced}
+	for _, pb := range res.Pack.Playbooks {
+		out.PlaybookIds = append(out.PlaybookIds, pb.ID)
+	}
+	return out, nil
+}
+
 func (s *svc) List(ctx context.Context, _ *v1.PackServiceListRequest) (*v1.PackServiceListResponse, error) {
 	out := &v1.PackServiceListResponse{}
 	for _, p := range s.store.Snapshot().Packs {

@@ -44,6 +44,10 @@ func (fakePack) SetItems(_ context.Context, r *v1.PackServiceSetItemsRequest) (*
 	return &v1.PackServiceSetItemsResponse{Pack: &v1.PackInfo{Id: r.PackId, Hidden: r.Hide}}, nil
 }
 
+func (fakePack) Inspect(_ context.Context, r *v1.PackServiceInspectRequest) (*v1.PackServiceInspectResponse, error) {
+	return &v1.PackServiceInspectResponse{Pack: &v1.PackInfo{Id: r.Path}, ReplacedVersion: "0.9.0"}, nil
+}
+
 func TestPackBridge(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
@@ -90,6 +94,9 @@ func TestPackBridge(t *testing.T) {
 	}
 	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}); err != nil || ins.Pack.ID != "/y.mpack" {
 		t.Fatalf("%+v %v", ins, err)
+	}
+	if in, err := b.PackInspect("/z.mpack", true); err != nil || in.Pack.ID != "/z.mpack" || in.ReplacedVersion != "0.9.0" || in.PlaybookIDs == nil || in.ScriptIDs == nil {
+		t.Fatalf("%+v %v", in, err)
 	}
 	j, _ := json.Marshal(PackInfoDTO{Platforms: strs(nil), Shadowed: strs(nil), Hidden: strs(nil)})
 	if !strings.Contains(string(j), `"platforms":[]`) || !strings.Contains(string(j), `"shadowed":[]`) || !strings.Contains(string(j), `"hidden":[]`) {

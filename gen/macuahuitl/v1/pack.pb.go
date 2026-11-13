@@ -673,6 +673,126 @@ func (x *PackServiceSetItemsResponse) GetPack() *PackInfo {
 	return nil
 }
 
+type PackServiceInspectRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`                                         // ruta absoluta del .mpack
+	AllowUnsigned bool                   `protobuf:"varint,2,opt,name=allow_unsigned,json=allowUnsigned,proto3" json:"allow_unsigned,omitempty"` // igual que en Install: sin ella, un paquete de terceros da pack.err.unsigned
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PackServiceInspectRequest) Reset() {
+	*x = PackServiceInspectRequest{}
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PackServiceInspectRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PackServiceInspectRequest) ProtoMessage() {}
+
+func (x *PackServiceInspectRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PackServiceInspectRequest.ProtoReflect.Descriptor instead.
+func (*PackServiceInspectRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_pack_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *PackServiceInspectRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *PackServiceInspectRequest) GetAllowUnsigned() bool {
+	if x != nil {
+		return x.AllowUnsigned
+	}
+	return false
+}
+
+type PackServiceInspectResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Pack            *PackInfo              `protobuf:"bytes,1,opt,name=pack,proto3" json:"pack,omitempty"` // official indica si la firma oficial es válida; hidden trae lo ya oculto de una versión instalada
+	PlaybookIds     []string               `protobuf:"bytes,2,rep,name=playbook_ids,json=playbookIds,proto3" json:"playbook_ids,omitempty"`
+	ScriptIds       []string               `protobuf:"bytes,3,rep,name=script_ids,json=scriptIds,proto3" json:"script_ids,omitempty"`                   // los derivados de playbooks más los de scripts.json
+	ReplacedVersion string                 `protobuf:"bytes,4,opt,name=replaced_version,json=replacedVersion,proto3" json:"replaced_version,omitempty"` // versión instalada que reemplazaría; vacío si es nuevo
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *PackServiceInspectResponse) Reset() {
+	*x = PackServiceInspectResponse{}
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PackServiceInspectResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PackServiceInspectResponse) ProtoMessage() {}
+
+func (x *PackServiceInspectResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PackServiceInspectResponse.ProtoReflect.Descriptor instead.
+func (*PackServiceInspectResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_pack_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PackServiceInspectResponse) GetPack() *PackInfo {
+	if x != nil {
+		return x.Pack
+	}
+	return nil
+}
+
+func (x *PackServiceInspectResponse) GetPlaybookIds() []string {
+	if x != nil {
+		return x.PlaybookIds
+	}
+	return nil
+}
+
+func (x *PackServiceInspectResponse) GetScriptIds() []string {
+	if x != nil {
+		return x.ScriptIds
+	}
+	return nil
+}
+
+func (x *PackServiceInspectResponse) GetReplacedVersion() string {
+	if x != nil {
+		return x.ReplacedVersion
+	}
+	return ""
+}
+
 var File_macuahuitl_v1_pack_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_pack_proto_rawDesc = "" +
@@ -722,13 +842,23 @@ const file_macuahuitl_v1_pack_proto_rawDesc = "" +
 	"\x04hide\x18\x02 \x03(\tR\x04hide\x12\x12\n" +
 	"\x04show\x18\x03 \x03(\tR\x04show\"J\n" +
 	"\x1bPackServiceSetItemsResponse\x12+\n" +
-	"\x04pack\x18\x01 \x01(\v2\x17.macuahuitl.v1.PackInfoR\x04pack2\xdb\x03\n" +
+	"\x04pack\x18\x01 \x01(\v2\x17.macuahuitl.v1.PackInfoR\x04pack\"V\n" +
+	"\x19PackServiceInspectRequest\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12%\n" +
+	"\x0eallow_unsigned\x18\x02 \x01(\bR\rallowUnsigned\"\xb6\x01\n" +
+	"\x1aPackServiceInspectResponse\x12+\n" +
+	"\x04pack\x18\x01 \x01(\v2\x17.macuahuitl.v1.PackInfoR\x04pack\x12!\n" +
+	"\fplaybook_ids\x18\x02 \x03(\tR\vplaybookIds\x12\x1d\n" +
+	"\n" +
+	"script_ids\x18\x03 \x03(\tR\tscriptIds\x12)\n" +
+	"\x10replaced_version\x18\x04 \x01(\tR\x0freplacedVersion2\xbb\x04\n" +
 	"\vPackService\x12^\n" +
 	"\aInstall\x12(.macuahuitl.v1.PackServiceInstallRequest\x1a).macuahuitl.v1.PackServiceInstallResponse\x12U\n" +
 	"\x04List\x12%.macuahuitl.v1.PackServiceListRequest\x1a&.macuahuitl.v1.PackServiceListResponse\x12U\n" +
 	"\x04Show\x12%.macuahuitl.v1.PackServiceShowRequest\x1a&.macuahuitl.v1.PackServiceShowResponse\x12[\n" +
 	"\x06Remove\x12'.macuahuitl.v1.PackServiceRemoveRequest\x1a(.macuahuitl.v1.PackServiceRemoveResponse\x12a\n" +
-	"\bSetItems\x12).macuahuitl.v1.PackServiceSetItemsRequest\x1a*.macuahuitl.v1.PackServiceSetItemsResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
+	"\bSetItems\x12).macuahuitl.v1.PackServiceSetItemsRequest\x1a*.macuahuitl.v1.PackServiceSetItemsResponse\x12^\n" +
+	"\aInspect\x12(.macuahuitl.v1.PackServiceInspectRequest\x1a).macuahuitl.v1.PackServiceInspectResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
 
 var (
 	file_macuahuitl_v1_pack_proto_rawDescOnce sync.Once
@@ -742,7 +872,7 @@ func file_macuahuitl_v1_pack_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_pack_proto_rawDescData
 }
 
-var file_macuahuitl_v1_pack_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_macuahuitl_v1_pack_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_macuahuitl_v1_pack_proto_goTypes = []any{
 	(*PackServiceInstallRequest)(nil),   // 0: macuahuitl.v1.PackServiceInstallRequest
 	(*PackServiceInstallResponse)(nil),  // 1: macuahuitl.v1.PackServiceInstallResponse
@@ -755,27 +885,32 @@ var file_macuahuitl_v1_pack_proto_goTypes = []any{
 	(*PackServiceRemoveResponse)(nil),   // 8: macuahuitl.v1.PackServiceRemoveResponse
 	(*PackServiceSetItemsRequest)(nil),  // 9: macuahuitl.v1.PackServiceSetItemsRequest
 	(*PackServiceSetItemsResponse)(nil), // 10: macuahuitl.v1.PackServiceSetItemsResponse
+	(*PackServiceInspectRequest)(nil),   // 11: macuahuitl.v1.PackServiceInspectRequest
+	(*PackServiceInspectResponse)(nil),  // 12: macuahuitl.v1.PackServiceInspectResponse
 }
 var file_macuahuitl_v1_pack_proto_depIdxs = []int32{
 	4,  // 0: macuahuitl.v1.PackServiceInstallResponse.pack:type_name -> macuahuitl.v1.PackInfo
 	4,  // 1: macuahuitl.v1.PackServiceListResponse.packs:type_name -> macuahuitl.v1.PackInfo
 	4,  // 2: macuahuitl.v1.PackServiceShowResponse.pack:type_name -> macuahuitl.v1.PackInfo
 	4,  // 3: macuahuitl.v1.PackServiceSetItemsResponse.pack:type_name -> macuahuitl.v1.PackInfo
-	0,  // 4: macuahuitl.v1.PackService.Install:input_type -> macuahuitl.v1.PackServiceInstallRequest
-	2,  // 5: macuahuitl.v1.PackService.List:input_type -> macuahuitl.v1.PackServiceListRequest
-	5,  // 6: macuahuitl.v1.PackService.Show:input_type -> macuahuitl.v1.PackServiceShowRequest
-	7,  // 7: macuahuitl.v1.PackService.Remove:input_type -> macuahuitl.v1.PackServiceRemoveRequest
-	9,  // 8: macuahuitl.v1.PackService.SetItems:input_type -> macuahuitl.v1.PackServiceSetItemsRequest
-	1,  // 9: macuahuitl.v1.PackService.Install:output_type -> macuahuitl.v1.PackServiceInstallResponse
-	3,  // 10: macuahuitl.v1.PackService.List:output_type -> macuahuitl.v1.PackServiceListResponse
-	6,  // 11: macuahuitl.v1.PackService.Show:output_type -> macuahuitl.v1.PackServiceShowResponse
-	8,  // 12: macuahuitl.v1.PackService.Remove:output_type -> macuahuitl.v1.PackServiceRemoveResponse
-	10, // 13: macuahuitl.v1.PackService.SetItems:output_type -> macuahuitl.v1.PackServiceSetItemsResponse
-	9,  // [9:14] is the sub-list for method output_type
-	4,  // [4:9] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	4,  // 4: macuahuitl.v1.PackServiceInspectResponse.pack:type_name -> macuahuitl.v1.PackInfo
+	0,  // 5: macuahuitl.v1.PackService.Install:input_type -> macuahuitl.v1.PackServiceInstallRequest
+	2,  // 6: macuahuitl.v1.PackService.List:input_type -> macuahuitl.v1.PackServiceListRequest
+	5,  // 7: macuahuitl.v1.PackService.Show:input_type -> macuahuitl.v1.PackServiceShowRequest
+	7,  // 8: macuahuitl.v1.PackService.Remove:input_type -> macuahuitl.v1.PackServiceRemoveRequest
+	9,  // 9: macuahuitl.v1.PackService.SetItems:input_type -> macuahuitl.v1.PackServiceSetItemsRequest
+	11, // 10: macuahuitl.v1.PackService.Inspect:input_type -> macuahuitl.v1.PackServiceInspectRequest
+	1,  // 11: macuahuitl.v1.PackService.Install:output_type -> macuahuitl.v1.PackServiceInstallResponse
+	3,  // 12: macuahuitl.v1.PackService.List:output_type -> macuahuitl.v1.PackServiceListResponse
+	6,  // 13: macuahuitl.v1.PackService.Show:output_type -> macuahuitl.v1.PackServiceShowResponse
+	8,  // 14: macuahuitl.v1.PackService.Remove:output_type -> macuahuitl.v1.PackServiceRemoveResponse
+	10, // 15: macuahuitl.v1.PackService.SetItems:output_type -> macuahuitl.v1.PackServiceSetItemsResponse
+	12, // 16: macuahuitl.v1.PackService.Inspect:output_type -> macuahuitl.v1.PackServiceInspectResponse
+	11, // [11:17] is the sub-list for method output_type
+	5,  // [5:11] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_pack_proto_init() }
@@ -789,7 +924,7 @@ func file_macuahuitl_v1_pack_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_pack_proto_rawDesc), len(file_macuahuitl_v1_pack_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
