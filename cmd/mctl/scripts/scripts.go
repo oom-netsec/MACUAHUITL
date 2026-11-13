@@ -282,6 +282,20 @@ func dup(c *cli.Env, args []string) error {
 	return nil
 }
 
+// scripts copy ID: copia un script de un paquete instalado a «Mis scripts».
+func copyCmd(c *cli.Env, args []string) error {
+	id, err := cli.OneArg("scripts copy", args)
+	if err != nil {
+		return err
+	}
+	r, err := client(c).CopyFromPack(context.Background(), &v1.CopyFromPackRequest{Id: id})
+	if err != nil {
+		return err
+	}
+	saved(c, "copiado", r.Script)
+	return nil
+}
+
 // scripts export --out RUTA [--overwrite] ID...
 func export(c *cli.Env, args []string) error {
 	var out string
@@ -385,6 +399,8 @@ const help = `  scripts list [TEXTO] [--tech T] [--platform P] [--tag X] [--fav]
          tech: l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro; platform: ios, ios-xe, nx-os, asa, cualquiera)
   scripts rm ID  |  scripts fav ID [--off]  |  scripts dup ID
         (borra uno tuyo, marca o quita un favorito (también en la biblioteca), o copia cualquiera como script tuyo)
+  scripts copy ID
+        (copia un script de un paquete instalado, también uno oculto, a tus scripts: ID nuevo, editable, nombre «<nombre> (copia)»; quitar el paquete no la borra)
   scripts export --out RUTA [--overwrite] ID...
         (archivo JSON 0600 con la suma SHA-256 de los scripts (integridad, no autenticidad); no sobrescribe sin --overwrite; los favoritos no viajan)
   scripts import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
@@ -408,7 +424,7 @@ func Area() cli.Area {
 	return cli.Area{Usage: help, Commands: []cli.Command{
 		{Name: "scripts list", Run: list}, {Name: "scripts show", Run: show},
 		{Name: "scripts add", Run: add}, {Name: "scripts edit", Run: edit},
-		{Name: "scripts rm", Run: rm}, {Name: "scripts fav", Run: fav}, {Name: "scripts dup", Run: dup},
+		{Name: "scripts rm", Run: rm}, {Name: "scripts fav", Run: fav}, {Name: "scripts dup", Run: dup}, {Name: "scripts copy", Run: copyCmd},
 		{Name: "scripts export", Run: export}, {Name: "scripts import", Run: importCmd},
 		{Name: "scripts col", Run: col}, {Name: "scripts pin", Run: pin}, {Name: "scripts template", Run: template},
 	}}
