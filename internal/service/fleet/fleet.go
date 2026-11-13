@@ -47,7 +47,7 @@ func (s *fleetSvc) Find(ctx context.Context, r *v1.FindRequest) (*v1.FindRespons
 		return nil, err
 	}
 	res := f.Find(r.Query)
-	return &v1.FindResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.FindText(res) })}, nil
+	return &v1.FindResponse{Report: service.ReportL(ctx, &res, func(loc string) string { return f.In(loc).FindText(res) })}, nil
 }
 
 func (s *fleetSvc) Trace(ctx context.Context, r *v1.TraceRequest) (*v1.TraceResponse, error) {
@@ -59,7 +59,7 @@ func (s *fleetSvc) Trace(ctx context.Context, r *v1.TraceRequest) (*v1.TraceResp
 		return nil, err
 	}
 	res := f.Trace(r.Query)
-	return &v1.TraceResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.TraceText(res) })}, nil
+	return &v1.TraceResponse{Report: service.ReportL(ctx, &res, func(loc string) string { return f.In(loc).TraceText(res) })}, nil
 }
 
 func (s *fleetSvc) Path(ctx context.Context, r *v1.PathRequest) (*v1.PathResponse, error) {
@@ -71,7 +71,7 @@ func (s *fleetSvc) Path(ctx context.Context, r *v1.PathRequest) (*v1.PathRespons
 		return nil, err
 	}
 	res := f.Path(r.Query, r.Dst)
-	return &v1.PathResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.PathText(res) }), Svg: res.SVG()}, nil
+	return &v1.PathResponse{Report: service.ReportL(ctx, &res, func(loc string) string { return f.In(loc).PathText(res) }), Svg: res.SVG()}, nil
 }
 
 func (s *fleetSvc) Health(ctx context.Context, r *v1.HealthRequest) (*v1.HealthResponse, error) {
@@ -80,7 +80,7 @@ func (s *fleetSvc) Health(ctx context.Context, r *v1.HealthRequest) (*v1.HealthR
 		return nil, err
 	}
 	res := f.Health()
-	return &v1.HealthResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.HealthText(res) })}, nil
+	return &v1.HealthResponse{Report: service.ReportL(ctx, &res, func(loc string) string { return f.In(loc).HealthText(res) })}, nil
 }
 
 func (s *fleetSvc) Summary(ctx context.Context, r *v1.SummaryRequest) (*v1.SummaryResponse, error) {
@@ -89,7 +89,7 @@ func (s *fleetSvc) Summary(ctx context.Context, r *v1.SummaryRequest) (*v1.Summa
 		return nil, err
 	}
 	res := f.Summary()
-	return &v1.SummaryResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.SummaryText(res) })}, nil
+	return &v1.SummaryResponse{Report: service.ReportL(ctx, &res, func(loc string) string { return f.In(loc).SummaryText(res) })}, nil
 }
 
 func (s *fleetSvc) Capacity(ctx context.Context, r *v1.CapacityRequest) (*v1.CapacityResponse, error) {
@@ -106,7 +106,7 @@ func (s *fleetSvc) Capacity(ctx context.Context, r *v1.CapacityRequest) (*v1.Cap
 		return nil, err
 	}
 	res := f.Capacity(need)
-	return &v1.CapacityResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.CapacityText(res) })}, nil
+	return &v1.CapacityResponse{Report: service.ReportL(ctx, &res, func(loc string) string { return f.In(loc).CapacityText(res) })}, nil
 }
 
 func (s *fleetSvc) Inventory(ctx context.Context, r *v1.InventoryRequest) (*v1.InventoryResponse, error) {
@@ -115,7 +115,7 @@ func (s *fleetSvc) Inventory(ctx context.Context, r *v1.InventoryRequest) (*v1.I
 		return nil, err
 	}
 	res := f.Inventory()
-	return &v1.InventoryResponse{Report: service.ReportL(ctx, &res, func(string) string { return f.InventoryText(res) }), Csv: res.CSV(), Markdown: res.Markdown()}, nil
+	return &v1.InventoryResponse{Report: service.ReportL(ctx, &res, func(loc string) string { return f.In(loc).InventoryText(res) }), Csv: res.CSVIn(i18n.Locale(ctx)), Markdown: res.MarkdownIn(i18n.Locale(ctx))}, nil
 }
 
 // Module registra el servicio Fleet.

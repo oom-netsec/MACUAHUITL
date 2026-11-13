@@ -400,18 +400,30 @@ func cell(s string) string {
 	return s
 }
 
-var invHead = []string{"Equipo", "Tipo", "Nombre", "Descripción", "PID", "VID", "Serie", "Modelo", "Versión", "Fuente", "Evidencia"}
+func invHeadIn(loc string) []string { return strings.Split(i18n.Msg(loc, "fleet.inv.head", nil), ",") }
 
 func (r InvRow) cells() []string {
 	return []string{r.Device, r.Kind, r.Name, r.Descr, r.PID, r.VID, r.Serial, r.Model, r.Version, r.Source, r.At.UTC().Format(time.RFC3339)}
 }
 
-func (r InventoryResult) CSV() string {
+func (r InventoryResult) CSV() string { return r.CSVIn(i18n.Es) }
+
+// invCells son las celdas de una fila en el idioma dado: el tipo sale traducido; lo demás son datos.
+func invCells(loc string, x InvRow) []string {
+	c := x.cells()
+	if k := "fleet.inv.kind." + x.Kind; loc != i18n.Es && x.Kind != "sfp" { // sfp se escribe igual en los dos idiomas
+		c[1] = i18n.Msg(loc, k, nil)
+	}
+	return c
+}
+
+// CSVIn es CSV con el encabezado y el tipo en el idioma dado (es es el de siempre).
+func (r InventoryResult) CSVIn(loc string) string {
 	var b bytes.Buffer
 	cw := csv.NewWriter(&b)
-	_ = cw.Write(invHead)
+	_ = cw.Write(invHeadIn(loc))
 	for _, x := range r.Rows {
-		c := x.cells()
+		c := invCells(loc, x)
 		for i := range c {
 			c[i] = cell(c[i])
 		}
@@ -421,12 +433,16 @@ func (r InventoryResult) CSV() string {
 	return b.String()
 }
 
-func (r InventoryResult) Markdown() string {
+func (r InventoryResult) Markdown() string { return r.MarkdownIn(i18n.Es) }
+
+// MarkdownIn es Markdown con el encabezado y el tipo en el idioma dado.
+func (r InventoryResult) MarkdownIn(loc string) string {
 	esc := strings.NewReplacer("|", `\|`, "\n", " ")
 	var b strings.Builder
-	b.WriteString("| " + strings.Join(invHead, " | ") + " |\n|" + strings.Repeat(" --- |", len(invHead)) + "\n")
+	head := invHeadIn(loc)
+	b.WriteString("| " + strings.Join(head, " | ") + " |\n|" + strings.Repeat(" --- |", len(head)) + "\n")
 	for _, x := range r.Rows {
-		c := x.cells()
+		c := invCells(loc, x)
 		for i := range c {
 			c[i] = esc.Replace(c[i])
 		}
