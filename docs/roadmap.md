@@ -130,22 +130,25 @@ Los playbooks y scripts de cada tecnología se publican como paquetes `.mpack` f
 |---|---|
 | `oom/ios-xe` (switches y routers IOS-XE) | Publicado (v0.3.0; routers en 1.1.0, v0.3.1) |
 | `oom/ios` (IOS clásico) | Publicado (v0.3.1), validado en 3560CX |
-| `oom/wlc-9800` (Catalyst 9800 y EWC) | En main, sale en v0.4.0, validado en 9120 EWC |
+| `oom/wlc-9800` (Catalyst 9800 y EWC) | En main, sin release todavía (pide núcleo 0.4.0), validado en 9120 EWC |
 | NX-OS, firewall (ASA/FTD), ACI, wireless AireOS, ISE, SD-Access | Pendientes |
 
 También pendiente: selección por elemento, copia a «Mis scripts» y paquete personal de respaldo (fase 32b).
 
 ## Después de los paquetes: Windows y macOS
 
-Empieza cuando estén todos los paquetes por tecnología. Hoy MACUAHUITL es solo para Linux. El núcleo y `mctl` (Go) y la app (Wails + React) ya son multiplataforma; solo hay que adaptar lo que es propio de Linux. Primero Windows, que es donde más ingenieros de redes trabajan, y después macOS.
+Empieza cuando estén todos los paquetes por tecnología. Hoy MACUAHUITL es solo para Linux. El núcleo y `mctl` (Go) y la app (Wails + React) son portables en su mayor parte; hay que adaptar lo propio de Linux. Primero Windows y después macOS.
 
-1. **ADR de multiplataforma**: qué funciones pueden faltar al principio, cómo se instala y se firma en cada sistema y qué código queda por plataforma (como `internal/sys`).
+1. **ADR de multiplataforma, antes de tocar código**: qué funciones pueden faltar al principio, cómo se instala y se firma en cada sistema y qué código queda por plataforma (como `internal/sys`).
 2. **Piezas de Linux que se adaptan**:
+   - el canal local entre núcleo y clientes (hoy socket Unix con `SO_PEERCRED`);
+   - el endurecimiento de memoria de `internal/sys` (`mlock`, sin core dumps);
    - inhibir la suspensión (systemd-logind → `SetThreadExecutionState` / `IOPMAssertion`);
    - consola serie (`/dev/ttyUSB*` → `COMx` / `/dev/cu.*`);
-   - servidores TFTP/FTP sin `setcap`;
-   - arranque del núcleo (systemd → tarea de inicio de sesión / LaunchAgent).
-3. **Instaladores y firma**: `.msi` firmado (SmartScreen) y `.dmg` notarizado (Gatekeeper, cuenta de Apple Developer).
+   - redirección de los puertos 21/69 (hoy `nft`): el servidor sigue en puerto alto y se explica el equivalente de cada sistema (ADR 0004);
+   - herramientas externas (`dumpcap`, `nmap`, `iperf3`, `tracepath`) y sus equivalentes;
+   - arranque del núcleo (servicio de usuario systemd → tarea de inicio de sesión / LaunchAgent).
+3. **Instaladores y firma**: en Windows, un instalador firmado con certificado de firma de código (SmartScreen depende además de la reputación del certificado); en macOS, un `.dmg` firmado con Developer ID y notarizado (Gatekeeper, cuenta de Apple Developer).
 4. **CI y release** con runners de Windows y macOS: pruebas y artefactos de las tres plataformas en cada tag.
 
 ## Qué cambia la red y dónde
