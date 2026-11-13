@@ -1004,6 +1004,8 @@ func TestMovidosSinPaqueteConservanFijadosYColecciones(t *testing.T) {
 	// También el de un paquete quitado (anotado en pack_removed).
 	d.DB().Exec(`INSERT INTO pack_removed(playbook_id, pack) VALUES('ios-xe/acme-x', 'acme/demo')`)
 	d.DB().Exec(`INSERT INTO script_pins(script_id, position) VALUES('lib-acme-x', 1)`)
+	d.DB().Exec(`INSERT INTO pack_removed(playbook_id, pack) VALUES('ios/acme-y', 'acme/demo')`) // otra plataforma: lib-ios-acme-y
+	d.DB().Exec(`INSERT INTO script_pins(script_id, position) VALUES('lib-ios-acme-y', 2)`)
 
 	mio := guardar(t, s, "Mi script", "show clock")
 	if _, err := s.SetPinned(bg, &v1.SetPinnedRequest{Id: mio.Id, Pinned: true}); err != nil { // corre prunePins
@@ -1028,7 +1030,7 @@ func TestMovidosSinPaqueteConservanFijadosYColecciones(t *testing.T) {
 		}
 		return out
 	}
-	if p := pins(); !slices.Contains(p, "lib-l2-stp") || !slices.Contains(p, "lib-acme-x") {
+	if p := pins(); !slices.Contains(p, "lib-l2-stp") || !slices.Contains(p, "lib-acme-x") || !slices.Contains(p, "lib-ios-acme-y") {
 		t.Fatalf("la poda borró fijados: %v", p)
 	}
 	// Se instala el paquete: el fijado y la colección siguen ahí.
