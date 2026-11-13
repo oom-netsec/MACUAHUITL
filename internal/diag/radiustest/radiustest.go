@@ -10,7 +10,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -130,14 +129,14 @@ func (c *Config) nasAttrs() ([]Attr, error) {
 	if c.NASIP != "" {
 		a, err := netip.ParseAddr(c.NASIP)
 		if err != nil || !a.Is4() {
-			return nil, fmt.Errorf("NAS-IP-Address %q: debe ser IPv4", c.NASIP)
+			return nil, i18n.New("radius.err.nas_ip", i18n.A("ip", c.NASIP))
 		}
 		b := a.As4()
 		out = append(out, Attr{AttrNASIPAddress, b[:]})
 	}
 	for name, v := range map[string]string{"NAS-Identifier": c.NASIdentifier, "Called-Station-Id": c.CalledStationID, "Calling-Station-Id": c.CallingStationID} {
 		if len(v) > 253 { // RFC 2865 §5: el valor de un atributo mide a lo más 253 bytes
-			return nil, fmt.Errorf("%s de más de 253 bytes", name)
+			return nil, i18n.New("radius.err.too_long", i18n.A("name", name))
 		}
 	}
 	if c.NASIdentifier != "" {
@@ -157,7 +156,7 @@ func (c *Config) nasAttrs() ([]Attr, error) {
 		}
 		n, err := parseEnum(e.v, e.m)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", e.name, err)
+			return nil, i18n.Wrap("radius.err.attr_enum", err, i18n.A("name", e.name))
 		}
 		out = append(out, Attr{e.t, u32(n)})
 	}
@@ -174,14 +173,14 @@ func (c *Config) nasAttrs() ([]Attr, error) {
 func Run(ctx context.Context, d Dialer, c Config) (Report, error) {
 	c.defaults()
 	if strings.TrimSpace(c.Host) == "" || strings.HasPrefix(c.Host, "-") {
-		return Report{}, errors.New("radius: servidor inválido")
+		return Report{}, i18n.New("radius.err.host", nil)
 	}
 	if len(c.Secret) == 0 {
-		return Report{}, errors.New("radius: falta el secreto compartido")
+		return Report{}, i18n.New("radius.err.secret", nil)
 	}
 	nas, err := c.nasAttrs()
 	if err != nil {
-		return Report{}, fmt.Errorf("radius: %w", err)
+		return Report{}, i18n.Wrap("radius.err.wrap", err, nil)
 	}
 	r := Report{Server: c.Host}
 	if c.StatusServer {
@@ -192,10 +191,10 @@ func Run(ctx context.Context, d Dialer, c Config) (Report, error) {
 		return r, nil
 	}
 	if c.Username == "" || len(c.Username) > 253 {
-		return Report{}, errors.New("radius: usuario vacío o de más de 253 bytes")
+		return Report{}, i18n.New("radius.err.user", nil)
 	}
 	if len(c.Password) > 128 { // RFC 2865 §5.2
-		return Report{}, errors.New("radius: contraseña de más de 128 bytes")
+		return Report{}, i18n.New("radius.err.password", nil)
 	}
 	r.Method = c.Method
 	p := &Packet{Code: AccessRequest, ID: randBytes(1)[0]}
@@ -222,13 +221,14 @@ func Run(ctx context.Context, d Dialer, c Config) (Report, error) {
 				if a.Name == "MS-CHAP2-Success" {
 					ok := strings.Contains(a.Value, want)
 					e.MSCHAP2Verified = &ok
-					e.Attrs[i].Value = map[bool]string{true: "respuesta del servidor verificada (autenticación mutua)", false: "NO verifica: el servidor no conoce la contraseña o hay un intermediario"}[ok]
+					e.Attrs[i].Text = i18n.Tx(map[bool]string{true: "radius.val.mschap_ok", false: "radius.val.mschap_bad"}[ok])
+					e.Attrs[i].Value = e.Attrs[i].Text.In(i18n.Es)
 				}
 			}
 			return e
 		}
 	default:
-		return Report{}, fmt.Errorf("radius: método %q no soportado (pap, chap, mschapv2)", c.Method)
+		return Report{}, i18n.New("radius.err.method", i18n.A("method", c.Method))
 	}
 	p.Attrs = append(p.Attrs, nas...)
 	e := exchange(ctx, d, c, c.AuthPort, "access-request", p, p.EncodeWithMA(c.Secret))
@@ -425,7 +425,7 @@ func (r Report) TextIn(loc string) string {
 			fmt.Fprintf(&b, "  ! %s\n", msg)
 		}
 		for _, a := range e.Attrs {
-			fmt.Fprintf(&b, "  %-26s %s\n", a.Name, a.Value)
+			fmt.Fprintf(&b, "  %-26s %s\n", a.Name, a.ValueIn(loc))
 		}
 	}
 	if len(r.Findings) > 0 {

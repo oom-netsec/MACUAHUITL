@@ -9,7 +9,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -17,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/openconfig/gnmi/proto/gnmi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -24,7 +24,7 @@ import (
 )
 
 // ErrInvalid marca errores de parámetros (ruta, modo, CA): no se tocó la red.
-var ErrInvalid = errors.New("gnmi: parámetros inválidos")
+var ErrInvalid error = i18n.New("gnmi.err.invalid", nil)
 
 type Dialer func(ctx context.Context, network, host string, port uint16) (net.Conn, error)
 
@@ -55,7 +55,7 @@ type Update struct {
 
 func (t Target) conn(ctx context.Context, d Dialer) (*grpc.ClientConn, context.Context, error) {
 	if strings.TrimSpace(t.Host) == "" || strings.HasPrefix(t.Host, "-") {
-		return nil, nil, fmt.Errorf("%w: destino vacío", ErrInvalid)
+		return nil, nil, i18n.Wrap("gnmi.err.no_target", ErrInvalid, nil)
 	}
 	port := t.Port
 	if port == 0 {
@@ -68,7 +68,7 @@ func (t Target) conn(ctx context.Context, d Dialer) (*grpc.ClientConn, context.C
 	if len(t.CA) > 0 {
 		pool := x509.NewCertPool()
 		if !pool.AppendCertsFromPEM(t.CA) {
-			return nil, nil, fmt.Errorf("%w: la CA no contiene certificados PEM válidos", ErrInvalid)
+			return nil, nil, i18n.Wrap("gnmi.err.ca", ErrInvalid, nil)
 		}
 		cfg.RootCAs = pool
 	}
@@ -89,7 +89,7 @@ var encodings = map[string]gnmi.Encoding{"json_ietf": gnmi.Encoding_JSON_IETF, "
 
 func paths(ps []string) ([]*gnmi.Path, error) {
 	if len(ps) == 0 {
-		return nil, fmt.Errorf("%w: sin rutas", ErrInvalid)
+		return nil, i18n.Wrap("gnmi.err.no_paths", ErrInvalid, nil)
 	}
 	out := make([]*gnmi.Path, 0, len(ps))
 	for _, s := range ps {
@@ -109,7 +109,7 @@ func Get(ctx context.Context, d Dialer, t Target, ps []string, encoding string) 
 		enc, ok = gnmi.Encoding_JSON_IETF, true
 	}
 	if !ok {
-		return nil, fmt.Errorf("%w: codificación %q desconocida", ErrInvalid, encoding)
+		return nil, i18n.Wrap("gnmi.err.encoding", ErrInvalid, i18n.A("encoding", encoding))
 	}
 	gp, err := paths(ps)
 	if err != nil {
@@ -142,7 +142,7 @@ func Subscribe(ctx context.Context, d Dialer, t Target, ps []string, mode string
 	m := map[string]gnmi.SubscriptionMode{"sample": gnmi.SubscriptionMode_SAMPLE, "": gnmi.SubscriptionMode_SAMPLE, "on_change": gnmi.SubscriptionMode_ON_CHANGE}
 	sm, ok := m[strings.ToLower(mode)]
 	if !ok {
-		return fmt.Errorf("%w: modo %q desconocido (sample u on_change)", ErrInvalid, mode)
+		return i18n.Wrap("gnmi.err.mode", ErrInvalid, i18n.A("mode", mode))
 	}
 	gp, err := paths(ps)
 	if err != nil {
@@ -249,7 +249,7 @@ func decodeJSON(b []byte) any {
 func ParsePath(s string) (*gnmi.Path, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return nil, fmt.Errorf("%w: ruta vacía", ErrInvalid)
+		return nil, i18n.Wrap("gnmi.err.path_empty", ErrInvalid, nil)
 	}
 	p := &gnmi.Path{}
 	var cur *gnmi.PathElem
@@ -268,25 +268,25 @@ func ParsePath(s string) (*gnmi.Path, error) {
 		case '[':
 			end := strings.IndexByte(s[i:], ']')
 			if end < 0 {
-				return nil, fmt.Errorf("%w: falta ] en %q", ErrInvalid, s)
+				return nil, i18n.Wrap("gnmi.err.path_close", ErrInvalid, i18n.A("path", s))
 			}
 			k, v, ok := strings.Cut(s[i+1:i+end], "=")
 			if !ok || k == "" {
-				return nil, fmt.Errorf("%w: clave inválida en %q", ErrInvalid, s)
+				return nil, i18n.Wrap("gnmi.err.path_key", ErrInvalid, i18n.A("path", s))
 			}
 			if cur == nil {
 				if name.Len() == 0 {
-					return nil, fmt.Errorf("%w: clave sin elemento en %q", ErrInvalid, s)
+					return nil, i18n.Wrap("gnmi.err.path_nokey_elem", ErrInvalid, i18n.A("path", s))
 				}
 				cur = &gnmi.PathElem{Name: name.String(), Key: map[string]string{}}
 			}
 			cur.Key[k] = v
 			i += end
 		case ']':
-			return nil, fmt.Errorf("%w: ] sin [ en %q", ErrInvalid, s)
+			return nil, i18n.Wrap("gnmi.err.path_open", ErrInvalid, i18n.A("path", s))
 		default:
 			if cur != nil {
-				return nil, fmt.Errorf("%w: texto tras una clave en %q", ErrInvalid, s)
+				return nil, i18n.Wrap("gnmi.err.path_text", ErrInvalid, i18n.A("path", s))
 			}
 			name.WriteByte(c)
 		}

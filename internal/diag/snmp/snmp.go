@@ -16,10 +16,11 @@ import (
 	"unicode/utf8"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // ErrInvalid marca errores de parámetros (versión, protocolos, llaves): no se tocó la red.
-var ErrInvalid = errors.New("snmp: parámetros inválidos")
+var ErrInvalid error = i18n.New("snmp.err.invalid", nil)
 
 // MaxWalk acota un walk sin límite explícito.
 const MaxWalk = 50000
@@ -48,7 +49,7 @@ var privProtos = map[string]gosnmp.SnmpV3PrivProtocol{"AES": gosnmp.AES, "AES192
 
 func (t Target) client(ctx context.Context) (*gosnmp.GoSNMP, error) {
 	if strings.TrimSpace(t.Host) == "" || strings.HasPrefix(t.Host, "-") {
-		return nil, fmt.Errorf("%w: destino vacío", ErrInvalid)
+		return nil, i18n.Wrap("snmp.err.no_target", ErrInvalid, nil)
 	}
 	x := &gosnmp.GoSNMP{Target: t.Host, Port: t.Port, Transport: "udp", Timeout: t.Timeout, Retries: t.Retries, Context: ctx,
 		Control: t.Control, MaxOids: gosnmp.MaxOids, MaxRepetitions: 25}
@@ -61,26 +62,26 @@ func (t Target) client(ctx context.Context) (*gosnmp.GoSNMP, error) {
 	switch t.Version {
 	case "2c", "":
 		if t.Community == "" {
-			return nil, fmt.Errorf("%w: falta la comunidad", ErrInvalid)
+			return nil, i18n.Wrap("snmp.err.no_community", ErrInvalid, nil)
 		}
 		x.Version, x.Community = gosnmp.Version2c, t.Community
 	case "3":
 		ap, ok := authProtos[strings.ToUpper(t.AuthProto)]
 		if !ok {
-			return nil, fmt.Errorf("%w: autenticación %q no soportada (SHA, SHA224, SHA256, SHA384, SHA512; MD5 no)", ErrInvalid, t.AuthProto)
+			return nil, i18n.Wrap("snmp.err.auth", ErrInvalid, i18n.A("proto", t.AuthProto))
 		}
 		pp, ok := privProtos[strings.ToUpper(t.PrivProto)]
 		if !ok {
-			return nil, fmt.Errorf("%w: privacidad %q no soportada (AES, AES192, AES256; DES no)", ErrInvalid, t.PrivProto)
+			return nil, i18n.Wrap("snmp.err.priv", ErrInvalid, i18n.A("proto", t.PrivProto))
 		}
 		if t.User == "" || len(t.AuthPass) < 8 || len(t.PrivPass) < 8 {
-			return nil, fmt.Errorf("%w: v3 requiere usuario y llaves de al menos 8 caracteres (authPriv)", ErrInvalid)
+			return nil, i18n.Wrap("snmp.err.v3", ErrInvalid, nil)
 		}
 		x.Version, x.SecurityModel, x.MsgFlags = gosnmp.Version3, gosnmp.UserSecurityModel, gosnmp.AuthPriv
 		x.SecurityParameters = &gosnmp.UsmSecurityParameters{UserName: t.User, AuthenticationProtocol: ap, AuthenticationPassphrase: t.AuthPass,
 			PrivacyProtocol: pp, PrivacyPassphrase: t.PrivPass}
 	default:
-		return nil, fmt.Errorf("%w: versión %q no soportada (2c o 3)", ErrInvalid, t.Version)
+		return nil, i18n.Wrap("snmp.err.version", ErrInvalid, i18n.A("version", t.Version))
 	}
 	if err := x.Connect(); err != nil {
 		return nil, fmt.Errorf("snmp: %w", err)
@@ -111,7 +112,7 @@ func toVar(p gosnmp.SnmpPDU) Var {
 // Get consulta OIDs concretos (hasta 60 por petición, gosnmp parte el resto).
 func Get(ctx context.Context, t Target, oids []string) ([]Var, error) {
 	if len(oids) == 0 {
-		return nil, fmt.Errorf("%w: sin OIDs", ErrInvalid)
+		return nil, i18n.Wrap("snmp.err.no_oids", ErrInvalid, nil)
 	}
 	x, err := t.client(ctx)
 	if err != nil {
@@ -129,7 +130,7 @@ func Get(ctx context.Context, t Target, oids []string) ([]Var, error) {
 			return out, fmt.Errorf("snmp: %w", err)
 		}
 		if r.Error != gosnmp.NoError {
-			return out, fmt.Errorf("snmp: el agente respondió %s", r.Error)
+			return out, i18n.New("snmp.err.agent", i18n.A("error", r.Error.String()))
 		}
 		for _, p := range r.Variables {
 			out = append(out, toVar(p))

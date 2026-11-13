@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Other agrupa lo que ya no cabe en una tabla llena.
@@ -28,7 +30,8 @@ type Snapshot struct {
 	Ports                 []Counter // protocolo/puerto de servicio (el menor de los dos)
 	Protocols             []Counter
 	Exporters             []ExporterStat
-	LastError             string `json:",omitempty"`
+	LastError             string    `json:",omitempty"`
+	LastErrorText         i18n.Text `json:"-"` // LastError como texto, para darlo en otro idioma
 }
 
 // Aggregator acumula en memoria; cada tabla guarda a lo más max claves.
@@ -36,7 +39,7 @@ type Aggregator struct {
 	max                           int
 	mu                            sync.Mutex
 	flows, bytes, packets, errors uint64
-	lastErr                       string
+	lastErr                       i18n.Text
 	talkers, convs, ports, protos map[string]*Counter
 	exporters                     map[string]*ExporterStat
 }
@@ -122,7 +125,7 @@ func (a *Aggregator) Error(exporter string, err error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.errors++
-	a.lastErr = exporter + ": " + err.Error()
+	a.lastErr = i18n.Join(": ", i18n.Lit(exporter, exporter), i18n.FromErr(err))
 	a.exporter(exporter).Errors++
 }
 
@@ -143,10 +146,18 @@ func top(m map[string]*Counter, n int) []Counter {
 	return out
 }
 
+// Localize da el último error en el idioma pedido (el resto del resumen son cifras y direcciones).
+func (s Snapshot) Localize(loc string) Snapshot {
+	if !s.LastErrorText.Empty() {
+		s.LastError = s.LastErrorText.In(loc)
+	}
+	return s
+}
+
 func (a *Aggregator) Snapshot(n int) Snapshot {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	s := Snapshot{Flows: a.flows, Bytes: a.bytes, Packets: a.packets, Errors: a.errors, LastError: a.lastErr,
+	s := Snapshot{Flows: a.flows, Bytes: a.bytes, Packets: a.packets, Errors: a.errors, LastError: a.lastErr.In(i18n.Es), LastErrorText: a.lastErr,
 		Talkers: top(a.talkers, n), Conversations: top(a.convs, n), Ports: top(a.ports, n), Protocols: top(a.protos, n)}
 	for _, e := range a.exporters {
 		s.Exporters = append(s.Exporters, *e)

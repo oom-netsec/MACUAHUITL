@@ -1,0 +1,13 @@
+{
+ "atributo": "radius: atributo con longitud inválida",
+ "clave": "radius: contraseña de más de 128 bytes",
+ "corto": "radius: paquete de menos de 20 bytes",
+ "enum": "radius: NAS-Port-Type: valor \"nada\" desconocido",
+ "largo": "radius: Called-Station-Id de más de 253 bytes",
+ "longitud": "radius: longitud 5 inválida (recibidos 20 bytes)",
+ "metodo": "radius: método \"x\" no soportado (pap, chap, mschapv2)",
+ "nasip": "radius: NAS-IP-Address \"::1\": debe ser IPv4",
+ "secreto": "radius: falta el secreto compartido",
+ "servidor": "radius: servidor inválido",
+ "usuario": "radius: usuario vacío o de más de 253 bytes"
+}
