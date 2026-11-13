@@ -1193,3 +1193,28 @@ Cierra lo que 30a-30c dejaron en español. Misma regla de compatibilidad: sin `a
 - `PlaybookInfo.params` (`PlaybookParam{name, kind}`; kind = `mac`, `ap`, `interface` o `ip`): lo que el playbook pide al armar el trabajo. Sus `commands` traen la plantilla con `{nombre}`; no se ejecutan tal cual.
 - `JobSpec.params` (`map<string,string>`): un valor por dato de los playbooks elegidos. El núcleo valida (la MAC se normaliza a `aaaa.bbbb.cccc`) y rechaza datos faltantes, desconocidos o inválidos en `CreateJob` con `field = params` y códigos `playbook.err.param_*` (`name`, `kind` en la metadata). Sin datos, un trabajo se comporta como antes. Mientras la UI no pida los datos, un playbook con `params` no se puede usar desde la app: `CreateJob` falla por el dato que falta.
 - Los datos quedan en el manifest (`params`) y en la auditoría de `job.create`; no son secretos. Los playbooks con datos no generan script `lib-<id>` en la biblioteca.
+
+## Paquete personal: exportar e importar (fase 32c)
+Dos RPC al final de `PackService` y sus métodos de puente (`ui/bridge/pack.go`; tipos y Wails en `modules/packs/api.ts`, con su `fake.ts`). La vista (Ajustes → Paquetes → Exportar / Importar) es de front. Nada de esto escribe en equipos. Texto, nombres y README del paquete siguen siendo texto plano.
+
+| Puente | Entrada | Salida |
+|---|---|---|
+| `PackExport(req)` | `{editorName "<editor>/<nombre>", scriptIds[], includePlaybooks, license, path, overwrite, name, nameEn, description, descriptionEn, author}`; `path` absoluto; lo opcional vacío toma su valor por omisión | `{id, version, sha256, scripts, playbooks, omittedPlaybooks[]}` |
+| `PackImportPreview(path)` | ruta absoluta del `.mpack`; no escribe nada | `{pack, items[], warnings[], applied:false, …}` |
+| `PackImport(path, decisions[])` | `decisions` = `{itemId, action}` con `action` `renombrar` u `omitir` | `{pack, items[], applied:true, scriptsCreated/Renamed/Skipped, playbooksCreated/Renamed/Skipped, playbookIds[]}` |
+
+- **Exportar.** Solo scripts del usuario (uno de biblioteca da `scripts.svc.not_found`); `includePlaybooks` suma todos los de `<config>/playbooks`. El archivo no lleva firma y pasa las mismas validaciones del instalador como paquete de terceros: se instala con `allowUnsigned`. Versión `AAAA.MMDD.HHMM` de la hora local, `min_core` = versión del núcleo (`0.0.0` si es `dev`), licencia `NOASSERTION` si va vacía, `nameEn`/`descriptionEn` copian el español. Los scripts salen como `lib-<editor>-<12 hex>`; los playbooks con el editor como prefijo (`ios-xe/<editor>-<id>`). Solo `ios`, `ios-xe` y `wlc-9800`: lo demás, o un ID que un paquete no aceptaría, llega en `omittedPlaybooks` (mostrar el aviso). Los favoritos no viajan. La ruta debe ser nueva salvo `overwrite`.
+- **Importar.** Dos pasos sin token: la vista previa y luego `PackImport` con las decisiones (se vuelve a validar todo). Un paquete con firma oficial no se importa (`pack.err.import.official`; se instala). Cada elemento de `items`: `kind` `script` o `playbook`, `id` (el del archivo), `name`, `state` (`nuevo`, `igual`, `conflicto_id`, `conflicto_nombre`) y `conflictsWith` (script: ID guardado; playbook: `base`, `reserved`, `user`, `file` o el id del paquete instalado). Los `nuevo` entran solos; `igual` se omite solo; cada conflicto necesita `renombrar` u `omitir` (un playbook renombrado queda `<id>-2`, `-3`…). **Nunca se reemplaza** (`reemplazar` da `pack.err.import.decision`). Los scripts quedan editables con ID de usuario; los playbooks van a `<config>/playbooks` con su ID con prefijo y el catálogo se recarga sin reiniciar (`ListPlaybooks` los trae al instante). Todo o nada: si algo falla no queda nada escrito.
+- **Auditoría (inglés):** `pack.export` (`id= version= sha256= scripts= playbooks= omitted= path=`), `pack.import` (`id= version= sha256= origin= scripts_created= … playbooks_skipped= path=`), `pack.rejected` si el `.mpack` no pasa, y `pack.import.reload_failed` si los archivos quedaron escritos pero la recarga falló (el catálogo los toma al reiniciar).
+
+| Reason | Args | gRPC |
+|---|---|---|
+| `pack.err.export.empty` | | InvalidArgument (nada que exportar) |
+| `pack.err.export.name_dup` | `name` | InvalidArgument (dos elementos con el mismo nombre) |
+| `pack.err.import.official` | | InvalidArgument |
+| `pack.err.import.missing` | `id` | InvalidArgument (conflicto sin decisión) |
+| `pack.err.import.decision` | `id` | InvalidArgument (acción no permitida, ID que no es del paquete o repetido) |
+| `pack.err.import.exists` | `file` | FailedPrecondition (carrera: el archivo apareció antes de escribir; nada se sobrescribe) |
+| `pack.err.editor.reserved`, `pack.err.manifest.invalid` (`field=id`, `license`…) | | el editor no cumple las reglas del export |
+
+Además salen los de siempre de `Install` (`pack.err.zip.*`, `pack.err.id.prefix`, `pack.err.playbook.denied`…) al importar un `.mpack` hostil, y `scripts.imp.*` por las decisiones de scripts. `mctl pack export` y `mctl pack import` son la misma API.

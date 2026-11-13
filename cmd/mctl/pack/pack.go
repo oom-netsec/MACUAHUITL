@@ -8,7 +8,9 @@ import (
 	"flag"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -17,7 +19,15 @@ import (
 const help = `  pack install <archivo.mpack> [--allow-unsigned]  |  pack list  |  pack show <id>  |  pack remove <id>
         (paquetes de contenido: playbooks y scripts por tecnología; se bajan a mano de los releases y nada se descarga solo.
          Un paquete sin firma oficial es de terceros y solo se instala con --allow-unsigned; trae únicamente comandos de lectura.
-         remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README)`
+         remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README)
+  pack export <editor/nombre> [ID...] --out <archivo.mpack> [--playbooks] [--license SPDX] [--name N] [--description D] [--author A] [--overwrite]
+        (arma un paquete personal SIN firma con los scripts del usuario ID... y, con --playbooks, los de <config>/playbooks de ios, ios-xe y wlc-9800.
+         Los scripts salen como lib-<editor>-… y los playbooks con el editor como prefijo; los demás playbooks se omiten y se avisa. El editor es
+         [a-z0-9]{1,16}, sin los reservados. Versión AAAA.MMDD.HHMM; licencia NOASSERTION si no das otra; los favoritos no viajan)
+  pack import <archivo.mpack> [--decision ID=renombrar|omitir]... [--all=renombrar|omitir] [--preview]
+        (copia un .mpack sin firma oficial a «Mis scripts» y a <config>/playbooks, editables, sin instalarlo. Muestra el estado de cada elemento:
+         nuevo, igual, conflicto_id o conflicto_nombre; cada conflicto pide decisión y nunca se sobrescribe nada. Un playbook importado conserva su ID con
+         prefijo de editor y entra al catálogo sin reiniciar)`
 
 func origin(p *v1.PackInfo) string {
 	if p.Official {
@@ -101,8 +111,109 @@ func remove(c *cli.Env, args []string) error {
 	return nil
 }
 
-// Area registra pack install, list, show y remove.
+func exportCmd(c *cli.Env, args []string) error {
+	var out, license, name, desc, author string
+	var pbs, ow bool
+	fs, err := cli.Flags("pack export", args, func(fs *flag.FlagSet) {
+		fs.StringVar(&out, "out", "", "archivo .mpack de salida")
+		fs.BoolVar(&pbs, "playbooks", false, "incluye los playbooks de <config>/playbooks")
+		fs.StringVar(&license, "license", "", "licencia SPDX (por omisión NOASSERTION)")
+		fs.StringVar(&name, "name", "", "nombre del paquete")
+		fs.StringVar(&desc, "description", "", "descripción del paquete")
+		fs.StringVar(&author, "author", "", "autor (por omisión el editor)")
+		fs.BoolVar(&ow, "overwrite", false, "reemplaza el archivo si existe")
+	})
+	const uso = "uso: mctl pack export <editor/nombre> [ID...] --out <archivo.mpack> [--playbooks] [--license SPDX] [--name N] [--description D] [--author A] [--overwrite]"
+	if err != nil || out == "" || fs.NArg() < 1 || fs.NArg() == 1 && !pbs {
+		return errors.New(uso)
+	}
+	if out, err = filepath.Abs(out); err != nil {
+		return err
+	}
+	r, err := v1.NewPackServiceClient(c.Conn).Export(context.Background(), &v1.PackServiceExportRequest{EditorName: fs.Arg(0), ScriptIds: fs.Args()[1:],
+		IncludePlaybooks: pbs, License: license, Path: out, Overwrite: ow, Name: name, Description: desc, Author: author})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(c.Out, "exportado %s %s: %d scripts, %d playbooks, sin firma, a %s\nsha256 %s\n", r.Id, r.Version, r.Scripts, r.Playbooks, out, r.Sha256)
+	for _, id := range r.OmittedPlaybooks {
+		fmt.Fprintf(c.Out, "aviso: el playbook %s no se exportó (plataforma o ID que un paquete no acepta)\n", id)
+	}
+	return nil
+}
+
+func importCmd(c *cli.Env, args []string) error {
+	var decs cli.List
+	var all string
+	var preview bool
+	fs, err := cli.Flags("pack import", args, func(fs *flag.FlagSet) {
+		fs.Var(&decs, "decision", "ID=acción para un conflicto (repetible)")
+		fs.StringVar(&all, "all", "", "acción para los conflictos sin --decision")
+		fs.BoolVar(&preview, "preview", false, "solo la vista previa")
+	})
+	const uso = "uso: mctl pack import <archivo.mpack> [--decision ID=renombrar|omitir]... [--all=renombrar|omitir] [--preview]"
+	if err != nil || fs.NArg() != 1 {
+		return errors.New(uso)
+	}
+	dec := map[string]string{}
+	for _, d := range decs {
+		id, a, ok := strings.Cut(d, "=")
+		if !ok || id == "" || (a != "renombrar" && a != "omitir") {
+			return errors.New("decisión inválida " + strconv.Quote(d) + ": " + uso)
+		}
+		dec[id] = a
+	}
+	if all != "" && all != "renombrar" && all != "omitir" {
+		return errors.New(uso)
+	}
+	path, err := filepath.Abs(fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	cl := v1.NewPackServiceClient(c.Conn)
+	pv, err := cl.Import(context.Background(), &v1.PackServiceImportRequest{Path: path})
+	if err != nil {
+		return err
+	}
+	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "TIPO\tID\tNOMBRE\tESTADO\tCHOCA CON")
+	var req []*v1.PackImportDecision
+	var missing []string
+	for _, it := range pv.Items {
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", it.Kind, it.Id, it.Name, it.State, it.ConflictsWith)
+		a, ok := dec[it.Id]
+		if !ok && (it.State == "conflicto_id" || it.State == "conflicto_nombre") {
+			if a = all; a == "" {
+				missing = append(missing, it.Id)
+				continue
+			}
+			ok = true
+		}
+		if ok {
+			req = append(req, &v1.PackImportDecision{ItemId: it.Id, Action: a})
+		}
+	}
+	tw.Flush()
+	for _, w := range pv.Warnings {
+		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+	}
+	if preview {
+		return nil
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("no se importó nada: falta decidir %d conflicto(s); use --decision ID=renombrar|omitir o --all=ACCIÓN: %s", len(missing), strings.Join(missing, ", "))
+	}
+	r, err := cl.Import(context.Background(), &v1.PackServiceImportRequest{Path: path, Confirm: true, Decisions: req})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(c.Out, "importados: scripts %d nuevos, %d renombrados, %d omitidos; playbooks %d nuevos, %d renombrados, %d omitidos\n",
+		r.ScriptsCreated, r.ScriptsRenamed, r.ScriptsSkipped, r.PlaybooksCreated, r.PlaybooksRenamed, r.PlaybooksSkipped)
+	return nil
+}
+
+// Area registra pack install, list, show, remove, export e import.
 func Area() cli.Area {
 	return cli.Area{Usage: help, Commands: []cli.Command{{Name: "pack install", Run: install}, {Name: "pack list", Run: list},
-		{Name: "pack show", Run: show}, {Name: "pack remove", Run: remove}}}
+		{Name: "pack show", Run: show}, {Name: "pack remove", Run: remove}, {Name: "pack export", Run: exportCmd}, {Name: "pack import", Run: importCmd}}}
 }

@@ -55,3 +55,53 @@ func versionIOSXE(t *testing.T) string {
 	}
 	return string(m[1])
 }
+
+// pack export / pack import de punta a punta: el paquete personal sale sin firma y vuelve a «Mis scripts».
+func TestPackExportImport(t *testing.T) {
+	startCore(t)
+	out := must(t, "show version\nshow clock\n", "scripts", "add", "Mi script", "--tech", "l2", "--platform", "ios-xe", "--tag", "prueba")
+	id := regexp.MustCompile(`[0-9a-f]{32}`).FindString(out)
+	if id == "" {
+		t.Fatalf("add: %q", out)
+	}
+	f := filepath.Join(t.TempDir(), "mio.mpack")
+	if _, err := mctl(t, "", "pack", "export", "acme/mio", id); err == nil {
+		t.Fatal("sin --out debe fallar")
+	}
+	if _, err := mctl(t, "", "pack", "export", "oom/mio", id, "--out", f); err == nil {
+		t.Fatal("oom está reservado")
+	}
+	if o := must(t, "", "pack", "export", "acme/mio", id, "--out", f); !strings.Contains(o, "exportado acme/mio") || !strings.Contains(o, "sin firma") {
+		t.Fatalf("export: %q", o)
+	}
+	if _, err := mctl(t, "", "pack", "export", "acme/mio", id, "--out", f); err == nil {
+		t.Fatal("pisó el archivo")
+	}
+	must(t, "", "scripts", "rm", id)
+	if o := must(t, "", "pack", "import", f, "--preview"); !strings.Contains(o, "nuevo") || strings.Contains(o, "importados") {
+		t.Fatalf("preview: %q", o)
+	}
+	if o := must(t, "", "pack", "import", f); !strings.Contains(o, "scripts 1 nuevos") {
+		t.Fatalf("import: %q", o)
+	}
+	if o := must(t, "", "scripts", "list", "Mi script"); !strings.Contains(o, "Mi script") {
+		t.Fatalf("list: %q", o)
+	}
+	// Sin decisión para un conflicto no se importa nada; con --all=renombrar entra con otro nombre.
+	if o := must(t, "", "pack", "import", f); !strings.Contains(o, "igual") {
+		t.Fatalf("segundo import: %q", o)
+	}
+	if _, err := mctl(t, "", "pack", "import", f, "--decision", "x=reemplazar"); err == nil {
+		t.Fatal("reemplazar no existe aquí")
+	}
+	if _, err := mctl(t, "", "pack", "import"); err == nil || !strings.Contains(err.Error(), "uso:") {
+		t.Fatalf("sin archivo: %v", err)
+	}
+	// El mismo archivo se instala como paquete de solo lectura con --allow-unsigned.
+	if _, err := mctl(t, "", "pack", "install", f); err == nil {
+		t.Fatal("sin --allow-unsigned")
+	}
+	if o := must(t, "", "pack", "install", f, "--allow-unsigned"); !strings.Contains(o, "instalado: acme/mio") {
+		t.Fatalf("install: %q", o)
+	}
+}

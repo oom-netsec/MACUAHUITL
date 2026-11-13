@@ -165,3 +165,10 @@ Un playbook elegido corre en su gemelo (`ios/x` por `ios-xe/x` y al revés) solo
 ## Enmienda (fase 34): wlc-9800 como plataforma instalable
 
 `wlc-9800` entra en las plataformas instalables de un paquete porque tiene driver: el de IOS-XE, con detección propia por «C9800» en `show version`. Sus playbooks pasan por el mismo `CheckDenied` que los de `ios-xe`, sin reglas propias. El gemelo `ios/ios-xe` no aplica a `wlc-9800`: un 9800 usa los playbooks de `ios-xe` directamente. Los playbooks pueden además declarar datos (`params`: MAC, AP, interfaz, IP) que el núcleo valida y sustituye antes de volver a pasar `CheckDenied`. El paquete oficial `oom/wlc-9800` los usa para los casos de un cliente o un AP puntual.
+
+## Enmienda (fase 32c): export e import del paquete personal
+
+Se implementa tal como lo describe «Selección por elemento y paquete personal», con estas precisiones:
+
+- **Plataformas del export:** `ios`, `ios-xe` y `wlc-9800` (wlc-9800 es instalable desde la fase 34). Los playbooks de otras plataformas, y los que un paquete no aceptaría (ID con caracteres fuera de `a-z0-9-` o script derivado inválido), se omiten y se avisa por ID.
+- **El import es de dos pasos sin token** (`Import` sin y con `confirm`) y se revalida completo en cada uno. Un `.mpack` con firma oficial no se importa: se instala. Un playbook que choca (ID de la base, de los movidos, de un paquete instalado o de `<config>/playbooks`, o archivo existente) pide renombrar (`<id>-2`…) u omitir; `reemplazar` se rechaza. Los archivos se crean con `O_EXCL` y sin seguir enlaces dentro de un `os.Root` sobre `<config>/playbooks`, y la escritura es todo o nada junto con la base de scripts.

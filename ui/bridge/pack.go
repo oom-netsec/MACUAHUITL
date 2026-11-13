@@ -81,3 +81,97 @@ func (b *Bridge) PackRemove(id string) (int, error) {
 		return int(r.GetFavoritesRemoved()), err
 	})
 }
+
+// ---- Paquete personal (fase 32c): exportar scripts y playbooks propios a un .mpack sin firma e importarlo de vuelta ----
+
+type PackExportRequestDTO struct {
+	EditorName       string   `json:"editorName"` // "<editor>/<nombre>"
+	ScriptIDs        []string `json:"scriptIds"`
+	IncludePlaybooks bool     `json:"includePlaybooks"`
+	License          string   `json:"license"`
+	Path             string   `json:"path"`
+	Overwrite        bool     `json:"overwrite"`
+	Name             string   `json:"name"`
+	NameEn           string   `json:"nameEn"`
+	Description      string   `json:"description"`
+	DescriptionEn    string   `json:"descriptionEn"`
+	Author           string   `json:"author"`
+}
+
+type PackExportResultDTO struct {
+	ID               string   `json:"id"`
+	Version          string   `json:"version"`
+	SHA256           string   `json:"sha256"`
+	Scripts          int      `json:"scripts"`
+	Playbooks        int      `json:"playbooks"`
+	OmittedPlaybooks []string `json:"omittedPlaybooks"`
+}
+
+type PackImportItemDTO struct {
+	Kind          string `json:"kind"` // script | playbook
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	State         string `json:"state"` // nuevo | igual | conflicto_id | conflicto_nombre
+	ConflictsWith string `json:"conflictsWith"`
+}
+
+type PackImportDecisionDTO struct {
+	ItemID string `json:"itemId"`
+	Action string `json:"action"` // renombrar | omitir
+}
+
+type PackImportResultDTO struct {
+	Pack             PackInfoDTO         `json:"pack"`
+	Items            []PackImportItemDTO `json:"items"`
+	Warnings         []string            `json:"warnings"`
+	Applied          bool                `json:"applied"`
+	ScriptsCreated   int                 `json:"scriptsCreated"`
+	ScriptsRenamed   int                 `json:"scriptsRenamed"`
+	ScriptsSkipped   int                 `json:"scriptsSkipped"`
+	PlaybooksCreated int                 `json:"playbooksCreated"`
+	PlaybooksRenamed int                 `json:"playbooksRenamed"`
+	PlaybooksSkipped int                 `json:"playbooksSkipped"`
+	PlaybookIDs      []string            `json:"playbookIds"`
+}
+
+// PackExport arma el paquete personal en req.Path (ruta absoluta que el usuario eligió).
+func (b *Bridge) PackExport(req PackExportRequestDTO) (PackExportResultDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PackExportResultDTO, error) {
+		r, err := v1.NewPackServiceClient(c).Export(ctx, &v1.PackServiceExportRequest{EditorName: req.EditorName, ScriptIds: req.ScriptIDs,
+			IncludePlaybooks: req.IncludePlaybooks, License: req.License, Path: req.Path, Overwrite: req.Overwrite, Name: req.Name, NameEn: req.NameEn,
+			Description: req.Description, DescriptionEn: req.DescriptionEn, Author: req.Author})
+		return PackExportResultDTO{ID: r.GetId(), Version: r.GetVersion(), SHA256: r.GetSha256(), Scripts: int(r.GetScripts()), Playbooks: int(r.GetPlaybooks()),
+			OmittedPlaybooks: strs(r.GetOmittedPlaybooks())}, err
+	})
+}
+
+func packImportDTO(r *v1.PackServiceImportResponse) PackImportResultDTO {
+	out := PackImportResultDTO{Pack: packInfoDTO(r.GetPack()), Items: []PackImportItemDTO{}, Warnings: strs(r.GetWarnings()), Applied: r.GetApplied(),
+		ScriptsCreated: int(r.GetScriptsCreated()), ScriptsRenamed: int(r.GetScriptsRenamed()), ScriptsSkipped: int(r.GetScriptsSkipped()),
+		PlaybooksCreated: int(r.GetPlaybooksCreated()), PlaybooksRenamed: int(r.GetPlaybooksRenamed()), PlaybooksSkipped: int(r.GetPlaybooksSkipped()),
+		PlaybookIDs: strs(r.GetPlaybookIds())}
+	for _, it := range r.GetItems() {
+		out.Items = append(out.Items, PackImportItemDTO{Kind: it.GetKind(), ID: it.GetId(), Name: it.GetName(), State: it.GetState(), ConflictsWith: it.GetConflictsWith()})
+	}
+	return out
+}
+
+// PackImportPreview valida el .mpack de path y dice qué traería, sin escribir nada.
+func (b *Bridge) PackImportPreview(path string) (PackImportResultDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PackImportResultDTO, error) {
+		r, err := v1.NewPackServiceClient(c).Import(ctx, &v1.PackServiceImportRequest{Path: path})
+		return packImportDTO(r), err
+	})
+}
+
+// PackImport aplica el import con las decisiones del diálogo (un conflicto sin decisión falla sin escribir nada).
+func (b *Bridge) PackImport(path string, decisions []PackImportDecisionDTO) (PackImportResultDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PackImportResultDTO, error) {
+		req := &v1.PackServiceImportRequest{Path: path, Confirm: true}
+		for _, d := range decisions {
+			req.Decisions = append(req.Decisions, &v1.PackImportDecision{ItemId: d.ItemID, Action: d.Action})
+		}
+		r, err := v1.NewPackServiceClient(c).Import(ctx, req)
+		return packImportDTO(r), err
+	})
+}

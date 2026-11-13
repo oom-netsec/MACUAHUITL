@@ -181,4 +181,12 @@ uso: mctl <comando>
         (paquetes de contenido: playbooks y scripts por tecnología; se bajan a mano de los releases y nada se descarga solo.
          Un paquete sin firma oficial es de terceros y solo se instala con --allow-unsigned; trae únicamente comandos de lectura.
          remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README)
+  pack export <editor/nombre> [ID...] --out <archivo.mpack> [--playbooks] [--license SPDX] [--name N] [--description D] [--author A] [--overwrite]
+        (arma un paquete personal SIN firma con los scripts del usuario ID... y, con --playbooks, los de <config>/playbooks de ios, ios-xe y wlc-9800.
+         Los scripts salen como lib-<editor>-… y los playbooks con el editor como prefijo; los demás playbooks se omiten y se avisa. El editor es
+         [a-z0-9]{1,16}, sin los reservados. Versión AAAA.MMDD.HHMM; licencia NOASSERTION si no das otra; los favoritos no viajan)
+  pack import <archivo.mpack> [--decision ID=renombrar|omitir]... [--all=renombrar|omitir] [--preview]
+        (copia un .mpack sin firma oficial a «Mis scripts» y a <config>/playbooks, editables, sin instalarlo. Muestra el estado de cada elemento:
+         nuevo, igual, conflicto_id o conflicto_nombre; cada conflicto pide decisión y nunca se sobrescribe nada. Un playbook importado conserva su ID con
+         prefijo de editor y entra al catálogo sin reiniciar)
   --version
