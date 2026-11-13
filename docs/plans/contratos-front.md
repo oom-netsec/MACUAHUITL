@@ -1231,3 +1231,28 @@ Spec: ADR 0010, «Selección por elemento y paquete personal». Aquí solo lo qu
 
 ### CLI
 `mctl pack inspect <archivo.mpack> [--allow-unsigned]`, `mctl pack items <id> [--hide ITEM]... [--show ITEM]...`, `mctl pack install … [--hide ITEM]...`, `mctl scripts copy <id>`; `pack list` marca cuántos ocultos y `pack show` los lista.
+
+## Idioma: cierre (fase 30e) — dispositivos, puente y mctl
+Con `en`, nada visible de esta área sale en español; sin idioma o con `es` el texto es el de siempre, byte por byte. Catálogos: `internal/i18n/catalog_devices.go` (libreta, import, equipos, salida, puente), `catalog_mctl_{a,b,c}.go` (mensajes propios de mctl) y `catalog_snippets.go` (plantillas).
+
+### Libreta de hosts y lista de equipos
+- Los errores de campo de un host (`hostfield.*`), de los archivos de import (`hostfile.*`) y de las decisiones (`hostimport.*`) llevan código; `devices.FieldError` y `devices.LineError` traen `Err` (con código) además de `Reason` (texto en es). `ImportHostError.reason` sale en el idioma pedido.
+- `hosts.err.full|no_id|dup_name|dup_target|export_count`, los avisos de PutDevice (`hosts.warn.vault_closed`), de exportar e importar (`hosts.warn.*`) y los de `ListDevices` (`devices.warn.*`, también el error de la carpeta de salidas `devices.err.read`) salen en el idioma pedido. Los errores de `devices.Clean`/import llevan `reason` y metadata (ErrorInfo).
+- `HostsImportFormat`: `description` y `type` de cada campo salen en el idioma (`hostfield.desc.<campo>`, `hostfield.type.<tipo>`); el nombre del archivo de la plantilla (`hosts-plantilla.csv|json`) y el `state`/`reason` de cada fila (`nuevo`, `conflicto`, `nombre`…) siguen siendo valores técnicos.
+
+### Salida, protocolo, trabajos y paquetes
+- `out.err.dir|file|busy` (carpeta y archivo de salida de adhoc, diag y field), `field.err.protocol`, `field.err.port_lost`, `patrol.err.job_missing` («trabajo X no existe»; `Deps.Job` conserva su firma sin contexto) y `pack.err.hidden_save|hidden_read`.
+- Snippets: `ListSnippetTemplates` entrega `name`, `label` y `help` en el idioma del contexto (`snippet.<id>.name|field.<campo>[.help]`, mismas claves y textos en inglés de la app). Una prueba compara el español del catálogo con el de las plantillas del núcleo.
+
+### Puente (`ui/bridge`)
+- Toda validación propia del puente (rondas, instante, fase, calculadora, ráfaga/umbral, guardar archivo, herramienta, ejecución/consola/terminal inexistente, modo DNS, puerto, rango, ruta absoluta) sale por `bridgeErr`: texto en el idioma de la app, `reason` `bridge.err.*` y metadata. «núcleo desconectado» sale en inglés si el idioma ya se había leído (sin núcleo no se puede leer la preferencia: si no, es); `errors.Is(err, ErrDisconnected)` sigue valiendo.
+
+### mctl
+- `mctl --lang en` pide al núcleo sus mensajes en inglés y escribe en inglés los PROPIOS de mctl con el mismo catálogo (`cli.T`, `cli.Err`, `cli.ErrWrap`, `cli.SetLang`): errores de valores, encabezados y etiquetas de tablas, avisos y resúmenes, y los textos de la ejecución asistida (`assistrun.go`). Sin `--lang` o con `es`, idéntico.
+- Se queda en español a propósito: la ayuda (`--help`, `help.golden`), los errores `uso: mctl …`, los nombres y textos de las banderas, los valores aceptados (`renombrar|reemplazar|omitir`), CSV/JSON, y los errores de `--lang` mismo (se dan antes de conocer el idioma).
+
+### Qué sigue sin cubrir
+- `Deps.Job` (sin contexto): el «trabajo X no existe» que devuelven visibility, analysis, forensic, drift, metrics, backup, change y adhoc por ese camino sigue en es.
+- Los `status.Error(err.Error())` que envuelven errores de SQLite o del sistema (`internal()` de inventory y scripts, prefs, pack, diag `ListInterfaces`, `audit Verify/Export`) y los `core: …` del arranque del demonio: texto de la biblioteca, no de la app.
+- La marca `abierto/cerrado:` del log de la consola serie (es contenido del archivo de evidencia) y `HashFile` (rama 30e-b).
+- `hosts-plantilla.*` (nombre de archivo) y los valores técnicos `state/reason` de las filas del import.
