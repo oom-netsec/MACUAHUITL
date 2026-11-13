@@ -249,6 +249,9 @@ type LoginDTO struct {
 	Detail      string `json:"detail"`
 	Platform    string `json:"platform"`
 	Fingerprint string `json:"fingerprint"`
+	// Reason y Args son el código estable del error de Detail (transport.hostkey.unknown, ...) y sus argumentos; vacíos si es texto de sistema.
+	Reason string            `json:"reason,omitempty"`
+	Args   map[string]string `json:"args,omitempty"`
 }
 
 func (b *Bridge) LoginTest(jobID string) ([]LoginDTO, error) {
@@ -266,7 +269,7 @@ func (b *Bridge) LoginTest(jobID string) ([]LoginDTO, error) {
 			if err != nil {
 				return out, err
 			}
-			out = append(out, LoginDTO{Target: r.Target.GetAddress(), Passed: r.Passed, FailedStep: r.FailedStep.String(), Detail: r.Detail, Platform: r.DetectedPlatform, Fingerprint: r.HostKeyFingerprint})
+			out = append(out, LoginDTO{Target: r.Target.GetAddress(), Passed: r.Passed, FailedStep: r.FailedStep.String(), Detail: r.Detail, Platform: r.DetectedPlatform, Fingerprint: r.HostKeyFingerprint, Reason: r.Reason, Args: r.Args})
 		}
 	})
 }
@@ -423,6 +426,9 @@ type RunDeviceDTO struct {
 	Target string `json:"target"`
 	State  string `json:"state"`
 	Detail string `json:"detail"`
+	// Reason y Args son el código estable del error de Detail y sus argumentos; vacíos si es texto de sistema.
+	Reason string            `json:"reason,omitempty"`
+	Args   map[string]string `json:"args,omitempty"`
 }
 
 // targetLabel es "dirección:puerto" igual que patrol.hostport en el núcleo (IPv6 entre corchetes): así la fila coincide con el deviceId de los eventos.
@@ -442,7 +448,7 @@ func (b *Bridge) GetRun(jobID string, round uint32) ([]RunDeviceDTO, error) {
 		}
 		out := []RunDeviceDTO{}
 		for _, d := range r.Devices {
-			out = append(out, RunDeviceDTO{Target: targetLabel(d.Target.GetAddress(), d.Target.GetPort()), State: d.State.String(), Detail: d.Detail})
+			out = append(out, RunDeviceDTO{Target: targetLabel(d.Target.GetAddress(), d.Target.GetPort()), State: d.State.String(), Detail: d.Detail, Reason: d.Reason, Args: d.Args})
 		}
 		return out, nil
 	})

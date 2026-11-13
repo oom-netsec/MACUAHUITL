@@ -12,7 +12,6 @@ package fileserve
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"net"
 	"net/netip"
@@ -22,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
@@ -41,12 +41,13 @@ type Transfer struct {
 	File     string
 	Bytes    int64
 	Duration time.Duration
-	Result   string // ok o error
-	Dir      string `json:",omitempty"` // lectura o escritura
-	Path     string `json:",omitempty"` // ruta del archivo recibido o servido
-	SHA256   string `json:",omitempty"` // del archivo recibido
-	Error    string `json:",omitempty"`
-	Rejected bool   `json:",omitempty"` // rechazada antes de empezar (no publicado, método, saturación)
+	Result   string    // ok o error
+	Dir      string    `json:",omitempty"` // lectura o escritura
+	Path     string    `json:",omitempty"` // ruta del archivo recibido o servido
+	SHA256   string    `json:",omitempty"` // del archivo recibido
+	Error    string    `json:",omitempty"`
+	ReasonT  i18n.Text `json:"-"`          // el motivo de Error como texto de catálogo, para darlo en otro idioma
+	Rejected bool      `json:",omitempty"` // rechazada antes de empezar (no publicado, método, saturación)
 }
 
 // Ready es lo que el usuario necesita saber al abrir el servidor.
@@ -215,21 +216,21 @@ func Hint(proto, listen string, files []string) string {
 func ValidateAddr(addr string, allowAny bool) error {
 	h, p, err := net.SplitHostPort(addr)
 	if err != nil {
-		return fmt.Errorf("fileserve: dirección inválida %q: %w", addr, err)
+		return i18n.Wrap("fileserve.err.addr_invalid", err, i18n.A("addr", addr))
 	}
 	port, err := strconv.ParseUint(p, 10, 16)
 	if err != nil {
-		return fmt.Errorf("fileserve: puerto inválido %q", p)
+		return i18n.New("fileserve.err.port_invalid", i18n.A("port", p))
 	}
 	if port != 0 && port < 1024 {
-		return fmt.Errorf("fileserve: el puerto %d es privilegiado; usa uno alto (TFTP 6969, FTP 2121, SSH 2222, HTTP 8080) y redirige con nftables si hace falta", port)
+		return i18n.New("fileserve.err.port_privileged", i18n.A("port", port))
 	}
 	ip, err := netip.ParseAddr(h)
 	if err != nil {
-		return fmt.Errorf("fileserve: el host debe ser una IP local, no %q", h)
+		return i18n.New("fileserve.err.host_not_local", i18n.A("host", h))
 	}
 	if ip.IsUnspecified() && !allowAny {
-		return errors.New("fileserve: escuchar en todas las interfaces requiere pedirlo explícitamente")
+		return i18n.New("fileserve.err.all_ifaces", nil)
 	}
 	return nil
 }
@@ -245,26 +246,26 @@ func Publish(files []string) (map[string]string, error) {
 // Un archivo con enlaces duros (Nlink > 1) no se publica: puede ser el mismo inodo que uno sensible.
 func publish(files []string) (map[string]string, map[string]os.FileInfo, error) {
 	if len(files) == 0 {
-		return nil, nil, errors.New("fileserve: no hay archivos que publicar")
+		return nil, nil, i18n.New("fileserve.err.no_files", nil)
 	}
 	out, infos := map[string]string{}, map[string]os.FileInfo{}
 	for _, f := range files {
 		if !filepath.IsAbs(f) {
-			return nil, nil, fmt.Errorf("fileserve: la ruta %q debe ser absoluta", f)
+			return nil, nil, i18n.New("fileserve.err.path_relative", i18n.A("path", f))
 		}
 		st, err := os.Stat(f)
 		if err != nil {
 			return nil, nil, fmt.Errorf("fileserve: %w", err)
 		}
 		if !st.Mode().IsRegular() {
-			return nil, nil, fmt.Errorf("fileserve: %s no es un archivo regular", f)
+			return nil, nil, i18n.New("fileserve.err.not_regular", i18n.A("path", f))
 		}
 		if sys.HardLinked(st) {
-			return nil, nil, fmt.Errorf("fileserve: %s tiene enlaces duros (más de un nombre): publica una copia", f)
+			return nil, nil, i18n.New("fileserve.err.hardlinks", i18n.A("path", f))
 		}
 		name := filepath.Base(f)
 		if _, dup := out[name]; dup {
-			return nil, nil, fmt.Errorf("fileserve: dos archivos se llaman %q", name)
+			return nil, nil, i18n.New("fileserve.err.dup_name", i18n.A("name", name))
 		}
 		out[name], infos[name] = f, st
 	}
@@ -281,14 +282,14 @@ func prepare(c Config) (src *source, rcv *receiver, err error) {
 	switch c.Proto {
 	case "tftp", "ftp", "scp", "sftp", "http":
 	default:
-		return nil, nil, fmt.Errorf("fileserve: protocolo %q no soportado (tftp, ftp, scp, sftp o http)", c.Proto)
+		return nil, nil, i18n.New("fileserve.err.bad_proto", i18n.A("proto", c.Proto))
 	}
 	if c.Write && c.Proto == "http" {
-		return nil, nil, errors.New("fileserve: HTTP es de solo lectura")
+		return nil, nil, i18n.New("fileserve.err.http_ro", nil)
 	}
 	if lo, hi := c.PassivePorts[0], c.PassivePorts[1]; lo != 0 || hi != 0 {
 		if lo < 1024 || hi < lo {
-			return nil, nil, fmt.Errorf("fileserve: el rango de puertos pasivos %d-%d es inválido: debe empezar en 1024 o más (los bajos son privilegiados) y MIN ≤ MAX", lo, hi)
+			return nil, nil, i18n.New("fileserve.err.passive_range", i18n.A("lo", lo, "hi", hi))
 		}
 	}
 	src = &source{}
@@ -310,10 +311,10 @@ func prepare(c Config) (src *source, rcv *receiver, err error) {
 	}
 	if c.Write {
 		if len(c.Allow) == 0 && c.Proto == "tftp" {
-			return nil, nil, errors.New("fileserve: recibir por TFTP exige --allow con la IP del equipo (sin lista cualquiera escribiría); " + udpAllowNote)
+			return nil, nil, i18n.New("fileserve.err.tftp_allow", nil)
 		}
 		if len(c.Allow) == 0 && h(c.Addr).IsUnspecified() {
-			return nil, nil, errors.New("fileserve: recibir en todas las interfaces exige indicar las IP de origen permitidas")
+			return nil, nil, i18n.New("fileserve.err.recv_all", nil)
 		}
 		root, dir, err := OpenDir(c.RecvDir, c.DenyDirs...)
 		if err != nil {
@@ -323,7 +324,7 @@ func prepare(c Config) (src *source, rcv *receiver, err error) {
 		src.rcv = rcv
 	}
 	if !src.enabled() && rcv == nil {
-		return nil, nil, errors.New("fileserve: no hay nada que servir: indica archivos o una carpeta para leer, o habilita la escritura")
+		return nil, nil, i18n.New("fileserve.err.nothing", nil)
 	}
 	return src, rcv, nil
 }

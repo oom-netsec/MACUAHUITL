@@ -182,7 +182,7 @@ func (s *vaultSvc) ExportBackup(ctx context.Context, r *v1.ExportBackupRequest) 
 	if err != nil {
 		return nil, err
 	}
-	v, err := s.v()
+	v, err := s.v(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -268,14 +268,14 @@ func planImport(v *vault.Vault, in []vault.Credential) (map[string]planned, map[
 
 // PreviewBackupImport abre el respaldo con su frase y lo compara con la bóveda viva, sin tocarla. Las credenciales descifradas quedan
 // en memoria protegida solo hasta que se aplique, venza el token o se cierre la bóveda.
-func (s *vaultSvc) PreviewBackupImport(_ context.Context, r *v1.PreviewBackupImportRequest) (*v1.PreviewBackupImportResponse, error) {
+func (s *vaultSvc) PreviewBackupImport(ctx context.Context, r *v1.PreviewBackupImportRequest) (*v1.PreviewBackupImportResponse, error) {
 	defer clear(r.Passphrase)
 	s.c.markActive()
 	path, err := respaldoPath(r.Path)
 	if err != nil {
 		return nil, err
 	}
-	v, err := s.v()
+	v, err := s.v(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -341,9 +341,9 @@ func uniqueLabel(base string, used map[string]bool) string {
 }
 
 // ApplyBackupImport aplica las decisiones por credencial en una sola escritura: o entra todo o no entra nada.
-func (s *vaultSvc) ApplyBackupImport(_ context.Context, r *v1.ApplyBackupImportRequest) (*v1.ApplyBackupImportResponse, error) {
+func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImportRequest) (*v1.ApplyBackupImportResponse, error) {
 	s.c.markActive()
-	v, err := s.v()
+	v, err := s.v(ctx)
 	if err != nil {
 		return nil, err
 	}

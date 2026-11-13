@@ -13,13 +13,14 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	dom "github.com/oom-netsec/MACUAHUITL/internal/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
 // Colecciones y fijados de la bóveda de scripts (fase 29c). Las colecciones guardan IDs, nunca copias.
 
-func (s *svc) libSet() (map[string]bool, error) {
+func (s *svc) libSet(ctx context.Context) (map[string]bool, error) {
 	lib, err := s.library()
 	if err != nil {
 		return nil, err
@@ -72,9 +73,9 @@ func corta(ids []string) string {
 	return strings.Join(ids, ",")
 }
 
-func (s *svc) ListCollections(_ context.Context, _ *v1.ListCollectionsRequest) (*v1.ListCollectionsResponse, error) {
+func (s *svc) ListCollections(ctx context.Context, _ *v1.ListCollectionsRequest) (*v1.ListCollectionsResponse, error) {
 	s.d.MarkActive()
-	lib, err := s.libSet()
+	lib, err := s.libSet(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -89,15 +90,15 @@ func (s *svc) ListCollections(_ context.Context, _ *v1.ListCollectionsRequest) (
 	return out, nil
 }
 
-func (s *svc) GetCollection(_ context.Context, r *v1.GetCollectionRequest) (*v1.GetCollectionResponse, error) {
+func (s *svc) GetCollection(ctx context.Context, r *v1.GetCollectionRequest) (*v1.GetCollectionResponse, error) {
 	s.d.MarkActive()
-	lib, err := s.libSet()
+	lib, err := s.libSet(ctx)
 	if err != nil {
 		return nil, err
 	}
 	c, err := getCollection(s.d.DB(), r.Id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, status.Errorf(codes.NotFound, "no hay una colección %q", r.Id)
+		return nil, service.Err(ctx, codes.NotFound, "scripts.svc.col_not_found", i18n.A("id", r.Id))
 	}
 	if err != nil {
 		return nil, internal(err)
@@ -115,10 +116,10 @@ func colNameTaken(cols []dom.Coleccion, name, exceptID string) bool {
 	return false
 }
 
-func (s *svc) SaveCollection(_ context.Context, r *v1.SaveCollectionRequest) (*v1.SaveCollectionResponse, error) {
+func (s *svc) SaveCollection(ctx context.Context, r *v1.SaveCollectionRequest) (*v1.SaveCollectionResponse, error) {
 	s.d.MarkActive()
 	if r.Collection == nil {
-		return nil, status.Error(codes.InvalidArgument, "falta la colección")
+		return nil, service.Err(ctx, codes.InvalidArgument, "scripts.svc.col_missing", nil)
 	}
 	in := r.Collection
 	now := s.clock().UTC().Truncate(time.Second)
@@ -132,21 +133,21 @@ func (s *svc) SaveCollection(_ context.Context, r *v1.SaveCollectionRequest) (*v
 		c := dom.Coleccion{ID: dom.NewID(), CreatedAt: now, ScriptIDs: []string{}}
 		if in.Id == "" {
 			if len(cols) >= dom.MaxColecciones {
-				return status.Errorf(codes.FailedPrecondition, "ya hay %d colecciones, el tope", dom.MaxColecciones)
+				return service.Err(ctx, codes.FailedPrecondition, "scripts.svc.col_max", i18n.A("max", dom.MaxColecciones))
 			}
 		} else {
 			i := slices.IndexFunc(cols, func(x dom.Coleccion) bool { return x.ID == in.Id })
 			if i < 0 {
-				return status.Errorf(codes.NotFound, "no hay una colección %q", in.Id)
+				return service.Err(ctx, codes.NotFound, "scripts.svc.col_not_found", i18n.A("id", in.Id))
 			}
 			c, action = cols[i], "scripts.coleccion.editar"
 		}
 		c.Name, c.Description, c.UpdatedAt = strings.TrimSpace(in.Name), in.Description, now
 		if err := c.Validate(); err != nil {
-			return status.Error(codes.InvalidArgument, err.Error())
+			return service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 		if colNameTaken(cols, c.Name, c.ID) {
-			return status.Errorf(codes.AlreadyExists, "ya hay una colección llamada %q", c.Name)
+			return service.Err(ctx, codes.AlreadyExists, "scripts.svc.col_name_taken", i18n.A("name", c.Name))
 		}
 		if err := putCollection(tx, c); err != nil {
 			return internal(err)
@@ -163,16 +164,16 @@ func (s *svc) SaveCollection(_ context.Context, r *v1.SaveCollectionRequest) (*v
 	return &v1.SaveCollectionResponse{Collection: colPB(out)}, nil
 }
 
-func (s *svc) DeleteCollection(_ context.Context, r *v1.DeleteCollectionRequest) (*v1.DeleteCollectionResponse, error) {
+func (s *svc) DeleteCollection(ctx context.Context, r *v1.DeleteCollectionRequest) (*v1.DeleteCollectionResponse, error) {
 	s.d.MarkActive()
 	if r.Id == dom.FavoritosID {
-		return nil, status.Errorf(codes.FailedPrecondition, "la colección %s no se borra", dom.FavoritosID)
+		return nil, service.Err(ctx, codes.FailedPrecondition, "scripts.svc.col_no_delete", i18n.A("id", dom.FavoritosID))
 	}
 	var name string
 	err := s.tx(func(tx *sql.Tx) error {
 		c, err := getCollection(tx, r.Id)
 		if errors.Is(err, sql.ErrNoRows) {
-			return status.Errorf(codes.NotFound, "no hay una colección %q", r.Id)
+			return service.Err(ctx, codes.NotFound, "scripts.svc.col_not_found", i18n.A("id", r.Id))
 		}
 		if err != nil {
 			return internal(err)
@@ -198,7 +199,7 @@ func (s *svc) DeleteCollection(_ context.Context, r *v1.DeleteCollectionRequest)
 	return &v1.DeleteCollectionResponse{}, nil
 }
 
-func (s *svc) ReorderCollections(_ context.Context, r *v1.ReorderCollectionsRequest) (*v1.ReorderCollectionsResponse, error) {
+func (s *svc) ReorderCollections(ctx context.Context, r *v1.ReorderCollectionsRequest) (*v1.ReorderCollectionsResponse, error) {
 	s.d.MarkActive()
 	err := s.tx(func(tx *sql.Tx) error {
 		cols, err := loadCollections(tx)
@@ -210,7 +211,7 @@ func (s *svc) ReorderCollections(_ context.Context, r *v1.ReorderCollectionsRequ
 			have[i] = c.ID
 		}
 		if !isPerm(have, r.Ids) {
-			return status.Error(codes.InvalidArgument, "el orden debe traer cada colección existente (también favoritos) una sola vez")
+			return service.Err(ctx, codes.InvalidArgument, "scripts.svc.col_order", nil)
 		}
 		for i, id := range r.Ids {
 			if _, err := tx.Exec(`UPDATE script_collections SET position = ? WHERE id = ?`, i, id); err != nil {
@@ -226,17 +227,17 @@ func (s *svc) ReorderCollections(_ context.Context, r *v1.ReorderCollectionsRequ
 	return &v1.ReorderCollectionsResponse{}, nil
 }
 
-func (s *svc) SetCollectionScripts(_ context.Context, r *v1.SetCollectionScriptsRequest) (*v1.SetCollectionScriptsResponse, error) {
+func (s *svc) SetCollectionScripts(ctx context.Context, r *v1.SetCollectionScriptsRequest) (*v1.SetCollectionScriptsResponse, error) {
 	s.d.MarkActive()
 	if len(r.ScriptIds) > dom.MaxScriptsColeccion {
-		return nil, status.Errorf(codes.InvalidArgument, "una colección lleva hasta %d scripts", dom.MaxScriptsColeccion)
+		return nil, service.Err(ctx, codes.InvalidArgument, "scripts.col.scripts_max", i18n.A("max", dom.MaxScriptsColeccion))
 	}
 	var c dom.Coleccion
 	var added, removed []string
 	err := s.tx(func(tx *sql.Tx) error {
 		old, err := getCollection(tx, r.Id)
 		if errors.Is(err, sql.ErrNoRows) {
-			return status.Errorf(codes.NotFound, "no hay una colección %q", r.Id)
+			return service.Err(ctx, codes.NotFound, "scripts.svc.col_not_found", i18n.A("id", r.Id))
 		}
 		if err != nil {
 			return internal(err)
@@ -244,10 +245,10 @@ func (s *svc) SetCollectionScripts(_ context.Context, r *v1.SetCollectionScripts
 		seen := map[string]bool{}
 		for _, id := range r.ScriptIds {
 			if seen[id] {
-				return status.Errorf(codes.InvalidArgument, "el script %s está repetido", id)
+				return service.Err(ctx, codes.InvalidArgument, "scripts.svc.script_dup", i18n.A("id", id))
 			}
 			seen[id] = true
-			if _, err := s.find(tx, id); err != nil {
+			if _, err := s.find(ctx, tx, id); err != nil {
 				return err
 			}
 		}
@@ -277,8 +278,8 @@ func (s *svc) SetCollectionScripts(_ context.Context, r *v1.SetCollectionScripts
 
 // prunePins quita de los fijados los «lib-*» que esta biblioteca ya no trae: no se ven, pero contarían para el tope
 // y harían fallar el reorden.
-func (s *svc) prunePins(tx *sql.Tx) error {
-	lib, err := s.libSet()
+func (s *svc) prunePins(ctx context.Context, tx *sql.Tx) error {
+	lib, err := s.libSet(ctx)
 	if err != nil {
 		return err
 	}
@@ -296,15 +297,15 @@ func (s *svc) prunePins(tx *sql.Tx) error {
 	return nil
 }
 
-func (s *svc) SetPinned(_ context.Context, r *v1.SetPinnedRequest) (*v1.SetPinnedResponse, error) {
+func (s *svc) SetPinned(ctx context.Context, r *v1.SetPinnedRequest) (*v1.SetPinnedResponse, error) {
 	s.d.MarkActive()
 	changed := false
 	err := s.tx(func(tx *sql.Tx) error {
-		if err := s.prunePins(tx); err != nil {
+		if err := s.prunePins(ctx, tx); err != nil {
 			return err
 		}
 		if r.Pinned { // desfijar no exige que el script exista
-			if _, err := s.find(tx, r.Id); err != nil {
+			if _, err := s.find(ctx, tx, r.Id); err != nil {
 				return err
 			}
 		}
@@ -317,7 +318,7 @@ func (s *svc) SetPinned(_ context.Context, r *v1.SetPinnedRequest) (*v1.SetPinne
 		case had == r.Pinned:
 			return nil
 		case r.Pinned && len(pins) >= dom.MaxFijados:
-			return status.Errorf(codes.FailedPrecondition, "ya hay %d scripts fijados, el máximo; desfija uno antes", dom.MaxFijados)
+			return service.Err(ctx, codes.FailedPrecondition, "scripts.svc.pinned_max", i18n.A("max", dom.MaxFijados))
 		case r.Pinned:
 			_, err = tx.Exec(`INSERT INTO script_pins(script_id, position) VALUES(?, (SELECT COALESCE(MAX(position)+1, 0) FROM script_pins))`, r.Id)
 		default:
@@ -338,7 +339,7 @@ func (s *svc) SetPinned(_ context.Context, r *v1.SetPinnedRequest) (*v1.SetPinne
 	return &v1.SetPinnedResponse{}, nil
 }
 
-func (s *svc) ListPinned(_ context.Context, _ *v1.ListPinnedRequest) (*v1.ListPinnedResponse, error) {
+func (s *svc) ListPinned(ctx context.Context, _ *v1.ListPinnedRequest) (*v1.ListPinnedResponse, error) {
 	s.d.MarkActive()
 	m, err := loadMeta(s.d.DB())
 	if err != nil {
@@ -350,22 +351,22 @@ func (s *svc) ListPinned(_ context.Context, _ *v1.ListPinnedRequest) (*v1.ListPi
 	}
 	out := &v1.ListPinnedResponse{}
 	for _, id := range pins {
-		x, err := s.find(s.d.DB(), id)
+		x, err := s.find(ctx, s.d.DB(), id)
 		if status.Code(err) == codes.NotFound { // un «lib-*» que esta biblioteca ya no trae
 			continue
 		}
 		if err != nil {
 			return nil, err
 		}
-		out.Scripts = append(out.Scripts, toPB(x, m))
+		out.Scripts = append(out.Scripts, toPB(s.in(ctx, x), m))
 	}
 	return out, nil
 }
 
-func (s *svc) ReorderPinned(_ context.Context, r *v1.ReorderPinnedRequest) (*v1.ReorderPinnedResponse, error) {
+func (s *svc) ReorderPinned(ctx context.Context, r *v1.ReorderPinnedRequest) (*v1.ReorderPinnedResponse, error) {
 	s.d.MarkActive()
 	err := s.tx(func(tx *sql.Tx) error {
-		if err := s.prunePins(tx); err != nil {
+		if err := s.prunePins(ctx, tx); err != nil {
 			return err
 		}
 		pins, err := loadPins(tx)
@@ -373,7 +374,7 @@ func (s *svc) ReorderPinned(_ context.Context, r *v1.ReorderPinnedRequest) (*v1.
 			return internal(err)
 		}
 		if !isPerm(pins, r.Ids) {
-			return status.Error(codes.InvalidArgument, "el orden debe traer cada script fijado una sola vez")
+			return service.Err(ctx, codes.InvalidArgument, "scripts.svc.pinned_order", nil)
 		}
 		for i, id := range r.Ids {
 			if _, err := tx.Exec(`UPDATE script_pins SET position = ? WHERE script_id = ?`, i, id); err != nil {
@@ -398,9 +399,9 @@ func (s *svc) ExportCollections(ctx context.Context, r *v1.ExportCollectionsRequ
 		return nil, err
 	}
 	if len(r.Ids) < 1 || len(r.Ids) > dom.MaxColecciones {
-		return nil, status.Errorf(codes.InvalidArgument, "se exportan de 1 a %d colecciones", dom.MaxColecciones)
+		return nil, service.Err(ctx, codes.InvalidArgument, "scripts.svc.col_export_range", i18n.A("max", dom.MaxColecciones))
 	}
-	lib, err := s.libSet()
+	lib, err := s.libSet(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -418,7 +419,7 @@ func (s *svc) ExportCollections(ctx context.Context, r *v1.ExportCollectionsRequ
 		seenCol[id] = true
 		i := slices.IndexFunc(all, func(c dom.Coleccion) bool { return c.ID == id })
 		if i < 0 {
-			return nil, status.Errorf(codes.NotFound, "no hay una colección %q", id)
+			return nil, service.Err(ctx, codes.NotFound, "scripts.svc.col_not_found", i18n.A("id", id))
 		}
 		c := cleanCol(all[i], lib)
 		c.Order = len(sel)
@@ -440,7 +441,7 @@ func (s *svc) ExportCollections(ctx context.Context, r *v1.ExportCollectionsRequ
 		return nil, internal(err)
 	}
 	if len(b) > dom.MaxImportBytes {
-		return nil, status.Error(codes.InvalidArgument, "el archivo pasaría de 5 MB y el import lo rechazaría; exporta menos colecciones")
+		return nil, service.Err(ctx, codes.InvalidArgument, "scripts.svc.col_export_big", nil)
 	}
 	if err := service.WriteExport(ctx, path, b, r.Overwrite); err != nil {
 		return nil, err
@@ -462,7 +463,7 @@ func libAvisos(cols []dom.Coleccion, lib map[string]bool) []string {
 	return out
 }
 
-func (s *svc) PreviewImportCollections(_ context.Context, r *v1.PreviewImportCollectionsRequest) (*v1.PreviewImportCollectionsResponse, error) {
+func (s *svc) PreviewImportCollections(ctx context.Context, r *v1.PreviewImportCollectionsRequest) (*v1.PreviewImportCollectionsResponse, error) {
 	s.d.MarkActive()
 	path, err := service.AbsPath(r.Path)
 	if err != nil {
@@ -474,7 +475,7 @@ func (s *svc) PreviewImportCollections(_ context.Context, r *v1.PreviewImportCol
 	}
 	cols, scripts, avisos, err := dom.ParseColeccionesAvisos(b)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	user, err := loadUser(s.d.DB())
 	if err != nil {
@@ -488,7 +489,7 @@ func (s *svc) PreviewImportCollections(_ context.Context, r *v1.PreviewImportCol
 	if err != nil {
 		return nil, err
 	}
-	libIDs, err := s.libSet()
+	libIDs, err := s.libSet(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -498,26 +499,26 @@ func (s *svc) PreviewImportCollections(_ context.Context, r *v1.PreviewImportCol
 		out.Collections = append(out.Collections, &v1.CollectionImportItem{Collection: colPB(it.Col), State: it.Estado, ConflictsWith: it.Con})
 	}
 	for _, it := range dom.Plan(scripts, user, lib) {
-		out.Scripts = append(out.Scripts, &v1.ImportItem{Script: toPB(it.Script, meta{}), State: it.Estado, ConflictsWith: it.Con})
+		out.Scripts = append(out.Scripts, &v1.ImportItem{Script: toPB(s.in(ctx, it.Script), meta{}), State: it.Estado, ConflictsWith: it.Con})
 	}
 	return out, nil
 }
 
-func decisionMap(ds []*v1.ImportDecision, que string) (map[string]string, error) {
+func decisionMap(ctx context.Context, ds []*v1.ImportDecision, que string) (map[string]string, error) {
 	out := map[string]string{}
 	for _, d := range ds {
 		if _, dup := out[d.ScriptId]; dup {
-			return nil, status.Errorf(codes.InvalidArgument, "decisión repetida para %s (%s)", d.ScriptId, que)
+			return nil, service.Err(ctx, codes.InvalidArgument, "scripts.svc.decision_dup_kind", i18n.A("id", d.ScriptId, "what", map[string]string{"collection": "colección"}[que]+map[string]string{"script": "script"}[que], "what_en", que))
 		}
 		out[d.ScriptId] = d.Action
 	}
 	return out, nil
 }
 
-func (s *svc) ApplyImportCollections(_ context.Context, r *v1.ApplyImportCollectionsRequest) (*v1.ApplyImportCollectionsResponse, error) {
+func (s *svc) ApplyImportCollections(ctx context.Context, r *v1.ApplyImportCollectionsRequest) (*v1.ApplyImportCollectionsResponse, error) {
 	s.d.MarkActive()
 	now := s.clock()
-	p, err := s.take(r.Token, pendCols)
+	p, err := s.take(ctx, r.Token, pendCols)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +526,7 @@ func (s *svc) ApplyImportCollections(_ context.Context, r *v1.ApplyImportCollect
 	if err != nil {
 		return nil, err
 	}
-	libIDs, err := s.libSet()
+	libIDs, err := s.libSet(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -535,8 +536,8 @@ func (s *svc) ApplyImportCollections(_ context.Context, r *v1.ApplyImportCollect
 	var sres dom.Resultado
 	var cres dom.ResultadoCol
 	var sdec, cdec map[string]string
-	if sdec, err = decisionMap(r.ScriptDecisions, "script"); err == nil {
-		cdec, err = decisionMap(r.CollectionDecisions, "colección")
+	if sdec, err = decisionMap(ctx, r.ScriptDecisions, "script"); err == nil {
+		cdec, err = decisionMap(ctx, r.CollectionDecisions, "collection")
 	}
 	if err != nil {
 		invalid = true
@@ -554,11 +555,11 @@ func (s *svc) ApplyImportCollections(_ context.Context, r *v1.ApplyImportCollect
 			ahora := now.UTC().Truncate(time.Second)
 			if sres, err = dom.Apply(dom.Plan(p.scripts, user, lib), sdec, user, lib, ahora); err != nil {
 				invalid = true
-				return status.Error(codes.InvalidArgument, err.Error())
+				return service.ErrFrom(ctx, codes.InvalidArgument, err)
 			}
 			if cres, err = dom.ApplyColecciones(dom.PlanColecciones(p.cols, local), cdec, local, sres.IDs, libIDs, ahora); err != nil {
 				invalid = true
-				return status.Error(codes.InvalidArgument, err.Error())
+				return service.ErrFrom(ctx, codes.InvalidArgument, err)
 			}
 			total := len(local)
 			for _, w := range cres.Writes {
@@ -568,7 +569,7 @@ func (s *svc) ApplyImportCollections(_ context.Context, r *v1.ApplyImportCollect
 			}
 			if total > dom.MaxColecciones {
 				invalid = true
-				return status.Errorf(codes.InvalidArgument, "quedarían %d colecciones; el tope es %d", total, dom.MaxColecciones)
+				return service.Err(ctx, codes.InvalidArgument, "scripts.svc.col_total", i18n.A("total", total, "max", dom.MaxColecciones))
 			}
 			for _, x := range sres.Writes {
 				if err := put(tx, x); err != nil {
@@ -598,16 +599,16 @@ func (s *svc) ApplyImportCollections(_ context.Context, r *v1.ApplyImportCollect
 	}, nil
 }
 
-func checkKind(kind string) error {
+func checkKind(ctx context.Context, kind string) error {
 	if kind != dom.KindScripts && kind != dom.KindColecciones {
-		return status.Errorf(codes.InvalidArgument, "tipo %q desconocido: %s o %s", kind, dom.KindScripts, dom.KindColecciones)
+		return service.Err(ctx, codes.InvalidArgument, "scripts.svc.kind_unknown", i18n.A("kind", kind, "a", dom.KindScripts, "b", dom.KindColecciones))
 	}
 	return nil
 }
 
-func (s *svc) ImportTemplate(_ context.Context, r *v1.ImportTemplateRequest) (*v1.ImportTemplateResponse, error) {
+func (s *svc) ImportTemplate(ctx context.Context, r *v1.ImportTemplateRequest) (*v1.ImportTemplateResponse, error) {
 	s.d.MarkActive()
-	if err := checkKind(r.Kind); err != nil {
+	if err := checkKind(ctx, r.Kind); err != nil {
 		return nil, err
 	}
 	lib, err := s.library()
@@ -621,9 +622,9 @@ func (s *svc) ImportTemplate(_ context.Context, r *v1.ImportTemplateRequest) (*v
 	return &v1.ImportTemplateResponse{Json: string(b)}, nil
 }
 
-func (s *svc) ImportFormat(_ context.Context, r *v1.ImportFormatRequest) (*v1.ImportFormatResponse, error) {
+func (s *svc) ImportFormat(ctx context.Context, r *v1.ImportFormatRequest) (*v1.ImportFormatResponse, error) {
 	s.d.MarkActive()
-	if err := checkKind(r.Kind); err != nil {
+	if err := checkKind(ctx, r.Kind); err != nil {
 		return nil, err
 	}
 	lib, err := s.library()

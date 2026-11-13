@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -48,6 +49,13 @@ type PortStatus struct {
 	Ports    []Port
 	Channels []Channel
 	Warnings []string
+	WarnT    []i18n.Text `json:"-"` // los Warnings como texto de catálogo, en paralelo
+}
+
+// Localize da el estado con los avisos en el idioma dado; con es, tal cual.
+func (p PortStatus) Localize(loc string) PortStatus {
+	p.Warnings = i18n.Notes(loc, p.Warnings, p.WarnT)
+	return p
 }
 
 // PortDevice es el estado de puertos de un equipo, con su origen.
@@ -90,23 +98,21 @@ func duplexMode(s string) string {
 // trunk y show etherchannel summary. Lo que falta o no se entiende queda en Warnings; sin el estado no hay puertos.
 func BuildPorts(in PortTexts) PortStatus {
 	var ps PortStatus
-	warnMissing := func(cmd, why string) {
-		ps.Warnings = append(ps.Warnings, fmt.Sprintf("falta el comando %s: %s", cmd, why))
-	}
+	warn := func(key, cmd string) { i18n.Note(&ps.Warnings, &ps.WarnT, key, "cmd", cmd) }
 	rows, ok := iosxe.ParseIfStatus(in.Status)
 	switch {
 	case strings.TrimSpace(in.Status) == "":
-		warnMissing(CmdPortStatus, "sin él no hay puertos que mostrar")
+		warn("metrics.ports.no_status", CmdPortStatus)
 		return ps
 	case !ok:
-		ps.Warnings = append(ps.Warnings, "no se pudo leer "+CmdPortStatus+": no trae la tabla de puertos")
+		warn("metrics.ports.unread_status", CmdPortStatus)
 		return ps
 	}
 	trunks := map[string]iosxe.Trunk{}
 	if !in.HaveTrunk {
-		warnMissing(CmdTrunk, "«trunk» se deduce de la columna VLAN y no se conoce la VLAN nativa")
+		warn("metrics.ports.no_trunk", CmdTrunk)
 	} else if ts, ok := iosxe.ParseTrunks(in.Trunk); !ok {
-		ps.Warnings = append(ps.Warnings, "no se pudo leer "+CmdTrunk)
+		warn("metrics.ports.unread", CmdTrunk)
 	} else {
 		for _, t := range ts {
 			trunks[strings.ToLower(t.Port)] = t
@@ -115,10 +121,10 @@ func BuildPorts(in PortTexts) PortStatus {
 	chOf := map[string]ChannelMember{}
 	chName := map[string]string{}
 	if !in.HaveChannels {
-		warnMissing(CmdChannels, "no se sabe qué puertos son miembros de un canal")
+		warn("metrics.ports.no_channels", CmdChannels)
 	} else if ecs, ok := iosxe.ParseEtherChannels(in.Channels); !ok {
 		if !strings.Contains(in.Channels, "channel-groups in use: 0") { // un switch sin canales lo dice así
-			ps.Warnings = append(ps.Warnings, "no se pudo leer "+CmdChannels)
+			warn("metrics.ports.unread", CmdChannels)
 		}
 	} else {
 		for _, ec := range ecs {
@@ -170,19 +176,19 @@ func PortsFromJob(dir, device string) (PortDevice, error) {
 	}
 	switch {
 	case len(pick) == 0 && device != "":
-		return PortDevice{}, fmt.Errorf("metrics: el trabajo no tiene datos del equipo %q", device)
+		return PortDevice{}, i18n.New("metrics.err.no_device", i18n.A("device", device))
 	case len(pick) == 0:
-		return PortDevice{}, fmt.Errorf("metrics: el trabajo no tiene salidas de equipos")
+		return PortDevice{}, i18n.New("metrics.err.no_outputs", nil)
 	case len(pick) > 1:
 		var names []string
 		for _, r := range pick {
 			names = append(names, r.Host+" ("+r.IP+")")
 		}
-		return PortDevice{}, fmt.Errorf("metrics: el trabajo tiene %d equipos (%s): indica uno", len(pick), strings.Join(names, ", "))
+		return PortDevice{}, i18n.New("metrics.err.many", i18n.A("n", len(pick), "names", strings.Join(names, ", ")))
 	}
 	d, ok := loadDevice(dir, pick[0], portWant, parseText, true)
 	if !ok {
-		return PortDevice{}, fmt.Errorf("metrics: el trabajo no tiene salidas del equipo %s", pick[0].Host)
+		return PortDevice{}, i18n.New("metrics.err.no_host", i18n.A("host", pick[0].Host))
 	}
 	last := map[string]section{}
 	for _, s := range d.Secs { // ordenadas: gana la ronda más reciente
@@ -193,6 +199,6 @@ func PortsFromJob(dir, device string) (PortDevice, error) {
 	_, in.HaveTrunk = last[CmdTrunk]
 	_, in.HaveChannels = last[CmdChannels]
 	ps := BuildPorts(in)
-	ps.Warnings = append(d.Warnings, ps.Warnings...)
+	ps.Warnings, ps.WarnT = append(d.Warnings, ps.Warnings...), append(d.WarnT, ps.WarnT...)
 	return PortDevice{PortStatus: ps, Address: d.IP, Hostname: d.Host, At: last[CmdPortStatus].At}, nil
 }

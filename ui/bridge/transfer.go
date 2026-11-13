@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	"google.golang.org/grpc/codes"
@@ -207,12 +208,15 @@ type RemoteEntryDTO struct {
 
 // TransferListingDTO: Listable=false (TFTP, o SCP sin SFTP) no es una falla: Reason trae el motivo para mostrarlo.
 type TransferListingDTO struct {
-	Listable  bool             `json:"listable"`
-	Reason    string           `json:"reason"`
-	Path      string           `json:"path"`
-	Entries   []RemoteEntryDTO `json:"entries"`
-	Truncated bool             `json:"truncated"`
-	Method    string           `json:"method"`
+	Listable bool   `json:"listable"`
+	Reason   string `json:"reason"`
+	// ReasonCode y ReasonArgs son el código estable del motivo (xfer.no_listing.tftp, …) y su metadata (proto); vacíos si no hay.
+	ReasonCode string            `json:"reasonCode,omitempty"`
+	ReasonArgs map[string]string `json:"reasonArgs,omitempty"`
+	Path       string            `json:"path"`
+	Entries    []RemoteEntryDTO  `json:"entries"`
+	Truncated  bool              `json:"truncated"`
+	Method     string            `json:"method"`
 }
 
 func (b *Bridge) TransferBrowse(d TransferBrowseDTO) (TransferListingDTO, error) {
@@ -220,7 +224,12 @@ func (b *Bridge) TransferBrowse(d TransferBrowseDTO) (TransferListingDTO, error)
 		r, err := v1.NewTransferServiceClient(c).Browse(ctx, &v1.BrowseRequest{Url: d.URL, CredentialId: d.CredentialID, Path: d.Path, AcceptedHostKeyFingerprints: d.HostKeys,
 			Insecure: d.Insecure, LegacySsh: d.LegacySSH, MaxEntries: int32(d.MaxEntries), TimeoutSeconds: int32(d.Seconds)})
 		if status.Code(err) == codes.Unimplemented {
-			return TransferListingDTO{Reason: status.Convert(err).Message(), Entries: []RemoteEntryDTO{}}, nil
+			out := TransferListingDTO{Reason: status.Convert(err).Message(), Entries: []RemoteEntryDTO{}}
+			var be *Error
+			if errors.As(wrapErr(err), &be) {
+				out.ReasonCode, out.ReasonArgs = be.Reason, be.Metadata
+			}
+			return out, nil
 		}
 		out := TransferListingDTO{Listable: true, Path: r.GetPath(), Entries: []RemoteEntryDTO{}, Truncated: r.GetTruncated(), Method: r.GetMethod()}
 		for _, e := range r.GetEntries() {

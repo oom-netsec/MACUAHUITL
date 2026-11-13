@@ -16,6 +16,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
@@ -34,10 +35,41 @@ type Entry struct {
 	Action   string   `yaml:"action" json:"action"`
 	Verify   []string `yaml:"verify" json:"verify"` // solo lectura: validados con playbook.CheckDenied
 	Source   string   `json:"source"`
+
+	// La versión en inglés del texto (en el YAML: meaning_en, cause_en, action_en); no viaja en el JSON.
+	MeaningEN string `yaml:"meaning_en" json:"-"`
+	CauseEN   string `yaml:"cause_en" json:"-"`
+	ActionEN  string `yaml:"action_en" json:"-"`
+}
+
+// In da la ficha en el idioma dado: con en, el texto en inglés y la fuente traducida; con es, la ficha tal cual.
+func (e Entry) In(loc string) Entry {
+	if loc != i18n.En {
+		return e
+	}
+	for _, p := range [][2]*string{{&e.Meaning, &e.MeaningEN}, {&e.Cause, &e.CauseEN}, {&e.Action, &e.ActionEN}} {
+		if *p[1] != "" { // sin versión en inglés (un YAML ajeno), queda el español
+			*p[0] = *p[1]
+		}
+	}
+	e.Source = i18n.Msg(loc, "msgkb.source", nil)
+	return e
+}
+
+// EntriesIn da las fichas en el idioma dado (con es, la misma lista).
+func EntriesIn(loc string, es []Entry) []Entry {
+	if loc != i18n.En {
+		return es
+	}
+	out := make([]Entry, len(es))
+	for i, e := range es {
+		out[i] = e.In(loc)
+	}
+	return out
 }
 
 // source se pone a todas las entradas: la base no tiene transcripciones de equipos reales.
-const source = "documentación pública de Cisco (sin validar en laboratorio)"
+var source = i18n.Msg(i18n.Es, "msgkb.source", nil)
 
 // KB es un conjunto de entradas ya validado.
 type KB struct{ entries []Entry }
@@ -151,11 +183,11 @@ func (k *KB) Search(pattern string) []Entry {
 // con comodines, la búsqueda. Rechaza consultas largas o con caracteres de control.
 func (k *KB) Query(q string) ([]Entry, error) {
 	if len(q) > MaxQuery {
-		return nil, fmt.Errorf("msgkb: la consulta excede %d caracteres", MaxQuery)
+		return nil, i18n.New("msgkb.err.long", i18n.A("max", MaxQuery))
 	}
 	for _, r := range q {
 		if r < 0x20 || r > 0x7e {
-			return nil, errors.New("msgkb: la consulta solo admite ASCII imprimible")
+			return nil, i18n.New("msgkb.err.ascii", nil)
 		}
 	}
 	if strings.ContainsAny(q, "*?") || strings.TrimSpace(q) == "" {
@@ -212,27 +244,32 @@ func glob(pat, s string) bool {
 	return p == len(pat)
 }
 
-var sevNames = [...]string{"emergencia", "alerta", "crítica", "error", "advertencia", "aviso", "informativo", "depuración"}
+// Text arma la ficha legible de las entradas en español (la CLI la imprime tal cual).
+func Text(es []Entry) string { return TextIn(i18n.Es, es) }
 
-// Text arma la ficha legible de las entradas (la CLI la imprime tal cual).
-func Text(es []Entry) string {
+// TextIn arma la ficha legible en el idioma dado; las entradas ya vienen en ese idioma (ver EntriesIn).
+func TextIn(loc string, es []Entry) string {
 	if len(es) == 0 {
-		return "sin coincidencias en la base de mensajes"
+		return i18n.Msg(loc, "msgkb.none", nil)
 	}
 	var b strings.Builder
 	for i, e := range es {
 		if i > 0 {
 			b.WriteByte('\n')
 		}
-		sev := "varía"
-		if e.Severity >= 0 && e.Severity < len(sevNames) {
-			sev = fmt.Sprintf("%d %s", e.Severity, sevNames[e.Severity])
+		sev := i18n.Msg(loc, "msgkb.varies", nil)
+		if e.Severity >= 0 && e.Severity < 8 {
+			sev = fmt.Sprintf("%d %s", e.Severity, i18n.Msg(loc, fmt.Sprintf("msgkb.sev.%d", e.Severity), nil))
 		}
-		fmt.Fprintf(&b, "%s  (severidad %s)\n  Significado: %s\n  Causa probable: %s\n  Acción: %s\n  Verificar (solo lectura):\n", e.ID, sev, e.Meaning, e.Cause, e.Action)
+		b.WriteString(i18n.Msg(loc, "msgkb.text.head", i18n.A("id", e.ID, "severity", sev)) + "\n")
+		b.WriteString(i18n.Msg(loc, "msgkb.text.meaning", i18n.A("v", e.Meaning)) + "\n")
+		b.WriteString(i18n.Msg(loc, "msgkb.text.cause", i18n.A("v", e.Cause)) + "\n")
+		b.WriteString(i18n.Msg(loc, "msgkb.text.action", i18n.A("v", e.Action)) + "\n")
+		b.WriteString(i18n.Msg(loc, "msgkb.text.verify", nil) + "\n")
 		for _, c := range e.Verify {
 			fmt.Fprintf(&b, "    %s\n", c)
 		}
-		fmt.Fprintf(&b, "  Fuente: %s\n", e.Source)
+		b.WriteString(i18n.Msg(loc, "msgkb.text.source", i18n.A("v", e.Source)) + "\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

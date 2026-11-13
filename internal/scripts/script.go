@@ -10,14 +10,13 @@ package scripts
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
@@ -39,10 +38,10 @@ var (
 )
 
 var (
-	tagRe   = regexp.MustCompile(`^[a-z0-9-]{1,24}$`)
-	userID  = regexp.MustCompile(`^[0-9a-f]{32}$`)
-	libID   = regexp.MustCompile(`^lib-[a-z0-9-]{1,60}$`)
-	errName = errors.New("el nombre va de 1 a 64 caracteres, sin espacios en los extremos ni caracteres de control")
+	tagRe         = regexp.MustCompile(`^[a-z0-9-]{1,24}$`)
+	userID        = regexp.MustCompile(`^[0-9a-f]{32}$`)
+	libID         = regexp.MustCompile(`^lib-[a-z0-9-]{1,60}$`)
+	errName error = i18n.New("scripts.err.name", nil)
 )
 
 // Script es una lista de comandos con nombre. El JSON es también el formato del archivo de export.
@@ -96,47 +95,47 @@ func (s Script) Validate() error {
 	switch s.Origin {
 	case OrigenBiblioteca:
 		if !libID.MatchString(s.ID) {
-			return fmt.Errorf("id %q inválido para un script de la biblioteca", s.ID)
+			return i18n.New("scripts.err.lib_id", i18n.A("id", s.ID))
 		}
 	case OrigenUsuario:
 		if !userID.MatchString(s.ID) {
-			return fmt.Errorf("id %q inválido: son 32 caracteres hexadecimales", s.ID)
+			return i18n.New("scripts.err.user_id", i18n.A("id", s.ID))
 		}
 	default:
-		return fmt.Errorf("origen %q desconocido", s.Origin)
+		return i18n.New("scripts.err.origin", i18n.A("origin", s.Origin))
 	}
 	if !in(Techs, s.Tech) {
-		return fmt.Errorf("tecnología %q fuera de la lista (%s)", s.Tech, strings.Join(Techs, ", "))
+		return i18n.New("scripts.err.tech", i18n.A("tech", s.Tech, "list", strings.Join(Techs, ", ")))
 	}
 	if !in(Platforms, s.Platform) {
-		return fmt.Errorf("plataforma %q fuera de la lista (%s)", s.Platform, strings.Join(Platforms, ", "))
+		return i18n.New("scripts.err.platform", i18n.A("platform", s.Platform, "list", strings.Join(Platforms, ", ")))
 	}
 	if utf8.RuneCountInString(s.Description) > MaxDescription || hasControl(s.Description, true) {
-		return fmt.Errorf("la descripción pasa de %d caracteres o trae caracteres de control", MaxDescription)
+		return i18n.New("scripts.err.description", i18n.A("max", MaxDescription))
 	}
 	if len(s.Commands) < 1 || len(s.Commands) > MaxCommands {
-		return fmt.Errorf("el script lleva de 1 a %d comandos", MaxCommands)
+		return i18n.New("scripts.err.commands", i18n.A("max", MaxCommands))
 	}
 	for i, c := range s.Commands {
 		if strings.TrimSpace(c) == "" || len(c) > MaxCommandLen {
-			return fmt.Errorf("comando %d: vacío o de más de %d caracteres", i+1, MaxCommandLen)
+			return i18n.New("scripts.err.command_empty", i18n.A("n", i+1, "max", MaxCommandLen))
 		}
 		for _, r := range c {
 			if r < 0x20 || r > 0x7e {
-				return fmt.Errorf("comando %d: solo ASCII imprimible, sin tabuladores ni caracteres de control", i+1)
+				return i18n.New("scripts.err.command_ascii", i18n.A("n", i+1))
 			}
 		}
 	}
 	if len(s.Tags) > MaxTags {
-		return fmt.Errorf("máximo %d etiquetas", MaxTags)
+		return i18n.New("scripts.err.tags_max", i18n.A("max", MaxTags))
 	}
 	seen := map[string]bool{}
 	for _, t := range s.Tags {
 		if !tagRe.MatchString(t) {
-			return fmt.Errorf("etiqueta %q inválida: minúsculas, dígitos y guion, de 1 a 24", t)
+			return i18n.New("scripts.err.tag_bad", i18n.A("tag", t))
 		}
 		if seen[t] {
-			return fmt.Errorf("etiqueta %q repetida", t)
+			return i18n.New("scripts.err.tag_dup", i18n.A("tag", t))
 		}
 		seen[t] = true
 	}

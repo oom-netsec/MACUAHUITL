@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Colecciones (fase 29c): listas ordenadas de IDs de script, de un solo nivel. Guardan referencias, nunca copias,
@@ -51,27 +53,27 @@ func ValidName(n string) error {
 // «favoritos» conserva su nombre.
 func (c Coleccion) Validate() error {
 	if c.ID != FavoritosID && !userID.MatchString(c.ID) {
-		return fmt.Errorf("id %q inválido para una colección: son 32 caracteres hexadecimales", c.ID)
+		return i18n.New("scripts.col.id", i18n.A("id", c.ID))
 	}
 	if err := ValidName(c.Name); err != nil {
 		return err
 	}
 	if c.ID == FavoritosID && c.Name != FavoritosNombre {
-		return fmt.Errorf("la colección %s no se renombra", FavoritosID)
+		return i18n.New("scripts.col.no_rename", i18n.A("id", FavoritosID))
 	}
 	if utf8.RuneCountInString(c.Description) > MaxDescription || hasControl(c.Description, true) {
-		return fmt.Errorf("la descripción pasa de %d caracteres o trae caracteres de control", MaxDescription)
+		return i18n.New("scripts.err.description", i18n.A("max", MaxDescription))
 	}
 	if len(c.ScriptIDs) > MaxScriptsColeccion {
-		return fmt.Errorf("una colección lleva hasta %d scripts", MaxScriptsColeccion)
+		return i18n.New("scripts.col.scripts_max", i18n.A("max", MaxScriptsColeccion))
 	}
 	seen := map[string]bool{}
 	for _, id := range c.ScriptIDs {
 		if !userID.MatchString(id) && !libID.MatchString(id) {
-			return fmt.Errorf("id de script %q inválido", id)
+			return i18n.New("scripts.col.script_id", i18n.A("id", id))
 		}
 		if seen[id] {
-			return fmt.Errorf("el script %s está repetido en la colección", id)
+			return i18n.New("scripts.col.script_dup", i18n.A("id", id))
 		}
 		seen[id] = true
 	}
@@ -362,11 +364,11 @@ func ParseColeccionesAvisos(b []byte) ([]Coleccion, []Script, []string, error) {
 	for i, c := range normalizaCol(cols) {
 		cols[i] = c
 		if err := c.Validate(); err != nil {
-			return nil, nil, nil, fmt.Errorf("colección %d (%q): %w", i+1, c.Name, err)
+			return nil, nil, nil, i18n.Wrap("scripts.imp.col", err, i18n.A("n", i+1, "name", c.Name))
 		}
 		k := NameKey(c.Name)
 		if ids[c.ID] || nombres[k] {
-			return nil, nil, nil, fmt.Errorf("colección %d (%q): ID o nombre repetido dentro del archivo", i+1, c.Name)
+			return nil, nil, nil, i18n.New("scripts.imp.col_dup", i18n.A("n", i+1, "name", c.Name))
 		}
 		ids[c.ID], nombres[k] = true, true
 		for _, id := range c.ScriptIDs {

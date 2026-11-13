@@ -1,0 +1,9 @@
+{
+ "diff_no_existe": "ERROR: rpc error: code = NotFound desc = backup: identificador \"no-existe-a\" inválido (equipo/AAAAMMDDTHHMMSSZ-running|startup)",
+ "listar_equipo": "ERROR: rpc error: code = InvalidArgument desc = backup: nombre de equipo \"../x\" inválido",
+ "obtener_no_existe": "ERROR: rpc error: code = NotFound desc = backup: identificador \"no-existe\" inválido (equipo/AAAAMMDDTHHMMSSZ-running|startup)",
+ "recoger_retencion": "ERROR: rpc error: code = InvalidArgument desc = la retención máxima es 1000",
+ "retencion": "ERROR: rpc error: code = InvalidArgument desc = la retención máxima es 1000",
+ "rondas": "ERROR: rpc error: code = InvalidArgument desc = con intervalo indica cuántas rondas (2 o más)",
+ "sin_equipos": "ERROR: rpc error: code = InvalidArgument desc = indica al menos un equipo"
+}

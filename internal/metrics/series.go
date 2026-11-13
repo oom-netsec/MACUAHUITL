@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -82,11 +83,26 @@ type Device struct {
 	Reboots           []Reboot
 	Truncated         bool
 	Warnings          []string
+	WarnT             []i18n.Text `json:"-"` // los Warnings como texto de catálogo, en paralelo
 }
 
 type Result struct {
 	Devices  []Device
 	Warnings []string
+	WarnT    []i18n.Text `json:"-"` // los Warnings como texto de catálogo, en paralelo
+}
+
+// Localize da el resultado con los avisos (los suyos y los de cada equipo) en el idioma dado; con es, tal cual.
+func (r Result) Localize(loc string) Result {
+	if loc != i18n.En {
+		return r
+	}
+	r.Warnings = i18n.Notes(loc, r.Warnings, r.WarnT)
+	r.Devices = append([]Device(nil), r.Devices...)
+	for i := range r.Devices {
+		r.Devices[i].Warnings = i18n.Notes(loc, r.Devices[i].Warnings, r.Devices[i].WarnT)
+	}
+	return r
 }
 
 // Build lee la carpeta de salida de un trabajo de Patrol y arma las series de cada equipo.
@@ -113,7 +129,7 @@ func Build(dir string, o Options) (Result, error) {
 		}
 	}
 	if o.Device != "" && len(res.Devices) == 0 {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("el trabajo no tiene datos del equipo %q", o.Device))
+		i18n.Note(&res.Warnings, &res.WarnT, "metrics.warn.no_device", "device", o.Device)
 	}
 	// interfaces pedidas que ningún equipo tiene
 	for _, want := range o.Ifaces {
@@ -125,7 +141,7 @@ func Build(dir string, o Options) (Result, error) {
 			}
 		}
 		if !found && len(res.Devices) > 0 {
-			res.Warnings = append(res.Warnings, fmt.Sprintf("la interfaz %s no aparece en los datos de los equipos", w))
+			i18n.Note(&res.Warnings, &res.WarnT, "metrics.warn.no_iface", "iface", w)
 		}
 	}
 	return res, nil
@@ -147,12 +163,12 @@ func buildDevice(r rawDevice, o Options) Device {
 		}
 		return 0
 	}
-	d.Warnings = append(d.Warnings, r.Warnings...)
-	warn := func(format string, a ...any) { d.Warnings = append(d.Warnings, fmt.Sprintf(format, a...)) }
+	d.Warnings, d.WarnT = append(d.Warnings, r.Warnings...), append(d.WarnT, r.WarnT...)
+	warn := func(key string, kv ...any) { i18n.Note(&d.Warnings, &d.WarnT, key, kv...) }
 
 	// ---- CPU ----
 	if cmd := present(r.Secs, cmdCPU); cmd == "" {
-		warn("falta el comando %s: el playbook no lo recolectó", strings.Join(cmdCPU, " o "))
+		warn("metrics.warn.missing_cmd", "cmd", strings.Join(cmdCPU, " o "), "cmd_en", strings.Join(cmdCPU, " or "))
 	} else {
 		bad := 0
 		for _, s := range r.Secs {
@@ -166,14 +182,14 @@ func buildDevice(r rawDevice, o Options) Device {
 			}
 		}
 		if bad > 0 {
-			warn("no se pudo leer %s en %s", cmd, rondas(bad))
+			warn("metrics.warn.unreadable", "cmd", cmd, "n", bad)
 		}
 		d.CPU = d.CPU[trunc(len(d.CPU)):]
 	}
 
 	// ---- memoria ----
 	if cmd := present(r.Secs, cmdMem); cmd == "" {
-		warn("falta el comando %s: el playbook no lo recolectó", strings.Join(cmdMem, " o "))
+		warn("metrics.warn.missing_cmd", "cmd", strings.Join(cmdMem, " o "), "cmd_en", strings.Join(cmdMem, " or "))
 	} else {
 		bad := 0
 		idx := map[string]int{}
@@ -197,7 +213,7 @@ func buildDevice(r rawDevice, o Options) Device {
 			}
 		}
 		if bad > 0 {
-			warn("no se pudo leer %s en %s", cmd, rondas(bad))
+			warn("metrics.warn.unreadable", "cmd", cmd, "n", bad)
 		}
 		for i := range d.Memory {
 			d.Memory[i].Points = d.Memory[i].Points[trunc(len(d.Memory[i].Points)):]
@@ -214,7 +230,7 @@ func buildDevice(r rawDevice, o Options) Device {
 
 	// ---- interfaces ----
 	if !hasCmd(r.Secs, cmdIfaces) {
-		warn("falta el comando %s: el playbook no lo recolectó", cmdIfaces)
+		warn("metrics.warn.missing_cmd", "cmd", cmdIfaces, "cmd_en", cmdIfaces)
 	} else {
 		bad := 0
 		series := map[string]*IfSeries{}
@@ -254,7 +270,7 @@ func buildDevice(r rawDevice, o Options) Device {
 			}
 		}
 		if bad > 0 {
-			warn("no se pudo leer %s en %s", cmdIfaces, rondas(bad))
+			warn("metrics.warn.unreadable", "cmd", cmdIfaces, "n", bad)
 		}
 		d.IfaceTotal = len(order)
 		all := make([]*IfSeries, 0, len(order))
@@ -270,7 +286,7 @@ func buildDevice(r rawDevice, o Options) Device {
 			d.Interfaces = append(d.Interfaces, *s)
 		}
 		if d.IfaceTotal > 0 && len(d.Interfaces) < d.IfaceTotal && len(o.Ifaces) == 0 {
-			warn("se muestran las %d interfaces con más utilización de %d", len(d.Interfaces), d.IfaceTotal)
+			warn("metrics.warn.top_ifaces", "shown", len(d.Interfaces), "total", d.IfaceTotal)
 		}
 	}
 	return d
@@ -383,13 +399,6 @@ func rebootsOf(b []boot) []Reboot {
 		}
 	}
 	return out
-}
-
-func rondas(n int) string {
-	if n == 1 {
-		return "1 ronda"
-	}
-	return fmt.Sprintf("%d rondas", n)
 }
 
 func contains(l []string, s string) bool {

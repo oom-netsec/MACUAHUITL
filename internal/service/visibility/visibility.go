@@ -19,6 +19,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/gnmic"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/snmp"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/pcapan"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -40,16 +41,16 @@ func (s *visibilitySvc) BuildTopology(ctx context.Context, r *v1.BuildTopologyRe
 			return nil, err
 		}
 		if j.Dir == "" {
-			return nil, status.Error(codes.FailedPrecondition, "el trabajo aún no tiene salidas")
+			return nil, service.Err(ctx, codes.FailedPrecondition, "visibility.err.job_empty", nil)
 		}
 		dir = j.Dir
 	}
 	if dir == "" && r.PcapPath == "" {
-		return nil, status.Error(codes.InvalidArgument, "indica un trabajo, una carpeta de salida o una captura")
+		return nil, service.Err(ctx, codes.InvalidArgument, "visibility.err.no_source", nil)
 	}
 	for _, p := range []string{dir, r.PcapPath} {
 		if p != "" && !filepath.IsAbs(p) {
-			return nil, status.Errorf(codes.InvalidArgument, "la ruta %q debe ser absoluta", p)
+			return nil, service.Err(ctx, codes.InvalidArgument, "visibility.err.relative", i18n.A("path", p))
 		}
 	}
 	s.d.Audit("visibility.topo", strings.TrimSpace(dir+" "+r.PcapPath), r.JobId)
@@ -73,13 +74,13 @@ func (s *visibilitySvc) BuildTopology(ctx context.Context, r *v1.BuildTopologyRe
 }
 
 // credential descifra una credencial de la bóveda; quien llama hace Destroy.
-func (s *visibilitySvc) credential(id string) (vault.Credential, error) {
+func (s *visibilitySvc) credential(ctx context.Context, id string) (vault.Credential, error) {
 	v := s.d.Vault()
 	if v == nil {
-		return vault.Credential{}, status.Error(codes.FailedPrecondition, "no hay bóveda; crea una y guarda la credencial")
+		return vault.Credential{}, service.Err(ctx, codes.FailedPrecondition, "visibility.err.no_vault", nil)
 	}
 	if id == "" {
-		return vault.Credential{}, status.Error(codes.InvalidArgument, "falta la credencial")
+		return vault.Credential{}, service.Err(ctx, codes.InvalidArgument, "visibility.err.no_cred", nil)
 	}
 	c, err := v.Get(id)
 	return c, service.VaultErr(err)
@@ -95,12 +96,12 @@ func destroy(c vault.Credential) {
 // shortcut: gosnmp recibe las llaves como string; la copia vive lo que dura la ejecución.
 func (s *visibilitySvc) snmpTarget(ctx context.Context, t *v1.SnmpTarget, id string) (snmp.Target, error) {
 	if t == nil || strings.TrimSpace(t.Host) == "" || strings.HasPrefix(t.Host, "-") {
-		return snmp.Target{}, status.Error(codes.InvalidArgument, "destino SNMP inválido")
+		return snmp.Target{}, service.Err(ctx, codes.InvalidArgument, "visibility.err.bad_snmp", nil)
 	}
 	if t.Port > 0xffff {
-		return snmp.Target{}, status.Error(codes.InvalidArgument, "puerto inválido")
+		return snmp.Target{}, service.Err(ctx, codes.InvalidArgument, "visibility.err.bad_port", nil)
 	}
-	cred, err := s.credential(t.CredentialId)
+	cred, err := s.credential(ctx, t.CredentialId)
 	if err != nil {
 		return snmp.Target{}, err
 	}
@@ -227,7 +228,7 @@ func (s *visibilitySvc) SnmpTraps(r *v1.SnmpTrapsRequest, st v1.VisibilityServic
 		cfg.Addr = snmp.DefaultTrapAddr
 	}
 	if r.V3CredentialId != "" {
-		cred, err := s.credential(r.V3CredentialId)
+		cred, err := s.credential(st.Context(), r.V3CredentialId)
 		if err != nil {
 			return err
 		}
@@ -340,12 +341,12 @@ func (s *visibilitySvc) Flows(r *v1.FlowsRequest, st v1.VisibilityService_FlowsS
 // gnmiTarget arma el destino con la credencial y autoriza solo ese host.
 func (s *visibilitySvc) gnmiTarget(ctx context.Context, t *v1.GnmiTarget, id string) (gnmic.Target, error) {
 	if t == nil || strings.TrimSpace(t.Host) == "" || strings.HasPrefix(t.Host, "-") || t.Port > 0xffff {
-		return gnmic.Target{}, status.Error(codes.InvalidArgument, "destino gNMI inválido")
+		return gnmic.Target{}, service.Err(ctx, codes.InvalidArgument, "visibility.err.bad_gnmi", nil)
 	}
 	gt := gnmic.Target{Host: t.Host, Port: uint16(t.Port), ServerName: t.ServerName, Timeout: service.MS(t.TimeoutMs, 0)}
 	if t.CaPath != "" {
 		if !filepath.IsAbs(t.CaPath) {
-			return gnmic.Target{}, status.Error(codes.InvalidArgument, "la ruta de la CA debe ser absoluta")
+			return gnmic.Target{}, service.Err(ctx, codes.InvalidArgument, "visibility.err.ca_relative", nil)
 		}
 		b, err := os.ReadFile(t.CaPath)
 		if err != nil {
@@ -354,7 +355,7 @@ func (s *visibilitySvc) gnmiTarget(ctx context.Context, t *v1.GnmiTarget, id str
 		gt.CA = b
 	}
 	if t.CredentialId != "" {
-		cred, err := s.credential(t.CredentialId)
+		cred, err := s.credential(ctx, t.CredentialId)
 		if err != nil {
 			return gnmic.Target{}, err
 		}

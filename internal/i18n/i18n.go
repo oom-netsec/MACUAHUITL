@@ -305,13 +305,7 @@ func (e *Error) Localize(loc string) string {
 }
 
 // causeIn es el texto de una causa en el idioma pedido: con código, el del catálogo; sin él, el de siempre.
-func causeIn(err error, loc string) string {
-	var c Coded
-	if loc != Es && errors.As(err, &c) {
-		return c.Localize(loc)
-	}
-	return err.Error()
-}
+func causeIn(err error, loc string) string { return In(loc, err) }
 
 // Codes lista los códigos del catálogo en orden (para pruebas y documentación).
 func Codes() []string {
@@ -325,16 +319,7 @@ func Codes() []string {
 
 // English es el texto de err para la auditoría, que va siempre en inglés: si err (o algo que envuelve) trae
 // código del catálogo, ese tramo sale en inglés y el resto del mensaje queda tal cual; sin código, es err.Error().
-func English(err error) string {
-	if err == nil {
-		return ""
-	}
-	var c Coded
-	if !errors.As(err, &c) {
-		return err.Error()
-	}
-	return strings.Replace(err.Error(), c.Error(), c.Localize(En), 1)
-}
+func English(err error) string { return In(En, err) }
 
 // Text es un texto ya elegido, para poder darlo en el otro idioma o entregar su clave. Lo normal es un código
 // del catálogo con sus argumentos (Key y Args); además puede ser un literal es/en (Lit), la unión de otros
@@ -425,4 +410,40 @@ func (t Text) In(loc string) string {
 		}
 	}
 	return Msg(loc, t.Key, args)
+}
+
+// Note agrega un aviso a dos listas paralelas: su texto en es (el de siempre, el que va en el JSON) y su Text.
+func Note(es *[]string, ts *[]Text, key string, kv ...any) {
+	t := Tx(key, kv...)
+	*es = append(*es, t.In(Es))
+	*ts = append(*ts, t)
+}
+
+// Notes da los avisos en el idioma dado. Con es, o si las listas paralelas no coinciden (un aviso se agregó sin su
+// Text), devuelve es tal cual: nunca mezcla un aviso con la traducción de otro.
+func Notes(loc string, es []string, ts []Text) []string {
+	if loc != En || len(es) != len(ts) {
+		return es
+	}
+	out := make([]string, len(es))
+	for i, t := range ts {
+		out[i] = es[i]
+		if !t.Empty() {
+			out[i] = t.In(En)
+		}
+	}
+	return out
+}
+
+// In es err en el idioma dado: el tramo con código del catálogo sale en ese idioma y el resto del mensaje queda tal
+// cual (como English, pero para cualquier idioma); sin código, o con es, es err.Error().
+func In(loc string, err error) string {
+	if err == nil {
+		return ""
+	}
+	var c Coded
+	if loc != En || !errors.As(err, &c) {
+		return err.Error()
+	}
+	return strings.Replace(err.Error(), c.Error(), c.Localize(En), 1)
 }

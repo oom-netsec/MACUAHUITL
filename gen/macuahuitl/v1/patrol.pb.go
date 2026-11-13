@@ -692,8 +692,11 @@ type LoginTestResponse struct {
 	DetectedPlatform string        `protobuf:"bytes,5,opt,name=detected_platform,json=detectedPlatform,proto3" json:"detected_platform,omitempty"`
 	// Huella SHA-256 de la llave de host, para confirmar en el primer uso.
 	HostKeyFingerprint string `protobuf:"bytes,6,opt,name=host_key_fingerprint,json=hostKeyFingerprint,proto3" json:"host_key_fingerprint,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Código estable del catálogo del error de detail y sus argumentos; vacío si el detalle es texto de sistema.
+	Reason        string            `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
+	Args          map[string]string `protobuf:"bytes,8,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LoginTestResponse) Reset() {
@@ -766,6 +769,20 @@ func (x *LoginTestResponse) GetHostKeyFingerprint() string {
 		return x.HostKeyFingerprint
 	}
 	return ""
+}
+
+func (x *LoginTestResponse) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *LoginTestResponse) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
 }
 
 type ArmJobRequest struct {
@@ -1285,10 +1302,13 @@ func (x *ListJobsResponse) GetJobs() []*JobSummary {
 }
 
 type RunDevice struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Target        *Target                `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
-	State         DeviceState            `protobuf:"varint,2,opt,name=state,proto3,enum=macuahuitl.v1.DeviceState" json:"state,omitempty"`
-	Detail        string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Target *Target                `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	State  DeviceState            `protobuf:"varint,2,opt,name=state,proto3,enum=macuahuitl.v1.DeviceState" json:"state,omitempty"`
+	Detail string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
+	// Código estable del catálogo del error de detail y sus argumentos; vacío si el detalle es texto de sistema.
+	Reason        string            `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Args          map[string]string `protobuf:"bytes,5,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1342,6 +1362,20 @@ func (x *RunDevice) GetDetail() string {
 		return x.Detail
 	}
 	return ""
+}
+
+func (x *RunDevice) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *RunDevice) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
 }
 
 type GetRunRequest struct {
@@ -1641,7 +1675,7 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x11CreateJobResponse\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\")\n" +
 	"\x10LoginTestRequest\x12\x15\n" +
-	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"\x90\x02\n" +
+	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"\xa1\x03\n" +
 	"\x11LoginTestResponse\x12-\n" +
 	"\x06target\x18\x01 \x01(\v2\x15.macuahuitl.v1.TargetR\x06target\x12\x16\n" +
 	"\x06passed\x18\x02 \x01(\bR\x06passed\x12=\n" +
@@ -1649,7 +1683,12 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"failedStep\x12\x16\n" +
 	"\x06detail\x18\x04 \x01(\tR\x06detail\x12+\n" +
 	"\x11detected_platform\x18\x05 \x01(\tR\x10detectedPlatform\x120\n" +
-	"\x14host_key_fingerprint\x18\x06 \x01(\tR\x12hostKeyFingerprint\"\x9b\x01\n" +
+	"\x14host_key_fingerprint\x18\x06 \x01(\tR\x12hostKeyFingerprint\x12\x16\n" +
+	"\x06reason\x18\a \x01(\tR\x06reason\x12>\n" +
+	"\x04args\x18\b \x03(\v2*.macuahuitl.v1.LoginTestResponse.ArgsEntryR\x04args\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9b\x01\n" +
 	"\rArmJobRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12.\n" +
 	"\x13excluded_device_ids\x18\x02 \x03(\tR\x11excludedDeviceIds\x12C\n" +
@@ -1691,11 +1730,16 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x11\n" +
 	"\x0fListJobsRequest\"A\n" +
 	"\x10ListJobsResponse\x12-\n" +
-	"\x04jobs\x18\x01 \x03(\v2\x19.macuahuitl.v1.JobSummaryR\x04jobs\"\x84\x01\n" +
+	"\x04jobs\x18\x01 \x03(\v2\x19.macuahuitl.v1.JobSummaryR\x04jobs\"\x8d\x02\n" +
 	"\tRunDevice\x12-\n" +
 	"\x06target\x18\x01 \x01(\v2\x15.macuahuitl.v1.TargetR\x06target\x120\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1a.macuahuitl.v1.DeviceStateR\x05state\x12\x16\n" +
-	"\x06detail\x18\x03 \x01(\tR\x06detail\"<\n" +
+	"\x06detail\x18\x03 \x01(\tR\x06detail\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x126\n" +
+	"\x04args\x18\x05 \x03(\v2\".macuahuitl.v1.RunDevice.ArgsEntryR\x04args\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"<\n" +
 	"\rGetRunRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x14\n" +
 	"\x05round\x18\x02 \x01(\rR\x05round\"e\n" +
@@ -1765,7 +1809,7 @@ func file_macuahuitl_v1_patrol_proto_rawDescGZIP() []byte {
 }
 
 var file_macuahuitl_v1_patrol_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_macuahuitl_v1_patrol_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_macuahuitl_v1_patrol_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_macuahuitl_v1_patrol_proto_goTypes = []any{
 	(SplitStrategy)(0),            // 0: macuahuitl.v1.SplitStrategy
 	(ZipPolicy)(0),                // 1: macuahuitl.v1.ZipPolicy
@@ -1792,53 +1836,57 @@ var file_macuahuitl_v1_patrol_proto_goTypes = []any{
 	(*ListPlaybooksRequest)(nil),  // 22: macuahuitl.v1.ListPlaybooksRequest
 	(*PlaybookInfo)(nil),          // 23: macuahuitl.v1.PlaybookInfo
 	(*ListPlaybooksResponse)(nil), // 24: macuahuitl.v1.ListPlaybooksResponse
-	nil,                           // 25: macuahuitl.v1.JobPhase.ArgsEntry
-	(*timestamppb.Timestamp)(nil), // 26: google.protobuf.Timestamp
-	(*Target)(nil),                // 27: macuahuitl.v1.Target
-	(DeviceState)(0),              // 28: macuahuitl.v1.DeviceState
+	nil,                           // 25: macuahuitl.v1.LoginTestResponse.ArgsEntry
+	nil,                           // 26: macuahuitl.v1.JobPhase.ArgsEntry
+	nil,                           // 27: macuahuitl.v1.RunDevice.ArgsEntry
+	(*timestamppb.Timestamp)(nil), // 28: google.protobuf.Timestamp
+	(*Target)(nil),                // 29: macuahuitl.v1.Target
+	(DeviceState)(0),              // 30: macuahuitl.v1.DeviceState
 }
 var file_macuahuitl_v1_patrol_proto_depIdxs = []int32{
-	26, // 0: macuahuitl.v1.Schedule.until:type_name -> google.protobuf.Timestamp
-	27, // 1: macuahuitl.v1.JobSpec.targets:type_name -> macuahuitl.v1.Target
+	28, // 0: macuahuitl.v1.Schedule.until:type_name -> google.protobuf.Timestamp
+	29, // 1: macuahuitl.v1.JobSpec.targets:type_name -> macuahuitl.v1.Target
 	4,  // 2: macuahuitl.v1.JobSpec.overrides:type_name -> macuahuitl.v1.DeviceOverride
 	0,  // 3: macuahuitl.v1.JobSpec.split:type_name -> macuahuitl.v1.SplitStrategy
 	5,  // 4: macuahuitl.v1.JobSpec.schedule:type_name -> macuahuitl.v1.Schedule
 	1,  // 5: macuahuitl.v1.JobSpec.zip:type_name -> macuahuitl.v1.ZipPolicy
 	6,  // 6: macuahuitl.v1.CreateJobRequest.spec:type_name -> macuahuitl.v1.JobSpec
-	27, // 7: macuahuitl.v1.LoginTestResponse.target:type_name -> macuahuitl.v1.Target
+	29, // 7: macuahuitl.v1.LoginTestResponse.target:type_name -> macuahuitl.v1.Target
 	2,  // 8: macuahuitl.v1.LoginTestResponse.failed_step:type_name -> macuahuitl.v1.LoginTestStep
-	26, // 9: macuahuitl.v1.ArmJobResponse.window_ends_at:type_name -> google.protobuf.Timestamp
-	26, // 10: macuahuitl.v1.JobSummary.next_round_at:type_name -> google.protobuf.Timestamp
-	26, // 11: macuahuitl.v1.JobSummary.armed_at:type_name -> google.protobuf.Timestamp
-	26, // 12: macuahuitl.v1.JobSummary.window_ends_at:type_name -> google.protobuf.Timestamp
-	16, // 13: macuahuitl.v1.JobSummary.phases:type_name -> macuahuitl.v1.JobPhase
-	26, // 14: macuahuitl.v1.JobPhase.at:type_name -> google.protobuf.Timestamp
-	3,  // 15: macuahuitl.v1.JobPhase.kind:type_name -> macuahuitl.v1.JobPhaseKind
-	25, // 16: macuahuitl.v1.JobPhase.args:type_name -> macuahuitl.v1.JobPhase.ArgsEntry
-	15, // 17: macuahuitl.v1.ListJobsResponse.jobs:type_name -> macuahuitl.v1.JobSummary
-	27, // 18: macuahuitl.v1.RunDevice.target:type_name -> macuahuitl.v1.Target
-	28, // 19: macuahuitl.v1.RunDevice.state:type_name -> macuahuitl.v1.DeviceState
-	19, // 20: macuahuitl.v1.GetRunResponse.devices:type_name -> macuahuitl.v1.RunDevice
-	23, // 21: macuahuitl.v1.ListPlaybooksResponse.playbooks:type_name -> macuahuitl.v1.PlaybookInfo
-	7,  // 22: macuahuitl.v1.PatrolService.CreateJob:input_type -> macuahuitl.v1.CreateJobRequest
-	9,  // 23: macuahuitl.v1.PatrolService.LoginTest:input_type -> macuahuitl.v1.LoginTestRequest
-	11, // 24: macuahuitl.v1.PatrolService.ArmJob:input_type -> macuahuitl.v1.ArmJobRequest
-	13, // 25: macuahuitl.v1.PatrolService.CancelJob:input_type -> macuahuitl.v1.CancelJobRequest
-	17, // 26: macuahuitl.v1.PatrolService.ListJobs:input_type -> macuahuitl.v1.ListJobsRequest
-	20, // 27: macuahuitl.v1.PatrolService.GetRun:input_type -> macuahuitl.v1.GetRunRequest
-	22, // 28: macuahuitl.v1.PatrolService.ListPlaybooks:input_type -> macuahuitl.v1.ListPlaybooksRequest
-	8,  // 29: macuahuitl.v1.PatrolService.CreateJob:output_type -> macuahuitl.v1.CreateJobResponse
-	10, // 30: macuahuitl.v1.PatrolService.LoginTest:output_type -> macuahuitl.v1.LoginTestResponse
-	12, // 31: macuahuitl.v1.PatrolService.ArmJob:output_type -> macuahuitl.v1.ArmJobResponse
-	14, // 32: macuahuitl.v1.PatrolService.CancelJob:output_type -> macuahuitl.v1.CancelJobResponse
-	18, // 33: macuahuitl.v1.PatrolService.ListJobs:output_type -> macuahuitl.v1.ListJobsResponse
-	21, // 34: macuahuitl.v1.PatrolService.GetRun:output_type -> macuahuitl.v1.GetRunResponse
-	24, // 35: macuahuitl.v1.PatrolService.ListPlaybooks:output_type -> macuahuitl.v1.ListPlaybooksResponse
-	29, // [29:36] is the sub-list for method output_type
-	22, // [22:29] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	25, // 9: macuahuitl.v1.LoginTestResponse.args:type_name -> macuahuitl.v1.LoginTestResponse.ArgsEntry
+	28, // 10: macuahuitl.v1.ArmJobResponse.window_ends_at:type_name -> google.protobuf.Timestamp
+	28, // 11: macuahuitl.v1.JobSummary.next_round_at:type_name -> google.protobuf.Timestamp
+	28, // 12: macuahuitl.v1.JobSummary.armed_at:type_name -> google.protobuf.Timestamp
+	28, // 13: macuahuitl.v1.JobSummary.window_ends_at:type_name -> google.protobuf.Timestamp
+	16, // 14: macuahuitl.v1.JobSummary.phases:type_name -> macuahuitl.v1.JobPhase
+	28, // 15: macuahuitl.v1.JobPhase.at:type_name -> google.protobuf.Timestamp
+	3,  // 16: macuahuitl.v1.JobPhase.kind:type_name -> macuahuitl.v1.JobPhaseKind
+	26, // 17: macuahuitl.v1.JobPhase.args:type_name -> macuahuitl.v1.JobPhase.ArgsEntry
+	15, // 18: macuahuitl.v1.ListJobsResponse.jobs:type_name -> macuahuitl.v1.JobSummary
+	29, // 19: macuahuitl.v1.RunDevice.target:type_name -> macuahuitl.v1.Target
+	30, // 20: macuahuitl.v1.RunDevice.state:type_name -> macuahuitl.v1.DeviceState
+	27, // 21: macuahuitl.v1.RunDevice.args:type_name -> macuahuitl.v1.RunDevice.ArgsEntry
+	19, // 22: macuahuitl.v1.GetRunResponse.devices:type_name -> macuahuitl.v1.RunDevice
+	23, // 23: macuahuitl.v1.ListPlaybooksResponse.playbooks:type_name -> macuahuitl.v1.PlaybookInfo
+	7,  // 24: macuahuitl.v1.PatrolService.CreateJob:input_type -> macuahuitl.v1.CreateJobRequest
+	9,  // 25: macuahuitl.v1.PatrolService.LoginTest:input_type -> macuahuitl.v1.LoginTestRequest
+	11, // 26: macuahuitl.v1.PatrolService.ArmJob:input_type -> macuahuitl.v1.ArmJobRequest
+	13, // 27: macuahuitl.v1.PatrolService.CancelJob:input_type -> macuahuitl.v1.CancelJobRequest
+	17, // 28: macuahuitl.v1.PatrolService.ListJobs:input_type -> macuahuitl.v1.ListJobsRequest
+	20, // 29: macuahuitl.v1.PatrolService.GetRun:input_type -> macuahuitl.v1.GetRunRequest
+	22, // 30: macuahuitl.v1.PatrolService.ListPlaybooks:input_type -> macuahuitl.v1.ListPlaybooksRequest
+	8,  // 31: macuahuitl.v1.PatrolService.CreateJob:output_type -> macuahuitl.v1.CreateJobResponse
+	10, // 32: macuahuitl.v1.PatrolService.LoginTest:output_type -> macuahuitl.v1.LoginTestResponse
+	12, // 33: macuahuitl.v1.PatrolService.ArmJob:output_type -> macuahuitl.v1.ArmJobResponse
+	14, // 34: macuahuitl.v1.PatrolService.CancelJob:output_type -> macuahuitl.v1.CancelJobResponse
+	18, // 35: macuahuitl.v1.PatrolService.ListJobs:output_type -> macuahuitl.v1.ListJobsResponse
+	21, // 36: macuahuitl.v1.PatrolService.GetRun:output_type -> macuahuitl.v1.GetRunResponse
+	24, // 37: macuahuitl.v1.PatrolService.ListPlaybooks:output_type -> macuahuitl.v1.ListPlaybooksResponse
+	31, // [31:38] is the sub-list for method output_type
+	24, // [24:31] is the sub-list for method input_type
+	24, // [24:24] is the sub-list for extension type_name
+	24, // [24:24] is the sub-list for extension extendee
+	0,  // [0:24] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_patrol_proto_init() }
@@ -1853,7 +1901,7 @@ func file_macuahuitl_v1_patrol_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_patrol_proto_rawDesc), len(file_macuahuitl_v1_patrol_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

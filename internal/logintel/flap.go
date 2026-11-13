@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/msgkb"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
@@ -53,6 +54,7 @@ type FlapReport struct {
 	Count       int                    `json:"count"`
 	Window      string                 `json:"window"`
 	Warnings    []string               `json:"warnings,omitempty"`
+	WarnT       []i18n.Text            `json:"-"`            // los Warnings como texto de catálogo, en paralelo
 	KB          map[string]msgkb.Entry `json:"kb,omitempty"` // fichas por mnemónico, una vez
 }
 
@@ -154,7 +156,7 @@ func Flaps(es []Entry, o FlapOptions) FlapReport {
 		return a.Interface < b.Interface
 	})
 	if noTime > 0 {
-		rep.Warnings = append(rep.Warnings, fmt.Sprintf("hay interfaces con %d transición(es) sin hora: son posible flapping, pero sin hora no se mide la ventana (activa service timestamps log datetime msec)", noTime))
+		i18n.Note(&rep.Warnings, &rep.WarnT, "logintel.flap.warn_no_time", "n", noTime)
 	}
 	return rep
 }
@@ -182,12 +184,33 @@ func peaks(times []time.Time, window time.Duration, n int) (peak, episodes int) 
 	return peak, episodes
 }
 
-// Text arma el informe legible.
-func (r FlapReport) Text() string {
+// Localize da el informe con los avisos y las fichas de la base de mensajes en el idioma dado (con es, tal cual).
+func (r FlapReport) Localize(loc string) FlapReport {
+	if loc != i18n.En {
+		return r
+	}
+	r.Warnings = i18n.Notes(loc, r.Warnings, r.WarnT)
+	r.Flaps = append([]Flap(nil), r.Flaps...)
+	for i, f := range r.Flaps {
+		if f.KB != nil {
+			e := f.KB.In(loc)
+			r.Flaps[i].KB = &e
+		}
+	}
+	r.KB = kbIn(loc, r.KB)
+	return r
+}
+
+// Text arma el informe legible en español.
+func (r FlapReport) Text() string { return r.TextIn(i18n.Es) }
+
+// TextIn arma el informe legible en el idioma dado (r ya viene en ese idioma: ver Localize).
+func (r FlapReport) TextIn(loc string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d interfaz(ces) con transiciones, %d transición(es). Flapping: %d o más en %s.\n", r.Interfaces, r.Transitions, r.Count, r.Window)
+	m := func(k string, kv ...any) string { return i18n.Msg(loc, k, i18n.A(kv...)) }
+	b.WriteString(m("logintel.flap.head", "interfaces", r.Interfaces, "transitions", r.Transitions, "count", r.Count, "window", r.Window) + "\n")
 	if len(r.Flaps) == 0 {
-		b.WriteString("Ninguna interfaz con flapping.\n")
+		b.WriteString(m("logintel.flap.none") + "\n")
 	}
 	for _, f := range r.Flaps {
 		host := f.Host
@@ -195,16 +218,16 @@ func (r FlapReport) Text() string {
 			host = "-"
 		}
 		if f.NoTime {
-			fmt.Fprintf(&b, "\n[POSIBLE, SIN HORA] %s %s: %d transiciones (%s)\n", host, f.Interface, f.Total, f.Sequence)
+			b.WriteString("\n" + m("logintel.flap.possible", "host", host, "iface", f.Interface, "total", f.Total, "seq", f.Sequence) + "\n")
 		} else {
-			fmt.Fprintf(&b, "\n[FLAPPING] %s %s: %d transiciones en una ventana (pico), %d en total, de %s a %s (%s)\n", host, f.Interface, f.Peak, f.Total, f.First.UTC().Format(time.RFC3339Nano), f.Last.UTC().Format(time.RFC3339Nano), f.Sequence)
+			b.WriteString("\n" + m("logintel.flap.flapping", "host", host, "iface", f.Interface, "peak", f.Peak, "total", f.Total, "from", f.First.UTC().Format(time.RFC3339Nano), "to", f.Last.UTC().Format(time.RFC3339Nano), "seq", f.Sequence) + "\n")
 		}
 		if f.KB != nil {
-			fmt.Fprintf(&b, "    %s Causa probable: %s Acción: %s\n", f.KB.ID, f.KB.Cause, f.KB.Action)
+			b.WriteString(m("logintel.flap.kb", "id", f.KB.ID, "cause", f.KB.Cause, "action", f.KB.Action) + "\n")
 		}
 	}
 	for _, w := range r.Warnings {
-		fmt.Fprintf(&b, "\nAviso: %s\n", w)
+		fmt.Fprintf(&b, "\n%s: %s\n", m("forensic.label.warning"), w)
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
@@ -278,16 +301,19 @@ func CounterJumps(ss []CounterSample, minDelta int64) []CounterJump {
 	return out
 }
 
-// JumpsText arma el bloque legible de los saltos de contadores.
-func JumpsText(js []CounterJump) string {
+// JumpsText arma el bloque legible de los saltos de contadores en español.
+func JumpsText(js []CounterJump) string { return JumpsTextIn(i18n.Es, js) }
+
+// JumpsTextIn arma el bloque legible de los saltos de contadores en el idioma dado.
+func JumpsTextIn(loc string, js []CounterJump) string {
 	if len(js) == 0 {
-		return "Ningún contador de interfaz saltó entre rondas."
+		return i18n.Msg(loc, "logintel.jump.none", nil)
 	}
 	var b strings.Builder
 	for _, j := range js {
-		fmt.Fprintf(&b, "[SALTO] %s %s: %s subió de %d a %d (+%d) entre las rondas %d y %d", j.Host, j.Interface, j.Counter, j.From, j.To, j.Delta, j.FromRound, j.ToRound)
+		b.WriteString(i18n.Msg(loc, "logintel.jump.line", i18n.A("host", j.Host, "iface", j.Interface, "counter", j.Counter, "from", j.From, "to", j.To, "delta", j.Delta, "from_round", j.FromRound, "to_round", j.ToRound)))
 		if j.PerHour > 0 {
-			fmt.Fprintf(&b, " (%.1f por hora)", j.PerHour)
+			b.WriteString(i18n.Msg(loc, "logintel.jump.per_hour", i18n.A("rate", fmt.Sprintf("%.1f", j.PerHour))))
 		}
 		b.WriteByte('\n')
 	}

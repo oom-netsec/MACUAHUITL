@@ -3,13 +3,13 @@ package patrol
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/netip"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
@@ -21,6 +21,7 @@ type LoginResult struct {
 	Passed         bool
 	FailedStep     string // tcp, host_key, auth, privilege, prompt, platform
 	Detail         string
+	DetailErr      error // el error de Detail, para darlo en el idioma del cliente (i18n.In); nil si Detail no sale de un error
 	Platform       string
 	Fingerprint    string
 }
@@ -93,7 +94,7 @@ func connectOnce(ctx context.Context, d Deps, jobID string, s Spec, t Target, hk
 	open := func(id string) (*transport.Session, vault.Credential, error) {
 		cred, err := d.Vault.Get(id)
 		if err != nil {
-			return nil, cred, fmt.Errorf("patrol: credencial: %w", err)
+			return nil, cred, i18n.Wrap("patrol.err.credential", err, nil)
 		}
 		sess, err := transport.OpenSSH(ctx, d.Guard, jobID, t.Address, port(t), cred, cb, transport.SSHOptions{})
 		if err != nil {
@@ -136,7 +137,7 @@ func LoginTest(ctx context.Context, d Deps, jobID string, s Spec, interactive bo
 	out := make([]LoginResult, len(s.Targets))
 	if err := d.Guard.Allow(ctx, jobID, addresses(s)); err != nil {
 		for i, t := range s.Targets {
-			out[i] = LoginResult{Target: hostport(t), FailedStep: "tcp", Detail: err.Error()}
+			out[i] = LoginResult{Target: hostport(t), FailedStep: "tcp", Detail: err.Error(), DetailErr: err}
 		}
 		return out
 	}
@@ -166,7 +167,7 @@ func LoginTest(ctx context.Context, d Deps, jobID string, s Spec, interactive bo
 			r.FailedStep = step(err)
 		}
 		if err != nil {
-			r.Detail = err.Error()
+			r.Detail, r.DetailErr = err.Error(), err
 			var he *transport.HostKeyError
 			if errors.As(err, &he) {
 				r.Fingerprint = he.Fingerprint

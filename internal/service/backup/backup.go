@@ -84,12 +84,12 @@ func (s *backupSvc) close() {
 	s.wg.Wait()
 }
 
-func keepOf(k uint32) (int, error) {
+func keepOf(ctx context.Context, k uint32) (int, error) {
 	if k == 0 {
 		return backup.DefaultKeep, nil
 	}
 	if k > maxKeep {
-		return 0, status.Errorf(codes.InvalidArgument, "la retención máxima es %d", maxKeep)
+		return 0, service.Err(ctx, codes.InvalidArgument, "backup.err.keep", i18n.A("max", maxKeep))
 	}
 	return int(k), nil
 }
@@ -97,9 +97,9 @@ func keepOf(k uint32) (int, error) {
 func (s *backupSvc) StartBackup(ctx context.Context, r *v1.StartBackupRequest) (*v1.StartBackupResponse, error) {
 	s.d.MarkActive()
 	if len(r.Targets) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "indica al menos un equipo")
+		return nil, service.Err(ctx, codes.InvalidArgument, "backup.err.no_targets", nil)
 	}
-	keep, err := keepOf(r.Keep)
+	keep, err := keepOf(ctx, r.Keep)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (s *backupSvc) StartBackup(ctx context.Context, r *v1.StartBackupRequest) (
 		WindowHours: 1, Split: v1.SplitStrategy_SPLIT_STRATEGY_PER_ROUND, Zip: v1.ZipPolicy_ZIP_POLICY_NONE, DisableMasking: r.IncludeSecrets}
 	if r.IntervalSeconds > 0 {
 		if r.Rounds < 2 {
-			return nil, status.Error(codes.InvalidArgument, "con intervalo indica cuántas rondas (2 o más)")
+			return nil, service.Err(ctx, codes.InvalidArgument, "backup.err.rounds", nil)
 		}
 		spec.Schedule = &v1.Schedule{IntervalSeconds: r.IntervalSeconds, Rounds: r.Rounds}
 		spec.WindowHours = uint32(min(96, (uint64(r.IntervalSeconds)*uint64(r.Rounds))/3600+2))
@@ -120,11 +120,11 @@ func (s *backupSvc) StartBackup(ctx context.Context, r *v1.StartBackupRequest) (
 	out := s.d.Outputs() // se lee una sola vez: el trabajo entero queda en esta carpeta aunque luego cambie
 	root := filepath.Join(out, "respaldos", trabajos)
 	if err := os.MkdirAll(root, 0o700); err != nil {
-		return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+		return nil, service.Err(ctx, codes.Internal, "backup.err.out_dir", i18n.A("error", err.Error()))
 	}
 	lote, err := os.MkdirTemp(root, "lote-")
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+		return nil, service.Err(ctx, codes.Internal, "backup.err.out_dir", i18n.A("error", err.Error()))
 	}
 	spec.OutputDir = lote
 	p := s.d.Patrol()
@@ -406,12 +406,12 @@ func (s *backupSvc) forget(job string, tr *tracked, clean bool) {
 	}
 }
 
-func (s *backupSvc) CollectBackups(_ context.Context, r *v1.CollectBackupsRequest) (*v1.CollectBackupsResponse, error) {
+func (s *backupSvc) CollectBackups(ctx context.Context, r *v1.CollectBackupsRequest) (*v1.CollectBackupsResponse, error) {
 	s.d.MarkActive()
 	keep := 0 // 0 = la retención del trabajo propio, o la de por defecto
 	if r.Keep > 0 {
 		var err error
-		if keep, err = keepOf(r.Keep); err != nil {
+		if keep, err = keepOf(ctx, r.Keep); err != nil {
 			return nil, err
 		}
 	}

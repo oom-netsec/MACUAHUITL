@@ -1,0 +1,8 @@
+{
+ "boveda": "ERROR: rpc error: code = FailedPrecondition desc = abre la bóveda: la terminal necesita las credenciales del equipo",
+ "guard": "ERROR: rpc error: code = PermissionDenied desc = transport: 10.0.0.1/8 tiene bits de host; ¿quisiste decir 10.0.0.0/8?",
+ "limite": "ERROR: rpc error: code = ResourceExhausted desc = máximo 8 terminales abiertas",
+ "no_abre": "ERROR: rpc error: code = InvalidArgument desc = el primer mensaje debe abrir la sesión",
+ "puerto": "ERROR: rpc error: code = InvalidArgument desc = puerto fuera de rango",
+ "sin_equipo": "ERROR: rpc error: code = InvalidArgument desc = indica el equipo (dirección) y la credencial"
+}

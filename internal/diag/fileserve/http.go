@@ -42,18 +42,18 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		defer func() { t.Duration = time.Since(start); c.OnTransfer(t) }()
 		if ap, err := netip.ParseAddrPort(r.RemoteAddr); err != nil || !c.permits(ap.Addr()) {
 			http.Error(w, "origen no permitido", http.StatusForbidden)
-			t.Error, t.Rejected = "origen no permitido", true
+			t.Error, t.ReasonT, t.Rejected = "origen no permitido", lit("origen no permitido"), true
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, "solo GET", http.StatusMethodNotAllowed)
-			t.Error, t.Rejected = "método "+r.Method, true
+			t.Error, t.ReasonT, t.Rejected = "método "+r.Method, why("method", "method", r.Method), true
 			return
 		}
 		if !src.exists(name) {
 			http.NotFound(w, r) // sin listado ni pistas de qué hay publicado
-			t.Error, t.Rejected = "archivo no publicado", true
+			t.Error, t.ReasonT, t.Rejected = "archivo no publicado", lit("archivo no publicado"), true
 			return
 		}
 		select {
@@ -61,13 +61,13 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 			defer func() { <-sem }()
 		default:
 			http.Error(w, "ocupado", http.StatusServiceUnavailable)
-			t.Error, t.Rejected = "demasiadas transferencias simultáneas", true
+			t.Error, t.ReasonT, t.Rejected = "demasiadas transferencias simultáneas", lit("demasiadas transferencias simultáneas"), true
 			return
 		}
 		f, st, err := src.open(name)
 		if err != nil {
 			http.Error(w, "no disponible", http.StatusInternalServerError)
-			t.Error = err.Error()
+			t.setErr(err)
 			return
 		}
 		defer f.Close()
@@ -77,7 +77,7 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		t.Bytes = cw.n
 		switch {
 		case cw.err != nil:
-			t.Error = "interrumpida: " + cw.err.Error()
+			t.Error, t.ReasonT = "interrumpida: "+cw.err.Error(), why("interrupted", "error", cw.err.Error())
 		case cw.status >= 400:
 			t.Error = fmt.Sprintf("HTTP %d", cw.status)
 		default:

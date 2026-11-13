@@ -1,0 +1,23 @@
+{
+ "armar_armado": "ERROR: rpc error: code = FailedPrecondition desc = el trabajo está armed",
+ "armar_sin_equipos": "ERROR: rpc error: code = FailedPrecondition desc = no quedan equipos",
+ "armar_sin_llave": "ERROR: rpc error: code = FailedPrecondition desc = Login Test falló; excluye o corrige: \u003cip\u003e:\u003cp\u003e: host_key",
+ "crear_comando_malo": "ERROR: rpc error: code = InvalidArgument desc = patrol: custom_commands: playbook: comando no permitido en una recolección (solo lectura): \"configure terminal\" (no es un comando de lectura)",
+ "crear_cred_no_esta": "ERROR: rpc error: code = InvalidArgument desc = patrol: credential: zzz no está en la bóveda",
+ "crear_cron": "ERROR: rpc error: code = InvalidArgument desc = patrol: schedule: cron: expected exactly 5 fields, found 1: [x]",
+ "crear_excluyentes": "ERROR: rpc error: code = InvalidArgument desc = patrol: schedule: intervalo y cron son excluyentes",
+ "crear_fin_pasado": "ERROR: rpc error: code = InvalidArgument desc = patrol: schedule: la fecha de fin ya pasó",
+ "crear_override": "ERROR: rpc error: code = InvalidArgument desc = patrol: overrides: zzz (equipo sw1) no está en la bóveda",
+ "crear_playbook": "ERROR: rpc error: code = InvalidArgument desc = patrol: playbook_ids: no-existe no existe",
+ "crear_salida_no_dir": "ERROR: rpc error: code = InvalidArgument desc = prefs.outputs.no_existe: la carpeta no existe: \u003croot\u003e/o/no-existe-aun (créala con permisos 0700)",
+ "crear_sin_comandos": "ERROR: rpc error: code = InvalidArgument desc = patrol: commands: sin playbooks ni comandos",
+ "crear_sin_cred": "ERROR: rpc error: code = InvalidArgument desc = patrol: credential: sin credencial por defecto",
+ "crear_sin_equipos": "ERROR: rpc error: code = InvalidArgument desc = patrol: targets: sin equipos",
+ "crear_tipo": "ERROR: rpc error: code = InvalidArgument desc = tipo de trabajo \"x\" no válido (patrol, adhoc, backup o change)",
+ "crear_ventana_0": "ERROR: rpc error: code = InvalidArgument desc = patrol: window_hours: debe estar entre 1 y 96, es 0",
+ "crear_ventana_97": "ERROR: rpc error: code = InvalidArgument desc = patrol: window_hours: debe estar entre 1 y 96, es 97",
+ "login_armado": "ERROR: rpc error: code = FailedPrecondition desc = el trabajo está armed; el Login Test solo aplica antes de armar",
+ "login_cerrado_0": "passed=false step=LOGIN_TEST_STEP_TCP detail=\"dial tcp \u003cip\u003e:\u003cp\u003e: connect: connection refused\" platform=\"\"",
+ "login_llave_0": "passed=false step=LOGIN_TEST_STEP_HOST_KEY detail=\"transport: llave de host desconocida de \u003cip\u003e:\u003cp\u003e: \u003cv\u003e\" platform=\"\"",
+ "sin_boveda": "ERROR: rpc error: code = FailedPrecondition desc = no hay bóveda"
+}

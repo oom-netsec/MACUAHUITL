@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/crashinfo"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/logintel"
 	"github.com/oom-netsec/MACUAHUITL/internal/msgkb"
@@ -53,19 +55,19 @@ const maxText = 8 << 20
 // readSource devuelve el texto de la petición o el contenido de un archivo regular local
 // (ruta absoluta, sin directorios ni dispositivos), leyendo a lo más max+1 bytes para que el
 // dominio pueda avisar que se truncó.
-func readSource(text, path string, max int) (string, error) {
+func readSource(ctx context.Context, text, path string, max int) (string, error) {
 	switch {
 	case text != "" && path != "":
-		return "", status.Error(codes.InvalidArgument, "manda el texto o la ruta, no los dos")
+		return "", service.Err(ctx, codes.InvalidArgument, "forensic.err.both", nil)
 	case text != "":
 		if len(text) > maxText {
-			return "", status.Errorf(codes.InvalidArgument, "el texto excede %d MiB", maxText>>20)
+			return "", service.Err(ctx, codes.InvalidArgument, "forensic.err.text_big", i18n.A("mib", maxText>>20))
 		}
 		return text, nil
 	case path == "":
-		return "", status.Error(codes.InvalidArgument, "falta el texto o la ruta del archivo")
+		return "", service.Err(ctx, codes.InvalidArgument, "forensic.err.neither", nil)
 	case !filepath.IsAbs(path):
-		return "", status.Error(codes.InvalidArgument, "la ruta del archivo debe ser absoluta")
+		return "", service.Err(ctx, codes.InvalidArgument, "forensic.err.relative", nil)
 	}
 	f, err := sys.OpenRegular(filepath.Clean(path))
 	if errors.Is(err, sys.ErrNotRegular) {
@@ -89,8 +91,8 @@ const maxReport = 4 << 20
 // fitReport empaqueta el informe que arma build con las primeras n filas de total. Si el JSON o
 // el texto pasan de maxReport, reduce n y lo avisa en el propio informe (warn llega vacío si no
 // hubo recorte). Las filas ya vienen ordenadas por importancia: se pierde la cola.
-func (s *forensicSvc) fitReport(total int, build func(n int, warn string) (any, string)) *v1.ToolReport {
-	n, warn := total, ""
+func (s *forensicSvc) fitReport(total int, build func(n int, warn i18n.Text) (any, string)) *v1.ToolReport {
+	n, warn := total, i18n.Text{}
 	for {
 		v, txt := build(n, warn)
 		r := service.Report(v, txt)
@@ -99,7 +101,7 @@ func (s *forensicSvc) fitReport(total int, build func(n int, warn string) (any, 
 			return r
 		}
 		n = min(int(int64(n)*s.reportBytes()/int64(size)*9/10), n-1)
-		warn = fmt.Sprintf("informe recortado: se muestran %d de %d filas por el tope de %d KiB; acota la fuente (equipo, archivo o rango)", n, total, s.reportBytes()>>10)
+		warn = i18n.Tx("forensic.warn.fit", "n", n, "total", total, "kib", s.reportBytes()>>10)
 	}
 }
 
@@ -111,7 +113,13 @@ func kb() (*msgkb.KB, error) {
 	return k, nil
 }
 
-func (s *forensicSvc) MsgLookup(_ context.Context, r *v1.MsgLookupRequest) (*v1.MsgLookupResponse, error) {
+// reportOf arma el informe con las fichas y el texto en el idioma de la llamada.
+func lookupOf(loc string, es []msgkb.Entry) ([]msgkb.Entry, string) {
+	es = msgkb.EntriesIn(loc, es)
+	return es, msgkb.TextIn(loc, es)
+}
+
+func (s *forensicSvc) MsgLookup(ctx context.Context, r *v1.MsgLookupRequest) (*v1.MsgLookupResponse, error) {
 	s.d.MarkActive()
 	k, err := kb()
 	if err != nil {
@@ -119,13 +127,14 @@ func (s *forensicSvc) MsgLookup(_ context.Context, r *v1.MsgLookupRequest) (*v1.
 	}
 	es, err := k.Query(r.Query)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	if es == nil {
 		es = []msgkb.Entry{}
 	}
 	s.d.Audit("forensic.msg", r.Query, fmt.Sprintf("results=%d", len(es)))
-	return &v1.MsgLookupResponse{Report: service.Report(es, msgkb.Text(es))}, nil
+	es, txt := lookupOf(i18n.Locale(ctx), es)
+	return &v1.MsgLookupResponse{Report: service.Report(es, txt)}, nil
 }
 
 // crashReport es la respuesta de Crashinfo: lo leído más la ficha de cada mensaje que el
@@ -135,9 +144,9 @@ type crashReport struct {
 	Messages []msgkb.Entry `json:"messages"`
 }
 
-func (s *forensicSvc) Crashinfo(_ context.Context, r *v1.CrashinfoRequest) (*v1.CrashinfoResponse, error) {
+func (s *forensicSvc) Crashinfo(ctx context.Context, r *v1.CrashinfoRequest) (*v1.CrashinfoResponse, error) {
 	s.d.MarkActive()
-	text, err := readSource(r.Text, r.Path, crashinfo.MaxBytes)
+	text, err := readSource(ctx, r.Text, r.Path, crashinfo.MaxBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -147,9 +156,10 @@ func (s *forensicSvc) Crashinfo(_ context.Context, r *v1.CrashinfoRequest) (*v1.
 		if !errors.Is(err, crashinfo.ErrEmpty) {
 			code = codes.Internal
 		}
-		return nil, status.Error(code, err.Error())
+		return nil, service.ErrFrom(ctx, code, err)
 	}
-	out := crashReport{Report: rep, Messages: []msgkb.Entry{}}
+	loc := i18n.Locale(ctx)
+	out := crashReport{Report: rep.Localize(loc), Messages: []msgkb.Entry{}}
 	k, err := kb()
 	if err != nil {
 		return nil, err
@@ -159,9 +169,10 @@ func (s *forensicSvc) Crashinfo(_ context.Context, r *v1.CrashinfoRequest) (*v1.
 			out.Messages = append(out.Messages, e)
 		}
 	}
-	txt := rep.Text()
+	out.Messages = msgkb.EntriesIn(loc, out.Messages)
+	txt := out.Report.TextIn(loc)
 	if len(out.Messages) > 0 {
-		txt += "\n\nMensajes conocidos:\n" + msgkb.Text(out.Messages)
+		txt += "\n\n" + i18n.Msg(loc, "forensic.crash.known", nil) + "\n" + msgkb.TextIn(loc, out.Messages)
 	}
 	s.d.Audit("forensic.crashinfo", strings.TrimSpace(r.Path), fmt.Sprintf("bytes=%d type=%s", rep.Bytes, rep.Kind))
 	return &v1.CrashinfoResponse{Report: service.Report(out, txt)}, nil
@@ -174,47 +185,52 @@ func (Module) Register(s ipc.Registrar, d service.Deps) {
 	v1.RegisterForensicServiceServer(s, &forensicSvc{d: d})
 }
 
-func (s *forensicSvc) LogPatterns(_ context.Context, r *v1.LogPatternsRequest) (*v1.LogPatternsResponse, error) {
+func (s *forensicSvc) LogPatterns(ctx context.Context, r *v1.LogPatternsRequest) (*v1.LogPatternsResponse, error) {
 	s.d.MarkActive()
-	l, err := s.loadLogs(r.Source)
+	l, err := s.loadLogs(ctx, r.Source)
 	if err != nil {
 		return nil, err
 	}
 	o := logintel.GroupOptions{BurstCount: int(min(r.BurstCount, 1000)), BurstWindow: time.Duration(min(r.BurstWindowSeconds, 86400)) * time.Second}
 	rep := logintel.Group(l.entries, o)
-	rep.Warnings = append(l.warnings, rep.Warnings...)
-	s.d.Audit("forensic.patterns", l.source, fmt.Sprintf("messages=%d patterns=%d", len(l.entries), len(rep.Patterns)))
-	return &v1.LogPatternsResponse{Report: s.fitReport(len(rep.Patterns), func(n int, warn string) (any, string) {
+	rep.Warnings, rep.WarnT = append(slices.Clone(l.warnings), rep.Warnings...), append(slices.Clone(l.warnT), rep.WarnT...)
+	loc := i18n.Locale(ctx)
+	s.d.Audit("forensic.patterns", l.source.in(i18n.En), fmt.Sprintf("messages=%d patterns=%d", len(l.entries), len(rep.Patterns)))
+	return &v1.LogPatternsResponse{Report: s.fitReport(len(rep.Patterns), func(n int, warn i18n.Text) (any, string) {
 		r := rep
 		r.Patterns = rep.Patterns[:n]
-		if warn != "" {
-			r.Warnings = append(r.Warnings[:len(r.Warnings):len(r.Warnings)], warn)
+		if !warn.Empty() {
+			r.Warnings, r.WarnT = append(r.Warnings[:len(r.Warnings):len(r.Warnings)], warn.In(i18n.Es)), append(r.WarnT[:len(r.WarnT):len(r.WarnT)], warn)
 		}
+		r = r.Localize(loc)
 		out := struct {
 			logintel.Report
 			Source string         `json:"source"`
 			Stats  logintel.Stats `json:"stats"`
-		}{r, l.source, l.stats}
-		return out, "Fuente: " + l.source + "\n" + r.Text()
+		}{r, l.source.in(loc), l.stats}
+		return out, i18n.Msg(loc, "forensic.label.source", nil) + ": " + l.source.in(loc) + "\n" + r.TextIn(loc)
 	})}, nil
 }
 
-func (s *forensicSvc) DebugFilter(_ context.Context, r *v1.DebugFilterRequest) (*v1.DebugFilterResponse, error) {
+func (s *forensicSvc) DebugFilter(ctx context.Context, r *v1.DebugFilterRequest) (*v1.DebugFilterResponse, error) {
 	s.d.MarkActive()
 	if len(r.Noise) > logintel.MaxNoise {
-		return nil, status.Errorf(codes.InvalidArgument, "como máximo %d textos de ruido", logintel.MaxNoise)
+		return nil, service.Err(ctx, codes.InvalidArgument, "forensic.err.noise_max", i18n.A("max", logintel.MaxNoise))
 	}
-	text, err := readSource(r.Text, r.Path, maxLogBytes)
+	text, err := readSource(ctx, r.Text, r.Path, maxLogBytes)
 	if err != nil {
 		return nil, err
 	}
 	var warns []string
+	var warnsT []i18n.Text
 	if len(text) > maxLogBytes {
 		text = text[:maxLogBytes]
-		warns = append(warns, "el archivo supera 32 MiB: solo se leyó el principio")
+		i18n.Note(&warns, &warnsT, "forensic.warn.file_cap")
 	}
 	rep := logintel.FilterDebug(text, logintel.DebugOptions{Noise: r.Noise, FamilyMin: int(min(r.FamilyMin, 1<<20)), RareMax: int(min(r.RareMax, 1<<20)), Top: int(min(r.Top, 500))})
-	rep.Warnings = append(warns, rep.Warnings...)
+	rep.Warnings, rep.WarnT = append(warns, rep.Warnings...), append(warnsT, rep.WarnT...)
+	loc := i18n.Locale(ctx)
+	rep = rep.Localize(loc)
 	s.d.Audit("forensic.debugs", strings.TrimSpace(r.Path), fmt.Sprintf("lines=%d hidden=%d patterns=%d anomalies=%d", rep.Lines, rep.Hidden, rep.GroupsTotal, len(rep.Anomalies)))
-	return &v1.DebugFilterResponse{Report: service.Report(rep, rep.Text())}, nil
+	return &v1.DebugFilterResponse{Report: service.Report(rep, rep.TextIn(loc))}, nil
 }

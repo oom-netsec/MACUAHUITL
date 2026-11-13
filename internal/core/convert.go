@@ -1,12 +1,14 @@
 package core
 
 import (
+	"errors"
 	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/engine"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
@@ -60,7 +62,8 @@ func eventToProto(loc string, e engine.Event) *v1.SubscribeResponse {
 	r := &v1.SubscribeResponse{At: timestamppb.New(e.At), JobId: e.JobID}
 	switch e.Kind {
 	case engine.DeviceState:
-		r.Event = &v1.SubscribeResponse_DeviceStateChanged{DeviceStateChanged: &v1.DeviceStateChanged{DeviceId: e.DeviceID, State: deviceStates[e.State], Detail: e.Detail}}
+		detail, reason, args := detailOf(loc, e.Detail, e.Err)
+		r.Event = &v1.SubscribeResponse_DeviceStateChanged{DeviceStateChanged: &v1.DeviceStateChanged{DeviceId: e.DeviceID, State: deviceStates[e.State], Detail: detail, Reason: reason, Args: args}}
 	case engine.Progress:
 		r.Event = &v1.SubscribeResponse_CommandProgress{CommandProgress: &v1.CommandProgress{DeviceId: e.DeviceID, Command: e.Command, Index: uint32(e.Index), Total: uint32(e.Total), BytesReceived: uint64(e.Bytes)}}
 	case engine.Heartbeat:
@@ -73,4 +76,14 @@ func eventToProto(loc string, e engine.Event) *v1.SubscribeResponse {
 		r.Event = &v1.SubscribeResponse_PhaseAdded{PhaseAdded: phaseToProto(loc, phase{At: e.At, Kind: e.State, Round: e.Index, Detail: e.Detail, Reason: e.Reason, Args: e.Args})}
 	}
 	return r
+}
+
+// detailOf da el detalle de un equipo en el idioma loc, junto con el código del catálogo y los argumentos de su error;
+// sin error con código (texto de sistema), es el detalle en español de siempre, sin código.
+func detailOf(loc, es string, err error) (detail, reason string, args map[string]string) {
+	var c i18n.Coded
+	if err == nil || !errors.As(err, &c) {
+		return es, "", nil
+	}
+	return i18n.In(loc, err), c.Reason(), c.Metadata()
 }

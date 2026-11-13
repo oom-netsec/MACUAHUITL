@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 )
 
@@ -14,6 +15,7 @@ type Progress struct {
 	Index, Total           int
 	Bytes                  int64
 	Detail                 string
+	Err                    error // el error de Detail, para darlo en el idioma del suscriptor; nil si Detail no sale de un error
 }
 
 type HostKeyChange struct {
@@ -26,6 +28,7 @@ type DeviceResult struct {
 	Hostname, Platform string
 	State              string // completed, failed, skipped
 	Detail             string
+	DetailErr          error `json:"-"` // el error de Detail, para darlo en el idioma del cliente (i18n.In)
 	Commands, Invalid  int
 	// Skipped: comandos que no corren en la plataforma detectada (platforms: del playbook); van en el manifest.
 	Skipped        []string       `json:",omitempty"`
@@ -35,10 +38,15 @@ type DeviceResult struct {
 // auditResult registra el resultado del equipo en la ronda (spec §12.2). Si la auditoría
 // no se puede escribir, el equipo cuenta como fallido: no hay evidencia sin rastro.
 func auditResult(ctx context.Context, d Deps, jobID string, res DeviceResult) DeviceResult {
+	detail := res.Detail // la auditoría va siempre en inglés
+	if res.DetailErr != nil {
+		detail = i18n.English(res.DetailErr)
+	}
 	_, err := d.Audit.Append(ctx, audit.Entry{Actor: "patrol", Action: "device.round", Target: hostport(res.Target),
-		Detail: fmt.Sprintf("job=%s round=%d state=%s commands=%d invalid=%d %s", jobID, res.Round, res.State, res.Commands, res.Invalid, res.Detail)})
+		Detail: fmt.Sprintf("job=%s round=%d state=%s commands=%d invalid=%d error=%q", jobID, res.Round, res.State, res.Commands, res.Invalid, detail)})
 	if err != nil {
-		res.State, res.Detail = "failed", "auditoría: "+err.Error()
+		res.State, res.DetailErr = "failed", i18n.New("patrol.err.audit", i18n.A("error", err.Error()))
+		res.Detail = res.DetailErr.Error()
 	}
 	return res
 }
@@ -58,19 +66,19 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	defer func() { res = auditResult(ctx, d, jobID, res) }()
 	c, err := connect(ctx, d, jobID, s, t, transport.HostKeyPolicy{AcceptChanged: s.AcceptChangedHostKeys}, onEvent, d.PrimaryVerified[hp], d.backoff())
 	if err != nil {
-		res.State, res.Detail = "failed", err.Error()
+		res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
 		if step(err) == "host_key" {
 			res.State = "skipped"
 		}
-		emit(Progress{Target: hp, State: res.State, Detail: res.Detail})
+		emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})
 		return res
 	}
 	defer c.close()
 	res.Hostname, res.Platform = c.drv.Hostname(), c.platform
 	cmds, skipped, err := commands(s, c.platform, d.Playbooks)
 	if err != nil {
-		res.State, res.Detail = "failed", err.Error()
-		emit(Progress{Target: hp, State: res.State, Detail: res.Detail})
+		res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
+		emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})
 		return res
 	}
 	res.Skipped = skipped
@@ -89,8 +97,8 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		}
 		res.Commands++
 		if runErr != nil {
-			res.State, res.Detail = "failed", runErr.Error()
-			emit(Progress{Target: hp, State: res.State, Detail: res.Detail})
+			res.State, res.Detail, res.DetailErr = "failed", runErr.Error(), runErr
+			emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})
 			return res
 		}
 	}

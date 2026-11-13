@@ -1042,3 +1042,55 @@ En TS los métodos nuevos son opcionales en `AnalysisAPI` y `DriftAPI`; `keys?` 
 - **Secretos.** El informe de cumplimiento oculta, además del valor de `password` y `secret`, la comunidad de `snmp-server community`, el `key-string` y la llave de `ntp authentication-key`. Eso cambia el texto en español de esos casos raros (por ejemplo, la línea citada de una regla prohibida de la plantilla) y cierra una fuga. La marca es `<oculto>` con `es` y `<hidden>` con `en`.
 - **Errores con causa.** Un error que envuelve a otro (`acl.err.import` sobre `acl.err.line`) trae en su metadata la de la causa (`line`) y `cause_reason`; los argumentos de `Finding.detail_key` traen la `cause` (en español) cuando la plantilla la pide.
 - **`fleetWails`** devuelve `keys` en cada resultado cuando el núcleo las manda.
+
+## Idioma del resto del núcleo: bloque D (fase 30c)
+Forense, métricas, Patrol, scripts y transferencias. Sin `accept-language`, o con es, cada RPC devuelve los mismos bytes de antes (lo fijan los golden `testdata/*_es.golden.json`); con `en` el texto sale traducido.
+
+### Reglas
+- Los errores gRPC de estas áreas usan `service.Err`/`ErrFrom`: el texto sigue al idioma y `ErrorInfo.reason` + `metadata` viajan siempre (el puente ya los lleva con `wrapErr`).
+- Los informes JSON no ganan campos: el JSON de forense, métricas y transferencias trae los mismos campos que antes, con el texto en el idioma pedido (`meaning`, `cause`, `action`, `hint`, `warnings`, `reason` de las anomalías, `source`…). Lo que el front dibuja sigue saliendo de los campos de siempre (`id`, `severity`, `count`…), que no cambian.
+- Los nombres de equipo, IP, comandos de IOS, mnemónicos y la salida de los equipos no se traducen.
+
+### Campos nuevos (puente, todos `omitempty`)
+| DTO | Campos | Qué traen |
+|---|---|---|
+| `LoginDTO` (`LoginTest`) | `reason`, `args` | código y argumentos del error de `detail` (`transport.hostkey.unknown {host, fingerprint}`, `transport.err.auth`, `platform.err.closed`…); vacíos si `detail` es texto de sistema |
+| `RunDeviceDTO` (`GetRun`) | `reason`, `args` | igual, para el `detail` de un equipo que falló |
+| `DeviceStateChanged` (evento) | `reason`, `args` (proto `reason = 4`, `args = 5`) | igual, para el `detail` del evento |
+
+`detail` sigue siendo el texto en el idioma pedido. Los códigos nuevos son `patrol.field.*` (validación del trabajo, con `metadata.field`), `patrol.svc.*`, `transport.err.*`, `transport.hostkey.{unknown,changed,known}`, `platform.err.*`, `backup.err.*`, `terminal.err.*`, `visibility.err.*`, `metrics.svc.*`, `forensic.err.*`, `scripts.err.*`, `scripts.col.*`, `scripts.svc.*`, `xfer.err.*`, `transfer.svc.*` y `fileserve.err.*`.
+
+### Forense
+- `MsgLookup` y `Crashinfo`: `meaning`, `cause`, `action` y `source` de cada ficha salen en el idioma pedido (en el YAML de la base van `meaning_en`, `cause_en` y `action_en`). `verify` son comandos de IOS y no cambian. La fuente fija es «documentación pública de Cisco (sin validar en laboratorio)» / «Cisco public documentation (not validated in the lab)».
+- `Crashinfo`: `hint` y `warnings` traducidos; `kind` conserva el código de siempre (`crashinfo`, `core`, `desconocido`).
+- `LogPatterns`, `Flapping`, `MemLeaks`, `DebugFilter`: `warnings`, la `kb` por mnemónico, el `reason` de cada anomalía de `DebugFilter` y el texto del informe (`text`) en el idioma pedido; `source` es «texto pegado» / «pasted text», «captura del receptor syslog» / «syslog receiver capture» o `show logging del trabajo <carpeta>` / `show logging of job <carpeta>` (o la ruta del archivo, que es un dato).
+- Siguen en español con `en`: el texto del sistema (`no such file…`) y los avisos del lector de carpetas de Patrol (`internal/analyze`, bloque C).
+
+### Métricas
+`GetJobMetrics` (`warnings` de la respuesta y de cada equipo) y `GetPortStatus` (`warnings`, en vivo y de un trabajo) salen en el idioma pedido; los comandos que citan no cambian. Los errores del servicio (`metrics.svc.*`, `metrics.err.*`) son de catálogo.
+
+### Patrol
+- `CreateJob`: los errores de validación son `patrol.field.*` con `metadata.field` (`targets`, `credential`, `window_hours`, `output_dir`, `commands`, `custom_commands`, `playbook_ids`, `overrides`, `schedule`) más los argumentos (`n`, `id`, `device`, `error`). El texto sigue siendo `patrol: <campo>: <mensaje>`.
+- `LoginTest` y los eventos de equipo: ver la tabla de arriba. Los pasos (`failed_step`) no cambian.
+- La auditoría del equipo (`device.round`) lleva ahora el detalle en inglés.
+
+### Scripts
+Los scripts de fábrica (origen `biblioteca`) salen con `name` y `description` en inglés con `en` (`name_en` y `description_en` en `configuracion.yaml`; los de playbook toman el `name_en` del playbook y «Read-only diagnostic of playbook <id>.»). Los scripts del usuario no se traducen, ni el archivo de export (siempre en español). Los errores de validación y de los RPC de scripts y colecciones son `scripts.err.*`, `scripts.col.*` y `scripts.svc.*`.
+
+### Transferencias
+- `StartServer`: el campo `Error` de `transfer_json` (motivo de rechazo o de falla) sale traducido: `origen no permitido` → `origin not allowed`, `archivo no publicado` → `file not published`, `método POST` → `method POST`… (`fileserve.reason.*`). `HTTP 404` y los textos del sistema no cambian. Lo que el servidor manda por el cable al equipo (respuestas FTP, errores TFTP y SCP) sigue en español.
+- `TransferResult.report`: «guardado/enviado … (N bytes en T)» / «saved/sent … (N bytes in T)»; `verified` conserva sus códigos (`ok`, `distinto`) y la línea «verificado: …» se traduce.
+- `TransferListing.reason` (el motivo de «no lista») sale en el idioma pedido (`xfer.no_listing`).
+- Errores de validación: `fileserve.err.*`, `xfer.err.*` y `transfer.svc.*`.
+
+### No cubierto en este bloque
+Instrucciones de `ServerReady.hint` (la explicación paso a paso del servidor de archivos), los textos del informe de respaldos (`collected.text`, avisos de `CollectBackups`) y de `ListBackups`, el análisis de las salidas de Patrol (`internal/analyze`, bloque C), los errores de importación de archivos de scripts (`importar.go`, `exchange.go`, `formato.go` y las decisiones de colecciones en `coleccion.go`), `service.VaultErr` y los textos de `internal/sys`, `internal/backup` y `internal/playbook`.
+
+### Ajustes tras la revisión del bloque D
+- **Texto en español que cambió (cierra una fuga):** `URL inválida "<url>"` (en `Get`, `Put`, `Browse` y `GetMany`) cita la URL sin contraseña (`ftp://admin:xxxxx@/a`) en el texto y en `metadata.url`, con es y con en. Antes salía completa.
+- **Puente:** `TransferListingDTO` gana `reasonCode` y `reasonArgs` (`omitempty`): el código estable del motivo de «no lista» (`xfer.no_listing.tftp`, `xfer.no_listing.scp`) y su metadata (`proto`). `reason` sigue siendo el texto.
+- **`GetRun` tras reiniciar el núcleo** sale en español y sin `reason`: el error del detalle (`DetailErr`) no se guarda en disco.
+- **Auditoría (siempre en inglés):** el detalle libre de `device.round` y de `transfer.serve.transfer` va como `error="…"`. El `target` de `forensic.patterns` y `forensic.flapping` es «pasted text», «syslog receiver capture», «show logging of job <carpeta>» o la ruta del archivo.
+- **Severidades de syslog** con `en`, como las nombra Cisco: emergencies, alerts, critical, errors, warnings, notifications, informational, debugging.
+- **Metadata de `ErrorInfo`** de los códigos nuevos: solo trae los argumentos declarados por el código (sin secretos); `xfer.no_listing.*` lleva `proto` y no texto traducido.
+- **Sigue en español con `en`:** los errores de `internal/core/respaldo.go` (exportar e importar el respaldo de la bóveda) y los textos de `internal/analyze`.

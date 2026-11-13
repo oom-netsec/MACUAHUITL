@@ -14,6 +14,8 @@ import (
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Topes del listado remoto: lo que devuelve el servidor no es de fiar ni tiene tamaño acotado.
@@ -40,14 +42,23 @@ type NoListingError struct{ Proto, Reason string }
 
 func (e *NoListingError) Error() string { return "este servidor no permite listar: " + e.Reason }
 
+// Code es el código del catálogo del motivo (xfer.no_listing.<proto>) si es uno de los de TFTP o SCP; vacío si no.
+func (e *NoListingError) Code() string {
+	k := "xfer.no_listing." + e.Proto
+	if i18n.Msg(i18n.Es, k, nil) == e.Error() {
+		return k
+	}
+	return ""
+}
+
 // browsePath valida la carpeta que se pide: va como texto a un protocolo, así que sin control ni formato invisible.
 func browsePath(p string) error {
 	if len(p) > maxBrowsePath {
-		return errors.New("transfer: la ruta es demasiado larga")
+		return i18n.New("xfer.err.path_long", nil)
 	}
 	for _, c := range p {
 		if unicode.IsControl(c) || unicode.Is(unicode.Cf, c) {
-			return errors.New("transfer: la ruta tiene caracteres de control o invisibles")
+			return i18n.New("xfer.err.path_ctl", nil)
 		}
 	}
 	return nil
@@ -57,7 +68,7 @@ func browsePath(p string) error {
 // índice HTML; TFTP no lista). max acota las entradas (0 = DefaultMaxEntries). r.Timeout acota el tiempo.
 func Browse(ctx context.Context, r Request, path string, max int) (Listing, error) {
 	if r.URL == nil {
-		return Listing{}, errors.New("transfer: falta la URL")
+		return Listing{}, i18n.New("xfer.err.no_url", nil)
 	}
 	if r.URL.Scheme == "tftp" { // por diseño del protocolo: ni se abre un socket
 		return Listing{}, &NoListingError{"tftp", "TFTP no tiene comando para listar carpetas"}
@@ -80,7 +91,7 @@ func Browse(ctx context.Context, r Request, path string, max int) (Listing, erro
 		to = DefaultBrowseTimeout
 	}
 	if to > MaxBrowseTimeout {
-		return Listing{}, fmt.Errorf("transfer: el tiempo máximo es %s", MaxBrowseTimeout)
+		return Listing{}, i18n.New("xfer.err.max_time", i18n.A("max", MaxBrowseTimeout))
 	}
 	ctx, cancel := context.WithTimeout(ctx, to)
 	defer cancel()
@@ -94,7 +105,7 @@ func Browse(ctx context.Context, r Request, path string, max int) (Listing, erro
 	case "http", "https":
 		ls, err = r.httpList(ctx, path)
 	default:
-		return Listing{}, fmt.Errorf("transfer: esquema %q no soportado", r.URL.Scheme)
+		return Listing{}, i18n.New("xfer.err.scheme", i18n.A("scheme", r.URL.Scheme))
 	}
 	if err != nil {
 		if ctx.Err() != nil {
@@ -190,7 +201,7 @@ func (r *Request) ftpList(ctx context.Context, path string) (Listing, error) {
 
 // ---- SFTP (y SCP, que lista por el subsistema SFTP si el servidor lo tiene) ----
 
-var errNoSubsystem = errors.New("el servidor rechazó el subsistema sftp")
+var errNoSubsystem = i18n.New("xfer.err.no_subsys", nil)
 
 // sftpOpen abre el subsistema SFTP leyendo a lo más limit bytes del servidor (pkg/sftp lee un
 // directorio entero en memoria: así un servidor hostil no la llena).
@@ -223,7 +234,7 @@ func sftpOpen(c *ssh.Client, limit int64) (*sftp.Client, error) {
 
 func (r *Request) sftpList(ctx context.Context, path string) (Listing, error) {
 	if r.SSH == nil {
-		return Listing{}, errors.New("transfer: falta la conexión SSH")
+		return Listing{}, i18n.New("xfer.err.no_ssh", nil)
 	}
 	sess, err := r.SSH(ctx)
 	if err != nil {
@@ -302,7 +313,7 @@ func (r *Request) httpList(ctx context.Context, path string) (Listing, error) {
 		return Listing{}, fmt.Errorf("HTTP %s", resp.Status)
 	}
 	if ct := strings.ToLower(resp.Header.Get("Content-Type")); !strings.Contains(ct, "html") {
-		return Listing{}, errors.New("la respuesta no es un índice HTML (Content-Type " + resp.Header.Get("Content-Type") + ")")
+		return Listing{}, i18n.New("xfer.err.not_index", i18n.A("ctype", resp.Header.Get("Content-Type")))
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxListBytes+1))
 	if err != nil {

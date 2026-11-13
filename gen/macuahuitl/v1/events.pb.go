@@ -231,10 +231,14 @@ func (*SubscribeResponse_Warning) isSubscribeResponse_Event() {}
 func (*SubscribeResponse_PhaseAdded) isSubscribeResponse_Event() {}
 
 type DeviceStateChanged struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
-	State         DeviceState            `protobuf:"varint,2,opt,name=state,proto3,enum=macuahuitl.v1.DeviceState" json:"state,omitempty"`
-	Detail        string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	State    DeviceState            `protobuf:"varint,2,opt,name=state,proto3,enum=macuahuitl.v1.DeviceState" json:"state,omitempty"`
+	// El texto de siempre en español; con accept-language en sale traducido.
+	Detail string `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
+	// Código estable del catálogo del error (transport.err.auth, platform.err.closed, ...) y sus argumentos; vacío si el detalle es texto de sistema.
+	Reason        string            `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Args          map[string]string `protobuf:"bytes,5,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -288,6 +292,20 @@ func (x *DeviceStateChanged) GetDetail() string {
 		return x.Detail
 	}
 	return ""
+}
+
+func (x *DeviceStateChanged) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *DeviceStateChanged) GetArgs() map[string]string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
 }
 
 type CommandProgress struct {
@@ -516,11 +534,16 @@ const file_macuahuitl_v1_events_proto_rawDesc = "" +
 	"\awarning\x18\a \x01(\v2\x16.macuahuitl.v1.WarningH\x00R\awarning\x12:\n" +
 	"\vphase_added\x18\b \x01(\v2\x17.macuahuitl.v1.JobPhaseH\x00R\n" +
 	"phaseAddedB\a\n" +
-	"\x05event\"{\n" +
+	"\x05event\"\x8d\x02\n" +
 	"\x12DeviceStateChanged\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x120\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1a.macuahuitl.v1.DeviceStateR\x05state\x12\x16\n" +
-	"\x06detail\x18\x03 \x01(\tR\x06detail\"\x9b\x01\n" +
+	"\x06detail\x18\x03 \x01(\tR\x06detail\x12\x16\n" +
+	"\x06reason\x18\x04 \x01(\tR\x06reason\x12?\n" +
+	"\x04args\x18\x05 \x03(\v2+.macuahuitl.v1.DeviceStateChanged.ArgsEntryR\x04args\x1a7\n" +
+	"\tArgsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9b\x01\n" +
 	"\x0fCommandProgress\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x18\n" +
 	"\acommand\x18\x02 \x01(\tR\acommand\x12\x14\n" +
@@ -548,7 +571,7 @@ func file_macuahuitl_v1_events_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_events_proto_rawDescData
 }
 
-var file_macuahuitl_v1_events_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_macuahuitl_v1_events_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_macuahuitl_v1_events_proto_goTypes = []any{
 	(*SubscribeRequest)(nil),      // 0: macuahuitl.v1.SubscribeRequest
 	(*SubscribeResponse)(nil),     // 1: macuahuitl.v1.SubscribeResponse
@@ -557,26 +580,28 @@ var file_macuahuitl_v1_events_proto_goTypes = []any{
 	(*Heartbeat)(nil),             // 4: macuahuitl.v1.Heartbeat
 	(*JobStateChanged)(nil),       // 5: macuahuitl.v1.JobStateChanged
 	(*Warning)(nil),               // 6: macuahuitl.v1.Warning
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
-	(*JobPhase)(nil),              // 8: macuahuitl.v1.JobPhase
-	(DeviceState)(0),              // 9: macuahuitl.v1.DeviceState
+	nil,                           // 7: macuahuitl.v1.DeviceStateChanged.ArgsEntry
+	(*timestamppb.Timestamp)(nil), // 8: google.protobuf.Timestamp
+	(*JobPhase)(nil),              // 9: macuahuitl.v1.JobPhase
+	(DeviceState)(0),              // 10: macuahuitl.v1.DeviceState
 }
 var file_macuahuitl_v1_events_proto_depIdxs = []int32{
-	7, // 0: macuahuitl.v1.SubscribeResponse.at:type_name -> google.protobuf.Timestamp
-	2, // 1: macuahuitl.v1.SubscribeResponse.device_state_changed:type_name -> macuahuitl.v1.DeviceStateChanged
-	3, // 2: macuahuitl.v1.SubscribeResponse.command_progress:type_name -> macuahuitl.v1.CommandProgress
-	4, // 3: macuahuitl.v1.SubscribeResponse.heartbeat:type_name -> macuahuitl.v1.Heartbeat
-	5, // 4: macuahuitl.v1.SubscribeResponse.job_state_changed:type_name -> macuahuitl.v1.JobStateChanged
-	6, // 5: macuahuitl.v1.SubscribeResponse.warning:type_name -> macuahuitl.v1.Warning
-	8, // 6: macuahuitl.v1.SubscribeResponse.phase_added:type_name -> macuahuitl.v1.JobPhase
-	9, // 7: macuahuitl.v1.DeviceStateChanged.state:type_name -> macuahuitl.v1.DeviceState
-	0, // 8: macuahuitl.v1.EventService.Subscribe:input_type -> macuahuitl.v1.SubscribeRequest
-	1, // 9: macuahuitl.v1.EventService.Subscribe:output_type -> macuahuitl.v1.SubscribeResponse
-	9, // [9:10] is the sub-list for method output_type
-	8, // [8:9] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	8,  // 0: macuahuitl.v1.SubscribeResponse.at:type_name -> google.protobuf.Timestamp
+	2,  // 1: macuahuitl.v1.SubscribeResponse.device_state_changed:type_name -> macuahuitl.v1.DeviceStateChanged
+	3,  // 2: macuahuitl.v1.SubscribeResponse.command_progress:type_name -> macuahuitl.v1.CommandProgress
+	4,  // 3: macuahuitl.v1.SubscribeResponse.heartbeat:type_name -> macuahuitl.v1.Heartbeat
+	5,  // 4: macuahuitl.v1.SubscribeResponse.job_state_changed:type_name -> macuahuitl.v1.JobStateChanged
+	6,  // 5: macuahuitl.v1.SubscribeResponse.warning:type_name -> macuahuitl.v1.Warning
+	9,  // 6: macuahuitl.v1.SubscribeResponse.phase_added:type_name -> macuahuitl.v1.JobPhase
+	10, // 7: macuahuitl.v1.DeviceStateChanged.state:type_name -> macuahuitl.v1.DeviceState
+	7,  // 8: macuahuitl.v1.DeviceStateChanged.args:type_name -> macuahuitl.v1.DeviceStateChanged.ArgsEntry
+	0,  // 9: macuahuitl.v1.EventService.Subscribe:input_type -> macuahuitl.v1.SubscribeRequest
+	1,  // 10: macuahuitl.v1.EventService.Subscribe:output_type -> macuahuitl.v1.SubscribeResponse
+	10, // [10:11] is the sub-list for method output_type
+	9,  // [9:10] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_events_proto_init() }
@@ -600,7 +625,7 @@ func file_macuahuitl_v1_events_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_events_proto_rawDesc), len(file_macuahuitl_v1_events_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

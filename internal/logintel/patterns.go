@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/msgkb"
 )
 
@@ -51,13 +52,14 @@ type Pattern struct {
 
 // Report es el resultado de agrupar.
 type Report struct {
-	Entries     int       `json:"entries"`
-	WithTime    int       `json:"with_time"`
-	Patterns    []Pattern `json:"patterns"`
-	Overflow    int       `json:"overflow,omitempty"` // mensajes de patrones que no cupieron
-	BurstCount  int       `json:"burst_count"`
-	BurstWindow string    `json:"burst_window"`
-	Warnings    []string  `json:"warnings,omitempty"`
+	Entries     int         `json:"entries"`
+	WithTime    int         `json:"with_time"`
+	Patterns    []Pattern   `json:"patterns"`
+	Overflow    int         `json:"overflow,omitempty"` // mensajes de patrones que no cupieron
+	BurstCount  int         `json:"burst_count"`
+	BurstWindow string      `json:"burst_window"`
+	Warnings    []string    `json:"warnings,omitempty"`
+	WarnT       []i18n.Text `json:"-"` // los Warnings como texto de catálogo, en paralelo
 	// KB: la ficha de la base de mensajes por mnemónico, una vez, no repetida en cada patrón.
 	KB map[string]msgkb.Entry `json:"kb,omitempty"`
 }
@@ -121,10 +123,10 @@ func Group(es []Entry, o GroupOptions) Report {
 		return a.Pattern < b.Pattern
 	})
 	if n := len(es) - rep.WithTime; n > 0 {
-		rep.Warnings = append(rep.Warnings, fmt.Sprintf("%d mensaje(s) sin hora: se agrupan y cuentan, pero no entran en la detección de ráfagas", n))
+		i18n.Note(&rep.Warnings, &rep.WarnT, "logintel.warn.no_time", "n", n)
 	}
 	if rep.Overflow > 0 {
-		rep.Warnings = append(rep.Warnings, fmt.Sprintf("hay más de %d patrones distintos: %d mensaje(s) de patrones nuevos no se agruparon", o.MaxPatterns, rep.Overflow))
+		i18n.Note(&rep.Warnings, &rep.WarnT, "logintel.warn.overflow", "max", o.MaxPatterns, "n", rep.Overflow)
 	}
 	return rep
 }
@@ -154,35 +156,67 @@ func (a *acc) finish(o GroupOptions, kb *msgkb.KB) {
 	}
 }
 
-// Text arma el informe legible de los patrones.
-func (r Report) Text() string {
+// Localize da el informe con los avisos y las fichas de la base de mensajes en el idioma dado (con es, tal cual).
+func (r Report) Localize(loc string) Report {
+	if loc != i18n.En {
+		return r
+	}
+	r.Warnings = i18n.Notes(loc, r.Warnings, r.WarnT)
+	r.Patterns = append([]Pattern(nil), r.Patterns...)
+	for i, p := range r.Patterns {
+		if p.KB != nil {
+			e := p.KB.In(loc)
+			r.Patterns[i].KB = &e
+		}
+	}
+	r.KB = kbIn(loc, r.KB)
+	return r
+}
+
+func kbIn(loc string, m map[string]msgkb.Entry) map[string]msgkb.Entry {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]msgkb.Entry, len(m))
+	for k, e := range m {
+		out[k] = e.In(loc)
+	}
+	return out
+}
+
+// Text arma el informe legible de los patrones en español.
+func (r Report) Text() string { return r.TextIn(i18n.Es) }
+
+// TextIn arma el informe legible en el idioma dado (r ya viene en ese idioma: ver Localize).
+func (r Report) TextIn(loc string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d mensaje(s) en %d patrón(es). Ráfaga: %d del mismo patrón en %s.\n", r.Entries, len(r.Patterns), r.BurstCount, r.BurstWindow)
+	m := func(k string, kv ...any) string { return i18n.Msg(loc, k, i18n.A(kv...)) }
+	b.WriteString(m("logintel.pat.head", "entries", r.Entries, "patterns", len(r.Patterns), "count", r.BurstCount, "window", r.BurstWindow) + "\n")
 	for _, p := range r.Patterns {
 		tag := ""
 		switch {
 		case p.Unstable:
-			tag = "[INESTABLE] "
+			tag = m("logintel.pat.unstable")
 		case p.Burst:
-			tag = "[RÁFAGA] "
+			tag = m("logintel.pat.burst")
 		}
 		fmt.Fprintf(&b, "\n%sx%d  %s\n", tag, p.Count, p.Pattern)
 		if p.Peak > 0 {
-			fmt.Fprintf(&b, "    pico: %d en la ventana; ráfagas: %d\n", p.Peak, p.Episodes)
+			b.WriteString(m("logintel.pat.peak", "peak", p.Peak, "episodes", p.Episodes) + "\n")
 		}
 		if !p.First.IsZero() {
-			fmt.Fprintf(&b, "    de %s a %s\n", p.First.UTC().Format(time.RFC3339), p.Last.UTC().Format(time.RFC3339))
+			b.WriteString(m("logintel.pat.range", "from", p.First.UTC().Format(time.RFC3339), "to", p.Last.UTC().Format(time.RFC3339)) + "\n")
 		}
 		if p.HostCount > 0 {
-			fmt.Fprintf(&b, "    equipos (%d): %s\n", p.HostCount, strings.Join(p.Hosts, ", "))
+			b.WriteString(m("logintel.pat.hosts", "n", p.HostCount, "hosts", strings.Join(p.Hosts, ", ")) + "\n")
 		}
-		fmt.Fprintf(&b, "    ejemplo: %s\n", p.Example)
+		b.WriteString(m("logintel.pat.example", "example", p.Example) + "\n")
 		if p.KB != nil {
-			fmt.Fprintf(&b, "    base de mensajes: %s Acción: %s\n", p.KB.Meaning, p.KB.Action)
+			b.WriteString(m("logintel.pat.kb", "meaning", p.KB.Meaning, "action", p.KB.Action) + "\n")
 		}
 	}
 	for _, w := range r.Warnings {
-		fmt.Fprintf(&b, "\nAviso: %s\n", w)
+		fmt.Fprintf(&b, "\n%s: %s\n", m("forensic.label.warning"), w)
 	}
 	return strings.TrimRight(b.String(), "\n")
 }

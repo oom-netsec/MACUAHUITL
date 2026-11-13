@@ -20,13 +20,15 @@ var bibliotecaFS embed.FS
 var fechaBiblioteca = time.Date(2026, 11, 7, 0, 0, 0, 0, time.UTC)
 
 type cfgScript struct {
-	ID          string   `yaml:"id"`
-	Name        string   `yaml:"name"`
-	Tech        string   `yaml:"tech"`
-	Platform    string   `yaml:"platform"`
-	Description string   `yaml:"description"`
-	Tags        []string `yaml:"tags"`
-	Commands    []string `yaml:"commands"`
+	ID            string   `yaml:"id"`
+	Name          string   `yaml:"name"`
+	Tech          string   `yaml:"tech"`
+	Platform      string   `yaml:"platform"`
+	Description   string   `yaml:"description"`
+	NameEN        string   `yaml:"name_en"`
+	DescriptionEN string   `yaml:"description_en"`
+	Tags          []string `yaml:"tags"`
+	Commands      []string `yaml:"commands"`
 }
 
 // Library arma la biblioteca predefinida (solo lectura): un script de diagnóstico por playbook de
@@ -35,10 +37,21 @@ type cfgScript struct {
 // shortcut: se deriva de los playbooks al cargar y no se genera una copia en yaml; si los playbooks
 // dejan de ser la fuente, congelar la copia con un generador.
 func Library(pb fs.FS) ([]Script, error) {
+	out, _, err := LibraryWithEN(pb)
+	return out, err
+}
+
+// Texto es el nombre y la descripción de un script de fábrica en inglés (name_en y description_en).
+type Texto struct{ Name, Description string }
+
+// LibraryWithEN es Library junto con el texto en inglés de cada script de fábrica, por ID. Los playbooks sin
+// name_en no traen nombre en inglés: ese script queda con el español (In).
+func LibraryWithEN(pb fs.FS) ([]Script, map[string]Texto, error) {
 	pbs, err := playbook.Load(pb)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	en := map[string]Texto{}
 	var out []Script
 	for _, p := range pbs {
 		id := p.ID[strings.Index(p.ID, "/")+1:]
@@ -52,16 +65,17 @@ func Library(pb fs.FS) ([]Script, error) {
 		out = append(out, Script{ID: "lib-" + id, Name: p.Name, Tech: techDe(id), Platform: p.Platform,
 			Description: "Diagnóstico de solo lectura del playbook " + p.ID + ".",
 			Commands:    cmds, Tags: []string{}, Origin: OrigenBiblioteca, CreatedAt: fechaBiblioteca, UpdatedAt: fechaBiblioteca})
+		en["lib-"+id] = Texto{p.NameEn, "Read-only diagnostic of playbook " + p.ID + "."}
 	}
 	b, err := bibliotecaFS.ReadFile("biblioteca/configuracion.yaml")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var cfgs []cfgScript
 	dec := yaml.NewDecoder(bytes.NewReader(b))
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfgs); err != nil {
-		return nil, fmt.Errorf("biblioteca/configuracion.yaml: %w", err)
+		return nil, nil, fmt.Errorf("biblioteca/configuracion.yaml: %w", err)
 	}
 	for _, c := range cfgs {
 		id := c.ID
@@ -70,18 +84,34 @@ func Library(pb fs.FS) ([]Script, error) {
 		}
 		out = append(out, Script{ID: "lib-" + id, Name: c.Name, Tech: c.Tech, Platform: c.Platform, Description: c.Description,
 			Commands: c.Commands, Tags: nonNil(c.Tags), Origin: OrigenBiblioteca, CreatedAt: fechaBiblioteca, UpdatedAt: fechaBiblioteca})
+		en["lib-"+id] = Texto{c.NameEN, c.DescriptionEN}
 	}
 	ids, nombres := map[string]bool{}, map[string]bool{}
 	for _, s := range out {
 		if err := s.Validate(); err != nil {
-			return nil, fmt.Errorf("biblioteca %s: %w", s.ID, err)
+			return nil, nil, fmt.Errorf("biblioteca %s: %w", s.ID, err)
 		}
 		if k := NameKey(s.Name); ids[s.ID] || nombres[k] {
-			return nil, fmt.Errorf("biblioteca %s (%q): ID o nombre repetido", s.ID, s.Name)
+			return nil, nil, fmt.Errorf("biblioteca %s (%q): ID o nombre repetido", s.ID, s.Name)
 		}
 		ids[s.ID], nombres[NameKey(s.Name)] = true, true
 	}
-	return out, nil
+	return out, en, nil
+}
+
+// In da el script de fábrica en el idioma loc: con en, su nombre y descripción en inglés (los que falten quedan en
+// español); lo demás (es, o un script del usuario) queda tal cual.
+func (t Texto) In(loc string, s Script) Script {
+	if loc != "en" || s.Origin != OrigenBiblioteca {
+		return s
+	}
+	if t.Name != "" {
+		s.Name = t.Name
+	}
+	if t.Description != "" {
+		s.Description = t.Description
+	}
+	return s
 }
 
 func nonNil(s []string) []string {

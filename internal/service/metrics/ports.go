@@ -25,15 +25,16 @@ import (
 func (s *svc) GetPortStatus(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.GetPortStatusResponse, error) {
 	s.d.MarkActive()
 	if r.JobId != "" || r.Dir != "" {
-		dir, err := s.jobDir(r.JobId, r.Dir)
+		dir, err := s.jobDir(ctx, r.JobId, r.Dir)
 		if err != nil {
 			return nil, err
 		}
 		s.d.Audit("metrics.ports", dir, "device="+r.Device)
 		pd, err := metrics.PortsFromJob(dir, r.Device)
 		if err != nil {
-			return nil, status.Error(codes.FailedPrecondition, err.Error())
+			return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 		}
+		pd.PortStatus = pd.PortStatus.Localize(i18n.Locale(ctx))
 		return portResponse("job", pd), nil
 	}
 	return s.livePorts(ctx, r)
@@ -60,18 +61,18 @@ func portResponse(src string, pd metrics.PortDevice) *v1.GetPortStatusResponse {
 }
 
 // connErr traduce los errores de conexión a códigos gRPC; la huella de una llave nueva va en el mensaje.
-func connErr(err error) error {
+func connErr(ctx context.Context, err error) error {
 	var he *transport.HostKeyError
 	switch {
 	case errors.As(err, &he):
-		return status.Error(codes.FailedPrecondition, err.Error())
+		return service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	case errors.Is(err, transport.ErrAuth), errors.Is(err, transport.ErrEgressDenied):
-		return status.Error(codes.PermissionDenied, err.Error())
+		return service.ErrFrom(ctx, codes.PermissionDenied, err)
 	}
 	if s := service.VaultErr(err); status.Code(s) != codes.Internal {
 		return s
 	}
-	return status.Error(codes.Unavailable, err.Error())
+	return service.ErrFrom(ctx, codes.Unavailable, err)
 }
 
 // livePorts abre una sesión SSH de solo lectura: guard con Revoke, llave de host estricta, tres comandos de
@@ -79,10 +80,10 @@ func connErr(err error) error {
 func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.GetPortStatusResponse, error) {
 	host := strings.TrimSpace(r.Device)
 	if host == "" || strings.HasPrefix(host, "-") || strings.ContainsAny(host, " \t\r\n/") || r.Port > 0xffff {
-		return nil, status.Error(codes.InvalidArgument, "indica un trabajo, o el equipo y su credencial para consultarlo en vivo")
+		return nil, service.Err(ctx, codes.InvalidArgument, "metrics.svc.live_target", nil)
 	}
 	if r.CredentialId == "" {
-		return nil, status.Error(codes.InvalidArgument, "la consulta en vivo necesita una credencial de la bóveda")
+		return nil, service.Err(ctx, codes.InvalidArgument, "metrics.svc.live_cred", nil)
 	}
 	for _, c := range metrics.PortCommands { // la lista es fija, pero un cambio futuro no debe saltarse la regla de solo lectura
 		if err := playbook.CheckDenied("ios-xe", c); err != nil {
@@ -91,7 +92,7 @@ func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.Ge
 	}
 	v := s.d.Vault()
 	if v == nil || !v.Unlocked() {
-		return nil, status.Error(codes.FailedPrecondition, "abre la bóveda: la consulta necesita la credencial")
+		return nil, service.Err(ctx, codes.FailedPrecondition, "metrics.svc.vault_locked", nil)
 	}
 	cred, err := v.Get(r.CredentialId)
 	if err != nil {
@@ -113,7 +114,7 @@ func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.Ge
 	s.d.Audit("metrics.ports.live.start", host, fmt.Sprintf("run=%s port=%d credential=%q legacy_ssh=%t", run, port, r.CredentialId, r.LegacySsh))
 	fail := func(err error) (*v1.GetPortStatusResponse, error) {
 		s.d.Audit("metrics.ports.live.failed", host, fmt.Sprintf("run=%s reason=%q guard=revoked", run, i18n.English(err)))
-		return nil, connErr(err)
+		return nil, connErr(ctx, err)
 	}
 	acc := map[string]bool{}
 	for _, fp := range r.AcceptedHostKeyFingerprints {
@@ -138,7 +139,7 @@ func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.Ge
 	}
 	if p, err := drv.Detect(ctx); err != nil || (p != "ios-xe" && p != "ios") {
 		if err == nil {
-			err = fmt.Errorf("plataforma %q no soportada: la vista de frente lee IOS e IOS-XE", p)
+			err = i18n.New("metrics.svc.platform", i18n.A("platform", p))
 		}
 		return fail(err)
 	}
@@ -165,7 +166,7 @@ func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.Ge
 			in.Channels, in.HaveChannels = text, ok
 		}
 	}
-	ps := metrics.BuildPorts(in)
+	ps := metrics.BuildPorts(in).Localize(i18n.Locale(ctx))
 	s.d.Audit("metrics.ports.live", host, fmt.Sprintf("run=%s ports=%d channels=%d guard=revoked", run, len(ps.Ports), len(ps.Channels)))
 	return portResponse("live", metrics.PortDevice{PortStatus: ps, Address: host, Hostname: drv.Hostname(), At: at}), nil
 }

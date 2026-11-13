@@ -16,6 +16,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
 	xfer "github.com/oom-netsec/MACUAHUITL/internal/diag/transfer"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
@@ -27,14 +28,15 @@ const maxBatch = 200
 func (s *svc) Browse(ctx context.Context, r *v1.BrowseRequest) (*v1.BrowseResponse, error) {
 	s.d.MarkActive()
 	if r.MaxEntries < 0 || r.MaxEntries > xfer.MaxEntriesCap || r.TimeoutSeconds < 0 {
-		return nil, bad("tope inválido (entradas 0 a %d, tiempo en segundos)", xfer.MaxEntriesCap)
+		return nil, bad(ctx, "transfer.svc.browse_limits", "max", xfer.MaxEntriesCap)
 	}
 	to := time.Duration(r.TimeoutSeconds) * time.Second
 	if to > xfer.MaxBrowseTimeout {
-		return nil, bad("el tiempo máximo es %s", xfer.MaxBrowseTimeout)
+		return nil, bad(ctx, "transfer.svc.max_time", "max", xfer.MaxBrowseTimeout)
 	}
 	if u, err := url.Parse(r.Url); err == nil && u.Scheme == "tftp" { // TFTP no lista: ni se pide autorización al guard
-		return nil, status.Error(codes.Unimplemented, (&xfer.NoListingError{Proto: "tftp", Reason: "TFTP no tiene comando para listar carpetas"}).Error())
+		nl := &xfer.NoListingError{Proto: "tftp", Reason: "TFTP no tiene comando para listar carpetas"}
+		return nil, noListing(ctx, nl)
 	}
 	j, err := s.open(ctx, r.Url, r.CredentialId, r.AcceptedHostKeyFingerprints, r.LegacySsh)
 	if err != nil {
@@ -42,7 +44,7 @@ func (s *svc) Browse(ctx context.Context, r *v1.BrowseRequest) (*v1.BrowseRespon
 	}
 	defer j.done()
 	if r.Insecure && j.u.Scheme != "https" {
-		return nil, bad("--insecure solo aplica a https")
+		return nil, bad(ctx, "transfer.svc.insecure")
 	}
 	j.req.Insecure, j.req.Timeout = r.Insecure, to
 	s.d.Audit("transfer.browse.start", j.label, fmt.Sprintf("job=%s folder=%q credential=%q insecure=%t legacy_ssh=%t", j.id, r.Path, r.CredentialId, r.Insecure, r.LegacySsh))
@@ -50,11 +52,11 @@ func (s *svc) Browse(ctx context.Context, r *v1.BrowseRequest) (*v1.BrowseRespon
 	var nl *xfer.NoListingError
 	if errors.As(err, &nl) {
 		s.d.Audit("transfer.browse.nolisting", j.label, fmt.Sprintf("job=%s folder=%q protocol=%s guard=revoked", j.id, r.Path, nl.Proto))
-		return nil, status.Error(codes.Unimplemented, err.Error())
+		return nil, noListing(ctx, nl)
 	}
 	if err != nil {
 		s.d.Audit("transfer.browse.failed", j.label, fmt.Sprintf("job=%s folder=%q reason=%q guard=revoked", j.id, r.Path, j.errText(err)))
-		return nil, connErr(err)
+		return nil, connErr(ctx, err)
 	}
 	s.d.Audit("transfer.browse", j.label, fmt.Sprintf("job=%s folder=%q entries=%d method=%s truncated=%t guard=revoked", j.id, ls.Path, len(ls.Entries), ls.Method, ls.Truncated))
 	out := &v1.BrowseResponse{Path: ls.Path, Truncated: ls.Truncated, Method: ls.Method}
@@ -116,7 +118,7 @@ func (s *svc) GetStream(r *v1.GetStreamRequest, st v1.TransferService_GetStreamS
 	ev := &events{st: st}
 	req := r.GetRequest()
 	if req == nil {
-		return bad("falta la petición")
+		return bad(st.Context(), "transfer.svc.no_request")
 	}
 	name := path.Base(req.Name)
 	if req.Name == "" {
@@ -136,7 +138,7 @@ func (s *svc) PutStream(r *v1.PutStreamRequest, st v1.TransferService_PutStreamS
 	ev := &events{st: st}
 	req := r.GetRequest()
 	if req == nil {
-		return bad("falta la petición")
+		return bad(st.Context(), "transfer.svc.no_request")
 	}
 	res, err := s.put(st.Context(), req, func(p xfer.Progress) { ev.send(&v1.PutStreamResponse{Event: progressEvent(0, 1, req.Name, p)}) })
 	if err != nil {
@@ -149,7 +151,7 @@ func (s *svc) PutStream(r *v1.PutStreamRequest, st v1.TransferService_PutStreamS
 // batchName valida un nombre de archivo del lote: base sola, el nombre local debe ser aceptable.
 func batchName(n string) error {
 	if n == "" || strings.ContainsAny(n, `/\`) {
-		return errors.New("el nombre debe ser un archivo de la carpeta, sin ruta")
+		return i18n.New("transfer.svc.name_no_path", nil)
 	}
 	if _, err := fileserve.SafeName(n); err != nil {
 		return err
@@ -174,25 +176,25 @@ func (s *svc) GetMany(r *v1.GetManyRequest, st v1.TransferService_GetManyServer)
 	s.d.MarkActive()
 	ctx := st.Context()
 	if len(r.Names) == 0 || len(r.Names) > maxBatch {
-		return bad("indica entre 1 y %d archivos", maxBatch)
+		return bad(ctx, "transfer.svc.batch", "max", maxBatch)
 	}
 	base, err := url.Parse(r.Url)
 	if err != nil || base.Hostname() == "" {
-		return bad("URL inválida %q", r.Url)
+		return bad(ctx, "transfer.svc.bad_url", "url", redacted(r.Url))
 	}
 	if base.Scheme == "tftp" {
-		return bad("TFTP no lista carpetas: descarga cada archivo por su URL")
+		return bad(ctx, "transfer.svc.tftp_no_list")
 	}
 	dest := r.DestDir
 	if dest == "" {
-		if dest, err = s.receiveDir(service.NewID()); err != nil {
+		if dest, err = s.receiveDir(ctx, service.NewID()); err != nil {
 			return err
 		}
 	}
 	if _, err := fileserve.ValidateDir(dest); err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
-	if _, _, err := s.limits(r.MaxBytes, r.TimeoutSeconds); err != nil {
+	if _, _, err := s.limits(ctx, r.MaxBytes, r.TimeoutSeconds); err != nil {
 		return err
 	}
 	seen := map[string]bool{}
@@ -238,4 +240,12 @@ func (s *svc) GetMany(r *v1.GetManyRequest, st v1.TransferService_GetManyServer)
 	s.d.Audit("transfer.getmany", base.Host, fmt.Sprintf("done=%d failed=%d", ok, failed))
 	ev.send(&v1.GetManyResponse{Event: &v1.TransferEvent{Event: &v1.TransferEvent_Done{Done: &v1.BatchSummary{Ok: int32(ok), Failed: int32(failed)}}}})
 	return ev.err
+}
+
+// noListing es el error de «este servidor no lista»: con código estable y el protocolo en la metadata.
+func noListing(ctx context.Context, nl *xfer.NoListingError) error {
+	if k := nl.Code(); k != "" {
+		return service.Err(ctx, codes.Unimplemented, k, i18n.A("proto", nl.Proto))
+	}
+	return status.Error(codes.Unimplemented, nl.Error())
 }

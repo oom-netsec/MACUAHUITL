@@ -276,7 +276,7 @@ func TestFallosAlAbrirRevocanYAuditan(t *testing.T) {
 	if err := wait(t, done); status.Code(err) != codes.FailedPrecondition || !strings.Contains(err.Error(), "SHA256:") {
 		t.Fatalf("llave nueva: %v", err)
 	}
-	r2.cerrada("terminal.failed", "llave de host")
+	r2.cerrada("terminal.failed", "unknown host key") // la auditoría va en inglés
 }
 
 func TestPrimerMensajeDebeAbrir(t *testing.T) {

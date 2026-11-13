@@ -11,7 +11,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
 type fakeBrowse struct {
@@ -19,7 +21,10 @@ type fakeBrowse struct {
 	block chan struct{} // GetMany espera aquí tras el primer archivo hasta que lo cancelen
 }
 
-func (fakeBrowse) Browse(_ context.Context, r *v1.BrowseRequest) (*v1.BrowseResponse, error) {
+func (fakeBrowse) Browse(ctx context.Context, r *v1.BrowseRequest) (*v1.BrowseResponse, error) {
+	if strings.HasPrefix(r.Url, "tftp://coded") {
+		return nil, service.Err(ctx, codes.Unimplemented, "xfer.no_listing.tftp", i18n.A("proto", "tftp"))
+	}
 	if strings.HasPrefix(r.Url, "tftp://") {
 		return nil, status.Error(codes.Unimplemented, "este servidor no permite listar: TFTP no tiene comando para listar carpetas")
 	}
@@ -82,6 +87,11 @@ func TestTransferBrowseBridge(t *testing.T) {
 	l, err = b.TransferBrowse(TransferBrowseDTO{URL: "tftp://10.0.0.1/"})
 	if err != nil || l.Listable || !strings.Contains(l.Reason, "este servidor no permite listar") || l.Entries == nil {
 		t.Fatalf("tftp: %+v %v", l, err)
+	}
+	// con código del catálogo, el puente pasa el código y su metadata
+	l, err = b.TransferBrowse(TransferBrowseDTO{URL: "tftp://coded/"})
+	if err != nil || l.Listable || l.ReasonCode != "xfer.no_listing.tftp" || l.ReasonArgs["proto"] != "tftp" {
+		t.Fatalf("con código: %+v %v", l, err)
 	}
 	// un error de verdad sí es error
 	if _, err = b.TransferBrowse(TransferBrowseDTO{URL: "ftp://roto/"}); err == nil {

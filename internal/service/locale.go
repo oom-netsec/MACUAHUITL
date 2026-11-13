@@ -21,7 +21,7 @@ func Err(ctx context.Context, c codes.Code, code string, args i18n.Args) error {
 }
 
 // ErrFrom es Err para un error que ya trae código (i18n.Coded, aunque venga envuelto). Con es el texto es
-// exactamente err.Error(), envoltorios incluidos; con en, el del catálogo. Un error sin código sale como
+// exactamente err.Error(), envoltorios incluidos; con en, el tramo con código en inglés y el resto igual (i18n.In). Un error sin código sale como
 // status.Error(c, err.Error()), igual que antes.
 func ErrFrom(ctx context.Context, c codes.Code, err error) error {
 	var ce i18n.Coded
@@ -31,7 +31,7 @@ func ErrFrom(ctx context.Context, c codes.Code, err error) error {
 	loc := i18n.Locale(ctx)
 	msg := err.Error()
 	if loc != i18n.Es {
-		msg = ce.Localize(loc)
+		msg = i18n.In(loc, err) // conserva el envoltorio y el sufijo del error
 	}
 	st := status.New(c, msg)
 	if d, derr := st.WithDetails(

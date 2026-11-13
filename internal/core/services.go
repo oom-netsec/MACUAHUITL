@@ -33,11 +33,11 @@ type vaultSvc struct {
 	c *Core
 }
 
-func (s *vaultSvc) v() (*vault.Vault, error) {
+func (s *vaultSvc) v(ctx context.Context) (*vault.Vault, error) {
 	s.c.mu.Lock()
 	defer s.c.mu.Unlock()
 	if s.c.vault == nil {
-		return nil, status.Error(codes.FailedPrecondition, "no hay bóveda; créala primero")
+		return nil, service.Err(ctx, codes.FailedPrecondition, "patrol.svc.no_vault_create", nil)
 	}
 	return s.c.vault, nil
 }
@@ -54,11 +54,11 @@ func (s *vaultSvc) Status(context.Context, *v1.StatusRequest) (*v1.StatusRespons
 	return r, nil
 }
 
-func (s *vaultSvc) Create(_ context.Context, r *v1.CreateRequest) (*v1.CreateResponse, error) {
+func (s *vaultSvc) Create(ctx context.Context, r *v1.CreateRequest) (*v1.CreateResponse, error) {
 	s.c.mu.Lock()
 	defer s.c.mu.Unlock()
 	if s.c.vault != nil {
-		return nil, status.Error(codes.AlreadyExists, "la bóveda ya existe")
+		return nil, service.Err(ctx, codes.AlreadyExists, "patrol.svc.vault_exists", nil)
 	}
 	p := vault.Calibrate(time.Second)
 	if s.c.o.VaultParams != nil {
@@ -78,9 +78,9 @@ func (s *vaultSvc) Create(_ context.Context, r *v1.CreateRequest) (*v1.CreateRes
 	return &v1.CreateResponse{}, nil
 }
 
-func (s *vaultSvc) Unlock(_ context.Context, r *v1.UnlockRequest) (*v1.UnlockResponse, error) {
+func (s *vaultSvc) Unlock(ctx context.Context, r *v1.UnlockRequest) (*v1.UnlockResponse, error) {
 	s.c.markActive()
-	v, err := s.v()
+	v, err := s.v(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -94,8 +94,8 @@ func (s *vaultSvc) Unlock(_ context.Context, r *v1.UnlockRequest) (*v1.UnlockRes
 	return &v1.UnlockResponse{}, nil
 }
 
-func (s *vaultSvc) Lock(context.Context, *v1.LockRequest) (*v1.LockResponse, error) {
-	v, err := s.v()
+func (s *vaultSvc) Lock(ctx context.Context, _ *v1.LockRequest) (*v1.LockResponse, error) {
+	v, err := s.v(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -104,9 +104,9 @@ func (s *vaultSvc) Lock(context.Context, *v1.LockRequest) (*v1.LockResponse, err
 	return &v1.LockResponse{}, nil
 }
 
-func (s *vaultSvc) ChangeMasterPassword(_ context.Context, r *v1.ChangeMasterPasswordRequest) (*v1.ChangeMasterPasswordResponse, error) {
+func (s *vaultSvc) ChangeMasterPassword(ctx context.Context, r *v1.ChangeMasterPasswordRequest) (*v1.ChangeMasterPasswordResponse, error) {
 	s.c.markActive()
-	v, err := s.v()
+	v, err := s.v(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +117,8 @@ func (s *vaultSvc) ChangeMasterPassword(_ context.Context, r *v1.ChangeMasterPas
 	return &v1.ChangeMasterPasswordResponse{}, nil
 }
 
-func (s *vaultSvc) ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error) {
-	v, err := s.v()
+func (s *vaultSvc) ListCredentials(ctx context.Context, _ *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error) {
+	v, err := s.v(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -133,14 +133,14 @@ func (s *vaultSvc) ListCredentials(context.Context, *v1.ListCredentialsRequest) 
 	return r, nil
 }
 
-func (s *vaultSvc) PutCredential(_ context.Context, r *v1.PutCredentialRequest) (*v1.PutCredentialResponse, error) {
+func (s *vaultSvc) PutCredential(ctx context.Context, r *v1.PutCredentialRequest) (*v1.PutCredentialResponse, error) {
 	s.c.markActive()
-	v, err := s.v()
+	v, err := s.v(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if vault.Reserved(r.Label) {
-		return nil, status.Errorf(codes.InvalidArgument, "la etiqueta %q está reservada para el sistema", r.Label)
+		return nil, service.Err(ctx, codes.InvalidArgument, "patrol.svc.reserved_label", i18n.A("label", r.Label))
 	}
 	// secret.New pone en ceros los bytes recibidos; el búfer de gRPC del cable no se puede borrar.
 	c := vault.Credential{ID: r.Id, Label: r.Label, Username: r.Username,
@@ -156,9 +156,9 @@ func (s *vaultSvc) PutCredential(_ context.Context, r *v1.PutCredentialRequest) 
 	return &v1.PutCredentialResponse{Id: id}, nil
 }
 
-func (s *vaultSvc) DeleteCredential(_ context.Context, r *v1.DeleteCredentialRequest) (*v1.DeleteCredentialResponse, error) {
+func (s *vaultSvc) DeleteCredential(ctx context.Context, r *v1.DeleteCredentialRequest) (*v1.DeleteCredentialResponse, error) {
 	s.c.markActive()
-	v, err := s.v()
+	v, err := s.v(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -180,16 +180,16 @@ type patrolSvc struct {
 var jobKinds = []string{"", "patrol", "adhoc", "backup", "change"}
 
 // validate traduce y revisa un JobSpec; también la usa la ventana de cambio.
-func (s *patrolSvc) validate(p *v1.JobSpec) (patrol.Spec, error) {
+func (s *patrolSvc) validate(ctx context.Context, p *v1.JobSpec) (patrol.Spec, error) {
 	spec := specFromProto(p)
 	s.c.mu.Lock()
 	v := s.c.vault
 	s.c.mu.Unlock()
 	if v == nil {
-		return spec, status.Error(codes.FailedPrecondition, "no hay bóveda")
+		return spec, service.Err(ctx, codes.FailedPrecondition, "patrol.svc.no_vault", nil)
 	}
 	if !slices.Contains(jobKinds, spec.Kind) {
-		return spec, status.Errorf(codes.InvalidArgument, "tipo de trabajo %q no válido (patrol, adhoc, backup o change)", spec.Kind)
+		return spec, service.Err(ctx, codes.InvalidArgument, "patrol.svc.bad_kind", i18n.A("kind", spec.Kind))
 	}
 	// Un output_dir explícito pasa por la validación de Ajustes → Almacenamiento; vacío = la carpeta vigente.
 	if spec.OutputDir == "" {
@@ -202,16 +202,16 @@ func (s *patrolSvc) validate(p *v1.JobSpec) (patrol.Spec, error) {
 	if err := patrol.Validate(spec, s.c.pbs, v); err != nil {
 		var fe *patrol.FieldError
 		if errors.As(err, &fe) {
-			return spec, status.Error(codes.InvalidArgument, err.Error())
+			return spec, service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
-		return spec, status.Error(codes.FailedPrecondition, err.Error())
+		return spec, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
 	return spec, nil
 }
 
-func (s *patrolSvc) CreateJob(_ context.Context, r *v1.CreateJobRequest) (*v1.CreateJobResponse, error) {
+func (s *patrolSvc) CreateJob(ctx context.Context, r *v1.CreateJobRequest) (*v1.CreateJobResponse, error) {
 	s.c.markActive()
-	spec, err := s.validate(r.GetSpec())
+	spec, err := s.validate(ctx, r.GetSpec())
 	if err != nil {
 		return nil, err
 	}
@@ -226,9 +226,10 @@ func (s *patrolSvc) CreateJob(_ context.Context, r *v1.CreateJobRequest) (*v1.Cr
 	return &v1.CreateJobResponse{JobId: j.id}, nil
 }
 
-func loginToProto(r patrol.LoginResult) *v1.LoginTestResponse {
+func loginToProto(loc string, r patrol.LoginResult) *v1.LoginTestResponse {
+	detail, reason, args := detailOf(loc, r.Detail, r.DetailErr)
 	return &v1.LoginTestResponse{Target: &v1.Target{Address: r.Target}, Passed: r.Passed, FailedStep: loginSteps[r.FailedStep],
-		Detail: r.Detail, DetectedPlatform: r.Platform, HostKeyFingerprint: r.Fingerprint}
+		Detail: detail, DetectedPlatform: r.Platform, HostKeyFingerprint: r.Fingerprint, Reason: reason, Args: args}
 }
 
 func (s *patrolSvc) LoginTest(r *v1.LoginTestRequest, st v1.PatrolService_LoginTestServer) error {
@@ -241,7 +242,7 @@ func (s *patrolSvc) LoginTest(r *v1.LoginTestRequest, st v1.PatrolService_LoginT
 	spec, state := j.spec, j.state
 	s.c.mu.Unlock()
 	if state != "created" {
-		return status.Errorf(codes.FailedPrecondition, "el trabajo está %s; el Login Test solo aplica antes de armar", state)
+		return service.Err(st.Context(), codes.FailedPrecondition, "patrol.svc.login_after_arm", i18n.A("state", state))
 	}
 	res := patrol.LoginTest(st.Context(), s.c.deps(j), j.id, spec, true, nil)
 	passed := 0
@@ -249,7 +250,7 @@ func (s *patrolSvc) LoginTest(r *v1.LoginTestRequest, st v1.PatrolService_LoginT
 		if x.Passed {
 			passed++
 		}
-		if err := st.Send(loginToProto(x)); err != nil {
+		if err := st.Send(loginToProto(i18n.Locale(st.Context()), x)); err != nil {
 			return err
 		}
 	}
@@ -270,7 +271,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	if j.state != "created" {
 		st := j.state
 		c.mu.Unlock()
-		return nil, status.Errorf(codes.FailedPrecondition, "el trabajo está %s", st)
+		return nil, service.Err(ctx, codes.FailedPrecondition, "patrol.svc.job_state", i18n.A("state", st))
 	}
 	j.state = "arming"
 	spec, v := j.spec, c.vault
@@ -301,7 +302,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 	}
 	if len(keep) == 0 {
-		return fail(status.Error(codes.FailedPrecondition, "no quedan equipos"), "no devices left")
+		return fail(service.Err(ctx, codes.FailedPrecondition, "patrol.svc.no_devices_left", nil), "no devices left")
 	}
 	spec.Targets = keep // copia local: un armado fallido no altera el trabajo
 	accepted := map[string]bool{}
@@ -326,7 +327,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	undo = append(undo, func() { c.guard.Revoke(j.id) })
 	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARM_CHECK_DONE, 0, "phase.ok_failed", i18n.A("ok", len(res)-len(failed), "failed", len(failed)))
 	if len(failed) > 0 {
-		return fail(status.Errorf(codes.FailedPrecondition, "Login Test falló; excluye o corrige: %s", strings.Join(failed, "; ")), "login test failed: "+strings.Join(failed, "; "))
+		return fail(service.Err(ctx, codes.FailedPrecondition, "patrol.svc.login_failed", i18n.A("failed", strings.Join(failed, "; "))), "login test failed: "+strings.Join(failed, "; "))
 	}
 	until := c.o.Now().Add(time.Duration(spec.WindowHours) * time.Hour)
 	creds := []string{spec.DefaultCredentialID}
@@ -368,7 +369,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 			if p.State == "running" {
 				kind = engine.Progress
 			}
-			c.bus.Publish(engine.Event{JobID: j.id, Kind: kind, DeviceID: p.Target, State: p.State, Command: p.Command, Index: p.Index, Total: p.Total, Bytes: p.Bytes, Detail: p.Detail})
+			c.bus.Publish(engine.Event{JobID: j.id, Kind: kind, DeviceID: p.Target, State: p.State, Command: p.Command, Index: p.Index, Total: p.Total, Bytes: p.Bytes, Detail: p.Detail, Err: p.Err})
 		})
 		c.mu.Lock()
 		j.results[round] = append(j.results[round], res)
@@ -546,7 +547,7 @@ func (s *patrolSvc) ListPlaybooks(ctx context.Context, r *v1.ListPlaybooksReques
 	return out, nil
 }
 
-func (s *patrolSvc) GetRun(_ context.Context, r *v1.GetRunRequest) (*v1.GetRunResponse, error) {
+func (s *patrolSvc) GetRun(ctx context.Context, r *v1.GetRunRequest) (*v1.GetRunResponse, error) {
 	j, err := s.c.getJob(r.JobId)
 	if err != nil {
 		return nil, err
@@ -558,8 +559,9 @@ func (s *patrolSvc) GetRun(_ context.Context, r *v1.GetRunRequest) (*v1.GetRunRe
 		out.OutputPath = j.writer.Dir()
 	}
 	for _, d := range j.results[int(r.Round)] {
+		detail, reason, args := detailOf(i18n.Locale(ctx), d.Detail, d.DetailErr)
 		out.Devices = append(out.Devices, &v1.RunDevice{Target: &v1.Target{Address: d.Target.Address, Port: uint32(patrol.EffectivePort(d.Target.Port)), DeviceId: d.Target.DeviceID},
-			State: deviceStates[d.State], Detail: d.Detail})
+			State: deviceStates[d.State], Detail: detail, Reason: reason, Args: args})
 	}
 	return out, nil
 }

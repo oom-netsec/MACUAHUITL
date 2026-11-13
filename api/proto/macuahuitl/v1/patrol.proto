@@ -100,6 +100,9 @@ message LoginTestResponse {
   string detected_platform = 5;
   // Huella SHA-256 de la llave de host, para confirmar en el primer uso.
   string host_key_fingerprint = 6;
+  // Código estable del catálogo del error de detail y sus argumentos; vacío si el detalle es texto de sistema.
+  string reason = 7;
+  map<string, string> args = 8;
 }
 
 message ArmJobRequest {
@@ -180,6 +183,9 @@ message RunDevice {
   Target target = 1;
   DeviceState state = 2;
   string detail = 3;
+  // Código estable del catálogo del error de detail y sus argumentos; vacío si el detalle es texto de sistema.
+  string reason = 4;
+  map<string, string> args = 5;
 }
 
 message GetRunRequest {

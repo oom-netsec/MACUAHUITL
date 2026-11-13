@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 const (
@@ -76,14 +77,14 @@ func (c *tftpConn) trip(pkt []byte, handle func(op uint16, b []byte) (bool, erro
 			}
 			op := binary.BigEndian.Uint16(c.buf)
 			if op == opERROR {
-				return fmt.Errorf("el servidor TFTP respondió error %d: %s", binary.BigEndian.Uint16(c.buf[2:]), strings.TrimRight(string(c.buf[4:n]), "\x00"))
+				return i18n.New("xfer.err.tftp_error", i18n.A("code", binary.BigEndian.Uint16(c.buf[2:]), "message", strings.TrimRight(string(c.buf[4:n]), "\x00")))
 			}
 			if done, err := handle(op, c.buf[:n]); err != nil || done {
 				return err
 			}
 		}
 	}
-	return fmt.Errorf("el servidor TFTP no respondió tras %d intentos", tftpTries)
+	return i18n.New("xfer.err.tftp_silent", i18n.A("n", tftpTries))
 }
 
 func (r *Request) tftpOpen(ctx context.Context) (*tftpConn, string, func(), error) {
@@ -138,7 +139,7 @@ func (r *Request) tftpGet(ctx context.Context, w io.Writer) error {
 				return true, nil
 			case op == opDATA && binary.BigEndian.Uint16(b[2:]) == want:
 				if len(b)-4 > blk {
-					return false, errors.New("bloque mayor que el blksize acordado")
+					return false, i18n.New("xfer.err.tftp_block", nil)
 				}
 				data = b[4:]
 				return true, nil

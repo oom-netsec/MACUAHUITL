@@ -12,6 +12,8 @@ import (
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 func (r *Request) sshOpen(ctx context.Context) (*ssh.Client, string, func(), error) {
@@ -20,7 +22,7 @@ func (r *Request) sshOpen(ctx context.Context) (*ssh.Client, string, func(), err
 		return nil, "", nil, err
 	}
 	if r.SSH == nil {
-		return nil, "", nil, errors.New("transfer: falta la conexión SSH")
+		return nil, "", nil, i18n.New("xfer.err.no_ssh", nil)
 	}
 	sess, err := r.SSH(ctx)
 	if err != nil {
@@ -115,7 +117,7 @@ func scpStart(c *ssh.Client, flag, file string) (*scpSession, error) {
 // maxCtlLine es el tope de una línea de control (scp y FTP): un servidor no nos hace leer sin fin.
 const maxCtlLine = 4096
 
-var errLineTooLong = errors.New("transfer: línea de control demasiado larga")
+var errLineTooLong = i18n.New("xfer.err.line_long", nil)
 
 // readLine lee una línea terminada en \n con tope de longitud (maxCtlLine).
 func readLine(br *bufio.Reader) (string, error) {
@@ -176,13 +178,13 @@ func (r *Request) scpGet(ctx context.Context, w io.Writer) error {
 		case strings.HasPrefix(line, "C"):
 			f := strings.SplitN(strings.TrimSpace(line[1:]), " ", 3)
 			if len(f) != 3 {
-				return errors.New("scp: orden C mal formada")
+				return i18n.New("xfer.err.scp_c_line", nil)
 			}
 			if size, err = strconv.ParseInt(f[1], 10, 64); err != nil || size < 0 {
-				return errors.New("scp: tamaño inválido")
+				return i18n.New("xfer.err.scp_size", nil)
 			}
 		default:
-			return errors.New("scp: el servidor no mandó un archivo (¿es una carpeta?)")
+			return i18n.New("xfer.err.scp_dir", nil)
 		}
 		break
 	}

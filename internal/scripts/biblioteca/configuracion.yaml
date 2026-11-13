@@ -6,6 +6,8 @@
   tech: l2
   platform: ios-xe
   description: Crea la VLAN 10 y deja un puerto en modo acceso con PortFast. Cambia la VLAN y la interfaz.
+  name_en: "Config · VLAN and access port"
+  description_en: "Creates VLAN 10 and leaves a port in access mode with PortFast. Change the VLAN and the interface."
   tags: [vlan, acceso]
   commands:
     - configure terminal
@@ -22,6 +24,8 @@
   tech: l2
   platform: ios-xe
   description: Puerto troncal con VLANs permitidas y VLAN nativa explícita. Cambia la interfaz y las VLAN.
+  name_en: "Config · 802.1Q trunk"
+  description_en: "Trunk port with allowed VLANs and an explicit native VLAN. Change the interface and the VLANs."
   tags: [trunk, vlan]
   commands:
     - configure terminal
@@ -35,6 +39,8 @@
   tech: gestion
   platform: ios-xe
   description: Sincroniza la hora con un servidor NTP. Cambia la dirección del servidor.
+  name_en: "Config · NTP"
+  description_en: "Synchronizes the clock with an NTP server. Change the server address."
   tags: [ntp, hora]
   commands:
     - configure terminal
@@ -47,6 +53,8 @@
   tech: gestion
   platform: ios-xe
   description: Envía los registros a un servidor syslog. Cambia la dirección del servidor.
+  name_en: "Config · Logging to a syslog server"
+  description_en: "Sends the logs to a syslog server. Change the server address."
   tags: [syslog, logging]
   commands:
     - configure terminal
@@ -60,6 +68,8 @@
   tech: gestion
   platform: ios-xe
   description: Comunidad SNMP de solo lectura limitada por ACL. Cambia la comunidad (es solo un ejemplo) y la red.
+  name_en: "Config · Read-only SNMP"
+  description_en: "Read-only SNMP community limited by an ACL. Change the community (it is only an example) and the network."
   tags: [snmp]
   commands:
     - configure terminal
@@ -73,6 +83,8 @@
   tech: seguridad
   platform: ios-xe
   description: Aviso legal al conectarse. El texto va entre delimitadores ^.
+  name_en: "Config · Login banner"
+  description_en: "Legal notice shown on connection. The text goes between ^ delimiters."
   tags: [banner]
   commands:
     - configure terminal
@@ -83,6 +95,8 @@
   tech: l2
   platform: ios-xe
   description: Protege los puertos de acceso contra BPDU de otro switch. Cambia el rango de interfaces.
+  name_en: "Config · PortFast with BPDU Guard on access ports"
+  description_en: "Protects access ports against BPDUs from another switch. Change the interface range."
   tags: [stp, bpduguard]
   commands:
     - configure terminal
@@ -95,6 +109,8 @@
   tech: etherchannel
   platform: ios-xe
   description: Agrupa dos puertos en un Port-channel con LACP. Cambia las interfaces y el número de grupo.
+  name_en: "Config · LACP EtherChannel"
+  description_en: "Bundles two ports into a Port-channel with LACP. Change the interfaces and the group number."
   tags: [lacp, port-channel]
   commands:
     - configure terminal
@@ -109,6 +125,8 @@
   tech: seguridad
   platform: ios-xe
   description: Activa SSH 2 y deja solo SSH en las líneas VTY. Exige un usuario local y un nombre de dominio.
+  name_en: "Config · SSH version 2 on the VTY lines"
+  description_en: "Enables SSH 2 and leaves only SSH on the VTY lines. Requires a local user and a domain name."
   tags: [ssh, vty]
   commands:
     - configure terminal
@@ -124,6 +142,8 @@
   tech: seguridad
   platform: ios-xe
   description: Manda los puertos sin uso a una VLAN aislada y los apaga. Cambia el rango y la VLAN.
+  name_en: "Config · Shut down unused ports"
+  description_en: "Sends unused ports to an isolated VLAN and shuts them down. Change the range and the VLAN."
   tags: [puertos, hardening]
   commands:
     - configure terminal

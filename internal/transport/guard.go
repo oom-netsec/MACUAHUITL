@@ -15,9 +15,10 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-var ErrEgressDenied = errors.New("transport: destino no autorizado")
+var ErrEgressDenied error = i18n.New("transport.err.not_authorized", nil)
 
 // Guard es la única puerta de salida a la red: cada trabajo solo alcanza
 // las IPs, rangos y nombres que el ingeniero escribió para él.
