@@ -171,7 +171,13 @@ func (f *Fake) checkPassword(req *Packet, pw []byte, resp *Packet) bool {
 	}
 	ar := authenticatorResponse(pw, nt, peer, authCh, string(user))
 	if f.cfg.BadMSSuccess {
-		ar = ar[:len(ar)-1] + "0" + ar[len(ar)-1:] // cambia el valor sin dejar de ser un texto
+		// Cambia el último dígito del S=<40 hex>; insertar un carácter no bastaba: si ese dígito ya era 0, los 42
+		// primeros quedaban iguales y verificaba (1 de cada 16 corridas).
+		last := byte('0')
+		if ar[len(ar)-1] == '0' {
+			last = '1'
+		}
+		ar = ar[:len(ar)-1] + string(last)
 	}
 	resp.Add(AttrVendorSpecific, vsa(311, 26, append([]byte{msResp[0]}, ar...)))
 	return true
