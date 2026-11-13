@@ -121,3 +121,37 @@ test("libOf arma el ID del script derivado como el núcleo", () => {
   expect(libOf("ios/l2-stp")).toBe("lib-ios-l2-stp");
   expect(libOf("wlc-9800/ap-join")).toBe("lib-wlc-9800-ap-join");
 });
+
+test("instalar: desmarcar un playbook oculta su script en la vista previa y marcarlo lo devuelve", async () => {
+  const inspect = vi.fn(async () => ({ pack: { ...sampleThirdParty, hidden: ["ios-xe/mine"] }, playbookIds: ["ios-xe/l2-stp", "ios-xe/mine"], scriptIds: ["lib-l2-stp", "lib-mine"], replacedVersion: "" }));
+  const install = vi.fn(async () => ({ pack: sampleThirdParty, replacedVersion: "" }));
+  view(fakeCore({ packInspect: inspect, packInstallHiding: install, pickPath: vi.fn(async () => "/tmp/x.mpack") }));
+  await userEvent.click(await screen.findByRole("button", { name: "Instalar paquete…" }));
+  const d = await screen.findByRole("dialog");
+  expect(within(d).getByText("Demo <b>de terceros</b>")).toBeVisible(); // nombre del paquete, como texto
+  expect(within(d).getByRole("checkbox", { name: /lib-mine/ })).toBeDisabled();
+  await userEvent.click(within(d).getByRole("checkbox", { name: /ios-xe\/mine/ }));
+  expect(within(d).getByRole("checkbox", { name: /lib-mine/ })).toBeEnabled();
+  expect(within(d).getByRole("checkbox", { name: /lib-mine/ })).toBeChecked();
+  await userEvent.click(within(d).getByRole("checkbox", { name: /ios-xe\/l2-stp/ }));
+  expect(within(d).getByRole("checkbox", { name: /lib-l2-stp/ })).not.toBeChecked();
+  expect(within(d).getByRole("checkbox", { name: /lib-l2-stp/ })).toBeDisabled();
+  await userEvent.click(within(d).getByRole("button", { name: "Instalar" }));
+  await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/x.mpack", true, ["ios-xe/l2-stp"], true));
+});
+
+test("instalar: un playbook tapado que estaba oculto no viaja en hide", async () => {
+  const inspect = vi.fn(async () => ({ pack: { ...sampleThirdParty, hidden: ["ios-xe/acme-a"] }, playbookIds: ["ios-xe/acme-a"], scriptIds: [], replacedVersion: "" }));
+  const install = vi.fn(async () => ({ pack: sampleThirdParty, replacedVersion: "" }));
+  view(fakeCore({ packInspect: inspect, packInstallHiding: install, pickPath: vi.fn(async () => "/tmp/x.mpack") }));
+  await userEvent.click(await screen.findByRole("button", { name: "Instalar paquete…" }));
+  const d = await screen.findByRole("dialog");
+  await userEvent.click(within(d).getByRole("button", { name: "Instalar" }));
+  await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/x.mpack", true, [], true));
+});
+
+test("si el selector de archivos falla, el error se muestra", async () => {
+  view(fakeCore({ pickPath: vi.fn(async () => { throw new Error("portal no disponible"); }) }));
+  await userEvent.click(await screen.findByRole("button", { name: "Instalar paquete…" }));
+  expect(await screen.findByText(/portal no disponible/)).toBeInTheDocument();
+});

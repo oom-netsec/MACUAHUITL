@@ -21,6 +21,10 @@ export function hiddenState(pack: PackInfo, playbookIds: string[]) {
   return { hidden, viaPlaybook };
 }
 
+// En inglés, el texto en inglés del paquete; si un paquete de terceros no lo trae, el que tenga.
+const packName = (p: PackInfo, lang: string) => (lang === "en" && p.nameEn) || p.name;
+const packDesc = (p: PackInfo, lang: string) => (lang === "en" && p.descriptionEn) || p.description;
+
 function Items({ pack, playbookIds, scriptIds, isHidden, onToggle, busy }: {
   pack: PackInfo; playbookIds: string[]; scriptIds: string[]; isHidden: (id: string) => boolean; onToggle: (id: string, visible: boolean) => void; busy?: boolean;
 }) {
@@ -72,6 +76,7 @@ function PackDetailDialog({ core, id, onChange, onClose }: { core: CoreAPI; id: 
 function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; path: string; info: PackInspectResult; onDone: () => void; onClose: () => void }) {
   const t = useT();
   const { pack, playbookIds, scriptIds } = info;
+  const lang = useLang();
   const [hide, setHide] = useState(() => new Set(pack.hidden));
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -79,7 +84,8 @@ function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; p
     setBusy(true); setErr("");
     let ok = false;
     try {
-      await core.packInstallHiding(path, !pack.official, [...playbookIds, ...scriptIds].filter((x) => hide.has(x)), true);
+      // Un playbook tapado no se oculta (su casilla queda marcada): no viaja en hide, que con replaceHidden es el conjunto exacto.
+      await core.packInstallHiding(path, !pack.official, [...playbookIds, ...scriptIds].filter((x) => hide.has(x) && !pack.shadowed.includes(x)), true);
       ok = true;
     } catch (e) { setErr(errorText(e)); }
     try { onDone(); } finally { setBusy(false); }
@@ -87,10 +93,13 @@ function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; p
   };
   return (
     <Dialog title={t("packs.install.title")} onClose={onClose}>
-      <p><code>{pack.id}</code> · {pack.version} · {pack.official ? t("packs.official") : t("packs.thirdParty")}</p>
+      <h4>{packName(pack, lang)}</h4>
+      <p>{packDesc(pack, lang)}</p>
+      <p><code>{pack.id}</code> · {pack.version} · {pack.official ? t("packs.official") : t("packs.thirdParty")}{pack.author && <> · {pack.author}</>}{pack.license && <> · {pack.license}</>}</p>
       {info.replacedVersion && <p>{t("packs.replaces", { version: info.replacedVersion })}</p>}
       {!pack.official && <Notice kind="warn">{t("packs.unsigned")}</Notice>}
-      <Items pack={pack} playbookIds={playbookIds} scriptIds={scriptIds} isHidden={(x) => hide.has(x)}
+      {/* Lo derivado (lib-<id> de un playbook desmarcado) sale de la selección actual, no de lo que ya estaba oculto. */}
+      <Items pack={{ ...pack, hidden: [...hide] }} playbookIds={playbookIds} scriptIds={scriptIds} isHidden={(x) => hide.has(x)} busy={busy}
         onToggle={(id, visible) => setHide((s) => { const n = new Set(s); if (visible) n.delete(id); else n.add(id); return n; })} />
       {err && <Notice kind="error">{err}</Notice>}
       <div className="actions"><button type="button" className="primary" disabled={busy} onClick={install}>{t("packs.install.go")}</button></div>
@@ -113,9 +122,10 @@ export function PacksSection({ core }: { core: CoreAPI }) {
 
   const pick = async () => {
     setErr(""); setMsg("");
-    const path = await core.pickPath({ title: t("packs.pick"), filters: [{ name: "MACUAHUITL", pattern: "*.mpack" }] });
-    if (!path) return;
-    try { setPreview({ path, info: await core.packInspect(path, true) }); } catch (e) { setErr(errorText(e)); }
+    try {
+      const path = await core.pickPath({ title: t("packs.pick"), filters: [{ name: "MACUAHUITL", pattern: "*.mpack" }] });
+      if (path) setPreview({ path, info: await core.packInspect(path, true) });
+    } catch (e) { setErr(errorText(e)); }
   };
   const remove = async (id: string) => {
     setErr(""); setMsg("");
@@ -133,8 +143,8 @@ export function PacksSection({ core }: { core: CoreAPI }) {
       <ul className="pack-list">
         {packs?.map((p) => (
           <li key={p.id} className="pack-card">
-            <h4>{lang === "en" ? p.nameEn : p.name}</h4>
-            <p>{lang === "en" ? p.descriptionEn : p.description}</p>
+            <h4>{packName(p, lang)}</h4>
+            <p>{packDesc(p, lang)}</p>
             <p className="hint"><code>{p.id}</code> · {p.version} · <span>{p.official ? t("packs.official") : t("packs.thirdParty")}</span></p>
             <p className="hint">{t("packs.counts", { playbooks: p.playbookCount, scripts: p.scriptCount, hidden: p.hidden.length })}</p>
             {p.shadowed.length > 0 && <Notice kind="warn">{t("packs.shadowed", { ids: p.shadowed.join(", ") })}</Notice>}
