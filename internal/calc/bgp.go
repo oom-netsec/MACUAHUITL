@@ -1,12 +1,13 @@
 package calc
 
 import (
-	"errors"
 	"fmt"
 	"net/netip"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Route es una ruta candidata con los atributos que usa el algoritmo de Cisco.
@@ -78,7 +79,7 @@ func parseASPath(s string) (n int, first string, err error) {
 		switch tok {
 		case "{", "(":
 			if in != "" {
-				return 0, "", errors.New("segmentos anidados")
+				return 0, "", i18n.New("calc.err.bgp_as_nested", nil)
 			}
 			in = tok
 			if tok == "{" {
@@ -86,13 +87,13 @@ func parseASPath(s string) (n int, first string, err error) {
 			}
 		case "}", ")":
 			if (in == "{") != (tok == "}") || in == "" {
-				return 0, "", errors.New("segmento mal cerrado")
+				return 0, "", i18n.New("calc.err.bgp_as_close", nil)
 			}
 			in = ""
 		default:
 			for _, part := range strings.Split(tok, ".") { // asdot: 1.10
 				if _, err := strconv.ParseUint(part, 10, 32); err != nil {
-					return 0, "", fmt.Errorf("AS %q inválido", tok)
+					return 0, "", i18n.New("calc.err.bgp_as_invalid", i18n.A("as", tok))
 				}
 			}
 			if in == "" {
@@ -104,7 +105,7 @@ func parseASPath(s string) (n int, first string, err error) {
 		}
 	}
 	if in != "" {
-		return 0, "", errors.New("segmento sin cerrar")
+		return 0, "", i18n.New("calc.err.bgp_as_open", nil)
 	}
 	return n, first, nil
 }
@@ -122,11 +123,11 @@ func prep(r Route) (path, error) {
 	}
 	var ok bool
 	if p.origin, ok = origins[strings.ToLower(r.Origin)]; !ok {
-		return p, fmt.Errorf("%s: origin %q inválido (i, e, ?)", r.Name, r.Origin)
+		return p, i18n.New("calc.err.bgp_origin", i18n.A("name", r.Name, "origin", r.Origin))
 	}
 	var err error
 	if p.asLen, p.neighborAS, err = parseASPath(r.ASPath); err != nil {
-		return p, fmt.Errorf("%s: AS_PATH %q: %w", r.Name, r.ASPath, err)
+		return p, i18n.Wrap("calc.err.bgp_aspath", err, i18n.A("name", r.Name, "path", r.ASPath))
 	}
 	id := r.RouterID
 	if r.OriginatorID != "" { // en rutas reflejadas el ORIGINATOR_ID ocupa el lugar del router-ID
@@ -141,7 +142,7 @@ func prep(r Route) (path, error) {
 			continue
 		}
 		if *a.dst, err = netip.ParseAddr(a.s); err != nil {
-			return p, fmt.Errorf("%s: dirección %q inválida", r.Name, a.s)
+			return p, i18n.New("calc.err.bgp_addr", i18n.A("name", r.Name, "addr", a.s))
 		}
 	}
 	return p, nil
@@ -267,7 +268,7 @@ func compare(a, b *path, o BGPOptions, upto int) (winner *path, c BGPComparison)
 // primero se elige el mejor de cada AS vecino y luego se comparan esos ganadores.
 func BGPBestPath(routes []Route, o BGPOptions) (BGPResult, error) {
 	if len(routes) < 2 {
-		return BGPResult{}, errors.New("indica al menos dos rutas candidatas")
+		return BGPResult{}, i18n.New("calc.err.bgp_few", nil)
 	}
 	res := BGPResult{Routes: slices.Clone(routes), Options: o}
 	var ps []*path
@@ -292,7 +293,7 @@ func BGPBestPath(routes []Route, o BGPOptions) (BGPResult, error) {
 		ps = append(ps, &p)
 	}
 	if len(ps) == 0 {
-		return BGPResult{}, errors.New("ninguna ruta tiene el next-hop accesible: no hay mejor ruta")
+		return BGPResult{}, i18n.New("calc.err.bgp_unreachable", nil)
 	}
 	run := func(list []*path) *path {
 		b := list[0]

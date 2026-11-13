@@ -1,12 +1,13 @@
 package diag
 
 import (
-	"errors"
 	"fmt"
 	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type Tool string
@@ -38,24 +39,24 @@ var (
 // target valida un destino: IP, nombre DNS o (si cidr) un prefijo. Nunca empieza con "-".
 func target(s string, cidr bool) error {
 	if s == "" || s[0] == '-' {
-		return fmt.Errorf("destino %q inválido", s)
+		return i18n.New("diag.err.target_bad", i18n.A("target", s))
 	}
 	if _, err := netip.ParseAddr(s); err == nil {
 		return nil
 	}
 	if p, err := netip.ParsePrefix(s); err == nil {
 		if !cidr {
-			return fmt.Errorf("%s no acepta rangos CIDR", s)
+			return i18n.New("diag.err.no_cidr", i18n.A("target", s))
 		}
 		if p.Addr().IsValid() {
 			return nil
 		}
 	}
 	if strings.Contains(s, "/") {
-		return fmt.Errorf("prefijo %q inválido", s)
+		return i18n.New("diag.err.prefix_bad", i18n.A("prefix", s))
 	}
 	if !hostRe.MatchString(s) {
-		return fmt.Errorf("destino %q no es IP, nombre ni CIDR", s)
+		return i18n.New("diag.err.target_kind", i18n.A("target", s))
 	}
 	return nil
 }
@@ -78,7 +79,7 @@ func (o *opts) str(key string, allowed ...string) (string, bool) {
 				return v, true
 			}
 		}
-		o.fail("%s debe ser uno de %s", key, strings.Join(allowed, "|"))
+		o.fail(i18n.New("diag.err.one_of", i18n.A("key", key, "values", strings.Join(allowed, "|"))))
 		return "", false
 	}
 	return v, true
@@ -98,7 +99,7 @@ func (o *opts) num(key string, lo, hi float64) (string, bool) {
 	}
 	f, err := strconv.ParseFloat(v, 64)
 	if !re.MatchString(v) || err != nil || f < lo || f > hi {
-		o.fail("%s debe ser un número entre %g y %g", key, lo, hi)
+		o.fail(i18n.New("diag.err.number", i18n.A("key", key, "lo", fmt.Sprintf("%g", lo), "hi", fmt.Sprintf("%g", hi))))
 		return "", false
 	}
 	return v, true
@@ -112,9 +113,9 @@ func (o *opts) boolean(key string) bool {
 	return v == "true" || v == "1"
 }
 
-func (o *opts) fail(format string, a ...any) {
+func (o *opts) fail(err error) {
 	if o.err == nil {
-		o.err = fmt.Errorf(format, a...)
+		o.err = err
 	}
 }
 
@@ -124,7 +125,7 @@ func (o *opts) done() error {
 	}
 	for k := range o.m {
 		if !o.used[k] {
-			return fmt.Errorf("opción %q no existe para esta herramienta", k)
+			return i18n.New("diag.err.option", i18n.A("key", k))
 		}
 	}
 	return nil
@@ -132,7 +133,7 @@ func (o *opts) done() error {
 
 func one(r Request, cidr bool) (string, error) {
 	if len(r.Targets) != 1 {
-		return "", errors.New("se necesita exactamente un destino")
+		return "", i18n.New("diag.err.one_target", nil)
 	}
 	return r.Targets[0], target(r.Targets[0], cidr)
 }
@@ -178,7 +179,7 @@ func Build(r Request) (bin string, argv []string, err error) {
 		argv = append(argv, map[string]string{"": "-sT", "connect": "-sT", "syn": "-sS", "udp": "-sU", "ping": "-sn"}[scan])
 		if v, ok := o.str("ports"); ok {
 			if !portsRe.MatchString(v) {
-				return "", nil, fmt.Errorf("ports %q inválido; usa 22,80,443-445", v)
+				return "", nil, i18n.New("diag.err.ports", i18n.A("value", v))
 			}
 			argv = append(argv, "-p", v)
 		}
@@ -199,7 +200,7 @@ func Build(r Request) (bin string, argv []string, err error) {
 		case "client", "":
 			host, err := one(r, false)
 			if err != nil {
-				return "", nil, fmt.Errorf("iperf3 cliente: %w", err)
+				return "", nil, i18n.Wrap("diag.err.iperf_client", err, nil)
 			}
 			argv = []string{"-c", host}
 		case "server":
@@ -228,14 +229,14 @@ func Build(r Request) (bin string, argv []string, err error) {
 		bin = "iperf3"
 	case Pcap:
 		if len(r.Targets) != 0 {
-			return "", nil, errors.New("la captura no lleva destino; usa el filtro")
+			return "", nil, i18n.New("diag.err.pcap_target", nil)
 		}
 		if r.OutputDir == "" {
-			return "", nil, errors.New("la captura necesita una carpeta de salida")
+			return "", nil, i18n.New("diag.err.pcap_dir", nil)
 		}
 		iface, ok := o.str("interface")
 		if !ok || !ifaceRe.MatchString(iface) {
-			return "", nil, errors.New("interfaz inválida o ausente")
+			return "", nil, i18n.New("diag.err.pcap_iface", nil)
 		}
 		argv = []string{"-i", iface}
 		if v, ok := o.num("seconds", 1, 3600); ok {
@@ -249,7 +250,7 @@ func Build(r Request) (bin string, argv []string, err error) {
 		}
 		bin = "dumpcap"
 	default:
-		return "", nil, fmt.Errorf("herramienta %q desconocida", r.Tool)
+		return "", nil, i18n.New("diag.err.tool_unknown", i18n.A("tool", string(r.Tool)))
 	}
 	if err := o.done(); err != nil {
 		return "", nil, err
@@ -257,7 +258,7 @@ func Build(r Request) (bin string, argv []string, err error) {
 	// Defensa final: ningún valor que venga del usuario puede parecer una bandera.
 	for i, a := range argv {
 		if strings.HasPrefix(a, "-") && !literalFlags[a] && !(i > 0 && argv[i-1] == "-f") {
-			return "", nil, fmt.Errorf("el valor %q parece una bandera", a)
+			return "", nil, i18n.New("diag.err.flag_like", i18n.A("value", a))
 		}
 	}
 	return bin, argv, nil

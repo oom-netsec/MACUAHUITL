@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
@@ -38,16 +39,17 @@ type TrapConfig struct {
 
 // Trap es un trap o inform recibido. La comunidad no se conserva.
 type Trap struct {
-	Time    time.Time
-	From    string
-	Version string `json:",omitempty"`
-	Inform  bool   `json:",omitempty"`
-	Name    string `json:",omitempty"` // coldStart, linkDown... o el OID si no es conocido
-	TrapOID string `json:",omitempty"`
-	Summary string `json:",omitempty"`
-	Vars    []Var  `json:",omitempty"`
-	Error   string `json:",omitempty"`
-	Raw     string `json:",omitempty"` // hex, solo si no se pudo decodificar
+	Time      time.Time
+	From      string
+	Version   string    `json:",omitempty"`
+	Inform    bool      `json:",omitempty"`
+	Name      string    `json:",omitempty"` // coldStart, linkDown... o el OID si no es conocido
+	TrapOID   string    `json:",omitempty"`
+	Summary   string    `json:",omitempty"`
+	Vars      []Var     `json:",omitempty"`
+	Error     string    `json:",omitempty"`
+	ErrorText i18n.Text `json:"-"`          // Error como texto, para darlo en otro idioma
+	Raw       string    `json:",omitempty"` // hex, solo si no se pudo decodificar
 }
 
 // Origin, Text y Line hacen de Trap un ingest.Record.
@@ -133,23 +135,39 @@ func summarize(t *Trap) {
 	t.Summary = t.Name + " " + strings.Join(parts, " ")
 }
 
+// trapErr es un trap que no se pudo decodificar, con su error como texto de catálogo.
+func trapErr(key string, kv ...any) Trap {
+	t := i18n.Tx(key, kv...)
+	return Trap{Error: t.In(i18n.Es), ErrorText: t}
+}
+
+// Localize da el error del trap en el idioma pedido (lo demás son datos del equipo).
+func (t Trap) Localize(loc string) Trap {
+	if !t.ErrorText.Empty() {
+		t.Error = t.ErrorText.In(loc)
+	}
+	return t
+}
+
 func decodeTrap(x *gosnmp.GoSNMP, b []byte) (t Trap, p *gosnmp.SnmpPacket) {
 	defer func() {
 		if r := recover(); r != nil { // gosnmp con un paquete hostil no debe tumbar el receptor
-			t, p = Trap{Error: fmt.Sprintf("paquete malformado: %v", r)}, nil
+			t, p = trapErr("snmp.trap.malformed", "detail", fmt.Sprint(r)), nil
 		}
 	}()
 	p, err := x.UnmarshalTrap(b, false)
 	if err != nil {
-		return Trap{Error: err.Error()}, nil
+		return Trap{Error: err.Error(), ErrorText: i18n.FromErr(err)}, nil
 	}
 	if p == nil {
-		return Trap{Error: "paquete vacío"}, nil
+		return trapErr("snmp.trap.empty"), nil
 	}
 	t.Version = map[gosnmp.SnmpVersion]string{gosnmp.Version1: "1", gosnmp.Version2c: "2c", gosnmp.Version3: "3"}[p.Version]
 	t.Inform = p.PDUType == gosnmp.InformRequest
 	if p.PDUType != gosnmp.Trap && p.PDUType != gosnmp.SNMPv2Trap && !t.Inform {
-		return Trap{Version: t.Version, Error: fmt.Sprintf("PDU %s no es trap ni inform", p.PDUType)}, nil
+		bad := trapErr("snmp.trap.not_trap", "pdu", p.PDUType)
+		bad.Version = t.Version
+		return bad, nil
 	}
 	for _, v := range p.Variables {
 		vv := toVar(v)
@@ -242,7 +260,7 @@ func ListenTraps(ctx context.Context, c TrapConfig) error {
 	if c.V3 != nil {
 		ap, pp := authProtos[strings.ToUpper(c.V3.AuthProto)], privProtos[strings.ToUpper(c.V3.PrivProto)]
 		if ap == 0 || pp == 0 || c.V3.User == "" {
-			return fmt.Errorf("snmp traps: credencial v3 incompleta (usuario, SHA*, AES*)")
+			return i18n.New("snmp.err.trap_v3", nil)
 		}
 		x = &gosnmp.GoSNMP{Version: gosnmp.Version3, SecurityModel: gosnmp.UserSecurityModel, MsgFlags: gosnmp.AuthPriv,
 			SecurityParameters: &gosnmp.UsmSecurityParameters{UserName: c.V3.User, AuthenticationProtocol: ap, AuthenticationPassphrase: c.V3.AuthPass,
@@ -318,7 +336,9 @@ func readTraps(ctx context.Context, pc net.PacketConn, x *gosnmp.GoSNMP, c TrapC
 		if t.Error != "" {
 			if v, _, ok := snmpVersion(pkt); ok && v == 3 {
 				// v3 sin decodificar: nunca el paquete, que trae el usuario USM y los parámetros de autenticación.
-				t.Version, t.Error = "3", fmt.Sprintf("v3 sin decodificar (%d bytes): %s", n, t.Error)
+				t.Version = "3"
+				t.ErrorText = i18n.Tx("snmp.trap.v3_raw", "bytes", n).With("error", t.ErrorText)
+				t.Error = t.ErrorText.In(i18n.Es)
 			} else if b, ok := blindCommunity(pkt); ok {
 				// Solo si se pudo ubicar y cegar la comunidad: el crudo va a eventos y a disco.
 				t.Raw = hex.EncodeToString(b[:min(n, MaxRawTrap)])

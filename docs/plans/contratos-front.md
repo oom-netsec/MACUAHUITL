@@ -1064,7 +1064,7 @@ Forense, métricas, Patrol, scripts y transferencias. Sin `accept-language`, o c
 - `MsgLookup` y `Crashinfo`: `meaning`, `cause`, `action` y `source` de cada ficha salen en el idioma pedido (en el YAML de la base van `meaning_en`, `cause_en` y `action_en`). `verify` son comandos de IOS y no cambian. La fuente fija es «documentación pública de Cisco (sin validar en laboratorio)» / «Cisco public documentation (not validated in the lab)».
 - `Crashinfo`: `hint` y `warnings` traducidos; `kind` conserva el código de siempre (`crashinfo`, `core`, `desconocido`).
 - `LogPatterns`, `Flapping`, `MemLeaks`, `DebugFilter`: `warnings`, la `kb` por mnemónico, el `reason` de cada anomalía de `DebugFilter` y el texto del informe (`text`) en el idioma pedido; `source` es «texto pegado» / «pasted text», «captura del receptor syslog» / «syslog receiver capture» o `show logging del trabajo <carpeta>` / `show logging of job <carpeta>` (o la ruta del archivo, que es un dato).
-- Siguen en español con `en`: el texto del sistema (`no such file…`) y los avisos del lector de carpetas de Patrol (`internal/analyze`, bloque C).
+- Siguen en español con `en`: el texto del sistema (`no such file…`).
 
 ### Métricas
 `GetJobMetrics` (`warnings` de la respuesta y de cada equipo) y `GetPortStatus` (`warnings`, en vivo y de un trabajo) salen en el idioma pedido; los comandos que citan no cambian. Los errores del servicio (`metrics.svc.*`, `metrics.err.*`) son de catálogo.
@@ -1252,3 +1252,19 @@ Cierra los «No cubierto» del bloque B de 30c para el modo asistido. Misma regl
 - Los nombres, etiquetas y ayudas de las plantillas (`ListSnippetTemplates`: `name`, `label`, `help`): la vista los traduce con sus claves `snippet.<id>.*`; el CLI `mctl snippet` los muestra en español (rama de mctl).
 - Los textos propios de `cmd/mctl/cli/assistrun.go` (errores del CLI: puerto inválido, estado final de la ejecución): son del CLI, no del núcleo.
 - Errores de la bóveda anidados en los de rotación (el texto de la causa viene de la bóveda).
+
+## Idioma: cierre (fase 30e) — calculadoras, diagnóstico y análisis
+
+Con `accept-language: en` ya no sale español en estas áreas; sin idioma o con `es` todo es idéntico byte por byte (goldens en español generados antes del cambio).
+
+- **Errores con código** (`ErrorInfo.reason` = el código; el texto va en el idioma pedido): `calc.err.*` (todas las calculadoras), `diag.err.*`, `snmp.err.*`, `gnmi.err.*`, `serial.err.*`, `radius.err.*`, `tacacs.err.*`, `flows.err.*`, `pki.err.*`, `msgkb.err.*`, `transport.err.*`, `iosxe.err.*`, `platform.err.config_line` y los de campo (`field`, `imgverify`, `hash`). Los sentinelas (`snmp.ErrInvalid`, `gnmic.ErrInvalid`, `diag.ErrNotInstalled`, `serialcon.ErrPermission`, `platform.ErrConfigLine`) siguen sirviendo con `errors.Is`.
+- **Texto del sistema** (`no such file…`, `connection refused`, errores de x509/gRPC): va tal cual como `{cause}` dentro de una frase en el idioma pedido.
+- **Calculadoras:** también salen por código los valores de «Valores que coinciden» de Wildcard (`calc.val.octet.*`) y los nombres por defecto «red N»/«ruta N» (`calc.val.name.*`). El `json` en español no cambia.
+- **Diagnóstico:** `Snapshot.Localize` (flows), `Trap.Localize`, `Sample.Localize` (SNMP), `Config.StringIn` (consola serie: «flow=» con `en`), `Decoded.ValueIn` (RADIUS: valor de `MS-CHAP2-Success` y «(truncado)») y el argumento `error` de `ns-lame` (DNS) salen en el idioma pedido. El informe de `HashFile` también.
+- **Patrol:** los avisos del lector de carpetas ya salen en el idioma pedido (ya lo hacía `catalog_analyze.go`); se quita la nota «siguen en español».
+- **Auditoría:** siempre en inglés (`i18n.English`); el motivo del guard en `terminal.failed` ahora sale en inglés.
+
+### Siguen en español (con motivo)
+- Se disparan solo por un fallo interno imposible desde la entrada: reglas YAML de `internal/analyze/rules.go`, base embebida de `msgkb.Default()`, defensa `flag_like` de diag (esta sí con código).
+- No llegan al usuario o son contenido de archivo/protocolo: errores de `radius.Decode` y de `parseRequest` TFTP, «contraseña incorrecta» de sshsrv (el cliente ve un fallo genérico), `Trap.Text()` y las marcas del grabador de consola, `tftpErr(3, …)`, `Config.String()` de serialcon.
+- Datos que escribe el usuario (nombres, entradas citadas en los errores).

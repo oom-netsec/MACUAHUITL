@@ -216,7 +216,7 @@ func (w *recvFile) commit() (sum string, size int64, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.done {
-		return "", w.size, errors.New("archivo ya cerrado")
+		return "", w.size, i18n.New("fileserve.reason.file_closed", nil)
 	}
 	w.done = true
 	defer w.f.Close()

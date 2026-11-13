@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/flows"
@@ -58,14 +57,14 @@ func (s *visibilitySvc) BuildTopology(ctx context.Context, r *v1.BuildTopologyRe
 	var err error
 	if dir != "" {
 		if devs, err = topo.LoadPatrolDir(dir); err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 	}
 	var neigh []pcapan.Neighbor
 	if r.PcapPath != "" {
 		rep, err := pcapan.Analyze(ctx, r.PcapPath, pcapan.Options{})
 		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 		neigh = rep.Neighbors
 	}
@@ -113,16 +112,16 @@ func (s *visibilitySvc) snmpTarget(ctx context.Context, t *v1.SnmpTarget, id str
 		st.Community = string(cred.Password.Bytes())
 	}
 	if err := s.d.Guard().Allow(ctx, id, []string{t.Host}); err != nil {
-		return snmp.Target{}, status.Error(codes.InvalidArgument, err.Error())
+		return snmp.Target{}, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	return st, nil
 }
 
-func snmpErr(err error) error {
+func snmpErr(ctx context.Context, err error) error {
 	if errors.Is(err, snmp.ErrInvalid) {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
-	return status.Error(codes.Unavailable, err.Error())
+	return service.ErrFrom(ctx, codes.Unavailable, err)
 }
 
 func (s *visibilitySvc) SnmpGet(ctx context.Context, r *v1.SnmpGetRequest) (*v1.SnmpGetResponse, error) {
@@ -136,7 +135,7 @@ func (s *visibilitySvc) SnmpGet(ctx context.Context, r *v1.SnmpGetRequest) (*v1.
 	s.d.Audit("visibility.snmp", t.Host, fmt.Sprintf("run=%s op=get version=%s oids=%d", id, t.Version, len(r.Oids)))
 	vs, err := snmp.Get(ctx, t, r.Oids)
 	if err != nil {
-		return nil, snmpErr(err)
+		return nil, snmpErr(ctx, err)
 	}
 	return &v1.SnmpGetResponse{Report: service.Report(vs, varsText(vs))}, nil
 }
@@ -152,7 +151,7 @@ func (s *visibilitySvc) SnmpWalk(ctx context.Context, r *v1.SnmpWalkRequest) (*v
 	s.d.Audit("visibility.snmp", t.Host, fmt.Sprintf("run=%s op=walk bulk=%t version=%s oid=%s", id, r.Bulk, t.Version, r.Oid))
 	vs, err := snmp.Walk(ctx, t, r.Oid, r.Bulk, int(r.Limit))
 	if err != nil {
-		return nil, snmpErr(err)
+		return nil, snmpErr(ctx, err)
 	}
 	return &v1.SnmpWalkResponse{Report: service.Report(vs, varsText(vs))}, nil
 }
@@ -181,11 +180,11 @@ func (s *visibilitySvc) SnmpPoll(r *v1.SnmpPollRequest, st v1.VisibilityService_
 	}
 	s.d.Audit("visibility.snmp", t.Host, fmt.Sprintf("run=%s op=poll version=%s profiles=%q interval=%s", id, t.Version, r.Profiles, every))
 	err = snmp.Poll(ctx, t, r.Profiles, every, int(r.Count), func(sm snmp.Sample) {
-		b, _ := json.Marshal(sm)
+		b, _ := json.Marshal(sm.Localize(i18n.Locale(ctx)))
 		st.Send(&v1.SnmpPollResponse{Json: string(b)})
 	})
 	if err != nil {
-		return snmpErr(err)
+		return snmpErr(ctx, err)
 	}
 	return nil
 }
@@ -259,7 +258,7 @@ func (s *visibilitySvc) SnmpTraps(r *v1.SnmpTrapsRequest, st v1.VisibilityServic
 	}
 	cfg.OnTrap = func(t snmp.Trap) {
 		n++
-		b, _ := json.Marshal(t)
+		b, _ := json.Marshal(t.Localize(i18n.Locale(st.Context())))
 		send(&v1.SnmpTrapsResponse{Json: string(b)})
 	}
 	cfg.OnDrops = func(d ingest.Drops) {
@@ -305,7 +304,7 @@ func (s *visibilitySvc) Flows(r *v1.FlowsRequest, st v1.VisibilityService_FlowsS
 		cfg.Sink = &sink
 	}
 	snap := func(sn flows.Snapshot, final bool) {
-		b, _ := json.Marshal(sn)
+		b, _ := json.Marshal(sn.Localize(i18n.Locale(st.Context())))
 		send(&v1.FlowsResponse{Json: string(b), Final: final})
 	}
 	var last ingest.Drops
@@ -350,7 +349,7 @@ func (s *visibilitySvc) gnmiTarget(ctx context.Context, t *v1.GnmiTarget, id str
 		}
 		b, err := os.ReadFile(t.CaPath)
 		if err != nil {
-			return gnmic.Target{}, status.Error(codes.InvalidArgument, err.Error())
+			return gnmic.Target{}, service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 		gt.CA = b
 	}
@@ -363,16 +362,16 @@ func (s *visibilitySvc) gnmiTarget(ctx context.Context, t *v1.GnmiTarget, id str
 		destroy(cred)
 	}
 	if err := s.d.Guard().Allow(ctx, id, []string{t.Host}); err != nil {
-		return gnmic.Target{}, status.Error(codes.InvalidArgument, err.Error())
+		return gnmic.Target{}, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	return gt, nil
 }
 
-func gnmiErr(err error) error {
+func gnmiErr(ctx context.Context, err error) error {
 	if errors.Is(err, gnmic.ErrInvalid) {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
-	return status.Error(codes.Unavailable, err.Error())
+	return service.ErrFrom(ctx, codes.Unavailable, err)
 }
 
 func (s *visibilitySvc) GnmiGet(ctx context.Context, r *v1.GnmiGetRequest) (*v1.GnmiGetResponse, error) {
@@ -386,7 +385,7 @@ func (s *visibilitySvc) GnmiGet(ctx context.Context, r *v1.GnmiGetRequest) (*v1.
 	s.d.Audit("visibility.gnmi", t.Host, fmt.Sprintf("run=%s op=get paths=%q", id, r.Paths))
 	ups, err := gnmic.Get(ctx, gnmic.Dialer(s.d.Guard().DialerFor(id)), t, r.Paths, r.Encoding)
 	if err != nil {
-		return nil, gnmiErr(err)
+		return nil, gnmiErr(ctx, err)
 	}
 	return &v1.GnmiGetResponse{Report: service.Report(ups, "")}, nil
 }
@@ -407,7 +406,7 @@ func (s *visibilitySvc) GnmiSubscribe(r *v1.GnmiSubscribeRequest, st v1.Visibili
 		st.Send(&v1.GnmiSubscribeResponse{Json: string(b)})
 	})
 	if err != nil {
-		return gnmiErr(err)
+		return gnmiErr(ctx, err)
 	}
 	return nil
 }

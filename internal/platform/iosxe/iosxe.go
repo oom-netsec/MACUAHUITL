@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
@@ -257,7 +258,7 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 		return out, d.err
 	}
 	if strings.ContainsAny(cmd, "\r\n") {
-		return out, fmt.Errorf("platform: el comando %q tiene saltos de línea", cmd)
+		return out, i18n.New("iosxe.err.newline", i18n.A("cmd", cmd))
 	}
 	ctx, cancel := context.WithTimeout(ctx, maxRun) // timeout es de inactividad; maxRun, el tope fijo
 	defer cancel()
@@ -341,16 +342,16 @@ func refuseConfigLine(l string) error {
 	// Fuera de 0x20-0x7e: con exec-character-bits 7 el equipo quita el bit alto y "Í" llega como 'C' + CR.
 	for _, r := range l {
 		if r < 0x20 || r > 0x7e || r == '?' {
-			return fmt.Errorf("%w: %q tiene caracteres fuera de ASCII imprimible o '?'", platform.ErrConfigLine, l)
+			return i18n.Wrap("iosxe.err.cfg_chars", platform.ErrConfigLine, i18n.A("line", l))
 		}
 	}
 	f := strings.Fields(strings.ToLower(l))
 	if len(f) == 0 {
-		return fmt.Errorf("%w: línea vacía", platform.ErrConfigLine)
+		return i18n.Wrap("iosxe.err.cfg_empty", platform.ErrConfigLine, nil)
 	}
 	for _, w := range []string{"end", "exit", "do", "configure", "write", "copy", "reload"} {
 		if playbook.Abbrev(f[0], w) { // IOS ejecuta cualquier prefijo único: "en", "ex", "wr", "conf t"
-			return fmt.Errorf("%w: %q cambia de modo o ejecuta fuera de la configuración", platform.ErrConfigLine, l)
+			return i18n.Wrap("iosxe.err.cfg_mode", platform.ErrConfigLine, i18n.A("line", l))
 		}
 	}
 	return nil
@@ -390,7 +391,7 @@ func (d *driver) Configure(ctx context.Context, lines []string, timeout time.Dur
 		return res, err
 	}
 	if cfgError(out) {
-		return res, fmt.Errorf("platform: el equipo no entró a configuración: %s", strings.TrimSpace(out))
+		return res, i18n.New("iosxe.err.no_config_mode", i18n.A("output", strings.TrimSpace(out)))
 	}
 	for _, l := range lines {
 		out, wrote, err := d.step(ctx, l, d.atConfigPrompt)
