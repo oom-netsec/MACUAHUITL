@@ -1,0 +1,21 @@
+# Propósito: Revisa las VRF, sus interfaces, rutas y la parte MPLS/VPNv4 asociada.
+# Cuándo usarlo: Servicio aislado por VRF sin alcance, fuga de rutas entre VRF o fallas en un VPN MPLS.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/mpls/command/mp-cr-book.html
+# Sin validar en laboratorio.
+id: l3-vrf
+platform: ios
+name: L3 · VRF (IOS)
+name_en: L3 · VRF (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show vrf
+  - cmd: show ip vrf
+  - cmd: show ip vrf interfaces
+  - cmd: show mpls interfaces
+  - cmd: show ip vrf detail
+  - cmd: show bgp vpnv4 unicast all summary
+  - cmd: show mpls ldp neighbor
+  - cmd: show mpls forwarding-table
+    timeout: 120s
+  - cmd: show ip route vrf *
+    timeout: 300s

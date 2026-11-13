@@ -1,0 +1,19 @@
+# Propósito: Revisa las sesiones SPAN/RSPAN y las capturas locales configuradas.
+# Cuándo usarlo: Una captura de tráfico no muestra nada, o hay que confirmar origen y destino de una sesión de espejo.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
+# Sin validar en laboratorio.
+id: svc-span
+platform: ios
+name: Servicios · SPAN (IOS)
+name_en: Services · SPAN (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show monitor
+  - cmd: show monitor session all
+  - cmd: show monitor session all detail
+  - cmd: show monitor capture
+  - cmd: show vlan remote-span
+  - cmd: show interfaces status
+  - cmd: show logging | include SPAN|MONITOR
+  - cmd: show running-config | include monitor session
+    may_contain_secrets: true

@@ -1,0 +1,16 @@
+# Propósito: Revisa la política del plano de control, los descartes por clase y las causas de punt hacia la CPU.
+# Cuándo usarlo: CPU alta por tráfico al plano de control o paquetes de protocolos descartados por CoPP.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/qos/command/qos-cr-book.html
+# Sin validar en laboratorio.
+id: svc-copp
+platform: ios
+name: Servicios · CoPP (IOS)
+name_en: Services · CoPP (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show policy-map control-plane
+  - cmd: show control-plane host open-ports
+  - cmd: show processes cpu sorted
+  - cmd: show controllers cpu-interface
+  - cmd: show running-config | section control-plane|policy-map|class-map
+    may_contain_secrets: true

@@ -1,0 +1,22 @@
+# Propósito: Revisa vecinos, interfaces, topología y rutas activas (SIA) de EIGRP.
+# Cuándo usarlo: Vecinos EIGRP que flapean, rutas atascadas en activo o diferencias de métrica entre vecinos.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_eigrp/command/ire-cr-book.html
+# Sin validar en laboratorio.
+id: l3-eigrp
+platform: ios
+name: L3 · EIGRP (IOS)
+name_en: L3 · EIGRP (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show ip protocols | section eigrp
+  - cmd: show ip eigrp neighbors
+  - cmd: show ip eigrp interfaces
+  - cmd: show ip eigrp traffic
+  - cmd: show eigrp address-family ipv4 neighbors
+  - cmd: show ip route eigrp
+  - cmd: show logging | include DUAL|EIGRP|NBRCHANGE
+  - cmd: show ip eigrp topology active
+  - cmd: show ip eigrp topology zero-successors
+  - cmd: show ip eigrp neighbors detail
+  - cmd: show ip eigrp topology
+    timeout: 300s

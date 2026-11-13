@@ -1,0 +1,13 @@
+# Comandos de la documentación pública de Cisco para IOS clásico. Sin validar en laboratorio.
+id: cpu-alta
+platform: ios
+name: Plataforma · CPU alta (IOS)
+name_en: Platform · High CPU (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show processes cpu sorted
+  - cmd: show processes cpu history
+  - cmd: show interfaces summary
+  - cmd: show controllers cpu-interface
+  - cmd: show platform cpu packet statistics
+  - cmd: show logging | include CPU|HOG|MEM

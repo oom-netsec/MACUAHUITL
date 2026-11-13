@@ -1,0 +1,18 @@
+# Propósito: Revisa el estado de port-security, las MAC seguras y las violaciones registradas.
+# Cuándo usarlo: Un usuario pierde red tras mover su equipo, o un puerto cae por violación de MAC.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
+# Sin validar en laboratorio.
+id: l1-port-security
+platform: ios
+name: L1 · Port-security (IOS)
+name_en: L1 · Port security (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show port-security
+  - cmd: show port-security address
+  - cmd: show mac address-table secure
+  - cmd: show interfaces status err-disabled
+  - cmd: show errdisable recovery
+  - cmd: show logging | include PSECURE|PORT_SECURITY
+  - cmd: show running-config | include port-security|^interface
+    may_contain_secrets: true

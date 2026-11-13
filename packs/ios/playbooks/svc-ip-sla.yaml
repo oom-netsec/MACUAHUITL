@@ -1,0 +1,22 @@
+# Propósito: Revisa las operaciones IP SLA, sus estadísticas, el respondedor y los objetos track ligados.
+# Cuándo usarlo: Un failover por track no se dispara, o medir retardo, jitter y pérdida entre dos puntos.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipsla/command/sla-cr-book.html
+# Sin validar en laboratorio.
+id: svc-ip-sla
+platform: ios
+name: Servicios · IP SLA (IOS)
+name_en: Services · IP SLA (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show ip sla summary
+  - cmd: show ip sla configuration
+  - cmd: show ip sla statistics
+  - cmd: show ip sla statistics aggregated
+  - cmd: show ip sla application
+  - cmd: show ip sla responder
+  - cmd: show track brief
+  - cmd: show logging | include SLA|TRACK
+  - cmd: show ip sla history
+  - cmd: show track
+  - cmd: show running-config | section ip sla
+    may_contain_secrets: true

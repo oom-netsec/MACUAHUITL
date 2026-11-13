@@ -1,0 +1,10 @@
+id: oom/ios
+version: 1.0.0
+min_core: 0.3.0
+name: IOS clásico, diagnóstico TAC
+name_en: IOS classic, TAC diagnostics
+description: Playbooks de solo lectura de capa 1, 2, 3, plataforma, servicios y VPN para IOS clásico 12.2/15.x (Catalyst 2960/3560/3750 e ISR G2), con su biblioteca de scripts.
+description_en: Read-only layer 1, 2, 3, platform, services and VPN playbooks for classic IOS 12.2/15.x (Catalyst 2960/3560/3750 and ISR G2), with their script library.
+platforms: [ios]
+author: oom-netsec
+license: Apache-2.0

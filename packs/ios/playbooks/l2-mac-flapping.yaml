@@ -1,0 +1,18 @@
+# Propósito: Localiza direcciones MAC que cambian de puerto: tabla MAC, eventos de flapping y posibles loops.
+# Cuándo usarlo: Mensajes MACFLAP o HOST_FLAPPING, conectividad intermitente de un host o sospecha de loop.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/command/lsw-cr-book.html
+# Sin validar en laboratorio.
+id: l2-mac-flapping
+platform: ios
+name: L2 · MAC flapping (IOS)
+name_en: L2 · MAC flapping (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show mac address-table count
+  - cmd: show mac address-table aging-time
+  - cmd: show logging | include MACFLAP|MAC_MOVE|MACMOVE|HOST_FLAPPING|FLAPPING
+  - cmd: show cdp neighbors
+  - cmd: show etherchannel summary
+  - cmd: show spanning-tree detail | include occurred|from
+  - cmd: show interfaces counters
+  - cmd: show mac address-table dynamic

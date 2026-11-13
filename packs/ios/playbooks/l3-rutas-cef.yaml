@@ -1,0 +1,24 @@
+# Propósito: Resume la tabla de rutas, las adyacencias y CEF para IPv4 e IPv6.
+# Cuándo usarlo: Destino inalcanzable, ruta inesperada o sospecha de inconsistencia entre la tabla de rutas y CEF.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/command/iri-cr-book.html
+# Sin validar en laboratorio.
+id: l3-rutas-cef
+platform: ios
+name: L3 · Rutas y CEF (IOS)
+name_en: L3 · Routes and CEF (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show ip interface brief
+  - cmd: show ip route summary
+  - cmd: show ip protocols
+  - cmd: show ip route connected
+  - cmd: show ip route static
+  - cmd: show ip cef summary
+  - cmd: show adjacency summary
+  - cmd: show ipv6 route summary
+  - cmd: show ipv6 cef summary
+  - cmd: show ip traffic
+  - cmd: show ip cef
+    timeout: 120s
+  - cmd: show ip route
+    timeout: 300s

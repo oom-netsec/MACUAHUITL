@@ -1,0 +1,17 @@
+# Propósito: Comprueba la sincronización de hora: reloj, asociaciones NTP y su configuración.
+# Cuándo usarlo: Logs con hora desfasada, certificados que fallan por fecha o servidor NTP sin sincronizar.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/bsm/command/bsm-cr-book.html
+# Sin validar en laboratorio.
+id: svc-ntp
+platform: ios
+name: Servicios · NTP (IOS)
+name_en: Services · NTP (IOS)
+commands:
+  - cmd: show clock detail
+  - cmd: show calendar
+  - cmd: show ntp status
+  - cmd: show ntp associations
+  - cmd: show ntp associations detail
+  - cmd: show logging | include NTP|CLOCK|SNTP
+  - cmd: show running-config | include ntp|clock timezone|clock summer-time
+    may_contain_secrets: true

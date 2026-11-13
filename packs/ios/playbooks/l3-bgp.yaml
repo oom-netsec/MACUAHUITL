@@ -1,0 +1,20 @@
+# Propósito: Revisa el estado de los pares BGP, prefijos recibidos y anunciados, y fallas de instalación.
+# Cuándo usarlo: Par BGP caído o en Idle/Active, prefijos faltantes o rutas BGP que no entran a la tabla de rutas.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_bgp/command/irg-cr-book.html
+# Sin validar en laboratorio.
+id: l3-bgp
+platform: ios
+name: L3 · BGP (IOS)
+name_en: L3 · BGP (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show ip bgp summary
+  - cmd: show bgp all summary
+  - cmd: show bgp ipv6 unicast summary
+  - cmd: show bgp vpnv4 unicast all summary
+  - cmd: show tcp brief | include 179
+  - cmd: show logging | include BGP|ADJCHANGE
+  - cmd: show ip route bgp
+  - cmd: show ip bgp rib-failure
+  - cmd: show ip bgp neighbors
+    timeout: 300s

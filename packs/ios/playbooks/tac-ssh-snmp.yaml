@@ -1,0 +1,27 @@
+# Propósito: Revisa el acceso de administración: líneas VTY, SSH, SNMP, AAA, ACL, CPU y el plano de control.
+# Cuándo usarlo: El equipo no responde a SSH o SNMP pero sigue reenviando tráfico; se accede por consola u otra vía.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
+# Sin validar en laboratorio.
+id: tac-ssh-snmp
+platform: ios
+name: TAC · No responde a SSH/SNMP (IOS)
+name_en: TAC · Not responding to SSH/SNMP (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show users
+  - cmd: show line
+  - cmd: show ip ssh
+  - cmd: show ssh
+  - cmd: show snmp
+  - cmd: show aaa servers
+  - cmd: show tcp brief
+  - cmd: show ip sockets
+  - cmd: show ip interface brief
+  - cmd: show control-plane host open-ports
+  - cmd: show processes cpu sorted
+  - cmd: show processes cpu history
+  - cmd: show ip access-lists
+  - cmd: show crypto key mypubkey rsa
+  - cmd: show logging | include SSH|SNMP|LOGIN|AAA|VTY|TACACS|RADIUS|CPUHOG
+  - cmd: show running-config | section line vty|ip ssh|snmp-server|access-class|aaa
+    may_contain_secrets: true

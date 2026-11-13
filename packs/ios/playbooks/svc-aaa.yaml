@@ -1,0 +1,23 @@
+# Propósito: Revisa servidores AAA, métodos de autenticación, sesiones y contadores de TACACS+/RADIUS.
+# Cuándo usarlo: No entran usuarios por SSH/consola, tiempos de espera con el servidor AAA o servidor marcado como muerto.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/security/s1/sec-s1-cr-book.html
+# Sin validar en laboratorio.
+id: svc-aaa
+platform: ios
+name: Servicios · AAA, TACACS+ y RADIUS (IOS)
+name_en: Services · AAA, TACACS+ and RADIUS (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show users
+  - cmd: show aaa servers
+  - cmd: show aaa local user lockout
+  - cmd: show aaa sessions
+  - cmd: show aaa method-lists authentication
+  - cmd: show tacacs
+  - cmd: show radius statistics
+  - cmd: show radius server-group all
+  - cmd: show line
+  - cmd: show ip ssh
+  - cmd: show logging | include TAC|RADIUS|AAA|SYS-5-CONFIG|LOGIN
+  - cmd: show running-config | section aaa|tacacs|radius|username
+    may_contain_secrets: true

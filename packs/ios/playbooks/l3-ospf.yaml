@@ -1,0 +1,25 @@
+# Propósito: Revisa vecinos, interfaces, base de datos y rutas de OSPF.
+# Cuándo usarlo: Vecino atascado en EXSTART/INIT, adyacencia que cae, rutas OSPF ausentes o cambios frecuentes de SPF.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_ospf/command/iro-cr-book.html
+# Sin validar en laboratorio.
+id: l3-ospf
+platform: ios
+name: L3 · OSPF (IOS)
+name_en: L3 · OSPF (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show ip protocols | section ospf
+  - cmd: show ip ospf
+  - cmd: show ip ospf neighbor
+  - cmd: show ip ospf interface brief
+  - cmd: show ip ospf database database-summary
+  - cmd: show ip ospf border-routers
+  - cmd: show ip ospf statistics
+  - cmd: show ip route ospf
+  - cmd: show logging | include OSPF|ADJCHG
+  - cmd: show ip ospf traffic
+  - cmd: show ipv6 ospf neighbor
+  - cmd: show ip ospf neighbor detail
+  - cmd: show ip ospf interface
+  - cmd: show ip ospf database
+    timeout: 300s

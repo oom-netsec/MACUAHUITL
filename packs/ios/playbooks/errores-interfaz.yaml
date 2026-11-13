@@ -1,0 +1,13 @@
+# Comandos de la documentación pública de Cisco para IOS clásico. Sin validar en laboratorio.
+id: errores-interfaz
+platform: ios
+name: Interfaces · Errores (IOS)
+name_en: Interfaces · Errors (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show interfaces counters errors
+  - cmd: show interfaces
+    timeout: 120s
+  - cmd: show interfaces status err-disabled
+  - cmd: show errdisable recovery
+  - cmd: show logging | include LINK|LINEPROTO|ERR

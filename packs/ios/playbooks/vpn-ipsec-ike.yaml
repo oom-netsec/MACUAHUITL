@@ -1,0 +1,28 @@
+# Propósito: Revisa las asociaciones de seguridad IKEv1/IKEv2 e IPsec, sus contadores y la configuración criptográfica.
+# Cuándo usarlo: Un túnel no levanta o no pasa tráfico, rekeys fallidos o diferencias de propuesta entre ambos extremos.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/security/s1/sec-s1-cr-book.html
+# Sin validar en laboratorio.
+id: vpn-ipsec-ike
+platform: ios
+name: VPN · IPsec/IKE (IOS)
+name_en: VPN · IPsec/IKE (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show crypto session
+  - cmd: show crypto isakmp sa
+  - cmd: show crypto ikev2 sa
+  - cmd: show crypto ikev2 sa detail
+  - cmd: show crypto session detail
+  - cmd: show crypto ipsec sa
+  - cmd: show crypto isakmp policy
+  - cmd: show crypto ikev2 proposal
+  - cmd: show crypto ikev2 policy
+  - cmd: show crypto ikev2 profile
+  - cmd: show crypto ikev2 stats
+  - cmd: show crypto ipsec transform-set
+  - cmd: show crypto map
+  - cmd: show ip interface brief | include Tunnel
+  - cmd: show logging | include CRYPTO|IKE|IPSEC|ISAKMP
+  - cmd: show crypto engine connections active
+  - cmd: show running-config | section crypto|tunnel
+    may_contain_secrets: true
