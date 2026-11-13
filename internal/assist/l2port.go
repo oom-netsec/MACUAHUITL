@@ -20,7 +20,7 @@ import (
 // l2Feature es una línea de apply con su reversa y lo que se espera ver al aplicarla.
 type l2Feature struct {
 	apply, back string
-	exp         Expect // sin Command: lo pone assembleL2 (el running del puerto)
+	exp         Expect // si no trae Command, lo pone assembleG (el comando base del alcance)
 }
 
 // l2Scope es un puerto (o la configuración global, header vacío) con sus cambios.
