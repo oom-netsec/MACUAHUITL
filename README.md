@@ -113,7 +113,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 Playbooks and scripts come in **content packs** (`.mpack`), one per technology. Install the ones for the platforms you work on and leave the rest out. Each pack has its own version, so newer content installs on the core you already have.
 
 ```sh
-mctl pack install oom-ios-xe-1.1.0.mpack    # from the release page; the app never downloads anything
+mctl pack install oom-ios-xe-<version>.mpack    # from the release page; the app never downloads anything
 mctl pack list                              # installed packs, version, official or third-party
 mctl pack show oom/ios-xe                   # manifest and the pack's own README
 mctl pack remove oom/ios-xe
@@ -183,7 +183,7 @@ systemctl --user enable --now macuahuitld     # as the user who will use it
 ## Quick start
 
 ```sh
-mctl pack install oom-ios-xe-1.1.0.mpack    # v0.3.0+: the IOS-XE playbooks (from the release page)
+mctl pack install oom-ios-xe-<version>.mpack    # v0.3.0+: the IOS-XE playbooks (from the release page)
 mctl vault create                           # set the master password (no echo)
 mctl cred add --label lab --user admin      # device credential
 mctl job create -f job.yaml                 # returns the job ID
