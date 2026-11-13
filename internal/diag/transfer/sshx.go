@@ -42,6 +42,14 @@ func (x tapW) Write(p []byte) (int, error) {
 }
 func (x tapW) Close() error { return x.w.Close() }
 
+// tapOf da el Activity de la sesión (*transport.Session) o uno nulo si no lo tiene.
+func tapOf(s SSHSession) tap {
+	if a, ok := s.(interface{ Activity(int) }); ok {
+		return a.Activity
+	}
+	return func(int) {}
+}
+
 func (r *Request) sshOpen(ctx context.Context) (*ssh.Client, string, tap, func(), error) {
 	file, err := remotePath(r.URL)
 	if err != nil {
@@ -56,11 +64,7 @@ func (r *Request) sshOpen(ctx context.Context) (*ssh.Client, string, tap, func()
 	}
 	c := sess.Client()
 	stop := closeOnDone(ctx, c)
-	t := tap(func(int) {})
-	if a, ok := sess.(interface{ Activity(int) }); ok {
-		t = a.Activity
-	}
-	return c, file, t, func() { stop(); sess.Close() }, nil
+	return c, file, tapOf(sess), func() { stop(); sess.Close() }, nil
 }
 
 // ---- SFTP ----

@@ -452,3 +452,6 @@ func TestRedirectHintRPCEn(t *testing.T) {
 		t.Errorf("es cambió: %s", es.Nftables)
 	}
 }
+
+// Un renombre de Session.Activity rompe la compilación en vez de apagar en silencio el keepalive de scp/sftp.
+var _ interface{ Activity(int) } = (*transport.Session)(nil)

@@ -243,11 +243,7 @@ func (r *Request) sftpList(ctx context.Context, path string) (Listing, error) {
 	c := sess.Client()
 	stop := closeOnDone(ctx, c)
 	defer func() { stop(); sess.Close() }()
-	t := tap(func(int) {})
-	if a, ok := sess.(interface{ Activity(int) }); ok {
-		t = a.Activity
-	}
-	cl, err := sftpOpen(c, maxSFTPBytes, t)
+	cl, err := sftpOpen(c, maxSFTPBytes, tapOf(sess))
 	if err != nil {
 		if r.URL.Scheme == "scp" && errors.Is(err, errNoSubsystem) {
 			return Listing{}, &NoListingError{"scp", "SCP no lista y el servidor no ofrece el subsistema SFTP"}
