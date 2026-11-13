@@ -11,17 +11,40 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-go@v7.0.0
+      # checkout y setup-go fijados por SHA: corren antes del paso que ve MPACK_SIGNING_KEY.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # el tag anterior, para exigir versión nueva en un paquete que cambió
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - name: versión
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+      - name: paquetes de contenido, reglas del repo (sin el secret)
+        run: |
+          go test ./internal/pack/ -run 'TestPacksDelRepoSonValidos|TestSegmentosOficialesEstanReservados|TestBuildEsDeterminista'
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          [ -z "$prev" ] && exit 0
+          for d in packs/*/; do
+            git diff --quiet "$prev" -- "$d" && continue
+            old=$(git show "$prev:${d}manifest.yaml" 2>/dev/null | sed -n 's/^version: *//p' || true)
+            new=$(sed -n 's/^version: *//p' "${d}manifest.yaml")
+            # mayor, no solo distinta: el núcleo rechaza instalar una versión igual o más vieja
+            [ -z "$old" ] || { [ "$old" != "$new" ] && [ "$(printf '%s\n%s\n' "$old" "$new" | sort -V | tail -1)" = "$new" ]; } ||
+              { echo "::error::${d} cambió desde $prev sin subir version ($old -> $new)"; exit 1; }
+          done
+      # Antes de Node y npm ci: el secret solo vive en el entorno de este paso y ningún script de npm lo ve.
+      - name: paquetes de contenido firmados (.mpack)
+        env:
+          MPACK_SIGNING_KEY: ${{ secrets.MPACK_SIGNING_KEY }}
+        run: |
+          go run ./tools/packaging/mpack-sign -packs packs -out dist -core "$VERSION"
+          (cd dist && sha256sum *.mpack *.README.md) > "$RUNNER_TEMP/mpack.sha256"
       - uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
       - name: dependencias de la UI
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config rpm
-      - name: versión
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - name: núcleo y CLI (reproducibles)
         run: |
           build() { rm -rf "$1" && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -buildid= -X github.com/oom-netsec/MACUAHUITL/internal/version.Version=${GITHUB_REF_NAME}" -o "$1/" ./cmd/macuahuitld ./cmd/mctl && (cd "$1" && sha256sum macuahuitld mctl); }
@@ -47,6 +70,7 @@ jobs:
           upload-artifact: false
       - name: sumas
         run: |
+          (cd dist && sha256sum -c --quiet "$RUNNER_TEMP/mpack.sha256") # contra accidentes; contra alteraciones protege la firma
           cd dist && sha256sum * > SHA256SUMS
           { echo "go: $(go version)"; echo "tag: ${GITHUB_REF_NAME}"; echo "commit: ${GITHUB_SHA}"; echo "reproducible: macuahuitld, mctl (CGO_ENABLED=0 -trimpath -ldflags '-s -w -buildid=')"; echo "no reproducible byte a byte: macuahuitl (UI con cgo/WebKitGTK)"; } > BUILD-INFO.txt
       - uses: softprops/action-gh-release@v3.0.3
