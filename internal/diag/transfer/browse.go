@@ -205,7 +205,7 @@ var errNoSubsystem = i18n.New("xfer.err.no_subsys", nil)
 
 // sftpOpen abre el subsistema SFTP leyendo a lo más limit bytes del servidor (pkg/sftp lee un
 // directorio entero en memoria: así un servidor hostil no la llena).
-func sftpOpen(c *ssh.Client, limit int64) (*sftp.Client, error) {
+func sftpOpen(c *ssh.Client, limit int64, t tap) (*sftp.Client, error) {
 	s, err := c.NewSession()
 	if err != nil {
 		return nil, err
@@ -224,7 +224,7 @@ func sftpOpen(c *ssh.Client, limit int64) (*sftp.Client, error) {
 		s.Close()
 		return nil, fmt.Errorf("%w: %v", errNoSubsystem, err)
 	}
-	cl, err := sftp.NewClientPipe(io.LimitReader(rd, limit), wr)
+	cl, err := sftp.NewClientPipe(io.LimitReader(tapR{rd, t}, limit), tapW{wr, t})
 	if err != nil {
 		s.Close()
 		return nil, err
@@ -243,7 +243,7 @@ func (r *Request) sftpList(ctx context.Context, path string) (Listing, error) {
 	c := sess.Client()
 	stop := closeOnDone(ctx, c)
 	defer func() { stop(); sess.Close() }()
-	cl, err := sftpOpen(c, maxSFTPBytes)
+	cl, err := sftpOpen(c, maxSFTPBytes, tapOf(sess))
 	if err != nil {
 		if r.URL.Scheme == "scp" && errors.Is(err, errNoSubsystem) {
 			return Listing{}, &NoListingError{"scp", "SCP no lista y el servidor no ofrece el subsistema SFTP"}

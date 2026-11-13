@@ -368,6 +368,8 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	j.OutputDir = w.Dir()
 	c.mu.Unlock()
 	run := func(ctx context.Context, round int, hp string) error {
+		ctx, cancelWin := windowCtx(ctx, until, c.o.Now())
+		defer cancelWin()
 		res := patrol.RunDevice(ctx, c.deps(j), j.id, spec, w, round, byHP[hp], func(p patrol.Progress) {
 			kind := engine.DeviceState
 			if p.State == "running" {
@@ -636,4 +638,10 @@ func (s *auditSvc) Export(r *v1.ExportRequest, st v1.AuditService_ExportServer) 
 		}
 	}
 	return nil
+}
+
+// windowCtx limita a un equipo al fin de la ventana de la bóveda (until), no a Schedule.Until, que solo
+// impide empezar rondas nuevas. El plazo es relativo al reloj del núcleo; si ya pasó, nace vencido.
+func windowCtx(ctx context.Context, until, now time.Time) (context.Context, context.CancelFunc) {
+	return context.WithTimeoutCause(ctx, until.Sub(now), patrol.ErrWindowEnded)
 }

@@ -400,3 +400,49 @@ func TestClientsCapControlLines(t *testing.T) {
 		}
 	})
 }
+
+type actSession struct {
+	clientSession
+	n *atomic.Int64
+}
+
+func (a actSession) Activity(n int) { a.n.Add(int64(n)) }
+
+// Lo que pasa por los canales de scp/sftp cuenta como actividad de la sesión (keepalive): en una subida
+// el equipo casi no manda bytes, así que debe contar también lo escrito.
+func TestTransferCuentaActividadDeSesion(t *testing.T) {
+	data := bytes.Repeat([]byte("x"), 50000)
+	for _, proto := range []string{"scp", "sftp"} {
+		t.Run(proto, func(t *testing.T) {
+			pub, recv, dest := t.TempDir(), t.TempDir(), t.TempDir()
+			os.WriteFile(filepath.Join(pub, "r1.cfg"), data, 0o600)
+			r := startSrv(t, fileserve.Config{Proto: proto, FromDir: pub, Write: true, RecvDir: recv})
+			var n atomic.Int64
+			wrap := func(q Request) Request {
+				f := q.SSH
+				q.SSH = func(ctx context.Context) (SSHSession, error) {
+					s, err := f(ctx)
+					return actSession{s.(clientSession), &n}, err
+				}
+				return q
+			}
+			up := wrap(reqFor(t, proto, r, "subida.cfg"))
+			up.FromDir, up.Name = pub, "r1.cfg"
+			if _, err := Upload(context.Background(), up); err != nil {
+				t.Fatal(err)
+			}
+			if got := n.Load(); got < int64(len(data)) {
+				t.Fatalf("subida: actividad %d < %d", got, len(data))
+			}
+			n.Store(0)
+			g := wrap(reqFor(t, proto, r, "r1.cfg"))
+			g.DestDir = dest
+			if _, err := Download(context.Background(), g); err != nil {
+				t.Fatal(err)
+			}
+			if got := n.Load(); got < int64(len(data)) {
+				t.Fatalf("bajada: actividad %d < %d", got, len(data))
+			}
+		})
+	}
+}
