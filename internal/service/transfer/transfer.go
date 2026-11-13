@@ -238,7 +238,7 @@ func (s *svc) RedirectHint(ctx context.Context, r *v1.RedirectHintRequest) (*v1.
 		return nil, bad(ctx, "transfer.svc.no_redirect", "proto", r.Protocol)
 	}
 	std := map[string]int32{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22}[r.Protocol]
-	return &v1.RedirectHintResponse{StandardPort: std, Nftables: h, Setcap: fileserve.SetcapHintIn(loc, "RUTA-DEL-SERVIDOR"), Remove: fileserve.RedirectCleanup(r.Protocol, r.Ip, int(r.Port))}, nil
+	return &v1.RedirectHintResponse{StandardPort: std, Nftables: h, Setcap: fileserve.SetcapHintIn(loc, i18n.Msg(loc, "fileserve.hint.server_path", nil)), Remove: fileserve.RedirectCleanup(r.Protocol, r.Ip, int(r.Port))}, nil
 }
 
 // sink: las transferencias reales se auditan; los rechazos (escáneres, nombres equivocados)

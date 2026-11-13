@@ -74,3 +74,11 @@ func TestHintsEnIngles(t *testing.T) {
 		t.Error(h)
 	}
 }
+
+// El marcador de la ruta del servidor también se traduce en el hint de setcap.
+func TestHintSetcapMarcadorRutaEn(t *testing.T) {
+	r := Ready{Addr: "0.0.0.0:2121", User: "mac", Pass: "pw123"}
+	if en := ServerHintIn("en", Config{Proto: "tftp"}, r, []string{"a.bin"}); strings.Contains(en, "RUTA-DEL-SERVIDOR") || !strings.Contains(en, "SERVER-PATH") {
+		t.Error(en)
+	}
+}

@@ -72,7 +72,7 @@ func ServerHintIn(loc string, c Config, r Ready, names []string) string {
 		p, _ := strconv.Atoi(port)
 		b.WriteString(t("fileserve.hint.std_port", "std", s.port, "proto", c.Proto, "port", p) + "\n")
 		b.WriteString("  " + t("fileserve.hint.redirect", "cmd", RedirectHintIn(loc, c.Proto, host, p)) + "\n")
-		b.WriteString("  " + t("fileserve.hint.setcap_alt", "cmd", SetcapHintIn(loc, "RUTA-DEL-SERVIDOR")) + "\n")
+		b.WriteString("  " + t("fileserve.hint.setcap_alt", "cmd", SetcapHintIn(loc, t("fileserve.hint.server_path"))) + "\n")
 	}
 	return b.String()
 }

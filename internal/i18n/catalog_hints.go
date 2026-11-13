@@ -6,6 +6,7 @@ func init() {
 	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
 	add(map[string]entry{
 		"fileserve.hint.this_host":   e("IP-DE-ESTA-MÁQUINA", "IP-OF-THIS-MACHINE"),
+		"fileserve.hint.server_path": e("RUTA-DEL-SERVIDOR", "SERVER-PATH"),
 		"fileserve.hint.head":        e("En el equipo:", "On the device:"),
 		"fileserve.hint.warn_udp":    e("AVISO: en UDP la lista de IP no autentica: la IP de origen se puede falsificar; úsala como filtro, no como seguridad, y solo en una red de confianza", "WARNING: over UDP the IP list does not authenticate: the source IP can be spoofed; use it as a filter, not as security, and only on a trusted network"),
 		"fileserve.hint.warn_ftp":    e("AVISO: FTP manda el usuario y la contraseña en claro por la red; úsalo solo en un enlace directo o una red de confianza (SCP o SFTP no lo hacen)", "WARNING: FTP sends the user and password in clear text over the network; use it only on a direct link or a trusted network (SCP and SFTP do not)"),
