@@ -14,18 +14,24 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	dom "github.com/oom-netsec/MACUAHUITL/internal/pack"
+	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
 // Module registra el servicio. Store es el almacén del núcleo; UserIDs da los IDs de playbook de
-// <config>/playbooks (para marcar los tapados); puede ser nil.
+// <config>/playbooks (para marcar los tapados); puede ser nil. Para el paquete personal (fase 32c): ConfigDir es la
+// carpeta de configuración (los playbooks viven en <ConfigDir>/playbooks), UserPlaybooks los playbooks del usuario
+// vigentes y Reload vuelve a leer esa carpeta y recarga el catálogo en caliente; pueden ser nil.
 type Module struct {
-	Store   *dom.Store
-	UserIDs func() map[string]bool
+	Store         *dom.Store
+	UserIDs       func() map[string]bool
+	ConfigDir     string
+	UserPlaybooks func() []playbook.Playbook
+	Reload        func() error
 }
 
 func (m Module) Register(s ipc.Registrar, d service.Deps) {
-	v1.RegisterPackServiceServer(s, &svc{d: d, store: m.Store, userIDs: m.UserIDs})
+	v1.RegisterPackServiceServer(s, &svc{d: d, store: m.Store, userIDs: m.UserIDs, cfg: m})
 }
 
 type svc struct {
@@ -33,13 +39,14 @@ type svc struct {
 	d       service.Deps
 	store   *dom.Store
 	userIDs func() map[string]bool
+	cfg     Module
 }
 
 // fail traduce un error del paquete a gRPC: el código del catálogo viaja como reason.
 func fail(ctx context.Context, err error) error {
 	c := codes.InvalidArgument
 	switch dom.Reason(err) {
-	case "unsigned", "collision", "version", "official_replace":
+	case "unsigned", "collision", "version", "official_replace", "import.exists":
 		c = codes.FailedPrecondition
 	case "not_found":
 		c = codes.NotFound
@@ -64,6 +71,16 @@ func (s *svc) info(p *dom.Pack) (*v1.PackInfo, error) {
 	return i, err
 }
 
+// reject audita el rechazo (en inglés: id, versión, sha256 del archivo, origen, motivo y ruta) y lo traduce a gRPC.
+func (s *svc) reject(ctx context.Context, err error, p *dom.Pack, sum, path string) error {
+	id, version, origin := "unknown", "unknown", "unknown"
+	if p != nil {
+		id, version, origin = p.ID, p.Version, p.Origin()
+	}
+	s.d.Audit("pack.rejected", id, fmt.Sprintf("id=%s version=%s sha256=%s origin=%s reason=%s path=%q", id, version, sum, origin, dom.Reason(err), path))
+	return fail(ctx, err)
+}
+
 func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1.PackServiceInstallResponse, error) {
 	s.d.MarkActive()
 	if r.GetPath() == "" {
@@ -73,15 +90,7 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	if err != nil {
 		return nil, err
 	}
-	// Auditoría en inglés: id, versión, sha256 del archivo, origen y, si se rechaza, el motivo.
-	reject := func(err error, p *dom.Pack, sum string) error {
-		id, version, origin := "unknown", "unknown", "unknown"
-		if p != nil {
-			id, version, origin = p.ID, p.Version, p.Origin()
-		}
-		s.d.Audit("pack.rejected", id, fmt.Sprintf("id=%s version=%s sha256=%s origin=%s reason=%s path=%q", id, version, sum, origin, dom.Reason(err), path))
-		return fail(ctx, err)
-	}
+	reject := func(err error, p *dom.Pack, sum string) error { return s.reject(ctx, err, p, sum, path) }
 	data, err := dom.ReadArchive(path)
 	if err != nil {
 		return nil, reject(err, nil, "none")

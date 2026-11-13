@@ -25,6 +25,8 @@ const (
 	PackService_Remove_FullMethodName   = "/macuahuitl.v1.PackService/Remove"
 	PackService_SetItems_FullMethodName = "/macuahuitl.v1.PackService/SetItems"
 	PackService_Inspect_FullMethodName  = "/macuahuitl.v1.PackService/Inspect"
+	PackService_Export_FullMethodName   = "/macuahuitl.v1.PackService/Export"
+	PackService_Import_FullMethodName   = "/macuahuitl.v1.PackService/Import"
 )
 
 // PackServiceClient is the client API for PackService service.
@@ -47,6 +49,10 @@ type PackServiceClient interface {
 	SetItems(ctx context.Context, in *PackServiceSetItemsRequest, opts ...grpc.CallOption) (*PackServiceSetItemsResponse, error)
 	// Vista previa de Install (fase 32b): valida el .mpack igual y con los mismos errores, pero no instala, no toca el almacén ni audita.
 	Inspect(ctx context.Context, in *PackServiceInspectRequest, opts ...grpc.CallOption) (*PackServiceInspectResponse, error)
+	// Fase 32c. Arma un paquete personal sin firma con scripts del usuario y, si se pide, sus playbooks.
+	Export(ctx context.Context, in *PackServiceExportRequest, opts ...grpc.CallOption) (*PackServiceExportResponse, error)
+	// Fase 32c. Importa un .mpack sin firma a «Mis scripts» y a <config>/playbooks. Sin confirm es solo la vista previa.
+	Import(ctx context.Context, in *PackServiceImportRequest, opts ...grpc.CallOption) (*PackServiceImportResponse, error)
 }
 
 type packServiceClient struct {
@@ -117,6 +123,26 @@ func (c *packServiceClient) Inspect(ctx context.Context, in *PackServiceInspectR
 	return out, nil
 }
 
+func (c *packServiceClient) Export(ctx context.Context, in *PackServiceExportRequest, opts ...grpc.CallOption) (*PackServiceExportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PackServiceExportResponse)
+	err := c.cc.Invoke(ctx, PackService_Export_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *packServiceClient) Import(ctx context.Context, in *PackServiceImportRequest, opts ...grpc.CallOption) (*PackServiceImportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PackServiceImportResponse)
+	err := c.cc.Invoke(ctx, PackService_Import_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PackServiceServer is the server API for PackService service.
 // All implementations must embed UnimplementedPackServiceServer
 // for forward compatibility.
@@ -137,6 +163,10 @@ type PackServiceServer interface {
 	SetItems(context.Context, *PackServiceSetItemsRequest) (*PackServiceSetItemsResponse, error)
 	// Vista previa de Install (fase 32b): valida el .mpack igual y con los mismos errores, pero no instala, no toca el almacén ni audita.
 	Inspect(context.Context, *PackServiceInspectRequest) (*PackServiceInspectResponse, error)
+	// Fase 32c. Arma un paquete personal sin firma con scripts del usuario y, si se pide, sus playbooks.
+	Export(context.Context, *PackServiceExportRequest) (*PackServiceExportResponse, error)
+	// Fase 32c. Importa un .mpack sin firma a «Mis scripts» y a <config>/playbooks. Sin confirm es solo la vista previa.
+	Import(context.Context, *PackServiceImportRequest) (*PackServiceImportResponse, error)
 	mustEmbedUnimplementedPackServiceServer()
 }
 
@@ -164,6 +194,12 @@ func (UnimplementedPackServiceServer) SetItems(context.Context, *PackServiceSetI
 }
 func (UnimplementedPackServiceServer) Inspect(context.Context, *PackServiceInspectRequest) (*PackServiceInspectResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Inspect not implemented")
+}
+func (UnimplementedPackServiceServer) Export(context.Context, *PackServiceExportRequest) (*PackServiceExportResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Export not implemented")
+}
+func (UnimplementedPackServiceServer) Import(context.Context, *PackServiceImportRequest) (*PackServiceImportResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Import not implemented")
 }
 func (UnimplementedPackServiceServer) mustEmbedUnimplementedPackServiceServer() {}
 func (UnimplementedPackServiceServer) testEmbeddedByValue()                     {}
@@ -294,6 +330,42 @@ func _PackService_Inspect_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PackService_Export_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PackServiceExportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PackServiceServer).Export(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PackService_Export_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PackServiceServer).Export(ctx, req.(*PackServiceExportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PackService_Import_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PackServiceImportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PackServiceServer).Import(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PackService_Import_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PackServiceServer).Import(ctx, req.(*PackServiceImportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PackService_ServiceDesc is the grpc.ServiceDesc for PackService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -324,6 +396,14 @@ var PackService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Inspect",
 			Handler:    _PackService_Inspect_Handler,
+		},
+		{
+			MethodName: "Export",
+			Handler:    _PackService_Export_Handler,
+		},
+		{
+			MethodName: "Import",
+			Handler:    _PackService_Import_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

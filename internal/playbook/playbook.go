@@ -100,9 +100,9 @@ type Playbook struct {
 
 type fileCommand struct {
 	Cmd        string   `yaml:"cmd"`
-	Timeout    string   `yaml:"timeout"`
-	MaySecrets bool     `yaml:"may_contain_secrets"`
-	Platforms  []string `yaml:"platforms"`
+	Timeout    string   `yaml:"timeout,omitempty"`
+	MaySecrets bool     `yaml:"may_contain_secrets,omitempty"`
+	Platforms  []string `yaml:"platforms,omitempty"`
 }
 
 type fileParam struct {
@@ -114,9 +114,9 @@ type file struct {
 	ID       string        `yaml:"id"`
 	Platform string        `yaml:"platform"`
 	Name     string        `yaml:"name"`
-	NameEn   string        `yaml:"name_en"`
-	Pre      []string      `yaml:"pre"`
-	Params   []fileParam   `yaml:"params"`
+	NameEn   string        `yaml:"name_en,omitempty"`
+	Pre      []string      `yaml:"pre,omitempty"`
+	Params   []fileParam   `yaml:"params,omitempty"`
 	Commands []fileCommand `yaml:"commands"`
 }
 
@@ -229,4 +229,20 @@ func Ephemeral(platform, text string) (Playbook, error) {
 		return Playbook{}, i18n.New("playbook.err.none", nil)
 	}
 	return p, nil
+}
+
+// Marshal escribe p como YAML de playbook (el id del archivo es lo que va después de «<plataforma>/»); Load lo lee de vuelta.
+func Marshal(p Playbook) ([]byte, error) {
+	f := file{ID: p.ID[strings.Index(p.ID, "/")+1:], Platform: p.Platform, Name: p.Name, NameEn: p.NameEn, Pre: p.Pre}
+	for _, q := range p.Params {
+		f.Params = append(f.Params, fileParam(q))
+	}
+	for _, c := range p.Commands {
+		fc := fileCommand{Cmd: c.Text, MaySecrets: c.MaySecrets, Platforms: c.Platforms}
+		if c.Timeout != defaultTimeout {
+			fc.Timeout = c.Timeout.String()
+		}
+		f.Commands = append(f.Commands, fc)
+	}
+	return yaml.Marshal(f)
 }

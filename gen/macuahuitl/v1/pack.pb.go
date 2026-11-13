@@ -801,6 +801,534 @@ func (x *PackServiceInspectResponse) GetReplacedVersion() string {
 	return ""
 }
 
+type PackServiceExportRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	EditorName       string                 `protobuf:"bytes,1,opt,name=editor_name,json=editorName,proto3" json:"editor_name,omitempty"`                    // "<editor>/<nombre>"; editor [a-z0-9]{1,16}, sin los reservados
+	ScriptIds        []string               `protobuf:"bytes,2,rep,name=script_ids,json=scriptIds,proto3" json:"script_ids,omitempty"`                       // scripts del usuario (0 a 1000; con include_playbooks pueden ser 0)
+	IncludePlaybooks bool                   `protobuf:"varint,3,opt,name=include_playbooks,json=includePlaybooks,proto3" json:"include_playbooks,omitempty"` // todos los de <config>/playbooks exportables
+	License          string                 `protobuf:"bytes,4,opt,name=license,proto3" json:"license,omitempty"`                                            // SPDX; vacío = NOASSERTION
+	Path             string                 `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`                                                  // absoluta; archivo nuevo 0600
+	Overwrite        bool                   `protobuf:"varint,6,opt,name=overwrite,proto3" json:"overwrite,omitempty"`                                       // sin esto, una ruta que existe da AlreadyExists
+	Name             string                 `protobuf:"bytes,7,opt,name=name,proto3" json:"name,omitempty"`                                                  // opcional; vacío = la parte <nombre> del id
+	NameEn           string                 `protobuf:"bytes,8,opt,name=name_en,json=nameEn,proto3" json:"name_en,omitempty"`                                // opcional; vacío copia name
+	Description      string                 `protobuf:"bytes,9,opt,name=description,proto3" json:"description,omitempty"`                                    // opcional
+	DescriptionEn    string                 `protobuf:"bytes,10,opt,name=description_en,json=descriptionEn,proto3" json:"description_en,omitempty"`          // opcional; vacío copia description
+	Author           string                 `protobuf:"bytes,11,opt,name=author,proto3" json:"author,omitempty"`                                             // opcional; vacío = el editor
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *PackServiceExportRequest) Reset() {
+	*x = PackServiceExportRequest{}
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PackServiceExportRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PackServiceExportRequest) ProtoMessage() {}
+
+func (x *PackServiceExportRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PackServiceExportRequest.ProtoReflect.Descriptor instead.
+func (*PackServiceExportRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_pack_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PackServiceExportRequest) GetEditorName() string {
+	if x != nil {
+		return x.EditorName
+	}
+	return ""
+}
+
+func (x *PackServiceExportRequest) GetScriptIds() []string {
+	if x != nil {
+		return x.ScriptIds
+	}
+	return nil
+}
+
+func (x *PackServiceExportRequest) GetIncludePlaybooks() bool {
+	if x != nil {
+		return x.IncludePlaybooks
+	}
+	return false
+}
+
+func (x *PackServiceExportRequest) GetLicense() string {
+	if x != nil {
+		return x.License
+	}
+	return ""
+}
+
+func (x *PackServiceExportRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *PackServiceExportRequest) GetOverwrite() bool {
+	if x != nil {
+		return x.Overwrite
+	}
+	return false
+}
+
+func (x *PackServiceExportRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PackServiceExportRequest) GetNameEn() string {
+	if x != nil {
+		return x.NameEn
+	}
+	return ""
+}
+
+func (x *PackServiceExportRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *PackServiceExportRequest) GetDescriptionEn() string {
+	if x != nil {
+		return x.DescriptionEn
+	}
+	return ""
+}
+
+func (x *PackServiceExportRequest) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+type PackServiceExportResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Version          string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"` // AAAA.MMDD.HHMMSS de la hora local
+	Sha256           string                 `protobuf:"bytes,3,opt,name=sha256,proto3" json:"sha256,omitempty"`   // del archivo escrito
+	Scripts          int32                  `protobuf:"varint,4,opt,name=scripts,proto3" json:"scripts,omitempty"`
+	Playbooks        int32                  `protobuf:"varint,5,opt,name=playbooks,proto3" json:"playbooks,omitempty"`
+	OmittedPlaybooks []string               `protobuf:"bytes,6,rep,name=omitted_playbooks,json=omittedPlaybooks,proto3" json:"omitted_playbooks,omitempty"` // IDs de playbook que no se exportaron (plataforma no instalable o ID que no sirve)
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *PackServiceExportResponse) Reset() {
+	*x = PackServiceExportResponse{}
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PackServiceExportResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PackServiceExportResponse) ProtoMessage() {}
+
+func (x *PackServiceExportResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PackServiceExportResponse.ProtoReflect.Descriptor instead.
+func (*PackServiceExportResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_pack_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *PackServiceExportResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PackServiceExportResponse) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *PackServiceExportResponse) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+func (x *PackServiceExportResponse) GetScripts() int32 {
+	if x != nil {
+		return x.Scripts
+	}
+	return 0
+}
+
+func (x *PackServiceExportResponse) GetPlaybooks() int32 {
+	if x != nil {
+		return x.Playbooks
+	}
+	return 0
+}
+
+func (x *PackServiceExportResponse) GetOmittedPlaybooks() []string {
+	if x != nil {
+		return x.OmittedPlaybooks
+	}
+	return nil
+}
+
+type PackImportDecision struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ItemId        string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"` // ID del script o del playbook tal como viene en el archivo
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`               // renombrar | omitir (nunca reemplazar)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PackImportDecision) Reset() {
+	*x = PackImportDecision{}
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PackImportDecision) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PackImportDecision) ProtoMessage() {}
+
+func (x *PackImportDecision) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PackImportDecision.ProtoReflect.Descriptor instead.
+func (*PackImportDecision) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_pack_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *PackImportDecision) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
+func (x *PackImportDecision) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+type PackServiceImportRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`        // absoluta; el .mpack no debe tener firma oficial
+	Confirm       bool                   `protobuf:"varint,2,opt,name=confirm,proto3" json:"confirm,omitempty"` // false = vista previa (no escribe nada); true = aplica con decisions
+	Decisions     []*PackImportDecision  `protobuf:"bytes,3,rep,name=decisions,proto3" json:"decisions,omitempty"`
+	Sha256        string                 `protobuf:"bytes,4,opt,name=sha256,proto3" json:"sha256,omitempty"` // opcional: el de la vista previa; con confirm, si no coincide con el archivo, falla (pack.err.import.changed)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PackServiceImportRequest) Reset() {
+	*x = PackServiceImportRequest{}
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PackServiceImportRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PackServiceImportRequest) ProtoMessage() {}
+
+func (x *PackServiceImportRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PackServiceImportRequest.ProtoReflect.Descriptor instead.
+func (*PackServiceImportRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_pack_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *PackServiceImportRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *PackServiceImportRequest) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+func (x *PackServiceImportRequest) GetDecisions() []*PackImportDecision {
+	if x != nil {
+		return x.Decisions
+	}
+	return nil
+}
+
+func (x *PackServiceImportRequest) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+type PackImportItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"` // script | playbook
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`     // el del archivo
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	State         string                 `protobuf:"bytes,4,opt,name=state,proto3" json:"state,omitempty"`                                      // nuevo | igual | conflicto_id | conflicto_nombre
+	ConflictsWith string                 `protobuf:"bytes,5,opt,name=conflicts_with,json=conflictsWith,proto3" json:"conflicts_with,omitempty"` // script: ID guardado; playbook: base, reserved, user, file o el id del paquete instalado
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PackImportItem) Reset() {
+	*x = PackImportItem{}
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PackImportItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PackImportItem) ProtoMessage() {}
+
+func (x *PackImportItem) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PackImportItem.ProtoReflect.Descriptor instead.
+func (*PackImportItem) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_pack_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *PackImportItem) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *PackImportItem) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PackImportItem) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *PackImportItem) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *PackImportItem) GetConflictsWith() string {
+	if x != nil {
+		return x.ConflictsWith
+	}
+	return ""
+}
+
+type PackServiceImportResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Pack             *PackInfo              `protobuf:"bytes,1,opt,name=pack,proto3" json:"pack,omitempty"`
+	Items            []*PackImportItem      `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
+	Applied          bool                   `protobuf:"varint,4,opt,name=applied,proto3" json:"applied,omitempty"` // false en la vista previa
+	ScriptsCreated   int32                  `protobuf:"varint,5,opt,name=scripts_created,json=scriptsCreated,proto3" json:"scripts_created,omitempty"`
+	ScriptsRenamed   int32                  `protobuf:"varint,6,opt,name=scripts_renamed,json=scriptsRenamed,proto3" json:"scripts_renamed,omitempty"`
+	ScriptsSkipped   int32                  `protobuf:"varint,7,opt,name=scripts_skipped,json=scriptsSkipped,proto3" json:"scripts_skipped,omitempty"`
+	PlaybooksCreated int32                  `protobuf:"varint,8,opt,name=playbooks_created,json=playbooksCreated,proto3" json:"playbooks_created,omitempty"`
+	PlaybooksRenamed int32                  `protobuf:"varint,9,opt,name=playbooks_renamed,json=playbooksRenamed,proto3" json:"playbooks_renamed,omitempty"`
+	PlaybooksSkipped int32                  `protobuf:"varint,10,opt,name=playbooks_skipped,json=playbooksSkipped,proto3" json:"playbooks_skipped,omitempty"`
+	PlaybookIds      []string               `protobuf:"bytes,11,rep,name=playbook_ids,json=playbookIds,proto3" json:"playbook_ids,omitempty"` // IDs con los que quedaron escritos los playbooks
+	Sha256           string                 `protobuf:"bytes,12,opt,name=sha256,proto3" json:"sha256,omitempty"`                              // del archivo; pásalo en el Import con confirm para atar la vista previa a lo que se aplica
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *PackServiceImportResponse) Reset() {
+	*x = PackServiceImportResponse{}
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PackServiceImportResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PackServiceImportResponse) ProtoMessage() {}
+
+func (x *PackServiceImportResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_pack_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PackServiceImportResponse.ProtoReflect.Descriptor instead.
+func (*PackServiceImportResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_pack_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *PackServiceImportResponse) GetPack() *PackInfo {
+	if x != nil {
+		return x.Pack
+	}
+	return nil
+}
+
+func (x *PackServiceImportResponse) GetItems() []*PackImportItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *PackServiceImportResponse) GetApplied() bool {
+	if x != nil {
+		return x.Applied
+	}
+	return false
+}
+
+func (x *PackServiceImportResponse) GetScriptsCreated() int32 {
+	if x != nil {
+		return x.ScriptsCreated
+	}
+	return 0
+}
+
+func (x *PackServiceImportResponse) GetScriptsRenamed() int32 {
+	if x != nil {
+		return x.ScriptsRenamed
+	}
+	return 0
+}
+
+func (x *PackServiceImportResponse) GetScriptsSkipped() int32 {
+	if x != nil {
+		return x.ScriptsSkipped
+	}
+	return 0
+}
+
+func (x *PackServiceImportResponse) GetPlaybooksCreated() int32 {
+	if x != nil {
+		return x.PlaybooksCreated
+	}
+	return 0
+}
+
+func (x *PackServiceImportResponse) GetPlaybooksRenamed() int32 {
+	if x != nil {
+		return x.PlaybooksRenamed
+	}
+	return 0
+}
+
+func (x *PackServiceImportResponse) GetPlaybooksSkipped() int32 {
+	if x != nil {
+		return x.PlaybooksSkipped
+	}
+	return 0
+}
+
+func (x *PackServiceImportResponse) GetPlaybookIds() []string {
+	if x != nil {
+		return x.PlaybookIds
+	}
+	return nil
+}
+
+func (x *PackServiceImportResponse) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
 var File_macuahuitl_v1_pack_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_pack_proto_rawDesc = "" +
@@ -860,14 +1388,65 @@ const file_macuahuitl_v1_pack_proto_rawDesc = "" +
 	"\fplaybook_ids\x18\x02 \x03(\tR\vplaybookIds\x12\x1d\n" +
 	"\n" +
 	"script_ids\x18\x03 \x03(\tR\tscriptIds\x12)\n" +
-	"\x10replaced_version\x18\x04 \x01(\tR\x0freplacedVersion2\xbb\x04\n" +
+	"\x10replaced_version\x18\x04 \x01(\tR\x0freplacedVersion\"\xe1\x02\n" +
+	"\x18PackServiceExportRequest\x12\x1f\n" +
+	"\veditor_name\x18\x01 \x01(\tR\n" +
+	"editorName\x12\x1d\n" +
+	"\n" +
+	"script_ids\x18\x02 \x03(\tR\tscriptIds\x12+\n" +
+	"\x11include_playbooks\x18\x03 \x01(\bR\x10includePlaybooks\x12\x18\n" +
+	"\alicense\x18\x04 \x01(\tR\alicense\x12\x12\n" +
+	"\x04path\x18\x05 \x01(\tR\x04path\x12\x1c\n" +
+	"\toverwrite\x18\x06 \x01(\bR\toverwrite\x12\x12\n" +
+	"\x04name\x18\a \x01(\tR\x04name\x12\x17\n" +
+	"\aname_en\x18\b \x01(\tR\x06nameEn\x12 \n" +
+	"\vdescription\x18\t \x01(\tR\vdescription\x12%\n" +
+	"\x0edescription_en\x18\n" +
+	" \x01(\tR\rdescriptionEn\x12\x16\n" +
+	"\x06author\x18\v \x01(\tR\x06author\"\xc2\x01\n" +
+	"\x19PackServiceExportResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12\x16\n" +
+	"\x06sha256\x18\x03 \x01(\tR\x06sha256\x12\x18\n" +
+	"\ascripts\x18\x04 \x01(\x05R\ascripts\x12\x1c\n" +
+	"\tplaybooks\x18\x05 \x01(\x05R\tplaybooks\x12+\n" +
+	"\x11omitted_playbooks\x18\x06 \x03(\tR\x10omittedPlaybooks\"E\n" +
+	"\x12PackImportDecision\x12\x17\n" +
+	"\aitem_id\x18\x01 \x01(\tR\x06itemId\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\"\xa1\x01\n" +
+	"\x18PackServiceImportRequest\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x18\n" +
+	"\aconfirm\x18\x02 \x01(\bR\aconfirm\x12?\n" +
+	"\tdecisions\x18\x03 \x03(\v2!.macuahuitl.v1.PackImportDecisionR\tdecisions\x12\x16\n" +
+	"\x06sha256\x18\x04 \x01(\tR\x06sha256\"\x85\x01\n" +
+	"\x0ePackImportItem\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x14\n" +
+	"\x05state\x18\x04 \x01(\tR\x05state\x12%\n" +
+	"\x0econflicts_with\x18\x05 \x01(\tR\rconflictsWith\"\xda\x03\n" +
+	"\x19PackServiceImportResponse\x12+\n" +
+	"\x04pack\x18\x01 \x01(\v2\x17.macuahuitl.v1.PackInfoR\x04pack\x123\n" +
+	"\x05items\x18\x02 \x03(\v2\x1d.macuahuitl.v1.PackImportItemR\x05items\x12\x18\n" +
+	"\aapplied\x18\x04 \x01(\bR\aapplied\x12'\n" +
+	"\x0fscripts_created\x18\x05 \x01(\x05R\x0escriptsCreated\x12'\n" +
+	"\x0fscripts_renamed\x18\x06 \x01(\x05R\x0escriptsRenamed\x12'\n" +
+	"\x0fscripts_skipped\x18\a \x01(\x05R\x0escriptsSkipped\x12+\n" +
+	"\x11playbooks_created\x18\b \x01(\x05R\x10playbooksCreated\x12+\n" +
+	"\x11playbooks_renamed\x18\t \x01(\x05R\x10playbooksRenamed\x12+\n" +
+	"\x11playbooks_skipped\x18\n" +
+	" \x01(\x05R\x10playbooksSkipped\x12!\n" +
+	"\fplaybook_ids\x18\v \x03(\tR\vplaybookIds\x12\x16\n" +
+	"\x06sha256\x18\f \x01(\tR\x06sha256J\x04\b\x03\x10\x042\xf5\x05\n" +
 	"\vPackService\x12^\n" +
 	"\aInstall\x12(.macuahuitl.v1.PackServiceInstallRequest\x1a).macuahuitl.v1.PackServiceInstallResponse\x12U\n" +
 	"\x04List\x12%.macuahuitl.v1.PackServiceListRequest\x1a&.macuahuitl.v1.PackServiceListResponse\x12U\n" +
 	"\x04Show\x12%.macuahuitl.v1.PackServiceShowRequest\x1a&.macuahuitl.v1.PackServiceShowResponse\x12[\n" +
 	"\x06Remove\x12'.macuahuitl.v1.PackServiceRemoveRequest\x1a(.macuahuitl.v1.PackServiceRemoveResponse\x12a\n" +
 	"\bSetItems\x12).macuahuitl.v1.PackServiceSetItemsRequest\x1a*.macuahuitl.v1.PackServiceSetItemsResponse\x12^\n" +
-	"\aInspect\x12(.macuahuitl.v1.PackServiceInspectRequest\x1a).macuahuitl.v1.PackServiceInspectResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
+	"\aInspect\x12(.macuahuitl.v1.PackServiceInspectRequest\x1a).macuahuitl.v1.PackServiceInspectResponse\x12[\n" +
+	"\x06Export\x12'.macuahuitl.v1.PackServiceExportRequest\x1a(.macuahuitl.v1.PackServiceExportResponse\x12[\n" +
+	"\x06Import\x12'.macuahuitl.v1.PackServiceImportRequest\x1a(.macuahuitl.v1.PackServiceImportResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
 
 var (
 	file_macuahuitl_v1_pack_proto_rawDescOnce sync.Once
@@ -881,7 +1460,7 @@ func file_macuahuitl_v1_pack_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_pack_proto_rawDescData
 }
 
-var file_macuahuitl_v1_pack_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_macuahuitl_v1_pack_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_macuahuitl_v1_pack_proto_goTypes = []any{
 	(*PackServiceInstallRequest)(nil),   // 0: macuahuitl.v1.PackServiceInstallRequest
 	(*PackServiceInstallResponse)(nil),  // 1: macuahuitl.v1.PackServiceInstallResponse
@@ -896,6 +1475,12 @@ var file_macuahuitl_v1_pack_proto_goTypes = []any{
 	(*PackServiceSetItemsResponse)(nil), // 10: macuahuitl.v1.PackServiceSetItemsResponse
 	(*PackServiceInspectRequest)(nil),   // 11: macuahuitl.v1.PackServiceInspectRequest
 	(*PackServiceInspectResponse)(nil),  // 12: macuahuitl.v1.PackServiceInspectResponse
+	(*PackServiceExportRequest)(nil),    // 13: macuahuitl.v1.PackServiceExportRequest
+	(*PackServiceExportResponse)(nil),   // 14: macuahuitl.v1.PackServiceExportResponse
+	(*PackImportDecision)(nil),          // 15: macuahuitl.v1.PackImportDecision
+	(*PackServiceImportRequest)(nil),    // 16: macuahuitl.v1.PackServiceImportRequest
+	(*PackImportItem)(nil),              // 17: macuahuitl.v1.PackImportItem
+	(*PackServiceImportResponse)(nil),   // 18: macuahuitl.v1.PackServiceImportResponse
 }
 var file_macuahuitl_v1_pack_proto_depIdxs = []int32{
 	4,  // 0: macuahuitl.v1.PackServiceInstallResponse.pack:type_name -> macuahuitl.v1.PackInfo
@@ -903,23 +1488,30 @@ var file_macuahuitl_v1_pack_proto_depIdxs = []int32{
 	4,  // 2: macuahuitl.v1.PackServiceShowResponse.pack:type_name -> macuahuitl.v1.PackInfo
 	4,  // 3: macuahuitl.v1.PackServiceSetItemsResponse.pack:type_name -> macuahuitl.v1.PackInfo
 	4,  // 4: macuahuitl.v1.PackServiceInspectResponse.pack:type_name -> macuahuitl.v1.PackInfo
-	0,  // 5: macuahuitl.v1.PackService.Install:input_type -> macuahuitl.v1.PackServiceInstallRequest
-	2,  // 6: macuahuitl.v1.PackService.List:input_type -> macuahuitl.v1.PackServiceListRequest
-	5,  // 7: macuahuitl.v1.PackService.Show:input_type -> macuahuitl.v1.PackServiceShowRequest
-	7,  // 8: macuahuitl.v1.PackService.Remove:input_type -> macuahuitl.v1.PackServiceRemoveRequest
-	9,  // 9: macuahuitl.v1.PackService.SetItems:input_type -> macuahuitl.v1.PackServiceSetItemsRequest
-	11, // 10: macuahuitl.v1.PackService.Inspect:input_type -> macuahuitl.v1.PackServiceInspectRequest
-	1,  // 11: macuahuitl.v1.PackService.Install:output_type -> macuahuitl.v1.PackServiceInstallResponse
-	3,  // 12: macuahuitl.v1.PackService.List:output_type -> macuahuitl.v1.PackServiceListResponse
-	6,  // 13: macuahuitl.v1.PackService.Show:output_type -> macuahuitl.v1.PackServiceShowResponse
-	8,  // 14: macuahuitl.v1.PackService.Remove:output_type -> macuahuitl.v1.PackServiceRemoveResponse
-	10, // 15: macuahuitl.v1.PackService.SetItems:output_type -> macuahuitl.v1.PackServiceSetItemsResponse
-	12, // 16: macuahuitl.v1.PackService.Inspect:output_type -> macuahuitl.v1.PackServiceInspectResponse
-	11, // [11:17] is the sub-list for method output_type
-	5,  // [5:11] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	15, // 5: macuahuitl.v1.PackServiceImportRequest.decisions:type_name -> macuahuitl.v1.PackImportDecision
+	4,  // 6: macuahuitl.v1.PackServiceImportResponse.pack:type_name -> macuahuitl.v1.PackInfo
+	17, // 7: macuahuitl.v1.PackServiceImportResponse.items:type_name -> macuahuitl.v1.PackImportItem
+	0,  // 8: macuahuitl.v1.PackService.Install:input_type -> macuahuitl.v1.PackServiceInstallRequest
+	2,  // 9: macuahuitl.v1.PackService.List:input_type -> macuahuitl.v1.PackServiceListRequest
+	5,  // 10: macuahuitl.v1.PackService.Show:input_type -> macuahuitl.v1.PackServiceShowRequest
+	7,  // 11: macuahuitl.v1.PackService.Remove:input_type -> macuahuitl.v1.PackServiceRemoveRequest
+	9,  // 12: macuahuitl.v1.PackService.SetItems:input_type -> macuahuitl.v1.PackServiceSetItemsRequest
+	11, // 13: macuahuitl.v1.PackService.Inspect:input_type -> macuahuitl.v1.PackServiceInspectRequest
+	13, // 14: macuahuitl.v1.PackService.Export:input_type -> macuahuitl.v1.PackServiceExportRequest
+	16, // 15: macuahuitl.v1.PackService.Import:input_type -> macuahuitl.v1.PackServiceImportRequest
+	1,  // 16: macuahuitl.v1.PackService.Install:output_type -> macuahuitl.v1.PackServiceInstallResponse
+	3,  // 17: macuahuitl.v1.PackService.List:output_type -> macuahuitl.v1.PackServiceListResponse
+	6,  // 18: macuahuitl.v1.PackService.Show:output_type -> macuahuitl.v1.PackServiceShowResponse
+	8,  // 19: macuahuitl.v1.PackService.Remove:output_type -> macuahuitl.v1.PackServiceRemoveResponse
+	10, // 20: macuahuitl.v1.PackService.SetItems:output_type -> macuahuitl.v1.PackServiceSetItemsResponse
+	12, // 21: macuahuitl.v1.PackService.Inspect:output_type -> macuahuitl.v1.PackServiceInspectResponse
+	14, // 22: macuahuitl.v1.PackService.Export:output_type -> macuahuitl.v1.PackServiceExportResponse
+	18, // 23: macuahuitl.v1.PackService.Import:output_type -> macuahuitl.v1.PackServiceImportResponse
+	16, // [16:24] is the sub-list for method output_type
+	8,  // [8:16] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_pack_proto_init() }
@@ -933,7 +1525,7 @@ func file_macuahuitl_v1_pack_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_pack_proto_rawDesc), len(file_macuahuitl_v1_pack_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
