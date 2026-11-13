@@ -19,6 +19,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/service/forensic"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/inventory"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/metrics"
+	packsvc "github.com/oom-netsec/MACUAHUITL/internal/service/pack"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/prefs"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/security"
@@ -53,7 +54,8 @@ func modules(c *Core) []service.Module {
 		transfer.Module{},
 		metrics.Module{},
 		inventory.Module{},
-		scripts.Module{},
+		scripts.Module{Packs: c.packs},
+		packsvc.Module{Store: c.packs, UserIDs: c.userIDs},
 	}
 }
 

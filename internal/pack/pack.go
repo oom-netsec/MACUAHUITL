@@ -268,3 +268,6 @@ func loadPlaybooks(p *Pack, files map[string][]byte) error {
 }
 
 func (p *Pack) String() string { return fmt.Sprintf("%s@%s", p.ID, p.Version) }
+
+// NotFound es el error de un paquete que no está instalado.
+func NotFound(id string) error { return rej("not_found", "id", id) }

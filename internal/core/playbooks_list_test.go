@@ -14,13 +14,20 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
+// coreWith es un Core con solo el catálogo de playbooks dado.
+func coreWith(pbs []playbook.Playbook) *Core {
+	c := &Core{}
+	c.pbs.Store(&pbs)
+	return c
+}
+
 func TestListPlaybooks(t *testing.T) {
 	cmd := func(s string) playbook.Command { return playbook.Command{Text: s} }
-	s := &patrolSvc{c: &Core{pbs: []playbook.Playbook{
+	s := &patrolSvc{c: coreWith([]playbook.Playbook{
 		{ID: "ios-xe/zeta", Platform: "ios-xe", Name: "Z", Commands: []playbook.Command{cmd("show a"), cmd("show b")}},
 		{ID: "nx-os/mid", Platform: "nx-os", Name: "M", Commands: []playbook.Command{cmd("show c")}},
 		{ID: "ios-xe/alfa", Platform: "ios-xe", Name: "A", Commands: []playbook.Command{cmd("show d")}},
-	}}}
+	})}
 	ids := func(r *v1.ListPlaybooksResponse) []string {
 		var out []string
 		for _, p := range r.Playbooks {
@@ -76,11 +83,11 @@ func TestLoadPlaybooksUserOverridesEmbedded(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "mia.yaml"), []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	pbs, err := loadPlaybooks(config)
-	if err != nil {
+	c := &Core{p: Paths{Config: config, Data: t.TempDir()}, o: Options{CoreVersion: "dev"}}
+	if err := c.openPacks(); err != nil {
 		t.Fatal(err)
 	}
-	s := &patrolSvc{c: &Core{pbs: pbs}}
+	s := &patrolSvc{c: c}
 	r, _ := s.ListPlaybooks(context.Background(), &v1.ListPlaybooksRequest{})
 	var got []*v1.PlaybookInfo
 	for _, p := range r.Playbooks {
@@ -117,10 +124,10 @@ func TestListPlaybooksIOSListaLosDeIOSXE(t *testing.T) {
 
 // El nombre sale en el idioma del contexto: es (o sin idioma) es el de siempre; en usa name_en y cae al español si no lo hay.
 func TestListPlaybooksNombreSegunIdioma(t *testing.T) {
-	s := &patrolSvc{c: &Core{pbs: []playbook.Playbook{
+	s := &patrolSvc{c: coreWith([]playbook.Playbook{
 		{ID: "ios-xe/a", Platform: "ios-xe", Name: "Plataforma · CPU alta", NameEn: "Platform · High CPU", Commands: []playbook.Command{{Text: "show a"}}},
 		{ID: "ios-xe/b", Platform: "ios-xe", Name: "Mío · Propio", Commands: []playbook.Command{{Text: "show b"}}},
-	}}}
+	})}
 	name := func(loc string, i int) string {
 		ctx := context.Background()
 		if loc != "" {

@@ -3,6 +3,7 @@ package core
 import (
 	"cmp"
 	"context"
+	"crypto/ed25519"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -24,12 +26,15 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/engine"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/pack"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
+	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/store"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
+	"github.com/oom-netsec/MACUAHUITL/internal/version"
 	"github.com/oom-netsec/MACUAHUITL/playbooks"
 )
 
@@ -45,13 +50,16 @@ type Options struct {
 	RetryBackoff   []time.Duration              // nil = 1 s, 2 s, 4 s
 	DiagLookPath   func(string) (string, error) // nil = exec.LookPath; las pruebas apuntan a dobles
 	ErrOut         io.Writer                    // dónde avisar una entrada de auditoría perdida; nil = os.Stderr
+	PackKeys       []ed25519.PublicKey          // llaves de la firma oficial de paquetes; nil = la compilada (pack.OfficialKeys)
+	CoreVersion    string                       // versión para min_core de los paquetes; vacía = version.Version
 }
 
 type job struct {
 	jobHistory
 	id        string
 	spec      patrol.Spec
-	state     string // created, arming, armed, completed, cancelled, failed (núcleo caído con el trabajo armado)
+	pbs       []playbook.Playbook // catálogo al crearse el trabajo: instalar o quitar un paquete no lo cambia
+	state     string              // created, arming, armed, completed, cancelled, failed (núcleo caído con el trabajo armado)
 	creds     []string
 	verified  map[string]bool
 	changes   []patrol.HostKeyChange
@@ -102,8 +110,11 @@ type Core struct {
 	log      *audit.Log
 	guard    *transport.Guard
 	hosts    *transport.KnownHosts
-	settings *service.CoreSettings // preferencias del núcleo; viven en preferences (core.*)
-	pbs      []playbook.Playbook
+	settings *service.CoreSettings               // preferencias del núcleo; viven en preferences (core.*)
+	basePbs  []playbook.Playbook                 // playbooks embebidos
+	userPbs  []playbook.Playbook                 // los de <config>/playbooks, cargados al arrancar
+	pbs      atomic.Pointer[[]playbook.Playbook] // catálogo vigente: base < paquetes < usuario; se reemplaza entero, nunca se muta
+	packs    *pack.Store
 	bus      *engine.Bus
 	sched    *engine.Scheduler
 
@@ -163,7 +174,7 @@ func New(p Paths, o Options) (*Core, error) {
 	if c.hosts, err = transport.OpenKnownHosts(filepath.Join(p.Data, "known_hosts")); err != nil {
 		return nil, err
 	}
-	if c.pbs, err = loadPlaybooks(p.Config); err != nil {
+	if err := c.openPacks(); err != nil {
 		return nil, err
 	}
 	if _, err := os.Stat(c.vaultPath()); err == nil {
@@ -183,18 +194,56 @@ func New(p Paths, o Options) (*Core, error) {
 	return c, nil
 }
 
-func loadPlaybooks(config string) ([]playbook.Playbook, error) {
-	pbs, err := playbook.Load(playbooks.FS)
-	if err != nil {
-		return nil, err
+// openPacks carga el contenido base y el del usuario, abre el almacén de paquetes (revalidándolos y auditando los
+// que se omiten) y publica el primer catálogo.
+func (c *Core) openPacks() (err error) {
+	if c.basePbs, err = playbook.Load(playbooks.FS); err != nil {
+		return err
 	}
-	user := filepath.Join(config, "playbooks")
-	if _, err := os.Stat(user); err == nil {
-		extra, err := playbook.Load(os.DirFS(user))
-		if err != nil {
-			return nil, err
+	if user := filepath.Join(c.p.Config, "playbooks"); dirExists(user) {
+		if c.userPbs, err = playbook.Load(os.DirFS(user)); err != nil {
+			return err
 		}
-		for _, e := range extra { // mismo id: el del usuario reemplaza al embebido (patrol corre el primero que coincide)
+	}
+	base := pack.Base{}
+	for _, p := range c.basePbs {
+		base.PlaybookIDs = append(base.PlaybookIDs, p.ID)
+	}
+	lib, _, err := scripts.LibraryWithEN(playbooks.FS)
+	if err != nil {
+		return err
+	}
+	for _, s := range lib {
+		base.ScriptIDs, base.ScriptNames = append(base.ScriptIDs, s.ID), append(base.ScriptNames, s.Name)
+	}
+	keys, coreVersion := c.o.PackKeys, c.o.CoreVersion
+	if keys == nil {
+		keys = pack.OfficialKeys()
+	}
+	if coreVersion == "" {
+		coreVersion = version.Version
+	}
+	st, rejected, err := pack.Open(filepath.Join(c.p.Data, "packs"), coreVersion, keys, base)
+	if err != nil {
+		return fmt.Errorf("core: paquetes: %w", err)
+	}
+	c.packs = st
+	st.OnChange = c.rebuildCatalog
+	c.rebuildCatalog()
+	for _, r := range rejected {
+		c.audit("pack.rejected", r.Dir, fmt.Sprintf("id=%s dir=%s reason=%s stage=startup", cmp.Or(r.ID, "unknown"), r.Dir, r.Reason))
+	}
+	return nil
+}
+
+func dirExists(p string) bool { fi, err := os.Stat(p); return err == nil && fi.IsDir() }
+
+// rebuildCatalog arma el catálogo de playbooks (base < paquetes < usuario, el mismo ID lo reemplaza el de más a la
+// derecha) y lo publica de una vez. Quien ya tiene una copia la conserva.
+func (c *Core) rebuildCatalog() {
+	pbs := slices.Clone(c.basePbs)
+	merge := func(extra []playbook.Playbook) {
+		for _, e := range extra {
 			if i := slices.IndexFunc(pbs, func(p playbook.Playbook) bool { return p.ID == e.ID }); i >= 0 {
 				pbs[i] = e
 			} else {
@@ -202,7 +251,36 @@ func loadPlaybooks(config string) ([]playbook.Playbook, error) {
 			}
 		}
 	}
-	return pbs, nil
+	for _, p := range c.packs.Snapshot().Packs {
+		merge(p.Playbooks)
+	}
+	merge(c.userPbs)
+	c.pbs.Store(&pbs)
+}
+
+// userIDs son los IDs de los playbooks de <config>/playbooks, que tapan a los de un paquete con el mismo ID.
+func (c *Core) userIDs() map[string]bool {
+	m := map[string]bool{}
+	for _, p := range c.userPbs {
+		m[p.ID] = true
+	}
+	return m
+}
+
+// catalog es el catálogo vigente de playbooks.
+func (c *Core) catalog() []playbook.Playbook { return *c.pbs.Load() }
+
+// missingPack dice qué paquete trae el playbook id que no está en el catálogo: el de la lista compilada de los
+// movidos a oom/ios-xe o el de un paquete quitado (anotado en la base). Vacío si no es de ningún paquete.
+func (c *Core) missingPack(id string) string {
+	if slices.Contains(playbooks.MovedToIOSXE, id) {
+		return "oom/ios-xe"
+	}
+	var pk string
+	if err := c.db.QueryRow(`SELECT pack FROM pack_removed WHERE playbook_id = ?`, id).Scan(&pk); err != nil {
+		return ""
+	}
+	return pk
 }
 
 func (c *Core) vaultPath() string { return filepath.Join(c.p.Data, "vault.mcv") }
@@ -358,11 +436,19 @@ func (c *Core) resumePaused() {
 	}
 }
 
+// catalog es el catálogo del trabajo: el de cuando se creó; uno recargado de la base toma el vigente.
+func (j *job) catalog(c *Core) []playbook.Playbook {
+	if j.pbs != nil {
+		return j.pbs
+	}
+	return c.catalog()
+}
+
 func (c *Core) deps(j *job) patrol.Deps {
 	c.mu.Lock()
 	v, verified := c.vault, j.verified
 	c.mu.Unlock()
-	return patrol.Deps{Guard: c.guard, Hosts: c.hosts, Vault: v, Audit: c.log, Now: c.o.Now, Playbooks: c.pbs,
+	return patrol.Deps{Guard: c.guard, Hosts: c.hosts, Vault: v, Audit: c.log, Now: c.o.Now, Playbooks: j.catalog(c), MissingPack: c.missingPack,
 		PrimaryVerified: verified, RetryBackoff: c.o.RetryBackoff}
 }
 
@@ -404,7 +490,7 @@ func (c *Core) loadJobs() {
 			c.audit("job.load_failed", "", i18n.English(err))
 			continue
 		}
-		j := &job{id: id, state: state, results: map[int][]patrol.DeviceResult{}}
+		j := &job{id: id, state: state, pbs: c.catalog(), results: map[int][]patrol.DeviceResult{}}
 		if err := json.Unmarshal([]byte(spec), &j.spec); err != nil {
 			c.audit("job.load_failed", id, i18n.English(err))
 			continue

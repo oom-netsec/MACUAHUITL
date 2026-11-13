@@ -80,7 +80,9 @@ type Deps struct {
 	Audit     *audit.Log
 	Now       func() time.Time
 	Playbooks []playbook.Playbook
-	NewDriver func() platform.Driver // nil = iosxe.New
+	// MissingPack dice qué paquete trae un playbook que ya no está (movido o de un paquete quitado); nil o "" = ninguno.
+	MissingPack func(id string) string
+	NewDriver   func() platform.Driver // nil = iosxe.New
 	// PrimaryVerified: host:puerto cuya credencial principal pasó el Login Test al armar.
 	// Solo para esos equipos se intenta la credencial de respaldo tras un rechazo (spec §10.2).
 	PrimaryVerified map[string]bool
@@ -146,6 +148,21 @@ func kvOf(a i18n.Args) (kv []any) {
 // Validate revisa el trabajo antes de crearlo, para no fallar a mitad de la primera ronda.
 // v debe estar abierta; con v nil no se revisan las credenciales.
 func Validate(s Spec, pbs []playbook.Playbook, v *vault.Vault) error {
+	return ValidateWith(s, pbs, v, nil)
+}
+
+// noPlaybook es el error de un playbook que no existe; si lo trae un paquete que no está instalado, pack.missing.
+func noPlaybook(id string, missing func(string) string) error {
+	if missing != nil {
+		if pk := missing(id); pk != "" {
+			return fieldErr("playbook_ids", "pack.missing", "playbook", id, "pack", pk)
+		}
+	}
+	return fieldErr("playbook_ids", "patrol.field.no_playbook", "id", id)
+}
+
+// ValidateWith es Validate con la regla de pack.missing (ADR 0010).
+func ValidateWith(s Spec, pbs []playbook.Playbook, v *vault.Vault, missing func(string) string) error {
 	if len(s.Targets) == 0 {
 		return fieldErr("targets", "patrol.field.no_targets")
 	}
@@ -168,7 +185,7 @@ func Validate(s Spec, pbs []playbook.Playbook, v *vault.Vault) error {
 	}
 	for _, id := range s.PlaybookIDs {
 		if find(pbs, id) == nil {
-			return fieldErr("playbook_ids", "patrol.field.no_playbook", "id", id)
+			return noPlaybook(id, missing)
 		}
 	}
 	if v != nil {
@@ -236,11 +253,15 @@ func find(pbs []playbook.Playbook, id string) *playbook.Playbook {
 
 // commands arma la lista para la plataforma detectada: playbooks elegidos y luego los pegados. Los comandos
 // marcados para otras plataformas (platforms:) no entran; skipped trae su texto, para anotarlo en el manifest.
-func commands(s Spec, detected string, pbs []playbook.Playbook) (out []playbook.Command, skipped []string, err error) {
+func commands(s Spec, detected string, pbs []playbook.Playbook) ([]playbook.Command, []string, error) {
+	return commandsWith(s, detected, pbs, nil)
+}
+
+func commandsWith(s Spec, detected string, pbs []playbook.Playbook, missing func(string) string) (out []playbook.Command, skipped []string, err error) {
 	for _, id := range s.PlaybookIDs {
 		p := find(pbs, id)
 		if p == nil {
-			return nil, nil, fieldErr("playbook_ids", "patrol.field.no_playbook", "id", id)
+			return nil, nil, noPlaybook(id, missing)
 		}
 		if !playbook.Compatible(detected, p.Platform) {
 			return nil, nil, i18n.New("patrol.err.playbook_platform", i18n.A("id", id, "platform", p.Platform, "detected", detected))

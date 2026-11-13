@@ -75,7 +75,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	}
 	defer c.close()
 	res.Hostname, res.Platform = c.drv.Hostname(), c.platform
-	cmds, skipped, err := commands(s, c.platform, d.Playbooks)
+	cmds, skipped, err := commandsWith(s, c.platform, d.Playbooks, d.MissingPack)
 	if err != nil {
 		res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
 		emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})

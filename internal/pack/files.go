@@ -3,7 +3,9 @@ package pack
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -209,11 +211,20 @@ func readDir(dir string, extra ...string) (map[string][]byte, error) {
 }
 
 // Build arma el zip determinista de una carpeta fuente packs/<nombre>/ (sin SIGNATURE) y la valida con las
-// reglas del instalador, salvo la firma, como si fuera de terceros. keys vacío: la firma no se exige.
+// reglas del instalador no se aplican aquí: Validate lo hace.
 func Build(dir string) ([]byte, error) {
 	files, err := readDir(dir)
 	if err != nil {
 		return nil, err
 	}
 	return Zip(files)
+}
+
+// ReadSource lee una carpeta fuente packs/<nombre>/ a un mapa ruta→bytes (con los mismos topes y rutas del formato).
+func ReadSource(dir string) (map[string][]byte, error) { return readDir(dir) }
+
+// Sign agrega SIGNATURE a files: la firma Ed25519 del índice, en base64. Para el release y las pruebas (con su par
+// propio); el núcleo no firma nada con la llave oficial.
+func Sign(files map[string][]byte, priv ed25519.PrivateKey) {
+	files[fileSig] = []byte(base64.StdEncoding.EncodeToString(ed25519.Sign(priv, Index(files))) + "\n")
 }
