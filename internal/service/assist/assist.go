@@ -414,17 +414,20 @@ func templateOf(ctx context.Context, ts *v1.TemplateSnippet) (assist.Template, a
 }
 
 // ListSnippetTemplates da el catálogo de plantillas con sus campos tipados, en orden de catálogo; platform vacío = todas.
-func (s *assistSvc) ListSnippetTemplates(_ context.Context, r *v1.ListSnippetTemplatesRequest) (*v1.ListSnippetTemplatesResponse, error) {
+func (s *assistSvc) ListSnippetTemplates(ctx context.Context, r *v1.ListSnippetTemplatesRequest) (*v1.ListSnippetTemplatesResponse, error) {
 	s.d.MarkActive()
 	out := &v1.ListSnippetTemplatesResponse{}
 	for _, t := range assist.Templates() {
 		if r.Platform != "" && !slices.Contains(t.Platforms, r.Platform) {
 			continue
 		}
-		st := &v1.SnippetTemplate{Id: t.ID, Tech: t.Tech, Name: t.Name, Platforms: t.Platforms}
+		// Nombre, etiqueta y ayuda salen en el idioma del contexto (claves snippet.<id>.…, las mismas de la app).
+		loc, k := i18n.Locale(ctx), "snippet."+t.ID
+		st := &v1.SnippetTemplate{Id: t.ID, Tech: t.Tech, Name: i18n.MsgOr(loc, k+".name", t.Name), Platforms: t.Platforms}
 		for _, f := range t.Fields {
-			st.Fields = append(st.Fields, &v1.SnippetField{Name: f.Name, Label: f.Label, Type: string(f.Type), Required: f.Required, Min: f.Min, Max: f.Max,
-				Pattern: f.Pattern, Choices: f.Choices, DefaultValue: f.Default, Help: f.Help})
+			fk := k + ".field." + f.Name
+			st.Fields = append(st.Fields, &v1.SnippetField{Name: f.Name, Label: i18n.MsgOr(loc, fk, f.Label), Type: string(f.Type), Required: f.Required, Min: f.Min, Max: f.Max,
+				Pattern: f.Pattern, Choices: f.Choices, DefaultValue: f.Default, Help: i18n.MsgOr(loc, fk+".help", f.Help)})
 		}
 		out.Templates = append(out.Templates, st)
 	}

@@ -252,11 +252,13 @@ func (s *svc) HostsImportTemplate(ctx context.Context, r *v1.HostsImportTemplate
 }
 
 // HostsImportFormat describe los campos del archivo de import, de la misma tabla que lo valida.
-func (s *svc) HostsImportFormat(context.Context, *v1.HostsImportFormatRequest) (*v1.HostsImportFormatResponse, error) {
+func (s *svc) HostsImportFormat(ctx context.Context, _ *v1.HostsImportFormatRequest) (*v1.HostsImportFormatResponse, error) {
 	s.d.MarkActive()
+	loc := i18n.Locale(ctx)
 	out := &v1.HostsImportFormatResponse{MaxRows: devices.MaxImportHosts, MaxBytes: devices.MaxImportBytes}
 	for _, f := range devices.HostFields {
-		out.Fields = append(out.Fields, &v1.HostField{Name: f.Name, Type: f.Type, Required: f.Required, Example: f.Examples[0], Description: f.Description})
+		out.Fields = append(out.Fields, &v1.HostField{Name: f.Name, Type: i18n.MsgOr(loc, "hostfield.type."+f.Type, f.Type), Required: f.Required, Example: f.Examples[0],
+			Description: i18n.MsgOr(loc, "hostfield.desc."+f.Name, f.Description)})
 	}
 	return out, nil
 }

@@ -161,3 +161,21 @@ func init() {
 		"bridge.err.only_empty":     e("solo se borra un archivo regular vacío", "only an empty regular file is deleted"),
 	})
 }
+
+// Descripción y tipo de los campos del archivo de import de hosts (HostsImportFormat); el inglés es el de la app.
+func init() {
+	e := func(es, en string) entry { return entry{Es: es, En: en} }
+	add(map[string]entry{
+		"hostfield.type.texto":            e("texto", "text"),
+		"hostfield.type.entero":           e("entero", "integer"),
+		"hostfield.type.lista":            e("lista", "list"),
+		"hostfield.desc.name":             e("Nombre del host: 1 a 64 caracteres, sin espacios en los extremos. No se repite (sin importar mayúsculas).", "Host name: 1 to 64 characters, no leading or trailing spaces. Not repeated (case-insensitive)."),
+		"hostfield.desc.address":          e("IP o nombre DNS, sin usuario, esquema, puerto ni ruta. La dirección con el puerto no se repite.", "IP or DNS name, without user, scheme, port or path. The address with the port is not repeated."),
+		"hostfield.desc.port":             e("Puerto SSH, de 1 a 65535. Vacío = 22.", "SSH port, from 1 to 65535. Empty = 22."),
+		"hostfield.desc.platform":         e("Plataforma: ios, ios-xe, nx-os, asa, iosxr, wlc. Vacío = sin definir.", "Platform: ios, ios-xe, nx-os, asa, iosxr, wlc. Empty = not set."),
+		"hostfield.desc.folder":           e("Carpeta de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -. Vacío = sin carpeta.", "Single-level folder: 1 to 48 characters among letters, digits, space, _, . and -. Empty = no folder."),
+		"hostfield.desc.tags":             e("Hasta 10 etiquetas de 1 a 24 caracteres entre a-z, 0-9 y -. En CSV separadas por «;»; en JSON, un arreglo.", "Up to 10 tags of 1 to 24 characters among a-z, 0-9 and -. In CSV separated by \";\"; in JSON, an array."),
+		"hostfield.desc.credential_label": e("Etiqueta de una credencial de la bóveda local (nunca el usuario ni la contraseña). Si al importar no existe una con esa etiqueta, el host queda sin credencial.", "Label of a credential in the local vault (never the user or the password). If none with that label exists on import, the host is left without a credential."),
+		"hostfield.desc.notes":            e("Notas libres, hasta 2000 caracteres.", "Free notes, up to 2000 characters."),
+	})
+}

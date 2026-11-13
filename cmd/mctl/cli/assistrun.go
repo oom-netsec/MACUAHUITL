@@ -3,7 +3,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -30,7 +29,7 @@ func SplitHost(s string) (string, uint32, error) {
 	if i := strings.LastIndex(s, ":"); i > 0 && strings.Count(s, ":") == 1 {
 		n, err := strconv.ParseUint(s[i+1:], 10, 16)
 		if err != nil {
-			return "", 0, fmt.Errorf("puerto inválido %q", s[i+1:])
+			return "", 0, Err("mctl.common_a.bad_port", "port", s[i+1:])
 		}
 		return s[:i], uint32(n), nil
 	}
@@ -44,41 +43,41 @@ func StateLine(st *v1.AssistRunState) string {
 	}
 	live := ""
 	if st.Active {
-		live = " (viva)"
+		live = T("mctl.run.live")
 	}
-	return fmt.Sprintf("%s  %-15s%s  equipos=%s  cambiados=%s  inicio=%s", st.RunId, st.State, live,
-		strings.Join(st.Devices, ","), ch, time.Unix(st.StartedUnix, 0).Format("2006-01-02 15:04:05"))
+	return T("mctl.run.state_line", "id", st.RunId, "state", fmt.Sprintf("%-15s", st.State), "live", live,
+		"devices", strings.Join(st.Devices, ","), "changed", ch, "start", time.Unix(st.StartedUnix, 0).Format("2006-01-02 15:04:05"))
 }
 
 func PrintPlan(w io.Writer, p *v1.AssistPlan) {
 	for _, d := range p.Devices {
-		fmt.Fprintf(w, "Plan para %s\n", d.Device)
+		fmt.Fprintln(w, T("mctl.run.plan_for", "device", d.Device))
 		for _, sec := range []struct {
 			title string
 			lines []string
-		}{{"Pre-check (lectura)", d.Pre}, {"Aplicar", d.Apply}, {"REVERSA (restaura lo capturado)", d.Rollback}, {"Post-check (lectura)", d.Post}} {
+		}{{T("mctl.run.pre"), d.Pre}, {T("mctl.run.apply"), d.Apply}, {T("mctl.run.rollback"), d.Rollback}, {T("mctl.run.post"), d.Post}} {
 			fmt.Fprintf(w, "  %s:\n", sec.title)
 			for _, l := range sec.lines {
 				fmt.Fprintf(w, "    %s\n", l)
 			}
 		}
 		if len(d.Notes) > 0 {
-			fmt.Fprintln(w, "  Avisos:")
+			fmt.Fprintln(w, T("mctl.run.notes"))
 			for _, n := range d.Notes {
 				fmt.Fprintf(w, "    %s\n", n)
 			}
 		}
-		fmt.Fprintln(w, "  Se espera ver:")
+		fmt.Fprintln(w, T("mctl.run.expect"))
 		for _, e := range d.Expect {
-			verb := "debe aparecer"
+			verb := T("mctl.run.must")
 			if !e.Present {
-				verb = "NO debe aparecer"
+				verb = T("mctl.run.must_not")
 			}
 			fmt.Fprintf(w, "    %s: %q (%s)\n", e.Command, e.Line, verb)
 		}
 	}
 	if p.WriteMemory {
-		fmt.Fprintln(w, "  Al final, con confirmación: write memory")
+		fmt.Fprintln(w, T("mctl.run.write_mem"))
 	}
 }
 
@@ -116,11 +115,11 @@ func Follow(c *Env, cl v1.AssistServiceClient, runID string, from uint32, first 
 			select {
 			case <-sigs:
 				if n++; n > 1 { // el núcleo no contesta o no termina: no esperarlo
-					fmt.Fprintln(c.Out, "\nSegundo Ctrl-C: se sale sin esperar al núcleo.")
+					fmt.Fprintln(c.Out, T("mctl.run.ctrlc2"))
 					Exit(130)
 					return
 				}
-				fmt.Fprintln(c.Out, "\nCtrl-C: se aborta la ejecución; no se aplicará nada más.")
+				fmt.Fprintln(c.Out, T("mctl.run.ctrlc1"))
 				go abort() // en otro hilo para seguir escuchando un segundo Ctrl-C
 				close(intr)
 			case <-finished:
@@ -133,16 +132,16 @@ func Follow(c *Env, cl v1.AssistServiceClient, runID string, from uint32, first 
 	var lastChanged []string
 	onFail := func(reason string, ch []string) {
 		failed = true
-		fmt.Fprintf(c.Out, "\nSE DETUVO: %s\n", reason)
+		fmt.Fprintln(c.Out, T("mctl.run.stopped", "reason", reason))
 		if !changed(ch) { // sin equipos cambiados no hay reversa que proponer
-			fmt.Fprintln(c.Out, "Ningún equipo quedó cambiado.")
+			fmt.Fprintln(c.Out, T("mctl.run.none_changed"))
 			return
 		}
-		fmt.Fprintf(c.Out, "Ya cambiados: %s.\n", strings.Join(ch, ", "))
+		fmt.Fprintln(c.Out, T("mctl.run.changed", "devices", strings.Join(ch, ", ")))
 		// Con Ctrl-C (stopped) se vuelve a pedir el Abort: el primero pudo llegar cuando el motor aún corría un paso.
-		if a, stopped := ask(c, "¿Proponer la reversa de los equipos ya cambiados? [s/N] ", intr); !stopped && yes(a) {
+		if a, stopped := ask(c, T("mctl.run.ask_revert"), intr); !stopped && yes(a) {
 			if _, err := cl.Rollback(ctx, &v1.RollbackRequest{RunId: runID}); err != nil {
-				fmt.Fprintln(c.Out, "no se puede revertir:", err)
+				fmt.Fprintln(c.Out, T("mctl.run.cant_revert", "cause", err))
 				abort() // sin decisión posible, no dejar la ejecución colgada
 			}
 		} else {
@@ -151,10 +150,10 @@ func Follow(c *Env, cl v1.AssistServiceClient, runID string, from uint32, first 
 	}
 	onPending := func(st *v1.AssistStep, ch []string) error {
 		if st.Kind == "close" {
-			fmt.Fprintf(c.Out, "\nTerminar sin guardar [%s]: el cambio queda solo en la configuración en ejecución (sin write memory). Revisa el tráfico antes de decidir.\n", st.Id)
+			fmt.Fprintln(c.Out, T("mctl.run.close", "id", st.Id))
 		} else {
-			what := map[string]string{"apply": "Aplicar", "save": "Guardar en NVRAM", "rollback": "Aplicar la REVERSA"}[st.Kind]
-			fmt.Fprintf(c.Out, "\n%s en %s [%s]: se enviarán estas líneas\n", what, st.Device, st.Id)
+			what := map[string]string{"apply": T("mctl.run.kind_apply"), "save": T("mctl.run.kind_save"), "rollback": T("mctl.run.kind_rollback")}[st.Kind]
+			fmt.Fprintln(c.Out, T("mctl.run.step", "what", what, "device", st.Device, "id", st.Id))
 		}
 		for _, l := range st.Lines {
 			fmt.Fprintf(c.Out, "    %s\n", l)
@@ -162,7 +161,7 @@ func Follow(c *Env, cl v1.AssistServiceClient, runID string, from uint32, first 
 		if st.Kind == "close" {
 			// Aquí «no» es ambiguo (¿no dejarlo o no revertir?): se pregunta qué hacer y se repite.
 			for range 3 {
-				a, stopped := ask(c, "¿Dejas el cambio solo en ejecución? [s = dejarlo, r = revertir todo, a = abortar] ", intr)
+				a, stopped := ask(c, T("mctl.run.ask_close"), intr)
 				switch {
 				case stopped || a == "a":
 					abort()
@@ -179,9 +178,9 @@ func Follow(c *Env, cl v1.AssistServiceClient, runID string, from uint32, first 
 			return nil
 		}
 		canRoll := st.Kind != "rollback" && changed(ch)
-		q := "¿Confirmas? [s/N] "
+		q := T("mctl.run.ask_ok")
 		if canRoll {
-			q = "¿Confirmas? [s/N, r = revertir lo ya cambiado] "
+			q = T("mctl.run.ask_ok_roll")
 		}
 		a, stopped := ask(c, q, intr)
 		var err error
@@ -238,22 +237,22 @@ func Follow(c *Env, cl v1.AssistServiceClient, runID string, from uint32, first 
 		}
 	}
 	if changed(lastChanged) && final != "done" && final != "rolled-back" {
-		who := "el equipo " + strings.Join(lastChanged, ", ") + " quedó cambiado"
+		code := "mctl.run.warn_one"
 		if len(lastChanged) > 1 {
-			who = "los equipos " + strings.Join(lastChanged, ", ") + " quedaron cambiados"
+			code = "mctl.run.warn_many"
 		}
-		fmt.Fprintf(c.Out, "\nATENCIÓN: %s. Revisa su configuración o aplica la reversa del plan a mano.\n", who)
+		fmt.Fprintln(c.Out, T(code, "devices", strings.Join(lastChanged, ", ")))
 	}
 	switch {
 	case final == "done":
-		fmt.Fprintln(c.Out, "\nListo: el cambio se aplicó y pasó el post-check.")
+		fmt.Fprintln(c.Out, T("mctl.run.done"))
 		return nil
 	case final == "rolled-back": // a propósito ≠ 0: el cambio pedido no quedó aplicado (ADR 0007)
-		return errors.New("el cambio se revirtió")
+		return Err("mctl.run.err_rolled")
 	case final == "abandoned":
-		return errors.New("la ejecución se abandonó sin decisión")
+		return Err("mctl.run.err_abandoned")
 	case failed || final == "failed":
-		return errors.New("la ejecución se detuvo por un error")
+		return Err("mctl.run.err_failed")
 	}
-	return fmt.Errorf("la ejecución terminó en %s sin completarse", final)
+	return Err("mctl.run.err_final", "state", final)
 }

@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/devices"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
@@ -105,6 +106,21 @@ func TestListaDeEquiposAvisosEnIngles(t *testing.T) {
 		r, err := s.ListDevices(i18n.WithLocale(context.Background(), loc), &v1.ListDevicesRequest{})
 		if err != nil || len(r.Warnings) != 1 || !strings.HasPrefix(r.Warnings[0], want) {
 			t.Errorf("%s: %v %v", loc, r, err)
+		}
+	}
+}
+
+// La descripción y el tipo de los campos del archivo de import siguen el idioma; el catálogo en es no se desvía de la tabla.
+func TestCamposDelImportEsYEn(t *testing.T) {
+	s, _ := nuevoSvc(t)
+	es, _ := s.HostsImportFormat(i18n.WithLocale(context.Background(), "es"), &v1.HostsImportFormatRequest{})
+	en, _ := s.HostsImportFormat(i18n.WithLocale(context.Background(), "en"), &v1.HostsImportFormatRequest{})
+	for i, f := range devices.HostFields {
+		if es.Fields[i].Description != f.Description || es.Fields[i].Type != f.Type {
+			t.Errorf("%s: es %q / %q, quería %q / %q", f.Name, es.Fields[i].Description, es.Fields[i].Type, f.Description, f.Type)
+		}
+		if en.Fields[i].Description == f.Description || en.Fields[i].Type == f.Type && f.Type != "" && f.Type != "text" {
+			t.Errorf("%s: en sigue en español: %q / %q", f.Name, en.Fields[i].Description, en.Fields[i].Type)
 		}
 	}
 }
