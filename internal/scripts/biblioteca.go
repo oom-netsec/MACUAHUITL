@@ -102,10 +102,13 @@ func LibraryWith(pb fs.FS, packs []Contenido) ([]Script, map[string]Texto, error
 
 // Derived arma el script de diagnóstico «lib-<id>» de cada playbook (los comandos son los del playbook), y solo esos:
 // nunca los de configuración. Lo usan la biblioteca y los paquetes de contenido: un playbook movido a un paquete
-// conserva su ID.
+// conserva su ID. Un playbook con datos (params) no se deriva: un script de biblioteca no tiene dónde pedirlos.
 func Derived(pbs []playbook.Playbook) []Script {
 	var out []Script
 	for _, p := range pbs {
+		if len(p.Params) > 0 {
+			continue
+		}
 		id := derivedID(p)
 		cmds := append([]string{}, p.Pre...)
 		for _, c := range p.Commands {
@@ -122,6 +125,9 @@ func Derived(pbs []playbook.Playbook) []Script {
 func DerivedTexts(pbs []playbook.Playbook) map[string]Texto {
 	en := map[string]Texto{}
 	for _, p := range pbs {
+		if len(p.Params) > 0 {
+			continue
+		}
 		en["lib-"+derivedID(p)] = Texto{p.NameEn, "Read-only diagnostic of playbook " + p.ID + "."}
 	}
 	return en

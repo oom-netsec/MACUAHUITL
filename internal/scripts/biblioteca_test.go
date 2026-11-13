@@ -154,3 +154,15 @@ func TestDerivedNoTraeConfiguracionYLaBibliotecaNoLaDuplica(t *testing.T) {
 		t.Fatalf("duplicados: cfg-ntp=%d acme-a=%d l2-stp=%d", n["lib-cfg-ntp"], n["lib-acme-a"], n["lib-l2-stp"])
 	}
 }
+
+// Un script de biblioteca no tiene datos: los playbooks con params no se derivan.
+func TestDerivedOmiteLosPlaybooksConDatos(t *testing.T) {
+	pb := playbook.Playbook{ID: "wlc-9800/cli-x", Platform: "wlc-9800", Name: "Cliente · X",
+		Params: []playbook.Param{{Name: "mac", Kind: "mac"}}, Commands: []playbook.Command{{Text: "show wireless client mac-address {mac} detail"}}}
+	if d := Derived([]playbook.Playbook{pb}); len(d) != 0 {
+		t.Fatalf("derivó %v", d)
+	}
+	if d := DerivedTexts([]playbook.Playbook{pb}); len(d) != 0 {
+		t.Fatalf("textos %v", d)
+	}
+}

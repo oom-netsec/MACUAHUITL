@@ -93,6 +93,8 @@ type Playbook struct {
 	Pack                       string // ID del paquete que lo trae; vacío = contenido base o playbooks del usuario (no se serializa)
 	Pre                        []string
 	Commands                   []Command
+	// Params son los datos que el playbook pide (MAC, AP...); vacío = el playbook de siempre.
+	Params []Param
 }
 
 type fileCommand struct {
@@ -102,12 +104,18 @@ type fileCommand struct {
 	Platforms  []string `yaml:"platforms"`
 }
 
+type fileParam struct {
+	Name string `yaml:"name"`
+	Kind string `yaml:"kind"`
+}
+
 type file struct {
 	ID       string        `yaml:"id"`
 	Platform string        `yaml:"platform"`
 	Name     string        `yaml:"name"`
 	NameEn   string        `yaml:"name_en"`
 	Pre      []string      `yaml:"pre"`
+	Params   []fileParam   `yaml:"params"`
 	Commands []fileCommand `yaml:"commands"`
 }
 
@@ -146,6 +154,12 @@ func parse(b []byte) (Playbook, error) {
 		return Playbook{}, errors.New("sin comandos")
 	}
 	p := Playbook{ID: f.Platform + "/" + f.ID, Platform: f.Platform, Name: f.Name, NameEn: f.NameEn, Pre: f.Pre}
+	for _, q := range f.Params {
+		p.Params = append(p.Params, Param{q.Name, q.Kind})
+	}
+	if err := checkParams(p.Params, f.Pre, f.Commands); err != nil {
+		return Playbook{}, err
+	}
 	for _, c := range append(f.Pre, cmdTexts(f.Commands)...) {
 		if err := CheckDenied(f.Platform, c); err != nil {
 			return Playbook{}, err
