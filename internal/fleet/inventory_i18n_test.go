@@ -76,3 +76,20 @@ func TestTextoDeFlotaEnIngles(t *testing.T) {
 		t.Error("es debe ser idéntico")
 	}
 }
+
+// Fase 30d: el tipo del inventario y la fuente «carpeta de Patrol» del texto salen en el idioma pedido; el JSON no cambia.
+func TestInventarioYFuenteDelTextoEnIngles(t *testing.T) {
+	f := load(t)
+	en := f.In("en")
+	inv := f.Inventory()
+	if txt := en.InventoryText(inv); !strings.Contains(txt, "device") || strings.Contains(txt, "equipo") {
+		t.Errorf("inventario en:\n%s", txt)
+	}
+	r := f.Find("dist1")
+	if txt := en.FindText(r); !strings.Contains(txt, "Patrol folder") || strings.Contains(txt, "carpeta de Patrol") {
+		t.Errorf("find en:\n%s", txt)
+	}
+	if txt := f.FindText(r); !strings.Contains(txt, "carpeta de Patrol") {
+		t.Errorf("find es:\n%s", txt)
+	}
+}

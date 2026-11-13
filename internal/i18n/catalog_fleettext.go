@@ -33,6 +33,7 @@ func init() {
 		"fleet.ago.d":              e("hace {n} d", "{n} d ago", "n"),
 		"fleet.stale":              e("DATO VIEJO", "OLD DATA"),
 		"fleet.inv.head":           e("Equipo,Tipo,Nombre,Descripción,PID,VID,Serie,Modelo,Versión,Fuente,Evidencia", "Device,Type,Name,Description,PID,VID,Serial,Model,Version,Source,Evidence"),
+		"fleet.src.patrol_dir":     e("carpeta de Patrol", "Patrol folder"),
 		"fleet.inv.kind.equipo":    e("equipo", "device"),
 		"fleet.inv.kind.modulo":    e("modulo", "module"),
 	})

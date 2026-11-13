@@ -38,7 +38,11 @@ func (f *Fleet) FindText(r FindResult) string {
 	b.WriteString(f.t("fleet.text.find_head", "query", r.Query, "mode", r.Mode, "n", r.Devices, "hits", len(r.Hits)) + "\n")
 	t := tw(&b)
 	for _, h := range r.Hits {
-		fmt.Fprintf(t, "%s\t%s\t%s\tVLAN %s\t%s\t%s\t%s\t%s | %s\n", h.Device, h.Kind, dash(h.Port), dash(h.VLAN), dash(h.MAC), dash(h.IP), dash(h.Name), h.Source, f.Stamp(h.At))
+		src := h.Source
+		if h.SourceKey != "" {
+			src = f.t(h.SourceKey)
+		}
+		fmt.Fprintf(t, "%s\t%s\t%s\tVLAN %s\t%s\t%s\t%s\t%s | %s\n", h.Device, h.Kind, dash(h.Port), dash(h.VLAN), dash(h.MAC), dash(h.IP), dash(h.Name), src, f.Stamp(h.At))
 	}
 	t.Flush()
 	f.warns(&b, r.Warnings)
@@ -191,7 +195,7 @@ func (f *Fleet) InventoryText(r InventoryResult) string {
 	var b strings.Builder
 	t := tw(&b)
 	for _, x := range r.Rows {
-		fmt.Fprintf(t, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", x.Device, x.Kind, dash(x.Name), dash(x.PID), dash(x.Serial), dash(x.Model), dash(x.Version), f.Stamp(x.At))
+		fmt.Fprintf(t, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", x.Device, invCells(f.loc, x)[1], dash(x.Name), dash(x.PID), dash(x.Serial), dash(x.Model), dash(x.Version), f.Stamp(x.At))
 	}
 	t.Flush()
 	f.warns(&b, r.Warnings)

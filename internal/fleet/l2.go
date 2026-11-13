@@ -21,6 +21,8 @@ type Hit struct {
 	Name   string    `json:"name,omitempty"` // vecino u otro nombre
 	Source string    `json:"source"`
 	At     time.Time `json:"at"`
+	// SourceKey: clave de catálogo de Source cuando es un texto nuestro (no un comando); solo para el texto.
+	SourceKey string `json:"-"`
 }
 
 type FindResult struct {
@@ -32,6 +34,9 @@ type FindResult struct {
 	Warnings   []string       `json:"warnings"`
 	WarningsTx []i18n.Text    `json:"-"`
 }
+
+// srcPatrolDir es la fuente de un hallazgo que sale de la carpeta de Patrol (no de un comando show).
+const srcPatrolDir = "carpeta de Patrol"
 
 type tag struct {
 	Dev *Dev
@@ -161,6 +166,9 @@ func (f *Fleet) Find(q string) FindResult {
 	res := FindResult{Query: q, Devices: len(f.Devs), Checked: map[string]int{}}
 	add := func(h Hit, t tag) {
 		h.Device, h.Source, h.At = t.Dev.Name, t.Src, t.At
+		if t.Src == srcPatrolDir {
+			h.SourceKey = "fleet.src.patrol_dir"
+		}
 		res.Hits = append(res.Hits, h)
 	}
 	macs := map[string]bool{}
@@ -224,7 +232,7 @@ func (f *Fleet) Find(q string) FindResult {
 		}
 		for _, d := range f.Devs {
 			if d.IP == ip {
-				add(Hit{Kind: "device", IP: ip, Name: d.Key}, tag{d, "carpeta de Patrol", latest(d)})
+				add(Hit{Kind: "device", IP: ip, Name: d.Key}, tag{d, srcPatrolDir, latest(d)})
 			}
 		}
 		for m := range macs {
@@ -235,7 +243,7 @@ func (f *Fleet) Find(q string) FindResult {
 		n := strings.ToLower(q)
 		for _, d := range f.Devs {
 			if strings.Contains(strings.ToLower(d.Name), n) || strings.Contains(strings.ToLower(d.Key), n) {
-				add(Hit{Kind: "device", IP: d.IP, Name: d.Key}, tag{d, "carpeta de Patrol", latest(d)})
+				add(Hit{Kind: "device", IP: d.IP, Name: d.Key}, tag{d, srcPatrolDir, latest(d)})
 			}
 		}
 		for _, r := range g.nbr {
