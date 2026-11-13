@@ -1,7 +1,7 @@
 # Propósito: Salud de RADIUS, métodos AAA, exclusiones y causas de desconexión.
 # Cuándo usarlo: Muchos clientes fallan al autenticarse o el servidor RADIUS parece caído.
 # Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
 id: tac-autenticacion-general
 platform: wlc-9800
 name: TAC · Autenticación de clientes (general)

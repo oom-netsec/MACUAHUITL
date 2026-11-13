@@ -1,14 +1,14 @@
 # Propósito: Mide CPU y memoria del controlador y de los procesos de plano de control inalámbrico.
 # Cuándo usarlo: CPU alta, GUI/CLI lentos, clientes que se caen en bloque o procesos wncd consumiendo memoria.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13), salvo los marcados «no existe en EWC».
 id: ctrl-cpu-memoria
 platform: wlc-9800
 name: Controlador · CPU y memoria (wncd)
 name_en: Controller · CPU and memory (wncd)
 commands:
   - cmd: show clock
-  - cmd: show platform resources
+  - cmd: show platform resources  # no existe en EWC
   - cmd: show processes cpu platform sorted
   - cmd: show processes cpu sorted
   - cmd: show processes cpu history

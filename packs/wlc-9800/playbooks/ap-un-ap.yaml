@@ -1,7 +1,7 @@
 # Propósito: Configuración, tags, imagen, inventario, radios y puerto cableado de un AP.
 # Cuándo usarlo: Un AP concreto se comporta distinto al resto: cobertura, tags, versión o puerto.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
 id: ap-un-ap
 platform: wlc-9800
 name: AP · Un AP puntual
@@ -20,4 +20,3 @@ commands:
   - cmd: show ap name {ap} lldp neighbors detail
   - cmd: show ap name {ap} wlan vlan
   - cmd: show ap name {ap} environment
-  - cmd: show ap name {ap} neighbor summary

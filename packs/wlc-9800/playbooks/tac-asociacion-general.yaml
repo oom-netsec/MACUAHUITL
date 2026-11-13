@@ -1,7 +1,7 @@
 # Propósito: Causas de desconexión, exclusiones, WLANs y carga de los APs.
 # Cuándo usarlo: Varios clientes no se asocian a una SSID o a un AP.
 # Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
 id: tac-asociacion-general
 platform: wlc-9800
 name: TAC · Asociación de clientes (general)

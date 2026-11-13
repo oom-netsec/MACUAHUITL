@@ -1,7 +1,7 @@
 # Propósito: Lista los APs con estado, uptime, tags, canales y vecinos CDP/LLDP.
 # Cuándo usarlo: Auditar qué APs hay, en qué tags y desde cuándo están arriba.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13), salvo los marcados «no existe en EWC».
 id: ap-inventario
 platform: wlc-9800
 name: AP · Inventario
@@ -14,7 +14,7 @@ commands:
   - cmd: show ap tag summary
   - cmd: show ap dot11 24ghz summary
   - cmd: show ap dot11 5ghz summary
-  - cmd: show cdp neighbors
-  - cmd: show lldp neighbors
+  - cmd: show cdp neighbors  # no existe en EWC
+  - cmd: show lldp neighbors  # no existe en EWC
   - cmd: show ap monitor-mode summary
   - cmd: show ap dot11 dual-band summary

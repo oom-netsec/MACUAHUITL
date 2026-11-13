@@ -1,7 +1,7 @@
 # Propósito: Capacidades 11k/v/r por WLAN, steering y band select.
 # Cuándo usarlo: Roaming lento o fallido; verificar FT, BSS transition y neighbor reports.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13), salvo los marcados «no existe en EWC».
 id: mob-roaming-11kvr
 platform: wlc-9800
 name: Movilidad · Roaming 802.11k/v/r
@@ -14,6 +14,6 @@ commands:
   - cmd: show wireless stats client delete reasons
   - cmd: show wireless client summary
     timeout: 180s
-  - cmd: show wireless mobility summary
+  - cmd: show wireless mobility summary  # no existe en EWC
   - cmd: show ap dot11 5ghz network
   - cmd: show ap dot11 24ghz network

@@ -1,7 +1,7 @@
 # Propósito: Cruza carga del controlador, utilización de canal, interferencia y causas de desconexión.
 # Cuándo usarlo: Quejas generalizadas de lentitud o intermitencia en el WiFi.
 # Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13), salvo los marcados «no existe en EWC».
 id: tac-wifi-lento
 platform: wlc-9800
 name: TAC · WiFi lento (general)
@@ -18,8 +18,7 @@ commands:
   - cmd: show ap dot11 5ghz cleanair air-quality worst
   - cmd: show wireless stats client delete reasons
   - cmd: show wireless stats client detail
-  - cmd: show platform resources
+  - cmd: show platform resources  # no existe en EWC
   - cmd: show processes cpu platform sorted
   - cmd: show logging | include DOT11|CAPWAP|CPUHOG|RADIUS
   - cmd: show wireless load-balancing
-  - cmd: show ap dot11 5ghz receiver

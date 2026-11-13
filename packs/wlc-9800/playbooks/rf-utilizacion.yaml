@@ -1,7 +1,7 @@
 # Propósito: Carga y utilización del canal por AP y banda, junto con la cantidad de clientes.
 # Cuándo usarlo: WiFi lento por canal saturado o desbalance de clientes entre APs.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
 id: rf-utilizacion
 platform: wlc-9800
 name: RF · Utilización y carga
@@ -13,8 +13,6 @@ commands:
   - cmd: show wireless client summary
     timeout: 180s
   - cmd: show wireless band-select
-  - cmd: show ap dot11 24ghz receiver
-  - cmd: show ap dot11 5ghz receiver
   - cmd: show wireless load-balancing
   - cmd: show ap auto-rf dot11 24ghz
     timeout: 120s

@@ -1,7 +1,7 @@
 # Propósito: Gateway mDNS y modo multicast inalámbrico.
 # Cuándo usarlo: AirPlay/Chromecast o multicast no llegan a los clientes inalámbricos.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13), salvo los marcados «no existe en EWC».
 id: svc-mdns-multicast
 platform: wlc-9800
 name: Servicios · mDNS y multicast
@@ -12,5 +12,5 @@ commands:
   - cmd: show mdns-sd cache
   - cmd: show mdns-sd statistics
   - cmd: show wireless multicast
-  - cmd: show ip igmp snooping
+  - cmd: show ip igmp snooping  # no existe en EWC
   - cmd: show wlan summary

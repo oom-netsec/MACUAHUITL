@@ -1,7 +1,7 @@
 # Propósito: Estado completo de un cliente: AP, WLAN, RSSI/SNR, tasas, seguridad, VLAN y política.
 # Cuándo usarlo: Se necesita ver cómo ve el controlador a un cliente concreto.
 # Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
 id: cli-detalle
 platform: wlc-9800
 name: Clientes · Detalle de un cliente

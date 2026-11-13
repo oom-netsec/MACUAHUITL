@@ -10,9 +10,10 @@ cliente), `rf` (radios, RRM, CleanAir, perfiles), `wlan`, `sec` (AAA, rogues, we
 que no se une; con versión general y versión para un cliente o AP).
 
 Los playbooks que declaran datos piden la MAC del cliente (`mac`) o el nombre del AP (`ap`); el núcleo los valida
-antes de armar los comandos. Los comandos de alta disponibilidad (SSO, `show chassis`) llevan el comentario
-`# no existe en EWC (sin SSO)`: el chasis y el 9800-CL los tienen; el EWC en AP no. No hay debugs, trazas ni nada que escriba en flash.
-Los comandos vienen de la documentación pública de Cisco y están sin validar en laboratorio.
+antes de armar los comandos. Validado en un C9120AXI-A en modo EWC con IOS-XE 17.12.6a (2026-11-13). Lo que el EWC no tiene y un
+9800 de chasis o CL sí (grupos de movilidad, Smart Licensing, VLAN/trunks/CDP/LLDP, `show chassis rmi`) lleva el
+comentario `# no existe en EWC`. No hay debugs, trazas ni nada que escriba en flash.
+Los comandos vienen de la documentación pública de Cisco.
 
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
@@ -30,9 +31,10 @@ certificates), `ap` (CAPWAP join, inventory, images, tags, reboots, a single AP)
 join; each with a general version and a per-client or per-AP version).
 
 Playbooks that declare data ask for the client MAC (`mac`) or the AP name (`ap`); the core validates them before
-building the commands. High-availability commands (SSO, `show chassis`) carry the comment `# no existe en EWC (sin SSO)`:
-appliances and the 9800-CL have them; EWC on an AP does not. No debugs, traces or anything that writes to flash.
-Commands come from Cisco's public documentation and are not yet validated in a lab.
+building the commands. Validated on a C9120AXI-A in EWC mode running IOS-XE 17.12.6a (2026-11-13). What EWC lacks and an appliance or
+9800-CL has (mobility groups, Smart Licensing, VLAN/trunks/CDP/LLDP, `show chassis rmi`) carries the comment
+`# no existe en EWC`. No debugs, traces or anything that writes to flash.
+Commands come from Cisco's public documentation.
 
 How to load it (the application never downloads packages):
 

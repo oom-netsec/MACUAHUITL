@@ -1,7 +1,7 @@
 # Propósito: Parámetros webauth, ACL de redirección y servicio HTTP para portal cautivo.
 # Cuándo usarlo: El portal cautivo no aparece, no redirige o el cliente se queda sin autorizar.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
 id: sec-webauth-cwa
 platform: wlc-9800
 name: Seguridad · Web Auth y CWA

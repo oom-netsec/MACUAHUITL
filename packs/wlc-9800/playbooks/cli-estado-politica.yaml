@@ -1,7 +1,7 @@
 # Propósito: VLAN, ACL, QoS y perfil de política que el controlador aplicó a un cliente.
 # Cuándo usarlo: El cliente cae en la VLAN, ACL o QoS equivocados.
 # Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
 id: cli-estado-politica
 platform: wlc-9800
 name: Clientes · Estado de política de un cliente

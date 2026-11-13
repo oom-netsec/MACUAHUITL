@@ -1,7 +1,7 @@
 # Propósito: Descubrimiento, unión, certificados, hora, país y registros de un AP que no aparece.
 # Cuándo usarlo: Un AP nuevo o existente no se une al controlador.
 # Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218396-troubleshoot-catalyst-9800-ap-join-or-di.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
 id: tac-ap-no-se-une
 platform: wlc-9800
 name: TAC · AP no se une

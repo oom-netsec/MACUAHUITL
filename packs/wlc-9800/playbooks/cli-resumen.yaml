@@ -1,7 +1,7 @@
 # Propósito: Cuenta clientes por AP/WLAN/estado y las causas de desconexión acumuladas.
 # Cuándo usarlo: Visión general de los clientes; primer paso ante quejas generalizadas.
 # Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13).
 id: cli-resumen
 platform: wlc-9800
 name: Clientes · Resumen y estadísticas
@@ -14,7 +14,6 @@ commands:
   - cmd: show wireless stats client delete reasons
   - cmd: show wireless stats client detail
   - cmd: show wireless exclusionlist
-  - cmd: show wireless client timers
   - cmd: show wlan summary
   - cmd: show ap summary
     timeout: 180s

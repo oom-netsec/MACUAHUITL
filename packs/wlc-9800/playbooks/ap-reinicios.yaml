@@ -1,7 +1,7 @@
 # Propósito: Busca APs que se reinician o se desunen: uptime, estadísticas de unión y registros.
 # Cuándo usarlo: APs con uptime bajo, flapeo de unión o clientes que se caen en bloque.
 # Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218396-troubleshoot-catalyst-9800-ap-join-or-di.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: C9120AXI-A (EWC) con IOS-XE 17.12.6a (2026-11-13), salvo los marcados «no existe en EWC».
 id: ap-reinicios
 platform: wlc-9800
 name: AP · Reinicios y caídas
@@ -13,7 +13,7 @@ commands:
     timeout: 180s
   - cmd: show wireless stats ap join summary
   - cmd: show wireless stats ap discovery
-  - cmd: show cdp neighbors
+  - cmd: show cdp neighbors  # no existe en EWC
   - cmd: show ip interface brief
   - cmd: show logging | include CAPWAP|DTLS|AP_JOIN|APMGR|PKI|DISJOIN|AP_DISCONNECT
   - cmd: show wireless stats ap history
