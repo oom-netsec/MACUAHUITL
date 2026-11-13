@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/csv"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Un archivo para Excel: una celda que empieza con = + - @ tab o CR se ejecutaría como fórmula (Excel ignora los
@@ -59,20 +60,20 @@ func MarshalHostsCSV(hosts []FileHost) ([]byte, error) {
 func ParseHostsCSV(b []byte) (Parsed, error) {
 	var out Parsed
 	if len(b) > MaxImportBytes {
-		return out, errors.New("el archivo pasa de 5 MB")
+		return out, i18n.New("hostfile.too_big", nil)
 	}
 	b = bytes.TrimPrefix(b, []byte(bom))
 	if !utf8.Valid(b) {
-		return out, errors.New("el archivo no es UTF-8")
+		return out, i18n.New("hostfile.not_utf8", nil)
 	}
 	r := csv.NewReader(bytes.NewReader(b))
 	r.FieldsPerRecord = -1
 	head, err := r.Read()
 	if err == io.EOF {
-		return out, errors.New("el archivo está vacío: falta el encabezado " + strings.Join(HostsHeader(), ","))
+		return out, i18n.New("hostfile.empty", i18n.A("header", strings.Join(HostsHeader(), ",")))
 	}
 	if err != nil {
-		return out, fmt.Errorf("encabezado ilegible: %w", err)
+		return out, i18n.Wrap("hostfile.header_read", err, nil)
 	}
 	if err := checkHeader(head); err != nil {
 		return out, err
@@ -85,19 +86,19 @@ func ParseHostsCSV(b []byte) (Parsed, error) {
 			break
 		}
 		if n > MaxImportHosts {
-			return out, fmt.Errorf("el archivo trae más de %d filas; el tope es %d", MaxImportHosts, MaxImportHosts)
+			return out, i18n.New("hostfile.too_many_rows", i18n.A("max", MaxImportHosts))
 		}
 		var pe *csv.ParseError
 		if errors.As(err, &pe) {
-			reason := pe.Err.Error()
+			var reason error = pe.Err // texto de la biblioteca csv
 			switch {
 			case errors.Is(pe.Err, csv.ErrQuote) && r.InputOffset() >= int64(len(b)):
 				// comilla abierta que no se cierra: el lector se tragó todo hasta el final
-				reason = fmt.Sprintf("comillas sin cerrar: se ignoró el resto del archivo desde la línea %d", pe.StartLine)
+				reason = i18n.New("hostfile.quote_open", i18n.A("line", pe.StartLine))
 			case errors.Is(pe.Err, csv.ErrQuote) || errors.Is(pe.Err, csv.ErrBareQuote):
-				reason = "comillas mal cerradas o sobrantes"
+				reason = i18n.New("hostfile.quote_bad", nil)
 			}
-			malas = append(malas, LineError{Line: pe.StartLine, Reason: reason})
+			malas = append(malas, lineErr(pe.StartLine, "", reason))
 			continue
 		}
 		if err != nil {
@@ -105,7 +106,7 @@ func ParseHostsCSV(b []byte) (Parsed, error) {
 		}
 		line, _ := r.FieldPos(0)
 		if len(rec) != len(HostFields) {
-			malas = append(malas, LineError{Line: line, Reason: fmt.Sprintf("tiene %d columnas; se esperaban %d", len(rec), len(HostFields))})
+			malas = append(malas, lineErr(line, "", i18n.New("hostfile.columns", i18n.A("got", len(rec), "want", len(HostFields)))))
 			continue
 		}
 		for i := range rec {
@@ -113,7 +114,7 @@ func ParseHostsCSV(b []byte) (Parsed, error) {
 		}
 		h, ferr := rowToHost(rec)
 		if ferr != nil {
-			malas = append(malas, LineError{Line: line, Field: ferr.Field, Reason: ferr.Reason})
+			malas = append(malas, lineErr(line, ferr.Field, ferr))
 			continue
 		}
 		rows = append(rows, row{line, h})
@@ -123,6 +124,10 @@ func ParseHostsCSV(b []byte) (Parsed, error) {
 	out.Errors = append(malas, errs...)
 	sortErrors(out.Errors)
 	return out, nil
+}
+
+func lineErr(line int, field string, err error) LineError {
+	return LineError{Line: line, Field: field, Reason: err.Error(), Err: err}
 }
 
 func sortErrors(e []LineError) {
@@ -160,7 +165,7 @@ func checkHeader(got []string) error {
 		}
 	}
 	if len(faltan) == 0 && len(sobran) == 0 {
-		return fmt.Errorf("encabezado inválido: las columnas deben ir en este orden: %s", strings.Join(want, ","))
+		return i18n.New("hostfile.header_order", i18n.A("want", strings.Join(want, ",")))
 	}
-	return fmt.Errorf("encabezado inválido (se espera %s): faltan [%s]; sobran [%s]", strings.Join(want, ","), strings.Join(faltan, ","), strings.Join(sobran, ","))
+	return i18n.New("hostfile.header_diff", i18n.A("want", strings.Join(want, ","), "missing", strings.Join(faltan, ","), "extra", strings.Join(sobran, ",")))
 }
