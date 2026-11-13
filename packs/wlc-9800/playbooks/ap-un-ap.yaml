@@ -1,0 +1,23 @@
+# Propósito: Configuración, tags, imagen, inventario, radios y puerto cableado de un AP.
+# Cuándo usarlo: Un AP concreto se comporta distinto al resto: cobertura, tags, versión o puerto.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: ap-un-ap
+platform: wlc-9800
+name: AP · Un AP puntual
+name_en: AP · A single AP
+params:
+  - name: ap
+    kind: ap
+commands:
+  - cmd: show clock
+  - cmd: show ap name {ap} config general
+  - cmd: show ap name {ap} wlan dot11 24ghz
+  - cmd: show ap name {ap} wlan dot11 5ghz
+  - cmd: show ap name {ap} auto-rf dot11 24ghz
+  - cmd: show ap name {ap} auto-rf dot11 5ghz
+  - cmd: show ap name {ap} config ethernet
+  - cmd: show ap name {ap} lldp neighbors detail
+  - cmd: show ap name {ap} wlan vlan
+  - cmd: show ap name {ap} environment
+  - cmd: show ap name {ap} neighbor summary

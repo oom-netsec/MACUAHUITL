@@ -1,0 +1,16 @@
+# Propósito: Lista WLANs y su estado, perfiles de política y tags.
+# Cuándo usarlo: Una SSID no se publica, está deshabilitada o está ligada al perfil equivocado.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: wlan-resumen
+platform: wlc-9800
+name: WLAN · WLANs y asignaciones
+name_en: WLAN · WLANs and mappings
+commands:
+  - cmd: show clock
+  - cmd: show wlan summary
+  - cmd: show wlan all
+  - cmd: show wireless profile policy summary
+  - cmd: show wireless tag policy summary
+  - cmd: show ap tag summary
+  - cmd: show wireless client summary

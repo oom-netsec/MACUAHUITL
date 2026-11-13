@@ -1,0 +1,22 @@
+# Propósito: Un cliente que no se mueve de un AP lejano: señal, steering, tasas mínimas y capacidades 11k/v/r.
+# Cuándo usarlo: Un cliente se queda pegado a un AP con RSSI bajo en vez de pasar a uno mejor.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
+# Sin validar en laboratorio.
+id: tac-sticky-client
+platform: wlc-9800
+name: TAC · Sticky client
+name_en: TAC · Sticky client
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show wireless client mac-address {mac} detail
+    timeout: 120s
+  - cmd: show wireless client mac-address {mac} mobility history
+  - cmd: show wireless band-select
+  - cmd: show wlan all
+  - cmd: show ap rf-profile summary
+  - cmd: show ap dot11 5ghz network
+  - cmd: show ap dot11 24ghz network
+  - cmd: show wireless stats client detail

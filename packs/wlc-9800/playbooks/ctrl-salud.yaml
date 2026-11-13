@@ -1,0 +1,19 @@
+# Propósito: Resume versión, recursos, APs y clientes del controlador.
+# Cuándo usarlo: Primera revisión de un 9800 (chasis, 9800-CL o EWC) antes de profundizar.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: ctrl-salud
+platform: wlc-9800
+name: Controlador · Salud general
+name_en: Controller · General health
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show wireless summary
+  - cmd: show ap summary
+  - cmd: show wireless client summary
+  - cmd: show platform resources
+  - cmd: show processes cpu platform sorted
+  - cmd: show processes memory platform sorted
+  - cmd: show platform software status control-processor brief
+  - cmd: show logging | include %.*-(2|1|0)-|CRIT|ALERT|EMERG

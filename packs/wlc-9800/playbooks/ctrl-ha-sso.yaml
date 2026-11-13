@@ -1,0 +1,18 @@
+# Propósito: Estado de la redundancia SSO, el enlace RMI y los switchovers del par de 9800.
+# Cuándo usarlo: Un failover no esperado, el par standby no sincroniza o los APs se reinician tras un switchover.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: ctrl-ha-sso
+platform: wlc-9800
+name: Controlador · Alta disponibilidad (SSO)
+name_en: Controller · High availability (SSO)
+commands:
+  - cmd: show clock
+  - cmd: show redundancy  # solo 9800 de chasis
+  - cmd: show redundancy states  # solo 9800 de chasis
+  - cmd: show redundancy switchover history  # solo 9800 de chasis
+  - cmd: show chassis  # solo 9800 de chasis
+  - cmd: show chassis rmi  # solo 9800 de chasis
+  - cmd: show ap summary  # solo 9800 de chasis
+  - cmd: show wireless client summary  # solo 9800 de chasis
+  - cmd: show logging | include REDUNDANCY|RMI|HA_|SSO|SWITCHOVER|STANDBY  # solo 9800 de chasis

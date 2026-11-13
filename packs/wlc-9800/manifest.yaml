@@ -1,0 +1,10 @@
+id: oom/wlc-9800
+version: 1.0.0
+min_core: 0.4.0
+name: Catalyst 9800, diagnóstico TAC
+name_en: Catalyst 9800, TAC diagnostics
+description: Playbooks de solo lectura para el controlador inalámbrico Catalyst 9800 (chasis, 9800-CL y EWC en APs 9100/9120) con IOS-XE 17.x - controlador, APs, clientes, RF, WLANs, seguridad, movilidad y casos TAC; los de un cliente o AP piden su MAC o nombre.
+description_en: Read-only playbooks for the Catalyst 9800 wireless controller (appliance, 9800-CL and EWC on 9100/9120 APs) with IOS-XE 17.x - controller, APs, clients, RF, WLANs, security, mobility and TAC cases; the per-client and per-AP ones ask for the MAC or name.
+platforms: [wlc-9800]
+author: oom-netsec
+license: Apache-2.0

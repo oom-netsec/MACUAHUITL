@@ -1,0 +1,21 @@
+# Propósito: Estado completo de un cliente: AP, WLAN, RSSI/SNR, tasas, seguridad, VLAN y política.
+# Cuándo usarlo: Se necesita ver cómo ve el controlador a un cliente concreto.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
+# Sin validar en laboratorio.
+id: cli-detalle
+platform: wlc-9800
+name: Clientes · Detalle de un cliente
+name_en: Clients · Client detail
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show wireless client mac-address {mac} detail
+    timeout: 120s
+  - cmd: show wireless client summary
+  - cmd: show wireless device-tracking database mac
+  - cmd: show ip arp | include {mac}
+  - cmd: show ip dhcp binding
+  - cmd: show wireless exclusionlist
+  - cmd: show logging | include {mac}

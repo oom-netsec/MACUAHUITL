@@ -1,0 +1,24 @@
+# Propósito: Estado del cliente, RADIUS, método de autenticación y causas de desconexión.
+# Cuándo usarlo: Un cliente no logra autenticarse (802.1X, PSK, webauth o MAB).
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
+# Sin validar en laboratorio.
+id: tac-autenticacion-cliente
+platform: wlc-9800
+name: TAC · Autenticación de cliente falla
+name_en: TAC · Client authentication failure
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show wireless client mac-address {mac} detail
+    timeout: 120s
+  - cmd: show wireless exclusionlist
+  - cmd: show wireless stats client delete reasons
+  - cmd: show aaa servers
+  - cmd: show radius statistics
+  - cmd: show aaa method-lists authentication
+  - cmd: show wlan summary
+  - cmd: show wireless profile policy summary
+  - cmd: show logging | include {mac}|RADIUS|DOT1X|EAP
+  - cmd: show wireless exclusionlist client mac-address {mac} detail

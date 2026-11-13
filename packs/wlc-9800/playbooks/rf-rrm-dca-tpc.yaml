@@ -1,0 +1,21 @@
+# Propósito: Grupo RRM, canales, potencia, cobertura y monitoreo de vecinos.
+# Cuándo usarlo: Canales o potencias que cambian solos, cobertura con huecos o vecinos inesperados.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: rf-rrm-dca-tpc
+platform: wlc-9800
+name: RF · RRM, DCA y TPC
+name_en: RF · RRM, DCA and TPC
+commands:
+  - cmd: show clock
+  - cmd: show ap dot11 24ghz group
+  - cmd: show ap dot11 5ghz group
+  - cmd: show ap dot11 24ghz monitor
+  - cmd: show ap dot11 5ghz monitor
+  - cmd: show ap dot11 24ghz coverage
+  - cmd: show ap dot11 5ghz coverage
+  - cmd: show ap rf-profile summary
+  - cmd: show ap auto-rf dot11 24ghz
+    timeout: 120s
+  - cmd: show ap auto-rf dot11 5ghz
+    timeout: 120s

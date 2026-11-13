@@ -1,0 +1,20 @@
+# Propósito: Seguridad configurada (802.1X, PSK, WPA3, MAC filtering) y clientes excluidos.
+# Cuándo usarlo: Se necesita saber qué esquema de autenticación usa cada SSID y quién está excluido.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: sec-autenticacion-wlan
+platform: wlc-9800
+name: Seguridad · Autenticación por WLAN
+name_en: Security · Per-WLAN authentication
+commands:
+  - cmd: show clock
+  - cmd: show wlan summary
+  - cmd: show wlan all
+  - cmd: show wireless profile policy summary
+  - cmd: show wireless exclusionlist
+  - cmd: show wireless stats client delete reasons
+  - cmd: show wireless client summary
+  - cmd: show aaa servers
+  - cmd: show running-config | section ^wlan
+    may_contain_secrets: true
+  - cmd: show ap auth-list

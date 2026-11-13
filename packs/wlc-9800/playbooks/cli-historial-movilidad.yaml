@@ -1,0 +1,19 @@
+# Propósito: Historial de roaming de un cliente entre APs y controladores.
+# Cuándo usarlo: Un cliente roamea mal, salta entre APs o pierde la conexión al moverse.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
+# Sin validar en laboratorio.
+id: cli-historial-movilidad
+platform: wlc-9800
+name: Clientes · Historial de movilidad de un cliente
+name_en: Clients · Client mobility history
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show wireless client mac-address {mac} mobility history
+  - cmd: show wireless client mac-address {mac} detail
+  - cmd: show wireless mobility summary
+  - cmd: show wireless statistics mobility
+  - cmd: show logging | include {mac}
+  - cmd: show wireless client mac-address {mac} stats mobility

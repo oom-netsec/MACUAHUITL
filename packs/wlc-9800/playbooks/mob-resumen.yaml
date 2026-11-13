@@ -1,0 +1,18 @@
+# Propósito: Estado del grupo de movilidad, pares y APs conocidos.
+# Cuándo usarlo: Los clientes no hacen roaming entre controladores o un par aparece caído.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: mob-resumen
+platform: wlc-9800
+name: Movilidad · Grupo y estado
+name_en: Mobility · Group and status
+commands:
+  - cmd: show clock
+  - cmd: show wireless mobility summary
+  - cmd: show wireless statistics mobility
+  - cmd: show wireless client summary
+  - cmd: show ip interface brief
+  - cmd: show running-config | section wireless mobility
+    may_contain_secrets: true
+  - cmd: show wireless mobility
+  - cmd: show wireless mobility controller ap

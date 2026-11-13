@@ -1,0 +1,21 @@
+# Propósito: Examina RSSI, SNR, tasa, reintentos y AP de un cliente lento, y la carga de su AP.
+# Cuándo usarlo: Un usuario concreto se queja de lentitud.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
+# Sin validar en laboratorio.
+id: tac-wifi-lento-cliente
+platform: wlc-9800
+name: TAC · WiFi lento (un cliente)
+name_en: TAC · Slow WiFi (one client)
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show wireless client mac-address {mac} detail
+    timeout: 120s
+  - cmd: show wireless client mac-address {mac} mobility history
+  - cmd: show wireless client summary
+  - cmd: show wireless stats client delete reasons
+  - cmd: show ap dot11 5ghz network
+  - cmd: show logging | include {mac}
+  - cmd: show wireless client mac-address {mac} stats latency

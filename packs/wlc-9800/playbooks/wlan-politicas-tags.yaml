@@ -1,0 +1,16 @@
+# Propósito: Perfiles de política, tags de política y sitio y su relación con los APs.
+# Cuándo usarlo: Clientes en VLAN, ACL o modo de switching inesperados.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: wlan-politicas-tags
+platform: wlc-9800
+name: WLAN · Perfiles de política y tags
+name_en: WLAN · Policy profiles and tags
+commands:
+  - cmd: show clock
+  - cmd: show wireless profile policy summary
+  - cmd: show wireless tag policy summary
+  - cmd: show wireless tag site summary
+  - cmd: show wireless tag rf summary
+  - cmd: show ap tag summary
+  - cmd: show wlan summary

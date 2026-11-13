@@ -1,0 +1,16 @@
+# Propósito: Verifica hora, NTP y certificados/trustpoints que usa el controlador para unir APs.
+# Cuándo usarlo: AP no se une con error de certificado o DTLS, o el reloj del controlador está desfasado.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: ctrl-hora-certificados
+platform: wlc-9800
+name: Controlador · Hora y certificados
+name_en: Controller · Clock and certificates
+commands:
+  - cmd: show clock
+  - cmd: show ntp status
+  - cmd: show ntp associations
+  - cmd: show crypto pki trustpoints
+  - cmd: show crypto pki certificates
+  - cmd: show ap summary
+  - cmd: show logging | include PKI|CERT|DTLS|NTP

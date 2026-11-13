@@ -1,0 +1,18 @@
+# Propósito: Revisa interfaces, VLANs, trunks y port-channel hacia la red cableada.
+# Cuándo usarlo: Los APs o clientes no alcanzan la gestión, DHCP o el gateway; flapeo del uplink.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: ctrl-interfaces-vlans
+platform: wlc-9800
+name: Controlador · Interfaces y VLANs de gestión
+name_en: Controller · Management interfaces and VLANs
+commands:
+  - cmd: show clock
+  - cmd: show ip interface brief
+  - cmd: show interfaces trunk
+  - cmd: show vlan brief
+  - cmd: show etherchannel summary
+  - cmd: show cdp neighbors
+  - cmd: show lldp neighbors
+  - cmd: show ip route
+    timeout: 120s

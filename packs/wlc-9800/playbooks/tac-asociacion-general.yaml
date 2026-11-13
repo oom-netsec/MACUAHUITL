@@ -1,0 +1,18 @@
+# Propósito: Causas de desconexión, exclusiones, WLANs y carga de los APs.
+# Cuándo usarlo: Varios clientes no se asocian a una SSID o a un AP.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9800-series-wireless-controllers/218395-troubleshoot-catalyst-9800-client-connec.html
+# Sin validar en laboratorio.
+id: tac-asociacion-general
+platform: wlc-9800
+name: TAC · Asociación de clientes (general)
+name_en: TAC · Client association (general)
+commands:
+  - cmd: show clock
+  - cmd: show wireless client summary
+  - cmd: show wireless stats client delete reasons
+  - cmd: show wireless stats client detail
+  - cmd: show wireless exclusionlist
+  - cmd: show wlan summary
+  - cmd: show wireless profile policy summary
+  - cmd: show ap summary
+  - cmd: show logging | include ASSOC|DOT11|CAPWAP

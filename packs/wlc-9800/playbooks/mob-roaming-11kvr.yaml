@@ -1,0 +1,18 @@
+# Propósito: Capacidades 11k/v/r por WLAN, steering y band select.
+# Cuándo usarlo: Roaming lento o fallido; verificar FT, BSS transition y neighbor reports.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: mob-roaming-11kvr
+platform: wlc-9800
+name: Movilidad · Roaming 802.11k/v/r
+name_en: Mobility · 802.11k/v/r roaming
+commands:
+  - cmd: show clock
+  - cmd: show wlan all
+  - cmd: show wireless band-select
+  - cmd: show wireless stats client detail
+  - cmd: show wireless stats client delete reasons
+  - cmd: show wireless client summary
+  - cmd: show wireless mobility summary
+  - cmd: show ap dot11 5ghz network
+  - cmd: show ap dot11 24ghz network

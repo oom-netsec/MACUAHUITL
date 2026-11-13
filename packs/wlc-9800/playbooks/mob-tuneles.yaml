@@ -1,0 +1,16 @@
+# Propósito: Contadores de movilidad y conectividad con los pares.
+# Cuándo usarlo: Roaming L3 falla, túnel de movilidad caído o pérdida de paquetes entre controladores.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/9800/command-reference/b_wireless_cr/show-commands.html
+# Sin validar en laboratorio.
+id: mob-tuneles
+platform: wlc-9800
+name: Movilidad · Túneles y estadísticas
+name_en: Mobility · Tunnels and statistics
+commands:
+  - cmd: show clock
+  - cmd: show wireless mobility summary
+  - cmd: show wireless statistics mobility
+  - cmd: show ip interface brief
+  - cmd: show interfaces trunk
+  - cmd: show logging | include MOBILITY|MM_|MOBILE
+  - cmd: show wireless mobility controller ap
