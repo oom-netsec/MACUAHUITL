@@ -98,7 +98,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 | **Field tools** | Temporary TFTP/HTTP/FTP/SCP/SFTP servers and clients, MD5/SHA-512 verification. |
 | **Calculators** | Subnets, VLSM, summarization, wildcards, IPv6, MTU/MSS, TCP throughput, DSCP/QoS, optical budget, BGP best path. |
 | **Syslog** | Local receiver that feeds the timeline. |
-| **Content packs** | Playbooks and scripts per technology in signed `.mpack` bundles. Install only what you use; read-only content, checked on install. |
+| **Content packs** | Playbooks and scripts per technology in `.mpack` bundles, official ones signed. Install only what you use; read-only playbooks, checked on install and at every start. |
 
 ### A Patrol job, step by step
 
@@ -110,7 +110,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 
 ## Content packs
 
-Playbooks and scripts come in **content packs** (`.mpack`), one per technology. Install the IOS-XE pack and skip the firewall one; add ACI and leave wireless out. Content ships on its own schedule, without a new core release.
+Playbooks and scripts come in **content packs** (`.mpack`), one per technology. Install the ones for the platforms you work on and leave the rest out. Each pack has its own version, so newer content installs on the core you already have.
 
 ```sh
 mctl pack install oom-ios-xe-1.0.0.mpack    # from the release page; the app never downloads anything
@@ -120,8 +120,8 @@ mctl pack remove oom/ios-xe
 ```
 
 - **Official packs** (`oom/*`) are signed with Ed25519 and published as release assets with their README and checksum. The public key is compiled into the core.
-- **Third-party packs** install only with `--allow-unsigned` (or a confirmation in the app) and carry their author's prefix in every ID, so they can never take over an official playbook.
-- **Every pack is read-only content.** Each playbook command passes the same deny list as built-in ones, on install and again at every start. Nothing executable travels in a pack, and change templates stay in the core.
+- **Third-party packs** install only with `--allow-unsigned` (or a confirmation in the app) and carry their publisher prefix in every ID, so they can never take over an official playbook.
+- **Playbooks stay read-only.** Every playbook command in a pack passes the same deny list as the built-in ones, on install and again at every start. Scripts are never run: the terminal pastes them without pressing Enter, like the built-in library. Nothing executable travels in a pack, and change templates stay in the core.
 - **Each pack carries its own README** with what it contains and how to load it.
 
 Official packs today: `oom/ios-xe`. Classic IOS is next; NX-OS, ASA/FTD, ACI, wireless, ISE and SD-Access follow as each platform gets its driver and read-only rules. The format is defined in [ADR 0010](docs/adr/0010-paquetes-de-contenido.md).
@@ -183,7 +183,7 @@ systemctl --user enable --now macuahuitld     # as the user who will use it
 ## Quick start
 
 ```sh
-mctl pack install oom-ios-xe-1.0.0.mpack     # v0.3.0+: the IOS-XE playbooks (from the release page)
+mctl pack install oom-ios-xe-1.0.0.mpack    # v0.3.0+: the IOS-XE playbooks (from the release page)
 mctl vault create                           # set the master password (no echo)
 mctl cred add --label lab --user admin      # device credential
 mctl job create -f job.yaml                 # returns the job ID
