@@ -16,6 +16,10 @@ service PackService {
   rpc Show(PackServiceShowRequest) returns (PackServiceShowResponse);
   // Quita el paquete id y los favoritos de sus scripts.
   rpc Remove(PackServiceRemoveRequest) returns (PackServiceRemoveResponse);
+  // Fase 32c. Arma un paquete personal sin firma con scripts del usuario y, si se pide, sus playbooks.
+  rpc Export(PackServiceExportRequest) returns (PackServiceExportResponse);
+  // Fase 32c. Importa un .mpack sin firma a «Mis scripts» y a <config>/playbooks. Sin confirm es solo la vista previa.
+  rpc Import(PackServiceImportRequest) returns (PackServiceImportResponse);
 }
 
 message PackServiceInstallRequest {
@@ -68,4 +72,60 @@ message PackServiceRemoveRequest {
 
 message PackServiceRemoveResponse {
   int32 favorites_removed = 1;     // scripts del paquete que estaban en colecciones o fijados
+}
+
+message PackServiceExportRequest {
+  string editor_name = 1;           // "<editor>/<nombre>"; editor [a-z0-9]{1,16}, sin los reservados
+  repeated string script_ids = 2;   // scripts del usuario (hasta 1000)
+  bool include_playbooks = 3;       // todos los de <config>/playbooks exportables
+  string license = 4;               // SPDX; vacío = NOASSERTION
+  string path = 5;                  // absoluta; archivo nuevo 0600
+  bool overwrite = 6;               // sin esto, una ruta que existe da AlreadyExists
+  string name = 7;                  // opcional; vacío = la parte <nombre> del id
+  string name_en = 8;               // opcional; vacío copia name
+  string description = 9;           // opcional
+  string description_en = 10;       // opcional; vacío copia description
+  string author = 11;               // opcional; vacío = el editor
+}
+
+message PackServiceExportResponse {
+  string id = 1;
+  string version = 2;               // AAAA.MMDD.HHMM de la hora local
+  string sha256 = 3;                // del archivo escrito
+  int32 scripts = 4;
+  int32 playbooks = 5;
+  repeated string omitted_playbooks = 6;  // IDs de playbook que no se exportaron (plataforma no instalable o ID que no sirve)
+}
+
+message PackImportDecision {
+  string item_id = 1;               // ID del script o del playbook tal como viene en el archivo
+  string action = 2;                // renombrar | omitir (nunca reemplazar)
+}
+
+message PackServiceImportRequest {
+  string path = 1;                  // absoluta; el .mpack no debe tener firma oficial
+  bool confirm = 2;                 // false = vista previa (no escribe nada); true = aplica con decisions
+  repeated PackImportDecision decisions = 3;
+}
+
+message PackImportItem {
+  string kind = 1;                  // script | playbook
+  string id = 2;                    // el del archivo
+  string name = 3;
+  string state = 4;                 // nuevo | igual | conflicto_id | conflicto_nombre
+  string conflicts_with = 5;        // script: ID guardado; playbook: base, reserved, user, file o el id del paquete instalado
+}
+
+message PackServiceImportResponse {
+  PackInfo pack = 1;
+  repeated PackImportItem items = 2;
+  repeated string warnings = 3;
+  bool applied = 4;                 // false en la vista previa
+  int32 scripts_created = 5;
+  int32 scripts_renamed = 6;
+  int32 scripts_skipped = 7;
+  int32 playbooks_created = 8;
+  int32 playbooks_renamed = 9;
+  int32 playbooks_skipped = 10;
+  repeated string playbook_ids = 11;  // IDs con los que quedaron escritos los playbooks
 }

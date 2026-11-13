@@ -27,6 +27,12 @@ func init() {
 		"pack.err.official_replace":  e("el paquete oficial {id} solo lo reemplaza otro con firma oficial", "the official package {id} can only be replaced by another with an official signature", "id"),
 		"pack.err.not_found":         e("no hay un paquete {id:q} instalado", "there is no installed package {id:q}", "id"),
 		"pack.err.path":              e("indica la ruta de un archivo .mpack", "give the path of an .mpack file"),
+		"pack.err.export.empty":      e("no hay nada que exportar: elige scripts o playbooks exportables", "there is nothing to export: choose scripts or exportable playbooks"),
+		"pack.err.export.name_dup":   e("dos elementos del paquete se llaman igual: {name:q}", "two items in the package have the same name: {name:q}", "name"),
+		"pack.err.import.official":   e("un paquete con firma oficial se instala, no se importa", "a package with an official signature is installed, not imported"),
+		"pack.err.import.missing":    e("falta decidir qué hacer con {id}: renombrar u omitir", "a decision is missing for {id}: rename or skip", "id"),
+		"pack.err.import.decision":   e("decisión no válida para {id}: solo renombrar (si choca) u omitir, y el ID debe ser del paquete", "invalid decision for {id}: only rename (on a clash) or skip, and the ID must be in the package", "id"),
+		"pack.err.import.exists":     e("el archivo {file} ya existe; no se sobrescribe", "the file {file} already exists; it is not overwritten", "file"),
 		"pack.missing":               e("el playbook {playbook} viene en el paquete {pack}, que no está instalado; instálalo con «mctl pack install»", "playbook {playbook} comes in package {pack}, which is not installed; install it with \"mctl pack install\"", "playbook", "pack"),
 	})
 }

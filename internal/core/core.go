@@ -113,7 +113,8 @@ type Core struct {
 	hosts    *transport.KnownHosts
 	settings *service.CoreSettings               // preferencias del núcleo; viven en preferences (core.*)
 	basePbs  []playbook.Playbook                 // playbooks embebidos
-	userPbs  []playbook.Playbook                 // los de <config>/playbooks, cargados al arrancar
+	userPbs  atomic.Pointer[[]playbook.Playbook] // los de <config>/playbooks; se vuelven a leer al importar un paquete (fase 32c)
+	catMu    sync.Mutex                          // serializa armar y publicar el catálogo: dos recargas a la vez no publican una foto vieja
 	pbs      atomic.Pointer[[]playbook.Playbook] // catálogo vigente: base < paquetes < usuario; se reemplaza entero, nunca se muta
 	packs    *pack.Store
 	bus      *engine.Bus
@@ -201,10 +202,8 @@ func (c *Core) openPacks() (err error) {
 	if c.basePbs, err = playbook.Load(playbooks.FS); err != nil {
 		return err
 	}
-	if user := filepath.Join(c.p.Config, "playbooks"); dirExists(user) {
-		if c.userPbs, err = playbook.Load(os.DirFS(user)); err != nil {
-			return err
-		}
+	if err = c.loadUser(); err != nil {
+		return err
 	}
 	base := pack.Base{}
 	for _, p := range c.basePbs {
@@ -238,11 +237,43 @@ func (c *Core) openPacks() (err error) {
 	return nil
 }
 
+// loadUser lee <config>/playbooks y deja esa lista como la vigente (sin tocar el catálogo).
+func (c *Core) loadUser() error {
+	var pbs []playbook.Playbook
+	if user := filepath.Join(c.p.Config, "playbooks"); dirExists(user) {
+		var err error
+		if pbs, err = playbook.Load(os.DirFS(user)); err != nil {
+			return err
+		}
+	}
+	c.userPbs.Store(&pbs)
+	return nil
+}
+
+// reloadUser vuelve a leer <config>/playbooks y recarga el catálogo en caliente. Si la carpeta no se puede leer queda lo anterior.
+func (c *Core) reloadUser() error {
+	if err := c.loadUser(); err != nil {
+		return err
+	}
+	c.rebuildCatalog()
+	return nil
+}
+
+// userPlaybooks son los playbooks vigentes de <config>/playbooks.
+func (c *Core) userPlaybooks() []playbook.Playbook {
+	if p := c.userPbs.Load(); p != nil {
+		return slices.Clone(*p)
+	}
+	return nil
+}
+
 func dirExists(p string) bool { fi, err := os.Stat(p); return err == nil && fi.IsDir() }
 
 // rebuildCatalog arma el catálogo de playbooks (base < paquetes < usuario, el mismo ID lo reemplaza el de más a la
 // derecha) y lo publica de una vez. Quien ya tiene una copia la conserva.
 func (c *Core) rebuildCatalog() {
+	c.catMu.Lock()
+	defer c.catMu.Unlock()
 	pbs := slices.Clone(c.basePbs)
 	merge := func(extra []playbook.Playbook) {
 		for _, e := range extra {
@@ -256,14 +287,14 @@ func (c *Core) rebuildCatalog() {
 	for _, p := range c.packs.Snapshot().Packs {
 		merge(p.Playbooks)
 	}
-	merge(c.userPbs)
+	merge(c.userPlaybooks())
 	c.pbs.Store(&pbs)
 }
 
 // userIDs son los IDs de los playbooks de <config>/playbooks, que tapan a los de un paquete con el mismo ID.
 func (c *Core) userIDs() map[string]bool {
 	m := map[string]bool{}
-	for _, p := range c.userPbs {
+	for _, p := range c.userPlaybooks() {
 		m[p.ID] = true
 	}
 	return m
