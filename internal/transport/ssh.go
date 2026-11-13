@@ -145,19 +145,23 @@ func keepaliveLoop(every time.Duration, send func() error, rx func() int64, clos
 	defer t.Stop()
 	fails := 0
 	last := rx()
+	var res chan error // envío en vuelo: mientras no conteste no se lanza otro (SendRequest se encola y acumularía goroutines)
 	for {
 		select {
 		case <-stop:
 			return
 		case <-t.C:
 		}
-		res := make(chan error, 1)
-		go func() { res <- send() }()
+		if res == nil {
+			res = make(chan error, 1)
+			go func(c chan<- error) { c <- send() }(res)
+		}
 		var err error
 		select {
 		case <-stop:
 			return
 		case err = <-res:
+			res = nil
 		case <-time.After(every):
 			err = errors.New("sin respuesta")
 		}
