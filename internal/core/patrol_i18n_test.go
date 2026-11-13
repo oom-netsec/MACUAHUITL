@@ -129,11 +129,13 @@ func failingRun(t *testing.T, lang string, reasons ...map[string]string) map[str
 		t.Fatal(err)
 	}
 	lt := h.loginTest(t, cj.JobId)
-	if _, err := h.patrol.ArmJob(con(t, lang), &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: []string{lt[0].HostKeyFingerprint}}); err != nil {
-		t.Fatal(err)
-	}
+	// La suscripción va antes de armar: la primera ronda arranca al armar y su fallo podía publicarse antes de que
+	// hubiera suscriptor. Son dos eventos de EOF porque h.spec programa dos rondas y cada una pierde la sesión.
 	s, err := h.events.Subscribe(con(t, lang), &v1.SubscribeRequest{JobIds: []string{cj.JobId}})
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.patrol.ArmJob(con(t, lang), &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: []string{lt[0].HostKeyFingerprint}}); err != nil {
 		t.Fatal(err)
 	}
 	var details []string
