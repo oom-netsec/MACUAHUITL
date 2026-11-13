@@ -52,8 +52,10 @@ func (p *Pack) Hidden(q Querier) ([]string, error) {
 }
 
 // HiddenSets son los IDs de playbook y de script que las listas no deben mostrar, de todos los paquetes de sn. Un
-// playbook oculto oculta también su script derivado lib-<id>. Se lee de la base en cada llamada: nunca hay copia que se desfase.
-func HiddenSets(q Querier, sn *Snapshot) (playbooks, scriptIDs map[string]bool, err error) {
+// playbook oculto oculta también su script derivado lib-<id>. Un playbook que uno de <config>/playbooks tapa (shadowed)
+// no se oculta: lo que se vería es el del usuario, no el del paquete. Se lee de la base en cada llamada: nunca hay
+// copia que se desfase.
+func HiddenSets(q Querier, sn *Snapshot, shadowed map[string]bool) (playbooks, scriptIDs map[string]bool, err error) {
 	m, err := hiddenRows(q)
 	if err != nil {
 		return nil, nil, err
@@ -61,6 +63,18 @@ func HiddenSets(q Querier, sn *Snapshot) (playbooks, scriptIDs map[string]bool, 
 	playbooks, scriptIDs = map[string]bool{}, map[string]bool{}
 	for _, p := range sn.Packs {
 		for _, id := range m[p.ID] {
+			if !p.HasItem(id) {
+				continue
+			}
+			isPB := false
+			for _, pb := range p.Playbooks {
+				if pb.ID == id {
+					isPB = true
+				}
+			}
+			if isPB && shadowed[id] {
+				continue
+			}
 			scriptIDs[id] = true
 			for _, pb := range p.Playbooks {
 				if pb.ID == id {
@@ -75,16 +89,44 @@ func HiddenSets(q Querier, sn *Snapshot) (playbooks, scriptIDs map[string]bool, 
 	return playbooks, scriptIDs, nil
 }
 
-// SetHidden aplica la elección: oculta hide y muestra show. Los IDs ya deben estar validados con HasItem.
-func SetHidden(q Querier, packID string, hide, show []string) error {
+// SetHidden aplica la elección: oculta hide y muestra show, y dice cuántas filas cambió de verdad. Los IDs ya deben
+// estar validados con HasItem.
+func SetHidden(q Querier, packID string, hide, show []string) (changed int, err error) {
 	for _, id := range hide {
-		if _, err := q.Exec(`INSERT OR IGNORE INTO pack_hidden(pack, item_id) VALUES(?, ?)`, packID, id); err != nil {
-			return err
+		r, err := q.Exec(`INSERT OR IGNORE INTO pack_hidden(pack, item_id) VALUES(?, ?)`, packID, id)
+		if err != nil {
+			return 0, err
 		}
+		n, _ := r.RowsAffected()
+		changed += int(n)
 	}
 	for _, id := range show {
-		if _, err := q.Exec(`DELETE FROM pack_hidden WHERE pack = ? AND item_id = ?`, packID, id); err != nil {
-			return err
+		r, err := q.Exec(`DELETE FROM pack_hidden WHERE pack = ? AND item_id = ?`, packID, id)
+		if err != nil {
+			return 0, err
+		}
+		n, _ := r.RowsAffected()
+		changed += int(n)
+	}
+	return changed, nil
+}
+
+// ResetHidden prepara la elección de p al instalarlo: una instalación nueva (fresh) parte de cero y siempre se borran
+// las filas de IDs que el paquete ya no trae, para que uno que vuelva en una versión posterior entre visible.
+func ResetHidden(q Querier, p *Pack, fresh bool) error {
+	if fresh {
+		_, err := q.Exec(`DELETE FROM pack_hidden WHERE pack = ?`, p.ID)
+		return err
+	}
+	rows, err := hiddenRows(q)
+	if err != nil {
+		return err
+	}
+	for _, id := range rows[p.ID] {
+		if !p.HasItem(id) {
+			if _, err := q.Exec(`DELETE FROM pack_hidden WHERE pack = ? AND item_id = ?`, p.ID, id); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

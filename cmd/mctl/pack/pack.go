@@ -14,15 +14,16 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
 
-const help = `  pack install <archivo.mpack> [--allow-unsigned] [--hide <item>…]  |  pack list  |  pack show <id>  |  pack remove <id>
-  pack inspect <archivo.mpack> [--allow-unsigned]
-        (vista previa de install: valida el paquete y muestra qué trae y qué reemplazaría, sin instalar nada)
-  pack items <id> [--hide <item>…] [--show <item>…]
-        (items oculta o muestra playbooks y scripts de un paquete instalado: solo quita de las listas, el ID se sigue
-         resolviendo y los trabajos lo pueden pedir; lo oculto sobrevive a las versiones nuevas y se borra con el paquete)
+const help = `  pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM]...  |  pack list  |  pack show <id>  |  pack remove <id>
         (paquetes de contenido: playbooks y scripts por tecnología; se bajan a mano de los releases y nada se descarga solo.
          Un paquete sin firma oficial es de terceros y solo se instala con --allow-unsigned; trae únicamente comandos de lectura.
-         remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README)`
+         remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README.
+         --hide ITEM instala el paquete con ese playbook o script oculto, y se repite)
+  pack inspect <archivo.mpack> [--allow-unsigned]
+        (vista previa de install: valida el paquete y muestra qué trae y qué reemplazaría, sin instalar nada)
+  pack items <id> [--hide ITEM]... [--show ITEM]...
+        (oculta o muestra playbooks y scripts de un paquete instalado: solo quita de las listas, el ID se sigue
+         resolviendo y los trabajos lo pueden pedir; lo oculto sobrevive a las versiones nuevas y se borra con el paquete)`
 
 func origin(p *v1.PackInfo) string {
 	if p.Official {
@@ -50,7 +51,7 @@ func install(c *cli.Env, args []string) error {
 		fs.Var(&hide, "hide", "ID de playbook o script que queda oculto (se repite)")
 	})
 	if err != nil || fs.NArg() != 1 {
-		return errors.New("uso: mctl pack install <archivo.mpack> [--allow-unsigned] [--hide <item>…]")
+		return errors.New("uso: mctl pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM ...]")
 	}
 	path, err := filepath.Abs(fs.Arg(0))
 	if err != nil {
@@ -105,7 +106,7 @@ func items(c *cli.Env, args []string) error {
 		fs.Var(&show, "show", "ID de playbook o script que se vuelve a mostrar (se repite)")
 	})
 	if err != nil || fs.NArg() != 1 || len(hide)+len(show) == 0 {
-		return errors.New("uso: mctl pack items <id> [--hide <item>…] [--show <item>…]")
+		return errors.New("uso: mctl pack items <id> [--hide ITEM ...] [--show ITEM ...]")
 	}
 	r, err := v1.NewPackServiceClient(c.Conn).SetItems(context.Background(), &v1.PackServiceSetItemsRequest{PackId: fs.Arg(0), Hide: hide, Show: show})
 	if err != nil {

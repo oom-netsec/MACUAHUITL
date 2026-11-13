@@ -315,7 +315,7 @@ type Result struct {
 }
 
 // check hace los pasos 2 a 7 del ADR sobre bytes ya leídos y devuelve el paquete y el instalado que reemplazaría
-// (nil si es nuevo). Con el error, el paquete viaja igual si ya se pudo leer. Quien llama sostiene s.mu.
+// (nil si es nuevo). Con el error, el paquete viaja igual si ya se pudo leer. Install lo llama con s.mu; Inspect sin él.
 func (s *Store) check(data []byte, allowUnsigned bool) (p, old *Pack, cur *Snapshot, err error) {
 	if p, err = Verify(data, s.core, s.keys); err != nil {
 		return nil, nil, nil, err
@@ -343,9 +343,7 @@ func (s *Store) check(data []byte, allowUnsigned bool) (p, old *Pack, cur *Snaps
 
 // Inspect valida el paquete igual que Install (mismos pasos y mismos errores) sin instalar nada: no toca el disco
 // ni la foto vigente. Devuelve el paquete y la versión que reemplazaría.
-func (s *Store) Inspect(data []byte, allowUnsigned bool) (*Result, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *Store) Inspect(data []byte, allowUnsigned bool) (*Result, error) { // sin s.mu: la foto es atómica y no escribe
 	p, old, _, err := s.check(data, allowUnsigned)
 	if err != nil {
 		if p == nil {

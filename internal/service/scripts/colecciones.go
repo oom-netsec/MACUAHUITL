@@ -357,7 +357,7 @@ func (s *svc) prunePins(ctx context.Context, tx *sql.Tx) error {
 }
 
 // splitPins separa los fijados guardados en visibles y ocultos: un «lib-*» retenido de un paquete que no está instalado
-// no resuelve a ningún script (ListPinned no lo muestra). Los ocultos no cuentan para el tope ni para reordenar, y se
+// no resuelve a ningún script y uno oculto por el usuario no se muestra (ListPinned no los muestra). Los ocultos no cuentan para el tope ni para reordenar, y se
 // conservan en la base, al final, hasta que se instale el paquete.
 func (s *svc) splitPins(pins []string) (visible, hidden []string, err error) {
 	lib, err := s.library()
@@ -368,8 +368,12 @@ func (s *svc) splitPins(pins []string) (visible, hidden []string, err error) {
 	for _, x := range lib {
 		have[x.ID] = true
 	}
+	_, ocultos, err := s.hiddenSets() // los que un paquete tiene oculto tampoco cuentan: no se ven ni se pueden reordenar
+	if err != nil {
+		return nil, nil, err
+	}
 	for _, id := range pins {
-		if dom.IsLib(id) && !have[id] {
+		if dom.IsLib(id) && !have[id] || ocultos[id] {
 			hidden = append(hidden, id)
 		} else {
 			visible = append(visible, id)

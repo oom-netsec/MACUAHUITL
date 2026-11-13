@@ -43,23 +43,28 @@ type pending struct {
 
 type svc struct {
 	v1.UnimplementedScriptsServiceServer
-	d      service.Deps
-	now    func() time.Time // nil = d.Now; las pruebas lo fijan para vencer tokens
-	packs  *pack.Store      // paquetes instalados; nil = solo la biblioteca base
-	libMu  sync.Mutex
-	libFor *pack.Snapshot // foto de paquetes con la que se armó lib; una foto nueva (instalar o quitar) invalida la caché
-	lib    []dom.Script
-	libEN  map[string]dom.Texto
-	libErr error
-	pend   service.Pending[pending]
+	d       service.Deps
+	now     func() time.Time       // nil = d.Now; las pruebas lo fijan para vencer tokens
+	packs   *pack.Store            // paquetes instalados; nil = solo la biblioteca base
+	userIDs func() map[string]bool // IDs de playbook de <config>/playbooks; puede ser nil
+	libMu   sync.Mutex
+	libFor  *pack.Snapshot // foto de paquetes con la que se armó lib; una foto nueva (instalar o quitar) invalida la caché
+	lib     []dom.Script
+	libEN   map[string]dom.Texto
+	libErr  error
+	pend    service.Pending[pending]
 }
 
 // Module registra el servicio de scripts. Packs es el almacén de paquetes de contenido, de donde salen los scripts
 // de la biblioteca que no vienen en el binario; puede ser nil.
-type Module struct{ Packs *pack.Store }
+// UserIDs da los IDs de playbook de <config>/playbooks (los que tapan a los de un paquete); puede ser nil.
+type Module struct {
+	Packs   *pack.Store
+	UserIDs func() map[string]bool
+}
 
 func (m Module) Register(s ipc.Registrar, d service.Deps) {
-	v1.RegisterScriptsServiceServer(s, &svc{d: d, packs: m.Packs})
+	v1.RegisterScriptsServiceServer(s, &svc{d: d, packs: m.Packs, userIDs: m.UserIDs})
 }
 
 func (s *svc) clock() time.Time {
@@ -110,7 +115,11 @@ func (s *svc) hiddenSets() (pbs, ids map[string]bool, err error) {
 	if s.packs == nil {
 		return map[string]bool{}, map[string]bool{}, nil
 	}
-	return pack.HiddenSets(s.d.DB(), s.packs.Snapshot())
+	var shadowed map[string]bool
+	if s.userIDs != nil {
+		shadowed = s.userIDs()
+	}
+	return pack.HiddenSets(s.d.DB(), s.packs.Snapshot(), shadowed)
 }
 
 // in da el script en el idioma de la llamada: los de fábrica con su nombre y descripción en inglés; los del usuario, tal cual.

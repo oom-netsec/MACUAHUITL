@@ -1201,7 +1201,11 @@ Spec: ADR 0010, «Selección por elemento y paquete personal». Aquí solo lo qu
 - `PackInfo.hidden` (`hidden` en `PackInfoDTO`, siempre arreglo): IDs de playbook o de script del paquete que el usuario ocultó, ordenados. Viene en `PackList`, `PackShow`, `PackInstall` y `PackSetItems`.
 - `PackSetItems(packId, hide[], show[])` → `PackInfoDTO`. Un ID que no es playbook ni script del paquete, o que viene en `hide` y `show` a la vez, falla con `pack.err.item` (`id`, `pack`; InvalidArgument). Un paquete no instalado, `pack.err.not_found`.
 - `PackInstallHiding(path, allowUnsigned, hide[])`: igual que `PackInstall` (que se queda con su firma de siempre) pero deja ocultos al instalar los IDs de `hide`; los que el paquete no trae se ignoran. El diálogo de instalación lista playbooks y scripts con casillas y manda como `hide` lo desmarcado. Para listar los IDs antes de instalar, la vista previa de un `.mpack` no existe aún: hoy el diálogo puede mostrar la lista tras instalar y llamar `PackSetItems`.
-- Ocultar un playbook oculta también su script `lib-<id>`; ocultar solo el script no toca al playbook.
+- Ocultar un playbook oculta también su script `lib-<id>`; ocultar solo el script no toca al playbook. Mostrar un `lib-<id>` cuyo playbook sigue oculto no tiene efecto: hay que mostrar el playbook.
+- Un playbook del paquete que uno de `<config>/playbooks` tapa (`PackInfo.shadowed`) no se oculta: lo que se vería es el del usuario. La fila se guarda, pero no filtra ni a él ni a su `lib-<id>`.
+- `SetItems` con `hide` y `show` vacíos falla con `pack.err.item`, y solo audita (`pack.items`) si cambió algo de verdad.
+- Un fijado de la terminal cuyo script está oculto no cuenta para el tope de fijados ni para `ReorderPinned` (se manda la lista de los visibles, que es la que devuelve `ListPinned`); se conserva y vuelve al mostrarlo.
+- La elección se limpia al instalar: una instalación nueva parte sin ocultos y una versión nueva borra las filas de IDs que ya no trae (si una versión posterior lo vuelve a traer, entra visible).
 - Qué filtra: `ListPlaybooks` (Patrol), `ListScripts` y `ListPinned`. Qué no: `GetScript`, la resolución por ID (`CreateJob`, `mctl`), los trabajos guardados y programados, y las colecciones: éstas siguen devolviendo el ID en `scriptIds` y lo repiten en `Collection.hiddenScriptIds` (`CollectionDTO.hiddenScriptIds`, siempre arreglo) para que la vista lo marque como oculto.
 - La elección sobrevive a una versión nueva del paquete (un ID nuevo entra visible; uno que la versión quitó deja de contar) y se borra al quitar el paquete.
 - Auditoría (inglés): `pack.items` con `hidden=<n> shown=<n>` (`at=install` si vino de `hide[]`).
@@ -1223,4 +1227,4 @@ Spec: ADR 0010, «Selección por elemento y paquete personal». Aquí solo lo qu
 | `scripts.svc.not_from_pack` | `id` | InvalidArgument |
 
 ### CLI
-`mctl pack inspect <archivo.mpack> [--allow-unsigned]`, `mctl pack items <id> [--hide <item>…] [--show <item>…]`, `mctl pack install … --hide <item>…`, `mctl scripts copy <id>`; `pack list` marca cuántos ocultos y `pack show` los lista.
+`mctl pack inspect <archivo.mpack> [--allow-unsigned]`, `mctl pack items <id> [--hide ITEM]... [--show ITEM]...`, `mctl pack install … [--hide ITEM]...`, `mctl scripts copy <id>`; `pack list` marca cuántos ocultos y `pack show` los lista.

@@ -179,13 +179,14 @@ uso: mctl <comando>
   prefs show [--json]  |  prefs set [--outputs DIR] [--rotate-mb N] [--rotate-min N] [--max-files N] [--format F]
         (set cambia solo lo que se pide; 0 o "" devuelve ese valor al de fábrica. La carpeta debe ser absoluta, existir, ser tuya, escribible y de modo 0700;
          aplica a lo que empiece después y los datos de la anterior no se mueven. rotate-mb 1-1024, rotate-min 1-10080, max-files 1-1000, format texto|crudo|jsonl)
-  pack install <archivo.mpack> [--allow-unsigned] [--hide <item>…]  |  pack list  |  pack show <id>  |  pack remove <id>
-  pack inspect <archivo.mpack> [--allow-unsigned]
-        (vista previa de install: valida el paquete y muestra qué trae y qué reemplazaría, sin instalar nada)
-  pack items <id> [--hide <item>…] [--show <item>…]
-        (items oculta o muestra playbooks y scripts de un paquete instalado: solo quita de las listas, el ID se sigue
-         resolviendo y los trabajos lo pueden pedir; lo oculto sobrevive a las versiones nuevas y se borra con el paquete)
+  pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM]...  |  pack list  |  pack show <id>  |  pack remove <id>
         (paquetes de contenido: playbooks y scripts por tecnología; se bajan a mano de los releases y nada se descarga solo.
          Un paquete sin firma oficial es de terceros y solo se instala con --allow-unsigned; trae únicamente comandos de lectura.
-         remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README)
+         remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README.
+         --hide ITEM instala el paquete con ese playbook o script oculto, y se repite)
+  pack inspect <archivo.mpack> [--allow-unsigned]
+        (vista previa de install: valida el paquete y muestra qué trae y qué reemplazaría, sin instalar nada)
+  pack items <id> [--hide ITEM]... [--show ITEM]...
+        (oculta o muestra playbooks y scripts de un paquete instalado: solo quita de las listas, el ID se sigue
+         resolviendo y los trabajos lo pueden pedir; lo oculto sobrevive a las versiones nuevas y se borra con el paquete)
   --version

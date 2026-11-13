@@ -330,7 +330,7 @@ func TestPackTerceroNoOcupaIDsMovidos(t *testing.T) {
 }
 
 // ioSXEVersion es oom/ios-xe del repo con otra versión, firmado con la llave de pruebas.
-func ioSXEVersion(t *testing.T, v string) []byte {
+func ioSXEVersion(t *testing.T, v string, sin ...string) []byte {
 	t.Helper()
 	files, err := pack.ReadSource(filepath.Join(packtest.RepoDir(), "packs", "ios-xe"))
 	if err != nil {
@@ -338,6 +338,9 @@ func ioSXEVersion(t *testing.T, v string) []byte {
 	}
 	m := string(files["manifest.yaml"])
 	files["manifest.yaml"] = []byte(strings.Replace(m, "version: 1.1.0", "version: "+v, 1))
+	for _, f := range sin { // archivos de playbook que esta versión ya no trae
+		delete(files, f)
+	}
 	pack.Sign(files, packtest.Private())
 	b, err := pack.Zip(files)
 	if err != nil {
@@ -562,5 +565,118 @@ func TestPackInspectNoInstala(t *testing.T) {
 	rn, _ = reasonOf(ein)
 	if ri == "" || ri != rn {
 		t.Fatalf("inspect %v / install %v", ei, ein)
+	}
+}
+
+// Un fijado cuyo script está oculto no cuenta para el tope ni estorba al reordenar los visibles.
+func TestPackFijadoOcultoNoEstorba(t *testing.T) {
+	h := newHarness(t, nil)
+	h.installIOSXE(t)
+	sc := v1.NewScriptsServiceClient(h.conn)
+	if _, err := sc.SetPinned(ctx(t), &v1.SetPinnedRequest{Id: "lib-l2-stp", Pinned: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v1.NewPackServiceClient(h.conn).SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l2-stp"}}); err != nil {
+		t.Fatal(err)
+	}
+	vis := []string{"lib-tac-baseline", "lib-l1-poe", "lib-l1-flapping", "lib-cpu-alta", "lib-flota"}
+	for _, id := range vis { // 5 visibles = el tope, con el oculto fuera de la cuenta
+		if _, err := sc.SetPinned(ctx(t), &v1.SetPinnedRequest{Id: id, Pinned: true}); err != nil {
+			t.Fatalf("fijar %s: %v", id, err)
+		}
+	}
+	if _, err := sc.SetPinned(ctx(t), &v1.SetPinnedRequest{Id: "lib-l1-err-disabled", Pinned: true}); err == nil {
+		t.Fatal("el sexto visible debía pasar el tope")
+	}
+	rev := []string{vis[4], vis[3], vis[2], vis[1], vis[0]}
+	if _, err := sc.ReorderPinned(ctx(t), &v1.ReorderPinnedRequest{Ids: rev}); err != nil {
+		t.Fatalf("reordenar los visibles: %v", err)
+	}
+	lp, err := sc.ListPinned(ctx(t), &v1.ListPinnedRequest{})
+	if err != nil || len(lp.Scripts) != 5 || lp.Scripts[0].Id != vis[4] {
+		t.Fatalf("%+v %v", lp, err)
+	}
+	// Se puede desfijar el oculto.
+	if _, err := sc.SetPinned(ctx(t), &v1.SetPinnedRequest{Id: "lib-l2-stp", Pinned: false}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Ocultar un playbook del paquete que uno de <config>/playbooks tapa no oculta el del usuario ni su lib-; copiar
+// copia el script del paquete.
+func TestPackOcultarNoTapaAlDelUsuario(t *testing.T) {
+	h := newHarness(t, nil)
+	h.installIOSXE(t)
+	dir := filepath.Join(h.p.Config, "playbooks")
+	os.MkdirAll(dir, 0o700)
+	y := "id: l2-stp\nplatform: ios-xe\nname: Mío · STP\ncommands:\n  - cmd: show clock\n"
+	if err := os.WriteFile(filepath.Join(dir, "mio.yaml"), []byte(y), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h.restart(t)
+	if _, err := v1.NewPackServiceClient(h.conn).SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l2-stp"}}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") || !slices.Contains(h.scriptIDs(t), "lib-l2-stp") {
+		t.Fatal("ocultar el del paquete ocultó el del usuario o su lib-")
+	}
+	c, err := v1.NewScriptsServiceClient(h.conn).CopyFromPack(ctx(t), &v1.CopyFromPackRequest{Id: "lib-l2-stp"})
+	if err != nil || strings.Contains(c.Script.Name, "Mío") || !slices.Contains(c.Script.Commands, "show spanning-tree summary") {
+		t.Fatalf("debía copiar el script del paquete: %+v %v", c, err)
+	}
+}
+
+// Las filas de IDs que una versión quitó no se heredan: si una versión posterior lo vuelve a traer entra visible; y
+// una instalación nueva no hereda filas viejas.
+func TestPackOcultosNoSeHeredan(t *testing.T) {
+	h := newHarness(t, nil)
+	h.installIOSXE(t)
+	pk := v1.NewPackServiceClient(h.conn)
+	if _, err := pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l1-poe"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1", "playbooks/l1-poe.yaml"))}); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	h.core.db.QueryRow(`SELECT count(*) FROM pack_hidden`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("la v2 sin el ID debía borrar su fila: %d", n)
+	}
+	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.2"))}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(h.playbookIDs(t), "ios-xe/l1-poe") {
+		t.Fatal("el ID que vuelve en la v3 debía entrar visible")
+	}
+	// Fila vieja de una instalación anterior: una instalación nueva parte de cero.
+	if _, err := pk.Remove(ctx(t), &v1.PackServiceRemoveRequest{Id: "oom/ios-xe"}); err != nil {
+		t.Fatal(err)
+	}
+	h.core.db.Exec(`INSERT INTO pack_hidden(pack, item_id) VALUES('oom/ios-xe', 'ios-xe/l1-poe')`)
+	h.installIOSXE(t)
+	if !slices.Contains(h.playbookIDs(t), "ios-xe/l1-poe") {
+		t.Fatal("reinstalar heredó lo oculto")
+	}
+}
+
+// SetItems sin nada que cambiar da pack.err.item y no audita; repetir lo mismo tampoco audita.
+func TestPackSetItemsAuditaSoloCambios(t *testing.T) {
+	h := newHarness(t, nil)
+	h.installIOSXE(t)
+	pk := v1.NewPackServiceClient(h.conn)
+	if _, err := pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe"}); err == nil {
+		t.Fatal("hide y show vacíos debían fallar")
+	} else if r, _ := reasonOf(err); r != "pack.err.item" {
+		t.Fatalf("%v", err)
+	}
+	for i := 0; i < 3; i++ {
+		if _, err := pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l1-poe"}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Show: []string{"ios-xe/l1-flapping"}}) // no estaba oculto
+	if got := strings.Count(h.auditText(t), `"action":"pack.items"`); got != 1 {
+		t.Fatalf("pack.items = %d, want 1", got)
 	}
 }

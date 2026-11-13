@@ -104,14 +104,15 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		detail += " min_core_unchecked=true"
 	}
 	s.d.Audit("pack.install", p.ID, detail)
-	// Lo ya oculto de una versión anterior se conserva; los IDs de hide que el paquete no trae se ignoran.
+	// En una sola transacción: una instalación nueva parte sin ocultos, una versión nueva conserva lo oculto que sigue
+	// existiendo, y se aplica hide (los IDs que el paquete no trae se ignoran).
 	var hide []string
 	for _, id := range r.GetHide() {
 		if p.HasItem(id) {
 			hide = append(hide, id)
 		}
 	}
-	if err := dom.SetHidden(s.d.DB(), p.ID, hide, nil); err != nil {
+	if err := s.applyInstallHidden(p, res.Replaced == "", hide); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if len(hide) > 0 {
@@ -151,6 +152,21 @@ func (s *svc) Inspect(ctx context.Context, r *v1.PackServiceInspectRequest) (*v1
 		out.PlaybookIds = append(out.PlaybookIds, pb.ID)
 	}
 	return out, nil
+}
+
+func (s *svc) applyInstallHidden(p *dom.Pack, fresh bool, hide []string) error {
+	tx, err := s.d.DB().Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := dom.ResetHidden(tx, p, fresh); err != nil {
+		return err
+	}
+	if _, err := dom.SetHidden(tx, p.ID, hide, nil); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *svc) List(ctx context.Context, _ *v1.PackServiceListRequest) (*v1.PackServiceListResponse, error) {
@@ -236,6 +252,9 @@ func (s *svc) SetItems(ctx context.Context, r *v1.PackServiceSetItemsRequest) (*
 	if p == nil {
 		return nil, fail(ctx, dom.NotFound(r.GetPackId()))
 	}
+	if len(r.GetHide())+len(r.GetShow()) == 0 {
+		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.item", i18n.A("id", "", "pack", p.ID))
+	}
 	for _, id := range append(slices.Clone(r.GetHide()), r.GetShow()...) {
 		if !p.HasItem(id) || slices.Contains(r.GetHide(), id) && slices.Contains(r.GetShow(), id) {
 			return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.item", i18n.A("id", id, "pack", p.ID))
@@ -246,13 +265,16 @@ func (s *svc) SetItems(ctx context.Context, r *v1.PackServiceSetItemsRequest) (*
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	defer tx.Rollback()
-	if err := dom.SetHidden(tx, p.ID, r.GetHide(), r.GetShow()); err != nil {
+	changed, err := dom.SetHidden(tx, p.ID, r.GetHide(), r.GetShow())
+	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=%d", p.ID, len(r.GetHide()), len(r.GetShow())))
+	if changed > 0 { // solo cambios reales
+		s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=%d", p.ID, len(r.GetHide()), len(r.GetShow())))
+	}
 	i, err := s.info(p)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

@@ -540,7 +540,7 @@ func (s *patrolSvc) ListPlaybooks(ctx context.Context, r *v1.ListPlaybooksReques
 	if r.GetPlatform() != "" {
 		pbs = playbook.Visible(r.GetPlatform(), pbs) // ios lista los de ios-xe que oom/ios no reemplaza
 	}
-	hidden, _, err := pack.HiddenSets(s.c.db, s.c.packs.Snapshot()) // ocultos: fuera de la lista; CreateJob los sigue resolviendo
+	hidden, _, err := pack.HiddenSets(s.c.db, s.c.packs.Snapshot(), s.c.userIDs()) // ocultos: fuera de la lista; CreateJob los sigue resolviendo
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
