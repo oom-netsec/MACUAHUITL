@@ -259,7 +259,11 @@ func TestFlotaRegresionEs(t *testing.T) {
 		names = append(names, n)
 	}
 	slices.Sort(names)
+	age := regexp.MustCompile(`hace \d+ d`) // la antigüedad sale del reloj real: el golden no puede fijarla
 	for _, n := range names {
+		b, w := base[n], want[n]
+		b.Text, w.Text = age.ReplaceAllString(b.Text, "hace N d"), age.ReplaceAllString(w.Text, "hace N d")
+		base[n], want[n] = b, w
 		if n == "compliance.plantilla.debil.txt" { // la fase 30c también oculta la comunidad de snmp-server: es lo único que cambia
 			w := want[n]
 			re := regexp.MustCompile(`(snmp-server community) [A-Za-z0-9_-]+`)
