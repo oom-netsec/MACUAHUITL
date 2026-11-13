@@ -286,15 +286,17 @@ func paramsOf(p *playbook.Playbook, vals map[string]string) map[string]string {
 func checkParams(s Spec, pbs []playbook.Playbook) error {
 	owned := map[string]bool{}
 	for _, id := range s.PlaybookIDs {
-		p := find(pbs, id)
-		if p == nil {
-			continue
-		}
-		if _, err := p.Expand(paramsOf(p, s.Params)); err != nil {
-			return err
-		}
-		for _, q := range p.Params {
-			owned[q.Name] = true
+		// como ValidateWith: el propio y su gemelo ios/ios-xe son candidatos
+		for _, p := range []*playbook.Playbook{find(pbs, id), playbook.Twin(pbs, id, "ios"), playbook.Twin(pbs, id, "ios-xe")} {
+			if p == nil {
+				continue
+			}
+			if _, err := p.Expand(paramsOf(p, s.Params)); err != nil {
+				return err
+			}
+			for _, q := range p.Params {
+				owned[q.Name] = true
+			}
 		}
 	}
 	for _, k := range slices.Sorted(maps.Keys(s.Params)) {

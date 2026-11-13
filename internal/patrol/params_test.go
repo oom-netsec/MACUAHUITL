@@ -70,3 +70,20 @@ func TestSpecParamsJSON(t *testing.T) {
 		t.Fatal(err, s.Params)
 	}
 }
+
+// ios/cli solo existe por su gemelo ios-xe/cli: la MAC va al gemelo y no es param_unknown.
+func TestValidateWithParamsGemelo(t *testing.T) {
+	pbs := pbConMAC()
+	s := specParams(t, []string{"ios/cli"}, map[string]string{"mac": "AA:BB:CC:DD:EE:FF"})
+	if err := ValidateWith(s, pbs, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	s = specParams(t, []string{"ios/cli"}, nil)
+	if err := ValidateWith(s, pbs, nil, nil); err == nil {
+		t.Fatal("falta el dato del gemelo y pasó")
+	}
+	s = specParams(t, []string{"ios/cli"}, map[string]string{"mac": "mal"})
+	if err := ValidateWith(s, pbs, nil, nil); err == nil {
+		t.Fatal("dato inválido pasó")
+	}
+}
