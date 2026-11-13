@@ -541,7 +541,7 @@ func (s *patrolSvc) ListPlaybooks(ctx context.Context, r *v1.ListPlaybooksReques
 		pbs = playbook.Visible(r.GetPlatform(), pbs) // ios lista los de ios-xe que oom/ios no reemplaza
 	}
 	var hidden map[string]bool
-	if s.c.packs != nil { // sin almacén de paquetes (núcleo mínimo de prueba) no hay nada oculto
+	if s.c.packs != nil && s.c.db != nil { // sin almacén o sin base (núcleo mínimo de prueba) no hay nada oculto
 		h, _, err := pack.HiddenSets(s.c.db, s.c.packs.Snapshot(), s.c.userIDs()) // ocultos: fuera de la lista; CreateJob los sigue resolviendo
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
