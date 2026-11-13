@@ -230,7 +230,7 @@ func TestKeepaliveActivityDeCanalPropio(t *testing.T) {
 			}
 		}
 	}()
-	go keepaliveLoop(20*time.Millisecond, func() error { select {} }, s.rx.Load, func() { close(closed) }, stop)
+	go keepaliveLoop(20*time.Millisecond, func() error { <-stop; return nil }, s.rx.Load, func() { close(closed) }, stop)
 	select {
 	case <-closed:
 		t.Fatal("cerró con un canal que progresa")
