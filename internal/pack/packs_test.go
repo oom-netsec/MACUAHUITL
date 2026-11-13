@@ -76,9 +76,10 @@ func TestIOSEIOSXEConviven(t *testing.T) {
 		}
 	}
 	for _, n := range []string{"ios-xe", "ios"} {
+		files, _ := filepath.Glob(filepath.Join(packtest.RepoDir(), "packs", n, "playbooks", "*.yaml"))
 		p := st.Snapshot().Find("oom/" + n)
-		if p == nil || len(p.Playbooks) != 52 {
-			t.Fatalf("oom/%s: deben quedar instalados sus 52 playbooks: %v", n, p)
+		if p == nil || len(files) == 0 || len(p.Playbooks) != len(files) {
+			t.Fatalf("oom/%s: deben quedar instalados sus %d playbooks", n, len(files))
 		}
 		for _, pb := range p.Playbooks {
 			if pb.Platform != n || !strings.HasPrefix(pb.ID, n+"/") {
