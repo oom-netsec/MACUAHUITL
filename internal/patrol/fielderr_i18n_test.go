@@ -1,6 +1,7 @@
 package patrol
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
@@ -18,5 +19,8 @@ func TestFieldErrOfConCausa(t *testing.T) {
 	}
 	if fe.Reason() != "playbook.err.denied_cmd" || fe.Metadata()["field"] != "custom_commands" || fe.Metadata()["cmd"] != "configure terminal" {
 		t.Errorf("reason %q metadata %v", fe.Reason(), fe.Metadata())
+	}
+	if cr := fe.Metadata()["cause_reason"]; !strings.HasPrefix(cr, "playbook.why.") {
+		t.Errorf("sin cause_reason: %v", fe.Metadata())
 	}
 }

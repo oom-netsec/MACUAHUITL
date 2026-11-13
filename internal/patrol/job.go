@@ -109,6 +109,7 @@ func (d Deps) driver() platform.Driver {
 type FieldError struct {
 	Field, Msg string
 	T          i18n.Text
+	Cause      *i18n.Error // si el error viene del catálogo con causa: su metadata (con cause_reason) es la del campo
 }
 
 func (e *FieldError) Error() string { return "patrol: " + e.Field + ": " + e.Msg }
@@ -119,8 +120,13 @@ func (e *FieldError) Reason() string {
 }
 
 func (e *FieldError) Metadata() map[string]string {
-	key, args := e.T.KeyArgs()
-	m := i18n.Metadata(key, args)
+	var m map[string]string
+	if e.Cause != nil {
+		m = e.Cause.Metadata()
+	} else {
+		key, args := e.T.KeyArgs()
+		m = i18n.Metadata(key, args)
+	}
 	m["field"] = e.Field
 	return m
 }
@@ -139,7 +145,7 @@ func fieldErrOf(f string, err error) error {
 	if errors.As(err, &ie) && ie.Error() == err.Error() { // solo si el error es el del catálogo, sin envoltorio propio
 		if ie.Cause != nil { // con causa, el texto se arma con ella (en el idioma pedido) y no solo con el código
 			t := i18n.FromErr(ie)
-			return &FieldError{Field: f, Msg: t.In(i18n.Es), T: t}
+			return &FieldError{Field: f, Msg: t.In(i18n.Es), T: t, Cause: ie}
 		}
 		return fieldErr(f, ie.Code, kvOf(ie.Args)...)
 	}
