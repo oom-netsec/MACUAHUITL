@@ -213,19 +213,18 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 		case <-quiet:
 			select { // llegó un pedazo justo al vencer el plazo: cuenta como actividad
 			case c, ok := <-d.chunks:
-				if ok {
-					d.buf = append(d.buf, c...)
-					timer.Reset(idle)
-					continue
+				if !ok {
+					return d.closedErr()
 				}
+				d.buf = append(d.buf, c...)
+				timer.Reset(idle)
+				continue
 			default:
 			}
 			return clean(string(d.buf)), platform.ErrPromptTimeout
 		case c, ok := <-d.chunks:
 			if !ok {
-				err := <-d.readErr
-				d.readErr <- err
-				return clean(string(d.buf)), fmt.Errorf("%w: %v", platform.ErrClosed, err)
+				return d.closedErr()
 			}
 			d.buf = append(d.buf, c...)
 			if timer != nil {
@@ -233,6 +232,13 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 			}
 		}
 	}
+}
+
+// closedErr: el lector del shell terminó; se devuelve lo que había y la causa del cierre.
+func (d *driver) closedErr() (string, error) {
+	err := <-d.readErr
+	d.readErr <- err
+	return clean(string(d.buf)), fmt.Errorf("%w: %v", platform.ErrClosed, err)
 }
 
 func clean(s string) string {

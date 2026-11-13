@@ -235,3 +235,17 @@ func TestSalidaGrandeSoloRevisaLaCola(t *testing.T) {
 		t.Errorf("salida: %d bytes, quiero %d", len(text), len(want))
 	}
 }
+
+// Si al vencer el plazo el canal de pedazos ya está cerrado, el error es el cierre de la sesión, no un timeout.
+// Con ambos casos listos el select elige al azar, por eso se repite.
+func TestPlazoConCanalCerradoDaErrClosed(t *testing.T) {
+	for range 200 {
+		d := &driver{w: io.Discard, chunks: make(chan []byte), readErr: make(chan error, 1), quit: make(chan struct{}), hostname: "SW"}
+		d.readErr <- io.EOF
+		close(d.chunks)
+		_, err := d.untilIdle(context.Background(), time.Nanosecond, func(string) bool { return false })
+		if !errors.Is(err, platform.ErrClosed) {
+			t.Fatalf("err = %v, quiero ErrClosed", err)
+		}
+	}
+}
