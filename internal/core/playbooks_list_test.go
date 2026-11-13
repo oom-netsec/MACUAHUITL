@@ -55,6 +55,14 @@ func TestListPlaybooks(t *testing.T) {
 	if len(none.Playbooks) != 0 {
 		t.Fatalf("junos = %v", ids(none))
 	}
+
+	// Con oom/ios instalado, un IOS clásico ve ios/alfa y ya no el ios-xe/alfa repetido; ios-xe/zeta sigue.
+	pbs := append(*s.c.pbs.Load(), playbook.Playbook{ID: "ios/alfa", Platform: "ios", Name: "A (IOS)"})
+	s.c.pbs.Store(&pbs)
+	ios, _ := s.ListPlaybooks(context.Background(), &v1.ListPlaybooksRequest{Platform: "ios"})
+	if got := ids(ios); !reflect.DeepEqual(got, []string{"ios-xe/zeta", "ios/alfa"}) {
+		t.Fatalf("ios = %v", got)
+	}
 }
 
 // Con el catálogo real embebido: ids con la forma que acepta CreateJob y comandos presentes.

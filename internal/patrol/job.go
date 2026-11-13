@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/robfig/cron/v3"
@@ -247,6 +248,8 @@ func find(pbs []playbook.Playbook, id string) *playbook.Playbook {
 	return nil
 }
 
+func iosFamily(p string) bool { return p == "ios" || p == "ios-xe" }
+
 // commands arma la lista para la plataforma detectada: playbooks elegidos y luego los pegados. Los comandos
 // marcados para otras plataformas (platforms:) no entran; skipped trae su texto, para anotarlo en el manifest.
 func commands(s Spec, detected string, pbs []playbook.Playbook, missing func(string) string) (out []playbook.Command, skipped []string, err error) {
@@ -254,6 +257,11 @@ func commands(s Spec, detected string, pbs []playbook.Playbook, missing func(str
 		p := find(pbs, id)
 		if p == nil {
 			return nil, nil, noPlaybook(id, missing)
+		}
+		if iosFamily(detected) && iosFamily(p.Platform) { // flota mixta: ios/x en IOS clásico, ios-xe/x en IOS-XE
+			if twin := find(pbs, detected+"/"+strings.TrimPrefix(p.ID, p.Platform+"/")); twin != nil {
+				p = twin
+			}
 		}
 		if !playbook.Compatible(detected, p.Platform) {
 			return nil, nil, i18n.New("patrol.err.playbook_platform", i18n.A("id", id, "platform", p.Platform, "detected", detected))

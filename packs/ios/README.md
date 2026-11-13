@@ -7,7 +7,10 @@ Paquete oficial con los playbooks de diagnóstico de solo lectura para IOS clás
 los comandos que solo existen en IOS-XE (`show platform software/hardware fed`, `bootflash:`, licencias inteligentes) y
 con el equivalente clásico cuando existe (`show platform tcam utilization`, `show controllers cpu-interface`,
 `show license detail`). Los comandos vienen de la documentación pública de Cisco y están sin validar en laboratorio.
-Los scripts de biblioteca derivados llevan el prefijo `lib-ios-`, así que conviven con los de `oom/ios-xe`.
+Los scripts de biblioteca derivados llevan el prefijo `lib-ios-`, así que conviven con los de `oom/ios-xe`. Con los dos
+paquetes instalados, un equipo detectado como IOS clásico corre el playbook de este paquete aunque se haya elegido el
+de `oom/ios-xe` con el mismo nombre (y al revés en IOS-XE), así una ronda sobre una flota mixta usa en cada equipo sus
+comandos. Los comandos de switch (`mls qos`, `sdm`, `power inline`, stack) darán inválido en un ISR.
 
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
@@ -22,7 +25,10 @@ Official package with the read-only diagnostic playbooks for classic IOS 12.2/15
 without the commands that only exist on IOS-XE (`show platform software/hardware fed`, `bootflash:`, Smart Licensing)
 and with the classic equivalent where one exists (`show platform tcam utilization`, `show controllers cpu-interface`,
 `show license detail`). Commands come from Cisco's public documentation and are not yet validated in a lab.
-The derived library scripts use the `lib-ios-` prefix, so they coexist with those of `oom/ios-xe`.
+The derived library scripts use the `lib-ios-` prefix, so they coexist with those of `oom/ios-xe`. With both packages
+installed, a device detected as classic IOS runs this package's playbook even if the `oom/ios-xe` one with the same
+name was chosen (and the other way around on IOS-XE), so a round over a mixed fleet uses each device's own commands.
+Switch commands (`mls qos`, `sdm`, `power inline`, stack) will be invalid on an ISR.
 
 How to load it (the application never downloads packages):
 

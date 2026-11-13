@@ -75,8 +75,16 @@ func TestIOSEIOSXEConviven(t *testing.T) {
 			t.Fatalf("oom/%s: %v", n, err)
 		}
 	}
-	if st.Snapshot().Find("oom/ios") == nil || st.Snapshot().Find("oom/ios-xe") == nil {
-		t.Fatal("deben quedar instalados los dos")
+	for _, n := range []string{"ios-xe", "ios"} {
+		p := st.Snapshot().Find("oom/" + n)
+		if p == nil || len(p.Playbooks) != 52 {
+			t.Fatalf("oom/%s: deben quedar instalados sus 52 playbooks: %v", n, p)
+		}
+		for _, pb := range p.Playbooks {
+			if pb.Platform != n || !strings.HasPrefix(pb.ID, n+"/") {
+				t.Errorf("oom/%s: %s es de %s", n, pb.ID, pb.Platform)
+			}
+		}
 	}
 }
 

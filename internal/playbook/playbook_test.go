@@ -3,6 +3,7 @@ package playbook
 import (
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -173,5 +174,23 @@ func TestCompatible(t *testing.T) {
 		if got := Compatible(c.det, c.pb); got != c.ok {
 			t.Errorf("Compatible(%q, %q) = %v", c.det, c.pb, got)
 		}
+	}
+}
+
+// En un IOS clásico, el ios/<x> de oom/ios tapa al ios-xe/<x> del mismo nombre; el resto de ios-xe sigue visible.
+func TestVisibleIOSTapaIOSXE(t *testing.T) {
+	pbs := []Playbook{{ID: "ios-xe/cpu-alta", Platform: "ios-xe"}, {ID: "ios/cpu-alta", Platform: "ios"},
+		{ID: "ios-xe/pre-post", Platform: "ios-xe"}, {ID: "nx-os/cpu-alta", Platform: "nx-os"}}
+	ids := func(ps []Playbook) (out []string) {
+		for _, p := range ps {
+			out = append(out, p.ID)
+		}
+		return out
+	}
+	if got := ids(Visible("ios", pbs)); !slices.Equal(got, []string{"ios/cpu-alta", "ios-xe/pre-post"}) {
+		t.Errorf("ios: %v", got)
+	}
+	if got := ids(Visible("ios-xe", pbs)); !slices.Equal(got, []string{"ios-xe/cpu-alta", "ios-xe/pre-post"}) {
+		t.Errorf("ios-xe: %v", got)
 	}
 }

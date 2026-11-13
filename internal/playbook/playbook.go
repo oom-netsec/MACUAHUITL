@@ -39,6 +39,23 @@ func Compatible(detected, pbPlatform string) bool {
 	return detected == pbPlatform || (detected == "ios" && pbPlatform == "ios-xe")
 }
 
+// Visible son los playbooks compatibles con detected, sin repetir: en IOS clásico, ios/<x> tapa a ios-xe/<x>.
+func Visible(detected string, pbs []Playbook) []Playbook {
+	own := map[string]bool{}
+	for _, p := range pbs {
+		if p.Platform == detected {
+			own[strings.TrimPrefix(p.ID, p.Platform+"/")] = true
+		}
+	}
+	var out []Playbook
+	for _, p := range pbs {
+		if Compatible(detected, p.Platform) && (p.Platform == detected || !own[strings.TrimPrefix(p.ID, p.Platform+"/")]) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // knownPlatforms son las plataformas que un playbook puede nombrar en platforms: (las de playbooks/cisco).
 var knownPlatforms = []string{"ios", "ios-xe", "nx-os", "cat9k", "ftd", "ise", "sda", "wlc-9800", "wlc-aireos"}
 
