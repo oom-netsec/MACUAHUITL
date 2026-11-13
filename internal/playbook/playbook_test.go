@@ -102,12 +102,15 @@ func TestEphemeralID(t *testing.T) {
 func TestDenyVariants(t *testing.T) {
 	for _, c := range []string{"conf t", "  CONF T", "configure terminal", "config t", "wr", "write mem", "copy run start", "copy tftp: flash:",
 		"reload in 5", "clear counters", "debug ip packet", "undebug all", "delete flash:x", "erase startup-config", "format flash:",
-		"test cable-diagnostics tdr int gi1/0/1", "install add file x", "request platform software", "license boot level", "Reload"} {
+		"test cable-diagnostics tdr int gi1/0/1", "install add file x", "request platform software", "license boot level", "Reload",
+		"show logging profile wireless filter mac aaaa.bbbb.cccc to-file bootflash:ra.txt", "show logging process wncd to-file bootflash:x",
+		"sh log prof wir to-f flash:x", "SHOW LOG TO-FILE flash:x", "show tech to- flash:x", "show tech to-fi flash:x"} {
 		if err := CheckDenied("ios-xe", c); !errors.Is(err, ErrDenied) {
 			t.Errorf("%q not denied", c)
 		}
 	}
-	for _, c := range []string{"show running-config", "show clock", "show configuration", "dir flash:", "show debug", "show license"} {
+	for _, c := range []string{"show running-config", "show clock", "show configuration", "dir flash:", "show debug", "show license",
+		"show topology", "show spanning-tree top", "show spanning-tree topology detail"} {
 		if err := CheckDenied("ios-xe", c); err != nil {
 			t.Errorf("%q denied: %v", c, err)
 		}

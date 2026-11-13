@@ -81,6 +81,11 @@ func CheckDenied(platform, cmd string) error {
 	default:
 		return denied(cmd, "playbook.why.not_read")
 	}
+	for _, f := range fields {
+		if len(f) >= 3 && strings.HasPrefix(f, "to-") && strings.HasPrefix("to-file", f) { // show … to-file flash:x escribe
+			return denied(cmd, "playbook.why.to_file")
+		}
+	}
 	for i, seg := range segs[1:] {
 		f := strings.Fields(seg)
 		if len(f) == 0 {
