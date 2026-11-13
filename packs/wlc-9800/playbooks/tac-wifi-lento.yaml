@@ -9,7 +9,9 @@ name_en: TAC · Slow WiFi (general)
 commands:
   - cmd: show clock
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show ap dot11 24ghz summary
   - cmd: show ap dot11 5ghz summary
   - cmd: show ap dot11 24ghz cleanair air-quality worst

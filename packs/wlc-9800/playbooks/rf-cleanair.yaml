@@ -9,6 +9,7 @@ name_en: RF · CleanAir and interference
 commands:
   - cmd: show clock
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show ap dot11 24ghz cleanair config
   - cmd: show ap dot11 5ghz cleanair config
   - cmd: show ap dot11 24ghz cleanair air-quality summary

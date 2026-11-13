@@ -9,7 +9,7 @@ name_en: Mobility · Tunnels and statistics
 commands:
   - cmd: show clock
   - cmd: show wireless mobility summary
-  - cmd: show wireless statistics mobility
+  - cmd: show wireless stats mobility
   - cmd: show ip interface brief
   - cmd: show interfaces trunk
   - cmd: show logging | include MOBILITY|MM_|MOBILE

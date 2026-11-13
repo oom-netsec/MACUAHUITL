@@ -12,6 +12,7 @@ commands:
   - cmd: show install summary
   - cmd: show ap image
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show ap uptime
   - cmd: show wireless stats ap join summary
   - cmd: show file systems

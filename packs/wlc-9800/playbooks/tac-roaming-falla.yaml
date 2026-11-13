@@ -16,7 +16,7 @@ commands:
   - cmd: show wireless client mac-address {mac} mobility history
   - cmd: show wlan all
   - cmd: show wireless mobility summary
-  - cmd: show wireless statistics mobility
+  - cmd: show wireless stats mobility
   - cmd: show wireless stats client delete reasons
   - cmd: show ap dot11 5ghz network
   - cmd: show logging | include {mac}

@@ -13,6 +13,7 @@ commands:
   - cmd: show wireless stats client detail
   - cmd: show wireless stats client delete reasons
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show wireless mobility summary
   - cmd: show ap dot11 5ghz network
   - cmd: show ap dot11 24ghz network

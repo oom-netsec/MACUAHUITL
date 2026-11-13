@@ -12,6 +12,7 @@ commands:
   - cmd: show wireless tag site summary
   - cmd: show ap tag summary
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show wlan summary
   - cmd: show wireless profile policy summary
   - cmd: show running-config | section wireless profile flex

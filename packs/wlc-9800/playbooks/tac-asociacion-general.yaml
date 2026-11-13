@@ -9,10 +9,12 @@ name_en: TAC · Client association (general)
 commands:
   - cmd: show clock
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show wireless stats client delete reasons
   - cmd: show wireless stats client detail
   - cmd: show wireless exclusionlist
   - cmd: show wlan summary
   - cmd: show wireless profile policy summary
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show logging | include ASSOC|DOT11|CAPWAP

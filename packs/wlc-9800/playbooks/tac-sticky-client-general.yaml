@@ -9,6 +9,7 @@ name_en: TAC · Sticky client (general)
 commands:
   - cmd: show clock
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show wireless band-select
   - cmd: show wlan all
   - cmd: show ap rf-profile summary

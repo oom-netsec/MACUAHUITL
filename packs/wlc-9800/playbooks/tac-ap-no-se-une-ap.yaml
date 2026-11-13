@@ -12,6 +12,7 @@ params:
 commands:
   - cmd: show clock
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show ap name {ap} config general
   - cmd: show wireless stats ap join summary
   - cmd: show wireless stats ap discovery

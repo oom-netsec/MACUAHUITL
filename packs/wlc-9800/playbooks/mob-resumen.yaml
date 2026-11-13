@@ -9,10 +9,10 @@ name_en: Mobility · Group and status
 commands:
   - cmd: show clock
   - cmd: show wireless mobility summary
-  - cmd: show wireless statistics mobility
+  - cmd: show wireless stats mobility
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show ip interface brief
   - cmd: show running-config | section wireless mobility
     may_contain_secrets: true
-  - cmd: show wireless mobility
   - cmd: show wireless mobility controller ap

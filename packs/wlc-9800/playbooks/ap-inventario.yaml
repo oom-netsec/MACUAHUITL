@@ -9,6 +9,7 @@ name_en: AP · Inventory
 commands:
   - cmd: show clock
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show ap uptime
   - cmd: show ap tag summary
   - cmd: show ap dot11 24ghz summary

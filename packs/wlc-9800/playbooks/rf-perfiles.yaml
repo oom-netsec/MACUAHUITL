@@ -15,4 +15,5 @@ commands:
   - cmd: show ap dot11 5ghz network
   - cmd: show wireless country configured
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show ap dot11 dual-band summary

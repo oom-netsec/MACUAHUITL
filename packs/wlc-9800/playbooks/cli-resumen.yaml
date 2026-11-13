@@ -10,11 +10,13 @@ commands:
   - cmd: show clock
   - cmd: show wireless summary
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show wireless stats client delete reasons
   - cmd: show wireless stats client detail
   - cmd: show wireless exclusionlist
   - cmd: show wireless client timers
   - cmd: show wlan summary
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show wireless client device summary
   - cmd: show wireless vlan details

@@ -14,3 +14,4 @@ commands:
   - cmd: show wireless tag policy summary
   - cmd: show ap tag summary
   - cmd: show wireless client summary
+    timeout: 180s

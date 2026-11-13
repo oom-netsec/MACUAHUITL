@@ -11,7 +11,9 @@ commands:
   - cmd: show version
   - cmd: show wireless summary
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show platform resources
   - cmd: show processes cpu platform sorted
   - cmd: show processes memory platform sorted

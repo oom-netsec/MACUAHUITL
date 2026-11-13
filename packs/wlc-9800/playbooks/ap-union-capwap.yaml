@@ -9,6 +9,7 @@ name_en: AP · CAPWAP join
 commands:
   - cmd: show clock
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show ap uptime
   - cmd: show wireless stats ap join summary
   - cmd: show wireless stats ap discovery

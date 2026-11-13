@@ -13,4 +13,5 @@ commands:
   - cmd: show crypto pki trustpoints
   - cmd: show crypto pki certificates
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show logging | include PKI|CERT|DTLS|NTP

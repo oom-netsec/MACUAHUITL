@@ -15,5 +15,6 @@ commands:
   - cmd: show ip access-lists
   - cmd: show aaa servers
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show wireless exclusionlist
   - cmd: show logging | include WEBAUTH|CWA|HTTP

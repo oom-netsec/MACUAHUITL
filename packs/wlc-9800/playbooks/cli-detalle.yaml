@@ -14,6 +14,7 @@ commands:
   - cmd: show wireless client mac-address {mac} detail
     timeout: 120s
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show wireless device-tracking database mac
   - cmd: show ip arp | include {mac}
   - cmd: show ip dhcp binding

@@ -11,6 +11,7 @@ commands:
   - cmd: show ap dot11 24ghz summary
   - cmd: show ap dot11 5ghz summary
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show wireless band-select
   - cmd: show ap dot11 24ghz receiver
   - cmd: show ap dot11 5ghz receiver

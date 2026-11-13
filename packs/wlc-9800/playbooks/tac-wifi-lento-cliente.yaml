@@ -15,6 +15,7 @@ commands:
     timeout: 120s
   - cmd: show wireless client mac-address {mac} mobility history
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show wireless stats client delete reasons
   - cmd: show ap dot11 5ghz network
   - cmd: show logging | include {mac}

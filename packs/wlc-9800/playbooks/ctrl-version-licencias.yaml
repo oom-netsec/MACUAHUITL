@@ -16,3 +16,4 @@ commands:
   - cmd: show license usage
   - cmd: show ntp status
   - cmd: show ap summary
+    timeout: 180s

@@ -16,6 +16,7 @@ commands:
   - cmd: show wireless exclusionlist
   - cmd: show wireless stats client delete reasons
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show wlan summary
   - cmd: show wireless profile policy summary
   - cmd: show ap tag summary

@@ -8,11 +8,13 @@ name: Controlador · Alta disponibilidad (SSO)
 name_en: Controller · High availability (SSO)
 commands:
   - cmd: show clock
-  - cmd: show redundancy  # solo 9800 de chasis
-  - cmd: show redundancy states  # solo 9800 de chasis
-  - cmd: show redundancy switchover history  # solo 9800 de chasis
-  - cmd: show chassis  # solo 9800 de chasis
-  - cmd: show chassis rmi  # solo 9800 de chasis
-  - cmd: show ap summary  # solo 9800 de chasis
-  - cmd: show wireless client summary  # solo 9800 de chasis
-  - cmd: show logging | include REDUNDANCY|RMI|HA_|SSO|SWITCHOVER|STANDBY  # solo 9800 de chasis
+  - cmd: show redundancy  # no existe en EWC (sin SSO)
+  - cmd: show redundancy states  # no existe en EWC (sin SSO)
+  - cmd: show redundancy switchover history  # no existe en EWC (sin SSO)
+  - cmd: show chassis  # no existe en EWC (sin SSO)
+  - cmd: show chassis rmi  # no existe en EWC (sin SSO)
+  - cmd: show ap summary
+    timeout: 180s
+  - cmd: show wireless client summary
+    timeout: 180s
+  - cmd: show logging | include REDUNDANCY|RMI|HA_|SSO|SWITCHOVER|STANDBY

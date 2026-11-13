@@ -22,7 +22,7 @@ var catalogFile = regexp.MustCompile(`^(l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cl
 var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp comm|archive log)|more )`)
 
 // Salidas sin acotar: tabla completa de rutas/BGP/CEF/MAC o todas las interfaces.
-var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces)$`)
+var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces|wireless client summary|ap summary)$`)
 
 // catalogFS junta el contenido embebido con el de packs/ios-xe, packs/ios y packs/wlc-9800 (en cisco/<plataforma>), para que estas pruebas sigan
 // cubriendo los playbooks que salieron del binario al paquete oficial.

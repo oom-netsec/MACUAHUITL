@@ -9,6 +9,7 @@ name_en: TAC · AP does not join
 commands:
   - cmd: show clock
   - cmd: show ap summary
+    timeout: 180s
   - cmd: show wireless stats ap join summary
   - cmd: show wireless stats ap discovery
   - cmd: show crypto pki trustpoints

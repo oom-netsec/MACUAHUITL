@@ -9,9 +9,10 @@ name_en: TAC · Roaming failure (general)
 commands:
   - cmd: show clock
   - cmd: show wireless client summary
+    timeout: 180s
   - cmd: show wlan all
   - cmd: show wireless mobility summary
-  - cmd: show wireless statistics mobility
+  - cmd: show wireless stats mobility
   - cmd: show wireless stats client delete reasons
   - cmd: show wireless stats client detail
   - cmd: show ap rf-profile summary
