@@ -11,7 +11,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -24,6 +23,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Dialer abre una conexión tcp o udp hacia host:port. En producción la arma el
@@ -57,18 +58,18 @@ func mustAddr(s string) netip.Addr { a, _ := netip.ParseAddr(s); return a }
 // ParseServer entiende "192.0.2.1", "192.0.2.1:5353", "tcp://…", "tls://IP#nombre" y "https://host/ruta".
 func ParseServer(s string) (Server, error) {
 	if s == "" || strings.HasPrefix(s, "-") || strings.ContainsAny(s, " \t\n") {
-		return Server{}, fmt.Errorf("dnsq: servidor %q inválido", s)
+		return Server{}, i18n.New("dns.parse.err.server", i18n.A("server", s))
 	}
 	if strings.HasPrefix(s, "https://") {
 		u, err := url.Parse(s)
 		if err != nil || u.Hostname() == "" {
-			return Server{}, fmt.Errorf("dnsq: URL DoH %q inválida", s)
+			return Server{}, i18n.New("dns.parse.err.doh_url", i18n.A("server", s))
 		}
 		port := uint16(443)
 		if p := u.Port(); p != "" {
 			n, err := strconv.Atoi(p)
 			if err != nil || n < 1 || n > 65535 {
-				return Server{}, fmt.Errorf("dnsq: puerto %q inválido", p)
+				return Server{}, i18n.New("dns.parse.err.port", i18n.A("port", p))
 			}
 			port = uint16(n)
 		}
@@ -86,19 +87,19 @@ func ParseServer(s string) (Server, error) {
 		}
 	}
 	if strings.Contains(rest, "://") {
-		return Server{}, fmt.Errorf("dnsq: esquema de %q no soportado (udp, tcp, tls, https)", s)
+		return Server{}, i18n.New("dns.parse.err.scheme", i18n.A("server", s))
 	}
 	if srv.Transport == "dot" {
 		srv.Port = 853
 		host, name, ok := strings.Cut(rest, "#")
 		if !ok || name == "" {
-			return Server{}, fmt.Errorf("dnsq: DoT necesita el nombre del certificado: tls://IP#nombre")
+			return Server{}, i18n.New("dns.parse.err.dot_name", nil)
 		}
 		srv.TLSName, rest = name, host
 	}
 	if ap, err := netip.ParseAddrPort(rest); err == nil {
 		if ap.Port() == 0 {
-			return Server{}, errors.New("dnsq: puerto 0 inválido")
+			return Server{}, i18n.New("dns.parse.err.port_zero", nil)
 		}
 		srv.Host, srv.Port = ap.Addr().String(), ap.Port()
 		return srv, nil
@@ -110,14 +111,14 @@ func ParseServer(s string) (Server, error) {
 	if h, p, err := net.SplitHostPort(rest); err == nil {
 		n, err := strconv.Atoi(p)
 		if err != nil || n < 1 || n > 65535 {
-			return Server{}, fmt.Errorf("dnsq: puerto %q inválido", p)
+			return Server{}, i18n.New("dns.parse.err.port", i18n.A("port", p))
 		}
 		srv.Host, srv.Port = h, uint16(n)
 	} else {
 		srv.Host = rest
 	}
 	if _, ok := dns.IsDomainName(srv.Host); !ok || srv.Host == "" {
-		return Server{}, fmt.Errorf("dnsq: servidor %q inválido", s)
+		return Server{}, i18n.New("dns.parse.err.server", i18n.A("server", s))
 	}
 	return srv, nil
 }
@@ -390,7 +391,7 @@ func ParseType(s string) (uint16, error) {
 	if t, ok := dns.StringToType[strings.ToUpper(s)]; ok {
 		return t, nil
 	}
-	return 0, fmt.Errorf("dnsq: tipo de registro desconocido %q", s)
+	return 0, i18n.New("dns.parse.err.type", i18n.A("type", s))
 }
 
 // SystemResolvers lee los nameserver de un resolv.conf (normalmente /etc/resolv.conf).
@@ -404,7 +405,7 @@ func SystemResolvers(path string) ([]Server, error) {
 		out = append(out, Server{Transport: "udp", Host: s, Port: 53})
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("dnsq: %s no tiene nameserver", path)
+		return nil, i18n.New("dns.parse.err.no_nameserver", i18n.A("path", path))
 	}
 	return out, nil
 }

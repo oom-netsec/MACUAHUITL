@@ -263,6 +263,10 @@ func Localize(v any, loc string) any {
 		return r.In(loc)
 	case ZoneReport:
 		return r.In(loc)
+	case DNSSECReport:
+		return r.In(loc)
+	case TraceResult:
+		return r.In(loc)
 	}
 	return v
 }

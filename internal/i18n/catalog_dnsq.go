@@ -1,0 +1,60 @@
+package i18n
+
+// DNS diagnóstico, resto (internal/diag/dnsq): cadena DNSSEC, avisos de la traza y errores de las funciones de
+// análisis. Los nombres, las IP, las fechas y los textos del sistema que cita el texto son datos y no se traducen.
+func init() {
+	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
+	add(map[string]entry{
+		"dns.dnssec.err.anchor":      e("dnsq: ancla inválida {anchor:q}: {cause}", "dnsq: invalid trust anchor {anchor:q}: {cause}", "anchor", "cause"),
+		"dns.dnssec.link.no_server":  e("no se encontró un servidor autoritativo en la traza", "no authoritative server was found in the trace"),
+		"dns.dnssec.link.ds_fetch":   e("DS del padre: {cause}", "DS from the parent: {cause}", "cause"),
+		"dns.dnssec.link.unsigned":   e("la zona no está firmada y el padre no publica DS (delegación insegura)", "the zone is not signed and the parent publishes no DS (insecure delegation)"),
+		"dns.dnssec.link.broken":     e("la zona tiene llaves pero el padre no publica DS: la cadena se rompe aquí", "the zone has keys but the parent publishes no DS: the chain breaks here"),
+		"dns.dnssec.link.ds_sig":     e("firma del DS en el padre: {cause}", "signature of the DS in the parent: {cause}", "cause"),
+		"dns.dnssec.link.root_nokey": e("la raíz de esta traza no publica DNSKEY", "the root of this trace does not publish a DNSKEY"),
+		"dns.dnssec.link.no_dnskey":  e("el padre publica DS pero la zona no tiene DNSKEY: la resolución validada falla", "the parent publishes a DS but the zone has no DNSKEY: validated resolution fails"),
+		"dns.dnssec.link.no_match":   e("ninguna llave de la zona coincide con el DS (o con el ancla de confianza)", "no key of the zone matches the DS (or the trust anchor)"),
+		"dns.dnssec.link.key_sig":    e("firma del DNSKEY: {cause}", "DNSKEY signature: {cause}", "cause"),
+		"dns.dnssec.link.soa_sig":    e("firma de la SOA: {cause}", "SOA signature: {cause}", "cause"),
+		"dns.dnssec.warn.expiring":   e("la firma del DNSKEY de {zone} vence el {when}", "the DNSKEY signature of {zone} expires on {when}", "zone", "when"),
+		"dns.dnssec.verify.empty":    e("rrset vacío", "empty rrset"),
+		"dns.dnssec.verify.no_sig":   e("sin RRSIG", "no RRSIG"),
+		"dns.dnssec.verify.no_key":   e("ninguna llave verifica la firma", "no key verifies the signature"),
+		"dns.dnssec.verify.expired":  e("firma vencida el {when}", "signature expired on {when}", "when"),
+		"dns.dnssec.verify.not_yet":  e("firma aún no válida", "signature not yet valid"),
+		"dns.dnssec.denial.none":     e("ninguna", "none"),
+		"dns.dnssec.denial.unknown":  e("desconocido", "unknown"),
+
+		"dns.trace.warn.no_glue":      e("{zone} se delega sin glue; se resolvió el NS aparte", "{zone} is delegated without glue; the NS was resolved separately", "zone"),
+		"dns.trace.err.depth":         e("dnsq: traza abortada: profundidad máxima alcanzada", "dnsq: trace aborted: maximum depth reached"),
+		"dns.trace.err.cname":         e("dnsq: demasiados CNAME encadenados", "dnsq: too many chained CNAMEs"),
+		"dns.trace.err.rcode":         e("dnsq: {server} respondió {rcode} para {name}", "dnsq: {server} answered {rcode} for {name}", "server", "rcode", "name"),
+		"dns.trace.err.no_answer":     e("dnsq: {server} no respondió ni delegó {name}", "dnsq: {server} neither answered nor delegated {name}", "server", "name"),
+		"dns.trace.err.loop":          e("dnsq: bucle de delegación: {server} vuelve a delegar {zone}", "dnsq: delegation loop: {server} delegates {zone} again", "server", "zone"),
+		"dns.trace.err.ns_limit":      e("dnsq: no hay glue para {zone} y se alcanzó el límite de resoluciones de NS", "dnsq: there is no glue for {zone} and the NS resolution limit was reached", "zone"),
+		"dns.trace.err.no_ns_addr":    e("dnsq: no se pudo obtener la dirección de ningún NS de {zone}", "dnsq: could not get the address of any NS of {zone}", "zone"),
+		"dns.trace.err.no_servers":    e("dnsq: no hay servidores para {zone}", "dnsq: there are no servers for {zone}", "zone"),
+		"dns.parse.err.server":        e("dnsq: servidor {server:q} inválido", "dnsq: invalid server {server:q}", "server"),
+		"dns.parse.err.doh_url":       e("dnsq: URL DoH {server:q} inválida", "dnsq: invalid DoH URL {server:q}", "server"),
+		"dns.parse.err.port":          e("dnsq: puerto {port:q} inválido", "dnsq: invalid port {port:q}", "port"),
+		"dns.parse.err.scheme":        e("dnsq: esquema de {server:q} no soportado (udp, tcp, tls, https)", "dnsq: scheme of {server:q} not supported (udp, tcp, tls, https)", "server"),
+		"dns.parse.err.dot_name":      e("dnsq: DoT necesita el nombre del certificado: tls://IP#nombre", "dnsq: DoT needs the certificate name: tls://IP#name"),
+		"dns.parse.err.port_zero":     e("dnsq: puerto 0 inválido", "dnsq: invalid port 0"),
+		"dns.parse.err.type":          e("dnsq: tipo de registro desconocido {type:q}", "dnsq: unknown record type {type:q}", "type"),
+		"dns.parse.err.no_nameserver": e("dnsq: {path} no tiene nameserver", "dnsq: {path} has no nameserver", "path"),
+
+		"tools.svc.pcap_path":   e("la ruta de la captura debe ser absoluta", "the capture path must be absolute"),
+		"tools.svc.dns_mode":    e("modo DNS no indicado", "DNS mode not given"),
+		"tools.svc.dns_deep":    e("este modo contacta raíces y autoritativos: requiere activar el modo profundo", "this mode contacts roots and authoritative servers: it requires deep mode"),
+		"tools.svc.dns_name":    e("nombre no indicado", "name not given"),
+		"tools.svc.dns_unknown": e("modo DNS desconocido", "unknown DNS mode"),
+		"tools.svc.tls_host":    e("host inválido", "invalid host"),
+		"tools.svc.tls_port":    e("puerto inválido", "invalid port"),
+		"tls.err.handshake":     e("tlsinspect: el servicio no completó un handshake TLS: {cause}", "tlsinspect: the service did not complete a TLS handshake: {cause}", "cause"),
+		"tls.err.no_cert":       e("tlsinspect: el servidor no presentó certificado", "tlsinspect: the server presented no certificate"),
+		"pcap.err.read":         e("pcapan: {cause}", "pcapan: {cause}", "cause"),
+		"pcap.err.empty":        e("pcapan: archivo vacío o ilegible: {cause}", "pcapan: empty or unreadable file: {cause}", "cause"),
+		"pcap.err.pcapng":       e("pcapan: pcapng inválido: {cause}", "pcapan: invalid pcapng: {cause}", "cause"),
+		"pcap.err.not_pcap":     e("pcapan: no es un pcap/pcapng: {cause}", "pcapan: not a pcap/pcapng: {cause}", "cause"),
+	})
+}

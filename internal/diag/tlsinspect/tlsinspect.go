@@ -181,7 +181,7 @@ func Inspect(ctx context.Context, d Dialer, host string, port uint16, sni string
 		// Puede que solo hable TLS 1.0/1.1; se intenta antes de rendirse.
 		st, err = handshake(ctx, d, host, port, sni, tls.VersionTLS10, tls.VersionTLS11, o.Timeout)
 		if err != nil {
-			return r, fmt.Errorf("tlsinspect: el servicio no completó un handshake TLS: %w", err)
+			return r, i18n.Wrap("tls.err.handshake", err, nil)
 		}
 	}
 	r.Version, r.Cipher, r.ALPN = versionName(st.Version), tls.CipherSuiteName(st.CipherSuite), st.NegotiatedProtocol
@@ -197,7 +197,7 @@ func Inspect(ctx context.Context, d Dialer, host string, port uint16, sni string
 		r.Chain = append(r.Chain, describe(c))
 	}
 	if len(st.PeerCertificates) == 0 {
-		return r, errors.New("tlsinspect: el servidor no presentó certificado")
+		return r, i18n.New("tls.err.no_cert", nil)
 	}
 	leaf := st.PeerCertificates[0]
 	r.DaysLeft = int(leaf.NotAfter.Sub(now).Hours() / 24)
