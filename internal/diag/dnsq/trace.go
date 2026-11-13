@@ -43,6 +43,8 @@ type Step struct {
 	Glue         map[string][]string
 	Answer       []string
 	Error        string `json:",omitempty"`
+	// ErrorText es Error como texto de catálogo; no viaja en el JSON.
+	ErrorText i18n.Text `json:"-"`
 }
 
 type TraceResult struct {
@@ -58,6 +60,14 @@ type TraceResult struct {
 
 // In devuelve el resultado con los avisos en el idioma dado (es es el de siempre).
 func (r TraceResult) In(loc string) TraceResult {
+	if r.Steps != nil {
+		r.Steps = append([]Step(nil), r.Steps...)
+		for i := range r.Steps {
+			if !r.Steps[i].ErrorText.Empty() {
+				r.Steps[i].Error = r.Steps[i].ErrorText.In(loc)
+			}
+		}
+	}
 	if len(r.WarningTexts) == len(r.Warnings) && r.Warnings != nil {
 		r.Warnings = make([]string, len(r.WarningTexts))
 		for i, t := range r.WarningTexts {
@@ -216,7 +226,7 @@ func (t *tracer) ask(servers []nsAddr, zone, qname string, qtype uint16) (*dns.M
 	if lastErr == nil {
 		lastErr = i18n.New("dns.trace.err.no_servers", i18n.A("zone", zone))
 	}
-	step.Error = lastErr.Error()
+	step.Error, step.ErrorText = lastErr.Error(), i18n.FromErr(lastErr)
 	return nil, step, lastErr
 }
 
@@ -289,6 +299,14 @@ func localizeFindings(fs []Finding, loc string) []Finding {
 
 // In devuelve el informe con el detalle de cada hallazgo en el idioma dado (es es el de siempre).
 func (r ZoneReport) In(loc string) ZoneReport {
+	if r.Servers != nil {
+		r.Servers = append([]ZoneServer(nil), r.Servers...)
+		for i := range r.Servers {
+			if !r.Servers[i].ErrorText.Empty() {
+				r.Servers[i].Error = r.Servers[i].ErrorText.In(loc)
+			}
+		}
+	}
 	r.Findings = localizeFindings(r.Findings, loc)
 	return r
 }
@@ -300,6 +318,8 @@ type ZoneServer struct {
 	RTT      time.Duration
 	AXFR     bool
 	Error    string `json:",omitempty"`
+	// ErrorText es Error como texto de catálogo; no viaja en el JSON.
+	ErrorText i18n.Text `json:"-"`
 }
 
 type ZoneReport struct {
@@ -368,7 +388,7 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 			}
 		}
 		if len(ips) == 0 {
-			rep.Servers = append(rep.Servers, ZoneServer{Name: name, Error: "sin dirección"})
+			rep.Servers = append(rep.Servers, ZoneServer{Name: name, Error: "sin dirección", ErrorText: i18n.Tx("dns.zone.no_address")})
 			rep.Findings = append(rep.Findings, dataFinding("error", "ns-sin-direccion", name))
 			continue
 		}
@@ -379,7 +399,7 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 			zs.RTT = rtt
 			switch {
 			case err != nil:
-				zs.Error = err.Error()
+				zs.Error, zs.ErrorText = err.Error(), i18n.FromErr(err)
 				rep.Findings = append(rep.Findings, finding("error", "ns-lame", "dns.finding.ns_unreachable", "name", name, "ip", ip, "error", err))
 			case r.Rcode != dns.RcodeSuccess || !r.Authoritative:
 				zs.Error = dns.RcodeToString[r.Rcode]

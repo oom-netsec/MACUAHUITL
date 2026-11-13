@@ -166,7 +166,9 @@ type Answer struct {
 	RetriedTCP bool
 	EDNS       bool
 	Error      string `json:",omitempty"`
-	msg        *dns.Msg
+	// ErrorText es Error como texto de catálogo; no viaja en el JSON.
+	ErrorText i18n.Text `json:"-"`
+	msg       *dns.Msg
 }
 
 func newMsg(name string, qtype uint16, o Options) *dns.Msg {
@@ -203,17 +205,17 @@ func exchange(ctx context.Context, d Dialer, s Server, m *dns.Msg, o Options) (*
 	case "doh":
 		r, size, err = exchangeDoH(ctx, d, s, m, o)
 	default:
-		err = fmt.Errorf("transporte %q desconocido", s.Transport)
+		err = i18n.New("dns.exch.transport", i18n.A("transport", s.Transport))
 	}
 	rtt := time.Since(start)
 	if err != nil {
-		return nil, rtt, 0, fmt.Errorf("dnsq: %s: %w", s, err)
+		return nil, rtt, 0, i18n.Wrap("dns.exch.wrap", err, i18n.A("server", s.String()))
 	}
 	if r.Id != m.Id && s.Transport != "doh" { // DoH usa ID 0 por RFC 8484
-		return nil, rtt, size, fmt.Errorf("dnsq: %s: respuesta con ID %d, esperaba %d", s, r.Id, m.Id)
+		return nil, rtt, size, i18n.New("dns.exch.bad_id", i18n.A("server", s.String(), "got", r.Id, "want", m.Id))
 	}
 	if len(r.Question) != 1 || !strings.EqualFold(r.Question[0].Name, m.Question[0].Name) || r.Question[0].Qtype != m.Question[0].Qtype || r.Question[0].Qclass != m.Question[0].Qclass {
-		return nil, rtt, size, fmt.Errorf("dnsq: %s: la respuesta no corresponde a la pregunta (posible suplantación)", s)
+		return nil, rtt, size, i18n.New("dns.exch.mismatch", i18n.A("server", s.String()))
 	}
 	return r, rtt, size, nil
 }
@@ -279,7 +281,7 @@ func exchangeDoH(ctx context.Context, d Dialer, s Server, m *dns.Msg, o Options)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, 0, fmt.Errorf("DoH respondió HTTP %d", resp.StatusCode)
+		return nil, 0, i18n.New("dns.exch.doh_http", i18n.A("status", resp.StatusCode))
 	}
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 65536))
 	if err != nil {
@@ -287,7 +289,7 @@ func exchangeDoH(ctx context.Context, d Dialer, s Server, m *dns.Msg, o Options)
 	}
 	r := new(dns.Msg)
 	if err := r.Unpack(raw); err != nil {
-		return nil, 0, fmt.Errorf("DoH: respuesta ilegible: %w", err)
+		return nil, 0, i18n.Wrap("dns.exch.doh_unreadable", err, nil)
 	}
 	return r, len(raw), nil
 }
@@ -315,7 +317,7 @@ func Query(ctx context.Context, d Dialer, s Server, name string, qtype uint16, o
 	m := newMsg(name, qtype, o)
 	r, rtt, size, err := exchange(ctx, d, s, m, o)
 	if err != nil {
-		return Answer{Server: s.String(), Name: dns.Fqdn(name), Type: dns.TypeToString[qtype], Error: err.Error()}, err
+		return Answer{Server: s.String(), Name: dns.Fqdn(name), Type: dns.TypeToString[qtype], Error: err.Error(), ErrorText: i18n.FromErr(err)}, err
 	}
 	if s.Transport == "udp" && r.Truncated {
 		ts := s
@@ -323,7 +325,8 @@ func Query(ctx context.Context, d Dialer, s Server, name string, qtype uint16, o
 		r2, rtt2, size2, err := exchange(ctx, d, ts, newMsg(name, qtype, o), o)
 		if err != nil {
 			a := toAnswer(s, name, qtype, r, rtt, size)
-			a.Truncated, a.Error = true, "truncada por UDP y TCP falló: "+err.Error()
+			e := i18n.Wrap("dns.exch.trunc_failed", err, nil)
+			a.Truncated, a.Error, a.ErrorText = true, e.Error(), i18n.FromErr(e)
 			return a, err
 		}
 		a := toAnswer(s, name, qtype, r2, rtt+rtt2, size2)
@@ -331,6 +334,20 @@ func Query(ctx context.Context, d Dialer, s Server, name string, qtype uint16, o
 		return a, nil
 	}
 	return toAnswer(s, name, qtype, r, rtt, size), nil
+}
+
+// In devuelve el resultado con el error de cada respuesta en el idioma dado (es es el de siempre).
+func (r CompareResult) In(loc string) CompareResult {
+	if r.Answers == nil {
+		return r
+	}
+	r.Answers = append([]Answer(nil), r.Answers...)
+	for i := range r.Answers {
+		if !r.Answers[i].ErrorText.Empty() {
+			r.Answers[i].Error = r.Answers[i].ErrorText.In(loc)
+		}
+	}
+	return r
 }
 
 // CompareResult es la misma pregunta hecha a varios servidores.

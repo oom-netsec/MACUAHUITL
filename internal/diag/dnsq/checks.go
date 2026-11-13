@@ -20,6 +20,8 @@ type Probe struct {
 	Truncated bool
 	RTT       time.Duration
 	Error     string `json:",omitempty"`
+	// ErrorText es Error como texto de catálogo; no viaja en el JSON.
+	ErrorText i18n.Text `json:"-"`
 }
 
 type TransportReport struct {
@@ -52,7 +54,7 @@ func CheckTransport(ctx context.Context, d Dialer, s Server, name string, o Opti
 		}
 		p.RTT = rtt
 		if err != nil {
-			p.Error = err.Error()
+			p.Error, p.ErrorText = err.Error(), i18n.FromErr(err)
 		} else {
 			p.RCode, p.Size, p.Truncated = dns.RcodeToString[r.Rcode], size, r.Truncated
 			if v.tr == "tcp" {
@@ -243,6 +245,14 @@ func (r ExposureReport) In(loc string) ExposureReport {
 
 // In devuelve el informe con el detalle de cada hallazgo en el idioma dado (es es el de siempre).
 func (r TransportReport) In(loc string) TransportReport {
+	if r.Probes != nil {
+		r.Probes = append([]Probe(nil), r.Probes...)
+		for i := range r.Probes {
+			if !r.Probes[i].ErrorText.Empty() {
+				r.Probes[i].Error = r.Probes[i].ErrorText.In(loc)
+			}
+		}
+	}
 	r.Findings = localizeFindings(r.Findings, loc)
 	return r
 }
@@ -264,6 +274,8 @@ func Localize(v any, loc string) any {
 	case ZoneReport:
 		return r.In(loc)
 	case DNSSECReport:
+		return r.In(loc)
+	case CompareResult:
 		return r.In(loc)
 	case TraceResult:
 		return r.In(loc)
