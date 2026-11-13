@@ -3,8 +3,8 @@ package playbook
 import (
 	"errors"
 	"strings"
-	"testing/fstest"
 	"testing"
+	"testing/fstest"
 )
 
 func TestDenyReviewBypasses(t *testing.T) {
