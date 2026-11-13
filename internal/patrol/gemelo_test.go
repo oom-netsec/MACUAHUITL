@@ -94,3 +94,48 @@ func TestManifestRegistraElGemelo(t *testing.T) {
 		t.Errorf("Ran vacío no debe serializarse: %s", b)
 	}
 }
+
+// De punta a punta con el simulador: RunDevice llena Ran con los gemelos que de verdad corrieron.
+func TestRanDePuntaAPunta(t *testing.T) {
+	casos := []struct {
+		nombre, transcripts string
+		elegidos, ran, refs []string
+	}{
+		{"ios-xe elegido en IOS", "ios", []string{"ios-xe/cpu"}, []string{"ios/cpu"}, []string{"ios-xe/cpu", "ios/cpu"}},
+		{"ambos elegidos sin repetir", "ios", []string{"ios-xe/cpu", "ios/cpu"}, []string{"ios/cpu"}, nil},
+		{"ID faltante con gemelo", "ios", []string{"ios-xe/solo"}, []string{"ios/solo"}, nil},
+		{"ios elegido en IOS-XE", "ios-xe", []string{"ios/cpu"}, []string{"ios-xe/cpu"}, nil},
+	}
+	for _, c := range casos {
+		t.Run(c.nombre, func(t *testing.T) {
+			e := newEnv(t, simulator.Config{Transcripts: transcripts(c.transcripts)})
+			e.d.Playbooks = gemelos()
+			for i := range e.d.Playbooks { // el simulador solo conoce show version
+				e.d.Playbooks[i].Commands = []playbook.Command{{Text: "show version", Timeout: 10 * time.Second}}
+			}
+			e.spec.PlaybookIDs = c.elegidos
+			e.trust(t)
+			w, err := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+			if res.State != "completed" || !slices.Equal(res.Ran, c.ran) {
+				t.Fatalf("estado %q Ran %v, quería %v (%s)", res.State, res.Ran, c.ran, res.Detail)
+			}
+			m, err := Finish(context.Background(), e.d, w, e.spec, 1, []DeviceResult{res})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.refs != nil {
+				ids := []string{}
+				for _, p := range m.Playbooks {
+					ids = append(ids, p.ID)
+				}
+				if !slices.Equal(ids, c.refs) {
+					t.Errorf("refs del manifest %v, quería %v", ids, c.refs)
+				}
+			}
+		})
+	}
+}
