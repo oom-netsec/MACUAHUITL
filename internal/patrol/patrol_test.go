@@ -132,13 +132,13 @@ func TestValidateRejects(t *testing.T) {
 		"schedule ambos":         func(s *Spec) { s.Schedule = Schedule{IntervalSeconds: 60, Cron: "* * * * *"} },
 		"schedule until":         func(s *Spec) { s.Schedule.Until = time.Now().Add(-time.Hour) },
 	}
-	if err := Validate(e.spec, e.d.Playbooks, e.d.Vault); err != nil {
+	if err := ValidateWith(e.spec, e.d.Playbooks, e.d.Vault, nil); err != nil {
 		t.Fatalf("valid spec rejected: %v", err)
 	}
 	for name, mut := range cases {
 		s := e.spec
 		mut(&s)
-		err := Validate(s, e.d.Playbooks, e.d.Vault)
+		err := ValidateWith(s, e.d.Playbooks, e.d.Vault, nil)
 		var fe *FieldError
 		if !errors.As(err, &fe) || !strings.HasPrefix(name, fe.Field) {
 			t.Errorf("%s: err = %v", name, err)

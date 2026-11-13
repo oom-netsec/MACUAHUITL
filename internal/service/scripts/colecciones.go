@@ -16,6 +16,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	dom "github.com/oom-netsec/MACUAHUITL/internal/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
+	"github.com/oom-netsec/MACUAHUITL/playbooks"
 )
 
 // Colecciones y fijados de la bóveda de scripts (fase 29c). Las colecciones guardan IDs, nunca copias.
@@ -29,10 +30,45 @@ func (s *svc) libSet(ctx context.Context) (map[string]bool, error) {
 	for _, x := range lib {
 		out[x.ID] = true
 	}
+	for id := range s.retained() { // no se podan ni se ocultan: vuelven a verse al instalar el paquete
+		out[id] = true
+	}
 	return out, nil
 }
 
-// cleanCol quita de la colección los «lib-*» que esta biblioteca ya no trae (por ejemplo, tras actualizar la app).
+// libID es el ID del script «lib-<id>» que deriva el playbook pbID (como scripts.Derived).
+func libID(pbID string) string {
+	plat, id, _ := strings.Cut(pbID, "/")
+	if plat != "ios-xe" {
+		id = plat + "-" + id
+	}
+	return "lib-" + id
+}
+
+// retained son los scripts «lib-*» que hoy no están en la biblioteca pero vienen en un paquete que no está instalado:
+// los movidos a oom/ios-xe y los de playbooks de un paquete quitado (pack_removed). Quien los fijó o los puso en una
+// colección no debe perderlos por no tener el paquete todavía.
+func (s *svc) retained() map[string]bool {
+	out := map[string]bool{}
+	for _, id := range playbooks.MovedToIOSXE {
+		out[libID(id)] = true
+	}
+	rows, err := s.d.DB().Query(`SELECT playbook_id FROM pack_removed`)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil {
+			out[libID(id)] = true
+		}
+	}
+	return out
+}
+
+// cleanCol quita de la colección los «lib-*» que esta biblioteca ya no trae (por ejemplo, tras actualizar la app), salvo los
+// retenidos de paquetes (ver libSet).
 func cleanCol(c dom.Coleccion, lib map[string]bool) dom.Coleccion {
 	c.ScriptIDs = slices.DeleteFunc(slices.Clone(c.ScriptIDs), func(id string) bool { return dom.IsLib(id) && !lib[id] })
 	return c
@@ -243,11 +279,15 @@ func (s *svc) SetCollectionScripts(ctx context.Context, r *v1.SetCollectionScrip
 			return internal(err)
 		}
 		seen := map[string]bool{}
+		keep := s.retained() // un script de un paquete ausente que ya estaba en la colección se conserva
 		for _, id := range r.ScriptIds {
 			if seen[id] {
 				return service.Err(ctx, codes.InvalidArgument, "scripts.svc.script_dup", i18n.A("id", id))
 			}
 			seen[id] = true
+			if keep[id] && slices.Contains(old.ScriptIDs, id) {
+				continue
+			}
 			if _, err := s.find(ctx, tx, id); err != nil {
 				return err
 			}
@@ -276,7 +316,7 @@ func (s *svc) SetCollectionScripts(ctx context.Context, r *v1.SetCollectionScrip
 	return &v1.SetCollectionScriptsResponse{Collection: colPB(c)}, nil
 }
 
-// prunePins quita de los fijados los «lib-*» que esta biblioteca ya no trae: no se ven, pero contarían para el tope
+// prunePins quita de los fijados los «lib-*» que esta biblioteca ya no trae (salvo los retenidos de paquetes): no se ven, pero contarían para el tope
 // y harían fallar el reorden.
 func (s *svc) prunePins(ctx context.Context, tx *sql.Tx) error {
 	lib, err := s.libSet(ctx)

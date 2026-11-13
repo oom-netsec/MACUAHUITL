@@ -158,7 +158,7 @@ func LoginTest(ctx context.Context, d Deps, jobID string, s Spec, interactive bo
 		c, err := connect(ctx, d, jobID, s, t, pol, onEvent, false, nil)
 		if err == nil {
 			r.Platform = c.platform
-			_, _, err = commandsWith(s, c.platform, d.Playbooks, d.MissingPack)
+			_, _, err = commands(s, c.platform, d.Playbooks, d.MissingPack)
 			if err != nil {
 				r.FailedStep = "platform"
 			}

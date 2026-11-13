@@ -145,12 +145,8 @@ func kvOf(a i18n.Args) (kv []any) {
 	return kv
 }
 
-// Validate revisa el trabajo antes de crearlo, para no fallar a mitad de la primera ronda.
+// ValidateWith revisa el trabajo antes de crearlo, para no fallar a mitad de la primera ronda.
 // v debe estar abierta; con v nil no se revisan las credenciales.
-func Validate(s Spec, pbs []playbook.Playbook, v *vault.Vault) error {
-	return ValidateWith(s, pbs, v, nil)
-}
-
 // noPlaybook es el error de un playbook que no existe; si lo trae un paquete que no está instalado, pack.missing.
 func noPlaybook(id string, missing func(string) string) error {
 	if missing != nil {
@@ -161,7 +157,7 @@ func noPlaybook(id string, missing func(string) string) error {
 	return fieldErr("playbook_ids", "patrol.field.no_playbook", "id", id)
 }
 
-// ValidateWith es Validate con la regla de pack.missing (ADR 0010).
+// missing dice qué paquete trae un playbook que ya no está (pack.missing, ADR 0010); nil = ninguno.
 func ValidateWith(s Spec, pbs []playbook.Playbook, v *vault.Vault, missing func(string) string) error {
 	if len(s.Targets) == 0 {
 		return fieldErr("targets", "patrol.field.no_targets")
@@ -253,11 +249,7 @@ func find(pbs []playbook.Playbook, id string) *playbook.Playbook {
 
 // commands arma la lista para la plataforma detectada: playbooks elegidos y luego los pegados. Los comandos
 // marcados para otras plataformas (platforms:) no entran; skipped trae su texto, para anotarlo en el manifest.
-func commands(s Spec, detected string, pbs []playbook.Playbook) ([]playbook.Command, []string, error) {
-	return commandsWith(s, detected, pbs, nil)
-}
-
-func commandsWith(s Spec, detected string, pbs []playbook.Playbook, missing func(string) string) (out []playbook.Command, skipped []string, err error) {
+func commands(s Spec, detected string, pbs []playbook.Playbook, missing func(string) string) (out []playbook.Command, skipped []string, err error) {
 	for _, id := range s.PlaybookIDs {
 		p := find(pbs, id)
 		if p == nil {

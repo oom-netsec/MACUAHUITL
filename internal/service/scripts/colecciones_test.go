@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -13,8 +14,11 @@ import (
 	"google.golang.org/grpc/codes"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/pack"
+	"github.com/oom-netsec/MACUAHUITL/internal/pack/packtest"
 	dom "github.com/oom-netsec/MACUAHUITL/internal/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
+	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
 
 func colGuardar(t *testing.T, s *svc, name string) *v1.Collection {
@@ -980,4 +984,67 @@ func TestFormatoDeImportListaLosCampos(t *testing.T) {
 	}
 	_, err := s.ImportFormat(bg, &v1.ImportFormatRequest{Kind: ""})
 	codigo(t, err, codes.InvalidArgument)
+}
+
+// Los scripts movidos a un paquete (o de uno quitado) que el usuario tenía fijados o en colecciones no se pierden
+// mientras el paquete no está instalado: ni la poda de fijados ni la limpieza de colecciones los tocan.
+func TestMovidosSinPaqueteConservanFijadosYColecciones(t *testing.T) {
+	d := servicetest.New(t)
+	st, _, err := pack.Open(t.TempDir(), "dev", packtest.Keys(), pack.Base{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &svc{d: d, packs: st} // sin oom/ios-xe
+	if _, err := d.DB().Exec(`INSERT INTO script_pins(script_id, position) VALUES('lib-l2-stp', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.DB().Exec(`INSERT INTO script_collection_items(collection_id, script_id, position) VALUES('favoritos', 'lib-l2-stp', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	// También el de un paquete quitado (anotado en pack_removed).
+	d.DB().Exec(`INSERT INTO pack_removed(playbook_id, pack) VALUES('ios-xe/acme-x', 'acme/demo')`)
+	d.DB().Exec(`INSERT INTO script_pins(script_id, position) VALUES('lib-acme-x', 1)`)
+
+	mio := guardar(t, s, "Mi script", "show clock")
+	if _, err := s.SetPinned(bg, &v1.SetPinnedRequest{Id: mio.Id, Pinned: true}); err != nil { // corre prunePins
+		t.Fatal(err)
+	}
+	lc, err := s.ListCollections(bg, &v1.ListCollectionsRequest{})
+	if err != nil || !slices.Contains(lc.Collections[0].ScriptIds, "lib-l2-stp") {
+		t.Fatalf("la vista de colecciones lo oculta: %+v %v", lc, err)
+	}
+	// Guardar la colección como la vería el cliente no debe perderlo.
+	if _, err := s.SetCollectionScripts(bg, &v1.SetCollectionScriptsRequest{Id: "favoritos", ScriptIds: lc.Collections[0].ScriptIds}); err != nil {
+		t.Fatal(err)
+	}
+	pins := func() []string {
+		var out []string
+		rows, _ := d.DB().Query(`SELECT script_id FROM script_pins`)
+		defer rows.Close()
+		for rows.Next() {
+			var id string
+			rows.Scan(&id)
+			out = append(out, id)
+		}
+		return out
+	}
+	if p := pins(); !slices.Contains(p, "lib-l2-stp") || !slices.Contains(p, "lib-acme-x") {
+		t.Fatalf("la poda borró fijados: %v", p)
+	}
+	// Se instala el paquete: el fijado y la colección siguen ahí.
+	if _, err := st.Install(packtest.IOSXE(t), false); err != nil {
+		t.Fatal(err)
+	}
+	lc, _ = s.ListCollections(bg, &v1.ListCollectionsRequest{})
+	if !slices.Contains(lc.Collections[0].ScriptIds, "lib-l2-stp") || !slices.Contains(pins(), "lib-l2-stp") {
+		t.Fatalf("tras instalar: %+v %v", lc, pins())
+	}
+	// Un lib-* que no es de ningún paquete sí se sigue podando.
+	d.DB().Exec(`INSERT INTO script_pins(script_id, position) VALUES('lib-fantasma', 5)`)
+	if _, err := s.SetPinned(bg, &v1.SetPinnedRequest{Id: mio.Id, Pinned: true}); err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(pins(), "lib-fantasma") {
+		t.Fatal("lib-fantasma debía podarse")
+	}
 }
