@@ -93,3 +93,13 @@ func TestInventarioYFuenteDelTextoEnIngles(t *testing.T) {
 		t.Errorf("find es:\n%s", txt)
 	}
 }
+
+// Sin idioma (loc vacío) el tipo sale como en es; un tipo sin traducción sale tal cual.
+func TestInvCellsLocVacioYTipoDesconocido(t *testing.T) {
+	if got, want := invCells("", InvRow{Kind: "equipo"})[1], invCells(i18n.Es, InvRow{Kind: "equipo"})[1]; got != want {
+		t.Errorf("loc vacío: %q, quería %q", got, want)
+	}
+	if got := invCells("en", InvRow{Kind: "raro"})[1]; got != "raro" {
+		t.Errorf("tipo desconocido: %q", got)
+	}
+}

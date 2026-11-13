@@ -411,8 +411,10 @@ func (r InventoryResult) CSV() string { return r.CSVIn(i18n.Es) }
 // invCells son las celdas de una fila en el idioma dado: el tipo sale traducido; lo demás son datos.
 func invCells(loc string, x InvRow) []string {
 	c := x.cells()
-	if k := "fleet.inv.kind." + x.Kind; loc != i18n.Es && x.Kind != "sfp" { // sfp se escribe igual en los dos idiomas
-		c[1] = i18n.Msg(loc, k, nil)
+	if k := "fleet.inv.kind." + x.Kind; loc == i18n.En && x.Kind != "sfp" { // sfp se escribe igual en los dos idiomas
+		if m := i18n.Msg(loc, k, nil); m != k { // sin traducción, el tipo tal cual
+			c[1] = m
+		}
 	}
 	return c
 }
