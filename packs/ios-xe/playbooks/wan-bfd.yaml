@@ -1,0 +1,21 @@
+# Propósito: Revisa las sesiones BFD, sus temporizadores, diagnósticos, descartes e historial y los protocolos registrados.
+# Cuándo usarlo: Una sesión BFD cae o rebota, o un vecino de ruteo se reinicia por BFD.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/ip/ip-routing/220364-troubleshoot-bidirectional-forwarding-de.html
+# Sin validar en laboratorio.
+id: wan-bfd
+platform: ios-xe
+name: WAN · BFD
+name_en: WAN · BFD
+commands:
+  - cmd: show clock
+  - cmd: show bfd neighbors
+  - cmd: show bfd neighbors details
+  - cmd: show bfd summary client
+  - cmd: show bfd summary session
+  - cmd: show bfd summary host
+  - cmd: show bfd drops
+  - cmd: show bfd neighbors history
+  - cmd: show logging | include BFD
+  - cmd: show ip protocols
+  - cmd: show running-config | section bfd
+    may_contain_secrets: true

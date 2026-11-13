@@ -1,0 +1,27 @@
+# Propósito: Revisa el firewall por zonas: zonas, pares de zonas, políticas inspect, sesiones, estadísticas y descartes del plano de reenvío.
+# Cuándo usarlo: Un flujo que debería pasar es descartado o no se crea la sesión entre dos zonas.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/security/ios-firewall/117721-technote-iosfirewall-00.html
+# Sin validar en laboratorio.
+id: wan-zbfw
+platform: ios-xe
+name: WAN · Firewall por zonas (ZBFW)
+name_en: WAN · Zone-based firewall (ZBFW)
+commands:
+  - cmd: show clock
+  - cmd: show zone security
+  - cmd: show zone-pair security
+  - cmd: show policy-map type inspect
+  - cmd: show class-map type inspect
+  - cmd: show parameter-map type inspect
+  - cmd: show policy-firewall stats global
+  - cmd: show policy-firewall stats zone
+  - cmd: show platform hardware qfp active feature firewall drop all
+  - cmd: show platform hardware qfp active statistics drop
+  - cmd: show platform hardware qfp active feature firewall memory
+  - cmd: show logging | include FW|ZBFW
+  - cmd: show running-config | section zone|class-map type inspect|policy-map type inspect
+    may_contain_secrets: true
+  - cmd: show policy-map type inspect zone-pair sessions
+    timeout: 120s
+  - cmd: show policy-firewall sessions platform
+    timeout: 120s

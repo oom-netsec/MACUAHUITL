@@ -1,0 +1,28 @@
+# Propósito: Revisa DMVPN (fase 2 y 3): estado de los túneles, registro NHRP con los NHS, tráfico NHRP y la sesión IPsec subyacente.
+# Cuándo usarlo: Un spoke no se registra con el hub, no se forma el túnel spoke a spoke o el overlay pierde rutas.
+# Fuente: https://www.cisco.com/c/en/us/support/docs/security/dynamic-multipoint-vpn-dmvpn/221665-troubleshoot-dmvpn-phase-2-spoke-to-spok.html
+# Sin validar en laboratorio.
+id: wan-dmvpn
+platform: ios-xe
+name: WAN · DMVPN y NHRP
+name_en: WAN · DMVPN and NHRP
+commands:
+  - cmd: show clock
+  - cmd: show dmvpn
+  - cmd: show ip nhrp nhs detail
+  - cmd: show ip nhrp traffic
+  - cmd: show crypto session
+  - cmd: show crypto isakmp sa
+  - cmd: show crypto ikev2 sa
+  - cmd: show tunnel endpoints
+  - cmd: show ip interface brief | include Tunnel
+  - cmd: show ip protocols
+  - cmd: show logging | include NHRP|DMVPN|IKEV2|CRYPTO|TUN
+  - cmd: show running-config | section tunnel|nhrp|crypto
+    may_contain_secrets: true
+  - cmd: show ip nhrp
+    timeout: 120s
+  - cmd: show dmvpn detail
+    timeout: 120s
+  - cmd: show crypto ipsec sa
+    timeout: 120s

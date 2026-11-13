@@ -1,7 +1,8 @@
 package playbooks
 
-// MovedToIOSXE son los IDs de playbook que salieron del binario al paquete oficial oom/ios-xe (ADR 0010). Un trabajo
-// que pide uno sin el paquete instalado falla con pack.missing. Una prueba la compara con packs/ios-xe/playbooks.
+// MovedToIOSXE son los IDs de playbook que trae el paquete oficial oom/ios-xe (ADR 0010): los que salieron del binario y
+// los nuevos del paquete. Un trabajo que pide uno sin el paquete instalado falla con pack.missing. Una prueba la compara con
+// packs/ios-xe/playbooks.
 var MovedToIOSXE = []string{
 	"ios-xe/cpu-alta",
 	"ios-xe/errores-interfaz",
@@ -50,9 +51,26 @@ var MovedToIOSXE = []string{
 	"ios-xe/svc-snmp",
 	"ios-xe/svc-span",
 	"ios-xe/svc-syslog",
+	"ios-xe/tac-failover-wan-no-funciona",
 	"ios-xe/tac-lentitud-intermitente",
+	"ios-xe/tac-sitio-remoto-sin-servicio",
 	"ios-xe/tac-ssh-snmp",
+	"ios-xe/tac-tunel-vpn-no-levanta",
 	"ios-xe/tac-usuario-sin-red",
+	"ios-xe/tac-wan-lenta-perdida",
 	"ios-xe/topologia",
 	"ios-xe/vpn-ipsec-ike",
+	"ios-xe/wan-bfd",
+	"ios-xe/wan-dhcp-cliente",
+	"ios-xe/wan-dmvpn",
+	"ios-xe/wan-flexvpn-ikev2",
+	"ios-xe/wan-gre-tuneles",
+	"ios-xe/wan-interfaces",
+	"ios-xe/wan-nat-borde-vrf",
+	"ios-xe/wan-pbr-route-maps",
+	"ios-xe/wan-pppoe-dialer",
+	"ios-xe/wan-qos-shaping",
+	"ios-xe/wan-redundancia",
+	"ios-xe/wan-tracking-ip-sla",
+	"ios-xe/wan-zbfw",
 }

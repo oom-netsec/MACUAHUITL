@@ -99,7 +99,7 @@ func TestPackIdaYVueltaEnCaliente(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	au := h.auditText(t)
-	for _, want := range []string{`"action":"pack.install"`, `origin=official`, `"action":"pack.remove"`, `favorites_removed=1`, `version=1.0.0`} {
+	for _, want := range []string{`"action":"pack.install"`, `origin=official`, `"action":"pack.remove"`, `favorites_removed=1`, `version=1.1.0`} {
 		if !strings.Contains(au, want) {
 			t.Errorf("la auditoría no trae %s:\n%s", want, au)
 		}
@@ -302,7 +302,7 @@ func TestPackRutaRelativaYAuditoriaDeRechazos(t *testing.T) {
 	if r, _ := reasonOf(err); r != "pack.err.version" {
 		t.Fatalf("%v", err)
 	}
-	if au := h.auditText(t); !strings.Contains(au, "id=oom/ios-xe version=1.0.0") || !strings.Contains(au, "reason=version") {
+	if au := h.auditText(t); !strings.Contains(au, "id=oom/ios-xe version=1.1.0") || !strings.Contains(au, "reason=version") {
 		t.Fatalf("auditoría:\n%s", au)
 	}
 }

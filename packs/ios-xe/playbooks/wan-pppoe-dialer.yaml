@@ -1,0 +1,20 @@
+# Propósito: Revisa las sesiones PPPoE, la interfaz dialer, el estado de PPP y los registros asociados.
+# Cuándo usarlo: Un enlace por PPPoE no levanta, no obtiene dirección o rebota.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/bbdsl/command/bba-cr-book/bba-s1.html
+# Sin validar en laboratorio.
+id: wan-pppoe-dialer
+platform: ios-xe
+name: WAN · PPPoE y dialer
+name_en: WAN · PPPoE and dialer
+commands:
+  - cmd: show clock
+  - cmd: show pppoe summary
+  - cmd: show pppoe session
+  - cmd: show pppoe session all
+  - cmd: show pppoe session packets
+  - cmd: show dialer
+  - cmd: show ip interface brief
+  - cmd: show logging | include PPP|PPPOE|DIALER|LINEPROTO
+  - cmd: show ip route static
+  - cmd: show running-config | section interface Dialer|pppoe
+    may_contain_secrets: true

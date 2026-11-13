@@ -20,7 +20,7 @@ var reservedSegments = map[string]bool{
 	"pre": true, "upgrade": true, "metricas": true, "analisis": true, "tac": true, "cfg": true,
 	// Los de los playbooks movidos a oom/ios-xe.
 	"l1": true, "l2": true, "l3": true, "plat": true, "svc": true, "vpn": true, "cpu": true, "errores": true,
-	"flota": true, "topologia": true,
+	"flota": true, "topologia": true, "wan": true,
 	// Previstos para paquetes oficiales posteriores (ADR 0010: nx-os, fw, aci, wireless, ise, sda).
 	"fw": true, "aci": true, "wireless": true,
 }
