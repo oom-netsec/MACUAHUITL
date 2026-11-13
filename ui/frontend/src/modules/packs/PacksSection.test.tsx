@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PacksSection } from "./PacksSection";
+import { PacksSection, libOf } from "./PacksSection";
 import { I18nProvider } from "../../lib/i18n";
 import { fakeCore } from "../../lib/fake";
 import { sampleDetail, samplePack, sampleThirdParty } from "./fake";
@@ -114,4 +114,10 @@ test("quitar pide confirmación y avisa de los favoritos quitados", async () => 
   await userEvent.click(screen.getByRole("button", { name: "Confirmar: quitar oom/ios-xe" }));
   await waitFor(() => expect(remove).toHaveBeenCalledWith("oom/ios-xe"));
   expect(await screen.findByText(/3 favoritos/)).toBeVisible();
+});
+
+test("libOf arma el ID del script derivado como el núcleo", () => {
+  expect(libOf("ios-xe/l2-stp")).toBe("lib-l2-stp");
+  expect(libOf("ios/l2-stp")).toBe("lib-ios-l2-stp");
+  expect(libOf("wlc-9800/ap-join")).toBe("lib-wlc-9800-ap-join");
 });

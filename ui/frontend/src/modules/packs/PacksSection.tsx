@@ -6,7 +6,13 @@ import { useLang, useT } from "../../lib/i18n";
 import "./packs.css";
 
 // Todo texto del paquete (nombre, README, IDs) se dibuja como texto de React: sin HTML, imágenes ni enlaces (ADR 0010).
-const libOf = (playbookId: string) => `lib-${playbookId.split("/").pop()}`;
+// El script derivado de un playbook, igual que libID en internal/service/scripts: los de ios-xe quedan «lib-<id>», los
+// demás llevan la plataforma («ios/l2-stp» → «lib-ios-l2-stp») para no chocar.
+export function libOf(playbookId: string): string {
+  const [plat, ...rest] = playbookId.split("/");
+  const id = rest.join("/");
+  return `lib-${plat === "ios-xe" ? id : `${plat}-${id}`}`;
+}
 
 // Un playbook oculto oculta su lib-<id>, salvo que el playbook esté tapado (entonces no filtra nada).
 export function hiddenState(pack: PackInfo, playbookIds: string[]) {
