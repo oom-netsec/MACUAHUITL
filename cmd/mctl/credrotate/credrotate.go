@@ -35,7 +35,7 @@ func rotate(c *cli.Env, args []string) error {
 		return errors.New("uso: mctl cred rotate EQUIPO[:PUERTO] --user U --cred ID [--update-cred ID] [--generate] [--asistido]")
 	}
 	if gen && update == "" {
-		return errors.New("--generate exige --update-cred: un secreto generado solo se recupera desde la bóveda")
+		return cli.Err("mctl.credrotate.generate")
 	}
 	host, port, err := cli.SplitHost(fs.Arg(0))
 	if err != nil {
@@ -45,7 +45,7 @@ func rotate(c *cli.Env, args []string) error {
 		UpdateCredentialId: update, WriteMemory: true, // write memory es obligatorio en la rotación
 		AcceptedHostKeyFingerprints: accept}
 	if !gen {
-		b, err := c.Secret("Secreto nuevo de " + user + ": ")
+		b, err := c.Secret(cli.T("mctl.credrotate.prompt", "user", user))
 		if err != nil {
 			return err
 		}
@@ -59,19 +59,19 @@ func rotate(c *cli.Env, args []string) error {
 		return err
 	}
 	cli.PrintPlan(c.Out, res.Plan)
-	fmt.Fprintln(c.Out, "\nLos secretos (el nuevo y el hash previo) no se muestran nunca; la reversa los restaura desde el núcleo.")
-	fmt.Fprintln(c.Out, "write memory es obligatorio: sin él el equipo volvería al hash anterior al reiniciar. La bóveda se actualiza solo después de que")
-	fmt.Fprintln(c.Out, "write memory salga con [OK]; la credencial anterior se conserva como \"<etiqueta> (anterior)\" hasta que la borres a mano.")
-	fmt.Fprintln(c.Out, "Si rechazas write memory, la ejecución no termina: se propone la reversa.")
+	fmt.Fprintln(c.Out, "\n"+cli.T("mctl.credrotate.note_1"))
+	fmt.Fprintln(c.Out, cli.T("mctl.credrotate.note_2"))
+	fmt.Fprintln(c.Out, cli.T("mctl.credrotate.note_3"))
+	fmt.Fprintln(c.Out, cli.T("mctl.credrotate.note_4"))
 	if !assisted {
-		fmt.Fprintln(c.Out, "Solo se mostró el plan: no se cambió nada. Para aplicarlo agrega --asistido.")
+		fmt.Fprintln(c.Out, cli.T("mctl.restore.plan_only"))
 		return nil
 	}
 	run, err := cl.StartRun(context.Background(), &v1.StartRunRequest{PlanId: res.PlanId, Assisted: true})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "\nMODO ASISTIDO ACTIVO. Ejecución %s: cada paso que cambia la red pide confirmación.\n", run.RunId)
+	fmt.Fprintln(c.Out, "\n"+cli.T("mctl.restore.assist_active", "run", run.RunId))
 	return cli.Follow(c, cl, run.RunId, 0, nil)
 }
 

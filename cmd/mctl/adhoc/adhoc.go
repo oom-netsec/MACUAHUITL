@@ -21,7 +21,7 @@ func target(s string) (*v1.Target, error) {
 	if i := strings.LastIndex(s, ":"); i > 0 && strings.Count(s, ":") == 1 {
 		p, err := strconv.ParseUint(s[i+1:], 10, 16)
 		if err != nil {
-			return nil, fmt.Errorf("puerto inválido en %q", s)
+			return nil, cli.Err("mctl.backup.port_invalid", "value", s)
 		}
 		return &v1.Target{Address: s[:i], Port: uint32(p)}, nil
 	}
@@ -69,8 +69,8 @@ func runBatch(c *cli.Env, args []string) error {
 		return err
 	}
 	if !st.Armed {
-		fmt.Fprintf(c.Out, "trabajo %s creado sin armar: %s\nrevisa con: mctl job logintest %s\ny repite con --accept HUELLA (o arma con mctl job arm)\n", st.JobId, st.Detail, st.JobId)
-		return errors.New("lote sin armar")
+		fmt.Fprintln(c.Out, cli.T("mctl.adhoc.unarmed", "job", st.JobId, "detail", st.Detail))
+		return cli.Err("mctl.adhoc.unarmed_err")
 	}
 	for deadline := time.Now().Add(timeout); ; time.Sleep(300 * time.Millisecond) {
 		r, err := cl.AdhocResult(context.Background(), &v1.AdhocResultRequest{JobId: st.JobId})
@@ -79,7 +79,7 @@ func runBatch(c *cli.Env, args []string) error {
 		}
 		switch {
 		case r.Done && r.Report == nil:
-			return fmt.Errorf("el trabajo %s terminó %s sin resultados", st.JobId, r.State)
+			return cli.Err("mctl.adhoc.no_results", "job", st.JobId, "state", r.State)
 		case r.Done && csv:
 			fmt.Fprint(c.Out, r.Csv)
 		case r.Done && md:
@@ -87,7 +87,7 @@ func runBatch(c *cli.Env, args []string) error {
 		case r.Done:
 			c.PrintReport(r.Report, asJSON)
 		case time.Now().After(deadline):
-			return fmt.Errorf("sin resultado tras %s; consúltalo después con el trabajo %s", timeout, st.JobId)
+			return cli.Err("mctl.adhoc.timeout", "timeout", timeout, "job", st.JobId)
 		default:
 			continue
 		}
