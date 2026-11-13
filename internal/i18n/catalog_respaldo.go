@@ -15,8 +15,8 @@ func init() {
 		"respaldo.err.locked":           e("la bóveda está cerrada: desbloquéala y abre el respaldo de nuevo", "the vault is locked: unlock it and open the backup again"),
 		"respaldo.err.decision_unknown": e("decisión para una credencial que no está en el respaldo", "decision for a credential that is not in the backup"),
 		"respaldo.err.decision_dup":     e("decisión repetida para {label:q}", "repeated decision for {label:q}", "label"),
-		"respaldo.err.action":           e("acción {action:q} desconocida; usa renombrar, reemplazar u omitir", "unknown action {action:q}; use renombrar, reemplazar or omitir", "action"),
-		"respaldo.err.undecided":        e("falta decidir qué hacer con {label:q}: renombrar, reemplazar u omitir", "you still need to decide what to do with {label:q}: renombrar, reemplazar or omitir", "label"),
+		"respaldo.err.action":           e("acción {action:q} desconocida; usa renombrar, reemplazar u omitir", "unknown action {action:q}; use \"renombrar\", \"reemplazar\" or \"omitir\"", "action"),
+		"respaldo.err.undecided":        e("falta decidir qué hacer con {label:q}: renombrar, reemplazar u omitir", "you still need to decide what to do with {label:q}: \"renombrar\", \"reemplazar\" or \"omitir\"", "label"),
 		"respaldo.err.double_replace":   e("dos credenciales del respaldo reemplazarían la misma credencial de la bóveda ({label:q}): elige otra decisión para una de ellas", "two credentials of the backup would replace the same credential of the vault ({label:q}): choose another decision for one of them", "label"),
 	})
 }

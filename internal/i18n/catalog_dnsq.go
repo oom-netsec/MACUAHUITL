@@ -49,7 +49,7 @@ func init() {
 		"dns.exch.mismatch":       e("dnsq: {server}: la respuesta no corresponde a la pregunta (posible suplantación)", "dnsq: {server}: the response does not match the question (possible spoofing)", "server"),
 		"dns.exch.doh_http":       e("DoH respondió HTTP {status}", "DoH answered HTTP {status}", "status"),
 		"dns.exch.doh_unreadable": e("DoH: respuesta ilegible: {cause}", "DoH: unreadable response: {cause}", "cause"),
-		"dns.exch.trunc_failed":   e("truncada por UDP y TCP falló: {cause}", "truncated over UDP and TCP failed: {cause}", "cause"),
+		"dns.exch.trunc_failed":   e("truncada por UDP y TCP falló: {cause}", "truncated over UDP, and the TCP retry failed: {cause}", "cause"),
 		"dns.zone.no_address":     e("sin dirección", "no address"),
 		"tools.svc.pcap_path":     e("la ruta de la captura debe ser absoluta", "the capture path must be absolute"),
 		"tools.svc.dns_mode":      e("modo DNS no indicado", "DNS mode not given"),

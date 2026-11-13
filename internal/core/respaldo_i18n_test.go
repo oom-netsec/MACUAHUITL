@@ -73,8 +73,8 @@ func TestRespaldoErroresEsYEn(t *testing.T) {
 	}{
 		{"id ajeno", "respaldo.err.decision_unknown", "decisión para una credencial que no está en el respaldo", "decision for a credential that is not in the backup", []*v1.VaultBackupDecision{{Id: "zz", Action: "omitir"}}},
 		{"repetida", "respaldo.err.decision_dup", `decisión repetida para "core"`, `repeated decision for "core"`, []*v1.VaultBackupDecision{{Id: core, Action: "omitir"}, {Id: core, Action: "omitir"}}},
-		{"acción", "respaldo.err.action", `acción "fusionar" desconocida; usa renombrar, reemplazar u omitir`, `unknown action "fusionar"; use renombrar, reemplazar or omitir`, []*v1.VaultBackupDecision{{Id: core, Action: "fusionar"}}},
-		{"sin decidir", "respaldo.err.undecided", `falta decidir qué hacer con "core": renombrar, reemplazar u omitir`, `you still need to decide what to do with "core": renombrar, reemplazar or omitir`, nil},
+		{"acción", "respaldo.err.action", `acción "fusionar" desconocida; usa renombrar, reemplazar u omitir`, `unknown action "fusionar"; use "renombrar", "reemplazar" or "omitir"`, []*v1.VaultBackupDecision{{Id: core, Action: "fusionar"}}},
+		{"sin decidir", "respaldo.err.undecided", `falta decidir qué hacer con "core": renombrar, reemplazar u omitir`, `you still need to decide what to do with "core": "renombrar", "reemplazar" or "omitir"`, nil},
 	} {
 		c := c
 		cases = append(cases, struct {

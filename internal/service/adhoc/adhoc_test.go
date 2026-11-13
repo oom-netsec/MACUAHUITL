@@ -63,7 +63,7 @@ func TestStartAdhocRechazosEsYEn(t *testing.T) {
 	}{
 		{&v1.StartAdhocRequest{Commands: "configure terminal"}, `playbook: comando no permitido en una recolección (solo lectura): "configure terminal" (no es un comando de lectura)`,
 			`playbook: command not allowed in a collection (read-only): "configure terminal" (not a read command)`, "playbook.err.denied_cmd"},
-		{&v1.StartAdhocRequest{Commands: "show clock"}, "indica al menos un equipo", "give at least one device", "adhoc.err.no_targets"},
+		{&v1.StartAdhocRequest{Commands: "show clock"}, "indica al menos un equipo", "specify at least one device", "adhoc.err.no_targets"},
 	} {
 		for loc, want := range map[string]string{"es": c.es, "en": c.en} {
 			_, err := s.StartAdhoc(i18n.WithLocale(context.Background(), loc), c.req)

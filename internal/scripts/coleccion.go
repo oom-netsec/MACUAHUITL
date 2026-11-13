@@ -129,7 +129,7 @@ type ResultadoCol struct {
 	Created, Replaced, Renamed, Merged, Skipped int
 	Warnings                                    []string
 	// WarningTexts son Warnings como texto de catálogo (mismo orden), para darlos en otro idioma.
-	WarningTexts []i18n.Text
+	WarningTexts []i18n.Text `json:"-"`
 }
 
 func (r *ResultadoCol) warn(key string, kv ...any) {
