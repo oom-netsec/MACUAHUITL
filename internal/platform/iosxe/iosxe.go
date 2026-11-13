@@ -283,6 +283,9 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 
 func (d *driver) Hostname() string { return d.hostname }
 
+// wlc9800 busca «C9800» solo en la línea del software, no en el hostname ni en el resto de show version.
+var wlc9800 = regexp.MustCompile(`(?m)^Cisco IOS Software.*, C9800`)
+
 func (d *driver) Detect(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, maxDetect)
 	defer cancel()
@@ -291,7 +294,7 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 		return "", err
 	}
 	switch {
-	case strings.Contains(out.Text, "C9800") && strings.Contains(out.Text, "Cisco IOS XE Software"): // antes de la regla genérica
+	case wlc9800.MatchString(out.Text) && strings.Contains(out.Text, "Cisco IOS XE Software"): // antes de la regla genérica
 		return "wlc-9800", nil
 	case strings.Contains(out.Text, "Cisco IOS XE Software"):
 		return "ios-xe", nil

@@ -96,3 +96,18 @@ func TestExpandRechecksDenied(t *testing.T) {
 		t.Error("CheckDenied no se repasó")
 	}
 }
+
+// Un cuantificador de regex ({3}) en un filtro no es un dato: el playbook carga como antes.
+func TestCuantificadorNoEsDato(t *testing.T) {
+	if _, err := loadOne(t, "id: x\nplatform: ios-xe\nname: X\ncommands:\n  - cmd: show logging | include ^.{3}\n"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// En un 9800 corren los comandos marcados solo para ios-xe (dir bootflash: es su sistema de archivos principal).
+func TestAppliesIOSXEEnWLC9800(t *testing.T) {
+	c := Command{Text: "dir bootflash:", Platforms: []string{"ios-xe"}}
+	if !c.Applies("wlc-9800") || c.Applies("ios") {
+		t.Fatal("ios-xe debe aplicar en wlc-9800 y no en ios")
+	}
+}

@@ -17,7 +17,7 @@ type Param struct{ Name, Kind string }
 var ParamKinds = []string{"mac", "ap", "interface", "ip"}
 
 var (
-	placeholder = regexp.MustCompile(`\{[A-Za-z0-9_-]+\}`)
+	placeholder = regexp.MustCompile(`\{[a-z][a-z0-9_]*\}`) // misma forma que paramName: {3} de un regex no es un dato
 	paramName   = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	// aa:bb:cc:dd:ee:ff, aa-bb-cc-dd-ee-ff, aabb.ccdd.eeff o aabbccddeeff
 	macRe    = regexp.MustCompile(`^(?:(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4}|[0-9A-Fa-f]{12})$`)

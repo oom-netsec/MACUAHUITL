@@ -42,7 +42,7 @@ func TestPlaybookGemeloPorPlataforma(t *testing.T) {
 		{ID: "nx-os/cpu", Platform: "nx-os", Commands: cmd("show nx")}}
 	for _, c := range []struct{ id, det, want string }{
 		{"ios-xe/cpu", "ios", "show clasico"}, {"ios/cpu", "ios-xe", "show xe"}, {"ios-xe/cpu", "ios-xe", "show xe"},
-		{"ios/cpu", "ios", "show clasico"}, {"ios-xe/solo", "ios", "show solo"}, {"nx-os/cpu", "nx-os", "show nx"},
+		{"ios/cpu", "ios", "show clasico"}, {"ios-xe/solo", "ios", "show solo"}, {"nx-os/cpu", "nx-os", "show nx"}, {"ios/cpu", "wlc-9800", "show xe"},
 	} {
 		out, _, err := commands(Spec{PlaybookIDs: []string{c.id}}, c.det, pbs, nil)
 		if err != nil || len(out) != 1 || out[0].Text != c.want {

@@ -33,9 +33,10 @@ type Command struct {
 	Platforms []string
 }
 
-// Applies dice si el comando corre en la plataforma detectada.
+// Applies dice si el comando corre en la plataforma detectada; un 9800 es IOS-XE, así que corre los marcados ios-xe.
 func (c Command) Applies(detected string) bool {
-	return len(c.Platforms) == 0 || slices.Contains(c.Platforms, detected)
+	return len(c.Platforms) == 0 || slices.Contains(c.Platforms, detected) ||
+		(detected == "wlc-9800" && slices.Contains(c.Platforms, "ios-xe"))
 }
 
 // Compatible: un IOS clásico y un WLC 9800 (que es IOS-XE) usan también los playbooks de IOS-XE; lo que no exista queda marcado inválido.
@@ -155,7 +156,7 @@ func parse(b []byte) (Playbook, error) {
 	}
 	p := Playbook{ID: f.Platform + "/" + f.ID, Platform: f.Platform, Name: f.Name, NameEn: f.NameEn, Pre: f.Pre}
 	for _, q := range f.Params {
-		p.Params = append(p.Params, Param{q.Name, q.Kind})
+		p.Params = append(p.Params, Param(q))
 	}
 	if err := checkParams(p.Params, f.Pre, f.Commands); err != nil {
 		return Playbook{}, err

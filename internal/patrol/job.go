@@ -300,8 +300,12 @@ func resolve(s Spec, detected string, pbs []playbook.Playbook, missing func(stri
 	seen := map[string]bool{}
 	for _, id := range s.PlaybookIDs {
 		p := find(pbs, id)
-		if iosFamily(detected) && (p == nil || iosFamily(p.Platform)) { // flota mixta
-			if twin := playbook.Twin(pbs, id, detected); twin != nil {
+		look := detected
+		if look == "wlc-9800" { // un 9800 es IOS-XE: su gemelo es el de ios-xe
+			look = "ios-xe"
+		}
+		if iosFamily(look) && (p == nil || iosFamily(p.Platform)) { // flota mixta
+			if twin := playbook.Twin(pbs, id, look); twin != nil {
 				p = twin
 			}
 		}
