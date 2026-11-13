@@ -15,6 +15,7 @@ commands:
   - cmd: show ip ospf neighbor
   - cmd: show ip eigrp neighbors
   - cmd: show ip bgp summary
+  - cmd: show bgp all summary
   - cmd: show bfd neighbors
   - cmd: show crypto session
   - cmd: show dmvpn

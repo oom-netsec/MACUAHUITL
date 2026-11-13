@@ -14,13 +14,14 @@ commands:
   - cmd: show crypto ikev2 diagnose error
   - cmd: show crypto ikev2 profile
   - cmd: show crypto ikev2 authorization policy
-  - cmd: show crypto session detail
-  - cmd: show crypto ipsec sa
   - cmd: show crypto pki trustpoints
   - cmd: show crypto pki certificates
   - cmd: show crypto key mypubkey rsa
-  - cmd: show interface virtual-access
   - cmd: show ip interface brief | include Virtual-Access|Tunnel
   - cmd: show logging | include IKEV2|CRYPTO|PKI|IPSEC
   - cmd: show running-config | section crypto ikev2|crypto ipsec|Virtual-Template|interface Tunnel
     may_contain_secrets: true
+  - cmd: show crypto session detail
+    timeout: 120s
+  - cmd: show crypto ipsec sa
+    timeout: 120s

@@ -13,7 +13,6 @@ commands:
   - cmd: show crypto session
   - cmd: show crypto isakmp sa
   - cmd: show crypto ikev2 sa
-  - cmd: show crypto ipsec sa
   - cmd: show dmvpn
   - cmd: show ip nhrp nhs detail
   - cmd: show ip route static
@@ -23,3 +22,5 @@ commands:
   - cmd: show logging | include IKE|CRYPTO|IPSEC|NHRP|TUN|LINEPROTO
   - cmd: show running-config | section crypto|tunnel
     may_contain_secrets: true
+  - cmd: show crypto ipsec sa
+    timeout: 120s

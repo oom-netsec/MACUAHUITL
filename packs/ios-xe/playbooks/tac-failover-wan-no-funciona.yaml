@@ -17,6 +17,7 @@ commands:
   - cmd: show ip policy
   - cmd: show route-map
   - cmd: show standby brief
+  - cmd: show vrrp brief
   - cmd: show bfd neighbors
   - cmd: show ip protocols
   - cmd: show logging | include TRACK|SLA|STANDBY|BFD|ROUTE_MAP|LINEPROTO

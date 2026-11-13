@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/pack"
@@ -30,8 +31,8 @@ func TestFirmaLosPaquetesDelRepoYVerificanComoOficiales(t *testing.T) {
 			t.Fatalf("%s no verifica como oficial: %v", h, err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(out, "oom-ios-xe-1.0.0.mpack")); err != nil {
-		t.Fatal("falta oom-ios-xe-1.0.0.mpack")
+	if _, err := os.Stat(filepath.Join(out, "oom-ios-xe-"+versionIOSXE(t)+".mpack")); err != nil {
+		t.Fatal("falta el .mpack de oom/ios-xe")
 	}
 }
 
@@ -90,6 +91,20 @@ func TestNoPisaUnAssetExistente(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := firmaTodos("../../../packs", out, "0.3.0", priv, []ed25519.PublicKey{pub}); err == nil {
-		t.Fatal("pisó oom-ios-xe-1.0.0.mpack")
+		t.Fatal("pisó el .mpack de oom/ios-xe")
 	}
+}
+
+// versionIOSXE lee la versión de packs/ios-xe/manifest.yaml para no fijarla en la prueba.
+func versionIOSXE(t *testing.T) string {
+	t.Helper()
+	b, err := os.ReadFile("../../../packs/ios-xe/manifest.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`(?m)^version: (\S+)$`).FindSubmatch(b)
+	if m == nil {
+		t.Fatal("el manifiesto no trae versión")
+	}
+	return string(m[1])
 }

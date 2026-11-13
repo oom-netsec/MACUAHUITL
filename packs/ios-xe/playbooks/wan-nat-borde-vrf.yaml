@@ -16,8 +16,6 @@ commands:
   - cmd: show drops nat
   - cmd: show platform hardware qfp active statistics drop
   - cmd: show platform hardware qfp active datapath utilization summary
-  - cmd: show platform packet-trace statistics
-  - cmd: show platform packet-trace summary
   - cmd: show logging | include NAT
   - cmd: show running-config | include ip nat|vrf|access-list
     may_contain_secrets: true

@@ -10,9 +10,6 @@ commands:
   - cmd: show clock
   - cmd: show track
   - cmd: show track brief
-  - cmd: show ip sla summary
-  - cmd: show ip sla statistics
-  - cmd: show ip sla configuration
   - cmd: show ip route track-table
   - cmd: show ip route static
   - cmd: show logging | include TRACK|SLA

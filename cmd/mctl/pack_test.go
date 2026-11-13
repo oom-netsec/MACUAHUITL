@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -11,7 +12,7 @@ import (
 
 func TestPackListShowRemoveInstall(t *testing.T) {
 	startCore(t) // el arnés ya instaló oom/ios-xe firmado con la llave de pruebas
-	if out := must(t, "", "pack", "list"); !strings.Contains(out, "oom/ios-xe  1.0.0  oficial") {
+	if out := must(t, "", "pack", "list"); !strings.Contains(out, "oom/ios-xe  "+versionIOSXE(t)+"  oficial") {
 		t.Fatalf("list: %q", out)
 	}
 	if out := must(t, "", "pack", "show", "oom/ios-xe"); !strings.Contains(out, "licencia: Apache-2.0") || !strings.Contains(out, "mctl pack install") {
@@ -39,4 +40,18 @@ func TestPackListShowRemoveInstall(t *testing.T) {
 	if _, err := mctl(t, "", "pack", "install"); err == nil || !strings.Contains(err.Error(), "uso:") {
 		t.Fatalf("sin archivo: %v", err)
 	}
+}
+
+// versionIOSXE lee la versión de packs/ios-xe/manifest.yaml para no fijarla en la prueba.
+func versionIOSXE(t *testing.T) string {
+	t.Helper()
+	b, err := os.ReadFile("../../packs/ios-xe/manifest.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`(?m)^version: (\S+)$`).FindSubmatch(b)
+	if m == nil {
+		t.Fatal("el manifiesto no trae versión")
+	}
+	return string(m[1])
 }

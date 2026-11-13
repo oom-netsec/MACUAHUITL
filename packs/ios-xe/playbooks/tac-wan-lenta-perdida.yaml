@@ -14,8 +14,11 @@ commands:
   - cmd: show ip nat statistics
   - cmd: show platform hardware qfp active statistics drop
   - cmd: show platform hardware qfp active datapath utilization summary
-  - cmd: show platform hardware throughput level
-  - cmd: show platform hardware qfp active feature lic-bw oversubscription
+  - cmd: show processes cpu sorted
+  - cmd: show processes cpu platform sorted
+  - cmd: show platform resources
+  - cmd: show platform hardware throughput level # no existe en ASR 1000 ni C8500
+  - cmd: show platform hardware qfp active feature lic-bw oversubscription # no existe en ASR 1000 ni C8500
   - cmd: show platform hardware qfp active infrastructure punt statistics type per-cause
   - cmd: show logging | include UPDOWN|LINK|DUPLEX|QOS|BFD
   - cmd: show interfaces | include line protocol|input errors|CRC|output drops|Total output drops|rate

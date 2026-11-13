@@ -15,9 +15,11 @@ commands:
   - cmd: show ip ospf neighbor
   - cmd: show ip eigrp neighbors
   - cmd: show ip bgp summary
+  - cmd: show bgp all summary
   - cmd: show bfd neighbors
   - cmd: show track brief
   - cmd: show ip route track-table
   - cmd: show ip sla summary
   - cmd: show standby brief
+  - cmd: show vrrp brief
   - cmd: show logging | include TRACK|SLA|STANDBY|BFD|BGP|OSPF|EIGRP|LINEPROTO

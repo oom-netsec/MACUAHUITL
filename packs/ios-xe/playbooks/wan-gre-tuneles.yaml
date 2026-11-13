@@ -17,5 +17,6 @@ commands:
   - cmd: show ip traffic
   - cmd: show platform hardware qfp active statistics drop
   - cmd: show interfaces | include Tunnel|Tunnel source|Tunnel protocol|packets input|packets output
+    timeout: 120s
   - cmd: show running-config | section interface Tunnel
     may_contain_secrets: true
