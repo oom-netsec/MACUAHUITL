@@ -134,11 +134,11 @@ func Msg(loc, code string, args Args) string {
 	return render(e.Es, args)
 }
 
-// Los códigos que son un valor con palabras (calc.val.*, ike.val.*) pueden ir como valor de un argumento: al armar
+// Los códigos que son un valor con palabras (calc.val.*, ike.val.*, assist.what.*) pueden ir como valor de un argumento: al armar
 // el texto se escriben en el idioma pedido, así un mensaje cita un valor traducible. Varios códigos separados por
 // coma se escriben separados por «, ».
 func isValKey(v string) bool {
-	if !strings.HasPrefix(v, "calc.val.") && !strings.HasPrefix(v, "ike.val.") {
+	if !strings.HasPrefix(v, "calc.val.") && !strings.HasPrefix(v, "ike.val.") && !strings.HasPrefix(v, "assist.what.") {
 		return false
 	}
 	_, ok := catalog[v]

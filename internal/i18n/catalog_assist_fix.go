@@ -14,3 +14,16 @@ func init() {
 		"assist.residue.err_disabled": e("{port} quedó err-disabled; la reversa no lo recupera: shutdown/no shutdown a mano", "{port} ended up err-disabled; the rollback does not recover it: shutdown/no shutdown by hand", "port"),
 	})
 }
+
+// Etiquetas de lo que valida unicastIPv4; entran como {what} de assist.err.ipv4_invalid_for y unicast_unusable (Refs).
+func init() {
+	e := func(es, en string) entry { return entry{Es: es, En: en} }
+	add(map[string]entry{
+		"assist.what.network":     e("red", "network"),
+		"assist.what.next_hop":    e("siguiente salto", "next hop"),
+		"assist.what.loopback":    e("loopback", "loopback"),
+		"assist.what.helper":      e("helper", "helper"),
+		"assist.what.ntp_server":  e("servidor NTP", "NTP server"),
+		"assist.what.syslog_dest": e("destino de syslog", "syslog destination"),
+	})
+}

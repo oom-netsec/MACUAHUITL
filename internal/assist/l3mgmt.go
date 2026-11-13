@@ -125,7 +125,7 @@ func (r routeSpec) back() string {
 }
 
 func (r routeSpec) check() error {
-	if err := unicastIPv4("red", r.net); err != nil {
+	if err := unicastIPv4("assist.what.network", r.net); err != nil {
 		return err
 	}
 	ones, err := maskBits(r.mask)
@@ -140,7 +140,7 @@ func (r routeSpec) check() error {
 		return lerr("indica el siguiente salto, la interfaz de salida o ambos", "give the next hop, the exit interface or both")
 	}
 	if r.nh != "" {
-		if err := unicastIPv4("siguiente salto", r.nh); err != nil {
+		if err := unicastIPv4("assist.what.next_hop", r.nh); err != nil {
 			return err
 		}
 		if p, _ := n.Prefix(ones); p.Contains(netip.MustParseAddr(r.nh)) {
@@ -357,7 +357,7 @@ func loopID(name string) (int, bool) {
 
 // checkLoopbackAddress: IPv4 unicast, máscara contigua de /8 a /32 y, salvo en /31 y /32, ni la red ni la difusión.
 func checkLoopbackAddress(addr, mask string) error {
-	if err := unicastIPv4("loopback", addr); err != nil {
+	if err := unicastIPv4("assist.what.loopback", addr); err != nil {
 		return err
 	}
 	ones, err := maskBits(mask)
@@ -483,7 +483,7 @@ var SnippetHelper = Function{
 				return lerr("solo una SVI, un puerto físico, un Port-channel o una subinterfaz", "only an SVI, a physical port, a Port-channel or a subinterface")
 			}
 		case f[0] == "ip" && len(f) == 3, f[0] == "no" && len(f) == 4:
-			return unicastIPv4("helper", f[len(f)-1])
+			return unicastIPv4("assist.what.helper", f[len(f)-1])
 		default:
 			return lerr("solo interface X, ip helper-address A y su no", "only interface X, ip helper-address A and its no")
 		}
@@ -497,7 +497,7 @@ func helperPre(v Values) ([]string, error) {
 	if !routedIfaceRe.MatchString(n) {
 		return nil, cerr("assist.err.not_svi_or_port", "port", n)
 	}
-	if err := unicastIPv4("helper", v.Str("address")); err != nil {
+	if err := unicastIPv4("assist.what.helper", v.Str("address")); err != nil {
 		return nil, err
 	}
 	pre := []string{showCfg(n)}
@@ -567,7 +567,7 @@ var SnippetNTP = Function{
 		default:
 			return cerr("assist.err.ntp_form")
 		}
-		return unicastIPv4("servidor NTP", f[len(f)-1-ifElseInt(f[len(f)-1] == "prefer", 1, 0)])
+		return unicastIPv4("assist.what.ntp_server", f[len(f)-1-ifElseInt(f[len(f)-1] == "prefer", 1, 0)])
 	},
 	CheckDevice: l2Inverse(keyN("ntp server", 3), func(string) string { return ntpCmd }),
 }
@@ -580,7 +580,7 @@ func ifElseInt(c bool, a, b int) int {
 }
 
 func ntpPre(v Values) ([]string, error) {
-	if err := unicastIPv4("servidor NTP", v.Str("address")); err != nil {
+	if err := unicastIPv4("assist.what.ntp_server", v.Str("address")); err != nil {
 		return nil, err
 	}
 	return []string{ntpCmd}, nil
@@ -654,12 +654,12 @@ var SnippetLogging = Function{
 		}
 		switch {
 		case len(f) == 3 && f[1] == "host":
-			return unicastIPv4("destino de syslog", f[2])
+			return unicastIPv4("assist.what.syslog_dest", f[2])
 		case len(f) == 7 && f[1] == "host": // logging host IP transport udp|tcp port N, nada más (ni beep ni opciones extra)
 			if _, _, ok := (iosxe.LogHost{Options: f[3:]}).Transport(); !ok {
 				return lerr("solo logging host A transport udp|tcp port N (1-65535)", "only logging host A transport udp|tcp port N (1-65535)")
 			}
-			return unicastIPv4("destino de syslog", f[2])
+			return unicastIPv4("assist.what.syslog_dest", f[2])
 		case len(f) == 3 && f[1] == "trap" && !neg && slices.Contains(logLevels, f[2]):
 		case len(f) == 2 && f[1] == "trap" && neg:
 		default:
@@ -708,7 +708,7 @@ func loggingSpec(v Values) (apply, opts, transport string, port int) {
 }
 
 func loggingPre(v Values) ([]string, error) {
-	if err := unicastIPv4("destino de syslog", v.Str("address")); err != nil {
+	if err := unicastIPv4("assist.what.syslog_dest", v.Str("address")); err != nil {
 		return nil, err
 	}
 	if t, p := v.Str("transport"), v.Int("port"); t != "" && t != "udp" && t != "tcp" || p < 0 || p > 65535 || v.Has("port") && p == 0 {
