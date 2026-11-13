@@ -1,0 +1,349 @@
+package pack
+
+import (
+	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
+)
+
+const fileIndex = "INDEX" // el índice calculado al instalar; revalida el contenido al arrancar
+
+// Base es el contenido que sigue embebido en el binario; con él se detectan los choques de IDs y nombres.
+type Base struct {
+	PlaybookIDs []string
+	ScriptIDs   []string
+	ScriptNames []string // se comparan con scripts.NameKey
+}
+
+// Rejected es un paquete instalado que no pasó la revalidación al arrancar.
+type Rejected struct {
+	Dir    string // relativa a la carpeta de paquetes
+	ID     string // vacío si el manifiesto no se pudo leer
+	Reason string
+}
+
+// Snapshot es una foto inmutable de los paquetes instalados, ordenados por ID.
+type Snapshot struct{ Packs []*Pack }
+
+// Store es la carpeta <datos>/packs con los paquetes instalados y su foto en memoria.
+type Store struct {
+	dir      string
+	core     string
+	keys     []ed25519.PublicKey
+	base     Base
+	mu       sync.Mutex // serializa instalar y quitar
+	snap     atomic.Pointer[Snapshot]
+	OnChange func() // tras instalar o quitar, ya publicada la foto nueva; sin locks tomados
+}
+
+// Open abre la carpeta, borra los .tmp-* que hayan quedado y revalida cada paquete (sha256, índice, firma, sin
+// archivos de más ni enlaces). Uno que no pasa se omite y vuelve en rej; el núcleo sigue funcionando.
+func Open(dir, coreVersion string, keys []ed25519.PublicKey, base Base) (*Store, []Rejected, error) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, nil, err
+	}
+	s := &Store{dir: dir, core: coreVersion, keys: keys, base: base}
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	var rej []Rejected
+	var packs []*Pack
+	for _, e := range ents {
+		if strings.HasPrefix(e.Name(), ".tmp-") {
+			os.RemoveAll(filepath.Join(dir, e.Name()))
+			continue
+		}
+		sub, err := os.ReadDir(filepath.Join(dir, e.Name()))
+		if err != nil || !e.IsDir() {
+			rej = append(rej, Rejected{Dir: e.Name(), Reason: "zip.path"})
+			continue
+		}
+		for _, n := range sub {
+			rel := e.Name() + "/" + n.Name()
+			p, err := s.revalidate(rel)
+			if err == nil {
+				err = s.collides(p, packs)
+			}
+			if err != nil {
+				r := Rejected{Dir: rel, Reason: Reason(err)}
+				if p != nil {
+					r.ID = p.ID
+				}
+				if r.Reason == "" {
+					r.Reason = "read"
+				}
+				rej = append(rej, r)
+				continue
+			}
+			packs = append(packs, p)
+		}
+	}
+	s.publish(packs)
+	return s, rej, nil
+}
+
+func (s *Store) revalidate(rel string) (*Pack, error) {
+	d := filepath.Join(s.dir, rel)
+	if fi, err := os.Lstat(d); err != nil || !fi.IsDir() {
+		return nil, rej("zip.path", "name", rel)
+	}
+	files, err := readDir(d, fileIndex)
+	if err != nil {
+		return nil, err
+	}
+	idx, ok := files[fileIndex]
+	delete(files, fileIndex)
+	if !ok {
+		return nil, rej("index.mismatch", "name", fileIndex)
+	}
+	if string(idx) != string(Index(files)) {
+		return nil, rej("index.mismatch", "name", rel)
+	}
+	p, err := check(files, s.core, s.keys, false)
+	if err != nil {
+		return nil, err
+	}
+	if rel != filepath.ToSlash(p.ID) {
+		return p, rej("zip.path", "name", rel)
+	}
+	return p, nil
+}
+
+func (s *Store) publish(packs []*Pack) {
+	sort.Slice(packs, func(i, j int) bool { return packs[i].ID < packs[j].ID })
+	s.snap.Store(&Snapshot{Packs: packs})
+}
+
+// Snapshot es la foto vigente; nunca cambia una vez devuelta.
+func (s *Store) Snapshot() *Snapshot { return s.snap.Load() }
+
+// Contenido es lo que los paquetes suman a la biblioteca de scripts.
+func (sn *Snapshot) Contenido() []scripts.Contenido {
+	var out []scripts.Contenido
+	for _, p := range sn.Packs {
+		out = append(out, scripts.Contenido{Playbooks: p.Playbooks, Scripts: p.Scripts})
+	}
+	return out
+}
+
+// Find busca el ID entre los instalados; nunca lo une a una ruta.
+func (sn *Snapshot) Find(id string) *Pack {
+	for _, p := range sn.Packs {
+		if p.ID == id {
+			return p
+		}
+	}
+	return nil
+}
+
+// ScriptIDs son los IDs de todos los scripts que el paquete aporta: los derivados de sus playbooks y los propios.
+func (p *Pack) ScriptIDs() []string {
+	d, _ := scripts.Derived(p.Playbooks)
+	var ids []string
+	for _, s := range append(d, p.Scripts...) {
+		ids = append(ids, s.ID)
+	}
+	return ids
+}
+
+// collides aplica el paso 7: ID de playbook o de script, o nombre de script, repetido contra la base, los otros
+// paquetes (menos el mismo ID, que se reemplaza) o el propio paquete.
+func (s *Store) collides(p *Pack, others []*Pack) error {
+	pbs, ids, names := map[string]string{}, map[string]string{}, map[string]string{}
+	for _, id := range s.base.PlaybookIDs {
+		pbs[id] = "base"
+	}
+	for _, id := range s.base.ScriptIDs {
+		ids[id] = "base"
+	}
+	for _, n := range s.base.ScriptNames {
+		names[scripts.NameKey(n)] = "base"
+	}
+	add := func(q *Pack, who string) error {
+		for _, pb := range q.Playbooks {
+			if w, dup := pbs[pb.ID]; dup {
+				return rej("collision", "id", pb.ID, "with", w)
+			}
+			pbs[pb.ID] = who
+		}
+		d, _ := scripts.Derived(q.Playbooks)
+		for _, sc := range append(d, q.Scripts...) {
+			if w, dup := ids[sc.ID]; dup {
+				return rej("collision", "id", sc.ID, "with", w)
+			}
+			ids[sc.ID] = who
+			k := scripts.NameKey(sc.Name)
+			if w, dup := names[k]; dup {
+				return rej("collision", "id", sc.Name, "with", w)
+			}
+			names[k] = who
+		}
+		return nil
+	}
+	for _, o := range others {
+		if o.ID == p.ID {
+			continue
+		}
+		if err := add(o, o.ID); err != nil { // dos paquetes ya instalados chocan entre sí: no es culpa de p
+			continue
+		}
+	}
+	return add(p, p.ID)
+}
+
+// ReadArchive lee el .mpack una sola vez, con tope de 20 MB.
+func ReadArchive(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, i18n.Wrap("pack.err.read", err, nil)
+	}
+	defer f.Close()
+	if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
+		return nil, rej("zip.invalid")
+	}
+	b, err := io.ReadAll(io.LimitReader(f, MaxArchive+1))
+	if err != nil {
+		return nil, i18n.Wrap("pack.err.read", err, nil)
+	}
+	if len(b) > MaxArchive {
+		return nil, rej("zip.too_big", "what", "archive")
+	}
+	return b, nil
+}
+
+// Result es lo que devuelve Install.
+type Result struct {
+	Pack     *Pack
+	Replaced string // versión anterior que reemplazó; vacío si era nuevo
+}
+
+// Install hace los pasos 2 a 8 del ADR sobre bytes ya leídos. allowUnsigned es la confirmación explícita para un
+// paquete de terceros.
+func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
+	p, err := Verify(data, s.core, s.keys)
+	if err != nil {
+		return nil, err
+	}
+	if !p.Official && !allowUnsigned {
+		return &Result{Pack: p}, rej("unsigned")
+	}
+	s.mu.Lock()
+	cur := s.snap.Load()
+	old := cur.Find(p.ID)
+	if old != nil {
+		switch {
+		case old.Official && !p.Official:
+			s.mu.Unlock()
+			return nil, rej("official_replace", "id", p.ID)
+		case CompareVersions(p.Version, old.Version) <= 0:
+			s.mu.Unlock()
+			return nil, rej("version", "id", p.ID, "installed", old.Version, "version", p.Version)
+		}
+	}
+	if err := s.collides(p, cur.Packs); err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
+	if err := s.extract(p, old != nil); err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
+	next := []*Pack{p}
+	for _, o := range cur.Packs {
+		if o.ID != p.ID {
+			next = append(next, o)
+		}
+	}
+	s.publish(next)
+	s.mu.Unlock()
+	if s.OnChange != nil {
+		s.OnChange()
+	}
+	res := &Result{Pack: p}
+	if old != nil {
+		res.Replaced = old.Version
+	}
+	return res, nil
+}
+
+// extract escribe el paquete en .tmp-* y lo mete con rename; la versión anterior se borra después del rename.
+func (s *Store) extract(p *Pack, replace bool) error {
+	tmp, err := os.MkdirTemp(s.dir, ".tmp-")
+	if err != nil {
+		return i18n.Wrap("pack.err.read", err, nil)
+	}
+	defer os.RemoveAll(tmp)
+	files := map[string][]byte{fileIndex: Index(p.files)}
+	for n, b := range p.files {
+		files[n] = b
+	}
+	for n, b := range files {
+		dst := filepath.Join(tmp, "x", filepath.FromSlash(n))
+		if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
+			return i18n.Wrap("pack.err.read", err, nil)
+		}
+		if err := os.WriteFile(dst, b, 0o600); err != nil {
+			return i18n.Wrap("pack.err.read", err, nil)
+		}
+	}
+	final := filepath.Join(s.dir, filepath.FromSlash(p.ID))
+	if err := os.MkdirAll(filepath.Dir(final), 0o700); err != nil {
+		return i18n.Wrap("pack.err.read", err, nil)
+	}
+	var aside string
+	if replace {
+		aside = filepath.Join(tmp, "old")
+		if err := os.Rename(final, aside); err != nil {
+			return i18n.Wrap("pack.err.read", err, nil)
+		}
+	}
+	if err := os.Rename(filepath.Join(tmp, "x"), final); err != nil {
+		if aside != "" {
+			os.Rename(aside, final)
+		}
+		return i18n.Wrap("pack.err.read", err, nil)
+	}
+	return nil // el defer borra tmp, y con él la versión anterior apartada
+}
+
+// Remove quita el paquete id (buscado entre los instalados) y devuelve lo que traía.
+func (s *Store) Remove(id string) (*Pack, error) {
+	s.mu.Lock()
+	cur := s.snap.Load()
+	p := cur.Find(id)
+	if p == nil {
+		s.mu.Unlock()
+		return nil, rej("not_found", "id", id)
+	}
+	// p.ID cumple la gramática del manifiesto, así que la ruta no sale de la carpeta.
+	if err := os.RemoveAll(filepath.Join(s.dir, filepath.FromSlash(p.ID))); err != nil {
+		s.mu.Unlock()
+		return nil, i18n.Wrap("pack.err.read", err, nil)
+	}
+	var next []*Pack
+	for _, o := range cur.Packs {
+		if o.ID != id {
+			next = append(next, o)
+		}
+	}
+	s.publish(next)
+	s.mu.Unlock()
+	if s.OnChange != nil {
+		s.OnChange()
+	}
+	return p, nil
+}
+
+// SHA256 es el sha256 en hex de los bytes del archivo.
+func SHA256(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
