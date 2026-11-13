@@ -60,6 +60,7 @@ func TestListPlaybooks(t *testing.T) {
 // Con el catálogo real embebido: ids con la forma que acepta CreateJob y comandos presentes.
 func TestListPlaybooksCatalogoReal(t *testing.T) {
 	h := newHarness(t, nil)
+	h.installIOSXE(t)
 	r, err := h.patrol.ListPlaybooks(ctx(t), &v1.ListPlaybooksRequest{Platform: "ios-xe"})
 	if err != nil || len(r.Playbooks) == 0 {
 		t.Fatalf("catálogo vacío: %v", err)
@@ -103,6 +104,7 @@ func TestLoadPlaybooksUserOverridesEmbedded(t *testing.T) {
 // Un equipo ios clásico lista los playbooks de ios-xe, sin los comandos que solo corren en ios-xe (dir bootflash:).
 func TestListPlaybooksIOSListaLosDeIOSXE(t *testing.T) {
 	h := newHarness(t, nil)
+	h.installIOSXE(t)
 	xe, _ := h.patrol.ListPlaybooks(ctx(t), &v1.ListPlaybooksRequest{Platform: "ios-xe"})
 	ios, err := h.patrol.ListPlaybooks(ctx(t), &v1.ListPlaybooksRequest{Platform: "ios"})
 	if err != nil || len(ios.Playbooks) == 0 || len(ios.Playbooks) != len(xe.Playbooks) {

@@ -1,18 +1,31 @@
 package scripts
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/playbooks"
 )
 
-func TestBibliotecaCargaYSusScriptsSonValidos(t *testing.T) {
-	lib, err := Library(playbooks.FS)
+// conPaquete es la biblioteca con el contenido del paquete oficial oom/ios-xe, como la ve un núcleo que lo instaló.
+func conPaquete(t *testing.T) []Script {
+	t.Helper()
+	pbs, err := playbook.Load(os.DirFS("../../packs/ios-xe/playbooks"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	lib, _, err := LibraryWith(playbooks.FS, []Contenido{{Playbooks: pbs}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return lib
+}
+
+func TestBibliotecaCargaYSusScriptsSonValidos(t *testing.T) {
+	lib := conPaquete(t)
 	if len(lib) < 60 {
 		t.Fatalf("faltan scripts de la biblioteca: %d", len(lib))
 	}
@@ -49,7 +62,7 @@ func TestBibliotecaCargaYSusScriptsSonValidos(t *testing.T) {
 
 // Los scripts de diagnóstico siguen en sincronía con los playbooks porque se derivan de ellos al cargar.
 func TestBibliotecaDiagnosticoCoincideConElPlaybook(t *testing.T) {
-	lib, _ := Library(playbooks.FS)
+	lib := conPaquete(t)
 	for _, s := range lib {
 		if s.ID != "lib-l2-stp" {
 			continue

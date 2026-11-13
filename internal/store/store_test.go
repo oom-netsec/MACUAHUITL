@@ -110,15 +110,18 @@ func TestMigrateFromEitherBranch(t *testing.T) {
 			if _, err := db.Exec(`INSERT INTO script_collection_items(collection_id, script_id, position) VALUES('favoritos','lib-x',0)`); err != nil {
 				t.Fatalf("sin la colección favoritos: %v", err)
 			}
+			if _, err := db.Exec(`INSERT INTO pack_removed VALUES('ios-xe/x','oom/ios-xe')`); err != nil {
+				t.Fatalf("sin pack_removed: %v", err)
+			}
 			if _, err := db.Exec(`INSERT INTO hosts VALUES('h','n','10.0.0.1',22,'','','[]','','','t','t')`); err != nil {
 				t.Fatalf("sin hosts: %v", err)
 			}
 			if _, err := db.Exec(`INSERT INTO hosts VALUES('h2','N','10.0.0.2',22,'','','[]','','','t','t')`); err == nil {
 				t.Fatal("el nombre de un host no se repite aunque cambien las mayúsculas")
 			}
-			want := 6 // 0001, preferences, historial, scripts, colecciones, hosts
+			want := 7 // 0001, preferences, historial, scripts, colecciones, hosts, paquetes quitados
 			if applied != nil && applied[1] == "0002_job_history.sql" {
-				want = 7 // además queda la fila con el nombre viejo
+				want = 8 // además queda la fila con el nombre viejo
 			}
 			if n != want {
 				t.Fatalf("migraciones registradas = %d, want %d", n, want)

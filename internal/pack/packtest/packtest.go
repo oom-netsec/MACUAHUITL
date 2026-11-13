@@ -42,4 +42,20 @@ func Signed(t testing.TB, dir string) []byte {
 }
 
 // IOSXE es packs/ios-xe del repo, firmado con la llave de pruebas.
-func IOSXE(t testing.TB) []byte { t.Helper(); return Signed(t, filepath.Join(RepoDir(), "packs", "ios-xe")) }
+func IOSXE(t testing.TB) []byte {
+	t.Helper()
+	return Signed(t, filepath.Join(RepoDir(), "packs", "ios-xe"))
+}
+
+// InstallIOSXE deja oom/ios-xe instalado en <data>/packs, como lo habría dejado «mctl pack install»; el núcleo que
+// se abra después sobre data debe usar Keys() como core.Options.PackKeys.
+func InstallIOSXE(t testing.TB, data string) {
+	t.Helper()
+	st, _, err := pack.Open(filepath.Join(data, "packs"), "dev", Keys(), pack.Base{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Install(IOSXE(t), false); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -133,8 +133,11 @@ func check(files map[string][]byte, coreVersion string, keys []ed25519.PublicKey
 		return nil, err
 	}
 	p.Manifest = m
-	if m.Editor() == "oom" && !p.Official && !source {
-		return nil, rej("editor.reserved", "editor", "oom")
+	if m.Editor() == "oom" && !p.Official {
+		if !source {
+			return nil, rej("editor.reserved", "editor", "oom")
+		}
+		p.Official = true // una fuente oom/* será oficial cuando el release la firme: sin prefijo de editor en los IDs
 	}
 	if !utf8.Valid(files[fileReadme]) {
 		return nil, rej("manifest.invalid", "field", "README.md")

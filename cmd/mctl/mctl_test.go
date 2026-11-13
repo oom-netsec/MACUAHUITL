@@ -17,6 +17,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/core"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/pack/packtest"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
@@ -53,7 +54,8 @@ func startCoreWith(t *testing.T, prepare func(core.Paths)) *env {
 	if prepare != nil {
 		prepare(p)
 	}
-	o := core.Options{VaultParams: &vault.Params{MemoryKiB: 8192, Iterations: 1, Threads: 1}, Actor: "tester", RetryBackoff: []time.Duration{}}
+	packtest.InstallIOSXE(t, p.Data) // los playbooks movidos al paquete oficial oom/ios-xe, firmado con la llave de pruebas
+	o := core.Options{VaultParams: &vault.Params{MemoryKiB: 8192, Iterations: 1, Threads: 1}, Actor: "tester", RetryBackoff: []time.Duration{}, PackKeys: packtest.Keys()}
 	if bin := os.Getenv("MCTL_TEST_DIAG_BIN"); bin != "" {
 		o.DiagLookPath = func(name string) (string, error) { return filepath.Join(bin, name), nil }
 	}

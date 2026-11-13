@@ -82,6 +82,11 @@ func newEnv(t *testing.T, c simulator.Config) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
+	pack, err := playbook.Load(os.DirFS("../../packs/ios-xe/playbooks")) // los movidos al paquete oficial oom/ios-xe
+	if err != nil {
+		t.Fatal(err)
+	}
+	pbs = append(pbs, pack...)
 	return &env{
 		d: Deps{Guard: transport.NewGuard(nil, nil), Hosts: hosts, Vault: v, Audit: audit.New(db, time.Now), Now: time.Now, Playbooks: pbs},
 		spec: Spec{
