@@ -89,3 +89,29 @@ func TestAdhocDeniedAuditaEnIngles(t *testing.T) {
 		}
 	}
 }
+
+// Fase 30e: los errores de AdhocResult salen en el idioma pedido; el máximo de comandos se audita en inglés.
+func TestAdhocResultErroresEnElIdioma(t *testing.T) {
+	cases := []struct {
+		info   service.JobInfo
+		es, en string
+	}{
+		{service.JobInfo{State: "failed"}, "el núcleo se detuvo con el lote en curso; vuelve a lanzarlo", "the core stopped with the batch in progress; launch it again"},
+		{service.JobInfo{State: "completed"}, "el lote no conserva su carpeta de salida", "the batch no longer has its output folder"},
+	}
+	for _, c := range cases {
+		for loc, want := range map[string]string{"": c.es, "es": c.es, "en": c.en} {
+			s := &adhocSvc{d: jobDeps{servicetest.New(t), c.info}, cmds: map[string][]string{}}
+			r, err := s.AdhocResult(i18n.WithLocale(context.Background(), loc), &v1.AdhocResultRequest{JobId: "j"})
+			if err != nil || r.Error != want {
+				t.Errorf("%q %s: %q %v", loc, c.info.State, r.GetError(), err)
+			}
+		}
+	}
+	d := servicetest.New(t)
+	s := &adhocSvc{d: d, cmds: map[string][]string{}}
+	s.StartAdhoc(i18n.WithLocale(context.Background(), "es"), &v1.StartAdhocRequest{Commands: strings.Repeat("show version\n", 51)})
+	if got := d.AuditText(); !strings.Contains(got, "51 commands; the maximum is 50") {
+		t.Errorf("auditoría %s", got)
+	}
+}

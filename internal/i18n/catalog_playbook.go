@@ -24,6 +24,9 @@ func init() {
 		"playbook.err.timeout_max":   e("timeout {timeout:q} de {cmd:q} pasa el máximo de {max}", "timeout {timeout:q} of {cmd:q} exceeds the maximum of {max}", "timeout", "cmd", "max"),
 		"sys.err.not_regular":        e("la ruta no es un archivo regular", "the path is not a regular file"),
 		"adhoc.err.no_targets":       e("indica al menos un equipo", "specify at least one device"),
+		"adhoc.err.max":              e("adhoc: {n} comandos; el máximo es {max}", "adhoc: {n} commands; the maximum is {max}", "n", "max"),
+		"adhoc.err.node_stopped":     e("el núcleo se detuvo con el lote en curso; vuelve a lanzarlo", "the core stopped with the batch in progress; launch it again"),
+		"adhoc.err.no_dir":           e("el lote no conserva su carpeta de salida", "the batch no longer has its output folder"),
 		"playbook.err.none":          e("playbook: no hay comandos", "playbook: there are no commands"),
 	})
 }

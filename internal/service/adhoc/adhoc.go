@@ -82,13 +82,13 @@ func (s *adhocSvc) AdhocResult(ctx context.Context, r *v1.AdhocResultRequest) (*
 		out.Done = true
 		return out, nil
 	case "failed": // el núcleo cayó con el lote armado; no se reanuda
-		out.Done, out.Error = true, "el núcleo se detuvo con el lote en curso; vuelve a lanzarlo"
+		out.Done, out.Error = true, i18n.T(ctx, "adhoc.err.node_stopped", nil)
 		s.forget(r.JobId)
 		return out, nil
 	case "completed":
 		if j.Dir == "" { // nunca se lee una carpeta vacía: sería el directorio de trabajo del demonio
 			s.forget(r.JobId)
-			out.Done, out.Error = true, "el lote no conserva su carpeta de salida"
+			out.Done, out.Error = true, i18n.T(ctx, "adhoc.err.no_dir", nil)
 			return out, nil
 		}
 	default:
