@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -73,6 +74,18 @@ func TestStartAdhocRechazosEsYEn(t *testing.T) {
 			if ei, _ := st.Details()[0].(*errdetails.ErrorInfo); ei == nil || ei.Reason != c.reason {
 				t.Errorf("%s: sin reason %s: %v", loc, c.reason, st.Details())
 			}
+		}
+	}
+}
+
+// Fase 30d: el detalle de adhoc.denied se audita en inglés completo, con cualquier idioma.
+func TestAdhocDeniedAuditaEnIngles(t *testing.T) {
+	for _, loc := range []string{"", "es", "en"} {
+		d := servicetest.New(t)
+		s := &adhocSvc{d: d, cmds: map[string][]string{}}
+		s.StartAdhoc(i18n.WithLocale(context.Background(), loc), &v1.StartAdhocRequest{Commands: "configure terminal"})
+		if got := d.AuditText(); !strings.Contains(got, `command not allowed in a collection (read-only): \"configure terminal\" (not a read command)`) {
+			t.Errorf("%q: auditoría %s", loc, got)
 		}
 	}
 }
