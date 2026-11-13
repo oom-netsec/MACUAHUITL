@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/version"
 )
 
@@ -66,6 +68,14 @@ func RoundDone(w *Writer, s Spec, round int) (string, error) {
 	return zipFiles(w.dir, fmt.Sprintf("%s_r%03d", filepath.Base(w.dir), round), w.roundFiles(round), del)
 }
 
+func playbookSHA(p *playbook.Playbook) string {
+	var b strings.Builder
+	for _, c := range p.Commands {
+		b.WriteString(c.Text + "\n")
+	}
+	return sha([]byte(b.String()))
+}
+
 // Finish escribe manifest.json (con el hash de cabeza de la auditoría) y aplica la política de zip.
 func Finish(ctx context.Context, d Deps, w *Writer, s Spec, rounds int, results []DeviceResult) (Manifest, error) {
 	m := Manifest{
@@ -75,11 +85,14 @@ func Finish(ctx context.Context, d Deps, w *Writer, s Spec, rounds int, results 
 	}
 	for _, id := range s.PlaybookIDs {
 		if p := find(d.Playbooks, id); p != nil {
-			var b strings.Builder
-			for _, c := range p.Commands {
-				b.WriteString(c.Text + "\n")
+			m.Playbooks = append(m.Playbooks, PlaybookRef{ID: id, SHA256: playbookSHA(p)})
+		}
+	}
+	for _, r := range results { // los gemelos que corrieron en lugar del elegido
+		for _, id := range r.Ran {
+			if p := find(d.Playbooks, id); p != nil && !slices.ContainsFunc(m.Playbooks, func(x PlaybookRef) bool { return x.ID == id }) {
+				m.Playbooks = append(m.Playbooks, PlaybookRef{ID: id, SHA256: playbookSHA(p)})
 			}
-			m.Playbooks = append(m.Playbooks, PlaybookRef{ID: id, SHA256: sha([]byte(b.String()))})
 		}
 	}
 	if s.CustomCommands != "" {
