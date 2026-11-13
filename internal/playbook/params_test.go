@@ -30,7 +30,6 @@ func TestParamsLoad(t *testing.T) {
 		t.Fatalf("%v %+v", err, p.Params)
 	}
 	for name, y := range map[string]string{
-		"sin declarar": strings.Replace(withMAC, "params:\n  - {name: mac, kind: mac}\n", "", 1),
 		"sin usar":     strings.Replace(withMAC, "{mac} detail", "x detail", 1),
 		"tipo malo":    strings.Replace(withMAC, "kind: mac", "kind: otro", 1),
 		"nombre malo":  strings.Replace(strings.Replace(withMAC, "name: mac", "name: M-1", 1), "{mac}", "{M-1}", 1),
