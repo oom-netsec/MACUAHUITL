@@ -531,10 +531,11 @@ func (s *patrolSvc) ListJobs(ctx context.Context, _ *v1.ListJobsRequest) (*v1.Li
 // el id es el mismo que CreateJob acepta en playbook_ids.
 func (s *patrolSvc) ListPlaybooks(ctx context.Context, r *v1.ListPlaybooksRequest) (*v1.ListPlaybooksResponse, error) {
 	out := &v1.ListPlaybooksResponse{}
-	for _, p := range s.c.catalog() {
-		if r.GetPlatform() != "" && !playbook.Compatible(r.GetPlatform(), p.Platform) { // ios lista los de ios-xe
-			continue
-		}
+	pbs := s.c.catalog()
+	if r.GetPlatform() != "" {
+		pbs = playbook.Visible(r.GetPlatform(), pbs) // ios lista los de ios-xe que oom/ios no reemplaza
+	}
+	for _, p := range pbs {
 		info := &v1.PlaybookInfo{Id: p.ID, Platform: p.Platform, Name: p.NameFor(i18n.Locale(ctx)), Commands: slices.Clone(p.Pre)} // los pre corren primero
 		for _, c := range p.Commands {
 			if r.GetPlatform() == "" || c.Applies(r.GetPlatform()) { // sin plataforma, todos; con ella, los que corren ahí

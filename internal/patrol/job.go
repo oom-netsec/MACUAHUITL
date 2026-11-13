@@ -180,7 +180,7 @@ func ValidateWith(s Spec, pbs []playbook.Playbook, v *vault.Vault, missing func(
 		}
 	}
 	for _, id := range s.PlaybookIDs {
-		if find(pbs, id) == nil {
+		if find(pbs, id) == nil && playbook.Twin(pbs, id, "ios") == nil && playbook.Twin(pbs, id, "ios-xe") == nil {
 			return noPlaybook(id, missing)
 		}
 	}
@@ -247,17 +247,42 @@ func find(pbs []playbook.Playbook, id string) *playbook.Playbook {
 	return nil
 }
 
+func iosFamily(p string) bool { return p == "ios" || p == "ios-xe" }
+
+// resolve da los playbooks que corren en la plataforma detectada, en orden y sin repetir: cada ID elegido pasa a su
+// gemelo (ios/x en IOS clásico, ios-xe/x en IOS-XE), también si el elegido ya no existe.
+func resolve(s Spec, detected string, pbs []playbook.Playbook, missing func(string) string) ([]*playbook.Playbook, error) {
+	var out []*playbook.Playbook
+	seen := map[string]bool{}
+	for _, id := range s.PlaybookIDs {
+		p := find(pbs, id)
+		if iosFamily(detected) && (p == nil || iosFamily(p.Platform)) { // flota mixta
+			if twin := playbook.Twin(pbs, id, detected); twin != nil {
+				p = twin
+			}
+		}
+		if p == nil {
+			return nil, noPlaybook(id, missing)
+		}
+		if !playbook.Compatible(detected, p.Platform) {
+			return nil, i18n.New("patrol.err.playbook_platform", i18n.A("id", id, "platform", p.Platform, "detected", detected))
+		}
+		if !seen[p.ID] { // elegir los dos del par no corre el playbook dos veces
+			seen[p.ID] = true
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
 // commands arma la lista para la plataforma detectada: playbooks elegidos y luego los pegados. Los comandos
 // marcados para otras plataformas (platforms:) no entran; skipped trae su texto, para anotarlo en el manifest.
 func commands(s Spec, detected string, pbs []playbook.Playbook, missing func(string) string) (out []playbook.Command, skipped []string, err error) {
-	for _, id := range s.PlaybookIDs {
-		p := find(pbs, id)
-		if p == nil {
-			return nil, nil, noPlaybook(id, missing)
-		}
-		if !playbook.Compatible(detected, p.Platform) {
-			return nil, nil, i18n.New("patrol.err.playbook_platform", i18n.A("id", id, "platform", p.Platform, "detected", detected))
-		}
+	ran, err := resolve(s, detected, pbs, missing)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, p := range ran {
 		for _, pre := range p.Pre {
 			out = append(out, playbook.Command{Text: pre, Timeout: 60 * time.Second})
 		}

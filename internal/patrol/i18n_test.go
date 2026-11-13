@@ -32,3 +32,24 @@ func TestPlaybookDeOtraPlataformaTieneCodigo(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+// Flota mixta: el playbook elegido corre en su gemelo de la plataforma detectada si existe (ios/x en un IOS clásico,
+// ios-xe/x en un IOS-XE); sin gemelo, IOS clásico sigue usando el de ios-xe.
+func TestPlaybookGemeloPorPlataforma(t *testing.T) {
+	cmd := func(s string) []playbook.Command { return []playbook.Command{{Text: s}} }
+	pbs := []playbook.Playbook{{ID: "ios-xe/cpu", Platform: "ios-xe", Commands: cmd("show xe")},
+		{ID: "ios/cpu", Platform: "ios", Commands: cmd("show clasico")}, {ID: "ios-xe/solo", Platform: "ios-xe", Commands: cmd("show solo")},
+		{ID: "nx-os/cpu", Platform: "nx-os", Commands: cmd("show nx")}}
+	for _, c := range []struct{ id, det, want string }{
+		{"ios-xe/cpu", "ios", "show clasico"}, {"ios/cpu", "ios-xe", "show xe"}, {"ios-xe/cpu", "ios-xe", "show xe"},
+		{"ios/cpu", "ios", "show clasico"}, {"ios-xe/solo", "ios", "show solo"}, {"nx-os/cpu", "nx-os", "show nx"},
+	} {
+		out, _, err := commands(Spec{PlaybookIDs: []string{c.id}}, c.det, pbs, nil)
+		if err != nil || len(out) != 1 || out[0].Text != c.want {
+			t.Errorf("%s en %s: %v %v, quiero %q", c.id, c.det, out, err, c.want)
+		}
+	}
+	if _, _, err := commands(Spec{PlaybookIDs: []string{"nx-os/cpu"}}, "ios-xe", pbs, nil); err == nil { // fuera de la familia IOS no hay gemelo
+		t.Error("nx-os/cpu en ios-xe debía fallar por plataforma")
+	}
+}

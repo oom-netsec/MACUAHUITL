@@ -1,0 +1,22 @@
+# Propósito: Resume el estado de los protocolos de gateway redundante y de los objetos track asociados.
+# Cuándo usarlo: Doble activo, cambios de rol inesperados del gateway o pérdidas durante un failover.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipapp_fhrp/command/fhp-cr-book.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: l3-hsrp-vrrp-glbp
+platform: ios
+name: L3 · HSRP, VRRP y GLBP (IOS)
+name_en: L3 · HSRP, VRRP and GLBP (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show standby brief
+  - cmd: show vrrp brief
+  - cmd: show glbp brief
+  - cmd: show track brief
+  - cmd: show standby neighbors
+  - cmd: show standby delay
+  - cmd: show ip interface brief
+  - cmd: show logging | include HSRP|VRRP|GLBP|STANDBY|TRACK
+  - cmd: show standby
+  - cmd: show vrrp
+  - cmd: show glbp
+  - cmd: show track

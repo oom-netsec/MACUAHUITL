@@ -1,0 +1,20 @@
+# Propósito: Revisa las tablas ARP y de vecinos IPv6 y sus contadores, para encontrar duplicados o entradas incompletas.
+# Cuándo usarlo: Host alcanzable por un lado y no por otro, entradas ARP incompletas, IP duplicada o fallas de ND en IPv6.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipaddr/command/ipaddr-cr-book.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: l3-arp-nd
+platform: ios
+name: L3 · ARP e IPv6 ND (IOS)
+name_en: L3 · ARP and IPv6 ND (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show ip interface brief
+  - cmd: show ipv6 interface brief
+  - cmd: show ip arp
+  - cmd: show ipv6 neighbors
+  - cmd: show ipv6 neighbors statistics
+  - cmd: show mac address-table count
+  - cmd: show logging | include ARP|DUPADDR|DUPLICATE|IP-4
+  - cmd: show ip traffic
+  - cmd: show ipv6 traffic
+  - cmd: show ip interface | include line protocol|Proxy ARP

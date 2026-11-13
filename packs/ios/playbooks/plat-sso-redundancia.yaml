@@ -1,0 +1,19 @@
+# Propósito: Revisa el estado de redundancia del supervisor: roles, sincronización, clientes y la historia de eventos.
+# Cuándo usarlo: Failover entre supervisores, standby que no sincroniza o pérdidas durante una conmutación SSO.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ha/command/ha-cr-book.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13), salvo los marcados «no existe en 3560CX».
+id: plat-sso-redundancia
+platform: ios
+name: Plataforma · SSO y redundancia (IOS)
+name_en: Platform · SSO and redundancy (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show redundancy  # no existe en 3560CX
+  - cmd: show redundancy states  # no existe en 3560CX
+  - cmd: show redundancy clients  # no existe en 3560CX
+  - cmd: show redundancy counters  # no existe en 3560CX
+  - cmd: show redundancy history  # no existe en 3560CX
+  - cmd: show cef state
+  - cmd: show switch  # no existe en 3560CX
+  - cmd: show module  # no existe en 3560CX
+  - cmd: show logging | include RF|REDUNDANCY|SSO|STANDBY

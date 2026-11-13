@@ -24,7 +24,7 @@ var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp comm|archive log
 // Salidas sin acotar: tabla completa de rutas/BGP/CEF/MAC o todas las interfaces.
 var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces)$`)
 
-// catalogFS junta el contenido embebido con el de packs/ios-xe (en cisco/ios-xe), para que estas pruebas sigan
+// catalogFS junta el contenido embebido con el de packs/ios-xe y packs/ios (en cisco/<plataforma>), para que estas pruebas sigan
 // cubriendo los playbooks que salieron del binario al paquete oficial.
 func catalogFS(t testing.TB) fs.FS {
 	t.Helper()
@@ -44,6 +44,7 @@ func catalogFS(t testing.TB) fs.FS {
 	}
 	add(playbooks.FS, "")
 	add(os.DirFS("../packs/ios-xe/playbooks"), "cisco/ios-xe")
+	add(os.DirFS("../packs/ios/playbooks"), "cisco/ios")
 	return m
 }
 
@@ -58,14 +59,14 @@ func TestCatalogo(t *testing.T) {
 			t.Errorf("id duplicado: %s", p.ID)
 		}
 		byID[p.ID] = p
-		if p.Platform == "ios-xe" && !strings.Contains(p.Name, " · ") { // el selector de Patrol agrupa por el área antes del «·»
+		if (p.Platform == "ios-xe" || p.Platform == "ios") && !strings.Contains(p.Name, " · ") { // el selector de Patrol agrupa por el área antes del «·»
 			t.Errorf("%s: name %q sin área (\"L2 · STP\")", p.ID, p.Name)
 		}
 		for _, c := range p.Commands {
 			if secretCmd.MatchString(c.Text) && !c.MaySecrets {
 				t.Errorf("%s: %q puede traer secretos y debe llevar may_contain_secrets", p.ID, c.Text)
 			}
-			if p.Platform == "ios-xe" && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
+			if (p.Platform == "ios-xe" || p.Platform == "ios") && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
 				t.Errorf("%s: %q es una salida grande y necesita timeout > 60s", p.ID, c.Text)
 			}
 		}
@@ -84,8 +85,12 @@ func TestCatalogo(t *testing.T) {
 		}
 		lines := strings.Split(string(raw), "\n")
 		for i, want := range []string{"# Propósito", "# Cuándo", "# Fuente: https://www.cisco.com", "# Sin validar en laboratorio"} {
-			if i >= len(lines) || !strings.HasPrefix(lines[i], want) {
-				t.Errorf("%s: la línea %d de la cabecera debe empezar con %q", name, i+1, want)
+			ok := i < len(lines) && strings.HasPrefix(lines[i], want)
+			if i == 3 && !ok { // o ya pasó por un equipo real: «# Validado en laboratorio: <modelo> con <versión> (<fecha>)…»
+				ok = i < len(lines) && strings.HasPrefix(lines[i], "# Validado en laboratorio: ")
+			}
+			if !ok {
+				t.Errorf("%s: la línea %d de la cabecera debe empezar con %q (o «# Validado en laboratorio: »)", name, i+1, want)
 			}
 		}
 		p, ok := byID[path.Base(path.Dir(name))+"/"+base]

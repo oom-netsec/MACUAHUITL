@@ -1,0 +1,19 @@
+# Propósito: Revisa los sistemas de archivos, el espacio libre y la imagen de arranque.
+# Cuándo usarlo: Antes de subir una imagen, flash llena, arranque desde una imagen incorrecta o archivos de crash acumulados.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/fundamentals/command/cf_command_ref.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13), salvo los marcados «no existe en 3560CX».
+id: plat-flash-fs
+platform: ios
+name: Plataforma · Flash y sistemas de archivos (IOS)
+name_en: Platform · Flash and file systems (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show file systems
+  - cmd: show boot
+  - cmd: show version | include System image|image file|uptime
+  - cmd: dir
+  - cmd: "dir flash:"
+  - cmd: "dir nvram:"
+  - cmd: "dir crashinfo:"  # no existe en 3560CX
+  - cmd: dir all-filesystems
+    timeout: 120s

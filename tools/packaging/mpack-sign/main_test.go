@@ -17,7 +17,7 @@ func TestFirmaLosPaquetesDelRepoYVerificanComoOficiales(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := t.TempDir()
-	hechos, err := firmaTodos("../../../packs", out, "0.3.0", priv, []ed25519.PublicKey{pub})
+	hechos, err := firmaTodos("../../../packs", out, "0.3.1", priv, []ed25519.PublicKey{pub})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestFirmaLosPaquetesDelRepoYVerificanComoOficiales(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		p, err := pack.Verify(data, "0.3.0", []ed25519.PublicKey{pub})
+		p, err := pack.Verify(data, "0.3.1", []ed25519.PublicKey{pub})
 		if err != nil || !p.Official {
 			t.Fatalf("%s no verifica como oficial: %v", h, err)
 		}
@@ -40,7 +40,7 @@ func TestRechazaLlaveQueNoEsLaOficial(t *testing.T) {
 	_, priv, _ := ed25519.GenerateKey(rand.Reader)
 	otra, _, _ := ed25519.GenerateKey(rand.Reader)
 	out := t.TempDir()
-	if _, err := firmaTodos("../../../packs", out, "0.3.0", priv, []ed25519.PublicKey{otra}); err == nil {
+	if _, err := firmaTodos("../../../packs", out, "0.3.1", priv, []ed25519.PublicKey{otra}); err == nil {
 		t.Fatal("firmó con una llave que no corresponde a la oficial")
 	}
 	if entries, _ := os.ReadDir(out); len(entries) != 0 {
@@ -79,7 +79,7 @@ func copia(t *testing.T, carpeta string) string {
 func TestRechazaIDQueNoEsLaCarpeta(t *testing.T) {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	src := copia(t, "ios")
-	if _, err := firmaTodos(src, t.TempDir(), "0.3.0", priv, []ed25519.PublicKey{pub}); err == nil {
+	if _, err := firmaTodos(src, t.TempDir(), "0.3.1", priv, []ed25519.PublicKey{pub}); err == nil {
 		t.Fatal("firmó packs/ios con id oom/ios-xe")
 	}
 }
@@ -87,10 +87,10 @@ func TestRechazaIDQueNoEsLaCarpeta(t *testing.T) {
 func TestNoPisaUnAssetExistente(t *testing.T) {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	out := t.TempDir()
-	if _, err := firmaTodos("../../../packs", out, "0.3.0", priv, []ed25519.PublicKey{pub}); err != nil {
+	if _, err := firmaTodos("../../../packs", out, "0.3.1", priv, []ed25519.PublicKey{pub}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := firmaTodos("../../../packs", out, "0.3.0", priv, []ed25519.PublicKey{pub}); err == nil {
+	if _, err := firmaTodos("../../../packs", out, "0.3.1", priv, []ed25519.PublicKey{pub}); err == nil {
 		t.Fatal("pisó el .mpack de oom/ios-xe")
 	}
 }
