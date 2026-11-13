@@ -39,9 +39,9 @@ func list(c *cli.Env, args []string) error {
 		return nil
 	}
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "DIRECCIÓN\tNOMBRE\tPLATAFORMA\tVISTO\tORIGEN")
+	fmt.Fprintln(tw, cli.T("mctl.devices.head"))
 	for _, d := range r.Devices {
-		seen := "nunca"
+		seen := cli.T("mctl.devices.never")
 		if d.LastSeenMs > 0 {
 			seen = time.UnixMilli(d.LastSeenMs).UTC().Format("2006-01-02 15:04")
 		}
@@ -49,7 +49,7 @@ func list(c *cli.Env, args []string) error {
 	}
 	tw.Flush()
 	for _, w := range r.Warnings {
-		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+		fmt.Fprintln(c.Out, cli.T("mctl.hosts.warning", "text", w))
 	}
 	return nil
 }

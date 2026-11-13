@@ -20,7 +20,7 @@ const help = `  prefs show [--json]  |  prefs set [--outputs DIR] [--rotate-mb N
 
 func orDefault(n int32) string {
 	if n == 0 {
-		return "de fábrica"
+		return cli.T("mctl.prefs.default")
 	}
 	return fmt.Sprint(n)
 }
@@ -38,15 +38,14 @@ func show(c *cli.Env, st *v1.CorePrefsState, asJSON bool) error {
 	}
 	suffix := ""
 	if st.Prefs.GetOutputsDir() == "" {
-		suffix = " (de fábrica)"
+		suffix = " (" + cli.T("mctl.prefs.default") + ")"
 	}
 	in := st.Prefs.GetIngestDefaults()
 	format := in.GetFormat()
 	if format == "" {
-		format = "de fábrica"
+		format = cli.T("mctl.prefs.default")
 	}
-	fmt.Fprintf(c.Out, "carpeta de salidas: %s%s\nrotar_mb: %s\nrotar_min: %s\nmax_archivos: %s\nformato: %s\n",
-		st.OutputsDirEffective, suffix, orDefault(in.GetRotateMb()), orDefault(in.GetRotateMinutes()), orDefault(in.GetMaxFiles()), format)
+	fmt.Fprintln(c.Out, cli.T("mctl.prefs.show", "dir", st.OutputsDirEffective, "suffix", suffix, "mb", orDefault(in.GetRotateMb()), "min", orDefault(in.GetRotateMinutes()), "max", orDefault(in.GetMaxFiles()), "format", format))
 	if st.Note != "" {
 		fmt.Fprintln(c.Out, st.Note)
 	}

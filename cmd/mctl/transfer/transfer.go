@@ -57,7 +57,7 @@ func resolveFiles(paths []string, from string) ([]string, error) {
 			continue
 		}
 		if !filepath.IsLocal(p) {
-			return nil, fmt.Errorf("--files %q: con --from va un nombre relativo dentro de esa carpeta", p)
+			return nil, cli.Err("mctl.transfer.files_relative", "path", p)
 		}
 		if root == nil { // se abre solo si hace falta: sin --files relativos, la carpeta la valida el servidor
 			r, err := os.OpenRoot(from)
@@ -68,7 +68,7 @@ func resolveFiles(paths []string, from string) ([]string, error) {
 			root = r
 		}
 		if _, err := root.Stat(p); err != nil {
-			return nil, fmt.Errorf("--files %q: %w", p, err)
+			return nil, cli.ErrWrap("mctl.transfer.files_error", err, "path", p)
 		}
 		out = append(out, filepath.Join(from, p))
 	}
@@ -90,7 +90,7 @@ func parseRange(s string) (lo, hi uint32, err error) {
 	x, e1 := strconv.ParseUint(a, 10, 16)
 	y, e2 := strconv.ParseUint(b, 10, 16)
 	if !ok || e1 != nil || e2 != nil || x > y {
-		return 0, 0, errors.New("--pasv-ports espera MIN-MAX, p. ej. 50000-50031")
+		return 0, 0, cli.Err("mctl.transfer.pasv_range")
 	}
 	return uint32(x), uint32(y), nil
 }
@@ -124,7 +124,7 @@ func serve(c *cli.Env, args []string) error {
 	}
 	for _, a := range allow {
 		if _, err := netip.ParseAddr(a); err != nil {
-			return fmt.Errorf("--allow %q no es una IP", a)
+			return cli.Err("mctl.transfer.allow_not_ip", "value", a)
 		}
 	}
 	lo, hi, err := parseRange(pasv)
@@ -161,20 +161,20 @@ func serve(c *cli.Env, args []string) error {
 		}
 		if cl := r.GetClosed(); cl != nil {
 			if cl.Cleanup != "" {
-				fmt.Fprintf(c.Out, "servidor cerrado. Si aplicaste la regla de redirección, quítala:\n  %s\n", cl.Cleanup)
+				fmt.Fprintln(c.Out, cli.T("mctl.transfer.closed", "cmd", cl.Cleanup))
 			}
 			continue
 		}
 		if rd := r.GetReady(); rd != nil {
-			fmt.Fprintf(c.Out, "sirviendo %s en %s (servidor %s)\n", rd.Protocol, rd.Listening, rd.ServerId)
+			fmt.Fprintln(c.Out, cli.T("mctl.transfer.serving", "proto", rd.Protocol, "addr", rd.Listening, "id", rd.ServerId))
 			if rd.FromDir != "" {
-				fmt.Fprintf(c.Out, "  lee de:   %s\n", rd.FromDir)
+				fmt.Fprintln(c.Out, cli.T("mctl.transfer.reads_from", "dir", rd.FromDir))
 			}
 			if rd.RecvDir != "" {
-				fmt.Fprintf(c.Out, "  recibe en: %s\n", rd.RecvDir)
+				fmt.Fprintln(c.Out, cli.T("mctl.transfer.receives_in", "dir", rd.RecvDir))
 			}
 			if rd.User != "" {
-				fmt.Fprintf(c.Out, "  usuario: %s   contraseña: %s   (solo para esta sesión)\n", rd.User, rd.Password)
+				fmt.Fprintln(c.Out, cli.T("mctl.transfer.credentials", "user", rd.User, "password", rd.Password))
 			}
 			fmt.Fprint(c.Out, rd.Hint)
 			continue
@@ -188,7 +188,7 @@ func serve(c *cli.Env, args []string) error {
 		json.Unmarshal([]byte(r.GetTransferJson()), &t)
 		mark := ""
 		if t.Rejected {
-			mark = " (rechazado)"
+			mark = cli.T("mctl.transfer.rejected")
 		}
 		fmt.Fprintf(c.Out, "%s  %s %s %s  %s  %d bytes  %s  %s %s%s\n", time.Now().Format("15:04:05"), t.Proto, t.Dir, t.Client, t.File, t.Bytes, t.Duration.Round(time.Millisecond), t.Result, t.Error, mark)
 	}
@@ -283,7 +283,7 @@ func put(c *cli.Env, args []string) error {
 		return err
 	}
 	if name == "" {
-		return errors.New("LOCAL debe ser un archivo, no una carpeta")
+		return cli.Err("mctl.transfer.local_not_dir")
 	}
 	r, err := v1.NewTransferServiceClient(c.Conn).Put(context.Background(), &v1.PutRequest{Url: fs.Arg(0), FromDir: d, Name: name, CredentialId: cred,
 		AcceptedHostKeyFingerprints: accepted, MaxBytes: maxBytes, TimeoutSeconds: int32(timeout / time.Second), LegacySsh: legacy})
@@ -343,22 +343,22 @@ func ls(c *cli.Env, args []string) error {
 		}
 		warn := ""
 		if e.UnsafeName {
-			warn = "  (el nombre traía caracteres de control o invisibles)"
+			warn = cli.T("mctl.transfer.unsafe_name")
 		}
 		fmt.Fprintf(c.Out, "%-5s %-10s %12s  %s  %s%s\n", e.Type, e.Perms, size, mod, name, warn)
 	}
-	fmt.Fprintf(c.Out, "%d entradas (%s)\n", len(r.Entries), r.Method)
+	fmt.Fprintln(c.Out, cli.T("mctl.transfer.entries", "n", len(r.Entries), "method", r.Method))
 	if r.Truncated {
-		fmt.Fprintln(c.Out, "listado cortado por el tope; sube --max o entra a una subcarpeta con --path")
+		fmt.Fprintln(c.Out, cli.T("mctl.transfer.truncated"))
 	}
 	return nil
 }
 
 // hostKeyHelp explica cómo aceptar una llave de host nueva, sin aceptarla por el usuario.
 func hostKeyHelp(err error) error {
-	if i := strings.Index(err.Error(), "SHA256:"); i >= 0 && strings.Contains(err.Error(), "llave de host") {
+	if i := strings.Index(err.Error(), "SHA256:"); i >= 0 && (strings.Contains(err.Error(), "llave de host") || strings.Contains(err.Error(), "host key")) {
 		fp := strings.Fields(err.Error()[i:])[0]
-		return fmt.Errorf("%w\nsi esa huella es la del equipo, repite con --accept-host-key %s", err, fp)
+		return cli.ErrWrap("mctl.common_a.accept_host_key", err, "fp", fp)
 	}
 	return err
 }
@@ -373,9 +373,9 @@ func stop(c *cli.Env, args []string) error {
 		return err
 	}
 	if !r.Stopped {
-		return errors.New("ese servidor ya no está abierto")
+		return cli.Err("mctl.transfer.not_open")
 	}
-	fmt.Fprintln(c.Out, "detenido")
+	fmt.Fprintln(c.Out, cli.T("mctl.transfer.stopped"))
 	return nil
 }
 
@@ -385,10 +385,10 @@ func list(c *cli.Env, _ []string) error {
 		return err
 	}
 	if len(r.Servers) == 0 {
-		fmt.Fprintln(c.Out, "no hay servidores abiertos")
+		fmt.Fprintln(c.Out, cli.T("mctl.transfer.none_open"))
 	}
 	for _, s := range r.Servers {
-		fmt.Fprintf(c.Out, "%s  %s  %s  escritura=%t  transferencias=%d  rechazos=%d\n", s.ServerId, s.Protocol, s.Listening, s.Write, s.Transfers, s.Rejected)
+		fmt.Fprintln(c.Out, cli.T("mctl.transfer.server_line", "id", s.ServerId, "proto", s.Protocol, "addr", s.Listening, "write", s.Write, "transfers", s.Transfers, "rejected", s.Rejected))
 	}
 	return nil
 }
@@ -409,7 +409,7 @@ func hint(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "El equipo usa el puerto %d; la app escucha en el %d y nunca abre puertos privilegiados.\nRedirección (la ejecutas tú):\n  %s\nPara quitarla al terminar:\n  %s\nAlternativa más amplia:\n  %s\n", r.StandardPort, port, r.Nftables, r.Remove, r.Setcap)
+	fmt.Fprintln(c.Out, cli.T("mctl.transfer.hint", "std", r.StandardPort, "port", port, "nft", r.Nftables, "remove", r.Remove, "setcap", r.Setcap))
 	return nil
 }
 

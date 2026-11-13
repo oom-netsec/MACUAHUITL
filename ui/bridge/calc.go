@@ -2,8 +2,8 @@ package bridge
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -54,7 +54,7 @@ func calcRPC[Req any, PReq interface {
 	return func(ctx context.Context, c v1.CalcServiceClient, js string) (*v1.CalcResult, error) {
 		req := PReq(new(Req))
 		if err := protojson.Unmarshal([]byte(js), req); err != nil {
-			return nil, fmt.Errorf("solicitud inválida: %w", err)
+			return nil, i18n.Wrap("bridge.err.request", err, nil)
 		}
 		r, err := m(c, ctx, req)
 		if err != nil {
@@ -74,12 +74,12 @@ var calcRPCs = map[string]calcFn{
 func (b *Bridge) Calc(kind, reqJSON string) (CalcResultDTO, error) {
 	f, ok := calcRPCs[kind]
 	if !ok {
-		return CalcResultDTO{}, wrapErr(fmt.Errorf("calculadora %q desconocida", kind))
+		return CalcResultDTO{}, b.bridgeErr(i18n.New("bridge.err.calc", i18n.A("kind", kind)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (CalcResultDTO, error) {
 		r, err := f(ctx, v1.NewCalcServiceClient(c), reqJSON)
 		if err != nil {
-			return CalcResultDTO{}, err
+			return CalcResultDTO{}, b.bridgeErr(err)
 		}
 		out := CalcResultDTO{Text: r.Text, Tables: []CalcTableDTO{}, Notes: r.Notes}
 		if out.Notes == nil {

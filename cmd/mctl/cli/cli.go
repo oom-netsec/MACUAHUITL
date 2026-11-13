@@ -101,7 +101,7 @@ func (c *Env) Secret(prompt string) ([]byte, error) {
 	}
 	line, err := c.In.ReadString('\n')
 	if err != nil && line == "" {
-		return nil, fmt.Errorf("se esperaba %q en stdin: %w", strings.TrimSpace(prompt), err)
+		return nil, ErrWrap("mctl.cli.stdin_expected", err, "prompt", strings.TrimSpace(prompt))
 	}
 	return []byte(strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")), nil
 }
@@ -150,7 +150,7 @@ func OneArg(name string, args []string) (string, error) {
 		return "", err
 	}
 	if fs.NArg() != 1 {
-		return "", fmt.Errorf("%s necesita un ID", name)
+		return "", Err("mctl.cli.needs_id", "name", name)
 	}
 	return fs.Arg(0), nil
 }

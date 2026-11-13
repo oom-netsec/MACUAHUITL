@@ -41,7 +41,7 @@ func (g *common) flags(fs *flag.FlagSet) {
 func vlanNum(s string) (uint32, error) {
 	n, err := strconv.Atoi(s)
 	if err != nil || n < 1 || n > 4094 {
-		return 0, fmt.Errorf("VLAN %q: las VLAN van de 1 a 4094", s)
+		return 0, cli.Err("mctl.snippet.bad_vlan", "value", s)
 	}
 	return uint32(n), nil
 }
@@ -62,14 +62,14 @@ func plan(c *cli.Env, host string, g *common, set func(*v1.PlanSnippetRequest)) 
 	}
 	cli.PrintPlan(c.Out, res.Plan)
 	if !g.assisted {
-		fmt.Fprintln(c.Out, "\nSolo se mostró el plan: no se cambió nada. Para aplicarlo agrega --asistido.")
+		fmt.Fprintln(c.Out, cli.T("mctl.snippet.plan_only"))
 		return nil
 	}
 	run, err := cl.StartRun(context.Background(), &v1.StartRunRequest{PlanId: res.PlanId, Assisted: true})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "\nMODO ASISTIDO ACTIVO. Ejecución %s: cada paso que cambia la red pide confirmación.\n", run.RunId)
+	fmt.Fprintln(c.Out, cli.T("mctl.snippet.assisted", "id", run.RunId))
 	return cli.Follow(c, cl, run.RunId, 0, nil)
 }
 
@@ -104,7 +104,7 @@ func trunk(c *cli.Env, args []string) error {
 	}
 	op := fs.Arg(2)
 	if op != "add" && op != "remove" { // nunca se reemplaza la lista: ni "set" ni una lista como 10,20
-		return errors.New("la operación es add o remove: el trunk nunca reemplaza su lista de VLAN permitidas")
+		return cli.Err("mctl.snippet.bad_op")
 	}
 	v, err := vlanNum(fs.Arg(3))
 	if err != nil {

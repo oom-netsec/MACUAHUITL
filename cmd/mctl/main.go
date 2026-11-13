@@ -117,6 +117,7 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if len(args) < 1 {
 		return errors.New(usage)
 	}
+	cli.SetLang(lang)
 	cmd, rest, ok := cli.Find(areas, args)
 	if !ok {
 		return errors.New(usage)

@@ -68,7 +68,7 @@ func Area() cli.Area {
 				}
 				n, err := strconv.ParseUint(hosts, 10, 64)
 				if err != nil {
-					return nil, fmt.Errorf("necesidad %q inválida: usa NOMBRE=HOSTS o HOSTS", a)
+					return nil, cli.Err("mctl.calc.need_invalid", "need", a)
 				}
 				needs = append(needs, &v1.VlsmNeed{Name: name, Hosts: n})
 			}
@@ -103,7 +103,7 @@ func Area() cli.Area {
 			fs.BoolVar(&inner6, "ipv6", false, "tráfico interno IPv6 (MSS = MTU - 60)")
 		}, func(c *cli.Env, fs *flag.FlagSet) (*v1.CalcResult, error) {
 			if mtu < 0 {
-				return nil, fmt.Errorf("MTU %d inválida", mtu)
+				return nil, cli.Err("mctl.calc.mtu_invalid", "mtu", mtu)
 			}
 			r, err := v1.NewCalcServiceClient(c.Conn).Mtu(context.Background(), &v1.MtuRequest{Physical: uint32(mtu), Layers: fs.Args(), InnerIpv6: inner6})
 			return r.GetResult(), err
@@ -116,7 +116,7 @@ func Area() cli.Area {
 			fs.IntVar(&mss, "mss", 0, "MSS (1460 por defecto)")
 		}, func(c *cli.Env, fs *flag.FlagSet) (*v1.CalcResult, error) {
 			if mss < 0 {
-				return nil, fmt.Errorf("MSS %d inválido", mss)
+				return nil, cli.Err("mctl.calc.mss_invalid", "mss", mss)
 			}
 			r, err := v1.NewCalcServiceClient(c.Conn).Tcp(context.Background(), &v1.TcpRequest{Bandwidth: bw, RttMs: rtt, Window: window, LossPercent: loss, Mss: uint32(mss)})
 			return r.GetResult(), err
@@ -144,7 +144,7 @@ func Area() cli.Area {
 				fs.Float64Var(&margin, "margin", 3, "margen exigido (dB)")
 			}, func(c *cli.Env, fs *flag.FlagSet) (*v1.CalcResult, error) {
 				if conn < 0 || splices < 0 {
-					return nil, errors.New("conectores y empalmes no pueden ser negativos")
+					return nil, cli.Err("mctl.calc.negative")
 				}
 				r, err := v1.NewCalcServiceClient(c.Conn).Optics(context.Background(), &v1.OpticsRequest{Convert: convert, TxDbm: tx, RxSensitivityDbm: rx, RxOverloadDbm: overload.p, Km: km, Fiber: fiber,
 					LossPerKm: lossKm, Connectors: uint32(conn), ConnectorLossDb: connLoss, Splices: uint32(splices), SpliceLossDb: spliceLoss, MarginDb: margin})
@@ -213,7 +213,7 @@ func parseRoute(s string) (*v1.BgpRoute, error) {
 	u32 := func(k, v string) (uint32, error) {
 		n, err := strconv.ParseUint(v, 10, 32)
 		if err != nil {
-			return 0, fmt.Errorf("ruta %q: %s=%q no es un número", s, k, v)
+			return 0, cli.Err("mctl.calc.route_num", "route", s, "key", k, "value", v)
 		}
 		return uint32(n), nil
 	}

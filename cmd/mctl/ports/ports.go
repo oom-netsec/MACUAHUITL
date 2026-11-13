@@ -40,14 +40,14 @@ func set(c *cli.Env, args []string) error {
 		return errors.New(usage)
 	}
 	if shut && noShut {
-		return errors.New("--shut y --no-shut son excluyentes")
+		return cli.Err("mctl.ports.shut_exclusive")
 	}
 	host, port, err := cli.SplitHost(fs.Arg(0))
 	if err != nil {
 		return err
 	}
 	if vlan < 0 || vlan > 4094 || voice < 0 || voice > 4094 { // antes de convertir a uint32: -1 no puede volverse 4294967295
-		return errors.New("las VLAN van de 1 a 4094")
+		return cli.Err("mctl.ports.vlan_range")
 	}
 	req := &v1.PlanPortsRequest{
 		Target:     &v1.AssistTarget{Name: host, Address: host, Port: port, CredentialId: credID},
@@ -72,14 +72,14 @@ func set(c *cli.Env, args []string) error {
 	}
 	cli.PrintPlan(c.Out, plan.Plan)
 	if !assisted {
-		fmt.Fprintln(c.Out, "\nSolo se mostró el plan: no se cambió nada. Para aplicarlo agrega --asistido.")
+		fmt.Fprintln(c.Out, "\n"+cli.T("mctl.ports.plan_only"))
 		return nil
 	}
 	run, err := cl.StartRun(context.Background(), &v1.StartRunRequest{PlanId: plan.PlanId, Assisted: true})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "\nMODO ASISTIDO ACTIVO. Ejecución %s: cada paso que cambia la red pide confirmación.\n", run.RunId)
+	fmt.Fprintln(c.Out, "\n"+cli.T("mctl.ports.assisted_started", "run", run.RunId))
 	return cli.Follow(c, cl, run.RunId, 0, nil)
 }
 
@@ -94,7 +94,7 @@ func runs(c *cli.Env, args []string) error {
 		return err
 	}
 	if len(r.Runs) == 0 {
-		fmt.Fprintln(c.Out, "No hay ejecuciones.")
+		fmt.Fprintln(c.Out, cli.T("mctl.ports.no_runs"))
 	}
 	for _, st := range r.Runs {
 		fmt.Fprintln(c.Out, cli.StateLine(st))
@@ -114,9 +114,9 @@ func resume(c *cli.Env, args []string) error {
 	}
 	st := g.Run
 	if !st.Active {
-		return fmt.Errorf("la ejecución %s ya terminó: %s", st.RunId, cli.StateLine(st))
+		return cli.Err("mctl.ports.run_finished", "run", st.RunId, "state", cli.StateLine(st))
 	}
-	fmt.Fprintf(c.Out, "MODO ASISTIDO ACTIVO. Retomando la ejecución %s.\n%s\n", st.RunId, cli.StateLine(st))
+	fmt.Fprintf(c.Out, "%s\n%s\n", cli.T("mctl.ports.assisted_resumed", "run", st.RunId), cli.StateLine(st))
 	return cli.Follow(c, cl, st.RunId, st.EventCount, st)
 }
 

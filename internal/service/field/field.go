@@ -12,12 +12,12 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/grpc/codes"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/serialcon"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/imgverify"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"

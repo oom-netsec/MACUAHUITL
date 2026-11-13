@@ -183,13 +183,13 @@ func printSample(c *cli.Env, js string) {
 		fmt.Fprintf(c.Out, "  %-24s %-6s in %s  out %s  err %d/%d\n", i.Name, i.Oper, bps(i.InBps), bps(i.OutBps), i.InErrors, i.OutErrors)
 	}
 	for _, p := range s.CPU {
-		fmt.Fprintf(c.Out, "  CPU %s: 5 s %d%%  1 min %d%%  5 min %d%%\n", p.Index, p.FiveSec, p.OneMin, p.FiveMin)
+		fmt.Fprintln(c.Out, cli.T("mctl.visibility.cpu", "index", p.Index, "five", p.FiveSec, "one", p.OneMin, "fivemin", p.FiveMin))
 	}
 	for _, m := range s.Memory {
-		fmt.Fprintf(c.Out, "  memoria %s: %.1f%% usada\n", m.Name, m.UsedPct)
+		fmt.Fprintln(c.Out, cli.T("mctl.visibility.memory", "name", m.Name, "pct", fmt.Sprintf("%.1f", m.UsedPct)))
 	}
 	for _, e := range s.Errors {
-		fmt.Fprintf(c.Out, "  aviso: %s\n", e)
+		fmt.Fprintln(c.Out, cli.T("mctl.common_a.warning_indented", "text", e))
 	}
 }
 
@@ -262,7 +262,7 @@ func snmpTraps(c *cli.Env, args []string) error {
 		case r.Drops != nil:
 			cli.PrintDrops(c.Out, r.Drops)
 		case r.RotatedPath != "":
-			fmt.Fprintf(c.Out, "archivo nuevo: %s\n", r.RotatedPath)
+			fmt.Fprintln(c.Out, cli.T("mctl.common_a.new_file", "path", r.RotatedPath))
 		case r.Listening != "":
 			listening(c, "traps", r.Listening, r.OutputPath)
 		default:
@@ -272,11 +272,11 @@ func snmpTraps(c *cli.Env, args []string) error {
 }
 
 func listening(c *cli.Env, what, addr, out string) {
-	fmt.Fprintf(c.Out, "escuchando %s en %s/udp", what, addr)
+	code := "mctl.visibility.listening"
 	if out != "" {
-		fmt.Fprintf(c.Out, " (guardando en %s)", out)
+		code = "mctl.visibility.listening_saving"
 	}
-	fmt.Fprintln(c.Out)
+	fmt.Fprintln(c.Out, cli.T(code, "what", cli.T("mctl.visibility.what_"+what), "addr", addr, "path", out))
 }
 
 func flowsListen(c *cli.Env, args []string) error {
@@ -327,9 +327,9 @@ func flowsListen(c *cli.Env, args []string) error {
 		case r.Drops != nil:
 			cli.PrintDrops(c.Out, r.Drops)
 		case r.RotatedPath != "":
-			fmt.Fprintf(c.Out, "archivo nuevo: %s\n", r.RotatedPath)
+			fmt.Fprintln(c.Out, cli.T("mctl.common_a.new_file", "path", r.RotatedPath))
 		case r.Listening != "":
-			listening(c, "flujos", r.Listening, r.OutputPath)
+			listening(c, "flows", r.Listening, r.OutputPath)
 		case asJSON:
 			fmt.Fprintln(c.Out, r.Json)
 		default:
@@ -357,27 +357,27 @@ func printFlows(c *cli.Env, js string, final bool) {
 		fmt.Fprintln(c.Out, js)
 		return
 	}
-	fmt.Fprintf(c.Out, "%s %d flujos, %d bytes, %d paquetes con error\n", time.Now().Format("15:04:05"), s.Flows, s.Bytes, s.Errors)
+	fmt.Fprintln(c.Out, cli.T("mctl.visibility.flows_line", "time", time.Now().Format("15:04:05"), "flows", s.Flows, "bytes", s.Bytes, "errors", s.Errors))
 	if !final {
 		return
 	}
 	for _, t := range []struct {
 		name string
 		rows []counter
-	}{{"Top talkers", s.Talkers}, {"Conversaciones", s.Conversations}, {"Puertos", s.Ports}, {"Protocolos", s.Protocols}} {
+	}{{cli.T("mctl.visibility.top_talkers"), s.Talkers}, {cli.T("mctl.visibility.conversations"), s.Conversations}, {cli.T("mctl.visibility.ports"), s.Ports}, {cli.T("mctl.visibility.protocols"), s.Protocols}} {
 		if len(t.rows) == 0 {
 			continue
 		}
 		fmt.Fprintf(c.Out, "\n%s:\n", t.name)
 		for _, r := range t.rows {
-			fmt.Fprintf(c.Out, "  %-44s %12d B %8d flujos\n", r.Key, r.Bytes, r.Flows)
+			fmt.Fprintln(c.Out, cli.T("mctl.visibility.flow_row", "key", fmt.Sprintf("%-44s", r.Key), "bytes", fmt.Sprintf("%12d", r.Bytes), "flows", fmt.Sprintf("%8d", r.Flows)))
 		}
 	}
 	for _, e := range s.Exporters {
-		fmt.Fprintf(c.Out, "exportador %s: %d flujos, %d bytes, %d errores\n", e.Exporter, e.Flows, e.Bytes, e.Errors)
+		fmt.Fprintln(c.Out, cli.T("mctl.visibility.exporter", "name", e.Exporter, "flows", e.Flows, "bytes", e.Bytes, "errors", e.Errors))
 	}
 	if s.LastError != "" {
-		fmt.Fprintf(c.Out, "último error: %s\n", s.LastError)
+		fmt.Fprintln(c.Out, cli.T("mctl.visibility.last_error", "text", s.LastError))
 	}
 }
 

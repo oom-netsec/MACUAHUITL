@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Error es todo error que el puente devuelve a TypeScript. Error() es el texto de siempre; además viaja como
@@ -67,6 +67,22 @@ func wrapErr(err error) error {
 		}
 	}
 	return out
+}
+
+// bridgeErr es wrapErr para un error propio del puente con código del catálogo: suma su reason y su metadata y, con
+// la app en otro idioma, lo escribe en él (en es, el texto de siempre). Un error sin código sale como wrapErr.
+func (b *Bridge) bridgeErr(err error) error {
+	out := wrapErr(err)
+	var c i18n.Coded
+	var be *Error
+	if !errors.As(out, &be) || !errors.As(err, &c) || be.Reason != "" || be.msg != "" {
+		return out
+	}
+	be.Reason, be.Metadata = c.Reason(), c.Metadata()
+	if loc := b.locale(); loc != i18n.Es {
+		be.msg = i18n.In(loc, err)
+	}
+	return be
 }
 
 // Idioma: con la bandera Localize encendida el puente manda el metadato accept-language con la preferencia ui.language.
