@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"errors"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -248,5 +249,34 @@ func TestRunDevicePasaPlazoTotalAlComando(t *testing.T) {
 		if l < 4*time.Minute || l > 5*time.Minute+time.Second {
 			t.Errorf("comando %d: plazo %s, quiero ~maxCmd (5 min)", i, l)
 		}
+	}
+}
+
+type cuelgaDrv struct{ platform.Driver }
+
+func (p *cuelgaDrv) Run(ctx context.Context, cmd string, timeout time.Duration) (platform.Output, error) {
+	if cmd == "show version" {
+		return p.Driver.Run(ctx, cmd, timeout)
+	}
+	<-ctx.Done()
+	return platform.Output{}, ctx.Err()
+}
+
+// Un comando que sigue corriendo al llegar el fin de la ventana se corta y el equipo falla con un error claro.
+func TestRunDeviceCortaAlFinDeLaVentana(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	drv := &cuelgaDrv{e.d.driver()}
+	e.d.NewDriver = func() platform.Driver { return drv }
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	ctx, cancel := context.WithTimeoutCause(context.Background(), 300*time.Millisecond, ErrWindowEnded)
+	defer cancel()
+	t0 := time.Now()
+	res := RunDevice(ctx, e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if res.State != "failed" || !errors.Is(res.DetailErr, ErrWindowEnded) {
+		t.Fatalf("res = %s %q %v", res.State, res.Detail, res.DetailErr)
+	}
+	if time.Since(t0) > 3*time.Second {
+		t.Fatalf("tardó %s", time.Since(t0))
 	}
 }
