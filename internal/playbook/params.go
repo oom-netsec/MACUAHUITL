@@ -52,8 +52,11 @@ func ValidateValue(kind, v string) (string, error) {
 	return "", errValue
 }
 
-// checkParams valida las declaraciones y que cada {x} de los comandos esté declarado y cada dato declarado se use.
+// checkParams (solo si hay params) valida las declaraciones y que cada {x} de los comandos esté declarado y cada dato declarado se use.
 func checkParams(ps []Param, pre []string, cmds []fileCommand) error {
+	if len(ps) == 0 { // sin params las llaves son texto literal; CheckDenied decide
+		return nil
+	}
 	declared := map[string]bool{}
 	for _, p := range ps {
 		switch {

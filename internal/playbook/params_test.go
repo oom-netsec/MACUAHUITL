@@ -111,3 +111,15 @@ func TestAppliesIOSXEEnWLC9800(t *testing.T) {
 		t.Fatal("ios-xe debe aplicar en wlc-9800 y no en ios")
 	}
 }
+
+// Sin params no se interpretan llaves: el comando queda tal cual y CheckDenied decide.
+func TestLlavesSinParams(t *testing.T) {
+	p, err := loadOne(t, "id: x\nplatform: ios-xe\nname: X\npre:\n  - show {a}\ncommands:\n  - cmd: show run | include {abc}\n")
+	if err != nil || p.Commands[0].Text != "show run | include {abc}" {
+		t.Fatalf("%v %+v", err, p.Commands)
+	}
+	_, err = loadOne(t, "id: x\nplatform: ios-xe\nname: X\nparams:\n  - {name: mac, kind: mac}\ncommands:\n  - cmd: show {mac} {otro}\n")
+	if err == nil || !strings.Contains(err.Error(), "otro") {
+		t.Fatalf("sin declarar debe fallar: %v", err)
+	}
+}
