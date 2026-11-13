@@ -206,3 +206,14 @@ func TestComandosPorPlataformaSeOmitenYSeAnotan(t *testing.T) {
 		})
 	}
 }
+
+// El tope total por comando es 5 veces su timeout de inactividad y nunca menos de 5 minutos.
+func TestTopeTotalPorComando(t *testing.T) {
+	for _, c := range []struct{ in, want time.Duration }{
+		{time.Second, 5 * time.Minute}, {time.Minute, 5 * time.Minute}, {10 * time.Minute, 50 * time.Minute},
+	} {
+		if got := maxCmd(c.in); got != c.want {
+			t.Errorf("maxCmd(%s) = %s, quiero %s", c.in, got, c.want)
+		}
+	}
+}

@@ -87,7 +87,9 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	var bytes int64
 	for i, cmd := range cmds {
 		emit(Progress{Target: hp, State: "running", Command: cmd.Text, Index: i + 1, Total: len(cmds), Bytes: bytes})
-		out, runErr := c.drv.Run(ctx, cmd.Text, cmd.Timeout)
+		cctx, cancel := context.WithTimeout(ctx, maxCmd(cmd.Timeout)) // el timeout es de inactividad: esto es el tope total
+		out, runErr := c.drv.Run(cctx, cmd.Text, cmd.Timeout)
+		cancel()
 		bytes += int64(len(out.Text))
 		if out.Invalid {
 			res.Invalid++
@@ -106,3 +108,6 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	emit(Progress{Target: hp, State: res.State, Index: len(cmds), Total: len(cmds), Bytes: bytes})
 	return res
 }
+
+// maxCmd es el tope total de un comando: 5 veces su timeout de inactividad, y no menos de 5 minutos.
+func maxCmd(timeout time.Duration) time.Duration { return max(5*timeout, 5*time.Minute) }
