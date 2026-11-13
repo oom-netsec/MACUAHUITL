@@ -3,6 +3,7 @@ package iosxe
 import (
 	"context"
 	"errors"
+	"io"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -203,8 +204,34 @@ func TestTopeAbsolutoDelComando(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	start := time.Now()
-	if _, err := d.Run(context.Background(), "show sin fin", 100*time.Millisecond); !errors.Is(err, platform.ErrPromptTimeout) || time.Since(start) > 2*time.Second {
+	start := time.Now() // inactividad de 10 s: solo el tope puede cortar antes de 2 s
+	if _, err := d.Run(context.Background(), "show sin fin", 10*time.Second); !errors.Is(err, platform.ErrPromptTimeout) || time.Since(start) < maxRun || time.Since(start) > 2*time.Second {
 		t.Fatalf("err = %v tras %s", err, time.Since(start))
+	}
+}
+
+// Con una salida de 1 MB (show tech), el prompt y el --More-- se buscan solo en la última línea: revisar todo el
+// búfer en cada pedazo costaba tiempo cuadrático. La salida devuelta sigue completa y limpia.
+func TestSalidaGrandeSoloRevisaLaCola(t *testing.T) {
+	d := &driver{w: io.Discard, chunks: make(chan []byte, 2000), readErr: make(chan error, 1), quit: make(chan struct{}), hostname: "SW"}
+	line := strings.Repeat("x", 1000) + "\r\n"
+	for range 1000 {
+		d.chunks <- []byte(line)
+	}
+	d.chunks <- []byte(" --More-- ")
+	d.chunks <- []byte("\r          \rfin\r\nSW#")
+	maxArg := 0
+	text, err := d.untilIdle(context.Background(), time.Second, func(s string) bool {
+		maxArg = max(maxArg, len(s))
+		return d.atPrompt(s)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if maxArg > 2048 {
+		t.Errorf("done recibió %d bytes: revisa todo el búfer, no la cola", maxArg)
+	}
+	if want := strings.Repeat(strings.Repeat("x", 1000)+"\n", 1000) + "fin\nSW#"; text != want {
+		t.Errorf("salida: %d bytes, quiero %d", len(text), len(want))
 	}
 }

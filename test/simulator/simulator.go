@@ -267,7 +267,10 @@ type session struct {
 	rctx    []string // contexto del running-config completo (Config.Running)
 }
 
-func (s *session) write(str string) { io.WriteString(s.ch, strings.ReplaceAll(str, "\n", "\r\n")) }
+func (s *session) write(str string) error {
+	_, err := io.WriteString(s.ch, strings.ReplaceAll(str, "\n", "\r\n"))
+	return err
+}
 
 func (s *session) prompt() {
 	if s.mode != "" {
@@ -375,7 +378,9 @@ func (s *session) run() {
 		case cmd == s.c.StreamCommand && cmd != "":
 			for i := range s.c.StreamLines {
 				time.Sleep(s.c.SlowDelay)
-				s.write(fmt.Sprintf("linea %d de %s\n", i+1, cmd))
+				if s.write(fmt.Sprintf("linea %d de %s\n", i+1, cmd)) != nil {
+					break // el cliente se fue
+				}
 			}
 		case cmd == s.c.DropDuringCommand:
 			out := s.outputs[cmd]

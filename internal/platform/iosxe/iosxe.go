@@ -2,6 +2,7 @@
 package iosxe
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -190,15 +191,19 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 		quiet = timer.C
 	}
 	for {
-		raw := string(d.buf)
-		if strings.HasSuffix(strings.TrimRight(raw, " "), "--More--") {
-			d.buf = []byte(more.ReplaceAllString(raw, ""))
+		// El prompt y el --More-- están siempre en la última línea: se revisa solo desde el último salto (incluido,
+		// por los patrones con (?:^|\n)). Limpiar todo el búfer en cada pedazo costaba tiempo cuadrático: 63 s con 1 MB.
+		from := max(bytes.LastIndexByte(d.buf, '\n'), 0)
+		tail := string(d.buf[from:])
+		if strings.HasSuffix(strings.TrimRight(tail, " "), "--More--") {
+			tail = more.ReplaceAllString(tail, "")
+			d.buf = append(d.buf[:from], tail...)
 			if _, err := io.WriteString(d.w, " "); err != nil {
 				return clean(string(d.buf)), err
 			}
-			raw = string(d.buf)
 		}
-		if text := clean(raw); done(text) {
+		if done(clean(tail)) {
+			text := clean(string(d.buf))
 			d.buf = nil
 			return text, nil
 		}
@@ -206,6 +211,15 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 		case <-ctx.Done():
 			return clean(string(d.buf)), platform.ErrPromptTimeout
 		case <-quiet:
+			select { // llegó un pedazo justo al vencer el plazo: cuenta como actividad
+			case c, ok := <-d.chunks:
+				if ok {
+					d.buf = append(d.buf, c...)
+					timer.Reset(idle)
+					continue
+				}
+			default:
+			}
 			return clean(string(d.buf)), platform.ErrPromptTimeout
 		case c, ok := <-d.chunks:
 			if !ok {
@@ -236,7 +250,7 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	if strings.ContainsAny(cmd, "\r\n") {
 		return out, fmt.Errorf("platform: el comando %q tiene saltos de línea", cmd)
 	}
-	ctx, cancel := context.WithTimeout(ctx, max(maxRun, timeout)) // timeout es de inactividad; maxRun, el tope
+	ctx, cancel := context.WithTimeout(ctx, maxRun) // timeout es de inactividad; maxRun, el tope fijo
 	defer cancel()
 	if _, err := io.WriteString(d.w, cmd+"\n"); err != nil {
 		return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
