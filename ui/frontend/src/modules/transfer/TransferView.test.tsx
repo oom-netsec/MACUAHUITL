@@ -259,3 +259,13 @@ test("la tarjeta de FTP sugiere borrar la credencial del equipo al terminar", as
   const card = await screen.findByRole("group", { name: "FTP 192.0.2.10:2121" });
   expect(within(card).getAllByText(/no ip ftp password/).length).toBeGreaterThan(0);
 });
+
+// Con la interfaz en inglés el texto del núcleo no dice «no coincide»: el aviso sale del reason.
+test("el cliente avisa del hash distinto por el reason, aunque el texto venga en inglés", async () => {
+  const err = Object.assign(new Error("transfer: digest mismatch (SHA-256 aaa, MD5 bbb): the file was discarded"), { cause: { code: "Unavailable", reason: "xfer.err.digest", metadata: {} } });
+  const core = setup({ transferGet: vi.fn(async () => { throw err; }) });
+  await client(core, "http://192.0.2.1/c4.bin");
+  await userEvent.type(screen.getByLabelText("Hash esperado (opcional)"), "c".repeat(64));
+  await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("El hash no coincide con el esperado: el archivo se descartó.");
+});

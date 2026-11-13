@@ -1,4 +1,5 @@
 import type { Key } from "../../lib/i18n/es";
+import { errInfo } from "../../lib/coreError";
 
 // Lo que se inserta en la terminal: los comandos tal cual, incluidas las líneas «!» (dentro de un banner son texto).
 export const scriptText = (commands: string[]) => commands.join("\n");
@@ -60,8 +61,18 @@ export const tokenGone = (e: unknown) => /code = (NotFound|FailedPrecondition)\b
 // El sexto fijado: FailedPrecondition. Se mira el mensaje crudo (errorText ya quita el prefijo) y no la redacción del motivo.
 export const isPinLimit = (e: unknown) => /code = FailedPrecondition\b/.test(rawMsg(e));
 
-// Un error del núcleo se pone junto al campo que nombra; el resto queda como aviso general.
-export function fieldOfError(msg: string): FormField | "" {
+// Campo de cada reason de validación del núcleo (catalog_scripts.go).
+const REASON_FIELD: Record<string, FormField> = {
+  "scripts.err.name": "name", "scripts.svc.name_taken": "name", "scripts.err.description": "desc",
+  "scripts.err.tags_max": "tags", "scripts.err.tag_bad": "tags", "scripts.err.tag_dup": "tags",
+  "scripts.err.commands": "commands", "scripts.err.command_empty": "commands", "scripts.err.command_ascii": "commands",
+};
+
+// Un error del núcleo se pone junto al campo que nombra (por su reason; sin reason, por el texto en español); el resto queda como aviso general.
+export function fieldOfError(e: unknown): FormField | "" {
+  const info = errInfo(e);
+  if (info) return REASON_FIELD[info.reason] ?? "";
+  const msg = e instanceof Error ? e.message : String(e);
   if (/llamado|^el nombre/i.test(msg)) return "name";
   if (/etiqueta/i.test(msg)) return "tags";
   if (/descripci/i.test(msg)) return "desc";
