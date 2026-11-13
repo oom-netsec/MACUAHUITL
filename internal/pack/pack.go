@@ -104,9 +104,10 @@ func Verify(data []byte, coreVersion string, keys []ed25519.PublicKey) (*Pack, e
 	return p, nil
 }
 
-// Validate valida una carpeta fuente packs/<nombre>/ con las reglas del instalador, salvo la firma y la reserva
-// del editor oom (la firma la pone el release). Para la prueba de CI de cada packs/*.
-func Validate(dir, coreVersion string) (*Pack, error) {
+// ValidateSource valida una carpeta fuente packs/<nombre>/ con las reglas del instalador, salvo la firma y la
+// reserva del editor oom (la firma la pone el release). Solo para las fuentes del repo y su prueba de CI: nunca
+// para un paquete que llega de fuera.
+func ValidateSource(dir, coreVersion string) (*Pack, error) {
 	files, err := readDir(dir)
 	if err != nil {
 		return nil, err
@@ -155,6 +156,9 @@ func check(files map[string][]byte, coreVersion string, keys []ed25519.PublicKey
 			return nil, rejWrap("script.invalid", err)
 		}
 		for _, s := range ss {
+			if s.Origin != scripts.OrigenBiblioteca || !scripts.IsLib(s.ID) { // también en los oficiales
+				return nil, rejWrap("script.invalid", fmt.Errorf("script %s: origin biblioteca e ID lib-… obligatorios", s.ID))
+			}
 			if !slices.Contains(m.Platforms, s.Platform) && s.Platform != "cualquiera" {
 				return nil, rejWrap("script.invalid", fmt.Errorf("script %s: plataforma %q fuera de platforms del manifiesto", s.ID, s.Platform))
 			}
@@ -171,7 +175,8 @@ func plain(s string, max int) bool {
 	if s == "" || utf8.RuneCountInString(s) > max || s != strings.TrimSpace(s) {
 		return false
 	}
-	return !strings.ContainsFunc(s, func(r rune) bool { return unicode.IsControl(r) })
+	// Cf: formato (bidi, U+202E…) que cambia cómo se ve el texto sin cambiar lo que dice.
+	return !strings.ContainsFunc(s, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) })
 }
 
 func parseManifest(b []byte) (Manifest, error) {
@@ -243,19 +248,34 @@ func checkCore(minCore, core string, p *Pack) error {
 	return nil
 }
 
+var pbIDRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+
 func loadPlaybooks(p *Pack, files map[string][]byte) error {
-	mem := fstest.MapFS{}
-	for n, b := range files {
-		if rest, ok := strings.CutPrefix(n, filePlay); ok {
-			mem[rest] = &fstest.MapFile{Data: b}
+	var names []string
+	for n := range files {
+		if strings.HasPrefix(n, filePlay) {
+			names = append(names, n)
 		}
 	}
-	pbs, err := playbook.Load(fs.FS(mem))
-	if err != nil {
-		if errors.Is(err, playbook.ErrDenied) {
-			return rejWrap("playbook.denied", err)
+	slices.Sort(names)
+	var pbs []playbook.Playbook
+	for _, n := range names {
+		file := strings.TrimPrefix(n, filePlay)
+		one, err := playbook.Load(fs.FS(fstest.MapFS{file: &fstest.MapFile{Data: files[n]}}))
+		if err != nil {
+			if errors.Is(err, playbook.ErrDenied) {
+				return rejWrap("playbook.denied", err)
+			}
+			return rejWrap("playbook.invalid", err)
 		}
-		return rejWrap("playbook.invalid", err)
+		pbs = append(pbs, one...)
+		// El ID debe poder ser el de un script «lib-<id>» y coincidir con el nombre del archivo.
+		for _, pb := range one {
+			id := pb.ID[strings.Index(pb.ID, "/")+1:]
+			if !pbIDRe.MatchString(id) || id != strings.TrimSuffix(file, ".yaml") {
+				return rejWrap("playbook.invalid", fmt.Errorf("playbook %s: el id debe ser a-z, 0-9 y guion, e igual al nombre del archivo %s", pb.ID, file))
+			}
+		}
 	}
 	for _, pb := range pbs {
 		if !slices.Contains(Installable, pb.Platform) || !slices.Contains(p.Platforms, pb.Platform) {
@@ -265,12 +285,17 @@ func loadPlaybooks(p *Pack, files map[string][]byte) error {
 			return rej("id.prefix", "id", pb.ID, "want", want)
 		}
 	}
+	// Los scripts derivados deben pasar Validate: un paquete que los rompiera dejaría LibraryWith fallando para siempre.
+	derived, _ := scripts.Derived(pbs)
+	for _, s := range derived {
+		if err := s.Validate(); err != nil {
+			return rejWrap("playbook.invalid", fmt.Errorf("script derivado %s: %w", s.ID, err))
+		}
+	}
 	slices.SortFunc(pbs, func(a, b playbook.Playbook) int { return strings.Compare(a.ID, b.ID) })
 	p.Playbooks = pbs
 	return nil
 }
-
-func (p *Pack) String() string { return fmt.Sprintf("%s@%s", p.ID, p.Version) }
 
 // NotFound es el error de un paquete que no está instalado.
 func NotFound(id string) error { return rej("not_found", "id", id) }

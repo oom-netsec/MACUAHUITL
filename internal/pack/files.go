@@ -161,6 +161,7 @@ func Zip(files map[string][]byte) ([]byte, error) {
 func readDir(dir string, extra ...string) (map[string][]byte, error) {
 	files := map[string][]byte{}
 	var total int64
+	entries := 0 // lo de extra (INDEX) es del almacén, no del paquete: no cuenta para los topes
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -183,8 +184,10 @@ func readDir(dir string, extra ...string) (map[string][]byte, error) {
 		if !d.Type().IsRegular() || (!known && !allowedPath(rel)) {
 			return i18n.New("pack.err.zip.path", i18n.A("name", rel))
 		}
-		if len(files) >= MaxEntries {
-			return i18n.New("pack.err.zip.too_big", i18n.A("what", "entries"))
+		if !known {
+			if entries++; entries > MaxEntries {
+				return i18n.New("pack.err.zip.too_big", i18n.A("what", "entries"))
+			}
 		}
 		f, err := os.Open(p)
 		if err != nil {
@@ -199,13 +202,15 @@ func readDir(dir string, extra ...string) (map[string][]byte, error) {
 		if int64(len(b)) > lim {
 			return i18n.New("pack.err.zip.too_big", i18n.A("what", rel))
 		}
-		total += int64(len(b))
+		if !known {
+			total += int64(len(b))
+		}
 		files[rel] = b
 		return nil
 	})
 	var ie *i18n.Error
 	if err != nil && !errors.As(err, &ie) {
-		return nil, i18n.Wrap("pack.err.read", err, nil)
+		return nil, readErr(err)
 	}
 	return files, err
 }
@@ -227,4 +232,18 @@ func ReadSource(dir string) (map[string][]byte, error) { return readDir(dir) }
 // propio); el núcleo no firma nada con la llave oficial.
 func Sign(files map[string][]byte, priv ed25519.PrivateKey) {
 	files[fileSig] = []byte(base64.StdEncoding.EncodeToString(ed25519.Sign(priv, Index(files))) + "\n")
+}
+
+// readErr es pack.err.read con la causa sin la ruta: el mensaje de un error del sistema («rename /home/…/packs/.tmp-…»)
+// no debe llevar rutas absolutas de la carpeta de datos.
+func readErr(err error) error {
+	var pe *fs.PathError
+	var le *os.LinkError
+	switch {
+	case errors.As(err, &pe):
+		err = pe.Err
+	case errors.As(err, &le):
+		err = le.Err
+	}
+	return i18n.Wrap("pack.err.read", err, nil)
 }

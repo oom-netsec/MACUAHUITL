@@ -42,6 +42,9 @@ func Compatible(detected, pbPlatform string) bool {
 // knownPlatforms son las plataformas que un playbook puede nombrar en platforms: (las de playbooks/cisco).
 var knownPlatforms = []string{"ios", "ios-xe", "nx-os", "cat9k", "ftd", "ise", "sda", "wlc-9800", "wlc-aireos"}
 
+// KnownPlatforms son las plataformas que un playbook puede nombrar.
+func KnownPlatforms() []string { return slices.Clone(knownPlatforms) }
+
 // KnownPlatform dice si s es una plataforma que un playbook puede nombrar.
 func KnownPlatform(s string) bool { return slices.Contains(knownPlatforms, s) }
 

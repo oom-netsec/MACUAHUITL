@@ -4,15 +4,18 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
 )
 
@@ -23,6 +26,48 @@ type Base struct {
 	PlaybookIDs []string
 	ScriptIDs   []string
 	ScriptNames []string // se comparan con scripts.NameKey
+	// ReservedPlaybooks y ReservedScripts son IDs que salieron del binario a un paquete oficial (p. ej. los movidos a
+	// oom/ios-xe): un paquete que no es oficial nunca los ocupa, esté o no instalado el oficial.
+	ReservedPlaybooks []string
+	ReservedScripts   []string
+}
+
+// reservedEditors son los editores que un tercero no puede usar (calculados, no escritos a mano): oom, los
+// nombres de plataforma y el primer segmento (antes del «-») de todos los IDs de la base y de los reservados,
+// porque un ID de tercero con ese prefijo podría ocupar uno de un paquete oficial futuro.
+func (b Base) reservedEditors() map[string]bool {
+	r := map[string]bool{"oom": true}
+	for _, p := range append(playbook.KnownPlatforms(), scripts.Platforms...) {
+		r[p] = true
+		r[strings.SplitN(p, "-", 2)[0]] = true
+	}
+	first := func(id string) {
+		if _, rest, ok := strings.Cut(id, "/"); ok {
+			id = rest
+		}
+		id = strings.TrimPrefix(id, "lib-")
+		if seg, _, _ := strings.Cut(id, "-"); seg != "" {
+			r[seg] = true
+		}
+	}
+	for _, l := range [][]string{b.PlaybookIDs, b.ScriptIDs, b.ReservedPlaybooks, b.ReservedScripts} {
+		for _, id := range l {
+			first(id)
+		}
+	}
+	return r
+}
+
+// checkReserved aplica las reservas a un paquete que no es oficial.
+func (s *Store) checkReserved(p *Pack) error {
+	if p.Official {
+		return nil
+	}
+	ed := p.Editor()
+	if seg, _, _ := strings.Cut(ed, "-"); s.reserved[ed] || s.reserved[seg] {
+		return rej("editor.reserved", "editor", ed)
+	}
+	return nil
 }
 
 // Rejected es un paquete instalado que no pasó la revalidación al arrancar.
@@ -41,6 +86,7 @@ type Store struct {
 	core     string
 	keys     []ed25519.PublicKey
 	base     Base
+	reserved map[string]bool
 	mu       sync.Mutex // serializa instalar y quitar
 	snap     atomic.Pointer[Snapshot]
 	OnChange func() // tras instalar o quitar, ya publicada la foto nueva; sin locks tomados
@@ -52,7 +98,7 @@ func Open(dir, coreVersion string, keys []ed25519.PublicKey, base Base) (*Store,
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, nil, err
 	}
-	s := &Store{dir: dir, core: coreVersion, keys: keys, base: base}
+	s := &Store{dir: dir, core: coreVersion, keys: keys, base: base, reserved: base.reservedEditors()}
 	ents, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, nil, err
@@ -61,6 +107,7 @@ func Open(dir, coreVersion string, keys []ed25519.PublicKey, base Base) (*Store,
 	var packs []*Pack
 	for _, e := range ents {
 		if strings.HasPrefix(e.Name(), ".tmp-") {
+			s.restoreOld(filepath.Join(dir, e.Name()))
 			os.RemoveAll(filepath.Join(dir, e.Name()))
 			continue
 		}
@@ -73,7 +120,9 @@ func Open(dir, coreVersion string, keys []ed25519.PublicKey, base Base) (*Store,
 			rel := e.Name() + "/" + n.Name()
 			p, err := s.revalidate(rel)
 			if err == nil {
-				err = s.collides(p, packs)
+				if err = s.checkReserved(p); err == nil {
+					err = s.collides(p, packs)
+				}
 			}
 			if err != nil {
 				r := Rejected{Dir: rel, Reason: Reason(err)}
@@ -91,6 +140,26 @@ func Open(dir, coreVersion string, keys []ed25519.PublicKey, base Base) (*Store,
 	}
 	s.publish(packs)
 	return s, rej, nil
+}
+
+// restoreOld devuelve a su lugar la versión que una instalación interrumpida dejó en tmp/old, si ese lugar quedó
+// vacío (la caída ocurrió entre los dos rename). El contenido se revalida igual que cualquier paquete instalado.
+func (s *Store) restoreOld(tmp string) {
+	b, err := os.ReadFile(filepath.Join(tmp, "old", fileManifest))
+	if err != nil {
+		return
+	}
+	m, err := parseManifest(b)
+	if err != nil {
+		return
+	}
+	final := filepath.Join(s.dir, filepath.FromSlash(m.ID))
+	if _, err := os.Lstat(final); err == nil {
+		return
+	}
+	if os.MkdirAll(filepath.Dir(final), 0o700) == nil {
+		os.Rename(filepath.Join(tmp, "old"), final)
+	}
 }
 
 func (s *Store) revalidate(rel string) (*Pack, error) {
@@ -167,6 +236,14 @@ func (s *Store) collides(p *Pack, others []*Pack) error {
 	for _, id := range s.base.ScriptIDs {
 		ids[id] = "base"
 	}
+	if !p.Official {
+		for _, id := range s.base.ReservedPlaybooks {
+			pbs[id] = "reserved"
+		}
+		for _, id := range s.base.ReservedScripts {
+			ids[id] = "reserved"
+		}
+	}
 	for _, n := range s.base.ScriptNames {
 		names[scripts.NameKey(n)] = "base"
 	}
@@ -202,11 +279,12 @@ func (s *Store) collides(p *Pack, others []*Pack) error {
 	return add(p, p.ID)
 }
 
-// ReadArchive lee el .mpack una sola vez, con tope de 20 MB.
+// ReadArchive lee el .mpack una sola vez, con tope de 20 MB. Abre sin bloquear y mira el tipo antes de leer: un FIFO
+// o un dispositivo no cuelgan al núcleo.
 func ReadArchive(path string) ([]byte, error) {
-	f, err := os.Open(path)
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
-		return nil, i18n.Wrap("pack.err.read", err, nil)
+		return nil, readErr(err)
 	}
 	defer f.Close()
 	if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
@@ -214,7 +292,7 @@ func ReadArchive(path string) ([]byte, error) {
 	}
 	b, err := io.ReadAll(io.LimitReader(f, MaxArchive+1))
 	if err != nil {
-		return nil, i18n.Wrap("pack.err.read", err, nil)
+		return nil, readErr(err)
 	}
 	if len(b) > MaxArchive {
 		return nil, rej("zip.too_big", "what", "archive")
@@ -238,6 +316,9 @@ func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
 	if !p.Official && !allowUnsigned {
 		return &Result{Pack: p}, rej("unsigned")
 	}
+	if err := s.checkReserved(p); err != nil {
+		return &Result{Pack: p}, err
+	}
 	s.mu.Lock()
 	cur := s.snap.Load()
 	old := cur.Find(p.ID)
@@ -245,19 +326,19 @@ func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
 		switch {
 		case old.Official && !p.Official:
 			s.mu.Unlock()
-			return nil, rej("official_replace", "id", p.ID)
+			return &Result{Pack: p}, rej("official_replace", "id", p.ID)
 		case CompareVersions(p.Version, old.Version) <= 0:
 			s.mu.Unlock()
-			return nil, rej("version", "id", p.ID, "installed", old.Version, "version", p.Version)
+			return &Result{Pack: p}, rej("version", "id", p.ID, "installed", old.Version, "version", p.Version)
 		}
 	}
 	if err := s.collides(p, cur.Packs); err != nil {
 		s.mu.Unlock()
-		return nil, err
+		return &Result{Pack: p}, err
 	}
-	if err := s.extract(p, old != nil); err != nil {
+	if err := s.extract(p); err != nil {
 		s.mu.Unlock()
-		return nil, err
+		return &Result{Pack: p}, err
 	}
 	next := []*Pack{p}
 	for _, o := range cur.Packs {
@@ -266,10 +347,10 @@ func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
 		}
 	}
 	s.publish(next)
-	s.mu.Unlock()
-	if s.OnChange != nil {
+	if s.OnChange != nil { // bajo el lock: así no queda publicado un catálogo viejo si otra instalación entra enseguida
 		s.OnChange()
 	}
+	s.mu.Unlock()
 	res := &Result{Pack: p}
 	if old != nil {
 		res.Replaced = old.Version
@@ -277,44 +358,80 @@ func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
 	return res, nil
 }
 
-// extract escribe el paquete en .tmp-* y lo mete con rename; la versión anterior se borra después del rename.
-func (s *Store) extract(p *Pack, replace bool) error {
+// syncDir hace fsync de una carpeta para que el rename y los archivos nuevos sobrevivan a una caída.
+func syncDir(d string) error {
+	f, err := os.Open(d)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return f.Sync()
+}
+
+func writeSync(path string, b []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(b); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
+}
+
+// extract escribe el paquete en .tmp-* (con fsync) y lo mete con rename. Lo que hubiera en su lugar (la versión
+// anterior, o una carpeta que no pasó la revalidación al arrancar) se aparta a .tmp-*/old y se borra después del
+// rename; si el proceso muere entre los dos rename, Open lo restaura.
+func (s *Store) extract(p *Pack) error {
 	tmp, err := os.MkdirTemp(s.dir, ".tmp-")
 	if err != nil {
-		return i18n.Wrap("pack.err.read", err, nil)
+		return readErr(err)
 	}
 	defer os.RemoveAll(tmp)
 	files := map[string][]byte{fileIndex: Index(p.files)}
 	for n, b := range p.files {
 		files[n] = b
 	}
+	dirs := map[string]bool{}
 	for n, b := range files {
 		dst := filepath.Join(tmp, "x", filepath.FromSlash(n))
 		if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
-			return i18n.Wrap("pack.err.read", err, nil)
+			return readErr(err)
 		}
-		if err := os.WriteFile(dst, b, 0o600); err != nil {
-			return i18n.Wrap("pack.err.read", err, nil)
+		if err := writeSync(dst, b); err != nil {
+			return readErr(err)
+		}
+		dirs[filepath.Dir(dst)] = true
+	}
+	for d := range dirs {
+		if err := syncDir(d); err != nil {
+			return readErr(err)
 		}
 	}
 	final := filepath.Join(s.dir, filepath.FromSlash(p.ID))
 	if err := os.MkdirAll(filepath.Dir(final), 0o700); err != nil {
-		return i18n.Wrap("pack.err.read", err, nil)
+		return readErr(err)
 	}
-	var aside string
-	if replace {
-		aside = filepath.Join(tmp, "old")
-		if err := os.Rename(final, aside); err != nil {
-			return i18n.Wrap("pack.err.read", err, nil)
+	aside := filepath.Join(tmp, "old")
+	moved := true
+	if err := os.Rename(final, aside); err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			return readErr(err)
 		}
+		moved = false
 	}
 	if err := os.Rename(filepath.Join(tmp, "x"), final); err != nil {
-		if aside != "" {
+		if moved {
 			os.Rename(aside, final)
 		}
-		return i18n.Wrap("pack.err.read", err, nil)
+		return readErr(err)
 	}
-	return nil // el defer borra tmp, y con él la versión anterior apartada
+	return syncDir(filepath.Dir(final)) // si falla, el paquete ya entró: solo se avisa con el error
 }
 
 // Remove quita el paquete id (buscado entre los instalados) y devuelve lo que traía.
@@ -329,7 +446,7 @@ func (s *Store) Remove(id string) (*Pack, error) {
 	// p.ID cumple la gramática del manifiesto, así que la ruta no sale de la carpeta.
 	if err := os.RemoveAll(filepath.Join(s.dir, filepath.FromSlash(p.ID))); err != nil {
 		s.mu.Unlock()
-		return nil, i18n.Wrap("pack.err.read", err, nil)
+		return nil, readErr(err)
 	}
 	var next []*Pack
 	for _, o := range cur.Packs {
@@ -338,10 +455,10 @@ func (s *Store) Remove(id string) (*Pack, error) {
 		}
 	}
 	s.publish(next)
-	s.mu.Unlock()
 	if s.OnChange != nil {
 		s.OnChange()
 	}
+	s.mu.Unlock()
 	return p, nil
 }
 

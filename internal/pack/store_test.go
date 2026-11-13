@@ -2,10 +2,13 @@ package pack
 
 import (
 	"crypto/ed25519"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func openStore(t *testing.T, dir string, pub ed25519.PublicKey, base Base) (*Store, []Rejected) {
@@ -286,5 +289,218 @@ func TestCarpetaQueNoCoincideConSuID(t *testing.T) {
 	_, rej := openStore(t, dir, pub, Base{})
 	if len(rej) != 1 || rej[0].Reason != "zip.path" {
 		t.Fatalf("%+v", rej)
+	}
+}
+
+// C1: un tercero no puede ocupar IDs movidos ni de futuros paquetes oficiales por la vía del prefijo de editor.
+func TestEditoresReservadosParaTerceros(t *testing.T) {
+	pub, priv := testKey(t)
+	base := Base{PlaybookIDs: []string{"ios-xe/tac-baseline"}, ScriptIDs: []string{"lib-tac-baseline", "lib-cfg-ntp"},
+		ReservedPlaybooks: []string{"ios-xe/l2-stp"}, ReservedScripts: []string{"lib-l2-stp"}}
+	evil := func(editor string) map[string][]byte {
+		f := goodFiles()
+		f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "oom/demo", editor+"/evil", 1))
+		setPB(f, strings.Replace(goodPlaybook, "oom-stp", "l2-stp", 1))
+		return f
+	}
+	for _, withOfficial := range []bool{false, true} {
+		s, _ := openStore(t, t.TempDir(), pub, base)
+		if withOfficial {
+			if _, err := s.Install(signedZip(t, priv, nil), false); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, ed := range []string{"l2", "tac", "cfg", "oom", "ios-xe", "ios", "nx-os", "nx", "l2-foo"} {
+			f := evil(ed)
+			setPB(f, strings.Replace(goodPlaybook, "oom-stp", ed+"-stp", 1))
+			if ed == "l2" {
+				setPB(f, strings.Replace(goodPlaybook, "oom-stp", "l2-stp", 1)) // el escenario del hallazgo
+			}
+			_, err := s.Install(mustZip(t, f), true)
+			if r := Reason(err); r != "editor.reserved" {
+				t.Errorf("editor %q (oficial=%v): %v", ed, withOfficial, err)
+			}
+		}
+		// Un editor normal sigue pudiendo instalar.
+		ok := thirdParty()
+		setPB(ok, strings.ReplaceAll(string(ok["playbooks/acme-stp.yaml"]), "L2 · STP", "Acme · STP"))
+		if _, err := s.Install(mustZip(t, ok), true); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// Defensa en profundidad: aunque el editor no estuviera reservado, un ID de la lista reservada choca (se prueba el
+// choque directamente, porque calcular los editores ya reserva el propio «acme»).
+func TestIDsReservadosChocan(t *testing.T) {
+	pub, _ := testKey(t)
+	p, err := Verify(mustZip(t, thirdParty()), "dev", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _ := openStore(t, t.TempDir(), pub, Base{ReservedPlaybooks: []string{"ios-xe/acme-stp"}})
+	wantReason(t, s.collides(p, nil), "collision")
+	s, _ = openStore(t, t.TempDir(), pub, Base{ReservedScripts: []string{"lib-acme-stp"}})
+	wantReason(t, s.collides(p, nil), "collision")
+	// Un oficial no está sujeto a las reservas.
+	po := *p
+	po.Official = true
+	if err := s.collides(&po, nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// I1: un paquete que no pasó la revalidación al arrancar se puede reinstalar (la carpeta dañada se aparta).
+func TestReinstalarUnPaqueteCorrompido(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	z := signedZip(t, priv, nil)
+	if _, err := s.Install(z, false); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(dir, "oom", "demo", "README.md"), []byte("dañado"), 0o600)
+	s2, rej := openStore(t, dir, pub, Base{})
+	if len(rej) != 1 || s2.Snapshot().Find("oom/demo") != nil {
+		t.Fatalf("%+v", rej)
+	}
+	if _, err := s2.Install(z, false); err != nil {
+		t.Fatalf("reinstalar: %v", err)
+	}
+	if s2.Snapshot().Find("oom/demo") == nil {
+		t.Fatal("no quedó instalado")
+	}
+	if _, rej := openStore(t, dir, pub, Base{}); len(rej) != 0 {
+		t.Fatalf("tras reinstalar: %+v", rej)
+	}
+}
+
+// bigPack arma un paquete oficial válido con n playbooks y, si pad > 0, relleno de comentario en cada uno.
+func bigPack(t *testing.T, priv ed25519.PrivateKey, n, pad int) []byte {
+	t.Helper()
+	f := map[string][]byte{"manifest.yaml": []byte(goodManifest), "README.md": []byte("x")}
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("p%04d", i)
+		body := fmt.Sprintf("id: %s\nplatform: ios-xe\nname: \"P · %s\"\nname_en: \"P · %s\"\ncommands:\n  - cmd: show clock\n", id, id, id)
+		if pad > 0 {
+			body += "#" + strings.Repeat("x", pad) + "\n"
+		}
+		f["playbooks/"+id+".yaml"] = []byte(body)
+	}
+	sign(f, priv)
+	return mustZip(t, f)
+}
+
+// I2: el INDEX del almacén no cuenta para los topes al revalidar; un paquete justo en el límite sigue cargando.
+func TestLimitesNoContanElIndexAlRevalidar(t *testing.T) {
+	pub, priv := testKey(t)
+	for name, z := range map[string][]byte{
+		"2000 entradas": bigPack(t, priv, MaxEntries-3, 0),
+		"20 MB":         bigPack(t, priv, 20, maxPlaybook-176),
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			s, _ := openStore(t, dir, pub, Base{})
+			if _, err := s.Install(z, false); err != nil {
+				t.Fatal(err)
+			}
+			s2, rej := openStore(t, dir, pub, Base{})
+			if len(rej) != 0 || s2.Snapshot().Find("oom/demo") == nil {
+				t.Fatalf("al arrancar: %+v", rej)
+			}
+		})
+	}
+}
+
+// Si el proceso murió entre los dos rename, al arrancar vuelve la versión vieja que quedó en .tmp-*/old.
+func TestRecuperaLaVersionViejaTrasUnaCaida(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	s.Install(signedZip(t, priv, nil), false)
+	crash := filepath.Join(dir, ".tmp-crash")
+	os.MkdirAll(crash, 0o700)
+	if err := os.Rename(filepath.Join(dir, "oom", "demo"), filepath.Join(crash, "old")); err != nil {
+		t.Fatal(err)
+	}
+	s2, rej := openStore(t, dir, pub, Base{})
+	if len(rej) != 0 || s2.Snapshot().Find("oom/demo") == nil {
+		t.Fatalf("no se recuperó: %+v", rej)
+	}
+	if _, err := os.Stat(crash); !os.IsNotExist(err) {
+		t.Fatal(".tmp sigue")
+	}
+}
+
+// Si la nueva ya entró (final existe), lo que quedó en old se descarta.
+func TestNoPisaLaVersionNuevaConLaViejaDeUnaCaida(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	s.Install(signedZip(t, priv, withVersion("1.1.0")), false)
+	os.MkdirAll(filepath.Join(dir, ".tmp-x", "old"), 0o700)
+	s2, _ := openStore(t, dir, pub, Base{})
+	if s2.Snapshot().Find("oom/demo").Version != "1.1.0" {
+		t.Fatal("se pisó")
+	}
+}
+
+func TestOnChangeCorreConElLockTomado(t *testing.T) {
+	pub, priv := testKey(t)
+	s, _ := openStore(t, t.TempDir(), pub, Base{})
+	s.OnChange = func() {
+		if s.mu.TryLock() {
+			s.mu.Unlock()
+			t.Error("OnChange debe correr bajo s.mu para no dejar publicado un catálogo viejo")
+		}
+	}
+	s.Install(signedZip(t, priv, nil), false)
+	s.Remove("oom/demo")
+}
+
+// Los rechazos por choque, versión u oficial devuelven el paquete, para auditar su id real.
+func TestRechazosDevuelvenElPaquete(t *testing.T) {
+	pub, priv := testKey(t)
+	s, _ := openStore(t, t.TempDir(), pub, Base{PlaybookIDs: []string{"ios-xe/oom-stp"}})
+	res, err := s.Install(signedZip(t, priv, nil), false)
+	if Reason(err) != "collision" || res == nil || res.Pack.ID != "oom/demo" {
+		t.Fatalf("%v %+v", err, res)
+	}
+	s, _ = openStore(t, t.TempDir(), pub, Base{})
+	s.Install(signedZip(t, priv, nil), false)
+	res, err = s.Install(signedZip(t, priv, nil), false)
+	if Reason(err) != "version" || res == nil || res.Pack.Version != "1.0.0" {
+		t.Fatalf("%v %+v", err, res)
+	}
+}
+
+// pack.err.read no filtra rutas absolutas de la carpeta de datos.
+func TestErrorDeLecturaSinRutas(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root escribe donde sea")
+	}
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	os.Chmod(dir, 0o500)
+	defer os.Chmod(dir, 0o700)
+	_, err := s.Install(signedZip(t, priv, nil), false)
+	if Reason(err) != "read" || strings.Contains(err.Error(), dir) {
+		t.Fatalf("%v", err)
+	}
+}
+
+func TestReadArchiveNoSeCuelgaConUnFIFO(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "x.mpack")
+	if err := syscall.Mkfifo(f, 0o600); err != nil {
+		t.Skip(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := ReadArchive(f); done <- err }()
+	select {
+	case err := <-done:
+		wantReason(t, err, "zip.invalid")
+	case <-time.After(3 * time.Second):
+		t.Fatal("ReadArchive se colgó con un FIFO")
 	}
 }

@@ -35,7 +35,7 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 	}
 	for _, d := range dirs {
 		t.Run(filepath.Base(d), func(t *testing.T) {
-			p, err := pack.Validate(d, "v0.2.0")
+			p, err := pack.ValidateSource(d, "v0.2.0")
 			if err != nil {
 				t.Fatal(err)
 			}

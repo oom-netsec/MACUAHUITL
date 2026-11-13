@@ -32,10 +32,21 @@ commands:
 
 func goodFiles() map[string][]byte {
 	return map[string][]byte{
-		"manifest.yaml":      []byte(goodManifest),
-		"README.md":          []byte("# Demo\n"),
-		"playbooks/stp.yaml": []byte(goodPlaybook),
+		"manifest.yaml":          []byte(goodManifest),
+		"README.md":              []byte("# Demo\n"),
+		"playbooks/oom-stp.yaml": []byte(goodPlaybook),
 	}
+}
+
+// setPB deja en f un solo playbook, en el archivo que lleva el nombre de su id (regla del instalador).
+func setPB(f map[string][]byte, body string) {
+	for n := range f {
+		if strings.HasPrefix(n, "playbooks/") {
+			delete(f, n)
+		}
+	}
+	id := strings.Trim(strings.SplitN(strings.SplitN(body, "id: ", 2)[1], "\n", 2)[0], "\"")
+	f["playbooks/"+id+".yaml"] = []byte(body)
 }
 
 func testKey(t *testing.T) (ed25519.PublicKey, ed25519.PrivateKey) {
@@ -83,7 +94,7 @@ func TestOficialValido(t *testing.T) {
 func TestOficialSinPrefijoDeEditor(t *testing.T) {
 	pub, priv := testKey(t)
 	f := goodFiles()
-	f["playbooks/stp.yaml"] = []byte(strings.Replace(goodPlaybook, "oom-stp", "stp", 1))
+	setPB(f, strings.Replace(goodPlaybook, "oom-stp", "stp", 1))
 	sign(f, priv)
 	if _, err := Verify(mustZip(t, f), "dev", []ed25519.PublicKey{pub}); err != nil {
 		t.Fatal(err)
@@ -93,7 +104,7 @@ func TestOficialSinPrefijoDeEditor(t *testing.T) {
 func thirdParty() map[string][]byte {
 	f := goodFiles()
 	f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "oom/demo", "acme/demo", 1))
-	f["playbooks/stp.yaml"] = []byte(strings.Replace(goodPlaybook, "oom-stp", "acme-stp", 1))
+	setPB(f, strings.Replace(goodPlaybook, "oom-stp", "acme-stp", 1))
 	return f
 }
 
@@ -167,15 +178,15 @@ func TestRechazos(t *testing.T) {
 		{"núcleo viejo", signed(func(map[string][]byte) {}), "v0.1.9", "core.too_old"},
 		{"editor oom sin firma", func() map[string][]byte { f := goodFiles(); return f }(), "dev", "editor.reserved"},
 		{"comando de escritura", signed(func(f map[string][]byte) {
-			f["playbooks/stp.yaml"] = []byte(strings.Replace(goodPlaybook, "show spanning-tree summary", "configure terminal", 1))
+			setPB(f, strings.Replace(goodPlaybook, "show spanning-tree summary", "configure terminal", 1))
 		}), "dev", "playbook.denied"},
 		{"redirect en pipe", signed(func(f map[string][]byte) {
-			f["playbooks/stp.yaml"] = []byte(strings.Replace(goodPlaybook, "show spanning-tree summary", "show run | redirect flash:x", 1))
+			setPB(f, strings.Replace(goodPlaybook, "show spanning-tree summary", "show run | redirect flash:x", 1))
 		}), "dev", "playbook.denied"},
 		{"playbook roto", signed(func(f map[string][]byte) { f["playbooks/stp.yaml"] = []byte("id: x\n") }), "dev", "playbook.invalid"},
 		{"plataforma sin driver", signed(func(f map[string][]byte) {
 			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[ios-xe, nx-os]", 1))
-			f["playbooks/stp.yaml"] = []byte(strings.Replace(goodPlaybook, "ios-xe", "nx-os", 1))
+			setPB(f, strings.Replace(goodPlaybook, "ios-xe", "nx-os", 1))
 		}), "dev", "playbook.platform"},
 		{"plataforma fuera de platforms", signed(func(f map[string][]byte) {
 			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[ios]", 1))
@@ -196,7 +207,7 @@ func TestRechazos(t *testing.T) {
 
 func TestPrefijoDeTerceros(t *testing.T) {
 	f := thirdParty()
-	f["playbooks/stp.yaml"] = []byte(strings.Replace(goodPlaybook, "oom-stp", "stp", 1))
+	setPB(f, strings.Replace(goodPlaybook, "oom-stp", "stp", 1))
 	_, err := Verify(mustZip(t, f), "dev", nil)
 	wantReason(t, err, "id.prefix")
 
@@ -336,5 +347,54 @@ func TestCompareVersions(t *testing.T) {
 		if got := CompareVersions(c.a, c.b); got != c.want {
 			t.Errorf("%s %s: %d", c.a, c.b, got)
 		}
+	}
+}
+
+// C2: lo que un paquete instalado aporta a la biblioteca de scripts debe ser válido siempre; si no, rompería
+// LibraryWith para siempre. Se rechaza al instalar.
+func TestPlaybooksQueRomperianLaBiblioteca(t *testing.T) {
+	pb := func(id, name string, cmds int) string {
+		s := "id: " + id + "\nplatform: ios-xe\nname: " + name + "\nname_en: x\ncommands:\n"
+		for i := 0; i < cmds; i++ {
+			s += "  - cmd: show clock\n"
+		}
+		return s
+	}
+	cases := map[string]struct{ file, body string }{
+		"punto":                   {"acme-x.y.yaml", pb("acme-x.y", "A · B", 1)},
+		"guion bajo":              {"acme_x.yaml", pb("acme_x", "A · B", 1)},
+		"mayúsculas":              {"stp.yaml", pb("Acme-x", "A · B", 1)},
+		"espacio":                 {"stp.yaml", pb("\"acme x\"", "A · B", 1)},
+		"id distinto del archivo": {"stp.yaml", pb("acme-otro", "A · B", 1)},
+		"lib de más de 60":        {"acme-" + strings.Repeat("a", 56) + ".yaml", pb("acme-"+strings.Repeat("a", 56), "A · B", 1)},
+		"nombre de más de 64":     {"acme-stp.yaml", pb("acme-stp", strings.Repeat("n", 65), 1)},
+		"más de 200 comandos":     {"acme-stp.yaml", pb("acme-stp", "A · B", 201)},
+	}
+	for n, c := range cases {
+		t.Run(n, func(t *testing.T) {
+			f := thirdParty()
+			setPB(f, c.body)
+			f["playbooks/"+c.file] = []byte(c.body)
+			if "playbooks/"+c.file != "playbooks/"+strings.Trim(strings.SplitN(strings.SplitN(c.body, "id: ", 2)[1], "\n", 2)[0], "\"")+".yaml" {
+				delete(f, "playbooks/"+strings.Trim(strings.SplitN(strings.SplitN(c.body, "id: ", 2)[1], "\n", 2)[0], "\"")+".yaml")
+			}
+			_, err := Verify(mustZip(t, f), "dev", nil)
+			wantReason(t, err, "playbook.invalid")
+		})
+	}
+}
+
+func TestScriptsDePaqueteOficialExigenBibliotecaYLib(t *testing.T) {
+	pub, priv := testKey(t)
+	f := goodFiles()
+	f["scripts.json"] = []byte(strings.Replace(scriptsJSON("lib-oom-x"), `"origin":"biblioteca"`, `"origin":"usuario"`, 1))
+	sign(f, priv)
+	_, err := Verify(mustZip(t, f), "dev", []ed25519.PublicKey{pub})
+	wantReason(t, err, "script.invalid")
+}
+
+func TestPlainRechazaFormato(t *testing.T) {
+	if plain("a‮b", 10) || !plain("ab", 10) {
+		t.Fatal("plain debe rechazar caracteres de formato (bidi)")
 	}
 }
