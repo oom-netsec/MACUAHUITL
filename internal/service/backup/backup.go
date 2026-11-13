@@ -202,10 +202,7 @@ func (c collected) text(loc string) string {
 	for _, id := range c.Saved {
 		fmt.Fprintf(&b, "  %s\n", id)
 	}
-	for i, w := range c.Warnings {
-		if i < len(c.WarningTexts) {
-			w = c.WarningTexts[i].In(loc)
-		}
+	for _, w := range i18n.Notes(loc, c.Warnings, c.WarningTexts) { // listas paralelas: si se desparejan, sale es, nunca mezclado
 		b.WriteString(i18n.Msg(loc, "backup.rep.warning", i18n.A("w", w)) + "\n")
 	}
 	return b.String()
