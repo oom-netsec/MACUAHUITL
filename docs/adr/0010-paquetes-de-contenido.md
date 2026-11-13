@@ -161,3 +161,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
 ### Gemelo de playbook
 
 Un playbook elegido corre en su gemelo (`ios/x` por `ios-xe/x` y al revés) solo entre `ios` e `ios-xe`, y solo si los dos son del mismo paquete o los dos oficiales (base, propios del usuario u `oom/*`).
+
+## Enmienda (fase 34): wlc-9800 como plataforma instalable
+
+`wlc-9800` entra en las plataformas instalables de un paquete porque tiene driver: el de IOS-XE, con detección propia por «C9800» en `show version`. Sus playbooks pasan por el mismo `CheckDenied` de solo lectura que los demás. Los playbooks pueden además declarar datos (`params`: MAC, AP, interfaz, IP) que el núcleo valida y sustituye antes de volver a pasar `CheckDenied`. El paquete oficial `oom/wlc-9800` los usa para los casos de un cliente o un AP puntual.

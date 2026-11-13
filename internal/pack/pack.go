@@ -29,7 +29,7 @@ import (
 )
 
 // Installable son las plataformas con driver de Patrol y reglas propias de CheckDenied (ADR 0010).
-var Installable = []string{"ios", "ios-xe"}
+var Installable = []string{"ios", "ios-xe", "wlc-9800"}
 
 var (
 	idRe      = regexp.MustCompile(`^([a-z0-9][a-z0-9-]{0,31})/([a-z0-9][a-z0-9-]{0,31})$`)

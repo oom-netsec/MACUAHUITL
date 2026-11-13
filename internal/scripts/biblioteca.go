@@ -114,7 +114,11 @@ func Derived(pbs []playbook.Playbook) []Script {
 		for _, c := range p.Commands {
 			cmds = append(cmds, c.Text)
 		}
-		out = append(out, Script{ID: "lib-" + id, Name: p.Name, Tech: techDe(id), Platform: p.Platform,
+		plat := p.Platform
+		if plat == "wlc-9800" { // el 9800 corre IOS-XE: su script de biblioteca usa el driver y la plataforma de scripts de IOS-XE
+			plat = "ios-xe"
+		}
+		out = append(out, Script{ID: "lib-" + id, Name: p.Name, Tech: techDe(id), Platform: plat,
 			Description: "Diagnóstico de solo lectura del playbook " + p.ID + ".",
 			Commands:    cmds, Tags: []string{}, Origin: OrigenBiblioteca, CreatedAt: fechaBiblioteca, UpdatedAt: fechaBiblioteca})
 	}
