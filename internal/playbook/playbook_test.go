@@ -3,6 +3,7 @@ package playbook
 import (
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -173,5 +174,65 @@ func TestCompatible(t *testing.T) {
 		if got := Compatible(c.det, c.pb); got != c.ok {
 			t.Errorf("Compatible(%q, %q) = %v", c.det, c.pb, got)
 		}
+	}
+}
+
+// En un IOS clásico, el ios/<x> de oom/ios tapa al ios-xe/<x> del mismo nombre; el resto de ios-xe sigue visible.
+func TestVisibleIOSTapaIOSXE(t *testing.T) {
+	pbs := []Playbook{{ID: "ios-xe/cpu-alta", Platform: "ios-xe"}, {ID: "ios/cpu-alta", Platform: "ios"},
+		{ID: "ios-xe/pre-post", Platform: "ios-xe"}, {ID: "nx-os/cpu-alta", Platform: "nx-os"}}
+	ids := func(ps []Playbook) (out []string) {
+		for _, p := range ps {
+			out = append(out, p.ID)
+		}
+		return out
+	}
+	if got := ids(Visible("ios", pbs)); !slices.Equal(got, []string{"ios/cpu-alta", "ios-xe/pre-post"}) {
+		t.Errorf("ios: %v", got)
+	}
+	if got := ids(Visible("ios-xe", pbs)); !slices.Equal(got, []string{"ios-xe/cpu-alta", "ios-xe/pre-post"}) {
+		t.Errorf("ios-xe: %v", got)
+	}
+}
+
+// El gemelo no cruza paquetes de terceros: solo entre oficiales (o base) o del mismo paquete.
+func TestGemeloNoCruzaPaquetes(t *testing.T) {
+	pbs := []Playbook{
+		{ID: "ios-xe/a", Platform: "ios-xe"}, {ID: "ios/a", Platform: "ios", Pack: "oom/ios"},
+		{ID: "ios-xe/acme-b", Platform: "ios-xe", Pack: "acme/x"}, {ID: "ios/acme-b", Platform: "ios", Pack: "otro/y"},
+		{ID: "ios-xe/acme-c", Platform: "ios-xe", Pack: "acme/x"}, {ID: "ios/acme-c", Platform: "ios", Pack: "acme/x"},
+	}
+	for _, c := range []struct{ id, plat, want string }{
+		{"ios-xe/a", "ios", "ios/a"},           // base + oficial
+		{"ios-xe/acme-b", "ios", ""},           // dos terceros distintos
+		{"ios-xe/acme-c", "ios", "ios/acme-c"}, // mismo paquete
+		{"ios/a", "ios-xe", "ios-xe/a"},
+	} {
+		got := ""
+		if tw := Twin(pbs, c.id, c.plat); tw != nil {
+			got = tw.ID
+		}
+		if got != c.want {
+			t.Errorf("Twin(%s,%s)=%q quiero %q", c.id, c.plat, got, c.want)
+		}
+	}
+	// El ID elegido ya no existe: solo vale un gemelo oficial.
+	if tw := Twin(pbs, "ios-xe/borrado", "ios"); tw != nil {
+		t.Errorf("sin gemelo debía ser nil: %v", tw)
+	}
+	pbs = append(pbs, Playbook{ID: "ios/borrado", Platform: "ios", Pack: "oom/ios"}, Playbook{ID: "ios/ajeno", Platform: "ios", Pack: "acme/x"})
+	if tw := Twin(pbs, "ios-xe/borrado", "ios"); tw == nil || tw.ID != "ios/borrado" {
+		t.Errorf("gemelo oficial de un ID faltante: %v", tw)
+	}
+	if tw := Twin(pbs, "ios-xe/ajeno", "ios"); tw != nil {
+		t.Errorf("gemelo de tercero para un ID faltante: %v", tw)
+	}
+	// Visible: un gemelo de otro tercero no tapa.
+	got := []string{}
+	for _, p := range Visible("ios", pbs) {
+		got = append(got, p.ID)
+	}
+	if slices.Contains(got, "ios-xe/a") || !slices.Contains(got, "ios-xe/acme-b") || slices.Contains(got, "ios-xe/acme-c") {
+		t.Errorf("Visible: %v", got)
 	}
 }

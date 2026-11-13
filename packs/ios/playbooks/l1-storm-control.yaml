@@ -1,0 +1,18 @@
+# Propósito: Muestra los umbrales y las acciones de storm-control y los paquetes descartados por puerto.
+# Cuándo usarlo: Tormenta de broadcast o multicast, puertos apagados por storm-control o tráfico anómalo en un VLAN.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: l1-storm-control
+platform: ios
+name: L1 · Storm control (IOS)
+name_en: L1 · Storm control (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show storm-control
+  - cmd: show storm-control broadcast
+  - cmd: show storm-control multicast
+  - cmd: show storm-control unicast
+  - cmd: show interfaces status err-disabled
+  - cmd: show errdisable recovery
+  - cmd: show interfaces counters
+  - cmd: show logging | include STORM

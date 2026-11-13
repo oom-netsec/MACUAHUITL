@@ -1,0 +1,11 @@
+# Comandos de la documentación pública de Cisco para IOS clásico. Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: topologia
+platform: ios
+name: L2 · Topología (CDP, LLDP, STP, port-channels) (IOS)
+name_en: L2 · Topology (CDP, LLDP, STP, port-channels) (IOS)
+commands:
+  - cmd: show version
+  - cmd: show cdp neighbors detail
+  - cmd: show lldp neighbors detail
+  - cmd: show spanning-tree
+  - cmd: show etherchannel summary

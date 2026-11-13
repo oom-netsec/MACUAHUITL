@@ -1,0 +1,20 @@
+# Propósito: Revisa las ACL, sus contadores de coincidencias y dónde están aplicadas.
+# Cuándo usarlo: Tráfico bloqueado inesperadamente, ACL que no hace match o confirmar que una regla está aplicada.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/security/s1/sec-s1-cr-book.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: svc-acl
+platform: ios
+name: Servicios · ACL (IOS)
+name_en: Services · ACL (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show access-lists
+  - cmd: show ip access-lists
+  - cmd: show ipv6 access-list
+  - cmd: show time-range
+  - cmd: show vlan access-map
+  - cmd: show vlan filter
+  - cmd: show ip interface | include line protocol|access list
+  - cmd: show logging | include SEC-6-IPACCESSLOG|ACL|IPACCESS
+  - cmd: show running-config | section access-list|access-group
+    may_contain_secrets: true

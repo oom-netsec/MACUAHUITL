@@ -1,0 +1,20 @@
+# Propósito: Comprueba el estado de UDLD, los vecinos bidireccionales y los puertos apagados por UDLD.
+# Cuándo usarlo: Enlace de fibra con un solo sentido, loops por enlaces unidireccionales o err-disabled por UDLD.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: l1-udld
+platform: ios
+name: L1 · UDLD (IOS)
+name_en: L1 · UDLD (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show udld
+  - cmd: show udld neighbors
+  - cmd: show errdisable detect
+  - cmd: show errdisable recovery
+  - cmd: show interfaces status err-disabled
+  - cmd: show cdp neighbors
+  - cmd: show interfaces transceiver detail
+  - cmd: show logging | include UDLD
+  - cmd: show running-config | include udld|^interface
+    may_contain_secrets: true
