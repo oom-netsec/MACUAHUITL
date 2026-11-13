@@ -9,12 +9,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 
-	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
@@ -32,39 +32,12 @@ type Base struct {
 	ReservedScripts   []string
 }
 
-// reservedEditors son los editores que un tercero no puede usar (calculados, no escritos a mano): oom, los
-// nombres de plataforma y el primer segmento (antes del «-») de todos los IDs de la base y de los reservados,
-// porque un ID de tercero con ese prefijo podría ocupar uno de un paquete oficial futuro.
-func (b Base) reservedEditors() map[string]bool {
-	r := map[string]bool{"oom": true}
-	for _, p := range append(playbook.KnownPlatforms(), scripts.Platforms...) {
-		r[p] = true
-		r[strings.SplitN(p, "-", 2)[0]] = true
-	}
-	first := func(id string) {
-		if _, rest, ok := strings.Cut(id, "/"); ok {
-			id = rest
-		}
-		id = strings.TrimPrefix(id, "lib-")
-		if seg, _, _ := strings.Cut(id, "-"); seg != "" {
-			r[seg] = true
-		}
-	}
-	for _, l := range [][]string{b.PlaybookIDs, b.ScriptIDs, b.ReservedPlaybooks, b.ReservedScripts} {
-		for _, id := range l {
-			first(id)
-		}
-	}
-	return r
-}
-
 // checkReserved aplica las reservas a un paquete que no es oficial.
 func (s *Store) checkReserved(p *Pack) error {
 	if p.Official {
 		return nil
 	}
-	ed := p.Editor()
-	if seg, _, _ := strings.Cut(ed, "-"); s.reserved[ed] || s.reserved[seg] {
+	if ed := p.Editor(); reservedSegments[ed] {
 		return rej("editor.reserved", "editor", ed)
 	}
 	return nil
@@ -86,29 +59,52 @@ type Store struct {
 	core     string
 	keys     []ed25519.PublicKey
 	base     Base
-	reserved map[string]bool
 	mu       sync.Mutex // serializa instalar y quitar
 	snap     atomic.Pointer[Snapshot]
 	OnChange func() // tras instalar o quitar, ya publicada la foto nueva; sin locks tomados
 }
 
-// Open abre la carpeta, borra los .tmp-* que hayan quedado y revalida cada paquete (sha256, índice, firma, sin
-// archivos de más ni enlaces). Uno que no pasa se omite y vuelve en rej; el núcleo sigue funcionando.
+// Open abre la carpeta, borra los .tmp-* que hayan quedado (restaurando antes una versión vieja interrumpida) y
+// revalida cada paquete: sha256 contra el INDEX, sin archivos de más ni enlaces, firma y los pasos 4 a 7 del ADR
+// (manifiesto y min_core, playbooks, scripts y choques), con los oficiales primero y luego por ID, para que el
+// resultado no dependa del orden de la carpeta. Uno que no pasa se omite y vuelve en rej; el núcleo sigue funcionando.
 func Open(dir, coreVersion string, keys []ed25519.PublicKey, base Base) (*Store, []Rejected, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, nil, err
 	}
-	s := &Store{dir: dir, core: coreVersion, keys: keys, base: base, reserved: base.reservedEditors()}
+	s := &Store{dir: dir, core: coreVersion, keys: keys, base: base}
 	ents, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, nil, err
 	}
 	var rej []Rejected
-	var packs []*Pack
+	reject := func(rel string, p *Pack, err error) {
+		r := Rejected{Dir: rel, Reason: Reason(err)}
+		if p != nil {
+			r.ID = p.ID
+		}
+		if r.Reason == "" {
+			r.Reason = "read"
+		}
+		rej = append(rej, r)
+	}
+	type cand struct {
+		rel string
+		p   *Pack
+	}
+	var cands []cand
 	for _, e := range ents {
 		if strings.HasPrefix(e.Name(), ".tmp-") {
 			s.restoreOld(filepath.Join(dir, e.Name()))
 			os.RemoveAll(filepath.Join(dir, e.Name()))
+		}
+	}
+	ents, err = os.ReadDir(dir) // tras restaurar
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, e := range ents {
+		if strings.HasPrefix(e.Name(), ".tmp-") {
 			continue
 		}
 		sub, err := os.ReadDir(filepath.Join(dir, e.Name()))
@@ -118,25 +114,34 @@ func Open(dir, coreVersion string, keys []ed25519.PublicKey, base Base) (*Store,
 		}
 		for _, n := range sub {
 			rel := e.Name() + "/" + n.Name()
-			p, err := s.revalidate(rel)
-			if err == nil {
-				if err = s.checkReserved(p); err == nil {
-					err = s.collides(p, packs)
-				}
-			}
+			p, err := s.revalidate(rel) // sha256/INDEX, firma, manifiesto, min_core, playbooks y scripts
 			if err != nil {
-				r := Rejected{Dir: rel, Reason: Reason(err)}
-				if p != nil {
-					r.ID = p.ID
-				}
-				if r.Reason == "" {
-					r.Reason = "read"
-				}
-				rej = append(rej, r)
+				reject(rel, p, err)
 				continue
 			}
-			packs = append(packs, p)
+			cands = append(cands, cand{rel, p})
 		}
+	}
+	slices.SortFunc(cands, func(a, b cand) int {
+		if a.p.Official != b.p.Official {
+			if a.p.Official {
+				return -1
+			}
+			return 1
+		}
+		return strings.Compare(a.p.ID, b.p.ID)
+	})
+	var packs []*Pack
+	for _, c := range cands { // reservas y choques (paso 7) contra la base y los ya aceptados
+		err := s.checkReserved(c.p)
+		if err == nil {
+			err = s.collides(c.p, packs)
+		}
+		if err != nil {
+			reject(c.rel, c.p, err)
+			continue
+		}
+		packs = append(packs, c.p)
 	}
 	s.publish(packs)
 	return s, rej, nil
@@ -181,6 +186,9 @@ func (s *Store) revalidate(rel string) (*Pack, error) {
 	}
 	p, err := check(files, s.core, s.keys, false)
 	if err != nil {
+		if m, merr := parseManifest(files[fileManifest]); merr == nil {
+			return &Pack{Manifest: m}, err // solo para nombrar el id en el aviso
+		}
 		return nil, err
 	}
 	if rel != filepath.ToSlash(p.ID) {
@@ -218,7 +226,7 @@ func (sn *Snapshot) Find(id string) *Pack {
 
 // ScriptIDs son los IDs de todos los scripts que el paquete aporta: los derivados de sus playbooks y los propios.
 func (p *Pack) ScriptIDs() []string {
-	d, _ := scripts.Derived(p.Playbooks)
+	d := scripts.Derived(p.Playbooks)
 	var ids []string
 	for _, s := range append(d, p.Scripts...) {
 		ids = append(ids, s.ID)
@@ -254,7 +262,7 @@ func (s *Store) collides(p *Pack, others []*Pack) error {
 			}
 			pbs[pb.ID] = who
 		}
-		d, _ := scripts.Derived(q.Playbooks)
+		d := scripts.Derived(q.Playbooks)
 		for _, sc := range append(d, q.Scripts...) {
 			if w, dup := ids[sc.ID]; dup {
 				return rej("collision", "id", sc.ID, "with", w)

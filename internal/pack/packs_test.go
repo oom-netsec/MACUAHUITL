@@ -3,6 +3,7 @@ package pack_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/pack"
@@ -68,5 +69,57 @@ func TestBuildEsDeterminista(t *testing.T) {
 	}
 	if _, err := pack.Verify(a, "v0.3.0", nil); pack.Reason(err) != "editor.reserved" {
 		t.Fatalf("sin firma, oom está reservado: %v", err)
+	}
+}
+
+// Quien agregue un segmento oficial (base, movido a oom/ios-xe o un packs/*) debe reservarlo en reservedSegments:
+// si no, un tercero con ese editor podría publicar IDs que bloquearan al oficial.
+func TestSegmentosOficialesEstanReservados(t *testing.T) {
+	first := func(id string) string {
+		if _, rest, ok := strings.Cut(id, "/"); ok {
+			id = rest
+		}
+		id = strings.TrimPrefix(id, "lib-")
+		seg, _, _ := strings.Cut(id, "-")
+		return seg
+	}
+	check := func(origin, id string) {
+		if seg := first(id); !pack.IsReservedSegment(seg) {
+			t.Errorf("%s: el ID %q usa el segmento %q, que no está en reservedSegments (internal/pack/reserved.go)", origin, id, seg)
+		}
+	}
+	pbs, err := playbook.Load(playbooks.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range pbs {
+		check("base", p.ID)
+	}
+	lib, _, err := scripts.LibraryWithEN(playbooks.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range lib {
+		check("biblioteca base", s.ID)
+	}
+	for _, id := range playbooks.MovedToIOSXE {
+		check("movido", id)
+	}
+	dirs, _ := filepath.Glob(filepath.Join(packtest.RepoDir(), "packs", "*"))
+	for _, d := range dirs {
+		p, err := pack.ValidateSource(d, "v0.3.0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, pb := range p.Playbooks {
+			check("packs/"+filepath.Base(d), pb.ID)
+		}
+		for _, id := range p.ScriptIDs() {
+			check("packs/"+filepath.Base(d), id)
+		}
+	}
+	// La prueba muerde: un segmento que no existe no está reservado.
+	if pack.IsReservedSegment("acme") {
+		t.Fatal("acme no debe estar reservado")
 	}
 }

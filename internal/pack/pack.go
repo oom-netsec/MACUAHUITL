@@ -140,6 +140,9 @@ func check(files map[string][]byte, coreVersion string, keys []ed25519.PublicKey
 		}
 		p.Official = true // una fuente oom/* será oficial cuando el release la firme: sin prefijo de editor en los IDs
 	}
+	if !p.Official && !source && !thirdPartyEditor.MatchString(m.Editor()) {
+		return nil, rej("manifest.invalid", "field", "id")
+	}
 	if !utf8.Valid(files[fileReadme]) {
 		return nil, rej("manifest.invalid", "field", "README.md")
 	}
@@ -286,7 +289,7 @@ func loadPlaybooks(p *Pack, files map[string][]byte) error {
 		}
 	}
 	// Los scripts derivados deben pasar Validate: un paquete que los rompiera dejaría LibraryWith fallando para siempre.
-	derived, _ := scripts.Derived(pbs)
+	derived := scripts.Derived(pbs)
 	for _, s := range derived {
 		if err := s.Validate(); err != nil {
 			return rejWrap("playbook.invalid", fmt.Errorf("script derivado %s: %w", s.ID, err))

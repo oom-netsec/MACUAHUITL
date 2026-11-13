@@ -61,7 +61,7 @@ func LibraryWith(pb fs.FS, packs []Contenido) ([]Script, map[string]Texto, error
 	if err != nil {
 		return nil, nil, err
 	}
-	out, en := Derived(pbs)
+	out, en := Derived(pbs), DerivedTexts(pbs)
 	b, err := bibliotecaFS.ReadFile("biblioteca/configuracion.yaml")
 	if err != nil {
 		return nil, nil, err
@@ -82,9 +82,8 @@ func LibraryWith(pb fs.FS, packs []Contenido) ([]Script, map[string]Texto, error
 		en["lib-"+id] = Texto{c.NameEN, c.DescriptionEN}
 	}
 	for _, c := range packs {
-		d, den := Derived(c.Playbooks)
-		out = append(append(out, d...), c.Scripts...)
-		for k, v := range den {
+		out = append(append(out, Derived(c.Playbooks)...), c.Scripts...)
+		for k, v := range DerivedTexts(c.Playbooks) {
 			en[k] = v
 		}
 	}
@@ -101,16 +100,13 @@ func LibraryWith(pb fs.FS, packs []Contenido) ([]Script, map[string]Texto, error
 	return out, en, nil
 }
 
-// Derived arma el script de diagnóstico «lib-<id>» de cada playbook (los comandos son los del playbook) y su texto
-// en inglés. Lo usan la biblioteca y los paquetes de contenido: un playbook movido a un paquete conserva su ID.
-func Derived(pbs []playbook.Playbook) ([]Script, map[string]Texto) {
-	en := map[string]Texto{}
+// Derived arma el script de diagnóstico «lib-<id>» de cada playbook (los comandos son los del playbook), y solo esos:
+// nunca los de configuración. Lo usan la biblioteca y los paquetes de contenido: un playbook movido a un paquete
+// conserva su ID.
+func Derived(pbs []playbook.Playbook) []Script {
 	var out []Script
 	for _, p := range pbs {
-		id := p.ID[strings.Index(p.ID, "/")+1:]
-		if p.Platform != "ios-xe" { // los IDs de ios-xe no cambian; el resto lleva su plataforma para no chocar
-			id = p.Platform + "-" + id
-		}
+		id := derivedID(p)
 		cmds := append([]string{}, p.Pre...)
 		for _, c := range p.Commands {
 			cmds = append(cmds, c.Text)
@@ -118,9 +114,25 @@ func Derived(pbs []playbook.Playbook) ([]Script, map[string]Texto) {
 		out = append(out, Script{ID: "lib-" + id, Name: p.Name, Tech: techDe(id), Platform: p.Platform,
 			Description: "Diagnóstico de solo lectura del playbook " + p.ID + ".",
 			Commands:    cmds, Tags: []string{}, Origin: OrigenBiblioteca, CreatedAt: fechaBiblioteca, UpdatedAt: fechaBiblioteca})
-		en["lib-"+id] = Texto{p.NameEn, "Read-only diagnostic of playbook " + p.ID + "."}
 	}
-	return out, en
+	return out
+}
+
+// DerivedTexts es el texto en inglés de los scripts de Derived, por ID.
+func DerivedTexts(pbs []playbook.Playbook) map[string]Texto {
+	en := map[string]Texto{}
+	for _, p := range pbs {
+		en["lib-"+derivedID(p)] = Texto{p.NameEn, "Read-only diagnostic of playbook " + p.ID + "."}
+	}
+	return en
+}
+
+func derivedID(p playbook.Playbook) string {
+	id := p.ID[strings.Index(p.ID, "/")+1:]
+	if p.Platform != "ios-xe" { // los IDs de ios-xe no cambian; el resto lleva su plataforma para no chocar
+		id = p.Platform + "-" + id
+	}
+	return id
 }
 
 // In da el script de fábrica en el idioma loc: con en, su nombre y descripción en inglés (los que falten quedan en

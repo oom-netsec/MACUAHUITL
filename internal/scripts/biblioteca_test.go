@@ -128,3 +128,29 @@ func TestTechDeUnPlaybook(t *testing.T) {
 		}
 	}
 }
+
+// Derived devuelve solo los scripts derivados de playbooks; los de configuración entran una sola vez, con la base,
+// aunque haya varios paquetes (si se llamara LibraryWithEN por paquete saldrían duplicados).
+func TestDerivedNoTraeConfiguracionYLaBibliotecaNoLaDuplica(t *testing.T) {
+	pbs, err := playbook.Load(os.DirFS("../../packs/ios-xe/playbooks"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range Derived(pbs) {
+		if strings.HasPrefix(s.ID, "lib-cfg-") {
+			t.Fatalf("Derived trajo un script de configuración: %s", s.ID)
+		}
+	}
+	otro := []playbook.Playbook{{ID: "ios-xe/acme-a", Platform: "ios-xe", Name: "Acme · A", Commands: []playbook.Command{{Text: "show clock"}}}}
+	lib, _, err := LibraryWith(playbooks.FS, []Contenido{{Playbooks: pbs}, {Playbooks: otro}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := map[string]int{}
+	for _, s := range lib {
+		n[s.ID]++
+	}
+	if n["lib-cfg-ntp"] != 1 || n["lib-acme-a"] != 1 || n["lib-l2-stp"] != 1 {
+		t.Fatalf("duplicados: cfg-ntp=%d acme-a=%d l2-stp=%d", n["lib-cfg-ntp"], n["lib-acme-a"], n["lib-l2-stp"])
+	}
+}

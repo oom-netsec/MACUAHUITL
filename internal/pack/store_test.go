@@ -310,7 +310,7 @@ func TestEditoresReservadosParaTerceros(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		for _, ed := range []string{"l2", "tac", "cfg", "oom", "ios-xe", "ios", "nx-os", "nx", "l2-foo"} {
+		for _, ed := range []string{"l2", "tac", "cfg", "oom", "ios", "nx", "wireless", "lib"} {
 			f := evil(ed)
 			setPB(f, strings.Replace(goodPlaybook, "oom-stp", ed+"-stp", 1))
 			if ed == "l2" {
@@ -318,6 +318,14 @@ func TestEditoresReservadosParaTerceros(t *testing.T) {
 			}
 			_, err := s.Install(mustZip(t, f), true)
 			if r := Reason(err); r != "editor.reserved" {
+				t.Errorf("editor %q (oficial=%v): %v", ed, withOfficial, err)
+			}
+		}
+		// Un editor con guion no es válido para terceros: «l2-stp» no podría publicar ios-xe/l2-stp-guard.
+		for _, ed := range []string{"ios-xe", "nx-os", "l2-foo", "l2-stp", "acme-x", "abcdefghijklmnopq"} {
+			f := evil(ed)
+			setPB(f, strings.Replace(goodPlaybook, "oom-stp", ed+"-guard", 1))
+			if _, err := s.Install(mustZip(t, f), true); Reason(err) != "manifest.invalid" {
 				t.Errorf("editor %q (oficial=%v): %v", ed, withOfficial, err)
 			}
 		}
@@ -502,5 +510,75 @@ func TestReadArchiveNoSeCuelgaConUnFIFO(t *testing.T) {
 		wantReason(t, err, "zip.invalid")
 	case <-time.After(3 * time.Second):
 		t.Fatal("ReadArchive se colgó con un FIFO")
+	}
+}
+
+// Al arrancar se vuelven a aplicar los pasos 4 a 7: un oom/* alterado a mano que se quedó sin firma no conserva el editor.
+func TestArranqueOomSinFirmaSeOmite(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	s.Install(signedZip(t, priv, nil), false)
+	if err := os.Remove(filepath.Join(dir, "oom", "demo", "SIGNATURE")); err != nil { // el INDEX no cubre SIGNATURE: solo cambia el origen
+		t.Fatal(err)
+	}
+	_, rej := openStore(t, dir, pub, Base{})
+	if len(rej) != 1 || rej[0].Reason != "editor.reserved" || rej[0].ID != "oom/demo" {
+		t.Fatalf("%+v", rej)
+	}
+}
+
+// Los oficiales se aceptan primero: ante un choque en disco, el de terceros es el que se omite aunque su carpeta
+// vaya antes en el orden del directorio («acme» < «oom»).
+func TestArranqueOficialesPrimero(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	if _, err := s.Install(signedZip(t, priv, nil), false); err != nil {
+		t.Fatal(err)
+	}
+	other := t.TempDir()
+	s2, _ := openStore(t, other, pub, Base{})
+	if _, err := s2.Install(mustZip(t, thirdParty()), true); err != nil { // mismo nombre de script «L2 · STP»
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(other, "acme"), filepath.Join(dir, "acme")); err != nil {
+		t.Fatal(err)
+	}
+	s3, rej := openStore(t, dir, pub, Base{})
+	if len(rej) != 1 || rej[0].ID != "acme/demo" || rej[0].Reason != "collision" || s3.Snapshot().Find("oom/demo") == nil {
+		t.Fatalf("%+v", rej)
+	}
+}
+
+// Un núcleo que ya trae un ID de un paquete instalado, o más viejo que su min_core, omite el paquete al arrancar.
+func TestArranqueReaplicaChoquesYMinCore(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	s.Install(signedZip(t, priv, nil), false)
+	_, rej := openStore(t, dir, pub, Base{PlaybookIDs: []string{"ios-xe/oom-stp"}})
+	if len(rej) != 1 || rej[0].Reason != "collision" {
+		t.Fatalf("choque: %+v", rej)
+	}
+	_, rej, err := Open(dir, "v0.1.0", []ed25519.PublicKey{pub}, Base{})
+	if err != nil || len(rej) != 1 || rej[0].Reason != "core.too_old" {
+		t.Fatalf("min_core: %+v %v", rej, err)
+	}
+}
+
+// Un editor que pasa a estar reservado tras instalar el paquete (una versión nueva del núcleo) lo omite al arrancar.
+func TestArranqueReaplicaLasReservas(t *testing.T) {
+	pub, _ := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	if _, err := s.Install(mustZip(t, thirdParty()), true); err != nil {
+		t.Fatal(err)
+	}
+	reservedSegments["acme"] = true
+	defer delete(reservedSegments, "acme")
+	_, rej := openStore(t, dir, pub, Base{})
+	if len(rej) != 1 || rej[0].Reason != "editor.reserved" {
+		t.Fatalf("%+v", rej)
 	}
 }

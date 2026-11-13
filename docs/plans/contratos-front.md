@@ -1130,12 +1130,12 @@ Instrucciones de `ServerReady.hint` (la explicación paso a paso del servidor de
 | `pack.err.zip.missing` | `name` | InvalidArgument |
 | `pack.err.index.mismatch` | `name` | InvalidArgument |
 | `pack.err.signature.invalid` | | InvalidArgument |
-| `pack.err.manifest.invalid` | `field` | InvalidArgument |
+| `pack.err.manifest.invalid` | `field` (`id` también cuando el editor de un paquete de terceros no cumple `^[a-z0-9]{1,16}$`, sin guion) | InvalidArgument |
 | `pack.err.core.too_old` | `min_core`, `core` | InvalidArgument |
 | `pack.err.playbook.denied`, `pack.err.playbook.invalid` (incluye un id que no sea `a-z0-9-` o distinto del nombre del archivo, o que haría inválido el script `lib-<id>`), `pack.err.script.invalid` | `cause_reason` si la causa trae código | InvalidArgument |
 | `pack.err.playbook.platform` | `id`, `platform` | InvalidArgument |
 | `pack.err.id.prefix` | `id`, `want` | InvalidArgument |
-| `pack.err.editor.reserved` | `editor` | InvalidArgument (`oom`, nombres de plataforma y los prefijos de ID del contenido base y del movido a `oom/ios-xe` están reservados para paquetes con firma oficial) |
+| `pack.err.editor.reserved` | `editor` | InvalidArgument (`oom`, nombres de plataforma y los primeros segmentos de ID del contenido base, del movido a `oom/ios-xe` y de los previstos para paquetes oficiales están reservados para paquetes con firma oficial) |
 | `pack.err.unsigned` | | FailedPrecondition |
 | `pack.err.collision` | `id`, `with` (`base` o el id del otro paquete) | FailedPrecondition |
 | `pack.err.version` | `id`, `installed`, `version` | FailedPrecondition |
