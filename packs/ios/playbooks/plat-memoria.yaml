@@ -1,0 +1,15 @@
+# Propósito: Revisa el uso de memoria, los procesos que más consumen y las fallas de asignación.
+# Cuándo usarlo: Memoria libre baja, mensajes MALLOCFAIL o sospecha de fuga de memoria tras días de uptime.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/fundamentals/command/cf_command_ref.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: plat-memoria
+platform: ios
+name: Plataforma · Memoria (IOS)
+name_en: Platform · Memory (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show memory statistics
+  - cmd: show memory failures alloc
+  - cmd: show logging | include MALLOCFAIL|MEMORY|MEM
+  - cmd: show memory allocating-process totals
+  - cmd: show processes memory sorted

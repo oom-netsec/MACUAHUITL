@@ -1,0 +1,19 @@
+# Propósito: Reúne la causa del último reinicio, los archivos de crash y la historia de redundancia.
+# Cuándo usarlo: El equipo se reinició solo, hay tracebacks en el log o se necesita evidencia para abrir un caso con TAC.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/fundamentals/command/cf_command_ref.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13), salvo los marcados «no existe en 3560CX».
+id: plat-reloads-crashinfo
+platform: ios
+name: Plataforma · Reinicios y crashinfo (IOS)
+name_en: Platform · Reloads and crashinfo (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show reload
+  - cmd: show version | include uptime|System returned|System restarted|Last reload|reason
+  - cmd: show logging | include RELOAD|RESTART|CRASH|TRACEBACK|CPUHOG
+  - cmd: show redundancy history  # no existe en 3560CX
+  - cmd: show stacks
+  - cmd: "dir crashinfo:"  # no existe en 3560CX
+  - cmd: "dir flash:"
+  - cmd: show boot

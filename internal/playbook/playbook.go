@@ -43,6 +43,40 @@ func Compatible(detected, pbPlatform string) bool {
 	return detected == pbPlatform || (detected == "ios" && pbPlatform == "ios-xe")
 }
 
+func officialPack(p string) bool { return p == "" || strings.HasPrefix(p, "oom/") }
+
+// Twin es el gemelo de id en la plataforma platform ("ios-xe/x" ↔ "ios/x"), o nil. No cruza paquetes de terceros:
+// solo si ambos son del mismo paquete o ambos oficiales. Si id ya no existe, se trata como oficial.
+func Twin(pbs []Playbook, id, platform string) *Playbook {
+	pl, rest, _ := strings.Cut(id, "/")
+	if pl == platform || (pl != "ios" && pl != "ios-xe") || (platform != "ios" && platform != "ios-xe") {
+		return nil
+	}
+	orig := ""
+	for _, p := range pbs {
+		if p.ID == id {
+			orig = p.Pack
+		}
+	}
+	for i, p := range pbs {
+		if p.ID == platform+"/"+rest && (p.Pack == orig || officialPack(p.Pack) && officialPack(orig)) {
+			return &pbs[i]
+		}
+	}
+	return nil
+}
+
+// Visible son los playbooks compatibles con detected, sin repetir: en IOS clásico, ios/<x> tapa a ios-xe/<x>.
+func Visible(detected string, pbs []Playbook) []Playbook {
+	var out []Playbook
+	for _, p := range pbs {
+		if Compatible(detected, p.Platform) && (p.Platform == detected || Twin(pbs, p.ID, detected) == nil) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // knownPlatforms son las plataformas que un playbook puede nombrar en platforms: (las de playbooks/cisco).
 var knownPlatforms = []string{"ios", "ios-xe", "nx-os", "cat9k", "ftd", "ise", "sda", "wlc-9800", "wlc-aireos"}
 
@@ -56,6 +90,7 @@ func KnownPlatform(s string) bool { return slices.Contains(knownPlatforms, s) }
 // (name_en); los playbooks del usuario pueden omitirlo y NameFor cae al nombre en español.
 type Playbook struct {
 	ID, Platform, Name, NameEn string
+	Pack                       string // ID del paquete que lo trae; vacío = contenido base o playbooks del usuario (no se serializa)
 	Pre                        []string
 	Commands                   []Command
 }

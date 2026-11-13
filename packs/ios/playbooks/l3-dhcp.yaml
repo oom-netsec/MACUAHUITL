@@ -1,0 +1,19 @@
+# Propósito: Revisa el servidor y relay DHCP: pools, conflictos, asignaciones y estadísticas.
+# Cuándo usarlo: Clientes sin IP, pool agotado, conflictos de dirección o relay mal dirigido.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipaddr/command/ipaddr-cr-book.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: l3-dhcp
+platform: ios
+name: L3 · DHCP (IOS)
+name_en: L3 · DHCP (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show ip dhcp server statistics
+  - cmd: show ip dhcp pool
+  - cmd: show ip dhcp conflict
+  - cmd: show ip dhcp binding
+  - cmd: show ip dhcp database
+  - cmd: show logging | include DHCP
+  - cmd: show ip interface | include line protocol|elper
+  - cmd: show running-config | section dhcp
+    may_contain_secrets: true

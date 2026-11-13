@@ -1,0 +1,17 @@
+# Propósito: Busca puertos que suben y bajan: eventos de enlace, contadores de errores y óptica.
+# Cuándo usarlo: Reportes de cortes intermitentes en un puerto o troncal; antes de cambiar cable, SFP o puerto.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/interface/command/ir-cr-book.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: l1-flapping
+platform: ios
+name: L1 · Flapping de enlace (IOS)
+name_en: L1 · Link flapping (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show interfaces status
+  - cmd: show logging | include UPDOWN|CHANGED|FLAP|LINK-3|LINEPROTO
+  - cmd: show interfaces counters errors
+  - cmd: show errdisable flap-values
+  - cmd: show interfaces transceiver
+  - cmd: show interfaces summary
+  - cmd: show spanning-tree detail | include occurred|from

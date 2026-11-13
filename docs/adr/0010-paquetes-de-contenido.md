@@ -157,3 +157,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
 - Patrol sigue siendo de solo lectura: los playbooks de un paquete pasan por `CheckDenied` igual que los embebidos, y solo en plataformas con reglas propias. Las plantillas de cambio asistido (ADR 0007) se quedan en el núcleo; los paquetes no pueden traer plantillas de escritura.
 - Quien venga de una versión anterior pierde los playbooks movidos hasta que instale `oom/ios-xe`. Las notas del release lo dicen, y un trabajo que los use falla con `pack.missing`.
 - Aparece una llave que hay que custodiar. Si se pierde o se filtra, sale un núcleo nuevo con otra llave pública y se vuelven a firmar los paquetes.
+
+### Gemelo de playbook
+
+Un playbook elegido corre en su gemelo (`ios/x` por `ios-xe/x` y al revés) solo entre `ios` e `ios-xe`, y solo si los dos son del mismo paquete o los dos oficiales (base, propios del usuario u `oom/*`).

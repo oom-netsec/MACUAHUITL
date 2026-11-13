@@ -1,0 +1,12 @@
+# Comandos de la documentación pública de Cisco para IOS clásico. Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: cpu-alta
+platform: ios
+name: Plataforma · CPU alta (IOS)
+name_en: Platform · High CPU (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show processes cpu sorted
+  - cmd: show processes cpu history
+  - cmd: show interfaces summary
+  - cmd: show controllers cpu-interface
+  - cmd: show logging | include CPU|HOG|MEM

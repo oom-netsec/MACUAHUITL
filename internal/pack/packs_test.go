@@ -19,6 +19,33 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 	if len(dirs) == 0 {
 		t.Fatal("no hay packs/*")
 	}
+	base := repoBase(t)
+	for _, d := range dirs {
+		t.Run(filepath.Base(d), func(t *testing.T) {
+			p, err := pack.ValidateSource(d, "v0.3.1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(p.Playbooks) == 0 {
+				t.Fatal("un paquete sin playbooks no se publica")
+			}
+			if _, err := os.Stat(filepath.Join(d, "SIGNATURE")); err == nil {
+				t.Fatal("la fuente no lleva SIGNATURE")
+			}
+			st, _, err := pack.Open(t.TempDir(), "v0.3.1", packtest.Keys(), base)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := st.Install(packtest.Signed(t, d), false); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+// repoBase es el contenido base embebido, contra el que se instala cada paquete.
+func repoBase(t *testing.T) pack.Base {
+	t.Helper()
 	base := pack.Base{}
 	pbs, err := playbook.Load(playbooks.FS)
 	if err != nil {
@@ -34,26 +61,30 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 	for _, s := range lib {
 		base.ScriptIDs, base.ScriptNames = append(base.ScriptIDs, s.ID), append(base.ScriptNames, s.Name)
 	}
-	for _, d := range dirs {
-		t.Run(filepath.Base(d), func(t *testing.T) {
-			p, err := pack.ValidateSource(d, "v0.3.0")
-			if err != nil {
-				t.Fatal(err)
+	return base
+}
+
+// oom/ios y oom/ios-xe conviven en el mismo almacén: playbooks distintos por plataforma y scripts por el prefijo ios-.
+func TestIOSEIOSXEConviven(t *testing.T) {
+	st, _, err := pack.Open(t.TempDir(), "v0.3.1", packtest.Keys(), repoBase(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"ios-xe", "ios"} {
+		if _, err := st.Install(packtest.Signed(t, filepath.Join(packtest.RepoDir(), "packs", n)), false); err != nil {
+			t.Fatalf("oom/%s: %v", n, err)
+		}
+	}
+	for _, n := range []string{"ios-xe", "ios"} {
+		p := st.Snapshot().Find("oom/" + n)
+		if p == nil || len(p.Playbooks) != 52 {
+			t.Fatalf("oom/%s: deben quedar instalados sus 52 playbooks: %v", n, p)
+		}
+		for _, pb := range p.Playbooks {
+			if pb.Platform != n || !strings.HasPrefix(pb.ID, n+"/") {
+				t.Errorf("oom/%s: %s es de %s", n, pb.ID, pb.Platform)
 			}
-			if len(p.Playbooks) == 0 {
-				t.Fatal("un paquete sin playbooks no se publica")
-			}
-			if _, err := os.Stat(filepath.Join(d, "SIGNATURE")); err == nil {
-				t.Fatal("la fuente no lleva SIGNATURE")
-			}
-			st, _, err := pack.Open(t.TempDir(), "v0.3.0", packtest.Keys(), base)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := st.Install(packtest.Signed(t, d), false); err != nil {
-				t.Fatal(err)
-			}
-		})
+		}
 	}
 }
 
@@ -67,7 +98,7 @@ func TestBuildEsDeterminista(t *testing.T) {
 	if string(a) != string(b) {
 		t.Fatal("Build no es determinista")
 	}
-	if _, err := pack.Verify(a, "v0.3.0", nil); pack.Reason(err) != "editor.reserved" {
+	if _, err := pack.Verify(a, "v0.3.1", nil); pack.Reason(err) != "editor.reserved" {
 		t.Fatalf("sin firma, oom está reservado: %v", err)
 	}
 }
@@ -107,7 +138,7 @@ func TestSegmentosOficialesEstanReservados(t *testing.T) {
 	}
 	dirs, _ := filepath.Glob(filepath.Join(packtest.RepoDir(), "packs", "*"))
 	for _, d := range dirs {
-		p, err := pack.ValidateSource(d, "v0.3.0")
+		p, err := pack.ValidateSource(d, "v0.3.1")
 		if err != nil {
 			t.Fatal(err)
 		}

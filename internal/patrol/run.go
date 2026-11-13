@@ -3,6 +3,7 @@ package patrol
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
@@ -32,7 +33,9 @@ type DeviceResult struct {
 	DetailErr          error `json:"-"` // el error de Detail, para darlo en el idioma del cliente (i18n.In)
 	Commands, Invalid  int
 	// Skipped: comandos que no corren en la plataforma detectada (platforms: del playbook); van en el manifest.
-	Skipped        []string       `json:",omitempty"`
+	Skipped []string `json:",omitempty"`
+	// Ran: IDs que de verdad corrieron cuando difieren de los elegidos (gemelo de la plataforma); va en el manifest.
+	Ran            []string       `json:",omitempty"`
 	ChangedHostKey *HostKeyChange `json:",omitempty"`
 }
 
@@ -83,6 +86,14 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		return res
 	}
 	res.Skipped = skipped
+	if ran, _ := resolve(s, c.platform, d.Playbooks, d.MissingPack); len(ran) > 0 {
+		for _, p := range ran {
+			res.Ran = append(res.Ran, p.ID)
+		}
+		if slices.Equal(res.Ran, s.PlaybookIDs) {
+			res.Ran = nil
+		}
+	}
 	dev := Device{Host: res.Hostname, IP: t.Address, Platform: c.platform}
 	roundStart := d.Now()
 	var bytes int64

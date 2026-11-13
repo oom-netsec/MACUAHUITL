@@ -1,0 +1,28 @@
+# Propósito: Busca la causa de lentitud intermitente: CPU, errores y descartes en interfaces, STP, loops y enrutamiento.
+# Cuándo usarlo: Quejas de lentitud que van y vienen; compara CPU, errores de capa 1, flapping y reconvergencias.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
+id: tac-lentitud-intermitente
+platform: ios
+name: TAC · Lentitud intermitente (IOS)
+name_en: TAC · Intermittent slowness (IOS)
+commands:
+  - cmd: show clock
+  - cmd: show processes cpu sorted
+  - cmd: show processes cpu history
+  - cmd: show interfaces summary
+  - cmd: show controllers cpu-interface
+  - cmd: show interfaces counters errors
+  - cmd: show spanning-tree summary
+  - cmd: show etherchannel summary
+  - cmd: show standby brief
+  - cmd: show ip ospf neighbor
+  - cmd: show ip route summary
+  - cmd: show mac address-table count
+  - cmd: show ntp status
+  - cmd: show logging | include CPUHOG|DUPLEX|FLAP|STORM|MACFLAP|UPDOWN
+  - cmd: show spanning-tree detail | include occurred|from
+  - cmd: show policy-map interface
+    timeout: 120s
+  - cmd: show interfaces | include line protocol|input rate|output rate|drops|CRC
+    timeout: 120s
