@@ -19,7 +19,11 @@ import (
 
 func jobCreate(c *cli.Env, args []string) error {
 	var file string
-	if _, err := cli.Flags("job create", args, func(fs *flag.FlagSet) { fs.StringVar(&file, "f", "", "archivo YAML") }); err != nil {
+	var params cli.List
+	if _, err := cli.Flags("job create", args, func(fs *flag.FlagSet) {
+		fs.StringVar(&file, "f", "", "archivo YAML")
+		fs.Var(&params, "param", "dato de un playbook, nombre=valor (repetible; pisa el del YAML)")
+	}); err != nil {
 		return err
 	}
 	b, err := os.ReadFile(file)
@@ -38,11 +42,35 @@ func jobCreate(c *cli.Env, args []string) error {
 	if err := (protojson.UnmarshalOptions{}).Unmarshal(j, &spec); err != nil {
 		return fmt.Errorf("%s: %w", file, err)
 	}
+	if err := applyParams(&spec, params); err != nil {
+		return err
+	}
 	r, err := v1.NewPatrolServiceClient(c.Conn).CreateJob(context.Background(), &v1.CreateJobRequest{Spec: &spec})
 	if err != nil {
 		return err
 	}
 	fmt.Fprintln(c.Out, r.JobId)
+	return nil
+}
+
+// applyParams suma los --param nombre=valor a spec.Params; uno repetido o sin nombre es error. El núcleo valida el
+// resto (faltantes, desconocidos, formato) y responde con su mensaje.
+func applyParams(spec *v1.JobSpec, kv []string) error {
+	seen := map[string]bool{}
+	for _, p := range kv {
+		k, v, ok := strings.Cut(p, "=")
+		if !ok || k == "" {
+			return fmt.Errorf("--param %q: use nombre=valor", p)
+		}
+		if seen[k] {
+			return fmt.Errorf("--param %q repetido", k)
+		}
+		seen[k] = true
+		if spec.Params == nil {
+			spec.Params = map[string]string{}
+		}
+		spec.Params[k] = v
+	}
 	return nil
 }
 
@@ -138,9 +166,22 @@ func playbooks(c *cli.Env, args []string) error {
 		return err
 	}
 	for _, p := range r.Playbooks {
-		fmt.Fprintf(c.Out, "%s  %s  %d comandos\n", p.Id, p.Name, len(p.Commands))
+		fmt.Fprintln(c.Out, playbookLine(p))
 	}
 	return nil
+}
+
+// playbookLine es una línea del listado; si el playbook pide datos, los suma al final (nombre:tipo).
+func playbookLine(p *v1.PlaybookInfo) string {
+	line := fmt.Sprintf("%s  %s  %d comandos", p.Id, p.Name, len(p.Commands))
+	if len(p.Params) > 0 {
+		var ds []string
+		for _, q := range p.Params {
+			ds = append(ds, q.Name+":"+q.Kind)
+		}
+		line += "  datos: " + strings.Join(ds, " ")
+	}
+	return line
 }
 
 func jobWatch(c *cli.Env, args []string) error {
@@ -179,7 +220,7 @@ func jobWatch(c *cli.Env, args []string) error {
 }
 
 // help son las líneas de este área en mctl --help.
-const help = `  job   create -f job.yaml | logintest ID | arm [--accept HUELLA]... [--exclude EQUIPO]... ID
+const help = `  job   create -f job.yaml [--param nombre=valor]... | logintest ID | arm [--accept HUELLA]... [--exclude EQUIPO]... ID
         cancel ID | list | watch ID
   playbooks [--platform P]`
 

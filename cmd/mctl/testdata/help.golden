@@ -5,7 +5,7 @@ uso: mctl <comando>
         (respaldo cifrado de la bóveda con una frase propia, distinta de la maestra y de al menos 12 caracteres; la frase se lee de la terminal o de stdin, nunca como argumento.
          export exige --yes: el archivo trae todas tus credenciales. import muestra el estado de cada una: nueva, igual, conflicto_etiqueta o reservada (se omite);
          cada conflicto necesita una decisión por ID o etiqueta, o --all; si falta una no se importa nada)
-  job   create -f job.yaml | logintest ID | arm [--accept HUELLA]... [--exclude EQUIPO]... ID
+  job   create -f job.yaml [--param nombre=valor]... | logintest ID | arm [--accept HUELLA]... [--exclude EQUIPO]... ID
         cancel ID | list | watch ID
   playbooks [--platform P]
   audit verify | export
