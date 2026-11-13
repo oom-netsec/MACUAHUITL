@@ -337,6 +337,28 @@ func (s *svc) prunePins(ctx context.Context, tx *sql.Tx) error {
 	return nil
 }
 
+// splitPins separa los fijados guardados en visibles y ocultos: un «lib-*» retenido de un paquete que no está instalado
+// no resuelve a ningún script (ListPinned no lo muestra). Los ocultos no cuentan para el tope ni para reordenar, y se
+// conservan en la base, al final, hasta que se instale el paquete.
+func (s *svc) splitPins(pins []string) (visible, hidden []string, err error) {
+	lib, err := s.library()
+	if err != nil {
+		return nil, nil, err
+	}
+	have := make(map[string]bool, len(lib))
+	for _, x := range lib {
+		have[x.ID] = true
+	}
+	for _, id := range pins {
+		if dom.IsLib(id) && !have[id] {
+			hidden = append(hidden, id)
+		} else {
+			visible = append(visible, id)
+		}
+	}
+	return visible, hidden, nil
+}
+
 func (s *svc) SetPinned(ctx context.Context, r *v1.SetPinnedRequest) (*v1.SetPinnedResponse, error) {
 	s.d.MarkActive()
 	changed := false
@@ -354,10 +376,14 @@ func (s *svc) SetPinned(ctx context.Context, r *v1.SetPinnedRequest) (*v1.SetPin
 			return internal(err)
 		}
 		had := slices.Contains(pins, r.Id)
+		visible, _, err := s.splitPins(pins)
+		if err != nil {
+			return err
+		}
 		switch {
 		case had == r.Pinned:
 			return nil
-		case r.Pinned && len(pins) >= dom.MaxFijados:
+		case r.Pinned && len(visible) >= dom.MaxFijados:
 			return service.Err(ctx, codes.FailedPrecondition, "scripts.svc.pinned_max", i18n.A("max", dom.MaxFijados))
 		case r.Pinned:
 			_, err = tx.Exec(`INSERT INTO script_pins(script_id, position) VALUES(?, (SELECT COALESCE(MAX(position)+1, 0) FROM script_pins))`, r.Id)
@@ -413,10 +439,14 @@ func (s *svc) ReorderPinned(ctx context.Context, r *v1.ReorderPinnedRequest) (*v
 		if err != nil {
 			return internal(err)
 		}
-		if !isPerm(pins, r.Ids) {
+		visible, hidden, err := s.splitPins(pins)
+		if err != nil {
+			return err
+		}
+		if !isPerm(visible, r.Ids) {
 			return service.Err(ctx, codes.InvalidArgument, "scripts.svc.pinned_order", nil)
 		}
-		for i, id := range r.Ids {
+		for i, id := range append(slices.Clone(r.Ids), hidden...) { // los ocultos, al final y en su orden
 			if _, err := tx.Exec(`UPDATE script_pins SET position = ? WHERE script_id = ?`, i, id); err != nil {
 				return internal(err)
 			}

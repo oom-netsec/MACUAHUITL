@@ -61,7 +61,7 @@ type Store struct {
 	base     Base
 	mu       sync.Mutex // serializa instalar y quitar
 	snap     atomic.Pointer[Snapshot]
-	OnChange func() // tras instalar o quitar, ya publicada la foto nueva; sin locks tomados
+	OnChange func() // tras instalar o quitar, ya publicada la foto nueva; corre bajo el lock del almacén (no debe llamarlo de vuelta)
 }
 
 // Open abre la carpeta, borra los .tmp-* que hayan quedado (restaurando antes una versión vieja interrumpida) y
