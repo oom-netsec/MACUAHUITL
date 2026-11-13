@@ -1,7 +1,7 @@
 # Propósito: Comprueba la sincronización de hora: reloj, asociaciones NTP y su configuración.
 # Cuándo usarlo: Logs con hora desfasada, certificados que fallan por fecha o servidor NTP sin sincronizar.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/bsm/command/bsm-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: svc-ntp
 platform: ios
 name: Servicios · NTP (IOS)

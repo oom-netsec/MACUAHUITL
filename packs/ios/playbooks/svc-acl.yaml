@@ -1,7 +1,7 @@
 # Propósito: Revisa las ACL, sus contadores de coincidencias y dónde están aplicadas.
 # Cuándo usarlo: Tráfico bloqueado inesperadamente, ACL que no hace match o confirmar que una regla está aplicada.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/security/s1/sec-s1-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: svc-acl
 platform: ios
 name: Servicios · ACL (IOS)

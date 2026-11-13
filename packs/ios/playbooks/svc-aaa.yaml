@@ -1,7 +1,7 @@
 # Propósito: Revisa servidores AAA, métodos de autenticación, sesiones y contadores de TACACS+/RADIUS.
 # Cuándo usarlo: No entran usuarios por SSH/consola, tiempos de espera con el servidor AAA o servidor marcado como muerto.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/security/s1/sec-s1-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: svc-aaa
 platform: ios
 name: Servicios · AAA, TACACS+ y RADIUS (IOS)

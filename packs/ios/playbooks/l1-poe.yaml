@@ -1,7 +1,7 @@
 # Propósito: Reúne el estado de alimentación PoE por puerto, el presupuesto de potencia y los eventos ILPOWER.
 # Cuándo usarlo: Un teléfono, AP o cámara no enciende o se reinicia; sospecha de presupuesto PoE agotado.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l1-poe
 platform: ios
 name: L1 · PoE (IOS)

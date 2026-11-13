@@ -1,7 +1,7 @@
 # Propósito: Revisa vecinos, interfaces, base de datos y rutas de OSPF.
 # Cuándo usarlo: Vecino atascado en EXSTART/INIT, adyacencia que cae, rutas OSPF ausentes o cambios frecuentes de SPF.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_ospf/command/iro-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l3-ospf
 platform: ios
 name: L3 · OSPF (IOS)

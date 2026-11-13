@@ -1,7 +1,7 @@
 # Propósito: Revisa las sesiones de autenticación 802.1X y MAB, los servidores RADIUS y los fallos recientes.
 # Cuándo usarlo: Un usuario o dispositivo no autentica, cae a VLAN de invitados o hay tiempos de espera con RADIUS.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l2-dot1x-mab
 platform: ios
 name: L2 · 802.1X y MAB (IOS)

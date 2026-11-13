@@ -1,7 +1,7 @@
 # Propósito: Resume la topología de spanning-tree: raíz, puertos bloqueados, inconsistentes y cambios de topología.
 # Cuándo usarlo: Reconvergencias lentas, puerto bloqueado inesperado, cambio de raíz o pérdidas breves en toda una VLAN.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/command/lsw-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l2-stp
 platform: ios
 name: L2 · STP (IOS)

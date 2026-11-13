@@ -1,4 +1,4 @@
-# Comandos de la documentación pública de Cisco para IOS clásico. Sin validar en laboratorio.
+# Comandos de la documentación pública de Cisco para IOS clásico. Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: errores-interfaz
 platform: ios
 name: Interfaces · Errores (IOS)

@@ -1,7 +1,7 @@
 # Propósito: Revisa el estado de port-security, las MAC seguras y las violaciones registradas.
 # Cuándo usarlo: Un usuario pierde red tras mover su equipo, o un puerto cae por violación de MAC.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l1-port-security
 platform: ios
 name: L1 · Port-security (IOS)

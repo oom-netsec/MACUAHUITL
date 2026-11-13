@@ -1,7 +1,7 @@
 # Propósito: Revisa PIM, IGMP, snooping y la tabla de rutas multicast.
 # Cuándo usarlo: Aplicaciones multicast que no llegan, RP inalcanzable o tráfico de grupo que inunda la VLAN.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ipmulti/command/imc-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13), salvo los marcados «no existe en 3560CX».
 id: l3-multicast
 platform: ios
 name: L3 · Multicast (IOS)
@@ -20,6 +20,6 @@ commands:
   - cmd: show ip mroute summary
   - cmd: show logging | include PIM|IGMP|MCAST
   - cmd: show ip mroute active
-  - cmd: show ip mfib
+  - cmd: show ip mfib  # no existe en 3560CX
   - cmd: show ip mroute
     timeout: 300s

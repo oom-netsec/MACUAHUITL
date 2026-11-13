@@ -1,7 +1,7 @@
 # Propósito: Revisa políticas, clases y colas de QoS, y los descartes de salida por interfaz.
 # Cuándo usarlo: Pérdida de voz o video bajo carga, descartes de salida o políticas que no hacen match.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/qos/command/qos-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: svc-qos
 platform: ios
 name: Servicios · QoS (IOS)

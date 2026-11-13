@@ -1,7 +1,7 @@
 # Propósito: Revisa los exportadores, monitores y registros de flujo (Flexible NetFlow y NetFlow tradicional).
 # Cuándo usarlo: El colector no recibe flujos, exportación con errores o monitores sin interfaz asociada.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/fnetflow/command/fnf-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: svc-netflow
 platform: ios
 name: Servicios · NetFlow (IOS)

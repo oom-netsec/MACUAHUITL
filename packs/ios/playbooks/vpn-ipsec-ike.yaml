@@ -1,7 +1,7 @@
 # Propósito: Revisa las asociaciones de seguridad IKEv1/IKEv2 e IPsec, sus contadores y la configuración criptográfica.
 # Cuándo usarlo: Un túnel no levanta o no pasa tráfico, rekeys fallidos o diferencias de propuesta entre ambos extremos.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/security/s1/sec-s1-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: vpn-ipsec-ike
 platform: ios
 name: VPN · IPsec/IKE (IOS)

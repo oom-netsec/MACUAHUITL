@@ -1,7 +1,7 @@
 # Propósito: Resume la tabla de rutas, las adyacencias y CEF para IPv4 e IPv6.
 # Cuándo usarlo: Destino inalcanzable, ruta inesperada o sospecha de inconsistencia entre la tabla de rutas y CEF.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/command/iri-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l3-rutas-cef
 platform: ios
 name: L3 · Rutas y CEF (IOS)

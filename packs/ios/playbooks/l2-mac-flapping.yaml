@@ -1,7 +1,7 @@
 # Propósito: Localiza direcciones MAC que cambian de puerto: tabla MAC, eventos de flapping y posibles loops.
 # Cuándo usarlo: Mensajes MACFLAP o HOST_FLAPPING, conectividad intermitente de un host o sospecha de loop.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/command/lsw-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l2-mac-flapping
 platform: ios
 name: L2 · MAC flapping (IOS)

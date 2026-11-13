@@ -1,7 +1,7 @@
 # Propósito: Revisa el nivel de licencia, el uso y el estado de registro (Smart Licensing y clásico).
 # Cuándo usarlo: Una función no habilita, mensajes de licencia vencida o no registrada, o auditoría de licencias.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: plat-licencias
 platform: ios
 name: Plataforma · Licencias (IOS)

@@ -1,7 +1,7 @@
 # Propósito: Revisa los port-channels, el estado de LACP/PAgP, los miembros y el balanceo de carga.
 # Cuándo usarlo: Miembros suspendidos o independientes, desbalanceo de tráfico o port-channel que no levanta.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/command/lsw-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l2-etherchannel
 platform: ios
 name: L2 · EtherChannel (IOS)

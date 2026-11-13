@@ -1,7 +1,7 @@
 # Propósito: Recorre la ruta de un puerto de acceso: enlace, VLAN, autenticación, DHCP, seguridad y STP.
 # Cuándo usarlo: Un usuario reporta que no tiene red en un puerto; primera recolección antes de profundizar.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: tac-usuario-sin-red
 platform: ios
 name: TAC · Usuario sin red (IOS)

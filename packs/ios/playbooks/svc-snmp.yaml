@@ -1,7 +1,7 @@
 # Propósito: Revisa la configuración y el estado de SNMP: comunidades, grupos, usuarios, hosts y sesiones.
 # Cuándo usarlo: El NMS no consulta el equipo, traps que no llegan o errores de autenticación SNMP.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/snmp/command/nm-snmp-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: svc-snmp
 platform: ios
 name: Servicios · SNMP (IOS)

@@ -1,7 +1,7 @@
 # Propósito: Revisa el estado de los pares BGP, prefijos recibidos y anunciados, y fallas de instalación.
 # Cuándo usarlo: Par BGP caído o en Idle/Active, prefijos faltantes o rutas BGP que no entran a la tabla de rutas.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_bgp/command/irg-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l3-bgp
 platform: ios
 name: L3 · BGP (IOS)

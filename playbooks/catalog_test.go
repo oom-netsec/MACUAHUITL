@@ -85,8 +85,12 @@ func TestCatalogo(t *testing.T) {
 		}
 		lines := strings.Split(string(raw), "\n")
 		for i, want := range []string{"# Propósito", "# Cuándo", "# Fuente: https://www.cisco.com", "# Sin validar en laboratorio"} {
-			if i >= len(lines) || !strings.HasPrefix(lines[i], want) {
-				t.Errorf("%s: la línea %d de la cabecera debe empezar con %q", name, i+1, want)
+			ok := i < len(lines) && strings.HasPrefix(lines[i], want)
+			if i == 3 && !ok { // o ya pasó por un equipo real: «# Validado en laboratorio: <modelo> con <versión> (<fecha>)…»
+				ok = i < len(lines) && strings.HasPrefix(lines[i], "# Validado en laboratorio: ")
+			}
+			if !ok {
+				t.Errorf("%s: la línea %d de la cabecera debe empezar con %q (o «# Validado en laboratorio: »)", name, i+1, want)
 			}
 		}
 		p, ok := byID[path.Base(path.Dir(name))+"/"+base]

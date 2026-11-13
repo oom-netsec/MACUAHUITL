@@ -1,7 +1,7 @@
 # Propósito: Verifica VLAN existentes, troncales, VLAN nativa y el estado de VTP.
 # Cuándo usarlo: VLAN que no pasa por un troncal, desajuste de VLAN nativa o cambios inesperados de la base de VLAN.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lanswitch/command/lsw-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l2-vlan-trunk-vtp
 platform: ios
 name: L2 · VLAN, trunks y VTP (IOS)

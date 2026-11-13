@@ -1,7 +1,7 @@
 # Propósito: Revisa los módulos ópticos y sus lecturas DOM (potencia, temperatura, voltaje) frente a umbrales.
 # Cuándo usarlo: Enlace de fibra con errores, caídas o potencia baja; antes de cambiar un SFP o un patch cord.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/interface/command/ir-cr-book.html
-# Sin validar en laboratorio.
+# Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13).
 id: l1-transceptores-dom
 platform: ios
 name: L1 · Transceptores (DOM) (IOS)
