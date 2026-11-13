@@ -2,6 +2,7 @@
 package iosxe
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -15,6 +16,12 @@ import (
 )
 
 const openTimeout = 15 * time.Second
+
+// maxRun es lo más que corre un comando aunque su salida siga llegando (el timeout de Run es de inactividad).
+var maxRun = 30 * time.Minute
+
+// maxDetect es lo más que tarda Detect: una reconexión no debe quedar retenida por un equipo que contesta a goteo.
+var maxDetect = 2 * time.Minute
 
 var (
 	anyPrompt = regexp.MustCompile(`(?:^|\n)([\w.\-@/:]{1,63})([>#]) ?$`)
@@ -173,31 +180,68 @@ func (d *driver) atPrompt(s string) bool {
 
 // until acumula salida normalizada hasta que done la acepta. Responde a --More-- con espacio.
 func (d *driver) until(ctx context.Context, done func(string) bool) (string, error) {
+	return d.untilIdle(ctx, 0, done)
+}
+
+// untilIdle es until con plazo de inactividad: con idle > 0 falla si pasa idle sin que llegue nada, y cada pedazo
+// de salida reinicia el reloj (una salida grande y lenta no se corta mientras siga llegando). ctx es el tope absoluto.
+func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(string) bool) (string, error) {
+	var quiet <-chan time.Time
+	var timer *time.Timer
+	if idle > 0 {
+		timer = time.NewTimer(idle)
+		defer timer.Stop()
+		quiet = timer.C
+	}
 	for {
-		raw := string(d.buf)
-		if strings.HasSuffix(strings.TrimRight(raw, " "), "--More--") {
-			d.buf = []byte(more.ReplaceAllString(raw, ""))
+		// El prompt y el --More-- están siempre en la última línea: se revisa solo desde el último salto (incluido,
+		// por los patrones con (?:^|\n)). Limpiar todo el búfer en cada pedazo costaba tiempo cuadrático: 63 s con 1 MB.
+		from := max(bytes.LastIndexByte(d.buf, '\n'), 0)
+		tail := string(d.buf[from:])
+		if strings.HasSuffix(strings.TrimRight(tail, " "), "--More--") {
+			tail = more.ReplaceAllString(tail, "")
+			d.buf = append(d.buf[:from], tail...)
 			if _, err := io.WriteString(d.w, " "); err != nil {
 				return clean(string(d.buf)), err
 			}
-			raw = string(d.buf)
 		}
-		if text := clean(raw); done(text) {
+		if done(clean(tail)) {
+			text := clean(string(d.buf))
 			d.buf = nil
 			return text, nil
 		}
 		select {
 		case <-ctx.Done():
 			return clean(string(d.buf)), platform.ErrPromptTimeout
+		case <-quiet:
+			select { // llegó un pedazo justo al vencer el plazo: cuenta como actividad
+			case c, ok := <-d.chunks:
+				if !ok {
+					return d.closedErr()
+				}
+				d.buf = append(d.buf, c...)
+				timer.Reset(idle)
+				continue
+			default:
+			}
+			return clean(string(d.buf)), platform.ErrPromptTimeout
 		case c, ok := <-d.chunks:
 			if !ok {
-				err := <-d.readErr
-				d.readErr <- err
-				return clean(string(d.buf)), fmt.Errorf("%w: %v", platform.ErrClosed, err)
+				return d.closedErr()
 			}
 			d.buf = append(d.buf, c...)
+			if timer != nil {
+				timer.Reset(idle)
+			}
 		}
 	}
+}
+
+// closedErr: el lector del shell terminó; se devuelve lo que había y la causa del cierre.
+func (d *driver) closedErr() (string, error) {
+	err := <-d.readErr
+	d.readErr <- err
+	return clean(string(d.buf)), fmt.Errorf("%w: %v", platform.ErrClosed, err)
 }
 
 func clean(s string) string {
@@ -215,12 +259,12 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	if strings.ContainsAny(cmd, "\r\n") {
 		return out, fmt.Errorf("platform: el comando %q tiene saltos de línea", cmd)
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, maxRun) // timeout es de inactividad; maxRun, el tope fijo
 	defer cancel()
 	if _, err := io.WriteString(d.w, cmd+"\n"); err != nil {
 		return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
 	}
-	text, err := d.until(ctx, d.atPrompt)
+	text, err := d.untilIdle(ctx, timeout, d.atPrompt)
 	out.Ended = time.Now()
 	if err != nil {
 		d.fail(err)
@@ -240,6 +284,8 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 func (d *driver) Hostname() string { return d.hostname }
 
 func (d *driver) Detect(ctx context.Context) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, maxDetect)
+	defer cancel()
 	out, err := d.Run(ctx, "show version", 60*time.Second)
 	if err != nil {
 		return "", err

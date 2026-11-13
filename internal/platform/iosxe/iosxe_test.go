@@ -3,6 +3,7 @@ package iosxe
 import (
 	"context"
 	"errors"
+	"io"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -178,5 +179,88 @@ func TestCleanEraseSequences(t *testing.T) {
 	in := "a\r\n --More-- \r          \rb\r\n --More-- \x08\x08\x08\x08   \x08\x08\x08\x08c\r\n"
 	if got := clean(in); got != "a\nb\nc\n" {
 		t.Fatalf("clean = %q", got)
+	}
+}
+
+// Una salida grande y lenta (show memory summary en un 3560CX) que sigue llegando no se corta por el plazo: el
+// plazo es de inactividad. Mientras llegan líneas, el comando sigue.
+func TestPlazoEsDeInactividad(t *testing.T) {
+	d, err := open(t, simulator.Config{StreamCommand: "show memory summary", StreamLines: 20, SlowDelay: 50 * time.Millisecond}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := d.Run(context.Background(), "show memory summary", 300*time.Millisecond)
+	if err != nil || strings.Count(out.Text, "\n") != 20 || !strings.Contains(out.Text, "linea 20 de") {
+		t.Fatalf("err = %v, salida %q", err, out.Text)
+	}
+}
+
+// Aun con datos llegando (cada 20 ms, menos que el plazo de inactividad), ningún comando corre más que maxRun.
+func TestTopeAbsolutoDelComando(t *testing.T) {
+	old := maxRun
+	maxRun = 400 * time.Millisecond
+	defer func() { maxRun = old }()
+	d, err := open(t, simulator.Config{StreamCommand: "show sin fin", StreamLines: 1000, SlowDelay: 20 * time.Millisecond}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now() // inactividad de 10 s: solo el tope puede cortar antes de 2 s
+	if _, err := d.Run(context.Background(), "show sin fin", 10*time.Second); !errors.Is(err, platform.ErrPromptTimeout) || time.Since(start) < maxRun || time.Since(start) > 2*time.Second {
+		t.Fatalf("err = %v tras %s", err, time.Since(start))
+	}
+}
+
+// Con una salida de 1 MB (show tech), el prompt y el --More-- se buscan solo en la última línea: revisar todo el
+// búfer en cada pedazo costaba tiempo cuadrático. La salida devuelta sigue completa y limpia.
+func TestSalidaGrandeSoloRevisaLaCola(t *testing.T) {
+	d := &driver{w: io.Discard, chunks: make(chan []byte, 2000), readErr: make(chan error, 1), quit: make(chan struct{}), hostname: "SW"}
+	line := strings.Repeat("x", 1000) + "\r\n"
+	for range 1000 {
+		d.chunks <- []byte(line)
+	}
+	d.chunks <- []byte(" --More-- ")
+	d.chunks <- []byte("\r          \rfin\r\nSW#")
+	maxArg := 0
+	text, err := d.untilIdle(context.Background(), time.Second, func(s string) bool {
+		maxArg = max(maxArg, len(s))
+		return d.atPrompt(s)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if maxArg > 2048 {
+		t.Errorf("done recibió %d bytes: revisa todo el búfer, no la cola", maxArg)
+	}
+	if want := strings.Repeat(strings.Repeat("x", 1000)+"\n", 1000) + "fin\nSW#"; text != want {
+		t.Errorf("salida: %d bytes, quiero %d", len(text), len(want))
+	}
+}
+
+// Si al vencer el plazo el canal de pedazos ya está cerrado, el error es el cierre de la sesión, no un timeout.
+// Con ambos casos listos el select elige al azar, por eso se repite.
+func TestPlazoConCanalCerradoDaErrClosed(t *testing.T) {
+	for range 200 {
+		d := &driver{w: io.Discard, chunks: make(chan []byte), readErr: make(chan error, 1), quit: make(chan struct{}), hostname: "SW"}
+		d.readErr <- io.EOF
+		close(d.chunks)
+		_, err := d.untilIdle(context.Background(), time.Nanosecond, func(string) bool { return false })
+		if !errors.Is(err, platform.ErrClosed) {
+			t.Fatalf("err = %v, quiero ErrClosed", err)
+		}
+	}
+}
+
+// Detect tiene tope total: un "show version" a goteo no lo retiene más que maxDetect.
+func TestDetectTieneTopeTotal(t *testing.T) {
+	old := maxDetect
+	maxDetect = 400 * time.Millisecond
+	defer func() { maxDetect = old }()
+	d, err := open(t, simulator.Config{StreamCommand: "show version", StreamLines: 1000, SlowDelay: 20 * time.Millisecond}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	if _, err := d.Detect(context.Background()); !errors.Is(err, platform.ErrPromptTimeout) || time.Since(start) > 2*time.Second {
+		t.Fatalf("err = %v tras %s", err, time.Since(start))
 	}
 }

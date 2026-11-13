@@ -78,6 +78,9 @@ func connErr(ctx context.Context, err error) error {
 // livePorts abre una sesión SSH de solo lectura: guard con Revoke, llave de host estricta, tres comandos de
 // la lista de lectura (CheckDenied) y se cierra. La bitácora lleva el equipo y la credencial, nunca secretos.
 func (s *svc) livePorts(ctx context.Context, r *v1.GetPortStatusRequest) (*v1.GetPortStatusResponse, error) {
+	// El plazo de cada comando es de inactividad (con tope de 30 min): la consulta en vivo completa se acota aquí.
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
 	host := strings.TrimSpace(r.Device)
 	if host == "" || strings.HasPrefix(host, "-") || strings.ContainsAny(host, " \t\r\n/") || r.Port > 0xffff {
 		return nil, service.Err(ctx, codes.InvalidArgument, "metrics.svc.live_target", nil)

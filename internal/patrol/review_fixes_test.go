@@ -206,3 +206,47 @@ func TestComandosPorPlataformaSeOmitenYSeAnotan(t *testing.T) {
 		})
 	}
 }
+
+// El tope total por comando es 5 veces su timeout de inactividad y nunca menos de 5 minutos.
+func TestTopeTotalPorComando(t *testing.T) {
+	for _, c := range []struct{ in, want time.Duration }{
+		{time.Second, 5 * time.Minute}, {time.Minute, 5 * time.Minute}, {10 * time.Minute, 50 * time.Minute},
+	} {
+		if got := maxCmd(c.in); got != c.want {
+			t.Errorf("maxCmd(%s) = %s, quiero %s", c.in, got, c.want)
+		}
+	}
+}
+
+// plazoDrv es el driver real con Run anotando el plazo del contexto que recibe.
+type plazoDrv struct {
+	platform.Driver
+	left []time.Duration
+}
+
+func (p *plazoDrv) Run(ctx context.Context, cmd string, timeout time.Duration) (platform.Output, error) {
+	if dl, ok := ctx.Deadline(); ok && cmd != "show version" {
+		p.left = append(p.left, time.Until(dl))
+	} else if !ok {
+		p.left = append(p.left, -1)
+	}
+	return p.Driver.Run(ctx, cmd, timeout)
+}
+
+// RunDevice pasa a Run un contexto con plazo total de maxCmd(timeout), no el del trabajo.
+func TestRunDevicePasaPlazoTotalAlComando(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	drv := &plazoDrv{Driver: e.d.driver()}
+	e.d.NewDriver = func() platform.Driver { return drv }
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if len(drv.left) == 0 {
+		t.Fatal("Run no se llamó")
+	}
+	for i, l := range drv.left {
+		if l < 4*time.Minute || l > 5*time.Minute+time.Second {
+			t.Errorf("comando %d: plazo %s, quiero ~maxCmd (5 min)", i, l)
+		}
+	}
+}

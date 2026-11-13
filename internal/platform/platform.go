@@ -53,6 +53,8 @@ type Driver interface {
 	// Open espera el prompt, entra a privilegiado con enable y desactiva la paginación.
 	// Destruye enable al volver.
 	Open(ctx context.Context, r io.Reader, w io.Writer, enable *secret.Secret) error
+	// Run manda un comando y espera el prompt. timeout es de inactividad: se reinicia con cada pedazo de salida, así
+	// que una salida grande y lenta no se corta mientras siga llegando; un tope fijo del driver la acota igual.
 	Run(ctx context.Context, cmd string, timeout time.Duration) (Output, error)
 	// Configure entra con "configure terminal", manda las líneas una por una y sale con "end".
 	// Tras el primer error de configuración no manda las restantes. No decide qué líneas son

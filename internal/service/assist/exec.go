@@ -129,6 +129,14 @@ func (e *devExec) SourceAddr(dev string) string {
 	return ap.Addr().String()
 }
 
+// runTotal corre un comando con 60 s de inactividad y 2 min de plazo total: un equipo saturado que contesta a goteo
+// no debe retener el comando (y la reversa detrás) hasta el tope del driver.
+func runTotal(ctx context.Context, drv platform.Driver, cmd string) (platform.Output, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	return drv.Run(ctx, cmd, 60*time.Second)
+}
+
 func (c *conn) close() { c.drv.Close(); c.sess.Close() }
 
 // Read corre comandos de lectura; cada uno pasa por CheckDenied también aquí.
@@ -149,7 +157,7 @@ func (e *devExec) Read(ctx context.Context, dev string, cmds []string) ([]assist
 	}
 	var out []assist.Output
 	for _, cmd := range cmds {
-		o, err := c.drv.Run(ctx, cmd, 60*time.Second)
+		o, err := runTotal(ctx, c.drv, cmd)
 		if err != nil {
 			return out, err
 		}
@@ -177,7 +185,7 @@ func (e *devExec) Save(ctx context.Context, dev string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	o, err := c.drv.Run(ctx, "write memory", 60*time.Second)
+	o, err := runTotal(ctx, c.drv, "write memory")
 	if err == nil {
 		err = saveErr(o.Text)
 	}

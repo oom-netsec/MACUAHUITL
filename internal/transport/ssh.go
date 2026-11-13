@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -41,6 +42,7 @@ type Session struct {
 	client *ssh.Client
 	sess   *ssh.Session
 	stop   chan struct{}
+	rx     atomic.Int64 // bytes leídos del shell: si siguen llegando, la sesión está viva aunque no conteste el keepalive
 }
 
 // OpenSSH conecta pasando por el Guard y autentica una sola vez.
@@ -130,34 +132,42 @@ func OpenSSH(ctx context.Context, g *Guard, jobID, host string, port uint16, cre
 		_, _, err := s.client.SendRequest("keepalive@openssh.com", true, nil)
 		return err
 	}
-	go keepaliveLoop(o.Keepalive, send, func() { s.client.Close() }, s.stop)
+	go keepaliveLoop(o.Keepalive, send, s.rx.Load, func() { s.client.Close() }, s.stop)
 	return s, nil
 }
 
 // keepaliveLoop cierra la sesión tras 3 fallos seguidos (spec §6). Una respuesta que no llega
-// en un intervalo cuenta como fallo: en un enlace caído SendRequest se bloquea minutos.
-func keepaliveLoop(every time.Duration, send func() error, closeFn func(), stop <-chan struct{}) {
+// en un intervalo cuenta como fallo: en un enlace caído SendRequest se bloquea minutos. Pero si
+// rx avanzó, llegaron datos: un equipo ocupado mandando una salida grande no contesta el keepalive
+// y la sesión sigue viva, así que eso no cuenta como fallo.
+func keepaliveLoop(every time.Duration, send func() error, rx func() int64, closeFn func(), stop <-chan struct{}) {
 	t := time.NewTicker(every)
 	defer t.Stop()
 	fails := 0
+	last := rx()
+	var res chan error // envío en vuelo: mientras no conteste no se lanza otro (SendRequest se encola y acumularía goroutines)
 	for {
 		select {
 		case <-stop:
 			return
 		case <-t.C:
 		}
-		res := make(chan error, 1)
-		go func() { res <- send() }()
+		if res == nil {
+			res = make(chan error, 1)
+			go func(c chan<- error) { c <- send() }(res)
+		}
 		var err error
 		select {
 		case <-stop:
 			return
 		case err = <-res:
+			res = nil
 		case <-time.After(every):
 			err = errors.New("sin respuesta")
 		}
-		if err == nil {
-			fails = 0
+		now := rx()
+		if err == nil || now != last {
+			fails, last = 0, now
 			continue
 		}
 		if fails++; fails >= 3 {
@@ -189,11 +199,12 @@ func (s *Session) ShellSize(rows, cols int) (io.Reader, io.Writer, error) {
 		sess.Close()
 		return nil, nil, err
 	}
-	r, err := sess.StdoutPipe()
+	out, err := sess.StdoutPipe()
 	if err != nil {
 		sess.Close()
 		return nil, nil, err
 	}
+	r := countingReader{out, &s.rx}
 	if err := sess.Shell(); err != nil {
 		sess.Close()
 		return nil, nil, fmt.Errorf("transport: shell: %w", err)
@@ -220,4 +231,16 @@ func (s *Session) Close() error {
 		s.sess.Close()
 	}
 	return s.client.Close()
+}
+
+// countingReader cuenta los bytes que entrega, para que el keepalive sepa que llegan datos.
+type countingReader struct {
+	r io.Reader
+	n *atomic.Int64
+}
+
+func (c countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n.Add(int64(n))
+	return n, err
 }

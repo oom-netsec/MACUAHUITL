@@ -105,11 +105,43 @@ func TestKeepaliveTimeoutCloses(t *testing.T) {
 	closed := make(chan struct{})
 	stop := make(chan struct{})
 	defer close(stop)
-	go keepaliveLoop(20*time.Millisecond, func() error { select {} }, func() { close(closed) }, stop)
+	go keepaliveLoop(20*time.Millisecond, func() error { select {} }, func() int64 { return 0 }, func() { close(closed) }, stop)
 	select {
 	case <-closed:
 	case <-time.After(time.Second):
 		t.Fatal("hung keepalive never closed the session")
+	}
+}
+
+// Un equipo ocupado mandando una salida grande (show memory summary en un 3560CX) no contesta el keepalive, pero
+// los datos siguen llegando: la sesión está viva y no se cierra. Cuando dejan de llegar, sí.
+func TestKeepaliveConDatosNoCierra(t *testing.T) {
+	closed := make(chan struct{})
+	stop := make(chan struct{})
+	defer close(stop)
+	var rx atomic.Int64
+	streaming := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-streaming:
+				return
+			case <-time.After(2 * time.Millisecond):
+				rx.Add(100)
+			}
+		}
+	}()
+	go keepaliveLoop(20*time.Millisecond, func() error { select {} }, rx.Load, func() { close(closed) }, stop)
+	select {
+	case <-closed:
+		t.Fatal("cerró una sesión que seguía recibiendo datos")
+	case <-time.After(300 * time.Millisecond):
+	}
+	close(streaming)
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("sin datos ni respuesta, debía cerrar")
 	}
 }
 
@@ -135,5 +167,48 @@ func TestAllowRejectsHostBits(t *testing.T) {
 	g := NewGuard(nil, nil)
 	if err := g.Allow(context.Background(), "j", []string{"10.0.0.1/8"}); err == nil {
 		t.Fatal("10.0.0.1/8 silently widened to 10.0.0.0/8")
+	}
+}
+
+// Con un send que nunca contesta y datos llegando, no se acumulan envíos: mientras el anterior siga pendiente no se
+// lanza otro.
+func TestKeepaliveNoAcumulaEnvios(t *testing.T) {
+	stop := make(chan struct{})
+	defer close(stop)
+	var calls, rx atomic.Int64
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			case <-time.After(2 * time.Millisecond):
+				rx.Add(100)
+			}
+		}
+	}()
+	go keepaliveLoop(20*time.Millisecond, func() error { calls.Add(1); select {} }, rx.Load, func() {}, stop)
+	time.Sleep(300 * time.Millisecond)
+	if n := calls.Load(); n != 1 {
+		t.Fatalf("send se llamó %d veces, quiero 1", n)
+	}
+}
+
+// ShellSize envuelve la salida en countingReader: lo que se lee suma a rx, que es lo que el keepalive vigila.
+func TestShellCuentaBytesRecibidos(t *testing.T) {
+	g, host, port, hk := startSim(t)
+	s, err := OpenSSH(context.Background(), g, "j", host, port, testCred("pw"), ssh.FixedHostKey(hk), SSHOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	r, _, err := s.Shell()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Read(make([]byte, 64)); err != nil {
+		t.Fatal(err)
+	}
+	if s.rx.Load() == 0 {
+		t.Fatal("rx sigue en 0 tras leer del shell")
 	}
 }
