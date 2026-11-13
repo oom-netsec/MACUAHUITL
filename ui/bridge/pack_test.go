@@ -40,6 +40,10 @@ func (fakePack) Remove(context.Context, *v1.PackServiceRemoveRequest) (*v1.PackS
 	return &v1.PackServiceRemoveResponse{FavoritesRemoved: 2}, nil
 }
 
+func (fakePack) SetItems(_ context.Context, r *v1.PackServiceSetItemsRequest) (*v1.PackServiceSetItemsResponse, error) {
+	return &v1.PackServiceSetItemsResponse{Pack: &v1.PackInfo{Id: r.PackId, Hidden: r.Hide}}, nil
+}
+
 func TestPackBridge(t *testing.T) {
 	d, _ := os.MkdirTemp("", "brg")
 	defer os.RemoveAll(d)
@@ -78,8 +82,17 @@ func TestPackBridge(t *testing.T) {
 	if n, err := b.PackRemove("oom/ios-xe"); err != nil || n != 2 {
 		t.Fatalf("%d %v", n, err)
 	}
-	j, _ := json.Marshal(PackInfoDTO{Platforms: strs(nil), Shadowed: strs(nil)})
-	if !strings.Contains(string(j), `"platforms":[]`) || !strings.Contains(string(j), `"shadowed":[]`) {
+	if p, err := b.PackSetItems("oom/ios-xe", []string{"ios-xe/x"}, nil); err != nil || p.ID != "oom/ios-xe" || len(p.Hidden) != 1 {
+		t.Fatalf("%+v %v", p, err)
+	}
+	if p, err := b.PackSetItems("oom/ios-xe", nil, []string{"ios-xe/x"}); err != nil || p.Hidden == nil {
+		t.Fatalf("hidden nunca es null: %+v %v", p, err)
+	}
+	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}); err != nil || ins.Pack.ID != "/y.mpack" {
+		t.Fatalf("%+v %v", ins, err)
+	}
+	j, _ := json.Marshal(PackInfoDTO{Platforms: strs(nil), Shadowed: strs(nil), Hidden: strs(nil)})
+	if !strings.Contains(string(j), `"platforms":[]`) || !strings.Contains(string(j), `"shadowed":[]`) || !strings.Contains(string(j), `"hidden":[]`) {
 		t.Fatalf("json = %s", j)
 	}
 }

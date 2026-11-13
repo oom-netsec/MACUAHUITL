@@ -51,6 +51,8 @@ service ScriptsService {
   rpc ImportTemplate(ImportTemplateRequest) returns (ImportTemplateResponse);
   // Los campos del archivo (cabecera incluida) con tipo, si son obligatorios, un ejemplo y su descripción.
   rpc ImportFormat(ImportFormatRequest) returns (ImportFormatResponse);
+  // Copia un script de un paquete instalado a «Mis scripts» (fase 32b): ID nuevo, editable, nombre «<nombre> (copia)».
+  rpc CopyFromPack(CopyFromPackRequest) returns (CopyFromPackResponse);
 }
 
 message Script {
@@ -162,6 +164,7 @@ message Collection {
   repeated string script_ids = 5;      // en orden; de usuario o de biblioteca («lib-*»)
   int64 created_ms = 6;
   int64 updated_ms = 7;
+  repeated string hidden_script_ids = 8; // subconjunto de script_ids que un paquete tiene oculto (fase 32b); siguen en script_ids
 }
 
 message ListCollectionsRequest {}
@@ -282,4 +285,11 @@ message FormatField {
 }
 message ImportFormatResponse {
   repeated FormatField fields = 1;
+}
+
+message CopyFromPackRequest {
+  string id = 1;                       // ID de un script de un paquete instalado (derivado «lib-*» o de scripts.json)
+}
+message CopyFromPackResponse {
+  Script script = 1;
 }

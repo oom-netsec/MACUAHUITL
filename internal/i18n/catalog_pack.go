@@ -27,6 +27,7 @@ func init() {
 		"pack.err.official_replace":  e("el paquete oficial {id} solo lo reemplaza otro con firma oficial", "the official package {id} can only be replaced by another with an official signature", "id"),
 		"pack.err.not_found":         e("no hay un paquete {id:q} instalado", "there is no installed package {id:q}", "id"),
 		"pack.err.path":              e("indica la ruta de un archivo .mpack", "give the path of an .mpack file"),
+		"pack.err.item":              e("{id:q} no es un playbook ni un script de {pack}, o está en hide y show a la vez", "{id:q} is not a playbook or script of {pack}, or it is in both hide and show", "id", "pack"),
 		"pack.missing":               e("el playbook {playbook} viene en el paquete {pack}, que no está instalado; instálalo con «mctl pack install»", "playbook {playbook} comes in package {pack}, which is not installed; install it with \"mctl pack install\"", "playbook", "pack"),
 	})
 }

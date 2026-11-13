@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -325,5 +326,198 @@ func TestPackTerceroNoOcupaIDsMovidos(t *testing.T) {
 	}
 	if slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
 		t.Fatal("el tercero ocupó ios-xe/l2-stp")
+	}
+}
+
+// ioSXEVersion es oom/ios-xe del repo con otra versión, firmado con la llave de pruebas.
+func ioSXEVersion(t *testing.T, v string) []byte {
+	t.Helper()
+	files, err := pack.ReadSource(filepath.Join(packtest.RepoDir(), "packs", "ios-xe"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := string(files["manifest.yaml"])
+	files["manifest.yaml"] = []byte(strings.Replace(m, "version: 1.1.0", "version: "+v, 1))
+	pack.Sign(files, packtest.Private())
+	b, err := pack.Zip(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// Fase 32b: un ID oculto sale de ListPlaybooks y de la biblioteca (con su lib-<id>), pero un trabajo lo sigue
+// resolviendo; actualizar el paquete conserva lo oculto y quitarlo borra la elección.
+func TestPackOcultarNoCambiaLoQueResuelve(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	h.installIOSXE(t)
+	pk := v1.NewPackServiceClient(h.conn)
+	sc := v1.NewScriptsServiceClient(h.conn)
+	if _, err := sc.SetFavorite(ctx(t), &v1.SetFavoriteRequest{Id: "lib-l2-stp", Favorite: true}); err != nil {
+		t.Fatal(err)
+	}
+	r, err := pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l2-stp", "lib-plat-flash-fs"}})
+	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l2-stp", "lib-plat-flash-fs"}) {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") || slices.Contains(h.scriptIDs(t), "lib-l2-stp") {
+		t.Fatal("el playbook oculto (o su lib-) sigue en las listas")
+	}
+	if slices.Contains(h.scriptIDs(t), "lib-plat-flash-fs") || !slices.Contains(h.playbookIDs(t), "ios-xe/plat-flash-fs") {
+		t.Fatal("ocultar un script no debe ocultar su playbook, y sí al script")
+	}
+	if !slices.Contains(h.playbookIDs(t), "ios-xe/l1-poe") {
+		t.Fatal("lo no oculto debe seguir")
+	}
+	// El trabajo que pide el ID oculto se arma (Review Focus 1).
+	s := h.spec(cred)
+	s.CustomCommands, s.PlaybookIds = "", []string{"ios-xe/l2-stp"}
+	if _, err := h.patrol.CreateJob(ctx(t), &v1.CreateJobRequest{Spec: s}); err != nil {
+		t.Fatalf("un ID oculto debe seguir resolviéndose: %v", err)
+	}
+	// La colección lo conserva y lo marca oculto.
+	gc, err := sc.GetCollection(ctx(t), &v1.GetCollectionRequest{Id: "favoritos"})
+	if err != nil || !slices.Contains(gc.Collection.ScriptIds, "lib-l2-stp") || !slices.Equal(gc.Collection.HiddenScriptIds, []string{"lib-l2-stp"}) {
+		t.Fatalf("%+v %v", gc, err)
+	}
+	// get del script oculto sigue (resolución por ID).
+	if _, err := v1.NewScriptsServiceClient(h.conn).GetScript(ctx(t), &v1.GetScriptRequest{Id: "lib-l2-stp"}); err != nil {
+		t.Fatal(err)
+	}
+	// Show y List informan lo oculto.
+	sh, err := pk.Show(ctx(t), &v1.PackServiceShowRequest{Id: "oom/ios-xe"})
+	if err != nil || len(sh.Pack.Hidden) != 2 {
+		t.Fatalf("%+v %v", sh, err)
+	}
+	// Elementos ajenos o contradictorios: pack.err.item.
+	for _, bad := range []*v1.PackServiceSetItemsRequest{
+		{PackId: "oom/ios-xe", Hide: []string{"ios-xe/no-existe"}},
+		{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l1-poe"}, Show: []string{"ios-xe/l1-poe"}},
+	} {
+		if _, err := pk.SetItems(ctx(t), bad); err == nil {
+			t.Fatal("debía fallar")
+		} else if r, _ := reasonOf(err); r != "pack.err.item" {
+			t.Fatalf("%v", err)
+		}
+	}
+	// Actualizar: lo oculto se conserva; reinstalar nuevo ID entra visible.
+	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1"))}); err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
+		t.Fatal("la versión nueva perdió lo oculto")
+	}
+	// Mostrar de nuevo.
+	if _, err := pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Show: []string{"ios-xe/l2-stp"}}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") || !slices.Contains(h.scriptIDs(t), "lib-l2-stp") {
+		t.Fatal("mostrar no devolvió el playbook")
+	}
+	// Quitar el paquete borra la elección (lib-plat-flash-fs seguía oculto).
+	if _, err := pk.Remove(ctx(t), &v1.PackServiceRemoveRequest{Id: "oom/ios-xe"}); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	h.core.db.QueryRow(`SELECT count(*) FROM pack_hidden`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("quedaron %d elecciones", n)
+	}
+	h.installIOSXE(t)
+	if !slices.Contains(h.scriptIDs(t), "lib-plat-flash-fs") {
+		t.Fatal("reinstalar tras quitar debe entrar todo visible")
+	}
+	if au := h.auditText(t); !strings.Contains(au, `"action":"pack.items"`) {
+		t.Fatalf("falta la auditoría pack.items:\n%s", au)
+	}
+}
+
+// Install acepta hide[]: lo ignora si el paquete no lo trae y ocultar al instalar no impide resolver el ID.
+func TestPackInstalarConHide(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp", "ios-xe/nope"}})
+	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l2-stp"}) {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
+		t.Fatal("hide al instalar no se aplicó")
+	}
+}
+
+// Concurrencia (Review Focus 5): ocultar y mostrar mientras se listan los playbooks y se instala el paquete.
+func TestPackOcultarConcurrente(t *testing.T) {
+	h := newHarness(t, nil)
+	h.installIOSXE(t)
+	pk := v1.NewPackServiceClient(h.conn)
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 20; j++ {
+				pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l2-stp"}})
+				pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Show: []string{"ios-xe/l2-stp"}})
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 20; j++ {
+				if _, err := h.patrol.ListPlaybooks(ctx(t), &v1.ListPlaybooksRequest{}); err != nil {
+					t.Error(err)
+				}
+				h.core.rebuildCatalog()
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// Fase 32b: copiar un script de un paquete (también oculto) a «Mis scripts»: ID nuevo, editable, nombre libre, y
+// sobrevive a quitar el paquete. Lo que no es de un paquete se rechaza.
+func TestPackCopiarAMisScripts(t *testing.T) {
+	h := newHarness(t, nil)
+	h.installIOSXE(t)
+	sc := v1.NewScriptsServiceClient(h.conn)
+	orig, err := sc.GetScript(ctx(t), &v1.GetScriptRequest{Id: "lib-l2-stp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v1.NewPackServiceClient(h.conn).SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l2-stp"}}); err != nil {
+		t.Fatal(err)
+	}
+	c, err := sc.CopyFromPack(ctx(t), &v1.CopyFromPackRequest{Id: "lib-l2-stp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Script.Id == "lib-l2-stp" || c.Script.Origin != "usuario" || c.Script.Name != orig.Script.Name+" (copia)" || !slices.Equal(c.Script.Commands, orig.Script.Commands) {
+		t.Fatalf("copia = %+v", c.Script)
+	}
+	c2, err := sc.CopyFromPack(ctx(t), &v1.CopyFromPackRequest{Id: "lib-l2-stp"})
+	if err != nil || c2.Script.Name != orig.Script.Name+" (copia 2)" {
+		t.Fatalf("segunda copia = %+v %v", c2, err)
+	}
+	// Editable.
+	e := c.Script
+	e.Description = "mi nota"
+	if _, err := sc.SaveScript(ctx(t), &v1.SaveScriptRequest{Script: e}); err != nil {
+		t.Fatalf("la copia debe ser editable: %v", err)
+	}
+	// Con el paquete instalado, ni uno de la base ni uno del usuario se copian por aquí.
+	for _, id := range []string{"lib-tac-baseline", c.Script.Id} {
+		if _, err := sc.CopyFromPack(ctx(t), &v1.CopyFromPackRequest{Id: id}); err == nil {
+			t.Fatalf("%s no es de un paquete instalado", id)
+		}
+	}
+	// Quitar el paquete no borra la copia.
+	if _, err := v1.NewPackServiceClient(h.conn).Remove(ctx(t), &v1.PackServiceRemoveRequest{Id: "oom/ios-xe"}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(h.scriptIDs(t), c.Script.Id) {
+		t.Fatal("quitar el paquete borró la copia")
+	}
+	if au := h.auditText(t); !strings.Contains(au, `"action":"scripts.copy"`) {
+		t.Fatalf("falta scripts.copy:\n%s", au)
 	}
 }

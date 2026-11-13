@@ -5,11 +5,13 @@ package pack
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	dom "github.com/oom-netsec/MACUAHUITL/internal/pack"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -45,7 +47,7 @@ func fail(ctx context.Context, err error) error {
 	return service.ErrFrom(ctx, c, err)
 }
 
-func (s *svc) info(p *dom.Pack) *v1.PackInfo {
+func (s *svc) info(p *dom.Pack) (*v1.PackInfo, error) {
 	i := &v1.PackInfo{Id: p.ID, Version: p.Version, MinCore: p.MinCore, Name: p.Name, NameEn: p.NameEn, Description: p.Description,
 		DescriptionEn: p.DescriptionEn, Platforms: p.Platforms, Author: p.Author, License: p.License, Official: p.Official,
 		PlaybookCount: int32(len(p.Playbooks)), ScriptCount: int32(len(p.ScriptIDs()))}
@@ -57,7 +59,9 @@ func (s *svc) info(p *dom.Pack) *v1.PackInfo {
 			}
 		}
 	}
-	return i
+	h, err := p.Hidden(s.d.DB())
+	i.Hidden = h
+	return i, err
 }
 
 func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1.PackServiceInstallResponse, error) {
@@ -100,13 +104,34 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		detail += " min_core_unchecked=true"
 	}
 	s.d.Audit("pack.install", p.ID, detail)
-	return &v1.PackServiceInstallResponse{Pack: s.info(p), ReplacedVersion: res.Replaced}, nil
+	// Lo ya oculto de una versión anterior se conserva; los IDs de hide que el paquete no trae se ignoran.
+	var hide []string
+	for _, id := range r.GetHide() {
+		if p.HasItem(id) {
+			hide = append(hide, id)
+		}
+	}
+	if err := dom.SetHidden(s.d.DB(), p.ID, hide, nil); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if len(hide) > 0 {
+		s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=0 at=install", p.ID, len(hide)))
+	}
+	info, err := s.info(p)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &v1.PackServiceInstallResponse{Pack: info, ReplacedVersion: res.Replaced}, nil
 }
 
 func (s *svc) List(ctx context.Context, _ *v1.PackServiceListRequest) (*v1.PackServiceListResponse, error) {
 	out := &v1.PackServiceListResponse{}
 	for _, p := range s.store.Snapshot().Packs {
-		out.Packs = append(out.Packs, s.info(p))
+		i, err := s.info(p)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		out.Packs = append(out.Packs, i)
 	}
 	return out, nil
 }
@@ -116,7 +141,11 @@ func (s *svc) Show(ctx context.Context, r *v1.PackServiceShowRequest) (*v1.PackS
 	if p == nil {
 		return nil, fail(ctx, dom.NotFound(r.GetId()))
 	}
-	out := &v1.PackServiceShowResponse{Pack: s.info(p), Readme: p.Readme, ScriptIds: p.ScriptIDs()}
+	i, err := s.info(p)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	out := &v1.PackServiceShowResponse{Pack: i, Readme: p.Readme, ScriptIds: p.ScriptIDs()}
 	for _, pb := range p.Playbooks {
 		out.PlaybookIds = append(out.PlaybookIds, pb.ID)
 	}
@@ -161,10 +190,43 @@ func (s *svc) cleanup(p *dom.Pack) (int, error) {
 			favs++
 		}
 	}
+	if _, err := tx.Exec(`DELETE FROM pack_hidden WHERE pack = ?`, p.ID); err != nil { // la elección se va con el paquete
+		return 0, err
+	}
 	for _, pb := range p.Playbooks {
 		if _, err := tx.Exec(`INSERT OR REPLACE INTO pack_removed(playbook_id, pack) VALUES(?, ?)`, pb.ID, p.ID); err != nil {
 			return 0, err
 		}
 	}
 	return favs, tx.Commit()
+}
+
+func (s *svc) SetItems(ctx context.Context, r *v1.PackServiceSetItemsRequest) (*v1.PackServiceSetItemsResponse, error) {
+	s.d.MarkActive()
+	p := s.store.Snapshot().Find(r.GetPackId())
+	if p == nil {
+		return nil, fail(ctx, dom.NotFound(r.GetPackId()))
+	}
+	for _, id := range append(slices.Clone(r.GetHide()), r.GetShow()...) {
+		if !p.HasItem(id) || slices.Contains(r.GetHide(), id) && slices.Contains(r.GetShow(), id) {
+			return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.item", i18n.A("id", id, "pack", p.ID))
+		}
+	}
+	tx, err := s.d.DB().Begin()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	defer tx.Rollback()
+	if err := dom.SetHidden(tx, p.ID, r.GetHide(), r.GetShow()); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=%d", p.ID, len(r.GetHide()), len(r.GetShow())))
+	i, err := s.info(p)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &v1.PackServiceSetItemsResponse{Pack: i}, nil
 }

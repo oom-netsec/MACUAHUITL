@@ -42,6 +42,7 @@ const (
 	ScriptsService_ApplyImportCollections_FullMethodName   = "/macuahuitl.v1.ScriptsService/ApplyImportCollections"
 	ScriptsService_ImportTemplate_FullMethodName           = "/macuahuitl.v1.ScriptsService/ImportTemplate"
 	ScriptsService_ImportFormat_FullMethodName             = "/macuahuitl.v1.ScriptsService/ImportFormat"
+	ScriptsService_CopyFromPack_FullMethodName             = "/macuahuitl.v1.ScriptsService/CopyFromPack"
 )
 
 // ScriptsServiceClient is the client API for ScriptsService service.
@@ -93,6 +94,8 @@ type ScriptsServiceClient interface {
 	ImportTemplate(ctx context.Context, in *ImportTemplateRequest, opts ...grpc.CallOption) (*ImportTemplateResponse, error)
 	// Los campos del archivo (cabecera incluida) con tipo, si son obligatorios, un ejemplo y su descripción.
 	ImportFormat(ctx context.Context, in *ImportFormatRequest, opts ...grpc.CallOption) (*ImportFormatResponse, error)
+	// Copia un script de un paquete instalado a «Mis scripts» (fase 32b): ID nuevo, editable, nombre «<nombre> (copia)».
+	CopyFromPack(ctx context.Context, in *CopyFromPackRequest, opts ...grpc.CallOption) (*CopyFromPackResponse, error)
 }
 
 type scriptsServiceClient struct {
@@ -333,6 +336,16 @@ func (c *scriptsServiceClient) ImportFormat(ctx context.Context, in *ImportForma
 	return out, nil
 }
 
+func (c *scriptsServiceClient) CopyFromPack(ctx context.Context, in *CopyFromPackRequest, opts ...grpc.CallOption) (*CopyFromPackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CopyFromPackResponse)
+	err := c.cc.Invoke(ctx, ScriptsService_CopyFromPack_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScriptsServiceServer is the server API for ScriptsService service.
 // All implementations must embed UnimplementedScriptsServiceServer
 // for forward compatibility.
@@ -382,6 +395,8 @@ type ScriptsServiceServer interface {
 	ImportTemplate(context.Context, *ImportTemplateRequest) (*ImportTemplateResponse, error)
 	// Los campos del archivo (cabecera incluida) con tipo, si son obligatorios, un ejemplo y su descripción.
 	ImportFormat(context.Context, *ImportFormatRequest) (*ImportFormatResponse, error)
+	// Copia un script de un paquete instalado a «Mis scripts» (fase 32b): ID nuevo, editable, nombre «<nombre> (copia)».
+	CopyFromPack(context.Context, *CopyFromPackRequest) (*CopyFromPackResponse, error)
 	mustEmbedUnimplementedScriptsServiceServer()
 }
 
@@ -460,6 +475,9 @@ func (UnimplementedScriptsServiceServer) ImportTemplate(context.Context, *Import
 }
 func (UnimplementedScriptsServiceServer) ImportFormat(context.Context, *ImportFormatRequest) (*ImportFormatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ImportFormat not implemented")
+}
+func (UnimplementedScriptsServiceServer) CopyFromPack(context.Context, *CopyFromPackRequest) (*CopyFromPackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CopyFromPack not implemented")
 }
 func (UnimplementedScriptsServiceServer) mustEmbedUnimplementedScriptsServiceServer() {}
 func (UnimplementedScriptsServiceServer) testEmbeddedByValue()                        {}
@@ -896,6 +914,24 @@ func _ScriptsService_ImportFormat_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScriptsService_CopyFromPack_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CopyFromPackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScriptsServiceServer).CopyFromPack(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScriptsService_CopyFromPack_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScriptsServiceServer).CopyFromPack(ctx, req.(*CopyFromPackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScriptsService_ServiceDesc is the grpc.ServiceDesc for ScriptsService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -994,6 +1030,10 @@ var ScriptsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ImportFormat",
 			Handler:    _ScriptsService_ImportFormat_Handler,
+		},
+		{
+			MethodName: "CopyFromPack",
+			Handler:    _ScriptsService_CopyFromPack_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

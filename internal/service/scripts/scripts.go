@@ -105,6 +105,14 @@ func (s *svc) libraryEN() ([]dom.Script, map[string]dom.Texto, error) {
 	return s.lib, s.libEN, nil
 }
 
+// hiddenSets son los playbooks y scripts que el usuario ocultó de sus paquetes (ver pack.HiddenSets).
+func (s *svc) hiddenSets() (pbs, ids map[string]bool, err error) {
+	if s.packs == nil {
+		return map[string]bool{}, map[string]bool{}, nil
+	}
+	return pack.HiddenSets(s.d.DB(), s.packs.Snapshot())
+}
+
 // in da el script en el idioma de la llamada: los de fábrica con su nombre y descripción en inglés; los del usuario, tal cual.
 func (s *svc) in(ctx context.Context, x dom.Script) dom.Script {
 	if x.Origin != dom.OrigenBiblioteca {
@@ -238,10 +246,15 @@ func (s *svc) ListScripts(ctx context.Context, r *v1.ListScriptsRequest) (*v1.Li
 	if err != nil {
 		return nil, internal(err)
 	}
+	_, hidden, err := s.hiddenSets()
+	if err != nil {
+		return nil, internal(err)
+	}
 	text := strings.ToLower(r.Text)
 	var all []dom.Script
 	for _, x := range append(append([]dom.Script{}, lib...), user...) {
 		switch {
+		case hidden[x.ID]:
 		case r.OnlyFavorites && !m.fav[x.ID]:
 		case r.Tech != "" && x.Tech != r.Tech:
 		case r.Platform != "" && x.Platform != r.Platform && x.Platform != "cualquiera":
@@ -397,11 +410,48 @@ func (s *svc) SetFavorite(ctx context.Context, r *v1.SetFavoriteRequest) (*v1.Se
 
 func (s *svc) DuplicateScript(ctx context.Context, r *v1.DuplicateScriptRequest) (*v1.DuplicateScriptResponse, error) {
 	s.d.MarkActive()
+	c, err := s.duplicate(ctx, r.Id, nil)
+	if err != nil {
+		return nil, err
+	}
+	s.d.Audit("scripts.crear", c.ID, c.Name+" (copy of "+r.Id+")")
+	return &v1.DuplicateScriptResponse{Script: toPB(c, meta{})}, nil
+}
+
+// CopyFromPack copia a «Mis scripts» un script de un paquete instalado (también uno oculto): ID nuevo, editable.
+// Quitar el paquete después no la borra.
+func (s *svc) CopyFromPack(ctx context.Context, r *v1.CopyFromPackRequest) (*v1.CopyFromPackResponse, error) {
+	s.d.MarkActive()
+	c, err := s.duplicate(ctx, r.Id, func(x dom.Script) error {
+		if s.packs != nil {
+			for _, p := range s.packs.Snapshot().Packs {
+				if slices.Contains(p.ScriptIDs(), x.ID) {
+					return nil
+				}
+			}
+		}
+		return service.Err(ctx, codes.InvalidArgument, "scripts.svc.not_from_pack", i18n.A("id", x.ID))
+	})
+	if err != nil {
+		return nil, err
+	}
+	s.d.Audit("scripts.copy", c.ID, c.Name+" (copy of "+r.Id+")")
+	return &v1.CopyFromPackResponse{Script: toPB(c, meta{})}, nil
+}
+
+// duplicate guarda como script del usuario una copia del script id (nombre «<nombre> (copia)»); si ok no es nil, se
+// consulta antes de copiar.
+func (s *svc) duplicate(ctx context.Context, id string, ok func(dom.Script) error) (dom.Script, error) {
 	var c dom.Script
 	err := s.tx(func(tx *sql.Tx) error {
-		x, err := s.find(ctx, tx, r.Id)
+		x, err := s.find(ctx, tx, id)
 		if err != nil {
 			return err
+		}
+		if ok != nil {
+			if err := ok(x); err != nil {
+				return err
+			}
 		}
 		user, err := loadUser(tx)
 		if err != nil {
@@ -416,11 +466,7 @@ func (s *svc) DuplicateScript(ctx context.Context, r *v1.DuplicateScriptRequest)
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	s.d.Audit("scripts.crear", c.ID, c.Name+" (copy of "+r.Id+")")
-	return &v1.DuplicateScriptResponse{Script: toPB(c, meta{})}, nil
+	return c, err
 }
 
 func (s *svc) ExportScripts(ctx context.Context, r *v1.ExportScriptsRequest) (*v1.ExportScriptsResponse, error) {
