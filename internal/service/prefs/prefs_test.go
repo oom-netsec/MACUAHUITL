@@ -465,3 +465,45 @@ func TestPreferenciasRechazosEsYEn(t *testing.T) {
 		}
 	}
 }
+
+// Fase 30e: los errores de la carpeta de salidas, el aviso y la nota de cambio salen en el idioma pedido, con el
+// prefijo prefs.outputs.<motivo>: intacto; es es el texto de siempre.
+func TestCarpetaDeSalidasEnElIdioma(t *testing.T) {
+	s, _, root := montar(t)
+	laxa := carpeta(t, filepath.Join(root, "laxa"), 0o755)
+	set := func(loc, dir string) (*v1.SetCorePrefsResponse, error) {
+		return s.SetCorePrefs(i18n.WithLocale(context.Background(), loc), &v1.SetCorePrefsRequest{Prefs: &v1.CorePrefs{OutputsDir: dir}})
+	}
+	for loc, want := range map[string]string{
+		"es": `prefs.outputs.relativa: la ruta debe ser absoluta: "salidas"`,
+		"en": `prefs.outputs.relativa: the path must be absolute: "salidas"`,
+	} {
+		if _, err := set(loc, "salidas"); status.Convert(err).Message() != want {
+			t.Errorf("%s: %q", loc, status.Convert(err).Message())
+		}
+	}
+	_, err := set("en", laxa)
+	if m := status.Convert(err).Message(); !strings.HasPrefix(m, "prefs.outputs.permisos: the folder ") || !strings.Contains(m, "has mode 0755 and must be 0700; fix it with: chmod 700 ") {
+		t.Errorf("permisos en: %q", m)
+	}
+	// Nota de cambio y aviso de carpeta que ya no vale.
+	ok := carpeta(t, filepath.Join(root, "ok"), 0o700)
+	if r, err := set("en", ok); err != nil || !strings.HasPrefix(r.State.Note, "The change applies to what starts afterwards") {
+		t.Fatalf("nota en: %v %v", r, err)
+	}
+	if r, _ := set("es", ""); !strings.HasPrefix(r.State.Note, "El cambio aplica a lo que empiece después") {
+		t.Fatalf("nota es: %q", r.State.Note)
+	}
+	if _, err := set("es", ok); err != nil {
+		t.Fatal(err)
+	}
+	os.RemoveAll(ok)
+	r, _ := set("en", ok)
+	if !strings.Contains(r.State.Note, "the saved outputs folder ("+ok+") is no longer valid and the factory one is used: prefs.outputs.no_existe: the folder does not exist: ") {
+		t.Fatalf("aviso en: %q", r.State.Note)
+	}
+	r, _ = set("es", ok)
+	if !strings.Contains(r.State.Note, "la carpeta de salidas guardada ("+ok+") ya no es válida y se usa la de fábrica: prefs.outputs.no_existe: la carpeta no existe: ") {
+		t.Fatalf("aviso es: %q", r.State.Note)
+	}
+}

@@ -196,7 +196,7 @@ func (s *patrolSvc) validate(ctx context.Context, p *v1.JobSpec) (patrol.Spec, e
 	if spec.OutputDir == "" {
 		spec.OutputDir = s.c.settings.Outputs()
 	} else if dir, err := service.CheckOutputs(spec.OutputDir, s.c.settings, true); err != nil {
-		return spec, err
+		return spec, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	} else {
 		spec.OutputDir = dir
 	}

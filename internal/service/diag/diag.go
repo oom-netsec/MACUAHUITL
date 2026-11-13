@@ -43,7 +43,7 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	if factory {
 		req.OutputDir = filepath.Join(s.d.Outputs(), "diag")
 	} else if dir, err := service.CheckOutputs(req.OutputDir, s.d.Settings(), true); err != nil { // la misma validación que Ajustes
-		return err
+		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	} else {
 		req.OutputDir = dir
 	}
