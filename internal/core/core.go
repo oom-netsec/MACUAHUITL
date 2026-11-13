@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -454,12 +453,21 @@ func (c *Core) deps(j *job) patrol.Deps {
 		PrimaryVerified: verified, RetryBackoff: c.o.RetryBackoff}
 }
 
+// getJobIn es getJob con el error en el idioma del contexto.
+func (c *Core) getJobIn(ctx context.Context, id string) (*job, error) {
+	j, err := c.getJob(id)
+	if err != nil {
+		return nil, service.Err(ctx, codes.NotFound, "patrol.err.job_missing", i18n.A("id", id))
+	}
+	return j, nil
+}
+
 func (c *Core) getJob(id string) (*job, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	j, ok := c.jobs[id]
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "trabajo %s no existe", id)
+		return nil, service.Err(context.Background(), codes.NotFound, "patrol.err.job_missing", i18n.A("id", id))
 	}
 	return j, nil
 }

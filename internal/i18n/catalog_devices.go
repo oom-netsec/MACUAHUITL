@@ -102,3 +102,31 @@ func init() {
 		"devices.warn.too_many":         e("más de {max} equipos: la lista está incompleta", "more than {max} devices: the list is incomplete"),
 	})
 }
+
+// Carpeta y archivo de salida de adhoc, diag y field, y errores sueltos de field.
+func init() {
+	e := func(es, en string) entry { return entry{Es: es, En: en, Args: tplArgs(es, en)} }
+	add(map[string]entry{
+		"out.err.dir":         e("carpeta de salida: {cause}", "output folder: {cause}"),
+		"out.err.file":        e("archivo de salida: {cause}", "output file: {cause}"),
+		"out.err.busy":        e("archivo de salida: demasiados nombres ocupados", "output file: too many names in use"),
+		"field.err.protocol":  e("protocolo {proto:q} no soportado (tftp o http)", "protocol {proto:q} not supported (tftp or http)"),
+		"field.err.port_lost": e("puerto perdido: {cause}", "port lost: {cause}"),
+	})
+}
+
+// Paquetes: errores de la instalación que envuelven un error del sistema.
+func init() {
+	e := func(es, en string) entry { return entry{Es: es, En: en, Args: tplArgs(es, en)} }
+	add(map[string]entry{
+		"pack.err.hidden_save": e("no se instaló nada: no se pudo guardar lo oculto: {cause}", "nothing was installed: the hidden items could not be saved: {cause}"),
+		"pack.err.hidden_read": e("el paquete quedó instalado, pero no se pudo leer lo oculto: {cause}", "the package was installed, but the hidden items could not be read: {cause}"),
+	})
+}
+
+// Núcleo: trabajos de Patrol.
+func init() {
+	add(map[string]entry{
+		"patrol.err.job_missing": {Es: "trabajo {id} no existe", En: "job {id} does not exist", Args: []string{"id"}},
+	})
+}

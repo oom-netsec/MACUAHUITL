@@ -9,13 +9,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/adhoc"
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
@@ -41,12 +41,12 @@ func (s *adhocSvc) StartAdhoc(ctx context.Context, r *v1.StartAdhocRequest) (*v1
 	}
 	root := filepath.Join(s.d.Outputs(), "adhoc")
 	if err := os.MkdirAll(root, 0o700); err != nil {
-		return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("out.err.dir", err, nil))
 	}
 	// Una carpeta por lote: el sello de tiempo de Patrol es de un segundo y dos lotes seguidos compartirían manifest, salidas y zip.
 	dir, err := os.MkdirTemp(root, "lote-")
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("out.err.dir", err, nil))
 	}
 	// Una ronda, un archivo por ronda y sin borrar sueltos: capture.ReadDir lee así.
 	spec := &v1.JobSpec{Name: "adhoc", Targets: r.Targets, DefaultCredentialId: r.CredentialId, CustomCommands: strings.Join(cmds, "\n"),

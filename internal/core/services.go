@@ -238,7 +238,7 @@ func loginToProto(loc string, r patrol.LoginResult) *v1.LoginTestResponse {
 }
 
 func (s *patrolSvc) LoginTest(r *v1.LoginTestRequest, st v1.PatrolService_LoginTestServer) error {
-	j, err := s.c.getJob(r.JobId)
+	j, err := s.c.getJobIn(st.Context(), r.JobId)
 	if err != nil {
 		return err
 	}
@@ -267,7 +267,7 @@ func (s *patrolSvc) LoginTest(r *v1.LoginTestRequest, st v1.PatrolService_LoginT
 func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJobResponse, error) {
 	c := s.c
 	c.markActive()
-	j, err := c.getJob(r.JobId)
+	j, err := c.getJobIn(ctx, r.JobId)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +349,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	undo = append(undo, func() { v.Disarm(j.id) })
 	w, err := patrol.NewWriter(spec.OutputDir, spec, c.o.Now())
 	if err != nil {
-		return fail(status.Error(codes.FailedPrecondition, err.Error()), i18n.English(err))
+		return fail(service.ErrFrom(ctx, codes.FailedPrecondition, err), i18n.English(err))
 	}
 	for _, ch := range changes {
 		w.NoteHostKeyChange(ch)
@@ -395,7 +395,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	events, cancelSub := c.bus.Subscribe([]string{j.id})
 	if err := c.sched.Arm(j.id, engineSchedule(spec.Schedule), until, targets, run); err != nil {
 		cancelSub()
-		return fail(status.Error(codes.InvalidArgument, err.Error()), i18n.English(err))
+		return fail(service.ErrFrom(ctx, codes.InvalidArgument, err), i18n.English(err))
 	}
 	c.mu.Lock()
 	j.state, j.ArmedAt = "armed", c.o.Now()
@@ -502,9 +502,9 @@ func (c *Core) finish(j *job, state string) {
 
 var endPhase = map[string]v1.JobPhaseKind{"completed": v1.JobPhaseKind_JOB_PHASE_KIND_COMPLETED, "cancelled": v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED}
 
-func (s *patrolSvc) CancelJob(_ context.Context, r *v1.CancelJobRequest) (*v1.CancelJobResponse, error) {
+func (s *patrolSvc) CancelJob(ctx context.Context, r *v1.CancelJobRequest) (*v1.CancelJobResponse, error) {
 	s.c.markActive()
-	j, err := s.c.getJob(r.JobId)
+	j, err := s.c.getJobIn(ctx, r.JobId)
 	if err != nil {
 		return nil, err
 	}
@@ -570,7 +570,7 @@ func (s *patrolSvc) ListPlaybooks(ctx context.Context, r *v1.ListPlaybooksReques
 }
 
 func (s *patrolSvc) GetRun(ctx context.Context, r *v1.GetRunRequest) (*v1.GetRunResponse, error) {
-	j, err := s.c.getJob(r.JobId)
+	j, err := s.c.getJobIn(ctx, r.JobId)
 	if err != nil {
 		return nil, err
 	}

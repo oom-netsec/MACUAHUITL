@@ -12,13 +12,13 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/serialcon"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/imgverify"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -40,7 +40,7 @@ func (s *fieldSvc) ListSerialPorts(context.Context, *v1.ListSerialPortsRequest) 
 func (s *fieldSvc) outFile(sub, prefix string) (*os.File, error) {
 	dir := filepath.Join(s.d.Outputs(), sub)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+		return nil, i18n.Wrap("out.err.dir", err, nil)
 	}
 	base := prefix + "_" + s.d.Now().Format("20060102-150405")
 	for n := 0; n < 100; n++ {
@@ -53,11 +53,11 @@ func (s *fieldSvc) outFile(sub, prefix string) (*os.File, error) {
 			continue
 		}
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "archivo de salida: %v", err)
+			return nil, i18n.Wrap("out.err.file", err, nil)
 		}
 		return f, nil
 	}
-	return nil, status.Error(codes.Internal, "archivo de salida: demasiados nombres ocupados")
+	return nil, i18n.New("out.err.busy", nil)
 }
 
 // Console conecta el stream con el puerto serie. Lo tecleado no se graba ni se
@@ -85,7 +85,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	defer p.Close()
 	f, err := s.outFile("console", "console_"+filepath.Base(cfg.Path))
 	if err != nil {
-		return err
+		return service.ErrFrom(st.Context(), codes.Internal, err)
 	}
 	defer f.Close()
 	rec := serialcon.NewRecorder(f, s.d.Now)
@@ -147,7 +147,7 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	rec.Mark("cerrado: " + reason)
 	s.d.Audit("field.console.close", cfg.Path, fmt.Sprintf("received=%d sent=%d break=%d %s", rx.Load(), tx.Load(), breaks.Load(), reasonEN))
 	if lost != nil {
-		return status.Error(codes.Unavailable, reason)
+		return service.ErrFrom(st.Context(), codes.Unavailable, i18n.Wrap("field.err.port_lost", lost, nil))
 	}
 	return nil
 }
@@ -159,7 +159,7 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	s.d.MarkActive()
 	port, ok := defaultServePort[r.Protocol]
 	if !ok {
-		return status.Errorf(codes.InvalidArgument, "protocolo %q no soportado (tftp o http)", r.Protocol)
+		return service.Err(st.Context(), codes.InvalidArgument, "field.err.protocol", i18n.A("proto", r.Protocol))
 	}
 	addr := r.Addr
 	if ip, err := netip.ParseAddr(strings.Trim(addr, "[]")); err == nil { // solo IP: puerto por defecto

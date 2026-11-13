@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -49,11 +50,11 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	}
 	bin, argv, err := diag.Build(req)
 	if err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	}
 	if factory { // la de fábrica la crea el núcleo (0700), ya con la petición válida
 		if err := os.MkdirAll(req.OutputDir, 0o700); err != nil {
-			return status.Errorf(codes.InvalidArgument, "carpeta de salida: %v", err)
+			return service.ErrFrom(st.Context(), codes.InvalidArgument, i18n.Wrap("out.err.dir", err, nil))
 		}
 	}
 	s.d.Audit("diag.run", string(tool), fmt.Sprintf("%s %q", bin, argv))
