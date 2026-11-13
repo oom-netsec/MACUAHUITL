@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
@@ -50,7 +49,7 @@ func (s *forensicSvc) bundle(ctx context.Context, job string) (*analyze.Bundle, 
 	}
 	b, err := analyze.Load(dir)
 	if err != nil {
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
+		return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
 	return b, nil
 }

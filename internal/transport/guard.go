@@ -6,8 +6,6 @@ package transport
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"net"
 	"net/netip"
 	"strconv"
@@ -48,11 +46,11 @@ func (g *Guard) lookup(ctx context.Context, host string) ([]netip.Addr, error) {
 		return []netip.Addr{a.Unmap()}, nil
 	}
 	if host == "" {
-		return nil, errors.New("transport: dirección vacía")
+		return nil, i18n.New("transport.err.empty_addr", nil)
 	}
 	addrs, err := g.resolve(ctx, host)
 	if err != nil {
-		return nil, fmt.Errorf("transport: resolver %q: %w", host, err)
+		return nil, i18n.Wrap("transport.err.resolve", err, i18n.A("host", host))
 	}
 	for i := range addrs {
 		addrs[i] = addrs[i].Unmap()
@@ -66,7 +64,7 @@ func (g *Guard) Allow(ctx context.Context, jobID string, addresses []string) err
 	for _, a := range addresses {
 		if p, err := netip.ParsePrefix(a); err == nil {
 			if p.Masked() != p {
-				return fmt.Errorf("transport: %s tiene bits de host; ¿quisiste decir %s?", a, p.Masked())
+				return i18n.New("transport.err.host_bits", i18n.A("addr", a, "masked", p.Masked()))
 			}
 			add = append(add, p)
 			continue
@@ -135,7 +133,7 @@ func (g *Guard) DialerFor(jobID string) func(ctx context.Context, network, host 
 // DialNetwork es Dial para tcp o udp.
 func (g *Guard) DialNetwork(ctx context.Context, jobID, network, host string, port uint16) (net.Conn, error) {
 	if network != "tcp" && network != "udp" {
-		return nil, fmt.Errorf("transport: red %q no soportada", network)
+		return nil, i18n.New("transport.err.network", i18n.A("network", network))
 	}
 	addrs, err := g.lookup(ctx, host)
 	if err == nil {

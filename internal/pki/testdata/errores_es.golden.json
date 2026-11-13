@@ -1,0 +1,23 @@
+{
+ "alg": "pki: algoritmo \"dsa\" no soportado (rsa2048, rsa3072, rsa4096, p256, p384)",
+ "ca-dias": "pki: validez de 0 días fuera de 1–7300",
+ "ca-nombre": "pki: falta el nombre de la CA",
+ "csr-cn": "pki: falta el CN",
+ "csr-ip": "pki: IP \"x.y\" inválida",
+ "csr-pais": "pki: el país (C) es de 2 letras ISO 3166",
+ "decode-bloque": "pki: bloque PEM \"PRIVATE KEY\" no soportado (solo certificados y CSR; no pegues llaves privadas)",
+ "decode-cert": "pki: certificado: x509: malformed certificate",
+ "decode-csr": "pki: CSR: asn1: structure error: tags don't match (16 vs {class:0 tag:0 length:0 isCompound:false}) {optional:false explicit:false application:false private:false defaultValue:\u003cnil\u003e tag:\u003cnil\u003e stringType:0 timeType:0 set:false omitEmpty:false} certificateRequest @2",
+ "decode-nada": "pki: no se reconoce un certificado ni un CSR (PEM o DER)",
+ "export-cadena": "pki: cadena: x509: malformed certificate",
+ "export-formato": "pki: formato \"zip\" desconocido (pem, der, p12, p12-legacy)",
+ "export-llave": "pki: la llave no corresponde al certificado",
+ "export-p12": "pki: PKCS#12 necesita la llave y una contraseña de exportación",
+ "sealed-clave": "pki: abrir la llave: vault: contraseña maestra incorrecta",
+ "sealed-tipo": "pki: no es una llave sellada por MACUAHUITL (MACUAHUITL SEALED PRIVATE KEY)",
+ "sign-csr": "pki: se esperaba un CSR PEM",
+ "sign-csr-malo": "pki: CSR: asn1: structure error: tags don't match (16 vs {class:0 tag:0 length:0 isCompound:false}) {optional:false explicit:false application:false private:false defaultValue:\u003cnil\u003e tag:\u003cnil\u003e stringType:0 timeType:0 set:false omitEmpty:false} certificateRequest @2",
+ "sign-noca": "pki: el certificado indicado no es de una CA",
+ "sign-pem": "pki: se esperaba un certificado PEM",
+ "sign-perfil": "pki: perfil \"raro\" desconocido (server, client, server-client)"
+}
