@@ -150,7 +150,7 @@ Known limits are declared, not hidden, in the [threat model](docs/security/THREA
 - **No privileged code.** No setuid helpers, no raw sockets of its own, no embedded Wireshark or tshark.
 - **Cannot protect you from malware running as your own user** while the vault is open. No user-space app can.
 - **Cannot recover a lost master password.**
-- **Linux only**, for now.
+- **Linux only**, for now. Windows and macOS are on the [roadmap](docs/roadmap.md), after the content packs for every technology.
 
 ## Supported platforms
 
@@ -241,7 +241,7 @@ task ui-build   # desktop app
 
 ## Docs
 
-- [Roadmap](docs/roadmap.md): what is built and the phases ahead (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging)
+- [Roadmap](docs/roadmap.md): what is built and the phases ahead (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging, then Windows and macOS)
 - [Architecture design](docs/architecture/2026-11-02-macuahuitl-architecture-design.md) · [Decision records](docs/adr/)
 - [Threat model](docs/security/THREAT_MODEL.md) · [Cryptography](docs/security/CRYPTO.md) · [Auditor's guide](docs/security/AUDIT_GUIDE.md)
 

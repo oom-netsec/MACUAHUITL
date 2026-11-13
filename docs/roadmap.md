@@ -122,6 +122,32 @@ Se define junto con la **vista de líder** del [backlog](backlog.md).
 2. **Telemetría por modelos YANG** con tableros de alta resolución sobre gNMI.
 3. **EEM temporal**: inyecta un applet de captura con retiro automático, por el modo asistido.
 
+## Paquetes de contenido por tecnología (en curso)
+
+Los playbooks y scripts de cada tecnología se publican como paquetes `.mpack` firmados ([ADR 0010](adr/0010-paquetes-de-contenido.md)), y cada quien instala solo los que usa.
+
+| Paquete | Estado |
+|---|---|
+| `oom/ios-xe` (switches y routers IOS-XE) | Publicado (v0.3.0; routers en 1.1.0, v0.3.1) |
+| `oom/ios` (IOS clásico) | Publicado (v0.3.1), validado en 3560CX |
+| `oom/wlc-9800` (Catalyst 9800 y EWC) | En main, sale en v0.4.0, validado en 9120 EWC |
+| NX-OS, firewall (ASA/FTD), ACI, wireless AireOS, ISE, SD-Access | Pendientes |
+
+También pendiente: selección por elemento, copia a «Mis scripts» y paquete personal de respaldo (fase 32b).
+
+## Después de los paquetes: Windows y macOS
+
+Empieza cuando estén todos los paquetes por tecnología. Hoy MACUAHUITL es solo para Linux. El núcleo y `mctl` (Go) y la app (Wails + React) ya son multiplataforma; solo hay que adaptar lo que es propio de Linux. Primero Windows, que es donde más ingenieros de redes trabajan, y después macOS.
+
+1. **ADR de multiplataforma**: qué funciones pueden faltar al principio, cómo se instala y se firma en cada sistema y qué código queda por plataforma (como `internal/sys`).
+2. **Piezas de Linux que se adaptan**:
+   - inhibir la suspensión (systemd-logind → `SetThreadExecutionState` / `IOPMAssertion`);
+   - consola serie (`/dev/ttyUSB*` → `COMx` / `/dev/cu.*`);
+   - servidores TFTP/FTP sin `setcap`;
+   - arranque del núcleo (systemd → tarea de inicio de sesión / LaunchAgent).
+3. **Instaladores y firma**: `.msi` firmado (SmartScreen) y `.dmg` notarizado (Gatekeeper, cuenta de Apple Developer).
+4. **CI y release** con runners de Windows y macOS: pruebas y artefactos de las tres plataformas en cada tag.
+
 ## Qué cambia la red y dónde
 
 Todo pasa por el modo de cambio asistido (ADR 0007), que se construye primero, en la fase 16.
