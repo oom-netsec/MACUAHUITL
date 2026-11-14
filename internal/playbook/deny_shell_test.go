@@ -108,3 +108,57 @@ func TestDenyNXOSParentesisLlavesYComillas(t *testing.T) {
 		}
 	}
 }
+
+// «?» pide ayuda al equipo en la terminal interactiva: quita el signo y conserva el texto, así que corre otro comando.
+func TestDenyInterrogacionEnTodasLasPlataformas(t *testing.T) {
+	casos := map[string][]string{
+		"ios":      {"show clock t?o-file flash:a"},
+		"ios-xe":   {"show clock t?o-file flash:a"},
+		"wlc-9800": {"show clock t?o-file flash:a"},
+		"cat9k":    {"show clock t?o-file flash:a"},
+		"asa":      {"show tech-support f?ile disk0:a"},
+		"ftd":      {"show tech-support f?ile disk0:a"},
+		"nx-os":    {"show tech-support bi?nary"},
+	}
+	for plat, cmds := range casos {
+		for _, cmd := range cmds {
+			if err := CheckDenied(plat, cmd); err == nil {
+				t.Errorf("%s %q: no se rechazó", plat, cmd)
+			}
+		}
+	}
+}
+
+func TestDenyTracerouteIOSTopes(t *testing.T) {
+	for _, cmd := range []string{"traceroute 8.8.8.8 ttl 1 255 probe 10 timeout 10", "traceroute 8.8.8.8 ttl 1 31", "traceroute 8.8.8.8 probe 6"} {
+		if CheckDenied("ios", cmd) == nil {
+			t.Errorf("%q: no se rechazó", cmd)
+		}
+	}
+	if err := CheckDenied("ios", "traceroute 8.8.8.8 ttl 1 30 probe 5 timeout 10"); err != nil {
+		t.Errorf("en el tope: %v", err)
+	}
+}
+
+// En nx-os (bash en los leaf ACI) «*» y «[» fuera de comillas se expanden tras la validación.
+func TestDenyNXOSComodinesFueraDeComillas(t *testing.T) {
+	for _, cmd := range []string{"show clock | grep *", "show clock | grep [a-z]", "show interface eth1/*", "show clock | grep a*"} {
+		if CheckDenied("nx-os", cmd) == nil {
+			t.Errorf("%q: no se rechazó", cmd)
+		}
+	}
+	for _, cmd := range []string{`show clock | grep "a.*b"`, `show clock | egrep "[0-9]+"`} {
+		if err := CheckDenied("nx-os", cmd); err != nil {
+			t.Errorf("%q: %v", cmd, err)
+		}
+	}
+}
+
+// Un Nexus mal marcado como IOS: tras el segundo «|» también se rechazan estos comandos.
+func TestDenyShellTokensAmpliados(t *testing.T) {
+	for _, w := range []string{"sort -o a", "uniq", "cp a b", "mv a b", "rm a", "dd if=a", "sh", "ln a b", "chmod 777 a"} {
+		if CheckDenied("ios", "show clock | include x | "+w) == nil {
+			t.Errorf("| %s: no se rechazó", w)
+		}
+	}
+}
