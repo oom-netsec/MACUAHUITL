@@ -76,6 +76,9 @@ var iosRules = []rule{
 	R("ospf-key", "", `\s*(?:ipv6 ospf|ospfv3(?: \d+)?) authentication ipsec spi \d+ (?:md5|sha1) `+typ),
 	R("ospf-key", "", `\s*(?:ipv6 ospf|ospfv3(?: \d+)?) encryption ipsec spi \d+ esp (?:aes-cbc (?:\d+ )?|3des |des )`+typ),
 	R("ospf-key", "", `\s*(?:ipv6 ospf|ospfv3(?: \d+)?) encryption ipsec spi \d+ esp (?:.*? )?(?:md5|sha1) `+typ),
+	R("ospf-key", "", `\s*area \S+ (?:virtual-link \S+ )?authentication ipsec spi \d+ (?:md5|sha1) `+typ),
+	R("ospf-key", "", `\s*area \S+ (?:virtual-link \S+ )?encryption ipsec spi \d+ esp (?:aes-cbc (?:\d+ )?|3des |des )`+typ),
+	R("ospf-key", "", `\s*area \S+ (?:virtual-link \S+ )?encryption ipsec spi \d+ esp (?:.*? )?(?:md5|sha1) `+typ),
 	R("eigrp-key", "", `\s*authentication mode hmac-sha-256 `+typ),
 	// ISE/TrustSec: PAC dentro de «radius server …»; CoA de ISE en «aaa server radius dynamic-author».
 	R("radius-key", "", `\s*pac key `+typ),
@@ -87,7 +90,7 @@ var iosRules = []rule{
 	// 9800: credenciales de gestión de los AP en «ap profile», 802.1X de AP, usuarios locales y EWC.
 	R("user-secret", "", `\s*mgmtuser username \S+ (?:.*? )?password `+typ),
 	R("user-secret", "", `\s*mgmtuser username \S+ (?:.*? )?secret `+typ),
-	R("dot1x-password", "", `\s*dot1x username \S+ (?:.*? )?password `+typ),
+	R("dot1x-password", "", `\s*(?:ap )?dot1x username \S+ (?:.*? )?password `+typ),
 	R("user-secret", "", `\s*wireless ewc-ap (?:.*? )?password `+typ),
 	R("user-secret", "", `\s*wireless ewc-ap (?:.*? )?secret `+typ),
 	R("user-secret", "username", `\s+(?:password|secret) `+typ),
@@ -104,6 +107,8 @@ var iosRules = []rule{
 	// VPN y PKI.
 	R("psk", "", `\s*authentication (?:local|remote) pre-share key `+typ),
 	R("psk", "ezvpn", `\s+key `+typ),
+	R("psk", "", `\s*group \S+ key `+typ), // cliente EzVPN (crypto ipsec client ezvpn)
+	R("l2tp-password", "", `\s*l2tp tunnel password `+typ),
 	R("nhrp-key", "", `\s*ip(?:v6)? nhrp authentication `),
 	R("ipsec-key", "", `\s*set session-key (?:inbound|outbound) esp \d+ cipher `),
 	R("ipsec-key", "", `\s*set session-key (?:inbound|outbound) esp \d+ (?:.*? )?authenticator `),
@@ -161,7 +166,7 @@ var tailStops = map[string]bool{
 	"role": true, "hidden": true, "localizedkey": true, "level-1": true, "level-2": true, "priority": true,
 	"mode-list": true, "eap-type": true, "timeout": true, "retransmit": true, "expire": true, "sshkey": true, "privilege": true,
 	"cryptographic-algorithm": true, "auth-port": true, "acct-port": true, "single-connection": true,
-	"port": true, "view": true, "vrf": true, "use-vrf": true, "type": true,
+	"port": true, "view": true, "address": true, "hostname": true, "no-xauth": true, "vrf": true, "use-vrf": true, "type": true,
 }
 
 // tail amplía un valor de tipo 0: sigue hasta el fin de la línea o hasta una palabra clave de tailStops.
@@ -232,7 +237,7 @@ func Apply(platform, text string) (string, map[string]int) {
 type Stream struct {
 	block, skip string
 	table       string // tabla de NX-OS/IOS en curso: "community", "host" o "isakmp"
-	rows, col   int    // filas vistas y columna del 2.º encabezado (tabla de comunidades)
+	rows        int    // filas vistas de la tabla en curso
 	n           int
 	counts      map[string]int
 	// MaxSkip: líneas máximas que se descartan dentro de una llave o cadena sin cierre (0 = sin tope).
@@ -311,20 +316,21 @@ func fieldStart(line string, n int) int {
 	}
 }
 
-// tableRow dice si la línea tiene forma de fila de la tabla en curso. Ante la duda es fila (se tapa de más, no de menos);
-// solo lo claramente ajeno (otra salida, un prompt) cierra la tabla.
-func (s *Stream) tableRow(line string, f []string) bool {
+var hostLabel = regexp.MustCompile(`^\s*[A-Z][A-Za-z ]*:(?:\s|$)`) // «Use VRF: x», «Source interface: x»…
+
+// tableRow dice si la línea es una fila de la tabla en curso. Ante la duda es fila (se tapa de más, no de menos):
+// solo lo claramente ajeno (otra salida, un prompt) cierra la tabla. keep: línea de la tabla que no es fila.
+func (s *Stream) tableRow(line string, f []string) (row, keep bool) {
 	switch s.table {
 	case "community":
-		if line[0] == ' ' || line[0] == '\t' || len(f) > 4 {
-			return false
-		}
-		// Las columnas van alineadas: «Eth1/1 up» o «switch# show run» no empiezan su 2.ª columna donde el encabezado.
-		return len(f) == 1 || len(f[0]) >= s.col-1 || fieldStart(line, 1) == s.col
+		// La 1.ª columna es la comunidad aunque las columnas no cuadren o vengan con tabuladores.
+		last := f[0][len(f[0])-1]
+		return len(f) <= 4 && last != '#' && last != '>', false
 	case "host":
-		return len(f) >= 6 && digits.MatchString(f[1])
+		// Entre host y host van «Use VRF:», «Source interface:», «Notification type:»… y separadores.
+		return len(f) >= 6 && digits.MatchString(f[1]), hostLabel.MatchString(line)
 	}
-	return len(f) >= 3 // isakmp: llavero, equipo y llave
+	return len(f) >= 3, false // isakmp: llavero, equipo y llave
 }
 
 // snmpTable enmascara las tablas de show snmp community (comunidad en la 1.ª columna) y show snmp host (SecName en la
@@ -335,7 +341,7 @@ func (s *Stream) snmpTable(line string) (string, bool) {
 	t := strings.TrimSpace(line)
 	switch {
 	case nxCommunityHead.MatchString(line):
-		s.table, s.rows, s.col = "community", 0, strings.Index(line, "Group")
+		s.table, s.rows = "community", 0
 		return line, true
 	case nxHostHead.MatchString(line):
 		s.table, s.rows = "host", 0
@@ -345,6 +351,8 @@ func (s *Stream) snmpTable(line string) (string, bool) {
 		return line, true
 	case s.table == "":
 		return "", false
+	case s.table == "host" && dashes.MatchString(t):
+		return line, true // los separadores entre hosts no cierran la tabla
 	case t == "" || dashes.MatchString(t):
 		if s.rows > 0 {
 			s.table = "" // fin de la tabla
@@ -353,24 +361,32 @@ func (s *Stream) snmpTable(line string) (string, bool) {
 		return line, true // línea en blanco o separador entre el encabezado y las filas
 	}
 	f := strings.Fields(line)
-	if !s.tableRow(line, f) {
+	row, keep := s.tableRow(line, f)
+	if keep {
+		return maskLine(line, "", s.counts), true
+	}
+	if !row {
 		s.table = ""
 		return "", false
 	}
 	s.rows++
+	line = maskLine(line, "", s.counts) // la fila también pasa por las reglas
+	if f = strings.Fields(line); len(f) == 0 {
+		return line, true
+	}
 	switch {
 	case s.table == "community" && !strings.HasPrefix(f[0], "<MASKED:"):
 		s.counts["snmp-community"]++
 		line = strings.Replace(line, f[0], "<MASKED:snmp-community>", 1)
-	case s.table == "host" && (f[2] == "v1" || f[2] == "v2c") && !strings.HasPrefix(f[len(f)-1], "<MASKED:"):
+	case s.table == "host" && len(f) >= 3 && (f[2] == "v1" || f[2] == "v2c") && !strings.HasPrefix(f[len(f)-1], "<MASKED:"):
 		s.counts["snmp-community"]++
 		i := strings.LastIndex(line, f[len(f)-1])
 		line = line[:i] + "<MASKED:snmp-community>" + line[i+len(f[len(f)-1]):]
-	case s.table == "isakmp" && !strings.HasPrefix(f[2], "<MASKED:"):
+	case s.table == "isakmp" && len(f) >= 3 && !strings.HasPrefix(f[2], "<MASKED:"):
 		s.counts["psk"]++
 		line = line[:fieldStart(line, 2)] + "<MASKED:psk>"
 	}
-	return maskLine(line, "", s.counts), true
+	return line, true
 }
 
 // Prompted enmascara una línea tecleada o repetida tras un prompt (sin sangría). El bloque lo da
@@ -393,9 +409,15 @@ func (s *Stream) Prompted(line, block string) string {
 // archiveLog: línea de show archive log config; tras «|» va un comando de configuración.
 var archiveLog = regexp.MustCompile(`^(\s*\d+\s+\d+\s+\S+\s+\|)(.*)$`)
 
+// loggedCmd: mensaje de syslog (%PARSER-5-CFGLOG_LOGGEDCMD) con el comando de configuración tras «logged command:».
+var loggedCmd = regexp.MustCompile(`^(.*logged command:)(.*)$`)
+
 // maskLine aplica reglas hasta que ninguna cambie la línea: una línea puede traer
 // varios secretos (snmp-server user … auth X priv Y).
 func maskLine(line, block string, counts map[string]int) string {
+	if m := loggedCmd.FindStringSubmatch(line); m != nil {
+		return m[1] + maskLine(m[2], "", counts)
+	}
 	if m := archiveLog.FindStringSubmatch(line); m != nil {
 		return m[1] + maskLine(m[2], "", counts)
 	}
@@ -450,11 +472,11 @@ func isGuard(v string) bool {
 var freeText = regexp.MustCompile(`^\s*(?:\d+\s+)?(?:description|remark)\s`)
 
 // Credenciales en una URL (scp://usuario:CLAVE@host/…) en cualquier línea, también en logs.
-var urlPassword = regexp.MustCompile(`([a-z][a-z0-9+.-]*://[^/\s:@]+:)([^/\s]+)@`)
+var urlPassword = regexp.MustCompile(`([a-z][a-z0-9+.-]*://[^/\s:@]+:)(\S+)@`)
 
 // Forma genérica <palabra de secreto> <tipo de cifrado> <valor> en cualquier posición: tapa lo que ninguna regla por
 // comando conoce (0 claro; 3, 4, 5, 6, 7, 8 y 9 cifrados o con hash).
-var genericHead = regexp.MustCompile(`(?:^|\s)(?:password|secret|key|key-string|server-key|authentication-key|pre-shared-key|hex-key|key-octet-string) [03-9] `)
+var genericHead = regexp.MustCompile(`(?:^|[\s-])(?:password|secret|key|key-string|server-key|authentication-key|pre-shared-key|hex-key|key-octet-string) [03-9] `)
 
 func maskGeneric(line string, counts map[string]int) string {
 	var out strings.Builder

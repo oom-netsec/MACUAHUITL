@@ -236,6 +236,29 @@ var huecoCases = []huecoCase{
 	{"User: monitor\n security model: v3 priv", "User: monitor\n security model: v3 priv"},
 	{" description password 0 two words", " description password 0 two words"},
 	{" 10 remark key 7 0822", " 10 remark key 7 0822"},
+	// Segunda pasada: syslog, palabras con guion, EzVPN cliente, OSPFv3 por área, l2tp, URL con «/» y pares tras tipo 0.
+	{"%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:username bob secret Cl4ve", "%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:username bob secret <MASKED:user-secret>"},
+	{"%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:snmp-server community Cl4ve RO", "%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:snmp-server community <MASKED:snmp-community> RO"},
+	{"%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:tacacs-server key Cl4ve", "%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:tacacs-server key <MASKED:tacacs-key>"},
+	{"%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:interface Gi1", "%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:interface Gi1"},
+	{" local-key 0 Cl4ve", " local-key 0 <MASKED:secret>"},
+	{" pac-password 0 Cl4ve", " pac-password 0 <MASKED:secret>"},
+	{" monkey 5 abc", " monkey 5 abc"},
+	{" group G1 key Cl4ve", " group G1 key <MASKED:psk>"},
+	{" group 14", " group 14"},
+	{" area 0 authentication ipsec spi 256 sha1 0123456789ABCDEF0123456789ABCDEF01234567", " area 0 authentication ipsec spi 256 sha1 <MASKED:ospf-key>"},
+	{" area 0 encryption ipsec spi 256 esp aes-cbc 128 AABBCCDDEEFF00112233445566778899 sha1 0123456789ABCDEF0123456789ABCDEF01234567", " area 0 encryption ipsec spi 256 esp aes-cbc 128 <MASKED:ospf-key> sha1 <MASKED:ospf-key>"},
+	{" area 1 virtual-link 2.2.2.2 authentication ipsec spi 256 md5 0123456789ABCDEF0123456789ABCDEF", " area 1 virtual-link 2.2.2.2 authentication ipsec spi 256 md5 <MASKED:ospf-key>"},
+	{" area 0 authentication message-digest", " area 0 authentication message-digest"},
+	{" area 0 encryption disable", " area 0 encryption disable"},
+	{" l2tp tunnel password Cl4ve", " l2tp tunnel password <MASKED:l2tp-password>"},
+	{" l2tp tunnel timeout 30", " l2tp tunnel timeout 30"},
+	{"ap dot1x username u password Cl4ve", "ap dot1x username u password <MASKED:dot1x-password>"},
+	{"ap dot1x max-sessions 5", "ap dot1x max-sessions 5"},
+	{" path scp://u:Cl4/ve@h/x", " path scp://u:<MASKED:url-password>@h/x"},
+	{"crypto isakmp key 0 Cl4ve address 0.0.0.0", "crypto isakmp key 0 <MASKED:psk> address 0.0.0.0"},
+	{"crypto isakmp key 0 Cl4ve hostname peer.example no-xauth", "crypto isakmp key 0 <MASKED:psk> hostname peer.example no-xauth"},
+	{"crypto isakmp key 0 two words address 10.0.0.1 no-xauth", "crypto isakmp key 0 <MASKED:psk> address 10.0.0.1 no-xauth"},
 }
 
 func applyOnce(in string) string {
@@ -324,7 +347,7 @@ func TestTablasSNMPSeCierran(t *testing.T) {
 		t.Errorf("la fila no pasó por maskLine:\n%s", got)
 	}
 	// Una línea sin forma de fila cierra la tabla y sigue por las reglas.
-	for _, l := range []string{"Cisco Nexus Operating System (NX-OS) Software\n", "Eth1/1 up\n", "show version\n", "switch# show run\n"} {
+	for _, l := range []string{"Cisco Nexus Operating System (NX-OS) Software\n", "switch# show run\n"} {
 		got, _ := run(head, row, l, "username admin password 5 HASH role x\n")
 		if !strings.Contains(got, l) || !strings.Contains(got, "username admin password 5 <MASKED:user-secret> role x") {
 			t.Errorf("la línea %q no cerró la tabla:\n%s", l, got)
@@ -335,6 +358,19 @@ func TestTablasSNMPSeCierran(t *testing.T) {
 		if !strings.Contains(got, l) || strings.Contains(got, "Cl4ve") {
 			t.Errorf("la tabla de hosts no se cerró con %q:\n%s", l, got)
 		}
+	}
+	// Una fila desalineada o separada por tab sigue siendo fila: la comunidad es la 1.ª columna.
+	for _, r := range []string{"MARKER-X network-operator\n", "MARKER-X\tnetwork-operator\n", "MARKER-X\n"} {
+		if got, _ := run(head, row, r); strings.Contains(got, "MARKER-X") {
+			t.Errorf("fila %q en claro:\n%s", r, got)
+		}
+	}
+	// Tabla de hosts con varios hosts separados por líneas «Use VRF:» y separadores: todos se tapan.
+	hosts := []string{hhead, hrow, "    Use VRF: management\n", "    Source interface: Lo0\n", "-------------------------------------------------------------------\n",
+		"10.1.1.2                        162  v2c      noauth trap   MARKER-H2\n", "    Notification type: trap\n",
+		"10.1.1.3                        162  v1       noauth trap   MARKER-H3\n", "\n", "10.1.1.4 x\n"}
+	if got, c := run(hosts...); strings.Contains(got, "MARKER") || c["snmp-community"] != 3 || !strings.Contains(got, "Use VRF: management") || !strings.Contains(got, "10.1.1.4 x") {
+		t.Errorf("hosts (%v):\n%s", c, got)
 	}
 	// En blanco o separador (con filas ya vistas) cierra; las filas pasan por maskLine.
 	for _, sep := range []string{"\n", "-----------\n"} {
