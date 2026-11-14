@@ -93,6 +93,7 @@ type Vault struct {
 	onLock   []func() // se llaman al cerrarse de forma interactiva, ya sin v.mu
 	// Solo los respaldos: toleran un sistema de archivos sin permisos (vfat) y anotan que no se pudo poner 0600.
 	lenient, noPerms bool
+	bakSynced        bool // el .bak ya se puso al día en este arranque (syncOldBak)
 }
 
 // Create crea una bóveda nueva en path y la deja desbloqueada.
@@ -215,7 +216,28 @@ func (v *Vault) Unlock(master []byte) error {
 		dek.Destroy()
 	}
 	v.unlocked = true
+	v.syncOldBak()
 	return nil
+}
+
+// syncOldBak migra un .bak dejado por versiones anteriores (puede traer credenciales borradas, secretos viejos o
+// la DEK sellada con una contraseña anterior): lo reescribe con el estado vigente, una vez por arranque. Si no
+// se puede, sigue sin él (no impide desbloquear) y lo reintenta en el siguiente Unlock. Requiere v.mu.
+func (v *Vault) syncOldBak() {
+	if v.bakSynced {
+		return
+	}
+	if _, err := os.Stat(v.path + ".bak"); err != nil {
+		v.bakSynced = true
+		return
+	}
+	var noPerms *bool
+	if v.lenient {
+		noPerms = &v.noPerms
+	}
+	if writeAtomicOpt(v.path+".bak", marshalFile(v.hdr, v.entries), noPerms) == nil {
+		v.bakSynced = true
+	}
 }
 
 func (v *Vault) entryAAD(id [16]byte) []byte {
@@ -435,12 +457,12 @@ func (v *Vault) ChangeMasterPassword(old, new []byte) error {
 		v.hdr = prev
 		return err
 	}
-	if err := v.persist(); err != nil {
+	// El .bak se escribe antes y con la DEK ya sellada con la contraseña nueva: nunca queda uno que abra con la vieja.
+	if err := v.persistReplacingBak(); err != nil {
 		v.hdr = prev
 		return err
 	}
-	// El respaldo tenía la DEK sellada con la contraseña vieja; se reemplaza.
-	return writeAtomic(v.path+".bak", marshalFile(v.hdr, v.entries))
+	return nil
 }
 
 // persist respalda el archivo vigente en .bak y escribe el nuevo, ambos de forma atómica.

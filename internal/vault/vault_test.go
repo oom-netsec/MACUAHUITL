@@ -488,3 +488,54 @@ func TestPutReemplazaElSecretoEnElBak(t *testing.T) {
 		t.Fatalf("el .bak conserva el secreto anterior: %v", err)
 	}
 }
+
+// ChangeMasterPassword escribe el .bak antes que la bóveda: el .bak no abre con la contraseña vieja y, si falla
+// la escritura de la bóveda, la contraseña vieja sigue valiendo.
+func TestCambioDeContrasenaNoDejaBakConLaVieja(t *testing.T) {
+	v, p := newVault(t)
+	v.Put(cred("a", "x", ""))
+	fallaLaNEsima(t, 2)
+	if err := v.ChangeMasterPassword(pw("maestra"), pw("nueva")); err == nil {
+		t.Fatal("debía fallar")
+	}
+	chmod = func(f *os.File, m os.FileMode) error { return f.Chmod(m) }
+	if err := v.ChangeMasterPassword(pw("maestra"), pw("nueva")); err != nil {
+		t.Fatalf("la contraseña vieja debía seguir valiendo: %v", err)
+	}
+	b, _ := Open(p + ".bak")
+	if err := b.Unlock(pw("maestra")); !errors.Is(err, ErrWrongPassword) {
+		t.Fatalf(".bak abre con la vieja: %v", err)
+	}
+}
+
+// Un .bak dejado por una versión anterior (credencial borrada, DEK con la contraseña vieja) se reescribe al
+// desbloquear, una vez por arranque.
+func TestUnlockMigraElBakViejo(t *testing.T) {
+	v, p := newVault(t)
+	a, _ := v.Put(cred("a", "x", ""))
+	v.Put(cred("b", "y", ""))
+	viejo, _ := os.ReadFile(p) // con a
+	v.Delete(a)
+	v.ChangeMasterPassword(pw("maestra"), pw("nueva"))
+	os.WriteFile(p+".bak", viejo, 0o600) // lo que dejaba la versión anterior
+	w, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Unlock(pw("nueva")); err != nil {
+		t.Fatal(err)
+	}
+	b, err := Open(p + ".bak")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Unlock(pw("maestra")); !errors.Is(err, ErrWrongPassword) {
+		t.Fatalf(".bak aún abre con la contraseña vieja: %v", err)
+	}
+	if err := b.Unlock(pw("nueva")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Get(a); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("el .bak aún trae la borrada: %v", err)
+	}
+}
