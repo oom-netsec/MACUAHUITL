@@ -26,6 +26,9 @@ type LoginResult struct {
 	Fingerprint    string
 }
 
+// Hostport es el host:puerto de un equipo tal como lo muestran el Login Test y los eventos (IPv6 entre corchetes).
+func Hostport(t Target) string { return hostport(t) }
+
 func hostport(t Target) string {
 	if a, err := netip.ParseAddr(t.Address); err == nil {
 		return netip.AddrPortFrom(a, port(t)).String()

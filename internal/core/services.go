@@ -432,9 +432,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	return &v1.ArmJobResponse{WindowEndsAt: timestamppb.New(until), MissingInhibitors: missing}, nil
 }
 
-func patrolHostport(t patrol.Target) string {
-	return fmt.Sprintf("%s:%d", t.Address, patrol.EffectivePort(t.Port))
-}
+func patrolHostport(t patrol.Target) string { return patrol.Hostport(t) }
 
 // watch empaqueta cada ronda y cierra el trabajo al terminar.
 func (c *Core) watch(j *job, events <-chan engine.Event, cancel func()) {
