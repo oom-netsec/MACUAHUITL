@@ -272,8 +272,11 @@ func checkFamily(cmd string, head func(cmd string, fields []string) error) error
 			return denied(cmd, "playbook.why.pipe_sink")
 		}
 		for _, tok := range f {
-			if remotePath(tok) || asaDevicePath.MatchString(tok) {
+			if remotePath(tok) {
 				return denied(cmd, "playbook.why.remote")
+			}
+			if asaDevicePath.MatchString(tok) {
+				return denied(cmd, "playbook.why.local_path")
 			}
 		}
 	}
