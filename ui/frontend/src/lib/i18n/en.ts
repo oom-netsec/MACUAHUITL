@@ -519,7 +519,7 @@ export const en: Record<Key, string> = {
   "visibility.anyIf": "Listen on all interfaces (0.0.0.0)",
   "visibility.topo.src": "Patrol job or output folder (ID or absolute path)",
   "visibility.topo.pcap": "Capture with CDP/LLDP (optional, absolute path)",
-  "visibility.topo.note": "Use the \"L2 · Topología (CDP, LLDP, STP, port-channels)\" playbook in Patrol: show cdp|lldp neighbors detail, show spanning-tree and show etherchannel summary.",
+  "visibility.topo.note": "Use the \"L2 · Topology (CDP, LLDP, STP, port-channels)\" playbook in Patrol: show cdp|lldp neighbors detail, show spanning-tree and show etherchannel summary.",
   "visibility.topo.build": "Build",
   "visibility.topo.exportSvg": "Export SVG",
   "visibility.topo.exportJson": "Export JSON",
@@ -1924,7 +1924,7 @@ export const en: Record<Key, string> = {
   "snippet.modo-puerto.field.interfaces": "Ports",
   "snippet.modo-puerto.field.interfaces.help": "Comma-separated list or ranges like Gi1/0/1-4; physical access ports only.",
   "snippet.modo-puerto.field.mode": "Mode",
-  "snippet.modo-puerto.field.mode.help": "fabrica = no switchport mode (the factory default, dynamic auto on an access Catalyst). Never trunk.",
+  "snippet.modo-puerto.field.mode.help": "Factory default = no switchport mode (dynamic auto on an access Catalyst). Never trunk.",
   // Syslog receiver: options, status and drops (phase 19q).
   "syslog.opts": "Options",
   "syslog.opts.flood": "Flood protection",
