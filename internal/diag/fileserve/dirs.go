@@ -40,8 +40,14 @@ var homeDir = func() (string, error) {
 func denyList(extra []string) []string {
 	out := append([]string(nil), sensitiveDirs...)
 	if home, err := homeDir(); err == nil {
-		for _, h := range sensitiveHome {
-			out = append(out, filepath.Join(home, h))
+		homes := []string{home}
+		if r, err := evalSymlinks(home); err == nil && r != home { // $HOME bajo un enlace: la ruta real es la que se elige
+			homes = append(homes, r)
+		}
+		for _, hm := range homes {
+			for _, h := range sensitiveHome {
+				out = append(out, filepath.Join(hm, h))
+			}
 		}
 	}
 	// Config y datos XDG enteros (autostart/, systemd/user, applications/ cargan y ejecutan lo que haya), aunque
