@@ -111,7 +111,7 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 func byCommand(b *Bundle, dev string, round int) map[string]string {
 	out := map[string]string{}
 	for _, s := range b.Sections {
-		if s.Device == dev && s.Round == round && !s.Invalid {
+		if s.Device == dev && s.Round == round && !s.Invalid && !s.Incomplete {
 			if _, ok := out[normCmd(s.Command)]; !ok {
 				out[normCmd(s.Command)] = s.Text
 			}
