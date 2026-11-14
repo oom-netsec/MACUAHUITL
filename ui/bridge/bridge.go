@@ -442,6 +442,18 @@ func (b *Bridge) open(jobID string) error {
 			}
 			raw, _ := protojson.Marshal(e)
 			b.emit("core:event", json.RawMessage(raw))
+			switch e.GetJobStateChanged().GetState() {
+			case "completed", "cancelled", "failed":
+				// El trabajo terminó: no habrá más eventos. Se cierra el stream y se borra del mapa (si otro open
+				// no lo reemplazó) para que ni se acumulen ni resubscribe reabra un trabajo terminado.
+				b.mu.Lock()
+				if b.streams[jobID] == me {
+					delete(b.streams, jobID)
+				}
+				b.mu.Unlock()
+				cancel()
+				return
+			}
 		}
 	}()
 	return nil
