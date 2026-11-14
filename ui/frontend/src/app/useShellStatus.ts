@@ -38,12 +38,10 @@ export function useShellStatus(core: CoreAPI, everyMs = 15_000): ShellStatus {
     window.addEventListener("focus", refresh);
     const offA = core.onAssist((e) => { if (e.kind === "state") refresh(); }); // no por cada línea de salida
     const offD = core.onAssistDone((e) => {
-      // Terminó: el dueño ya no hace falta y la clave no se acumula. Un corte del stream (error) no es el fin de la ejecución: se conserva.
-      // Un done de más puede llegar con la ejecución viva (watch reemplazado): solo se borra si el núcleo ya no la tiene activa.
-      if (!e.error) void core.assistListRuns().then((rs) => {
-        if (rs.some((x) => x.runId === e.runId && x.active)) return;
-        try { localStorage.removeItem(assistOwnerKey(e.runId)); } catch { /* sin almacenamiento */ }
-      }, () => {});
+      // El dueño se borra cuando la ejecución ya no está activa en el núcleo (terminó, o el núcleo se reinició y no la tiene). Un done con
+      // error con la ejecución viva es solo el corte del stream: se conserva (la vista se vuelve a enganchar). Sin respuesta, decide el error.
+      const drop = () => { try { localStorage.removeItem(assistOwnerKey(e.runId)); } catch { /* sin almacenamiento */ } };
+      void core.assistListRuns().then((rs) => { if (!rs.some((x) => x.runId === e.runId && x.active)) drop(); }, () => { if (!e.error) drop(); });
       refresh();
     });
     const offV = onVaultChanged(refresh);

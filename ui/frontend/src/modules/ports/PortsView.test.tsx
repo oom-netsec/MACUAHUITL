@@ -136,8 +136,8 @@ test("al montarse se engancha a una ejecución viva y pide la confirmación pend
   expect(await screen.findByText(/Listo: el cambio/)).toBeInTheDocument();
 });
 
-// Un assist:done de más (el watch se reemplazó en el mismo instante) con la ejecución todavía viva no cierra la vista.
-test("un done de más con la ejecución aún activa en el núcleo deja el paso pendiente a la vista", async () => {
+// Un done con error con la ejecución viva es el corte del stream (IPC, transporte): la vista se vuelve a enganchar y no se congela.
+test("un corte del stream con la ejecución viva vuelve a engancharse y conserva el paso pendiente", async () => {
   const step = { id: "save-1", kind: "save", device: "SW1", lines: ["write memory"] };
   const core = fakeCore({
     listCredentials: vi.fn(async () => creds),
@@ -145,9 +145,26 @@ test("un done de más con la ejecución aún activa en el núcleo deja el paso p
   });
   render(<PortsView core={core} />);
   await screen.findByRole("region", { name: "Paso pendiente save-1" });
-  await act(async () => core.emitAssistDone({ runId: "r9" }));
-  expect(screen.getByRole("region", { name: "Paso pendiente save-1" })).toBeInTheDocument();
+  await act(async () => core.emitAssistDone({ runId: "r9", error: "stream cortado" }));
+  await waitFor(() => expect(core.assistWatch).toHaveBeenCalledTimes(2));
+  // El núcleo repite desde seq 0: el estado vuelve a armarse y el paso pendiente sigue ahí.
+  act(() => { core.emitAssist({ runId: "r9", kind: "state", state: "running" }); core.emitAssist({ runId: "r9", seq: 1, kind: "pending", state: "waiting-confirm", step }); });
+  expect(await screen.findByRole("region", { name: "Paso pendiente save-1" })).toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("MODO ASISTIDO ACTIVO");
+});
+
+test("si no se puede preguntar al núcleo, un done cierra la vista como siempre", async () => {
+  const step = { id: "save-1", kind: "save", device: "SW1", lines: ["write memory"] };
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => creds),
+    assistListRuns: vi.fn().mockResolvedValueOnce([{ runId: "r9", state: "waiting-confirm", active: true, waiting: true, canRollback: true, pending: step, changed: ["SW1"] }])
+      .mockRejectedValue(new Error("x")),
+  });
+  render(<PortsView core={core} />);
+  await screen.findByRole("region", { name: "Paso pendiente save-1" });
+  await act(async () => core.emitAssistDone({ runId: "r9" }));
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Paso pendiente save-1" })).toBeNull());
+  expect(core.assistWatch).toHaveBeenCalledTimes(1);
 });
 
 test("al montarse con una ejecución detenida por fallo ofrece la reversa o abortar", async () => {

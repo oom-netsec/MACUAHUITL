@@ -166,6 +166,8 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
 
   useEffect(() => setArmed(false), [plan]);
   useEffect(() => { onActive(!!run?.active); }, [run?.active, onActive]);
+  const onErrorRef = useRef(onError); // el suscriptor de eventos vive todo el montaje: usa siempre el onError vigente
+  onErrorRef.current = onError;
 
   useEffect(() => {
     const off1 = core.onAssist((e: AssistEvent) => {
@@ -196,10 +198,15 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
     });
     const off2 = core.onAssistDone(async (e) => {
       if (e.runId !== runId.current) return;
-      // Un done puede llegar de más (el watch se reemplazó en el mismo instante en que terminó el anterior): si el núcleo dice que la
-      // ejecución sigue viva, no se cierra en la vista (perdería el paso pendiente). Si no se puede preguntar, se cierra como siempre.
+      // Un done con error puede ser solo el corte del stream (IPC, transporte) con la ejecución viva en el núcleo: entonces se vuelve a
+      // enganchar (el núcleo repite desde seq 0) en lugar de cerrar la vista y perder el paso pendiente. Si no se puede preguntar, se cierra.
       const alive = await core.assistListRuns().then((rs) => rs.some((x) => x.runId === e.runId && x.active), () => false);
-      if (alive || e.runId !== runId.current) return;
+      if (e.runId !== runId.current) return;
+      if (alive) {
+        lastSeq.current = 0;
+        core.assistWatch(e.runId).catch((err) => onErrorRef.current(errorText(err)));
+        return;
+      }
       setRun((r) => (r ? { ...r, active: false, pending: null, stopped: false, failReason: r.failReason || e.error || "" } : r));
     });
     return () => { off1(); off2(); };
