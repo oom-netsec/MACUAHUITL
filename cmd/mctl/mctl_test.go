@@ -78,11 +78,31 @@ func startCoreWith(t *testing.T, prepare func(core.Paths)) *env {
 	return &env{out: p.Outputs, target: addr}
 }
 
-func mctl(t *testing.T, stdin string, args ...string) (string, error) {
+// mctlRaw corre mctl tal cual: sin --lang, en inglés (el idioma canónico).
+func mctlRaw(t *testing.T, stdin string, args ...string) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
 	err := run(args, strings.NewReader(stdin), &out)
 	return out.String(), err
+}
+
+func mustRaw(t *testing.T, stdin string, args ...string) string {
+	t.Helper()
+	out, err := mctlRaw(t, stdin, args...)
+	if err != nil {
+		t.Fatalf("mctl %v: %v\n%s", args, err, out)
+	}
+	return out
+}
+
+// mctl pide el español explícito (--lang es) salvo que los argumentos ya traigan --lang: las pruebas de regresión en
+// español comparan con sus textos de siempre.
+func mctl(t *testing.T, stdin string, args ...string) (string, error) {
+	t.Helper()
+	if len(args) == 0 || !strings.HasPrefix(strings.TrimLeft(args[0], "-"), "lang") {
+		args = append([]string{"--lang", "es"}, args...)
+	}
+	return mctlRaw(t, stdin, args...)
 }
 
 func must(t *testing.T, stdin string, args ...string) string {

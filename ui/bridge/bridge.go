@@ -74,9 +74,9 @@ func (b *Bridge) client() (*ipc.ClientConn, error) {
 }
 
 // disconnected es ErrDisconnected en el idioma ya conocido de la app (sin núcleo no se puede leer la preferencia: si
-// no se había leído, es). errors.Is(err, ErrDisconnected) sigue valiendo.
+// no se había leído, en). errors.Is(err, ErrDisconnected) sigue valiendo.
 func (b *Bridge) disconnected() error {
-	loc := i18n.Es
+	loc := i18n.Locale(context.Background())
 	b.lang.mu.Lock()
 	if b.Localize && b.lang.loaded {
 		loc = b.lang.value

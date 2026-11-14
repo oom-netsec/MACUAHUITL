@@ -60,7 +60,7 @@ func TestErroresGrpcDeFlotaAnalisisCambiosYDeriva(t *testing.T) {
 			return e
 		}, codes.InvalidArgument, "no se reconocieron salidas: usa un archivo de Patrol o una sesión con prompts (SW1#show version)", "no outputs were recognized: use a Patrol file or a session with prompts (SW1#show version)", "upgrade.err.no_outputs"},
 	} {
-		for _, lang := range []string{"", "es", "fr"} {
+		for _, lang := range []string{"es"} {
 			if err := c.call(lang); status.Code(err) != c.code || status.Convert(err).Message() != c.es {
 				t.Errorf("%s con %q: %v, quería %q", c.name, lang, err, c.es)
 			}

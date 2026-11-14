@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/pack/packtest"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -27,6 +28,7 @@ import (
 func TestMain(m *testing.M) {
 	vault.MinMemoryKiB = 8192
 	// Las pruebas viven bajo /tmp (1777): sus ancestros se dan por seguros; la regla real la prueba prefs.
+	i18n.SetDefault(i18n.Es) // estas pruebas comparan textos en español; el idioma por omisión de la app es el inglés
 	service.AncestorInfo = func(string) (os.FileMode, uint32, error) { return 0o755, uint32(os.Getuid()), nil }
 	os.Exit(m.Run())
 }

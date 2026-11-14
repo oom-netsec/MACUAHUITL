@@ -12,6 +12,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n/i18ntest"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
@@ -68,12 +69,14 @@ func info(t *testing.T, err error) (*errdetails.ErrorInfo, *errdetails.Localized
 	return ei, lm
 }
 
-// Sin metadato o con es, el mensaje es el de siempre; con en sale en inglés; un idioma desconocido da es.
+// Con es, el mensaje es el de siempre; con en sale en inglés; sin metadato o con un idioma desconocido sale en inglés
+// (el canónico).
 func TestInterceptorIdioma(t *testing.T) {
+	i18ntest.Default(t, "en")
 	c := conn(t)
 	for _, tc := range []struct{ md, want, loc string }{
-		{"", "el archivo ya existe", "es"}, {"es", "el archivo ya existe", "es"}, {"es-MX", "el archivo ya existe", "es"},
-		{"fr", "el archivo ya existe", "es"}, {"en", "the file already exists", "en"}, {"en-US,en;q=0.9", "the file already exists", "en"},
+		{"", "the file already exists", "en"}, {"es", "el archivo ya existe", "es"}, {"es-MX", "el archivo ya existe", "es"},
+		{"fr", "the file already exists", "en"}, {"en", "the file already exists", "en"}, {"en-US,en;q=0.9", "the file already exists", "en"},
 		{"fr;q=0.9, en;q=0.5", "the file already exists", "en"},
 	} {
 		ctx := context.Background()

@@ -168,12 +168,12 @@ func guionesCasos(t *testing.T, ctx context.Context) map[string]string {
 }
 
 func TestGuionesRegresionEs(t *testing.T) {
-	base := guionesCasos(t, context.Background())
+	base := guionesCasos(t, i18n.WithLocale(context.Background(), "es"))
 	i18ntest.Golden(t, "testdata/guiones_es.golden.json", base)
-	for _, loc := range []string{"es", "es-MX", "fr"} {
-		for k, v := range guionesCasos(t, i18n.WithLocale(context.Background(), loc)) {
+	for _, loc := range []string{"es", "es-MX"} {
+		for k, v := range guionesCasos(t, i18n.WithLocale(i18n.WithLocale(context.Background(), "es"), loc)) {
 			if base[k] != v {
-				t.Errorf("%s con %q difiere de sin idioma", k, loc)
+				t.Errorf("%s con %q difiere de es", k, loc)
 			}
 		}
 	}
@@ -185,7 +185,7 @@ func TestGuionesEnIngles(t *testing.T) {
 	es := regexp.MustCompile(`[áéíóúñ¿]|\b(el|la|los|las|de|del|con|sin|para|solo|hay|ya|falta|una|un)\b`)
 	ids := regexp.MustCompile(`lib-[a-z0-9-]+|ios-xe/[a-z0-9-]+`)
 	en := i18n.WithLocale(context.Background(), "en")
-	base := guionesCasos(t, context.Background())
+	base := guionesCasos(t, i18n.WithLocale(context.Background(), "es"))
 	for k, v := range guionesCasos(t, en) {
 		if k == "biblioteca" {
 			var got, was []string

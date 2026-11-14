@@ -149,12 +149,12 @@ type getManyStream struct {
 func (g *getManyStream) Context() context.Context { return g.ctx }
 
 func TestTransferenciasRegresionEs(t *testing.T) {
-	base := transferenciaCasos(t, context.Background())
+	base := transferenciaCasos(t, i18n.WithLocale(context.Background(), "es"))
 	i18ntest.Golden(t, "testdata/transferencias_es.golden.json", base)
-	for _, loc := range []string{"es", "es-MX", "fr"} {
-		for k, v := range transferenciaCasos(t, i18n.WithLocale(context.Background(), loc)) {
+	for _, loc := range []string{"es", "es-MX"} {
+		for k, v := range transferenciaCasos(t, i18n.WithLocale(i18n.WithLocale(context.Background(), "es"), loc)) {
 			if base[k] != v {
-				t.Errorf("%s con %q difiere de sin idioma: %q vs %q", k, loc, v, base[k])
+				t.Errorf("%s con %q difiere de es: %q vs %q", k, loc, v, base[k])
 			}
 		}
 	}
@@ -163,7 +163,7 @@ func TestTransferenciasRegresionEs(t *testing.T) {
 // Con en, los errores, el informe y los motivos de rechazo salen en inglés, sin español.
 func TestTransferenciasEnSinEspanol(t *testing.T) {
 	es := regexp.MustCompile(`[áéíóúñ¿]|\b(el|la|los|las|de|del|con|sin|para|solo|hay|ya|falta|una|un|abre|usa|indica|tope|máximo|bytes en|guardado|permitido)\b`)
-	base := transferenciaCasos(t, context.Background())
+	base := transferenciaCasos(t, i18n.WithLocale(context.Background(), "es"))
 	for k, v := range transferenciaCasos(t, i18n.WithLocale(context.Background(), "en")) {
 		if v == base[k] && strings.HasPrefix(v, "ERROR") && !strings.Contains(v, "HTTP 40") && k != "get_ruta_larga" && k != "servidor_archivo_no_existe" {
 			t.Errorf("%s: en igual a es: %s", k, v)
