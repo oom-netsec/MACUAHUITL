@@ -1392,7 +1392,7 @@ export const en: Record<Key, string> = {
   "patrol.metrics.err.crc": "CRC of {device} per round",
   "patrol.metrics.err.resets": "Resets of {device} per round",
   "patrol.metrics.err.none": "No growth between rounds in this counter.",
-  "patrol.metrics.err.note": "Each point is the counter difference from the previous round.",
+  "patrol.metrics.err.note": "Each point is the counter delta from the previous round.",
   "patrol.grid.cpu": "CPU",
   "patrol.grid.cpuLabel": "CPU {device}",
   "patrol.package.title": "Output archive",
