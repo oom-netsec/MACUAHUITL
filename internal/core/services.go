@@ -618,6 +618,19 @@ func (s *patrolSvc) GetRun(ctx context.Context, r *v1.GetRunRequest) (*v1.GetRun
 
 // ---- Eventos ----
 
+// finishedStates da el estado final (completed, cancelled o failed) de los trabajos de ids que ya terminaron.
+func (c *Core) finishedStates(ids []string) map[string]string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := map[string]string{}
+	for _, id := range ids {
+		if j, ok := c.jobs[id]; ok && (j.state == "completed" || j.state == "cancelled" || j.state == "failed") {
+			out[id] = j.state
+		}
+	}
+	return out
+}
+
 type eventSvc struct {
 	v1.UnimplementedEventServiceServer
 	c *Core
@@ -627,6 +640,19 @@ func (s *eventSvc) Subscribe(r *v1.SubscribeRequest, st v1.EventService_Subscrib
 	ch, cancel := s.c.bus.Subscribe(r.JobIds)
 	defer cancel()
 	st.SendHeader(nil)
+	// Un trabajo que ya terminó no emitirá más: se manda su estado final y, si todos los pedidos terminaron, se
+	// cierra el stream (si no, el cliente lo dejaría abierto para siempre). Se suscribe antes de mirar el estado:
+	// un final que llegue en medio sale dos veces, no se pierde.
+	if done := s.c.finishedStates(r.JobIds); len(done) > 0 {
+		for id, state := range done {
+			if err := st.Send(&v1.SubscribeResponse{JobId: id, Event: &v1.SubscribeResponse_JobStateChanged{JobStateChanged: &v1.JobStateChanged{State: state}}}); err != nil {
+				return err
+			}
+		}
+		if len(done) == len(r.JobIds) {
+			return nil
+		}
+	}
 	for {
 		select {
 		case <-st.Context().Done():
