@@ -64,6 +64,7 @@ type harness struct {
 	stop   func()
 	p      Paths
 	o      Options
+	subs   map[string]v1.EventService_SubscribeClient // suscripciones tomadas por arm antes de armar, que waitJob consume
 }
 
 func transcripts() string {
@@ -196,10 +197,31 @@ func (h *harness) loginTest(t *testing.T, job string) []*v1.LoginTestResponse {
 	}
 }
 
+// subscribe se suscribe a los eventos de job y vuelve cuando el servidor ya registró la suscripción (manda los
+// encabezados después de registrarla): lo que se publique desde ahí no se pierde.
+func (h *harness) subscribe(t *testing.T, job string) v1.EventService_SubscribeClient {
+	t.Helper()
+	s, err := h.events.Subscribe(ctx(t), &v1.SubscribeRequest{JobIds: []string{job}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Header(); err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
 // arm crea el trabajo, corre el Login Test, acepta la huella y arma.
 func (h *harness) arm(t *testing.T, cred string) (string, *v1.ArmJobResponse) {
 	t.Helper()
-	cj, err := h.patrol.CreateJob(ctx(t), &v1.CreateJobRequest{Spec: h.spec(cred)})
+	return h.armSpec(t, h.spec(cred))
+}
+
+// armSpec es arm con un spec propio. Se suscribe antes de armar y waitJob usa esa suscripción: un trabajo que cierra
+// muy rápido ya no deja a waitJob esperando un cierre que se publicó antes de que él se suscribiera.
+func (h *harness) armSpec(t *testing.T, spec *v1.JobSpec) (string, *v1.ArmJobResponse) {
+	t.Helper()
+	cj, err := h.patrol.CreateJob(ctx(t), &v1.CreateJobRequest{Spec: spec})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,6 +229,10 @@ func (h *harness) arm(t *testing.T, cred string) (string, *v1.ArmJobResponse) {
 	if len(lt) != 1 || lt[0].FailedStep != v1.LoginTestStep_LOGIN_TEST_STEP_HOST_KEY || lt[0].HostKeyFingerprint == "" {
 		t.Fatalf("login test = %+v", lt)
 	}
+	if h.subs == nil {
+		h.subs = map[string]v1.EventService_SubscribeClient{}
+	}
+	h.subs[cj.JobId] = h.subscribe(t, cj.JobId)
 	ar, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: []string{lt[0].HostKeyFingerprint}})
 	if err != nil {
 		t.Fatal(err)
@@ -216,9 +242,11 @@ func (h *harness) arm(t *testing.T, cred string) (string, *v1.ArmJobResponse) {
 
 func (h *harness) waitJob(t *testing.T, job string, states ...string) []*v1.SubscribeResponse {
 	t.Helper()
-	s, err := h.events.Subscribe(ctx(t), &v1.SubscribeRequest{JobIds: []string{job}})
-	if err != nil {
-		t.Fatal(err)
+	s, ok := h.subs[job]
+	if ok {
+		delete(h.subs, job)
+	} else {
+		s = h.subscribe(t, job)
 	}
 	var evs []*v1.SubscribeResponse
 	for {
@@ -263,6 +291,25 @@ func actionsInOrder(t *testing.T, text string, actions ...string) {
 		}
 		pos += i + 1
 	}
+}
+
+// Un trabajo que cierra antes de que el llamador espere no puede dejar a waitJob sin su cierre.
+func TestWaitJobNoPierdeCierreRapido(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	job, _ := h.arm(t, cred)
+	for { // sondea hasta que el trabajo terminó (el evento closed sale tras empaquetar): waitJob solo puede verlo por la suscripción previa
+		l, err := h.patrol.ListJobs(ctx(t), &v1.ListJobsRequest{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(l.Jobs) == 1 && l.Jobs[0].State == "completed" {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	time.Sleep(time.Second) // empaquetar y publicar closed
+	h.waitJob(t, job, "closed")
 }
 
 func TestVaultLifecycleAudited(t *testing.T) {
