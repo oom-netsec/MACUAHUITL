@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -427,6 +428,18 @@ func (b *Bridge) open(jobID string) error {
 		b.mu.Unlock()
 	}
 	st, err := v1.NewEventServiceClient(c).Subscribe(ctx, &v1.SubscribeRequest{JobIds: []string{jobID}})
+	if err == nil {
+		// El núcleo manda los encabezados ya suscrito al bus: esperarlos asegura que no se pierde un evento publicado
+		// justo después (armed, la ronda 1). Un error del núcleo (NotFound) llega sin encabezados, en el primer Recv.
+		var md metadata.MD
+		if md, err = st.Header(); err == nil && md == nil {
+			if _, err = st.Recv(); err == nil || errors.Is(err, io.EOF) {
+				err = nil // terminó sin error ni eventos: no hay nada que vigilar
+				markDead()
+				return nil
+			}
+		}
+	}
 	if err != nil {
 		if ctx.Err() != nil { // otro open (resubscribe) lo reemplazó: el stream nuevo ya cubre el trabajo
 			return nil
