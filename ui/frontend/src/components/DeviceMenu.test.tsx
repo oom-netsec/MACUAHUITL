@@ -6,9 +6,9 @@ import type { CoreAPI } from "../lib/core";
 import { DeviceMenu } from "./DeviceMenu";
 import { ErrorState } from "./Page";
 
-function setup() {
+function setup(over = {}) {
   const go = vi.fn();
-  const core = fakeCore();
+  const core = fakeCore(over);
   render(<CoreContext.Provider value={core as unknown as CoreAPI}><NavContext.Provider value={{ go, inbox: {} }}>
     <DeviceMenu name="SW1-ACC-03" address="10.20.3.11"><span>SW1-ACC-03</span></DeviceMenu>
   </NavContext.Provider></CoreContext.Provider>);
@@ -60,4 +60,14 @@ test("el menú se dibuja en el body (fuera de contenedores con scroll o transfor
   setup();
   await userEvent.click(screen.getByRole("button", { name: "Acciones de SW1-ACC-03" }));
   expect(screen.getByRole("menu").parentElement).toBe(document.body);
+});
+
+test("si el portapapeles falla, copiar IP no deja un rechazo sin atrapar", async () => {
+  let caught: ReturnType<typeof vi.spyOn> | undefined;
+  const copyText = vi.fn(() => { const p = Promise.reject(new Error("sin portapapeles")); caught = vi.spyOn(p, "catch"); return p; });
+  setup({ copyText });
+  fireEvent.contextMenu(screen.getByText("SW1-ACC-03"));
+  await userEvent.click(screen.getByRole("menuitem", { name: "Copiar IP" }));
+  expect(copyText).toHaveBeenCalled();
+  expect(caught).toHaveBeenCalled(); // el rechazo se atrapa
 });

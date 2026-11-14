@@ -128,7 +128,7 @@ export function Console({ label, text, copy, onClear }: { label: string; text: s
     <div className="console-wrap">
       <div className="console-bar">
         <span>{label}</span>
-        <button type="button" className="quiet" disabled={!text} onClick={async () => { await copy(text); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>
+        <button type="button" className="quiet" disabled={!text} onClick={async () => { try { await copy(text); } catch { return; } setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>
           {copied ? t("common.copied") : t("common.copy")}
         </button>
         {onClear && <button type="button" className="quiet" disabled={!text} onClick={onClear}>{t("common.clear")}</button>}

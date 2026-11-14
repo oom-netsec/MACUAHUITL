@@ -8,6 +8,7 @@ import { CommandPalette, rememberRecent, type PaletteAction } from "./CommandPal
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { assistOwner, useShellStatus } from "./useShellStatus";
 import { Icon } from "../components/Icon";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { I18nProvider, useLang, useSetLang, useT } from "../lib/i18n";
 import { setTheme } from "../lib/theme";
 import { vaultChanged } from "../lib/vaultSignal";
@@ -34,6 +35,7 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
   // Un módulo visitado se queda montado (oculto) para no perder su salida ni sus tareas en vivo.
   const [visited, setVisited] = useState(() => new Set([start]));
   const [busy, setBusy] = useState<Set<string>>(new Set());
+  const busyCount = useRef(new Map<string, number>());
   const busySetters = useRef(new Map<string, (b: boolean) => void>());
   const [inbox, setInbox] = useState<Record<string, Delivery>>({});
   const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -67,12 +69,17 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
   const busySetter = (id: string) => {
     let f = busySetters.current.get(id);
     if (!f) {
-      f = (b) => setBusy((s) => {
-        if (s.has(id) === b) return s;
-        const n = new Set(s);
-        if (b) n.add(id); else n.delete(id);
-        return n;
-      });
+      // Contador por módulo: varios componentes pueden estar ocupados a la vez y el último en terminar no apaga a los demás.
+      f = (b) => {
+        const c = Math.max(0, (busyCount.current.get(id) ?? 0) + (b ? 1 : -1));
+        busyCount.current.set(id, c);
+        setBusy((s) => {
+          if (s.has(id) === c > 0) return s;
+          const n = new Set(s);
+          if (c > 0) n.add(id); else n.delete(id);
+          return n;
+        });
+      };
       busySetters.current.set(id, f);
     }
     return f;
@@ -183,7 +190,7 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
               {modules.filter((m) => visited.has(m.id)).map((m) => (
                 <div key={m.id} className="view" hidden={m.id !== current}>
                   <ModuleIdContext.Provider value={m.id}>
-                    <BusyContext.Provider value={busySetter(m.id)}><Suspense fallback={<Loading />}>{m.view(core)}</Suspense></BusyContext.Provider>
+                    <BusyContext.Provider value={busySetter(m.id)}><ErrorBoundary><Suspense fallback={<Loading />}>{m.view(core)}</Suspense></ErrorBoundary></BusyContext.Provider>
                   </ModuleIdContext.Provider>
                 </div>
               ))}

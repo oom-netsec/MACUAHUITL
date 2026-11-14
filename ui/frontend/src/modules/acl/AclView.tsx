@@ -47,7 +47,7 @@ export function AclView({ core }: { core: CoreAPI }) {
     return [String(i + 1), r.action, r.protocol, r.source, r.sourcePorts, r.destination, opts(r), f ? `${kind(f.kind)}: ${f.detail}` : ""];
   }) ?? [];
   const exportHead = ["#", t("acl.col.action"), t("acl.col.proto"), t("acl.col.src"), t("acl.col.srcPorts"), t("acl.col.dst"), t("acl.col.dstPorts"), t("acl.col.finding")];
-  const copy = async () => { await core.copyText(gen.data ?? ""); setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
+  const copy = async () => { try { await core.copyText(gen.data ?? ""); } catch { return; } setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
 
   return (
     <Page title={t("acl.title")} description={t("acl.desc")}>

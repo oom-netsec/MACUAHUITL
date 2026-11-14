@@ -14,7 +14,7 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   const copy = async () => {
-    await (core ? core.copyText(value) : navigator.clipboard?.writeText(value));
+    try { await (core ? core.copyText(value) : navigator.clipboard?.writeText(value)); } catch { return; }
     setDone(true);
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setDone(false), 1400);

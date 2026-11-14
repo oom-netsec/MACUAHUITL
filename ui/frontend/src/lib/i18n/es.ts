@@ -2679,6 +2679,7 @@ export const es = {
   "diag.bind.error": "No se pudieron leer las interfaces de esta máquina; reintenta cambiando de modo.",
   "diag.bind.gone": "La IP {ip} ya no es de esta máquina (cambió la red): elige otra y vuelve a ejecutar.",
   "paste.controls": "Contiene caracteres de control o invisibles: {codes}",
+  "shell.moduleError": "El módulo falló al mostrarse",
 };
 
 export type Key = keyof typeof es;

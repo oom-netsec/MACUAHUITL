@@ -97,3 +97,10 @@ test("trackOf: ancho exacto, o mínimo que cede en ventanas angostas", async () 
   expect(trackOf({})).toBe("minmax(96px, 1fr)");
   expect(trackOf({ width: 130, minWidth: 96 }, 200)).toBe("200px");
 });
+
+test("sin búsqueda ni filtros no se normalizan todas las filas", () => {
+  const muchas: Dev[] = Array.from({ length: 2000 }, (_, i) => ({ name: `SW${i}`, ip: "10.0.0.1", state: "up", cpu: i }));
+  const value = vi.fn((d: Dev) => d.name);
+  render(<DataTable label="Equipos" columns={[{ id: "name", header: "Equipo", value }]} rows={muchas} rowKey={(d) => d.name} />);
+  expect(value.mock.calls.length).toBeLessThan(500); // solo las filas dibujadas, no las 2000
+});

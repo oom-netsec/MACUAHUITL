@@ -116,7 +116,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   };
   const cancel = () => core.diagCancel(runId).catch((e) => setErr(errorText(e)));
 
-  const copy = async () => { await core.copyText(lines.join("\n")); setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
+  const copy = async () => { try { await core.copyText(lines.join("\n")); } catch { return; } setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
   const status = runId ? { tone: "info" as const, label: t("diag.status.running") }
     : result?.canceled ? { tone: "" as const, label: t("diag.status.canceled") }
     : result ? (result.ok ? { tone: "ok" as const, label: t("diag.status.done") } : { tone: "bad" as const, label: t("diag.status.failed") }) : undefined;
