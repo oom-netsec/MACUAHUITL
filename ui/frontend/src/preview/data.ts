@@ -2,46 +2,61 @@ import type { CoreAPI } from "../lib/core";
 import { dnsTraceSample, pcapSample, tlsSample } from "../modules/tools/samples";
 import { fakeScripts } from "../modules/scripts/fake";
 import type { ScriptItem } from "../modules/scripts/api";
+import { fakeInventory, sampleDevices, sampleHostFields, sampleHostsImport } from "../modules/inventory/fake";
+import { samplePlaybooks } from "../modules/patrol/fake";
+import { sampleRestore } from "../modules/backup/fake";
+import { fakeSettings } from "../modules/settings/fake";
+import type { Host } from "../modules/inventory/api";
 
-// Datos de ejemplo para que cada vista se vea como en uso real; se amplía módulo por módulo.
+// Sample data (in English, the app's canonical language) so every view looks like real use; extended module by module.
 export function sample(): Partial<CoreAPI> {
   const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
   const backups = backupSamples(ago);
+  const settings = fakeSettings();
   return {
+    ...fakeInventory(hostsEn),
+    listDevices: async (q?: string) => { const n = (q ?? "").trim().toLowerCase(); return { ...devicesEn, devices: devicesEn.devices.filter((d) => !n || `${d.address} ${d.hostname} ${d.platform}`.toLowerCase().includes(n)) }; },
+    previewHostsImport: async () => importEn,
+    hostsImportFormat: async () => ({ fields: hostFieldsEn, maxRows: 1000, maxBytes: 5 << 20 }),
+    hostsImportTemplate: async (format: "csv" | "json") => hostsTemplate(format),
+    listPlaybooks: async () => playbooksEn,
+    assistPlanRestore: async () => restoreEn,
+    setCorePrefs: async (p: Parameters<typeof settings.setCorePrefs>[0]) => { const r = await settings.setCorePrefs(p); return r.note ? { ...r, note: "The change applies to what starts afterwards: jobs and listeners already running keep the folder they started with. Data in the previous folder is not moved." } : r; },
+    getCorePrefs: settings.getCorePrefs,
     ...previewTerminal(),
     ...previewScriptsApi(),
     listCredentials: async () => [
       { id: "c1", label: "Core DC", username: "netops", hasEnable: true, hasSshKey: false },
-      { id: "c2", label: "Acceso sucursales", username: "tac", hasEnable: false, hasSshKey: true },
-      { id: "c3", label: "Laboratorio", username: "lab", hasEnable: true, hasSshKey: true },
-      { id: "c4", label: "ISE (secreto RADIUS)", username: "-", hasEnable: false, hasSshKey: false },
+      { id: "c2", label: "Branch access", username: "tac", hasEnable: false, hasSshKey: true },
+      { id: "c3", label: "lab-admin", username: "lab", hasEnable: true, hasSshKey: true },
+      { id: "c4", label: "ISE (RADIUS secret)", username: "-", hasEnable: false, hasSshKey: false },
       { id: "c5", label: "WAN edge", username: "wanops", hasEnable: true, hasSshKey: false },
     ],
     getRun: async () => [
       { target: "10.0.0.1:22", state: "DEVICE_STATE_COMPLETED", detail: "" },
       { target: "10.0.0.2:22", state: "DEVICE_STATE_RUNNING", detail: "" },
-      { target: "10.0.0.3:22", state: "DEVICE_STATE_FAILED", detail: "tiempo agotado" },
+      { target: "10.0.0.3:22", state: "DEVICE_STATE_FAILED", detail: "timed out" },
     ],
     auditVerify: async () => ({ intact: true, firstBroken: 0, head: "7f3a9c01d4e2b685a0c7e1f93b24d86a5c10e7ab9d3f2468c1b05e7a94d3c2f8" }),
     listJobs: async () => [
-      { id: "j0", name: "Respaldo nocturno core", state: "armed", armedAt: ago(135), round: 3, rounds: 6, devicesTotal: 24, devicesOk: 22, devicesFailed: 1, outputDir: "/home/u/evidencia/nocturno-core",
-        phases: [{ at: ago(140), kind: "JOB_PHASE_KIND_CREATED" }, { at: ago(135), kind: "JOB_PHASE_KIND_ARMED", detail: "24 equipos" }] },
-      { id: "j9", name: "Caso TAC 6942", state: "completed", round: 1, rounds: 1, devicesTotal: 3, devicesOk: 3, devicesFailed: 0, outputDir: "/home/u/evidencia/caso-6942",
-        phases: [{ at: ago(900), kind: "JOB_PHASE_KIND_COMPLETED", detail: "1 ronda" }] },
+      { id: "j0", name: "Nightly core backup", state: "armed", armedAt: ago(135), round: 3, rounds: 6, devicesTotal: 24, devicesOk: 22, devicesFailed: 1, outputDir: "/home/u/evidence/nightly-core",
+        phases: [{ at: ago(140), kind: "JOB_PHASE_KIND_CREATED" }, { at: ago(135), kind: "JOB_PHASE_KIND_ARMED", detail: "24 devices" }] },
+      { id: "j9", name: "TAC case 6942", state: "completed", round: 1, rounds: 1, devicesTotal: 3, devicesOk: 3, devicesFailed: 0, outputDir: "/home/u/evidence/tac-case-6942",
+        phases: [{ at: ago(900), kind: "JOB_PHASE_KIND_COMPLETED", detail: "1 round" }] },
     ],
-    // Herramientas, Limpiador, Flota, Forense, ACL y Corridas (utilidades de redes).
+    // Tools, Cleaner, Fleet, Forensics, ACL and Runs (network utilities).
     toolsPcap: async () => pcapSample,
     toolsDns: async (r) => (r.mode === "trace" ? dnsTraceSample : "{}"),
     toolsTls: async () => tlsSample,
-    cleanerRun: async (text) => ({ report: { changes: [], orphans: [{ line: 7, text: " ip access-group IN-FALTA in", why: "ACL IN-FALTA no existe (ip access-group)" }] }, text: "3 líneas vacías quitadas\n\n1 HUÉRFANA",
+    cleanerRun: async (text) => ({ report: { changes: [], orphans: [{ line: 7, text: " ip access-group IN-MISSING in", why: "ACL IN-MISSING does not exist (ip access-group)" }] }, text: "3 empty lines removed\n\n1 ORPHANS (marked with a ! comment in the output)\nline 7:  ip access-group IN-MISSING in — ACL IN-MISSING does not exist (ip access-group)\n\nOrphans are only marked: the cleanup never removes them.",
       output: text.replace(/\n{2,}/g, "\n").replace(/^!\n(?=!)/gm, "") }),
     fleetPath: async () => ({ svg: "", result: { src: "10.1.10.20", dst: "172.31.0.1", arrived: false, warnings: [], hops: [
       { id: 0, parent: -1, device: "ACC1", route: "S* 0.0.0.0/0", status: "ok" as const, source: "show ip route", at: ago(40) },
       { id: 1, parent: 0, device: "DIST1", via: "10.1.0.1", out_if: "Te1/1/1", segment: { interface: "Vlan10", vlan: "10", l2: [{ device: "ACC2", port: "Gi1/0/24", source: "show mac address-table", at: ago(40) }] }, status: "ok" as const, source: "show ip route", at: ago(40) },
       { id: 2, parent: 1, device: "CORE1", via: "10.1.255.1", out_if: "Po1", ecmp: true, status: "ok" as const, source: "show ip route", at: ago(41) },
       { id: 3, parent: 1, device: "CORE2", via: "10.1.255.5", out_if: "Po2", ecmp: true, status: "ok" as const, source: "show ip route", at: ago(41) },
-      { id: 4, parent: 2, device: "EDGE1", via: "10.2.0.1", out_if: "Te1/0/1", segment: { interface: "Te1/0/1", vlan: "300" }, status: "arrived" as const, reason: "destino conectado", source: "show ip route", at: ago(42) },
-      { id: 5, parent: 3, device: "10.2.0.5", via: "10.2.0.5", out_if: "Te1/0/2", status: "cut" as const, reason: "sin evidencia del siguiente equipo", at: "0001-01-01T00:00:00Z" },
+      { id: 4, parent: 2, device: "EDGE1", via: "10.2.0.1", out_if: "Te1/0/1", segment: { interface: "Te1/0/1", vlan: "300" }, status: "arrived" as const, reason: "destination connected", source: "show ip route", at: ago(42) },
+      { id: 5, parent: 3, device: "10.2.0.5", via: "10.2.0.5", out_if: "Te1/0/2", status: "cut" as const, reason: "no evidence of the next device (hop 10.2.0.5 does not belong to any collected device)", at: "0001-01-01T00:00:00Z" },
     ] } }),
     fleetHealth: async () => ({ devices: 12, warnings: [], issues: [
       { device: "ACC1", port: "Gi1/0/9", severity: "critica" as const, problems: [{ kind: "err-disabled", evidence: "Gi1/0/9 err-disabled (psecure-violation)" }], source: "show interfaces status", at: ago(30) },
@@ -50,12 +65,12 @@ export function sample(): Partial<CoreAPI> {
       { device: "DIST1", port: "Te1/1/1", severity: "baja" as const, problems: [{ kind: "drops", value: 31, evidence: "31 output drops" }], source: "show interfaces", at: ago(33) },
     ] }),
     fleetSummary: async () => ({ devices: 12, checked: { cpu: 12, ntp: 12, reboot: 12, memory: 12, flash: 12 }, warnings: [], rows: [
-      { device: "ACC1", check: "ntp", value: "no sincronizado", source: "show ntp status", at: ago(30) },
+      { device: "ACC1", check: "ntp", value: "not synchronized", source: "show ntp status", at: ago(30) },
       { device: "ACC2", check: "cpu", value: "92 %", source: "show processes cpu", at: ago(30) },
-      { device: "ACC2", check: "flash", value: "97 % usado", source: "dir flash:", at: ago(31) },
-      { device: "DIST1", check: "reboot", value: "hace 2 h", source: "show version", at: ago(33) },
+      { device: "ACC2", check: "flash", value: "97 % used", source: "dir flash:", at: ago(31) },
+      { device: "DIST1", check: "reboot", value: "2 h ago", source: "show version", at: ago(33) },
     ] }),
-    forensicFlapping: async () => ({ source: "show logging del trabajo j0", interfaces: 3, transitions: 19, count: 3, window: "1m0s", warnings: [], counter_jumps: [],
+    forensicFlapping: async () => ({ source: "show logging of job j0", interfaces: 3, transitions: 19, count: 3, window: "1m0s", warnings: [], counter_jumps: [],
       flaps: [
         { host: "ACC1_10.1.1.1", interface: "Gi1/0/3", layer: "link" as const, total: 9, peak: 8, episodes: 2, first: ago(50), last: ago(47), sequence: "down up down up down up down up down" },
         { host: "ACC2_10.1.1.2", interface: "Gi1/0/9", layer: "link" as const, total: 6, peak: 6, episodes: 1, first: ago(20), last: ago(19), sequence: "down up down up down up" },
@@ -70,104 +85,144 @@ export function sample(): Partial<CoreAPI> {
       { action: "permit", protocol: "tcp", source: "10.1.10.0/24", destination: "172.31.0.0/16", sourcePorts: "", destinationPorts: "eq 22", log: true, established: false, remark: "" },
       { action: "deny", protocol: "ip", source: "any", destination: "172.31.0.5", sourcePorts: "", destinationPorts: "", log: true, established: false, remark: "" },
     ] }),
-    aclAnalyze: async () => [{ index: 1, kind: "shadowed", detail: "la regla 1 ya cubre este tráfico" }],
+    aclAnalyze: async () => [{ index: 1, kind: "shadowed", detail: "rule 1 (permit) already covers everything this one matches" }],
     analysisRun: async () => ({ dir: "/outputs/j0", devices: ["ACC1_10.1.1.1", "DIST1_10.1.0.1"], rounds: [1, 2, 3], missing: [], warnings: [], findings: [
-      { rule: "cpu-alta", title: "CPU alta", severity: "alta" as const, device: "DIST1_10.1.0.1", round: 3, at: ago(20), command: "show processes cpu sorted", evidence: ["CPU utilization for five seconds: 95%/4%; one minute: 93%; five minutes: 91%"], detail: "5 min: 91 % (umbral 80 %)", explanation: "El promedio supera el umbral.", action: "Revisa los procesos que más CPU usan." },
-      { rule: "log-mallocfail", title: "Falla de asignación de memoria", severity: "critica" as const, device: "ACC1_10.1.1.1", round: 2, at: ago(35), command: "show logging", evidence: ["%SYS-2-MALLOCFAIL: Memory allocation of 65536 bytes failed"], detail: "1 evento", explanation: "El equipo se quedó sin memoria libre.", action: "Revisa show memory statistics." },
+      { rule: "cpu-alta", title: "High CPU", severity: "alta" as const, device: "DIST1_10.1.0.1", round: 3, at: ago(20), command: "show processes cpu sorted", evidence: ["CPU utilization for five seconds: 95%/4%; one minute: 93%; five minutes: 91%"], detail: "5 min: 91% (threshold 80%)", explanation: "The average exceeds the threshold.", action: "Check the processes that use the most CPU." },
+      { rule: "log-mallocfail", title: "Memory allocation failure", severity: "critica" as const, device: "ACC1_10.1.1.1", round: 2, at: ago(35), command: "show logging", evidence: ["%SYS-2-MALLOCFAIL: Memory allocation of 65536 bytes failed"], detail: "1 event", explanation: "The device ran out of free memory.", action: "Check show memory statistics." },
     ] }),
     analysisTimeline: async () => ({ dir: "/outputs/j0", warnings: [], events: [
-      { at: ago(50), source: "syslog", device: "ACC1_10.1.1.1", severity: "media" as const, text: "%LINK-3-UPDOWN: Interface Gi1/0/3, changed state to down", kb: "%LINK-3-UPDOWN: El enlace bajó." },
+      { at: ago(50), source: "syslog", device: "ACC1_10.1.1.1", severity: "media" as const, text: "%LINK-3-UPDOWN: Interface Gi1/0/3, changed state to down", kb: "%LINK-3-UPDOWN: The link went down." },
       { at: ago(49), source: "log-equipo", device: "ACC1_10.1.1.1", severity: "baja" as const, text: "%LINK-3-UPDOWN: Interface Gi1/0/3, changed state to up" },
-      { at: ago(35), source: "hallazgo", device: "ACC1_10.1.1.1", severity: "critica" as const, text: "Falla de asignación de memoria", note: "ronda 2" },
-      { at: ago(20), source: "hallazgo", device: "DIST1_10.1.0.1", severity: "alta" as const, text: "CPU alta: 5 min 91 %" },
+      { at: ago(35), source: "hallazgo", device: "ACC1_10.1.1.1", severity: "critica" as const, text: "Memory allocation failure", note: "round 2" },
+      { at: ago(20), source: "hallazgo", device: "DIST1_10.1.0.1", severity: "alta" as const, text: "High CPU: 5 min 91%" },
     ] }),
-    // Cambios: una ventana con PRE y POST completos y un reporte con una regresión de OSPF.
+    // Changes: one window with full PRE and POST and a report with an OSPF regression.
     listChanges: async () => [
-      { id: "ch1", name: "CRQ-48213 Ajuste de timeouts VTY", preJobId: "j20", preState: "completed", postJobId: "j21", postState: "completed" },
-      { id: "ch2", name: "CRQ-48377 Migración a OSPF área 10", preJobId: "j22", preState: "completed", postJobId: "", postState: "" },
+      { id: "ch1", name: "CRQ-48213 VTY timeout tuning", preJobId: "j20", preState: "completed", postJobId: "j21", postState: "completed" },
+      { id: "ch2", name: "CRQ-48377 Migration to OSPF area 10", preJobId: "j22", preState: "completed", postJobId: "", postState: "" },
     ],
     changeReport: async () => ({ text: "", json: JSON.stringify({ devices: [
       { address: "10.20.0.1", hostname: "DIST-01", verdict: "regression",
-        findings: [{ facet: "ospf", level: "regression", detail: "10.20.0.3 @ Gi1/0/24: FULL → INIT" }, { facet: "interfaces", level: "review", detail: "Gi1/0/24 errores de entrada 0 → 214" }],
+        findings: [{ facet: "ospf", level: "regression", detail: "10.20.0.3 @ Gi1/0/24: FULL → INIT" }, { facet: "interfaces", level: "review", detail: "Gi1/0/24 input errors 0 → 214" }],
         config_diff: ["- line vty 0 15 > exec-timeout 0 0", "+ line vty 0 15 > exec-timeout 10 0", "+ interface GigabitEthernet1/0/24 > ip ospf cost 500"] },
-      { address: "10.20.0.2", hostname: "DIST-02", verdict: "review", findings: [{ facet: "vlans", level: "review", detail: "VLAN 120 sin puertos activos" }], config_diff: ["+ line vty 0 15 > exec-timeout 10 0"] },
+      { address: "10.20.0.2", hostname: "DIST-02", verdict: "review", findings: [{ facet: "vlans", level: "review", detail: "VLAN 120 has no active ports" }], config_diff: ["+ line vty 0 15 > exec-timeout 10 0"] },
       { address: "10.20.0.4", hostname: "ACC-07", verdict: "ok", findings: [], config_diff: [] },
-    ], note: "Fixtures sin validar en laboratorio." }) }),
-    // Lotes: cuatro equipos por tres comandos, con una celda con error y otra vacía.
+    ], note: "Fixtures not validated in the lab." }) }),
+    // Batches: four devices by three commands, with one error cell and one empty cell.
     adhocResult: async () => adhocSample,
-    // Visibilidad: el sondeo, los flujos y los traps emiten eventos de ejemplo por el doble (window.core.emitVis).
+    // Visibility: polling, flows and traps emit sample events through the double (window.core.emitVis).
     snmpPollStart: async () => { visSnmp(); return "p1"; },
     flowsStart: async () => { visFlows(); return "f1"; },
     trapsStart: async () => { visTraps(); return "t1"; },
-    // Seguridad: salidas con la forma de los informes del núcleo (RADIUS, TACACS+ y decodificación de PKI).
-    secRadius: async () => `Servidor RADIUS 10.20.0.30:1812 (método PAP)
+    // Security: output shaped like the core's reports (RADIUS, TACACS+ and PKI decoding).
+    secRadius: async () => `RADIUS server 10.20.0.30:1812 (method PAP)
 
-access-request: Access-Accept en 4.2 ms (intento 1, Message-Authenticator válido)
-  Reply-Message              Bienvenido, netops
+access-request: Access-Accept in 4.2 ms (attempt 1, Message-Authenticator valid)
+  Reply-Message              Welcome, netops
   Tunnel-Private-Group-ID    120
   Filter-Id                  PERMIT-MGMT
 
-status-server: Access-Reject en 2.8 ms (intento 1, Message-Authenticator válido)
-  Reply-Message              Usuario desconocido
+status-server: Access-Reject in 2.8 ms (attempt 1, Message-Authenticator valid)
+  Reply-Message              Unknown user
 
-Hallazgos:
-  [aviso] access-request: la respuesta no trae Message-Authenticator; el servidor es vulnerable a Blast-RADIUS
+Findings:
+  [warning] access-request: the response has no Message-Authenticator; the server is vulnerable to Blast-RADIUS (CVE-2024-3596). Update it and require Message-Authenticator.
 `,
-    secTacacs: async () => `Servidor TACACS+ 10.20.0.31:49
+    secTacacs: async () => `TACACS+ server 10.20.0.31:49
 
-authentication: PASS en 12.4 ms
+authentication: PASS in 12.4 ms
 
-authorization: PASS_ADD en 8.0 ms
-  enviado  service=shell
-  enviado  cmd=show running-config
-  recibido priv-lvl=15
+authorization: PASS_ADD in 8.0 ms
+  sent     service=shell
+  sent     cmd=show running-config
+  received priv-lvl=15
 
-accounting-start: sin respuesta
-  ! tiempo de espera agotado
+accounting-start: no response
+  ! timed out
 
-Hallazgos:
-  [error] accounting-start: el servidor no respondió
+Findings:
+  [error] accounting-start: the server did not answer
 `,
-    secPkiDecode: async () => `certificado: CN=ise01.lab.local,O=Lab
-  Emisor           CN=Lab Issuing CA,O=Lab
-  Serie            0A1B2C3D
-  Validez          2026-01-10T00:00:00Z → 2026-11-20T00:00:00Z (14 días)
-  Llave            ECDSA P-256
-  Firma            ECDSA-SHA256
+    secPkiDecode: async () => `certificate: CN=ise01.lab.local,O=Lab
+  Issuer           CN=Lab Issuing CA,O=Lab
+  Serial           0A1B2C3D
+  Validity         2026-01-10T00:00:00Z → 2026-11-20T00:00:00Z (14 days)
+  Key              ECDSA P-256
+  Signature        ECDSA-SHA256
   SAN              ise01.lab.local, 10.20.0.30
   SHA-1            3A:9F:12:C4:55:E0:7B:91:0D:AA:42:19:8E:67:B3:C0:D1:2F:44:08
   SHA-256          9C:41:0E:7A:B2:33:5D:E8:6F:01:AA:C7:19:84:D2:5B:3E:70:F6:2A:91:C8:04:BD:57:E3:1A:66:0F:D9:42:8B
-  ! vence en 14 días
+  ! expires in 14 days
 
-certificado: CN=Lab Issuing CA,O=Lab
-  Emisor           CN=Lab Root CA,O=Lab
-  Validez          2023-06-01T00:00:00Z → 2028-06-01T00:00:00Z (572 días)
-  Llave            ECDSA P-384
-  CA               sí
+certificate: CN=Lab Issuing CA,O=Lab
+  Issuer           CN=Lab Root CA,O=Lab
+  Validity         2023-06-01T00:00:00Z → 2028-06-01T00:00:00Z (572 days)
+  Key              ECDSA P-384
+  CA               yes
   SHA-256          5B:22:AA:10:7E:C3:90:F4:61:08:DD:3C:A7:15:E9:42:B0:6D:81:2E:F7:93:0A:4C:D5:68:1B:E0:37:9A:C2:7F
 
-certificado: CN=Lab Root CA,O=Lab
-  Emisor           CN=Lab Root CA,O=Lab
-  Validez          2016-01-01T00:00:00Z → 2026-10-01T00:00:00Z (-36 días)
-  Llave            RSA 4096
-  CA               sí
+certificate: CN=Lab Root CA,O=Lab
+  Issuer           CN=Lab Root CA,O=Lab
+  Validity         2016-01-01T00:00:00Z → 2026-10-01T00:00:00Z (-36 days)
+  Key              RSA 4096
+  CA               yes
   SHA-256          E1:0C:7D:42:93:BA:58:2F:A6:D4:11:C9:3B:80:6E:F5:27:9D:0A:B3:64:1E:C8:75:F2:49:8A:03:DB:5C:90:16
 `,
-    // Calculadoras: subred y VLSM con el formato de las tablas del núcleo.
+    // Calculators: subnet and VLSM in the core's table format.
     calc: async (kind: string) => kind === "vlsm"
-      ? { text: "", notes: ["Espacio libre: 10.20.0.192/26"], tables: [{ title: "VLSM sobre 10.20.0.0/24",
-        head: ["Nombre", "Hosts", "Prefijo", "Máscara", "Primera", "Última", "Broadcast", "Capacidad", "Sobrante"],
-        rows: [["ventas", "100", "10.20.0.0/25", "255.255.255.128", "10.20.0.1", "10.20.0.126", "10.20.0.127", "126", "26"],
-          ["voz", "50", "10.20.0.128/26", "255.255.255.192", "10.20.0.129", "10.20.0.190", "10.20.0.191", "62", "12"]] }] }
-      : { text: "", notes: [], tables: [{ title: "Subred 10.20.7.0/24", head: ["Campo", "Valor"],
-        rows: [["Red", "10.20.7.0"], ["Broadcast", "10.20.7.255"], ["Primera usable", "10.20.7.1"], ["Última usable", "10.20.7.254"], ["Direcciones", "256"], ["Hosts usables", "254"],
-          ["Prefijo", "/24"], ["Máscara", "255.255.255.0"], ["Wildcard", "0.0.0.255"], ["Clase", "A"], ["Tipo", "privada (RFC 1918)"]] }] },
-    // Respaldos: dos equipos con varias tomas; el contenido y la diferencia salen de configuraciones de ejemplo.
+      ? { text: "", notes: ["Free space: 10.20.0.192/26"], tables: [{ title: "VLSM over 10.20.0.0/24",
+        head: ["Name", "Hosts", "Prefix", "Mask", "First", "Last", "Broadcast", "Capacity", "Unused"],
+        rows: [["sales", "100", "10.20.0.0/25", "255.255.255.128", "10.20.0.1", "10.20.0.126", "10.20.0.127", "126", "26"],
+          ["voice", "50", "10.20.0.128/26", "255.255.255.192", "10.20.0.129", "10.20.0.190", "10.20.0.191", "62", "12"]] }] }
+      : { text: "", notes: [], tables: [{ title: "Subnet 10.20.7.0/24", head: ["Field", "Value"],
+        rows: [["Network", "10.20.7.0"], ["Broadcast", "10.20.7.255"], ["First usable", "10.20.7.1"], ["Last usable", "10.20.7.254"], ["Addresses", "256"], ["Usable hosts", "254"],
+          ["Prefix", "/24"], ["Mask", "255.255.255.0"], ["Wildcard", "0.0.0.255"], ["Class", "A"], ["Type", "private (RFC 1918)"]] }] },
+    // Backups: two devices with several snapshots; content and diff come from sample configurations.
     backupList: async () => ({ masked: false, backups }),
     backupGet: async (id: string) => { const i = Math.max(0, backups.findIndex((x) => x.id === id)); return { meta: backups[i], text: backupConfig(backups[i].device, i) }; },
     backupDiff: async (from: string, to: string) => ({ from: backups.find((x) => x.id === from) ?? backups[1], to: backups.find((x) => x.id === to) ?? backups[0], added: 0, removed: 0, changes: [], ignored: ["ntp clock-period 36029"], masked: false }),
   };
 }
+
+// English overrides of the module fakes (those feed the tests and stay in Spanish; the Spanish literals below are the source strings to replace): same shape, same counts.
+const swap = <T,>(v: T, pairs: [string, string][]): T => {
+  // Un par que no reemplaza nada es un literal que cambió en el fake: la captura saldría en español sin avisar.
+  const all = JSON.stringify(v);
+  for (const [p] of pairs) if (!all.includes(JSON.stringify(p).slice(1, -1))) console.warn(`preview swap: "${p}" no aparece en el fake`);
+  const m = (x: unknown): unknown => typeof x === "string" ? pairs.reduce((r, [p, q]) => r.split(p).join(q), x) : Array.isArray(x) ? x.map(m) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, y]) => [k, m(y)])) : x;
+  return m(v) as T;
+};
+const hostsEn: Host[] = [
+  { id: "a".repeat(32), name: "LAB-CORE", address: "10.9.0.1", port: 22, platform: "ios-xe", folder: "Lab", tags: ["core"], credentialId: "c".repeat(32), credentialLabel: "lab-admin", notes: "floor 2" },
+  { id: "b".repeat(32), name: "LAB-AP", address: "ap1.lab", port: 2222, platform: "wlc", folder: "Lab", tags: [], credentialId: "", credentialLabel: "", notes: "" },
+  { id: "d".repeat(32), name: "OFFICE-SW", address: "10.8.0.1", port: 22, platform: "", folder: "Office", tags: ["access", "dc-1"], credentialId: "", credentialLabel: "", notes: "" },
+];
+const devicesEn = swap(sampleDevices, [["CAIDO", "DOWN-SW"], ["SOLO-RESP", "BACKUP-ONLY"]]);
+const importEn = swap(sampleHostsImport, [
+  ["1 host(s) traen una etiqueta de credencial que no está en la bóveda (o está repetida) y quedarían sin credencial", "1 host(s) carry a credential label that is not in the vault (or is repeated) and would be left without a credential"],
+  ['dirección "admin@10.0.0.9": use una IP o un nombre DNS', 'address "admin@10.0.0.9": use an IP or a DNS name (letters, digits and hyphens), without spaces, @, scheme, port or path'],
+  ["tiene 3 columnas; se esperaban 8", "has 3 columns; 8 were expected"],
+  ["NUEVO", "NEW-HOST"], ["OTRO-NOMBRE", "OTHER-NAME"], ["Oficina", "Office"], ["acceso", "access"], ["admin lab", "lab-admin"], ["no existe", "missing-cred"], ["OFI-SW", "OFFICE-SW"],
+]);
+const hostFieldsEn = swap(sampleHostFields, [
+  ["Nombre del host: 1 a 64 caracteres, sin espacios en los extremos. No se repite (sin importar mayúsculas).", "Host name: 1 to 64 characters, no leading or trailing spaces. Not repeated (case-insensitive)."],
+  ["IP o nombre DNS, sin usuario, esquema, puerto ni ruta. La dirección con el puerto no se repite.", "IP or DNS name, without user, scheme, port or path. The address with the port is not repeated."],
+  ["Puerto SSH, de 1 a 65535. Vacío = 22.", "SSH port, from 1 to 65535. Empty = 22."],
+  ["Plataforma: ios, ios-xe, nx-os, asa, iosxr, wlc. Vacío = sin definir.", "Platform: ios, ios-xe, nx-os, asa, iosxr, wlc. Empty = not set."],
+  ["Carpeta de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -. Vacío = sin carpeta.", "Single-level folder: 1 to 48 characters among letters, digits, space, _, . and -. Empty = no folder."],
+  ["Hasta 10 etiquetas de 1 a 24 caracteres entre a-z, 0-9 y -. En CSV separadas por «;»; en JSON, un arreglo.", "Up to 10 tags of 1 to 24 characters among a-z, 0-9 and -. In CSV separated by \";\"; in JSON, an array."],
+  ["Etiqueta de una credencial de la bóveda local (nunca el usuario ni la contraseña).", "Label of a credential in the local vault (never the user or the password)."],
+  ["Notas libres, hasta 2000 caracteres.", "Free notes, up to 2000 characters."],
+  ["Piso 2", "Floor 2"], ["admin lab", "lab-admin"],
+]);
+const hostsTemplate = (format: "csv" | "json") => {
+  const rows = [["SW-CORE", "10.0.0.1", "22", "ios-xe", "Lab", "core;dc-1", "lab-admin", "Floor 2"], ["SW-ACC1", "10.0.0.2", "22", "nx-os", "Lab", "access", "", ""], ["AP-1", "ap1.lab.example.com", "2222", "wlc", "Office", "wifi", "", ""]];
+  const names = hostFieldsEn.map((f) => f.name);
+  return { format, filename: `hosts-plantilla.${format}`, content: format === "csv" ? "\ufeff" + [names, ...rows].map((r) => r.join(",")).join("\n") + "\n"
+    : JSON.stringify({ formato: "macuahuitl-hosts", version: 1, exportado: new Date().toISOString(), hosts: rows.map((r) => Object.fromEntries(names.map((n, i) => [n, r[i]]))) }, null, 2) };
+};
+const playbooksEn = swap(samplePlaybooks, [["TAC · Línea base", "TAC · Baseline"], ["TAC · Usuario sin red", "TAC · User with no connectivity"], ["L2 · VLAN y troncales", "L2 · VLANs, trunks and VTP"]]);
+const restoreEn = swap(sampleRestore, [["PC-contabilidad", "PC-accounting"], ["PC-ventas", "PC-sales"]]);
 
 type Ago = (min: number) => string;
 const stamp = (iso: string) => iso.replace(/[-:]|\.\d+/g, "");
@@ -181,10 +236,10 @@ function backupSamples(ago: Ago) {
     mk("R1-WAN_10.20.0.254", 40, 9420), mk("R1-WAN_10.20.0.254", 2 * 24 * 60 + 40, 9388),
   ];
 }
-// Cuanto más viejo el respaldo, más atrás la VLAN y la descripción del puerto (para que la diferencia muestre algo).
+// The older the backup, the further back the VLAN and port description (so the diff shows something).
 function backupConfig(device: string, i: number) {
   const first = i === 0 || i === 3;
-  return [`hostname ${device.split("_")[0]}`, "!", "interface GigabitEthernet1/0/14", ` description ${first ? "CAJA-07" : "PC-contabilidad"}`, ` switchport access vlan ${first ? 20 : 10}`,
+  return [`hostname ${device.split("_")[0]}`, "!", "interface GigabitEthernet1/0/14", ` description ${first ? "CASHIER-07" : "PC-accounting"}`, ` switchport access vlan ${first ? 20 : 10}`,
     " no shutdown", ...(first ? [" spanning-tree portfast"] : []), "!", "ntp clock-period 36029", "ntp server 10.0.0.2", "end", ""].join("\n");
 }
 
@@ -194,12 +249,12 @@ const adhocOut = (d: string, c: string) => c.startsWith("show version") ? `${d} 
   : c.startsWith("show ip") ? "Interface              IP-Address      OK? Method Status                Protocol\nGigabitEthernet0/0     10.20.0.1       YES NVRAM  up                    up\nGigabitEthernet0/1     unassigned      YES unset  administratively down down"
   : "Clock is synchronized, stratum 3, reference is 10.0.0.2";
 const adhocRows = adhocDevs.flatMap(([device, address]) => adhocCmds.map((command) => {
-  if (device === "ACC-07") return { device, address, command, ok: false, output: "", note: "Tiempo de espera agotado al abrir la sesión SSH" };
+  if (device === "ACC-07") return { device, address, command, ok: false, output: "", note: "Timed out opening the SSH session" };
   if (device === "R1-WAN" && command.includes("ntp")) return { device, address, command, ok: true, output: "" };
   return { device, address, command, ok: true, output: adhocOut(device, command) };
 }));
 const adhocSample = { state: "completed", done: true, text: adhocRows.map((r) => `== ${r.device} (${r.address}) ==\n$ ${r.command}\n${r.output || r.note || ""}`).join("\n\n"),
-  csv: "equipo,direccion,comando,estado\n" + adhocRows.map((r) => `${r.device},${r.address},"${r.command}",${r.ok ? "ok" : "error"}`).join("\n"), markdown: "| Equipo | Comando | Estado |",
+  csv: "device,address,command,status\n" + adhocRows.map((r) => `${r.device},${r.address},"${r.command}",${r.ok ? "ok" : "error"}`).join("\n"), markdown: "| Device | Command | Status |",
   report: { commands: adhocCmds, devices: adhocDevs.length, rows: adhocRows } };
 
 const emitVis = (kind: string, e: unknown) => (window as unknown as { core?: { emitVis?: (k: string, e: unknown) => void } }).core?.emitVis?.(kind, e);
@@ -221,12 +276,12 @@ function visFlows() {
 }
 function visTraps() {
   const list: [string, string, string][] = [["10.20.0.1:5100", "linkDown", "linkDown GigabitEthernet1/0/24 oper down"], ["10.20.0.1:5100", "linkUp", "linkUp GigabitEthernet1/0/24 oper up"],
-    ["10.20.0.254:5100", "authenticationFailure", "authenticationFailure desde 192.0.2.77"], ["10.20.7.1:5101", "coldStart", "coldStart"], ["10.20.0.2:5100", "linkDown", "linkDown TenGigabitEthernet1/1/1 oper down"], ["10.20.0.2:5100", "linkUp", "linkUp TenGigabitEthernet1/1/1 oper up"]];
+    ["10.20.0.254:5100", "authenticationFailure", "authenticationFailure from 192.0.2.77"], ["10.20.7.1:5101", "coldStart", "coldStart"], ["10.20.0.2:5100", "linkDown", "linkDown TenGigabitEthernet1/1/1 oper down"], ["10.20.0.2:5100", "linkUp", "linkUp TenGigabitEthernet1/1/1 oper up"]];
   list.forEach(([From, Name, Summary], k) => setTimeout(() => emitVis("traps", { runId: "t1", json: JSON.stringify({ From, Name, Summary, Version: "2c" }) }), 80 + k * 20));
 }
 
-// Equipo de ejemplo para la terminal SSH: banner, prompt de IOS y un eco con algunos comandos conocidos.
-// Cada apertura es una sesión (p1, p2…) con su propio equipo; la salida va sin colores para que se vea el resaltado de palabras clave.
+// Sample device for the SSH terminal: banner, IOS prompt and an echo for a few known commands.
+// Each open is a session (p1, p2…) with its own device; output has no colors so keyword highlighting shows.
 function previewTerminal(): Partial<CoreAPI> {
   const core = () => (window as unknown as { core: { emitTerminal: (e: { runId: string; data?: string; opened?: string; recording?: string }) => void } }).core;
   const brief = "Interface              IP-Address      OK? Method Status                Protocol\r\nGigabitEthernet1/0/1   10.20.7.1       YES NVRAM  up                    up\r\nGigabitEthernet1/0/2   10.20.7.5       YES NVRAM  administratively down down\r\nGigabitEthernet1/0/24  unassigned      YES unset  down                  down\r\nVlan10                 10.20.10.1      YES NVRAM  up                    up\r\n";
@@ -263,26 +318,26 @@ function previewTerminal(): Partial<CoreAPI> {
   };
 }
 
-// Scripts de ejemplo: una muestra de la biblioteca (diagnóstico de solo lectura y plantillas de configuración) y tres propios, dos favoritos.
+// Sample scripts: a slice of the library (read-only diagnostics and config templates) and three of the user's own, two favorites.
 function previewScripts(): ScriptItem[] {
   const t0 = Date.UTC(2026, 10, 7, 12, 0, 0);
   const mk = (id: string, name: string, p: Partial<ScriptItem>): ScriptItem => ({ id, name, tech: "diagnostico", platform: "ios-xe", description: "", commands: [], tags: [], origin: "usuario", createdMs: t0, updatedMs: t0, readOnly: false, favorite: false, pinned: false, collections: [], ...p });
   const lib = (id: string, name: string, p: Partial<ScriptItem>) => mk(`lib-${id}`, name, { origin: "biblioteca", ...p });
   return [
-    lib("l2-stp", "L2 · STP", { tech: "l2", readOnly: true, favorite: true, description: "Raíz, puertos y topología de spanning-tree.", commands: ["show spanning-tree summary", "show spanning-tree root", "show spanning-tree blockedports"], tags: ["stp"] }),
-    lib("l2-vlan", "L2 · VLAN y trunks", { tech: "l2", readOnly: true, description: "VLAN activas y trunks.", commands: ["show vlan brief", "show interfaces trunk"], tags: ["vlan", "trunk"] }),
-    lib("l3-ospf", "L3 · OSPF", { tech: "l3", readOnly: true, description: "Vecinos, interfaces y base de OSPF.", commands: ["show ip ospf neighbor", "show ip ospf interface brief", "show ip ospf database"], tags: ["ospf"] }),
-    lib("seg-ssh", "Seguridad · SSH", { tech: "seguridad", readOnly: true, commands: ["show ip ssh", "show ssh"], tags: ["ssh"] }),
-    lib("cfg-vlan-acceso", "Config · VLAN y puerto de acceso", { tech: "l2", description: "Plantilla sin validar en laboratorio.", commands: ["configure terminal", "vlan 10", " name USUARIOS", "interface GigabitEthernet1/0/10", " switchport mode access", " switchport access vlan 10", "end"], tags: ["vlan", "acceso"] }),
+    lib("l2-stp", "L2 · STP", { tech: "l2", readOnly: true, favorite: true, description: "Root, ports and spanning-tree topology.", commands: ["show spanning-tree summary", "show spanning-tree root", "show spanning-tree blockedports"], tags: ["stp"] }),
+    lib("l2-vlan", "L2 · VLANs and trunks", { tech: "l2", readOnly: true, description: "Active VLANs and trunks.", commands: ["show vlan brief", "show interfaces trunk"], tags: ["vlan", "trunk"] }),
+    lib("l3-ospf", "L3 · OSPF", { tech: "l3", readOnly: true, description: "OSPF neighbors, interfaces and database.", commands: ["show ip ospf neighbor", "show ip ospf interface brief", "show ip ospf database"], tags: ["ospf"] }),
+    lib("seg-ssh", "Security · SSH", { tech: "seguridad", readOnly: true, commands: ["show ip ssh", "show ssh"], tags: ["ssh"] }),
+    lib("cfg-vlan-acceso", "Config · VLAN and access port", { tech: "l2", description: "Template not validated in the lab.", commands: ["configure terminal", "vlan 10", " name USERS", "interface GigabitEthernet1/0/10", " switchport mode access", " switchport access vlan 10", "end"], tags: ["vlan", "access"] }),
     lib("cfg-ntp", "Config · NTP", { tech: "gestion", commands: ["configure terminal", "ntp server 192.0.2.10", "end"], tags: ["ntp"] }),
     lib("nxos-vpc", "NX-OS · vPC", { tech: "l2", platform: "nx-os", commands: ["show vpc", "show vpc peer-keepalive"], tags: ["vpc"] }),
-    mk("a".repeat(32), "Mi OSPF", { tech: "l3", readOnly: true, favorite: true, description: "Revisión rápida de vecinos.", commands: ["show ip ospf neighbor"], tags: ["ospf"] }),
-    mk("e".repeat(32), "Vecinos CDP y LLDP", { tech: "diagnostico", readOnly: true, favorite: true, commands: ["show cdp neighbors", "! comentario", "show lldp neighbors"], tags: ["cdp", "lldp"] }),
-    mk("f".repeat(32), "Puertos sin uso", { tech: "gestion", description: "Lista y apaga puertos sin uso (revisar antes).", commands: ["show interfaces status | include notconnect", "configure terminal", "interface range Gi1/0/20 - 24", " shutdown", "end"], tags: ["puertos"] }),
+    mk("a".repeat(32), "My OSPF", { tech: "l3", readOnly: true, favorite: true, description: "Quick neighbor check.", commands: ["show ip ospf neighbor"], tags: ["ospf"] }),
+    mk("e".repeat(32), "CDP and LLDP neighbors", { tech: "diagnostico", readOnly: true, favorite: true, commands: ["show cdp neighbors", "! comment", "show lldp neighbors"], tags: ["cdp", "lldp"] }),
+    mk("f".repeat(32), "Unused ports", { tech: "gestion", description: "Lists and shuts down unused ports (review first).", commands: ["show interfaces status | include notconnect", "configure terminal", "interface range Gi1/0/20 - 24", " shutdown", "end"], tags: ["ports"] }),
   ];
 }
 
-// Scripts con colecciones y fijados de ejemplo (la API en memoria se siembra con sus propias llamadas).
+// Scripts with sample collections and pins (the in-memory API is seeded through its own calls).
 function previewScriptsApi() {
   const api = fakeScripts(previewScripts());
   void (async () => {
