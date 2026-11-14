@@ -162,7 +162,7 @@ func (s *backupSvc) watch(job string) {
 				return
 			case <-t.C:
 			}
-			r, err := s.collect(s.ctx, job, 0)
+			r, err := s.collect(i18n.WithLocale(s.ctx, i18n.En), job, 0) // la auditoría va en inglés (Deps.Job ya devuelve el error localizado)
 			if err != nil {
 				s.d.Audit("backup.failed", job, i18n.English(err))
 				return
