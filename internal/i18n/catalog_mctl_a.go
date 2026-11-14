@@ -137,7 +137,7 @@ func init() {
 		"mctl.metrics.cpu":          e("  CPU    último 5s/1min/5min: {five}/{one}/{fivemin} %   pico 5s: {peak} %", "  CPU    latest 5s/1min/5min: {five}/{one}/{fivemin} %   5s peak: {peak} %"),
 		"mctl.metrics.memory":       e("  Memoria {pool} usado {used} de {total} bytes ({pct} %)", "  Memory {pool} used {used} of {total} bytes ({pct} %)"),
 		"mctl.metrics.iface_header": e("  INTERFAZ\tBW\tPICO UTIL %\tENTRADA bps\tSALIDA bps\tERRORES\tDESCARTES\tCRC\tRESETS", "  INTERFACE\tBW\tPEAK UTIL %\tIN bps\tOUT bps\tERRORS\tDROPS\tCRC\tRESETS"),
-		"mctl.metrics.iface_more":   e("  ({shown} de {total} interfaces; --top N o --iface NOMBRE para otras)", "  ({shown} of {total} interfaces; --top N or --iface NOMBRE for others)"),
+		"mctl.metrics.iface_more":   e("  ({shown} de {total} interfaces; --top N o --iface NOMBRE para otras)", "  ({shown} of {total} interfaces; --top N or --iface NAME for others)"),
 		"mctl.metrics.no_data":      e("el trabajo no tiene datos de equipos", "the job has no device data"),
 		"mctl.metrics.ports_header": e("PUERTO\tM/S/N\tESTADO\tVLAN\tDÚPLEX\tVELOCIDAD\tTIPO\tNOTAS\tDESCRIPCIÓN", "PORT\tM/S/N\tSTATE\tVLAN\tDUPLEX\tSPEED\tTYPE\tNOTES\tDESCRIPTION"),
 		"mctl.metrics.channel":      e("canal {name} ({state}, {proto}): {members}", "channel {name} ({state}, {proto}): {members}"),

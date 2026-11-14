@@ -120,7 +120,7 @@ func init() {
 		"mctl.credrotate.prompt":   e("Secreto nuevo de {user}: ", "New secret for {user}: "),
 		"mctl.credrotate.note_1":   e("Los secretos (el nuevo y el hash previo) no se muestran nunca; la reversa los restaura desde el núcleo.", "The secrets (the new one and the previous hash) are never shown; the rollback restores them from the core."),
 		"mctl.credrotate.note_2":   e("write memory es obligatorio: sin él el equipo volvería al hash anterior al reiniciar. La bóveda se actualiza solo después de que", "write memory is mandatory: without it the device would return to the previous hash on reload. The vault is updated only after"),
-		"mctl.credrotate.note_3":   e("write memory salga con [OK]; la credencial anterior se conserva como \"<etiqueta> (anterior)\" hasta que la borres a mano.", "write memory exits with [OK]; the previous credential is kept as \"<label> (previous)\" until you delete it by hand."),
+		"mctl.credrotate.note_3":   e("write memory salga con [OK]; la credencial anterior se conserva como \"<etiqueta> (anterior)\" hasta que la borres a mano.", "write memory exits with [OK]; the previous credential is kept as \"<label> (anterior)\" until you delete it by hand."),
 		"mctl.credrotate.note_4":   e("Si rechazas write memory, la ejecución no termina: se propone la reversa.", "If you reject write memory, the run does not finish: the rollback is proposed."),
 
 		// forensic
