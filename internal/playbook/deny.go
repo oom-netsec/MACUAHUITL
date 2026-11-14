@@ -101,6 +101,9 @@ func CheckDenied(platform, cmd string) error {
 	if platform == "ftd" {
 		return checkFTD(cmd)
 	}
+	if platform == "ise" {
+		return checkISE(cmd)
+	}
 	segs := strings.Split(strings.ToLower(cmd), "|")
 	fields := strings.Fields(segs[0])
 	if len(fields) == 0 {
