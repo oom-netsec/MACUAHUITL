@@ -217,7 +217,7 @@ func (c *Core) openPacks() (err error) {
 		base.ReservedPlaybooks = append(base.ReservedPlaybooks, id)
 		base.ReservedScripts = append(base.ReservedScripts, "lib-"+strings.TrimPrefix(id, "ios-xe/"))
 	}
-	if base.ScriptIDs, base.ScriptNames, err = scriptsvc.BaseLibrary(); err != nil {
+	if base.ScriptIDs, base.ScriptNames, base.ScriptNamesEN, err = scriptsvc.BaseLibrary(); err != nil {
 		return err
 	}
 	keys, coreVersion := c.o.PackKeys, c.o.CoreVersion
