@@ -130,7 +130,7 @@ Los playbooks y scripts de cada tecnología se publican como paquetes `.mpack` f
 |---|---|
 | `oom/ios-xe` (switches y routers IOS-XE) | Publicado (v0.3.0; routers en 1.1.0, v0.3.1) |
 | `oom/ios` (IOS clásico) | Publicado (v0.3.1), validado en 3560CX |
-| `oom/wlc-9800` (Catalyst 9800 y EWC) | En main, sin release todavía (pide núcleo 0.4.0), validado en 9120 EWC |
+| `oom/wlc-9800` (Catalyst 9800 y EWC) | Publicado en v0.4.0 (pide núcleo 0.4.0), validado en 9120 EWC |
 | NX-OS, firewall (ASA/FTD), ACI, wireless AireOS, ISE, SD-Access | Pendientes |
 
 También pendiente: selección por elemento, copia a «Mis scripts» y paquete personal de respaldo (fase 32b).
