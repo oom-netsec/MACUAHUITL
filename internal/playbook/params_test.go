@@ -135,3 +135,49 @@ func TestExpandGuionBajoComoALaMano(t *testing.T) {
 		}
 	}
 }
+
+// En AireOS la MAC va en minúsculas con «:»; en las demás plataformas sigue como aaaa.bbbb.cccc.
+func TestExpandMACPorPlataforma(t *testing.T) {
+	for _, c := range []struct{ plat, in, want string }{
+		{"wlc-aireos", "AABB.CCDD.EEFF", "aa:bb:cc:dd:ee:ff"}, {"wlc-aireos", "AA-BB-CC-DD-EE-FF", "aa:bb:cc:dd:ee:ff"},
+		{"ios-xe", "AA:BB:CC:DD:EE:FF", "aabb.ccdd.eeff"}, {"wlc-9800", "aa:bb:cc:dd:ee:ff", "aabb.ccdd.eeff"}, {"ios", "aabbccddeeff", "aabb.ccdd.eeff"},
+	} {
+		p := Playbook{Platform: c.plat, Params: []Param{{"mac", "mac"}}, Commands: []Command{{Text: "show client detail {mac}"}, {Text: "show mac address-table address {mac}"}}}
+		if c.plat == "wlc-aireos" {
+			p.Commands[1].Text = `grep include "{mac}" "show client summary"`
+		}
+		cmds, err := p.Expand(map[string]string{"mac": c.in})
+		if err != nil {
+			t.Fatalf("%s: %v", c.plat, err)
+		}
+		if cmds[0].Text != "show client detail "+c.want || (c.plat != "wlc-aireos" && cmds[1].Text != "show mac address-table address "+c.want) || (c.plat == "wlc-aireos" && cmds[1].Text != `grep include "`+c.want+`" "show client summary"`) {
+			t.Errorf("%s: %q / %q", c.plat, cmds[0].Text, cmds[1].Text)
+		}
+	}
+}
+
+func TestKindWLAN(t *testing.T) {
+	for _, v := range []string{"1", "9", "10", "512"} {
+		if got, err := ValidateValue("wlan", v); err != nil || got != v {
+			t.Errorf("wlan %q: %q %v", v, got, err)
+		}
+	}
+	for _, v := range []string{"", "0", "01", "513", "1000", "-1", "1 2", "a", "1;x", "+5", "０１"} {
+		if _, err := ValidateValue("wlan", v); err == nil {
+			t.Errorf("wlan aceptó %q", v)
+		}
+	}
+}
+
+func TestWLANEsTipoDeclarable(t *testing.T) {
+	p, err := loadOne(t, "id: w\nplatform: wlc-aireos\nname: W\nparams:\n  - name: wlan\n    kind: wlan\ncommands:\n  - cmd: show wlan {wlan}\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c, err := p.Expand(map[string]string{"wlan": "7"}); err != nil || c[0].Text != "show wlan 7" {
+		t.Fatal(c, err)
+	}
+	if _, err := p.Expand(map[string]string{"wlan": "0"}); err == nil {
+		t.Fatal("wlan 0 aceptada")
+	}
+}

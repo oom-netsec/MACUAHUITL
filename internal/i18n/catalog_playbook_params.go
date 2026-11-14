@@ -6,7 +6,7 @@ func init() {
 	add(map[string]entry{
 		"playbook.err.param_undeclared": e("el comando usa {name:q} pero no está en params", "the command uses {name:q} but it is not in params", "name"),
 		"playbook.err.param_unused":     e("el dato {name:q} está declarado y ningún comando lo usa", "the parameter {name:q} is declared but no command uses it", "name"),
-		"playbook.err.param_kind":       e("el dato {name:q} tiene un tipo {kind:q} desconocido (mac, ap, interface o ip)", "parameter {name:q} has an unknown type {kind:q} (mac, ap, interface or ip)", "name", "kind"),
+		"playbook.err.param_kind":       e("el dato {name:q} tiene un tipo {kind:q} desconocido (mac, ap, wlan, interface o ip)", "parameter {name:q} has an unknown type {kind:q} (mac, ap, wlan, interface or ip)", "name", "kind"),
 		"playbook.err.param_name":       e("nombre de dato {name:q} inválido (minúsculas, dígitos y _)", "invalid parameter name {name:q} (lowercase, digits and _)", "name"),
 		"playbook.err.param_dup":        e("el dato {name:q} está repetido", "parameter {name:q} is repeated", "name"),
 		"playbook.err.param_in_pre":     e("pre no admite datos ({name:q})", "pre does not accept parameters ({name:q})", "name"),
