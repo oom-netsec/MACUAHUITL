@@ -522,6 +522,9 @@ func (c *Core) finish(j *job, state string) {
 	if w != nil {
 		detail = w.Dir()
 	}
+	c.mu.Lock()
+	j.closed = true // antes de publicar: un Subscribe que llegue ahora ya lo ve cerrado
+	c.mu.Unlock()
 	c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "closed", Detail: detail})
 }
 
@@ -546,6 +549,12 @@ func (s *patrolSvc) CancelJob(ctx context.Context, r *v1.CancelJobRequest) (*v1.
 	if created {
 		s.c.guard.Revoke(j.id)
 		s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
+		// Nunca pasa por finish: se publican los estados finales aquí para que quien lo vigila termine.
+		s.c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "cancelled"})
+		s.c.mu.Lock()
+		j.closed = true
+		s.c.mu.Unlock()
+		s.c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "closed"})
 		return &v1.CancelJobResponse{}, nil
 	}
 	s.c.sched.Cancel(j.id)
@@ -618,15 +627,28 @@ func (s *patrolSvc) GetRun(ctx context.Context, r *v1.GetRunRequest) (*v1.GetRun
 
 // ---- Eventos ----
 
-// finishedStates da el estado final (completed, cancelled o failed) de los trabajos de ids que ya terminaron.
-func (c *Core) finishedStates(ids []string) map[string]string {
+// closedJobs da, de los trabajos de ids que ya cerraron (manifest y zip hechos, o que nunca pasan por finish), los
+// eventos que el cliente se perdió: su estado final si lo hay y un "closed" con la hora de su última fase.
+func (c *Core) closedJobs(ids []string) map[string][]*v1.SubscribeResponse {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	out := map[string]string{}
+	out := map[string][]*v1.SubscribeResponse{}
 	for _, id := range ids {
-		if j, ok := c.jobs[id]; ok && (j.state == "completed" || j.state == "cancelled" || j.state == "failed") {
-			out[id] = j.state
+		j, ok := c.jobs[id]
+		if !ok || !j.closed {
+			continue
 		}
+		at := c.o.Now()
+		if n := len(j.Phases); n > 0 {
+			at = j.Phases[n-1].At
+		}
+		ev := func(state string) *v1.SubscribeResponse {
+			return &v1.SubscribeResponse{At: timestamppb.New(at), JobId: id, Event: &v1.SubscribeResponse_JobStateChanged{JobStateChanged: &v1.JobStateChanged{State: state}}}
+		}
+		if j.state == "completed" || j.state == "cancelled" || j.state == "failed" {
+			out[id] = append(out[id], ev(j.state))
+		}
+		out[id] = append(out[id], ev("closed"))
 	}
 	return out
 }
@@ -641,13 +663,16 @@ func (s *eventSvc) Subscribe(r *v1.SubscribeRequest, st v1.EventService_Subscrib
 	ch, cancel := s.c.bus.Subscribe(ids)
 	defer cancel()
 	st.SendHeader(nil)
-	// Un trabajo que ya terminó no emitirá más: se manda su estado final y, si todos los pedidos terminaron, se
-	// cierra el stream (si no, el cliente lo dejaría abierto para siempre). Se suscribe antes de mirar el estado:
-	// un final que llegue en medio sale dos veces, no se pierde.
-	if done := s.c.finishedStates(ids); len(done) > 0 {
-		for id, state := range done {
-			if err := st.Send(&v1.SubscribeResponse{JobId: id, Event: &v1.SubscribeResponse_JobStateChanged{JobStateChanged: &v1.JobStateChanged{State: state}}}); err != nil {
-				return err
+	// Un trabajo ya cerrado no emitirá más: se manda su estado final y un "closed" y, si todos los pedidos cerraron,
+	// se cierra el stream (si no, el cliente lo dejaría abierto para siempre). Uno que aún está en finish (manifest
+	// y zip) no cuenta: su "closed" llegará por el bus. Se suscribe antes de mirar: un evento que llegue en medio
+	// sale dos veces, no se pierde.
+	if done := s.c.closedJobs(ids); len(done) > 0 {
+		for _, id := range ids {
+			for _, e := range done[id] {
+				if err := st.Send(e); err != nil {
+					return err
+				}
 			}
 		}
 		if len(done) == len(ids) {
