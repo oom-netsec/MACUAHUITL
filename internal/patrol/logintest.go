@@ -50,11 +50,12 @@ func step(err error) string {
 	switch {
 	case errors.As(err, &he), errors.Is(err, transport.ErrKnownHosts):
 		return "host_key"
-	case errors.Is(err, transport.ErrAuth):
+	case errors.Is(err, transport.ErrAuth), errors.Is(err, platform.ErrLoginFailed):
 		return "auth"
-	case errors.Is(err, platform.ErrEnableFailed), errors.Is(err, platform.ErrFirstLogin), errors.Is(err, platform.ErrLoginFailed):
+	case errors.Is(err, platform.ErrEnableFailed), errors.Is(err, platform.ErrFirstLogin):
 		return "privilege"
-	case errors.Is(err, platform.ErrPromptTimeout), errors.Is(err, platform.ErrClosed):
+	case errors.Is(err, platform.ErrPromptTimeout), errors.Is(err, platform.ErrClosed),
+		errors.Is(err, platform.ErrConfigPrompt), errors.Is(err, platform.ErrDesync), errors.Is(err, platform.ErrConfirmPrompt):
 		return "prompt"
 	case errors.Is(err, platform.ErrUnknownPlatform):
 		return "platform"
@@ -113,36 +114,44 @@ func connectOnce(ctx context.Context, d Deps, jobID string, s Spec, t Target, hk
 		}
 		return sess, cred, err
 	}
-	sess, cred, err := open(primary)
-	if errors.Is(err, transport.ErrAuth) && fallback != "" && allowFallback {
+	try := func(id string) (*connected, error) {
+		sess, cred, err := open(id)
+		if err != nil {
+			return nil, err
+		}
+		r, w, err := sess.Shell()
+		if err != nil {
+			cred.Enable.Destroy()
+			sess.Close()
+			return nil, err
+		}
+		drv := d.driver()
+		// AireOS pide usuario y clave dentro del shell; el driver clona la clave. Target no trae la plataforma de la libreta, así que
+		// SetLogin se llama siempre y el driver decide: solo contesta «User:» si la línea anterior es «(Nombre)» y nunca escribe la clave
+		// sin que llegue «Password:» antes del primer prompt. Un IOS cuyo banner imite «(Nombre)» + «User:» puede recibir el usuario.
+		if sl, ok := drv.(platform.ShellLogin); ok {
+			sl.SetLogin(cred.Username, shellPw)
+		}
+		c := &connected{sess: sess, drv: drv}
+		if err := drv.Open(ctx, r, w, cred.Enable); err != nil {
+			c.close()
+			return nil, err
+		}
+		p, err := drv.Detect(ctx)
+		if err != nil {
+			c.close()
+			return nil, err
+		}
+		c.platform = p
+		return c, nil
+	}
+	c, err := try(primary)
+	// El rechazo del shell de AireOS (ErrLoginFailed) es rechazo de credencial igual que el de SSH: también prueba el respaldo.
+	if (errors.Is(err, transport.ErrAuth) || errors.Is(err, platform.ErrLoginFailed)) && fallback != "" && allowFallback {
 		onEvent(audit.Entry{Action: "auth.fallback", Target: hostport(t), Detail: jobID})
-		sess, cred, err = open(fallback)
+		c, err = try(fallback)
 	}
-	if err != nil {
-		return nil, err
-	}
-	r, w, err := sess.Shell()
-	if err != nil {
-		cred.Enable.Destroy()
-		sess.Close()
-		return nil, err
-	}
-	drv := d.driver()
-	if sl, ok := drv.(platform.ShellLogin); ok { // AireOS pide usuario y clave dentro del shell; el driver clona la clave
-		sl.SetLogin(cred.Username, shellPw)
-	}
-	c := &connected{sess: sess, drv: drv}
-	if err := drv.Open(ctx, r, w, cred.Enable); err != nil {
-		c.close()
-		return nil, err
-	}
-	p, err := drv.Detect(ctx)
-	if err != nil {
-		c.close()
-		return nil, err
-	}
-	c.platform = p
-	return c, nil
+	return c, err
 }
 
 // LoginTest prueba cada equipo. Interactivo: una llave desconocida devuelve su huella para
