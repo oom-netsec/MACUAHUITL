@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 func TestConsolePrefix(t *testing.T) {
@@ -36,7 +38,7 @@ func TestErroresFatalesPorIdioma(t *testing.T) {
 	}
 	for lang, want := range map[string]string{"en": "XDG_RUNTIME_DIR is not set", "es": "XDG_RUNTIME_DIR no está definido"} {
 		consoleLang = lang
-		if err := run(); err == nil || err.Error() != want {
+		if err := run(func() []i18n.Text { return nil }); err == nil || err.Error() != want {
 			t.Errorf("%s: %v", lang, err)
 		}
 	}

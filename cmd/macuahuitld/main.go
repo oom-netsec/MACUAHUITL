@@ -32,7 +32,7 @@ func main() {
 		fmt.Println(version.String())
 		return
 	}
-	if err := run(); err != nil {
+	if err := run(sys.Harden); err != nil {
 		fmt.Fprintln(os.Stderr, "macuahuitld:", err)
 		os.Exit(1)
 	}
@@ -41,11 +41,12 @@ func main() {
 // consoleLang es el idioma de lo que el daemon imprime en su consola; sin --lang, el canónico (inglés).
 var consoleLang = i18n.En
 
-func run() error {
+// run recibe el endurecimiento como dependencia: en producción sys.Harden; las pruebas pasan una falsa (mlockall no va en go test).
+func run(harden func() []i18n.Text) error {
 	if os.Geteuid() == 0 {
 		return errors.New(i18n.Msg(consoleLang, "harden.err.root", nil))
 	}
-	hw := sys.Harden() // antes de tocar cualquier secreto
+	hw := harden() // antes de tocar cualquier secreto
 	warns := make([]string, len(hw))
 	for i, w := range hw {
 		warns[i] = w.In(i18n.En) // la auditoría va siempre en inglés
