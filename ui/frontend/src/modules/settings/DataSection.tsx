@@ -34,7 +34,7 @@ function DataCard({ core, kind, tk, wk }: { core: CoreAPI; kind: ImportKind; tk:
     const body = await core.importTemplate(kind);
     const path = await core.pickSavePath(t(kind === "scripts" ? "settings.data.templateName" : "settings.data.templateNameCols"));
     if (!path) return;
-    await core.writeFile(path, body, "utf8", true); // pickSavePath ya confirmó el reemplazo
+    await cleanOnFail(core, path, core.writeFile(path, body, "utf8", true)); // pickSavePath ya confirmó el reemplazo
     setMsg(t("settings.data.templateSaved", { path }));
   });
   const exportAll = () => run(async () => {

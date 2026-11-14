@@ -82,6 +82,7 @@ export function Select<T extends string>({ label, hint, error, value, onChange, 
         <select id={id} value={value} disabled={disabled} aria-describedby={hintId} aria-required={required || undefined} aria-invalid={error ? true : undefined} onChange={(e) => onChange(e.target.value as T)}>
           {placeholder !== undefined && <option value="" disabled>{placeholder}</option>}
           {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {value !== "" && !options.some(([v]) => v === value) && <option value={value}>{value}</option>/* valor que el front no conoce: se muestra tal cual en vez de aparentar otra opción */}
         </select>
       )}
     </Labeled>

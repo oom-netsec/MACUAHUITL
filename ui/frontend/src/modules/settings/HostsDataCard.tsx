@@ -9,6 +9,7 @@ import { useLang, useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import type { Host, HostFileFormat, HostImportAction, HostImportItem, HostsFormat, HostsImportPreview, HostsImportResult } from "../inventory/api";
 import { hostsChanged, useHostsVersion } from "../inventory/signal";
+import { addrPort } from "../inventory/HostPicker";
 import "../inventory/hosts.css";
 
 // Tipos de la tabla de campos: el núcleo manda text/integer/list (en español, texto/entero/lista); se muestran con el nombre de la UI.
@@ -59,7 +60,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
     const tpl = await core.hostsImportTemplate(format);
     const path = await core.pickSavePath(tpl.filename);
     if (!path) return;
-    await core.writeFile(path, tpl.content, "utf8", true); // pickSavePath ya confirmó el reemplazo
+    await cleanOnFail(core, path, core.writeFile(path, tpl.content, "utf8", true)); // pickSavePath ya confirmó el reemplazo
     setMsg(t("hosts.data.template.saved", { path }));
   });
 
@@ -140,7 +141,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
         {scope === "some" && (
           <div role="group" aria-label={t("hosts.data.export.list")} className="hosts-pick-list">
             {book.map((h) => (
-              <Check key={h.id} label={`${h.name} · ${h.address}:${h.port}`} checked={picked.has(h.id)}
+              <Check key={h.id} label={`${h.name} · ${addrPort(h)}`} checked={picked.has(h.id)}
                 onChange={(v) => setPicked((s) => { const n = new Set(s); if (v) n.add(h.id); else n.delete(h.id); return n; })} />
             ))}
           </div>
