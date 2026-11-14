@@ -133,6 +133,9 @@ func (b *Bridge) AssistWatch(runID string) error {
 	st, err := v1.NewAssistServiceClient(c).WatchRun(ctx, &v1.WatchRunRequest{RunId: runID})
 	if err != nil {
 		forget()
+		if ctx.Err() != nil { // otro watch del mismo run lo reemplazó mientras abría: el nuevo ya cubre la ejecución
+			return nil
+		}
 		return wrapErr(err)
 	}
 	go func() {
@@ -143,6 +146,12 @@ func (b *Bridge) AssistWatch(runID string) error {
 				return
 			}
 			if err != nil {
+				b.mu.Lock()
+				vigente := b.assists[runID] == me
+				b.mu.Unlock()
+				if !vigente { // otro watch lo reemplazó: el nuevo emitirá su propio assist:done
+					return
+				}
 				if err != io.EOF {
 					b.emit("assist:done", map[string]any{"runId": runID, "error": err.Error(), "errorInfo": errorInfo(err)})
 				} else {
