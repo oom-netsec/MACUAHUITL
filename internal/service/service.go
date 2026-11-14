@@ -26,6 +26,8 @@ import (
 type JobInfo struct {
 	State string
 	Dir   string
+	// Until: fin de la ventana real del trabajo armado; cero antes de armar.
+	Until time.Time
 	// FinishErr: por qué no se pudo cerrar el trabajo (manifest, zip); vacío si cerró bien o sigue abierto.
 	FinishErr string
 }

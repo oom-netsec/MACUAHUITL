@@ -291,6 +291,8 @@ func TestAvisoDeTopeORecorteConservaLaCarpetaDePatrol(t *testing.T) {
 		}
 		if a := sd.AuditText(); !strings.Contains(a, `"action":"backup.warning"`) {
 			t.Errorf("%s: el aviso no quedó auditado: %s", nombre, a)
+		} else if strings.Contains(a, "recortad") || strings.Contains(a, "sin firma") || strings.Contains(a, "no devolvió") {
+			t.Errorf("%s: la auditoría va en inglés: %s", nombre, a)
 		}
 	}
 }
@@ -598,5 +600,17 @@ func TestNoGuardaUnTxtDePatrolQueSeEstaEscribiendo(t *testing.T) {
 	r, _ = s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
 	if !r.Done || !strings.Contains(r.Report.Text, "guardado(s)") {
 		t.Fatalf("final: %+v", r)
+	}
+}
+
+// Un trabajo armado después de crearse tiene otra ventana: la del trabajo manda sobre la que se calculó al crearlo.
+func TestVentanaDelTrabajoArmadoTarde(t *testing.T) {
+	at := time.Date(2026, 11, 6, 14, 0, 0, 0, time.UTC)
+	tr := &tracked{from: at.Add(-5 * time.Hour), until: at.Add(-2 * time.Hour)}
+	if tr.inWindow(at, time.Time{}) {
+		t.Error("fuera de la ventana de creación y sin otra: debía rechazarse")
+	}
+	if !tr.inWindow(at, at.Add(time.Hour)) {
+		t.Error("dentro del Until real del trabajo: debía aceptarse")
 	}
 }

@@ -273,3 +273,23 @@ func TestCollectRespaldosConDireccion(t *testing.T) {
 		t.Fatalf("solo respaldos = %+v", rt)
 	}
 }
+
+// Evidencia vieja IPv6 con puerto distinto de 22: la carpeta no llevaba el puerto y aun así es del equipo del manifest.
+func TestCollectCarpetaViejaIPv6ConPuerto(t *testing.T) {
+	out := t.TempDir()
+	m := `{"name":"j","ended_at":"` + d1.Format(time.RFC3339) + `","devices":[{"Target":{"Address":"2001:db8::1","Port":2222},"Hostname":"SW6","State":"completed"}]}`
+	write(t, filepath.Join(out, "j", "manifest.json"), m, d1)
+	write(t, filepath.Join(out, "j", "SW6_2001_db8__1", "running.txt"), "x", d1)
+	r, err := Collect(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range r.Devices {
+		for _, s := range d.Sources {
+			if s == SrcFlota {
+				return
+			}
+		}
+	}
+	t.Fatalf("la carpeta vieja no se reconoció: %+v", r.Devices)
+}

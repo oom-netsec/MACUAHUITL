@@ -196,7 +196,11 @@ func (c *collector) job(dir, name string) {
 					seen = at
 				}
 				c.add(obs{addr: clean(d.Target.Address), host: clean(d.Hostname), platform: clean(d.Platform), src: SrcPatrol, at: seen})
-				known[patrol.DeviceDirOf(d.Hostname, d.Target)] = [2]string{clean(d.Hostname), clean(d.Target.Address)}
+				kv := [2]string{clean(d.Hostname), clean(d.Target.Address)}
+				known[patrol.DeviceDirOf(d.Hostname, d.Target)] = kv
+				if old := patrol.DeviceDir(d.Hostname, d.Target.Address); known[old] == [2]string{} { // evidencia vieja: la carpeta no llevaba el puerto
+					known[old] = kv
+				}
 			}
 		}
 	}
