@@ -4,7 +4,7 @@ import type { SyslogDrops } from "../../modules/tools/api";
 import { useT } from "../../lib/i18n";
 import { optErrorText, type OptMessages } from "./IngestOptions";
 import type { ErrInfo } from "../../lib/coreError";
-import { buildOpts, coreFieldError, emptyForm, mapStartError, validateOpts, type IngestKind, type OptForm, type OptKey } from "./ingestOpts";
+import { buildOpts, coreFieldError, emptyForm, mapStartError, perSourceTemplate, validateOpts, type IngestKind, type OptForm, type OptKey } from "./ingestOpts";
 
 export const MAX_LIVE = 5000; // filas que se conservan en pantalla; los archivos guardan todo
 export const FLUSH_MS = 100;
@@ -65,7 +65,7 @@ export function useIngestOpts(kind: IngestKind, save: boolean) {
     /** Limpia lo de la escucha anterior y anota lo que se pide ahora; devuelve las opciones que se mandan. */
     begin: () => {
       setFile(""); setFolder(""); setDrops(null);
-      setRun({ save, perSource: form.nameTemplate.includes("{origen}"), maxFiles: Number(form.maxFiles.trim()) || 20 });
+      setRun({ save, perSource: perSourceTemplate(form.nameTemplate), maxFiles: Number(form.maxFiles.trim()) || 20 });
       return buildOpts(form, save, kind);
     },
     /** Ya escucha: las opciones no se editan, deja lugar a los resultados. */

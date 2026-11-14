@@ -1,8 +1,8 @@
 // Opciones de los receptores (syslog, traps, flujos): contra inundación y, al guardar, rotación, nombre, retención y formato.
 import { Field, Select } from "../../components/Field";
-import { useT } from "../../lib/i18n";
+import { useLang, useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
-import { DEFAULT_TEMPLATES, RANGES, kindKey, previewName, rangeOf, type IngestKind, type KindText, type NumKey, type OptError, type OptForm, type OptKey, type SyslogFormat } from "./ingestOpts";
+import { RANGES, defaultTemplate, perSourceTemplate, kindKey, previewName, rangeOf, type IngestKind, type KindText, type NumKey, type OptError, type OptForm, type OptKey, type SyslogFormat } from "./ingestOpts";
 import "./ingest.css";
 
 const FORMATS: SyslogFormat[] = ["texto", "crudo", "jsonl"];
@@ -14,6 +14,7 @@ export function IngestOptionsBox({ kind = "syslog", form, onChange, save, errors
   kind?: IngestKind; form: OptForm; onChange: (k: OptKey, v: string) => void; save: boolean; errors: OptMessages; open: boolean; onOpen: (v: boolean) => void; disabled?: boolean;
 }) {
   const t = useT();
+  const lang = useLang();
   // def: el default que se dice en la ayuda y se pone de marcador.
   const num = (k: NumKey, label: Key, def: string = rangeOf(kind, k).def, hintKey: Key = "syslog.opt.range") => (
     <Field label={t(label)} value={form[k]} onChange={(v) => onChange(k, v)} mono placeholder={def} error={errors[k]} disabled={disabled} inputMode="numeric"
@@ -24,7 +25,7 @@ export function IngestOptionsBox({ kind = "syslog", form, onChange, save, errors
   // Tope aproximado en disco con lo escrito, o con los defaults si falta o no es válido.
   const n = (k: NumKey) => (/^\d+$/.test(form[k].trim()) ? Number(form[k]) : Number(RANGES[k].def));
   const size = (mb: number) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`);
-  const perSource = form.nameTemplate.includes("{origen}");
+  const perSource = perSourceTemplate(form.nameTemplate);
   const disk = perSource
     ? t("syslog.opt.diskOrigin", { size: size(n("rotateMb") * n("maxFiles")), open: size(n("rotateMb") * 64) })
     : t("syslog.opt.disk", { size: size(n("rotateMb") * n("maxFiles")) });
@@ -57,7 +58,7 @@ export function IngestOptionsBox({ kind = "syslog", form, onChange, save, errors
             <Select label={t("syslog.opt.format")} value={form.format} onChange={(v) => onChange("format", v)} error={errors.format} disabled={disabled} hint={t(kindKey(kind, `fmt.${form.format}` as KindText))}
               options={FORMATS.map((f): [SyslogFormat, string] => [f, t(`syslog.fmtName.${f}`)])} />
             <div>
-              <Field label={t("syslog.opt.nameTemplate")} value={form.nameTemplate} onChange={(v) => onChange("nameTemplate", v)} mono placeholder={DEFAULT_TEMPLATES[kind]} disabled={disabled}
+              <Field label={t("syslog.opt.nameTemplate")} value={form.nameTemplate} onChange={(v) => onChange("nameTemplate", v)} mono placeholder={defaultTemplate(kind, lang)} disabled={disabled}
                 error={errors.nameTemplate} hint={t(kindKey(kind, "opt.tokens"))} />
               {!errors.nameTemplate && <p className="hint">{t("syslog.opt.example", { name: previewName(form.nameTemplate, form.format, new Date(), kind) })}</p>}
             </div>

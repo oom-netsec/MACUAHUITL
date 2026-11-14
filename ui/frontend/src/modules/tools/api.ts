@@ -10,7 +10,7 @@ export interface SyslogOptions {
   queueSize?: number;                              // cola antes de escribir (default 4096, 64–65536)
   rotateMb?: number;                               // con save: rotar a N MB (default 50, 1–1024)
   rotateMinutes?: number;                          // con save: rotar cada N min (0 = no, 1–10080)
-  nameTemplate?: string;                           // {fecha} {hora} {origen}; default syslog_{fecha}_{hora}
+  nameTemplate?: string;                           // {fecha}|{date} {hora}|{time} {origen}|{source}; default syslog_{fecha}_{hora}
   maxFiles?: number;                               // archivos que se conservan (default 20, 1–1000)
   format?: "texto" | "crudo" | "jsonl";            // default texto
 }
