@@ -1,0 +1,17 @@
+# Propósito: Resume las sesiones BGP del handoff por VRF.
+# Cuándo usarlo: Las rutas del fabric no salen o no entran por el handoff.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: border-handoff-bgp
+platform: sda
+name: SD-Access · Border · Handoff BGP
+name_en: SD-Access · Border · BGP handoff
+commands:
+  - cmd: show clock
+  - cmd: show ip bgp summary
+  - cmd: show bgp all summary
+  - cmd: show ip route vrf * summary
+  - cmd: show lisp session
+  - cmd: show ip protocols
+  - cmd: show logging | include BGP|ADJCHANGE
+    timeout: 180s

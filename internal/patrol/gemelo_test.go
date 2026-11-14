@@ -139,3 +139,29 @@ func TestRanDePuntaAPunta(t *testing.T) {
 		})
 	}
 }
+
+// cat9k/x y sda/x no son gemelos de ios/x ni de ios-xe/x: un ios no los corre (ni por gemelo) y un ios-xe sí.
+func TestCat9kSDANoSonGemelos(t *testing.T) {
+	cmd := func(s string) []playbook.Command { return []playbook.Command{{Text: s}} }
+	pbs := []playbook.Playbook{
+		{ID: "ios-xe/plat-salud", Platform: "ios-xe", Commands: cmd("show xe")},
+		{ID: "cat9k/plat-salud", Platform: "cat9k", Commands: cmd("show cat9k")},
+		{ID: "sda/plat-salud", Platform: "sda", Commands: cmd("show sda")},
+	}
+	for _, id := range []string{"cat9k/plat-salud", "sda/plat-salud"} {
+		for _, det := range []string{"ios", "wlc-9800", "nx-os"} {
+			if _, _, err := commands(Spec{PlaybookIDs: []string{id}}, det, pbs, nil); err == nil {
+				t.Errorf("%s en %s debía fallar", id, det)
+			}
+		}
+		out, _, err := commands(Spec{PlaybookIDs: []string{id}}, "ios-xe", pbs, nil)
+		if err != nil || len(out) != 1 || out[0].Text == "show xe" {
+			t.Errorf("%s en ios-xe: %v %v", id, out, err)
+		}
+	}
+	// ios elige ios-xe/plat-salud y no se le cuela cat9k/plat-salud
+	out, _, err := commands(Spec{PlaybookIDs: []string{"ios-xe/plat-salud"}}, "ios", pbs, nil)
+	if err != nil || len(out) != 1 || out[0].Text != "show xe" {
+		t.Errorf("ios: %v %v", out, err)
+	}
+}

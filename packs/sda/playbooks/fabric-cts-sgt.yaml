@@ -1,0 +1,16 @@
+# Propósito: Muestra el entorno CTS, el mapeo de SGT y las políticas.
+# Cuándo usarlo: El tráfico se bloquea por una política de grupos.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: fabric-cts-sgt
+platform: sda
+name: SD-Access · Fabric · SGT y políticas CTS
+name_en: SD-Access · Fabric · SGTs and CTS policies
+commands:
+  - cmd: show clock
+  - cmd: show cts environment-data
+  - cmd: show cts role-based sgt-map all
+  - cmd: show cts role-based permissions
+  - cmd: show cts role-based counters
+  - cmd: show cts server-list
+  - cmd: show cts role-based enforcement

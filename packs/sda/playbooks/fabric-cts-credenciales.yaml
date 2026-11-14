@@ -1,0 +1,20 @@
+# Propósito: Revisa las credenciales, las PAC y el aprovisionamiento de CTS.
+# Cuándo usarlo: El equipo no descarga el entorno CTS de ISE.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: fabric-cts-credenciales
+platform: sda
+name: SD-Access · Fabric · Credenciales y PAC de CTS
+name_en: SD-Access · Fabric · CTS credentials and PACs
+commands:
+  - cmd: show clock
+  - cmd: show cts credentials
+    may_contain_secrets: true
+  - cmd: show cts pacs
+    may_contain_secrets: true
+  - cmd: show cts provisioning
+  - cmd: show cts server-list
+  - cmd: show cts environment-data
+  - cmd: show aaa servers
+  - cmd: show logging | include CTS|RADIUS
+    timeout: 180s

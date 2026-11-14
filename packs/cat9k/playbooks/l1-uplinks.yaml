@@ -1,0 +1,17 @@
+# Propósito: Revisa uplinks, troncales, canales y transceptores.
+# Cuándo usarlo: Un uplink cae, pierde potencia o no pasa VLANs.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: l1-uplinks
+platform: cat9k
+name: Catalyst 9K · L1 · Uplinks y troncales
+name_en: Catalyst 9K · L1 · Uplinks and trunks
+commands:
+  - cmd: show clock
+  - cmd: show interfaces status
+  - cmd: show interfaces trunk
+  - cmd: show etherchannel summary
+  - cmd: show interfaces transceiver
+  - cmd: show udld neighbors
+  - cmd: show logging | include UPDOWN|LINEPROTO
+    timeout: 180s

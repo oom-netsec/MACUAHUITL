@@ -53,7 +53,7 @@ test("el contrato de Wails tolera las listas vacías que omite protojson", async
   const api = (json: string) => patrolWails((async () => json) as never);
   expect(await api("{}").listPlaybooks()).toEqual([]);
   expect(await api('{"playbooks":[{"id":"ios-xe/l2-stp","platform":"ios-xe","name":"L2 · STP"}]}').listPlaybooks())
-    .toEqual([{ id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: [], params: [] }]);
+    .toEqual([{ id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: [], params: [], pack: "" }]);
 });
 
 test("un playbook sin id no llega al selector", async () => {

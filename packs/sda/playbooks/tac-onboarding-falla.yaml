@@ -1,0 +1,22 @@
+# Propósito: Recolecta autenticación, RADIUS, CTS y DHCP de un puerto.
+# Cuándo usarlo: Un endpoint no completa la autenticación o no recibe SGT.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: tac-onboarding-falla
+platform: sda
+name: SD-Access · TAC · Onboarding falla en un puerto
+name_en: SD-Access · TAC · Onboarding fails on a port
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show clock
+  - cmd: show authentication sessions interface {interface} details
+  - cmd: show dot1x interface {interface} details
+  - cmd: show aaa servers
+  - cmd: show radius statistics
+  - cmd: show cts environment-data
+  - cmd: show ip dhcp snooping binding
+  - cmd: show interfaces {interface} status
+  - cmd: show logging | include AUTHMGR|DOT1X|MAB|RADIUS|CTS
+    timeout: 180s

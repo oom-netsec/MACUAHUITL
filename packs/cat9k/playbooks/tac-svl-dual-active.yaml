@@ -1,0 +1,19 @@
+# Propósito: Recolecta SVL, DAD y redundancia tras un dual-active.
+# Cuándo usarlo: Dos chasis se creen activos.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: tac-svl-dual-active
+platform: cat9k
+name: Catalyst 9K · TAC · StackWise Virtual dual-active
+name_en: Catalyst 9K · TAC · StackWise Virtual dual-active
+commands:
+  - cmd: show clock
+  - cmd: show stackwise-virtual
+  - cmd: show stackwise-virtual link
+  - cmd: show stackwise-virtual dual-active-detection
+  - cmd: show stackwise-virtual dual-active-detection pagp
+  - cmd: show redundancy
+  - cmd: show switch
+  - cmd: show etherchannel summary
+  - cmd: show logging
+    timeout: 180s

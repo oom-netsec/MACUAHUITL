@@ -1,0 +1,16 @@
+# Propósito: Resume sesiones BGP y motivos de reinicio.
+# Cuándo usarlo: Una sesión BGP cae o no anuncia rutas.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: l3-bgp
+platform: cat9k
+name: Catalyst 9K · L3 · BGP
+name_en: Catalyst 9K · L3 · BGP
+commands:
+  - cmd: show clock
+  - cmd: show ip bgp summary
+  - cmd: show bgp all summary
+  - cmd: show ip bgp neighbors | include BGP state|Last reset|Hold
+  - cmd: show ip route summary
+  - cmd: show logging | include BGP|ADJCHANGE
+    timeout: 180s

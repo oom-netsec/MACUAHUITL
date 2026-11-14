@@ -1542,6 +1542,7 @@ type PlaybookInfo struct {
 	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
 	Commands      []string               `protobuf:"bytes,4,rep,name=commands,proto3" json:"commands,omitempty"` // texto de cada comando, en orden
 	Params        []*PlaybookParam       `protobuf:"bytes,5,rep,name=params,proto3" json:"params,omitempty"`     // datos que pide; vacío = ninguno
+	Pack          string                 `protobuf:"bytes,6,opt,name=pack,proto3" json:"pack,omitempty"`         // paquete de origen: "oom/cat9k", "usuario" (propios) o vacío (contenido base)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1609,6 +1610,13 @@ func (x *PlaybookInfo) GetParams() []*PlaybookParam {
 		return x.Params
 	}
 	return nil
+}
+
+func (x *PlaybookInfo) GetPack() string {
+	if x != nil {
+		return x.Pack
+	}
+	return ""
 }
 
 type PlaybookParam struct {
@@ -1821,13 +1829,14 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\voutput_path\x18\x02 \x01(\tR\n" +
 	"outputPath\"2\n" +
 	"\x14ListPlaybooksRequest\x12\x1a\n" +
-	"\bplatform\x18\x01 \x01(\tR\bplatform\"\xa0\x01\n" +
+	"\bplatform\x18\x01 \x01(\tR\bplatform\"\xb4\x01\n" +
 	"\fPlaybookInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bplatform\x18\x02 \x01(\tR\bplatform\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1a\n" +
 	"\bcommands\x18\x04 \x03(\tR\bcommands\x124\n" +
-	"\x06params\x18\x05 \x03(\v2\x1c.macuahuitl.v1.PlaybookParamR\x06params\"7\n" +
+	"\x06params\x18\x05 \x03(\v2\x1c.macuahuitl.v1.PlaybookParamR\x06params\x12\x12\n" +
+	"\x04pack\x18\x06 \x01(\tR\x04pack\"7\n" +
 	"\rPlaybookParam\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\"R\n" +

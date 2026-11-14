@@ -12,6 +12,7 @@ commands:
   - cmd: show snmp engineID
   - cmd: show snmp group
   - cmd: show snmp user
+    may_contain_secrets: true
   - cmd: show snmp view
   - cmd: show snmp pending
   - cmd: show snmp sessions

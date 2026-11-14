@@ -1,0 +1,17 @@
+# Propósito: Muestra fuentes, ventiladores y temperaturas con los mensajes de ambiente.
+# Cuándo usarlo: Alarma de fuente, ventilador o temperatura, o un miembro que se apaga.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: plat-ambiental
+platform: cat9k
+name: Catalyst 9K · Plataforma · Energía, ventiladores y temperatura
+name_en: Catalyst 9K · Platform · Power, fans and temperature
+commands:
+  - cmd: show clock
+  - cmd: show environment all
+  - cmd: show environment power
+  - cmd: show environment temperature
+  - cmd: show inventory
+  - cmd: show switch
+  - cmd: show logging | include FAN|PWR|TEMP|POWER
+    timeout: 180s

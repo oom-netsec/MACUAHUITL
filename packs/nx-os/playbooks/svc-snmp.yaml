@@ -12,6 +12,7 @@ commands:
     timeout: 60s
     may_contain_secrets: true
   - cmd: show snmp host
+    may_contain_secrets: true
   - cmd: show snmp trap
   - cmd: show snmp user
     timeout: 60s

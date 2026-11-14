@@ -1,0 +1,18 @@
+# Propósito: Lista los EID registrados localmente por instancia.
+# Cuándo usarlo: Un endpoint no está en la base local del edge.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: lisp-base-datos
+platform: sda
+name: SD-Access · LISP · Base de datos local
+name_en: SD-Access · LISP · Local database
+commands:
+  - cmd: show clock
+  - cmd: show lisp all instance-id * ipv4 database
+    timeout: 180s
+  - cmd: show lisp all instance-id * ethernet database
+    timeout: 180s
+  - cmd: show lisp all instance-id * ipv6 database
+    timeout: 180s
+  - cmd: show lisp session
+  - cmd: show device-tracking database

@@ -1,0 +1,19 @@
+# Propósito: Resume versión, miembros, recursos, ambiente y mensajes recientes del Catalyst 9000.
+# Cuándo usarlo: Primera revisión de cualquier Catalyst 9000 antes de profundizar.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: plat-salud
+platform: cat9k
+name: Catalyst 9K · Plataforma · Salud general
+name_en: Catalyst 9K · Platform · General health
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show inventory
+  - cmd: show switch
+  - cmd: show platform resources
+  - cmd: show processes cpu sorted 5sec | exclude 0.00% 0.00% 0.00%
+  - cmd: show processes memory platform sorted
+  - cmd: show environment all
+  - cmd: show logging
+    timeout: 180s

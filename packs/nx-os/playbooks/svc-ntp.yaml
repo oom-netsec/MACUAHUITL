@@ -14,5 +14,6 @@ commands:
   - cmd: show ntp statistics io
   - cmd: show ntp authentication-status
   - cmd: show ntp trusted-keys
+    may_contain_secrets: true
   - cmd: show logging last 100 | include NTP
     timeout: 180s

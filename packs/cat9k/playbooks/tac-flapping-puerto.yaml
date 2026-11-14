@@ -1,0 +1,22 @@
+# Propósito: Recolecta estado, log, UDLD y STP de un puerto inestable.
+# Cuándo usarlo: Un puerto sube y baja o se pone err-disabled.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: tac-flapping-puerto
+platform: cat9k
+name: Catalyst 9K · TAC · Puerto con flapping
+name_en: Catalyst 9K · TAC · Flapping port
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show clock
+  - cmd: show interfaces {interface}
+  - cmd: show interfaces {interface} transceiver detail
+  - cmd: show controllers ethernet-controller {interface}
+  - cmd: show spanning-tree interface {interface} detail
+  - cmd: show udld {interface}
+  - cmd: show errdisable detect
+  - cmd: show etherchannel summary
+  - cmd: show logging
+    timeout: 180s

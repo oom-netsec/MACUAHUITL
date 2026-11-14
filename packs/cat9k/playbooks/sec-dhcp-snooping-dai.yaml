@@ -1,0 +1,18 @@
+# Propósito: Revisa las tablas de snooping, las inspecciones ARP y la protección de origen.
+# Cuándo usarlo: Clientes sin DHCP, ARP bloqueado o tráfico descartado por IPSG.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: sec-dhcp-snooping-dai
+platform: cat9k
+name: Catalyst 9K · Seguridad · DHCP snooping, DAI y IPSG
+name_en: Catalyst 9K · Security · DHCP snooping, DAI and IPSG
+commands:
+  - cmd: show clock
+  - cmd: show ip dhcp snooping
+  - cmd: show ip dhcp snooping binding
+  - cmd: show ip dhcp snooping statistics detail
+  - cmd: show ip arp inspection
+  - cmd: show ip arp inspection statistics
+  - cmd: show ip source binding
+  - cmd: show logging | include DHCP_SNOOPING|SW_DAI|IPSG
+    timeout: 180s

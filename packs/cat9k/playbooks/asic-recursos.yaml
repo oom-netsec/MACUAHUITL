@@ -1,0 +1,16 @@
+# Propósito: Muestra la ocupación del TCAM y los recursos de plataforma.
+# Cuándo usarlo: Tablas llenas o programación de hardware que falla.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: asic-recursos
+platform: cat9k
+name: Catalyst 9K · ASIC · Recursos del ASIC
+name_en: Catalyst 9K · ASIC · ASIC resources
+commands:
+  - cmd: show clock
+  - cmd: show platform hardware fed switch active fwd-asic resource tcam utilization  # 9200/9300/9500 con stack; en 9400/9600: fed active
+  - cmd: show platform resources
+  - cmd: show sdm prefer
+  - cmd: show platform software status control-processor brief
+  - cmd: show ip route summary
+  - cmd: show mac address-table count

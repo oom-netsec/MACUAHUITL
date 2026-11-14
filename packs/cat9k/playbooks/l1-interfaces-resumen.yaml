@@ -1,0 +1,17 @@
+# Propósito: Resume estado, descripción, errores y flaps de las interfaces.
+# Cuándo usarlo: Primera vista de puertos caídos o con errores.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: l1-interfaces-resumen
+platform: cat9k
+name: Catalyst 9K · L1 · Resumen de interfaces
+name_en: Catalyst 9K · L1 · Interfaces summary
+commands:
+  - cmd: show clock
+  - cmd: show interfaces status
+  - cmd: show interfaces description
+  - cmd: show ip interface brief
+  - cmd: show interfaces counters errors
+  - cmd: show interfaces status err-disabled
+  - cmd: show logging | include UPDOWN|LINK
+    timeout: 180s

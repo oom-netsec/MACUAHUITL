@@ -1,0 +1,18 @@
+# Propósito: Lista los vecinos CDP y LLDP con detalle.
+# Cuándo usarlo: Un vecino no aparece o publica datos incorrectos.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: l2-cdp-lldp
+platform: cat9k
+name: Catalyst 9K · L2 · Vecinos CDP y LLDP
+name_en: Catalyst 9K · L2 · CDP and LLDP neighbors
+commands:
+  - cmd: show clock
+  - cmd: show cdp neighbors
+  - cmd: show cdp neighbors detail
+    timeout: 120s
+  - cmd: show lldp neighbors
+  - cmd: show lldp neighbors detail
+    timeout: 120s
+  - cmd: show lldp traffic
+  - cmd: show cdp traffic

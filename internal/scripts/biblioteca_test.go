@@ -166,3 +166,14 @@ func TestDerivedOmiteLosPlaybooksConDatos(t *testing.T) {
 		t.Fatalf("textos %v", d)
 	}
 }
+
+// Los playbooks cat9k y sda son contenido sobre ios-xe: su script derivado usa la plataforma de scripts ios-xe.
+func TestDerivedCat9kSDAUsaIOSXE(t *testing.T) {
+	for _, pl := range []string{"cat9k", "sda"} {
+		pb := playbook.Playbook{ID: pl + "/plat-x", Platform: pl, Name: "X · Y", Commands: []playbook.Command{{Text: "show clock"}}}
+		d := Derived([]playbook.Playbook{pb})
+		if len(d) != 1 || d[0].Platform != "ios-xe" || d[0].ID != "lib-"+pl+"-plat-x" || d[0].Validate() != nil {
+			t.Fatalf("%s: %+v", pl, d)
+		}
+	}
+}

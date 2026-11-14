@@ -44,7 +44,7 @@ export interface RunDevice { target: string; state: string; detail: string; reas
 // Un playbook del catálogo: id "ios-xe/stp", nombre "L2 · STP" (área antes del «·») y los comandos que corre.
 export type ParamKind = "mac" | "ap" | "interface" | "ip";
 export interface PlaybookParam { name: string; kind: ParamKind }
-export interface PlaybookInfo { id: string; platform: string; name: string; commands: string[]; params: PlaybookParam[] }
+export interface PlaybookInfo { id: string; platform: string; name: string; commands: string[]; params: PlaybookParam[]; pack: string } // pack: "oom/cat9k", "usuario" (propios) o "" (base)
 
 export interface PatrolAPI {
   getRun(jobId: string, round: number): Promise<RunDevice[]>;
@@ -73,5 +73,5 @@ export const patrolWails = (call: Call): PatrolAPI => ({
   // protojson omite las listas vacías: {} sin playbooks, y un playbook sin commands.
   listPlaybooks: async () => ((JSON.parse(await call<string>("ListPlaybooks")) as { playbooks?: Partial<PlaybookInfo>[] }).playbooks ?? [])
     .filter((p): p is Partial<PlaybookInfo> & { id: string } => !!p.id) // sin id no se puede pedir: el núcleo lo rechazaría
-    .map((p) => ({ id: p.id, platform: p.platform ?? "", name: p.name ?? p.id, commands: p.commands ?? [], params: p.params ?? [] })),
+    .map((p) => ({ id: p.id, platform: p.platform ?? "", name: p.name ?? p.id, commands: p.commands ?? [], params: p.params ?? [], pack: p.pack ?? "" })),
 });

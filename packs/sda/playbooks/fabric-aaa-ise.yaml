@@ -1,0 +1,18 @@
+# Propósito: Revisa servidores AAA, estadísticas RADIUS y el CTS asociado.
+# Cuándo usarlo: Los endpoints no autentican porque ISE no responde.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: fabric-aaa-ise
+platform: sda
+name: SD-Access · Fabric · AAA y RADIUS hacia ISE
+name_en: SD-Access · Fabric · AAA and RADIUS to ISE
+commands:
+  - cmd: show clock
+  - cmd: show aaa servers
+  - cmd: show radius statistics
+  - cmd: show cts server-list
+  - cmd: show cts environment-data
+  - cmd: show running-config | section aaa|radius|cts
+    may_contain_secrets: true
+  - cmd: show logging | include RADIUS|AAA|CTS
+    timeout: 180s

@@ -47,11 +47,11 @@ export function sampleMetrics(start = Date.now() - 90 * 60_000): JobMetrics {
 
 // Catálogo de ejemplo con la forma de ListPlaybooks (nombres "Área · Tema").
 export const samplePlaybooks: PlaybookInfo[] = [
-  { id: "ios-xe/l3-ospf", platform: "ios-xe", name: "L3 · OSPF", commands: ["show clock", "show ip ospf neighbor", "show ip ospf interface brief", "show ip ospf database"], params: [] },
-  { id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: ["show clock", "show spanning-tree summary", "show spanning-tree detail", "show spanning-tree blockedports"], params: [] },
-  { id: "ios-xe/tac-baseline", platform: "ios-xe", name: "TAC · Línea base", commands: ["show version", "show running-config", "show logging"], params: [] },
-  { id: "ios-xe/tac-usuario-sin-red", platform: "ios-xe", name: "TAC · Usuario sin red", commands: ["show interfaces status", "show mac address-table", "show ip dhcp snooping binding"], params: [] },
-  { id: "ios-xe/l2-vlan-troncales", platform: "ios-xe", name: "L2 · VLAN y troncales", commands: ["show vlan brief", "show interfaces trunk", "show vtp status"], params: [] },
+  { id: "ios-xe/l3-ospf", platform: "ios-xe", name: "L3 · OSPF", commands: ["show clock", "show ip ospf neighbor", "show ip ospf interface brief", "show ip ospf database"], params: [], pack: "" },
+  { id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: ["show clock", "show spanning-tree summary", "show spanning-tree detail", "show spanning-tree blockedports"], params: [], pack: "" },
+  { id: "ios-xe/tac-baseline", platform: "ios-xe", name: "TAC · Línea base", commands: ["show version", "show running-config", "show logging"], params: [], pack: "" },
+  { id: "ios-xe/tac-usuario-sin-red", platform: "ios-xe", name: "TAC · Usuario sin red", commands: ["show interfaces status", "show mac address-table", "show ip dhcp snooping binding"], params: [], pack: "" },
+  { id: "ios-xe/l2-vlan-troncales", platform: "ios-xe", name: "L2 · VLAN y troncales", commands: ["show vlan brief", "show interfaces trunk", "show vtp status"], params: [], pack: "" },
 ];
 
 export function fakePatrol() {
