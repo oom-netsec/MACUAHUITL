@@ -1,0 +1,19 @@
+# Propósito: Asociaciones IPsec, estadísticas de cifrado y mapas criptográficos.
+# Cuándo usarlo: La fase 2 no sube o el tráfico cifrado no cuenta (encaps/decaps en cero).
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: vpn-ipsec
+platform: asa
+name: ASA · VPN · IPsec
+name_en: ASA · VPN · IPsec
+commands:
+  - cmd: show clock
+  - cmd: show crypto ipsec stats
+  - cmd: show crypto ipsec sa detail
+  - cmd: show running-config crypto ipsec
+    may_contain_secrets: true
+  - cmd: show running-config crypto map
+    may_contain_secrets: true
+  - cmd: show crypto accelerator statistics
+  - cmd: show crypto ipsec sa
+    timeout: 120s

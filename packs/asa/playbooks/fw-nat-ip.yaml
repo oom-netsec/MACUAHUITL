@@ -1,0 +1,23 @@
+# Propósito: Traducciones, reglas y conexiones relacionadas con la IP indicada.
+# Cuándo usarlo: Un host concreto no se traduce o sale con la IP equivocada.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: fw-nat-ip
+platform: asa
+name: ASA · Firewall · NAT de una IP
+name_en: ASA · Firewall · NAT of one IP
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: show xlate local {ip}
+  - cmd: show xlate global {ip}
+  - cmd: show nat detail
+  - cmd: show conn address {ip}
+  - cmd: show running-config nat
+    may_contain_secrets: true
+  - cmd: show running-config object | include {ip}
+    may_contain_secrets: true
+  - cmd: show running-config object-group | include {ip}
+    may_contain_secrets: true

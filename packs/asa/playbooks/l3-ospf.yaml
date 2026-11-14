@@ -1,0 +1,19 @@
+# Propósito: Vecinos, interfaces, base de datos y tráfico de OSPF.
+# Cuándo usarlo: Un vecino OSPF no llega a FULL o faltan rutas aprendidas.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: l3-ospf
+platform: asa
+name: ASA · Capa 3 · OSPF
+name_en: ASA · Layer 3 · OSPF
+commands:
+  - cmd: show clock
+  - cmd: show ospf
+  - cmd: show ospf neighbor
+  - cmd: show ospf interface
+  - cmd: show ospf border-routers
+  - cmd: show ospf traffic
+  - cmd: show route ospf
+  - cmd: show running-config router ospf
+    may_contain_secrets: true
+  - cmd: show ospf database

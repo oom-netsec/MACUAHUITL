@@ -1,0 +1,20 @@
+# Propósito: Contadores de ASP y flujos descartados con el contexto de interfaces y políticas.
+# Cuándo usarlo: Hay descartes (acl-drop, no-route, inspect-*, tcp-*, etc.) y se necesita acotarlos.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: tac-descartes-asp
+platform: asa
+name: ASA · TAC · Descartes de ASP
+name_en: ASA · TAC · ASP drops (TAC case)
+commands:
+  - cmd: show clock
+  - cmd: show asp drop
+  - cmd: show asp drop frame
+  - cmd: show asp drop flow
+  - cmd: show asp event dp-cp
+  - cmd: show service-policy
+  - cmd: show conn count
+  - cmd: show interface | include Interface|errors|overrun
+  - cmd: show cpu usage
+  - cmd: "show logging | include ASA-[0-9]-(106|710|302)"
+    timeout: 180s

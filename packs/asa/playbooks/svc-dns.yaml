@@ -1,0 +1,18 @@
+# Propósito: Servidores DNS configurados, resolución de nombres y objetos FQDN.
+# Cuándo usarlo: El ASA no resuelve nombres o falla un objeto FQDN.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: svc-dns
+platform: asa
+name: ASA · Servicios · DNS
+name_en: ASA · Services · DNS
+commands:
+  - cmd: show clock
+  - cmd: show dns
+  - cmd: show dns-hosts
+  - cmd: show running-config dns
+    may_contain_secrets: true
+  - cmd: show running-config domain-name
+    may_contain_secrets: true
+  - cmd: show running-config name
+    may_contain_secrets: true

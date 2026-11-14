@@ -1,0 +1,20 @@
+# Propósito: Reglas NAT, orden, hitcounts, pools y tabla de traducciones.
+# Cuándo usarlo: El NAT no traduce, se agotó un pool de PAT o hay conflicto entre reglas.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: fw-xlate-nat
+platform: asa
+name: ASA · Firewall · NAT y tabla de xlate
+name_en: ASA · Firewall · NAT and xlate table
+commands:
+  - cmd: show clock
+  - cmd: show nat
+  - cmd: show nat detail
+  - cmd: show nat pool
+  - cmd: show xlate count
+  - cmd: show running-config nat
+    may_contain_secrets: true
+  - cmd: show running-config object
+    may_contain_secrets: true
+  - cmd: show xlate
+    timeout: 120s

@@ -1,0 +1,29 @@
+# Propósito: Simulación con packet-tracer (TCP 443, TCP 80 e ICMP) más NAT, ACL, rutas y descartes.
+# Cuándo usarlo: Un flujo entre dos hosts no pasa por el ASA y se necesita ver qué fase lo descarta.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: tac-trafico-no-pasa
+platform: asa
+name: ASA · TAC · Tráfico que no pasa (packet-tracer)
+name_en: ASA · TAC · Traffic not passing (packet-tracer)
+params:
+  - name: interface
+    kind: interface
+  - name: src
+    kind: ip
+  - name: dst
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: packet-tracer input {interface} tcp {src} 12345 {dst} 443 detailed
+  - cmd: packet-tracer input {interface} tcp {src} 12345 {dst} 80 detailed
+  - cmd: packet-tracer input {interface} icmp {src} 8 0 {dst} detailed
+  - cmd: show route {dst}
+  - cmd: show nat detail
+  - cmd: show access-group
+  - cmd: show conn address {src}
+  - cmd: show asp drop
+  - cmd: show capture
+  - cmd: show access-list | include {dst}
+  - cmd: show logging | include {src}
+    timeout: 180s

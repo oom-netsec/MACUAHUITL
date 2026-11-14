@@ -1,0 +1,22 @@
+# Propósito: IKEv1, IKEv2, IPsec, sesiones y mensajes de negociación de syslog.
+# Cuándo usarlo: Un túnel site-to-site no sube y no se conoce al peer.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: tac-tunel-no-sube
+platform: asa
+name: ASA · TAC · Túnel VPN que no sube
+name_en: ASA · TAC · VPN tunnel not coming up
+commands:
+  - cmd: show clock
+  - cmd: show crypto ikev2 sa
+  - cmd: show crypto ikev1 sa
+  - cmd: show crypto ipsec sa detail
+  - cmd: show crypto ikev2 stats
+  - cmd: show crypto ikev1 stats
+  - cmd: show vpn-sessiondb summary
+  - cmd: show running-config crypto map
+    may_contain_secrets: true
+  - cmd: show crypto ca certificates
+  - cmd: show asp drop
+  - cmd: "show logging | include ASA-[0-9]-(713|750|751|752)"
+    timeout: 180s

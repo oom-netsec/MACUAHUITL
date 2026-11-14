@@ -1,0 +1,23 @@
+# Propósito: SSH, ASDM, AAA, llaves y syslogs de acceso.
+# Cuándo usarlo: SSH o ASDM no entran al ASA o falla la autenticación de gestión.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: tac-gestion-no-accede
+platform: asa
+name: ASA · TAC · No se puede administrar el ASA
+name_en: ASA · TAC · Cannot manage the ASA
+commands:
+  - cmd: show clock
+  - cmd: show curpriv
+  - cmd: show ssh sessions
+  - cmd: show asdm sessions
+  - cmd: show running-config ssh
+    may_contain_secrets: true
+  - cmd: show running-config http
+    may_contain_secrets: true
+  - cmd: show running-config aaa
+    may_contain_secrets: true
+  - cmd: show aaa-server
+  - cmd: show crypto key mypubkey rsa
+  - cmd: "show logging | include ASA-[0-9]-(315|605|611)"
+    timeout: 180s

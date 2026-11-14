@@ -1,0 +1,19 @@
+# Propósito: Políticas globales y por interfaz, motores de inspección y sus contadores.
+# Cuándo usarlo: Una aplicación falla por inspección (FTP, SIP, DNS, HTTP) o se sospecha de un class-map.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: fw-service-policy
+platform: asa
+name: ASA · Firewall · Service-policy e inspección
+name_en: ASA · Firewall · Service-policy and inspection
+commands:
+  - cmd: show clock
+  - cmd: show service-policy
+  - cmd: show service-policy global
+  - cmd: show service-policy | include Inspect|drop|reset
+  - cmd: show running-config policy-map
+    may_contain_secrets: true
+  - cmd: show running-config class-map
+    may_contain_secrets: true
+  - cmd: show running-config service-policy
+    may_contain_secrets: true

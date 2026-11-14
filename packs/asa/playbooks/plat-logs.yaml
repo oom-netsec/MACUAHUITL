@@ -1,0 +1,17 @@
+# Propósito: Configuración de logging, cola de mensajes y mensajes de severidad alta en el búfer.
+# Cuándo usarlo: Se busca la causa de un evento reciente en el búfer de syslog del ASA.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: plat-logs
+platform: asa
+name: ASA · Plataforma · Logs y registros
+name_en: ASA · Platform · Logs and syslog buffer
+commands:
+  - cmd: show clock
+  - cmd: show logging setting
+  - cmd: show logging queue
+  - cmd: show logging asdm
+  - cmd: "show logging | include ASA-[0-3]-"
+    timeout: 180s
+  - cmd: show logging
+    timeout: 180s

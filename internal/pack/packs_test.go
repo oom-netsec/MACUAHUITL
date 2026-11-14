@@ -22,7 +22,7 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 	base := repoBase(t)
 	for _, d := range dirs {
 		t.Run(filepath.Base(d), func(t *testing.T) {
-			p, err := pack.ValidateSource(d, "v0.4.1")
+			p, err := pack.ValidateSource(d, "v0.4.3")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -32,7 +32,7 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(d, "SIGNATURE")); err == nil {
 				t.Fatal("la fuente no lleva SIGNATURE")
 			}
-			st, _, err := pack.Open(t.TempDir(), "v0.4.1", packtest.Keys(), base)
+			st, _, err := pack.Open(t.TempDir(), "v0.4.3", packtest.Keys(), base)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -71,7 +71,7 @@ func repoBase(t *testing.T) pack.Base {
 
 // oom/ios y oom/ios-xe conviven en el mismo almacén: playbooks distintos por plataforma y scripts por el prefijo ios-.
 func TestIOSEIOSXEConviven(t *testing.T) {
-	st, _, err := pack.Open(t.TempDir(), "v0.4.1", packtest.Keys(), repoBase(t))
+	st, _, err := pack.Open(t.TempDir(), "v0.4.3", packtest.Keys(), repoBase(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +104,7 @@ func TestBuildEsDeterminista(t *testing.T) {
 	if string(a) != string(b) {
 		t.Fatal("Build no es determinista")
 	}
-	if _, err := pack.Verify(a, "v0.4.1", nil); pack.Reason(err) != "editor.reserved" {
+	if _, err := pack.Verify(a, "v0.4.3", nil); pack.Reason(err) != "editor.reserved" {
 		t.Fatalf("sin firma, oom está reservado: %v", err)
 	}
 }
@@ -144,7 +144,7 @@ func TestSegmentosOficialesEstanReservados(t *testing.T) {
 	}
 	dirs, _ := filepath.Glob(filepath.Join(packtest.RepoDir(), "packs", "*"))
 	for _, d := range dirs {
-		p, err := pack.ValidateSource(d, "v0.4.1")
+		p, err := pack.ValidateSource(d, "v0.4.3")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -164,7 +164,7 @@ func TestSegmentosOficialesEstanReservados(t *testing.T) {
 // El paquete oom/nx-os pide el núcleo 0.4.1: instala en él y un núcleo 0.4.0 lo rechaza.
 func TestNXOSPideNucleo041(t *testing.T) {
 	d := filepath.Join(packtest.RepoDir(), "packs", "nx-os")
-	if _, err := pack.ValidateSource(d, "v0.4.1"); err != nil {
+	if _, err := pack.ValidateSource(d, "v0.4.3"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pack.ValidateSource(d, "v0.4.0"); pack.Reason(err) != "core.too_old" {
@@ -174,14 +174,25 @@ func TestNXOSPideNucleo041(t *testing.T) {
 
 // Los paquetes oficiales ios, ios-xe, wlc-9800 y nx-os conviven en el mismo almacén: sin choques de ID ni de nombre de script.
 func TestPaquetesOficialesConviven(t *testing.T) {
-	st, _, err := pack.Open(t.TempDir(), "v0.4.1", packtest.Keys(), repoBase(t))
+	st, _, err := pack.Open(t.TempDir(), "v0.4.3", packtest.Keys(), repoBase(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, n := range []string{"ios", "ios-xe", "wlc-9800", "nx-os"} {
+	for _, n := range []string{"ios", "ios-xe", "wlc-9800", "nx-os", "asa"} {
 		if _, err := st.Install(packtest.Signed(t, filepath.Join(packtest.RepoDir(), "packs", n)), false); err != nil {
 			t.Fatalf("oom/%s junto a los demás: %v", n, err)
 		}
+	}
+}
+
+// El paquete oom/asa pide el núcleo 0.4.3 (reconoce ASA): un 0.4.2 lo rechaza.
+func TestASAPideNucleo043(t *testing.T) {
+	d := filepath.Join(packtest.RepoDir(), "packs", "asa")
+	if _, err := pack.ValidateSource(d, "v0.4.3"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pack.ValidateSource(d, "v0.4.2"); pack.Reason(err) != "core.too_old" {
+		t.Fatalf("0.4.2 debe rechazarlo: %v", err)
 	}
 }
 
@@ -189,7 +200,7 @@ func TestPaquetesOficialesConviven(t *testing.T) {
 func TestCat9kSDAPidenNucleo041(t *testing.T) {
 	for _, n := range []string{"cat9k", "sda"} {
 		d := filepath.Join(packtest.RepoDir(), "packs", n)
-		if _, err := pack.ValidateSource(d, "v0.4.1"); err != nil {
+		if _, err := pack.ValidateSource(d, "v0.4.3"); err != nil {
 			t.Fatalf("%s: %v", n, err)
 		}
 		if _, err := pack.ValidateSource(d, "v0.4.0"); pack.Reason(err) != "core.too_old" {
@@ -200,7 +211,7 @@ func TestCat9kSDAPidenNucleo041(t *testing.T) {
 
 // Todos los paquetes oficiales del repo (también oom/cat9k y oom/sda) conviven en el mismo almacén.
 func TestTodosLosPaquetesOficialesConviven(t *testing.T) {
-	st, _, err := pack.Open(t.TempDir(), "v0.4.1", packtest.Keys(), repoBase(t))
+	st, _, err := pack.Open(t.TempDir(), "v0.4.3", packtest.Keys(), repoBase(t))
 	if err != nil {
 		t.Fatal(err)
 	}

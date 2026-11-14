@@ -1,0 +1,18 @@
+# Propósito: Roles, estado, interfaces monitoreadas y estadísticas del par.
+# Cuándo usarlo: Se revisa el estado del par activo/standby o por qué no sincronizan.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: ha-failover-estado
+platform: asa
+name: ASA · Alta disponibilidad · Estado de failover
+name_en: ASA · High availability · Failover status
+commands:
+  - cmd: show clock
+  - cmd: show failover
+  - cmd: show failover state
+  - cmd: show failover interface
+  - cmd: show failover statistics
+  - cmd: show monitor-interface
+  - cmd: show running-config failover
+    may_contain_secrets: true
+  - cmd: show failover history

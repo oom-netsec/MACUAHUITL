@@ -1,0 +1,20 @@
+# Propósito: Miembros, roles, historial y distribución de conexiones del cluster.
+# Cuándo usarlo: Un miembro sale del cluster, cambia de rol o el reparto de carga es desigual.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: ha-cluster-estado
+platform: asa
+name: ASA · Alta disponibilidad · Estado de cluster
+name_en: ASA · High availability · Cluster status
+commands:
+  - cmd: show clock
+  - cmd: show cluster info
+  - cmd: show cluster history
+  - cmd: show cluster info load-monitor
+  - cmd: show cluster info conn-distribution
+  - cmd: show cluster info packet-distribution
+  - cmd: show cluster info incompatible-config
+  - cmd: show cluster info transport cp
+  - cmd: show asp cluster counter
+  - cmd: show running-config cluster
+    may_contain_secrets: true
