@@ -262,6 +262,9 @@ func publish(files []string, extraDeny []string) (map[string]string, map[string]
 		// (un enlace que cambie después no desvía); si no se puede resolver, se rechaza.
 		real, err := evalSymlinks(filepath.Clean(f))
 		if err != nil {
+			if _, serr := os.Stat(f); serr != nil {
+				err = serr // el mensaje de siempre para un archivo inexistente
+			}
 			return nil, nil, fmt.Errorf("fileserve: %w", err)
 		}
 		st, err := os.Lstat(real)
