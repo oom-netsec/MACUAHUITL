@@ -22,6 +22,12 @@ func TestCheckDeniedISERechaza(t *testing.T) {
 		"show logging system tail", "show logging application ise-psc.log tail", "show logging system TAIL", "show tail", "show logging tai",
 		"show tech-support file disk:/x", "show tech-support fi x", "show file x", "show running-config file x", "show repository r ftp://h/x",
 		"show top", "show to", "show TOP", "show version disk:/x", "show version localdisk:x", "show version tftp://h/x", "show version https://h/x",
+		// abreviaturas de una letra de tail y file; show t solo es ambiguo
+		"show logging system t", "show logging application ise-psc.log t", "show tech-support f x", "show logging system ta", "show f x", "show t",
+		// show repository con argumento lista el repositorio remoto
+		"show repository myrepo", "show repo myrepo", "show rep x",
+		// destinos numéricos abreviados u hexadecimales
+		"ping 224.1", "ping 4294967295", "ping 0xffffffff", "ping 127.1", "ping 0177.0.0.1", "ping 0xff.1.1.1", "ping a:b", "traceroute 224.1", "nslookup 0xffffffff", "nslookup 4294967295",
 		// ?, ;, >, `
 		"show version ?", "show version ; reload", "show version > x", "show `x`",
 		// pipe: un operador de la lista, sin sumideros ni segundas tuberías
@@ -50,7 +56,7 @@ func TestCheckDeniedISEAcepta(t *testing.T) {
 		"show uptime", "show timezone", "show ntp", "show interface", "show interface GigabitEthernet 0", "show ip route", "show running-config", "show repository",
 		"show inventory", "show udi", "show logging system", "show logging application", "show logging application ise-psc.log", "show tech-support", "show ntp | include synchronised",
 		"show logging system | last 100", "show logging application ise-psc.log | last 200", "show logging system | include error", "show logging system | exclude info",
-		"show logging system | begin Nov", "show logging system | count", "show logging system | end x", "show version | include ISE", "show version | include Version : 3",
+		"show logging system | begin Nov", "show logging system | count", "show logging system | end x", "show version | include ISE", "show version | include Version : 3", "show repository",
 		"show logging system | include Error code=5", "show logging application | exclude disk0 files", "show patch", "show udi", "show tech-support | last 50",
 		"show ip name-server", "show ports", "show users", "show running-config | include hostname",
 		"ping 10.0.0.1", "ping host-1.example.com", "ping ise-node1", "PING 10.0.0.1", "ping 2001:db8::1", "ping 10.0.0.1 pingcount 5", "ping 10.0.0.1 count 5",
@@ -108,6 +114,22 @@ func TestCompatibleISE(t *testing.T) {
 	for _, p := range []string{"ios", "ios-xe", "wlc-9800", "asa", "ftd", "nx-os", "wlc-aireos", "cat9k", "sda"} {
 		if Compatible("ise", p) || Compatible(p, "ise") {
 			t.Errorf("%s no es compatible con ise", p)
+		}
+	}
+}
+
+// Los destinos numéricos abreviados u hexadecimales también se rechazan en asa y ftd; los nombres y las IP completas pasan.
+func TestDestinosNumericosAbreviados(t *testing.T) {
+	for _, p := range []string{"asa", "ftd", "ise"} {
+		for _, cmd := range []string{"ping 224.1", "ping 4294967295", "ping 0xffffffff", "ping 127.1", "ping 0177.0.0.1"} {
+			if err := CheckDenied(p, cmd); err == nil {
+				t.Errorf("%s %q: se aceptó", p, cmd)
+			}
+		}
+		for _, cmd := range []string{"ping 10.0.0.1", "ping host.example.com", "ping 2001:db8::1", "ping 1.2.3.4.nip.io"} {
+			if err := CheckDenied(p, cmd); err != nil {
+				t.Errorf("%s %q: %v", p, cmd, err)
+			}
 		}
 	}
 }

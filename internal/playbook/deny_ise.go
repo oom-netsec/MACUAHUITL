@@ -69,11 +69,12 @@ func isePath(cmd, a string) error {
 	return nil
 }
 
-// iseShow: «tail» sigue el archivo para siempre, «file» escribe (show tech-support file X) y «show top» es continuo.
-// ADE-OS completa prefijos, así que «ta», «fi» y «to» (2+ letras) cuentan.
+// iseShow: «tail» sigue el archivo para siempre, «file» escribe (show tech-support file X), «show top» es continuo y
+// «show repository NOMBRE» hace que el nodo se conecte al repositorio remoto. ADE-OS completa prefijos: de «tail» y
+// «file» cuenta cualquiera desde 1 letra; de «top» y «repository», desde 2 y 3 («show t» solo es ambiguo).
 func iseShow(cmd string, f []string) error {
 	for i, a := range f[1:] {
-		if len(a) >= 2 && (Abbrev(a, "tail") || Abbrev(a, "file") || i == 0 && Abbrev(a, "top")) {
+		if Abbrev(a, "tail") || Abbrev(a, "file") || i == 0 && (len(a) >= 2 && Abbrev(a, "top") || len(a) >= 3 && Abbrev(a, "repository") && len(f) > 2) {
 			return denied(cmd, "playbook.why.show_ise")
 		}
 	}
