@@ -519,7 +519,7 @@ export const en: Record<Key, string> = {
   "visibility.anyIf": "Listen on all interfaces (0.0.0.0)",
   "visibility.topo.src": "Patrol job or output folder (ID or absolute path)",
   "visibility.topo.pcap": "Capture with CDP/LLDP (optional, absolute path)",
-  "visibility.topo.note": "Use the \"L2 · Topología (CDP, LLDP, STP, port-channels)\" playbook in Patrol: show cdp|lldp neighbors detail, show spanning-tree and show etherchannel summary.",
+  "visibility.topo.note": "Use the \"L2 · Topology (CDP, LLDP, STP, port-channels)\" playbook in Patrol: show cdp|lldp neighbors detail, show spanning-tree and show etherchannel summary.",
   "visibility.topo.build": "Build",
   "visibility.topo.exportSvg": "Export SVG",
   "visibility.topo.exportJson": "Export JSON",
