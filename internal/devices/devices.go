@@ -144,7 +144,7 @@ type manifestFile struct {
 	StartedAt time.Time `json:"started_at"`
 	EndedAt   time.Time `json:"ended_at"`
 	Devices   []struct {
-		Target             struct{ Address string }
+		Target             patrol.Target
 		Hostname, Platform string
 		State              string
 	} `json:"devices"`
@@ -184,7 +184,7 @@ func (c *collector) job(dir, name string) {
 					seen = at
 				}
 				c.add(obs{addr: clean(d.Target.Address), host: clean(d.Hostname), platform: clean(d.Platform), src: SrcPatrol, at: seen})
-				known[patrol.DeviceDir(d.Hostname, d.Target.Address)] = [2]string{clean(d.Hostname), clean(d.Target.Address)}
+				known[patrol.DeviceDirOf(d.Hostname, d.Target)] = [2]string{clean(d.Hostname), clean(d.Target.Address)}
 			}
 		}
 	}

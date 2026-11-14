@@ -127,13 +127,13 @@ func listDevices(dir string) ([]devDir, error) {
 		if b, err := os.ReadFile(filepath.Join(dir, "manifest.json")); err == nil {
 			var m struct {
 				Devices []struct {
-					Target   struct{ Address string }
+					Target   patrol.Target
 					Hostname string
 				} `json:"devices"`
 			}
 			if json.Unmarshal(b, &m) == nil {
 				for _, d := range m.Devices {
-					n := patrol.DeviceDir(d.Hostname, d.Target.Address)
+					n := patrol.DeviceDirOf(d.Hostname, d.Target)
 					known[n] = devDir{Dir: n, Host: d.Hostname, IP: d.Target.Address}
 				}
 			}

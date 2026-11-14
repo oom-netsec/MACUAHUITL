@@ -108,7 +108,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			res.Ran = nil
 		}
 	}
-	dev := Device{Host: res.Hostname, IP: t.Address, Platform: c.platform}
+	dev := Device{Host: res.Hostname, IP: t.Address, Port: t.Port, Platform: c.platform}
 	roundStart := d.Now()
 	var bytes int64
 	for i, cmd := range cmds {

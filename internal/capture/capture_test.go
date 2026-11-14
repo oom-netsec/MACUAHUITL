@@ -2,6 +2,7 @@ package capture
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -87,5 +88,29 @@ func TestSplitDescartaLasIncompletas(t *testing.T) {
 	m := Split(text)
 	if _, ok := m["show version"]; ok || m["show clock"] != "10:00:01\n" {
 		t.Fatalf("m = %q", m)
+	}
+}
+
+// Dos equipos con la misma dirección y distinto puerto son equipos distintos, cada uno con su carpeta.
+func TestReadDirSeparaPorPuerto(t *testing.T) {
+	root := t.TempDir()
+	start := time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC)
+	w, _ := patrol.NewWriter(root, patrol.Spec{Name: "puertos"}, start)
+	for _, p := range []uint16{0, 2222} {
+		dev := patrol.Device{Host: "SW1", IP: "192.0.2.10", Port: p, Platform: "ios-xe"}
+		w.Write(dev, 1, start, platform.Output{Command: "show clock", Text: "p" + fmt.Sprint(p), Started: start}, false)
+	}
+	m := patrol.Manifest{Name: "puertos", Devices: []patrol.DeviceResult{
+		{Target: patrol.Target{Address: "192.0.2.10"}, Round: 1, Hostname: "SW1", State: "completed"},
+		{Target: patrol.Target{Address: "192.0.2.10", Port: 2222}, Round: 1, Hostname: "SW1", State: "completed"},
+	}}
+	b, _ := json.Marshal(m)
+	os.WriteFile(filepath.Join(w.Dir(), "manifest.json"), b, 0o600)
+	devs, err := ReadDir(w.Dir())
+	if err != nil || len(devs) != 2 {
+		t.Fatalf("%v %+v", err, devs)
+	}
+	if devs[0].Outputs["show clock"] != "p0\n" || devs[1].Outputs["show clock"] != "p2222\n" {
+		t.Fatalf("salidas mezcladas: %q %q", devs[0].Outputs, devs[1].Outputs)
 	}
 }

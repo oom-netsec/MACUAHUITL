@@ -105,7 +105,7 @@ func ReadDir(dir string) ([]Device, error) {
 	last := map[string]patrol.DeviceResult{}
 	var order []string
 	for _, d := range m.Devices {
-		a := d.Target.Address
+		a := patrol.Hostport(d.Target) // host:puerto: la misma dirección con otro puerto es otro equipo
 		if _, seen := last[a]; !seen {
 			order = append(order, a)
 		}
@@ -116,9 +116,9 @@ func ReadDir(dir string) ([]Device, error) {
 	var out []Device
 	for _, a := range order {
 		d := last[a]
-		dev := Device{Address: a, Hostname: d.Hostname, State: d.State, Detail: d.Detail, Outputs: map[string]string{}}
+		dev := Device{Address: d.Target.Address, Hostname: d.Hostname, State: d.State, Detail: d.Detail, Outputs: map[string]string{}}
 		if d.Hostname != "" {
-			files, _ := filepath.Glob(filepath.Join(dir, patrol.DeviceDir(d.Hostname, a), "*.txt"))
+			files, _ := filepath.Glob(filepath.Join(dir, patrol.DeviceDirOf(d.Hostname, d.Target), "*.txt"))
 			sort.Strings(files)
 			for _, f := range files {
 				b, err := readLimited(f)
