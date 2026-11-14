@@ -194,8 +194,12 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
         return n;
       });
     });
-    const off2 = core.onAssistDone((e) => {
+    const off2 = core.onAssistDone(async (e) => {
       if (e.runId !== runId.current) return;
+      // Un done puede llegar de más (el watch se reemplazó en el mismo instante en que terminó el anterior): si el núcleo dice que la
+      // ejecución sigue viva, no se cierra en la vista (perdería el paso pendiente). Si no se puede preguntar, se cierra como siempre.
+      const alive = await core.assistListRuns().then((rs) => rs.some((x) => x.runId === e.runId && x.active), () => false);
+      if (alive || e.runId !== runId.current) return;
       setRun((r) => (r ? { ...r, active: false, pending: null, stopped: false, failReason: r.failReason || e.error || "" } : r));
     });
     return () => { off1(); off2(); };

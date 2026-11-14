@@ -58,7 +58,7 @@ test("ejecución asistida: aviso rojo permanente, un botón por paso y la casill
   expect(core.assistConfirm).toHaveBeenCalledWith("r1", "apply-1");
 
   act(() => core.emitAssist({ runId: "r1", kind: "state", state: "done" }));
-  act(() => core.emitAssistDone({ runId: "r1" }));
+  await act(async () => core.emitAssistDone({ runId: "r1" }));
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(await screen.findByText(/Listo: el cambio/)).toBeInTheDocument();
 
@@ -111,7 +111,7 @@ test("un fallo inmediato al iniciar se muestra aunque el evento llegue antes de 
   await start();
   expect(await screen.findByText(/el equipo no responde/)).toBeInTheDocument();
   expect(core.assistWatch).toHaveBeenCalledWith("r1");
-  act(() => core.emitAssistDone({ runId: "r1" }));
+  await act(async () => core.emitAssistDone({ runId: "r1" }));
   expect(await screen.findByText(/La ejecución se detuvo por un error/)).toBeInTheDocument();
 });
 
@@ -120,7 +120,8 @@ test("al montarse se engancha a una ejecución viva y pide la confirmación pend
   const step = { id: "save-1", kind: "save", device: "SW1", lines: ["write memory"] };
   const core = fakeCore({
     listCredentials: vi.fn(async () => creds),
-    assistListRuns: vi.fn(async () => [{ runId: "r9", state: "waiting-confirm", active: true, waiting: true, canRollback: true, pending: step, changed: ["SW1"] }]),
+    assistListRuns: vi.fn().mockResolvedValueOnce([{ runId: "r9", state: "waiting-confirm", active: true, waiting: true, canRollback: true, pending: step, changed: ["SW1"] }])
+      .mockResolvedValue([{ runId: "r9", state: "done", active: false }]), // al terminar, el núcleo ya no la tiene activa
   });
   render(<PortsView core={core} />);
   const banner = await screen.findByRole("alert");
@@ -131,8 +132,22 @@ test("al montarse se engancha a una ejecución viva y pide la confirmación pend
   expect(core.assistConfirm).toHaveBeenCalledWith("r9", "save-1");
   // Los eventos del historial que repite el núcleo no duplican nada: el estado final queda bien.
   act(() => core.emitAssist({ runId: "r9", kind: "state", state: "done", changed: ["SW1"] }));
-  act(() => core.emitAssistDone({ runId: "r9" }));
+  await act(async () => core.emitAssistDone({ runId: "r9" }));
   expect(await screen.findByText(/Listo: el cambio/)).toBeInTheDocument();
+});
+
+// Un assist:done de más (el watch se reemplazó en el mismo instante) con la ejecución todavía viva no cierra la vista.
+test("un done de más con la ejecución aún activa en el núcleo deja el paso pendiente a la vista", async () => {
+  const step = { id: "save-1", kind: "save", device: "SW1", lines: ["write memory"] };
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => creds),
+    assistListRuns: vi.fn(async () => [{ runId: "r9", state: "waiting-confirm", active: true, waiting: true, canRollback: true, pending: step, changed: ["SW1"] }]),
+  });
+  render(<PortsView core={core} />);
+  await screen.findByRole("region", { name: "Paso pendiente save-1" });
+  await act(async () => core.emitAssistDone({ runId: "r9" }));
+  expect(screen.getByRole("region", { name: "Paso pendiente save-1" })).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent("MODO ASISTIDO ACTIVO");
 });
 
 test("al montarse con una ejecución detenida por fallo ofrece la reversa o abortar", async () => {
@@ -161,7 +176,7 @@ test("abortar con un equipo ya cambiado dice que quedó cambiado", async () => {
   await start();
   act(() => core.emitAssist({ runId: "r1", kind: "pending", state: "waiting-confirm", step: { id: "save-1", kind: "save", device: "SW1", lines: ["write memory"] }, changed: ["SW1"] }));
   act(() => core.emitAssist({ runId: "r1", kind: "state", state: "aborted", changed: ["SW1"] }));
-  act(() => core.emitAssistDone({ runId: "r1" }));
+  await act(async () => core.emitAssistDone({ runId: "r1" }));
   expect(await screen.findByText(/Ejecución abortada/)).toBeInTheDocument();
   expect(screen.getByText(/El equipo SW1 quedó cambiado/)).toBeInTheDocument();
 });
@@ -171,7 +186,7 @@ test("abandonada: lo dice y lista los equipos cambiados", async () => {
   await plan(core);
   await start();
   act(() => core.emitAssist({ runId: "r1", kind: "state", state: "abandoned", changed: ["SW1", "SW2"] }));
-  act(() => core.emitAssistDone({ runId: "r1" }));
+  await act(async () => core.emitAssistDone({ runId: "r1" }));
   expect(await screen.findByText(/se abandonó/)).toBeInTheDocument();
   expect(screen.getByText(/Los equipos SW1, SW2 quedaron cambiados/)).toBeInTheDocument();
 });
@@ -181,7 +196,7 @@ test("abortar sin cambios no avisa de equipos cambiados", async () => {
   await plan(core);
   await start();
   act(() => core.emitAssist({ runId: "r1", kind: "state", state: "aborted" }));
-  act(() => core.emitAssistDone({ runId: "r1" }));
+  await act(async () => core.emitAssistDone({ runId: "r1" }));
   expect(await screen.findByText(/Ejecución abortada/)).toBeInTheDocument();
   expect(screen.queryByText(/quedó cambiado|quedaron cambiados/)).not.toBeInTheDocument();
 });
@@ -225,7 +240,7 @@ test("tras «Terminar sin guardar» el final recuerda que el cambio no está en 
   act(() => core.emitAssist({ runId: "r1", kind: "pending", state: "waiting-confirm", step: { id: "close", kind: "close" }, changed: ["SW1"] }));
   await screen.findByRole("region", { name: "Paso pendiente close" });
   act(() => core.emitAssist({ runId: "r1", kind: "state", state: "done", changed: ["SW1"] }));
-  act(() => core.emitAssistDone({ runId: "r1" }));
+  await act(async () => core.emitAssistDone({ runId: "r1" }));
   expect(await screen.findByText(/quedó solo en la configuración en ejecución de SW1/)).toBeInTheDocument();
 });
 
@@ -236,7 +251,7 @@ test("revertir desde «Terminar sin guardar» termina en rolled-back sin el avis
   act(() => core.emitAssist({ runId: "r1", kind: "pending", state: "waiting-confirm", step: { id: "close", kind: "close" }, changed: ["SW1"] }));
   await screen.findByRole("region", { name: "Paso pendiente close" });
   act(() => core.emitAssist({ runId: "r1", kind: "state", state: "rolled-back", changed: [] }));
-  act(() => core.emitAssistDone({ runId: "r1" }));
+  await act(async () => core.emitAssistDone({ runId: "r1" }));
   await waitFor(() => expect(screen.queryByRole("region", { name: "Paso pendiente close" })).not.toBeInTheDocument());
   expect(screen.queryByText(/quedó solo en la configuración en ejecución/)).not.toBeInTheDocument();
 });
