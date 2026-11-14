@@ -35,10 +35,7 @@ func asaDest(s string) bool {
 	if !asaName.MatchString(s) {
 		return false
 	}
-	if a, err := netip.ParseAddr(s); err == nil && badProbeAddr(a) {
-		return false
-	}
-	return true
+	return probeDest(s)
 }
 
 // asaLone: destino sin IFNAME delante. Una palabra suelta sin punto («inside», «ipv6») es indistinguible de un nombre

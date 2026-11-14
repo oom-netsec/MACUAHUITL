@@ -208,7 +208,7 @@ const hostFieldsEn = swap(sampleHostFields, [
   ["Nombre del host: 1 a 64 caracteres, sin espacios en los extremos. No se repite (sin importar mayúsculas).", "Host name: 1 to 64 characters, no leading or trailing spaces. Not repeated (case-insensitive)."],
   ["IP o nombre DNS, sin usuario, esquema, puerto ni ruta. La dirección con el puerto no se repite.", "IP or DNS name, without user, scheme, port or path. The address with the port is not repeated."],
   ["Puerto SSH, de 1 a 65535. Vacío = 22.", "SSH port, from 1 to 65535. Empty = 22."],
-  ["Plataforma: ios, ios-xe, nx-os, asa, ftd, iosxr, wlc. Vacío = sin definir.", "Platform: ios, ios-xe, nx-os, asa, ftd, iosxr, wlc. Empty = not set."],
+  ["Plataforma: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc. Vacío = sin definir.", "Platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc. Empty = not set."],
   ["Carpeta de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -. Vacío = sin carpeta.", "Single-level folder: 1 to 48 characters among letters, digits, space, _, . and -. Empty = no folder."],
   ["Hasta 10 etiquetas de 1 a 24 caracteres entre a-z, 0-9 y -. En CSV separadas por «;»; en JSON, un arreglo.", "Up to 10 tags of 1 to 24 characters among a-z, 0-9 and -. In CSV separated by \";\"; in JSON, an array."],
   ["Etiqueta de una credencial de la bóveda local (nunca el usuario ni la contraseña).", "Label of a credential in the local vault (never the user or the password)."],

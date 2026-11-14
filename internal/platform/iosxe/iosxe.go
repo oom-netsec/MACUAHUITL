@@ -32,6 +32,9 @@ var (
 	ftdPrompt = regexp.MustCompile(`(?:^|\n)> ?$`)
 	// Primer inicio de sesión de FTD: cambio de contraseña obligatorio o EULA. Responder cambiaría el equipo.
 	ftdFirstLogin = regexp.MustCompile(`(?i)you must change your password|you must accept the eula|press <enter> to display the eula|enter new password:|confirm new password:|unix password: ?$|to agree to the eula|please enter 'yes'`)
+	// Primer inicio de sesión de ISE (ADE-OS): contraseña vencida o cambio obligatorio, o una pregunta (y/n) o (yes/no).
+	// Responder cambiaría el nodo: se aborta sin escribir. Solo cuenta al final de la salida.
+	iseFirstLogin = regexp.MustCompile(`(?i)(?:password (?:has )?expired|(?:must|required to) change (?:your |the )?password|changing password for|(?:enter|confirm|retype|re-enter) new password:|new password:|\(current\) password:|current password:|[(\[](?:y/n|yes/no)[)\]][?:]?) *$`)
 	more          = regexp.MustCompile(` ?(?:--More-- or \(q\)uit|--More or \(q\)uit current module or <ctrl-z> to abort|--More--|<--- More --->) ?`) // el segundo es el de ASA, el primero el de AireOS
 	// AireOS: prompt «(Nombre) >» (el nombre puede llevar espacios), el de configuración «(Nombre) config>» y el login
 	// «User:»/«Password:» dentro del shell. La pregunta de confirmación se detecta solo al final de la salida.
@@ -175,7 +178,7 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 	defer cancel()
 	text, err := d.until(ctx, func(s string) bool {
 		return anyPrompt.MatchString(s) || ftdPrompt.MatchString(s) || ftdFirstLogin.MatchString(s) ||
-			airePrompt.MatchString(s) || aireConfig.MatchString(s) || aireUser.MatchString(s)
+			airePrompt.MatchString(s) || aireConfig.MatchString(s) || aireUser.MatchString(s) || iseFirstLogin.MatchString(s)
 	})
 	if err != nil {
 		return d.fail(err)
@@ -211,6 +214,11 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 		out, err := d.Run(ctx, c, 10*time.Second)
 		if err != nil {
 			return err
+		}
+		// ISE (prompt host/admin#, con «/»; IOS no admite «/» en el nombre y ASA rechaza length 0): ADE-OS acepta
+		// «terminal length 0» y no tiene «terminal width», así que no se le manda.
+		if c == "terminal length 0" && strings.Contains(d.hostname, "/") && !hasPercentLine(out.Text) {
+			break
 		}
 		// ASA no admite «terminal length 0»: su paginación se apaga con «terminal pager 0».
 		if c == "terminal length 0" && hasPercentLine(out.Text) {
@@ -501,7 +509,7 @@ func (d *driver) quiet(ctx context.Context, n int) bool {
 // moreComing: si tail es el «> » de FTD, espera ftdSettle por más datos; si llegan, no era el prompt (era el inicio
 // de una línea de salida) y se agregan al búfer.
 func (d *driver) moreComing(ctx context.Context, tail string) bool {
-	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) { // «User:» de un banner puede ir seguido del prompt de otra plataforma
+	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) && !iseFirstLogin.MatchString(tail) { // «User:», «(y/n)» o «New password:» de un banner pueden ir seguidos del prompt de otra plataforma
 		return false
 	}
 	select {
@@ -619,6 +627,12 @@ var nxos = regexp.MustCompile(`(?m)^Cisco Nexus Operating System \(NX-OS\) Softw
 // ftd: línea «Model : Cisco … Threat Defense» (Firepower, Secure Firewall, «Cisco Firepower 1120», «Cisco ASA5508-X», «Cisco ISA 3000»). Un ASA real no trae «Model :» seguido de Cisco.
 var ftd = regexp.MustCompile(`(?m)^Model\s*:\s*Cisco .*Threat Defense`)
 
+// ise: show version de ISE (ADE-OS): cabecera del sistema y, más abajo, la aplicación; ambas al inicio de línea.
+var (
+	adeOS  = regexp.MustCompile(`(?m)^Cisco Application Deployment Engine OS Release`)
+	iseApp = regexp.MustCompile(`(?m)^Cisco Identity Services Engine`)
+)
+
 var asa = regexp.MustCompile(`(?m)^Cisco Adaptive Security Appliance Software Version`)
 
 func (d *driver) Detect(ctx context.Context) (string, error) {
@@ -639,6 +653,8 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 		return "", err
 	}
 	switch {
+	case adeOS.MatchString(out.Text) && iseApp.MatchString(out.Text): // ADE-OS de otro producto no es ISE
+		return "ise", nil
 	case ftd.MatchString(out.Text): // antes que asa: la salida de FTD puede citar la versión de lina
 		return "ftd", nil
 	case asa.MatchString(out.Text):

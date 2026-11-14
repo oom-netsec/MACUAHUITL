@@ -16,7 +16,7 @@ import (
 )
 
 // Archivos del catálogo por área (los playbooks anteriores no llevan estos prefijos; tac-baseline es anterior).
-var catalogFile = regexp.MustCompile(`^(aci|l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob|vxlan|fex|stack|svl|poe|asic|lisp|fabric|edge|border|fw|ha|snort|mgmt)-`)
+var catalogFile = regexp.MustCompile(`^(aci|l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob|vxlan|fex|stack|svl|poe|asic|lisp|fabric|edge|border|fw|ha|snort|mgmt|logs)-`)
 
 // Comandos que pueden imprimir secretos (el enmascarado solo corre si el comando lo declara).
 var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp (comm|host)|archive log|cts (pacs|cred)|tacacs-server|radius-server)|show (managers|network)( |$)|more )`)
@@ -32,6 +32,12 @@ var aireosBigCmd = regexp.MustCompile(`^(show (tech-support|msglog|traplog|loggi
 
 // Comandos de AireOS que pueden imprimir claves: tech-support, WLAN (PSK), RADIUS, TACACS, SNMP, usuarios y EAP local.
 var aireosSecretCmd = regexp.MustCompile(`^show (tech-support|wlan (\d+|\{wlan\})|radius summary|tacacs|local-auth|snmpcommunity|snmpv3user|mgmtuser|network summary)`)
+
+// Salidas grandes de ISE: logs, puertos, configuración y tech-support.
+var iseBigCmd = regexp.MustCompile(`^show (tech-support|running-config|startup-config|logging|ports)( .*)?$`)
+
+// Comandos de ISE que pueden imprimir claves o hashes: repositorios y copias de la configuración.
+var iseSecretCmd = regexp.MustCompile(`^show (tech-support|running-config|startup-config|repository)`)
 
 // catalogFS junta el contenido embebido con el de packs/ios-xe, packs/ios, packs/wlc-9800, packs/nx-os, packs/cat9k, packs/sda, packs/asa y packs/ftd (en cisco/<plataforma>), para que estas pruebas sigan
 // cubriendo los playbooks que salieron del binario al paquete oficial.
@@ -62,6 +68,7 @@ func catalogFS(t testing.TB) fs.FS {
 	add(os.DirFS("../packs/asa/playbooks"), "cisco/asa")
 	add(os.DirFS("../packs/ftd/playbooks"), "cisco/ftd")
 	add(os.DirFS("../packs/wlc-aireos/playbooks"), "cisco/wlc-aireos")
+	add(os.DirFS("../packs/ise/playbooks"), "cisco/ise")
 	return m
 }
 
@@ -76,7 +83,7 @@ func TestCatalogo(t *testing.T) {
 			t.Errorf("id duplicado: %s", p.ID)
 		}
 		byID[p.ID] = p
-		if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa" || p.Platform == "ftd" || p.Platform == "wlc-aireos") && !strings.Contains(p.Name, " · ") { // el selector de Patrol agrupa por el área antes del «·»
+		if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa" || p.Platform == "ftd" || p.Platform == "wlc-aireos" || p.Platform == "ise") && !strings.Contains(p.Name, " · ") { // el selector de Patrol agrupa por el área antes del «·»
 			t.Errorf("%s: name %q sin área (\"L2 · STP\")", p.ID, p.Name)
 		}
 		for _, c := range p.Commands {
@@ -97,13 +104,27 @@ func TestCatalogo(t *testing.T) {
 					t.Errorf("%s: %q no es de lectura", p.ID, c.Text)
 				}
 			}
+			if p.Platform == "ise" {
+				if iseSecretCmd.MatchString(c.Text) && !c.MaySecrets {
+					t.Errorf("%s: %q puede traer claves y debe llevar may_contain_secrets", p.ID, c.Text)
+				}
+				if iseBigCmd.MatchString(c.Text) && c.Timeout < 120*time.Second {
+					t.Errorf("%s: %q es una salida grande de ISE y necesita timeout >= 120s", p.ID, c.Text)
+				}
+				if strings.Contains(c.Text, "tail") || strings.HasPrefix(c.Text, "show top") || strings.Contains(c.Text, "redirect") {
+					t.Errorf("%s: %q no termina o escribe", p.ID, c.Text)
+				}
+				if strings.HasPrefix(c.Text, "show tech-support") && c.Timeout < 300*time.Second {
+					t.Errorf("%s: %q necesita timeout >= 300s", p.ID, c.Text)
+				}
+			}
 			if p.Platform == "ftd" && strings.Contains(c.Text, "ASA-") { // en FTD los mensajes salen como %FTD-n-xxxxxx
 				t.Errorf("%s: %q filtra por ASA-, FTD usa %%FTD-", p.ID, c.Text)
 			}
 			if strings.Contains(c.Text, "@") {
 				t.Errorf("%s: %q lleva «@» pegado al comando", p.ID, c.Text)
 			}
-			if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa" || p.Platform == "ftd" || p.Platform == "wlc-aireos") && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
+			if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa" || p.Platform == "ftd" || p.Platform == "wlc-aireos" || p.Platform == "ise") && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
 				t.Errorf("%s: %q es una salida grande y necesita timeout > 60s", p.ID, c.Text)
 			}
 		}

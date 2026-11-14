@@ -75,10 +75,14 @@ func isASASNMPHost(line, platform string) bool {
 	return len(f) > 4 && (f[4] == "trap" || f[4] == "poll" || f[4] == "version")
 }
 
+// ISE (ADE-OS): «username U password hash|plain X role …»; la regla de
+// IOS tomaría «hash»/«plain» como el valor y dejaría el secreto a la vista.
+var iseHashPlain = regexp.MustCompile(`(?i)^\s*username \S+ password (?:hash|plain) \S`)
+
 // Cada regla captura (prefijo)(valor)(resto); solo se reemplaza el valor.
 var iosRules = []rule{
 	R("enable-secret", "", `\s*enable (?:algorithm-type \S+ )?(?:secret|password) (?:level \d+ )?`+typ),
-	R("user-secret", "", `\s*username \S+ (?:.*? )?(?:secret|password) `+typ),
+	R("user-secret", "", `\s*username \S+ (?:.*? )?(?:secret|password) `+typ).unless(iseHashPlain),
 	R("snmp-community", "", `\s*snmp-server community `+commTyp).stopAt(`\s+(?:ro|rw)(?:\s+\S+)?\s*$`),
 	R("tacacs-key", "", `\s*tacacs-server (?:host \S+ (?:.*? )?)?key `+typ),
 	R("radius-key", "", `\s*radius-server (?:host \S+ .*?)?key `+typ),
@@ -86,7 +90,7 @@ var iosRules = []rule{
 	// Keyring IKEv1: la llave va tras «key», no tras address/hostname/ipv6.
 	R("psk", "", `\s*pre-shared-key (?:address|hostname|ipv6) .*? key `+typ),
 	R("psk", "", `\s*pre-shared-key (?:local |remote )?`+typ).unless(keyringLine),
-	R("ntp-key", "", `\s*ntp authentication-key \d+ (?:md5|hmac-sha\S*|cmac-aes-128) `),
+	R("ntp-key", "", `\s*ntp authentication-key \d+ (?:md5|sha\d*|hmac-sha\S*|cmac-aes-128) (?:(?:hash|plain) )?`),
 	R("snmp-user-auth", "", `\s*snmp-server user .*? auth (?:md5|sha-2 \d+|sha\S*) `),
 	R("snmp-user-priv", "", `\s*snmp-server user .*? priv (?:(?:des|3des|aes(?:[- ]\d+)?) )?`),
 	// La comunidad va tras vrf/use-vrf, informs/traps y version; use-vrf sin valor no es la comunidad.
@@ -201,7 +205,7 @@ var iosRules = []rule{
 
 // Palabras que, como valor, no son un secreto sino otra palabra clave del comando (ntp … key 5 prefer, password default…).
 var guardWords = map[string]bool{
-	"md5": true, "sha1": true, "sha-1": true, "sha-2": true, "sha256": true, "sha-256": true, "sha512": true, "hmac-sha-256": true,
+	"md5": true, "sha1": true, "sha-1": true, "sha-2": true, "sha256": true, "sha-256": true, "sha512": true, "hmac-sha-256": true, "hmac-sha2-256": true, "hmac-sha2-512": true, "cmac-aes-128": true,
 	"prefer": true, "iburst": true, "burst": true, "use-vrf": true, "vrf": true, "filter-vrf": true, "version": true,
 	"source": true, "source-interface": true, "minpoll": true, "maxpoll": true, "priority": true, "--": true, "text": true,
 	"key-string": true, "ascii": true, "hex": true, "mode-list": true, "cryptographic-algorithm": true, "key": true,
@@ -685,3 +689,16 @@ func init() {
 		iosRules = append(iosRules, R(r.kind, "", `\s*config `+r.body), R(r.kind, "aireconfig", `\s*`+r.body))
 	}
 }
+
+// ISE: usuarios, claves NTP y usuarios de repositorios con «hash|plain» antes del valor; el usuario, el rol y el índice no se tapan.
+var iseRules = []rule{
+	R("user-secret", "", `\s*username \S+ password (?:hash|plain) `),
+	// SNMPv3: dos claves (autenticación y privacidad) tras hash|plain; cada regla tapa una y la otra regla la otra.
+	R("snmp-user-auth", "", `\s*snmp-server user \S+ v3 (?:hash|plain) `),
+	R("snmp-user-priv", "", `\s*snmp-server user \S+ v3 (?:hash|plain) \S+ `),
+	R("snmp-user-auth", "", `\s*snmp-server host \S+ version 3 \S+ \S+ (?:hash|plain) `),
+	R("snmp-user-priv", "", `\s*snmp-server host \S+ version 3 \S+ \S+ (?:hash|plain) \S+ `),
+	R("client-password", "", `\s*user \S+ password (?:hash|plain) `), // dentro de «repository NAME»
+}
+
+func init() { iosRules = append(iosRules, iseRules...) }

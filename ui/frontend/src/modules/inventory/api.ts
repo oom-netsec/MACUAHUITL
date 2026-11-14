@@ -26,7 +26,7 @@ export interface KnownDevices { devices: KnownDevice[]; warnings: string[] }
 
 // ---- Libreta de hosts ----
 
-export type HostPlatform = "" | "ios" | "ios-xe" | "nx-os" | "asa" | "ftd" | "iosxr" | "wlc"; // vacío = sin definir
+export type HostPlatform = "" | "ios" | "ios-xe" | "nx-os" | "asa" | "ftd" | "ise" | "iosxr" | "wlc"; // vacío = sin definir
 
 export interface Host {
   id: string; // 32 hex; vacío al crear

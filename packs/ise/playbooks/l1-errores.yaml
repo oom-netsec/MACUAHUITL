@@ -1,0 +1,16 @@
+# Propósito: Errores, descartes y colisiones de las interfaces.
+# Cuándo usarlo: Lentitud o pérdida de paquetes del nodo.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/ise/3-1/cli_ref_guide/b_ise_CLI_Reference_Guide_31.html
+# Sin validar en laboratorio (no hay ISE en el laboratorio; comandos de la documentación de Cisco).
+id: l1-errores
+platform: ise
+name: ISE · Interfaces · Errores de interfaz
+name_en: ISE · Interfaces · Interface errors
+commands:
+  - cmd: show clock
+  - cmd: show interface | include errors
+  - cmd: show interface | include dropped
+  - cmd: show interface | include collisions
+  - cmd: show interface | include RX bytes
+  - cmd: show interface | include inet
+  - cmd: show uptime

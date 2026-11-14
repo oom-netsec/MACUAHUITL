@@ -1,0 +1,20 @@
+# Propósito: Errores y avisos del log principal de la aplicación.
+# Cuándo usarlo: Un servicio de ISE falla y hay que ver el error.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/ise/3-1/cli_ref_guide/b_ise_CLI_Reference_Guide_31.html
+# Sin validar en laboratorio (no hay ISE en el laboratorio; comandos de la documentación de Cisco).
+id: logs-ise-psc-errores
+platform: ise
+name: ISE · Logs · Errores de ise-psc
+name_en: ISE · Logs · ise-psc errors
+commands:
+  - cmd: show clock
+  - cmd: show logging application ise-psc.log | include ERROR
+    timeout: 120s
+  - cmd: show logging application ise-psc.log | include FATAL
+    timeout: 120s
+  - cmd: show logging application ise-psc.log | include WARN
+    timeout: 120s
+  - cmd: show logging application ise-psc.log | last 200
+    timeout: 120s
+  - cmd: show application status ise
+  - cmd: show uptime

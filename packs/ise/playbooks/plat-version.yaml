@@ -1,0 +1,17 @@
+# Propósito: Versión de ADE-OS, de ISE y parches instalados.
+# Cuándo usarlo: Saber qué versión y qué parche corre el nodo antes de abrir un caso.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/ise/3-1/cli_ref_guide/b_ise_CLI_Reference_Guide_31.html
+# Sin validar en laboratorio (no hay ISE en el laboratorio; comandos de la documentación de Cisco).
+id: plat-version
+platform: ise
+name: ISE · Plataforma · Versión y parches
+name_en: ISE · Platform · Version and patches
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show application
+  - cmd: show application version ise
+  - cmd: show udi
+  - cmd: show inventory
+  - cmd: show timezone
+  - cmd: show uptime

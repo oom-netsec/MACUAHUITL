@@ -1,0 +1,26 @@
+# command: show version
+# Armado a mano con la forma de la documentación de Cisco (ISE 3.1, CLI Reference); sin validar en laboratorio.
+
+Cisco Application Deployment Engine OS Release: 3.1
+ADE-OS Build Version: 3.1.0.518
+ADE-OS System Architecture: x86_64
+
+Copyright (c) 2005-2021 by Cisco Systems, Inc.
+All rights reserved.
+Hostname: ise
+
+
+Version information of installed applications
+---------------------------------------------
+
+Cisco Identity Services Engine
+---------------------------------------------
+Version      : 3.1.0.518
+Build Type   : Release
+Build Date   : Fri Jun 18 2021
+Install Date : Mon Jul 05 2021
+
+Cisco Identity Services Engine Patch
+---------------------------------------------
+Version      : 3
+Install Date : Tue Mar 08 2022
