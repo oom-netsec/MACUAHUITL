@@ -73,7 +73,7 @@ func set(c *cli.Env, args []string) error {
 		fs.IntVar(&mb, "rotate-mb", 0, "rotar cada N MB (0 = de fábrica; 1-1024)")
 		fs.IntVar(&mins, "rotate-min", 0, "rotar cada N minutos (0 = de fábrica; 1-10080)")
 		fs.IntVar(&maxFiles, "max-files", 0, "archivos que se conservan (0 = de fábrica; 1-1000)")
-		fs.StringVar(&format, "format", "", "texto, crudo o jsonl (vacío = de fábrica)")
+		fs.StringVar(&format, "format", "", "texto|text, crudo|raw o jsonl (vacío = de fábrica)")
 	})
 	given := map[string]bool{}
 	if err == nil {
@@ -108,7 +108,7 @@ func set(c *cli.Env, args []string) error {
 		p.OutputsDir = outputs
 	}
 	if given["format"] {
-		in.Format = format
+		in.Format = cli.WireFormat(format)
 	}
 	r, err := cl.SetCorePrefs(context.Background(), &v1.SetCorePrefsRequest{Prefs: p})
 	if err != nil {

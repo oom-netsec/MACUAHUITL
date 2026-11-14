@@ -51,18 +51,22 @@ func TestPrintDrops(t *testing.T) {
 	}
 }
 
-// La ayuda de --name documenta los tokens en el idioma de mctl: {date} {time} {source} en inglés, {fecha} {hora}
-// {origen} con --lang es.
-func TestIngestNameFlagTokensPorIdioma(t *testing.T) {
-	t.Cleanup(func() { SetLang("") })
-	for lang, c := range map[string]struct{ has, not string }{"": {"{date} {time} {source}", "{fecha}"}, "es": {"{fecha} {hora} {origen}", "{date}"}} {
-		SetLang(lang)
-		var f IngestFlags
-		fs := flag.NewFlagSet("x", flag.ContinueOnError)
-		f.Register(fs, "syslog_{fecha}_{hora}")
-		u := fs.Lookup("name").Usage
-		if !strings.Contains(u, c.has) || strings.Contains(u, c.not) {
-			t.Errorf("lang %q: %q", lang, u)
+// WireFormat manda por el cable el valor histórico (texto o crudo) aunque se escriba text o raw.
+func TestWireFormat(t *testing.T) {
+	for in, want := range map[string]string{"text": "texto", "raw": "crudo", "texto": "texto", "crudo": "crudo", "jsonl": "jsonl", "": ""} {
+		if got := WireFormat(in); got != want {
+			t.Errorf("%q: %q", in, got)
 		}
+	}
+}
+
+// La ayuda visible (help_en.txt, la de --lang es sale de los Usage) documenta los dos juegos de tokens de --name y
+// los valores canónicos de --format.
+func TestAyudaTokensYFormato(t *testing.T) {
+	if n := strings.Count(helpEn, "--name takes {date} {time} {source}; the Spanish {fecha} {hora} {origen} also work"); n != 2 {
+		t.Errorf("tokens en la ayuda inglesa: %d líneas", n)
+	}
+	if strings.Contains(helpEn, "texto|crudo") || !strings.Contains(helpEn, "--format text|raw|jsonl") {
+		t.Error("--format en inglés debe ser text|raw|jsonl")
 	}
 }

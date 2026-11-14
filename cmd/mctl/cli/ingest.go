@@ -36,7 +36,7 @@ func (f *IngestFlags) Register(fs *flag.FlagSet, defName string) {
 	}
 	fs.StringVar(&f.Name, "name", "", name)
 	fs.IntVar(&f.MaxFiles, "max-files", 0, "con --save, archivos que se conservan (20 por defecto; 1-1000)")
-	fs.StringVar(&f.Format, "format", "", "con --save: texto (por defecto), crudo o jsonl")
+	fs.StringVar(&f.Format, "format", "", "con --save: texto|text (por defecto), crudo|raw o jsonl")
 }
 
 // Int32 rechaza lo que no cabe en el int32 del contrato, en vez de truncarlo en silencio.
@@ -71,4 +71,15 @@ func PrintDrops(w io.Writer, d *v1.SyslogDrops) {
 		fmt.Fprintf(w, " %s=%d", s.Source, s.Count)
 	}
 	fmt.Fprintln(w)
+}
+
+// WireFormat lleva --format a lo que el núcleo acepta: text pasa a texto y raw a crudo (con los españoles no cambia nada).
+func WireFormat(v string) string {
+	switch v {
+	case "text":
+		return "texto"
+	case "raw":
+		return "crudo"
+	}
+	return v
 }
