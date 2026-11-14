@@ -117,7 +117,7 @@ test("en inglés el núcleo ya contesta traducido: tipos, avisos y motivos de fi
   await userEvent.click(screen.getByRole("button", { name: /^Show details/ }));
   const dialog = await screen.findByRole("dialog", { name: "Details · Hosts" });
   const fields = await within(dialog).findByRole("table", { name: "File fields" });
-  expect(within(fields).getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("cell")[1].textContent)).toEqual(["Text", "Integer", "List"]);
+  expect(within(fields).getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("cell")[1].textContent)).toEqual(["Text", "Integer", "List of strings"]);
   await userEvent.keyboard("{Escape}");
   await userEvent.click(screen.getByRole("button", { name: "Import…" }));
   const errors = await screen.findByRole("table", { name: "Invalid rows in the file" });

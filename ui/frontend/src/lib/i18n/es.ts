@@ -2530,7 +2530,7 @@ export const es = {
   "dialog.close": "Cerrar",
   "audit.empty.title": "Aún no se ha verificado la cadena",
   "audit.empty": "Pulsa «Verificar cadena» (Ctrl ↵) para comprobar que ningún registro de auditoría fue editado o eliminado.",
-  "fps.accepted": "Huellas SHA256 aceptadas (SHA256:…, separadas por espacios o comas)",
+  "fps.accepted": "Huellas SHA256 aceptadas",
   "fps.accepted.short": "Huellas aceptadas",
   "fps.accepted.hint": "SHA256:…, separadas por espacios o comas",
   "patrol.filter.kind": "Tipo de trabajo",

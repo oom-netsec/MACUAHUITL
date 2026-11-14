@@ -136,7 +136,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
       )}
       <Section title={t("snippets.section.run")}>
         <Check label={t("assist.writeMem")} checked={writeMem} onChange={edit(setWriteMem)} />
-        <Field label={t("fps.accepted")} value={fps} onChange={edit(setFps)} w="full" mono />
+        <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={fps} onChange={edit(setFps)} w="full" mono />
       </Section>
       <div className="actions">
         <button className="primary" disabled={!canPlan || active} onClick={doPlan}>{t("assist.plan")}</button>

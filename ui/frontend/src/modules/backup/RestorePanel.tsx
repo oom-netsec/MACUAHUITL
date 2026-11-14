@@ -79,7 +79,7 @@ export function RestorePanel({ core, entry, creds, onClose }: { core: CoreAPI; e
       </div>
       <Check label={t("backup.restore.partial")} checked={partial} onChange={setPartial} />
       <Check label={t("backup.restore.writeMem")} checked={writeMem} onChange={setWriteMem} />
-      <Field label={t("fps.accepted")} value={fps} onChange={setFps} w="full" mono />
+      <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={fps} onChange={setFps} w="full" mono />
       <div className="actions">
         <button disabled={!canPlan || active} onClick={doPlan}>{t("backup.restore.plan")}</button>
         <button onClick={onClose} disabled={active}>{t("backup.restore.close")}</button>
