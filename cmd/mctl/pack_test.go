@@ -124,3 +124,28 @@ func TestPackInstallRechazaArchivoNoRegular(t *testing.T) {
 		t.Fatal("se colgó leyendo /dev/zero")
 	}
 }
+
+// mctl pack export/import salen en inglés con --lang en, sin líneas mezcladas; en español con el idioma por omisión de las pruebas.
+func TestPackExportImportEnIngles(t *testing.T) {
+	startCore(t)
+	id := regexp.MustCompile(`[0-9a-f]{32}`).FindString(must(t, "show clock\n", "scripts", "add", "Mi script", "--tech", "l2", "--platform", "ios-xe"))
+	f := filepath.Join(t.TempDir(), "mio.mpack")
+	has(t, "export en", enMust(t, "", "pack", "export", "acme/mio", id, "--out", f), "exported acme/mio", "unsigned, to "+f, "sha256 ")
+	must(t, "", "scripts", "rm", id)
+	must(t, "show version\n", "scripts", "add", "Mi script", "--tech", "l2", "--platform", "ios-xe") // mismo nombre, otro contenido
+	has(t, "preview en", enMust(t, "", "pack", "import", f, "--preview"), "KIND", "NAME", "STATE", "CONFLICTS WITH", "conflicto_nombre")
+	_, err := en(t, "", "pack", "import", f)
+	if err == nil || !strings.Contains(err.Error(), "nothing imported: 1 conflict(s) need a decision") {
+		t.Fatalf("sin decidir: %v", err)
+	}
+	if _, err := en(t, "", "pack", "import", f, "--decision", "x=reemplazar"); err == nil || !strings.Contains(err.Error(), `invalid decision "x=reemplazar"`) || strings.Contains(err.Error(), "uso") {
+		t.Fatalf("decisión inválida: %v", err)
+	}
+	if _, err := en(t, "", "pack", "import", f, "--decision", "ninguno=omitir"); err == nil || !strings.Contains(err.Error(), `"ninguno", which is not in the pack`) {
+		t.Fatalf("decisión de un ID ausente: %v", err)
+	}
+	if _, err := mctl(t, "", "pack", "import", f, "--decision", "x=reemplazar"); err == nil || !strings.Contains(err.Error(), `decisión inválida "x=reemplazar"`) {
+		t.Fatalf("decisión inválida es: %v", err)
+	}
+	has(t, "import en", enMust(t, "", "pack", "import", f, "--all=omitir"), "imported: scripts 0 new, 0 renamed, 1 skipped; playbooks 0 new, 0 renamed, 0 skipped")
+}
