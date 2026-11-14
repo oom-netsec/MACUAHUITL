@@ -131,6 +131,18 @@ var iosRules = []rule{
 	R("user-secret", "", `\s*wireless ewc-ap (?:.*? )?password `+typ),
 	R("user-secret", "", `\s*wireless ewc-ap (?:.*? )?secret `+typ),
 	R("user-secret", "username", `\s+(?:password|secret) `+typ),
+	// AireOS (WLC 5520/8540…): sintaxis «config …» tecleada. Sin tipo de cifrado; el usuario, índice, IP, puerto y WLAN no se tapan.
+	R("radius-key", "", `\s*config radius (?:auth|acct) add \d+ \S+ \d+ (?:ascii|hex) `),
+	R("tacacs-key", "", `\s*config tacacs (?:auth|acct|athr) add \d+ \S+ \d+ (?:ascii|hex) `),
+	R("user-secret", "", `\s*config (?:mgmtuser|netuser) (?:add|password) \S+ `),
+	R("snmp-community", "", `\s*config snmp community (?:create|accessmode (?:ro|rw)|ipaddr \S+ \S+) `),
+	R("snmp-user-auth", "", `\s*config snmp v3user create \S+ \S+ \S+ \S+ `),
+	R("snmp-user-priv", "", `\s*config snmp v3user create \S+ \S+ \S+ \S+ \S+ `),
+	R("user-secret", "", `\s*config local-auth (?:.*? )?password `),
+	R("psk", "", `\s*config local-auth method fast server-key `),
+	R("user-secret", "", `\s*config ap mgmtuser add username \S+ password `),
+	R("user-secret", "", `\s*config ap mgmtuser add username \S+ password \S+ secret `),
+	R("dot1x-password", "", `\s*config ap 802\.1Xuser add username \S+ password `),
 	// LDAP (IOS «bind authenticate», NX-OS «ldap-server host … rootDN … password»), IS-IS, LDP, MSDP, PIM, BFD, GLBP.
 	R("ldap-password", "", `\s*bind authenticated? (?:.*? )?password `+typ),
 	R("ldap-password", "", `\s*ldap-server host \S+ (?:.*? )?password `+typ),
@@ -190,6 +202,8 @@ var iosRules = []rule{
 	full("cts-pac", `^(\s*PAC-Opaque\s*[:=]\s*)(\S+)(.*)$`),
 	full("user-secret", `^(\s*Mgmt (?:Password|Secret)\s*[:=]\s*)(\S.*?)(\s*)$`),
 	full("dot1x-password", `^(\s*Dot1x Password\s*[:=]\s*)(\S.*?)(\s*)$`),
+	// show snmpcommunity de AireOS: nombre en claro, IP, máscara, modo y estado.
+	full("snmp-community", `^()(\S+)(\s+\d+\.\d+\.\d+\.\d+\s+\d+\.\d+\.\d+\.\d+\s+(?:Read Only|Read/Write)\s+(?:Enable|Disable)\s*)$`),
 	full("wifi-psk", `^(\s*PSK\s*[:=]\s*)(\S.*?)(\s*)$`).guarded(),
 	R("tacacs-key", "tacacs", `\s+key `+typ),
 	R("radius-key", "radius", `\s+key `+typ),
