@@ -52,7 +52,7 @@ func FuzzParse(f *testing.F) {
 	})
 }
 
-// FuzzReadStream: un flujo TCP arbitrario (conteo de octetos o líneas) no entra en pánico, termina y cada
+// FuzzReadStream (con el tamaño de búfer de listenTCP): un flujo TCP arbitrario (conteo de octetos o líneas) no entra en pánico, termina y cada
 // mensaje respeta el tope.
 func FuzzReadStream(f *testing.F) {
 	for _, s := range syslogSeeds {
@@ -62,7 +62,7 @@ func FuzzReadStream(f *testing.F) {
 	f.Add([]byte("5 hello5 world\n\n\r\n99999999999 x"))
 	f.Fuzz(func(t *testing.T, in []byte) {
 		n := 0
-		readStream(bufio.NewReaderSize(bytes.NewReader(in), 4096), "x", func(_ string, msg []byte, _ bool) {
+		readStream(bufio.NewReaderSize(bytes.NewReader(in), MaxMessage+16), "x", func(_ string, msg []byte, _ bool) {
 			if n++; len(msg) > MaxMessage {
 				t.Fatalf("mensaje de %d bytes pasa el tope", len(msg))
 			}
