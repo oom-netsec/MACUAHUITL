@@ -91,15 +91,15 @@ func slowUpload(t *testing.T, stalled bool) (n *atomic.Int64, done chan error, c
 	return n, done, cancel
 }
 
-// Un par que no lee ni ajusta la ventana: lo escrito dentro de la ventana inicial no es actividad, así que
-// el contador no avanza y el keepalive de la sesión la cierra a los 3 fallos.
+// Un par que no lee ni ajusta la ventana: el crédito falso es lo que cabe en la ventana (una sola vez); después los
+// Write se bloquean, el contador se detiene y el keepalive de la sesión cierra a los 3 fallos.
 func TestKeepaliveSubidaConParQueNoLee(t *testing.T) {
 	n, done, cancel := slowUpload(t, true)
 	defer cancel()
 	time.Sleep(1500 * time.Millisecond)
 	a := n.Load()
 	time.Sleep(500 * time.Millisecond)
-	if b := n.Load(); b != a || a > 64<<10 {
+	if b := n.Load(); b != a || a > 8<<20 {
 		t.Fatalf("actividad con un par que no consume: %d -> %d", a, b)
 	}
 	select {

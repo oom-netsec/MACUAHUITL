@@ -30,26 +30,19 @@ func (x tapR) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// writeWindow es lo que SSH acepta escribir sin que el par haga nada: la ventana inicial del canal (2 MiB en
-// OpenSSH y x/crypto). Lo escrito dentro de ella no prueba que el par viva; pasada la ventana, cada Write que
-// vuelve exige que el par haya ajustado la ventana (consumió), y solo eso cuenta como actividad.
-// shortcut: el tope es fijo, un par con ventana mayor deja pasar una vez esa diferencia; cerrar el hueco exigiría
-// leer la ventana real del canal, que x/crypto/ssh no expone.
-const writeWindow = 2 << 20
-
+// tapW cuenta lo escrito como actividad. Decisión (revisión de seguridad): no se descuenta la ventana inicial.
+// Un par que no lee solo deja pasar lo que cabe en su ventana de canal (≈2 MiB en OpenSSH y x/crypto) una vez:
+// sin que ajuste la ventana, los Write siguientes se bloquean y el contador se detiene, así que el crédito falso
+// está acotado y el keepalive cierra a los 3 fallos. En cambio, no contar esos primeros bytes cerraría una subida
+// sana a la flash de un equipo con ventana chica (3560), que tarda en contestar mientras escribe.
 type tapW struct {
-	w    io.WriteCloser
-	t    tap
-	sent int64
+	w io.WriteCloser
+	t tap
 }
 
 func (x *tapW) Write(p []byte) (int, error) {
 	n, err := x.w.Write(p)
-	before := x.sent
-	x.sent += int64(n)
-	if credit := x.sent - max(before, writeWindow); credit > 0 {
-		x.t(int(credit))
-	}
+	x.t(n)
 	return n, err
 }
 func (x *tapW) Close() error { return x.w.Close() }
