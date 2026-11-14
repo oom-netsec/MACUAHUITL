@@ -16,13 +16,7 @@ import (
 
 // Harden se llama al arrancar el núcleo. Devuelve avisos para la auditoría (en inglés, como toda la auditoría); nunca falla.
 func Harden() []string {
-	var warns []string
-	if err := unix.Prctl(unix.PR_SET_DUMPABLE, 0, 0, 0, 0); err != nil {
-		warns = append(warns, "could not mark the process as non-dumpable: "+err.Error())
-	}
-	if err := unix.Setrlimit(unix.RLIMIT_CORE, &unix.Rlimit{}); err != nil {
-		warns = append(warns, "could not disable core dumps: "+err.Error())
-	}
+	warns := NoDump()
 	var lim unix.Rlimit
 	if err := unix.Getrlimit(unix.RLIMIT_MEMLOCK, &lim); err != nil {
 		warns = append(warns, "could not read RLIMIT_MEMLOCK: "+err.Error())
@@ -33,6 +27,19 @@ func Harden() []string {
 	}
 	warns = append(warns, swapWarnings("/proc/swaps")...)
 	return append(warns, hibernationWarnings("/sys/power/resume")...)
+}
+
+// NoDump marca el proceso como no volcable y sin core dumps (lo que Harden hace primero); la UI usa solo esto, porque
+// mlockall y los avisos de swap son del núcleo. Devuelve avisos; nunca falla.
+func NoDump() []string {
+	var warns []string
+	if err := unix.Prctl(unix.PR_SET_DUMPABLE, 0, 0, 0, 0); err != nil {
+		warns = append(warns, "could not mark the process as non-dumpable: "+err.Error())
+	}
+	if err := unix.Setrlimit(unix.RLIMIT_CORE, &unix.Rlimit{}); err != nil {
+		warns = append(warns, "could not disable core dumps: "+err.Error())
+	}
+	return warns
 }
 
 // mlockWarning: con un límite finito, MCL_FUTURE haría fallar al runtime de Go cuando crezca
