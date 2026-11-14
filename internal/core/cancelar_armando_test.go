@@ -1,6 +1,7 @@
 package core
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -45,6 +46,9 @@ func TestCancelarDuranteElArmadoCancelaElTrabajo(t *testing.T) {
 	}
 	if a, r := inh.counts(); a != r {
 		t.Errorf("inhibidor sin liberar: %d tomados, %d liberados", a, r)
+	}
+	if ents, _ := os.ReadDir(h.out); len(ents) != 0 {
+		t.Errorf("quedó la carpeta vacía de la corrida: %v", ents)
 	}
 	if a := h.auditText(t); strings.Contains(a, `"action":"job.arm"`) {
 		t.Errorf("auditó un armado que no ocurrió: %s", a)

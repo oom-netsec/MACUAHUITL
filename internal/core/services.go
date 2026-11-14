@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"sort"
 	"strings"
@@ -289,10 +290,15 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 		c.mu.Lock()
 		j.state = "created"
-		if j.cancelReq { // cancelaron durante el armado fallido: no vuelve a "created"
+		cancelled := j.cancelReq
+		if cancelled { // cancelaron durante el armado fallido: no vuelve a "created"
 			j.cancelReq, j.state = false, "cancelled"
 		}
 		c.mu.Unlock()
+		if cancelled {
+			c.guard.Revoke(j.id)
+			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
+		}
 		c.persistJob(j) // la fase del Login Test ya guardó "arming"; al recargar no debe verse como caído
 		c.audit("job.arm_failed", j.id, reason)
 		return nil, err
@@ -402,6 +408,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		for i := len(undo) - 1; i >= 0; i-- {
 			undo[i]()
 		}
+		os.Remove(w.Dir()) // la carpeta que creó NewWriter; Remove no borra una carpeta con contenido
 		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
 		return nil, service.Err(ctx, codes.FailedPrecondition, "patrol.svc.job_state", i18n.A("state", "cancelled"))
 	}
@@ -417,7 +424,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	j.cancelReq = false
 	c.mu.Unlock()
 	if late {
-		defer c.sched.Cancel(j.id)
+		c.sched.Cancel(j.id)
 	}
 	armed, armedArgs := "phase.devices", i18n.A("n", len(spec.Targets))
 	if n := len(r.ExcludedDeviceIds); n > 0 {
