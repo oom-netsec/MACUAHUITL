@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/pack/packtest"
 )
@@ -106,5 +107,20 @@ func TestPackExportImport(t *testing.T) {
 	}
 	if o := must(t, "", "pack", "install", f, "--allow-unsigned"); !strings.Contains(o, "instalado: acme/mio") {
 		t.Fatalf("install: %q", o)
+	}
+}
+
+// mctl no lee sin tope ni se cuelga con un archivo que no es regular (dispositivo, FIFO): lo rechaza antes de hablar con el núcleo.
+func TestPackInstallRechazaArchivoNoRegular(t *testing.T) {
+	startCore(t)
+	done := make(chan error, 1)
+	go func() { _, err := mctl(t, "", "pack", "install", "/dev/zero"); done <- err }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("aceptó /dev/zero")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("se colgó leyendo /dev/zero")
 	}
 }

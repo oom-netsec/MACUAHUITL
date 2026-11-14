@@ -4,13 +4,9 @@ package pack
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,6 +14,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	dompack "github.com/oom-netsec/MACUAHUITL/internal/pack"
 )
 
 const help = `  pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM]...  |  pack list  |  pack show <id>  |  pack remove <id>
@@ -59,17 +56,13 @@ func line(p *v1.PackInfo) string {
 }
 
 // fileSHA256 es la suma del archivo que mctl va a pedir instalar: el núcleo la compara con la del archivo que lee.
+// Lee con el mismo tope y la misma comprobación de archivo regular que el núcleo (un FIFO o /dev/zero no cuelgan a mctl).
 func fileSHA256(path string) (string, error) {
-	f, err := os.Open(path)
+	data, err := dompack.ReadArchive(path)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	return dompack.SHA256(data), nil
 }
 
 func install(c *cli.Env, args []string) error {
