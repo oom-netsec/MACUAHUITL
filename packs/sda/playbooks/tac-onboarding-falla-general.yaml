@@ -1,0 +1,19 @@
+# Propósito: Recolecta autenticación, RADIUS, CTS y DHCP del edge completo.
+# Cuándo usarlo: Varios endpoints no autentican.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: tac-onboarding-falla-general
+platform: sda
+name: SD-Access · TAC · Onboarding falla en el edge
+name_en: SD-Access · TAC · Onboarding fails on the edge
+commands:
+  - cmd: show clock
+  - cmd: show authentication sessions
+  - cmd: show dot1x all summary
+  - cmd: show aaa servers
+  - cmd: show radius statistics
+  - cmd: show cts environment-data
+  - cmd: show cts server-list
+  - cmd: show ip dhcp snooping statistics detail
+  - cmd: show logging | include AUTHMGR|DOT1X|MAB|RADIUS|CTS
+    timeout: 180s

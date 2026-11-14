@@ -1,0 +1,17 @@
+# Propósito: Revisa snooping, asociaciones y estadísticas DHCP del edge.
+# Cuándo usarlo: Clientes del fabric sin dirección.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: edge-dhcp
+platform: sda
+name: SD-Access · Edge · DHCP en el edge
+name_en: SD-Access · Edge · DHCP at the edge
+commands:
+  - cmd: show clock
+  - cmd: show ip dhcp snooping
+  - cmd: show ip dhcp snooping binding
+  - cmd: show ip dhcp snooping statistics detail
+  - cmd: show ip arp inspection statistics
+  - cmd: show device-tracking database
+  - cmd: show logging | include DHCP
+    timeout: 180s

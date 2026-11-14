@@ -1,0 +1,18 @@
+# Propósito: Muestra la caché de mapeos EID a RLOC por instancia.
+# Cuándo usarlo: Un edge no resuelve el destino o usa un RLOC viejo.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: lisp-map-cache
+platform: sda
+name: SD-Access · LISP · Map-cache
+name_en: SD-Access · LISP · Map-cache
+commands:
+  - cmd: show clock
+  - cmd: show lisp all instance-id * ipv4 map-cache
+    timeout: 180s
+  - cmd: show lisp all instance-id * ethernet map-cache
+    timeout: 180s
+  - cmd: show lisp all instance-id * ipv6 map-cache
+    timeout: 180s
+  - cmd: show lisp session
+  - cmd: show ip cef summary

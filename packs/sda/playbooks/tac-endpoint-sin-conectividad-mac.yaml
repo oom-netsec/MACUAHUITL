@@ -1,0 +1,25 @@
+# Propósito: Sigue un endpoint por sesión, tracking, MAC, LISP y SGT.
+# Cuándo usarlo: Un endpoint no tiene red en el fabric.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: tac-endpoint-sin-conectividad-mac
+platform: sda
+name: SD-Access · TAC · Endpoint sin conectividad (una MAC)
+name_en: SD-Access · TAC · Endpoint with no connectivity (one MAC)
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show authentication sessions mac {mac} details
+  - cmd: show device-tracking database mac {mac}
+  - cmd: show mac address-table address {mac}
+  - cmd: show lisp all instance-id * ethernet database
+    timeout: 180s
+  - cmd: show lisp all instance-id * ethernet map-cache
+    timeout: 180s
+  - cmd: show cts role-based sgt-map all
+  - cmd: show access-tunnel summary
+  - cmd: show ip dhcp snooping binding
+  - cmd: show logging | include AUTHMGR|DOT1X|MAB|LISP|DHCP
+    timeout: 180s

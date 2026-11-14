@@ -1,0 +1,16 @@
+# Propósito: Revisa la base, las políticas, los contadores y los eventos de SISF.
+# Cuándo usarlo: Hosts que no se registran o pierden su entrada.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: edge-device-tracking
+platform: sda
+name: SD-Access · Edge · Device tracking del edge
+name_en: SD-Access · Edge · Edge device tracking
+commands:
+  - cmd: show clock
+  - cmd: show device-tracking database
+  - cmd: show device-tracking policies
+  - cmd: show device-tracking counters
+  - cmd: show device-tracking events
+  - cmd: show device-tracking messages
+  - cmd: show device-tracking features

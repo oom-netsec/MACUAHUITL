@@ -1,0 +1,16 @@
+# Propósito: Relaciona las VN con VRF, interfaces y rutas.
+# Cuándo usarlo: Una VN no tiene rutas o el SVI está en otra VRF.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: fabric-vn-vrf
+platform: sda
+name: SD-Access · Fabric · VN, VRF e instancias
+name_en: SD-Access · Fabric · VNs, VRFs and instances
+commands:
+  - cmd: show clock
+  - cmd: show vrf
+  - cmd: show ip vrf interfaces
+  - cmd: show ip route vrf * summary
+  - cmd: show ip interface brief
+  - cmd: show vlan brief
+  - cmd: show lisp all instance-id * ipv4 summary

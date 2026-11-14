@@ -1,0 +1,17 @@
+# Propósito: Muestra publicadores y suscriptores de pub/sub.
+# Cuándo usarlo: Un border no recibe las rutas o los EID publicados.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: lisp-publicaciones
+platform: sda
+name: SD-Access · LISP · Publicaciones y suscripciones
+name_en: SD-Access · LISP · Publications and subscriptions
+commands:
+  - cmd: show clock
+  - cmd: show lisp all instance-id * ipv4 publisher
+  - cmd: show lisp all instance-id * ipv4 subscriber
+  - cmd: show lisp all instance-id * ethernet publisher
+  - cmd: show lisp all instance-id * ethernet subscriber
+  - cmd: show lisp session
+  - cmd: show logging | include LISP
+    timeout: 180s

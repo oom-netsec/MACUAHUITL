@@ -1,0 +1,16 @@
+# Propósito: Revisa sesiones LISP, túneles y BGP hacia el tránsito.
+# Cuándo usarlo: Dos sitios del fabric no se ven por el tránsito.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: border-transit
+platform: sda
+name: SD-Access · Border · Tránsito SD-Access
+name_en: SD-Access · Border · SD-Access transit
+commands:
+  - cmd: show clock
+  - cmd: show lisp session
+  - cmd: show lisp all instance-id * ipv4 server summary
+  - cmd: show lisp all instance-id * ipv4 publisher
+  - cmd: show access-tunnel summary
+  - cmd: show ip bgp summary
+  - cmd: show ip route summary

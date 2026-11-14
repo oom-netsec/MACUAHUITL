@@ -1,0 +1,17 @@
+# Propósito: Muestra el rol del equipo y la configuración de LISP del fabric.
+# Cuándo usarlo: No se sabe si un equipo es edge, border o control plane.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: fabric-roles
+platform: sda
+name: SD-Access · Fabric · Roles y configuración LISP
+name_en: SD-Access · Fabric · Roles and LISP configuration
+commands:
+  - cmd: show clock
+  - cmd: show version | include image|System image
+  - cmd: show lisp session
+  - cmd: show access-tunnel summary
+  - cmd: show vrf
+  - cmd: show running-config | section router lisp
+    may_contain_secrets: true
+  - cmd: show cts environment-data

@@ -1,0 +1,23 @@
+# Propósito: Sigue una IP por ARP, ruta, CEF, tracking y LISP.
+# Cuándo usarlo: Una IP del fabric no responde.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: tac-endpoint-sin-conectividad-ip
+platform: sda
+name: SD-Access · TAC · Endpoint sin conectividad (una IP)
+name_en: SD-Access · TAC · Endpoint with no connectivity (one IP)
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: show ip arp {ip}
+  - cmd: show ip route {ip}
+  - cmd: show ip cef {ip} detail
+  - cmd: show device-tracking database
+  - cmd: show lisp all instance-id * ipv4 map-cache
+    timeout: 180s
+  - cmd: show lisp all instance-id * ipv4 database
+    timeout: 180s
+  - cmd: show cts role-based sgt-map all
+  - cmd: show access-tunnel summary

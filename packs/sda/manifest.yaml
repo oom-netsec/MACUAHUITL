@@ -1,0 +1,10 @@
+id: oom/sda
+version: 1.0.0
+min_core: 0.4.1
+name: SD-Access, diagnóstico TAC
+name_en: SD-Access, TAC diagnostics
+description: Playbooks de solo lectura para el fabric SD-Access sobre Catalyst 9000 con IOS-XE 17.x - LISP, fabric (roles, VN, túneles de acceso, CTS/SGT), edge, border y casos TAC; los de un endpoint piden su MAC, IP o interfaz.
+description_en: Read-only playbooks for the SD-Access fabric on Catalyst 9000 running IOS-XE 17.x - LISP, fabric (roles, VNs, access tunnels, CTS/SGT), edge, border and TAC cases; the per-endpoint ones ask for its MAC, IP or interface.
+platforms: [sda]
+author: oom-netsec
+license: Apache-2.0

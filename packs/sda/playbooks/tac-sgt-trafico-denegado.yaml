@@ -1,0 +1,19 @@
+# Propósito: Recolecta mapeos, políticas y contadores CTS del tráfico denegado.
+# Cuándo usarlo: El tráfico se descarta entre dos grupos.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: tac-sgt-trafico-denegado
+platform: sda
+name: SD-Access · TAC · Tráfico denegado por SGT
+name_en: SD-Access · TAC · Traffic denied by SGT
+commands:
+  - cmd: show clock
+  - cmd: show cts role-based sgt-map all
+  - cmd: show cts role-based permissions
+  - cmd: show cts role-based counters
+  - cmd: show cts environment-data
+  - cmd: show cts server-list
+  - cmd: show access-lists
+    timeout: 120s
+  - cmd: show logging | include CTS|RBM
+    timeout: 180s

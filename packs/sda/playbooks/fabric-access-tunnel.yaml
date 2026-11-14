@@ -1,0 +1,17 @@
+# Propósito: Muestra los túneles de acceso y las interfaces del overlay.
+# Cuándo usarlo: El tráfico encapsulado no llega a otro edge o a un AP.
+# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: fabric-access-tunnel
+platform: sda
+name: SD-Access · Fabric · Túneles de acceso VXLAN
+name_en: SD-Access · Fabric · VXLAN access tunnels
+commands:
+  - cmd: show clock
+  - cmd: show access-tunnel summary
+  - cmd: show ip interface brief | include Tunnel|Loopback|Vlan
+  - cmd: show interfaces | include Tunnel|line protocol
+  - cmd: show lisp session
+  - cmd: show ip route summary
+  - cmd: show logging | include TUNNEL|LISP|VXLAN
+    timeout: 180s
