@@ -485,6 +485,32 @@ func (s *Stream) Typed(line string) string {
 	return maskLine(" "+line, s.block, s.Platform, s.counts)[1:]
 }
 
+// Peek enmascara una línea tecleada sobre una copia: ni el bloque ni los contadores de s cambian.
+func (s Stream) Peek(line string) string {
+	s.counts = nil
+	return s.Typed(line)
+}
+
+// looseBlocks son los bloques que tienen reglas propias.
+var looseBlocks = []string{"line", "aaaserver", "tacacs", "radius", "licsmart", "username", "dot1x", "ezvpn", "trustpoint", "umbrella"}
+
+// TypedLoose enmascara una línea tecleada cuyo bloque no confirmó ningún prompt: si el bloque en curso no
+// la tapa, la prueba con cada bloque que tenga reglas propias y graba la primera versión que tape algo
+// (tapar de más ahí es aceptable).
+func (s *Stream) TypedLoose(line string) string {
+	out := s.Typed(line)
+	if out != line {
+		return out
+	}
+	for _, b := range looseBlocks {
+		tmp := Stream{Platform: s.Platform}
+		if m := tmp.Prompted(line, b); m != line {
+			return m
+		}
+	}
+	return out
+}
+
 // archiveLog: línea de show archive log config; tras «|» va un comando de configuración.
 var archiveLog = regexp.MustCompile(`^(\s*\d+\s+\d+\s+\S+\s+\|)(.*)$`)
 

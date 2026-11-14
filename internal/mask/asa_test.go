@@ -184,3 +184,24 @@ func TestASALicenseSmartRegisterNoAbreBloque(t *testing.T) {
 		t.Fatalf("got:\n%s", got)
 	}
 }
+
+// TypedLoose enmascara sin bloque confirmado probando cada bloque con reglas propias; Peek no toca el estado.
+func TestTypedLooseYPeek(t *testing.T) {
+	for _, in := range []string{"password K9x", "key K9x", "token K9x", "key-string K9x", "radius-common-pw K9x"} {
+		s := Stream{}
+		if got := s.TypedLoose(in); got == in {
+			t.Errorf("TypedLoose(%q) sin tapar", in)
+		}
+	}
+	s := Stream{}
+	if got := s.TypedLoose("hostname FW1"); got != "hostname FW1" {
+		t.Errorf("tapó de más: %q", got)
+	}
+	s = Stream{}
+	s.Typed("aaa-server RAD (inside) host 10.1.1.5")
+	n := len(s.counts)
+	_ = s.Peek("enable password Secret99")
+	if len(s.counts) != n || s.counts["enable-secret"] != 0 || s.block != "aaaserver" {
+		t.Errorf("Peek tocó el estado: %v %q", s.counts, s.block)
+	}
+}

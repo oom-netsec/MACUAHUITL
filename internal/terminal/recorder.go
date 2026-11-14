@@ -209,13 +209,17 @@ var maskedTok = regexp.MustCompile(`<MASKED:[^>]*>`)
 // peekSecrets alimenta la red por contenido con lo que ya se detecta en una línea retenida, sin tocar
 // el estado de bloque de lo tecleado (su bloque lo da el prompt que aún no llega).
 func (r *Recorder) peekSecrets(line string) {
-	tmp := r.typed
-	r.noteSecrets(line, tmp.Typed(line))
+	r.noteSecrets(line, r.typed.Peek(line))
 }
 
 // typedLine enmascara lo tecleado y guarda en memoria los valores tapados (red por contenido).
-func (r *Recorder) typedLine(line string) string {
-	m := r.typed.Typed(line)
+func (r *Recorder) typedLine(line string, loose bool) string {
+	var m string
+	if loose {
+		m = r.typed.TypedLoose(line)
+	} else {
+		m = r.typed.Typed(line)
+	}
 	r.noteSecrets(line, m)
 	return m
 }
@@ -343,16 +347,16 @@ func (r *Recorder) settle() {
 		r.input("[oculto]")
 		r.tail = nil
 	case shellPrompt.MatchString(r.lastLine()):
-		r.commitHeld()
+		r.commitHeld(false)
 	}
 }
 
 // commitHeld graba como comandos las líneas retenidas. Requiere r.mu.
-func (r *Recorder) commitHeld() {
+func (r *Recorder) commitHeld(loose bool) {
 	h := r.held
 	r.held = nil
 	for _, l := range h {
-		r.input(r.typedLine(l))
+		r.input(r.typedLine(l, loose))
 	}
 }
 
@@ -403,14 +407,14 @@ func (r *Recorder) flush() {
 		r.input("[oculto]")
 	case line == "":
 	case fresh && len(r.held) == 0:
-		r.input(r.typedLine(line)) // shortcut: ver la nota del paquete sobre abreviaturas
+		r.input(r.typedLine(line, false)) // shortcut: ver la nota del paquete sobre abreviaturas
 	default:
 		// Sin salida nueva desde el Enter anterior: el equipo aún no mostró su prompt y esta línea
 		// podría ser la contraseña que el prompt de secreto va a pedir. Se decide al llegar la salida.
 		r.peekSecrets(line) // los valores ya detectados entran a la red por contenido; se graba al llegar el prompt con su bloque
 		r.held = append(r.held, line)
 		if len(r.held) > heldMax {
-			r.input(r.typedLine(r.held[0]))
+			r.input(r.typedLine(r.held[0], true))
 			r.held = r.held[1:]
 		}
 	}
@@ -433,9 +437,9 @@ func (r *Recorder) Close() {
 		r.outLine(string(r.pend))
 		r.pend = nil
 	}
-	r.commitHeld()
+	r.commitHeld(true)
 	if !r.hidden && len(r.line) > 0 {
-		r.input(r.typedLine(string(r.line)))
+		r.input(r.typedLine(string(r.line), true))
 	}
 	r.hidden, r.line = false, nil
 }

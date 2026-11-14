@@ -338,7 +338,8 @@ func TestExitPegadoCierraElBloqueTecleado(t *testing.T) {
 	r.Input([]byte("aaa-server RAD (inside) host 10.1.1.5\rkey K1\rexit\rkey Foo2\r"))
 	r.Close()
 	out := b.String()
-	if strings.Contains(out, "K1") || !strings.Contains(out, ">>> key Foo2") {
+	// Sin prompt que confirme el bloque (cierre), tapar de más «key Foo2» es aceptable; lo que no puede pasar es la fuga de K1.
+	if strings.Contains(out, "K1") {
 		t.Errorf("%s", out)
 	}
 }
@@ -714,6 +715,28 @@ func TestPegadoTrasBloqueAbreviado(t *testing.T) {
 		r.Close()
 		if out := b.String(); strings.Contains(out, c.leak) {
 			t.Errorf("%q:\n%s", c.in, out)
+		}
+	}
+}
+
+// Sin bloque confirmado por un prompt (desbordamiento de lo retenido o cierre), se enmascara con cada bloque.
+func TestRetenidoSinBloqueSeEnmascaraConservador(t *testing.T) {
+	var many strings.Builder
+	many.WriteString("lin vty 0 4\r")
+	for i := 0; i < 40; i++ {
+		many.WriteString("password K9x\r")
+	}
+	casos := map[string]string{
+		"desborda": many.String(),
+		"cierre":   "lin vty 0 4\rpassword K7x\r",
+	}
+	for nombre, in := range casos {
+		r, b := newRec()
+		r.Output([]byte("SW1(config)# "))
+		r.Input([]byte(in))
+		r.Close() // sin que llegue el prompt del bloque
+		if out := b.String(); strings.Contains(out, "K9x") || strings.Contains(out, "K7x") {
+			t.Errorf("%s:\n%.600s", nombre, out)
 		}
 	}
 }
