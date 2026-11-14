@@ -11,7 +11,7 @@ import { PlaybookPicker } from "./PlaybookPicker";
 import { useScriptsVersion } from "../scripts/signal";
 
 // Un tipo de dato nuevo del núcleo que el front aún no traduce: se muestra el nombre del dato, sin ayuda.
-const known = (k: string) => ["mac", "ap", "wlan", "interface", "ip"].includes(k);
+const known = (k: string) => ["mac", "ap", "wlan", "interface", "ip", "vrf", "vnid"].includes(k);
 
 // Acepta IPs, nombres y CIDR separados por comas, espacios o saltos de línea; sin duplicados.
 export function parseTargets(text: string): string[] {

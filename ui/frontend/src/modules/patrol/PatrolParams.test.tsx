@@ -92,3 +92,11 @@ test("un tipo de dato desconocido usa el nombre del dato como etiqueta y sin ayu
   expect(screen.getByLabelText("vrf")).toBeInTheDocument();
   expect(document.body.textContent).not.toContain("patrol.param");
 });
+
+test("los tipos vrf y vnid (ACI) llevan su etiqueta y su ayuda", async () => {
+  const pbAci = { id: "aci/ep", platform: "nx-os", name: "ACI · EP", commands: ["show x {vrf} {vnid}"], params: [{ name: "vrf", kind: "vrf" }, { name: "vnid", kind: "vnid" }] };
+  await setup([pbAci]);
+  await userEvent.click(await screen.findByRole("checkbox", { name: /EP/ }));
+  expect(screen.getByLabelText("VRF (vrf)")).toHaveAccessibleDescription(/tenant:vrf/);
+  expect(screen.getByLabelText("VNID (vnid)")).toHaveAccessibleDescription(/16777215/);
+});

@@ -42,7 +42,7 @@ export interface JobSpec {
 }
 export interface RunDevice { target: string; state: string; detail: string; reason?: string; args?: Record<string, string> }
 // Un playbook del catálogo: id "ios-xe/stp", nombre "L2 · STP" (área antes del «·») y los comandos que corre.
-export type ParamKind = "mac" | "ap" | "wlan" | "interface" | "ip";
+export type ParamKind = "mac" | "ap" | "wlan" | "interface" | "ip" | "vrf" | "vnid";
 export interface PlaybookParam { name: string; kind: ParamKind }
 export interface PlaybookInfo { id: string; platform: string; name: string; commands: string[]; params: PlaybookParam[]; pack: string } // pack: "oom/cat9k", "usuario" (propios) o "" (base)
 

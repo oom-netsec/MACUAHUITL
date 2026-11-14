@@ -2684,4 +2684,8 @@ export const en: Record<Key, string> = {
   "shell.moduleError": "The module failed to display",
   "patrol.pb.own": "Own",
   "patrol.pb.base": "Built-in",
+  "patrol.param.kind.vrf": "VRF",
+  "patrol.param.vrf": "Tenant and VRF as tenant:vrf, for example common:default.",
+  "patrol.param.kind.vnid": "VNID",
+  "patrol.param.vnid": "Whole number from 1 to 16777215, for example 2850817.",
 };

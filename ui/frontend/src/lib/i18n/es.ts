@@ -2682,6 +2682,10 @@ export const es = {
   "shell.moduleError": "El módulo falló al mostrarse",
   "patrol.pb.own": "Propio",
   "patrol.pb.base": "Base",
+  "patrol.param.kind.vrf": "VRF",
+  "patrol.param.vrf": "Tenant y VRF con la forma tenant:vrf, por ejemplo common:default.",
+  "patrol.param.kind.vnid": "VNID",
+  "patrol.param.vnid": "Entero de 1 a 16777215, por ejemplo 2850817.",
 };
 
 export type Key = keyof typeof es;
