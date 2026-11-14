@@ -8,7 +8,7 @@ name: AireOS · Clientes · Clientes de una WLAN
 name_en: AireOS · Clients · Clients of a WLAN
 params:
   - name: wlan
-    kind: ap
+    kind: wlan
 commands:
   - cmd: show time
   - cmd: show client wlan {wlan}

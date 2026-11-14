@@ -15,16 +15,19 @@ import (
 type Param struct{ Name, Kind string }
 
 // ParamKinds son los tipos de dato válidos.
-var ParamKinds = []string{"mac", "ap", "wlan", "interface", "ip"}
+var ParamKinds = []string{"mac", "ap", "wlan", "interface", "ip", "vrf", "vnid"}
 
 var (
 	placeholder = regexp.MustCompile(`\{[a-z][a-z0-9_]*\}`) // misma forma que paramName: {3} de un regex no es un dato
 	paramName   = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	// aa:bb:cc:dd:ee:ff, aa-bb-cc-dd-ee-ff, aabb.ccdd.eeff o aabbccddeeff
-	macRe    = regexp.MustCompile(`^(?:(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4}|[0-9A-Fa-f]{12})$`)
-	wlanRe   = regexp.MustCompile(`^[1-9][0-9]{0,2}$`) // 1 a 512, sin ceros a la izquierda (el tope se mide aparte)
-	apRe     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$`)
-	ifaceRe  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9/.:_-]{1,47}$`)
+	macRe   = regexp.MustCompile(`^(?:(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4}|[0-9A-Fa-f]{12})$`)
+	wlanRe  = regexp.MustCompile(`^[1-9][0-9]{0,2}$`) // 1 a 512, sin ceros a la izquierda (el tope se mide aparte)
+	apRe    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$`)
+	ifaceRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9/.:_-]{1,47}$`)
+	// ACI: tenant:vrf, cada parte de 1 a 64 sin empezar con «-» (no se confunde con una opción) y un solo «:».
+	vrfRe    = regexp.MustCompile(`^[A-Za-z0-9_.][A-Za-z0-9_.-]{0,63}:[A-Za-z0-9_.][A-Za-z0-9_.-]{0,63}$`)
+	vnidRe   = regexp.MustCompile(`^[1-9][0-9]{0,7}$`) // 1 a 16777215, sin ceros a la izquierda (el tope se mide aparte)
 	errValue = errors.New("valor inválido")
 )
 
@@ -52,6 +55,15 @@ func ValidateValue(kind, v string) (string, error) {
 		}
 	case "ip":
 		if a, err := netip.ParseAddr(v); err == nil && a.Zone() == "" && len(v) <= 45 {
+			return v, nil
+		}
+	case "vrf":
+		// «tftp:x» tiene la forma de tenant:vrf pero CheckDenied lo tomaría por ruta remota: se rechaza aquí como dato inválido.
+		if vrfRe.MatchString(v) && !remotePath(strings.ToLower(v)) {
+			return v, nil
+		}
+	case "vnid":
+		if n, err := strconv.Atoi(v); vnidRe.MatchString(v) && err == nil && n <= 16777215 {
 			return v, nil
 		}
 	}

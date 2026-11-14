@@ -8,7 +8,7 @@ name: ACI · Contratos · Zoning de una VRF (scope)
 name_en: ACI · Contracts · VRF zoning (scope)
 params:
   - name: vnid
-    kind: ap
+    kind: vnid
 commands:
   - cmd: show zoning-rule scope {vnid}
   - cmd: show zoning-filter
