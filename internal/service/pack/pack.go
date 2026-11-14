@@ -121,13 +121,7 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		return nil, reject(err, p, sum)
 	}
 	p := res.Pack
-	detail := fmt.Sprintf("id=%s version=%s sha256=%s origin=%s playbooks=%d scripts=%d", p.ID, p.Version, sum, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()))
-	if res.Replaced != "" {
-		detail += " replaced=" + res.Replaced
-	}
-	if p.DevCore {
-		detail += " min_core_unchecked=true"
-	}
+	detail := installDetail(p, sum, res)
 	s.d.Audit("pack.install", p.ID, detail)
 	if len(hide) > 0 {
 		s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=0 at=install", p.ID, len(hide)))
@@ -300,4 +294,19 @@ func (s *svc) SetItems(ctx context.Context, r *v1.PackServiceSetItemsRequest) (*
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &v1.PackServiceSetItemsResponse{Pack: i}, nil
+}
+
+// installDetail es el detalle de la auditoría pack.install (en inglés, como toda la auditoría).
+func installDetail(p *dom.Pack, sum string, res *dom.Result) string {
+	detail := fmt.Sprintf("id=%s version=%s sha256=%s origin=%s playbooks=%d scripts=%d", p.ID, p.Version, sum, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()))
+	if res.Replaced != "" {
+		detail += " replaced=" + res.Replaced
+	}
+	if p.DevCore {
+		detail += " min_core_unchecked=true"
+	}
+	if res.SyncWarning != nil {
+		detail += " fsync_warning=" + res.SyncWarning.Error()
+	}
+	return detail
 }
