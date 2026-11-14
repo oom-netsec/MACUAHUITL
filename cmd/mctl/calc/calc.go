@@ -257,7 +257,7 @@ func parseRoute(s string) (*v1.BgpRoute, error) {
 			r.Neighbor = v
 		case "":
 		default:
-			return nil, fmt.Errorf("ruta %q: clave %q desconocida", s, k)
+			return nil, cli.Err("mctl.calc.route_key", "route", s, "key", k)
 		}
 		if err != nil {
 			return nil, err

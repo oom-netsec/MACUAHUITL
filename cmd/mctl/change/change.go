@@ -190,7 +190,7 @@ func upgradeCheck(c *cli.Env, args []string) error {
 		}
 	}
 	if n > 0 {
-		return fmt.Errorf("%d verificaciones fallaron", n)
+		return cli.Err("mctl.change.checks_failed", "n", n)
 	}
 	return nil
 }
@@ -224,7 +224,7 @@ func complianceCheck(c *cli.Env, args []string) error {
 	var rep struct{ Fail int }
 	json.Unmarshal([]byte(r.Report.Json), &rep)
 	if rep.Fail > 0 {
-		return fmt.Errorf("%d reglas fallaron", rep.Fail)
+		return cli.Err("mctl.change.rules_failed", "n", rep.Fail)
 	}
 	return nil
 }
