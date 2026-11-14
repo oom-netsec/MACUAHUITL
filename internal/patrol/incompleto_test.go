@@ -1,6 +1,8 @@
 package patrol
 
 import (
+	"context"
+	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,5 +63,35 @@ func TestNewWriterNoComparteCarpeta(t *testing.T) {
 	}
 	if a.Dir() == b.Dir() {
 		t.Fatalf("misma carpeta: %s", a.Dir())
+	}
+}
+
+// incompletoDrv es el driver real con Run marcando Incomplete sin error (FTD que aceptó un solo prompt).
+type incompletoDrv struct{ platform.Driver }
+
+func (p *incompletoDrv) Run(ctx context.Context, cmd string, timeout time.Duration) (platform.Output, error) {
+	out, err := p.Driver.Run(ctx, cmd, timeout)
+	out.Incomplete = cmd != "show version" && err == nil
+	return out, err
+}
+
+// Un Incomplete que el driver marca sin error llega a la evidencia con « · incompleto»; el equipo no falla.
+func TestRunDeviceConservaIncompleteDelDriver(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	drv := &incompletoDrv{e.d.driver()}
+	e.d.NewDriver = func() platform.Driver { return drv }
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if res.State != "completed" {
+		t.Fatalf("res = %s %q", res.State, res.Detail)
+	}
+	var all string
+	for _, f := range w.Files() {
+		b, _ := os.ReadFile(filepath.Join(w.Dir(), f))
+		all += string(b)
+	}
+	if !strings.Contains(all, " · incompleto =====") {
+		t.Fatalf("la evidencia no marca incompleto:\n%s", all[:min(len(all), 600)])
 	}
 }

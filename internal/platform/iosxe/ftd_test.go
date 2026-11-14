@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -107,81 +109,126 @@ func TestFTDPrimerLoginNoEscribeNada(t *testing.T) {
 }
 
 // Líneas de salida que empiezan con «>» (BGP, tablas) y una «>» suelta a mitad de la salida no cortan el comando:
-// solo el «> » final lo cierra, aunque el equipo entregue la salida en pedazos.
+// el fin es el segundo prompt seguido, aunque el equipo entregue la salida en pedazos.
 func TestFTDPromptNoCortaSalida(t *testing.T) {
-	devR, drvW := io.Pipe()
-	drvR, devW := io.Pipe()
-	t.Cleanup(func() { drvW.Close(); devW.Close() })
-	go func() {
-		io.WriteString(devW, "> ")
-		buf := make([]byte, 256)
-		for {
-			n, err := devR.Read(buf)
-			if err != nil {
-				return
-			}
-			if !strings.Contains(string(buf[:n]), "show bgp") {
-				io.WriteString(devW, string(buf[:n])+"\r\n> ")
-				continue
-			}
-			io.WriteString(devW, "show bgp\r\n")
-			for _, p := range []string{"   Network          Next Hop\r\n", ">", "  ", "10.0.0.0/8      192.0.2.1\r\n", ">\r\n", "> ", " 172.16.0.0/12  192.0.2.2\r\n"} {
-				io.WriteString(devW, p)
-				time.Sleep(30 * time.Millisecond)
-			}
-			io.WriteString(devW, "fin\r\n> ")
+	r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
+		if line != "show bgp" {
+			out(line + "\r\n> ")
+			return
 		}
-	}()
+		out("show bgp\r\n")
+		for _, p := range []string{"   Network          Next Hop\r\n", ">", "  ", "10.0.0.0/8      192.0.2.1\r\n", ">\r\n", "  172.16.0.0/12  192.0.2.2\r\n"} {
+			out(p)
+			time.Sleep(30 * time.Millisecond)
+		}
+		out("fin\r\n> ")
+	})
 	d := New().(*driver)
-	if err := d.Open(context.Background(), drvR, drvW, secret.New(nil)); err != nil {
+	if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
 		t.Fatal(err)
 	}
 	out, err := d.Run(context.Background(), "show bgp", 5*time.Second)
-	if err != nil {
-		t.Fatal(err)
+	if err != nil || out.Incomplete {
+		t.Fatal(err, out.Incomplete)
 	}
-	want := "   Network          Next Hop\n>  10.0.0.0/8      192.0.2.1\n>\n>  172.16.0.0/12  192.0.2.2\nfin\n"
+	want := "   Network          Next Hop\n>  10.0.0.0/8      192.0.2.1\n>\n  172.16.0.0/12  192.0.2.2\nfin\n"
 	if out.Text != want {
 		t.Fatalf("texto %q", out.Text)
 	}
 }
 
-// scriptedDev es un equipo que responde con pedazos y pausas: handle recibe cada línea y escribe lo que quiera.
+// scriptedDev es un equipo que responde con pedazos y pausas: handle recibe cada línea y escribe lo que quiera. Las
+// líneas que llegan mientras handle trabaja quedan en cola (como el Enter de cola de un FTD ocupado). El equipo anota
+// las líneas recibidas.
+type devLog struct {
+	mu    sync.Mutex
+	lines []string
+}
+
+func (l *devLog) get() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return append([]string(nil), l.lines...)
+}
+
 func scriptedDev(t *testing.T, first func(out func(string)), handle func(line string, out func(string))) (io.Reader, io.Writer) {
+	r, w, _ := scriptedDevLog(t, first, handle)
+	return r, w
+}
+
+func scriptedDevLog(t *testing.T, first func(out func(string)), handle func(line string, out func(string))) (io.Reader, io.Writer, *devLog) {
 	t.Helper()
 	devR, drvW := io.Pipe()
 	drvR, devW := io.Pipe()
+	lg := &devLog{}
+	q := make(chan string, 64)
 	t.Cleanup(func() { drvW.Close(); devW.Close() })
+	out := func(s string) { io.WriteString(devW, s) }
 	go func() {
-		first(func(s string) { io.WriteString(devW, s) })
 		var buf []byte
 		b := make([]byte, 1)
 		for {
 			if _, err := devR.Read(b); err != nil {
+				close(q)
 				return
 			}
 			if b[0] != '\n' {
 				buf = append(buf, b[0])
 				continue
 			}
-			line := string(buf)
+			lg.mu.Lock()
+			lg.lines = append(lg.lines, string(buf))
+			lg.mu.Unlock()
+			q <- string(buf)
 			buf = buf[:0]
-			handle(line, func(s string) { io.WriteString(devW, s) })
 		}
 	}()
-	return drvR, drvW
+	go func() {
+		first(out)
+		for line := range q {
+			handle(line, out)
+		}
+	}()
+	return drvR, drvW, lg
 }
 
-// Una pausa de 300 ms en mitad de la salida (tras una línea «> ») no corta el comando ni desfasa el siguiente.
+// Una pausa a mitad de la salida, tras una línea «> », no corta el comando ni desfasa el siguiente mientras no se
+// llegue al límite de la red de seguridad (3 × 400 ms): el fin es el segundo prompt seguido.
 func TestFTDPausaLargaNoDesfasa(t *testing.T) {
-	r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
+	for _, pausa := range []time.Duration{300 * time.Millisecond, 500 * time.Millisecond} {
+		r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
+			out(line + "\r\n")
+			if line == "show a" {
+				out("linea1\r\n> ")
+				time.Sleep(pausa)
+				out("resto\r\n")
+			} else if line == "show b" {
+				out("b1\r\n")
+			}
+			out("> ")
+		})
+		d := New().(*driver)
+		if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
+			t.Fatal(err)
+		}
+		a, err := d.Run(context.Background(), "show a", 5*time.Second)
+		if err != nil || a.Text != "linea1\n> resto\n" || a.Incomplete {
+			t.Fatalf("%s: a = %q, %v, %v", pausa, a.Text, err, a.Incomplete)
+		}
+		b, err := d.Run(context.Background(), "show b", 5*time.Second)
+		if err != nil || b.Text != "b1\n" || b.Incomplete {
+			t.Fatalf("%s: b = %q, %v, %v", pausa, b.Text, err, b.Incomplete)
+		}
+	}
+}
+
+// El fin confirmado son dos prompts seguidos: la salida queda sin el prompt extra (el eco del Enter de cola) y completa.
+// El Enter de cola llega al equipo justo después del comando.
+func TestFTDCentinelaConfirmaFin(t *testing.T) {
+	r, w, lg := scriptedDevLog(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
 		out(line + "\r\n")
 		if line == "show a" {
-			out("linea1\r\n> ")
-			time.Sleep(300 * time.Millisecond)
-			out("resto\r\n")
-		} else if line == "show b" {
-			out("b1\r\n")
+			out("uno\r\ndos\r\n")
 		}
 		out("> ")
 	})
@@ -189,13 +236,78 @@ func TestFTDPausaLargaNoDesfasa(t *testing.T) {
 	if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
 		t.Fatal(err)
 	}
-	a, err := d.Run(context.Background(), "show a", 5*time.Second)
-	if err != nil || a.Text != "linea1\n> resto\n" {
-		t.Fatalf("a = %q, %v", a.Text, err)
+	t0 := time.Now()
+	out, err := d.Run(context.Background(), "show a", 5*time.Second)
+	if err != nil || out.Text != "uno\ndos\n" || out.Incomplete || time.Since(t0) > time.Second {
+		t.Fatalf("out = %q, %v, %v, %s", out.Text, err, out.Incomplete, time.Since(t0))
 	}
-	b, err := d.Run(context.Background(), "show b", 5*time.Second)
-	if err != nil || b.Text != "b1\n" {
-		t.Fatalf("b = %q, %v", b.Text, err)
+	got := lg.get()
+	if i := slices.Index(got, "show a"); i < 0 || i+1 >= len(got) || got[i+1] != "" {
+		t.Fatalf("el Enter de cola no llegó tras el comando: %q", got)
+	}
+}
+
+// Si el equipo leyó el Enter antes o lo descartó, queda un solo prompt: tras ~1,2 s sin datos se acepta, pero la
+// salida queda marcada como incompleta.
+func TestFTDUnSoloPromptSeAceptaIncompleto(t *testing.T) {
+	r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
+		if line == "" {
+			return // Enter descartado
+		}
+		out(line + "\r\n")
+		if line == "show a" {
+			out("uno\r\n")
+		}
+		out("> ")
+	})
+	d := New().(*driver)
+	if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
+		t.Fatal(err)
+	}
+	t0 := time.Now()
+	out, err := d.Run(context.Background(), "show a", 10*time.Second)
+	el := time.Since(t0)
+	if err != nil || out.Text != "uno\n" || !out.Incomplete || el < time.Second || el > 2500*time.Millisecond {
+		t.Fatalf("out = %q, %v, %v, %s", out.Text, err, out.Incomplete, el)
+	}
+}
+
+// Una línea «> » suelta con una pausa de 1,3 s es indistinguible de un solo prompt final: se corta, pero marcada como
+// incompleta (nunca en silencio).
+func TestFTDPausaMayorQueLaRedDeSeguridadQuedaIncompleta(t *testing.T) {
+	r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
+		out(line + "\r\n")
+		if line == "show a" {
+			out("linea1\r\n> ")
+			time.Sleep(1300 * time.Millisecond)
+			out("resto\r\n")
+		}
+		out("> ")
+	})
+	d := New().(*driver)
+	if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
+		t.Fatal(err)
+	}
+	out, err := d.Run(context.Background(), "show a", 10*time.Second)
+	if err != nil || !out.Incomplete {
+		t.Fatalf("out = %q, %v, %v", out.Text, err, out.Incomplete)
+	}
+}
+
+// IOS, ASA y NX-OS escriben exactamente lo de siempre: ni Enter de cola ni nada más.
+func TestSinCentinelaEnOtrasPlataformas(t *testing.T) {
+	for _, p := range []string{"SW1# ", "asa# ", "n9k# "} {
+		f, r, w := startFake(t, p, p, func(string) (string, string) { return "", "" })
+		d := New().(*driver)
+		if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := d.Run(context.Background(), "show clock", 5*time.Second); err != nil {
+			t.Fatal(err)
+		}
+		if got := f.written(); got != "terminal length 0\nterminal width 0\nshow clock\n" {
+			t.Fatalf("%q: se escribió %q", p, got)
+		}
 	}
 }
 

@@ -122,7 +122,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		if out.Invalid {
 			res.Invalid++
 		}
-		out.Incomplete = runErr != nil
+		out.Incomplete = out.Incomplete || runErr != nil
 		if werr := w.Write(dev, round, roundStart, out, !s.DisableMasking); werr != nil {
 			runErr = werr
 		}

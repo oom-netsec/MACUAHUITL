@@ -63,7 +63,9 @@ type driver struct {
 	err      error // primer error; desde ahí el driver no se reutiliza
 	buf      []byte
 	hostname string
-	echo     string // comando en curso (solo FTD): su eco debe verse antes de dar por bueno el «> »
+	// FTD (hostname vacío): sentinel = Run manda un Enter vacío tras el comando; el fin confirmado son dos prompts
+	// seguidos. confirmed/incomplete los deja untilIdle para Run.
+	sentinel, confirmed, incomplete bool
 }
 
 // fail guarda el primer error y suelta al lector.
@@ -243,12 +245,24 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				return clean(string(d.buf)), err
 			}
 		}
-		if ct := clean(tail); done(ct) {
-			if d.noEchoYet(ct) {
-				if !d.quiet(ctx, 3) { // red de seguridad: sin eco visible, 3 pausas seguidas sin datos aceptan el «> »
+		if d.sentinel {
+			if bareConfirmed(d.buf) { // dos prompts seguidos: el comando terminó
+				d.confirmed = true
+				text := clean(string(d.buf))
+				d.buf = nil
+				return text, nil
+			}
+			if ftdPrompt.MatchString(clean(tail)) {
+				if !d.quiet(ctx, 3) { // llegaron datos (o venció el plazo): se revisa de nuevo
 					continue
 				}
-			} else if d.moreComing(ctx, ct) { // llegaron datos en la pausa: se revisa de nuevo
+				d.incomplete = true // un solo «> » y nada más en ~1,2 s: se acepta, pero incompleto
+				text := clean(string(d.buf))
+				d.buf = nil
+				return text, nil
+			}
+		} else if ct := clean(tail); done(ct) {
+			if d.moreComing(ctx, ct) { // llegaron datos en la pausa: se revisa de nuevo
 				continue
 			}
 			text := clean(string(d.buf))
@@ -286,35 +300,32 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 // Es una heurística: una pausa mayor a mitad de la salida, justo tras una línea «> », aún la cortaría (sin un marcador del equipo no se cierra del todo).
 var ftdSettle = 400 * time.Millisecond
 
-// echoNorm quita lo que el eco puede alterar (saltos, «$» de scroll, espacios) y aplica los retrocesos.
-func echoNorm(s string) string {
-	var out []byte
-	for i := 0; i < len(s); i++ {
-		switch c := s[i]; c {
-		case '\x08':
-			if len(out) > 0 {
-				out = out[:len(out)-1]
-			}
-		case '\r', '\n', '$', ' ':
-		default:
-			out = append(out, c)
-		}
+// bareConfirmed: el búfer termina en dos líneas de prompt de FTD seguidas: la penúltima es exactamente «>» o «> » y la
+// última es «> » sin salto después. Una línea «> » dentro de la salida no va seguida de otro prompt idéntico.
+func bareConfirmed(buf []byte) bool {
+	n := len(buf)
+	for n > 0 && buf[n-1] == ' ' {
+		n--
 	}
-	return string(out)
-}
-
-// noEchoYet: con el «> » a secas de FTD, mientras corre un comando, el prompt solo vale si ya llegó el eco de ese
-// comando. El eco se compara normalizado y basta con el final del comando (sus últimos 16 caracteres): un comando
-// largo puede venir envuelto, truncado o con «$» de scroll.
-func (d *driver) noEchoYet(tail string) bool {
-	if d.echo == "" || !ftdPrompt.MatchString(tail) {
+	if n == 0 || buf[n-1] != '>' {
 		return false
 	}
-	want := echoNorm(d.echo)
-	if len(want) > 16 {
-		want = want[len(want)-16:]
+	n-- // la última línea es «>» o «> »
+	if n == 0 || buf[n-1] != '\n' {
+		return false
 	}
-	return !strings.Contains(echoNorm(string(d.buf)), want)
+	n-- // salto antes de la última línea
+	if n > 0 && buf[n-1] == '\r' {
+		n--
+	}
+	for n > 0 && buf[n-1] == ' ' {
+		n--
+	}
+	if n == 0 || buf[n-1] != '>' {
+		return false
+	}
+	n--
+	return n == 0 || buf[n-1] == '\n'
 }
 
 // quiet espera n pausas ftdSettle seguidas sin datos; true si pasaron todas. Si llegan datos, los agrega y devuelve false.
@@ -381,9 +392,12 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	if _, err := io.WriteString(d.w, cmd+"\n"); err != nil {
 		return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
 	}
-	if d.hostname == "" {
-		d.echo = cmd
-		defer func() { d.echo = "" }()
+	d.confirmed, d.incomplete = false, false
+	if d.sentinel = d.hostname == ""; d.sentinel { // FTD: un Enter vacío en cola da el segundo prompt cuando el comando termina
+		defer func() { d.sentinel = false }()
+		if _, err := io.WriteString(d.w, "\n"); err != nil {
+			return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
+		}
 	}
 	text, err := d.untilIdle(ctx, timeout, d.atPrompt)
 	out.Ended = time.Now()
@@ -396,6 +410,10 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	}
 	if err == nil {
 		text = text[:strings.LastIndexByte(text, '\n')+1]
+		if d.confirmed { // el prompt del comando y el del Enter de cola: se quitan los dos
+			text = text[:strings.LastIndexByte(strings.TrimSuffix(text, "\n"), '\n')+1]
+		}
+		out.Incomplete = d.incomplete
 	}
 	out.Text = text
 	out.Invalid = invalidOutput(text)

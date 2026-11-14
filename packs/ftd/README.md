@@ -19,7 +19,10 @@ app solo permite en FTD `show`, `ping`, `traceroute` y `packet-tracer` (forma es
 `system support diagnostic-cli` ni a `expert`, y no permite `configure`, `clear`, `capture`, `capture-traffic`,
 `debug`, `cluster exec`, `ping system`, `| redirect` ni `show … file`. Ojo: `packet-tracer` es una simulación, pero
 sube los contadores `hitcnt` de las ACL que toca. Si el equipo pide cambiar la contraseña o aceptar el EULA en el
-primer inicio de sesión, la conexión se aborta sin escribir nada: hazlo a mano una vez.
+primer inicio de sesión, la conexión se aborta sin escribir nada: hazlo a mano una vez. Para saber cuándo termina
+cada comando, la app manda un Enter vacío en cola y espera dos prompts seguidos; sin un FTD real, si el equipo
+descarta ese Enter de cola, las salidas pueden llegar marcadas como incompletas (« · incompleto» en la evidencia) y
+cada comando tarda ~1,2 s más.
 
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
@@ -46,7 +49,10 @@ FTD the app only allows `show`, `ping`, `traceroute` and `packet-tracer` (strict
 `system support diagnostic-cli` or `expert`, and does not allow `configure`, `clear`, `capture`, `capture-traffic`,
 `debug`, `cluster exec`, `ping system`, `| redirect` or `show … file`. Note: `packet-tracer` is a simulation, but it
 increments the `hitcnt` counters of the ACLs it touches. If the device asks to change the password or accept the
-EULA at first login, the connection is aborted without writing anything: do it by hand once.
+EULA at first login, the connection is aborted without writing anything: do it by hand once. To know when each command
+ends, the app sends a queued empty Enter and waits for two prompts in a row; without a real FTD, if the device
+drops that queued Enter, outputs may arrive marked as incomplete (" · incompleto" in the evidence) and each
+command takes ~1.2 s longer.
 
 How to load it (the application never downloads packages):
 
