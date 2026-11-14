@@ -124,7 +124,9 @@ const MaxMsg = 16 << 20
 // NewServer crea el servidor gRPC del núcleo. Sin TLS: el canal es un socket Unix local
 // protegido por permisos y SO_PEERCRED.
 func NewServer(opts ...grpc.ServerOption) *grpc.Server {
-	return grpc.NewServer(append([]grpc.ServerOption{grpc.MaxRecvMsgSize(MaxMsg), grpc.MaxSendMsgSize(MaxMsg)}, opts...)...)
+	base := []grpc.ServerOption{grpc.MaxRecvMsgSize(MaxMsg), grpc.MaxSendMsgSize(MaxMsg),
+		grpc.ChainUnaryInterceptor(utf8Unary), grpc.ChainStreamInterceptor(utf8Stream)} // texto de equipos en UTF-8 válido
+	return grpc.NewServer(append(base, opts...)...)
 }
 
 // Dial conecta al núcleo del usuario actual.

@@ -300,7 +300,8 @@ func (r *Run) Events(from int) ([]Event, <-chan struct{}) {
 // emit anota un evento. Requiere r.mu.
 func (r *Run) emit(e Event) {
 	e.Seq = len(r.log)
-	e.Text, e.TextEN = r.scrub(e.Text), r.scrubEN(e.TextEN)
+	// La salida del equipo puede no ser UTF-8 (un banner Latin-1): el historial se reenvía a cada watch y proto3 lo rechaza.
+	e.Text, e.TextEN = strings.ToValidUTF8(r.scrub(e.Text), "\uFFFD"), strings.ToValidUTF8(r.scrubEN(e.TextEN), "\uFFFD")
 	if e.Kind == EvOutput && !r.fn.Scrub { // la salida cruda de una lectura puede traer llaves y contraseñas de otras secciones del running
 		e.Text, _ = mask.Apply("ios-xe", e.Text)
 		if e.TextEN != "" {
