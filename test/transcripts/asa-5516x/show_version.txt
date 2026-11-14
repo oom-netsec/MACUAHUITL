@@ -1,0 +1,44 @@
+# command: show version
+# Armado a mano con la forma de la documentación de Cisco (ASA 5516-X, 9.14); sin validar en laboratorio.
+
+Cisco Adaptive Security Appliance Software Version 9.14(4)14
+SSP Operating System Version 2.8(1.152)
+Device Manager Version 7.14(1)
+
+Compiled on Fri 11-Jun-21 17:46 GMT by builders
+System image file is "disk0:/asa9-14-4-14-lfbff-k8.SPA"
+Config file at boot was "startup-config"
+
+asa5516-lab-01 up 41 days 6 hours
+failover cluster up 41 days 6 hours
+
+Hardware:   ASA5516, 8192 MB RAM, CPU Atom C2000 series 2416 MHz, 1 CPU (8 cores)
+Model Id:   ASA5516
+Internal ATA Compact Flash, 4096MB
+Slot 1: ATA Compact Flash, 4096MB
+BIOS Flash MX25L6445E @ 0xffbb0000, 8192KB
+
+Encryption hardware device: Cisco ASA Crypto on-board accelerator (revision 0x1)
+                            Number of accelerators: 1
+
+ 0: Ext: GigabitEthernet1/1  : address is 0000.5e00.0101, irq 255
+ 1: Ext: GigabitEthernet1/2  : address is 0000.5e00.0102, irq 255
+ 2: Int: Internal-Data1/1    : address is 0000.5e00.0103, irq 255
+ 3: Ext: Management1/1       : address is 0000.5e00.0104, irq 255
+
+License mode: Smart Licensing
+Licensed features for this platform:
+Maximum Physical Interfaces       : Unlimited
+Maximum VLANs                     : 150
+Inside Hosts                      : Unlimited
+Failover                          : Active/Active
+Encryption-DES                    : Enabled
+Encryption-3DES-AES               : Enabled
+Security Contexts                 : 2
+AnyConnect Premium Peers          : 300
+
+Serial Number: JAD00000000
+Image type          : Release
+Key version         : A
+
+Configuration last modified by enable_15 at 09:12:44.123 UTC Tue Nov 4 2026

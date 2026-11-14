@@ -26,7 +26,7 @@ var maxDetect = 2 * time.Minute
 
 var (
 	anyPrompt = regexp.MustCompile(`(?:^|\n)([\w.\-@/:]{1,63})([>#]) ?$`)
-	more      = regexp.MustCompile(` ?--More-- ?`)
+	more      = regexp.MustCompile(` ?(?:--More--|<--- More --->) ?`) // el segundo es el de ASA
 	// Secuencias con que el equipo borra el --More--: "\r    \r" o retrocesos "\b\b  \b\b".
 	erase = regexp.MustCompile(`\r +\r|\x08+ +\x08+`)
 )
@@ -45,6 +45,8 @@ var interfaceRemoved = regexp.MustCompile(`^% Interface \S+ removed`)
 
 // Avisos que IOS da cuando la línea sí se aplicó pero creó algo que nadie pidió (una VLAN nueva, que con VTP servidor se propaga).
 var cfgWarnings = []string{"Creating vlan", "does not exist"}
+
+var asaSetPassword = regexp.MustCompile(`(?i)The enable password is not set|(?:enter|repeat)\s+password: ?$`)
 
 var passwordPrompt = regexp.MustCompile(`(?i)password: ?$`)
 
@@ -116,6 +118,12 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 		if err != nil {
 			return err
 		}
+		// ASA no admite «terminal length 0»: su paginación se apaga con «terminal pager 0».
+		if c == "terminal length 0" && hasPercentLine(out.Text) {
+			if _, err := d.Run(ctx, "terminal pager 0", 10*time.Second); err != nil {
+				return err
+			}
+		}
 		// NX-OS no admite ancho 0 («% Invalid number, range is (24:511)», «% Invalid parameter…»): su máximo es 511. Así las tablas no se parten
 		// aunque la plataforma del host sea fija y no se llame a Detect.
 		if c == "terminal width 0" && hasPercentLine(out.Text) {
@@ -135,6 +143,10 @@ func (d *driver) enable(ctx context.Context, enable *secret.Secret) error {
 	text, err := d.until(ctx, func(s string) bool { return isPw(s) || d.atPrompt(s) })
 	if err != nil {
 		return err
+	}
+	// ASA 9.12+ sin clave de enable pide fijarla («Enter Password:» / «Repeat Password:»): mandar el secreto cambiaría la configuración.
+	if asaSetPassword.MatchString(text) {
+		return platform.ErrEnableFailed
 	}
 	if isPw(text) {
 		if enable.Empty() {
@@ -207,7 +219,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 		// por los patrones con (?:^|\n)). Limpiar todo el búfer en cada pedazo costaba tiempo cuadrático: 63 s con 1 MB.
 		from := max(bytes.LastIndexByte(d.buf, '\n'), 0)
 		tail := string(d.buf[from:])
-		if strings.HasSuffix(strings.TrimRight(tail, " "), "--More--") {
+		if t := strings.TrimRight(tail, " "); strings.HasSuffix(t, "--More--") || strings.HasSuffix(t, "<--- More --->") {
 			tail = more.ReplaceAllString(tail, "")
 			d.buf = append(d.buf[:from], tail...)
 			if _, err := io.WriteString(d.w, " "); err != nil {
@@ -305,10 +317,10 @@ func invalidOutput(text string) bool {
 	return false
 }
 
-// hasPercentLine: alguna línea de text empieza por «%» (el equipo rechazó el comando).
+// hasPercentLine: alguna línea de text empieza por «%» o «ERROR: %» (el equipo rechazó el comando).
 func hasPercentLine(text string) bool {
 	for _, l := range strings.Split(text, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(l), "%") {
+		if l = strings.TrimSpace(l); strings.HasPrefix(l, "%") || strings.HasPrefix(l, "ERROR: %") { // el segundo es la forma de ASA
 			return true
 		}
 	}
@@ -323,6 +335,9 @@ var wlc9800 = regexp.MustCompile(`(?m)^Cisco IOS Software.*, C9800`)
 // nxos busca la cabecera de show version de NX-OS al inicio de línea; un IOS-XE que mencione «NX-OS» en texto libre no cuenta.
 var nxos = regexp.MustCompile(`(?m)^Cisco Nexus Operating System \(NX-OS\) Software`)
 
+// asa busca la cabecera de show version de ASA al inicio de línea; un IOS que diga «Adaptive Security» en texto libre no cuenta.
+var asa = regexp.MustCompile(`(?m)^Cisco Adaptive Security Appliance Software Version`)
+
 func (d *driver) Detect(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, maxDetect)
 	defer cancel()
@@ -331,6 +346,8 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 		return "", err
 	}
 	switch {
+	case asa.MatchString(out.Text):
+		return "asa", nil
 	case nxos.MatchString(out.Text):
 		return "nx-os", nil
 	case wlc9800.MatchString(out.Text) && strings.Contains(out.Text, "Cisco IOS XE Software"): // antes de la regla genérica
