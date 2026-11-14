@@ -151,3 +151,24 @@ func TestASABloquesMayusculas(t *testing.T) {
 		t.Fatalf("got:\n%s", got)
 	}
 }
+
+// «host NOMBRE IP» sin comunidad es ASA solo en ASA; en cualquier otra plataforma (o sin ella) la IP es la comunidad.
+func TestASAHostSinComunidadDependeDeLaPlataforma(t *testing.T) {
+	in := "snmp-server host nms01 1.2.3.4\n"
+	for plat, want := range map[string]string{
+		"asa":    in,
+		"ios-xe": "snmp-server host nms01 <MASKED:snmp-community>\n",
+		"":       "snmp-server host nms01 <MASKED:snmp-community>\n",
+	} {
+		if got, _ := Apply(plat, in); got != want {
+			t.Errorf("Apply(%q) = %q, want %q", plat, got, want)
+		}
+	}
+	// La palabra community vale en todas.
+	for _, plat := range []string{"asa", "ios-xe", ""} {
+		got, _ := Apply(plat, "snmp-server host inside 10.1.1.1 community C1\n")
+		if got != "snmp-server host inside 10.1.1.1 community <MASKED:snmp-community>\n" {
+			t.Errorf("%q: %q", plat, got)
+		}
+	}
+}

@@ -14,7 +14,7 @@ type rule struct {
 	block string // "" = en cualquier lugar; si no, solo dentro de ese bloque
 	re    *regexp.Regexp
 	not   *regexp.Regexp // si la línea la cumple, la regla no aplica
-	notFn func(string) bool
+	notFn func(line, platform string) bool
 	stop  *regexp.Regexp // en tipo 0, la clave llega hasta aquí (sufijo propio del comando); si no, hasta el fin de línea
 	guard bool           // si el valor es una palabra clave (md5, use-vrf, default…), la regla no aplica
 }
@@ -33,9 +33,9 @@ func R(kind, block, prefix string) rule {
 // full arma una regla con la expresión completa (prefijo, valor y resto) para las salidas de show.
 func full(kind, expr string) rule { return rule{kind: kind, re: regexp.MustCompile(`(?i)` + expr)} }
 
-func (r rule) unless(not *regexp.Regexp) rule    { r.not = not; return r }
-func (r rule) guarded() rule                     { r.guard = true; return r }
-func (r rule) unlessFn(f func(string) bool) rule { r.notFn = f; return r }
+func (r rule) unless(not *regexp.Regexp) rule                   { r.not = not; return r }
+func (r rule) guarded() rule                                    { r.guard = true; return r }
+func (r rule) unlessFn(f func(line, platform string) bool) rule { r.notFn = f; return r }
 
 // stopAt: la clave tipo 0 (con espacios) termina donde empieza el sufijo propio de ESE comando.
 func (r rule) stopAt(expr string) rule { r.stop = regexp.MustCompile(`(?i)` + expr); return r }
@@ -53,8 +53,7 @@ var ipOnly = regexp.MustCompile(`^(?:\d{1,3}(?:\.\d{1,3}){3}|[0-9a-fA-F:.]*:[0-9
 
 // isASASNMPHost: «snmp-server host IFNAME X …» de ASA (interfaz que no es IP y luego el destino), no IOS/NX-OS.
 // Con la palabra «community», con una IP tras la interfaz o con trap/poll/version tras el destino es ASA.
-// shortcut: «host nombre 1.2.3.4» de IOS (comunidad con forma de IP) es indistinguible de ASA «host interfaz IP»; se deja la IP.
-func isASASNMPHost(line string) bool {
+func isASASNMPHost(line, platform string) bool {
 	f := strings.Fields(strings.ToLower(line))
 	if len(f) < 4 || f[0] != "snmp-server" || f[1] != "host" || f[2][0] < 'a' || f[2][0] > 'z' || strings.Contains(f[2], ":") {
 		return false
@@ -71,7 +70,7 @@ func isASASNMPHost(line string) bool {
 		return false
 	}
 	if ipOnly.MatchString(f[3]) {
-		return true
+		return platform == "asa" // «host nombre 1.2.3.4» en IOS es una comunidad con forma de IP
 	}
 	return len(f) > 4 && (f[4] == "trap" || f[4] == "poll" || f[4] == "version")
 }
@@ -278,7 +277,7 @@ func blockOf(line string) string {
 // shortcut: solo reglas IOS/IOS-XE; cada plataforma de la Fase 2 agrega las suyas.
 func Apply(platform, text string) (string, map[string]int) {
 	var out strings.Builder
-	st := Stream{counts: map[string]int{}}
+	st := Stream{counts: map[string]int{}, Platform: platform}
 	for _, raw := range strings.SplitAfter(text, "\n") {
 		if l, ok := st.Line(raw); ok {
 			out.WriteString(l)
@@ -297,6 +296,8 @@ type Stream struct {
 	counts      map[string]int
 	// MaxSkip: líneas máximas que se descartan dentro de una llave o cadena sin cierre (0 = sin tope).
 	MaxSkip int
+	// Platform: la de la salida ("asa", "ios-xe"…); decide formas ambiguas entre plataformas. Vacía = no es ASA.
+	Platform string
 }
 
 // Line enmascara una línea (con su fin de línea, si lo trae). ok=false: la línea se omite (cuerpo de una llave).
@@ -344,7 +345,7 @@ func (s *Stream) Line(raw string) (out string, ok bool) {
 	if line != "" && line[0] != ' ' && line[0] != '\t' {
 		s.block = blockOf(line)
 	}
-	return maskLine(line, s.block, s.counts) + eol, true
+	return maskLine(line, s.block, s.Platform, s.counts) + eol, true
 }
 
 var (
@@ -421,14 +422,14 @@ func (s *Stream) snmpTable(line string) (string, bool) {
 	f := strings.Fields(line)
 	row, keep := s.tableRow(line, f)
 	if keep {
-		return maskLine(line, "", s.counts), true
+		return maskLine(line, "", s.Platform, s.counts), true
 	}
 	if !row {
 		s.table = ""
 		return "", false
 	}
 	s.rows++
-	line = maskLine(line, "", s.counts) // la fila también pasa por las reglas
+	line = maskLine(line, "", s.Platform, s.counts) // la fila también pasa por las reglas
 	if f = strings.Fields(line); len(f) == 0 {
 		return line, true
 	}
@@ -461,7 +462,7 @@ func (s *Stream) Prompted(line, block string) string {
 	if block == "" {
 		block = s.block
 	}
-	return maskLine(" "+line, block, s.counts)[1:]
+	return maskLine(" "+line, block, s.Platform, s.counts)[1:]
 }
 
 // archiveLog: línea de show archive log config; tras «|» va un comando de configuración.
@@ -472,17 +473,17 @@ var loggedCmd = regexp.MustCompile(`^(.*logged command:)(.*)$`)
 
 // maskLine aplica reglas hasta que ninguna cambie la línea: una línea puede traer
 // varios secretos (snmp-server user … auth X priv Y).
-func maskLine(line, block string, counts map[string]int) string {
+func maskLine(line, block, platform string, counts map[string]int) string {
 	if m := loggedCmd.FindStringSubmatch(line); m != nil {
-		return m[1] + maskLine(m[2], "", counts)
+		return m[1] + maskLine(m[2], "", platform, counts)
 	}
 	if m := archiveLog.FindStringSubmatch(line); m != nil {
-		return m[1] + maskLine(m[2], "", counts)
+		return m[1] + maskLine(m[2], "", platform, counts)
 	}
 	for changed := true; changed; {
 		changed = false
 		for _, r := range iosRules {
-			if r.block != "" && r.block != block || r.not != nil && r.not.MatchString(line) || r.notFn != nil && r.notFn(line) {
+			if r.block != "" && r.block != block || r.not != nil && r.not.MatchString(line) || r.notFn != nil && r.notFn(line, platform) {
 				continue
 			}
 			m := r.re.FindStringSubmatch(line)
