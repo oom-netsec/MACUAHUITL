@@ -25,6 +25,9 @@ import (
 // Paquete personal (fase 32c, ADR 0010): exportar scripts y playbooks del usuario a un .mpack sin firma e importar uno
 // de vuelta a «Mis scripts» y <config>/playbooks. Nada de esto escribe en equipos.
 
+// beforePublish es un gancho de pruebas: corre justo antes de publicar los playbooks del import (nil en producción).
+var beforePublish func()
+
 func internal(err error) error { return status.Error(codes.Internal, err.Error()) }
 
 // Estas consultas repiten las de internal/service/scripts (un servicio no importa a otro): la tabla scripts es la misma.
@@ -219,15 +222,32 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 			return nil, internal(err)
 		}
 	}
-	// shortcut: los playbooks se escriben antes del commit de la base; si el proceso cae entre los dos quedan archivos sin
-	// scripts (no se pierde nada, y reimportar los ve como conflicto y pide decisión). Mejorar con un diario si hiciera falta.
-	if pbRes, err = s.store.ImportPlaybooks(p, dir, userIDs, pbDec); err != nil {
+	// Orden: los playbooks se preparan con nombre temporal (el catálogo no los lee), se confirman los scripts y recién
+	// entonces se publican con un enlace atómico. Una caída entre el commit y la publicación deja los scripts confirmados y los
+	// playbooks solo como temporales (invisibles): el reimport los ve como scripts iguales y publica los playbooks.
+	if pbRes, err = s.store.StagePlaybooks(p, dir, userIDs, pbDec); err != nil {
 		tx.Rollback() // la auditoría escribe en la misma base: no puede haber una transacción abierta
 		return nil, s.reject(ctx, err, p, sum, path)
 	}
 	if err := tx.Commit(); err != nil {
 		pbRes.Undo(dir)
 		return nil, internal(err)
+	}
+	if beforePublish != nil {
+		beforePublish()
+	}
+	if err := pbRes.Publish(dir); err != nil { // los scripts ya están confirmados: se retiran para no dejar el import a medias
+		var left []string
+		for _, x := range sres.Writes {
+			if _, derr := s.d.DB().Exec(`DELETE FROM scripts WHERE id = ?`, x.ID); derr != nil {
+				left = append(left, x.ID)
+				s.d.Audit("pack.import.compensate_failed", p.ID, fmt.Sprintf("script=%s error=%q", x.ID, derr))
+			}
+		}
+		if len(left) > 0 { // quedaron scripts importados sin sus playbooks: que el ingeniero lo sepa
+			return nil, service.Err(ctx, codes.Internal, "pack.err.import.compensate", i18n.A("ids", strings.Join(left, ", "), "reason", dom.Reason(err)))
+		}
+		return nil, s.reject(ctx, err, p, sum, path)
 	}
 	if s.cfg.Reload != nil {
 		if err := s.cfg.Reload(); err != nil { // los archivos ya están: el catálogo los toma en el próximo arranque
