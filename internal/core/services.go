@@ -289,6 +289,9 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 		c.mu.Lock()
 		j.state = "created"
+		if j.cancelReq { // cancelaron durante el armado fallido: no vuelve a "created"
+			j.cancelReq, j.state = false, "cancelled"
+		}
 		c.mu.Unlock()
 		c.persistJob(j) // la fase del Login Test ya guardó "arming"; al recargar no debe verse como caído
 		c.audit("job.arm_failed", j.id, reason)
@@ -392,6 +395,17 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 		return nil
 	}
+	c.mu.Lock()
+	if j.cancelReq {
+		j.cancelReq, j.state = false, "cancelled"
+		c.mu.Unlock()
+		for i := len(undo) - 1; i >= 0; i-- {
+			undo[i]()
+		}
+		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
+		return nil, service.Err(ctx, codes.FailedPrecondition, "patrol.svc.job_state", i18n.A("state", "cancelled"))
+	}
+	c.mu.Unlock()
 	events, cancelSub := c.bus.Subscribe([]string{j.id})
 	if err := c.sched.Arm(j.id, engineSchedule(spec.Schedule), until, targets, run); err != nil {
 		cancelSub()
@@ -399,7 +413,12 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	}
 	c.mu.Lock()
 	j.state, j.ArmedAt = "armed", c.o.Now()
+	late := j.cancelReq // la cancelación llegó entre la revisión y el armado
+	j.cancelReq = false
 	c.mu.Unlock()
+	if late {
+		defer c.sched.Cancel(j.id)
+	}
 	armed, armedArgs := "phase.devices", i18n.A("n", len(spec.Targets))
 	if n := len(r.ExcludedDeviceIds); n > 0 {
 		armed, armedArgs = "phase.devices_excluded", i18n.A("n", len(spec.Targets), "excluded", n)
@@ -511,6 +530,9 @@ func (s *patrolSvc) CancelJob(_ context.Context, r *v1.CancelJobRequest) (*v1.Ca
 	s.c.audit("job.cancel", j.id, "")
 	s.c.mu.Lock()
 	created := j.state == "created"
+	if j.state == "arming" {
+		j.cancelReq = true // ArmJob la atiende antes de armar en el planificador
+	}
 	if created {
 		j.state = "cancelled" // nada que detener: solo deja de aparecer como vivo
 	}
