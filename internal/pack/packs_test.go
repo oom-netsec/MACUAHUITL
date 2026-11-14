@@ -179,3 +179,16 @@ func TestPaquetesOficialesConviven(t *testing.T) {
 		}
 	}
 }
+
+// Los paquetes oom/cat9k y oom/sda piden el núcleo 0.4.1 (plataformas instalables nuevas): un 0.4.0 los rechaza.
+func TestCat9kSDAPidenNucleo041(t *testing.T) {
+	for _, n := range []string{"cat9k", "sda"} {
+		d := filepath.Join(packtest.RepoDir(), "packs", n)
+		if _, err := pack.ValidateSource(d, "v0.4.1"); err != nil {
+			t.Fatalf("%s: %v", n, err)
+		}
+		if _, err := pack.ValidateSource(d, "v0.4.0"); pack.Reason(err) != "core.too_old" {
+			t.Fatalf("%s: 0.4.0 debe rechazarlo: %v", n, err)
+		}
+	}
+}
