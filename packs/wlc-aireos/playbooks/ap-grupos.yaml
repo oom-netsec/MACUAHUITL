@@ -1,0 +1,16 @@
+# Propósito: Grupos de AP, WLANs asociadas y grupos FlexConnect.
+# Cuándo usarlo: Una WLAN no se anuncia en ciertos APs.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: ap-grupos
+platform: wlc-aireos
+name: AireOS · AP · Grupos de AP
+name_en: AireOS · AP · AP groups
+commands:
+  - cmd: show time
+  - cmd: show wlan apgroups
+  - cmd: show ap summary
+    timeout: 120s
+  - cmd: show flexconnect group summary
+  - cmd: show wlan summary
+  - cmd: show ap config global

@@ -1,0 +1,20 @@
+# Propósito: Cliente, movilidad, handoff y PMK de un cliente.
+# Cuándo usarlo: Un cliente tarda en cambiar de AP.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-roaming-lento
+platform: wlc-aireos
+name: AireOS · TAC · Roaming lento
+name_en: AireOS · TAC · Slow roaming
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show time
+  - cmd: show client detail {mac}
+  - cmd: show mobility summary
+  - cmd: show mobility statistics
+  - cmd: show advanced client-handoff
+  - cmd: show pmk-cache all
+    timeout: 120s
+  - cmd: show wlan summary

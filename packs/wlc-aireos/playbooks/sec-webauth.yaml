@@ -1,0 +1,17 @@
+# Propósito: Usuarios de red, ACLs y WLANs para autenticación web.
+# Cuándo usarlo: El portal cautivo o los invitados fallan.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: sec-webauth
+platform: wlc-aireos
+name: AireOS · Seguridad · WebAuth e invitados
+name_en: AireOS · Security · WebAuth and guests
+commands:
+  - cmd: show time
+  - cmd: show wlan summary
+  - cmd: show netuser summary
+  - cmd: show acl summary
+  - cmd: show client summary
+    timeout: 120s
+  - cmd: show network summary
+    may_contain_secrets: true

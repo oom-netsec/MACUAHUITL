@@ -1,0 +1,19 @@
+# Propósito: APs unidos, tiempo activo, imágenes y configuración global.
+# Cuándo usarlo: Panorama de la flota de APs del controlador.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: ap-resumen
+platform: wlc-aireos
+name: AireOS · AP · Resumen de APs
+name_en: AireOS · AP · AP summary
+commands:
+  - cmd: show time
+  - cmd: show ap summary
+    timeout: 120s
+  - cmd: show ap uptime
+    timeout: 120s
+  - cmd: show ap join stats summary all
+    timeout: 120s
+  - cmd: show ap image all
+    timeout: 120s
+  - cmd: show ap config global

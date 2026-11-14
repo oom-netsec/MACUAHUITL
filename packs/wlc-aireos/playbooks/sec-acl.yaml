@@ -1,0 +1,15 @@
+# Propósito: ACLs del controlador y ACL de CPU.
+# Cuándo usarlo: Una ACL bloquea o permite tráfico inesperado.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: sec-acl
+platform: wlc-aireos
+name: AireOS · Seguridad · ACLs
+name_en: AireOS · Security · ACLs
+commands:
+  - cmd: show time
+  - cmd: show sysinfo
+  - cmd: show acl summary
+  - cmd: show acl cpu
+  - cmd: show wlan summary
+  - cmd: show interface summary

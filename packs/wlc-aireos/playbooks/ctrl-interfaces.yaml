@@ -1,0 +1,16 @@
+# Propósito: Interfaces del controlador: gestión, virtual, puerto de servicio y grupos.
+# Cuándo usarlo: Revisar VLANs, IPs y puertos de las interfaces.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: ctrl-interfaces
+platform: wlc-aireos
+name: AireOS · Controlador · Interfaces dinámicas
+name_en: AireOS · Controller · Dynamic interfaces
+commands:
+  - cmd: show time
+  - cmd: show interface summary
+  - cmd: show interface detailed management
+  - cmd: show interface detailed virtual
+  - cmd: show interface detailed service-port
+  - cmd: show interface group summary
+  - cmd: show wlan summary

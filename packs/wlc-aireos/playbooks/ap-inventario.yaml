@@ -1,0 +1,19 @@
+# Propósito: APs con su imagen, tiempo activo y ajuste de TCP MSS.
+# Cuándo usarlo: Auditar versiones de imagen en los APs.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: ap-inventario
+platform: wlc-aireos
+name: AireOS · AP · Inventario y versiones
+name_en: AireOS · AP · Inventory and versions
+commands:
+  - cmd: show time
+  - cmd: show sysinfo
+  - cmd: show ap summary
+    timeout: 120s
+  - cmd: show ap image all
+    timeout: 120s
+  - cmd: show ap uptime
+    timeout: 120s
+  - cmd: show ap config global
+  - cmd: show ap tcp-mss-adjust all

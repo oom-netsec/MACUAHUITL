@@ -1,0 +1,21 @@
+# Propósito: WLAN, servidores RADIUS y sus estadísticas.
+# Cuándo usarlo: Los clientes de una WLAN no autentican.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: sec-radius-wlan
+platform: wlc-aireos
+name: AireOS · Seguridad · RADIUS de una WLAN
+name_en: AireOS · Security · RADIUS of a WLAN
+params:
+  - name: wlan
+    kind: ap
+commands:
+  - cmd: show time
+  - cmd: show wlan {wlan}
+    may_contain_secrets: true
+  - cmd: show radius summary
+    may_contain_secrets: true
+  - cmd: show radius auth statistics
+  - cmd: show radius acct statistics
+  - cmd: show client wlan {wlan}
+  - cmd: show exclusionlist

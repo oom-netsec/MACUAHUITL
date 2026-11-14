@@ -27,6 +27,12 @@ var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac add
 // Salidas grandes de ASA: conexiones, xlates, ACL, logs, memoria, descartes de ASP, sesiones VPN y configuraciones.
 var asaBigCmd = regexp.MustCompile(`^show (conn( address .*| detail)?|local-host|xlate|access-list( .*)?|tech-support.*|logging( \|.*)?|memory detail|asp drop.*|vpn-sessiondb detail.*|running-config( .*)?|startup-config|nat detail|access-control-config.*|route|bgp|interface|crypto ipsec sa)$`)
 
+// Salidas grandes de AireOS: tablas de APs y clientes, rogues, PMK, registros y tech-support.
+var aireosBigCmd = regexp.MustCompile(`^(show (tech-support|msglog|traplog|logging|client summary|ap (summary|uptime|image all|eventlog .*|join stats summary all)|rogue (ap|client) .*summary|pmk-cache all)|grep (include|exclude) ".*" "show (msglog|traplog|client summary|ap (summary|uptime|join stats summary all))")$`)
+
+// Comandos de AireOS que pueden imprimir claves: tech-support, WLAN (PSK), RADIUS, TACACS, SNMP, usuarios y EAP local.
+var aireosSecretCmd = regexp.MustCompile(`^show (tech-support|wlan (\d+|\{wlan\})|radius summary|tacacs|local-auth|snmpcommunity|snmpv3user|mgmtuser|network summary)`)
+
 // catalogFS junta el contenido embebido con el de packs/ios-xe, packs/ios, packs/wlc-9800, packs/nx-os, packs/cat9k, packs/sda, packs/asa y packs/ftd (en cisco/<plataforma>), para que estas pruebas sigan
 // cubriendo los playbooks que salieron del binario al paquete oficial.
 func catalogFS(t testing.TB) fs.FS {
@@ -54,6 +60,7 @@ func catalogFS(t testing.TB) fs.FS {
 	add(os.DirFS("../packs/sda/playbooks"), "cisco/sda")
 	add(os.DirFS("../packs/asa/playbooks"), "cisco/asa")
 	add(os.DirFS("../packs/ftd/playbooks"), "cisco/ftd")
+	add(os.DirFS("../packs/wlc-aireos/playbooks"), "cisco/wlc-aireos")
 	return m
 }
 
@@ -68,7 +75,7 @@ func TestCatalogo(t *testing.T) {
 			t.Errorf("id duplicado: %s", p.ID)
 		}
 		byID[p.ID] = p
-		if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa" || p.Platform == "ftd") && !strings.Contains(p.Name, " · ") { // el selector de Patrol agrupa por el área antes del «·»
+		if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa" || p.Platform == "ftd" || p.Platform == "wlc-aireos") && !strings.Contains(p.Name, " · ") { // el selector de Patrol agrupa por el área antes del «·»
 			t.Errorf("%s: name %q sin área (\"L2 · STP\")", p.ID, p.Name)
 		}
 		for _, c := range p.Commands {
@@ -78,13 +85,24 @@ func TestCatalogo(t *testing.T) {
 			if (p.Platform == "asa" || p.Platform == "ftd") && asaBigCmd.MatchString(c.Text) && c.Timeout < 120*time.Second {
 				t.Errorf("%s: %q es una salida grande de ASA y necesita timeout >= 120s", p.ID, c.Text)
 			}
+			if p.Platform == "wlc-aireos" {
+				if aireosSecretCmd.MatchString(c.Text) && !c.MaySecrets {
+					t.Errorf("%s: %q puede traer claves y debe llevar may_contain_secrets", p.ID, c.Text)
+				}
+				if aireosBigCmd.MatchString(c.Text) && c.Timeout < 120*time.Second {
+					t.Errorf("%s: %q es una salida grande de AireOS y necesita timeout >= 120s", p.ID, c.Text)
+				}
+				if strings.HasPrefix(c.Text, "config") || strings.Contains(c.Text, "run-config") {
+					t.Errorf("%s: %q no es de lectura", p.ID, c.Text)
+				}
+			}
 			if p.Platform == "ftd" && strings.Contains(c.Text, "ASA-") { // en FTD los mensajes salen como %FTD-n-xxxxxx
 				t.Errorf("%s: %q filtra por ASA-, FTD usa %%FTD-", p.ID, c.Text)
 			}
 			if strings.Contains(c.Text, "@") {
 				t.Errorf("%s: %q lleva «@» pegado al comando", p.ID, c.Text)
 			}
-			if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa" || p.Platform == "ftd") && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
+			if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa" || p.Platform == "ftd" || p.Platform == "wlc-aireos") && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
 				t.Errorf("%s: %q es una salida grande y necesita timeout > 60s", p.ID, c.Text)
 			}
 		}

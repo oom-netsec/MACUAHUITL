@@ -1,0 +1,22 @@
+# Propósito: Unión CAPWAP, certificados, límites y mensajes.
+# Cuándo usarlo: Los APs no aparecen en el controlador.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-ap-no-se-une
+platform: wlc-aireos
+name: AireOS · TAC · AP no se une
+name_en: AireOS · TAC · AP does not join
+commands:
+  - cmd: show time
+  - cmd: show sysinfo
+  - cmd: show ap summary
+    timeout: 120s
+  - cmd: show ap join stats summary all
+    timeout: 120s
+  - cmd: show ap config global
+  - cmd: show ap max-count summary
+  - cmd: show certificate summary
+  - cmd: show msglog
+    timeout: 120s
+  - cmd: show traplog
+    timeout: 120s

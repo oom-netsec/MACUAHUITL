@@ -1,0 +1,21 @@
+# Propósito: Bitácora de eventos del AP y su estado en el controlador.
+# Cuándo usarlo: Hay que ver por qué un AP se reinició o cambió de estado.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: ap-eventlog-un-ap
+platform: wlc-aireos
+name: AireOS · AP · Eventlog de un AP
+name_en: AireOS · AP · AP eventlog
+params:
+  - name: ap
+    kind: ap
+commands:
+  - cmd: show time
+  - cmd: show ap eventlog {ap}
+    timeout: 120s
+  - cmd: show ap config general {ap}
+  - cmd: show ap crash-file
+  - cmd: show ap uptime
+    timeout: 120s
+  - cmd: show traplog
+    timeout: 120s

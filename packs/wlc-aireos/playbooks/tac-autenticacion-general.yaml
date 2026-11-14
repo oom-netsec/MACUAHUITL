@@ -1,0 +1,20 @@
+# Propósito: RADIUS, AAA, WLANs y mensajes de autenticación.
+# Cuándo usarlo: Varios clientes no autentican.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-autenticacion-general
+platform: wlc-aireos
+name: AireOS · TAC · Autenticación general
+name_en: AireOS · TAC · General authentication
+commands:
+  - cmd: show time
+  - cmd: show client summary
+    timeout: 120s
+  - cmd: show wlan summary
+  - cmd: show radius summary
+    may_contain_secrets: true
+  - cmd: show radius auth statistics
+  - cmd: show aaa auth
+  - cmd: show exclusionlist
+  - cmd: show msglog
+    timeout: 120s

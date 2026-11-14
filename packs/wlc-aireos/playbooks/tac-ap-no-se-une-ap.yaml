@@ -1,0 +1,23 @@
+# Propósito: Unión, eventos y estado de un AP.
+# Cuándo usarlo: Un AP concreto no se une o se cae.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-ap-no-se-une-ap
+platform: wlc-aireos
+name: AireOS · TAC · Un AP no se une
+name_en: AireOS · TAC · One AP does not join
+params:
+  - name: ap
+    kind: ap
+commands:
+  - cmd: show time
+  - cmd: show ap config general {ap}
+  - cmd: show ap eventlog {ap}
+    timeout: 120s
+  - cmd: grep include "{ap}" "show ap join stats summary all"
+    timeout: 120s
+  - cmd: grep include "{ap}" "show ap summary"
+    timeout: 120s
+  - cmd: show ap crash-file
+  - cmd: show msglog
+    timeout: 120s

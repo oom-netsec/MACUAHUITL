@@ -1,0 +1,17 @@
+# Propósito: Servidores TACACS, orden AAA y usuarios locales.
+# Cuándo usarlo: Falla el acceso de administradores al controlador.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: sec-tacacs-mgmt
+platform: wlc-aireos
+name: AireOS · Seguridad · TACACS y usuarios de gestión
+name_en: AireOS · Security · TACACS and management users
+commands:
+  - cmd: show time
+  - cmd: show sysinfo
+  - cmd: show tacacs summary
+    may_contain_secrets: true
+  - cmd: show aaa auth
+  - cmd: show mgmtuser
+    may_contain_secrets: true
+  - cmd: show netuser summary

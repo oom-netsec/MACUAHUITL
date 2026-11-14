@@ -1,0 +1,15 @@
+# Propósito: Estado de puertos físicos y LAG, y vecinos CDP y LLDP.
+# Cuándo usarlo: Un puerto o el LAG del controlador cae o flapea.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: ctrl-puertos-lag
+platform: wlc-aireos
+name: AireOS · Controlador · Puertos y LAG
+name_en: AireOS · Controller · Ports and LAG
+commands:
+  - cmd: show time
+  - cmd: show port summary
+  - cmd: show lag summary
+  - cmd: show interface summary
+  - cmd: show cdp neighbors
+  - cmd: show lldp summary

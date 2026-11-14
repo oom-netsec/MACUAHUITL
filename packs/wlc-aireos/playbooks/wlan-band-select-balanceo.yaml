@@ -1,0 +1,17 @@
+# Propósito: Band select, balanceo de carga y RF por banda.
+# Cuándo usarlo: Clientes pegados a 2,4 GHz o mal repartidos.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: wlan-band-select-balanceo
+platform: wlc-aireos
+name: AireOS · WLAN · Band select y balanceo
+name_en: AireOS · WLAN · Band select and load balancing
+commands:
+  - cmd: show time
+  - cmd: show band-select
+  - cmd: show load-balancing
+  - cmd: show wlan summary
+  - cmd: show 802.11a
+  - cmd: show 802.11b
+  - cmd: show client summary
+    timeout: 120s

@@ -1,0 +1,24 @@
+# Propósito: Configuración, inventario, radios y eventos de un AP.
+# Cuándo usarlo: Un AP concreto se comporta distinto al resto.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: ap-un-ap
+platform: wlc-aireos
+name: AireOS · AP · Un AP puntual
+name_en: AireOS · AP · A single AP
+params:
+  - name: ap
+    kind: ap
+commands:
+  - cmd: show time
+  - cmd: show ap config general {ap}
+  - cmd: show ap inventory {ap}
+  - cmd: show ap config 802.11a {ap}
+  - cmd: show ap config 802.11b {ap}
+  - cmd: show ap wlan 802.11a {ap}
+  - cmd: show ap wlan 802.11b {ap}
+  - cmd: show ap channel {ap}
+  - cmd: show ap auto-rf 802.11a {ap}
+  - cmd: show ap auto-rf 802.11b {ap}
+  - cmd: show ap eventlog {ap}
+    timeout: 120s

@@ -1,0 +1,18 @@
+# Propósito: CleanAir, canales y calidad de aire en ambas bandas.
+# Cuándo usarlo: Se sospecha interferencia o canales saturados.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-interferencia
+platform: wlc-aireos
+name: AireOS · TAC · Interferencia
+name_en: AireOS · TAC · Interference
+commands:
+  - cmd: show time
+  - cmd: show 802.11a cleanair config
+  - cmd: show 802.11b cleanair config
+  - cmd: show 802.11a cleanair air-quality summary
+  - cmd: show 802.11b cleanair air-quality summary
+  - cmd: show 802.11a cleanair device type all
+  - cmd: show 802.11b cleanair device type all
+  - cmd: show advanced 802.11a channel
+  - cmd: show advanced 802.11b channel

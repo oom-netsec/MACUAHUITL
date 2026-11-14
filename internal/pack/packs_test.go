@@ -172,13 +172,13 @@ func TestNXOSPideNucleo041(t *testing.T) {
 	}
 }
 
-// Los paquetes oficiales ios, ios-xe, wlc-9800, nx-os, asa y ftd conviven en el mismo almacén: sin choques de ID ni de nombre de script.
+// Los paquetes oficiales ios, ios-xe, wlc-9800, nx-os, asa, ftd y wlc-aireos conviven en el mismo almacén: sin choques de ID ni de nombre de script.
 func TestPaquetesOficialesConviven(t *testing.T) {
 	st, _, err := pack.Open(t.TempDir(), "v0.4.3", packtest.Keys(), repoBase(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, n := range []string{"ios", "ios-xe", "wlc-9800", "nx-os", "asa", "ftd"} {
+	for _, n := range []string{"ios", "ios-xe", "wlc-9800", "nx-os", "asa", "ftd", "wlc-aireos"} {
 		if _, err := st.Install(packtest.Signed(t, filepath.Join(packtest.RepoDir(), "packs", n)), false); err != nil {
 			t.Fatalf("oom/%s junto a los demás: %v", n, err)
 		}
@@ -199,6 +199,17 @@ func TestASAPideNucleo043(t *testing.T) {
 // El paquete oom/ftd pide el núcleo 0.4.3 (reconoce FTD): un 0.4.2 lo rechaza.
 func TestFTDPideNucleo043(t *testing.T) {
 	d := filepath.Join(packtest.RepoDir(), "packs", "ftd")
+	if _, err := pack.ValidateSource(d, "v0.4.3"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pack.ValidateSource(d, "v0.4.2"); pack.Reason(err) != "core.too_old" {
+		t.Fatalf("0.4.2 debe rechazarlo: %v", err)
+	}
+}
+
+// El paquete oom/wlc-aireos pide el núcleo 0.4.3 (reconoce AireOS): un 0.4.2 lo rechaza.
+func TestAireOSPideNucleo043(t *testing.T) {
+	d := filepath.Join(packtest.RepoDir(), "packs", "wlc-aireos")
 	if _, err := pack.ValidateSource(d, "v0.4.3"); err != nil {
 		t.Fatal(err)
 	}

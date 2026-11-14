@@ -1,0 +1,16 @@
+# Propósito: Modelo, versión, imagen de arranque, serie e inventario del controlador.
+# Cuándo usarlo: Primer vistazo a un controlador: qué modelo es y qué versión corre.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: plat-version
+platform: wlc-aireos
+name: AireOS · Plataforma · Versión e inventario
+name_en: AireOS · Platform · Version and inventory
+commands:
+  - cmd: show time
+  - cmd: show sysinfo
+  - cmd: show inventory
+  - cmd: show boot
+  - cmd: show serial
+  - cmd: show country
+  - cmd: show switchconfig

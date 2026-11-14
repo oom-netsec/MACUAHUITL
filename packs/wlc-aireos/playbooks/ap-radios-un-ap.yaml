@@ -1,0 +1,20 @@
+# Propósito: Canal, potencia y estadísticas de las radios 2,4 y 5 GHz de un AP.
+# Cuándo usarlo: Un AP tiene canal o potencia inesperados.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: ap-radios-un-ap
+platform: wlc-aireos
+name: AireOS · AP · Radios de un AP
+name_en: AireOS · AP · Radios of an AP
+params:
+  - name: ap
+    kind: ap
+commands:
+  - cmd: show time
+  - cmd: show ap config 802.11a {ap}
+  - cmd: show ap config 802.11b {ap}
+  - cmd: show ap auto-rf 802.11a {ap}
+  - cmd: show ap auto-rf 802.11b {ap}
+  - cmd: show ap channel {ap}
+  - cmd: show ap stats 802.11a {ap}
+  - cmd: show ap stats 802.11b {ap}
