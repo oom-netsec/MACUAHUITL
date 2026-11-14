@@ -41,6 +41,7 @@ func req(tool Tool, target string, opts map[string]string, dir string) Request {
 }
 
 func TestBuildArgv(t *testing.T) {
+	localTest(t)
 	cases := []struct {
 		r    Request
 		want string
@@ -52,7 +53,7 @@ func TestBuildArgv(t *testing.T) {
 		{req(Nmap, "192.0.2.1", map[string]string{"scan": "syn"}, ""), "-sS -n -oG - 192.0.2.1"},
 		{req(Nmap, "192.0.2.1", map[string]string{"scan": "ping"}, ""), "-sn -n -oG - 192.0.2.1"},
 		{req(Iperf3, "192.0.2.1", map[string]string{"mode": "client", "port": "5201", "seconds": "10", "parallel": "4", "reverse": "true"}, ""), "-c 192.0.2.1 -p 5201 -t 10 -P 4 -R"},
-		{req(Iperf3, "", map[string]string{"mode": "server", "port": "5201"}, ""), "-s -p 5201 -1"},
+		{req(Iperf3, "", map[string]string{"mode": "server", "port": "5201", "bind": "192.0.2.9"}, ""), "-s -B 192.0.2.9 -p 5201 -1"},
 		{req(Pcap, "", map[string]string{"interface": "eth0", "seconds": "30", "packets": "1000", "filter": "tcp port 22 and host 192.0.2.1"}, "/out"), "-i eth0 -a duration:30 -c 1000 -f tcp port 22 and host 192.0.2.1"},
 	}
 	for _, c := range cases {

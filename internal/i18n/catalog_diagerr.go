@@ -15,6 +15,7 @@ func init() {
 		"diag.err.one_target":    e("se necesita exactamente un destino", "exactly one target is needed"),
 		"diag.err.ports":         e("ports {value:q} inválido; usa 22,80,443-445", "invalid ports {value:q}; use 22,80,443-445", "value"),
 		"diag.err.iperf_client":  e("iperf3 cliente: {cause}", "iperf3 client: {cause}", "cause"),
+		"diag.err.iperf_bind":    e("iperf3 servidor: bind {value:q} debe ser una IP de esta máquina (nunca todas las interfaces)", "iperf3 server: bind {value:q} must be an IP of this machine (never all interfaces)", "value"),
 		"diag.err.pcap_target":   e("la captura no lleva destino; usa el filtro", "the capture takes no target; use the filter"),
 		"diag.err.pcap_dir":      e("la captura necesita una carpeta de salida", "the capture needs an output folder"),
 		"diag.err.pcap_iface":    e("interfaz inválida o ausente", "invalid or missing interface"),

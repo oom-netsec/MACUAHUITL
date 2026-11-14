@@ -2,6 +2,7 @@ package diag
 
 import (
 	"context"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -98,6 +99,7 @@ func TestResultReportsRealBinary(t *testing.T) {
 }
 
 func TestStrictNumbersAndInterface(t *testing.T) {
+	localTest(t)
 	for name, r := range map[string]Request{
 		"NaN":         req(Ping, "192.0.2.1", map[string]string{"count": "NaN"}, ""),
 		"exponente":   req(Ping, "192.0.2.1", map[string]string{"count": "1e1"}, ""),
@@ -118,7 +120,54 @@ func TestStrictNumbersAndInterface(t *testing.T) {
 	if _, argv, err := Build(req(Nmap, "2001:db8::1", nil, "")); err != nil || !strings.Contains(strings.Join(argv, " "), "-6") {
 		t.Fatalf("ipv6 nmap without -6: %v %v", argv, err)
 	}
-	if _, argv, err := Build(req(Iperf3, "", map[string]string{"mode": "server", "seconds": "10"}, "")); err != nil || strings.Contains(strings.Join(argv, " "), "-t") {
+	if _, argv, err := Build(req(Iperf3, "", map[string]string{"mode": "server", "seconds": "10", "bind": "192.0.2.9"}, "")); err != nil || strings.Contains(strings.Join(argv, " "), "-t") {
 		t.Fatalf("server must ignore seconds: %v %v", argv, err)
 	}
+}
+
+// El servidor de iperf3 no escucha en todas las interfaces: exige -B con una IP de esta máquina,
+// puerto no privilegiado y un tope de tiempo.
+func TestIperfServerRestringido(t *testing.T) {
+	localIPs = func() []netip.Addr { return []netip.Addr{netip.MustParseAddr("192.0.2.9"), netip.MustParseAddr("::1")} }
+	t.Cleanup(func() { localIPs = realLocalIPs })
+	srv := func(o map[string]string) error {
+		o["mode"] = "server"
+		_, _, err := Build(req(Iperf3, "", o, ""))
+		return err
+	}
+	for name, o := range map[string]map[string]string{
+		"sin bind": {}, "bind ajeno": {"bind": "198.51.100.1"}, "bind 0.0.0.0": {"bind": "0.0.0.0"}, "bind nombre": {"bind": "localhost"},
+		"bind bandera": {"bind": "-1"}, "puerto 80": {"bind": "192.0.2.9", "port": "80"}, "puerto 1023": {"bind": "192.0.2.9", "port": "1023"},
+	} {
+		if srv(o) == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+	if err := srv(map[string]string{"bind": "192.0.2.9", "port": "1024"}); err != nil {
+		t.Errorf("ok rechazado: %v", err)
+	}
+	if err := srv(map[string]string{"bind": "::1"}); err != nil {
+		t.Errorf("ipv6 local rechazado: %v", err)
+	}
+	// El cliente no usa bind.
+	if _, _, err := Build(req(Iperf3, "192.0.2.1", map[string]string{"bind": "192.0.2.9"}, "")); err == nil {
+		t.Error("bind en cliente aceptado")
+	}
+}
+
+func TestIperfServerTieneTope(t *testing.T) {
+	localIPs = func() []netip.Addr { return []netip.Addr{netip.MustParseAddr("192.0.2.9")} }
+	iperfServerMax = 300 * time.Millisecond
+	t.Cleanup(func() { localIPs = realLocalIPs; iperfServerMax = 10 * time.Minute })
+	start := time.Now()
+	_, err := withBin(t, "sleeper").Run(context.Background(), req(Iperf3, "", map[string]string{"mode": "server", "bind": "192.0.2.9"}, ""), func(string) {})
+	_ = err
+	if d := time.Since(start); d > 8*time.Second {
+		t.Fatalf("el servidor no se cortó por tope: %v", d)
+	}
+}
+
+func localTest(t *testing.T) {
+	localIPs = func() []netip.Addr { return []netip.Addr{netip.MustParseAddr("192.0.2.9")} }
+	t.Cleanup(func() { localIPs = realLocalIPs })
 }
