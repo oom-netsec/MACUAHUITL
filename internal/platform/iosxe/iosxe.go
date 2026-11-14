@@ -243,8 +243,12 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				return clean(string(d.buf)), err
 			}
 		}
-		if ct := clean(tail); done(ct) && !d.noEchoYet(ct) {
-			if d.moreComing(ctx, ct) { // llegaron datos en la pausa: se revisa de nuevo
+		if ct := clean(tail); done(ct) {
+			if d.noEchoYet(ct) {
+				if !d.quiet(ctx, 3) { // red de seguridad: sin eco visible, 3 pausas seguidas sin datos aceptan el «> »
+					continue
+				}
+			} else if d.moreComing(ctx, ct) { // llegaron datos en la pausa: se revisa de nuevo
 				continue
 			}
 			text := clean(string(d.buf))
@@ -282,9 +286,52 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 // Es una heurística: una pausa mayor a mitad de la salida, justo tras una línea «> », aún la cortaría (sin un marcador del equipo no se cierra del todo).
 var ftdSettle = 400 * time.Millisecond
 
-// noEchoYet: con el «> » a secas de FTD, mientras corre un comando, el prompt solo vale si ya llegó el eco de ese comando.
+// echoNorm quita lo que el eco puede alterar (saltos, «$» de scroll, espacios) y aplica los retrocesos.
+func echoNorm(s string) string {
+	var out []byte
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; c {
+		case '\x08':
+			if len(out) > 0 {
+				out = out[:len(out)-1]
+			}
+		case '\r', '\n', '$', ' ':
+		default:
+			out = append(out, c)
+		}
+	}
+	return string(out)
+}
+
+// noEchoYet: con el «> » a secas de FTD, mientras corre un comando, el prompt solo vale si ya llegó el eco de ese
+// comando. El eco se compara normalizado y basta con el final del comando (sus últimos 16 caracteres): un comando
+// largo puede venir envuelto, truncado o con «$» de scroll.
 func (d *driver) noEchoYet(tail string) bool {
-	return d.echo != "" && ftdPrompt.MatchString(tail) && !strings.Contains(clean(string(d.buf)), d.echo+"\n")
+	if d.echo == "" || !ftdPrompt.MatchString(tail) {
+		return false
+	}
+	want := echoNorm(d.echo)
+	if len(want) > 16 {
+		want = want[len(want)-16:]
+	}
+	return !strings.Contains(echoNorm(string(d.buf)), want)
+}
+
+// quiet espera n pausas ftdSettle seguidas sin datos; true si pasaron todas. Si llegan datos, los agrega y devuelve false.
+func (d *driver) quiet(ctx context.Context, n int) bool {
+	for range n {
+		select {
+		case c, ok := <-d.chunks:
+			if ok {
+				d.buf = append(d.buf, c...)
+			}
+			return false
+		case <-time.After(ftdSettle):
+		case <-ctx.Done():
+			return false
+		}
+	}
+	return true
 }
 
 // moreComing: si tail es el «> » de FTD, espera ftdSettle por más datos; si llegan, no era el prompt (era el inicio

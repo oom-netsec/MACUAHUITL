@@ -235,3 +235,33 @@ func TestFTDPromptSinEcoNoCuenta(t *testing.T) {
 		t.Fatalf("out = %q, %v", out.Text, err)
 	}
 }
+
+// Un comando pegado de ~215 caracteres: el eco no siempre es literal (CRLF al envolver, «$» de scroll, retrocesos,
+// truncado, « \r»). Nunca debe colgarse hasta el timeout de inactividad por culpa del eco.
+func TestFTDEcoNoLiteralNoCuelga(t *testing.T) {
+	cmd := "show " + strings.Repeat("abcdefghij", 21)
+	for name, echo := range map[string]func(string) string{
+		"crlf":       func(l string) string { return l[:198] + "\r\n" + l[198:] },
+		"scroll":     func(l string) string { return l[:100] + "$" + l[100:] },
+		"retroceso":  func(l string) string { return l[:50] + "X\x08" + l[50:] },
+		"truncado":   func(l string) string { return l[:190] },
+		"espacio-cr": func(l string) string { return l[:198] + " \r" + l[198:] },
+	} {
+		r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
+			if line == cmd {
+				out(echo(line) + "\r\nout\r\n> ")
+				return
+			}
+			out(line + "\r\n> ")
+		})
+		d := New().(*driver)
+		if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
+			t.Fatal(err)
+		}
+		t0 := time.Now()
+		out, err := d.Run(context.Background(), cmd, 30*time.Second)
+		if err != nil || !strings.HasSuffix(out.Text, "out\n") || time.Since(t0) > 4*time.Second {
+			t.Fatalf("%s: out = %q, %v, %v", name, out.Text, err, time.Since(t0))
+		}
+	}
+}
