@@ -77,22 +77,25 @@ function PackDetailDialog({ core, id, onChange, onClose }: { core: CoreAPI; id: 
   );
 }
 
-function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; path: string; info: PackInspectResult; onDone: () => void; onClose: () => void }) {
+function InstallDialog({ core, path, info, onDone, onClose, onDisplaced }: { core: CoreAPI; path: string; info: PackInspectResult; onDone: () => void; onClose: () => void; onDisplaced: (ids: string[]) => void }) {
   const t = useT();
   const { pack, playbookIds, scriptIds } = info;
   const lang = useLang();
   const [hide, setHide] = useState(() => new Set(pack.hidden));
   const [err, setErr] = useState("");
-  const [changed, setChanged] = useState(false);
+  const [changed, setChanged] = useState<"" | "file" | "displace">(""); // la vista previa ya no vale: hay que reabrir el archivo
   const [busy, setBusy] = useState(false);
+  const displaced = info.displaced ?? [];
+  const [okDisplace, setOkDisplace] = useState(false); // quitar terceros siempre se acepta a mano (#85)
   const install = async () => {
-    setBusy(true); setErr(""); setChanged(false);
+    setBusy(true); setErr(""); setChanged("");
     let ok = false;
     try {
       // Un playbook tapado no se oculta (su casilla queda marcada): no viaja en hide, que con replaceHidden es el conjunto exacto.
-      await core.packInstallHiding(path, !pack.official, [...playbookIds, ...scriptIds].filter((x) => hide.has(x) && !pack.shadowed.includes(x)), true, info.sha256);
+      const res = await core.packInstallHiding(path, !pack.official, [...playbookIds, ...scriptIds].filter((x) => hide.has(x) && !pack.shadowed.includes(x)), true, info.sha256, okDisplace ? displaced : []);
+      if (res.displaced?.length) onDisplaced(res.displaced);
       ok = true;
-    } catch (e) { setErr(errorText(e)); setChanged(errInfo(e)?.reason === "pack.err.install.changed"); }
+    } catch (e) { setErr(errorText(e)); const r = errInfo(e)?.reason; setChanged(r === "pack.err.install.changed" ? "file" : r === "pack.err.would_displace" ? "displace" : ""); }
     scriptsChanged(); // también si falló: un error puede decir «el paquete quedó instalado»
     try { onDone(); } finally { setBusy(false); }
     if (ok) onClose();
@@ -107,9 +110,13 @@ function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; p
       {/* Lo derivado (lib-<id> de un playbook desmarcado) sale de la selección actual, no de lo que ya estaba oculto. */}
       <Items pack={{ ...pack, hidden: [...hide] }} playbookIds={playbookIds} scriptIds={scriptIds} isHidden={(x) => hide.has(x)} busy={busy}
         onToggle={(id, visible) => setHide((s) => { const n = new Set(s); if (visible) n.delete(id); else n.add(id); return n; })} />
-      {err && <Notice kind="error">{err}</Notice>}
-      {changed && <Notice kind="warn">{t("packs.import.changed")}</Notice>}
-      <div className="actions"><button type="button" className="primary" disabled={busy || changed} onClick={install}>{t("packs.install.go")}</button></div>
+      {displaced.length > 0 && <>
+        <Notice kind="warn">{t("packs.displace", { ids: displaced.join(", ") })}</Notice>
+        <Check label={t("packs.displace.ok", { ids: displaced.join(", ") })} checked={okDisplace} onChange={setOkDisplace} />
+      </>}
+      {err && changed !== "displace" && <Notice kind="error">{err}</Notice>}
+      {changed && <Notice kind="warn">{t(changed === "displace" ? "packs.displace.changed" : "packs.import.changed")}</Notice>}
+      <div className="actions"><button type="button" className="primary" disabled={busy || !!changed || (displaced.length > 0 && !okDisplace)} onClick={install}>{t("packs.install.go")}</button></div>
     </Dialog>
   );
 }
@@ -177,7 +184,7 @@ export function PacksSection({ core }: { core: CoreAPI }) {
       {showing && <PackDetailDialog core={core} id={showing} onChange={merge} onClose={() => setShowing("")} />}
       {exporting && <ExportDialog core={core} onClose={() => setExporting(false)} />}
       {imp && <ImportDialog core={core} path={imp.path} preview={imp.preview} onDone={refresh} onClose={() => setImp(null)} />}
-      {preview && <InstallDialog core={core} path={preview.path} info={preview.info} onDone={refresh} onClose={() => setPreview(null)} />}
+      {preview && <InstallDialog core={core} path={preview.path} info={preview.info} onDone={refresh} onClose={() => setPreview(null)} onDisplaced={(ids) => setMsg(t("packs.displaced", { ids: ids.join(", ") }))} />}
     </div>
   );
 }
