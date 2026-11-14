@@ -62,3 +62,11 @@ test("sin keepUnknown un valor viejo (p. ej. la credencial con la bóveda cerrad
   render(<Select label="Credencial" value="3f2a-uuid" onChange={() => {}} options={[["", "Ninguna"]]} />);
   expect(screen.queryByRole("option", { name: "3f2a-uuid" })).toBeNull();
 });
+
+test("si copiar falla, la consola no dice «Copiado» ni deja un rechazo sin atrapar", async () => {
+  const copy = vi.fn(async () => { throw new Error("sin portapapeles"); });
+  render(<Console label="Salida" text="x" copy={copy} />);
+  await userEvent.click(screen.getByRole("button", { name: "Copiar" }));
+  expect(copy).toHaveBeenCalled();
+  expect(screen.queryByRole("button", { name: "Copiado" })).toBeNull();
+});

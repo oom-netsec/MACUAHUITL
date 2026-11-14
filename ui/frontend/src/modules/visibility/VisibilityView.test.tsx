@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VisibilityView } from "./VisibilityView";
 import { fakeCore } from "../../lib/fake";
@@ -230,6 +230,21 @@ test("gnmi: varios eventos seguidos se muestran todos", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Suscribir" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "Detener" })).toBeEnabled());
   act(() => { for (const p of ["a", "b", "c"]) core.emitVis("gnmi", { runId: "g1", json: JSON.stringify({ Path: `/p/${p}`, Value: 1 }) }); });
+  expect(screen.queryByText("/p/a = 1")).toBeNull(); // se juntan: un render por lote, no por evento
   expect(await screen.findByText("/p/c = 1")).toBeInTheDocument();
   expect(screen.getAllByText(/^\/p\/[abc] = 1$/)).toHaveLength(3);
+});
+
+test("gnmi: Limpiar también descarta los eventos que esperaban en el lote", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), gnmiSubscribeStart: vi.fn(async () => "g1") });
+  await gnmiListo(core);
+  await userEvent.click(screen.getByRole("button", { name: "Suscribir" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Detener" })).toBeEnabled());
+  act(() => core.emitVis("gnmi", { runId: "g1", json: JSON.stringify({ Path: "/p/a", Value: 1 }) }));
+  expect(await screen.findByText("/p/a = 1")).toBeInTheDocument();
+  act(() => core.emitVis("gnmi", { runId: "g1", json: JSON.stringify({ Path: "/p/b", Value: 2 }) }));
+  fireEvent.click(screen.getByRole("button", { name: "Limpiar" }));
+  await new Promise((r) => setTimeout(r, 250)); // más que el intervalo del lote
+  expect(screen.queryByText("/p/b = 2")).toBeNull();
+  expect(screen.queryByText("/p/a = 1")).toBeNull();
 });

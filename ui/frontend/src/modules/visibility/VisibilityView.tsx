@@ -465,7 +465,7 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
         {!active ? null : !live.started && ups.length === 0
           ? <EmptyState icon="pulse" title={t("visibility.empty.title")}>{t("visibility.gnmi.empty")}</EmptyState>
           : (
-            <ResultPanel title={t("visibility.events")} status={live.badge} actions={<button className="quiet sm" disabled={!ups.length} onClick={() => setUps([])}>{t("common.clear")}</button>}>
+            <ResultPanel title={t("visibility.events")} status={live.badge} actions={<button className="quiet sm" disabled={!ups.length} onClick={() => { batch.reset(); setUps([]); }}>{t("common.clear")}</button>}>
               <Terminal as="ul" aria-live="polite" aria-label={t("visibility.events")}>{ups.map((u) => <li key={u.id}><Hl text={u.Sync ? t("visibility.gnmi.synced") : `${u.Path} = ${u.Delete ? t("visibility.gnmi.deleted") : JSON.stringify(u.Value)}`} /></li>)}</Terminal>
             </ResultPanel>
           )}
