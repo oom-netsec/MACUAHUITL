@@ -30,7 +30,7 @@ type Out<R = undefined> = { text: string; rep?: R };
 function TextResult<R = undefined>({ core, r, empty, view }: { core: CoreAPI; r: ReturnType<typeof useResult<Out<R>>>; empty: ReactNode; view?: (out: Out<R>) => ReactNode }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
-  if (!r.busy && !r.data && !r.error) return <>{empty}</>;
+  if (!r.busy && !r.data?.text && !r.error) return <>{empty}</>;
   const status = r.busy ? { tone: "info" as const, label: t("diag.status.running") }
     : r.error ? { tone: "bad" as const, label: t("diag.status.failed") } : { tone: "ok" as const, label: t("diag.status.done") };
   const copy = async () => { await core.copyText(r.data?.text ?? ""); setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
@@ -41,7 +41,7 @@ function TextResult<R = undefined>({ core, r, empty, view }: { core: CoreAPI; r:
     {extra}
     <ResultPanel title={title} status={status} error={r.error}
       actions={<>
-        <button className="quiet sm" disabled={!r.data} onClick={copy}><Icon name="copy" size={14} />{t(copied ? "common.copied" : "common.copy")}</button>
+        <button className="quiet sm" disabled={!r.data?.text} onClick={copy}><Icon name="copy" size={14} />{t(copied ? "common.copied" : "common.copy")}</button>
         <button className="quiet sm" disabled={r.busy} onClick={r.reset}>{t("common.clear")}</button>
       </>}>
       <Terminal text={r.data?.text ?? ""} role="log" aria-label={title} />
@@ -119,7 +119,7 @@ export function DnsPanel({ core }: { core: CoreAPI }) {
       </div>
       <TextResult core={core} r={r} view={({ text, rep }) => {
         const tr = mode === "trace" ? parseTrace(rep ? rep.json : text) : null;
-        return tr && <DnsTree trace={rep ? { ...tr, warnings: rep.findings.map((f) => f.message) } : tr} />;
+        return tr && <DnsTree trace={tr} />; // los Warnings del json ya vienen en el idioma pedido (30d); la traza no trae findings
       }}
         empty={<EmptyState icon="pulse" title={t("dns.empty.title")}>{t("dns.empty")}</EmptyState>} />
     </Page>

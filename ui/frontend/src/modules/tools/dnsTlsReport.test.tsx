@@ -6,7 +6,6 @@ import { dnsTraceSample, tlsSample } from "./samples";
 import type { PcapReportData } from "./api";
 
 // Fase 30c: DNS y TLS salen de toolsDnsReport/toolsTlsReport (hallazgos y verifyCode estructurados), sin leer texto del núcleo.
-const finding = (code: string, message: string) => ({ code, severity: "warning" as const, message });
 
 async function dns(core: ReturnType<typeof fakeCore>) {
   render(<DnsPanel core={core} />);
@@ -16,13 +15,13 @@ async function dns(core: ReturnType<typeof fakeCore>) {
   await userEvent.click(screen.getByRole("button", { name: "Consultar" }));
 }
 
-test("DNS: el árbol sale del json del informe y los avisos de findings, sin llamar al método de texto", async () => {
-  const json = JSON.stringify({ ...JSON.parse(dnsTraceSample), Warnings: ["texto crudo en español"] });
-  const core = fakeCore({ toolsDnsReport: vi.fn(async () => ({ text: "Trace report", json, findings: [finding("slow", "Slow resolver")] })), toolsDns: vi.fn(async () => "no") });
+// La traza no trae findings (solo transporte, higiene y zona): sus avisos son los Warnings del json, ya traducidos (30d).
+test("DNS: el árbol y sus avisos salen del json del informe, sin llamar al método de texto", async () => {
+  const json = JSON.stringify({ ...JSON.parse(dnsTraceSample), Warnings: ["Long CNAME chain"] });
+  const core = fakeCore({ toolsDnsReport: vi.fn(async () => ({ text: "Trace report", json, findings: [] })), toolsDns: vi.fn(async () => "no") });
   await dns(core);
   expect(await screen.findByRole("list", { name: "Traza desde la raíz" })).toBeInTheDocument();
-  expect(screen.getByText("Slow resolver")).toBeInTheDocument();
-  expect(screen.queryByText("texto crudo en español")).not.toBeInTheDocument();
+  expect(screen.getByText("Long CNAME chain")).toBeInTheDocument();
   expect(screen.getByText("Trace report")).toBeInTheDocument();
   expect(core.toolsDns).not.toHaveBeenCalled();
 });

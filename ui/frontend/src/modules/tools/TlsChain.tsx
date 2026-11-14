@@ -17,7 +17,7 @@ export function TlsChain({ info }: { info: TlsInfo }) {
         <p className="tls-status">
           <StatusPill tone={info.verified ? "ok" : "bad"} label={t(info.verified ? "tls.verified" : "tls.unverified")} />{" "}
           <StatusPill tone={info.nameMatches ? "ok" : "bad"} label={t(info.nameMatches ? "tls.nameOk" : "tls.nameBad")} />
-          {!info.verified && <span className="hint"> {info.verifyCode !== undefined || !info.verifyError ? t(`tls.verify.${verifyKey(info.verifyCode)}` as Key) : info.verifyError}</span>}
+          {!info.verified && <span className="hint" title={info.verifyError || undefined}> {info.verifyCode !== undefined || !info.verifyError ? t(`tls.verify.${verifyKey(info.verifyCode)}` as Key) : info.verifyError}</span>}
         </p>
         <ol className="tls-chain" aria-label={t("tls.chain.title")}>
           {info.chain.map((c, i) => {
