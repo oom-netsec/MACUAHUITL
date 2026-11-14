@@ -1,0 +1,17 @@
+# Propósito: Resume la tabla de rutas, CEF y los protocolos activos.
+# Cuándo usarlo: Rutas que faltan o un salto que no coincide.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: l3-rutas
+platform: cat9k
+name: Catalyst 9K · L3 · Rutas y CEF
+name_en: Catalyst 9K · L3 · Routes and CEF
+commands:
+  - cmd: show clock
+  - cmd: show ip route summary
+  - cmd: show ip route
+    timeout: 180s
+  - cmd: show ip cef summary
+  - cmd: show ip protocols
+  - cmd: show ip interface brief
+  - cmd: show vrf

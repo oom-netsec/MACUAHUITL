@@ -1,0 +1,19 @@
+# Propósito: Recolecta plantilla SDM, TCAM y tablas cuando se agota un recurso.
+# Cuándo usarlo: Rutas o ACL que no se programan y mensajes de TCAM.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: tac-tcam-sdm-llena
+platform: cat9k
+name: Catalyst 9K · TAC · TCAM o SDM llenos
+name_en: Catalyst 9K · TAC · TCAM or SDM exhausted
+commands:
+  - cmd: show clock
+  - cmd: show sdm prefer
+  - cmd: show platform hardware fed switch active fwd-asic resource tcam utilization
+  - cmd: show platform resources
+  - cmd: show ip route summary
+  - cmd: show mac address-table count
+  - cmd: show access-lists
+    timeout: 120s
+  - cmd: show logging | include TCAM|SDM|FED|ACL
+    timeout: 180s

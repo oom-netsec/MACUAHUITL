@@ -1,0 +1,18 @@
+# Propósito: Lista chasis, miembros, módulos, tarjetas y diagnósticos de arranque.
+# Cuándo usarlo: Un módulo o miembro aparece en otro estado, o antes de abrir un RMA.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: plat-hardware
+platform: cat9k
+name: Catalyst 9K · Plataforma · Hardware y módulos
+name_en: Catalyst 9K · Platform · Hardware and modules
+commands:
+  - cmd: show clock
+  - cmd: show platform
+  - cmd: show switch detail
+  - cmd: show module  # 9400/9600
+  - cmd: show inventory
+  - cmd: show platform software status control-processor brief
+  - cmd: show diagnostic result switch all
+    timeout: 120s
+  - cmd: show environment all

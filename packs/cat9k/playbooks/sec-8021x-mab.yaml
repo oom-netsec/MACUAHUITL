@@ -1,0 +1,18 @@
+# Propósito: Lista las sesiones de autenticación, RADIUS y eventos de 802.1X y MAB.
+# Cuándo usarlo: Un endpoint no autentica o queda en el método equivocado.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: sec-8021x-mab
+platform: cat9k
+name: Catalyst 9K · Seguridad · 802.1X y MAB
+name_en: Catalyst 9K · Security · 802.1X and MAB
+commands:
+  - cmd: show clock
+  - cmd: show authentication sessions
+  - cmd: show dot1x all summary
+  - cmd: show aaa servers
+  - cmd: show radius statistics
+  - cmd: show running-config | section aaa|dot1x|radius
+    may_contain_secrets: true
+  - cmd: show logging | include DOT1X|AUTHMGR|MAB|RADIUS
+    timeout: 180s

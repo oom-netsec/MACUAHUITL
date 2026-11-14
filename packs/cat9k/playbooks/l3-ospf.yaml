@@ -1,0 +1,17 @@
+# Propósito: Revisa vecinos, interfaces y base de datos de OSPF.
+# Cuándo usarlo: Un vecino OSPF no llega a FULL.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: l3-ospf
+platform: cat9k
+name: Catalyst 9K · L3 · OSPF
+name_en: Catalyst 9K · L3 · OSPF
+commands:
+  - cmd: show clock
+  - cmd: show ip ospf
+  - cmd: show ip ospf neighbor
+  - cmd: show ip ospf interface brief
+  - cmd: show ip ospf database database-summary
+  - cmd: show ip ospf traffic
+  - cmd: show logging | include OSPF
+    timeout: 180s

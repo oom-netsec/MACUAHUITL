@@ -1,0 +1,10 @@
+id: oom/cat9k
+version: 1.0.0
+min_core: 0.4.1
+name: Catalyst 9000, diagnóstico TAC
+name_en: Catalyst 9000, TAC diagnostics
+description: Playbooks de solo lectura para Catalyst 9200/9300/9400/9500/9600 con IOS-XE 17.x - plataforma, stack y StackWise Virtual, PoE, ASIC, CPU y punt, seguridad, servicios, L1, L2, L3 y casos TAC; los de una interfaz o una MAC piden ese dato.
+description_en: Read-only playbooks for Catalyst 9200/9300/9400/9500/9600 running IOS-XE 17.x - platform, stack and StackWise Virtual, PoE, ASIC, CPU and punt, security, services, L1, L2, L3 and TAC cases; the per-interface and per-MAC ones ask for that datum.
+platforms: [cat9k]
+author: oom-netsec
+license: Apache-2.0

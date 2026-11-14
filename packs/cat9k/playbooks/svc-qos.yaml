@@ -1,0 +1,17 @@
+# Propósito: Muestra clases, políticas y sus contadores por interfaz.
+# Cuándo usarlo: Tráfico mal clasificado o descartes de QoS.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: svc-qos
+platform: cat9k
+name: Catalyst 9K · Servicios · QoS y políticas
+name_en: Catalyst 9K · Services · QoS and policies
+commands:
+  - cmd: show clock
+  - cmd: show class-map
+  - cmd: show policy-map
+  - cmd: show policy-map interface
+    timeout: 120s
+  - cmd: show interfaces | include line protocol|output drops
+    timeout: 180s
+  - cmd: show platform resources

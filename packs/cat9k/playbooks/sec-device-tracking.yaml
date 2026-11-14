@@ -1,0 +1,17 @@
+# Propósito: Muestra la base, las políticas y los contadores de device-tracking.
+# Cuándo usarlo: Hosts que no aparecen en la tabla o pierden su entrada.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: sec-device-tracking
+platform: cat9k
+name: Catalyst 9K · Seguridad · Device tracking
+name_en: Catalyst 9K · Security · Device tracking
+commands:
+  - cmd: show clock
+  - cmd: show device-tracking database
+  - cmd: show device-tracking policies
+  - cmd: show device-tracking counters
+  - cmd: show device-tracking events
+  - cmd: show device-tracking features
+  - cmd: show logging | include SISF|DEVICE_TRACKING
+    timeout: 180s

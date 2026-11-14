@@ -1,0 +1,19 @@
+# Propósito: Revisa colas, descartes y políticas de un puerto en el ASIC.
+# Cuándo usarlo: Descartes por cola o QoS que no se comporta como se configuró.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: asic-qos-puerto
+platform: cat9k
+name: Catalyst 9K · ASIC · QoS y colas de un puerto
+name_en: Catalyst 9K · ASIC · Port QoS and queues
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show clock
+  - cmd: show interfaces {interface}
+  - cmd: show interfaces {interface} counters errors
+  - cmd: show platform hardware fed switch active qos queue stats interface {interface}
+  - cmd: show platform hardware fed switch active qos queue config interface {interface}
+  - cmd: show policy-map interface {interface}
+  - cmd: show controllers ethernet-controller {interface}

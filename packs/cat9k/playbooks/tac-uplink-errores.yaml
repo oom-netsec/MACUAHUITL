@@ -1,0 +1,22 @@
+# Propósito: Recolecta contadores, transceptor y canal de un uplink con errores.
+# Cuándo usarlo: CRC, descartes o flaps en un enlace entre switches.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: tac-uplink-errores
+platform: cat9k
+name: Catalyst 9K · TAC · Uplink con errores
+name_en: Catalyst 9K · TAC · Uplink with errors
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show clock
+  - cmd: show interfaces {interface}
+  - cmd: show interfaces {interface} counters errors
+  - cmd: show interfaces {interface} transceiver detail
+  - cmd: show controllers ethernet-controller {interface}
+  - cmd: show etherchannel summary
+  - cmd: show udld neighbors
+  - cmd: show interfaces trunk
+  - cmd: show logging
+    timeout: 180s

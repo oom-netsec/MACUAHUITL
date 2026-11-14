@@ -1,0 +1,17 @@
+# Propósito: Cuenta MAC, revisa movimientos y el ARP.
+# Cuándo usarlo: Una MAC cambia de puerto o un host no resuelve ARP.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: l2-mac-arp
+platform: cat9k
+name: Catalyst 9K · L2 · Tabla MAC y ARP
+name_en: Catalyst 9K · L2 · MAC table and ARP
+commands:
+  - cmd: show clock
+  - cmd: show mac address-table count
+  - cmd: show mac address-table aging-time
+  - cmd: show mac address-table notification mac-move
+  - cmd: show ip arp
+    timeout: 120s
+  - cmd: show logging | include MACFLAP|MAC_MOVE|HOST_FLAP
+    timeout: 180s
