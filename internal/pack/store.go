@@ -26,9 +26,6 @@ type Base struct {
 	PlaybookIDs []string
 	ScriptIDs   []string
 	ScriptNames []string // se comparan con scripts.NameKey
-	// ScriptNamesEN son los nombres en inglés de la biblioteca base: también chocan (con la app en inglés serían
-	// dos scripts indistinguibles).
-	ScriptNamesEN []string
 	// ReservedPlaybooks y ReservedScripts son IDs que salieron del binario a un paquete oficial (p. ej. los movidos a
 	// oom/ios-xe): un paquete que no es oficial nunca los ocupa, esté o no instalado el oficial.
 	ReservedPlaybooks []string
@@ -258,10 +255,6 @@ func (s *Store) collides(p *Pack, others []*Pack) error {
 	for _, n := range s.base.ScriptNames {
 		names[scripts.NameKey(n)] = "base"
 	}
-	namesEN := map[string]string{}
-	for _, n := range s.base.ScriptNamesEN {
-		namesEN[scripts.NameKey(n)] = "base"
-	}
 	add := func(q *Pack, who string) error {
 		for _, pb := range q.Playbooks {
 			if w, dup := pbs[pb.ID]; dup {
@@ -270,16 +263,6 @@ func (s *Store) collides(p *Pack, others []*Pack) error {
 			pbs[pb.ID] = who
 		}
 		d := scripts.Derived(q.Playbooks)
-		for _, tx := range scripts.DerivedTexts(q.Playbooks) {
-			if tx.Name == "" {
-				continue
-			}
-			k := scripts.NameKey(tx.Name)
-			if w, dup := namesEN[k]; dup {
-				return rej("collision", "id", tx.Name, "with", w)
-			}
-			namesEN[k] = who
-		}
 		for _, sc := range append(d, q.Scripts...) {
 			if w, dup := ids[sc.ID]; dup {
 				return rej("collision", "id", sc.ID, "with", w)

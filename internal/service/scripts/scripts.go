@@ -81,15 +81,12 @@ func (s *svc) library() ([]dom.Script, error) {
 
 // BaseLibrary son los IDs y nombres de los scripts de la biblioteca base (la del binario, sin paquetes): con ellos el
 // almacén de paquetes detecta choques. Lo pide el núcleo, que no importa el dominio de scripts (ADR 0008).
-func BaseLibrary() (ids, names, namesEN []string, err error) {
-	lib, en, err := dom.LibraryWithEN(playbooks.FS)
+func BaseLibrary() (ids, names []string, err error) {
+	lib, _, err := dom.LibraryWithEN(playbooks.FS)
 	for _, x := range lib {
 		ids, names = append(ids, x.ID), append(names, x.Name)
-		if t := en[x.ID]; t.Name != "" {
-			namesEN = append(namesEN, t.Name)
-		}
 	}
-	return ids, names, namesEN, err
+	return ids, names, err
 }
 
 // libraryEN arma la biblioteca (base más paquetes instalados) y su texto en inglés; se vuelve a armar cuando cambia

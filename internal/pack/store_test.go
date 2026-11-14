@@ -647,25 +647,3 @@ func TestInstallWithCommitCorreDespuesDelExtract(t *testing.T) {
 		t.Fatalf("err=%v res=%+v prep=%v commit=%v/%v", err, res, prepDisco, commitDisco, commitPublicado)
 	}
 }
-
-// El nombre en inglés de un script derivado también choca: dos paquetes con nombres distintos en español pero
-// iguales en inglés dejarían dos scripts indistinguibles con la app en inglés. Lo mismo contra la base.
-func TestChocaElNombreEnIngles(t *testing.T) {
-	pub, priv := testKey(t)
-	s, _ := openStore(t, t.TempDir(), pub, Base{ScriptNamesEN: []string{"Base · Health"}})
-	if _, err := s.Install(signedZip(t, priv, nil), false); err != nil { // oom/demo: «L2 · STP» en los dos idiomas
-		t.Fatal(err)
-	}
-	for _, en := range []string{"L2 · STP", "l2 · stp", "Base · Health"} {
-		f := thirdParty()
-		setPB(f, strings.NewReplacer(`name: "L2 · STP"`, `name: "Acme · Árbol"`, `name_en: "L2 · STP"`, `name_en: "`+en+`"`).Replace(string(f["playbooks/acme-stp.yaml"])))
-		if _, err := s.Install(mustZip(t, f), true); Reason(err) != "collision" {
-			t.Errorf("name_en %q: %v; quería collision", en, err)
-		}
-	}
-	ok := thirdParty()
-	setPB(ok, strings.NewReplacer(`name: "L2 · STP"`, `name: "Acme · Árbol"`, `name_en: "L2 · STP"`, `name_en: "Acme · Tree"`).Replace(string(ok["playbooks/acme-stp.yaml"])))
-	if _, err := s.Install(mustZip(t, ok), true); err != nil {
-		t.Fatal(err)
-	}
-}
