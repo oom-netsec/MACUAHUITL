@@ -259,3 +259,19 @@ func TestTimeoutMaximoEnEsYEn(t *testing.T) {
 		t.Fatalf("es %q\nen %q", err, i18n.In(i18n.En, err))
 	}
 }
+
+// Nombres y comandos con caracteres de control o de formato (bidi, U+202E…) se rechazan: cambian cómo se ve el texto
+// sin cambiar lo que dice (trojan source).
+func TestLoadRechazaBidiYControl(t *testing.T) {
+	for name, body := range map[string]string{
+		"nombre":    "id: a\nplatform: ios-xe\nname: \"a\\u202eb\"\ncommands: [{cmd: show clock}]\n",
+		"nombre_en": "id: a\nplatform: ios-xe\nname: a\nname_en: \"a\\u2066b\\u2069\"\ncommands: [{cmd: show clock}]\n",
+		"comando":   "id: a\nplatform: ios-xe\nname: a\ncommands: [{cmd: \"show clock \\u200f\"}]\n",
+		"pre":       "id: a\nplatform: ios-xe\nname: a\npre: [\"terminal length 0\\u202a\"]\ncommands: [{cmd: show clock}]\n",
+		"control":   "id: a\nplatform: ios-xe\nname: \"a\\u0007\"\ncommands: [{cmd: show clock}]\n",
+	} {
+		if _, err := Load(fstest.MapFS{"cisco/ios-xe/a.yaml": {Data: []byte(body)}}); err == nil {
+			t.Errorf("%s: aceptado", name)
+		}
+	}
+}

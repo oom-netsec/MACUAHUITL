@@ -134,3 +134,18 @@ func TestNewIDUnicoYValido(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Nombre y descripción con controles bidi (U+202E, U+2066…) se rechazan: engañan a la vista (trojan source).
+func TestValidateRechazaBidi(t *testing.T) {
+	for _, mod := range []func(*Script){
+		func(s *Script) { s.Name = "Mi \u202escript" },
+		func(s *Script) { s.Name = "Mi \u2066script\u2069" },
+		func(s *Script) { s.Description = "linea\n\u200fotra" },
+	} {
+		s := valido()
+		mod(&s)
+		if err := s.Validate(); err == nil {
+			t.Errorf("aceptado: %q / %q", s.Name, s.Description)
+		}
+	}
+}

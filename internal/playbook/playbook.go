@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 
@@ -158,6 +159,16 @@ func parse(b []byte) (Playbook, error) {
 	if len(f.Commands) == 0 {
 		return Playbook{}, i18n.New("playbook.err.no_commands", nil)
 	}
+	for field, v := range map[string]string{"name": f.Name, "name_en": f.NameEn} {
+		if hidden(v) {
+			return Playbook{}, i18n.New("playbook.err.text", i18n.A("field", field))
+		}
+	}
+	for _, c := range append(slices.Clone(f.Pre), cmdTexts(f.Commands)...) {
+		if hidden(c) {
+			return Playbook{}, i18n.New("playbook.err.text", i18n.A("field", "cmd"))
+		}
+	}
 	p := Playbook{ID: f.Platform + "/" + f.ID, Platform: f.Platform, Name: f.Name, NameEn: f.NameEn, Pre: f.Pre}
 	for _, q := range f.Params {
 		p.Params = append(p.Params, Param(q))
@@ -193,6 +204,12 @@ func parse(b []byte) (Playbook, error) {
 		p.Commands = append(p.Commands, cmd)
 	}
 	return p, nil
+}
+
+// hidden dice si s lleva caracteres de control o de formato (Cf: bidi U+202E…), que cambian cómo se ve el texto sin
+// cambiar lo que dice (trojan source).
+func hidden(s string) bool {
+	return strings.ContainsFunc(s, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) })
 }
 
 func cmdTexts(cs []fileCommand) []string {

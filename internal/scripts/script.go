@@ -79,7 +79,8 @@ func in(list []string, v string) bool {
 
 func hasControl(s string, allowNL bool) bool {
 	for _, r := range s {
-		if unicode.IsControl(r) && !(allowNL && r == '\n') {
+		// Cf: formato (bidi, U+202E…) que cambia cómo se ve el texto sin cambiar lo que dice (trojan source).
+		if (unicode.IsControl(r) || unicode.Is(unicode.Cf, r)) && !(allowNL && r == '\n') {
 			return true
 		}
 	}
