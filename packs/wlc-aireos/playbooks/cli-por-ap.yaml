@@ -1,0 +1,18 @@
+# Propósito: Clientes por radio de un AP y la RF del AP.
+# Cuándo usarlo: Quejas de usuarios conectados a un AP concreto.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: cli-por-ap
+platform: wlc-aireos
+name: AireOS · Clientes · Clientes de un AP
+name_en: AireOS · Clients · Clients of an AP
+params:
+  - name: ap
+    kind: ap
+commands:
+  - cmd: show time
+  - cmd: show client ap 802.11a {ap}
+  - cmd: show client ap 802.11b {ap}
+  - cmd: show ap config general {ap}
+  - cmd: show ap auto-rf 802.11a {ap}
+  - cmd: show ap auto-rf 802.11b {ap}

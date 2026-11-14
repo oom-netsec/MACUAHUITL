@@ -1,0 +1,15 @@
+# Propósito: Hora del controlador y certificados instalados (MIC, LSC).
+# Cuándo usarlo: Los APs no se unen por certificado o la hora es incorrecta.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: ctrl-hora-certificados
+platform: wlc-aireos
+name: AireOS · Controlador · Hora y certificados
+name_en: AireOS · Controller · Time and certificates
+commands:
+  - cmd: show time
+  - cmd: show sysinfo
+  - cmd: show certificate summary
+  - cmd: show certificate lsc summary
+  - cmd: show boot
+  - cmd: show country

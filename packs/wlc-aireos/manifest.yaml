@@ -1,0 +1,10 @@
+id: oom/wlc-aireos
+version: 1.0.0
+min_core: 0.4.4
+name: AireOS · Controladores inalámbricos Cisco, diagnóstico TAC
+name_en: AireOS · Cisco wireless controllers, TAC diagnostics
+description: Playbooks de solo lectura para controladores inalámbricos Cisco AireOS 8.5 a 8.10 (2504, 3504, 5508, 5520, 8540, vWLC) - plataforma y salud, APs (unión CAPWAP, inventario, radios), clientes, WLANs, RF/RRM y CleanAir, movilidad y anchors, seguridad (RADIUS, TACACS, rogues, ACLs), interfaces y puertos, servicios y casos TAC; los de un AP, un cliente o una WLAN piden ese dato.
+description_en: Read-only playbooks for Cisco AireOS wireless controllers 8.5 to 8.10 (2504, 3504, 5508, 5520, 8540, vWLC) - platform and health, APs (CAPWAP join, inventory, radios), clients, WLANs, RF/RRM and CleanAir, mobility and anchors, security (RADIUS, TACACS, rogues, ACLs), interfaces and ports, services and TAC cases; the per-AP, per-client and per-WLAN ones ask for that datum.
+platforms: [wlc-aireos]
+author: oom-netsec
+license: Apache-2.0

@@ -1,0 +1,18 @@
+# Propósito: Exclusión, cliente y EAP de un cliente por MAC.
+# Cuándo usarlo: Un cliente queda excluido.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-cliente-excluido
+platform: wlc-aireos
+name: AireOS · TAC · Cliente excluido
+name_en: AireOS · TAC · Excluded client
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show time
+  - cmd: show exclusionlist
+  - cmd: show client detail {mac}
+  - cmd: show wlan summary
+  - cmd: show advanced eap
+  - cmd: show radius auth statistics

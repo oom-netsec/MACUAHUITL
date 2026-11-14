@@ -190,6 +190,8 @@ var iosRules = []rule{
 	full("cts-pac", `^(\s*PAC-Opaque\s*[:=]\s*)(\S+)(.*)$`),
 	full("user-secret", `^(\s*Mgmt (?:Password|Secret)\s*[:=]\s*)(\S.*?)(\s*)$`),
 	full("dot1x-password", `^(\s*Dot1x Password\s*[:=]\s*)(\S.*?)(\s*)$`),
+	// show snmpcommunity de AireOS: nombre en claro, IP, máscara, modo y estado.
+	full("snmp-community", `^()(\S+)(\s+\d+\.\d+\.\d+\.\d+\s+\d+\.\d+\.\d+\.\d+\s+(?:Read Only|Read/Write)\s+(?:Enable|Disable)\s*)$`),
 	full("wifi-psk", `^(\s*PSK\s*[:=]\s*)(\S.*?)(\s*)$`).guarded(),
 	R("tacacs-key", "tacacs", `\s+key `+typ),
 	R("radius-key", "radius", `\s+key `+typ),
@@ -655,4 +657,31 @@ func (r rule) stopIndex(rest string) int {
 		return loc[0]
 	}
 	return len(rest)
+}
+
+// Sintaxis de configuración de AireOS: sin tipo de cifrado; el usuario, índice, IP, puerto y WLAN no se tapan. En el
+// modo «(Nombre) config>» se teclea SIN el prefijo «config»: por eso cada regla va dos veces, con «config » en
+// cualquier bloque y sin él solo en el bloque «aireconfig» (así el «radius …» suelto de otras plataformas no cambia).
+var aireosRules = []struct{ kind, body string }{
+	{"radius-key", `radius (?:auth|acct) add \d+ \S+ \d+ (?:ascii|hex) `},
+	{"radius-key", `radius auth keywrap add (?:ascii|hex) `},
+	{"radius-key", `radius auth keywrap add (?:ascii|hex) \S+ `},
+	{"tacacs-key", `tacacs (?:auth|acct|athr) add \d+ \S+ \d+ (?:ascii|hex) `},
+	{"user-secret", `(?:mgmtuser|netuser) (?:add|password) \S+ `},
+	{"snmp-community", `snmp community (?:create|delete|mode (?:enable|disable)|accessmode (?:ro|rw)|ipaddr \S+ \S+) `},
+	{"snmp-user-auth", `snmp v3user create \S+ \S+ \S+ \S+ `},
+	{"snmp-user-priv", `snmp v3user create \S+ \S+ \S+ \S+ \S+ `},
+	{"user-secret", `local-auth (?:.*? )?password `},
+	{"psk", `local-auth method fast server-key `},
+	{"user-secret", `ap mgmtuser add username \S+ password `},
+	{"user-secret", `ap mgmtuser add username \S+ password \S+ secret `},
+	{"dot1x-password", `ap 802\.1Xuser add username \S+ password `},
+	{"wifi-psk", `wlan security static-wep-key encryption \d+ \d+ (?:ascii|hex) `},
+	{"ldap-password", `ldap simple-bind authenticated \d+ (?:username \S+ password |\S+ )`},
+}
+
+func init() {
+	for _, r := range aireosRules {
+		iosRules = append(iosRules, R(r.kind, "", `\s*config `+r.body), R(r.kind, "aireconfig", `\s*`+r.body))
+	}
 }

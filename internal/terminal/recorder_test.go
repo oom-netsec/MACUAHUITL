@@ -740,3 +740,119 @@ func TestRetenidoSinBloqueSeEnmascaraConservador(t *testing.T) {
 		}
 	}
 }
+
+// AireOS: el login dentro del shell («User:» y «Password:», sin hostname) no graba la clave.
+func TestAireOSLoginNoGrabaLaClave(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("\r\n(Cisco Controller)\r\n\r\nUser: "))
+	r.Input([]byte("admin\r"))
+	r.Output([]byte("admin\r\nPassword:"))
+	r.Input([]byte("Secreta1\r"))
+	r.Output([]byte("\r\n\r\n(Cisco Controller) >"))
+	r.Input([]byte("show sysinfo\r"))
+	r.Output([]byte("show sysinfo\r\nProduct Name.... Cisco Controller\r\n\r\n(Cisco Controller) >"))
+	r.Close()
+	out := b.String()
+	if strings.Contains(out, "Secreta1") || !strings.Contains(out, ">>> [oculto]") || !strings.Contains(out, ">>> show sysinfo") {
+		t.Errorf("login AireOS mal grabado:\n%s", out)
+	}
+}
+
+// AireOS: el prompt «(Cisco Controller) >» abre bloque normal y los secretos tecleados o repetidos en el eco salen tapados.
+func TestAireOSPromptYRedPorContenido(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("(Cisco Controller) >"))
+	r.Input([]byte("config mgmtuser add op1 Secreta1 read-only\r"))
+	r.Output([]byte("config mgmtuser add op1 Secreta1 read-only\r\n\r\n(Cisco Controller) >"))
+	r.Input([]byte("config radius auth add 1 10.1.1.5 1812 ascii Rad1usK3y\r"))
+	r.Output([]byte("config radius auth add 1 10.1.1.5 1812 ascii Rad1usK3y\r\nRad1usK3y\r\n(Cisco Controller) >"))
+	// Varias líneas pegadas sin salida entre ellas: se retienen y se graban al llegar el prompt.
+	r.Input([]byte("config snmp community create Comun1dad\r"))
+	r.Input([]byte("show ap summary\r"))
+	r.Output([]byte("(Cisco Controller) >"))
+	r.Close()
+	out := b.String()
+	for _, s := range []string{"Secreta1", "Rad1usK3y", "Comun1dad"} {
+		if strings.Contains(out, s) {
+			t.Errorf("%q en la grabación:\n%s", s, out)
+		}
+	}
+	for _, s := range []string{"config mgmtuser add op1 <MASKED:user-secret> read-only", "config radius auth add 1 10.1.1.5 1812 ascii <MASKED:radius-key>", "config snmp community create <MASKED:snmp-community>", ">>> show ap summary"} {
+		if !strings.Contains(out, s) {
+			t.Errorf("falta %q:\n%s", s, out)
+		}
+	}
+}
+
+// Falsos positivos de AireOS: nombres de WLAN y de AP, listados y una descripción con «password» no se tocan.
+func TestAireOSFalsosPositivos(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("(Cisco Controller) >"))
+	for _, c := range []string{"config wlan ssid 3 Corp-WiFi", "config ap name AP-Sala1 AP-Sala-2", "show ap summary", "show client summary", "config wlan description 3 password de invitados"} {
+		r.Input([]byte(c + "\r"))
+		r.Output([]byte(c + "\r\n\r\n(Cisco Controller) >"))
+	}
+	r.Close()
+	out := b.String()
+	for _, c := range []string{"config wlan ssid 3 Corp-WiFi", "config ap name AP-Sala1 AP-Sala-2", "show ap summary", "show client summary", "config wlan description 3 password de invitados"} {
+		if strings.Count(out, c) != 2 {
+			t.Errorf("%q debía salir dos veces (tecla y eco):\n%s", c, out)
+		}
+	}
+}
+
+// AireOS: el eco con prompt «(Cisco Controller) >» pasa por las reglas aunque el valor sea corto, y las líneas
+// pegadas se graban al volver el prompt (no se quedan retenidas hasta el cierre).
+func TestAireOSEcoCortoYPegado(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("(Cisco Controller) >"))
+	r.Input([]byte("config mgmtuser add op1 Ab1 read-only\r"))
+	r.Output([]byte("config mgmtuser add op1 Ab1 read-only\r\n\r\n(Cisco Controller) >"))
+	r.Input([]byte("config snmp community create Cx9\r"))
+	r.Input([]byte("show ap summary\r"))
+	r.Output([]byte("config snmp community create Cx9\r\nshow ap summary\r\n\r\n(Cisco Controller) >"))
+	if !strings.Contains(b.String(), ">>> show ap summary") {
+		t.Errorf("las líneas pegadas siguen retenidas al volver el prompt:\n%s", b.String())
+	}
+	r.Close()
+	out := b.String()
+	if strings.Contains(out, "Ab1") || strings.Contains(out, "Cx9") {
+		t.Errorf("valor corto en la grabación:\n%s", out)
+	}
+}
+
+// AireOS: dentro de «(Cisco Controller) config>» se teclea sin el prefijo «config»; lo tecleado y el eco salen tapados.
+// Al volver a «(Cisco Controller) >» el bloque se cierra.
+func TestAireOSConfigSinPrefijoTapaTeclasYEco(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("(Cisco Controller) >"))
+	r.Input([]byte("config\r"))
+	r.Output([]byte("config\r\n\r\n(Cisco Controller) config>"))
+	cmds := []string{"radius auth add 1 10.1.1.5 1812 ascii Rad1usK3y", "mgmtuser add op1 Secreta1 read-only", "snmp community create Comun1dad"}
+	for _, c := range cmds {
+		r.Input([]byte(c + "\r"))
+		r.Output([]byte(c + "\r\n\r\n(Cisco Controller) config>"))
+	}
+	r.Close()
+	out := b.String()
+	for _, s := range []string{"Rad1usK3y", "Secreta1", "Comun1dad"} {
+		if strings.Contains(out, s) {
+			t.Errorf("%q en la grabación:\n%s", s, out)
+		}
+	}
+	if strings.Count(out, "<MASKED:") != 6 {
+		t.Errorf("se esperaban 6 tapados (tecla y eco):\n%s", out)
+	}
+}
+
+// Fuera de config> de AireOS el «radius …» suelto no se toca (IOS-XE).
+func TestRadiusSueltoDeOtrasPlataformasNoCambia(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("SW1(config)#"))
+	r.Input([]byte("radius auth add 1 10.1.1.5 1812 ascii Visible\r"))
+	r.Output([]byte("radius auth add 1 10.1.1.5 1812 ascii Visible\r\nSW1(config)#"))
+	r.Close()
+	if strings.Count(b.String(), "ascii Visible") != 2 {
+		t.Errorf("cambió:\n%s", b.String())
+	}
+}

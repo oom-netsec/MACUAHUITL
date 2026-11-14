@@ -35,7 +35,7 @@
  "guardar_muchas_etiquetas": "ERROR: rpc error: code = InvalidArgument desc = máximo 10 etiquetas",
  "guardar_nombre_de_lib": "ERROR: rpc error: code = AlreadyExists desc = ya hay un script llamado \"Análisis · Evidencia para el analizador\" (los nombres de la biblioteca también cuentan)",
  "guardar_nombre_vacio": "ERROR: rpc error: code = InvalidArgument desc = el nombre va de 1 a 64 caracteres, sin espacios en los extremos ni caracteres de control o de dirección (bidi)",
- "guardar_plataforma": "ERROR: rpc error: code = InvalidArgument desc = plataforma \"nada\" fuera de la lista (ios, ios-xe, nx-os, asa, ftd, cualquiera)",
+ "guardar_plataforma": "ERROR: rpc error: code = InvalidArgument desc = plataforma \"nada\" fuera de la lista (ios, ios-xe, nx-os, asa, ftd, wlc-aireos, cualquiera)",
  "guardar_sin_comandos": "ERROR: rpc error: code = InvalidArgument desc = el script lleva de 1 a 200 comandos",
  "guardar_sin_script": "ERROR: rpc error: code = InvalidArgument desc = falta el script",
  "guardar_tecnologia": "ERROR: rpc error: code = InvalidArgument desc = tecnología \"nada\" fuera de la lista (l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro)",

@@ -1,0 +1,20 @@
+# Propósito: RF, canal, clientes y cobertura de un AP.
+# Cuándo usarlo: Zonas con mala cobertura servidas por un AP.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-cobertura-ap
+platform: wlc-aireos
+name: AireOS · TAC · Cobertura de un AP
+name_en: AireOS · TAC · AP coverage
+params:
+  - name: ap
+    kind: ap
+commands:
+  - cmd: show time
+  - cmd: show ap auto-rf 802.11a {ap}
+  - cmd: show ap auto-rf 802.11b {ap}
+  - cmd: show ap config 802.11a {ap}
+  - cmd: show ap config 802.11b {ap}
+  - cmd: show client ap 802.11a {ap}
+  - cmd: show client ap 802.11b {ap}
+  - cmd: show advanced 802.11a coverage

@@ -1,0 +1,17 @@
+# Propósito: Cobertura, potencia y monitoreo RRM en ambas bandas.
+# Cuándo usarlo: Cobertura débil en un área.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-cobertura-general
+platform: wlc-aireos
+name: AireOS · TAC · Cobertura general
+name_en: AireOS · TAC · General coverage
+commands:
+  - cmd: show time
+  - cmd: show advanced 802.11a coverage
+  - cmd: show advanced 802.11b coverage
+  - cmd: show advanced 802.11a txpower
+  - cmd: show advanced 802.11b txpower
+  - cmd: show advanced 802.11a monitor
+  - cmd: show 802.11a
+  - cmd: show 802.11b

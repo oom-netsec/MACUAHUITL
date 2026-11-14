@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -14,13 +15,14 @@ import (
 type Param struct{ Name, Kind string }
 
 // ParamKinds son los tipos de dato válidos.
-var ParamKinds = []string{"mac", "ap", "interface", "ip"}
+var ParamKinds = []string{"mac", "ap", "wlan", "interface", "ip"}
 
 var (
 	placeholder = regexp.MustCompile(`\{[a-z][a-z0-9_]*\}`) // misma forma que paramName: {3} de un regex no es un dato
 	paramName   = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	// aa:bb:cc:dd:ee:ff, aa-bb-cc-dd-ee-ff, aabb.ccdd.eeff o aabbccddeeff
 	macRe    = regexp.MustCompile(`^(?:(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4}|[0-9A-Fa-f]{12})$`)
+	wlanRe   = regexp.MustCompile(`^[1-9][0-9]{0,2}$`) // 1 a 512, sin ceros a la izquierda (el tope se mide aparte)
 	apRe     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$`)
 	ifaceRe  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9/.:_-]{1,47}$`)
 	errValue = errors.New("valor inválido")
@@ -38,6 +40,10 @@ func ValidateValue(kind, v string) (string, error) {
 		return h[0:4] + "." + h[4:8] + "." + h[8:12], nil
 	case "ap":
 		if apRe.MatchString(v) {
+			return v, nil
+		}
+	case "wlan":
+		if n, err := strconv.Atoi(v); wlanRe.MatchString(v) && err == nil && n <= 512 {
 			return v, nil
 		}
 	case "interface":
@@ -113,6 +119,9 @@ func (p Playbook) Expand(vals map[string]string) ([]Command, error) {
 		v, err := ValidateValue(q.Kind, raw)
 		if err != nil {
 			return nil, i18n.New("playbook.err.param_invalid", i18n.A("name", q.Name, "kind", q.Kind))
+		}
+		if q.Kind == "mac" && p.Platform == "wlc-aireos" { // AireOS pide aa:bb:cc:dd:ee:ff
+			v = strings.Join([]string{v[0:2], v[2:4], v[5:7], v[7:9], v[10:12], v[12:14]}, ":")
 		}
 		norm = append(norm, "{"+q.Name+"}", v)
 	}

@@ -1,0 +1,18 @@
+# Propósito: Movilidad, handoff y clientes del controlador.
+# Cuándo usarlo: Varios clientes tienen roaming lento.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-roaming-general
+platform: wlc-aireos
+name: AireOS · TAC · Roaming general
+name_en: AireOS · TAC · General roaming
+commands:
+  - cmd: show time
+  - cmd: show mobility summary
+  - cmd: show mobility statistics
+  - cmd: show advanced client-handoff
+  - cmd: show client summary
+    timeout: 120s
+  - cmd: show wlan summary
+  - cmd: show ap summary
+    timeout: 120s

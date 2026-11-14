@@ -1,0 +1,24 @@
+# Propósito: Cliente, RADIUS, exclusión y mensajes de un cliente por MAC.
+# Cuándo usarlo: Un cliente no logra autenticar.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-cliente-no-autentica
+platform: wlc-aireos
+name: AireOS · TAC · Cliente no autentica
+name_en: AireOS · TAC · Client does not authenticate
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show time
+  - cmd: show client detail {mac}
+  - cmd: grep include "{mac}" "show client summary"
+    timeout: 120s
+  - cmd: show exclusionlist
+  - cmd: show radius summary
+    may_contain_secrets: true
+  - cmd: show radius auth statistics
+  - cmd: show pmk-cache all
+    timeout: 120s
+  - cmd: show msglog
+    timeout: 120s

@@ -1,0 +1,19 @@
+# Propósito: Cliente, proxy DHCP e interfaces de un cliente por MAC.
+# Cuándo usarlo: Un cliente asocia pero no obtiene IP.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: tac-dhcp-cliente
+platform: wlc-aireos
+name: AireOS · TAC · Cliente sin DHCP
+name_en: AireOS · TAC · Client without DHCP
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show time
+  - cmd: show client detail {mac}
+  - cmd: show dhcp proxy
+  - cmd: show interface summary
+  - cmd: show wlan summary
+  - cmd: show network summary
+    may_contain_secrets: true

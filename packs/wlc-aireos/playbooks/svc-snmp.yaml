@@ -1,0 +1,19 @@
+# Propósito: Comunidades, usuarios v3, destinos de trap y banderas de trap.
+# Cuándo usarlo: El monitoreo SNMP no recibe datos.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: svc-snmp
+platform: wlc-aireos
+name: AireOS · Servicios · SNMP
+name_en: AireOS · Services · SNMP
+commands:
+  - cmd: show time
+  - cmd: show sysinfo
+  - cmd: show snmpcommunity
+    may_contain_secrets: true
+  - cmd: show snmpv3user
+    may_contain_secrets: true
+  - cmd: show snmptrap
+  - cmd: show trapflags
+  - cmd: show mgmtuser
+    may_contain_secrets: true

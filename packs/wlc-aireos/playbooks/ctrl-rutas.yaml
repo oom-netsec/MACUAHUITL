@@ -1,0 +1,16 @@
+# Propósito: Rutas del controlador y datos de red de gestión.
+# Cuándo usarlo: El controlador no alcanza un destino de gestión.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/wireless/controller/8-10/command-reference/b_cr810.html
+# Sin validar en laboratorio (no hay AireOS en el laboratorio; comandos de la documentación de Cisco).
+id: ctrl-rutas
+platform: wlc-aireos
+name: AireOS · Controlador · Rutas y red
+name_en: AireOS · Controller · Routes and network
+commands:
+  - cmd: show time
+  - cmd: show sysinfo
+  - cmd: show route summary
+  - cmd: show interface detailed management
+  - cmd: show interface detailed service-port
+  - cmd: show network summary
+    may_contain_secrets: true

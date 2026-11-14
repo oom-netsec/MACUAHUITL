@@ -11,6 +11,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
+	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
@@ -51,7 +52,7 @@ func step(err error) string {
 		return "host_key"
 	case errors.Is(err, transport.ErrAuth):
 		return "auth"
-	case errors.Is(err, platform.ErrEnableFailed), errors.Is(err, platform.ErrFirstLogin):
+	case errors.Is(err, platform.ErrEnableFailed), errors.Is(err, platform.ErrFirstLogin), errors.Is(err, platform.ErrLoginFailed):
 		return "privilege"
 	case errors.Is(err, platform.ErrPromptTimeout), errors.Is(err, platform.ErrClosed):
 		return "prompt"
@@ -94,10 +95,17 @@ func connect(ctx context.Context, d Deps, jobID string, s Spec, t Target, hk tra
 func connectOnce(ctx context.Context, d Deps, jobID string, s Spec, t Target, hk transport.HostKeyPolicy, onEvent func(audit.Entry), allowFallback bool) (*connected, error) {
 	primary, fallback := credentialsFor(s, t)
 	cb := d.Hosts.Callback(hk, onEvent)
+	var shellPw *secret.Secret // copia de la clave para el login dentro del shell: OpenSSH destruye la de cred
+	defer func() { shellPw.Destroy() }()
 	open := func(id string) (*transport.Session, vault.Credential, error) {
 		cred, err := d.Vault.Get(id)
 		if err != nil {
 			return nil, cred, i18n.Wrap("patrol.err.credential", err, nil)
+		}
+		shellPw.Destroy()
+		shellPw = nil
+		if !cred.Password.Empty() {
+			shellPw = secret.New(append([]byte(nil), cred.Password.Bytes()...))
 		}
 		sess, err := transport.OpenSSH(ctx, d.Guard, jobID, t.Address, port(t), cred, cb, transport.SSHOptions{})
 		if err != nil {
@@ -120,6 +128,9 @@ func connectOnce(ctx context.Context, d Deps, jobID string, s Spec, t Target, hk
 		return nil, err
 	}
 	drv := d.driver()
+	if sl, ok := drv.(platform.ShellLogin); ok { // AireOS pide usuario y clave dentro del shell; el driver clona la clave
+		sl.SetLogin(cred.Username, shellPw)
+	}
 	c := &connected{sess: sess, drv: drv}
 	if err := drv.Open(ctx, r, w, cred.Enable); err != nil {
 		c.close()
