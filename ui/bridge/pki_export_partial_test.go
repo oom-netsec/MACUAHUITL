@@ -2,10 +2,9 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"testing"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -24,18 +23,11 @@ func TestSecPkiExportBorraElParcialSiFallaLaEscritura(t *testing.T) {
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
 	Start(ctx, b)
 	dst := filepath.Join(d, "x.p12")
-	// La respuesta (4 bytes) pasa del tope de tamaño de archivo: write escribe 2 y falla con EFBIG.
-	var old syscall.Rlimit
-	if err := syscall.Getrlimit(syscall.RLIMIT_FSIZE, &old); err != nil {
-		t.Skip(err)
-	}
-	signal.Ignore(syscall.SIGXFSZ)
-	defer signal.Reset(syscall.SIGXFSZ)
-	if err := syscall.Setrlimit(syscall.RLIMIT_FSIZE, &syscall.Rlimit{Cur: 2, Max: old.Max}); err != nil {
-		t.Skip(err)
-	}
+	old := exportWrite
+	exportWrite = func(f *os.File, p []byte) (int, error) { n, _ := f.Write(p[:2]); return n, errors.New("disco lleno") }
+	defer func() { exportWrite = old }()
 	_, err := b.SecPkiExport(ExportDTO{Format: "p12", Cert: "c", Path: dst})
-	syscall.Setrlimit(syscall.RLIMIT_FSIZE, &old)
+	exportWrite = old
 	if err == nil {
 		t.Fatal("la escritura debía fallar")
 	}
