@@ -26,11 +26,13 @@ type armed struct {
 	paused  atomic.Bool
 	running atomic.Bool
 	next    atomic.Int64 // UnixNano de la siguiente ronda; 0 = no hay
+	until   time.Time    // fin de la ventana, sin lectura monotónica
 }
 
 // Scheduler dispara rondas de trabajos armados.
 type Scheduler struct {
 	Heartbeat time.Duration // 5 s por defecto (spec §6)
+	Tick      time.Duration // cada cuánto se compara el reloj de pared con la hora esperada; 1 s por defecto
 	r         *Runner
 	bus       *Bus
 	now       func() time.Time
@@ -39,7 +41,7 @@ type Scheduler struct {
 }
 
 func NewScheduler(r *Runner, bus *Bus, now func() time.Time) *Scheduler {
-	return &Scheduler{Heartbeat: 5 * time.Second, r: r, bus: bus, now: now, jobs: map[string]*armed{}}
+	return &Scheduler{Heartbeat: 5 * time.Second, Tick: time.Second, r: r, bus: bus, now: now, jobs: map[string]*armed{}}
 }
 
 // Arm empieza a correr jobID: la primera ronda sale de inmediato, salvo con cron,
@@ -58,8 +60,10 @@ func (s *Scheduler) Arm(jobID string, sc Schedule, until time.Time, targets []st
 			return fmt.Errorf("engine: cron: %w", err)
 		}
 	}
-	if !sc.Until.IsZero() && sc.Until.Before(until) {
-		until = sc.Until
+	// Round(0) quita la lectura monotónica: en Linux no avanza con el sistema suspendido y compararía mal contra el reloj de pared.
+	until = until.Round(0)
+	if !sc.Until.IsZero() && sc.Until.Round(0).Before(until) {
+		until = sc.Until.Round(0)
 	}
 	if !until.After(s.now()) {
 		return i18n.New("engine.err.job_ended", nil)
@@ -73,11 +77,11 @@ func (s *Scheduler) Arm(jobID string, sc Schedule, until time.Time, targets []st
 		return i18n.New("engine.err.armed", i18n.A("job", jobID))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	a := &armed{cancel: cancel}
+	a := &armed{cancel: cancel, until: until}
 	s.jobs[jobID] = a
 	s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: "armed"})
 	go s.heartbeat(ctx, jobID)
-	go s.loop(ctx, a, jobID, sc, cs, until, targets, f)
+	go s.loop(ctx, a, jobID, sc, cs, targets, f)
 	return nil
 }
 
@@ -94,10 +98,11 @@ func (s *Scheduler) heartbeat(ctx context.Context, jobID string) {
 	}
 }
 
-func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedule, cs cron.Schedule, until time.Time, targets []string, f RunFunc) {
+func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedule, cs cron.Schedule, targets []string, f RunFunc) {
+	until := a.until
 	var wg sync.WaitGroup
 	state := "completed"
-	next := s.now()
+	next := s.now().Round(0)
 	if cs != nil {
 		next = cs.Next(next) // cron: la primera ronda es la primera coincidencia, no ya
 	}
@@ -108,28 +113,29 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 			wake = until // no esperar al siguiente tic si el trabajo termina antes
 			a.next.Store(0)
 		}
-		timer := time.NewTimer(time.Until(wake))
-		select {
-		case <-ctx.Done():
-			timer.Stop()
+		if !s.sleepUntil(ctx, wake) {
 			state = "cancelled"
-		case <-timer.C:
 		}
 		if state == "cancelled" || !s.now().Before(until) {
 			break
 		}
 		// La siguiente se calcula y publica antes de lanzar esta ronda: NextRound nunca devuelve la que ya corre.
 		if cs != nil {
-			next = cs.Next(s.now())
+			next = cs.Next(s.now().Round(0))
 		} else {
 			next = next.Add(sc.Interval)
 		}
-		if (sc.Rounds == 0 || round < sc.Rounds) && next.Before(until) {
+		more := (sc.Rounds == 0 || round < sc.Rounds) && next.Before(until)
+		if more {
 			a.next.Store(next.UnixNano())
 		} else {
 			a.next.Store(0)
 		}
-		if a.paused.Load() || a.running.Load() {
+		// Tras una suspensión del sistema, las rondas que ya pasaron de largo se registran como omitidas en vez de
+		// salir todas de golpe; la última de la ventana sí corre.
+		late := s.now().Round(0).Sub(wake.Round(0))
+		missed := more && sc.Interval > 0 && roundLost(late, sc.Interval, s.tick())
+		if a.paused.Load() || a.running.Load() || missed {
 			s.bus.Publish(Event{JobID: jobID, Kind: Warning, Detail: "round.skipped", Index: round})
 		} else {
 			a.running.Store(true)
@@ -153,6 +159,39 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 	s.mu.Unlock()
 	a.cancel()
 	s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: state})
+}
+
+// roundLost: una ronda se da por perdida (suspensión del sistema) si llega al menos un intervalo tarde y más de dos
+// tics; una pausa corta del proceso (GC, carga) no cuenta.
+func roundLost(late, interval, tick time.Duration) bool {
+	return interval > 0 && late >= interval && late > 2*tick
+}
+
+func (s *Scheduler) tick() time.Duration {
+	if s.Tick <= 0 {
+		return time.Second
+	}
+	return s.Tick
+}
+
+// sleepUntil espera hasta wake mirando el reloj de pared cada Tick: los temporizadores de Go son monotónicos y no
+// avanzan mientras el sistema está suspendido, así que un solo sueño largo se pasaría de la ventana al reanudar.
+// Devuelve false si ctx se cancela antes.
+func (s *Scheduler) sleepUntil(ctx context.Context, wake time.Time) bool {
+	tick := s.tick()
+	for {
+		rem := wake.Round(0).Sub(s.now().Round(0)) // Round(0) quita la lectura monotónica
+		if rem <= 0 {
+			return ctx.Err() == nil
+		}
+		t := time.NewTimer(min(rem, tick))
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return false
+		case <-t.C:
+		}
+	}
 }
 
 func (s *Scheduler) get(jobID string) *armed {

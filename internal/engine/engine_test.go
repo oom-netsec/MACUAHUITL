@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -296,5 +297,90 @@ func TestArmValidation(t *testing.T) {
 	defer s.Cancel("dup")
 	if err := s.Arm("dup", Schedule{Interval: time.Hour}, time.Now().Add(time.Minute), nil, f); err == nil {
 		t.Error("double arm accepted")
+	}
+}
+
+// reloj es un reloj de pared que la prueba adelanta a mano, como lo hace una suspensión del sistema.
+type reloj struct{ ns atomic.Int64 }
+
+func (r *reloj) now() time.Time         { return time.Unix(0, r.ns.Load()).UTC() }
+func (r *reloj) avanza(d time.Duration) { r.ns.Add(int64(d)) }
+
+// Tras una suspensión, los temporizadores monotónicos no avanzaron: el planificador mira el reloj de pared en cada
+// tic. Las rondas perdidas salen como omitidas, la última de la ventana corre y pasada la ventana el trabajo termina.
+func TestSuspensionRecalculaConElRelojDePared(t *testing.T) {
+	c := &reloj{}
+	c.ns.Store(time.Date(2026, 11, 13, 9, 0, 0, 0, time.UTC).UnixNano())
+	t0 := c.now()
+	b := NewBus(256)
+	s := NewScheduler(NewRunner(10, b), b, c.now)
+	s.Heartbeat, s.Tick = time.Hour, 5*time.Millisecond
+	ch, cancel := b.Subscribe(nil)
+	defer cancel()
+	var runs atomic.Int32
+	if err := s.Arm("j", Schedule{Interval: time.Hour}, t0.Add(10*time.Hour), []string{"x"}, func(context.Context, int, string) error {
+		runs.Add(1)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor := func(what string, ok func() bool) {
+		t.Helper()
+		for end := time.Now().Add(3 * time.Second); !ok(); time.Sleep(5 * time.Millisecond) {
+			if time.Now().After(end) {
+				t.Fatalf("no ocurrió: %s (runs=%d)", what, runs.Load())
+			}
+		}
+	}
+	waitFor("ronda 1", func() bool { return runs.Load() == 1 })
+	c.avanza(5*time.Hour + 30*time.Minute) // el sistema duerme 5 h 30 min
+	waitFor("ronda al reanudar", func() bool { return runs.Load() == 2 })
+	time.Sleep(100 * time.Millisecond)
+	if n := runs.Load(); n != 2 {
+		t.Fatalf("las rondas perdidas salieron de golpe: runs=%d", n)
+	}
+	if n := s.NextRound("j"); !n.Equal(t0.Add(6 * time.Hour)) {
+		t.Fatalf("siguiente ronda = %v", n)
+	}
+	c.avanza(6 * time.Hour) // pasada la ventana (t0+11 h)
+	evs := collect(ch, done, 3*time.Second)
+	if evs[len(evs)-1].State != "completed" || runs.Load() != 2 {
+		t.Fatalf("fuera de la ventana corrió o no terminó: runs=%d last=%+v", runs.Load(), evs[len(evs)-1])
+	}
+	if n := count(evs, Warning, "round.skipped"); n != 4 {
+		t.Fatalf("rondas omitidas = %d, quería 4", n)
+	}
+}
+
+// Con el reloj real (que trae lectura monotónica), el fin de la ventana se guarda solo con hora de pared: la
+// monotónica no avanza con el sistema suspendido y dejaría correr rondas fuera de la ventana al despertar.
+func TestVentanaDelPlanificadorSinLecturaMonotonica(t *testing.T) {
+	s, _ := newSched(t)
+	if err := s.Arm("j", Schedule{Interval: time.Hour}, time.Now().Add(time.Minute), []string{"x"}, func(context.Context, int, string) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Cancel("j")
+	if u := s.get("j").until; strings.Contains(u.String(), "m=") {
+		t.Fatalf("until trae lectura monotónica: %v", u)
+	}
+}
+
+// Una ronda es «perdida» solo si llega al menos un intervalo tarde y más de dos tics: una pausa corta del proceso
+// (GC, carga) no omite rondas aunque el intervalo sea menor.
+func TestRondaPerdidaExigeMasDeDosTics(t *testing.T) {
+	tick := time.Second
+	for _, c := range []struct {
+		late, interval time.Duration
+		want           bool
+	}{
+		{50 * time.Millisecond, 10 * time.Millisecond, false}, // tarde varios intervalos, pero fue una pausa corta
+		{2 * time.Second, time.Millisecond, false},
+		{2*time.Second + 1, time.Millisecond, true},
+		{5 * time.Hour, time.Hour, true},
+		{30 * time.Minute, time.Hour, false}, // menos de un intervalo
+	} {
+		if got := roundLost(c.late, c.interval, tick); got != c.want {
+			t.Errorf("late=%v interval=%v: %v, quería %v", c.late, c.interval, got, c.want)
+		}
 	}
 }

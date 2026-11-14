@@ -2,6 +2,7 @@ package vault
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -189,5 +190,19 @@ func TestUnlockedAccessor(t *testing.T) {
 	v.Lock()
 	if v.Unlocked() {
 		t.Fatal("locked with a window must not report unlocked")
+	}
+}
+
+// El reloj monotónico de Linux no avanza con el sistema suspendido: una ventana con lectura monotónica seguiría
+// vigente al despertar. La ventana y la comparación usan solo la hora de pared.
+func TestVentanaSinLecturaMonotonica(t *testing.T) {
+	v, _, a, _ := armedVault(t)
+	v.SetClock(time.Now) // el reloj real trae lectura monotónica
+	if err := v.Arm("j", time.Now().Add(time.Hour), []string{a}); err != nil {
+		t.Fatal(err)
+	}
+	ws := v.Windows()
+	if len(ws) != 1 || strings.Contains(ws[0].Until.String(), "m=") {
+		t.Fatalf("la ventana guarda lectura monotónica: %v", ws)
 	}
 }
