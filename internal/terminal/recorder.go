@@ -35,12 +35,14 @@ var (
 )
 
 const (
-	tailMax  = 256
-	lineMax  = 64 << 10 // una línea (de salida o tecleada) más larga se recorta
-	heldMax  = 32       // líneas tecleadas retenidas a la espera de saber si eran una contraseña
-	sentMax  = 32       // líneas enviadas que esperan su eco
-	skipMax  = 4096     // líneas que se descartan dentro de una llave privada sin cierre
-	totalMax = 256 << 20
+	tailMax    = 256
+	lineMax    = 64 << 10 // una línea (de salida o tecleada) más larga se recorta
+	heldMax    = 32       // líneas tecleadas retenidas a la espera de saber si eran una contraseña
+	secretsMax = 16
+	secretsWin = 50   // líneas de salida que dura la red por contenido
+	sentMax    = 32   // líneas enviadas que esperan su eco
+	skipMax    = 4096 // líneas que se descartan dentro de una llave privada sin cierre
+	totalMax   = 256 << 20
 )
 
 // Recorder es seguro entre goroutines: la salida y el teclado llegan por separado.
@@ -58,6 +60,9 @@ type Recorder struct {
 	lastBlk string      // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
 	typed   mask.Stream // lleva el bloque entre las líneas tecleadas
 	sent    []string    // líneas tecleadas y enviadas cuyo eco aún no llegó completo (solo en memoria, con tope)
+	pi      int         // índice en sent de la línea cuyo eco quedó partido
+	secrets []string    // valores tapados en lo tecleado, en memoria, mientras dure su ventana
+	win     int         // líneas de salida que le quedan a la ventana
 	acc     string      // lo recibido del eco partido hasta ahora
 	cont    bool        // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
 	hidden  bool        // lo tecleado es una contraseña: no se graba
@@ -91,9 +96,6 @@ func (r *Recorder) Output(p []byte) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, c := range p {
-		if c == '\r' { // el log se lee mejor sin retornos de carro
-			continue
-		}
 		if r.pendAt.IsZero() {
 			r.pendAt = r.now()
 		}
@@ -120,7 +122,14 @@ func (r *Recorder) Output(p []byte) {
 // outLine enmascara y escribe una línea de salida. El prompt (SW1(config)#) se conserva y se
 // analiza lo que sigue, que es el eco de lo tecleado o una línea de configuración.
 func (r *Recorder) outLine(l string) {
-	l = applyBackspaces(ansi.ReplaceAllString(l, ""))
+	// Se borra la secuencia de borrado de --More-- antes de quitar los retornos de carro: no deja sangría falsa.
+	l = erase.ReplaceAllString(ansi.ReplaceAllString(l, ""), "")
+	l = applyBackspaces(strings.ReplaceAll(l, "\r", "")) // el log se lee mejor sin retornos de carro
+	if r.win > 0 {
+		if r.win--; r.win == 0 {
+			r.secrets = nil
+		}
+	}
 	out, keep := "", true
 	if pr := promptRe.FindString(l); pr != "" {
 		r.setPromptBlock(blockOfPrompt(pr))
@@ -129,13 +138,19 @@ func (r *Recorder) outLine(l string) {
 		// que aún espera su eco. Un eco completo la saca de la cola; lo que no cuadra la vacía.
 		text := strings.TrimLeft(l[len(pr):], " \t") // tras el prompt va un espacio antes del eco
 		partial := false
-		switch {
-		case len(r.sent) > 0 && text == r.sent[0]:
-			r.sent = r.sent[1:]
-		case len(r.sent) > 0 && text != "" && strings.HasPrefix(r.sent[0], text):
-			partial = true
-		default:
-			r.sent = nil
+		if len(r.sent) == 0 {
+			r.secrets, r.win = nil, 0 // prompt sin pendientes: la ventana de la red por contenido vence
+		} else if text != "" { // un Enter vacío no saca nada
+			if i := indexOf(r.sent, text); i >= 0 {
+				r.sent = r.sent[i+1:] // lo anterior se perdió en el eco (p. ej. tabulador completado)
+			} else {
+				for i, s := range r.sent {
+					if strings.HasPrefix(s, text) {
+						partial, r.pi = true, i
+						break
+					}
+				}
+			}
 		}
 		r.cont = echo != l[len(pr):] && (len(r.line) > 0 || partial)
 		r.acc = text
@@ -144,15 +159,18 @@ func (r *Recorder) outLine(l string) {
 		// Desde un eco enmascarado hasta el siguiente prompt, lo que no es syslog ni aviso del equipo
 		// es el resto del eco (partido por logs asíncronos): se tapa entero.
 		out = "<MASKED:secret>"
-		if len(r.sent) > 0 {
+		if r.pi < len(r.sent) {
 			// El eco ya completó la línea enviada: lo que siga es salida normal.
-			if r.acc += l; r.acc == r.sent[0] {
-				r.cont, r.sent = false, r.sent[1:]
-			} else if !strings.HasPrefix(r.sent[0], r.acc) {
-				r.cont, r.sent = false, nil
+			if r.acc += l; r.acc == r.sent[r.pi] {
+				r.cont, r.sent = false, r.sent[r.pi+1:]
+			} else if !strings.HasPrefix(r.sent[r.pi], r.acc) {
+				r.cont = false
 			}
 		}
 	} else {
+		if !equipoMsg(l) {
+			l = r.scrub(l)
+		}
 		out, keep = r.stream.Line(l)
 	}
 	if keep {
@@ -173,6 +191,71 @@ func equipoMsg(l string) bool {
 		}
 	}
 	return false
+}
+
+var erase = regexp.MustCompile(`(?: ?--More--)?(?:\r +\r|\x08+ +\x08+)`)
+
+func indexOf(l []string, s string) int {
+	for i, x := range l {
+		if x == s {
+			return i
+		}
+	}
+	return -1
+}
+
+var maskedTok = regexp.MustCompile(`<MASKED:[^>]*>`)
+
+// typedLine enmascara lo tecleado y guarda en memoria los valores tapados (red por contenido).
+func (r *Recorder) typedLine(line string) string {
+	m := r.typed.Typed(line)
+	if m == line {
+		return m
+	}
+	pieces := maskedTok.Split(m, -1)
+	if !strings.HasPrefix(line, pieces[0]) {
+		return m
+	}
+	pos := len(pieces[0])
+	for _, p := range pieces[1:] {
+		end := len(line)
+		if p != "" {
+			i := strings.Index(line[pos:], p)
+			if i < 0 {
+				return m
+			}
+			end = pos + i
+		}
+		if v := line[pos:end]; len(v) >= 2 && !strings.HasPrefix(v, "<MASKED:") && indexOf(r.secrets, v) < 0 {
+			if r.secrets = append(r.secrets, v); len(r.secrets) > secretsMax {
+				r.secrets = r.secrets[1:]
+			}
+			r.win = secretsWin
+		}
+		pos = end + len(p)
+	}
+	return m
+}
+
+// scrub tapa en una línea de salida los valores tapados antes: completos, o como trozo (≥2) al inicio
+// (sufijo del valor) o al final (prefijo del valor), que es lo que deja un eco partido.
+func (r *Recorder) scrub(l string) string {
+	for _, v := range r.secrets {
+		l = strings.ReplaceAll(l, v, "<MASKED:secret>")
+		for k := len(v) - 1; k >= 2; k-- {
+			if strings.HasPrefix(l, v[len(v)-k:]) {
+				l = "<MASKED:secret>" + l[k:]
+				break
+			}
+		}
+		for k := len(v) - 1; k >= 2; k-- {
+			if strings.HasSuffix(l, v[:k]) {
+				l = l[:len(l)-k] + "<MASKED:secret>"
+				break
+			}
+		}
+	}
+	return l
 }
 
 // setPromptBlock recuerda el bloque del prompt; solo si cambia reinicia el de lo tecleado (un prompt
@@ -228,7 +311,7 @@ func (r *Recorder) commitHeld() {
 	h := r.held
 	r.held = nil
 	for _, l := range h {
-		r.input(r.typed.Typed(l))
+		r.input(r.typedLine(l))
 	}
 }
 
@@ -279,13 +362,13 @@ func (r *Recorder) flush() {
 		r.input("[oculto]")
 	case line == "":
 	case fresh && len(r.held) == 0:
-		r.input(r.typed.Typed(line)) // shortcut: ver la nota del paquete sobre abreviaturas
+		r.input(r.typedLine(line)) // shortcut: ver la nota del paquete sobre abreviaturas
 	default:
 		// Sin salida nueva desde el Enter anterior: el equipo aún no mostró su prompt y esta línea
 		// podría ser la contraseña que el prompt de secreto va a pedir. Se decide al llegar la salida.
 		r.held = append(r.held, line)
 		if len(r.held) > heldMax {
-			r.input(r.typed.Typed(r.held[0]))
+			r.input(r.typedLine(r.held[0]))
 			r.held = r.held[1:]
 		}
 	}
@@ -310,7 +393,7 @@ func (r *Recorder) Close() {
 	}
 	r.commitHeld()
 	if !r.hidden && len(r.line) > 0 {
-		r.input(r.typed.Typed(string(r.line)))
+		r.input(r.typedLine(string(r.line)))
 	}
 	r.hidden, r.line = false, nil
 }

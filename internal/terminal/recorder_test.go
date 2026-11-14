@@ -591,3 +591,80 @@ func TestEcoConRetrocesoSeEnmascaraCompleto(t *testing.T) {
 		}
 	}
 }
+
+// La cola de enviadas no se vacía por un Enter vacío ni por un eco que no cuadra (tabulador completado).
+func TestColaDeEnviadasSobreviveAEnterVacioYTabulador(t *testing.T) {
+	casos := map[string]string{
+		"enter vacío": "\rkey Secret\r",
+		"tabulador":   "timeout\t5\rkey Secret\r",
+		"vacío y tab": "\rtimeout\t5\r\rkey Secret\r",
+	}
+	for nombre, typed := range casos {
+		r, b := newRec()
+		r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+		r.Input([]byte(typed))
+		if strings.Contains(typed, "timeout") {
+			r.Output([]byte("timeout 5\r\nciscoasa(config-aaa-server-host)# "))
+		}
+		r.Output([]byte("key Se"))
+		r.Output([]byte("\r\n%ASA-5-111008: log\r\n"))
+		r.Output([]byte("cret\r\nciscoasa(config-aaa-server-host)# "))
+		r.Close()
+		if out := b.String(); strings.Contains(out, "Z cret\n") {
+			t.Errorf("%s:\n%s", nombre, out)
+		}
+	}
+}
+
+// Red por contenido: un valor tapado en lo tecleado se tapa donde aparezca en la salida de la ventana.
+func TestRedPorContenidoTapaElValorEnLaSalida(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+	r.Input([]byte("key SecretValue1\rshow run\r"))
+	r.Output([]byte("key <eco perdido>\r\n"))
+	r.Output([]byte("ValueX SecretValue1 y mas\r\n"))  // valor completo
+	r.Output([]byte("retValue1 sufijo al inicio\r\n")) // sufijo del valor al inicio (≥2)
+	r.Output([]byte("prefijo al final SecretV\r\n"))   // prefijo del valor al final (≥2)
+	r.Output([]byte("linea sin relacion\r\n"))
+	r.Close()
+	out := b.String()
+	for _, leak := range []string{"SecretValue1", "retValue1", "SecretV\n"} {
+		if strings.Contains(out, leak) {
+			t.Errorf("fuga %q:\n%s", leak, out)
+		}
+	}
+	if !strings.Contains(out, "linea sin relacion") {
+		t.Errorf("tapó de más:\n%s", out)
+	}
+}
+
+// La ventana vence con un prompt sin pendientes: después el valor ya no se persigue.
+func TestRedPorContenidoVenceConUnPrompt(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+	r.Input([]byte("key SecretValue1\r"))
+	r.Output([]byte("key SecretValue1\r\nciscoasa(config-aaa-server-host)# \r\n"))
+	r.Output([]byte("texto SecretValue1 posterior\r\n"))
+	r.Close()
+	if out := b.String(); !strings.Contains(out, "texto SecretValue1 posterior") {
+		t.Errorf("la ventana no venció:\n%s", out)
+	}
+}
+
+// El borrado de --More-- de IOS no deja sangría falsa que impida abrir el bloque.
+func TestBorradoDeMoreNoImpideElBloque(t *testing.T) {
+	for _, n := range []int{8, 9, 20} {
+		for _, kind := range []string{"cr", "bs"} {
+			borrado := "\r" + strings.Repeat(" ", n) + "\r"
+			if kind == "bs" {
+				borrado = strings.Repeat("\b", n) + strings.Repeat(" ", n) + strings.Repeat("\b", n)
+			}
+			r, b := newRec()
+			r.Output([]byte("SW1#show running-config\r\nhostname SW1\r\n --More--" + borrado + "line con 0\r\n password Plain2\r\n"))
+			r.Close()
+			if out := b.String(); strings.Contains(out, "Plain2") {
+				t.Errorf("n=%d %s:\n%s", n, kind, out)
+			}
+		}
+	}
+}
