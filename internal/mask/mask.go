@@ -40,6 +40,11 @@ var keyringLine = regexp.MustCompile(`^\s*pre-shared-key (?:address|hostname|ipv
 // HSRP/VRRP con key-chain o sin autenticación: no hay secreto en la línea.
 var fhrpNoKey = regexp.MustCompile(`authentication (?:md5 key-chain|none)\b`)
 
+const ipAddr = `(?:\d+(?:\.\d+){3}|[0-9a-fA-F:]*:[0-9a-fA-F:.]*)`
+
+// snmp-server host de ASA: interfaz primero y luego la IP (en IOS/NX-OS la IP va primero).
+var asaSNMPHost = regexp.MustCompile(`^\s*snmp-server host \S+ ` + ipAddr + `(?: |$)`)
+
 // Cada regla captura (prefijo)(valor)(resto); solo se reemplaza el valor.
 var iosRules = []rule{
 	R("enable-secret", "", `\s*enable (?:algorithm-type \S+ )?(?:secret|password) (?:level \d+ )?`+typ),
@@ -55,7 +60,9 @@ var iosRules = []rule{
 	R("snmp-user-auth", "", `\s*snmp-server user .*? auth (?:md5|sha-2 \d+|sha\S*) `),
 	R("snmp-user-priv", "", `\s*snmp-server user .*? priv (?:(?:des|3des|aes(?:[- ]\d+)?) )?`),
 	// La comunidad va tras vrf/use-vrf, informs/traps y version; use-vrf sin valor no es la comunidad.
-	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) )?`).guarded(),
+	// ASA: «host IFNAME IP [trap|poll] community X»; la IP no es la comunidad.
+	R("snmp-community", "", `\s*snmp-server host \S+ `+ipAddr+` (?:(?:trap|poll) )*community `),
+	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) )?`).guarded().unless(asaSNMPHost),
 	R("snmp-community", "", `\s*snmp mib community-map `),
 	R("bgp-password", "", `\s*neighbor \S+ password `+typ),
 	R("ppp-password", "", `\s*ppp (?:chap password|pap sent-username \S+ password) `+typ),
@@ -69,8 +76,8 @@ var iosRules = []rule{
 	R("client-password", "", `\s*ip (?:ftp|http client) password `+typ),
 	R("config-key", "", `\s*key config-key password-encrypt `),
 	R("config-key", "", `\s*key config-key \d+ `),
-	R("ospf-key", "", `\s*ip ospf authentication-key `+typ),
-	R("ospf-key", "", `\s*ip ospf message-digest-key \d+ md5 `+typ),
+	R("ospf-key", "", `\s*(?:ip )?ospf authentication-key `+typ),
+	R("ospf-key", "", `\s*(?:ip )?ospf message-digest-key \d+ md5 `+typ),
 	R("ospf-key", "", `\s*area \S+ virtual-link \S+ (?:.*? )?(?:message-digest-key \d+ md5|authentication-key) `+typ),
 	// OSPFv3 (IOS «ipv6 ospf», NX-OS/IOS-XE «ospfv3»): autenticación y cifrado IPsec.
 	R("ospf-key", "", `\s*(?:ipv6 ospf|ospfv3(?: \d+)?) authentication ipsec spi \d+ (?:md5|sha1) `+typ),
@@ -104,6 +111,15 @@ var iosRules = []rule{
 	R("msdp-password", "", `\s*ip msdp password (?:peer )?\S+ `+typ),
 	R("pim-key", "", `\s*ip pim hello-authentication ah-md5 `+typ),
 	R("bfd-key", "", `\s*bfd authentication \S+ key-id \d+ (?:hex-)?key `),
+	// ASA: passwd, IKEv1/IKEv2, failover, LDAP, EIGRP y licencia inteligente.
+	R("enable-secret", "", `\s*passwd `),
+	R("psk", "", `\s*(?:ikev1|ikev2 (?:local|remote)-authentication) pre-shared-key `+typ),
+	R("failover-key", "", `\s*failover (?:key (?:hex )?|ipsec pre-shared-key )`),
+	R("ldap-password", "", `\s*ldap-login-password `+typ),
+	R("eigrp-key", "", `\s*eigrp authentication key \d+ `),
+	R("eigrp-key", "", `\s*authentication key eigrp \d+ `),
+	R("aaa-key", "aaaserver", `\s+key `+typ),
+	R("token", "licsmart", `\s+token `),
 	// VPN y PKI.
 	R("psk", "", `\s*authentication (?:local|remote) pre-share key `+typ),
 	R("psk", "ezvpn", `\s+key `+typ),
@@ -211,6 +227,10 @@ func blockOf(line string) string {
 		return "ezvpn"
 	case strings.HasPrefix(line, "crypto pki trustpoint "):
 		return "trustpoint"
+	case strings.HasPrefix(line, "aaa-server "):
+		return "aaaserver"
+	case strings.HasPrefix(line, "license smart"):
+		return "licsmart"
 	case strings.HasPrefix(line, "user-name "):
 		return "username"
 	case strings.HasPrefix(line, "parameter-map type umbrella"):
@@ -431,7 +451,7 @@ func maskLine(line, block string, counts map[string]int) string {
 				continue
 			}
 			m := r.re.FindStringSubmatch(line)
-			if m == nil || strings.HasPrefix(m[2], "<MASKED:") || r.guard && isGuard(m[2]) {
+			if m == nil || strings.HasPrefix(m[2], "<MASKED:") || strings.Trim(m[2], "*") == "" || r.guard && isGuard(m[2]) {
 				continue
 			}
 			// En tipo 0 la clave puede llevar espacios: llega hasta el fin de línea o una palabra clave del comando.
