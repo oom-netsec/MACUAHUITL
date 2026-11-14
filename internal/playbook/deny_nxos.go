@@ -193,7 +193,7 @@ func validNXProbe(f []string) bool {
 			}
 		}
 	}
-	if holder := placeholder.FindString(f[0]) == f[0]; !holder && !probeName(f[0]) {
+	if holder := placeholder.FindString(f[0]) == f[0]; !holder && !(probeName(f[0]) && probeDest(f[0])) {
 		return false
 	} else if holder {
 		f = f[1:]
