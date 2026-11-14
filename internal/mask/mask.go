@@ -75,10 +75,14 @@ func isASASNMPHost(line, platform string) bool {
 	return len(f) > 4 && (f[4] == "trap" || f[4] == "poll" || f[4] == "version")
 }
 
+// ISE (ADE-OS): «username U password hash|plain X role …» y «ntp authentication-key N md5 hash|plain X»; las reglas de
+// IOS tomarían «hash»/«plain» como el valor y dejarían el secreto a la vista.
+var iseHashPlain = regexp.MustCompile(`(?i)^\s*(?:username \S+ password|ntp authentication-key \d+ md5) (?:hash|plain) \S`)
+
 // Cada regla captura (prefijo)(valor)(resto); solo se reemplaza el valor.
 var iosRules = []rule{
 	R("enable-secret", "", `\s*enable (?:algorithm-type \S+ )?(?:secret|password) (?:level \d+ )?`+typ),
-	R("user-secret", "", `\s*username \S+ (?:.*? )?(?:secret|password) `+typ),
+	R("user-secret", "", `\s*username \S+ (?:.*? )?(?:secret|password) `+typ).unless(iseHashPlain),
 	R("snmp-community", "", `\s*snmp-server community `+commTyp).stopAt(`\s+(?:ro|rw)(?:\s+\S+)?\s*$`),
 	R("tacacs-key", "", `\s*tacacs-server (?:host \S+ (?:.*? )?)?key `+typ),
 	R("radius-key", "", `\s*radius-server (?:host \S+ .*?)?key `+typ),
@@ -86,7 +90,7 @@ var iosRules = []rule{
 	// Keyring IKEv1: la llave va tras «key», no tras address/hostname/ipv6.
 	R("psk", "", `\s*pre-shared-key (?:address|hostname|ipv6) .*? key `+typ),
 	R("psk", "", `\s*pre-shared-key (?:local |remote )?`+typ).unless(keyringLine),
-	R("ntp-key", "", `\s*ntp authentication-key \d+ (?:md5|hmac-sha\S*|cmac-aes-128) `),
+	R("ntp-key", "", `\s*ntp authentication-key \d+ (?:md5|hmac-sha\S*|cmac-aes-128) `).unless(iseHashPlain),
 	R("snmp-user-auth", "", `\s*snmp-server user .*? auth (?:md5|sha-2 \d+|sha\S*) `),
 	R("snmp-user-priv", "", `\s*snmp-server user .*? priv (?:(?:des|3des|aes(?:[- ]\d+)?) )?`),
 	// La comunidad va tras vrf/use-vrf, informs/traps y version; use-vrf sin valor no es la comunidad.
@@ -685,3 +689,12 @@ func init() {
 		iosRules = append(iosRules, R(r.kind, "", `\s*config `+r.body), R(r.kind, "aireconfig", `\s*`+r.body))
 	}
 }
+
+// ISE: usuarios, claves NTP y usuarios de repositorios con «hash|plain» antes del valor; el usuario, el rol y el índice no se tapan.
+var iseRules = []rule{
+	R("user-secret", "", `\s*username \S+ password (?:hash|plain) `),
+	R("ntp-key", "", `\s*ntp authentication-key \d+ md5 (?:hash|plain) `),
+	R("client-password", "", `\s*user \S+ password (?:hash|plain) `), // dentro de «repository NAME»
+}
+
+func init() { iosRules = append(iosRules, iseRules...) }
