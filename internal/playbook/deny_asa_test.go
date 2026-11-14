@@ -116,7 +116,7 @@ func TestWritesOnOtherFamily(t *testing.T) {
 		"show logging process ios to-file bootflash:x": true, "show x to-f flash:x": true, "show x t y": true,
 		"show tech-support file disk0:x": true, "show tech-support fil x": true, "show tech-support f x": true,
 		"show ip interface brief | section x": false, "show conn count": false, "show running-config | include file": false,
-		"show tech-support | include to-file": false, "show version": false, "": false,
+		"show tech-support | include to-file": false, "show file systems": false, "show file information x": false, "show file descriptors": false, "show fil systems": false, "show x file y": true, "show version": false, "": false,
 	} {
 		if got := WritesOnOtherFamily(cmd); got != want {
 			t.Errorf("%q: %v, se esperaba %v", cmd, got, want)

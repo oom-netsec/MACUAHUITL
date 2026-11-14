@@ -294,8 +294,8 @@ func WritesOnOtherFamily(cmd string) bool {
 	if len(f) == 0 {
 		return false
 	}
-	for _, a := range f[1:] {
-		if isToFile(a) || Abbrev(a, "file") {
+	for i, a := range f[1:] {
+		if isToFile(a) || i > 0 && Abbrev(a, "file") { // «show file systems»: «file» en primer lugar es el subcomando, no un destino
 			return true
 		}
 	}
