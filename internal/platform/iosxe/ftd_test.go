@@ -85,6 +85,7 @@ func TestFTDOpenSinEnable(t *testing.T) {
 
 // Primer login: cambio de contraseña obligatorio o EULA. Open aborta sin escribir NADA (ni el secreto ni un Enter).
 func TestFTDPrimerLoginNoEscribeNada(t *testing.T) {
+	fastSettle(t)
 	for _, first := range []string{
 		"You must change your password\r\nEnter new password: ",
 		"You must change your password\r\n(current) UNIX password: ",

@@ -11,6 +11,14 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 )
 
+// fastSettle baja las calmas del driver para que las pruebas no esperen tiempo real; las pausas de cada prueba se miden en múltiplos de ellas.
+func fastSettle(t *testing.T) {
+	t.Helper()
+	s, c := ftdSettle, ftdConfirmSettle
+	ftdSettle, ftdConfirmSettle = 80*time.Millisecond, 50*time.Millisecond
+	t.Cleanup(func() { ftdSettle, ftdConfirmSettle = s, c })
+}
+
 var prompts = map[string]string{"ios": "Router#", "asa": "asa# ", "nxos": "nx1# "}
 
 const abre = "terminal length 0|terminal width 0"
@@ -18,6 +26,7 @@ const abre = "terminal length 0|terminal width 0"
 // openBanner arma un equipo que imprime chunks con pausas (en ms) entre ellos y luego su prompt; devuelve el error de Open y lo escrito.
 func openBanner(t *testing.T, prompt string, cred bool, chunks ...any) (error, string) {
 	t.Helper()
+	fastSettle(t)
 	r, w, lg := scriptedDevLog(t, func(out func(string)) {
 		for _, c := range chunks {
 			switch v := c.(type) {
@@ -43,7 +52,7 @@ func TestBannerUserLentoSinNombreNoEscribe(t *testing.T) {
 		"\r\n*** Acceso ***\r\nUser:", "\r\n*** Acceso ***\r\nUser: ", "\r\nCisco Controller\r\nUser: ", "\r\n(sin cierre\r\nUser: ", "\r\n(Router) >\r\nUser: ",
 	} {
 		for name, p := range prompts {
-			err, got := openBanner(t, p, true, banner, 500*time.Millisecond, "\r\n"+p)
+			err, got := openBanner(t, p, true, banner, 2*ftdSettle, "\r\n"+p)
 			if err != nil || got != abre {
 				t.Fatalf("%s %q: Open = %v, escrito %q", name, banner, err, got)
 			}
@@ -53,7 +62,7 @@ func TestBannerUserLentoSinNombreNoEscribe(t *testing.T) {
 
 // Un IOS sin plataforma marcada con un banner que imita el login («(X)» y «User:») puede recibir el usuario, pero nunca la clave: sin «Password:» antes del primer prompt no sale.
 func TestBannerImitaLoginRecibeSoloElUsuario(t *testing.T) {
-	err, got := openBanner(t, "Router#", true, "\r\n(X)\r\nUser:", 500*time.Millisecond, "\r\nRouter#")
+	err, got := openBanner(t, "Router#", true, "\r\n(X)\r\nUser:", 2*ftdSettle, "\r\nRouter#")
 	if !errors.Is(err, platform.ErrLoginFailed) || got != "admin" {
 		t.Fatalf("Open = %v, escrito %q", err, got)
 	}
@@ -62,7 +71,7 @@ func TestBannerImitaLoginRecibeSoloElUsuario(t *testing.T) {
 func TestAireCueTabla(t *testing.T) {
 	for s, want := range map[string]bool{
 		"(Cisco Controller)\nUser: ": true, "(Cisco Controller) \nUser:": true, "x\n(WLC-1)\nUser:": true,
-		"x\nUser:": false, "(X) >\nUser:": false, "Router#\nUser:": false, "(X)\n\nUser:": false, "(X)User:": false, "": false,
+		"x\nUser:": false, "x(X)\nUser:": false, "(X) >\nUser:": false, "Router#\nUser:": false, "(X)\n\nUser:": false, "(X)User:": false, "": false,
 	} {
 		if aireCue.MatchString(s) != want {
 			t.Errorf("%q: %v", s, !want)
@@ -77,12 +86,13 @@ func TestAireCueTabla(t *testing.T) {
 
 // Tras el usuario, si no llega «Password:» (llega «User:», un prompt o texto) la clave no se escribe.
 func TestAireLoginSinPasswordNoEscribeLaClave(t *testing.T) {
+	fastSettle(t)
 	for name, reply := range map[string]string{"user otra vez": "User: ", "prompt": "\r\n(Cisco Controller) >", "texto": "hola\r\n"} {
 		r, w, lg := scriptedDevLog(t, func(out func(string)) { out("(Cisco Controller)\r\nUser: ") },
 			func(line string, out func(string)) { out(line + "\r\n" + reply) })
 		d := New().(*driver)
 		d.SetLogin("admin", secret.New([]byte("s3cret")))
-		ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 		err := d.Open(ctx, r, w, secret.New(nil))
 		cancel()
 		time.Sleep(20 * time.Millisecond)
@@ -97,6 +107,7 @@ func TestAireLoginSinPasswordNoEscribeLaClave(t *testing.T) {
 
 // Un salto de línea en el usuario o en la clave no se escribe nunca.
 func TestAireLoginRechazaSaltosEnLaCredencial(t *testing.T) {
+	fastSettle(t)
 	for _, c := range [][2]string{{"ad\nmin", "x"}, {"ad\rmin", "x"}, {"admin", "s3\ncret"}, {"admin", "s3\rcret"}} {
 		r, w, lg := scriptedDevLog(t, func(out func(string)) { out("(Cisco Controller)\r\nUser: ") }, func(string, func(string)) {})
 		d := New().(*driver)
@@ -111,6 +122,7 @@ func TestAireLoginRechazaSaltosEnLaCredencial(t *testing.T) {
 
 // El login de AireOS con nombre sin espacio ni «Cisco» también funciona.
 func TestAireLoginNombreDelControlador(t *testing.T) {
+	fastSettle(t)
 	r, w, lg := scriptedDevLog(t, func(out func(string)) { out("\r\n(WLC-1)\r\nUser: ") }, func(line string, out func(string)) {
 		switch line {
 		case "admin":
@@ -142,7 +154,7 @@ func TestMOTDCortadoNoEsPrimerLogin(t *testing.T) {
 		{"Note: unix password:\r", "\nx\r\n"},
 	} {
 		for name, p := range prompts {
-			err, got := openBanner(t, p, false, "\r\n"+c[0], 50*time.Millisecond, c[1], 50*time.Millisecond, "\r\n"+p)
+			err, got := openBanner(t, p, false, "\r\n"+c[0], ftdSettle/8, c[1], ftdSettle/8, "\r\n"+p)
 			if err != nil || got != abre {
 				t.Fatalf("%s %q: Open = %v, escrito %q", name, c, err, got)
 			}
@@ -153,7 +165,7 @@ func TestMOTDCortadoNoEsPrimerLogin(t *testing.T) {
 // BAJO-1: una línea de banner «(Cisco Controller) >» al final de un pedazo no hace pasar el equipo por AireOS si llega más.
 func TestBannerConPromptDeAireOSNoEsAireOS(t *testing.T) {
 	for name, p := range prompts {
-		err, got := openBanner(t, p, false, "\r\n(Cisco Controller) >", 50*time.Millisecond, "\r\n"+p)
+		err, got := openBanner(t, p, false, "\r\n(Cisco Controller) >", ftdSettle/8, "\r\n"+p)
 		if err != nil || got != abre {
 			t.Fatalf("%s: Open = %v, escrito %q", name, err, got)
 		}
@@ -197,10 +209,11 @@ func TestASAEnableNoFijadaBastaPorSiSola(t *testing.T) {
 
 // AireOS: la pregunta partida en dos pedazos con menos de 150 ms entre ellos, o seguida de más texto en la línea, no es pregunta.
 func TestAireOSPreguntaNoSiguePorVenir(t *testing.T) {
+	fastSettle(t)
 	for name, chunks := range map[string][]any{
-		"partida":   {"Reset (y/n)", 60 * time.Millisecond, " listo\r\n"},
-		"misma lín": {"Valor (y/n) mostrado aq", 250 * time.Millisecond, "uí\r\n"},
-		"sin signo": {"Are you sure\r\n", "Proceed", 300 * time.Millisecond, "\r\n"},
+		"partida":   {"Reset (y/n)", ftdConfirmSettle / 5, " listo\r\n"},
+		"misma lín": {"Valor (y/n) mostrado aq", 4 * ftdConfirmSettle, "uí\r\n"},
+		"sin signo": {"Are you sure\r\n", "Proceed", 4 * ftdConfirmSettle, "\r\n"},
 	} {
 		r, w := scriptedDev(t, func(out func(string)) { out(aireP) }, func(line string, out func(string)) {
 			out(line + "\r\n")
@@ -262,6 +275,73 @@ func TestAtPromptFTD(t *testing.T) {
 	for s, want := range map[string]bool{"x\n> ": true, "x\n>": true, "x\nfoo>": false, "x\nR#": false} {
 		if d.atPrompt(s) != want {
 			t.Errorf("%q: %v", s, !want)
+		}
+	}
+}
+
+func TestAnclasDeInicioDeLineaDeAireOS(t *testing.T) {
+	for s, want := range map[string]bool{"x(Cisco Controller) >": false, "\n(X) >": true, "(X) >": true} {
+		if airePrompt.MatchString(s) != want {
+			t.Errorf("airePrompt %q: %v", s, !want)
+		}
+	}
+	if aireConfig.MatchString("x(X) config>") || !aireConfig.MatchString("\n(X) config>") {
+		t.Error("aireConfig sin ancla de inicio de línea")
+	}
+}
+
+// En AireOS atPrompt acepta solo «(Nombre) >» del controlador, no cualquier línea que termine en «>».
+func TestAtPromptAireOS(t *testing.T) {
+	d := &driver{aire: true, hostname: "Cisco Controller"}
+	for s, want := range map[string]bool{
+		"x\n(Cisco Controller) >": true, "x\n(Cisco Controller)>": true, "x\n(Cisco Controller) > ": true,
+		"x\nfoo>": false, "x\n(Otro) >": false, "x\nCisco Controller >": false, "x\n> ": false, "x\nRouter#": false,
+	} {
+		if d.atPrompt(s) != want {
+			t.Errorf("%q: %v", s, !want)
+		}
+	}
+}
+
+// «(X)» + «User:» seguido enseguida (menos de la calma) del prompt de un IOS no recibe ni el usuario.
+func TestBannerImitaLoginConPromptRapido(t *testing.T) {
+	err, got := openBanner(t, "Router#", true, "\r\n(X)\r\nUser:", ftdSettle/8, "\r\nRouter#")
+	if err != nil || got != abre {
+		t.Fatalf("Open = %v, escrito %q", err, got)
+	}
+}
+
+// «(Nombre) config>» de un banner tampoco se toma de golpe por el prompt de configuración de AireOS.
+func TestBannerConPromptDeConfigDeAireOS(t *testing.T) {
+	err, got := openBanner(t, "Router#", false, "\r\n(Cisco Controller) config>", ftdSettle/8, "\r\nRouter#")
+	if err != nil || got != abre {
+		t.Fatalf("Open = %v, escrito %q", err, got)
+	}
+}
+
+// El Run de AireOS no espera la calma de moreComing (solo existe al abrir).
+func TestRunDeAireOSNoEsperaLaCalma(t *testing.T) {
+	_, d, err := openAire(t, aireP, aireReply, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ftdSettle = 3 * time.Second // fastSettle restaura el valor al terminar
+	t0 := time.Now()
+	if _, err := d.Run(context.Background(), "show x", 5*time.Second); err != nil || time.Since(t0) > time.Second {
+		t.Fatalf("Run = %v en %v", err, time.Since(t0))
+	}
+}
+
+// «User:» o «Password:» a mitad de un comando (Detect incluido) no es un rechazo de credencial.
+func TestUserOPasswordEnDetectNoEsRechazo(t *testing.T) {
+	for _, q := range []string{"User: ", "Password: "} {
+		_, d, err := openAire(t, aireP, func(l string) (string, string) { return "", q }, "admin", "s3cret")
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = d.Detect(context.Background())
+		if !errors.Is(err, platform.ErrUnexpectedPrompt) || errors.Is(err, platform.ErrLoginFailed) {
+			t.Fatalf("%q: Detect = %v", q, err)
 		}
 	}
 }

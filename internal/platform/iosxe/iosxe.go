@@ -410,8 +410,8 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 // fuera del login (no se escribe nada), el prompt de configuración o una pregunta de confirmación (y/N).
 func (d *driver) aireGuard(ctx context.Context, tail string) error {
 	switch {
-	case aireUser.MatchString(tail) || airePass.MatchString(tail):
-		return platform.ErrLoginFailed
+	case aireUser.MatchString(tail) || airePass.MatchString(tail): // no es un rechazo de credencial: no debe disparar el respaldo
+		return platform.ErrUnexpectedPrompt
 	case aireConfig.MatchString(tail):
 		return platform.ErrConfigPrompt
 	case aireConfirm.MatchString(tail):
@@ -485,7 +485,7 @@ func echoFirst(text, cmd string) bool {
 }
 
 // ftdConfirmSettle es la calma corta antes de dar por confirmado el par de prompts: un trozo puede terminar justo en «\n>\n> ».
-const ftdConfirmSettle = 150 * time.Millisecond
+var ftdConfirmSettle = 150 * time.Millisecond // var para que las pruebas la bajen, como ftdSettle
 
 // dataWithin espera hasta dur por datos; si llegan, los agrega y devuelve true.
 func (d *driver) dataWithin(ctx context.Context, dur time.Duration) bool {
@@ -524,7 +524,8 @@ func (d *driver) moreComing(ctx context.Context, tail string) bool {
 	// «User:», «(y/n)», «New password:», «(Cisco Controller) >» o un aviso de contraseña de un banner pueden ir seguidos del prompt de otra plataforma.
 	// Límite conocido: con una pausa mayor a ftdSettle antes del prompt (banner lento) «\r\n> » se toma por FTD y «(y/n)» o
 	// «password has expired» dan ErrFirstLogin; es heurística y falla cerrada (no se escribe nada).
-	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) && !iseFirstLogin.MatchString(tail) && !ftdFirstLogin.MatchString(tail) && (d.aire || !airePrompt.MatchString(tail)) {
+	aireOpen := !d.aire && (airePrompt.MatchString(tail) || aireConfig.MatchString(tail)) // solo al abrir: en el Run de AireOS no se espera
+	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) && !iseFirstLogin.MatchString(tail) && !ftdFirstLogin.MatchString(tail) && !aireOpen {
 		return false
 	}
 	select {

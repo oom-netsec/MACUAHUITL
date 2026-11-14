@@ -55,7 +55,7 @@ func step(err error) string {
 	case errors.Is(err, platform.ErrEnableFailed), errors.Is(err, platform.ErrFirstLogin):
 		return "privilege"
 	case errors.Is(err, platform.ErrPromptTimeout), errors.Is(err, platform.ErrClosed),
-		errors.Is(err, platform.ErrConfigPrompt), errors.Is(err, platform.ErrDesync), errors.Is(err, platform.ErrConfirmPrompt):
+		errors.Is(err, platform.ErrConfigPrompt), errors.Is(err, platform.ErrUnexpectedPrompt), errors.Is(err, platform.ErrDesync), errors.Is(err, platform.ErrConfirmPrompt):
 		return "prompt"
 	case errors.Is(err, platform.ErrUnknownPlatform):
 		return "platform"
