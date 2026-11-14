@@ -30,3 +30,20 @@ func TestWriteMarcaLaSalidaIncompleta(t *testing.T) {
 		t.Fatalf("cabeceras: %q", hs)
 	}
 }
+
+func TestSplitDeviceDir(t *testing.T) {
+	for in, want := range map[string][2]string{
+		"SW1_192.0.2.1":      {"SW1", "192.0.2.1"},
+		"SW1_192.0.2.1_2222": {"SW1", "192.0.2.1"},
+		"SW_A_192.0.2.1_22":  {"SW_A", "192.0.2.1"},
+		"SW1_2001_db8__1":    {"SW1_2001_db8_", "1"}, // IPv6: el nombre no es reversible, se corta en el último «_» como siempre
+		"solo":               {"solo", ""},
+	} {
+		if h, ip := SplitDeviceDir(in); h != want[0] || ip != want[1] {
+			t.Errorf("SplitDeviceDir(%q) = %q, %q; quería %q", in, h, ip, want)
+		}
+	}
+	if got := DeviceDirOf("SW1", Target{Address: "192.0.2.1", Port: 2222}); got != "SW1_192.0.2.1_2222" {
+		t.Errorf("DeviceDirOf = %q", got)
+	}
+}

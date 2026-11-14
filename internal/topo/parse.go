@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
+	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
 // Device es un equipo recolectado por Patrol: sus salidas por comando.
@@ -41,9 +42,7 @@ func LoadPatrolDir(dir string) ([]Device, error) {
 		files, _ := filepath.Glob(filepath.Join(dir, e.Name(), "*.txt"))
 		sort.Strings(files)
 		d := Device{Name: e.Name(), Outputs: map[string]string{}}
-		if i := strings.LastIndexByte(e.Name(), '_'); i > 0 {
-			d.Name, d.IP = e.Name()[:i], e.Name()[i+1:]
-		}
+		d.Name, d.IP = patrol.SplitDeviceDir(e.Name())
 		for _, f := range files {
 			b, err := os.ReadFile(f)
 			if err != nil {

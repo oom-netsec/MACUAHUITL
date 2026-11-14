@@ -147,9 +147,7 @@ func listDevices(dir string) ([]devDir, error) {
 		d, ok := known[e.Name()]
 		if !ok {
 			d = devDir{Dir: e.Name(), Host: e.Name()}
-			if i := strings.LastIndexByte(e.Name(), '_'); i > 0 {
-				d.Host, d.IP = e.Name()[:i], e.Name()[i+1:]
-			}
+			d.Host, d.IP = patrol.SplitDeviceDir(e.Name())
 		}
 		out = append(out, d)
 	}

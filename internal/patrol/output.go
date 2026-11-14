@@ -134,6 +134,21 @@ func DeviceDirOf(host string, t Target) string {
 	return DeviceDir(host, t.Address)
 }
 
+var dirWithPort = regexp.MustCompile(`^(.+)_(\d{1,3}(?:\.\d{1,3}){3})_\d{1,5}$`)
+
+// SplitDeviceDir saca equipo y dirección de la carpeta de un equipo (<equipo>_<dirección>, o con «_<puerto>»
+// al final cuando el puerto no es 22 y la dirección es IPv4); sin puerto corta en el último «_» como siempre.
+// La dirección sale sin el puerto.
+func SplitDeviceDir(name string) (host, ip string) {
+	if m := dirWithPort.FindStringSubmatch(name); m != nil {
+		return m[1], m[2]
+	}
+	if i := strings.LastIndexByte(name, '_'); i > 0 {
+		return name[:i], name[i+1:]
+	}
+	return name, ""
+}
+
 func sorted(m map[string]bool) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

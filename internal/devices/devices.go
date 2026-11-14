@@ -59,7 +59,7 @@ type Result struct {
 }
 
 var (
-	hostDirRe = regexp.MustCompile(`^.+_\d{1,3}(?:\.\d{1,3}){3}$`)
+	hostDirRe = regexp.MustCompile(`^.+_\d{1,3}(?:\.\d{1,3}){3}(?:_\d{1,5})?$`)
 	backupRe  = regexp.MustCompile(`^(\d{8}T\d{6}Z)-(?:running|startup)\.cfg$`)
 	nameRe    = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$`)
 )
@@ -214,8 +214,8 @@ func (c *collector) hostIP(n string, known map[string][2]string) (host, ip strin
 	if k, ok := known[n]; ok {
 		return k[0], k[1]
 	}
-	i := strings.LastIndexByte(n, '_')
-	return clean(n[:i]), n[i+1:]
+	host, ip = patrol.SplitDeviceDir(n)
+	return clean(host), ip
 }
 
 // newestFile es la hora de la evidencia más reciente de la carpeta de un equipo.

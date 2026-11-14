@@ -110,7 +110,25 @@ func TestReadDirSeparaPorPuerto(t *testing.T) {
 	if err != nil || len(devs) != 2 {
 		t.Fatalf("%v %+v", err, devs)
 	}
+	if devs[0].Address != "192.0.2.10" || devs[1].Address != "192.0.2.10:2222" {
+		t.Fatalf("direcciones: %q %q", devs[0].Address, devs[1].Address)
+	}
 	if devs[0].Outputs["show clock"] != "p0\n" || devs[1].Outputs["show clock"] != "p2222\n" {
 		t.Fatalf("salidas mezcladas: %q %q", devs[0].Outputs, devs[1].Outputs)
+	}
+}
+
+// Una captura vieja, con la carpeta sin puerto, se sigue leyendo aunque el destino use otro puerto.
+func TestReadDirLeeCarpetaViejaSinPuerto(t *testing.T) {
+	root := t.TempDir()
+	start := time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC)
+	w, _ := patrol.NewWriter(root, patrol.Spec{Name: "viejo"}, start)
+	w.Write(patrol.Device{Host: "SW1", IP: "192.0.2.10"}, 1, start, platform.Output{Command: "show clock", Text: "viejo", Started: start}, false)
+	m := patrol.Manifest{Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "192.0.2.10", Port: 2222}, Round: 1, Hostname: "SW1", State: "completed"}}}
+	b, _ := json.Marshal(m)
+	os.WriteFile(filepath.Join(w.Dir(), "manifest.json"), b, 0o600)
+	devs, err := ReadDir(w.Dir())
+	if err != nil || len(devs) != 1 || devs[0].Outputs["show clock"] != "viejo\n" {
+		t.Fatalf("%v %+v", err, devs)
 	}
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
+	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
 // Evidence es la salida de un comando tal como la guardó Patrol.
@@ -87,9 +88,7 @@ var headerRe = regexp.MustCompile(`^===== (?:ronda \d+ · )?(\S+) · (.*?)( · c
 // NewDev arma un equipo en memoria (pruebas).
 func NewDev(key string, ev map[string]Evidence) *Dev {
 	d := &Dev{Key: key, Name: key, ev: map[string]Evidence{}}
-	if i := strings.LastIndexByte(key, '_'); i > 0 {
-		d.Name, d.IP = key[:i], key[i+1:]
-	}
+	d.Name, d.IP = patrol.SplitDeviceDir(key)
 	for c, e := range ev {
 		d.ev[strings.ToLower(strings.TrimSpace(c))] = e
 	}

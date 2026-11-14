@@ -116,9 +116,16 @@ func ReadDir(dir string) ([]Device, error) {
 	var out []Device
 	for _, a := range order {
 		d := last[a]
-		dev := Device{Address: d.Target.Address, Hostname: d.Hostname, State: d.State, Detail: d.Detail, Outputs: map[string]string{}}
+		addr := d.Target.Address
+		if patrol.EffectivePort(d.Target.Port) != 22 {
+			addr = a // host:puerto, para que Compare no mezcle dos equipos con la misma dirección
+		}
+		dev := Device{Address: addr, Hostname: d.Hostname, State: d.State, Detail: d.Detail, Outputs: map[string]string{}}
 		if d.Hostname != "" {
 			files, _ := filepath.Glob(filepath.Join(dir, patrol.DeviceDirOf(d.Hostname, d.Target), "*.txt"))
+			if len(files) == 0 { // evidencia vieja: la carpeta no llevaba el puerto
+				files, _ = filepath.Glob(filepath.Join(dir, patrol.DeviceDir(d.Hostname, d.Target.Address), "*.txt"))
+			}
 			sort.Strings(files)
 			for _, f := range files {
 				b, err := readLimited(f)
