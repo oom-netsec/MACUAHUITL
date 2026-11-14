@@ -18,7 +18,7 @@ func TestSwapWarnings(t *testing.T) {
 	d := t.TempDir()
 	swaps := write(t, d, "swaps", "Filename\tType\tSize\tUsed\tPriority\n/dev/zram0 partition 8G 0 100\n/dev/mapper/vg-swap partition 8G 0 -2\n/dev/sda3 partition 8G 0 -3\n/swap.img file 2G 0 -4\n")
 	w := swapWarnings(swaps)
-	if len(w) != 2 || !strings.Contains(w[0], "/dev/sda3") || !strings.Contains(w[1], "/swap.img") {
+	if len(w) != 2 || !strings.Contains(w[0].In("en"), "/dev/sda3") || !strings.Contains(w[1].In("en"), "/swap.img") {
 		t.Fatalf("warnings = %v", w)
 	}
 	if w := swapWarnings(write(t, d, "none", "Filename\tType\tSize\tUsed\tPriority\n")); len(w) != 0 {
@@ -50,7 +50,18 @@ func TestHardenSetsNotDumpable(t *testing.T) {
 }
 
 func TestMlockSkippedWithFiniteLimit(t *testing.T) {
-	if w := mlockWarning(8 << 20); w == "" || !strings.Contains(w, "LimitMEMLOCK") {
-		t.Fatalf("finite limit should skip mlockall with a warning, got %q", w)
+	if w := mlockWarning(8 << 20); w.Empty() || !strings.Contains(w.In("en"), "LimitMEMLOCK") {
+		t.Fatalf("finite limit should skip mlockall with a warning, got %v", w)
+	}
+}
+
+// El aviso de MEMLOCK sale completo en cada idioma, sin mezclar.
+func TestMlockWarningIdiomas(t *testing.T) {
+	w := mlockWarning(8 << 20)
+	if got, want := w.In("en"), "RLIMIT_MEMLOCK is 8388608 bytes; not all memory is locked. Set LimitMEMLOCK=infinity in the systemd unit"; got != want {
+		t.Fatalf("en = %q", got)
+	}
+	if got, want := w.In("es"), "RLIMIT_MEMLOCK es de 8388608 bytes; no toda la memoria queda bloqueada. Pon LimitMEMLOCK=infinity en la unidad de systemd"; got != want {
+		t.Fatalf("es = %q", got)
 	}
 }

@@ -29,7 +29,7 @@ type VaultBackupPreviewDTO struct {
 
 type VaultBackupDecisionDTO struct {
 	ID     string `json:"id"`
-	Action string `json:"action"` // renombrar | reemplazar | omitir
+	Action string `json:"action"` // cable histórico: renombrar | reemplazar | omitir (el núcleo acepta también rename | replace | skip)
 }
 
 type VaultBackupResultDTO struct {

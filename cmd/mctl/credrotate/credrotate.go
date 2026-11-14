@@ -12,7 +12,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
 
-const help = `  cred rotate EQUIPO[:PUERTO] --user U --cred ID [--update-cred ID] [--generate] [--accept HUELLA]... [--asistido]
+const help = `  cred rotate EQUIPO[:PUERTO] --user U --cred ID [--update-cred ID] [--generate] [--accept HUELLA]... [--assisted]
         (rota el secreto de un usuario local de un equipo; --cred es la credencial con la que te conectas y debe ser de OTRO usuario;
          el secreto nuevo se lee de la terminal o de stdin, o con --generate lo crea el núcleo (exige --update-cred); si la sesión nueva
          entra, se pide write memory (obligatorio: sin él el equipo vuelve al hash anterior al reiniciar); solo si sale [OK],
@@ -28,11 +28,12 @@ func rotate(c *cli.Env, args []string) error {
 		fs.StringVar(&credID, "cred", "", "ID de la credencial con la que te conectas")
 		fs.StringVar(&update, "update-cred", "", "ID de la credencial de la bóveda que recibe el secreto nuevo")
 		fs.BoolVar(&gen, "generate", false, "que el núcleo genere el secreto")
-		fs.BoolVar(&assisted, "asistido", false, "aplicar el cambio con confirmación por paso")
+		fs.BoolVar(&assisted, "assisted", false, "aplicar el cambio con confirmación por paso")
+		fs.BoolVar(&assisted, "asistido", false, "alias de --assisted")
 		fs.Var(&accept, "accept", "huella SHA256 confirmada (repetible)")
 	})
 	if err != nil || fs.NArg() != 1 || user == "" || credID == "" {
-		return errors.New("uso: mctl cred rotate EQUIPO[:PUERTO] --user U --cred ID [--update-cred ID] [--generate] [--asistido]")
+		return errors.New("uso: mctl cred rotate EQUIPO[:PUERTO] --user U --cred ID [--update-cred ID] [--generate] [--assisted]")
 	}
 	if gen && update == "" {
 		return cli.Err("mctl.credrotate.generate")

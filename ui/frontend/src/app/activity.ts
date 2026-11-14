@@ -7,7 +7,8 @@ export const BusyContext = createContext<(busy: boolean) => void>(() => {});
 export function useBusy(busy: boolean) {
   const set = useContext(BusyContext);
   useEffect(() => {
-    set(busy);
+    if (!busy) return;
+    set(true);
     return () => set(false);
   }, [busy, set]);
 }

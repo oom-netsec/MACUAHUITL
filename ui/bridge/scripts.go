@@ -50,7 +50,7 @@ type ImportPreviewDTO struct {
 
 type ImportDecisionDTO struct {
 	ScriptID string `json:"scriptId"`
-	Action   string `json:"action"` // renombrar | reemplazar | omitir
+	Action   string `json:"action"` // cable histórico: renombrar | reemplazar | omitir (el núcleo acepta también rename | replace | skip)
 }
 
 type ImportResultDTO struct {

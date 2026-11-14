@@ -21,9 +21,9 @@ const (
 
 // Decisiones para un conflicto (omitir también vale para un nuevo).
 const (
-	Renombrar  = "renombrar"
-	Reemplazar = "reemplazar"
-	Omitir     = "omitir"
+	Renombrar  = "rename"
+	Reemplazar = "replace"
+	Omitir     = "skip"
 )
 
 // Item es un host del archivo con su estado; Con es el ID del guardado con el que choca o coincide.

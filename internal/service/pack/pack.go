@@ -47,7 +47,7 @@ type svc struct {
 func fail(ctx context.Context, err error) error {
 	c := codes.InvalidArgument
 	switch dom.Reason(err) {
-	case "unsigned", "collision", "version", "official_replace", "import.exists", "import.unsupported_fs", "install.changed", "import.changed":
+	case "unsigned", "would_displace", "collision", "version", "official_replace", "import.exists", "import.unsupported_fs", "install.changed", "import.changed":
 		c = codes.FailedPrecondition
 	case "not_found":
 		c = codes.NotFound
@@ -109,7 +109,7 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	// el fsync del extract. Si el guardado falla, el paquete ya está instalado: se audita con hidden_save_failed y la
 	// respuesta es de éxito (la respuesta no tiene campo de aviso; lo oculto queda como estaba antes).
 	hide := []string{}
-	res, err := s.store.InstallWith(data, r.GetAllowUnsigned(), func(p *dom.Pack, _ string) error {
+	res, err := s.store.InstallConfirmed(data, r.GetAllowUnsigned(), r.GetConfirmedDisplace(), func(p *dom.Pack, _ string) error {
 		items := p.Items()
 		for _, id := range r.GetHide() { // los IDs que el paquete no trae se ignoran
 			if items[id] {
@@ -132,6 +132,14 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		hide = nil // no quedó guardado: no se audita como oculto
 	}
 	s.d.Audit("pack.install", p.ID, detail)
+	for _, d := range res.DisplacedPacks { // misma limpieza que Remove: favoritos, ocultos y pack_missing del apartado
+		var favs int
+		var cerr error
+		if lerr := s.store.Locked(func() error { favs, cerr = s.cleanup(d); return nil }); lerr != nil {
+			cerr = lerr
+		}
+		s.d.Audit("pack.conflict", d.ID, fmt.Sprintf("id=%s displaced_by=%s reason=collision removed=%t favorites_removed=%d cleanup_failed=%t", d.ID, p.ID, slices.Contains(res.DisplacedRemoved, d.ID), favs, cerr != nil))
+	}
 	if len(hide) > 0 {
 		s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=0 at=install", p.ID, len(hide)))
 	}
@@ -139,7 +147,7 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	if err != nil {
 		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("pack.err.hidden_read", err, nil))
 	}
-	return &v1.PackServiceInstallResponse{Pack: info, ReplacedVersion: res.Replaced}, nil
+	return &v1.PackServiceInstallResponse{Pack: info, ReplacedVersion: res.Replaced, Displaced: res.Displaced}, nil
 }
 
 // Inspect es la vista previa de Install: lee y valida igual, pero no instala ni audita.
@@ -164,7 +172,7 @@ func (s *svc) Inspect(ctx context.Context, r *v1.PackServiceInspectRequest) (*v1
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	out := &v1.PackServiceInspectResponse{Pack: info, ScriptIds: res.Pack.ScriptIDs(), ReplacedVersion: res.Replaced, Sha256: dom.SHA256(data)}
+	out := &v1.PackServiceInspectResponse{Pack: info, ScriptIds: res.Pack.ScriptIDs(), ReplacedVersion: res.Replaced, Sha256: dom.SHA256(data), Displaced: res.Displaced}
 	for _, pb := range res.Pack.Playbooks {
 		out.PlaybookIds = append(out.PlaybookIds, pb.ID)
 	}
@@ -236,8 +244,8 @@ func (s *svc) Remove(ctx context.Context, r *v1.PackServiceRemoveRequest) (*v1.P
 	}); lerr != nil {
 		return nil, fail(ctx, lerr)
 	}
-	s.d.Audit("pack.remove", p.ID, fmt.Sprintf("id=%s version=%s origin=%s playbooks=%d scripts=%d favorites_removed=%d",
-		p.ID, p.Version, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()), favs))
+	s.d.Audit("pack.remove", p.ID, fmt.Sprintf("id=%s version=%s origin=%s playbooks=%d scripts=%d favorites_removed=%d%s",
+		p.ID, p.Version, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()), favs, notLoaded(p)))
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -326,4 +334,12 @@ func installDetail(p *dom.Pack, sum string, res *dom.Result) string {
 		detail += fmt.Sprintf(" fsync_warning=%q", res.SyncWarning.Error())
 	}
 	return detail
+}
+
+// notLoaded marca en la auditoría el borrado de una carpeta que no estaba cargada (rechazada al arrancar o apartada).
+func notLoaded(p *dom.Pack) string {
+	if p.Version == "" {
+		return " not_loaded=true"
+	}
+	return ""
 }

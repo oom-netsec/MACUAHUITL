@@ -141,7 +141,7 @@ message PreviewImportResponse {
 
 message ImportDecision {
   string script_id = 1;                // ID del script en el archivo
-  string action = 2;                   // renombrar | reemplazar | omitir
+  string action = 2;                   // cable histórico: renombrar | reemplazar | omitir; el núcleo acepta también rename | replace | skip
 }
 message ApplyImportRequest {
   string token = 1;

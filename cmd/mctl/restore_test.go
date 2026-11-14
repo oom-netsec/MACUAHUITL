@@ -94,7 +94,7 @@ func TestRestoreDiffRefusesMaskedBackupAndListsRefusals(t *testing.T) {
 	if err == nil || !strings.Contains(out, "PLAN RECHAZADO") || !strings.Contains(out, "vtp mode client") || !strings.Contains(out, "hazlo a mano") {
 		t.Fatalf("err=%v\n%s", err, out)
 	}
-	out, err = mctl(t, "", e.args("--parcial")...)
+	out, err = mctl(t, "", e.args("--partial")...)
 	if err != nil || !strings.Contains(out, "No se restaura (plan parcial") || strings.Contains(strings.SplitN(out, "No se restaura", 2)[0], "vtp") {
 		t.Fatalf("parcial: err=%v\n%s", err, out)
 	}

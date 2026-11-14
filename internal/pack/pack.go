@@ -28,7 +28,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
 )
 
-// Installable son las plataformas con driver de Patrol (cat9k y sda son contenido sobre el driver de ios-xe); todas usan el CheckDenied de ios-xe salvo nx-os, que trae el suyo (ADR 0010). El gemelo ios/ios-xe no aplica a wlc-9800 ni a nx-os (que además tiene su propio CheckDenied).
+// Installable son las plataformas con driver de Patrol (cat9k, sda y ACI son contenido sobre el driver de ios-xe); usan el CheckDenied de ios-xe salvo nx-os, asa, ftd, wlc-aireos e ise, que traen el suyo (ADR 0010). El gemelo ios/ios-xe no aplica a wlc-9800 ni a nx-os.
 var Installable = []string{"ios", "ios-xe", "wlc-9800", "nx-os", "asa", "ftd", "wlc-aireos", "ise", "cat9k", "sda"}
 
 var (

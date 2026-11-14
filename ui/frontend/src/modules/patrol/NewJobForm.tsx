@@ -10,6 +10,9 @@ import type { PlaybookInfo } from "./api";
 import { PlaybookPicker } from "./PlaybookPicker";
 import { useScriptsVersion } from "../scripts/signal";
 
+// Un tipo de dato nuevo del núcleo que el front aún no traduce: se muestra el nombre del dato, sin ayuda.
+const known = (k: string) => ["mac", "ap", "wlan", "interface", "ip", "vrf", "vnid"].includes(k);
+
 // Acepta IPs, nombres y CIDR separados por comas, espacios o saltos de línea; sin duplicados.
 export function parseTargets(text: string): string[] {
   return [...new Set(text.split(/[\s,;]+/).filter(Boolean))];
@@ -104,7 +107,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
         <p className="hint">{t("patrol.pb.hint")}</p>
         {pbErr ? <Notice kind="warn">{t("patrol.pb.unavailable")} <button type="button" className="sm" onClick={() => setPbTry((n) => n + 1)}>{t("common.retry")}</button></Notice> : catalog && <PlaybookPicker playbooks={catalog} selected={pbs} onChange={setPbs} />}
         {asked.map(([n, k]) => (
-          <Field key={n} label={`${t(`patrol.param.kind.${k}` as Key)} (${n})`} hint={t(`patrol.param.${k}` as Key)} value={vals[n] ?? ""} error={paramErr[n]} onChange={(v) => setVals({ ...vals, [n]: v })} w="md" mono />
+          <Field key={n} label={known(k) ? `${t(`patrol.param.kind.${k}` as Key)} (${n})` : n} hint={known(k) ? t(`patrol.param.${k}` as Key) : undefined} value={vals[n] ?? ""} error={paramErr[n]} onChange={(v) => setVals({ ...vals, [n]: v })} w="md" mono />
         ))}
         <TextArea label={t("patrol.commands")} hint={t("patrol.commands.hint")} value={cmds} onChange={setCmds} rows={4} mono />
         <PathField label={t("patrol.outDir")} value={out} onChange={setOut} pick={() => core.pickPath({ title: t("patrol.outDir"), directory: true })} />

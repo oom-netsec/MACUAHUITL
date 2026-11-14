@@ -116,7 +116,7 @@ message PreviewBackupImportResponse {
 
 message VaultBackupDecision {
   string id = 1;                       // ID del item en la vista previa
-  string action = 2;                   // renombrar | reemplazar | omitir (obligatoria en conflicto_etiqueta)
+  string action = 2;                   // cable histórico: renombrar | reemplazar | omitir (obligatoria en conflicto_etiqueta); el núcleo acepta también rename | replace | skip
 }
 message ApplyBackupImportRequest {
   string token = 1;

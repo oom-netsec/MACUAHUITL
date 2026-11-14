@@ -92,6 +92,13 @@ describe("Datos", () => {
     expect(within(card(name)).getByRole("button", { name: /^Ver detalles/ })).toHaveFocus();
   });
 
+  test("si escribir la plantilla falla, se borra el archivo vacío que dejó el diálogo", async () => {
+    const core = fakeCore({ importTemplate: vi.fn(async () => TPL), writeFile: vi.fn(async () => { throw new Error("disco lleno"); }) });
+    view(core);
+    await userEvent.click(within(card("Scripts")).getByRole("button", { name: "Descargar plantilla de ejemplo" }));
+    await waitFor(() => expect(core.removeEmptyFile).toHaveBeenCalledWith("/home/u/Descargas/plantilla-scripts.json"));
+  });
+
   test("descargar la plantilla pide dónde guardar y escribe el contenido que da el núcleo", async () => {
     const core = fakeCore({ importTemplate: vi.fn(async () => TPL) });
     view(core);

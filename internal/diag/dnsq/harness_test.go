@@ -62,6 +62,11 @@ func (z *zone) sign(t *testing.T, inception, expiration time.Time) *zone {
 	for _, flags := range []uint16{257, 256} {
 		k := &dns.DNSKEY{Hdr: dns.RR_Header{Name: z.origin, Rrtype: dns.TypeDNSKEY, Class: dns.ClassINET, Ttl: 3600}, Flags: flags, Protocol: 3, Algorithm: dns.ECDSAP256SHA256}
 		priv, err := k.Generate(256)
+		// dns.RRSIG.Sign rechaza KeyTag 0 («bad key») y una llave al azar lo tiene 1 de cada 65536 veces; tampoco se repite el
+		// tag de la otra llave de la zona: se genera otra. Sin esto la prueba fallaba de vez en cuando.
+		for err == nil && (k.KeyTag() == 0 || len(z.keys) > 0 && z.keys[len(z.keys)-1].KeyTag() == k.KeyTag()) {
+			priv, err = k.Generate(256)
+		}
 		if err != nil {
 			t.Fatal(err)
 		}

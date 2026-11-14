@@ -60,3 +60,22 @@ test("un playbook sin id no llega al selector", async () => {
   const { patrolWails } = await import("./api");
   expect(await patrolWails((async () => '{"playbooks":[{"name":"roto"},{"id":"ios-xe/x","name":"X"}]}') as never).listPlaybooks()).toHaveLength(1);
 });
+
+test("cada fila muestra su paquete de origen y la búsqueda lo encuentra", async () => {
+  const pbs = [
+    { id: "a/uno", platform: "ios-xe", name: "L2 · Uno", commands: ["show a"], params: [], pack: "oom/cat9k" },
+    { id: "a/dos", platform: "ios-xe", name: "L2 · Dos", commands: ["show b"], params: [], pack: "usuario" },
+    { id: "a/tres", platform: "ios-xe", name: "L2 · Tres", commands: ["show c"], params: [], pack: "" },
+  ];
+  render(<PlaybookPicker playbooks={pbs} selected={[]} onChange={() => {}} />);
+  expect(screen.getByText("oom/cat9k")).toBeInTheDocument();
+  expect(screen.getByText("Propio")).toBeInTheDocument();
+  expect(screen.getByText("Base")).toBeInTheDocument();
+  await userEvent.type(screen.getByRole("searchbox", { name: "Buscar playbook" }), "cat9k");
+  expect(screen.queryByRole("checkbox", { name: /Dos/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("checkbox", { name: /Uno/ })).toBeInTheDocument();
+  await userEvent.clear(screen.getByRole("searchbox", { name: "Buscar playbook" }));
+  await userEvent.type(screen.getByRole("searchbox", { name: "Buscar playbook" }), "propio"); // busca lo que la etiqueta muestra
+  expect(screen.getByRole("checkbox", { name: /Dos/ })).toBeInTheDocument();
+  expect(screen.queryByRole("checkbox", { name: /Uno/ })).not.toBeInTheDocument();
+});

@@ -2678,6 +2678,18 @@ export const es = {
   "diag.port.invalid": "Un entero de 1024 a 65535.",
   "diag.bind.error": "No se pudieron leer las interfaces de esta máquina; reintenta cambiando de modo.",
   "diag.bind.gone": "La IP {ip} ya no es de esta máquina (cambió la red): elige otra y vuelve a ejecutar.",
+  "paste.controls": "Contiene caracteres de control o invisibles: {codes}",
+  "shell.moduleError": "El módulo falló al mostrarse",
+  "patrol.pb.own": "Propio",
+  "patrol.pb.base": "Base",
+  "patrol.param.kind.vrf": "VRF",
+  "patrol.param.vrf": "Tenant y VRF con la forma tenant:vrf, por ejemplo common:default.",
+  "patrol.param.kind.vnid": "VNID",
+  "patrol.param.vnid": "Entero de 1 a 16777215, por ejemplo 2850817.",
+  "packs.displace": "Al instalar este paquete oficial se quitan y se borran del disco estos paquetes de terceros que chocan con él: {ids}.",
+  "packs.displace.ok": "Entiendo: quitar {ids}",
+  "packs.displace.changed": "Otro paquete de terceros también chocaría con este oficial: vuelve a abrir el archivo para revisar la vista previa.",
+  "packs.displaced": "Se quitaron los paquetes de terceros que chocaban con el oficial: {ids}.",
 };
 
 export type Key = keyof typeof es;

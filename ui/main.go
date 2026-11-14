@@ -12,10 +12,13 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"sync/atomic"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"github.com/oom-netsec/MACUAHUITL/ui/bridge"
@@ -35,7 +38,7 @@ const coreLocalize = true
 func main() {
 	// La contraseña maestra y las credenciales pasan por el puente: sin volcados de memoria si la UI se cae.
 	for _, w := range sys.NoDump() {
-		log.Println("macuahuitl:", w)
+		log.Println("macuahuitl:", w.In(i18n.En))
 	}
 	dist, err := fs.Sub(assets, "frontend/dist")
 	if err != nil {
@@ -67,6 +70,41 @@ func main() {
 			target = d.ElementID
 		}
 		app.Event.Emit("ui:files-dropped", map[string]any{"target": target, "paths": e.Context().DroppedFiles()})
+	})
+	// Cerrar (✕ propio, Alt+F4, la barra de tareas) con sesiones o tareas en curso pregunta antes: se cortarían sin aviso
+	// y un cambio asistido quedaría esperando en el núcleo. El hook no debe bloquear el despachador de eventos: Busy (toma
+	// el candado del puente), el idioma y el diálogo van en otra goroutine. quitting se enciende justo antes del cierre
+	// real: un segundo ✕ durante la espera no se salta la escritura final.
+	var quitting, asking atomic.Bool
+	win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		if quitting.Load() {
+			return
+		}
+		e.Cancel()
+		// shortcut: si GTK devolviera una respuesta que no mapea a ningún botón, asking quedaría encendido y el ✕ ya no
+		// preguntaría (ni cerraría); Esc y la ✕ del diálogo sí mapean a Cancelar. Revisar si se cambia de versión de Wails.
+		if !asking.CompareAndSwap(false, true) {
+			return // ya hay un aviso abierto
+		}
+		go func() {
+			if !bridge.Busy(b) {
+				quitting.Store(true)
+				win.Close()
+				return
+			}
+			t := bridge.CloseTextFor(b)
+			d := app.Dialog.Question().SetTitle(t.Title).SetMessage(t.Message).AttachToWindow(win)
+			d.AddButton(t.Quit).OnClick(func() { // Wails ya corre OnClick en su propia goroutine
+				app.Event.Emit("ui:closing", nil) // la terminal hace su última escritura del registro
+				time.Sleep(700 * time.Millisecond)
+				quitting.Store(true)
+				win.Close()
+			})
+			stay := d.AddButton(t.Stay).OnClick(func() { asking.Store(false) })
+			d.SetDefaultButton(stay)
+			d.SetCancelButton(stay)
+			d.Show()
+		}()
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

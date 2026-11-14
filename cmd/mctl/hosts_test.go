@@ -168,7 +168,7 @@ func TestHostsExportImportDePuntaAPunta(t *testing.T) {
 	if out := must(t, "", "hosts", "import", path, "--preview"); !strings.Contains(out, "conflicto") || strings.Contains(out, "importados") {
 		t.Fatalf("--preview:\n%s", out)
 	}
-	must(t, "", "hosts", "import", path, "--decision", "10.0.0.1:22=reemplazar")
+	must(t, "", "hosts", "import", path, "--decision", "10.0.0.1:22=replace")
 	if out := must(t, "", "hosts", "list", "--json"); strings.Contains(out, "cambió") {
 		t.Fatalf("reemplazar no restauró:\n%s", out)
 	}
@@ -179,7 +179,7 @@ func TestHostsExportImportDePuntaAPunta(t *testing.T) {
 	// un conflicto de nombre se puede renombrar
 	must(t, "", "hosts", "rm", hostIDOf(t, "Dos"))
 	addHost(t, "Dos", "10.0.0.99")
-	if out := must(t, "", "hosts", "import", path, "--decision", "10.0.0.2:22=renombrar", "--all=omitir"); !strings.Contains(out, "1 renombrados") {
+	if out := must(t, "", "hosts", "import", path, "--decision", "10.0.0.2:22=renombrar", "--all=skip"); !strings.Contains(out, "1 renombrados") {
 		t.Fatalf("renombrar:\n%s", out)
 	}
 	if out := must(t, "", "hosts", "list"); !strings.Contains(out, "Dos (importado)") {

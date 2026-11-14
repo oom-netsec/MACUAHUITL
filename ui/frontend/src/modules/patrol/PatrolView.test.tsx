@@ -482,3 +482,32 @@ test("una respuesta vieja de listJobs no pisa a una más nueva", async () => {
   expect(screen.queryByRole("button", { name: /trabajo-viejo/ })).toBeNull();
   expect(screen.getByRole("button", { name: /trabajo-nuevo/ })).toBeInTheDocument();
 });
+
+test("la misma fase de ListJobs (sin fracción) y en vivo (con nanosegundos) se muestra una sola vez", async () => {
+  const core = fakeCore({
+    listJobs: vi.fn(async () => [{ id: "j9", name: "nocturno", state: "armed", phases: [{ at: "2026-11-14T10:00:00Z", kind: "JOB_PHASE_KIND_ROUND_STARTED", round: 2 }] }]),
+  });
+  render(<PatrolView core={core} />);
+  const phases = await screen.findByRole("list", { name: "Fases" });
+  expect(within(phases).getAllByText("Ronda 2 iniciada")).toHaveLength(1);
+  act(() => core.emitEvent({ jobId: "j9", phaseAdded: { at: "2026-11-14T10:00:00.123456789Z", kind: "JOB_PHASE_KIND_ROUND_STARTED", round: 2 } }));
+  await waitFor(() => expect(core.listJobs).toHaveBeenCalledTimes(2));
+  expect(within(phases).getAllByText("Ronda 2 iniciada")).toHaveLength(1);
+});
+
+test("con la ronda 1 sin equipos terminados la grilla se arma con los eventos: cada equipo entra con el suyo", async () => {
+  const core = fakeCore({
+    listJobs: vi.fn(async () => [{ id: "j9", name: "nocturno", state: "armed", round: 1 }]),
+    getRun: vi.fn(async () => []), // el núcleo solo lista los equipos que ya terminaron la ronda
+  });
+  render(<PatrolView core={core} />);
+  await screen.findByRole("heading", { name: "nocturno" });
+  await screen.findByText("Estado por equipo"); // la grilla vacía ya está montada y escucha los eventos
+  act(() => {
+    core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.5:22", state: "DEVICE_STATE_RUNNING" } });
+    core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.6:22", state: "DEVICE_STATE_CONNECTING" } });
+  });
+  expect(await screen.findByRole("row", { name: /10\.0\.0\.5:22/ })).toBeInTheDocument();
+  expect(screen.getByRole("row", { name: /10\.0\.0\.6:22/ })).toBeInTheDocument();
+  expect(core.getRun).toHaveBeenCalledTimes(1); // los eventos no vuelven a pedir la ronda
+});

@@ -213,3 +213,9 @@ test("en inglés, un error con reason del núcleo se muestra tal cual (ya viene 
   await userEvent.click(await screen.findByRole("button", { name: /Export/ }));
   expect(await screen.findByText("the export is empty")).toBeVisible();
 });
+
+test("si escribir la plantilla de hosts falla, se borra el archivo vacío que dejó el diálogo", async () => {
+  const core = setup({ writeFile: vi.fn(async () => { throw new Error("disco lleno"); }), removeEmptyFile: vi.fn(async () => {}) });
+  await userEvent.click(screen.getByRole("button", { name: "Descargar plantilla CSV" }));
+  await waitFor(() => expect(core.removeEmptyFile).toHaveBeenCalledWith("/home/u/Descargas/hosts-plantilla.csv"));
+});

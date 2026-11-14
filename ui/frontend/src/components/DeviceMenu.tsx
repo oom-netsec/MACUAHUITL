@@ -60,7 +60,7 @@ export function DeviceMenu({ name, address, children }: { name: string; address:
       {open && createPortal(
         <div ref={pop} className="popover menu fixed" style={pos} role="menu" id={menu} aria-label={label}>
           {ACTIONS.map(([id, k]) => <button key={id} role="menuitem" className="quiet" onClick={() => { close(false); go(id, address); }}>{t(k)}</button>)}
-          <button role="menuitem" className="quiet" onClick={() => { close(); void core?.copyText(address); }}>{t("device.copyIp")}</button>
+          <button role="menuitem" className="quiet" onClick={() => { close(); void core?.copyText(address).catch(() => {}); }}>{t("device.copyIp")}</button>
         </div>, document.body)}
     </span>
   );

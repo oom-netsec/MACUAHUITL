@@ -32,11 +32,13 @@ message PackServiceInstallRequest {
   repeated string hide = 3;   // IDs de playbook o script del paquete que quedan ocultos al instalar; los que no existan se ignoran (fase 32b)
   bool replace_hidden = 4;    // con true, hide es el conjunto exacto de ocultos tras instalar; sin él se conserva lo oculto y hide suma
   string sha256 = 5;          // obligatorio: el del archivo que vio la vista previa (Inspect); si falta o no coincide, no se instala (pack.err.install.sha256_missing / pack.err.install.changed)
+  repeated string confirmed_displace = 6; // IDs de terceros que el usuario aceptó que un oficial aparte y borre (los de Inspect.displaced); si aparta alguno que no está aquí, falla con pack.err.would_displace y no toca nada
 }
 
 message PackServiceInstallResponse {
   PackInfo pack = 1;
   string replaced_version = 2;   // versión anterior que reemplazó; vacío si era nuevo
+  repeated string displaced = 3; // paquetes de terceros que chocaban con este oficial y se apartaron y borraron
 }
 
 message PackServiceListRequest {}
@@ -103,6 +105,7 @@ message PackServiceInspectResponse {
   repeated string script_ids = 3;  // los derivados de playbooks más los de scripts.json
   string replaced_version = 4;     // versión instalada que reemplazaría; vacío si es nuevo
   string sha256 = 5;               // del archivo; pásalo en Install para atar la vista previa a lo que se instala
+  repeated string displaced = 6;   // paquetes de terceros que este oficial apartaría y borraría al instalarse (choque de nombre)
 }
 
 message PackServiceExportRequest {
@@ -130,7 +133,7 @@ message PackServiceExportResponse {
 
 message PackImportDecision {
   string item_id = 1;               // ID del script o del playbook tal como viene en el archivo
-  string action = 2;                // renombrar | omitir (nunca reemplazar)
+  string action = 2;                // cable histórico: renombrar | omitir (nunca reemplazar); el núcleo acepta también rename | skip
 }
 
 message PackServiceImportRequest {

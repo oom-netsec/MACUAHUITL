@@ -324,13 +324,13 @@ func TestRespaldoEstadosYDecisiones(t *testing.T) {
 	}
 	// Omitir.
 	pr, _ = o.preview(t, path)
-	ap, err = apply(pr.Token, &v1.VaultBackupDecision{Id: itemID(t, pr, "core"), Action: "omitir"})
+	ap, err = apply(pr.Token, &v1.VaultBackupDecision{Id: itemID(t, pr, "core"), Action: "skip"})
 	if err != nil || ap.Skipped != 1 || ap.Created != 0 || len(o.labels(t)) != 5 {
 		t.Fatalf("omitir: %+v %v", ap, err)
 	}
 	// Reemplazar.
 	pr, _ = o.preview(t, path)
-	ap, err = apply(pr.Token, &v1.VaultBackupDecision{Id: itemID(t, pr, "core"), Action: "reemplazar"})
+	ap, err = apply(pr.Token, &v1.VaultBackupDecision{Id: itemID(t, pr, "core"), Action: "replace"})
 	if err != nil || ap.Replaced != 1 || ap.Created != 0 {
 		t.Fatalf("reemplazar: %+v %v", ap, err)
 	}
@@ -613,7 +613,7 @@ func TestRespaldoDosReemplazosAlMismoDestino(t *testing.T) {
 	if got := o.labels(t); got["dup"] != "LOCAL" || len(got) != 1 {
 		t.Fatalf("escribió algo: %v", got)
 	}
-	ap, err := o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token, Decisions: []*v1.VaultBackupDecision{{Id: dups[0], Action: "reemplazar"}, {Id: dups[1], Action: "renombrar"}}})
+	ap, err := o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token, Decisions: []*v1.VaultBackupDecision{{Id: dups[0], Action: "replace"}, {Id: dups[1], Action: "rename"}}})
 	if err != nil || ap.Replaced != 1 || ap.Renamed != 1 {
 		t.Fatalf("corregida: %+v %v", ap, err)
 	}

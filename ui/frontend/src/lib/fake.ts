@@ -35,6 +35,7 @@ export function fakeCore(over: Partial<CoreAPI> = {}) {
   const status = new Set<(s: CoreStatus) => void>();
   const prefs = new Map<string, string>();
   const drops = new Set<(e: { target: string; paths: string[] }) => void>();
+  const closing = new Set<() => void>();
   const core = {
     coreStatus: vi.fn(async () => "connected" as CoreStatus),
     onStatus: (cb: (s: CoreStatus) => void) => (status.add(cb), () => status.delete(cb)),
@@ -50,6 +51,8 @@ export function fakeCore(over: Partial<CoreAPI> = {}) {
     confirmPaste: vi.fn(async () => true),
     onFilesDropped: (cb: (e: { target: string; paths: string[] }) => void) => (drops.add(cb), () => { drops.delete(cb); }),
     emitFilesDropped: (e: { target: string; paths: string[] }) => drops.forEach((cb) => cb(e)),
+    onClosing: (cb: () => void) => (closing.add(cb), () => { closing.delete(cb); }),
+    emitClosing: () => closing.forEach((cb) => cb()),
     ...fakeVault(),
     ...fakeAudit(),
     ...fakePatrol(),

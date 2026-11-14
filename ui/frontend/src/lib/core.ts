@@ -32,6 +32,7 @@ import { inventoryWails, type InventoryAPI } from "../modules/inventory/api";
 import { scriptsWails, type ScriptsAPI } from "../modules/scripts/api";
 import { settingsWails, type SettingsAPI } from "../modules/settings/api";
 import { packsWails, type PacksAPI } from "../modules/packs/api";
+import { pastePreview, safeFileName } from "./safeText";
 
 export type CoreStatus = "connected" | "disconnected";
 
@@ -75,6 +76,8 @@ export interface BaseAPI {
   saveFile(name: string, data: string, encoding: "utf8" | "base64"): Promise<string>;
   // Archivos soltados en la ventana sobre una zona [data-file-drop-target] (ui/main.go): rutas y el id de la zona.
   onFilesDropped(cb: (e: { target: string; paths: string[] }) => void): () => void;
+  // La ventana se va a cerrar (la persona lo confirmó en ui/main.go): última oportunidad de escribir lo pendiente.
+  onClosing(cb: () => void): () => void;
   // Diálogo nativo de guardar solo para elegir la ruta (un registro que se reescribe): confirma la sobrescritura
   // y deja el archivo creado, vacío. Devuelve la ruta o "" si se cancela o falla.
   pickSavePath(name: string): Promise<string>;
@@ -146,7 +149,7 @@ export const wailsCore: CoreAPI = {
   // el puente se niega y aquí se pregunta. Cancelar devuelve ""; un fallo se muestra y también devuelve "".
   saveFile: async (name, data, encoding) => {
     try {
-      const path = await Dialogs.SaveFile({ Filename: name, CanCreateDirectories: true });
+      const path = await Dialogs.SaveFile({ Filename: safeFileName(name), CanCreateDirectories: true });
       if (!path) return "";
       try {
         await call("WriteFile", path, data, encoding, false);
@@ -162,10 +165,11 @@ export const wailsCore: CoreAPI = {
     }
   },
   onFilesDropped: (cb) => Events.On("ui:files-dropped", (e) => cb(e.data as { target: string; paths: string[] })),
+  onClosing: (cb) => Events.On("ui:closing", () => cb()),
   // Igual que saveFile, pero solo la ruta: se crea vacío para fallar ya si no se puede escribir y para confirmar el reemplazo.
   pickSavePath: async (name) => {
     try {
-      const path = await Dialogs.SaveFile({ Filename: name, CanCreateDirectories: true });
+      const path = await Dialogs.SaveFile({ Filename: safeFileName(name), CanCreateDirectories: true });
       if (!path) return "";
       try {
         await call("WriteFile", path, "", "utf8", false);
@@ -182,10 +186,10 @@ export const wailsCore: CoreAPI = {
   writeFile: (path, data, encoding, overwrite) => call("WriteFile", path, data, encoding, overwrite),
   pasteText: () => Clipboard.Text(),
   confirmPaste: async (text, host, script) => {
-    const lines = text.replace(/[\r\n]+$/, "").split(/\r\n|\r|\n/);
-    const preview = lines.slice(0, 5).map((l) => (l.length > 80 ? `${l.slice(0, 80)}…` : l)).join("\n") + (lines.length > 5 ? "\n…" : "");
+    const { n, preview: shown, controls } = pastePreview(text);
+    const preview = controls ? `${tr("paste.controls", { codes: controls })}\n\n${shown}` : shown;
     const yes = tr("paste.yes");
-    return (await Dialogs.Question({ Title: tr("paste.title"), Message: script ? tr("paste.script", { name: script, n: lines.length, run: lines.length - 1, host, preview }) : tr("paste.msg", { n: lines.length, host, preview }), Buttons: [{ Label: yes }, { Label: tr("paste.no"), IsCancel: true, IsDefault: true }] })) === yes;
+    return (await Dialogs.Question({ Title: tr("paste.title"), Message: script ? tr("paste.script", { name: script, n, run: n - 1, host, preview }) : tr("paste.msg", { n, host, preview }), Buttons: [{ Label: yes }, { Label: tr("paste.no"), IsCancel: true, IsDefault: true }] })) === yes;
   },
   ...vaultWails(call),
   ...auditWails(call),

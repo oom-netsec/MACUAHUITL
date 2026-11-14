@@ -124,7 +124,7 @@ func TestPackPersonalIdaYVuelta(t *testing.T) {
 	if r, _ := reasonOf(err); r != "pack.err.import.decision" {
 		t.Fatalf("%v", err)
 	}
-	ap, err = pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: "ios-xe/acme-mio", Action: "renombrar"}}}))
+	ap, err = pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: "ios-xe/acme-mio", Action: "rename"}}}))
 	if err != nil || ap.PlaybooksRenamed != 1 || !slices.Equal(ap.PlaybookIds, []string{"ios-xe/acme-mio-2"}) {
 		t.Fatalf("%+v %v", ap, err)
 	}
@@ -274,7 +274,7 @@ func TestPackImportHostil(t *testing.T) {
 	if pv.Items[0].State != "conflicto_id" {
 		t.Fatalf("%+v", pv.Items)
 	}
-	pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: other, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: "ios-xe/acme-evil", Action: "omitir"}}}))
+	pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: other, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: "ios-xe/acme-evil", Action: "skip"}}}))
 	if es, _ := os.ReadDir(fuera); len(es) != 0 {
 		t.Fatalf("escribió por el enlace: %v", es)
 	}

@@ -55,7 +55,8 @@ export function DataTable<T>({ label, columns, rows, rowKey, selectable, actions
   const visible = columns.filter((c) => !hidden.has(c.id));
   const shown = useMemo(() => {
     const words = norm(q).split(/\s+/).filter(Boolean);
-    let out = rows.filter((r) => {
+    const filtering = words.length > 0 || columns.some((c) => filters[c.id]);
+    let out = !filtering ? rows : rows.filter((r) => {
       const all = norm(columns.map((c) => String(c.value(r))).join(" "));
       if (!words.every((w) => all.includes(w))) return false;
       return columns.every((c) => !filters[c.id] || norm(String(c.value(r))).includes(norm(filters[c.id])));

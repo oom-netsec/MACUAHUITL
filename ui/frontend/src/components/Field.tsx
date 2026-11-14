@@ -75,13 +75,15 @@ export function Check({ label, checked, onChange, disabled, describedBy }: { lab
 }
 
 // placeholder: opción vacía deshabilitada que se muestra mientras no se elija nada (un campo obligatorio sin valor sugerido).
-export function Select<T extends string>({ label, hint, error, value, onChange, options, w, required, placeholder, disabled }: { label: string; hint?: string; error?: string; value: T; onChange: (v: T) => void; options: [T, string][]; w?: Width; required?: boolean; placeholder?: string; disabled?: boolean }) {
+// keepUnknown: un valor que no está entre las opciones (p. ej. una plataforma nueva del núcleo) se muestra tal cual en vez de aparentar otra opción.
+export function Select<T extends string>({ label, hint, error, value, onChange, options, w, required, placeholder, disabled, keepUnknown }: { label: string; hint?: string; error?: string; value: T; onChange: (v: T) => void; options: [T, string][]; w?: Width; required?: boolean; placeholder?: string; disabled?: boolean; keepUnknown?: boolean }) {
   return (
     <Labeled label={label} hint={hint} error={error} w={w}>
       {(id, hintId) => (
         <select id={id} value={value} disabled={disabled} aria-describedby={hintId} aria-required={required || undefined} aria-invalid={error ? true : undefined} onChange={(e) => onChange(e.target.value as T)}>
           {placeholder !== undefined && <option value="" disabled>{placeholder}</option>}
           {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          {keepUnknown && value !== "" && !options.some(([v]) => v === value) && <option value={value}>{value}</option>}
         </select>
       )}
     </Labeled>
@@ -126,7 +128,7 @@ export function Console({ label, text, copy, onClear }: { label: string; text: s
     <div className="console-wrap">
       <div className="console-bar">
         <span>{label}</span>
-        <button type="button" className="quiet" disabled={!text} onClick={async () => { await copy(text); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>
+        <button type="button" className="quiet" disabled={!text} onClick={async () => { try { await copy(text); } catch { return; } setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>
           {copied ? t("common.copied") : t("common.copy")}
         </button>
         {onClear && <button type="button" className="quiet" disabled={!text} onClick={onClear}>{t("common.clear")}</button>}

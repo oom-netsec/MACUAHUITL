@@ -2,7 +2,7 @@
  "auth": "snmp: parámetros inválidos: autenticación \"MD5\" no soportada (SHA, SHA224, SHA256, SHA384, SHA512; MD5 no)",
  "comunidad": "snmp: parámetros inválidos: falta la comunidad",
  "destino": "snmp: parámetros inválidos: destino vacío",
- "perfil": "snmp: parámetros inválidos: perfil \"nada\" desconocido (sistema, interfaces, cpu, memoria)",
+ "perfil": "snmp: parámetros inválidos: perfil \"nada\" desconocido (system, interfaces, cpu, memory)",
  "priv": "snmp: parámetros inválidos: privacidad \"DES\" no soportada (AES, AES192, AES256; DES no)",
  "sin-oids": "snmp: parámetros inválidos: sin OIDs",
  "trap-v3": "snmp traps: credencial v3 incompleta (usuario, SHA*, AES*)",

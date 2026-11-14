@@ -104,7 +104,7 @@ func fillSecrets(c *cli.Env, t *v1.SnippetTemplate, vals map[string]string) erro
 	return nil
 }
 
-// run planea (y con --asistido ejecuta) una plantilla del catálogo con los valores de --set.
+// run planea (y con --assisted ejecuta) una plantilla del catálogo con los valores de --set.
 func run(c *cli.Env, args []string) error {
 	var g common
 	var sets cli.List
@@ -113,7 +113,7 @@ func run(c *cli.Env, args []string) error {
 		fs.Var(&sets, "set", "campo=valor (repetible)")
 	})
 	if err != nil || fs.NArg() != 2 || g.credID == "" {
-		return errors.New("uso: mctl snippet run EQUIPO[:PUERTO] ID --cred ID [--set campo=valor]... [--asistido]  (mctl snippet list muestra los campos)")
+		return errors.New("uso: mctl snippet run EQUIPO[:PUERTO] ID --cred ID [--set campo=valor]... [--assisted]  (mctl snippet list muestra los campos)")
 	}
 	vals, err := parseSets(sets)
 	if err != nil {

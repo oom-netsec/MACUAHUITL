@@ -12,6 +12,7 @@ import { vocab } from "../lib/vocab";
 import type { Key } from "../lib/i18n/es";
 import { ModuleIdContext } from "../app/activity";
 import { assistOwner, assistOwnerKey } from "../app/useShellStatus";
+import { showHidden } from "../lib/safeText";
 
 export type AssistRunCore = Pick<CoreAPI, "assistStart" | "assistWatch" | "assistListRuns" | "assistConfirm" | "assistAbort" | "assistRollback" | "onAssist" | "onAssistDone">;
 
@@ -66,7 +67,7 @@ export function targetOf(equipo: string, credentialId: string) {
 
 // Líneas de configuración con su marca (+ aplicar, ↺ reversa) y resaltado de palabras clave.
 function CodeLines({ lines, mark }: { lines: string[]; mark?: string }) {
-  return <pre className="code">{lines.map((l, i) => <div key={i}>{mark && <span className="mark" aria-hidden="true">{mark} </span>}<Hl text={l} /></div>)}</pre>;
+  return <pre className="code">{lines.map((l, i) => <div key={i}>{mark && <span className="mark" aria-hidden="true">{mark} </span>}<Hl text={showHidden(l)} /></div>)}</pre>;
 }
 
 export function PlanView({ r }: { r: PortsPlanResult }) {
@@ -199,7 +200,8 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
           n.stopped = true;
           n.state = "failed";
         } else if (e.kind === "output") {
-          n.log = [...n.log, `${e.device ?? ""}: ${(e.text ?? "").trimEnd()}`];
+          const line = `${e.device ?? ""}: ${(e.text ?? "").trimEnd()}`;
+          n.log = n.log.length > 5000 ? [...n.log.slice(-4000), line] : [...n.log, line]; // tope: el núcleo repite el historial al reenganchar
         }
         return n;
       });

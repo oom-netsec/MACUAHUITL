@@ -68,7 +68,7 @@ message SnmpWalkResponse {
 
 message SnmpPollRequest {
   SnmpTarget target = 1;
-  repeated string profiles = 2; // sistema, interfaces, cpu, memoria; vacío = sistema e interfaces
+  repeated string profiles = 2; // cable histórico: sistema, interfaces, cpu, memoria (el núcleo acepta también system y memory); vacío = sistema e interfaces
   int32 interval_seconds = 3;   // 10 por defecto
   int32 count = 4;              // 0 = hasta duration_seconds
   int32 duration_seconds = 5;   // 0 = 1 h; máximo 24 h

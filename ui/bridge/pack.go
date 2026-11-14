@@ -32,6 +32,7 @@ type PackInfoDTO struct {
 type PackInstallResultDTO struct {
 	Pack            PackInfoDTO `json:"pack"`
 	ReplacedVersion string      `json:"replacedVersion"`
+	Displaced       []string    `json:"displaced"` // paquetes de terceros que el oficial apartó y borró (#85)
 }
 
 type PackDetailDTO struct {
@@ -51,16 +52,18 @@ func packInfoDTO(p *v1.PackInfo) PackInfoDTO {
 // PackInstall instala el .mpack de path (ruta absoluta que el usuario eligió). allowUnsigned es la confirmación del
 // diálogo con aviso para un paquete de terceros; sin ella se rechaza con pack.err.unsigned.
 func (b *Bridge) PackInstall(path string, allowUnsigned bool, sha256 string) (PackInstallResultDTO, error) {
-	return b.PackInstallHiding(path, allowUnsigned, nil, false, sha256)
+	return b.PackInstallHiding(path, allowUnsigned, nil, false, sha256, nil)
 }
 
 // PackInstallHiding es PackInstall con los IDs de playbook o script que quedan ocultos al instalar (la selección del
 // diálogo). Con replaceHidden, hide es el conjunto exacto de ocultos tras instalar (el diálogo manda true); sin él se
 // conserva lo que ya estaba oculto y hide suma. sha256 es el de PackInspect (obligatorio: ata lo revisado a lo instalado).
-func (b *Bridge) PackInstallHiding(path string, allowUnsigned bool, hide []string, replaceHidden bool, sha256 string) (PackInstallResultDTO, error) {
+// confirmedDisplace son los IDs de terceros que la persona aceptó quitar (los de PackInspect.displaced); si el oficial
+// apartaría otro, el núcleo no instala (pack.err.would_displace).
+func (b *Bridge) PackInstallHiding(path string, allowUnsigned bool, hide []string, replaceHidden bool, sha256 string, confirmedDisplace []string) (PackInstallResultDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PackInstallResultDTO, error) {
-		r, err := v1.NewPackServiceClient(c).Install(ctx, &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: allowUnsigned, Hide: hide, ReplaceHidden: replaceHidden, Sha256: sha256})
-		return PackInstallResultDTO{Pack: packInfoDTO(r.GetPack()), ReplacedVersion: r.GetReplacedVersion()}, err
+		r, err := v1.NewPackServiceClient(c).Install(ctx, &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: allowUnsigned, Hide: hide, ReplaceHidden: replaceHidden, Sha256: sha256, ConfirmedDisplace: confirmedDisplace})
+		return PackInstallResultDTO{Pack: packInfoDTO(r.GetPack()), ReplacedVersion: r.GetReplacedVersion(), Displaced: strs(r.GetDisplaced())}, err
 	})
 }
 
@@ -103,7 +106,8 @@ type PackInspectDTO struct {
 	PlaybookIDs     []string    `json:"playbookIds"`
 	ScriptIDs       []string    `json:"scriptIds"`
 	ReplacedVersion string      `json:"replacedVersion"`
-	SHA256          string      `json:"sha256"` // del archivo: pásalo a PackInstall
+	SHA256          string      `json:"sha256"`    // del archivo: pásalo a PackInstall
+	Displaced       []string    `json:"displaced"` // terceros que este oficial apartaría: pedir confirmación y pasarlos en confirmedDisplace
 }
 
 // PackInspect es la vista previa de PackInstall para el diálogo con casillas: valida el .mpack igual y no instala nada.
@@ -111,7 +115,7 @@ func (b *Bridge) PackInspect(path string, allowUnsigned bool) (PackInspectDTO, e
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PackInspectDTO, error) {
 		r, err := v1.NewPackServiceClient(c).Inspect(ctx, &v1.PackServiceInspectRequest{Path: path, AllowUnsigned: allowUnsigned})
 		return PackInspectDTO{Pack: packInfoDTO(r.GetPack()), PlaybookIDs: strs(r.GetPlaybookIds()), ScriptIDs: strs(r.GetScriptIds()),
-			ReplacedVersion: r.GetReplacedVersion(), SHA256: r.GetSha256()}, err
+			ReplacedVersion: r.GetReplacedVersion(), SHA256: r.GetSha256(), Displaced: strs(r.GetDisplaced())}, err
 	})
 }
 
@@ -150,7 +154,7 @@ type PackImportItemDTO struct {
 
 type PackImportDecisionDTO struct {
 	ItemID string `json:"itemId"`
-	Action string `json:"action"` // renombrar | omitir
+	Action string `json:"action"` // cable histórico: renombrar | omitir (el núcleo acepta también rename | skip)
 }
 
 type PackImportResultDTO struct {

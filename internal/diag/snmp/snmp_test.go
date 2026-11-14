@@ -91,6 +91,16 @@ func TestControlCortaLaSalida(t *testing.T) {
 	}
 }
 
+// Los perfiles canónicos van en inglés; sistema y memoria siguen valiendo como alias.
+func TestPollPerfilesEnIngles(t *testing.T) {
+	a := snmptest.New(t, "lab-ro", nil)
+	var got []Sample
+	err := Poll(context.Background(), v2(a), []string{"system", "memory"}, 100*time.Millisecond, 1, func(s Sample) { got = append(got, s) })
+	if err != nil || len(got) != 1 || got[0].System["sysName"] != "SW1" || len(got[0].Memory) != 1 {
+		t.Fatalf("muestras %+v: %v", got, err)
+	}
+}
+
 func TestPollPerfiles(t *testing.T) {
 	a := snmptest.New(t, "lab-ro", nil)
 	var got []Sample
@@ -163,5 +173,23 @@ func TestPollInterfacesLeeUptime(t *testing.T) {
 	}
 	if got.Uptime != 123456 {
 		t.Fatalf("uptime = %d", got.Uptime)
+	}
+}
+
+// El prefijo del error de un perfil sale en el idioma de la llamada: sistema/memoria en es, system/memory en en.
+func TestErrorDePerfilEnElIdioma(t *testing.T) {
+	a := snmptest.New(t, "lab-ro", nil)
+	tg := v2(a)
+	tg.Community = "otra"
+	var got Sample
+	if err := Poll(context.Background(), tg, []string{"system", "memory"}, time.Second, 1, func(s Sample) { got = s }); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Errors) != 2 || !strings.HasPrefix(got.Errors[0], "sistema: ") || !strings.HasPrefix(got.Errors[1], "memoria: ") {
+		t.Fatalf("es = %q", got.Errors)
+	}
+	en := got.Localize("en").Errors
+	if !strings.HasPrefix(en[0], "system: ") || !strings.HasPrefix(en[1], "memory: ") {
+		t.Fatalf("en = %q", en)
 	}
 }

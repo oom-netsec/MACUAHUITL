@@ -97,6 +97,13 @@ func ask(c *Env, q string, intr <-chan struct{}) (a string, interrupted bool) {
 	}
 }
 
+// Confirm hace la pregunta y solo una afirmación explícita cuenta; sin entrada (stdin no interactivo) es que no.
+func Confirm(c *Env, q string) bool {
+	fmt.Fprint(c.Out, q)
+	l, _ := c.In.ReadString('\n')
+	return yes(strings.ToLower(strings.TrimSpace(l)))
+}
+
 func yes(a string) bool { return a == "s" || a == "si" || a == "sí" || a == "y" || a == "yes" }
 
 // Follow sigue la ejecución y pregunta en cada paso pendiente. Todo lo que no sea una afirmación

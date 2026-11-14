@@ -1,7 +1,7 @@
 package i18n
 
 // Fase 30e (mctl, primera parte): mensajes propios de mctl en scripts, vault, security, tools, visibility, metrics, ports y transfer.
-// La ayuda y los «uso: mctl …» se quedan en español a propósito, igual que los valores aceptados (renombrar|reemplazar|omitir).
+// Los valores de decisión canónicos son rename|replace|skip; los mensajes en español muestran renombrar|reemplazar|omitir (alias que siguen valiendo).
 func init() {
 	e := func(es, en string) entry { return entry{Es: es, En: en, Args: tplArgs(es, en)} }
 	add(map[string]entry{
@@ -13,10 +13,10 @@ func init() {
 		"mctl.common_a.bad_port":         e("puerto inválido {port:q}", "invalid port {port:q}"),
 		"mctl.common_a.new_file":         e("archivo nuevo: {path}", "new file: {path}"),
 		"mctl.common_a.accept_host_key":  e("{cause}\nsi esa huella es la del equipo, repite con --accept-host-key {fp}", "{cause}\nif that fingerprint is the device's, repeat with --accept-host-key {fp}"),
-		"mctl.import_a.bad_all":          e("--all={value:q}: use renombrar, reemplazar u omitir", "--all={value:q}: use renombrar, reemplazar or omitir"),
-		"mctl.import_a.bad_decision":     e("--decision {value:q}: use ID=renombrar|reemplazar|omitir", "--decision {value:q}: use ID=renombrar|reemplazar|omitir"),
+		"mctl.import_a.bad_all":          e("--all={value:q}: use renombrar, reemplazar u omitir", "--all={value:q}: use rename, replace or skip"),
+		"mctl.import_a.bad_decision":     e("--decision {value:q}: use ID=renombrar|reemplazar|omitir", "--decision {value:q}: use ID=rename|replace|skip"),
 		"mctl.import_a.missing": e("no se importó nada: falta decidir {n} conflicto(s); use --decision ID=renombrar|reemplazar|omitir o --all=ACCIÓN: {ids}",
-			"nothing was imported: {n} conflict(s) still need a decision; use --decision ID=renombrar|reemplazar|omitir or --all=ACTION: {ids}"),
+			"nothing was imported: {n} conflict(s) still need a decision; use --decision ID=rename|replace|skip or --all=ACTION: {ids}"),
 
 		// scripts
 		"mctl.scripts.not_regular":          e("{file} no es un archivo regular", "{file} is not a regular file"),
