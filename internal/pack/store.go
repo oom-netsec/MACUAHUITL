@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -330,46 +331,64 @@ type Result struct {
 	SyncWarning error
 	// CommitErr: el paquete quedó instalado, pero falló el paso commit de InstallWith (lo oculto no se guardó).
 	CommitErr error
+	// Displaced: IDs de paquetes de terceros que chocaban con este oficial; salen de la foto (siguen en disco y Open los
+	// omite igual) para que un tercero no pueda vetar contenido firmado.
+	Displaced []string
+	// DisplacedPacks: los mismos paquetes apartados, para que quien instala limpie lo que dejaron (como Remove).
+	DisplacedPacks []*Pack
+	// DisplacedRemoved: los de Displaced que además se borraron del disco (InstallWith); no vuelven al quitar el oficial.
+	DisplacedRemoved []string
 }
 
 // check hace los pasos 2 a 7 del ADR sobre bytes ya leídos y devuelve el paquete y el instalado que reemplazaría
 // (nil si es nuevo). Con el error, el paquete viaja igual si ya se pudo leer. Install lo llama con s.mu; Inspect sin él.
-func (s *Store) check(data []byte, allowUnsigned bool) (p, old *Pack, cur *Snapshot, err error) {
+func (s *Store) check(data []byte, allowUnsigned bool) (p, old *Pack, cur *Snapshot, displaced []*Pack, err error) {
 	if p, err = Verify(data, s.core, s.keys); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if !p.Official && !allowUnsigned {
-		return p, nil, nil, rej("unsigned")
+		return p, nil, nil, nil, rej("unsigned")
 	}
 	if err = s.checkReserved(p); err != nil {
-		return p, nil, nil, err
+		return p, nil, nil, nil, err
 	}
 	cur = s.snap.Load()
 	if old = cur.Find(p.ID); old != nil {
 		switch {
 		case old.Official && !p.Official:
-			return p, nil, nil, rej("official_replace", "id", p.ID)
+			return p, nil, nil, nil, rej("official_replace", "id", p.ID)
 		case CompareVersions(p.Version, old.Version) <= 0:
-			return p, nil, nil, rej("version", "id", p.ID, "installed", old.Version, "version", p.Version)
+			return p, nil, nil, nil, rej("version", "id", p.ID, "installed", old.Version, "version", p.Version)
 		}
 	}
-	if err = s.collides(p, cur.Packs); err != nil {
-		return p, nil, nil, err
+	if p.Official { // lo oficial gana: los de terceros que chocan con él se apartan, igual que en Open
+		var keep []*Pack
+		for _, o := range cur.Packs {
+			if !o.Official && o.ID != p.ID && s.collides(p, []*Pack{o}) != nil {
+				displaced = append(displaced, o)
+				continue
+			}
+			keep = append(keep, o)
+		}
+		cur = &Snapshot{Packs: keep}
 	}
-	return p, old, cur, nil
+	if err = s.collides(p, cur.Packs); err != nil {
+		return p, nil, nil, nil, err
+	}
+	return p, old, cur, displaced, nil
 }
 
 // Inspect valida el paquete igual que Install (mismos pasos y mismos errores) sin instalar nada: no toca el disco
 // ni la foto vigente. Devuelve el paquete y la versión que reemplazaría.
 func (s *Store) Inspect(data []byte, allowUnsigned bool) (*Result, error) { // sin s.mu: la foto es atómica y no escribe
-	p, old, _, err := s.check(data, allowUnsigned)
+	p, old, _, displaced, err := s.check(data, allowUnsigned)
 	if err != nil {
 		if p == nil {
 			return nil, err
 		}
 		return &Result{Pack: p}, err
 	}
-	res := &Result{Pack: p}
+	res := &Result{Pack: p, Displaced: packIDs(displaced)}
 	if old != nil {
 		res.Replaced = old.Version
 	}
@@ -389,8 +408,38 @@ func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
 // igual, y el error va en Result.CommitErr (quien instala debe auditarlo). replaced es la versión que reemplazaría
 // ("" si es nuevo).
 func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) error, commit func(p *Pack) error) (*Result, error) {
+	return s.install(data, allowUnsigned, func([]string) bool { return true }, prepare, commit)
+}
+
+func packIDs(ps []*Pack) []string {
+	var ids []string
+	for _, p := range ps {
+		ids = append(ids, p.ID)
+	}
+	return ids
+}
+
+// InstallConfirmed es InstallWith donde apartar (y borrar) paquetes de terceros exige que estén en confirmed: si el
+// oficial apartaría alguno que no está (por ejemplo uno instalado después de la vista previa), falla con would_displace
+// y no toca nada, así un paquete instalado nunca desaparece en silencio.
+func (s *Store) InstallConfirmed(data []byte, allowUnsigned bool, confirmed []string, prepare func(p *Pack, replaced string) error, commit func(p *Pack) error) (*Result, error) {
+	return s.install(data, allowUnsigned, func(ids []string) bool {
+		for _, id := range ids {
+			if !slices.Contains(confirmed, id) {
+				return false
+			}
+		}
+		return true
+	}, prepare, commit)
+}
+
+func (s *Store) install(data []byte, allowUnsigned bool, allow func(ids []string) bool, prepare func(p *Pack, replaced string) error, commit func(p *Pack) error) (*Result, error) {
 	s.mu.Lock()
-	p, old, cur, err := s.check(data, allowUnsigned)
+	p, old, cur, displaced, err := s.check(data, allowUnsigned)
+	if err == nil && len(displaced) > 0 && !allow(packIDs(displaced)) {
+		s.mu.Unlock()
+		return &Result{Pack: p, Displaced: packIDs(displaced)}, rej("would_displace", "id", p.ID, "ids", strings.Join(packIDs(displaced), ", "))
+	}
 	if err != nil {
 		s.mu.Unlock()
 		if p == nil {
@@ -424,11 +473,17 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 		}
 	}
 	s.publish(next)
+	var removed []string
+	for _, d := range displaced { // el oficial ya está publicado: ahora sí se borra al apartado
+		if s.removePackDir(d.ID) == nil {
+			removed = append(removed, d.ID)
+		}
+	}
 	if s.OnChange != nil { // bajo el lock: así no queda publicado un catálogo viejo si otra instalación entra enseguida
 		s.OnChange()
 	}
 	s.mu.Unlock()
-	res := &Result{Pack: p, SyncWarning: syncWarn, CommitErr: commitErr}
+	res := &Result{Pack: p, SyncWarning: syncWarn, CommitErr: commitErr, Displaced: packIDs(displaced), DisplacedPacks: displaced, DisplacedRemoved: removed}
 	if old != nil {
 		res.Replaced = old.Version
 	}
@@ -513,6 +568,27 @@ func (s *Store) extract(p *Pack) (syncWarn, err error) {
 	return syncDir(filepath.Dir(final)), nil // si falla, el paquete ya entró: solo se avisa
 }
 
+var errNotPackDir = errors.New("not a real package directory")
+
+// removePackDir borra <almacén>/<editor>/<nombre> dentro de un os.Root: ni el editor ni el nombre pueden ser enlaces
+// ni quedar fuera del almacén (errNotPackDir). Es el único borrado de carpetas de paquete.
+func (s *Store) removePackDir(id string) error {
+	if !idRe.MatchString(id) {
+		return errNotPackDir
+	}
+	root, err := os.OpenRoot(s.dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	for _, part := range []string{path.Dir(id), id} {
+		if st, err := root.Lstat(part); err != nil || !st.IsDir() {
+			return errNotPackDir
+		}
+	}
+	return root.RemoveAll(id)
+}
+
 // Remove quita el paquete id (buscado entre los instalados) y devuelve lo que traía.
 func (s *Store) Remove(id string) (*Pack, error) {
 	s.mu.Lock()
@@ -524,11 +600,18 @@ func (s *Store) Remove(id string) (*Pack, error) {
 func (s *Store) RemoveLocked(id string) (*Pack, error) {
 	cur := s.snap.Load()
 	p := cur.Find(id)
-	if p == nil {
-		return nil, rej("not_found", "id", id)
+	if p == nil { // un paquete que Open rechazó o que se apartó sigue en disco: se puede borrar igual (Pack solo trae el ID)
+		if !idRe.MatchString(id) {
+			return nil, rej("not_found", "id", id)
+		}
+		if err := s.removePackDir(id); errors.Is(err, errNotPackDir) {
+			return nil, rej("not_found", "id", id)
+		} else if err != nil {
+			return nil, readErr(err)
+		}
+		return &Pack{Manifest: Manifest{ID: id}, Official: strings.HasPrefix(id, "oom/")}, nil // el origen se deduce del editor
 	}
-	// p.ID cumple la gramática del manifiesto, así que la ruta no sale de la carpeta.
-	if err := os.RemoveAll(filepath.Join(s.dir, filepath.FromSlash(p.ID))); err != nil {
+	if err := s.removePackDir(p.ID); err != nil {
 		return nil, readErr(err)
 	}
 	var next []*Pack

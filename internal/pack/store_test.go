@@ -687,3 +687,189 @@ func TestChocaElNombreVisibleEnInglesSinNameEn(t *testing.T) {
 		t.Fatalf("%v; quería collision", err)
 	}
 }
+
+// Lo oficial gana: un tercero ya instalado que ocupa un nombre (es o en) no impide instalar ni actualizar al oficial;
+// el tercero sale de la foto y se reporta. Lo inverso y entre terceros se rechaza como antes.
+func TestOficialGanaAlTerceroQueOcupaSuNombre(t *testing.T) {
+	pub, priv := testKey(t)
+	tercero := func(es, en string) []byte {
+		f := thirdParty()
+		setPB(f, strings.NewReplacer(`name: "L2 · STP"`, `name: "`+es+`"`, `name_en: "L2 · STP"`, `name_en: "`+en+`"`).Replace(string(f["playbooks/acme-stp.yaml"])))
+		return mustZip(t, f)
+	}
+	for _, c := range []struct{ nom, es, en string }{{"en", "Acme · Árbol", "L2 · STP"}, {"es", "L2 · STP", "Acme · Tree"}} {
+		t.Run(c.nom, func(t *testing.T) {
+			dir := t.TempDir()
+			s, _ := openStore(t, dir, pub, Base{})
+			if _, err := s.Install(tercero(c.es, c.en), true); err != nil {
+				t.Fatal(err)
+			}
+			// el tercero no puede instalarse sobre el oficial, pero antes de que exista el oficial sí
+			res, err := s.Install(signedZip(t, priv, nil), false)
+			if err != nil || len(res.Displaced) != 1 || res.Displaced[0] != "acme/demo" {
+				t.Fatalf("err=%v res=%+v", err, res)
+			}
+			if s.Snapshot().Find("oom/demo") == nil || s.Snapshot().Find("acme/demo") != nil {
+				t.Fatal("el oficial debe quedar y el tercero salir de la foto")
+			}
+			// actualización del oficial ya instalado
+			if _, err := s.Install(signedZip(t, priv, withVersion("1.1.0")), false); err != nil {
+				t.Fatalf("actualización: %v", err)
+			}
+			// inverso: el tercero choca con el oficial y se rechaza
+			if _, err := s.Install(tercero(c.es, c.en), true); Reason(err) != "collision" {
+				t.Fatalf("inverso: %v", err)
+			}
+			// y al reabrir no queda rastro del apartado
+			if s2, rej := openStore(t, dir, pub, Base{}); len(rej) != 0 || s2.Snapshot().Find("acme/demo") != nil || s2.Snapshot().Find("oom/demo") == nil {
+				t.Fatalf("%+v", rej)
+			}
+		})
+	}
+}
+
+// Dos de terceros que chocan entre sí siguen rechazándose.
+func TestTercerosQueChocanSiguenRechazados(t *testing.T) {
+	pub, _ := testKey(t)
+	s, _ := openStore(t, t.TempDir(), pub, Base{})
+	if _, err := s.Install(mustZip(t, thirdParty()), true); err != nil {
+		t.Fatal(err)
+	}
+	f := thirdParty()
+	f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "oom/demo", "acme/otro", 1))
+	setPB(f, strings.Replace(goodPlaybook, "oom-stp", "acme-otro", 1))
+	if _, err := s.Install(mustZip(t, f), true); Reason(err) != "collision" {
+		t.Fatalf("%v", err)
+	}
+}
+
+// El tercero apartado se borra del disco: no reaparece al quitar el oficial y reabrir.
+func TestApartadoSeBorraDelDisco(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	if _, err := s.Install(mustZip(t, thirdParty()), true); err != nil {
+		t.Fatal(err)
+	}
+	res, err := s.Install(signedZip(t, priv, nil), false)
+	if err != nil || len(res.DisplacedRemoved) != 1 {
+		t.Fatalf("%v %+v", err, res)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "acme", "demo")); err == nil {
+		t.Fatal("el apartado sigue en disco")
+	}
+	s.Remove("oom/demo")
+	if s2, rej := openStore(t, dir, pub, Base{}); len(rej) != 0 || s2.Snapshot().Find("acme/demo") != nil {
+		t.Fatalf("reapareció: %+v", rej)
+	}
+}
+
+// Remove borra una carpeta de paquete que está en disco aunque no esté en la foto; con ids raros da not_found.
+func TestRemoveBorraLoQueNoEstaEnLaFoto(t *testing.T) {
+	pub, _ := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	os.MkdirAll(filepath.Join(dir, "acme", "roto"), 0o700)
+	os.MkdirAll(filepath.Join(dir, "..x"), 0o700)
+	for _, id := range []string{"../acme", "acme", "acme/../acme/roto", "nada/nada"} {
+		if _, err := s.Remove(id); Reason(err) != "not_found" {
+			t.Errorf("%q: %v", id, err)
+		}
+	}
+	p, err := s.Remove("acme/roto")
+	if err != nil || p.ID != "acme/roto" {
+		t.Fatalf("%v %+v", err, p)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "acme", "roto")); err == nil {
+		t.Fatal("sigue en disco")
+	}
+	if _, err := s.Remove("acme/roto"); Reason(err) != "not_found" {
+		t.Fatal(err)
+	}
+}
+
+// Sin allowDisplace un oficial que apartaría a un tercero falla y no toca nada; uno que no aparta a nadie no lo necesita.
+func TestInstallConfirmedExigeConfirmarLosApartados(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	if _, err := s.InstallConfirmed(signedZip(t, priv, nil), false, nil, nil, nil); err != nil { // nadie que apartar
+		t.Fatal(err)
+	}
+	s.Remove("oom/demo")
+	if _, err := s.Install(mustZip(t, thirdParty()), true); err != nil {
+		t.Fatal(err)
+	}
+	res, err := s.InstallConfirmed(signedZip(t, priv, nil), false, nil, nil, nil)
+	if Reason(err) != "would_displace" || res == nil || len(res.Displaced) != 1 || !strings.Contains(err.Error(), "acme/demo") {
+		t.Fatalf("%v %+v", err, res)
+	}
+	if _, e := os.Stat(filepath.Join(dir, "acme", "demo")); e != nil || s.Snapshot().Find("acme/demo") == nil || s.Snapshot().Find("oom/demo") != nil {
+		t.Fatal("tocó el almacén")
+	}
+	if _, err := s.InstallConfirmed(signedZip(t, priv, nil), false, []string{"acme/demo"}, nil, nil); err != nil || s.Snapshot().Find("acme/demo") != nil {
+		t.Fatalf("con confirmación: %v", err)
+	}
+}
+
+// Remove de una carpeta no cargada no sale del almacén: un enlace en el editor o en el nombre da not_found y no borra nada fuera.
+func TestRemoveNoCargadoNoSigueEnlaces(t *testing.T) {
+	pub, _ := testKey(t)
+	dir, fuera := t.TempDir(), t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	os.MkdirAll(filepath.Join(fuera, "victima"), 0o700)
+	os.MkdirAll(filepath.Join(fuera, "otro", "x"), 0o700)
+	if err := os.Symlink(fuera, filepath.Join(dir, "acme")); err != nil { // enlace en el tramo del editor
+		t.Skip(err)
+	}
+	os.MkdirAll(filepath.Join(dir, "beta"), 0o700)
+	os.Symlink(filepath.Join(fuera, "otro", "x"), filepath.Join(dir, "beta", "enlace")) // enlace en el tramo del nombre
+	for _, id := range []string{"acme/victima", "beta/enlace"} {
+		if _, err := s.Remove(id); Reason(err) != "not_found" {
+			t.Errorf("%s: %v", id, err)
+		}
+	}
+	for _, p := range []string{filepath.Join(fuera, "victima"), filepath.Join(fuera, "otro", "x")} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("se borró %s", p)
+		}
+	}
+	os.MkdirAll(filepath.Join(dir, "oom", "roto"), 0o700)
+	if p, err := s.Remove("oom/roto"); err != nil || !p.Official {
+		t.Fatalf("origen de oom/*: %v %+v", err, p)
+	}
+}
+
+// Solo se aparta lo que el usuario confirmó: un tercero que apareció tras la vista previa hace fallar la instalación.
+func TestInstallConfirmedSoloLoConfirmado(t *testing.T) {
+	pub, priv := testKey(t)
+	s, _ := openStore(t, t.TempDir(), pub, Base{})
+	s.Install(mustZip(t, thirdParty()), true)
+	_, err := s.InstallConfirmed(signedZip(t, priv, nil), false, []string{"acme/otro"}, nil, nil)
+	if Reason(err) != "would_displace" || s.Snapshot().Find("acme/demo") == nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+// El borrado del apartado tampoco sigue un enlace en el editor: nada se borra afuera y queda sin DisplacedRemoved.
+func TestApartadoNoSigueEnlaces(t *testing.T) {
+	pub, priv := testKey(t)
+	dir, fuera := t.TempDir(), t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	if _, err := s.Install(mustZip(t, thirdParty()), true); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(dir, "acme"), filepath.Join(fuera, "acme")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(fuera, "acme"), filepath.Join(dir, "acme")); err != nil {
+		t.Skip(err)
+	}
+	res, err := s.InstallConfirmed(signedZip(t, priv, nil), false, []string{"acme/demo"}, nil, nil)
+	if err != nil || len(res.Displaced) != 1 || len(res.DisplacedRemoved) != 0 {
+		t.Fatalf("%v %+v", err, res)
+	}
+	if _, err := os.Stat(filepath.Join(fuera, "acme", "demo")); err != nil {
+		t.Fatal("borró fuera del almacén")
+	}
+}
