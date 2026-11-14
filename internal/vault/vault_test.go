@@ -405,3 +405,26 @@ func TestReservedEntryCannotBeOverwrittenOrDeletedByID(t *testing.T) {
 		t.Errorf("borrar una normal: %v", err)
 	}
 }
+
+// Borrar una credencial no la deja viva en el respaldo hasta la siguiente escritura.
+func TestDeleteReescribeElBak(t *testing.T) {
+	v, p := newVault(t)
+	a, _ := v.Put(cred("a", "x", ""))
+	v.Put(cred("b", "y", ""))
+	if err := v.Delete(a); err != nil {
+		t.Fatal(err)
+	}
+	b, err := Open(p + ".bak")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Unlock(pw("maestra")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Get(a); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("la credencial borrada sigue en el .bak: %v", err)
+	}
+	if l, err := b.List(); err != nil || len(l) != 1 {
+		t.Fatalf("el .bak debía conservar la otra: %v %v", l, err)
+	}
+}

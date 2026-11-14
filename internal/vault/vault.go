@@ -410,7 +410,8 @@ func (v *Vault) Delete(id string) error {
 		v.entries = prev
 		return err
 	}
-	return nil
+	// persist dejó en .bak el archivo anterior, que aún trae la credencial borrada: se reemplaza por el vigente.
+	return writeAtomic(v.path+".bak", marshalFile(v.hdr, v.entries))
 }
 
 // ChangeMasterPassword vuelve a cifrar la DEK con una KEK nueva (sal nueva).
