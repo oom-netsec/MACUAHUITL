@@ -76,3 +76,73 @@ func TestTimeoutMayorAlTopeSeRechazaConElArchivo(t *testing.T) {
 		t.Fatalf("err = %v, quiero error que nombre mio.yaml", err)
 	}
 }
+
+// ping y traceroute: solo destino más opciones de una lista cerrada con topes; un .mpack de terceros no
+// puede lanzar `ping X repeat 2147483647 size 18024 timeout 0` en toda la flota.
+func TestDenyProbeOptions(t *testing.T) {
+	bad := []string{
+		"ping", "ping 10.0.0.1 repeat 2147483647 size 18024 timeout 0", "ping 10.0.0.1 repeat 11", "ping 10.0.0.1 repeat 0",
+		"ping 10.0.0.1 size 1501", "ping 10.0.0.1 timeout 0", "ping 10.0.0.1 timeout 11", "ping 10.0.0.1 repeat",
+		"ping 10.0.0.1 repeat x", "ping 10.0.0.1 data 0xabcd", "ping 10.0.0.1 df-bit extra", "ping 10.0.0.1 source",
+		"ping 10.0.0.1 source gi0/1;x", "ping vrf", "ping 10.0.0.1 10.0.0.2", "ping 10.0.0.1 repeat 5 repeat 5",
+		"ping 10.0.0.1 repeat -5", "ping 10.0.0.1 repeat 05x", "ping 10.0.0.1 repeat 99999999999999999999",
+		"traceroute 10.0.0.1 ttl 1 300", "traceroute 10.0.0.1 ttl 0 5", "traceroute 10.0.0.1 ttl 9 3", "traceroute 10.0.0.1 probe 11",
+		"traceroute 10.0.0.1 timeout 0", "traceroute 10.0.0.1 size 100", "pi 10.0.0.1 repeat 99999", "traceroute", "ping a$b",
+	}
+	for _, c := range bad {
+		if err := CheckDenied("ios-xe", c); !errors.Is(err, ErrDenied) {
+			t.Errorf("%q not denied", c)
+		}
+	}
+	good := []string{
+		"ping 10.0.0.1", "ping ip 10.0.0.1", "ping ipv6 2001:db8::1", "ping host-1.example.com", "ping 10.0.0.1 repeat 10",
+		"ping 10.0.0.1 repeat 2 size 1500 timeout 2", "ping vrf MGMT 10.0.0.1", "ping vrf mgmt ip 10.0.0.1 source gigabitethernet0/1 repeat 3",
+		"ping 10.0.0.1 source 10.0.0.9", "pi 10.0.0.1 rep 3", "traceroute 10.0.0.1", "traceroute vrf mgmt 10.0.0.1 ttl 1 30 timeout 3 probe 2",
+		"traceroute 10.0.0.1 source loopback0", "ping 10.0.0.1 | include !",
+	}
+	for _, c := range good {
+		if err := CheckDenied("ios-xe", c); err != nil {
+			t.Errorf("%q denied: %v", c, err)
+		}
+	}
+}
+
+// to-file es el único destino de escritura que empieza por «to-» en show; «to-» ya es abreviatura suya
+// (IOS acepta cualquier prefijo único) y sigue bloqueado, pero un nombre como to-core no lo es.
+func TestDenyToFileVsNombreToCore(t *testing.T) {
+	for _, c := range []string{"show logging to-file flash:x", "show logging to-fi flash:x", "show logging to- flash:x"} {
+		if err := CheckDenied("ios-xe", c); !errors.Is(err, ErrDenied) {
+			t.Errorf("%q not denied", c)
+		}
+	}
+	for _, c := range []string{"show running-config interface to-core", "show ip route vrf to-core", "ping vrf to-core 10.0.0.1"} {
+		if err := CheckDenied("ios-xe", c); err != nil {
+			t.Errorf("%q denied: %v", c, err)
+		}
+	}
+}
+
+// «to» y «to-» ya son abreviatura de to-file; «t» solo es ambigua y to-core no es prefijo.
+func TestDenyToAbreviadoYDestinosAmbiguos(t *testing.T) {
+	for _, c := range []string{"show logging process x to bootflash:a", "show logging to bootflash:a", "show logging process x to- bootflash:a",
+		"ping ip", "ping i", "ping m", "ping mac", "ping vrf", "ping v", "traceroute tag", "traceroute e", "ping ipv6", "ping mpls", "ping fe80::1",
+		"ping ff02::1", "ping ipv6 fe80::1", "ping ipv6 ff02::1", "traceroute fe80::1"} {
+		if err := CheckDenied("ios-xe", c); !errors.Is(err, ErrDenied) {
+			t.Errorf("%q not denied", c)
+		}
+	}
+	for _, c := range []string{"show running-config interface to-core", "ping 2001:db8::1", "ping core1", "ping ::1"} {
+		if err := CheckDenied("ios-xe", c); err != nil {
+			t.Errorf("%q denied: %v", c, err)
+		}
+	}
+}
+
+// «oldvines» (traceroute o…) y «t» sola abren un diálogo o abrevian to-file.
+func TestDenyOldvinesYTSola(t *testing.T) {
+	for _, c := range []string{"traceroute o", "traceroute old", "traceroute oldvines", "show logging process x t bootflash:a", "show logging t"} {
+		if err := CheckDenied("ios-xe", c); !errors.Is(err, ErrDenied) {
+			t.Errorf("%q not denied", c)
+		}
+	}
+}

@@ -34,6 +34,9 @@ type Result struct {
 	Argv       []string // argv completo, incluido -w para la captura
 }
 
+// iperfServerMax es el tope de vida del servidor de iperf3 (-s -1 espera un cliente indefinidamente).
+var iperfServerMax = 10 * time.Minute
+
 // Runner ejecuta herramientas. LookPath nil usa exec.LookPath.
 type Runner struct {
 	LookPath func(string) (string, error)
@@ -90,6 +93,11 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 		}
 	}
 	res.Argv = argv
+	if req.Tool == Iperf3 && argv[0] == "-s" { // un servidor olvidado no debe quedar escuchando
+		var stop context.CancelFunc
+		ctx, stop = context.WithTimeout(ctx, iperfServerMax)
+		defer stop()
+	}
 
 	cmd := exec.CommandContext(ctx, path, argv...)
 	cmd.Env = append([]string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C"}, r.extraEnv...)
