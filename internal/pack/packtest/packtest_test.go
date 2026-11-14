@@ -1,6 +1,7 @@
 package packtest
 
 import (
+	"errors"
 	"go/parser"
 	"go/token"
 	"io/fs"
@@ -16,6 +17,9 @@ func TestSoloLasPruebasImportanPacktest(t *testing.T) {
 	root := RepoDir()
 	n := 0
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil // un temporal de otra prueba que corre a la vez (p. ej. cmd/mctl/salidas-…) desapareció a mitad del recorrido
+		}
 		if err != nil {
 			return err
 		}
