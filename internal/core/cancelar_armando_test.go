@@ -47,6 +47,12 @@ func TestCancelarDuranteElArmadoCancelaElTrabajo(t *testing.T) {
 	if a, r := inh.counts(); a != r {
 		t.Errorf("inhibidor sin liberar: %d tomados, %d liberados", a, r)
 	}
+	if rr, err := h.patrol.GetRun(ctx(t), &v1.GetRunRequest{JobId: job, Round: 1}); err != nil || rr.OutputPath != "" {
+		t.Errorf("el trabajo cancelado apunta a una carpeta borrada: %v %v", rr.GetOutputPath(), err)
+	}
+	if d := h.summary(t, job).OutputDir; d != h.out {
+		t.Errorf("OutputDir = %s, quería la raíz %s", d, h.out)
+	}
 	if ents, _ := os.ReadDir(h.out); len(ents) != 0 {
 		t.Errorf("quedó la carpeta vacía de la corrida: %v", ents)
 	}

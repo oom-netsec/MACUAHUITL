@@ -404,6 +404,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	c.mu.Lock()
 	if j.cancelReq {
 		j.cancelReq, j.state = false, "cancelled"
+		j.OutputDir, j.writer = "", nil // la carpeta se borra abajo: no debe quedar apuntada
 		c.mu.Unlock()
 		for i := len(undo) - 1; i >= 0; i-- {
 			undo[i]()
