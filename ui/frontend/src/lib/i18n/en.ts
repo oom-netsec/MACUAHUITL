@@ -2680,4 +2680,5 @@ export const en: Record<Key, string> = {
   "diag.port.invalid": "A whole number from 1024 to 65535.",
   "diag.bind.error": "The interfaces of this machine could not be read; retry by switching modes.",
   "diag.bind.gone": "The IP {ip} no longer belongs to this machine (the network changed): pick another one and run again.",
+  "paste.controls": "Contains control or invisible characters: {codes}",
 };
