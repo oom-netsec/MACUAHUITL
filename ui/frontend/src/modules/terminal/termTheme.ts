@@ -20,6 +20,8 @@ export const TERM_OPTIONS: ITerminalOptions = {
   fontFamily: FONT, fontSize: 14, lineHeight: 1, letterSpacing: 0, fontWeight: "400", fontWeightBold: "700",
   cursorStyle: "block", cursorBlink: true, cursorInactiveStyle: "outline",
   scrollback: 20000, allowProposedApi: true, // el addon de búsqueda marca coincidencias con decoraciones (API propuesta)
+  linkHandler: { activate: () => {} }, // un equipo no decide qué se abre: sus hipervínculos OSC 8 no navegan
+  // Un equipo no decide qué se abre: los hipervínculos OSC 8 que mande no navegan ni abren nada.
 };
 
 export const MARK = { matchBackground: "#2f6f62", activeMatchBackground: "#45c9ad", matchOverviewRuler: "#2f6f62", activeMatchColorOverviewRuler: "#45c9ad" };
