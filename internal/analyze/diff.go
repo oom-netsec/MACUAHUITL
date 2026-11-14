@@ -76,7 +76,8 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 		if !matchDevice(dev, device) {
 			continue
 		}
-		a, z := byCommand(b, dev, from), byCommand(b, dev, to)
+		a, ia := byCommand(b, dev, from)
+		z, iz := byCommand(b, dev, to)
 		if len(a) == 0 || len(z) == 0 {
 			r.Warnings = append(r.Warnings, Warn(dev, 0, "", "analyze.warn.no_outputs", "from", from, "to", to))
 			continue
@@ -87,7 +88,18 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 		diffBGP(&d, firstOf(a, "show ip bgp summary", "show bgp summary", "show bgp ipv4 unicast summary", "show bgp ipv6 unicast summary"), firstOf(z, "show ip bgp summary", "show bgp summary", "show bgp ipv4 unicast summary", "show bgp ipv6 unicast summary"))
 		diffOSPF(&d, a["show ip ospf neighbor"], z["show ip ospf neighbor"])
 		diffHSRP(&d, a["show standby brief"], z["show standby brief"])
+		for _, side := range []struct {
+			round int
+			inc   map[string]bool
+		}{{from, ia}, {to, iz}} {
+			for _, cmd := range sortedKeys(side.inc) {
+				r.Warnings = append(r.Warnings, Warn(dev, side.round, cmd, "analyze.warn.incomplete"))
+			}
+		}
 		for _, cmd := range sortedKeys(union(a, z)) {
+			if ia[cmd] || iz[cmd] {
+				continue // salida cortada en una de las rondas: no se compara
+			}
 			x, okx := a[cmd]
 			y, oky := z[cmd]
 			switch {
@@ -108,16 +120,23 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 }
 
 // byCommand: texto de cada comando válido de la ronda, con el nombre normalizado.
-func byCommand(b *Bundle, dev string, round int) map[string]string {
-	out := map[string]string{}
+// El segundo valor son los comandos que solo llegaron incompletos (cortados): no se comparan, se avisan.
+func byCommand(b *Bundle, dev string, round int) (map[string]string, map[string]bool) {
+	out, inc := map[string]string{}, map[string]bool{}
 	for _, s := range b.Sections {
-		if s.Device == dev && s.Round == round && !s.Invalid && !s.Incomplete {
-			if _, ok := out[normCmd(s.Command)]; !ok {
-				out[normCmd(s.Command)] = s.Text
-			}
+		if s.Device != dev || s.Round != round || s.Invalid {
+			continue
+		}
+		if s.Incomplete {
+			inc[normCmd(s.Command)] = true
+		} else if _, ok := out[normCmd(s.Command)]; !ok {
+			out[normCmd(s.Command)] = s.Text
 		}
 	}
-	return out
+	for c := range out {
+		delete(inc, c)
+	}
+	return out, inc
 }
 
 func firstOf(m map[string]string, cmds ...string) string {

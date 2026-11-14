@@ -145,12 +145,15 @@ func TestDiffIgnoraSeccionesIncompletas(t *testing.T) {
 	}
 	for _, td := range devDiff(t, r, "SW1").Text {
 		if td.Command == "show running-config" {
-			for _, l := range td.Lines {
-				if strings.HasPrefix(l, "- ") {
-					t.Fatalf("línea quitada falsa: %v", td.Lines)
-				}
-			}
+			t.Fatalf("la salida incompleta no se compara ni sale «solo en la ronda»: %+v", td)
 		}
+	}
+	avisado := false
+	for _, w := range r.Warnings {
+		avisado = avisado || w.Command == "show running-config" && w.Round == 2
+	}
+	if !avisado {
+		t.Fatalf("sin aviso de salida incompleta: %+v", r.Warnings)
 	}
 }
 
