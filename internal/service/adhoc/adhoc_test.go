@@ -115,3 +115,21 @@ func TestAdhocResultErroresEnElIdioma(t *testing.T) {
 		t.Errorf("auditoría %s", got)
 	}
 }
+
+// Una sola familia de códigos para la carpeta de salida (la misma de diag y field).
+func TestAdhocCarpetaDeSalidaUsaElCodigoComun(t *testing.T) {
+	d := servicetest.New(t)
+	os.MkdirAll(d.Outputs(), 0o700)
+	os.WriteFile(filepath.Join(d.Outputs(), "adhoc"), nil, 0o600) // un archivo donde va la carpeta
+	s := &adhocSvc{d: d, cmds: map[string][]string{}}
+	_, err := s.StartAdhoc(i18n.WithLocale(context.Background(), "en"), &v1.StartAdhocRequest{Commands: "show version", Targets: []*v1.Target{{}}})
+	st := status.Convert(err)
+	if !strings.HasPrefix(st.Message(), "output folder: ") {
+		t.Fatalf("%v", err)
+	}
+	for _, dt := range st.Details() {
+		if ei, ok := dt.(*errdetails.ErrorInfo); ok && ei.Reason != "ingest.err.out_dir" {
+			t.Errorf("reason %q", ei.Reason)
+		}
+	}
+}

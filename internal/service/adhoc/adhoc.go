@@ -41,12 +41,12 @@ func (s *adhocSvc) StartAdhoc(ctx context.Context, r *v1.StartAdhocRequest) (*v1
 	}
 	root := filepath.Join(s.d.Outputs(), "adhoc")
 	if err := os.MkdirAll(root, 0o700); err != nil {
-		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("out.err.dir", err, nil))
+		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("ingest.err.out_dir", err, nil))
 	}
 	// Una carpeta por lote: el sello de tiempo de Patrol es de un segundo y dos lotes seguidos compartirían manifest, salidas y zip.
 	dir, err := os.MkdirTemp(root, "lote-")
 	if err != nil {
-		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("out.err.dir", err, nil))
+		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("ingest.err.out_dir", err, nil))
 	}
 	// Una ronda, un archivo por ronda y sin borrar sueltos: capture.ReadDir lee así.
 	spec := &v1.JobSpec{Name: "adhoc", Targets: r.Targets, DefaultCredentialId: r.CredentialId, CustomCommands: strings.Join(cmds, "\n"),

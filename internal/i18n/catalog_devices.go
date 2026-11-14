@@ -103,15 +103,6 @@ func init() {
 	})
 }
 
-// Carpeta y archivo de salida de adhoc, diag y field, y errores sueltos de field.
-func init() {
-	e := func(es, en string) entry { return entry{Es: es, En: en, Args: tplArgs(es, en)} }
-	add(map[string]entry{
-		"out.err.dir":  e("carpeta de salida: {cause}", "output folder: {cause}"),
-		"out.err.file": e("archivo de salida: {cause}", "output file: {cause}"),
-	})
-}
-
 // Paquetes: errores de la instalación que envuelven un error del sistema.
 func init() {
 	e := func(es, en string) entry { return entry{Es: es, En: en, Args: tplArgs(es, en)} }
