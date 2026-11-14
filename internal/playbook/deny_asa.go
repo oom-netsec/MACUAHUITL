@@ -258,10 +258,27 @@ func checkFamily(cmd string, head func(cmd string, fields []string) error) error
 	if len(t) == 0 {
 		return denied(cmd, "playbook.why.pipe_filter_asa")
 	}
-	for _, s := range []string{"redirect", "tee", "append"} { // «a prueba de fallas»: la regex no abre con un sumidero
-		if Abbrev(t[0], s) {
+	sink := func(tok string) bool {
+		return Abbrev(tok, "redirect") || Abbrev(tok, "tee") || Abbrev(tok, "append")
+	}
+	if sink(t[0]) && len(t) > 1 { // «a prueba de fallas»: la regex no abre con un sumidero seguido de un destino; «| i redirect» solo sí
+		return denied(cmd, "playbook.why.pipe_sink")
+	}
+	// Algunas versiones de ASA aceptan «| redirect» o «| append» tras el filtro: tras cada «|» posterior tampoco va un
+	// sumidero, y ningún token de la parte del pipe puede ser una ruta del equipo o remota (tapar de más está bien).
+	for i, seg := range strings.Split(pipe, "|") {
+		f := strings.Fields(seg)
+		if i > 0 && len(f) > 0 && sink(f[0]) {
 			return denied(cmd, "playbook.why.pipe_sink")
+		}
+		for _, tok := range f {
+			if remotePath(tok) || asaDevicePath.MatchString(tok) {
+				return denied(cmd, "playbook.why.remote")
+			}
 		}
 	}
 	return nil
 }
+
+// asaDevicePath: un sistema de archivos local de ASA al inicio del token (disk0:, flash:, system:…).
+var asaDevicePath = regexp.MustCompile(`^(?:disk\d+|flash|bootflash|system|nvram|tmp|cache|coredumpfsys):`)

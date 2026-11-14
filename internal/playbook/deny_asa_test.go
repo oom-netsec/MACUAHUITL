@@ -123,3 +123,30 @@ func TestWritesOnOtherFamily(t *testing.T) {
 		}
 	}
 }
+
+// Un segundo «|» tras el filtro no puede abrir un sumidero (redirect, append, tee) ni la parte del pipe nombrar una ruta
+// del equipo o remota: algunas versiones de ASA aceptan esos sumideros en show. Una palabra «redirect» dentro de la
+// regex, sin «|» delante, sigue valiendo.
+func TestASASegundoPipeNoAbreSumidero(t *testing.T) {
+	for _, c := range []string{
+		"show run | i x | redirect disk0:/a",
+		"show run | i x | append flash:/a",
+		"sh run | g -v x | tee disk0:a",
+		"show run | i x | r disk0:/a",
+		"show run | i x|redirect disk0:/a",
+		"show run | i x disk0:/a",
+		"show run | i system:running-config",
+		"show run | i x | tee a.txt",
+		"show run | i x | app a.txt",
+		"show run | i x tftp://10.0.0.1/a",
+	} {
+		if CheckDenied("asa", c) == nil {
+			t.Errorf("debió rechazarse: %q", c)
+		}
+	}
+	for _, c := range []string{"show run | i redirect", "show run | i up|down", "show conn | i 10.0.0.1"} {
+		if err := CheckDenied("asa", c); err != nil {
+			t.Errorf("debió permitirse %q: %v", c, err)
+		}
+	}
+}
