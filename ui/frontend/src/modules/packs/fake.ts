@@ -16,13 +16,13 @@ const emptyImport = { pack: samplePack, items: [], sha256: "", applied: false, s
 
 export function fakePacks() {
   return {
-    packInstall: vi.fn(async () => ({ pack: samplePack, replacedVersion: "" })),
-    packInstallHiding: vi.fn(async () => ({ pack: samplePack, replacedVersion: "" })),
+    packInstall: vi.fn(async () => ({ pack: samplePack, replacedVersion: "", displaced: [] as string[] })),
+    packInstallHiding: vi.fn(async () => ({ pack: samplePack, replacedVersion: "", displaced: [] as string[] })),
     packList: vi.fn(async () => [samplePack, sampleThirdParty]),
     packShow: vi.fn(async () => sampleDetail),
     packRemove: vi.fn(async () => 0),
     packSetItems: vi.fn(async () => samplePack),
-    packInspect: vi.fn(async () => ({ pack: samplePack, playbookIds: sampleDetail.playbookIds, scriptIds: sampleDetail.scriptIds, replacedVersion: "", sha256: "a".repeat(64) })),
+    packInspect: vi.fn(async () => ({ pack: samplePack, playbookIds: sampleDetail.playbookIds, scriptIds: sampleDetail.scriptIds, replacedVersion: "", sha256: "a".repeat(64), displaced: [] as string[] })),
     packExport: vi.fn(async () => ({ id: "yo/mis", version: "2026.1113.100000", sha256: "", scripts: 0, playbooks: 0, omittedPlaybooks: [] })),
     packImportPreview: vi.fn(async () => emptyImport),
     packImport: vi.fn(async () => ({ ...emptyImport, applied: true })),

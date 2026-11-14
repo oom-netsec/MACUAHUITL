@@ -27,7 +27,7 @@ func (fakePack) Install(_ context.Context, r *v1.PackServiceInstallRequest) (*v1
 	if !r.AllowUnsigned {
 		return nil, status.Error(codes.FailedPrecondition, "sin firma")
 	}
-	return &v1.PackServiceInstallResponse{ReplacedVersion: "0.9.0", Pack: &v1.PackInfo{Id: r.Path, Version: "1.0.0", Hidden: map[bool][]string{true: {"replace"}}[r.ReplaceHidden]}}, nil
+	return &v1.PackServiceInstallResponse{ReplacedVersion: "0.9.0", Displaced: r.ConfirmedDisplace, Pack: &v1.PackInfo{Id: r.Path, Version: "1.0.0", Hidden: map[bool][]string{true: {"replace"}}[r.ReplaceHidden]}}, nil
 }
 
 func (fakePack) List(context.Context, *v1.PackServiceListRequest) (*v1.PackServiceListResponse, error) {
@@ -48,7 +48,7 @@ func (fakePack) SetItems(_ context.Context, r *v1.PackServiceSetItemsRequest) (*
 }
 
 func (fakePack) Inspect(_ context.Context, r *v1.PackServiceInspectRequest) (*v1.PackServiceInspectResponse, error) {
-	return &v1.PackServiceInspectResponse{Pack: &v1.PackInfo{Id: r.Path}, ReplacedVersion: "0.9.0", Sha256: "abc123"}, nil
+	return &v1.PackServiceInspectResponse{Pack: &v1.PackInfo{Id: r.Path}, ReplacedVersion: "0.9.0", Sha256: "abc123", Displaced: []string{"acme/demo"}}, nil
 }
 
 func TestPackBridge(t *testing.T) {
@@ -95,10 +95,13 @@ func TestPackBridge(t *testing.T) {
 	if p, err := b.PackSetItems("oom/ios-xe", nil, []string{"ios-xe/x"}); err != nil || p.Hidden == nil {
 		t.Fatalf("hidden nunca es null: %+v %v", p, err)
 	}
-	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}, true, "abc123"); err != nil || ins.Pack.ID != "/y.mpack" || len(ins.Pack.Hidden) != 1 { // replace_hidden viaja
+	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}, true, "abc123", []string{"acme/demo"}); err != nil || len(ins.Displaced) != 1 || ins.Displaced[0] != "acme/demo" { // confirmed_displace viaja y displaced vuelve
 		t.Fatalf("%+v %v", ins, err)
 	}
-	if in, err := b.PackInspect("/z.mpack", true); err != nil || in.Pack.ID != "/z.mpack" || in.ReplacedVersion != "0.9.0" || in.SHA256 != "abc123" || in.PlaybookIDs == nil || in.ScriptIDs == nil {
+	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}, true, "abc123", nil); err != nil || ins.Displaced == nil /* [] y no null en el JSON */ || ins.Pack.ID != "/y.mpack" || len(ins.Pack.Hidden) != 1 { // replace_hidden viaja
+		t.Fatalf("%+v %v", ins, err)
+	}
+	if in, err := b.PackInspect("/z.mpack", true); err != nil || in.Pack.ID != "/z.mpack" || in.ReplacedVersion != "0.9.0" || in.SHA256 != "abc123" || in.PlaybookIDs == nil || in.ScriptIDs == nil || len(in.Displaced) != 1 || in.Displaced[0] != "acme/demo" {
 		t.Fatalf("%+v %v", in, err)
 	}
 	j, _ := json.Marshal(PackInfoDTO{Platforms: strs(nil), Shadowed: strs(nil), Hidden: strs(nil)})
