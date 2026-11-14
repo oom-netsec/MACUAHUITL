@@ -60,3 +60,28 @@ func TestCancelarDuranteElArmadoCancelaElTrabajo(t *testing.T) {
 		t.Errorf("auditó un armado que no ocurrió: %s", a)
 	}
 }
+
+// Si el armado falla con una cancelación pendiente, el trabajo queda cancelado (no vuelve a «created») y con su fase.
+func TestArmadoFallidoConCancelacionPendienteQuedaCancelado(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	cj, err := h.patrol.CreateJob(ctx(t), &v1.CreateJobRequest{Spec: h.spec(cred)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	j, _ := h.core.getJob(cj.JobId)
+	h.core.mu.Lock()
+	j.cancelReq = true // lo que dejaría un CancelJob llegado durante el armado
+	h.core.mu.Unlock()
+	// Sin la huella aceptada el Login Test falla: el armado cae en fail().
+	if _, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: cj.JobId}); err == nil {
+		t.Fatal("el armado debía fallar")
+	}
+	s := h.summary(t, cj.JobId)
+	if s.State != "cancelled" || s.Phases[len(s.Phases)-1].Kind != v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED {
+		t.Fatalf("estado %s fases %v", s.State, phaseLines(s.Phases))
+	}
+	if _, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: cj.JobId}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("un trabajo cancelado se armó: %v", err)
+	}
+}
