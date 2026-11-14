@@ -82,6 +82,10 @@ func CheckDenied(platform, cmd string) error {
 	if strings.Contains(cmd, ";") {
 		return denied(cmd, "playbook.why.chain")
 	}
+	// «&», «&&», «||» y «<» los interpreta bash en la CLI de los leaf ACI (iBash); ningún show los necesita.
+	if strings.ContainsAny(cmd, "&<") || strings.Contains(cmd, "||") {
+		return denied(cmd, "playbook.why.shell")
+	}
 	// «>» y «>>» escriben a flash; «`» y «$(» ejecutan una sustitución. También para IOS, por si el host está mal marcado.
 	if strings.Contains(cmd, ">") {
 		return denied(cmd, "playbook.why.redirect")
