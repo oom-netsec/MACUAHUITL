@@ -2,8 +2,6 @@ package pack
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -27,60 +25,6 @@ import (
 
 func internal(err error) error { return status.Error(codes.Internal, err.Error()) }
 
-// Estas consultas repiten las de internal/service/scripts (un servicio no importa a otro): la tabla scripts es la misma.
-const columns = `id, name, tech, platform, description, commands_json, tags_json, created_at, updated_at`
-
-func scan(r interface{ Scan(...any) error }) (scripts.Script, error) {
-	var s scripts.Script
-	var cmds, tags, created, updated string
-	if err := r.Scan(&s.ID, &s.Name, &s.Tech, &s.Platform, &s.Description, &cmds, &tags, &created, &updated); err != nil {
-		return s, err
-	}
-	if err := json.Unmarshal([]byte(cmds), &s.Commands); err != nil {
-		return s, err
-	}
-	if err := json.Unmarshal([]byte(tags), &s.Tags); err != nil {
-		return s, err
-	}
-	s.CreatedAt, _ = time.Parse(time.RFC3339, created)
-	s.UpdatedAt, _ = time.Parse(time.RFC3339, updated)
-	s.Origin = scripts.OrigenUsuario
-	return s, nil
-}
-
-type querier interface {
-	Query(string, ...any) (*sql.Rows, error)
-	QueryRow(string, ...any) *sql.Row
-	Exec(string, ...any) (sql.Result, error)
-}
-
-func loadUser(q querier) ([]scripts.Script, error) {
-	rows, err := q.Query(`SELECT ` + columns + ` FROM scripts ORDER BY name COLLATE NOCASE`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []scripts.Script
-	for rows.Next() {
-		s, err := scan(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, s)
-	}
-	return out, rows.Err()
-}
-
-// put inserta; el import nunca reemplaza (el plan lo prohíbe), así que no hay ON CONFLICT: un ID repetido falla.
-func put(q querier, s scripts.Script) error {
-	cmds, _ := json.Marshal(s.Commands)
-	tags, _ := json.Marshal(s.Tags)
-	_, err := q.Exec(`INSERT INTO scripts(`+columns+`) VALUES(?,?,?,?,?,?,?,?,?)`,
-		s.ID, s.Name, s.Tech, s.Platform, s.Description, string(cmds), string(tags),
-		s.CreatedAt.UTC().Format(time.RFC3339), s.UpdatedAt.UTC().Format(time.RFC3339))
-	return err
-}
-
 func (s *svc) Export(ctx context.Context, r *v1.PackServiceExportRequest) (*v1.PackServiceExportResponse, error) {
 	s.d.MarkActive()
 	path, err := service.AbsPath(ctx, r.GetPath())
@@ -92,7 +36,7 @@ func (s *svc) Export(ctx context.Context, r *v1.PackServiceExportRequest) (*v1.P
 	}
 	var sel []scripts.Script
 	if len(r.GetScriptIds()) > 0 {
-		user, err := loadUser(s.d.DB())
+		user, err := scripts.LoadUser(s.d.DB())
 		if err != nil {
 			return nil, internal(err)
 		}
@@ -172,7 +116,7 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 	}
 	out := &v1.PackServiceImportResponse{Pack: info, Sha256: sum}
 	if !r.GetConfirm() {
-		user, err := loadUser(s.d.DB())
+		user, err := scripts.LoadUser(s.d.DB())
 		if err != nil {
 			return nil, internal(err)
 		}
@@ -209,7 +153,7 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 			return internal(err)
 		}
 		defer tx.Rollback()
-		user, err := loadUser(tx)
+		user, err := scripts.LoadUser(tx)
 		if err != nil {
 			return internal(err)
 		}
@@ -217,7 +161,7 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 			return service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 		for _, x := range sres.Writes {
-			if err := put(tx, x); err != nil {
+			if err := scripts.Insert(tx, x); err != nil {
 				return internal(err)
 			}
 		}
