@@ -418,6 +418,14 @@ func TestInvalidosDeNXOS(t *testing.T) {
 			t.Errorf("%q no cuenta como inválido", txt)
 		}
 	}
+	// el error de un comando va al inicio: una running-config o un log que cite la frase al final no es inválido
+	largo := "hostname X\nline 2\nline 3\nline 4\n% Invalid input detected at '^' marker.\n% Incomplete command\n"
+	if invalidOutput(largo) {
+		t.Error("la frase tras las primeras 3 líneas no es un error del comando")
+	}
+	if !invalidOutput("\n                 ^\n% Invalid input detected at '^' marker.\n\n") {
+		t.Error("caret y error al inicio sí cuentan")
+	}
 	if invalidOutput("Interface Eth1/1 is up") {
 		t.Error("salida normal marcada inválida")
 	}

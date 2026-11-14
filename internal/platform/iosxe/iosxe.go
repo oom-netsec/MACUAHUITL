@@ -293,9 +293,12 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 // Respuestas de error de IOS («% Invalid input») y de NX-OS («% Invalid command», «% Invalid parameter», «% Incomplete command»).
 var invalidMarks = []string{"% Invalid input", "% Invalid command", "% Invalid parameter", "% Incomplete command"}
 
+// invalidOutput mira solo las primeras 3 líneas (el error de un comando va al inicio, tras el eco y el «^»): una
+// running-config o un log que cite la frase más abajo no es un comando inválido.
 func invalidOutput(text string) bool {
+	head := strings.Join(strings.SplitN(text, "\n", 4)[:min(3, strings.Count(text, "\n")+1)], "\n")
 	for _, m := range invalidMarks {
-		if strings.Contains(text, m) {
+		if strings.Contains(head, m) {
 			return true
 		}
 	}

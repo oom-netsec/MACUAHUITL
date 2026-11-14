@@ -24,8 +24,18 @@ func TestCheckDeniedNXOSRechaza(t *testing.T) {
 		"show version | sed 'w /bootflash/x'", "show version | sed e", "show version | json | python3", "show version | json | run bash",
 		"show version | json | source y", "show version | json | tclsh", "show version | json | diff-clean", "show version | include a | awk x",
 		"show version | json | xargs x", "show version | include \"a|b\" | sed e", "show version | include \"a|b", "show version | include \"a\\\"|reload\"", "show version | include \"a\"\"|reload\"",
+		// comilla a media palabra y argumentos de los pipes permitidos
+		"show version | include a\" | sed 'w /bootflash/x' | include \"b", "show version | include a\"b", "show version | include a\"b c\"", "show version | include \"a\"b", "show version | include \"a",
+		"show version | sort -o bootflash:x", "show version | uniq a bootflash:x", "show version | head -c 10", "show version | json native",
+		"show version | count x", "show version | wc lines", "show version | no-more x", "show version | xml x", "show version | end x", "show version | sort -n",
+		"show version | head lines", "show version | head lines x", "show version | head 5 6", "show version | last x", "show version | last lines 5", "show version | head -5",
+		"show version | include -f bootflash:x", "show version | include a b", "show version | include", "show version | grep -c -f x", "show version | include next x z",
+		"show version | include bootflash:x", "show version | include volatile:x", "show version | include logflash:x", "show version | include usb1:x", "show version | include /bootflash/x",
+		"show version | include \"bootflash:x\"", "show version | egrep ignore-case bootflash:x", "show version | include -i /etc/passwd",
+		// variables y sustituciones
+		"show version | include $(reload)", "show version | include `reload`", "show version | include $x", "show version | egrep \"up$\"", "show $x",
 		// to-file, rutas remotas y destinos de escritura de show tech-support
-		"show tech-support all binary bootflash:x", "show tech-support binary bootflash:x", "show tech-support all bin x", "show tech-support all tar",
+		"show tech-support all binary bootflash:x", "show tech-support binary bootflash:x", "show tech-support all bin x", "show tec binary bootflash:x", "sh tec tar bootflash:x", "show tech all compressed", "show tech-s gzip", "show tech-support all tar",
 		"show tech-support compressed", "show tech-support all gzip", "show running-config to-file bootflash:x", "show version to-",
 		"show tech-support ftp://h/x",
 		// destinos que son palabras clave (abren sub-diálogos)
@@ -47,9 +57,12 @@ func TestCheckDeniedNXOSAcepta(t *testing.T) {
 	for _, cmd := range []string{
 		"show version", "sh ver", "show tech-support details", "show running-config | include ^interface", "show interface status",
 		"show logging last 100 | grep -i error", "show ip route vrf all | json | no-more", "show vpc | head lines 5",
-		"show interface counters errors | exclude ' 0 '", "show ip route | include 10.0.0.0/8", "show mac address-table | count",
+		"show interface counters errors | exclude \" 0 \"", "show ip route | include 10.0.0.0/8", "show mac address-table | count",
 		"show version | json-pretty", "show version | xml | end", "show vlan | section 10", "show vpc | begin Peer", "show vpc | sort | uniq", "show vpc | wc",
 		"show running-config | egrep ^int | last 5", "show version | egrep \"up|down\"", "show version | include \"a|b\" | count",
+		"show version | include ignore-case up", "show version | include invert-match line-number word-exp up", "show version | include -i -v -c -n -w -x up",
+		"show version | include next 2 up", "show version | egrep prev 3 \"a|b\"", "show version | head lines 5", "show version | head 5", "show version | last 5",
+		"show version | json | no-more", "show version | sort | uniq | wc", "show version | include 2001:db8::1", "show version | include fe80::1", "show version | section \"ethernet1/1 \"",
 		"show tech-support all", "show tech-support details", "show tech-support ethpm", "ping switch1", "ping 10.0.0.1 count 5 | include x",
 		"dir bootflash:", "dir", "terminal length 0", "terminal width 511", "ter wid 0", "",
 		"ping 10.0.0.1", "ping 10.0.0.1 vrf management count 5 packet-size 1400 timeout 2 source 10.0.0.2",
@@ -73,11 +86,38 @@ func TestCheckDeniedRechazaPuntoYComaEnTodas(t *testing.T) {
 	}
 }
 
+// `>`, comillas invertidas y `$(` se rechazan en todas las plataformas; en nx-os, cualquier `$`.
+func TestCheckDeniedRedireccionYSustitucionEnTodas(t *testing.T) {
+	for _, pl := range []string{"nx-os", "ios", "ios-xe", "wlc-9800"} {
+		for _, cmd := range []string{"show version > bootflash:x", "show version >> x", "show version | include a > x", "show version | include `x`", "show version | include $(x)", "show $(x)"} {
+			if err := CheckDenied(pl, cmd); !errors.Is(err, ErrDenied) {
+				t.Errorf("%s %q: se aceptó", pl, cmd)
+			}
+		}
+	}
+	if err := CheckDenied("ios-xe", "show running-config | include ^interface.*$"); err != nil {
+		t.Error("el ancla $ de una regex en IOS debe pasar:", err)
+	}
+	if err := CheckDenied("nx-os", "show running-config | include up$"); err == nil {
+		t.Error("nx-os rechaza cualquier $")
+	}
+}
+
 // Plataforma mal marcada: una regla de IOS aplicada a un Nexus no deja pasar los comandos de shell tras un pipe.
 func TestCheckDeniedIOSRechazaShellDeNXOSTrasPipe(t *testing.T) {
 	for _, tok := range []string{"sed", "awk", "python", "python3", "bash", "run", "source", "tclsh", "vsh", "email", "diff", "less", "xargs"} {
 		if err := CheckDenied("ios-xe", "show version | include a | "+tok+" x"); !errors.Is(err, ErrDenied) {
 			t.Errorf("%s: se aceptó", tok)
+		}
+	}
+	for _, tok := range []string{"em", "ema", "vs", "pe", "perl", "ss", "sscp", "se", "cu", "cut", "tr", "pyt", "ba", "ru", "sou", "tcl", "di", "le", "xar"} {
+		if err := CheckDenied("ios-xe", "show version | include a | "+tok+" x"); !errors.Is(err, ErrDenied) {
+			t.Errorf("abreviatura %s: se aceptó", tok)
+		}
+	}
+	for _, ok := range []string{"show version | include a | include b", "show version | include \"a|down\" | exclude x", "show version | include a | trunk"} {
+		if err := CheckDenied("ios-xe", ok); err != nil {
+			t.Errorf("%q: %v", ok, err)
 		}
 	}
 	if err := CheckDenied("ios-xe", "show version | include a | include b"); err != nil {

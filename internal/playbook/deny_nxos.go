@@ -2,6 +2,7 @@ package playbook
 
 import (
 	"net/netip"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -21,31 +22,110 @@ var nxWriteArgs = []string{"binary", "tar", "compressed", "gzip"}
 // Palabras de ping/traceroute de NX-OS que abren un sub-diálogo o cambian el modo: un destino que las abrevie se rechaza.
 var nxProbeKeywords = []string{"vrf", "multicast", "mpls", "nve", "ip", "ipv6", "ethernet", "mac", "source", "source-interface"}
 
-// splitPipes parte cmd por «|» fuera de comillas dobles; false si quedó una comilla sin cerrar. NX-OS trata cada «|»
-// como un pipe nuevo, pero dentro de comillas es parte de la expresión regular («egrep "A|B"»).
+// splitPipes parte cmd por «|» fuera de comillas dobles; false si las comillas no son limpias. NX-OS trata cada «|»
+// como un pipe nuevo, pero dentro de comillas es parte de la expresión regular («egrep "A|B"»). Una «"» solo abre al
+// inicio de una palabra (tras inicio, espacio o «|») y solo cierra si la sigue espacio, «|» o el fin; cualquier otra
+// (a media palabra, «""», «\"») se rechaza: cómo las lee NX-OS no está claro y una mal leída esconde un «|».
 func splitPipes(cmd string) ([]string, bool) {
-	if strings.Contains(cmd, `""`) || strings.Contains(cmd, `\"`) { // cómo las lee NX-OS (¿comilla escapada?) no está claro: fuera
-		return nil, false
-	}
 	var segs []string
 	start, in := 0, false
 	for i := 0; i < len(cmd); i++ {
-		switch cmd[i] {
-		case '"':
-			in = !in
-		case '|':
-			if !in {
-				segs, start = append(segs, cmd[start:i]), i+1
+		c := cmd[i]
+		switch {
+		case c == '"' && !in:
+			if i > 0 && cmd[i-1] != ' ' && cmd[i-1] != '|' {
+				return nil, false
 			}
+			in = true
+		case c == '"':
+			if i+1 < len(cmd) && cmd[i+1] != ' ' && cmd[i+1] != '|' || cmd[i-1] == '"' || cmd[i-1] == '\\' {
+				return nil, false
+			}
+			in = false
+		case c == '\\' && i+1 < len(cmd) && cmd[i+1] == '"':
+			return nil, false
+		case c == '|' && !in:
+			segs, start = append(segs, cmd[start:i]), i+1
 		}
 	}
 	return append(segs, cmd[start:]), !in
 }
 
+// pipeTokens parte un segmento de pipe por espacios fuera de comillas (splitPipes ya validó que son limpias).
+func pipeTokens(seg string) []string {
+	var toks []string
+	start, in := -1, false
+	for i := 0; i <= len(seg); i++ {
+		if i < len(seg) && seg[i] == '"' {
+			in = !in
+		}
+		if i == len(seg) || seg[i] == ' ' && !in {
+			if start >= 0 {
+				toks, start = append(toks, seg[start:i]), -1
+			}
+		} else if start < 0 {
+			start = i
+		}
+	}
+	return toks
+}
+
+// Token con forma de sistema de archivos (bootflash:, volatile:, logflash:, usb1:, slot0:…) o ruta absoluta: un
+// argumento de pipe así escribe o lee un archivo. Un prefijo de hasta 4 dígitos hexadecimales (un IPv6, «2001:db8::1»)
+// no cuenta.
+var nxFSToken = regexp.MustCompile(`^[a-z0-9-]+:`)
+var hextet = regexp.MustCompile(`^[0-9a-f]{1,4}:`)
+
+func nxFileLike(tok string) bool {
+	t := strings.Trim(tok, `"`)
+	return strings.HasPrefix(t, "/") || nxFSToken.MatchString(t) && !hextet.MatchString(t)
+}
+
+// Opciones de los filtros de texto: palabras largas y sus formas cortas; «next N» y «prev N» llevan un número.
+var nxFilterOpts = []string{"ignore-case", "invert-match", "count", "line-number", "word-exp", "-i", "-v", "-c", "-n", "-w", "-x"}
+
+func isNum(s string) bool {
+	_, ok := probeNum(s, 0, 9999)
+	return ok
+}
+
+// checkNXPipe valida un segmento de pipe: operador completo de la lista blanca y sus argumentos.
+func checkNXPipe(seg string) bool {
+	t := pipeTokens(seg)
+	if len(t) == 0 || !slices.Contains(nxPipeOK, t[0]) {
+		return false
+	}
+	for _, a := range t[1:] {
+		if nxFileLike(a) {
+			return false
+		}
+	}
+	args := t[1:]
+	switch t[0] {
+	case "include", "exclude", "begin", "section", "grep", "egrep":
+		pat := 0
+		for i := 0; i < len(args); i++ {
+			switch {
+			case slices.Contains(nxFilterOpts, args[i]):
+			case (args[i] == "next" || args[i] == "prev") && i+1 < len(args) && isNum(args[i+1]):
+				i++
+			default:
+				pat++ // el patrón: uno solo (con espacios va entre comillas)
+			}
+		}
+		return pat == 1
+	case "head":
+		return len(args) == 0 || len(args) == 1 && isNum(args[0]) || len(args) == 2 && args[0] == "lines" && isNum(args[1])
+	case "last":
+		return len(args) == 0 || len(args) == 1 && isNum(args[0])
+	}
+	return len(args) == 0 // count wc no-more json json-pretty xml end sort uniq
+}
+
 // checkNXOS aplica las reglas de CheckDenied a un comando de NX-OS (ya validado como ASCII imprimible y sin «;»).
 func checkNXOS(cmd string) error {
-	if strings.Contains(cmd, ">") { // «> bootflash:f» y «>> f» escriben
-		return denied(cmd, "playbook.why.redirect")
+	if strings.Contains(cmd, "$") { // NX-OS sustituye variables («cli var»): fuera
+		return denied(cmd, "playbook.why.subst")
 	}
 	segs, ok := splitPipes(strings.ToLower(cmd))
 	if !ok {
@@ -70,7 +150,7 @@ func checkNXOS(cmd string) error {
 	default:
 		return denied(cmd, "playbook.why.not_read")
 	}
-	tech := len(fields) > 1 && len(fields[1]) >= 4 && strings.HasPrefix("tech-support", fields[1])
+	tech := len(fields) > 1 && len(fields[1]) >= 3 && strings.HasPrefix("tech-support", fields[1])
 	for _, f := range fields[1:] {
 		if remotePath(f) {
 			return denied(cmd, "playbook.why.remote")
@@ -87,8 +167,7 @@ func checkNXOS(cmd string) error {
 		}
 	}
 	for _, seg := range segs[1:] { // lista blanca en TODOS los segmentos, con la palabra completa
-		f := strings.Fields(seg)
-		if len(f) == 0 || !slices.Contains(nxPipeOK, f[0]) {
+		if !checkNXPipe(seg) {
 			return denied(cmd, "playbook.why.pipe_filter_nxos")
 		}
 	}
