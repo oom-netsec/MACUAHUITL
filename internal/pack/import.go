@@ -31,6 +31,15 @@ func (s *Store) TakenScriptNames() []string {
 	return names
 }
 
+// TakenScriptNamesEN son los nombres con que se ven en inglés los scripts de la base y de los paquetes instalados.
+func (s *Store) TakenScriptNamesEN() []string {
+	names := slices.Clone(s.base.ScriptNamesEN)
+	for _, p := range s.snap.Load().Packs {
+		names = append(names, namesShownEN(p)...)
+	}
+	return names
+}
+
 // VerifyImport hace los pasos 2 a 6 del ADR para importar a «Mis scripts» (fase 32b). Solo vale un paquete sin firma:
 // uno con firma oficial se instala, no se importa, porque sus IDs van sin prefijo de editor.
 func (s *Store) VerifyImport(data []byte) (*Pack, error) {
