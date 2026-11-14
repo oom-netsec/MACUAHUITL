@@ -246,6 +246,9 @@ func (c *Core) loadUser() error {
 		if pbs, err = playbook.Load(os.DirFS(user)); err != nil {
 			return err
 		}
+		for i := range pbs {
+			pbs[i].Pack = playbook.PackUsuario // el origen distingue a un playbook del usuario de uno oficial con Pack vacío
+		}
 	}
 	c.userPbs.Store(&pbs)
 	return nil
@@ -295,7 +298,13 @@ func (c *Core) buildCatalog() {
 	for _, p := range c.packs.Snapshot().Packs {
 		merge(p.Playbooks)
 	}
-	merge(c.userPlaybooks())
+	for _, u := range c.userPlaybooks() {
+		// El que reemplaza a uno de la base conserva su Pack vacío: así el gemelo y Visible no cambian por tapar la base.
+		if i := slices.IndexFunc(pbs, func(p playbook.Playbook) bool { return p.ID == u.ID }); i >= 0 && pbs[i].Pack == "" {
+			u.Pack = ""
+		}
+		merge([]playbook.Playbook{u})
+	}
 	c.pbs.Store(&pbs)
 }
 

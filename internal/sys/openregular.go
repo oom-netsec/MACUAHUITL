@@ -1,8 +1,11 @@
 package sys
 
 import (
+	"errors"
 	"os"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
@@ -80,3 +83,19 @@ func Owner(fi os.FileInfo) (uid uint32, ok bool) {
 
 // ONoFollow es el indicador O_NOFOLLOW de open(2): falla si el último componente es un enlace simbólico.
 const ONoFollow = syscall.O_NOFOLLOW
+
+// RenameNoReplaceIn renombra old a new dentro de root sin sobrescribir (renameat2 con RENAME_NOREPLACE); falla con
+// fs.ErrExist si new existe.
+func RenameNoReplaceIn(root *os.Root, old, new string) error {
+	d, err := root.Open(".")
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	return unix.Renameat2(int(d.Fd()), old, int(d.Fd()), new, unix.RENAME_NOREPLACE)
+}
+
+// NoAtomicRename dice si err es que el sistema de archivos no sabe renombrar sin sobrescribir.
+func NoAtomicRename(err error) bool {
+	return errors.Is(err, unix.EINVAL) || errors.Is(err, unix.ENOSYS) || errors.Is(err, unix.EOPNOTSUPP) || errors.Is(err, unix.EPERM)
+}
