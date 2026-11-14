@@ -38,6 +38,7 @@ const (
 	tailMax  = 256
 	lineMax  = 64 << 10 // una línea (de salida o tecleada) más larga se recorta
 	heldMax  = 32       // líneas tecleadas retenidas a la espera de saber si eran una contraseña
+	sentMax  = 32       // líneas enviadas que esperan su eco
 	skipMax  = 4096     // líneas que se descartan dentro de una llave privada sin cierre
 	totalMax = 256 << 20
 )
@@ -56,7 +57,7 @@ type Recorder struct {
 	held    []string
 	lastBlk string      // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
 	typed   mask.Stream // lleva el bloque entre las líneas tecleadas
-	sent    string      // última línea tecleada y enviada, solo en memoria: se borra al apagarse cont o al ver su eco
+	sent    []string    // líneas tecleadas y enviadas cuyo eco aún no llegó completo (solo en memoria, con tope)
 	acc     string      // lo recibido del eco partido hasta ahora
 	cont    bool        // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
 	hidden  bool        // lo tecleado es una contraseña: no se graba
@@ -119,27 +120,36 @@ func (r *Recorder) Output(p []byte) {
 // outLine enmascara y escribe una línea de salida. El prompt (SW1(config)#) se conserva y se
 // analiza lo que sigue, que es el eco de lo tecleado o una línea de configuración.
 func (r *Recorder) outLine(l string) {
-	l = ansi.ReplaceAllString(l, "")
+	l = applyBackspaces(ansi.ReplaceAllString(l, ""))
 	out, keep := "", true
 	if pr := promptRe.FindString(l); pr != "" {
 		r.setPromptBlock(blockOfPrompt(pr))
 		echo := r.stream.Prompted(l[len(pr):], r.lastBlk)
-		// Eco partido: se sigue tecleando, o el texto recibido es un prefijo estricto de la línea enviada.
+		// Eco partido: se sigue tecleando, o el texto recibido es un prefijo estricto de la primera línea enviada
+		// que aún espera su eco. Un eco completo la saca de la cola; lo que no cuadra la vacía.
 		text := strings.TrimLeft(l[len(pr):], " \t") // tras el prompt va un espacio antes del eco
-		r.cont = echo != l[len(pr):] && (len(r.line) > 0 || r.sent != "" && text != r.sent && strings.HasPrefix(r.sent, text))
-		r.acc = text
-		if !r.cont {
-			r.sent = ""
+		partial := false
+		switch {
+		case len(r.sent) > 0 && text == r.sent[0]:
+			r.sent = r.sent[1:]
+		case len(r.sent) > 0 && text != "" && strings.HasPrefix(r.sent[0], text):
+			partial = true
+		default:
+			r.sent = nil
 		}
+		r.cont = echo != l[len(pr):] && (len(r.line) > 0 || partial)
+		r.acc = text
 		out = pr + echo
 	} else if r.cont && !equipoMsg(l) {
 		// Desde un eco enmascarado hasta el siguiente prompt, lo que no es syslog ni aviso del equipo
 		// es el resto del eco (partido por logs asíncronos): se tapa entero.
 		out = "<MASKED:secret>"
-		if r.sent != "" {
+		if len(r.sent) > 0 {
 			// El eco ya completó la línea enviada: lo que siga es salida normal.
-			if r.acc += l; !strings.HasPrefix(r.sent, r.acc) || r.acc == r.sent {
-				r.cont, r.sent = false, ""
+			if r.acc += l; r.acc == r.sent[0] {
+				r.cont, r.sent = false, r.sent[1:]
+			} else if !strings.HasPrefix(r.sent[0], r.acc) {
+				r.cont, r.sent = false, nil
 			}
 		}
 	} else {
@@ -259,8 +269,10 @@ func (r *Recorder) flush() {
 	}
 	// Un nuevo prompt de contraseña tiene que llegar en la salida: lo ya visto no vale para la línea siguiente.
 	r.hidden, r.line, r.tail, r.fresh = false, r.line[:0], nil, false
-	if r.sent = ""; !hidden {
-		r.sent = line
+	if !hidden && line != "" {
+		if r.sent = append(r.sent, line); len(r.sent) > sentMax {
+			r.sent = r.sent[1:]
+		}
 	}
 	switch {
 	case hidden:
@@ -301,4 +313,20 @@ func (r *Recorder) Close() {
 		r.input(r.typed.Typed(string(r.line)))
 	}
 	r.hidden, r.line = false, nil
+}
+
+// applyBackspaces aplica los retrocesos (\b, 0x7f y la secuencia «\b \b») que el equipo devuelve en el eco.
+func applyBackspaces(s string) string {
+	if !strings.ContainsAny(s, "\b\x7f") {
+		return s
+	}
+	out := make([]rune, 0, len(s))
+	for _, c := range s {
+		if c != '\b' && c != 0x7f {
+			out = append(out, c)
+		} else if len(out) > 0 {
+			out = out[:len(out)-1]
+		}
+	}
+	return string(out)
 }

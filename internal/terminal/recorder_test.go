@@ -552,3 +552,42 @@ func TestEcoPartidoDePegadoPorUnoYDosLogs(t *testing.T) {
 		}
 	}
 }
+
+// Pegado de varias líneas: el eco partido de la primera se tapa aunque la última enviada sea otra.
+func TestEcoPartidoDeLaPrimeraDeVariasLineasPegadas(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+	r.Input([]byte("key Secret\rtimeout 5\r"))
+	r.Output([]byte("key Se"))
+	r.Output([]byte("\r\n%ASA-5-111008: log\r\n"))
+	r.Output([]byte("cret\r\nciscoasa(config-aaa-server-host)# timeout 5\r\nciscoasa(config-aaa-server-host)# "))
+	r.Close()
+	out := b.String()
+	if strings.Contains(out, "Z cret\n") || !strings.Contains(out, "# timeout 5\n") {
+		t.Errorf("%s", out)
+	}
+}
+
+// Retroceso en el eco: «SecX» + «\b \b» + «ret» es «Secret»; se aplica antes de enmascarar, con y sin log en medio.
+func TestEcoConRetrocesoSeEnmascaraCompleto(t *testing.T) {
+	for _, conLog := range []bool{false, true} {
+		for _, bs := range []string{"\b \b", "\x7f", "\b"} {
+			r, b := newRec()
+			r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+			r.Input([]byte("key Secret\r"))
+			if conLog {
+				r.Output([]byte("key SecX" + bs))
+				r.Output([]byte("\r\n%ASA-5-111008: log\r\n"))
+				r.Output([]byte("ret\r\n"))
+			} else {
+				r.Output([]byte("key SecX" + bs + "ret\r\n"))
+			}
+			r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+			r.Close()
+			out := b.String()
+			if strings.Contains(out, "Z ret\n") || strings.Contains(out, "\b") || strings.Contains(out, "\x7f") || !strings.Contains(out, "# key <MASKED:aaa-key>\n") {
+				t.Errorf("log=%v bs=%q:\n%s", conLog, bs, out)
+			}
+		}
+	}
+}
