@@ -447,7 +447,7 @@ test("la casilla liga su ayuda y su error con aria-describedby", async () => {
 });
 
 test("en inglés, la plantilla y sus campos salen de las claves snippet.<id>.*", async () => {
-  localStorage.setItem("macuahuitl.idioma", "en");
+  localStorage.setItem("macuahuitl.lang", "en");
   try {
     const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
     render(<I18nProvider><SnippetsView core={core} /></I18nProvider>);
@@ -455,7 +455,7 @@ test("en inglés, la plantilla y sus campos salen de las claves snippet.<id>.*",
     expect(screen.getByLabelText("Ports *")).toBeInTheDocument();
     expect(screen.getByLabelText("Speed")).toHaveAccessibleDescription("Empty leaves it untouched. auto returns it to negotiation.");
     expect(screen.getByText("Layer 2")).toBeInTheDocument();
-  } finally { localStorage.removeItem("macuahuitl.idioma"); }
+  } finally { localStorage.removeItem("macuahuitl.lang"); }
 });
 
 test("cambiar de plantilla con el plan en vuelo descarta la respuesta", async () => {

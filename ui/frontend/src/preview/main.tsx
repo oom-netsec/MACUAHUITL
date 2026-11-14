@@ -12,7 +12,7 @@ import "../styles.css";
 const q = new URLSearchParams(location.search);
 try {
   if (q.get("theme")) localStorage.setItem("macuahuitl.tema", q.get("theme")!);
-  if (q.get("lang")) localStorage.setItem("macuahuitl.idioma", q.get("lang")!);
+  if (q.get("lang")) localStorage.setItem("macuahuitl.lang", q.get("lang")!);
 } catch { /* sin almacenamiento */ }
 // lib/theme.ts leyó el almacenamiento al importarse, antes de la línea de arriba: vuelve a leerlo para aplicar ?theme= en esta carga.
 resetTheme();
