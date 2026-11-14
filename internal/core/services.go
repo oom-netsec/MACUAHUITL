@@ -298,6 +298,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		if cancelled {
 			c.guard.Revoke(j.id)
 			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
+			c.closeCancelled(j)
 		}
 		c.persistJob(j) // la fase del Login Test ya guardó "arming"; al recargar no debe verse como caído
 		c.audit("job.arm_failed", j.id, reason)
@@ -411,6 +412,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 		os.Remove(w.Dir()) // la carpeta que creó NewWriter; Remove no borra una carpeta con contenido
 		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
+		c.closeCancelled(j)
 		return nil, service.Err(ctx, codes.FailedPrecondition, "patrol.svc.job_state", i18n.A("state", "cancelled"))
 	}
 	c.mu.Unlock()
@@ -549,12 +551,7 @@ func (s *patrolSvc) CancelJob(ctx context.Context, r *v1.CancelJobRequest) (*v1.
 	if created {
 		s.c.guard.Revoke(j.id)
 		s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
-		// Nunca pasa por finish: se publican los estados finales aquí para que quien lo vigila termine.
-		s.c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "cancelled"})
-		s.c.mu.Lock()
-		j.closed = true
-		s.c.mu.Unlock()
-		s.c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "closed"})
+		s.c.closeCancelled(j) // nunca pasa por finish
 		return &v1.CancelJobResponse{}, nil
 	}
 	s.c.sched.Cancel(j.id)
@@ -627,6 +624,16 @@ func (s *patrolSvc) GetRun(ctx context.Context, r *v1.GetRunRequest) (*v1.GetRun
 
 // ---- Eventos ----
 
+// closeCancelled cierra un trabajo cancelado que nunca llega a finish (cancelado antes de armar o mientras se arma):
+// publica cancelled, lo marca cerrado y publica closed, para que quien lo vigila termine.
+func (c *Core) closeCancelled(j *job) {
+	c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "cancelled"})
+	c.mu.Lock()
+	j.closed = true
+	c.mu.Unlock()
+	c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "closed"})
+}
+
 // closedJobs da, de los trabajos de ids que ya cerraron (manifest y zip hechos, o que nunca pasan por finish), los
 // eventos que el cliente se perdió: su estado final si lo hay y un "closed" con la hora de su última fase.
 func (c *Core) closedJobs(ids []string) map[string][]*v1.SubscribeResponse {
@@ -660,24 +667,29 @@ type eventSvc struct {
 
 func (s *eventSvc) Subscribe(r *v1.SubscribeRequest, st v1.EventService_SubscribeServer) error {
 	ids := slices.Compact(slices.Sorted(slices.Values(r.JobIds))) // sin repetidos: el cierre cuenta trabajos distintos
+	for _, id := range ids {
+		if _, err := s.c.getJobIn(st.Context(), id); err != nil { // un id que no existe no emitirá nunca: no se deja colgado
+			return err
+		}
+	}
 	ch, cancel := s.c.bus.Subscribe(ids)
 	defer cancel()
 	st.SendHeader(nil)
 	// Un trabajo ya cerrado no emitirá más: se manda su estado final y un "closed" y, si todos los pedidos cerraron,
 	// se cierra el stream (si no, el cliente lo dejaría abierto para siempre). Uno que aún está en finish (manifest
 	// y zip) no cuenta: su "closed" llegará por el bus. Se suscribe antes de mirar: un evento que llegue en medio
-	// sale dos veces, no se pierde.
-	if done := s.c.closedJobs(ids); len(done) > 0 {
-		for _, id := range ids {
-			for _, e := range done[id] {
-				if err := st.Send(e); err != nil {
-					return err
-				}
+	// se descarta abajo para los ya enviados, no se pierde para los demás.
+	done := s.c.closedJobs(ids)
+	for _, id := range ids {
+		for _, e := range done[id] {
+			if err := st.Send(e); err != nil {
+				return err
 			}
 		}
-		if len(done) == len(ids) {
-			return nil
-		}
+	}
+	closed := len(done)
+	if len(ids) > 0 && closed == len(ids) {
+		return nil
 	}
 	for {
 		select {
@@ -687,8 +699,17 @@ func (s *eventSvc) Subscribe(r *v1.SubscribeRequest, st v1.EventService_Subscrib
 			if !ok {
 				return nil
 			}
+			if _, was := done[e.JobID]; was { // ya mandado en el sintético
+				continue
+			}
 			if err := st.Send(eventToProto(i18n.Locale(st.Context()), e)); err != nil {
 				return err
+			}
+			if e.Kind == engine.JobState && e.State == "closed" && len(ids) > 0 && slices.Contains(ids, e.JobID) {
+				done[e.JobID] = nil // contado: con todos cerrados, el stream termina
+				if closed++; closed == len(ids) {
+					return nil
+				}
 			}
 		}
 	}
