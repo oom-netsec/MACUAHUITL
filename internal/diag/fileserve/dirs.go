@@ -126,11 +126,11 @@ func checkFileDeny(file string, extra []string) error {
 			}
 		}
 	}
-	// Directo en $HOME (.bash_history, .netrc, .git-credentials…): igual que $HOME como carpeta de envío.
+	// Oculto directo en $HOME (.bash_history, .netrc, .git-credentials…): no se publica; uno visible (~/c9300.bin) sí.
 	if home, err := os.UserHomeDir(); err == nil && filepath.IsAbs(home) {
 		hr, _ := filepath.EvalSymlinks(home)
 		for _, p := range paths {
-			if d := filepath.Dir(p); d == filepath.Clean(home) || d == hr {
+			if d := filepath.Dir(p); (d == filepath.Clean(home) || d == hr) && strings.HasPrefix(filepath.Base(p), ".") {
 				return i18n.New("fileserve.err.dir_home", nil)
 			}
 		}

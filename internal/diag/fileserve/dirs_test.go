@@ -405,10 +405,22 @@ func TestPublishRechazaArchivosSensibles(t *testing.T) {
 			t.Errorf("%s: prepare lo aceptó", name)
 		}
 	}
-	hist := filepath.Join(home, ".bash_history")
-	os.WriteFile(hist, []byte("h"), 0o600)
-	if _, err := Publish([]string{hist}); err == nil {
-		t.Error("archivo directo en $HOME publicado")
+	for _, n := range []string{".bash_history", ".netrc"} {
+		h := filepath.Join(home, n)
+		os.WriteFile(h, []byte("h"), 0o600)
+		if _, err := Publish([]string{h}); err == nil {
+			t.Errorf("~/%s publicado", n)
+		}
+	}
+	vis := filepath.Join(t.TempDir(), "visible.txt") // enlace visible a un oculto de $HOME
+	os.Symlink(filepath.Join(home, ".netrc"), vis)
+	if _, err := Publish([]string{vis}); err == nil {
+		t.Error("enlace visible a ~/.netrc publicado")
+	}
+	fw := filepath.Join(home, "firmware.bin")
+	os.WriteFile(fw, []byte("f"), 0o600)
+	if _, err := Publish([]string{fw}); err != nil {
+		t.Errorf("~/firmware.bin visible debe poder publicarse: %v", err)
 	}
 	ok := filepath.Join(t.TempDir(), "a.bin")
 	os.WriteFile(ok, []byte("x"), 0o600)
