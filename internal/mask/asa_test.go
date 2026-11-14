@@ -58,6 +58,21 @@ var asaCases = []struct{ in, want string }{
 	{"ENABLE PASSWORD Secret", "ENABLE PASSWORD <MASKED:enable-secret>"},
 	// Solo «*****» exacto queda igual: una clave real de asteriscos se tapa.
 	{"failover key ********", "failover key <MASKED:failover-key>"},
+	// Claves tipo 0 con espacios: se tapa todo hasta el fin de línea o hasta la palabra propia del comando.
+	{"username bob password 0 open version two", "username bob password 0 <MASKED:user-secret>"},
+	{"username bob secret 0 my rw pass", "username bob secret 0 <MASKED:user-secret>"},
+	{"snmp-server community 0 my ro word RW", "snmp-server community 0 <MASKED:snmp-community> RW"},
+	{"snmp-server community 0 my pass RO", "snmp-server community 0 <MASKED:snmp-community> RO"},
+	{" ikev1 pre-shared-key 0 go udp-port now", " ikev1 pre-shared-key 0 <MASKED:psk>"},
+	{"snmp-server host inside 10.1.1.1 community 0 my version two version 2c udp-port 162", "snmp-server host inside 10.1.1.1 community 0 <MASKED:snmp-community> version 2c udp-port 162"},
+	{" authentication key eigrp 100 0 my key-id pass key-id 1", " authentication key eigrp 100 0 <MASKED:eigrp-key> key-id 1"},
+	{"vpdn username u1 password 0 a b store-local", "vpdn username u1 password 0 <MASKED:user-secret> store-local"},
+	// Host de IOS por nombre con comunidad que parece IP; en ASA «interfaz IP» sigue sin tocarse.
+	{"snmp-server host nms01 cafe:01", "snmp-server host nms01 <MASKED:snmp-community>"},
+	{"snmp-server host inside nms01 poll", "snmp-server host inside nms01 poll"},
+	{"snmp-server host inside nms01 version 3 user1", "snmp-server host inside nms01 version 3 user1"},
+	{"snmp-server host nms01 version 2c Comm1", "snmp-server host nms01 version 2c <MASKED:snmp-community>"},
+	{"snmp-server host 10.0.0.9 Comm1 udp-port 162", "snmp-server host 10.0.0.9 <MASKED:snmp-community> udp-port 162"},
 	// Sin falsos positivos.
 	{" description key server for vpn", " description key server for vpn"},
 	{"ssh key-exchange group dh-group14-sha256", "ssh key-exchange group dh-group14-sha256"},

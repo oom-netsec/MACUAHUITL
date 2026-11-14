@@ -54,6 +54,7 @@ type Recorder struct {
 	tail    []byte // últimos bytes de salida desde el último Enter, para reconocer el prompt
 	fresh   bool   // llegó salida desde el último Enter
 	held    []string
+	lastBlk string   // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
 	heldBlk []string // bloque del prompt con que se tecleó cada línea retenida
 	hidden  bool     // lo tecleado es una contraseña: no se graba
 	line    []byte   // lo tecleado en la línea actual
@@ -118,7 +119,8 @@ func (r *Recorder) outLine(l string) {
 	l = ansi.ReplaceAllString(l, "")
 	out, keep := "", true
 	if pr := promptRe.FindString(l); pr != "" {
-		out = pr + r.stream.Prompted(l[len(pr):], blockOfPrompt(pr))
+		r.lastBlk = blockOfPrompt(pr)
+		out = pr + r.stream.Prompted(l[len(pr):], r.lastBlk)
 	} else {
 		out, keep = r.stream.Line(l)
 	}
@@ -217,7 +219,10 @@ func maskTyped(s, block string) string {
 // flush trata la línea tecleada al pulsar Enter. Requiere r.mu.
 func (r *Recorder) flush() {
 	line, hidden, fresh := string(r.line), r.hidden, r.fresh
-	blk := blockOfPrompt(promptRe.FindString(r.lastLine()))
+	if pr := promptRe.FindString(r.lastLine()); pr != "" {
+		r.lastBlk = blockOfPrompt(pr)
+	}
+	blk := r.lastBlk
 	// Un nuevo prompt de contraseña tiene que llegar en la salida: lo ya visto no vale para la línea siguiente.
 	r.hidden, r.line, r.tail, r.fresh = false, r.line[:0], nil, false
 	switch {
@@ -256,7 +261,7 @@ func (r *Recorder) Close() {
 	}
 	r.commitHeld()
 	if !r.hidden && len(r.line) > 0 {
-		r.input(maskTyped(string(r.line), ""))
+		r.input(maskTyped(string(r.line), r.lastBlk))
 	}
 	r.hidden, r.line = false, nil
 }

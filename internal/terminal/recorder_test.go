@@ -236,3 +236,48 @@ func TestEnmascaraTecleadoEnBloqueDeASA(t *testing.T) {
 		t.Errorf("%s", out)
 	}
 }
+
+// El bloque del prompt vale también para líneas pegadas, con log intercalado o a medias al cerrar.
+func TestEnmascaraTecleadoSinPromptPropio(t *testing.T) {
+	casos := []struct {
+		prompt string
+		in     []string
+		out    string
+		leak   []string
+	}{
+		{"ciscoasa(config-aaa-server-host)# ", []string{"key K1\rkey K2\r"}, "key K2\r\nciscoasa(config-aaa-server-host)# ", []string{"K1", "K2"}},
+		{"ciscoasa(config-smart-lic)# ", []string{"token TOK1\rtoken TOK999\r"}, "", []string{"TOK1", "TOK999"}},
+		{"ciscoasa(config-aaa-server-host)# ", []string{"key Se", "cret\r"}, "%ASA-5-111008: User 'x' executed", []string{"Secret"}},
+		{"ciscoasa(config-aaa-server-host)# ", []string{"key Pend"}, "", []string{"Pend"}},
+	}
+	for i, c := range casos {
+		r, b := newRec()
+		r.Output([]byte(c.prompt))
+		for j, in := range c.in {
+			r.Input([]byte(in))
+			if j == 0 && c.out != "" && len(c.in) > 1 {
+				r.Output([]byte(c.out + "\r\n"))
+			}
+		}
+		r.Close()
+		out := b.String()
+		for _, l := range c.leak {
+			if strings.Contains(out, l) {
+				t.Errorf("caso %d: quedó en claro %q:\n%s", i, l, out)
+			}
+		}
+	}
+}
+
+// exit saca del bloque: lo tecleado después ya no lleva el bloque anterior.
+func TestSalirDelBloqueQuitaElBloqueDelTeclado(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+	r.Input([]byte("exit\r"))
+	r.Output([]byte("exit\r\nciscoasa(config)# "))
+	r.Input([]byte("hostname FW1\r"))
+	r.Close()
+	if out := b.String(); !strings.Contains(out, ">>> hostname FW1") {
+		t.Errorf("%s", out)
+	}
+}
