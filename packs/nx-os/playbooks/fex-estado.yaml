@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: fex-estado
 platform: nx-os
-name: FEX · Estado de extensores
-name_en: FEX · Fabric extender status
+name: NX-OS · FEX · Estado de extensores
+name_en: NX-OS · FEX · Fabric extender status
 commands:
   - cmd: show fex
   - cmd: show fex detail

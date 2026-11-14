@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-vpc-inconsistente
 platform: nx-os
-name: TAC · vPC inconsistente o caído
-name_en: TAC · vPC inconsistent or down
+name: NX-OS · TAC · vPC inconsistente o caído
+name_en: NX-OS · TAC · vPC inconsistent or down
 commands:
   - cmd: show clock
   - cmd: show vpc

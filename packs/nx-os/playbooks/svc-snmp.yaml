@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: svc-snmp
 platform: nx-os
-name: Servicios · SNMP
-name_en: Services · SNMP
+name: NX-OS · Servicios · SNMP
+name_en: NX-OS · Services · SNMP
 commands:
   - cmd: show snmp
   - cmd: show snmp community

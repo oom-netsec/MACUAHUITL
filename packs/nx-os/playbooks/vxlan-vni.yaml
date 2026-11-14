@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: vxlan-vni
 platform: nx-os
-name: VXLAN · VNIs y VLANs
-name_en: VXLAN · VNIs and VLANs
+name: NX-OS · VXLAN · VNIs y VLANs
+name_en: NX-OS · VXLAN · VNIs and VLANs
 commands:
   - cmd: show nve vni
   - cmd: show nve vni summary

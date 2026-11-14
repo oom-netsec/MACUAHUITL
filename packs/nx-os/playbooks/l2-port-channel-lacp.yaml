@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l2-port-channel-lacp
 platform: nx-os
-name: L2 · Port-channel y LACP
-name_en: L2 · Port-channel and LACP
+name: NX-OS · L2 · Port-channel y LACP
+name_en: NX-OS · L2 · Port-channel and LACP
 commands:
   - cmd: show port-channel summary
   - cmd: show port-channel database

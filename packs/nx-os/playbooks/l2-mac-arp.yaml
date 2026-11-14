@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l2-mac-arp
 platform: nx-os
-name: L2 · MAC y ARP
-name_en: L2 · MAC and ARP
+name: NX-OS · L2 · MAC y ARP
+name_en: NX-OS · L2 · MAC and ARP
 commands:
   - cmd: show mac address-table count
   - cmd: show mac address-table notification mac-move

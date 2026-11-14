@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: vxlan-evpn-bgp
 platform: nx-os
-name: VXLAN · BGP EVPN
-name_en: VXLAN · BGP EVPN
+name: NX-OS · VXLAN · BGP EVPN
+name_en: NX-OS · VXLAN · BGP EVPN
 commands:
   - cmd: show bgp l2vpn evpn summary
   - cmd: show bgp process

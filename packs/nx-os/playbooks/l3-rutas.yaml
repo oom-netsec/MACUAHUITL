@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l3-rutas
 platform: nx-os
-name: L3 · Tabla de ruteo
-name_en: L3 · Routing table
+name: NX-OS · L3 · Tabla de ruteo
+name_en: NX-OS · L3 · Routing table
 commands:
   - cmd: show ip route summary
   - cmd: show ip route vrf all summary

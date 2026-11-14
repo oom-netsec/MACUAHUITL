@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: fex-red-vpc
 platform: nx-os
-name: FEX · FEX en vPC y port-channel
-name_en: FEX · FEX with vPC and port-channel
+name: NX-OS · FEX · FEX en vPC y port-channel
+name_en: NX-OS · FEX · FEX with vPC and port-channel
 commands:
   - cmd: show fex
   - cmd: show vpc

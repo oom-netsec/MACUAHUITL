@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l1-transceptores-dom
 platform: nx-os
-name: L1 · Transceptores y DOM
-name_en: L1 · Transceivers and DOM
+name: NX-OS · L1 · Transceptores y DOM
+name_en: NX-OS · L1 · Transceivers and DOM
 commands:
   - cmd: show interface transceiver
     timeout: 180s

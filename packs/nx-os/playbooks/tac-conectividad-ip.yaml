@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-conectividad-ip
 platform: nx-os
-name: TAC · Conectividad hacia una IP
-name_en: TAC · Connectivity to an IP
+name: NX-OS · TAC · Conectividad hacia una IP
+name_en: NX-OS · TAC · Connectivity to an IP
 params:
   - name: ip
     kind: ip
