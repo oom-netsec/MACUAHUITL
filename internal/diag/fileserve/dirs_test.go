@@ -576,3 +576,17 @@ func TestXDGFueraDeHomeSeBloqueaEntero(t *testing.T) {
 		t.Errorf("una carpeta normal se rechazó: %v", err)
 	}
 }
+
+// Un XDG_CONFIG_HOME que pasa por un enlace simbólico también bloquea su ruta real (la que se elige al servir).
+func TestXDGPorEnlaceBloqueaLaRutaReal(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	real := t.TempDir()
+	os.MkdirAll(filepath.Join(real, "autostart"), 0o700)
+	link := filepath.Join(t.TempDir(), "cfg")
+	os.Symlink(real, link)
+	t.Setenv("XDG_CONFIG_HOME", link)
+	t.Setenv("XDG_DATA_HOME", "")
+	if _, err := ValidateDir(filepath.Join(real, "autostart")); err == nil {
+		t.Fatal("la ruta real del XDG_CONFIG_HOME enlazado se aceptó")
+	}
+}

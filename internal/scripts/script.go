@@ -77,10 +77,15 @@ func in(list []string, v string) bool {
 	return false
 }
 
+func bidi(r rune) bool {
+	return r == 0x061c || r == 0x200e || r == 0x200f || r >= 0x202a && r <= 0x202e || r >= 0x2066 && r <= 0x2069
+}
+
 func hasControl(s string, allowNL bool) bool {
 	for _, r := range s {
-		// Cf: formato (bidi, U+202E…) que cambia cómo se ve el texto sin cambiar lo que dice (trojan source).
-		if (unicode.IsControl(r) || unicode.Is(unicode.Cf, r)) && !(allowNL && r == '\n') {
+		// Los de dirección (bidi) cambian cómo se ve el texto sin cambiar lo que dice (trojan source); otros de formato,
+		// como el ZWJ de un emoji, son legítimos.
+		if (unicode.IsControl(r) || bidi(r)) && !(allowNL && r == '\n') {
 			return true
 		}
 	}

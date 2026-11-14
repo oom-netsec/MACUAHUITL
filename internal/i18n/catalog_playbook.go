@@ -21,7 +21,7 @@ func init() {
 		"playbook.err.no_commands":   e("sin comandos", "no commands"),
 		"playbook.err.platform":      e("plataforma desconocida {platform:q} en platforms de {cmd:q}", "unknown platform {platform:q} in platforms of {cmd:q}", "platform", "cmd"),
 		"playbook.err.empty_command": e("comando vacío", "empty command"),
-		"playbook.err.text":          e("{field} lleva caracteres de control o de formato (bidi) que cambian cómo se ve el texto", "{field} contains control or format (bidi) characters that change how the text looks", "field"),
+		"playbook.err.text":          e("{field} lleva caracteres de control o de dirección (bidi) que cambian cómo se ve el texto", "{field} contains control or direction (bidi) characters that change how the text looks", "field"),
 		"playbook.err.timeout":       e("timeout {timeout:q} inválido en {cmd:q}", "invalid timeout {timeout:q} in {cmd:q}", "timeout", "cmd"),
 		"playbook.err.timeout_max":   e("timeout {timeout:q} de {cmd:q} pasa el máximo de {max}", "timeout {timeout:q} of {cmd:q} exceeds the maximum of {max}", "timeout", "cmd", "max"),
 		"sys.err.not_regular":        e("la ruta no es un archivo regular", "the path is not a regular file"),

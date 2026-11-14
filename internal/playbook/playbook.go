@@ -159,14 +159,11 @@ func parse(b []byte) (Playbook, error) {
 	if len(f.Commands) == 0 {
 		return Playbook{}, i18n.New("playbook.err.no_commands", nil)
 	}
+	// Los comandos ya los limita CheckDenied a ASCII imprimible; en los nombres solo se rechazan los controles y los
+	// de dirección (un emoji con ZWJ o un guion suave son legítimos y un playbook propio que no carga tumba el arranque).
 	for field, v := range map[string]string{"name": f.Name, "name_en": f.NameEn} {
 		if hidden(v) {
 			return Playbook{}, i18n.New("playbook.err.text", i18n.A("field", field))
-		}
-	}
-	for _, c := range append(slices.Clone(f.Pre), cmdTexts(f.Commands)...) {
-		if hidden(c) {
-			return Playbook{}, i18n.New("playbook.err.text", i18n.A("field", "cmd"))
 		}
 	}
 	p := Playbook{ID: f.Platform + "/" + f.ID, Platform: f.Platform, Name: f.Name, NameEn: f.NameEn, Pre: f.Pre}
@@ -206,10 +203,12 @@ func parse(b []byte) (Playbook, error) {
 	return p, nil
 }
 
-// hidden dice si s lleva caracteres de control o de formato (Cf: bidi U+202E…), que cambian cómo se ve el texto sin
-// cambiar lo que dice (trojan source).
+// hidden dice si s lleva caracteres de control o de dirección (bidi: U+061C, U+200E/F, U+202A-202E, U+2066-2069),
+// que cambian cómo se ve el texto sin cambiar lo que dice (trojan source).
 func hidden(s string) bool {
-	return strings.ContainsFunc(s, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) })
+	return strings.ContainsFunc(s, func(r rune) bool {
+		return unicode.IsControl(r) || r == 0x061c || r == 0x200e || r == 0x200f || r >= 0x202a && r <= 0x202e || r >= 0x2066 && r <= 0x2069
+	})
 }
 
 func cmdTexts(cs []fileCommand) []string {

@@ -275,3 +275,12 @@ func TestLoadRechazaBidiYControl(t *testing.T) {
 		}
 	}
 }
+
+// Un nombre con caracteres de formato legítimos (emoji con ZWJ, guion suave) sigue cargando: solo se rechazan los
+// controles de dirección (bidi). Un playbook propio que no carga tumbaría el arranque del núcleo.
+func TestLoadAceptaFormatoLegitimoEnNombre(t *testing.T) {
+	body := "id: a\nplatform: ios-xe\nname: \"STP \\U0001F468\\u200D\\U0001F4BB re\\u00ADvisión\"\ncommands: [{cmd: show clock}]\n"
+	if _, err := Load(fstest.MapFS{"cisco/ios-xe/a.yaml": {Data: []byte(body)}}); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -149,3 +149,18 @@ func TestValidateRechazaBidi(t *testing.T) {
 		}
 	}
 }
+
+// Emoji con ZWJ o guion suave en nombre y descripción siguen valiendo (datos ya guardados se pueden editar e
+// importar); solo los controles de dirección (bidi) se rechazan.
+func TestValidateAceptaFormatoLegitimo(t *testing.T) {
+	s := valido()
+	s.Name = "Mi \U0001F468‍\U0001F4BB script"
+	s.Description = "re­visión\nde VLAN"
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	s.Name = "Mi ؜script"
+	if err := s.Validate(); err == nil {
+		t.Fatal("U+061C aceptado")
+	}
+}
