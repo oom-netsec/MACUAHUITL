@@ -12,7 +12,8 @@ import (
 // zipFiles crea <dir>/<name>.zip con los archivos dados (rutas relativas a dir).
 // Solo archivos regulares: un symlink no se sigue. Con deleteLoose borra los
 // archivos empaquetados salvo manifest.json y las carpetas que queden vacías.
-func zipFiles(dir, name string, files []string, deleteLoose bool) (string, error) {
+func zipFiles(w *Writer, name string, files []string, deleteLoose bool) (string, error) {
+	dir := w.dir
 	out := filepath.Join(dir, name+".zip")
 	f, err := os.OpenFile(out, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
@@ -65,6 +66,9 @@ func zipFiles(dir, name string, files []string, deleteLoose bool) (string, error
 		return "", fmt.Errorf("patrol: zip: %w", err)
 	}
 	if deleteLoose {
+		// Write hace MkdirAll y abre el archivo bajo w.mu: sin él, la carpeta de un equipo podría borrarse entre ambos pasos.
+		w.mu.Lock()
+		defer w.mu.Unlock()
 		for _, rel := range files {
 			if rel != "manifest.json" {
 				os.Remove(filepath.Join(dir, rel))
