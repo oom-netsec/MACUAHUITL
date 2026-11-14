@@ -454,9 +454,7 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	}
 	// FTD: la primera línea de la respuesta debe ser el eco del comando (normalizado; envuelto o truncado también vale);
 	// si no, es la cola del comando anterior: la sesión está desfasada.
-	if d.sentinel && err == nil && !echoFirst(text, cmd) {
-		d.incomplete = true
-	}
+	desync := d.sentinel && err == nil && !echoFirst(text, cmd)
 	// Quitar eco (primera línea) y prompt (última línea).
 	if i := strings.IndexByte(text, '\n'); i >= 0 && strings.TrimSpace(text[:i]) == cmd {
 		text = text[i+1:]
@@ -466,8 +464,10 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 		if d.confirmed { // el prompt del comando y el del Enter de cola: se quitan los dos
 			text = text[:strings.LastIndexByte(strings.TrimSuffix(text, "\n"), '\n')+1]
 		}
-		out.Incomplete = d.incomplete
-		if d.incomplete { // desfasado (calma agotada o respuesta sin eco): la sesión ya no sirve, se debe reconectar
+		// Cierre por calma: incompleto, pero la sesión sigue (si el equipo descarta el Enter de cola, todos los comandos
+		// cerrarían así). Respuesta sin eco: es la cola del comando anterior, la sesión ya no sirve y se debe reconectar.
+		out.Incomplete = d.incomplete || desync
+		if desync {
 			err = d.fail(platform.ErrDesync)
 		}
 	}

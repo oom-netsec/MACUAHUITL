@@ -247,19 +247,16 @@ func TestFTDCentinelaConfirmaFin(t *testing.T) {
 	}
 }
 
-// Si el equipo leyó el Enter antes o lo descartó, queda un solo prompt: tras ~1,2 s sin datos se acepta, pero la
-// salida queda marcada como incompleta.
-func TestFTDUnSoloPromptSeAceptaIncompleto(t *testing.T) {
-	var last string
+// Si el equipo descarta el Enter de cola, cada comando queda con un solo prompt: tras ~1,2 s se acepta, marcado como
+// incompleto y sin error; la sesión sigue siendo utilizable (si no, cada FTD fallaría tras su primer comando).
+func TestFTDEnterDescartadoDejaIncompletoSinError(t *testing.T) {
 	r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
-		prev := last
-		last = line
-		if line == "" && prev == "show a" {
+		if line == "" {
 			return // Enter descartado
 		}
 		out(line + "\r\n")
-		if line == "show a" {
-			out("uno\r\n")
+		if strings.HasPrefix(line, "show ") {
+			out("sal-" + line[5:] + "\r\n")
 		}
 		out("> ")
 	})
@@ -267,26 +264,24 @@ func TestFTDUnSoloPromptSeAceptaIncompleto(t *testing.T) {
 	if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
 		t.Fatal(err)
 	}
-	t0 := time.Now()
-	out, err := d.Run(context.Background(), "show a", 10*time.Second)
-	el := time.Since(t0)
-	if !errors.Is(err, platform.ErrDesync) || out.Text != "uno\n" || !out.Incomplete || el < time.Second || el > 2500*time.Millisecond {
-		t.Fatalf("out = %q, %v, %v, %s", out.Text, err, out.Incomplete, el)
-	}
-	// la sesión quedó inservible: el siguiente comando no corre en ella
-	if _, err := d.Run(context.Background(), "show b", time.Second); !errors.Is(err, platform.ErrDesync) {
-		t.Fatalf("show b: %v", err)
+	for _, c := range []string{"a", "b", "c"} {
+		t0 := time.Now()
+		out, err := d.Run(context.Background(), "show "+c, 10*time.Second)
+		el := time.Since(t0)
+		if err != nil || out.Text != "sal-"+c+"\n" || !out.Incomplete || el < time.Second || el > 2500*time.Millisecond {
+			t.Fatalf("show %s: out = %q, %v, %v, %s", c, out.Text, err, out.Incomplete, el)
+		}
 	}
 }
 
-// Una línea «> » suelta con una pausa de 1,3 s es indistinguible de un solo prompt final: se corta, pero marcada como
-// incompleta (nunca en silencio).
-func TestFTDPausaMayorQueLaRedDeSeguridadQuedaIncompleta(t *testing.T) {
+// Una pausa de 1,5 s tras una línea «> » suelta corta «show a» (incompleto, sin error); «show b» recibe la cola de
+// «show a» sin su propio eco: sale incompleto con ErrDesync y no hace pasar «resto» por suyo.
+func TestFTDPausaLargaDesfasaYSeDetectaEnElSiguiente(t *testing.T) {
 	r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
 		out(line + "\r\n")
 		if line == "show a" {
 			out("linea1\r\n> ")
-			time.Sleep(1300 * time.Millisecond)
+			time.Sleep(1500 * time.Millisecond)
 			out("resto\r\n")
 		}
 		out("> ")
@@ -295,9 +290,16 @@ func TestFTDPausaMayorQueLaRedDeSeguridadQuedaIncompleta(t *testing.T) {
 	if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
 		t.Fatal(err)
 	}
-	out, err := d.Run(context.Background(), "show a", 10*time.Second)
-	if !errors.Is(err, platform.ErrDesync) || !out.Incomplete {
-		t.Fatalf("out = %q, %v, %v", out.Text, err, out.Incomplete)
+	a, err := d.Run(context.Background(), "show a", 10*time.Second)
+	if err != nil || !a.Incomplete || a.Text != "linea1\n" {
+		t.Fatalf("a = %q, %v, %v", a.Text, err, a.Incomplete)
+	}
+	b, err := d.Run(context.Background(), "show b", 10*time.Second)
+	if !errors.Is(err, platform.ErrDesync) || !b.Incomplete {
+		t.Fatalf("b = %q, %v, %v", b.Text, err, b.Incomplete)
+	}
+	if _, err := d.Run(context.Background(), "show c", time.Second); !errors.Is(err, platform.ErrDesync) {
+		t.Fatalf("show c: %v", err)
 	}
 }
 

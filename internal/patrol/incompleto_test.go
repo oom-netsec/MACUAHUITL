@@ -109,8 +109,9 @@ func (p *desyncDrv) Run(ctx context.Context, cmd string, timeout time.Duration) 
 	return out, err
 }
 
-// Patrol no reconecta dentro de un equipo: una sesión desincronizada falla el equipo con ese error, deja la salida
-// parcial marcada como incompleta y la ronda siguiente abre una sesión nueva.
+// Patrol no reconecta dentro de un equipo: una sesión desincronizada (ErrDesync, detectada por la falta de eco del
+// comando siguiente) falla el equipo con ese error, deja la salida parcial marcada como incompleta y la ronda
+// siguiente abre una sesión nueva. Un cierre por calma, en cambio, no falla: solo marca la salida incompleta.
 func TestRunDeviceFallaConSesionDesincronizada(t *testing.T) {
 	e := newEnv(t, simulator.Config{})
 	e.trust(t)
