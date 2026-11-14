@@ -393,6 +393,7 @@ func (b *Bridge) ListJobs() ([]JobDTO, error) {
 // El stream vive lo que viva el puente, no la llamada: Wails cancela el contexto de
 // cada llamada al volver. Un trabajo ya suscrito no abre otro stream.
 func (b *Bridge) Subscribe(_ context.Context, jobIDs []string) error {
+	var errs []error
 	for _, id := range jobIDs {
 		b.mu.Lock()
 		st, has := b.streams[id]
@@ -400,11 +401,14 @@ func (b *Bridge) Subscribe(_ context.Context, jobIDs []string) error {
 		b.mu.Unlock()
 		if !has || dead {
 			if err := b.open(id); err != nil {
-				return wrapErr(err)
+				errs = append(errs, err) // se intentan todos los ids
 			}
 		}
 	}
-	return nil
+	if len(errs) == 1 {
+		return wrapErr(errs[0])
+	}
+	return wrapErr(errors.Join(errs...))
 }
 
 // headerWait es cuánto espera open los encabezados del núcleo antes de seguir sin ellos (variable para las pruebas).
@@ -456,7 +460,13 @@ func (b *Bridge) open(jobID string) error {
 		if ctx.Err() != nil { // otro open (resubscribe) lo reemplazó: el stream nuevo ya cubre el trabajo
 			return nil
 		}
-		markDead()
+		// Abrir falló: no se deja la entrada (resubscribe la reabriría y fallaría para siempre).
+		b.mu.Lock()
+		if b.streams[jobID] == me {
+			delete(b.streams, jobID)
+		}
+		b.mu.Unlock()
+		cancel()
 		return wrapErr(err)
 	}
 	go func() {
@@ -493,9 +503,13 @@ func (b *Bridge) resubscribe() {
 		ids = append(ids, id)
 	}
 	b.mu.Unlock()
+	// En paralelo: un núcleo atorado cuesta un plazo de encabezados, no uno por trabajo.
+	var wg sync.WaitGroup
 	for _, id := range ids {
-		b.open(id)
+		wg.Add(1)
+		go func() { defer wg.Done(); b.open(id) }()
 	}
+	wg.Wait()
 }
 
 type RunDeviceDTO struct {
