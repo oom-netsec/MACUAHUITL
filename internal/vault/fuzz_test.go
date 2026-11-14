@@ -10,11 +10,7 @@ import (
 // FuzzOpenBackup abre un respaldo válido mutado (o bytes arbitrarios): sin pánico, sin escribir nada y, si lo
 // abre, solo con credenciales idénticas a las del original (el formato es autenticado).
 func FuzzOpenBackup(f *testing.F) {
-	root, err := os.MkdirTemp("", "fuzzbackup")
-	if err != nil {
-		f.Fatal(err)
-	}
-	f.Cleanup(func() { os.RemoveAll(root) })
+	root := f.TempDir()
 	src, err := Create(filepath.Join(root, "vault.mcv"), pw("maestra"), testParams)
 	if err != nil {
 		f.Fatal(err)
@@ -37,7 +33,7 @@ func FuzzOpenBackup(f *testing.F) {
 	f.Add(uint32(0), byte(0), uint16(0), []byte("no es un respaldo"))
 	f.Fuzz(func(t *testing.T, pos uint32, x byte, cut uint16, raw []byte) {
 		data := raw
-		if raw == nil {
+		if len(raw) == 0 { // el motor entrega []byte{} en lugar de nil: este es el camino del respaldo válido mutado
 			data = slices.Clone(orig)
 			data[int(pos)%len(data)] ^= x
 			data = data[:len(data)-min(int(cut), len(data))]

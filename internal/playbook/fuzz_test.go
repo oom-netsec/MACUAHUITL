@@ -25,33 +25,38 @@ func FuzzCheckDenied(f *testing.F) {
 		if CheckDenied(plat, cmd) != nil {
 			return
 		}
-		for _, r := range cmd {
-			if r < 0x20 || r > 0x7e {
-				t.Fatalf("SEGURIDAD: %q aceptó %q con un byte fuera de 0x20-0x7e", plat, cmd)
-			}
-		}
-		bad := []string{";", "&", "<", ">", "`", "$(", "||"}
-		if plat != "ise" && plat != "wlc-aireos" { // ahí «?» tiene su propio tratamiento
-			bad = append(bad, "?")
-		}
-		if plat == "nx-os" {
-			bad = append(bad, "$", "!", `\`, "'", "(", ")")
-		}
-		for _, b := range bad {
-			if strings.Contains(cmd, b) {
-				t.Fatalf("SEGURIDAD: %q aceptó %q que contiene %q", plat, cmd, b)
-			}
-		}
-		if plat == "nx-os" {
-			for i, in := 0, false; i < len(cmd); i++ {
-				if cmd[i] == '"' {
-					in = !in
-				} else if !in && (cmd[i] == '*' || cmd[i] == '[') {
-					t.Fatalf("SEGURIDAD: nx-os aceptó %q con %q fuera de comillas", cmd, cmd[i])
-				}
-			}
+		if m := violation(plat, cmd); m != "" {
+			t.Fatalf("SEGURIDAD: %q aceptó %q: %s", plat, cmd, m)
 		}
 	})
+}
+
+// violation dice qué carácter prohibido trae un comando que CheckDenied dejó pasar ("" = ninguno).
+func violation(plat, cmd string) string {
+	for _, r := range cmd {
+		if r < 0x20 || r > 0x7e {
+			return "byte fuera de 0x20-0x7e"
+		}
+	}
+	bad := []string{";", "&", "<", ">", "`", "$(", "||", "?"}
+	if plat == "nx-os" {
+		bad = append(bad, "$", "!", `\`, "'", "(", ")")
+	}
+	for _, b := range bad {
+		if strings.Contains(cmd, b) {
+			return "contiene " + b
+		}
+	}
+	if plat == "nx-os" {
+		for i, in := 0, false; i < len(cmd); i++ {
+			if cmd[i] == '"' {
+				in = !in
+			} else if !in && (cmd[i] == '*' || cmd[i] == '[') {
+				return "contiene " + string(cmd[i]) + " fuera de comillas"
+			}
+		}
+	}
+	return ""
 }
 
 func FuzzExpand(f *testing.F) {
@@ -80,9 +85,19 @@ func FuzzExpand(f *testing.F) {
 		if err != nil {
 			return
 		}
+		got, verr := ValidateValue(kind, v)
+		if verr != nil {
+			t.Fatalf("Expand aceptó %q que ValidateValue rechaza (%q)", v, kind)
+		}
+		if kind == "mac" && plat == "wlc-aireos" { // AireOS pide aa:bb:cc:dd:ee:ff
+			got = got[0:2] + ":" + got[2:4] + ":" + got[5:7] + ":" + got[7:9] + ":" + got[10:12] + ":" + got[12:14]
+		}
 		for _, c := range cmds {
-			if CheckDenied(plat, c.Text) != nil {
-				t.Fatalf("Expand dejó pasar %q", c.Text)
+			if m := violation(plat, c.Text); m != "" {
+				t.Fatalf("SEGURIDAD: Expand dejó pasar %q (%s)", c.Text, m)
+			}
+			if !strings.Contains(c.Text, got) || strings.Contains(c.Text, "{v}") {
+				t.Fatalf("el valor %q no aparece literal en %q", got, c.Text)
 			}
 		}
 	})

@@ -57,17 +57,18 @@ func FuzzVerify(f *testing.F) {
 			}
 			return
 		}
-		root := t.TempDir()
+		outer := t.TempDir() // el padre de root: ahí se ve un escape de varios niveles
+		root := filepath.Join(outer, "root")
 		dir := filepath.Join(root, "work", "playbooks")
 		s, _, err := Open(filepath.Join(root, "store"), "v0.3.0", []ed25519.PublicKey{pub}, Base{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		before := tree(root)
+		before := tree(outer)
 		if r, err := s.StagePlaybooks(p, dir, nil, nil); err == nil {
 			_ = r.Publish(dir)
 		}
-		for _, n := range tree(root) {
+		for _, n := range tree(outer) {
 			if !slices.Contains(before, n) && !isUnder(n, dir) {
 				t.Fatalf("escribió fuera de su carpeta: %s", n)
 			}

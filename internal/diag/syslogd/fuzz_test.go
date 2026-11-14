@@ -34,7 +34,7 @@ func FuzzParse(f *testing.F) {
 		}
 		// Text y los campos salen del propio mensaje: nunca texto inventado.
 		for _, s := range []string{m.Text, m.Host, m.App, m.Mnemonic} {
-			if !strings.Contains(m.Raw, s) && !(m.Format == "rfc5424" && s == m.Text) {
+			if !strings.Contains(m.Raw, s) {
 				t.Fatalf("%q no sale de %q", s, m.Raw)
 			}
 		}
@@ -62,11 +62,15 @@ func FuzzReadStream(f *testing.F) {
 	f.Add([]byte("5 hello5 world\n\n\r\n99999999999 x"))
 	f.Fuzz(func(t *testing.T, in []byte) {
 		n := 0
-		readStream(bufio.NewReaderSize(bytes.NewReader(in), MaxMessage+16), "x", func(_ string, msg []byte, _ bool) {
+		readStream(bufio.NewReaderSize(bytes.NewReader(in), MaxMessage+16), "x", func(_ string, msg []byte, tr bool) {
 			if n++; len(msg) > MaxMessage {
 				t.Fatalf("mensaje de %d bytes pasa el tope", len(msg))
 			}
-			if n > len(in)+1 {
+			// Solo un mensaje recortado lleva la marca, y entonces mide justo el tope; uno corto nunca la lleva.
+			if tr && len(msg) != MaxMessage || len(msg) < MaxMessage && tr || len(in) <= MaxMessage && tr {
+				t.Fatalf("marca truncated=%v con un mensaje de %d bytes (entrada de %d)", tr, len(msg), len(in))
+			}
+			if n > len(in) { // cada mensaje consume al menos un byte
 				t.Fatalf("más mensajes (%d) que bytes (%d)", n, len(in))
 			}
 		})
