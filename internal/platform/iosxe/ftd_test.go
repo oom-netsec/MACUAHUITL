@@ -117,7 +117,7 @@ func TestFTDPromptNoCortaSalida(t *testing.T) {
 			return
 		}
 		out("show bgp\r\n")
-		for _, p := range []string{"   Network          Next Hop\r\n", ">", "  ", "10.0.0.0/8      192.0.2.1\r\n", ">\r\n", "  172.16.0.0/12  192.0.2.2\r\n"} {
+		for _, p := range []string{"   Network          Next Hop\r\n", ">", "  ", "10.0.0.0/8      192.0.2.1\r\n", ">\r\n", "> ", " 172.16.0.0/12  192.0.2.2\r\n"} {
 			out(p)
 			time.Sleep(30 * time.Millisecond)
 		}
@@ -131,7 +131,7 @@ func TestFTDPromptNoCortaSalida(t *testing.T) {
 	if err != nil || out.Incomplete {
 		t.Fatal(err, out.Incomplete)
 	}
-	want := "   Network          Next Hop\n>  10.0.0.0/8      192.0.2.1\n>\n  172.16.0.0/12  192.0.2.2\nfin\n"
+	want := "   Network          Next Hop\n>  10.0.0.0/8      192.0.2.1\n>\n>  172.16.0.0/12  192.0.2.2\nfin\n"
 	if out.Text != want {
 		t.Fatalf("texto %q", out.Text)
 	}
@@ -379,5 +379,26 @@ func TestFTDEcoNoLiteralNoCuelga(t *testing.T) {
 		if err != nil || !strings.HasSuffix(out.Text, "out\n") || time.Since(t0) > limit {
 			t.Fatalf("%s: out = %q, %v, %v", name, out.Text, err, time.Since(t0))
 		}
+	}
+}
+
+// Un trozo que termina en «…\n>\n> » parece el fin confirmado, pero la salida sigue: no corta en silencio.
+func TestFTDParDePromptsAparenteNoCorta(t *testing.T) {
+	r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
+		if line != "show r" {
+			out(line + "\r\n> ")
+			return
+		}
+		out("show r\r\nlinea\r\n>\r\n> ")
+		time.Sleep(50 * time.Millisecond)
+		out("10.0.0.0/8 via x\r\n> ")
+	})
+	d := New().(*driver)
+	if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
+		t.Fatal(err)
+	}
+	out, err := d.Run(context.Background(), "show r", 5*time.Second)
+	if err != nil || out.Incomplete || out.Text != "linea\n>\n> 10.0.0.0/8 via x\n" {
+		t.Fatalf("out = %q, %v, %v", out.Text, err, out.Incomplete)
 	}
 }

@@ -246,7 +246,10 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 			}
 		}
 		if d.sentinel {
-			if bareConfirmed(d.buf) { // dos prompts seguidos: el comando terminó
+			if bareConfirmed(d.buf) { // dos prompts seguidos: el comando terminó, salvo que un trozo corte justo ahí y la salida siga
+				if d.dataWithin(ctx, ftdConfirmSettle) {
+					continue
+				}
 				d.confirmed = true
 				text := clean(string(d.buf))
 				d.buf = nil
@@ -326,6 +329,23 @@ func bareConfirmed(buf []byte) bool {
 	}
 	n--
 	return n == 0 || buf[n-1] == '\n'
+}
+
+// ftdConfirmSettle es la calma corta antes de dar por confirmado el par de prompts: un trozo puede terminar justo en «\n>\n> ».
+const ftdConfirmSettle = 150 * time.Millisecond
+
+// dataWithin espera hasta dur por datos; si llegan, los agrega y devuelve true.
+func (d *driver) dataWithin(ctx context.Context, dur time.Duration) bool {
+	select {
+	case c, ok := <-d.chunks:
+		if ok {
+			d.buf = append(d.buf, c...)
+		}
+		return ok
+	case <-time.After(dur):
+	case <-ctx.Done():
+	}
+	return false
 }
 
 // quiet espera n pausas ftdSettle seguidas sin datos; true si pasaron todas. Si llegan datos, los agrega y devuelve false.
