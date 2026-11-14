@@ -12,6 +12,8 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"sync/atomic"
+	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -67,6 +69,37 @@ func main() {
 			target = d.ElementID
 		}
 		app.Event.Emit("ui:files-dropped", map[string]any{"target": target, "paths": e.Context().DroppedFiles()})
+	})
+	// Cerrar (✕ propio, Alt+F4, la barra de tareas) con sesiones o tareas en curso pregunta antes: se cortarían sin aviso
+	// y un cambio asistido quedaría esperando en el núcleo. El hook corre en el hilo principal: el diálogo y el candado
+	// del puente van en otra goroutine (InvokeSync desde el hilo principal se bloquearía).
+	var quitting atomic.Bool
+	win.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		if quitting.Load() {
+			return
+		}
+		e.Cancel()
+		go func() {
+			if !bridge.Busy(b) {
+				quitting.Store(true)
+				win.Close()
+				return
+			}
+			t := bridge.CloseTextFor(b)
+			d := app.Dialog.Question().SetTitle(t.Title).SetMessage(t.Message).AttachToWindow(win)
+			d.AddButton(t.Quit).OnClick(func() {
+				go func() {
+					quitting.Store(true)
+					app.Event.Emit("ui:closing", nil) // la terminal hace su última escritura del registro
+					time.Sleep(700 * time.Millisecond)
+					win.Close()
+				}()
+			})
+			stay := d.AddButton(t.Stay)
+			d.SetDefaultButton(stay)
+			d.SetCancelButton(stay)
+			d.Show()
+		}()
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
