@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -38,12 +40,30 @@ func TestHelpGolden(t *testing.T) {
 	}
 }
 
-// La ayuda en inglés y la de --lang es tienen las mismas líneas (se traducen a la par).
+// La ayuda en inglés y la de --lang es dicen lo mismo línea por línea: el mismo comando (sus primeras palabras) y las
+// mismas banderas --x; solo cambia la prosa.
 func TestHelpMismasLineas(t *testing.T) {
 	en, _ := os.ReadFile("testdata/help.golden")
 	es, _ := os.ReadFile("testdata/help_es.golden")
-	if a, b := strings.Count(string(en), "\n"), strings.Count(string(es), "\n"); a != b {
-		t.Fatalf("en tiene %d líneas y es %d", a, b)
+	le, ls := strings.Split(string(en), "\n"), strings.Split(string(es), "\n")
+	if len(le) != len(ls) {
+		t.Fatalf("en tiene %d líneas y es %d", len(le), len(ls))
+	}
+	flag := regexp.MustCompile(`--[a-z][a-z0-9-]*`)
+	word := regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+	for i := range le {
+		if a, b := flag.FindAllString(le[i], -1), flag.FindAllString(ls[i], -1); !slices.Equal(a, b) {
+			t.Errorf("línea %d: banderas distintas %v / %v\n  en: %s\n  es: %s", i+1, a, b, le[i], ls[i])
+		}
+		if i == 0 || !strings.HasPrefix(le[i], "  ") || strings.HasPrefix(strings.TrimSpace(le[i]), "(") || strings.HasPrefix(le[i], "   ") {
+			continue // el encabezado y la prosa de continuación no son una línea de comando
+		}
+		fe, fs := strings.Fields(le[i]), strings.Fields(ls[i])
+		for k := 0; k < 2 && k < len(fe) && k < len(fs); k++ {
+			if (word.MatchString(fe[k]) || word.MatchString(fs[k])) && fe[k] != fs[k] {
+				t.Errorf("línea %d: comando distinto %q / %q\n  en: %s\n  es: %s", i+1, fe[k], fs[k], le[i], ls[i])
+			}
+		}
 	}
 }
 
