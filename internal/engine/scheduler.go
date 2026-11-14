@@ -103,7 +103,7 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 	for round := 1; sc.Rounds == 0 || round <= sc.Rounds; round++ {
 		wake := next
 		a.next.Store(wake.UnixNano())
-		if until.Before(wake) {
+		if !wake.Before(until) { // una ronda justo al cerrar la ventana no corre: no se anuncia
 			wake = until // no esperar al siguiente tic si el trabajo termina antes
 			a.next.Store(0)
 		}
@@ -123,7 +123,7 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 		} else {
 			next = next.Add(sc.Interval)
 		}
-		if (sc.Rounds == 0 || round < sc.Rounds) && !until.Before(next) {
+		if (sc.Rounds == 0 || round < sc.Rounds) && next.Before(until) {
 			a.next.Store(next.UnixNano())
 		} else {
 			a.next.Store(0)
