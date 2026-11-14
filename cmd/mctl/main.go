@@ -72,10 +72,13 @@ var areas = []cli.Area{
 
 func main() {
 	if err := run(os.Args[1:], os.Stdin, os.Stdout); err != nil {
-		fmt.Fprintln(os.Stderr, "mctl:", err)
+		printErr(os.Stderr, err)
 		os.Exit(1)
 	}
 }
+
+// printErr escribe el error saneado: puede traer texto de un paquete de terceros o de un equipo.
+func printErr(w io.Writer, err error) { fmt.Fprintln(w, "mctl:", cli.Sanitize(err.Error())) }
 
 // outIsTTY es variable para que las pruebas simulen una terminal.
 var outIsTTY = func(w io.Writer) bool {
