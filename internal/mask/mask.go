@@ -323,9 +323,12 @@ var hostLabel = regexp.MustCompile(`^\s*[A-Z][A-Za-z ]*:(?:\s|$)`) // «Use VRF:
 func (s *Stream) tableRow(line string, f []string) (row, keep bool) {
 	switch s.table {
 	case "community":
-		// La 1.ª columna es la comunidad aunque las columnas no cuadren o vengan con tabuladores.
+		// La 1.ª columna es la comunidad aunque las columnas no cuadren o vengan con tabuladores. Una línea con sangría,
+		// un «!» o una palabra de primer nivel de la config no es una fila: es lo que sigue a la tabla sin línea en
+		// blanco (p. ej. la running-config), y cierra la tabla.
 		last := f[0][len(f[0])-1]
-		return len(f) <= 4 && last != '#' && last != '>', false
+		indented := line[0] == ' ' || line[0] == '\t'
+		return len(f) <= 4 && last != '#' && last != '>' && !indented && f[0] != "!" && !configTop[f[0]], false
 	case "host":
 		// Entre host y host van «Use VRF:», «Source interface:», «Notification type:»… y separadores.
 		return len(f) >= 6 && digits.MatchString(f[1]), hostLabel.MatchString(line)
@@ -446,7 +449,7 @@ func maskLine(line, block string, counts map[string]int) string {
 	line = maskGeneric(line, counts)
 	return urlPassword.ReplaceAllStringFunc(line, func(m string) string {
 		sm := urlPassword.FindStringSubmatch(m)
-		if strings.HasPrefix(sm[2], "<MASKED:") {
+		if strings.HasPrefix(sm[2], "<MASKED:") || urlPort.MatchString(sm[2]) {
 			return m
 		}
 		counts["url-password"]++
@@ -472,6 +475,18 @@ func isGuard(v string) bool {
 var freeText = regexp.MustCompile(`^\s*(?:\d+\s+)?(?:description|remark)\s`)
 
 // Credenciales en una URL (scp://usuario:CLAVE@host/…) en cualquier línea, también en logs.
+// configTop son palabras de primer nivel de la config de NX-OS/IOS que nunca son una fila de show snmp community.
+var configTop = map[string]bool{
+	"hostname": true, "version": true, "interface": true, "feature": true, "vlan": true, "vrf": true, "username": true,
+	"role": true, "snmp-server": true, "ip": true, "ipv6": true, "router": true, "line": true, "boot": true, "ntp": true,
+	"logging": true, "aaa": true, "tacacs-server": true, "radius-server": true, "spanning-tree": true,
+	"policy-map": true, "class-map": true, "control-plane": true, "system": true, "no": true, "cfs": true,
+	"copp": true, "power": true, "show": true, "Cisco": true, "Building": true, "Current": true, "end": true,
+}
+
+// urlPort: lo que parece clave en «host:8443/ruta…@x» es un puerto con ruta, no una clave.
+var urlPort = regexp.MustCompile(`^\d+/`)
+
 var urlPassword = regexp.MustCompile(`([a-z][a-z0-9+.-]*://[^/\s:@]+:)(\S+)@`)
 
 // Forma genérica <palabra de secreto> <tipo de cifrado> <valor> en cualquier posición: tapa lo que ninguna regla por
