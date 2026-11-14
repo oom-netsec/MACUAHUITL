@@ -3,7 +3,8 @@
 // Por cada carpeta packs/<nombre>/ la valida con las reglas del instalador, la firma con la llave privada de la
 // variable MPACK_SIGNING_KEY (base64 de ed25519.PrivateKey, como la escribe mpack-keygen) y la vuelve a verificar
 // como lo haría el núcleo con las llaves oficiales compiladas: si el secret no corresponde a internal/pack/oom.pub,
-// falla aquí y no en la máquina del usuario. Deja <editor>-<nombre>-<versión>.mpack y su README en -out.
+// falla aquí y no en la máquina del usuario. Al final instala todo lo firmado en un almacén temporal con la base de
+// este núcleo. Deja <editor>-<nombre>-<versión>.mpack y su README en -out.
 package main
 
 import (
@@ -15,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	nucleo "github.com/oom-netsec/MACUAHUITL/internal/core"
 	"github.com/oom-netsec/MACUAHUITL/internal/pack"
 )
 
@@ -71,7 +73,38 @@ func firmaTodos(src, out, core string, priv ed25519.PrivateKey, oficiales []ed25
 	if len(hechos) == 0 {
 		return nil, fmt.Errorf("no hay paquetes en %s", src)
 	}
+	if err := instalaTodos(out, hechos, core, oficiales); err != nil {
+		return nil, err
+	}
 	return hechos, nil
+}
+
+// instalaTodos instala lo firmado, todo junto, en un almacén temporal con el contenido base y las reglas de este
+// núcleo, como lo haría la app: los choques con la base embebida y entre paquetes fallan aquí y no en el usuario.
+func instalaTodos(out string, hechos []string, core string, oficiales []ed25519.PublicKey) error {
+	base, err := nucleo.PackBase()
+	if err != nil {
+		return err
+	}
+	dir, err := os.MkdirTemp("", "mpack-sign-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	st, _, err := pack.Open(dir, core, oficiales, base)
+	if err != nil {
+		return err
+	}
+	for _, h := range hechos {
+		data, err := os.ReadFile(filepath.Join(out, h))
+		if err != nil {
+			return err
+		}
+		if _, err := st.Install(data, false); err != nil {
+			return fmt.Errorf("%s no se instala en el núcleo %s junto a los demás: %w", h, core, err)
+		}
+	}
+	return nil
 }
 
 func firma(dir, out, core string, priv ed25519.PrivateKey, oficiales []ed25519.PublicKey) (string, error) {

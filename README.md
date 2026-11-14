@@ -119,7 +119,7 @@ mctl pack show oom/ios-xe                   # manifest and the pack's own README
 mctl pack remove oom/ios-xe
 ```
 
-- **Official packs** (`oom/*`) are signed with Ed25519 and published as release assets with their README and checksum. The public key is compiled into the core.
+- **Official packs** (`oom/*`) are signed with Ed25519 and published as release assets with their README and checksum. The public key is compiled into the core. Packs that need no core change also ship on their own, in **Content packs** releases (`packs-YYYY-MM-DD`) that install on the latest core.
 - **Third-party packs** install only with `--allow-unsigned` (or a confirmation in the app) and carry their publisher prefix in every ID, so they can never take over an official playbook.
 - **Playbooks stay read-only.** Every playbook command in a pack passes the same deny list as the built-in ones, on install and again at every start. Scripts are never run: the terminal pastes them without pressing Enter, like the built-in library. Nothing executable travels in a pack, and change templates stay in the core.
 - **Each pack carries its own README** with what it contains and how to load it.

@@ -1,0 +1,97 @@
+name: release-packs
+
+# Release solo de paquetes de contenido (tag packs-AAAA-MM-DD o packs-AAAA-MM-DD.N): sin núcleo, sin UI ni npm.
+# Las reglas del repo corren con el código del tag en un job sin secret. La firma corre en otro job con el código y la
+# versión del último núcleo publicado (el v* anterior): mpack-sign valida cada paquete, lo firma y los instala todos
+# juntos en un almacén temporal con la base de ese núcleo. Lo que sale aquí se instala en el núcleo que la gente ya tiene;
+# un paquete que pida uno más nuevo, una plataforma que no conoce o que choque con su base hace fallar el release.
+on:
+  push:
+    tags: ["packs-*"]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      core_tag: ${{ steps.core.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # los tags anteriores: el núcleo publicado y la regla de versión
+          persist-credentials: false
+      - name: tag y núcleo publicado
+        id: core
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^packs-[0-9]{4}-[0-9]{2}-[0-9]{2}(\.[0-9]+)?$ ]] || { echo "::error::tag inválido: packs-AAAA-MM-DD[.N]"; exit 1; }
+          git merge-base --is-ancestor HEAD origin/main || { echo "::error::el tag no está en main"; exit 1; }
+          core=$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD)
+          last=$(git tag -l 'v[0-9]*' --sort=-v:refname | head -1)
+          [ "$core" = "$last" ] || { echo "::error::el tag va antes del último núcleo ($last): saldrían paquetes viejos"; exit 1; }
+          echo "tag=$core" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: paquetes de contenido, reglas del repo
+        run: |
+          go test ./internal/pack/ -run 'TestPacksDelRepoSonValidos|TestSegmentosOficialesEstanReservados|TestBuildEsDeterminista|TestPaquetesOficialesConviven|TestTodosLosPaquetesOficialesConviven|TestChocaElNombreEnIngles'
+          tools/packaging/packs-version.sh "$GITHUB_REF_NAME"
+
+  # Job aparte: nada de lo que corrió con el código del tag (go test) llega a este entorno.
+  release:
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CORE_TAG: ${{ needs.checks.outputs.core_tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: núcleo publicado con los paquetes del tag
+        run: |
+          [[ "$CORE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::núcleo inválido: $CORE_TAG"; exit 1; }
+          git worktree add .core "$CORE_TAG"
+          # Sin la prueba de instalación en mpack-sign (núcleos anteriores a v0.4.3) no se revisan los choques con su base.
+          grep -q 'func instalaTodos' .core/tools/packaging/mpack-sign/main.go || { echo "::error::$CORE_TAG es anterior a la prueba de instalación de mpack-sign"; exit 1; }
+          rm -rf .core/packs && cp -r packs .core/packs
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .core/go.mod
+          cache: false
+      # El secret solo vive en el entorno de este paso.
+      - name: paquetes de contenido firmados (.mpack)
+        env:
+          MPACK_SIGNING_KEY: ${{ secrets.MPACK_SIGNING_KEY }}
+        run: |
+          rm -rf dist
+          (cd .core && go run ./tools/packaging/mpack-sign -packs packs -out "$GITHUB_WORKSPACE/dist" -core "${CORE_TAG#v}")
+      - name: sumas y notas
+        run: |
+          cd dist && sha256sum * > SHA256SUMS
+          {
+            echo "Content packs only: no new core. They install on MACUAHUITL ${CORE_TAG} or newer; each pack's README states its minimum core."
+            echo
+            echo '```sh'
+            echo 'sha256sum -c --ignore-missing SHA256SUMS'
+            echo 'mctl pack install oom-<name>-<version>.mpack'
+            echo '```'
+            echo
+            echo "| Pack | Version |"
+            echo "|---|---|"
+            for m in *.mpack; do v=${m%.mpack}; echo "| oom/${v%-*} | ${v##*-} |" | sed 's#oom/oom-#oom/#'; done
+          } > "$RUNNER_TEMP/notes.md"
+          echo "WHEN=${GITHUB_REF_NAME#packs-}" >> "$GITHUB_ENV"
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          name: Content packs ${{ env.WHEN }}
+          files: dist/*
+          body_path: ${{ runner.temp }}/notes.md
+          make_latest: "false" # «latest» sigue apuntando al último núcleo
