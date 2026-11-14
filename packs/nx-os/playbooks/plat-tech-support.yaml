@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: plat-tech-support
 platform: nx-os
-name: Plataforma · Tech-support completo
-name_en: Platform · Full tech-support
+name: NX-OS · Plataforma · Tech-support completo
+name_en: NX-OS · Platform · Full tech-support
 commands:
   - cmd: show clock
   - cmd: show version

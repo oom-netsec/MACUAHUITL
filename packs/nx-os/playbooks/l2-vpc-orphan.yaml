@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l2-vpc-orphan
 platform: nx-os
-name: L2 · vPC puertos huérfanos
-name_en: L2 · vPC orphan ports
+name: NX-OS · L2 · vPC puertos huérfanos
+name_en: NX-OS · L2 · vPC orphan ports
 commands:
   - cmd: show vpc orphan-ports
   - cmd: show vpc

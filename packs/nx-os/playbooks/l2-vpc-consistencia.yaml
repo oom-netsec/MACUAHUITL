@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l2-vpc-consistencia
 platform: nx-os
-name: L2 · vPC consistencia
-name_en: L2 · vPC consistency
+name: NX-OS · L2 · vPC consistencia
+name_en: NX-OS · L2 · vPC consistency
 commands:
   - cmd: show vpc
   - cmd: show vpc consistency-parameters global

@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l1-errores-descartes
 platform: nx-os
-name: L1 · Errores y descartes
-name_en: L1 · Errors and discards
+name: NX-OS · L1 · Errores y descartes
+name_en: NX-OS · L1 · Errors and discards
 commands:
   - cmd: show clock
   - cmd: show interface counters errors

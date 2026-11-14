@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-lentitud-puerto
 platform: nx-os
-name: TAC · Lentitud en un puerto
-name_en: TAC · Slowness on one port
+name: NX-OS · TAC · Lentitud en un puerto
+name_en: NX-OS · TAC · Slowness on one port
 params:
   - name: interface
     kind: interface

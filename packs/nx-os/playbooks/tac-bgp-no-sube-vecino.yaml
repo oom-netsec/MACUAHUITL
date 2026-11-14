@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-bgp-no-sube-vecino
 platform: nx-os
-name: TAC · BGP no establece con un vecino
-name_en: TAC · BGP does not establish with a neighbor
+name: NX-OS · TAC · BGP no establece con un vecino
+name_en: NX-OS · TAC · BGP does not establish with a neighbor
 params:
   - name: ip
     kind: ip

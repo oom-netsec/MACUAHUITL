@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l1-interfaz-detalle
 platform: nx-os
-name: L1 · Detalle de una interfaz
-name_en: L1 · Single interface detail
+name: NX-OS · L1 · Detalle de una interfaz
+name_en: NX-OS · L1 · Single interface detail
 params:
   - name: interface
     kind: interface

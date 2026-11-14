@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-cpu-alta
 platform: nx-os
-name: TAC · CPU alta
-name_en: TAC · High CPU
+name: NX-OS · TAC · CPU alta
+name_en: NX-OS · TAC · High CPU
 commands:
   - cmd: show clock
   - cmd: show system resources

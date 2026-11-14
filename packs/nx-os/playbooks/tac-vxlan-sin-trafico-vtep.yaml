@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-vxlan-sin-trafico-vtep
 platform: nx-os
-name: TAC · VXLAN sin tráfico hacia un VTEP
-name_en: TAC · VXLAN no traffic to a VTEP
+name: NX-OS · TAC · VXLAN sin tráfico hacia un VTEP
+name_en: NX-OS · TAC · VXLAN no traffic to a VTEP
 params:
   - name: ip
     kind: ip

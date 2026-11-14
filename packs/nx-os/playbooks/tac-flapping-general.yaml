@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-flapping-general
 platform: nx-os
-name: TAC · Interfaces con flapping (general)
-name_en: TAC · Flapping interfaces (general)
+name: NX-OS · TAC · Interfaces con flapping (general)
+name_en: NX-OS · TAC · Flapping interfaces (general)
 commands:
   - cmd: show clock
   - cmd: show interface status err-disabled

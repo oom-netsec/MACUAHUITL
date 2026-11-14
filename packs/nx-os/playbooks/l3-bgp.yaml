@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l3-bgp
 platform: nx-os
-name: L3 · BGP
-name_en: L3 · BGP
+name: NX-OS · L3 · BGP
+name_en: NX-OS · L3 · BGP
 commands:
   - cmd: show bgp all summary
   - cmd: show bgp sessions

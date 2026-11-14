@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-vxlan-sin-trafico
 platform: nx-os
-name: TAC · VXLAN sin tráfico (general)
-name_en: TAC · VXLAN no traffic (general)
+name: NX-OS · TAC · VXLAN sin tráfico (general)
+name_en: NX-OS · TAC · VXLAN no traffic (general)
 commands:
   - cmd: show clock
   - cmd: show nve interface nve1 detail

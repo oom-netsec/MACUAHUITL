@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: svc-qos
 platform: nx-os
-name: Servicios · QoS
-name_en: Services · QoS
+name: NX-OS · Servicios · QoS
+name_en: NX-OS · Services · QoS
 commands:
   - cmd: show class-map
   - cmd: show policy-map

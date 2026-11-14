@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l2-vlans-stp
 platform: nx-os
-name: L2 · VLANs y Spanning Tree
-name_en: L2 · VLANs and Spanning Tree
+name: NX-OS · L2 · VLANs y Spanning Tree
+name_en: NX-OS · L2 · VLANs and Spanning Tree
 commands:
   - cmd: show vlan brief
     timeout: 120s

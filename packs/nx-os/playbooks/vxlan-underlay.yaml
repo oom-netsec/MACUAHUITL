@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: vxlan-underlay
 platform: nx-os
-name: VXLAN · Underlay
-name_en: VXLAN · Underlay
+name: NX-OS · VXLAN · Underlay
+name_en: NX-OS · VXLAN · Underlay
 commands:
   - cmd: show nve interface nve1 detail
   - cmd: show ip ospf neighbors

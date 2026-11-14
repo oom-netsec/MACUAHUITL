@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-descartes-puerto
 platform: nx-os
-name: TAC · Descartes en un puerto
-name_en: TAC · Drops on one port
+name: NX-OS · TAC · Descartes en un puerto
+name_en: NX-OS · TAC · Drops on one port
 params:
   - name: interface
     kind: interface

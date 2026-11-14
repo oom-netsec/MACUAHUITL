@@ -166,3 +166,16 @@ func TestNXOSPideNucleo041(t *testing.T) {
 		t.Fatalf("0.4.0 debe rechazarlo: %v", err)
 	}
 }
+
+// Los paquetes oficiales ios, ios-xe, wlc-9800 y nx-os conviven en el mismo almacén: sin choques de ID ni de nombre de script.
+func TestPaquetesOficialesConviven(t *testing.T) {
+	st, _, err := pack.Open(t.TempDir(), "v0.4.1", packtest.Keys(), repoBase(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"ios", "ios-xe", "wlc-9800", "nx-os"} {
+		if _, err := st.Install(packtest.Signed(t, filepath.Join(packtest.RepoDir(), "packs", n)), false); err != nil {
+			t.Fatalf("oom/%s junto a los demás: %v", n, err)
+		}
+	}
+}

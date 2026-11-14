@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l1-interfaces-resumen
 platform: nx-os
-name: L1 · Resumen de interfaces
-name_en: L1 · Interface summary
+name: NX-OS · L1 · Resumen de interfaces
+name_en: NX-OS · L1 · Interface summary
 commands:
   - cmd: show interface status
     timeout: 120s
