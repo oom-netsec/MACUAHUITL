@@ -1,3 +1,5 @@
+import { errorText } from "../../components/Field";
+import { errInfo } from "../../lib/coreError";
 import type { Key } from "../../lib/i18n/es";
 import type { Host, HostDraft, HostPlatform } from "./api";
 
@@ -44,16 +46,24 @@ export const draftOf = (f: HostForm, id?: string): HostDraft => ({
   folder: f.folder, tags: parseTags(f.tags), credentialId: f.credentialId, notes: f.notes,
 });
 
-// El núcleo contesta en español y sin campo: se deduce por lo que nombra el mensaje. "" = no se pudo asignar.
+const FIELDS: HostField[] = ["name", "address", "port", "platform", "folder", "tags", "notes", "credentialId"];
+
+// El campo y el duplicado salen de reason y metadata.field. El texto en español solo es respaldo de errores sin reason.
 // Las duplicadas van primero: el nombre del host puede contener cualquier palabra («credencial», «puerto»…).
-export function coreErrorKey(msg: string): "hosts.err.nameDup" | "hosts.err.addrDup" | "" {
+export function coreErrorKey(e: unknown): "hosts.err.nameDup" | "hosts.err.addrDup" | "" {
+  const i = errInfo(e);
+  if (i) return i.reason === "hosts.duplicate_name" ? "hosts.err.nameDup" : i.reason === "hosts.duplicate_address" ? "hosts.err.addrDup" : "";
+  const msg = errorText(e);
   if (/ya hay un host llamado/i.test(msg)) return "hosts.err.nameDup";
   if (/ya está en la libreta/i.test(msg)) return "hosts.err.addrDup";
   return "";
 }
 
-export function coreErrorField(msg: string): HostField | "" {
-  const dup = coreErrorKey(msg);
+export function coreErrorField(e: unknown): HostField | "" {
+  const i = errInfo(e);
+  if (i) return i.reason.startsWith("hosts.") ? FIELDS.find((f) => f === i.metadata.field) ?? "" : "";
+  const msg = errorText(e);
+  const dup = coreErrorKey(e);
   if (dup) return dup === "hosts.err.nameDup" ? "name" : "address";
   if (/credencial/i.test(msg)) return "credentialId";
   if (/direcci[oó]n/i.test(msg)) return "address";

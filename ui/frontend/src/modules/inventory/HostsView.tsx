@@ -3,7 +3,7 @@ import type { CoreAPI, Credential } from "../../lib/core";
 import { ConfirmButton, Field, Notice, Select, TextArea, errorText } from "../../components/Field";
 import { Badge, EmptyState, Page, Section } from "../../components/Page";
 import { Icon } from "../../components/Icon";
-import { useLang, useT } from "../../lib/i18n";
+import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import { useVaultVersion } from "../../lib/vaultSignal";
 import type { Host, KnownDevice } from "./api";
@@ -19,7 +19,6 @@ const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCas
 // con una acción para pasarlos a la libreta. Una credencial es la referencia a la bóveda; nunca un secreto.
 export function HostsView({ core }: { core: CoreAPI }) {
   const t = useT();
-  const lang = useLang();
   const ct = useCoreText();
   const hv = useHostsVersion();
   const vv = useVaultVersion();
@@ -39,7 +38,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
 
   useEffect(() => {
     let live = true;
-    core.listHosts().then((l) => { if (live) setHosts(l); }, (e) => { if (live) { setHosts([]); setErr(ct(errorText(e), "hosts.coreError")); } });
+    core.listHosts().then((l) => { if (live) setHosts(l); }, (e) => { if (live) { setHosts([]); setErr(ct(errorText(e), "hosts.coreError", e)); } });
     // Sin outputs/ o sin descubiertos la lista puede fallar o venir vacía: la libreta no depende de ella.
     core.listDevices().then((l) => { if (live) setFound(l.devices.filter((d) => !d.sources.includes("manual") && d.address)); }, () => { if (live) setFound([]); });
     return () => { live = false; };
@@ -94,13 +93,13 @@ export function HostsView({ core }: { core: CoreAPI }) {
       hostsChanged();
     } catch (e) {
       const m = errorText(e);
-      const f = coreErrorField(m);
-      if (f) { setErrs({ [f]: t(coreErrorKey(m) || "hosts.coreField") }); setCoreDetail(m); } else setErr(ct(m, "hosts.coreError"));
+      const f = coreErrorField(e);
+      if (f) { setErrs({ [f]: t(coreErrorKey(e) || "hosts.coreField") }); setCoreDetail(ct(m, "hosts.coreError", e) === m ? m : ""); } else setErr(ct(m, "hosts.coreError", e));
     } finally { setBusy(false); }
   };
   const del = async (h: Host) => {
     setErr(""); setMsg("");
-    try { await core.deleteHost(h.id); setMsg(t("hosts.deleted", { name: h.name })); if (editing?.id === h.id) closeForm(); hostsChanged(); } catch (e) { setErr(ct(errorText(e), "hosts.coreError")); }
+    try { await core.deleteHost(h.id); setMsg(t("hosts.deleted", { name: h.name })); if (editing?.id === h.id) closeForm(); hostsChanged(); } catch (e) { setErr(ct(errorText(e), "hosts.coreError", e)); }
   };
 
   const f = editing?.form;
@@ -128,7 +127,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
             hint={!vaultOpen && editing.hiddenCred ? t("hosts.cred.vaultHint") : undefined} options={credOptions} />
         </div>
         <TextArea label={t("hosts.f.notes")} value={f.notes} onChange={(v) => set("notes", v)} rows={3} error={errs.notes} />
-        {coreDetail && lang === "es" && <p className="hosts-core"><strong>{t("hosts.coreDetail")}:</strong> <span>{coreDetail}</span></p>}
+        {coreDetail && <p className="hosts-core"><strong>{t("hosts.coreDetail")}:</strong> <span>{coreDetail}</span></p>}
         <div className="actions">
           <button type="submit" className="primary" disabled={busy} aria-busy={busy}>{t("hosts.save")}</button>
           <button type="button" onClick={() => closeForm()}>{t("hosts.cancel")}</button>

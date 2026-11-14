@@ -1,3 +1,4 @@
+import { errInfo } from "../../lib/coreError";
 import { useLang, useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 
@@ -6,7 +7,8 @@ import type { Key } from "../../lib/i18n/es";
 export function useCoreText() {
   const lang = useLang();
   const t = useT();
-  return (core: string, generic: Key) => (lang === "es" ? core : t(generic));
+  // Un error con reason ya llega en el idioma pedido: se muestra tal cual; sin reason, en inglés solo hay el genérico.
+  return (core: string, generic: Key, e?: unknown) => (lang === "es" || (e !== undefined && errInfo(e)) ? core : t(generic));
 }
 
 // Avisos de la vista previa que la vista conoce por su texto; el resto cae en el genérico.

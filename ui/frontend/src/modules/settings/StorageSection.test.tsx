@@ -161,6 +161,13 @@ describe("motivos de rechazo", () => {
     expect(core.copyText).toHaveBeenCalledWith("chmod 700 '/home/u/mi salidas'");
   });
 
+  test("con cause: la ruta del chmod sale de metadata.path, no del texto", async () => {
+    const core = fakeCore({ setCorePrefs: vi.fn(async () => { throw Object.assign(new Error("the folder is open"), { cause: { code: "FailedPrecondition", reason: "prefs.outputs.permisos", metadata: { code: "permisos", path: "/home/u/mi salidas" } } }); }) });
+    view(core, "en");
+    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    expect(await screen.findByText("chmod 700 '/home/u/mi salidas'")).toBeVisible();
+  });
+
   test("el rechazo por la carpeta queda bajo su campo, marcado inválido y descrito", async () => {
     view(failing("permisos"));
     await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));
@@ -178,8 +185,8 @@ describe("motivos de rechazo", () => {
   });
 
   test("parseOutputsError: código y ruta", () => {
-    expect(parseOutputsError("prefs.outputs.permisos: x; corrígelo con: chmod 700 /a/b")).toEqual({ code: "permisos", path: "/a/b" });
-    expect(parseOutputsError("otra cosa")).toBeNull();
+    expect(parseOutputsError(new Error("prefs.outputs.permisos: x; corrígelo con: chmod 700 /a/b"))).toEqual({ code: "permisos", path: "/a/b" });
+    expect(parseOutputsError(new Error("otra cosa"))).toBeNull();
   });
 });
 
@@ -191,4 +198,13 @@ test("Ajustes → Datos: la tarjeta de la bóveda explica el respaldo y navega a
   expect(screen.getByText(/Nunca forma parte de las exportaciones generales/)).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Abrir la bóveda" }));
   expect(go).toHaveBeenCalledWith("vault");
+});
+
+// Un error con código que no es de la carpeta ya llega traducido: en inglés se muestra tal cual, no el genérico.
+test("en inglés, un error con reason que no es de carpeta se muestra tal cual", async () => {
+  const err = Object.assign(new Error("rpc error: code = InvalidArgument desc = rotate size out of range"), { cause: { code: "InvalidArgument", reason: "prefs.err.rotate", metadata: {} } });
+  view(fakeCore({ setCorePrefs: vi.fn(async () => { throw err; }) }), "en");
+  await folder();
+  await userEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText("rotate size out of range")).toBeVisible();
 });

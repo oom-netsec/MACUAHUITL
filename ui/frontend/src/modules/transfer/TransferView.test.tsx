@@ -89,7 +89,7 @@ test("el registro en vivo, Detener y la lista que sobrevive al cambiar de pesta√
   const core = await openServer(setup());
   act(() => {
     core.emitTransfer({ runId: "r1", ready: ready({ recvDir: "/o/recibidos/x" }) });
-    core.emitTransfer({ runId: "r1", line: { Proto: "tftp", Client: "192.0.2.1", File: "r1-config.txt", Bytes: 2048, Duration: 1e9, Result: "ok", Dir: "escritura", SHA256: "f".repeat(64) } });
+    core.emitTransfer({ runId: "r1", line: { Proto: "tftp", Client: "192.0.2.1", File: "r1-config.txt", Bytes: 2048, Duration: 1e9, Result: "ok", Dir: "write-text", dirCode: "write", SHA256: "f".repeat(64) } });
     core.emitTransfer({ runId: "r1", line: { Proto: "tftp", Client: "192.0.2.9", File: "x", Bytes: 0, Duration: 0, Result: "error", Rejected: true, Error: "no publicado" } });
   });
   const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
@@ -98,6 +98,7 @@ test("el registro en vivo, Detener y la lista que sobrevive al cambiar de pesta√
   expect(rows[1]).toHaveTextContent("r1-config.txt");
   expect(rows[1]).toHaveTextContent("2048");
   expect(rows[1]).toHaveTextContent("f".repeat(64));
+  expect(rows[1]).toHaveTextContent("recibido");
   expect(rows[1]).toHaveTextContent("correcta");
   expect(rows[2]).toHaveTextContent("rechazada");
   expect(within(card).getByRole("log", { name: "Comandos de IOS" })).toHaveTextContent("copy running-config tftp://192.0.2.10/r1-config.txt");

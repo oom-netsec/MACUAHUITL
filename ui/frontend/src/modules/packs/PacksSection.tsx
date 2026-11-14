@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { scriptsChanged } from "../scripts/signal";
 import type { CoreAPI, PackDetail, PackInfo, PackInspectResult } from "../../lib/core";
 import { Check, ConfirmButton, Notice, errorText } from "../../components/Field";
+import { errInfo } from "../../lib/coreError";
 import { Dialog } from "../../components/Dialog";
 import { useLang, useT } from "../../lib/i18n";
 import { ExportDialog, ImportDialog } from "./PackPersonal";
@@ -82,15 +83,16 @@ function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; p
   const lang = useLang();
   const [hide, setHide] = useState(() => new Set(pack.hidden));
   const [err, setErr] = useState("");
+  const [changed, setChanged] = useState(false);
   const [busy, setBusy] = useState(false);
   const install = async () => {
-    setBusy(true); setErr("");
+    setBusy(true); setErr(""); setChanged(false);
     let ok = false;
     try {
       // Un playbook tapado no se oculta (su casilla queda marcada): no viaja en hide, que con replaceHidden es el conjunto exacto.
       await core.packInstallHiding(path, !pack.official, [...playbookIds, ...scriptIds].filter((x) => hide.has(x) && !pack.shadowed.includes(x)), true, info.sha256);
       ok = true;
-    } catch (e) { setErr(errorText(e)); }
+    } catch (e) { setErr(errorText(e)); setChanged(errInfo(e)?.reason === "pack.err.install.changed"); }
     scriptsChanged(); // también si falló: un error puede decir «el paquete quedó instalado»
     try { onDone(); } finally { setBusy(false); }
     if (ok) onClose();
@@ -106,7 +108,8 @@ function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; p
       <Items pack={{ ...pack, hidden: [...hide] }} playbookIds={playbookIds} scriptIds={scriptIds} isHidden={(x) => hide.has(x)} busy={busy}
         onToggle={(id, visible) => setHide((s) => { const n = new Set(s); if (visible) n.delete(id); else n.add(id); return n; })} />
       {err && <Notice kind="error">{err}</Notice>}
-      <div className="actions"><button type="button" className="primary" disabled={busy} onClick={install}>{t("packs.install.go")}</button></div>
+      {changed && <Notice kind="warn">{t("packs.import.changed")}</Notice>}
+      <div className="actions"><button type="button" className="primary" disabled={busy || changed} onClick={install}>{t("packs.install.go")}</button></div>
     </Dialog>
   );
 }

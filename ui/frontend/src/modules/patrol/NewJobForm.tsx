@@ -80,7 +80,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
       if (i?.metadata.field === "params" && i.metadata.name && asked.some(([n]) => n === i.metadata.name)) {
         setParamErr({ [i.metadata.name]: errorText(e).replace(/^patrol: params: /, "") }); // el prefijo interno no aporta junto al campo
         setErr(t("patrol.param.check")); // aviso junto al botón (role=alert): el campo puede estar fuera de la vista
-      } else setErr(outputsErrorText(errorText(e), t));
+      } else setErr(outputsErrorText(e, t));
     } finally {
       setBusy(false);
     }

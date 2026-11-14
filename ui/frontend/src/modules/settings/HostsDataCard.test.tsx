@@ -206,3 +206,11 @@ test("otro error al aplicar deja la vista previa abierta", async () => {
   expect(await screen.findByText("falta la decisión de un conflicto")).toBeVisible();
   expect(screen.getByRole("table", { name: "Filas válidas del archivo" })).toBeVisible();
 });
+
+test("en inglés, un error con reason del núcleo se muestra tal cual (ya viene traducido)", async () => {
+  localStorage.setItem("macuahuitl.lang", "en");
+  const err = Object.assign(new Error("rpc error: code = InvalidArgument desc = the export is empty"), { cause: { code: "InvalidArgument", reason: "hosts.err.export_empty", metadata: {} } });
+  setup({ exportHosts: vi.fn(async () => { throw err; }) });
+  await userEvent.click(await screen.findByRole("button", { name: /Export/ }));
+  expect(await screen.findByText("the export is empty")).toBeVisible();
+});
