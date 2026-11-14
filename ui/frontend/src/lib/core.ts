@@ -32,6 +32,7 @@ import { inventoryWails, type InventoryAPI } from "../modules/inventory/api";
 import { scriptsWails, type ScriptsAPI } from "../modules/scripts/api";
 import { settingsWails, type SettingsAPI } from "../modules/settings/api";
 import { packsWails, type PacksAPI } from "../modules/packs/api";
+import { safeFileName, showHidden } from "./safeText";
 
 export type CoreStatus = "connected" | "disconnected";
 
@@ -146,7 +147,7 @@ export const wailsCore: CoreAPI = {
   // el puente se niega y aquí se pregunta. Cancelar devuelve ""; un fallo se muestra y también devuelve "".
   saveFile: async (name, data, encoding) => {
     try {
-      const path = await Dialogs.SaveFile({ Filename: name, CanCreateDirectories: true });
+      const path = await Dialogs.SaveFile({ Filename: safeFileName(name), CanCreateDirectories: true });
       if (!path) return "";
       try {
         await call("WriteFile", path, data, encoding, false);
@@ -165,7 +166,7 @@ export const wailsCore: CoreAPI = {
   // Igual que saveFile, pero solo la ruta: se crea vacío para fallar ya si no se puede escribir y para confirmar el reemplazo.
   pickSavePath: async (name) => {
     try {
-      const path = await Dialogs.SaveFile({ Filename: name, CanCreateDirectories: true });
+      const path = await Dialogs.SaveFile({ Filename: safeFileName(name), CanCreateDirectories: true });
       if (!path) return "";
       try {
         await call("WriteFile", path, "", "utf8", false);
@@ -183,7 +184,7 @@ export const wailsCore: CoreAPI = {
   pasteText: () => Clipboard.Text(),
   confirmPaste: async (text, host, script) => {
     const lines = text.replace(/[\r\n]+$/, "").split(/\r\n|\r|\n/);
-    const preview = lines.slice(0, 5).map((l) => (l.length > 80 ? `${l.slice(0, 80)}…` : l)).join("\n") + (lines.length > 5 ? "\n…" : "");
+    const preview = lines.slice(0, 5).map((l) => showHidden(l.length > 80 ? `${l.slice(0, 80)}…` : l)).join("\n") + (lines.length > 5 ? "\n…" : "");
     const yes = tr("paste.yes");
     return (await Dialogs.Question({ Title: tr("paste.title"), Message: script ? tr("paste.script", { name: script, n: lines.length, run: lines.length - 1, host, preview }) : tr("paste.msg", { n: lines.length, host, preview }), Buttons: [{ Label: yes }, { Label: tr("paste.no"), IsCancel: true, IsDefault: true }] })) === yes;
   },
