@@ -281,6 +281,9 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	}
 	j.state = "arming"
 	spec, v := j.spec, c.vault
+	spec0 := spec // spec se recorta abajo (equipos excluidos); el trabajo conserva el original si el armado falla
+	// Lo que el armado escribe en el trabajo antes de sched.Arm: un armado fallido lo devuelve tal cual estaba.
+	prevVerified, prevChanges, prevUntil, prevCreds := j.verified, j.changes, j.Until, j.creds
 	c.mu.Unlock()
 	var undo []func()
 	// reason es el motivo en inglés para la auditoría (no depende del idioma del cliente).
@@ -292,6 +295,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		j.state = "created"
 		w := j.writer // el writer, la carpeta y el release de este armado ya están deshechos: no deben quedar apuntados
 		j.OutputDir, j.writer, j.release = "", nil, nil
+		j.spec, j.verified, j.changes, j.Until, j.creds = spec0, prevVerified, prevChanges, prevUntil, prevCreds
 		cancelled := j.cancelReq
 		if cancelled { // cancelaron durante el armado fallido: no vuelve a "created"
 			j.cancelReq, j.state = false, "cancelled"

@@ -14,6 +14,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/engine"
+	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
 func (h *harness) jobClosed(job string) bool {
@@ -340,5 +341,28 @@ func TestArmadoDeshechoNoDejaCarpetaNiWriter(t *testing.T) {
 				t.Fatalf("quedó la carpeta del armado deshecho: %v", m)
 			}
 		})
+	}
+}
+
+// Un armado que el planificador rechaza (Schedule.Until ya vencido: engine.err.job_ended) deja el trabajo como
+// estaba: los equipos excluidos siguen en el spec y no quedan ventana, credenciales ni verificaciones del intento.
+func TestArmadoRechazadoDejaElTrabajoIgual(t *testing.T) {
+	h := newHarness(t, nil)
+	job, fp := h.created(t, h.ready(t), nil)
+	h.core.mu.Lock()
+	j := h.core.jobs[job]
+	j.spec.Targets = append(j.spec.Targets, patrol.Target{Address: "192.0.2.10", DeviceID: "excluido"})
+	j.spec.Schedule.IntervalSeconds, j.spec.Schedule.Rounds = 60, 0
+	j.spec.Schedule.Until = time.Now().Add(-time.Hour)
+	antes := j.spec
+	h.core.mu.Unlock()
+	_, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: job, AcceptedHostKeyFingerprints: []string{fp}, ExcludedDeviceIds: []string{"excluido"}})
+	if reason, _ := reasonOf(err); reason != "engine.err.job_ended" {
+		t.Fatalf("err = %v (%q); quería engine.err.job_ended", err, reason)
+	}
+	h.core.mu.Lock()
+	defer h.core.mu.Unlock()
+	if j.state != "created" || !slices.Equal(j.spec.Targets, antes.Targets) || !j.Until.IsZero() || j.creds != nil || j.verified != nil {
+		t.Fatalf("el trabajo cambió: state=%q targets=%v until=%v creds=%v verified=%v", j.state, j.spec.Targets, j.Until, j.creds, j.verified)
 	}
 }
