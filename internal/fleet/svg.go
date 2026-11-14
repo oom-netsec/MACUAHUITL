@@ -4,6 +4,8 @@ import (
 	"encoding/xml"
 	"fmt"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 func esc(s string) string {
@@ -14,7 +16,10 @@ func esc(s string) string {
 
 // SVG dibuja el camino: una columna por salto, ramas ECMP en filas distintas,
 // cortes en rojo. Sin scripts ni recursos externos; los nombres vienen de la red y se escapan.
-func (r PathResult) SVG() string {
+func (r PathResult) SVG() string { return r.SVGIn(i18n.Es) }
+
+// SVGIn es SVG con la etiqueta de corte en el idioma loc.
+func (r PathResult) SVGIn(loc string) string {
 	const colW, rowH, pad = 190.0, 90.0, 70.0
 	depth := make([]int, len(r.Hops))
 	rows := map[int]int{}
@@ -54,7 +59,7 @@ func (r PathResult) SVG() string {
 		}
 		fmt.Fprintf(&sb, `<g><circle cx="%.1f" cy="%.1f" r="18" fill="%s" stroke="%s"/><text x="%.1f" y="%.1f" text-anchor="middle" font-weight="bold" fill="#0f172a">%s</text>`, pos[i][0], pos[i][1], fill, stroke, pos[i][0], pos[i][1]+32, esc(hp.Device))
 		if hp.Status == "cut" {
-			fmt.Fprintf(&sb, `<text x="%.1f" y="%.1f" text-anchor="middle" fill="#b91c1c">CORTE: %s</text>`, pos[i][0], pos[i][1]+45, esc(trunc(hp.Reason, 34)))
+			fmt.Fprintf(&sb, `<text x="%.1f" y="%.1f" text-anchor="middle" fill="#b91c1c">%s</text>`, pos[i][0], pos[i][1]+45, esc(i18n.Msg(loc, "fleet.svg.cut", i18n.A("reason", trunc(hp.Reason, 34)))))
 		}
 		sb.WriteString(`</g>`)
 	}

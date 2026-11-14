@@ -103,3 +103,15 @@ func TestInvCellsLocVacioYTipoDesconocido(t *testing.T) {
 		t.Errorf("tipo desconocido: %q", got)
 	}
 }
+
+// La etiqueta de corte del SVG sale en el idioma pedido; SVG() es el de es de siempre.
+func TestSVGCorteEnElIdiomaPedido(t *testing.T) {
+	f := load(t)
+	r := f.Path("10.1.10.20", "172.31.0.1")
+	if es := r.SVGIn("es"); !strings.Contains(es, "CORTE: ") || es != r.SVG() {
+		t.Error("es")
+	}
+	if en := r.SVGIn("en"); !strings.Contains(en, "CUT: ") || strings.Contains(en, "CORTE") {
+		t.Error("en")
+	}
+}
