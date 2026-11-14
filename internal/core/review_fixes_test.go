@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -244,5 +245,38 @@ func TestSuspenderYReanudarIgnoranTrabajosCerrando(t *testing.T) {
 	}
 	if ws := h.core.vault.Windows(); len(ws) != 0 {
 		t.Fatalf("resumePaused rearmó la ventana de un trabajo cerrando: %v", ws)
+	}
+}
+
+// Si el trabajo empieza a cerrar mientras resumePaused rearma su ventana (Arm va sin el candado del núcleo), la
+// ventana se retira: no queda la DEK viva para un trabajo terminado.
+func TestResumePausedRetiraLaVentanaSiElTrabajoCerroMientrasTanto(t *testing.T) {
+	var j *job
+	var core atomic.Pointer[Core]
+	var armando atomic.Bool
+	h := newHarness(t, func(o *Options) {
+		o.Now = func() time.Time {
+			if c := core.Load(); c != nil && armando.Load() && j != nil {
+				c.mu.Lock()
+				j.closing = true // finish arrancó justo durante Arm
+				c.mu.Unlock()
+			}
+			return time.Now()
+		}
+	})
+	core.Store(h.core)
+	cred := h.ready(t)
+	j = &job{id: "j-carrera", state: "armed", paused: true, Until: time.Now().Add(time.Hour), creds: []string{cred}}
+	h.core.mu.Lock()
+	h.core.jobs[j.id] = j
+	h.core.mu.Unlock()
+	armando.Store(true)
+	h.core.resumePaused()
+	armando.Store(false)
+	if ws := h.core.vault.Windows(); len(ws) != 0 {
+		t.Fatalf("quedó la ventana de un trabajo cerrando: %v", ws)
+	}
+	if !j.paused {
+		t.Fatal("no debía reanudarse")
 	}
 }

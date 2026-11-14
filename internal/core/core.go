@@ -480,6 +480,11 @@ func (c *Core) resumePaused() {
 			continue
 		}
 		c.mu.Lock()
+		if j.closing || j.state != "armed" { // empezó a cerrar mientras se armaba: no dejar la DEK viva para un trabajo terminado
+			c.mu.Unlock()
+			v.Disarm(j.id)
+			continue
+		}
 		j.paused = false
 		c.mu.Unlock()
 		c.sched.Resume(j.id)
