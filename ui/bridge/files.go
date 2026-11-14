@@ -68,11 +68,20 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 	}
 	// Sin overwrite nunca se reemplaza: un enlace duro falla si el destino apareció después del Lstat; sin enlaces
 	// duros (vfat, FUSE) se renombra con RENAME_NOREPLACE.
-	err = os.Link(tmp.Name(), path)
+	err = linkFile(tmp.Name(), path)
 	if err != nil && !errors.Is(err, fs.ErrExist) {
 		if root, rerr := os.OpenRoot(filepath.Dir(path)); rerr == nil {
-			err = sys.RenameNoReplaceIn(root, filepath.Base(tmp.Name()), filepath.Base(path))
+			err = renameNoReplace(root, filepath.Base(tmp.Name()), filepath.Base(path))
 			root.Close()
+		}
+		if sys.NoAtomicRename(err) {
+			// shortcut: en sistemas de archivos sin enlaces duros ni RENAME_NOREPLACE (CIFS, FUSE) queda la ventana
+			// entre Lstat y Rename; subir a un bloqueo de carpeta si alguna vez importa.
+			if _, lerr := os.Lstat(path); lerr == nil {
+				err = fs.ErrExist
+			} else {
+				err = os.Rename(tmp.Name(), path)
+			}
 		}
 	}
 	if errors.Is(err, fs.ErrExist) {
@@ -83,3 +92,9 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 
 // beforeSaveRename es un gancho de pruebas: corre justo antes de dar su nombre final al temporal.
 var beforeSaveRename func()
+
+// Variables para que las pruebas simulen sistemas de archivos sin enlaces duros ni RENAME_NOREPLACE.
+var (
+	linkFile        = os.Link
+	renameNoReplace = sys.RenameNoReplaceIn
+)

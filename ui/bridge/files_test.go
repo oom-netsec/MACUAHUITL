@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"errors"
+	"golang.org/x/sys/unix"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,5 +69,27 @@ func TestWriteFileCarreraNoReemplaza(t *testing.T) {
 	}
 	if got, _ := os.ReadFile(p); string(got) != "ajeno" {
 		t.Fatalf("el archivo ajeno quedó con %q", got)
+	}
+}
+
+// En sistemas de archivos sin enlaces duros ni RENAME_NOREPLACE (CIFS, FUSE) se cae a Lstat + Rename.
+func TestWriteFileSinLinkNiNoReplace(t *testing.T) {
+	b := New(nil, func(string, any) {})
+	oldL, oldR := linkFile, renameNoReplace
+	linkFile = func(string, string) error { return &os.LinkError{Op: "link", Err: unix.EPERM} }
+	renameNoReplace = func(*os.Root, string, string) error { return unix.EINVAL }
+	defer func() { linkFile, renameNoReplace = oldL, oldR }()
+	p := filepath.Join(t.TempDir(), "x.csv")
+	if err := b.WriteFile(p, "mio", "utf8", false); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if got, _ := os.ReadFile(p); string(got) != "mio" {
+		t.Fatalf("contenido %q", got)
+	}
+	if err := b.WriteFile(p, "otro", "utf8", false); !errors.Is(err, ErrFileExists) {
+		t.Fatalf("err = %v; quería ErrFileExists", err)
+	}
+	if got, _ := os.ReadFile(p); string(got) != "mio" {
+		t.Fatalf("se reemplazó: %q", got)
 	}
 }
