@@ -139,6 +139,14 @@ func checkNXOS(cmd string) error {
 	if strings.ContainsAny(cmd, "()") || strings.ContainsAny(placeholder.ReplaceAllString(cmd, ""), "{}") || strings.Contains(segs[0], `"`) {
 		return denied(cmd, "playbook.why.nxos_shell")
 	}
+	// «*» y «[» fuera de comillas dobles los expande bash tras la validación; dentro de un filtro entre comillas valen.
+	for i, in := 0, false; i < len(cmd); i++ {
+		if cmd[i] == '"' {
+			in = !in
+		} else if !in && (cmd[i] == '*' || cmd[i] == '[') {
+			return denied(cmd, "playbook.why.nxos_shell")
+		}
+	}
 	fields := strings.Fields(segs[0])
 	if len(fields) == 0 {
 		if len(segs) > 1 {
