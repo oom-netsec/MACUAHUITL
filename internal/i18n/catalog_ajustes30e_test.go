@@ -15,3 +15,25 @@ func TestTextosEnQueCitanCosasReales(t *testing.T) {
 		t.Errorf("iface_more en: %q", got)
 	}
 }
+
+// El motivo de cada error de la carpeta de salidas es el prefijo prefs.outputs.<motivo> de su texto, aunque haya
+// varias claves para el mismo motivo.
+func TestMotivoDeCarpetaDeSalidasIgualAlPrefijo(t *testing.T) {
+	n := 0
+	for _, c := range Codes() {
+		if !strings.HasPrefix(c, "prefs.outputs.") || c == "prefs.outputs.issue" || c == "prefs.outputs.note" {
+			continue
+		}
+		n++
+		prefix, _, _ := strings.Cut(Msg(Es, c, nil), ":")
+		if got := Reason(c); got != prefix {
+			t.Errorf("%s: reason %q, prefijo %q", c, got, prefix)
+		}
+		if pe, _, _ := strings.Cut(Msg(En, c, nil), ":"); pe != prefix {
+			t.Errorf("%s: el prefijo en inglés es %q", c, pe)
+		}
+	}
+	if n < 12 {
+		t.Fatalf("solo %d códigos", n)
+	}
+}
