@@ -160,6 +160,9 @@ func TestRechazos(t *testing.T) {
 			f["README.md"] = bytes.Repeat([]byte("a"), MaxReadme+1)
 			return f
 		}(), "dev", "zip.too_big"},
+		{"README con control bidi (trojan source)", signed(func(f map[string][]byte) { f["README.md"] = []byte("# Demo\nseguro \u202e)lla( tluafed\n") }), "dev", "manifest.invalid"},
+		{"README con marca de letra árabe", signed(func(f map[string][]byte) { f["README.md"] = []byte("# Demo \u061Cx\n") }), "dev", "manifest.invalid"},
+		{"README con aislamiento bidi", signed(func(f map[string][]byte) { f["README.md"] = []byte("# Demo \u2066x\u2069\n") }), "dev", "manifest.invalid"},
 		{"manifiesto con campo desconocido", func() map[string][]byte {
 			f := goodFiles()
 			f["manifest.yaml"] = []byte(goodManifest + "extra: 1\n")

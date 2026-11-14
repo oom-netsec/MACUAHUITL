@@ -134,3 +134,33 @@ func TestNewIDUnicoYValido(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Nombre y descripción con controles bidi (U+202E, U+2066…) se rechazan: engañan a la vista (trojan source).
+func TestValidateRechazaBidi(t *testing.T) {
+	for _, mod := range []func(*Script){
+		func(s *Script) { s.Name = "Mi \u202escript" },
+		func(s *Script) { s.Name = "Mi \u2066script\u2069" },
+		func(s *Script) { s.Description = "linea\n\u200fotra" },
+	} {
+		s := valido()
+		mod(&s)
+		if err := s.Validate(); err == nil {
+			t.Errorf("aceptado: %q / %q", s.Name, s.Description)
+		}
+	}
+}
+
+// Emoji con ZWJ o guion suave en nombre y descripción siguen valiendo (datos ya guardados se pueden editar e
+// importar); solo los controles de dirección (bidi) se rechazan.
+func TestValidateAceptaFormatoLegitimo(t *testing.T) {
+	s := valido()
+	s.Name = "Mi \U0001F468\u200d\U0001F4BB script"
+	s.Description = "re\u00advisión\nde VLAN"
+	if err := s.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	s.Name = "Mi \u061cscript"
+	if err := s.Validate(); err == nil {
+		t.Fatal("U+061C aceptado")
+	}
+}

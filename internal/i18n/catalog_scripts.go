@@ -5,13 +5,13 @@ package i18n
 func init() {
 	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
 	add(map[string]entry{
-		"scripts.err.name":          e("el nombre va de 1 a 64 caracteres, sin espacios en los extremos ni caracteres de control", "the name must be 1 to 64 characters, with no leading or trailing spaces and no control characters"),
+		"scripts.err.name":          e("el nombre va de 1 a 64 caracteres, sin espacios en los extremos ni caracteres de control o de dirección (bidi)", "the name must be 1 to 64 characters, with no leading or trailing spaces and no control or direction (bidi) characters"),
 		"scripts.err.lib_id":        e("id {id:q} inválido para un script de la biblioteca", "id {id:q} is not valid for a library script", "id"),
 		"scripts.err.user_id":       e("id {id:q} inválido: son 32 caracteres hexadecimales", "id {id:q} is not valid: it is 32 hexadecimal characters", "id"),
 		"scripts.err.origin":        e("origen {origin:q} desconocido", "unknown origin {origin:q}", "origin"),
 		"scripts.err.tech":          e("tecnología {tech:q} fuera de la lista ({list})", "technology {tech:q} is not in the list ({list})", "tech", "list"),
 		"scripts.err.platform":      e("plataforma {platform:q} fuera de la lista ({list})", "platform {platform:q} is not in the list ({list})", "platform", "list"),
-		"scripts.err.description":   e("la descripción pasa de {max} caracteres o trae caracteres de control", "the description exceeds {max} characters or has control characters", "max"),
+		"scripts.err.description":   e("la descripción pasa de {max} caracteres o trae caracteres de control o de dirección (bidi)", "the description exceeds {max} characters or has control or direction (bidi) characters", "max"),
 		"scripts.err.commands":      e("el script lleva de 1 a {max} comandos", "the script must have 1 to {max} commands", "max"),
 		"scripts.err.command_empty": e("comando {n}: vacío o de más de {max} caracteres", "command {n}: empty or longer than {max} characters", "n", "max"),
 		"scripts.err.command_ascii": e("comando {n}: solo ASCII imprimible, sin tabuladores ni caracteres de control", "command {n}: printable ASCII only, no tabs or control characters", "n"),
