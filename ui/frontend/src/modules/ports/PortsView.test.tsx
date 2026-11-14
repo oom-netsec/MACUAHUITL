@@ -136,21 +136,29 @@ test("al montarse se engancha a una ejecución viva y pide la confirmación pend
   expect(await screen.findByText(/Listo: el cambio/)).toBeInTheDocument();
 });
 
-// Un done con error con la ejecución viva es el corte del stream (IPC, transporte): la vista se vuelve a enganchar y no se congela.
-test("un corte del stream con la ejecución viva vuelve a engancharse y conserva el paso pendiente", async () => {
+// Un done con error con la ejecución viva es el corte del stream (IPC, transporte): la vista se vuelve a enganchar desde seq 0 con el
+// estado del núcleo, sin duplicar la salida; si el corte se repite sin eventos nuevos, a los 3 reenganches se cierra con el error.
+test("un corte del stream con la ejecución viva se reengancha sin duplicar la salida y con tope", async () => {
   const step = { id: "save-1", kind: "save", device: "SW1", lines: ["write memory"] };
-  const core = fakeCore({
-    listCredentials: vi.fn(async () => creds),
-    assistListRuns: vi.fn(async () => [{ runId: "r9", state: "waiting-confirm", active: true, waiting: true, canRollback: true, pending: step, changed: ["SW1"] }]),
-  });
+  const info = { runId: "r9", state: "waiting-confirm", active: true, waiting: true, canRollback: true, pending: step, changed: ["SW1"] };
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), assistListRuns: vi.fn(async () => [info]) });
   render(<PortsView core={core} />);
   await screen.findByRole("region", { name: "Paso pendiente save-1" });
+  const history = () => act(() => {
+    core.emitAssist({ runId: "r9", kind: "state", state: "running" }); // seq 0: protojson lo omite
+    core.emitAssist({ runId: "r9", seq: 1, kind: "output", device: "SW1", text: "linea-de-salida" });
+    core.emitAssist({ runId: "r9", seq: 2, kind: "pending", state: "waiting-confirm", step });
+  });
+  history();
   await act(async () => core.emitAssistDone({ runId: "r9", error: "stream cortado" }));
   await waitFor(() => expect(core.assistWatch).toHaveBeenCalledTimes(2));
-  // El núcleo repite desde seq 0: el estado vuelve a armarse y el paso pendiente sigue ahí.
-  act(() => { core.emitAssist({ runId: "r9", kind: "state", state: "running" }); core.emitAssist({ runId: "r9", seq: 1, kind: "pending", state: "waiting-confirm", step }); });
+  // El doble de pruebas repite el historial al llamar assistWatch, como el núcleo.
   expect(await screen.findByRole("region", { name: "Paso pendiente save-1" })).toBeInTheDocument();
-  expect(screen.getByRole("alert")).toHaveTextContent("MODO ASISTIDO ACTIVO");
+  expect((document.body.textContent ?? "").match(/linea-de-salida/g)).toHaveLength(1);
+  // Cortes repetidos sin ningún evento nuevo (seq ≤ 2): dos reenganches más y al cuarto corte la vista se cierra.
+  for (let i = 0; i < 3; i++) await act(async () => core.emitAssistDone({ runId: "r9", error: "stream cortado" }));
+  await waitFor(() => expect(screen.queryByRole("region", { name: "Paso pendiente save-1" })).toBeNull());
+  expect(core.assistWatch).toHaveBeenCalledTimes(4);
 });
 
 test("si no se puede preguntar al núcleo, un done cierra la vista como siempre", async () => {

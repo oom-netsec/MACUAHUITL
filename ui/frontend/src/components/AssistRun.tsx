@@ -44,6 +44,8 @@ function changedText(changed: string[], t: ReturnType<typeof useT>): string {
 const stepOf = (s: AssistStep): AssistStep => ({ ...s, device: s.device ?? "", lines: s.lines ?? [] });
 
 // fromInfo arma el estado de la vista para una ejecución que seguía viva al abrir el módulo.
+const MAX_REATTACH = 3;
+
 function fromInfo(i: AssistRunInfo): RunState {
   return { id: i.runId, active: true, state: i.state ?? "running", pending: i.pending ? stepOf(i.pending) : null, failReason: i.failReason ?? "",
     stopped: i.state === "failed" && !!i.waiting, changed: i.changed ?? [], log: [] };
@@ -163,6 +165,10 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
   const [run, setRun] = useState<RunState | null>(null);
   const runId = useRef("");
   const lastSeq = useRef(0); // el núcleo repite el historial: un seq ya visto no se aplica dos veces
+  // Reenganches tras un corte del stream: se cuentan seguidos hasta que llega un evento nuevo de verdad (seq mayor que el máximo visto en
+  // la ejecución, que no vuelve a 0 al reenganchar). Un evento que rompe el stream en cada repetición no deja la vista reenganchando sin fin.
+  const maxSeq = useRef(0);
+  const retries = useRef(0);
 
   useEffect(() => setArmed(false), [plan]);
   useEffect(() => { onActive(!!run?.active); }, [run?.active, onActive]);
@@ -175,6 +181,7 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
       // El primer evento (seq 0) llega sin seq (protojson omite el 0) y se aplica siempre: con un solo módulo enganchado por
       // ejecución solo se repetiría al reenganchar, y es el estado inicial, que no cambia nada al repetirse.
       if (e.seq) { if (e.seq <= lastSeq.current) return; lastSeq.current = e.seq; }
+      if ((e.seq ?? 0) > maxSeq.current) { maxSeq.current = e.seq!; retries.current = 0; }
       setRun((r) => {
         if (!r) return r;
         const n = { ...r, changed: e.changed ?? [] }; // cada evento trae los equipos cambiados al emitirse
@@ -200,10 +207,12 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
       if (e.runId !== runId.current) return;
       // Un done con error puede ser solo el corte del stream (IPC, transporte) con la ejecución viva en el núcleo: entonces se vuelve a
       // enganchar (el núcleo repite desde seq 0) en lugar de cerrar la vista y perder el paso pendiente. Si no se puede preguntar, se cierra.
-      const alive = await core.assistListRuns().then((rs) => rs.some((x) => x.runId === e.runId && x.active), () => false);
+      const live = await core.assistListRuns().then((rs) => rs.find((x) => x.runId === e.runId && x.active), () => undefined);
       if (e.runId !== runId.current) return;
-      if (alive) {
+      if (live && retries.current < MAX_REATTACH) {
+        retries.current++;
         lastSeq.current = 0;
+        setRun(fromInfo(live)); // estado del núcleo (paso pendiente incluido) y registro vacío: la repetición lo vuelve a llenar sin duplicar
         core.assistWatch(e.runId).catch((err) => onErrorRef.current(errorText(err)));
         return;
       }
@@ -221,7 +230,7 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
       const live = runs.find((r) => r.active && [moduleId, ""].includes(assistOwner(r.runId)));
       if (!alive || !live || runId.current) return;
       if (!assistOwner(live.runId) && moduleId) try { localStorage.setItem(assistOwnerKey(live.runId), moduleId); } catch { /* sin almacenamiento */ }
-      runId.current = live.runId; lastSeq.current = 0;
+      runId.current = live.runId; lastSeq.current = 0; maxSeq.current = 0; retries.current = 0;
       setRun(fromInfo(live));
       return core.assistWatch(live.runId); // el núcleo repite el historial: el estado se reconstruye solo
     }).catch((e) => alive && onError(errorText(e)));
@@ -233,7 +242,7 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
     onError("");
     try {
       const id = await core.assistStart(plan.planId, true);
-      runId.current = id; lastSeq.current = 0;
+      runId.current = id; lastSeq.current = 0; maxSeq.current = 0; retries.current = 0;
       // El núcleo no sabe qué módulo inició la ejecución; la franja del shell lo necesita para llevar de vuelta.
       try { if (moduleId) localStorage.setItem(assistOwnerKey(id), moduleId); } catch { /* sin almacenamiento */ }
       setRun({ id, active: true, state: "running", pending: null, failReason: "", stopped: false, changed: [], log: [] });
