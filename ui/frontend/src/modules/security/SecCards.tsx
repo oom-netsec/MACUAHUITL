@@ -51,11 +51,13 @@ export function ResultCards({ kind, text, report, fallback }: { kind: "radius" |
       <div className="sec-cards">
         <Head>{[t("security.card.server", { server: r.server }), r.method && t("security.card.method", { method: r.method })].filter(Boolean).join(" · ")}</Head>
         {r.exchanges.map((e, i) => {
-          const tone: Tone = !e.code ? "bad" : e.code === "Access-Accept" ? "ok" : e.code === "Access-Challenge" ? "warn" : e.code === "Access-Reject" ? "bad" : "warn";
+          // Un Access-Accept de MS-CHAPv2 cuyo MS-CHAP2-Success no verificó al servidor no es un éxito limpio: el servidor no probó conocer la contraseña.
+          const tone: Tone = !e.code ? "bad" : e.code === "Access-Accept" ? (e.mschap2Verified === false ? "warn" : "ok") : e.code === "Access-Challenge" ? "warn" : e.code === "Access-Reject" ? "bad" : "warn";
           return (
             <ResultPanel key={i} title={vocab(t, "exchange", e.kind)} status={{ tone, label: e.code || t("security.card.noReply") }}
               meta={e.code ? <><Duration ms={e.rttMs} /> · {t("security.card.attempt", { n: e.attempts })} · {t("security.card.ma", { v: vocab(t, "ma", e.messageAuthenticator) })}{e.mschap2Verified !== undefined && <> · {t(e.mschap2Verified ? "security.card.mschap2.ok" : "security.card.mschap2.bad")}</>}</> : undefined}>
               {e.error && <p className="panel-body meta">{e.error}</p>}
+              {e.mschap2Verified === false && <p className="panel-body"><Badge tone="warn">{t("security.card.mschap2.bad")}</Badge> {t("security.card.mschap2.warn")}</p>}
               {attrTable(vocab(t, "exchange", e.kind), [t("security.card.attr"), t("security.card.value")], e.attrs.map((a) => [a.name, a.value]))
                 ?? (e.code && <p className="panel-body meta">{t("security.card.none")}</p>)}
             </ResultPanel>
@@ -97,14 +99,14 @@ export function IkeCards({ report }: { report: IkeReportData }) {
   return (
     <div className="sec-cards">
       {([[1, report.phase1], [2, report.phase2]] as const).map(([n, p]) => (
-        <ResultPanel key={n} title={t(n === 1 ? "security.ike.phase1" : "security.ike.phase2")} status={{ tone: phaseTone(p), label: vocab(t, "phase", p) }} />
+        <ResultPanel key={n} title={t(n === 1 ? "security.ike.phase1" : "security.ike.phase2")} status={{ tone: phaseTone(p), label: vocab(t, "phase", p || "no_data") }} />
       ))}
       {report.note && <p className="hint">{report.note}</p>}
       {report.findings.length > 0 && (
         <ResultPanel title={t("security.findings")} pad>
           <ul className="findings">{report.findings.map((f, i) => (
             <li key={i}>
-              <Badge tone={findingTone(f.severity)}>{vocab(t, "findingSev", f.severity)}</Badge> <strong>{f.title}</strong>
+              <Badge tone={findingTone(f.severity)}>{vocab(t, "findingSev", f.severity)}</Badge>{f.phase ? <> <Badge>{t(f.phase === 1 ? "security.ike.phase1" : "security.ike.phase2")}</Badge></> : null} <strong>{f.title}</strong>
               <p className="meta">{f.explanation}</p>
               <p className="meta">{t("security.ike.action")}: {f.action}</p>
               {f.evidence.length > 0 && <Terminal text={f.evidence.join("\n")} aria-label={t("security.ike.evidence")} />}

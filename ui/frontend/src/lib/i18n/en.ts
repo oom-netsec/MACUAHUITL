@@ -2653,6 +2653,7 @@ export const en: Record<Key, string> = {
   "patrol.param.kind.ip": "IP address",
   "security.card.mschap2.ok": "Mutual authentication verified",
   "security.card.mschap2.bad": "Mutual authentication not verified",
+  "security.card.mschap2.warn": "The password was accepted, but the server did not prove it knows it (MS-CHAP2-Success did not verify): check that the right server answered and not a man-in-the-middle.",
   "security.ike.phase1": "Phase 1 (IKE SA)",
   "security.ike.phase2": "Phase 2 (IPsec SA)",
   "security.ike.proposals": "Proposals",

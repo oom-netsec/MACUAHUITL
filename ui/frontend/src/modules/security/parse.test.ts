@@ -160,3 +160,9 @@ CSR: CN=req
   expect(c[0]).toMatchObject({ kind: "certificate", issuer: "CN=Lab CA", serial: "0A1B", daysLeft: 1, keyType: "ECDSA P-256", sigAlg: "ECDSA-SHA256", san: "ise01.lab", isCA: true, sha1: "AA:BB", sha256: "CC:DD", warnings: ["expires in 1 day"] });
   expect(c[1]).toMatchObject({ kind: "csr", daysLeft: 55 });
 });
+
+// Un servidor que termina sus mensajes en CRLF no debe hacer que se pierdan.
+test("tacacs: el mensaje y los datos con \\r al final se conservan sin el \\r", () => {
+  const r = parseTacacs("TACACS+ server 10.0.0.21:49\n\nauthorization: PASS_ADD in 8.0 ms\n  message: ok\r\n  data: d1\r\n")!;
+  expect(r.steps[0]).toMatchObject({ message: "ok", data: "d1" });
+});

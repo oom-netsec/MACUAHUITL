@@ -67,9 +67,9 @@ export function parseTacacs(text: string): TacacsReport | null {
     if (!cur) continue;
     let m: RegExpExecArray | null;
     if (l.startsWith("  ! ")) cur.error = l.slice(4);
-    else if ((m = /^ {2}(?:servidor pidió|server asked): "(.*)"$/.exec(l))) cur.prompts.push(m[1]);
-    else if ((m = /^ {2}(?:mensaje|message): (.*)$/.exec(l))) cur.message = m[1];
-    else if ((m = /^ {2}(?:datos|data): (.*)$/.exec(l))) cur.data = m[1];
+    else if ((m = /^ {2}(?:servidor pidió|server asked): "(.*)"\r?$/.exec(l))) cur.prompts.push(m[1]);
+    else if ((m = /^ {2}(?:mensaje|message): (.*?)\r?$/.exec(l))) cur.message = m[1];
+    else if ((m = /^ {2}(?:datos|data): (.*?)\r?$/.exec(l))) cur.data = m[1];
     else if (/^ {2}(?:enviado {2}|sent {5})/.test(l)) cur.sent.push(l.slice(11)); // mismo ancho en los dos idiomas
     else if (/^ {2}(?:recibido|received) /.test(l)) cur.received.push(l.slice(11));
   }

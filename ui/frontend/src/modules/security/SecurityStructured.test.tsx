@@ -55,7 +55,9 @@ test("radius muestra mschap2Verified solo cuando viene", async () => {
     const core = fakeCore({ secRadiusReport: vi.fn(async () => ex(v)) });
     const { unmount } = render(<SecurityView core={core} />);
     await fillRadius();
-    expect(await screen.findByText(new RegExp(text))).toBeInTheDocument();
+    expect((await screen.findAllByText(new RegExp(text))).length).toBeGreaterThan(0);
+    if (v === false) expect(screen.getByText(/no probó conocerla/)).toBeInTheDocument(); // el aviso destaca, no queda en los metadatos
+    else expect(screen.queryByText(/no probó conocerla/)).not.toBeInTheDocument();
     unmount();
   }
   const core = fakeCore({ secRadiusReport: vi.fn(async () => ex(undefined)) });
@@ -91,6 +93,17 @@ test("ike: tarjetas de fase, hallazgos y propuestas salen del informe estructura
   expect(screen.getByRole("region", { name: /Fase 1/ })).toHaveTextContent("Falló");
   expect(screen.getByRole("region", { name: /Fase 2/ })).toHaveTextContent("Sin datos");
   expect(core.secIkeDecode).not.toHaveBeenCalled();
+});
+
+test("ike: cada hallazgo dice su fase, la evidencia es texto literal y una fase vacía se ve como «Sin datos»", async () => {
+  const rep = { ...ike, phase2: "", findings: [{ ...ike.findings[0], phase: 2, evidence: ["<b>no es html</b>"] }] };
+  render(<SecurityView core={fakeCore({ secIkeReport: vi.fn(async () => rep) })} />);
+  await pasteIke();
+  const item = (await screen.findByText("Phase 1 proposal mismatch")).closest("li")!;
+  expect(item).toHaveTextContent("Fase 2 (IPsec SA)");
+  expect(item.querySelector("b")).toBeNull();
+  expect(item).toHaveTextContent("<b>no es html</b>");
+  expect(screen.getByRole("region", { name: /Fase 2/ })).toHaveTextContent("Sin datos");
 });
 
 test("ike: si el informe llega sin texto cae a secIkeDecode", async () => {

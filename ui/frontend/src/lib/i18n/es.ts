@@ -2651,6 +2651,7 @@ export const es = {
   "patrol.param.kind.ip": "Dirección IP",
   "security.card.mschap2.ok": "Autenticación mutua verificada",
   "security.card.mschap2.bad": "Autenticación mutua no verificada",
+  "security.card.mschap2.warn": "La contraseña se aceptó, pero el servidor no probó conocerla (MS-CHAP2-Success no verificó): revisa que respondió el servidor correcto y no un intermediario.",
   "security.ike.phase1": "Fase 1 (IKE SA)",
   "security.ike.phase2": "Fase 2 (IPsec SA)",
   "security.ike.proposals": "Propuestas",
