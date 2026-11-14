@@ -49,7 +49,7 @@ func TestBibliotecaCargaYSusScriptsSonValidos(t *testing.T) {
 		}
 	}
 	// los de diagnóstico vienen de los playbooks (solo lectura); los de configuración, no
-	if lectura < 45 || config < 10 { // ReadOnly exige también pasar las reglas de ASA: los «| section» de IOS ya no cuentan
+	if lectura < 50 || config < 10 {
 		t.Errorf("lectura=%d configuración=%d", lectura, config)
 	}
 	// IDs estables: el de un playbook conocido y uno de configuración

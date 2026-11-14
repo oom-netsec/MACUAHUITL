@@ -123,7 +123,7 @@ func CheckDenied(platform, cmd string) error {
 		if remotePath(f) {
 			return denied(cmd, "playbook.why.remote")
 		}
-		if f != "" && strings.HasPrefix("to-file", f) { // «t», «to», «to-»… abrevian to-file: show … to-file flash:x escribe
+		if isToFile(f) { // «t», «to», «to-»… abrevian to-file: show … to-file flash:x escribe
 			return denied(cmd, "playbook.why.to_file")
 		}
 	}
@@ -280,4 +280,24 @@ func validProbe(f []string) bool {
 func badProbeAddr(a netip.Addr) bool {
 	a = a.Unmap()
 	return a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})
+}
+
+// isToFile: «to-file» y sus prefijos («t», «to», «to-»…) son el destino de escritura de show en IOS.
+func isToFile(f string) bool { return f != "" && strings.HasPrefix("to-file", f) }
+
+// WritesOnOtherFamily dice si cmd lleva un destino de escritura de la otra familia: «to-file» (IOS/IOS-XE) o
+// «file» (ASA) entre los argumentos, antes del pipe. Un script que se manda a la terminal sin saber la plataforma
+// de la sesión no debe contar como de lectura si escribe en alguna de las dos.
+func WritesOnOtherFamily(cmd string) bool {
+	cmdPart, _, _ := strings.Cut(strings.ToLower(cmd), "|")
+	f := strings.Fields(cmdPart)
+	if len(f) == 0 {
+		return false
+	}
+	for _, a := range f[1:] {
+		if isToFile(a) || Abbrev(a, "file") {
+			return true
+		}
+	}
+	return false
 }

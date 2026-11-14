@@ -85,7 +85,7 @@ func TestReadOnly(t *testing.T) {
 		t.Fatal("sin comandos reales no es read_only")
 	}
 	// ASA tiene sus reglas: solo show es de lectura; «more system:running-config» muestra las claves.
-	s.Platform, s.Commands = "asa", []string{"show version", "show conn count"}
+	s.Platform, s.Commands = "asa", []string{"show version", "show conn count", "packet-tracer input inside tcp 10.0.0.1 1025 192.0.2.5 80"}
 	if !s.ReadOnly() {
 		t.Error("asa con solo show es read_only")
 	}
@@ -102,7 +102,7 @@ func TestReadOnly(t *testing.T) {
 			t.Errorf("%s %q no debe ser read_only", c.plat, c.cmd)
 		}
 	}
-	for _, c := range []struct{ plat, cmd string }{{"ios-xe", "show ip interface brief"}, {"asa", "show conn count"}} {
+	for _, c := range []struct{ plat, cmd string }{{"ios-xe", "show ip interface brief | section x"}, {"asa", "show conn count"}} {
 		s.Platform, s.Commands = c.plat, []string{c.cmd}
 		if !s.ReadOnly() {
 			t.Errorf("%s %q debe ser read_only", c.plat, c.cmd)

@@ -109,3 +109,17 @@ func TestMotivosASA(t *testing.T) {
 		}
 	}
 }
+
+// Destinos de escritura de la otra familia: «file» en ASA, «to-file» (y prefijos) en IOS/IOS-XE.
+func TestWritesOnOtherFamily(t *testing.T) {
+	for cmd, want := range map[string]bool{
+		"show logging process ios to-file bootflash:x": true, "show x to-f flash:x": true, "show x t y": true,
+		"show tech-support file disk0:x": true, "show tech-support fil x": true, "show tech-support f x": true,
+		"show ip interface brief | section x": false, "show conn count": false, "show running-config | include file": false,
+		"show tech-support | include to-file": false, "show version": false, "": false,
+	} {
+		if got := WritesOnOtherFamily(cmd); got != want {
+			t.Errorf("%q: %v, se esperaba %v", cmd, got, want)
+		}
+	}
+}
