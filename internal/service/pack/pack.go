@@ -4,7 +4,6 @@ package pack
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"slices"
 
@@ -97,33 +96,20 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		return nil, reject(err, nil, "none")
 	}
 	sum := dom.SHA256(data)
-	// Lo oculto se prepara en una transacción antes de tocar el disco y se confirma después del extract, justo antes de
-	// publicar: si algo falla antes, no se instala nada ni queda guardada la elección.
+	// Lo oculto se calcula antes de tocar el disco y se guarda en una transacción corta después del extract, justo antes
+	// de publicar: si algo falla antes, no se instala nada ni queda guardada la elección, y ninguna transacción espera
+	// el fsync del extract. Si el guardado falla, el paquete ya está instalado: se audita con hidden_save_failed y la
+	// respuesta es de éxito (la respuesta no tiene campo de aviso; el paquete entra con todo visible).
 	hide := []string{}
-	var prepErr error
-	res, err := s.store.InstallWith(data, r.GetAllowUnsigned(), func(p *dom.Pack, _ string) (func(bool) error, error) {
+	res, err := s.store.InstallWith(data, r.GetAllowUnsigned(), func(p *dom.Pack, _ string) error {
 		items := p.Items()
 		for _, id := range r.GetHide() { // los IDs que el paquete no trae se ignoran
 			if items[id] {
 				hide = append(hide, id)
 			}
 		}
-		tx, err := s.applyInstallHidden(p, hide, r.GetReplaceHidden())
-		if err != nil {
-			prepErr = err
-			return nil, err
-		}
-		return func(commit bool) error {
-			if !commit {
-				return tx.Rollback()
-			}
-			prepErr = tx.Commit()
-			return prepErr
-		}, nil
-	})
-	if prepErr != nil {
-		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("pack.err.hidden_save", prepErr, nil))
-	}
+		return nil
+	}, func(p *dom.Pack) error { return s.applyInstallHidden(p, hide, r.GetReplaceHidden()) })
 	if err != nil {
 		var p *dom.Pack
 		if res != nil {
@@ -133,6 +119,10 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	}
 	p := res.Pack
 	detail := installDetail(p, sum, res)
+	if res.CommitErr != nil {
+		detail += fmt.Sprintf(" hidden_save_failed=%q", res.CommitErr.Error())
+		hide = nil // no quedó guardado: no se audita como oculto
+	}
 	s.d.Audit("pack.install", p.ID, detail)
 	if len(hide) > 0 {
 		s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=0 at=install", p.ID, len(hide)))
@@ -173,26 +163,25 @@ func (s *svc) Inspect(ctx context.Context, r *v1.PackServiceInspectRequest) (*v1
 	return out, nil
 }
 
-// applyInstallHidden prepara lo oculto de una instalación en una transacción que devuelve abierta (quien la llama la
-// confirma o la deshace): poda los IDs que el paquete ya no trae y, con replace, deja hide como el conjunto exacto; sin
-// replace, lo que ya estaba oculto se conserva y hide suma.
-func (s *svc) applyInstallHidden(p *dom.Pack, hide []string, replace bool) (*sql.Tx, error) {
+// applyInstallHidden guarda lo oculto de una instalación en una transacción corta: poda los IDs que el paquete ya no
+// trae y, con replace, deja hide como el conjunto exacto; sin replace, lo que ya estaba oculto se conserva y hide suma.
+func (s *svc) applyInstallHidden(p *dom.Pack, hide []string, replace bool) error {
 	tx, err := s.d.DB().Begin()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if err = dom.PruneHidden(tx, p); err == nil {
-		if replace {
-			err = dom.ReplaceHidden(tx, p, hide)
-		} else {
-			_, err = dom.SetHidden(tx, p.ID, hide, nil)
+	defer tx.Rollback()
+	if err := dom.PruneHidden(tx, p); err != nil {
+		return err
+	}
+	if replace {
+		if err := dom.ReplaceHidden(tx, p, hide); err != nil {
+			return err
 		}
+	} else if _, err := dom.SetHidden(tx, p.ID, hide, nil); err != nil {
+		return err
 	}
-	if err != nil {
-		tx.Rollback()
-		return nil, err
-	}
-	return tx, nil
+	return tx.Commit()
 }
 
 func (s *svc) List(ctx context.Context, _ *v1.PackServiceListRequest) (*v1.PackServiceListResponse, error) {

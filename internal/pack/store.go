@@ -314,6 +314,8 @@ type Result struct {
 	Replaced string // versión anterior que reemplazó; vacío si era nuevo
 	// SyncWarning: el paquete quedó instalado, pero no se pudo asegurar con fsync la carpeta (una caída podría perderlo).
 	SyncWarning error
+	// CommitErr: el paquete quedó instalado, pero falló el paso commit de InstallWith (lo oculto no se guardó).
+	CommitErr error
 }
 
 // check hace los pasos 2 a 7 del ADR sobre bytes ya leídos y devuelve el paquete y el instalado que reemplazaría
@@ -363,16 +365,16 @@ func (s *Store) Inspect(data []byte, allowUnsigned bool) (*Result, error) { // s
 // Install hace los pasos 2 a 8 del ADR sobre bytes ya leídos. allowUnsigned es la confirmación explícita para un
 // paquete de terceros.
 func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
-	return s.InstallWith(data, allowUnsigned, nil)
+	return s.InstallWith(data, allowUnsigned, nil, nil)
 }
 
-// InstallWith es Install con un paso previo en dos tiempos, para guardar lo que debe estar listo cuando el paquete se
-// vea (lo oculto) sin que quede aplicado a una versión que no cambió. prepare corre con el paquete ya validado y bajo
-// el lock, antes de tocar el disco: si falla, no se instala nada. Su finish (puede ser nil) corre con commit=false si
-// el extract falla (deshacer) y con commit=true justo antes de publicar la foto; si ese commit falla, el paquete ya
-// está en disco y se publica igual, y el error se devuelve junto con el resultado. replaced es la versión que
-// reemplazaría ("" si es nuevo).
-func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) (finish func(commit bool) error, err error)) (*Result, error) {
+// InstallWith es Install con dos pasos, para guardar lo que debe estar listo cuando el paquete se vea (lo oculto) sin
+// que quede aplicado a una versión que no cambió y sin retener una transacción durante el extract. prepare corre con
+// el paquete ya validado y bajo el lock, antes de tocar el disco: si falla, no se instala nada. commit (puede ser nil)
+// corre después del extract y justo antes de publicar la foto; si falla, el paquete ya está en disco y se publica
+// igual, y el error va en Result.CommitErr (quien instala debe auditarlo). replaced es la versión que reemplazaría
+// ("" si es nuevo).
+func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) error, commit func(p *Pack) error) (*Result, error) {
 	s.mu.Lock()
 	p, old, cur, err := s.check(data, allowUnsigned)
 	if err != nil {
@@ -382,28 +384,24 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 		}
 		return &Result{Pack: p}, err
 	}
-	var finish func(bool) error
 	if prepare != nil {
 		replaced := ""
 		if old != nil {
 			replaced = old.Version
 		}
-		if finish, err = prepare(p, replaced); err != nil {
+		if err := prepare(p, replaced); err != nil {
 			s.mu.Unlock()
 			return &Result{Pack: p}, err
 		}
 	}
 	syncWarn, err := s.extract(p)
 	if err != nil {
-		if finish != nil {
-			finish(false)
-		}
 		s.mu.Unlock()
 		return &Result{Pack: p}, err
 	}
-	var finishErr error
-	if finish != nil {
-		finishErr = finish(true)
+	var commitErr error
+	if commit != nil {
+		commitErr = commit(p)
 	}
 	next := []*Pack{p}
 	for _, o := range cur.Packs {
@@ -416,11 +414,11 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 		s.OnChange()
 	}
 	s.mu.Unlock()
-	res := &Result{Pack: p, SyncWarning: syncWarn}
+	res := &Result{Pack: p, SyncWarning: syncWarn, CommitErr: commitErr}
 	if old != nil {
 		res.Replaced = old.Version
 	}
-	return res, finishErr
+	return res, nil
 }
 
 // syncDir hace fsync de una carpeta para que el rename y los archivos nuevos sobrevivan a una caída.

@@ -426,7 +426,7 @@ func TestPackImportNoTomaLaBaseAntesDelAlmacen(t *testing.T) {
 	raw, _ := os.ReadFile(out)
 	inside, release, installed := make(chan struct{}), make(chan struct{}), make(chan error, 1)
 	go func() {
-		_, err := h.core.packs.InstallWith(raw, true, func(*pack.Pack, string) (func(bool) error, error) { close(inside); <-release; return nil, nil })
+		_, err := h.core.packs.InstallWith(raw, true, func(*pack.Pack, string) error { close(inside); <-release; return nil }, nil)
 		installed <- err
 	}()
 	<-inside // Install tiene el almacén

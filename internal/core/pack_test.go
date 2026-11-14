@@ -774,3 +774,24 @@ func TestPackInstalarQueFallaAlExtraerNoGuardaLoOculto(t *testing.T) {
 		t.Fatalf("%+v %v", r, err)
 	}
 }
+
+// Si guardar lo oculto falla después del extract, el paquete ya está instalado y activo: la instalación se audita
+// (con hidden_save_failed) y la respuesta es de éxito; nunca contenido activo sin auditoría.
+func TestPackInstalarConFalloAlGuardarLoOcultoSeAudita(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	if _, err := h.core.db.Exec(`CREATE TRIGGER no_ocultar BEFORE INSERT ON pack_hidden BEGIN SELECT RAISE(ABORT, 'disco lleno'); END`); err != nil {
+		t.Fatal(err)
+	}
+	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})
+	if err != nil || len(r.Pack.Hidden) != 0 {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if !slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
+		t.Fatal("el paquete debía quedar instalado")
+	}
+	au := h.auditText(t)
+	if !strings.Contains(au, `"action":"pack.install"`) || !strings.Contains(au, "hidden_save_failed=") || strings.Contains(au, `"action":"pack.items"`) {
+		t.Fatalf("auditoría:\n%s", au)
+	}
+}

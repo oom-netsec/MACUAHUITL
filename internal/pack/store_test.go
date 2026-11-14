@@ -593,17 +593,17 @@ func TestInstallWithPrepare(t *testing.T) {
 	changes := 0
 	s.OnChange = func() { changes++ }
 	boom := errors.New("boom")
-	if _, err := s.InstallWith(signedZip(t, priv, nil), false, func(*Pack, string) (func(bool) error, error) { return nil, boom }); !errors.Is(err, boom) {
+	if _, err := s.InstallWith(signedZip(t, priv, nil), false, func(*Pack, string) error { return boom }, nil); !errors.Is(err, boom) {
 		t.Fatalf("err = %v", err)
 	}
 	if ents, _ := os.ReadDir(dir); len(ents) != 0 || len(s.Snapshot().Packs) != 0 || changes != 0 {
 		t.Fatalf("quedó %v %d", ents, changes)
 	}
 	visto := true
-	if _, err := s.InstallWith(signedZip(t, priv, nil), false, func(p *Pack, _ string) (func(bool) error, error) {
+	if _, err := s.InstallWith(signedZip(t, priv, nil), false, func(p *Pack, _ string) error {
 		visto = s.Snapshot().Find(p.ID) != nil // todavía no está publicado
-		return nil, nil
-	}); err != nil || visto || s.Snapshot().Find("oom/demo") == nil {
+		return nil
+	}, nil); err != nil || visto || s.Snapshot().Find("oom/demo") == nil {
 		t.Fatalf("%v visto=%v", err, visto)
 	}
 }
@@ -625,5 +625,22 @@ func TestFalloDelFsyncFinalPublicaYAvisa(t *testing.T) {
 	res, err := s.Install(signedZip(t, priv, nil), false)
 	if err != nil || res.SyncWarning == nil || changes != 1 || len(s.Snapshot().Packs) != 1 {
 		t.Fatalf("res=%+v err=%v changes=%d", res, err, changes)
+	}
+}
+
+// prepare corre antes de tocar el disco y commit después del extract, antes de publicar: nada que retenga una
+// transacción durante el fsync del extract. Un fallo de commit no deshace la instalación: va en Result.CommitErr.
+func TestInstallWithCommitCorreDespuesDelExtract(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	enDisco := func() bool { _, err := os.Stat(filepath.Join(dir, "oom", "demo")); return err == nil }
+	var prepDisco, commitDisco, commitPublicado bool
+	boom := errors.New("boom")
+	res, err := s.InstallWith(signedZip(t, priv, nil), false,
+		func(*Pack, string) error { prepDisco = enDisco(); return nil },
+		func(p *Pack) error { commitDisco, commitPublicado = enDisco(), s.Snapshot().Find(p.ID) != nil; return boom })
+	if err != nil || !errors.Is(res.CommitErr, boom) || prepDisco || !commitDisco || commitPublicado || s.Snapshot().Find("oom/demo") == nil {
+		t.Fatalf("err=%v res=%+v prep=%v commit=%v/%v", err, res, prepDisco, commitDisco, commitPublicado)
 	}
 }
