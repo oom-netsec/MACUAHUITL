@@ -36,6 +36,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   // Solo se guardan mientras arranca: con varias vistas montadas, una inactiva no acumula lo ajeno.
   const pending = useRef<DiagEvent[]>([]);
   const starting = useRef(false);
+  const [launching, setLaunching] = useState(false); // igual que starting pero visible: apaga el botón mientras arranca
   const runRef = useRef("");
   useBusy(!!runId);
   // El menú de equipo manda la dirección al módulo con su id (ping, traceroute…); cada instancia toma solo la suya.
@@ -82,7 +83,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     }
     pending.current = [];
     runRef.current = "";
-    starting.current = true;
+    starting.current = true; setLaunching(true);
     try {
       const id = await core.diagRun(tool, targets, options);
       runRef.current = id;
@@ -94,6 +95,8 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     } catch (e) {
       starting.current = false;
       setErr(outputsErrorText(errorText(e), t));
+    } finally {
+      setLaunching(false);
     }
   };
   const cancel = () => core.diagCancel(runId).catch((e) => setErr(errorText(e)));
@@ -131,7 +134,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
         </>
       )}
       <div className="actions">
-        <button className="primary" onClick={run} disabled={!!runId || (needsTarget && !target.trim())} aria-busy={!!runId}>{t("common.run")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
+        <button className="primary" onClick={run} disabled={!!runId || launching || (needsTarget && !target.trim())} aria-busy={!!runId}>{t("common.run")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
         <button onClick={cancel} disabled={!runId}>{t("common.cancel")}</button>
       </div>
       {!started && <EmptyState icon="pulse" title={t("diag.empty.title")}>{t("diag.empty")}</EmptyState>}

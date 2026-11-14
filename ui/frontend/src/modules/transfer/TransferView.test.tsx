@@ -259,3 +259,10 @@ test("la tarjeta de FTP sugiere borrar la credencial del equipo al terminar", as
   const card = await screen.findByRole("group", { name: "FTP 192.0.2.10:2121" });
   expect(within(card).getAllByText(/no ip ftp password/).length).toBeGreaterThan(0);
 });
+
+test("dos clics seguidos en Abrir servidor no abren dos servidores", async () => {
+  const core = setup({ transferServe: vi.fn(() => new Promise<void>(() => {})) });
+  await openServer(core);
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenCalledTimes(1);
+});

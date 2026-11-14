@@ -125,12 +125,14 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const ssh = proto === "scp" || proto === "sftp";
   const form = { proto, any, listen, port, write, recvDir, fromDir, files, allow, minutes };
   const missing = (!any && !listen) || (!write && !fromDir && splitList(files).length === 0); // datos requeridos; el resto lo explica serveProblem al abrir
+  const [starting, setStarting] = useState(false); // la promesa de abrir sigue pendiente: otro clic no abre otro servidor
   const start = async () => {
     const p = serveProblem(form);
     if (p) { setErr(t(p)); return; }
     setErr("");
     const host = any ? "0.0.0.0" : listen;
     legacyNext.current = ssh && legacy;
+    setStarting(true);
     try {
       await core.transferServe({
         protocol: proto, listen: host.includes(":") ? `[${host}]:${port}` : `${host}:${port}`, allowAny: any,
@@ -138,6 +140,8 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
       });
     } catch (e) {
       setErr(errorText(e));
+    } finally {
+      setStarting(false);
     }
   };
   const stop = (s: Srv) => core.transferStop(s.ready.serverId)
@@ -164,7 +168,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         <Field label={t("transfer.allow")} hint={t("transfer.allow.hint")} value={allow} onChange={setAllow} />
         {ssh && <Check label={t("transfer.legacy.server")} checked={legacy} onChange={setLegacy} />}
         {ssh && <p className="hint">{t("transfer.legacy.server.hint")}</p>}
-        <div className="actions"><button className="primary" disabled={missing} onClick={start}>{t("transfer.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>
+        <div className="actions"><button className="primary" disabled={missing || starting} onClick={start}>{t("transfer.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>
         {err && <Notice kind="error">{err}</Notice>}
       </Section>
       {servers.length === 0 && <EmptyState icon="upload" title={t("transfer.servers.none")} />}

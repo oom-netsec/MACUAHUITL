@@ -82,3 +82,13 @@ test("cancelar no es un fallo: estado neutro «Cancelado» y sin mensaje de erro
   expect(screen.getByText("Cancelado por el usuario.")).toBeInTheDocument();
   expect(screen.queryByText(/Con error|Error:/)).not.toBeInTheDocument();
 });
+
+test("dos clics seguidos en Ejecutar no lanzan dos ejecuciones", async () => {
+  const core = fakeCore({ diagRun: vi.fn(() => new Promise<string>(() => {})) });
+  render(<DiagView core={core} tool="ping" />);
+  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
+  const run = screen.getByRole("button", { name: /Ejecutar/ });
+  await userEvent.click(run);
+  await userEvent.click(run);
+  expect(core.diagRun).toHaveBeenCalledTimes(1);
+});

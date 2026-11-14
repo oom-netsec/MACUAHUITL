@@ -23,6 +23,7 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
   const [status, setStatus] = useState<{ k: Key; v?: Record<string, string> } | null>(null);
   const [err, setErr] = useState("");
   const [text, setText] = useState("");
+  const [starting, setStarting] = useState(false); // la promesa de abrir sigue pendiente: otro clic no abre otra sesión
   const [cmd, setCmd] = useState("");
   const out = useRef<HTMLPreElement>(null);
   // «Consola serie» del menú de equipo: una ruta de puerto se toma; una dirección solo se recuerda (el equipo no dice en qué puerto está).
@@ -52,11 +53,13 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
   });
   s.onUnmount(core.consoleClose);
   const open = async () => {
-    setErr(""); setText(""); setStatus(null);
+    setErr(""); setText(""); setStatus(null); setStarting(true);
     try {
       setRunId(await s.start(() => core.consoleOpen({ port, baud: Number(baud), dataBits: Number(dataBits), parity, stopBits: Number(stopBits), flow })));
     } catch (e) {
       setErr(errorText(e));
+    } finally {
+      setStarting(false);
     }
   };
   const act = (f: () => Promise<void>) => f().catch((e) => setErr(errorText(e)));
@@ -79,7 +82,7 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
         </div>
         <p className="hint defaults">{t("console.defaults")}</p>
         <div className="actions">
-          <button className="primary" disabled={!!runId || !port} onClick={open}>{t("console.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
+          <button className="primary" disabled={!!runId || starting || !port} onClick={open}>{t("console.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
           <button disabled={!runId} onClick={() => send("\x03")}>Ctrl-C</button>
           <button disabled={!runId} onClick={() => act(() => core.consoleBreak(runId))}>BREAK</button>
           <button disabled={!runId} onClick={() => act(() => core.consoleClose(runId))}>{t("console.close")}</button>
