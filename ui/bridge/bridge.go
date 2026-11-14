@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -412,10 +414,10 @@ func (b *Bridge) Subscribe(_ context.Context, jobIDs []string) error {
 			}
 		}
 	}
-	if len(errs) == 1 {
-		return wrapErr(errs[0])
+	if len(errs) > 0 {
+		return wrapErr(errs[0]) // el primero: un errors.Join no es *Error y la UI perdería code y reason
 	}
-	return wrapErr(errors.Join(errs...))
+	return nil
 }
 
 // headerWait es cuánto espera open los encabezados del núcleo antes de seguir sin ellos (variable para las pruebas).
@@ -467,12 +469,18 @@ func (b *Bridge) open(jobID string) error {
 		if ctx.Err() != nil { // otro open (resubscribe) lo reemplazó: el stream nuevo ya cubre el trabajo
 			return nil
 		}
-		// Abrir falló: no se deja la entrada (resubscribe la reabriría y fallaría para siempre).
-		b.mu.Lock()
-		if b.streams[jobID] == me {
-			delete(b.streams, jobID)
+		// Error definitivo: no se deja la entrada (resubscribe la reabriría y fallaría para siempre). Uno transitorio
+		// (Unavailable, un reset al reconectar) la deja muerta para que resubscribe la reabra.
+		switch status.Code(err) {
+		case codes.NotFound, codes.InvalidArgument, codes.PermissionDenied, codes.FailedPrecondition:
+			b.mu.Lock()
+			if b.streams[jobID] == me {
+				delete(b.streams, jobID)
+			}
+			b.mu.Unlock()
+		default:
+			markDead()
 		}
-		b.mu.Unlock()
 		cancel()
 		return wrapErr(err)
 	}

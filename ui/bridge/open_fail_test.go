@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,8 +34,8 @@ func TestSubscribeIntentaTodosLosIds(t *testing.T) {
 	b := headerBridge(t, f)
 	err := b.Subscribe(b.ctx, []string{"a", "b"})
 	var be *Error
-	if !errors.As(err, &be) || be.Code != codes.NotFound.String() {
-		t.Fatalf("err = %v", err)
+	if !errors.As(err, &be) || be.Code != codes.NotFound.String() || be.err != nil && strings.Count(err.Error(), "no existe") != 1 {
+		t.Fatalf("err = %v; quería un solo *Error con el NotFound", err)
 	}
 	if n := f.opens.Load(); n != 2 {
 		t.Fatalf("aperturas = %d; quería 2", n)
@@ -54,7 +55,27 @@ func TestResubscribeEsParalelo(t *testing.T) {
 	b.mu.Unlock()
 	t0 := time.Now()
 	b.resubscribe()
-	if d := time.Since(t0); d > 700*time.Millisecond {
+	if d := time.Since(t0); d > 750*time.Millisecond { // 2,5 plazos; en serie serían 4
 		t.Fatalf("resubscribe tardó %v; quería ~1 plazo", d)
+	}
+}
+
+// Un error transitorio (Unavailable) deja el trabajo muerto pero registrado: resubscribe lo reabre.
+func TestOpenTransitorioSeReabre(t *testing.T) {
+	f := &headerEvents{failFirst: true}
+	b := headerBridge(t, f)
+	if err := b.Subscribe(b.ctx, []string{"j1"}); err == nil {
+		t.Fatal("la primera apertura debía fallar")
+	}
+	b.resubscribe()
+	if n := f.opens.Load(); n != 2 {
+		t.Fatalf("aperturas = %d; quería 2", n)
+	}
+	b.mu.Lock()
+	st, ok := b.streams["j1"]
+	live := ok && !st.dead
+	b.mu.Unlock()
+	if !live {
+		t.Fatal("tras reabrir el stream debía estar vivo")
 	}
 }
