@@ -35,10 +35,19 @@ func asaDest(s string) bool {
 	if !asaName.MatchString(s) {
 		return false
 	}
-	if a, err := netip.ParseAddr(s); err == nil && (a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})) {
+	if a, err := netip.ParseAddr(s); err == nil && badProbeAddr(a) {
 		return false
 	}
 	return true
+}
+
+// asaLone: destino sin IFNAME delante. Una palabra suelta sin punto («inside», «ipv6») es indistinguible de un nombre
+// de interfaz o de una palabra clave: se exige IP, dato o nombre con punto.
+func asaLone(s string) bool {
+	if _, err := netip.ParseAddr(s); err == nil || isHolder(s) {
+		return true
+	}
+	return strings.Contains(s, ".")
 }
 
 func asaIP(s string) bool {
@@ -109,7 +118,7 @@ func validASAPing(f []string) bool {
 		n++
 	}
 	pos := f[:n]
-	if !tcp && len(pos) > 0 && (strings.HasPrefix("tcp", pos[0]) || strings.HasPrefix("interface", pos[0])) && !isHolder(pos[0]) {
+	if !tcp && len(pos) > 0 && (strings.HasPrefix("tcp", pos[0]) || strings.HasPrefix("interface", pos[0]) || pos[0] == "ipv6") && !isHolder(pos[0]) {
 		return false // abreviatura de una palabra clave: abre otra sintaxis
 	}
 	want := 1
@@ -124,6 +133,8 @@ func validASAPing(f []string) bool {
 			return false
 		}
 		pos = pos[1:]
+	} else if !asaLone(pos[0]) {
+		return false
 	}
 	if !asaDest(pos[0]) || tcp && !asaPortOK(pos[1]) {
 		return false
@@ -133,7 +144,7 @@ func validASAPing(f []string) bool {
 
 // validASATrace: traceroute DESTINO [source IFNAME|IP] [numeric] [timeout 1-10] [probe 1-5] [use-icmp].
 func validASATrace(f []string) bool {
-	if len(f) < 2 || !asaDest(f[1]) {
+	if len(f) < 2 || !asaDest(f[1]) || !asaLone(f[1]) {
 		return false
 	}
 	return asaOpts(f[2:], map[string][2]int{"timeout": {1, 10}, "probe": {1, 5}}, "numeric", "use-icmp", "source")

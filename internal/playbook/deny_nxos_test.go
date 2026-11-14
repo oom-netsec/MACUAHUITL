@@ -41,7 +41,7 @@ func TestCheckDeniedNXOSRechaza(t *testing.T) {
 		// destinos que son palabras clave (abren sub-diálogos)
 		"ping vrf", "ping multicast", "ping mpls", "ping m", "ping v", "traceroute vrf", "ping ip", "ping ipv6", "ping nve", "traceroute6 vrf default",
 		"dir ftp://h/x", "show file scp://u@h/x", "dir tftp:", "show file sftp:x", "show file http://h/x",
-		"ping", "ping6", "ping 255.255.255.255", "ping 0.0.0.0", "ping 224.0.0.1", "ping fe80::1", "ping ::",
+		"ping", "ping6", "ping 255.255.255.255", "ping ::ffff:255.255.255.255", "ping 0.0.0.0", "ping 224.0.0.1", "ping fe80::1", "ping ::",
 		"ping 10.0.0.1 count 11", "ping 10.0.0.1 count 0", "ping 10.0.0.1 packet-size 1501", "ping 10.0.0.1 timeout 11",
 		"ping 10.0.0.1 count 2 count 3", "ping 10.0.0.1 df-bit", "ping 10.0.0.1 source", "ping 10.0.0.1 data 0x1",
 		"traceroute", "traceroute 10.0.0.1 count 2", "traceroute6 ff02::1", "traceroute 10.0.0.1 vrf",

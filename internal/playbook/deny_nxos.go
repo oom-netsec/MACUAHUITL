@@ -199,7 +199,7 @@ func validNXProbe(f []string) bool {
 		f = f[1:]
 		return nxProbeOpts(f, ping)
 	}
-	if a, err := netip.ParseAddr(f[0]); err == nil && (a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})) {
+	if a, err := netip.ParseAddr(f[0]); err == nil && badProbeAddr(a) {
 		return false
 	}
 	return nxProbeOpts(f[1:], ping)

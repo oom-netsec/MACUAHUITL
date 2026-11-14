@@ -22,7 +22,7 @@ var (
 	// aa:bb:cc:dd:ee:ff, aa-bb-cc-dd-ee-ff, aabb.ccdd.eeff o aabbccddeeff
 	macRe    = regexp.MustCompile(`^(?:(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}|(?:[0-9A-Fa-f]{4}\.){2}[0-9A-Fa-f]{4}|[0-9A-Fa-f]{12})$`)
 	apRe     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$`)
-	ifaceRe  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9/.:-]{1,47}$`)
+	ifaceRe  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9/.:_-]{1,47}$`)
 	errValue = errors.New("valor inválido")
 )
 

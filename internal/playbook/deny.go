@@ -235,7 +235,7 @@ func validProbe(f []string) bool {
 	if len(f) == 0 || !probeName(f[0]) || probeKeyword(f[0]) { // un prefijo de palabra clave abre el diálogo interactivo
 		return false
 	}
-	if a, err := netip.ParseAddr(f[0]); err == nil && (a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})) {
+	if a, err := netip.ParseAddr(f[0]); err == nil && badProbeAddr(a) {
 		return false // IOS pide «Output Interface» y abre el diálogo
 	}
 	f = f[1:]
@@ -273,4 +273,11 @@ func validProbe(f []string) bool {
 		f = f[o.nargs:]
 	}
 	return true
+}
+
+// badProbeAddr: destinos de ping/traceroute que abren el diálogo o hacen difusión. Una IPv4 mapeada (::ffff:a.b.c.d)
+// se juzga como la IPv4 que envuelve.
+func badProbeAddr(a netip.Addr) bool {
+	a = a.Unmap()
+	return a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})
 }
