@@ -523,7 +523,8 @@ func (d *driver) quiet(ctx context.Context, n int) bool {
 func (d *driver) moreComing(ctx context.Context, tail string) bool {
 	// «User:», «(y/n)», «New password:», «(Cisco Controller) >» o un aviso de contraseña de un banner pueden ir seguidos del prompt de otra plataforma.
 	// Límite conocido: con una pausa mayor a ftdSettle antes del prompt (banner lento) «\r\n> » se toma por FTD y «(y/n)» o
-	// «password has expired» dan ErrFirstLogin; es heurística y falla cerrada (no se escribe nada).
+	// «password has expired» dan ErrFirstLogin; es heurística y falla cerrada: nunca se escribe una credencial, aunque con
+	// «\r\n> » Open sí manda «terminal length 0» y el Enter de cola antes de fallar.
 	aireOpen := !d.aire && (airePrompt.MatchString(tail) || aireConfig.MatchString(tail)) // solo al abrir: en el Run de AireOS no se espera
 	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) && !iseFirstLogin.MatchString(tail) && !ftdFirstLogin.MatchString(tail) && !aireOpen {
 		return false
