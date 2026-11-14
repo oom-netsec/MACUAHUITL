@@ -57,7 +57,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
       const js = await core.listJobs();
       if (n !== listSeq.current) return;
       setJobs(sortJobs(js));
-      await subscribeJobs(js.filter(active).map((j) => j.id));
+      await subscribeJobs(js.filter((j) => j.state !== "created").map((j) => j.id)); // también los terminados (created aún no emite): el núcleo no dice si ya cerraron (empaquetan manifest y zip) y, si cerraron, contesta «closed» y cierra el stream
       // Al abrir, si hay un trabajo armado, se muestra ese en lugar del formulario.
       if (!autoSelected.current) {
         autoSelected.current = true;
@@ -71,11 +71,16 @@ export function PatrolView({ core }: { core: CoreAPI }) {
 
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
   useEffect(() => {
+    let live = true; // un cambio de bóveda posterior no se pisa con una respuesta vieja
     core.vaultStatus().then(async (s) => {
+      if (!live) return;
       setVault(s.state);
-      if (s.state === "unlocked") setCreds(await core.listCredentials());
-    }).catch((e) => setErr(errorText(e)));
+      if (s.state !== "unlocked") return setCreds([]); // bóveda cerrada: no quedan credenciales a la vista
+      const l = await core.listCredentials();
+      if (live) setCreds(l);
+    }).catch((e) => { if (live) setErr(errorText(e)); });
     refreshJobs();
+    return () => { live = false; };
   }, [core, vv, refreshJobs]);
 
   useEffect(() => core.onEvent((e) => {

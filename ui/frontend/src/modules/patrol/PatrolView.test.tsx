@@ -5,6 +5,7 @@ import { DeviceGrid } from "./DeviceGrid";
 import { activeMs, elapsed } from "./format";
 import { fakeCore } from "../../lib/fake";
 import { I18nProvider, LanguageSwitch } from "../../lib/i18n";
+import { vaultChanged } from "../../lib/vaultSignal";
 
 test("parseTargets normaliza comas, espacios, saltos y CIDR sin duplicados", () => {
   expect(parseTargets("10.0.0.1, 10.0.0.2\n10.0.1.0/30  sw1\n10.0.0.1")).toEqual(["10.0.0.1", "10.0.0.2", "10.0.1.0/30", "sw1"]);
@@ -30,6 +31,16 @@ async function fillForm(core: ReturnType<typeof fakeCore>) {
   await userEvent.type(screen.getByLabelText("Comandos"), "show version");
   await userEvent.type(screen.getByLabelText("Carpeta de salida"), "/home/u/out");
 }
+
+test("al cerrarse la bóveda se vacían las credenciales a la vista", async () => {
+  let state = "unlocked";
+  const core = fakeCore({ vaultStatus: vi.fn(async () => ({ state })) as never, listCredentials: vi.fn(async () => creds) });
+  render(<PatrolView core={core} />);
+  expect(await screen.findByRole("option", { name: "lab (admin)" })).toBeInTheDocument();
+  state = "locked";
+  act(() => vaultChanged());
+  await waitFor(() => expect(screen.queryByRole("option", { name: "lab (admin)" })).toBeNull());
+});
 
 test("valores por defecto seguros y aviso al apagar el enmascarado", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
@@ -367,6 +378,13 @@ test("closed repetido o fuera de orden no reabre el stream ni duplica fases", as
   await act(async () => {});
   expect(within(await screen.findByRole("list", { name: "Fases" })).getAllByText("Ronda 2 iniciada")).toHaveLength(1);
   expect(core.subscribe).toHaveBeenCalledTimes(1);
+});
+
+test("al abrir se suscribe también a un trabajo terminado que aún puede estar empaquetando", async () => {
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "jc", name: "cerrando", state: "completed" }, { id: "jn", name: "nuevo", state: "created" }]) });
+  render(<PatrolView core={core} />);
+  await waitFor(() => expect(core.subscribe).toHaveBeenCalledWith(["jc"]));
+  expect(core.subscribe).not.toHaveBeenCalledWith(["jn"]);
 });
 
 test("armar no abre un segundo stream del mismo trabajo", async () => {

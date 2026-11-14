@@ -235,3 +235,18 @@ test("en inglés el v3 muestra solo la etiqueta traducida: el motivo del núcleo
     localStorage.removeItem("macuahuitl.lang");
   }
 });
+
+test("en inglés el v3 sin decodificar llega con el texto del catálogo en inglés y también se reconoce", async () => {
+  localStorage.setItem("macuahuitl.lang", "en");
+  try {
+    const core = fakeCore({ trapsStart: vi.fn(async () => "t1") });
+    render(<I18nProvider><VisibilityView core={core} /></I18nProvider>);
+    await userEvent.click(screen.getByRole("tab", { name: "Traps" }));
+    await userEvent.click(screen.getByRole("button", { name: "Listen" }));
+    act(() => core.emitVis("traps", { runId: "t1", json: JSON.stringify({ From: "10.0.0.2:5000", Version: "3", Error: "undecoded v3 (87 bytes): unknown USM user" }) }));
+    await flush();
+    expect(await screen.findByRole("cell", { name: "v3 undecoded (87 bytes)" })).toBeInTheDocument();
+  } finally {
+    localStorage.removeItem("macuahuitl.lang");
+  }
+});

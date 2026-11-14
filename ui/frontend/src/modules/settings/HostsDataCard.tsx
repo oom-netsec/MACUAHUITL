@@ -8,13 +8,13 @@ import { DetailsButton } from "../../components/Dialog";
 import { useLang, useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import type { Host, HostFileFormat, HostImportAction, HostImportItem, HostsFormat, HostsImportPreview, HostsImportResult } from "../inventory/api";
-import { knownWarning, useCoreText } from "../inventory/coreText";
 import { hostsChanged, useHostsVersion } from "../inventory/signal";
 import "../inventory/hosts.css";
 
-// Tipos y descripciones de la tabla de campos: el núcleo los describe en español; aquí se traducen por nombre de campo/tipo.
-// Un campo o tipo que la vista no conozca se muestra tal cual el núcleo lo dijo solo en español; en inglés se oculta (la app no mezcla idiomas).
-const TYPES: Record<string, Key> = { texto: "hosts.data.type.texto", entero: "hosts.data.type.entero", lista: "hosts.data.type.lista" };
+// Tipos de la tabla de campos: el núcleo manda text/integer/list (en español, texto/entero/lista); se muestran con el nombre de la UI.
+// Los ejemplos no neutros los escribe el núcleo en español siempre: en otro idioma se ocultan.
+const BASE: Record<string, Key> = { texto: "hosts.data.type.texto", entero: "hosts.data.type.entero", lista: "hosts.data.type.lista" };
+const TYPES: Record<string, Key> = { ...BASE, text: BASE.texto, integer: BASE.entero, list: BASE.lista };
 const FIELD_NAMES = new Set(["name", "address", "port", "platform", "folder", "tags", "credential_label", "notes"]);
 // Ejemplos que no dependen del idioma (IP, puerto, plataforma); los demás vienen en español del núcleo y en inglés no se muestran.
 const NEUTRAL = new Set(["address", "port", "platform"]);
@@ -26,7 +26,6 @@ const descKey = (n: string) => `hosts.data.field.${n}` as Key;
 export function HostsDataCard({ core }: { core: CoreAPI }) {
   const t = useT();
   const lang = useLang();
-  const ct = useCoreText();
   const uid = useId();
   const hv = useHostsVersion();
   const [fmt, setFmt] = useState<HostsFormat | null>(null);
@@ -44,17 +43,17 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
 
   useEffect(() => {
     let live = true;
-    core.hostsImportFormat().then((f) => { if (live) setFmt(f); }, (e) => { if (live) setErr(ct(errorText(e), "hosts.coreError", e)); });
+    core.hostsImportFormat().then((f) => { if (live) setFmt(f); }, (e) => { if (live) setErr(errorText(e)); });
     return () => { live = false; };
   }, [core]);
   useEffect(() => {
     if (scope !== "some") return;
     let live = true;
-    core.listHosts().then((l) => { if (live) { setBook(l); setPicked((p) => new Set([...p].filter((id) => l.some((h) => h.id === id)))); } }, (e) => { if (live) setErr(ct(errorText(e), "hosts.coreError", e)); });
+    core.listHosts().then((l) => { if (live) { setBook(l); setPicked((p) => new Set([...p].filter((id) => l.some((h) => h.id === id)))); } }, (e) => { if (live) setErr(errorText(e)); });
     return () => { live = false; };
   }, [core, scope, hv]);
 
-  const run = async (f: () => Promise<void>) => { setErr(""); setMsg(""); setWarn(""); setBusy(true); try { await f(); } catch (e) { setErr(ct(errorText(e), "hosts.coreError", e)); } finally { setBusy(false); } };
+  const run = async (f: () => Promise<void>) => { setErr(""); setMsg(""); setWarn(""); setBusy(true); try { await f(); } catch (e) { setErr(errorText(e)); } finally { setBusy(false); } };
 
   const template = (format: HostFileFormat) => run(async () => {
     const tpl = await core.hostsImportTemplate(format);
@@ -73,7 +72,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
     // Si falla, se borra el archivo vacío que dejó pickSavePath (un archivo previo con contenido no se toca) y se muestra el error real.
     const r = await cleanOnFail(core, path, core.exportHosts(ids, path, true, format));
     setMsg(t("hosts.data.export.done", { n: String(r.count), path }));
-    if (r.warnings.length) setWarn(ct(r.warnings.join(" "), "hosts.coreWarn"));
+    if (r.warnings.length) setWarn([...new Set(r.warnings)].join(" "));
   });
 
   const startImport = () => run(async () => {
@@ -96,8 +95,6 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
   });
 
   const fieldName = (n: string) => <code>{n}</code>;
-  // Avisos conocidos traducidos; los demás, el texto del núcleo en español y un genérico en inglés.
-  const warnText = (w: string) => { const k = knownWarning(w); return k === "nosum" ? t("hosts.data.import.w.nosum") : k === "cred" ? t("hosts.data.import.w.cred", { n: String(prev?.items.filter((i) => i.credentialMissing).length || 1) }) : ct(w, "hosts.data.import.w.other"); };
   const stateOf = (i: HostImportItem) => (i.state === "conflicto" ? t(`hosts.data.import.state.${i.reason === "nombre" ? "nombre" : "direccion"}`) : t(`hosts.data.import.state.${i.state}`));
 
   return (
@@ -120,10 +117,10 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
                   {fmt.fields.map((f) => (
                     <tr key={f.name}>
                       <td>{fieldName(f.name)}</td>
-                      <td>{TYPES[f.type] ? t(TYPES[f.type]) : ct(f.type, "hosts.data.field.exampleHidden")}</td>
+                      <td>{TYPES[f.type] ? t(TYPES[f.type]) : f.type}</td>
                       <td>{t(f.required ? "hosts.data.yes" : "hosts.data.no")}</td>
-                      <td>{neutral(f.name) ? <code>{f.example}</code> : ct(f.example, "hosts.data.field.exampleHidden")}</td>
-                      <td>{FIELD_NAMES.has(f.name) ? t(descKey(f.name)) : ct(f.description, "hosts.data.field.exampleHidden")}</td>
+                      <td>{neutral(f.name) ? <code>{f.example}</code> : (lang === "es" ? f.example : t("hosts.data.field.exampleHidden"))}</td>
+                      <td>{FIELD_NAMES.has(f.name) ? t(descKey(f.name)) : f.description}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -165,7 +162,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
           {prev.warnings.length > 0 && (
             <Notice kind="warn">
               <strong>{t("hosts.data.import.warnings")}</strong>
-              <ul>{prev.warnings.map((w, i) => <li key={i}>{warnText(w)}</li>)}</ul>
+              <ul>{prev.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
             </Notice>
           )}
           {prev.errors.length > 0 && (
@@ -180,7 +177,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
                       <tr key={i}>
                         <td className="mono">{e.line}</td>
                         <td>{e.field ? fieldName(e.field) : t("hosts.data.import.wholeRow")}</td>
-                        <td className="hosts-core-cell">{lang === "es" ? e.reason : t(e.field ? "hosts.data.import.invalid" : "hosts.data.import.invalidRow")}</td>
+                        <td className="hosts-core-cell">{e.reason}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -1,10 +1,9 @@
-import { errInfo } from "../../lib/coreError";
 import { useCallback, useEffect, useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Field, Notice, PathField, Select, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
 import { RANGES, emptyForm, validateOpts, type NumKey, type SyslogFormat } from "../../components/ingest/ingestOpts";
-import { useLang, useT } from "../../lib/i18n";
+import { useT } from "../../lib/i18n";
 import { chmodCommand, outputsReasonKey, parseOutputsError } from "../../lib/outputsError";
 import type { Key } from "../../lib/i18n/es";
 import type { CorePrefs, CorePrefsState } from "./api";
@@ -15,14 +14,13 @@ const NUMS = ["rotateMb", "rotateMinutes", "maxFiles"] as const;
 export { parseOutputsError };
 
 type Form = { outputsDir: string; rotateMb: string; rotateMinutes: string; maxFiles: string; format: CorePrefs["format"] };
-type SaveErr = { msg: string; parsed: ReturnType<typeof parseOutputsError>; coded: boolean };
+type SaveErr = { msg: string; parsed: ReturnType<typeof parseOutputsError> };
 const toForm = (s: CorePrefsState): Form => ({ outputsDir: s.outputsDir, rotateMb: s.rotateMb ? String(s.rotateMb) : "", rotateMinutes: s.rotateMin ? String(s.rotateMin) : "", maxFiles: s.maxFiles ? String(s.maxFiles) : "", format: s.format });
 const num = (v: string) => (v.trim() ? Number(v.trim()) : 0);
 
 // Ajustes → Almacenamiento: carpeta de salidas y defaults de archivo de syslog, traps y flujos (fase 29e). Guardar reemplaza todo: vacío es el de fábrica.
 export function StorageSection({ core }: { core: CoreAPI }) {
   const t = useT();
-  const lang = useLang();
   const [state, setState] = useState<CorePrefsState | null>(null);
   const [form, setForm] = useState<Form>({ outputsDir: "", rotateMb: "", rotateMinutes: "", maxFiles: "", format: "" });
   const [loadErr, setLoadErr] = useState("");
@@ -45,16 +43,16 @@ export function StorageSection({ core }: { core: CoreAPI }) {
       setState(s); setForm(toForm(s)); setSaved(true);
     } catch (e) {
       const msg = errorText(e);
-      setSaveErr({ msg, parsed: parseOutputsError(e), coded: !!errInfo(e) });
+      setSaveErr({ msg, parsed: parseOutputsError(e) });
     } finally { setBusy(false); }
   };
 
-  if (loadErr) return <Notice kind="error">{lang === "es" ? loadErr : t("settings.storage.loadFail")}</Notice>;
+  if (loadErr) return <Notice kind="error">{loadErr}</Notice>;
   if (!state) return null;
 
   // La carpeta guardada ya no cumple y rige la de fábrica (el núcleo lo dice en `note`, en español).
   const fellBack = !!state.outputsDir && state.outputsDirEffective !== state.outputsDir;
-  const noteText = lang === "es" && state.note ? state.note : fellBack ? t("settings.storage.noteFallback", { path: state.outputsDir }) : t("settings.storage.noteMoved");
+  const noteText = state.note ? state.note : fellBack ? t("settings.storage.noteFallback", { path: state.outputsDir }) : t("settings.storage.noteMoved");
   const chmod = saveErr?.parsed?.code === "permisos" ? chmodCommand(saveErr.parsed.path) : "";
 
   // Los rechazos del núcleo por la carpeta van bajo su campo; el resto (p. ej. fallo al guardar) junto a Guardar.
@@ -99,7 +97,7 @@ export function StorageSection({ core }: { core: CoreAPI }) {
       </fieldset>
 
       {(!!state.note || fellBack) && <Notice kind="warn">{noteText}</Notice>}
-      {saveErr && !parsedErr && <Notice kind="error">{lang === "es" || saveErr.coded ? saveErr.msg : t("settings.storage.err.save")}</Notice>}
+      {saveErr && !parsedErr && <Notice kind="error">{saveErr.msg}</Notice>}
       {saved && !saveErr && <Notice kind="ok">{t("settings.storage.saved")}</Notice>}
       <div className="actions">
         <button type="button" className="primary" disabled={busy || Object.keys(errs).length > 0} onClick={() => void save()}>{t("settings.storage.save")}</button>

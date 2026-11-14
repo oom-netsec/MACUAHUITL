@@ -37,7 +37,10 @@ export function useShellStatus(core: CoreAPI, everyMs = 15_000): ShellStatus {
     const id = window.setInterval(refresh, everyMs);
     window.addEventListener("focus", refresh);
     const offA = core.onAssist((e) => { if (e.kind === "state") refresh(); }); // no por cada línea de salida
-    const offD = core.onAssistDone(() => refresh());
+    const offD = core.onAssistDone((e) => {
+      try { localStorage.removeItem(assistOwnerKey(e.runId)); } catch { /* sin almacenamiento */ } // terminó: el dueño ya no hace falta y la clave no se acumula
+      refresh();
+    });
     const offV = onVaultChanged(refresh);
     return () => { window.clearInterval(id); window.removeEventListener("focus", refresh); offA(); offD(); offV(); };
   }, [core, refresh, everyMs]);

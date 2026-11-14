@@ -66,12 +66,13 @@ export function ImportDialog({ core, path, preview, onDone, onClose }: { core: C
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<PackImportResult | null>(null);
   const conflicts = preview.items.filter((i) => i.state.startsWith("conflicto"));
-  const pending = conflicts.filter((i) => !choice[i.id]).length;
+  const ck = (i: { kind: string; id: string }) => `${i.kind}:${i.id}`; // un script y un playbook con el mismo id no comparten la elección
+  const pending = conflicts.filter((i) => !choice[ck(i)]).length;
   const ready = !res && !changed && pending === 0;
   const go = async () => {
     setBusy(true); setErr(""); setChanged(false);
     try {
-      const decisions: PackImportDecision[] = conflicts.map((i) => ({ itemId: i.id, action: choice[i.id] }));
+      const decisions: PackImportDecision[] = conflicts.map((i) => ({ itemId: i.id, action: choice[ck(i)] }));
       setRes(await core.packImport(path, preview.sha256, decisions));
       onDone(); scriptsChanged(); // la biblioteca de scripts y los favoritos de la terminal cambiaron
     } catch (e) { setErr(errorText(e)); setChanged(STALE.includes(errInfo(e)?.reason ?? "")); } finally { setBusy(false); }
@@ -84,8 +85,8 @@ export function ImportDialog({ core, path, preview, onDone, onClose }: { core: C
           <li key={`${i.kind}:${i.id}`}>
             <span>{t(`packs.import.kind.${i.kind}` as never)} · <code>{i.id}</code> · {i.name} · {t(`packs.import.state.${i.state}` as never)}</span>
             {i.state.startsWith("conflicto") && (
-              <Select label={t("packs.import.decision", { id: i.id })} value={choice[i.id] ?? ""} placeholder={t("packs.import.choose")} disabled={!!res}
-                onChange={(v) => setChoice((c) => ({ ...c, [i.id]: v }))} options={[["renombrar", t("packs.import.rename")], ["omitir", t("packs.import.skip")]]} />
+              <Select label={t("packs.import.decision", { id: i.id })} value={choice[ck(i)] ?? ""} placeholder={t("packs.import.choose")} disabled={!!res}
+                onChange={(v) => setChoice((c) => ({ ...c, [ck(i)]: v }))} options={[["renombrar", t("packs.import.rename")], ["omitir", t("packs.import.skip")]]} />
             )}
           </li>
         ))}
