@@ -502,7 +502,7 @@ test("con la ronda 1 sin equipos terminados la grilla se arma con los eventos: c
   });
   render(<PatrolView core={core} />);
   await screen.findByRole("heading", { name: "nocturno" });
-  await waitFor(() => expect(core.getRun).toHaveBeenCalled());
+  await screen.findByText("Estado por equipo"); // la grilla vacía ya está montada y escucha los eventos
   act(() => {
     core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.5:22", state: "DEVICE_STATE_RUNNING" } });
     core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.6:22", state: "DEVICE_STATE_CONNECTING" } });
