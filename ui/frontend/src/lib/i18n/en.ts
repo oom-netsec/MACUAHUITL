@@ -2651,4 +2651,11 @@ export const en: Record<Key, string> = {
   "patrol.param.kind.ap": "AP",
   "patrol.param.kind.interface": "Interface",
   "patrol.param.kind.ip": "IP address",
+  "scripts.col.hidden": "hidden by a package",
+  "scripts.col.unavailable": "unavailable: install the package",
+  "tls.verify.unknown_authority": "Unknown authority",
+  "tls.verify.hostname": "Name does not match the certificate",
+  "tls.verify.expired": "Certificate expired",
+  "tls.verify.not_yet_valid": "Certificate not yet valid",
+  "tls.verify.other": "The chain could not be verified",
 };

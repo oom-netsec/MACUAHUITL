@@ -349,7 +349,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	if len(failed) > 0 {
 		return fail(service.Err(ctx, codes.FailedPrecondition, "patrol.svc.login_failed", i18n.A("failed", strings.Join(failed, "; "))), "login test failed: "+strings.Join(failed, "; "))
 	}
-	until := c.o.Now().Add(time.Duration(spec.WindowHours) * time.Hour)
+	until := c.o.Now().Round(0).Add(time.Duration(spec.WindowHours) * time.Hour) // sin lectura monotónica: no avanza con el sistema suspendido
 	creds := []string{spec.DefaultCredentialID}
 	for _, o := range spec.Overrides {
 		for _, id := range []string{o.CredentialID, o.FallbackCredentialID} {
@@ -384,7 +384,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	j.OutputDir = w.Dir()
 	c.mu.Unlock()
 	run := func(ctx context.Context, round int, hp string) error {
-		ctx, cancelWin := windowCtx(ctx, until, c.o.Now())
+		ctx, cancelWin := windowCtx(ctx, until, c.o.Now)
 		defer cancelWin()
 		res := patrol.RunDevice(ctx, c.deps(j), j.id, spec, w, round, byHP[hp], func(p patrol.Progress) {
 			kind := engine.DeviceState
@@ -491,11 +491,11 @@ func (c *Core) watch(j *job, events <-chan engine.Event, cancel func()) {
 
 func (c *Core) finish(j *job, state string) {
 	c.mu.Lock()
-	if j.state == "completed" || j.state == "cancelled" {
+	if j.closing || j.state == "completed" || j.state == "cancelled" {
 		c.mu.Unlock()
 		return
 	}
-	j.state = state
+	j.closing = true
 	w := j.writer
 	var all []patrol.DeviceResult
 	for r := 1; r <= j.rounds; r++ {
@@ -514,6 +514,10 @@ func (c *Core) finish(j *job, state string) {
 			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_PACKAGED, 0, "phase.packaged", i18n.A("path", zip))
 		}
 	}
+	// Quien vea el estado terminal (el respaldo programado, la UI) ya puede leer la carpeta completa.
+	c.mu.Lock()
+	j.state = state
+	c.mu.Unlock()
 	if v != nil {
 		v.Disarm(j.id) // al terminar la última ronda la DEK se borra si nadie más la necesita (spec §10.4)
 	}
@@ -787,8 +791,32 @@ func (s *auditSvc) Export(r *v1.ExportRequest, st v1.AuditService_ExportServer) 
 	return nil
 }
 
+// windowTick es cada cuánto windowCtx compara la hora de pared con el fin de la ventana.
+var windowTick = time.Second
+
 // windowCtx limita a un equipo al fin de la ventana de la bóveda (until), no a Schedule.Until, que solo
-// impide empezar rondas nuevas. El plazo es relativo al reloj del núcleo; si ya pasó, nace vencido.
-func windowCtx(ctx context.Context, until, now time.Time) (context.Context, context.CancelFunc) {
-	return context.WithTimeoutCause(ctx, until.Sub(now), patrol.ErrWindowEnded)
+// impide empezar rondas nuevas. El plazo es relativo al reloj del núcleo; si ya pasó, nace vencido. Los temporizadores
+// de Go son monotónicos y no avanzan con el sistema suspendido: además del plazo, un vigilante compara la hora de
+// pared en cada tic y cancela con window_ended en cuanto pasa until (termina junto con el contexto).
+func windowCtx(ctx context.Context, until time.Time, now func() time.Time) (context.Context, context.CancelFunc) {
+	until = until.Round(0)
+	base, cancelBase := context.WithCancelCause(ctx)
+	tctx, cancelT := context.WithTimeoutCause(base, until.Sub(now().Round(0)), patrol.ErrWindowEnded)
+	tick := windowTick
+	go func() {
+		t := time.NewTicker(tick)
+		defer t.Stop()
+		for {
+			select {
+			case <-tctx.Done():
+				return
+			case <-t.C:
+				if !now().Round(0).Before(until) {
+					cancelBase(patrol.ErrWindowEnded)
+					return
+				}
+			}
+		}
+	}()
+	return tctx, func() { cancelT(); cancelBase(context.Canceled) }
 }

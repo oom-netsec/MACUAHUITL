@@ -748,3 +748,50 @@ func TestPackColeccionesMarcanOcultosAlGuardar(t *testing.T) {
 		t.Fatalf("%+v %v", sv, err)
 	}
 }
+
+// Si el extract falla, lo oculto que pedía la instalación no queda guardado (se aplicaría a lo que sigue instalado).
+func TestPackInstalarQueFallaAlExtraerNoGuardaLoOculto(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root escribe donde quiere")
+	}
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	dir := filepath.Join(h.p.Data, "packs")
+	os.MkdirAll(dir, 0o700)
+	os.Chmod(dir, 0o500) // el extract no puede crear su carpeta temporal
+	t.Cleanup(func() { os.Chmod(dir, 0o700) })
+	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}}); err == nil {
+		t.Fatal("el extract debía fallar")
+	}
+	var n int
+	h.core.db.QueryRow(`SELECT count(*) FROM pack_hidden`).Scan(&n)
+	if n != 0 {
+		t.Fatalf("quedaron %d elecciones guardadas de una instalación fallida", n)
+	}
+	os.Chmod(dir, 0o700)
+	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})
+	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l2-stp"}) {
+		t.Fatalf("%+v %v", r, err)
+	}
+}
+
+// Si guardar lo oculto falla después del extract, el paquete ya está instalado y activo: la instalación se audita
+// (con hidden_save_failed) y la respuesta es de éxito; nunca contenido activo sin auditoría.
+func TestPackInstalarConFalloAlGuardarLoOcultoSeAudita(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	if _, err := h.core.db.Exec(`CREATE TRIGGER no_ocultar BEFORE INSERT ON pack_hidden BEGIN SELECT RAISE(ABORT, 'disco lleno'); END`); err != nil {
+		t.Fatal(err)
+	}
+	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})
+	if err != nil || len(r.Pack.Hidden) != 0 {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if !slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
+		t.Fatal("el paquete debía quedar instalado")
+	}
+	au := h.auditText(t)
+	if !strings.Contains(au, `"action":"pack.install"`) || !strings.Contains(au, "hidden_save_failed=") || strings.Contains(au, `"action":"pack.items"`) {
+		t.Fatalf("auditoría:\n%s", au)
+	}
+}

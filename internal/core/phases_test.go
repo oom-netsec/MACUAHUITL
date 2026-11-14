@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -305,5 +307,56 @@ func TestPhasesIdiomaYCodigos(t *testing.T) {
 	}
 	if p := eventToProto("es", engine.Event{Kind: engine.Phase, State: "JOB_PHASE_KIND_COMPLETED", Detail: "3 rondas", Reason: "phase.rounds", Args: map[string]string{"n": "3"}}).GetPhaseAdded(); p.Detail != "3 rondas" {
 		t.Fatalf("evento es: %+v", p)
+	}
+}
+
+// «completed» solo se ve cuando el manifest ya está escrito: quien lo vea (el respaldo programado, la UI) puede leer
+// la carpeta del trabajo completa.
+func TestCompletedSoloSeVeConElManifestEscrito(t *testing.T) {
+	var gate atomic.Pointer[chan chan struct{}] // cuando se arma, la siguiente llamada a Now avisa y espera
+	h := newHarness(t, func(o *Options) {
+		o.Now = func() time.Time {
+			if g := gate.Swap(nil); g != nil {
+				reached := make(chan struct{})
+				*g <- reached
+				<-reached
+			}
+			return time.Now()
+		}
+	})
+	w, err := patrol.NewWriter(h.out, patrol.Spec{Name: "m"}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	j := &job{id: "j-manifest", state: "armed", writer: w, results: map[int][]patrol.DeviceResult{}}
+	h.core.mu.Lock()
+	h.core.jobs[j.id] = j
+	h.core.mu.Unlock()
+	ch := make(chan chan struct{})
+	gate.Store(&ch)
+	done := make(chan struct{})
+	go func() { h.core.finish(j, "completed"); close(done) }()
+	release := <-ch // finish ya está dentro de patrol.Finish, antes de escribir el manifest
+	h.core.mu.Lock()
+	st := j.state
+	h.core.mu.Unlock()
+	_, merr := os.Stat(filepath.Join(w.Dir(), "manifest.json"))
+	if st == "completed" && merr != nil {
+		t.Errorf("el trabajo figura completed sin manifest.json")
+	}
+	close(release)
+	<-done
+	if _, err := os.Stat(filepath.Join(w.Dir(), "manifest.json")); err != nil {
+		t.Fatal(err)
+	}
+	h.core.mu.Lock()
+	st = j.state
+	h.core.mu.Unlock()
+	if st != "completed" {
+		t.Errorf("al terminar, state = %q", st)
+	}
+	h.core.finish(j, "cancelled") // un segundo cierre no pisa el primero
+	if j.state != "completed" {
+		t.Errorf("segundo finish cambió el estado a %q", j.state)
 	}
 }

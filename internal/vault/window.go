@@ -35,7 +35,8 @@ func (v *Vault) Arm(jobID string, until time.Time, credentialIDs []string) error
 	if err := v.requireFull(); err != nil {
 		return err
 	}
-	now := v.now()
+	now := v.now().Round(0) // sin lectura monotónica: no avanza con el sistema suspendido
+	until = until.Round(0)
 	if !until.After(now) || until.Sub(now) > MaxWindow {
 		return ErrWindowTooLong
 	}
@@ -115,7 +116,7 @@ func (v *Vault) Unlocked() bool {
 
 // sweep quita ventanas vencidas y destruye la DEK si ya nadie la necesita. Requiere v.mu.
 func (v *Vault) sweep() {
-	now := v.now()
+	now := v.now().Round(0)
 	for id, w := range v.windows {
 		if !now.Before(w.Until) {
 			delete(v.windows, id)

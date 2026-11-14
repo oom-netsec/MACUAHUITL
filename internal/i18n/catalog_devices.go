@@ -134,7 +134,6 @@ func init() {
 func init() {
 	e := func(es, en string) entry { return entry{Es: es, En: en, Args: tplArgs(es, en)} }
 	add(map[string]entry{
-		"pack.err.hidden_save": e("no se instaló nada: no se pudo guardar lo oculto: {cause}", "nothing was installed: the hidden items could not be saved: {cause}"),
 		"pack.err.hidden_read": e("el paquete quedó instalado, pero no se pudo leer lo oculto: {cause}", "the package was installed, but the hidden items could not be read: {cause}"),
 	})
 }

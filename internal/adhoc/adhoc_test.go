@@ -110,10 +110,11 @@ func TestBuildSinSalidaNoMezclaElEstado(t *testing.T) {
 // Fase 30e: el máximo de comandos es un error con código: es, el de siempre; en, en inglés.
 func TestMaximoDeComandosTieneCodigo(t *testing.T) {
 	_, err := Commands(strings.Repeat("show version\n", MaxCommands+1))
-	if err == nil || err.Error() != "adhoc: 51 comandos; el máximo es 50" {
+	const es, en = "adhoc: 51 comandos; el máximo es 50. El tope es de diseño", "adhoc: 51 commands; the maximum is 50. The cap is by design"
+	if err == nil || !strings.HasPrefix(err.Error(), es) || !strings.Contains(err.Error(), "divide el lote en tandas de 50 comandos o menos") {
 		t.Fatalf("es: %v", err)
 	}
-	if got := i18n.English(err); got != "adhoc: 51 commands; the maximum is 50" {
+	if got := i18n.English(err); !strings.HasPrefix(got, en) || !strings.Contains(got, "split the batch into runs of 50 commands or fewer") {
 		t.Fatalf("en: %q", got)
 	}
 }
