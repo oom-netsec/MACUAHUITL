@@ -242,14 +242,15 @@ func ValidateAddr(addr string, allowAny bool) error {
 
 // Publish arma el mapa nombre base → ruta. Solo archivos regulares con ruta absoluta
 // y nombres sin repetir.
-func Publish(files []string) (map[string]string, error) {
-	out, _, err := publish(files)
+func Publish(files []string, extraDeny ...string) (map[string]string, error) {
+	out, _, err := publish(files, extraDeny)
 	return out, err
 }
 
+// Los archivos sueltos pasan por la misma lista de carpetas sensibles que FromDir y RecvDir (ruta y ruta real).
 // publish además devuelve el estado de cada archivo al publicarse, para detectar que después sea otro.
 // Un archivo con enlaces duros (Nlink > 1) no se publica: puede ser el mismo inodo que uno sensible.
-func publish(files []string) (map[string]string, map[string]os.FileInfo, error) {
+func publish(files []string, extraDeny []string) (map[string]string, map[string]os.FileInfo, error) {
 	if len(files) == 0 {
 		return nil, nil, i18n.New("fileserve.err.no_files", nil)
 	}
@@ -258,12 +259,24 @@ func publish(files []string) (map[string]string, map[string]os.FileInfo, error) 
 		if !filepath.IsAbs(f) {
 			return nil, nil, i18n.New("fileserve.err.path_relative", i18n.A("path", f))
 		}
-		st, err := os.Stat(f)
+		// Se resuelve el enlace una sola vez y se publica la ruta real: lo que se comprueba es lo que se sirve
+		// (un enlace que cambie después no desvía); si no se puede resolver, se rechaza.
+		real, err := evalSymlinks(filepath.Clean(f))
+		if err != nil {
+			if _, serr := os.Stat(f); serr != nil {
+				err = serr // el mensaje de siempre para un archivo inexistente
+			}
+			return nil, nil, fmt.Errorf("fileserve: %w", err)
+		}
+		st, err := os.Lstat(real)
 		if err != nil {
 			return nil, nil, fmt.Errorf("fileserve: %w", err)
 		}
 		if !st.Mode().IsRegular() {
 			return nil, nil, i18n.New("fileserve.err.not_regular", i18n.A("path", f))
+		}
+		if err := checkPathsDeny(extraDeny, filepath.Clean(f), real); err != nil {
+			return nil, nil, err
 		}
 		if sys.HardLinked(st) {
 			return nil, nil, i18n.New("fileserve.err.hardlinks", i18n.A("path", f))
@@ -272,7 +285,7 @@ func publish(files []string) (map[string]string, map[string]os.FileInfo, error) 
 		if _, dup := out[name]; dup {
 			return nil, nil, i18n.New("fileserve.err.dup_name", i18n.A("name", name))
 		}
-		out[name], infos[name] = f, st
+		out[name], infos[name] = real, st
 	}
 	return out, infos, nil
 }
@@ -305,7 +318,7 @@ func prepare(c Config) (src *source, rcv *receiver, err error) {
 		}
 	}()
 	if len(c.Files) > 0 {
-		if src.files, src.infos, err = publish(c.Files); err != nil {
+		if src.files, src.infos, err = publish(c.Files, c.DenyDirs); err != nil {
 			return nil, nil, err
 		}
 	}

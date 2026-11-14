@@ -4,8 +4,8 @@ import { Check, Field, Notice, Select, TextArea } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section, Tabs, useResult } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
-import type { PkiReportData, RadiusReportData, TacacsReportData } from "./api";
-import { CertChain, ResultCards } from "./SecCards";
+import type { IkeReportData, PkiReportData, RadiusReportData, TacacsReportData } from "./api";
+import { CertChain, IkeCards, ResultCards } from "./SecCards";
 import "./security.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
 
@@ -348,14 +348,14 @@ function DecodeCard({ core }: { core: CoreAPI }) {
 function IkePanel({ core }: { core: CoreAPI }) {
   const t = useT();
   const [text, setText] = useState("");
-  const r = useResult<string>();
+  const r = useResult<Probe<IkeReportData>>();
   return (
     <>
       <Section title={t("security.sec.ike")} description={t("security.ike.note")}>
         <TextArea label={t("security.ike.input")} value={text} onChange={setText} rows={14} />
-        <div className="actions"><button className="primary" disabled={!text || r.busy} aria-busy={r.busy} onClick={() => r.run(() => core.secIkeDecode(text))}>{t("security.decode")}{kbd}</button></div>
+        <div className="actions"><button className="primary" disabled={!text || r.busy} aria-busy={r.busy} onClick={() => r.run(() => probe(core.secIkeReport, core.secIkeDecode, text))}>{t("security.decode")}{kbd}</button></div>
       </Section>
-      <Outcome r={r} empty={t("security.ike.empty")}>{r.data && <Terminal text={r.data} aria-label={t("common.output")} />}</Outcome>
+      <Outcome r={r} bare empty={t("security.ike.empty")}>{r.data && (r.data.report ? <IkeCards report={r.data.report} /> : <Raw text={r.data.text} />)}</Outcome>
     </>
   );
 }

@@ -409,7 +409,7 @@ type actSession struct {
 func (a actSession) Activity(n int) { a.n.Add(int64(n)) }
 
 // Lo que pasa por los canales de scp/sftp cuenta como actividad de la sesión (keepalive): en una subida
-// el equipo casi no manda bytes, así que debe contar también lo escrito.
+// en una subida el equipo casi no manda bytes, así que cuenta también lo escrito (acotado: ver tapW).
 func TestTransferCuentaActividadDeSesion(t *testing.T) {
 	data := bytes.Repeat([]byte("x"), 50000)
 	for _, proto := range []string{"scp", "sftp"} {

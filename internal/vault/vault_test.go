@@ -405,3 +405,137 @@ func TestReservedEntryCannotBeOverwrittenOrDeletedByID(t *testing.T) {
 		t.Errorf("borrar una normal: %v", err)
 	}
 }
+
+// Borrar una credencial no la deja viva en el respaldo hasta la siguiente escritura.
+func TestDeleteReescribeElBak(t *testing.T) {
+	v, p := newVault(t)
+	a, _ := v.Put(cred("a", "x", ""))
+	v.Put(cred("b", "y", ""))
+	if err := v.Delete(a); err != nil {
+		t.Fatal(err)
+	}
+	b, err := Open(p + ".bak")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Unlock(pw("maestra")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Get(a); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("la credencial borrada sigue en el .bak: %v", err)
+	}
+	if l, err := b.List(); err != nil || len(l) != 1 {
+		t.Fatalf("el .bak debía conservar la otra: %v %v", l, err)
+	}
+}
+
+// fallaLaNEsima hace fallar la escritura atómica número n (1 = el .bak, 2 = la bóveda).
+func fallaLaNEsima(t *testing.T, n int) {
+	old, calls := chmod, 0
+	chmod = func(f *os.File, m os.FileMode) error {
+		if calls++; calls == n {
+			return errors.New("disco lleno")
+		}
+		return old(f, m)
+	}
+	t.Cleanup(func() { chmod = old })
+}
+
+// Delete escribe primero el .bak sin la credencial y después la bóveda: si lo segundo falla, la credencial sigue
+// en la bóveda y Delete devuelve error (nunca «borrada pero con error»).
+func TestDeleteFallaAlEscribirLaBovedaNoBorra(t *testing.T) {
+	v, p := newVault(t)
+	a, _ := v.Put(cred("a", "x", ""))
+	v.Put(cred("b", "y", ""))
+	fallaLaNEsima(t, 2)
+	if err := v.Delete(a); err == nil {
+		t.Fatal("Delete debía fallar")
+	}
+	chmod = func(f *os.File, m os.FileMode) error { return f.Chmod(m) }
+	if c, err := v.Get(a); err != nil {
+		t.Fatalf("la credencial debía seguir en memoria: %v", err)
+	} else {
+		c.Password.Destroy()
+	}
+	if c, err := reopen(t, p).Get(a); err != nil {
+		t.Fatalf("la credencial debía seguir en la bóveda: %v", err)
+	} else {
+		c.Password.Destroy()
+	}
+	if err := v.Delete(a); err != nil { // reintento posible
+		t.Fatal(err)
+	}
+}
+
+// Editar una credencial no deja el secreto anterior en el .bak.
+func TestPutReemplazaElSecretoEnElBak(t *testing.T) {
+	v, p := newVault(t)
+	id, _ := v.Put(cred("a", "viejo", ""))
+	c := cred("a", "nuevo", "")
+	c.ID = id
+	if _, err := v.Put(c); err != nil {
+		t.Fatal(err)
+	}
+	b, err := Open(p + ".bak")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Unlock(pw("maestra")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := b.Get(id)
+	if err != nil || string(got.Password.Bytes()) != "nuevo" {
+		t.Fatalf("el .bak conserva el secreto anterior: %v", err)
+	}
+}
+
+// ChangeMasterPassword escribe el .bak antes que la bóveda: el .bak no abre con la contraseña vieja y, si falla
+// la escritura de la bóveda, la contraseña vieja sigue valiendo.
+func TestCambioDeContrasenaNoDejaBakConLaVieja(t *testing.T) {
+	v, p := newVault(t)
+	v.Put(cred("a", "x", ""))
+	fallaLaNEsima(t, 2)
+	if err := v.ChangeMasterPassword(pw("maestra"), pw("nueva")); err == nil {
+		t.Fatal("debía fallar")
+	}
+	chmod = func(f *os.File, m os.FileMode) error { return f.Chmod(m) }
+	if err := v.ChangeMasterPassword(pw("maestra"), pw("nueva")); err != nil {
+		t.Fatalf("la contraseña vieja debía seguir valiendo: %v", err)
+	}
+	b, _ := Open(p + ".bak")
+	if err := b.Unlock(pw("maestra")); !errors.Is(err, ErrWrongPassword) {
+		t.Fatalf(".bak abre con la vieja: %v", err)
+	}
+}
+
+// Un .bak dejado por una versión anterior (credencial borrada, DEK con la contraseña vieja) se reescribe al
+// desbloquear, una vez por arranque.
+func TestUnlockMigraElBakViejo(t *testing.T) {
+	v, p := newVault(t)
+	a, _ := v.Put(cred("a", "x", ""))
+	v.Put(cred("b", "y", ""))
+	viejo, _ := os.ReadFile(p) // con a
+	v.Delete(a)
+	v.ChangeMasterPassword(pw("maestra"), pw("nueva"))
+	os.WriteFile(p+".bak", viejo, 0o600) // lo que dejaba la versión anterior
+	w, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Unlock(pw("nueva")); err != nil {
+		t.Fatal(err)
+	}
+	b, err := Open(p + ".bak")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Unlock(pw("maestra")); !errors.Is(err, ErrWrongPassword) {
+		t.Fatalf(".bak aún abre con la contraseña vieja: %v", err)
+	}
+	if err := b.Unlock(pw("nueva")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Get(a); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("el .bak aún trae la borrada: %v", err)
+	}
+}

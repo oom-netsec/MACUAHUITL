@@ -9,6 +9,7 @@ func init() {
 		"playbook.err.denied_cmd":    e("playbook: comando no permitido en una recolección (solo lectura): {cmd:q} ({cause})", "playbook: command not allowed in a collection (read-only): {cmd:q} ({cause})", "cmd", "cause"),
 		"playbook.why.ascii":         e("solo ASCII imprimible; un retorno de carro o un carácter de 8 bits ejecutaría otro comando", "printable ASCII only; a carriage return or an 8-bit character would run another command"),
 		"playbook.why.to_file":       e("to-file escribe en el equipo", "to-file writes to the device"),
+		"playbook.why.probe":         e("ping y traceroute solo admiten destino y opciones acotadas (repeat ≤ 10, size ≤ 1500, timeout 1-10, source, vrf, ttl, probe)", "ping and traceroute only accept a destination and bounded options (repeat ≤ 10, size ≤ 1500, timeout 1-10, source, vrf, ttl, probe)"),
 		"playbook.why.terminal":      e("solo terminal length y terminal width", "only terminal length and terminal width"),
 		"playbook.why.not_read":      e("no es un comando de lectura", "not a read command"),
 		"playbook.why.empty_pipe":    e("pipe vacío", "empty pipe"),

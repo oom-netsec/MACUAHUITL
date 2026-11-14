@@ -2,6 +2,7 @@ package diag
 
 import (
 	"context"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -98,6 +99,7 @@ func TestResultReportsRealBinary(t *testing.T) {
 }
 
 func TestStrictNumbersAndInterface(t *testing.T) {
+	localTest(t)
 	for name, r := range map[string]Request{
 		"NaN":         req(Ping, "192.0.2.1", map[string]string{"count": "NaN"}, ""),
 		"exponente":   req(Ping, "192.0.2.1", map[string]string{"count": "1e1"}, ""),
@@ -118,7 +120,85 @@ func TestStrictNumbersAndInterface(t *testing.T) {
 	if _, argv, err := Build(req(Nmap, "2001:db8::1", nil, "")); err != nil || !strings.Contains(strings.Join(argv, " "), "-6") {
 		t.Fatalf("ipv6 nmap without -6: %v %v", argv, err)
 	}
-	if _, argv, err := Build(req(Iperf3, "", map[string]string{"mode": "server", "seconds": "10"}, "")); err != nil || strings.Contains(strings.Join(argv, " "), "-t") {
+	if _, argv, err := Build(req(Iperf3, "", map[string]string{"mode": "server", "seconds": "10", "bind": "192.0.2.9"}, "")); err != nil || strings.Contains(strings.Join(argv, " "), "-t") {
 		t.Fatalf("server must ignore seconds: %v %v", argv, err)
+	}
+}
+
+// El servidor de iperf3 no escucha en todas las interfaces: exige -B con una IP de esta máquina,
+// puerto no privilegiado y un tope de tiempo.
+func TestIperfServerRestringido(t *testing.T) {
+	localIPs = func() []netip.Addr { return []netip.Addr{netip.MustParseAddr("192.0.2.9"), netip.MustParseAddr("::1")} }
+	t.Cleanup(func() { localIPs = realLocalIPs })
+	srv := func(o map[string]string) error {
+		o["mode"] = "server"
+		_, _, err := Build(req(Iperf3, "", o, ""))
+		return err
+	}
+	for name, o := range map[string]map[string]string{
+		"sin bind": {}, "bind ajeno": {"bind": "198.51.100.1"}, "bind 0.0.0.0": {"bind": "0.0.0.0"}, "bind nombre": {"bind": "localhost"},
+		"bind bandera": {"bind": "-1"}, "puerto 80": {"bind": "192.0.2.9", "port": "80"}, "puerto 1023": {"bind": "192.0.2.9", "port": "1023"},
+	} {
+		if srv(o) == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+	if err := srv(map[string]string{"bind": "192.0.2.9", "port": "1024"}); err != nil {
+		t.Errorf("ok rechazado: %v", err)
+	}
+	if err := srv(map[string]string{"bind": "::1"}); err != nil {
+		t.Errorf("ipv6 local rechazado: %v", err)
+	}
+	// El cliente no usa bind.
+	if _, _, err := Build(req(Iperf3, "192.0.2.1", map[string]string{"bind": "192.0.2.9"}, "")); err == nil {
+		t.Error("bind en cliente aceptado")
+	}
+}
+
+// iperf3 -B sin zona falla con una IPv6 link-local: se rechaza aunque sea de esta máquina; y el error dice qué falta.
+func TestIperfServerBindLinkLocalYMensaje(t *testing.T) {
+	localIPs = func() []netip.Addr {
+		return []netip.Addr{netip.MustParseAddr("fe80::1"), netip.MustParseAddr("192.0.2.9")}
+	}
+	t.Cleanup(func() { localIPs = realLocalIPs })
+	_, _, err := Build(req(Iperf3, "", map[string]string{"mode": "server", "bind": "fe80::1"}, ""))
+	if err == nil {
+		t.Fatal("link-local aceptada")
+	}
+	_, _, err = Build(req(Iperf3, "", map[string]string{"mode": "server"}, ""))
+	le, ok := err.(interface{ Localize(string) string })
+	if !ok {
+		t.Fatalf("sin Localize: %T", err)
+	}
+	for _, loc := range []string{"es", "en"} {
+		if m := le.Localize(loc); !strings.Contains(m, "options.bind") && !strings.Contains(m, "bind") {
+			t.Errorf("%s: %q no menciona bind", loc, m)
+		}
+	}
+	if en, es := le.Localize("en"), le.Localize("es"); en == es || !strings.Contains(en, "local IP") || !strings.Contains(es, "IP local") {
+		t.Errorf("mensajes: %q / %q", en, es)
+	}
+}
+
+func TestIperfServerTieneTope(t *testing.T) {
+	localIPs = func() []netip.Addr { return []netip.Addr{netip.MustParseAddr("192.0.2.9")} }
+	iperfServerMax = 300 * time.Millisecond
+	t.Cleanup(func() { localIPs = realLocalIPs; iperfServerMax = 10 * time.Minute })
+	start := time.Now()
+	_, err := withBin(t, "sleeper").Run(context.Background(), req(Iperf3, "", map[string]string{"mode": "server", "bind": "192.0.2.9"}, ""), func(string) {})
+	_ = err
+	if d := time.Since(start); d > 8*time.Second {
+		t.Fatalf("el servidor no se cortó por tope: %v", d)
+	}
+}
+
+func localTest(t *testing.T) {
+	localIPs = func() []netip.Addr { return []netip.Addr{netip.MustParseAddr("192.0.2.9")} }
+	t.Cleanup(func() { localIPs = realLocalIPs })
+}
+
+func TestLocalIPsRealIncluyeLoopback(t *testing.T) {
+	if !isLocalIP(netip.MustParseAddr("127.0.0.1")) || isLocalIP(netip.MustParseAddr("0.0.0.0")) {
+		t.Fatal("127.0.0.1 debe ser local y 0.0.0.0 no")
 	}
 }
