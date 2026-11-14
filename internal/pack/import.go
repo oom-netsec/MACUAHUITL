@@ -1,12 +1,17 @@
 package pack
 
 import (
+	"crypto/rand"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
+	"time"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
@@ -91,14 +96,21 @@ func (s *Store) plan(p *Pack, dir string, userIDs map[string]bool) []PlaybookPla
 }
 
 // PlaybookResult es lo que StagePlaybooks preparó: Written son los IDs finales. files son los nombres finales de los
-// archivos preparados (con sufijo .tmp, que el catálogo no lee) y published los que Publish ya dejó con su nombre final.
+// archivos preparados (con un temporal único <nombre>.<aleatorio>.tmp, que el catálogo no lee) y published los que Publish ya dejó con su nombre final.
 type PlaybookResult struct {
 	Written                   []string
 	Created, Renamed, Skipped int
-	files, published          []string
+	files                     []staged // lo preparado (nombre final y temporal)
+	published                 []string
 }
 
+// staged es un playbook preparado: final es su nombre definitivo y tmp el temporal único donde está hasta Publish.
+type staged struct{ final, tmp string }
+
 const tmpSuffix = ".tmp"
+
+// linkFile es el enlace duro de Publish; las pruebas lo cambian para simular sistemas de archivos sin enlaces.
+var linkFile = func(root *os.Root, old, new string) error { return root.Link(old, new) }
 
 // Undo borra de dir lo que este import creó: los archivos preparados y los ya publicados (nunca uno que ya existía).
 func (r *PlaybookResult) Undo(dir string) {
@@ -107,8 +119,8 @@ func (r *PlaybookResult) Undo(dir string) {
 		return
 	}
 	defer root.Close()
-	for _, n := range r.files {
-		root.Remove(n + tmpSuffix)
+	for _, f := range r.files {
+		root.Remove(f.tmp)
 	}
 	for _, n := range r.published {
 		root.Remove(n)
@@ -126,16 +138,23 @@ func (r *PlaybookResult) Publish(dir string) error {
 		return readErr(err)
 	}
 	defer root.Close()
-	for _, n := range r.files {
-		if err := root.Link(n+tmpSuffix, n); err != nil {
+	for _, f := range r.files {
+		err := linkFile(root, f.tmp, f.final)
+		if err != nil && !errors.Is(err, fs.ErrExist) {
+			err = renameNoReplace(root, f.tmp, f.final) // sin enlaces duros (vfat, FUSE): renombrar sin sobrescribir
+		}
+		if err != nil {
 			r.Undo(dir)
-			if errors.Is(err, fs.ErrExist) {
-				return rej("import.exists", "file", n)
+			switch {
+			case errors.Is(err, fs.ErrExist):
+				return rej("import.exists", "file", f.final)
+			case errors.Is(err, unix.EINVAL), errors.Is(err, unix.ENOSYS), errors.Is(err, unix.EOPNOTSUPP), errors.Is(err, unix.EPERM):
+				return rej("import.unsupported_fs", "file", f.final)
 			}
 			return readErr(err)
 		}
-		r.published = append(r.published, n)
-		root.Remove(n + tmpSuffix)
+		r.published = append(r.published, f.final)
+		root.Remove(f.tmp) // si falla queda un temporal único, que el barrido de writePlaybooks retira con el tiempo
 	}
 	if d, err := root.Open("."); err == nil { // que los archivos nuevos sobrevivan a una caída
 		d.Sync()
@@ -144,16 +163,34 @@ func (r *PlaybookResult) Publish(dir string) error {
 	return nil
 }
 
-// ImportPlaybooks prepara y publica de una vez (StagePlaybooks + Publish).
-func (s *Store) ImportPlaybooks(p *Pack, dir string, userIDs map[string]bool, dec map[string]string) (*PlaybookResult, error) {
-	res, err := s.StagePlaybooks(p, dir, userIDs, dec)
+// renameNoReplace renombra old a new dentro de root sin sobrescribir (renameat2 RENAME_NOREPLACE).
+func renameNoReplace(root *os.Root, old, new string) error {
+	d, err := root.Open(".")
 	if err != nil {
-		return nil, err
+		return err
 	}
-	if err := res.Publish(dir); err != nil {
-		return nil, err
+	defer d.Close()
+	return unix.Renameat2(int(d.Fd()), old, int(d.Fd()), new, unix.RENAME_NOREPLACE)
+}
+
+// staleTmp es la edad desde la que un temporal se considera huérfano: un import en curso tarda segundos entre Stage y
+// Publish (s.mu se suelta entre los dos), así que un temporal más viejo es de una caída.
+const staleTmp = 10 * time.Minute
+
+// sweepTmp borra de root los temporales viejos que dejó una caída o un Remove fallido.
+func sweepTmp(root *os.Root) {
+	es, err := fs.ReadDir(root.FS(), ".")
+	if err != nil {
+		return
 	}
-	return res, nil
+	for _, e := range es {
+		if !strings.HasSuffix(e.Name(), tmpSuffix) {
+			continue
+		}
+		if fi, err := e.Info(); err == nil && fi.Mode().IsRegular() && time.Since(fi.ModTime()) > staleTmp {
+			root.Remove(e.Name())
+		}
+	}
 }
 
 // StagePlaybooks prepara en dir (<config>/playbooks) los playbooks de p, con nombre temporal hasta Publish, según dec (ID del archivo → renombrar u omitir).
@@ -223,7 +260,7 @@ func (s *Store) StagePlaybooks(p *Pack, dir string, userIDs map[string]bool, dec
 
 // writePlaybooks crea cada archivo nuevo con sufijo .tmp dentro de dir (que se crea si falta) con un os.Root: un nombre o un enlace no
 // pueden sacar la escritura de la carpeta, y nada existente se sobrescribe. Si algo falla, borra lo que había escrito.
-func writePlaybooks(dir string, files map[string][]byte) ([]string, error) {
+func writePlaybooks(dir string, files map[string][]byte) ([]staged, error) {
 	if len(files) == 0 {
 		return nil, nil
 	}
@@ -235,10 +272,11 @@ func writePlaybooks(dir string, files map[string][]byte) ([]string, error) {
 		return nil, readErr(err)
 	}
 	defer root.Close()
-	var done []string
-	fail := func(err error, name string) ([]string, error) {
-		for _, n := range done {
-			root.Remove(n + tmpSuffix)
+	sweepTmp(root)
+	var done []staged
+	fail := func(err error, name string) ([]staged, error) {
+		for _, f := range done {
+			root.Remove(f.tmp)
 		}
 		if errors.Is(err, fs.ErrExist) {
 			return nil, rej("import.exists", "file", name)
@@ -246,11 +284,12 @@ func writePlaybooks(dir string, files map[string][]byte) ([]string, error) {
 		return nil, readErr(err)
 	}
 	for name, b := range files {
-		f, err := sys.OpenNewIn(root, name+tmpSuffix)
+		tmp := name + "." + rand.Text()[:8] + tmpSuffix
+		f, err := sys.OpenNewIn(root, tmp)
 		if err != nil {
 			return fail(err, name)
 		}
-		done = append(done, name)
+		done = append(done, staged{name, tmp})
 		if _, err = f.Write(b); err == nil {
 			err = f.Sync()
 		}

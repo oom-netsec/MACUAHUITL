@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
@@ -43,7 +45,7 @@ func TestImportEscribeSoloEnLaCarpeta(t *testing.T) {
 	if len(plan) != 2 || plan[0].State != scripts.Nuevo || plan[0].File != "acme-dos.yaml" {
 		t.Fatalf("%+v", plan)
 	}
-	w, err := s.ImportPlaybooks(p, dir, nil, nil)
+	w, err := importar(s, p, dir, nil, nil)
 	if err != nil || w.Created != 2 || len(w.Written) != 2 {
 		t.Fatal(err, w)
 	}
@@ -67,17 +69,17 @@ func TestImportChoqueNoSobrescribe(t *testing.T) {
 	if plan[0].State != scripts.ConflictoID {
 		t.Fatalf("%+v", plan)
 	}
-	if _, err := s.ImportPlaybooks(p, dir, nil, nil); Reason(err) != "import.missing" {
+	if _, err := importar(s, p, dir, nil, nil); Reason(err) != "import.missing" {
 		t.Fatal(err)
 	}
-	if _, err := s.ImportPlaybooks(p, dir, nil, map[string]string{"ios/acme-uno": scripts.Reemplazar}); Reason(err) != "import.decision" {
+	if _, err := importar(s, p, dir, nil, map[string]string{"ios/acme-uno": scripts.Reemplazar}); Reason(err) != "import.decision" {
 		t.Fatal(err)
 	}
-	w, err := s.ImportPlaybooks(p, dir, nil, map[string]string{"ios/acme-uno": scripts.Omitir})
+	w, err := importar(s, p, dir, nil, map[string]string{"ios/acme-uno": scripts.Omitir})
 	if err != nil || w.Skipped != 1 || len(w.Written) != 0 {
 		t.Fatal(err, w)
 	}
-	w, err = s.ImportPlaybooks(p, dir, nil, map[string]string{"ios/acme-uno": scripts.Renombrar})
+	w, err = importar(s, p, dir, nil, map[string]string{"ios/acme-uno": scripts.Renombrar})
 	if err != nil || w.Renamed != 1 || w.Written[0] != "ios/acme-uno-2" {
 		t.Fatal(err, w)
 	}
@@ -111,7 +113,7 @@ func TestImportChocaConInstaladosYBase(t *testing.T) {
 	}
 	// Renombrar nunca cae en un ID de la base ni de un instalado.
 	dir := t.TempDir()
-	w, err := s.ImportPlaybooks(p, dir, nil, map[string]string{"ios-xe/acme-otro": scripts.Renombrar, "ios/acme-uno": scripts.Renombrar})
+	w, err := importar(s, p, dir, nil, map[string]string{"ios-xe/acme-otro": scripts.Renombrar, "ios/acme-uno": scripts.Renombrar})
 	if err != nil || strings.Join(w.Written, ",") != "ios-xe/acme-otro-2,ios/acme-uno-2" {
 		t.Fatal(err, w)
 	}
@@ -126,7 +128,7 @@ func TestImportDecisionDeIDQueNoEstaEsError(t *testing.T) {
 	s, _ := openStore(t, t.TempDir(), nil, Base{})
 	p := exported(t, "acme/mio", userPB("ios", "uno", "show clock"))
 	dir := t.TempDir()
-	if _, err := s.ImportPlaybooks(p, dir, nil, map[string]string{"ios/otro": scripts.Omitir}); Reason(err) != "import.decision" {
+	if _, err := importar(s, p, dir, nil, map[string]string{"ios/otro": scripts.Omitir}); Reason(err) != "import.decision" {
 		t.Fatal(err)
 	}
 	if len(ls(t, dir)) != 0 {
@@ -218,8 +220,69 @@ func TestImportReservadosYRenombradoSinChoques(t *testing.T) {
 	if plan[0].ID != "ios/acme-uno" || plan[0].With != "reserved" || plan[1].State != scripts.Nuevo {
 		t.Fatalf("%+v", plan)
 	}
-	w, err := s.ImportPlaybooks(p, t.TempDir(), nil, map[string]string{"ios/acme-uno": scripts.Renombrar})
+	w, err := importar(s, p, t.TempDir(), nil, map[string]string{"ios/acme-uno": scripts.Renombrar})
 	if err != nil || strings.Join(w.Written, ",") != "ios/acme-uno-3,ios/acme-uno-2" {
 		t.Fatal(err, w)
 	}
+}
+
+// Un temporal huérfano (caída entre confirmar y publicar) no bloquea el reimport; los viejos se barren y los recientes
+// (de un import en curso) se respetan.
+func TestImportTmpHuerfanoNoBloquea(t *testing.T) {
+	s, _ := openStore(t, t.TempDir(), nil, Base{})
+	dir := t.TempDir()
+	hace := time.Now().Add(-time.Hour)
+	os.WriteFile(filepath.Join(dir, "acme-uno.yaml.tmp"), []byte("viejo"), 0o600)
+	os.Chtimes(filepath.Join(dir, "acme-uno.yaml.tmp"), hace, hace)
+	os.WriteFile(filepath.Join(dir, "acme-uno.abc.tmp"), []byte("viejo"), 0o600)
+	os.Chtimes(filepath.Join(dir, "acme-uno.abc.tmp"), hace, hace)
+	os.WriteFile(filepath.Join(dir, "acme-otro.xyz.tmp"), []byte("en curso"), 0o600)
+	p := exported(t, "acme/mio", userPB("ios", "uno", "show clock"))
+	if _, err := importar(s, p, dir, nil, nil); err != nil {
+		t.Fatalf("el huérfano bloqueó el import: %v", err)
+	}
+	if got := strings.Join(ls(t, dir), ","); got != "acme-otro.xyz.tmp,acme-uno.yaml" {
+		t.Fatal(got)
+	}
+}
+
+// Sin enlaces duros (vfat, FUSE) Publish cae a renombrar sin sobrescribir; y tampoco pisa.
+func TestPublishSinEnlacesDuros(t *testing.T) {
+	linkFile = func(*os.Root, string, string) error { return syscall.EPERM }
+	t.Cleanup(func() { linkFile = func(root *os.Root, old, new string) error { return root.Link(old, new) } })
+	s, _ := openStore(t, t.TempDir(), nil, Base{})
+	dir := t.TempDir()
+	p := exported(t, "acme/mio", userPB("ios", "uno", "show clock"))
+	r, err := s.StagePlaybooks(p, dir, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Publish(dir); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(ls(t, dir), ","); got != "acme-uno.yaml" {
+		t.Fatal(got)
+	}
+	d2, err := writePlaybooks(dir, map[string][]byte{"acme-uno.yaml": []byte("x")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&PlaybookResult{files: d2}).Publish(dir); Reason(err) != "import.exists" {
+		t.Fatal(err)
+	}
+	if got := strings.Join(ls(t, dir), ","); got != "acme-uno.yaml" {
+		t.Fatal(got)
+	}
+}
+
+// importar es Stage + Publish, lo que hace el servicio con la base confirmada entre los dos.
+func importar(s *Store, p *Pack, dir string, userIDs map[string]bool, dec map[string]string) (*PlaybookResult, error) {
+	r, err := s.StagePlaybooks(p, dir, userIDs, dec)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.Publish(dir); err != nil {
+		return nil, err
+	}
+	return r, nil
 }
