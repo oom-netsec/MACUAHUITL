@@ -3,10 +3,12 @@ import type { CoreAPI, Credential, JobSpec } from "../../lib/core";
 import { Check, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
 import { Section } from "../../components/Page";
 import { useCoreLang, useT } from "../../lib/i18n";
+import { errInfo } from "../../lib/coreError";
 import { outputsErrorText } from "../../lib/outputsError";
 import type { Key } from "../../lib/i18n/es";
 import type { PlaybookInfo } from "./api";
 import { PlaybookPicker } from "./PlaybookPicker";
+import { useScriptsVersion } from "../scripts/signal";
 
 // Acepta IPs, nombres y CIDR separados por comas, espacios o saltos de línea; sin duplicados.
 export function parseTargets(text: string): string[] {
@@ -17,6 +19,7 @@ export function parseTargets(text: string): string[] {
 export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: Credential[]; onCreated: (id: string) => void }) {
   const t = useT();
   const coreLang = useCoreLang();
+  const contentVer = useScriptsVersion(); // instalar, quitar o importar un paquete cambia el catálogo de playbooks
   const [name, setName] = useState("");
   const [targets, setTargets] = useState("");
   const [cred, setCred] = useState("");
@@ -32,7 +35,11 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
     setPbErr(false);
     core.listPlaybooks().then((c) => { if (!off) setCatalog(c); }).catch(() => { if (!off) setPbErr(true); });
     return () => { off = true; };
-  }, [core, pbTry, coreLang]);
+  }, [core, pbTry, coreLang, contentVer]);
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [paramErr, setParamErr] = useState<Record<string, string>>({});
+  // Un campo por nombre, aunque dos playbooks elegidos lo pidan.
+  const asked = [...new Map((catalog ?? []).filter((p) => pbs.includes(p.id)).flatMap((p) => p.params ?? []).map((q) => [q.name, q.kind])).entries()];
   const [out, setOut] = useState("");
   const [minutes, setMinutes] = useState("0");
   const [rounds, setRounds] = useState("1");
@@ -49,20 +56,28 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
   const devices = parseTargets(targets);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const noVal = asked.filter(([n]) => !(vals[n] ?? "").trim());
+    setParamErr(Object.fromEntries(noVal.map(([n]) => [n, t("patrol.param.required")])));
     const missing = ([[!name.trim(), "name"], [!devices.length, "targets"], [!cred, "cred"], [!pbs.length && !cmds.trim(), "commands"], [!out.trim(), "outDir"]] as const)
       .filter(([m]) => m).map(([, k]) => t(`patrol.missing.${k}` as Key));
     if (missing.length) return setErr(t("patrol.missing", { list: missing.join(", ") }));
+    if (noVal.length) return setErr(t("patrol.param.check"));
     const spec: JobSpec = {
       name, targets: devices.map((a) => ({ address: a, deviceId: a })), defaultCredentialId: cred, customCommands: cmds, playbookIds: pbs,
       outputDir: out, split, zip, deleteLooseFiles: delLoose, disableMasking: !mask, acceptChangedHostKeys: acceptChanged,
       windowHours: Math.min(96, Math.max(1, Number(hours) || 1)),
       schedule: cron ? { cron, rounds: Number(rounds) || 0 } : { intervalSeconds: Number(minutes) * 60, rounds: Number(rounds) || 0 },
     };
+    if (asked.length) spec.params = Object.fromEntries(asked.map(([n]) => [n, vals[n].trim()]));
     setErr(""); setBusy(true);
     try {
       onCreated(await core.createJob(spec));
     } catch (e) {
-      setErr(outputsErrorText(errorText(e), t));
+      const i = errInfo(e);
+      if (i?.metadata.field === "params" && i.metadata.name && asked.some(([n]) => n === i.metadata.name)) {
+        setParamErr({ [i.metadata.name]: errorText(e).replace(/^patrol: params: /, "") }); // el prefijo interno no aporta junto al campo
+        setErr(t("patrol.param.check")); // aviso junto al botón (role=alert): el campo puede estar fuera de la vista
+      } else setErr(outputsErrorText(errorText(e), t));
     } finally {
       setBusy(false);
     }
@@ -85,6 +100,9 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
         <h4>{t("patrol.pb.title")}</h4>
         <p className="hint">{t("patrol.pb.hint")}</p>
         {pbErr ? <Notice kind="warn">{t("patrol.pb.unavailable")} <button type="button" className="sm" onClick={() => setPbTry((n) => n + 1)}>{t("common.retry")}</button></Notice> : catalog && <PlaybookPicker playbooks={catalog} selected={pbs} onChange={setPbs} />}
+        {asked.map(([n, k]) => (
+          <Field key={n} label={`${t(`patrol.param.kind.${k}` as Key)} (${n})`} hint={t(`patrol.param.${k}` as Key)} value={vals[n] ?? ""} error={paramErr[n]} onChange={(v) => setVals({ ...vals, [n]: v })} w="md" mono />
+        ))}
         <TextArea label={t("patrol.commands")} hint={t("patrol.commands.hint")} value={cmds} onChange={setCmds} rows={4} mono />
         <PathField label={t("patrol.outDir")} value={out} onChange={setOut} pick={() => core.pickPath({ title: t("patrol.outDir"), directory: true })} />
         <div className="field-row">
