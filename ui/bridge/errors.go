@@ -88,9 +88,10 @@ func (b *Bridge) bridgeErr(err error) error {
 const langPref = "ui.language"
 
 type langCache struct {
-	mu     sync.Mutex
-	value  string
-	loaded bool
+	mu      sync.Mutex
+	value   string
+	loaded  bool
+	pending string // idioma elegido con el núcleo caído: se manda al reconectar
 }
 
 // language devuelve el idioma de la interfaz (preferencia ui.language), o "" si no se pudo leer. Se guarda en memoria
@@ -115,8 +116,11 @@ func (b *Bridge) language() string {
 	}
 	v = i18n.Normalize(r.GetValue())
 	b.lang.mu.Lock()
+	defer b.lang.mu.Unlock()
+	if b.lang.loaded { // setLanguage ganó mientras leíamos: el valor leído es el viejo
+		return b.lang.value
+	}
 	b.lang.value, b.lang.loaded = v, true
-	b.lang.mu.Unlock()
 	return v
 }
 
