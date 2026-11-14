@@ -6,7 +6,7 @@ import { en } from "./i18n/en";
 // Textos de la interfaz en español e inglés. Los mensajes que vienen del núcleo no se traducen.
 export type Lang = "es" | "en";
 const dicts: Record<Lang, Record<Key, string>> = { es, en };
-// Clave nueva: la anterior (macuahuitl.lang) guardaba también el idioma autodetectado y no se puede distinguir de una
+// Clave nueva: la anterior (macuahuitl.idioma) guardaba también el idioma autodetectado y no se puede distinguir de una
 // elección explícita, así que se ignora; solo se guarda lo que el usuario elige en Ajustes. Inglés es el canónico.
 export const langStorageKey = "macuahuitl.lang";
 
