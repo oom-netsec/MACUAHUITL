@@ -154,10 +154,10 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 	}
 	sum := dom.SHA256(data)
 	if r.GetConfirm() && r.GetSha256() == "" {
-		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.import.sha256_missing", nil)
+		return nil, s.reject(ctx, i18n.New("pack.err.import.sha256_missing", nil), nil, sum, path)
 	}
 	if r.GetConfirm() && !strings.EqualFold(r.GetSha256(), sum) {
-		return nil, service.Err(ctx, codes.FailedPrecondition, "pack.err.import.changed", nil)
+		return nil, s.reject(ctx, i18n.New("pack.err.import.changed", nil), nil, sum, path)
 	}
 	p, err := s.store.VerifyImport(data)
 	if err != nil {

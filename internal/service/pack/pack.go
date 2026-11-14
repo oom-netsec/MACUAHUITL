@@ -47,7 +47,7 @@ type svc struct {
 func fail(ctx context.Context, err error) error {
 	c := codes.InvalidArgument
 	switch dom.Reason(err) {
-	case "unsigned", "collision", "version", "official_replace", "import.exists", "import.unsupported_fs":
+	case "unsigned", "collision", "version", "official_replace", "import.exists", "import.unsupported_fs", "install.changed", "import.changed":
 		c = codes.FailedPrecondition
 	case "not_found":
 		c = codes.NotFound
@@ -92,16 +92,17 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		return nil, err
 	}
 	reject := func(err error, p *dom.Pack, sum string) error { return s.reject(ctx, err, p, sum, path) }
-	if r.GetSha256() == "" { // la vista previa (Inspect) da el sha256: instalar sin él no ata lo revisado a lo instalado
-		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.install.sha256_missing", nil)
-	}
 	data, err := dom.ReadArchive(path)
 	if err != nil {
 		return nil, reject(err, nil, "none")
 	}
 	sum := dom.SHA256(data)
+	// La vista previa (Inspect) da el sha256: instalar sin él, o con otro, no ata lo revisado a lo instalado.
+	if r.GetSha256() == "" {
+		return nil, reject(i18n.New("pack.err.install.sha256_missing", nil), nil, sum)
+	}
 	if !strings.EqualFold(r.GetSha256(), sum) {
-		return nil, service.Err(ctx, codes.FailedPrecondition, "pack.err.install.changed", nil)
+		return nil, reject(i18n.New("pack.err.install.changed", nil), nil, sum)
 	}
 	// Lo oculto se guarda antes de publicar el paquete (en una sola transacción): si falla, no se instala nada.
 	// shortcut: si el disco falla justo después, la elección ya guardada queda aplicada a la versión que seguía instalada.

@@ -64,3 +64,28 @@ func withImportSum(t *testing.T, r *v1.PackServiceImportRequest) *v1.PackService
 	}
 	return r
 }
+
+// Los rechazos por sha256 (falta o no coincide) se auditan como pack.rejected, con la suma del archivo y el motivo.
+func TestPackRechazosDeSha256SeAuditan(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	path := writeMpack(t, packtest.IOSXE(t))
+	b, _ := os.ReadFile(path)
+	sum := pack.SHA256(b)
+	imp := hostile(t, func(map[string][]byte) {})
+	ib, _ := os.ReadFile(imp)
+	isum := pack.SHA256(ib)
+	pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: path})
+	pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: path, Sha256: strings.Repeat("0", 64)})
+	pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: imp, Confirm: true})
+	pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: imp, Confirm: true, Sha256: strings.Repeat("0", 64)})
+	au := h.auditText(t)
+	for _, want := range []string{"reason=install.sha256_missing", "reason=install.changed", "reason=import.sha256_missing", "reason=import.changed", "sha256=" + sum, "sha256=" + isum} {
+		if !strings.Contains(au, want) {
+			t.Errorf("la auditoría no tiene %q", want)
+		}
+	}
+	if strings.Count(au, `"action":"pack.rejected"`) != 4 {
+		t.Errorf("rechazos auditados: %d", strings.Count(au, `"action":"pack.rejected"`))
+	}
+}
