@@ -62,9 +62,11 @@ func (s *vaultSvc) Create(ctx context.Context, r *v1.CreateRequest) (*v1.CreateR
 	if s.c.vault != nil {
 		return nil, service.Err(ctx, codes.AlreadyExists, "patrol.svc.vault_exists", nil)
 	}
-	p := vault.Calibrate(time.Second)
+	var p vault.Params
 	if s.c.o.VaultParams != nil {
 		p = *s.c.o.VaultParams
+	} else {
+		p = vault.Calibrate(time.Second) // solo sin parámetros fijos: calibrar a 256 MiB cuesta segundos y las pruebas los fijan
 	}
 	v, err := vault.Create(s.c.vaultPath(), r.MasterPassword, p)
 	if err != nil {
