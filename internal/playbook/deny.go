@@ -74,6 +74,11 @@ func CheckDenied(platform, cmd string) error {
 	}
 	switch {
 	case matchAny(allowedFirst, fields[0]):
+		if (word{"ping", "pi"}).matches(fields[0]) || (word{"traceroute", "tr"}).matches(fields[0]) {
+			if !validProbe(fields) {
+				return denied(cmd, "playbook.why.probe")
+			}
+		}
 	case (word{"terminal", "ter"}).matches(fields[0]):
 		if len(fields) < 2 || !matchAny(allowedTerminal, fields[1]) {
 			return denied(cmd, "playbook.why.terminal")
@@ -81,6 +86,8 @@ func CheckDenied(platform, cmd string) error {
 	default:
 		return denied(cmd, "playbook.why.not_read")
 	}
+	// «to-file» es el único destino de escritura que empieza por «to-» en show; IOS acepta cualquier prefijo único,
+	// así que «to-» y «to-f…» lo son. Un nombre como «to-core» no es prefijo de to-file y pasa.
 	for _, f := range fields {
 		if len(f) >= 3 && strings.HasPrefix(f, "to-") && strings.HasPrefix("to-file", f) { // show … to-file flash:x escribe
 			return denied(cmd, "playbook.why.to_file")
@@ -102,4 +109,100 @@ func CheckDenied(platform, cmd string) error {
 		}
 	}
 	return nil
+}
+
+// probeOpt es una opción de ping/traceroute: nargs valores numéricos con tope [lo,hi], o un nombre (nargs 0, name).
+type probeOpt struct {
+	w      word
+	lo, hi int
+	nargs  int
+	name   bool
+}
+
+// Lista cerrada. Un paquete de terceros no debe poder pedir repeat/size/timeout absurdos en toda la flota.
+var pingOpts = []probeOpt{
+	{w: word{"repeat", "rep"}, lo: 1, hi: 10, nargs: 1}, {w: word{"size", "si"}, lo: 1, hi: 1500, nargs: 1},
+	{w: word{"timeout", "ti"}, lo: 1, hi: 10, nargs: 1}, {w: word{"source", "so"}, name: true},
+}
+var traceOpts = []probeOpt{
+	{w: word{"ttl", "ttl"}, lo: 1, hi: 255, nargs: 2}, {w: word{"timeout", "ti"}, lo: 1, hi: 10, nargs: 1},
+	{w: word{"probe", "pr"}, lo: 1, hi: 10, nargs: 1}, {w: word{"source", "so"}, name: true},
+}
+
+// token válido para destino, VRF o fuente: nombre, IPv4/IPv6 o interfaz (sin espacios ni metacaracteres).
+func probeName(s string) bool {
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || strings.ContainsRune(".:_-/", r)) {
+			return false
+		}
+	}
+	return s != ""
+}
+
+func probeNum(s string, lo, hi int) (int, bool) {
+	n := 0
+	for _, r := range s {
+		if r < '0' || r > '9' || len(s) > 4 {
+			return 0, false
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n, s != "" && n >= lo && n <= hi
+}
+
+// validProbe acepta `ping|traceroute [vrf V] [ip|ipv6] DESTINO [opciones]` con opciones de lista cerrada, sin
+// repetir y con topes; todo lo demás (data, df-bit, validate, el diálogo interactivo sin destino…) se rechaza.
+func validProbe(f []string) bool {
+	opts := pingOpts
+	if !(word{"ping", "pi"}).matches(f[0]) {
+		opts = traceOpts
+	}
+	f = f[1:]
+	if len(f) >= 2 && (word{"vrf", "vr"}).matches(f[0]) {
+		if !probeName(f[1]) {
+			return false
+		}
+		f = f[2:]
+	}
+	if len(f) > 0 && (f[0] == "ip" || f[0] == "ipv6") {
+		f = f[1:]
+	}
+	if len(f) == 0 || !probeName(f[0]) || (word{"vrf", "vr"}).matches(f[0]) { // «ping vrf» sin nombre no es un destino
+		return false
+	}
+	f = f[1:]
+	seen := map[string]bool{}
+	for len(f) > 0 {
+		var o *probeOpt
+		for i := range opts {
+			if opts[i].w.matches(f[0]) {
+				o = &opts[i]
+			}
+		}
+		if o == nil || seen[o.w.full] {
+			return false
+		}
+		seen[o.w.full] = true
+		f = f[1:]
+		if o.name {
+			if len(f) == 0 || !probeName(f[0]) {
+				return false
+			}
+			f = f[1:]
+			continue
+		}
+		if len(f) < o.nargs {
+			return false
+		}
+		prev := 0
+		for i := 0; i < o.nargs; i++ {
+			n, ok := probeNum(f[i], o.lo, o.hi)
+			if !ok || n < prev { // ttl min max: max no menor que min
+				return false
+			}
+			prev = n
+		}
+		f = f[o.nargs:]
+	}
+	return true
 }
