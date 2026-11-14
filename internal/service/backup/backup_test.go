@@ -602,3 +602,15 @@ func TestNoGuardaUnTxtDePatrolQueSeEstaEscribiendo(t *testing.T) {
 		t.Fatalf("final: %+v", r)
 	}
 }
+
+// Un trabajo armado después de crearse tiene otra ventana: la del trabajo manda sobre la que se calculó al crearlo.
+func TestVentanaDelTrabajoArmadoTarde(t *testing.T) {
+	at := time.Date(2026, 11, 6, 14, 0, 0, 0, time.UTC)
+	tr := &tracked{from: at.Add(-5 * time.Hour), until: at.Add(-2 * time.Hour)}
+	if tr.inWindow(at, time.Time{}) {
+		t.Error("fuera de la ventana de creación y sin otra: debía rechazarse")
+	}
+	if !tr.inWindow(at, at.Add(time.Hour)) {
+		t.Error("dentro del Until real del trabajo: debía aceptarse")
+	}
+}

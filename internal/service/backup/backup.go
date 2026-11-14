@@ -228,8 +228,16 @@ func (t *tracked) skip(rel string, size int64) bool {
 }
 
 // inWindow: la hora de una sección cae en la ventana del trabajo. Sin ventana conocida, todo vale.
-func (t *tracked) inWindow(at time.Time) bool {
-	return t == nil || t.from.IsZero() || !at.Before(t.from) && !at.After(t.until)
+// real es el Until del trabajo ya armado (cero si no se conoce): si se armó tarde, la ventana de creación se quedó corta.
+func (t *tracked) inWindow(at, real time.Time) bool {
+	return t == nil || t.from.IsZero() || !at.Before(t.from) && !at.After(laterOf(t.until, real.Add(5*time.Minute)))
+}
+
+func laterOf(a, b time.Time) time.Time {
+	if b.After(a) {
+		return b
+	}
+	return a
 }
 
 // masked: lo que se anotó al crear el trabajo; si no es nuestro, el manifest de Patrol; si falta, enmascarado (aviso conservador).
@@ -353,7 +361,7 @@ func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int) (co
 			if tr != nil {
 				tr.incomplete = true
 			}
-		case !tr.inWindow(sec.At):
+		case !tr.inWindow(sec.At, j.Until):
 			// Solo puede venir de texto del equipo que imita una cabecera: no es un respaldo.
 			res.warn(i18n.Tx("backup.warn.outside", "device", sec.Device, "cmd", sec.Command, "at", sec.At.Format(time.RFC3339)))
 			failed = true
