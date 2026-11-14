@@ -1370,4 +1370,4 @@ Todos los errores son gRPC con `ErrorInfo` (reason, metadata) y salen en el idio
 - `vrf`: forma `tenant:vrf` (p. ej. `common:default`), un solo `:`, cada parte de 1 a 64 caracteres `[A-Za-z0-9_.-]` sin empezar con `-`.
 - `vnid`: entero de 1 a 16777215, sin ceros a la izquierda (p. ej. `2850817`).
 
-Los usa `oom/aci` 1.0.1 (antes iban como `interface` y `ap`); `oom/wlc-aireos` 1.0.1 pasa sus `wlan` a `kind: wlan`. El núcleo valida (`playbook.err.param_value` si no cumple); Front agrega las etiquetas `patrol.param.kind.vrf` y `patrol.param.kind.vnid` y su ayuda en es/en, y el tipo `ParamKind` en el contrato TS. Un tipo desconocido para la UI debe mostrarse como texto libre (el núcleo valida igual).
+Los usa `oom/aci` 1.0.1 (antes iban como `interface` y `ap`); `oom/wlc-aireos` 1.0.1 pasa sus `wlan` a `kind: wlan`. El núcleo valida (`playbook.err.param_invalid` si no cumple); Front agrega las etiquetas `patrol.param.kind.vrf` y `patrol.param.kind.vnid` y su ayuda en es/en, y el tipo `ParamKind` en el contrato TS. Un tipo desconocido para la UI debe mostrarse como texto libre (el núcleo valida igual).
