@@ -7,7 +7,7 @@ import { sampleDetail, samplePack, sampleThirdParty } from "./fake";
 import { useScriptsVersion } from "../scripts/signal";
 
 const view = (core = fakeCore(), lang = "es") => {
-  localStorage.setItem("macuahuitl.idioma", lang);
+  localStorage.setItem("macuahuitl.lang", lang);
   return render(<I18nProvider><PacksSection core={core} /></I18nProvider>);
 };
 const detail = { ...sampleDetail, playbookIds: ["ios-xe/l2-stp", "ios-xe/mine"], scriptIds: ["lib-l2-stp", "lib-mine", "extra"] };

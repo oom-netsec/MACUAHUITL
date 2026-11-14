@@ -47,7 +47,7 @@ type svc struct {
 func fail(ctx context.Context, err error) error {
 	c := codes.InvalidArgument
 	switch dom.Reason(err) {
-	case "unsigned", "collision", "version", "official_replace", "import.exists":
+	case "unsigned", "collision", "version", "official_replace", "import.exists", "import.unsupported_fs":
 		c = codes.FailedPrecondition
 	case "not_found":
 		c = codes.NotFound
