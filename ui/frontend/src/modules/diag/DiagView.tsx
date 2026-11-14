@@ -84,7 +84,9 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   );
 
   const run = async () => {
-    if (server && !localIPs(await loadIfaces()).includes(bindIP)) return setErr(t("diag.bind.gone", { ip: bindIP })); // la IP ya no está (DHCP, VPN)
+    if (starting.current) return; // doble clic o clic más Ctrl+Enter: un solo arranque
+    starting.current = true; setLaunching(true); // antes del await: si no, el segundo disparo pasa
+    if (server && !localIPs(await loadIfaces()).includes(bindIP)) { starting.current = false; setLaunching(false); return setErr(t("diag.bind.gone", { ip: bindIP })); } // la IP ya no está (DHCP, VPN)
     setErr(""); setLines([]); setResult(null); setT0(Math.floor(Date.now() / 1000));
     const options: Record<string, string> = {};
     let targets: string[] = [];
@@ -97,7 +99,6 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     }
     pending.current = [];
     runRef.current = "";
-    starting.current = true; setLaunching(true);
     try {
       const id = await core.diagRun(tool, targets, options);
       runRef.current = id;

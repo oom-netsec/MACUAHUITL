@@ -108,6 +108,19 @@ test("iperf3 servidor: si la IP ya no es de la máquina al ejecutar, lo dice y n
   expect(core.diagRun).not.toHaveBeenCalled();
 });
 
+test("iperf3 servidor: dos disparos seguidos (mientras se leen las interfaces) lanzan diagRun una sola vez", async () => {
+  let release: (l: typeof nics) => void = () => {};
+  const listInterfaces = vi.fn().mockResolvedValueOnce(nics).mockReturnValue(new Promise<typeof nics>((r) => { release = r; }));
+  const core = await server({ listInterfaces });
+  await screen.findByLabelText("Escuchar en");
+  const btn = screen.getByRole("button", { name: "Ejecutar" });
+  btn.click(); btn.click(); // sin act entre los dos: el botón aún no se apagó
+  release(nics);
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
+  await new Promise((r) => setTimeout(r, 20));
+  expect(core.diagRun).toHaveBeenCalledTimes(1);
+});
+
 test("iperf3 servidor: si no se pueden leer las interfaces lo dice (no que falte una IP)", async () => {
   await server({ listInterfaces: vi.fn(async () => { throw new Error("x"); }) });
   expect(await screen.findByText(/No se pudieron leer las interfaces/)).toBeInTheDocument();

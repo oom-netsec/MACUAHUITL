@@ -101,45 +101,44 @@ test("un archivo sin filas válidas no se puede aplicar", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Importar…" }));
   expect(await screen.findByText("El archivo no trae ninguna fila válida.")).toBeVisible();
   expect(screen.getByRole("button", { name: "Aplicar importación" })).toBeDisabled();
-  expect(screen.getByText("El archivo no trae suma de verificación: no se pudo comprobar que esté íntegro.")).toBeVisible(); // aviso conocido, traducido
+  expect(screen.getByText("archivo sin suma de verificación")).toBeVisible(); // el aviso del núcleo, tal cual
 });
 
-test("en inglés no aparece ningún texto del núcleo en español: errores por línea, avisos y ejemplos", async () => {
+const enFormat = ["name:text", "port:integer", "tags:list"].map((x) => { const [name, type] = x.split(":"); return { name, type, required: name === "name", example: name === "port" ? "22" : "x", description: `desc ${name}` }; });
+const enPreview = {
+  token: "t", expiresMs: 0, format: "csv" as const, items: [],
+  warnings: ["file without a checksum: nothing verifies that it is not damaged or modified; review its contents", "3 host(s) carry a credential label that is not in the vault (or is repeated) and would be left without a credential"],
+  errors: [{ line: 15, field: "", reason: "has 3 columns; 8 were expected" }, { line: 14, field: "name", reason: "the name must be 1 to 64 characters, with no leading or trailing spaces and no control characters" }],
+};
+
+test("en inglés el núcleo ya contesta traducido: tipos, avisos y motivos de fila se muestran tal cual", async () => {
   localStorage.setItem("macuahuitl.lang", "en");
-  setup();
+  setup({ hostsImportFormat: vi.fn(async () => ({ maxRows: 1000, maxBytes: 1 << 20, fields: enFormat })), previewHostsImport: vi.fn(async () => enPreview) });
   await userEvent.click(screen.getByRole("button", { name: /^Show details/ }));
   const dialog = await screen.findByRole("dialog", { name: "Details · Hosts" });
   const fields = await within(dialog).findByRole("table", { name: "File fields" });
-  // Ejemplos: solo los neutros (dirección, puerto, plataforma); «SW-CORE», «Lab», «admin lab» y «Piso 2» vienen del núcleo.
-  expect(within(fields).getByText("10.0.0.1")).toBeVisible();
-  for (const x of ["SW-CORE", "Piso 2", "admin lab"]) expect(within(fields).queryByText(x)).toBeNull();
-  expect(within(dialog).getByText(/example values are written by the core and may be in Spanish/)).toBeVisible();
-  const detailsText = dialog.textContent ?? "";
+  expect(within(fields).getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("cell")[1].textContent)).toEqual(["Text", "Integer", "List"]);
   await userEvent.keyboard("{Escape}");
   await userEvent.click(screen.getByRole("button", { name: "Import…" }));
   const errors = await screen.findByRole("table", { name: "Invalid rows in the file" });
   const rows = within(errors).getAllByRole("row").slice(1).map((r) => within(r).getAllByRole("cell").map((c) => c.textContent));
-  expect(rows).toEqual([["14", "address", "Invalid value"], ["15", "Whole row", "The row could not be read"]]);
-  expect(screen.getByText("1 hosts reference a credential that is not in the vault (or is ambiguous) and would end up without a credential.")).toBeVisible();
-  const text = (document.body.textContent ?? "") + detailsText;
-  // Textos reales del doble: avisos, errores de línea, descripciones de campo y estados del núcleo.
-  for (const w of ["tiene 3 columnas", "use una IP", "etiqueta de credencial", "quedarían sin credencial", "Nombre del host", "vacío", "Detalle del núcleo", "en español)"]) expect(text, w).not.toContain(w);
-  expect(text).not.toMatch(/[áéíóúñ¿¡«»]/);
-  for (const w of ["Download CSV template", "Problem", "Whole row", "Conflict: same address and port", "Apply import"]) expect(text).toContain(w);
-  expect(text).not.toMatch(/\b(Nuevo|Igual|Omitir|Reemplazar|Filas|Línea)\b/);
+  expect(rows).toEqual([["15", "Whole row", "has 3 columns; 8 were expected"], ["14", "name", "the name must be 1 to 64 characters, with no leading or trailing spaces and no control characters"]]);
+  expect(screen.getByText(enPreview.warnings[0])).toBeVisible();
+  expect(screen.getByText(enPreview.warnings[1])).toBeVisible();
 });
 
-test("un aviso desconocido del núcleo sale tal cual en español y como aviso genérico en inglés", async () => {
+test("los avisos al exportar salen tal cual en inglés", async () => {
+  localStorage.setItem("macuahuitl.lang", "en");
+  setup({ exportHosts: vi.fn(async () => ({ count: 1, warnings: ["the vault is closed: the credential was saved without validation", "the vault is closed: the credential was saved without validation", "other warning"] })) });
+  await userEvent.click(screen.getByRole("button", { name: "Export hosts" }));
+  expect(await screen.findByText("the vault is closed: the credential was saved without validation other warning")).toBeVisible();
+});
+
+test("un aviso del núcleo sale tal cual (ya viene en el idioma de la UI)", async () => {
   const prev = { token: "t", expiresMs: 0, format: "json" as const, items: [], errors: [], warnings: ["algo raro pasó con el archivo"] };
-  const { unmount } = render(<I18nProvider><HostsDataCard core={fakeCore({ ...fakeInventory(), pickPath: vi.fn(async () => "/x.json"), previewHostsImport: vi.fn(async () => prev) })} /></I18nProvider>);
+  render(<I18nProvider><HostsDataCard core={fakeCore({ ...fakeInventory(), pickPath: vi.fn(async () => "/x.json"), previewHostsImport: vi.fn(async () => prev) })} /></I18nProvider>);
   await userEvent.click(screen.getByRole("button", { name: "Importar…" }));
   expect(await screen.findByText("algo raro pasó con el archivo")).toBeVisible();
-  unmount();
-  localStorage.setItem("macuahuitl.lang", "en");
-  render(<I18nProvider><HostsDataCard core={fakeCore({ ...fakeInventory(), pickPath: vi.fn(async () => "/x.json"), previewHostsImport: vi.fn(async () => prev) })} /></I18nProvider>);
-  await userEvent.click(screen.getByRole("button", { name: "Import…" }));
-  expect(await screen.findByText("The core reported a warning for this file.")).toBeVisible();
-  expect(document.body.textContent).not.toContain("algo raro");
 });
 
 test("si la exportación falla se borra el archivo vacío y se muestra el error sin decir que quedó vacío", async () => {

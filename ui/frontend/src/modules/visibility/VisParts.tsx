@@ -81,7 +81,7 @@ const host = (from?: string) => (from ?? "").replace(/^\[(.*)\]:\d+$/, "$1").rep
 /** Resumen de la fila: un v3 sin decodificar lleva su etiqueta traducida; el motivo del núcleo (en español) solo con la app en español. */
 export function trapSummary(r: TrapMsg, t: (k: Key, v?: Record<string, string | number>) => string, lang: string): string {
   if (r.Summary) return r.Summary;
-  const m = /^v3 sin decodificar \((\d+) bytes\): (.*)$/s.exec(r.Error ?? "");
+  const m = /^(?:v3 sin decodificar|undecoded v3) \((\d+) bytes\): (.*)$/s.exec(r.Error ?? "");
   if (!m) return r.Error ?? "";
   const label = t("visibility.traps.v3", { bytes: m[1] });
   return lang === "es" ? `${label}: ${m[2]}` : label;

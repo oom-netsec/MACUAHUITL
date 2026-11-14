@@ -37,7 +37,13 @@ export function useShellStatus(core: CoreAPI, everyMs = 15_000): ShellStatus {
     const id = window.setInterval(refresh, everyMs);
     window.addEventListener("focus", refresh);
     const offA = core.onAssist((e) => { if (e.kind === "state") refresh(); }); // no por cada línea de salida
-    const offD = core.onAssistDone(() => refresh());
+    const offD = core.onAssistDone((e) => {
+      // El dueño se borra cuando la ejecución ya no está activa en el núcleo (terminó, o el núcleo se reinició y no la tiene). Un done con
+      // error con la ejecución viva es solo el corte del stream: se conserva (la vista se vuelve a enganchar). Sin respuesta, decide el error.
+      const drop = () => { try { localStorage.removeItem(assistOwnerKey(e.runId)); } catch { /* sin almacenamiento */ } };
+      void core.assistListRuns().then((rs) => { if (!rs.some((x) => x.runId === e.runId && x.active)) drop(); }, () => { if (!e.error) drop(); });
+      refresh();
+    });
     const offV = onVaultChanged(refresh);
     return () => { window.clearInterval(id); window.removeEventListener("focus", refresh); offA(); offD(); offV(); };
   }, [core, refresh, everyMs]);

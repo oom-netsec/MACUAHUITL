@@ -31,11 +31,15 @@ test("la nota del núcleo sale como aviso en español", async () => {
   expect(await screen.findByText("Nota del núcleo X.")).toBeVisible();
 });
 
-test("la nota del núcleo no sale en inglés: va el aviso traducido", async () => {
-  view(fakeCore({ getCorePrefs: vi.fn(async () => ({ ...base, outputsDir: "/home/u/viejo", note: "El cambio aplica a lo que empiece después." })) }), "en");
+test("en inglés la nota del núcleo ya llega traducida y se muestra tal cual", async () => {
+  view(fakeCore({ getCorePrefs: vi.fn(async () => ({ ...base, outputsDir: "/home/u/viejo", note: "The change applies to what starts afterwards." })) }), "en");
   await folder();
-  expect(screen.queryByText(/El cambio aplica/)).toBeNull();
-  expect(screen.getByText(/no longer meets the rules/)).toBeVisible(); // carpeta guardada distinta de la efectiva
+  expect(screen.getByText("The change applies to what starts afterwards.")).toBeVisible();
+});
+
+test("en inglés el error al leer las preferencias se muestra tal cual", async () => {
+  view(fakeCore({ getCorePrefs: vi.fn(async () => { throw new Error("could not read the preferences file"); }) }), "en");
+  expect(await screen.findByText("could not read the preferences file")).toBeVisible();
 });
 
 test("sin nota ni desvío no hay aviso", async () => {
@@ -139,16 +143,10 @@ describe("motivos de rechazo", () => {
     expect(await screen.findByText("The folder is not valid.")).toBeVisible();
   });
 
-  test("un error sin código: en español sale tal cual; en inglés, genérico", async () => {
-    const core = () => fakeCore({ setCorePrefs: vi.fn(async () => { throw rpc("tasa fuera de rango"); }) });
-    const { unmount } = view(core());
-    await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));
-    expect(await screen.findByText("tasa fuera de rango")).toBeVisible();
-    unmount();
-    view(core(), "en");
+  test("un error sin código se muestra tal cual en cualquier idioma", async () => {
+    view(fakeCore({ setCorePrefs: vi.fn(async () => { throw rpc("rate out of range"); }) }), "en");
     await userEvent.click(await screen.findByRole("button", { name: "Save" }));
-    expect(await screen.findByText("Could not save.")).toBeVisible();
-    expect(screen.queryByText("tasa fuera de rango")).toBeNull();
+    expect(await screen.findByText("rate out of range")).toBeVisible();
   });
 
   test("permisos: muestra chmod 700 con la ruta del núcleo y la copia", async () => {

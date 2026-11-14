@@ -57,6 +57,8 @@ export function PatrolView({ core }: { core: CoreAPI }) {
       const js = await core.listJobs();
       if (n !== listSeq.current) return;
       setJobs(sortJobs(js));
+      // Solo los activos: el manifest y el zip se hacen mientras el trabajo sigue armado, y suscribir a los ya cerrados abriría un stream y
+      // dos recargas por cada trabajo viejo (los respaldos programados se cuentan por cientos).
       await subscribeJobs(js.filter(active).map((j) => j.id));
       // Al abrir, si hay un trabajo armado, se muestra ese en lugar del formulario.
       if (!autoSelected.current) {
@@ -71,11 +73,16 @@ export function PatrolView({ core }: { core: CoreAPI }) {
 
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
   useEffect(() => {
+    let live = true; // un cambio de bóveda posterior no se pisa con una respuesta vieja
     core.vaultStatus().then(async (s) => {
+      if (!live) return;
       setVault(s.state);
-      if (s.state === "unlocked") setCreds(await core.listCredentials());
-    }).catch((e) => setErr(errorText(e)));
+      if (s.state !== "unlocked") return setCreds([]); // bóveda cerrada: no quedan credenciales a la vista
+      const l = await core.listCredentials();
+      if (live) setCreds(l);
+    }).catch((e) => { if (live) setErr(errorText(e)); });
     refreshJobs();
+    return () => { live = false; };
   }, [core, vv, refreshJobs]);
 
   useEffect(() => core.onEvent((e) => {

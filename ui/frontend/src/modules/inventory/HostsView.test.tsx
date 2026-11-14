@@ -123,9 +123,10 @@ test("en inglés no queda ningún texto en español ni clave sin traducir", asyn
   expect(text).toMatch(/The name is required/);
 });
 
-test("en inglés el error del núcleo en el formulario es genérico y no muestra su texto en español", async () => {
+test("en inglés el error del núcleo en el formulario se muestra tal cual (ya llega traducido)", async () => {
   localStorage.setItem("macuahuitl.lang", "en");
-  setup();
+  const { core } = setup();
+  core.saveHost = vi.fn().mockRejectedValue(Object.assign(new Error("there is already a host named \"lab-core\""), { cause: { code: "AlreadyExists", reason: "hosts.duplicate_name", metadata: { field: "name" } } }));
   await screen.findByRole("table", { name: "Hosts in the book" });
   await userEvent.click(screen.getByRole("button", { name: /New host/ }));
   await userEvent.type(screen.getByLabelText("Name"), "lab-core");
@@ -133,22 +134,23 @@ test("en inglés el error del núcleo en el formulario es genérico y no muestra
   await userEvent.click(screen.getByRole("button", { name: "Save host" }));
   expect(await screen.findByText("A host with this name already exists.")).toBeVisible();
   expect(screen.getByLabelText("Name")).toBeInvalid();
-  expect(document.body.textContent).not.toMatch(/ya hay un host|Detalle del núcleo|Core detail/);
+  expect(screen.getByText("there is already a host named \"lab-core\"")).toBeVisible();
 });
 
-test("en inglés un error sin campo y los avisos de guardado salen como textos genéricos", async () => {
+test("en inglés un error sin campo y los avisos de guardado salen con el texto del núcleo, sin repetidos", async () => {
   localStorage.setItem("macuahuitl.lang", "en");
   const { core } = setup();
-  core.saveHost = vi.fn().mockRejectedValueOnce(new Error("el núcleo no responde")).mockResolvedValueOnce({ id: "x", warnings: ["la bóveda está cerrada: la credencial se guardó sin validar"] });
+  const w = "the vault is closed: the credential was saved without validation";
+  core.saveHost = vi.fn().mockRejectedValueOnce(new Error("the core is not responding")).mockResolvedValueOnce({ id: "x", warnings: [w, w, "file without a checksum: nothing verifies that it is not damaged or modified; review its contents"] });
   await screen.findByRole("table", { name: "Hosts in the book" });
   await userEvent.click(screen.getByRole("button", { name: /New host/ }));
   await userEvent.type(screen.getByLabelText("Name"), "N1");
   await userEvent.type(screen.getByLabelText("Address (IP or DNS name)"), "10.0.0.51");
   await userEvent.click(screen.getByRole("button", { name: "Save host" }));
-  expect(await screen.findByText("The core could not complete the operation.")).toBeVisible();
+  expect(await screen.findByText("the core is not responding")).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Save host" }));
-  expect(await screen.findByText("The core reported a warning for this operation.")).toBeVisible();
-  expect(document.body.textContent).not.toMatch(/núcleo no responde|bóveda está cerrada/);
+  const notice = (await screen.findByText(/the vault is closed/)).closest(".notice");
+  expect(notice?.textContent).toBe(`${w} file without a checksum: nothing verifies that it is not damaged or modified; review its contents`);
 });
 
 test("la dirección repetida se marca en su campo, en español y en inglés", async () => {

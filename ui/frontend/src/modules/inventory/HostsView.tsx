@@ -8,7 +8,6 @@ import type { Key } from "../../lib/i18n/es";
 import { useVaultVersion } from "../../lib/vaultSignal";
 import type { Host, KnownDevice } from "./api";
 import { PLATFORMS, coreErrorField, coreErrorKey, draftOf, groupByFolder, emptyForm, formOf, validateHost, type HostField, type HostForm } from "./hostForm";
-import { useCoreText } from "./coreText";
 import { hostsChanged, useHostsVersion } from "./signal";
 import "./hosts.css";
 
@@ -19,7 +18,6 @@ const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCas
 // con una acción para pasarlos a la libreta. Una credencial es la referencia a la bóveda; nunca un secreto.
 export function HostsView({ core }: { core: CoreAPI }) {
   const t = useT();
-  const ct = useCoreText();
   const hv = useHostsVersion();
   const vv = useVaultVersion();
   const [hosts, setHosts] = useState<Host[] | null>(null);
@@ -38,7 +36,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
 
   useEffect(() => {
     let live = true;
-    core.listHosts().then((l) => { if (live) setHosts(l); }, (e) => { if (live) { setHosts([]); setErr(ct(errorText(e), "hosts.coreError", e)); } });
+    core.listHosts().then((l) => { if (live) setHosts(l); }, (e) => { if (live) { setHosts([]); setErr(errorText(e)); } });
     // Sin outputs/ o sin descubiertos la lista puede fallar o venir vacía: la libreta no depende de ella.
     core.listDevices().then((l) => { if (live) setFound(l.devices.filter((d) => !d.sources.includes("manual") && d.address)); }, () => { if (live) setFound([]); });
     return () => { live = false; };
@@ -87,19 +85,19 @@ export function HostsView({ core }: { core: CoreAPI }) {
     setBusy(true); setCoreDetail(""); setErr("");
     try {
       const r = await core.saveHost(draftOf(editing.form, editing.id));
-      setWarns(r.warnings.map((w) => ct(w, "hosts.coreWarn")).filter((w, i, a) => a.indexOf(w) === i));
+      setWarns(r.warnings.filter((w, i, a) => a.indexOf(w) === i));
       setMsg(t("hosts.saved", { name: editing.form.name.trim() }));
       closeForm(true);
       hostsChanged();
     } catch (e) {
       const m = errorText(e);
       const f = coreErrorField(e);
-      if (f) { setErrs({ [f]: t(coreErrorKey(e) || "hosts.coreField") }); setCoreDetail(ct(m, "hosts.coreError", e) === m ? m : ""); } else setErr(ct(m, "hosts.coreError", e));
+      if (f) { setErrs({ [f]: t(coreErrorKey(e) || "hosts.coreField") }); setCoreDetail(m); } else setErr(m);
     } finally { setBusy(false); }
   };
   const del = async (h: Host) => {
     setErr(""); setMsg("");
-    try { await core.deleteHost(h.id); setMsg(t("hosts.deleted", { name: h.name })); if (editing?.id === h.id) closeForm(); hostsChanged(); } catch (e) { setErr(ct(errorText(e), "hosts.coreError", e)); }
+    try { await core.deleteHost(h.id); setMsg(t("hosts.deleted", { name: h.name })); if (editing?.id === h.id) closeForm(); hostsChanged(); } catch (e) { setErr(errorText(e)); }
   };
 
   const f = editing?.form;
