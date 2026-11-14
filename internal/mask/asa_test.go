@@ -175,3 +175,12 @@ func TestASAHostSinComunidadDependeDeLaPlataforma(t *testing.T) {
 		}
 	}
 }
+
+// «license smart» solo abre el bloque con la línea exacta; el register de exec no.
+func TestASALicenseSmartRegisterNoAbreBloque(t *testing.T) {
+	in := "license smart register idtoken TOK123\n token abc\n"
+	want := "license smart register idtoken <MASKED:token>\n token abc\n"
+	if got, _ := Apply("asa", in); got != want {
+		t.Fatalf("got:\n%s", got)
+	}
+}

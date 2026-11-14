@@ -122,21 +122,33 @@ func (r *Recorder) outLine(l string) {
 	if pr := promptRe.FindString(l); pr != "" {
 		r.setPromptBlock(blockOfPrompt(pr))
 		echo := r.stream.Prompted(l[len(pr):], r.lastBlk)
-		r.cont = r.lastBlk != "" && echo != l[len(pr):]
+		r.cont = echo != l[len(pr):]
 		out = pr + echo
-	} else if r.cont && (l == "" || strings.HasPrefix(l, "%")) {
-		out, keep = r.stream.Line(l) // un log o un error puede llegar antes del resto del eco
-	} else if r.cont {
-		// Resto de un eco partido por un log asíncrono: va con la clave que se enmascaró.
-		r.cont = false
+	} else if r.cont && !equipoMsg(l) {
+		// Desde un eco enmascarado hasta el siguiente prompt, lo que no es syslog ni aviso del equipo
+		// es el resto del eco (partido por logs asíncronos): se tapa entero.
 		out = "<MASKED:secret>"
 	} else {
-		r.cont = false
 		out, keep = r.stream.Line(l)
 	}
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
 	}
+}
+
+var syslogLine = regexp.MustCompile(`%[A-Z][A-Z0-9_]*-\d-`)
+
+// equipoMsg: línea vacía, syslog (con fecha delante o no) o aviso propio del equipo; no es resto de un eco.
+func equipoMsg(l string) bool {
+	if l == "" || strings.HasPrefix(l, "%") || syslogLine.MatchString(l) {
+		return true
+	}
+	for _, p := range []string{"WARNING:", "ERROR:", "INFO:"} {
+		if strings.HasPrefix(l, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // setPromptBlock recuerda el bloque del prompt; solo si cambia reinicia el de lo tecleado (un prompt

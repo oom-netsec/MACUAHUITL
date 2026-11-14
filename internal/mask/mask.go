@@ -263,7 +263,7 @@ func blockOf(line string) string {
 		return "trustpoint"
 	case strings.HasPrefix(line, "aaa-server "):
 		return "aaaserver"
-	case strings.HasPrefix(line, "license smart"):
+	case strings.TrimSpace(line) == "license smart":
 		return "licsmart"
 	case strings.HasPrefix(line, "user-name "):
 		return "username"

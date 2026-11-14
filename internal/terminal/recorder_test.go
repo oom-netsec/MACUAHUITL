@@ -353,3 +353,39 @@ func TestEnmascaraRestoDelEcoConEspaciosYVariosLogs(t *testing.T) {
 		t.Errorf("%s", out)
 	}
 }
+
+// Desde un eco enmascarado hasta el siguiente prompt, toda línea de salida que no sea syslog ni aviso del equipo se tapa.
+func TestEcoEnmascaradoTapaLaSalidaHastaElPrompt(t *testing.T) {
+	asaLog := "Nov 14 2026 10:00:00: %ASA-5-111008: User 'x' executed the 'key' command."
+	iosLog := "*Nov 14 10:00:00.123: %SYS-5-CONFIG_I: Configured from console by admin"
+	casos := []struct {
+		nombre string
+		salida []string
+		leak   []string // líneas que no deben salir enteras en claro
+		keep   []string
+	}{
+		{"fuera de bloque", []string{"ciscoasa(config)#failover key Se", "\r\n" + asaLog + "\r\n", "cret\r\n", "ciscoasa(config)# "}, []string{"cret"}, []string{asaLog}},
+		{"ios con fecha", []string{"SW1(config)#enable secret 0 My Se", "\r\n" + iosLog + "\r\n", "cret phrase\r\n", "SW1(config)# "}, []string{"cret phrase"}, []string{iosLog}},
+		{"partido por dos logs", []string{"ciscoasa(config)#failover key Se", "\r\n" + asaLog + "\r\n", "cr\r\n", asaLog + "\r\n", "et\r\n", "ciscoasa(config)# "}, []string{"cr", "et"}, []string{asaLog}},
+		{"warning intacto", []string{"ciscoasa(config)#enable password 0 Pw1", "\r\nWARNING: Command has been added to the configuration using a type 0 password.\r\nERROR: x\r\nINFO: y\r\nciscoasa(config)# "}, nil, []string{"WARNING: Command has been added", "ERROR: x", "INFO: y"}},
+		{"show después del prompt", []string{"ciscoasa(config)#failover key Se", "\r\n" + asaLog + "\r\n", "cret\r\n", "ciscoasa# ", "show version\r\nCisco Adaptive Security Appliance\r\nciscoasa# "}, []string{"cret"}, []string{"Cisco Adaptive Security Appliance"}},
+	}
+	for _, c := range casos {
+		r, b := newRec()
+		for _, s := range c.salida {
+			r.Output([]byte(s))
+		}
+		r.Close()
+		out := b.String()
+		for _, l := range c.leak {
+			if strings.Contains(out, "Z "+l+"\n") {
+				t.Errorf("%s: en claro %q:\n%s", c.nombre, l, out)
+			}
+		}
+		for _, k := range c.keep {
+			if !strings.Contains(out, k) {
+				t.Errorf("%s: se perdió %q:\n%s", c.nombre, k, out)
+			}
+		}
+	}
+}
