@@ -174,6 +174,14 @@ func playbooks(c *cli.Env, args []string) error {
 // playbookLine es una línea del listado; si el playbook pide datos, los suma al final (nombre:tipo).
 func playbookLine(p *v1.PlaybookInfo) string {
 	line := cli.T("mctl.patrol.playbook_line", "id", p.Id, "name", p.Name, "n", len(p.Commands))
+	pack := p.Pack
+	switch pack {
+	case "":
+		pack = cli.T("mctl.patrol.pack_base")
+	case "usuario": // playbook.PackUsuario: los de <config>/playbooks
+		pack = cli.T("mctl.patrol.pack_own")
+	}
+	line += cli.T("mctl.patrol.playbook_pack", "pack", pack)
 	if len(p.Params) > 0 {
 		var ds []string
 		for _, q := range p.Params {

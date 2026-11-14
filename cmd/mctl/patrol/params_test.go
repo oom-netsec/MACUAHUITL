@@ -29,11 +29,21 @@ func TestPlaybookLine(t *testing.T) {
 	cli.SetLang("es")
 	t.Cleanup(func() { cli.SetLang("") })
 	p := &v1.PlaybookInfo{Id: "ios-xe/x", Name: "X", Commands: []string{"a", "b"}}
-	if got := playbookLine(p); got != "ios-xe/x  X  2 comandos" {
+	if got := playbookLine(p); got != "ios-xe/x  X  2 comandos  [base]" {
 		t.Fatal(got)
 	}
 	p.Params = []*v1.PlaybookParam{{Name: "mac", Kind: "mac"}, {Name: "ap", Kind: "ap"}}
-	if got := playbookLine(p); got != "ios-xe/x  X  2 comandos  datos: mac:mac ap:ap" {
+	if got := playbookLine(p); got != "ios-xe/x  X  2 comandos  [base]  datos: mac:mac ap:ap" {
 		t.Fatal(got)
+	}
+	for pack, want := range map[string]string{"": "base", "oom/cat9k": "oom/cat9k", "usuario": "propio"} {
+		q := &v1.PlaybookInfo{Id: "ios-xe/x", Name: "X", Commands: []string{"a"}, Pack: pack}
+		if got := playbookLine(q); got != "ios-xe/x  X  1 comandos  ["+want+"]" {
+			t.Errorf("%q: %s", pack, got)
+		}
+	}
+	cli.SetLang("en")
+	if got := playbookLine(&v1.PlaybookInfo{Id: "ios-xe/x", Name: "X", Commands: []string{"a"}, Pack: "usuario"}); got != "ios-xe/x  X  1 command  [own]" {
+		t.Error(got)
 	}
 }

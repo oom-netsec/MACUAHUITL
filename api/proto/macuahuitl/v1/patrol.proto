@@ -208,6 +208,7 @@ message PlaybookInfo {
   string name = 3;
   repeated string commands = 4; // texto de cada comando, en orden
   repeated PlaybookParam params = 5; // datos que pide; vacío = ninguno
+  string pack = 6; // paquete de origen: "oom/cat9k", "usuario" (propios) o vacío (contenido base)
 }
 message PlaybookParam {
   string name = 1;
