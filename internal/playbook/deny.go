@@ -41,7 +41,7 @@ var allowedTerminal = []word{{"length", "len"}, {"width", "wid"}}
 var allowedPipe = []word{{"include", "i"}, {"exclude", "e"}, {"begin", "b"}, {"section", "s"}, {"count", "c"}}
 
 // Comandos de shell o de escritura de NX-OS que un pipe posterior podría invocar si el host está mal marcado.
-var shellTokens = []string{"sed", "awk", "python", "python3", "bash", "run", "source", "tclsh", "vsh", "email", "diff", "less", "xargs", "perl", "sscp", "cut", "tr"}
+var shellTokens = []string{"sed", "awk", "python", "python3", "bash", "run", "source", "tclsh", "vsh", "email", "diff", "less", "xargs", "perl", "sscp", "cut", "tr", "sort", "uniq", "cp", "mv", "rm", "dd", "sh", "ln", "chmod"}
 
 // shellToken: tok es, o abrevia con 2 o más letras, un comando de shell de NX-OS (que acepta abreviaturas).
 func shellToken(tok string) bool {
@@ -82,10 +82,11 @@ func CheckDenied(platform, cmd string) error {
 	if strings.Contains(cmd, ";") {
 		return denied(cmd, "playbook.why.chain")
 	}
+	// «?» en la terminal interactiva pide ayuda: el editor de línea lo quita y conserva el resto, y corre otro comando (ISE y AireOS tienen su propio motivo).
 	// «&», «&&», «||» y «<» los interpreta bash en la CLI de los leaf ACI (iBash); ningún show los necesita.
 	// En nx-os (los leaf ACI corren como nx-os) además «$» (expansión), «!» (historial), «\» y «'» (otra forma de citar que el
 	// análisis de comillas no sigue); en IOS, ASA y AireOS son anclas y patrones legítimos (^…$, ^!) y no pasan por bash.
-	if strings.ContainsAny(cmd, "&<") || strings.Contains(cmd, "||") || platform == "nx-os" && strings.ContainsAny(cmd, `$!\'`) {
+	if strings.ContainsAny(cmd, "&<") || strings.Contains(cmd, "?") && platform != "ise" && platform != "wlc-aireos" || strings.Contains(cmd, "||") || platform == "nx-os" && strings.ContainsAny(cmd, `$!\'`) {
 		return denied(cmd, "playbook.why.shell")
 	}
 	// «>» y «>>» escriben a flash; «`» y «$(» ejecutan una sustitución. También para IOS, por si el host está mal marcado.
@@ -193,8 +194,8 @@ var pingOpts = []probeOpt{
 	{w: word{"timeout", "ti"}, lo: 1, hi: 10, nargs: 1}, {w: word{"source", "so"}, name: true},
 }
 var traceOpts = []probeOpt{
-	{w: word{"ttl", "ttl"}, lo: 1, hi: 255, nargs: 2}, {w: word{"timeout", "ti"}, lo: 1, hi: 10, nargs: 1},
-	{w: word{"probe", "pr"}, lo: 1, hi: 10, nargs: 1}, {w: word{"source", "so"}, name: true},
+	{w: word{"ttl", "ttl"}, lo: 1, hi: 30, nargs: 2}, {w: word{"timeout", "ti"}, lo: 1, hi: 10, nargs: 1},
+	{w: word{"probe", "pr"}, lo: 1, hi: 5, nargs: 1}, {w: word{"source", "so"}, name: true},
 }
 
 // token válido para destino, VRF o fuente: nombre, IPv4/IPv6 o interfaz (sin espacios ni metacaracteres).
