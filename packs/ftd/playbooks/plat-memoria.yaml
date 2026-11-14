@@ -1,0 +1,16 @@
+# Propósito: Memoria de lina, bloques y conexiones.
+# Cuándo usarlo: Hay sospecha de fuga o falta de memoria.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: plat-memoria
+platform: ftd
+name: FTD · Plataforma · Memoria
+name_en: FTD · Platform · Memory
+commands:
+  - cmd: show clock
+  - cmd: show memory
+  - cmd: show memory detail
+    timeout: 120s
+  - cmd: show blocks
+  - cmd: show disk
+  - cmd: show conn count

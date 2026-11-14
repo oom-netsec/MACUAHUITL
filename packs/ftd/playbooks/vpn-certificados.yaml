@@ -1,0 +1,17 @@
+# Propósito: Certificados, trustpoints y hora del equipo.
+# Cuándo usarlo: Un túnel o el portal falla por un certificado vencido o no confiable.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: vpn-certificados
+platform: ftd
+name: FTD · VPN · Certificados
+name_en: FTD · VPN · Certificates
+commands:
+  - cmd: show clock
+  - cmd: show clock detail
+  - cmd: show ntp
+  - cmd: show crypto ca certificates
+  - cmd: show crypto ca trustpoints
+  - cmd: show running-config crypto ca trustpoint
+    timeout: 120s
+    may_contain_secrets: true

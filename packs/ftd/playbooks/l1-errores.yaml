@@ -1,0 +1,17 @@
+# Propósito: Errores de entrada, CRC, overruns y descartes en todas las interfaces.
+# Cuándo usarlo: Hay pérdida de paquetes y se sospecha de cable, SFP o velocidad.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: l1-errores
+platform: ftd
+name: FTD · Capa 1 · Errores de interfaz
+name_en: FTD · Layer 1 · Interface errors
+commands:
+  - cmd: show clock
+  - cmd: show interface | include Interface .* is|input errors|CRC|overrun|underrun|output errors|collisions
+    timeout: 120s
+  - cmd: show traffic
+  - cmd: show asp drop
+    timeout: 120s
+  - cmd: show interface ip brief
+  - cmd: show blocks

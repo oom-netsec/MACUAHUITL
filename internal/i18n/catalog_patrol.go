@@ -31,6 +31,8 @@ func init() {
 		"transport.hostkey.changed":       e("transport: llave de host cambiada de {host}: {fingerprint}", "transport: changed host key from {host}: {fingerprint}", "host", "fingerprint"),
 		"transport.hostkey.known":         e("transport: llave de host conocida de {host}: {fingerprint}", "transport: known host key from {host}: {fingerprint}", "host", "fingerprint"),
 		"platform.err.prompt_timeout":     e("platform: el equipo no mostró prompt a tiempo", "platform: the device did not show a prompt in time"),
+		"platform.err.first_login":        e("platform: el equipo pide cambiar la contraseña o aceptar el EULA en el primer inicio de sesión; hazlo a mano y vuelve a probar", "platform: the device asks to change the password or accept the EULA at first login; do it by hand and try again"),
+		"platform.err.desync":             e("platform: la sesión con el equipo quedó desincronizada (la salida de un comando se mezcló con la del siguiente); se reconecta", "platform: the session with the device got out of sync (one command's output mixed with the next one's); reconnecting"),
 		"platform.err.enable_failed":      e("platform: enable rechazado", "platform: enable rejected"),
 		"platform.err.unknown":            e("platform: plataforma no reconocida", "platform: platform not recognized"),
 		"platform.err.closed":             e("platform: el equipo cerró la sesión", "platform: the device closed the session"),

@@ -1,4 +1,4 @@
-import { coreErrorField, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
+import { PLATFORMS, coreErrorField, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
 
 const ok: HostForm = { name: "SW1", address: "10.0.0.1", port: "22", platform: "ios-xe", folder: "Lab", tags: "core dc-1", credentialId: "", notes: "" };
 
@@ -69,4 +69,8 @@ test("los duplicados se reconocen por reason, también con metadata.id", () => {
 
 test("un error con reason ajeno a hosts no se asigna a ningún campo aunque el texto diga «nombre»", () => {
   expect(coreErrorField(bridge("vault.locked", {}, "el nombre de la bóveda"))).toBe("");
+});
+
+test("ftd es una plataforma de host", () => {
+  expect(PLATFORMS.map(([v]) => v)).toContain("ftd");
 });

@@ -1,0 +1,17 @@
+# Propósito: Miembros del cluster, roles e historial de eventos.
+# Cuándo usarlo: Un miembro del cluster no se une o se sale.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: ha-cluster-estado
+platform: ftd
+name: FTD · Alta disponibilidad · Estado del cluster
+name_en: FTD · High availability · Cluster status
+commands:
+  - cmd: show clock
+  - cmd: show cluster info
+  - cmd: show cluster history
+  - cmd: show running-config cluster
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show interface ip brief
+  - cmd: show version

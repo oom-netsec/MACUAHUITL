@@ -139,7 +139,7 @@ usage: mctl <command>
         (host book: the devices you add by hand, the «manual» source of «devices»; merged by address with what was discovered. rm does not delete the evidence)
   hosts add NAME --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
   hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
-        (A: IP or DNS name, without user, scheme or port; port 22 by default; platform: ios, ios-xe, nx-os, asa, iosxr, wlc; single-level folder; up to 10 tags.
+        (A: IP or DNS name, without user, scheme or port; port 22 by default; platform: ios, ios-xe, nx-os, asa, ftd, iosxr, wlc; single-level folder; up to 10 tags.
          --cred is the id of a vault credential (cred list): never a secret. edit only changes what is passed; --tag replaces all of them and an empty value clears the field)
   hosts export --out PATH [--format csv|json] [--overwrite] [ID...]
         (0600 file; the format comes from the extension (.csv / .json) or from --format. Versioned JSON with a SHA-256 sum (integrity, not authenticity);
@@ -154,7 +154,7 @@ usage: mctl <command>
   scripts add NAME --tech T --platform P [--desc D] [--tag X]... [--file F|-]
   scripts edit ID [--name N] [--tech T] [--platform P] [--desc D] [--tag X]... [--file F|-]
         (commands go one per line, from a file or stdin; edit only changes what is passed and --tag or --file replace the whole list.
-         tech: l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro; platform: ios, ios-xe, nx-os, asa, cualquiera)
+         tech: l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro; platform: ios, ios-xe, nx-os, asa, ftd, cualquiera)
   scripts rm ID  |  scripts fav ID [--off]  |  scripts dup ID
         (deletes one of yours, sets or clears a favorite (also on the library), or copies any as a script of yours)
   scripts copy ID

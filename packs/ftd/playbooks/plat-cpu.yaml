@@ -1,0 +1,16 @@
+# Propósito: Uso de CPU de lina y de los procesos, rendimiento y estado de Snort.
+# Cuándo usarlo: La CPU está alta o el tráfico se atrasa.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: plat-cpu
+platform: ftd
+name: FTD · Plataforma · CPU
+name_en: FTD · Platform · CPU
+commands:
+  - cmd: show clock
+  - cmd: show cpu usage
+  - cmd: show processes cpu-usage non-zero
+  - cmd: show perfmon
+  - cmd: show snort statistics
+  - cmd: show conn count
+  - cmd: show traffic

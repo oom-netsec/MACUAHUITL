@@ -70,7 +70,7 @@ func isASASNMPHost(line, platform string) bool {
 		return false
 	}
 	if ipOnly.MatchString(f[3]) {
-		return platform == "asa" // «host nombre 1.2.3.4» en IOS es una comunidad con forma de IP
+		return platform == "asa" || platform == "ftd" // «host nombre 1.2.3.4» en IOS es una comunidad con forma de IP
 	}
 	return len(f) > 4 && (f[4] == "trap" || f[4] == "poll" || f[4] == "version")
 }

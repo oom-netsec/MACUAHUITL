@@ -26,7 +26,12 @@ var maxDetect = 2 * time.Minute
 
 var (
 	anyPrompt = regexp.MustCompile(`(?:^|\n)([\w.\-@/:]{1,63})([>#]) ?$`)
-	more      = regexp.MustCompile(` ?(?:--More--|<--- More --->) ?`) // el segundo es el de ASA
+	// FTD: la CLI normal tiene el prompt «> » sin nombre de host. Una línea de salida que empiece con «>» (BGP, tablas)
+	// se confunde con él, así que solo cuenta al final del búfer y tras una pausa (ftdSettle) sin más datos.
+	ftdPrompt = regexp.MustCompile(`(?:^|\n)> ?$`)
+	// Primer inicio de sesión de FTD: cambio de contraseña obligatorio o EULA. Responder cambiaría el equipo.
+	ftdFirstLogin = regexp.MustCompile(`(?i)you must change your password|you must accept the eula|press <enter> to display the eula|enter new password:|confirm new password:|unix password: ?$|to agree to the eula|please enter 'yes'`)
+	more          = regexp.MustCompile(` ?(?:--More--|<--- More --->) ?`) // el segundo es el de ASA
 	// Secuencias con que el equipo borra el --More--: "\r    \r" o retrocesos "\b\b  \b\b".
 	erase = regexp.MustCompile(`\r +\r|\x08+ +\x08+`)
 )
@@ -58,6 +63,9 @@ type driver struct {
 	err      error // primer error; desde ahí el driver no se reutiliza
 	buf      []byte
 	hostname string
+	// FTD (hostname vacío): sentinel = Run manda un Enter vacío tras el comando; el fin confirmado son dos prompts
+	// seguidos. confirmed/incomplete los deja untilIdle para Run.
+	sentinel, confirmed, incomplete bool
 }
 
 // fail guarda el primer error y suelta al lector.
@@ -102,13 +110,21 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 
 	ctx, cancel := context.WithTimeout(ctx, openTimeout)
 	defer cancel()
-	text, err := d.until(ctx, func(s string) bool { return anyPrompt.MatchString(s) })
+	text, err := d.until(ctx, func(s string) bool {
+		return anyPrompt.MatchString(s) || ftdPrompt.MatchString(s) || ftdFirstLogin.MatchString(s)
+	})
 	if err != nil {
 		return d.fail(err)
 	}
 	m := anyPrompt.FindStringSubmatch(text)
+	if m == nil {
+		if !ftdPrompt.MatchString(text) { // primer inicio de sesión: no se escribe nada, ni siquiera un Enter
+			return d.fail(platform.ErrFirstLogin)
+		}
+		m = []string{"", "", ">"}
+	}
 	d.hostname = m[1]
-	if m[2] == ">" {
+	if m[2] == ">" && d.hostname != "" { // FTD no tiene enable
 		if err := d.enable(ctx, enable); err != nil {
 			return d.fail(err)
 		}
@@ -196,6 +212,9 @@ func (d *driver) pump(r io.Reader) {
 func (d *driver) atPrompt(s string) bool {
 	last := s[strings.LastIndexByte(s, '\n')+1:]
 	last = strings.TrimSuffix(last, " ")
+	if d.hostname == "" { // FTD: solo «>»
+		return last == ">"
+	}
 	return last == d.hostname+"#" || last == d.hostname+">"
 }
 
@@ -226,7 +245,29 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				return clean(string(d.buf)), err
 			}
 		}
-		if done(clean(tail)) {
+		if d.sentinel {
+			if bareConfirmed(d.buf) { // dos prompts seguidos: el comando terminó, salvo que un trozo corte justo ahí y la salida siga
+				if d.dataWithin(ctx, ftdConfirmSettle) {
+					continue
+				}
+				d.confirmed = true
+				text := clean(string(d.buf))
+				d.buf = nil
+				return text, nil
+			}
+			if ftdPrompt.MatchString(clean(tail)) {
+				if !d.quiet(ctx, 3) { // llegaron datos (o venció el plazo): se revisa de nuevo
+					continue
+				}
+				d.incomplete = true // un solo «> » y nada más en ~1,2 s: se acepta, pero incompleto
+				text := clean(string(d.buf))
+				d.buf = nil
+				return text, nil
+			}
+		} else if ct := clean(tail); done(ct) {
+			if d.moreComing(ctx, ct) { // llegaron datos en la pausa: se revisa de nuevo
+				continue
+			}
 			text := clean(string(d.buf))
 			d.buf = nil
 			return text, nil
@@ -258,6 +299,121 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 	}
 }
 
+// ftdSettle es la pausa sin datos tras un «> » para aceptarlo como prompt de FTD.
+// Límites sin un marcador del equipo (no se distinguen): dos líneas seguidas tipo prompt dentro de la salida («>\n> ») con
+// una pausa de ~200 ms o más cortan en silencio; la defensa es que el siguiente comando no traiga su eco y se reconecte.
+// Es una heurística: una pausa mayor a mitad de la salida, justo tras una línea «> », aún la cortaría (sin un marcador del equipo no se cierra del todo).
+var ftdSettle = 400 * time.Millisecond
+
+// bareConfirmed: el búfer termina en dos líneas de prompt de FTD seguidas: la penúltima es exactamente «>» o «> » y la
+// última es «> » sin salto después. Una línea «> » dentro de la salida no va seguida de otro prompt idéntico.
+func bareConfirmed(buf []byte) bool {
+	n := len(buf)
+	for n > 0 && buf[n-1] == ' ' {
+		n--
+	}
+	if n == 0 || buf[n-1] != '>' {
+		return false
+	}
+	n-- // la última línea es «>» o «> »
+	if n == 0 || buf[n-1] != '\n' {
+		return false
+	}
+	n-- // salto antes de la última línea
+	if n > 0 && buf[n-1] == '\r' {
+		n--
+	}
+	for n > 0 && buf[n-1] == ' ' {
+		n--
+	}
+	if n == 0 || buf[n-1] != '>' {
+		return false
+	}
+	n--
+	return n == 0 || buf[n-1] == '\n'
+}
+
+// echoNorm quita lo que el eco puede alterar (saltos, «$» de scroll, espacios) y aplica los retrocesos.
+func echoNorm(s string) string {
+	var out []byte
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; c {
+		case '\x08':
+			if len(out) > 0 {
+				out = out[:len(out)-1]
+			}
+		case '\r', '\n', '$', ' ':
+		default:
+			out = append(out, c)
+		}
+	}
+	return string(out)
+}
+
+// echoFirst: la respuesta empieza con el eco de cmd. Vale el eco completo o un prefijo suyo (envuelto o truncado),
+// pero no cualquier otra primera línea.
+func echoFirst(text, cmd string) bool {
+	c := echoNorm(cmd)
+	first, _, _ := strings.Cut(text, "\n")
+	f := echoNorm(first)
+	// Sufijo: un comando largo con scroll horizontal se ve como «$» + su final; 16+ caracteres para no tomar un resto corto por eco.
+	return c == "" || strings.HasPrefix(echoNorm(text), c) || f != "" && strings.HasPrefix(c, f) || len(f) >= 16 && strings.HasSuffix(c, f)
+}
+
+// ftdConfirmSettle es la calma corta antes de dar por confirmado el par de prompts: un trozo puede terminar justo en «\n>\n> ».
+const ftdConfirmSettle = 150 * time.Millisecond
+
+// dataWithin espera hasta dur por datos; si llegan, los agrega y devuelve true.
+func (d *driver) dataWithin(ctx context.Context, dur time.Duration) bool {
+	select {
+	case c, ok := <-d.chunks:
+		if ok {
+			d.buf = append(d.buf, c...)
+		}
+		return ok
+	case <-time.After(dur):
+	case <-ctx.Done():
+	}
+	return false
+}
+
+// quiet espera n pausas ftdSettle seguidas sin datos; true si pasaron todas. Si llegan datos, los agrega y devuelve false.
+func (d *driver) quiet(ctx context.Context, n int) bool {
+	for range n {
+		select {
+		case c, ok := <-d.chunks:
+			if ok {
+				d.buf = append(d.buf, c...)
+			}
+			return false
+		case <-time.After(ftdSettle):
+		case <-ctx.Done():
+			return false
+		}
+	}
+	return true
+}
+
+// moreComing: si tail es el «> » de FTD, espera ftdSettle por más datos; si llegan, no era el prompt (era el inicio
+// de una línea de salida) y se agregan al búfer.
+func (d *driver) moreComing(ctx context.Context, tail string) bool {
+	if !ftdPrompt.MatchString(tail) {
+		return false
+	}
+	select {
+	case c, ok := <-d.chunks:
+		if ok {
+			d.buf = append(d.buf, c...)
+			return true
+		}
+		return false // el cierre lo reporta la vuelta siguiente
+	case <-time.After(ftdSettle):
+		return false
+	case <-ctx.Done():
+		return false
+	}
+}
+
 // closedErr: el lector del shell terminó; se devuelve lo que había y la causa del cierre.
 func (d *driver) closedErr() (string, error) {
 	err := <-d.readErr
@@ -285,17 +441,36 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	if _, err := io.WriteString(d.w, cmd+"\n"); err != nil {
 		return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
 	}
+	d.confirmed, d.incomplete = false, false
+	if d.sentinel = d.hostname == ""; d.sentinel { // FTD: un Enter vacío en cola da el segundo prompt cuando el comando termina
+		defer func() { d.sentinel = false }()
+		if _, err := io.WriteString(d.w, "\n"); err != nil {
+			return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
+		}
+	}
 	text, err := d.untilIdle(ctx, timeout, d.atPrompt)
 	out.Ended = time.Now()
 	if err != nil {
 		d.fail(err)
 	}
+	// FTD: la primera línea de la respuesta debe ser el eco del comando (normalizado; envuelto o truncado también vale);
+	// si no, es la cola del comando anterior: la sesión está desfasada.
+	desync := d.sentinel && err == nil && !echoFirst(text, cmd)
 	// Quitar eco (primera línea) y prompt (última línea).
 	if i := strings.IndexByte(text, '\n'); i >= 0 && strings.TrimSpace(text[:i]) == cmd {
 		text = text[i+1:]
 	}
 	if err == nil {
 		text = text[:strings.LastIndexByte(text, '\n')+1]
+		if d.confirmed { // el prompt del comando y el del Enter de cola: se quitan los dos
+			text = text[:strings.LastIndexByte(strings.TrimSuffix(text, "\n"), '\n')+1]
+		}
+		// Cierre por calma: incompleto, pero la sesión sigue (si el equipo descarta el Enter de cola, todos los comandos
+		// cerrarían así). Respuesta sin eco: es la cola del comando anterior, la sesión ya no sirve y se debe reconectar.
+		out.Incomplete = d.incomplete || desync
+		if desync {
+			err = d.fail(platform.ErrDesync)
+		}
 	}
 	out.Text = text
 	out.Invalid = invalidOutput(text)
@@ -336,6 +511,9 @@ var wlc9800 = regexp.MustCompile(`(?m)^Cisco IOS Software.*, C9800`)
 var nxos = regexp.MustCompile(`(?m)^Cisco Nexus Operating System \(NX-OS\) Software`)
 
 // asa busca la cabecera de show version de ASA al inicio de línea; un IOS que diga «Adaptive Security» en texto libre no cuenta.
+// ftd: línea «Model : Cisco … Threat Defense» (Firepower, Secure Firewall, «Cisco Firepower 1120», «Cisco ASA5508-X», «Cisco ISA 3000»). Un ASA real no trae «Model :» seguido de Cisco.
+var ftd = regexp.MustCompile(`(?m)^Model\s*:\s*Cisco .*Threat Defense`)
+
 var asa = regexp.MustCompile(`(?m)^Cisco Adaptive Security Appliance Software Version`)
 
 func (d *driver) Detect(ctx context.Context) (string, error) {
@@ -346,6 +524,8 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 		return "", err
 	}
 	switch {
+	case ftd.MatchString(out.Text): // antes que asa: la salida de FTD puede citar la versión de lina
+		return "ftd", nil
 	case asa.MatchString(out.Text):
 		return "asa", nil
 	case nxos.MatchString(out.Text):

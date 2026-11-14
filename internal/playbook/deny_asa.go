@@ -184,22 +184,12 @@ func validASATracer(f []string) bool {
 
 // checkASA aplica las reglas de CheckDenied a un comando de Cisco ASA (ya validado como ASCII, sin «;», «>», «`» ni «$(»).
 // Lista blanca: el primer comando va completo (show acepta «sh» y «sho»); lo demás se rechaza.
-func checkASA(cmd string) error {
-	cmdPart, pipe, hasPipe := strings.Cut(strings.ToLower(cmd), "|")
-	fields := strings.Fields(cmdPart)
-	if len(fields) == 0 {
-		if hasPipe {
-			return denied(cmd, "playbook.why.empty_pipe")
-		}
-		return nil
-	}
+func checkASA(cmd string) error { return checkFamily(cmd, asaHead) }
+
+func asaHead(cmd string, fields []string) error {
 	switch first := fields[0]; {
 	case (word{"show", "sh"}).matches(first):
-		for _, f := range fields[1:] {
-			if Abbrev(f, "file") { // show tech-support file disk0:x escribe
-				return denied(cmd, "playbook.why.show_file_asa")
-			}
-		}
+		return showNoFile(cmd, fields)
 	case first == "dir":
 	case first == "ping":
 		if !validASAPing(fields) {
@@ -219,6 +209,32 @@ func checkASA(cmd string) error {
 		}
 	default:
 		return denied(cmd, "playbook.why.not_read")
+	}
+	return nil
+}
+
+// showNoFile: «show tech-support file disk0:x» escribe.
+func showNoFile(cmd string, fields []string) error {
+	for _, f := range fields[1:] {
+		if Abbrev(f, "file") {
+			return denied(cmd, "playbook.why.show_file_asa")
+		}
+	}
+	return nil
+}
+
+// checkFamily es el esqueleto común de ASA y FTD: valida el primer comando con head y luego rutas remotas y pipe.
+func checkFamily(cmd string, head func(cmd string, fields []string) error) error {
+	cmdPart, pipe, hasPipe := strings.Cut(strings.ToLower(cmd), "|")
+	fields := strings.Fields(cmdPart)
+	if len(fields) == 0 {
+		if hasPipe {
+			return denied(cmd, "playbook.why.empty_pipe")
+		}
+		return nil
+	}
+	if err := head(cmd, fields); err != nil {
+		return err
 	}
 	for _, f := range fields[1:] {
 		if remotePath(f) {
@@ -256,8 +272,11 @@ func checkASA(cmd string) error {
 			return denied(cmd, "playbook.why.pipe_sink")
 		}
 		for _, tok := range f {
-			if remotePath(tok) || asaDevicePath.MatchString(tok) {
+			if remotePath(tok) {
 				return denied(cmd, "playbook.why.remote")
+			}
+			if asaDevicePath.MatchString(tok) {
+				return denied(cmd, "playbook.why.local_path")
 			}
 		}
 	}

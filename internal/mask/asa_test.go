@@ -160,6 +160,7 @@ func TestASAHostSinComunidadDependeDeLaPlataforma(t *testing.T) {
 	in := "snmp-server host nms01 1.2.3.4\n"
 	for plat, want := range map[string]string{
 		"asa":    in,
+		"ftd":    in,
 		"ios-xe": "snmp-server host nms01 <MASKED:snmp-community>\n",
 		"":       "snmp-server host nms01 <MASKED:snmp-community>\n",
 	} {
