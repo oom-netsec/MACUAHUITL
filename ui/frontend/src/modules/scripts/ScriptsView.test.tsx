@@ -327,9 +327,10 @@ test("importar: contra un script de la biblioteca no se ofrece «Reemplazar»", 
 });
 
 test("una plataforma que el front no conoce se muestra tal cual, sin clave cruda", async () => {
-  const s = { ...sampleScripts[2], platform: "xyz" as never };
+  const s = { ...sampleScripts[2], platform: "xyz" as never, tech: "abc" as never };
   setup({ listScripts: vi.fn(async () => [s]) });
   await mine();
   expect(await screen.findByText("xyz")).toBeInTheDocument();
-  expect(screen.queryByText(/scripts\.plat\./)).not.toBeInTheDocument();
+  expect(screen.getByText("abc")).toBeInTheDocument();
+  expect(screen.queryByText(/scripts\.(plat|tech)\./)).not.toBeInTheDocument();
 });

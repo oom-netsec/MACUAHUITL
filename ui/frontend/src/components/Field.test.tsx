@@ -54,6 +54,11 @@ test("la consola copia y limpia su contenido", async () => {
 });
 
 test("un select con un valor que no está entre sus opciones lo muestra tal cual (no aparenta otra opción)", () => {
-  render(<Select label="Plataforma" value="xyz" onChange={() => {}} options={[["ios", "IOS"], ["asa", "ASA"]]} />);
+  render(<Select label="Plataforma" value="xyz" onChange={() => {}} options={[["ios", "IOS"], ["asa", "ASA"]]} keepUnknown />);
   expect(screen.getByLabelText("Plataforma")).toHaveDisplayValue("xyz");
+});
+
+test("sin keepUnknown un valor viejo (p. ej. la credencial con la bóveda cerrada) no aparece como opción", () => {
+  render(<Select label="Credencial" value="3f2a-uuid" onChange={() => {}} options={[["", "Ninguna"]]} />);
+  expect(screen.queryByRole("option", { name: "3f2a-uuid" })).toBeNull();
 });

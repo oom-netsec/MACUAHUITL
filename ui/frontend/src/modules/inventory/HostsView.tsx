@@ -116,7 +116,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
           <Field label={t("hosts.f.port")} error={errs.port} value={f.port} onChange={(v) => set("port", v)} w="xs" mono inputMode="numeric" />
         </div>
         <div className="field-row">
-          <Select label={t("hosts.f.platform")} value={f.platform} onChange={(v) => set("platform", v)} w="md" error={errs.platform}
+          <Select label={t("hosts.f.platform")} value={f.platform} onChange={(v) => set("platform", v)} w="md" error={errs.platform} keepUnknown
             options={[["", t("hosts.platform.none")], ...PLATFORMS]} />
           <Field label={t("hosts.f.folder")} hint={t("hosts.f.folder.hint")} error={errs.folder} value={f.folder} onChange={(v) => set("folder", v)} w="md" />
           <Field label={t("hosts.f.tags")} hint={t("hosts.f.tags.hint")} error={errs.tags} value={f.tags} onChange={(v) => set("tags", v)} w="lg" mono />

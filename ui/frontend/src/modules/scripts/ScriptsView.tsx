@@ -21,7 +21,9 @@ import "./scripts.css";
 // «Enviar a la terminal» deja el texto en la sesión SSH activa sin Enter, y la persona decide si lo ejecuta.
 export function ScriptsView({ core }: { core: CoreAPI }) {
   const t = useT();
-  const platName = (p: string) => ((PLATFORMS as string[]).includes(p) ? t(`scripts.plat.${p}` as Key) : p); // una plataforma nueva del núcleo se muestra tal cual
+  // Una plataforma o tecnología nueva del núcleo se muestra tal cual, sin la clave i18n cruda.
+  const platName = (p: string) => ((PLATFORMS as string[]).includes(p) ? t(`scripts.plat.${p}` as Key) : p);
+  const techName = (x: string) => ((TECHS as string[]).includes(x) ? t(`scripts.tech.${x}` as Key) : x);
   const go = useNav();
   const [origin, setOrigin] = useState<ScriptOrigin | "colecciones">("biblioteca");
   const [text, setText] = useState("");
@@ -130,7 +132,7 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
                     onChange={(e) => setPicked((p) => (e.target.checked ? [...p, s.id] : p.filter((x) => x !== s.id)))} />
                   <button type="button" className="quiet scr-name" onClick={() => setSelId(s.id)}>{s.name}</button>
                   <span className="scr-meta">
-                    <Badge>{t(`scripts.tech.${s.tech}` as Key)}</Badge>
+                    <Badge>{techName(s.tech)}</Badge>
                     <Badge>{platName(s.platform)}</Badge>
                     {s.readOnly && <Badge tone="ok">{t("scripts.readOnly")}</Badge>}
                   </span>
@@ -162,7 +164,7 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
                 </>
               }>
               <div className="scr-meta">
-                <Badge>{t(`scripts.tech.${sel.tech}` as Key)}</Badge>
+                <Badge>{techName(sel.tech)}</Badge>
                 <Badge>{platName(sel.platform)}</Badge>
                 {sel.readOnly && <span title={t("scripts.readOnlyHint")}><Badge tone="ok">{t("scripts.readOnly")}</Badge></span>}
               </div>
