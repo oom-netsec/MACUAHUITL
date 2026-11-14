@@ -21,15 +21,18 @@ const creds = [{ id: "c1", label: "snmp-lab", username: "snmp", hasEnable: false
 
 test("topología: construye desde una carpeta, dibuja el SVG y ofrece exportar", async () => {
   const core = fakeCore({ topoBuild: vi.fn(async () => ({ text: "Hallazgos:\n  [error] VLAN nativa distinta", json: '{"nodes":[]}', svg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>' })) });
-  render(<VisibilityView core={core} />);
+  render(<CoreContext.Provider value={core as unknown as CoreAPI}><VisibilityView core={core} /></CoreContext.Provider>);
   await userEvent.type(screen.getByLabelText(/Trabajo o carpeta/), "/home/x/outputs/caso_20261104");
   await userEvent.click(screen.getByRole("button", { name: "Construir" }));
   expect(core.topoBuild).toHaveBeenCalledWith("/home/x/outputs/caso_20261104", "");
   // La salida va resaltada (palabras clave en <span>): se busca en el <pre> completo.
   expect(await screen.findByText((_, el) => el?.tagName === "PRE" && /VLAN nativa distinta/.test(el.textContent ?? ""))).toBeInTheDocument();
   expect(screen.getByRole("img", { name: "Topología" }).getAttribute("src")).toMatch(/^data:image\/svg\+xml/);
-  expect(screen.getByRole("link", { name: "Exportar SVG" })).toHaveAttribute("download", "topologia.svg");
-  expect(screen.getByRole("link", { name: "Exportar JSON" })).toHaveAttribute("download", "topologia.json");
+  expect(screen.queryByRole("link", { name: "Exportar SVG" })).not.toBeInTheDocument(); // se guarda con saveFile, no con un enlace data:
+  await userEvent.click(screen.getByRole("button", { name: "Exportar SVG" }));
+  expect(core.saveFile).toHaveBeenCalledWith("topologia.svg", '<svg xmlns="http://www.w3.org/2000/svg"></svg>', "utf8");
+  await userEvent.click(screen.getByRole("button", { name: "Exportar JSON" }));
+  expect(core.saveFile).toHaveBeenLastCalledWith("topologia.json", '{"nodes":[]}', "utf8");
 });
 
 test("snmp: get con la credencial de la bóveda y sondeo en vivo", async () => {
