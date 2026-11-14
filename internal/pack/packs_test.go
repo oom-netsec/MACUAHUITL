@@ -155,3 +155,14 @@ func TestSegmentosOficialesEstanReservados(t *testing.T) {
 		t.Fatal("acme no debe estar reservado")
 	}
 }
+
+// El paquete oom/nx-os pide el núcleo 0.4.1: instala en él y un núcleo 0.4.0 lo rechaza.
+func TestNXOSPideNucleo041(t *testing.T) {
+	d := filepath.Join(packtest.RepoDir(), "packs", "nx-os")
+	if _, err := pack.ValidateSource(d, "v0.4.1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pack.ValidateSource(d, "v0.4.0"); pack.Reason(err) != "core.too_old" {
+		t.Fatalf("0.4.0 debe rechazarlo: %v", err)
+	}
+}

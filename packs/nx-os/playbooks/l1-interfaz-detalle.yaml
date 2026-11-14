@@ -1,0 +1,21 @@
+# Propósito: Estado, errores, capacidades, transceptor y vecinos de una interfaz.
+# Cuándo usarlo: Un puerto en particular no se comporta como se espera.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l1-interfaz-detalle
+platform: nx-os
+name: L1 · Detalle de una interfaz
+name_en: L1 · Single interface detail
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show clock
+  - cmd: show interface {interface}
+  - cmd: show interface {interface} counters errors
+  - cmd: show interface {interface} capabilities
+  - cmd: show interface {interface} transceiver details
+  - cmd: show cdp neighbors interface {interface} detail
+  - cmd: show lldp neighbors interface {interface} detail
+  - cmd: show logging last 300 | include {interface}
+    timeout: 180s

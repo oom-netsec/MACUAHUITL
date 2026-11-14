@@ -1,0 +1,18 @@
+# Propósito: Contadores de error, descartes, storm-control y capacidad de hardware.
+# Cuándo usarlo: Se sospechan errores CRC, descartes o tormentas en uno o varios puertos.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l1-errores-descartes
+platform: nx-os
+name: L1 · Errores y descartes
+name_en: L1 · Errors and discards
+commands:
+  - cmd: show clock
+  - cmd: show interface counters errors
+  - cmd: show interface counters errors non-zero
+  - cmd: show interface counters detailed
+    timeout: 180s
+  - cmd: show interface counters storm-control
+  - cmd: show hardware capacity interface  # N9K
+  - cmd: show logging last 200 | include ETHPORT
+    timeout: 180s

@@ -1,0 +1,18 @@
+# Propósito: Vecinos, interfaces, topología y tráfico de EIGRP.
+# Cuándo usarlo: Un vecino EIGRP no se forma o faltan rutas EIGRP.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l3-eigrp
+platform: nx-os
+name: L3 · EIGRP
+name_en: L3 · EIGRP
+commands:
+  - cmd: show ip eigrp
+  - cmd: show ip eigrp neighbors
+  - cmd: show ip eigrp interfaces
+  - cmd: show ip eigrp traffic
+  - cmd: show ip eigrp topology summary
+  - cmd: show ip route eigrp
+    timeout: 180s
+  - cmd: show logging last 200 | include EIGRP
+    timeout: 180s

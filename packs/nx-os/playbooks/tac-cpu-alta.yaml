@@ -1,0 +1,23 @@
+# Propósito: Procesos, historial de CPU, tráfico al CPU, rate-limiters y cores.
+# Cuándo usarlo: La CPU del supervisor está sostenida arriba del 70 %.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-cpu-alta
+platform: nx-os
+name: TAC · CPU alta
+name_en: TAC · High CPU
+commands:
+  - cmd: show clock
+  - cmd: show system resources
+  - cmd: show processes cpu sort | head lines 20
+  - cmd: show processes cpu history
+  - cmd: show system internal processes cpu  # N9K
+  - cmd: show policy-map interface control-plane | include violate|drop
+    timeout: 180s
+  - cmd: show hardware rate-limiter
+  - cmd: show ip arp statistics
+  - cmd: show spanning-tree summary
+  - cmd: show cores
+  - cmd: show processes log
+  - cmd: show logging last 200 | include CPU
+    timeout: 180s

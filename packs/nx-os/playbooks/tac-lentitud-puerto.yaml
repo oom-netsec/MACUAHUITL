@@ -1,0 +1,23 @@
+# Propósito: Estado, errores, colas, QoS y transceptor de la interfaz del problema.
+# Cuándo usarlo: Un servidor o enlace específico va lento.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-lentitud-puerto
+platform: nx-os
+name: TAC · Lentitud en un puerto
+name_en: TAC · Slowness on one port
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show clock
+  - cmd: show interface {interface}
+  - cmd: show interface {interface} counters errors
+  - cmd: show interface {interface} counters detailed
+    timeout: 120s
+  - cmd: show queuing interface {interface}
+  - cmd: show interface {interface} transceiver details
+  - cmd: show mac address-table interface {interface}
+  - cmd: show cdp neighbors interface {interface} detail
+  - cmd: show logging last 300 | include {interface}
+    timeout: 180s

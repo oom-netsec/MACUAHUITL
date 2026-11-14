@@ -30,7 +30,7 @@ func exportIn(sc []scripts.Script, pbs []playbook.Playbook) ExportInput {
 // El .mpack exportado pasa Verify como NO oficial y trae lo que se pidió con las reglas del ADR.
 func TestExportPasaVerifyComoNoOficial(t *testing.T) {
 	sc := []scripts.Script{userScript("Uno", "ios", "show version"), userScript("Dos", "cualquiera", "show clock")}
-	pbs := []playbook.Playbook{userPB("ios-xe", "mio", "show clock"), userPB("nx-os", "nx", "show clock"), userPB("ios", "acme-ya", "show version")}
+	pbs := []playbook.Playbook{userPB("ios-xe", "mio", "show clock"), userPB("ftd", "nx", "show clock"), userPB("ios", "acme-ya", "show version")}
 	r, err := Export(exportIn(sc, pbs))
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +51,7 @@ func TestExportPasaVerifyComoNoOficial(t *testing.T) {
 	if p.Playbooks[0].ID != "ios-xe/acme-mio" || p.Playbooks[1].ID != "ios/acme-ya" {
 		t.Fatalf("%v %v", p.Playbooks[0].ID, p.Playbooks[1].ID)
 	}
-	if len(r.Omitted) != 1 || r.Omitted[0] != "nx-os/nx" {
+	if len(r.Omitted) != 1 || r.Omitted[0] != "ftd/nx" {
 		t.Fatal(r.Omitted)
 	}
 	if !strings.Contains(p.Readme, "Uno") || !strings.Contains(p.Readme, "ios-xe/acme-mio") {
@@ -94,7 +94,7 @@ func TestExportRechazos(t *testing.T) {
 		{"vacío", func(in *ExportInput) { in.Scripts = nil }, "export.empty"},
 		{"solo playbooks no exportables", func(in *ExportInput) {
 			in.Scripts = nil
-			in.Playbooks = []playbook.Playbook{userPB("nx-os", "a", "show clock")}
+			in.Playbooks = []playbook.Playbook{userPB("ftd", "a", "show clock")}
 		}, "export.empty"},
 		{"nombres repetidos", func(in *ExportInput) { in.Scripts = append(in.Scripts, userScript("UNO", "ios", "show clock")) }, "export.name_dup"},
 		{"licencia mala", func(in *ExportInput) { in.License = "no es spdx!" }, "manifest.invalid"},

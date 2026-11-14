@@ -193,8 +193,8 @@ func TestRechazos(t *testing.T) {
 		}), "dev", "playbook.denied"},
 		{"playbook roto", signed(func(f map[string][]byte) { f["playbooks/stp.yaml"] = []byte("id: x\n") }), "dev", "playbook.invalid"},
 		{"plataforma sin driver", signed(func(f map[string][]byte) {
-			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[ios-xe, nx-os]", 1))
-			setPB(f, strings.Replace(goodPlaybook, "ios-xe", "nx-os", 1))
+			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[ios-xe, ftd]", 1))
+			setPB(f, strings.Replace(goodPlaybook, "ios-xe", "ftd", 1))
 		}), "dev", "playbook.platform"},
 		{"wlc-9800 es instalable", signed(func(f map[string][]byte) {
 			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[wlc-9800]", 1))

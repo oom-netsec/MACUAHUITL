@@ -82,13 +82,23 @@ func checkNXOS(cmd string) error {
 func validNXProbe(f []string) bool {
 	ping := strings.HasPrefix(f[0], "pi")
 	f = f[1:]
-	if len(f) == 0 || !probeName(f[0]) {
+	if len(f) == 0 {
 		return false
+	}
+	// «{ip}» sin sustituir (al cargar el playbook): Expand vuelve a pasar CheckDenied con el valor ya validado.
+	if holder := placeholder.FindString(f[0]) == f[0]; !holder && !probeName(f[0]) {
+		return false
+	} else if holder {
+		f = f[1:]
+		return nxProbeOpts(f, ping)
 	}
 	if a, err := netip.ParseAddr(f[0]); err == nil && (a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})) {
 		return false
 	}
-	f = f[1:]
+	return nxProbeOpts(f[1:], ping)
+}
+
+func nxProbeOpts(f []string, ping bool) bool {
 	nums := map[string][2]int{"count": {1, 10}, "packet-size": {1, 1500}, "timeout": {1, 10}}
 	seen := map[string]bool{}
 	for len(f) > 0 {

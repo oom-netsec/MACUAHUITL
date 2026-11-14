@@ -1,0 +1,16 @@
+# Propósito: Objetos de tracking e IP SLA.
+# Cuándo usarlo: Una ruta estática o HSRP cambia por un track que se cae.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: svc-track-sla
+platform: nx-os
+name: Servicios · Tracking e IP SLA
+name_en: Services · Tracking and IP SLA
+commands:
+  - cmd: show track
+  - cmd: show track brief
+  - cmd: show ip sla configuration
+  - cmd: show ip sla summary
+  - cmd: show ip sla statistics
+  - cmd: show logging last 100 | include TRACK
+    timeout: 180s

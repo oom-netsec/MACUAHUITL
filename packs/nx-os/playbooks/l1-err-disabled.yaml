@@ -1,0 +1,18 @@
+# Propósito: Lista las interfaces err-disabled con el log que explica la causa.
+# Cuándo usarlo: Un puerto aparece apagado por el sistema (BPDU guard, loop, flap).
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l1-err-disabled
+platform: nx-os
+name: L1 · Interfaces err-disabled
+name_en: L1 · Err-disabled interfaces
+commands:
+  - cmd: show clock
+  - cmd: show interface status err-disabled
+  - cmd: show logging last 300 | include ETHPORT
+    timeout: 180s
+  - cmd: show logging last 300 | include errdisable
+    timeout: 180s
+  - cmd: show spanning-tree summary
+  - cmd: show port-channel summary
+  - cmd: show interface counters errors non-zero

@@ -1,0 +1,22 @@
+# Propósito: Estado de sesiones, vecinos, eventos y errores de BGP, más ARP e interfaces.
+# Cuándo usarlo: Una sesión BGP queda en Idle, Active o Connect.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-bgp-no-sube
+platform: nx-os
+name: TAC · BGP no establece (general)
+name_en: TAC · BGP does not establish (general)
+commands:
+  - cmd: show clock
+  - cmd: show bgp sessions
+  - cmd: show bgp all summary
+  - cmd: show bgp ipv4 unicast neighbors
+    timeout: 120s
+  - cmd: show bgp event-history events
+    timeout: 120s
+  - cmd: show bgp event-history errors  # errors: según versión
+  - cmd: show bgp process
+  - cmd: show ip interface brief
+  - cmd: show ip arp summary
+  - cmd: show logging last 300 | include BGP
+    timeout: 180s

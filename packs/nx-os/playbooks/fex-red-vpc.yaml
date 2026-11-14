@@ -1,0 +1,17 @@
+# Propósito: Relaciona los FEX con sus port-channels de fabric y el estado vPC.
+# Cuándo usarlo: FEX en topología dual-homed con inconsistencias o asociaciones perdidas.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: fex-red-vpc
+platform: nx-os
+name: FEX · FEX en vPC y port-channel
+name_en: FEX · FEX with vPC and port-channel
+commands:
+  - cmd: show fex
+  - cmd: show vpc
+  - cmd: show port-channel summary
+  - cmd: show interface fex-fabric
+  - cmd: show fex detail
+    timeout: 120s
+  - cmd: show logging last 200 | include FEX
+    timeout: 180s

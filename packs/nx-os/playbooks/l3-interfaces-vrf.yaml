@@ -1,0 +1,17 @@
+# Propósito: Interfaces IP, VRFs y resúmenes de ARP y ruteo.
+# Cuándo usarlo: Primer vistazo al plano de capa 3 de un Nexus.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l3-interfaces-vrf
+platform: nx-os
+name: L3 · Interfaces IP y VRF
+name_en: L3 · IP interfaces and VRFs
+commands:
+  - cmd: show vrf
+  - cmd: show vrf interface
+  - cmd: show ip interface brief
+  - cmd: show ip interface brief vrf all
+  - cmd: show ipv6 interface brief
+  - cmd: show ip arp summary
+  - cmd: show ip route summary
+  - cmd: show ip route vrf all summary

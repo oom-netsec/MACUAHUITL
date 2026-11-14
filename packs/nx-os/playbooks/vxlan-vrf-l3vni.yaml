@@ -1,0 +1,19 @@
+# Propósito: VRFs, rutas tipo 5, VNI de capa 3 y tabla de ruteo por VRF.
+# Cuándo usarlo: El ruteo entre VNIs o hacia el exterior falla dentro de un VRF de tenant.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/103x/configuration/vxlan/cisco-nexus-9000-series-nx-os-vxlan-configuration-guide-103x.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: vxlan-vrf-l3vni
+platform: nx-os
+name: VXLAN · VRF y L3VNI
+name_en: VXLAN · VRF and L3VNI
+commands:
+  - cmd: show vrf
+  - cmd: show vrf interface
+  - cmd: show nve vni
+  - cmd: show bgp l2vpn evpn route-type 5
+    timeout: 240s
+  - cmd: show ip route vrf all summary
+  - cmd: show ip arp vrf all
+    timeout: 180s
+  - cmd: show ip route vrf all
+    timeout: 300s

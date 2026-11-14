@@ -1,0 +1,18 @@
+# Propósito: Muestra imagen en uso, arranque, estado de la última instalación, licencias y funciones activas.
+# Cuándo usarlo: Antes de una actualización o al verificar que una función tiene licencia.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-configuration-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: plat-version-licencias
+platform: nx-os
+name: Plataforma · Versión, imagen y licencias
+name_en: Platform · Version, image and licensing
+commands:
+  - cmd: show version
+  - cmd: show boot
+  - cmd: show install all status
+  - cmd: show license summary
+  - cmd: show license usage
+  - cmd: show feature | include enabled
+  - cmd: "dir bootflash:"
+  - cmd: show system reset-reason
+  - cmd: show inventory

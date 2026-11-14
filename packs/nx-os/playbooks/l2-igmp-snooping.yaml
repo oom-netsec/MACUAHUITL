@@ -1,0 +1,16 @@
+# Propósito: Grupos, puertos de router y queriers de IGMP snooping.
+# Cuándo usarlo: El tráfico multicast no llega a los receptores de una VLAN.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l2-igmp-snooping
+platform: nx-os
+name: L2 · IGMP snooping
+name_en: L2 · IGMP snooping
+commands:
+  - cmd: show ip igmp snooping
+  - cmd: show ip igmp snooping groups
+  - cmd: show ip igmp snooping mrouter
+  - cmd: show ip igmp snooping querier
+  - cmd: show ip igmp snooping statistics
+  - cmd: show vlan brief
+    timeout: 120s

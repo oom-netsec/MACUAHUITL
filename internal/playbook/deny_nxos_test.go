@@ -22,7 +22,7 @@ func TestCheckDeniedNXOSRechaza(t *testing.T) {
 		"ping 10.0.0.1 count 11", "ping 10.0.0.1 count 0", "ping 10.0.0.1 packet-size 1501", "ping 10.0.0.1 timeout 11",
 		"ping 10.0.0.1 count 2 count 3", "ping 10.0.0.1 df-bit", "ping 10.0.0.1 source", "ping 10.0.0.1 data 0x1",
 		"traceroute", "traceroute 10.0.0.1 count 2", "traceroute6 ff02::1", "traceroute 10.0.0.1 vrf",
-		"ping 10.0.0.1 vrf a;b", "ping 10.0.0.1 vrf management\x01",
+		"ping 10.0.0.1 vrf a;b", "ping {ip} count 11", "ping {ip} data 1", "ping {mal", "ping {ip}x", "ping 10.0.0.1 vrf management\x01",
 	} {
 		if err := CheckDenied("nx-os", cmd); !errors.Is(err, ErrDenied) {
 			t.Errorf("%q: se aceptó (err=%v)", cmd, err)
@@ -40,7 +40,7 @@ func TestCheckDeniedNXOSAcepta(t *testing.T) {
 		"dir bootflash:", "dir", "terminal length 0", "terminal width 511", "ter wid 0", "",
 		"ping 10.0.0.1", "ping 10.0.0.1 vrf management count 5 packet-size 1400 timeout 2 source 10.0.0.2",
 		"ping 10.0.0.1 source-interface loopback0", "ping6 2001:db8::1 vrf default count 3", "traceroute 10.0.0.1 vrf management source 10.0.0.2",
-		"traceroute6 2001:db8::1 source-interface loopback0", "traceroute switch1",
+		"traceroute6 2001:db8::1 source-interface loopback0", "ping {ip} count 5", "traceroute {ip}", "traceroute switch1",
 	} {
 		if err := CheckDenied("nx-os", cmd); err != nil {
 			t.Errorf("%q: rechazado: %v", cmd, err)

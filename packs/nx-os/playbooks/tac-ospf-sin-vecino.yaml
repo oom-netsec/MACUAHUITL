@@ -1,0 +1,23 @@
+# Propósito: Alcance, ARP, ruta, interfaces y contadores OSPF hacia el vecino dado.
+# Cuándo usarlo: Se conoce la IP del vecino OSPF que no llega a FULL.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-ospf-sin-vecino
+platform: nx-os
+name: TAC · OSPF sin adyacencia con un vecino
+name_en: TAC · OSPF no adjacency with a neighbor
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: ping {ip} count 5
+    timeout: 90s
+  - cmd: show ip arp {ip}
+  - cmd: show ip route {ip}
+  - cmd: show ip ospf neighbors
+  - cmd: show ip ospf interface brief
+  - cmd: show ip ospf traffic
+  - cmd: show ip ospf
+  - cmd: show logging last 300 | include OSPF
+    timeout: 180s

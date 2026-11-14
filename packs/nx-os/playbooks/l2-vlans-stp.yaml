@@ -1,0 +1,19 @@
+# Propósito: VLANs, raíz de STP, puertos bloqueados e inconsistentes y cambios de topología.
+# Cuándo usarlo: Una VLAN no pasa tráfico o hay sospecha de cambios de topología STP.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l2-vlans-stp
+platform: nx-os
+name: L2 · VLANs y Spanning Tree
+name_en: L2 · VLANs and Spanning Tree
+commands:
+  - cmd: show vlan brief
+    timeout: 120s
+  - cmd: show spanning-tree summary
+  - cmd: show spanning-tree root
+  - cmd: show spanning-tree blockedports
+  - cmd: show spanning-tree inconsistentports
+  - cmd: show spanning-tree detail | include occurred|from
+    timeout: 120s
+  - cmd: show vlan all-ports
+    timeout: 120s

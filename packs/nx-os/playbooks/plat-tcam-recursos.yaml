@@ -1,0 +1,16 @@
+# Propósito: Regiones de TCAM y utilización de recursos de ACL (Nexus 9000).
+# Cuándo usarlo: Una ACL no se aplica por falta de recursos o antes de agregar funciones que consumen TCAM.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-configuration-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: plat-tcam-recursos
+platform: nx-os
+name: Plataforma · TCAM y recursos de ACL
+name_en: Platform · TCAM and ACL resources
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show module
+  - cmd: show hardware access-list tcam region  # N9K
+  - cmd: show hardware access-list resource utilization  # N9K
+  - cmd: show system internal access-list resource utilization  # N9K
+  - cmd: show hardware capacity forwarding  # N7K y algunos N9K

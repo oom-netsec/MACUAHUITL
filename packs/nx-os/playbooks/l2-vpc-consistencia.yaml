@@ -1,0 +1,17 @@
+# Propósito: Parámetros de consistencia tipo 1 y 2 globales y de VLAN, con el estado del vPC.
+# Cuándo usarlo: El vPC muestra parámetros inconsistentes o VLANs suspendidas.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l2-vpc-consistencia
+platform: nx-os
+name: L2 · vPC consistencia
+name_en: L2 · vPC consistency
+commands:
+  - cmd: show vpc
+  - cmd: show vpc consistency-parameters global
+  - cmd: show vpc consistency-parameters vlans
+  - cmd: show vpc brief
+  - cmd: show vpc orphan-ports
+  - cmd: show spanning-tree summary
+  - cmd: show logging last 200 | include VPC
+    timeout: 180s

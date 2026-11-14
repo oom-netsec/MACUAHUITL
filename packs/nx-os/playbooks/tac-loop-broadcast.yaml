@@ -1,0 +1,19 @@
+# Propósito: STP, storm-control, MAC moves y CPU para confirmar un bucle de capa 2.
+# Cuándo usarlo: CPU alta, enlaces saturados y MACs saltando: se sospecha un bucle.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-loop-broadcast
+platform: nx-os
+name: TAC · Bucle o tormenta de broadcast
+name_en: TAC · Loop or broadcast storm
+commands:
+  - cmd: show clock
+  - cmd: show spanning-tree summary
+  - cmd: show spanning-tree detail | include occurred|from
+    timeout: 120s
+  - cmd: show interface counters storm-control
+  - cmd: show mac address-table notification mac-move
+  - cmd: show processes cpu sort | head lines 15
+  - cmd: show interface counters errors non-zero
+  - cmd: show logging last 200 | include L2FM
+    timeout: 180s

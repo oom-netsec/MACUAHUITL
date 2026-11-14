@@ -1,0 +1,16 @@
+# Propósito: Salud del underlay: IGP, PIM, multicast y loopbacks de los VTEPs.
+# Cuándo usarlo: Los VTEPs no se alcanzan entre sí o el BUM multicast no se replica.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/103x/configuration/vxlan/cisco-nexus-9000-series-nx-os-vxlan-configuration-guide-103x.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: vxlan-underlay
+platform: nx-os
+name: VXLAN · Underlay
+name_en: VXLAN · Underlay
+commands:
+  - cmd: show nve interface nve1 detail
+  - cmd: show ip ospf neighbors
+  - cmd: show ip pim neighbor
+  - cmd: show ip mroute summary
+  - cmd: show ip interface brief
+  - cmd: show ip route summary
+  - cmd: show nve peers

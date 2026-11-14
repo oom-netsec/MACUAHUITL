@@ -1,0 +1,20 @@
+# Propósito: Revisa el log, el log de NVRAM, los cores, el motivo del último reinicio y la bitácora de cuentas.
+# Cuándo usarlo: Un reinicio inesperado, un proceso caído o alertas de severidad alta.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: plat-logs-cores
+platform: nx-os
+name: Plataforma · Logs, cores y reinicios
+name_en: Platform · Logs, cores and reloads
+commands:
+  - cmd: show clock
+  - cmd: show system reset-reason
+  - cmd: show cores
+  - cmd: show processes log
+  - cmd: show logging nvram last 100
+  - cmd: show logging logfile | last 200
+    timeout: 180s
+  - cmd: show accounting log | last 50
+    timeout: 120s
+  - cmd: show logging last 300 | include CRIT|ALERT|EMERG
+    timeout: 180s

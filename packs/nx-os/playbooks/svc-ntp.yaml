@@ -1,0 +1,18 @@
+# Propósito: Peers NTP, estado de sincronización, autenticación y estadísticas.
+# Cuándo usarlo: La hora del equipo difiere o los logs no coinciden con otros dispositivos.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: svc-ntp
+platform: nx-os
+name: Servicios · NTP y hora
+name_en: Services · NTP and clock
+commands:
+  - cmd: show clock detail
+  - cmd: show ntp peers
+  - cmd: show ntp peer-status
+  - cmd: show ntp statistics local
+  - cmd: show ntp statistics io
+  - cmd: show ntp authentication-status
+  - cmd: show ntp trusted-keys
+  - cmd: show logging last 100 | include NTP
+    timeout: 180s

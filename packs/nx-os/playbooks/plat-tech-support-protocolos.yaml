@@ -1,0 +1,25 @@
+# Propósito: Tech-support acotado de interfaces, port-channel, vPC, OSPF y BGP.
+# Cuándo usarlo: Cuando TAC pide el tech-support de un solo protocolo en vez del completo.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: plat-tech-support-protocolos
+platform: nx-os
+name: Plataforma · Tech-support por protocolo
+name_en: Platform · Per-protocol tech-support
+commands:
+  - cmd: show clock
+  - cmd: show tech-support ethpm
+    timeout: 280s
+    may_contain_secrets: true
+  - cmd: show tech-support port-channel
+    timeout: 280s
+    may_contain_secrets: true
+  - cmd: show tech-support vpc
+    timeout: 280s
+    may_contain_secrets: true
+  - cmd: show tech-support ospf
+    timeout: 280s
+    may_contain_secrets: true
+  - cmd: show tech-support bgp
+    timeout: 900s
+    may_contain_secrets: true

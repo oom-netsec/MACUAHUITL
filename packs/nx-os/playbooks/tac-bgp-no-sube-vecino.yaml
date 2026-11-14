@@ -1,0 +1,26 @@
+# Propósito: Alcance, ruta, ARP y estado del vecino BGP dado.
+# Cuándo usarlo: Se conoce la IP del vecino BGP que no sube.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-bgp-no-sube-vecino
+platform: nx-os
+name: TAC · BGP no establece con un vecino
+name_en: TAC · BGP does not establish with a neighbor
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: ping {ip} count 5
+    timeout: 90s
+  - cmd: traceroute {ip}
+    timeout: 120s
+  - cmd: show ip route {ip}
+  - cmd: show ip arp {ip}
+  - cmd: show bgp ipv4 unicast neighbors {ip}
+  - cmd: show bgp event-history events
+    timeout: 120s
+  - cmd: show bgp event-history errors
+  - cmd: show ip access-lists summary
+  - cmd: show logging last 300 | include {ip}
+    timeout: 180s

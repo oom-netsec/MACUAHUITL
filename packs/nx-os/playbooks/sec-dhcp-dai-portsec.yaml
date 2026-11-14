@@ -1,0 +1,17 @@
+# Propósito: Estado y contadores de DHCP snooping, inspección ARP, IP source guard y port-security.
+# Cuándo usarlo: Hosts sin DHCP, ARP descartado o puertos asegurados que se apagan.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-configuration-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: sec-dhcp-dai-portsec
+platform: nx-os
+name: Seguridad · DHCP snooping, DAI y port-security
+name_en: Security · DHCP snooping, DAI and port-security
+commands:
+  - cmd: show ip dhcp snooping
+  - cmd: show ip dhcp snooping binding
+    timeout: 120s
+  - cmd: show ip arp inspection
+  - cmd: show ip arp inspection statistics
+  - cmd: show ip verify source
+  - cmd: show port-security
+  - cmd: show ip dhcp relay

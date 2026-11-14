@@ -1,0 +1,17 @@
+# Propósito: FEX asociados, detalle, enlaces de fabric y ambiente.
+# Cuándo usarlo: Un FEX está offline, en estado de descubrimiento o sus puertos de host caen.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: fex-estado
+platform: nx-os
+name: FEX · Estado de extensores
+name_en: FEX · Fabric extender status
+commands:
+  - cmd: show fex
+  - cmd: show fex detail
+    timeout: 120s
+  - cmd: show interface fex-fabric
+  - cmd: show module fex
+  - cmd: show environment fex all
+  - cmd: show logging last 200 | include FEX
+    timeout: 180s

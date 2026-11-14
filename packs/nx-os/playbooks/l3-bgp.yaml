@@ -1,0 +1,22 @@
+# Propósito: Resumen de vecinos BGP, sesiones, proceso y eventos recientes.
+# Cuándo usarlo: Una sesión BGP no está establecida o faltan prefijos.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l3-bgp
+platform: nx-os
+name: L3 · BGP
+name_en: L3 · BGP
+commands:
+  - cmd: show bgp all summary
+  - cmd: show bgp sessions
+  - cmd: show bgp process
+  - cmd: show bgp ipv4 unicast neighbors
+    timeout: 120s
+  - cmd: show bgp event-history events
+    timeout: 120s
+  - cmd: show ip route bgp
+    timeout: 180s
+  - cmd: show logging last 200 | include BGP
+    timeout: 180s
+  - cmd: show bgp ipv4 unicast
+    timeout: 300s

@@ -23,6 +23,8 @@ var reservedSegments = map[string]bool{
 	"flota": true, "topologia": true, "wan": true,
 	// Previstos para paquetes oficiales posteriores (ADR 0010: nx-os, fw, aci, wireless, ise, sda).
 	"fw": true, "aci": true, "wireless": true,
+	// Los de oom/nx-os (además de plat, l1, l2, l3, sec, svc y tac, ya reservados).
+	"vxlan": true, "fex": true,
 	// Los de oom/wlc-9800 (controlador inalámbrico Catalyst 9800).
 	"ctrl": true, "ap": true, "cli": true, "rf": true, "wlan": true, "sec": true, "mob": true,
 }

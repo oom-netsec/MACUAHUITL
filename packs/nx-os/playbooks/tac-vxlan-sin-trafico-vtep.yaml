@@ -1,0 +1,24 @@
+# Propósito: Alcance del underlay al VTEP dado, ruta, peer NVE y rutas EVPN.
+# Cuándo usarlo: Se conoce el VTEP remoto con el que falla el tráfico.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/103x/configuration/vxlan/cisco-nexus-9000-series-nx-os-vxlan-configuration-guide-103x.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-vxlan-sin-trafico-vtep
+platform: nx-os
+name: TAC · VXLAN sin tráfico hacia un VTEP
+name_en: TAC · VXLAN no traffic to a VTEP
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: ping {ip} count 5
+    timeout: 90s
+  - cmd: traceroute {ip}
+    timeout: 180s
+  - cmd: show ip route {ip}
+  - cmd: show nve peers detail
+  - cmd: show nve vni
+  - cmd: show bgp l2vpn evpn summary
+  - cmd: show nve interface nve1 detail
+  - cmd: show logging last 200 | include {ip}
+    timeout: 180s

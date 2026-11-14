@@ -1,0 +1,19 @@
+# Propósito: Estado de módulos, supervisoras, redundancia y resultados de diagnóstico en línea.
+# Cuándo usarlo: Un módulo aparece en estado distinto de ok, o sospechas de una falla de hardware.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: plat-modulos-hardware
+platform: nx-os
+name: Plataforma · Módulos y diagnóstico de hardware
+name_en: Platform · Modules and hardware diagnostics
+commands:
+  - cmd: show module
+  - cmd: show inventory
+  - cmd: show hardware
+  - cmd: show system redundancy status  # modulares (N9500, N7K)
+  - cmd: show diagnostic result module all
+  - cmd: show diagnostic result module all detail
+    timeout: 180s
+  - cmd: show environment
+  - cmd: show logging last 100 | include MODULE
+    timeout: 180s

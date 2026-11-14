@@ -16,7 +16,7 @@ import (
 )
 
 // Archivos del catálogo por área (los playbooks anteriores no llevan estos prefijos; tac-baseline es anterior).
-var catalogFile = regexp.MustCompile(`^(l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob)-`)
+var catalogFile = regexp.MustCompile(`^(l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob|vxlan|fex)-`)
 
 // Comandos que pueden imprimir secretos (el enmascarado solo corre si el comando lo declara).
 var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp comm|archive log)|more )`)
@@ -24,7 +24,7 @@ var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp comm|archive log
 // Salidas sin acotar: tabla completa de rutas/BGP/CEF/MAC o todas las interfaces.
 var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces|wireless client summary|ap summary)$`)
 
-// catalogFS junta el contenido embebido con el de packs/ios-xe, packs/ios y packs/wlc-9800 (en cisco/<plataforma>), para que estas pruebas sigan
+// catalogFS junta el contenido embebido con el de packs/ios-xe, packs/ios, packs/wlc-9800 y packs/nx-os (en cisco/<plataforma>), para que estas pruebas sigan
 // cubriendo los playbooks que salieron del binario al paquete oficial.
 func catalogFS(t testing.TB) fs.FS {
 	t.Helper()
@@ -46,6 +46,7 @@ func catalogFS(t testing.TB) fs.FS {
 	add(os.DirFS("../packs/ios-xe/playbooks"), "cisco/ios-xe")
 	add(os.DirFS("../packs/ios/playbooks"), "cisco/ios")
 	add(os.DirFS("../packs/wlc-9800/playbooks"), "cisco/wlc-9800")
+	add(os.DirFS("../packs/nx-os/playbooks"), "cisco/nx-os")
 	return m
 }
 
@@ -60,14 +61,14 @@ func TestCatalogo(t *testing.T) {
 			t.Errorf("id duplicado: %s", p.ID)
 		}
 		byID[p.ID] = p
-		if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800") && !strings.Contains(p.Name, " · ") { // el selector de Patrol agrupa por el área antes del «·»
+		if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os") && !strings.Contains(p.Name, " · ") { // el selector de Patrol agrupa por el área antes del «·»
 			t.Errorf("%s: name %q sin área (\"L2 · STP\")", p.ID, p.Name)
 		}
 		for _, c := range p.Commands {
 			if secretCmd.MatchString(c.Text) && !c.MaySecrets {
 				t.Errorf("%s: %q puede traer secretos y debe llevar may_contain_secrets", p.ID, c.Text)
 			}
-			if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800") && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
+			if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os") && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
 				t.Errorf("%s: %q es una salida grande y necesita timeout > 60s", p.ID, c.Text)
 			}
 		}
@@ -129,7 +130,7 @@ func TestSoloBootflashLlevaPlatforms(t *testing.T) {
 	con := map[string]bool{}
 	for _, p := range pbs {
 		for _, c := range p.Commands {
-			if c.Text == "dir bootflash:" && (len(c.Platforms) != 1 || c.Platforms[0] != "ios-xe") {
+			if c.Text == "dir bootflash:" && p.Platform != "nx-os" && (len(c.Platforms) != 1 || c.Platforms[0] != "ios-xe") {
 				t.Errorf("%s: %q debe llevar platforms: [ios-xe]: %v", p.ID, c.Text, c.Platforms)
 			}
 			if len(c.Platforms) > 0 {

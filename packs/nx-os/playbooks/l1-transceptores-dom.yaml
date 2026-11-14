@@ -1,0 +1,19 @@
+# Propósito: Potencia óptica, temperatura y datos del módulo óptico en todos los puertos.
+# Cuándo usarlo: Enlaces ópticos con errores, flaps o niveles de luz dudosos.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l1-transceptores-dom
+platform: nx-os
+name: L1 · Transceptores y DOM
+name_en: L1 · Transceivers and DOM
+commands:
+  - cmd: show interface transceiver
+    timeout: 180s
+  - cmd: show interface transceiver details
+    timeout: 240s
+  - cmd: show inventory
+  - cmd: show interface status err-disabled
+  - cmd: show interface brief
+    timeout: 120s
+  - cmd: show logging last 200 | include TRANSCEIVER
+    timeout: 180s

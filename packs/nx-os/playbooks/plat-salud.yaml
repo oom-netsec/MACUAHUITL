@@ -1,0 +1,20 @@
+# Propósito: Resume versión, módulos, recursos, ambiente, uptime y mensajes recientes del Nexus.
+# Cuándo usarlo: Primera revisión de cualquier Nexus antes de profundizar.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: plat-salud
+platform: nx-os
+name: Plataforma · Salud general
+name_en: Platform · General health
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show system uptime
+  - cmd: show module
+  - cmd: show system resources
+  - cmd: show processes cpu sort | head lines 15
+  - cmd: show environment
+  - cmd: show inventory
+  - cmd: show feature | include enabled
+  - cmd: show logging last 100
+    timeout: 180s
