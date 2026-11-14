@@ -383,18 +383,23 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 	}
 	var batch []vault.Credential
 	reemplazados := map[string]string{} // ID local -> etiqueta de la credencial del respaldo que ya lo reemplaza
+	iguales := map[string]bool{}        // destinos que alguna credencial del respaldo reporta «igual»: reemplazarlos haría mentir al informe
 	var res v1.ApplyBackupImportResponse
 	for _, c := range p.creds {
 		pl, act := plan[c.ID], dec[c.ID]
 		switch {
 		case pl.state == estIgual:
+			if _, dup := reemplazados[pl.target]; dup {
+				return nil, bad("respaldo.err.double_replace", "label", c.Label)
+			}
+			iguales[pl.target] = true
 			res.Same++
 		case act == decOmitir:
 			res.Skipped++
 		case pl.state == estConflicto && act == "":
 			return nil, bad("respaldo.err.undecided", "label", c.Label)
 		case pl.state == estConflicto && act == decReemplazar:
-			if _, dup := reemplazados[pl.target]; dup {
+			if _, dup := reemplazados[pl.target]; dup || iguales[pl.target] {
 				return nil, bad("respaldo.err.double_replace", "label", c.Label)
 			}
 			reemplazados[pl.target] = c.Label

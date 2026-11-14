@@ -60,3 +60,14 @@ test("salir de la consola serie la cierra para no dejar el puerto tomado", async
   unmount();
   await waitFor(() => expect(core.consoleClose).toHaveBeenCalledWith("c1"));
 });
+
+test("dos clics seguidos en Abrir no abren dos sesiones", async () => {
+  const core = fakeCore({ fieldPorts: vi.fn(async () => ["/dev/ttyUSB0"]), consoleOpen: vi.fn(() => new Promise<string>(() => {})) });
+  render(<ConsoleView core={core} />);
+  await waitFor(() => expect(screen.getByLabelText("Puerto")).toHaveValue("/dev/ttyUSB0"));
+  const open = screen.getByRole("button", { name: "Abrir" });
+  await userEvent.click(open);
+  await userEvent.click(open);
+  expect(core.consoleOpen).toHaveBeenCalledTimes(1);
+  expect(open).toBeDisabled();
+});

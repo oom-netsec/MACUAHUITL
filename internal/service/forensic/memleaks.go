@@ -34,7 +34,7 @@ func (s *forensicSvc) MemLeaks(ctx context.Context, r *v1.MemLeaksRequest) (*v1.
 	var warnsT []i18n.Text
 	seen := map[string]bool{}
 	for _, sec := range b.Sections {
-		if sec.Invalid || !isProcMem(sec.Command) {
+		if sec.Invalid || sec.Incomplete || !isProcMem(sec.Command) {
 			continue
 		}
 		if d := strings.ToLower(r.Device); d != "" && !strings.Contains(strings.ToLower(sec.Device), d) {

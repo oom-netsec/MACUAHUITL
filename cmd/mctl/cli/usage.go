@@ -13,7 +13,7 @@ var placeholders = strings.NewReplacer(
 	"campo=valor", "field=value",
 	"(mctl snippet list muestra los campos)", "(mctl snippet list shows the fields)",
 	"PUERTO-ALTO", "HIGH-PORT", "IP-DE-ESCUCHA", "LISTEN-IP",
-	"<archivo.mpack>", "<file.mpack>", "(todas las colecciones, también favoritos)", "(all collections, including favorites)",
+	"<archivo.mpack>", "<file.mpack>", "<editor/nombre>", "<editor/name>", "(todas las colecciones, también favoritos)", "(all collections, including favorites)",
 )
 
 var placeholderWord = map[string]string{

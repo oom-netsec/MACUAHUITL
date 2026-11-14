@@ -6,7 +6,7 @@ import { EmptyState, Page, ResultPanel, Section, Tabs, useResult } from "../../c
 import { useT } from "../../lib/i18n";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import type { Key } from "../../lib/i18n/es";
-import { formatBytes } from "../../components/Files";
+import { DownloadButton, formatBytes } from "../../components/Files";
 import { Icon } from "../../components/Icon";
 import { IngestOptionsBox } from "../../components/ingest/IngestOptions";
 import { IngestDropsBanner, IngestStatusLine } from "../../components/ingest/IngestStatus";
@@ -138,8 +138,8 @@ function TopoPanel({ core }: { core: CoreAPI }) {
         <ResultPanel title={t("visibility.sub.topo")} error={r.error}
           actions={topo && (
             <span className="export-links">
-              <a href={svgURL} download={`${t("file.topologia")}.svg`}>{t("visibility.topo.exportSvg")}</a>
-              <a href={"data:application/json;charset=utf-8," + encodeURIComponent(topo.json)} download={`${t("file.topologia")}.json`}>{t("visibility.topo.exportJson")}</a>
+              <DownloadButton name={`${t("file.topologia")}.svg`} data={() => topo.svg} label={t("visibility.topo.exportSvg")} />
+              <DownloadButton name={`${t("file.topologia")}.json`} data={() => topo.json} label={t("visibility.topo.exportJson")} />
             </span>
           )}>
           {topo && (

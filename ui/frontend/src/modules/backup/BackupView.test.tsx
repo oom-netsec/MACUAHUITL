@@ -1,8 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BackupView } from "./BackupView";
 import { fakeCore } from "../../lib/fake";
-import { CoreContext, NavContext } from "../../app/activity";
+import { CoreContext, ModuleIdContext, NavContext } from "../../app/activity";
 import { sampleEntry } from "./fake";
 
 const a = sampleEntry();
@@ -122,4 +122,14 @@ test("ver muestra el contenido y el error del núcleo sale como alerta", async (
 test("el menú de equipo precarga la dirección en Equipos", () => {
   render(<NavContext.Provider value={{ go: () => {}, inbox: { backup: { data: "10.20.3.11", n: 1 } } }}><BackupView core={withCreds()} /></NavContext.Provider>);
   expect(screen.getByLabelText(/Equipos/)).toHaveValue("10.20.3.11");
+});
+
+// Una restauración viva tras reabrir la app se retoma en Respaldos aunque no haya una entrada elegida.
+test("una restauración viva de Respaldos se engancha sin elegir entrada", async () => {
+  localStorage.setItem("macuahuitl.assist.r7", "backup");
+  try {
+    const core = withCreds({ assistListRuns: vi.fn(async () => [{ runId: "r7", state: "running", active: true }]) });
+    render(<ModuleIdContext.Provider value="backup"><BackupView core={core} /></ModuleIdContext.Provider>);
+    await waitFor(() => expect(core.assistWatch).toHaveBeenCalledWith("r7"));
+  } finally { localStorage.removeItem("macuahuitl.assist.r7"); }
 });

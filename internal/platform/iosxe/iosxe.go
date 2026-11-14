@@ -213,7 +213,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 		}
 		select {
 		case <-ctx.Done():
-			return clean(string(d.buf)), platform.ErrPromptTimeout
+			return clean(string(d.buf)), fmt.Errorf("%w: %w", platform.ErrPromptTimeout, ctx.Err())
 		case <-quiet:
 			select { // llegó un pedazo justo al vencer el plazo: cuenta como actividad
 			case c, ok := <-d.chunks:

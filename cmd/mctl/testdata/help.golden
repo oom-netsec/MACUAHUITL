@@ -190,4 +190,12 @@ usage: mctl <command>
   pack items <id> [--hide ITEM]... [--show ITEM]...
         (hides or shows playbooks and scripts of an installed package: it only removes them from the lists, the ID still
          resolves and jobs can ask for it; what is hidden survives new versions and is deleted with the package)
+  pack export <editor/name> [ID...] --out <file.mpack> [--playbooks] [--license SPDX] [--name N] [--description D] [--author A] [--overwrite]
+        (builds an UNSIGNED personal package with the user's scripts ID... and, with --playbooks, the ios, ios-xe and wlc-9800 ones in <config>/playbooks.
+         Scripts come out as lib-<editor>-… and playbooks with the editor as prefix; other playbooks are left out with a warning. The editor is
+         [a-z0-9]{1,16}, not a reserved one. Version YYYY.MMDD.HHMMSS (local time); license NOASSERTION unless you give another; favorites do not travel)
+  pack import <file.mpack> [--decision ID=renombrar|omitir]... [--all=renombrar|omitir] [--preview]
+        (copies a .mpack without an official signature into «My scripts» and <config>/playbooks, editable, without installing it. Shows each item's state:
+         nuevo, igual, conflicto_id or conflicto_nombre; every conflict needs a decision and nothing is ever overwritten. An imported playbook keeps its
+         editor-prefixed ID and joins the catalog without a restart)
   --version

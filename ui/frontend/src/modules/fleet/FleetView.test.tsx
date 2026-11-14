@@ -2,7 +2,8 @@ import { render, renderHook, screen, waitFor, within } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { FleetView, age } from "./FleetView";
 import { fakeCore } from "../../lib/fake";
-import { NavContext } from "../../app/activity";
+import { CoreContext, NavContext } from "../../app/activity";
+import type { CoreAPI } from "../../lib/core";
 import { useT } from "../../lib/i18n";
 
 const at = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
@@ -82,7 +83,7 @@ test("salud, tablero, flash e inventario cargan al abrir y muestran la antigüed
     fleetCapacity: vi.fn(async (n: string) => ({ devices: 1, warnings: [], dram: [], flash: [{ device: "DIST1", fs: "flash:", total: 11 << 30, free: 300 << 20, used_pct: 97, fits: n ? false : undefined, at }] })),
     fleetInventory: vi.fn(async () => ({ csv: "Equipo\n", markdown: "| a |", result: { devices: 1, warnings: [], rows: [{ device: "CORE1", kind: "equipo", model: "C9500", serial: "FCW1", source: "show version", at }] } })),
   });
-  render(<FleetView core={core} />);
+  render(<CoreContext.Provider value={core as unknown as CoreAPI}><FleetView core={core} /></CoreContext.Provider>);
   await userEvent.click(screen.getByRole("tab", { name: "Salud" }));
   expect(await screen.findByText("Gi1/0/9")).toBeInTheDocument();
   expect(screen.getAllByRole("cell").some((c) => /^(Crítica|Alta|Media|Baja)$/.test(c.textContent ?? ""))).toBe(true); // gravedad con mayúscula
@@ -97,7 +98,12 @@ test("salud, tablero, flash e inventario cargan al abrir y muestran la antigüed
   expect(await screen.findByText("No")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("tab", { name: "Inventario" }));
   expect(await screen.findByText("FCW1")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Descargar CSV" })).toHaveAttribute("download", "inventario.csv");
+  // Sin enlace de descarga con data: en WebKitGTK no descarga; se guarda por el diálogo nativo (saveFile).
+  expect(screen.queryByRole("link", { name: "Descargar CSV" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Descargar CSV" }));
+  expect(core.saveFile).toHaveBeenCalledWith("inventario.csv", "Equipo\n", "utf8");
+  await userEvent.click(screen.getByRole("button", { name: "Descargar Markdown" }));
+  expect(core.saveFile).toHaveBeenLastCalledWith("inventario.md", "| a |", "utf8");
 });
 
 test("el menú de equipo precarga la búsqueda con la dirección", () => {

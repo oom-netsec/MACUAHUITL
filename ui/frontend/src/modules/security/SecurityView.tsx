@@ -70,7 +70,8 @@ function useSecrets(core: CoreAPI) {
   );
   const values = { secretCredId, secret: secretCredId ? "" : secret, credId, username: credId ? "" : username, password: credId ? "" : password };
   const ready = (needUser: boolean) => (!!secretCredId || !!secret) && (!needUser || !!credId || !!username);
-  return { view, values, ready };
+  const clear = () => { setSecret(""); setPassword(""); }; // se llama justo después de r.run: los valores ya se tomaron
+  return { view, values, ready, clear };
 }
 
 // Resultado de una prueba: el informe estructurado y, si no lo hay o llega sin texto (doble de pruebas), el texto de siempre.
@@ -101,8 +102,11 @@ function RadiusPanel({ core }: { core: CoreAPI }) {
   const [statusServer, setStatusServer] = useState(false);
   const [accounting, setAccounting] = useState(false);
   const r = useResult<Probe<RadiusReportData>>();
-  const go = () => r.run(() => probe(core.secRadiusReport, core.secRadius, { host, authPort: Number(authPort) || 1812, acctPort: Number(acctPort) || 1813, ...s.values, method,
-    nasIp, nasId, portType, serviceType, called, calling, statusServer, accounting }));
+  const go = () => {
+    void r.run(() => probe(core.secRadiusReport, core.secRadius, { host, authPort: Number(authPort) || 1812, acctPort: Number(acctPort) || 1813, ...s.values, method,
+      nasIp, nasId, portType, serviceType, called, calling, statusServer, accounting }));
+    s.clear();
+  };
   return (
     <>
       <Section title={t("security.sec.target")}>
@@ -166,7 +170,7 @@ function TacacsPanel({ core }: { core: CoreAPI }) {
       </Section>
       <div className="actions">
         <button className="primary" disabled={!host || !s.ready(true) || r.busy} aria-busy={r.busy}
-          onClick={() => r.run(() => probe(core.secTacacsReport, core.secTacacs, { host, port: Number(port) || 49, ...s.values, authenType, command, accounting }))}>{t("security.test")}{kbd}</button>
+          onClick={() => { void r.run(() => probe(core.secTacacsReport, core.secTacacs, { host, port: Number(port) || 49, ...s.values, authenType, command, accounting })); s.clear(); }}>{t("security.test")}{kbd}</button>
       </div>
       <Outcome r={r} bare empty={t("security.tacacs.empty")}>{r.data && <ResultCards kind="tacacs" text={r.data.text} report={r.data.report} fallback={<Raw text={r.data.text} />} />}</Outcome>
     </>
@@ -214,7 +218,7 @@ function CsrCard({ core }: { core: CoreAPI }) {
         </div>
         <div className="actions">
           <button className="primary" disabled={!cn || !keyPassword || r.busy} aria-busy={r.busy}
-            onClick={() => r.run(() => core.secPkiCsr({ cn, o, ou, l, st, c, dns: list(dns), ips: list(ips), algorithm, sealedKey, keyPassword }))}>{t("security.csr.generate")}{kbd}</button>
+            onClick={() => { void r.run(() => core.secPkiCsr({ cn, o, ou, l, st, c, dns: list(dns), ips: list(ips), algorithm, sealedKey, keyPassword })); setKeyPassword(""); }}>{t("security.csr.generate")}{kbd}</button>
         </div>
       </Section>
       <Outcome r={r}>
@@ -274,7 +278,7 @@ function CaCard({ core }: { core: CoreAPI }) {
         </div>
         <div className="actions">
           <button disabled={!caCert || !caKey || !csr || !password || sign.busy} aria-busy={sign.busy}
-            onClick={() => sign.run(() => core.secPkiCaSign(caCert, caKey, password, csr, profile, Number(certDays) || 365))}>{t("security.ca.sign")}</button>
+            onClick={() => { void sign.run(() => core.secPkiCaSign(caCert, caKey, password, csr, profile, Number(certDays) || 365)); setPassword(""); }}>{t("security.ca.sign")}</button>
         </div>
       </Section>
       <Outcome r={sign}>
@@ -318,7 +322,7 @@ function ExportCard({ core }: { core: CoreAPI }) {
       <Field label={t("security.export.path")} value={path} onChange={setPath} w="full" mono />
       <div className="actions">
         <button disabled={!cert || !path || r.busy} aria-busy={r.busy}
-          onClick={() => r.run(() => core.secPkiExport({ format, cert, chain, sealedKey, keyPassword, exportPassword, plainKey, path }))}>{t("security.export")}</button>
+          onClick={() => { void r.run(() => core.secPkiExport({ format, cert, chain, sealedKey, keyPassword, exportPassword, plainKey, path })); setKeyPassword(""); setExportPassword(""); }}>{t("security.export")}</button>
       </div>
       {r.error && <Notice kind="error">{r.error}</Notice>}
       {r.data && <Notice kind="ok">{t("security.export.saved", { path: r.data })}</Notice>}

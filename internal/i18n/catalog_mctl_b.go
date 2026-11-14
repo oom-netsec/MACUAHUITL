@@ -9,6 +9,7 @@ func init() {
 		"mctl.backup.port_invalid":   e("puerto inválido en {value:q}", "invalid port in {value:q}"),
 		"mctl.backup.write_out":      e("no se escribe la salida (¿ya existe?): {cause}", "the output is not written (does it already exist?): {cause}"),
 		"mctl.backup.written":        e("escrito {path}", "written {path}"),
+		"mctl.backup.job_failed":     e("el trabajo {job} terminó con error: {error}", "job {job} finished with an error: {error}"),
 		"mctl.restore.assist_active": e("MODO ASISTIDO ACTIVO. Ejecución {run}: cada paso que cambia la red pide confirmación.", "ASSISTED MODE ACTIVE. Run {run}: every step that changes the network asks for confirmation."),
 		"mctl.restore.plan_only":     e("Solo se mostró el plan: no se cambió nada. Para aplicarlo agrega --asistido.", "Only the plan was shown: nothing was changed. To apply it add --asistido."),
 

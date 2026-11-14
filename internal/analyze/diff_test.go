@@ -130,3 +130,37 @@ func TestDiffOSPFSameRouterIDTwoLinks(t *testing.T) {
 		t.Fatalf("neighbors = %+v", n)
 	}
 }
+
+// Una salida incompleta (comando cortado) no se compara: no debe fabricar líneas «quitadas».
+func TestDiffIgnoraSeccionesIncompletas(t *testing.T) {
+	b := &Bundle{Sections: []Section{
+		{Device: "SW1_192.0.2.1", Round: 1, Command: "show running-config", Text: "a\nb\nc\n"},
+		{Device: "SW1_192.0.2.1", Round: 1, Command: "show clock", Text: "10:00\n"},
+		{Device: "SW1_192.0.2.1", Round: 2, Command: "show running-config", Text: "a\n", Incomplete: true},
+		{Device: "SW1_192.0.2.1", Round: 2, Command: "show clock", Text: "10:05\n"},
+	}}
+	r, err := Diff(b, 1, 2, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, td := range devDiff(t, r, "SW1").Text {
+		if td.Command == "show running-config" {
+			t.Fatalf("la salida incompleta no se compara ni sale «solo en la ronda»: %+v", td)
+		}
+	}
+	avisado := false
+	for _, w := range r.Warnings {
+		avisado = avisado || w.Command == "show running-config" && w.Round == 2
+	}
+	if !avisado {
+		t.Fatalf("sin aviso de salida incompleta: %+v", r.Warnings)
+	}
+}
+
+func TestSeriesForAvisaYOmiteIncompletas(t *testing.T) {
+	b := &Bundle{Sections: []Section{{Device: "d", Round: 1, Command: "show version", Text: "x", Incomplete: true}}}
+	var ws []Warning
+	if got := seriesFor(b, "d", &Rule{Commands: []string{"show version"}}, 0, func(w Warning) { ws = append(ws, w) }); len(got) != 0 || len(ws) != 1 {
+		t.Fatalf("%+v %+v", got, ws)
+	}
+}

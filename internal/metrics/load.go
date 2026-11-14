@@ -74,7 +74,7 @@ type rawDevice struct {
 type parseFn func(cmd, text string) (any, bool)
 
 var (
-	hdrRe   = regexp.MustCompile(`^===== (?:ronda (\d+) · )?(\S+) · (.+?)( · comando inválido)? =====$`)
+	hdrRe   = regexp.MustCompile(`^===== (?:ronda (\d+) · )?(\S+) · (.+?)( · comando inválido)?( · incompleto)? =====$`)
 	roundRe = regexp.MustCompile(`^r(\d+)_`)
 )
 
@@ -127,13 +127,13 @@ func listDevices(dir string) ([]devDir, error) {
 		if b, err := os.ReadFile(filepath.Join(dir, "manifest.json")); err == nil {
 			var m struct {
 				Devices []struct {
-					Target   struct{ Address string }
+					Target   patrol.Target
 					Hostname string
 				} `json:"devices"`
 			}
 			if json.Unmarshal(b, &m) == nil {
 				for _, d := range m.Devices {
-					n := patrol.DeviceDir(d.Hostname, d.Target.Address)
+					n := patrol.DeviceDirOf(d.Hostname, d.Target)
 					known[n] = devDir{Dir: n, Host: d.Hostname, IP: d.Target.Address}
 				}
 			}
@@ -147,9 +147,7 @@ func listDevices(dir string) ([]devDir, error) {
 		d, ok := known[e.Name()]
 		if !ok {
 			d = devDir{Dir: e.Name(), Host: e.Name()}
-			if i := strings.LastIndexByte(e.Name(), '_'); i > 0 {
-				d.Host, d.IP = e.Name()[:i], e.Name()[i+1:]
-			}
+			d.Host, d.IP = patrol.SplitDeviceDir(e.Name())
 		}
 		out = append(out, d)
 	}
@@ -301,7 +299,7 @@ func scanFile(path string, fileRound int, want map[string]bool, parse parseFn, e
 		ln := sc.Text()
 		if m := hdrRe.FindStringSubmatch(ln); m != nil {
 			flush()
-			if m[4] != "" { // el equipo rechazó el comando: su salida no son datos
+			if m[4] != "" || m[5] != "" { // rechazado o incompleto: su salida no son datos
 				continue
 			}
 			round := fileRound

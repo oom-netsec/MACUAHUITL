@@ -188,3 +188,37 @@ test("pki: la cadena es una lista con cuenta regresiva (aviso a 30 días, vencid
   await userEvent.click(within(leaf).getByRole("button", { name: "Copiar huella SHA-256" }));
   expect(core.copyText).toHaveBeenCalledWith("CC:DD:EE");
 });
+
+// Auditoría 21h: los secretos escritos se borran de la pantalla una vez enviados.
+test("radius vacía el secreto y la contraseña de prueba al probar", async () => {
+  const core = fakeCore({ secRadius: vi.fn(async () => "Access-Accept") });
+  render(<SecurityView core={core} />);
+  await userEvent.type(screen.getByLabelText("Servidor"), "10.0.0.20");
+  await userEvent.type(screen.getByLabelText("Secreto compartido"), "s3cr3t");
+  await userEvent.type(screen.getByLabelText("Usuario de prueba"), "alice");
+  await userEvent.type(screen.getByLabelText("Contraseña de prueba"), "pw");
+  await userEvent.click(screen.getByRole("button", { name: "Probar" }));
+  await waitFor(() => expect(core.secRadius).toHaveBeenCalledWith(expect.objectContaining({ secret: "s3cr3t", password: "pw" })));
+  expect(screen.getByLabelText("Secreto compartido")).toHaveValue("");
+  expect(screen.getByLabelText("Contraseña de prueba")).toHaveValue("");
+});
+
+test("pki: la contraseña de la llave y las del export se vacían tras enviarse", async () => {
+  const core = fakeCore({
+    secPkiCsr: vi.fn(async () => ({ pem: "P", key: "K", text: "t" })),
+    secPkiExport: vi.fn(async () => "/home/x/a.p12"),
+  });
+  render(<SecurityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "PKI" }));
+  await userEvent.type(screen.getByLabelText("CN"), "ise01.lab");
+  await userEvent.type(screen.getByLabelText("Contraseña de la llave"), "kpw");
+  await userEvent.click(screen.getByRole("button", { name: "Generar CSR" }));
+  await waitFor(() => expect(core.secPkiCsr).toHaveBeenCalled());
+  expect(screen.getByLabelText("Contraseña de la llave")).toHaveValue("");
+  await userEvent.type(screen.getByLabelText("Certificado (PEM)"), "C");
+  await userEvent.type(screen.getByLabelText(/Ruta de salida/), "/home/x/a.p12");
+  await userEvent.type(screen.getByLabelText("Contraseña del PKCS#12"), "epw");
+  await userEvent.click(screen.getByRole("button", { name: "Exportar" }));
+  await waitFor(() => expect(core.secPkiExport).toHaveBeenCalledWith(expect.objectContaining({ exportPassword: "epw" })));
+  expect(screen.getByLabelText("Contraseña del PKCS#12")).toHaveValue("");
+});

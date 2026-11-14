@@ -26,6 +26,7 @@ type Output struct {
 	Command        string
 	Text           string
 	Invalid        bool
+	Incomplete     bool // el comando falló o se cortó: Text es parcial
 	Started, Ended time.Time
 }
 

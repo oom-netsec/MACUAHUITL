@@ -7,6 +7,10 @@ import { DiffView } from "../../components/DiffView";
 import { CopyButton } from "../../components/Data";
 import { DownloadButton } from "../../components/Files";
 import { parseTargets } from "../patrol/PatrolView";
+import { AssistExecution } from "../../components/AssistRun";
+import { assistOwner } from "../../app/useShellStatus";
+
+const noop = () => {};
 import { parseTarget } from "../adhoc/AdhocView";
 import type { BackupDiff, BackupEntry, BackupList } from "./api";
 import { RestorePanel } from "./RestorePanel";
@@ -34,6 +38,12 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   const [accept, setAccept] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [liveRestore, setLiveRestore] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    core.assistListRuns().then((rs) => { if (alive) setLiveRestore(rs.some((r) => r.active && assistOwner(r.runId) === "backup")); }, () => {});
+    return () => { alive = false; };
+  }, [core]);
   const [note, setNote] = useState<{ kind: "ok" | "info" | "warn"; text: string } | null>(null);
   const [list, setList] = useState<BackupList>({ backups: [], masked: false });
   const [sel, setSel] = useState<string[]>([]);
@@ -127,6 +137,8 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
         </div>
       </Section>
       {restoring && <RestorePanel key={restoring.id} core={core} entry={restoring} creds={creds} onClose={() => setRestoring(null)} />}
+      {/* Una restauración que quedó viva (se cerró la app) se retoma aquí aunque no haya entrada elegida: confirmar, revertir o abortar. */}
+      {!restoring && liveRestore && <AssistExecution core={core} plan={null} onStarted={noop} onActive={noop} onError={setErr} />}
 
       {diff && (
         <>

@@ -259,3 +259,38 @@ test("la tarjeta de FTP sugiere borrar la credencial del equipo al terminar", as
   const card = await screen.findByRole("group", { name: "FTP 192.0.2.10:2121" });
   expect(within(card).getAllByText(/no ip ftp password/).length).toBeGreaterThan(0);
 });
+
+test("dos clics seguidos en Abrir servidor no abren dos servidores", async () => {
+  const core = setup({ transferServe: vi.fn(() => new Promise<void>(() => {})) });
+  await openServer(core);
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenCalledTimes(1);
+});
+
+// Con la interfaz en inglés el texto del núcleo no dice «no coincide»: el aviso sale del reason.
+test("el cliente avisa del hash distinto por el reason, aunque el texto venga en inglés", async () => {
+  const err = Object.assign(new Error("transfer: the digest does not match (SHA-256 aaa, MD5 bbb): the file was discarded"), { cause: { code: "Unavailable", reason: "xfer.err.digest", metadata: {} } });
+  const core = setup({ transferGet: vi.fn(async () => { throw err; }) });
+  await client(core, "http://192.0.2.1/c4.bin");
+  await userEvent.type(screen.getByLabelText("Hash esperado (opcional)"), "c".repeat(64));
+  await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("El hash no coincide con el esperado: el archivo se descartó.");
+});
+
+test("el aviso de hash distinto también sale con el SHA-512 publicado (por reason)", async () => {
+  const err = Object.assign(new Error("the SHA-512 does not match the published one"), { cause: { code: "Unavailable", reason: "transfer.svc.sha512", metadata: {} } });
+  const core = setup({ transferGet: vi.fn(async () => { throw err; }) });
+  await client(core, "http://192.0.2.1/c4.bin");
+  await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("El hash no coincide con el esperado");
+});
+
+test("una llave de host nueva en inglés, con reason, también pide aceptar la huella", async () => {
+  const cause = { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "192.0.2.1:22", fingerprint: "SHA256:AbC123+/x" } };
+  const get = vi.fn().mockRejectedValueOnce(Object.assign(new Error("transport: unknown host key from 192.0.2.1:22: SHA256:AbC123+/x"), { cause }));
+  const core = setup({ transferGet: get, listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false }]) });
+  await client(core, "scp://admin@192.0.2.1/ios.bin");
+  await userEvent.selectOptions(await screen.findByLabelText("Credencial de la bóveda"), "c1");
+  await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
+  expect(await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeInTheDocument();
+});

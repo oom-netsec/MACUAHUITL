@@ -60,7 +60,7 @@ type Result struct {
 }
 
 var (
-	hostDirRe = regexp.MustCompile(`^.+_\d{1,3}(?:\.\d{1,3}){3}$`)
+	hostDirRe = regexp.MustCompile(`^.+_\d{1,3}(?:\.\d{1,3}){3}(?:_\d{1,5})?$`)
 	backupRe  = regexp.MustCompile(`^(\d{8}T\d{6}Z)-(?:running|startup)\.cfg$`)
 	nameRe    = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$`)
 )
@@ -145,7 +145,7 @@ type manifestFile struct {
 	StartedAt time.Time `json:"started_at"`
 	EndedAt   time.Time `json:"ended_at"`
 	Devices   []struct {
-		Target             struct{ Address string }
+		Target             patrol.Target
 		Hostname, Platform string
 		State              string
 	} `json:"devices"`
@@ -196,7 +196,7 @@ func (c *collector) job(dir, name string) {
 					seen = at
 				}
 				c.add(obs{addr: clean(d.Target.Address), host: clean(d.Hostname), platform: clean(d.Platform), src: SrcPatrol, at: seen})
-				known[patrol.DeviceDir(d.Hostname, d.Target.Address)] = [2]string{clean(d.Hostname), clean(d.Target.Address)}
+				known[patrol.DeviceDirOf(d.Hostname, d.Target)] = [2]string{clean(d.Hostname), clean(d.Target.Address)}
 			}
 		}
 	}
@@ -226,8 +226,8 @@ func (c *collector) hostIP(n string, known map[string][2]string) (host, ip strin
 	if k, ok := known[n]; ok {
 		return k[0], k[1]
 	}
-	i := strings.LastIndexByte(n, '_')
-	return clean(n[:i]), n[i+1:]
+	host, ip = patrol.SplitDeviceDir(n)
+	return clean(host), ip
 }
 
 // newestFile es la hora de la evidencia más reciente de la carpeta de un equipo.

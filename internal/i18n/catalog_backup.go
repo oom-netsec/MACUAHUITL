@@ -19,6 +19,7 @@ func init() {
 		"backup.rep.notice":         e("AVISO: {w}", "WARNING: {w}", "w"),
 		"backup.warn.no_startup":    e("{device}: el equipo no devolvió startup-config", "{device}: the device did not return startup-config", "device"),
 		"backup.warn.outside":       e("{device}: sección de {cmd} fuera de la ventana del trabajo ({at}): se descartó", "{device}: section of {cmd} outside the job window ({at}): discarded", "device", "cmd", "at"),
+		"backup.warn.incomplete":    e("{device}: salida incompleta de {cmd} (el comando falló o se cortó): no se guardó", "{device}: incomplete output of {cmd} (the command failed or was cut off): not saved", "device", "cmd"),
 		"backup.warn.unsigned":      e("respaldos guardados sin firma: la bóveda está cerrada y la ficha no se puede firmar; se pueden ver y comparar, pero no restaurar", "backups saved without a signature: the vault is locked and the record cannot be signed; they can be viewed and compared, but not restored"),
 		"backup.warn.dup_section":   e("{device}: más de una sección de {cmd} en la ronda {round}: no se sabe cuál es la real, se descartaron todas", "{device}: more than one section of {cmd} in round {round}: it is not known which one is real, all were discarded", "device", "cmd", "round"),
 		"backup.warn.device_cause":  e("{device}: {cause}", "{device}: {cause}", "device", "cause"),

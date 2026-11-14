@@ -129,6 +129,9 @@ func collect(c *cli.Env, args []string) error {
 	if !r.Done {
 		fmt.Fprintln(c.Out, cli.T("mctl.backup.still_running", "state", r.State))
 	}
+	if r.Done && r.Error != "" {
+		return cli.Err("mctl.backup.job_failed", "job", fs.Arg(0), "error", r.Error)
+	}
 	return nil
 }
 

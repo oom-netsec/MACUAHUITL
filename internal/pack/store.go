@@ -312,6 +312,8 @@ func ReadArchive(path string) ([]byte, error) {
 type Result struct {
 	Pack     *Pack
 	Replaced string // versión anterior que reemplazó; vacío si era nuevo
+	// SyncWarning: el paquete quedó instalado, pero no se pudo asegurar con fsync la carpeta (una caída podría perderlo).
+	SyncWarning error
 }
 
 // check hace los pasos 2 a 7 del ADR sobre bytes ya leídos y devuelve el paquete y el instalado que reemplazaría
@@ -387,7 +389,8 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 			return &Result{Pack: p}, err
 		}
 	}
-	if err := s.extract(p); err != nil {
+	syncWarn, err := s.extract(p)
+	if err != nil {
 		s.mu.Unlock()
 		return &Result{Pack: p}, err
 	}
@@ -402,7 +405,7 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 		s.OnChange()
 	}
 	s.mu.Unlock()
-	res := &Result{Pack: p}
+	res := &Result{Pack: p, SyncWarning: syncWarn}
 	if old != nil {
 		res.Replaced = old.Version
 	}
@@ -410,7 +413,9 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 }
 
 // syncDir hace fsync de una carpeta para que el rename y los archivos nuevos sobrevivan a una caída.
-func syncDir(d string) error {
+var syncDir = syncDirOS // variable para que las pruebas simulen un fallo
+
+func syncDirOS(d string) error {
 	f, err := os.Open(d)
 	if err != nil {
 		return err
@@ -438,10 +443,10 @@ func writeSync(path string, b []byte) error {
 // extract escribe el paquete en .tmp-* (con fsync) y lo mete con rename. Lo que hubiera en su lugar (la versión
 // anterior, o una carpeta que no pasó la revalidación al arrancar) se aparta a .tmp-*/old y se borra después del
 // rename; si el proceso muere entre los dos rename, Open lo restaura.
-func (s *Store) extract(p *Pack) error {
+func (s *Store) extract(p *Pack) (syncWarn, err error) {
 	tmp, err := os.MkdirTemp(s.dir, ".tmp-")
 	if err != nil {
-		return readErr(err)
+		return nil, readErr(err)
 	}
 	defer os.RemoveAll(tmp)
 	files := map[string][]byte{fileIndex: Index(p.files)}
@@ -452,27 +457,27 @@ func (s *Store) extract(p *Pack) error {
 	for n, b := range files {
 		dst := filepath.Join(tmp, "x", filepath.FromSlash(n))
 		if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
-			return readErr(err)
+			return nil, readErr(err)
 		}
 		if err := writeSync(dst, b); err != nil {
-			return readErr(err)
+			return nil, readErr(err)
 		}
 		dirs[filepath.Dir(dst)] = true
 	}
 	for d := range dirs {
 		if err := syncDir(d); err != nil {
-			return readErr(err)
+			return nil, readErr(err)
 		}
 	}
 	final := filepath.Join(s.dir, filepath.FromSlash(p.ID))
 	if err := os.MkdirAll(filepath.Dir(final), 0o700); err != nil {
-		return readErr(err)
+		return nil, readErr(err)
 	}
 	aside := filepath.Join(tmp, "old")
 	moved := true
 	if err := os.Rename(final, aside); err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
-			return readErr(err)
+			return nil, readErr(err)
 		}
 		moved = false
 	}
@@ -480,9 +485,9 @@ func (s *Store) extract(p *Pack) error {
 		if moved {
 			os.Rename(aside, final)
 		}
-		return readErr(err)
+		return nil, readErr(err)
 	}
-	return syncDir(filepath.Dir(final)) // si falla, el paquete ya entró: solo se avisa con el error
+	return syncDir(filepath.Dir(final)), nil // si falla, el paquete ya entró: solo se avisa
 }
 
 // Remove quita el paquete id (buscado entre los instalados) y devuelve lo que traía.
