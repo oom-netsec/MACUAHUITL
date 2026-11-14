@@ -472,7 +472,7 @@ func TestLangPideElIdiomaDelNucleo(t *testing.T) {
 		}
 	}
 	// Un valor inválido es un error y no se come el nombre del comando.
-	if _, err := mctl(t, "", "--lang", "vault", "status"); err == nil || !strings.Contains(err.Error(), "idioma inválido") {
+	if _, err := mctl(t, "", "--lang", "vault", "status"); err == nil || !strings.Contains(err.Error(), "invalid language") { // antes de saber el idioma: el canónico, inglés
 		t.Errorf("--lang vault: %v", err)
 	}
 	// Después del comando no es bandera global: lo rechaza el propio comando, sin cambiar el idioma.

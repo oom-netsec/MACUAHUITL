@@ -752,7 +752,7 @@ Con `accept-language: es`, cada respuesta del núcleo es **idéntica byte por by
 - `ui.language` es una clave nueva de `getPreference`/`setPreference` (la lista cerrada la acepta; el núcleo solo guarda `es` o `en` y rechaza cualquier otro valor con `InvalidArgument`).
 - El núcleo acepta `es`, `en`, `es-MX`, `en-US`… y listas con `q` (`fr, en;q=0.8` da `en`); ausente o desconocido es `es`.
 - **La auditoría no depende del idioma** (decisión del 2026-11-12, rama 30a-2): su detalle irá fijo en inglés; esta fase no toca sus textos y la infraestructura no los pasa por el catálogo.
-- CLI: `mctl --lang es|en` (también `-lang`, `--lang=en` y etiquetas como `en-US`) es una bandera global que solo vale **antes** del comando; un valor que no sea idioma es un error (no se come el nombre del comando). **mctl no lee `LC_ALL`, `LC_MESSAGES` ni `LANG`**: mientras sus textos propios sigan en español, pedir un idioma solo con `--lang` evita mezclarlos; sin la bandera todo sale en español.
+- CLI: `mctl --lang es|en` (también `-lang`, `--lang=en` y etiquetas como `en-US`) es una bandera global que solo vale **antes** del comando; un valor que no sea idioma es un error (no se come el nombre del comando). **mctl no lee `LC_ALL`, `LC_MESSAGES` ni `LANG`**: el idioma se pide solo con `--lang`; sin la bandera todo sale en inglés, el idioma canónico (ver «Idioma canónico: inglés»).
 
 ### Forma exacta del error en TS
 Todo método del puente que devuelve `error` rechaza la promesa con un `RuntimeError` de Wails cuyo `message` es el texto de siempre (`rpc error: code = X desc = …` para lo que viene del núcleo) y cuyo **`cause`** es:
@@ -1286,7 +1286,7 @@ Con `en`, nada visible de esta área sale en español; sin idioma o con `es` el 
 
 ### mctl
 - `mctl --lang en` pide al núcleo sus mensajes en inglés y escribe en inglés los PROPIOS de mctl con el mismo catálogo (`cli.T`, `cli.Err`, `cli.ErrWrap`, `cli.SetLang`): errores de valores, encabezados y etiquetas de tablas, avisos y resúmenes, y los textos de la ejecución asistida (`assistrun.go`). Sin `--lang` o con `es`, idéntico.
-- Se queda sin traducir a propósito: los nombres y textos de las banderas, los valores aceptados (`renombrar|reemplazar|omitir`), CSV/JSON, y los errores de `--lang` mismo (se dan antes de conocer el idioma).
+- Se queda sin traducir a propósito: los nombres y textos de las banderas, los valores aceptados (`renombrar|reemplazar|omitir`), CSV/JSON, y los errores de `--lang` mismo, que salen en inglés porque se dan antes de conocer el idioma.
 
 ### Qué sigue sin cubrir
 - `Deps.Job` recibe ahora el contexto de la petición: el «trabajo X no existe» de visibility, analysis, forensic, drift, metrics, backup, change y adhoc sale en el idioma pedido.

@@ -31,13 +31,13 @@ func StripLang(args []string) (rest []string, lang string, err error) {
 		}
 		if !hasVal {
 			if i+1 >= len(args) {
-				return nil, "", fmt.Errorf("--lang pide un idioma (es o en)")
+				return nil, "", fmt.Errorf("--lang needs a language (es or en)")
 			}
 			i++
 			val = args[i]
 		}
 		if !validLang(val) {
-			return nil, "", fmt.Errorf("idioma inválido %q (usa es o en)", val)
+			return nil, "", fmt.Errorf("invalid language %q (use es or en)", val)
 		}
 		lang = i18n.Parse(val)
 	}
