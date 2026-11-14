@@ -37,6 +37,7 @@ message PackServiceInstallRequest {
 message PackServiceInstallResponse {
   PackInfo pack = 1;
   string replaced_version = 2;   // versión anterior que reemplazó; vacío si era nuevo
+  repeated string displaced = 3; // paquetes de terceros que chocaban con este oficial y se apartaron y borraron
 }
 
 message PackServiceListRequest {}
@@ -103,6 +104,7 @@ message PackServiceInspectResponse {
   repeated string script_ids = 3;  // los derivados de playbooks más los de scripts.json
   string replaced_version = 4;     // versión instalada que reemplazaría; vacío si es nuevo
   string sha256 = 5;               // del archivo; pásalo en Install para atar la vista previa a lo que se instala
+  repeated string displaced = 6;   // paquetes de terceros que este oficial apartaría y borraría al instalarse (choque de nombre)
 }
 
 message PackServiceExportRequest {

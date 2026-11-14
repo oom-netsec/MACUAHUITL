@@ -333,6 +333,8 @@ type Result struct {
 	// Displaced: IDs de paquetes de terceros que chocaban con este oficial; salen de la foto (siguen en disco y Open los
 	// omite igual) para que un tercero no pueda vetar contenido firmado.
 	Displaced []string
+	// DisplacedRemoved: los de Displaced que además se borraron del disco (InstallWith); no vuelven al quitar el oficial.
+	DisplacedRemoved []string
 }
 
 // check hace los pasos 2 a 7 del ADR sobre bytes ya leídos y devuelve el paquete y el instalado que reemplazaría
@@ -438,11 +440,17 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 		}
 	}
 	s.publish(next)
+	var removed []string
+	for _, id := range displaced { // el oficial ya está publicado: ahora sí se borra al apartado
+		if os.RemoveAll(filepath.Join(s.dir, filepath.FromSlash(id))) == nil { // id viene de un paquete cargado: cumple idRe
+			removed = append(removed, id)
+		}
+	}
 	if s.OnChange != nil { // bajo el lock: así no queda publicado un catálogo viejo si otra instalación entra enseguida
 		s.OnChange()
 	}
 	s.mu.Unlock()
-	res := &Result{Pack: p, SyncWarning: syncWarn, CommitErr: commitErr, Displaced: displaced}
+	res := &Result{Pack: p, SyncWarning: syncWarn, CommitErr: commitErr, Displaced: displaced, DisplacedRemoved: removed}
 	if old != nil {
 		res.Replaced = old.Version
 	}
@@ -538,8 +546,15 @@ func (s *Store) Remove(id string) (*Pack, error) {
 func (s *Store) RemoveLocked(id string) (*Pack, error) {
 	cur := s.snap.Load()
 	p := cur.Find(id)
-	if p == nil {
-		return nil, rej("not_found", "id", id)
+	if p == nil { // un paquete que Open rechazó o que se apartó sigue en disco: se puede borrar igual (Pack solo trae el ID)
+		dir := filepath.Join(s.dir, filepath.FromSlash(id))
+		if st, err := os.Lstat(dir); !idRe.MatchString(id) || err != nil || !st.IsDir() {
+			return nil, rej("not_found", "id", id)
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			return nil, readErr(err)
+		}
+		return &Pack{Manifest: Manifest{ID: id}}, nil
 	}
 	// p.ID cumple la gramática del manifiesto, así que la ruta no sale de la carpeta.
 	if err := os.RemoveAll(filepath.Join(s.dir, filepath.FromSlash(p.ID))); err != nil {

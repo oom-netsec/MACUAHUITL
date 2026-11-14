@@ -38,6 +38,7 @@ func init() {
 		"mctl.pack.shadowed":  e("  (tapados por los tuyos: {list})", "  (shadowed by your own: {list})"),
 		"mctl.pack.installed": e("instalado", "installed"),
 		"mctl.pack.updated":   e("actualizado (antes {version})", "updated (was {version})"),
+		"mctl.pack.displaced": e("aparta y borra los paquetes de terceros que chocan con él: {ids}", "displaces and removes the third-party packages that collide with it: {ids}"),
 		"mctl.pack.replaces":  e("reemplazaría la versión {version}", "would replace version {version}"),
 		"mctl.pack.hidden":    e("ocultos: {list}", "hidden: {list}"),
 		"mctl.pack.none":      e("no hay paquetes instalados", "no packs installed"),

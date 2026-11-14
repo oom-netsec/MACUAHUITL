@@ -92,6 +92,7 @@ func install(c *cli.Env, args []string) error {
 		verb = cli.T("mctl.pack.updated", "version", r.ReplacedVersion)
 	}
 	fmt.Fprintf(c.Out, "%s: %s\n", verb, line(r.Pack))
+	displaced(c, r.Displaced)
 	return nil
 }
 
@@ -115,8 +116,16 @@ func inspect(c *cli.Env, args []string) error {
 	if r.ReplacedVersion != "" {
 		fmt.Fprintln(c.Out, cli.T("mctl.pack.replaces", "version", r.ReplacedVersion))
 	}
+	displaced(c, r.Displaced)
 	fmt.Fprintf(c.Out, "playbooks:\n  %s\nscripts:\n  %s\n", strings.Join(r.PlaybookIds, "\n  "), strings.Join(r.ScriptIds, "\n  "))
 	return nil
+}
+
+// displaced avisa de los paquetes de terceros que un oficial aparta por chocar con él.
+func displaced(c *cli.Env, ids []string) {
+	if len(ids) > 0 {
+		fmt.Fprintln(c.Out, cli.T("mctl.pack.displaced", "ids", strings.Join(ids, ", ")))
+	}
 }
 
 // multi es un flag que se repite.

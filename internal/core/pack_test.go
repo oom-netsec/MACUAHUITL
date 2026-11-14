@@ -846,3 +846,42 @@ func TestPackQuitarLimpiaBajoElCandadoDelAlmacen(t *testing.T) {
 	}
 	<-got
 }
+
+// Lo oficial gana: un tercero que ocupa el nombre de un script de oom/ios-xe se avisa en Inspect, se aparta y se
+// borra en Install, y queda auditado como pack.conflict.
+func TestPackOficialAPartaAlTerceroQueChoca(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	src, err := os.ReadFile(filepath.Join(packtest.RepoDir(), "packs", "ios-xe", "playbooks", "l2-stp.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := regexp.MustCompile(`(?m)^name: (.+)$`).FindSubmatch(src)[1]
+	files := map[string][]byte{
+		"manifest.yaml":           []byte("id: acme/demo\nversion: 1.0.0\nmin_core: 0.3.0\nname: A\nname_en: A\ndescription: d\ndescription_en: d\nplatforms: [ios-xe]\nauthor: a\nlicense: MIT\n"),
+		"README.md":               []byte("x"),
+		"playbooks/acme-stp.yaml": []byte("id: acme-stp\nplatform: ios-xe\nname: " + string(name) + "\nname_en: \"Acme only\"\ncommands:\n  - cmd: show clock\n"),
+	}
+	zb, err := pack.Zip(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, zb), AllowUnsigned: true})); err != nil {
+		t.Fatal(err)
+	}
+	path := writeMpack(t, packtest.IOSXE(t))
+	pv, err := pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: path})
+	if err != nil || !slices.Equal(pv.Displaced, []string{"acme/demo"}) {
+		t.Fatalf("inspect: %v %v", pv.GetDisplaced(), err)
+	}
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path}))
+	if err != nil || !slices.Equal(r.Displaced, []string{"acme/demo"}) {
+		t.Fatalf("install: %v %v", r.GetDisplaced(), err)
+	}
+	if l, _ := pk.List(ctx(t), &v1.PackServiceListRequest{}); len(l.Packs) != 1 || l.Packs[0].Id != "oom/ios-xe" {
+		t.Fatalf("%v", l)
+	}
+	if au := h.auditText(t); !strings.Contains(au, `"action":"pack.conflict"`) || !strings.Contains(au, "displaced_by=oom/ios-xe") || !strings.Contains(au, "removed=true") {
+		t.Fatalf("auditoría:\n%s", au)
+	}
+}

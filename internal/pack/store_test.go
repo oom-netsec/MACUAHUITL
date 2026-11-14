@@ -720,8 +720,8 @@ func TestOficialGanaAlTerceroQueOcupaSuNombre(t *testing.T) {
 			if _, err := s.Install(tercero(c.es, c.en), true); Reason(err) != "collision" {
 				t.Fatalf("inverso: %v", err)
 			}
-			// y al reabrir, el de disco sigue omitido
-			if s2, rej := openStore(t, dir, pub, Base{}); len(rej) != 1 || rej[0].ID != "acme/demo" || s2.Snapshot().Find("oom/demo") == nil {
+			// y al reabrir no queda rastro del apartado
+			if s2, rej := openStore(t, dir, pub, Base{}); len(rej) != 0 || s2.Snapshot().Find("acme/demo") != nil || s2.Snapshot().Find("oom/demo") == nil {
 				t.Fatalf("%+v", rej)
 			}
 		})
@@ -740,5 +740,50 @@ func TestTercerosQueChocanSiguenRechazados(t *testing.T) {
 	setPB(f, strings.Replace(goodPlaybook, "oom-stp", "acme-otro", 1))
 	if _, err := s.Install(mustZip(t, f), true); Reason(err) != "collision" {
 		t.Fatalf("%v", err)
+	}
+}
+
+// El tercero apartado se borra del disco: no reaparece al quitar el oficial y reabrir.
+func TestApartadoSeBorraDelDisco(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	if _, err := s.Install(mustZip(t, thirdParty()), true); err != nil {
+		t.Fatal(err)
+	}
+	res, err := s.Install(signedZip(t, priv, nil), false)
+	if err != nil || len(res.DisplacedRemoved) != 1 {
+		t.Fatalf("%v %+v", err, res)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "acme", "demo")); err == nil {
+		t.Fatal("el apartado sigue en disco")
+	}
+	s.Remove("oom/demo")
+	if s2, rej := openStore(t, dir, pub, Base{}); len(rej) != 0 || s2.Snapshot().Find("acme/demo") != nil {
+		t.Fatalf("reapareció: %+v", rej)
+	}
+}
+
+// Remove borra una carpeta de paquete que está en disco aunque no esté en la foto; con ids raros da not_found.
+func TestRemoveBorraLoQueNoEstaEnLaFoto(t *testing.T) {
+	pub, _ := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	os.MkdirAll(filepath.Join(dir, "acme", "roto"), 0o700)
+	os.MkdirAll(filepath.Join(dir, "..x"), 0o700)
+	for _, id := range []string{"../acme", "acme", "acme/../acme/roto", "nada/nada"} {
+		if _, err := s.Remove(id); Reason(err) != "not_found" {
+			t.Errorf("%q: %v", id, err)
+		}
+	}
+	p, err := s.Remove("acme/roto")
+	if err != nil || p.ID != "acme/roto" {
+		t.Fatalf("%v %+v", err, p)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "acme", "roto")); err == nil {
+		t.Fatal("sigue en disco")
+	}
+	if _, err := s.Remove("acme/roto"); Reason(err) != "not_found" {
+		t.Fatal(err)
 	}
 }
