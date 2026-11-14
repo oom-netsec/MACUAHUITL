@@ -164,39 +164,26 @@ func Flags(name string, args []string, setup func(*flag.FlagSet)) (*flag.FlagSet
 		fs.SetOutput(HelpOut)
 		fs.PrintDefaults()
 		fs.SetOutput(io.Discard)
-		panic(helpShown{}) // ningún comando lo convierte en su «uso: …»; TryHelp lo atrapa
+		helpShown = true
+		return fs, ErrHelpShown
 	}
 	return fs, err
 }
 
-type helpShown struct{}
+// ErrHelpShown es lo que devuelve Flags cuando el comando pidió -h o --help (en cualquier forma que flag reconozca:
+// --help=false, -h=1…): ya escribió las banderas en HelpOut y no hay nada más que hacer. Algunos comandos lo vuelven un
+// «uso: …», por eso main mira también HelpShown.
+var ErrHelpShown = errors.New("help shown")
 
-// TryHelp escribe en out las banderas de un comando cuando args pide -h o --help y devuelve true. Corre el comando sin
-// conexión: si no llega a leer sus banderas (sin banderas, o -h es el valor de otra) no hace nada y devuelve false.
-func TryHelp(c Command, args []string, out io.Writer) (shown bool) {
-	ask := false
-	for _, a := range args {
-		if a == "--" {
-			break
-		}
-		ask = ask || a == "-h" || a == "-help" || a == "--help" || a == "--h"
-	}
-	if !ask {
-		return false
-	}
-	prev := HelpOut
-	HelpOut = out
-	defer func() {
-		HelpOut = prev
-		if r := recover(); r != nil {
-			_, shown = r.(helpShown) // cualquier otro pánico (usar Conn sin banderas) no es ayuda
-		}
-	}()
-	_ = c.Run(&Env{In: bufio.NewReader(strings.NewReader("")), Out: io.Discard}, args)
-	return false
-}
+var helpShown bool
 
-// HelpOut es donde -h escribe las banderas del comando (TryHelp lo apunta a la salida de mctl); FlagSetHook (solo para pruebas) ve cada FlagSet que se arma.
+// HelpShown dice si Flags escribió la ayuda de banderas desde ResetHelp.
+func HelpShown() bool { return helpShown }
+
+// ResetHelp limpia HelpShown y fija dónde se escribe la ayuda; main lo llama al empezar cada ejecución.
+func ResetHelp(out io.Writer) { helpShown, HelpOut = false, out }
+
+// HelpOut es donde -h escribe las banderas del comando; FlagSetHook (solo para pruebas) ve cada FlagSet que se arma.
 var (
 	HelpOut     io.Writer = os.Stdout
 	FlagSetHook func(name string, fs *flag.FlagSet)
@@ -217,6 +204,15 @@ func FlagUsage(cmd string, f *flag.Flag) string {
 		}
 	}
 	return f.Usage
+}
+
+// NoFlags es Flags para un comando sin banderas: -h y --help muestran su uso en vez de pasar «-h» como un argumento.
+func NoFlags(name string, args []string) ([]string, error) {
+	fs, err := Flags(name, args, nil)
+	if err != nil {
+		return nil, err
+	}
+	return fs.Args(), nil
 }
 
 // OneArg exige exactamente un argumento posicional (un ID).

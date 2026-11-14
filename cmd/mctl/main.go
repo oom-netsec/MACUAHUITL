@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"golang.org/x/term"
 
@@ -125,9 +126,7 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if !ok {
 		return errors.New(cli.Help(areas))
 	}
-	if cli.TryHelp(cmd, rest, out) { // -h de un subcomando: sus banderas y código 0, sin conectar al núcleo
-		return nil
-	}
+	cli.ResetHelp(out)
 	c := &cli.Env{In: bufio.NewReader(stdin), Out: out}
 	if f, ok := stdin.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
 		c.TTY = f
@@ -138,19 +137,52 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if lang != "" {
 		dialOpts = ipc.WithLanguage(lang)
 	}
-	conn, err := ipc.Dial(context.Background(), dialOpts...)
-	if err != nil {
-		return err
+	conn, dialErr := ipc.Dial(context.Background(), dialOpts...)
+	if dialErr != nil && !wantsHelp(rest) {
+		return dialErr
 	}
-	defer conn.Close()
-	c.Conn = conn
-	color := termcolor.Enabled(outIsTTY(out), noColor, cli.HasJSON(rest), os.Getenv)
-	var pal string
-	if color {
-		pal = c.Palette()
+	// Con -h el comando lee sus banderas antes de tocar nada (lo vigila una prueba), así que la ayuda sale aunque el núcleo no esté.
+	if dialErr == nil {
+		defer conn.Close()
+		c.Conn = conn
+		color := termcolor.Enabled(outIsTTY(out), noColor, cli.HasJSON(rest), os.Getenv)
+		var pal string
+		if color {
+			pal = c.Palette()
+		}
+		if !cmd.Raw { // la consola es una sesión cruda: sin sanear ni pintar
+			c.Out = cli.NewOut(out, color, termcolor.Lookup(pal), termcolor.Truecolor(os.Getenv))
+		}
 	}
-	if !cmd.Raw { // la consola es una sesión cruda: sin sanear ni pintar
-		c.Out = cli.NewOut(out, color, termcolor.Lookup(pal), termcolor.Truecolor(os.Getenv))
+	err = runCmd(cmd, c, rest, dialErr)
+	if cli.HelpShown() {
+		return nil
 	}
-	return cli.LocalizeUsage(cmd.Run(c, rest))
+	if dialErr != nil {
+		return dialErr
+	}
+	return cli.LocalizeUsage(err)
+}
+
+// wantsHelp dice si algún argumento puede ser -h o --help (con o sin =valor): solo una pista para no exigir el núcleo.
+func wantsHelp(args []string) bool {
+	for _, a := range args {
+		switch n, _, _ := strings.Cut(strings.TrimLeft(a, "-"), "="); {
+		case n == "h" || n == "help":
+			return strings.HasPrefix(a, "-")
+		}
+	}
+	return false
+}
+
+// runCmd corre el comando; sin conexión (solo con -h) un comando que llegara a usarla no debe tumbar mctl.
+func runCmd(cmd cli.Command, c *cli.Env, rest []string, dialErr error) (err error) {
+	if dialErr != nil {
+		defer func() {
+			if recover() != nil {
+				err = dialErr
+			}
+		}()
+	}
+	return cmd.Run(c, rest)
 }
