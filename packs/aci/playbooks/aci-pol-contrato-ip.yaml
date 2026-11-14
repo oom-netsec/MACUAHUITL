@@ -18,3 +18,4 @@ commands:
   - cmd: show zoning-filter
   - cmd: show vrf
   - cmd: show vrf all detail
+    timeout: 180s

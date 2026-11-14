@@ -22,7 +22,7 @@ var catalogFile = regexp.MustCompile(`^(aci|l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|a
 var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp (comm|host)|archive log|cts (pacs|cred)|tacacs-server|radius-server)|show (managers|network)( |$)|more )`)
 
 // Salidas sin acotar: tabla completa de rutas/BGP/CEF/MAC o todas las interfaces.
-var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces|wireless client summary|ap summary)$`)
+var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*| vrf all)?|zoning-rule|vrf all detail|ip bgp|ip cef|mac address-table|interfaces|wireless client summary|ap summary)$`)
 
 // Salidas grandes de ASA: conexiones, xlates, ACL, logs, memoria, descartes de ASP, sesiones VPN y configuraciones.
 var asaBigCmd = regexp.MustCompile(`^show (conn( address .*| detail)?|local-host|xlate|access-list( .*)?|tech-support.*|logging( \|.*)?|memory detail|asp drop.*|vpn-sessiondb detail.*|running-config( .*)?|startup-config|nat detail|access-control-config.*|route|bgp|interface|crypto ipsec sa)$`)

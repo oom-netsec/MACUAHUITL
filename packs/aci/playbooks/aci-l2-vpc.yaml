@@ -1,4 +1,4 @@
-# Propósito: Estado general y rol de vPC y de su peer-keepalive.
+# Propósito: Estado general y rol de vPC.
 # Cuándo usarlo: Un vPC está caído o inconsistente (solo leaf).
 # Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
 # Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
@@ -10,6 +10,6 @@ commands:
   - cmd: show vpc
   - cmd: show vpc brief
   - cmd: show vpc role
-  - cmd: show vpc peer-keepalive
+  - cmd: show lacp neighbor
   - cmd: show vpc extended
   - cmd: show port-channel summary

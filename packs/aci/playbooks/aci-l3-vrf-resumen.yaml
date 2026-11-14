@@ -8,8 +8,10 @@ name: ACI · L3 · VRF del leaf
 name_en: ACI · L3 · Leaf VRFs
 commands:
   - cmd: show vrf
-  - cmd: show vrf all detail
   - cmd: show ip interface brief vrf all
-  - cmd: show ip route vrf all
   - cmd: show ip arp vrf all
   - cmd: show tunnel interface
+  - cmd: show vrf all detail
+    timeout: 180s
+  - cmd: show ip route vrf all
+    timeout: 180s

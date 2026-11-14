@@ -14,7 +14,7 @@ los de vPC o L3Out no aplican. La app solo permite comandos de lectura: nada de 
 
 ### Datos
 - `ip`, `mac` e `interface`: como en el paquete oom/nx-os.
-- `vrf`: se escribe como `tenant:vrf` (p. ej. `common:default`); la app lo pide con el tipo "interfaz".
+- `vrf`: se escribe como `tenant:vrf` (p. ej. `common:default`); la app lo pide con el tipo "interfaz": debe empezar con letra, medir hasta 48 caracteres y no llamarse como un esquema (`tftp:`, `http:`…), porque la app lo rechaza.
 - `vnid`: número de VNID (p. ej. `2850817`); la app lo pide con el tipo "AP".
 
 Cómo cargarlo (la aplicación nunca descarga paquetes): baja `oom-aci-<versión>.mpack` de los releases de GitHub, verifica
@@ -34,7 +34,7 @@ L3Out ones do not apply. The app only allows read commands: no `vsh`, `moquery`,
 
 ### Data
 - `ip`, `mac` and `interface`: as in the oom/nx-os package.
-- `vrf`: written as `tenant:vrf` (e.g. `common:default`); the app asks for it with the type "interface".
+- `vrf`: written as `tenant:vrf` (e.g. `common:default`); the app asks for it with the type "interface": it must start with a letter, be at most 48 characters and not be named like a scheme (`tftp:`, `http:`…), because the app rejects it.
 - `vnid`: VNID number (e.g. `2850817`); the app asks for it with the type "AP".
 
 How to load it (the application never downloads packages): download `oom-aci-<version>.mpack` from the GitHub releases,

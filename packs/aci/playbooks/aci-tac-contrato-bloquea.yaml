@@ -16,6 +16,7 @@ commands:
   - cmd: show endpoint ip {ip}
   - cmd: show zoning-rule scope {vnid}
   - cmd: show zoning-filter
-  - cmd: show zoning-rule
   - cmd: show logging logfile | include ACLQOS
+    timeout: 180s
+  - cmd: show zoning-rule
     timeout: 180s
