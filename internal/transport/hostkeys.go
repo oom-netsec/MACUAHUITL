@@ -107,7 +107,7 @@ func (k *KnownHosts) load() (map[string]ssh.PublicKey, error) {
 		id, rest, ok := strings.Cut(ln, " ")
 		key, _, _, _, perr := ssh.ParseAuthorizedKey([]byte(rest))
 		if !ok || perr != nil {
-			return nil, fmt.Errorf("%w: línea %d", ErrKnownHosts, n)
+			return nil, i18n.Wrap("transport.err.known_hosts_ln", ErrKnownHosts, i18n.A("n", n))
 		}
 		out[id] = key
 	}

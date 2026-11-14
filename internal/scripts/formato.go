@@ -59,13 +59,13 @@ func datos(kind string, lib []Script, now time.Time) (cols []Coleccion, scripts 
 		return nil, scripts, nil
 	case KindColecciones:
 		if len(lib) == 0 {
-			return nil, nil, fmt.Errorf("no hay scripts en la biblioteca para el ejemplo")
+			return nil, nil, i18n.New("scripts.err.no_library", nil)
 		}
 		c := Coleccion{ID: idColEjemplo, Name: "Ejemplo · revisión de acceso", Description: "Dos scripts propios y uno de la biblioteca, que viaja solo por ID.",
 			ScriptIDs: []string{scripts[0].ID, lib[0].ID, scripts[1].ID}, CreatedAt: now, UpdatedAt: now}
 		return []Coleccion{c}, scripts[:2], nil
 	}
-	return nil, nil, fmt.Errorf("tipo %q desconocido: scripts o colecciones", kind)
+	return nil, nil, i18n.New("scripts.err.kind", i18n.A("kind", kind))
 }
 
 // Plantilla da el JSON de ejemplo de un archivo de import, con sangría y sin sha256 (opcional al importar).

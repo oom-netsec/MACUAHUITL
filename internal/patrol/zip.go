@@ -3,6 +3,7 @@ package patrol
 import (
 	"archive/zip"
 	"fmt"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,7 +26,7 @@ func zipFiles(dir, name string, files []string, deleteLoose bool) (string, error
 			return err
 		}
 		if !fi.Mode().IsRegular() {
-			return fmt.Errorf("%s no es un archivo regular", rel)
+			return i18n.New("patrol.err.zip_not_regular", i18n.A("file", rel))
 		}
 		src, err := os.Open(p)
 		if err != nil {

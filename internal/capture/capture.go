@@ -7,6 +7,7 @@ package capture
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"io"
 	"os"
 	"path/filepath"
@@ -94,7 +95,7 @@ type Device struct {
 func ReadDir(dir string) ([]Device, error) {
 	b, err := readLimited(filepath.Join(dir, "manifest.json"))
 	if err != nil {
-		return nil, fmt.Errorf("capture: %s no es una captura terminada de Patrol: %w", dir, err)
+		return nil, i18n.Wrap("capture.err.not_finished", err, i18n.A("dir", dir))
 	}
 	var m patrol.Manifest
 	if err := json.Unmarshal(b, &m); err != nil {
