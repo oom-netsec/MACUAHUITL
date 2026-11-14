@@ -99,7 +99,7 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	// Lo oculto se calcula antes de tocar el disco y se guarda en una transacción corta después del extract, justo antes
 	// de publicar: si algo falla antes, no se instala nada ni queda guardada la elección, y ninguna transacción espera
 	// el fsync del extract. Si el guardado falla, el paquete ya está instalado: se audita con hidden_save_failed y la
-	// respuesta es de éxito (la respuesta no tiene campo de aviso; el paquete entra con todo visible).
+	// respuesta es de éxito (la respuesta no tiene campo de aviso; lo oculto queda como estaba antes).
 	hide := []string{}
 	res, err := s.store.InstallWith(data, r.GetAllowUnsigned(), func(p *dom.Pack, _ string) error {
 		items := p.Items()

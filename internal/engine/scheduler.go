@@ -81,7 +81,7 @@ func (s *Scheduler) Arm(jobID string, sc Schedule, until time.Time, targets []st
 	s.jobs[jobID] = a
 	s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: "armed"})
 	go s.heartbeat(ctx, jobID)
-	go s.loop(ctx, a, jobID, sc, cs, until, targets, f)
+	go s.loop(ctx, a, jobID, sc, cs, targets, f)
 	return nil
 }
 
@@ -98,7 +98,8 @@ func (s *Scheduler) heartbeat(ctx context.Context, jobID string) {
 	}
 }
 
-func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedule, cs cron.Schedule, until time.Time, targets []string, f RunFunc) {
+func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedule, cs cron.Schedule, targets []string, f RunFunc) {
+	until := a.until
 	var wg sync.WaitGroup
 	state := "completed"
 	next := s.now().Round(0)
