@@ -209,6 +209,8 @@ test("Ctrl+Enter mantenido (repetición de tecla) no vuelve a ejecutar", async (
   const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
   render(<App core={core} initial="ping" />);
   await userEvent.type(await screen.findByLabelText("Destino"), "10.0.0.1");
-  act(() => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, repeat: true, bubbles: true, cancelable: true })); });
+  const ev = new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, repeat: true, bubbles: true, cancelable: true });
+  act(() => { document.dispatchEvent(ev); });
   expect(core.diagRun).not.toHaveBeenCalled();
+  expect(ev.defaultPrevented).toBe(true); // la repetición tampoco llega al envío implícito del formulario
 });

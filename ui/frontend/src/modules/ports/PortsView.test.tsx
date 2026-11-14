@@ -259,13 +259,22 @@ const owned = () => fakeCore({
   listCredentials: vi.fn(async () => creds),
   assistListRuns: vi.fn(async () => [{ runId: "r9", state: "running", active: true }]),
 });
+afterEach(() => localStorage.removeItem("macuahuitl.assist.r9"));
+
 test("un módulo que no inició la ejecución viva no se engancha a ella", async () => {
   localStorage.setItem("macuahuitl.assist.r9", "snippets");
   const core = owned();
   render(<ModuleIdContext.Provider value="ports"><PortsView core={core} /></ModuleIdContext.Provider>);
-  await screen.findByLabelText("Equipo (IP o nombre[:puerto])");
+  await waitFor(() => expect(core.assistListRuns).toHaveBeenCalled());
+  await act(async () => {}); // que resuelva la lista antes de mirar
   expect(core.assistWatch).not.toHaveBeenCalled();
-  localStorage.removeItem("macuahuitl.assist.r9");
+});
+
+test("una ejecución viva sin dueño la toma el primer módulo que la ve y queda como su dueño", async () => {
+  const core = owned();
+  render(<ModuleIdContext.Provider value="ports"><PortsView core={core} /></ModuleIdContext.Provider>);
+  await waitFor(() => expect(core.assistWatch).toHaveBeenCalledWith("r9"));
+  expect(localStorage.getItem("macuahuitl.assist.r9")).toBe("ports");
 });
 
 test("el módulo dueño se engancha y un seq repetido no duplica la salida", async () => {
@@ -276,5 +285,4 @@ test("el módulo dueño se engancha y un seq repetido no duplica la salida", asy
   act(() => core.emitAssist({ runId: "r9", seq: 1, kind: "output", device: "SW1", text: "linea-unica" }));
   act(() => core.emitAssist({ runId: "r9", seq: 1, kind: "output", device: "SW1", text: "linea-unica" }));
   expect((document.body.textContent ?? "").match(/linea-unica/g)).toHaveLength(1);
-  localStorage.removeItem("macuahuitl.assist.r9");
 });

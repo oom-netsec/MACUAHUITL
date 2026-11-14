@@ -379,12 +379,12 @@ test("el rechazo de la carpeta de salida se ve traducido, con la orden chmod", a
   expect(screen.queryByText(/prefs\.outputs/)).toBeNull();
 });
 
-test("Rondas vacío o no entero no crea el trabajo (0 significa sin límite y debe ser explícito)", async () => {
+test("Rondas vacío o no entero no crea el trabajo (0 significa hasta el fin de la ventana y debe ser explícito)", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
   await fillForm(core);
   await userEvent.clear(screen.getByLabelText("Rondas"));
   await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
-  expect(await screen.findByText("Escribe un entero de 0 en adelante (0 = sin límite).")).toBeInTheDocument();
+  expect(await screen.findByText("Escribe un entero de 0 en adelante (0: hasta el fin de la ventana).")).toBeInTheDocument();
   expect(core.createJob).not.toHaveBeenCalled();
   await userEvent.type(screen.getByLabelText("Rondas"), "0");
   await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));

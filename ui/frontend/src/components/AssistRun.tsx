@@ -170,6 +170,8 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
   useEffect(() => {
     const off1 = core.onAssist((e: AssistEvent) => {
       if (e.runId !== runId.current) return;
+      // El primer evento (seq 0) llega sin seq (protojson omite el 0) y se aplica siempre: con un solo módulo enganchado por
+      // ejecución solo se repetiría al reenganchar, y es el estado inicial, que no cambia nada al repetirse.
       if (e.seq) { if (e.seq <= lastSeq.current) return; lastSeq.current = e.seq; }
       setRun((r) => {
         if (!r) return r;
@@ -203,9 +205,11 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
   useEffect(() => {
     let alive = true;
     core.assistListRuns().then((runs) => {
-      // Solo el módulo dueño la engancha: si no, cada vista abre su propio watch y los eventos llegan duplicados.
-      const live = runs.find((r) => r.active && assistOwner(r.runId) === moduleId);
+      // La engancha el módulo dueño. Una sin dueño (almacenamiento borrado, o iniciada desde mctl) la toma el primer módulo
+      // que la vea y queda como su dueño: así la franja del shell lleva a él y nunca se queda sin quién la confirme o aborte.
+      const live = runs.find((r) => r.active && [moduleId, ""].includes(assistOwner(r.runId)));
       if (!alive || !live || runId.current) return;
+      if (!assistOwner(live.runId) && moduleId) try { localStorage.setItem(assistOwnerKey(live.runId), moduleId); } catch { /* sin almacenamiento */ }
       runId.current = live.runId; lastSeq.current = 0;
       setRun(fromInfo(live));
       return core.assistWatch(live.runId); // el núcleo repite el historial: el estado se reconstruye solo

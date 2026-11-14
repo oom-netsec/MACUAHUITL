@@ -52,7 +52,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
         if (first) setSelected(first.id);
       }
     } catch (e) {
-      setErr(errorText(e));
+      if (n === listSeq.current) setErr(errorText(e)); // el error de una consulta vieja no pisa a una nueva
     }
   }, [core]);
 

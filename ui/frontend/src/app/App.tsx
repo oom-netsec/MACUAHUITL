@@ -109,7 +109,8 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
   // Atajos globales (ADR 0009 §3). Ctrl+Enter nunca actúa dentro del modo asistido.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.repeat) return; // tecla mantenida: un atajo no se repite (dos Ctrl+Enter abrirían dos sesiones)
+      // Tecla mantenida: un atajo no se repite (dos Ctrl+Enter abrirían dos sesiones), y Ctrl+Enter repetido tampoco llega al formulario.
+      if (e.repeat) { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") e.preventDefault(); return; }
       if ((e.target as Element | null)?.closest?.(".xterm")) return; // en una terminal SSH todas las teclas son del equipo; se sale con Ctrl+Mayús+K
       if (document.querySelector(".dialog[aria-modal=true]")) return; // con una ventana de detalles abierta no corren los atajos de la app
       const mod = e.ctrlKey || e.metaKey;
