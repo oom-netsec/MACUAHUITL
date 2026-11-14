@@ -558,3 +558,21 @@ func TestPublishArchivoInexistenteDiceQueNoExiste(t *testing.T) {
 		t.Fatalf("err = %v; quiero el mensaje de stat de siempre", err)
 	}
 }
+
+// XDG_CONFIG_HOME y XDG_DATA_HOME fuera de $HOME se bloquean enteros: su autostart/, systemd/user o applications/
+// cargan y ejecutan lo que se reciba ahí, igual que ~/.config y ~/.local.
+func TestXDGFueraDeHomeSeBloqueaEntero(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cfg, data := t.TempDir(), t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfg)
+	t.Setenv("XDG_DATA_HOME", data)
+	for _, d := range []string{cfg, filepath.Join(cfg, "autostart"), filepath.Join(cfg, "systemd", "user"), data, filepath.Join(data, "applications")} {
+		os.MkdirAll(d, 0o700)
+		if _, err := ValidateDir(d); err == nil {
+			t.Errorf("%s aceptada", d)
+		}
+	}
+	if _, err := ValidateDir(t.TempDir()); err != nil {
+		t.Errorf("una carpeta normal se rechazó: %v", err)
+	}
+}
