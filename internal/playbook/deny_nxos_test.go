@@ -151,3 +151,20 @@ func TestCheckDeniedNXOSNoCambiaIOS(t *testing.T) {
 		t.Error("count no es de IOS")
 	}
 }
+
+// En los filtros de NX-OS, un argumento con guion fuera de la lista cerrada (`--file=bootflash:x`, `-f`) no se cuenta
+// como patrón: se rechaza. `line-exp` es una opción válida de egrep.
+func TestCheckDeniedNXOSOpcionesDeFiltro(t *testing.T) {
+	for _, c := range []string{
+		"show version | grep --file=bootflash:x",
+		"show version | grep -f x",
+		`show version | egrep -e "a"`,
+	} {
+		if err := CheckDenied("nx-os", c); err == nil {
+			t.Errorf("aceptado: %q", c)
+		}
+	}
+	if err := CheckDenied("nx-os", `show interface | egrep line-exp "Eth1/1"`); err != nil {
+		t.Errorf("line-exp rechazado: %v", err)
+	}
+}

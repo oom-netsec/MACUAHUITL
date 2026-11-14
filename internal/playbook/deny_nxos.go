@@ -82,7 +82,7 @@ func nxFileLike(tok string) bool {
 }
 
 // Opciones de los filtros de texto: palabras largas y sus formas cortas; «next N» y «prev N» llevan un número.
-var nxFilterOpts = []string{"ignore-case", "invert-match", "count", "line-number", "word-exp", "-i", "-v", "-c", "-n", "-w", "-x"}
+var nxFilterOpts = []string{"ignore-case", "invert-match", "count", "line-number", "word-exp", "line-exp", "-i", "-v", "-c", "-n", "-w", "-x"}
 
 func isNum(s string) bool {
 	_, ok := probeNum(s, 0, 9999)
@@ -109,6 +109,8 @@ func checkNXPipe(seg string) bool {
 			case slices.Contains(nxFilterOpts, args[i]):
 			case (args[i] == "next" || args[i] == "prev") && i+1 < len(args) && isNum(args[i+1]):
 				i++
+			case strings.HasPrefix(args[i], "-"): // una opción fuera de la lista (--file=…, -f) no es un patrón
+				return false
 			default:
 				pat++ // el patrón: uno solo (con espacios va entre comillas)
 			}

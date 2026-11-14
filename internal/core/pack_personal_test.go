@@ -55,7 +55,7 @@ func TestPackPersonalIdaYVuelta(t *testing.T) {
 	a := h.saveScript(t, "Uno", "ios", "show version", "!comentario", "show clock")
 	b := h.saveScript(t, "Dos", "cualquiera", "show ip route")
 	h.userPlaybookFile(t, "mio.yaml", "mio", "ios-xe")
-	h.userPlaybookFile(t, "nx.yaml", "nx", "nx-os")
+	h.userPlaybookFile(t, "nx.yaml", "nx", "ftd") // una plataforma que un paquete aún no instala
 	h.restart(t)
 	pk := v1.NewPackServiceClient(h.conn)
 	out := filepath.Join(t.TempDir(), "p.mpack")
@@ -63,7 +63,7 @@ func TestPackPersonalIdaYVuelta(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ex.Scripts != 2 || ex.Playbooks != 1 || !slices.Equal(ex.OmittedPlaybooks, []string{"nx-os/nx"}) {
+	if ex.Scripts != 2 || ex.Playbooks != 1 || !slices.Equal(ex.OmittedPlaybooks, []string{"ftd/nx"}) {
 		t.Fatalf("%+v", ex)
 	}
 	if _, err := pk.Export(ctx(t), &v1.PackServiceExportRequest{EditorName: "acme/mio", ScriptIds: []string{a.Id}, Path: out}); err == nil {
