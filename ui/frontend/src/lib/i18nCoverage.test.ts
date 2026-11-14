@@ -6,10 +6,11 @@ import { en } from "./i18n/en";
 // Guardia del idioma: es.ts y en.ts tienen las mismas claves y ningún .tsx de la interfaz
 // lleva texto visible fijo. Los términos técnicos (lista blanca) no se traducen.
 
-// Estas claves muestran los tokens de plantilla de archivos (syslog/traps/flows) tal cual, sin interpolar, cada una en su idioma.
-const TEMPLATE_KEYS = /^(syslog|traps|flows)\.opt\.tokens$|^syslog\.err\.tpl(Need|Tokens)$/;
-const TEMPLATE_TOKENS = new Set(["fecha", "hora", "origen", "date", "time", "source"]);
-const vars = (s: string, k = "") => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((v) => !(TEMPLATE_KEYS.test(k) && TEMPLATE_TOKENS.has(v))).sort().join(",");
+// Estas claves muestran los tokens de plantilla de archivos (syslog/traps/flows) tal cual, sin interpolar, cada una en su
+// idioma: {fecha}/{hora}/{origen} en español equivalen a {date}/{time}/{source} en inglés y se comparan ya traducidos.
+const TEMPLATE_KEYS = /^(syslog|traps|flows)\.opt\.tokens$|^syslog\.err\.tpl(Need|Tokens)$|^syslog\.opt\.diskOrigin$/;
+const TOKEN_EN: Record<string, string> = { fecha: "date", hora: "time", origen: "source" };
+const vars = (s: string, k = "") => [...s.matchAll(/\{(\w+)\}/g)].map((m) => (TEMPLATE_KEYS.test(k) ? TOKEN_EN[m[1]] ?? m[1] : m[1])).sort().join(",");
 
 test("es.ts y en.ts tienen las mismas claves, con las mismas variables", () => {
   const ke = Object.keys(es).sort();

@@ -1972,7 +1972,7 @@ export const en: Record<Key, string> = {
   "syslog.drops.others": "others (grouped)",
   "syslog.capped": "Showing the last {n} messages; the files keep everything received (except files removed by retention beyond {files} files).",
   "syslog.cappedNoSave": "Showing the last {n} messages; older ones are no longer in the list (enable “Save to file” to keep them).",
-  "syslog.opt.diskOrigin": "Approximate disk cap: {size}; with {origen}, up to 64 simultaneously open files ({open}) count on top of the files kept.",
+  "syslog.opt.diskOrigin": "Approximate disk cap: {size}; with {source}, up to 64 simultaneously open files ({open}) count on top of the files kept.",
   "syslog.locked": "Stop the listener to change these options.",
   "syslog.file.perSource": "One file per source in {folder}; last created: {name}",
   "syslog.file.pending": "none yet",
