@@ -121,7 +121,8 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	if real == "/" || clean == "/" {
 		return "", nil, i18n.New("fileserve.err.dir_root", nil)
 	}
-	if hr, err := evalSymlinks(home); err == nil && (real == hr || clean == filepath.Clean(home)) {
+	hr, herr := evalSymlinks(home)
+	if clean == filepath.Clean(home) || herr == nil && real == hr { // sin resolver $HOME se compara tal cual
 		return "", nil, i18n.New("fileserve.err.dir_home", nil)
 	}
 	return real, st, nil

@@ -527,3 +527,31 @@ func TestHomeVacioUsaLaCuentaYSinHomeRechaza(t *testing.T) {
 		t.Error("ValidateDir sin home conocido")
 	}
 }
+
+// Si no se puede resolver $HOME, se compara con el $HOME sin resolver (no se salta la comprobación).
+func TestHomeSinResolverSigueRechazando(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	os.MkdirAll(filepath.Join(home, ".cache"), 0o700)
+	old := evalSymlinks
+	calls := 0
+	evalSymlinks = func(p string) (string, error) {
+		if p == home { // la primera (resolver la carpeta pedida) funciona; la de $HOME falla
+			if calls++; calls > 1 {
+				return "", errors.New("boom")
+			}
+		}
+		return filepath.EvalSymlinks(p)
+	}
+	defer func() { evalSymlinks = old }()
+	if _, err := ValidateDir(home); err == nil {
+		t.Error("$HOME exacto aceptado")
+	}
+	if _, err := ValidateDir(filepath.Join(home, ".cache")); err == nil {
+		t.Error("~/.cache aceptada")
+	}
+	os.WriteFile(filepath.Join(home, ".netrc"), []byte("x"), 0o600)
+	if _, err := Publish([]string{filepath.Join(home, ".netrc")}); err == nil {
+		t.Error("~/.netrc publicado")
+	}
+}
