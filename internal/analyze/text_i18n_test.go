@@ -143,6 +143,7 @@ func TestFrasesDeAnalisisFueraDeLosDatosDePrueba(t *testing.T) {
 		{i18n.Tx("analyze.warn.format_no_nbrs"), "formato inesperado: sin datos para esta regla (falta la tabla de vecinos)", "unexpected format: no data for this rule (the neighbor table is missing)"},
 		{i18n.Tx("analyze.warn.format_no_groups"), "formato inesperado: sin datos para esta regla (falta la tabla de grupos)", "unexpected format: no data for this rule (the group table is missing)"},
 		{i18n.Tx("analyze.warn.rejected"), "el equipo rechazó el comando; sin datos para las reglas que lo usan", "the device rejected the command; no data for the rules that use it"},
+		{i18n.Tx("analyze.warn.incomplete"), "la salida del comando quedó incompleta (se cortó o falló); sin datos para las reglas que lo usan", "the command output is incomplete (it was cut off or failed); no data for the rules that use it"},
 		{i18n.Tx("analyze.warn.over_total", "mib", 512), "el paquete supera el tope de 512 MiB descomprimidos: se leyó parcialmente y los hallazgos pueden estar incompletos (usa --round o --device)", "the package exceeds the 512 MiB uncompressed limit: it was read partially and the findings may be incomplete (use --round or --device)"},
 		{i18n.Tx("analyze.warn.trimmed", "bytes", 100), "salida recortada a 100 bytes", "output trimmed to 100 bytes"},
 		{i18n.Tx("analyze.warn.no_outputs", "from", 1, "to", 2), "sin salidas en la ronda 1 o 2", "no outputs in round 1 or 2"},
@@ -184,8 +185,9 @@ func TestEscenariosCubrenTodasLasClavesDeAnalisis(t *testing.T) {
 		}
 	}
 	sinDatos := map[string]string{
-		"analyze.warn.audit": "lo arma el servicio cuando falla la exportación de la auditoría (no es del dominio)",
-		"analyze.warn.pcap":  "lo arma el servicio con los avisos de la captura (la regresión por RPC lo cubre)",
+		"analyze.warn.audit":      "lo arma el servicio cuando falla la exportación de la auditoría (no es del dominio)",
+		"analyze.warn.incomplete": "exige una salida marcada incompleta; la cubre TestSeriesForAvisaYOmiteIncompletas",
+		"analyze.warn.pcap":       "lo arma el servicio con los avisos de la captura (la regresión por RPC lo cubre)",
 	}
 	if os.Geteuid() == 0 {
 		sinDatos["analyze.warn.system"] = "exige un archivo ilegible, y como root todo se lee"
