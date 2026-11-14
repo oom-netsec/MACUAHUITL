@@ -3,7 +3,6 @@ package patrol
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
