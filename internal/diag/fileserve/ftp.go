@@ -317,7 +317,7 @@ func (s *ftpSession) openPasv(ext bool) {
 func (s *ftpSession) dataConn() (net.Conn, error) {
 	ln := s.pasv
 	if ln == nil {
-		return nil, errors.New("sin PASV")
+		return nil, i18n.New("fileserve.reason.no_pasv", nil)
 	}
 	s.pasv = nil
 	defer ln.Close()

@@ -1,0 +1,12 @@
+{
+ "datos": "serialcon: bits de datos 9 inválidos (5 a 8)",
+ "flujo": "serialcon: control de flujo \"x\" inválido (none, rtscts, xonxoff)",
+ "no-existe": "serialcon: /dev/ttyUSB0 no existe; ¿está conectado el cable USB-serie?",
+ "no-serie": "serialcon: /dev/null no es un puerto serie: inappropriate ioctl for device",
+ "ocupado": "serialcon: /dev/ttyUSB0 está en uso por otro programa (minicom, screen…)",
+ "parada": "serialcon: bits de parada 3 inválidos (1 o 2)",
+ "paridad": "serialcon: paridad \"x\" inválida (none, even, odd)",
+ "permiso": "sin permiso sobre el puerto serie /dev/ttyUSB0: agrega tu usuario al grupo dialout con «sudo usermod -aG dialout $USER» y cierra todas tus sesiones o reinicia para que el servicio macuahuitld tome el grupo (no hace falta ejecutar MACUAHUITL como root)",
+ "ruta": "serialcon: \"/tmp/x\" no es un dispositivo bajo /dev",
+ "velocidad": "serialcon: velocidad 7 no soportada"
+}

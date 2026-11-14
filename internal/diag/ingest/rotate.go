@@ -142,7 +142,7 @@ func (e *OutputError) Unwrap() error { return e.Err }
 // NewWriter no valida: quien lo llama usa antes Sink.Validate.
 func NewWriter(s Sink, now func() time.Time) (*Writer, error) {
 	if err := os.MkdirAll(s.Dir, 0o700); err != nil {
-		return nil, &OutputError{fmt.Errorf("carpeta de salida: %w", err)}
+		return nil, &OutputError{i18n.Wrap("ingest.err.out_dir", err, nil)}
 	}
 	w := &Writer{s: s, now: now, ext: ".log", perOrigin: strings.Contains(canon.Replace(s.Template), "{origen}"), files: map[string]*outFile{}}
 	if s.Format == "jsonl" {
@@ -222,7 +222,7 @@ func (w *Writer) reopen(of *outFile) error {
 	w.room()
 	f, err := os.OpenFile(of.path, os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		return fmt.Errorf("archivo de salida: %w", err)
+		return i18n.Wrap("ingest.err.out_file", err, nil)
 	}
 	of.f = f
 	w.open++
@@ -244,7 +244,7 @@ func (w *Writer) create(key string, now time.Time) (*outFile, error) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("archivo de salida: %w", err)
+			return nil, i18n.Wrap("ingest.err.out_file", err, nil)
 		}
 		of := &outFile{f: f, path: path, opened: now}
 		w.files[key] = of
@@ -255,7 +255,7 @@ func (w *Writer) create(key string, now time.Time) (*outFile, error) {
 		w.retain()
 		return of, nil
 	}
-	return nil, errors.New("demasiados archivos con el mismo nombre")
+	return nil, i18n.New("ingest.err.too_many_names", nil)
 }
 
 // retain borra los más viejos (por mtime) que encajan con la plantilla hasta

@@ -2,7 +2,6 @@ package assist
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/netip"
 	"strings"
@@ -61,11 +60,11 @@ func (e *devExec) conn(ctx context.Context, dev string) (*conn, error) {
 	}
 	t, ok := e.targets[dev]
 	if !ok {
-		return nil, fmt.Errorf("equipo %q desconocido", dev)
+		return nil, i18n.New("assist.svc.unknown_device", i18n.A("device", dev))
 	}
 	v := e.d.Vault()
 	if v == nil {
-		return nil, errors.New("la bóveda no existe")
+		return nil, i18n.New("assist.svc.no_vault", nil)
 	}
 	cred, err := v.Get(t.cred)
 	if err != nil {

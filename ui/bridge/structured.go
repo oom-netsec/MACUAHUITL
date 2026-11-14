@@ -2,9 +2,9 @@ package bridge
 
 import (
 	"context"
-	"fmt"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 )
 
@@ -88,11 +88,11 @@ type RadiusReportDTO struct {
 func (b *Bridge) SecRadiusReport(d RadiusDTO) (RadiusReportDTO, error) {
 	ap, err := port(d.AuthPort)
 	if err != nil {
-		return RadiusReportDTO{}, wrapErr(err)
+		return RadiusReportDTO{}, b.bridgeErr(err)
 	}
 	cp, err := port(d.AcctPort)
 	if err != nil {
-		return RadiusReportDTO{}, wrapErr(err)
+		return RadiusReportDTO{}, b.bridgeErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (RadiusReportDTO, error) {
 		r, err := v1.NewSecurityServiceClient(c).RadiusTest(ctx, &v1.RadiusTestRequest{Host: d.Host, AuthPort: ap, AcctPort: cp,
@@ -140,7 +140,7 @@ type TacacsReportDTO struct {
 func (b *Bridge) SecTacacsReport(d TacacsDTO) (TacacsReportDTO, error) {
 	p, err := port(d.Port)
 	if err != nil {
-		return TacacsReportDTO{}, wrapErr(err)
+		return TacacsReportDTO{}, b.bridgeErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (TacacsReportDTO, error) {
 		r, err := v1.NewSecurityServiceClient(c).TacacsTest(ctx, &v1.TacacsTestRequest{Host: d.Host, Port: p, SharedSecret: source(d.SecretCredID, d.Secret),
@@ -458,7 +458,7 @@ type DnsReportDTO struct {
 func (b *Bridge) ToolsDnsReport(d DnsDTO) (DnsReportDTO, error) {
 	mode, ok := dnsModes[d.Mode]
 	if !ok {
-		return DnsReportDTO{}, wrapErr(fmt.Errorf("modo DNS %q desconocido", d.Mode))
+		return DnsReportDTO{}, b.bridgeErr(i18n.New("bridge.err.dns_mode", i18n.A("mode", d.Mode)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (DnsReportDTO, error) {
 		r, err := v1.NewToolsServiceClient(c).Dns(ctx, &v1.DnsRequest{Mode: mode, Name: d.Name, Type: d.Type, Servers: d.Servers, Deep: d.Deep, Dnssec: d.Dnssec})
@@ -484,7 +484,7 @@ type TlsReportDTO struct {
 
 func (b *Bridge) ToolsTlsReport(host string, port int, sni string) (TlsReportDTO, error) {
 	if port < 0 || port > 65535 {
-		return TlsReportDTO{}, wrapErr(fmt.Errorf("puerto %d inválido", port))
+		return TlsReportDTO{}, b.bridgeErr(i18n.New("bridge.err.port", i18n.A("port", port)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (TlsReportDTO, error) {
 		r, err := v1.NewToolsServiceClient(c).InspectTls(ctx, &v1.InspectTlsRequest{Host: host, Port: uint32(port), Sni: sni})

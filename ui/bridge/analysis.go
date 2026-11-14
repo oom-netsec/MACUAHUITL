@@ -2,9 +2,9 @@ package bridge
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -16,7 +16,7 @@ import (
 
 func (b *Bridge) AnalysisRun(job string, round int, device string) (string, error) {
 	if round < 0 {
-		return "", wrapErr(fmt.Errorf("ronda %d inválida", round))
+		return "", b.bridgeErr(i18n.New("bridge.err.round", i18n.A("round", round)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewAnalysisServiceClient(c).AnalyzeJob(ctx, &v1.AnalyzeJobRequest{Job: job, Round: uint32(round), Device: device})
@@ -26,7 +26,7 @@ func (b *Bridge) AnalysisRun(job string, round int, device string) (string, erro
 
 func (b *Bridge) AnalysisDiff(job string, from, to int, device string) (string, error) {
 	if from <= 0 || to <= 0 {
-		return "", wrapErr(fmt.Errorf("rondas %d y %d inválidas", from, to))
+		return "", b.bridgeErr(i18n.New("bridge.err.rounds", i18n.A("from", from, "to", to)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewAnalysisServiceClient(c).DiffRounds(ctx, &v1.DiffRoundsRequest{Job: job, From: uint32(from), To: uint32(to), Device: device})
@@ -43,7 +43,7 @@ func (b *Bridge) AnalysisTimeline(job, around string, windowSeconds int, device,
 	if around != "" {
 		t, err := time.Parse(time.RFC3339, around)
 		if err != nil {
-			return "", wrapErr(fmt.Errorf("instante %q inválido: usa RFC 3339 (2026-11-04T10:09:18Z)", around))
+			return "", b.bridgeErr(i18n.New("bridge.err.instant", i18n.A("value", around)))
 		}
 		req.Around = timestamppb.New(t)
 	}
@@ -58,7 +58,7 @@ func (b *Bridge) AnalysisTimeline(job, around string, windowSeconds int, device,
 
 func (b *Bridge) AnalysisRunReport(job string, round int, device string) (ReportDTO, error) {
 	if round < 0 {
-		return ReportDTO{}, wrapErr(fmt.Errorf("ronda %d inválida", round))
+		return ReportDTO{}, b.bridgeErr(i18n.New("bridge.err.round", i18n.A("round", round)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (ReportDTO, error) {
 		r, err := v1.NewAnalysisServiceClient(c).AnalyzeJob(ctx, &v1.AnalyzeJobRequest{Job: job, Round: uint32(round), Device: device})
@@ -68,7 +68,7 @@ func (b *Bridge) AnalysisRunReport(job string, round int, device string) (Report
 
 func (b *Bridge) AnalysisDiffReport(job string, from, to int, device string) (ReportDTO, error) {
 	if from <= 0 || to <= 0 {
-		return ReportDTO{}, wrapErr(fmt.Errorf("rondas %d y %d inválidas", from, to))
+		return ReportDTO{}, b.bridgeErr(i18n.New("bridge.err.rounds", i18n.A("from", from, "to", to)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (ReportDTO, error) {
 		r, err := v1.NewAnalysisServiceClient(c).DiffRounds(ctx, &v1.DiffRoundsRequest{Job: job, From: uint32(from), To: uint32(to), Device: device})
@@ -84,7 +84,7 @@ func (b *Bridge) AnalysisTimelineReport(job, around string, windowSeconds int, d
 	if around != "" {
 		t, err := time.Parse(time.RFC3339, around)
 		if err != nil {
-			return ReportDTO{}, wrapErr(fmt.Errorf("instante %q inválido: usa RFC 3339 (2026-11-04T10:09:18Z)", around))
+			return ReportDTO{}, b.bridgeErr(i18n.New("bridge.err.instant", i18n.A("value", around)))
 		}
 		req.Around = timestamppb.New(t)
 	}

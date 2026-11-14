@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 )
 
@@ -118,8 +120,8 @@ func TestAdhocDosLotesNoComparten(t *testing.T) {
 		t.Errorf("informes mezclados:\n%s\n%s", r1.Report.Json, r2.Report.Json)
 	}
 	d := coreDeps{h.core}
-	i1, _ := d.Job(j1)
-	i2, _ := d.Job(j2)
+	i1, _ := d.Job(context.Background(), j1)
+	i2, _ := d.Job(context.Background(), j2)
 	if i1.Dir == "" || i1.Dir == i2.Dir || filepath.Dir(i1.Dir) == filepath.Dir(i2.Dir) {
 		t.Errorf("carpetas compartidas: %q %q", i1.Dir, i2.Dir)
 	}
@@ -131,7 +133,7 @@ func TestAdhocCierreFallidoTerminaConError(t *testing.T) {
 	cred := h.ready(t)
 	ad := v1.NewAdhocServiceClient(h.conn)
 	job, _ := h.adhocLote(t, cred, h.target)
-	info, _ := coreDeps{h.core}.Job(job)
+	info, _ := coreDeps{h.core}.Job(context.Background(), job)
 	if err := os.Mkdir(filepath.Join(info.Dir, "manifest.json"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +158,7 @@ func TestJobRecargadoConservaSuCarpeta(t *testing.T) {
 	cred := h.ready(t)
 	job, wait := h.adhocLote(t, cred, h.target)
 	wait()
-	before, _ := coreDeps{h.core}.Job(job)
+	before, _ := coreDeps{h.core}.Job(context.Background(), job)
 	if k := h.summary(t, job).Kind; k != "adhoc" {
 		t.Fatalf("kind = %q, quería adhoc", k)
 	}
@@ -164,7 +166,7 @@ func TestJobRecargadoConservaSuCarpeta(t *testing.T) {
 	if k := h.summary(t, job).Kind; k != "adhoc" { // el tipo se persiste con el trabajo
 		t.Fatalf("kind recargado = %q, quería adhoc", k)
 	}
-	info, err := coreDeps{h.core}.Job(job)
+	info, err := coreDeps{h.core}.Job(context.Background(), job)
 	if err != nil || info.Dir == "" || info.Dir != before.Dir || info.State != "completed" {
 		t.Fatalf("recargado = %+v %v, antes = %+v", info, err, before)
 	}
@@ -188,10 +190,10 @@ func TestJobRecargadoConCierreFallidoTerminaConError(t *testing.T) {
 	h := newHarness(t, nil)
 	cred := h.ready(t)
 	job, _ := h.adhocLote(t, cred, h.target)
-	info, _ := coreDeps{h.core}.Job(job)
+	info, _ := coreDeps{h.core}.Job(context.Background(), job)
 	os.Mkdir(filepath.Join(info.Dir, "manifest.json"), 0o700)
 	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
-		if i, _ := (coreDeps{h.core}).Job(job); i.FinishErr != "" {
+		if i, _ := (coreDeps{h.core}).Job(context.Background(), job); i.FinishErr != "" {
 			break
 		}
 	}
@@ -231,5 +233,18 @@ func TestAdhocLoteArmadoAlCaerTerminaConError(t *testing.T) {
 	res, err := v1.NewAdhocServiceClient(h.conn).AdhocResult(ctx(t), &v1.AdhocResultRequest{JobId: job})
 	if err != nil || !res.Done || res.Error == "" || res.State != "failed" {
 		t.Fatalf("res = %+v %v", res, err)
+	}
+}
+
+// «trabajo no existe» que llega a los servicios por Deps.Job sale en el idioma de la petición, no siempre en español.
+func TestDepsJobInexistenteEnElIdiomaPedido(t *testing.T) {
+	h := newHarness(t, nil)
+	_, err := coreDeps{h.core}.Job(i18n.WithLocale(context.Background(), "en"), "nope")
+	if st, _ := status.FromError(err); st.Message() != "job nope does not exist" {
+		t.Fatalf("en: %v", err)
+	}
+	_, err = coreDeps{h.core}.Job(context.Background(), "nope")
+	if st, _ := status.FromError(err); st.Message() != "trabajo nope no existe" {
+		t.Fatalf("es: %v", err)
 	}
 }

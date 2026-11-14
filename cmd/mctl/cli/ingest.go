@@ -37,7 +37,7 @@ func (f *IngestFlags) Register(fs *flag.FlagSet, defName string) {
 // Int32 rechaza lo que no cabe en el int32 del contrato, en vez de truncarlo en silencio.
 func Int32(flagName string, v int) (int32, error) {
 	if int(int32(v)) != v {
-		return 0, fmt.Errorf("--%s fuera de rango: %d", flagName, v)
+		return 0, Err("mctl.cli.out_of_range", "flag", flagName, "value", v)
 	}
 	return int32(v), nil
 }
@@ -61,7 +61,7 @@ func (f *IngestFlags) Values() (v IngestValues, err error) {
 
 // PrintDrops escribe el acumulado de descartes en una línea.
 func PrintDrops(w io.Writer, d *v1.SyslogDrops) {
-	fmt.Fprintf(w, "descartes: %d (por origen %d, global %d, cola llena %d)", d.Total, d.PorOrigen, d.Global, d.ColaLlena)
+	fmt.Fprint(w, T("mctl.cli.drops", "total", d.Total, "origin", d.PorOrigen, "global", d.Global, "queue", d.ColaLlena))
 	for _, s := range d.Top {
 		fmt.Fprintf(w, " %s=%d", s.Source, s.Count)
 	}

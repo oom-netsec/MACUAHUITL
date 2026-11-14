@@ -1,8 +1,6 @@
 package calc
 
 import (
-	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -53,16 +51,16 @@ var simpleLayers = map[string]struct {
 	"pppoe":   {8, "pppoe", false},
 }
 
-const mtuLayersHelp = "gre, gre-key, esp-tunnel:CIFRADO[:AUT], esp-transport:CIFRADO[:AUT], getvpn:CIFRADO[:AUT][:tbar], nat-t, vxlan, mpls[:N], dot1q, qinq, pppoe, lisp (CIFRADO: aes-cbc, aes-gcm, 3des, des; AUT: sha1, sha256, sha384, sha512, md5)"
+const mtuLayersHelp = "calc.val.mtu.layers_help" // código de valor: el mensaje lo escribe en el idioma pedido
 
 // MTU recorre la pila de afuera hacia adentro restando cada encabezado sobre la MTU
 // IP física; ESP se resuelve exacto: lo cifrado (carga + 2 de cola) se alinea al bloque.
 func MTU(phys int, stack []string, inner6 bool) (MTUResult, error) {
 	if phys < 68 || phys > 65535 {
-		return MTUResult{}, fmt.Errorf("MTU física %d fuera de rango (68–65535)", phys)
+		return MTUResult{}, i18n.New("calc.err.mtu_range", i18n.A("mtu", phys))
 	}
 	if len(stack) == 0 {
-		return MTUResult{}, errors.New("indica al menos una capa: " + mtuLayersHelp)
+		return MTUResult{}, i18n.New("calc.err.mtu_no_layers", i18n.A("help", mtuLayersHelp))
 	}
 	r, err := walk(phys, stack)
 	if err != nil {
@@ -73,7 +71,7 @@ func MTU(phys int, stack []string, inner6 bool) (MTUResult, error) {
 		hdr, minMTU = 60, 1280
 	}
 	if r.Effective < 68 || r.Effective-hdr < 1 {
-		return MTUResult{}, fmt.Errorf("la pila deja %d bytes: no cabe en una MTU física de %d", r.Effective, phys)
+		return MTUResult{}, i18n.New("calc.err.mtu_no_fit", i18n.A("effective", r.Effective, "mtu", phys))
 	}
 	r.InnerIPv6, r.IPMTU, r.MSS = inner6, r.Effective, r.Effective-hdr
 	if r.Effective < minMTU {
@@ -104,7 +102,7 @@ func walk(phys int, stack []string) (MTUResult, error) {
 		name := f[0]
 		// NAT-T es el UDP 4500 que envuelve al ESP: solo vale justo por fuera de él.
 		if name == "nat-t" && (i+1 >= len(stack) || !strings.HasPrefix(strings.ToLower(strings.TrimSpace(stack[i+1])), "esp-")) {
-			return r, errors.New("nat-t va inmediatamente antes (por fuera) de una capa esp-tunnel o esp-transport")
+			return r, i18n.New("calc.err.mtu_natt", nil)
 		}
 		if s, ok := simpleLayers[name]; ok && len(f) == 1 && (!lifted || s.outerIP) {
 			b, ip := s.bytes, "calc.val.mtu.ip_outer"
@@ -117,7 +115,7 @@ func walk(phys int, stack []string) (MTUResult, error) {
 			continue
 		}
 		if lifted {
-			return r, fmt.Errorf("ESP de transporte protege un paquete IP: después solo van gre, gre-key, vxlan o lisp, no %q", raw)
+			return r, i18n.New("calc.err.mtu_transport", i18n.A("layer", raw))
 		}
 		switch name {
 		case "mpls":
@@ -125,10 +123,10 @@ func walk(phys int, stack []string) (MTUResult, error) {
 			if len(f) == 2 {
 				var err error
 				if n, err = strconv.Atoi(f[1]); err != nil || n < 1 || n > 16 {
-					return r, fmt.Errorf("etiquetas MPLS %q inválidas (1–16)", f[1])
+					return r, i18n.New("calc.err.mtu_mpls", i18n.A("n", f[1]))
 				}
 			} else if len(f) > 2 {
-				return r, fmt.Errorf("capa %q inválida", raw)
+				return r, i18n.New("calc.err.mtu_layer", i18n.A("layer", raw))
 			}
 			add(name, "mpls", i18n.A("n", n), 4*n)
 		case "dot1q", "qinq":
@@ -146,19 +144,19 @@ func walk(phys int, stack []string) (MTUResult, error) {
 			}
 			c, ok := espCiphers[get(f, 1)]
 			if !ok {
-				return r, fmt.Errorf("cifrado ESP %q desconocido en %q (aes-cbc, aes-gcm, 3des, des)", get(f, 1), raw)
+				return r, i18n.New("calc.err.mtu_cipher", i18n.A("cipher", get(f, 1), "layer", raw))
 			}
 			icv, auth := c.icv, get(f, 2)
 			switch {
 			case c.icv > 0 && auth != "":
-				return r, fmt.Errorf("%s ya autentica: quita %q", get(f, 1), auth)
+				return r, i18n.New("calc.err.mtu_auth_built", i18n.A("cipher", get(f, 1), "auth", auth))
 			case c.icv == 0:
 				if icv, ok = espAuths[auth]; !ok {
-					return r, fmt.Errorf("autenticación ESP %q desconocida en %q (sha1, sha256, sha384, sha512, md5)", auth, raw)
+					return r, i18n.New("calc.err.mtu_auth", i18n.A("auth", auth, "layer", raw))
 				}
 			}
 			if len(f) > 3 {
-				return r, fmt.Errorf("capa %q inválida", raw)
+				return r, i18n.New("calc.err.mtu_layer", i18n.A("layer", raw))
 			}
 			ipLabel := "calc.val.mtu.ip_outer"
 			switch name {
@@ -173,7 +171,7 @@ func walk(phys int, stack []string) (MTUResult, error) {
 			}
 			ct := (avail - fixed) / c.block * c.block // lo cifrado: carga + relleno + 2
 			if ct < 2 {
-				return r, fmt.Errorf("no cabe ESP en %d bytes", avail)
+				return r, i18n.New("calc.err.mtu_esp_no_fit", i18n.A("avail", avail))
 			}
 			align := avail - fixed - ct
 			tb := ""
@@ -183,7 +181,7 @@ func walk(phys int, stack []string) (MTUResult, error) {
 			add(raw, "esp", i18n.A("ip", ipLabel, "iv", c.iv, "icv", icv, "tbar", tb, "align", align, "block", c.block), avail-(ct-2))
 			ipsec = true
 		default:
-			return r, fmt.Errorf("capa %q desconocida; usa %s", raw, mtuLayersHelp)
+			return r, i18n.New("calc.err.mtu_unknown", i18n.A("layer", raw, "help", mtuLayersHelp))
 		}
 	}
 	if lifted { // transporte sin nada dentro: el paquete conserva su propia cabecera

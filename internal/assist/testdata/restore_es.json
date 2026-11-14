@@ -1,0 +1,474 @@
+{
+ "closed/ACL extendida": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "ip access-list extended EDGE | permit tcp any any eq 22 | ACL: hazla a mano (ip access-list extended EDGE): hazlo a mano",
+  "ip access-list extended EDGE | permit tcp any any eq 23 | ACL: hazla a mano (ip access-list extended EDGE): hazlo a mano"
+ ],
+ "closed/ACL extendida/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "ip access-list extended EDGE | permit tcp any any eq 22 | ACL: hazla a mano (ip access-list extended EDGE): hazlo a mano",
+  "ip access-list extended EDGE | permit tcp any any eq 23 | ACL: hazla a mano (ip access-list extended EDGE): hazlo a mano"
+ ],
+ "closed/abreviatura ip default-g": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ip default-gateway 192.0.2.1 | ruta por omisión (ip default-gateway): puede cortar el acceso",
+  " | ip default-g 192.0.2.77 | ruta por omisión (ip default-gateway): puede cortar el acceso"
+ ],
+ "closed/abreviatura ip default-g/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ip default-gateway 192.0.2.1 | ruta por omisión (ip default-gateway): puede cortar el acceso",
+  " | ip default-g 192.0.2.77 | ruta por omisión (ip default-gateway): puede cortar el acceso"
+ ],
+ "closed/abreviatura ip ss ver 1": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ip ss ver 1 | ip ssh: un error corta el acceso"
+ ],
+ "closed/abreviatura ip ss ver 1/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ip ss ver 1 | ip ssh: un error corta el acceso"
+ ],
+ "closed/abreviatura lin vty": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | lin vty 5 15 | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; line (consola, auxiliar y vty): un error corta el acceso"
+ ],
+ "closed/abreviatura lin vty/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | lin vty 5 15 | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; line (consola, auxiliar y vty): un error corta el acceso"
+ ],
+ "closed/abreviatura no ip rout": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | no ip rout 10.9.0.0 255.255.0.0 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "closed/abreviatura no ip rout/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | no ip rout 10.9.0.0 255.255.0.0 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "closed/abreviatura snmp-s comm": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | snmp-s comm \u003coculto\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
+ ],
+ "closed/abreviatura snmp-s comm/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | snmp-s comm \u003coculto\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
+ ],
+ "closed/access-class de la vty": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "line vty 0 4 | access-class 10 in | line (consola, auxiliar y vty): un error corta el acceso (line vty 0 4): hazlo a mano",
+  "line vty 0 4 | access-class 11 in | line (consola, auxiliar y vty): un error corta el acceso (line vty 0 4): hazlo a mano"
+ ],
+ "closed/access-class de la vty/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "line vty 0 4 | access-class 10 in | line (consola, auxiliar y vty): un error corta el acceso (line vty 0 4): hazlo a mano",
+  "line vty 0 4 | access-class 11 in | line (consola, auxiliar y vty): un error corta el acceso (line vty 0 4): hazlo a mano"
+ ],
+ "closed/authentication": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ip ospf \u003coculto\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
+ ],
+ "closed/authentication/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ip ospf \u003coculto\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
+ ],
+ "closed/cambio de remote-as": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "router bgp 65000 | neighbor 10.1.1.1 remote-as 65001 | router *: protocolo de enrutamiento; hazlo a mano (router bgp 65000): hazlo a mano",
+  "router bgp 65000 | neighbor 10.1.1.1 remote-as 65002 | router *: protocolo de enrutamiento; hazlo a mano (router bgp 65000): hazlo a mano"
+ ],
+ "closed/cambio de remote-as/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "router bgp 65000 | neighbor 10.1.1.1 remote-as 65001 | router *: protocolo de enrutamiento; hazlo a mano (router bgp 65000): hazlo a mano",
+  "router bgp 65000 | neighbor 10.1.1.1 remote-as 65002 | router *: protocolo de enrutamiento; hazlo a mano (router bgp 65000): hazlo a mano"
+ ],
+ "closed/cambio de vrf forwarding": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface GigabitEthernet1/0/3 | vrf forwarding Mgmt | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano",
+  "interface GigabitEthernet1/0/3 | vrf forwarding Otra | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano"
+ ],
+ "closed/cambio de vrf forwarding/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "interface GigabitEthernet1/0/3 | vrf forwarding Mgmt | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano",
+  "interface GigabitEthernet1/0/3 | vrf forwarding Otra | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano"
+ ],
+ "closed/ip access-group de la SVI": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface Vlan10 | ip access-group EDGE in | no es un puerto físico (SVI, Port-channel, loopback, subinterfaz...): hazlo a mano",
+  "interface Vlan10 | ip access-group OTRA in | no es un puerto físico (SVI, Port-channel, loopback, subinterfaz...): hazlo a mano"
+ ],
+ "closed/ip access-group de la SVI/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "interface Vlan10 | ip access-group EDGE in | no es un puerto físico (SVI, Port-channel, loopback, subinterfaz...): hazlo a mano",
+  "interface Vlan10 | ip access-group OTRA in | no es un puerto físico (SVI, Port-channel, loopback, subinterfaz...): hazlo a mano"
+ ],
+ "closed/no ip route": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ip route 10.9.0.0 255.255.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "closed/no ip route vrf": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ip route vrf Mgmt 10.8.0.0 255.255.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "closed/no ip route vrf/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ip route vrf Mgmt 10.8.0.0 255.255.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "closed/no ip route/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ip route 10.9.0.0 255.255.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "closed/no ipv6 route": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ipv6 route 2001:DB8:9::/48 2001:DB8::1 | ruta estática IPv6: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "closed/no ipv6 route/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ipv6 route 2001:DB8:9::/48 2001:DB8::1 | ruta estática IPv6: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "closed/no switchport": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 3 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface GigabitEthernet1/0/4 | switchport access vlan 10 | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano",
+  "interface GigabitEthernet1/0/4 | switchport mode access | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano",
+  "interface GigabitEthernet1/0/4 | no switchport | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano"
+ ],
+ "closed/no switchport/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "interface GigabitEthernet1/0/4 | switchport access vlan 10 | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano",
+  "interface GigabitEthernet1/0/4 | switchport mode access | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano",
+  "interface GigabitEthernet1/0/4 | no switchport | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano"
+ ],
+ "closed/nopassword": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "line vty 0 4 | no \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+ ],
+ "closed/nopassword/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "line vty 0 4 | no \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+ ],
+ "closed/puerto que pasa a la VLAN de gestión": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface GigabitEthernet1/0/1 | switchport access vlan 10 | lleva la VLAN de gestión (99): cambiarla podría cortar la sesión",
+  "interface GigabitEthernet1/0/1 | switchport access vlan 99 | lleva la VLAN de gestión (99): cambiarla podría cortar la sesión"
+ ],
+ "closed/puerto que pasa a la VLAN de gestión/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "interface GigabitEthernet1/0/1 | switchport access vlan 10 | lleva la VLAN de gestión (99): cambiarla podría cortar la sesión",
+  "interface GigabitEthernet1/0/1 | switchport access vlan 99 | lleva la VLAN de gestión (99): cambiarla podría cortar la sesión"
+ ],
+ "closed/puerto sin switchport mode access": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface GigabitEthernet1/0/5 | description sin-modo | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano",
+  "interface GigabitEthernet1/0/5 | description otra | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano"
+ ],
+ "closed/puerto sin switchport mode access/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "interface GigabitEthernet1/0/5 | description sin-modo | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano",
+  "interface GigabitEthernet1/0/5 | description otra | no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano"
+ ],
+ "closed/quitar una entrada de access-list N": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | access-list 10 permit 10.1.0.0 0.0.0.255 | ACL numerada (access-list): hazla a mano"
+ ],
+ "closed/quitar una entrada de access-list N/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | access-list 10 permit 10.1.0.0 0.0.0.255 | ACL numerada (access-list): hazla a mano"
+ ],
+ "closed/reload": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | reload | comando prohibido en modo asistido"
+ ],
+ "closed/reload/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | reload | comando prohibido en modo asistido"
+ ],
+ "closed/route-map": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "route-map RM1 permit 10 | set metric 5 | route-map: hazlo a mano (route-map RM1 permit 10): hazlo a mano",
+  "route-map RM1 permit 10 | set metric 6 | route-map: hazlo a mano (route-map RM1 permit 10): hazlo a mano"
+ ],
+ "closed/route-map/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "route-map RM1 permit 10 | set metric 5 | route-map: hazlo a mano (route-map RM1 permit 10): hazlo a mano",
+  "route-map RM1 permit 10 | set metric 6 | route-map: hazlo a mano (route-map RM1 permit 10): hazlo a mano"
+ ],
+ "closed/ruta por omisión partida": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 3 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ip route 0.0.0.0 0.0.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano",
+  " | ip route 0.0.0.0 128.0.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano",
+  " | ip route 128.0.0.0 128.0.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "closed/ruta por omisión partida/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ip route 0.0.0.0 0.0.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano",
+  " | ip route 0.0.0.0 128.0.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano",
+  " | ip route 128.0.0.0 128.0.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "closed/standby authentication": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface Vlan10 | standby 1 \u003coculto\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
+ ],
+ "closed/standby authentication/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "interface Vlan10 | standby 1 \u003coculto\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
+ ],
+ "closed/uplink con la VLAN de gestión (apagar)": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface GigabitEthernet1/0/24 | shutdown | lleva la VLAN de gestión (99): cambiarla podría cortar la sesión"
+ ],
+ "closed/uplink con la VLAN de gestión (apagar)/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "interface GigabitEthernet1/0/24 | shutdown | lleva la VLAN de gestión (99): cambiarla podría cortar la sesión"
+ ],
+ "closed/uplink con la VLAN de gestión (descripción)": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface GigabitEthernet1/0/24 | description UPLINK | lleva la VLAN de gestión (99): cambiarla podría cortar la sesión",
+  "interface GigabitEthernet1/0/24 | description OTRO | lleva la VLAN de gestión (99): cambiarla podría cortar la sesión"
+ ],
+ "closed/uplink con la VLAN de gestión (descripción)/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "interface GigabitEthernet1/0/24 | description UPLINK | lleva la VLAN de gestión (99): cambiarla podría cortar la sesión",
+  "interface GigabitEthernet1/0/24 | description OTRO | lleva la VLAN de gestión (99): cambiarla podría cortar la sesión"
+ ],
+ "refusal/aaa": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | aaa new-model | aaa: un error corta el acceso al equipo"
+ ],
+ "refusal/aaa/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | aaa new-model | aaa: un error corta el acceso al equipo"
+ ],
+ "refusal/abreviatura de lo permitido": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | logg host 10.9.9.9 | abreviatura de \"logging host\": IOS la expande, pero el plan exige la palabra completa"
+ ],
+ "refusal/abreviatura de lo permitido/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | logg host 10.9.9.9 | abreviatura de \"logging host\": IOS la expande, pero el plan exige la palabra completa"
+ ],
+ "refusal/banner": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | banner motd ^C | banner: texto con delimitadores, no se inversa con certeza"
+ ],
+ "refusal/banner/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | banner motd ^C | banner: texto con delimitadores, no se inversa con certeza"
+ ],
+ "refusal/boot": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | boot system flash:c3560cx.bin | comando prohibido en modo asistido"
+ ],
+ "refusal/boot/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | boot system flash:c3560cx.bin | comando prohibido en modo asistido"
+ ],
+ "refusal/config-register": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | config-register 0x2102 | config-register: cambia el arranque del equipo"
+ ],
+ "refusal/config-register/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | config-register 0x2102 | config-register: cambia el arranque del equipo"
+ ],
+ "refusal/crypto": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | crypto \u003coculto\u003e | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; llaves y certificados (crypto): no se pueden inversar con certeza"
+ ],
+ "refusal/crypto pki": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | crypto pki trustpoint T1 | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; llaves y certificados (crypto): no se pueden inversar con certeza"
+ ],
+ "refusal/crypto pki/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | crypto pki trustpoint T1 | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; llaves y certificados (crypto): no se pueden inversar con certeza"
+ ],
+ "refusal/crypto/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | crypto \u003coculto\u003e | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; llaves y certificados (crypto): no se pueden inversar con certeza"
+ ],
+ "refusal/enable secret": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | enable \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+ ],
+ "refusal/enable secret/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | enable \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+ ],
+ "refusal/global que no está en la lista": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ip http server | fuera de la lista cerrada de restore-diff: hazlo a mano"
+ ],
+ "refusal/global que no está en la lista/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ip http server | fuera de la lista cerrada de restore-diff: hazlo a mano"
+ ],
+ "refusal/interfaz nueva": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | interface Loopback9 | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; interfaz completa: crearla o borrarla no se inversa con certeza"
+ ],
+ "refusal/interfaz nueva/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | interface Loopback9 | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; interfaz completa: crearla o borrarla no se inversa con certeza"
+ ],
+ "refusal/ip ssh": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ip ssh version 1 | ip ssh: un error corta el acceso"
+ ],
+ "refusal/ip ssh/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ip ssh version 1 | ip ssh: un error corta el acceso"
+ ],
+ "refusal/license": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | license boot level ipservices | licencias"
+ ],
+ "refusal/license/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | license boot level ipservices | licencias"
+ ],
+ "refusal/logging source-interface inexistente": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | logging source-interface Vlan77 | nombra una interfaz que el equipo no tiene"
+ ],
+ "refusal/logging source-interface inexistente/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | logging source-interface Vlan77 | nombra una interfaz que el equipo no tiene"
+ ],
+ "refusal/línea de interfaz que no está en la lista": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface GigabitEthernet1/0/1 | switchport port-security maximum 3 | fuera de la lista cerrada de restore-diff: hazlo a mano"
+ ],
+ "refusal/línea de interfaz que no está en la lista/parcial": [
+  "interface GigabitEthernet1/0/1 | switchport port-security maximum 3 | fuera de la lista cerrada de restore-diff: hazlo a mano"
+ ],
+ "refusal/name-server con vrf": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ip name-server vrf Mgmt 10.1.1.1 | nombra una VRF: hazlo a mano"
+ ],
+ "refusal/name-server con vrf/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ip name-server vrf Mgmt 10.1.1.1 | nombra una VRF: hazlo a mano"
+ ],
+ "refusal/no ascii": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface GigabitEthernet1/0/1 | description PC-contabilidad-Ñ | caracteres fuera de ASCII imprimible (0x20-0x7e): IOS los recorta y una línea podría colar otro comando; hazlo a mano"
+ ],
+ "refusal/no ascii/parcial": [
+  "interface GigabitEthernet1/0/1 | description PC-contabilidad-Ñ | caracteres fuera de ASCII imprimible (0x20-0x7e): IOS los recorta y una línea podría colar otro comando; hazlo a mano"
+ ],
+ "refusal/ntp con vrf": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ntp server vrf Mgmt 10.0.0.2 | ntp server solo con una dirección IP (y prefer); hazlo a mano"
+ ],
+ "refusal/ntp con vrf/parcial": [
+  " | ntp server vrf Mgmt 10.0.0.2 | ntp server solo con una dirección IP (y prefer); hazlo a mano"
+ ],
+ "refusal/puerto de acceso a una VLAN que no existe": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface GigabitEthernet1/0/1 | switchport access vlan 77 | nombra una VLAN que el equipo no tiene activa (IOS la crearía y, con VTP servidor, la propagaría): créala por separado"
+ ],
+ "refusal/puerto de acceso a una VLAN que no existe/parcial": [
+  "interface GigabitEthernet1/0/1 | switchport access vlan 77 | nombra una VLAN que el equipo no tiene activa (IOS la crearía y, con VTP servidor, la propagaría): créala por separado"
+ ],
+ "refusal/router nuevo": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | router ospf 1 | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; router *: protocolo de enrutamiento; hazlo a mano"
+ ],
+ "refusal/router nuevo/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | router ospf 1 | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; router *: protocolo de enrutamiento; hazlo a mano"
+ ],
+ "refusal/ruta por omisión en vrf": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | ip route vrf Mgmt 0.0.0.0 0.0.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "refusal/ruta por omisión en vrf/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | ip route vrf Mgmt 0.0.0.0 0.0.0.0 192.0.2.1 | ruta estática: puede cortar el acceso o el tráfico; hazla a mano"
+ ],
+ "refusal/snmp community": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | snmp-server community \u003coculto\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
+ ],
+ "refusal/snmp community/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | snmp-server community \u003coculto\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
+ ],
+ "refusal/spanning-tree extend system-id": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | spanning-tree extend system-id | spanning-tree extend system-id: cambia el identificador del puente y reconverge todo el árbol; hazlo a mano"
+ ],
+ "refusal/spanning-tree extend system-id/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | spanning-tree extend system-id | spanning-tree extend system-id: cambia el identificador del puente y reconverge todo el árbol; hazlo a mano"
+ ],
+ "refusal/spanning-tree mode (reconverge todo, el uplink incluido)": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | spanning-tree mode rapid-pvst | spanning-tree mode: reconverge todo el árbol, el uplink de gestión incluido; hazlo a mano"
+ ],
+ "refusal/spanning-tree mode (reconverge todo, el uplink incluido)/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | spanning-tree mode rapid-pvst | spanning-tree mode: reconverge todo el árbol, el uplink de gestión incluido; hazlo a mano"
+ ],
+ "refusal/spanning-tree mode con no": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | no spanning-tree mode | spanning-tree mode: reconverge todo el árbol, el uplink de gestión incluido; hazlo a mano"
+ ],
+ "refusal/spanning-tree mode con no/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | no spanning-tree mode | spanning-tree mode: reconverge todo el árbol, el uplink de gestión incluido; hazlo a mano"
+ ],
+ "refusal/spanning-tree mode mst": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | spanning-tree mode mst | spanning-tree mode: reconverge todo el árbol, el uplink de gestión incluido; hazlo a mano"
+ ],
+ "refusal/spanning-tree mode mst/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | spanning-tree mode mst | spanning-tree mode: reconverge todo el árbol, el uplink de gestión incluido; hazlo a mano"
+ ],
+ "refusal/tacacs key": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | tacacs-server \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+ ],
+ "refusal/tacacs key/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | tacacs-server \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+ ],
+ "refusal/username nuevo": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | username tech privilege 1 \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+ ],
+ "refusal/username nuevo/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | username tech privilege 1 \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+ ],
+ "refusal/vlan nueva": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | vlan 50 | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano"
+ ],
+ "refusal/vlan nueva/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | vlan 50 | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano"
+ ],
+ "refusal/vlan que el respaldo no tiene": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | vlan 10 | sección que el respaldo no tiene: habría que borrarla completa; hazlo a mano"
+ ],
+ "refusal/vlan que el respaldo no tiene/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | vlan 10 | sección que el respaldo no tiene: habría que borrarla completa; hazlo a mano"
+ ],
+ "refusal/voz en una VLAN que no existe": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  "interface GigabitEthernet1/0/1 | switchport voice vlan 77 | nombra una VLAN que el equipo no tiene activa (IOS la crearía y, con VTP servidor, la propagaría): créala por separado"
+ ],
+ "refusal/voz en una VLAN que no existe/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  "interface GigabitEthernet1/0/1 | switchport voice vlan 77 | nombra una VLAN que el equipo no tiene activa (IOS la crearía y, con VTP servidor, la propagaría): créala por separado"
+ ],
+ "refusal/vtp": [
+  "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
+  " | vtp mode client | vtp: se propaga a otros equipos"
+ ],
+ "refusal/vtp/parcial": [
+  "ERR assist: el equipo ya coincide con el respaldo",
+  " | vtp mode client | vtp: se propaga a otros equipos"
+ ]
+}

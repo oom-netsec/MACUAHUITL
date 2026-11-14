@@ -163,7 +163,7 @@ describe("Datos", () => {
   });
 
   test("en inglés: títulos, tipos y plantilla salen en inglés", async () => {
-    localStorage.setItem("macuahuitl.idioma", "en");
+    localStorage.setItem("macuahuitl.lang", "en");
     const core = fakeCore();
     view(core);
     const c = card("Scripts");

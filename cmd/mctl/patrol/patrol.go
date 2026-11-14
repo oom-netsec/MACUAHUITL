@@ -3,7 +3,6 @@ package patrol
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -60,10 +59,10 @@ func applyParams(spec *v1.JobSpec, kv []string) error {
 	for _, p := range kv {
 		k, v, ok := strings.Cut(p, "=")
 		if !ok || k == "" {
-			return fmt.Errorf("--param %q: use nombre=valor", p)
+			return cli.Err("mctl.patrol.param_form", "param", p)
 		}
 		if seen[k] {
-			return fmt.Errorf("--param %q repetido", k)
+			return cli.Err("mctl.patrol.param_dup", "name", k)
 		}
 		seen[k] = true
 		if spec.Params == nil {
@@ -97,14 +96,14 @@ func jobLoginTest(c *cli.Env, args []string) error {
 			continue
 		}
 		failed++
-		fmt.Fprintf(c.Out, "%s  FALLA  %s  %s", r.Target.GetAddress(), strings.TrimPrefix(r.FailedStep.String(), "LOGIN_TEST_STEP_"), r.Detail)
+		fmt.Fprint(c.Out, cli.T("mctl.patrol.login_fail", "addr", r.Target.GetAddress(), "step", strings.TrimPrefix(r.FailedStep.String(), "LOGIN_TEST_STEP_"), "detail", r.Detail))
 		if r.HostKeyFingerprint != "" {
-			fmt.Fprintf(c.Out, "  huella=%s (confírmala con: mctl job arm --accept %s %s)", r.HostKeyFingerprint, r.HostKeyFingerprint, id)
+			fmt.Fprint(c.Out, cli.T("mctl.patrol.login_fp", "fp", r.HostKeyFingerprint, "id", id))
 		}
 		fmt.Fprintln(c.Out)
 	}
 	if failed > 0 {
-		return fmt.Errorf("%d equipos no pasaron el Login Test", failed)
+		return cli.Err("mctl.patrol.login_failed", "n", failed)
 	}
 	return nil
 }
@@ -119,15 +118,15 @@ func jobArm(c *cli.Env, args []string) error {
 		return err
 	}
 	if fs.NArg() != 1 {
-		return errors.New("job arm necesita un ID")
+		return cli.Err("mctl.patrol.arm_need_id")
 	}
 	r, err := v1.NewPatrolServiceClient(c.Conn).ArmJob(context.Background(), &v1.ArmJobRequest{JobId: fs.Arg(0), AcceptedHostKeyFingerprints: accept, ExcludedDeviceIds: exclude})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "armado; la llave de la bóveda queda en memoria hasta %s\n", r.WindowEndsAt.AsTime().Local().Format("2006-01-02 15:04"))
+	fmt.Fprintln(c.Out, cli.T("mctl.patrol.armed", "until", r.WindowEndsAt.AsTime().Local().Format("2006-01-02 15:04")))
 	if len(r.MissingInhibitors) > 0 {
-		fmt.Fprintf(c.Out, "aviso: la laptop podría suspenderse; faltan bloqueos: %s\n", strings.Join(r.MissingInhibitors, ", "))
+		fmt.Fprintln(c.Out, cli.T("mctl.patrol.armed_warn", "list", strings.Join(r.MissingInhibitors, ", ")))
 	}
 	return nil
 }
@@ -173,13 +172,13 @@ func playbooks(c *cli.Env, args []string) error {
 
 // playbookLine es una línea del listado; si el playbook pide datos, los suma al final (nombre:tipo).
 func playbookLine(p *v1.PlaybookInfo) string {
-	line := fmt.Sprintf("%s  %s  %d comandos", p.Id, p.Name, len(p.Commands))
+	line := cli.T("mctl.patrol.playbook_line", "id", p.Id, "name", p.Name, "n", len(p.Commands))
 	if len(p.Params) > 0 {
 		var ds []string
 		for _, q := range p.Params {
 			ds = append(ds, q.Name+":"+q.Kind)
 		}
-		line += "  datos: " + strings.Join(ds, " ")
+		line += cli.T("mctl.patrol.playbook_data", "list", strings.Join(ds, " "))
 	}
 	return line
 }
@@ -207,11 +206,11 @@ func jobWatch(c *cli.Env, args []string) error {
 			fmt.Fprintf(c.Out, "%s  %s  %d/%d  %s\n", t, p.DeviceId, p.Index, p.Total, p.Command)
 		case *v1.SubscribeResponse_PhaseAdded:
 			p := ev.PhaseAdded
-			fmt.Fprintf(c.Out, "%s  fase  %s  ronda=%d  %s\n", t, strings.TrimPrefix(p.Kind.String(), "JOB_PHASE_KIND_"), p.Round, p.Detail)
+			fmt.Fprintln(c.Out, cli.T("mctl.patrol.watch_phase", "t", t, "kind", strings.TrimPrefix(p.Kind.String(), "JOB_PHASE_KIND_"), "round", p.Round, "detail", p.Detail))
 		case *v1.SubscribeResponse_Warning:
-			fmt.Fprintf(c.Out, "%s  aviso  %s\n", t, ev.Warning.Code)
+			fmt.Fprintln(c.Out, cli.T("mctl.patrol.watch_warning", "t", t, "code", ev.Warning.Code))
 		case *v1.SubscribeResponse_JobStateChanged:
-			fmt.Fprintf(c.Out, "%s  trabajo  %s\n", t, ev.JobStateChanged.State)
+			fmt.Fprintln(c.Out, cli.T("mctl.patrol.watch_job", "t", t, "state", ev.JobStateChanged.State))
 			if ev.JobStateChanged.State == "closed" {
 				return nil
 			}

@@ -12,7 +12,6 @@ import (
 	"cmp"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"net/netip"
@@ -25,6 +24,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
@@ -56,6 +56,7 @@ type Device struct {
 type Result struct {
 	Devices  []Device
 	Warnings []string
+	WarnErrs []error // los mismos avisos con código del catálogo, para darlos en el idioma pedido
 }
 
 var (
@@ -88,10 +89,10 @@ type acc struct {
 
 type collector struct {
 	obs   []obs
-	warns []string
+	warns []error
 }
 
-func (c *collector) warn(f string, a ...any) { c.warns = append(c.warns, fmt.Sprintf(f, a...)) }
+func (c *collector) warn(err *i18n.Error) { c.warns = append(c.warns, err) }
 
 // Collect lee la carpeta de salidas (outputs/) y las carpetas extra (los output_dir de los trabajos,
 // que pueden estar fuera de outputs/) y arma la lista de equipos conocidos. Solo falla si outputs/
@@ -105,9 +106,9 @@ func Collect(outputs string, extra ...string) (Result, error) {
 		ents, err := os.ReadDir(root)
 		if err != nil {
 			if i == 0 {
-				first = fmt.Errorf("devices: %w", err)
+				first = i18n.Wrap("devices.err.read", err, nil)
 			} else if !errors.Is(err, fs.ErrNotExist) { // la carpeta de un trabajo viejo ya borrada no es noticia
-				c.warn("%s: %v", root, err)
+				c.warn(i18n.Wrap("devices.warn.read", err, i18n.A("where", root)))
 			}
 			continue
 		}
@@ -121,7 +122,7 @@ func Collect(outputs string, extra ...string) (Result, error) {
 				continue
 			}
 			if jobs++; jobs > maxJobDirs {
-				c.warn("más de %d carpetas en outputs/: el resto no se leyó", maxJobDirs)
+				c.warn(i18n.New("devices.warn.too_many_dirs", i18n.A("max", maxJobDirs)))
 				return c.merge(), nil
 			}
 			c.job(filepath.Join(root, e.Name()), e.Name())
@@ -150,13 +151,24 @@ type manifestFile struct {
 	} `json:"devices"`
 }
 
+func warnTexts(errs []error) []string {
+	if errs == nil {
+		return nil
+	}
+	out := make([]string, len(errs))
+	for i, e := range errs {
+		out[i] = e.Error()
+	}
+	return out
+}
+
 func readSmall(p string, max int64) ([]byte, error) {
 	fi, err := os.Lstat(p)
 	if err != nil {
 		return nil, err
 	}
 	if !fi.Mode().IsRegular() || fi.Size() > max {
-		return nil, fmt.Errorf("no es un archivo regular o pasa de %d MiB", max>>20)
+		return nil, i18n.New("devices.err.not_regular", i18n.A("mib", max>>20))
 	}
 	f, err := os.Open(p)
 	if err != nil {
@@ -172,7 +184,7 @@ func (c *collector) job(dir, name string) {
 	if b, err := readSmall(filepath.Join(dir, "manifest.json"), maxManifest); err == nil {
 		var m manifestFile
 		if err := json.Unmarshal(b, &m); err != nil {
-			c.warn("%s/manifest.json ilegible: %v", name, err)
+			c.warn(i18n.Wrap("devices.warn.manifest", err, i18n.A("name", name)))
 		} else {
 			at := m.EndedAt
 			if at.IsZero() {
@@ -190,7 +202,7 @@ func (c *collector) job(dir, name string) {
 	}
 	ents, err := os.ReadDir(dir)
 	if err != nil {
-		c.warn("%s: %v", name, err)
+		c.warn(i18n.Wrap("devices.warn.read", err, i18n.A("where", name)))
 		return
 	}
 	zips := 0
@@ -201,7 +213,7 @@ func (c *collector) job(dir, name string) {
 			c.add(obs{addr: ip, host: host, src: SrcFlota, at: newestFile(filepath.Join(dir, e.Name()))})
 		case e.Type().IsRegular() && strings.HasSuffix(strings.ToLower(e.Name()), ".zip"):
 			if zips++; zips > maxZips {
-				c.warn("%s: más de %d zips, el resto no se leyó", name, maxZips)
+				c.warn(i18n.New("devices.warn.too_many_zips", i18n.A("name", name, "max", maxZips)))
 				continue
 			}
 			c.zipDevices(filepath.Join(dir, e.Name()), name, known)
@@ -241,7 +253,7 @@ func newestFile(dir string) time.Time {
 func (c *collector) zipDevices(p, job string, known map[string][2]string) {
 	zr, err := zip.OpenReader(p)
 	if err != nil {
-		c.warn("%s/%s: %v", job, filepath.Base(p), err)
+		c.warn(i18n.Wrap("devices.warn.read", err, i18n.A("where", job+"/"+filepath.Base(p))))
 		return
 	}
 	defer zr.Close()
@@ -252,7 +264,7 @@ func (c *collector) zipDevices(p, job string, known map[string][2]string) {
 	seen := map[string]bool{}
 	for i, zf := range zr.File {
 		if i >= maxZipEntries {
-			c.warn("%s/%s: más de %d entradas, el resto no se leyó", job, filepath.Base(p), maxZipEntries)
+			c.warn(i18n.New("devices.warn.too_many_entries", i18n.A("where", job+"/"+filepath.Base(p), "max", maxZipEntries)))
 			return
 		}
 		n := path.Clean(zf.Name)
@@ -300,7 +312,7 @@ func (c *collector) backups(root string) {
 
 // merge junta las observaciones: por dirección, y las que no la tienen (respaldos) por nombre.
 func (c *collector) merge() Result {
-	res := Result{Warnings: c.warns}
+	res := Result{Warnings: warnTexts(c.warns), WarnErrs: c.warns}
 	byAddr := map[string]*acc{}
 	var order []*acc
 	capped := false
@@ -358,7 +370,9 @@ func (c *collector) merge() Result {
 		}
 	}
 	if capped {
-		res.Warnings = append(res.Warnings, fmt.Sprintf("más de %d equipos: la lista está incompleta", MaxDevices))
+		capWarn := i18n.New("devices.warn.too_many", i18n.A("max", MaxDevices))
+		res.Warnings = append(res.Warnings, capWarn.Error())
+		res.WarnErrs = append(res.WarnErrs, capWarn)
 	}
 	for _, a := range order {
 		for _, s := range []string{SrcPatrol, SrcFlota, SrcRespaldos} {

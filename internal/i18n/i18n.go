@@ -1,8 +1,8 @@
 // Package i18n es el catálogo es/en de códigos estables del núcleo: cada código lleva su texto en los dos
 // idiomas, sus argumentos con nombre ({arg}) y los metadatos que viajan al cliente.
 //
-// El español es el idioma de origen: sin idioma en el contexto, o con uno desconocido, todo sale en es y
-// byte por byte igual que antes de existir el catálogo. No hace: auditoría (va fija en inglés, fuera del
+// El inglés es el idioma canónico: sin idioma en el contexto, o con uno desconocido, todo sale en en; el
+// español es segunda lengua y se pide explícito. No hace: auditoría (va fija en inglés, fuera del
 // catálogo), ni gRPC (eso es de internal/service).
 package i18n
 
@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // Idiomas que el núcleo entiende.
@@ -21,6 +22,19 @@ const (
 	Es = "es"
 	En = "en"
 )
+
+// defaultLocale es el idioma de lo que no pide ninguno: el canónico, en. Solo SetDefault lo cambia, para pruebas.
+var defaultLocale atomic.Value // string
+
+func init() { defaultLocale.Store(En) }
+
+func defLoc() string { return defaultLocale.Load().(string) }
+
+// SetDefault cambia el idioma por omisión y devuelve el anterior. Es solo para pruebas (i18ntest): el código de la
+// app nunca lo llama.
+func SetDefault(loc string) (prev string) {
+	return defaultLocale.Swap(Normalize(loc)).(string)
+}
 
 // Args son los argumentos con nombre de una plantilla.
 type Args map[string]string
@@ -64,25 +78,28 @@ func WithLocale(ctx context.Context, loc string) context.Context {
 	return context.WithValue(ctx, ctxKey{}, Normalize(loc))
 }
 
-// Locale devuelve es o en; sin idioma en el contexto, es.
+// Locale devuelve es o en; sin idioma en el contexto, en.
 func Locale(ctx context.Context) string {
 	if l, ok := ctx.Value(ctxKey{}).(string); ok {
 		return l
 	}
-	return Es
+	return defLoc()
 }
 
-// Normalize reduce una etiqueta (es, es-MX, EN-us) a es o en; lo desconocido es es.
+// Normalize reduce una etiqueta (es, es-MX, EN-us) a es o en; lo desconocido es en.
 func Normalize(tag string) string {
 	t := strings.ToLower(strings.TrimSpace(tag))
 	if t == En || strings.HasPrefix(t, "en-") || strings.HasPrefix(t, "en_") {
 		return En
 	}
-	return Es
+	if t == Es || strings.HasPrefix(t, "es-") || strings.HasPrefix(t, "es_") {
+		return Es
+	}
+	return defLoc()
 }
 
 // Parse elige el idioma de un valor Accept-Language (lista con q): el de mayor q entre es y en; ausente o
-// ninguno conocido, es. A igual q gana el primero de la lista.
+// ninguno conocido, en. A igual q gana el primero de la lista.
 func Parse(header string) string {
 	if len(header) > maxHeader {
 		complete := header[maxHeader] == ',' // el corte cae justo antes de una coma: el último trozo está entero
@@ -95,7 +112,7 @@ func Parse(header string) string {
 			header = ""
 		}
 	}
-	best, bestQ := Es, -1.0
+	best, bestQ := defLoc(), -1.0
 	for _, part := range strings.Split(header, ",") {
 		tag, params, _ := strings.Cut(part, ";")
 		tag = strings.ToLower(strings.TrimSpace(tag))
@@ -134,11 +151,11 @@ func Msg(loc, code string, args Args) string {
 	return render(e.Es, args)
 }
 
-// Los códigos que son un valor con palabras (calc.val.*, ike.val.*) pueden ir como valor de un argumento: al armar
+// Los códigos que son un valor con palabras (calc.val.*, ike.val.*, assist.what.*) pueden ir como valor de un argumento: al armar
 // el texto se escriben en el idioma pedido, así un mensaje cita un valor traducible. Varios códigos separados por
 // coma se escriben separados por «, ».
 func isValKey(v string) bool {
-	if !strings.HasPrefix(v, "calc.val.") && !strings.HasPrefix(v, "ike.val.") {
+	if !strings.HasPrefix(v, "calc.val.") && !strings.HasPrefix(v, "ike.val.") && !strings.HasPrefix(v, "assist.what.") {
 		return false
 	}
 	_, ok := catalog[v]

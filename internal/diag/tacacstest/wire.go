@@ -3,9 +3,10 @@ package tacacstest
 import (
 	"crypto/md5"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // RFC 8907 §4.1.
@@ -67,10 +68,10 @@ func readPacket(r io.Reader, key []byte) (header, []byte, error) {
 	h := header{Version: hb[0], Type: hb[1], Seq: hb[2], Flags: hb[3],
 		Session: binary.BigEndian.Uint32(hb[4:8]), Length: binary.BigEndian.Uint32(hb[8:12])}
 	if h.Version>>4 != 0xc {
-		return h, nil, fmt.Errorf("versión mayor 0x%x: no es TACACS+", h.Version>>4)
+		return h, nil, i18n.New("tacacs.err.version", i18n.A("version", fmt.Sprintf("0x%x", h.Version>>4)))
 	}
 	if h.Length > maxBody {
-		return h, nil, fmt.Errorf("cuerpo de %d bytes excede el límite", h.Length)
+		return h, nil, i18n.New("tacacs.err.body_limit", i18n.A("length", h.Length))
 	}
 	body := make([]byte, h.Length)
 	if _, err := io.ReadFull(r, body); err != nil {
@@ -82,7 +83,7 @@ func readPacket(r io.Reader, key []byte) (header, []byte, error) {
 	return h, body, nil
 }
 
-var errShort = errors.New("cuerpo truncado")
+var errShort error = i18n.New("tacacs.err.short", nil)
 
 // fields corta b en trozos de las longitudes dadas, con verificación de límites.
 func fields(b []byte, lens ...int) ([][]byte, error) {

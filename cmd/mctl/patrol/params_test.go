@@ -3,6 +3,7 @@ package patrol
 import (
 	"testing"
 
+	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
 
@@ -25,6 +26,8 @@ func TestApplyParams(t *testing.T) {
 }
 
 func TestPlaybookLine(t *testing.T) {
+	cli.SetLang("es")
+	t.Cleanup(func() { cli.SetLang("") })
 	p := &v1.PlaybookInfo{Id: "ios-xe/x", Name: "X", Commands: []string{"a", "b"}}
 	if got := playbookLine(p); got != "ios-xe/x  X  2 comandos" {
 		t.Fatal(got)

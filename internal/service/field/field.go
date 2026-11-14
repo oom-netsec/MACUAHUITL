@@ -12,13 +12,12 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/serialcon"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/imgverify"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -40,7 +39,7 @@ func (s *fieldSvc) ListSerialPorts(context.Context, *v1.ListSerialPortsRequest) 
 func (s *fieldSvc) outFile(sub, prefix string) (*os.File, error) {
 	dir := filepath.Join(s.d.Outputs(), sub)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, status.Errorf(codes.Internal, "carpeta de salida: %v", err)
+		return nil, i18n.Wrap("ingest.err.out_dir", err, nil)
 	}
 	base := prefix + "_" + s.d.Now().Format("20060102-150405")
 	for n := 0; n < 100; n++ {
@@ -53,11 +52,11 @@ func (s *fieldSvc) outFile(sub, prefix string) (*os.File, error) {
 			continue
 		}
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "archivo de salida: %v", err)
+			return nil, i18n.Wrap("ingest.err.out_file", err, nil)
 		}
 		return f, nil
 	}
-	return nil, status.Error(codes.Internal, "archivo de salida: demasiados nombres ocupados")
+	return nil, i18n.New("field.err.names_busy", nil)
 }
 
 // Console conecta el stream con el puerto serie. Lo tecleado no se graba ni se
@@ -74,25 +73,26 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	}
 	cfg, err := serialcon.Config{Path: o.Port, Baud: int(o.Baud), DataBits: int(o.DataBits), Parity: o.Parity, StopBits: int(o.StopBits), Flow: o.Flow}.Normalize()
 	if err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	}
 	p, err := serialcon.Open(cfg)
 	if errors.Is(err, serialcon.ErrPermission) {
-		return status.Error(codes.PermissionDenied, err.Error())
+		return service.ErrFrom(st.Context(), codes.PermissionDenied, err)
 	} else if err != nil {
-		return status.Error(codes.FailedPrecondition, err.Error())
+		return service.ErrFrom(st.Context(), codes.FailedPrecondition, err)
 	}
 	defer p.Close()
 	f, err := s.outFile("console", "console_"+filepath.Base(cfg.Path))
 	if err != nil {
-		return err
+		return service.ErrFrom(st.Context(), codes.Internal, err)
 	}
 	defer f.Close()
 	rec := serialcon.NewRecorder(f, s.d.Now)
 	summary := cfg.Path + " " + cfg.String()
 	rec.Mark("abierto " + summary)
+	opened := cfg.Path + " " + cfg.StringIn(i18n.Locale(st.Context()))
 	s.d.Audit("field.console.open", cfg.Path, cfg.AuditString()+" output="+f.Name())
-	if err := st.Send(&v1.ConsoleResponse{Opened: summary, OutputPath: f.Name()}); err != nil {
+	if err := st.Send(&v1.ConsoleResponse{Opened: opened, OutputPath: f.Name()}); err != nil {
 		return err
 	}
 	var rx, tx, breaks atomic.Int64
@@ -141,13 +141,15 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 		p.Close()
 	}
 	reason, reasonEN := "cerrada por el usuario", "closed by the user"
+	var lostErr error
 	if lost != nil {
-		reason, reasonEN = "puerto perdido: "+lost.Error(), "port lost: "+i18n.English(lost)
+		lostErr = i18n.Wrap("field.err.port_lost", lost, nil)
+		reason, reasonEN = lostErr.Error(), i18n.English(lostErr)
 	}
 	rec.Mark("cerrado: " + reason)
 	s.d.Audit("field.console.close", cfg.Path, fmt.Sprintf("received=%d sent=%d break=%d %s", rx.Load(), tx.Load(), breaks.Load(), reasonEN))
 	if lost != nil {
-		return status.Error(codes.Unavailable, reason)
+		return service.ErrFrom(st.Context(), codes.Unavailable, lostErr)
 	}
 	return nil
 }
@@ -159,17 +161,17 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	s.d.MarkActive()
 	port, ok := defaultServePort[r.Protocol]
 	if !ok {
-		return status.Errorf(codes.InvalidArgument, "protocolo %q no soportado (tftp o http)", r.Protocol)
+		return service.Err(st.Context(), codes.InvalidArgument, "field.err.proto", i18n.A("proto", r.Protocol))
 	}
 	addr := r.Addr
 	if ip, err := netip.ParseAddr(strings.Trim(addr, "[]")); err == nil { // solo IP: puerto por defecto
 		addr = netip.AddrPortFrom(ip, port).String()
 	}
 	if err := fileserve.ValidateAddr(addr, r.AllowAny); err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	}
 	if _, err := fileserve.Publish(r.Files); err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	}
 	ctx, cancel := context.WithTimeout(st.Context(), service.SyslogDuration(r.DurationSeconds))
 	defer cancel()
@@ -183,7 +185,7 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	n, rejected := k.stop()
 	s.d.Audit("field.serve.done", addr, fmt.Sprintf("transfers=%d rejected=%d", n, rejected))
 	if err != nil {
-		return status.Error(codes.Unavailable, err.Error())
+		return service.ErrFrom(st.Context(), codes.Unavailable, err)
 	}
 	return nil
 }
@@ -232,20 +234,14 @@ func (k *serveSink) stop() (n, rejected int64) {
 	return k.n.Load(), k.rejected.Load()
 }
 
-func (s *fieldSvc) HashFile(_ context.Context, r *v1.HashFileRequest) (*v1.HashFileResponse, error) {
+func (s *fieldSvc) HashFile(ctx context.Context, r *v1.HashFileRequest) (*v1.HashFileResponse, error) {
 	s.d.MarkActive()
 	s.d.Audit("field.hash", r.Path, "")
 	res, err := imgverify.Check(r.Path, r.Md5, r.Sha512)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "archivo  %s (%d bytes)\n", res.File, res.Size)
-	mark := map[string]string{"ok": "  coincide", "distinto": "  NO COINCIDE", "": ""}
-	fmt.Fprintf(&b, "MD5      %s%s\n", res.MD5, mark[res.MD5Match])
-	fmt.Fprintf(&b, "SHA-512  %s%s\n", res.SHA512, mark[res.SHA512Match])
-	fmt.Fprintf(&b, "en el equipo, tras copiarla:\n  %s", res.VerifyCommand)
-	return &v1.HashFileResponse{Report: service.Report(res, b.String()), Ok: res.OK()}, nil
+	return &v1.HashFileResponse{Report: service.Report(res, hashText(i18n.Locale(ctx), res)), Ok: res.OK()}, nil
 }
 
 // Module registra el servicio Field.
@@ -253,4 +249,15 @@ type Module struct{}
 
 func (Module) Register(s ipc.Registrar, d service.Deps) {
 	v1.RegisterFieldServiceServer(s, &fieldSvc{d: d})
+}
+
+// hashText es el informe de HashFile en el idioma pedido.
+func hashText(loc string, res imgverify.Result) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s  %s (%d bytes)\n", i18n.Msg(loc, "field.hash.file", nil), res.File, res.Size)
+	mark := map[string]string{"ok": "  " + i18n.Msg(loc, "field.hash.match", nil), "distinto": "  " + i18n.Msg(loc, "field.hash.differ", nil), "": ""}
+	fmt.Fprintf(&b, "MD5      %s%s\n", res.MD5, mark[res.MD5Match])
+	fmt.Fprintf(&b, "SHA-512  %s%s\n", res.SHA512, mark[res.SHA512Match])
+	fmt.Fprintf(&b, "%s\n  %s", i18n.Msg(loc, "field.hash.on_device", nil), res.VerifyCommand)
+	return b.String()
 }

@@ -3,8 +3,6 @@ package devices
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"net/netip"
 	"regexp"
 	"slices"
@@ -13,6 +11,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Libreta de hosts (fase 29b): los equipos que el usuario agrega a mano son la fuente «manual» del inventario.
@@ -80,22 +80,28 @@ func hasControl(s string, allowNL bool) bool {
 }
 
 // FieldError es un campo inválido de un host: Field es el nombre del campo en el archivo de import (name, address…).
-type FieldError struct{ Field, Reason string }
+// Reason es el texto en es; Err es el mismo con código del catálogo, para darlo en el idioma pedido.
+type FieldError struct {
+	Field, Reason string
+	Err           error
+}
 
 func (e *FieldError) Error() string { return e.Reason }
+func (e *FieldError) Unwrap() error { return e.Err }
 
-func fe(field, format string, a ...any) *FieldError {
-	return &FieldError{field, fmt.Sprintf(format, a...)}
+func fe(field, code string, args ...any) *FieldError {
+	err := i18n.New(code, i18n.A(args...))
+	return &FieldError{Field: field, Reason: err.Error(), Err: err}
 }
 
 // canonAddr valida una dirección (IP o nombre DNS, sin esquema, usuario, puerto ni ruta) y la deja canónica.
 func canonAddr(a string) (string, error) {
 	if a == "" || len(a) > 253 {
-		return "", errors.New("la dirección va de 1 a 253 caracteres")
+		return "", i18n.New("hostfield.addr_len", nil)
 	}
 	if ip, err := netip.ParseAddr(a); err == nil {
 		if ip.Zone() != "" {
-			return "", errors.New("la dirección no admite zona (%)")
+			return "", i18n.New("hostfield.addr_zone", nil)
 		}
 		return ip.Unmap().String(), nil
 	}
@@ -103,11 +109,11 @@ func canonAddr(a string) (string, error) {
 	labels := strings.Split(a, ".")
 	for _, l := range labels {
 		if !dnsLabelRe.MatchString(l) {
-			return "", fmt.Errorf("dirección %q: use una IP o un nombre DNS (letras, números y guiones), sin espacios, @, esquema, puerto ni ruta", a)
+			return "", i18n.New("hostfield.addr_dns", i18n.A("addr", a))
 		}
 	}
 	if _, err := strconv.Atoi(labels[len(labels)-1]); err == nil { // «10.0.0.256»: parece IP, no es nombre
-		return "", fmt.Errorf("dirección %q: parece una IP inválida", a)
+		return "", i18n.New("hostfield.addr_ip", i18n.A("addr", a))
 	}
 	return a, nil
 }
@@ -115,39 +121,39 @@ func canonAddr(a string) (string, error) {
 // Clean valida un host y lo deja canónico (dirección en minúsculas o IP normalizada, puerto por defecto).
 func Clean(h Host) (Host, error) {
 	if n := utf8.RuneCountInString(h.Name); n < 1 || n > MaxHostName || h.Name != strings.TrimSpace(h.Name) || hasControl(h.Name, false) {
-		return h, fe("name", "el nombre va de 1 a 64 caracteres, sin espacios en los extremos ni caracteres de control")
+		return h, fe("name", "hostfield.name")
 	}
 	var err error
 	if h.Address, err = canonAddr(h.Address); err != nil {
-		return h, fe("address", "%s", err)
+		return h, &FieldError{Field: "address", Reason: err.Error(), Err: err}
 	}
 	if h.Port == 0 {
 		h.Port = DefaultPort
 	}
 	if h.Port < 1 || h.Port > 65535 {
-		return h, fe("port", "el puerto va de 1 a 65535")
+		return h, fe("port", "hostfield.port")
 	}
 	if h.Platform != "" && !slices.Contains(HostPlatforms, h.Platform) {
-		return h, fe("platform", "plataforma %q fuera de la lista (%s)", h.Platform, strings.Join(HostPlatforms, ", "))
+		return h, fe("platform", "hostfield.platform", "platform", h.Platform, "list", strings.Join(HostPlatforms, ", "))
 	}
 	if h.Folder != "" && (!folderRe.MatchString(h.Folder) || h.Folder != strings.TrimSpace(h.Folder)) {
-		return h, fe("folder", "la carpeta es de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -")
+		return h, fe("folder", "hostfield.folder")
 	}
 	if len(h.Tags) > MaxHostTags {
-		return h, fe("tags", "máximo %d etiquetas", MaxHostTags)
+		return h, fe("tags", "hostfield.tags_max", "max", MaxHostTags)
 	}
 	seen := map[string]bool{}
 	for _, t := range h.Tags {
 		if !hostTagRe.MatchString(t) || seen[t] {
-			return h, fe("tags", "etiqueta %q inválida o repetida: 1 a 24 caracteres entre a-z, 0-9 y -", t)
+			return h, fe("tags", "hostfield.tag_bad", "tag", t)
 		}
 		seen[t] = true
 	}
 	if utf8.RuneCountInString(h.Notes) > MaxNotes || hasControl(h.Notes, true) {
-		return h, fe("notes", "las notas pasan de %d caracteres o traen caracteres de control", MaxNotes)
+		return h, fe("notes", "hostfield.notes", "max", MaxNotes)
 	}
 	if h.CredentialID != "" && !credIDRe.MatchString(h.CredentialID) {
-		return h, fe("credential_id", "no es un id de la bóveda")
+		return h, fe("credential_id", "hostfield.credential_id")
 	}
 	return h, nil
 }

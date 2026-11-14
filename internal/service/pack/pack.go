@@ -111,7 +111,7 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		return prepErr
 	})
 	if prepErr != nil {
-		return nil, status.Error(codes.Internal, "no se instaló nada: no se pudo guardar lo oculto: "+prepErr.Error())
+		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("pack.err.hidden_save", prepErr, nil))
 	}
 	if err != nil {
 		var p *dom.Pack
@@ -128,7 +128,7 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	}
 	info, err := s.info(p)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "el paquete quedó instalado, pero no se pudo leer lo oculto: "+err.Error())
+		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("pack.err.hidden_read", err, nil))
 	}
 	return &v1.PackServiceInstallResponse{Pack: info, ReplacedVersion: res.Replaced}, nil
 }

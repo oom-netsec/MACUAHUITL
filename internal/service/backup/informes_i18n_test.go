@@ -80,12 +80,12 @@ func informesCasos(t *testing.T, ctx context.Context) map[string]string {
 }
 
 func TestInformesRespaldosRegresionEs(t *testing.T) {
-	i18ntest.Golden(t, "testdata/informes_es.golden.json", informesCasos(t, context.Background()))
+	i18ntest.Golden(t, "testdata/informes_es.golden.json", informesCasos(t, i18n.WithLocale(context.Background(), "es")))
 }
 
 // Con en, los informes de respaldos salen sin español (salvo los datos); los errores del almacén llevan código.
 func TestInformesRespaldosEnSinEspanol(t *testing.T) {
-	es := informesCasos(t, context.Background())
+	es := informesCasos(t, i18n.WithLocale(context.Background(), "es"))
 	en := informesCasos(t, i18n.WithLocale(context.Background(), "en"))
 	spanish := regexp.MustCompile(`(?i)\b(respaldo|respaldos|guardado|guardados|Aviso|AVISO|enmascarado|sin diferencias|cambios|agregadas|quitadas|ignoradas|contra|firma|bóveda|no existe|equipo no devolvió|ventana|descartó|retención|existían|borrado)\b`)
 	for k, v := range en {

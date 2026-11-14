@@ -18,9 +18,9 @@ func auditVerify(c *cli.Env, args []string) error {
 		return err
 	}
 	if !r.Intact {
-		return fmt.Errorf("la cadena de auditoría está rota en el registro %d", r.FirstBrokenSeq)
+		return cli.Err("mctl.audit.broken", "seq", r.FirstBrokenSeq)
 	}
-	fmt.Fprintf(c.Out, "cadena íntegra; cabeza %s\n", r.HeadHash)
+	fmt.Fprintln(c.Out, cli.T("mctl.audit.intact", "head", r.HeadHash))
 	return nil
 }
 

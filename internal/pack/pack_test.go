@@ -8,6 +8,8 @@ import (
 	"io/fs"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 const goodManifest = `id: oom/demo
@@ -403,5 +405,40 @@ func TestScriptsDePaqueteOficialExigenBibliotecaYLib(t *testing.T) {
 func TestPlainRechazaFormato(t *testing.T) {
 	if plain("a\u202eb", 10) || !plain("ab", 10) {
 		t.Fatal("plain debe rechazar caracteres de formato (bidi)")
+	}
+}
+
+// Fase 30e: las causas armadas en la validación de playbooks y scripts salen en el idioma pedido.
+func TestCausasDePaqueteEnElIdioma(t *testing.T) {
+	casos := []struct {
+		name   string
+		files  func() map[string][]byte
+		es, en string
+	}{
+		{"plataforma", func() map[string][]byte {
+			f := thirdParty()
+			f["scripts.json"] = []byte(strings.Replace(scriptsJSON("lib-acme-x"), `"platform":"ios-xe"`, `"platform":"nx-os"`, 1))
+			return f
+		}, `script inválido: script lib-acme-x: plataforma "nx-os" fuera de platforms del manifiesto`,
+			`invalid script: script lib-acme-x: platform "nx-os" is not in the manifest platforms`},
+		{"id del playbook", func() map[string][]byte {
+			f := thirdParty()
+			delete(f, "playbooks/acme-stp.yaml")
+			f["playbooks/stp.yaml"] = []byte(strings.Replace(goodPlaybook, "oom-stp", "acme-otro", 1))
+			return f
+		}, `playbook inválido: playbook ios-xe/acme-otro: el id debe ser a-z, 0-9 y guion, e igual al nombre del archivo stp.yaml`,
+			`invalid playbook: playbook ios-xe/acme-otro: the id must be a-z, 0-9 and hyphen, and equal to the file name stp.yaml`},
+		{"origen", func() map[string][]byte {
+			f := thirdParty()
+			f["scripts.json"] = []byte(strings.Replace(scriptsJSON("0123456789abcdef0123456789abcdef"), `"origin":"biblioteca"`, `"origin":"usuario"`, 1))
+			return f
+		}, `script inválido: script 0123456789abcdef0123456789abcdef: origin biblioteca e ID lib-… obligatorios`,
+			`invalid script: script 0123456789abcdef0123456789abcdef: origin "biblioteca" and a lib-... ID are required`},
+	}
+	for _, c := range casos {
+		_, err := Verify(mustZip(t, c.files()), "dev", nil)
+		if err == nil || err.Error() != c.es || i18n.English(err) != c.en {
+			t.Errorf("%s: es=%v en=%q", c.name, err, i18n.English(err))
+		}
 	}
 }

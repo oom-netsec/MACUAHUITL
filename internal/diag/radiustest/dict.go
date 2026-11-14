@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type kind int
@@ -67,6 +69,20 @@ var vsaDict = map[[2]uint32]def{
 type Decoded struct {
 	Name  string
 	Value string
+	Text  i18n.Text `json:"-"` // Value como texto de catálogo, si lo es
+}
+
+func truncated(name string, b []byte) Decoded {
+	t := i18n.Tx("radius.val.truncated", "hex", hex.EncodeToString(b))
+	return Decoded{Name: name, Value: t.In(i18n.Es), Text: t}
+}
+
+// ValueIn es Value en el idioma pedido.
+func (d Decoded) ValueIn(loc string) string {
+	if d.Text.Empty() {
+		return d.Value
+	}
+	return d.Text.In(loc)
 }
 
 func printable(b []byte) bool {
@@ -136,17 +152,17 @@ func describe(a Attr) []Decoded {
 		if !ok {
 			d = def{name: fmt.Sprintf("Atributo-%d", a.Type), kind: kOctets}
 		}
-		return []Decoded{{d.name, render(d, a.Value)}}
+		return []Decoded{{Name: d.name, Value: render(d, a.Value)}}
 	}
 	if len(a.Value) < 4 {
-		return []Decoded{{"Vendor-Specific", "0x" + hex.EncodeToString(a.Value) + " (truncado)"}}
+		return []Decoded{truncated("Vendor-Specific", a.Value)}
 	}
 	vendor := binary.BigEndian.Uint32(a.Value)
 	var out []Decoded
 	rest := a.Value[4:]
 	for len(rest) > 0 {
 		if len(rest) < 2 || rest[1] < 2 || int(rest[1]) > len(rest) {
-			return append(out, Decoded{fmt.Sprintf("VSA-%d", vendor), "0x" + hex.EncodeToString(rest) + " (truncado)"})
+			return append(out, truncated(fmt.Sprintf("VSA-%d", vendor), rest))
 		}
 		t, v := rest[0], rest[2:rest[1]]
 		rest = rest[rest[1]:]
@@ -154,7 +170,7 @@ func describe(a Attr) []Decoded {
 		if !ok {
 			d = def{name: fmt.Sprintf("VSA-%d-%d", vendor, t), kind: kOctets}
 		}
-		out = append(out, Decoded{d.name, render(d, v)})
+		out = append(out, Decoded{Name: d.name, Value: render(d, v)})
 	}
 	return out
 }
@@ -169,7 +185,7 @@ func parseEnum(s string, m map[uint32]string) (uint32, error) {
 			return n, nil
 		}
 	}
-	return 0, fmt.Errorf("valor %q desconocido", s)
+	return 0, i18n.New("radius.err.value", i18n.A("value", s))
 }
 
 func norm(s string) string {

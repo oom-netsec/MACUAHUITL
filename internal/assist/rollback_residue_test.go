@@ -3,9 +3,12 @@ package assist
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // QA 3560CX: el equipo agrega solo «spanning-tree portfast edge» al aplicar y la reversa no lo quita. Eso no es «revertido»:
@@ -39,6 +42,9 @@ func TestRollbackLeavingResidueIsNotRolledBack(t *testing.T) {
 	sn := r.Snapshot()
 	if !strings.Contains(sn.Reason, "sobra «spanning-tree portfast edge»") || len(sn.Changed) != 1 || !sn.CanRollback {
 		t.Fatalf("%+v", sn)
+	}
+	if !strings.Contains(sn.ReasonEN, `extra "spanning-tree portfast edge"`) || strings.Contains(sn.ReasonEN, "sobra") {
+		t.Fatalf("motivo en inglés: %q", sn.ReasonEN)
 	}
 	// Reintentar no lo toma por un cambio ajeno: manda la reversa otra vez y vuelve a avisar.
 	if err := r.Rollback(); err != nil {
@@ -171,5 +177,36 @@ func TestResidueMissingOutputIsUnverified(t *testing.T) {
 	wait(t, r, Failed)
 	if !strings.Contains(r.FailReason(), "no se pudo verificar") || strings.Contains(r.FailReason(), "falta") {
 		t.Fatalf("motivo %q", r.FailReason())
+	}
+}
+
+// Fase 30e: el residuo sale en el idioma pedido; las líneas de configuración no se traducen.
+func TestResidueEnElIdioma(t *testing.T) {
+	base := "interface Gi1\n description a\n shutdown\ninterface Gi2\n shutdown\nend"
+	got := "interface Gi1\n description a\n shutdown\ninterface Gi2\n spanning-tree portfast edge\nend"
+	if d := residueT(base, got).In(i18n.En); d != `missing "shutdown" in interface Gi2, extra "spanning-tree portfast edge" in interface Gi2` {
+		t.Errorf("en: %q", d)
+	}
+	if d := residueT(base, got).In(i18n.Es); d != "falta «shutdown» en interface Gi2, sobra «spanning-tree portfast edge» en interface Gi2" {
+		t.Errorf("es: %q", d)
+	}
+	many := ""
+	for i := 0; i < 8; i++ {
+		many += fmt.Sprintf("hostname H%d\n", i)
+	}
+	if d := residueT("", many).In(i18n.En); !strings.HasSuffix(d, ", and 3 more") {
+		t.Errorf("más: %q", d)
+	}
+	if d := residueT("", many).In(i18n.Es); !strings.HasSuffix(d, ", y 3 más") {
+		t.Errorf("más es: %q", d)
+	}
+}
+
+func TestResiduePiezasSueltasEnEn(t *testing.T) {
+	if got := i18n.Tx("assist.residue.hidden").In(i18n.En); got != "(hidden line)" {
+		t.Errorf("%q", got)
+	}
+	if got := i18n.Tx("assist.residue.err_disabled", "port", "Gi1").In(i18n.En); !strings.HasPrefix(got, "Gi1 ended up err-disabled;") {
+		t.Errorf("%q", got)
 	}
 }

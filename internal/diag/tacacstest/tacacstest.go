@@ -64,10 +64,23 @@ func prob(key string, kv ...any) error { return problem{i18n.Tx(key, kv...)} }
 // fail registra el error del paso: uno propio (problem) conserva su código; cualquier otro es un texto del sistema.
 func (s *Step) fail(err error) {
 	var p problem
-	if !errors.As(err, &p) {
+	var c *i18n.Error
+	switch {
+	case errors.As(err, &p):
+	case errors.As(err, &c): // error con código de catálogo (lectura del paquete)
+		p = problem{i18n.Tx(c.Code, argsKV(c.Args)...)}
+	default:
 		p = problem{i18n.Tx("security.tacacs.err.system", "error", err.Error())}
 	}
 	s.ErrText, s.Error = p.t, p.Error()
+}
+
+func argsKV(a i18n.Args) []any {
+	var kv []any
+	for k, v := range a {
+		kv = append(kv, k, v)
+	}
+	return kv
 }
 
 // Finding es un hallazgo. Severity es aviso, error o info en el JSON y el texto en español de siempre.
@@ -139,23 +152,23 @@ func status(m map[byte]string, s byte) string {
 
 func Run(ctx context.Context, d Dialer, c Config) (Report, error) {
 	if strings.TrimSpace(c.Host) == "" || strings.HasPrefix(c.Host, "-") {
-		return Report{}, errors.New("tacacs: servidor inválido")
+		return Report{}, i18n.New("tacacs.err.host", nil)
 	}
 	if len(c.Secret) == 0 {
-		return Report{}, errors.New("tacacs: falta el secreto compartido (sin él el tráfico viaja en claro)")
+		return Report{}, i18n.New("tacacs.err.secret", nil)
 	}
 	if c.Username == "" || len(c.Username) > 255 || len(c.Password) > 255 || len(c.NASPort) > 255 || len(c.RemAddr) > 255 {
-		return Report{}, errors.New("tacacs: usuario vacío o campos de más de 255 bytes")
+		return Report{}, i18n.New("tacacs.err.user", nil)
 	}
 	if c.AuthenType == "" {
 		c.AuthenType = "ascii"
 	}
 	if c.AuthenType != "ascii" && c.AuthenType != "pap" {
-		return Report{}, fmt.Errorf("tacacs: tipo de autenticación %q no soportado (ascii, pap)", c.AuthenType)
+		return Report{}, i18n.New("tacacs.err.authen", i18n.A("type", c.AuthenType))
 	}
 	for _, a := range append(commandArgs(c.Command), acctCmd(c.Command)) {
 		if len(a) > 255 { // RFC 8907: cada AV pair lleva su longitud en un byte
-			return Report{}, fmt.Errorf("tacacs: el AV pair %.20q… mide %d bytes; el máximo es 255 (acorta el comando)", a, len(a))
+			return Report{}, i18n.New("tacacs.err.av_pair", i18n.A("pair", fmt.Sprintf("%.20q", a), "length", len(a)))
 		}
 	}
 	if c.Port == 0 {

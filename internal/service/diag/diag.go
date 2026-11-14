@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ifaces"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
@@ -43,17 +43,17 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	if factory {
 		req.OutputDir = filepath.Join(s.d.Outputs(), "diag")
 	} else if dir, err := service.CheckOutputs(req.OutputDir, s.d.Settings(), true); err != nil { // la misma validación que Ajustes
-		return err
+		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	} else {
 		req.OutputDir = dir
 	}
 	bin, argv, err := diag.Build(req)
 	if err != nil {
-		return status.Error(codes.InvalidArgument, err.Error())
+		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	}
 	if factory { // la de fábrica la crea el núcleo (0700), ya con la petición válida
 		if err := os.MkdirAll(req.OutputDir, 0o700); err != nil {
-			return status.Errorf(codes.InvalidArgument, "carpeta de salida: %v", err)
+			return service.ErrFrom(st.Context(), codes.InvalidArgument, i18n.Wrap("ingest.err.out_dir", err, nil))
 		}
 	}
 	s.d.Audit("diag.run", string(tool), fmt.Sprintf("%s %q", bin, argv))
@@ -67,19 +67,19 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	// Lo que corrió de verdad: binario resuelto (tracepath por traceroute) y argv completo, entrecomillado.
 	s.d.Audit("diag.done", string(tool), fmt.Sprintf("exit=%d bin=%s argv=%q output=%s", code, res.Bin, res.Argv, res.OutputPath))
 	if errors.Is(err, diag.ErrNotInstalled) {
-		return status.Error(codes.FailedPrecondition, err.Error())
+		return service.ErrFrom(st.Context(), codes.FailedPrecondition, err)
 	}
 	if err != nil && st.Context().Err() == nil {
-		return status.Error(codes.Internal, err.Error())
+		return service.ErrFrom(st.Context(), codes.Internal, err)
 	}
 	return st.Send(&v1.RunResponse{Done: true, ExitCode: int32(res.ExitCode), OutputPath: res.OutputPath})
 }
 
 // ListInterfaces lee las interfaces del sistema; no envía nada a la red.
-func (s *diagSvc) ListInterfaces(context.Context, *v1.ListInterfacesRequest) (*v1.ListInterfacesResponse, error) {
+func (s *diagSvc) ListInterfaces(ctx context.Context, _ *v1.ListInterfacesRequest) (*v1.ListInterfacesResponse, error) {
 	ifs, err := ifaces.List()
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, service.ErrFrom(ctx, codes.Internal, err)
 	}
 	r := &v1.ListInterfacesResponse{}
 	for _, i := range ifs {

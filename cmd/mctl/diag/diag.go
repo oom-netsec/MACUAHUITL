@@ -31,7 +31,7 @@ func diag(tool string) func(*cli.Env, []string) error {
 		for _, o := range opts {
 			k, v, ok := strings.Cut(o, "=")
 			if !ok {
-				return fmt.Errorf("opción %q: usa clave=valor", o)
+				return cli.Err("mctl.diag.opt_bad", "opt", o)
 			}
 			req.Options[k] = v
 		}
@@ -45,9 +45,9 @@ func diag(tool string) func(*cli.Env, []string) error {
 				return err
 			}
 			if r.Done {
-				fmt.Fprintf(c.Out, "guardado en %s (código de salida %d)\n", r.OutputPath, r.ExitCode)
+				fmt.Fprintln(c.Out, cli.T("mctl.diag.saved", "path", r.OutputPath, "code", r.ExitCode))
 				if r.ExitCode != 0 {
-					return fmt.Errorf("%s terminó con código %d", tool, r.ExitCode)
+					return cli.Err("mctl.diag.exit_code", "tool", tool, "code", r.ExitCode)
 				}
 				return nil
 			}
@@ -65,9 +65,9 @@ func interfaces(c *cli.Env, args []string) error {
 		return err
 	}
 	for _, i := range r.Interfaces {
-		st := "abajo"
+		st := cli.T("mctl.diag.if_down")
 		if i.Up {
-			st = "arriba"
+			st = cli.T("mctl.diag.if_up")
 		}
 		fmt.Fprintf(c.Out, "%s  %s  %s  %s\n", i.Name, st, i.HardwareAddr, strings.Join(i.Addresses, " "))
 	}

@@ -221,7 +221,7 @@ test("traps: un v3 sin decodificar se ve con la etiqueta traducida y el motivo d
 });
 
 test("en inglés el v3 muestra solo la etiqueta traducida: el motivo del núcleo (en español) no se mezcla", async () => {
-  localStorage.setItem("macuahuitl.idioma", "en");
+  localStorage.setItem("macuahuitl.lang", "en");
   try {
     const core = fakeCore({ trapsStart: vi.fn(async () => "t1") });
     render(<I18nProvider><VisibilityView core={core} /></I18nProvider>);
@@ -232,6 +232,6 @@ test("en inglés el v3 muestra solo la etiqueta traducida: el motivo del núcleo
     expect(await screen.findByRole("cell", { name: "v3 undecoded (87 bytes)" })).toBeInTheDocument();
     expect(screen.queryByText(/usuario USM desconocido/)).not.toBeInTheDocument();
   } finally {
-    localStorage.removeItem("macuahuitl.idioma");
+    localStorage.removeItem("macuahuitl.lang");
   }
 });

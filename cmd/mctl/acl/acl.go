@@ -2,7 +2,6 @@ package acl
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -13,7 +12,7 @@ import (
 
 func importACL(c *cli.Env, vendor, file string) (*v1.Acl, error) {
 	if vendor == "" || file == "" {
-		return nil, errors.New("faltan --vendor/--from y -f")
+		return nil, cli.Err("mctl.acl.missing_flags")
 	}
 	b, err := os.ReadFile(file)
 	if err != nil {
@@ -63,14 +62,14 @@ func aclAnalyze(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	kinds := map[string]string{"shadowed": "sombreada", "redundant": "redundante", "impossible": "imposible"}
+	kinds := map[string]string{"shadowed": cli.T("mctl.acl.shadowed"), "redundant": cli.T("mctl.acl.redundant"), "impossible": cli.T("mctl.acl.impossible")}
 	for _, f := range r.Findings {
-		fmt.Fprintf(c.Out, "regla %d: %s: %s\n", f.RuleIndex+1, kinds[f.Kind], f.Detail)
+		fmt.Fprintln(c.Out, cli.T("mctl.acl.finding", "n", f.RuleIndex+1, "kind", kinds[f.Kind], "detail", f.Detail))
 	}
 	if len(r.Findings) > 0 {
-		return fmt.Errorf("%d hallazgos en %s", len(r.Findings), a.Name)
+		return cli.Err("mctl.acl.findings", "n", len(r.Findings), "name", a.Name)
 	}
-	fmt.Fprintf(c.Out, "%s: %d reglas, sin hallazgos\n", a.Name, len(a.Rules))
+	fmt.Fprintln(c.Out, cli.T("mctl.acl.clean", "name", a.Name, "n", len(a.Rules)))
 	return nil
 }
 

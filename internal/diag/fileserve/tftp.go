@@ -170,8 +170,6 @@ type xfer struct {
 	tries   int
 }
 
-var errPeer = i18n.New("fileserve.reason.client_abort", nil)
-
 // exchange envía pkt y espera el ACK del bloque indicado; reenvía al vencer el plazo.
 // Los ACK duplicados se ignoran sin reenviar (síndrome del aprendiz de brujo, RFC 1123).
 func (x *xfer) exchange(pkt []byte, block uint16) error {
@@ -202,11 +200,11 @@ func (x *xfer) exchange(pkt []byte, block uint16) error {
 					return nil
 				}
 			case opERROR:
-				return fmt.Errorf("%w: %s", errPeer, strings.TrimRight(string(buf[4:n]), "\x00"))
+				return i18n.New("fileserve.reason.client_abort_msg", i18n.A("msg", strings.TrimRight(string(buf[4:n]), "\x00")))
 			}
 		}
 	}
-	return fmt.Errorf("sin respuesta tras %d intentos", x.tries)
+	return i18n.New("fileserve.reason.no_reply", i18n.A("tries", x.tries))
 }
 
 func sendFile(ctx context.Context, host string, peer net.Addr, name string, src *source, opts [][2]string) Transfer {
@@ -279,7 +277,7 @@ func sendFile(ctx context.Context, host string, peer net.Addr, name string, src 
 		binary.BigEndian.PutUint16(buf[2:], block)
 		if err := x.exchange(buf[:4+n], block); err != nil {
 			if ctx.Err() != nil {
-				err = errors.New("servidor detenido")
+				err = i18n.New("fileserve.reason.stopped", nil)
 			}
 			t.setErr(err)
 			return t
@@ -330,11 +328,11 @@ func (x *xfer) awaitData(pkt []byte, block uint16, blk int) ([]byte, error) {
 				}
 				return append([]byte(nil), buf[4:n]...), nil
 			case opERROR:
-				return nil, fmt.Errorf("%w: %s", errPeer, strings.TrimRight(string(buf[4:n]), "\x00"))
+				return nil, i18n.New("fileserve.reason.client_abort_msg", i18n.A("msg", strings.TrimRight(string(buf[4:n]), "\x00")))
 			}
 		}
 	}
-	return nil, fmt.Errorf("sin respuesta tras %d intentos", x.tries)
+	return nil, i18n.New("fileserve.reason.no_reply", i18n.A("tries", x.tries))
 }
 
 // recvFileTFTP atiende un WRQ. El archivo se crea hasta recibir el primer DATA: un WRQ con
@@ -402,7 +400,7 @@ func recvFileTFTP(ctx context.Context, host string, peer net.Addr, name string, 
 		data, err := x.awaitData(pkt, block, blk)
 		if err != nil {
 			if ctx.Err() != nil {
-				err = errors.New("servidor detenido")
+				err = i18n.New("fileserve.reason.stopped", nil)
 			}
 			t.setErr(err)
 			return t

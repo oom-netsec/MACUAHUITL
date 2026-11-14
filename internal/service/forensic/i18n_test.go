@@ -134,13 +134,13 @@ func forenseCasos(t *testing.T, ctx context.Context) map[string]string {
 
 // Regresión: sin idioma, con es o con uno desconocido, cada RPC de forense devuelve lo mismo que antes del catálogo.
 func TestForenseRegresionEs(t *testing.T) {
-	i18ntest.Golden(t, "testdata/forense_es.golden.json", forenseCasos(t, context.Background()))
-	for _, loc := range []string{"es", "es-MX", "fr"} {
-		got := forenseCasos(t, i18n.WithLocale(context.Background(), loc))
-		base := forenseCasos(t, context.Background())
+	i18ntest.Golden(t, "testdata/forense_es.golden.json", forenseCasos(t, i18n.WithLocale(context.Background(), "es")))
+	for _, loc := range []string{"es", "es-MX"} {
+		got := forenseCasos(t, i18n.WithLocale(i18n.WithLocale(context.Background(), "es"), loc))
+		base := forenseCasos(t, i18n.WithLocale(context.Background(), "es"))
 		for k, v := range got {
 			if base[k] != v {
-				t.Errorf("%s con %q difiere de sin idioma", k, loc)
+				t.Errorf("%s con %q difiere de es", k, loc)
 			}
 		}
 	}
@@ -156,7 +156,7 @@ func tmp(dirs *[]string, t *testing.T) string {
 func TestForenseEnSinEspanol(t *testing.T) {
 	es := regexp.MustCompile(`[áéíóúñ¿¡]|\b(mensajes?|línea|ronda|rondas|aviso|Aviso|equipo|equipos|interfaz|archivo|trabajo|falta|Causa|Acción|Significado|Fuente|ninguna|Ninguna|texto|captura|hacen|solo|hay|sin|con)\b`)
 	got := forenseCasos(t, i18n.WithLocale(context.Background(), "en"))
-	base := forenseCasos(t, context.Background())
+	base := forenseCasos(t, i18n.WithLocale(context.Background(), "es"))
 	for k, v := range got {
 		if k == "crash_err_directorio" || k == "patrones_sin_patrol" { // el texto viene de internal/sys (fuera del bloque D)
 			continue

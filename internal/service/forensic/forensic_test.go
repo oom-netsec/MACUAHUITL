@@ -102,7 +102,7 @@ type jobDeps struct {
 	dir string
 }
 
-func (d jobDeps) Job(string) (service.JobInfo, error) {
+func (d jobDeps) Job(context.Context, string) (service.JobInfo, error) {
 	return service.JobInfo{State: "completed", Dir: d.dir}, nil
 }
 

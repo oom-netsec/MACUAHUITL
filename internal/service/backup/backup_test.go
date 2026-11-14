@@ -25,7 +25,7 @@ type jobDeps struct {
 	info *service.JobInfo
 }
 
-func (d jobDeps) Job(string) (service.JobInfo, error) { return *d.info, nil }
+func (d jobDeps) Job(context.Context, string) (service.JobInfo, error) { return *d.info, nil }
 
 // carpeta arma la salida de Patrol de un equipo con dos rondas.
 func carpeta(t *testing.T, dir string, cfgs ...string) {
@@ -481,6 +481,25 @@ func TestCollectedTextNuncaMezclaAvisos(t *testing.T) {
 	c.warn(i18n.Tx("backup.warn.unsigned"))
 	if en := c.text("en"); !strings.Contains(en, "without a signature") {
 		t.Errorf("pareados: %q", en)
+	}
+}
+
+type jobFalla struct{ *servicetest.Deps }
+
+func (jobFalla) Job(ctx context.Context, id string) (service.JobInfo, error) {
+	return service.JobInfo{}, service.Err(ctx, codes.NotFound, "patrol.err.job_missing", i18n.A("id", id))
+}
+
+// Fase 30e: en el respaldo programado el error de Deps.Job ya es status; la auditoría backup.failed sale en inglés.
+func TestRespaldoProgramadoAuditaElFalloEnIngles(t *testing.T) {
+	sd := servicetest.New(t)
+	s := newSvc(jobFalla{sd})
+	s.poll = time.Millisecond
+	t.Cleanup(s.close)
+	s.watch("j9")
+	s.wg.Wait()
+	if got := sd.AuditText(); !strings.Contains(got, "backup.failed") || !strings.Contains(got, "job j9 does not exist") {
+		t.Fatalf("auditoría: %s", got)
 	}
 }
 

@@ -1,0 +1,201 @@
+uso: mctl <comando>
+  vault status | create | unlock | lock | passwd
+  cred  list | add --label L --user U [--no-enable] | rm ID
+  cred  backup export RUTA [--overwrite] [--yes]  |  backup import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+        (respaldo cifrado de la bóveda con una frase propia, distinta de la maestra y de al menos 12 caracteres; la frase se lee de la terminal o de stdin, nunca como argumento.
+         export exige --yes: el archivo trae todas tus credenciales. import muestra el estado de cada una: nueva, igual, conflicto_etiqueta o reservada (se omite);
+         cada conflicto necesita una decisión por ID o etiqueta, o --all; si falta una no se importa nada)
+  job   create -f job.yaml [--param nombre=valor]... | logintest ID | arm [--accept HUELLA]... [--exclude EQUIPO]... ID
+        cancel ID | list | watch ID
+  playbooks [--platform P]
+  audit verify | export
+  (cualquier comando: --no-color o NO_COLOR desactivan el color; con --json o sin TTY no hay color)
+  (antes del comando: --lang es|en pide los mensajes del núcleo en ese idioma; sin ella, inglés. mctl no lee LC_ALL, LC_MESSAGES ni LANG)
+  acl   convert --from F --to F -f acl.txt | analyze --vendor F -f acl.txt   (F: ios-xe, nx-os, asa)
+  diag  ping|traceroute|nmap|iperf3|pcap [DESTINO] [-o clave=valor]... [--out CARPETA]
+        --out: la carpeta debe existir y tener modo 0700, como la de Ajustes → Almacenamiento
+        interfaces   (interfaces locales, sin tráfico de red)
+  pcap  analyze ARCHIVO [--top N] [--json]
+  dns   query|transport|hygiene|exposure NOMBRE [-t TIPO] [-s SERVIDOR]... [--dnssec] [--dkim SEL]
+        trace|zone|dnssec NOMBRE --deep   (contacta raíces y autoritativos; queda auditado)
+  tls   inspect HOST[:PUERTO] [--sni NOMBRE]
+  syslog listen [--addr IP:PUERTO] [--tcp] [--any] [--for SEGUNDOS] [--rate N] [--burst N] [--rate-global N] [--burst-global N] [--queue N]
+        [--save [--rotate-mb N] [--rotate-min N] [--name PLANTILLA] [--max-files N] [--format texto|crudo|jsonl]]
+  radius test SERVIDOR[:PUERTO] --user U|--cred ID [--secret-cred ID] [--method pap|chap|mschapv2]
+        [--nas-ip IP] [--port-type T] [--service-type T] [--called X] [--calling MAC] [--acct] [--status]
+  tacacs test SERVIDOR[:PUERTO] --user U|--cred ID [--secret-cred ID] [--type ascii|pap] [--cmd COMANDO] [--acct]
+  pki   key --alg A -o LLAVE | csr --cn CN [--dns D]... [--ip IP]... [--key LLAVE] [-o PREFIJO]
+        ca init --name N [--days D] [--out CARPETA] | ca sign --ca CARPETA --csr CSR -o CERT [--profile P]
+        export --cert C [--chain CA] [--key LLAVE] --format p12|p12-legacy|pem|der -o SALIDA | decode -f ARCHIVO
+  ike   decode -f ARCHIVO [--json]   (debug/show de IKEv1, IKEv2 e IPsec)
+  change create -f cambio.yaml | pre|post [--accept HUELLA]... [--exclude EQUIPO]... ID | list
+         report ID | report --pre CARPETA --post CARPETA   [--json]
+  upgrade check --outputs ARCHIVO --image NOMBRE [--size BYTES] [--md5 HEX] [--verify ARCHIVO] [--json]
+  compliance check --config ARCHIVO [--template ARCHIVO] [--json]
+  topo  build TRABAJO|CARPETA [--pcap ARCHIVO] [--svg ARCHIVO] [--json]
+  snmp  get HOST OID... | walk HOST OID [--bulk] | poll HOST [--profile P]... [--every S] [--count N]
+        --cred ID [-v 2c|3 --auth SHA --priv AES] [--port N] [--json]
+        traps listen [--addr IP:PUERTO] [--any] [--for S] [--v3-cred ID] [topes y archivo]   (1162 por defecto)
+  flows listen [--addr IP:PUERTO] [--any] [--for S] [--top N] [--every S] [--json] [topes y archivo]
+        topes y archivo: [--rate N] [--burst N] [--rate-global N] [--burst-global N] [--queue N]
+        [--save [--rotate-mb N] [--rotate-min N] [--name PLANTILLA] [--max-files N] [--format texto|crudo|jsonl]]
+        en flows el tope cuenta datagramas (no flujos), solo rige con --save (1000/s por exportador y 5000/s global por defecto);
+        un datagrama de plantilla v9/IPFIX descartado retrasa la decodificación hasta que el exportador la repita
+  gnmi  get|subscribe HOST RUTA... --cred ID [--ca CA.pem] [--port N] [--mode sample|on_change]
+  analyze  TRABAJO|CARPETA [--round N] [--device EQUIPO] [--json]   (reglas sin validar en laboratorio)
+  diff     TRABAJO|CARPETA --from A --to B [--device EQUIPO] [--json]
+  timeline TRABAJO|CARPETA [--around TS --window 30s] [--device EQUIPO] [--pcap ARCHIVO] [--json]
+  calc  subnet PREFIJO | vlsm RED [NOMBRE=]HOSTS... | summarize PREFIJO... | wildcard [DIRECCIÓN] VALOR
+        ipv6 [DIRECCIÓN] [--mac MAC] | mtu CAPA... [--mtu 1500] [--ipv6] | tcp --bw 1g --rtt MS [--window 64k] [--loss %]
+        dscp [CONSULTA] [--by CAMPO] | optics --tx DBM --rx DBM --km KM [--fiber F] | optics --convert -3dBm
+        bgp --route name=A,lp=200,path=65001,med=10,ebgp,rid=IP... [--deterministic-med] [--always-compare-med]
+        (todas con --json)
+  console [PUERTO] [--baud N] [--parity none|even|odd] [--flow none|rtscts|xonxoff] [--list]
+        (Ctrl-] q sale, Ctrl-] b envía BREAK; se graba en outputs/console)
+  serve tftp|http --addr IP[:PUERTO] --file RUTA... [--for SEGUNDOS] [--any]
+        (TFTP en 6969: IOS usa el 69, redirige con nftables; HTTP en 8080)
+  hash  ARCHIVO [--md5 VALOR] [--sha512 VALOR]
+  find  IP|MAC|NOMBRE           (busca en la evidencia de toda la flota; MAC en cualquier notación)
+  trace MAC|IP                  (sigue la MAC por las tablas CAM hasta el puerto de acceso)
+  path  ORIGEN DESTINO [--svg ARCHIVO]   (camino L3 salto a salto con el tramo L2)
+  health interfaces             (interfaces con CRC, errores, drops, err-disabled, half duplex)
+  fleet summary | flash [--need 1.2G] | inventory [--csv|--md]
+        (flota = última salida de cada equipo en outputs/; todas con --dir CARPETA y --json)
+  ports set EQUIPO[:PUERTO] IF... --cred ID [--vlan N] [--voice N] [--desc T] [--shut|--no-shut]
+        [--accept HUELLA]... [--write-memory] [--asistido]
+        (sin --asistido solo muestra el plan con su reversa; con --asistido pide confirmación en cada paso: s/N, r = revertir;
+         Ctrl-C aborta la ejecución y avisa si quedó algún equipo cambiado)
+  ports runs [--activas]            ejecuciones que el núcleo recuerda (para retomar una que quedó viva)
+  ports resume EJECUCION            retoma la confirmación de una ejecución viva
+  run -d EQUIPO... -c "show ..." | -f ARCHIVO --cred ID [--accept HUELLA] [--csv|--md|--json]
+        (lote de solo lectura: un trabajo de Patrol de una ronda; todo comando pasa por CheckDenied)
+  drift TRABAJO|CARPETA [--round N] [--device EQUIPO] [--json]
+        (running-config de la ronda N contra la N-1 por equipo, sin líneas volátiles; solo lee)
+  config clean ARCHIVO [-o SALIDA] [--sort] [--json]
+        (quita vacías y ! repetidos, recorta espacios, marca huérfanas; sin -o solo muestra el informe)
+  snippet vlan EQUIPO[:PUERTO] ID --cred ID [--name X | --remove [--accept-trunk]] [--accept-vtp] [--accept HUELLA]... [--write-memory] [--asistido]
+  snippet trunk EQUIPO[:PUERTO] IF add|remove VLAN --cred ID [--accept HUELLA]... [--write-memory] [--asistido]
+  snippet svi EQUIPO[:PUERTO] VLAN DIRECCION MASCARA --cred ID [--desc T] [--accept HUELLA]... [--write-memory] [--asistido]
+  snippet list [--platform P] [--json]
+  snippet run EQUIPO[:PUERTO] ID --cred ID [--set campo=valor]... [--accept HUELLA]... [--write-memory] [--asistido]
+        (sin --asistido solo muestra el plan con su reversa; con --asistido pide confirmación en cada paso: s/N, r = revertir.
+         --remove borra la VLAN (existente, activa, sin puertos, SVI ni trunk nativo; sin --name;
+         si viaja por trunks pide --accept-trunk). El trunk solo admite add o remove
+         de una VLAN: nunca reemplaza la lista permitida. list muestra el catálogo con los campos de cada plantilla y run la aplica con --set;
+         un secreto que no viene en --set se pide por la terminal sin eco)
+  cred rotate EQUIPO[:PUERTO] --user U --cred ID [--update-cred ID] [--generate] [--accept HUELLA]... [--asistido]
+        (rota el secreto de un usuario local de un equipo; --cred es la credencial con la que te conectas y debe ser de OTRO usuario;
+         el secreto nuevo se lee de la terminal o de stdin, o con --generate lo crea el núcleo (exige --update-cred); si la sesión nueva
+         entra, se pide write memory (obligatorio: sin él el equipo vuelve al hash anterior al reiniciar); solo si sale [OK],
+         --update-cred deja el secreto en la bóveda y la credencial anterior se conserva como "<etiqueta> (anterior)";
+         si la sesión nueva no entra o rechazas write memory, se propone la reversa por la sesión original)
+  backup run -d EQUIPO[:PUERTO]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept HUELLA] [--exclude EQUIPO] [--timeout 10m] [--json]
+        (guarda show running-config en outputs/respaldos/EQUIPO/ con 0600; un trabajo de Patrol: solo lectura.
+         Con --every y --rounds queda programado y el núcleo guarda cada ronda)
+  backup collect TRABAJO [--keep N] [--json]   guarda lo que un trabajo lleva recolectado (idempotente)
+  backup list [EQUIPO] [--json]                respaldos guardados (avisa los de secretos enmascarados)
+  backup diff ID_A ID_B | ID_A --now -d EQUIPO --cred ID [--json]
+        (diferencias entre dos respaldos, o contra el running actual: toma uno nuevo; sin líneas volátiles)
+  backup export ID [-o ARCHIVO]                respaldo a la salida estándar o a un archivo nuevo 0600
+  restore diff EQUIPO[:PUERTO] RESPALDO --cred ID [--mgmt-if IF] [--max-lines N] [--parcial] [--write-memory] [--accept HUELLA]... [--asistido]
+        (lleva el running-config del equipo al de un respaldo (ID de "backup list": equipo/AAAAMMDDTHHMMSSZ-running) cambiando solo las
+         líneas que difieren, con su reversa. Lista cerrada: hostname, logging, ntp server, snmp-server location|contact, ip domain-name,
+         ip name-server, clock, service timestamps, spanning-tree portfast default, errdisable recovery, nombre de VLAN y, en puertos físicos de acceso,
+         description, VLAN de acceso y de voz, shutdown, portfast, bpduguard y storm-control. Todo lo demás (rutas, router, ACL, vrf, trunk,
+         canales, SVI, line, aaa, usuarios, crypto, standby, autenticación, contraseñas) se lista para hacerlo a mano y rechaza el plan
+         entero, salvo con --parcial. Solo respaldos sin enmascarar, completos (terminan en end), con ficha firmada por la bóveda y del
+         mismo equipo (número de serie). Nunca toca la interfaz por la que te conectas ni las que llevan su VLAN: se identifica con
+         show users, show tcp brief y la salida hacia ti (show ip cef); si no es segura, indícala con --mgmt-if. Tope de líneas: 200 por omisión.
+         Sin --asistido solo muestra el plan; con --asistido pide confirmación en cada paso: s/N, r = revertir)
+  msg [MNEMONICO|PATRON] [--json]
+        (base de mensajes de Cisco: significado, causa, acción y comandos de lectura; acepta comodines: %PLATFORM-3-*)
+  crashinfo ARCHIVO [--json]
+        (motivo, proceso, traceback, versión y CPU/memoria de un crashinfo de texto; un core binario solo se identifica; solo lee)
+  logs patterns ARCHIVO|-|--capture|--job TRABAJO [--device EQ] [--burst N] [--window SEG] [--json]
+        (syslog agrupado por patrón: cuenta, marca ráfagas (N en M segundos, 5 en 60 por defecto) e inestabilidad y anota cada patrón con la base de mensajes; solo lee)
+  logs flaps ARCHIVO|-|--capture|--job TRABAJO [--device EQ] [--count N] [--window SEG] [--min-delta N] [--json]
+        (interfaces con N transiciones en M segundos (3 en 60) aunque duren milisegundos; con --job también los saltos de carrier/resets de show interfaces entre rondas; solo lee)
+  logs debugs ARCHIVO|- [--hide TEXTO]... [--family-min N] [--rare-max M] [--top N] [--json]
+        (debug pegado o en archivo: agrupa líneas repetidas, oculta el ruido y marca anomalías; sin conexión a ningún equipo)
+  logs leaks TRABAJO|CARPETA [--device EQ] [--rounds N] [--min-growth-kib K] [--json]
+        (procesos cuya memoria de show processes memory sorted crece sin bajar entre rondas de Patrol; solo lee)
+  transfer serve --proto tftp|ftp|scp|sftp|http --listen IP[:PUERTO] [--write] [--allow IP]... [--dir CARPETA] [--from CARPETA] [--files A,B] [--duration 30m] [--legacy-ssh] [--pasv-ports MIN-MAX]
+        (servidor temporal, puerto alto: tftp 6969, ftp 2121, scp/sftp 2222, http 8080; --dir recibe, --from publica; ftp/scp/sftp muestran usuario y contraseña de la sesión (FTP las manda en claro); recibir por tftp exige --allow; --legacy-ssh activa los algoritmos de IOS 15.x; Ctrl-C lo detiene)
+  transfer get URL [LOCAL] [--dir CARPETA] [--cred ID] [--sha256 H] [--md5 H] [--sha512 H] [--insecure] [--legacy-ssh] [--accept-host-key SHA256:...]
+        (tftp://, ftp://, scp://, sftp://, http://, https://; archivo nuevo en la carpeta, con MD5 y SHA-256)
+  transfer put URL LOCAL [--from CARPETA] [--cred ID] [--legacy-ssh] [--accept-host-key SHA256:...]
+        (tftp://, ftp://, scp://, sftp://; sale de la carpeta elegida)
+  transfer ls URL [--cred ID] [--path CARPETA] [--max N] [--insecure] [--legacy-ssh] [--accept-host-key SHA256:...] [--json]
+        (lista una carpeta remota: ftp (MLSD o LIST), sftp, scp (si el servidor tiene SFTP) y http(s) (índice HTML); tftp no lista)
+  transfer stop ID | transfer list | transfer hint tftp|ftp|scp|sftp PUERTO [IP]
+        (cierra un servidor, los lista, o explica la redirección nftables a los puertos 69, 21 y 22)
+  job metrics TRABAJO|CARPETA [--device EQ] [--iface I]... [--top N] [--max-points N] [--csv|--json]
+        (CPU, memoria por pool y tráfico/errores por interfaz, ronda por ronda; lo que el playbook no recolectó viene con aviso. Playbook: ios-xe/metricas)
+  ports status TRABAJO|CARPETA [--device EQ] [--json]  |  ports status --device HOST[:PUERTO] --cred ID [--accept-host-key SHA256:...] [--legacy-ssh] [--json]
+        (estado de los puertos físicos de un switch para el frente: de la evidencia de un trabajo (show interfaces status, trunk y etherchannel summary) o en vivo por SSH, solo lectura)
+  devices [TEXTO] [--json]
+        (equipos conocidos de los trabajos de Patrol, la flota, los respaldos y la libreta de hosts, sin duplicados por dirección; TEXTO filtra por dirección, nombre, plataforma, carpeta o etiqueta)
+  hosts list [TEXTO] [--folder F] [--tag X] [--json]  |  hosts rm ID
+        (libreta de hosts: los equipos que agregas a mano, la fuente «manual» de «devices»; se fusionan por dirección con lo descubierto. rm no borra la evidencia)
+  hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
+  hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
+        (A: IP o nombre DNS, sin usuario, esquema ni puerto; puerto 22 por defecto; platform: ios, ios-xe, nx-os, asa, iosxr, wlc; carpeta de un solo nivel; hasta 10 etiquetas.
+         --cred es el id de una credencial de la bóveda (cred list): nunca un secreto. edit solo cambia lo que se pasa; --tag reemplaza todas y un valor vacío quita el campo)
+  hosts export --out RUTA [--format csv|json] [--overwrite] [ID...]
+        (archivo 0600; el formato sale de la extensión (.csv / .json) o de --format. JSON versionado con suma SHA-256 (integridad, no autenticidad);
+         CSV para Excel (UTF-8, encabezado fijo, etiquetas separadas por «;», celdas que empiezan con = + - @ llevan un apóstrofo delante). La credencial viaja solo como su etiqueta; sin ID exporta todos, hasta 1000)
+  hosts template --format csv|json  |  hosts template --fields
+        (imprime un archivo de ejemplo con el encabezado y 3 filas válidas, o describe cada campo; ambos salen de la misma tabla que valida el import)
+  hosts import RUTA [--format csv|json] [--decision DIRECCIÓN:PUERTO=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+        (una fila inválida sale como «línea N: campo: motivo», no bloquea las demás y cuenta como omitida; el JSON sin suma avisa. Estado de cada host válido: nuevo, igual o conflicto (misma dirección y puerto con otros datos: reemplazar u omitir; mismo nombre: también renombrar); los nuevos entran solos y cada conflicto necesita una decisión, si no, no se importa nada.
+         La etiqueta de la credencial se busca en la bóveda abierta; si no está, el host queda sin credencial)
+  scripts list [TEXTO] [--tech T] [--platform P] [--tag X] [--fav] [--json]  |  scripts show ID [--json]
+        (bóveda de scripts: los tuyos más la biblioteca predefinida, ordenados por nombre; MODO lectura = Patrol puede correrlo. Los IDs «lib-*» son de la biblioteca y no se editan)
+  scripts add NOMBRE --tech T --platform P [--desc D] [--tag X]... [--file F|-]
+  scripts edit ID [--name N] [--tech T] [--platform P] [--desc D] [--tag X]... [--file F|-]
+        (los comandos van uno por línea, de un archivo o de stdin; edit solo cambia lo que se pasa y --tag o --file reemplazan la lista entera.
+         tech: l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro; platform: ios, ios-xe, nx-os, asa, cualquiera)
+  scripts rm ID  |  scripts fav ID [--off]  |  scripts dup ID
+        (borra uno tuyo, marca o quita un favorito (también en la biblioteca), o copia cualquiera como script tuyo)
+  scripts copy ID
+        (copia un script de un paquete instalado, también uno oculto, a tus scripts: ID nuevo, editable, nombre «<nombre> (copia)»; quitar el paquete no la borra)
+  scripts export --out RUTA [--overwrite] ID...
+        (archivo JSON 0600 con la suma SHA-256 de los scripts (integridad, no autenticidad); no sobrescribe sin --overwrite; los favoritos no viajan)
+  scripts import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+        (muestra el estado de cada script: nuevo, igual, conflicto_id o conflicto_nombre; los nuevos entran solos y cada conflicto necesita una decisión, si no, no se importa nada)
+  scripts col list [--json]  |  scripts col show ID [--json]  |  scripts col add NOMBRE [--desc D]  |  scripts col edit ID [--name N] [--desc D]  |  scripts col rm ID
+        (colecciones: listas ordenadas de IDs de script, también de la biblioteca, que no se copian; un script puede estar en varias y borrarlo lo quita de todas.
+         «favoritos» es la colección por defecto: no se borra ni se renombra, y scripts fav la usa)
+  scripts col set ID [SCRIPT_ID...] [--add ID]... [--rm ID]... [--clear]  |  scripts col order ID...
+        (set deja exactamente los SCRIPT_ID dados y en ese orden; sin ellos parte de lo que hay y aplica --rm y --add; order reordena todas las colecciones, también favoritos)
+  scripts col export --out RUTA [--overwrite] ID...
+  scripts col import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+        (el archivo lleva las colecciones y los scripts de usuario que referencian; los de biblioteca van por ID y los que esta biblioteca no trae se avisan y se omiten.
+         Estados: nueva, igual, fusionar (favoritos: se le agregan los que falten, nunca se reemplaza), conflicto_id y conflicto_nombre; las decisiones de colecciones y de scripts del archivo van con --decision por ID)
+  scripts template [--kind scripts|colecciones] [--fields]
+        (imprime un archivo de ejemplo que el import acepta tal cual, o con --fields la lista de campos con su tipo, si son obligatorios, un ejemplo y su descripción. Ambos salen de las mismas reglas que validan el import. El sha256 es opcional: sin él se valida campo por campo y el import avisa)
+  scripts pin [ID [--off]]  |  scripts pin --order ID...
+        (barra corta de la terminal: máximo 5 scripts fijados, aparte de las colecciones; sin argumentos los lista en su orden)
+  prefs show [--json]  |  prefs set [--outputs DIR] [--rotate-mb N] [--rotate-min N] [--max-files N] [--format F]
+        (set cambia solo lo que se pide; 0 o "" devuelve ese valor al de fábrica. La carpeta debe ser absoluta, existir, ser tuya, escribible y de modo 0700;
+         aplica a lo que empiece después y los datos de la anterior no se mueven. rotate-mb 1-1024, rotate-min 1-10080, max-files 1-1000, format texto|crudo|jsonl)
+  pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM]...  |  pack list  |  pack show <id>  |  pack remove <id>
+        (paquetes de contenido: playbooks y scripts por tecnología; se bajan a mano de los releases y nada se descarga solo.
+         Un paquete sin firma oficial es de terceros y solo se instala con --allow-unsigned; trae únicamente comandos de lectura.
+         remove quita también los favoritos de sus scripts. show muestra el manifiesto y el README.
+         --hide ITEM instala el paquete con ese playbook o script oculto, y se repite; con --hide, lo oculto queda
+         exactamente en esos ITEM, y sin --hide una actualización conserva lo que ya estaba oculto)
+  pack inspect <archivo.mpack> [--allow-unsigned]
+        (vista previa de install: valida el paquete y muestra qué trae y qué reemplazaría, sin instalar nada)
+  pack items <id> [--hide ITEM]... [--show ITEM]...
+        (oculta o muestra playbooks y scripts de un paquete instalado: solo quita de las listas, el ID se sigue
+         resolviendo y los trabajos lo pueden pedir; lo oculto sobrevive a las versiones nuevas y se borra con el paquete)
+  pack export <editor/nombre> [ID...] --out <archivo.mpack> [--playbooks] [--license SPDX] [--name N] [--description D] [--author A] [--overwrite]
+        (arma un paquete personal SIN firma con los scripts del usuario ID... y, con --playbooks, los de <config>/playbooks de ios, ios-xe y wlc-9800.
+         Los scripts salen como lib-<editor>-… y los playbooks con el editor como prefijo; los demás playbooks se omiten y se avisa. El editor es
+         [a-z0-9]{1,16}, sin los reservados. Versión AAAA.MMDD.HHMMSS (hora local); licencia NOASSERTION si no das otra; los favoritos no viajan)
+  pack import <archivo.mpack> [--decision ID=renombrar|omitir]... [--all=renombrar|omitir] [--preview]
+        (copia un .mpack sin firma oficial a «Mis scripts» y a <config>/playbooks, editables, sin instalarlo. Muestra el estado de cada elemento:
+         nuevo, igual, conflicto_id o conflicto_nombre; cada conflicto pide decisión y nunca se sobrescribe nada. Un playbook importado conserva su ID con
+         prefijo de editor y entra al catálogo sin reiniciar)
+  --version

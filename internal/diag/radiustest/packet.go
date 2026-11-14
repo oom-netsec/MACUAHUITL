@@ -6,10 +6,11 @@ import (
 	"crypto/md5"
 	"crypto/sha1"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"strings"
 	"unicode/utf16"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 
 	//lint:ignore SA1019 MS-CHAPv2 (RFC 2759) exige MD4: compatibilidad con el servidor, no seguridad propia
 	"golang.org/x/crypto/md4"
@@ -91,18 +92,18 @@ func (p *Packet) Encode() []byte {
 // Decode valida longitudes de paquete y atributos antes de confiar en ellas.
 func Decode(b []byte) (*Packet, error) {
 	if len(b) < headerLen {
-		return nil, errors.New("radius: paquete de menos de 20 bytes")
+		return nil, i18n.New("radius.err.short", nil)
 	}
 	l := int(binary.BigEndian.Uint16(b[2:4]))
 	if l < headerLen || l > maxPacket || l > len(b) {
-		return nil, fmt.Errorf("radius: longitud %d inválida (recibidos %d bytes)", l, len(b))
+		return nil, i18n.New("radius.err.length", i18n.A("length", l, "got", len(b)))
 	}
 	p := &Packet{Code: b[0], ID: b[1]}
 	copy(p.Authenticator[:], b[4:20])
 	rest := b[headerLen:l] // RFC 2865 §3: los bytes después de Length se ignoran
 	for len(rest) > 0 {
 		if len(rest) < 2 || rest[1] < 2 || int(rest[1]) > len(rest) {
-			return nil, errors.New("radius: atributo con longitud inválida")
+			return nil, i18n.New("radius.err.attr_length", nil)
 		}
 		p.Attrs = append(p.Attrs, Attr{rest[0], append([]byte(nil), rest[2:rest[1]]...)})
 		rest = rest[rest[1]:]

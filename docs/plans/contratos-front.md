@@ -744,15 +744,15 @@ Para la pantalla Ajustes. Son preferencias tipadas, aparte de `getPreference`/`s
 Paso 1 de 3 del inventario `docs/plans/2026-11-07-idioma-nucleo.md`: la infraestructura y los primeros códigos. El núcleo ya no obliga a leer su texto en español para saber qué pasó: cada error migrado lleva un **reason** estable y su **metadata**, y con el idioma pedido el texto sale en inglés.
 
 ### Regla de compatibilidad
-Sin el metadato `accept-language`, o con `es` (o con cualquier idioma que no sea `en`), cada respuesta del núcleo es **idéntica byte por byte** a la de antes de la fase: mismos mensajes de error, mismos detalles de fase, mismos nombres. Lo único que cambia son campos nuevos (`reason`, `args`, la metadata del error). Lo fijan pruebas de regresión con el texto en español literal. El front puede seguir parseando texto mientras no encienda la bandera.
+Con `accept-language: es`, cada respuesta del núcleo es **idéntica byte por byte** a la de antes de la fase: mismos mensajes de error, mismos detalles de fase, mismos nombres. Lo único que cambia son campos nuevos (`reason`, `args`, la metadata del error). Lo fijan pruebas de regresión con el texto en español literal, que piden `es` explícito. **El idioma canónico es el inglés** (decisión posterior a la fase 30e): sin `accept-language`, o con uno desconocido, el núcleo responde en inglés; el español es segunda lengua y se pide con `es`. El front puede seguir parseando texto mientras no encienda la bandera.
 
 ### Cómo se activa: `core.localize`
 - La bandera vive en el puente: `Bridge.Localize` (Go), apagada por omisión. En `ui/main.go` es la constante `coreLocalize` (`false`); la sesión de front la pasa a `true` cuando termine de migrar. Para probar sin recompilar: `MACUAHUITL_CORE_LOCALIZE=1` al lanzar la app.
-- Encendida, **toda** llamada y todo stream del puente lleva `accept-language` con el valor de la preferencia `ui.language` (`es` o `en`; sin valor guardado o desconocido = `es`). El puente la lee una vez y la mantiene al día cuando `setPreference("ui.language", v)` pasa por él; si la interfaz no guarda esa preferencia, no hay idioma que mandar y todo sale en español.
+- Encendida, **toda** llamada y todo stream del puente lleva `accept-language` con el valor de la preferencia `ui.language` (`es` o `en`; sin valor guardado o desconocido = `en`). El puente la lee una vez y la mantiene al día cuando `setPreference("ui.language", v)` pasa por él; si no puede leerla, no manda idioma y todo sale en inglés.
 - `ui.language` es una clave nueva de `getPreference`/`setPreference` (la lista cerrada la acepta; el núcleo solo guarda `es` o `en` y rechaza cualquier otro valor con `InvalidArgument`).
 - El núcleo acepta `es`, `en`, `es-MX`, `en-US`… y listas con `q` (`fr, en;q=0.8` da `en`); ausente o desconocido es `es`.
 - **La auditoría no depende del idioma** (decisión del 2026-11-12, rama 30a-2): su detalle irá fijo en inglés; esta fase no toca sus textos y la infraestructura no los pasa por el catálogo.
-- CLI: `mctl --lang es|en` (también `-lang`, `--lang=en` y etiquetas como `en-US`) es una bandera global que solo vale **antes** del comando; un valor que no sea idioma es un error (no se come el nombre del comando). **mctl no lee `LC_ALL`, `LC_MESSAGES` ni `LANG`**: mientras sus textos propios sigan en español, pedir un idioma solo con `--lang` evita mezclarlos; sin la bandera todo sale en español.
+- CLI: `mctl --lang es|en` (también `-lang`, `--lang=en` y etiquetas como `en-US`) es una bandera global que solo vale **antes** del comando; un valor que no sea idioma es un error (no se come el nombre del comando). **mctl no lee `LC_ALL`, `LC_MESSAGES` ni `LANG`**: el idioma se pide solo con `--lang`; sin la bandera todo sale en inglés, el idioma canónico (ver «Idioma canónico: inglés»).
 
 ### Forma exacta del error en TS
 Todo método del puente que devuelve `error` rechaza la promesa con un `RuntimeError` de Wails cuyo `message` es el texto de siempre (`rpc error: code = X desc = …` para lo que viene del núcleo) y cuyo **`cause`** es:
@@ -1064,7 +1064,7 @@ Forense, métricas, Patrol, scripts y transferencias. Sin `accept-language`, o c
 - `MsgLookup` y `Crashinfo`: `meaning`, `cause`, `action` y `source` de cada ficha salen en el idioma pedido (en el YAML de la base van `meaning_en`, `cause_en` y `action_en`). `verify` son comandos de IOS y no cambian. La fuente fija es «documentación pública de Cisco (sin validar en laboratorio)» / «Cisco public documentation (not validated in the lab)».
 - `Crashinfo`: `hint` y `warnings` traducidos; `kind` conserva el código de siempre (`crashinfo`, `core`, `desconocido`).
 - `LogPatterns`, `Flapping`, `MemLeaks`, `DebugFilter`: `warnings`, la `kb` por mnemónico, el `reason` de cada anomalía de `DebugFilter` y el texto del informe (`text`) en el idioma pedido; `source` es «texto pegado» / «pasted text», «captura del receptor syslog» / «syslog receiver capture» o `show logging del trabajo <carpeta>` / `show logging of job <carpeta>` (o la ruta del archivo, que es un dato).
-- Siguen en español con `en`: el texto del sistema (`no such file…`) y los avisos del lector de carpetas de Patrol (`internal/analyze`, bloque C).
+- Siguen en español con `en`: el texto del sistema (`no such file…`).
 
 ### Métricas
 `GetJobMetrics` (`warnings` de la respuesta y de cada equipo) y `GetPortStatus` (`warnings`, en vivo y de un trabajo) salen en el idioma pedido; los comandos que citan no cambian. Los errores del servicio (`metrics.svc.*`, `metrics.err.*`) son de catálogo.
@@ -1259,3 +1259,79 @@ Dos RPC al final de `PackService` y sus métodos de puente (`ui/bridge/pack.go`;
 | `pack.err.editor.reserved`, `pack.err.manifest.invalid` (`field=id`, `license`…) | | el editor no cumple las reglas del export |
 
 Además salen los de siempre de `Install` (`pack.err.zip.*`, `pack.err.id.prefix`, `pack.err.playbook.denied`…) al importar un `.mpack` hostil, y `scripts.imp.*` por las decisiones de scripts. `mctl pack export` y `mctl pack import` son la misma API.
+
+## Idioma: cierre (fase 30e) — asistido
+
+Cierra los «No cubierto» del bloque B de 30c para el modo asistido. Misma regla: sin `accept-language`, o con `es`, todo texto es idéntico byte por byte (lo fijan el golden por RPC de 30c y un golden nuevo de los motivos de restauración, `internal/assist/testdata/restore_es.json`, generado antes del cambio). La auditoría sigue en inglés. No hay campos nuevos en el proto ni claves nuevas en `i18n/{es,en}.ts`.
+
+### Qué cambia con `en`
+- **`RestoreRefusal.why`** (los ~45 motivos por línea de la restauración por diff) sale en el idioma pedido. En el núcleo, `assist.Refusal` conserva `Why` (es) y suma `WhyT` (`i18n.Text`); `path` y `line` no cambian (son configuración del equipo).
+- **Rechazo del plan** (`ErrInvalidPlan`, las funciones `Check`/`CheckDevice` y los `parse*Line`): ahora es un error con código, reason `assist.invalid_plan` (`InvalidArgument`, sin metadata). Con es el mensaje es el mismo; con `en` cada pieza sale en inglés. `errors.Is(err, ErrInvalidPlan)` sigue valiendo.
+- **Sin diferencia** (`ErrNoDifference`): código `assist.no_difference` (`FailedPrecondition`), antes sin reason.
+- **Rotación de credenciales**: los errores de la bóveda y del ejecutor (`assist.svc.unknown_device {device}`, `assist.svc.no_vault`, `assist.svc.vault_read_failed`, `assist.svc.vault_save_prev_failed`, `assist.svc.vault_save_new_failed {prev}`) y los textos que la rotación manda como salida de la ejecución (`assist.run.new_session_ok {user}`, `assist.run.saved_no_credential`, `assist.run.saved_vault_updated {prev}`) salen en el idioma pedido; en el evento `output` y en `fail_reason` el texto en inglés ya no mezcla español. El marcador de lo oculto sale como `<hidden>` en los mensajes en inglés (en los errores del plan y los textos de fallo).
+- El error interno de arranque del ejecutor (`assist.run.missing_runner_parts`) tiene su texto en inglés.
+
+### Para quien implementa
+- `assist.Verifier.Verify` y `Saved` devuelven `i18n.Text` (antes `string`).
+- Los errores internos del plan se arman con `lerr(es, en, args...)`; el motivo de una negativa de restauración, con `lt(es, en, args...)`.
+
+### Sigue sin cubrir
+- El marcador `<oculto>` dentro de las líneas de configuración (`Apply`, `Rollback`, `Expect`, `RestoreRefusal.line`): es dato de configuración y la vista y el detector de respaldos enmascarados lo conocen así.
+- Los nombres, etiquetas y ayudas de las plantillas (`ListSnippetTemplates`: `name`, `label`, `help`): la vista los traduce con sus claves `snippet.<id>.*`; el CLI `mctl snippet` los muestra en español (rama de mctl).
+- Los textos propios de `cmd/mctl/cli/assistrun.go` (errores del CLI: puerto inválido, estado final de la ejecución): son del CLI, no del núcleo.
+- Errores de la bóveda anidados en los de rotación (el texto de la causa viene de la bóveda).
+
+## Idioma: cierre (fase 30e) — calculadoras, diagnóstico y análisis
+
+Con `accept-language: en` ya no sale español en estas áreas; sin idioma o con `es` todo es idéntico byte por byte (goldens en español generados antes del cambio).
+
+- **Errores con código** (`ErrorInfo.reason` = el código; el texto va en el idioma pedido): `calc.err.*` (todas las calculadoras), `diag.err.*`, `snmp.err.*`, `gnmi.err.*`, `serial.err.*`, `radius.err.*`, `tacacs.err.*`, `flows.err.*`, `pki.err.*`, `msgkb.err.*`, `transport.err.*`, `iosxe.err.*`, `platform.err.config_line` y los de campo (`field`, `imgverify`, `hash`). Los sentinelas (`snmp.ErrInvalid`, `gnmic.ErrInvalid`, `diag.ErrNotInstalled`, `serialcon.ErrPermission`, `platform.ErrConfigLine`) siguen sirviendo con `errors.Is`.
+- **Texto del sistema** (`no such file…`, `connection refused`, errores de x509/gRPC): va tal cual como `{cause}` dentro de una frase en el idioma pedido.
+- **Calculadoras:** también salen por código los valores de «Valores que coinciden» de Wildcard (`calc.val.octet.*`) y los nombres por defecto «red N»/«ruta N» (`calc.val.name.*`). El `json` en español no cambia.
+- **Diagnóstico:** `Snapshot.Localize` (flows), `Trap.Localize`, `Sample.Localize` (SNMP), `Config.StringIn` (consola serie: «flow=» con `en`), `Decoded.ValueIn` (RADIUS: valor de `MS-CHAP2-Success` y «(truncado)») y el argumento `error` de `ns-lame` (DNS) salen en el idioma pedido. El informe de `HashFile` también.
+- **Patrol:** los avisos del lector de carpetas ya salen en el idioma pedido (ya lo hacía `catalog_analyze.go`); se quita la nota «siguen en español».
+- **Auditoría:** siempre en inglés (`i18n.English`); el motivo del guard en `terminal.failed` ahora sale en inglés.
+
+### Siguen en español (con motivo)
+- Se disparan solo por un fallo interno imposible desde la entrada: reglas YAML de `internal/analyze/rules.go`, base embebida de `msgkb.Default()`, defensa `flag_like` de diag (esta sí con código).
+- No llegan al usuario o son contenido de archivo/protocolo: errores de `radius.Decode` y de `parseRequest` TFTP, «contraseña incorrecta» de sshsrv (el cliente ve un fallo genérico), `Trap.Text()` y las marcas del grabador de consola, `tftpErr(3, …)`, `Config.String()` de serialcon.
+- Datos que escribe el usuario (nombres, entradas citadas en los errores).
+
+## Idioma: cierre (fase 30e) — dispositivos, puente y mctl
+Con `en`, nada visible de esta área sale en español; sin idioma o con `es` el texto es el de siempre, byte por byte. Catálogos: `internal/i18n/catalog_devices.go` (libreta, import, equipos, salida, puente), `catalog_mctl_{a,b,c}.go` (mensajes propios de mctl) y `catalog_snippets.go` (plantillas).
+
+### Libreta de hosts y lista de equipos
+- Los errores de campo de un host (`hostfield.*`), de los archivos de import (`hostfile.*`) y de las decisiones (`hostimport.*`) llevan código; `devices.FieldError` y `devices.LineError` traen `Err` (con código) además de `Reason` (texto en es). `ImportHostError.reason` sale en el idioma pedido.
+- `hosts.err.full|no_id|dup_name|dup_target|export_count`, los avisos de PutDevice (`hosts.warn.vault_closed`), de exportar e importar (`hosts.warn.*`) y los de `ListDevices` (`devices.warn.*`, también el error de la carpeta de salidas `devices.err.read`) salen en el idioma pedido. Los errores de `devices.Clean`/import llevan `reason` y metadata (ErrorInfo).
+- `HostsImportFormat`: `description` y `type` de cada campo salen en el idioma (`hostfield.desc.<campo>`, `hostfield.type.<tipo>`); el nombre del archivo de la plantilla (`hosts-plantilla.csv|json`) y el `state`/`reason` de cada fila (`nuevo`, `conflicto`, `nombre`…) siguen siendo valores técnicos.
+
+### Salida, protocolo, trabajos y paquetes
+- `ingest.err.out_dir|out_file` (carpeta y archivo de salida: una sola familia para adhoc, diag y field; `out.err.*` ya no existe), `field.err.names_busy|proto|port_lost` (diag y field), `patrol.err.job_missing` («trabajo X no existe») y `pack.err.hidden_save|hidden_read`.
+- Snippets: `ListSnippetTemplates` entrega `name`, `label` y `help` en el idioma del contexto (`snippet.<id>.name|field.<campo>[.help]`, mismas claves y textos en inglés de la app). Una prueba compara el español del catálogo con el de las plantillas del núcleo.
+
+### Puente (`ui/bridge`)
+- Toda validación propia del puente (rondas, instante, fase, calculadora, ráfaga/umbral, guardar archivo, herramienta, ejecución/consola/terminal inexistente, modo DNS, puerto, rango, ruta absoluta) sale por `bridgeErr`: texto en el idioma de la app, `reason` `bridge.err.*` y metadata. «núcleo desconectado» sale en inglés si el idioma ya se había leído (sin núcleo no se puede leer la preferencia: si no, es); `errors.Is(err, ErrDisconnected)` sigue valiendo.
+
+### mctl
+- `mctl --lang en` pide al núcleo sus mensajes en inglés y escribe en inglés los PROPIOS de mctl con el mismo catálogo (`cli.T`, `cli.Err`, `cli.ErrWrap`, `cli.SetLang`): errores de valores, encabezados y etiquetas de tablas, avisos y resúmenes, y los textos de la ejecución asistida (`assistrun.go`). Sin `--lang` o con `es`, idéntico.
+- Se queda sin traducir a propósito: los nombres y textos de las banderas, los valores aceptados (`renombrar|reemplazar|omitir`), CSV/JSON, y los errores de `--lang` mismo, que salen en inglés porque se dan antes de conocer el idioma.
+
+### Qué sigue sin cubrir
+- `Deps.Job` recibe ahora el contexto de la petición: el «trabajo X no existe» de visibility, analysis, forensic, drift, metrics, backup, change y adhoc sale en el idioma pedido.
+- Los `status.Error(err.Error())` que envuelven errores de SQLite o del sistema (`internal()` de inventory y scripts, prefs, pack, diag `ListInterfaces`, `audit Verify/Export`) y los `core: …` del arranque del demonio: texto de la biblioteca, no de la app.
+- La marca `abierto/cerrado:` del log de la consola serie (es contenido del archivo de evidencia) y `HashFile` (rama 30e-b).
+- `hosts-plantilla.*` (nombre de archivo) y los valores técnicos `state/reason` de las filas del import.
+
+## Idioma: correcciones de la revisión de 30e
+- Puente: `language()` ya no retiene su candado mientras consulta al núcleo; sin núcleo, las llamadas vuelven con error en vez de colgarse.
+- Adhoc: `adhoc.err.max`, `adhoc.err.node_stopped` y `adhoc.err.no_dir` (el `error` de `AdhocResult` sale en el idioma pedido); la auditoría `adhoc.denied` va en inglés.
+- Carpeta de salidas: los errores `prefs.outputs.<motivo>` (códigos `prefs.outputs.*` del catálogo, con el prefijo en es y en en), el aviso `Note` de carpeta inválida (`prefs.outputs.issue`) y la nota de cambio (`prefs.outputs.note`) salen en el idioma pedido. `CheckOutputs` devuelve un error con código: quien lo entrega al cliente lo pasa por `service.ErrFrom`.
+- Asistente: el motivo de una reversa que no restauró el equipo (`assist.residue.*`: falta, sobra, «y N más», línea oculta, err-disabled), la etiqueta de la dirección validada (`assist.what.*`, resueltas como Refs) y el rango sin tope (`assist.invalid_value.out_of_range_min`) salen en el idioma pedido. Las líneas de configuración no se traducen.
+- `ImportFormat` (scripts y colecciones): `description` y `type` por campo en el idioma (`scriptsfmt.desc.*`, `scriptsfmt.type.*`); es es idéntico.
+- Paquetes: `pack.err.script.platform|origin` y `pack.err.playbook.id`.
+- `mctl.credrotate.note_3` en inglés cita la etiqueta real guardada en la bóveda, `"<label> (anterior)"` (no se cambia la etiqueta: ya existe en bóvedas de usuarios y se busca por ella). El respaldo programado audita `backup.failed` en inglés.
+
+## Idioma canónico: inglés (después de la fase 30e)
+- El inglés es el idioma canónico de la app y el español es segunda lengua que se elige en Ajustes. La regla «sin `accept-language` = español byte a byte» de 30a a 30e deja de aplicar: **sin `accept-language` (o con uno desconocido) el núcleo responde en inglés**; `internal/i18n` (`Locale`, `Normalize`, `Parse`) devuelve `en` por omisión. Las pruebas de regresión en español piden `es` explícito (`accept-language: es`, `i18n.WithLocale(ctx, "es")` o `--lang es`) y siguen comparando con sus goldens; hay pruebas de que sin idioma sale inglés. La auditoría sigue fija en inglés.
+- mctl: sin `--lang`, inglés. La ayuda (`--help`, `-h`, `help`, sin comando) y los errores `usage: mctl …` salen en inglés (`testdata/help.golden`); con `--lang es` salen en español (`help_es.golden`, `uso: mctl …`). Los nombres de banderas y los valores técnicos (`renombrar|reemplazar|omitir`) no se traducen. La ayuda en inglés vive en `cmd/mctl/cli/help_en.txt`, línea por línea la misma que los `Usage` de las áreas (español).
+- UI: sin elección guardada la interfaz arranca en inglés (ya no mira `navigator.language`). Solo se guarda la elección explícita del selector de Ajustes, en la clave nueva `macuahuitl.lang` de `localStorage`; la clave anterior (`macuahuitl.idioma`) se ignora porque guardaba también lo autodetectado. El contexto por omisión de `i18n.tsx` y `tr` caen a inglés.

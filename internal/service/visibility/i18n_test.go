@@ -57,12 +57,12 @@ func visibilidadCasos(t *testing.T, ctx context.Context) map[string]string {
 }
 
 func TestVisibilidadRegresionEs(t *testing.T) {
-	base := visibilidadCasos(t, context.Background())
+	base := visibilidadCasos(t, i18n.WithLocale(context.Background(), "es"))
 	i18ntest.Golden(t, "testdata/visibilidad_es.golden.json", base)
-	for _, loc := range []string{"es", "es-MX", "fr"} {
-		for k, v := range visibilidadCasos(t, i18n.WithLocale(context.Background(), loc)) {
+	for _, loc := range []string{"es", "es-MX"} {
+		for k, v := range visibilidadCasos(t, i18n.WithLocale(i18n.WithLocale(context.Background(), "es"), loc)) {
 			if base[k] != v {
-				t.Errorf("%s con %q difiere de sin idioma", k, loc)
+				t.Errorf("%s con %q difiere de es", k, loc)
 			}
 		}
 	}

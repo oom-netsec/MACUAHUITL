@@ -103,7 +103,7 @@ func tlsInspect(c *cli.Env, args []string) error {
 	}
 	if hasPort {
 		if port, err = strconv.ParseUint(p, 10, 16); err != nil {
-			return fmt.Errorf("puerto inválido %q", p)
+			return cli.Err("mctl.common_a.bad_port", "port", p)
 		}
 		host = h
 	}
@@ -161,13 +161,13 @@ func syslogListen(c *cli.Env, args []string) error {
 		case r.Drops != nil:
 			cli.PrintDrops(c.Out, r.Drops)
 		case r.RotatedPath != "":
-			fmt.Fprintf(c.Out, "archivo nuevo: %s\n", r.RotatedPath)
+			fmt.Fprintln(c.Out, cli.T("mctl.common_a.new_file", "path", r.RotatedPath))
 		case r.Listening != "":
-			fmt.Fprintf(c.Out, "escuchando en %s/%s", r.Listening, proto)
+			code := "mctl.tools.listening"
 			if r.OutputPath != "" {
-				fmt.Fprintf(c.Out, " (guardando en %s)", r.OutputPath)
+				code = "mctl.tools.listening_saving"
 			}
-			fmt.Fprintln(c.Out)
+			fmt.Fprintln(c.Out, cli.T(code, "addr", r.Listening, "proto", proto, "path", r.OutputPath))
 		default:
 			fmt.Fprintln(c.Out, r.Json)
 		}

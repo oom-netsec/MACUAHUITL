@@ -75,7 +75,7 @@ func (f srcFlags) source(c *cli.Env, fs *flag.FlagSet) (*v1.LogSource, error) {
 				return nil, err
 			}
 			if len(b) > maxStdin {
-				return nil, fmt.Errorf("la entrada excede %d MiB", maxStdin>>20)
+				return nil, cli.Err("mctl.forensic.stdin_max", "n", maxStdin>>20)
 			}
 			return &v1.LogSource{Text: string(b)}, nil
 		}
@@ -86,7 +86,7 @@ func (f srcFlags) source(c *cli.Env, fs *flag.FlagSet) (*v1.LogSource, error) {
 	case fs.NArg() == 0 && !f.capture && f.job != "":
 		return &v1.LogSource{Job: jobArg(f.job), Device: f.device}, nil
 	}
-	return nil, errors.New("elige una fuente: ARCHIVO (o - para la entrada estándar), --capture o --job TRABAJO")
+	return nil, cli.Err("mctl.forensic.no_source")
 }
 
 // jobArg: una carpeta se resuelve en el cliente; lo demás es el ID de un trabajo.

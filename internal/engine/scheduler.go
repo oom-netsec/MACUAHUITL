@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -61,7 +62,7 @@ func (s *Scheduler) Arm(jobID string, sc Schedule, until time.Time, targets []st
 		until = sc.Until
 	}
 	if !until.After(s.now()) {
-		return errors.New("engine: el fin del trabajo ya pasó")
+		return i18n.New("engine.err.job_ended", nil)
 	}
 	if sc.Interval == 0 && sc.Cron == "" {
 		sc.Rounds = 1
@@ -69,7 +70,7 @@ func (s *Scheduler) Arm(jobID string, sc Schedule, until time.Time, targets []st
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, dup := s.jobs[jobID]; dup {
-		return fmt.Errorf("engine: %s ya está armado", jobID)
+		return i18n.New("engine.err.armed", i18n.A("job", jobID))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	a := &armed{cancel: cancel}

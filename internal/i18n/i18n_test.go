@@ -29,8 +29,14 @@ func TestTIdioma(t *testing.T) {
 	add(map[string]entry{"prueba.uno": {Es: "hola {n}", En: "hello {n}", Args: []string{"n"}}})
 	defer delete(catalog, "prueba.uno")
 	ctx := context.Background()
-	if got := T(ctx, "prueba.uno", A("n", 3)); got != "hola 3" {
-		t.Fatalf("sin locale debe ser es: %q", got)
+	if got := T(ctx, "prueba.uno", A("n", 3)); got != "hello 3" {
+		t.Fatalf("sin locale debe ser en (el canónico): %q", got)
+	}
+	if got := T(WithLocale(ctx, Es), "prueba.uno", A("n", 3)); got != "hola 3" {
+		t.Fatalf("es explícito: %q", got)
+	}
+	if Locale(ctx) != En || Normalize("") != En || Normalize("fr") != En || Normalize("es-MX") != Es {
+		t.Fatal("sin idioma o desconocido debe ser en")
 	}
 	if got := T(WithLocale(ctx, En), "prueba.uno", A("n", 3)); got != "hello 3" {
 		t.Fatalf("en: %q", got)
@@ -42,8 +48,8 @@ func TestTIdioma(t *testing.T) {
 
 func TestParse(t *testing.T) {
 	for in, want := range map[string]string{
-		"": Es, "es": Es, "en": En, "es-MX": Es, "en-US": En, "EN-gb": En, "fr": Es, "xx-yy": Es,
-		"fr, en;q=0.8": En, "en, es": En, "es, en": Es, "en;q=0.5, es;q=0.9": Es, "en;q=0": Es, "de, fr;q=0.9, en;q=0.1": En, "*": Es, "en;q=x": Es, "en;q=NaN": Es, "en;q=2": Es, "en;foo=1;q=0.3, es;q=0.2": En, "en;foo=1;q=0": Es, "en;q=0.5;x=1, es;q=0.4": En,
+		"": En, "es": Es, "en": En, "es-MX": Es, "en-US": En, "EN-gb": En, "fr": En, "xx-yy": En,
+		"fr, en;q=0.8": En, "en, es": En, "es, en": Es, "en;q=0.5, es;q=0.9": Es, "en;q=0": En, "de, fr;q=0.9, en;q=0.1": En, "*": En, "en;q=x": En, "en;q=NaN": En, "en;q=2": En, "en;foo=1;q=0.3, es;q=0.2": En, "en;foo=1;q=0": En, "en;q=0.5;x=1, es;q=0.4": En,
 	} {
 		if got := Parse(in); got != want {
 			t.Errorf("Parse(%q)=%q want %q", in, got, want)
@@ -53,7 +59,7 @@ func TestParse(t *testing.T) {
 
 func TestParseCortaElHeader(t *testing.T) {
 	// El header se corta a 256 bytes: un en que queda después del corte no cuenta.
-	if got := Parse(strings.Repeat(" ", 300) + "en"); got != Es {
+	if got := Parse(strings.Repeat(" ", 300) + "es"); got != En {
 		t.Fatalf("%q", got)
 	}
 	// El corte deja «en» sin su «;q=0.1»: la entrada incompleta se descarta en vez de valer q=1.

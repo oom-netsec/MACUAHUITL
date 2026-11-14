@@ -269,3 +269,14 @@ func UsedKeys(v any) map[string]bool {
 	}
 	return used
 }
+
+// Has dice si el código está en el catálogo.
+func Has(code string) bool { _, ok := catalog[code]; return ok }
+
+// MsgOr es el texto del código en el idioma dado; con es, o si el código no existe, def (el texto de origen).
+func MsgOr(loc, code, def string) string {
+	if loc == Es || !Has(code) {
+		return def
+	}
+	return Msg(loc, code, nil)
+}

@@ -230,11 +230,11 @@ func errStr(err error) string {
 func TestFlotaRegresionEs(t *testing.T) {
 	h := newHarness(t, nil)
 	fx := newFlotaFx(t)
-	base := flotaCases(t, h, "", fx)
-	for _, lang := range []string{"es", "es-MX", "fr"} {
+	base := flotaCases(t, h, "es", fx)
+	for _, lang := range []string{"es", "es-MX"} {
 		for n, r := range flotaCases(t, h, lang, fx) {
 			if !r.same(base[n]) {
-				t.Errorf("%s con %q difiere de sin idioma", n, lang)
+				t.Errorf("%s con %q difiere de es", n, lang)
 			}
 		}
 	}

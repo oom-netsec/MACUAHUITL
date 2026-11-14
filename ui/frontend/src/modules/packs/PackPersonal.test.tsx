@@ -8,7 +8,7 @@ import type { PackImportItem } from "./api";
 
 const mk = (id: string, name: string, origin: "usuario" | "biblioteca") => ({ id, name, tech: "cli", platform: "ios", description: "", commands: ["show version"], tags: [], origin, createdMs: 0, updatedMs: 0, readOnly: true, favorite: false, pinned: false, collections: [] }) as unknown as ScriptItem;
 const scripts = [mk("a".repeat(32), "Mi script", "usuario"), mk("lib-x", "De biblioteca", "biblioteca")];
-const view = (core = fakeCore()) => { localStorage.setItem("macuahuitl.idioma", "es"); return render(<I18nProvider><PacksSection core={core} /></I18nProvider>); };
+const view = (core = fakeCore()) => { localStorage.setItem("macuahuitl.lang", "es"); return render(<I18nProvider><PacksSection core={core} /></I18nProvider>); };
 const exportBase = { id: "yo/mis", version: "2026.1113.100000", sha256: "abc", scripts: 1, playbooks: 2, omittedPlaybooks: [] as string[] };
 
 async function openExport(over = {}) {

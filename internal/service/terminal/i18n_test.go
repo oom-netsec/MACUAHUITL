@@ -44,12 +44,12 @@ func terminalCasos(t *testing.T, ctx context.Context) map[string]string {
 }
 
 func TestTerminalRegresionEs(t *testing.T) {
-	base := terminalCasos(t, context.Background())
+	base := terminalCasos(t, i18n.WithLocale(context.Background(), "es"))
 	i18ntest.Golden(t, "testdata/terminal_es.golden.json", base)
-	for _, loc := range []string{"es", "es-MX", "fr"} {
-		for k, v := range terminalCasos(t, i18n.WithLocale(context.Background(), loc)) {
+	for _, loc := range []string{"es", "es-MX"} {
+		for k, v := range terminalCasos(t, i18n.WithLocale(i18n.WithLocale(context.Background(), "es"), loc)) {
 			if base[k] != v {
-				t.Errorf("%s con %q difiere de sin idioma", k, loc)
+				t.Errorf("%s con %q difiere de es", k, loc)
 			}
 		}
 	}

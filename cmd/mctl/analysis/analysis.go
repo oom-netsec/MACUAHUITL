@@ -92,7 +92,7 @@ func timeline(c *cli.Env, args []string) error {
 	if around != "" {
 		t, err := time.Parse(time.RFC3339, around)
 		if err != nil {
-			return fmt.Errorf("--around: usa RFC 3339, p. ej. 2026-11-04T10:09:18Z")
+			return cli.Err("mctl.analysis.around")
 		}
 		req.Around = timestamppb.New(t)
 	}
