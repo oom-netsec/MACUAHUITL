@@ -530,28 +530,31 @@ func TestHomeVacioUsaLaCuentaYSinHomeRechaza(t *testing.T) {
 
 // Si no se puede resolver $HOME, se compara con el $HOME sin resolver (no se salta la comprobación).
 func TestHomeSinResolverSigueRechazando(t *testing.T) {
-	home := t.TempDir()
+	base := t.TempDir()
+	realHome := filepath.Join(base, "var-home")
+	os.MkdirAll(filepath.Join(realHome, ".cache"), 0o700)
+	home := filepath.Join(base, "home") // $HOME es un enlace (como /home -> /var/home en Silverblue)
+	os.Symlink(realHome, home)
 	t.Setenv("HOME", home)
-	os.MkdirAll(filepath.Join(home, ".cache"), 0o700)
 	old := evalSymlinks
-	calls := 0
 	evalSymlinks = func(p string) (string, error) {
-		if p == home { // la primera (resolver la carpeta pedida) funciona; la de $HOME falla
-			if calls++; calls > 1 {
-				return "", errors.New("boom")
-			}
+		if p == home {
+			return "", errors.New("boom")
 		}
 		return filepath.EvalSymlinks(p)
 	}
 	defer func() { evalSymlinks = old }()
-	if _, err := ValidateDir(home); err == nil {
-		t.Error("$HOME exacto aceptado")
+	for _, d := range []string{home, realHome, filepath.Join(realHome, ".cache")} {
+		if _, err := ValidateDir(d); err == nil {
+			t.Errorf("%s aceptada sin poder resolver $HOME", d)
+		}
 	}
-	if _, err := ValidateDir(filepath.Join(home, ".cache")); err == nil {
-		t.Error("~/.cache aceptada")
-	}
-	os.WriteFile(filepath.Join(home, ".netrc"), []byte("x"), 0o600)
-	if _, err := Publish([]string{filepath.Join(home, ".netrc")}); err == nil {
-		t.Error("~/.netrc publicado")
+}
+
+func TestPublishArchivoInexistenteDiceQueNoExiste(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "no-esta.bin")
+	_, err := Publish([]string{f})
+	if !errors.Is(err, os.ErrNotExist) || err.Error() != "fileserve: stat "+f+": no such file or directory" {
+		t.Fatalf("err = %v; quiero el mensaje de stat de siempre", err)
 	}
 }
