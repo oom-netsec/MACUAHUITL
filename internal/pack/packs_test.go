@@ -54,12 +54,17 @@ func repoBase(t *testing.T) pack.Base {
 	for _, p := range pbs {
 		base.PlaybookIDs = append(base.PlaybookIDs, p.ID)
 	}
-	lib, _, err := scripts.LibraryWithEN(playbooks.FS)
+	lib, en, err := scripts.LibraryWithEN(playbooks.FS)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, s := range lib {
 		base.ScriptIDs, base.ScriptNames = append(base.ScriptIDs, s.ID), append(base.ScriptNames, s.Name)
+		n := en[s.ID].Name
+		if n == "" {
+			n = s.Name
+		}
+		base.ScriptNamesEN = append(base.ScriptNamesEN, n)
 	}
 	return base
 }

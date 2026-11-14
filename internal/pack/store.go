@@ -270,13 +270,10 @@ func (s *Store) collides(p *Pack, others []*Pack) error {
 			pbs[pb.ID] = who
 		}
 		d := scripts.Derived(q.Playbooks)
-		for _, tx := range scripts.DerivedTexts(q.Playbooks) {
-			if tx.Name == "" {
-				continue
-			}
-			k := scripts.NameKey(tx.Name)
+		for _, n := range namesShownEN(q) {
+			k := scripts.NameKey(n)
 			if w, dup := namesEN[k]; dup {
-				return rej("collision", "id", tx.Name, "with", w)
+				return rej("collision", "id", n, "with", w)
 			}
 			namesEN[k] = who
 		}
@@ -549,3 +546,18 @@ func (s *Store) RemoveLocked(id string) (*Pack, error) {
 
 // SHA256 es el sha256 en hex de los bytes del archivo.
 func SHA256(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
+
+// namesShownEN son los nombres con que se ven en inglés los scripts de q (derivados y de scripts.json): el name_en
+// del playbook o, sin él, el español (lo mismo que muestra Texto.In).
+func namesShownEN(q *Pack) []string {
+	en := scripts.DerivedTexts(q.Playbooks)
+	var out []string
+	for _, sc := range append(scripts.Derived(q.Playbooks), q.Scripts...) {
+		if t := en[sc.ID]; t.Name != "" {
+			out = append(out, t.Name)
+		} else {
+			out = append(out, sc.Name)
+		}
+	}
+	return out
+}

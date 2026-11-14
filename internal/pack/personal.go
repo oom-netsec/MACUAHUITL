@@ -20,6 +20,7 @@ type ExportInput struct {
 	Core                                                      string // versión del núcleo; «dev» o no semver = min_core 0.0.0
 	Now                                                       time.Time
 	TakenNames                                                []string            // nombres de script ya ocupados (base e instalados): un playbook cuyo script derivado se llame igual se omite
+	TakenNamesEN                                              []string            // lo mismo con los nombres como se ven en inglés
 	Scripts                                                   []scripts.Script    // los del usuario que se exportan
 	Playbooks                                                 []playbook.Playbook // los de <config>/playbooks; los que no sean exportables se omiten con aviso
 }
@@ -80,9 +81,17 @@ func Export(in ExportInput) (*ExportResult, error) {
 	for _, n := range in.TakenNames {
 		taken[scripts.NameKey(n)] = true
 	}
+	// En inglés: un script de scripts.json se ve con su nombre (no tiene otro en inglés).
+	namesEN, takenEN := map[string]bool{}, map[string]bool{}
+	for _, s := range out {
+		namesEN[scripts.NameKey(s.Name)] = true
+	}
+	for _, n := range in.TakenNamesEN {
+		takenEN[scripts.NameKey(n)] = true
+	}
 	var pbs []playbook.Playbook
 	for _, pb := range in.Playbooks {
-		pb, ok := exportPlaybook(pb, editor, files, names, taken)
+		pb, ok := exportPlaybook(pb, editor, files, names, taken, namesEN, takenEN)
 		if !ok {
 			res.Omitted = append(res.Omitted, pb.ID)
 			continue
@@ -154,7 +163,7 @@ func exportScriptID(editor, orig string, used map[string]bool) string {
 // exportPlaybook le pone al playbook su ID con prefijo de editor y agrega su archivo a files. ok=false (y pb.ID con el ID
 // original) si no se puede exportar: plataforma que no es instalable, ID que el instalador rechazaría, script derivado
 // inválido o un archivo playbooks/<id>.yaml ya tomado.
-func exportPlaybook(pb playbook.Playbook, editor string, files map[string][]byte, names, taken map[string]bool) (playbook.Playbook, bool) {
+func exportPlaybook(pb playbook.Playbook, editor string, files map[string][]byte, names, taken, namesEN, takenEN map[string]bool) (playbook.Playbook, bool) {
 	orig := pb
 	if !slices.Contains(Installable, pb.Platform) {
 		return orig, false
@@ -169,10 +178,11 @@ func exportPlaybook(pb playbook.Playbook, editor string, files map[string][]byte
 	}
 	pb.ID, pb.Pack = pb.Platform+"/"+id, ""
 	for _, s := range scripts.Derived([]playbook.Playbook{pb}) {
-		if s.Validate() != nil || names[scripts.NameKey(s.Name)] || taken[scripts.NameKey(s.Name)] {
+		en := scripts.NameKey(namesShownEN(&Pack{Playbooks: []playbook.Playbook{pb}})[0])
+		if s.Validate() != nil || names[scripts.NameKey(s.Name)] || taken[scripts.NameKey(s.Name)] || namesEN[en] || takenEN[en] {
 			return orig, false
 		}
-		names[scripts.NameKey(s.Name)] = true
+		names[scripts.NameKey(s.Name)], namesEN[en] = true, true
 	}
 	raw, err := playbook.Marshal(pb)
 	if err != nil {

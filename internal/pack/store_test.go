@@ -669,3 +669,21 @@ func TestChocaElNombreEnIngles(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Con la app en inglés, un playbook sin name_en (o un script de scripts.json) se ve con su nombre en español: ese es el
+// que se compara en inglés, contra el name_en de otro paquete.
+func TestChocaElNombreVisibleEnInglesSinNameEn(t *testing.T) {
+	pub, _ := testKey(t)
+	s, _ := openStore(t, t.TempDir(), pub, Base{})
+	a := thirdParty()
+	setPB(a, strings.NewReplacer(`name: "L2 · STP"`, `name: "Acme · Árbol"`, `name_en: "L2 · STP"`, `name_en: "Acme · Tree"`).Replace(string(a["playbooks/acme-stp.yaml"])))
+	if _, err := s.Install(mustZip(t, a), true); err != nil {
+		t.Fatal(err)
+	}
+	b := thirdParty()
+	b["manifest.yaml"] = []byte(strings.Replace(string(b["manifest.yaml"]), "acme/demo", "acme/otro", 1))
+	setPB(b, strings.NewReplacer("acme-stp", "acme-otro", `name: "L2 · STP"`, `name: "Acme · Tree"`, "name_en: \"L2 · STP\"\n", "").Replace(string(b["playbooks/acme-stp.yaml"])))
+	if _, err := s.Install(mustZip(t, b), true); Reason(err) != "collision" {
+		t.Fatalf("%v; quería collision", err)
+	}
+}

@@ -85,8 +85,10 @@ func BaseLibrary() (ids, names, namesEN []string, err error) {
 	lib, en, err := dom.LibraryWithEN(playbooks.FS)
 	for _, x := range lib {
 		ids, names = append(ids, x.ID), append(names, x.Name)
-		if t := en[x.ID]; t.Name != "" {
+		if t := en[x.ID]; t.Name != "" { // como se ve en inglés: su nombre en inglés o, sin él, el español
 			namesEN = append(namesEN, t.Name)
+		} else {
+			namesEN = append(namesEN, x.Name)
 		}
 	}
 	return ids, names, namesEN, err
