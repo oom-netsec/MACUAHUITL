@@ -38,7 +38,7 @@ func TestImportPublicaPlaybooksTrasConfirmarScripts(t *testing.T) {
 		chocar(pbDir, conflict)
 	}
 	t.Cleanup(func() { beforePublish = nil })
-	_, err := s2.Import(context.Background(), &v1.PackServiceImportRequest{Path: mp, Confirm: true})
+	_, err := s2.Import(context.Background(), &v1.PackServiceImportRequest{Path: mp, Confirm: true, Sha256: sumOf(t, mp)})
 	if err == nil || !called {
 		t.Fatalf("debía fallar al publicar (hook %v): %v", called, err)
 	}
@@ -72,7 +72,7 @@ func TestImportCompensacionFallidaSeAudita(t *testing.T) {
 		d2.DB().Exec(`CREATE TRIGGER no_borrar BEFORE DELETE ON scripts BEGIN SELECT RAISE(ABORT, 'no'); END`)
 	}
 	t.Cleanup(func() { beforePublish = nil })
-	_, err := s2.Import(context.Background(), &v1.PackServiceImportRequest{Path: mp, Confirm: true})
+	_, err := s2.Import(context.Background(), &v1.PackServiceImportRequest{Path: mp, Confirm: true, Sha256: sumOf(t, mp)})
 	if err == nil || !strings.Contains(err.Error(), "scripts") || !strings.Contains(d2.AuditText(), "pack.import.compensate_failed") {
 		t.Fatalf("err=%v\n%s", err, d2.AuditText())
 	}
@@ -107,4 +107,14 @@ func prepImport(t *testing.T) (*svc, *servicetest.Deps, string, string) {
 	pbDir := filepath.Join(cfg, "playbooks")
 	s2 := &svc{d: d2, store: st2, cfg: Module{ConfigDir: cfg}}
 	return s2, d2, mp, pbDir
+}
+
+// sumOf es el sha256 del archivo, como lo daría la vista previa.
+func sumOf(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dom.SHA256(b)
 }
