@@ -11,7 +11,8 @@ import (
 func TestMotivosDeSintaxisDicenQueHacer(t *testing.T) {
 	for cmd, hint := range map[string][2]string{
 		"show version ; reload":          {"un comando por línea", "one command per line"},
-		"show version > flash:x":         {"quita la redirección", "remove the redirection"},
+		"show version > flash:x":         {"ningún lugar del comando", "anywhere in the command"},
+		"show version | include ->":      {"dentro de un filtro", "inside a filter"},
 		"show version `x`":               {"valor literal", "literal value"},
 		"show version | include \"":      {"ciérralas o quítalas", "close it or remove it"},
 		"show version | include a|sed x": {"reescribe la alternancia", "rewrite the alternation"},
