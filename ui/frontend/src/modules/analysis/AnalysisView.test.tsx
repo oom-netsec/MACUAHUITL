@@ -46,10 +46,10 @@ test("hallazgos agrupados por severidad con evidencia expandible", async () => {
   expect(screen.getByText(/sin validar en laboratorio/i)).toBeInTheDocument();
 }, 15_000);
 
-test("sin corridas explica de dónde salen y lleva a Patrol", async () => {
+test("sin trabajos analizados explica de dónde salen y lleva a Patrol", async () => {
   const go = vi.fn();
   render(<NavContext.Provider value={{ go, inbox: {} }}><AnalysisView core={fakeCore()} /></NavContext.Provider>);
-  expect(screen.getByText("Sin corridas analizadas")).toBeInTheDocument();
+  expect(screen.getByText("Sin trabajos analizados")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Ir a Patrol" }));
   expect(go).toHaveBeenCalledWith("patrol");
 });
