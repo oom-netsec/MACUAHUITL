@@ -137,9 +137,9 @@ func (d *Dev) match(full string, filtered bool) (Evidence, bool) {
 	return best, found
 }
 
-// hostDirRe: carpeta de equipo de Patrol, <host>_<ip>. Cualquier otra carpeta
+// hostDirRe: carpeta de equipo de Patrol, <host>_<ip>[_<puerto>]. Cualquier otra carpeta
 // (outputs/diag, un trabajo) no es un equipo.
-var hostDirRe = regexp.MustCompile(`^.+_\d{1,3}(?:\.\d{1,3}){3}$`)
+var hostDirRe = regexp.MustCompile(`^.+_\d{1,3}(?:\.\d{1,3}){3}(?:_\d{1,5})?$`)
 
 // Load lee dir: o es un trabajo de Patrol (subcarpetas <equipo>_<ip>) o una
 // carpeta con varios trabajos (outputs/). Por equipo y comando gana la hora más reciente.

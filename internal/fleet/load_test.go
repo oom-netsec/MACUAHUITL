@@ -214,3 +214,19 @@ func TestLoadSaltaSeccionesIncompletas(t *testing.T) {
 		t.Fatalf("%+v", e)
 	}
 }
+
+// Una carpeta <equipo>_<ip>_<puerto> (puerto distinto de 22) también es un equipo, suelta o en zip.
+func TestLoadCarpetaConPuerto(t *testing.T) {
+	d := t.TempDir()
+	put(t, d, "trabajo_1/SW1_10.0.0.1_2222/r001.txt", errDis)
+	f, err := Load(d, now)
+	if err != nil || len(f.Devs) != 1 || f.Devs[0].IP != "10.0.0.1" {
+		t.Fatalf("suelta: %v %+v", err, f)
+	}
+	z := t.TempDir()
+	zipOf(t, filepath.Join(z, "trabajo_1", "x.zip"), map[string]string{"SW1_10.0.0.1_2222/r001.txt": errDis})
+	f, err = Load(z, now)
+	if err != nil || len(f.Devs) != 1 {
+		t.Fatalf("zip: %v %+v", err, f)
+	}
+}
