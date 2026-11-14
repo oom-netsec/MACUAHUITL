@@ -10,7 +10,7 @@ uso: mctl <comando>
   playbooks [--platform P]
   audit verify | export
   (cualquier comando: --no-color o NO_COLOR desactivan el color; con --json o sin TTY no hay color)
-  (antes del comando: --lang es|en pide los mensajes del núcleo en ese idioma; sin ella, es. mctl no lee LC_ALL, LC_MESSAGES ni LANG)
+  (antes del comando: --lang es|en pide los mensajes del núcleo en ese idioma; sin ella, inglés. mctl no lee LC_ALL, LC_MESSAGES ni LANG)
   acl   convert --from F --to F -f acl.txt | analyze --vendor F -f acl.txt   (F: ios-xe, nx-os, asa)
   diag  ping|traceroute|nmap|iperf3|pcap [DESTINO] [-o clave=valor]... [--out CARPETA]
         --out: la carpeta debe existir y tener modo 0700, como la de Ajustes → Almacenamiento

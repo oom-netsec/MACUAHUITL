@@ -14,8 +14,8 @@ func TestAsistidoEsYEn(t *testing.T) {
 	plan := &v1.AssistPlan{WriteMemory: true, Devices: []*v1.AssistDevicePlan{{Device: "sw", Pre: []string{"show x"}, Notes: []string{"n"},
 		Expect: []*v1.AssistExpect{{Command: "c", Line: "l", Present: false}}}}}
 	for lang, want := range map[string][]string{
-		"":   {"(viva)", "equipos=a", "Plan para sw", "Pre-check (lectura)", "REVERSA (restaura lo capturado)", "  Avisos:", "  Se espera ver:", "(NO debe aparecer)", "write memory"},
-		"en": {"(live)", "devices=a", "Plan for sw", "Pre-check (read-only)", "ROLLBACK (restores what was captured)", "  Warnings:", "  Expected to see:", "(must NOT appear)", "write memory"},
+		"es": {"(viva)", "equipos=a", "Plan para sw", "Pre-check (lectura)", "REVERSA (restaura lo capturado)", "  Avisos:", "  Se espera ver:", "(NO debe aparecer)", "write memory"},
+		"":   {"(live)", "devices=a", "Plan for sw", "Pre-check (read-only)", "ROLLBACK (restores what was captured)", "  Warnings:", "  Expected to see:", "(must NOT appear)", "write memory"},
 	} {
 		SetLang(lang)
 		var b strings.Builder
@@ -27,11 +27,11 @@ func TestAsistidoEsYEn(t *testing.T) {
 			}
 		}
 	}
-	SetLang("en")
+	SetLang("")
 	if _, _, err := SplitHost("h:abc"); err == nil || err.Error() != `invalid port "abc"` {
 		t.Errorf("%v", err)
 	}
-	SetLang("")
+	SetLang("es")
 	if _, _, err := SplitHost("h:abc"); err == nil || err.Error() != `puerto inválido "abc"` {
 		t.Errorf("%v", err)
 	}

@@ -164,7 +164,7 @@ func TestPortsSetFailureOffersRollback(t *testing.T) {
 // mctlAsync corre mctl con una entrada que la prueba controla (una tubería) y devuelve su salida y su resultado.
 func mctlAsync(stdin io.Reader, args ...string) (*syncBuf, <-chan error) {
 	out, done := &syncBuf{}, make(chan error, 1)
-	go func() { done <- run(args, stdin, out) }()
+	go func() { done <- run(append([]string{"--lang", "es"}, args...), stdin, out) }()
 	return out, done
 }
 

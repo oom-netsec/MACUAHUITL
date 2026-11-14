@@ -1,0 +1,193 @@
+usage: mctl <command>
+  vault status | create | unlock | lock | passwd
+  cred  list | add --label L --user U [--no-enable] | rm ID
+  cred  backup export PATH [--overwrite] [--yes]  |  backup import PATH [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+        (encrypted vault backup with its own passphrase, different from the master one and at least 12 characters; the passphrase is read from the terminal or stdin, never as an argument.
+         export requires --yes: the file holds all your credentials. import shows the state of each one: nueva, igual, conflicto_etiqueta or reservada (skipped);
+         each conflict needs a decision per ID or label, or --all; if one is missing nothing is imported)
+  job   create -f job.yaml [--param name=value]... | logintest ID | arm [--accept FINGERPRINT]... [--exclude DEVICE]... ID
+        cancel ID | list | watch ID
+  playbooks [--platform P]
+  audit verify | export
+  (any command: --no-color or NO_COLOR turn color off; with --json or without a TTY there is no color)
+  (before the command: --lang es|en asks for the core messages in that language; without it, en. mctl does not read LC_ALL, LC_MESSAGES or LANG)
+  acl   convert --from F --to F -f acl.txt | analyze --vendor F -f acl.txt   (F: ios-xe, nx-os, asa)
+  diag  ping|traceroute|nmap|iperf3|pcap [TARGET] [-o key=value]... [--out FOLDER]
+        --out: the folder must exist and have mode 0700, like the one in Settings → Storage
+        interfaces   (local interfaces, no network traffic)
+  pcap  analyze FILE [--top N] [--json]
+  dns   query|transport|hygiene|exposure NAME [-t TYPE] [-s SERVER]... [--dnssec] [--dkim SEL]
+        trace|zone|dnssec NAME --deep   (contacts roots and authoritative servers; audited)
+  tls   inspect HOST[:PORT] [--sni NAME]
+  syslog listen [--addr IP:PORT] [--tcp] [--any] [--for SECONDS] [--rate N] [--burst N] [--rate-global N] [--burst-global N] [--queue N]
+        [--save [--rotate-mb N] [--rotate-min N] [--name TEMPLATE] [--max-files N] [--format texto|crudo|jsonl]]
+  radius test SERVER[:PORT] --user U|--cred ID [--secret-cred ID] [--method pap|chap|mschapv2]
+        [--nas-ip IP] [--port-type T] [--service-type T] [--called X] [--calling MAC] [--acct] [--status]
+  tacacs test SERVER[:PORT] --user U|--cred ID [--secret-cred ID] [--type ascii|pap] [--cmd COMMAND] [--acct]
+  pki   key --alg A -o KEY | csr --cn CN [--dns D]... [--ip IP]... [--key KEY] [-o PREFIX]
+        ca init --name N [--days D] [--out FOLDER] | ca sign --ca FOLDER --csr CSR -o CERT [--profile P]
+        export --cert C [--chain CA] [--key KEY] --format p12|p12-legacy|pem|der -o OUTPUT | decode -f FILE
+  ike   decode -f FILE [--json]   (IKEv1, IKEv2 and IPsec debug/show)
+  change create -f change.yaml | pre|post [--accept FINGERPRINT]... [--exclude DEVICE]... ID | list
+         report ID | report --pre FOLDER --post FOLDER   [--json]
+  upgrade check --outputs FILE --image NAME [--size BYTES] [--md5 HEX] [--verify FILE] [--json]
+  compliance check --config FILE [--template FILE] [--json]
+  topo  build JOB|FOLDER [--pcap FILE] [--svg FILE] [--json]
+  snmp  get HOST OID... | walk HOST OID [--bulk] | poll HOST [--profile P]... [--every S] [--count N]
+        --cred ID [-v 2c|3 --auth SHA --priv AES] [--port N] [--json]
+        traps listen [--addr IP:PORT] [--any] [--for S] [--v3-cred ID] [limits and file]   (1162 by default)
+  flows listen [--addr IP:PORT] [--any] [--for S] [--top N] [--every S] [--json] [limits and file]
+        limits and file: [--rate N] [--burst N] [--rate-global N] [--burst-global N] [--queue N]
+        [--save [--rotate-mb N] [--rotate-min N] [--name TEMPLATE] [--max-files N] [--format texto|crudo|jsonl]]
+        in flows the limit counts datagrams (not flows), only applies with --save (1000/s per exporter and 5000/s global by default);
+        a dropped v9/IPFIX template datagram delays decoding until the exporter repeats it
+  gnmi  get|subscribe HOST PATH... --cred ID [--ca CA.pem] [--port N] [--mode sample|on_change]
+  analyze  JOB|FOLDER [--round N] [--device DEVICE] [--json]   (rules not validated in the lab)
+  diff     JOB|FOLDER --from A --to B [--device DEVICE] [--json]
+  timeline JOB|FOLDER [--around TS --window 30s] [--device DEVICE] [--pcap FILE] [--json]
+  calc  subnet PREFIX | vlsm NETWORK [NAME=]HOSTS... | summarize PREFIX... | wildcard [ADDRESS] VALUE
+        ipv6 [ADDRESS] [--mac MAC] | mtu LAYER... [--mtu 1500] [--ipv6] | tcp --bw 1g --rtt MS [--window 64k] [--loss %]
+        dscp [QUERY] [--by FIELD] | optics --tx DBM --rx DBM --km KM [--fiber F] | optics --convert -3dBm
+        bgp --route name=A,lp=200,path=65001,med=10,ebgp,rid=IP... [--deterministic-med] [--always-compare-med]
+        (all with --json)
+  console [PORT] [--baud N] [--parity none|even|odd] [--flow none|rtscts|xonxoff] [--list]
+        (Ctrl-] q quits, Ctrl-] b sends BREAK; recorded in outputs/console)
+  serve tftp|http --addr IP[:PORT] --file PATH... [--for SECONDS] [--any]
+        (TFTP on 6969: IOS uses 69, redirect with nftables; HTTP on 8080)
+  hash  FILE [--md5 VALUE] [--sha512 VALUE]
+  find  IP|MAC|NAME             (searches the evidence of the whole fleet; MAC in any notation)
+  trace MAC|IP                  (follows the MAC through the CAM tables to the access port)
+  path  SOURCE DESTINATION [--svg FILE]   (hop-by-hop L3 path with the L2 leg)
+  health interfaces             (interfaces with CRC, errors, drops, err-disabled, half duplex)
+  fleet summary | flash [--need 1.2G] | inventory [--csv|--md]
+        (fleet = the latest output of each device in outputs/; all with --dir FOLDER and --json)
+  ports set DEVICE[:PORT] IF... --cred ID [--vlan N] [--voice N] [--desc T] [--shut|--no-shut]
+        [--accept FINGERPRINT]... [--write-memory] [--asistido]
+        (without --asistido it only shows the plan with its rollback; with --asistido it asks for confirmation at each step: s/N, r = revert;
+         Ctrl-C aborts the run and warns if any device was left changed)
+  ports runs [--activas]            runs the core remembers (to resume one that was left alive)
+  ports resume RUN                  resumes the confirmation of a live run
+  run -d DEVICE... -c "show ..." | -f FILE --cred ID [--accept FINGERPRINT] [--csv|--md|--json]
+        (read-only batch: a one-round Patrol job; every command goes through CheckDenied)
+  drift JOB|FOLDER [--round N] [--device DEVICE] [--json]
+        (running-config of round N against N-1 per device, without volatile lines; read-only)
+  config clean FILE [-o OUTPUT] [--sort] [--json]
+        (removes empty and repeated ! lines, trims spaces, flags orphans; without -o it only shows the report)
+  snippet vlan DEVICE[:PORT] ID --cred ID [--name X | --remove [--accept-trunk]] [--accept-vtp] [--accept FINGERPRINT]... [--write-memory] [--asistido]
+  snippet trunk DEVICE[:PORT] IF add|remove VLAN --cred ID [--accept FINGERPRINT]... [--write-memory] [--asistido]
+  snippet svi DEVICE[:PORT] VLAN ADDRESS MASK --cred ID [--desc T] [--accept FINGERPRINT]... [--write-memory] [--asistido]
+  snippet list [--platform P] [--json]
+  snippet run DEVICE[:PORT] ID --cred ID [--set field=value]... [--accept FINGERPRINT]... [--write-memory] [--asistido]
+        (without --asistido it only shows the plan with its rollback; with --asistido it asks for confirmation at each step: s/N, r = revert.
+         --remove deletes the VLAN (existing, active, with no ports, SVI or native trunk; without --name;
+         if it travels over trunks it requires --accept-trunk). The trunk only accepts add or remove
+         of one VLAN: it never replaces the allowed list. list shows the catalog with the fields of each template and run applies it with --set;
+         a secret that does not come in --set is asked for on the terminal without echo)
+  cred rotate DEVICE[:PORT] --user U --cred ID [--update-cred ID] [--generate] [--accept FINGERPRINT]... [--asistido]
+        (rotates the secret of a local user on a device; --cred is the credential you connect with and must belong to ANOTHER user;
+         the new secret is read from the terminal or stdin, or with --generate the core creates it (requires --update-cred); if the new session
+         gets in, write memory is requested (mandatory: without it the device goes back to the previous hash on reload); only if it ends [OK],
+         --update-cred leaves the secret in the vault and the previous credential is kept as "<label> (anterior)";
+         if the new session does not get in or you reject write memory, the rollback is proposed through the original session)
+  backup run -d DEVICE[:PORT]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept FINGERPRINT] [--exclude DEVICE] [--timeout 10m] [--json]
+        (saves show running-config in outputs/respaldos/DEVICE/ with 0600; a Patrol job: read-only.
+         With --every and --rounds it is scheduled and the core saves each round)
+  backup collect JOB [--keep N] [--json]   saves what a job has collected (idempotent)
+  backup list [DEVICE] [--json]            saved backups (flags those with masked secrets)
+  backup diff ID_A ID_B | ID_A --now -d DEVICE --cred ID [--json]
+        (differences between two backups, or against the current running config: takes a new one; without volatile lines)
+  backup export ID [-o FILE]               backup to standard output or to a new 0600 file
+  restore diff DEVICE[:PORT] BACKUP --cred ID [--mgmt-if IF] [--max-lines N] [--parcial] [--write-memory] [--accept FINGERPRINT]... [--asistido]
+        (brings the device running-config to that of a backup (ID from "backup list": device/YYYYMMDDTHHMMSSZ-running) changing only the
+         lines that differ, with its rollback. Closed list: hostname, logging, ntp server, snmp-server location|contact, ip domain-name,
+         ip name-server, clock, service timestamps, spanning-tree portfast default, errdisable recovery, VLAN name and, on physical access ports,
+         description, access and voice VLAN, shutdown, portfast, bpduguard and storm-control. Everything else (routes, router, ACL, vrf, trunk,
+         channels, SVI, line, aaa, users, crypto, standby, authentication, passwords) is listed to be done by hand and rejects the whole
+         plan, unless --parcial. Only unmasked, complete backups (ending in end), with a record signed by the vault and from the
+         same device (serial number). It never touches the interface you connect through nor those carrying its VLAN: it is identified with
+         show users, show tcp brief and the output toward you (show ip cef); if it is not safe, point it out with --mgmt-if. Line limit: 200 by default.
+         Without --asistido it only shows the plan; with --asistido it asks for confirmation at each step: s/N, r = revert)
+  msg [MNEMONIC|PATTERN] [--json]
+        (Cisco message base: meaning, cause, action and read commands; accepts wildcards: %PLATFORM-3-*)
+  crashinfo FILE [--json]
+        (reason, process, traceback, version and CPU/memory from a text crashinfo; a binary core is only identified; read-only)
+  logs patterns FILE|-|--capture|--job JOB [--device EQ] [--burst N] [--window SEC] [--json]
+        (syslog grouped by pattern: counts, flags bursts (N in M seconds, 5 in 60 by default) and instability and annotates each pattern with the message base; read-only)
+  logs flaps FILE|-|--capture|--job JOB [--device EQ] [--count N] [--window SEC] [--min-delta N] [--json]
+        (interfaces with N transitions in M seconds (3 in 60) even if they last milliseconds; with --job also the carrier jumps/resets of show interfaces between rounds; read-only)
+  logs debugs FILE|- [--hide TEXT]... [--family-min N] [--rare-max M] [--top N] [--json]
+        (pasted or file debug: groups repeated lines, hides the noise and flags anomalies; no connection to any device)
+  logs leaks JOB|FOLDER [--device EQ] [--rounds N] [--min-growth-kib K] [--json]
+        (processes whose show processes memory sorted memory grows without dropping between Patrol rounds; read-only)
+  transfer serve --proto tftp|ftp|scp|sftp|http --listen IP[:PORT] [--write] [--allow IP]... [--dir FOLDER] [--from FOLDER] [--files A,B] [--duration 30m] [--legacy-ssh] [--pasv-ports MIN-MAX]
+        (temporary server, high port: tftp 6969, ftp 2121, scp/sftp 2222, http 8080; --dir receives, --from publishes; ftp/scp/sftp show the session user and password (FTP sends them in clear); receiving over tftp requires --allow; --legacy-ssh enables the IOS 15.x algorithms; Ctrl-C stops it)
+  transfer get URL [LOCAL] [--dir FOLDER] [--cred ID] [--sha256 H] [--md5 H] [--sha512 H] [--insecure] [--legacy-ssh] [--accept-host-key SHA256:...]
+        (tftp://, ftp://, scp://, sftp://, http://, https://; new file in the folder, with MD5 and SHA-256)
+  transfer put URL LOCAL [--from FOLDER] [--cred ID] [--legacy-ssh] [--accept-host-key SHA256:...]
+        (tftp://, ftp://, scp://, sftp://; comes from the chosen folder)
+  transfer ls URL [--cred ID] [--path FOLDER] [--max N] [--insecure] [--legacy-ssh] [--accept-host-key SHA256:...] [--json]
+        (lists a remote folder: ftp (MLSD or LIST), sftp, scp (if the server has SFTP) and http(s) (HTML index); tftp does not list)
+  transfer stop ID | transfer list | transfer hint tftp|ftp|scp|sftp PORT [IP]
+        (closes a server, lists them, or explains the nftables redirect to ports 69, 21 and 22)
+  job metrics JOB|FOLDER [--device EQ] [--iface I]... [--top N] [--max-points N] [--csv|--json]
+        (CPU, memory per pool and traffic/errors per interface, round by round; what the playbook did not collect comes with a warning. Playbook: ios-xe/metricas)
+  ports status JOB|FOLDER [--device EQ] [--json]  |  ports status --device HOST[:PORT] --cred ID [--accept-host-key SHA256:...] [--legacy-ssh] [--json]
+        (state of a switch's physical ports for the front end: from a job's evidence (show interfaces status, trunk and etherchannel summary) or live over SSH, read-only)
+  devices [TEXT] [--json]
+        (devices known from Patrol jobs, the fleet, the backups and the host book, without duplicates per address; TEXT filters by address, name, platform, folder or tag)
+  hosts list [TEXT] [--folder F] [--tag X] [--json]  |  hosts rm ID
+        (host book: the devices you add by hand, the «manual» source of «devices»; merged by address with what was discovered. rm does not delete the evidence)
+  hosts add NAME --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
+  hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
+        (A: IP or DNS name, without user, scheme or port; port 22 by default; platform: ios, ios-xe, nx-os, asa, iosxr, wlc; single-level folder; up to 10 tags.
+         --cred is the id of a vault credential (cred list): never a secret. edit only changes what is passed; --tag replaces all of them and an empty value clears the field)
+  hosts export --out PATH [--format csv|json] [--overwrite] [ID...]
+        (0600 file; the format comes from the extension (.csv / .json) or from --format. Versioned JSON with a SHA-256 sum (integrity, not authenticity);
+         CSV for Excel (UTF-8, fixed header, tags separated by «;», cells starting with = + - @ get a leading apostrophe). The credential travels only as its label; without an ID it exports all, up to 1000)
+  hosts template --format csv|json  |  hosts template --fields
+        (prints a sample file with the header and 3 valid rows, or describes each field; both come from the same table that validates the import)
+  hosts import PATH [--format csv|json] [--decision ADDRESS:PORT=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+        (an invalid row comes out as «line N: field: reason», does not block the others and counts as skipped; JSON without a sum warns. State of each valid host: nuevo, igual or conflicto (same address and port with other data: reemplazar or omitir; same name: also renombrar); new ones go in on their own and each conflict needs a decision, otherwise nothing is imported.
+         The credential label is looked up in the open vault; if it is not there, the host is left without a credential)
+  scripts list [TEXT] [--tech T] [--platform P] [--tag X] [--fav] [--json]  |  scripts show ID [--json]
+        (script vault: yours plus the predefined library, sorted by name; read MODE = Patrol can run it. The «lib-*» IDs belong to the library and are not edited)
+  scripts add NAME --tech T --platform P [--desc D] [--tag X]... [--file F|-]
+  scripts edit ID [--name N] [--tech T] [--platform P] [--desc D] [--tag X]... [--file F|-]
+        (commands go one per line, from a file or stdin; edit only changes what is passed and --tag or --file replace the whole list.
+         tech: l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro; platform: ios, ios-xe, nx-os, asa, cualquiera)
+  scripts rm ID  |  scripts fav ID [--off]  |  scripts dup ID
+        (deletes one of yours, sets or clears a favorite (also on the library), or copies any as a script of yours)
+  scripts copy ID
+        (copies a script from an installed package, also a hidden one, to your scripts: new ID, editable, name «<name> (copia)»; removing the package does not delete it)
+  scripts export --out PATH [--overwrite] ID...
+        (0600 JSON file with the SHA-256 sum of the scripts (integrity, not authenticity); does not overwrite without --overwrite; favorites do not travel)
+  scripts import PATH [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+        (shows the state of each script: nuevo, igual, conflicto_id or conflicto_nombre; new ones go in on their own and each conflict needs a decision, otherwise nothing is imported)
+  scripts col list [--json]  |  scripts col show ID [--json]  |  scripts col add NAME [--desc D]  |  scripts col edit ID [--name N] [--desc D]  |  scripts col rm ID
+        (collections: ordered lists of script IDs, also from the library, which are not copied; a script can be in several and deleting it removes it from all.
+         «favoritos» is the default collection: it is not deleted or renamed, and scripts fav uses it)
+  scripts col set ID [SCRIPT_ID...] [--add ID]... [--rm ID]... [--clear]  |  scripts col order ID...
+        (set leaves exactly the given SCRIPT_IDs in that order; without them it starts from what is there and applies --rm and --add; order reorders all collections, also favorites)
+  scripts col export --out PATH [--overwrite] ID...
+  scripts col import PATH [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+        (the file carries the collections and the user scripts they reference; library ones go by ID and those this library does not have are reported and skipped.
+         States: nueva, igual, fusionar (favoritos: missing ones are added, never replaced), conflicto_id and conflicto_nombre; the decisions for collections and for the file's scripts go with --decision by ID)
+  scripts template [--kind scripts|colecciones] [--fields]
+        (prints a sample file that import accepts as is, or with --fields the list of fields with their type, whether they are required, an example and their description. Both come from the same rules that validate the import. The sha256 is optional: without it each field is validated and import warns)
+  scripts pin [ID [--off]]  |  scripts pin --order ID...
+        (the terminal's short bar: at most 5 pinned scripts, separate from collections; without arguments it lists them in order)
+  prefs show [--json]  |  prefs set [--outputs DIR] [--rotate-mb N] [--rotate-min N] [--max-files N] [--format F]
+        (set changes only what is asked; 0 or "" returns that value to the factory one. The folder must be absolute, exist, be yours, writable and mode 0700;
+         applies to whatever starts afterwards and the previous data is not moved. rotate-mb 1-1024, rotate-min 1-10080, max-files 1-1000, format texto|crudo|jsonl)
+  pack install <file.mpack> [--allow-unsigned] [--hide ITEM]...  |  pack list  |  pack show <id>  |  pack remove <id>
+        (content packages: playbooks and scripts per technology; downloaded by hand from the releases and nothing is downloaded on its own.
+         A package without an official signature is third-party and is only installed with --allow-unsigned; it carries read commands only.
+         remove also removes the favorites of its scripts. show displays the manifest and the README.
+         --hide ITEM installs the package with that playbook or script hidden, and can be repeated; with --hide, what is hidden ends up
+         exactly in those ITEMs, and without --hide an update keeps what was already hidden)
+  pack inspect <file.mpack> [--allow-unsigned]
+        (preview of install: validates the package and shows what it brings and what it would replace, without installing anything)
+  pack items <id> [--hide ITEM]... [--show ITEM]...
+        (hides or shows playbooks and scripts of an installed package: it only removes them from the lists, the ID still
+         resolves and jobs can ask for it; what is hidden survives new versions and is deleted with the package)
+  --version

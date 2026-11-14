@@ -242,7 +242,9 @@ func TestIdioma30eMetricsYPorts(t *testing.T) {
 	csv := enMust(t, "", "job", "metrics", dir, "--csv")
 	has(t, "metrics csv no se traduce", csv, "equipo,serie,nombre,ronda,hora,metrica,valor")
 	_, err := en(t, "", "job", "metrics", dir, "--csv", "--json")
-	errHas(t, "metrics uso sigue en es", err, "uso: mctl job metrics")
+	errHas(t, "metrics uso en inglés con --lang en", err, "usage: mctl job metrics JOB|FOLDER")
+	_, err = mctl(t, "", "job", "metrics", dir, "--csv", "--json")
+	errHas(t, "metrics uso en es con --lang es", err, "uso: mctl job metrics TRABAJO|CARPETA")
 }
 
 func TestIdioma30ePortsStatusYSet(t *testing.T) {

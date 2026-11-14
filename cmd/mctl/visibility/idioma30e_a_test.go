@@ -23,9 +23,9 @@ func render(lang string) string {
 
 func TestMuestrasYFlujosPorIdioma(t *testing.T) {
 	for lang, wants := range map[string][]string{
-		"": {"  CPU 1: 5 s 3%  1 min 2%  5 min 1%", "  memoria proc: 41.2% usada", "  aviso: sin datos", "5 flujos, 900 bytes, 1 paquetes con error",
+		"es": {"  CPU 1: 5 s 3%  1 min 2%  5 min 1%", "  memoria proc: 41.2% usada", "  aviso: sin datos", "5 flujos, 900 bytes, 1 paquetes con error",
 			"Conversaciones:", "Puertos:", "Protocolos:", "exportador 10.0.0.9: 5 flujos, 900 bytes, 0 errores", "último error: boom", "B        5 flujos"},
-		"en": {"  CPU 1: 5 s 3%  1 min 2%  5 min 1%", "  memory proc: 41.2% used", "  warning: sin datos", "5 flows, 900 bytes, 1 packets with errors",
+		"": {"  CPU 1: 5 s 3%  1 min 2%  5 min 1%", "  memory proc: 41.2% used", "  warning: sin datos", "5 flows, 900 bytes, 1 packets with errors",
 			"Conversations:", "Ports:", "Protocols:", "exporter 10.0.0.9: 5 flows, 900 bytes, 0 errors", "last error: boom", "B        5 flows"},
 	} {
 		out := render(lang)

@@ -44,12 +44,11 @@ func StripLang(args []string) (rest []string, lang string, err error) {
 	return append(rest, args[i:]...), lang, nil
 }
 
-// locale es el idioma de los mensajes propios de mctl (los del núcleo ya llegan en él por accept-language): es salvo
-// que main reciba --lang en. Se fija una vez, antes de despachar el comando. La ayuda y los «uso: mctl …» se quedan
-// en español a propósito: son documentación del CLI, no resultados.
-var locale = i18n.Es
+// locale es el idioma de los mensajes propios de mctl (los del núcleo ya llegan en él por accept-language): en salvo
+// que main reciba --lang es. Se fija una vez, antes de despachar el comando.  La ayuda y los «uso: mctl …» siguen el mismo idioma.
+var locale = i18n.En
 
-// SetLang fija el idioma de los mensajes propios de mctl (el que devuelve StripLang; "" = es).
+// SetLang fija el idioma de los mensajes propios de mctl (el que devuelve StripLang; "" = en).
 func SetLang(lang string) { locale = i18n.Normalize(lang) }
 
 // Lang es el idioma vigente de los mensajes propios de mctl (es o en).

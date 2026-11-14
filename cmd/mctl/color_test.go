@@ -19,7 +19,7 @@ func runTTY(t *testing.T, args ...string) string {
 	outIsTTY = func(io.Writer) bool { return true }
 	defer func() { outIsTTY = func(io.Writer) bool { return false } }()
 	var out bytes.Buffer
-	if err := run(args, strings.NewReader(""), &out); err != nil {
+	if err := run(append([]string{"--lang", "es"}, args...), strings.NewReader(""), &out); err != nil {
 		t.Fatal(err)
 	}
 	return out.String()
@@ -84,7 +84,7 @@ func TestConsoleOutputIsRaw(t *testing.T) {
 	outIsTTY = func(io.Writer) bool { return true }
 	defer func() { outIsTTY = func(io.Writer) bool { return false } }()
 	done := make(chan error, 1)
-	go func() { done <- run([]string{"console", port, "--baud", "115200"}, in, out) }()
+	go func() { done <- run([]string{"--lang", "es", "console", port, "--baud", "115200"}, in, out) }()
 	keys.Write([]byte("x"))
 	buf := make([]byte, 8)
 	dev.Read(buf)
