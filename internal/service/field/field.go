@@ -156,16 +156,27 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 
 var defaultServePort = map[string]uint16{"tftp": 6969, "http": 8080}
 
+// serveAddr: una IP sola toma el puerto por omisión del protocolo; ok=false si el protocolo no se publica.
+func serveAddr(proto, addr string) (string, bool) {
+	port, ok := defaultServePort[proto]
+	if !ok {
+		return "", false
+	}
+	if _, err := netip.ParseAddrPort(addr); err == nil { // ya trae puerto (también [fe80::1%eth0]:7, cuya zona confundía a ParseAddr)
+		return addr, true
+	}
+	if ip, err := netip.ParseAddr(strings.Trim(addr, "[]")); err == nil {
+		return netip.AddrPortFrom(ip, port).String(), true
+	}
+	return addr, true
+}
+
 // ServeFiles publica los archivos elegidos hasta que el cliente cancele o venza la duración.
 func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeFilesServer) error {
 	s.d.MarkActive()
-	port, ok := defaultServePort[r.Protocol]
+	addr, ok := serveAddr(r.Protocol, r.Addr)
 	if !ok {
 		return service.Err(st.Context(), codes.InvalidArgument, "field.err.proto", i18n.A("proto", r.Protocol))
-	}
-	addr := r.Addr
-	if ip, err := netip.ParseAddr(strings.Trim(addr, "[]")); err == nil { // solo IP: puerto por defecto
-		addr = netip.AddrPortFrom(ip, port).String()
 	}
 	if err := fileserve.ValidateAddr(addr, r.AllowAny); err != nil {
 		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
