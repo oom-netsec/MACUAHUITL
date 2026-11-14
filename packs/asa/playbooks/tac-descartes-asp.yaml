@@ -9,8 +9,11 @@ name_en: ASA · TAC · ASP drops (TAC case)
 commands:
   - cmd: show clock
   - cmd: show asp drop
+    timeout: 120s
   - cmd: show asp drop frame
+    timeout: 120s
   - cmd: show asp drop flow
+    timeout: 120s
   - cmd: show asp event dp-cp
   - cmd: show service-policy
   - cmd: show conn count

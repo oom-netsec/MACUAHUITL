@@ -19,8 +19,11 @@ commands:
   - cmd: show ospf traffic
   - cmd: show ospf
   - cmd: show running-config router ospf
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show access-list | include ospf
+    timeout: 120s
   - cmd: show asp drop
+    timeout: 120s
   - cmd: show logging | include OSPF
     timeout: 180s

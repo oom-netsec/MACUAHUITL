@@ -13,6 +13,8 @@ commands:
   - cmd: show context detail
   - cmd: show admin-context
   - cmd: show running-config context
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config class
+    timeout: 120s
     may_contain_secrets: true

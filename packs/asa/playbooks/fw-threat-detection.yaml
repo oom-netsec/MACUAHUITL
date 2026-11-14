@@ -14,4 +14,5 @@ commands:
   - cmd: show threat-detection scanning-threat targets
   - cmd: show threat-detection shun
   - cmd: show running-config threat-detection
+    timeout: 120s
     may_contain_secrets: true

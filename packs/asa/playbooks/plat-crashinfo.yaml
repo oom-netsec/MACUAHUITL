@@ -12,5 +12,4 @@ commands:
   - cmd: show crashinfo
   - cmd: dir
   - cmd: "dir disk0:"
-  - cmd: "dir crashinfo:"
   - cmd: show bootvar

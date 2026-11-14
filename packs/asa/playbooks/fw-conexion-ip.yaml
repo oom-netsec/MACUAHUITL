@@ -12,7 +12,9 @@ params:
 commands:
   - cmd: show clock
   - cmd: show conn address {ip}
+    timeout: 120s
   - cmd: show conn address {ip} detail
+    timeout: 120s
   - cmd: show local-host {ip}
   - cmd: show xlate local {ip}
   - cmd: show xlate global {ip}

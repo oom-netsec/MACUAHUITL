@@ -11,8 +11,11 @@ commands:
   - cmd: show dns
   - cmd: show dns-hosts
   - cmd: show running-config dns
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config domain-name
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config name
+    timeout: 120s
     may_contain_secrets: true

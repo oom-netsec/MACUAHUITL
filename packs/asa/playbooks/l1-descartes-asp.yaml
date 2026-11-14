@@ -9,9 +9,13 @@ name_en: ASA · Layer 1 · ASP drops
 commands:
   - cmd: show clock
   - cmd: show asp drop
+    timeout: 120s
   - cmd: show asp drop frame
+    timeout: 120s
   - cmd: show asp drop flow
+    timeout: 120s
   - cmd: show asp event dp-cp
   - cmd: show asp load-balance
   - cmd: show conn count
   - cmd: show access-list | include hitcnt=
+    timeout: 120s

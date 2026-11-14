@@ -17,8 +17,11 @@ commands:
   - cmd: show bgp summary
   - cmd: show bgp neighbors {ip}
   - cmd: show conn address {ip}
+    timeout: 120s
   - cmd: show running-config router bgp
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show asp drop
+    timeout: 120s
   - cmd: show logging | include BGP
     timeout: 180s

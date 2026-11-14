@@ -15,4 +15,5 @@ commands:
   - cmd: show dhcprelay statistics
   - cmd: show ip address dhcp
   - cmd: show running-config dhcpd
+    timeout: 120s
     may_contain_secrets: true

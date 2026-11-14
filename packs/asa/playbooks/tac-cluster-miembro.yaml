@@ -17,6 +17,7 @@ commands:
   - cmd: show interface ip brief
   - cmd: show asp cluster counter
   - cmd: show running-config cluster
+    timeout: 120s
     may_contain_secrets: true
   - cmd: "show logging | include ASA-[0-9]-747"
     timeout: 180s

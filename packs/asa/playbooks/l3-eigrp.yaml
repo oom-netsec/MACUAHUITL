@@ -15,4 +15,5 @@ commands:
   - cmd: show eigrp events
   - cmd: show route eigrp
   - cmd: show running-config router eigrp
+    timeout: 120s
     may_contain_secrets: true

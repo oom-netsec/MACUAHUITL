@@ -10,12 +10,16 @@ commands:
   - cmd: show clock
   - cmd: show webvpn anyconnect
   - cmd: show running-config webvpn
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config tunnel-group
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config group-policy
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config ip local pool
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show ip local pool
   - cmd: show ssl

@@ -15,6 +15,7 @@ commands:
   - cmd: show conn count
   - cmd: show resource usage
   - cmd: show asp drop
+    timeout: 120s
   - cmd: show processes cpu-usage sorted non-zero
   - cmd: show service-policy
   - cmd: show interface | include Interface|errors|overrun|no buffer

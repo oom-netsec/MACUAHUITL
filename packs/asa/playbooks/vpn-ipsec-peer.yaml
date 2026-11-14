@@ -18,9 +18,12 @@ commands:
   - cmd: show crypto ipsec sa peer {peer}
   - cmd: show crypto ipsec sa peer {peer} detail
   - cmd: show running-config crypto map | include {peer}
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config tunnel-group {peer}
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show conn address {peer}
+    timeout: 120s
   - cmd: show logging | include {peer}
     timeout: 180s

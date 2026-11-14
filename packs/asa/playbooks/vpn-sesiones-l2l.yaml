@@ -11,6 +11,7 @@ commands:
   - cmd: show vpn-sessiondb summary
   - cmd: show vpn-sessiondb l2l
   - cmd: show vpn-sessiondb detail l2l
+    timeout: 120s
   - cmd: show vpn-sessiondb ratio protocol
   - cmd: show vpn-sessiondb ratio encryption
   - cmd: show vpn-sessiondb license-summary

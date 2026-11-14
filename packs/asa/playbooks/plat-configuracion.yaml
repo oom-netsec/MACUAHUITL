@@ -13,6 +13,8 @@ commands:
   - cmd: show firewall
   - cmd: show checksum
   - cmd: show running-config
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show startup-config
+    timeout: 120s
     may_contain_secrets: true

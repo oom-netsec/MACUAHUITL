@@ -17,4 +17,5 @@ commands:
   - cmd: show cluster info transport cp
   - cmd: show asp cluster counter
   - cmd: show running-config cluster
+    timeout: 120s
     may_contain_secrets: true

@@ -11,6 +11,6 @@ commands:
   - cmd: show environment
   - cmd: show environment temperature
   - cmd: show environment fans
-  - cmd: show environment power-supplies
+  - cmd: show environment power-supply
   - cmd: show module
   - cmd: show inventory

@@ -14,6 +14,7 @@ commands:
   - cmd: show perfmon
   - cmd: show traffic
   - cmd: show asp drop
+    timeout: 120s
   - cmd: show asp load-balance
   - cmd: show conn count
   - cmd: show threat-detection statistics

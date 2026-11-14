@@ -14,5 +14,6 @@ commands:
   - cmd: show failover statistics
   - cmd: show monitor-interface
   - cmd: show running-config failover
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show failover history

@@ -14,10 +14,15 @@ commands:
   - cmd: show xlate local {ip}
   - cmd: show xlate global {ip}
   - cmd: show nat detail
+    timeout: 120s
   - cmd: show conn address {ip}
+    timeout: 120s
   - cmd: show running-config nat
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config object | include {ip}
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config object-group | include {ip}
+    timeout: 120s
     may_contain_secrets: true

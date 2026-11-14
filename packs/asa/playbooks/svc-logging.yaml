@@ -11,8 +11,10 @@ commands:
   - cmd: show logging setting
   - cmd: show logging queue
   - cmd: show running-config logging
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config logging | include host
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show logging
     timeout: 180s

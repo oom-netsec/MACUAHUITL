@@ -14,6 +14,7 @@ commands:
   - cmd: show route ospf
   - cmd: show route bgp
   - cmd: show running-config route
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show route
     timeout: 120s

@@ -12,8 +12,11 @@ commands:
   - cmd: show service-policy global
   - cmd: show service-policy | include Inspect|drop|reset
   - cmd: show running-config policy-map
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config class-map
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config service-policy
+    timeout: 120s
     may_contain_secrets: true

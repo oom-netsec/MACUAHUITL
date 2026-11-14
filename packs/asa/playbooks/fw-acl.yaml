@@ -8,11 +8,14 @@ name: ASA · Firewall · ACL y hitcounts
 name_en: ASA · Firewall · ACLs and hit counts
 commands:
   - cmd: show clock
-  - cmd: show access-group
-  - cmd: show access-list brief
-  - cmd: show access-list element-count
-  - cmd: show access-list | include inactive|expired
   - cmd: show running-config access-group
+    timeout: 120s
     may_contain_secrets: true
+  - cmd: show access-list brief
+    timeout: 120s
+  - cmd: show access-list element-count
+    timeout: 120s
+  - cmd: show access-list | include inactive|expired
+    timeout: 120s
   - cmd: show access-list
     timeout: 120s

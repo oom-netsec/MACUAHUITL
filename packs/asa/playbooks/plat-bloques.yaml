@@ -14,3 +14,4 @@ commands:
   - cmd: show interface | include Interface|no buffer|overrun|underrun
   - cmd: show traffic
   - cmd: show asp drop
+    timeout: 120s

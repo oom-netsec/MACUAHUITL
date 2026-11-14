@@ -11,8 +11,10 @@ commands:
   - cmd: show crypto ipsec stats
   - cmd: show crypto ipsec sa detail
   - cmd: show running-config crypto ipsec
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config crypto map
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show crypto accelerator statistics
   - cmd: show crypto ipsec sa

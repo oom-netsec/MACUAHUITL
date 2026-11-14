@@ -16,7 +16,9 @@ Los playbooks que declaran datos piden la interfaz (`interface`, el nombre `name
 `src`, `dst`) o el peer (`peer`); el núcleo los valida antes de armar los comandos. Todo está sin validar en
 laboratorio (no hay ASA en el laboratorio). La app solo permite en ASA comandos de lectura: `show`, `ping`,
 `traceroute`, `packet-tracer` (forma estricta) y `dir`; sin `more`, `copy`, `capture`, `changeto`, `failover`,
-`clear`, `debug`, `| redirect` ni `show … file`. Los comandos vienen de la documentación pública de Cisco.
+`clear`, `debug`, `| redirect` ni `show … file`. Los comandos vienen de la documentación pública de Cisco. Ojo: `packet-tracer` es una simulación, pero sube los
+contadores `hitcnt` de las ACL que toca y, si el flujo es tráfico interesante para un crypto map, puede iniciar la
+negociación IKE; los playbooks que lo usan lo avisan en su cabecera.
 
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
@@ -40,7 +42,9 @@ Playbooks that declare data ask for the interface (`interface`, the `nameif` nam
 `src`, `dst`) or the peer (`peer`); the core validates them before building the commands. Everything is unvalidated
 in the lab (there is no ASA in the lab). On ASA the app only allows read commands: `show`, `ping`, `traceroute`,
 `packet-tracer` (strict form) and `dir`; no `more`, `copy`, `capture`, `changeto`, `failover`, `clear`, `debug`,
-`| redirect` or `show … file`. Commands come from Cisco's public documentation.
+`| redirect` or `show … file`. Commands come from Cisco's public documentation. Note: `packet-tracer` is a simulation, but it increments the `hitcnt`
+counters of the ACLs it touches and, if the flow is interesting traffic for a crypto map, it can start the IKE
+negotiation; the playbooks that use it say so in their header.
 
 How to load it (the application never downloads packages):
 

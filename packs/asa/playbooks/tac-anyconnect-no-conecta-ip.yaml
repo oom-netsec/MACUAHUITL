@@ -12,10 +12,14 @@ params:
 commands:
   - cmd: show clock
   - cmd: show vpn-sessiondb detail anyconnect filter p-ipaddress {ip}
+    timeout: 120s
   - cmd: show vpn-sessiondb detail anyconnect filter a-ipaddress {ip}
+    timeout: 120s
   - cmd: show conn address {ip}
+    timeout: 120s
   - cmd: show route {ip}
   - cmd: show asp drop
+    timeout: 120s
   - cmd: show vpn-sessiondb license-summary
   - cmd: show logging | include {ip}
     timeout: 180s

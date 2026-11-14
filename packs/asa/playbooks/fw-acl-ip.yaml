@@ -12,10 +12,16 @@ params:
 commands:
   - cmd: show clock
   - cmd: show access-list | include {ip}
+    timeout: 120s
   - cmd: show running-config access-list | include {ip}
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config object | include {ip}
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config object-group | include {ip}
+    timeout: 120s
     may_contain_secrets: true
-  - cmd: show access-group
+  - cmd: show running-config access-group
+    timeout: 120s
+    may_contain_secrets: true

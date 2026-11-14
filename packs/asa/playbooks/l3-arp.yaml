@@ -11,6 +11,7 @@ commands:
   - cmd: show arp
   - cmd: show arp statistics
   - cmd: show running-config arp
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show mac-address-table
   - cmd: show interface ip brief

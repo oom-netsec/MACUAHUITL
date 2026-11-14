@@ -12,9 +12,12 @@ commands:
   - cmd: show ssh sessions
   - cmd: show asdm sessions
   - cmd: show running-config ssh
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config http
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config telnet
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show crypto key mypubkey rsa

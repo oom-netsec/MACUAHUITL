@@ -12,6 +12,7 @@ commands:
   - cmd: show bgp neighbors
   - cmd: show route bgp
   - cmd: show running-config router bgp
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show bgp
     timeout: 120s

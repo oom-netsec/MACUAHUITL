@@ -1,4 +1,4 @@
-# Propósito: Simulación con packet-tracer (UDP 53 y UDP 123) más NAT, ACL y descartes.
+# Propósito: Simulación con packet-tracer (UDP 53 y UDP 123) más NAT, ACL y descartes. Ojo: packet-tracer sube los contadores hitcnt de las ACL y, con tráfico interesante para un crypto map, puede iniciar la negociación IKE.
 # Cuándo usarlo: Falla DNS, NTP u otro flujo UDP entre dos hosts a través del ASA.
 # Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
 # Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
@@ -19,8 +19,11 @@ commands:
   - cmd: packet-tracer input {interface} udp {src} 12345 {dst} 123 detailed
   - cmd: show route {dst}
   - cmd: show nat detail
+    timeout: 120s
   - cmd: show conn address {src}
+    timeout: 120s
   - cmd: show asp drop
+    timeout: 120s
   - cmd: show service-policy | include Inspect|drop
   - cmd: show logging | include {src}
     timeout: 180s

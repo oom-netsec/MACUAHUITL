@@ -12,8 +12,11 @@ commands:
   - cmd: show crypto ikev1 sa detail
   - cmd: show crypto ikev1 stats
   - cmd: show running-config crypto ikev1
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config crypto isakmp
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config tunnel-group
+    timeout: 120s
     may_contain_secrets: true

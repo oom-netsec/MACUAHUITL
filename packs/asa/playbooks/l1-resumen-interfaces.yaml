@@ -12,6 +12,8 @@ commands:
   - cmd: show nameif
   - cmd: show ip address
   - cmd: show running-config interface
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config mtu
+    timeout: 120s
     may_contain_secrets: true

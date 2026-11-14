@@ -10,11 +10,14 @@ commands:
   - cmd: show clock
   - cmd: show nat
   - cmd: show nat detail
+    timeout: 120s
   - cmd: show nat pool
   - cmd: show xlate count
   - cmd: show running-config nat
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config object
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show xlate
     timeout: 120s

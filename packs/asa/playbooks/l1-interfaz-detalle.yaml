@@ -13,8 +13,9 @@ commands:
   - cmd: show clock
   - cmd: show interface {interface}
   - cmd: show interface {interface} detail
-  - cmd: show running-config interface {interface}
-    may_contain_secrets: true
+  - cmd: show ip address
   - cmd: show service-policy interface {interface}
-  - cmd: show access-group interface {interface}
+  - cmd: show running-config access-group | include {interface}
+    timeout: 120s
+    may_contain_secrets: true
   - cmd: show nameif

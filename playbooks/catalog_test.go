@@ -24,6 +24,9 @@ var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp (comm|host)|arch
 // Salidas sin acotar: tabla completa de rutas/BGP/CEF/MAC o todas las interfaces.
 var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces|wireless client summary|ap summary)$`)
 
+// Salidas grandes de ASA: conexiones, xlates, ACL, logs, memoria, descartes de ASP, sesiones VPN y configuraciones.
+var asaBigCmd = regexp.MustCompile(`^show (conn( address .*| detail)?|local-host|xlate|access-list( .*)?|tech-support.*|logging( \|.*)?|memory detail|asp drop.*|vpn-sessiondb detail.*|running-config( .*)?|startup-config|nat detail)$`)
+
 // catalogFS junta el contenido embebido con el de packs/ios-xe, packs/ios, packs/wlc-9800, packs/nx-os, packs/cat9k, packs/sda y packs/asa (en cisco/<plataforma>), para que estas pruebas sigan
 // cubriendo los playbooks que salieron del binario al paquete oficial.
 func catalogFS(t testing.TB) fs.FS {
@@ -70,6 +73,12 @@ func TestCatalogo(t *testing.T) {
 		for _, c := range p.Commands {
 			if secretCmd.MatchString(c.Text) && !c.MaySecrets {
 				t.Errorf("%s: %q puede traer secretos y debe llevar may_contain_secrets", p.ID, c.Text)
+			}
+			if p.Platform == "asa" && asaBigCmd.MatchString(c.Text) && c.Timeout < 120*time.Second {
+				t.Errorf("%s: %q es una salida grande de ASA y necesita timeout >= 120s", p.ID, c.Text)
+			}
+			if strings.Contains(c.Text, "@") {
+				t.Errorf("%s: %q lleva «@» pegado al comando", p.ID, c.Text)
 			}
 			if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa") && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
 				t.Errorf("%s: %q es una salida grande y necesita timeout > 60s", p.ID, c.Text)

@@ -13,8 +13,11 @@ commands:
   - cmd: show aaa local user locked
   - cmd: show uauth
   - cmd: show running-config aaa
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config aaa-server
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config username
+    timeout: 120s
     may_contain_secrets: true

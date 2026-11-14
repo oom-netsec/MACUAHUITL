@@ -15,8 +15,10 @@ commands:
   - cmd: show crypto ikev1 stats
   - cmd: show vpn-sessiondb summary
   - cmd: show running-config crypto map
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show crypto ca certificates
   - cmd: show asp drop
+    timeout: 120s
   - cmd: "show logging | include ASA-[0-9]-(713|750|751|752)"
     timeout: 180s

@@ -13,3 +13,4 @@ commands:
   - cmd: show traffic
   - cmd: show blocks
   - cmd: show asp drop
+    timeout: 120s

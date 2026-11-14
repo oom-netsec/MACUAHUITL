@@ -13,6 +13,8 @@ commands:
   - cmd: show ntp associations
   - cmd: show ntp associations detail
   - cmd: show running-config ntp
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show running-config clock
+    timeout: 120s
     may_contain_secrets: true

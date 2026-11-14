@@ -15,5 +15,6 @@ commands:
   - cmd: show ospf traffic
   - cmd: show route ospf
   - cmd: show running-config router ospf
+    timeout: 120s
     may_contain_secrets: true
   - cmd: show ospf database

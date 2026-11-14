@@ -14,7 +14,9 @@ commands:
   - cmd: show route {ip}
   - cmd: show arp | include {ip}
   - cmd: show conn address {ip}
+    timeout: 120s
   - cmd: show access-list | include {ip}
+    timeout: 120s
   - cmd: ping {ip} repeat 5
   - cmd: traceroute {ip} numeric
     timeout: 120s

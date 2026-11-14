@@ -12,12 +12,15 @@ params:
 commands:
   - cmd: show clock
   - cmd: show conn address {ip}
+    timeout: 120s
   - cmd: show local-host {ip}
   - cmd: show xlate local {ip}
   - cmd: show arp | include {ip}
   - cmd: show route {ip}
   - cmd: show access-list | include {ip}
+    timeout: 120s
   - cmd: show asp drop
+    timeout: 120s
   - cmd: ping {ip} repeat 5
   - cmd: show logging | include {ip}
     timeout: 180s

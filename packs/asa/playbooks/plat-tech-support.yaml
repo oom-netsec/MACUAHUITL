@@ -12,7 +12,8 @@ commands:
   - cmd: show failover state
   - cmd: show context detail
   - cmd: show running-config
+    timeout: 120s
     may_contain_secrets: true
-  - cmd: show tech-support @300
+  - cmd: show tech-support
     timeout: 300s
     may_contain_secrets: true
