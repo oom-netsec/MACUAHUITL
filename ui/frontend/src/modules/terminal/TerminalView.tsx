@@ -380,7 +380,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
                       <div key={tab.key} hidden={!shown} data-key={tab.key} className={`ssh-pane ${side}`} onFocus={() => setFocusKey(tab.key)} onMouseDown={() => setFocusKey(tab.key)}>
                         {second && shown && <div className="ssh-pane-head"><strong>{tab.label}</strong>{head(tab)}</div>}
                         <div className="ssh-term" style={second ? { background: theme.background } : undefined}>
-                          <XTermPane runId={tab.runId} screenReader={srm} onCopy={(x) => { void core.copyText(x).catch(() => {}); }} onPaste={async () => { const txt = await core.pasteText(); return pasteNeedsConfirm(txt) && !(await core.confirmPaste(txt, tab.label)) ? "" : txt; }} active={i === active} shown={shown} done={tab.done} theme={theme} search={tab.key === tool.key ? find : undefined}
+                          <XTermPane runId={tab.runId} screenReader={srm} onCopy={(x) => { void core.copyText(x).catch(() => {}); }} onPaste={async (given) => { const txt = given ?? await core.pasteText(); return pasteNeedsConfirm(txt) && !(await core.confirmPaste(txt, tab.label)) ? "" : txt; }} active={i === active} shown={shown} done={tab.done} theme={theme} search={tab.key === tool.key ? find : undefined}
                             label={second && shown ? t(side === "left" ? "ssh.pane.left" : "ssh.pane.right", { label: tab.label }) : undefined}
                             bind={bind} onInput={(d) => send(tab.runId, d)} onResults={(index, count) => { if (tab.key === tool.key) setHits({ index, count }); }}
                             onSize={(rows, cols) => { size.current = { rows, cols }; core.terminalResize(tab.runId, rows, cols).catch(() => {}); }}

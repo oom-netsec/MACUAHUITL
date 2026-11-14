@@ -1,4 +1,4 @@
-import { pasteNeedsConfirm, safeFileName, showHidden } from "./safeText";
+import { pasteNeedsConfirm, pastePreview, safeFileName, showHidden } from "./safeText";
 
 test("pegar pide confirmación con saltos de línea y con controles, no con texto normal ni tabulador", () => {
   expect(pasteNeedsConfirm("show version")).toBe(false);
@@ -24,4 +24,19 @@ test("safeFileName quita carpetas, controles e invisibles y el punto inicial", (
   expect(safeFileName(".bashrc")).toBe("_bashrc");
   expect(safeFileName("SW1-cpu.csv")).toBe("SW1-cpu.csv");
   expect(safeFileName("a\x00b\nc")).toBe("a_b_c");
+});
+
+test("showHidden también marca guion suave, separador de línea, etiquetas Unicode y surrogates sueltos", () => {
+  expect(showHidden("a\u00adb")).toBe("a⟦U+00AD⟧b");
+  expect(showHidden("a\u2028b")).toBe("a⟦U+2028⟧b");
+  expect(showHidden("ok\u{E0063}")).toBe("ok⟦U+E0063⟧");
+  expect(showHidden("x\ud800")).toBe("x⟦U+D800⟧");
+});
+
+test("la vista previa de pegar lista los códigos ocultos aunque queden fuera de las 80 columnas", () => {
+  const p = pastePreview(`show version${" ".repeat(90)}\x15\x10\x1a`);
+  expect(p.n).toBe(1);
+  expect(p.preview).not.toMatch(/U\+/);
+  expect(p.controls).toBe("⟦U+0015⟧ ⟦U+0010⟧ ⟦U+001A⟧");
+  expect(pastePreview("a\nb").controls).toBe("");
 });

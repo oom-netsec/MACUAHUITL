@@ -32,7 +32,7 @@ import { inventoryWails, type InventoryAPI } from "../modules/inventory/api";
 import { scriptsWails, type ScriptsAPI } from "../modules/scripts/api";
 import { settingsWails, type SettingsAPI } from "../modules/settings/api";
 import { packsWails, type PacksAPI } from "../modules/packs/api";
-import { safeFileName, showHidden } from "./safeText";
+import { pastePreview, safeFileName } from "./safeText";
 
 export type CoreStatus = "connected" | "disconnected";
 
@@ -183,10 +183,10 @@ export const wailsCore: CoreAPI = {
   writeFile: (path, data, encoding, overwrite) => call("WriteFile", path, data, encoding, overwrite),
   pasteText: () => Clipboard.Text(),
   confirmPaste: async (text, host, script) => {
-    const lines = text.replace(/[\r\n]+$/, "").split(/\r\n|\r|\n/);
-    const preview = lines.slice(0, 5).map((l) => showHidden(l.length > 80 ? `${l.slice(0, 80)}…` : l)).join("\n") + (lines.length > 5 ? "\n…" : "");
+    const { n, preview: shown, controls } = pastePreview(text);
+    const preview = controls ? `${tr("paste.controls", { codes: controls })}\n\n${shown}` : shown;
     const yes = tr("paste.yes");
-    return (await Dialogs.Question({ Title: tr("paste.title"), Message: script ? tr("paste.script", { name: script, n: lines.length, run: lines.length - 1, host, preview }) : tr("paste.msg", { n: lines.length, host, preview }), Buttons: [{ Label: yes }, { Label: tr("paste.no"), IsCancel: true, IsDefault: true }] })) === yes;
+    return (await Dialogs.Question({ Title: tr("paste.title"), Message: script ? tr("paste.script", { name: script, n, run: n - 1, host, preview }) : tr("paste.msg", { n, host, preview }), Buttons: [{ Label: yes }, { Label: tr("paste.no"), IsCancel: true, IsDefault: true }] })) === yes;
   },
   ...vaultWails(call),
   ...auditWails(call),
