@@ -44,10 +44,14 @@ func Compatible(detected, pbPlatform string) bool {
 	return detected == pbPlatform || (pbPlatform == "ios-xe" && (detected == "ios" || detected == "wlc-9800"))
 }
 
+// PackUsuario es el Pack de los playbooks de <config>/playbooks (propios o importados): no es un ID de paquete válido
+// (no lleva «editor/nombre»), así que no choca con ninguno, y solo se empareja con los de su propio origen.
+const PackUsuario = "usuario"
+
 func officialPack(p string) bool { return p == "" || strings.HasPrefix(p, "oom/") }
 
 // Twin es el gemelo de id en la plataforma platform ("ios-xe/x" ↔ "ios/x"), o nil. No cruza paquetes de terceros:
-// solo si ambos son del mismo paquete o ambos oficiales. Si id ya no existe, se trata como oficial.
+// solo si ambos son del mismo paquete u origen, o ambos oficiales (base u oom/*). Si id ya no existe, se trata como oficial.
 func Twin(pbs []Playbook, id, platform string) *Playbook {
 	pl, rest, _ := strings.Cut(id, "/")
 	if pl == platform || (pl != "ios" && pl != "ios-xe") || (platform != "ios" && platform != "ios-xe") {
@@ -91,7 +95,7 @@ func KnownPlatform(s string) bool { return slices.Contains(knownPlatforms, s) }
 // (name_en); los playbooks del usuario pueden omitirlo y NameFor cae al nombre en español.
 type Playbook struct {
 	ID, Platform, Name, NameEn string
-	Pack                       string // ID del paquete que lo trae; vacío = contenido base o playbooks del usuario (no se serializa)
+	Pack                       string // ID del paquete que lo trae; vacío = contenido base; PackUsuario = <config>/playbooks (no se serializa)
 	Pre                        []string
 	Commands                   []Command
 	// Params son los datos que el playbook pide (MAC, AP...); vacío = el playbook de siempre.

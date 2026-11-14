@@ -60,7 +60,8 @@ func auditResult(ctx context.Context, d Deps, jobID string, res DeviceResult) De
 // lo que siga corriendo se corta y el equipo falla con este error.
 var ErrWindowEnded = i18n.New("patrol.err.window_ended", nil)
 
-// windowEnded sustituye el error de un comando o conexión cortados por el fin de la ventana.
+// windowEnded sustituye el error de un comando o conexión cortados por el fin de la ventana. El driver envuelve
+// ctx.Err() en su ErrPromptTimeout, así que basta con reconocer el error del contexto.
 func windowEnded(ctx context.Context, err error) error {
 	if (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) && errors.Is(context.Cause(ctx), ErrWindowEnded) {
 		return ErrWindowEnded
