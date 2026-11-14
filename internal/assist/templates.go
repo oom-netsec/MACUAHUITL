@@ -217,7 +217,7 @@ func checkValue(f Field, val string) error {
 			}
 		}
 		if float64(n) < lo || (hi > 0 && float64(n) > hi) {
-			return vbad("out_of_range", "value", n, "range", rangeText(lo, hi))
+			return outOfRange(n, lo, hi)
 		}
 	case TypeDecimal:
 		if !decimalRe.MatchString(val) {
@@ -225,7 +225,7 @@ func checkValue(f Field, val string) error {
 		}
 		x, _ := strconv.ParseFloat(val, 64)
 		if x < f.Min || (f.Max > 0 && x > f.Max) {
-			return vbad("out_of_range", "value", val, "range", rangeText(f.Min, f.Max))
+			return outOfRange(val, f.Min, f.Max)
 		}
 	case TypeBool:
 		if val != "true" && val != "false" {
@@ -258,11 +258,12 @@ func checkValue(f Field, val string) error {
 	return nil
 }
 
-func rangeText(lo, hi float64) string {
+// outOfRange: sin tope (hi 0) el rango es «lo o más», que lleva su propio texto para salir en el idioma pedido.
+func outOfRange(value any, lo, hi float64) error {
 	if hi > 0 {
-		return fmt.Sprintf("%g-%g", lo, hi)
+		return vbad("out_of_range", "value", value, "range", fmt.Sprintf("%g-%g", lo, hi))
 	}
-	return fmt.Sprintf("%g o más", lo)
+	return vbad("out_of_range_min", "value", value, "lo", fmt.Sprintf("%g", lo))
 }
 
 // checkSecretField: ASCII visible sin espacios ni '?', del largo pedido; el error no cita el valor.

@@ -21,6 +21,7 @@ func init() {
 	val("format", "pattern", entry{Es: "{value:q} no cumple el formato esperado", En: "{value:q} does not match the expected format", Args: []string{"value"}})
 	val("not_int", "type", entry{Es: "{value:q} no es un entero (sin signo ni ceros a la izquierda)", En: "{value:q} is not an integer (no sign or leading zeros)", Args: []string{"value"}})
 	val("out_of_range", "range", entry{Es: "{value} fuera de {range}", En: "{value} is outside {range}", Args: []string{"value", "range"}})
+	val("out_of_range_min", "range", entry{Es: "{value} fuera de {lo} o más", En: "{value} is below {lo}", Args: []string{"value", "lo"}})
 	val("not_decimal", "type", entry{Es: "{value:q} no es un número con hasta dos decimales", En: "{value:q} is not a number with up to two decimals", Args: []string{"value"}})
 	val("bool", "choice", entry{Es: "{value:q}: solo true o false", En: "{value:q}: only true or false", Args: []string{"value"}})
 	val("choice", "choice", entry{Es: "{value:q}: elige una de {choices}", En: "{value:q}: choose one of {choices}", Args: []string{"value", "choices"}})

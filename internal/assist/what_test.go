@@ -31,3 +31,15 @@ func TestEtiquetaDeDireccionEnElIdioma(t *testing.T) {
 		}
 	}
 }
+
+// El rango abierto («lo o más») sale en el idioma del error, no con «o más» fijo.
+func TestRangoAbiertoEnElIdioma(t *testing.T) {
+	tpl := Template{Fields: []Field{{Name: "n", Label: "N", Type: TypeInt, Min: 5}}}
+	err := ValidateValues(tpl, Values{"n": "3"})
+	if err == nil || !strings.Contains(err.Error(), "3 fuera de 5 o más") {
+		t.Fatalf("es: %v", err)
+	}
+	if got := i18n.English(err); !strings.Contains(got, "3 is below 5") || strings.Contains(got, "más") {
+		t.Fatalf("en: %q", got)
+	}
+}
