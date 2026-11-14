@@ -256,6 +256,10 @@ func (r *Recorder) typedLine(line string, loose bool) string {
 	} else {
 		m = r.typed.Typed(line)
 	}
+	// Un Tab (se graba como «^I») hace que el equipo complete palabras que las reglas no ven: desde el primero se tapa todo.
+	if i := strings.Index(m, "^I"); i >= 0 {
+		m = m[:i] + "<MASKED:secret>"
+	}
 	r.noteSecrets(line, m)
 	return m
 }

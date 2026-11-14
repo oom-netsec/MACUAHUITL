@@ -215,3 +215,28 @@ func TestAuditoriaFTDConTabulador(t *testing.T) {
 		}
 	}
 }
+
+// Una línea tecleada con Tab se graba tapada desde el Tab: el equipo completó palabras que las reglas no ven.
+func TestAuditoriaTabuladorTecleadoSeTapaDesdeElTab(t *testing.T) {
+	for _, c := range []struct{ prompt, in, want, no string }{
+		{"> ", "configure man\tadd 10.1.1.10 RegK3yAA NatId1AA", ">>> configure man<MASKED:secret>\n", "RegK3yAA"},
+		{"SW1(config)#", "username a\tpassword 0 SecretoXX", ">>> username a<MASKED:secret>\n", "SecretoXX"},
+		{"SW1#", "show ver\tsion", ">>> show ver<MASKED:secret>\n", "sion"},
+		{"SW1(config)#", "username bob password 0 SecretoXX\tfoo", ">>> username bob password 0 <MASKED:user-secret>\n", "SecretoXX"},
+		{"SW1(config)#", "snmp-server community ComunXX ro\tfoo", ">>> snmp-server community <MASKED:snmp-community> ro<MASKED:secret>\n", "ComunXX"},
+	} {
+		for _, pegado := range []bool{false, true} {
+			r, b := newRec()
+			r.Output([]byte(c.prompt))
+			r.Input([]byte(c.in + "\r"))
+			if pegado { // sin salida entre medias: la línea se retiene y se graba al llegar el prompt
+				r.Input([]byte("show clock\r"))
+			}
+			r.Output([]byte("\r\n" + c.prompt))
+			r.Close()
+			if !strings.Contains(b.String(), c.want) || strings.Contains(b.String(), c.no) {
+				t.Errorf("%q pegado=%v:\n%s", c.in, pegado, b.String())
+			}
+		}
+	}
+}
