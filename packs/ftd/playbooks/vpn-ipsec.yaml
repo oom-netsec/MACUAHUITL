@@ -9,6 +9,7 @@ name_en: FTD · VPN · IPsec
 commands:
   - cmd: show clock
   - cmd: show crypto ipsec sa
+    timeout: 120s
   - cmd: show crypto ipsec sa detail
     timeout: 120s
   - cmd: show crypto ipsec stats

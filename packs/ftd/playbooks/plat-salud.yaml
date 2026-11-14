@@ -16,5 +16,5 @@ commands:
   - cmd: show failover state
   - cmd: show interface ip brief
   - cmd: show conn count
-  - cmd: show logging | include %ASA-[0-3]-
+  - cmd: show logging | include %FTD-[0-3]-
     timeout: 180s

@@ -10,9 +10,9 @@ commands:
   - cmd: show clock
   - cmd: show logging setting
   - cmd: show logging queue
-  - cmd: show logging | include %ASA-[0-3]-
+  - cmd: show logging | include %FTD-[0-3]-
     timeout: 180s
-  - cmd: show logging | include %ASA-4-
+  - cmd: show logging | include %FTD-4-
     timeout: 180s
   - cmd: show logging
     timeout: 180s

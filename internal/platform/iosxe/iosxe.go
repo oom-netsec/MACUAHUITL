@@ -30,7 +30,7 @@ var (
 	// se confunde con él, así que solo cuenta al final del búfer y tras una pausa (ftdSettle) sin más datos.
 	ftdPrompt = regexp.MustCompile(`(?:^|\n)> ?$`)
 	// Primer inicio de sesión de FTD: cambio de contraseña obligatorio o EULA. Responder cambiaría el equipo.
-	ftdFirstLogin = regexp.MustCompile(`(?i)you must change your password|enter new password:|confirm new password:|unix password: ?$|to agree to the eula|please enter 'yes'`)
+	ftdFirstLogin = regexp.MustCompile(`(?i)you must change your password|you must accept the eula|press <enter> to display the eula|enter new password:|confirm new password:|unix password: ?$|to agree to the eula|please enter 'yes'`)
 	more          = regexp.MustCompile(` ?(?:--More--|<--- More --->) ?`) // el segundo es el de ASA
 	// Secuencias con que el equipo borra el --More--: "\r    \r" o retrocesos "\b\b  \b\b".
 	erase = regexp.MustCompile(`\r +\r|\x08+ +\x08+`)
@@ -63,6 +63,7 @@ type driver struct {
 	err      error // primer error; desde ahí el driver no se reutiliza
 	buf      []byte
 	hostname string
+	echo     string // comando en curso (solo FTD): su eco debe verse antes de dar por bueno el «> »
 }
 
 // fail guarda el primer error y suelta al lector.
@@ -242,7 +243,10 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				return clean(string(d.buf)), err
 			}
 		}
-		if done(clean(tail)) && !d.moreComing(ctx, clean(tail)) {
+		if ct := clean(tail); done(ct) && !d.noEchoYet(ct) {
+			if d.moreComing(ctx, ct) { // llegaron datos en la pausa: se revisa de nuevo
+				continue
+			}
 			text := clean(string(d.buf))
 			d.buf = nil
 			return text, nil
@@ -275,7 +279,13 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 }
 
 // ftdSettle es la pausa sin datos tras un «> » para aceptarlo como prompt de FTD.
-var ftdSettle = 150 * time.Millisecond
+// Es una heurística: una pausa mayor a mitad de la salida, justo tras una línea «> », aún la cortaría (sin un marcador del equipo no se cierra del todo).
+var ftdSettle = 400 * time.Millisecond
+
+// noEchoYet: con el «> » a secas de FTD, mientras corre un comando, el prompt solo vale si ya llegó el eco de ese comando.
+func (d *driver) noEchoYet(tail string) bool {
+	return d.echo != "" && ftdPrompt.MatchString(tail) && !strings.Contains(clean(string(d.buf)), d.echo+"\n")
+}
 
 // moreComing: si tail es el «> » de FTD, espera ftdSettle por más datos; si llegan, no era el prompt (era el inicio
 // de una línea de salida) y se agregan al búfer.
@@ -323,6 +333,10 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	defer cancel()
 	if _, err := io.WriteString(d.w, cmd+"\n"); err != nil {
 		return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
+	}
+	if d.hostname == "" {
+		d.echo = cmd
+		defer func() { d.echo = "" }()
 	}
 	text, err := d.untilIdle(ctx, timeout, d.atPrompt)
 	out.Ended = time.Now()
@@ -375,8 +389,8 @@ var wlc9800 = regexp.MustCompile(`(?m)^Cisco IOS Software.*, C9800`)
 var nxos = regexp.MustCompile(`(?m)^Cisco Nexus Operating System \(NX-OS\) Software`)
 
 // asa busca la cabecera de show version de ASA al inicio de línea; un IOS que diga «Adaptive Security» en texto libre no cuenta.
-// ftd: línea «Model : Cisco Firepower … Threat Defense» o «Cisco Secure Firewall Threat Defense» (también «Cisco Firepower 1120 Threat Defense»).
-var ftd = regexp.MustCompile(`(?m)^Model\s*:\s*Cisco (?:Firepower|Secure Firewall)\b.*Threat Defense`)
+// ftd: línea «Model : Cisco … Threat Defense» (Firepower, Secure Firewall, «Cisco Firepower 1120», «Cisco ASA5508-X», «Cisco ISA 3000»). Un ASA real no trae «Model :» seguido de Cisco.
+var ftd = regexp.MustCompile(`(?m)^Model\s*:\s*Cisco .*Threat Defense`)
 
 var asa = regexp.MustCompile(`(?m)^Cisco Adaptive Security Appliance Software Version`)
 

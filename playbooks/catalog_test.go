@@ -25,7 +25,7 @@ var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp (comm|host)|arch
 var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces|wireless client summary|ap summary)$`)
 
 // Salidas grandes de ASA: conexiones, xlates, ACL, logs, memoria, descartes de ASP, sesiones VPN y configuraciones.
-var asaBigCmd = regexp.MustCompile(`^show (conn( address .*| detail)?|local-host|xlate|access-list( .*)?|tech-support.*|logging( \|.*)?|memory detail|asp drop.*|vpn-sessiondb detail.*|running-config( .*)?|startup-config|nat detail|access-control-config.*)$`)
+var asaBigCmd = regexp.MustCompile(`^show (conn( address .*| detail)?|local-host|xlate|access-list( .*)?|tech-support.*|logging( \|.*)?|memory detail|asp drop.*|vpn-sessiondb detail.*|running-config( .*)?|startup-config|nat detail|access-control-config.*|route|bgp|interface|crypto ipsec sa)$`)
 
 // catalogFS junta el contenido embebido con el de packs/ios-xe, packs/ios, packs/wlc-9800, packs/nx-os, packs/cat9k, packs/sda, packs/asa y packs/ftd (en cisco/<plataforma>), para que estas pruebas sigan
 // cubriendo los playbooks que salieron del binario al paquete oficial.
@@ -77,6 +77,9 @@ func TestCatalogo(t *testing.T) {
 			}
 			if (p.Platform == "asa" || p.Platform == "ftd") && asaBigCmd.MatchString(c.Text) && c.Timeout < 120*time.Second {
 				t.Errorf("%s: %q es una salida grande de ASA y necesita timeout >= 120s", p.ID, c.Text)
+			}
+			if p.Platform == "ftd" && strings.Contains(c.Text, "ASA-") { // en FTD los mensajes salen como %FTD-n-xxxxxx
+				t.Errorf("%s: %q filtra por ASA-, FTD usa %%FTD-", p.ID, c.Text)
 			}
 			if strings.Contains(c.Text, "@") {
 				t.Errorf("%s: %q lleva «@» pegado al comando", p.ID, c.Text)

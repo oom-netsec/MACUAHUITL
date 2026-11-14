@@ -11,6 +11,7 @@ commands:
   - cmd: show crypto ikev2 sa
   - cmd: show crypto ikev1 sa
   - cmd: show crypto ipsec sa
+    timeout: 120s
   - cmd: show crypto ikev2 stats
   - cmd: show crypto ikev1 stats
   - cmd: show vpn-sessiondb summary
@@ -19,5 +20,5 @@ commands:
     may_contain_secrets: true
   - cmd: show asp drop
     timeout: 120s
-  - cmd: show logging | include %ASA-[0-3]-
+  - cmd: show logging | include %FTD-[0-3]-
     timeout: 180s

@@ -9,6 +9,7 @@ name_en: FTD · Layer 3 · Routing table
 commands:
   - cmd: show clock
   - cmd: show route
+    timeout: 120s
   - cmd: show route summary
   - cmd: show arp
   - cmd: show interface ip brief

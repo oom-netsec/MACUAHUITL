@@ -19,7 +19,7 @@ func TestCheckDeniedFTDRechaza(t *testing.T) {
 		// pipes
 		"show version | redirect x", "show version | include redirect x", "show version | section x", "show version |", "| include a",
 		// ping y traceroute: solo la forma de datos; «system» sale por la gestión
-		"ping system 10.0.0.1", "traceroute system 10.0.0.1", "ping system", "ping 10.0.0.1 repeat 11", "ping 255.255.255.255", "traceroute 10.0.0.1 probe 6",
+		"ping system 10.0.0.1", "traceroute system 10.0.0.1", "ping tcp system 10.0.0.1 443", "traceroute 10.0.0.1 source system", "ping 10.0.0.1 system", "ping inside system", "ping system", "ping 10.0.0.1 repeat 11", "ping 255.255.255.255", "traceroute 10.0.0.1 probe 6",
 		"packet-tracer input inside tcp 1.1.1.1 1000 2.2.2.2 80 transmit", "packet-tracer input inside tcp 1.1.1.1 1000 2.2.2.2",
 		"show version > x", "show version | include `x`",
 	} {

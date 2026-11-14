@@ -1,5 +1,7 @@
 package playbook
 
+import "slices"
+
 // checkFTD: CLI normal de Cisco Secure Firewall Threat Defense (prompt «> »). Sin abreviaturas: el primer comando va
 // completo. Reusa de ASA los filtros de pipe, las rutas remotas y las formas acotadas de ping, traceroute y
 // packet-tracer. Quedan fuera expert, system (diagnostic-cli incluido), capture-traffic y todo lo que no sea lectura.
@@ -10,8 +12,8 @@ func ftdHead(cmd string, fields []string) error {
 	case "show":
 		return showNoFile(cmd, fields)
 	case "ping", "traceroute":
-		// «ping system DESTINO» sale por la interfaz de gestión y su sintaxis es otra: se rechaza
-		if len(fields) > 1 && fields[1] == "system" {
+		// «system» (ping system DESTINO, source system…) sale por la interfaz de gestión y su sintaxis es otra: se rechaza en cualquier posición
+		if slices.Contains(fields[1:], "system") {
 			return denied(cmd, "playbook.why.probe_asa")
 		}
 		f := fields
