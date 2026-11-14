@@ -54,10 +54,11 @@ type Recorder struct {
 	tail    []byte // últimos bytes de salida desde el último Enter, para reconocer el prompt
 	fresh   bool   // llegó salida desde el último Enter
 	held    []string
-	lastBlk string   // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
-	heldBlk []string // bloque del prompt con que se tecleó cada línea retenida
-	hidden  bool     // lo tecleado es una contraseña: no se graba
-	line    []byte   // lo tecleado en la línea actual
+	lastBlk string      // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
+	typed   mask.Stream // lleva el bloque entre las líneas tecleadas
+	cont    bool        // el eco anterior se enmascaró en un bloque: la línea suelta que siga puede ser su resto
+	hidden  bool        // lo tecleado es una contraseña: no se graba
+	line    []byte      // lo tecleado en la línea actual
 	lastCR  bool
 	max     int64 // tope de la grabación en bytes
 	written int64
@@ -119,14 +120,30 @@ func (r *Recorder) outLine(l string) {
 	l = ansi.ReplaceAllString(l, "")
 	out, keep := "", true
 	if pr := promptRe.FindString(l); pr != "" {
-		r.lastBlk = blockOfPrompt(pr)
-		out = pr + r.stream.Prompted(l[len(pr):], r.lastBlk)
+		r.setPromptBlock(blockOfPrompt(pr))
+		echo := r.stream.Prompted(l[len(pr):], r.lastBlk)
+		r.cont = r.lastBlk != "" && echo != l[len(pr):]
+		out = pr + echo
+	} else if r.cont && !strings.ContainsAny(l, " \t%") && l != "" {
+		// Resto de un eco partido por un log asíncrono: va con la clave que se enmascaró.
+		r.cont = false
+		out = "<MASKED:secret>"
 	} else {
+		r.cont = false
 		out, keep = r.stream.Line(l)
 	}
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
 	}
+}
+
+// setPromptBlock recuerda el bloque del prompt; solo si cambia reinicia el de lo tecleado (un prompt
+// viejo que llega tarde no debe borrar el bloque que abrió una línea pegada).
+func (r *Recorder) setPromptBlock(b string) {
+	if b != r.lastBlk {
+		r.typed.SetBlock(b)
+	}
+	r.lastBlk = b
 }
 
 func blockOfPrompt(p string) string {
@@ -160,7 +177,7 @@ func (r *Recorder) settle() {
 	switch {
 	case len(r.held) == 0:
 	case r.asksSecret():
-		r.held, r.heldBlk = r.held[1:], r.heldBlk[1:]
+		r.held = r.held[1:]
 		r.input("[oculto]")
 		r.tail = nil
 	case shellPrompt.MatchString(r.lastLine()):
@@ -170,10 +187,10 @@ func (r *Recorder) settle() {
 
 // commitHeld graba como comandos las líneas retenidas. Requiere r.mu.
 func (r *Recorder) commitHeld() {
-	h, hb := r.held, r.heldBlk
-	r.held, r.heldBlk = nil, nil
-	for i, l := range h {
-		r.input(maskTyped(l, hb[i]))
+	h := r.held
+	r.held = nil
+	for _, l := range h {
+		r.input(r.typed.Typed(l))
 	}
 }
 
@@ -206,23 +223,12 @@ func (r *Recorder) Input(p []byte) {
 	}
 }
 
-// maskTyped enmascara una línea tecleada; block es el bloque que da el prompt en que se tecleó.
-func maskTyped(s, block string) string {
-	if block != "" {
-		st := mask.Stream{}
-		return st.Prompted(s, block)
-	}
-	text, _ := mask.Apply("ios-xe", s)
-	return text
-}
-
 // flush trata la línea tecleada al pulsar Enter. Requiere r.mu.
 func (r *Recorder) flush() {
 	line, hidden, fresh := string(r.line), r.hidden, r.fresh
 	if pr := promptRe.FindString(r.lastLine()); pr != "" {
-		r.lastBlk = blockOfPrompt(pr)
+		r.setPromptBlock(blockOfPrompt(pr))
 	}
-	blk := r.lastBlk
 	// Un nuevo prompt de contraseña tiene que llegar en la salida: lo ya visto no vale para la línea siguiente.
 	r.hidden, r.line, r.tail, r.fresh = false, r.line[:0], nil, false
 	switch {
@@ -230,14 +236,14 @@ func (r *Recorder) flush() {
 		r.input("[oculto]")
 	case line == "":
 	case fresh && len(r.held) == 0:
-		r.input(maskTyped(line, blk)) // shortcut: ver la nota del paquete sobre abreviaturas
+		r.input(r.typed.Typed(line)) // shortcut: ver la nota del paquete sobre abreviaturas
 	default:
 		// Sin salida nueva desde el Enter anterior: el equipo aún no mostró su prompt y esta línea
 		// podría ser la contraseña que el prompt de secreto va a pedir. Se decide al llegar la salida.
-		r.held, r.heldBlk = append(r.held, line), append(r.heldBlk, blk)
+		r.held = append(r.held, line)
 		if len(r.held) > heldMax {
-			r.input(maskTyped(r.held[0], r.heldBlk[0]))
-			r.held, r.heldBlk = r.held[1:], r.heldBlk[1:]
+			r.input(r.typed.Typed(r.held[0]))
+			r.held = r.held[1:]
 		}
 	}
 }
@@ -261,7 +267,7 @@ func (r *Recorder) Close() {
 	}
 	r.commitHeld()
 	if !r.hidden && len(r.line) > 0 {
-		r.input(maskTyped(string(r.line), r.lastBlk))
+		r.input(r.typed.Typed(string(r.line)))
 	}
 	r.hidden, r.line = false, nil
 }

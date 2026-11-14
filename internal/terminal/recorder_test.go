@@ -281,3 +281,61 @@ func TestSalirDelBloqueQuitaElBloqueDelTeclado(t *testing.T) {
 		t.Errorf("%s", out)
 	}
 }
+
+// Al pegar la línea que abre el bloque junto con su clave desde (config)#, el bloque viaja entre líneas tecleadas.
+func TestEnmascaraTecleadoPegadoQueAbreElBloque(t *testing.T) {
+	casos := []struct{ prompt, in, leak string }{
+		{"ciscoasa(config)# ", "aaa-server RAD (inside) host 10.1.1.5\rkey PasteK\r", "PasteK"},
+		{"ciscoasa(config)# ", "aaa-server RAD (inside) host 10.1.1.5\r key PasteK2\r", "PasteK2"},
+		{"SW1(config)# ", "tacacs server ISE\r key TacPaste\r", "TacPaste"},
+		{"SW1(config)# ", "tacacs server ISE\rkey TacPaste2\r", "TacPaste2"},
+	}
+	for _, c := range casos {
+		r, b := newRec()
+		r.Output([]byte(c.prompt))
+		r.Input([]byte(c.in))
+		r.Close()
+		if out := b.String(); strings.Contains(out, c.leak) {
+			t.Errorf("%q:\n%s", c.in, out)
+		}
+	}
+}
+
+// Un prompt nuevo que cambia de bloque reinicia el bloque de lo tecleado.
+func TestPromptNuevoReiniciaElBloqueDeLoTecleado(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("ciscoasa(config)# "))
+	r.Input([]byte("aaa-server RAD (inside) host 10.1.1.5\r"))
+	r.Output([]byte("aaa-server RAD (inside) host 10.1.1.5\r\nciscoasa(config-aaa-server-host)# "))
+	r.Input([]byte("exit\r"))
+	r.Output([]byte("exit\r\nciscoasa(config)# "))
+	r.Input([]byte("hostname FW1\r"))
+	r.Close()
+	if out := b.String(); !strings.Contains(out, ">>> hostname FW1") {
+		t.Errorf("%s", out)
+	}
+}
+
+// El resto de un eco partido por un log asíncrono también se enmascara.
+func TestEnmascaraRestoDelEcoTrasUnLog(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("ciscoasa(config-aaa-server-host)#key Se"))
+	r.Output([]byte("%ASA-5-111008: User 'x' executed a command\r\n"))
+	r.Output([]byte("cret\r\nciscoasa(config-aaa-server-host)# "))
+	r.Close()
+	if out := b.String(); strings.Contains(out, " cret\n") || strings.Contains(out, "Secret") {
+		t.Errorf("%s", out)
+	}
+}
+
+// exit pegado cierra el bloque: lo que sigue ya no se enmascara por el bloque anterior.
+func TestExitPegadoCierraElBloqueTecleado(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("ciscoasa(config)# "))
+	r.Input([]byte("aaa-server RAD (inside) host 10.1.1.5\rkey K1\rexit\rkey Foo2\r"))
+	r.Close()
+	out := b.String()
+	if strings.Contains(out, "K1") || !strings.Contains(out, ">>> key Foo2") {
+		t.Errorf("%s", out)
+	}
+}

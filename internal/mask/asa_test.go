@@ -73,6 +73,9 @@ var asaCases = []struct{ in, want string }{
 	{"snmp-server host inside nms01 version 3 user1", "snmp-server host inside nms01 version 3 user1"},
 	{"snmp-server host nms01 version 2c Comm1", "snmp-server host nms01 version 2c <MASKED:snmp-community>"},
 	{"snmp-server host 10.0.0.9 Comm1 udp-port 162", "snmp-server host 10.0.0.9 <MASKED:snmp-community> udp-port 162"},
+	// Un espacio al final no anula el sufijo propio del comando.
+	{"snmp-server community 0 Comm RO ", "snmp-server community 0 <MASKED:snmp-community> RO "},
+	{" authentication key eigrp 100 0 my pass key-id 1 ", " authentication key eigrp 100 0 <MASKED:eigrp-key> key-id 1 "},
 	// Sin falsos positivos.
 	{" description key server for vpn", " description key server for vpn"},
 	{"ssh key-exchange group dh-group14-sha256", "ssh key-exchange group dh-group14-sha256"},

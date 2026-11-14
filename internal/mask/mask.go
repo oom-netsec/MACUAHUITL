@@ -79,7 +79,7 @@ func isASASNMPHost(line, platform string) bool {
 var iosRules = []rule{
 	R("enable-secret", "", `\s*enable (?:algorithm-type \S+ )?(?:secret|password) (?:level \d+ )?`+typ),
 	R("user-secret", "", `\s*username \S+ (?:.*? )?(?:secret|password) `+typ),
-	R("snmp-community", "", `\s*snmp-server community `+commTyp).stopAt(`\s+(?:ro|rw)(?:\s+\S+)?$`),
+	R("snmp-community", "", `\s*snmp-server community `+commTyp).stopAt(`\s+(?:ro|rw)(?:\s+\S+)?\s*$`),
 	R("tacacs-key", "", `\s*tacacs-server (?:host \S+ (?:.*? )?)?key `+typ),
 	R("radius-key", "", `\s*radius-server (?:host \S+ .*?)?key `+typ),
 	R("psk", "", `\s*crypto isakmp key `+typ),
@@ -91,7 +91,7 @@ var iosRules = []rule{
 	R("snmp-user-priv", "", `\s*snmp-server user .*? priv (?:(?:des|3des|aes(?:[- ]\d+)?) )?`),
 	// La comunidad va tras vrf/use-vrf, informs/traps y version; use-vrf sin valor no es la comunidad.
 	// ASA: «host IFNAME IP [trap|poll] community X»; la IP no es la comunidad.
-	R("snmp-community", "", `\s*snmp-server host \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+$`),
+	R("snmp-community", "", `\s*snmp-server host \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+\s*$`),
 	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) )?`).guarded().unlessFn(isASASNMPHost),
 	R("snmp-community", "", `\s*snmp mib community-map `),
 	R("bgp-password", "", `\s*neighbor \S+ password `+typ),
@@ -146,11 +146,11 @@ var iosRules = []rule{
 	R("psk", "", `\s*(?:ikev1|ikev2 (?:local|remote)-authentication) pre-shared-key `+typ),
 	R("failover-key", "", `\s*failover (?:key (?:hex )?|ipsec pre-shared-key )`+typ),
 	R("ldap-password", "", `\s*ldap-login-password `+typ),
-	R("eigrp-key", "", `\s*eigrp authentication key \d+ `+commTyp).stopAt(`\s+key-id \d+$`),
-	R("eigrp-key", "", `\s*authentication key eigrp \d+ `+commTyp).stopAt(`\s+key-id \d+$`),
+	R("eigrp-key", "", `\s*eigrp authentication key \d+ `+commTyp).stopAt(`\s+key-id \d+\s*$`),
+	R("eigrp-key", "", `\s*authentication key eigrp \d+ `+commTyp).stopAt(`\s+key-id \d+\s*$`),
 	R("aaa-key", "aaaserver", `\s+key `+typ),
 	R("radius-key", "", `\s*radius-common-pw `+typ),
-	R("user-secret", "", `\s*vpdn username \S+ password `+typ).stopAt(`\s+store-local$`),
+	R("user-secret", "", `\s*vpdn username \S+ password `+typ).stopAt(`\s+store-local\s*$`),
 	R("aaa-key", "", `\s*aaa-server \S+ (?:\(\S+\) )?host \S+ `).guarded(), // forma de una línea
 	R("token", "licsmart", `\s+token `),
 	// VPN y PKI.
@@ -463,6 +463,26 @@ func (s *Stream) Prompted(line, block string) string {
 		block = s.block
 	}
 	return maskLine(" "+line, block, s.Platform, s.counts)[1:]
+}
+
+// SetBlock fija el bloque en curso (el que da un prompt); "" = fuera de todo bloque.
+func (s *Stream) SetBlock(block string) { s.block = block }
+
+// Typed enmascara una línea tecleada llevando el bloque entre líneas: una línea que abre un bloque
+// (aaa-server …, tacacs server …) lo fija para las siguientes, y exit/end lo cierran.
+func (s *Stream) Typed(line string) string {
+	if s.counts == nil {
+		s.counts = map[string]int{}
+	}
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "exit", "end":
+		s.block = ""
+	default:
+		if b := blockOf(strings.TrimLeft(line, " \t")); b != "" {
+			s.block = b
+		}
+	}
+	return maskLine(" "+line, s.block, s.Platform, s.counts)[1:]
 }
 
 // archiveLog: línea de show archive log config; tras «|» va un comando de configuración.
