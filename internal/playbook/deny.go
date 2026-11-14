@@ -92,6 +92,9 @@ func CheckDenied(platform, cmd string) error {
 	if platform == "nx-os" {
 		return checkNXOS(cmd)
 	}
+	if platform == "asa" {
+		return checkASA(cmd)
+	}
 	segs := strings.Split(strings.ToLower(cmd), "|")
 	fields := strings.Fields(segs[0])
 	if len(fields) == 0 {

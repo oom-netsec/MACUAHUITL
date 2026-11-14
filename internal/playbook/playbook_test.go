@@ -170,11 +170,17 @@ func TestCampoPlatformsPorComando(t *testing.T) {
 	}
 }
 
+func TestASAEsPlataformaConocida(t *testing.T) {
+	if !KnownPlatform("asa") {
+		t.Fatal("asa debe ser conocida")
+	}
+}
+
 func TestCompatible(t *testing.T) {
 	for _, c := range []struct {
 		det, pb string
 		ok      bool
-	}{{"ios-xe", "ios-xe", true}, {"ios", "ios-xe", true}, {"ios", "ios", true}, {"ios-xe", "ios", false}, {"nx-os", "ios-xe", false}, {"wlc-9800", "ios-xe", true}, {"wlc-9800", "wlc-9800", true}, {"ios-xe", "wlc-9800", false}, {"ios", "wlc-9800", false}} {
+	}{{"ios-xe", "ios-xe", true}, {"ios", "ios-xe", true}, {"ios", "ios", true}, {"ios-xe", "ios", false}, {"nx-os", "ios-xe", false}, {"wlc-9800", "ios-xe", true}, {"wlc-9800", "wlc-9800", true}, {"ios-xe", "wlc-9800", false}, {"ios", "wlc-9800", false}, {"asa", "asa", true}, {"asa", "ios-xe", false}, {"ios-xe", "asa", false}, {"ios", "asa", false}, {"asa", "ios", false}, {"nx-os", "asa", false}} {
 		if got := Compatible(c.det, c.pb); got != c.ok {
 			t.Errorf("Compatible(%q, %q) = %v", c.det, c.pb, got)
 		}
