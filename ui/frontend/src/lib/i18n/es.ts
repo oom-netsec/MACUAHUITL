@@ -2680,6 +2680,8 @@ export const es = {
   "diag.bind.gone": "La IP {ip} ya no es de esta máquina (cambió la red): elige otra y vuelve a ejecutar.",
   "paste.controls": "Contiene caracteres de control o invisibles: {codes}",
   "shell.moduleError": "El módulo falló al mostrarse",
+  "patrol.pb.own": "Propio",
+  "patrol.pb.base": "Base",
 };
 
 export type Key = keyof typeof es;

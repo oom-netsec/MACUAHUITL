@@ -18,7 +18,9 @@ const active = (j: Job) => j.state === "armed" || j.state === "arming";
 const rank = (j: Job) => (active(j) ? 0 : j.state === "created" ? 1 : 2);
 const lastActivity = (j: Job) => Math.max(0, ...(j.phases ?? []).map((p) => Date.parse(p.at)), j.armedAt ? Date.parse(j.armedAt) : 0);
 const sortJobs = (js: Job[]) => [...js].sort((a, b) => rank(a) - rank(b) || lastActivity(b) - lastActivity(a) || a.name.localeCompare(b.name));
-const samePhase = (a: JobPhase, b: JobPhase) => a.at === b.at && a.kind === b.kind && (a.round ?? 0) === (b.round ?? 0);
+// El puente lista con RFC3339 sin fracción y el stream trae nanosegundos: se compara el instante al segundo.
+const sec = (s: string) => Math.floor(Date.parse(s.replace(/\.\d+/, "")) / 1000);
+const samePhase = (a: JobPhase, b: JobPhase) => sec(a.at) === sec(b.at) && a.kind === b.kind && (a.round ?? 0) === (b.round ?? 0);
 
 export function PatrolView({ core }: { core: CoreAPI }) {
   const t = useT();

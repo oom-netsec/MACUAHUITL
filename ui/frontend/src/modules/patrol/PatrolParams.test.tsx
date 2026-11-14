@@ -84,3 +84,11 @@ test("el catálogo de playbooks se vuelve a pedir cuando cambia el contenido (pa
   act(() => scriptsChanged());
   await waitFor(() => expect(vi.mocked(core.listPlaybooks).mock.calls.length).toBeGreaterThan(before));
 });
+
+test("un tipo de dato desconocido usa el nombre del dato como etiqueta y sin ayuda, no claves crudas", async () => {
+  const pbNew = { id: "ios-xe/nuevo", platform: "ios-xe", name: "TAC · Nuevo", commands: ["show x {vrf}"], params: [{ name: "vrf", kind: "xyz" }] };
+  await setup([pbNew]);
+  await userEvent.click(await screen.findByRole("checkbox", { name: /Nuevo/ }));
+  expect(screen.getByLabelText("vrf")).toBeInTheDocument();
+  expect(document.body.textContent).not.toContain("patrol.param");
+});

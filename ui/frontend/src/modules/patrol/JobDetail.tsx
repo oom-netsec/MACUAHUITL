@@ -33,7 +33,7 @@ export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: C
     if (job.state !== "armed" || grid) return;
     const r = job.round || 1;
     let off = false;
-    (async () => {
+    const rebuild = async () => {
       const cur = await core.getRun(job.id, r);
       // La ronda en curso solo trae los equipos que ya terminaron: la lista completa es la unión con la anterior.
       const prev = r > 1 ? await core.getRun(job.id, r - 1) : [];
@@ -43,8 +43,12 @@ export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: C
         devices,
         initial: cur.length ? Object.fromEntries(cur.map((d) => [d.target, { state: d.state, progress: "", detail: d.detail }])) : undefined,
       });
-    })().catch(() => {});
-    return () => { off = true; };
+    };
+    const go = () => { rebuild().catch(() => {}); };
+    go();
+    // Ronda 1 sin equipos terminados: el primer evento de equipo de este trabajo reintenta la reconstrucción.
+    const un = core.onEvent((e) => { if (e.jobId === job.id && e.deviceStateChanged) go(); });
+    return () => { off = true; un(); };
   }, [core, job.id, job.state, job.round, grid]);
 
   const runLogin = async () => {
