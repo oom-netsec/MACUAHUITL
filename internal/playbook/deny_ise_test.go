@@ -133,3 +133,17 @@ func TestDestinosNumericosAbreviados(t *testing.T) {
 		}
 	}
 }
+
+// Un FQDN con punto final es un nombre válido (asa, ftd e ise).
+func TestDestinoFQDNConPuntoFinal(t *testing.T) {
+	for p, cmd := range map[string]string{"asa": "ping inside host.example.com.", "ftd": "ping host.example.com.", "ise": "ping host.example.com."} {
+		if err := CheckDenied(p, cmd); err != nil {
+			t.Errorf("%s %q: %v", p, cmd, err)
+		}
+	}
+	for _, cmd := range []string{"ping host.example.com..", "ping .", "ping 224.1.", "ping 0xff."} {
+		if err := CheckDenied("ise", cmd); err == nil {
+			t.Errorf("%q: se aceptó", cmd)
+		}
+	}
+}

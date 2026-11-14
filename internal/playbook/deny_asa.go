@@ -40,7 +40,7 @@ func asaDest(s string) bool {
 	}
 	// Un nombre: sin «:» (no es IPv6 válida), con una etiqueta final con letras y sin etiquetas hexadecimales; así
 	// «224.1», «4294967295» y «0xffffffff» (IPv4 abreviadas que el equipo resuelve) no pasan.
-	labels := strings.Split(s, ".")
+	labels := strings.Split(strings.TrimSuffix(s, "."), ".") // un FQDN puede llevar un punto final
 	if strings.Contains(s, ":") || !strings.ContainsAny(labels[len(labels)-1], "abcdefghijklmnopqrstuvwxyz") {
 		return false
 	}

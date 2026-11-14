@@ -77,3 +77,29 @@ func TestISESNMPv3YNtpSha(t *testing.T) {
 		}
 	}
 }
+
+// ntp authentication-key en IOS, IOS-XE y ISE: se ve el índice y el algoritmo, se tapa la clave; el tipo final (0/7) y
+// hash|plain quedan visibles.
+func TestNTPAuthenticationKeyTodosLosAlgoritmos(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"ntp authentication-key 4 sha1 X 7", "ntp authentication-key 4 sha1 <MASKED:ntp-key> 7"},
+		{"ntp authentication-key 5 hmac-sha2-256 K3y", "ntp authentication-key 5 hmac-sha2-256 <MASKED:ntp-key>"},
+		{"ntp authentication-key 5 hmac-sha2-256 K3y 7", "ntp authentication-key 5 hmac-sha2-256 <MASKED:ntp-key> 7"},
+		{"ntp authentication-key 5 cmac-aes-128 K3y", "ntp authentication-key 5 cmac-aes-128 <MASKED:ntp-key>"},
+		{"ntp authentication-key 3 sha256 K3y 0", "ntp authentication-key 3 sha256 <MASKED:ntp-key> 0"},
+		{"ntp authentication-key 6 md5 plain 7", "ntp authentication-key 6 md5 plain <MASKED:ntp-key>"},
+		{"ntp authentication-key 6 md5 0822455D0A16 7", "ntp authentication-key 6 md5 <MASKED:ntp-key> 7"},
+		{"ntp authentication-key 7 sha1 hash 0A1B", "ntp authentication-key 7 sha1 hash <MASKED:ntp-key>"},
+		{"ntp authentication-key 2 md5 hash 0A1B", "ntp authentication-key 2 md5 hash <MASKED:ntp-key>"},
+	} {
+		for _, pl := range []string{"ios", "ios-xe", "ise"} {
+			once, _ := Apply(pl, c.in+"\n")
+			if got := once[:len(once)-1]; got != c.want {
+				t.Errorf("%s Apply(%q)\n got %q\nwant %q", pl, c.in, got, c.want)
+			}
+			if twice, n := Apply(pl, once); twice != once || len(n) != 0 {
+				t.Errorf("%s no idempotente %q: %q → %q %v", pl, c.in, once, twice, n)
+			}
+		}
+	}
+}
