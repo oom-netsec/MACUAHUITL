@@ -14,6 +14,7 @@ func init() {
 		"playbook.why.not_read":         e("no es un comando de lectura", "not a read command"),
 		"playbook.why.empty_pipe":       e("pipe vacío", "empty pipe"),
 		"playbook.why.remote":           e("ruta remota (ftp:, tftp:, http:, scp:…): el equipo se conectaría a otro servidor", "remote path (ftp:, tftp:, http:, scp:…): the device would connect to another server"),
+		"playbook.why.local_path":       e("ruta del equipo (disk0:, flash:, system:…): show escribiría o leería archivos locales", "device path (disk0:, flash:, system:…): show would write or read local files"),
 		"playbook.why.pipe_sink":        e("redirect, tee y append escriben fuera de la sesión", "redirect, tee and append write outside the session"),
 		"playbook.why.pipe_filter":      e("solo include, exclude, begin, section y count tras |", "only include, exclude, begin, section and count after |"),
 		"playbook.why.redirect":         e("«>» no se permite en ningún lugar del comando, tampoco dentro de un filtro (como «| include ->»): «>» y «>>» redirigen la salida a un archivo del equipo; quita el carácter y, para filtrar, usa un patrón sin «>»", "\">\" is not allowed anywhere in the command, not even inside a filter (as in \"| include ->\"): \">\" and \">>\" redirect output to a file on the device; remove the character and, to filter, use a pattern without \">\""),

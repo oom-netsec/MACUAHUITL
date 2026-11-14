@@ -2,6 +2,7 @@ package playbook
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -148,5 +149,33 @@ func TestASASegundoPipeNoAbreSumidero(t *testing.T) {
 		if err := CheckDenied("asa", c); err != nil {
 			t.Errorf("debió permitirse %q: %v", c, err)
 		}
+	}
+}
+
+// Una ruta del equipo en el pipe tiene su propio motivo: no es una ruta remota.
+func TestASARutaDelEquipoTieneMotivoPropio(t *testing.T) {
+	motivo := func(plat, cmd string) string {
+		d, ok := CheckDenied(plat, cmd).(deniedErr)
+		if !ok {
+			return ""
+		}
+		c, _ := d.e.Cause.(*i18n.Error)
+		if c == nil {
+			return ""
+		}
+		return c.Code
+	}
+	for _, plat := range []string{"asa", "ftd"} {
+		cmd := "show running-config | include x disk0:/a"
+		if r := motivo(plat, cmd); r != "playbook.why.local_path" {
+			t.Errorf("%s: motivo %q", plat, r)
+		}
+		err := CheckDenied(plat, cmd)
+		if es, en := i18n.In("es", err), i18n.In("en", err); !strings.Contains(es, "ruta del equipo") || !strings.Contains(en, "device path") {
+			t.Errorf("%s:\n es=%s\n en=%s", plat, es, en)
+		}
+	}
+	if r := motivo("asa", "show running-config | include x tftp://10.0.0.1/a"); r != "playbook.why.remote" {
+		t.Errorf("tftp: motivo %q", r)
 	}
 }
