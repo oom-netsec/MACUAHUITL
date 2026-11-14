@@ -187,9 +187,17 @@ Se implementa tal como lo describe «Selección por elemento y paquete personal�
 ## Enmienda (2026-11-14): releases solo de paquetes
 
 Un paquete nuevo o actualizado que no necesita cambios en el núcleo sale sin núcleo nuevo, con un tag `packs-AAAA-MM-DD` (o `packs-AAAA-MM-DD.N` si hay más de uno en el día). Lo publica `.github/workflows/release-packs.yml`:
-- Corre las reglas del repo y la regla de versión: un paquete que cambió desde el release anterior, sea `v*` o `packs-*`, sube de versión.
-- Firma con el código y la versión del último núcleo publicado (el `v*` anterior). Si un paquete pide un núcleo más nuevo o usa una plataforma que ese núcleo no conoce, el release falla.
+- El tag va sobre `main` y después del último `v*`.
+- Corre las reglas del repo en un job sin secret, y la regla de versión (`tools/packaging/packs-version.sh`, la misma del release `v*`):
+  - un paquete que cambió desde el release anterior, sea `v*` o `packs-*`, sube de versión;
+  - una versión ya etiquetada conserva su contenido, comparada contra todos los tags anteriores, también los de un release que falló.
+- Firma en otro job con el código y la versión del último núcleo publicado (el `v*` anterior). mpack-sign valida, firma e instala todos los paquetes juntos en un almacén temporal con la base de ese núcleo. El release falla si un paquete:
+  - pide un núcleo más nuevo;
+  - usa una plataforma que ese núcleo no conoce;
+  - choca con su contenido embebido.
+- Necesita un núcleo publicado con esa prueba de instalación, es decir v0.4.3 o posterior.
 - No toca «latest»: la última versión sigue apuntando al último núcleo.
 - Sube todos los paquetes oficiales, con sus README y `SHA256SUMS`.
 
 Un paquete que depende de un driver o de reglas nuevas (ASA, FTD, AireOS…) sigue saliendo con el release `v*` que trae ese núcleo.
+Mientras en `main` haya un paquete que pide un núcleo aún no publicado, no sale ningún release `packs-*`, porque se firman todos los paquetes juntos. Por eso los paquetes que esperan núcleo nuevo entran a `main` justo antes de su tag `v*`.

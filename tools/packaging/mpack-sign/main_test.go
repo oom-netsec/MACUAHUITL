@@ -108,3 +108,21 @@ func versionIOSXE(t *testing.T) string {
 	}
 	return string(m[1])
 }
+
+// Un paquete que choca con el contenido embebido en el núcleo se valida y se firma bien, pero no se instala:
+// mpack-sign lo prueba instalando todo en un almacén temporal con la base de este núcleo.
+func TestRechazaLoQueChocaConLaBase(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	src := copia(t, "ios-xe")
+	b, err := os.ReadFile("../../../playbooks/cisco/ios-xe/tac-baseline.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(src, "ios-xe", "playbooks", "tac-baseline.yaml"), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err = firmaTodos(src, t.TempDir(), "0.4.3", priv, []ed25519.PublicKey{pub})
+	if err == nil || !regexp.MustCompile(`no se instala`).MatchString(err.Error()) {
+		t.Fatalf("firmó un paquete que choca con la base: %v", err)
+	}
+}

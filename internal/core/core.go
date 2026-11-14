@@ -199,6 +199,29 @@ func New(p Paths, o Options) (*Core, error) {
 	return c, nil
 }
 
+// PackBase es el contenido embebido en este núcleo contra el que se revisan los choques al instalar un paquete;
+// mpack-sign lo usa para probar la instalación de lo que firma.
+func PackBase() (pack.Base, error) {
+	pbs, err := playbook.Load(playbooks.FS)
+	if err != nil {
+		return pack.Base{}, err
+	}
+	return packBase(pbs)
+}
+
+func packBase(pbs []playbook.Playbook) (base pack.Base, err error) {
+	for _, p := range pbs {
+		base.PlaybookIDs = append(base.PlaybookIDs, p.ID)
+	}
+	// Lo movido a oom/ios-xe sigue reservado para los paquetes que no son oficiales, esté o no instalado el oficial.
+	for _, id := range playbooks.MovedToIOSXE {
+		base.ReservedPlaybooks = append(base.ReservedPlaybooks, id)
+		base.ReservedScripts = append(base.ReservedScripts, "lib-"+strings.TrimPrefix(id, "ios-xe/"))
+	}
+	base.ScriptIDs, base.ScriptNames, base.ScriptNamesEN, err = scriptsvc.BaseLibrary()
+	return base, err
+}
+
 // openPacks carga el contenido base y el del usuario, abre el almacén de paquetes (revalidándolos y auditando los
 // que se omiten) y publica el primer catálogo.
 func (c *Core) openPacks() (err error) {
@@ -208,16 +231,8 @@ func (c *Core) openPacks() (err error) {
 	if err = c.loadUser(); err != nil {
 		return err
 	}
-	base := pack.Base{}
-	for _, p := range c.basePbs {
-		base.PlaybookIDs = append(base.PlaybookIDs, p.ID)
-	}
-	// Lo movido a oom/ios-xe sigue reservado para los paquetes que no son oficiales, esté o no instalado el oficial.
-	for _, id := range playbooks.MovedToIOSXE {
-		base.ReservedPlaybooks = append(base.ReservedPlaybooks, id)
-		base.ReservedScripts = append(base.ReservedScripts, "lib-"+strings.TrimPrefix(id, "ios-xe/"))
-	}
-	if base.ScriptIDs, base.ScriptNames, base.ScriptNamesEN, err = scriptsvc.BaseLibrary(); err != nil {
+	base, err := packBase(c.basePbs)
+	if err != nil {
 		return err
 	}
 	keys, coreVersion := c.o.PackKeys, c.o.CoreVersion
