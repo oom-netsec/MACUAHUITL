@@ -1,0 +1,27 @@
+# command: show version
+Cisco Nexus Operating System (NX-OS) Software
+TAC support: http://www.cisco.com/tac
+Documents: http://www.cisco.com/en/US/products/ps9372/tsd_products_support_series_home.html
+Copyright (c) 2002-2020, Cisco Systems, Inc. All rights reserved.
+The copyrights to certain works contained herein are owned by
+other third parties and are used and distributed under license.
+
+Software
+  BIOS:      version 2.12.0
+  kickstart: version 8.4(5)
+  system:    version 8.4(5)
+  BIOS compile time:       05/29/2013
+  kickstart image file is: bootflash:///n7000-s2-kickstart.8.4.5.bin
+  system image file is:    bootflash:///n7000-s2-dk9.8.4.5.bin
+
+Hardware
+  cisco Nexus7000 C7010 (10 Slot) Chassis ("Supervisor Module-2")
+  Intel(R) Xeon(R) CPU         with 32737484 kB of memory.
+  Processor Board ID JAF1XXXXXXX
+
+  Device name: N7K-LAB-01
+  bootflash:    2007040 kB
+Kernel uptime is 90 day(s), 4 hour(s), 2 minute(s), 33 second(s)
+
+plugin
+  Core Plugin, Ethernet Plugin

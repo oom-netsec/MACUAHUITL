@@ -112,8 +112,16 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 		}
 	}
 	for _, c := range []string{"terminal length 0", "terminal width 0"} {
-		if _, err := d.Run(ctx, c, 10*time.Second); err != nil {
+		out, err := d.Run(ctx, c, 10*time.Second)
+		if err != nil {
 			return err
+		}
+		// NX-OS no admite ancho 0 («% Invalid…» o «range is…»): su máximo es 511. Así las tablas no se parten
+		// aunque la plataforma del host sea fija y no se llame a Detect.
+		if c == "terminal width 0" && (out.Invalid || strings.Contains(out.Text, "range is")) {
+			if _, err := d.Run(ctx, "terminal width 511", 10*time.Second); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -287,6 +295,9 @@ func (d *driver) Hostname() string { return d.hostname }
 // wlc9800 busca «C9800» solo en la línea del software, no en el hostname ni en el resto de show version.
 var wlc9800 = regexp.MustCompile(`(?m)^Cisco IOS Software.*, C9800`)
 
+// nxos busca la cabecera de show version de NX-OS al inicio de línea; un IOS-XE que mencione «NX-OS» en texto libre no cuenta.
+var nxos = regexp.MustCompile(`(?m)^Cisco Nexus Operating System \(NX-OS\) Software`)
+
 func (d *driver) Detect(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, maxDetect)
 	defer cancel()
@@ -295,6 +306,8 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 		return "", err
 	}
 	switch {
+	case nxos.MatchString(out.Text):
+		return "nx-os", nil
 	case wlc9800.MatchString(out.Text) && strings.Contains(out.Text, "Cisco IOS XE Software"): // antes de la regla genérica
 		return "wlc-9800", nil
 	case strings.Contains(out.Text, "Cisco IOS XE Software"):

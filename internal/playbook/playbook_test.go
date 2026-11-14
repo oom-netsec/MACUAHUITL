@@ -284,3 +284,15 @@ func TestLoadAceptaFormatoLegitimoEnNombre(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// nx-os solo con nx-os: los genéricos de ios-xe y los de nx-os no se cruzan.
+func TestCompatibleNXOS(t *testing.T) {
+	for _, c := range []struct {
+		detected, pb string
+		want         bool
+	}{{"nx-os", "nx-os", true}, {"nx-os", "ios-xe", false}, {"nx-os", "ios", false}, {"ios-xe", "nx-os", false}, {"ios", "nx-os", false}, {"wlc-9800", "nx-os", false}} {
+		if Compatible(c.detected, c.pb) != c.want {
+			t.Errorf("Compatible(%q, %q) != %v", c.detected, c.pb, c.want)
+		}
+	}
+}
