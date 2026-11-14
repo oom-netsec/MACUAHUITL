@@ -339,3 +339,17 @@ func TestExitPegadoCierraElBloqueTecleado(t *testing.T) {
 		t.Errorf("%s", out)
 	}
 }
+
+// El resto del eco puede traer espacios (clave tipo 0 de varias palabras) y venir tras varios logs.
+func TestEnmascaraRestoDelEcoConEspaciosYVariosLogs(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("ciscoasa(config-aaa-server-host)#key 0 My Se"))
+	r.Output([]byte("%ASA-5-111008: uno\r\n"))
+	r.Output([]byte("%ASA-5-111009: dos\r\n"))
+	r.Output([]byte("cret phrase\r\nciscoasa(config-aaa-server-host)# "))
+	r.Close()
+	out := b.String()
+	if strings.Contains(out, "cret phrase") || !strings.Contains(out, "%ASA-5-111009: dos") {
+		t.Errorf("%s", out)
+	}
+}

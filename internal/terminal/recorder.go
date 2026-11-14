@@ -124,7 +124,9 @@ func (r *Recorder) outLine(l string) {
 		echo := r.stream.Prompted(l[len(pr):], r.lastBlk)
 		r.cont = r.lastBlk != "" && echo != l[len(pr):]
 		out = pr + echo
-	} else if r.cont && !strings.ContainsAny(l, " \t%") && l != "" {
+	} else if r.cont && (l == "" || strings.HasPrefix(l, "%")) {
+		out, keep = r.stream.Line(l) // un log o un error puede llegar antes del resto del eco
+	} else if r.cont {
 		// Resto de un eco partido por un log asíncrono: va con la clave que se enmascaró.
 		r.cont = false
 		out = "<MASKED:secret>"
