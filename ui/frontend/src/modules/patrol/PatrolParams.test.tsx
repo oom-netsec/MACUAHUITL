@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PatrolView } from "./PatrolView";
 import { fakeCore } from "../../lib/fake";
+import { scriptsChanged } from "../scripts/signal";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 const pbMac = { id: "ios-xe/rastreo-mac", platform: "ios-xe", name: "TAC · Rastreo MAC", commands: ["show mac address-table address {mac}"], params: [{ name: "mac", kind: "mac" as const }] };
@@ -73,4 +74,13 @@ test("un rechazo de un dato que el formulario no muestra queda en el aviso gener
   await userEvent.type(screen.getByLabelText(/\(mac\)/), "aa:bb:cc:dd:ee:ff");
   await create();
   expect(await screen.findByRole("alert")).toHaveTextContent("falta el dato otro");
+});
+
+// Patrol sigue montada (oculta) mientras se instala un paquete en Ajustes: el catálogo se vuelve a pedir.
+test("el catálogo de playbooks se vuelve a pedir cuando cambia el contenido (paquete instalado o importado)", async () => {
+  const core = await setup([pbPlain]);
+  await screen.findByRole("checkbox", { name: "STP" });
+  const before = vi.mocked(core.listPlaybooks).mock.calls.length;
+  act(() => scriptsChanged());
+  await waitFor(() => expect(vi.mocked(core.listPlaybooks).mock.calls.length).toBeGreaterThan(before));
 });

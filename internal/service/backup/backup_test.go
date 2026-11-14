@@ -483,3 +483,67 @@ func TestCollectedTextNuncaMezclaAvisos(t *testing.T) {
 		t.Errorf("pareados: %q", en)
 	}
 }
+
+// La salida parcial de un comando cortado (« · incompleto») no se guarda como respaldo y conserva la carpeta de Patrol.
+func TestSeccionIncompletaNoSeGuardaComoRespaldo(t *testing.T) {
+	s, sd, info, _ := nuevo(t, "completed")
+	lote, pj := trabajoPropio(t, s, sd, info, 3)
+	os.MkdirAll(filepath.Join(pj, dev), 0o755)
+	txt := "===== 2026-11-06T10:00:01Z · show running-config · incompleto =====\nhostname SW1\n"
+	os.WriteFile(filepath.Join(pj, dev, "r001_20261106-100000.txt"), []byte(txt), 0o600)
+	r, err := s.CollectBackups(context.Background(), &v1.CollectBackupsRequest{JobId: "j1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(t, s); strings.Contains(got, "-running") {
+		t.Errorf("se guardó una salida incompleta: %s", got)
+	}
+	if !strings.Contains(r.Report.Text, "incompleta") {
+		t.Errorf("sin aviso: %s", r.Report.Text)
+	}
+	if _, err := os.Stat(lote); err != nil {
+		t.Error("se borró la carpeta de Patrol")
+	}
+}
+
+// Quien llega segundo (vigilante o `mctl backup run`) recibe el resultado final, no un error de carpeta borrada.
+func TestCollectRepiteElResultadoFinalDeUnTrabajoPropio(t *testing.T) {
+	s, sd, info, _ := nuevo(t, "completed")
+	_, pj := trabajoPropio(t, s, sd, info, 3)
+	carpeta(t, pj, "hostname SW1\n")
+	ctx := context.Background()
+	r1, err := s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
+	if err != nil || !r1.Done || r1.Error != "" {
+		t.Fatalf("1: %+v %v", r1, err)
+	}
+	r2, err := s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
+	if err != nil || !r2.Done || r2.Error != "" || r2.Report.Text != r1.Report.Text {
+		t.Fatalf("2: %+v %v", r2, err)
+	}
+}
+
+// Una ronda incompleta no detiene el avance: no se relee en cada vuelta (Save recrearía lo que Prune borró),
+// y la carpeta de Patrol queda como única copia de lo incompleto.
+func TestRondaIncompletaNoFrenaElAvance(t *testing.T) {
+	s, sd, info, _ := nuevo(t, "running")
+	lote, pj := trabajoPropio(t, s, sd, info, 3)
+	os.MkdirAll(filepath.Join(pj, dev), 0o755)
+	r1 := filepath.Join(pj, dev, "r001_20261106-100000.txt")
+	os.WriteFile(r1, []byte("===== 2026-11-06T10:00:01Z · show running-config · incompleto =====\nhostname SW1\n"), 0o600)
+	ctx := context.Background()
+	if _, err := s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.jobs["j1"].done) != 1 {
+		t.Fatalf("la ronda incompleta se volvería a leer: done=%v", s.jobs["j1"].done)
+	}
+	info.State = "completed"
+	os.WriteFile(filepath.Join(pj, dev, "r002_20261106-101000.txt"), []byte("===== 2026-11-06T10:10:01Z · show running-config =====\nhostname SW1\n"), 0o600)
+	r, err := s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
+	if err != nil || strings.Count(ids(t, s), "-running") != 1 || !strings.Contains(r.Report.Text, "1 respaldo(s) guardado(s)") {
+		t.Fatalf("%v %s", err, r.GetReport().GetText())
+	}
+	if _, err := os.Stat(lote); err != nil {
+		t.Error("se borró la carpeta de Patrol con una ronda incompleta")
+	}
+}

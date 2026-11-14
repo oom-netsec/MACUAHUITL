@@ -32,7 +32,9 @@ type Section struct {
 	Invalid bool
 	// Truncated: el tope por salida cortó el texto; no es la salida completa.
 	Truncated bool
-	Text      string
+	// Incomplete: el comando falló o se cortó y Text es solo lo que alcanzó a llegar.
+	Incomplete bool
+	Text       string
 }
 
 // Bundle es el paquete de salida de un trabajo de Patrol ya leído.
@@ -97,7 +99,7 @@ func SetLimits(section, total int64) (restore func()) {
 
 // Cabeceras que escribe patrol.Writer (internal/patrol/output.go).
 var (
-	headerRe    = regexp.MustCompile(`^===== (?:ronda (\d+) · )?(\S+) · (.*?)( · comando inválido)? =====$`)
+	headerRe    = regexp.MustCompile(`^===== (?:ronda (\d+) · )?(\S+) · (.*?)( · comando inválido)?( · incompleto)? =====$`)
 	roundFileRe = regexp.MustCompile(`^r(\d+)_\d{8}-\d{6}\.txt$`)
 )
 
@@ -282,7 +284,7 @@ func (b *Bundle) parseFile(rel string, r io.Reader) (complete bool) {
 				if m[1] != "" {
 					round, _ = strconv.Atoi(m[1])
 				}
-				cur = &Section{Device: dev, Round: round, At: at.UTC(), Command: m[3], Invalid: m[4] != ""}
+				cur = &Section{Device: dev, Round: round, At: at.UTC(), Command: m[3], Invalid: m[4] != "", Incomplete: m[5] != ""}
 				continue
 			}
 		}

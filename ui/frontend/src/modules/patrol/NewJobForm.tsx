@@ -8,6 +8,7 @@ import { outputsErrorText } from "../../lib/outputsError";
 import type { Key } from "../../lib/i18n/es";
 import type { PlaybookInfo } from "./api";
 import { PlaybookPicker } from "./PlaybookPicker";
+import { useScriptsVersion } from "../scripts/signal";
 
 // Acepta IPs, nombres y CIDR separados por comas, espacios o saltos de línea; sin duplicados.
 export function parseTargets(text: string): string[] {
@@ -18,6 +19,7 @@ export function parseTargets(text: string): string[] {
 export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: Credential[]; onCreated: (id: string) => void }) {
   const t = useT();
   const coreLang = useCoreLang();
+  const contentVer = useScriptsVersion(); // instalar, quitar o importar un paquete cambia el catálogo de playbooks
   const [name, setName] = useState("");
   const [targets, setTargets] = useState("");
   const [cred, setCred] = useState("");
@@ -33,7 +35,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
     setPbErr(false);
     core.listPlaybooks().then((c) => { if (!off) setCatalog(c); }).catch(() => { if (!off) setPbErr(true); });
     return () => { off = true; };
-  }, [core, pbTry, coreLang]);
+  }, [core, pbTry, coreLang, contentVer]);
   const [vals, setVals] = useState<Record<string, string>>({});
   const [paramErr, setParamErr] = useState<Record<string, string>>({});
   // Un campo por nombre, aunque dos playbooks elegidos lo pidan.

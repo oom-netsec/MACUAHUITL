@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
+	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
 // Device es un equipo recolectado por Patrol: sus salidas por comando.
@@ -23,7 +24,7 @@ type Device struct {
 	Outputs                     map[string]string // comando tal como se ejecutó → texto
 }
 
-var header = regexp.MustCompile(`^===== (?:ronda \d+ · )?\S+ · (.+?)(?: · comando inválido)? =====$`)
+var header = regexp.MustCompile(`^===== (?:ronda \d+ · )?\S+ · (.+?)( · comando inválido)?( · incompleto)? =====$`)
 
 // LoadPatrolDir lee la carpeta de salida de un trabajo (un subdirectorio
 // <equipo>_<IP> por equipo con archivos .txt). Si un comando aparece en varias
@@ -41,9 +42,7 @@ func LoadPatrolDir(dir string) ([]Device, error) {
 		files, _ := filepath.Glob(filepath.Join(dir, e.Name(), "*.txt"))
 		sort.Strings(files)
 		d := Device{Name: e.Name(), Outputs: map[string]string{}}
-		if i := strings.LastIndexByte(e.Name(), '_'); i > 0 {
-			d.Name, d.IP = e.Name()[:i], e.Name()[i+1:]
-		}
+		d.Name, d.IP = patrol.SplitDeviceDir(e.Name())
 		for _, f := range files {
 			b, err := os.ReadFile(f)
 			if err != nil {
@@ -61,6 +60,9 @@ func LoadPatrolDir(dir string) ([]Device, error) {
 				if m := header.FindStringSubmatch(line); m != nil {
 					flush()
 					cmd = strings.ToLower(strings.TrimSpace(m[1]))
+					if m[3] != "" { // salida parcial: no se toma ni pisa la completa de otra ronda
+						cmd = ""
+					}
 					continue
 				}
 				sb.WriteString(line + "\n")

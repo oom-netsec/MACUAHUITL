@@ -607,3 +607,23 @@ func TestInstallWithPrepare(t *testing.T) {
 		t.Fatalf("%v visto=%v", err, visto)
 	}
 }
+
+// Si falla el fsync de la carpeta tras el rename, el paquete ya está en disco: se publica y el fallo es un aviso.
+func TestFalloDelFsyncFinalPublicaYAvisa(t *testing.T) {
+	pub, priv := testKey(t)
+	s, _ := openStore(t, t.TempDir(), pub, Base{})
+	old := syncDir
+	syncDir = func(d string) error {
+		if !strings.Contains(d, ".tmp-") {
+			return errors.New("fsync simulado")
+		}
+		return old(d)
+	}
+	defer func() { syncDir = old }()
+	changes := 0
+	s.OnChange = func() { changes++ }
+	res, err := s.Install(signedZip(t, priv, nil), false)
+	if err != nil || res.SyncWarning == nil || changes != 1 || len(s.Snapshot().Packs) != 1 {
+		t.Fatalf("res=%+v err=%v changes=%d", res, err, changes)
+	}
+}

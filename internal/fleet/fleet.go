@@ -21,6 +21,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
+	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
 // Evidence es la salida de un comando tal como la guardó Patrol.
@@ -82,14 +83,12 @@ var (
 	maxDevs          = 2000      // equipos
 )
 
-var headerRe = regexp.MustCompile(`^===== (?:ronda \d+ · )?(\S+) · (.*?)( · comando inválido)? =====$`)
+var headerRe = regexp.MustCompile(`^===== (?:ronda \d+ · )?(\S+) · (.*?)( · comando inválido)?( · incompleto)? =====$`)
 
 // NewDev arma un equipo en memoria (pruebas).
 func NewDev(key string, ev map[string]Evidence) *Dev {
 	d := &Dev{Key: key, Name: key, ev: map[string]Evidence{}}
-	if i := strings.LastIndexByte(key, '_'); i > 0 {
-		d.Name, d.IP = key[:i], key[i+1:]
-	}
+	d.Name, d.IP = patrol.SplitDeviceDir(key)
 	for c, e := range ev {
 		d.ev[strings.ToLower(strings.TrimSpace(c))] = e
 	}
@@ -138,9 +137,9 @@ func (d *Dev) match(full string, filtered bool) (Evidence, bool) {
 	return best, found
 }
 
-// hostDirRe: carpeta de equipo de Patrol, <host>_<ip>. Cualquier otra carpeta
+// hostDirRe: carpeta de equipo de Patrol, <host>_<ip>[_<puerto>]. Cualquier otra carpeta
 // (outputs/diag, un trabajo) no es un equipo.
-var hostDirRe = regexp.MustCompile(`^.+_\d{1,3}(?:\.\d{1,3}){3}$`)
+var hostDirRe = regexp.MustCompile(`^.+_\d{1,3}(?:\.\d{1,3}){3}(?:_\d{1,5})?$`)
 
 // Load lee dir: o es un trabajo de Patrol (subcarpetas <equipo>_<ip>) o una
 // carpeta con varios trabajos (outputs/). Por equipo y comando gana la hora más reciente.
@@ -329,6 +328,9 @@ func (f *Fleet) parse(w *ws, devs map[string]*Dev, key, job string, r io.Reader)
 		if m := headerRe.FindStringSubmatch(ln); m != nil && !cut {
 			if at, err := time.Parse(time.RFC3339, m[1]); err == nil {
 				flush()
+				if m[4] != "" { // salida parcial de un comando cortado: no desplaza una evidencia completa anterior
+					continue
+				}
 				if d = devs[key]; d == nil {
 					if len(devs) >= maxDevs {
 						f.lim.devs = true

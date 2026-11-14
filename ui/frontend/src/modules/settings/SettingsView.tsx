@@ -8,6 +8,7 @@ import { PaletteSwatch, paletteName } from "../../components/Terminal";
 import { ThemeSwitch } from "../../components/ThemeSwitch";
 import { PALETTES } from "../../lib/termHighlight";
 import { setTermPrefs, useTermPrefs } from "../../lib/termPrefs";
+import { PacksSection } from "../packs/PacksSection";
 import "./settings.css";
 
 // Ajustes: reúne las preferencias que ya existían (tema, idioma, terminal) con las mismas tiendas de siempre.
@@ -43,6 +44,9 @@ export function SettingsView({ core }: { core: CoreAPI }) {
       </Section>
       <Section title={t("settings.data")} description={t("settings.data.desc")}>
         <DataSection core={core} />
+      </Section>
+      <Section title={t("settings.packs")} description={t("settings.packs.desc")}>
+        <PacksSection core={core} />
       </Section>
     </Page>
   );

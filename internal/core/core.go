@@ -68,6 +68,7 @@ type job struct {
 	results   map[int][]patrol.DeviceResult
 	release   func()
 	paused    bool
+	cancelReq bool       // CancelJob llegó con el trabajo en "arming": ArmJob lo cancela antes de entregarlo al planificador
 	rounds    int        // rondas terminadas, para el manifest
 	persistMu sync.Mutex // serializa foto y escritura de persistJob: la última foto es la última en llegar a la base
 }

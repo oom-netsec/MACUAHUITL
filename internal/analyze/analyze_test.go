@@ -549,3 +549,20 @@ func TestLoadRestauraLineasEscapadasYNoCreaSecciones(t *testing.T) {
 		t.Errorf("paquete viejo: %d secciones", len(b.Sections))
 	}
 }
+
+func TestCabeceraIncompletaSeLee(t *testing.T) {
+	dir := t.TempDir()
+	d := filepath.Join(dir, "SW1_192.0.2.1")
+	os.MkdirAll(d, 0o755)
+	txt := "===== 2026-11-06T10:00:00Z · show run · incompleto =====\nhostname SW\n" +
+		"===== 2026-11-06T10:00:01Z · show clock · comando inválido · incompleto =====\nx\n"
+	os.WriteFile(filepath.Join(d, "r001_20261106-100000.txt"), []byte(txt), 0o600)
+	b, err := Load(dir)
+	if err != nil || len(b.Sections) != 2 {
+		t.Fatalf("%v %+v", err, b)
+	}
+	s0, s1 := b.Sections[0], b.Sections[1]
+	if !s0.Incomplete || s0.Command != "show run" || s0.Invalid || !s1.Incomplete || !s1.Invalid || s1.Command != "show clock" {
+		t.Fatalf("%+v", b.Sections)
+	}
+}

@@ -122,6 +122,10 @@ func seriesFor(b *Bundle, dev string, rule *Rule, upTo int, warn func(Warning)) 
 			warn(Warn(dev, s.Round, s.Command, "analyze.warn.rejected"))
 			continue
 		}
+		if s.Incomplete {
+			warn(Warn(dev, s.Round, s.Command, "analyze.warn.incomplete"))
+			continue
+		}
 		out = append(out, s)
 		last = s.Round
 	}

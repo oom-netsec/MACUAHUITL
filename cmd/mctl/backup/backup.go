@@ -129,6 +129,9 @@ func collect(c *cli.Env, args []string) error {
 	if !r.Done {
 		fmt.Fprintf(c.Out, "el trabajo sigue en estado %s; vuelve a ejecutarlo al terminar\n", r.State)
 	}
+	if r.Done && r.Error != "" {
+		return fmt.Errorf("el trabajo %s terminó con error: %s", fs.Arg(0), r.Error)
+	}
 	return nil
 }
 
