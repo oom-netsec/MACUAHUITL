@@ -179,10 +179,14 @@ func (b *Bridge) SecPkiExport(d ExportDTO) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if _, err := f.Write(r.Data); err != nil {
-			f.Close()
+		_, err = f.Write(r.Data)
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			os.Remove(d.Path) // con O_EXCL, un parcial impediría reintentar con la misma ruta
 			return "", err
 		}
-		return d.Path, f.Close()
+		return d.Path, nil
 	})
 }
