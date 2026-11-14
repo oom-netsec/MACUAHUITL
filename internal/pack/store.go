@@ -330,46 +330,60 @@ type Result struct {
 	SyncWarning error
 	// CommitErr: el paquete quedó instalado, pero falló el paso commit de InstallWith (lo oculto no se guardó).
 	CommitErr error
+	// Displaced: IDs de paquetes de terceros que chocaban con este oficial; salen de la foto (siguen en disco y Open los
+	// omite igual) para que un tercero no pueda vetar contenido firmado.
+	Displaced []string
 }
 
 // check hace los pasos 2 a 7 del ADR sobre bytes ya leídos y devuelve el paquete y el instalado que reemplazaría
 // (nil si es nuevo). Con el error, el paquete viaja igual si ya se pudo leer. Install lo llama con s.mu; Inspect sin él.
-func (s *Store) check(data []byte, allowUnsigned bool) (p, old *Pack, cur *Snapshot, err error) {
+func (s *Store) check(data []byte, allowUnsigned bool) (p, old *Pack, cur *Snapshot, displaced []string, err error) {
 	if p, err = Verify(data, s.core, s.keys); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if !p.Official && !allowUnsigned {
-		return p, nil, nil, rej("unsigned")
+		return p, nil, nil, nil, rej("unsigned")
 	}
 	if err = s.checkReserved(p); err != nil {
-		return p, nil, nil, err
+		return p, nil, nil, nil, err
 	}
 	cur = s.snap.Load()
 	if old = cur.Find(p.ID); old != nil {
 		switch {
 		case old.Official && !p.Official:
-			return p, nil, nil, rej("official_replace", "id", p.ID)
+			return p, nil, nil, nil, rej("official_replace", "id", p.ID)
 		case CompareVersions(p.Version, old.Version) <= 0:
-			return p, nil, nil, rej("version", "id", p.ID, "installed", old.Version, "version", p.Version)
+			return p, nil, nil, nil, rej("version", "id", p.ID, "installed", old.Version, "version", p.Version)
 		}
 	}
-	if err = s.collides(p, cur.Packs); err != nil {
-		return p, nil, nil, err
+	if p.Official { // lo oficial gana: los de terceros que chocan con él se apartan, igual que en Open
+		var keep []*Pack
+		for _, o := range cur.Packs {
+			if !o.Official && o.ID != p.ID && s.collides(p, []*Pack{o}) != nil {
+				displaced = append(displaced, o.ID)
+				continue
+			}
+			keep = append(keep, o)
+		}
+		cur = &Snapshot{Packs: keep}
 	}
-	return p, old, cur, nil
+	if err = s.collides(p, cur.Packs); err != nil {
+		return p, nil, nil, nil, err
+	}
+	return p, old, cur, displaced, nil
 }
 
 // Inspect valida el paquete igual que Install (mismos pasos y mismos errores) sin instalar nada: no toca el disco
 // ni la foto vigente. Devuelve el paquete y la versión que reemplazaría.
 func (s *Store) Inspect(data []byte, allowUnsigned bool) (*Result, error) { // sin s.mu: la foto es atómica y no escribe
-	p, old, _, err := s.check(data, allowUnsigned)
+	p, old, _, displaced, err := s.check(data, allowUnsigned)
 	if err != nil {
 		if p == nil {
 			return nil, err
 		}
 		return &Result{Pack: p}, err
 	}
-	res := &Result{Pack: p}
+	res := &Result{Pack: p, Displaced: displaced}
 	if old != nil {
 		res.Replaced = old.Version
 	}
@@ -390,7 +404,7 @@ func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
 // ("" si es nuevo).
 func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) error, commit func(p *Pack) error) (*Result, error) {
 	s.mu.Lock()
-	p, old, cur, err := s.check(data, allowUnsigned)
+	p, old, cur, displaced, err := s.check(data, allowUnsigned)
 	if err != nil {
 		s.mu.Unlock()
 		if p == nil {
@@ -428,7 +442,7 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 		s.OnChange()
 	}
 	s.mu.Unlock()
-	res := &Result{Pack: p, SyncWarning: syncWarn, CommitErr: commitErr}
+	res := &Result{Pack: p, SyncWarning: syncWarn, CommitErr: commitErr, Displaced: displaced}
 	if old != nil {
 		res.Replaced = old.Version
 	}

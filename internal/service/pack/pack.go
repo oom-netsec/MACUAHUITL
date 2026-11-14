@@ -132,6 +132,9 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		hide = nil // no quedó guardado: no se audita como oculto
 	}
 	s.d.Audit("pack.install", p.ID, detail)
+	for _, id := range res.Displaced {
+		s.d.Audit("pack.conflict", id, fmt.Sprintf("id=%s displaced_by=%s reason=collision", id, p.ID))
+	}
 	if len(hide) > 0 {
 		s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=0 at=install", p.ID, len(hide)))
 	}

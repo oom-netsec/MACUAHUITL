@@ -687,3 +687,58 @@ func TestChocaElNombreVisibleEnInglesSinNameEn(t *testing.T) {
 		t.Fatalf("%v; quería collision", err)
 	}
 }
+
+// Lo oficial gana: un tercero ya instalado que ocupa un nombre (es o en) no impide instalar ni actualizar al oficial;
+// el tercero sale de la foto y se reporta. Lo inverso y entre terceros se rechaza como antes.
+func TestOficialGanaAlTerceroQueOcupaSuNombre(t *testing.T) {
+	pub, priv := testKey(t)
+	tercero := func(es, en string) []byte {
+		f := thirdParty()
+		setPB(f, strings.NewReplacer(`name: "L2 · STP"`, `name: "`+es+`"`, `name_en: "L2 · STP"`, `name_en: "`+en+`"`).Replace(string(f["playbooks/acme-stp.yaml"])))
+		return mustZip(t, f)
+	}
+	for _, c := range []struct{ nom, es, en string }{{"en", "Acme · Árbol", "L2 · STP"}, {"es", "L2 · STP", "Acme · Tree"}} {
+		t.Run(c.nom, func(t *testing.T) {
+			dir := t.TempDir()
+			s, _ := openStore(t, dir, pub, Base{})
+			if _, err := s.Install(tercero(c.es, c.en), true); err != nil {
+				t.Fatal(err)
+			}
+			// el tercero no puede instalarse sobre el oficial, pero antes de que exista el oficial sí
+			res, err := s.Install(signedZip(t, priv, nil), false)
+			if err != nil || len(res.Displaced) != 1 || res.Displaced[0] != "acme/demo" {
+				t.Fatalf("err=%v res=%+v", err, res)
+			}
+			if s.Snapshot().Find("oom/demo") == nil || s.Snapshot().Find("acme/demo") != nil {
+				t.Fatal("el oficial debe quedar y el tercero salir de la foto")
+			}
+			// actualización del oficial ya instalado
+			if _, err := s.Install(signedZip(t, priv, withVersion("1.1.0")), false); err != nil {
+				t.Fatalf("actualización: %v", err)
+			}
+			// inverso: el tercero choca con el oficial y se rechaza
+			if _, err := s.Install(tercero(c.es, c.en), true); Reason(err) != "collision" {
+				t.Fatalf("inverso: %v", err)
+			}
+			// y al reabrir, el de disco sigue omitido
+			if s2, rej := openStore(t, dir, pub, Base{}); len(rej) != 1 || rej[0].ID != "acme/demo" || s2.Snapshot().Find("oom/demo") == nil {
+				t.Fatalf("%+v", rej)
+			}
+		})
+	}
+}
+
+// Dos de terceros que chocan entre sí siguen rechazándose.
+func TestTercerosQueChocanSiguenRechazados(t *testing.T) {
+	pub, _ := testKey(t)
+	s, _ := openStore(t, t.TempDir(), pub, Base{})
+	if _, err := s.Install(mustZip(t, thirdParty()), true); err != nil {
+		t.Fatal(err)
+	}
+	f := thirdParty()
+	f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "oom/demo", "acme/otro", 1))
+	setPB(f, strings.Replace(goodPlaybook, "oom-stp", "acme-otro", 1))
+	if _, err := s.Install(mustZip(t, f), true); Reason(err) != "collision" {
+		t.Fatalf("%v", err)
+	}
+}

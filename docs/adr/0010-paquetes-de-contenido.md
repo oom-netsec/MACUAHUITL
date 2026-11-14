@@ -72,6 +72,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
 7. **Choques.**
    - Se rechaza la instalación si un ID de playbook o de script, o el nombre de un script (`NameKey`), choca con el contenido base, con otro paquete o con los scripts derivados de playbooks.
    - La única excepción es una versión más nueva del mismo paquete, que reemplaza a la anterior. Un paquete oficial instalado solo lo reemplaza otro con firma oficial.
+   - Lo oficial gana: si el que se instala es oficial y choca con uno de terceros ya instalado, el oficial se instala y el de terceros sale del catálogo (queda en disco; al arrancar se omite igual) con la auditoría `pack.conflict`. Un tercero que choca con un oficial se rechaza.
    - Para instalar una versión igual o más vieja que la instalada, primero se quita la instalada.
 8. **Extracción atómica.**
    - Se extrae a `<datos>/packs/.tmp-*`, conservando `SIGNATURE` y `manifest.yaml`, y el instalador escribe ahí el índice calculado como `INDEX`.
