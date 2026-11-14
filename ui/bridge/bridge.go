@@ -153,24 +153,30 @@ func (b *Bridge) run(ctx context.Context) {
 	}
 }
 
-// syncLanguage manda al núcleo el idioma elegido mientras estaba caído.
+// syncLanguage manda al núcleo el idioma elegido mientras estaba caído. Si la UI eligió otro mientras se mandaba,
+// vuelve a mandar el vigente: el núcleo no se queda con el viejo.
 func (b *Bridge) syncLanguage(c *ipc.ClientConn) {
 	b.lang.mu.Lock()
 	v := b.lang.pending
 	b.lang.mu.Unlock()
-	if v == "" {
-		return
+	for v != "" {
+		ctx, cancel := context.WithTimeout(b.ctx, 3*time.Second)
+		_, err := v1.NewPrefsServiceClient(c).SetPreference(ctx, &v1.SetPreferenceRequest{Key: langPref, Value: v})
+		cancel()
+		if err != nil {
+			return
+		}
+		b.lang.mu.Lock()
+		if b.lang.pending == v {
+			b.lang.pending = ""
+		}
+		cur := b.lang.value
+		if !b.lang.loaded || cur == v {
+			cur = ""
+		}
+		b.lang.mu.Unlock()
+		v = cur
 	}
-	ctx, cancel := context.WithTimeout(b.ctx, 3*time.Second)
-	defer cancel()
-	if _, err := v1.NewPrefsServiceClient(c).SetPreference(ctx, &v1.SetPreferenceRequest{Key: langPref, Value: v}); err != nil {
-		return
-	}
-	b.lang.mu.Lock()
-	if b.lang.pending == v {
-		b.lang.pending = ""
-	}
-	b.lang.mu.Unlock()
 }
 
 func call[T any](b *Bridge, f func(context.Context, *ipc.ClientConn) (T, error)) (T, error) {
