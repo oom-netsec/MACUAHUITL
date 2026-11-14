@@ -20,7 +20,7 @@ func sections(b *analyze.Bundle, device string, cmds ...string) []analyze.Sectio
 	var out []analyze.Section
 	for _, sec := range b.Sections {
 		c := strings.ToLower(strings.Join(strings.Fields(sec.Command), " "))
-		if sec.Invalid || !contains(cmds, c) {
+		if sec.Invalid || sec.Incomplete || !contains(cmds, c) {
 			continue
 		}
 		if d := strings.ToLower(device); d != "" && !strings.Contains(strings.ToLower(sec.Device), d) {

@@ -35,6 +35,7 @@ func init() {
 		"analyze.warn.format_no_ifaces": e("formato inesperado: sin datos para esta regla (ninguna interfaz reconocida)", "unexpected format: no data for this rule (no interface recognized)"),
 		"analyze.warn.format_no_nbrs":   e("formato inesperado: sin datos para esta regla (falta la tabla de vecinos)", "unexpected format: no data for this rule (the neighbor table is missing)"),
 		"analyze.warn.format_no_groups": e("formato inesperado: sin datos para esta regla (falta la tabla de grupos)", "unexpected format: no data for this rule (the group table is missing)"),
+		"analyze.warn.incomplete":       e("la salida del comando quedó incompleta (se cortó o falló); sin datos para las reglas que lo usan", "the command output is incomplete (it was cut off or failed); no data for the rules that use it"),
 		"analyze.warn.rejected":         e("el equipo rechazó el comando; sin datos para las reglas que lo usan", "the device rejected the command; no data for the rules that use it"),
 		"analyze.warn.system":           e("{error}", "{error}", "error"),
 		"analyze.warn.file_error":       e("{file}: {error}", "{file}: {error}", "file", "error"),

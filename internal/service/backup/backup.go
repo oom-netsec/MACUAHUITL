@@ -47,6 +47,7 @@ type tracked struct {
 	done        map[string]int64 // archivos de ronda ya importados completos (equipo/archivo → tamaño)
 	warned      map[string]bool  // avisos ya auditados
 	saved       []string         // respaldos que guardó el trabajo en todas las llamadas: el informe final los cuenta todos
+	incomplete  bool             // alguna salida llegó incompleta: no se relee, pero la carpeta de Patrol se conserva
 }
 
 type backupSvc struct {
@@ -58,7 +59,11 @@ type backupSvc struct {
 	wg     sync.WaitGroup
 	mu     sync.Mutex // serializa collect: el vigilante y Collect no importan a la vez
 	jobs   map[string]*tracked
+	final  map[string]collected // resultado final de los últimos trabajos propios: quien llega segundo lo recibe igual
+	order  []string
 }
+
+const maxFinal = 32
 
 func newSvc(d service.Deps) *backupSvc {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -238,9 +243,30 @@ func masked(t *tracked, dir string) bool {
 	return m.Masked
 }
 
+// collect serializa collectLocked; el primero en ver el estado terminal de un trabajo propio deja su
+// resultado en final, para que el otro (vigilante o CollectBackups) no responda con la carpeta ya borrada.
 func (s *backupSvc) collect(job string, keep int) (collected, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if f, ok := s.final[job]; ok {
+		return f, nil
+	}
+	own := s.jobs[job] != nil
+	res, err := s.collectLocked(job, keep)
+	if err == nil && res.done && own {
+		if s.final == nil {
+			s.final = map[string]collected{}
+		}
+		s.final[job] = res
+		if s.order = append(s.order, job); len(s.order) > maxFinal {
+			delete(s.final, s.order[0])
+			s.order = s.order[1:]
+		}
+	}
+	return res, err
+}
+
+func (s *backupSvc) collectLocked(job string, keep int) (collected, error) {
 	j, err := s.d.Job(job)
 	if err != nil {
 		return collected{}, err
@@ -294,6 +320,11 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 			if kind == backup.Startup {
 				res.warn(i18n.Tx("backup.warn.no_startup", "device", sec.Device))
 			}
+		case sec.Incomplete:
+			res.warn(i18n.Tx("backup.warn.incomplete", "device", sec.Device, "cmd", sec.Command))
+			if tr != nil {
+				tr.incomplete = true
+			}
 		case !tr.inWindow(sec.At):
 			// Solo puede venir de texto del equipo que imita una cabecera: no es un respaldo.
 			res.warn(i18n.Tx("backup.warn.outside", "device", sec.Device, "cmd", sec.Command, "at", sec.At.Format(time.RFC3339)))
@@ -312,7 +343,7 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 	}
 	serials := map[[2]string]string{} // (equipo, ronda) -> número de serie de show version
 	for _, sec := range b.Sections {
-		if !sec.Invalid && capture.Key(sec.Command) == "show version" {
+		if !sec.Invalid && !sec.Incomplete && capture.Key(sec.Command) == "show version" {
 			if v, _ := iosxe.ParseVersion(sec.Text); v.Serial != "" {
 				serials[[2]string{sec.Device, strconv.Itoa(sec.Round)}] = v.Serial
 			}
@@ -377,7 +408,7 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 	if terminal {
 		res.errMsg = j.FinishErr
 		// Si algo no se pudo guardar o leer entero, la carpeta de Patrol queda como única copia.
-		clean := !failed && j.FinishErr == ""
+		clean := !failed && (tr == nil || !tr.incomplete) && j.FinishErr == ""
 		if !clean && tr != nil {
 			s.d.Audit("backup.kept", job, "Patrol folder kept: "+tr.lote)
 		}

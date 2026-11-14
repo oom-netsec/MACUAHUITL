@@ -28,7 +28,7 @@ var prompt = regexp.MustCompile(`^[A-Za-z0-9][\w.\-]*#\s*(\S.*)?$`)
 
 // Split parte texto en salidas por comando. Entiende las cabeceras de Patrol
 // ("===== hora · comando =====") y, si no hay, los prompts de una sesión pegada ("SW1#show version").
-// Las salidas de comandos inválidos se descartan.
+// Las salidas de comandos inválidos o incompletas se descartan.
 func Split(text string) map[string]string {
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	out := map[string]string{}
@@ -52,7 +52,9 @@ func Split(text string) map[string]string {
 			cur, invalid = "", false
 			if len(parts) >= 2 {
 				cur = Key(parts[1])
-				invalid = len(parts) > 2 && strings.Contains(parts[2], "inválido")
+				for _, p := range parts[2:] {
+					invalid = invalid || strings.Contains(p, "inválido") || p == "incompleto"
+				}
 			}
 			continue
 		}
@@ -103,7 +105,7 @@ func ReadDir(dir string) ([]Device, error) {
 	last := map[string]patrol.DeviceResult{}
 	var order []string
 	for _, d := range m.Devices {
-		a := d.Target.Address
+		a := patrol.Hostport(d.Target) // host:puerto: la misma dirección con otro puerto es otro equipo
 		if _, seen := last[a]; !seen {
 			order = append(order, a)
 		}
@@ -111,12 +113,23 @@ func ReadDir(dir string) ([]Device, error) {
 			last[a] = d
 		}
 	}
+	owned := map[string]bool{} // carpetas que ya son de un equipo del manifest: el reintento sin puerto no las toma
+	for _, d := range m.Devices {
+		owned[patrol.DeviceDirOf(d.Hostname, d.Target)] = true
+	}
 	var out []Device
 	for _, a := range order {
 		d := last[a]
-		dev := Device{Address: a, Hostname: d.Hostname, State: d.State, Detail: d.Detail, Outputs: map[string]string{}}
+		addr := d.Target.Address
+		if patrol.EffectivePort(d.Target.Port) != 22 {
+			addr = a // host:puerto, para que Compare no mezcle dos equipos con la misma dirección
+		}
+		dev := Device{Address: addr, Hostname: d.Hostname, State: d.State, Detail: d.Detail, Outputs: map[string]string{}}
 		if d.Hostname != "" {
-			files, _ := filepath.Glob(filepath.Join(dir, patrol.DeviceDir(d.Hostname, a), "*.txt"))
+			files, _ := filepath.Glob(filepath.Join(dir, patrol.DeviceDirOf(d.Hostname, d.Target), "*.txt"))
+			if old := patrol.DeviceDir(d.Hostname, d.Target.Address); len(files) == 0 && !owned[old] { // evidencia vieja: la carpeta no llevaba el puerto
+				files, _ = filepath.Glob(filepath.Join(dir, old, "*.txt"))
+			}
 			sort.Strings(files)
 			for _, f := range files {
 				b, err := readLimited(f)

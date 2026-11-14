@@ -64,7 +64,7 @@ func BundleEvents(b *Bundle, findings []Finding) ([]Event, []Warning) {
 			first[k] = s.At
 		}
 		count[k]++
-		if !isLogging(s.Command) || s.Invalid {
+		if !isLogging(s.Command) || s.Invalid || s.Incomplete {
 			continue
 		}
 		uptime := 0
@@ -108,7 +108,7 @@ func BundleEvents(b *Bundle, findings []Finding) ([]Event, []Warning) {
 func ClockOffsets(b *Bundle) map[string]map[int]time.Duration {
 	out := map[string]map[int]time.Duration{}
 	for _, s := range b.Sections {
-		if normCmd(s.Command) != "show clock detail" || s.Invalid {
+		if normCmd(s.Command) != "show clock detail" || s.Invalid || s.Incomplete {
 			continue
 		}
 		if local, ok := iosxe.ParseClock(s.Text); ok {

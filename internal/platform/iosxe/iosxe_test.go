@@ -299,3 +299,16 @@ func TestDetectHostnameC9800NoEsWLC(t *testing.T) {
 		t.Fatalf("Detect = %q, %v", p, err)
 	}
 }
+
+// Al cancelarse o vencer el contexto, el error conserva su causa para que Patrol distinga el fin de la ventana.
+func TestCancelarComandoConservaLaCausa(t *testing.T) {
+	d, err := open(t, simulator.Config{StreamCommand: "show sin fin", StreamLines: 1000, SlowDelay: 20 * time.Millisecond}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(200*time.Millisecond, cancel)
+	if _, err := d.Run(ctx, "show sin fin", 10*time.Second); !errors.Is(err, platform.ErrPromptTimeout) || !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v", err)
+	}
+}

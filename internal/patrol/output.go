@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,7 +24,10 @@ var fakeHeader = regexp.MustCompile(`(?m)^(\\*===== )`)
 // secciones al leer el paquete; analyze.Load quita una barra. Es reversible.
 func escapeHeaders(text string) string { return fakeHeader.ReplaceAllString(text, `\${1}`) }
 
-type Device struct{ Host, IP, Platform string }
+type Device struct {
+	Host, IP, Platform string
+	Port               uint16 // 0 = 22
+}
 
 // Writer escribe los outputs de un trabajo bajo <root>/<trabajo>_<AAAAMMDD-HHMMSS>/.
 type Writer struct {
@@ -82,7 +86,10 @@ func (w *Writer) Write(dev Device, round int, roundStart time.Time, out platform
 	if out.Invalid {
 		note = " · comando inválido"
 	}
-	devDir := DeviceDir(dev.Host, dev.IP)
+	if out.Incomplete {
+		note += " · incompleto" // salida parcial de un comando cortado o fallido; los lectores no la toman por completa
+	}
+	devDir := DeviceDirOf(dev.Host, Target{Address: dev.IP, Port: dev.Port})
 	var rel, header string
 	if w.split == SplitConsolidated {
 		rel = filepath.Join(devDir, dirName(dev.Host)+".txt")
@@ -117,6 +124,30 @@ func (w *Writer) Write(dev Device, round int, roundStart time.Time, out platform
 
 // DeviceDir es la carpeta de un equipo dentro del trabajo; capture la usa para leer la evidencia.
 func DeviceDir(host, ip string) string { return dirName(host + "_" + ip) }
+
+// DeviceDirOf es DeviceDir de un destino: el puerto entra en el nombre solo cuando no es 22 (así no cambian las
+// carpetas de siempre y dos equipos con la misma dirección y distinto puerto no se mezclan).
+func DeviceDirOf(host string, t Target) string {
+	if p := EffectivePort(t.Port); p != 22 {
+		return DeviceDir(host, t.Address+":"+strconv.Itoa(int(p)))
+	}
+	return DeviceDir(host, t.Address)
+}
+
+var dirWithPort = regexp.MustCompile(`^(.+)_(\d{1,3}(?:\.\d{1,3}){3})_\d{1,5}$`)
+
+// SplitDeviceDir saca equipo y dirección de la carpeta de un equipo (<equipo>_<dirección>, o con «_<puerto>»
+// al final cuando el puerto no es 22 y la dirección es IPv4); sin puerto corta en el último «_» como siempre.
+// La dirección sale sin el puerto.
+func SplitDeviceDir(name string) (host, ip string) {
+	if m := dirWithPort.FindStringSubmatch(name); m != nil {
+		return m[1], m[2]
+	}
+	if i := strings.LastIndexByte(name, '_'); i > 0 {
+		return name[:i], name[i+1:]
+	}
+	return name, ""
+}
 
 func sorted(m map[string]bool) []string {
 	out := make([]string, 0, len(m))

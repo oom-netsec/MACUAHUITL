@@ -176,7 +176,7 @@ func (s *forensicSvc) loadLogs(ctx context.Context, src *v1.LogSource) (*loaded,
 		noZone := map[string]bool{}
 		for _, sec := range b.Sections {
 			cmd := strings.ToLower(strings.Join(strings.Fields(sec.Command), " "))
-			if sec.Invalid || !strings.HasPrefix(cmd, "show logging") {
+			if sec.Invalid || sec.Incomplete || !strings.HasPrefix(cmd, "show logging") {
 				continue
 			}
 			if d := strings.ToLower(src.Device); d != "" && !strings.Contains(strings.ToLower(sec.Device), d) {
