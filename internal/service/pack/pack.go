@@ -306,7 +306,7 @@ func installDetail(p *dom.Pack, sum string, res *dom.Result) string {
 		detail += " min_core_unchecked=true"
 	}
 	if res.SyncWarning != nil {
-		detail += " fsync_warning=" + res.SyncWarning.Error()
+		detail += fmt.Sprintf(" fsync_warning=%q", res.SyncWarning.Error())
 	}
 	return detail
 }

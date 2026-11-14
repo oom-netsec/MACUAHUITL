@@ -14,7 +14,7 @@ func TestInstallDetailAvisaDelFsync(t *testing.T) {
 		t.Fatal(d)
 	}
 	d := installDetail(p, "abc", &dom.Result{Pack: p, SyncWarning: errors.New("disk")})
-	if !strings.HasSuffix(d, " fsync_warning=disk") {
+	if !strings.HasSuffix(d, ` fsync_warning="disk"`) {
 		t.Fatal(d)
 	}
 }
