@@ -639,7 +639,10 @@ func TestInstallWithCommitCorreDespuesDelExtract(t *testing.T) {
 	boom := errors.New("boom")
 	res, err := s.InstallWith(signedZip(t, priv, nil), false,
 		func(*Pack, string) error { prepDisco = enDisco(); return nil },
-		func(p *Pack) error { commitDisco, commitPublicado = enDisco(), s.Snapshot().Find(p.ID) != nil; return boom })
+		func(p *Pack) error {
+			commitDisco, commitPublicado = enDisco(), s.Snapshot().Find(p.ID) != nil
+			return boom
+		})
 	if err != nil || !errors.Is(res.CommitErr, boom) || prepDisco || !commitDisco || commitPublicado || s.Snapshot().Find("oom/demo") == nil {
 		t.Fatalf("err=%v res=%+v prep=%v commit=%v/%v", err, res, prepDisco, commitDisco, commitPublicado)
 	}
