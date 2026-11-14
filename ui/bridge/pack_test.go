@@ -98,7 +98,7 @@ func TestPackBridge(t *testing.T) {
 	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}, true, "abc123", []string{"acme/demo"}); err != nil || len(ins.Displaced) != 1 || ins.Displaced[0] != "acme/demo" { // confirmed_displace viaja y displaced vuelve
 		t.Fatalf("%+v %v", ins, err)
 	}
-	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}, true, "abc123", nil); err != nil || ins.Pack.ID != "/y.mpack" || len(ins.Pack.Hidden) != 1 { // replace_hidden viaja
+	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}, true, "abc123", nil); err != nil || ins.Displaced == nil /* [] y no null en el JSON */ || ins.Pack.ID != "/y.mpack" || len(ins.Pack.Hidden) != 1 { // replace_hidden viaja
 		t.Fatalf("%+v %v", ins, err)
 	}
 	if in, err := b.PackInspect("/z.mpack", true); err != nil || in.Pack.ID != "/z.mpack" || in.ReplacedVersion != "0.9.0" || in.SHA256 != "abc123" || in.PlaybookIDs == nil || in.ScriptIDs == nil || len(in.Displaced) != 1 || in.Displaced[0] != "acme/demo" {

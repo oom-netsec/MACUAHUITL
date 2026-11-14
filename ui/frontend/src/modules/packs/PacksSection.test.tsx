@@ -205,6 +205,7 @@ test("un oficial que aparta paquetes de terceros los muestra y no instala hasta 
   await userEvent.click(within(d).getByRole("checkbox", { name: "Entiendo: quitar acme/demo" }));
   await userEvent.click(go);
   await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/o.mpack", false, [], true, "abc", ["acme/demo"]));
+  expect(await screen.findByText("Se quitaron los paquetes de terceros que chocaban con el oficial: acme/demo.")).toBeVisible();
 });
 
 test("si otro tercero se instaló tras la vista previa (would_displace), pide reabrir y no deja reintentar", async () => {
@@ -216,6 +217,7 @@ test("si otro tercero se instaló tras la vista previa (would_displace), pide re
   const d = await screen.findByRole("dialog");
   await userEvent.click(within(d).getByRole("checkbox", { name: "Entiendo: quitar acme/demo" }));
   await userEvent.click(within(d).getByRole("button", { name: "Instalar" }));
-  expect(await within(d).findByText(/Vuelve a abrir el archivo/)).toBeVisible();
+  expect(await within(d).findByText(/Otro paquete de terceros también chocaría/)).toBeVisible();
+  expect(within(d).queryByText(/would displace/)).toBeNull(); // un solo aviso, no el del núcleo encima
   expect(within(d).getByRole("button", { name: "Instalar" })).toBeDisabled();
 });

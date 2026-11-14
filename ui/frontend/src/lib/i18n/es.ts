@@ -2688,6 +2688,8 @@ export const es = {
   "patrol.param.vnid": "Entero de 1 a 16777215, por ejemplo 2850817.",
   "packs.displace": "Al instalar este paquete oficial se quitan y se borran del disco estos paquetes de terceros que chocan con él: {ids}.",
   "packs.displace.ok": "Entiendo: quitar {ids}",
+  "packs.displace.changed": "Otro paquete de terceros también chocaría con este oficial: vuelve a abrir el archivo para revisar la vista previa.",
+  "packs.displaced": "Se quitaron los paquetes de terceros que chocaban con el oficial: {ids}.",
 };
 
 export type Key = keyof typeof es;

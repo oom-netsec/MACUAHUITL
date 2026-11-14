@@ -2690,4 +2690,6 @@ export const en: Record<Key, string> = {
   "patrol.param.vnid": "Whole number from 1 to 16777215, for example 2850817.",
   "packs.displace": "Installing this official pack removes these third-party packs that collide with it and deletes them from disk: {ids}.",
   "packs.displace.ok": "I understand: remove {ids}",
+  "packs.displace.changed": "Another third-party pack would also collide with this official one: open the file again to review the preview.",
+  "packs.displaced": "The third-party packs that collided with the official one were removed: {ids}.",
 };
