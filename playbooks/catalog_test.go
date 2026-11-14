@@ -19,7 +19,7 @@ import (
 var catalogFile = regexp.MustCompile(`^(l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob|vxlan|fex|stack|svl|poe|asic|lisp|fabric|edge|border)-`)
 
 // Comandos que pueden imprimir secretos (el enmascarado solo corre si el comando lo declara).
-var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp comm|archive log)|more )`)
+var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp (comm|host)|archive log|cts (pacs|cred)|tacacs-server|radius-server)|more )`)
 
 // Salidas sin acotar: tabla completa de rutas/BGP/CEF/MAC o todas las interfaces.
 var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces|wireless client summary|ap summary)$`)
