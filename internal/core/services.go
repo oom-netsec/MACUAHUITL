@@ -637,19 +637,20 @@ type eventSvc struct {
 }
 
 func (s *eventSvc) Subscribe(r *v1.SubscribeRequest, st v1.EventService_SubscribeServer) error {
-	ch, cancel := s.c.bus.Subscribe(r.JobIds)
+	ids := slices.Compact(slices.Sorted(slices.Values(r.JobIds))) // sin repetidos: el cierre cuenta trabajos distintos
+	ch, cancel := s.c.bus.Subscribe(ids)
 	defer cancel()
 	st.SendHeader(nil)
 	// Un trabajo que ya terminó no emitirá más: se manda su estado final y, si todos los pedidos terminaron, se
 	// cierra el stream (si no, el cliente lo dejaría abierto para siempre). Se suscribe antes de mirar el estado:
 	// un final que llegue en medio sale dos veces, no se pierde.
-	if done := s.c.finishedStates(r.JobIds); len(done) > 0 {
+	if done := s.c.finishedStates(ids); len(done) > 0 {
 		for id, state := range done {
 			if err := st.Send(&v1.SubscribeResponse{JobId: id, Event: &v1.SubscribeResponse_JobStateChanged{JobStateChanged: &v1.JobStateChanged{State: state}}}); err != nil {
 				return err
 			}
 		}
-		if len(done) == len(r.JobIds) {
+		if len(done) == len(ids) {
 			return nil
 		}
 	}
