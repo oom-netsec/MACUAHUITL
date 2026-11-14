@@ -131,9 +131,18 @@ func TestDenyToAbreviadoYDestinosAmbiguos(t *testing.T) {
 			t.Errorf("%q not denied", c)
 		}
 	}
-	for _, c := range []string{"show logging process t", "show running-config interface to-core", "ping 2001:db8::1", "ping core1", "ping ::1"} {
+	for _, c := range []string{"show running-config interface to-core", "ping 2001:db8::1", "ping core1", "ping ::1"} {
 		if err := CheckDenied("ios-xe", c); err != nil {
 			t.Errorf("%q denied: %v", c, err)
+		}
+	}
+}
+
+// «oldvines» (traceroute o…) y «t» sola abren un diálogo o abrevian to-file.
+func TestDenyOldvinesYTSola(t *testing.T) {
+	for _, c := range []string{"traceroute o", "traceroute old", "traceroute oldvines", "show logging process x t bootflash:a", "show logging t"} {
+		if err := CheckDenied("ios-xe", c); !errors.Is(err, ErrDenied) {
+			t.Errorf("%q not denied", c)
 		}
 	}
 }

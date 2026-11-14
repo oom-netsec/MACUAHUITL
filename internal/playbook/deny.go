@@ -90,7 +90,7 @@ func CheckDenied(platform, cmd string) error {
 	// «to-file» es el único destino de escritura que empieza por «to-» en show; IOS acepta cualquier prefijo único,
 	// así que «to-» y «to-f…» lo son. Un nombre como «to-core» no es prefijo de to-file y pasa.
 	for _, f := range fields[1:] {
-		if len(f) >= 2 && strings.HasPrefix("to-file", f) { // «to» ya abrevia to-file; «t» sola es ambigua // show … to-file flash:x escribe
+		if f != "" && strings.HasPrefix("to-file", f) { // «t», «to», «to-»… abrevian to-file: show … to-file flash:x escribe
 			return denied(cmd, "playbook.why.to_file")
 		}
 	}
@@ -141,7 +141,7 @@ func probeName(s string) bool {
 }
 
 // Palabras de protocolo y sub-modo que IOS completa por prefijo: un destino así abre el diálogo extendido.
-var probeKeywords = []string{"ip", "ipv6", "clns", "tag", "atm", "mpls", "appletalk", "decnet", "ipx", "vines", "xns", "apollo", "srb", "ethernet", "mac", "vrf"}
+var probeKeywords = []string{"ip", "ipv6", "clns", "tag", "atm", "mpls", "appletalk", "decnet", "ipx", "vines", "xns", "apollo", "srb", "ethernet", "mac", "vrf", "oldvines"}
 
 func probeKeyword(s string) bool {
 	for _, k := range probeKeywords {
