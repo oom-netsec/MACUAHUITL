@@ -120,3 +120,22 @@ func TestErrFromSinCodigo(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Un argumento con UTF-8 inválido (la salida de un equipo en un error) no hace perder los detalles: el reason y el
+// texto localizado siguen llegando, saneados.
+func TestErrFromConTextoInvalidoConservaLosDetalles(t *testing.T) {
+	err := service.Err(i18n.WithLocale(context.Background(), "en"), codes.AlreadyExists, "file.exists", i18n.A("path", "/x/se\xf1al.txt"))
+	st := status.Convert(err)
+	var reason, msg string
+	for _, d := range st.Details() {
+		switch v := d.(type) {
+		case *errdetails.ErrorInfo:
+			reason = v.Reason
+		case *errdetails.LocalizedMessage:
+			msg = v.Message
+		}
+	}
+	if reason != "file.exists" || msg == "" {
+		t.Fatalf("detalles perdidos: reason=%q msg=%q (%v)", reason, msg, st.Details())
+	}
+}

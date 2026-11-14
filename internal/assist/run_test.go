@@ -9,6 +9,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // fakeExec registra todo lo que el motor le pide y responde según su guion.
@@ -910,5 +913,22 @@ func TestRunEventsAlwaysMaskReadOutputEvenWithoutScrub(t *testing.T) {
 		if strings.Contains(all.String(), s) || strings.Contains(a.text(), s) {
 			t.Errorf("un evento o la auditoría llevan %q:\n%s", s, all.String())
 		}
+	}
+}
+
+// La salida de un equipo con UTF-8 inválido (banner Latin-1) queda saneada en el historial: el evento se puede volver a
+// mandar a cada watch sin que proto3 rechace el texto.
+func TestEmitSaneaUTF8Invalido(t *testing.T) {
+	r, _ := newRun(t, twoDevices(), &fakeExec{})
+	r.out("SW1", "Bienvenido a la se\xf1al")
+	r.outT("SW1", i18n.Lit("ca\xf1a", "ca\xf1e"))
+	evs, _ := r.Events(0)
+	for _, e := range evs {
+		if !utf8.ValidString(e.Text) || !utf8.ValidString(e.TextEN) {
+			t.Fatalf("evento con UTF-8 inválido: %q / %q", e.Text, e.TextEN)
+		}
+	}
+	if last := evs[len(evs)-2]; last.Text != "Bienvenido a la se�al" {
+		t.Fatalf("texto = %q", last.Text)
 	}
 }
