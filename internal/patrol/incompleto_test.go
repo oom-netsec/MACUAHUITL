@@ -47,3 +47,19 @@ func TestSplitDeviceDir(t *testing.T) {
 		t.Errorf("DeviceDirOf = %q", got)
 	}
 }
+
+// Dos trabajos con el mismo nombre y el mismo segundo no comparten carpeta.
+func TestNewWriterNoComparteCarpeta(t *testing.T) {
+	root, now := t.TempDir(), time.Now()
+	a, err := NewWriter(root, Spec{Name: "j"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := NewWriter(root, Spec{Name: "j"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Dir() == b.Dir() {
+		t.Fatalf("misma carpeta: %s", a.Dir())
+	}
+}

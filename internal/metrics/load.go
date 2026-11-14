@@ -135,6 +135,11 @@ func listDevices(dir string) ([]devDir, error) {
 				for _, d := range m.Devices {
 					n := patrol.DeviceDirOf(d.Hostname, d.Target)
 					known[n] = devDir{Dir: n, Host: d.Hostname, IP: d.Target.Address}
+					if o := patrol.DeviceDir(d.Hostname, d.Target.Address); o != n { // evidencia vieja: la carpeta no llevaba el puerto
+						if _, ok := known[o]; !ok {
+							known[o] = devDir{Dir: o, Host: d.Hostname, IP: d.Target.Address}
+						}
+					}
 				}
 			}
 		}

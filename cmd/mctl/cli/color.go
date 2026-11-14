@@ -44,6 +44,9 @@ func (c *Env) Palette() string {
 // controlSeq: OSC, DCS/APC/PM/SOS, CSI y ESC + un carácter; después cualquier C0 (menos \t \n \r), DEL y C1.
 var controlSeq = regexp.MustCompile(`\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[PX^_][^\x1b]*(?:\x1b\\)?|\x1b\[[0-?]*[ -/]*[@-~]?|\x1b[@-_]?|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\x{80}-\x{9f}]`)
 
+// Sanitize es sanitize para quien escribe fuera de los writers de mctl (stderr).
+func Sanitize(s string) string { return sanitize(s) }
+
 // sanitize quita de un texto que viene del equipo todo lo que mueva o reescriba el terminal.
 // shortcut: trabaja por escritura; una secuencia partida entre dos escrituras queda como texto inofensivo.
 func sanitize(s string) string { return controlSeq.ReplaceAllString(s, "") }

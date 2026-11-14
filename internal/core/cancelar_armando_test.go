@@ -85,3 +85,34 @@ func TestArmadoFallidoConCancelacionPendienteQuedaCancelado(t *testing.T) {
 		t.Fatalf("un trabajo cancelado se armó: %v", err)
 	}
 }
+
+// duermeAlTomar simula una suspensión justo después de que Arm abrió la ventana y antes de quedar "armed".
+type duermeAlTomar struct {
+	*fakeInhibitor
+	sleep func()
+}
+
+func (d duermeAlTomar) Take(s string) (func(), []string) {
+	d.sleep()
+	return d.fakeInhibitor.Take(s)
+}
+
+// Una suspensión durante el armado deja el trabajo pausado, no armado con la bóveda cerrada.
+func TestSuspensionDuranteElArmadoDejaElTrabajoPausado(t *testing.T) {
+	var h *harness
+	h = newHarness(t, func(o *Options) {
+		o.Inhibitor = duermeAlTomar{&fakeInhibitor{}, func() { h.core.OnSleep() }}
+	})
+	cred := h.ready(t)
+	job, fp := h.created(t, cred, nil)
+	if _, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: job, AcceptedHostKeyFingerprints: []string{fp}}); err != nil {
+		t.Fatal(err)
+	}
+	j, _ := h.core.getJob(job)
+	h.core.mu.Lock()
+	st, paused := j.state, j.paused
+	h.core.mu.Unlock()
+	if st != "armed" || !paused {
+		t.Fatalf("state=%s paused=%v, quería armed y pausado", st, paused)
+	}
+}

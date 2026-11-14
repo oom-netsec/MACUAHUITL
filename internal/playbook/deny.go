@@ -71,6 +71,9 @@ func CheckDenied(platform, cmd string) error {
 	segs := strings.Split(strings.ToLower(cmd), "|")
 	fields := strings.Fields(segs[0])
 	if len(fields) == 0 {
+		if len(segs) > 1 { // «| redirect …» sin comando: no se deja pasar lo que sigue al pipe
+			return denied(cmd, "playbook.why.empty_pipe")
+		}
 		return nil
 	}
 	switch {
@@ -90,6 +93,9 @@ func CheckDenied(platform, cmd string) error {
 	// «to-file» es el único destino de escritura que empieza por «to-» en show; IOS acepta cualquier prefijo único,
 	// así que «to-» y «to-f…» lo son. Un nombre como «to-core» no es prefijo de to-file y pasa.
 	for _, f := range fields[1:] {
+		if remotePath(f) {
+			return denied(cmd, "playbook.why.remote")
+		}
 		if f != "" && strings.HasPrefix("to-file", f) { // «t», «to», «to-»… abrevian to-file: show … to-file flash:x escribe
 			return denied(cmd, "playbook.why.to_file")
 		}
@@ -110,6 +116,22 @@ func CheckDenied(platform, cmd string) error {
 		}
 	}
 	return nil
+}
+
+// Sistemas de archivos remotos de IOS: more/dir/verify/show file con uno de estos hacen que el equipo se conecte a
+// otro servidor (y le mande sus credenciales de ftp/http si las tiene), fuera del EgressGuard.
+var remoteFS = []string{"ftp:", "tftp:", "http:", "https:", "scp:", "rcp:", "sftp:"}
+
+func remotePath(f string) bool {
+	if strings.Contains(f, "://") {
+		return true
+	}
+	for _, p := range remoteFS {
+		if strings.HasPrefix(f, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // probeOpt es una opción de ping/traceroute: nargs valores numéricos con tope [lo,hi], o un nombre (nargs 0, name).
@@ -183,7 +205,7 @@ func validProbe(f []string) bool {
 	if len(f) == 0 || !probeName(f[0]) || probeKeyword(f[0]) { // un prefijo de palabra clave abre el diálogo interactivo
 		return false
 	}
-	if a, err := netip.ParseAddr(f[0]); err == nil && (a.IsLinkLocalUnicast() || a.IsMulticast()) {
+	if a, err := netip.ParseAddr(f[0]); err == nil && (a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})) {
 		return false // IOS pide «Output Interface» y abre el diálogo
 	}
 	f = f[1:]

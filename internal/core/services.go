@@ -362,6 +362,9 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 			}
 		}
 	}
+	c.mu.Lock()
+	gen := c.sleepGen // una suspensión durante el armado cierra la ventana que crea Arm
+	c.mu.Unlock()
 	if err := v.Arm(j.id, until, creds); err != nil {
 		return fail(service.VaultErr(ctx, err), i18n.English(err))
 	}
@@ -373,7 +376,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	for _, ch := range changes {
 		w.NoteHostKeyChange(ch)
 	}
-	release, missing := c.o.Inhibitor.Take("Trabajo armado: " + spec.Name)
+	release, missing := c.o.Inhibitor.Take("Armed job: " + spec.Name)
 	undo = append(undo, release)
 
 	byHP := map[string]patrol.Target{}
@@ -424,11 +427,19 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	}
 	c.mu.Lock()
 	j.state, j.ArmedAt = "armed", c.o.Now()
+	slept := c.sleepGen != gen
+	if slept { // OnSleep no vio este trabajo como armado: queda pausado y resumePaused lo reanuda
+		j.paused = true
+		c.sched.Pause(j.id)
+	}
 	late := j.cancelReq // la cancelación llegó entre la revisión y el armado
 	j.cancelReq = false
+	vlt := c.vault
 	c.mu.Unlock()
 	if late {
 		c.sched.Cancel(j.id)
+	} else if slept && vlt != nil && vlt.Unlocked() {
+		c.resumePaused() // la bóveda ya se desbloqueó mientras armábamos: nadie más lo reanudaría
 	}
 	armed, armedArgs := "phase.devices", i18n.A("n", len(spec.Targets))
 	if n := len(r.ExcludedDeviceIds); n > 0 {
@@ -502,10 +513,11 @@ func (c *Core) finish(j *job, state string) {
 	if w != nil {
 		if _, err := patrol.Finish(context.Background(), c.deps(j), w, spec, rounds, all); err != nil {
 			c.audit("job.finish_failed", j.id, i18n.English(err))
+			msg := i18n.English(err) // sin idioma de cliente aquí: se guarda en inglés
 			c.mu.Lock()
-			j.FinishErr = err.Error()
+			j.FinishErr = msg
 			c.mu.Unlock()
-			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, 0, "phase.close_failed", i18n.A("error", err.Error()))
+			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, 0, "phase.close_failed", i18n.A("error", msg))
 		} else if zip := patrol.FinalZip(w, spec); zip != "" {
 			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_PACKAGED, 0, "phase.packaged", i18n.A("path", zip))
 		}
