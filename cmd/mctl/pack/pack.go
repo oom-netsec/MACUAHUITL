@@ -96,7 +96,7 @@ func install(c *cli.Env, args []string) error {
 			return cli.Err("mctl.pack.displace_declined", "id", pv.Pack.Id, "ids", ids)
 		}
 	}
-	r, err := cl.Install(context.Background(), &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: unsigned, Hide: hide, ReplaceHidden: len(hide) > 0, Sha256: sum, AllowDisplace: len(pv.Displaced) > 0})
+	r, err := cl.Install(context.Background(), &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: unsigned, Hide: hide, ReplaceHidden: len(hide) > 0, Sha256: sum, ConfirmedDisplace: pv.Displaced})
 	if err != nil {
 		return err
 	}

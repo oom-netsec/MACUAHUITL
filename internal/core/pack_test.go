@@ -569,7 +569,7 @@ func TestPackInspectNoInstala(t *testing.T) {
 		t.Fatalf("%+v %v", r, err)
 	}
 	_, ei := pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: path})
-	_, ein := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path, AllowDisplace: true}))
+	_, ein := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path, ConfirmedDisplace: []string{"acme/demo"}}))
 	ri, _ := reasonOf(ei)
 	rn, _ := reasonOf(ein)
 	if ri != "pack.err.version" || ri != rn {
@@ -881,7 +881,7 @@ func TestPackOficialAPartaAlTerceroQueChoca(t *testing.T) {
 	if l, _ := pk.List(ctx(t), &v1.PackServiceListRequest{}); len(l.Packs) != 1 || l.Packs[0].Id != "acme/demo" {
 		t.Fatalf("tocó el almacén: %v", l)
 	}
-	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path, AllowDisplace: true}))
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path, ConfirmedDisplace: []string{"acme/demo"}}))
 	if err != nil || !slices.Equal(r.Displaced, []string{"acme/demo"}) {
 		t.Fatalf("install: %v %v", r.GetDisplaced(), err)
 	}
@@ -890,5 +890,33 @@ func TestPackOficialAPartaAlTerceroQueChoca(t *testing.T) {
 	}
 	if au := h.auditText(t); !strings.Contains(au, `"action":"pack.conflict"`) || !strings.Contains(au, "displaced_by=oom/ios-xe") || !strings.Contains(au, "removed=true") {
 		t.Fatalf("auditoría:\n%s", au)
+	}
+}
+
+// Al apartar un tercero se hace la misma limpieza que en Remove: lo que tenía oculto no revive al reinstalarlo.
+func TestPackApartadoLimpiaSusOcultos(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	zb, err := pack.Zip(map[string][]byte{
+		"manifest.yaml":           []byte("id: acme/demo\nversion: 1.0.0\nmin_core: 0.3.0\nname: A\nname_en: A\ndescription: d\ndescription_en: d\nplatforms: [ios-xe]\nauthor: a\nlicense: MIT\n"),
+		"README.md":               []byte("x"),
+		"playbooks/acme-stp.yaml": []byte("id: acme-stp\nplatform: ios-xe\nname: \"L2 · STP\"\nname_en: \"Acme only\"\ncommands:\n  - cmd: show clock\n"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	third := writeMpack(t, zb)
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: third, AllowUnsigned: true, Hide: []string{"ios-xe/acme-stp"}})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), ConfirmedDisplace: []string{"acme/demo"}})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pk.Remove(ctx(t), &v1.PackServiceRemoveRequest{Id: "oom/ios-xe"}); err != nil {
+		t.Fatal(err)
+	}
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: third, AllowUnsigned: true}))
+	if err != nil || len(r.Pack.Hidden) != 0 {
+		t.Fatalf("revivió lo oculto: %+v %v", r, err)
 	}
 }

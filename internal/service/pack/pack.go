@@ -109,7 +109,7 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	// el fsync del extract. Si el guardado falla, el paquete ya está instalado: se audita con hidden_save_failed y la
 	// respuesta es de éxito (la respuesta no tiene campo de aviso; lo oculto queda como estaba antes).
 	hide := []string{}
-	res, err := s.store.InstallConfirmed(data, r.GetAllowUnsigned(), r.GetAllowDisplace(), func(p *dom.Pack, _ string) error {
+	res, err := s.store.InstallConfirmed(data, r.GetAllowUnsigned(), r.GetConfirmedDisplace(), func(p *dom.Pack, _ string) error {
 		items := p.Items()
 		for _, id := range r.GetHide() { // los IDs que el paquete no trae se ignoran
 			if items[id] {
@@ -132,8 +132,13 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		hide = nil // no quedó guardado: no se audita como oculto
 	}
 	s.d.Audit("pack.install", p.ID, detail)
-	for _, id := range res.Displaced {
-		s.d.Audit("pack.conflict", id, fmt.Sprintf("id=%s displaced_by=%s reason=collision removed=%t", id, p.ID, slices.Contains(res.DisplacedRemoved, id)))
+	for _, d := range res.DisplacedPacks { // misma limpieza que Remove: favoritos, ocultos y pack_missing del apartado
+		var favs int
+		var cerr error
+		if lerr := s.store.Locked(func() error { favs, cerr = s.cleanup(d); return nil }); lerr != nil {
+			cerr = lerr
+		}
+		s.d.Audit("pack.conflict", d.ID, fmt.Sprintf("id=%s displaced_by=%s reason=collision removed=%t favorites_removed=%d cleanup_failed=%t", d.ID, p.ID, slices.Contains(res.DisplacedRemoved, d.ID), favs, cerr != nil))
 	}
 	if len(hide) > 0 {
 		s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=0 at=install", p.ID, len(hide)))

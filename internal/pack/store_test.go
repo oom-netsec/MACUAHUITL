@@ -793,21 +793,60 @@ func TestInstallConfirmedExigeConfirmarLosApartados(t *testing.T) {
 	pub, priv := testKey(t)
 	dir := t.TempDir()
 	s, _ := openStore(t, dir, pub, Base{})
-	if _, err := s.InstallConfirmed(signedZip(t, priv, nil), false, false, nil, nil); err != nil { // nadie que apartar
+	if _, err := s.InstallConfirmed(signedZip(t, priv, nil), false, nil, nil, nil); err != nil { // nadie que apartar
 		t.Fatal(err)
 	}
 	s.Remove("oom/demo")
 	if _, err := s.Install(mustZip(t, thirdParty()), true); err != nil {
 		t.Fatal(err)
 	}
-	res, err := s.InstallConfirmed(signedZip(t, priv, nil), false, false, nil, nil)
+	res, err := s.InstallConfirmed(signedZip(t, priv, nil), false, nil, nil, nil)
 	if Reason(err) != "would_displace" || res == nil || len(res.Displaced) != 1 || !strings.Contains(err.Error(), "acme/demo") {
 		t.Fatalf("%v %+v", err, res)
 	}
 	if _, e := os.Stat(filepath.Join(dir, "acme", "demo")); e != nil || s.Snapshot().Find("acme/demo") == nil || s.Snapshot().Find("oom/demo") != nil {
 		t.Fatal("tocó el almacén")
 	}
-	if _, err := s.InstallConfirmed(signedZip(t, priv, nil), false, true, nil, nil); err != nil || s.Snapshot().Find("acme/demo") != nil {
+	if _, err := s.InstallConfirmed(signedZip(t, priv, nil), false, []string{"acme/demo"}, nil, nil); err != nil || s.Snapshot().Find("acme/demo") != nil {
 		t.Fatalf("con confirmación: %v", err)
+	}
+}
+
+// Remove de una carpeta no cargada no sale del almacén: un enlace en el editor o en el nombre da not_found y no borra nada fuera.
+func TestRemoveNoCargadoNoSigueEnlaces(t *testing.T) {
+	pub, _ := testKey(t)
+	dir, fuera := t.TempDir(), t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	os.MkdirAll(filepath.Join(fuera, "victima"), 0o700)
+	os.MkdirAll(filepath.Join(fuera, "otro", "x"), 0o700)
+	if err := os.Symlink(fuera, filepath.Join(dir, "acme")); err != nil { // enlace en el tramo del editor
+		t.Skip(err)
+	}
+	os.MkdirAll(filepath.Join(dir, "beta"), 0o700)
+	os.Symlink(filepath.Join(fuera, "otro", "x"), filepath.Join(dir, "beta", "enlace")) // enlace en el tramo del nombre
+	for _, id := range []string{"acme/victima", "beta/enlace"} {
+		if _, err := s.Remove(id); Reason(err) != "not_found" {
+			t.Errorf("%s: %v", id, err)
+		}
+	}
+	for _, p := range []string{filepath.Join(fuera, "victima"), filepath.Join(fuera, "otro", "x")} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("se borró %s", p)
+		}
+	}
+	os.MkdirAll(filepath.Join(dir, "oom", "roto"), 0o700)
+	if p, err := s.Remove("oom/roto"); err != nil || !p.Official {
+		t.Fatalf("origen de oom/*: %v %+v", err, p)
+	}
+}
+
+// Solo se aparta lo que el usuario confirmó: un tercero que apareció tras la vista previa hace fallar la instalación.
+func TestInstallConfirmedSoloLoConfirmado(t *testing.T) {
+	pub, priv := testKey(t)
+	s, _ := openStore(t, t.TempDir(), pub, Base{})
+	s.Install(mustZip(t, thirdParty()), true)
+	_, err := s.InstallConfirmed(signedZip(t, priv, nil), false, []string{"acme/otro"}, nil, nil)
+	if Reason(err) != "would_displace" || s.Snapshot().Find("acme/demo") == nil {
+		t.Fatalf("%v", err)
 	}
 }
