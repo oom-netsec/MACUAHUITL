@@ -258,14 +258,20 @@ func publish(files []string, extraDeny []string) (map[string]string, map[string]
 		if !filepath.IsAbs(f) {
 			return nil, nil, i18n.New("fileserve.err.path_relative", i18n.A("path", f))
 		}
-		st, err := os.Stat(f)
+		// Se resuelve el enlace una sola vez y se publica la ruta real: lo que se comprueba es lo que se sirve
+		// (un enlace que cambie después no desvía); si no se puede resolver, se rechaza.
+		real, err := evalSymlinks(filepath.Clean(f))
+		if err != nil {
+			return nil, nil, fmt.Errorf("fileserve: %w", err)
+		}
+		st, err := os.Lstat(real)
 		if err != nil {
 			return nil, nil, fmt.Errorf("fileserve: %w", err)
 		}
 		if !st.Mode().IsRegular() {
 			return nil, nil, i18n.New("fileserve.err.not_regular", i18n.A("path", f))
 		}
-		if err := checkFileDeny(f, extraDeny); err != nil {
+		if err := checkPathsDeny(extraDeny, filepath.Clean(f), real); err != nil {
 			return nil, nil, err
 		}
 		if sys.HardLinked(st) {
@@ -275,7 +281,7 @@ func publish(files []string, extraDeny []string) (map[string]string, map[string]
 		if _, dup := out[name]; dup {
 			return nil, nil, i18n.New("fileserve.err.dup_name", i18n.A("name", name))
 		}
-		out[name], infos[name] = f, st
+		out[name], infos[name] = real, st
 	}
 	return out, infos, nil
 }

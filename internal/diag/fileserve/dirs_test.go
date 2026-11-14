@@ -2,10 +2,12 @@ package fileserve
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"net/netip"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -456,5 +458,72 @@ func TestOcultosBajoHomeSeRechazan(t *testing.T) {
 	}
 	if _, err := ValidateDir(filepath.Join(home, "Descargas")); err != nil {
 		t.Errorf("~/Descargas: %v", err)
+	}
+}
+
+// Se sirve la ruta real resuelta una sola vez: un enlace que cambia de destino después de publicar no desvía lo servido.
+func TestPublishSirveLaRutaRealYNoSigueAlEnlace(t *testing.T) {
+	d := t.TempDir()
+	a, b := filepath.Join(d, "a.bin"), filepath.Join(d, "b.bin")
+	os.WriteFile(a, []byte("AAA"), 0o600)
+	os.WriteFile(b, []byte("BBB"), 0o600)
+	link := filepath.Join(d, "l.bin")
+	os.Symlink(a, link)
+	files, infos, err := publish([]string{link}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if files["l.bin"] != a {
+		t.Fatalf("debía guardar la ruta real: %q", files["l.bin"])
+	}
+	os.Remove(link)
+	os.Symlink(b, link)
+	src := &source{files: files, infos: infos}
+	f, _, err := src.open("l.bin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	got, _ := io.ReadAll(f)
+	if string(got) != "AAA" {
+		t.Fatalf("se sirvió %q tras cambiar el enlace", got)
+	}
+}
+
+// Si no se puede resolver la ruta, se rechaza (no se sigue con la ruta sin resolver).
+func TestPublishRechazaSiFallaEvalSymlinks(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "a.bin")
+	os.WriteFile(f, []byte("x"), 0o600)
+	old := evalSymlinks
+	evalSymlinks = func(string) (string, error) { return "", errors.New("boom") }
+	defer func() { evalSymlinks = old }()
+	if _, err := Publish([]string{f}); err == nil {
+		t.Fatal("publicó con EvalSymlinks fallando")
+	}
+}
+
+// Con $HOME vacío se usa el de la cuenta; si no hay ninguno, se rechaza (fail-closed).
+func TestHomeVacioUsaLaCuentaYSinHomeRechaza(t *testing.T) {
+	t.Setenv("HOME", "")
+	u, err := user.Current()
+	if err != nil || !filepath.IsAbs(u.HomeDir) {
+		t.Skip("sin usuario con home")
+	}
+	if _, err := ValidateDir(filepath.Join(u.HomeDir, ".ssh")); err == nil {
+		t.Error("~/.ssh aceptada con $HOME vacío")
+	}
+	if _, err := ValidateDir(u.HomeDir); err == nil {
+		t.Error("$HOME de la cuenta aceptado con $HOME vacío")
+	}
+	old := homeDir
+	homeDir = func() (string, error) { return "", errors.New("sin home") }
+	defer func() { homeDir = old }()
+	f := filepath.Join(t.TempDir(), "a.bin")
+	os.WriteFile(f, []byte("x"), 0o600)
+	if _, err := Publish([]string{f}); err == nil {
+		t.Error("Publish sin home conocido")
+	}
+	if _, err := ValidateDir(t.TempDir()); err == nil {
+		t.Error("ValidateDir sin home conocido")
 	}
 }

@@ -65,6 +65,7 @@ func init() {
 		"fileserve.err.dir_not_dir":     e("fileserve: {dir} no es una carpeta", "fileserve: {dir} is not a folder", "dir"),
 		"fileserve.err.dir_sensitive":   e("fileserve: la carpeta {dir} es sensible ({deny}): elige otra", "fileserve: the folder {dir} is sensitive ({deny}): choose another", "dir", "deny"),
 		"fileserve.err.dir_root":        e("fileserve: la carpeta raíz no se puede usar: elige otra", "fileserve: the root folder cannot be used: choose another"),
+		"fileserve.err.no_home":         e("fileserve: no se pudo saber la carpeta personal; no se publica ni se recibe nada sin saberla", "fileserve: the home folder could not be determined; nothing is published or received without it"),
 		"fileserve.err.dir_home":        e("fileserve: tu carpeta personal completa no se puede usar (tiene los archivos que el shell y el escritorio cargan solos): elige una subcarpeta", "fileserve: your whole home folder cannot be used (it holds the files the shell and the desktop load on their own): choose a subfolder"),
 		"fileserve.err.addr_invalid":    e("fileserve: dirección inválida {addr:q}: {cause}", "fileserve: invalid address {addr:q}: {cause}", "addr", "cause"),
 		"fileserve.err.port_invalid":    e("fileserve: puerto inválido {port:q}", "fileserve: invalid port {port:q}", "port"),
