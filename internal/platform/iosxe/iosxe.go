@@ -356,7 +356,8 @@ func echoFirst(text, cmd string) bool {
 	c := echoNorm(cmd)
 	first, _, _ := strings.Cut(text, "\n")
 	f := echoNorm(first)
-	return c == "" || strings.HasPrefix(echoNorm(text), c) || f != "" && strings.HasPrefix(c, f)
+	// Sufijo: un comando largo con scroll horizontal se ve como «$» + su final; 16+ caracteres para no tomar un resto corto por eco.
+	return c == "" || strings.HasPrefix(echoNorm(text), c) || f != "" && strings.HasPrefix(c, f) || len(f) >= 16 && strings.HasSuffix(c, f)
 }
 
 // ftdConfirmSettle es la calma corta antes de dar por confirmado el par de prompts: un trozo puede terminar justo en «\n>\n> ».
