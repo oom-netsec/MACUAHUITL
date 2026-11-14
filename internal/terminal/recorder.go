@@ -169,7 +169,7 @@ func (r *Recorder) outLine(l string) {
 		}
 	} else {
 		if !equipoMsg(l) {
-			l = r.scrub(l)
+			l = r.scrub(l, len(r.sent) > 0)
 		}
 		out, keep = r.stream.Line(l)
 	}
@@ -193,7 +193,7 @@ func equipoMsg(l string) bool {
 	return false
 }
 
-var erase = regexp.MustCompile(`(?: ?--More--)?(?:\r +\r|\x08+ +\x08+)`)
+var erase = regexp.MustCompile(`(?: ?--More-- ?)?(?:\r +\r|\x08+ +\x08+)`)
 
 func indexOf(l []string, s string) int {
 	for i, x := range l {
@@ -237,11 +237,17 @@ func (r *Recorder) typedLine(line string) string {
 	return m
 }
 
-// scrub tapa en una línea de salida los valores tapados antes: completos, o como trozo (≥2) al inicio
-// (sufijo del valor) o al final (prefijo del valor), que es lo que deja un eco partido.
-func (r *Recorder) scrub(l string) string {
+// scrub tapa en una línea de salida los valores tapados antes: el valor completo solo como palabra entera y
+// de 4 o más caracteres; y, mientras algún eco siga pendiente (frag), trozos de 2 o más caracteres: un sufijo
+// del valor al inicio de la línea o un prefijo al final, que es lo que deja un eco partido.
+func (r *Recorder) scrub(l string, frag bool) string {
 	for _, v := range r.secrets {
-		l = strings.ReplaceAll(l, v, "<MASKED:secret>")
+		if len(v) >= 4 {
+			l = replaceWord(l, v)
+		}
+		if !frag {
+			continue
+		}
 		for k := len(v) - 1; k >= 2; k-- {
 			if strings.HasPrefix(l, v[len(v)-k:]) {
 				l = "<MASKED:secret>" + l[k:]
@@ -256,6 +262,29 @@ func (r *Recorder) scrub(l string) string {
 		}
 	}
 	return l
+}
+
+func isWordByte(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_'
+}
+
+// replaceWord tapa v donde aparece como palabra entera (límites: inicio o fin de línea, espacio o puntuación).
+func replaceWord(l, v string) string {
+	var out strings.Builder
+	for {
+		i := strings.Index(l, v)
+		if i < 0 {
+			break
+		}
+		end := i + len(v)
+		if (i == 0 || !isWordByte(l[i-1])) && (end == len(l) || !isWordByte(l[end])) {
+			out.WriteString(l[:i] + "<MASKED:secret>")
+		} else {
+			out.WriteString(l[:end])
+		}
+		l = l[end:]
+	}
+	return out.String() + l
 }
 
 // setPromptBlock recuerda el bloque del prompt; solo si cambia reinicia el de lo tecleado (un prompt

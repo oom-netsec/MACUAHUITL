@@ -654,17 +654,48 @@ func TestRedPorContenidoVenceConUnPrompt(t *testing.T) {
 // El borrado de --More-- de IOS no deja sangría falsa que impida abrir el bloque.
 func TestBorradoDeMoreNoImpideElBloque(t *testing.T) {
 	for _, n := range []int{8, 9, 20} {
-		for _, kind := range []string{"cr", "bs"} {
-			borrado := "\r" + strings.Repeat(" ", n) + "\r"
-			if kind == "bs" {
-				borrado = strings.Repeat("\b", n) + strings.Repeat(" ", n) + strings.Repeat("\b", n)
-			}
-			r, b := newRec()
-			r.Output([]byte("SW1#show running-config\r\nhostname SW1\r\n --More--" + borrado + "line con 0\r\n password Plain2\r\n"))
-			r.Close()
-			if out := b.String(); strings.Contains(out, "Plain2") {
-				t.Errorf("n=%d %s:\n%s", n, kind, out)
+		for _, more := range []string{" --More-- ", " --More--", "--More--", "--More-- "} {
+			for _, kind := range []string{"cr", "bs"} {
+				borrado := "\r" + strings.Repeat(" ", n) + "\r"
+				if kind == "bs" {
+					borrado = strings.Repeat("\b", n) + strings.Repeat(" ", n) + strings.Repeat("\b", n)
+				}
+				r, b := newRec()
+				r.Output([]byte("SW1#show running-config\r\nhostname SW1\r\n" + more + borrado + "line con 0\r\n password Plain2\r\n"))
+				r.Close()
+				if out := b.String(); strings.Contains(out, "Plain2") {
+					t.Errorf("n=%d %q %s:\n%s", n, more, kind, out)
+				}
 			}
 		}
+	}
+}
+
+// La red por contenido no tapa palabras que solo contienen el valor o fragmentos suyos.
+func TestRedPorContenidoNoTapaDeMas(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("SW1(config)# "))
+	r.Input([]byte("enable password Secret\renable password admin\renable password 12\rdo show interfaces\r"))
+	r.Output([]byte("enable password Secret\r\nSW1(config)#enable password admin\r\nSW1(config)#enable password 12\r\nSW1(config)#do show interfaces\r\n"))
+	for _, l := range []string{
+		"GigabitEthernet0/1 is administratively down, line protocol is down",
+		"  Hardware is ethernet, address is 0012.3456.789a",
+		"     12345 packets input, 12 bytes",
+		"interface Vlan12",
+		"  Version 12.4",
+		"ethernet cret",
+		"Secret aparece aqui",
+	} {
+		r.Output([]byte(l + "\r\n"))
+	}
+	r.Close()
+	out := b.String()
+	for _, keep := range []string{"administratively down", "Hardware is ethernet, address is 0012.3456.789a", "12345 packets input, 12 bytes", "interface Vlan12", "Version 12.4", "Z ethernet cret\n"} {
+		if !strings.Contains(out, keep) {
+			t.Errorf("tapó de más, falta %q:\n%s", keep, out)
+		}
+	}
+	if strings.Contains(out, "Z Secret aparece aqui") {
+		t.Errorf("el valor entero no se tapó:\n%s", out)
 	}
 }
