@@ -412,19 +412,11 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		return nil
 	}
 	c.mu.Lock()
-	if j.cancelReq {
-		j.cancelReq, j.state = false, "cancelled"
-		j.OutputDir, j.writer, j.release = "", nil, nil // undo los deshace y la carpeta se borra abajo: no deben quedar apuntados
-		c.mu.Unlock()
-		for i := len(undo) - 1; i >= 0; i-- {
-			undo[i]()
-		}
-		os.Remove(w.Dir()) // la carpeta que creó NewWriter; Remove no borra una carpeta con contenido
-		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
-		c.closeCancelled(j)
-		return nil, service.Err(ctx, codes.FailedPrecondition, "patrol.svc.job_state", i18n.A("state", "cancelled"))
-	}
+	cancelled := j.cancelReq
 	c.mu.Unlock()
+	if cancelled { // fail deshace el armado, devuelve el trabajo a como estaba y lo cierra cancelado
+		return fail(service.Err(ctx, codes.FailedPrecondition, "patrol.svc.job_state", i18n.A("state", "cancelled")), "cancelled while arming")
+	}
 	events, cancelSub := c.bus.Subscribe([]string{j.id})
 	if err := c.sched.Arm(j.id, engineSchedule(spec.Schedule), until, targets, run); err != nil {
 		cancelSub()

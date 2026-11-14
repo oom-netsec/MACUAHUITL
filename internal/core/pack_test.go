@@ -815,7 +815,9 @@ func TestPackQuitarLimpiaBajoElCandadoDelAlmacen(t *testing.T) {
 		_, err := pk.Remove(ctx(t), &v1.PackServiceRemoveRequest{Id: r.Pack.Id})
 		done <- err
 	}()
-	time.Sleep(300 * time.Millisecond) // el Remove ya quitó del almacén y espera la base
+	for h.core.packs.Snapshot().Find(r.Pack.Id) != nil { // el Remove ya quitó del almacén y espera la base
+		time.Sleep(5 * time.Millisecond)
+	}
 	got := make(chan struct{})
 	go func() { h.core.packs.Locked(func() error { return nil }); close(got) }()
 	select {

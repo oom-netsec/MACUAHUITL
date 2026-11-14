@@ -332,10 +332,10 @@ func TestArmadoDeshechoNoDejaCarpetaNiWriter(t *testing.T) {
 				t.Fatal("ArmJob debía fallar")
 			}
 			h.core.mu.Lock()
-			dir, w, rel := j.OutputDir, j.writer, j.release
+			dir, w, rel, until, creds := j.OutputDir, j.writer, j.release, j.Until, j.creds
 			h.core.mu.Unlock()
-			if dir != "" || w != nil || rel != nil {
-				t.Fatalf("OutputDir=%q writer=%v release=%v", dir, w != nil, rel != nil)
+			if dir != "" || w != nil || rel != nil || !until.IsZero() || creds != nil {
+				t.Fatalf("OutputDir=%q writer=%v release=%v Until=%v creds=%v", dir, w != nil, rel != nil, until, creds)
 			}
 			if m, _ := filepath.Glob(filepath.Join(out, "*")); len(m) != 0 {
 				t.Fatalf("quedó la carpeta del armado deshecho: %v", m)
@@ -355,6 +355,8 @@ func TestArmadoRechazadoDejaElTrabajoIgual(t *testing.T) {
 	j.spec.Schedule.IntervalSeconds, j.spec.Schedule.Rounds = 60, 0
 	j.spec.Schedule.Until = time.Now().Add(-time.Hour)
 	antes := j.spec
+	previos := []patrol.HostKeyChange{{}} // lo que ya tenía el trabajo: el intento fallido no lo cambia
+	j.changes = previos
 	h.core.mu.Unlock()
 	_, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: job, AcceptedHostKeyFingerprints: []string{fp}, ExcludedDeviceIds: []string{"excluido"}})
 	if reason, _ := reasonOf(err); reason != "engine.err.job_ended" {
@@ -362,7 +364,7 @@ func TestArmadoRechazadoDejaElTrabajoIgual(t *testing.T) {
 	}
 	h.core.mu.Lock()
 	defer h.core.mu.Unlock()
-	if j.state != "created" || !slices.Equal(j.spec.Targets, antes.Targets) || !j.Until.IsZero() || j.creds != nil || j.verified != nil {
+	if j.state != "created" || !slices.Equal(j.spec.Targets, antes.Targets) || !j.Until.IsZero() || j.creds != nil || j.verified != nil || len(j.changes) != 1 {
 		t.Fatalf("el trabajo cambió: state=%q targets=%v until=%v creds=%v verified=%v", j.state, j.spec.Targets, j.Until, j.creds, j.verified)
 	}
 }
