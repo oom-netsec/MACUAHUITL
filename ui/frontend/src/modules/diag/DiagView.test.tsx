@@ -56,12 +56,45 @@ test("un fallo inmediato (herramienta no instalada) no deja la vista atorada", a
   expect(screen.getByRole("button", { name: "Ejecutar" })).toBeEnabled();
 });
 
-test("iperf3 en modo servidor no manda segundos", async () => {
-  const core = fakeCore({ diagRun: vi.fn(async () => "r3") });
+// Desde la auditoría de seguridad el núcleo exige bind (una IP de esta máquina, ni 0.0.0.0 ni link-local) y puerto ≥ 1024.
+const nics = [
+  { name: "lo", up: true, loopback: true, addresses: ["127.0.0.1/8", "::1/128"], hardwareAddr: "" },
+  { name: "eth0", up: true, loopback: false, addresses: ["192.168.3.10/24", "fe80::1%eth0/64", "169.254.9.9/16"], hardwareAddr: "aa:bb" },
+  { name: "eth1", up: false, loopback: false, addresses: ["10.9.9.9/24"], hardwareAddr: "cc:dd" },
+];
+const server = async (over = {}) => {
+  const core = fakeCore({ diagRun: vi.fn(async () => "r3"), listInterfaces: vi.fn(async () => nics), ...over });
   render(<DiagView core={core} tool="iperf3" />);
   await userEvent.selectOptions(screen.getByLabelText("Modo"), "server");
+  return core;
+};
+
+test("iperf3 servidor: elige una IP local (sin link-local ni interfaces caídas) y manda bind y puerto, sin segundos", async () => {
+  const core = await server();
+  const bind = await screen.findByLabelText("Escuchar en");
+  expect([...bind.querySelectorAll("option")].map((o) => o.getAttribute("value"))).toEqual(["192.168.3.10", "127.0.0.1", "::1"]);
+  expect(bind).toHaveValue("192.168.3.10");
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("iperf3", [], { mode: "server" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("iperf3", [], { mode: "server", bind: "192.168.3.10", port: "5201" }));
+});
+
+test("iperf3 servidor: un puerto menor que 1024 o no entero no arranca", async () => {
+  const core = await server();
+  await screen.findByLabelText("Escuchar en");
+  const port = screen.getByLabelText("Puerto");
+  for (const bad of ["80", "", "5201.5", "70000"]) {
+    await userEvent.clear(port);
+    if (bad) await userEvent.type(port, bad);
+    expect(screen.getByRole("button", { name: "Ejecutar" })).toBeDisabled();
+  }
+  expect(port).toBeInvalid();
+  expect(core.diagRun).not.toHaveBeenCalled();
+});
+
+test("iperf3 servidor: sin IP local disponible lo dice y no arranca", async () => {
+  await server({ listInterfaces: vi.fn(async () => [nics[2]]) });
+  expect(await screen.findByText(/No hay una IP local/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Ejecutar" })).toBeDisabled();
 });
 
 test("el botón de ejecutar queda deshabilitado hasta que hay destino", async () => {
