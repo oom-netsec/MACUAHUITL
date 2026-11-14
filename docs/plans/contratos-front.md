@@ -1335,3 +1335,23 @@ Con `en`, nada visible de esta área sale en español; sin idioma o con `es` el 
 - El inglés es el idioma canónico de la app y el español es segunda lengua que se elige en Ajustes. La regla «sin `accept-language` = español byte a byte» de 30a a 30e deja de aplicar: **sin `accept-language` (o con uno desconocido) el núcleo responde en inglés**; `internal/i18n` (`Locale`, `Normalize`, `Parse`) devuelve `en` por omisión. Las pruebas de regresión en español piden `es` explícito (`accept-language: es`, `i18n.WithLocale(ctx, "es")` o `--lang es`) y siguen comparando con sus goldens; hay pruebas de que sin idioma sale inglés. La auditoría sigue fija en inglés.
 - mctl: sin `--lang`, inglés. La ayuda (`--help`, `-h`, `help`, sin comando) y los errores `usage: mctl …` salen en inglés (`testdata/help.golden`); con `--lang es` salen en español (`help_es.golden`, `uso: mctl …`). Los nombres de banderas y los valores técnicos (`renombrar|reemplazar|omitir`) no se traducen. La ayuda en inglés vive en `cmd/mctl/cli/help_en.txt`, línea por línea la misma que los `Usage` de las áreas (español).
 - UI: sin elección guardada la interfaz arranca en inglés (ya no mira `navigator.language`). Solo se guarda la elección explícita del selector de Ajustes, en la clave nueva `macuahuitl.lang` de `localStorage`; la clave anterior (`macuahuitl.idioma`) se ignora porque guardaba también lo autodetectado. El contexto por omisión de `i18n.tsx` y `tr` caen a inglés.
+
+## Contratos para front tras la auditoría
+Todos los errores son gRPC con `ErrorInfo` (reason, metadata) y salen en el idioma pedido; el texto en es no cambió.
+
+**1. Hosts (libreta, `PutDevice` y filas del import).** Cada rechazo de validación lleva un reason estable por caso y `metadata.field` con el nombre del campo del formulario:
+- `hosts.invalid_name` (`field=name`), `hosts.invalid_address` (`address`; cubre largo, zona, DNS e IP inválida), `hosts.invalid_port` (`port`), `hosts.invalid_platform` (`platform`), `hosts.invalid_folder` (`folder`), `hosts.invalid_tags` (`tags`; demasiadas o una inválida/repetida), `hosts.invalid_notes` (`notes`), `hosts.invalid_credential_id` (`credentialId`; el id no tiene forma de id de la bóveda) y `hosts.unknown_credential` (`credentialId`; la credencial no existe en la bóveda).
+- Duplicados: `hosts.duplicate_name` (`field=name`) y `hosts.duplicate_address` (`field=address`, la dirección con el puerto). En `PutDevice` traen además `metadata.id` con el id del host que ya existe (y `name`; en dirección, también `key`). En el import (filas del archivo y decisiones) llevan el mismo reason y field, sin id.
+- En las filas del import el campo del archivo sigue en `FieldError.Field` (p. ej. `credential_id`); `metadata.field` es el del formulario.
+
+**2. Transfer.** El JSON de cada transferencia (`transfer:msg`) trae `dirCode` (`read` | `write`) junto a `Dir`, que sigue con el texto («lectura»/«escritura»). El front compara `dirCode`, nunca el texto.
+
+**3. sha256 obligatorio en paquetes.**
+- `PackServiceInspectResponse.sha256` (campo 5): el del archivo leído. El puente lo da como `sha256` en `PackInspectDTO`.
+- `PackServiceInstallRequest.sha256` (campo 5) es obligatorio: sin él, `pack.err.install.sha256_missing` (InvalidArgument); si no coincide con el archivo, `pack.err.install.changed` (FailedPrecondition). No se instala nada.
+- `PackServiceImportRequest` con `confirm=true` exige `sha256`: sin él, `pack.err.import.sha256_missing`; si no coincide, `pack.err.import.changed`. La vista previa (sin confirm) no lo pide.
+- Puente: `PackInstall(path, allowUnsigned, sha256)` y `PackInstallHiding(path, allowUnsigned, hide, replaceHidden, sha256)` (el sha256 va al final); `PackImport` ya lo recibía. `mctl pack install` calcula la suma del archivo; `mctl pack import` usa la de su vista previa.
+
+**4. Carpeta de salidas (`prefs.outputs.*`).** Cada rechazo lleva `reason = prefs.outputs.<motivo>`, `metadata.code = <motivo>` (relativa, punto_punto, no_existe, ilegible, no_directorio, reservada, otro_dueno, permisos, ancestro_inseguro, no_escribible) y `metadata.path` con la ruta. `permisos` incluye la orden `chmod 700 <ruta>` solo si la ruta es segura de pegar; el texto y la orden salen en es y en.
+
+**5 a 9 (puente).** El stream de eventos de un trabajo se cierra cuando llega su `jobStateChanged` final (`completed`, `cancelled`, `failed`); el front no necesita reabrirlo. `DiagRun` y `SyslogStart` ya no dejan ejecuciones colgadas si falla abrir el stream. `SecPkiExport` borra el archivo parcial si falla la escritura (se puede reintentar con la misma ruta). El SVG del camino de flota (`PathResponse.svg`) escribe «CORTE:» o «CUT:» según el idioma de la llamada.
