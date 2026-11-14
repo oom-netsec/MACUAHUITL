@@ -14,13 +14,14 @@ const topicOf = (name: string) => (name.includes("·") ? name.slice(name.indexOf
 export function PlaybookPicker({ playbooks, selected, onChange }: { playbooks: PlaybookInfo[]; selected: string[]; onChange: (ids: string[]) => void }) {
   const t = useT();
   const [q, setQ] = useState("");
+  const packLabel = (pack: string) => (pack === "usuario" ? t("patrol.pb.own") : pack === "" ? t("patrol.pb.base") : pack);
   const groups = useMemo(() => {
     const words = norm(q).split(/\s+/).filter(Boolean);
-    const hit = (p: PlaybookInfo) => { const hay = norm([p.name, p.id, p.pack, ...p.commands].join(" ")); return words.every((w) => hay.includes(w)); };
+    const hit = (p: PlaybookInfo) => { const hay = norm([p.name, p.id, packLabel(p.pack), ...p.commands].join(" ")); return words.every((w) => hay.includes(w)); };
     const m = new Map<string, PlaybookInfo[]>();
     playbooks.filter(hit).forEach((p) => m.set(areaOf(p.name), [...(m.get(areaOf(p.name)) ?? []), p]));
     return [...m].sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b, undefined, { numeric: true })));
-  }, [playbooks, q]);
+  }, [playbooks, q, t]);
   const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id].sort());
   return (
     <div className="pb-picker">
@@ -35,7 +36,7 @@ export function PlaybookPicker({ playbooks, selected, onChange }: { playbooks: P
           {list.map((p) => (
             <div key={p.id} className="pb-item">
               <Check label={topicOf(p.name)} checked={selected.includes(p.id)} onChange={() => toggle(p.id)} />
-              <span className="meta">{p.pack === "usuario" ? t("patrol.pb.own") : p.pack === "" ? t("patrol.pb.base") : p.pack}</span>
+              <span className="meta">{packLabel(p.pack)}</span>
               <details>
                 <summary className="meta">{t("patrol.pb.cmds", { n: p.commands.length })}<span className="sr"> · {p.name}</span></summary>
                 <ul className="mono pb-cmds">{p.commands.map((c) => <li key={c}>{c}</li>)}</ul>

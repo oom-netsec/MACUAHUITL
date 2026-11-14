@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual";
 import type { CoreAPI } from "../../lib/core";
 import { useT } from "../../lib/i18n";
@@ -13,11 +13,13 @@ export interface Row { state: string; progress: string; detail: string }
 export const addressOf = (target: string) => target.replace(/:\d+$/, "");
 
 // cpu: CPU de 1 min por ronda, por dirección (de las métricas del trabajo).
-export function DeviceGrid({ core, jobId, devices, initial, cpu }: { core: CoreAPI; jobId: string; devices: string[]; initial?: Record<string, Row>; cpu?: Record<string, number[]> }) {
+export function DeviceGrid({ core, jobId, devices: known, initial, cpu }: { core: CoreAPI; jobId: string; devices: string[]; initial?: Record<string, Row>; cpu?: Record<string, number[]> }) {
   const t = useT();
   const label = (s: string) => (s.startsWith("DEVICE_STATE_") ? t(`device.${s.slice(13)}` as Key) : s);
   const [rows, setRows] = useState<Record<string, Row>>(initial ?? {});
   const [beat, setBeat] = useState<string>("");
+  // Un equipo que no estaba en la lista (grilla reconstruida a mitad de la ronda 1) entra con su primer evento.
+  const devices = useMemo(() => [...new Set([...known, ...Object.keys(rows)])], [known, rows]);
   useEffect(
     () =>
       core.onEvent((e) => {

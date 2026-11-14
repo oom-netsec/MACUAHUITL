@@ -74,4 +74,8 @@ test("cada fila muestra su paquete de origen y la búsqueda lo encuentra", async
   await userEvent.type(screen.getByRole("searchbox", { name: "Buscar playbook" }), "cat9k");
   expect(screen.queryByRole("checkbox", { name: /Dos/ })).not.toBeInTheDocument();
   expect(screen.getByRole("checkbox", { name: /Uno/ })).toBeInTheDocument();
+  await userEvent.clear(screen.getByRole("searchbox", { name: "Buscar playbook" }));
+  await userEvent.type(screen.getByRole("searchbox", { name: "Buscar playbook" }), "propio"); // busca lo que la etiqueta muestra
+  expect(screen.getByRole("checkbox", { name: /Dos/ })).toBeInTheDocument();
+  expect(screen.queryByRole("checkbox", { name: /Uno/ })).not.toBeInTheDocument();
 });

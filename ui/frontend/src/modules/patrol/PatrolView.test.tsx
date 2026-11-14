@@ -495,17 +495,19 @@ test("la misma fase de ListJobs (sin fracción) y en vivo (con nanosegundos) se 
   expect(within(phases).getAllByText("Ronda 2 iniciada")).toHaveLength(1);
 });
 
-test("la grilla aparece con el primer evento de equipo si la ronda 1 aún no devolvía nada", async () => {
-  let ready = false;
+test("con la ronda 1 sin equipos terminados la grilla se arma con los eventos: cada equipo entra con el suyo", async () => {
   const core = fakeCore({
     listJobs: vi.fn(async () => [{ id: "j9", name: "nocturno", state: "armed", round: 1 }]),
-    getRun: vi.fn(async () => (ready ? [{ target: "10.0.0.5:22", state: "DEVICE_STATE_RUNNING", detail: "" }] : [])),
+    getRun: vi.fn(async () => []), // el núcleo solo lista los equipos que ya terminaron la ronda
   });
   render(<PatrolView core={core} />);
   await screen.findByRole("heading", { name: "nocturno" });
   await waitFor(() => expect(core.getRun).toHaveBeenCalled());
-  expect(screen.queryByRole("row", { name: /10\.0\.0\.5:22/ })).not.toBeInTheDocument();
-  ready = true;
-  act(() => core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.5:22", state: "DEVICE_STATE_RUNNING" } }));
+  act(() => {
+    core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.5:22", state: "DEVICE_STATE_RUNNING" } });
+    core.emitEvent({ jobId: "j9", deviceStateChanged: { deviceId: "10.0.0.6:22", state: "DEVICE_STATE_CONNECTING" } });
+  });
   expect(await screen.findByRole("row", { name: /10\.0\.0\.5:22/ })).toBeInTheDocument();
+  expect(screen.getByRole("row", { name: /10\.0\.0\.6:22/ })).toBeInTheDocument();
+  expect(core.getRun).toHaveBeenCalledTimes(1); // los eventos no vuelven a pedir la ronda
 });
