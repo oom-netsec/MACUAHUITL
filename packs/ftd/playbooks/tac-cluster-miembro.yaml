@@ -1,0 +1,19 @@
+# Propósito: Estado e historial del cluster con los logs relacionados.
+# Cuándo usarlo: Un miembro del cluster sale o no logra unirse.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: tac-cluster-miembro
+platform: ftd
+name: FTD · TAC · Miembro de cluster caído
+name_en: FTD · TAC · Cluster member down
+commands:
+  - cmd: show clock
+  - cmd: show cluster info
+  - cmd: show cluster history
+  - cmd: show running-config cluster
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show interface ip brief
+  - cmd: show version
+  - cmd: show logging | include luster
+    timeout: 180s

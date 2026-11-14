@@ -1,0 +1,15 @@
+# Propósito: Resumen del EtherChannel, LACP y estado de sus miembros.
+# Cuándo usarlo: Un port-channel está caído o sin algún miembro.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: l1-etherchannel
+platform: ftd
+name: FTD · Capa 1 · EtherChannel
+name_en: FTD · Layer 1 · EtherChannel
+commands:
+  - cmd: show clock
+  - cmd: show port-channel summary
+  - cmd: show port-channel
+  - cmd: show lacp counters
+  - cmd: show interface ip brief
+  - cmd: show traffic

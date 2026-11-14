@@ -1,0 +1,16 @@
+# Propósito: Conjuntos en línea (inline-set) y estado de sus interfaces.
+# Cuándo usarlo: El FTD está en modo en línea y el tráfico no pasa por el par de interfaces.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: l1-inline-sets
+platform: ftd
+name: FTD · Capa 1 · Conjuntos en línea
+name_en: FTD · Layer 1 · Inline sets
+commands:
+  - cmd: show clock
+  - cmd: show inline-set
+  - cmd: show interface ip brief
+  - cmd: show nameif
+  - cmd: show interface
+    timeout: 120s
+  - cmd: show traffic

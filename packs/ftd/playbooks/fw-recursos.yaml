@@ -1,0 +1,16 @@
+# Propósito: Límites y uso de conexiones, xlates, CPU y memoria.
+# Cuándo usarlo: Se sospecha que se alcanzó un límite de recursos.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: fw-recursos
+platform: ftd
+name: FTD · Firewall · Recursos del firewall
+name_en: FTD · Firewall · Firewall resources
+commands:
+  - cmd: show clock
+  - cmd: show resource usage
+  - cmd: show conn count
+  - cmd: show xlate count
+  - cmd: show perfmon
+  - cmd: show memory
+  - cmd: show cpu usage

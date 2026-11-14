@@ -1,0 +1,21 @@
+# Propósito: Estado, contadores, configuración y tráfico de la interfaz indicada.
+# Cuándo usarlo: Una interfaz concreta pierde paquetes o cambia de estado.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: l1-interfaz-detalle
+platform: ftd
+name: FTD · Capa 1 · Detalle de una interfaz
+name_en: FTD · Layer 1 · One interface in detail
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show clock
+  - cmd: show interface {interface}
+  - cmd: show interface {interface} detail
+    timeout: 120s
+  - cmd: show running-config interface {interface}
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show traffic
+  - cmd: show nameif

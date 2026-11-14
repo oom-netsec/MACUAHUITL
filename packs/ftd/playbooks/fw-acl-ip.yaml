@@ -1,0 +1,26 @@
+# Propósito: Entradas de ACL y de política de acceso que mencionan la IP indicada.
+# Cuándo usarlo: Se busca la regla que permite o bloquea a una IP.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: fw-acl-ip
+platform: ftd
+name: FTD · Firewall · ACL de una IP
+name_en: FTD · Firewall · ACLs for one IP
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: show access-list | include {ip}
+    timeout: 120s
+  - cmd: show running-config access-list | include {ip}
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show access-control-config | include {ip}
+    timeout: 120s
+  - cmd: show conn address {ip}
+    timeout: 120s
+  - cmd: show asp drop
+    timeout: 120s
+  - cmd: show logging | include {ip}
+    timeout: 180s

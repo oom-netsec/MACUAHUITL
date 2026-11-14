@@ -1,0 +1,11 @@
+# command: show version
+# Armado a mano con la forma de la documentación de Cisco (FTD 7.x); sin validar en laboratorio.
+
+Cisco Adaptive Security Appliance Software Version 9.16(2)
+
+-------------------[ firepower ]--------------------
+Model                     : Cisco ISA 3000 Threat Defense (75) Version 7.2.0 (Build 82)
+UUID                      : 2c3d4e5f-6071-11ee-9a3c-5d3c6f7a8b92
+LSP version               : lsp-rel-20230501-1613
+VDB version               : 387
+----------------------------------------------------

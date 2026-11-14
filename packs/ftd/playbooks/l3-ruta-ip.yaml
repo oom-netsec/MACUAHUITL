@@ -1,0 +1,20 @@
+# Propósito: Ruta, ARP, tabla de ruteo del ASP y conexiones hacia la IP indicada, con ping y traceroute.
+# Cuándo usarlo: No hay conectividad hacia un destino concreto.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: l3-ruta-ip
+platform: ftd
+name: FTD · Capa 3 · Ruta hacia una IP
+name_en: FTD · Layer 3 · Route to one IP
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: show route {ip}
+  - cmd: show arp | include {ip}
+  - cmd: show asp table routing | include {ip}
+  - cmd: show conn address {ip}
+    timeout: 120s
+  - cmd: ping {ip}
+  - cmd: traceroute {ip}

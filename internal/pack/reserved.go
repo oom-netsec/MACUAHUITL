@@ -31,6 +31,8 @@ var reservedSegments = map[string]bool{
 	"stack": true, "svl": true, "poe": true, "asic": true, "lisp": true, "fabric": true, "edge": true, "border": true,
 	// Los de oom/asa (además de plat, l1, l3, fw, vpn, sec, svc y tac, ya reservados): alta disponibilidad y contextos.
 	"ha": true, "ctx": true,
+	// Los de oom/ftd (además de plat, l1, l3, fw, vpn, ha, svc y tac, ya reservados): Snort y gestión con el FMC.
+	"snort": true, "mgmt": true,
 }
 
 // IsReservedSegment dice si s es un primer segmento reservado para contenido oficial.

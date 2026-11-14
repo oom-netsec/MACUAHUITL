@@ -1,0 +1,18 @@
+# Propósito: Estado de Snort 3, instancias, versión y política desplegada.
+# Cuándo usarlo: Se confirma que Snort corre y con qué política.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: snort-estado
+platform: ftd
+name: FTD · Snort · Estado de Snort
+name_en: FTD · Snort · Snort status
+commands:
+  - cmd: show clock
+  - cmd: show snort3 status
+  - cmd: show snort instances
+  - cmd: show version
+  - cmd: show managers
+    may_contain_secrets: true
+  - cmd: show access-control-config
+    timeout: 120s
+  - cmd: show cpu usage

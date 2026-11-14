@@ -51,7 +51,7 @@ func step(err error) string {
 		return "host_key"
 	case errors.Is(err, transport.ErrAuth):
 		return "auth"
-	case errors.Is(err, platform.ErrEnableFailed):
+	case errors.Is(err, platform.ErrEnableFailed), errors.Is(err, platform.ErrFirstLogin):
 		return "privilege"
 	case errors.Is(err, platform.ErrPromptTimeout), errors.Is(err, platform.ErrClosed):
 		return "prompt"

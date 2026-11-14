@@ -141,3 +141,8 @@ describe("scripts api", () => {
     expect((await f.previewScriptsImport("/tmp/s.json")).warnings).toEqual(["archivo sin suma de verificación"]);
   });
 });
+
+test("ftd es una plataforma de script", async () => {
+  const { PLATFORMS } = await import("./ScriptForm");
+  expect(PLATFORMS).toContain("ftd");
+});

@@ -1,0 +1,10 @@
+id: oom/ftd
+version: 1.0.0
+min_core: 0.4.3
+name: Cisco Secure Firewall Threat Defense (FTD), diagnóstico TAC
+name_en: Cisco Secure Firewall Threat Defense (FTD), TAC diagnostics
+description: Playbooks de solo lectura para Cisco Secure Firewall Threat Defense (FTD 7.x, gestionado por FMC o FDM) desde su CLI normal - plataforma y salud, interfaces, firewall (conexiones, NAT, ACL de lina, política de acceso), Snort, VPN, alta disponibilidad y cluster, gestión con el FMC, ruteo, servicios y casos TAC; los de una interfaz, una IP o un peer piden ese dato.
+description_en: Read-only playbooks for Cisco Secure Firewall Threat Defense (FTD 7.x, managed by FMC or FDM) from its normal CLI - platform and health, interfaces, firewall (connections, NAT, lina ACLs, access control policy), Snort, VPN, high availability and cluster, management with the FMC, routing, services and TAC cases; the per-interface, per-IP and per-peer ones ask for that datum.
+platforms: [ftd]
+author: oom-netsec
+license: Apache-2.0

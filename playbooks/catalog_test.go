@@ -16,18 +16,18 @@ import (
 )
 
 // Archivos del catálogo por área (los playbooks anteriores no llevan estos prefijos; tac-baseline es anterior).
-var catalogFile = regexp.MustCompile(`^(l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob|vxlan|fex|stack|svl|poe|asic|lisp|fabric|edge|border)-`)
+var catalogFile = regexp.MustCompile(`^(l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob|vxlan|fex|stack|svl|poe|asic|lisp|fabric|edge|border|fw|ha|snort|mgmt)-`)
 
 // Comandos que pueden imprimir secretos (el enmascarado solo corre si el comando lo declara).
-var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp (comm|host)|archive log|cts (pacs|cred)|tacacs-server|radius-server)|more )`)
+var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp (comm|host)|archive log|cts (pacs|cred)|tacacs-server|radius-server)|show (managers|network)( |$)|more )`)
 
 // Salidas sin acotar: tabla completa de rutas/BGP/CEF/MAC o todas las interfaces.
 var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces|wireless client summary|ap summary)$`)
 
 // Salidas grandes de ASA: conexiones, xlates, ACL, logs, memoria, descartes de ASP, sesiones VPN y configuraciones.
-var asaBigCmd = regexp.MustCompile(`^show (conn( address .*| detail)?|local-host|xlate|access-list( .*)?|tech-support.*|logging( \|.*)?|memory detail|asp drop.*|vpn-sessiondb detail.*|running-config( .*)?|startup-config|nat detail)$`)
+var asaBigCmd = regexp.MustCompile(`^show (conn( address .*| detail)?|local-host|xlate|access-list( .*)?|tech-support.*|logging( \|.*)?|memory detail|asp drop.*|vpn-sessiondb detail.*|running-config( .*)?|startup-config|nat detail|access-control-config.*|route|bgp|interface|crypto ipsec sa)$`)
 
-// catalogFS junta el contenido embebido con el de packs/ios-xe, packs/ios, packs/wlc-9800, packs/nx-os, packs/cat9k, packs/sda y packs/asa (en cisco/<plataforma>), para que estas pruebas sigan
+// catalogFS junta el contenido embebido con el de packs/ios-xe, packs/ios, packs/wlc-9800, packs/nx-os, packs/cat9k, packs/sda, packs/asa y packs/ftd (en cisco/<plataforma>), para que estas pruebas sigan
 // cubriendo los playbooks que salieron del binario al paquete oficial.
 func catalogFS(t testing.TB) fs.FS {
 	t.Helper()
@@ -53,6 +53,7 @@ func catalogFS(t testing.TB) fs.FS {
 	add(os.DirFS("../packs/cat9k/playbooks"), "cisco/cat9k")
 	add(os.DirFS("../packs/sda/playbooks"), "cisco/sda")
 	add(os.DirFS("../packs/asa/playbooks"), "cisco/asa")
+	add(os.DirFS("../packs/ftd/playbooks"), "cisco/ftd")
 	return m
 }
 
@@ -67,20 +68,23 @@ func TestCatalogo(t *testing.T) {
 			t.Errorf("id duplicado: %s", p.ID)
 		}
 		byID[p.ID] = p
-		if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa") && !strings.Contains(p.Name, " · ") { // el selector de Patrol agrupa por el área antes del «·»
+		if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa" || p.Platform == "ftd") && !strings.Contains(p.Name, " · ") { // el selector de Patrol agrupa por el área antes del «·»
 			t.Errorf("%s: name %q sin área (\"L2 · STP\")", p.ID, p.Name)
 		}
 		for _, c := range p.Commands {
 			if secretCmd.MatchString(c.Text) && !c.MaySecrets {
 				t.Errorf("%s: %q puede traer secretos y debe llevar may_contain_secrets", p.ID, c.Text)
 			}
-			if p.Platform == "asa" && asaBigCmd.MatchString(c.Text) && c.Timeout < 120*time.Second {
+			if (p.Platform == "asa" || p.Platform == "ftd") && asaBigCmd.MatchString(c.Text) && c.Timeout < 120*time.Second {
 				t.Errorf("%s: %q es una salida grande de ASA y necesita timeout >= 120s", p.ID, c.Text)
+			}
+			if p.Platform == "ftd" && strings.Contains(c.Text, "ASA-") { // en FTD los mensajes salen como %FTD-n-xxxxxx
+				t.Errorf("%s: %q filtra por ASA-, FTD usa %%FTD-", p.ID, c.Text)
 			}
 			if strings.Contains(c.Text, "@") {
 				t.Errorf("%s: %q lleva «@» pegado al comando", p.ID, c.Text)
 			}
-			if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa") && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
+			if (p.Platform == "ios-xe" || p.Platform == "ios" || p.Platform == "wlc-9800" || p.Platform == "nx-os" || p.Platform == "cat9k" || p.Platform == "sda" || p.Platform == "asa" || p.Platform == "ftd") && bigCmd.MatchString(c.Text) && c.Timeout <= 60*time.Second {
 				t.Errorf("%s: %q es una salida grande y necesita timeout > 60s", p.ID, c.Text)
 			}
 		}
