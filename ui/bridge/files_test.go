@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 func TestWriteFile(t *testing.T) {
@@ -54,5 +56,41 @@ func TestWriteFile(t *testing.T) {
 		if err := b.WriteFile(c.path, c.data, c.enc, false); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: error %v, se esperaba %q", c.path, err, c.want)
 		}
+	}
+}
+
+// Un archivo creado entre la comprobación y el renombrado no se reemplaza si no se pidió overwrite.
+func TestWriteFileCarreraNoReemplaza(t *testing.T) {
+	b := New(nil, func(string, any) {})
+	p := filepath.Join(t.TempDir(), "x.csv")
+	beforeSaveRename = func() { os.WriteFile(p, []byte("ajeno"), 0o600) }
+	defer func() { beforeSaveRename = nil }()
+	if err := b.WriteFile(p, "mio", "utf8", false); !errors.Is(err, ErrFileExists) {
+		t.Fatalf("err = %v; quería ErrFileExists", err)
+	}
+	if got, _ := os.ReadFile(p); string(got) != "ajeno" {
+		t.Fatalf("el archivo ajeno quedó con %q", got)
+	}
+}
+
+// En sistemas de archivos sin enlaces duros ni RENAME_NOREPLACE (CIFS, FUSE) se cae a Lstat + Rename.
+func TestWriteFileSinLinkNiNoReplace(t *testing.T) {
+	b := New(nil, func(string, any) {})
+	oldL, oldR := linkFile, renameNoReplace
+	linkFile = func(string, string) error { return &os.LinkError{Op: "link", Err: sys.ErrNoAtomicRename} }
+	renameNoReplace = func(*os.Root, string, string) error { return sys.ErrNoAtomicRename }
+	defer func() { linkFile, renameNoReplace = oldL, oldR }()
+	p := filepath.Join(t.TempDir(), "x.csv")
+	if err := b.WriteFile(p, "mio", "utf8", false); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if got, _ := os.ReadFile(p); string(got) != "mio" {
+		t.Fatalf("contenido %q", got)
+	}
+	if err := b.WriteFile(p, "otro", "utf8", false); !errors.Is(err, ErrFileExists) {
+		t.Fatalf("err = %v; quería ErrFileExists", err)
+	}
+	if got, _ := os.ReadFile(p); string(got) != "mio" {
+		t.Fatalf("se reemplazó: %q", got)
 	}
 }

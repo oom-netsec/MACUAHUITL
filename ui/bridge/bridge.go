@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -41,13 +43,14 @@ type Bridge struct {
 	ctx       context.Context               // vida del puente; los streams cuelgan de aquí, no de la llamada
 	streams   map[string]*stream            // un stream de eventos por trabajo
 	runs      map[string]context.CancelFunc // ejecuciones de diagnóstico en curso
+	assists   map[string]*stream            // un watch de asistente por ejecución (assist.go)
 	runSeq    int
 	consoles  map[string]*consoleSess // consolas serie abiertas (field.go)
 	terminals map[string]*termSess    // terminales SSH abiertas (terminal.go)
 }
 
 func New(dial func() (*ipc.ClientConn, error), emit Emitter) *Bridge {
-	return &Bridge{Interval: time.Second, dial: dial, emit: emit, ctx: context.Background(), streams: map[string]*stream{}, runs: map[string]context.CancelFunc{}}
+	return &Bridge{Interval: time.Second, dial: dial, emit: emit, ctx: context.Background(), streams: map[string]*stream{}, runs: map[string]context.CancelFunc{}, assists: map[string]*stream{}}
 }
 
 // stream es el stream de eventos de un trabajo. Su dirección es el token de generación:
@@ -153,24 +156,30 @@ func (b *Bridge) run(ctx context.Context) {
 	}
 }
 
-// syncLanguage manda al núcleo el idioma elegido mientras estaba caído.
+// syncLanguage manda al núcleo el idioma elegido mientras estaba caído. Si la UI eligió otro mientras se mandaba,
+// vuelve a mandar el vigente: el núcleo no se queda con el viejo.
 func (b *Bridge) syncLanguage(c *ipc.ClientConn) {
 	b.lang.mu.Lock()
 	v := b.lang.pending
 	b.lang.mu.Unlock()
-	if v == "" {
-		return
+	for v != "" {
+		ctx, cancel := context.WithTimeout(b.ctx, 3*time.Second)
+		_, err := v1.NewPrefsServiceClient(c).SetPreference(ctx, &v1.SetPreferenceRequest{Key: langPref, Value: v})
+		cancel()
+		if err != nil {
+			return
+		}
+		b.lang.mu.Lock()
+		if b.lang.pending == v {
+			b.lang.pending = ""
+		}
+		cur := b.lang.value
+		if !b.lang.loaded || cur == v {
+			cur = ""
+		}
+		b.lang.mu.Unlock()
+		v = cur
 	}
-	ctx, cancel := context.WithTimeout(b.ctx, 3*time.Second)
-	defer cancel()
-	if _, err := v1.NewPrefsServiceClient(c).SetPreference(ctx, &v1.SetPreferenceRequest{Key: langPref, Value: v}); err != nil {
-		return
-	}
-	b.lang.mu.Lock()
-	if b.lang.pending == v {
-		b.lang.pending = ""
-	}
-	b.lang.mu.Unlock()
 }
 
 func call[T any](b *Bridge, f func(context.Context, *ipc.ClientConn) (T, error)) (T, error) {
@@ -393,6 +402,7 @@ func (b *Bridge) ListJobs() ([]JobDTO, error) {
 // El stream vive lo que viva el puente, no la llamada: Wails cancela el contexto de
 // cada llamada al volver. Un trabajo ya suscrito no abre otro stream.
 func (b *Bridge) Subscribe(_ context.Context, jobIDs []string) error {
+	var errs []error
 	for _, id := range jobIDs {
 		b.mu.Lock()
 		st, has := b.streams[id]
@@ -400,9 +410,12 @@ func (b *Bridge) Subscribe(_ context.Context, jobIDs []string) error {
 		b.mu.Unlock()
 		if !has || dead {
 			if err := b.open(id); err != nil {
-				return wrapErr(err)
+				errs = append(errs, err) // se intentan todos los ids
 			}
 		}
+	}
+	if len(errs) > 0 {
+		return wrapErr(errs[0]) // el primero: un errors.Join no es *Error y la UI perdería code y reason
 	}
 	return nil
 }
@@ -456,7 +469,19 @@ func (b *Bridge) open(jobID string) error {
 		if ctx.Err() != nil { // otro open (resubscribe) lo reemplazó: el stream nuevo ya cubre el trabajo
 			return nil
 		}
-		markDead()
+		// Error definitivo: no se deja la entrada (resubscribe la reabriría y fallaría para siempre). Uno transitorio
+		// (Unavailable, un reset al reconectar) la deja muerta para que resubscribe la reabra.
+		switch status.Code(err) {
+		case codes.NotFound, codes.InvalidArgument, codes.PermissionDenied, codes.FailedPrecondition:
+			b.mu.Lock()
+			if b.streams[jobID] == me {
+				delete(b.streams, jobID)
+			}
+			b.mu.Unlock()
+		default:
+			markDead()
+		}
+		cancel()
 		return wrapErr(err)
 	}
 	go func() {
@@ -493,9 +518,13 @@ func (b *Bridge) resubscribe() {
 		ids = append(ids, id)
 	}
 	b.mu.Unlock()
+	// En paralelo: un núcleo atorado cuesta un plazo de encabezados, no uno por trabajo.
+	var wg sync.WaitGroup
 	for _, id := range ids {
-		b.open(id)
+		wg.Add(1)
+		go func() { defer wg.Done(); b.open(id) }()
 	}
+	wg.Wait()
 }
 
 type RunDeviceDTO struct {
