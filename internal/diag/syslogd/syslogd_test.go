@@ -3,6 +3,7 @@ package syslogd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -137,4 +138,73 @@ func TestValidateAddr(t *testing.T) {
 	if err := ValidateAddr("0.0.0.0:5514", true); err != nil {
 		t.Errorf("explicit any rejected: %v", err)
 	}
+}
+
+// Conexiones TCP que no mandan nada no pueden ocupar el receptor para siempre: se cierran por inactividad.
+func TestTCPCierraConexionInactiva(t *testing.T) {
+	old := idleTimeout
+	idleTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { idleTimeout = old })
+	addr, _ := start(t, "tcp")
+	c, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	c.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if _, err := c.Read(make([]byte, 1)); err == nil || isTimeout(err) {
+		t.Fatalf("la conexión inactiva siguió abierta: %v", err)
+	}
+}
+
+// Un solo origen no acapara las conexiones: pasado su tope se le cierran y otro equipo sigue entrando.
+func TestTCPTopePorOrigen(t *testing.T) {
+	addr, s := start(t, "tcp")
+	var held []net.Conn
+	t.Cleanup(func() {
+		for _, c := range held {
+			c.Close()
+		}
+	})
+	for range maxPerSource {
+		c, err := net.Dial("tcp", addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		held = append(held, c)
+	}
+	extra, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer extra.Close()
+	extra.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if _, err := extra.Read(make([]byte, 1)); err == nil || isTimeout(err) {
+		t.Fatalf("la conexión de más no se cerró: %v", err)
+	}
+	held[0].Close() // al liberar una, el mismo origen vuelve a entrar
+	held = held[1:]
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		c, err := net.Dial("tcp", addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fmt.Fprintf(c, "<14>de vuelta\n")
+		c.Close()
+		if got := s.count(); got > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("el origen no volvió a entrar tras liberar una conexión")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func (s *sink) count() int { s.mu.Lock(); defer s.mu.Unlock(); return len(s.msgs) }
+
+func isTimeout(err error) bool {
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
 }
