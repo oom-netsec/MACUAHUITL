@@ -259,8 +259,12 @@ func TestFTDEcoNoLiteralNoCuelga(t *testing.T) {
 			t.Fatal(err)
 		}
 		t0 := time.Now()
+		limit := 1000 * time.Millisecond // con eco reconocible basta una pausa; sin él, la red de seguridad (3 pausas)
+		if name == "truncado" {
+			limit = 4 * time.Second
+		}
 		out, err := d.Run(context.Background(), cmd, 30*time.Second)
-		if err != nil || !strings.HasSuffix(out.Text, "out\n") || time.Since(t0) > 4*time.Second {
+		if err != nil || !strings.HasSuffix(out.Text, "out\n") || time.Since(t0) > limit {
 			t.Fatalf("%s: out = %q, %v, %v", name, out.Text, err, time.Since(t0))
 		}
 	}
