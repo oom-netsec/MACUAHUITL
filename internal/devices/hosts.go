@@ -42,7 +42,7 @@ var (
 )
 
 // HostPlatforms es la lista cerrada de plataformas; vacía = sin definir.
-var HostPlatforms = []string{"ios", "ios-xe", "nx-os", "asa", "ftd", "iosxr", "wlc"}
+var HostPlatforms = []string{"ios", "ios-xe", "nx-os", "asa", "ftd", "ise", "iosxr", "wlc"}
 
 // Host es un host de la libreta. CredentialID es el id de la bóveda, vacío si no tiene.
 type Host struct {

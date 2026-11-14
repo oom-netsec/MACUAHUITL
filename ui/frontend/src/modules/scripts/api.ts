@@ -3,7 +3,7 @@
 // Un script nunca se aplica a un equipo desde aquí (ADR 0007): la vista lo inserta en la terminal sin Enter.
 
 export type ScriptTech = "l2" | "l3" | "gestion" | "seguridad" | "qos" | "etherchannel" | "wireless" | "diagnostico" | "otro";
-export type ScriptPlatform = "ios" | "ios-xe" | "nx-os" | "asa" | "ftd" | "wlc-aireos" | "cualquiera";
+export type ScriptPlatform = "ios" | "ios-xe" | "nx-os" | "asa" | "ftd" | "wlc-aireos" | "ise" | "cualquiera";
 export type ScriptOrigin = "biblioteca" | "usuario";
 
 export interface ScriptItem {
@@ -17,7 +17,7 @@ export interface ScriptItem {
   origin: ScriptOrigin;
   createdMs: number;
   updatedMs: number;
-  readOnly: boolean; // ios/ios-xe con solo comandos de lectura (las líneas «!» se ignoran; nx-os, asa, ftd, wlc-aireos y cualquiera: siempre false): Patrol puede correrlo
+  readOnly: boolean; // ios/ios-xe con solo comandos de lectura (las líneas «!» se ignoran; nx-os, asa, ftd, wlc-aireos, ise y cualquiera: siempre false): Patrol puede correrlo
   favorite: boolean; // está en la colección «favoritos»
   pinned: boolean; // fijado para la barra corta de la terminal (máximo 5, aparte de las colecciones)
   collections: string[]; // IDs de las colecciones que lo contienen (incluye «favoritos» si es favorito)
