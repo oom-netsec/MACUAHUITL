@@ -298,7 +298,17 @@ func TestWaitJobNoPierdeCierreRapido(t *testing.T) {
 	h := newHarness(t, nil)
 	cred := h.ready(t)
 	job, _ := h.arm(t, cred)
-	time.Sleep(3500 * time.Millisecond) // h.spec: 2 rondas con 1 s de intervalo; ya cerró
+	for { // sondea hasta que el trabajo terminó (el evento closed sale tras empaquetar): waitJob solo puede verlo por la suscripción previa
+		l, err := h.patrol.ListJobs(ctx(t), &v1.ListJobsRequest{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(l.Jobs) == 1 && l.Jobs[0].State == "completed" {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	time.Sleep(time.Second) // empaquetar y publicar closed
 	h.waitJob(t, job, "closed")
 }
 
