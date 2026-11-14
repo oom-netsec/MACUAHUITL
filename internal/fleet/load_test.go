@@ -200,3 +200,17 @@ func TestLoadCarpetasExtra(t *testing.T) {
 		t.Fatalf("f = %+v err = %v", f, err)
 	}
 }
+
+// Una sección marcada incompleta no desplaza la evidencia completa anterior ni cuenta como truncada.
+func TestLoadSaltaSeccionesIncompletas(t *testing.T) {
+	d := t.TempDir()
+	put(t, d, "trabajo_1/SW1_10.0.0.1/r001.txt", hdr("show ntp status")+"Clock is synchronized, stratum 3\n")
+	put(t, d, "trabajo_1/SW1_10.0.0.1/r002.txt", "===== 2026-11-05T09:00:00Z · show ntp status · incompleto =====\nClock is\n")
+	f, err := Load(d, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e, ok := f.Devs[0].Get("show ntp status"); !ok || e.Truncated || !strings.Contains(e.Text, "synchronized") {
+		t.Fatalf("%+v", e)
+	}
+}

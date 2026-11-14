@@ -329,6 +329,9 @@ func (f *Fleet) parse(w *ws, devs map[string]*Dev, key, job string, r io.Reader)
 		if m := headerRe.FindStringSubmatch(ln); m != nil && !cut {
 			if at, err := time.Parse(time.RFC3339, m[1]); err == nil {
 				flush()
+				if m[4] != "" { // salida parcial de un comando cortado: no desplaza una evidencia completa anterior
+					continue
+				}
 				if d = devs[key]; d == nil {
 					if len(devs) >= maxDevs {
 						f.lim.devs = true
@@ -338,7 +341,7 @@ func (f *Fleet) parse(w *ws, devs map[string]*Dev, key, job string, r io.Reader)
 					devs[key] = d
 				}
 				sections++
-				cmd, cur = m[2], &Evidence{At: at.UTC(), Job: job, Invalid: m[3] != "", Truncated: m[4] != ""}
+				cmd, cur = m[2], &Evidence{At: at.UTC(), Job: job, Invalid: m[3] != ""}
 				continue
 			}
 		}

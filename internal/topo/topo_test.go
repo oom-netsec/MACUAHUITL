@@ -3,6 +3,8 @@ package topo
 import (
 	"encoding/json"
 	"encoding/xml"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -76,5 +78,17 @@ func TestSVGYJSON(t *testing.T) {
 	b, _ := json.Marshal(g)
 	if err := json.Unmarshal(b, &back); err != nil || len(back.Nodes) != 2 {
 		t.Fatalf("json: %v", err)
+	}
+}
+
+func TestLoadPatrolDirSaltaSeccionesIncompletas(t *testing.T) {
+	d := t.TempDir()
+	dd := filepath.Join(d, "SW1_10.0.0.1")
+	os.MkdirAll(dd, 0o755)
+	os.WriteFile(filepath.Join(dd, "r001.txt"), []byte("===== 2026-11-04T10:00:00Z · show version =====\ncompleta\n"), 0o600)
+	os.WriteFile(filepath.Join(dd, "r002.txt"), []byte("===== 2026-11-04T10:10:00Z · show version · incompleto =====\ncorta\n"), 0o600)
+	devs, err := LoadPatrolDir(d)
+	if err != nil || len(devs) != 1 || strings.TrimSpace(devs[0].Outputs["show version"]) != "completa" {
+		t.Fatalf("%v %+v", err, devs)
 	}
 }

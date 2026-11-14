@@ -74,7 +74,7 @@ type rawDevice struct {
 type parseFn func(cmd, text string) (any, bool)
 
 var (
-	hdrRe   = regexp.MustCompile(`^===== (?:ronda (\d+) · )?(\S+) · (.+?)( · comando inválido)? =====$`)
+	hdrRe   = regexp.MustCompile(`^===== (?:ronda (\d+) · )?(\S+) · (.+?)( · comando inválido)?( · incompleto)? =====$`)
 	roundRe = regexp.MustCompile(`^r(\d+)_`)
 )
 
@@ -301,7 +301,7 @@ func scanFile(path string, fileRound int, want map[string]bool, parse parseFn, e
 		ln := sc.Text()
 		if m := hdrRe.FindStringSubmatch(ln); m != nil {
 			flush()
-			if m[4] != "" { // el equipo rechazó el comando: su salida no son datos
+			if m[4] != "" || m[5] != "" { // rechazado o incompleto: su salida no son datos
 				continue
 			}
 			round := fileRound
