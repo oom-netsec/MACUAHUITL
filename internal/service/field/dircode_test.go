@@ -12,7 +12,7 @@ import (
 func TestServeFilesTransferenciaLlevaDirCode(t *testing.T) {
 	for dir, want := range map[string]string{"lectura": "read", "escritura": "write"} {
 		var ev *v1.ServeFilesResponse
-		k := newServeSink(func(a, _, d string) {}, func(e *v1.ServeFilesResponse) error { ev = e; return nil })
+		k := newServeSink("es", func(a, _, d string) {}, func(e *v1.ServeFilesResponse) error { ev = e; return nil })
 		k.onTransfer(fileserve.Transfer{Proto: "tftp", Dir: dir, Result: "ok"})
 		k.stop()
 		var m map[string]any

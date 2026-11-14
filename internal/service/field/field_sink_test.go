@@ -17,7 +17,7 @@ func TestServeSinkRejectionsAreCountedNotAudited(t *testing.T) {
 	var audits []string
 	unblock := make(chan struct{})
 	var sent int
-	k := newServeSink(func(a, _, d string) { mu.Lock(); audits = append(audits, a+" "+d); mu.Unlock() },
+	k := newServeSink("es", func(a, _, d string) { mu.Lock(); audits = append(audits, a+" "+d); mu.Unlock() },
 		func(*v1.ServeFilesResponse) error { <-unblock; mu.Lock(); sent++; mu.Unlock(); return nil })
 	done := make(chan struct{})
 	go func() {
