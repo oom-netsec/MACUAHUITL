@@ -241,14 +241,15 @@ func ValidateAddr(addr string, allowAny bool) error {
 
 // Publish arma el mapa nombre base → ruta. Solo archivos regulares con ruta absoluta
 // y nombres sin repetir.
-func Publish(files []string) (map[string]string, error) {
-	out, _, err := publish(files)
+func Publish(files []string, extraDeny ...string) (map[string]string, error) {
+	out, _, err := publish(files, extraDeny)
 	return out, err
 }
 
+// Los archivos sueltos pasan por la misma lista de carpetas sensibles que FromDir y RecvDir (ruta y ruta real).
 // publish además devuelve el estado de cada archivo al publicarse, para detectar que después sea otro.
 // Un archivo con enlaces duros (Nlink > 1) no se publica: puede ser el mismo inodo que uno sensible.
-func publish(files []string) (map[string]string, map[string]os.FileInfo, error) {
+func publish(files []string, extraDeny []string) (map[string]string, map[string]os.FileInfo, error) {
 	if len(files) == 0 {
 		return nil, nil, i18n.New("fileserve.err.no_files", nil)
 	}
@@ -263,6 +264,9 @@ func publish(files []string) (map[string]string, map[string]os.FileInfo, error) 
 		}
 		if !st.Mode().IsRegular() {
 			return nil, nil, i18n.New("fileserve.err.not_regular", i18n.A("path", f))
+		}
+		if err := checkFileDeny(f, extraDeny); err != nil {
+			return nil, nil, err
 		}
 		if sys.HardLinked(st) {
 			return nil, nil, i18n.New("fileserve.err.hardlinks", i18n.A("path", f))
@@ -304,7 +308,7 @@ func prepare(c Config) (src *source, rcv *receiver, err error) {
 		}
 	}()
 	if len(c.Files) > 0 {
-		if src.files, src.infos, err = publish(c.Files); err != nil {
+		if src.files, src.infos, err = publish(c.Files, c.DenyDirs); err != nil {
 			return nil, nil, err
 		}
 	}

@@ -110,3 +110,30 @@ func inside(p, d string) bool {
 	d = filepath.Clean(d)
 	return p == d || strings.HasPrefix(p, d+string(filepath.Separator))
 }
+
+// checkFileDeny aplica la lista de carpetas sensibles a un archivo suelto, tanto a su ruta como a la real
+// (un enlace simbólico no lo disfraza).
+func checkFileDeny(file string, extra []string) error {
+	clean := filepath.Clean(file)
+	paths := []string{clean}
+	if real, err := filepath.EvalSymlinks(clean); err == nil {
+		paths = append(paths, real)
+	}
+	for _, d := range denyList(extra) {
+		for _, p := range paths {
+			if inside(p, d) {
+				return i18n.New("fileserve.err.dir_sensitive", i18n.A("dir", p, "deny", d))
+			}
+		}
+	}
+	// Directo en $HOME (.bash_history, .netrc, .git-credentials…): igual que $HOME como carpeta de envío.
+	if home, err := os.UserHomeDir(); err == nil && filepath.IsAbs(home) {
+		hr, _ := filepath.EvalSymlinks(home)
+		for _, p := range paths {
+			if d := filepath.Dir(p); d == filepath.Clean(home) || d == hr {
+				return i18n.New("fileserve.err.dir_home", nil)
+			}
+		}
+	}
+	return nil
+}

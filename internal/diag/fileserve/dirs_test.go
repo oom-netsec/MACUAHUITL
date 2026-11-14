@@ -381,3 +381,38 @@ func testSource(t *testing.T, s *source) *source {
 	}
 	return s
 }
+
+// Los archivos sueltos pasan por la misma lista de carpetas sensibles que FromDir y RecvDir.
+func TestPublishRechazaArchivosSensibles(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	os.MkdirAll(filepath.Join(home, ".ssh"), 0o700)
+	key := filepath.Join(home, ".ssh", "id_ed25519")
+	os.WriteFile(key, []byte("k"), 0o600)
+	cfgDir := t.TempDir()
+	cfg := filepath.Join(cfgDir, "vault.mcv")
+	os.WriteFile(cfg, []byte("v"), 0o600)
+	link := filepath.Join(t.TempDir(), "inocente.txt") // un enlace a la llave no la disfraza
+	os.Symlink(key, link)
+	for name, c := range map[string]struct {
+		f    string
+		deny []string
+	}{"ssh": {key, nil}, "enlace": {link, nil}, "config de la app": {cfg, []string{cfgDir}}, "etc": {"/etc/hostname", nil}} {
+		if _, err := Publish([]string{c.f}, c.deny...); err == nil {
+			t.Errorf("%s: publicado", name)
+		}
+		if _, _, err := prepare(Config{Addr: "127.0.0.1:0", Proto: "http", Files: []string{c.f}, DenyDirs: c.deny}); err == nil {
+			t.Errorf("%s: prepare lo aceptó", name)
+		}
+	}
+	hist := filepath.Join(home, ".bash_history")
+	os.WriteFile(hist, []byte("h"), 0o600)
+	if _, err := Publish([]string{hist}); err == nil {
+		t.Error("archivo directo en $HOME publicado")
+	}
+	ok := filepath.Join(t.TempDir(), "a.bin")
+	os.WriteFile(ok, []byte("x"), 0o600)
+	if _, err := Publish([]string{ok}); err != nil {
+		t.Errorf("archivo normal: %v", err)
+	}
+}
