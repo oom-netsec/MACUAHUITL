@@ -1,6 +1,7 @@
 package playbook
 
 import (
+	"net/netip"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -88,8 +89,8 @@ func CheckDenied(platform, cmd string) error {
 	}
 	// «to-file» es el único destino de escritura que empieza por «to-» en show; IOS acepta cualquier prefijo único,
 	// así que «to-» y «to-f…» lo son. Un nombre como «to-core» no es prefijo de to-file y pasa.
-	for _, f := range fields {
-		if len(f) >= 3 && strings.HasPrefix(f, "to-") && strings.HasPrefix("to-file", f) { // show … to-file flash:x escribe
+	for _, f := range fields[1:] {
+		if len(f) >= 2 && strings.HasPrefix("to-file", f) { // «to» ya abrevia to-file; «t» sola es ambigua // show … to-file flash:x escribe
 			return denied(cmd, "playbook.why.to_file")
 		}
 	}
@@ -139,6 +140,18 @@ func probeName(s string) bool {
 	return s != ""
 }
 
+// Palabras de protocolo y sub-modo que IOS completa por prefijo: un destino así abre el diálogo extendido.
+var probeKeywords = []string{"ip", "ipv6", "clns", "tag", "atm", "mpls", "appletalk", "decnet", "ipx", "vines", "xns", "apollo", "srb", "ethernet", "mac", "vrf"}
+
+func probeKeyword(s string) bool {
+	for _, k := range probeKeywords {
+		if strings.HasPrefix(k, s) {
+			return true
+		}
+	}
+	return false
+}
+
 func probeNum(s string, lo, hi int) (int, bool) {
 	n := 0
 	for _, r := range s {
@@ -167,8 +180,11 @@ func validProbe(f []string) bool {
 	if len(f) > 0 && (f[0] == "ip" || f[0] == "ipv6") {
 		f = f[1:]
 	}
-	if len(f) == 0 || !probeName(f[0]) || (word{"vrf", "vr"}).matches(f[0]) { // «ping vrf» sin nombre no es un destino
+	if len(f) == 0 || !probeName(f[0]) || probeKeyword(f[0]) { // un prefijo de palabra clave abre el diálogo interactivo
 		return false
+	}
+	if a, err := netip.ParseAddr(f[0]); err == nil && (a.IsLinkLocalUnicast() || a.IsMulticast()) {
+		return false // IOS pide «Output Interface» y abre el diálogo
 	}
 	f = f[1:]
 	seen := map[string]bool{}

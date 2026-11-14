@@ -121,3 +121,19 @@ func TestDenyToFileVsNombreToCore(t *testing.T) {
 		}
 	}
 }
+
+// «to» y «to-» ya son abreviatura de to-file; «t» solo es ambigua y to-core no es prefijo.
+func TestDenyToAbreviadoYDestinosAmbiguos(t *testing.T) {
+	for _, c := range []string{"show logging process x to bootflash:a", "show logging to bootflash:a", "show logging process x to- bootflash:a",
+		"ping ip", "ping i", "ping m", "ping mac", "ping vrf", "ping v", "traceroute tag", "traceroute e", "ping ipv6", "ping mpls", "ping fe80::1",
+		"ping ff02::1", "ping ipv6 fe80::1", "ping ipv6 ff02::1", "traceroute fe80::1"} {
+		if err := CheckDenied("ios-xe", c); !errors.Is(err, ErrDenied) {
+			t.Errorf("%q not denied", c)
+		}
+	}
+	for _, c := range []string{"show logging process t", "show running-config interface to-core", "ping 2001:db8::1", "ping core1", "ping ::1"} {
+		if err := CheckDenied("ios-xe", c); err != nil {
+			t.Errorf("%q denied: %v", c, err)
+		}
+	}
+}
