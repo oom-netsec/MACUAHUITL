@@ -3,7 +3,7 @@
 import { Events } from "@wailsio/runtime";
 
 export interface TerminalOpenRequest { name: string; address: string; port: number; credentialId: string; accept: string[]; rows: number; cols: number }
-export interface TerminalEvent { runId: string; opened?: string; recording?: string; data?: string; error?: string; done?: boolean }
+export interface TerminalEvent { runId: string; opened?: string; recording?: string; data?: string; error?: string; errorInfo?: { code?: string; reason?: string; metadata?: Record<string, string> }; done?: boolean }
 
 export interface TerminalAPI {
   // Devuelve el id de la sesión; el núcleo rechaza una llave de host nueva con su huella en el error.

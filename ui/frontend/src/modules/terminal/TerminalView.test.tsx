@@ -350,3 +350,13 @@ test("la búsqueda del selector de hosts filtra la lista", async () => {
   const pick = screen.getByLabelText("Host de la libreta");
   expect(within(pick).getAllByRole("option").map((o) => o.textContent)).toEqual(["Elegir un host…", "OFI-SW · 10.8.0.1:22"]);
 });
+
+// Con la interfaz en otro idioma la huella sale del errorInfo del evento terminal:done, no del texto.
+test("una llave de host cambiada llega por errorInfo y ofrece aceptarla aunque el texto no sea el esperado", async () => {
+  const fp = "pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU";
+  const core = setup();
+  await abrir("192.168.3.2");
+  act(() => { core.emitTerminal({ runId: "t1", done: true, error: "transport: clé d'hôte modifiée", errorInfo: { code: "FailedPrecondition", reason: "transport.hostkey.changed", metadata: { fingerprint: `SHA256:${fp}` } } }); });
+  expect(await screen.findByText(`SHA256:${fp}`)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeInTheDocument();
+});
