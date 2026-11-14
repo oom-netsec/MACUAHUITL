@@ -33,6 +33,9 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
   const [items, setItems] = useState<ScriptItem[] | null>(null);
   const [ver, setVer] = useState(0);
   const [selId, setSelId] = useState("");
+  const detail = useRef<HTMLDivElement>(null);
+  // En una sola columna (ventana angosta, ver scripts.css) el detalle queda debajo de la lista: se lleva a la vista al elegir.
+  useEffect(() => { if (selId && window.matchMedia?.("(max-width: 1150px)").matches) detail.current?.scrollIntoView?.({ block: "start" }); }, [selId]);
   const [form, setForm] = useState<{ item?: ScriptItem } | null>(null);
   const back = useRef(""); // botón que abrió el formulario, para devolverle el foco al cerrarlo
   const [picked, setPicked] = useState<string[]>([]);
@@ -130,7 +133,7 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
                 <li key={s.id} className="scr-row" data-sel={s.id === selId}>
                   <input type="checkbox" aria-label={t("scripts.pick", { name: s.name })} checked={picked.includes(s.id)}
                     onChange={(e) => setPicked((p) => (e.target.checked ? [...p, s.id] : p.filter((x) => x !== s.id)))} />
-                  <button type="button" className="quiet scr-name" onClick={() => setSelId(s.id)}>{s.name}</button>
+                  <button type="button" className="quiet scr-name" onClick={() => setSelId(s.id)}><span className="ell">{s.name}</span></button>
                   <span className="scr-meta">
                     <Badge>{techName(s.tech)}</Badge>
                     <Badge>{platName(s.platform)}</Badge>
@@ -146,7 +149,7 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
             </ul>
           )}
         </div>
-        <div>
+        <div ref={detail}>
           {sel ? (
             <ResultPanel title={sel.name} pad
               actions={

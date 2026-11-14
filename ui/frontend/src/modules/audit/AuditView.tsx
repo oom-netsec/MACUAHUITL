@@ -11,7 +11,7 @@ export function AuditView({ core }: { core: CoreAPI }) {
   const r = useResult<{ intact: boolean; firstBroken: number; head: string }>();
   return (
     <Page title={t("audit.title")} description={t("audit.desc")}>
-      <p>{t("audit.intro")} <code>{EXPORT_CMD}</code><CopyButton value={EXPORT_CMD} label={t("audit.copyCmd")} /></p>
+      <p>{t("audit.intro")} <code className="nowrap">{EXPORT_CMD}</code><CopyButton value={EXPORT_CMD} label={t("audit.copyCmd")} /></p>
       <div className="actions">
         <button className="primary" onClick={() => r.run(() => core.auditVerify())} disabled={r.busy} aria-busy={r.busy}>{t("audit.verify")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
       </div>
