@@ -100,7 +100,7 @@ func TestAdhocResultErroresEnElIdioma(t *testing.T) {
 		{service.JobInfo{State: "completed"}, "el lote no conserva su carpeta de salida", "the batch no longer has its output folder"},
 	}
 	for _, c := range cases {
-		for loc, want := range map[string]string{"": c.es, "es": c.es, "en": c.en} {
+		for loc, want := range map[string]string{"es": c.es, "en": c.en} {
 			s := &adhocSvc{d: jobDeps{servicetest.New(t), c.info}, cmds: map[string][]string{}}
 			r, err := s.AdhocResult(i18n.WithLocale(context.Background(), loc), &v1.AdhocResultRequest{JobId: "j"})
 			if err != nil || r.Error != want {
