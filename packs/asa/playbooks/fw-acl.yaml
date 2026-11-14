@@ -1,0 +1,21 @@
+# Propósito: ACLs aplicadas, contadores de aciertos y reglas inactivas.
+# Cuándo usarlo: Se revisa qué regla bloquea o permite tráfico y cuáles no tienen aciertos.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: fw-acl
+platform: asa
+name: ASA · Firewall · ACL y hitcounts
+name_en: ASA · Firewall · ACLs and hit counts
+commands:
+  - cmd: show clock
+  - cmd: show running-config access-group
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show access-list brief
+    timeout: 120s
+  - cmd: show access-list element-count
+    timeout: 120s
+  - cmd: show access-list | include inactive|expired
+    timeout: 120s
+  - cmd: show access-list
+    timeout: 120s

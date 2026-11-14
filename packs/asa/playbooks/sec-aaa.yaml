@@ -1,0 +1,23 @@
+# Propósito: Servidores AAA, estado, usuarios locales y configuración de autenticación.
+# Cuándo usarlo: Falla la autenticación de VPN o de gestión contra RADIUS, TACACS+ o LDAP.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: sec-aaa
+platform: asa
+name: ASA · Seguridad · AAA
+name_en: ASA · Security · AAA
+commands:
+  - cmd: show clock
+  - cmd: show aaa-server
+  - cmd: show aaa-server protocol radius
+  - cmd: show aaa local user locked
+  - cmd: show uauth
+  - cmd: show running-config aaa
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show running-config aaa-server
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show running-config username
+    timeout: 120s
+    may_contain_secrets: true

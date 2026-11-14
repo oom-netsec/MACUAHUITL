@@ -84,8 +84,32 @@ func TestReadOnly(t *testing.T) {
 	if s.ReadOnly() {
 		t.Fatal("sin comandos reales no es read_only")
 	}
-	// CheckDenied solo modela IOS: en las demás plataformas nada es read_only hasta que tengan sus reglas
-	for _, p := range []string{"nx-os", "asa", "cualquiera"} {
+	// ASA tiene sus reglas: solo show es de lectura; «more system:running-config» muestra las claves.
+	s.Platform, s.Commands = "asa", []string{"show version", "show conn count", "packet-tracer input inside tcp 10.0.0.1 1025 192.0.2.5 80"}
+	if !s.ReadOnly() {
+		t.Error("asa con solo show es read_only")
+	}
+	for _, c := range []string{"more system:running-config", "copy running-config disk0:x", "show tech-support file disk0:x", "changeto context admin"} {
+		s.Commands = []string{"show version", c}
+		if s.ReadOnly() {
+			t.Errorf("asa %q no debe ser read_only", c)
+		}
+	}
+	// «Enviar a la terminal» no mira la plataforma de la sesión: de solo lectura es lo inofensivo en IOS-XE y en ASA a la vez.
+	for _, c := range []struct{ plat, cmd string }{{"asa", "show logging process ios to-file bootflash:x"}, {"ios-xe", "show tech-support file disk0:x"}} {
+		s.Platform, s.Commands = c.plat, []string{c.cmd}
+		if s.ReadOnly() {
+			t.Errorf("%s %q no debe ser read_only", c.plat, c.cmd)
+		}
+	}
+	for _, c := range []struct{ plat, cmd string }{{"ios-xe", "show ip interface brief | section x"}, {"asa", "show conn count"}} {
+		s.Platform, s.Commands = c.plat, []string{c.cmd}
+		if !s.ReadOnly() {
+			t.Errorf("%s %q debe ser read_only", c.plat, c.cmd)
+		}
+	}
+	// las demás plataformas no son read_only hasta que tengan sus reglas
+	for _, p := range []string{"nx-os", "cualquiera"} {
 		s.Platform, s.Commands = p, []string{"show version"}
 		if s.ReadOnly() {
 			t.Errorf("%s no debe ser read_only", p)

@@ -1,0 +1,17 @@
+# Propósito: Memoria libre, uso por proceso y detalle de la memoria de DMA y del sistema.
+# Cuándo usarlo: Memoria libre baja, sospecha de fuga o conexiones/xlates que no se liberan.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: plat-memoria
+platform: asa
+name: ASA · Plataforma · Memoria
+name_en: ASA · Platform · Memory
+commands:
+  - cmd: show clock
+  - cmd: show memory
+  - cmd: show processes memory
+  - cmd: show blocks
+  - cmd: show conn count
+  - cmd: show xlate count
+  - cmd: show memory detail
+    timeout: 120s

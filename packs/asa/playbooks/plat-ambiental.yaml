@@ -1,0 +1,16 @@
+# Propósito: Temperatura, ventiladores y fuentes de poder.
+# Cuándo usarlo: Alarma ambiental, apagados por temperatura o una fuente caída.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: plat-ambiental
+platform: asa
+name: ASA · Plataforma · Ambiente (temperatura, ventiladores, fuentes)
+name_en: ASA · Platform · Environment
+commands:
+  - cmd: show clock
+  - cmd: show environment
+  - cmd: show environment temperature
+  - cmd: show environment fans
+  - cmd: show environment power-supply
+  - cmd: show module
+  - cmd: show inventory

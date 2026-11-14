@@ -161,15 +161,15 @@ func Runnable(cmds []string) []string {
 }
 
 // ReadOnly dice si todos los comandos pasan playbook.CheckDenied y ninguno trae «;».
-// shortcut: CheckDenied solo modela IOS/IOS-XE, así que en nx-os, asa y cualquiera nunca es read_only;
-// cuando CheckDenied tenga reglas por plataforma, medir «cualquiera» contra todas las concretas.
+// shortcut: solo ios, ios-xe y asa se miden con CheckDenied; nx-os y cualquiera nunca son read_only. Cuando nx-os se
+// conecte aquí, medir «cualquiera» contra todas las concretas.
 func (s Script) ReadOnly() bool {
-	if s.Platform != "ios" && s.Platform != "ios-xe" {
+	if s.Platform != "ios" && s.Platform != "ios-xe" && s.Platform != "asa" {
 		return false
 	}
 	cmds := Runnable(s.Commands)
 	for _, c := range cmds {
-		if strings.Contains(c, ";") || playbook.CheckDenied(s.Platform, c) != nil {
+		if strings.Contains(c, ";") || playbook.CheckDenied(s.Platform, c) != nil || playbook.WritesOnOtherFamily(c) { // la terminal no mira la plataforma de la sesión: debe ser inofensivo en ambas familias
 			return false
 		}
 	}

@@ -70,8 +70,8 @@ func TestExpand(t *testing.T) {
 }
 
 func TestExpandKinds(t *testing.T) {
-	ok := map[string][]string{"ap": {"AP-9120_1", "a.b-c"}, "interface": {"Gi1/0/11", "Tw1/0/1.100", "Vlan10"}, "ip": {"10.0.0.1", "2001:db8::1"}}
-	bad := map[string][]string{"ap": {"-ap", "a b", "a|b", strings.Repeat("a", 33), ""}, "interface": {"1/0", "Gi1 /1", "Gi1/0;x", "G"}, "ip": {"10.0.0", "1.1.1.1 x", "fe80::1%eth0"}}
+	ok := map[string][]string{"ap": {"AP-9120_1", "a.b-c"}, "interface": {"Gi1/0/11", "Tw1/0/1.100", "Vlan10", "outside_isp", "dmz_1"}, "ip": {"10.0.0.1", "2001:db8::1"}}
+	bad := map[string][]string{"ap": {"-ap", "a b", "a|b", strings.Repeat("a", 33), ""}, "interface": {"1/0", "Gi1 /1", "Gi1/0;x", "G", "_x"}, "ip": {"10.0.0", "1.1.1.1 x", "fe80::1%eth0"}}
 	for k, vs := range ok {
 		for _, v := range vs {
 			if _, err := ValidateValue(k, v); err != nil {
@@ -120,5 +120,18 @@ func TestLlavesSinParams(t *testing.T) {
 	_, err = loadOne(t, "id: x\nplatform: ios-xe\nname: X\nparams:\n  - {name: mac, kind: mac}\ncommands:\n  - cmd: show {mac} {otro}\n")
 	if err == nil || !strings.Contains(err.Error(), "otro") {
 		t.Fatalf("sin declarar debe fallar: %v", err)
+	}
+}
+
+// Un nombre con «_» sustituido en un comando se juzga igual que escrito a mano en cada plataforma.
+func TestExpandGuionBajoComoALaMano(t *testing.T) {
+	for _, plat := range []string{"ios", "ios-xe", "nx-os", "asa"} {
+		for _, tpl := range []string{"show interface {x}", "ping {x}", "show run | redirect {x}"} {
+			p := Playbook{Platform: plat, Params: []Param{{"x", "interface"}}, Commands: []Command{{Text: tpl}}}
+			_, err := p.Expand(map[string]string{"x": "outside_isp"})
+			if want := CheckDenied(plat, strings.ReplaceAll(tpl, "{x}", "outside_isp")); (err == nil) != (want == nil) {
+				t.Errorf("%s %q: Expand=%v, a mano=%v", plat, tpl, err, want)
+			}
+		}
 	}
 }

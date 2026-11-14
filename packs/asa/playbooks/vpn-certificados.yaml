@@ -1,0 +1,18 @@
+# Propósito: Trustpoints, certificados, CRL y llaves públicas.
+# Cuándo usarlo: Un certificado venció, no valida o el cliente muestra advertencia.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: vpn-certificados
+platform: asa
+name: ASA · VPN · Certificados y trustpoints
+name_en: ASA · VPN · Certificates and trustpoints
+commands:
+  - cmd: show clock
+  - cmd: show crypto ca trustpoints
+  - cmd: show crypto ca certificates
+  - cmd: show crypto ca crls
+  - cmd: show crypto ca trustpool
+  - cmd: show crypto key mypubkey rsa
+  - cmd: show running-config ssl
+    timeout: 120s
+    may_contain_secrets: true

@@ -92,6 +92,9 @@ func CheckDenied(platform, cmd string) error {
 	if platform == "nx-os" {
 		return checkNXOS(cmd)
 	}
+	if platform == "asa" {
+		return checkASA(cmd)
+	}
 	segs := strings.Split(strings.ToLower(cmd), "|")
 	fields := strings.Fields(segs[0])
 	if len(fields) == 0 {
@@ -120,7 +123,7 @@ func CheckDenied(platform, cmd string) error {
 		if remotePath(f) {
 			return denied(cmd, "playbook.why.remote")
 		}
-		if f != "" && strings.HasPrefix("to-file", f) { // «t», «to», «to-»… abrevian to-file: show … to-file flash:x escribe
+		if isToFile(f) { // «t», «to», «to-»… abrevian to-file: show … to-file flash:x escribe
 			return denied(cmd, "playbook.why.to_file")
 		}
 	}
@@ -232,7 +235,7 @@ func validProbe(f []string) bool {
 	if len(f) == 0 || !probeName(f[0]) || probeKeyword(f[0]) { // un prefijo de palabra clave abre el diálogo interactivo
 		return false
 	}
-	if a, err := netip.ParseAddr(f[0]); err == nil && (a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})) {
+	if a, err := netip.ParseAddr(f[0]); err == nil && badProbeAddr(a) {
 		return false // IOS pide «Output Interface» y abre el diálogo
 	}
 	f = f[1:]
@@ -270,4 +273,31 @@ func validProbe(f []string) bool {
 		f = f[o.nargs:]
 	}
 	return true
+}
+
+// badProbeAddr: destinos de ping/traceroute que abren el diálogo o hacen difusión. Una IPv4 mapeada (::ffff:a.b.c.d)
+// se juzga como la IPv4 que envuelve.
+func badProbeAddr(a netip.Addr) bool {
+	a = a.Unmap()
+	return a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})
+}
+
+// isToFile: «to-file» y sus prefijos («t», «to», «to-»…) son el destino de escritura de show en IOS.
+func isToFile(f string) bool { return f != "" && strings.HasPrefix("to-file", f) }
+
+// WritesOnOtherFamily dice si cmd lleva un destino de escritura de la otra familia: «to-file» (IOS/IOS-XE) o
+// «file» (ASA) entre los argumentos, antes del pipe. Un script que se manda a la terminal sin saber la plataforma
+// de la sesión no debe contar como de lectura si escribe en alguna de las dos.
+func WritesOnOtherFamily(cmd string) bool {
+	cmdPart, _, _ := strings.Cut(strings.ToLower(cmd), "|")
+	f := strings.Fields(cmdPart)
+	if len(f) == 0 {
+		return false
+	}
+	for i, a := range f[1:] {
+		if isToFile(a) || i > 0 && Abbrev(a, "file") { // «show file systems»: «file» en primer lugar es el subcomando, no un destino
+			return true
+		}
+	}
+	return false
 }

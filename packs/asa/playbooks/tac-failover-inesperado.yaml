@@ -1,0 +1,21 @@
+# Propósito: Estado, historial, interfaces monitoreadas y syslogs de la conmutación.
+# Cuándo usarlo: El par conmutó sin cambio programado.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: tac-failover-inesperado
+platform: asa
+name: ASA · TAC · Failover inesperado
+name_en: ASA · TAC · Unexpected failover
+commands:
+  - cmd: show clock
+  - cmd: show failover
+  - cmd: show failover history
+  - cmd: show failover state
+  - cmd: show failover interface
+  - cmd: show failover statistics
+  - cmd: show monitor-interface
+  - cmd: show interface ip brief
+  - cmd: show cpu usage
+  - cmd: show memory
+  - cmd: "show logging | include ASA-[0-9]-(104|105|102|103)"
+    timeout: 180s

@@ -1,0 +1,23 @@
+# Propósito: Sesiones SSH y ASDM, ajustes de SSH/HTTP y llaves del equipo.
+# Cuándo usarlo: No se puede administrar el ASA por SSH o ASDM.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: sec-gestion
+platform: asa
+name: ASA · Seguridad · Acceso de gestión (SSH/HTTP)
+name_en: ASA · Security · Management access
+commands:
+  - cmd: show clock
+  - cmd: show curpriv
+  - cmd: show ssh sessions
+  - cmd: show asdm sessions
+  - cmd: show running-config ssh
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show running-config http
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show running-config telnet
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show crypto key mypubkey rsa

@@ -1,0 +1,29 @@
+# Propósito: Simulación con packet-tracer (UDP 53 y UDP 123) más NAT, ACL y descartes. Ojo: packet-tracer sube los contadores hitcnt de las ACL y, con tráfico interesante para un crypto map, puede iniciar la negociación IKE.
+# Cuándo usarlo: Falla DNS, NTP u otro flujo UDP entre dos hosts a través del ASA.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: tac-trafico-no-pasa-udp
+platform: asa
+name: ASA · TAC · Tráfico UDP que no pasa (DNS/NTP)
+name_en: ASA · TAC · UDP traffic not passing
+params:
+  - name: interface
+    kind: interface
+  - name: src
+    kind: ip
+  - name: dst
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: packet-tracer input {interface} udp {src} 12345 {dst} 53 detailed
+  - cmd: packet-tracer input {interface} udp {src} 12345 {dst} 123 detailed
+  - cmd: show route {dst}
+  - cmd: show nat detail
+    timeout: 120s
+  - cmd: show conn address {src}
+    timeout: 120s
+  - cmd: show asp drop
+    timeout: 120s
+  - cmd: show service-policy | include Inspect|drop
+  - cmd: show logging | include {src}
+    timeout: 180s

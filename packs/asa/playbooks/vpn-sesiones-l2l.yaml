@@ -1,0 +1,17 @@
+# Propósito: Resumen y detalle de sesiones L2L y razón de uso de protocolos.
+# Cuándo usarlo: Se revisa cuántos túneles L2L hay arriba y cuánto tráfico mueven.
+# Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
+# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+id: vpn-sesiones-l2l
+platform: asa
+name: ASA · VPN · Sesiones site-to-site
+name_en: ASA · VPN · Site-to-site sessions
+commands:
+  - cmd: show clock
+  - cmd: show vpn-sessiondb summary
+  - cmd: show vpn-sessiondb l2l
+  - cmd: show vpn-sessiondb detail l2l
+    timeout: 120s
+  - cmd: show vpn-sessiondb ratio protocol
+  - cmd: show vpn-sessiondb ratio encryption
+  - cmd: show vpn-sessiondb license-summary

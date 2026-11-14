@@ -86,7 +86,7 @@ func Visible(detected string, pbs []Playbook) []Playbook {
 }
 
 // knownPlatforms son las plataformas que un playbook puede nombrar en platforms: (las de playbooks/cisco).
-var knownPlatforms = []string{"ios", "ios-xe", "nx-os", "cat9k", "ftd", "ise", "sda", "wlc-9800", "wlc-aireos"}
+var knownPlatforms = []string{"ios", "ios-xe", "nx-os", "asa", "cat9k", "ftd", "ise", "sda", "wlc-9800", "wlc-aireos"}
 
 // KnownPlatforms son las plataformas que un playbook puede nombrar.
 func KnownPlatforms() []string { return slices.Clone(knownPlatforms) }
