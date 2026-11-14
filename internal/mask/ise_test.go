@@ -54,3 +54,26 @@ func TestISENoCambiaIOS(t *testing.T) {
 		}
 	}
 }
+
+// SNMPv3 de ISE: dos claves tras hash|plain; el usuario, el engine ID y la IP no se tapan.
+func TestISESNMPv3YNtpSha(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"snmp-server user snmpu v3 plain AuthPass123 PrivPass123", "snmp-server user snmpu v3 plain <MASKED:snmp-user-auth> <MASKED:snmp-user-priv>"},
+		{"snmp-server user snmpu v3 hash 1a2b3c 4d5e6f", "snmp-server user snmpu v3 hash <MASKED:snmp-user-auth> <MASKED:snmp-user-priv>"},
+		{"snmp-server user snmpu v3 plain AuthPass123 PrivPass123 RO", "snmp-server user snmpu v3 plain <MASKED:snmp-user-auth> <MASKED:snmp-user-priv> RO"},
+		{"snmp-server host 10.1.1.5 version 3 snmpu 0x80001f88 plain AuthPass123 PrivPass123", "snmp-server host 10.1.1.5 version 3 snmpu 0x80001f88 plain <MASKED:snmp-user-auth> <MASKED:snmp-user-priv>"},
+		{"snmp-server host 10.1.1.5 version 3 snmpu 0x80001f88 hash 1a2b 3c4d", "snmp-server host 10.1.1.5 version 3 snmpu 0x80001f88 hash <MASKED:snmp-user-auth> <MASKED:snmp-user-priv>"},
+		{"ntp authentication-key 1 sha1 plain K3y", "ntp authentication-key 1 sha1 plain <MASKED:ntp-key>"},
+		{"ntp authentication-key 1 sha1 hash 0A1B", "ntp authentication-key 1 sha1 hash <MASKED:ntp-key>"},
+		{"snmp-server user snmpu", "snmp-server user snmpu"},
+	} {
+		once, _ := Apply("ise", c.in+"\n")
+		if got := once[:len(once)-1]; got != c.want {
+			t.Errorf("Apply(%q)\n got %q\nwant %q", c.in, got, c.want)
+		}
+		twice, n := Apply("ise", once)
+		if twice != once || len(n) != 0 {
+			t.Errorf("no idempotente %q: %q → %q %v", c.in, once, twice, n)
+		}
+	}
+}

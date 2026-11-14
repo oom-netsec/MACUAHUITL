@@ -77,7 +77,7 @@ func isASASNMPHost(line, platform string) bool {
 
 // ISE (ADE-OS): «username U password hash|plain X role …» y «ntp authentication-key N md5 hash|plain X»; las reglas de
 // IOS tomarían «hash»/«plain» como el valor y dejarían el secreto a la vista.
-var iseHashPlain = regexp.MustCompile(`(?i)^\s*(?:username \S+ password|ntp authentication-key \d+ md5) (?:hash|plain) \S`)
+var iseHashPlain = regexp.MustCompile(`(?i)^\s*(?:username \S+ password|ntp authentication-key \d+ \S+) (?:hash|plain) \S`)
 
 // Cada regla captura (prefijo)(valor)(resto); solo se reemplaza el valor.
 var iosRules = []rule{
@@ -693,7 +693,12 @@ func init() {
 // ISE: usuarios, claves NTP y usuarios de repositorios con «hash|plain» antes del valor; el usuario, el rol y el índice no se tapan.
 var iseRules = []rule{
 	R("user-secret", "", `\s*username \S+ password (?:hash|plain) `),
-	R("ntp-key", "", `\s*ntp authentication-key \d+ md5 (?:hash|plain) `),
+	R("ntp-key", "", `\s*ntp authentication-key \d+ \S+ (?:hash|plain) `),
+	// SNMPv3: dos claves (autenticación y privacidad) tras hash|plain; cada regla tapa una y la otra regla la otra.
+	R("snmp-user-auth", "", `\s*snmp-server user \S+ v3 (?:hash|plain) `),
+	R("snmp-user-priv", "", `\s*snmp-server user \S+ v3 (?:hash|plain) \S+ `),
+	R("snmp-user-auth", "", `\s*snmp-server host \S+ version 3 \S+ \S+ (?:hash|plain) `),
+	R("snmp-user-priv", "", `\s*snmp-server host \S+ version 3 \S+ \S+ (?:hash|plain) \S+ `),
 	R("client-password", "", `\s*user \S+ password (?:hash|plain) `), // dentro de «repository NAME»
 }
 
