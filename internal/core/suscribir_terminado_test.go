@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"io"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -71,7 +72,8 @@ func suscribirCerrado(t *testing.T, veces int) {
 	}
 }
 
-// Un Subscribe que llega mientras finish corre (estado final puesto, closed aún no) no se cierra: recibe el closed por el bus.
+// Un Subscribe que llega mientras finish corre (estado final puesto, closed aún no) no se cierra: con el closed del bus
+// recibe antes el estado final que se perdió.
 func TestSubscribeDuranteFinishRecibeClosed(t *testing.T) {
 	h := newHarness(t, nil)
 	job, _ := h.created(t, h.ready(t), nil)
@@ -104,8 +106,10 @@ func TestSubscribeDuranteFinishRecibeClosed(t *testing.T) {
 	h.core.jobs[job].closed = true
 	h.core.mu.Unlock()
 	h.core.bus.Publish(engine.Event{JobID: job, Kind: engine.JobState, State: "closed"})
-	if m := <-got; m != "closed" {
-		t.Fatalf("llegó %q", m)
+	for _, want := range []string{"completed", "closed"} {
+		if m := <-got; m != want {
+			t.Fatalf("llegó %q, quería %q", m, want)
+		}
 	}
 }
 
@@ -280,5 +284,61 @@ func TestSubscribeAIdInexistenteEsNotFound(t *testing.T) {
 		if st.Code() != codes.NotFound || reason != "patrol.err.job_missing" || !strings.Contains(st.Message(), want) {
 			t.Errorf("%s: %v (%q)", loc, err, reason)
 		}
+	}
+}
+
+// Un Subscribe que llega con el trabajo ya terminado pero aún sin "closed" (finish haciendo el manifest y el zip, o
+// closeCancelled entre sus dos eventos) se perdió el estado final por el bus: lo recibe antes del "closed" en vivo.
+func TestSubscribeEnMedioDelCierreRecibeElEstadoFinal(t *testing.T) {
+	h := newHarness(t, nil)
+	job, _ := h.created(t, h.ready(t), nil)
+	h.core.mu.Lock()
+	h.core.jobs[job].state = "cancelled" // finish ya lo marcó; "cancelled" salió por el bus antes de suscribirse
+	h.core.mu.Unlock()
+	c, stop := context.WithTimeout(ctx(t), 20*time.Second)
+	defer stop()
+	s, err := h.events.Subscribe(c, &v1.SubscribeRequest{JobIds: []string{job}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for h.core.bus.Subscribers() < 1 {
+		time.Sleep(5 * time.Millisecond)
+	}
+	h.core.mu.Lock()
+	h.core.jobs[job].closed = true
+	h.core.mu.Unlock()
+	h.core.bus.Publish(engine.Event{JobID: job, Kind: engine.JobState, State: "closed"})
+	want := []string{job + ":cancelled", job + ":closed"}
+	if got := recvStates(t, s); !slices.Equal(got, want) {
+		t.Fatalf("eventos = %v, quería %v", got, want)
+	}
+}
+
+// Un armado deshecho (el planificador lo rechaza, o una cancelación vista justo antes) no deja al trabajo apuntando a
+// la carpeta de salida, al writer ni al release ya deshechos, y la carpeta vacía se borra.
+func TestArmadoDeshechoNoDejaCarpetaNiWriter(t *testing.T) {
+	for nombre, cancelar := range map[string]bool{"rechazado": false, "cancelado antes de armar": true} {
+		t.Run(nombre, func(t *testing.T) {
+			h := newHarness(t, nil)
+			job, fp := h.created(t, h.ready(t), nil)
+			h.core.mu.Lock()
+			j := h.core.jobs[job]
+			j.spec.Schedule.Cron = "no es cron" // sched.Arm lo rechaza después de crear el writer
+			j.cancelReq = cancelar
+			out := j.spec.OutputDir
+			h.core.mu.Unlock()
+			if _, err := h.patrol.ArmJob(ctx(t), &v1.ArmJobRequest{JobId: job, AcceptedHostKeyFingerprints: []string{fp}}); err == nil {
+				t.Fatal("ArmJob debía fallar")
+			}
+			h.core.mu.Lock()
+			dir, w, rel := j.OutputDir, j.writer, j.release
+			h.core.mu.Unlock()
+			if dir != "" || w != nil || rel != nil {
+				t.Fatalf("OutputDir=%q writer=%v release=%v", dir, w != nil, rel != nil)
+			}
+			if m, _ := filepath.Glob(filepath.Join(out, "*")); len(m) != 0 {
+				t.Fatalf("quedó la carpeta del armado deshecho: %v", m)
+			}
+		})
 	}
 }

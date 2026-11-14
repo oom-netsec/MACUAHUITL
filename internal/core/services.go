@@ -290,11 +290,16 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 		c.mu.Lock()
 		j.state = "created"
+		w := j.writer // el writer, la carpeta y el release de este armado ya están deshechos: no deben quedar apuntados
+		j.OutputDir, j.writer, j.release = "", nil, nil
 		cancelled := j.cancelReq
 		if cancelled { // cancelaron durante el armado fallido: no vuelve a "created"
 			j.cancelReq, j.state = false, "cancelled"
 		}
 		c.mu.Unlock()
+		if w != nil {
+			os.Remove(w.Dir()) // la carpeta que creó NewWriter; Remove no borra una carpeta con contenido
+		}
 		if cancelled {
 			c.guard.Revoke(j.id)
 			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
@@ -405,7 +410,7 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	c.mu.Lock()
 	if j.cancelReq {
 		j.cancelReq, j.state = false, "cancelled"
-		j.OutputDir, j.writer = "", nil // la carpeta se borra abajo: no debe quedar apuntada
+		j.OutputDir, j.writer, j.release = "", nil, nil // undo los deshace y la carpeta se borra abajo: no deben quedar apuntados
 		c.mu.Unlock()
 		for i := len(undo) - 1; i >= 0; i-- {
 			undo[i]()
@@ -627,10 +632,10 @@ func (s *patrolSvc) GetRun(ctx context.Context, r *v1.GetRunRequest) (*v1.GetRun
 // closeCancelled cierra un trabajo cancelado que nunca llega a finish (cancelado antes de armar o mientras se arma):
 // publica cancelled, lo marca cerrado y publica closed, para que quien lo vigila termine.
 func (c *Core) closeCancelled(j *job) {
-	c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "cancelled"})
 	c.mu.Lock()
-	j.closed = true
+	j.closed = true // antes de publicar, como finish: un Subscribe que llegue ahora manda el sintético completo
 	c.mu.Unlock()
+	c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "cancelled"})
 	c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "closed"})
 }
 
@@ -652,12 +657,26 @@ func (c *Core) closedJobs(ids []string) map[string][]*v1.SubscribeResponse {
 		ev := func(state string) *v1.SubscribeResponse {
 			return &v1.SubscribeResponse{At: timestamppb.New(at), JobId: id, Event: &v1.SubscribeResponse_JobStateChanged{JobStateChanged: &v1.JobStateChanged{State: state}}}
 		}
-		if j.state == "completed" || j.state == "cancelled" || j.state == "failed" {
+		if isFinal(j.state) {
 			out[id] = append(out[id], ev(j.state))
 		}
 		out[id] = append(out[id], ev("closed"))
 	}
 	return out
+}
+
+// finalState es el estado final de un trabajo terminado ("" si no ha terminado o no existe).
+func (c *Core) finalState(id string) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if j, ok := c.jobs[id]; ok && isFinal(j.state) {
+		return j.state
+	}
+	return ""
+}
+
+func isFinal(state string) bool {
+	return state == "completed" || state == "cancelled" || state == "failed"
 }
 
 type eventSvc struct {
@@ -691,6 +710,8 @@ func (s *eventSvc) Subscribe(r *v1.SubscribeRequest, st v1.EventService_Subscrib
 	if len(ids) > 0 && closed == len(ids) {
 		return nil
 	}
+	final := map[string]bool{} // trabajos cuyo estado final ya se mandó en vivo
+	loc := i18n.Locale(st.Context())
 	for {
 		select {
 		case <-st.Context().Done():
@@ -702,7 +723,20 @@ func (s *eventSvc) Subscribe(r *v1.SubscribeRequest, st v1.EventService_Subscrib
 			if _, was := done[e.JobID]; was { // ya mandado en el sintético
 				continue
 			}
-			if err := st.Send(eventToProto(i18n.Locale(st.Context()), e)); err != nil {
+			if e.Kind == engine.JobState && isFinal(e.State) {
+				final[e.JobID] = true
+			}
+			// Quien se suscribió después de que saliera el estado final (finish o closeCancelled en curso) lo recibe
+			// antes del "closed": el contrato es estado final y luego closed.
+			if e.Kind == engine.JobState && e.State == "closed" && !final[e.JobID] {
+				if fs := s.c.finalState(e.JobID); fs != "" {
+					final[e.JobID] = true
+					if err := st.Send(eventToProto(loc, engine.Event{At: e.At, JobID: e.JobID, Kind: engine.JobState, State: fs})); err != nil {
+						return err
+					}
+				}
+			}
+			if err := st.Send(eventToProto(loc, e)); err != nil {
 				return err
 			}
 			if e.Kind == engine.JobState && e.State == "closed" && len(ids) > 0 && slices.Contains(ids, e.JobID) {
