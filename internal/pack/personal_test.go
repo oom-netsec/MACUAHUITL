@@ -148,3 +148,20 @@ func TestExportOmiteNombreOcupado(t *testing.T) {
 		t.Fatal(r.Omitted, r.Playbooks)
 	}
 }
+
+// Un playbook propio cuyo nombre en inglés repite uno ya ocupado en inglés (base o paquetes instalados) se omite del
+// export: si no, Install lo rechazaría por colisión. Uno sin name_en compara su español, que es lo que se ve en inglés.
+func TestExportOmiteNombreEnInglesOcupado(t *testing.T) {
+	a, b, c := userPB("ios", "uno", "show clock"), userPB("ios", "dos", "show clock"), userPB("ios", "tres", "show clock")
+	a.NameEn = "Base · Health"
+	b.NameEn, b.Name = "", "Tomado · Tree"
+	in := exportIn(nil, []playbook.Playbook{a, b, c})
+	in.TakenNamesEN = []string{"base · health", "Tomado · Tree"}
+	r, err := Export(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(r.Omitted) != "[ios/uno ios/dos]" || r.Playbooks != 1 {
+		t.Fatal(r.Omitted, r.Playbooks)
+	}
+}

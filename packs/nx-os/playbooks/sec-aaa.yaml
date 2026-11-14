@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: sec-aaa
 platform: nx-os
-name: Seguridad · AAA, usuarios y SSH
-name_en: Security · AAA, users and SSH
+name: NX-OS · Seguridad · AAA, usuarios y SSH
+name_en: NX-OS · Security · AAA, users and SSH
 commands:
   - cmd: show aaa authentication
   - cmd: show aaa authorization

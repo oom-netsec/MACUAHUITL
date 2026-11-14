@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-mac-moviendose
 platform: nx-os
-name: TAC · MAC moviéndose (general)
-name_en: TAC · MAC moving (general)
+name: NX-OS · TAC · MAC moviéndose (general)
+name_en: NX-OS · TAC · MAC moving (general)
 commands:
   - cmd: show clock
   - cmd: show mac address-table notification mac-move

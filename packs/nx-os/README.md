@@ -3,7 +3,7 @@
 ## Español
 
 Paquete oficial con playbooks de diagnóstico de solo lectura para Cisco Nexus con NX-OS (9000, 7000, 5000/6000 y
-3000). Requiere el núcleo 0.4.1 o posterior, que reconoce NX-OS. Áreas: `plat` (salud, versión y licencias, módulos,
+3000). Requiere el núcleo 0.4.1 o posterior, que reconoce NX-OS. Todos los nombres empiezan con «NX-OS ·». Áreas: `plat` (salud, versión y licencias, módulos,
 CPU y memoria, logs y cores, ambiente, TCAM, alta disponibilidad y tech-support), `l1` (interfaces, errores,
 transceptores DOM, err-disabled), `l2` (VLAN/STP, port-channel y LACP, MAC y ARP, vPC: peer, consistencia y puertos
 huérfanos, CDP/LLDP, IGMP snooping), `vxlan` (NVE, VNIs, BGP EVPN, ARP suppression, L3VNI, underlay), `l3` (ruteo,
@@ -27,7 +27,7 @@ Cómo cargarlo (la aplicación nunca descarga paquetes):
 ## English
 
 Official package with read-only diagnostic playbooks for Cisco Nexus switches running NX-OS (9000, 7000, 5000/6000
-and 3000). It needs core 0.4.1 or later, which recognizes NX-OS. Areas: `plat` (health, version and licensing,
+and 3000). It needs core 0.4.1 or later, which recognizes NX-OS. Every name starts with "NX-OS ·". Areas: `plat` (health, version and licensing,
 modules, CPU and memory, logs and cores, environment, TCAM, high availability and tech-support), `l1` (interfaces,
 errors, DOM transceivers, err-disabled), `l2` (VLAN/STP, port-channel and LACP, MAC and ARP, vPC: peer, consistency
 and orphan ports, CDP/LLDP, IGMP snooping), `vxlan` (NVE, VNIs, BGP EVPN, ARP suppression, L3VNI, underlay), `l3`

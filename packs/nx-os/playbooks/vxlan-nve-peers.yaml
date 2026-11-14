@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: vxlan-nve-peers
 platform: nx-os
-name: VXLAN · Interfaz NVE y peers
-name_en: VXLAN · NVE interface and peers
+name: NX-OS · VXLAN · Interfaz NVE y peers
+name_en: NX-OS · VXLAN · NVE interface and peers
 commands:
   - cmd: show clock
   - cmd: show nve interface nve1 detail

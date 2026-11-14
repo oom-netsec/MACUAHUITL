@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-descartes-paquetes
 platform: nx-os
-name: TAC · Descartes de paquetes (general)
-name_en: TAC · Packet drops (general)
+name: NX-OS · TAC · Descartes de paquetes (general)
+name_en: NX-OS · TAC · Packet drops (general)
 commands:
   - cmd: show clock
   - cmd: show interface counters errors non-zero

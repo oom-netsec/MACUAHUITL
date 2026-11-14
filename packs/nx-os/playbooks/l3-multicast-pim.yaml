@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l3-multicast-pim
 platform: nx-os
-name: L3 · Multicast y PIM
-name_en: L3 · Multicast and PIM
+name: NX-OS · L3 · Multicast y PIM
+name_en: NX-OS · L3 · Multicast and PIM
 commands:
   - cmd: show ip pim neighbor
   - cmd: show ip pim interface brief

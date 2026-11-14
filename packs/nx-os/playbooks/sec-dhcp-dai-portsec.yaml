@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: sec-dhcp-dai-portsec
 platform: nx-os
-name: Seguridad · DHCP snooping, DAI y port-security
-name_en: Security · DHCP snooping, DAI and port-security
+name: NX-OS · Seguridad · DHCP snooping, DAI y port-security
+name_en: NX-OS · Security · DHCP snooping, DAI and port-security
 commands:
   - cmd: show ip dhcp snooping
   - cmd: show ip dhcp snooping binding

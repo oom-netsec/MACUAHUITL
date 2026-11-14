@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: plat-version-licencias
 platform: nx-os
-name: Plataforma · Versión, imagen y licencias
-name_en: Platform · Version, image and licensing
+name: NX-OS · Plataforma · Versión, imagen y licencias
+name_en: NX-OS · Platform · Version, image and licensing
 commands:
   - cmd: show version
   - cmd: show boot

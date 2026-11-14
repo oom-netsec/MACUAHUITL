@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: vxlan-arp-suppression
 platform: nx-os
-name: VXLAN · ARP suppression
-name_en: VXLAN · ARP suppression
+name: NX-OS · VXLAN · ARP suppression
+name_en: NX-OS · VXLAN · ARP suppression
 commands:
   - cmd: show nve vni
   - cmd: show ip arp suppression-cache detail

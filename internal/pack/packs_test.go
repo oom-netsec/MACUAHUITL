@@ -54,12 +54,17 @@ func repoBase(t *testing.T) pack.Base {
 	for _, p := range pbs {
 		base.PlaybookIDs = append(base.PlaybookIDs, p.ID)
 	}
-	lib, _, err := scripts.LibraryWithEN(playbooks.FS)
+	lib, en, err := scripts.LibraryWithEN(playbooks.FS)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, s := range lib {
 		base.ScriptIDs, base.ScriptNames = append(base.ScriptIDs, s.ID), append(base.ScriptNames, s.Name)
+		n := en[s.ID].Name
+		if n == "" {
+			n = s.Name
+		}
+		base.ScriptNamesEN = append(base.ScriptNamesEN, n)
 	}
 	return base
 }
@@ -164,5 +169,18 @@ func TestNXOSPideNucleo041(t *testing.T) {
 	}
 	if _, err := pack.ValidateSource(d, "v0.4.0"); pack.Reason(err) != "core.too_old" {
 		t.Fatalf("0.4.0 debe rechazarlo: %v", err)
+	}
+}
+
+// Los paquetes oficiales ios, ios-xe, wlc-9800 y nx-os conviven en el mismo almacén: sin choques de ID ni de nombre de script.
+func TestPaquetesOficialesConviven(t *testing.T) {
+	st, _, err := pack.Open(t.TempDir(), "v0.4.1", packtest.Keys(), repoBase(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"ios", "ios-xe", "wlc-9800", "nx-os"} {
+		if _, err := st.Install(packtest.Signed(t, filepath.Join(packtest.RepoDir(), "packs", n)), false); err != nil {
+			t.Fatalf("oom/%s junto a los demás: %v", n, err)
+		}
 	}
 }
