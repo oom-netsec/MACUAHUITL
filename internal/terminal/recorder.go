@@ -30,9 +30,10 @@ var secretPrompt = regexp.MustCompile(`(?i)\b(pass(word|phrase|code)|secret)\b[^
 
 var (
 	ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b.`)
-	// Prompt del equipo: «SW1(config)#» o el de AireOS «(Cisco Controller) >» / «(Cisco Controller) config>».
-	promptRe    = regexp.MustCompile(`^(?:\S+[#>]|\([^()\r\n]+\) (?:config)?>)`)
-	shellPrompt = regexp.MustCompile(`^(?:\S+[#>]|\([^()\r\n]+\) (?:config)?>)\s*$`)
+	// Prompt del equipo: «SW1(config)#», el de ISE con espacio «ise/admin(config-Policy List)#», el de AireOS
+	// «(Cisco Controller) >» / «(Cisco Controller) config>» y el «> » de FTD (solo si sigue un espacio o el fin).
+	promptRe    = regexp.MustCompile(`^(?:\S+[#>]|\S+\([^()\r\n]*\)[#>]|\([^()\r\n]+\) (?:config)?>|>(?: |$))`)
+	shellPrompt = regexp.MustCompile(`^(?:\S+[#>]|\S+\([^()\r\n]*\)[#>]|\([^()\r\n]+\) (?:config)?>|>)\s*$`)
 )
 
 const (
@@ -132,7 +133,12 @@ func (r *Recorder) outLine(l string) {
 		}
 	}
 	out, keep := "", true
-	if pr := promptRe.FindString(l); pr != "" {
+	pr := promptRe.FindString(l)
+	weak := ""
+	if pr != "" && weakPrompt(pr) && !r.echoOf(strings.TrimLeft(l[len(pr):], " \t")) {
+		weak, pr = pr, "" // «> x», «*> 10.0.0.0/8»: parece prompt, pero lo que sigue no es el eco de nada tecleado
+	}
+	if pr != "" {
 		r.setPromptBlock(blockOfPrompt(pr))
 		echo := r.stream.Prompted(l[len(pr):], r.lastBlk)
 		// Eco partido: se sigue tecleando, o el texto recibido es un prefijo estricto de la primera línea enviada
@@ -169,6 +175,14 @@ func (r *Recorder) outLine(l string) {
 			}
 		}
 	} else {
+		if weak != "" {
+			// Puede ser el eco de FTD con un tabulador completado («> configure manager add …»): el texto tras «> » pasa por
+			// las reglas sin tocar el bloque ni la red. Tapar de más está bien; si tapó y se sigue tecleando, el resto del eco también.
+			text := l[len(weak):]
+			if m := r.stream.Peek(text); m != text {
+				l, r.cont, r.acc = weak+m, len(r.line) > 0, ""
+			}
+		}
 		if !equipoMsg(l) {
 			l = r.scrub(l, len(r.sent) > 0)
 		}
@@ -177,6 +191,27 @@ func (r *Recorder) outLine(l string) {
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
 	}
+}
+
+// weakPrompt: el «prompt» no tiene letras ni dígitos («>», «*>»): lo mismo es una fila de salida que el de FTD.
+func weakPrompt(pr string) bool {
+	return !strings.ContainsFunc(pr, func(c rune) bool { return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' })
+}
+
+// echoOf dice si text es (el comienzo de) una línea enviada que espera su eco o de la que se está tecleando.
+func (r *Recorder) echoOf(text string) bool {
+	if text == "" {
+		return false
+	}
+	if strings.HasPrefix(string(r.line), text) {
+		return true
+	}
+	for _, s := range r.sent {
+		if strings.HasPrefix(s, text) {
+			return true
+		}
+	}
+	return false
 }
 
 var syslogLine = regexp.MustCompile(`%[A-Z][A-Z0-9_]*-\d-`)
@@ -220,6 +255,10 @@ func (r *Recorder) typedLine(line string, loose bool) string {
 		m = r.typed.TypedLoose(line)
 	} else {
 		m = r.typed.Typed(line)
+	}
+	// Un Tab (se graba como «^I») hace que el equipo complete palabras que las reglas no ven: desde el primero se tapa todo.
+	if i := strings.Index(m, "^I"); i >= 0 {
+		m = m[:i] + "<MASKED:secret>"
 	}
 	r.noteSecrets(line, m)
 	return m
@@ -325,6 +364,10 @@ func blockOfPrompt(p string) string {
 		return "radius"
 	case strings.Contains(p, "(config-aaa-server-host)"):
 		return "aaaserver"
+	case strings.Contains(p, "(cfg-cluster)"):
+		return "cluster"
+	case strings.Contains(p, "ca-trustpoint)"): // ASA «(config-ca-trustpoint)» e IOS «(ca-trustpoint)»
+		return "trustpoint"
 	case strings.Contains(p, "(config-smart-lic)"), strings.Contains(p, "(config-license)"):
 		return "licsmart"
 	}
@@ -395,8 +438,13 @@ func (r *Recorder) Input(p []byte) {
 // flush trata la línea tecleada al pulsar Enter. Requiere r.mu.
 func (r *Recorder) flush() {
 	line, hidden, fresh := string(r.line), r.hidden, r.fresh
-	if pr := promptRe.FindString(r.lastLine()); pr != "" {
-		r.setPromptBlock(blockOfPrompt(pr))
+	// Un prompt con letras fija el bloque siempre; uno débil («>», «*>») solo si es el prompt solo o lo que sigue es el
+	// eco (parcial, con los retrocesos aplicados) de lo tecleado.
+	if ll := applyBackspaces(r.lastLine()); promptRe.FindString(ll) != "" {
+		pr := promptRe.FindString(ll)
+		if text := strings.TrimLeft(ll[len(pr):], " \t"); !weakPrompt(pr) || text == "" || strings.HasPrefix(line, text) || r.echoOf(text) {
+			r.setPromptBlock(blockOfPrompt(pr))
+		}
 	}
 	// Un nuevo prompt de contraseña tiene que llegar en la salida: lo ya visto no vale para la línea siguiente.
 	r.hidden, r.line, r.tail, r.fresh = false, r.line[:0], nil, false

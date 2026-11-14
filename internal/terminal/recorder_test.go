@@ -485,30 +485,37 @@ func TestIntegridadDeLaSesion(t *testing.T) {
 	}
 }
 
-// Rendimiento: unos 5 MB de un show, en trozos de 4 KB, no se vuelven cuadráticos (mejor de dos corridas: la
-// máquina puede estar cargada).
+// Rendimiento: un show de 1 MB y otro de 5 MB, en trozos de 4 KB, no se vuelven cuadráticos. Lo que se vigila es la
+// forma (un costo cuadrático tardaría decenas de segundos), no los milisegundos: topes amplios por si la máquina está cargada.
 func TestRendimientoDeCincoMegas(t *testing.T) {
 	if testing.Short() || raceActivo {
 		t.Skip("lenta (con -race el detector multiplica el costo de las expresiones regulares)")
 	}
 	line := strings.Repeat("a", 79) + "\r\n"
-	var data []byte
-	for len(data) < 5<<20 {
-		data = append(data, line...)
-	}
-	best := time.Hour
-	for k := 0; k < 2 && best > 2*time.Second; k++ {
-		r, _ := newRec()
-		start := time.Now()
-		for i := 0; i < len(data); i += 4096 {
-			r.Output(data[i:min(i+4096, len(data))])
+	run := func(size int) time.Duration {
+		var data []byte
+		for len(data) < size {
+			data = append(data, line...)
 		}
-		r.Close()
-		best = min(best, time.Since(start))
+		best := time.Hour
+		for k := 0; k < 2 && best > 6*time.Second; k++ {
+			r, _ := newRec()
+			start := time.Now()
+			for i := 0; i < len(data); i += 4096 {
+				r.Output(data[i:min(i+4096, len(data))])
+			}
+			r.Close()
+			best = min(best, time.Since(start))
+		}
+		return best
 	}
-	t.Logf("5 MB en %v", best)
-	if best > 2*time.Second {
-		t.Errorf("tardó %v", best)
+	t1, t5 := run(1<<20), run(5<<20)
+	t.Logf("1 MB en %v, 5 MB en %v", t1, t5)
+	if t5 > 6*time.Second {
+		t.Errorf("5 MB tardó %v", t5)
+	}
+	if t5 > 12*t1+500*time.Millisecond { // lineal ≈ 5×; cuadrático ≈ 25×
+		t.Errorf("el tiempo no crece en forma lineal: 1 MB %v, 5 MB %v", t1, t5)
 	}
 }
 
