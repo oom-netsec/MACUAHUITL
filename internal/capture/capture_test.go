@@ -132,3 +132,21 @@ func TestReadDirLeeCarpetaViejaSinPuerto(t *testing.T) {
 		t.Fatalf("%v %+v", err, devs)
 	}
 }
+
+// El reintento a la carpeta vieja no toma la evidencia de otro equipo del manifest (misma IP y hostname, otro puerto).
+func TestReadDirReintentoNoTomaLaCarpetaDeOtroEquipo(t *testing.T) {
+	root := t.TempDir()
+	start := time.Date(2026, 11, 4, 10, 0, 0, 0, time.UTC)
+	w, _ := patrol.NewWriter(root, patrol.Spec{Name: "dos"}, start)
+	w.Write(patrol.Device{Host: "SW1", IP: "192.0.2.10"}, 1, start, platform.Output{Command: "show clock", Text: "del22", Started: start}, false)
+	m := patrol.Manifest{Devices: []patrol.DeviceResult{
+		{Target: patrol.Target{Address: "192.0.2.10"}, Round: 1, Hostname: "SW1", State: "completed"},
+		{Target: patrol.Target{Address: "192.0.2.10", Port: 2222}, Round: 1, Hostname: "SW1", State: "failed"},
+	}}
+	b, _ := json.Marshal(m)
+	os.WriteFile(filepath.Join(w.Dir(), "manifest.json"), b, 0o600)
+	devs, err := ReadDir(w.Dir())
+	if err != nil || len(devs) != 2 || devs[0].Outputs["show clock"] != "del22\n" || len(devs[1].Outputs) != 0 {
+		t.Fatalf("%v %+v", err, devs)
+	}
+}

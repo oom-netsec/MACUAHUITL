@@ -113,6 +113,10 @@ func ReadDir(dir string) ([]Device, error) {
 			last[a] = d
 		}
 	}
+	owned := map[string]bool{} // carpetas que ya son de un equipo del manifest: el reintento sin puerto no las toma
+	for _, d := range m.Devices {
+		owned[patrol.DeviceDirOf(d.Hostname, d.Target)] = true
+	}
 	var out []Device
 	for _, a := range order {
 		d := last[a]
@@ -123,8 +127,8 @@ func ReadDir(dir string) ([]Device, error) {
 		dev := Device{Address: addr, Hostname: d.Hostname, State: d.State, Detail: d.Detail, Outputs: map[string]string{}}
 		if d.Hostname != "" {
 			files, _ := filepath.Glob(filepath.Join(dir, patrol.DeviceDirOf(d.Hostname, d.Target), "*.txt"))
-			if len(files) == 0 { // evidencia vieja: la carpeta no llevaba el puerto
-				files, _ = filepath.Glob(filepath.Join(dir, patrol.DeviceDir(d.Hostname, d.Target.Address), "*.txt"))
+			if old := patrol.DeviceDir(d.Hostname, d.Target.Address); len(files) == 0 && !owned[old] { // evidencia vieja: la carpeta no llevaba el puerto
+				files, _ = filepath.Glob(filepath.Join(dir, old, "*.txt"))
 			}
 			sort.Strings(files)
 			for _, f := range files {
