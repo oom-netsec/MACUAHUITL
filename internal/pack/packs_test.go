@@ -192,3 +192,20 @@ func TestCat9kSDAPidenNucleo041(t *testing.T) {
 		}
 	}
 }
+
+// Todos los paquetes oficiales del repo (también oom/cat9k y oom/sda) conviven en el mismo almacén.
+func TestTodosLosPaquetesOficialesConviven(t *testing.T) {
+	st, _, err := pack.Open(t.TempDir(), "v0.4.1", packtest.Keys(), repoBase(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dirs, _ := filepath.Glob(filepath.Join(packtest.RepoDir(), "packs", "*"))
+	if len(dirs) < 6 {
+		t.Fatalf("se esperaban al menos 6 paquetes: %v", dirs)
+	}
+	for _, d := range dirs {
+		if _, err := st.Install(packtest.Signed(t, d), false); err != nil {
+			t.Fatalf("%s junto a los demás: %v", filepath.Base(d), err)
+		}
+	}
+}

@@ -26,9 +26,9 @@ var reservedSegments = map[string]bool{
 	// Los de oom/nx-os (además de plat, l1, l2, l3, sec, svc y tac, ya reservados).
 	"vxlan": true, "fex": true,
 	// Los de oom/wlc-9800 (controlador inalámbrico Catalyst 9800).
+	"ctrl": true, "ap": true, "cli": true, "rf": true, "wlan": true, "sec": true, "mob": true,
 	// Los de oom/cat9k y oom/sda (además de plat, l1, l2, l3, cpu, sec, svc y tac, ya reservados).
 	"stack": true, "svl": true, "poe": true, "asic": true, "lisp": true, "fabric": true, "edge": true, "border": true,
-	"ctrl": true, "ap": true, "cli": true, "rf": true, "wlan": true, "sec": true, "mob": true,
 }
 
 // IsReservedSegment dice si s es un primer segmento reservado para contenido oficial.
