@@ -66,7 +66,7 @@ func RoundDone(w *Writer, s Spec, round int) (string, error) {
 	}
 	// Con un archivo consolidado no se borran sueltos: la ronda siguiente sigue escribiendo en él.
 	del := s.DeleteLooseFiles && s.Split == SplitPerRound
-	return zipFiles(w.dir, fmt.Sprintf("%s_r%03d", filepath.Base(w.dir), round), w.roundFiles(round), del)
+	return zipFiles(w, fmt.Sprintf("%s_r%03d", filepath.Base(w.dir), round), w.roundFiles(round), del)
 }
 
 func playbookSHA(p *playbook.Playbook) string {
@@ -139,12 +139,12 @@ func Finish(ctx context.Context, d Deps, w *Writer, s Spec, rounds int, results 
 	}
 	switch s.Zip {
 	case ZipAtEnd:
-		if _, err := zipFiles(w.dir, filepath.Base(w.dir), append(present, "manifest.json"), s.DeleteLooseFiles); err != nil {
+		if _, err := zipFiles(w, filepath.Base(w.dir), append(present, "manifest.json"), s.DeleteLooseFiles); err != nil {
 			return m, err
 		}
 	case ZipPerRound:
 		// Los zips de ronda ya existen; este cierra con el manifest y lo que quede suelto.
-		if _, err := zipFiles(w.dir, filepath.Base(w.dir)+"_final", append(present, "manifest.json"), false); err != nil {
+		if _, err := zipFiles(w, filepath.Base(w.dir)+"_final", append(present, "manifest.json"), false); err != nil {
 			return m, err
 		}
 	}

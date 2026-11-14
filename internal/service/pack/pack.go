@@ -96,10 +96,11 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		return nil, reject(err, nil, "none")
 	}
 	sum := dom.SHA256(data)
-	// Lo oculto se guarda antes de publicar el paquete (en una sola transacción): si falla, no se instala nada.
-	// shortcut: si el disco falla justo después, la elección ya guardada queda aplicada a la versión que seguía instalada.
+	// Lo oculto se calcula antes de tocar el disco y se guarda en una transacción corta después del extract, justo antes
+	// de publicar: si algo falla antes, no se instala nada ni queda guardada la elección, y ninguna transacción espera
+	// el fsync del extract. Si el guardado falla, el paquete ya está instalado: se audita con hidden_save_failed y la
+	// respuesta es de éxito (la respuesta no tiene campo de aviso; lo oculto queda como estaba antes).
 	hide := []string{}
-	var prepErr error
 	res, err := s.store.InstallWith(data, r.GetAllowUnsigned(), func(p *dom.Pack, _ string) error {
 		items := p.Items()
 		for _, id := range r.GetHide() { // los IDs que el paquete no trae se ignoran
@@ -107,12 +108,8 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 				hide = append(hide, id)
 			}
 		}
-		prepErr = s.applyInstallHidden(p, hide, r.GetReplaceHidden())
-		return prepErr
-	})
-	if prepErr != nil {
-		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("pack.err.hidden_save", prepErr, nil))
-	}
+		return nil
+	}, func(p *dom.Pack) error { return s.applyInstallHidden(p, hide, r.GetReplaceHidden()) })
 	if err != nil {
 		var p *dom.Pack
 		if res != nil {
@@ -122,6 +119,10 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	}
 	p := res.Pack
 	detail := installDetail(p, sum, res)
+	if res.CommitErr != nil {
+		detail += fmt.Sprintf(" hidden_save_failed=%q", res.CommitErr.Error())
+		hide = nil // no quedó guardado: no se audita como oculto
+	}
 	s.d.Audit("pack.install", p.ID, detail)
 	if len(hide) > 0 {
 		s.d.Audit("pack.items", p.ID, fmt.Sprintf("id=%s hidden=%d shown=0 at=install", p.ID, len(hide)))
@@ -162,8 +163,8 @@ func (s *svc) Inspect(ctx context.Context, r *v1.PackServiceInspectRequest) (*v1
 	return out, nil
 }
 
-// applyInstallHidden guarda lo oculto de una instalación: poda los IDs que el paquete ya no trae y, con replace, deja
-// hide como el conjunto exacto; sin replace, lo que ya estaba oculto se conserva y hide suma.
+// applyInstallHidden guarda lo oculto de una instalación en una transacción corta: poda los IDs que el paquete ya no
+// trae y, con replace, deja hide como el conjunto exacto; sin replace, lo que ya estaba oculto se conserva y hide suma.
 func (s *svc) applyInstallHidden(p *dom.Pack, hide []string, replace bool) error {
 	tx, err := s.d.DB().Begin()
 	if err != nil {

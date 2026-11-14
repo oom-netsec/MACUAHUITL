@@ -2,7 +2,6 @@ package scripts
 
 import (
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	dom "github.com/oom-netsec/MACUAHUITL/internal/scripts"
@@ -10,66 +9,11 @@ import (
 
 const fechaFmt = time.RFC3339
 
-// querier es lo que comparten *sql.DB y *sql.Tx.
-type querier interface {
-	Query(string, ...any) (*sql.Rows, error)
-	QueryRow(string, ...any) *sql.Row
-	Exec(string, ...any) (sql.Result, error)
-}
+type querier = dom.Querier
 
-const columnas = `id, name, tech, platform, description, commands_json, tags_json, created_at, updated_at`
-
-func scan(r interface{ Scan(...any) error }) (dom.Script, error) {
-	var s dom.Script
-	var cmds, tags, created, updated string
-	if err := r.Scan(&s.ID, &s.Name, &s.Tech, &s.Platform, &s.Description, &cmds, &tags, &created, &updated); err != nil {
-		return s, err
-	}
-	if err := json.Unmarshal([]byte(cmds), &s.Commands); err != nil {
-		return s, err
-	}
-	if err := json.Unmarshal([]byte(tags), &s.Tags); err != nil {
-		return s, err
-	}
-	s.CreatedAt, _ = time.Parse(fechaFmt, created)
-	s.UpdatedAt, _ = time.Parse(fechaFmt, updated)
-	s.Origin = dom.OrigenUsuario
-	return s, nil
-}
-
-func loadUser(q querier) ([]dom.Script, error) {
-	rows, err := q.Query(`SELECT ` + columnas + ` FROM scripts ORDER BY name COLLATE NOCASE`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []dom.Script
-	for rows.Next() {
-		s, err := scan(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, s)
-	}
-	return out, rows.Err()
-}
-
-func getUser(q querier, id string) (dom.Script, error) {
-	return scan(q.QueryRow(`SELECT `+columnas+` FROM scripts WHERE id = ?`, id))
-}
-
-// put inserta o reemplaza por ID.
-func put(q querier, s dom.Script) error {
-	cmds, _ := json.Marshal(s.Commands)
-	tags, _ := json.Marshal(s.Tags)
-	_, err := q.Exec(`INSERT INTO scripts(`+columnas+`) VALUES(?,?,?,?,?,?,?,?,?)
-		ON CONFLICT(id) DO UPDATE SET name=excluded.name, tech=excluded.tech, platform=excluded.platform,
-		description=excluded.description, commands_json=excluded.commands_json, tags_json=excluded.tags_json,
-		created_at=excluded.created_at, updated_at=excluded.updated_at`,
-		s.ID, s.Name, s.Tech, s.Platform, s.Description, string(cmds), string(tags),
-		s.CreatedAt.UTC().Format(fechaFmt), s.UpdatedAt.UTC().Format(fechaFmt))
-	return err
-}
+func loadUser(q querier) ([]dom.Script, error)         { return dom.LoadUser(q) }
+func getUser(q querier, id string) (dom.Script, error) { return dom.GetUser(q, id) }
+func put(q querier, s dom.Script) error                { return dom.Put(q, s) }
 
 // loadCollections da las colecciones por orden, cada una con sus scripts en su orden.
 func loadCollections(q querier) ([]dom.Coleccion, error) {

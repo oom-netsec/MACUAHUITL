@@ -314,6 +314,8 @@ type Result struct {
 	Replaced string // versión anterior que reemplazó; vacío si era nuevo
 	// SyncWarning: el paquete quedó instalado, pero no se pudo asegurar con fsync la carpeta (una caída podría perderlo).
 	SyncWarning error
+	// CommitErr: el paquete quedó instalado, pero falló el paso commit de InstallWith (lo oculto no se guardó).
+	CommitErr error
 }
 
 // check hace los pasos 2 a 7 del ADR sobre bytes ya leídos y devuelve el paquete y el instalado que reemplazaría
@@ -363,13 +365,16 @@ func (s *Store) Inspect(data []byte, allowUnsigned bool) (*Result, error) { // s
 // Install hace los pasos 2 a 8 del ADR sobre bytes ya leídos. allowUnsigned es la confirmación explícita para un
 // paquete de terceros.
 func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
-	return s.InstallWith(data, allowUnsigned, nil)
+	return s.InstallWith(data, allowUnsigned, nil, nil)
 }
 
-// InstallWith es Install con un paso previo: prepare corre con el paquete ya validado y bajo el lock, antes de tocar
-// el disco y de publicar la foto; si falla, no se instala nada. Sirve para guardar lo que debe estar listo cuando el
-// paquete se vea (lo oculto). replaced es la versión que reemplazaría ("" si es nuevo).
-func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) error) (*Result, error) {
+// InstallWith es Install con dos pasos, para guardar lo que debe estar listo cuando el paquete se vea (lo oculto) sin
+// que quede aplicado a una versión que no cambió y sin retener una transacción durante el extract. prepare corre con
+// el paquete ya validado y bajo el lock, antes de tocar el disco: si falla, no se instala nada. commit (puede ser nil)
+// corre después del extract y justo antes de publicar la foto; si falla, el paquete ya está en disco y se publica
+// igual, y el error va en Result.CommitErr (quien instala debe auditarlo). replaced es la versión que reemplazaría
+// ("" si es nuevo).
+func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) error, commit func(p *Pack) error) (*Result, error) {
 	s.mu.Lock()
 	p, old, cur, err := s.check(data, allowUnsigned)
 	if err != nil {
@@ -394,6 +399,10 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 		s.mu.Unlock()
 		return &Result{Pack: p}, err
 	}
+	var commitErr error
+	if commit != nil {
+		commitErr = commit(p)
+	}
 	next := []*Pack{p}
 	for _, o := range cur.Packs {
 		if o.ID != p.ID {
@@ -405,7 +414,7 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 		s.OnChange()
 	}
 	s.mu.Unlock()
-	res := &Result{Pack: p, SyncWarning: syncWarn}
+	res := &Result{Pack: p, SyncWarning: syncWarn, CommitErr: commitErr}
 	if old != nil {
 		res.Replaced = old.Version
 	}

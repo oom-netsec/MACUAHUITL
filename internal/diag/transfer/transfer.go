@@ -292,9 +292,10 @@ func Upload(ctx context.Context, r Request) (Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, to)
 	defer cancel()
 	m, s := md5.New(), sha256.New()
+	var sent countWriter // lo realmente leído: el archivo puede cambiar de tamaño después del stat
 	r.track = newTracker(r.OnProgress, nil)
 	r.track.setTotal(fi.Size())
-	rd := progressReader{io.TeeReader(f, io.MultiWriter(m, s)), r.track}
+	rd := progressReader{io.TeeReader(f, io.MultiWriter(m, s, &sent)), r.track}
 	start := time.Now()
 	switch r.URL.Scheme {
 	case "tftp":
@@ -310,8 +311,12 @@ func Upload(ctx context.Context, r Request) (Result, error) {
 		return res, err
 	}
 	r.track.finish()
-	return Result{Path: f.Name(), Bytes: fi.Size(), MD5: hex.EncodeToString(m.Sum(nil)), SHA256: hex.EncodeToString(s.Sum(nil)), Duration: time.Since(start)}, nil
+	return Result{Path: f.Name(), Bytes: int64(sent), MD5: hex.EncodeToString(m.Sum(nil)), SHA256: hex.EncodeToString(s.Sum(nil)), Duration: time.Since(start)}, nil
 }
+
+type countWriter int64
+
+func (c *countWriter) Write(b []byte) (int, error) { *c += countWriter(len(b)); return len(b), nil }
 
 // closeOnDone cierra c si ctx termina antes: así una lectura bloqueada se interrumpe.
 func closeOnDone(ctx context.Context, c io.Closer) (stop func() bool) {

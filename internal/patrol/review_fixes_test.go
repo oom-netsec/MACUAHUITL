@@ -294,3 +294,27 @@ func TestWindowEndedSoloConvierteErroresDeContexto(t *testing.T) {
 		t.Fatalf("no convirtió el plazo: %v", got)
 	}
 }
+
+// Al borrar los sueltos de una ronda empaquetada, la carpeta del equipo no puede desaparecer entre el MkdirAll y el
+// OpenFile con que la ronda siguiente escribe (Write los hace bajo w.mu).
+func TestZipDeRondaNoBorraLaCarpetaDeUnaEscrituraEnCurso(t *testing.T) {
+	dir := t.TempDir()
+	dev := filepath.Join(dir, "SW1_192.0.2.1")
+	os.MkdirAll(dev, 0o700)
+	os.WriteFile(filepath.Join(dev, "r001.txt"), []byte("x\n"), 0o600)
+	w := &Writer{dir: dir}
+	w.mu.Lock() // una escritura de la ronda 2 ya hizo su MkdirAll y va a abrir el archivo
+	done := make(chan error)
+	go func() { _, err := zipFiles(w, "z", []string{"SW1_192.0.2.1/r001.txt"}, true); done <- err }()
+	time.Sleep(200 * time.Millisecond)
+	f, err := os.OpenFile(filepath.Join(dev, "r002.txt"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Errorf("la carpeta del equipo desapareció: %v", err)
+	} else {
+		f.Close()
+	}
+	w.mu.Unlock()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
