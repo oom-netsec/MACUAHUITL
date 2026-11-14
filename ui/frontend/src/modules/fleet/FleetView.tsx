@@ -7,6 +7,7 @@ import { useLang, useT } from "../../lib/i18n";
 import { useInbox } from "../../app/activity";
 import { formatDateTime } from "../../components/Data";
 import { DataTable, type Column } from "../../components/DataTable";
+import { DownloadButton } from "../../components/Files";
 import { HopChain } from "./HopChain";
 import { Heatmap, type Level } from "./Heatmap";
 import { healthMatrix, summaryMatrix } from "./heat";
@@ -324,8 +325,8 @@ function Inventory({ core }: { core: CoreAPI }) {
         <>
           <ResultPanel title={t("fleet.sub.inventory")}
             actions={<>
-              <a href={"data:text/csv;charset=utf-8," + encodeURIComponent(d.csv)} download={`${t("file.inventario")}.csv`}>{t("fleet.inv.csv")}</a>
-              <a href={"data:text/markdown;charset=utf-8," + encodeURIComponent(d.markdown)} download={`${t("file.inventario")}.md`}>{t("fleet.inv.md")}</a>
+              <DownloadButton name={`${t("file.inventario")}.csv`} data={() => d.csv} label={t("fleet.inv.csv")} />
+              <DownloadButton name={`${t("file.inventario")}.md`} data={() => d.markdown} label={t("fleet.inv.md")} />
             </>}>
             <Caption>{t("fleet.inv.caption", { n: rows.length, d: d.result.devices })}</Caption>
             {rows.length > 0 && <DataTable label={t("fleet.sub.inventory")} columns={cols} rows={rows} rowKey={keyer(rows)} exportName={t("file.inventario")} height={tableH(rows.length)} />}

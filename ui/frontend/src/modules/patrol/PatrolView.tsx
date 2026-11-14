@@ -31,11 +31,14 @@ export function PatrolView({ core }: { core: CoreAPI }) {
   const [err, setErr] = useState("");
   const subscribed = useRef(new Set<string>());
   const autoSelected = useRef(false);
+  const listSeq = useRef(0); // solo la última consulta de trabajos aplica: una respuesta vieja no pisa a la nueva
   useBusy(jobs.some(active));
 
   const refreshJobs = useCallback(async () => {
+    const n = ++listSeq.current;
     try {
       const js = await core.listJobs();
+      if (n !== listSeq.current) return;
       setJobs(sortJobs(js));
       const fresh = js.filter((j) => active(j) && !subscribed.current.has(j.id)).map((j) => j.id);
       if (fresh.length) {
@@ -49,7 +52,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
         if (first) setSelected(first.id);
       }
     } catch (e) {
-      setErr(errorText(e));
+      if (n === listSeq.current) setErr(errorText(e)); // el error de una consulta vieja no pisa a una nueva
     }
   }, [core]);
 

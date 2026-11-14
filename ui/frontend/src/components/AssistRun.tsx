@@ -11,7 +11,7 @@ import { useT } from "../lib/i18n";
 import { vocab } from "../lib/vocab";
 import type { Key } from "../lib/i18n/es";
 import { ModuleIdContext } from "../app/activity";
-import { assistOwnerKey } from "../app/useShellStatus";
+import { assistOwner, assistOwnerKey } from "../app/useShellStatus";
 
 export type AssistRunCore = Pick<CoreAPI, "assistStart" | "assistWatch" | "assistListRuns" | "assistConfirm" | "assistAbort" | "assistRollback" | "onAssist" | "onAssistDone">;
 
@@ -162,6 +162,7 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
   const [armed, setArmed] = useState(false); // por ejecución: nunca se recuerda
   const [run, setRun] = useState<RunState | null>(null);
   const runId = useRef("");
+  const lastSeq = useRef(0); // el núcleo repite el historial: un seq ya visto no se aplica dos veces
 
   useEffect(() => setArmed(false), [plan]);
   useEffect(() => { onActive(!!run?.active); }, [run?.active, onActive]);
@@ -169,6 +170,9 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
   useEffect(() => {
     const off1 = core.onAssist((e: AssistEvent) => {
       if (e.runId !== runId.current) return;
+      // El primer evento (seq 0) llega sin seq (protojson omite el 0) y se aplica siempre: con un solo módulo enganchado por
+      // ejecución solo se repetiría al reenganchar, y es el estado inicial, que no cambia nada al repetirse.
+      if (e.seq) { if (e.seq <= lastSeq.current) return; lastSeq.current = e.seq; }
       setRun((r) => {
         if (!r) return r;
         const n = { ...r, changed: e.changed ?? [] }; // cada evento trae los equipos cambiados al emitirse
@@ -201,21 +205,24 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
   useEffect(() => {
     let alive = true;
     core.assistListRuns().then((runs) => {
-      const live = runs.find((r) => r.active);
+      // La engancha el módulo dueño. Una sin dueño (almacenamiento borrado, o iniciada desde mctl) la toma el primer módulo
+      // que la vea y queda como su dueño: así la franja del shell lleva a él y nunca se queda sin quién la confirme o aborte.
+      const live = runs.find((r) => r.active && [moduleId, ""].includes(assistOwner(r.runId)));
       if (!alive || !live || runId.current) return;
-      runId.current = live.runId;
+      if (!assistOwner(live.runId) && moduleId) try { localStorage.setItem(assistOwnerKey(live.runId), moduleId); } catch { /* sin almacenamiento */ }
+      runId.current = live.runId; lastSeq.current = 0;
       setRun(fromInfo(live));
       return core.assistWatch(live.runId); // el núcleo repite el historial: el estado se reconstruye solo
     }).catch((e) => alive && onError(errorText(e)));
     return () => { alive = false; };
-  }, [core, onError]);
+  }, [core, onError, moduleId]);
 
   const doStart = async () => {
     if (!plan || !armed) return;
     onError("");
     try {
       const id = await core.assistStart(plan.planId, true);
-      runId.current = id;
+      runId.current = id; lastSeq.current = 0;
       // El núcleo no sabe qué módulo inició la ejecución; la franja del shell lo necesita para llevar de vuelta.
       try { if (moduleId) localStorage.setItem(assistOwnerKey(id), moduleId); } catch { /* sin almacenamiento */ }
       setRun({ id, active: true, state: "running", pending: null, failReason: "", stopped: false, changed: [], log: [] });

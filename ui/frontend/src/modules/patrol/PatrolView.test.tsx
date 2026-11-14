@@ -378,3 +378,32 @@ test("el rechazo de la carpeta de salida se ve traducido, con la orden chmod", a
   expect(alert).toHaveTextContent("chmod 700 /home/u/ev");
   expect(screen.queryByText(/prefs\.outputs/)).toBeNull();
 });
+
+test("Rondas vacío o no entero no crea el trabajo (0 significa hasta el fin de la ventana y debe ser explícito)", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  await fillForm(core);
+  await userEvent.clear(screen.getByLabelText("Rondas"));
+  await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
+  expect(await screen.findByText("Escribe un entero de 0 en adelante (0: hasta el fin de la ventana).")).toBeInTheDocument();
+  expect(core.createJob).not.toHaveBeenCalled();
+  await userEvent.type(screen.getByLabelText("Rondas"), "0");
+  await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
+  await waitFor(() => expect(core.createJob).toHaveBeenCalled());
+  expect(vi.mocked(core.createJob).mock.calls[0][0].schedule).toMatchObject({ rounds: 0 });
+});
+
+test("una respuesta vieja de listJobs no pisa a una más nueva", async () => {
+  const mk = (name: string) => [{ id: "j1", name, state: "created", phases: [] }];
+  let resolveOld: (v: ReturnType<typeof mk>) => void = () => {};
+  const listJobs = vi.fn()
+    .mockImplementationOnce(() => new Promise((r) => { resolveOld = r; })) // la de montar: lenta
+    .mockImplementation(async () => mk("trabajo-nuevo"));
+  const core = fakeCore({ listJobs });
+  render(<PatrolView core={core} />);
+  await waitFor(() => expect(listJobs).toHaveBeenCalledTimes(1));
+  act(() => core.emitEvent({ jobId: "j1", jobStateChanged: { state: "created" } }));
+  await screen.findByRole("button", { name: /trabajo-nuevo/ });
+  await act(async () => { resolveOld(mk("trabajo-viejo")); });
+  expect(screen.queryByRole("button", { name: /trabajo-viejo/ })).toBeNull();
+  expect(screen.getByRole("button", { name: /trabajo-nuevo/ })).toBeInTheDocument();
+});

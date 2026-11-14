@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PortsView } from "./PortsView";
 import { fakeCore } from "../../lib/fake";
+import { ModuleIdContext } from "../../app/activity";
 import { START, clickWhenReady, confirmStep, lineText } from "../../lib/assistTestkit";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
@@ -251,4 +252,37 @@ test("una ejecución viva retomada con el paso close sin lines ni device no romp
   const save = within(await screen.findByRole("region", { name: "Paso pendiente save-1" }));
   await userEvent.click(save.getByRole("button", { name: "Revertir lo ya cambiado" }));
   expect(core.assistRollback).toHaveBeenCalledWith("r9");
+});
+
+// Auditoría 21h: solo el módulo dueño engancha la ejecución viva; los demás no abren otro watch.
+const owned = () => fakeCore({
+  listCredentials: vi.fn(async () => creds),
+  assistListRuns: vi.fn(async () => [{ runId: "r9", state: "running", active: true }]),
+});
+afterEach(() => localStorage.removeItem("macuahuitl.assist.r9"));
+
+test("un módulo que no inició la ejecución viva no se engancha a ella", async () => {
+  localStorage.setItem("macuahuitl.assist.r9", "snippets");
+  const core = owned();
+  render(<ModuleIdContext.Provider value="ports"><PortsView core={core} /></ModuleIdContext.Provider>);
+  await waitFor(() => expect(core.assistListRuns).toHaveBeenCalled());
+  await act(async () => {}); // que resuelva la lista antes de mirar
+  expect(core.assistWatch).not.toHaveBeenCalled();
+});
+
+test("una ejecución viva sin dueño la toma el primer módulo que la ve y queda como su dueño", async () => {
+  const core = owned();
+  render(<ModuleIdContext.Provider value="ports"><PortsView core={core} /></ModuleIdContext.Provider>);
+  await waitFor(() => expect(core.assistWatch).toHaveBeenCalledWith("r9"));
+  expect(localStorage.getItem("macuahuitl.assist.r9")).toBe("ports");
+});
+
+test("el módulo dueño se engancha y un seq repetido no duplica la salida", async () => {
+  localStorage.setItem("macuahuitl.assist.r9", "ports");
+  const core = owned();
+  render(<ModuleIdContext.Provider value="ports"><PortsView core={core} /></ModuleIdContext.Provider>);
+  await waitFor(() => expect(core.assistWatch).toHaveBeenCalledWith("r9"));
+  act(() => core.emitAssist({ runId: "r9", seq: 1, kind: "output", device: "SW1", text: "linea-unica" }));
+  act(() => core.emitAssist({ runId: "r9", seq: 1, kind: "output", device: "SW1", text: "linea-unica" }));
+  expect((document.body.textContent ?? "").match(/linea-unica/g)).toHaveLength(1);
 });

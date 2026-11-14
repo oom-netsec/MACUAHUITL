@@ -260,6 +260,13 @@ test("la tarjeta de FTP sugiere borrar la credencial del equipo al terminar", as
   expect(within(card).getAllByText(/no ip ftp password/).length).toBeGreaterThan(0);
 });
 
+test("dos clics seguidos en Abrir servidor no abren dos servidores", async () => {
+  const core = setup({ transferServe: vi.fn(() => new Promise<void>(() => {})) });
+  await openServer(core);
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  expect(core.transferServe).toHaveBeenCalledTimes(1);
+});
+
 // Con la interfaz en inglés el texto del núcleo no dice «no coincide»: el aviso sale del reason.
 test("el cliente avisa del hash distinto por el reason, aunque el texto venga en inglés", async () => {
   const err = Object.assign(new Error("transfer: the digest does not match (SHA-256 aaa, MD5 bbb): the file was discarded"), { cause: { code: "Unavailable", reason: "xfer.err.digest", metadata: {} } });

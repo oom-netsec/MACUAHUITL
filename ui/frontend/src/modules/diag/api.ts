@@ -2,7 +2,7 @@
 import { Events } from "@wailsio/runtime";
 
 export interface NetInterface { name: string; up: boolean; loopback: boolean; addresses: string[]; hardwareAddr: string }
-export interface DiagEvent { runId: string; line?: string; done?: boolean; exitCode?: number; outputPath?: string; error?: string }
+export interface DiagEvent { runId: string; line?: string; done?: boolean; exitCode?: number; outputPath?: string; error?: string; canceled?: boolean }
 
 export interface DiagAPI {
   diagRun(tool: string, targets: string[], options: Record<string, string>): Promise<string>;
