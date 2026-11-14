@@ -49,8 +49,8 @@ export function ScriptForm({ initial, onSave, onCancel }: { initial?: ScriptItem
     <form ref={root} onSubmit={(e) => { e.preventDefault(); void save(); }}>
       <Field label={t("scripts.f.name")} value={name} onChange={(v) => { setName(v); setCoreErr(null); }} error={txt("name")} w="lg" />
       <div className="field-row">
-        <Select<ScriptTech> label={t("scripts.f.tech")} value={tech} onChange={setTech} w="md" options={TECHS.map((x) => [x, t(`scripts.tech.${x}` as Key)])} />
-        <Select<ScriptPlatform> label={t("scripts.f.platform")} value={platform} onChange={setPlatform} w="md" options={PLATFORMS.map((x) => [x, t(`scripts.plat.${x}` as Key)])} />
+        <Select<ScriptTech> label={t("scripts.f.tech")} value={tech} onChange={setTech} w="md" keepUnknown options={TECHS.map((x) => [x, t(`scripts.tech.${x}` as Key)])} />
+        <Select<ScriptPlatform> label={t("scripts.f.platform")} value={platform} onChange={setPlatform} w="md" keepUnknown options={PLATFORMS.map((x) => [x, t(`scripts.plat.${x}` as Key)])} />
       </div>
       <Field label={t("scripts.f.desc")} value={description} onChange={setDescription} error={txt("desc")} w="full" />
       <Field label={t("scripts.f.tags")} hint={t("scripts.f.tagsHint")} value={tags} onChange={setTags} error={txt("tags")} w="lg" mono />
