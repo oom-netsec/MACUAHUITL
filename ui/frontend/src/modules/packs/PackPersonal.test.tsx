@@ -94,4 +94,32 @@ test("importar: si el archivo cambió pide volver a abrirlo", async () => {
   await userEvent.click(within(d).getByRole("button", { name: "Importar" }));
   expect(await within(d).findByText(/el archivo cambió/)).toBeVisible();
   expect(within(d).getByText(/Vuelve a abrir el archivo/)).toBeVisible();
+  expect(within(d).getByRole("button", { name: "Importar" })).toBeDisabled(); // reintentar daría el mismo error
+});
+
+test("importar: con dos conflictos, uno sin decidir deja el botón apagado y dice cuántos faltan", async () => {
+  const two = { ...preview, items: [...items, { kind: "script" as const, id: "lib-yo-3", name: "Mismo nombre", state: "conflicto_nombre", conflictsWith: "b".repeat(32) }] };
+  const { d } = await openImport({ packImportPreview: vi.fn(async () => two) });
+  const [a, b] = await within(d).findAllByRole("combobox");
+  const go = within(d).getByRole("button", { name: "Importar" });
+  expect(within(d).getByText("Decide qué hacer con cada conflicto: faltan 2.")).toBeVisible();
+  await userEvent.selectOptions(a, "renombrar");
+  expect(go).toBeDisabled();
+  expect(within(d).getByText("Decide qué hacer con cada conflicto: faltan 1.")).toBeVisible();
+  await userEvent.selectOptions(b, "omitir");
+  expect(go).toBeEnabled();
+  expect(within(d).getAllByText(/^script · /).length).toBeGreaterThan(0); // el tipo pasa por i18n
+});
+
+test("exportar: el editor inválido dice por qué y sin nada que exportar no se pide la ruta", async () => {
+  const { core, d } = await openExport();
+  const ed = within(d).getByLabelText(/Editor y nombre/);
+  await userEvent.type(ed, "yo/Mis.Cosas");
+  expect(ed).toBeInvalid();
+  await userEvent.clear(ed);
+  await userEvent.type(ed, "yo/mis");
+  expect(ed).toBeValid();
+  expect(within(d).getByText("Elige al menos un script o incluye tus playbooks.")).toBeVisible();
+  expect(within(d).getByRole("button", { name: "Exportar" })).toBeDisabled();
+  expect(core.pickSavePath).not.toHaveBeenCalled();
 });

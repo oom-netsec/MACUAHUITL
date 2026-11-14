@@ -132,6 +132,17 @@ test("instalar y quitar un paquete avisan que los scripts cambiaron", async () =
   await waitFor(() => expect(seen).toBe(start + 2));
 });
 
+test("ocultar un elemento en el detalle también avisa que los scripts cambiaron", async () => {
+  let seen = 0;
+  function Probe() { seen = useScriptsVersion(); return null; }
+  render(<Probe />);
+  const start = seen;
+  view(withShow({}, [], []));
+  const d = await open();
+  await userEvent.click(within(d).getByRole("checkbox", { name: /lib-l2-stp/ }));
+  await waitFor(() => expect(seen).toBe(start + 1));
+});
+
 test("libOf arma el ID del script derivado como el núcleo", () => {
   expect(libOf("ios-xe/l2-stp")).toBe("lib-l2-stp");
   expect(libOf("ios/l2-stp")).toBe("lib-ios-l2-stp");

@@ -2604,7 +2604,7 @@ export const es = {
   "packs.export.title": "Exportar mi paquete",
   "packs.export.fileName": "mi-paquete.mpack",
   "packs.export.editor": "Editor y nombre",
-  "packs.export.editorHint": "Formato <editor>/<nombre>; el editor lleva minúsculas y números (hasta 16).",
+  "packs.export.editorHint": "Formato <editor>/<nombre>; el editor lleva minúsculas y números (hasta 16). oom, lib y los nombres de plataforma están reservados.",
   "packs.export.scripts": "Mis scripts",
   "packs.export.noScripts": "No tienes scripts propios.",
   "packs.export.playbooks": "Incluir mis playbooks",
@@ -2629,6 +2629,13 @@ export const es = {
   "packs.import.go": "Importar",
   "packs.import.done": "{kind}: {created} creados · {renamed} renombrados · {skipped} omitidos",
   "packs.import.changed": "Vuelve a abrir el archivo para revisar su vista previa de nuevo.",
+  "packs.export.editorBad": "Usa <editor>/<nombre>: el editor con minúsculas y números (hasta 16), el nombre con minúsculas, números y guiones (hasta 32).",
+  "packs.export.nothing": "Elige al menos un script o incluye tus playbooks.",
+  "packs.import.pending": "Decide qué hacer con cada conflicto: faltan {n}.",
+  "packs.import.kind.script": "script",
+  "packs.import.kind.playbook": "playbook",
+  "packs.import.kinds.scripts": "Scripts",
+  "packs.import.kinds.playbooks": "Playbooks",
 };
 
 export type Key = keyof typeof es;
