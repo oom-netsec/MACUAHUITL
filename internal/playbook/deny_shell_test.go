@@ -66,3 +66,21 @@ func TestDatosACI(t *testing.T) {
 		t.Error("vrf con & aceptado")
 	}
 }
+
+// En nx-os (los leaf ACI corren como nx-os y su CLI pasa por bash) se rechazan además «$», «!», «\» y «'»; en las demás
+// plataformas siguen valiendo como parte de un patrón (^…$, ^!).
+func TestDenyExpansionDeShellEnNXOS(t *testing.T) {
+	for _, cmd := range []string{
+		"show version $HOME", "show version | include ${x}", "show version !!", "show version | include !-1",
+		"show version | include a\\|b", "show version 'x'", "show version | include 'a|b'",
+	} {
+		if err := CheckDenied("nx-os", cmd); err == nil {
+			t.Errorf("nx-os %q: no se rechazó", cmd)
+		}
+	}
+	for _, c := range [][2]string{{"ios-xe", "show running-config | include ^interface.*$"}, {"ios", "show running-config | include ^!"}, {"asa", "show version | grep -v ^$"}} {
+		if err := CheckDenied(c[0], c[1]); err != nil {
+			t.Errorf("%s %q: %v", c[0], c[1], err)
+		}
+	}
+}
