@@ -14,7 +14,7 @@ import (
 const maxSaveBytes = 64 << 20
 
 // ErrFileExists: la ruta ya existe y no se pidió sobrescribir. El frontend pregunta y reintenta con overwrite.
-var ErrFileExists = errors.New("guardar: el archivo ya existe")
+var ErrFileExists = errors.New("save: the file already exists")
 
 // WriteFile escribe data en path, la ruta que la persona eligió en el diálogo nativo de guardar (lo abre el
 // frontend con el runtime de Wails). El diálogo GTK3 de Wails no confirma la sobrescritura, así que aquí no se

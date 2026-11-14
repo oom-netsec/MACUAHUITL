@@ -57,7 +57,7 @@ type stream struct {
 	dead   bool
 }
 
-var ErrDisconnected = errors.New("núcleo desconectado")
+var ErrDisconnected = errors.New("core disconnected")
 
 func (b *Bridge) client() (*ipc.ClientConn, error) {
 	b.mu.Lock()
