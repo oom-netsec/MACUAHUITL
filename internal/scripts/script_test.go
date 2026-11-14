@@ -95,6 +95,19 @@ func TestReadOnly(t *testing.T) {
 			t.Errorf("asa %q no debe ser read_only", c)
 		}
 	}
+	// «Enviar a la terminal» no mira la plataforma de la sesión: de solo lectura es lo inofensivo en IOS-XE y en ASA a la vez.
+	for _, c := range []struct{ plat, cmd string }{{"asa", "show logging process ios to-file bootflash:x"}, {"ios-xe", "show tech-support file disk0:x"}} {
+		s.Platform, s.Commands = c.plat, []string{c.cmd}
+		if s.ReadOnly() {
+			t.Errorf("%s %q no debe ser read_only", c.plat, c.cmd)
+		}
+	}
+	for _, c := range []struct{ plat, cmd string }{{"ios-xe", "show ip interface brief"}, {"asa", "show conn count"}} {
+		s.Platform, s.Commands = c.plat, []string{c.cmd}
+		if !s.ReadOnly() {
+			t.Errorf("%s %q debe ser read_only", c.plat, c.cmd)
+		}
+	}
 	// las demás plataformas no son read_only hasta que tengan sus reglas
 	for _, p := range []string{"nx-os", "cualquiera"} {
 		s.Platform, s.Commands = p, []string{"show version"}

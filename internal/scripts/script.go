@@ -169,7 +169,7 @@ func (s Script) ReadOnly() bool {
 	}
 	cmds := Runnable(s.Commands)
 	for _, c := range cmds {
-		if strings.Contains(c, ";") || playbook.CheckDenied(s.Platform, c) != nil {
+		if strings.Contains(c, ";") || playbook.CheckDenied(s.Platform, c) != nil || playbook.CheckDenied("ios-xe", c) != nil || playbook.CheckDenied("asa", c) != nil { // la terminal no mira la plataforma de la sesión: debe ser inofensivo en ambas familias
 			return false
 		}
 	}
