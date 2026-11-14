@@ -117,6 +117,17 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 		if state == "cancelled" || !s.now().Before(until) {
 			break
 		}
+		// La siguiente se calcula y publica antes de lanzar esta ronda: NextRound nunca devuelve la que ya corre.
+		if cs != nil {
+			next = cs.Next(s.now())
+		} else {
+			next = next.Add(sc.Interval)
+		}
+		if (sc.Rounds == 0 || round < sc.Rounds) && !until.Before(next) {
+			a.next.Store(next.UnixNano())
+		} else {
+			a.next.Store(0)
+		}
 		if a.paused.Load() || a.running.Load() {
 			s.bus.Publish(Event{JobID: jobID, Kind: Warning, Detail: "round.skipped", Index: round})
 		} else {
@@ -129,11 +140,6 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 				s.r.RunRound(ctx, jobID, round, targets, f)
 				s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: "round.end", Index: round})
 			}(round)
-		}
-		if cs != nil {
-			next = cs.Next(s.now())
-		} else {
-			next = next.Add(sc.Interval)
 		}
 	}
 	a.next.Store(0)
