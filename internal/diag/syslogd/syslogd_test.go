@@ -140,23 +140,6 @@ func TestValidateAddr(t *testing.T) {
 	}
 }
 
-// Conexiones TCP que no mandan nada no pueden ocupar el receptor para siempre: se cierran por inactividad.
-func TestTCPCierraConexionInactiva(t *testing.T) {
-	old := idleTimeout
-	idleTimeout = 200 * time.Millisecond
-	t.Cleanup(func() { idleTimeout = old })
-	addr, _ := start(t, "tcp")
-	c, err := net.Dial("tcp", addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer c.Close()
-	c.SetReadDeadline(time.Now().Add(3 * time.Second))
-	if _, err := c.Read(make([]byte, 1)); err == nil || isTimeout(err) {
-		t.Fatalf("la conexión inactiva siguió abierta: %v", err)
-	}
-}
-
 // Un solo origen no acapara las conexiones: pasado su tope se le cierran y otro equipo sigue entrando.
 func TestTCPTopePorOrigen(t *testing.T) {
 	addr, s := start(t, "tcp")
@@ -182,6 +165,14 @@ func TestTCPTopePorOrigen(t *testing.T) {
 	if _, err := extra.Read(make([]byte, 1)); err == nil || isTimeout(err) {
 		t.Fatalf("la conexión de más no se cerró: %v", err)
 	}
+	other := net.Dialer{LocalAddr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 2)}} // otro equipo sigue entrando
+	oc, err := other.Dial("tcp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Fprintf(oc, "<14>otro origen\n")
+	oc.Close()
+	s.wait(t, 1)
 	held[0].Close() // al liberar una, el mismo origen vuelve a entrar
 	held = held[1:]
 	deadline := time.Now().Add(3 * time.Second)
@@ -192,7 +183,7 @@ func TestTCPTopePorOrigen(t *testing.T) {
 		}
 		fmt.Fprintf(c, "<14>de vuelta\n")
 		c.Close()
-		if got := s.count(); got > 0 {
+		if s.count() > 1 {
 			break
 		}
 		if time.Now().After(deadline) {

@@ -34,7 +34,7 @@ const coreLocalize = true
 
 func main() {
 	// La contraseña maestra y las credenciales pasan por el puente: sin volcados de memoria si la UI se cae.
-	for _, w := range sys.Harden() {
+	for _, w := range sys.NoDump() {
 		log.Println("macuahuitl:", w)
 	}
 	dist, err := fs.Sub(assets, "frontend/dist")

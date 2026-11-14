@@ -30,11 +30,8 @@ const MaxMessage = 8192
 const maxConns = 64
 
 // maxPerSource es el tope de conexiones TCP simultáneas por IP de origen: un equipo usa una; un host no acapara las 64.
+// Sin cierre por inactividad: un IOS callado perdería el primer mensaje al reconectar; las muertas las corta el keepalive TCP.
 const maxPerSource = 4
-
-// idleTimeout cierra una conexión TCP que no manda nada en ese lapso; largo para no cortar equipos callados (reconectan al
-// volver a tener qué enviar), corto frente a las 24 h de una escucha.
-var idleTimeout = 30 * time.Minute
 
 type Message struct {
 	Time      time.Time
@@ -191,6 +188,14 @@ func listenTCP(ctx context.Context, c Config, emit emitFunc) error {
 	sem := make(chan struct{}, maxConns)
 	var mu sync.Mutex
 	perSource := map[string]int{}
+	release := func(src string) {
+		mu.Lock()
+		if perSource[src]--; perSource[src] <= 0 {
+			delete(perSource, src)
+		}
+		mu.Unlock()
+		<-sem
+	}
 	var wg sync.WaitGroup
 	defer wg.Wait()
 	for {
@@ -201,51 +206,32 @@ func listenTCP(ctx context.Context, c Config, emit emitFunc) error {
 			}
 			return fmt.Errorf("syslogd: %w", err)
 		}
-		src, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
-		mu.Lock()
-		full := perSource[src] >= maxPerSource
-		if !full {
-			perSource[src]++
-		}
-		mu.Unlock()
-		if full {
-			conn.Close() // un solo origen no acapara el receptor
-			continue
-		}
 		select {
 		case sem <- struct{}{}:
 		default:
-			mu.Lock()
-			perSource[src]--
-			mu.Unlock()
 			conn.Close() // demasiadas conexiones; se rechaza en vez de agotar recursos
+			continue
+		}
+		src, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+		mu.Lock()
+		perSource[src]++
+		full := perSource[src] > maxPerSource
+		mu.Unlock()
+		if full {
+			release(src)
+			conn.Close() // un solo origen no acapara el receptor
 			continue
 		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			defer func() {
-				<-sem
-				mu.Lock()
-				if perSource[src]--; perSource[src] == 0 {
-					delete(perSource, src)
-				}
-				mu.Unlock()
-			}()
+			defer release(src)
 			defer conn.Close()
 			stopConn := context.AfterFunc(ctx, func() { conn.Close() })
 			defer stopConn()
-			readStream(bufio.NewReaderSize(idleConn{conn}, MaxMessage+16), conn.RemoteAddr().String(), emit)
+			readStream(bufio.NewReaderSize(conn, MaxMessage+16), conn.RemoteAddr().String(), emit)
 		}()
 	}
-}
-
-// idleConn renueva el plazo de lectura en cada Read: una conexión que deja de mandar se cierra tras idleTimeout.
-type idleConn struct{ net.Conn }
-
-func (c idleConn) Read(p []byte) (int, error) {
-	c.SetReadDeadline(time.Now().Add(idleTimeout))
-	return c.Conn.Read(p)
 }
 
 // readStream separa mensajes por conteo de octetos ("<len> <msg>") o por salto de línea.
