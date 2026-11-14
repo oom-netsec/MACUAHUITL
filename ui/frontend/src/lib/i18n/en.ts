@@ -1324,7 +1324,7 @@ export const en: Record<Key, string> = {
   "acl.empty.title": "No ACL imported",
   "acl.empty": "Paste the ACL text, choose its source platform and import (Ctrl+↵). Findings and the rule table appear here.",
   "analysis.desc": "Findings, round-to-round differences and timeline for finished Patrol jobs.",
-  "analysis.section.run": "Run",
+  "analysis.section.run": "Job",
   "analysis.count": "{n} findings",
   "analysis.count.one": "1 finding",
   "analysis.empty.title": "No jobs analyzed yet",

@@ -20,7 +20,7 @@ const sevName = Object.fromEntries(sevs) as Record<Severity, Key>;
 
 const runKbd = <kbd aria-hidden="true">Ctrl ↵</kbd>;
 
-// Antes de la primera consulta: las corridas salen de un trabajo de Patrol terminado.
+// Antes de la primera consulta: el análisis sale de un trabajo de Patrol terminado.
 function NoRun() {
   const t = useT();
   const go = useNav();

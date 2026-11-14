@@ -1322,7 +1322,7 @@ export const es = {
   "acl.empty.title": "Sin ACL importada",
   "acl.empty": "Pegar el texto de la ACL, elegir su plataforma de origen e importar (Ctrl+↵). Los hallazgos y la tabla de reglas aparecen aquí.",
   "analysis.desc": "Hallazgos, diferencias entre rondas y línea de tiempo de los trabajos de Patrol ya terminados.",
-  "analysis.section.run": "Corrida",
+  "analysis.section.run": "Trabajo",
   "analysis.count": "{n} hallazgos",
   "analysis.count.one": "1 hallazgo",
   "analysis.empty.title": "Sin trabajos analizados",

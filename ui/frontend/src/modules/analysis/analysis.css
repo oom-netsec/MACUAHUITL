@@ -1,4 +1,4 @@
-/* Corridas: severidades, avisos y diferencias. */
+/* Análisis de trabajos: severidades, avisos y diferencias. */
 .sev { margin: 0 0 var(--s-4); }
 .sev h4 { margin-bottom: var(--s-2); }
 .sev[data-sev="critica"] h4, .sev[data-sev="alta"] h4 { color: var(--critical); }
