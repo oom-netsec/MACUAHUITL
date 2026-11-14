@@ -46,7 +46,7 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 			Metadata: i18n.Metadata("file.exists.save", i18n.A("path", path))}
 	}
 	if _, err := os.Lstat(path); err == nil && !overwrite {
-		return exists()
+		return wrapErr(exists())
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".guardar-*")
 	if err != nil {
@@ -76,7 +76,7 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 		}
 	}
 	if errors.Is(err, fs.ErrExist) {
-		return exists()
+		return wrapErr(exists())
 	}
 	return wrapErr(err)
 }
