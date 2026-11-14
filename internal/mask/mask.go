@@ -44,6 +44,23 @@ var iosRules = []rule{
 	{"config-key", "", regexp.MustCompile(`^(\s*key config-key password-encrypt )(\S+)(.*)$`), nil},
 	{"ospf-key", "", regexp.MustCompile(`^(\s*ip ospf authentication-key (?:[0-9] )?)(\S+)(.*)$`), nil},
 	{"ospf-key", "", regexp.MustCompile(`^(\s*ip ospf message-digest-key \d+ md5 (?:[0-9] )?)(\S+)(.*)$`), nil},
+	// ISE/TrustSec: PAC dentro de «radius server …»; CoA de ISE en «aaa server radius dynamic-author».
+	{"radius-key", "", regexp.MustCompile(`^(\s*pac key (?:[0-9] )?)(\S+)(.*)$`), nil},
+	{"radius-key", "", regexp.MustCompile(`^(\s*(?:client \S+ (?:vrf \S+ )?)?server-key (?:[0-9] )?)(\S+)(.*)$`), nil},
+	// LISP (fabric SD-Access).
+	{"lisp-key", "", regexp.MustCompile(`^(\s*authentication-key (?:[0-9] )?)(\S+)(.*)$`), nil},
+	{"lisp-key", "", regexp.MustCompile(`^(\s*(?:ipv[46] )?(?:etr )?map-server \S+ (?:.*? )?key (?:[0-9] )?)(\S+)(.*)$`), nil},
+	// 9800: credenciales de gestión de los AP en «ap profile».
+	{"user-secret", "", regexp.MustCompile(`^(\s*mgmtuser username \S+ (?:.*? )?password (?:[0-9] )?)(\S+)(.*)$`), nil},
+	{"user-secret", "", regexp.MustCompile(`^(\s*mgmtuser username \S+ (?:.*? )?secret (?:[0-9] )?)(\S+)(.*)$`), nil},
+	{"ldap-password", "", regexp.MustCompile(`^(\s*bind authenticated .*? password (?:[0-9] )?)(\S+)(.*)$`), nil},
+	{"isis-password", "", regexp.MustCompile(`^(\s*(?:area|domain)-password (?:[0-9] )?)(\S+)(.*)$`), nil},
+	{"ldp-password", "", regexp.MustCompile(`^(\s*mpls ldp neighbor \S+ (?:.*? )?password (?:[0-9] )?)(\S+)(.*)$`), nil},
+	{"fhrp-key", "", regexp.MustCompile(`^(\s*glbp \d+ authentication (?:md5 key-string (?:[0-9] )?|text ))(\S+)(.*)$`), nil},
+	{"ospf-key", "", regexp.MustCompile(`^(\s*ipv6 ospf authentication ipsec spi \d+ (?:md5|sha1) (?:[0-9] )?)(\S+)(.*)$`), nil},
+	// Salida de show snmp community / show snmp host de IOS: la comunidad v1/v2c es el secreto (v3 es un usuario).
+	{"snmp-community", "", regexp.MustCompile(`^(\s*Community (?:name|Index|SecurityName): )(\S+)(.*)$`), nil},
+	{"snmp-community", "", regexp.MustCompile(`^(\s*user: )(\S+)(\s+security model: v(?:1|2c)\b.*)$`), nil},
 	{"tacacs-key", "tacacs", regexp.MustCompile(`^(\s+key (?:[0-9] )?)(\S+)(.*)$`), nil},
 	{"radius-key", "radius", regexp.MustCompile(`^(\s+key (?:[0-9] )?)(\S+)(.*)$`), nil},
 	{"dot1x-password", "dot1x", regexp.MustCompile(`^(\s+password (?:[0-9] )?)(\S+)(.*)$`), nil},
@@ -88,6 +105,8 @@ func Apply(platform, text string) (string, map[string]int) {
 // cadenas de certificados), para enmascarar una salida que llega por trozos.
 type Stream struct {
 	block, skip string
+	table       string // tabla SNMP de NX-OS en curso: "community" o "host"
+	rows        int
 	n           int
 	counts      map[string]int
 	// MaxSkip: líneas máximas que se descartan dentro de una llave o cadena sin cierre (0 = sin tope).
@@ -133,10 +152,52 @@ func (s *Stream) Line(raw string) (out string, ok bool) {
 		s.skip, s.n = "chain", 0
 		return line + eol + " <MASKED:private-key>" + eol, true
 	}
+	if out, ok := s.snmpTable(line); ok {
+		return out + eol, true
+	}
 	if line != "" && line[0] != ' ' && line[0] != '\t' {
 		s.block = blockOf(line)
 	}
 	return maskLine(line, s.block, s.counts) + eol, true
+}
+
+var (
+	nxCommunityHead = regexp.MustCompile(`^Community\s+Group / Access`)
+	nxHostHead      = regexp.MustCompile(`^Host\s+Port\s+Version\s+Level\s+Type\s+SecName`)
+	dashes          = regexp.MustCompile(`^-[- ]*$`) // separador: guiones, con o sin espacios entre columnas
+)
+
+// snmpTable enmascara las tablas de show snmp community (comunidad en la 1.ª columna) y show snmp host (SecName en la
+// última; en v1/v2c es la comunidad) de NX-OS. ok=false: la línea no es de una tabla y sigue el camino normal.
+func (s *Stream) snmpTable(line string) (string, bool) {
+	t := strings.TrimSpace(line)
+	switch {
+	case nxCommunityHead.MatchString(line):
+		s.table, s.rows = "community", 0
+		return line, true
+	case nxHostHead.MatchString(line):
+		s.table, s.rows = "host", 0
+		return line, true
+	case s.table == "":
+		return "", false
+	case t == "" || dashes.MatchString(t) && s.rows > 0:
+		s.table = "" // fin de la tabla
+		return "", false
+	case dashes.MatchString(t):
+		return line, true
+	}
+	f := strings.Fields(line)
+	s.rows++
+	switch {
+	case s.table == "community" && !strings.HasPrefix(f[0], "<MASKED:"):
+		s.counts["snmp-community"]++
+		return strings.Replace(line, f[0], "<MASKED:snmp-community>", 1), true
+	case s.table == "host" && len(f) >= 6 && (f[2] == "v1" || f[2] == "v2c") && !strings.HasPrefix(f[len(f)-1], "<MASKED:"):
+		s.counts["snmp-community"]++
+		i := strings.LastIndex(line, f[len(f)-1])
+		return line[:i] + "<MASKED:snmp-community>" + line[i+len(f[len(f)-1]):], true
+	}
+	return line, true
 }
 
 // Prompted enmascara una línea tecleada o repetida tras un prompt (sin sangría). El bloque lo da
@@ -172,8 +233,25 @@ func maskLine(line, block string, counts map[string]int) string {
 			line, changed = m[1]+"<MASKED:"+r.kind+">"+m[3], true
 		}
 	}
-	return line
+	// Forma genérica <palabra de secreto> <tipo de cifrado> <valor> en cualquier posición: tapa lo que ninguna regla
+	// por comando conoce (0 claro; 5, 6, 7, 8 y 9 cifrados o con hash). Una descripción o un comentario de ACL es
+	// texto libre: no se toca.
+	if freeText.MatchString(line) {
+		return line
+	}
+	return genericSecret.ReplaceAllStringFunc(line, func(m string) string {
+		sm := genericSecret.FindStringSubmatch(m)
+		if strings.HasPrefix(sm[2], "<MASKED:") {
+			return m
+		}
+		counts["secret"]++
+		return sm[1] + "<MASKED:secret>"
+	})
 }
+
+var freeText = regexp.MustCompile(`^\s*(?:\d+\s+)?(?:description|remark)\s`)
+
+var genericSecret = regexp.MustCompile(`(\b(?:password|secret|key|key-string|server-key|authentication-key|pre-shared-key) [05-9] )(\S+)`)
 
 func splitEOL(s string) (string, string) {
 	if strings.HasSuffix(s, "\r\n") {
