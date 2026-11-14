@@ -133,7 +133,11 @@ func (r *Recorder) outLine(l string) {
 		}
 	}
 	out, keep := "", true
-	if pr := promptRe.FindString(l); pr != "" {
+	pr := promptRe.FindString(l)
+	if pr != "" && weakPrompt(pr) && !r.echoOf(strings.TrimLeft(l[len(pr):], " \t")) {
+		pr = "" // «> x», «*> 10.0.0.0/8»: parece prompt, pero lo que sigue no es el eco de nada tecleado
+	}
+	if pr != "" {
 		r.setPromptBlock(blockOfPrompt(pr))
 		echo := r.stream.Prompted(l[len(pr):], r.lastBlk)
 		// Eco partido: se sigue tecleando, o el texto recibido es un prefijo estricto de la primera línea enviada
@@ -178,6 +182,27 @@ func (r *Recorder) outLine(l string) {
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
 	}
+}
+
+// weakPrompt: el «prompt» no tiene letras ni dígitos («>», «*>»): lo mismo es una fila de salida que el de FTD.
+func weakPrompt(pr string) bool {
+	return !strings.ContainsFunc(pr, func(c rune) bool { return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' })
+}
+
+// echoOf dice si text es (el comienzo de) una línea enviada que espera su eco o de la que se está tecleando.
+func (r *Recorder) echoOf(text string) bool {
+	if text == "" {
+		return false
+	}
+	if strings.HasPrefix(string(r.line), text) {
+		return true
+	}
+	for _, s := range r.sent {
+		if strings.HasPrefix(s, text) {
+			return true
+		}
+	}
+	return false
 }
 
 var syslogLine = regexp.MustCompile(`%[A-Z][A-Z0-9_]*-\d-`)
@@ -400,8 +425,12 @@ func (r *Recorder) Input(p []byte) {
 // flush trata la línea tecleada al pulsar Enter. Requiere r.mu.
 func (r *Recorder) flush() {
 	line, hidden, fresh := string(r.line), r.hidden, r.fresh
-	if pr := promptRe.FindString(r.lastLine()); pr != "" {
-		r.setPromptBlock(blockOfPrompt(pr))
+	// La última línea cuenta como prompt si es solo el prompt o lo que sigue es el eco (parcial) de lo tecleado.
+	if ll := r.lastLine(); promptRe.FindString(ll) != "" {
+		pr := promptRe.FindString(ll)
+		if text := strings.TrimLeft(ll[len(pr):], " \t"); text == "" || strings.HasPrefix(line, text) || r.echoOf(text) {
+			r.setPromptBlock(blockOfPrompt(pr))
+		}
 	}
 	// Un nuevo prompt de contraseña tiene que llegar en la salida: lo ya visto no vale para la línea siguiente.
 	r.hidden, r.line, r.tail, r.fresh = false, r.line[:0], nil, false

@@ -108,3 +108,54 @@ func TestAuditoriaSyslogComando(t *testing.T) {
 		t.Errorf("%s", b.String())
 	}
 }
+
+// (a) Una línea «> x» de salida no vacía la red por contenido: el valor tecleado, repetido después, sale tapado.
+func TestAuditoriaFTDLineaMayorNoVaciaLaRed(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("> "))
+	r.Input([]byte("configure manager add 10.1.1.1 RegK3yAbcAA NatId123AA\r"))
+	r.Output([]byte("> configure manager add 10.1.1.1 RegK3yAbcAA NatId123AA\r\n> x\r\nregistrado con RegK3yAbcAA\r\n> "))
+	r.Close()
+	if strings.Contains(b.String(), "RegK3yAbcAA") {
+		t.Errorf("%s", b.String())
+	}
+}
+
+// (b) Una línea «> » en medio de un PEM no corta el descarte del resto de la llave.
+func TestAuditoriaFTDLineaMayorEnPEM(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("-----BEGIN RSA PRIVATE KEY-----\r\nMIIEowIBAAKCAQEA\r\n> \r\nQUJDREVGRwAAAAAA\r\n-----END RSA PRIVATE KEY-----\r\n> "))
+	r.Close()
+	if strings.Contains(b.String(), "QUJDREVGRw") {
+		t.Errorf("%s", b.String())
+	}
+}
+
+// (c) Teclear mientras la última línea va a medias («*> 10.0…», «> 10…») no vacía el bloque del prompt.
+func TestAuditoriaLineaAMediasNoReiniciaElBloque(t *testing.T) {
+	for _, partial := range []string{"*> 10.0.0.0/8 ", "> 10.0.0.0/8 ", "10.0.0.0/8#10 "} {
+		r, b := newRec()
+		r.Output([]byte("SW1(config-server-tacacs)#"))
+		r.Input([]byte("\r"))
+		r.Output([]byte("\r\nSW1(config-server-tacacs)#"))
+		r.Output([]byte("\r\n" + partial))
+		r.Input([]byte("key TacK3yAAAA\r"))
+		r.Output([]byte("\r\nSW1(config-server-tacacs)#"))
+		r.Close()
+		if strings.Contains(b.String(), "TacK3yAAAA") {
+			t.Errorf("%q:\n%s", partial, b.String())
+		}
+	}
+}
+
+// (d) Una fila «> …» de show snmp community no cierra la tabla.
+func TestAuditoriaFilaMayorNoCierraLaTabla(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("nx1# "))
+	r.Input([]byte("show snmp community\r"))
+	r.Output([]byte("show snmp community\r\nCommunity            Group / Access      context    acl_filter\r\n---------            --------------      -------    ----------\r\n> network-operator\r\nSecretComm           network-admin\r\n\r\nnx1# "))
+	r.Close()
+	if strings.Contains(b.String(), "SecretComm") {
+		t.Errorf("%s", b.String())
+	}
+}

@@ -211,7 +211,7 @@ var iosRules = []rule{
 
 // Palabras que, como valor, no son un secreto sino otra palabra clave del comando (ntp … key 5 prefer, password default…).
 var guardWords = map[string]bool{
-	"md5": true, "sha1": true, "sha-1": true, "sha-2": true, "sha256": true, "sha-256": true, "sha512": true, "hmac-sha-256": true, "hmac-sha2-256": true, "hmac-sha2-512": true, "cmac-aes-128": true, "cmac": true,
+	"md5": true, "sha1": true, "sha-1": true, "sha-2": true, "sha256": true, "sha-256": true, "sha512": true, "hmac-sha-256": true, "hmac-sha2-256": true, "hmac-sha2-512": true, "cmac-aes-128": true, "cmac": true, "sha2": true, "sha384": true, "sha-384": true, "sha224": true, "sha-224": true, "hmac-sha1": true, "hmac-sha-1": true, "hmac-sha384": true, "hmac-sha2-384": true, "hmac-sha-384": true, "hmac-sha512": true, "hmac-sha-512": true, "hmac-sha2-224": true,
 	"prefer": true, "iburst": true, "burst": true, "use-vrf": true, "vrf": true, "filter-vrf": true, "version": true,
 	"source": true, "source-interface": true, "minpoll": true, "maxpoll": true, "priority": true, "--": true, "text": true,
 	"key-string": true, "ascii": true, "hex": true, "mode-list": true, "cryptographic-algorithm": true, "key": true,
@@ -331,7 +331,8 @@ func (s *Stream) Line(raw string) (out string, ok bool) {
 			s.skip = ""
 			return "", false
 		}
-		if keyBody.MatchString(strings.TrimSpace(line)) {
+		// Una línea «> …» no es cuerpo PEM, pero tampoco prueba que la llave terminó (prompt de FTD que se cuela).
+		if t := strings.TrimSpace(line); keyBody.MatchString(t) || strings.HasPrefix(t, ">") {
 			return "", false
 		}
 		s.skip = "" // llave sin END: lo que no es cuerpo PEM sigue su camino, no se descarta el resto
@@ -398,7 +399,7 @@ func (s *Stream) tableRow(line string, f []string) (row, keep bool) {
 		// blanco (p. ej. la running-config), y cierra la tabla.
 		last := f[0][len(f[0])-1]
 		indented := line[0] == ' ' || line[0] == '\t'
-		return len(f) <= 4 && last != '#' && last != '>' && !indented && f[0] != "!" && !configTop[f[0]], false
+		return len(f) <= 4 && last != '#' && (last != '>' || f[0] == ">") && !indented && f[0] != "!" && !configTop[f[0]], false
 	case "host":
 		// Entre host y host van «Use VRF:», «Source interface:», «Notification type:»… y separadores.
 		return len(f) >= 6 && digits.MatchString(f[1]), hostLabel.MatchString(line)
@@ -538,6 +539,20 @@ var cmdSyslog = []*regexp.Regexp{
 	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111009: User '[^']*' executed cmd: )(.*)()$`),
 }
 
+// citedSecret: en un comando citado por un syslog se pierde el bloque (cluster, aaa-server…): se tapa el valor tras estas palabras.
+var citedSecret = regexp.MustCompile(`(?i)((?:^|\s)(?:key|password|secret|community) (?:[0-9] )?)("[^"]*"|\S+)`)
+
+func maskCited(cmd string, counts map[string]int) string {
+	return citedSecret.ReplaceAllStringFunc(cmd, func(m string) string {
+		sm := citedSecret.FindStringSubmatch(m)
+		if strings.HasPrefix(sm[2], "<MASKED:") || isGuard(sm[2]) || strings.EqualFold(sm[2], "config-key") {
+			return m
+		}
+		counts["secret"]++
+		return sm[1] + "<MASKED:secret>"
+	})
+}
+
 // maskLine aplica reglas hasta que ninguna cambie la línea: una línea puede traer
 // varios secretos (snmp-server user … auth X priv Y).
 func maskLine(line, block, platform string, counts map[string]int) string {
@@ -547,7 +562,7 @@ func maskLine(line, block, platform string, counts map[string]int) string {
 	if strings.Contains(line, "-1110") { // filtro barato: las expresiones de cmdSyslog corren por cada línea
 		for _, re := range cmdSyslog {
 			if m := re.FindStringSubmatch(line); m != nil {
-				return m[1] + maskLine(m[2], "", platform, counts) + m[3]
+				return m[1] + maskCited(maskLine(m[2], "", platform, counts), counts) + m[3]
 			}
 		}
 	}
@@ -692,10 +707,10 @@ var aireosRules = []struct {
 	kind, body string
 	skip       func(line, platform string) bool
 }{
-	{"radius-key", `radius (?:auth|acct) add \d+ \S+ \d+ (?:ascii|hex) `, nil},
+	{"radius-key", `radius (?:auth|acct) add (?:encrypt )?\d+ \S+ \d+ (?:ascii|hex) `, nil},
 	{"radius-key", `radius auth keywrap add (?:ascii|hex) `, nil},
 	{"radius-key", `radius auth keywrap add (?:ascii|hex) \S+ `, nil},
-	{"tacacs-key", `tacacs (?:auth|acct|athr) add \d+ \S+ \d+ (?:ascii|hex) `, nil},
+	{"tacacs-key", `tacacs (?:auth|acct|athr) add (?:encrypt )?\d+ \S+ \d+ (?:ascii|hex) `, nil},
 	{"user-secret", `(?:mgmtuser|netuser) (?:add|password) \S+ `, aireEncrypt},
 	{"user-secret", `mgmtuser add encrypt \S+ `, notAireEncrypt},
 	{"psk", `mesh security psk provisioning key `, nil},

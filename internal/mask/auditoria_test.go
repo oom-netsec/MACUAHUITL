@@ -1,6 +1,9 @@
 package mask
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // Auditoría de punta a punta: huecos de ISE, ASA/FTD, AireOS y syslogs de comandos ejecutados.
 func TestAuditoriaHuecos(t *testing.T) {
@@ -96,5 +99,42 @@ func TestAuditoriaAireOSConfigSinPrefijo(t *testing.T) {
 		if got := s.Prompted(c.in, "aireconfig"); got != c.want {
 			t.Errorf("config> %q\n got %q\nwant %q", c.in, got, c.want)
 		}
+	}
+}
+
+// Segunda ronda: comando citado en 111010 sin contexto de bloque, encrypt de radius/tacacs, sha2 y filas «> …».
+func TestAuditoria2(t *testing.T) {
+	for _, c := range []struct{ pl, in, want string }{
+		{"asa", "%ASA-5-111010: User 'admin', running 'CLI' from IP 10.1.1.9, executed 'key Cl4sterKey'", "%ASA-5-111010: User 'admin', running 'CLI' from IP 10.1.1.9, executed 'key <MASKED:secret>'"},
+		{"ftd", "%FTD-5-111010: User 'admin', running 'CLI' from IP 10.1.1.9, executed 'password TpPass1'", "%FTD-5-111010: User 'admin', running 'CLI' from IP 10.1.1.9, executed 'password <MASKED:secret>'"},
+		{"asa", "%ASA-5-111008: User 'enable_15' executed the 'secret S3cr3t' command.", "%ASA-5-111008: User 'enable_15' executed the 'secret <MASKED:secret>' command."},
+		{"asa", "%ASA-5-111008: User 'enable_15' executed the 'snmp-server community Comm1' command.", "%ASA-5-111008: User 'enable_15' executed the 'snmp-server community <MASKED:snmp-community>' command."},
+		{"asa", "%ASA-5-111008: User 'enable_15' executed the 'community Comm2' command.", "%ASA-5-111008: User 'enable_15' executed the 'community <MASKED:secret>' command."},
+		{"asa", "%ASA-5-111010: User 'a', running 'CLI' from IP 10.1.1.9, executed 'show key chain'", "%ASA-5-111010: User 'a', running 'CLI' from IP 10.1.1.9, executed 'show key chain'"},
+		{"aireos", "config radius auth add encrypt 4 10.1.1.8 1812 ascii R4dK3y", "config radius auth add encrypt 4 10.1.1.8 1812 ascii <MASKED:radius-key>"},
+		{"aireos", "config radius acct add encrypt 4 10.1.1.8 1813 hex 0a1b", "config radius acct add encrypt 4 10.1.1.8 1813 hex <MASKED:radius-key>"},
+		{"aireos", "config tacacs auth add encrypt 1 10.1.1.6 49 ascii TacK3y", "config tacacs auth add encrypt 1 10.1.1.6 49 ascii <MASKED:tacacs-key>"},
+		{"ios", "ntp authentication-key 3 sha2 Ntp5ecret", "ntp authentication-key 3 sha2 <MASKED:ntp-key>"},
+		{"ios", "ntp authentication-key 3 sha384 Ntp5ecret", "ntp authentication-key 3 sha384 <MASKED:ntp-key>"},
+		{"ios", "ntp authentication-key 3 hmac-sha1 Ntp5ecret", "ntp authentication-key 3 hmac-sha1 <MASKED:ntp-key>"},
+	} {
+		once, _ := Apply(c.pl, c.in+"\n")
+		if got := once[:len(once)-1]; got != c.want {
+			t.Errorf("%s Apply(%q)\n got %q\nwant %q", c.pl, c.in, got, c.want)
+		}
+		if twice, n := Apply(c.pl, once); twice != once || len(n) != 0 {
+			t.Errorf("%s no idempotente %q: %q → %q %v", c.pl, c.in, once, twice, n)
+		}
+	}
+	// Una fila «> …» de la tabla de comunidades no la cierra: la comunidad siguiente se tapa.
+	in := "Community            Group / Access      context    acl_filter\n---------            --------------      -------    ----------\n> network-operator\nSecretComm           network-admin\n\n"
+	out, _ := Apply("nx-os", in)
+	if strings.Contains(out, "SecretComm") {
+		t.Errorf("tabla cerrada por la fila «>»:\n%s", out)
+	}
+	// Una línea «> » dentro de una llave PEM no corta el descarte.
+	out, _ = Apply("ftd", "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n> \nQUJDREVGRw==\n-----END RSA PRIVATE KEY-----\nhostname x\n")
+	if strings.Contains(out, "QUJDREVGRw") || !strings.Contains(out, "hostname x") {
+		t.Errorf("PEM con «> »:\n%s", out)
 	}
 }
