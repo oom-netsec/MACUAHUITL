@@ -1,0 +1,19 @@
+# Propósito: Sesiones, vecinos, rutas y logs BGP de la VRF del L3Out.
+# Cuándo usarlo: El vecino BGP de un L3Out no establece. Pide la VRF como tenant:vrf (p. ej. common:default).
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-tac-l3out-bgp
+platform: nx-os
+name: ACI · TAC · BGP de L3Out no sube
+name_en: ACI · TAC · L3Out BGP not up
+params:
+  - name: vrf
+    kind: interface
+commands:
+  - cmd: show bgp sessions vrf {vrf}
+  - cmd: show bgp ipv4 unicast summary vrf {vrf}
+  - cmd: show bgp ipv4 unicast neighbors vrf {vrf}
+  - cmd: show ip interface brief vrf {vrf}
+  - cmd: show ip route vrf {vrf}
+  - cmd: show logging logfile | include BGP
+    timeout: 180s

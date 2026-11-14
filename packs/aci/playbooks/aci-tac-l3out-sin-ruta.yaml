@@ -1,0 +1,20 @@
+# Propósito: Ruta, vecinos y ARP en la VRF del L3Out hacia una IP.
+# Cuándo usarlo: Un destino fuera del fabric no tiene ruta en el leaf de borde. Pide la VRF como tenant:vrf (p. ej. common:default).
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-tac-l3out-sin-ruta
+platform: nx-os
+name: ACI · TAC · L3Out sin ruta a una IP
+name_en: ACI · TAC · L3Out with no route to an IP
+params:
+  - name: vrf
+    kind: interface
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show ip route {ip} vrf {vrf}
+  - cmd: show ip route vrf {vrf}
+  - cmd: show bgp sessions vrf {vrf}
+  - cmd: show ip ospf neighbors vrf {vrf}
+  - cmd: show ip arp vrf {vrf}
+  - cmd: show ip interface brief vrf {vrf}

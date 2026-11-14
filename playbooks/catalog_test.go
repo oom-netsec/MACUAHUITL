@@ -16,7 +16,7 @@ import (
 )
 
 // Archivos del catálogo por área (los playbooks anteriores no llevan estos prefijos; tac-baseline es anterior).
-var catalogFile = regexp.MustCompile(`^(l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob|vxlan|fex|stack|svl|poe|asic|lisp|fabric|edge|border|fw|ha|snort|mgmt)-`)
+var catalogFile = regexp.MustCompile(`^(aci|l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob|vxlan|fex|stack|svl|poe|asic|lisp|fabric|edge|border|fw|ha|snort|mgmt)-`)
 
 // Comandos que pueden imprimir secretos (el enmascarado solo corre si el comando lo declara).
 var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp (comm|host)|archive log|cts (pacs|cred)|tacacs-server|radius-server)|show (managers|network)( |$)|more )`)
@@ -56,6 +56,7 @@ func catalogFS(t testing.TB) fs.FS {
 	add(os.DirFS("../packs/ios/playbooks"), "cisco/ios")
 	add(os.DirFS("../packs/wlc-9800/playbooks"), "cisco/wlc-9800")
 	add(os.DirFS("../packs/nx-os/playbooks"), "cisco/nx-os")
+	add(os.DirFS("../packs/aci/playbooks"), "cisco/aci/nx-os") // ids nx-os/aci-…
 	add(os.DirFS("../packs/cat9k/playbooks"), "cisco/cat9k")
 	add(os.DirFS("../packs/sda/playbooks"), "cisco/sda")
 	add(os.DirFS("../packs/asa/playbooks"), "cisco/asa")

@@ -1,0 +1,19 @@
+# Propósito: Detalle de una interfaz con su óptica y los logs de ese puerto.
+# Cuándo usarlo: Un puerto no sube o acumula errores.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-tac-interfaz-caida
+platform: nx-os
+name: ACI · TAC · Interfaz caída o con errores
+name_en: ACI · TAC · Interface down or erroring
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show interface {interface}
+  - cmd: show interface {interface} counters errors
+  - cmd: show interface {interface} transceiver details
+  - cmd: show interface status err-disabled
+  - cmd: show lldp neighbors
+  - cmd: show logging logfile | include {interface}
+    timeout: 180s

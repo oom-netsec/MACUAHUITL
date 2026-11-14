@@ -1,0 +1,18 @@
+# Propósito: La ruta de overlay-1 hacia una IP (por ejemplo un TEP) con su contexto IS-IS.
+# Cuándo usarlo: No hay alcance hacia un TEP o una interfaz de loopback del fabric.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-fabric-ruta-overlay-ip
+platform: nx-os
+name: ACI · Fabric · Ruta en el overlay a una IP
+name_en: ACI · Fabric · Overlay route to an IP
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show ip route {ip} vrf overlay-1
+  - cmd: show ip route vrf overlay-1
+  - cmd: show isis route vrf overlay-1
+  - cmd: show isis adjacency vrf overlay-1
+  - cmd: show isis dteps vrf overlay-1
+  - cmd: show tunnel interface

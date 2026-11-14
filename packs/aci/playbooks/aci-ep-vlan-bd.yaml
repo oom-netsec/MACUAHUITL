@@ -1,0 +1,15 @@
+# Propósito: Mapa de VLAN internas del leaf, encapsulaciones y VRF.
+# Cuándo usarlo: Hay que ubicar qué VLAN interna corresponde a una EPG o BD.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-ep-vlan-bd
+platform: nx-os
+name: ACI · Endpoints · VLAN, EPG y BD en el leaf
+name_en: ACI · Endpoints · VLANs, EPGs and BDs on the leaf
+commands:
+  - cmd: show system internal epm vlan all
+  - cmd: show vlan extended
+  - cmd: show vrf
+  - cmd: show vrf all detail
+  - cmd: show interface trunk
+  - cmd: show interface status

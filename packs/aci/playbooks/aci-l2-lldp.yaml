@@ -1,0 +1,15 @@
+# Propósito: Vecinos LLDP y CDP del nodo.
+# Cuándo usarlo: Hay que confirmar quién está conectado a cada puerto.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l2-lldp
+platform: nx-os
+name: ACI · L2 · LLDP y CDP
+name_en: ACI · L2 · LLDP and CDP
+commands:
+  - cmd: show lldp neighbors
+  - cmd: show lldp neighbors detail
+  - cmd: show lldp traffic
+  - cmd: show cdp neighbors
+  - cmd: show interface status
+  - cmd: show interface description

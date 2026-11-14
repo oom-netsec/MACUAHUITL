@@ -1,0 +1,20 @@
+# Propósito: Mensajes críticos, errores y avisos del log del nodo.
+# Cuándo usarlo: Un nodo se comporta raro y hay que ver qué registró.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-plat-logs-criticos
+platform: nx-os
+name: ACI · Plataforma · Logs críticos
+name_en: ACI · Platform · Critical logs
+commands:
+  - cmd: show clock
+  - cmd: show logging logfile | egrep "EMERG|ALERT|CRIT"
+    timeout: 180s
+  - cmd: show logging logfile | egrep "ERR|WARN"
+    timeout: 180s
+  - cmd: show logging logfile | include ETHPM
+    timeout: 180s
+  - cmd: show logging logfile | include ISIS
+    timeout: 180s
+  - cmd: show logging logfile | include BGP
+    timeout: 180s

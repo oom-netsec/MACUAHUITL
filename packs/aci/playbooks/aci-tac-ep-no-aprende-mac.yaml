@@ -1,0 +1,19 @@
+# Propósito: EPM, VLAN, vPC y logs para una MAC que no aparece o se mueve.
+# Cuándo usarlo: Una MAC no se aprende o hay movimientos en el leaf.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-tac-ep-no-aprende-mac
+platform: nx-os
+name: ACI · TAC · Endpoint MAC que no se aprende
+name_en: ACI · TAC · MAC endpoint not learned
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show system internal epm endpoint mac {mac}
+  - cmd: show system internal epm vlan all
+  - cmd: show vlan extended
+  - cmd: show vpc brief
+  - cmd: show port-channel summary
+  - cmd: show logging logfile | include EPM
+    timeout: 180s

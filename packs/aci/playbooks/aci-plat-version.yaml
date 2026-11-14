@@ -1,0 +1,15 @@
+# Propósito: Versión de software, módulos, inventario, hora y NTP del leaf o spine ACI.
+# Cuándo usarlo: Primer vistazo a un nodo: qué imagen corre, si los módulos están ok y si el reloj coincide con el fabric.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-plat-version
+platform: nx-os
+name: ACI · Plataforma · Versión y módulos
+name_en: ACI · Platform · Version and modules
+commands:
+  - cmd: show version
+  - cmd: show module
+  - cmd: show inventory
+  - cmd: show clock
+  - cmd: show ntp peer-status
+  - cmd: show vrf

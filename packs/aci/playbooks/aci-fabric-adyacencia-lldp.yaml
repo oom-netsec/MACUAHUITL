@@ -1,0 +1,16 @@
+# Propósito: Vecinos IS-IS y LLDP del nodo con el detalle de los enlaces del fabric.
+# Cuándo usarlo: Se sospecha un cable o un puerto de fabric (leaf a spine) caído.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-fabric-adyacencia-lldp
+platform: nx-os
+name: ACI · Fabric · Adyacencias y LLDP
+name_en: ACI · Fabric · Adjacencies and LLDP
+commands:
+  - cmd: show isis adjacency vrf overlay-1
+  - cmd: show lldp neighbors
+  - cmd: show lldp neighbors detail
+  - cmd: show interface status
+  - cmd: show interface brief
+  - cmd: show logging logfile | include ISIS
+    timeout: 180s

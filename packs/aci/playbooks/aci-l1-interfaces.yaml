@@ -1,0 +1,15 @@
+# Propósito: Estado, descripciones y errores de todos los puertos del nodo.
+# Cuándo usarlo: Hay puertos caídos o con errores y hace falta una vista general.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l1-interfaces
+platform: nx-os
+name: ACI · L1 · Resumen de interfaces
+name_en: ACI · L1 · Interface summary
+commands:
+  - cmd: show interface brief
+  - cmd: show interface status
+  - cmd: show interface status err-disabled
+  - cmd: show interface description
+  - cmd: show interface counters errors
+  - cmd: show lldp neighbors

@@ -1,0 +1,18 @@
+# Propósito: Tabla de rutas, ARP e interfaces de una VRF (tenant:vrf).
+# Cuándo usarlo: Falta una ruta o el siguiente salto de una VRF. Pide la VRF como tenant:vrf (p. ej. common:default).
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l3-vrf-rutas
+platform: nx-os
+name: ACI · L3 · Rutas de una VRF
+name_en: ACI · L3 · VRF routes
+params:
+  - name: vrf
+    kind: interface
+commands:
+  - cmd: show vrf {vrf} detail
+  - cmd: show ip route vrf {vrf}
+  - cmd: show ip route vrf {vrf} summary
+  - cmd: show ip arp vrf {vrf}
+  - cmd: show ip interface brief vrf {vrf}
+  - cmd: show bgp sessions vrf {vrf}
