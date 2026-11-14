@@ -35,7 +35,7 @@ export function BackupSection({ core, setMsg, onImported, onPreview, onClosed }:
       path = await core.pickSavePath(t("vault.backup.fileName")); // confirma el reemplazo y deja el archivo vacío
       if (!path) return;
       const r = await core.exportVaultBackup(path, phrase, true, sure);
-      setMsg({ kind: "ok", text: t("vault.backup.exported", { n: String(r.count), path }) + (r.noPermissions ? ` ${t("vault.backup.noPerms")}` : "") });
+      setMsg({ kind: "ok", text: t("vault.backup.exported", { n: r.count, path }) + (r.noPermissions ? ` ${t("vault.backup.noPerms")}` : "") });
       setSure(false);
     } catch (e) {
       if (path) await core.removeEmptyFile(path).catch(() => {}); // el diálogo dejó un archivo vacío que no sirve

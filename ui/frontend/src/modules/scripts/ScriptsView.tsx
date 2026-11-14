@@ -92,7 +92,7 @@ export function ScriptsView({ core }: { core: CoreAPI }) {
     const path = await core.pickSavePath(t("scripts.exportName"));
     if (!path) return;
     const n = await cleanOnFail(core, path, core.exportScripts(picked, path, true)); // pickSavePath ya confirmó el reemplazo y dejó el archivo vacío
-    setMsg(t("scripts.exported", { n: String(n), path }));
+    setMsg(t("scripts.exported", { n, path }));
   });
   const imp = useImportFlow(core, "scripts", () => { scriptsChanged(); reload(); });
 

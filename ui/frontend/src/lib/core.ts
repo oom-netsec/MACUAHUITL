@@ -189,7 +189,7 @@ export const wailsCore: CoreAPI = {
     const { n, preview: shown, controls } = pastePreview(text);
     const preview = controls ? `${tr("paste.controls", { codes: controls })}\n\n${shown}` : shown;
     const yes = tr("paste.yes");
-    return (await Dialogs.Question({ Title: tr("paste.title"), Message: script ? tr("paste.script", { name: script, n, run: n - 1, host, preview }) : tr("paste.msg", { n, host, preview }), Buttons: [{ Label: yes }, { Label: tr("paste.no"), IsCancel: true, IsDefault: true }] })) === yes;
+    return (await Dialogs.Question({ Title: tr("paste.title", { n }), Message: script ? tr("paste.script", { name: script, n, run: n - 1, host, preview }) : tr("paste.msg", { n, host, preview }), Buttons: [{ Label: yes }, { Label: tr("paste.no"), IsCancel: true, IsDefault: true }] })) === yes;
   },
   ...vaultWails(call),
   ...auditWails(call),

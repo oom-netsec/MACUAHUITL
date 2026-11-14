@@ -72,7 +72,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
     if (!path) return;
     // Si falla, se borra el archivo vacío que dejó pickSavePath (un archivo previo con contenido no se toca) y se muestra el error real.
     const r = await cleanOnFail(core, path, core.exportHosts(ids, path, true, format));
-    setMsg(t("hosts.data.export.done", { n: String(r.count), path }));
+    setMsg(t("hosts.data.export.done", { n: r.count, path }));
     if (r.warnings.length) setWarn([...new Set(r.warnings)].join(" "));
   });
 
