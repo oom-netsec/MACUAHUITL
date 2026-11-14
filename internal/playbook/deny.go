@@ -82,6 +82,12 @@ func CheckDenied(platform, cmd string) error {
 	if strings.Contains(cmd, ";") {
 		return denied(cmd, "playbook.why.chain")
 	}
+	// «&», «&&», «||» y «<» los interpreta bash en la CLI de los leaf ACI (iBash); ningún show los necesita.
+	// En nx-os (los leaf ACI corren como nx-os) además «$» (expansión), «!» (historial), «\» y «'» (otra forma de citar que el
+	// análisis de comillas no sigue); en IOS, ASA y AireOS son anclas y patrones legítimos (^…$, ^!) y no pasan por bash.
+	if strings.ContainsAny(cmd, "&<") || strings.Contains(cmd, "||") || platform == "nx-os" && strings.ContainsAny(cmd, `$!\'`) {
+		return denied(cmd, "playbook.why.shell")
+	}
 	// «>» y «>>» escriben a flash; «`» y «$(» ejecutan una sustitución. También para IOS, por si el host está mal marcado.
 	if strings.Contains(cmd, ">") {
 		return denied(cmd, "playbook.why.redirect")
