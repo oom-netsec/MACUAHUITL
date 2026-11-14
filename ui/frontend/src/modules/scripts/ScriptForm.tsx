@@ -41,7 +41,7 @@ export function ScriptForm({ initial, onSave, onCancel }: { initial?: ScriptItem
       await onSave(initial ? { id: initial.id, ...draft } : draft);
     } catch (e) {
       const msg = errorText(e);
-      setCoreErr({ field: fieldOfError(msg), msg });
+      setCoreErr({ field: fieldOfError(e), msg });
     } finally { setBusy(false); }
   };
 

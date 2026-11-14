@@ -10,6 +10,10 @@ import type { TransferResult } from "./api";
 import { absoluteSlash, buildURL, clientErrors, clientProtos, getParams, parseClientURL, portOf, putParams, putProtos, usesCred, usesSsh, type ClientForm, type ClientProto } from "./client";
 import { hostKeyFromError } from "./validate";
 import { useVaultVersion } from "../../lib/vaultSignal";
+import { errInfo } from "../../lib/coreError";
+
+// El archivo bajado no tiene el hash esperado (xfer) o el publicado (SHA-512 de Cisco): se descartó.
+const DIGEST_REASONS = ["xfer.err.digest", "transfer.svc.sha512"];
 
 const label = (p: ClientProto) => p.toUpperCase();
 // Campos con error que viven dentro de «Opciones avanzadas».
@@ -32,6 +36,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [mismatch, setMismatch] = useState(false); // el hash no coincidió: por reason, o por el texto en español si no viene
   const [pending, setPending] = useState<{ fp: string; changed: boolean } | null>(null);
   const [res, setRes] = useState<TransferResult | null>(null);
   useBusy(busy);
@@ -69,7 +74,9 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
       setRes(await (form.dir === "get" ? core.transferGet(getParams(form)) : core.transferPut(putParams(form))));
     } catch (e) {
       const m = errorText(e);
-      const hk = hostKeyFromError(m);
+      const info = errInfo(e);
+      const hk = hostKeyFromError(m, info);
+      setMismatch(info ? DIGEST_REASONS.includes(info.reason) : /no coincide/.test(m));
       if (hk) setPending(hk); else setErr(m);
     } finally {
       setBusy(false);
@@ -81,7 +88,6 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
     setF(next);
     void run(next);
   };
-  const mismatch = /no coincide/.test(err);
   const protos = f.dir === "put" ? putProtos : clientProtos;
   const showFix = tried && Object.keys(errors).length > 0;
   return (

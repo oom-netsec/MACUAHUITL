@@ -23,6 +23,7 @@ import "./terminal.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
 import { HostPicker, targetOf } from "../inventory/HostPicker";
 import { hostKeyFromError, parseFingerprints } from "../../lib/hostkeys";
+import { errInfo, type ErrInfo } from "../../lib/coreError";
 import type { ScriptItem } from "../scripts/api";
 import { useScriptsVersion } from "../scripts/signal";
 import { decodeInsert, needsCopy, scriptText, type Insert } from "../scripts/text";
@@ -35,7 +36,7 @@ const XTermPane = lazy(() => import("./XTermPane"));
 // La salida viva se resalta con las reglas de la app (lib/termAnsi): solo líneas completas y sin ESC; el texto limpio (búsqueda, descarga y registro) no lleva códigos.
 
 interface Tab {
-  key: number; label: string; device: string; cred: string; runId: string; status: { k: Key; v?: Record<string, string> }; err: string; done: boolean;
+  key: number; label: string; device: string; cred: string; runId: string; status: { k: Key; v?: Record<string, string> }; err: string; errInfo?: ErrInfo; done: boolean;
   logPath: string; logAt: Date | null; logErr: string; // registro opcional en el archivo que eligió la persona
 }
 interface LogState { path: string; last: string; chain: Promise<void> }
@@ -107,7 +108,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
     if (e.done) {
       writers.current.get(e.runId)?.flush();
       saveLog(e.runId);
-      patch(e.runId, (t) => ({ ...t, done: true, status: { k: "ssh.closed" }, err: e.error ? errorText(new Error(e.error)) : t.err }));
+      patch(e.runId, (t) => ({ ...t, done: true, status: { k: "ssh.closed" }, err: e.error ? errorText(new Error(e.error)) : t.err, errInfo: e.error ? errInfo({ cause: e.errorInfo }) : t.errInfo }));
     } else if (e.opened) {
       patch(e.runId, (t) => ({ ...t, status: { k: "ssh.connected", v: { port: e.opened ?? "", path: e.recording ?? "" } } }));
     } else if (e.data) {
@@ -268,7 +269,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
 
   // Estado de una sesión: conexión, registro en archivo y avisos. Solo, arriba; dividida, en la cabecera de cada panel.
   const head = (tab: Tab) => {
-    const hk = tab.err ? hostKeyFromError(tab.err) : null;
+    const hk = tab.err ? hostKeyFromError(tab.err, tab.errInfo) : null;
     return (
       <>
         {tab.logErr && <Notice kind="error">{t("ssh.logError", { path: tab.logPath, error: tab.logErr })}</Notice>}
