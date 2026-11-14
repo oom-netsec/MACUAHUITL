@@ -13,6 +13,7 @@ func init() {
 		"playbook.why.terminal":      e("solo terminal length y terminal width", "only terminal length and terminal width"),
 		"playbook.why.not_read":      e("no es un comando de lectura", "not a read command"),
 		"playbook.why.empty_pipe":    e("pipe vacío", "empty pipe"),
+		"playbook.why.remote":        e("ruta remota (ftp:, tftp:, http:, scp:…): el equipo se conectaría a otro servidor", "remote path (ftp:, tftp:, http:, scp:…): the device would connect to another server"),
 		"playbook.why.pipe_sink":     e("redirect, tee y append escriben fuera de la sesión", "redirect, tee and append write outside the session"),
 		"playbook.why.pipe_filter":   e("solo include, exclude, begin, section y count tras |", "only include, exclude, begin, section and count after |"),
 		"playbook.why.cr_in_line":    e("retorno de carro dentro de la línea", "carriage return inside the line"),

@@ -45,6 +45,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+          cache: false # la caché la escribe el CI de main: el release no compila con objetos que no generó él
       - name: versión
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - name: paquetes de contenido, reglas del repo (sin el secret)

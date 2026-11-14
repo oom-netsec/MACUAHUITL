@@ -60,7 +60,7 @@ func (d coreDeps) Job(ctx context.Context, id string) (service.JobInfo, error) {
 	}
 	d.c.mu.Lock()
 	defer d.c.mu.Unlock()
-	info := service.JobInfo{State: j.state, FinishErr: j.FinishErr}
+	info := service.JobInfo{State: j.state, FinishErr: j.FinishErr, Until: j.Until}
 	switch {
 	case j.writer != nil:
 		info.Dir = j.writer.Dir()

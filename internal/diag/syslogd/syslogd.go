@@ -33,6 +33,9 @@ const maxConns = 64
 // Sin cierre por inactividad: un IOS callado perdería el primer mensaje al reconectar; las muertas las corta el keepalive TCP.
 const maxPerSource = 4
 
+// maxPerNet es el tope por /64 en IPv6: la mitad del receptor, para que un host con muchas direcciones no lo llene todo.
+const maxPerNet = maxConns / 2
+
 type Message struct {
 	Time      time.Time
 	From      string
@@ -188,10 +191,12 @@ func listenTCP(ctx context.Context, c Config, emit emitFunc) error {
 	sem := make(chan struct{}, maxConns)
 	var mu sync.Mutex
 	perSource := map[string]int{}
-	release := func(src string) {
+	release := func(keys []limitKey) {
 		mu.Lock()
-		if perSource[src]--; perSource[src] <= 0 {
-			delete(perSource, src)
+		for _, k := range keys {
+			if perSource[k.key]--; perSource[k.key] <= 0 {
+				delete(perSource, k.key)
+			}
 		}
 		mu.Unlock()
 		<-sem
@@ -212,26 +217,47 @@ func listenTCP(ctx context.Context, c Config, emit emitFunc) error {
 			conn.Close() // demasiadas conexiones; se rechaza en vez de agotar recursos
 			continue
 		}
-		src, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+		keys := sourceKeys(conn.RemoteAddr().String())
 		mu.Lock()
-		perSource[src]++
-		full := perSource[src] > maxPerSource
+		full := false
+		for _, k := range keys {
+			perSource[k.key]++
+			full = full || perSource[k.key] > k.max
+		}
 		mu.Unlock()
 		if full {
-			release(src)
+			release(keys)
 			conn.Close() // un solo origen no acapara el receptor
 			continue
 		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			defer release(src)
+			defer release(keys)
 			defer conn.Close()
 			stopConn := context.AfterFunc(ctx, func() { conn.Close() })
 			defer stopConn()
 			readStream(bufio.NewReaderSize(conn, MaxMessage+16), conn.RemoteAddr().String(), emit)
 		}()
 	}
+}
+
+// limitKey es un contador del tope por origen con su máximo.
+type limitKey struct {
+	key string
+	max int
+}
+
+// sourceKeys son los topes de una conexión: maxPerSource por IP y, en IPv6, maxPerNet por /64 (con su zona), porque
+// un host tiene el /64 entero de direcciones pero un /64 también puede ser la LAN de gestión con muchos equipos.
+func sourceKeys(addr string) []limitKey {
+	h, _, _ := net.SplitHostPort(addr)
+	keys := []limitKey{{"ip " + h, maxPerSource}}
+	a, err := netip.ParseAddr(h)
+	if err != nil || a.Unmap().Is4() {
+		return keys
+	}
+	return append(keys, limitKey{"net " + netip.PrefixFrom(a, 64).Masked().String() + "%" + a.Zone(), maxPerNet})
 }
 
 // readStream separa mensajes por conteo de octetos ("<len> <msg>") o por salto de línea.
