@@ -188,7 +188,7 @@ function Health({ core }: { core: CoreAPI }) {
     { id: "sev", header: t("fleet.col.severity"), value: (i) => cap(t(`fleet.sev.${i.severity}`)), width: W.sm },
     { id: "device", header: t("fleet.col.device"), value: (i) => i.device, width: W.md },
     { id: "port", header: t("fleet.col.iface"), value: (i) => i.port, mono: true, width: W.md },
-    { id: "problems", header: t("fleet.col.problems"), width: 320, wrap: true, value: (i) => i.problems.map((p) => `${vocab(t, "problem", p.kind)}${p.value ? ` ${p.value}` : ""} ${p.evidence}`).join(" · "),
+    { id: "problems", header: t("fleet.col.problems"), width: 200, wrap: true, value: (i) => i.problems.map((p) => `${vocab(t, "problem", p.kind)}${p.value ? ` ${p.value}` : ""} ${p.evidence}`).join(" · "),
       render: (i) => i.problems.map((p) => <span key={p.kind}>{vocab(t, "problem", p.kind)}{p.value ? ` ${p.value}` : ""} <span className="meta">{p.evidence}</span> </span>) },
     { id: "at", header: t("fleet.col.evidence"), value: (i) => whenText(i.at, srcOf(t, i.source)), render: (i) => <When at={i.at} source={i.source} />, wrap: true },
   ];
@@ -226,11 +226,11 @@ function Summary({ core }: { core: CoreAPI }) {
   useEffect(() => { void q.run(() => core.fleetSummary()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const rows = q.data?.rows ?? [];
   const cols: Column<(typeof rows)[number]>[] = [
-    { id: "device", header: t("fleet.col.device"), value: (x) => x.device, width: W.md },
-    { id: "check", header: t("fleet.col.alert"), value: (x) => ((checks as readonly string[]).includes(x.check) ? t(`fleet.check.${x.check as (typeof checks)[number]}`) : x.check), width: W.md },
-    { id: "value", header: t("fleet.col.value"), value: (x) => x.value, mono: true, width: W.md },
-    { id: "detail", header: t("fleet.col.detail"), value: (x) => x.detail ?? "", width: W.lg },
-    { id: "at", header: t("fleet.col.dataAge"), value: (x) => whenText(x.at, srcOf(t, x.source)), render: (x) => <When at={x.at} source={x.source} /> },
+    { id: "device", header: t("fleet.col.device"), value: (x) => x.device, width: W.sm },
+    { id: "check", header: t("fleet.col.alert"), value: (x) => ((checks as readonly string[]).includes(x.check) ? t(`fleet.check.${x.check as (typeof checks)[number]}`) : x.check), width: W.md, wrap: true },
+    { id: "value", header: t("fleet.col.value"), value: (x) => x.value, mono: true, width: W.md, wrap: true },
+    { id: "detail", header: t("fleet.col.detail"), value: (x) => x.detail ?? "", width: W.sm, wrap: true },
+    { id: "at", header: t("fleet.col.dataAge"), value: (x) => whenText(x.at, srcOf(t, x.source)), render: (x) => <When at={x.at} source={x.source} />, wrap: true },
   ];
   const heat = useMemo(() => summaryMatrix(rows, checks), [rows]);
   return (

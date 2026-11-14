@@ -292,3 +292,4 @@ th.num, td.num { text-align: right; }
 .dialog-body thead th { color: var(--text-2); font-weight: 600; white-space: nowrap; background: var(--surface); }
 .dialog-body code { white-space: nowrap; }
 .grid-2 .field { align-content: start; } /* una pista de dos líneas no estira las filas de sus vecinos */
+code.nowrap { white-space: nowrap; } /* un comando corto no se parte entre líneas */
