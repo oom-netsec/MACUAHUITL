@@ -150,6 +150,15 @@ describe("registro en archivo", () => {
     await waitFor(() => expect(core.writeFile).toHaveBeenCalledWith(expect.any(String), "tres\n", "utf8", true));
   });
 
+  test("cerrar la ventana (confirmado en el puente) hace la escritura final", async () => {
+    const { core } = setup();
+    await registro(core);
+    await term();
+    act(() => { core.emitTerminal({ runId: "t1", data: "cuatro\r\n" }); });
+    act(() => { core.emitClosing(); });
+    await waitFor(() => expect(core.writeFile).toHaveBeenCalledWith(expect.any(String), "cuatro\n", "utf8", true));
+  });
+
   test("salir del módulo también guarda", async () => {
     const { core, unmount } = setup();
     await registro(core);

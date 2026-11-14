@@ -150,8 +150,9 @@ export function TerminalView({ core }: { core: CoreAPI }) {
     const id = setInterval(() => tabsRef.current.forEach((t) => { if (!t.done) saveRef.current(t.runId); }), LOG_EVERY);
     const last = () => tabsRef.current.forEach((t) => saveRef.current(t.runId));
     window.addEventListener("beforeunload", last);
-    return () => { clearInterval(id); window.removeEventListener("beforeunload", last); };
-  }, []);
+    const off = core.onClosing(last); // WebKitGTK no garantiza beforeunload al destruir la ventana
+    return () => { clearInterval(id); window.removeEventListener("beforeunload", last); off(); };
+  }, [core]);
   // Al salir del módulo no queda ninguna sesión abierta: cada pestaña viva se cierra en el núcleo.
   useEffect(() => () => {
     tabsRef.current.forEach((t) => { writers.current.get(t.runId)?.dispose(); saveRef.current(t.runId); });

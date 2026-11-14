@@ -76,6 +76,8 @@ export interface BaseAPI {
   saveFile(name: string, data: string, encoding: "utf8" | "base64"): Promise<string>;
   // Archivos soltados en la ventana sobre una zona [data-file-drop-target] (ui/main.go): rutas y el id de la zona.
   onFilesDropped(cb: (e: { target: string; paths: string[] }) => void): () => void;
+  // La ventana se va a cerrar (la persona lo confirmó en ui/main.go): última oportunidad de escribir lo pendiente.
+  onClosing(cb: () => void): () => void;
   // Diálogo nativo de guardar solo para elegir la ruta (un registro que se reescribe): confirma la sobrescritura
   // y deja el archivo creado, vacío. Devuelve la ruta o "" si se cancela o falla.
   pickSavePath(name: string): Promise<string>;
@@ -163,6 +165,7 @@ export const wailsCore: CoreAPI = {
     }
   },
   onFilesDropped: (cb) => Events.On("ui:files-dropped", (e) => cb(e.data as { target: string; paths: string[] })),
+  onClosing: (cb) => Events.On("ui:closing", () => cb()),
   // Igual que saveFile, pero solo la ruta: se crea vacío para fallar ya si no se puede escribir y para confirmar el reemplazo.
   pickSavePath: async (name) => {
     try {
