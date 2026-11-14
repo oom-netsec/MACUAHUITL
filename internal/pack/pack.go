@@ -143,7 +143,7 @@ func check(files map[string][]byte, coreVersion string, keys []ed25519.PublicKey
 	if !p.Official && !source && !thirdPartyEditor.MatchString(m.Editor()) {
 		return nil, rej("manifest.invalid", "field", "id")
 	}
-	if !utf8.Valid(files[fileReadme]) {
+	if !utf8.Valid(files[fileReadme]) || bytes.ContainsFunc(files[fileReadme], bidi) {
 		return nil, rej("manifest.invalid", "field", "README.md")
 	}
 	p.Readme = string(files[fileReadme])
@@ -172,6 +172,12 @@ func check(files map[string][]byte, coreVersion string, keys []ed25519.PublicKey
 		p.Scripts = ss
 	}
 	return p, nil
+}
+
+// bidi son los controles de dirección (U+061C, U+200E/F, U+202A-202E, U+2066-2069): en el README, donde otros Cf como
+// el ZWJ de un emoji son legítimos, solo estos se rechazan (trojan source).
+func bidi(r rune) bool {
+	return r == 0x061c || r == 0x200e || r == 0x200f || r >= 0x202a && r <= 0x202e || r >= 0x2066 && r <= 0x2069
 }
 
 func plain(s string, max int) bool {

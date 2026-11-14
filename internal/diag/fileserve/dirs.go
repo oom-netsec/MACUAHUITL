@@ -44,10 +44,18 @@ func denyList(extra []string) []string {
 			out = append(out, filepath.Join(home, h))
 		}
 	}
-	for _, env := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"} {
+	// Config y datos XDG enteros (autostart/, systemd/user, applications/ cargan y ejecutan lo que haya), aunque
+	// apunten fuera de $HOME; del estado solo lo de la app.
+	for _, env := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME"} {
 		if v := os.Getenv(env); filepath.IsAbs(v) {
-			out = append(out, filepath.Join(v, "macuahuitl"))
+			out = append(out, v)
+			if r, err := evalSymlinks(v); err == nil && r != v { // la ruta real también: es la que se elige al servir
+				out = append(out, r)
+			}
 		}
+	}
+	if v := os.Getenv("XDG_STATE_HOME"); filepath.IsAbs(v) {
+		out = append(out, filepath.Join(v, "macuahuitl"))
 	}
 	return append(out, extra...)
 }

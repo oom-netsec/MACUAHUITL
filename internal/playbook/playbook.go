@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 
@@ -158,6 +159,13 @@ func parse(b []byte) (Playbook, error) {
 	if len(f.Commands) == 0 {
 		return Playbook{}, i18n.New("playbook.err.no_commands", nil)
 	}
+	// Los comandos ya los limita CheckDenied a ASCII imprimible; en los nombres solo se rechazan los controles y los
+	// de dirección (un emoji con ZWJ o un guion suave son legítimos y un playbook propio que no carga tumba el arranque).
+	for field, v := range map[string]string{"name": f.Name, "name_en": f.NameEn} {
+		if hidden(v) {
+			return Playbook{}, i18n.New("playbook.err.text", i18n.A("field", field))
+		}
+	}
 	p := Playbook{ID: f.Platform + "/" + f.ID, Platform: f.Platform, Name: f.Name, NameEn: f.NameEn, Pre: f.Pre}
 	for _, q := range f.Params {
 		p.Params = append(p.Params, Param(q))
@@ -193,6 +201,14 @@ func parse(b []byte) (Playbook, error) {
 		p.Commands = append(p.Commands, cmd)
 	}
 	return p, nil
+}
+
+// hidden dice si s lleva caracteres de control o de dirección (bidi: U+061C, U+200E/F, U+202A-202E, U+2066-2069),
+// que cambian cómo se ve el texto sin cambiar lo que dice (trojan source).
+func hidden(s string) bool {
+	return strings.ContainsFunc(s, func(r rune) bool {
+		return unicode.IsControl(r) || r == 0x061c || r == 0x200e || r == 0x200f || r >= 0x202a && r <= 0x202e || r >= 0x2066 && r <= 0x2069
+	})
 }
 
 func cmdTexts(cs []fileCommand) []string {
