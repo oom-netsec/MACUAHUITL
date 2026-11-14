@@ -1278,7 +1278,7 @@ Con `en`, nada visible de esta área sale en español; sin idioma o con `es` el 
 - `HostsImportFormat`: `description` y `type` de cada campo salen en el idioma (`hostfield.desc.<campo>`, `hostfield.type.<tipo>`); el nombre del archivo de la plantilla (`hosts-plantilla.csv|json`) y el `state`/`reason` de cada fila (`nuevo`, `conflicto`, `nombre`…) siguen siendo valores técnicos.
 
 ### Salida, protocolo, trabajos y paquetes
-- `out.err.dir|file` (carpeta y archivo de salida de adhoc), `ingest.err.out_dir|out_file`, `field.err.names_busy|proto|port_lost` (diag y field), `patrol.err.job_missing` («trabajo X no existe») y `pack.err.hidden_save|hidden_read`.
+- `ingest.err.out_dir|out_file` (carpeta y archivo de salida: una sola familia para adhoc, diag y field; `out.err.*` ya no existe), `field.err.names_busy|proto|port_lost` (diag y field), `patrol.err.job_missing` («trabajo X no existe») y `pack.err.hidden_save|hidden_read`.
 - Snippets: `ListSnippetTemplates` entrega `name`, `label` y `help` en el idioma del contexto (`snippet.<id>.name|field.<campo>[.help]`, mismas claves y textos en inglés de la app). Una prueba compara el español del catálogo con el de las plantillas del núcleo.
 
 ### Puente (`ui/bridge`)
@@ -1293,3 +1293,12 @@ Con `en`, nada visible de esta área sale en español; sin idioma o con `es` el 
 - Los `status.Error(err.Error())` que envuelven errores de SQLite o del sistema (`internal()` de inventory y scripts, prefs, pack, diag `ListInterfaces`, `audit Verify/Export`) y los `core: …` del arranque del demonio: texto de la biblioteca, no de la app.
 - La marca `abierto/cerrado:` del log de la consola serie (es contenido del archivo de evidencia) y `HashFile` (rama 30e-b).
 - `hosts-plantilla.*` (nombre de archivo) y los valores técnicos `state/reason` de las filas del import.
+
+## Idioma: correcciones de la revisión de 30e
+- Puente: `language()` ya no retiene su candado mientras consulta al núcleo; sin núcleo, las llamadas vuelven con error en vez de colgarse.
+- Adhoc: `adhoc.err.max`, `adhoc.err.node_stopped` y `adhoc.err.no_dir` (el `error` de `AdhocResult` sale en el idioma pedido); la auditoría `adhoc.denied` va en inglés.
+- Carpeta de salidas: los errores `prefs.outputs.<motivo>` (códigos `prefs.outputs.*` del catálogo, con el prefijo en es y en en), el aviso `Note` de carpeta inválida (`prefs.outputs.issue`) y la nota de cambio (`prefs.outputs.note`) salen en el idioma pedido. `CheckOutputs` devuelve un error con código: quien lo entrega al cliente lo pasa por `service.ErrFrom`.
+- Asistente: el motivo de una reversa que no restauró el equipo (`assist.residue.*`: falta, sobra, «y N más», línea oculta, err-disabled), la etiqueta de la dirección validada (`assist.what.*`, resueltas como Refs) y el rango sin tope (`assist.invalid_value.out_of_range_min`) salen en el idioma pedido. Las líneas de configuración no se traducen.
+- `ImportFormat` (scripts y colecciones): `description` y `type` por campo en el idioma (`scriptsfmt.desc.*`, `scriptsfmt.type.*`); es es idéntico.
+- Paquetes: `pack.err.script.platform|origin` y `pack.err.playbook.id`.
+- `mctl.credrotate.note_3` en inglés cita la etiqueta real guardada en la bóveda, `"<label> (anterior)"` (no se cambia la etiqueta: ya existe en bóvedas de usuarios y se busca por ella). El respaldo programado audita `backup.failed` en inglés.
