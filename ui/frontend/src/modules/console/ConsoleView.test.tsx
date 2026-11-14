@@ -71,3 +71,16 @@ test("dos clics seguidos en Abrir no abren dos sesiones", async () => {
   expect(core.consoleOpen).toHaveBeenCalledTimes(1);
   expect(open).toBeDisabled();
 });
+
+test("un comando con un control oculto (Ctrl+Z pegado) pide confirmación; si se cancela no se envía", async () => {
+  const core = fakeCore({ fieldPorts: vi.fn(async () => ["/dev/ttyUSB0"]), confirmPaste: vi.fn(async () => false) });
+  render(<ConsoleView core={core} />);
+  await waitFor(() => expect(screen.getByLabelText("Puerto")).toHaveValue("/dev/ttyUSB0"));
+  await userEvent.click(screen.getByRole("button", { name: "Abrir" }));
+  act(() => core.emitConsole({ runId: "c1", opened: "/dev/ttyUSB0 9600 8N1" }));
+  await userEvent.click(screen.getByLabelText("Comando"));
+  await userEvent.paste("end\x1a");
+  await userEvent.keyboard("{Enter}");
+  await waitFor(() => expect(core.confirmPaste).toHaveBeenCalledWith("end\x1a", "/dev/ttyUSB0"));
+  expect(core.consoleSend).not.toHaveBeenCalled();
+});
