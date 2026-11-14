@@ -90,12 +90,13 @@ var iosRules = []rule{
 	// Keyring IKEv1: la llave va tras «key», no tras address/hostname/ipv6.
 	R("psk", "", `\s*pre-shared-key (?:address|hostname|ipv6) .*? key `+typ),
 	R("psk", "", `\s*pre-shared-key (?:local |remote )?`+typ).unless(keyringLine),
-	R("ntp-key", "", `\s*ntp authentication-key \d+ (?:md5|sha\d*|hmac-sha\S*|cmac-aes-128) (?:(?:hash|plain) )?`),
+	R("ntp-key", "", `\s*ntp authentication-key \d+ (?:md5|sha\d*|hmac-sha\S*|cmac(?:-aes-128)?) (?:(?:hash|plain) )?`+typ),
 	R("snmp-user-auth", "", `\s*snmp-server user .*? auth (?:md5|sha-2 \d+|sha\S*) `),
 	R("snmp-user-priv", "", `\s*snmp-server user .*? priv (?:(?:des|3des|aes(?:[- ]\d+)?) )?`),
 	// La comunidad va tras vrf/use-vrf, informs/traps y version; use-vrf sin valor no es la comunidad.
 	// ASA: «host IFNAME IP [trap|poll] community X»; la IP no es la comunidad.
 	R("snmp-community", "", `\s*snmp-server host \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+\s*$`),
+	R("snmp-community", "", `\s*snmp-server host-group \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+\s*$`),
 	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) )?`).guarded().unlessFn(isASASNMPHost),
 	R("snmp-community", "", `\s*snmp mib community-map `),
 	R("bgp-password", "", `\s*neighbor \S+ password `+typ),
@@ -108,7 +109,11 @@ var iosRules = []rule{
 	R("key-string", "", `\s*key-string `+typ),
 	R("tacacs-key", "", `\s*server-private \S+ (?:.*? )?key `+typ),
 	R("client-password", "", `\s*ip (?:ftp|http client) password `+typ),
-	R("config-key", "", `\s*key config-key password-encrypt `),
+	R("config-key", "", `\s*key config-key password-encrypt(?:ion)? `),
+	R("config-key", "", `\s*key config-key password-encrypt(?:ion)? \S+ `), // la clave anterior
+	// FTD CLISH: clave de registro y NAT ID del gestor.
+	R("manager-regkey", "", `\s*configure manager add \S+ `),
+	R("manager-natid", "", `\s*configure manager add \S+ \S+ `),
 	R("config-key", "", `\s*key config-key \d+ `),
 	R("ospf-key", "", `\s*(?:ip )?ospf authentication-key `+typ),
 	R("ospf-key", "", `\s*(?:ip )?ospf message-digest-key \d+ md5 `+typ),
@@ -153,6 +158,7 @@ var iosRules = []rule{
 	R("eigrp-key", "", `\s*eigrp authentication key \d+ `+commTyp).stopAt(`\s+key-id \d+\s*$`),
 	R("eigrp-key", "", `\s*authentication key eigrp \d+ `+commTyp).stopAt(`\s+key-id \d+\s*$`),
 	R("aaa-key", "aaaserver", `\s+key `+typ),
+	R("cluster-key", "cluster", `\s+key `+typ),
 	R("radius-key", "", `\s*radius-common-pw `+typ),
 	R("user-secret", "", `\s*vpdn username \S+ password `+typ).stopAt(`\s+store-local\s*$`),
 	R("aaa-key", "", `\s*aaa-server \S+ (?:\(\S+\) )?host \S+ `).guarded(), // forma de una línea
@@ -205,7 +211,7 @@ var iosRules = []rule{
 
 // Palabras que, como valor, no son un secreto sino otra palabra clave del comando (ntp … key 5 prefer, password default…).
 var guardWords = map[string]bool{
-	"md5": true, "sha1": true, "sha-1": true, "sha-2": true, "sha256": true, "sha-256": true, "sha512": true, "hmac-sha-256": true, "hmac-sha2-256": true, "hmac-sha2-512": true, "cmac-aes-128": true,
+	"md5": true, "sha1": true, "sha-1": true, "sha-2": true, "sha256": true, "sha-256": true, "sha512": true, "hmac-sha-256": true, "hmac-sha2-256": true, "hmac-sha2-512": true, "cmac-aes-128": true, "cmac": true,
 	"prefer": true, "iburst": true, "burst": true, "use-vrf": true, "vrf": true, "filter-vrf": true, "version": true,
 	"source": true, "source-interface": true, "minpoll": true, "maxpoll": true, "priority": true, "--": true, "text": true,
 	"key-string": true, "ascii": true, "hex": true, "mode-list": true, "cryptographic-algorithm": true, "key": true,
@@ -265,8 +271,10 @@ func blockOf(line string) string {
 		return "line"
 	case strings.HasPrefix(line, "crypto isakmp client configuration group "):
 		return "ezvpn"
-	case strings.HasPrefix(line, "crypto pki trustpoint "):
+	case strings.HasPrefix(line, "crypto pki trustpoint "), strings.HasPrefix(line, "crypto ca trustpoint "):
 		return "trustpoint"
+	case strings.HasPrefix(line, "cluster group "):
+		return "cluster"
 	case strings.HasPrefix(line, "aaa-server "):
 		return "aaaserver"
 	case strings.TrimSpace(line) == "license smart":
@@ -498,7 +506,7 @@ func (s Stream) Peek(line string) string {
 }
 
 // looseBlocks son los bloques que tienen reglas propias.
-var looseBlocks = []string{"line", "aaaserver", "tacacs", "radius", "licsmart", "username", "dot1x", "ezvpn", "trustpoint", "umbrella"}
+var looseBlocks = []string{"line", "aaaserver", "tacacs", "radius", "licsmart", "username", "dot1x", "ezvpn", "trustpoint", "umbrella", "cluster"}
 
 // TypedLoose enmascara una línea tecleada cuyo bloque no confirmó ningún prompt: si el bloque en curso no
 // la tapa, la prueba con cada bloque que tenga reglas propias y graba la primera versión que tape algo
@@ -523,11 +531,25 @@ var archiveLog = regexp.MustCompile(`^(\s*\d+\s+\d+\s+\S+\s+\|)(.*)$`)
 // loggedCmd: mensaje de syslog (%PARSER-5-CFGLOG_LOGGEDCMD) con el comando de configuración tras «logged command:».
 var loggedCmd = regexp.MustCompile(`^(.*logged command:)(.*)$`)
 
+// cmdSyslog: syslogs de ASA/FTD que citan el comando ejecutado (111008, 111009, 111010); el comando va entre comillas.
+var cmdSyslog = []*regexp.Regexp{
+	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111008: User '[^']*' executed the ')(.*)(' command\.?\s*)$`),
+	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111010: User '[^']*', running '[^']*' from IP \S+, executed ')(.*)('\s*)$`),
+	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111009: User '[^']*' executed cmd: )(.*)()$`),
+}
+
 // maskLine aplica reglas hasta que ninguna cambie la línea: una línea puede traer
 // varios secretos (snmp-server user … auth X priv Y).
 func maskLine(line, block, platform string, counts map[string]int) string {
 	if m := loggedCmd.FindStringSubmatch(line); m != nil {
 		return m[1] + maskLine(m[2], "", platform, counts)
+	}
+	if strings.Contains(line, "-1110") { // filtro barato: las expresiones de cmdSyslog corren por cada línea
+		for _, re := range cmdSyslog {
+			if m := re.FindStringSubmatch(line); m != nil {
+				return m[1] + maskLine(m[2], "", platform, counts) + m[3]
+			}
+		}
 	}
 	if m := archiveLog.FindStringSubmatch(line); m != nil {
 		return m[1] + maskLine(m[2], "", platform, counts)
@@ -666,29 +688,58 @@ func (r rule) stopIndex(rest string) int {
 // Sintaxis de configuración de AireOS: sin tipo de cifrado; el usuario, índice, IP, puerto y WLAN no se tapan. En el
 // modo «(Nombre) config>» se teclea SIN el prefijo «config»: por eso cada regla va dos veces, con «config » en
 // cualquier bloque y sin él solo en el bloque «aireconfig» (así el «radius …» suelto de otras plataformas no cambia).
-var aireosRules = []struct{ kind, body string }{
-	{"radius-key", `radius (?:auth|acct) add \d+ \S+ \d+ (?:ascii|hex) `},
-	{"radius-key", `radius auth keywrap add (?:ascii|hex) `},
-	{"radius-key", `radius auth keywrap add (?:ascii|hex) \S+ `},
-	{"tacacs-key", `tacacs (?:auth|acct|athr) add \d+ \S+ \d+ (?:ascii|hex) `},
-	{"user-secret", `(?:mgmtuser|netuser) (?:add|password) \S+ `},
-	{"snmp-community", `snmp community (?:create|delete|mode (?:enable|disable)|accessmode (?:ro|rw)|ipaddr \S+ \S+) `},
-	{"snmp-user-auth", `snmp v3user create \S+ \S+ \S+ \S+ `},
-	{"snmp-user-priv", `snmp v3user create \S+ \S+ \S+ \S+ \S+ `},
-	{"user-secret", `local-auth (?:.*? )?password `},
-	{"psk", `local-auth method fast server-key `},
-	{"user-secret", `ap mgmtuser add username \S+ password `},
-	{"user-secret", `ap mgmtuser add username \S+ password \S+ secret `},
-	{"dot1x-password", `ap 802\.1Xuser add username \S+ password `},
-	{"wifi-psk", `wlan security static-wep-key encryption \d+ \d+ (?:ascii|hex) `},
-	{"ldap-password", `ldap simple-bind authenticated \d+ (?:username \S+ password |\S+ )`},
+var aireosRules = []struct {
+	kind, body string
+	skip       func(line, platform string) bool
+}{
+	{"radius-key", `radius (?:auth|acct) add \d+ \S+ \d+ (?:ascii|hex) `, nil},
+	{"radius-key", `radius auth keywrap add (?:ascii|hex) `, nil},
+	{"radius-key", `radius auth keywrap add (?:ascii|hex) \S+ `, nil},
+	{"tacacs-key", `tacacs (?:auth|acct|athr) add \d+ \S+ \d+ (?:ascii|hex) `, nil},
+	{"user-secret", `(?:mgmtuser|netuser) (?:add|password) \S+ `, aireEncrypt},
+	{"user-secret", `mgmtuser add encrypt \S+ `, notAireEncrypt},
+	{"psk", `mesh security psk provisioning key `, nil},
+	{"snmp-community", `snmp community (?:create|delete|mode (?:enable|disable)|accessmode (?:ro|rw)|(?:ipaddr|ipv6addr) \S+ \S+) `, nil},
+	{"snmp-user-auth", `snmp v3user create \S+ \S+ \S+ \S+ `, nil},
+	{"snmp-user-priv", `snmp v3user create \S+ \S+ \S+ \S+ \S+ `, nil},
+	{"user-secret", `local-auth (?:.*? )?password `, nil},
+	{"psk", `local-auth method fast server-key `, nil},
+	{"user-secret", `ap mgmtuser add username \S+ password `, nil},
+	{"user-secret", `ap mgmtuser add username \S+ password \S+ secret `, nil},
+	{"dot1x-password", `ap 802\.1Xuser add username \S+ password `, nil},
+	{"wifi-psk", `wlan security static-wep-key encryption \d+ \d+ (?:ascii|hex) `, nil},
+	{"ldap-password", `ldap simple-bind authenticated \d+ (?:username \S+ password |\S+ )`, nil},
 }
 
 func init() {
 	for _, r := range aireosRules {
-		iosRules = append(iosRules, R(r.kind, "", `\s*config `+r.body), R(r.kind, "aireconfig", `\s*`+r.body))
+		cfg, bare := R(r.kind, "", `\s*config `+r.body), R(r.kind, "aireconfig", `\s*`+r.body)
+		cfg.notFn, bare.notFn = r.skip, r.skip
+		iosRules = append(iosRules, cfg, bare)
 	}
+	// «transfer download|upload password» se teclea en el prompt normal, sin «config».
+	iosRules = append(iosRules, R("transfer-password", "", `\s*transfer (?:download|upload) password `), R("transfer-password", "", `\s*transfer download certpassword `))
 }
+
+// aireEncrypt: «mgmtuser add encrypt USUARIO CLAVE [read-write|read-only]». Un usuario llamado «encrypt» con la forma
+// clásica («add encrypt CLAVE read-only») no cuenta: el nivel de acceso queda en el 4.º lugar.
+func aireEncrypt(line, _ string) bool {
+	f := strings.Fields(strings.ToLower(line))
+	for i, w := range f {
+		if w != "mgmtuser" {
+			continue
+		}
+		acc := func(j int) bool { return j < len(f) && (f[j] == "read-write" || f[j] == "read-only") }
+		// El eco partido puede traer el nivel a medias («read-»): también cuenta.
+		part := func(j int) bool {
+			return j < len(f) && (strings.HasPrefix("read-write", f[j]) || strings.HasPrefix("read-only", f[j]))
+		}
+		return len(f) >= i+5 && f[i+1] == "add" && f[i+2] == "encrypt" && !acc(i+4) && (len(f) == i+5 || part(i+5))
+	}
+	return false
+}
+
+func notAireEncrypt(line, p string) bool { return !aireEncrypt(line, p) }
 
 // ISE: usuarios, claves NTP y usuarios de repositorios con «hash|plain» antes del valor; el usuario, el rol y el índice no se tapan.
 var iseRules = []rule{
@@ -699,6 +750,8 @@ var iseRules = []rule{
 	R("snmp-user-auth", "", `\s*snmp-server host \S+ version 3 \S+ \S+ (?:hash|plain) `),
 	R("snmp-user-priv", "", `\s*snmp-server host \S+ version 3 \S+ \S+ (?:hash|plain) \S+ `),
 	R("client-password", "", `\s*user \S+ password (?:hash|plain) `), // dentro de «repository NAME»
+	// backup, restore, backup-logs y «cli backup …» de una kron policy-list.
+	R("backup-key", "", `\s*(?:cli )?(?:backup|restore|backup-logs) (?:.*? )?encryption-key (?:hash|plain) `),
 }
 
 func init() { iosRules = append(iosRules, iseRules...) }

@@ -30,9 +30,10 @@ var secretPrompt = regexp.MustCompile(`(?i)\b(pass(word|phrase|code)|secret)\b[^
 
 var (
 	ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b.`)
-	// Prompt del equipo: «SW1(config)#» o el de AireOS «(Cisco Controller) >» / «(Cisco Controller) config>».
-	promptRe    = regexp.MustCompile(`^(?:\S+[#>]|\([^()\r\n]+\) (?:config)?>)`)
-	shellPrompt = regexp.MustCompile(`^(?:\S+[#>]|\([^()\r\n]+\) (?:config)?>)\s*$`)
+	// Prompt del equipo: «SW1(config)#», el de ISE con espacio «ise/admin(config-Policy List)#», el de AireOS
+	// «(Cisco Controller) >» / «(Cisco Controller) config>» y el «> » de FTD (solo si sigue un espacio o el fin).
+	promptRe    = regexp.MustCompile(`^(?:\S+[#>]|\S+\([^()\r\n]*\)[#>]|\([^()\r\n]+\) (?:config)?>|>(?: |$))`)
+	shellPrompt = regexp.MustCompile(`^(?:\S+[#>]|\S+\([^()\r\n]*\)[#>]|\([^()\r\n]+\) (?:config)?>|>)\s*$`)
 )
 
 const (
@@ -325,6 +326,10 @@ func blockOfPrompt(p string) string {
 		return "radius"
 	case strings.Contains(p, "(config-aaa-server-host)"):
 		return "aaaserver"
+	case strings.Contains(p, "(cfg-cluster)"):
+		return "cluster"
+	case strings.Contains(p, "ca-trustpoint)"): // ASA «(config-ca-trustpoint)» e IOS «(ca-trustpoint)»
+		return "trustpoint"
 	case strings.Contains(p, "(config-smart-lic)"), strings.Contains(p, "(config-license)"):
 		return "licsmart"
 	}
