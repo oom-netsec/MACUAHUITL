@@ -153,3 +153,22 @@ func TestUTF8MapaConservaLaEntrada(t *testing.T) {
 		t.Fatal("el original cambió")
 	}
 }
+
+// Dos claves inválidas que sanean igual, o una que sanea igual que una válida, no se pisan: ninguna entrada se pierde
+// y la válida queda intacta.
+func TestUTF8MapaClavesQueChocan(t *testing.T) {
+	out := validUTF8(&v1.TextRef{Args: map[string]string{"a\xff": "1", "a\xfe": "2", "a�": "ok"}}).(*v1.TextRef)
+	if len(out.Args) != 3 || out.Args["a�"] != "ok" {
+		t.Fatalf("args = %q", out.Args)
+	}
+	vals := map[string]bool{}
+	for k, v := range out.Args {
+		if !utf8.ValidString(k) {
+			t.Fatalf("clave inválida %q", k)
+		}
+		vals[v] = true
+	}
+	if !vals["1"] || !vals["2"] {
+		t.Fatalf("se perdió un valor: %q", out.Args)
+	}
+}

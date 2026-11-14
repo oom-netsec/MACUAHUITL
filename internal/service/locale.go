@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
@@ -33,9 +34,16 @@ func ErrFrom(ctx context.Context, c codes.Code, err error) error {
 	if loc != i18n.Es {
 		msg = i18n.In(loc, err) // conserva el envoltorio y el sufijo del error
 	}
+	// Un argumento puede traer salida de un equipo con UTF-8 inválido: sin sanear, WithDetails falla y se pierden el
+	// reason y el texto localizado.
+	msg = strings.ToValidUTF8(msg, "\uFFFD")
+	md := map[string]string{} // copia: la metadata de un error puede estar compartida
+	for k, v := range ce.Metadata() {
+		md[k] = strings.ToValidUTF8(v, "\uFFFD")
+	}
 	st := status.New(c, msg)
 	if d, derr := st.WithDetails(
-		&errdetails.ErrorInfo{Reason: ce.Reason(), Domain: ErrDomain, Metadata: ce.Metadata()},
+		&errdetails.ErrorInfo{Reason: ce.Reason(), Domain: ErrDomain, Metadata: md},
 		&errdetails.LocalizedMessage{Locale: loc, Message: msg},
 	); derr == nil {
 		st = d

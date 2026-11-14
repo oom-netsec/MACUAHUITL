@@ -2,6 +2,8 @@ package ipc
 
 import (
 	"context"
+	"sort"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -89,9 +91,18 @@ func walkUTF8(m protoreflect.Message, fix bool) bool {
 				return true
 			})
 			if fix {
+				// Primero se quitan todas y luego se ponen, en orden fijo: dos claves que sanean igual (o una igual a
+				// otra válida) no se pisan; la repetida lleva un sufijo #2, #3…
+				sort.Slice(bad, func(i, j int) bool { return bad[i].k.String() < bad[j].k.String() })
 				for _, b := range bad {
 					mp.Clear(b.k.MapKey())
-					mp.Set(b.nk.MapKey(), b.nv)
+				}
+				for _, b := range bad {
+					nk := b.nk
+					for n := 2; fd.MapKey().Kind() == protoreflect.StringKind && mp.Has(nk.MapKey()); n++ {
+						nk = protoreflect.ValueOfString(b.nk.String() + "#" + strconv.Itoa(n))
+					}
+					mp.Set(nk.MapKey(), b.nv)
 				}
 			}
 		case fd.Kind() == protoreflect.StringKind:
