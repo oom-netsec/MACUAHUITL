@@ -1,7 +1,9 @@
 package patrol
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -57,9 +59,20 @@ func (w *Writer) NoteHostKeyChange(c HostKeyChange) {
 }
 
 func NewWriter(root string, s Spec, startedAt time.Time) (*Writer, error) {
-	dir := filepath.Join(root, dirName(s.Name)+"_"+startedAt.Format(stamp))
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	base := filepath.Join(root, dirName(s.Name)+"_"+startedAt.Format(stamp))
+	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, fmt.Errorf("patrol: %w", err)
+	}
+	dir := base
+	for n := 2; ; n++ { // Mkdir sin MkdirAll: si la carpeta ya existe es de otro trabajo
+		err := os.Mkdir(dir, 0o700)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, fs.ErrExist) || n > 1000 {
+			return nil, fmt.Errorf("patrol: %w", err)
+		}
+		dir = fmt.Sprintf("%s-%d", base, n)
 	}
 	return &Writer{dir: dir, split: s.Split, files: map[string]bool{}, byRound: map[int]map[string]bool{}, maskCounts: map[string]int{}, started: startedAt}, nil
 }
