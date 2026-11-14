@@ -291,6 +291,8 @@ func TestAvisoDeTopeORecorteConservaLaCarpetaDePatrol(t *testing.T) {
 		}
 		if a := sd.AuditText(); !strings.Contains(a, `"action":"backup.warning"`) {
 			t.Errorf("%s: el aviso no quedó auditado: %s", nombre, a)
+		} else if strings.Contains(a, "recortad") || strings.Contains(a, "sin firma") || strings.Contains(a, "no devolvió") {
+			t.Errorf("%s: la auditoría va en inglés: %s", nombre, a)
 		}
 	}
 }

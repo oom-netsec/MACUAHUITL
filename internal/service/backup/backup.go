@@ -426,7 +426,7 @@ func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int) (co
 			s.d.Audit("backup.prune", dev, fmt.Sprintf("deleted=%d keep=%d", n, keep))
 		}
 	}
-	s.auditWarnings(job, tr, res.Warnings)
+	s.auditWarnings(job, tr, res.Warnings, res.WarningTexts)
 	if tr != nil {
 		tr.saved = append(tr.saved, res.Saved...)
 		if terminal {
@@ -456,8 +456,9 @@ func kindOf(cmd string) (backup.Kind, bool) {
 }
 
 // auditWarnings anota los avisos del vigilante; los de un trabajo propio, una sola vez cada uno.
-func (s *backupSvc) auditWarnings(job string, tr *tracked, ws []string) {
-	for _, w := range ws {
+func (s *backupSvc) auditWarnings(job string, tr *tracked, ws []string, ts []i18n.Text) {
+	en := i18n.Notes(i18n.En, ws, ts) // la auditoría va en inglés
+	for i, w := range ws {
 		if tr != nil {
 			if tr.warned[w] {
 				continue
@@ -467,7 +468,7 @@ func (s *backupSvc) auditWarnings(job string, tr *tracked, ws []string) {
 			}
 			tr.warned[w] = true
 		}
-		s.d.Audit("backup.warning", job, w)
+		s.d.Audit("backup.warning", job, en[i])
 	}
 }
 
