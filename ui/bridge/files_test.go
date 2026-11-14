@@ -56,3 +56,17 @@ func TestWriteFile(t *testing.T) {
 		}
 	}
 }
+
+// Un archivo creado entre la comprobación y el renombrado no se reemplaza si no se pidió overwrite.
+func TestWriteFileCarreraNoReemplaza(t *testing.T) {
+	b := New(nil, func(string, any) {})
+	p := filepath.Join(t.TempDir(), "x.csv")
+	beforeSaveRename = func() { os.WriteFile(p, []byte("ajeno"), 0o600) }
+	defer func() { beforeSaveRename = nil }()
+	if err := b.WriteFile(p, "mio", "utf8", false); !errors.Is(err, ErrFileExists) {
+		t.Fatalf("err = %v; quería ErrFileExists", err)
+	}
+	if got, _ := os.ReadFile(p); string(got) != "ajeno" {
+		t.Fatalf("el archivo ajeno quedó con %q", got)
+	}
+}

@@ -3,10 +3,12 @@ package bridge
 import (
 	"encoding/base64"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // ---- Guardar un archivo que eligió la persona ----
@@ -39,9 +41,12 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 	if len(raw) > maxSaveBytes {
 		return b.bridgeErr(i18n.New("bridge.err.save_big", nil))
 	}
-	if _, err := os.Lstat(path); err == nil && !overwrite {
+	exists := func() error {
 		return &Error{err: ErrFileExists, msg: i18n.Msg(b.locale(), "file.exists.save", nil), Code: "AlreadyExists", Reason: "file.exists",
 			Metadata: i18n.Metadata("file.exists.save", i18n.A("path", path))}
+	}
+	if _, err := os.Lstat(path); err == nil && !overwrite {
+		return exists()
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".guardar-*")
 	if err != nil {
@@ -55,5 +60,26 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 	if err := tmp.Close(); err != nil {
 		return wrapErr(err)
 	}
-	return wrapErr(os.Rename(tmp.Name(), path)) // CreateTemp ya deja 0600
+	if beforeSaveRename != nil {
+		beforeSaveRename()
+	}
+	if overwrite {
+		return wrapErr(os.Rename(tmp.Name(), path)) // CreateTemp ya deja 0600
+	}
+	// Sin overwrite nunca se reemplaza: un enlace duro falla si el destino apareció después del Lstat; sin enlaces
+	// duros (vfat, FUSE) se renombra con RENAME_NOREPLACE.
+	err = os.Link(tmp.Name(), path)
+	if err != nil && !errors.Is(err, fs.ErrExist) {
+		if root, rerr := os.OpenRoot(filepath.Dir(path)); rerr == nil {
+			err = sys.RenameNoReplaceIn(root, filepath.Base(tmp.Name()), filepath.Base(path))
+			root.Close()
+		}
+	}
+	if errors.Is(err, fs.ErrExist) {
+		return exists()
+	}
+	return wrapErr(err)
 }
+
+// beforeSaveRename es un gancho de pruebas: corre justo antes de dar su nombre final al temporal.
+var beforeSaveRename func()
