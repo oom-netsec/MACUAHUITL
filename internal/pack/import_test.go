@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -248,7 +247,7 @@ func TestImportTmpHuerfanoNoBloquea(t *testing.T) {
 
 // Sin enlaces duros (vfat, FUSE) Publish cae a renombrar sin sobrescribir; y tampoco pisa.
 func TestPublishSinEnlacesDuros(t *testing.T) {
-	linkFile = func(*os.Root, string, string) error { return syscall.EPERM }
+	linkFile = func(*os.Root, string, string) error { return os.ErrPermission }
 	t.Cleanup(func() { linkFile = func(root *os.Root, old, new string) error { return root.Link(old, new) } })
 	s, _ := openStore(t, t.TempDir(), nil, Base{})
 	dir := t.TempDir()

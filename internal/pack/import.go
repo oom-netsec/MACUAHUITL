@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
@@ -141,14 +139,14 @@ func (r *PlaybookResult) Publish(dir string) error {
 	for _, f := range r.files {
 		err := linkFile(root, f.tmp, f.final)
 		if err != nil && !errors.Is(err, fs.ErrExist) {
-			err = renameNoReplace(root, f.tmp, f.final) // sin enlaces duros (vfat, FUSE): renombrar sin sobrescribir
+			err = sys.RenameNoReplaceIn(root, f.tmp, f.final) // sin enlaces duros (vfat, FUSE): renombrar sin sobrescribir
 		}
 		if err != nil {
 			r.Undo(dir)
 			switch {
 			case errors.Is(err, fs.ErrExist):
 				return rej("import.exists", "file", f.final)
-			case errors.Is(err, unix.EINVAL), errors.Is(err, unix.ENOSYS), errors.Is(err, unix.EOPNOTSUPP), errors.Is(err, unix.EPERM):
+			case sys.NoAtomicRename(err):
 				return rej("import.unsupported_fs", "file", f.final)
 			}
 			return readErr(err)
@@ -161,16 +159,6 @@ func (r *PlaybookResult) Publish(dir string) error {
 		d.Close()
 	}
 	return nil
-}
-
-// renameNoReplace renombra old a new dentro de root sin sobrescribir (renameat2 RENAME_NOREPLACE).
-func renameNoReplace(root *os.Root, old, new string) error {
-	d, err := root.Open(".")
-	if err != nil {
-		return err
-	}
-	defer d.Close()
-	return unix.Renameat2(int(d.Fd()), old, int(d.Fd()), new, unix.RENAME_NOREPLACE)
 }
 
 // staleTmp es la edad desde la que un temporal se considera huérfano: un import en curso tarda segundos entre Stage y
