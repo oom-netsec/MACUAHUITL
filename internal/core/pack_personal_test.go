@@ -437,7 +437,7 @@ func TestPackImportNoTomaLaBaseAntesDelAlmacen(t *testing.T) {
 	})
 	done := make(chan error, 1)
 	go func() {
-		_, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: imp, Confirm: true})
+		_, err := pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: imp, Confirm: true}))
 		done <- err
 	}()
 	time.Sleep(300 * time.Millisecond) // el Import espera el almacén

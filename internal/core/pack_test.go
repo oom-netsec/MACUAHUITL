@@ -760,7 +760,7 @@ func TestPackInstalarQueFallaAlExtraerNoGuardaLoOculto(t *testing.T) {
 	os.MkdirAll(dir, 0o700)
 	os.Chmod(dir, 0o500) // el extract no puede crear su carpeta temporal
 	t.Cleanup(func() { os.Chmod(dir, 0o700) })
-	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}}); err == nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})); err == nil {
 		t.Fatal("el extract debía fallar")
 	}
 	var n int
@@ -769,7 +769,7 @@ func TestPackInstalarQueFallaAlExtraerNoGuardaLoOculto(t *testing.T) {
 		t.Fatalf("quedaron %d elecciones guardadas de una instalación fallida", n)
 	}
 	os.Chmod(dir, 0o700)
-	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}}))
 	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l2-stp"}) {
 		t.Fatalf("%+v %v", r, err)
 	}
@@ -783,7 +783,7 @@ func TestPackInstalarConFalloAlGuardarLoOcultoSeAudita(t *testing.T) {
 	if _, err := h.core.db.Exec(`CREATE TRIGGER no_ocultar BEFORE INSERT ON pack_hidden BEGIN SELECT RAISE(ABORT, 'disco lleno'); END`); err != nil {
 		t.Fatal(err)
 	}
-	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}}))
 	if err != nil || len(r.Pack.Hidden) != 0 {
 		t.Fatalf("%+v %v", r, err)
 	}
