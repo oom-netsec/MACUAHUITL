@@ -143,7 +143,7 @@ func syslogListen(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	req := &v1.SyslogRequest{Addr: addr, Protocol: proto, AllowAny: any, Save: save, NameTemplate: inf.Name, Format: inf.Format, DurationSeconds: dur,
+	req := &v1.SyslogRequest{Addr: addr, Protocol: proto, AllowAny: any, Save: save, NameTemplate: inf.Name, Format: cli.WireFormat(inf.Format), DurationSeconds: dur,
 		RatePerSource: v.Rate, BurstPerSource: v.Burst, RateGlobal: v.RateG, BurstGlobal: v.BurstG, QueueSize: v.Queue, RotateMb: v.RotMB, RotateMinutes: v.RotMin, MaxFiles: v.MaxFiles}
 	st, err := v1.NewToolsServiceClient(c.Conn).Syslog(context.Background(), req)
 	if err != nil {
@@ -180,7 +180,8 @@ const help = `  pcap  analyze ARCHIVO [--top N] [--json]
         trace|zone|dnssec NOMBRE --deep   (contacta raíces y autoritativos; queda auditado)
   tls   inspect HOST[:PUERTO] [--sni NOMBRE]
   syslog listen [--addr IP:PUERTO] [--tcp] [--any] [--for SEGUNDOS] [--rate N] [--burst N] [--rate-global N] [--burst-global N] [--queue N]
-        [--save [--rotate-mb N] [--rotate-min N] [--name PLANTILLA] [--max-files N] [--format texto|crudo|jsonl]]`
+        [--save [--rotate-mb N] [--rotate-min N] [--name PLANTILLA] [--max-files N] [--format texto|crudo|jsonl]]
+        (--name admite {fecha} {hora} {origen}; también valen {date} {time} {source})`
 
 // Area registra pcap analyze, dns, tls y syslog.
 func Area() cli.Area {

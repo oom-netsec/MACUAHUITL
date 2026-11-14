@@ -21,6 +21,7 @@ uso: mctl <comando>
   tls   inspect HOST[:PUERTO] [--sni NOMBRE]
   syslog listen [--addr IP:PUERTO] [--tcp] [--any] [--for SEGUNDOS] [--rate N] [--burst N] [--rate-global N] [--burst-global N] [--queue N]
         [--save [--rotate-mb N] [--rotate-min N] [--name PLANTILLA] [--max-files N] [--format texto|crudo|jsonl]]
+        (--name admite {fecha} {hora} {origen}; también valen {date} {time} {source})
   radius test SERVIDOR[:PUERTO] --user U|--cred ID [--secret-cred ID] [--method pap|chap|mschapv2]
         [--nas-ip IP] [--port-type T] [--service-type T] [--called X] [--calling MAC] [--acct] [--status]
   tacacs test SERVIDOR[:PUERTO] --user U|--cred ID [--secret-cred ID] [--type ascii|pap] [--cmd COMANDO] [--acct]
@@ -39,6 +40,7 @@ uso: mctl <comando>
   flows listen [--addr IP:PUERTO] [--any] [--for S] [--top N] [--every S] [--json] [topes y archivo]
         topes y archivo: [--rate N] [--burst N] [--rate-global N] [--burst-global N] [--queue N]
         [--save [--rotate-mb N] [--rotate-min N] [--name PLANTILLA] [--max-files N] [--format texto|crudo|jsonl]]
+        (--name admite {fecha} {hora} {origen}; también valen {date} {time} {source})
         en flows el tope cuenta datagramas (no flujos), solo rige con --save (1000/s por exportador y 5000/s global por defecto);
         un datagrama de plantilla v9/IPFIX descartado retrasa la decodificación hasta que el exportador la repita
   gnmi  get|subscribe HOST RUTA... --cred ID [--ca CA.pem] [--port N] [--mode sample|on_change]
