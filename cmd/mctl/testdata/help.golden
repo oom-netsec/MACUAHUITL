@@ -90,7 +90,7 @@ usage: mctl <command>
          --update-cred leaves the secret in the vault and the previous credential is kept as "<label> (anterior)";
          if the new session does not get in or you reject write memory, the rollback is proposed through the original session)
   backup run -d DEVICE[:PORT]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept FINGERPRINT] [--exclude DEVICE] [--timeout 10m] [--json]
-        (saves show running-config in outputs/respaldos/DEVICE/ with 0600; a Patrol job: read-only.
+        (saves show running-config in the backups folder, outputs/respaldos/DEVICE/, with 0600; a Patrol job: read-only.
          With --every and --rounds it is scheduled and the core saves each round)
   backup collect JOB [--keep N] [--json]   saves what a job has collected (idempotent)
   backup list [DEVICE] [--json]            saved backups (flags those with masked secrets)

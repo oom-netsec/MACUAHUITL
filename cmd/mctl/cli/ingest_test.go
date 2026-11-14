@@ -50,3 +50,19 @@ func TestPrintDrops(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+// La ayuda de --name documenta los tokens en el idioma de mctl: {date} {time} {source} en inglés, {fecha} {hora}
+// {origen} con --lang es.
+func TestIngestNameFlagTokensPorIdioma(t *testing.T) {
+	t.Cleanup(func() { SetLang("") })
+	for lang, c := range map[string]struct{ has, not string }{"": {"{date} {time} {source}", "{fecha}"}, "es": {"{fecha} {hora} {origen}", "{date}"}} {
+		SetLang(lang)
+		var f IngestFlags
+		fs := flag.NewFlagSet("x", flag.ContinueOnError)
+		f.Register(fs, "syslog_{fecha}_{hora}")
+		u := fs.Lookup("name").Usage
+		if !strings.Contains(u, c.has) || strings.Contains(u, c.not) {
+			t.Errorf("lang %q: %q", lang, u)
+		}
+	}
+}
