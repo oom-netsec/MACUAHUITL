@@ -223,7 +223,8 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 		}
 	}
 	// Orden: los playbooks se preparan con nombre temporal (el catálogo no los lee), se confirman los scripts y recién
-	// entonces se publican con un enlace atómico. Una caída antes de publicar deja solo temporales; nada visible a medias.
+	// entonces se publican con un enlace atómico. Una caída entre el commit y la publicación deja los scripts confirmados y los
+	// playbooks solo como temporales (invisibles): el reimport los ve como scripts iguales y publica los playbooks.
 	if pbRes, err = s.store.StagePlaybooks(p, dir, userIDs, pbDec); err != nil {
 		tx.Rollback() // la auditoría escribe en la misma base: no puede haber una transacción abierta
 		return nil, s.reject(ctx, err, p, sum, path)
@@ -236,8 +237,15 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 		beforePublish()
 	}
 	if err := pbRes.Publish(dir); err != nil { // los scripts ya están confirmados: se retiran para no dejar el import a medias
+		var left []string
 		for _, x := range sres.Writes {
-			s.d.DB().Exec(`DELETE FROM scripts WHERE id = ?`, x.ID)
+			if _, derr := s.d.DB().Exec(`DELETE FROM scripts WHERE id = ?`, x.ID); derr != nil {
+				left = append(left, x.ID)
+				s.d.Audit("pack.import.compensate_failed", p.ID, fmt.Sprintf("script=%s error=%q", x.ID, derr))
+			}
+		}
+		if len(left) > 0 { // quedaron scripts importados sin sus playbooks: que el ingeniero lo sepa
+			return nil, service.Err(ctx, codes.Internal, "pack.err.import.compensate", i18n.A("ids", strings.Join(left, ", "), "reason", dom.Reason(err)))
 		}
 		return nil, s.reject(ctx, err, p, sum, path)
 	}

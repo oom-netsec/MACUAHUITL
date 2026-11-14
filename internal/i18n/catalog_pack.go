@@ -36,6 +36,7 @@ func init() {
 		"pack.err.import.decision":       e("decisión no válida para {id}: solo renombrar (si choca) u omitir, y el ID debe ser del paquete", "invalid decision for {id}: only rename (on a clash) or skip, and the ID must be in the package", "id"),
 		"pack.err.import.exists":         e("el archivo {file} ya existe; no se sobrescribe", "the file {file} already exists; it is not overwritten", "file"),
 		"pack.err.import.unsupported_fs": e("la carpeta de playbooks está en un sistema de archivos que no permite publicar {file} sin sobrescribir", "the playbooks folder is on a filesystem that cannot publish {file} without overwriting", "file"),
+		"pack.err.import.compensate":     e("no se pudo publicar los playbooks ({reason}) y tampoco retirar los scripts importados: {ids}; bórralos a mano", "could not publish the playbooks ({reason}) nor remove the imported scripts: {ids}; delete them by hand", "ids", "reason"),
 		"pack.err.import.changed":        e("el archivo cambió desde la vista previa; vuelve a revisarlo", "the file changed since the preview; review it again"),
 		"pack.err.import.unavailable":    e("este núcleo no tiene carpeta de configuración para guardar playbooks", "this core has no configuration folder to store playbooks"),
 		"pack.err.export.range":          e("se exportan hasta {max} scripts", "export up to {max} scripts", "max"),

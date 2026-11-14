@@ -27,6 +27,60 @@ func nScripts(t *testing.T, q querier) int {
 // Los playbooks del import no son visibles hasta que los scripts ya están confirmados: antes quedan con nombre
 // temporal. Si publicarlos falla, el import se deshace entero (ni scripts ni archivos a medias).
 func TestImportPublicaPlaybooksTrasConfirmarScripts(t *testing.T) {
+	s2, d2, mp, pbDir := prepImport(t)
+	conflict := []byte("# de otro\n")
+	called := false
+	beforePublish = func() {
+		called = true
+		if n := nScripts(t, d2.DB()); n != 1 {
+			t.Errorf("al publicar los playbooks los scripts debían estar confirmados: %d", n)
+		}
+		chocar(pbDir, conflict)
+	}
+	t.Cleanup(func() { beforePublish = nil })
+	_, err := s2.Import(context.Background(), &v1.PackServiceImportRequest{Path: mp, Confirm: true})
+	if err == nil || !called {
+		t.Fatalf("debía fallar al publicar (hook %v): %v", called, err)
+	}
+	if n := nScripts(t, d2.DB()); n != 0 {
+		t.Fatalf("quedaron %d scripts a medias", n)
+	}
+	es, _ := os.ReadDir(pbDir)
+	if len(es) != 1 || es[0].Name() != "acme-mio.yaml" {
+		t.Fatalf("la carpeta debía tener solo el archivo ajeno: %v", es)
+	}
+	if b, _ := os.ReadFile(filepath.Join(pbDir, "acme-mio.yaml")); string(b) != string(conflict) {
+		t.Fatalf("se pisó el archivo ajeno: %q", b)
+	}
+}
+
+// chocar crea el nombre final de cada temporal de dir, como si alguien lo hubiera creado justo antes de publicar.
+func chocar(dir string, b []byte) {
+	es, _ := os.ReadDir(dir)
+	for _, e := range es {
+		if n, ok := strings.CutSuffix(e.Name(), ".tmp"); ok {
+			os.WriteFile(filepath.Join(dir, n[:strings.LastIndex(n, ".")]), b, 0o600)
+		}
+	}
+}
+
+// Si retirar los scripts tras un fallo de publicación también falla, queda auditado y el error lo dice.
+func TestImportCompensacionFallidaSeAudita(t *testing.T) {
+	s2, d2, mp, pbDir := prepImport(t)
+	beforePublish = func() {
+		chocar(pbDir, []byte("x"))
+		d2.DB().Exec(`CREATE TRIGGER no_borrar BEFORE DELETE ON scripts BEGIN SELECT RAISE(ABORT, 'no'); END`)
+	}
+	t.Cleanup(func() { beforePublish = nil })
+	_, err := s2.Import(context.Background(), &v1.PackServiceImportRequest{Path: mp, Confirm: true})
+	if err == nil || !strings.Contains(err.Error(), "scripts") || !strings.Contains(d2.AuditText(), "pack.import.compensate_failed") {
+		t.Fatalf("err=%v\n%s", err, d2.AuditText())
+	}
+}
+
+// prepImport exporta un .mpack con un script y un playbook y devuelve un servicio vacío listo para importarlo.
+func prepImport(t *testing.T) (*svc, *servicetest.Deps, string, string) {
+	t.Helper()
 	d1 := servicetest.New(t)
 	st1, _, err := dom.Open(t.TempDir(), "v0.3.0", nil, dom.Base{})
 	if err != nil {
@@ -52,35 +106,5 @@ func TestImportPublicaPlaybooksTrasConfirmarScripts(t *testing.T) {
 	cfg := t.TempDir()
 	pbDir := filepath.Join(cfg, "playbooks")
 	s2 := &svc{d: d2, store: st2, cfg: Module{ConfigDir: cfg}}
-	conflict := []byte("# de otro\n")
-	called := false
-	beforePublish = func() {
-		called = true
-		if n := nScripts(t, d2.DB()); n != 1 {
-			t.Errorf("al publicar los playbooks los scripts debían estar confirmados: %d", n)
-		}
-		es, _ := os.ReadDir(pbDir)
-		for _, e := range es {
-			if !strings.HasSuffix(e.Name(), ".tmp") {
-				t.Errorf("playbook visible antes de confirmar los scripts: %s", e.Name())
-				continue
-			}
-			os.WriteFile(filepath.Join(pbDir, strings.TrimSuffix(e.Name(), ".tmp")), conflict, 0o600) // alguien lo crea justo ahora
-		}
-	}
-	t.Cleanup(func() { beforePublish = nil })
-	_, err = s2.Import(context.Background(), &v1.PackServiceImportRequest{Path: mp, Confirm: true})
-	if err == nil || !called {
-		t.Fatalf("debía fallar al publicar (hook %v): %v", called, err)
-	}
-	if n := nScripts(t, d2.DB()); n != 0 {
-		t.Fatalf("quedaron %d scripts a medias", n)
-	}
-	es, _ := os.ReadDir(pbDir)
-	if len(es) != 1 || es[0].Name() != "acme-mio.yaml" {
-		t.Fatalf("la carpeta debía tener solo el archivo ajeno: %v", es)
-	}
-	if b, _ := os.ReadFile(filepath.Join(pbDir, "acme-mio.yaml")); string(b) != string(conflict) {
-		t.Fatalf("se pisó el archivo ajeno: %q", b)
-	}
+	return s2, d2, mp, pbDir
 }
