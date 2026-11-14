@@ -125,6 +125,9 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if !ok {
 		return errors.New(cli.Help(areas))
 	}
+	if cli.TryHelp(cmd, rest, out) { // -h de un subcomando: sus banderas y código 0, sin conectar al núcleo
+		return nil
+	}
 	c := &cli.Env{In: bufio.NewReader(stdin), Out: out}
 	if f, ok := stdin.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
 		c.TTY = f

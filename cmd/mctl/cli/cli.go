@@ -6,6 +6,7 @@ package cli
 import (
 	"bufio"
 	_ "embed"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -135,6 +136,10 @@ func Flags(name string, args []string, setup func(*flag.FlagSet)) (*flag.FlagSet
 	if setup != nil {
 		setup(fs)
 	}
+	fs.VisitAll(func(f *flag.Flag) { f.Usage = FlagUsage(name, f) })
+	if FlagSetHook != nil {
+		FlagSetHook(name, fs)
+	}
 	var opts, rest []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -153,7 +158,65 @@ func Flags(name string, args []string, setup func(*flag.FlagSet)) (*flag.FlagSet
 			}
 		}
 	}
-	return fs, fs.Parse(append(opts, rest...))
+	err := fs.Parse(append(opts, rest...))
+	if errors.Is(err, flag.ErrHelp) { // -h: la descripción de cada bandera, aunque el comando después pinte su «uso: …»
+		fmt.Fprintf(HelpOut, "%s mctl %s [flags]\n", T("mctl.flag.usage"), name)
+		fs.SetOutput(HelpOut)
+		fs.PrintDefaults()
+		fs.SetOutput(io.Discard)
+		panic(helpShown{}) // ningún comando lo convierte en su «uso: …»; TryHelp lo atrapa
+	}
+	return fs, err
+}
+
+type helpShown struct{}
+
+// TryHelp escribe en out las banderas de un comando cuando args pide -h o --help y devuelve true. Corre el comando sin
+// conexión: si no llega a leer sus banderas (sin banderas, o -h es el valor de otra) no hace nada y devuelve false.
+func TryHelp(c Command, args []string, out io.Writer) (shown bool) {
+	ask := false
+	for _, a := range args {
+		if a == "--" {
+			break
+		}
+		ask = ask || a == "-h" || a == "-help" || a == "--help" || a == "--h"
+	}
+	if !ask {
+		return false
+	}
+	prev := HelpOut
+	HelpOut = out
+	defer func() {
+		HelpOut = prev
+		if r := recover(); r != nil {
+			_, shown = r.(helpShown) // cualquier otro pánico (usar Conn sin banderas) no es ayuda
+		}
+	}()
+	_ = c.Run(&Env{In: bufio.NewReader(strings.NewReader("")), Out: io.Discard}, args)
+	return false
+}
+
+// HelpOut es donde -h escribe las banderas del comando (TryHelp lo apunta a la salida de mctl); FlagSetHook (solo para pruebas) ve cada FlagSet que se arma.
+var (
+	HelpOut     io.Writer = os.Stdout
+	FlagSetHook func(name string, fs *flag.FlagSet)
+)
+
+// FlagCode es el código del catálogo con la descripción de una bandera de un comando ("calc mtu" + "mtu" ->
+// mctl.flag.calc.mtu.mtu); mctl.flag.<bandera> es la descripción compartida por todos los comandos que la usan igual.
+func FlagCode(cmd, flagName string) string {
+	return "mctl.flag." + strings.ReplaceAll(cmd, " ", ".") + "." + flagName
+}
+
+// FlagUsage es la descripción de la bandera en el idioma de mctl: la del catálogo (propia del comando o compartida) y,
+// si no hay ninguna, el texto con que se registró.
+func FlagUsage(cmd string, f *flag.Flag) string {
+	for _, code := range []string{FlagCode(cmd, f.Name), "mctl.flag." + f.Name} {
+		if s := T(code); s != code {
+			return s
+		}
+	}
+	return f.Usage
 }
 
 // OneArg exige exactamente un argumento posicional (un ID).
