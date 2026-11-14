@@ -1,0 +1,16 @@
+# Propósito: Sesiones MP-BGP VPNv4 y EVPN de la VRF overlay-1 (route reflectors del fabric).
+# Cuándo usarlo: Faltan rutas de un tenant en otro pod o se cae una sesión de overlay.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-fabric-bgp-spine
+platform: nx-os
+name: ACI · Fabric · MP-BGP de los spine
+name_en: ACI · Fabric · Spine MP-BGP
+commands:
+  - cmd: show bgp sessions vrf overlay-1
+  - cmd: show bgp vpnv4 unicast summary vrf overlay-1
+  - cmd: show bgp l2vpn evpn summary vrf overlay-1
+  - cmd: show isis adjacency vrf overlay-1
+  - cmd: show ip route vrf overlay-1
+  - cmd: show logging logfile | include BGP
+    timeout: 180s

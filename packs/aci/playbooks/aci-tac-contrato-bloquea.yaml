@@ -1,0 +1,22 @@
+# Propósito: Endpoint, reglas de zoning y filtros del VNID para ver si un contrato bloquea.
+# Cuándo usarlo: El tráfico entre dos EPG no pasa y se sospecha de contratos. Pide el VNID como número (p. ej. 2850817).
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-tac-contrato-bloquea
+platform: nx-os
+name: ACI · TAC · Contrato que bloquea tráfico
+name_en: ACI · TAC · Contract blocking traffic
+params:
+  - name: ip
+    kind: ip
+  - name: vnid
+    kind: ap
+commands:
+  - cmd: show system internal epm endpoint ip {ip}
+  - cmd: show endpoint ip {ip}
+  - cmd: show zoning-rule scope {vnid}
+  - cmd: show zoning-filter
+  - cmd: show logging logfile | include ACLQOS
+    timeout: 180s
+  - cmd: show zoning-rule
+    timeout: 180s

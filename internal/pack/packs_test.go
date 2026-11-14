@@ -172,13 +172,13 @@ func TestNXOSPideNucleo041(t *testing.T) {
 	}
 }
 
-// Los paquetes oficiales ios, ios-xe, wlc-9800, nx-os, asa, ftd y wlc-aireos conviven en el mismo almacén: sin choques de ID ni de nombre de script.
+// Los paquetes oficiales ios, ios-xe, wlc-9800, nx-os, asa, ftd, wlc-aireos e ise conviven en el mismo almacén: sin choques de ID ni de nombre de script.
 func TestPaquetesOficialesConviven(t *testing.T) {
 	st, _, err := pack.Open(t.TempDir(), "v0.4.4", packtest.Keys(), repoBase(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, n := range []string{"ios", "ios-xe", "wlc-9800", "nx-os", "asa", "ftd", "wlc-aireos"} {
+	for _, n := range []string{"ios", "ios-xe", "wlc-9800", "nx-os", "asa", "ftd", "wlc-aireos", "ise"} {
 		if _, err := st.Install(packtest.Signed(t, filepath.Join(packtest.RepoDir(), "packs", n)), false); err != nil {
 			t.Fatalf("oom/%s junto a los demás: %v", n, err)
 		}
@@ -210,6 +210,17 @@ func TestFTDPideNucleo043(t *testing.T) {
 // El paquete oom/wlc-aireos pide el núcleo 0.4.4 (reconoce AireOS): un 0.4.3 (ASA y FTD) lo rechaza.
 func TestAireOSPideNucleo044(t *testing.T) {
 	d := filepath.Join(packtest.RepoDir(), "packs", "wlc-aireos")
+	if _, err := pack.ValidateSource(d, "v0.4.4"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pack.ValidateSource(d, "v0.4.3"); pack.Reason(err) != "core.too_old" {
+		t.Fatalf("0.4.3 debe rechazarlo: %v", err)
+	}
+}
+
+// El paquete oom/ise pide el núcleo 0.4.4 (reconoce ISE): un 0.4.3 lo rechaza.
+func TestISEPideNucleo044(t *testing.T) {
+	d := filepath.Join(packtest.RepoDir(), "packs", "ise")
 	if _, err := pack.ValidateSource(d, "v0.4.4"); err != nil {
 		t.Fatal(err)
 	}
@@ -268,5 +279,60 @@ func TestCat9kFedSwitchActiveAvisaDeFedActive(t *testing.T) {
 	}
 	if n == 0 {
 		t.Fatal("no se encontró ninguna línea con fed switch active")
+	}
+}
+
+// El paquete oom/aci pide el núcleo 0.4.4 (CheckDenied endurecido): un 0.4.3 lo rechaza.
+func TestACIPideNucleo044(t *testing.T) {
+	d := filepath.Join(packtest.RepoDir(), "packs", "aci")
+	if _, err := pack.ValidateSource(d, "v0.4.4"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pack.ValidateSource(d, "v0.4.3"); pack.Reason(err) != "core.too_old" {
+		t.Fatalf("0.4.3 debe rechazarlo: %v", err)
+	}
+}
+
+// oom/aci y oom/nx-os instalados juntos no chocan en IDs ni en nombres (es y en), y todo playbook de ACI expande con datos válidos.
+func TestACIConvivePorNombreConNXOS(t *testing.T) {
+	st, _, err := pack.Open(t.TempDir(), "v0.4.4", packtest.Keys(), repoBase(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"nx-os", "aci"} {
+		if _, err := st.Install(packtest.Signed(t, filepath.Join(packtest.RepoDir(), "packs", n)), false); err != nil {
+			t.Fatalf("oom/%s: %v", n, err)
+		}
+	}
+	load := func(n string) []playbook.Playbook {
+		pbs, err := playbook.Load(os.DirFS(filepath.Join(packtest.RepoDir(), "packs", n, "playbooks")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return pbs
+	}
+	ids, es, en := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	for _, p := range load("nx-os") {
+		ids[p.ID], es[p.Name], en[p.NameEn] = true, true, true
+	}
+	vals := map[string]string{"ip": "10.1.1.1", "mac": "0050.5694.7bc0", "vrf": "common:default", "vnid": "2850817", "interface": "eth1/1"}
+	aci := load("aci")
+	if len(aci) < 40 {
+		t.Fatalf("se esperaban 40 o más playbooks de ACI: %d", len(aci))
+	}
+	for _, p := range aci {
+		if ids[p.ID] || es[p.Name] || en[p.NameEn] {
+			t.Errorf("%s choca con oom/nx-os (id, name o name_en)", p.ID)
+		}
+		if !strings.HasPrefix(p.Name, "ACI · ") || !strings.HasPrefix(p.NameEn, "ACI · ") || p.Platform != "nx-os" {
+			t.Errorf("%s: nombre o plataforma fuera de forma", p.ID)
+		}
+		v := map[string]string{}
+		for _, q := range p.Params {
+			v[q.Name] = vals[q.Name]
+		}
+		if _, err := p.Expand(v); err != nil {
+			t.Errorf("%s no expande: %v", p.ID, err)
+		}
 	}
 }

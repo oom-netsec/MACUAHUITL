@@ -1,0 +1,18 @@
+# Propósito: Resumen de soporte técnico del nodo.
+# Cuándo usarlo: Reunir evidencia completa para el TAC.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/ise/3-1/cli_ref_guide/b_ise_CLI_Reference_Guide_31.html
+# Sin validar en laboratorio (no hay ISE en el laboratorio; comandos de la documentación de Cisco).
+id: plat-tech-support
+platform: ise
+name: ISE · Plataforma · Tech-support
+name_en: ISE · Platform · Tech-support
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show application status ise
+  - cmd: show cpu
+  - cmd: show memory
+  - cmd: show disks
+  - cmd: show tech-support
+    timeout: 300s
+    may_contain_secrets: true

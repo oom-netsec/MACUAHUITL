@@ -1,0 +1,20 @@
+# Propósito: Log del nodo filtrado por IS-IS, COOP, túneles y VXLAN.
+# Cuándo usarlo: Sospecha de problema en el underlay o en el plano de control del fabric.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-plat-logs-fabric
+platform: nx-os
+name: ACI · Plataforma · Logs del fabric
+name_en: ACI · Platform · Fabric logs
+commands:
+  - cmd: show clock
+  - cmd: show logging logfile | include ISIS
+    timeout: 180s
+  - cmd: show logging logfile | include COOP
+    timeout: 180s
+  - cmd: show logging logfile | include TUNNEL
+    timeout: 180s
+  - cmd: show logging logfile | include VXLAN
+    timeout: 180s
+  - cmd: show logging logfile | egrep "LLDP|MCP"
+    timeout: 180s

@@ -1,0 +1,19 @@
+# Propósito: Configuración activa y de arranque de ADE-OS.
+# Cuándo usarlo: Revisar la configuración del nodo (red, DNS, NTP, usuarios, repositorios).
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/ise/3-1/cli_ref_guide/b_ise_CLI_Reference_Guide_31.html
+# Sin validar en laboratorio (no hay ISE en el laboratorio; comandos de la documentación de Cisco).
+id: plat-configuracion
+platform: ise
+name: ISE · Plataforma · Configuración
+name_en: ISE · Platform · Configuration
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show application status ise
+  - cmd: show uptime
+  - cmd: show running-config
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show startup-config
+    timeout: 120s
+    may_contain_secrets: true

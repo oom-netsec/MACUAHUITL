@@ -1,0 +1,10 @@
+id: oom/ise
+version: 1.0.0
+min_core: 0.4.4
+name: ISE · Cisco Identity Services Engine, diagnóstico TAC
+name_en: ISE · Cisco Identity Services Engine, TAC diagnostics
+description: Playbooks de solo lectura para nodos Cisco ISE 3.x (PAN, MnT, PSN y pxGrid) desde su CLI ADE-OS - versión y parches, estado de los procesos de la aplicación, CPU, memoria y discos, respaldos, interfaces, rutas, puertos, DNS y NTP, servicios (RADIUS, TACACS+, pxGrid, certificados, Active Directory, replicación), logs de la aplicación y casos TAC; el de conectividad pide la IP de destino.
+description_en: Read-only playbooks for Cisco ISE 3.x nodes (PAN, MnT, PSN and pxGrid) from their ADE-OS CLI - version and patches, application process status, CPU, memory and disks, backups, interfaces, routes, ports, DNS and NTP, services (RADIUS, TACACS+, pxGrid, certificates, Active Directory, replication), application logs and TAC cases; the connectivity one asks for the target IP.
+platforms: [ise]
+author: oom-netsec
+license: Apache-2.0

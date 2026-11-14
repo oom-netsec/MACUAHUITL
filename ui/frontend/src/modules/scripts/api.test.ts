@@ -146,3 +146,8 @@ test("ftd es una plataforma de script", async () => {
   const { PLATFORMS } = await import("./ScriptForm");
   expect(PLATFORMS).toContain("ftd");
 });
+
+test("ise es una plataforma de script", async () => {
+  const { PLATFORMS } = await import("./ScriptForm");
+  expect(PLATFORMS).toContain("ise");
+});

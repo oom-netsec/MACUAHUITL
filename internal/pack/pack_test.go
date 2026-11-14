@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"io/fs"
+	"slices"
 	"strings"
 	"testing"
 
@@ -192,10 +193,10 @@ func TestRechazos(t *testing.T) {
 			setPB(f, strings.Replace(goodPlaybook, "show spanning-tree summary", "show run | redirect flash:x", 1))
 		}), "dev", "playbook.denied"},
 		{"playbook roto", signed(func(f map[string][]byte) { f["playbooks/stp.yaml"] = []byte("id: x\n") }), "dev", "playbook.invalid"},
-		{"plataforma sin driver", signed(func(f map[string][]byte) {
-			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[ios-xe, ise]", 1))
-			setPB(f, strings.Replace(goodPlaybook, "ios-xe", "ise", 1))
-		}), "dev", "playbook.platform"},
+		{"plataforma desconocida", signed(func(f map[string][]byte) {
+			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[ios-xe, iosxr]", 1))
+			setPB(f, strings.Replace(goodPlaybook, "ios-xe", "iosxr", 1))
+		}), "dev", "manifest.invalid"},
 		{"wlc-9800 es instalable", signed(func(f map[string][]byte) {
 			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[wlc-9800]", 1))
 			setPB(f, strings.Replace(goodPlaybook, "ios-xe", "wlc-9800", 1))
@@ -203,6 +204,10 @@ func TestRechazos(t *testing.T) {
 		{"cat9k es instalable", signed(func(f map[string][]byte) {
 			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[cat9k]", 1))
 			setPB(f, strings.Replace(goodPlaybook, "ios-xe", "cat9k", 1))
+		}), "dev", ""},
+		{"ise es instalable", signed(func(f map[string][]byte) {
+			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[ise]", 1))
+			setPB(f, strings.Replace(goodPlaybook, "ios-xe", "ise", 1))
 		}), "dev", ""},
 		{"sda es instalable", signed(func(f map[string][]byte) {
 			f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[sda]", 1))
@@ -223,6 +228,24 @@ func TestRechazos(t *testing.T) {
 			wantReason(t, err, c.reason)
 		})
 	}
+}
+
+// Una plataforma conocida que ningún driver sirve se rechaza en el playbook: se simula quitando sda de Installable.
+func TestPlataformaSinDriver(t *testing.T) {
+	pub, priv := testKey(t)
+	f := goodFiles()
+	f["manifest.yaml"] = []byte(strings.Replace(goodManifest, "[ios-xe]", "[sda]", 1))
+	setPB(f, strings.Replace(goodPlaybook, "ios-xe", "sda", 1))
+	sign(f, priv)
+	data := mustZip(t, f)
+	if _, err := Verify(data, "dev", []ed25519.PublicKey{pub}); err != nil {
+		t.Fatal(err)
+	}
+	old := Installable
+	Installable = slices.DeleteFunc(slices.Clone(old), func(s string) bool { return s == "sda" })
+	defer func() { Installable = old }()
+	_, err := Verify(data, "dev", []ed25519.PublicKey{pub})
+	wantReason(t, err, "playbook.platform")
 }
 
 func TestPrefijoDeTerceros(t *testing.T) {

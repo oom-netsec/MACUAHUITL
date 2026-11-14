@@ -1,0 +1,20 @@
+# Propósito: Ruta, ARP y EPM de una IP dentro de su VRF.
+# Cuándo usarlo: Una IP de un tenant no tiene ruta o la toma por donde no debe. Pide la VRF como tenant:vrf (p. ej. common:default).
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l3-ruta-ip
+platform: nx-os
+name: ACI · L3 · Ruta a una IP en una VRF
+name_en: ACI · L3 · Route to an IP in a VRF
+params:
+  - name: ip
+    kind: ip
+  - name: vrf
+    kind: interface
+commands:
+  - cmd: show ip route {ip} vrf {vrf}
+  - cmd: show ip arp vrf {vrf}
+  - cmd: show system internal epm endpoint ip {ip}
+  - cmd: show endpoint ip {ip}
+  - cmd: show vrf {vrf} detail
+  - cmd: show ip interface brief vrf {vrf}

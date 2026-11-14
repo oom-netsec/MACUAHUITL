@@ -1,0 +1,20 @@
+# Propósito: Una IP en su VRF: EPM, ARP y ruta en la tabla del tenant.
+# Cuándo usarlo: El endpoint existe pero el tráfico no sale por su VRF. Pide la VRF como tenant:vrf (p. ej. common:default).
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-ep-ip-vrf
+platform: nx-os
+name: ACI · Endpoints · Endpoint por IP en una VRF
+name_en: ACI · Endpoints · Endpoint by IP in a VRF
+params:
+  - name: ip
+    kind: ip
+  - name: vrf
+    kind: interface
+commands:
+  - cmd: show system internal epm endpoint ip {ip}
+  - cmd: show endpoint ip {ip}
+  - cmd: show ip arp vrf {vrf}
+  - cmd: show ip route {ip} vrf {vrf}
+  - cmd: show vrf {vrf} detail
+  - cmd: show ip interface brief vrf {vrf}

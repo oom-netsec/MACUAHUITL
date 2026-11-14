@@ -1,0 +1,17 @@
+# Propósito: Contadores de error de todas las interfaces y las que están en err-disabled.
+# Cuándo usarlo: Se sospecha de CRC, descartes o puertos deshabilitados por el sistema.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l1-errores
+platform: nx-os
+name: ACI · L1 · Errores y descartes
+name_en: ACI · L1 · Errors and discards
+commands:
+  - cmd: show interface counters errors
+  - cmd: show interface status err-disabled
+  - cmd: show interface brief
+  - cmd: show interface counters
+  - cmd: show logging logfile | include ETHPM
+    timeout: 180s
+  - cmd: show logging logfile | include ERR
+    timeout: 180s

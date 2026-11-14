@@ -1,0 +1,20 @@
+# Propósito: Log filtrado por BGP, OSPF, EIGRP, BFD y vPC.
+# Cuándo usarlo: Un vecino de L3Out o un par vPC se cae.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-plat-logs-ruteo-vpc
+platform: nx-os
+name: ACI · Plataforma · Logs de ruteo y vPC
+name_en: ACI · Platform · Routing and vPC logs
+commands:
+  - cmd: show clock
+  - cmd: show logging logfile | include BGP
+    timeout: 180s
+  - cmd: show logging logfile | include OSPF
+    timeout: 180s
+  - cmd: show logging logfile | include EIGRP
+    timeout: 180s
+  - cmd: show logging logfile | include BFD
+    timeout: 180s
+  - cmd: show logging logfile | include VPC
+    timeout: 180s

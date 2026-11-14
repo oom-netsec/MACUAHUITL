@@ -1,0 +1,18 @@
+# Propósito: Estado, contadores, errores, trunk y óptica de una interfaz.
+# Cuándo usarlo: Un puerto concreto cae, descarta o negocia mal.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l1-interfaz
+platform: nx-os
+name: ACI · L1 · Detalle de una interfaz
+name_en: ACI · L1 · Interface detail
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show interface {interface}
+  - cmd: show interface {interface} brief
+  - cmd: show interface {interface} counters
+  - cmd: show interface {interface} counters errors
+  - cmd: show interface {interface} transceiver details
+  - cmd: show interface {interface} trunk

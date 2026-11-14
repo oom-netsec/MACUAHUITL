@@ -1,0 +1,18 @@
+# Propósito: Reglas y filtros de contrato programados en el leaf.
+# Cuándo usarlo: Se sospecha que un contrato bloquea o permite tráfico por error.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-pol-zoning
+platform: nx-os
+name: ACI · Contratos · Reglas de zoning
+name_en: ACI · Contracts · Zoning rules
+commands:
+  - cmd: show zoning-filter
+  - cmd: show vrf
+  - cmd: show vlan extended
+  - cmd: show logging logfile | include ACLQOS
+    timeout: 180s
+  - cmd: show zoning-rule
+    timeout: 180s
+  - cmd: show vrf all detail
+    timeout: 180s

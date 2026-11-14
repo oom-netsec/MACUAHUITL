@@ -107,6 +107,9 @@ func CheckDenied(platform, cmd string) error {
 	if platform == "ftd" {
 		return checkFTD(cmd)
 	}
+	if platform == "ise" {
+		return checkISE(cmd)
+	}
 	segs := strings.Split(strings.ToLower(cmd), "|")
 	fields := strings.Fields(segs[0])
 	if len(fields) == 0 {
@@ -204,6 +207,25 @@ func probeName(s string) bool {
 	return s != ""
 }
 
+// probeDest: destino de ping o traceroute en cualquier plataforma. IPv4 solo con 4 octetos decimales sin ceros a la
+// izquierda (Go los rechaza) o IPv6 válida, sin las direcciones de difusión, multicast, link-local ni sin especificar;
+// si no es una IP, un nombre DNS con letras en la última etiqueta, sin etiquetas «0x» y con un punto final opcional.
+// El equipo resuelve «224.1», «4294967295», «0xffffffff» o «127.1» como otra dirección, y un dato «{x}» ya validado
+// por su tipo pasa.
+func probeDest(s string) bool {
+	if isHolder(s) {
+		return true
+	}
+	if a, err := netip.ParseAddr(s); err == nil {
+		return !badProbeAddr(a)
+	}
+	labels := strings.Split(strings.TrimSuffix(s, "."), ".")
+	if strings.Contains(s, ":") || !strings.ContainsAny(labels[len(labels)-1], "abcdefghijklmnopqrstuvwxyz") {
+		return false
+	}
+	return !slices.ContainsFunc(labels, func(l string) bool { return strings.HasPrefix(l, "0x") })
+}
+
 // Palabras de protocolo y sub-modo que IOS completa por prefijo: un destino así abre el diálogo extendido.
 var probeKeywords = []string{"ip", "ipv6", "clns", "tag", "atm", "mpls", "appletalk", "decnet", "ipx", "vines", "xns", "apollo", "srb", "ethernet", "mac", "vrf", "oldvines"}
 
@@ -244,7 +266,7 @@ func validProbe(f []string) bool {
 	if len(f) > 0 && (f[0] == "ip" || f[0] == "ipv6") {
 		f = f[1:]
 	}
-	if len(f) == 0 || !probeName(f[0]) || probeKeyword(f[0]) { // un prefijo de palabra clave abre el diálogo interactivo
+	if len(f) == 0 || !(isHolder(f[0]) || probeName(f[0]) && probeDest(f[0])) || probeKeyword(f[0]) { // un prefijo de palabra clave abre el diálogo interactivo
 		return false
 	}
 	if a, err := netip.ParseAddr(f[0]); err == nil && badProbeAddr(a) {

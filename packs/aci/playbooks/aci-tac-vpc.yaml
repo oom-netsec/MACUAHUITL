@@ -1,0 +1,16 @@
+# Propósito: Estado, rol, consistencia y logs de vPC.
+# Cuándo usarlo: Un vPC está inconsistente o con un lado caído.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-tac-vpc
+platform: nx-os
+name: ACI · TAC · Problema de vPC
+name_en: ACI · TAC · vPC problem
+commands:
+  - cmd: show vpc
+  - cmd: show vpc brief
+  - cmd: show vpc role
+  - cmd: show port-channel summary
+  - cmd: show vpc consistency-parameters global
+  - cmd: show logging logfile | include VPC
+    timeout: 180s

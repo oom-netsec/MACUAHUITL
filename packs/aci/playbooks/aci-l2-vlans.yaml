@@ -1,0 +1,15 @@
+# Propósito: VLAN internas, encapsulaciones y troncales del leaf.
+# Cuándo usarlo: Hay que ver qué VLAN de encapsulación hay en un puerto.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l2-vlans
+platform: nx-os
+name: ACI · L2 · VLAN y encapsulaciones
+name_en: ACI · L2 · VLANs and encapsulations
+commands:
+  - cmd: show vlan extended
+  - cmd: show system internal epm vlan all
+  - cmd: show interface trunk
+  - cmd: show vrf
+  - cmd: show interface status
+  - cmd: show port-channel summary

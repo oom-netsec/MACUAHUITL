@@ -14,3 +14,13 @@ func TestHostPlatformsIncluyeFTD(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// ise es una plataforma de host (Cisco ISE, ADE-OS).
+func TestHostPlatformsIncluyeISE(t *testing.T) {
+	if !slices.Contains(HostPlatforms, "ise") {
+		t.Fatalf("HostPlatforms = %v", HostPlatforms)
+	}
+	if _, err := Clean(Host{Name: "nodo", Address: "192.0.2.1", Platform: "ise"}); err != nil {
+		t.Fatal(err)
+	}
+}

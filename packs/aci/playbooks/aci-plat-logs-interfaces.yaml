@@ -1,0 +1,20 @@
+# Propósito: Cambios de estado de puertos, LACP y STP/MCP en el log.
+# Cuándo usarlo: Un puerto cae y vuelve o no sube.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-plat-logs-interfaces
+platform: nx-os
+name: ACI · Plataforma · Logs de interfaces
+name_en: ACI · Platform · Interface logs
+commands:
+  - cmd: show clock
+  - cmd: show logging logfile | include ETHPM
+    timeout: 180s
+  - cmd: show logging logfile | include LACP
+    timeout: 180s
+  - cmd: show logging logfile | include PORT_CHANNEL
+    timeout: 180s
+  - cmd: show logging logfile | include MCP
+    timeout: 180s
+  - cmd: show logging logfile | egrep "DOWN|FLAP"
+    timeout: 180s

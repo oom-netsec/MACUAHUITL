@@ -1,0 +1,16 @@
+# Propósito: Resumen de port-channels y negociación LACP.
+# Cuándo usarlo: Un port-channel no tiene todos sus miembros o LACP no negocia.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l2-port-channel
+platform: nx-os
+name: ACI · L2 · Port-channel y LACP
+name_en: ACI · L2 · Port-channels and LACP
+commands:
+  - cmd: show port-channel summary
+  - cmd: show lacp neighbor
+  - cmd: show lacp counters
+  - cmd: show interface brief
+  - cmd: show vpc brief
+  - cmd: show logging logfile | include LACP
+    timeout: 180s

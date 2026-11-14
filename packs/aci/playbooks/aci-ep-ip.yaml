@@ -1,0 +1,18 @@
+# Propósito: Cómo aprende el leaf una IP: tabla EPM y de endpoints, ARP, VLAN y VRF.
+# Cuándo usarlo: Una IP no responde o el fabric no la ve donde debería.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-ep-ip
+platform: nx-os
+name: ACI · Endpoints · Endpoint por IP
+name_en: ACI · Endpoints · Endpoint by IP
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show system internal epm endpoint ip {ip}
+  - cmd: show endpoint ip {ip}
+  - cmd: show ip arp
+  - cmd: show system internal epm vlan all
+  - cmd: show vlan extended
+  - cmd: show vrf

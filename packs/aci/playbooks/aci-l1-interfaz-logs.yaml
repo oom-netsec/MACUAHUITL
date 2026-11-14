@@ -1,0 +1,20 @@
+# Propósito: Estado de una interfaz y sus apariciones en el log.
+# Cuándo usarlo: Un puerto flapea y hay que ver cuándo y por qué.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l1-interfaz-logs
+platform: nx-os
+name: ACI · L1 · Logs de una interfaz
+name_en: ACI · L1 · Interface logs
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show interface {interface}
+  - cmd: show interface {interface} counters errors
+  - cmd: show interface status
+  - cmd: show clock
+  - cmd: show logging logfile | include {interface}
+    timeout: 180s
+  - cmd: show logging logfile | include ETHPM
+    timeout: 180s

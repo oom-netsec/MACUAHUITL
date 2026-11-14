@@ -1,0 +1,17 @@
+# Propósito: VRF presentes en el leaf, sus interfaces y rutas.
+# Cuándo usarlo: Ver qué tenants y VRF tiene programados el leaf.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l3-vrf-resumen
+platform: nx-os
+name: ACI · L3 · VRF del leaf
+name_en: ACI · L3 · Leaf VRFs
+commands:
+  - cmd: show vrf
+  - cmd: show ip interface brief vrf all
+  - cmd: show ip arp vrf all
+  - cmd: show tunnel interface
+  - cmd: show vrf all detail
+    timeout: 180s
+  - cmd: show ip route vrf all
+    timeout: 180s

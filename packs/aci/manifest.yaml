@@ -1,0 +1,10 @@
+id: oom/aci
+version: 1.0.0
+min_core: 0.4.4
+name: Cisco ACI, leaf y spine
+name_en: Cisco ACI, leaf and spine
+description: Playbooks de solo lectura para leaf y spine Nexus 9000 en modo ACI desde su CLI - fabric (IS-IS, VTEP, MP-BGP), endpoints (EPM), contratos (zoning-rule), vPC, interfaces, L3Out (BGP, OSPF, BFD) y casos TAC; los de una IP, MAC, VRF, VNID o interfaz piden ese dato.
+description_en: Read-only playbooks for Nexus 9000 leaf and spine switches in ACI mode from their CLI - fabric (IS-IS, VTEP, MP-BGP), endpoints (EPM), contracts (zoning-rule), vPC, interfaces, L3Out (BGP, OSPF, BFD) and TAC cases; the per-IP, per-MAC, per-VRF, per-VNID and per-interface ones ask for that datum.
+platforms: [nx-os]
+author: oom-netsec
+license: Apache-2.0

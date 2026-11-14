@@ -1,0 +1,16 @@
+# Propósito: Versión, módulos, interfaces caídas, fabric y logs críticos de un nodo.
+# Cuándo usarlo: Primer diagnóstico de un leaf o spine antes de profundizar.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-tac-salud-nodo
+platform: nx-os
+name: ACI · TAC · Salud de un nodo
+name_en: ACI · TAC · Node health
+commands:
+  - cmd: show version
+  - cmd: show module
+  - cmd: show interface status err-disabled
+  - cmd: show isis adjacency vrf overlay-1
+  - cmd: show vpc brief
+  - cmd: show logging logfile | egrep "EMERG|ALERT|CRIT|ERR"
+    timeout: 180s
