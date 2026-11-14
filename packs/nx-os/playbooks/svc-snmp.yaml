@@ -1,0 +1,21 @@
+# Propósito: Configuración y estadísticas de SNMP: hosts, usuarios, traps y sesiones.
+# Cuándo usarlo: La estación de monitoreo no recibe traps o no puede consultar el equipo.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: svc-snmp
+platform: nx-os
+name: Servicios · SNMP
+name_en: Services · SNMP
+commands:
+  - cmd: show snmp
+  - cmd: show snmp community
+    timeout: 60s
+    may_contain_secrets: true
+  - cmd: show snmp host
+  - cmd: show snmp trap
+  - cmd: show snmp user
+    timeout: 60s
+    may_contain_secrets: true
+  - cmd: show snmp engineID
+  - cmd: show snmp session
+  - cmd: show snmp source-interface

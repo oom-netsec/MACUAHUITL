@@ -1,0 +1,15 @@
+# Propósito: Sesiones de monitor SPAN y estado de NetFlow y sFlow.
+# Cuándo usarlo: No llegan flujos al colector o la captura SPAN no ve tráfico.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-configuration-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: svc-span-flujos
+platform: nx-os
+name: Servicios · SPAN, NetFlow y sFlow
+name_en: Services · SPAN, NetFlow and sFlow
+commands:
+  - cmd: show monitor session all
+  - cmd: show flow exporter
+  - cmd: show flow record
+  - cmd: show flow monitor
+  - cmd: show sflow
+  - cmd: show sflow statistics

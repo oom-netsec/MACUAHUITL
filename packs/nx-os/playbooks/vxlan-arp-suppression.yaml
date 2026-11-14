@@ -1,0 +1,19 @@
+# Propósito: Caché de supresión de ARP, su estadística y las entradas ARP y MAC-IP relacionadas.
+# Cuándo usarlo: Los hosts no resuelven ARP a través de la fábrica o se aprenden entradas viejas.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/103x/configuration/vxlan/cisco-nexus-9000-series-nx-os-vxlan-configuration-guide-103x.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: vxlan-arp-suppression
+platform: nx-os
+name: VXLAN · ARP suppression
+name_en: VXLAN · ARP suppression
+commands:
+  - cmd: show nve vni
+  - cmd: show ip arp suppression-cache detail
+    timeout: 120s
+  - cmd: show ip arp suppression-cache statistics
+  - cmd: show ip arp vrf all
+    timeout: 180s
+  - cmd: show l2route evpn mac-ip all
+    timeout: 240s
+  - cmd: show vlan brief
+    timeout: 120s

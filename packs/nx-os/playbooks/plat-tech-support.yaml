@@ -1,0 +1,19 @@
+# Propósito: Recolecta el show tech-support details para abrir un caso con TAC.
+# Cuándo usarlo: TAC pide el tech-support completo; tarda varios minutos y genera salida muy grande.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: plat-tech-support
+platform: nx-os
+name: Plataforma · Tech-support completo
+name_en: Platform · Full tech-support
+commands:
+  - cmd: show clock
+  - cmd: show version
+  - cmd: show module
+  - cmd: show system resources
+  - cmd: show inventory
+  - cmd: show cores
+  - cmd: "dir bootflash:"
+  - cmd: show tech-support details
+    timeout: 1500s
+    may_contain_secrets: true

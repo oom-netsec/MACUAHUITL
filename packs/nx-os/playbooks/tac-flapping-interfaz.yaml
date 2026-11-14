@@ -1,0 +1,23 @@
+# Propósito: Detalle de la interfaz, óptica, vecinos, STP y log filtrado por puerto.
+# Cuándo usarlo: Un enlace específico sube y baja.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-flapping-interfaz
+platform: nx-os
+name: TAC · Flapping de una interfaz
+name_en: TAC · Single interface flapping
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show clock
+  - cmd: show interface {interface}
+  - cmd: show interface {interface} counters errors
+  - cmd: show interface {interface} transceiver details
+  - cmd: show interface {interface} capabilities
+  - cmd: show cdp neighbors interface {interface} detail
+  - cmd: show lldp neighbors interface {interface} detail
+  - cmd: show spanning-tree interface {interface} detail
+  - cmd: show interface status err-disabled
+  - cmd: show logging last 300 | include {interface}
+    timeout: 180s

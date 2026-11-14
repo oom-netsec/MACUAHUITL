@@ -1,0 +1,20 @@
+# Propósito: ACLs IP, IPv6 y MAC con contadores y recursos de hardware.
+# Cuándo usarlo: Un flujo es bloqueado o permitido de forma inesperada, o una ACL no se aplica.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-configuration-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: sec-acl
+platform: nx-os
+name: Seguridad · ACLs
+name_en: Security · ACLs
+commands:
+  - cmd: show access-lists summary
+  - cmd: show ip access-lists summary
+  - cmd: show ip access-lists
+    timeout: 180s
+  - cmd: show ipv6 access-lists
+    timeout: 120s
+  - cmd: show mac access-lists
+  - cmd: show hardware access-list resource utilization  # N9K
+  - cmd: show running-config aclmgr
+    timeout: 120s
+    may_contain_secrets: true

@@ -1,0 +1,20 @@
+# Propósito: Contadores de error, colas y detalle de la interfaz con pérdida.
+# Cuándo usarlo: Un puerto muestra output discards o paquetes perdidos.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-descartes-puerto
+platform: nx-os
+name: TAC · Descartes en un puerto
+name_en: TAC · Drops on one port
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show clock
+  - cmd: show interface {interface}
+  - cmd: show interface {interface} counters errors
+  - cmd: show interface {interface} counters detailed
+    timeout: 120s
+  - cmd: show queuing interface {interface}
+  - cmd: show interface {interface} transceiver details
+  - cmd: show interface {interface} capabilities

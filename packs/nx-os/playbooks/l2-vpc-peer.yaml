@@ -1,0 +1,18 @@
+# Propósito: Estado del dominio vPC, keepalive, roles y port-channels asociados.
+# Cuándo usarlo: El vPC no está en peer-ok, o el keepalive o el peer-link fallan.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l2-vpc-peer
+platform: nx-os
+name: L2 · vPC y peer-link
+name_en: L2 · vPC and peer-link
+commands:
+  - cmd: show vpc
+  - cmd: show vpc brief
+  - cmd: show vpc role
+  - cmd: show vpc peer-keepalive
+  - cmd: show port-channel summary
+  - cmd: show cdp neighbors
+  - cmd: show spanning-tree summary
+  - cmd: show logging last 200 | include VPC
+    timeout: 180s

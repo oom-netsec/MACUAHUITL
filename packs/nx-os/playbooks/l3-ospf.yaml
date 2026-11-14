@@ -1,0 +1,20 @@
+# Propósito: Procesos, vecinos, interfaces, base de datos y tráfico de OSPF.
+# Cuándo usarlo: Un vecino OSPF no llega a FULL o faltan rutas aprendidas por OSPF.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l3-ospf
+platform: nx-os
+name: L3 · OSPF
+name_en: L3 · OSPF
+commands:
+  - cmd: show ip ospf
+  - cmd: show ip ospf neighbors
+  - cmd: show ip ospf interface brief
+  - cmd: show ip ospf database database-summary
+  - cmd: show ip ospf traffic
+  - cmd: show ip route ospf
+    timeout: 180s
+  - cmd: show ip ospf database
+    timeout: 240s
+  - cmd: show logging last 200 | include OSPF
+    timeout: 180s

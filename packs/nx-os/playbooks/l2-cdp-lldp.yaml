@@ -1,0 +1,19 @@
+# Propósito: Vecinos CDP y LLDP con detalle, contadores y temporizadores.
+# Cuándo usarlo: Falta documentación del cableado o un vecino no aparece.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l2-cdp-lldp
+platform: nx-os
+name: L2 · CDP y LLDP
+name_en: L2 · CDP and LLDP
+commands:
+  - cmd: show cdp global
+  - cmd: show cdp neighbors
+  - cmd: show cdp neighbors detail
+    timeout: 120s
+  - cmd: show cdp traffic
+  - cmd: show lldp timers
+  - cmd: show lldp neighbors
+  - cmd: show lldp neighbors detail
+    timeout: 120s
+  - cmd: show lldp traffic

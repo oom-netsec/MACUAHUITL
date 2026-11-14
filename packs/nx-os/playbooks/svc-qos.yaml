@@ -1,0 +1,16 @@
+# Propósito: Mapas de clase y política, política de sistema y control de flujo.
+# Cuándo usarlo: Se sospecha de marcado, colas o PFC en un puerto de alta carga.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-configuration-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: svc-qos
+platform: nx-os
+name: Servicios · QoS
+name_en: Services · QoS
+commands:
+  - cmd: show class-map
+  - cmd: show policy-map
+  - cmd: show policy-map system
+  - cmd: show interface priority-flow-control
+  - cmd: show interface flowcontrol
+  - cmd: show queuing interface
+    timeout: 120s

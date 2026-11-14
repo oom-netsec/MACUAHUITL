@@ -1,0 +1,19 @@
+# Propósito: Uso de CPU y memoria por proceso, historial y servicios del administrador del sistema.
+# Cuándo usarlo: CPU alta, memoria baja o procesos que se reinician.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: plat-recursos-cpu-memoria
+platform: nx-os
+name: Plataforma · CPU y memoria
+name_en: Platform · CPU and memory
+commands:
+  - cmd: show clock
+  - cmd: show system resources
+  - cmd: show processes cpu sort | head lines 20
+  - cmd: show processes cpu history
+  - cmd: show processes memory sort | head lines 20
+  - cmd: show system internal kernel meminfo
+  - cmd: show system internal sysmgr service all
+    timeout: 120s
+  - cmd: show processes log
+  - cmd: show cores

@@ -1,0 +1,23 @@
+# Propósito: Dónde se aprende la MAC dada, su historial en el log y su IP asociada.
+# Cuándo usarlo: Se conoce la MAC que salta entre puertos.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-mac-moviendose-mac
+platform: nx-os
+name: TAC · MAC moviéndose (una MAC)
+name_en: TAC · MAC moving (single MAC)
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show mac address-table address {mac}
+  - cmd: show mac address-table notification mac-move
+  - cmd: show l2route evpn mac all
+    timeout: 240s
+  - cmd: show ip arp | include {mac}
+    timeout: 180s
+  - cmd: show logging last 500 | include {mac}
+    timeout: 180s
+  - cmd: show spanning-tree summary
+  - cmd: show vpc

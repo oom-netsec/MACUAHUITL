@@ -1,0 +1,22 @@
+# Propósito: Busca flaps en el log, err-disabled, errores físicos y cambios de STP.
+# Cuándo usarlo: Enlaces que suben y bajan sin identificar el puerto.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-flapping-general
+platform: nx-os
+name: TAC · Interfaces con flapping (general)
+name_en: TAC · Flapping interfaces (general)
+commands:
+  - cmd: show clock
+  - cmd: show interface status err-disabled
+  - cmd: show logging last 500 | include IF_DOWN
+    timeout: 180s
+  - cmd: show logging last 500 | include UPDOWN
+    timeout: 180s
+  - cmd: show interface | include flapped
+    timeout: 180s
+  - cmd: show interface counters errors non-zero
+  - cmd: show spanning-tree summary
+  - cmd: show port-channel summary
+  - cmd: show udld neighbors
+  - cmd: show cdp neighbors

@@ -22,7 +22,7 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 	base := repoBase(t)
 	for _, d := range dirs {
 		t.Run(filepath.Base(d), func(t *testing.T) {
-			p, err := pack.ValidateSource(d, "v0.4.0")
+			p, err := pack.ValidateSource(d, "v0.4.1")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -32,7 +32,7 @@ func TestPacksDelRepoSonValidos(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(d, "SIGNATURE")); err == nil {
 				t.Fatal("la fuente no lleva SIGNATURE")
 			}
-			st, _, err := pack.Open(t.TempDir(), "v0.4.0", packtest.Keys(), base)
+			st, _, err := pack.Open(t.TempDir(), "v0.4.1", packtest.Keys(), base)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -66,7 +66,7 @@ func repoBase(t *testing.T) pack.Base {
 
 // oom/ios y oom/ios-xe conviven en el mismo almacén: playbooks distintos por plataforma y scripts por el prefijo ios-.
 func TestIOSEIOSXEConviven(t *testing.T) {
-	st, _, err := pack.Open(t.TempDir(), "v0.4.0", packtest.Keys(), repoBase(t))
+	st, _, err := pack.Open(t.TempDir(), "v0.4.1", packtest.Keys(), repoBase(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestBuildEsDeterminista(t *testing.T) {
 	if string(a) != string(b) {
 		t.Fatal("Build no es determinista")
 	}
-	if _, err := pack.Verify(a, "v0.4.0", nil); pack.Reason(err) != "editor.reserved" {
+	if _, err := pack.Verify(a, "v0.4.1", nil); pack.Reason(err) != "editor.reserved" {
 		t.Fatalf("sin firma, oom está reservado: %v", err)
 	}
 }
@@ -139,7 +139,7 @@ func TestSegmentosOficialesEstanReservados(t *testing.T) {
 	}
 	dirs, _ := filepath.Glob(filepath.Join(packtest.RepoDir(), "packs", "*"))
 	for _, d := range dirs {
-		p, err := pack.ValidateSource(d, "v0.4.0")
+		p, err := pack.ValidateSource(d, "v0.4.1")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -153,5 +153,16 @@ func TestSegmentosOficialesEstanReservados(t *testing.T) {
 	// La prueba muerde: un segmento que no existe no está reservado.
 	if pack.IsReservedSegment("acme") {
 		t.Fatal("acme no debe estar reservado")
+	}
+}
+
+// El paquete oom/nx-os pide el núcleo 0.4.1: instala en él y un núcleo 0.4.0 lo rechaza.
+func TestNXOSPideNucleo041(t *testing.T) {
+	d := filepath.Join(packtest.RepoDir(), "packs", "nx-os")
+	if _, err := pack.ValidateSource(d, "v0.4.1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pack.ValidateSource(d, "v0.4.0"); pack.Reason(err) != "core.too_old" {
+		t.Fatalf("0.4.0 debe rechazarlo: %v", err)
 	}
 }

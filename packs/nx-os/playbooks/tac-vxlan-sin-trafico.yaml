@@ -1,0 +1,24 @@
+# Propósito: NVE, VNIs, BGP EVPN, L2RIB, underlay y supresión de ARP.
+# Cuándo usarlo: Los hosts de una fábrica VXLAN EVPN no se ven entre sí.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/103x/configuration/vxlan/cisco-nexus-9000-series-nx-os-vxlan-configuration-guide-103x.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-vxlan-sin-trafico
+platform: nx-os
+name: TAC · VXLAN sin tráfico (general)
+name_en: TAC · VXLAN no traffic (general)
+commands:
+  - cmd: show clock
+  - cmd: show nve interface nve1 detail
+  - cmd: show nve peers detail
+  - cmd: show nve vni
+  - cmd: show bgp l2vpn evpn summary
+  - cmd: show l2route evpn mac all
+    timeout: 240s
+  - cmd: show l2route evpn mac-ip all
+    timeout: 240s
+  - cmd: show ip ospf neighbors
+  - cmd: show ip pim neighbor
+  - cmd: show vxlan interface
+  - cmd: show ip arp suppression-cache statistics
+  - cmd: show logging last 200 | include NVE
+    timeout: 180s

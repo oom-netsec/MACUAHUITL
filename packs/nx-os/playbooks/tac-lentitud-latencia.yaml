@@ -1,0 +1,23 @@
+# Propósito: Cruza CPU, errores, descartes, colas, STP y tráfico al plano de control.
+# Cuándo usarlo: Quejas de lentitud o latencia sin un puerto o destino identificado.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-lentitud-latencia
+platform: nx-os
+name: TAC · Lentitud y latencia (general)
+name_en: TAC · Slowness and latency (general)
+commands:
+  - cmd: show clock
+  - cmd: show system resources
+  - cmd: show processes cpu sort | head lines 15
+  - cmd: show interface counters errors non-zero
+  - cmd: show interface counters storm-control
+  - cmd: show port-channel traffic
+  - cmd: show spanning-tree summary
+  - cmd: show policy-map interface control-plane | egrep "violate|drop"
+    timeout: 180s
+  - cmd: show hardware rate-limiter
+  - cmd: show queuing interface
+    timeout: 120s
+  - cmd: show logging last 100
+    timeout: 180s

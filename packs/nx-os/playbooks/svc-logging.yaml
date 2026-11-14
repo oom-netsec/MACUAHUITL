@@ -1,0 +1,18 @@
+# Propósito: Configuración de logging, servidores syslog y últimos mensajes.
+# Cuándo usarlo: Los mensajes no llegan al servidor de syslog o falta el rastro de un evento.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: svc-logging
+platform: nx-os
+name: Servicios · Logging y syslog
+name_en: Services · Logging and syslog
+commands:
+  - cmd: show logging
+  - cmd: show logging server
+  - cmd: show logging info
+  - cmd: show logging timestamp
+  - cmd: show logging level
+  - cmd: show logging logfile | last 100
+    timeout: 180s
+  - cmd: show logging last 200
+    timeout: 180s

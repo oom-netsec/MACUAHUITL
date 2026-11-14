@@ -1,0 +1,15 @@
+# Propósito: Reloj PTP, padre, contadores y puertos.
+# Cuándo usarlo: Desviación de tiempo en un entorno con PTP (financiero, broadcast).
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-configuration-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: svc-ptp
+platform: nx-os
+name: Servicios · PTP
+name_en: Services · PTP
+commands:
+  - cmd: show ptp brief
+  - cmd: show ptp clock
+  - cmd: show ptp parent
+  - cmd: show ptp time-property
+  - cmd: show ptp counters
+  - cmd: show ptp corrections

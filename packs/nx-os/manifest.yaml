@@ -1,0 +1,10 @@
+id: oom/nx-os
+version: 1.0.0
+min_core: 0.4.1
+name: Nexus NX-OS, diagnóstico TAC
+name_en: Nexus NX-OS, TAC diagnostics
+description: Playbooks de solo lectura para Cisco Nexus con NX-OS (9000, 7000, 5000/6000, 3000) - plataforma, interfaces, L2 y vPC, VXLAN/EVPN, ruteo, FEX, seguridad, servicios y casos TAC; los de una interfaz, una IP o una MAC piden ese dato.
+description_en: Read-only playbooks for Cisco Nexus switches running NX-OS (9000, 7000, 5000/6000, 3000) - platform, interfaces, L2 and vPC, VXLAN/EVPN, routing, FEX, security, services and TAC cases; the per-interface, per-IP and per-MAC ones ask for that datum.
+platforms: [nx-os]
+author: oom-netsec
+license: Apache-2.0

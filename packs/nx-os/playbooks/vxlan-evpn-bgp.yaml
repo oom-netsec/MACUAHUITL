@@ -1,0 +1,23 @@
+# Propósito: Vecinos BGP l2vpn evpn, rutas tipo 2 y 5 y las tablas L2RIB.
+# Cuándo usarlo: Las rutas MAC o IP no se anuncian o no se reciben entre VTEPs.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/dcn/nx-os/nexus9000/103x/configuration/vxlan/cisco-nexus-9000-series-nx-os-vxlan-configuration-guide-103x.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: vxlan-evpn-bgp
+platform: nx-os
+name: VXLAN · BGP EVPN
+name_en: VXLAN · BGP EVPN
+commands:
+  - cmd: show bgp l2vpn evpn summary
+  - cmd: show bgp process
+  - cmd: show bgp l2vpn evpn neighbors
+    timeout: 120s
+  - cmd: show bgp l2vpn evpn route-type 2
+    timeout: 240s
+  - cmd: show bgp l2vpn evpn route-type 5
+    timeout: 240s
+  - cmd: show l2route evpn mac all
+    timeout: 240s
+  - cmd: show l2route evpn mac-ip all
+    timeout: 240s
+  - cmd: show bgp l2vpn evpn
+    timeout: 300s

@@ -1,0 +1,17 @@
+# Propósito: Estado de redundancia, motivo de reinicio, cores e instalaciones recientes.
+# Cuándo usarlo: Tras un cambio de supervisora activa o un reinicio en un chasis modular.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: plat-ha-supervisora
+platform: nx-os
+name: Plataforma · Alta disponibilidad de supervisoras
+name_en: Platform · Supervisor high availability
+commands:
+  - cmd: show system redundancy status  # modulares
+  - cmd: show module
+  - cmd: show system reset-reason
+  - cmd: show cores
+  - cmd: show boot
+  - cmd: show install all status
+  - cmd: show logging nvram last 100
+  - cmd: show diagnostic result module all

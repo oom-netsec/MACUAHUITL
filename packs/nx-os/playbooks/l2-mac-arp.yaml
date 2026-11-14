@@ -1,0 +1,19 @@
+# Propósito: Tabla MAC, conteos, movimientos de MAC y la tabla ARP con sus contadores.
+# Cuándo usarlo: Un host no se aprende, aparece en el puerto equivocado o hay problemas de resolución ARP.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l2-mac-arp
+platform: nx-os
+name: L2 · MAC y ARP
+name_en: L2 · MAC and ARP
+commands:
+  - cmd: show mac address-table count
+  - cmd: show mac address-table notification mac-move
+  - cmd: show mac address-table
+    timeout: 240s
+  - cmd: show ip arp summary
+  - cmd: show ip arp statistics
+  - cmd: show ip arp
+    timeout: 180s
+  - cmd: show ipv6 neighbor
+    timeout: 180s

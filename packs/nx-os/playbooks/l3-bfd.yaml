@@ -1,0 +1,17 @@
+# Propósito: Sesiones BFD con detalle y clientes registrados.
+# Cuándo usarlo: Las sesiones BFD fallan o tumban protocolos de ruteo.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l3-bfd
+platform: nx-os
+name: L3 · BFD
+name_en: L3 · BFD
+commands:
+  - cmd: show bfd neighbors
+  - cmd: show bfd neighbors details
+    timeout: 120s
+  - cmd: show bfd clients
+  - cmd: show logging last 200 | include BFD
+    timeout: 180s
+  - cmd: show ip ospf neighbors
+  - cmd: show bgp sessions

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -310,5 +311,122 @@ func TestCancelarComandoConservaLaCausa(t *testing.T) {
 	time.AfterFunc(200*time.Millisecond, cancel)
 	if _, err := d.Run(ctx, "show sin fin", 10*time.Second); !errors.Is(err, platform.ErrPromptTimeout) || !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// Fixtures de show version de N9K y N7K de la documentación de Cisco, sin validar en laboratorio.
+func TestDetectNXOS(t *testing.T) {
+	for _, f := range []string{"nx-os-n9k", "nx-os-n7k"} {
+		d, err := open(t, simulator.Config{Transcripts: dir(f), StartPrivileged: true}, "", context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if p, err := d.Detect(context.Background()); err != nil || p != "nx-os" {
+			t.Fatalf("%s: Detect = %q, %v", f, p, err)
+		}
+	}
+}
+
+// Un IOS-XE que menciona «NX-OS» en texto libre no es un Nexus: solo cuenta la línea de cabecera.
+func TestDetectMencionNXOSNoEsNexus(t *testing.T) {
+	tmp := t.TempDir()
+	b, err := os.ReadFile(filepath.Join(dir("ios-xe"), "show_version.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b = append(b, []byte("\nmigrated from Cisco Nexus Operating System (NX-OS) Software box\n")...)
+	if err := os.WriteFile(filepath.Join(tmp, "show_version.txt"), b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d, err := open(t, simulator.Config{Transcripts: tmp}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p, err := d.Detect(context.Background()); err != nil || p != "ios-xe" {
+		t.Fatalf("Detect = %q, %v", p, err)
+	}
+}
+
+// fakeNX es un equipo mínimo que contesta línea por línea y anota lo recibido.
+func fakeNX(t *testing.T, width0Reply string) (*driver, *[]string) {
+	t.Helper()
+	devR, drvW := io.Pipe()
+	drvR, devW := io.Pipe()
+	var got []string
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		io.WriteString(devW, "N9K# ")
+		buf := make([]byte, 0, 256)
+		b := make([]byte, 1)
+		for {
+			if _, err := devR.Read(b); err != nil {
+				return
+			}
+			if b[0] != '\n' {
+				buf = append(buf, b[0])
+				continue
+			}
+			line := string(buf)
+			buf = buf[:0]
+			got = append(got, line)
+			out := line + "\r\n"
+			if line == "terminal width 0" {
+				out += width0Reply
+			}
+			if line == "show nada" {
+				out += "% Invalid command at '^' marker.\r\n"
+			}
+			io.WriteString(devW, out+"N9K# ")
+		}
+	}()
+	t.Cleanup(func() { drvW.Close(); devW.Close(); <-done })
+	d := New().(*driver)
+	if err := d.Open(context.Background(), drvR, drvW, secret.New(nil)); err != nil {
+		t.Fatal(err)
+	}
+	return d, &got
+}
+
+// NX-OS no tiene enable y su ancho máximo es 511: se manda 511 si la respuesta a «terminal width 0» trae una línea con «%».
+func TestAnchoNXOSSoloSiRechazaCero(t *testing.T) {
+	rechazos := []string{
+		"% Invalid number, range is (24:511)\r\n", "% Invalid parameter detected at '^' marker.\r\n",
+		"\r\n  % Invalid command at '^' marker.\r\n", "% Incomplete command\r\n",
+	}
+	for _, r := range rechazos {
+		_, got := fakeNX(t, r)
+		if want := []string{"terminal length 0", "terminal width 0", "terminal width 511"}; !slices.Equal(*got, want) {
+			t.Fatalf("%q rechazado: %q", r, *got)
+		}
+	}
+	_, got := fakeNX(t, "")
+	if want := []string{"terminal length 0", "terminal width 0"}; !slices.Equal(*got, want) {
+		t.Fatalf("aceptado: %q", *got)
+	}
+}
+
+// Los errores de NX-OS cuentan como comando inválido.
+func TestInvalidosDeNXOS(t *testing.T) {
+	d, _ := fakeNX(t, "")
+	out, err := d.Run(context.Background(), "show nada", 5*time.Second)
+	if err != nil || !out.Invalid {
+		t.Fatalf("out = %+v, %v", out, err)
+	}
+	for _, txt := range []string{"% Invalid command at '^' marker.", "% Invalid parameter detected at '^' marker.", "% Incomplete command", "% Invalid input detected at '^' marker."} {
+		if !invalidOutput(txt) {
+			t.Errorf("%q no cuenta como inválido", txt)
+		}
+	}
+	// el error de un comando va al inicio: una running-config o un log que cite la frase al final no es inválido
+	largo := "hostname X\nline 2\nline 3\nline 4\n% Invalid input detected at '^' marker.\n% Incomplete command\n"
+	if invalidOutput(largo) {
+		t.Error("la frase tras las primeras 3 líneas no es un error del comando")
+	}
+	if !invalidOutput("\n                 ^\n% Invalid input detected at '^' marker.\n\n") {
+		t.Error("caret y error al inicio sí cuentan")
+	}
+	if invalidOutput("Interface Eth1/1 is up") {
+		t.Error("salida normal marcada inválida")
 	}
 }

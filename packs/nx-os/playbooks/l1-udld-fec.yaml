@@ -1,0 +1,17 @@
+# Propósito: UDLD, CDP y LLDP para validar que los dos extremos ven al otro.
+# Cuándo usarlo: Enlaces unidireccionales o vecinos que no aparecen.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l1-udld-fec
+platform: nx-os
+name: L1 · UDLD y vecinos de capa 1
+name_en: L1 · UDLD and layer 1 neighbors
+commands:
+  - cmd: show udld global
+  - cmd: show udld neighbors
+  - cmd: show udld
+  - cmd: show cdp neighbors detail
+    timeout: 120s
+  - cmd: show lldp neighbors detail
+    timeout: 120s
+  - cmd: show interface status err-disabled

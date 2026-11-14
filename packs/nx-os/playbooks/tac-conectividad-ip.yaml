@@ -1,0 +1,22 @@
+# Propósito: Ping, traceroute, ruta, ARP, adyacencia y ACLs hacia el destino dado.
+# Cuándo usarlo: Un destino no responde desde el Nexus.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-conectividad-ip
+platform: nx-os
+name: TAC · Conectividad hacia una IP
+name_en: TAC · Connectivity to an IP
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: ping {ip} count 5
+    timeout: 90s
+  - cmd: traceroute {ip}
+    timeout: 180s
+  - cmd: show ip route {ip} detail
+  - cmd: show ip arp {ip}
+  - cmd: show ip adjacency {ip}
+  - cmd: show ip interface brief
+  - cmd: show ip access-lists summary

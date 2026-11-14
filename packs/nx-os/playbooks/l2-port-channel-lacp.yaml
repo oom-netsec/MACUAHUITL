@@ -1,0 +1,19 @@
+# Propósito: Resumen de port-channels, vecinos LACP, contadores y balanceo.
+# Cuándo usarlo: Un port-channel no sube, está en estado individual o reparte mal el tráfico.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l2-port-channel-lacp
+platform: nx-os
+name: L2 · Port-channel y LACP
+name_en: L2 · Port-channel and LACP
+commands:
+  - cmd: show port-channel summary
+  - cmd: show port-channel database
+  - cmd: show lacp neighbor
+  - cmd: show lacp counters
+  - cmd: show lacp port-channel
+  - cmd: show port-channel traffic
+  - cmd: show port-channel load-balance
+  - cmd: show lacp system-identifier
+  - cmd: show logging last 200 | egrep "LACP|PORT-CHANNEL"
+    timeout: 180s

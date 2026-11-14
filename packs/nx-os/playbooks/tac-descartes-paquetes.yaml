@@ -1,0 +1,23 @@
+# Propósito: Descartes por errores, colas, buffers de hardware, rate-limiters y CoPP.
+# Cuándo usarlo: Pérdida de paquetes sin un puerto concreto.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-descartes-paquetes
+platform: nx-os
+name: TAC · Descartes de paquetes (general)
+name_en: TAC · Packet drops (general)
+commands:
+  - cmd: show clock
+  - cmd: show interface counters errors non-zero
+  - cmd: show interface counters detailed
+    timeout: 180s
+  - cmd: show queuing interface
+    timeout: 120s
+  - cmd: show hardware capacity interface  # N9K
+  - cmd: show hardware internal buffer info pkt-stats  # N9K
+  - cmd: show hardware rate-limiter
+  - cmd: show policy-map interface control-plane | egrep "violate|drop"
+    timeout: 180s
+  - cmd: show hardware access-list resource utilization  # N9K
+  - cmd: show logging last 200 | include drop
+    timeout: 180s

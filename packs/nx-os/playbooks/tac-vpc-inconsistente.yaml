@@ -1,0 +1,23 @@
+# Propósito: Estado, keepalive, consistencia, LACP, STP y log del dominio vPC.
+# Cuándo usarlo: vPC con parámetros inconsistentes, VLANs suspendidas o peer-link caído.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-vpc-inconsistente
+platform: nx-os
+name: TAC · vPC inconsistente o caído
+name_en: TAC · vPC inconsistent or down
+commands:
+  - cmd: show clock
+  - cmd: show vpc
+  - cmd: show vpc brief
+  - cmd: show vpc role
+  - cmd: show vpc peer-keepalive
+  - cmd: show vpc consistency-parameters global
+  - cmd: show vpc consistency-parameters vlans
+  - cmd: show vpc orphan-ports
+  - cmd: show port-channel summary
+  - cmd: show lacp neighbor
+  - cmd: show spanning-tree summary
+  - cmd: show cdp neighbors
+  - cmd: show logging last 300 | include VPC
+    timeout: 180s

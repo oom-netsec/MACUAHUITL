@@ -1,0 +1,22 @@
+# Propósito: Movimientos de MAC, cambios de topología STP, vPC y errores relacionados.
+# Cuándo usarlo: Aparecen mensajes de MAC move o flapping de MAC entre puertos.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-troubleshooting-guides-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: tac-mac-moviendose
+platform: nx-os
+name: TAC · MAC moviéndose (general)
+name_en: TAC · MAC moving (general)
+commands:
+  - cmd: show clock
+  - cmd: show mac address-table notification mac-move
+  - cmd: show mac address-table count
+  - cmd: show spanning-tree detail | egrep "occurred|from"
+    timeout: 120s
+  - cmd: show spanning-tree summary
+  - cmd: show vpc
+  - cmd: show port-channel summary
+  - cmd: show interface counters errors non-zero
+  - cmd: show logging last 300 | include L2FM
+    timeout: 180s
+  - cmd: show mac address-table
+    timeout: 240s

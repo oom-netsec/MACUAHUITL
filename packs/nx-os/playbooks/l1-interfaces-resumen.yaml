@@ -1,0 +1,20 @@
+# Propósito: Estado, descripción, velocidad y vecinos de todas las interfaces.
+# Cuándo usarlo: Revisión rápida del estado físico de un Nexus.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l1-interfaces-resumen
+platform: nx-os
+name: L1 · Resumen de interfaces
+name_en: L1 · Interface summary
+commands:
+  - cmd: show interface status
+    timeout: 120s
+  - cmd: show interface brief
+    timeout: 120s
+  - cmd: show interface status err-disabled
+  - cmd: show interface description
+    timeout: 120s
+  - cmd: show cdp neighbors
+  - cmd: show lldp neighbors
+  - cmd: show interface status | include notconn
+  - cmd: show interface counters errors non-zero

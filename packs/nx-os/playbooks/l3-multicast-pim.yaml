@@ -1,0 +1,18 @@
+# Propósito: Vecinos PIM, RP, rutas multicast e IGMP.
+# Cuándo usarlo: Un flujo multicast no llega o el árbol no se forma.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l3-multicast-pim
+platform: nx-os
+name: L3 · Multicast y PIM
+name_en: L3 · Multicast and PIM
+commands:
+  - cmd: show ip pim neighbor
+  - cmd: show ip pim interface brief
+  - cmd: show ip pim rp
+  - cmd: show ip mroute summary
+  - cmd: show ip mroute
+    timeout: 180s
+  - cmd: show ip igmp groups
+  - cmd: show ip igmp interface
+  - cmd: show ip pim statistics

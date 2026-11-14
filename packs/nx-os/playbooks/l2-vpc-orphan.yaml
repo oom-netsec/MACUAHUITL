@@ -1,0 +1,16 @@
+# Propósito: Puertos que no son vPC pero cuelgan de un par vPC, y su estado.
+# Cuándo usarlo: Hosts de un solo enlace pierden conectividad al caer el peer-link o un miembro del par.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l2-vpc-orphan
+platform: nx-os
+name: L2 · vPC puertos huérfanos
+name_en: L2 · vPC orphan ports
+commands:
+  - cmd: show vpc orphan-ports
+  - cmd: show vpc
+  - cmd: show vpc role
+  - cmd: show port-channel summary
+  - cmd: show interface status
+    timeout: 120s
+  - cmd: show spanning-tree summary

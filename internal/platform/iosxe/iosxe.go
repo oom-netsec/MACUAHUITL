@@ -112,8 +112,16 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 		}
 	}
 	for _, c := range []string{"terminal length 0", "terminal width 0"} {
-		if _, err := d.Run(ctx, c, 10*time.Second); err != nil {
+		out, err := d.Run(ctx, c, 10*time.Second)
+		if err != nil {
 			return err
+		}
+		// NX-OS no admite ancho 0 («% Invalid number, range is (24:511)», «% Invalid parameter…»): su máximo es 511. Así las tablas no se parten
+		// aunque la plataforma del host sea fija y no se llame a Detect.
+		if c == "terminal width 0" && hasPercentLine(out.Text) {
+			if _, err := d.Run(ctx, "terminal width 511", 10*time.Second); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -278,14 +286,42 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 		text = text[:strings.LastIndexByte(text, '\n')+1]
 	}
 	out.Text = text
-	out.Invalid = strings.Contains(text, "% Invalid input")
+	out.Invalid = invalidOutput(text)
 	return out, err
+}
+
+// Respuestas de error de IOS («% Invalid input») y de NX-OS («% Invalid command», «% Invalid parameter», «% Incomplete command»).
+var invalidMarks = []string{"% Invalid input", "% Invalid command", "% Invalid parameter", "% Incomplete command"}
+
+// invalidOutput mira solo las primeras 3 líneas (el error de un comando va al inicio, tras el eco y el «^»): una
+// running-config o un log que cite la frase más abajo no es un comando inválido.
+func invalidOutput(text string) bool {
+	head := strings.Join(strings.SplitN(text, "\n", 4)[:min(3, strings.Count(text, "\n")+1)], "\n")
+	for _, m := range invalidMarks {
+		if strings.Contains(head, m) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasPercentLine: alguna línea de text empieza por «%» (el equipo rechazó el comando).
+func hasPercentLine(text string) bool {
+	for _, l := range strings.Split(text, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(l), "%") {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *driver) Hostname() string { return d.hostname }
 
 // wlc9800 busca «C9800» solo en la línea del software, no en el hostname ni en el resto de show version.
 var wlc9800 = regexp.MustCompile(`(?m)^Cisco IOS Software.*, C9800`)
+
+// nxos busca la cabecera de show version de NX-OS al inicio de línea; un IOS-XE que mencione «NX-OS» en texto libre no cuenta.
+var nxos = regexp.MustCompile(`(?m)^Cisco Nexus Operating System \(NX-OS\) Software`)
 
 func (d *driver) Detect(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, maxDetect)
@@ -295,6 +331,8 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 		return "", err
 	}
 	switch {
+	case nxos.MatchString(out.Text):
+		return "nx-os", nil
 	case wlc9800.MatchString(out.Text) && strings.Contains(out.Text, "Cisco IOS XE Software"): // antes de la regla genérica
 		return "wlc-9800", nil
 	case strings.Contains(out.Text, "Cisco IOS XE Software"):

@@ -1,0 +1,17 @@
+# Propósito: Resumen y tabla completa de rutas, rutas estáticas y adyacencias.
+# Cuándo usarlo: Una ruta falta o aparece con un siguiente salto inesperado.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/nexus-9000-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
+id: l3-rutas
+platform: nx-os
+name: L3 · Tabla de ruteo
+name_en: L3 · Routing table
+commands:
+  - cmd: show ip route summary
+  - cmd: show ip route vrf all summary
+  - cmd: show ip static-route
+  - cmd: show ip adjacency summary
+  - cmd: show ip route
+    timeout: 240s
+  - cmd: show ip route vrf all
+    timeout: 300s
