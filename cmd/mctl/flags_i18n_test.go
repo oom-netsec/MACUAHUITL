@@ -172,3 +172,19 @@ func TestAyudaDeComandoSinBanderas(t *testing.T) {
 		}
 	}
 }
+
+// Sin XDG_RUNTIME_DIR no hay socket: mctl da el error de conexión de siempre y no corre el comando (ni crea «ca-lab»).
+func TestSinXDGNoCorreElComando(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", "")
+	dir := t.TempDir()
+	t.Chdir(dir)
+	for _, args := range [][]string{{"pki", "ca", "init", "--name", "-h"}, {"calc", "mtu", "-h"}} {
+		out, err := mctlRaw(t, "", args...)
+		if err == nil || strings.Contains(out, "usage:") {
+			t.Errorf("%v: err=%v\n%s", args, err, out)
+		}
+	}
+	if left, _ := os.ReadDir(dir); len(left) != 0 {
+		t.Errorf("dejó archivos: %v", left)
+	}
+}

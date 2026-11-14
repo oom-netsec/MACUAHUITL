@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"golang.org/x/term"
 
@@ -137,52 +136,25 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if lang != "" {
 		dialOpts = ipc.WithLanguage(lang)
 	}
-	conn, dialErr := ipc.Dial(context.Background(), dialOpts...)
-	if dialErr != nil && !wantsHelp(rest) {
-		return dialErr
+	conn, err := ipc.Dial(context.Background(), dialOpts...)
+	if err != nil {
+		return err
 	}
-	// Con -h el comando lee sus banderas antes de tocar nada (lo vigila una prueba), así que la ayuda sale aunque el núcleo no esté.
-	if dialErr == nil {
-		defer conn.Close()
-		c.Conn = conn
-		color := termcolor.Enabled(outIsTTY(out), noColor, cli.HasJSON(rest), os.Getenv)
-		var pal string
-		if color {
-			pal = c.Palette()
-		}
-		if !cmd.Raw { // la consola es una sesión cruda: sin sanear ni pintar
-			c.Out = cli.NewOut(out, color, termcolor.Lookup(pal), termcolor.Truecolor(os.Getenv))
-		}
+	defer conn.Close()
+	c.Conn = conn
+	color := termcolor.Enabled(outIsTTY(out), noColor, cli.HasJSON(rest), os.Getenv)
+	var pal string
+	if color {
+		pal = c.Palette()
 	}
-	err = runCmd(cmd, c, rest, dialErr)
+	if !cmd.Raw { // la consola es una sesión cruda: sin sanear ni pintar
+		c.Out = cli.NewOut(out, color, termcolor.Lookup(pal), termcolor.Truecolor(os.Getenv))
+	}
+	// -h: Flags escribe las banderas antes de cualquier llamada al núcleo (lo vigila una prueba); el dial es diferido,
+	// así que la ayuda sale aunque el núcleo no esté.
+	err = cmd.Run(c, rest)
 	if cli.HelpShown() {
 		return nil
 	}
-	if dialErr != nil {
-		return dialErr
-	}
 	return cli.LocalizeUsage(err)
-}
-
-// wantsHelp dice si algún argumento puede ser -h o --help (con o sin =valor): solo una pista para no exigir el núcleo.
-func wantsHelp(args []string) bool {
-	for _, a := range args {
-		switch n, _, _ := strings.Cut(strings.TrimLeft(a, "-"), "="); {
-		case n == "h" || n == "help":
-			return strings.HasPrefix(a, "-")
-		}
-	}
-	return false
-}
-
-// runCmd corre el comando; sin conexión (solo con -h) un comando que llegara a usarla no debe tumbar mctl.
-func runCmd(cmd cli.Command, c *cli.Env, rest []string, dialErr error) (err error) {
-	if dialErr != nil {
-		defer func() {
-			if recover() != nil {
-				err = dialErr
-			}
-		}()
-	}
-	return cmd.Run(c, rest)
 }
