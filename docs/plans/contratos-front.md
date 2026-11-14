@@ -1363,3 +1363,11 @@ Todos los errores son gRPC con `ErrorInfo` (reason, metadata) y salen en el idio
 ## PlaybookInfo.pack (fase 36)
 
 `PlaybookInfo` trae `pack`: el paquete de origen del playbook (`"oom/cat9k"`, `"oom/sda"`, `"oom/ios-xe"`…), `"usuario"` para los propios (`<config>/playbooks`) y `""` para el contenido base. Con la fase 36 un equipo `ios-xe` ve playbooks de tres paquetes (`oom/ios-xe`, `oom/cat9k`, `oom/sda`); el selector de Patrol debe mostrar de qué paquete viene cada uno. `listPlaybooks` del puente lo pasa tal cual (`pack` en el JSON; ausente = base).
+
+## Tipos de dato `vrf` y `vnid` (núcleo 0.4.7)
+
+`PlaybookInfo.params[].kind` suma dos valores a `mac | ap | wlan | interface | ip`:
+- `vrf`: forma `tenant:vrf` (p. ej. `common:default`), un solo `:`, cada parte de 1 a 64 caracteres `[A-Za-z0-9_.-]` sin empezar con `-`.
+- `vnid`: entero de 1 a 16777215, sin ceros a la izquierda (p. ej. `2850817`).
+
+Los usa `oom/aci` 1.0.1 (antes iban como `interface` y `ap`); `oom/wlc-aireos` 1.0.1 pasa sus `wlan` a `kind: wlan`. El núcleo valida (`playbook.err.param_value` si no cumple); Front agrega las etiquetas `patrol.param.kind.vrf` y `patrol.param.kind.vnid` y su ayuda en es/en, y el tipo `ParamKind` en el contrato TS. Un tipo desconocido para la UI debe mostrarse como texto libre (el núcleo valida igual).

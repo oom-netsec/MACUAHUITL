@@ -8,7 +8,7 @@ name: ACI · TAC · L3Out sin ruta a una IP
 name_en: ACI · TAC · L3Out with no route to an IP
 params:
   - name: vrf
-    kind: interface
+    kind: vrf
   - name: ip
     kind: ip
 commands:

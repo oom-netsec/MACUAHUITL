@@ -8,9 +8,9 @@ name: ACI · Contratos · VRF y reglas de un tenant
 name_en: ACI · Contracts · Tenant VRF and rules
 params:
   - name: vrf
-    kind: interface
+    kind: vrf
   - name: vnid
-    kind: ap
+    kind: vnid
 commands:
   - cmd: show vrf {vrf} detail
   - cmd: show zoning-rule scope {vnid}

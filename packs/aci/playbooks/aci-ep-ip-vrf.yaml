@@ -10,7 +10,7 @@ params:
   - name: ip
     kind: ip
   - name: vrf
-    kind: interface
+    kind: vrf
 commands:
   - cmd: show system internal epm endpoint ip {ip}
   - cmd: show endpoint ip {ip}

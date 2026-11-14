@@ -8,7 +8,7 @@ name: ACI · L3 · BGP de una VRF (L3Out)
 name_en: ACI · L3 · VRF BGP (L3Out)
 params:
   - name: vrf
-    kind: interface
+    kind: vrf
 commands:
   - cmd: show bgp sessions vrf {vrf}
   - cmd: show bgp ipv4 unicast summary vrf {vrf}

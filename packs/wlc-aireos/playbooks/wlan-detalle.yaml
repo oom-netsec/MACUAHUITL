@@ -8,7 +8,7 @@ name: AireOS · WLAN · Detalle de una WLAN
 name_en: AireOS · WLAN · One WLAN in detail
 params:
   - name: wlan
-    kind: ap
+    kind: wlan
 commands:
   - cmd: show time
   - cmd: show wlan {wlan}

@@ -8,7 +8,7 @@ name: ACI · L3 · OSPF de una VRF (L3Out)
 name_en: ACI · L3 · VRF OSPF (L3Out)
 params:
   - name: vrf
-    kind: interface
+    kind: vrf
 commands:
   - cmd: show ip ospf neighbors vrf {vrf}
   - cmd: show ip ospf vrf {vrf}
