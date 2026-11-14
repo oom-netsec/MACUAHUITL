@@ -22,7 +22,7 @@ func target(s string) (*v1.Target, error) {
 	if i := strings.LastIndex(s, ":"); i > 0 && strings.Count(s, ":") == 1 {
 		p, err := strconv.ParseUint(s[i+1:], 10, 16)
 		if err != nil {
-			return nil, fmt.Errorf("puerto inválido en %q", s)
+			return nil, cli.Err("mctl.backup.port_invalid", "value", s)
 		}
 		return &v1.Target{Address: s[:i], Port: uint32(p)}, nil
 	}
@@ -71,8 +71,8 @@ func (f *runFlags) start(c *cli.Env) (job string, scheduled bool, rep *v1.ToolRe
 		return "", false, nil, err
 	}
 	if !st.Armed {
-		fmt.Fprintf(c.Out, "trabajo %s creado sin armar: %s\nrevisa con: mctl job logintest %s\ny repite con --accept HUELLA\n", st.JobId, st.Detail, st.JobId)
-		return st.JobId, false, nil, errors.New("respaldo sin armar")
+		fmt.Fprintln(c.Out, cli.T("mctl.backup.unarmed", "job", st.JobId, "detail", st.Detail))
+		return st.JobId, false, nil, cli.Err("mctl.backup.unarmed_err")
 	}
 	if req.IntervalSeconds > 0 {
 		return st.JobId, true, nil, nil
@@ -84,11 +84,11 @@ func (f *runFlags) start(c *cli.Env) (job string, scheduled bool, rep *v1.ToolRe
 		}
 		switch {
 		case r.Done && r.Error != "":
-			return st.JobId, false, nil, fmt.Errorf("el trabajo %s terminó con error: %s", st.JobId, r.Error)
+			return st.JobId, false, nil, cli.Err("mctl.backup.job_error", "job", st.JobId, "error", r.Error)
 		case r.Done:
 			return st.JobId, false, r.Report, nil
 		case time.Now().After(deadline):
-			return st.JobId, false, nil, fmt.Errorf("sin resultado tras %s; guárdalo después con: mctl backup collect %s", f.timeout, st.JobId)
+			return st.JobId, false, nil, cli.Err("mctl.backup.timeout", "timeout", f.timeout, "job", st.JobId)
 		}
 	}
 }
@@ -104,7 +104,7 @@ func runBackup(c *cli.Env, args []string) error {
 		return err
 	}
 	if scheduled {
-		fmt.Fprintf(c.Out, "programado: trabajo %s, %d rondas cada %s; el núcleo guarda cada una al terminar (mctl backup list)\n", job, f.rounds, f.every)
+		fmt.Fprintln(c.Out, cli.T("mctl.backup.scheduled", "job", job, "rounds", f.rounds, "every", f.every))
 		return nil
 	}
 	c.PrintReport(rep, asJSON)
@@ -127,10 +127,10 @@ func collect(c *cli.Env, args []string) error {
 	}
 	c.PrintReport(r.Report, asJSON)
 	if !r.Done {
-		fmt.Fprintf(c.Out, "el trabajo sigue en estado %s; vuelve a ejecutarlo al terminar\n", r.State)
+		fmt.Fprintln(c.Out, cli.T("mctl.backup.still_running", "state", r.State))
 	}
 	if r.Done && r.Error != "" {
-		return fmt.Errorf("el trabajo %s terminó con error: %s", fs.Arg(0), r.Error)
+		return cli.Err("mctl.backup.job_failed", "job", fs.Arg(0), "error", r.Error)
 	}
 	return nil
 }
@@ -167,7 +167,7 @@ func diff(c *cli.Env, args []string) error {
 		dev, rest, ok := strings.Cut(a, "/")
 		_, kind, ok2 := strings.Cut(rest, "-")
 		if !ok || !ok2 {
-			return fmt.Errorf("identificador %q inválido", a)
+			return cli.Err("mctl.backup.bad_id", "id", a)
 		}
 		f.startup = kind == "startup"
 		if len(f.devs) != 1 {
@@ -191,7 +191,7 @@ func diff(c *cli.Env, args []string) error {
 			}
 		}
 		if b == "" {
-			return errors.New("el respaldo nuevo no apareció en la lista")
+			return cli.Err("mctl.backup.new_missing")
 		}
 	}
 	r, err := cl.DiffBackups(context.Background(), &v1.DiffBackupsRequest{From: a, To: b})
@@ -217,7 +217,7 @@ func export(c *cli.Env, args []string) error {
 	var meta struct{ Masked bool }
 	json.Unmarshal([]byte(r.MetaJson), &meta)
 	if meta.Masked {
-		fmt.Fprintln(os.Stderr, "aviso: este respaldo se tomó con secretos enmascarados; no sirve para recuperar contraseñas ni llaves")
+		fmt.Fprintln(os.Stderr, cli.T("mctl.backup.masked_warning"))
 	}
 	if out == "" {
 		fmt.Fprint(c.Out, r.Text)
@@ -226,7 +226,7 @@ func export(c *cli.Env, args []string) error {
 	// O_EXCL: no pisa un archivo existente ni sigue un enlace simbólico.
 	f, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return fmt.Errorf("no se escribe la salida (¿ya existe?): %w", err)
+		return cli.ErrWrap("mctl.backup.write_out", err)
 	}
 	if _, err := f.WriteString(r.Text); err != nil {
 		f.Close()
@@ -235,7 +235,7 @@ func export(c *cli.Env, args []string) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "escrito %s\n", out)
+	fmt.Fprintln(c.Out, cli.T("mctl.backup.written", "path", out))
 	return nil
 }
 

@@ -167,7 +167,7 @@ func (s *backupSvc) watch(job string) {
 				return
 			case <-t.C:
 			}
-			r, err := s.collect(job, 0)
+			r, err := s.collect(i18n.WithLocale(s.ctx, i18n.En), job, 0) // la auditoría va en inglés (Deps.Job ya devuelve el error localizado)
 			if err != nil {
 				s.d.Audit("backup.failed", job, i18n.English(err))
 				return
@@ -245,14 +245,14 @@ func masked(t *tracked, dir string) bool {
 
 // collect serializa collectLocked; el primero en ver el estado terminal de un trabajo propio deja su
 // resultado en final, para que el otro (vigilante o CollectBackups) no responda con la carpeta ya borrada.
-func (s *backupSvc) collect(job string, keep int) (collected, error) {
+func (s *backupSvc) collect(ctx context.Context, job string, keep int) (collected, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if f, ok := s.final[job]; ok {
 		return f, nil
 	}
 	own := s.jobs[job] != nil
-	res, err := s.collectLocked(job, keep)
+	res, err := s.collectLocked(ctx, job, keep)
 	if err == nil && res.done && own {
 		if s.final == nil {
 			s.final = map[string]collected{}
@@ -266,8 +266,8 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 	return res, err
 }
 
-func (s *backupSvc) collectLocked(job string, keep int) (collected, error) {
-	j, err := s.d.Job(job)
+func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int) (collected, error) {
+	j, err := s.d.Job(ctx, job)
 	if err != nil {
 		return collected{}, err
 	}
@@ -460,7 +460,7 @@ func (s *backupSvc) CollectBackups(ctx context.Context, r *v1.CollectBackupsRequ
 			return nil, err
 		}
 	}
-	c, err := s.collect(r.JobId, keep)
+	c, err := s.collect(ctx, r.JobId, keep)
 	if err != nil {
 		return nil, err
 	}

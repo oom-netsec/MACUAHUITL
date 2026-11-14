@@ -160,10 +160,10 @@ func check(files map[string][]byte, coreVersion string, keys []ed25519.PublicKey
 		}
 		for _, s := range ss {
 			if s.Origin != scripts.OrigenBiblioteca || !scripts.IsLib(s.ID) { // también en los oficiales
-				return nil, rejWrap("script.invalid", fmt.Errorf("script %s: origin biblioteca e ID lib-… obligatorios", s.ID))
+				return nil, rejWrap("script.invalid", rej("script.origin", "id", s.ID))
 			}
 			if !slices.Contains(m.Platforms, s.Platform) && s.Platform != "cualquiera" {
-				return nil, rejWrap("script.invalid", fmt.Errorf("script %s: plataforma %q fuera de platforms del manifiesto", s.ID, s.Platform))
+				return nil, rejWrap("script.invalid", rej("script.platform", "id", s.ID, "platform", s.Platform))
 			}
 			if !p.Official && !strings.HasPrefix(s.ID, "lib-"+m.Editor()+"-") {
 				return nil, rej("id.prefix", "id", s.ID, "want", "lib-"+m.Editor()+"-")
@@ -276,7 +276,7 @@ func loadPlaybooks(p *Pack, files map[string][]byte) error {
 		for _, pb := range one {
 			id := pb.ID[strings.Index(pb.ID, "/")+1:]
 			if !pbIDRe.MatchString(id) || id != strings.TrimSuffix(file, ".yaml") {
-				return rejWrap("playbook.invalid", fmt.Errorf("playbook %s: el id debe ser a-z, 0-9 y guion, e igual al nombre del archivo %s", pb.ID, file))
+				return rejWrap("playbook.invalid", rej("playbook.id", "id", pb.ID, "file", file))
 			}
 		}
 	}

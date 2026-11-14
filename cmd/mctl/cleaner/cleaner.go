@@ -31,7 +31,7 @@ func clean(c *cli.Env, args []string) error {
 		// Stat sigue enlaces simbólicos y SameFile reconoce los duros: ambos apuntan al original.
 		si, _ := os.Stat(in)
 		if so, err := os.Stat(out); err == nil && os.SameFile(si, so) {
-			return errors.New("la salida no puede ser el archivo de entrada: la limpieza no sobrescribe el original")
+			return cli.Err("mctl.cleaner.same_file")
 		}
 	}
 	r, err := v1.NewCleanerServiceClient(c.Conn).Clean(context.Background(), &v1.CleanRequest{Text: string(text), Sort: sort})
@@ -43,7 +43,7 @@ func clean(c *cli.Env, args []string) error {
 			return err
 		}
 		if !asJSON {
-			fmt.Fprintf(c.Out, "escrito %s\n", out)
+			fmt.Fprintln(c.Out, cli.T("mctl.backup.written", "path", out))
 		}
 	}
 	c.PrintReport(r.Report, asJSON)
@@ -54,7 +54,7 @@ func clean(c *cli.Env, args []string) error {
 func writeNew(path, text string) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return fmt.Errorf("no se escribe la salida (¿ya existe?): %w", err)
+		return cli.ErrWrap("mctl.backup.write_out", err)
 	}
 	if _, err := f.WriteString(text); err != nil {
 		f.Close()

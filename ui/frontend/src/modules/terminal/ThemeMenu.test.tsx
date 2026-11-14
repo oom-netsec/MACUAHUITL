@@ -7,7 +7,7 @@ import { ThemeMenu } from "./ThemeMenu";
 afterEach(() => localStorage.clear());
 
 test("con el idioma en inglés el menú muestra los nombres de las paletas en inglés, y cada paleta tiene el suyo", async () => {
-  localStorage.setItem("macuahuitl.idioma", "en");
+  localStorage.setItem("macuahuitl.lang", "en");
   render(<I18nProvider><ThemeMenu /></I18nProvider>);
   await userEvent.click(screen.getByRole("button", { name: "Change theme" }));
   const names = within(screen.getByRole("menu")).getAllByRole("menuitemradio").map((i) => i.querySelector(".theme-name")!.textContent);
@@ -19,7 +19,7 @@ test("con el idioma en inglés el menú muestra los nombres de las paletas en in
 });
 
 test("Tab cierra el menú y deja el foco en el botón para que siga al siguiente control", async () => {
-  localStorage.setItem("macuahuitl.idioma", "es");
+  localStorage.setItem("macuahuitl.lang", "es");
   render(<I18nProvider><ThemeMenu /><button>siguiente</button></I18nProvider>);
   await userEvent.click(screen.getByRole("button", { name: "Cambiar tema" }));
   await userEvent.tab();

@@ -118,7 +118,7 @@ func TestParseHostsErroresPorEntrada(t *testing.T) {
 	if len(got.Hosts) != 2 || got.Hosts[0].Name != "sw-01" || got.Hosts[1].Name != "sw-07" {
 		t.Fatalf("válidos = %+v", got.Hosts)
 	}
-	want := []LineError{{2, "name", ""}, {3, "address", ""}, {4, "address", ""}, {5, "credential_label", ""}, {6, "credential_label", ""}}
+	want := []LineError{{Line: 2, Field: "name"}, {Line: 3, Field: "address"}, {Line: 4, Field: "address"}, {Line: 5, Field: "credential_label"}, {Line: 6, Field: "credential_label"}}
 	if len(got.Errors) != len(want) {
 		t.Fatalf("errores = %+v", got.Errors)
 	}

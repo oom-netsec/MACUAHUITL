@@ -8,7 +8,6 @@ package assist
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -141,20 +140,20 @@ func (fn Function) configLine(line string) error {
 		return err
 	}
 	if strings.Contains(line, "?") {
-		return fmt.Errorf("%q: '?' abre la ayuda de IOS sin Enter", line)
+		return lerr("%q: '?' abre la ayuda de IOS sin Enter", "%q: '?' opens the IOS help without Enter", line)
 	}
 	if strings.TrimSpace(line) == "" {
-		return errors.New("línea en blanco")
+		return lerr("línea en blanco", "blank line")
 	}
 	if isDenied(line) {
-		return fmt.Errorf("%q: comando prohibido en modo asistido", line)
+		return lerr("%q: comando prohibido en modo asistido", "%q: command forbidden in assisted mode", line)
 	}
 	if !fn.allows(line) {
-		return fmt.Errorf("%q: fuera de la lista cerrada de %s", line, fn.Name)
+		return lerr("%q: fuera de la lista cerrada de %s", "%q: outside the closed list of %s", line, fn.Name)
 	}
 	if fn.Check != nil {
 		if err := fn.Check(strings.TrimSpace(line)); err != nil {
-			return fmt.Errorf("%q: %v", line, err)
+			return lerr("%q: %v", "%q: %v", line, err)
 		}
 	}
 	return nil
@@ -163,18 +162,20 @@ func (fn Function) configLine(line string) error {
 // Validate aplica las reglas 2 y 3 del ADR 0007: plan completo (con reversa) y solo líneas de
 // la lista cerrada de la función. Reúne todos los problemas en un solo error.
 func Validate(p Plan, fn Function) error {
-	var bad []string
-	add := func(dev, format string, a ...any) { bad = append(bad, dev+": "+fmt.Sprintf(format, a...)) }
+	var bad []func(loc string) string
+	add := func(dev string, e error) {
+		bad = append(bad, func(loc string) string { return dev + ": " + errIn(loc, e) })
+	}
 	if p.Function != fn.Name {
-		add("plan", "es de la función %q, no de %q", p.Function, fn.Name)
+		add("plan", lerr("es de la función %q, no de %q", "is of function %q, not %q", p.Function, fn.Name))
 	}
 	if len(p.Devices) == 0 {
-		add("plan", "sin equipos")
+		add("plan", lerr("sin equipos", "no devices"))
 	}
 	for _, d := range p.Devices {
 		name := d.Device
 		if name == "" {
-			add("equipo", "sin nombre")
+			add("equipo", lerr("sin nombre", "no name"))
 		}
 		for _, part := range []struct {
 			n string
@@ -182,34 +183,34 @@ func Validate(p Plan, fn Function) error {
 		}{{"Pre", len(d.Pre)}, {"Apply", len(d.Apply)}, {"Rollback (la reversa es obligatoria)", len(d.Rollback)},
 			{"Post", len(d.Post)}, {"Expect", len(d.Expect)}} {
 			if part.l == 0 {
-				add(name, "falta %s", part.n)
+				add(name, lerr("falta %s", "%s is missing", part.n))
 			}
 		}
 		for _, c := range append(append([]string(nil), d.Pre...), d.Post...) {
 			if err := asciiOnly(c); err != nil {
-				add(name, "Pre/Post %v", err)
+				add(name, lerr("Pre/Post %v", "Pre/Post %v", err))
 			} else if strings.TrimSpace(c) == "" {
-				add(name, "comando de lectura en blanco")
+				add(name, lerr("comando de lectura en blanco", "blank read command"))
 			} else if err := playbook.CheckDenied("ios-xe", c); err != nil {
-				add(name, "%v", err)
+				add(name, err)
 			}
 		}
 		if d.VerifyLogin && !p.WriteMemory {
-			add(name, "una rotación de credenciales exige write memory: sin él el equipo vuelve al hash anterior al reiniciar y la bóveda queda con el nuevo")
+			add(name, lerr("una rotación de credenciales exige write memory: sin él el equipo vuelve al hash anterior al reiniciar y la bóveda queda con el nuevo", "a credential rotation requires write memory: without it the device returns to the previous hash on reload and the vault keeps the new one"))
 		}
 		for _, l := range d.Apply {
 			if err := fn.configLine(l); err != nil {
-				add(name, "Apply %v", err)
+				add(name, lerr("Apply %v", "Apply %v", err))
 			}
 		}
 		for _, l := range d.Rollback {
 			if err := fn.configLine(l); err != nil {
-				add(name, "Rollback %v", err)
+				add(name, lerr("Rollback %v", "Rollback %v", err))
 			}
 		}
 		if fn.CheckDevice != nil {
 			if err := fn.CheckDevice(d); err != nil {
-				add(name, "%v", err)
+				add(name, err)
 			}
 		}
 		post := map[string]bool{}
@@ -218,7 +219,7 @@ func Validate(p Plan, fn Function) error {
 		}
 		for _, e := range d.Expect {
 			if !post[e.Command] || strings.TrimSpace(e.Line) == "" {
-				add(name, "Expect %q no corresponde a un comando de Post", e.Command)
+				add(name, lerr("Expect %q no corresponde a un comando de Post", "Expect %q does not match a Post command", e.Command))
 			}
 		}
 	}
@@ -230,7 +231,7 @@ func Validate(p Plan, fn Function) error {
 	for _, d := range p.Devices {
 		secrets = append(secrets, d.Secrets...)
 	}
-	return fmt.Errorf("%w: %s", ErrInvalidPlan, Scrub(strings.Join(bad, "; "), secrets, fn.Scrub))
+	return &planError{bad, secrets, fn.Scrub}
 }
 
 // EvalExpect devuelve cada condición que no se cumple, con la salida de cada comando de Post (en es).

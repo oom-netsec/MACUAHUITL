@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 )
 
@@ -103,7 +104,7 @@ func (b *Bridge) console(id string, f func(st v1.FieldService_ConsoleClient) err
 	s, ok := b.consoles[id]
 	b.mu.Unlock()
 	if !ok {
-		return wrapErr(fmt.Errorf("consola %q no existe o ya terminó", id))
+		return b.bridgeErr(i18n.New("bridge.err.console_gone", i18n.A("id", id)))
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

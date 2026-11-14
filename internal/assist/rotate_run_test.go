@@ -32,20 +32,20 @@ func (v *verifyExec) Save(_ context.Context, dev string) (string, error) {
 	return "[OK]", nil
 }
 
-func (v *verifyExec) Saved(_ context.Context, dev string) (string, error) {
+func (v *verifyExec) Saved(_ context.Context, dev string) (i18n.Text, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.saved++
 	v.fakeExec.log("saved " + dev)
-	return "la bóveda quedó con la credencial nueva", v.savedErr
+	return i18n.Lit("la bóveda quedó con la credencial nueva", "the vault holds the new credential"), v.savedErr
 }
 
-func (v *verifyExec) Verify(_ context.Context, dev string) (string, error) {
+func (v *verifyExec) Verify(_ context.Context, dev string) (i18n.Text, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.verified++
 	v.fakeExec.log("verify " + dev)
-	return "la sesión nueva con tech entró", v.verifyErr
+	return i18n.Lit("la sesión nueva con tech entró", "the new session with tech logged in"), v.verifyErr
 }
 
 func (v *verifyExec) Reverted(_ context.Context, dev string) error {

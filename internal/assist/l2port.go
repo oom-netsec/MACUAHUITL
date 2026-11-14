@@ -1,8 +1,6 @@
 package assist
 
 import (
-	"errors"
-	"fmt"
 	"regexp"
 	"slices"
 	"strconv"
@@ -216,7 +214,7 @@ func l2Blocks(lines []string) ([]l2Block, error) {
 		}
 		if len(out) == 0 {
 			if i != 0 {
-				return nil, errors.New("líneas sin interfaz")
+				return nil, lerr("líneas sin interfaz", "lines without an interface")
 			}
 			out = append(out, l2Block{})
 		}
@@ -241,12 +239,12 @@ func l2InverseDef(keyOf func(line string) string, baseCmd func(head string) stri
 		ab, err1 := l2Blocks(d.Apply)
 		rb, err2 := l2Blocks(d.Rollback)
 		if err1 != nil || err2 != nil || len(ab) != len(rb) || len(ab) == 0 {
-			return errors.New("la reversa debe recorrer los mismos puertos que el apply, en orden inverso")
+			return lerr("la reversa debe recorrer los mismos puertos que el apply, en orden inverso", "the rollback must go through the same ports as the apply, in reverse order")
 		}
 		for i, a := range ab {
 			r := rb[len(rb)-1-i]
 			if !strings.EqualFold(squash(a.head), squash(r.head)) || len(a.lines) != len(r.lines) {
-				return fmt.Errorf("la reversa de %q debe tener una línea por cada línea del apply, en orden inverso", a.head)
+				return lerr("la reversa de %q debe tener una línea por cada línea del apply, en orden inverso", "the rollback of %q must have one line for each apply line, in reverse order", a.head)
 			}
 			was := map[string]string{}
 			for _, l := range capturedLines(d.Baseline[baseCmd(a.head)], a.head != "") {
@@ -258,18 +256,18 @@ func l2InverseDef(keyOf func(line string) string, baseCmd func(head string) stri
 				rl := squash(r.lines[len(r.lines)-1-j])
 				k := keyOf(al)
 				if k == "" || strings.HasPrefix(strings.ToLower(al), "no ") || keyOf(rl) != k {
-					return fmt.Errorf("la reversa de %q debe deshacer esa misma línea", al)
+					return lerr("la reversa de %q debe deshacer esa misma línea", "the rollback of %q must undo that same line", al)
 				}
 				if w, had := was[k]; had {
 					if rl != w {
-						return fmt.Errorf("la reversa de %q debe restaurar %q, lo que tenía el equipo", al, w)
+						return lerr("la reversa de %q debe restaurar %q, lo que tenía el equipo", "the rollback of %q must restore %q, what the device had", al, w)
 					}
 				} else if factory := ifNil(def, k); factory != "" {
 					if rl != factory {
-						return fmt.Errorf("la reversa de %q debe ser %q: el equipo no tenía esa línea", al, factory)
+						return lerr("la reversa de %q debe ser %q: el equipo no tenía esa línea", "the rollback of %q must be %q: the device did not have that line", al, factory)
 					}
 				} else if no := "no " + k; rl != no && rl != "no "+squash(al) {
-					return fmt.Errorf("la reversa de %q debe ser %q: el equipo no tenía esa línea", al, no)
+					return lerr("la reversa de %q debe ser %q: el equipo no tenía esa línea", "the rollback of %q must be %q: the device did not have that line", al, no)
 				}
 			}
 		}
@@ -319,7 +317,7 @@ func keyByPrefix(keys ...string) func(string) string {
 
 func ifaceHeader(f []string) error {
 	if len(f) != 2 || !ValidInterface(f[1]) {
-		return errors.New("solo un puerto físico (nada de Port-channel, Vlan, rangos ni subinterfaces)")
+		return lerr("solo un puerto físico (nada de Port-channel, Vlan, rangos ni subinterfaces)", "only a physical port (no Port-channel, Vlan, ranges or subinterfaces)")
 	}
 	return nil
 }
@@ -649,7 +647,7 @@ var SnippetErrdisable = Function{
 		case len(f) == 4 && f[2] == "cause" && oneOf(f[3], errdisableCauses...):
 		case f[2] == "interval" && (neg && len(f) == 3 || !neg && len(f) == 4 && intIn(f[3], 30, 86400)):
 		default:
-			return errors.New("solo errdisable recovery cause (bpduguard, psecure-violation, storm-control, link-flap, udld, loopback), interval 30-86400 y su no")
+			return lerr("solo errdisable recovery cause (bpduguard, psecure-violation, storm-control, link-flap, udld, loopback), interval 30-86400 y su no", "only errdisable recovery cause (bpduguard, psecure-violation, storm-control, link-flap, udld, loopback), interval 30-86400 and its no")
 		}
 		return nil
 	},
@@ -722,7 +720,7 @@ var SnippetPortMode = Function{
 			return ifaceHeader(f)
 		case oneOf(strings.Join(f, " "), "switchport mode access", "switchport mode dynamic auto", "switchport mode dynamic desirable", "no switchport mode"):
 		default:
-			return errors.New("solo switchport mode access|dynamic auto|dynamic desirable y no switchport mode (nunca trunk)")
+			return lerr("solo switchport mode access|dynamic auto|dynamic desirable y no switchport mode (nunca trunk)", "only switchport mode access|dynamic auto|dynamic desirable and no switchport mode (never trunk)")
 		}
 		return nil
 	},
@@ -735,17 +733,17 @@ func portModeInverse(d DevicePlan) error {
 	ab, err1 := l2Blocks(d.Apply)
 	rb, err2 := l2Blocks(d.Rollback)
 	if err1 != nil || err2 != nil || len(ab) != len(rb) || len(ab) == 0 {
-		return errors.New("la reversa debe recorrer los mismos puertos que el apply, en orden inverso")
+		return lerr("la reversa debe recorrer los mismos puertos que el apply, en orden inverso", "the rollback must go through the same ports as the apply, in reverse order")
 	}
 	for i, a := range ab {
 		r := rb[len(rb)-1-i]
 		if !strings.EqualFold(squash(a.head), squash(r.head)) || len(a.lines) != 1 || len(r.lines) != 1 {
-			return fmt.Errorf("la reversa de %q debe ser una sola línea de modo, en orden inverso", a.head)
+			return lerr("la reversa de %q debe ser una sola línea de modo, en orden inverso", "the rollback of %q must be a single mode line, in reverse order", a.head)
 		}
 		// Sin la captura del puerto no se sabe qué restaurar: ni «no switchport mode» se acepta a ciegas.
 		iface := strings.TrimSpace(strings.TrimPrefix(squash(a.head), "interface "))
 		if c, ok := iosxe.ParseInterfaceConfig(d.Baseline[ifaceBase(a.head)]); !ok || !strings.EqualFold(iosxe.ShortIf(c.Name), iosxe.ShortIf(iface)) {
-			return fmt.Errorf("falta la línea base legible de %s: sin ella la reversa no sabe qué restaurar", iface)
+			return lerr("falta la línea base legible de %s: sin ella la reversa no sabe qué restaurar", "the readable baseline line of %s is missing: without it the rollback does not know what to restore", iface)
 		}
 		want := "no switchport mode"
 		for _, l := range capturedLines(d.Baseline[ifaceBase(a.head)], true) {
@@ -755,7 +753,7 @@ func portModeInverse(d DevicePlan) error {
 			}
 		}
 		if got := squash(r.lines[0]); got != want {
-			return fmt.Errorf("la reversa de %q debe ser %q (lo que tenía el equipo), no %q", a.lines[0], want, got)
+			return lerr("la reversa de %q debe ser %q (lo que tenía el equipo), no %q", "the rollback of %q must be %q (what the device had), not %q", a.lines[0], want, got)
 		}
 	}
 	return nil

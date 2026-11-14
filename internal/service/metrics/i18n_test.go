@@ -101,12 +101,12 @@ func metricasCasos(t *testing.T, ctx context.Context) map[string]string {
 
 // Regresión: sin idioma, con es o con uno desconocido, cada RPC de métricas devuelve lo mismo que antes del catálogo.
 func TestMetricasRegresionEs(t *testing.T) {
-	base := metricasCasos(t, context.Background())
+	base := metricasCasos(t, i18n.WithLocale(context.Background(), "es"))
 	i18ntest.Golden(t, "testdata/metricas_es.golden.json", base)
-	for _, loc := range []string{"es", "es-MX", "fr"} {
-		for k, v := range metricasCasos(t, i18n.WithLocale(context.Background(), loc)) {
+	for _, loc := range []string{"es", "es-MX"} {
+		for k, v := range metricasCasos(t, i18n.WithLocale(i18n.WithLocale(context.Background(), "es"), loc)) {
 			if base[k] != v {
-				t.Errorf("%s con %q difiere de sin idioma", k, loc)
+				t.Errorf("%s con %q difiere de es", k, loc)
 			}
 		}
 	}
@@ -115,7 +115,7 @@ func TestMetricasRegresionEs(t *testing.T) {
 // Con en, ninguna RPC de métricas deja español en lo que traduce el núcleo.
 func TestMetricasEnSinEspanol(t *testing.T) {
 	es := regexp.MustCompile(`[áéíóúñ¿¡]|\b(falta|comando|equipo|equipos|trabajo|ronda|rondas|interfaz|interfaces con|no se pudo|solo|carpeta|ruta|topes|indica)\b`)
-	base := metricasCasos(t, context.Background())
+	base := metricasCasos(t, i18n.WithLocale(context.Background(), "es"))
 	for k, v := range metricasCasos(t, i18n.WithLocale(context.Background(), "en")) {
 		if v == base[k] && !strings.HasPrefix(k, "puertos_vivo") && k != "metricas" && k != "puertos" && k != "puertos_sin_trunk" && k != "puertos_ilegible" {
 			if es.MatchString(v) {

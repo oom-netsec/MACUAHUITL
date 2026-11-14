@@ -97,7 +97,7 @@ func (s *securitySvc) RadiusTest(ctx context.Context, r *v1.RadiusTestRequest) (
 	id := service.RunID("radius")
 	defer s.d.Guard().Revoke(id)
 	if err := s.d.Guard().Allow(ctx, id, []string{r.Host}); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	cfg := radiustest.Config{Host: r.Host, AuthPort: auth, AcctPort: acct, Secret: secret, Username: user, Password: pw, Method: r.Method,
 		NASIP: r.NasIp, NASIdentifier: r.NasIdentifier, NASPortType: r.NasPortType, ServiceType: r.ServiceType,
@@ -107,7 +107,7 @@ func (s *securitySvc) RadiusTest(ctx context.Context, r *v1.RadiusTestRequest) (
 		id, auth, acct, r.Method, user, origin(r.SharedSecret), origin(r.Password), r.StatusServer, r.Accounting))
 	rep, err := radiustest.Run(ctx, radiustest.Dialer(s.d.Guard().DialerFor(id)), cfg)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	var res []string
 	for _, e := range rep.Exchanges {
@@ -144,14 +144,14 @@ func (s *securitySvc) TacacsTest(ctx context.Context, r *v1.TacacsTestRequest) (
 	id := service.RunID("tacacs")
 	defer s.d.Guard().Revoke(id)
 	if err := s.d.Guard().Allow(ctx, id, []string{r.Host}); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	s.d.Audit("security.tacacs", r.Host, fmt.Sprintf("run=%s port=%d type=%s user=%q secret=%s password=%s command=%q accounting=%t",
 		id, port, r.AuthenType, user, origin(r.SharedSecret), origin(r.Password), r.Command, r.Accounting))
 	rep, err := tacacstest.Run(ctx, tacacstest.Dialer(s.d.Guard().DialerFor(id)), tacacstest.Config{Host: r.Host, Port: port, Secret: secret,
 		Username: user, Password: pw, AuthenType: r.AuthenType, PrivLvl: int(r.PrivLvl), Command: r.Command, Accounting: r.Accounting, Timeout: service.MS(r.TimeoutMs, 0)})
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	var res []string
 	for _, st := range rep.Steps {
@@ -170,9 +170,9 @@ func pkiErr(ctx context.Context, err error) error {
 	case errors.Is(err, vault.ErrWrongPassword):
 		return service.Err(ctx, codes.PermissionDenied, "security.err.key_password", nil)
 	case errors.Is(err, vault.ErrWeakParams):
-		return status.Error(codes.Internal, err.Error())
+		return service.ErrFrom(ctx, codes.Internal, err)
 	}
-	return status.Error(codes.InvalidArgument, err.Error())
+	return service.ErrFrom(ctx, codes.InvalidArgument, err)
 }
 
 func (s *securitySvc) newSealedKey(ctx context.Context, alg string, pw []byte) (crypto.Signer, string, error) {

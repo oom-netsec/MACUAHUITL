@@ -105,7 +105,7 @@ test("un archivo sin filas válidas no se puede aplicar", async () => {
 });
 
 test("en inglés no aparece ningún texto del núcleo en español: errores por línea, avisos y ejemplos", async () => {
-  localStorage.setItem("macuahuitl.idioma", "en");
+  localStorage.setItem("macuahuitl.lang", "en");
   setup();
   await userEvent.click(screen.getByRole("button", { name: /^Show details/ }));
   const dialog = await screen.findByRole("dialog", { name: "Details · Hosts" });
@@ -135,7 +135,7 @@ test("un aviso desconocido del núcleo sale tal cual en español y como aviso ge
   await userEvent.click(screen.getByRole("button", { name: "Importar…" }));
   expect(await screen.findByText("algo raro pasó con el archivo")).toBeVisible();
   unmount();
-  localStorage.setItem("macuahuitl.idioma", "en");
+  localStorage.setItem("macuahuitl.lang", "en");
   render(<I18nProvider><HostsDataCard core={fakeCore({ ...fakeInventory(), pickPath: vi.fn(async () => "/x.json"), previewHostsImport: vi.fn(async () => prev) })} /></I18nProvider>);
   await userEvent.click(screen.getByRole("button", { name: "Import…" }));
   expect(await screen.findByText("The core reported a warning for this file.")).toBeVisible();

@@ -52,7 +52,7 @@ type Deps interface {
 	// DiagLookPath resuelve binarios de diag; nil = exec.LookPath.
 	DiagLookPath() func(string) (string, error)
 	// Job devuelve la foto de un trabajo de Patrol, o NotFound.
-	Job(id string) (JobInfo, error)
+	Job(ctx context.Context, id string) (JobInfo, error) // ctx da el idioma del «trabajo no existe»
 	// Patrol y ValidateJob dejan a la ventana de cambio crear y armar trabajos como cualquier cliente.
 	Patrol() v1.PatrolServiceServer
 	ValidateJob(context.Context, *v1.JobSpec) error

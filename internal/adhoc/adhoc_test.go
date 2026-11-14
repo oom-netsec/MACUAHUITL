@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
@@ -103,5 +104,16 @@ func TestBuildSinSalidaNoMezclaElEstado(t *testing.T) {
 	r := Build(devs, []string{"show environment all"})
 	if r.Rows[0].Note != "sin salida (comando inválido en el equipo)" || r.Rows[1].Note != "sin salida (equipo failed)" {
 		t.Fatalf("notas = %q, %q", r.Rows[0].Note, r.Rows[1].Note)
+	}
+}
+
+// Fase 30e: el máximo de comandos es un error con código: es, el de siempre; en, en inglés.
+func TestMaximoDeComandosTieneCodigo(t *testing.T) {
+	_, err := Commands(strings.Repeat("show version\n", MaxCommands+1))
+	if err == nil || err.Error() != "adhoc: 51 comandos; el máximo es 50" {
+		t.Fatalf("es: %v", err)
+	}
+	if got := i18n.English(err); got != "adhoc: 51 commands; the maximum is 50" {
+		t.Fatalf("en: %q", got)
 	}
 }

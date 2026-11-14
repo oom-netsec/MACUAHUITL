@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
@@ -25,7 +26,7 @@ func Commands(text string) ([]string, error) {
 		return nil, err
 	}
 	if len(p.Commands) > MaxCommands {
-		return nil, fmt.Errorf("adhoc: %d comandos; el máximo es %d", len(p.Commands), MaxCommands)
+		return nil, i18n.New("adhoc.err.max", i18n.A("n", len(p.Commands), "max", MaxCommands))
 	}
 	out := make([]string, len(p.Commands))
 	for i, c := range p.Commands {

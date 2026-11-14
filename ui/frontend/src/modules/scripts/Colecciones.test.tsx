@@ -24,7 +24,7 @@ const crear = async (name: string) => {
   await userEvent.click(screen.getByRole("button", { name: "Guardar colección" }));
   await waitFor(() => expect(screen.getByRole("button", { name: `Abrir ${name}` })).toBeInTheDocument());
 };
-beforeEach(() => localStorage.setItem("macuahuitl.idioma", "es"));
+beforeEach(() => localStorage.setItem("macuahuitl.lang", "es"));
 
 describe("colecciones: alta, edición, borrado y orden", () => {
   test("favoritos va primero y es fija; crear una colección la deja al final y llama a saveCollection sin id", async () => {
@@ -234,7 +234,7 @@ describe("exportar e importar colecciones", () => {
   });
 
   test("en inglés los avisos y los estados salen en inglés, sin español", async () => {
-    localStorage.setItem("macuahuitl.idioma", "en");
+    localStorage.setItem("macuahuitl.lang", "en");
     setup({ pickPath: vi.fn(async () => "/x.json"), previewCollectionsImport: vi.fn(async () => ({ ...sampleCollectionsImport, warnings: ["archivo sin suma de verificación", ...sampleCollectionsImport.warnings] })) });
     await userEvent.click(screen.getByRole("tab", { name: "Collections" }));
     await userEvent.click(screen.getByRole("button", { name: "Import…" }));
@@ -262,7 +262,7 @@ describe("revisión: avisos, datos, límite, foco y favoritos", () => {
   const onlyNew = (warnings: string[]) => vi.fn(async () => ({ ...sampleCollectionsImport, collections: [sampleCollectionsImport.collections[0]], warnings }));
 
   test("en inglés, los tres avisos del núcleo (vista previa «se omitirá» y resultado «se omitió»/«no se importó») salen traducidos", async () => {
-    localStorage.setItem("macuahuitl.idioma", "en");
+    localStorage.setItem("macuahuitl.lang", "en");
     setup({ pickPath: vi.fn(async () => "/x.json"), previewCollectionsImport: onlyNew([WARN_NEXT]), applyCollectionsImport: vi.fn(async () => result([WARN_DONE, WARN_DROP])) });
     await userEvent.click(screen.getByRole("tab", { name: "Collections" }));
     await userEvent.click(screen.getByRole("button", { name: "Import…" }));
@@ -314,7 +314,7 @@ describe("revisión: avisos, datos, límite, foco y favoritos", () => {
   });
 
   test("el límite de fijados se reconoce por el código FailedPrecondition del mensaje crudo, sin depender de la palabra «fijados»", async () => {
-    localStorage.setItem("macuahuitl.idioma", "en");
+    localStorage.setItem("macuahuitl.lang", "en");
     setup({ setScriptPinned: vi.fn(async () => { throw new Error("rpc error: code = FailedPrecondition desc = limit reached"); }) });
     await userEvent.click(await screen.findByRole("button", { name: `Pin to the terminal: ${STP.name}` }));
     expect(await screen.findByText("There are already 5 pinned scripts, the maximum. Unpin one before pinning another.")).toBeInTheDocument();
@@ -364,7 +364,7 @@ describe("revisión: avisos, datos, límite, foco y favoritos", () => {
   });
 
   test("en inglés, editar favoritos muestra «Favorites» y al guardar manda el nombre del núcleo sin renombrar", async () => {
-    localStorage.setItem("macuahuitl.idioma", "en");
+    localStorage.setItem("macuahuitl.lang", "en");
     const { core } = setup();
     await userEvent.click(screen.getByRole("tab", { name: "Collections" }));
     await userEvent.click(await screen.findByRole("button", { name: "Open Favorites" }));

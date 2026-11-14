@@ -1,0 +1,14 @@
+{
+ "corto": "paquete truncado",
+ "exportadores": "límite de 0 exportadores alcanzado; se ignora 10.0.0.1",
+ "global": "límite global de 0 plantillas alcanzado; se ignora la de 10.0.0.1",
+ "por-exportador": "límite de 0 plantillas para 10.0.0.1",
+ "sflow-agente": "sflow: tipo de dirección de agente desconocido",
+ "sflow-truncado": "sflow: paquete truncado",
+ "ultimo-error": "10.0.0.1: versión 7 no soportada (NetFlow v5/v9, IPFIX, sFlow v5)",
+ "v5-registros": "v5: 31 registros no caben en 120 bytes",
+ "v5-truncado": "paquete truncado",
+ "v9-set": "set 1 con largo 1 inválido",
+ "v9-sin-plantilla": "1 sets de datos sin plantilla (aún no llega del exportador)",
+ "version": "versión 7 no soportada (NetFlow v5/v9, IPFIX, sFlow v5)"
+}

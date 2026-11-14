@@ -157,12 +157,12 @@ func okExpr(info *types.Info, e ast.Expr, safe map[types.Object]bool, multi bool
 		}
 	}
 	recv, name := calleeName(e)
-	return recv == "" && (name == "wrapErr" || name == "call") || (recv == "b" && name != "" && (name[0] >= 'A' && name[0] <= 'Z' || internos[name]))
+	return recv == "" && (name == "wrapErr" || name == "call") || (recv == "b" && name == "bridgeErr") || (recv == "b" && name != "" && (name[0] >= 'A' && name[0] <= 'Z' || internos[name]))
 }
 
 func wraps(e ast.Expr) bool {
 	recv, n := calleeName(e)
-	return e != nil && recv == "" && (n == "call" || n == "wrapErr")
+	return e != nil && (recv == "" && (n == "call" || n == "wrapErr") || recv == "b" && n == "bridgeErr")
 }
 
 // safeVars son las variables cuyas asignaciones, todas (también en cierres), vienen de call(...) o wrapErr(...). La

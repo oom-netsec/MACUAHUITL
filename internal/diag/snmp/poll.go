@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Perfiles de sondeo: OIDs útiles en un caso TAC.
@@ -71,6 +72,7 @@ type Sample struct {
 	CPU        []CPUStat         `json:",omitempty"`
 	Memory     []MemStat         `json:",omitempty"`
 	Errors     []string          `json:",omitempty"` // un perfil que falla no detiene a los demás
+	ErrorTexts []i18n.Text       `json:"-"`          // Errors como textos, para darlos en otro idioma
 }
 
 // rate calcula bits/s entre dos lecturas de un contador de octetos. No adivina:
@@ -250,7 +252,7 @@ func Poll(ctx context.Context, t Target, profiles []string, interval time.Durati
 	want := map[string]bool{}
 	for _, p := range profiles {
 		if !contains(Profiles, p) {
-			return fmt.Errorf("%w: perfil %q desconocido (%s)", ErrInvalid, p, strings.Join(Profiles, ", "))
+			return i18n.Wrap("snmp.err.profile", ErrInvalid, i18n.A("profile", p, "profiles", strings.Join(Profiles, ", ")))
 		}
 		want[p] = true
 	}
@@ -277,7 +279,8 @@ func Poll(ctx context.Context, t Target, profiles []string, interval time.Durati
 		s := Sample{Time: time.Now()}
 		note := func(p string, err error) {
 			if err != nil {
-				s.Errors = append(s.Errors, fmt.Sprintf("%s: %v", p, err))
+				t := i18n.Join(": ", i18n.Lit(p, p), i18n.FromErr(err))
+				s.Errors, s.ErrorTexts = append(s.Errors, t.In(i18n.Es)), append(s.ErrorTexts, t)
 			}
 		}
 		if want["sistema"] {
@@ -311,10 +314,16 @@ func Poll(ctx context.Context, t Target, profiles []string, interval time.Durati
 	return nil
 }
 
+// Localize da los errores de la muestra en el idioma pedido.
+func (s Sample) Localize(loc string) Sample {
+	s.Errors = i18n.Notes(loc, s.Errors, s.ErrorTexts)
+	return s
+}
+
 func rates(prev, cur *Sample) {
 	dt := cur.Time.Sub(prev.Time).Seconds()
 	if prev.Uptime > 0 && cur.Uptime > 0 && (cur.Uptime < prev.Uptime || float64(cur.Uptime)/100 < dt) {
-		cur.Errors = append(cur.Errors, "tasas omitidas: el equipo se reinició entre muestras (sysUpTime bajó)")
+		i18n.Note(&cur.Errors, &cur.ErrorTexts, "snmp.poll.rates_skipped")
 		return
 	}
 	old := map[string]IfStat{}

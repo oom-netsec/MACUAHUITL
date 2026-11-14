@@ -1,0 +1,5 @@
+{
+ "md5": "imgverify: el MD5 esperado debe tener 32 dígitos hexadecimales",
+ "ruta": "imgverify: la ruta debe ser absoluta",
+ "sha": "imgverify: el SHA-512 esperado debe tener 128 dígitos hexadecimales"
+}

@@ -6,11 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 const (
@@ -92,6 +93,7 @@ func marshalHosts(hosts []FileHost, now time.Time, conSuma bool) ([]byte, error)
 type LineError struct {
 	Line          int
 	Field, Reason string
+	Err           error // el motivo con código del catálogo (Reason es su texto en es); nil si viene de la biblioteca
 }
 
 // Parsed es un archivo de import leído: los hosts válidos (canónicos), los errores por fila y si el JSON
@@ -114,17 +116,17 @@ func validateRows(rows []row) (ok []FileHost, errs []LineError) {
 	for _, r := range rows {
 		h, err := Clean(r.h.Host())
 		if err == nil && (utf8.RuneCountInString(r.h.CredentialLabel) > MaxLabel || hasControl(r.h.CredentialLabel, false)) {
-			err = fe("credential_label", "la etiqueta de credencial pasa de %d caracteres o trae caracteres de control", MaxLabel)
+			err = fe("credential_label", "hostfield.label", "max", MaxLabel)
 		}
 		if err == nil {
 			if l, dup := nombres[NameKey(h.Name)]; dup {
-				err = fe("name", "el nombre ya está en la fila %d", l)
+				err = fe("name", "hostfield.name_dup_row", "row", l)
 			} else if l, dup := claves[Key(h)]; dup {
-				err = fe("address", "%s ya está en la fila %d", Key(h), l)
+				err = fe("address", "hostfield.addr_dup_row", "key", Key(h), "row", l)
 			}
 		}
 		if err != nil {
-			le := LineError{Line: r.line, Reason: err.Error()}
+			le := LineError{Line: r.line, Reason: err.Error(), Err: err}
 			var f *FieldError
 			if errors.As(err, &f) {
 				le.Field = f.Field
@@ -143,7 +145,7 @@ func validateRows(rows []row) (ok []FileHost, errs []LineError) {
 func ParseHosts(b []byte) (Parsed, error) {
 	var out Parsed
 	if len(b) > MaxImportBytes {
-		return out, errors.New("el archivo pasa de 5 MB")
+		return out, i18n.New("hostfile.too_big", nil)
 	}
 	// Primero solo formato y versión, sin modo estricto: una versión futura puede traer campos que esta no conoce.
 	var cab struct {
@@ -151,32 +153,32 @@ func ParseHosts(b []byte) (Parsed, error) {
 		Version int    `json:"version"`
 	}
 	if err := json.NewDecoder(bytes.NewReader(b)).Decode(&cab); err != nil {
-		return out, fmt.Errorf("no es un archivo de hosts: %w", err)
+		return out, i18n.Wrap("hostfile.not_hosts", err, nil)
 	}
 	if cab.Formato != HostsFormato {
-		return out, fmt.Errorf("formato %q: se esperaba %q", cab.Formato, HostsFormato)
+		return out, i18n.New("hostfile.bad_format", i18n.A("got", cab.Formato, "want", HostsFormato))
 	}
 	if cab.Version != HostsVersion {
-		return out, fmt.Errorf("versión %d no soportada (solo la %d)", cab.Version, HostsVersion)
+		return out, i18n.New("hostfile.bad_version", i18n.A("got", cab.Version, "want", HostsVersion))
 	}
 	var a archivoHosts
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&a); err != nil {
-		return out, fmt.Errorf("no es un archivo de hosts: %w", err)
+		return out, i18n.Wrap("hostfile.not_hosts", err, nil)
 	}
 	if err := dec.Decode(&struct{}{}); err != io.EOF {
-		return out, errors.New("hay datos después del JSON del archivo")
+		return out, i18n.New("hostfile.trailing", nil)
 	}
 	var entradas []json.RawMessage
 	if len(a.Hosts) == 0 {
-		return out, errors.New("falta la lista «hosts»")
+		return out, i18n.New("hostfile.no_list", nil)
 	}
 	if err := json.Unmarshal(a.Hosts, &entradas); err != nil {
-		return out, fmt.Errorf("«hosts» no es una lista: %w", err)
+		return out, i18n.Wrap("hostfile.not_list", err, nil)
 	}
 	if len(entradas) > MaxImportHosts {
-		return out, fmt.Errorf("el archivo trae %d hosts; el tope es %d", len(entradas), MaxImportHosts)
+		return out, i18n.New("hostfile.too_many_hosts", i18n.A("n", len(entradas), "max", MaxImportHosts))
 	}
 	var rows []row
 	var malas []LineError
@@ -185,7 +187,7 @@ func ParseHosts(b []byte) (Parsed, error) {
 		d := json.NewDecoder(bytes.NewReader(raw))
 		d.DisallowUnknownFields()
 		if err := d.Decode(&h); err != nil {
-			malas = append(malas, LineError{Line: i + 1, Reason: "entrada ilegible: " + err.Error()})
+			malas = append(malas, lineErr(i+1, "", i18n.Wrap("hostfile.entry", err, nil)))
 			continue
 		}
 		rows = append(rows, row{i + 1, h})
@@ -198,7 +200,7 @@ func ParseHosts(b []byte) (Parsed, error) {
 			leidos[i] = r.h
 		}
 		if _, sum, err := sumaHosts(leidos); err != nil || len(malas) > 0 || !strings.EqualFold(sum, a.SHA256) {
-			return out, errors.New("la suma de verificación no coincide: el archivo está dañado o fue modificado")
+			return out, i18n.New("hostfile.checksum", nil)
 		}
 	}
 	rows2 := make([]row, len(rows))

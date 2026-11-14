@@ -11,7 +11,7 @@ import type { CorePrefsState } from "./api";
 const base: CorePrefsState = { outputsDir: "", rotateMb: 0, rotateMin: 0, maxFiles: 0, format: "", outputsDirEffective: sampleOutputsDefault, outputsDirDefault: sampleOutputsDefault, note: "" };
 const rpc = (m: string) => new Error(`rpc error: code = InvalidArgument desc = ${m}`);
 const view = (core = fakeCore(), lang = "es") => {
-  localStorage.setItem("macuahuitl.idioma", lang);
+  localStorage.setItem("macuahuitl.lang", lang);
   return render(<I18nProvider><CoreContext.Provider value={core}><StorageSection core={core} /></CoreContext.Provider></I18nProvider>);
 };
 const folder = () => screen.findByRole("textbox", { name: /Carpeta de salidas|Output folder/ });
@@ -185,7 +185,7 @@ describe("motivos de rechazo", () => {
 
 test("Ajustes → Datos: la tarjeta de la bóveda explica el respaldo y navega a la bóveda", async () => {
   const go = vi.fn();
-  localStorage.setItem("macuahuitl.idioma", "es");
+  localStorage.setItem("macuahuitl.lang", "es");
   render(<I18nProvider><NavContext.Provider value={{ go, inbox: {} }}><SettingsView core={fakeCore()} /></NavContext.Provider></I18nProvider>);
   expect(screen.getByText(/12 caracteres o más/)).toBeVisible();
   expect(screen.getByText(/Nunca forma parte de las exportaciones generales/)).toBeVisible();

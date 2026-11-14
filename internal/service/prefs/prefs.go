@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
@@ -67,11 +68,9 @@ func (s *prefsSvc) SetPreference(ctx context.Context, r *v1.SetPreferenceRequest
 	return &v1.SetPreferenceResponse{}, nil
 }
 
-const outputsNote = "El cambio aplica a lo que empiece después: los trabajos y escuchas en curso conservan la carpeta con que arrancaron. Los datos de la carpeta anterior no se mueven."
-
-func (s *prefsSvc) state(note string) *v1.CorePrefsState {
+func (s *prefsSvc) state(ctx context.Context, note string) *v1.CorePrefsState {
 	st := s.d.Settings()
-	note = strings.TrimSpace(note + " " + st.Issue())
+	note = strings.TrimSpace(note + " " + st.IssueIn(i18n.Locale(ctx)))
 	out, ing := st.Configured()
 	return &v1.CorePrefsState{
 		Prefs:               &v1.CorePrefs{OutputsDir: out, IngestDefaults: &v1.IngestDefaults{RotateMb: ing.RotateMB, RotateMinutes: ing.RotateMinutes, MaxFiles: ing.MaxFiles, Format: ing.Format}},
@@ -79,8 +78,8 @@ func (s *prefsSvc) state(note string) *v1.CorePrefsState {
 	}
 }
 
-func (s *prefsSvc) GetCorePrefs(context.Context, *v1.GetCorePrefsRequest) (*v1.GetCorePrefsResponse, error) {
-	return &v1.GetCorePrefsResponse{State: s.state("")}, nil
+func (s *prefsSvc) GetCorePrefs(ctx context.Context, _ *v1.GetCorePrefsRequest) (*v1.GetCorePrefsResponse, error) {
+	return &v1.GetCorePrefsResponse{State: s.state(ctx, "")}, nil
 }
 
 // SetCorePrefs reemplaza las preferencias del núcleo: lo que va en 0 o vacío vuelve al de fábrica.
@@ -94,15 +93,15 @@ func (s *prefsSvc) SetCorePrefs(ctx context.Context, r *v1.SetCorePrefsRequest) 
 	}
 	st := s.d.Settings()
 	oldOut, oldIng := st.Configured()
-	req, issue, issueAudit := r.GetPrefs().GetOutputsDir(), "", ""
+	req, issueAudit := r.GetPrefs().GetOutputsDir(), ""
+	var issue i18n.Text
 	out, err := service.CheckOutputs(req, st, true)
 	if err != nil {
 		if req == "" || req != oldOut {
-			return nil, err
+			return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 		}
 		// La carpeta no cambia pero ya no vale: el resto sí se guarda y el estado avisa (rige la de fábrica).
-		msg := status.Convert(err).Message()
-		out, issue, issueAudit = oldOut, service.OutputsIssue(oldOut, msg), service.OutputsIssueAudit(oldOut, msg)
+		out, issue, issueAudit = oldOut, service.OutputsIssue(oldOut, err), service.OutputsIssueAudit(oldOut, err)
 	}
 	var ch []string
 	diff := func(name, a, b string) {
@@ -118,17 +117,17 @@ func (s *prefsSvc) SetCorePrefs(ctx context.Context, r *v1.SetCorePrefsRequest) 
 	// La auditoría sigue a la carpeta y al código del motivo; el texto del aviso puede cambiar sin cambio de fondo
 	// (no_escribible trae el nombre temporal al azar) y entonces solo se pone al día la nota.
 	if st.IssueAudit() != issueAudit {
-		if issue != "" {
+		if !issue.Empty() {
 			ch = append(ch, issueAudit)
 		} else {
 			ch = append(ch, "outputs_dir_invalid=cleared")
 		}
 	}
 	if len(ch) == 0 {
-		if st.Issue() != issue {
+		if st.Issue() != issue.In(i18n.Es) {
 			st.Mark(issue, issueAudit)
 		}
-		return &v1.SetCorePrefsResponse{State: s.state("")}, nil
+		return &v1.SetCorePrefsResponse{State: s.state(ctx, "")}, nil
 	}
 	if err := service.SaveCoreSettings(s.d.DB(), s.d.Now(), out, ing); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -138,9 +137,9 @@ func (s *prefsSvc) SetCorePrefs(ctx context.Context, r *v1.SetCorePrefsRequest) 
 	s.d.Audit("prefs.core", "core", strings.Join(ch, " "))
 	note := ""
 	if oldOut != out {
-		note = outputsNote
+		note = i18n.T(ctx, "prefs.outputs.note", nil)
 	}
-	return &v1.SetCorePrefsResponse{State: s.state(note)}, nil
+	return &v1.SetCorePrefsResponse{State: s.state(ctx, note)}, nil
 }
 
 // cmpOutputs muestra la carpeta de fábrica cuando no hay una configurada, para que la auditoría diga rutas reales.

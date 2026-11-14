@@ -13,6 +13,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/devices"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
@@ -82,14 +83,14 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 	}
 	h, err := devices.Clean(hostFromPB(r.Device))
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	out := &v1.PutDeviceResponse{}
 	if h.CredentialID != "" {
 		infos, ok := s.creds()
 		switch {
 		case !ok:
-			out.Warnings = append(out.Warnings, "la bóveda está cerrada: la credencial se guardó sin validar")
+			out.Warnings = append(out.Warnings, i18n.T(ctx, "hosts.warn.vault_closed", nil))
 		case labelOf(infos, h.CredentialID) == "":
 			return nil, service.Err(ctx, codes.InvalidArgument, "hosts.err.no_credential", nil)
 		}
@@ -104,13 +105,13 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 		h.ID, h.CreatedAt, h.UpdatedAt = r.Device.Id, now, now
 		if h.ID == "" {
 			if len(all) >= devices.MaxHosts {
-				return status.Errorf(codes.ResourceExhausted, "la libreta llegó a %d hosts", devices.MaxHosts)
+				return service.Err(ctx, codes.ResourceExhausted, "hosts.err.full", i18n.A("max", devices.MaxHosts))
 			}
 			h.ID = devices.NewID()
 		} else {
 			old, err := getHost(tx, h.ID)
 			if errors.Is(err, sql.ErrNoRows) {
-				return status.Errorf(codes.NotFound, "no hay un host de la libreta con id %q", h.ID)
+				return service.Err(ctx, codes.NotFound, "hosts.err.no_id", i18n.A("id", h.ID))
 			}
 			if err != nil {
 				return internal(err)
@@ -121,9 +122,9 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 			switch {
 			case o.ID == h.ID:
 			case devices.NameKey(o.Name) == devices.NameKey(h.Name):
-				return status.Errorf(codes.AlreadyExists, "ya hay un host llamado %q", o.Name)
+				return service.Err(ctx, codes.AlreadyExists, "hosts.err.dup_name", i18n.A("name", o.Name))
 			case devices.Key(o) == devices.Key(h):
-				return status.Errorf(codes.AlreadyExists, "%q ya está en la libreta como %q", devices.Key(h), o.Name)
+				return service.Err(ctx, codes.AlreadyExists, "hosts.err.dup_target", i18n.A("key", devices.Key(h), "name", o.Name))
 			}
 		}
 		if err := putHost(tx, h); err != nil {
@@ -140,13 +141,13 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 }
 
 // DeleteDevice borra un host de la libreta; la evidencia de las otras fuentes no se toca.
-func (s *svc) DeleteDevice(_ context.Context, r *v1.DeleteDeviceRequest) (*v1.DeleteDeviceResponse, error) {
+func (s *svc) DeleteDevice(ctx context.Context, r *v1.DeleteDeviceRequest) (*v1.DeleteDeviceResponse, error) {
 	s.d.MarkActive()
 	var h devices.Host
 	err := s.tx(func(tx *sql.Tx) error {
 		var err error
 		if h, err = getHost(tx, r.Id); errors.Is(err, sql.ErrNoRows) {
-			return status.Errorf(codes.NotFound, "no hay un host de la libreta con id %q", r.Id)
+			return service.Err(ctx, codes.NotFound, "hosts.err.no_id", i18n.A("id", r.Id))
 		} else if err != nil {
 			return internal(err)
 		}

@@ -71,7 +71,7 @@ func parseVlanLine(line string) (verb, arg string, err error) {
 		a := f[len(f)-1]
 		id, e := strconv.Atoi(a)
 		if e != nil || ntoa(id) != a {
-			return "", "", errors.New("VLAN no numérica")
+			return "", "", lerr("VLAN no numérica", "non-numeric VLAN")
 		}
 		if e = vlanIDOK(id); e != nil {
 			return "", "", e
@@ -80,11 +80,11 @@ func parseVlanLine(line string) (verb, arg string, err error) {
 	case len(f) == 2 && f[0] == "name":
 		n := strings.Fields(line)[1] // el nombre conserva las mayúsculas
 		if !vlanNameRe.MatchString(n) {
-			return "", "", errors.New("nombre de VLAN inválido (letras, números, _ . -; hasta 32)")
+			return "", "", lerr("nombre de VLAN inválido (letras, números, _ . -; hasta 32)", "invalid VLAN name (letters, numbers, _ . -; up to 32)")
 		}
 		return "name", n, nil
 	}
-	return "", "", errors.New("no reconocida")
+	return "", "", lerr("no reconocida", "not recognized")
 }
 
 // SnippetVlan crea, nombra o borra una VLAN; al crear, la reversa borra solo la que el snippet creó; al borrar, la recrea con su nombre.
@@ -107,21 +107,21 @@ var SnippetVlan = Function{
 				applyID = arg
 			case i == 1 && verb == "name" && len(d.Apply) == 2:
 			default:
-				return errors.New("el apply de una VLAN es `vlan N` y, si se nombra, `name X`")
+				return lerr("el apply de una VLAN es `vlan N` y, si se nombra, `name X`", "the apply of a VLAN is `vlan N` and, if it is named, `name X`")
 			}
 		}
 		if applyID == "" {
-			return errors.New("el apply no empieza con `vlan N`")
+			return lerr("el apply no empieza con `vlan N`", "the apply does not start with `vlan N`")
 		}
 		verb, arg, _ := parseVlanLine(strings.Join(d.Rollback[:min(1, len(d.Rollback))], ""))
 		switch {
 		case verb == "no vlan" && len(d.Rollback) == 1 && arg == applyID: // borra exactamente la VLAN creada
 		case verb == "vlan" && len(d.Rollback) == 2 && arg == applyID:
 			if v2, _, _ := parseVlanLine(d.Rollback[1]); v2 != "name" {
-				return errors.New("la reversa que conserva la VLAN restaura su nombre")
+				return lerr("la reversa que conserva la VLAN restaura su nombre", "the rollback that keeps the VLAN restores its name")
 			}
 		default:
-			return fmt.Errorf("la reversa debe borrar solo la VLAN %s o restaurar su nombre", applyID)
+			return lerr("la reversa debe borrar solo la VLAN %s o restaurar su nombre", "the rollback must delete only VLAN %s or restore its name", applyID)
 		}
 		return nil
 	},
@@ -131,14 +131,14 @@ var SnippetVlan = Function{
 // tenía) y una verificación de que dejó de existir.
 func checkVlanDelete(d DevicePlan, id string) error {
 	if len(d.Apply) != 1 || len(d.Rollback) == 0 {
-		return errors.New("el apply de un borrado es solo `no vlan N`")
+		return lerr("el apply de un borrado es solo `no vlan N`", "the apply of a deletion is only `no vlan N`")
 	}
 	if v, a, _ := parseVlanLine(d.Rollback[0]); v != "vlan" || a != id || len(d.Rollback) > 2 {
-		return fmt.Errorf("la reversa de borrar la VLAN %s es recrearla con `vlan %s` y su nombre", id, id)
+		return lerr("la reversa de borrar la VLAN %s es recrearla con `vlan %s` y su nombre", "the rollback of deleting VLAN %s is to recreate it with `vlan %s` and its name", id, id)
 	}
 	if len(d.Rollback) == 2 {
 		if v, _, _ := parseVlanLine(d.Rollback[1]); v != "name" {
-			return errors.New("la reversa que recrea la VLAN solo restaura su nombre")
+			return lerr("la reversa que recrea la VLAN solo restaura su nombre", "the rollback that recreates the VLAN only restores its name")
 		}
 	}
 	for _, e := range d.Expect {
@@ -146,7 +146,7 @@ func checkVlanDelete(d DevicePlan, id string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("borrar la VLAN %s exige verificar que ya no existe", id)
+	return lerr("borrar la VLAN %s exige verificar que ya no existe", "deleting VLAN %s requires verifying that it no longer exists", id)
 }
 
 // VlanChange: crear la VLAN ID, ponerle Name si ya existe, o borrarla (Remove, sin Name). AcceptVTP acepta que se propague por VTP.
@@ -163,10 +163,10 @@ func (c VlanChange) check() error {
 		return err
 	}
 	if c.Remove && c.Name != "" {
-		return errors.New("--remove no lleva nombre: borra la VLAN completa")
+		return lerr("--remove no lleva nombre: borra la VLAN completa", "--remove takes no name: it deletes the whole VLAN")
 	}
 	if c.Name != "" && !vlanNameRe.MatchString(c.Name) {
-		return errors.New("nombre de VLAN inválido (letras, números, _ . -; hasta 32; sin espacios)")
+		return lerr("nombre de VLAN inválido (letras, números, _ . -; hasta 32; sin espacios)", "invalid VLAN name (letters, numbers, _ . -; up to 32; no spaces)")
 	}
 	return nil
 }
@@ -328,11 +328,11 @@ func ValidTrunkInterface(n string) bool { return ValidInterface(n) || poRe.Match
 func trunkLine(line string) (op string, vlan int, err error) {
 	f := strings.Fields(strings.ToLower(line))
 	if len(f) != 6 || (f[4] != "add" && f[4] != "remove") {
-		return "", 0, errors.New("solo `switchport trunk allowed vlan add N` o `remove N` (una VLAN); la forma sin add/remove reemplaza la lista y está prohibida")
+		return "", 0, lerr("solo `switchport trunk allowed vlan add N` o `remove N` (una VLAN); la forma sin add/remove reemplaza la lista y está prohibida", "only `switchport trunk allowed vlan add N` or `remove N` (one VLAN); the form without add/remove replaces the list and is forbidden")
 	}
 	n, e := strconv.Atoi(f[5])
 	if e != nil || ntoa(n) != f[5] || n < 1 || n > 4094 {
-		return "", 0, fmt.Errorf("VLAN %q fuera de 1-4094 (una sola, sin listas ni rangos)", f[5])
+		return "", 0, lerr("VLAN %q fuera de 1-4094 (una sola, sin listas ni rangos)", "VLAN %q outside 1-4094 (a single one, no lists or ranges)", f[5])
 	}
 	return f[4], n, nil
 }
@@ -345,7 +345,7 @@ var SnippetTrunk = Function{
 		f := strings.Fields(line)
 		if strings.EqualFold(f[0], "interface") {
 			if len(f) != 2 || !ValidTrunkInterface(f[1]) {
-				return errors.New("solo un puerto físico o un Port-channel")
+				return lerr("solo un puerto físico o un Port-channel", "only a physical port or a Port-channel")
 			}
 			return nil
 		}
@@ -354,18 +354,18 @@ var SnippetTrunk = Function{
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) != 2 || len(d.Rollback) != 2 {
-			return errors.New("el apply y la reversa son una interfaz y una sola línea de trunk")
+			return lerr("el apply y la reversa son una interfaz y una sola línea de trunk", "the apply and the rollback are one interface and a single trunk line")
 		}
 		if !strings.EqualFold(d.Apply[0], d.Rollback[0]) || !strings.HasPrefix(strings.ToLower(d.Apply[0]), "interface ") {
-			return errors.New("el apply y la reversa deben ser sobre la misma interfaz")
+			return lerr("el apply y la reversa deben ser sobre la misma interfaz", "the apply and the rollback must be on the same interface")
 		}
 		op1, v1, err1 := trunkLine(d.Apply[1])
 		op2, v2, err2 := trunkLine(d.Rollback[1])
 		switch {
 		case err1 != nil || err2 != nil:
-			return errors.New("el apply y la reversa llevan una línea add/remove")
+			return lerr("el apply y la reversa llevan una línea add/remove", "the apply and the rollback carry an add/remove line")
 		case v1 != v2 || op1 == op2:
-			return errors.New("la reversa debe ser la operación inversa sobre la misma VLAN")
+			return lerr("la reversa debe ser la operación inversa sobre la misma VLAN", "the rollback must be the inverse operation on the same VLAN")
 		}
 		return nil
 	},
@@ -380,11 +380,11 @@ type TrunkChange struct {
 func (c TrunkChange) check() error {
 	switch {
 	case !ValidTrunkInterface(c.Interface):
-		return fmt.Errorf("%q no es un puerto físico ni un Port-channel", c.Interface)
+		return lerr("%q no es un puerto físico ni un Port-channel", "%q is neither a physical port nor a Port-channel", c.Interface)
 	case c.Op != "add" && c.Op != "remove":
-		return errors.New("la operación es add o remove (nunca reemplazar la lista)")
+		return lerr("la operación es add o remove (nunca reemplazar la lista)", "the operation is add or remove (never replace the list)")
 	case c.Vlan < 1 || c.Vlan > 4094:
-		return fmt.Errorf("VLAN %d fuera de 1-4094", c.Vlan)
+		return lerr("VLAN %d fuera de 1-4094", "VLAN %d outside 1-4094", c.Vlan)
 	}
 	return nil
 }
@@ -578,7 +578,7 @@ type SVIChange struct {
 
 func (c SVIChange) check() error {
 	if c.VlanID < 1 || c.VlanID > 4094 {
-		return fmt.Errorf("VLAN %d fuera de 1-4094", c.VlanID)
+		return lerr("VLAN %d fuera de 1-4094", "VLAN %d outside 1-4094", c.VlanID)
 	}
 	if err := checkAddress(c.Address, c.Mask); err != nil {
 		return err

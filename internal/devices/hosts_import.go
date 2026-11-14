@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Estados de un host del archivo frente a los guardados.
@@ -102,7 +104,7 @@ func Apply(items []Item, dec map[string]string, guardados []Host, ahora time.Tim
 	}
 	if len(sobran) > 0 {
 		sort.Strings(sobran)
-		return r, fmt.Errorf("decisión para destinos que no están en el archivo: %s", strings.Join(sobran, ", "))
+		return r, i18n.New("hostimport.extra_keys", i18n.A("keys", strings.Join(sobran, ", ")))
 	}
 	porID, nombres, claves := map[string]Host{}, map[string]string{}, map[string]string{} // clave -> ID
 	for _, g := range guardados {
@@ -113,20 +115,20 @@ func Apply(items []Item, dec map[string]string, guardados []Host, ahora time.Tim
 		k := Key(it.Host)
 		d, hay := dec[k]
 		if hay && d != Renombrar && d != Reemplazar && d != Omitir {
-			return r, fmt.Errorf("decisión %q desconocida para %s", d, k)
+			return r, i18n.New("hostimport.unknown", i18n.A("action", d, "key", k))
 		}
 		if !hay && it.Estado == Conflicto {
 			faltan = append(faltan, k)
 		}
 		if hay && it.Estado != Conflicto && d != Omitir {
-			return r, fmt.Errorf("%s es %q: solo se puede omitir", k, it.Estado)
+			return r, i18n.New("hostimport.only_skip", i18n.A("key", k, "state", it.Estado))
 		}
 		if hay && d == Renombrar && it.Motivo == MotivoDireccion {
-			return r, fmt.Errorf("%s ya existe con otros datos: solo se puede reemplazar u omitir (renombrar dejaría dos hosts en el mismo destino)", k)
+			return r, i18n.New("hostimport.no_rename", i18n.A("key", k))
 		}
 	}
 	if len(faltan) > 0 {
-		return r, fmt.Errorf("falta la decisión de %d conflicto(s): %s", len(faltan), strings.Join(faltan, ", "))
+		return r, i18n.New("hostimport.missing", i18n.A("n", len(faltan), "keys", strings.Join(faltan, ", ")))
 	}
 	reemplazados := map[string]bool{}
 	for _, it := range items {
@@ -140,14 +142,14 @@ func Apply(items []Item, dec map[string]string, guardados []Host, ahora time.Tim
 		case d == Reemplazar:
 			old := porID[it.Con]
 			if reemplazados[old.ID] {
-				return r, fmt.Errorf("dos decisiones reemplazan el mismo host guardado (%s)", old.Name)
+				return r, i18n.New("hostimport.twice", i18n.A("name", old.Name))
 			}
 			reemplazados[old.ID] = true
 			if id, ok := nombres[NameKey(x.Name)]; ok && id != old.ID {
-				return r, fmt.Errorf("reemplazar %s dejaría dos hosts con el nombre %q", old.Name, x.Name)
+				return r, i18n.New("hostimport.dup_name", i18n.A("old", old.Name, "name", x.Name))
 			}
 			if id, ok := claves[Key(x)]; ok && id != old.ID {
-				return r, fmt.Errorf("reemplazar %s dejaría dos hosts en %s", old.Name, Key(x))
+				return r, i18n.New("hostimport.dup_target", i18n.A("old", old.Name, "key", Key(x)))
 			}
 			delete(nombres, NameKey(old.Name))
 			delete(claves, Key(old))
@@ -160,15 +162,15 @@ func Apply(items []Item, dec map[string]string, guardados []Host, ahora time.Tim
 		default: // nuevo
 			x.ID = NewID()
 			if _, ok := nombres[NameKey(x.Name)]; ok {
-				return r, fmt.Errorf("el nombre %q ya existe", x.Name)
+				return r, i18n.New("hostimport.name_exists", i18n.A("name", x.Name))
 			}
 			r.Created++
 		}
 		if _, ok := claves[Key(x)]; ok && d != Reemplazar {
-			return r, fmt.Errorf("%s ya existe", Key(x))
+			return r, i18n.New("hostimport.key_exists", i18n.A("key", Key(x)))
 		}
 		if len(porID)+r.Created+r.Renamed > MaxHosts {
-			return r, fmt.Errorf("la libreta pasaría de %d hosts", MaxHosts)
+			return r, i18n.New("hostimport.over_max", i18n.A("max", MaxHosts))
 		}
 		nombres[NameKey(x.Name)], claves[Key(x)] = x.ID, x.ID
 		r.Writes = append(r.Writes, x)

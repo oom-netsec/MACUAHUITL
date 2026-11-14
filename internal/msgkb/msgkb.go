@@ -6,7 +6,6 @@ package msgkb
 
 import (
 	"embed"
-	"errors"
 	"fmt"
 	"io/fs"
 	"regexp"
@@ -81,24 +80,24 @@ var idRe = regexp.MustCompile(`^%[A-Z0-9_]+(?:-(?:[0-7]|\*)(?:-[A-Z0-9_*]+)?|-\*
 func Load(data []byte) (*KB, error) {
 	var es []Entry
 	if err := yaml.Unmarshal(data, &es); err != nil {
-		return nil, fmt.Errorf("msgkb: %w", err)
+		return nil, i18n.Wrap("msgkb.err.yaml", err, nil)
 	}
 	seen := map[string]bool{}
 	for i := range es {
 		e := &es[i]
 		if !idRe.MatchString(e.ID) {
-			return nil, fmt.Errorf("msgkb: ID inválido %q", e.ID)
+			return nil, i18n.New("msgkb.err.bad_id", i18n.A("id", e.ID))
 		}
 		if seen[e.ID] {
-			return nil, fmt.Errorf("msgkb: ID repetido %s", e.ID)
+			return nil, i18n.New("msgkb.err.dup_id", i18n.A("id", e.ID))
 		}
 		seen[e.ID] = true
 		if e.Meaning == "" || e.Cause == "" || e.Action == "" || len(e.Verify) == 0 {
-			return nil, fmt.Errorf("msgkb: %s: faltan significado, causa, acción o verificación", e.ID)
+			return nil, i18n.New("msgkb.err.fields", i18n.A("id", e.ID))
 		}
 		for _, c := range e.Verify {
 			if err := playbook.CheckDenied("ios", c); err != nil {
-				return nil, fmt.Errorf("msgkb: %s: %w", e.ID, err)
+				return nil, i18n.Wrap("msgkb.err.verify", err, i18n.A("id", e.ID))
 			}
 		}
 		e.Severity, e.Source = -1, source
@@ -122,7 +121,7 @@ func Default() (*KB, error) {
 		var all []byte
 		names, err := fs.Glob(kbFS, "kb/*.yaml")
 		if err != nil || len(names) == 0 {
-			defErr = errors.New("msgkb: la base incrustada está vacía")
+			defErr = i18n.New("msgkb.err.empty_kb", nil)
 			return
 		}
 		sort.Strings(names)

@@ -2,11 +2,11 @@ package bridge
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 )
 
@@ -23,7 +23,7 @@ func source(credID, value string) *v1.SecretSource {
 
 func port(p int) (uint32, error) {
 	if p < 0 || p > 65535 {
-		return 0, fmt.Errorf("puerto %d inválido", p)
+		return 0, i18n.New("bridge.err.port", i18n.A("port", p))
 	}
 	return uint32(p), nil
 }
@@ -51,11 +51,11 @@ type RadiusDTO struct {
 func (b *Bridge) SecRadius(d RadiusDTO) (string, error) {
 	ap, err := port(d.AuthPort)
 	if err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	cp, err := port(d.AcctPort)
 	if err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewSecurityServiceClient(c).RadiusTest(ctx, &v1.RadiusTestRequest{Host: d.Host, AuthPort: ap, AcctPort: cp,
@@ -82,7 +82,7 @@ type TacacsDTO struct {
 func (b *Bridge) SecTacacs(d TacacsDTO) (string, error) {
 	p, err := port(d.Port)
 	if err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewSecurityServiceClient(c).TacacsTest(ctx, &v1.TacacsTestRequest{Host: d.Host, Port: p, SharedSecret: source(d.SecretCredID, d.Secret),
@@ -167,7 +167,7 @@ type ExportDTO struct {
 // una descarga confiable para binarios como PKCS#12.
 func (b *Bridge) SecPkiExport(d ExportDTO) (string, error) {
 	if !filepath.IsAbs(d.Path) {
-		return "", wrapErr(fmt.Errorf("la ruta de salida debe ser absoluta"))
+		return "", b.bridgeErr(i18n.New("bridge.err.out_abs", nil))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewSecurityServiceClient(c).PkiExport(ctx, &v1.PkiExportRequest{Format: d.Format, CertPem: d.Cert, ChainPem: d.Chain,

@@ -16,9 +16,11 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-var ErrNotInstalled = errors.New("diag: herramienta no instalada")
+var ErrNotInstalled error = i18n.New("diag.err.not_installed", nil)
 
 var packages = map[string]string{
 	"ping": "iputils-ping", "traceroute": "traceroute", "tracepath": "iputils-tracepath",
@@ -51,7 +53,7 @@ func (r Runner) look(name string) (string, error) {
 func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Result, error) {
 	bin, argv, err := Build(req)
 	if err != nil {
-		return Result{}, fmt.Errorf("diag: %w", err)
+		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	if bin == "traceroute" {
 		if _, err := r.look("traceroute"); err != nil {
@@ -60,14 +62,14 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	}
 	path, err := r.look(bin)
 	if err != nil {
-		return Result{}, fmt.Errorf("%w: %s (instala: sudo apt install %s)", ErrNotInstalled, bin, packages[bin])
+		return Result{}, i18n.Wrap("diag.err.install", ErrNotInstalled, i18n.A("bin", bin, "pkg", packages[bin]))
 	}
 	stamp := time.Now().Format("20060102-150405")
 	var out *os.File
 	res := Result{Bin: bin}
 	if req.OutputDir != "" {
 		if err := os.MkdirAll(req.OutputDir, 0o700); err != nil {
-			return Result{}, fmt.Errorf("diag: %w", err)
+			return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 		}
 		ext := ".txt"
 		if req.Tool == Pcap {
@@ -76,7 +78,7 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 		// Nombre único aunque dos ejecuciones caigan en el mismo segundo; el archivo lo crea
 		// el núcleo con 0600 (también el pcap: dumpcap solo lo trunca y no sigue symlinks).
 		if out, err = os.CreateTemp(req.OutputDir, fmt.Sprintf("diag_%s_%s_*%s", req.Tool, stamp, ext)); err != nil {
-			return Result{}, fmt.Errorf("diag: %w", err)
+			return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 		}
 		res.OutputPath = out.Name()
 		if req.Tool == Pcap {
@@ -118,7 +120,7 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 		if res.OutputPath != "" {
 			os.Remove(res.OutputPath)
 		}
-		return Result{}, fmt.Errorf("diag: %w", err)
+		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	err = cmd.Wait()
 	so.flush()
@@ -132,7 +134,7 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 			res.ExitCode = 143 // terminado por señal
 		}
 	default:
-		return res, fmt.Errorf("diag: %w", err)
+		return res, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	return res, nil
 }

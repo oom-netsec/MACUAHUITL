@@ -11,14 +11,13 @@ package flows
 
 import (
 	"encoding/binary"
-	"errors"
-	"fmt"
 	"net"
 	"net/netip"
 	"sync"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Flow es un registro normalizado; Exporter es la IP del equipo que lo envió.
@@ -66,7 +65,7 @@ func (d *Decoder) Templates(exporter string) int {
 	return d.perExp[exporter]
 }
 
-var errShort = errors.New("paquete truncado")
+var errShort error = i18n.New("flows.err.short", nil)
 
 func host(addr string) string {
 	if ap, err := netip.ParseAddrPort(addr); err == nil {
@@ -92,7 +91,7 @@ func (d *Decoder) Decode(from string, b []byte) ([]Flow, error) {
 	case v == 0 && binary.BigEndian.Uint32(b) == 5:
 		return decodeSFlow(b)
 	default:
-		return nil, fmt.Errorf("versión %d no soportada (NetFlow v5/v9, IPFIX, sFlow v5)", v)
+		return nil, i18n.New("flows.err.version", i18n.A("version", v))
 	}
 }
 
@@ -102,7 +101,7 @@ func decodeV5(exp string, b []byte) ([]Flow, error) {
 	}
 	n := int(binary.BigEndian.Uint16(b[2:]))
 	if n > 30 || len(b) < 24+48*n {
-		return nil, fmt.Errorf("v5: %d registros no caben en %d bytes", n, len(b))
+		return nil, i18n.New("flows.err.v5", i18n.A("n", n, "bytes", len(b)))
 	}
 	out := make([]Flow, 0, n)
 	for i := 0; i < n; i++ {
@@ -131,7 +130,7 @@ func (d *Decoder) decodeTemplated(exp string, version uint16, b []byte) ([]Flow,
 	for rest := b[hdr:]; len(rest) >= 4; {
 		id, l := binary.BigEndian.Uint16(rest), int(binary.BigEndian.Uint16(rest[2:]))
 		if l < 4 || l > len(rest) {
-			return out, fmt.Errorf("set %d con largo %d inválido", id, l)
+			return out, i18n.New("flows.err.set", i18n.A("id", id, "length", l))
 		}
 		body := rest[4:l]
 		rest = rest[l:]
@@ -158,7 +157,7 @@ func (d *Decoder) decodeTemplated(exp string, version uint16, b []byte) ([]Flow,
 		}
 	}
 	if missing > 0 && len(out) == 0 {
-		return out, fmt.Errorf("%d sets de datos sin plantilla (aún no llega del exportador)", missing)
+		return out, i18n.New("flows.err.no_template", i18n.A("n", missing))
 	}
 	return out, nil
 }
@@ -193,7 +192,7 @@ func (d *Decoder) templates(exp string, version uint16, domain uint32, b []byte,
 			return nil
 		}
 		if count > maxFields || id < 256 {
-			return fmt.Errorf("plantilla %d inválida (%d campos)", id, count)
+			return i18n.New("flows.err.template", i18n.A("id", id, "fields", count))
 		}
 		t := template{options: options}
 		for i := 0; i < count; i++ {
@@ -226,13 +225,13 @@ func (d *Decoder) store(k tmplKey, t template) error {
 		return nil
 	}
 	if _, known := d.perExp[k.exporter]; !known && len(d.perExp) >= d.MaxExporters {
-		return fmt.Errorf("límite de %d exportadores alcanzado; se ignora %s", d.MaxExporters, k.exporter)
+		return i18n.New("flows.err.max_exporters", i18n.A("max", d.MaxExporters, "exporter", k.exporter))
 	}
 	if d.total >= d.MaxTotal {
-		return fmt.Errorf("límite global de %d plantillas alcanzado; se ignora la de %s", d.MaxTotal, k.exporter)
+		return i18n.New("flows.err.max_total", i18n.A("max", d.MaxTotal, "exporter", k.exporter))
 	}
 	if d.perExp[k.exporter] >= d.MaxTemplates {
-		return fmt.Errorf("límite de %d plantillas para %s", d.MaxTemplates, k.exporter)
+		return i18n.New("flows.err.max_templates", i18n.A("max", d.MaxTemplates, "exporter", k.exporter))
 	}
 	d.tmpl[k] = t
 	d.perExp[k.exporter]++
@@ -321,7 +320,7 @@ func decodeSFlow(b []byte) ([]Flow, error) {
 	case 2:
 		agent = r.bytes(16)
 	default:
-		return nil, errors.New("sflow: tipo de dirección de agente desconocido")
+		return nil, i18n.New("flows.err.sflow_agent", nil)
 	}
 	r.skip(12) // sub-agente, secuencia, uptime
 	n := r.u32()
@@ -365,7 +364,7 @@ func decodeSFlow(b []byte) ([]Flow, error) {
 		}
 	}
 	if r.err != nil {
-		return out, fmt.Errorf("sflow: %w", r.err)
+		return out, i18n.Wrap("flows.err.sflow", r.err, nil)
 	}
 	return out, nil
 }

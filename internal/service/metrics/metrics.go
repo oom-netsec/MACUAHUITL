@@ -31,7 +31,7 @@ func (Module) Register(s ipc.Registrar, d service.Deps) {
 // jobDir resuelve la carpeta de salida de un trabajo por su ID o por una ruta absoluta.
 func (s *svc) jobDir(ctx context.Context, jobID, dir string) (string, error) {
 	if jobID != "" {
-		j, err := s.d.Job(jobID)
+		j, err := s.d.Job(ctx, jobID)
 		if err != nil {
 			return "", err
 		}

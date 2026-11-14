@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
@@ -18,12 +19,27 @@ func (b *Bridge) GetPreference(key string) (string, error) {
 }
 
 func (b *Bridge) SetPreference(key, value string) error {
+	var prev langCache
+	if key == langPref {
+		b.lang.mu.Lock()
+		prev.value, prev.loaded = b.lang.value, b.lang.loaded
+		b.lang.mu.Unlock()
+		b.setLanguage(value) // rige ya: la UI cambió de idioma aunque el núcleo no conteste
+	}
 	_, err := call(b, func(ctx context.Context, c *ipc.ClientConn) (struct{}, error) {
 		_, err := v1.NewPrefsServiceClient(c).SetPreference(ctx, &v1.SetPreferenceRequest{Key: key, Value: value})
 		return struct{}{}, err
 	})
-	if err == nil && key == langPref {
-		b.setLanguage(value)
+	if key == langPref {
+		b.lang.mu.Lock()
+		b.lang.pending = ""
+		var be *Error
+		if err != nil && errors.As(err, &be) && (errors.Is(err, ErrDisconnected) || be.Code == "Unavailable") {
+			b.lang.pending = value // no llegó al núcleo: se reintenta al reconectar
+		} else if err != nil { // el núcleo lo rechazó: el idioma no cambia
+			b.lang.value, b.lang.loaded = prev.value, prev.loaded
+		}
+		b.lang.mu.Unlock()
 	}
 	return err
 }

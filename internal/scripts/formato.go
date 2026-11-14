@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Plantilla y descripción de los archivos de import. Todo sale de los mismos tipos (archivo, archivoCol, Script,
@@ -20,10 +22,11 @@ const (
 
 // Campo es un campo del archivo. Nombre es la ruta: «formato», «scripts[].name».
 type Campo struct {
-	Nombre, Tipo string
+	Nombre, Tipo string // Tipo y Descripcion en es; TipoT y Desc dan los mismos textos en el idioma pedido
 	Obligatorio  bool
 	Ejemplo      string // JSON
 	Descripcion  string
+	TipoT, Desc  i18n.Text
 }
 
 // IDs fijos de la plantilla: así es estable y reimportarla dos veces da «igual».
@@ -56,13 +59,13 @@ func datos(kind string, lib []Script, now time.Time) (cols []Coleccion, scripts 
 		return nil, scripts, nil
 	case KindColecciones:
 		if len(lib) == 0 {
-			return nil, nil, fmt.Errorf("no hay scripts en la biblioteca para el ejemplo")
+			return nil, nil, i18n.New("scripts.err.no_library", nil)
 		}
 		c := Coleccion{ID: idColEjemplo, Name: "Ejemplo · revisión de acceso", Description: "Dos scripts propios y uno de la biblioteca, que viaja solo por ID.",
 			ScriptIDs: []string{scripts[0].ID, lib[0].ID, scripts[1].ID}, CreatedAt: now, UpdatedAt: now}
 		return []Coleccion{c}, scripts[:2], nil
 	}
-	return nil, nil, fmt.Errorf("tipo %q desconocido: scripts o colecciones", kind)
+	return nil, nil, i18n.New("scripts.err.kind", i18n.A("kind", kind))
 }
 
 // Plantilla da el JSON de ejemplo de un archivo de import, con sangría y sin sha256 (opcional al importar).
@@ -91,61 +94,61 @@ func Plantilla(kind string, lib []Script, now time.Time) ([]byte, error) {
 
 type esquemaCampo struct {
 	obligatorio bool
-	desc        string
+	desc        i18n.Text
 }
 
 func lista(l []string) string { return strings.Join(l, ", ") }
 
 // esquema describe cada campo por su ruta; «kind:ruta» pisa a «ruta» cuando el campo se entiende distinto en un tipo.
+// Los textos (scriptsfmt.desc.*) viven en el catálogo; aquí solo van las constantes que entran en ellos.
 func esquema() map[string]esquemaCampo {
-	nombre := fmt.Sprintf("De 1 a %d caracteres, sin espacios en los extremos ni caracteres de control. Único sin importar mayúsculas", MaxName)
-	desc := fmt.Sprintf("Hasta %d caracteres", MaxDescription)
+	d := func(k string, kv ...any) i18n.Text { return i18n.Tx("scriptsfmt.desc."+k, kv...) }
 	return map[string]esquemaCampo{
-		"formato":             {true, "Tipo de archivo; debe ser exactamente el de la plantilla"},
-		"version":             {true, fmt.Sprintf("Versión del formato; solo se acepta la %d", Version)},
-		"exportado":           {false, "Fecha del export (RFC 3339); informativa"},
-		"sha256":              {false, "Suma SHA-256 (hex) del JSON canónico de los datos; protege contra un archivo dañado, no prueba quién lo hizo. Opcional: sin ella se valida campo por campo y la vista previa avisa"},
-		"scripts":             {true, fmt.Sprintf("Arreglo de scripts, hasta %d", MaxImportScripts)},
-		"colecciones":         {true, fmt.Sprintf("Arreglo de colecciones, hasta %d", MaxColecciones)},
-		"colecciones:scripts": {true, "Arreglo con los scripts de usuario que las colecciones referencian (los de la biblioteca viajan solo por ID)"},
+		"formato":             {true, d("formato")},
+		"version":             {true, d("version", "v", Version)},
+		"exportado":           {false, d("exportado")},
+		"sha256":              {false, d("sha256")},
+		"scripts":             {true, d("scripts", "max", MaxImportScripts)},
+		"colecciones":         {true, d("colecciones", "max", MaxColecciones)},
+		"colecciones:scripts": {true, d("col_scripts")},
 
-		"scripts[].id":                 {true, "32 caracteres hexadecimales (usuario) o «lib-<nombre>» (biblioteca). Sin repetir en el archivo"},
-		"colecciones:scripts[].id":     {true, "32 caracteres hexadecimales; sin repetir en el archivo"},
-		"scripts[].name":               {true, nombre},
-		"scripts[].tech":               {true, "Una de: " + lista(Techs)},
-		"scripts[].platform":           {true, "Una de: " + lista(Platforms)},
-		"scripts[].description":        {false, desc},
-		"scripts[].commands":           {true, fmt.Sprintf("De 1 a %d comandos de hasta %d caracteres, ASCII imprimible (sin tabuladores ni acentos). Una línea que empieza con «!» en la columna 0 es comentario", MaxCommands, MaxCommandLen)},
-		"scripts[].tags":               {false, fmt.Sprintf("Hasta %d etiquetas, cada una de 1 a 24 caracteres entre minúsculas, dígitos y guion, sin repetir", MaxTags)},
-		"scripts[].origin":             {true, "«usuario» o «biblioteca»; lo de biblioteca que no coincide con la local se importa como script del usuario"},
-		"colecciones:scripts[].origin": {true, "Siempre «usuario»"},
-		"scripts[].created_at":         {false, "Fecha de creación (RFC 3339); al importar se usa la del momento"},
-		"scripts[].updated_at":         {false, "Fecha de edición (RFC 3339); al importar se usa la del momento"},
+		"scripts[].id":                 {true, d("script_id")},
+		"colecciones:scripts[].id":     {true, d("col_script_id")},
+		"scripts[].name":               {true, d("name", "max", MaxName)},
+		"scripts[].tech":               {true, d("one_of", "list", lista(Techs))},
+		"scripts[].platform":           {true, d("one_of", "list", lista(Platforms))},
+		"scripts[].description":        {false, d("description", "max", MaxDescription)},
+		"scripts[].commands":           {true, d("commands", "max", MaxCommands, "len", MaxCommandLen)},
+		"scripts[].tags":               {false, d("tags", "max", MaxTags)},
+		"scripts[].origin":             {true, d("origin")},
+		"colecciones:scripts[].origin": {true, d("col_origin")},
+		"scripts[].created_at":         {false, d("script_created")},
+		"scripts[].updated_at":         {false, d("script_updated")},
 
-		"colecciones[].id":          {true, "32 caracteres hexadecimales, o «favoritos» (la colección por defecto, que se fusiona y nunca se reemplaza). Sin repetir en el archivo"},
-		"colecciones[].name":        {true, nombre + "; «favoritos» se llama «" + FavoritosNombre + "»"},
-		"colecciones[].description": {false, desc},
-		"colecciones[].order":       {false, "Posición al exportar; al importar las nuevas quedan al final"},
-		"colecciones[].script_ids":  {false, fmt.Sprintf("IDs de script en orden, sin repetir, hasta %d. Los de usuario deben viajar en «scripts»; un «lib-*» que la biblioteca local no trae se avisa y se omite", MaxScriptsColeccion)},
-		"colecciones[].created_at":  {false, "Fecha de creación (RFC 3339)"},
-		"colecciones[].updated_at":  {false, "Fecha de edición (RFC 3339)"},
+		"colecciones[].id":          {true, d("col_id")},
+		"colecciones[].name":        {true, d("col_name", "max", MaxName, "fav", FavoritosNombre)},
+		"colecciones[].description": {false, d("description", "max", MaxDescription)},
+		"colecciones[].order":       {false, d("order")},
+		"colecciones[].script_ids":  {false, d("script_ids", "max", MaxScriptsColeccion)},
+		"colecciones[].created_at":  {false, d("col_created")},
+		"colecciones[].updated_at":  {false, d("col_updated")},
 	}
 }
 
-func tipoDe(t reflect.Type) string {
+func tipoDe(t reflect.Type) i18n.Text {
 	switch {
 	case t == reflect.TypeOf(time.Time{}):
-		return "fecha RFC 3339"
+		return i18n.Tx("scriptsfmt.type.date")
 	case t == reflect.TypeOf(json.RawMessage{}):
-		return "arreglo"
+		return i18n.Tx("scriptsfmt.type.array")
 	case t.Kind() == reflect.String:
-		return "texto"
+		return i18n.Tx("scriptsfmt.type.text")
 	case t.Kind() == reflect.Int:
-		return "entero"
+		return i18n.Tx("scriptsfmt.type.int")
 	case t.Kind() == reflect.Slice && t.Elem().Kind() == reflect.String:
-		return "lista de texto"
+		return i18n.Tx("scriptsfmt.type.text_list")
 	}
-	return t.String()
+	return i18n.Lit(t.String(), "")
 }
 
 func etiqueta(f reflect.StructField) string { return strings.Split(f.Tag.Get("json"), ",")[0] }
@@ -194,7 +197,8 @@ func Campos(kind string, lib []Script, now time.Time) ([]Campo, error) {
 				return fmt.Errorf("el campo %s no está descrito", ruta)
 			}
 		}
-		out = append(out, Campo{Nombre: ruta, Tipo: tipoDe(f.Type), Obligatorio: e.obligatorio, Ejemplo: ejemplo(ruta), Descripcion: e.desc})
+		tipo := tipoDe(f.Type)
+		out = append(out, Campo{Nombre: ruta, Tipo: tipo.In(i18n.Es), TipoT: tipo, Obligatorio: e.obligatorio, Ejemplo: ejemplo(ruta), Descripcion: e.desc.In(i18n.Es), Desc: e.desc})
 		return nil
 	}
 	cab := reflect.TypeOf(archivo{})

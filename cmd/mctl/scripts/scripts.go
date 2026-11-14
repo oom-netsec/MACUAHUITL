@@ -45,7 +45,7 @@ func readCommands(c *cli.Env, file string) ([]string, error) {
 		}
 		defer f.Close()
 		if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
-			return nil, fmt.Errorf("%s no es un archivo regular", file)
+			return nil, cli.Err("mctl.scripts.not_regular", "file", file)
 		}
 		r = f
 	}
@@ -54,7 +54,7 @@ func readCommands(c *cli.Env, file string) ([]string, error) {
 		return nil, err
 	}
 	if len(b) > maxCommandsFile {
-		return nil, errors.New("los comandos pasan de 1 MiB")
+		return nil, cli.Err("mctl.scripts.commands_too_big")
 	}
 	var out []string
 	for _, ln := range strings.Split(string(b), "\n") {
@@ -76,9 +76,9 @@ func star(fav bool) string {
 
 func ro(b bool) string {
 	if b {
-		return "lectura"
+		return cli.T("mctl.scripts.mode_read")
 	}
-	return "configura"
+	return cli.T("mctl.scripts.mode_config")
 }
 
 // scripts list [TEXTO] [--tech T] [--platform P] [--tag X] [--fav] [--json]
@@ -107,7 +107,7 @@ func list(c *cli.Env, args []string) error {
 		return printJSON(c, res)
 	}
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tFAV\tNOMBRE\tTECNOLOGÍA\tPLATAFORMA\tMODO\tORIGEN")
+	fmt.Fprintln(tw, cli.T("mctl.scripts.list_header"))
 	for _, s := range res.Scripts {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.Id, star(s.Favorite), s.Name, s.Tech, s.Platform, ro(s.ReadOnly), s.Origin)
 	}
@@ -132,18 +132,22 @@ func show(c *cli.Env, args []string) error {
 		return printJSON(c, res)
 	}
 	s := res.Script
-	fmt.Fprintf(c.Out, "%s%s\n  id: %s · %s · %s · %s · %s%s\n", s.Name, map[bool]string{true: " *", false: ""}[s.Favorite], s.Id, s.Origin, s.Tech, s.Platform, ro(s.ReadOnly),
-		map[bool]string{true: " · fijado", false: ""}[s.Pinned])
+	idCode := "mctl.scripts.show_id"
+	if s.Pinned {
+		idCode = "mctl.scripts.show_id_pinned"
+	}
+	fmt.Fprintf(c.Out, "%s%s\n%s\n", s.Name, map[bool]string{true: " *", false: ""}[s.Favorite],
+		cli.T(idCode, "id", s.Id, "origin", s.Origin, "tech", s.Tech, "platform", s.Platform, "mode", ro(s.ReadOnly)))
 	if len(s.Collections) > 0 {
-		fmt.Fprintf(c.Out, "  colecciones: %s\n", strings.Join(s.Collections, ", "))
+		fmt.Fprintln(c.Out, cli.T("mctl.scripts.show_collections", "list", strings.Join(s.Collections, ", ")))
 	}
 	if s.Description != "" {
 		fmt.Fprintf(c.Out, "  %s\n", s.Description)
 	}
 	if len(s.Tags) > 0 {
-		fmt.Fprintf(c.Out, "  etiquetas: %s\n", strings.Join(s.Tags, ", "))
+		fmt.Fprintln(c.Out, cli.T("mctl.scripts.show_tags", "list", strings.Join(s.Tags, ", ")))
 	}
-	fmt.Fprintf(c.Out, "  creado: %s · editado: %s\n\n", ts(s.CreatedMs), ts(s.UpdatedMs))
+	fmt.Fprint(c.Out, cli.T("mctl.scripts.show_dates", "created", ts(s.CreatedMs), "updated", ts(s.UpdatedMs))+"\n\n")
 	for _, ln := range s.Commands {
 		fmt.Fprintln(c.Out, ln)
 	}
@@ -164,8 +168,8 @@ func (f *fields) flags(fs *flag.FlagSet) {
 	fs.Var(&f.tags, "tag", "etiqueta (repetible)")
 }
 
-func saved(c *cli.Env, verb string, s *v1.Script) {
-	fmt.Fprintf(c.Out, "%s %s (%s)\n", verb, s.Id, s.Name)
+func saved(c *cli.Env, code string, s *v1.Script) {
+	fmt.Fprintln(c.Out, cli.T(code, "id", s.Id, "name", s.Name))
 }
 
 // scripts add NOMBRE --tech T --platform P [--desc D] [--tag X]... [--file F|-]
@@ -187,7 +191,7 @@ func add(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	saved(c, "creado", r.Script)
+	saved(c, "mctl.scripts.created", r.Script)
 	return nil
 }
 
@@ -234,7 +238,7 @@ func edit(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	saved(c, "guardado", r.Script)
+	saved(c, "mctl.scripts.saved", r.Script)
 	return nil
 }
 
@@ -247,7 +251,7 @@ func rm(c *cli.Env, args []string) error {
 	if _, err := client(c).DeleteScript(context.Background(), &v1.DeleteScriptRequest{Id: id}); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "borrado %s\n", id)
+	fmt.Fprintln(c.Out, cli.T("mctl.scripts.deleted", "id", id))
 	return nil
 }
 
@@ -264,7 +268,11 @@ func fav(c *cli.Env, args []string) error {
 	if _, err := client(c).SetFavorite(context.Background(), &v1.SetFavoriteRequest{Id: fs.Arg(0), Favorite: !off}); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "%s %s\n", map[bool]string{true: "favorito quitado:", false: "favorito:"}[off], fs.Arg(0))
+	code := "mctl.scripts.fav_on"
+	if off {
+		code = "mctl.scripts.fav_off"
+	}
+	fmt.Fprintln(c.Out, cli.T(code, "id", fs.Arg(0)))
 	return nil
 }
 
@@ -278,7 +286,7 @@ func dup(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	saved(c, "creado", r.Script)
+	saved(c, "mctl.scripts.created", r.Script)
 	return nil
 }
 
@@ -292,7 +300,7 @@ func copyCmd(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	saved(c, "copiado", r.Script)
+	saved(c, "mctl.scripts.copied", r.Script)
 	return nil
 }
 
@@ -317,7 +325,7 @@ func export(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "exportados %d scripts a %s\n", r.Count, out)
+	fmt.Fprintln(c.Out, cli.T("mctl.scripts.exported", "n", r.Count, "path", out))
 	return nil
 }
 
@@ -353,7 +361,7 @@ func importCmd(c *cli.Env, args []string) error {
 		return err
 	}
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tNOMBRE\tESTADO\tCHOCA CON")
+	fmt.Fprintln(tw, cli.T("mctl.scripts.import_header"))
 	var req []*v1.ImportDecision
 	var missing []string
 	for _, it := range p.Items {
@@ -375,19 +383,19 @@ func importCmd(c *cli.Env, args []string) error {
 	}
 	tw.Flush()
 	for _, w := range p.Warnings {
-		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+		fmt.Fprintln(c.Out, cli.T("mctl.common_a.warning", "text", w))
 	}
 	if onlyPreview {
 		return nil
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("no se importó nada: falta decidir %d conflicto(s); use --decision ID=renombrar|reemplazar|omitir o --all=ACCIÓN: %s", len(missing), strings.Join(missing, ", "))
+		return cli.Err("mctl.import_a.missing", "n", len(missing), "ids", strings.Join(missing, ", "))
 	}
 	r, err := cl.ApplyImport(context.Background(), &v1.ApplyImportRequest{Token: p.Token, Decisions: req})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "importados: %d nuevos, %d reemplazados, %d renombrados, %d omitidos\n", r.Created, r.Replaced, r.Renamed, r.Skipped)
+	fmt.Fprintln(c.Out, cli.T("mctl.scripts.imported", "created", r.Created, "replaced", r.Replaced, "renamed", r.Renamed, "skipped", r.Skipped))
 	return nil
 }
 
@@ -428,4 +436,11 @@ func Area() cli.Area {
 		{Name: "scripts export", Run: export}, {Name: "scripts import", Run: importCmd},
 		{Name: "scripts col", Run: col}, {Name: "scripts pin", Run: pin}, {Name: "scripts template", Run: template},
 	}}
+}
+
+func yesNo(b bool) string {
+	if b {
+		return cli.T("mctl.common_a.yes")
+	}
+	return cli.T("mctl.common_a.no")
 }

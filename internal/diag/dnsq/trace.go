@@ -272,6 +272,12 @@ func finding(sev, code, key string, kv ...any) Finding {
 	return Finding{sev, code, t.In(i18n.Es), t}
 }
 
+// findingErr es finding con un argumento «error» que es un error: va en el idioma pedido, sin mezclar.
+func findingErr(sev, code, key string, err error, kv ...any) Finding {
+	t := i18n.Tx(key, kv...).With("error", i18n.FromErr(err))
+	return Finding{sev, code, t.In(i18n.Es), t}
+}
+
 // dataFinding es un hallazgo cuyo detalle es un dato y no se traduce.
 func dataFinding(sev, code, detail string) Finding { return Finding{sev, code, detail, i18n.Text{}} }
 
@@ -400,7 +406,7 @@ func CheckZone(ctx context.Context, d Dialer, zone string, roots []Root, o Optio
 			switch {
 			case err != nil:
 				zs.Error, zs.ErrorText = err.Error(), i18n.FromErr(err)
-				rep.Findings = append(rep.Findings, finding("error", "ns-lame", "dns.finding.ns_unreachable", "name", name, "ip", ip, "error", err))
+				rep.Findings = append(rep.Findings, findingErr("error", "ns-lame", "dns.finding.ns_unreachable", err, "name", name, "ip", ip))
 			case r.Rcode != dns.RcodeSuccess || !r.Authoritative:
 				zs.Error = dns.RcodeToString[r.Rcode]
 				rep.Findings = append(rep.Findings, finding("error", "ns-lame", "dns.finding.ns_not_auth", "name", name, "ip", ip, "rcode", dns.RcodeToString[r.Rcode], "aa", r.Authoritative))

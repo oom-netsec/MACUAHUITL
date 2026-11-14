@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"golang.org/x/sys/unix"
 )
 
@@ -54,6 +55,11 @@ func (c Config) String() string {
 	return fmt.Sprintf("%d %d%c%d flujo=%s", c.Baud, c.DataBits, strings.ToUpper(c.Parity)[0], c.StopBits, c.Flow)
 }
 
+// StringIn es String en el idioma pedido.
+func (c Config) StringIn(loc string) string {
+	return fmt.Sprintf("%d %d%c%d %s=%s", c.Baud, c.DataBits, strings.ToUpper(c.Parity)[0], c.StopBits, i18n.Msg(loc, "serial.val.flow", nil), c.Flow)
+}
+
 // AuditString es String para la auditoría, que va siempre en inglés (flow en vez de flujo).
 func (c Config) AuditString() string {
 	return fmt.Sprintf("%d %d%c%d flow=%s", c.Baud, c.DataBits, strings.ToUpper(c.Parity)[0], c.StopBits, c.Flow)
@@ -61,28 +67,28 @@ func (c Config) AuditString() string {
 
 func (c Config) validate() error {
 	if !filepath.IsAbs(c.Path) || !strings.HasPrefix(filepath.Clean(c.Path), "/dev/") {
-		return fmt.Errorf("serialcon: %q no es un dispositivo bajo /dev", c.Path)
+		return i18n.New("serial.err.path", i18n.A("path", c.Path))
 	}
 	if _, ok := bauds[c.Baud]; !ok {
-		return fmt.Errorf("serialcon: velocidad %d no soportada", c.Baud)
+		return i18n.New("serial.err.baud", i18n.A("baud", c.Baud))
 	}
 	if _, ok := csize[c.DataBits]; !ok {
-		return fmt.Errorf("serialcon: bits de datos %d inválidos (5 a 8)", c.DataBits)
+		return i18n.New("serial.err.data_bits", i18n.A("bits", c.DataBits))
 	}
 	if !slices.Contains([]string{"none", "even", "odd"}, c.Parity) {
-		return fmt.Errorf("serialcon: paridad %q inválida (none, even, odd)", c.Parity)
+		return i18n.New("serial.err.parity", i18n.A("parity", c.Parity))
 	}
 	if c.StopBits != 1 && c.StopBits != 2 {
-		return fmt.Errorf("serialcon: bits de parada %d inválidos (1 o 2)", c.StopBits)
+		return i18n.New("serial.err.stop_bits", i18n.A("bits", c.StopBits))
 	}
 	if !slices.Contains([]string{"none", "rtscts", "xonxoff"}, c.Flow) {
-		return fmt.Errorf("serialcon: control de flujo %q inválido (none, rtscts, xonxoff)", c.Flow)
+		return i18n.New("serial.err.flow", i18n.A("flow", c.Flow))
 	}
 	return nil
 }
 
 // ErrPermission indica que el usuario no puede abrir el puerto (falta el grupo dialout).
-var ErrPermission = errors.New("sin permiso sobre el puerto serie")
+var ErrPermission error = i18n.New("serial.err.permission", nil)
 
 type Port struct {
 	f   *os.File
@@ -115,7 +121,7 @@ func open(c Config) (*Port, error) {
 	p.control(func(fd int) {
 		tio, err := unix.IoctlGetTermios(fd, unix.TCGETS)
 		if err != nil {
-			cerr = fmt.Errorf("serialcon: %s no es un puerto serie: %w", c.Path, err)
+			cerr = i18n.Wrap("serial.err.not_serial", err, i18n.A("path", c.Path))
 			return
 		}
 		// TIOCEXCL: un segundo programa no puede abrirlo y mezclar lo que se teclea.
@@ -125,7 +131,7 @@ func open(c Config) (*Port, error) {
 		}
 		raw(tio, c)
 		if err := unix.IoctlSetTermios(fd, unix.TCSETS, tio); err != nil {
-			cerr = fmt.Errorf("serialcon: configurar %s: %w", c.Path, err)
+			cerr = i18n.Wrap("serial.err.configure", err, i18n.A("path", c.Path))
 		}
 	})
 	if cerr != nil {
@@ -138,11 +144,11 @@ func open(c Config) (*Port, error) {
 func openErr(path string, err error) error {
 	switch {
 	case errors.Is(err, os.ErrPermission):
-		return fmt.Errorf("%w %s: agrega tu usuario al grupo dialout con «sudo usermod -aG dialout $USER» y cierra todas tus sesiones o reinicia para que el servicio macuahuitld tome el grupo (no hace falta ejecutar MACUAHUITL como root)", ErrPermission, path)
+		return i18n.Wrap("serial.err.permission_hint", ErrPermission, i18n.A("path", path))
 	case errors.Is(err, unix.EBUSY):
-		return fmt.Errorf("serialcon: %s está en uso por otro programa (minicom, screen…)", path)
+		return i18n.New("serial.err.busy", i18n.A("path", path))
 	case errors.Is(err, os.ErrNotExist):
-		return fmt.Errorf("serialcon: %s no existe; ¿está conectado el cable USB-serie?", path)
+		return i18n.New("serial.err.missing", i18n.A("path", path))
 	}
 	return fmt.Errorf("serialcon: %w", err)
 }
