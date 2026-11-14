@@ -1,0 +1,19 @@
+# Propósito: Traducciones activas, reglas NAT, pools y su configuración.
+# Cuándo usarlo: Una traducción no ocurre o el pool PAT se agota.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: fw-xlate-nat
+platform: ftd
+name: FTD · Firewall · Xlate y NAT
+name_en: FTD · Firewall · Xlate and NAT
+commands:
+  - cmd: show clock
+  - cmd: show xlate count
+  - cmd: show xlate
+    timeout: 120s
+  - cmd: show nat detail
+    timeout: 120s
+  - cmd: show nat pool
+  - cmd: show running-config nat
+    timeout: 120s
+    may_contain_secrets: true

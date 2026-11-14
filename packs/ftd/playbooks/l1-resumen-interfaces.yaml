@@ -1,0 +1,17 @@
+# Propósito: Estado de todas las interfaces, nombres y contadores de tráfico.
+# Cuándo usarlo: Primer vistazo al estado físico y lógico de los puertos.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: l1-resumen-interfaces
+platform: ftd
+name: FTD · Capa 1 · Resumen de interfaces
+name_en: FTD · Layer 1 · Interfaces summary
+commands:
+  - cmd: show clock
+  - cmd: show interface ip brief
+  - cmd: show nameif
+  - cmd: show interface
+    timeout: 120s
+  - cmd: show interface | include Interface .* is|line protocol|input errors|CRC|overrun
+    timeout: 120s
+  - cmd: show traffic

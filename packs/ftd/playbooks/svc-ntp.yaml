@@ -1,0 +1,18 @@
+# Propósito: Hora, sincronía NTP y registro con el FMC.
+# Cuándo usarlo: La hora está mal y fallan certificados o el registro con el FMC.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: svc-ntp
+platform: ftd
+name: FTD · Servicios · NTP y hora
+name_en: FTD · Services · NTP and time
+commands:
+  - cmd: show clock
+  - cmd: show clock detail
+  - cmd: show ntp
+  - cmd: show running-config ntp
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show managers
+    may_contain_secrets: true
+  - cmd: show version

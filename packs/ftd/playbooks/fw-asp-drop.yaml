@@ -1,0 +1,17 @@
+# Propósito: Contadores de descartes del acelerador de rutas y su contexto.
+# Cuándo usarlo: Se pierden paquetes y se busca el motivo del descarte.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: fw-asp-drop
+platform: ftd
+name: FTD · Firewall · Descartes de ASP
+name_en: FTD · Firewall · ASP drops
+commands:
+  - cmd: show clock
+  - cmd: show asp drop
+    timeout: 120s
+  - cmd: show conn count
+  - cmd: show traffic
+  - cmd: show interface ip brief
+  - cmd: show blocks
+  - cmd: show snort statistics

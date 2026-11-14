@@ -109,7 +109,7 @@ func TestReadOnly(t *testing.T) {
 		}
 	}
 	// las demás plataformas no son read_only hasta que tengan sus reglas
-	for _, p := range []string{"nx-os", "cualquiera"} {
+	for _, p := range []string{"nx-os", "ftd", "cualquiera"} {
 		s.Platform, s.Commands = p, []string{"show version"}
 		if s.ReadOnly() {
 			t.Errorf("%s no debe ser read_only", p)

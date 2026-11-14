@@ -34,7 +34,7 @@ const (
 // Techs y Platforms son listas cerradas.
 var (
 	Techs     = []string{"l2", "l3", "gestion", "seguridad", "qos", "etherchannel", "wireless", "diagnostico", "otro"}
-	Platforms = []string{"ios", "ios-xe", "nx-os", "asa", "cualquiera"}
+	Platforms = []string{"ios", "ios-xe", "nx-os", "asa", "ftd", "cualquiera"}
 )
 
 var (
@@ -161,7 +161,7 @@ func Runnable(cmds []string) []string {
 }
 
 // ReadOnly dice si todos los comandos pasan playbook.CheckDenied y ninguno trae «;».
-// shortcut: solo ios, ios-xe y asa se miden con CheckDenied; nx-os y cualquiera nunca son read_only. Cuando nx-os se
+// shortcut: solo ios, ios-xe y asa se miden con CheckDenied; nx-os, ftd (solo existe para los scripts derivados de oom/ftd) y cualquiera nunca son read_only. Cuando nx-os se
 // conecte aquí, medir «cualquiera» contra todas las concretas.
 func (s Script) ReadOnly() bool {
 	if s.Platform != "ios" && s.Platform != "ios-xe" && s.Platform != "asa" {

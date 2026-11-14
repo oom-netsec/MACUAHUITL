@@ -1,0 +1,22 @@
+# Propósito: Conexiones de la IP indicada y los contadores de Snort.
+# Cuándo usarlo: El tráfico de un host se bloquea o se retrasa en la inspección.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: snort-conexion-ip
+platform: ftd
+name: FTD · Snort · Snort y conexiones de una IP
+name_en: FTD · Snort · Snort and connections of one IP
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: show conn address {ip} detail
+    timeout: 120s
+  - cmd: show snort statistics
+  - cmd: show xlate local {ip}
+  - cmd: show route {ip}
+  - cmd: show asp drop
+    timeout: 120s
+  - cmd: show logging | include {ip}
+    timeout: 180s

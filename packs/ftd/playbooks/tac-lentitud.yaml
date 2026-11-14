@@ -1,0 +1,20 @@
+# Propósito: CPU, memoria, bloques, interfaces, Snort y descartes.
+# Cuándo usarlo: Los usuarios reportan lentitud a través del FTD.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/firepower/command_ref/b_Command_Reference_for_Firepower_Threat_Defense.html
+# Sin validar en laboratorio (no hay FTD en el laboratorio; comandos de la documentación de Cisco).
+id: tac-lentitud
+platform: ftd
+name: FTD · TAC · Lentitud
+name_en: FTD · TAC · Slowness
+commands:
+  - cmd: show clock
+  - cmd: show cpu usage
+  - cmd: show memory
+  - cmd: show blocks
+  - cmd: show interface | include Interface .* is|input errors|CRC|overrun
+    timeout: 120s
+  - cmd: show traffic
+  - cmd: show conn count
+  - cmd: show snort statistics
+  - cmd: show asp drop
+    timeout: 120s
