@@ -58,6 +58,8 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       setLines((l) => (l.length > 5000 ? [...l.slice(-4000), e.line!] : [...l, e.line!]));
     }
   };
+  const applyRef = useRef(apply); // el suscriptor se crea una vez: sin esto se quedaría con el t del primer render
+  applyRef.current = apply;
   useEffect(
     () =>
       core.onDiag((e: DiagEvent) => {
@@ -65,7 +67,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
           pending.current.push(e);
           return;
         }
-        if (e.runId === runRef.current) apply(e);
+        if (e.runId === runRef.current) applyRef.current(e);
       }),
     [core],
   );
@@ -91,7 +93,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       starting.current = false;
       const early = pending.current.filter((e) => e.runId === id);
       pending.current = [];
-      early.forEach(apply);
+      early.forEach((e) => applyRef.current(e));
     } catch (e) {
       starting.current = false;
       setErr(outputsErrorText(errorText(e), t));

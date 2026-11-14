@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DiagView } from "./DiagView";
 import { fakeCore } from "../../lib/fake";
+import { I18nProvider, useSetLang } from "../../lib/i18n";
 
 test("ejecuta ping, muestra la salida en vivo y la ruta al terminar", async () => {
   const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
@@ -91,4 +92,16 @@ test("dos clics seguidos en Ejecutar no lanzan dos ejecuciones", async () => {
   await userEvent.click(run);
   await userEvent.click(run);
   expect(core.diagRun).toHaveBeenCalledTimes(1);
+});
+
+test("un evento posterior al cambio de idioma se escribe en el idioma vigente, no en el del primer render", async () => {
+  const Switch = () => { const set = useSetLang(); return <button onClick={() => set("en")}>a-en</button>; };
+  const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
+  render(<I18nProvider><Switch /><DiagView core={core} tool="ping" /></I18nProvider>);
+  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
+  await userEvent.click(screen.getByRole("button", { name: /Ejecutar/ }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
+  await userEvent.click(screen.getByRole("button", { name: "a-en" }));
+  act(() => core.emitDiag({ runId: "r1", done: true, exitCode: -1, canceled: true }));
+  expect(await screen.findByText("Canceled by the user.")).toBeInTheDocument();
 });
