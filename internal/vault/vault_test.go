@@ -428,3 +428,63 @@ func TestDeleteReescribeElBak(t *testing.T) {
 		t.Fatalf("el .bak debía conservar la otra: %v %v", l, err)
 	}
 }
+
+// fallaLaNEsima hace fallar la escritura atómica número n (1 = el .bak, 2 = la bóveda).
+func fallaLaNEsima(t *testing.T, n int) {
+	old, calls := chmod, 0
+	chmod = func(f *os.File, m os.FileMode) error {
+		if calls++; calls == n {
+			return errors.New("disco lleno")
+		}
+		return old(f, m)
+	}
+	t.Cleanup(func() { chmod = old })
+}
+
+// Delete escribe primero el .bak sin la credencial y después la bóveda: si lo segundo falla, la credencial sigue
+// en la bóveda y Delete devuelve error (nunca «borrada pero con error»).
+func TestDeleteFallaAlEscribirLaBovedaNoBorra(t *testing.T) {
+	v, p := newVault(t)
+	a, _ := v.Put(cred("a", "x", ""))
+	v.Put(cred("b", "y", ""))
+	fallaLaNEsima(t, 2)
+	if err := v.Delete(a); err == nil {
+		t.Fatal("Delete debía fallar")
+	}
+	chmod = func(f *os.File, m os.FileMode) error { return f.Chmod(m) }
+	if c, err := v.Get(a); err != nil {
+		t.Fatalf("la credencial debía seguir en memoria: %v", err)
+	} else {
+		c.Password.Destroy()
+	}
+	if c, err := reopen(t, p).Get(a); err != nil {
+		t.Fatalf("la credencial debía seguir en la bóveda: %v", err)
+	} else {
+		c.Password.Destroy()
+	}
+	if err := v.Delete(a); err != nil { // reintento posible
+		t.Fatal(err)
+	}
+}
+
+// Editar una credencial no deja el secreto anterior en el .bak.
+func TestPutReemplazaElSecretoEnElBak(t *testing.T) {
+	v, p := newVault(t)
+	id, _ := v.Put(cred("a", "viejo", ""))
+	c := cred("a", "nuevo", "")
+	c.ID = id
+	if _, err := v.Put(c); err != nil {
+		t.Fatal(err)
+	}
+	b, err := Open(p + ".bak")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Unlock(pw("maestra")); err != nil {
+		t.Fatal(err)
+	}
+	got, err := b.Get(id)
+	if err != nil || string(got.Password.Bytes()) != "nuevo" {
+		t.Fatalf("el .bak conserva el secreto anterior: %v", err)
+	}
+}

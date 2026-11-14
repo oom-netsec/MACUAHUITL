@@ -334,7 +334,7 @@ func (v *Vault) PutBatch(cs []Credential) ([]string, error) {
 	}
 	prev := v.entries
 	v.entries = next
-	if err := v.persist(); err != nil {
+	if err := v.persistReplacingBak(); err != nil {
 		v.entries = prev
 		return nil, err
 	}
@@ -406,12 +406,11 @@ func (v *Vault) Delete(id string) error {
 	}
 	prev := v.entries
 	v.entries = append(append([]rawEntry(nil), v.entries[:i]...), v.entries[i+1:]...)
-	if err := v.persist(); err != nil {
+	if err := v.persistReplacingBak(); err != nil {
 		v.entries = prev
 		return err
 	}
-	// persist dejó en .bak el archivo anterior, que aún trae la credencial borrada: se reemplaza por el vigente.
-	return writeAtomic(v.path+".bak", marshalFile(v.hdr, v.entries))
+	return nil
 }
 
 // ChangeMasterPassword vuelve a cifrar la DEK con una KEK nueva (sal nueva).
@@ -456,6 +455,21 @@ func (v *Vault) persist() error {
 		}
 	}
 	return writeAtomicOpt(v.path, marshalFile(v.hdr, v.entries), noPerms)
+}
+
+// persistReplacingBak escribe primero el .bak con el estado nuevo y luego la bóveda: el .bak no conserva una
+// credencial borrada ni el secreto anterior de una editada, y si falla la segunda escritura la bóveda queda como
+// estaba y quien llama recibe el error (nunca «borrada pero con error»; el reintento es posible).
+func (v *Vault) persistReplacingBak() error {
+	var noPerms *bool
+	if v.lenient {
+		noPerms = &v.noPerms
+	}
+	data := marshalFile(v.hdr, v.entries)
+	if err := writeAtomicOpt(v.path+".bak", data, noPerms); err != nil {
+		return fmt.Errorf("vault: respaldo: %w", err)
+	}
+	return writeAtomicOpt(v.path, data, noPerms)
 }
 
 // chmod es variable para que las pruebas simulen un sistema de archivos sin permisos.
