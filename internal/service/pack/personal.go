@@ -97,16 +97,19 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 		return nil, s.reject(ctx, err, nil, "none", path)
 	}
 	sum := dom.SHA256(data)
-	if r.GetConfirm() && r.GetSha256() != "" && !strings.EqualFold(r.GetSha256(), sum) {
-		return nil, service.Err(ctx, codes.FailedPrecondition, "pack.err.import.changed", nil)
+	if r.GetConfirm() && r.GetSha256() == "" {
+		return nil, s.reject(ctx, i18n.New("pack.err.import.sha256_missing", nil), nil, sum, path)
+	}
+	if r.GetConfirm() && !strings.EqualFold(r.GetSha256(), sum) {
+		return nil, s.reject(ctx, i18n.New("pack.err.import.changed", nil), nil, sum, path)
 	}
 	p, err := s.store.VerifyImport(data)
 	if err != nil {
 		return nil, s.reject(ctx, err, p, sum, path)
 	}
-	lib, _, err := scripts.LibraryWith(playbooks.FS, s.store.Snapshot().Contenido())
-	if err != nil {
-		return nil, internal(err)
+	library := func() ([]scripts.Script, error) {
+		lib, _, err := scripts.LibraryWith(playbooks.FS, s.store.Snapshot().Contenido())
+		return lib, err
 	}
 	dir := filepath.Join(s.cfg.ConfigDir, "playbooks")
 	var userIDs map[string]bool
@@ -120,6 +123,10 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 	out := &v1.PackServiceImportResponse{Pack: info, Sha256: sum}
 	if !r.GetConfirm() {
 		user, err := scripts.LoadUser(s.d.DB())
+		if err != nil {
+			return nil, internal(err)
+		}
+		lib, err := library()
 		if err != nil {
 			return nil, internal(err)
 		}
@@ -157,6 +164,10 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 		}
 		defer tx.Rollback()
 		user, err := scripts.LoadUser(tx)
+		if err != nil {
+			return internal(err)
+		}
+		lib, err := library() // bajo el candado: un Install que terminó mientras se esperaba ya cuenta
 		if err != nil {
 			return internal(err)
 		}

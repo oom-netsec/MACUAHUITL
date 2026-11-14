@@ -28,7 +28,11 @@ var (
 var safeShellPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N}/._+,@%=:-]+$`)
 
 // outputsErr arma el error del código prefs.outputs.<motivo> (el prefijo va dentro del texto de es y de en).
-func outputsErr(code string, kv ...any) error { return i18n.New(code, i18n.A(kv...)) }
+func outputsErr(code string, kv ...any) error {
+	a := i18n.A(kv...)
+	a["path"] = a["dir"] // metadata.path: la ruta que el front muestra
+	return i18n.New(code, a)
+}
 
 // resolve sigue los enlaces si puede; si la ruta no existe devuelve la limpia.
 func resolve(p string) string {

@@ -122,9 +122,9 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 			switch {
 			case o.ID == h.ID:
 			case devices.NameKey(o.Name) == devices.NameKey(h.Name):
-				return service.Err(ctx, codes.AlreadyExists, "hosts.err.dup_name", i18n.A("name", o.Name))
+				return service.Err(ctx, codes.AlreadyExists, "hosts.err.dup_name", i18n.A("name", o.Name, "id", o.ID))
 			case devices.Key(o) == devices.Key(h):
-				return service.Err(ctx, codes.AlreadyExists, "hosts.err.dup_target", i18n.A("key", devices.Key(h), "name", o.Name))
+				return service.Err(ctx, codes.AlreadyExists, "hosts.err.dup_target", i18n.A("key", devices.Key(h), "name", o.Name, "id", o.ID))
 			}
 		}
 		if err := putHost(tx, h); err != nil {

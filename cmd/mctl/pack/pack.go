@@ -14,6 +14,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	dompack "github.com/oom-netsec/MACUAHUITL/internal/pack"
 )
 
 const help = `  pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM]...  |  pack list  |  pack show <id>  |  pack remove <id>
@@ -54,6 +55,16 @@ func line(p *v1.PackInfo) string {
 	return s
 }
 
+// fileSHA256 es la suma del archivo que mctl va a pedir instalar: el núcleo la compara con la del archivo que lee.
+// Lee con el mismo tope y la misma comprobación de archivo regular que el núcleo (un FIFO o /dev/zero no cuelgan a mctl).
+func fileSHA256(path string) (string, error) {
+	data, err := dompack.ReadArchive(path)
+	if err != nil {
+		return "", err
+	}
+	return dompack.SHA256(data), nil
+}
+
 func install(c *cli.Env, args []string) error {
 	var unsigned bool
 	var hide multi
@@ -68,7 +79,11 @@ func install(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	r, err := v1.NewPackServiceClient(c.Conn).Install(context.Background(), &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: unsigned, Hide: hide, ReplaceHidden: len(hide) > 0})
+	sum, err := fileSHA256(path)
+	if err != nil {
+		return err
+	}
+	r, err := v1.NewPackServiceClient(c.Conn).Install(context.Background(), &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: unsigned, Hide: hide, ReplaceHidden: len(hide) > 0, Sha256: sum})
 	if err != nil {
 		return err
 	}
@@ -197,9 +212,9 @@ func exportCmd(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "exportado %s %s: %d scripts, %d playbooks, sin firma, a %s\nsha256 %s\n", r.Id, r.Version, r.Scripts, r.Playbooks, out, r.Sha256)
+	fmt.Fprintln(c.Out, cli.T("mctl.pack.exported", "id", r.Id, "version", r.Version, "scripts", r.Scripts, "playbooks", r.Playbooks, "path", out, "sha256", r.Sha256))
 	for _, id := range r.OmittedPlaybooks {
-		fmt.Fprintf(c.Out, "aviso: el playbook %s no se exportó (plataforma o ID que un paquete no acepta)\n", id)
+		fmt.Fprintln(c.Out, cli.T("mctl.pack.omitted", "id", id))
 	}
 	return nil
 }
@@ -221,7 +236,7 @@ func importCmd(c *cli.Env, args []string) error {
 	for _, d := range decs {
 		id, a, ok := strings.Cut(d, "=")
 		if !ok || id == "" || (a != "renombrar" && a != "omitir") {
-			return errors.New("decisión inválida " + strconv.Quote(d) + ": " + uso)
+			return cli.Err("mctl.pack.bad_decision", "decision", strconv.Quote(d))
 		}
 		dec[id] = a
 	}
@@ -238,7 +253,7 @@ func importCmd(c *cli.Env, args []string) error {
 		return err
 	}
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "TIPO\tID\tNOMBRE\tESTADO\tCHOCA CON")
+	fmt.Fprintln(tw, cli.T("mctl.pack.import_header"))
 	var req []*v1.PackImportDecision
 	var missing []string
 	for _, it := range pv.Items {
@@ -262,21 +277,21 @@ func importCmd(c *cli.Env, args []string) error {
 	}
 	for id := range dec {
 		if !known[id] {
-			return fmt.Errorf("la decisión nombra %q, que no está en el paquete", id)
+			return cli.Err("mctl.pack.unknown_decision", "id", strconv.Quote(id))
 		}
 	}
 	if preview {
 		return nil
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("no se importó nada: falta decidir %d conflicto(s); use --decision ID=renombrar|omitir o --all=ACCIÓN: %s", len(missing), strings.Join(missing, ", "))
+		return cli.Err("mctl.pack.undecided", "n", len(missing), "list", strings.Join(missing, ", "))
 	}
 	r, err := cl.Import(context.Background(), &v1.PackServiceImportRequest{Path: path, Confirm: true, Decisions: req, Sha256: pv.Sha256})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "importados: scripts %d nuevos, %d renombrados, %d omitidos; playbooks %d nuevos, %d renombrados, %d omitidos\n",
-		r.ScriptsCreated, r.ScriptsRenamed, r.ScriptsSkipped, r.PlaybooksCreated, r.PlaybooksRenamed, r.PlaybooksSkipped)
+	fmt.Fprintln(c.Out, cli.T("mctl.pack.imported", "sc", r.ScriptsCreated, "sr", r.ScriptsRenamed, "ss", r.ScriptsSkipped,
+		"pc", r.PlaybooksCreated, "pr", r.PlaybooksRenamed, "ps", r.PlaybooksSkipped))
 	return nil
 }
 

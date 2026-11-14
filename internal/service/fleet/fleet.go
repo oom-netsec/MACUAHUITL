@@ -71,7 +71,7 @@ func (s *fleetSvc) Path(ctx context.Context, r *v1.PathRequest) (*v1.PathRespons
 		return nil, err
 	}
 	res := f.Path(r.Query, r.Dst)
-	return &v1.PathResponse{Report: service.ReportL(ctx, &res, func(loc string) string { return f.In(loc).PathText(res) }), Svg: res.SVG()}, nil
+	return &v1.PathResponse{Report: service.ReportL(ctx, &res, func(loc string) string { return f.In(loc).PathText(res) }), Svg: res.SVGIn(i18n.Locale(ctx))}, nil
 }
 
 func (s *fleetSvc) Health(ctx context.Context, r *v1.HealthRequest) (*v1.HealthResponse, error) {

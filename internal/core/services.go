@@ -281,6 +281,9 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	}
 	j.state = "arming"
 	spec, v := j.spec, c.vault
+	spec0 := spec // spec se recorta abajo (equipos excluidos); el trabajo conserva el original si el armado falla
+	// Lo que el armado escribe en el trabajo antes de sched.Arm: un armado fallido lo devuelve tal cual estaba.
+	prevVerified, prevChanges, prevUntil, prevCreds := j.verified, j.changes, j.Until, j.creds
 	c.mu.Unlock()
 	var undo []func()
 	// reason es el motivo en inglés para la auditoría (no depende del idioma del cliente).
@@ -290,14 +293,21 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		}
 		c.mu.Lock()
 		j.state = "created"
+		w := j.writer // el writer, la carpeta y el release de este armado ya están deshechos: no deben quedar apuntados
+		j.OutputDir, j.writer, j.release = "", nil, nil
+		j.spec, j.verified, j.changes, j.Until, j.creds = spec0, prevVerified, prevChanges, prevUntil, prevCreds
 		cancelled := j.cancelReq
 		if cancelled { // cancelaron durante el armado fallido: no vuelve a "created"
 			j.cancelReq, j.state = false, "cancelled"
 		}
 		c.mu.Unlock()
+		if w != nil {
+			os.Remove(w.Dir()) // la carpeta que creó NewWriter; Remove no borra una carpeta con contenido
+		}
 		if cancelled {
 			c.guard.Revoke(j.id)
 			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
+			c.closeCancelled(j)
 		}
 		c.persistJob(j) // la fase del Login Test ya guardó "arming"; al recargar no debe verse como caído
 		c.audit("job.arm_failed", j.id, reason)
@@ -405,18 +415,11 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		return nil
 	}
 	c.mu.Lock()
-	if j.cancelReq {
-		j.cancelReq, j.state = false, "cancelled"
-		j.OutputDir, j.writer = "", nil // la carpeta se borra abajo: no debe quedar apuntada
-		c.mu.Unlock()
-		for i := len(undo) - 1; i >= 0; i-- {
-			undo[i]()
-		}
-		os.Remove(w.Dir()) // la carpeta que creó NewWriter; Remove no borra una carpeta con contenido
-		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
-		return nil, service.Err(ctx, codes.FailedPrecondition, "patrol.svc.job_state", i18n.A("state", "cancelled"))
-	}
+	cancelled := j.cancelReq
 	c.mu.Unlock()
+	if cancelled { // fail deshace el armado, devuelve el trabajo a como estaba y lo cierra cancelado
+		return fail(service.Err(ctx, codes.FailedPrecondition, "patrol.svc.job_state", i18n.A("state", "cancelled")), "cancelled while arming")
+	}
 	events, cancelSub := c.bus.Subscribe([]string{j.id})
 	if err := c.sched.Arm(j.id, engineSchedule(spec.Schedule), until, targets, run); err != nil {
 		cancelSub()
@@ -538,6 +541,9 @@ func (c *Core) finish(j *job, state string) {
 	if w != nil {
 		detail = w.Dir()
 	}
+	c.mu.Lock()
+	j.closed = true // antes de publicar: un Subscribe que llegue ahora ya lo ve cerrado
+	c.mu.Unlock()
 	c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "closed", Detail: detail})
 }
 
@@ -562,6 +568,7 @@ func (s *patrolSvc) CancelJob(ctx context.Context, r *v1.CancelJobRequest) (*v1.
 	if created {
 		s.c.guard.Revoke(j.id)
 		s.c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED, 0, "phase.before_arming", nil)
+		s.c.closeCancelled(j) // nunca pasa por finish
 		return &v1.CancelJobResponse{}, nil
 	}
 	s.c.sched.Cancel(j.id)
@@ -634,15 +641,89 @@ func (s *patrolSvc) GetRun(ctx context.Context, r *v1.GetRunRequest) (*v1.GetRun
 
 // ---- Eventos ----
 
+// closeCancelled cierra un trabajo cancelado que nunca llega a finish (cancelado antes de armar o mientras se arma):
+// publica cancelled, lo marca cerrado y publica closed, para que quien lo vigila termine.
+func (c *Core) closeCancelled(j *job) {
+	c.mu.Lock()
+	j.closed = true // antes de publicar, como finish: un Subscribe que llegue ahora manda el sintético completo
+	c.mu.Unlock()
+	c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "cancelled"})
+	c.bus.Publish(engine.Event{JobID: j.id, Kind: engine.JobState, State: "closed"})
+}
+
+// closedJobs da, de los trabajos de ids que ya cerraron (manifest y zip hechos, o que nunca pasan por finish), los
+// eventos que el cliente se perdió: su estado final si lo hay y un "closed" con la hora de su última fase.
+func (c *Core) closedJobs(ids []string) map[string][]*v1.SubscribeResponse {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := map[string][]*v1.SubscribeResponse{}
+	for _, id := range ids {
+		j, ok := c.jobs[id]
+		if !ok || !j.closed {
+			continue
+		}
+		at := c.o.Now()
+		if n := len(j.Phases); n > 0 {
+			at = j.Phases[n-1].At
+		}
+		ev := func(state string) *v1.SubscribeResponse {
+			return &v1.SubscribeResponse{At: timestamppb.New(at), JobId: id, Event: &v1.SubscribeResponse_JobStateChanged{JobStateChanged: &v1.JobStateChanged{State: state}}}
+		}
+		if isFinal(j.state) {
+			out[id] = append(out[id], ev(j.state))
+		}
+		out[id] = append(out[id], ev("closed"))
+	}
+	return out
+}
+
+// finalState es el estado final de un trabajo terminado ("" si no ha terminado o no existe).
+func (c *Core) finalState(id string) string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if j, ok := c.jobs[id]; ok && isFinal(j.state) {
+		return j.state
+	}
+	return ""
+}
+
+func isFinal(state string) bool {
+	return state == "completed" || state == "cancelled" || state == "failed"
+}
+
 type eventSvc struct {
 	v1.UnimplementedEventServiceServer
 	c *Core
 }
 
 func (s *eventSvc) Subscribe(r *v1.SubscribeRequest, st v1.EventService_SubscribeServer) error {
-	ch, cancel := s.c.bus.Subscribe(r.JobIds)
+	ids := slices.Compact(slices.Sorted(slices.Values(r.JobIds))) // sin repetidos: el cierre cuenta trabajos distintos
+	for _, id := range ids {
+		if _, err := s.c.getJobIn(st.Context(), id); err != nil { // un id que no existe no emitirá nunca: no se deja colgado
+			return err
+		}
+	}
+	ch, cancel := s.c.bus.Subscribe(ids)
 	defer cancel()
 	st.SendHeader(nil)
+	// Un trabajo ya cerrado no emitirá más: se manda su estado final y un "closed" y, si todos los pedidos cerraron,
+	// se cierra el stream (si no, el cliente lo dejaría abierto para siempre). Uno que aún está en finish (manifest
+	// y zip) no cuenta: su "closed" llegará por el bus. Se suscribe antes de mirar: un evento que llegue en medio
+	// se descarta abajo para los ya enviados, no se pierde para los demás.
+	done := s.c.closedJobs(ids)
+	for _, id := range ids {
+		for _, e := range done[id] {
+			if err := st.Send(e); err != nil {
+				return err
+			}
+		}
+	}
+	closed := len(done)
+	if len(ids) > 0 && closed == len(ids) {
+		return nil
+	}
+	final := map[string]bool{} // trabajos cuyo estado final ya se mandó en vivo
+	loc := i18n.Locale(st.Context())
 	for {
 		select {
 		case <-st.Context().Done():
@@ -651,8 +732,30 @@ func (s *eventSvc) Subscribe(r *v1.SubscribeRequest, st v1.EventService_Subscrib
 			if !ok {
 				return nil
 			}
-			if err := st.Send(eventToProto(i18n.Locale(st.Context()), e)); err != nil {
+			if _, was := done[e.JobID]; was { // ya mandado en el sintético
+				continue
+			}
+			if e.Kind == engine.JobState && isFinal(e.State) {
+				final[e.JobID] = true
+			}
+			// Quien se suscribió después de que saliera el estado final (finish o closeCancelled en curso) lo recibe
+			// antes del "closed": el contrato es estado final y luego closed.
+			if e.Kind == engine.JobState && e.State == "closed" && !final[e.JobID] {
+				if fs := s.c.finalState(e.JobID); fs != "" {
+					final[e.JobID] = true
+					if err := st.Send(eventToProto(loc, engine.Event{At: e.At, JobID: e.JobID, Kind: engine.JobState, State: fs})); err != nil {
+						return err
+					}
+				}
+			}
+			if err := st.Send(eventToProto(loc, e)); err != nil {
 				return err
+			}
+			if e.Kind == engine.JobState && e.State == "closed" && len(ids) > 0 && slices.Contains(ids, e.JobID) {
+				done[e.JobID] = nil // contado: con todos cerrados, el stream termina
+				if closed++; closed == len(ids) {
+					return nil
+				}
 			}
 		}
 	}

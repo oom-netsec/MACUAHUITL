@@ -1,5 +1,10 @@
 package i18n
 
+import (
+	"slices"
+	"strings"
+)
+
 // Carpeta de salidas (Ajustes → Almacenamiento): el prefijo prefs.outputs.<motivo>: es estable y va en los dos idiomas.
 func init() {
 	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
@@ -21,6 +26,13 @@ func init() {
 		"prefs.outputs.issue":              e("la carpeta de salidas guardada ({dir}) ya no es válida y se usa la de fábrica: {reason}", "the saved outputs folder ({dir}) is no longer valid and the factory one is used: {reason}", "dir", "reason"),
 		"prefs.outputs.note":               e("El cambio aplica a lo que empiece después: los trabajos y escuchas en curso conservan la carpeta con que arrancaron. Los datos de la carpeta anterior no se mueven.", "The change applies to what starts afterwards: jobs and listeners already running keep the folder they started with. Data in the previous folder is not moved."),
 	})
+	// Contrato para front: metadata.code es el motivo (lo que sigue a prefs.outputs.) y metadata.path la ruta.
+	for k, e := range catalog {
+		if _, ok := strings.CutPrefix(k, "prefs.outputs."); ok && slices.Contains(e.Args, "dir") {
+			e.Meta, e.Extra = map[string]string{"code": strings.TrimPrefix(Reason(k), "prefs.outputs.")}, append(e.Extra, "path")
+			catalog[k] = e
+		}
+	}
 }
 
 func withReason(e entry, reason string) entry { e.Reason = reason; return e }

@@ -57,7 +57,7 @@ type stream struct {
 	dead   bool
 }
 
-var ErrDisconnected = errors.New("núcleo desconectado")
+var ErrDisconnected = errors.New("core disconnected")
 
 func (b *Bridge) client() (*ipc.ClientConn, error) {
 	b.mu.Lock()
@@ -395,8 +395,9 @@ func (b *Bridge) Subscribe(_ context.Context, jobIDs []string) error {
 	for _, id := range jobIDs {
 		b.mu.Lock()
 		st, has := b.streams[id]
+		dead := has && st.dead // se lee con el candado: markDead lo escribe con él
 		b.mu.Unlock()
-		if !has || st.dead {
+		if !has || dead {
 			if err := b.open(id); err != nil {
 				return wrapErr(err)
 			}
@@ -442,6 +443,19 @@ func (b *Bridge) open(jobID string) error {
 			}
 			raw, _ := protojson.Marshal(e)
 			b.emit("core:event", json.RawMessage(raw))
+			switch e.GetJobStateChanged().GetState() {
+			case "closed":
+				// El trabajo cerró (manifest y zip hechos): no habrá más eventos. Los estados completed, cancelled
+				// y failed NO cierran: tras ellos llegan las fases de empaquetado y el closed. Se cierra el stream y se
+				// borra del mapa (si otro open no lo reemplazó) para que ni se acumulen ni resubscribe reabra un trabajo cerrado.
+				b.mu.Lock()
+				if b.streams[jobID] == me {
+					delete(b.streams, jobID)
+				}
+				b.mu.Unlock()
+				cancel()
+				return
+			}
 		}
 	}()
 	return nil
@@ -624,6 +638,9 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 	b.mu.Unlock()
 	st, err := v1.NewDiagServiceClient(c).Run(ctx, req)
 	if err != nil {
+		b.mu.Lock()
+		delete(b.runs, id)
+		b.mu.Unlock()
 		cancel()
 		return "", wrapErr(err)
 	}
@@ -804,6 +821,9 @@ func (b *Bridge) SyslogStart(addr, proto string, allowAny, save bool, o SyslogOp
 		RotateMb: int32(o.RotateMB), RotateMinutes: int32(o.RotateMinutes), NameTemplate: o.NameTemplate, MaxFiles: int32(o.MaxFiles), Format: o.Format,
 	})
 	if err != nil {
+		b.mu.Lock()
+		delete(b.runs, id)
+		b.mu.Unlock()
 		cancel()
 		return "", wrapErr(err)
 	}

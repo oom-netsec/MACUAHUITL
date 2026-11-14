@@ -15,6 +15,7 @@ func init() {
 		"fleet.text.path_via_ecmp": e(" (vía {via} por {out}, rama ECMP)", " (via {via} through {out}, ECMP branch)", "via", "out"),
 		"fleet.text.path_route":    e(" ruta {route}", " route {route}", "route"),
 		"fleet.text.path_arrived":  e(" LLEGÓ: {reason}", " ARRIVED: {reason}", "reason"),
+		"fleet.svg.cut":            e("CORTE: {reason}", "CUT: {reason}", "reason"),
 		"fleet.text.path_cut":      e(" CORTE: {reason}", " CUT: {reason}", "reason"),
 		"fleet.text.health_head":   e("Interfaces con problema: {n} (contadores acumulados desde el último clear counters); equipos con dato: estado {st}/{dev} · contadores {ct}/{dev}", "Interfaces with problems: {n} (counters accumulated since the last clear counters); devices with data: status {st}/{dev} · counters {ct}/{dev}", "n", "st", "dev", "ct"),
 		"fleet.text.summary_head":  e("Tablero: {dev} equipos; con dato: cpu {cpu} · ntp {ntp} · reinicio {reboot} · memoria {mem} · flash {flash}", "Dashboard: {dev} devices; with data: cpu {cpu} · ntp {ntp} · reboot {reboot} · memory {mem} · flash {flash}", "dev", "cpu", "ntp", "reboot", "mem", "flash"),

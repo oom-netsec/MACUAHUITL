@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -46,7 +47,7 @@ type svc struct {
 func fail(ctx context.Context, err error) error {
 	c := codes.InvalidArgument
 	switch dom.Reason(err) {
-	case "unsigned", "collision", "version", "official_replace", "import.exists", "import.unsupported_fs":
+	case "unsigned", "collision", "version", "official_replace", "import.exists", "import.unsupported_fs", "install.changed", "import.changed":
 		c = codes.FailedPrecondition
 	case "not_found":
 		c = codes.NotFound
@@ -96,6 +97,13 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		return nil, reject(err, nil, "none")
 	}
 	sum := dom.SHA256(data)
+	// La vista previa (Inspect) da el sha256: instalar sin él, o con otro, no ata lo revisado a lo instalado.
+	if r.GetSha256() == "" {
+		return nil, reject(i18n.New("pack.err.install.sha256_missing", nil), nil, sum)
+	}
+	if !strings.EqualFold(r.GetSha256(), sum) {
+		return nil, reject(i18n.New("pack.err.install.changed", nil), nil, sum)
+	}
 	// Lo oculto se calcula antes de tocar el disco y se guarda en una transacción corta después del extract, justo antes
 	// de publicar: si algo falla antes, no se instala nada ni queda guardada la elección, y ninguna transacción espera
 	// el fsync del extract. Si el guardado falla, el paquete ya está instalado: se audita con hidden_save_failed y la
@@ -156,7 +164,7 @@ func (s *svc) Inspect(ctx context.Context, r *v1.PackServiceInspectRequest) (*v1
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	out := &v1.PackServiceInspectResponse{Pack: info, ScriptIds: res.Pack.ScriptIDs(), ReplacedVersion: res.Replaced}
+	out := &v1.PackServiceInspectResponse{Pack: info, ScriptIds: res.Pack.ScriptIDs(), ReplacedVersion: res.Replaced, Sha256: dom.SHA256(data)}
 	for _, pb := range res.Pack.Playbooks {
 		out.PlaybookIds = append(out.PlaybookIds, pb.ID)
 	}
@@ -214,12 +222,20 @@ func (s *svc) Show(ctx context.Context, r *v1.PackServiceShowRequest) (*v1.PackS
 
 func (s *svc) Remove(ctx context.Context, r *v1.PackServiceRemoveRequest) (*v1.PackServiceRemoveResponse, error) {
 	s.d.MarkActive()
-	// Buscar y quitar es una sola operación bajo el lock del almacén: lo que se limpia después es lo que de verdad se quitó.
-	p, err := s.store.Remove(r.GetId())
-	if err != nil {
-		return nil, fail(ctx, err)
+	// Buscar, quitar y limpiar la base es una sola operación bajo el candado del almacén (almacén primero, base
+	// después): lo que se limpia es lo que de verdad se quitó, y un Install del mismo paquete no cae en medio.
+	var p *dom.Pack
+	var favs int
+	var err error
+	if lerr := s.store.Locked(func() error {
+		if p, err = s.store.RemoveLocked(r.GetId()); err != nil {
+			return err
+		}
+		favs, err = s.cleanup(p)
+		return nil
+	}); lerr != nil {
+		return nil, fail(ctx, lerr)
 	}
-	favs, err := s.cleanup(p)
 	s.d.Audit("pack.remove", p.ID, fmt.Sprintf("id=%s version=%s origin=%s playbooks=%d scripts=%d favorites_removed=%d",
 		p.ID, p.Version, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()), favs))
 	if err != nil {

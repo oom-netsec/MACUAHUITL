@@ -19,11 +19,16 @@ func init() {
 		"prefs.err.bad_language":      e("ui.language debe ser es o en", "ui.language must be es or en"),
 		"prefs.err.too_big":           e("valor de preferencia mayor de 4 KiB", "preference value larger than 4 KiB"),
 		"hosts.err.missing":           e("falta el host", "the host is missing"),
-		"hosts.err.no_credential":     e("la credencial no existe en la bóveda (o es una entrada del sistema)", "the credential does not exist in the vault (or it is a system entry)"),
+		"hosts.err.no_credential":     withMeta(e("la credencial no existe en la bóveda (o es una entrada del sistema)", "the credential does not exist in the vault (or it is a system entry)"), "hosts.unknown_credential", "credentialId"),
 		"hosts.err.nothing_to_export": e("no hay hosts que exportar", "there are no hosts to export"),
 		"hosts.err.export_too_big":    e("el archivo pasaría de 5 MB y el import lo rechazaría; exporta menos hosts", "the file would exceed 5 MB and the import would reject it; export fewer hosts"),
 		"hosts.err.token":             e("token de importación desconocido; abre el archivo de nuevo", "unknown import token; open the file again"),
 		"hosts.err.expired":           e("la vista previa venció; vuelve a abrir el archivo", "the preview expired; open the file again"),
 		"hosts.err.format":            e("pida el formato csv o json", "ask for the csv or json format"),
 	})
+}
+
+func withMeta(e entry, reason, field string) entry {
+	e.Reason, e.Meta = reason, map[string]string{"field": field}
+	return e
 }
