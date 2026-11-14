@@ -158,3 +158,31 @@ func TestListPlaybooksNombreSegunIdioma(t *testing.T) {
 		t.Errorf("sin name_en cae al español: %q", got)
 	}
 }
+
+// Un ios-xe lista los playbooks de cat9k y sda (contenido sobre ios-xe); ios, wlc-9800 y nx-os no.
+func TestListPlaybooksCat9kSDASoloParaIOSXE(t *testing.T) {
+	cmd := []playbook.Command{{Text: "show clock"}}
+	s := &patrolSvc{c: coreWith([]playbook.Playbook{
+		{ID: "ios-xe/plat-salud", Platform: "ios-xe", Name: "A", Commands: cmd},
+		{ID: "cat9k/plat-salud", Platform: "cat9k", Name: "B", Commands: cmd},
+		{ID: "sda/lisp-sitios", Platform: "sda", Name: "C", Commands: cmd},
+	})}
+	for plat, want := range map[string][]string{
+		"ios-xe":   {"cat9k/plat-salud", "ios-xe/plat-salud", "sda/lisp-sitios"},
+		"ios":      {"ios-xe/plat-salud"},
+		"wlc-9800": {"ios-xe/plat-salud"},
+		"nx-os":    nil,
+	} {
+		r, err := s.ListPlaybooks(context.Background(), &v1.ListPlaybooksRequest{Platform: plat})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, p := range r.Playbooks {
+			got = append(got, p.Id)
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s ve %v, quiero %v", plat, got, want)
+		}
+	}
+}
