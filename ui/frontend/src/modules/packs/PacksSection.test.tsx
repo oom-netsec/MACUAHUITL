@@ -4,6 +4,7 @@ import { PacksSection, libOf } from "./PacksSection";
 import { I18nProvider } from "../../lib/i18n";
 import { fakeCore } from "../../lib/fake";
 import { sampleDetail, samplePack, sampleThirdParty } from "./fake";
+import { useScriptsVersion } from "../scripts/signal";
 
 const view = (core = fakeCore(), lang = "es") => {
   localStorage.setItem("macuahuitl.idioma", lang);
@@ -114,6 +115,21 @@ test("quitar pide confirmación y avisa de los favoritos quitados", async () => 
   await userEvent.click(screen.getByRole("button", { name: "Confirmar: quitar oom/ios-xe" }));
   await waitFor(() => expect(remove).toHaveBeenCalledWith("oom/ios-xe"));
   expect(await screen.findByText(/3 favoritos/)).toBeVisible();
+});
+
+// La terminal (favoritos) y Scripts siguen montadas aunque ocultas: instalar o quitar un paquete cambia su biblioteca.
+test("instalar y quitar un paquete avisan que los scripts cambiaron", async () => {
+  let seen = 0;
+  function Probe() { seen = useScriptsVersion(); return null; }
+  render(<Probe />);
+  const start = seen;
+  view(fakeCore({ packRemove: vi.fn(async () => 0), pickPath: vi.fn(async () => "/tmp/o.mpack") }));
+  await userEvent.click((await screen.findAllByRole("button", { name: "Quitar oom/ios-xe" }))[0]);
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar: quitar oom/ios-xe" }));
+  await waitFor(() => expect(seen).toBe(start + 1));
+  await userEvent.click(screen.getByRole("button", { name: "Instalar paquete…" }));
+  await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Instalar" }));
+  await waitFor(() => expect(seen).toBe(start + 2));
 });
 
 test("libOf arma el ID del script derivado como el núcleo", () => {

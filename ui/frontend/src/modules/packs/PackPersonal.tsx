@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { scriptsChanged } from "../scripts/signal";
 import type { CoreAPI } from "../../lib/core";
 import { cleanOnFail } from "../../lib/cleanOnFail";
 import { errInfo } from "../../lib/coreError";
@@ -66,7 +67,7 @@ export function ImportDialog({ core, path, preview, onDone, onClose }: { core: C
     try {
       const decisions: PackImportDecision[] = conflicts.map((i) => ({ itemId: i.id, action: choice[i.id] }));
       setRes(await core.packImport(path, preview.sha256, decisions));
-      onDone();
+      onDone(); scriptsChanged(); // la biblioteca de scripts y los favoritos de la terminal cambiaron
     } catch (e) { setErr(errorText(e)); setChanged(errInfo(e)?.reason === "pack.err.import.changed"); } finally { setBusy(false); }
   };
   const line = (k: string, c: number, r: number, s: number) => <p>{t("packs.import.done", { kind: k, created: c, renamed: r, skipped: s })}</p>;

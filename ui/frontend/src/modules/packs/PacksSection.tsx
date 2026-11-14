@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { scriptsChanged } from "../scripts/signal";
 import type { CoreAPI, PackDetail, PackInfo, PackInspectResult } from "../../lib/core";
 import { Check, ConfirmButton, Notice, errorText } from "../../components/Field";
 import { Dialog } from "../../components/Dialog";
@@ -58,7 +59,7 @@ function PackDetailDialog({ core, id, onChange, onClose }: { core: CoreAPI; id: 
     setBusy(true); setErr("");
     try {
       const pack = await core.packSetItems(id, visible ? [] : [item], visible ? [item] : []);
-      setD((x) => (x ? { ...x, pack } : x)); onChange(pack);
+      setD((x) => (x ? { ...x, pack } : x)); onChange(pack); scriptsChanged();
     } catch (e) { setErr(errorText(e)); } finally { setBusy(false); }
   };
   return (
@@ -90,6 +91,7 @@ function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; p
       await core.packInstallHiding(path, !pack.official, [...playbookIds, ...scriptIds].filter((x) => hide.has(x) && !pack.shadowed.includes(x)), true);
       ok = true;
     } catch (e) { setErr(errorText(e)); }
+    scriptsChanged(); // también si falló: un error puede decir «el paquete quedó instalado»
     try { onDone(); } finally { setBusy(false); }
     if (ok) onClose();
   };
@@ -141,7 +143,7 @@ export function PacksSection({ core }: { core: CoreAPI }) {
   };
   const remove = async (id: string) => {
     setErr(""); setMsg("");
-    try { const n = await core.packRemove(id); if (n > 0) setMsg(t("packs.removedFavs", { n })); } catch (e) { setErr(errorText(e)); }
+    try { const n = await core.packRemove(id); scriptsChanged(); if (n > 0) setMsg(t("packs.removedFavs", { n })); } catch (e) { setErr(errorText(e)); }
     void refresh();
   };
   const merge = (p: PackInfo) => setPacks((l) => l && l.map((x) => (x.id === p.id ? p : x)));
