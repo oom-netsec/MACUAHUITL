@@ -154,7 +154,7 @@ test("en inglés un error sin campo y los avisos de guardado salen con el texto 
 });
 
 test("la dirección repetida se marca en su campo, en español y en inglés", async () => {
-  for (const [lang, name, addr, save, msg] of [["es", "Nombre", "Dirección (IP o nombre DNS)", "Guardar host", "Esta dirección y puerto ya están en la libreta."], ["en", "Name", "Address (IP or DNS name)", "Save host", "This address is already in the saved hosts."]]) {
+  for (const [lang, name, addr, save, msg] of [["es", "Nombre", "Dirección (IP o nombre DNS)", "Guardar host", "Esta dirección y puerto ya están en la libreta."], ["en", "Name", "Address (IP or DNS name)", "Save host", "A saved host already uses this address and port."]]) {
     localStorage.setItem("macuahuitl.lang", lang);
     const { unmount } = setup();
     await userEvent.click(await screen.findByRole("button", { name: lang === "es" ? /Nuevo host/ : /New host/ }));

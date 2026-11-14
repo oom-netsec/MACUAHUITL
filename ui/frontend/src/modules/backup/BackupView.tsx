@@ -117,7 +117,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
           <Field label={t("backup.keep")} type="number" value={keep} onChange={setKeep} w="sm" />
           <Field label={t("backup.every")} type="number" value={every} onChange={setEvery} w="md" />
           {scheduled && <Field label={t("backup.rounds")} type="number" value={rounds} onChange={setRounds} w="sm" />}
-          <Field label={t("fps.accepted")} value={accept} onChange={setAccept} w="lg" mono />
+          <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="lg" mono />
         </div>
         <div className="actions">
           <button className="primary" disabled={busy || !cred || !devices.trim()} aria-busy={busy} onClick={run}>{t(busy ? "backup.busy" : scheduled ? "backup.schedule" : "backup.now")}<kbd aria-hidden="true">Ctrl ↵</kbd></button>
