@@ -290,6 +290,9 @@ func readStream(r *bufio.Reader, from string, emit emitFunc) {
 			}
 		}
 		if msg := strings.TrimRight(string(line), "\r\n"); msg != "" {
+			if len(msg) > MaxMessage { // el búfer es MaxMessage+16: una línea un poco más larga cabe entera
+				msg, truncated = msg[:MaxMessage], true
+			}
 			emit(from, []byte(msg), truncated)
 		}
 		if err != nil {

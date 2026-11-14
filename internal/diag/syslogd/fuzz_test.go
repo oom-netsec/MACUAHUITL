@@ -84,3 +84,16 @@ func TestParsePRISoloDigitos(t *testing.T) {
 		t.Errorf("<13>: %+v", m)
 	}
 }
+
+// Regresión del fuzz: una línea de 8193 a 8207 bytes cabe en el búfer (MaxMessage+16) y salía sin recortar.
+func TestLineaPasaDelTopeSeRecorta(t *testing.T) {
+	var got [][]byte
+	var trunc []bool
+	in := strings.Repeat("a", MaxMessage+5) + "\nb\n"
+	readStream(bufio.NewReaderSize(strings.NewReader(in), MaxMessage+16), "x", func(_ string, m []byte, tr bool) {
+		got, trunc = append(got, m), append(trunc, tr)
+	})
+	if len(got) != 2 || len(got[0]) != MaxMessage || !trunc[0] || string(got[1]) != "b" || trunc[1] {
+		t.Fatalf("%d mensajes, el primero de %d bytes (truncado=%v)", len(got), len(got[0]), trunc)
+	}
+}
