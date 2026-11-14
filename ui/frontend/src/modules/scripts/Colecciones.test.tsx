@@ -304,7 +304,7 @@ describe("revisión: avisos, datos, límite, foco y favoritos", () => {
     both(core);
     await cols();
     await waitFor(() => expect(colRows()).toHaveLength(1));
-    const base = { description: "", scriptIds: [], createdMs: 0, updatedMs: 0 };
+    const base = { description: "", scriptIds: [], hiddenScriptIds: [], createdMs: 0, updatedMs: 0 };
     (core.listCollections as ReturnType<typeof vi.fn>).mockImplementation(async () => [{ ...base, id: FAVORITES_ID, name: "Favoritos", order: 0 }, { ...base, id: "9".repeat(32), name: "Traída", order: 1 }]);
     await userEvent.click(within(screen.getByRole("article", { name: "Colecciones de scripts" })).getByRole("button", { name: "Importar…" }));
     const preview = await screen.findByRole("region", { name: "Vista previa de la importación de colecciones" });
@@ -373,5 +373,40 @@ describe("revisión: avisos, datos, límite, foco y favoritos", () => {
     await userEvent.type(screen.getByLabelText("Description"), "mis comandos");
     await userEvent.click(screen.getByRole("button", { name: "Save collection" }));
     await waitFor(() => expect(core.saveCollection).toHaveBeenCalledWith({ id: FAVORITES_ID, name: "Favoritos", description: "mis comandos" }));
+  });
+});
+
+describe("colecciones: ocultos por un paquete y scripts no disponibles", () => {
+  const withIds = async (scriptIds: string[], hiddenScriptIds: string[]) => {
+    const { core, ...r } = setup();
+    const base = await core.listCollections();
+    const c = { ...base[0], scriptIds, hiddenScriptIds };
+    (core.listCollections as ReturnType<typeof vi.fn>).mockResolvedValue([c]);
+    await cols();
+    await userEvent.click(await screen.findByRole("button", { name: "Abrir Favoritos" }));
+    return { core, ...r };
+  };
+
+  test("un id oculto se marca «oculto» y uno lib-* sin script, «no disponible», sin romper la lista", async () => {
+    await withIds([STP.id, "lib-l2-ghost", "lib-l2-hid"], ["lib-l2-hid"]);
+    const items = within(screen.getByRole("list", { name: /^Scripts de/ })).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    expect(items[0]).not.toHaveTextContent(/oculto|no disponible/);
+    expect(items[1]).toHaveTextContent("lib-l2-ghost");
+    expect(items[1]).toHaveTextContent("no disponible: instala el paquete");
+    expect(items[2]).toHaveTextContent("oculto por un paquete");
+    expect(items[2]).not.toHaveTextContent("no disponible");
+  });
+
+  test("el contador no cuenta los no disponibles", async () => {
+    await withIds([STP.id, "lib-l2-ghost"], []);
+    expect(within(colRows()[0]).getByText("1 scripts")).toBeInTheDocument();
+  });
+
+  test("un oculto que sí resuelve se marca «oculto» y tampoco cuenta", async () => {
+    await withIds([STP.id, "lib-l2-ghost"], [STP.id]);
+    const items = within(screen.getByRole("list", { name: /^Scripts de/ })).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("oculto por un paquete");
+    expect(within(colRows()[0]).getByText("0 scripts")).toBeInTheDocument();
   });
 });

@@ -45,7 +45,7 @@ export interface RemoteEntry {
 }
 // listable=false no es una falla: TFTP no lista, y un SCP sin SFTP tampoco; `reason` es el mensaje para mostrar.
 export interface TransferListing {
-  listable: boolean; reason: string; path: string; entries: RemoteEntry[]; truncated: boolean;
+  listable: boolean; reason: string; reasonCode?: string; reasonArgs?: Record<string, string>; path: string; entries: RemoteEntry[]; truncated: boolean;
   method: "mlsd" | "list" | "sftp" | "http" | "";
 }
 export interface TransferGetManyParams {

@@ -1,7 +1,7 @@
 // Contrato del módulo con el puente (ui/bridge) y su implementación de Wails.
 import { Events } from "@wailsio/runtime";
 
-export interface LoginResult { target: string; passed: boolean; failedStep: string; detail: string; platform: string; fingerprint: string }
+export interface LoginResult { target: string; passed: boolean; failedStep: string; detail: string; reason?: string; args?: Record<string, string>; platform: string; fingerprint: string }
 export interface ArmResult { windowEndsAt: string; missingInhibitors: string[] | null }
 // Fase del historial de un trabajo; kind es el nombre del enum (JOB_PHASE_KIND_*).
 export interface JobPhase { at: string; kind: string; round?: number; detail?: string; reason?: string; args?: Record<string, string> }
@@ -17,7 +17,7 @@ export interface Job {
 export interface CoreEvent {
   jobId: string;
   at?: string;
-  deviceStateChanged?: { deviceId: string; state: string; detail?: string };
+  deviceStateChanged?: { deviceId: string; state: string; detail?: string; reason?: string; args?: Record<string, string> };
   commandProgress?: { deviceId: string; command: string; index?: number; total?: number; bytesReceived?: string };
   heartbeat?: Record<string, never>;
   jobStateChanged?: { state: string };
@@ -40,7 +40,7 @@ export interface JobSpec {
   schedule: { intervalSeconds?: number; rounds?: number; cron?: string };
   params?: Record<string, string>; // un valor por dato que piden los playbooks elegidos
 }
-export interface RunDevice { target: string; state: string; detail: string }
+export interface RunDevice { target: string; state: string; detail: string; reason?: string; args?: Record<string, string> }
 // Un playbook del catálogo: id "ios-xe/stp", nombre "L2 · STP" (área antes del «·») y los comandos que corre.
 export type ParamKind = "mac" | "ap" | "interface" | "ip";
 export interface PlaybookParam { name: string; kind: ParamKind }
