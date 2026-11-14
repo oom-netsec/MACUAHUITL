@@ -478,3 +478,19 @@ test("un vlan_id con min y max propios los usa en la validación y en el mensaje
   await userEvent.type(screen.getByLabelText("VLAN acotada"), "15");
   expect(screen.queryByText("VLAN de 10 a 20.")).not.toBeInTheDocument();
 });
+
+test("ejecución asistida: el registro del equipo tiene tope", async () => {
+  const core = await open();
+  await choose("Agregar o quitar una VLAN de un trunk");
+  await userEvent.type(screen.getByLabelText("Trunk *"), "Gi1/0/48");
+  await userEvent.type(screen.getByLabelText("VLAN *"), "30");
+  await userEvent.click(planBtn());
+  await screen.findByRole("region", { name: "Reversa" });
+  await userEvent.click(screen.getByLabelText("Activar el modo asistido para esta ejecución"));
+  await userEvent.click(screen.getByRole("button", { name: START }));
+  await screen.findByRole("alert");
+  act(() => { for (let i = 0; i < 5200; i++) core.emitAssist({ runId: "r1", kind: "output", device: "SW1", text: `l${i}` }); });
+  const pre = (await screen.findByText("Salida del equipo")).closest("details")!.querySelector("pre")!;
+  expect(pre.textContent!.split("\n").length).toBeLessThan(5100);
+  expect(pre.textContent).toContain("l5199");
+});

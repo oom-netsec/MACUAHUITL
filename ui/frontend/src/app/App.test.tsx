@@ -5,7 +5,8 @@ import { fakeCore } from "../lib/fake";
 import { groups, modules } from "../modules";
 import { es } from "../lib/i18n/es";
 import { lazyView } from "../modules/lazy";
-import { useNav } from "./activity";
+import { useBusy, useNav } from "./activity";
+import { useState } from "react";
 
 const nav = () => screen.getByRole("navigation", { name: "Secciones" });
 const item = (name: RegExp) => within(nav()).getByRole("button", { name });
@@ -223,4 +224,40 @@ test("abrir la app no precarga vistas; pasar el puntero o enfocar una entrada s�
   await userEvent.hover(entry);
   expect(vi.mocked(bottom.view.preload)).toHaveBeenCalled();
   spies.forEach((s) => s.mockRestore());
+});
+
+test("un módulo que lanza al renderizar no tumba a los demás y se puede reintentar", async () => {
+  let falla = true;
+  const Roto = () => { if (falla) throw new Error("boom"); return <p>recuperado</p>; };
+  const original = modules[0].view;
+  modules[0].view = lazyView(async () => ({ Roto }), "Roto");
+  const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    render(<App core={fakeCore()} />);
+    expect(await screen.findByText("El módulo falló al mostrarse")).toBeInTheDocument();
+    expect(item(/^Bóveda/)).toBeInTheDocument(); // la barra lateral sigue en pie
+    falla = false;
+    await userEvent.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(await screen.findByText("recuperado")).toBeInTheDocument();
+  } finally {
+    spy.mockRestore();
+    modules[0].view = original;
+  }
+});
+
+test("dos componentes del mismo módulo: el que termina no marca libre al que sigue ocupado", async () => {
+  const A = ({ on }: { on: boolean }) => { useBusy(on); return null; };
+  let setA: (b: boolean) => void = () => {};
+  const Dos = () => { const [a, sa] = useState(true); setA = sa; return <><A on={a} /><A on /><p>dos</p></>; };
+  const original = modules[0].view;
+  modules[0].view = lazyView(async () => ({ Dos }), "Dos");
+  try {
+    render(<App core={fakeCore()} />);
+    expect(await screen.findByText("dos")).toBeInTheDocument();
+    expect(screen.getByText("1 en curso")).toBeInTheDocument();
+    act(() => setA(false));
+    expect(screen.getByText("1 en curso")).toBeInTheDocument(); // el otro sigue ocupado
+  } finally {
+    modules[0].view = original;
+  }
 });

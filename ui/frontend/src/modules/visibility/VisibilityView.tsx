@@ -70,6 +70,7 @@ function useLive(core: CoreAPI, kind: VisKind, onData: (e: VisEvent) => void, in
     [core, kind],
   );
   const start = async (f: () => Promise<string>) => {
+    if (starting.current) return; // doble clic: un solo arranque
     setErr(""); setStatus(null);
     pending.current = [];
     starting.current = true;
@@ -412,7 +413,7 @@ function FlowsPanel({ core, active, onRun }: PanelProps) {
   );
 }
 
-interface GnmiUpd { Path?: string; Value?: unknown; Sync?: boolean; Delete?: boolean }
+interface GnmiUpd { id?: number; Path?: string; Value?: unknown; Sync?: boolean; Delete?: boolean }
 
 function GnmiPanel({ core, active, onRun }: PanelProps) {
   const t = useT();
@@ -426,10 +427,12 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
   const [every, setEvery] = useState("10");
   const [ups, setUps] = useState<GnmiUpd[]>([]);
   const r = useResult<string>();
+  const seq = useRef(0);
+  // Los eventos pasan a la lista una vez cada 100 ms: ON_CHANGE puede traer muchos por segundo.
+  const batch = useBatch<GnmiUpd>((b) => setUps((l) => { const all = l.concat(b); return all.length > 2000 ? all.slice(-1500) : all; }), 1500);
   const live = useLive(core, "gnmi", (e) => {
     try {
-      const u = JSON.parse(e.json ?? "") as GnmiUpd;
-      setUps((l) => (l.length > 2000 ? [...l.slice(-1500), u] : [...l, u]));
+      batch.push({ ...(JSON.parse(e.json ?? "") as GnmiUpd), id: ++seq.current });
     } catch { /* evento malformado: se ignora */ }
   }, undefined, onRun);
   const target = (): GnmiTarget => ({ host: host.trim(), port: Number(port) || 9339, credentialId: cred, caPath: ca.trim(), serverName: "" });
@@ -455,7 +458,7 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
           <Field label={t("visibility.every")} type="number" value={every} onChange={setEvery} w="sm" mono />
         </div>
         <div className="actions">
-          <button disabled={!host || !list.length || !!live.runId} onClick={() => { setUps([]); live.start(() => core.gnmiSubscribeStart(target(), list, mode, Number(every) || 10)); }}>{t("visibility.gnmi.subscribe")}</button>
+          <button disabled={!host || !list.length || !!live.runId} onClick={() => { batch.reset(); setUps([]); live.start(() => core.gnmiSubscribeStart(target(), list, mode, Number(every) || 10)); }}>{t("visibility.gnmi.subscribe")}</button>
           <button disabled={!live.runId} onClick={live.stop}>{t("common.stop")}</button>
         </div>
         {live.view}
@@ -463,7 +466,7 @@ function GnmiPanel({ core, active, onRun }: PanelProps) {
           ? <EmptyState icon="pulse" title={t("visibility.empty.title")}>{t("visibility.gnmi.empty")}</EmptyState>
           : (
             <ResultPanel title={t("visibility.events")} status={live.badge} actions={<button className="quiet sm" disabled={!ups.length} onClick={() => setUps([])}>{t("common.clear")}</button>}>
-              <Terminal as="ul" aria-live="polite" aria-label={t("visibility.events")}>{ups.map((u, i) => <li key={i}><Hl text={u.Sync ? t("visibility.gnmi.synced") : `${u.Path} = ${u.Delete ? t("visibility.gnmi.deleted") : JSON.stringify(u.Value)}`} /></li>)}</Terminal>
+              <Terminal as="ul" aria-live="polite" aria-label={t("visibility.events")}>{ups.map((u) => <li key={u.id}><Hl text={u.Sync ? t("visibility.gnmi.synced") : `${u.Path} = ${u.Delete ? t("visibility.gnmi.deleted") : JSON.stringify(u.Value)}`} /></li>)}</Terminal>
             </ResultPanel>
           )}
       </Section>

@@ -18,7 +18,7 @@ export function CleanerView({ core }: { core: CoreAPI }) {
   const [ran, setRan] = useState(""); // lo que se limpió: el diff no cambia si se sigue editando la entrada
   const q = useResult<CleanResult>();
   const res = q.data;
-  const copy = async () => { await core.copyText(res?.output ?? ""); setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
+  const copy = async () => { try { await core.copyText(res?.output ?? ""); } catch { return; } setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
 
   return (
     <Page title={t("cleaner.title")} description={t("cleaner.intro")}>

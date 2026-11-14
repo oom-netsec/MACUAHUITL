@@ -200,7 +200,8 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
           n.stopped = true;
           n.state = "failed";
         } else if (e.kind === "output") {
-          n.log = [...n.log, `${e.device ?? ""}: ${(e.text ?? "").trimEnd()}`];
+          const line = `${e.device ?? ""}: ${(e.text ?? "").trimEnd()}`;
+          n.log = n.log.length > 5000 ? [...n.log.slice(-4000), line] : [...n.log, line]; // tope: el núcleo repite el historial al reenganchar
         }
         return n;
       });

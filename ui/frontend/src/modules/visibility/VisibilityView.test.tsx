@@ -209,3 +209,27 @@ test("un sondeo SNMP en curso sigue al volver de otra pesta√±a y marca su pesta√
   expect(screen.getByRole("button", { name: "Detener" })).toBeEnabled();
   expect(core.snmpPollStart).toHaveBeenCalledTimes(1);
 });
+
+async function gnmiListo(core: ReturnType<typeof fakeCore>) {
+  render(<VisibilityView core={core} />);
+  await userEvent.click(screen.getByRole("tab", { name: "gNMI" }));
+  await userEvent.type(screen.getByLabelText("Equipo"), "10.0.0.9");
+}
+
+test("gnmi: doble clic en Suscribir abre un solo sondeo", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), gnmiSubscribeStart: vi.fn(() => new Promise<string>((r) => setTimeout(() => r("g1"), 30))) });
+  await gnmiListo(core);
+  await userEvent.dblClick(screen.getByRole("button", { name: "Suscribir" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Detener" })).toBeEnabled());
+  expect(core.gnmiSubscribeStart).toHaveBeenCalledTimes(1);
+});
+
+test("gnmi: varios eventos seguidos se muestran todos", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), gnmiSubscribeStart: vi.fn(async () => "g1") });
+  await gnmiListo(core);
+  await userEvent.click(screen.getByRole("button", { name: "Suscribir" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Detener" })).toBeEnabled());
+  act(() => { for (const p of ["a", "b", "c"]) core.emitVis("gnmi", { runId: "g1", json: JSON.stringify({ Path: `/p/${p}`, Value: 1 }) }); });
+  expect(await screen.findByText("/p/c = 1")).toBeInTheDocument();
+  expect(screen.getAllByText(/^\/p\/[abc] = 1$/)).toHaveLength(3);
+});

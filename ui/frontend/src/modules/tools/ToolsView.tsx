@@ -33,7 +33,7 @@ function TextResult<R = undefined>({ core, r, empty, view }: { core: CoreAPI; r:
   if (!r.busy && !r.data?.text && !r.error) return <>{empty}</>;
   const status = r.busy ? { tone: "info" as const, label: t("diag.status.running") }
     : r.error ? { tone: "bad" as const, label: t("diag.status.failed") } : { tone: "ok" as const, label: t("diag.status.done") };
-  const copy = async () => { await core.copyText(r.data?.text ?? ""); setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
+  const copy = async () => { try { await core.copyText(r.data?.text ?? ""); } catch { return; } setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
   const extra = r.data && view ? view(r.data) : null;
   const title = t(extra ? "tools.fullReport" : "common.output");
   return (

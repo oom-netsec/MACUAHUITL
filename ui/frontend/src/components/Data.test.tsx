@@ -59,3 +59,11 @@ test("formatDateTime muestra fecha y hora locales con segundos y deja pasar lo q
   expect(out).toMatch(/\d{2}:\d{2}:\d{2}/);
   expect(formatDateTime("no es fecha", "es")).toBe("no es fecha");
 });
+
+test("CopyButton no deja un rechazo sin atrapar si el portapapeles falla", async () => {
+  const core = fakeCore({ copyText: vi.fn(async () => { throw new Error("sin portapapeles"); }) });
+  withCore(core as unknown as CoreAPI, <CopyButton value="10.0.0.1" label="IP" />);
+  await userEvent.click(screen.getByRole("button", { name: "Copiar IP" }));
+  await new Promise((r) => setTimeout(r, 20)); // un rechazo sin atrapar haría fallar la corrida
+  expect(screen.getByRole("status")).not.toHaveTextContent("Copiado");
+});
