@@ -86,3 +86,15 @@ func TestMotivosAireOS(t *testing.T) {
 		}
 	}
 }
+
+// Los playbooks de AireOS solo corren en AireOS y ningún otro usa los suyos.
+func TestCompatibleAireOS(t *testing.T) {
+	if !Compatible("wlc-aireos", "wlc-aireos") {
+		t.Error("wlc-aireos consigo misma")
+	}
+	for _, p := range []string{"ios", "ios-xe", "wlc-9800", "asa", "ftd", "nx-os"} {
+		if Compatible("wlc-aireos", p) || Compatible(p, "wlc-aireos") {
+			t.Errorf("%s no es compatible con wlc-aireos", p)
+		}
+	}
+}

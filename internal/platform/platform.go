@@ -21,6 +21,9 @@ var (
 	ErrDesync          error = i18n.New("platform.err.desync", nil)
 	ErrUnknownPlatform error = i18n.New("platform.err.unknown", nil)
 	ErrClosed          error = i18n.New("platform.err.closed", nil)
+	ErrLoginFailed     error = i18n.New("platform.err.login_failed", nil)
+	ErrConfirmPrompt   error = i18n.New("platform.err.confirm_prompt", nil)
+	ErrConfigPrompt    error = i18n.New("platform.err.config_prompt", nil)
 )
 
 // Output es la salida limpia de un comando: sin eco, sin prompt y sin --More--.
@@ -72,4 +75,11 @@ type Driver interface {
 	// Close suelta el lector del shell. Tras cualquier error el driver queda inservible
 	// y devuelve ese error en cada llamada: el worker debe reconectar.
 	Close()
+}
+
+// ShellLogin es la interfaz opcional de los drivers cuyo equipo pide usuario y clave ya dentro del shell SSH
+// (AireOS: «User:» y «Password:»). Solo Patrol la llama, antes de Open, si el driver la implementa. El driver clona la
+// clave (pw sigue siendo de quien llama), la destruye tras usarla y en Close, y nunca la deja en errores, logs ni evidencia.
+type ShellLogin interface {
+	SetLogin(user string, pw *secret.Secret)
 }

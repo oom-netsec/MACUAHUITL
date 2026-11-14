@@ -4,6 +4,7 @@ package iosxe
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -31,7 +32,15 @@ var (
 	ftdPrompt = regexp.MustCompile(`(?:^|\n)> ?$`)
 	// Primer inicio de sesión de FTD: cambio de contraseña obligatorio o EULA. Responder cambiaría el equipo.
 	ftdFirstLogin = regexp.MustCompile(`(?i)you must change your password|you must accept the eula|press <enter> to display the eula|enter new password:|confirm new password:|unix password: ?$|to agree to the eula|please enter 'yes'`)
-	more          = regexp.MustCompile(` ?(?:--More--|<--- More --->) ?`) // el segundo es el de ASA
+	more          = regexp.MustCompile(` ?(?:--More-- or \(q\)uit|--More--|<--- More --->) ?`) // el segundo es el de ASA, el primero el de AireOS
+	// AireOS: prompt «(Nombre) >» (el nombre puede llevar espacios), el de configuración «(Nombre) config>» y el login
+	// «User:»/«Password:» dentro del shell. La pregunta de confirmación se detecta solo al final de la salida.
+	airePrompt  = regexp.MustCompile(`(?:^|\n)\(([^()\r\n]{1,63})\) ?>\s?$`)
+	aireConfig  = regexp.MustCompile(`(?:^|\n)\([^()\r\n]{1,63}\) config[\w\-]*>\s?$`)
+	aireUser    = regexp.MustCompile(`(?i)(?:^|\n)(?:user|username): ?$`)
+	airePass    = regexp.MustCompile(`(?i)(?:^|\n)password: ?$`)
+	aireConfirm = regexp.MustCompile(`(?i)(?:\(y/n\)|are you sure[^\n]*\?) *$`)
+	aireSysinfo = regexp.MustCompile(`(?m)^Product Name\.*\s*Cisco Controller`)
 	// Secuencias con que el equipo borra el --More--: "\r    \r" o retrocesos "\b\b  \b\b".
 	erase = regexp.MustCompile(`\r +\r|\x08+ +\x08+`)
 )
@@ -63,6 +72,10 @@ type driver struct {
 	err      error // primer error; desde ahí el driver no se reutiliza
 	buf      []byte
 	hostname string
+	// AireOS: aire se activa al ver su prompt; user/login son la credencial del shell (login se destruye tras usarla).
+	aire  bool
+	user  string
+	login *secret.Secret
 	// FTD (hostname vacío): sentinel = Run manda un Enter vacío tras el comando; el fin confirmado son dos prompts
 	// seguidos. confirmed/incomplete los deja untilIdle para Run.
 	sentinel, confirmed, incomplete bool
@@ -96,6 +109,7 @@ func (d *driver) Err() error {
 }
 
 func (d *driver) Close() {
+	d.dropLogin()
 	if d.quit != nil {
 		d.fail(platform.ErrClosed)
 	}
@@ -103,18 +117,81 @@ func (d *driver) Close() {
 
 func New() platform.Driver { return &driver{} }
 
+// SetLogin guarda user y un clon de pw (sin pasar por string) para el «User:»/«Password:» del shell de AireOS.
+func (d *driver) SetLogin(user string, pw *secret.Secret) {
+	d.dropLogin()
+	d.user = user
+	if !pw.Empty() {
+		d.login = secret.New(append([]byte(nil), pw.Bytes()...)) // New pone el intermedio en ceros
+	}
+}
+
+func (d *driver) dropLogin() { d.login.Destroy(); d.login = nil }
+
+// aireLogin contesta «User:» y «Password:» una sola vez, solo antes del primer prompt. Un rechazo (vuelve a pedir
+// User: o Password:), la falta de credencial o un prompt inesperado abortan sin reintentar ni escribir de más. Ningún
+// error ni texto lleva la clave.
+func (d *driver) aireLogin(ctx context.Context) (string, error) {
+	defer d.dropLogin()
+	if d.user == "" || d.login.Empty() || strings.ContainsAny(d.user, "\r\n") || bytes.ContainsAny(d.login.Bytes(), "\r\n") {
+		return "", platform.ErrLoginFailed
+	}
+	next := func(s string) bool {
+		return airePass.MatchString(s) || aireUser.MatchString(s) || airePrompt.MatchString(s)
+	}
+	if _, err := io.WriteString(d.w, d.user+"\n"); err != nil {
+		return "", fmt.Errorf("%w: %v", platform.ErrClosed, err)
+	}
+	text, err := d.until(ctx, next)
+	if err != nil {
+		return "", err
+	}
+	if !airePass.MatchString(text) {
+		return "", platform.ErrLoginFailed
+	}
+	line := append(append([]byte(nil), d.login.Bytes()...), '\n')
+	_, err = d.w.Write(line)
+	clear(line)
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", platform.ErrClosed, err)
+	}
+	if text, err = d.until(ctx, next); err != nil {
+		return "", err
+	}
+	if !airePrompt.MatchString(text) {
+		return "", platform.ErrLoginFailed
+	}
+	return text, nil
+}
+
 func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *secret.Secret) error {
 	defer enable.Destroy()
+	defer d.dropLogin()
 	d.w, d.chunks, d.readErr, d.quit = w, make(chan []byte, 64), make(chan error, 1), make(chan struct{})
 	go d.pump(r)
 
 	ctx, cancel := context.WithTimeout(ctx, openTimeout)
 	defer cancel()
 	text, err := d.until(ctx, func(s string) bool {
-		return anyPrompt.MatchString(s) || ftdPrompt.MatchString(s) || ftdFirstLogin.MatchString(s)
+		return anyPrompt.MatchString(s) || ftdPrompt.MatchString(s) || ftdFirstLogin.MatchString(s) ||
+			airePrompt.MatchString(s) || aireConfig.MatchString(s) || aireUser.MatchString(s)
 	})
 	if err != nil {
 		return d.fail(err)
+	}
+	if aireConfig.MatchString(text) {
+		return d.fail(platform.ErrConfigPrompt)
+	}
+	if aireUser.MatchString(text) {
+		var err error
+		if text, err = d.aireLogin(ctx); err != nil {
+			d.buf = nil // el equipo pudo repetir la clave con eco
+			return d.fail(err)
+		}
+	}
+	if m := airePrompt.FindStringSubmatch(text); m != nil {
+		d.aire, d.hostname = true, m[1]
+		return nil // AireOS: sin enable y sin «terminal …» (config paging disable es configuración)
 	}
 	m := anyPrompt.FindStringSubmatch(text)
 	if m == nil {
@@ -212,6 +289,9 @@ func (d *driver) pump(r io.Reader) {
 func (d *driver) atPrompt(s string) bool {
 	last := s[strings.LastIndexByte(s, '\n')+1:]
 	last = strings.TrimSuffix(last, " ")
+	if d.aire {
+		return last == "("+d.hostname+") >"
+	}
 	if d.hostname == "" { // FTD: solo «>»
 		return last == ">"
 	}
@@ -238,10 +318,16 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 		// por los patrones con (?:^|\n)). Limpiar todo el búfer en cada pedazo costaba tiempo cuadrático: 63 s con 1 MB.
 		from := max(bytes.LastIndexByte(d.buf, '\n'), 0)
 		tail := string(d.buf[from:])
-		if t := strings.TrimRight(tail, " "); strings.HasSuffix(t, "--More--") || strings.HasSuffix(t, "<--- More --->") {
+		// AireOS: solo el «--More-- or (q)uit» completo (un «--More--» partido entre dos lecturas no se contesta a medias).
+		if t := strings.TrimRight(tail, " "); d.aire && strings.HasSuffix(t, "--More-- or (q)uit") || !d.aire && strings.HasSuffix(t, "--More--") || strings.HasSuffix(t, "<--- More --->") {
 			tail = more.ReplaceAllString(tail, "")
 			d.buf = append(d.buf[:from], tail...)
 			if _, err := io.WriteString(d.w, " "); err != nil {
+				return clean(string(d.buf)), err
+			}
+		}
+		if d.aire {
+			if err := d.aireGuard(ctx, clean(tail)); err != nil {
 				return clean(string(d.buf)), err
 			}
 		}
@@ -297,6 +383,23 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 			}
 		}
 	}
+}
+
+// aireGuard corta el comando si el final de la salida es algo que el driver nunca contesta: un «User:»/«Password:»
+// fuera del login (no se escribe nada), el prompt de configuración o una pregunta de confirmación (y/N).
+func (d *driver) aireGuard(ctx context.Context, tail string) error {
+	switch {
+	case aireUser.MatchString(tail) || airePass.MatchString(tail):
+		return platform.ErrLoginFailed
+	case aireConfig.MatchString(tail):
+		return platform.ErrConfigPrompt
+	case aireConfirm.MatchString(tail):
+		if d.dataWithin(ctx, ftdConfirmSettle) { // «(y/N)» a mitad de una línea que sigue llegando no es una pregunta
+			return nil
+		}
+		return platform.ErrConfirmPrompt
+	}
+	return nil
 }
 
 // ftdSettle es la pausa sin datos tras un «> » para aceptarlo como prompt de FTD.
@@ -474,6 +577,7 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	}
 	out.Text = text
 	out.Invalid = invalidOutput(text)
+	out.Incomplete = out.Incomplete || errors.Is(err, platform.ErrConfirmPrompt)
 	return out, err
 }
 
@@ -519,6 +623,16 @@ var asa = regexp.MustCompile(`(?m)^Cisco Adaptive Security Appliance Software Ve
 func (d *driver) Detect(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, maxDetect)
 	defer cancel()
+	if d.aire { // AireOS no tiene «show version» («Incorrect usage»): se identifica con show sysinfo
+		out, err := d.Run(ctx, "show sysinfo", 60*time.Second)
+		if err != nil {
+			return "", err
+		}
+		if aireSysinfo.MatchString(out.Text) {
+			return "wlc-aireos", nil
+		}
+		return "", platform.ErrUnknownPlatform
+	}
 	out, err := d.Run(ctx, "show version", 60*time.Second)
 	if err != nil {
 		return "", err
