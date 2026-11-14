@@ -2,12 +2,12 @@ package diag
 
 import (
 	"fmt"
-	"net"
 	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/ifaces"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
@@ -278,10 +278,12 @@ func Build(r Request) (bin string, argv []string, err error) {
 var localIPs = realLocalIPs
 
 func realLocalIPs() (out []netip.Addr) {
-	addrs, _ := net.InterfaceAddrs()
-	for _, a := range addrs {
-		if p, err := netip.ParsePrefix(a.String()); err == nil {
-			out = append(out, p.Addr())
+	ifs, _ := ifaces.List()
+	for _, i := range ifs {
+		for _, a := range i.Addresses {
+			if p, err := netip.ParsePrefix(a); err == nil {
+				out = append(out, p.Addr())
+			}
 		}
 	}
 	return out

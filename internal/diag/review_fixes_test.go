@@ -171,3 +171,9 @@ func localTest(t *testing.T) {
 	localIPs = func() []netip.Addr { return []netip.Addr{netip.MustParseAddr("192.0.2.9")} }
 	t.Cleanup(func() { localIPs = realLocalIPs })
 }
+
+func TestLocalIPsRealIncluyeLoopback(t *testing.T) {
+	if !isLocalIP(netip.MustParseAddr("127.0.0.1")) || isLocalIP(netip.MustParseAddr("0.0.0.0")) {
+		t.Fatal("127.0.0.1 debe ser local y 0.0.0.0 no")
+	}
+}
