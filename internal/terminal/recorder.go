@@ -29,9 +29,10 @@ const stamp = "2006-01-02T15:04:05.000Z07:00"
 var secretPrompt = regexp.MustCompile(`(?i)\b(pass(word|phrase|code)|secret)\b[^:\r\n]{0,30}:\s*$`)
 
 var (
-	ansi        = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b.`)
-	promptRe    = regexp.MustCompile(`^\S+[#>]`)
-	shellPrompt = regexp.MustCompile(`^\S+[#>]\s*$`)
+	ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b.`)
+	// Prompt del equipo: «SW1(config)#» o el de AireOS «(Cisco Controller) >» / «(Cisco Controller) config>».
+	promptRe    = regexp.MustCompile(`^(?:\S+[#>]|\([^()\r\n]+\) (?:config)?>)`)
+	shellPrompt = regexp.MustCompile(`^(?:\S+[#>]|\([^()\r\n]+\) (?:config)?>)\s*$`)
 )
 
 const (
