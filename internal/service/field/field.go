@@ -162,6 +162,9 @@ func serveAddr(proto, addr string) (string, bool) {
 	if !ok {
 		return "", false
 	}
+	if _, err := netip.ParseAddrPort(addr); err == nil { // ya trae puerto (también [fe80::1%eth0]:7, cuya zona confundía a ParseAddr)
+		return addr, true
+	}
 	if ip, err := netip.ParseAddr(strings.Trim(addr, "[]")); err == nil {
 		return netip.AddrPortFrom(ip, port).String(), true
 	}

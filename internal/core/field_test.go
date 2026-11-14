@@ -117,7 +117,7 @@ func TestFieldServeListensHintsAndAudits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first: %v", err)
 	}
-	_, port, _ := strings.Cut(first.Listening, "127.0.0.1:")
+	port, _ := strings.CutPrefix(first.Listening, "127.0.0.1:")
 	if port == "" || port == "0" || !strings.Contains(first.Hint, "copy tftp://127.0.0.1/c2960x.bin") || !strings.Contains(first.Hint, ":"+port) {
 		t.Fatalf("first = %+v", first)
 	}

@@ -12,6 +12,11 @@ func TestServeAddrPuertoPorOmision(t *testing.T) {
 		{"tftp", "[::1]", "[::1]:6969"},
 		{"tftp", "127.0.0.1:0", "127.0.0.1:0"},
 		{"http", "127.0.0.1:9090", "127.0.0.1:9090"},
+		{"tftp", "fe80::1%eth0", "[fe80::1%eth0]:6969"},
+		{"tftp", "[fe80::1%eth0]:7", "[fe80::1%eth0]:7"},
+		{"tftp", "[::1]:7000", "[::1]:7000"},
+		{"tftp", "localhost", "localhost"},
+		{"tftp", "", ""},
 	} {
 		got, ok := serveAddr(c.proto, c.in)
 		if !ok || got != c.want {
