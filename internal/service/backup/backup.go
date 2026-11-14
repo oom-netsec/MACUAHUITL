@@ -50,6 +50,12 @@ type tracked struct {
 	incomplete  bool             // alguna salida llegó incompleta: no se relee, pero la carpeta de Patrol se conserva
 }
 
+// fstat es lo que se vio de un .txt de Patrol en una vuelta: si no cambió en la siguiente, no lo están escribiendo.
+type fstat struct {
+	size int64
+	mod  time.Time
+}
+
 type backupSvc struct {
 	v1.UnimplementedBackupServiceServer
 	d      service.Deps
@@ -62,6 +68,7 @@ type backupSvc struct {
 	jobs   map[string]*tracked
 	final  map[string]collected // resultado final de los últimos trabajos propios: quien llega segundo lo recibe igual
 	order  []string
+	seen   map[string]map[string]fstat // trabajo -> archivo -> lo visto en la vuelta anterior
 }
 
 const maxFinal = 32
@@ -285,19 +292,31 @@ func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int) (co
 	if j.Dir == "" {
 		return res, nil
 	}
+	observed := map[string]fstat{}
 	skip := func(rel string, size int64) bool {
 		if tr != nil && tr.skip(rel, size) {
 			return true
 		}
 		// Con el trabajo en marcha, Patrol puede estar escribiendo ese archivo: leerlo ahora guardaría un respaldo cortado.
+		// Se lee solo si lleva quieto más de s.quiet y tamaño y fecha son los mismos que en la vuelta anterior (el mtime
+		// solo no basta: FAT/exFAT lo redondea a 2 s). Límite: un archivo en el que Patrol escribe cada vuelta no se
+		// importa hasta que el trabajo termina.
 		if !terminal && s.quiet > 0 {
-			if fi, err := os.Stat(filepath.Join(j.Dir, filepath.FromSlash(rel))); err == nil && time.Since(fi.ModTime()) < s.quiet {
-				return true
+			fi, err := os.Stat(filepath.Join(j.Dir, filepath.FromSlash(rel)))
+			if err != nil {
+				return false
 			}
+			cur := fstat{fi.Size(), fi.ModTime()}
+			observed[rel] = cur
+			return time.Since(fi.ModTime()) < s.quiet || s.seen[job][rel] != cur
 		}
 		return false
 	}
 	b, err := analyze.LoadSkipping(j.Dir, skip)
+	if s.seen == nil {
+		s.seen = map[string]map[string]fstat{}
+	}
+	s.seen[job] = observed
 	if err != nil {
 		// Sin salidas aún no es un error mientras el trabajo corre.
 		if terminal {
@@ -455,6 +474,7 @@ func (s *backupSvc) auditWarnings(job string, tr *tracked, ws []string) {
 // forget suelta el trabajo; con clean borra su carpeta de Patrol (ya copiada), solo si la creó este servicio.
 func (s *backupSvc) forget(job string, tr *tracked, clean bool) {
 	delete(s.jobs, job)
+	delete(s.seen, job)
 	if clean && tr != nil && filepath.Dir(tr.lote) == filepath.Join(s.outputs(tr), "respaldos", trabajos) {
 		os.RemoveAll(tr.lote)
 	}

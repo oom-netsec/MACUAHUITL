@@ -579,10 +579,15 @@ func TestNoGuardaUnTxtDePatrolQueSeEstaEscribiendo(t *testing.T) {
 	if strings.Contains(r.Report.Text, "guardado(s)") && !strings.Contains(r.Report.Text, "0 respaldo(s) guardado(s)") {
 		t.Fatalf("guardó un archivo recién tocado: %s", r.Report.Text)
 	}
-	// Quieto desde hace rato: ya se lee.
+	// Quieto desde hace rato, pero la fecha acaba de cambiar respecto a la vuelta anterior: todavía no.
 	old := time.Now().Add(-2 * time.Hour)
 	fs, _ := filepath.Glob(filepath.Join(dir, "SW1_192.0.2.1", "*.txt"))
 	os.Chtimes(fs[0], old, old)
+	r, _ = s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
+	if strings.Contains(r.Report.Text, "1 respaldo(s) guardado(s)") {
+		t.Fatalf("lo leyó sin ver el mismo tamaño y fecha dos vueltas seguidas: %s", r.Report.Text)
+	}
+	// Dos vueltas seguidas con el mismo tamaño y fecha, y quieto: ya se lee.
 	r, _ = s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
 	if !strings.Contains(r.Report.Text, "1 respaldo(s) guardado(s)") {
 		t.Fatalf("no lo leyó al quedar quieto: %s", r.Report.Text)
