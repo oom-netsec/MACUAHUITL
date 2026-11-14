@@ -428,3 +428,33 @@ func TestPublishRechazaArchivosSensibles(t *testing.T) {
 		t.Errorf("archivo normal: %v", err)
 	}
 }
+
+// Todo lo oculto bajo $HOME (no solo la lista fija) se rechaza, como archivo suelto y como carpeta de envío/recepción.
+func TestOcultosBajoHomeSeRechazan(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	for _, d := range []string{".password-store", ".thunderbird/x.default", ".cache/app", "Descargas/.oculta", "Descargas"} {
+		os.MkdirAll(filepath.Join(home, d), 0o700)
+	}
+	for _, f := range []string{".password-store/x.gpg", ".thunderbird/x.default/logins.json", ".cache/app/a", "Descargas/.oculta/a", "Descargas/.env"} {
+		os.WriteFile(filepath.Join(home, f), []byte("s"), 0o600)
+		if _, err := Publish([]string{filepath.Join(home, f)}); err == nil {
+			t.Errorf("~/%s publicado", f)
+		}
+	}
+	for _, d := range []string{".password-store", ".thunderbird/x.default", ".cache/app", "Descargas/.oculta"} {
+		if _, err := ValidateDir(filepath.Join(home, d)); err == nil {
+			t.Errorf("~/%s aceptada como carpeta", d)
+		}
+	}
+	os.WriteFile(filepath.Join(home, "c9300.bin"), []byte("f"), 0o600)
+	os.WriteFile(filepath.Join(home, "Descargas", "r.cfg"), []byte("f"), 0o600)
+	for _, f := range []string{"c9300.bin", "Descargas/r.cfg"} {
+		if _, err := Publish([]string{filepath.Join(home, f)}); err != nil {
+			t.Errorf("~/%s: %v", f, err)
+		}
+	}
+	if _, err := ValidateDir(filepath.Join(home, "Descargas")); err != nil {
+		t.Errorf("~/Descargas: %v", err)
+	}
+}

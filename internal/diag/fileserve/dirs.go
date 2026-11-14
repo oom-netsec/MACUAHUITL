@@ -94,6 +94,11 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 			}
 		}
 	}
+	for _, p := range []string{clean, real} {
+		if h := hiddenUnderHome(p); h != "" {
+			return "", nil, i18n.New("fileserve.err.dir_sensitive", i18n.A("dir", p, "deny", h))
+		}
+	}
 	if real == "/" || clean == "/" {
 		return "", nil, i18n.New("fileserve.err.dir_root", nil)
 	}
@@ -126,14 +131,36 @@ func checkFileDeny(file string, extra []string) error {
 			}
 		}
 	}
-	// Oculto directo en $HOME (.bash_history, .netrc, .git-credentials…): no se publica; uno visible (~/c9300.bin) sí.
-	if home, err := os.UserHomeDir(); err == nil && filepath.IsAbs(home) {
-		hr, _ := filepath.EvalSymlinks(home)
-		for _, p := range paths {
-			if d := filepath.Dir(p); (d == filepath.Clean(home) || d == hr) && strings.HasPrefix(filepath.Base(p), ".") {
-				return i18n.New("fileserve.err.dir_home", nil)
-			}
+	for _, p := range paths {
+		if h := hiddenUnderHome(p); h != "" {
+			return i18n.New("fileserve.err.dir_sensitive", i18n.A("dir", p, "deny", h))
 		}
 	}
 	return nil
+}
+
+// hiddenUnderHome devuelve la ruta oculta (~/.password-store, ~/.cache/x…) si algún componente de p bajo $HOME
+// empieza con «.»; ~/c9300.bin y ~/Descargas/x no lo son. Se prueba con $HOME tal cual y resuelto.
+func hiddenUnderHome(p string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || !filepath.IsAbs(home) {
+		return ""
+	}
+	homes := []string{filepath.Clean(home)}
+	if hr, err := filepath.EvalSymlinks(home); err == nil {
+		homes = append(homes, hr)
+	}
+	for _, h := range homes {
+		rel, err := filepath.Rel(h, p)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			continue
+		}
+		parts := strings.Split(rel, string(filepath.Separator))
+		for i, c := range parts {
+			if strings.HasPrefix(c, ".") && c != "." {
+				return filepath.Join(h, filepath.Join(parts[:i+1]...))
+			}
+		}
+	}
+	return ""
 }
