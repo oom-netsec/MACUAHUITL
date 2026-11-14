@@ -24,6 +24,8 @@ var (
 	ErrLoginFailed     error = i18n.New("platform.err.login_failed", nil)
 	ErrConfirmPrompt   error = i18n.New("platform.err.confirm_prompt", nil)
 	ErrConfigPrompt    error = i18n.New("platform.err.config_prompt", nil)
+	// ErrUnexpectedPrompt: un «User:» o «Password:» llegó fuera del login (a mitad de un comando); no se contesta.
+	ErrUnexpectedPrompt error = i18n.New("platform.err.unexpected_prompt", nil)
 )
 
 // Output es la salida limpia de un comando: sin eco, sin prompt y sin --More--.

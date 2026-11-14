@@ -85,6 +85,7 @@ func TestFTDOpenSinEnable(t *testing.T) {
 
 // Primer login: cambio de contraseña obligatorio o EULA. Open aborta sin escribir NADA (ni el secreto ni un Enter).
 func TestFTDPrimerLoginNoEscribeNada(t *testing.T) {
+	fastSettle(t)
 	for _, first := range []string{
 		"You must change your password\r\nEnter new password: ",
 		"You must change your password\r\n(current) UNIX password: ",
@@ -168,9 +169,11 @@ func scriptedDevLog(t *testing.T, first func(out func(string)), handle func(line
 		var buf []byte
 		b := make([]byte, 1)
 		for {
-			if _, err := devR.Read(b); err != nil {
+			if n, err := devR.Read(b); err != nil {
 				close(q)
 				return
+			} else if n == 0 { // una escritura de 0 bytes no repite el byte anterior
+				continue
 			}
 			if b[0] != '\n' {
 				buf = append(buf, b[0])
