@@ -340,7 +340,7 @@ func (r *Recorder) commitHeld() {
 	h := r.held
 	r.held = nil
 	for _, l := range h {
-		r.input(r.typedLine(l))
+		r.input(l)
 	}
 }
 
@@ -395,9 +395,9 @@ func (r *Recorder) flush() {
 	default:
 		// Sin salida nueva desde el Enter anterior: el equipo aún no mostró su prompt y esta línea
 		// podría ser la contraseña que el prompt de secreto va a pedir. Se decide al llegar la salida.
-		r.held = append(r.held, line)
+		r.held = append(r.held, r.typedLine(line)) // ya enmascarada: los valores entran a la red por contenido al teclear
 		if len(r.held) > heldMax {
-			r.input(r.typedLine(r.held[0]))
+			r.input(r.held[0])
 			r.held = r.held[1:]
 		}
 	}
