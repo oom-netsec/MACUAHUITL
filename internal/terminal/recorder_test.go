@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -319,8 +320,10 @@ func TestPromptNuevoReiniciaElBloqueDeLoTecleado(t *testing.T) {
 // El resto de un eco partido por un log asíncrono también se enmascara.
 func TestEnmascaraRestoDelEcoTrasUnLog(t *testing.T) {
 	r, b := newRec()
-	r.Output([]byte("ciscoasa(config-aaa-server-host)#key Se"))
-	r.Output([]byte("%ASA-5-111008: User 'x' executed a command\r\n"))
+	r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+	r.Input([]byte("key Secret")) // sin Enter: el eco va por detrás de lo tecleado
+	r.Output([]byte("key Se"))
+	r.Output([]byte("\r\n%ASA-5-111008: User 'x' executed a command\r\n"))
 	r.Output([]byte("cret\r\nciscoasa(config-aaa-server-host)# "))
 	r.Close()
 	if out := b.String(); strings.Contains(out, " cret\n") || strings.Contains(out, "Secret") {
@@ -343,8 +346,10 @@ func TestExitPegadoCierraElBloqueTecleado(t *testing.T) {
 // El resto del eco puede traer espacios (clave tipo 0 de varias palabras) y venir tras varios logs.
 func TestEnmascaraRestoDelEcoConEspaciosYVariosLogs(t *testing.T) {
 	r, b := newRec()
-	r.Output([]byte("ciscoasa(config-aaa-server-host)#key 0 My Se"))
-	r.Output([]byte("%ASA-5-111008: uno\r\n"))
+	r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+	r.Input([]byte("key 0 My Secret phrase"))
+	r.Output([]byte("key 0 My Se"))
+	r.Output([]byte("\r\n%ASA-5-111008: uno\r\n"))
 	r.Output([]byte("%ASA-5-111009: dos\r\n"))
 	r.Output([]byte("cret phrase\r\nciscoasa(config-aaa-server-host)# "))
 	r.Close()
@@ -360,19 +365,23 @@ func TestEcoEnmascaradoTapaLaSalidaHastaElPrompt(t *testing.T) {
 	iosLog := "*Nov 14 10:00:00.123: %SYS-5-CONFIG_I: Configured from console by admin"
 	casos := []struct {
 		nombre string
+		typed  string // lo tecleado sin Enter cuando llega el eco partido
 		salida []string
 		leak   []string // líneas que no deben salir enteras en claro
 		keep   []string
 	}{
-		{"fuera de bloque", []string{"ciscoasa(config)#failover key Se", "\r\n" + asaLog + "\r\n", "cret\r\n", "ciscoasa(config)# "}, []string{"cret"}, []string{asaLog}},
-		{"ios con fecha", []string{"SW1(config)#enable secret 0 My Se", "\r\n" + iosLog + "\r\n", "cret phrase\r\n", "SW1(config)# "}, []string{"cret phrase"}, []string{iosLog}},
-		{"partido por dos logs", []string{"ciscoasa(config)#failover key Se", "\r\n" + asaLog + "\r\n", "cr\r\n", asaLog + "\r\n", "et\r\n", "ciscoasa(config)# "}, []string{"cr", "et"}, []string{asaLog}},
-		{"warning intacto", []string{"ciscoasa(config)#enable password 0 Pw1", "\r\nWARNING: Command has been added to the configuration using a type 0 password.\r\nERROR: x\r\nINFO: y\r\nciscoasa(config)# "}, nil, []string{"WARNING: Command has been added", "ERROR: x", "INFO: y"}},
-		{"show después del prompt", []string{"ciscoasa(config)#failover key Se", "\r\n" + asaLog + "\r\n", "cret\r\n", "ciscoasa# ", "show version\r\nCisco Adaptive Security Appliance\r\nciscoasa# "}, []string{"cret"}, []string{"Cisco Adaptive Security Appliance"}},
+		{"fuera de bloque", "failover key Secret", []string{"ciscoasa(config)#failover key Se", "\r\n" + asaLog + "\r\n", "cret\r\n", "ciscoasa(config)# "}, []string{"cret"}, []string{asaLog}},
+		{"ios con fecha", "enable secret 0 My Secret phrase", []string{"SW1(config)#enable secret 0 My Se", "\r\n" + iosLog + "\r\n", "cret phrase\r\n", "SW1(config)# "}, []string{"cret phrase"}, []string{iosLog}},
+		{"partido por dos logs", "failover key Secret", []string{"ciscoasa(config)#failover key Se", "\r\n" + asaLog + "\r\n", "cr\r\n", asaLog + "\r\n", "et\r\n", "ciscoasa(config)# "}, []string{"cr", "et"}, []string{asaLog}},
+		{"warning intacto", "", []string{"ciscoasa(config)#enable password 0 Pw1", "\r\nWARNING: Command has been added to the configuration using a type 0 password.\r\nERROR: x\r\nINFO: y\r\nciscoasa(config)# "}, nil, []string{"WARNING: Command has been added", "ERROR: x", "INFO: y"}},
+		{"show después del prompt", "failover key Secret", []string{"ciscoasa(config)#failover key Se", "\r\n" + asaLog + "\r\n", "cret\r\n", "ciscoasa# ", "show version\r\nCisco Adaptive Security Appliance\r\nciscoasa# "}, []string{"cret"}, []string{"Cisco Adaptive Security Appliance"}},
 	}
 	for _, c := range casos {
 		r, b := newRec()
-		for _, s := range c.salida {
+		for i, s := range c.salida {
+			if i == 1 {
+				r.Input([]byte(c.typed))
+			}
 			r.Output([]byte(s))
 		}
 		r.Close()
@@ -387,5 +396,117 @@ func TestEcoEnmascaradoTapaLaSalidaHastaElPrompt(t *testing.T) {
 				t.Errorf("%s: se perdió %q:\n%s", c.nombre, k, out)
 			}
 		}
+	}
+}
+
+// Un eco completo (con Enter) de un comando exec con secreto no tapa su salida.
+func TestEcoCompletoNoTapaLaSalida(t *testing.T) {
+	casos := []struct{ cmd, salida, keep string }{
+		{"copy scp://bob:Pw1@10.1.1.9/c.txt flash:c.txt", "Destination filename [c.txt]?\r\nSending file modes:\r\n!\r\n1234 bytes copied in 0.5 secs\r\n", "1234 bytes copied"},
+		{"license smart register idtoken TOK123", "Registration process is in progress.\r\n", "Registration process is in progress."},
+		{"show run | include password 7 0822", "enable password 7 0822455D0A16\r\nusername a password 7 0822455D0A16\r\nhostname FW1\r\n", "hostname FW1"},
+	}
+	for _, c := range casos {
+		r, b := newRec()
+		r.Output([]byte("ciscoasa# "))
+		r.Input([]byte(c.cmd + "\r"))
+		r.Output([]byte(c.cmd + "\r\n" + c.salida + "ciscoasa# "))
+		r.Close()
+		out := b.String()
+		if !strings.Contains(out, c.keep) || strings.Contains(out, "Z <MASKED:secret>\n") {
+			t.Errorf("%q:\n%s", c.cmd, out)
+		}
+		if strings.Contains(out, "Pw1") || strings.Contains(out, "TOK123") || strings.Contains(out, "0822455D") {
+			t.Errorf("fuga en %q:\n%s", c.cmd, out)
+		}
+	}
+}
+
+// Integridad: en una sesión mezclada no se pierde ni se duplica ninguna línea de salida ni de «>>>».
+func TestIntegridadDeLaSesion(t *testing.T) {
+	r, b := newRec()
+	const n = 300
+	var typed []string
+	r.Output([]byte("ciscoasa# "))
+	for i := 0; i < n; i++ {
+		cmd := fmt.Sprintf("show thing %d", i)
+		secret := i%7 == 0
+		if secret {
+			cmd = fmt.Sprintf("failover key Secret%d", i)
+		}
+		r.Input([]byte(cmd + "\r"))
+		if secret {
+			r.Output([]byte(cmd + "\r\n"))
+		} else {
+			typed = append(typed, cmd)
+			r.Output([]byte(cmd + "\r\n"))
+		}
+		if i%5 == 0 {
+			r.Output([]byte(fmt.Sprintf("%%ASA-5-111008: log-%d\r\n", i)))
+		}
+		for j := 0; j < 3; j++ {
+			r.Output([]byte(fmt.Sprintf("out-%d-%d some output text\r\n", i, j)))
+		}
+		if i == 150 {
+			for j := 0; j < 3000; j++ {
+				r.Output([]byte(fmt.Sprintf("big-%d %s\r\n", j, strings.Repeat("x", 70))))
+			}
+		}
+		r.Output([]byte("ciscoasa# "))
+	}
+	r.Close()
+	out := b.String()
+	for i := 0; i < n; i++ {
+		for j := 0; j < 3; j++ {
+			if c := strings.Count(out, fmt.Sprintf("Z out-%d-%d some output text\n", i, j)); c != 1 {
+				t.Fatalf("out-%d-%d aparece %d veces", i, j, c)
+			}
+		}
+		if i%5 == 0 && strings.Count(out, fmt.Sprintf("log-%d\n", i)) != 1 {
+			t.Fatalf("log-%d perdido o duplicado", i)
+		}
+	}
+	for j := 0; j < 3000; j++ {
+		if strings.Count(out, fmt.Sprintf("Z big-%d ", j)) != 1 {
+			t.Fatalf("big-%d perdido o duplicado", j)
+		}
+	}
+	for _, c := range typed {
+		if strings.Count(out, ">>> "+c+"\n") != 1 {
+			t.Fatalf("%q perdido o duplicado en >>>", c)
+		}
+	}
+	if got, want := strings.Count(out, ">>> "), n; got != want {
+		t.Fatalf("líneas >>>: %d, quería %d", got, want)
+	}
+	if strings.Contains(out, "Secret") {
+		t.Fatalf("fuga de clave:\n%.500s", out)
+	}
+}
+
+// Rendimiento: unos 5 MB de un show, en trozos de 4 KB, no se vuelven cuadráticos (mejor de dos corridas: la
+// máquina puede estar cargada).
+func TestRendimientoDeCincoMegas(t *testing.T) {
+	if testing.Short() || raceActivo {
+		t.Skip("lenta (con -race el detector multiplica el costo de las expresiones regulares)")
+	}
+	line := strings.Repeat("a", 79) + "\r\n"
+	var data []byte
+	for len(data) < 5<<20 {
+		data = append(data, line...)
+	}
+	best := time.Hour
+	for k := 0; k < 2 && best > 2*time.Second; k++ {
+		r, _ := newRec()
+		start := time.Now()
+		for i := 0; i < len(data); i += 4096 {
+			r.Output(data[i:min(i+4096, len(data))])
+		}
+		r.Close()
+		best = min(best, time.Since(start))
+	}
+	t.Logf("5 MB en %v", best)
+	if best > 2*time.Second {
+		t.Errorf("tardó %v", best)
 	}
 }

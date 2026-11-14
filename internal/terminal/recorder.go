@@ -56,7 +56,7 @@ type Recorder struct {
 	held    []string
 	lastBlk string      // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
 	typed   mask.Stream // lleva el bloque entre las líneas tecleadas
-	cont    bool        // el eco anterior se enmascaró en un bloque: la línea suelta que siga puede ser su resto
+	cont    bool        // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
 	hidden  bool        // lo tecleado es una contraseña: no se graba
 	line    []byte      // lo tecleado en la línea actual
 	lastCR  bool
@@ -122,7 +122,7 @@ func (r *Recorder) outLine(l string) {
 	if pr := promptRe.FindString(l); pr != "" {
 		r.setPromptBlock(blockOfPrompt(pr))
 		echo := r.stream.Prompted(l[len(pr):], r.lastBlk)
-		r.cont = echo != l[len(pr):]
+		r.cont = echo != l[len(pr):] && len(r.line) > 0 // eco partido: aún se está tecleando
 		out = pr + echo
 	} else if r.cont && !equipoMsg(l) {
 		// Desde un eco enmascarado hasta el siguiente prompt, lo que no es syslog ni aviso del equipo
