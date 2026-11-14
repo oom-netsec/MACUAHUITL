@@ -107,13 +107,19 @@ func TestFieldServeListensHintsAndAudits(t *testing.T) {
 			t.Errorf("%v: %v", r, err)
 		}
 	}
-	st, err := fc.ServeFiles(ctx(t), &v1.ServeFilesRequest{Protocol: "tftp", Addr: "127.0.0.1", Files: []string{img}, DurationSeconds: 1})
+	// Puerto libre: el 6969 por omisión puede estar ocupado por otra suite o por la app abierta (el puerto por omisión
+	// se prueba sin sockets en service/field, TestServeAddrPuertoPorOmision).
+	st, err := fc.ServeFiles(ctx(t), &v1.ServeFilesRequest{Protocol: "tftp", Addr: "127.0.0.1:0", Files: []string{img}, DurationSeconds: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
 	first, err := st.Recv()
-	if err != nil || first.Listening != "127.0.0.1:6969" || !strings.Contains(first.Hint, "copy tftp://127.0.0.1/c2960x.bin") || !strings.Contains(first.Hint, ":6969") {
-		t.Fatalf("first = %+v, %v", first, err)
+	if err != nil {
+		t.Fatalf("first: %v", err)
+	}
+	port, _ := strings.CutPrefix(first.Listening, "127.0.0.1:")
+	if port == "" || port == "0" || !strings.Contains(first.Hint, "copy tftp://127.0.0.1/c2960x.bin") || !strings.Contains(first.Hint, ":"+port) {
+		t.Fatalf("first = %+v", first)
 	}
 	for err == nil {
 		_, err = st.Recv()
