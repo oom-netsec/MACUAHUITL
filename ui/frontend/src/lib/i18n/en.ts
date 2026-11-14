@@ -2670,4 +2670,11 @@ export const en: Record<Key, string> = {
   "vocab.phase.no_data": "No data",
   "vocab.proposal.accepted": "Accepted",
   "vocab.proposal.rejected": "Rejected",
+  "scripts.col.hidden": "hidden by a package",
+  "scripts.col.unavailable": "unavailable: install the package",
+  "tls.verify.unknown_authority": "Unknown authority",
+  "tls.verify.hostname": "Name does not match the certificate",
+  "tls.verify.expired": "Certificate expired",
+  "tls.verify.not_yet_valid": "Certificate not yet valid",
+  "tls.verify.other": "The chain could not be verified",
 };

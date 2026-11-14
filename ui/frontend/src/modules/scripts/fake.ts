@@ -29,7 +29,7 @@ export const sampleImport: ImportPreview = {
 };
 
 // Archivo de colecciones de ejemplo: una nueva, una igual, un conflicto de nombre, favoritos por fusionar y un aviso por un «lib-*» ajeno.
-const col = (p: Partial<Collection> & Pick<Collection, "id" | "name">): Collection => ({ description: "", order: 0, scriptIds: [], createdMs: t0, updatedMs: t0, ...p });
+const col = (p: Partial<Collection> & Pick<Collection, "id" | "name">): Collection => ({ description: "", order: 0, scriptIds: [], hiddenScriptIds: [], createdMs: t0, updatedMs: t0, ...p });
 export const sampleCollectionsImport: CollectionsImportPreview = {
   token: "token-c1",
   expiresMs: t0 + 600_000,
@@ -47,7 +47,7 @@ export function fakeScripts(initial: ScriptItem[] = sampleScripts) {
   let all = initial.map((s) => ({ ...s }));
   let n = 0;
   // Colecciones y fijados: favorite, pinned y collections de cada script se calculan de aquí, como en el núcleo.
-  let cols: Collection[] = [{ id: FAVORITES_ID, name: "Favoritos", description: "", order: 0, scriptIds: initial.filter((s) => s.favorite).map((s) => s.id), createdMs: t0, updatedMs: t0 }];
+  let cols: Collection[] = [{ id: FAVORITES_ID, name: "Favoritos", description: "", order: 0, hiddenScriptIds: [], scriptIds: initial.filter((s) => s.favorite).map((s) => s.id), createdMs: t0, updatedMs: t0 }];
   let pins: string[] = initial.filter((s) => s.pinned).map((s) => s.id);
   const view = (s: ScriptItem): ScriptItem => ({ ...s, favorite: cols[0] && cols.find((c) => c.id === FAVORITES_ID)!.scriptIds.includes(s.id), pinned: pins.includes(s.id), collections: cols.filter((c) => c.scriptIds.includes(s.id)).map((c) => c.id) });
   const find = (id: string) => {
@@ -119,7 +119,7 @@ export function fakeScripts(initial: ScriptItem[] = sampleScripts) {
         c.updatedMs = t0;
         return { ...c, scriptIds: [...c.scriptIds] };
       }
-      const c: Collection = { id: `c${String(++n).padStart(31, "0")}`, name, description: d.description ?? "", order: cols.length, scriptIds: [], createdMs: t0, updatedMs: t0 };
+      const c: Collection = { id: `c${String(++n).padStart(31, "0")}`, name, description: d.description ?? "", order: cols.length, scriptIds: [], hiddenScriptIds: [], createdMs: t0, updatedMs: t0 };
       cols = [...cols, c];
       return { ...c };
     }),

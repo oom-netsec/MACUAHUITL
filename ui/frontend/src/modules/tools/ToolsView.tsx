@@ -15,7 +15,7 @@ import { MAX_LIVE, useBatch, useIngestOpts } from "../../components/ingest/useIn
 import type { OptKey } from "../../components/ingest/ingestOpts";
 import { toMsg, type SysMsg, type WireMsg } from "./syslogStats";
 import { parsePcap, pcapFromReport } from "./pcapParse";
-import type { PcapReportData } from "./api";
+import type { DnsReportData, PcapReportData, TlsReportData } from "./api";
 import { PcapReport } from "./PcapReport";
 import { parseTrace } from "./dnsTrace";
 import { DnsTree } from "./DnsTree";
@@ -25,13 +25,15 @@ import "./tools.css";
 
 // Resultado de texto de una llamada: panel con copiar y limpiar; el estado vacío explica qué hacer primero.
 // view: vista gráfica del texto (null si no se reconoce el formato); el texto completo queda en la terminal.
-function TextResult({ core, r, empty, view }: { core: CoreAPI; r: ReturnType<typeof useResult<string>>; empty: ReactNode; view?: (text: string) => ReactNode }) {
+// El informe estructurado (rep) va dentro del resultado: comparte el seq de useResult y una respuesta vieja no deja datos de otra corrida.
+type Out<R = undefined> = { text: string; rep?: R };
+function TextResult<R = undefined>({ core, r, empty, view }: { core: CoreAPI; r: ReturnType<typeof useResult<Out<R>>>; empty: ReactNode; view?: (out: Out<R>) => ReactNode }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
-  if (!r.busy && !r.data && !r.error) return <>{empty}</>;
+  if (!r.busy && !r.data?.text && !r.error) return <>{empty}</>;
   const status = r.busy ? { tone: "info" as const, label: t("diag.status.running") }
     : r.error ? { tone: "bad" as const, label: t("diag.status.failed") } : { tone: "ok" as const, label: t("diag.status.done") };
-  const copy = async () => { await core.copyText(r.data ?? ""); setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
+  const copy = async () => { await core.copyText(r.data?.text ?? ""); setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
   const extra = r.data && view ? view(r.data) : null;
   const title = t(extra ? "tools.fullReport" : "common.output");
   return (
@@ -39,10 +41,10 @@ function TextResult({ core, r, empty, view }: { core: CoreAPI; r: ReturnType<typ
     {extra}
     <ResultPanel title={title} status={status} error={r.error}
       actions={<>
-        <button className="quiet sm" disabled={!r.data} onClick={copy}><Icon name="copy" size={14} />{t(copied ? "common.copied" : "common.copy")}</button>
+        <button className="quiet sm" disabled={!r.data?.text} onClick={copy}><Icon name="copy" size={14} />{t(copied ? "common.copied" : "common.copy")}</button>
         <button className="quiet sm" disabled={r.busy} onClick={r.reset}>{t("common.clear")}</button>
       </>}>
-      <Terminal text={r.data ?? ""} role="log" aria-label={title} />
+      <Terminal text={r.data?.text ?? ""} role="log" aria-label={title} />
     </ResultPanel>
     </>
   );
@@ -54,17 +56,13 @@ export function PcapPanel({ core }: { core: CoreAPI }) {
   const t = useT();
   const [path, setPath] = useState("");
   const [top, setTop] = useState("20");
-  const r = useResult<string>();
-  const [rep, setRep] = useState<PcapReportData | null>(null); // el informe estructurado de la última corrida
+  const r = useResult<Out<PcapReportData>>();
   useInbox("pcap", setPath);
   const pick = () => core.pickPath({ title: t("pcap.path"), filters: [{ name: t("pcap.filter"), pattern: "*.pcap;*.pcapng" }] });
   const run = async () => {
     const n = Number(top) || 20;
-    setRep(null);
     const d = core.toolsPcapReport && await core.toolsPcapReport(path, n); // un error se muestra, sin repetir con el método de texto
-    if (!d?.text) return core.toolsPcap(path, n);
-    setRep(d);
-    return d.text;
+    return d?.text ? { text: d.text, rep: d } : { text: await core.toolsPcap(path, n) };
   };
   return (
     <Page title={t("pcap.title")} description={t("pcap.desc")}>
@@ -75,7 +73,7 @@ export function PcapPanel({ core }: { core: CoreAPI }) {
       <div className="actions">
         <button className="primary" disabled={!path || r.busy} aria-busy={r.busy} onClick={() => r.run(run)}>{t("pcap.analyze")}{runKbd}</button>
       </div>
-      <TextResult core={core} r={r} view={(s) => { const p = rep ? pcapFromReport(rep) : parsePcap(s); return p && <PcapReport p={p} />; }}
+      <TextResult core={core} r={r} view={({ text, rep }) => { const p = rep ? pcapFromReport(rep) : parsePcap(text); return p && <PcapReport p={p} />; }}
         empty={<EmptyState icon="pulse" title={t("pcap.empty.title")}>{t("pcap.empty")}</EmptyState>} />
     </Page>
   );
@@ -93,7 +91,7 @@ export function DnsPanel({ core }: { core: CoreAPI }) {
   const [servers, setServers] = useState("");
   const [deep, setDeep] = useState(false);
   const [dnssec, setDnssec] = useState(false);
-  const r = useResult<string>();
+  const r = useResult<Out<DnsReportData>>();
   const needsDeep = deepModes.has(mode) && !deep;
   const list = servers.split(/[\s,;]+/).filter(Boolean);
   return (
@@ -113,9 +111,16 @@ export function DnsPanel({ core }: { core: CoreAPI }) {
       </Section>
       <div className="actions">
         <button className="primary" disabled={needsDeep || (!name && mode !== "exposure") || r.busy} aria-busy={r.busy}
-          onClick={() => r.run(() => core.toolsDns({ mode, name, type, servers: list, deep, dnssec }))}>{t("dns.query")}{runKbd}</button>
+          onClick={() => r.run(async () => {
+            const req = { mode, name, type, servers: list, deep, dnssec };
+            const d = core.toolsDnsReport && await core.toolsDnsReport(req); // un error se muestra, sin repetir con el método de texto
+            return d?.text ? { text: d.text, rep: d } : { text: await core.toolsDns(req) };
+          })}>{t("dns.query")}{runKbd}</button>
       </div>
-      <TextResult core={core} r={r} view={(s) => { const tr = mode === "trace" ? parseTrace(s) : null; return tr && <DnsTree trace={tr} />; }}
+      <TextResult core={core} r={r} view={({ text, rep }) => {
+        const tr = mode === "trace" ? parseTrace(rep ? rep.json : text) : null;
+        return tr && <DnsTree trace={tr} />; // los Warnings del json ya vienen en el idioma pedido (30d); la traza no trae findings
+      }}
         empty={<EmptyState icon="pulse" title={t("dns.empty.title")}>{t("dns.empty")}</EmptyState>} />
     </Page>
   );
@@ -126,7 +131,7 @@ export function TlsPanel({ core }: { core: CoreAPI }) {
   const [host, setHost] = useState("");
   const [port, setPort] = useState("443");
   const [sni, setSni] = useState("");
-  const r = useResult<string>();
+  const r = useResult<Out<TlsReportData>>();
   return (
     <Page title={t("tls.title")} description={t("tls.desc")}>
       <div className="field-row">
@@ -135,9 +140,13 @@ export function TlsPanel({ core }: { core: CoreAPI }) {
         <Field label={t("tls.sni")} hint={t("tls.sni.hint")} value={sni} onChange={setSni} w="lg" mono />
       </div>
       <div className="actions">
-        <button className="primary" disabled={!host || r.busy} aria-busy={r.busy} onClick={() => r.run(() => core.toolsTls(host, Number(port) || 443, sni))}>{t("tls.inspect")}{runKbd}</button>
+        <button className="primary" disabled={!host || r.busy} aria-busy={r.busy} onClick={() => r.run(async () => {
+          const p = Number(port) || 443;
+          const d = core.toolsTlsReport && await core.toolsTlsReport(host, p, sni); // un error se muestra, sin repetir con el método de texto
+          return d?.text ? { text: d.text, rep: d } : { text: await core.toolsTls(host, p, sni) };
+        })}>{t("tls.inspect")}{runKbd}</button>
       </div>
-      <TextResult core={core} r={r} view={(s) => { const i = parseTls(s); return i && <TlsChain info={i} />; }}
+      <TextResult core={core} r={r} view={({ text, rep }) => { const i = parseTls(rep ? rep.json : text); return i && <TlsChain info={rep ? { ...i, verifyCode: rep.verifyCode } : i} />; }}
         empty={<EmptyState icon="pulse" title={t("tls.empty.title")}>{t("tls.empty")}</EmptyState>} />
     </Page>
   );

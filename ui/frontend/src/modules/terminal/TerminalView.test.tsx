@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TerminalView } from "./TerminalView";
@@ -193,6 +194,29 @@ test("al salir del módulo se cierran las sesiones vivas", async () => {
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalled());
   unmount();
   expect(core.terminalClose).toHaveBeenCalledWith("t1");
+});
+
+test("si la vista se desmonta con terminalOpen en vuelo, la sesión que llega después se cierra", async () => {
+  let resolve!: (id: string) => void;
+  const terminalOpen = vi.fn(() => new Promise<string>((r) => { resolve = r; }));
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), terminalOpen });
+  const { unmount } = render(<TerminalView core={core} />);
+  await abrir("sw1");
+  await waitFor(() => expect(terminalOpen).toHaveBeenCalled());
+  unmount();
+  expect(core.terminalClose).not.toHaveBeenCalled();
+  await act(async () => { resolve("t9"); });
+  expect(core.terminalClose).toHaveBeenCalledWith("t9");
+});
+
+// En desarrollo main.tsx usa StrictMode (montar, desmontar, montar): la sesión abierta no debe cerrarse sola.
+test("bajo StrictMode una sesión abierta queda abierta", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]) });
+  render(<StrictMode><TerminalView core={core} /></StrictMode>);
+  await abrir("sw1");
+  await waitFor(() => expect(core.terminalOpen).toHaveBeenCalled());
+  expect(await screen.findByRole("tab")).toBeInTheDocument();
+  expect(core.terminalClose).not.toHaveBeenCalled();
 });
 
 test("una credencial creada después de abrir la vista aparece sin reabrirla", async () => {

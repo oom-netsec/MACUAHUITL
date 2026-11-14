@@ -56,6 +56,7 @@ export interface Collection {
   description: string; // hasta 512
   order: number; // posición entre todas las colecciones, desde 0
   scriptIds: string[]; // en orden; de usuario o de biblioteca
+  hiddenScriptIds: string[]; // los de scriptIds que un paquete oculta (siempre arreglo); siguen en la colección
   createdMs: number;
   updatedMs: number;
 }

@@ -6,8 +6,13 @@ export interface PcapConv { proto: string; a: string; b: string; packets: number
 export interface PcapProto { proto: string; packets: number; bytes: number }
 export interface PcapSummary { talkers: PcapTalker[]; conversations: PcapConv[]; protocols: PcapProto[] }
 
-const CONV = /^\s+(\S+)\s+(\S+) ↔ (\S+)\s+(\d+) paquetes\s+(\d+) bytes\s*$/;
-const TALKER = /^\s+(\S+)\s+(\d+) paquetes\s+(\d+) bytes\s*$/;
+// es: "N paquetes  N bytes"; en: "1 packet  1 byte" / "N packets  N bytes" (pcap.text.counts del núcleo).
+const COUNTS = String.raw`(\d+) (?:paquetes|packets?)\s+(\d+) (?:bytes?)`;
+const CONV = new RegExp(String.raw`^\s+(\S+)\s+(\S+) ↔ (\S+)\s+${COUNTS}\s*$`);
+const TALKER = new RegExp(String.raw`^\s+(\S+)\s+${COUNTS}\s*$`);
+// pcap.section.conversations / top_talkers, es y en.
+const SEC_CONV = ["== Conversaciones", "== Top conversations"];
+const SEC_TALK = ["== Equipos con más tráfico", "== Top talkers"];
 
 export function parsePcap(text: string): PcapSummary | null {
   const talkers: PcapTalker[] = [];
@@ -15,7 +20,7 @@ export function parsePcap(text: string): PcapSummary | null {
   let sec: "" | "conv" | "talk" = "";
   for (const line of text.split("\n")) {
     if (line.startsWith("== ")) {
-      sec = line.startsWith("== Conversaciones") ? "conv" : line.startsWith("== Equipos con más tráfico") ? "talk" : "";
+      sec = SEC_CONV.some((s) => line.startsWith(s)) ? "conv" : SEC_TALK.some((s) => line.startsWith(s)) ? "talk" : "";
       continue;
     }
     const c = sec === "conv" ? CONV.exec(line) : null;
