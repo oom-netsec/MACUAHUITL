@@ -409,7 +409,7 @@ type actSession struct {
 func (a actSession) Activity(n int) { a.n.Add(int64(n)) }
 
 // Lo que pasa por los canales de scp/sftp cuenta como actividad de la sesión (keepalive): en una subida
-// el equipo casi no manda bytes, así que debe contar también lo escrito.
+// la actividad son las respuestas del par (lo escrito dentro de la ventana inicial no cuenta; ver keepalive_test.go).
 func TestTransferCuentaActividadDeSesion(t *testing.T) {
 	data := bytes.Repeat([]byte("x"), 50000)
 	for _, proto := range []string{"scp", "sftp"} {
@@ -431,8 +431,8 @@ func TestTransferCuentaActividadDeSesion(t *testing.T) {
 			if _, err := Upload(context.Background(), up); err != nil {
 				t.Fatal(err)
 			}
-			if got := n.Load(); got < int64(len(data)) {
-				t.Fatalf("subida: actividad %d < %d", got, len(data))
+			if got := n.Load(); got == 0 || got >= int64(len(data)) {
+				t.Fatalf("subida: actividad %d (solo respuestas del par, sin lo escrito)", got)
 			}
 			n.Store(0)
 			g := wrap(reqFor(t, proto, r, "r1.cfg"))

@@ -30,17 +30,29 @@ func (x tapR) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// writeWindow es lo que SSH acepta escribir sin que el par haga nada: la ventana inicial del canal (2 MiB en
+// OpenSSH y x/crypto). Lo escrito dentro de ella no prueba que el par viva; pasada la ventana, cada Write que
+// vuelve exige que el par haya ajustado la ventana (consumió), y solo eso cuenta como actividad.
+// shortcut: el tope es fijo, un par con ventana mayor deja pasar una vez esa diferencia; cerrar el hueco exigiría
+// leer la ventana real del canal, que x/crypto/ssh no expone.
+const writeWindow = 2 << 20
+
 type tapW struct {
-	w io.WriteCloser
-	t tap
+	w    io.WriteCloser
+	t    tap
+	sent int64
 }
 
-func (x tapW) Write(p []byte) (int, error) {
+func (x *tapW) Write(p []byte) (int, error) {
 	n, err := x.w.Write(p)
-	x.t(n)
+	before := x.sent
+	x.sent += int64(n)
+	if credit := x.sent - max(before, writeWindow); credit > 0 {
+		x.t(int(credit))
+	}
 	return n, err
 }
-func (x tapW) Close() error { return x.w.Close() }
+func (x *tapW) Close() error { return x.w.Close() }
 
 // tapOf da el Activity de la sesión (*transport.Session) o uno nulo si no lo tiene.
 func tapOf(s SSHSession) tap {
@@ -145,7 +157,7 @@ func scpStart(c *ssh.Client, flag, file string, t tap) (*scpSession, error) {
 		s.Close()
 		return nil, err
 	}
-	return &scpSession{in: tapW{in, t}, out: bufio.NewReaderSize(tapR{out, t}, maxCtlLine), s: s}, nil
+	return &scpSession{in: &tapW{w: in, t: t}, out: bufio.NewReaderSize(tapR{out, t}, maxCtlLine), s: s}, nil
 }
 
 // maxCtlLine es el tope de una línea de control (scp y FTP): un servidor no nos hace leer sin fin.
