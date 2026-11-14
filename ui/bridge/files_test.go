@@ -2,11 +2,12 @@ package bridge
 
 import (
 	"errors"
-	"golang.org/x/sys/unix"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 func TestWriteFile(t *testing.T) {
@@ -76,8 +77,8 @@ func TestWriteFileCarreraNoReemplaza(t *testing.T) {
 func TestWriteFileSinLinkNiNoReplace(t *testing.T) {
 	b := New(nil, func(string, any) {})
 	oldL, oldR := linkFile, renameNoReplace
-	linkFile = func(string, string) error { return &os.LinkError{Op: "link", Err: unix.EPERM} }
-	renameNoReplace = func(*os.Root, string, string) error { return unix.EINVAL }
+	linkFile = func(string, string) error { return &os.LinkError{Op: "link", Err: sys.ErrNoAtomicRename} }
+	renameNoReplace = func(*os.Root, string, string) error { return sys.ErrNoAtomicRename }
 	defer func() { linkFile, renameNoReplace = oldL, oldR }()
 	p := filepath.Join(t.TempDir(), "x.csv")
 	if err := b.WriteFile(p, "mio", "utf8", false); err != nil {

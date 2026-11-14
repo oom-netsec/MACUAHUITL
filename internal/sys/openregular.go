@@ -95,6 +95,9 @@ func RenameNoReplaceIn(root *os.Root, old, new string) error {
 	return unix.Renameat2(int(d.Fd()), old, int(d.Fd()), new, unix.RENAME_NOREPLACE)
 }
 
+// ErrNoAtomicRename es el error que da un sistema de archivos sin RENAME_NOREPLACE (para simularlo en pruebas).
+var ErrNoAtomicRename error = unix.EINVAL
+
 // NoAtomicRename dice si err es que el sistema de archivos no sabe renombrar sin sobrescribir.
 func NoAtomicRename(err error) bool {
 	return errors.Is(err, unix.EINVAL) || errors.Is(err, unix.ENOSYS) || errors.Is(err, unix.EOPNOTSUPP) || errors.Is(err, unix.EPERM)
