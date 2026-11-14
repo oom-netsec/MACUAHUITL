@@ -56,6 +56,8 @@ type Recorder struct {
 	held    []string
 	lastBlk string      // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
 	typed   mask.Stream // lleva el bloque entre las líneas tecleadas
+	sent    string      // última línea tecleada y enviada, solo en memoria: se borra al apagarse cont o al ver su eco
+	acc     string      // lo recibido del eco partido hasta ahora
 	cont    bool        // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
 	hidden  bool        // lo tecleado es una contraseña: no se graba
 	line    []byte      // lo tecleado en la línea actual
@@ -122,12 +124,24 @@ func (r *Recorder) outLine(l string) {
 	if pr := promptRe.FindString(l); pr != "" {
 		r.setPromptBlock(blockOfPrompt(pr))
 		echo := r.stream.Prompted(l[len(pr):], r.lastBlk)
-		r.cont = echo != l[len(pr):] && len(r.line) > 0 // eco partido: aún se está tecleando
+		// Eco partido: se sigue tecleando, o el texto recibido es un prefijo estricto de la línea enviada.
+		text := strings.TrimLeft(l[len(pr):], " \t") // tras el prompt va un espacio antes del eco
+		r.cont = echo != l[len(pr):] && (len(r.line) > 0 || r.sent != "" && text != r.sent && strings.HasPrefix(r.sent, text))
+		r.acc = text
+		if !r.cont {
+			r.sent = ""
+		}
 		out = pr + echo
 	} else if r.cont && !equipoMsg(l) {
 		// Desde un eco enmascarado hasta el siguiente prompt, lo que no es syslog ni aviso del equipo
 		// es el resto del eco (partido por logs asíncronos): se tapa entero.
 		out = "<MASKED:secret>"
+		if r.sent != "" {
+			// El eco ya completó la línea enviada: lo que siga es salida normal.
+			if r.acc += l; !strings.HasPrefix(r.sent, r.acc) || r.acc == r.sent {
+				r.cont, r.sent = false, ""
+			}
+		}
 	} else {
 		out, keep = r.stream.Line(l)
 	}
@@ -245,6 +259,9 @@ func (r *Recorder) flush() {
 	}
 	// Un nuevo prompt de contraseña tiene que llegar en la salida: lo ya visto no vale para la línea siguiente.
 	r.hidden, r.line, r.tail, r.fresh = false, r.line[:0], nil, false
+	if r.sent = ""; !hidden {
+		r.sent = line
+	}
 	switch {
 	case hidden:
 		r.input("[oculto]")

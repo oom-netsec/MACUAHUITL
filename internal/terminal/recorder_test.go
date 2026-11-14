@@ -321,7 +321,7 @@ func TestPromptNuevoReiniciaElBloqueDeLoTecleado(t *testing.T) {
 func TestEnmascaraRestoDelEcoTrasUnLog(t *testing.T) {
 	r, b := newRec()
 	r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
-	r.Input([]byte("key Secret")) // sin Enter: el eco va por detrás de lo tecleado
+	r.Input([]byte("key Secret\r")) // pegado con Enter: el eco llega partido por el log
 	r.Output([]byte("key Se"))
 	r.Output([]byte("\r\n%ASA-5-111008: User 'x' executed a command\r\n"))
 	r.Output([]byte("cret\r\nciscoasa(config-aaa-server-host)# "))
@@ -347,7 +347,7 @@ func TestExitPegadoCierraElBloqueTecleado(t *testing.T) {
 func TestEnmascaraRestoDelEcoConEspaciosYVariosLogs(t *testing.T) {
 	r, b := newRec()
 	r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
-	r.Input([]byte("key 0 My Secret phrase"))
+	r.Input([]byte("key 0 My Secret phrase\r"))
 	r.Output([]byte("key 0 My Se"))
 	r.Output([]byte("\r\n%ASA-5-111008: uno\r\n"))
 	r.Output([]byte("%ASA-5-111009: dos\r\n"))
@@ -365,7 +365,7 @@ func TestEcoEnmascaradoTapaLaSalidaHastaElPrompt(t *testing.T) {
 	iosLog := "*Nov 14 10:00:00.123: %SYS-5-CONFIG_I: Configured from console by admin"
 	casos := []struct {
 		nombre string
-		typed  string // lo tecleado sin Enter cuando llega el eco partido
+		typed  string // lo tecleado (con Enter) antes de que llegue el eco partido
 		salida []string
 		leak   []string // líneas que no deben salir enteras en claro
 		keep   []string
@@ -379,8 +379,8 @@ func TestEcoEnmascaradoTapaLaSalidaHastaElPrompt(t *testing.T) {
 	for _, c := range casos {
 		r, b := newRec()
 		for i, s := range c.salida {
-			if i == 1 {
-				r.Input([]byte(c.typed))
+			if i == 0 {
+				r.Input([]byte(c.typed + "\r"))
 			}
 			r.Output([]byte(s))
 		}
@@ -508,5 +508,47 @@ func TestRendimientoDeCincoMegas(t *testing.T) {
 	t.Logf("5 MB en %v", best)
 	if best > 2*time.Second {
 		t.Errorf("tardó %v", best)
+	}
+}
+
+// Tecleo carácter por carácter: el eco llega partido y se sigue tecleando (aún sin Enter).
+func TestEcoPartidoMientrasSeTeclea(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+	for _, c := range "key Secret" {
+		r.Input([]byte(string(c)))
+	}
+	r.Output([]byte("key Se"))
+	r.Output([]byte("\r\n%ASA-5-111008: uno\r\n"))
+	r.Output([]byte("cret\r\n"))
+	r.Input([]byte("\r"))
+	r.Close()
+	if out := b.String(); strings.Contains(out, "Z cret\n") || strings.Contains(out, "Secret") {
+		t.Errorf("%s", out)
+	}
+}
+
+// Pegado con Enter y eco partido por uno y por dos logs; tras completar la línea el eco ya no tapa más.
+func TestEcoPartidoDePegadoPorUnoYDosLogs(t *testing.T) {
+	for _, logs := range []int{1, 2} {
+		r, b := newRec()
+		r.Output([]byte("ciscoasa(config-aaa-server-host)# "))
+		r.Input([]byte("key Secret\r"))
+		r.Output([]byte("key Se"))
+		for i := 0; i < logs; i++ {
+			r.Output([]byte("\r\n%ASA-5-111008: log\r\n"))
+			if i == 0 && logs == 2 {
+				r.Output([]byte("cre\r\n")) // trozo intermedio del eco
+			}
+		}
+		r.Output([]byte("t\r\nlinea posterior\r\nciscoasa(config-aaa-server-host)# "))
+		r.Close()
+		out := b.String()
+		if strings.Contains(out, "Z cre\n") || strings.Contains(out, "Z t\n") || strings.Contains(out, "Secret") {
+			t.Errorf("logs=%d: fuga:\n%s", logs, out)
+		}
+		if !strings.Contains(out, "Z linea posterior\n") {
+			t.Errorf("logs=%d: tapó de más:\n%s", logs, out)
+		}
 	}
 }
