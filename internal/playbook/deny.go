@@ -68,6 +68,9 @@ func CheckDenied(platform, cmd string) error {
 			return denied(cmd, "playbook.why.ascii")
 		}
 	}
+	if platform == "nx-os" {
+		return checkNXOS(cmd)
+	}
 	segs := strings.Split(strings.ToLower(cmd), "|")
 	fields := strings.Fields(segs[0])
 	if len(fields) == 0 {
