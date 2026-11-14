@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // Idiomas que el núcleo entiende.
@@ -23,13 +24,16 @@ const (
 )
 
 // defaultLocale es el idioma de lo que no pide ninguno: el canónico, en. Solo SetDefault lo cambia, para pruebas.
-var defaultLocale = En
+var defaultLocale atomic.Value // string
+
+func init() { defaultLocale.Store(En) }
+
+func defLoc() string { return defaultLocale.Load().(string) }
 
 // SetDefault cambia el idioma por omisión y devuelve el anterior. Es solo para pruebas (i18ntest): el código de la
 // app nunca lo llama.
 func SetDefault(loc string) (prev string) {
-	prev, defaultLocale = defaultLocale, Normalize(loc)
-	return prev
+	return defaultLocale.Swap(Normalize(loc)).(string)
 }
 
 // Args son los argumentos con nombre de una plantilla.
@@ -79,7 +83,7 @@ func Locale(ctx context.Context) string {
 	if l, ok := ctx.Value(ctxKey{}).(string); ok {
 		return l
 	}
-	return defaultLocale
+	return defLoc()
 }
 
 // Normalize reduce una etiqueta (es, es-MX, EN-us) a es o en; lo desconocido es en.
@@ -91,7 +95,7 @@ func Normalize(tag string) string {
 	if t == Es || strings.HasPrefix(t, "es-") || strings.HasPrefix(t, "es_") {
 		return Es
 	}
-	return defaultLocale
+	return defLoc()
 }
 
 // Parse elige el idioma de un valor Accept-Language (lista con q): el de mayor q entre es y en; ausente o
@@ -108,7 +112,7 @@ func Parse(header string) string {
 			header = ""
 		}
 	}
-	best, bestQ := defaultLocale, -1.0
+	best, bestQ := defLoc(), -1.0
 	for _, part := range strings.Split(header, ",") {
 		tag, params, _ := strings.Cut(part, ";")
 		tag = strings.ToLower(strings.TrimSpace(tag))
