@@ -12,7 +12,7 @@ func TestTiposVRFyVNID(t *testing.T) {
 		"vnid": {"1", "2850817", "16777215"},
 	}
 	malos := map[string][]string{
-		"vrf":  {"", "common", ":default", "common:", "a:b:c", strings.Repeat("a", 65) + ":b", "a:" + strings.Repeat("b", 65), "a b:c", "a:b?", "-x:y", "tftp:x/y", "a:b,c", "a:{b}"},
+		"vrf":  {"", "common", ":default", "common:", "a:b:c", strings.Repeat("a", 65) + ":b", "a:" + strings.Repeat("b", 65), "a b:c", "a:b?", "-x:y", "tftp:x/y", "a:b,c", "a:{b}", "tftp:x", "TFTP:x", "scp:a", "ftp:x", "http:y"},
 		"vnid": {"", "0", "16777216", "01", "-1", "+5", "1e3", "0x10", "12a", " 12"},
 	}
 	for k, vs := range buenos {

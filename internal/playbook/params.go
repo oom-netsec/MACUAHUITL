@@ -58,7 +58,8 @@ func ValidateValue(kind, v string) (string, error) {
 			return v, nil
 		}
 	case "vrf":
-		if vrfRe.MatchString(v) {
+		// «tftp:x» tiene la forma de tenant:vrf pero CheckDenied lo tomaría por ruta remota: se rechaza aquí como dato inválido.
+		if vrfRe.MatchString(v) && !remotePath(strings.ToLower(v)) {
 			return v, nil
 		}
 	case "vnid":
