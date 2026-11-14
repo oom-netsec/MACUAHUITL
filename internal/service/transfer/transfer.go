@@ -264,6 +264,7 @@ func newSink(send func(*v1.StartServerResponse) error) *sink {
 func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.Transfer, loc string) {
 	shown := t
 	shown.Error = fileserve.ReasonIn(loc, t)
+	shown.DirCode = service.DirEN(t.Dir)
 	b, _ := json.Marshal(shown)
 	ev := &v1.StartServerResponse{Event: &v1.StartServerResponse_TransferJson{TransferJson: string(b)}}
 	if t.Rejected {

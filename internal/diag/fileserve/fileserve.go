@@ -42,9 +42,10 @@ type Transfer struct {
 	Bytes    int64
 	Duration time.Duration
 	Result   string    // ok o error
-	Dir      string    `json:",omitempty"` // lectura o escritura
-	Path     string    `json:",omitempty"` // ruta del archivo recibido o servido
-	SHA256   string    `json:",omitempty"` // del archivo recibido
+	Dir      string    `json:",omitempty"`        // lectura o escritura
+	DirCode  string    `json:"dirCode,omitempty"` // read o write: código estable del sentido (Dir es solo texto)
+	Path     string    `json:",omitempty"`        // ruta del archivo recibido o servido
+	SHA256   string    `json:",omitempty"`        // del archivo recibido
 	Error    string    `json:",omitempty"`
 	ReasonT  i18n.Text `json:"-"`          // el motivo de Error como texto de catálogo, para darlo en otro idioma
 	Rejected bool      `json:",omitempty"` // rechazada antes de empezar (no publicado, método, saturación)

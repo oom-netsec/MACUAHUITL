@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -279,5 +280,19 @@ func TestRedirectHintMarcadorRutaEn(t *testing.T) {
 	r, err := s.RedirectHint(i18n.WithLocale(context.Background(), "en"), &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"})
 	if err != nil || strings.Contains(r.Setcap, "RUTA-DEL-SERVIDOR") || !strings.Contains(r.Setcap, "SERVER-PATH") {
 		t.Fatalf("%+v %v", r, err)
+	}
+}
+
+// Contrato para front: el sentido sale también como código estable (dirCode read|write), sin quitar el texto dir.
+func TestTransferenciaLlevaDirCode(t *testing.T) {
+	for dir, want := range map[string]string{"lectura": "read", "escritura": "write"} {
+		var ev *v1.StartServerResponse
+		k := newSink(func(e *v1.StartServerResponse) error { ev = e; return nil })
+		k.onTransfer(func(a, tg, d string) {}, &server{}, fileserve.Transfer{Proto: "tftp", Dir: dir, Result: "ok"}, "en")
+		k.stop()
+		var m map[string]any
+		if ev == nil || json.Unmarshal([]byte(ev.GetTransferJson()), &m) != nil || m["dirCode"] != want || m["Dir"] != dir {
+			t.Errorf("%s: %v", dir, m)
+		}
 	}
 }
