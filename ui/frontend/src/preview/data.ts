@@ -85,16 +85,16 @@ export function sample(): Partial<CoreAPI> {
       { action: "permit", protocol: "tcp", source: "10.1.10.0/24", destination: "172.31.0.0/16", sourcePorts: "", destinationPorts: "eq 22", log: true, established: false, remark: "" },
       { action: "deny", protocol: "ip", source: "any", destination: "172.31.0.5", sourcePorts: "", destinationPorts: "", log: true, established: false, remark: "" },
     ] }),
-    aclAnalyze: async () => [{ index: 1, kind: "shadowed", detail: "rule 1 already covers everything this one matches" }],
+    aclAnalyze: async () => [{ index: 1, kind: "shadowed", detail: "rule 1 (permit) already covers everything this one matches" }],
     analysisRun: async () => ({ dir: "/outputs/j0", devices: ["ACC1_10.1.1.1", "DIST1_10.1.0.1"], rounds: [1, 2, 3], missing: [], warnings: [], findings: [
       { rule: "cpu-alta", title: "High CPU", severity: "alta" as const, device: "DIST1_10.1.0.1", round: 3, at: ago(20), command: "show processes cpu sorted", evidence: ["CPU utilization for five seconds: 95%/4%; one minute: 93%; five minutes: 91%"], detail: "5 min: 91% (threshold 80%)", explanation: "The average exceeds the threshold.", action: "Check the processes that use the most CPU." },
       { rule: "log-mallocfail", title: "Memory allocation failure", severity: "critica" as const, device: "ACC1_10.1.1.1", round: 2, at: ago(35), command: "show logging", evidence: ["%SYS-2-MALLOCFAIL: Memory allocation of 65536 bytes failed"], detail: "1 event", explanation: "The device ran out of free memory.", action: "Check show memory statistics." },
     ] }),
     analysisTimeline: async () => ({ dir: "/outputs/j0", warnings: [], events: [
       { at: ago(50), source: "syslog", device: "ACC1_10.1.1.1", severity: "media" as const, text: "%LINK-3-UPDOWN: Interface Gi1/0/3, changed state to down", kb: "%LINK-3-UPDOWN: The link went down." },
-      { at: ago(49), source: "device-log", device: "ACC1_10.1.1.1", severity: "baja" as const, text: "%LINK-3-UPDOWN: Interface Gi1/0/3, changed state to up" },
-      { at: ago(35), source: "finding", device: "ACC1_10.1.1.1", severity: "critica" as const, text: "Memory allocation failure", note: "round 2" },
-      { at: ago(20), source: "finding", device: "DIST1_10.1.0.1", severity: "alta" as const, text: "High CPU: 5 min 91%" },
+      { at: ago(49), source: "log-equipo", device: "ACC1_10.1.1.1", severity: "baja" as const, text: "%LINK-3-UPDOWN: Interface Gi1/0/3, changed state to up" },
+      { at: ago(35), source: "hallazgo", device: "ACC1_10.1.1.1", severity: "critica" as const, text: "Memory allocation failure", note: "round 2" },
+      { at: ago(20), source: "hallazgo", device: "DIST1_10.1.0.1", severity: "alta" as const, text: "High CPU: 5 min 91%" },
     ] }),
     // Changes: one window with full PRE and POST and a report with an OSPF regression.
     listChanges: async () => [
@@ -186,6 +186,9 @@ certificate: CN=Lab Root CA,O=Lab
 
 // English overrides of the module fakes (those feed the tests and stay in Spanish; the Spanish literals below are the source strings to replace): same shape, same counts.
 const swap = <T,>(v: T, pairs: [string, string][]): T => {
+  // Un par que no reemplaza nada es un literal que cambió en el fake: la captura saldría en español sin avisar.
+  const all = JSON.stringify(v);
+  for (const [p] of pairs) if (!all.includes(JSON.stringify(p).slice(1, -1))) console.warn(`preview swap: "${p}" no aparece en el fake`);
   const m = (x: unknown): unknown => typeof x === "string" ? pairs.reduce((r, [p, q]) => r.split(p).join(q), x) : Array.isArray(x) ? x.map(m) : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).map(([k, y]) => [k, m(y)])) : x;
   return m(v) as T;
 };
@@ -215,7 +218,7 @@ const hostFieldsEn = swap(sampleHostFields, [
 const hostsTemplate = (format: "csv" | "json") => {
   const rows = [["SW-CORE", "10.0.0.1", "22", "ios-xe", "Lab", "core;dc-1", "lab-admin", "Floor 2"], ["SW-ACC1", "10.0.0.2", "22", "nx-os", "Lab", "access", "", ""], ["AP-1", "ap1.lab.example.com", "2222", "wlc", "Office", "wifi", "", ""]];
   const names = hostFieldsEn.map((f) => f.name);
-  return { format, filename: `hosts-template.${format}`, content: format === "csv" ? "\ufeff" + [names, ...rows].map((r) => r.join(",")).join("\n") + "\n"
+  return { format, filename: `hosts-plantilla.${format}`, content: format === "csv" ? "\ufeff" + [names, ...rows].map((r) => r.join(",")).join("\n") + "\n"
     : JSON.stringify({ formato: "macuahuitl-hosts", version: 1, exportado: new Date().toISOString(), hosts: rows.map((r) => Object.fromEntries(names.map((n, i) => [n, r[i]]))) }, null, 2) };
 };
 const playbooksEn = swap(samplePlaybooks, [["TAC · Línea base", "TAC · Baseline"], ["TAC · Usuario sin red", "TAC · User with no connectivity"], ["L2 · VLAN y troncales", "L2 · VLANs, trunks and VTP"]]);
