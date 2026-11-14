@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: plat-logs-cores
 platform: nx-os
-name: Plataforma · Logs, cores y reinicios
-name_en: Platform · Logs, cores and reloads
+name: NX-OS · Plataforma · Logs, cores y reinicios
+name_en: NX-OS · Platform · Logs, cores and reloads
 commands:
   - cmd: show clock
   - cmd: show system reset-reason

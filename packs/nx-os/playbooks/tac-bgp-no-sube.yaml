@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-bgp-no-sube
 platform: nx-os
-name: TAC · BGP no establece (general)
-name_en: TAC · BGP does not establish (general)
+name: NX-OS · TAC · BGP no establece (general)
+name_en: NX-OS · TAC · BGP does not establish (general)
 commands:
   - cmd: show clock
   - cmd: show bgp sessions

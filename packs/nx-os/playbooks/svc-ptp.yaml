@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: svc-ptp
 platform: nx-os
-name: Servicios · PTP
-name_en: Services · PTP
+name: NX-OS · Servicios · PTP
+name_en: NX-OS · Services · PTP
 commands:
   - cmd: show ptp brief
   - cmd: show ptp clock

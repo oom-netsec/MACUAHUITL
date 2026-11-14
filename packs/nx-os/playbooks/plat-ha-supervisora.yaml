@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: plat-ha-supervisora
 platform: nx-os
-name: Plataforma · Alta disponibilidad de supervisoras
-name_en: Platform · Supervisor high availability
+name: NX-OS · Plataforma · Alta disponibilidad de supervisoras
+name_en: NX-OS · Platform · Supervisor high availability
 commands:
   - cmd: show system redundancy status  # modulares
   - cmd: show module

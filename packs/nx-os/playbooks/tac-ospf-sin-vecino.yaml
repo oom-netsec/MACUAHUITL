@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-ospf-sin-vecino
 platform: nx-os
-name: TAC · OSPF sin adyacencia con un vecino
-name_en: TAC · OSPF no adjacency with a neighbor
+name: NX-OS · TAC · OSPF sin adyacencia con un vecino
+name_en: NX-OS · TAC · OSPF no adjacency with a neighbor
 params:
   - name: ip
     kind: ip

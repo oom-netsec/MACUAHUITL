@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l3-hsrp-vrrp
 platform: nx-os
-name: L3 · HSRP y VRRP
-name_en: L3 · HSRP and VRRP
+name: NX-OS · L3 · HSRP y VRRP
+name_en: NX-OS · L3 · HSRP and VRRP
 commands:
   - cmd: show hsrp brief
   - cmd: show hsrp

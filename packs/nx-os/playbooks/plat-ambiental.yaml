@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: plat-ambiental
 platform: nx-os
-name: Plataforma · Ambiente (energía, ventiladores, temperatura)
-name_en: Platform · Environment (power, fans, temperature)
+name: NX-OS · Plataforma · Ambiente (energía, ventilación, temp.)
+name_en: NX-OS · Platform · Environment (power, fans, temperature)
 commands:
   - cmd: show environment
   - cmd: show environment fan

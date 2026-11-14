@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: tac-mac-moviendose-mac
 platform: nx-os
-name: TAC · MAC moviéndose (una MAC)
-name_en: TAC · MAC moving (single MAC)
+name: NX-OS · TAC · MAC moviéndose (una MAC)
+name_en: NX-OS · TAC · MAC moving (single MAC)
 params:
   - name: mac
     kind: mac

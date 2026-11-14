@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l2-cdp-lldp
 platform: nx-os
-name: L2 · CDP y LLDP
-name_en: L2 · CDP and LLDP
+name: NX-OS · L2 · CDP y LLDP
+name_en: NX-OS · L2 · CDP and LLDP
 commands:
   - cmd: show cdp global
   - cmd: show cdp neighbors

@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l2-igmp-snooping
 platform: nx-os
-name: L2 · IGMP snooping
-name_en: L2 · IGMP snooping
+name: NX-OS · L2 · IGMP snooping
+name_en: NX-OS · L2 · IGMP snooping
 commands:
   - cmd: show ip igmp snooping
   - cmd: show ip igmp snooping groups

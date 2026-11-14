@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: sec-copp
 platform: nx-os
-name: Seguridad · CoPP y rate-limiters
-name_en: Security · CoPP and rate-limiters
+name: NX-OS · Seguridad · CoPP y rate-limiters
+name_en: NX-OS · Security · CoPP and rate-limiters
 commands:
   - cmd: show copp status
   - cmd: show policy-map interface control-plane

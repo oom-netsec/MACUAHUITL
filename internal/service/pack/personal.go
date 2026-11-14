@@ -65,7 +65,7 @@ func (s *svc) Export(ctx context.Context, r *v1.PackServiceExportRequest) (*v1.P
 		pbs = s.cfg.UserPlaybooks()
 	}
 	res, err := dom.Export(dom.ExportInput{ID: r.GetEditorName(), Name: r.GetName(), NameEn: r.GetNameEn(), Description: r.GetDescription(),
-		DescriptionEn: r.GetDescriptionEn(), Author: r.GetAuthor(), License: r.GetLicense(), Core: s.store.CoreVersion(), TakenNames: s.store.TakenScriptNames(),
+		DescriptionEn: r.GetDescriptionEn(), Author: r.GetAuthor(), License: r.GetLicense(), Core: s.store.CoreVersion(), TakenNames: s.store.TakenScriptNames(), TakenNamesEN: s.store.TakenScriptNamesEN(),
 		Now: s.d.Now().Local(), Scripts: sel, Playbooks: pbs})
 	if err != nil {
 		return nil, fail(ctx, err)

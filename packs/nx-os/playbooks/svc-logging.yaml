@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: svc-logging
 platform: nx-os
-name: Servicios · Logging y syslog
-name_en: Services · Logging and syslog
+name: NX-OS · Servicios · Logging y syslog
+name_en: NX-OS · Services · Logging and syslog
 commands:
   - cmd: show logging
   - cmd: show logging server

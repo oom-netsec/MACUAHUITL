@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l3-bfd
 platform: nx-os
-name: L3 · BFD
-name_en: L3 · BFD
+name: NX-OS · L3 · BFD
+name_en: NX-OS · L3 · BFD
 commands:
   - cmd: show bfd neighbors
   - cmd: show bfd neighbors details

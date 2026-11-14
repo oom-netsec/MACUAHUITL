@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: l1-udld-fec
 platform: nx-os
-name: L1 · UDLD y vecinos de capa 1
-name_en: L1 · UDLD and layer 1 neighbors
+name: NX-OS · L1 · UDLD y vecinos de capa 1
+name_en: NX-OS · L1 · UDLD and layer 1 neighbors
 commands:
   - cmd: show udld global
   - cmd: show udld neighbors

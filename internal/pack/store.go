@@ -26,6 +26,9 @@ type Base struct {
 	PlaybookIDs []string
 	ScriptIDs   []string
 	ScriptNames []string // se comparan con scripts.NameKey
+	// ScriptNamesEN son los nombres en inglés de la biblioteca base: también chocan (con la app en inglés serían
+	// dos scripts indistinguibles).
+	ScriptNamesEN []string
 	// ReservedPlaybooks y ReservedScripts son IDs que salieron del binario a un paquete oficial (p. ej. los movidos a
 	// oom/ios-xe): un paquete que no es oficial nunca los ocupa, esté o no instalado el oficial.
 	ReservedPlaybooks []string
@@ -255,6 +258,10 @@ func (s *Store) collides(p *Pack, others []*Pack) error {
 	for _, n := range s.base.ScriptNames {
 		names[scripts.NameKey(n)] = "base"
 	}
+	namesEN := map[string]string{}
+	for _, n := range s.base.ScriptNamesEN {
+		namesEN[scripts.NameKey(n)] = "base"
+	}
 	add := func(q *Pack, who string) error {
 		for _, pb := range q.Playbooks {
 			if w, dup := pbs[pb.ID]; dup {
@@ -263,6 +270,13 @@ func (s *Store) collides(p *Pack, others []*Pack) error {
 			pbs[pb.ID] = who
 		}
 		d := scripts.Derived(q.Playbooks)
+		for _, n := range namesShownEN(q) {
+			k := scripts.NameKey(n)
+			if w, dup := namesEN[k]; dup {
+				return rej("collision", "id", n, "with", w)
+			}
+			namesEN[k] = who
+		}
 		for _, sc := range append(d, q.Scripts...) {
 			if w, dup := ids[sc.ID]; dup {
 				return rej("collision", "id", sc.ID, "with", w)
@@ -532,3 +546,18 @@ func (s *Store) RemoveLocked(id string) (*Pack, error) {
 
 // SHA256 es el sha256 en hex de los bytes del archivo.
 func SHA256(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
+
+// namesShownEN son los nombres con que se ven en inglés los scripts de q (derivados y de scripts.json): el name_en
+// del playbook o, sin él, el español (lo mismo que muestra Texto.In).
+func namesShownEN(q *Pack) []string {
+	en := scripts.DerivedTexts(q.Playbooks)
+	var out []string
+	for _, sc := range append(scripts.Derived(q.Playbooks), q.Scripts...) {
+		if t := en[sc.ID]; t.Name != "" {
+			out = append(out, t.Name)
+		} else {
+			out = append(out, sc.Name)
+		}
+	}
+	return out
+}

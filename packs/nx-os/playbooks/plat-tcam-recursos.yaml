@@ -4,8 +4,8 @@
 # Validado en laboratorio: no (pendiente Nexus 9000v DevNet)
 id: plat-tcam-recursos
 platform: nx-os
-name: Plataforma · TCAM y recursos de ACL
-name_en: Platform · TCAM and ACL resources
+name: NX-OS · Plataforma · TCAM y recursos de ACL
+name_en: NX-OS · Platform · TCAM and ACL resources
 commands:
   - cmd: show clock
   - cmd: show version
