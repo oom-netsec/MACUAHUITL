@@ -112,11 +112,11 @@ test("con la bóveda cerrada se conserva la credencial guardada al editar", asyn
 test("en inglés no queda ningún texto en español ni clave sin traducir", async () => {
   localStorage.setItem("macuahuitl.lang", "en");
   setup();
-  await screen.findByRole("table", { name: "Hosts in the book" });
+  await screen.findByRole("table", { name: "Host list" });
   await userEvent.click(screen.getByRole("button", { name: /New host/ }));
   await userEvent.click(screen.getByRole("button", { name: "Save host" })); // errores de validación
   const text = document.body.textContent ?? "";
-  expect(screen.getByRole("heading", { name: "Host book" })).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Saved hosts" })).toBeVisible();
   expect(screen.getByRole("table", { name: "Discovered devices" })).toBeVisible();
   expect(text).not.toMatch(/[áéíóúñ¿¡«»]/);
   expect(text).not.toMatch(/\b(hosts|nav|common)\.[a-z]+/);
@@ -127,7 +127,7 @@ test("en inglés el error del núcleo en el formulario se muestra tal cual (ya l
   localStorage.setItem("macuahuitl.lang", "en");
   const { core } = setup();
   core.saveHost = vi.fn().mockRejectedValue(Object.assign(new Error("there is already a host named \"lab-core\""), { cause: { code: "AlreadyExists", reason: "hosts.duplicate_name", metadata: { field: "name" } } }));
-  await screen.findByRole("table", { name: "Hosts in the book" });
+  await screen.findByRole("table", { name: "Host list" });
   await userEvent.click(screen.getByRole("button", { name: /New host/ }));
   await userEvent.type(screen.getByLabelText("Name"), "lab-core");
   await userEvent.type(screen.getByLabelText("Address (IP or DNS name)"), "10.0.0.50");
@@ -142,7 +142,7 @@ test("en inglés un error sin campo y los avisos de guardado salen con el texto 
   const { core } = setup();
   const w = "the vault is closed: the credential was saved without validation";
   core.saveHost = vi.fn().mockRejectedValueOnce(new Error("the core is not responding")).mockResolvedValueOnce({ id: "x", warnings: [w, w, "file without a checksum: nothing verifies that it is not damaged or modified; review its contents"] });
-  await screen.findByRole("table", { name: "Hosts in the book" });
+  await screen.findByRole("table", { name: "Host list" });
   await userEvent.click(screen.getByRole("button", { name: /New host/ }));
   await userEvent.type(screen.getByLabelText("Name"), "N1");
   await userEvent.type(screen.getByLabelText("Address (IP or DNS name)"), "10.0.0.51");
@@ -154,7 +154,7 @@ test("en inglés un error sin campo y los avisos de guardado salen con el texto 
 });
 
 test("la dirección repetida se marca en su campo, en español y en inglés", async () => {
-  for (const [lang, name, addr, save, msg] of [["es", "Nombre", "Dirección (IP o nombre DNS)", "Guardar host", "Esta dirección y puerto ya están en la libreta."], ["en", "Name", "Address (IP or DNS name)", "Save host", "This address is already in the book."]]) {
+  for (const [lang, name, addr, save, msg] of [["es", "Nombre", "Dirección (IP o nombre DNS)", "Guardar host", "Esta dirección y puerto ya están en la libreta."], ["en", "Name", "Address (IP or DNS name)", "Save host", "This address is already in the saved hosts."]]) {
     localStorage.setItem("macuahuitl.lang", lang);
     const { unmount } = setup();
     await userEvent.click(await screen.findByRole("button", { name: lang === "es" ? /Nuevo host/ : /New host/ }));
@@ -206,7 +206,7 @@ test("con reason el campo sale de metadata.field y el texto del núcleo se muest
   localStorage.setItem("macuahuitl.lang", "en");
   const err = Object.assign(new Error("rpc error: code = InvalidArgument desc = the credential is not in the vault"), { cause: { code: "InvalidArgument", reason: "hosts.unknown_credential", metadata: { field: "credentialId" } } });
   setup({ saveHost: vi.fn(async () => { throw err; }) });
-  await screen.findByRole("table", { name: "Hosts in the book" });
+  await screen.findByRole("table", { name: "Host list" });
   await userEvent.click(screen.getByRole("button", { name: /New host/ }));
   await userEvent.type(screen.getByLabelText("Name"), "x1");
   await userEvent.type(screen.getByLabelText("Address (IP or DNS name)"), "10.0.0.51");

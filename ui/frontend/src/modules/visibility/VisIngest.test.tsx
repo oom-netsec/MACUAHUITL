@@ -229,7 +229,7 @@ test("en inglés el v3 muestra solo la etiqueta traducida: el motivo del núcleo
     await userEvent.click(screen.getByRole("button", { name: "Listen" }));
     act(() => core.emitVis("traps", { runId: "t1", json: JSON.stringify({ From: "10.0.0.2:5000", Version: "3", Error: "v3 sin decodificar (87 bytes): usuario USM desconocido" }) }));
     await flush();
-    expect(await screen.findByRole("cell", { name: "v3 undecoded (87 bytes)" })).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: "SNMPv3, not decoded (87 bytes)" })).toBeInTheDocument();
     expect(screen.queryByText(/usuario USM desconocido/)).not.toBeInTheDocument();
   } finally {
     localStorage.removeItem("macuahuitl.lang");
@@ -245,7 +245,7 @@ test("en inglés el v3 sin decodificar llega con el texto del catálogo en ingl�
     await userEvent.click(screen.getByRole("button", { name: "Listen" }));
     act(() => core.emitVis("traps", { runId: "t1", json: JSON.stringify({ From: "10.0.0.2:5000", Version: "3", Error: "undecoded v3 (87 bytes): unknown USM user" }) }));
     await flush();
-    expect(await screen.findByRole("cell", { name: "v3 undecoded (87 bytes)" })).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: "SNMPv3, not decoded (87 bytes)" })).toBeInTheDocument();
   } finally {
     localStorage.removeItem("macuahuitl.lang");
   }

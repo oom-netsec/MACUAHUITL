@@ -453,7 +453,7 @@ test("en inglés, la plantilla y sus campos salen de las claves snippet.<id>.*",
     render(<I18nProvider><SnippetsView core={core} /></I18nProvider>);
     await userEvent.click(await screen.findByRole("radio", { name: "Port speed and duplex" }));
     expect(screen.getByLabelText("Ports *")).toBeInTheDocument();
-    expect(screen.getByLabelText("Speed")).toHaveAccessibleDescription("Empty leaves it untouched. auto returns it to negotiation.");
+    expect(screen.getByLabelText("Speed")).toHaveAccessibleDescription("Empty leaves it untouched. auto restores autonegotiation.");
     expect(screen.getByText("Layer 2")).toBeInTheDocument();
   } finally { localStorage.removeItem("macuahuitl.lang"); }
 });
