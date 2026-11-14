@@ -32,6 +32,7 @@ message PackServiceInstallRequest {
   repeated string hide = 3;   // IDs de playbook o script del paquete que quedan ocultos al instalar; los que no existan se ignoran (fase 32b)
   bool replace_hidden = 4;    // con true, hide es el conjunto exacto de ocultos tras instalar; sin él se conserva lo oculto y hide suma
   string sha256 = 5;          // obligatorio: el del archivo que vio la vista previa (Inspect); si falta o no coincide, no se instala (pack.err.install.sha256_missing / pack.err.install.changed)
+  bool allow_displace = 6;    // confirmación explícita para que un oficial aparte y borre paquetes de terceros que chocan con él (los lista Inspect.displaced); sin ella falla con pack.err.would_displace y no toca nada
 }
 
 message PackServiceInstallResponse {

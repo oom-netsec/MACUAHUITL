@@ -68,12 +68,14 @@ func fileSHA256(path string) (string, error) {
 func install(c *cli.Env, args []string) error {
 	var unsigned bool
 	var hide multi
+	var assume bool
 	fs, err := cli.Flags("pack install", args, func(fs *flag.FlagSet) {
 		fs.BoolVar(&unsigned, "allow-unsigned", false, "instala un paquete de terceros (sin firma oficial)")
+		fs.BoolVar(&assume, "yes", false, "confirma sin preguntar que el oficial quite los paquetes de terceros que chocan con él")
 		fs.Var(&hide, "hide", "ID de playbook o script que queda oculto (se repite)")
 	})
 	if err != nil || fs.NArg() != 1 {
-		return errors.New("uso: mctl pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM ...]")
+		return errors.New("uso: mctl pack install <archivo.mpack> [--allow-unsigned] [--yes] [--hide ITEM ...]")
 	}
 	path, err := filepath.Abs(fs.Arg(0))
 	if err != nil {
@@ -83,7 +85,18 @@ func install(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	r, err := v1.NewPackServiceClient(c.Conn).Install(context.Background(), &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: unsigned, Hide: hide, ReplaceHidden: len(hide) > 0, Sha256: sum})
+	cl := v1.NewPackServiceClient(c.Conn)
+	pv, err := cl.Inspect(context.Background(), &v1.PackServiceInspectRequest{Path: path, AllowUnsigned: unsigned})
+	if err != nil {
+		return err
+	}
+	if len(pv.Displaced) > 0 && !assume {
+		ids := strings.Join(pv.Displaced, ", ")
+		if !cli.Confirm(c, cli.T("mctl.pack.ask_displace", "id", pv.Pack.Id, "ids", ids)) {
+			return cli.Err("mctl.pack.displace_declined", "id", pv.Pack.Id, "ids", ids)
+		}
+	}
+	r, err := cl.Install(context.Background(), &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: unsigned, Hide: hide, ReplaceHidden: len(hide) > 0, Sha256: sum, AllowDisplace: len(pv.Displaced) > 0})
 	if err != nil {
 		return err
 	}

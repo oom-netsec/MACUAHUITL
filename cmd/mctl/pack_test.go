@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	dompack "github.com/oom-netsec/MACUAHUITL/internal/pack"
 	"github.com/oom-netsec/MACUAHUITL/internal/pack/packtest"
 )
 
@@ -148,4 +149,50 @@ func TestPackExportImportEnIngles(t *testing.T) {
 		t.Fatalf("decisión inválida es: %v", err)
 	}
 	has(t, "import en", enMust(t, "", "pack", "import", f, "--all=omitir"), "imported: scripts 0 new, 0 renamed, 1 skipped; playbooks 0 new, 0 renamed, 0 skipped")
+}
+
+// Un oficial que quitaría paquetes de terceros pregunta; sin respuesta (stdin no interactivo) falla y no toca nada;
+// con --yes o un «s» procede.
+func TestPackInstallPideConfirmarLosApartados(t *testing.T) {
+	startCore(t)
+	must(t, "", "pack", "remove", "oom/ios-xe")
+	src, err := os.ReadFile("../../packs/ios-xe/playbooks/l2-stp.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := regexp.MustCompile(`(?m)^name: (.+)$`).FindSubmatch(src)[1]
+	files := map[string][]byte{
+		"manifest.yaml":           []byte("id: acme/demo\nversion: 1.0.0\nmin_core: 0.3.0\nname: A\nname_en: A\ndescription: d\ndescription_en: d\nplatforms: [ios-xe]\nauthor: a\nlicense: MIT\n"),
+		"README.md":               []byte("x"),
+		"playbooks/acme-stp.yaml": []byte("id: acme-stp\nplatform: ios-xe\nname: " + string(name) + "\nname_en: \"Acme only\"\ncommands:\n  - cmd: show clock\n"),
+	}
+	zb, err := dompack.Zip(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	third, off := filepath.Join(dir, "acme.mpack"), filepath.Join(dir, "oom.mpack")
+	os.WriteFile(third, zb, 0o600)
+	os.WriteFile(off, packtest.IOSXE(t), 0o600)
+	must(t, "", "pack", "install", "--allow-unsigned", third)
+	if out, err := mctl(t, "", "pack", "install", off); err == nil || !strings.Contains(err.Error(), "--yes") || !strings.Contains(out, "acme/demo") {
+		t.Fatalf("sin confirmar: %v\n%s", err, out)
+	}
+	if out := must(t, "", "pack", "list"); !strings.Contains(out, "acme/demo") || strings.Contains(out, "oom/ios-xe") {
+		t.Fatalf("tocó el almacén: %q", out)
+	}
+	if _, err := mctl(t, "n\n", "pack", "install", off); err == nil {
+		t.Fatal("una negativa no instala")
+	}
+	if out := must(t, "s\n", "pack", "install", off); !strings.Contains(out, "instalado: oom/ios-xe") {
+		t.Fatalf("con «s»: %q", out)
+	}
+	if out := must(t, "", "pack", "list"); strings.Contains(out, "acme/demo") {
+		t.Fatalf("el apartado sigue: %q", out)
+	}
+	must(t, "", "pack", "remove", "oom/ios-xe")
+	must(t, "", "pack", "install", "--allow-unsigned", third)
+	if out := must(t, "", "pack", "install", "--yes", off); !strings.Contains(out, "instalado: oom/ios-xe") {
+		t.Fatalf("--yes: %q", out)
+	}
 }

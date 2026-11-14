@@ -47,7 +47,7 @@ type svc struct {
 func fail(ctx context.Context, err error) error {
 	c := codes.InvalidArgument
 	switch dom.Reason(err) {
-	case "unsigned", "collision", "version", "official_replace", "import.exists", "import.unsupported_fs", "install.changed", "import.changed":
+	case "unsigned", "would_displace", "collision", "version", "official_replace", "import.exists", "import.unsupported_fs", "install.changed", "import.changed":
 		c = codes.FailedPrecondition
 	case "not_found":
 		c = codes.NotFound
@@ -109,7 +109,7 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 	// el fsync del extract. Si el guardado falla, el paquete ya está instalado: se audita con hidden_save_failed y la
 	// respuesta es de éxito (la respuesta no tiene campo de aviso; lo oculto queda como estaba antes).
 	hide := []string{}
-	res, err := s.store.InstallWith(data, r.GetAllowUnsigned(), func(p *dom.Pack, _ string) error {
+	res, err := s.store.InstallConfirmed(data, r.GetAllowUnsigned(), r.GetAllowDisplace(), func(p *dom.Pack, _ string) error {
 		items := p.Items()
 		for _, id := range r.GetHide() { // los IDs que el paquete no trae se ignoran
 			if items[id] {

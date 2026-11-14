@@ -28,6 +28,7 @@ type PackServiceInstallRequest struct {
 	Hide          []string               `protobuf:"bytes,3,rep,name=hide,proto3" json:"hide,omitempty"`                                         // IDs de playbook o script del paquete que quedan ocultos al instalar; los que no existan se ignoran (fase 32b)
 	ReplaceHidden bool                   `protobuf:"varint,4,opt,name=replace_hidden,json=replaceHidden,proto3" json:"replace_hidden,omitempty"` // con true, hide es el conjunto exacto de ocultos tras instalar; sin él se conserva lo oculto y hide suma
 	Sha256        string                 `protobuf:"bytes,5,opt,name=sha256,proto3" json:"sha256,omitempty"`                                     // obligatorio: el del archivo que vio la vista previa (Inspect); si falta o no coincide, no se instala (pack.err.install.sha256_missing / pack.err.install.changed)
+	AllowDisplace bool                   `protobuf:"varint,6,opt,name=allow_displace,json=allowDisplace,proto3" json:"allow_displace,omitempty"` // confirmación explícita para que un oficial aparte y borre paquetes de terceros que chocan con él (los lista Inspect.displaced); sin ella falla con pack.err.would_displace y no toca nada
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -95,6 +96,13 @@ func (x *PackServiceInstallRequest) GetSha256() string {
 		return x.Sha256
 	}
 	return ""
+}
+
+func (x *PackServiceInstallRequest) GetAllowDisplace() bool {
+	if x != nil {
+		return x.AllowDisplace
+	}
+	return false
 }
 
 type PackServiceInstallResponse struct {
@@ -1365,13 +1373,14 @@ var File_macuahuitl_v1_pack_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_pack_proto_rawDesc = "" +
 	"\n" +
-	"\x18macuahuitl/v1/pack.proto\x12\rmacuahuitl.v1\"\xa9\x01\n" +
+	"\x18macuahuitl/v1/pack.proto\x12\rmacuahuitl.v1\"\xd0\x01\n" +
 	"\x19PackServiceInstallRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12%\n" +
 	"\x0eallow_unsigned\x18\x02 \x01(\bR\rallowUnsigned\x12\x12\n" +
 	"\x04hide\x18\x03 \x03(\tR\x04hide\x12%\n" +
 	"\x0ereplace_hidden\x18\x04 \x01(\bR\rreplaceHidden\x12\x16\n" +
-	"\x06sha256\x18\x05 \x01(\tR\x06sha256\"\x92\x01\n" +
+	"\x06sha256\x18\x05 \x01(\tR\x06sha256\x12%\n" +
+	"\x0eallow_displace\x18\x06 \x01(\bR\rallowDisplace\"\x92\x01\n" +
 	"\x1aPackServiceInstallResponse\x12+\n" +
 	"\x04pack\x18\x01 \x01(\v2\x17.macuahuitl.v1.PackInfoR\x04pack\x12)\n" +
 	"\x10replaced_version\x18\x02 \x01(\tR\x0freplacedVersion\x12\x1c\n" +

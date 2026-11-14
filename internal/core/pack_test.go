@@ -569,7 +569,7 @@ func TestPackInspectNoInstala(t *testing.T) {
 		t.Fatalf("%+v %v", r, err)
 	}
 	_, ei := pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: path})
-	_, ein := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path}))
+	_, ein := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path, AllowDisplace: true}))
 	ri, _ := reasonOf(ei)
 	rn, _ := reasonOf(ein)
 	if ri != "pack.err.version" || ri != rn {
@@ -874,7 +874,14 @@ func TestPackOficialAPartaAlTerceroQueChoca(t *testing.T) {
 	if err != nil || !slices.Equal(pv.Displaced, []string{"acme/demo"}) {
 		t.Fatalf("inspect: %v %v", pv.GetDisplaced(), err)
 	}
-	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path}))
+	_, err = pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path}))
+	if r, _ := reasonOf(err); r != "pack.err.would_displace" || !strings.Contains(err.Error(), "acme/demo") {
+		t.Fatalf("sin allow_displace: %v", err)
+	}
+	if l, _ := pk.List(ctx(t), &v1.PackServiceListRequest{}); len(l.Packs) != 1 || l.Packs[0].Id != "acme/demo" {
+		t.Fatalf("tocó el almacén: %v", l)
+	}
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path, AllowDisplace: true}))
 	if err != nil || !slices.Equal(r.Displaced, []string{"acme/demo"}) {
 		t.Fatalf("install: %v %v", r.GetDisplaced(), err)
 	}

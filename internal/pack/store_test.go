@@ -787,3 +787,27 @@ func TestRemoveBorraLoQueNoEstaEnLaFoto(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Sin allowDisplace un oficial que apartaría a un tercero falla y no toca nada; uno que no aparta a nadie no lo necesita.
+func TestInstallConfirmedExigeConfirmarLosApartados(t *testing.T) {
+	pub, priv := testKey(t)
+	dir := t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	if _, err := s.InstallConfirmed(signedZip(t, priv, nil), false, false, nil, nil); err != nil { // nadie que apartar
+		t.Fatal(err)
+	}
+	s.Remove("oom/demo")
+	if _, err := s.Install(mustZip(t, thirdParty()), true); err != nil {
+		t.Fatal(err)
+	}
+	res, err := s.InstallConfirmed(signedZip(t, priv, nil), false, false, nil, nil)
+	if Reason(err) != "would_displace" || res == nil || len(res.Displaced) != 1 || !strings.Contains(err.Error(), "acme/demo") {
+		t.Fatalf("%v %+v", err, res)
+	}
+	if _, e := os.Stat(filepath.Join(dir, "acme", "demo")); e != nil || s.Snapshot().Find("acme/demo") == nil || s.Snapshot().Find("oom/demo") != nil {
+		t.Fatal("tocó el almacén")
+	}
+	if _, err := s.InstallConfirmed(signedZip(t, priv, nil), false, true, nil, nil); err != nil || s.Snapshot().Find("acme/demo") != nil {
+		t.Fatalf("con confirmación: %v", err)
+	}
+}

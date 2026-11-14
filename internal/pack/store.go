@@ -405,8 +405,18 @@ func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
 // igual, y el error va en Result.CommitErr (quien instala debe auditarlo). replaced es la versión que reemplazaría
 // ("" si es nuevo).
 func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) error, commit func(p *Pack) error) (*Result, error) {
+	return s.InstallConfirmed(data, allowUnsigned, true, prepare, commit)
+}
+
+// InstallConfirmed es InstallWith donde apartar (y borrar) paquetes de terceros exige allowDisplace: sin él, un oficial
+// que chocaría con alguno falla con would_displace y no toca nada, así un paquete instalado nunca desaparece en silencio.
+func (s *Store) InstallConfirmed(data []byte, allowUnsigned, allowDisplace bool, prepare func(p *Pack, replaced string) error, commit func(p *Pack) error) (*Result, error) {
 	s.mu.Lock()
 	p, old, cur, displaced, err := s.check(data, allowUnsigned)
+	if err == nil && len(displaced) > 0 && !allowDisplace {
+		s.mu.Unlock()
+		return &Result{Pack: p, Displaced: displaced}, rej("would_displace", "id", p.ID, "ids", strings.Join(displaced, ", "))
+	}
 	if err != nil {
 		s.mu.Unlock()
 		if p == nil {
