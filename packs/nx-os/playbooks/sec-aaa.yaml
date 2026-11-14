@@ -15,9 +15,11 @@ commands:
     timeout: 60s
     may_contain_secrets: true
   - cmd: show tacacs-server groups
+    may_contain_secrets: true
   - cmd: show radius-server
     timeout: 60s
     may_contain_secrets: true
   - cmd: show radius-server groups
+    may_contain_secrets: true
   - cmd: show users
   - cmd: show ssh server

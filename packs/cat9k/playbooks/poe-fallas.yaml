@@ -1,0 +1,16 @@
+# Propósito: Reúne los eventos de PoE, el err-disable y las reglas de recuperación.
+# Cuándo usarlo: Puertos con PoE que caen, se reinician o quedan en falla.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: poe-fallas
+platform: cat9k
+name: Catalyst 9K · PoE · Fallas y recuperación de PoE
+name_en: Catalyst 9K · PoE · PoE faults and recovery
+commands:
+  - cmd: show clock
+  - cmd: show power inline
+  - cmd: show interfaces status err-disabled
+  - cmd: show errdisable detect
+  - cmd: show errdisable recovery
+  - cmd: show logging | include ILPOWER|PLATFORM_POWER|PWR
+    timeout: 180s

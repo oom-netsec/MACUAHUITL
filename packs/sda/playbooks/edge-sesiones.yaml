@@ -1,0 +1,17 @@
+# Propósito: Lista sesiones de autenticación, tracking y el SGT de los endpoints.
+# Cuándo usarlo: Endpoints sin acceso o con el SGT equivocado.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: edge-sesiones
+platform: sda
+name: SD-Access · Edge · Sesiones de endpoints
+name_en: SD-Access · Edge · Endpoint sessions
+commands:
+  - cmd: show clock
+  - cmd: show authentication sessions
+  - cmd: show dot1x all summary
+  - cmd: show device-tracking database
+  - cmd: show device-tracking policies
+  - cmd: show cts role-based sgt-map all
+  - cmd: show lisp all instance-id * ethernet database
+    timeout: 180s

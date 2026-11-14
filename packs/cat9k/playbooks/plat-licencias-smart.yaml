@@ -1,0 +1,17 @@
+# Propósito: Revisa el estado de Smart Licensing, el uso y el UDI del equipo.
+# Cuándo usarlo: Licencia fuera de cumplimiento, aviso de registro o antes de renovar.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: plat-licencias-smart
+platform: cat9k
+name: Catalyst 9K · Plataforma · Licencias Smart
+name_en: Catalyst 9K · Platform · Smart licensing
+commands:
+  - cmd: show clock
+  - cmd: show license summary
+  - cmd: show license status
+  - cmd: show license usage
+  - cmd: show license all
+    timeout: 120s
+  - cmd: show license udi
+  - cmd: show version | include License|license

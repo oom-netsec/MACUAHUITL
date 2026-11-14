@@ -296,3 +296,56 @@ func TestCompatibleNXOS(t *testing.T) {
 		}
 	}
 }
+
+// Un ios-xe usa también los playbooks cat9k y sda (son paquetes de contenido sobre ios-xe); ios, wlc-9800 y nx-os no.
+func TestCompatibleCat9kSDA(t *testing.T) {
+	for _, det := range []string{"ios", "ios-xe", "wlc-9800", "nx-os"} {
+		for _, pb := range []string{"ios", "ios-xe", "cat9k", "sda", "wlc-9800", "nx-os"} {
+			want := det == pb ||
+				pb == "ios-xe" && (det == "ios" || det == "wlc-9800") ||
+				det == "ios-xe" && (pb == "cat9k" || pb == "sda")
+			if got := Compatible(det, pb); got != want {
+				t.Errorf("Compatible(%q, %q) = %v, quiero %v", det, pb, got, want)
+			}
+		}
+	}
+}
+
+// cat9k/x y sda/x nunca son gemelos de ios/x ni de ios-xe/x aunque compartan el ID corto; un ios no los ve.
+func TestCat9kSDANoSonGemelosDeIOS(t *testing.T) {
+	pbs := []Playbook{
+		{ID: "ios-xe/plat-salud", Platform: "ios-xe"}, {ID: "ios/plat-salud", Platform: "ios"},
+		{ID: "cat9k/plat-salud", Platform: "cat9k"}, {ID: "sda/plat-salud", Platform: "sda"},
+	}
+	for _, id := range []string{"cat9k/plat-salud", "sda/plat-salud"} {
+		for _, pl := range []string{"ios", "ios-xe"} {
+			if tw := Twin(pbs, id, pl); tw != nil {
+				t.Errorf("Twin(%s, %s) = %s", id, pl, tw.ID)
+			}
+		}
+	}
+	// ios-xe/x tampoco toma a cat9k/x por gemelo en otra plataforma
+	for _, pl := range []string{"cat9k", "sda"} {
+		if tw := Twin(pbs, "ios-xe/plat-salud", pl); tw != nil {
+			t.Errorf("Twin(ios-xe/plat-salud, %s) = %s", pl, tw.ID)
+		}
+	}
+	ids := func(det string) (out []string) {
+		for _, p := range Visible(det, pbs) {
+			out = append(out, p.ID)
+		}
+		return
+	}
+	if got := ids("ios"); len(got) != 1 || got[0] != "ios/plat-salud" {
+		t.Errorf("ios ve %v", got)
+	}
+	if got := ids("ios-xe"); len(got) != 3 {
+		t.Errorf("ios-xe ve %v", got)
+	}
+	if got := ids("wlc-9800"); len(got) != 1 || got[0] != "ios-xe/plat-salud" {
+		t.Errorf("wlc-9800 ve %v", got)
+	}
+	if got := ids("nx-os"); len(got) != 0 {
+		t.Errorf("nx-os ve %v", got)
+	}
+}

@@ -1,0 +1,17 @@
+# Propósito: Muestra las sesiones LISP y el resumen de los servidores por instancia.
+# Cuándo usarlo: Un edge o border pierde su sesión con el control plane.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: lisp-sesiones
+platform: sda
+name: SD-Access · LISP · Sesiones y resumen
+name_en: SD-Access · LISP · Sessions and summary
+commands:
+  - cmd: show clock
+  - cmd: show lisp session
+  - cmd: show lisp all instance-id * ipv4 server summary
+  - cmd: show lisp all instance-id * ethernet server summary
+  - cmd: show lisp all instance-id * ipv6 server summary
+  - cmd: show ip route summary
+  - cmd: show logging | include LISP
+    timeout: 180s

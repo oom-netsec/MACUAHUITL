@@ -1,0 +1,22 @@
+# Propósito: Sigue una MAC por MAC, sesión, snooping y device-tracking.
+# Cuándo usarlo: Un host no tiene red aunque el puerto está arriba.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: tac-host-sin-conectividad
+platform: cat9k
+name: Catalyst 9K · TAC · Host sin conectividad (una MAC)
+name_en: Catalyst 9K · TAC · Host with no connectivity (one MAC)
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show mac address-table address {mac}
+  - cmd: show authentication sessions mac {mac} details
+  - cmd: show device-tracking database mac {mac}
+  - cmd: show ip dhcp snooping binding
+  - cmd: show ip arp inspection statistics
+  - cmd: show interfaces status
+  - cmd: show vlan brief
+  - cmd: show logging
+    timeout: 180s

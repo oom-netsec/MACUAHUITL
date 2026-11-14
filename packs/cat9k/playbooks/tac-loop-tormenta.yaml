@@ -1,0 +1,19 @@
+# Propósito: Busca el puerto origen de un bucle o de una tormenta.
+# Cuándo usarlo: CPU alta, MAC moviéndose y enlaces saturados.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: tac-loop-tormenta
+platform: cat9k
+name: Catalyst 9K · TAC · Bucle o tormenta de broadcast
+name_en: Catalyst 9K · TAC · Loop or broadcast storm
+commands:
+  - cmd: show clock
+  - cmd: show storm-control
+  - cmd: show spanning-tree detail | include executing|Number of topology|from
+    timeout: 120s
+  - cmd: show spanning-tree inconsistentports
+  - cmd: show mac address-table notification mac-move
+  - cmd: show interfaces counters errors
+  - cmd: show processes cpu sorted 5sec | exclude 0.00% 0.00% 0.00%
+  - cmd: show logging | include LOOP|STORM|BPDU|MACFLAP
+    timeout: 180s

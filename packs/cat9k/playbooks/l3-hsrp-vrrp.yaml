@@ -1,0 +1,17 @@
+# Propósito: Revisa grupos HSRP y VRRP, prioridades y estado.
+# Cuándo usarlo: El gateway cambia de activo o no hay activo.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: l3-hsrp-vrrp
+platform: cat9k
+name: Catalyst 9K · L3 · HSRP y VRRP
+name_en: Catalyst 9K · L3 · HSRP and VRRP
+commands:
+  - cmd: show clock
+  - cmd: show standby brief
+  - cmd: show standby
+  - cmd: show vrrp brief
+  - cmd: show vrrp
+  - cmd: show glbp brief
+  - cmd: show logging | include HSRP|VRRP
+    timeout: 180s

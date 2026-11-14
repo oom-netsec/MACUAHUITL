@@ -1,0 +1,20 @@
+# Propósito: Revisa destinos SNMP, usuarios, comunidades y el log local.
+# Cuándo usarlo: El NMS no recibe traps o no consulta el equipo.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: svc-snmp-logging
+platform: cat9k
+name: Catalyst 9K · Servicios · SNMP y syslog
+name_en: Catalyst 9K · Services · SNMP and syslog
+commands:
+  - cmd: show clock
+  - cmd: show snmp
+  - cmd: show snmp host
+    may_contain_secrets: true
+  - cmd: show snmp user
+    may_contain_secrets: true
+  - cmd: show snmp group
+  - cmd: show snmp community
+    may_contain_secrets: true
+  - cmd: show logging
+    timeout: 180s

@@ -1,0 +1,18 @@
+# Propósito: Revisa las rutas externas por VRF, CEF y los protocolos.
+# Cuándo usarlo: Un destino fuera del fabric no tiene ruta.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: border-rutas-externas
+platform: sda
+name: SD-Access · Border · Rutas externas
+name_en: SD-Access · Border · External routes
+commands:
+  - cmd: show clock
+  - cmd: show ip route summary
+  - cmd: show ip route vrf *
+    timeout: 180s
+  - cmd: show ip cef vrf * summary
+  - cmd: show ip protocols
+  - cmd: show ip bgp
+    timeout: 180s
+  - cmd: show route-map

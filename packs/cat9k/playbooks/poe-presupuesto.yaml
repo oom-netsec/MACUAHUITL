@@ -1,0 +1,17 @@
+# Propósito: Muestra el presupuesto de PoE, el consumo por puerto y la energía.
+# Cuándo usarlo: Puertos sin energía o un miembro sin presupuesto.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: poe-presupuesto
+platform: cat9k
+name: Catalyst 9K · PoE · Presupuesto y consumo
+name_en: Catalyst 9K · PoE · Budget and consumption
+commands:
+  - cmd: show clock
+  - cmd: show power inline
+  - cmd: show power inline detail
+    timeout: 120s
+  - cmd: show environment power
+  - cmd: show inventory
+  - cmd: show logging | include ILPOWER|POWER|PWR
+    timeout: 180s

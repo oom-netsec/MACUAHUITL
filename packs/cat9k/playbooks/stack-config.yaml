@@ -1,0 +1,16 @@
+# Propósito: Compara prioridad y provisión configuradas con lo que la pila tiene.
+# Cuándo usarlo: El activo no es el esperado o un miembro quedó sin provisionar.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: stack-config
+platform: cat9k
+name: Catalyst 9K · Stack · Prioridad y provisión
+name_en: Catalyst 9K · Stack · Priority and provisioning
+commands:
+  - cmd: show clock
+  - cmd: show switch
+  - cmd: show switch detail
+  - cmd: show boot
+  - cmd: show running-config | include ^switch
+    may_contain_secrets: true
+  - cmd: show version | include Switch

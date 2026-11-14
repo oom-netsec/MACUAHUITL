@@ -1,0 +1,17 @@
+# Propósito: Muestra los enlaces SVL, el ancho de banda, los vecinos y la redundancia.
+# Cuándo usarlo: Un par 9400/9500/9600 pierde un enlace SVL o no forma el par.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: svl-estado
+platform: cat9k
+name: Catalyst 9K · SVL · Enlaces y estado de StackWise Virtual
+name_en: Catalyst 9K · SVL · StackWise Virtual links and status
+commands:
+  - cmd: show clock
+  - cmd: show stackwise-virtual  # SVL
+  - cmd: show stackwise-virtual link
+  - cmd: show stackwise-virtual bandwidth
+  - cmd: show stackwise-virtual neighbors
+  - cmd: show switch
+  - cmd: show redundancy
+  - cmd: show module  # 9400/9600

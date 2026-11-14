@@ -1,0 +1,22 @@
+# Propósito: Recolecta lo necesario cuando la pila se parte o un miembro no entra.
+# Cuándo usarlo: Dos activos, un miembro en estado distinto o versiones mezcladas.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: tac-stack-dividido
+platform: cat9k
+name: Catalyst 9K · TAC · Stack dividido o miembro que no se une
+name_en: Catalyst 9K · TAC · Split stack or member that will not join
+commands:
+  - cmd: show clock
+  - cmd: show switch
+  - cmd: show switch detail
+  - cmd: show switch stack-ports
+  - cmd: show switch neighbors
+  - cmd: show version | include Switch|image
+  - cmd: show install summary
+  - cmd: show boot
+  - cmd: show environment all
+  - cmd: show running-config | include ^switch
+    may_contain_secrets: true
+  - cmd: show logging
+    timeout: 180s

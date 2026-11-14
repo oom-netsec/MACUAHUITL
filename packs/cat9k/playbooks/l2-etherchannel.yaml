@@ -1,0 +1,19 @@
+# Propósito: Revisa canales, vecinos LACP/PAgP y el balanceo.
+# Cuándo usarlo: Un canal está en estado suspendido o desbalanceado.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: l2-etherchannel
+platform: cat9k
+name: Catalyst 9K · L2 · EtherChannel, LACP y PAgP
+name_en: Catalyst 9K · L2 · EtherChannel, LACP and PAgP
+commands:
+  - cmd: show clock
+  - cmd: show etherchannel summary
+  - cmd: show etherchannel detail
+    timeout: 120s
+  - cmd: show lacp neighbor
+  - cmd: show lacp counters
+  - cmd: show pagp neighbor
+  - cmd: show etherchannel load-balance
+  - cmd: show logging | include EC|LACP|PAGP
+    timeout: 180s

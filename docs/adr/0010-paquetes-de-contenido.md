@@ -175,3 +175,11 @@ Se implementa tal como lo describe «Selección por elemento y paquete personal�
 - **Versión con segundos:** el export usa `AAAA.MMDD.HHMMSS` en vez de `AAAA.MMDD.HHMM`; sigue siendo semver de tres números y crece dentro del día.
 - **Un paquete instalado después de un import** con los mismos IDs de playbook queda tapado por la copia importada en `<config>/playbooks` (`Shadowed`); es de diseño, igual que con cualquier playbook del usuario.
 - **Vista previa atada a lo aplicado:** `Import` acepta el `sha256` de la vista previa y con `confirm` falla (`pack.err.import.changed`) si el archivo cambió.
+
+## Enmienda (fase 36): cat9k y sda son paquetes de contenido sobre ios-xe, no plataformas detectadas
+
+`cat9k` y `sda` entran en las plataformas instalables, pero `Detect` no las devuelve: un Catalyst 9000, con o sin SD-Access, se sigue detectando como `ios-xe`.
+
+- **Por qué:** detectar `cat9k` cambiaría el comportamiento en los lugares que hoy deciden por `ios-xe` (el modo de cambio asistido, las métricas de puertos, el gemelo ios/ios-xe de Patrol, `playbook.Commands`, los scripts y las listas de acceso), y no hay un equipo con el que validarlo. El riesgo no compensa; el contenido nuevo sale sin tocar nada de eso.
+- **Qué implica:** `playbook.Compatible` deja que un equipo `ios-xe` use también los playbooks de plataforma `cat9k` y `sda` (lo que un router no tenga sale inválido, como ya pasa con un `ios` ante `ios-xe`). Un `ios`, un `wlc-9800` y un `nx-os` no los ven ni los reciben. Los gemelos solo existen entre `ios` e `ios-xe`: `cat9k/x` y `sda/x` nunca son gemelos de `ios/x` ni de `ios-xe/x`, aunque compartan el ID corto. Sus comandos pasan por el `CheckDenied` de IOS, y su script derivado usa la plataforma de scripts `ios-xe`.
+- **Versión:** como el núcleo anterior rechaza esas plataformas, los paquetes `oom/cat9k` y `oom/sda` piden `min_core: 0.4.1`.

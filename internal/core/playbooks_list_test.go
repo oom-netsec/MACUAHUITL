@@ -158,3 +158,39 @@ func TestListPlaybooksNombreSegunIdioma(t *testing.T) {
 		t.Errorf("sin name_en cae al español: %q", got)
 	}
 }
+
+// Un ios-xe lista los playbooks de cat9k y sda (contenido sobre ios-xe); ios, wlc-9800 y nx-os no.
+func TestListPlaybooksCat9kSDASoloParaIOSXE(t *testing.T) {
+	cmd := []playbook.Command{{Text: "show clock"}}
+	s := &patrolSvc{c: coreWith([]playbook.Playbook{
+		{ID: "ios-xe/plat-salud", Platform: "ios-xe", Name: "A", Commands: cmd},
+		{ID: "cat9k/plat-salud", Platform: "cat9k", Pack: "oom/cat9k", Name: "B", Commands: cmd},
+		{ID: "sda/lisp-sitios", Platform: "sda", Pack: "oom/sda", Name: "C", Commands: cmd},
+		{ID: "ios-xe/mio", Platform: "ios-xe", Pack: playbook.PackUsuario, Name: "D", Commands: cmd},
+	})}
+	for plat, want := range map[string][]string{
+		"ios-xe":   {"cat9k/plat-salud", "ios-xe/mio", "ios-xe/plat-salud", "sda/lisp-sitios"},
+		"ios":      {"ios-xe/mio", "ios-xe/plat-salud"},
+		"wlc-9800": {"ios-xe/mio", "ios-xe/plat-salud"},
+		"nx-os":    nil,
+	} {
+		r, err := s.ListPlaybooks(context.Background(), &v1.ListPlaybooksRequest{Platform: plat})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, p := range r.Playbooks {
+			got = append(got, p.Id)
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s ve %v, quiero %v", plat, got, want)
+		}
+		if plat == "ios-xe" { // el paquete de origen llega en pack: base vacío, oom/* y usuario
+			for i, p := range r.Playbooks {
+				if wantPack := map[string]string{"cat9k/plat-salud": "oom/cat9k", "sda/lisp-sitios": "oom/sda", "ios-xe/mio": "usuario", "ios-xe/plat-salud": ""}[p.Id]; p.Pack != wantPack {
+					t.Errorf("%d %s: pack %q, quiero %q", i, p.Id, p.Pack, wantPack)
+				}
+			}
+		}
+	}
+}

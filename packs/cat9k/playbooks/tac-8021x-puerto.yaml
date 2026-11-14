@@ -1,0 +1,21 @@
+# Propósito: Recolecta sesión, RADIUS y log de un puerto que no autentica.
+# Cuándo usarlo: Un endpoint queda sin acceso o en la VLAN de invitados.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: tac-8021x-puerto
+platform: cat9k
+name: Catalyst 9K · TAC · 802.1X no autentica en un puerto
+name_en: Catalyst 9K · TAC · 802.1X does not authenticate on a port
+params:
+  - name: interface
+    kind: interface
+commands:
+  - cmd: show clock
+  - cmd: show authentication sessions interface {interface} details
+  - cmd: show dot1x interface {interface} details
+  - cmd: show interfaces {interface} status
+  - cmd: show aaa servers
+  - cmd: show radius statistics
+  - cmd: show device-tracking database
+  - cmd: show logging | include DOT1X|AUTHMGR|MAB|RADIUS
+    timeout: 180s

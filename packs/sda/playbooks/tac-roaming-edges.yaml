@@ -1,0 +1,24 @@
+# Propósito: Sigue una MAC entre edges por base de datos, map-cache y servidor.
+# Cuándo usarlo: Un endpoint cambia de edge y pierde conectividad.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
+# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+id: tac-roaming-edges
+platform: sda
+name: SD-Access · TAC · Roaming entre edges (una MAC)
+name_en: SD-Access · TAC · Roaming between edges (one MAC)
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show clock
+  - cmd: show mac address-table address {mac}
+  - cmd: show device-tracking database mac {mac}
+  - cmd: show lisp all instance-id * ethernet database
+    timeout: 180s
+  - cmd: show lisp all instance-id * ethernet map-cache
+    timeout: 180s
+  - cmd: show lisp all instance-id * ethernet server
+    timeout: 180s
+  - cmd: show lisp session
+  - cmd: show logging | include LISP|MAC
+    timeout: 180s

@@ -605,7 +605,7 @@ func (s *patrolSvc) ListPlaybooks(ctx context.Context, r *v1.ListPlaybooksReques
 		if hidden[p.ID] {
 			continue
 		}
-		info := &v1.PlaybookInfo{Id: p.ID, Platform: p.Platform, Name: p.NameFor(i18n.Locale(ctx)), Commands: slices.Clone(p.Pre)} // los pre corren primero
+		info := &v1.PlaybookInfo{Id: p.ID, Pack: p.Pack, Platform: p.Platform, Name: p.NameFor(i18n.Locale(ctx)), Commands: slices.Clone(p.Pre)} // los pre corren primero
 		for _, c := range p.Commands {
 			if r.GetPlatform() == "" || c.Applies(r.GetPlatform()) { // sin plataforma, todos; con ella, los que corren ahí
 				info.Commands = append(info.Commands, c.Text)

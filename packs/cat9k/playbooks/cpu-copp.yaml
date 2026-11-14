@@ -1,0 +1,15 @@
+# Propósito: Revisa la política de CoPP, sus descartes y los puertos abiertos.
+# Cuándo usarlo: Un protocolo pierde paquetes por el policer de CPU.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: cpu-copp
+platform: cat9k
+name: Catalyst 9K · CPU · CoPP y puertos del plano de control
+name_en: Catalyst 9K · CPU · CoPP and control-plane ports
+commands:
+  - cmd: show clock
+  - cmd: show policy-map control-plane
+  - cmd: show control-plane host open-ports
+  - cmd: show platform hardware fed switch active qos queue stats internal cpu policer  # 9200/9300/9500 con stack; en 9400/9600: fed active
+  - cmd: show platform software fed switch active punt cause summary  # 9200/9300/9500 con stack; en 9400/9600: fed active
+  - cmd: show ip traffic

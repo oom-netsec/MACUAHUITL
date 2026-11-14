@@ -41,8 +41,10 @@ func (c Command) Applies(detected string) bool {
 }
 
 // Compatible: un IOS clásico y un WLC 9800 (que es IOS-XE) usan también los playbooks de IOS-XE; lo que no exista queda marcado inválido.
+// cat9k y sda son paquetes de contenido sobre ios-xe (no plataformas detectadas): solo un ios-xe los usa (fase 36).
 func Compatible(detected, pbPlatform string) bool {
-	return detected == pbPlatform || (pbPlatform == "ios-xe" && (detected == "ios" || detected == "wlc-9800"))
+	return detected == pbPlatform || (pbPlatform == "ios-xe" && (detected == "ios" || detected == "wlc-9800")) ||
+		(detected == "ios-xe" && (pbPlatform == "cat9k" || pbPlatform == "sda"))
 }
 
 // PackUsuario es el Pack de los playbooks de <config>/playbooks (propios o importados): no es un ID de paquete válido

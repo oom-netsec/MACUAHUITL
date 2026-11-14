@@ -115,7 +115,7 @@ func Derived(pbs []playbook.Playbook) []Script {
 			cmds = append(cmds, c.Text)
 		}
 		plat := p.Platform
-		if plat == "wlc-9800" { // el 9800 corre IOS-XE: su script de biblioteca usa el driver y la plataforma de scripts de IOS-XE
+		if plat == "wlc-9800" || plat == "cat9k" || plat == "sda" { // el 9800, el Cat9k y SD-Access corren IOS-XE: su script de biblioteca usa el driver y la plataforma de scripts de IOS-XE
 			plat = "ios-xe"
 		}
 		out = append(out, Script{ID: "lib-" + id, Name: p.Name, Tech: techDe(id), Platform: plat,

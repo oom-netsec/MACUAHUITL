@@ -1,0 +1,17 @@
+# Propósito: Lista los miembros de la pila con rol, prioridad, versión y estado.
+# Cuándo usarlo: Un miembro no aparece, cambió el activo o hay versiones mezcladas.
+# Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
+# Validado en laboratorio: no (sin equipo)
+id: stack-miembros
+platform: cat9k
+name: Catalyst 9K · Stack · Miembros, roles y prioridades
+name_en: Catalyst 9K · Stack · Members, roles and priorities
+commands:
+  - cmd: show clock
+  - cmd: show switch
+  - cmd: show switch detail
+  - cmd: show version | include Switch|image
+  - cmd: show install summary
+  - cmd: show inventory
+  - cmd: show logging | include STACKMGR|SWITCH|STACK
+    timeout: 180s
