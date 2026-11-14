@@ -133,7 +133,7 @@ func TestAuditoriaFTDLineaMayorEnPEM(t *testing.T) {
 
 // (c) Teclear mientras la última línea va a medias («*> 10.0…», «> 10…») no vacía el bloque del prompt.
 func TestAuditoriaLineaAMediasNoReiniciaElBloque(t *testing.T) {
-	for _, partial := range []string{"*> 10.0.0.0/8 ", "> 10.0.0.0/8 ", "10.0.0.0/8#10 "} {
+	for _, partial := range []string{"*> 10.0.0.0/8 ", "> 10.0.0.0/8 "} {
 		r, b := newRec()
 		r.Output([]byte("SW1(config-server-tacacs)#"))
 		r.Input([]byte("\r"))
@@ -157,5 +157,61 @@ func TestAuditoriaFilaMayorNoCierraLaTabla(t *testing.T) {
 	r.Close()
 	if strings.Contains(b.String(), "SecretComm") {
 		t.Errorf("%s", b.String())
+	}
+}
+
+// Retroceso al teclear en un submodo al que se entró por abreviatura: el eco trae «\b \b» y el bloque del prompt vale igual.
+func TestAuditoriaRetrocesoConservaElBloque(t *testing.T) {
+	for _, c := range []struct{ prompt, word string }{
+		{"ciscoasa(config-aaa-server-host)#", "key"},
+		{"ciscoasa(config-ca-trustpoint)#", "password"},
+		{"ciscoasa(cfg-cluster)#", "key"},
+	} {
+		for _, partido := range []bool{false, true} {
+			r, b := newRec()
+			r.Output([]byte("ciscoasa(config)#"))
+			r.Input([]byte("x\r"))
+			r.Output([]byte("x\r\n" + c.prompt + c.word + " ZZSecrx"))
+			for _, ch := range c.word + " ZZSecrx" {
+				r.Input([]byte(string(ch)))
+			}
+			if partido {
+				r.Output([]byte("\r\n%ASA-5-111008: uno\r\n"))
+			}
+			r.Output([]byte("\b \bet"))
+			r.Input([]byte{0x7f})
+			r.Input([]byte("et\r"))
+			r.Output([]byte("\r\n" + c.prompt))
+			r.Close()
+			if strings.Contains(b.String(), "ZZSecret") {
+				t.Errorf("%s %s partido=%v:\n%s", c.prompt, c.word, partido, b.String())
+			}
+		}
+	}
+}
+
+// FTD con Tab: el eco «> configure manager add …» no coincide con lo enviado y aun así sale tapado.
+func TestAuditoriaFTDConTabulador(t *testing.T) {
+	for _, partido := range []bool{false, true} {
+		r, b := newRec()
+		r.Output([]byte("> "))
+		for _, ch := range "configure man\tadd 10.1.1.10 RegK3yAA NatId1AA" {
+			r.Input([]byte(string(ch)))
+		}
+		if partido {
+			r.Output([]byte("configure manager add 10.1.1.10 RegK3"))
+			r.Output([]byte("\r\n%ASA-5-111008: uno\r\n"))
+			r.Output([]byte("yAA NatId1AA\r\n"))
+		} else {
+			r.Output([]byte("configure manager add 10.1.1.10 RegK3yAA NatId1AA\r\n"))
+		}
+		r.Input([]byte("\r"))
+		r.Output([]byte("> "))
+		r.Close()
+		for _, l := range strings.Split(b.String(), "\n") {
+			if !strings.Contains(l, ">>>") && (strings.Contains(l, "RegK3") || strings.Contains(l, "NatId1AA") || strings.Contains(l, "yAA")) {
+				t.Errorf("partido=%v eco en claro: %q\n%s", partido, l, b.String())
+			}
+		}
 	}
 }

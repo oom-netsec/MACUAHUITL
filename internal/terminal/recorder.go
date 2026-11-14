@@ -134,8 +134,9 @@ func (r *Recorder) outLine(l string) {
 	}
 	out, keep := "", true
 	pr := promptRe.FindString(l)
+	weak := ""
 	if pr != "" && weakPrompt(pr) && !r.echoOf(strings.TrimLeft(l[len(pr):], " \t")) {
-		pr = "" // «> x», «*> 10.0.0.0/8»: parece prompt, pero lo que sigue no es el eco de nada tecleado
+		weak, pr = pr, "" // «> x», «*> 10.0.0.0/8»: parece prompt, pero lo que sigue no es el eco de nada tecleado
 	}
 	if pr != "" {
 		r.setPromptBlock(blockOfPrompt(pr))
@@ -174,6 +175,14 @@ func (r *Recorder) outLine(l string) {
 			}
 		}
 	} else {
+		if weak != "" {
+			// Puede ser el eco de FTD con un tabulador completado («> configure manager add …»): el texto tras «> » pasa por
+			// las reglas sin tocar el bloque ni la red. Tapar de más está bien; si tapó y se sigue tecleando, el resto del eco también.
+			text := l[len(weak):]
+			if m := r.stream.Peek(text); m != text {
+				l, r.cont, r.acc = weak+m, len(r.line) > 0, ""
+			}
+		}
 		if !equipoMsg(l) {
 			l = r.scrub(l, len(r.sent) > 0)
 		}
@@ -425,10 +434,11 @@ func (r *Recorder) Input(p []byte) {
 // flush trata la línea tecleada al pulsar Enter. Requiere r.mu.
 func (r *Recorder) flush() {
 	line, hidden, fresh := string(r.line), r.hidden, r.fresh
-	// La última línea cuenta como prompt si es solo el prompt o lo que sigue es el eco (parcial) de lo tecleado.
-	if ll := r.lastLine(); promptRe.FindString(ll) != "" {
+	// Un prompt con letras fija el bloque siempre; uno débil («>», «*>») solo si es el prompt solo o lo que sigue es el
+	// eco (parcial, con los retrocesos aplicados) de lo tecleado.
+	if ll := applyBackspaces(r.lastLine()); promptRe.FindString(ll) != "" {
 		pr := promptRe.FindString(ll)
-		if text := strings.TrimLeft(ll[len(pr):], " \t"); text == "" || strings.HasPrefix(line, text) || r.echoOf(text) {
+		if text := strings.TrimLeft(ll[len(pr):], " \t"); !weakPrompt(pr) || text == "" || strings.HasPrefix(line, text) || r.echoOf(text) {
 			r.setPromptBlock(blockOfPrompt(pr))
 		}
 	}
