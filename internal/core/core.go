@@ -67,6 +67,7 @@ type job struct {
 	results   map[int][]patrol.DeviceResult
 	release   func()
 	paused    bool
+	closed    bool       // ya publicó (o nunca publicará) su "closed": manifest y zip hechos; solo entonces un Subscribe tardío lo da por terminado
 	closing   bool       // finish ya corre: state pasa a completed/cancelled hasta tener manifest y zip
 	cancelReq bool       // CancelJob llegó con el trabajo en "arming": ArmJob lo cancela antes de entregarlo al planificador
 	rounds    int        // rondas terminadas, para el manifest
@@ -569,6 +570,7 @@ func (c *Core) loadJobs() {
 			j.state = "failed"
 			dead = append(dead, j)
 		}
+		j.closed = j.state == "completed" || j.state == "cancelled" || j.state == "failed" // de una corrida anterior: no hay finish pendiente
 		c.jobs[id] = j
 	}
 	rows.Close()

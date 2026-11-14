@@ -3,6 +3,7 @@ package patrol
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -194,6 +195,9 @@ func jobWatch(c *cli.Env, args []string) error {
 	}
 	for {
 		e, err := st.Recv()
+		if errors.Is(err, io.EOF) { // el núcleo cerró el stream (trabajo ya cerrado): fin normal
+			return nil
+		}
 		if err != nil {
 			return err
 		}

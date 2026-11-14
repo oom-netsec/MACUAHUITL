@@ -163,6 +163,9 @@ type ExportDTO struct {
 	Path           string `json:"path"` // absoluta; nunca se sobrescribe
 }
 
+// exportWrite es inyectable solo para pruebas (simular un disco que falla a medias).
+var exportWrite = func(f *os.File, b []byte) (int, error) { return f.Write(b) }
+
 // SecPkiExport escribe el archivo (0600) en la ruta indicada: el webview no tiene
 // una descarga confiable para binarios como PKCS#12.
 func (b *Bridge) SecPkiExport(d ExportDTO) (string, error) {
@@ -179,10 +182,14 @@ func (b *Bridge) SecPkiExport(d ExportDTO) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		if _, err := f.Write(r.Data); err != nil {
-			f.Close()
+		_, err = exportWrite(f, r.Data)
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			os.Remove(d.Path) // con O_EXCL, un parcial impediría reintentar con la misma ruta
 			return "", err
 		}
-		return d.Path, f.Close()
+		return d.Path, nil
 	})
 }

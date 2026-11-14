@@ -101,6 +101,33 @@ func init() {
 		"devices.warn.too_many_entries": e("{where}: más de {max} entradas, el resto no se leyó", "{where}: more than {max} entries, the rest was not read"),
 		"devices.warn.too_many":         e("más de {max} equipos: la lista está incompleta", "more than {max} devices: the list is incomplete"),
 	})
+	// Contrato para front: reason estable por caso y metadata.field con el campo del formulario (en duplicados, id
+	// del host existente). El texto no cambia.
+	hostContract := func(code, reason, field string, extra ...string) {
+		e := catalog[code]
+		e.Reason, e.Meta, e.Extra = reason, map[string]string{"field": field}, append(e.Extra, extra...)
+		catalog[code] = e
+	}
+	for code, rf := range map[string][2]string{
+		"hostfield.addr_len": {"address", ""}, "hostfield.addr_zone": {"address", ""}, "hostfield.addr_dns": {"address", ""},
+		"hostfield.addr_ip": {"address", ""}, "hostfield.name": {"name", ""}, "hostfield.port": {"port", ""},
+		"hostfield.platform": {"platform", ""}, "hostfield.folder": {"folder", ""}, "hostfield.tags_max": {"tags", ""},
+		"hostfield.tag_bad": {"tags", ""}, "hostfield.notes": {"notes", ""}, "hostfield.credential_id": {"credentialId", "credential_id"},
+	} {
+		name := rf[1]
+		if name == "" {
+			name = rf[0]
+		}
+		hostContract(code, "hosts.invalid_"+name, rf[0])
+	}
+	hostContract("hostfield.name_dup_row", "hosts.duplicate_name", "name")
+	hostContract("hostfield.addr_dup_row", "hosts.duplicate_address", "address")
+	hostContract("hosts.err.dup_name", "hosts.duplicate_name", "name", "id")
+	hostContract("hosts.err.dup_target", "hosts.duplicate_address", "address", "id")
+	hostContract("hostimport.dup_name", "hosts.duplicate_name", "name")
+	hostContract("hostimport.name_exists", "hosts.duplicate_name", "name")
+	hostContract("hostimport.dup_target", "hosts.duplicate_address", "address")
+	hostContract("hostimport.key_exists", "hosts.duplicate_address", "address")
 }
 
 // Paquetes: errores de la instalación que envuelven un error del sistema.

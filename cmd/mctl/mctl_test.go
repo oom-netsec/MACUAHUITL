@@ -202,6 +202,10 @@ func TestJobLifecycleAgainstSimulator(t *testing.T) {
 	if out := must(t, "", "job", "watch", job); !strings.Contains(out, "closed") || !strings.Contains(out, "fase  COMPLETED") {
 		t.Fatalf("watch = %q", out)
 	}
+	// Sobre un trabajo ya cerrado, watch recibe el estado final y el closed sintético y termina bien.
+	if out := must(t, "", "job", "watch", job); !strings.Contains(out, "closed") {
+		t.Fatalf("watch de un trabajo cerrado = %q", out)
+	}
 	if zips, _ := filepath.Glob(filepath.Join(e.out, "lab_*", "*.zip")); len(zips) != 1 {
 		t.Fatalf("zips = %v", zips)
 	}

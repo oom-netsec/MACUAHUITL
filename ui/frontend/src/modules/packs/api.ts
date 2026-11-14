@@ -14,7 +14,7 @@ export interface PackInfo {
 }
 export interface PackInstallResult { pack: PackInfo; replacedVersion: string } // replacedVersion vacío = era nuevo
 export interface PackDetail { pack: PackInfo; readme: string; playbookIds: string[]; scriptIds: string[] }
-export interface PackInspectResult { pack: PackInfo; playbookIds: string[]; scriptIds: string[]; replacedVersion: string }
+export interface PackInspectResult { pack: PackInfo; playbookIds: string[]; scriptIds: string[]; replacedVersion: string; sha256: string }
 
 // Fase 32c: paquete personal.
 export interface PackExportRequest {
@@ -31,9 +31,10 @@ export interface PackImportResult {
 
 export interface PacksAPI {
   // Ruta absoluta del .mpack. Un paquete de terceros exige allowUnsigned (el diálogo con aviso); sin él falla con pack.err.unsigned.
-  packInstall(path: string, allowUnsigned: boolean): Promise<PackInstallResult>;
+  // sha256 es obligatorio: el de packInspect (si falta o no coincide con el archivo, el núcleo no instala).
+  packInstall(path: string, allowUnsigned: boolean, sha256: string): Promise<PackInstallResult>;
   // Con la selección del diálogo: hide = IDs que quedan ocultos; replaceHidden = hide es el conjunto exacto.
-  packInstallHiding(path: string, allowUnsigned: boolean, hide: string[], replaceHidden: boolean): Promise<PackInstallResult>;
+  packInstallHiding(path: string, allowUnsigned: boolean, hide: string[], replaceHidden: boolean, sha256: string): Promise<PackInstallResult>;
   packList(): Promise<PackInfo[]>;
   packShow(id: string): Promise<PackDetail>;
   packRemove(id: string): Promise<number>; // favoritos quitados
@@ -47,8 +48,8 @@ export interface PacksAPI {
 type Call = <T>(method: string, ...args: unknown[]) => Promise<T>;
 
 export const packsWails = (call: Call): PacksAPI => ({
-  packInstall: (path, allowUnsigned) => call("PackInstall", path, allowUnsigned),
-  packInstallHiding: (path, allowUnsigned, hide, replaceHidden) => call("PackInstallHiding", path, allowUnsigned, hide, replaceHidden),
+  packInstall: (path, allowUnsigned, sha256) => call("PackInstall", path, allowUnsigned, sha256),
+  packInstallHiding: (path, allowUnsigned, hide, replaceHidden, sha256) => call("PackInstallHiding", path, allowUnsigned, hide, replaceHidden, sha256),
   packList: () => call("PackList"),
   packShow: (id) => call("PackShow", id),
   packRemove: (id) => call("PackRemove", id),

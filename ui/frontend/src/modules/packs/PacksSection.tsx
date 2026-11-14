@@ -88,7 +88,7 @@ function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; p
     let ok = false;
     try {
       // Un playbook tapado no se oculta (su casilla queda marcada): no viaja en hide, que con replaceHidden es el conjunto exacto.
-      await core.packInstallHiding(path, !pack.official, [...playbookIds, ...scriptIds].filter((x) => hide.has(x) && !pack.shadowed.includes(x)), true);
+      await core.packInstallHiding(path, !pack.official, [...playbookIds, ...scriptIds].filter((x) => hide.has(x) && !pack.shadowed.includes(x)), true, info.sha256);
       ok = true;
     } catch (e) { setErr(errorText(e)); }
     scriptsChanged(); // también si falló: un error puede decir «el paquete quedó instalado»

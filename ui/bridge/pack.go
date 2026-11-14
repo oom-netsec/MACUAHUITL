@@ -50,16 +50,16 @@ func packInfoDTO(p *v1.PackInfo) PackInfoDTO {
 
 // PackInstall instala el .mpack de path (ruta absoluta que el usuario eligió). allowUnsigned es la confirmación del
 // diálogo con aviso para un paquete de terceros; sin ella se rechaza con pack.err.unsigned.
-func (b *Bridge) PackInstall(path string, allowUnsigned bool) (PackInstallResultDTO, error) {
-	return b.PackInstallHiding(path, allowUnsigned, nil, false)
+func (b *Bridge) PackInstall(path string, allowUnsigned bool, sha256 string) (PackInstallResultDTO, error) {
+	return b.PackInstallHiding(path, allowUnsigned, nil, false, sha256)
 }
 
 // PackInstallHiding es PackInstall con los IDs de playbook o script que quedan ocultos al instalar (la selección del
 // diálogo). Con replaceHidden, hide es el conjunto exacto de ocultos tras instalar (el diálogo manda true); sin él se
-// conserva lo que ya estaba oculto y hide suma.
-func (b *Bridge) PackInstallHiding(path string, allowUnsigned bool, hide []string, replaceHidden bool) (PackInstallResultDTO, error) {
+// conserva lo que ya estaba oculto y hide suma. sha256 es el de PackInspect (obligatorio: ata lo revisado a lo instalado).
+func (b *Bridge) PackInstallHiding(path string, allowUnsigned bool, hide []string, replaceHidden bool, sha256 string) (PackInstallResultDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PackInstallResultDTO, error) {
-		r, err := v1.NewPackServiceClient(c).Install(ctx, &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: allowUnsigned, Hide: hide, ReplaceHidden: replaceHidden})
+		r, err := v1.NewPackServiceClient(c).Install(ctx, &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: allowUnsigned, Hide: hide, ReplaceHidden: replaceHidden, Sha256: sha256})
 		return PackInstallResultDTO{Pack: packInfoDTO(r.GetPack()), ReplacedVersion: r.GetReplacedVersion()}, err
 	})
 }
@@ -103,6 +103,7 @@ type PackInspectDTO struct {
 	PlaybookIDs     []string    `json:"playbookIds"`
 	ScriptIDs       []string    `json:"scriptIds"`
 	ReplacedVersion string      `json:"replacedVersion"`
+	SHA256          string      `json:"sha256"` // del archivo: pásalo a PackInstall
 }
 
 // PackInspect es la vista previa de PackInstall para el diálogo con casillas: valida el .mpack igual y no instala nada.
@@ -110,7 +111,7 @@ func (b *Bridge) PackInspect(path string, allowUnsigned bool) (PackInspectDTO, e
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (PackInspectDTO, error) {
 		r, err := v1.NewPackServiceClient(c).Inspect(ctx, &v1.PackServiceInspectRequest{Path: path, AllowUnsigned: allowUnsigned})
 		return PackInspectDTO{Pack: packInfoDTO(r.GetPack()), PlaybookIDs: strs(r.GetPlaybookIds()), ScriptIDs: strs(r.GetScriptIds()),
-			ReplacedVersion: r.GetReplacedVersion()}, err
+			ReplacedVersion: r.GetReplacedVersion(), SHA256: r.GetSha256()}, err
 	})
 }
 

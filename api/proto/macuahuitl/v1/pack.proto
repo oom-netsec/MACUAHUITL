@@ -31,6 +31,7 @@ message PackServiceInstallRequest {
   bool allow_unsigned = 2;    // confirmación explícita para un paquete de terceros
   repeated string hide = 3;   // IDs de playbook o script del paquete que quedan ocultos al instalar; los que no existan se ignoran (fase 32b)
   bool replace_hidden = 4;    // con true, hide es el conjunto exacto de ocultos tras instalar; sin él se conserva lo oculto y hide suma
+  string sha256 = 5;          // obligatorio: el del archivo que vio la vista previa (Inspect); si falta o no coincide, no se instala (pack.err.install.sha256_missing / pack.err.install.changed)
 }
 
 message PackServiceInstallResponse {
@@ -101,6 +102,7 @@ message PackServiceInspectResponse {
   repeated string playbook_ids = 2;
   repeated string script_ids = 3;  // los derivados de playbooks más los de scripts.json
   string replaced_version = 4;     // versión instalada que reemplazaría; vacío si es nuevo
+  string sha256 = 5;               // del archivo; pásalo en Install para atar la vista previa a lo que se instala
 }
 
 message PackServiceExportRequest {
@@ -135,7 +137,7 @@ message PackServiceImportRequest {
   string path = 1;                  // absoluta; el .mpack no debe tener firma oficial
   bool confirm = 2;                 // false = vista previa (no escribe nada); true = aplica con decisions
   repeated PackImportDecision decisions = 3;
-  string sha256 = 4;                // opcional: el de la vista previa; con confirm, si no coincide con el archivo, falla (pack.err.import.changed)
+  string sha256 = 4;                // con confirm es obligatorio: el de la vista previa; si falta (pack.err.import.sha256_missing) o no coincide con el archivo (pack.err.import.changed), falla
 }
 
 message PackImportItem {

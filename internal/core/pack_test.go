@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/status"
 
@@ -53,7 +54,7 @@ func (h *harness) scriptIDs(t *testing.T) []string {
 // installIOSXE instala oom/ios-xe por el servicio, como lo haría «mctl pack install».
 func (h *harness) installIOSXE(t *testing.T) {
 	t.Helper()
-	if _, err := v1.NewPackServiceClient(h.conn).Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t))}); err != nil {
+	if _, err := v1.NewPackServiceClient(h.conn).Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t))})); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -153,11 +154,11 @@ func TestPackMissingDeUnPaqueteQuitado(t *testing.T) {
 	}
 	pk := v1.NewPackServiceClient(h.conn)
 	p := writeMpack(t, zb)
-	_, err = pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: p})
+	_, err = pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: p}))
 	if r, _ := reasonOf(err); r != "pack.err.unsigned" {
 		t.Fatalf("sin confirmar: %v", err)
 	}
-	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: p, AllowUnsigned: true}); err != nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: p, AllowUnsigned: true})); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pk.Remove(ctx(t), &v1.PackServiceRemoveRequest{Id: "acme/demo"}); err != nil {
@@ -244,7 +245,7 @@ func TestPackSobreviveAlReinicio(t *testing.T) {
 func TestPackRechazoNoFiltraRutas(t *testing.T) {
 	h := newHarness(t, nil)
 	p := writeMpack(t, []byte("no es un zip"))
-	_, err := v1.NewPackServiceClient(h.conn).Install(ctx(t), &v1.PackServiceInstallRequest{Path: p})
+	_, err := v1.NewPackServiceClient(h.conn).Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: p}))
 	r, md := reasonOf(err)
 	if r != "pack.err.zip.invalid" {
 		t.Fatalf("%v", err)
@@ -297,11 +298,11 @@ func TestPackPrecedenciaYTapados(t *testing.T) {
 func TestPackRutaRelativaYAuditoriaDeRechazos(t *testing.T) {
 	h := newHarness(t, nil)
 	pk := v1.NewPackServiceClient(h.conn)
-	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: "x.mpack"}); err == nil || !strings.Contains(err.Error(), "absoluta") {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: "x.mpack"})); err == nil || !strings.Contains(err.Error(), "absoluta") {
 		t.Fatalf("%v", err)
 	}
 	h.installIOSXE(t)
-	_, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t))})
+	_, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t))}))
 	if r, _ := reasonOf(err); r != "pack.err.version" {
 		t.Fatalf("%v", err)
 	}
@@ -322,7 +323,7 @@ func TestPackTerceroNoOcupaIDsMovidos(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = v1.NewPackServiceClient(h.conn).Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, zb), AllowUnsigned: true})
+	_, err = v1.NewPackServiceClient(h.conn).Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, zb), AllowUnsigned: true}))
 	if r, _ := reasonOf(err); r != "pack.err.editor.reserved" {
 		t.Fatalf("%v", err)
 	}
@@ -407,7 +408,7 @@ func TestPackOcultarNoCambiaLoQueResuelve(t *testing.T) {
 		}
 	}
 	// Actualizar: lo oculto se conserva; reinstalar nuevo ID entra visible.
-	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1"))}); err != nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1"))})); err != nil {
 		t.Fatal(err)
 	}
 	if slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
@@ -442,7 +443,7 @@ func TestPackOcultarNoCambiaLoQueResuelve(t *testing.T) {
 func TestPackInstalarConHide(t *testing.T) {
 	h := newHarness(t, nil)
 	pk := v1.NewPackServiceClient(h.conn)
-	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp", "ios-xe/nope"}})
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp", "ios-xe/nope"}}))
 	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l2-stp"}) {
 		t.Fatalf("%+v %v", r, err)
 	}
@@ -553,7 +554,7 @@ func TestPackInspectNoInstala(t *testing.T) {
 		t.Fatalf("%+v %v", r, err)
 	}
 	_, ei := pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: path})
-	_, ein := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: path})
+	_, ein := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: path}))
 	ri, _ := reasonOf(ei)
 	rn, _ := reasonOf(ein)
 	if ri != "pack.err.version" || ri != rn {
@@ -562,7 +563,7 @@ func TestPackInspectNoInstala(t *testing.T) {
 	// Un archivo que no es zip: el mismo error.
 	bad := writeMpack(t, []byte("no soy un zip"))
 	_, ei = pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: bad})
-	_, ein = pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: bad})
+	_, ein = pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: bad}))
 	ri, _ = reasonOf(ei)
 	rn, _ = reasonOf(ein)
 	if ri == "" || ri != rn {
@@ -637,7 +638,7 @@ func TestPackOcultosNoSeHeredan(t *testing.T) {
 	if _, err := pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l1-poe"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1", "playbooks/l1-poe.yaml"))}); err != nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1", "playbooks/l1-poe.yaml"))})); err != nil {
 		t.Fatal(err)
 	}
 	var n int
@@ -645,7 +646,7 @@ func TestPackOcultosNoSeHeredan(t *testing.T) {
 	if n != 0 {
 		t.Fatalf("la v2 sin el ID debía borrar su fila: %d", n)
 	}
-	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.2"))}); err != nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.2"))})); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Contains(h.playbookIDs(t), "ios-xe/l1-poe") {
@@ -711,21 +712,21 @@ func TestPackOmitidoAlArrancarConservaOcultos(t *testing.T) {
 func TestPackInstallReplaceHidden(t *testing.T) {
 	h := newHarness(t, nil)
 	pk := v1.NewPackServiceClient(h.conn)
-	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}}); err != nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})); err != nil {
 		t.Fatal(err)
 	}
 	// Sin replace_hidden: se conserva y suma.
-	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1")), Hide: []string{"ios-xe/l1-poe"}})
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1")), Hide: []string{"ios-xe/l1-poe"}}))
 	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l1-poe", "ios-xe/l2-stp"}) {
 		t.Fatalf("%+v %v", r, err)
 	}
 	// Con replace_hidden y hide vacío: nada oculto.
-	r, err = pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.2")), ReplaceHidden: true})
+	r, err = pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.2")), ReplaceHidden: true}))
 	if err != nil || len(r.Pack.Hidden) != 0 || !slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
 		t.Fatalf("%+v %v", r, err)
 	}
 	// Con replace_hidden y hide: exactamente eso.
-	r, err = pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.3")), Hide: []string{"ios-xe/l1-poe"}, ReplaceHidden: true})
+	r, err = pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.3")), Hide: []string{"ios-xe/l1-poe"}, ReplaceHidden: true}))
 	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l1-poe"}) {
 		t.Fatalf("%+v %v", r, err)
 	}
@@ -760,7 +761,7 @@ func TestPackInstalarQueFallaAlExtraerNoGuardaLoOculto(t *testing.T) {
 	os.MkdirAll(dir, 0o700)
 	os.Chmod(dir, 0o500) // el extract no puede crear su carpeta temporal
 	t.Cleanup(func() { os.Chmod(dir, 0o700) })
-	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}}); err == nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})); err == nil {
 		t.Fatal("el extract debía fallar")
 	}
 	var n int
@@ -769,7 +770,7 @@ func TestPackInstalarQueFallaAlExtraerNoGuardaLoOculto(t *testing.T) {
 		t.Fatalf("quedaron %d elecciones guardadas de una instalación fallida", n)
 	}
 	os.Chmod(dir, 0o700)
-	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}}))
 	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l2-stp"}) {
 		t.Fatalf("%+v %v", r, err)
 	}
@@ -783,7 +784,7 @@ func TestPackInstalarConFalloAlGuardarLoOcultoSeAudita(t *testing.T) {
 	if _, err := h.core.db.Exec(`CREATE TRIGGER no_ocultar BEFORE INSERT ON pack_hidden BEGIN SELECT RAISE(ABORT, 'disco lleno'); END`); err != nil {
 		t.Fatal(err)
 	}
-	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}})
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t)), Hide: []string{"ios-xe/l2-stp"}}))
 	if err != nil || len(r.Pack.Hidden) != 0 {
 		t.Fatalf("%+v %v", r, err)
 	}
@@ -794,4 +795,39 @@ func TestPackInstalarConFalloAlGuardarLoOcultoSeAudita(t *testing.T) {
 	if !strings.Contains(au, `"action":"pack.install"`) || !strings.Contains(au, "hidden_save_failed=") || strings.Contains(au, `"action":"pack.items"`) {
 		t.Fatalf("auditoría:\n%s", au)
 	}
+}
+
+// Quitar un paquete y limpiar lo suyo en la base (lo oculto, colecciones, pack_removed) es una sola operación bajo el
+// candado del almacén: un Install del mismo paquete no puede caer en medio y perder en silencio lo que ocultó.
+func TestPackQuitarLimpiaBajoElCandadoDelAlmacen(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t))}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := h.core.db.Begin() // la base ocupada: la limpieza del Remove espera aquí
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := pk.Remove(ctx(t), &v1.PackServiceRemoveRequest{Id: r.Pack.Id})
+		done <- err
+	}()
+	for h.core.packs.Snapshot().Find(r.Pack.Id) != nil { // el Remove ya quitó del almacén y espera la base
+		time.Sleep(5 * time.Millisecond)
+	}
+	got := make(chan struct{})
+	go func() { h.core.packs.Locked(func() error { return nil }); close(got) }()
+	select {
+	case <-got:
+		t.Error("el almacén quedó libre entre quitar el paquete y limpiar la base")
+	case <-time.After(300 * time.Millisecond):
+	}
+	tx.Rollback()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	<-got
 }
