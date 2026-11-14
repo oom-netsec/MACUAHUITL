@@ -207,7 +207,7 @@ func Build(r Request) (bin string, argv []string, err error) {
 		case "server":
 			// Nunca en todas las interfaces: -B con una IP de esta máquina; puerto no privilegiado.
 			b, _ := o.str("bind")
-			if a, err := netip.ParseAddr(b); err != nil || !isLocalIP(a) {
+			if a, err := netip.ParseAddr(b); err != nil || !isLocalIP(a) || a.IsLinkLocalUnicast() { // -B sin zona falla con link-local
 				return "", nil, i18n.New("diag.err.iperf_bind", i18n.A("value", b))
 			}
 			argv = []string{"-s", "-B", b}

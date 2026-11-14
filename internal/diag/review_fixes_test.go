@@ -155,6 +155,31 @@ func TestIperfServerRestringido(t *testing.T) {
 	}
 }
 
+// iperf3 -B sin zona falla con una IPv6 link-local: se rechaza aunque sea de esta máquina; y el error dice qué falta.
+func TestIperfServerBindLinkLocalYMensaje(t *testing.T) {
+	localIPs = func() []netip.Addr {
+		return []netip.Addr{netip.MustParseAddr("fe80::1"), netip.MustParseAddr("192.0.2.9")}
+	}
+	t.Cleanup(func() { localIPs = realLocalIPs })
+	_, _, err := Build(req(Iperf3, "", map[string]string{"mode": "server", "bind": "fe80::1"}, ""))
+	if err == nil {
+		t.Fatal("link-local aceptada")
+	}
+	_, _, err = Build(req(Iperf3, "", map[string]string{"mode": "server"}, ""))
+	le, ok := err.(interface{ Localize(string) string })
+	if !ok {
+		t.Fatalf("sin Localize: %T", err)
+	}
+	for _, loc := range []string{"es", "en"} {
+		if m := le.Localize(loc); !strings.Contains(m, "options.bind") && !strings.Contains(m, "bind") {
+			t.Errorf("%s: %q no menciona bind", loc, m)
+		}
+	}
+	if en, es := le.Localize("en"), le.Localize("es"); en == es || !strings.Contains(en, "local IP") || !strings.Contains(es, "IP local") {
+		t.Errorf("mensajes: %q / %q", en, es)
+	}
+}
+
 func TestIperfServerTieneTope(t *testing.T) {
 	localIPs = func() []netip.Addr { return []netip.Addr{netip.MustParseAddr("192.0.2.9")} }
 	iperfServerMax = 300 * time.Millisecond
