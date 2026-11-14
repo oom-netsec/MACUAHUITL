@@ -95,6 +95,9 @@ func CheckDenied(platform, cmd string) error {
 	if platform == "asa" {
 		return checkASA(cmd)
 	}
+	if platform == "wlc-aireos" {
+		return checkAireOS(cmd)
+	}
 	if platform == "ftd" {
 		return checkFTD(cmd)
 	}
