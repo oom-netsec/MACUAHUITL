@@ -2651,6 +2651,11 @@ export const es = {
   "patrol.param.kind.ip": "Dirección IP",
   "scripts.col.hidden": "oculto por un paquete",
   "scripts.col.unavailable": "no disponible: instala el paquete",
+  "tls.verify.unknown_authority": "Autoridad desconocida",
+  "tls.verify.hostname": "El nombre no coincide con el certificado",
+  "tls.verify.expired": "Certificado vencido",
+  "tls.verify.not_yet_valid": "Certificado aún no válido",
+  "tls.verify.other": "No se pudo verificar la cadena",
 };
 
 export type Key = keyof typeof es;

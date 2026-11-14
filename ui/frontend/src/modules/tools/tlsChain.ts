@@ -2,7 +2,7 @@
 import type { Tone } from "../../components/Page";
 
 export interface ChainCert { role: "leaf" | "intermediate" | "root"; subject: string; issuer: string; sans: string[]; notAfter: string; daysLeft: number; sha256: string; isCA: boolean; keyType: string; sigAlg: string }
-export interface TlsInfo { target: string; version: string; cipher: string; alpn: string; verified: boolean; verifyError: string; nameMatches: boolean; chain: ChainCert[]; findings: { severity: string; code: string; detail: string }[] }
+export interface TlsInfo { target: string; version: string; cipher: string; alpn: string; verified: boolean; verifyError: string; verifyCode?: string; nameMatches: boolean; chain: ChainCert[]; findings: { severity: string; code: string; detail: string }[] }
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const DAY = 864e5;
