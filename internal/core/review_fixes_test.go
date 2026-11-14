@@ -221,3 +221,28 @@ func TestLoginTestOnlyOnCreatedJob(t *testing.T) {
 	}
 	h.waitJob(t, job, "closed")
 }
+
+// Un trabajo que ya está cerrando (finish corriendo) no se pausa al suspender ni se vuelve a armar al desbloquear:
+// rearmar su ventana volvería a dejar la DEK viva para un trabajo terminado.
+func TestSuspenderYReanudarIgnoranTrabajosCerrando(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	j := &job{id: "j-cierra", state: "armed", closing: true, Until: time.Now().Add(time.Hour), creds: []string{cred}}
+	h.core.mu.Lock()
+	h.core.jobs[j.id] = j
+	h.core.mu.Unlock()
+	h.core.OnSleep()
+	h.core.mu.Lock()
+	paused := j.paused
+	j.paused = true // como si ya estuviera pausado cuando empezó a cerrar
+	h.core.mu.Unlock()
+	if paused {
+		t.Fatal("OnSleep pausó un trabajo que está cerrando")
+	}
+	if _, err := h.vault.Unlock(ctx(t), &v1.UnlockRequest{MasterPassword: []byte("maestra")}); err != nil { // Unlock llama a resumePaused
+		t.Fatal(err)
+	}
+	if ws := h.core.vault.Windows(); len(ws) != 0 {
+		t.Fatalf("resumePaused rearmó la ventana de un trabajo cerrando: %v", ws)
+	}
+}

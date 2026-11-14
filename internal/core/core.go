@@ -443,7 +443,7 @@ func (c *Core) OnSleep() {
 		c.vault.LockAll()
 	}
 	for _, j := range c.jobs {
-		if j.state == "armed" {
+		if j.state == "armed" && !j.closing {
 			j.paused = true
 			c.sched.Pause(j.id)
 		}
@@ -468,7 +468,7 @@ func (c *Core) resumePaused() {
 	c.mu.Lock()
 	var paused []*job
 	for _, j := range c.jobs {
-		if j.paused && j.state == "armed" {
+		if j.paused && j.state == "armed" && !j.closing {
 			paused = append(paused, j)
 		}
 	}
