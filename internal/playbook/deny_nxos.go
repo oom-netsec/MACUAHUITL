@@ -133,6 +133,12 @@ func checkNXOS(cmd string) error {
 	if !ok {
 		return denied(cmd, "playbook.why.quote")
 	}
+	// Los leaf ACI pasan la línea a bash en un shell persistente: «(»/«)» podrían definir una función que correría en el
+	// siguiente show; «{a,b}»/«{a..b}» se expanden y esquivan las listas de palabras; unas comillas en los argumentos del
+	// show («"binary"») también. Solo valen los marcadores de datos ({interface}) y las comillas de un filtro tras «|».
+	if strings.ContainsAny(cmd, "()") || strings.ContainsAny(placeholder.ReplaceAllString(cmd, ""), "{}") || strings.Contains(segs[0], `"`) {
+		return denied(cmd, "playbook.why.nxos_shell")
+	}
 	fields := strings.Fields(segs[0])
 	if len(fields) == 0 {
 		if len(segs) > 1 {

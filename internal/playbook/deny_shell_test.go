@@ -84,3 +84,27 @@ func TestDenyExpansionDeShellEnNXOS(t *testing.T) {
 		}
 	}
 }
+
+// En nx-os los leaf ACI pasan la línea a bash en un shell persistente: los paréntesis podrían definir una función que
+// se ejecutaría en el siguiente show, las llaves con «,» o «..» se expanden y esquivan las listas de tokens, y las
+// comillas en los argumentos del show esquivan las comprobaciones de palabras («"binary"»). Los marcadores de datos
+// ({interface}) y las comillas de un filtro tras «|» siguen valiendo.
+func TestDenyNXOSParentesisLlavesYComillas(t *testing.T) {
+	for _, cmd := range []string{
+		"show version() { true; }", "show (x)", "show version | egrep \"(a|b)\"",
+		"show tech-support {binary,x}", "show {a..b}", "show version {", "show version }",
+		"show tech-support \"binary\"", "show \"version\"",
+	} {
+		if err := CheckDenied("nx-os", cmd); err == nil {
+			t.Errorf("nx-os %q: no se rechazó", cmd)
+		}
+	}
+	for _, cmd := range []string{
+		"show interface {interface}", "show logging last 200 | egrep \"LACP|PORT-CHANNEL\"", "dir bootflash:",
+		"show ip route vrf {vrf} | include {ip}",
+	} {
+		if err := CheckDenied("nx-os", cmd); err != nil {
+			t.Errorf("nx-os %q: %v", cmd, err)
+		}
+	}
+}
