@@ -26,7 +26,12 @@ var maxDetect = 2 * time.Minute
 
 var (
 	anyPrompt = regexp.MustCompile(`(?:^|\n)([\w.\-@/:]{1,63})([>#]) ?$`)
-	more      = regexp.MustCompile(` ?(?:--More--|<--- More --->) ?`) // el segundo es el de ASA
+	// FTD: la CLI normal tiene el prompt «> » sin nombre de host. Una línea de salida que empiece con «>» (BGP, tablas)
+	// se confunde con él, así que solo cuenta al final del búfer y tras una pausa (ftdSettle) sin más datos.
+	ftdPrompt = regexp.MustCompile(`(?:^|\n)> ?$`)
+	// Primer inicio de sesión de FTD: cambio de contraseña obligatorio o EULA. Responder cambiaría el equipo.
+	ftdFirstLogin = regexp.MustCompile(`(?i)you must change your password|enter new password:|confirm new password:|unix password: ?$|to agree to the eula|please enter 'yes'`)
+	more          = regexp.MustCompile(` ?(?:--More--|<--- More --->) ?`) // el segundo es el de ASA
 	// Secuencias con que el equipo borra el --More--: "\r    \r" o retrocesos "\b\b  \b\b".
 	erase = regexp.MustCompile(`\r +\r|\x08+ +\x08+`)
 )
@@ -102,13 +107,21 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 
 	ctx, cancel := context.WithTimeout(ctx, openTimeout)
 	defer cancel()
-	text, err := d.until(ctx, func(s string) bool { return anyPrompt.MatchString(s) })
+	text, err := d.until(ctx, func(s string) bool {
+		return anyPrompt.MatchString(s) || ftdPrompt.MatchString(s) || ftdFirstLogin.MatchString(s)
+	})
 	if err != nil {
 		return d.fail(err)
 	}
 	m := anyPrompt.FindStringSubmatch(text)
+	if m == nil {
+		if !ftdPrompt.MatchString(text) { // primer inicio de sesión: no se escribe nada, ni siquiera un Enter
+			return d.fail(platform.ErrFirstLogin)
+		}
+		m = []string{"", "", ">"}
+	}
 	d.hostname = m[1]
-	if m[2] == ">" {
+	if m[2] == ">" && d.hostname != "" { // FTD no tiene enable
 		if err := d.enable(ctx, enable); err != nil {
 			return d.fail(err)
 		}
@@ -196,6 +209,9 @@ func (d *driver) pump(r io.Reader) {
 func (d *driver) atPrompt(s string) bool {
 	last := s[strings.LastIndexByte(s, '\n')+1:]
 	last = strings.TrimSuffix(last, " ")
+	if d.hostname == "" { // FTD: solo «>»
+		return last == ">"
+	}
 	return last == d.hostname+"#" || last == d.hostname+">"
 }
 
@@ -226,7 +242,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				return clean(string(d.buf)), err
 			}
 		}
-		if done(clean(tail)) {
+		if done(clean(tail)) && !d.moreComing(ctx, clean(tail)) {
 			text := clean(string(d.buf))
 			d.buf = nil
 			return text, nil
@@ -255,6 +271,29 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				timer.Reset(idle)
 			}
 		}
+	}
+}
+
+// ftdSettle es la pausa sin datos tras un «> » para aceptarlo como prompt de FTD.
+var ftdSettle = 150 * time.Millisecond
+
+// moreComing: si tail es el «> » de FTD, espera ftdSettle por más datos; si llegan, no era el prompt (era el inicio
+// de una línea de salida) y se agregan al búfer.
+func (d *driver) moreComing(ctx context.Context, tail string) bool {
+	if !ftdPrompt.MatchString(tail) {
+		return false
+	}
+	select {
+	case c, ok := <-d.chunks:
+		if ok {
+			d.buf = append(d.buf, c...)
+			return true
+		}
+		return false // el cierre lo reporta la vuelta siguiente
+	case <-time.After(ftdSettle):
+		return false
+	case <-ctx.Done():
+		return false
 	}
 }
 
@@ -336,6 +375,9 @@ var wlc9800 = regexp.MustCompile(`(?m)^Cisco IOS Software.*, C9800`)
 var nxos = regexp.MustCompile(`(?m)^Cisco Nexus Operating System \(NX-OS\) Software`)
 
 // asa busca la cabecera de show version de ASA al inicio de línea; un IOS que diga «Adaptive Security» en texto libre no cuenta.
+// ftd: línea «Model : Cisco Firepower … Threat Defense» o «Cisco Secure Firewall Threat Defense» (también «Cisco Firepower 1120 Threat Defense»).
+var ftd = regexp.MustCompile(`(?m)^Model\s*:\s*Cisco (?:Firepower|Secure Firewall)\b.*Threat Defense`)
+
 var asa = regexp.MustCompile(`(?m)^Cisco Adaptive Security Appliance Software Version`)
 
 func (d *driver) Detect(ctx context.Context) (string, error) {
@@ -346,6 +388,8 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 		return "", err
 	}
 	switch {
+	case ftd.MatchString(out.Text): // antes que asa: la salida de FTD puede citar la versión de lina
+		return "ftd", nil
 	case asa.MatchString(out.Text):
 		return "asa", nil
 	case nxos.MatchString(out.Text):
