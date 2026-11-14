@@ -23,7 +23,7 @@ test("compara y muestra los cambios por equipo, lo ignorado y los avisos", async
   await userEvent.click(btn);
   expect(core.driftRun).toHaveBeenCalledWith("/o/job", 2, "");
   const sw1 = await screen.findByRole("region", { name: "SW1_192.0.2.1" });
-  expect(within(sw1).getByText("2 cambio(s): 1 agregada(s), 1 quitada(s).")).toBeInTheDocument();
+  expect(within(sw1).getByText("2 cambios (líneas agregadas: 1, quitadas: 1).")).toBeInTheDocument();
   expect(within(sw1).getByText(termText(/^- interface Gi1\/0\/1 › description PC-01$/))).toBeInTheDocument();
   expect(within(sw1).getByText(termText(/^\+ interface Gi1\/0\/1 › description PC-01-NUEVA$/))).toBeInTheDocument();
   expect(within(sw1).getByText(/Ignoradas por volátiles: ntp clock-period 17179870/)).toBeInTheDocument();

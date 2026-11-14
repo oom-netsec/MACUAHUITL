@@ -400,7 +400,7 @@ describe("colecciones: ocultos por un paquete y scripts no disponibles", () => {
 
   test("el contador no cuenta los no disponibles", async () => {
     await withIds([STP.id, "lib-l2-ghost"], []);
-    expect(within(colRows()[0]).getByText("1 scripts")).toBeInTheDocument();
+    expect(within(colRows()[0]).getByText("1 script")).toBeInTheDocument();
   });
 
   test("un oculto que sí resuelve se marca «oculto» y tampoco cuenta", async () => {

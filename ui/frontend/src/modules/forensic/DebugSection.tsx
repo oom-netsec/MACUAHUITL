@@ -1,3 +1,4 @@
+import { plural } from "../../lib/plural";
 import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Field, Notice, TextArea } from "../../components/Field";
@@ -47,7 +48,7 @@ export function DebugSection({ core }: { core: CoreAPI }) {
       {!rep && !q.error && <FirstRun what="forensic.empty.debug" />}
       {rep && (
         <>
-          <p className="meta">{t("forensic.debug.summary", { lines: rep.lines, hidden: rep.hidden, blank: rep.blank, groups: rep.groups_total })}</p>
+          <p className="meta">{t("forensic.debug.summary", { lines: plural(t, "unit.line", rep.lines), hidden: rep.hidden, blank: rep.blank, groups: plural(t, "unit.pattern", rep.groups_total) })}</p>
           <Warnings list={rep.warnings} />
           <ResultPanel title={t("forensic.debug.anomalies")}>
             <div className="panel-body">

@@ -44,7 +44,7 @@ function DataCard({ core, kind, tk, wk }: { core: CoreAPI; kind: ImportKind; tk:
     if (ids.length === 0 || (all.length === 1 && all[0].id === FAVORITES_ID && all[0].scriptIds.length === 0)) { setMsg(t("settings.data.exportNone")); return; }
     const path = await core.pickSavePath(t(kind === "scripts" ? "scripts.exportName" : "scripts.col.exportName"));
     if (!path) return;
-    if (kind === "scripts") setMsg(t("settings.data.exportedScripts", { n: String(await cleanOnFail(core, path, core.exportScripts(ids, path, true))), path }));
+    if (kind === "scripts") setMsg(t("settings.data.exportedScripts", { n: await cleanOnFail(core, path, core.exportScripts(ids, path, true)), path }));
     else { const r = await cleanOnFail(core, path, core.exportCollections(ids, path, true)); setMsg(t("scripts.col.exported", { c: r.collections, s: r.scripts, path })); }
   });
 

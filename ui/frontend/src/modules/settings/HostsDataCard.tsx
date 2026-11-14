@@ -72,7 +72,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
     if (!path) return;
     // Si falla, se borra el archivo vacío que dejó pickSavePath (un archivo previo con contenido no se toca) y se muestra el error real.
     const r = await cleanOnFail(core, path, core.exportHosts(ids, path, true, format));
-    setMsg(t("hosts.data.export.done", { n: String(r.count), path }));
+    setMsg(t("hosts.data.export.done", { n: r.count, path }));
     if (r.warnings.length) setWarn([...new Set(r.warnings)].join(" "));
   });
 
@@ -212,7 +212,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
               </div>
             </>
           )}
-          {prev.errors.length > 0 && <p className="hint">{t("hosts.data.import.applyNote", { n: String(prev.errors.length) })}</p>}
+          {prev.errors.length > 0 && <p className="hint">{t("hosts.data.import.applyNote", { n: prev.errors.length })}</p>}
           <div className="actions">
             <button type="button" className="primary" disabled={busy || prev.items.length === 0} onClick={() => void apply()}>{t("hosts.data.import.apply")}</button>
             <button type="button" onClick={() => setPrev(null)}>{t("hosts.data.import.cancel")}</button>

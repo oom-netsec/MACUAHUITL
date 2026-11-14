@@ -121,7 +121,7 @@ export function CollectionsPanel({ core, onChanged }: { core: CoreAPI; onChanged
                   <input type="checkbox" aria-label={t("scripts.col.pick", { name: colName(t, c) })} checked={picked.includes(c.id)}
                     onChange={(e) => setPicked((p) => (e.target.checked ? [...p, c.id] : p.filter((x) => x !== c.id)))} />
                   <button type="button" className="quiet scr-name" aria-label={t("scripts.col.open", { name: colName(t, c) })} onClick={() => setSelId(c.id)}>{colName(t, c)}</button>
-                  <Badge>{t("scripts.col.count", { n: String(c.scriptIds.filter((id) => !missing(c, id) && !c.hiddenScriptIds.includes(id)).length) })}</Badge>
+                  <Badge>{t("scripts.col.count", { n: c.scriptIds.filter((id) => !missing(c, id) && !c.hiddenScriptIds.includes(id)).length })}</Badge>
                   <button type="button" className="quiet icon sm" data-mv={`c-${c.id}-up`} disabled={i === 0} aria-label={t("scripts.col.up", { name: colName(t, c) })} onClick={() => void moveCol(i, -1)}><Icon name="up" /></button>
                   <button type="button" className="quiet icon sm" data-mv={`c-${c.id}-down`} disabled={i === cols.length - 1} aria-label={t("scripts.col.down", { name: colName(t, c) })} onClick={() => void moveCol(i, 1)}><Icon name="down" /></button>
                 </li>

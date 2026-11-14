@@ -1,3 +1,4 @@
+import { plural } from "../../lib/plural";
 import { useEffect, useRef, useState } from "react";
 import type { AdhocResult, CoreAPI, Credential } from "../../lib/core";
 import { Field, Notice, Select, TextArea } from "../../components/Field";
@@ -89,7 +90,7 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
       {!started && !note && <EmptyState icon="layers" title={t("adhoc.empty.title")}>{t("adhoc.empty.text")}</EmptyState>}
       {started && (
         <ResultPanel title={t("common.output")} status={status} error={r.error}
-          meta={res ? t("adhoc.caption", { rows: rows.length, devices: res.report?.devices ?? "" }) : undefined}
+          meta={res ? t("adhoc.caption", { rows: plural(t, "unit.row", rows.length), devices: res.report ? plural(t, "unit.device", res.report.devices) : "" }) : undefined}
           actions={res && (
             <>
               <nav aria-label={t("adhoc.viewLabel")} className="view-switch">
