@@ -9,7 +9,7 @@ func TestLocalizeUsage(t *testing.T) {
 	t.Cleanup(func() { SetLang("") })
 	e := errors.New("uso: mctl backup diff ID_A ID_B | ID_A --now -d EQUIPO --cred ID [--accept HUELLA] [--all=renombrar|reemplazar|omitir]")
 	SetLang("")
-	want := "usage: mctl backup diff ID_A ID_B | ID_A --now -d DEVICE --cred ID [--accept FINGERPRINT] [--all=renombrar|reemplazar|omitir]"
+	want := "usage: mctl backup diff ID_A ID_B | ID_A --now -d DEVICE --cred ID [--accept FINGERPRINT] [--all=rename|replace|skip]"
 	if got := LocalizeUsage(e); got.Error() != want {
 		t.Fatalf("en: %v", got)
 	}

@@ -124,7 +124,7 @@ func snmpPoll(c *cli.Env, args []string) error {
 	var every, count, secs int
 	fs, err := cli.Flags("snmp poll", args, func(fs *flag.FlagSet) {
 		sf.register(fs)
-		fs.Var(&profiles, "profile", "sistema, interfaces, cpu o memoria (repetible)")
+		fs.Var(&profiles, "profile", "system, interfaces, cpu o memory (repetible; sistema y memoria también valen)")
 		fs.IntVar(&every, "every", 10, "segundos entre muestras")
 		fs.IntVar(&count, "count", 0, "muestras (0 = hasta --for)")
 		fs.IntVar(&secs, "for", 0, "segundos (0 = 1 h; máximo 24 h)")

@@ -91,6 +91,16 @@ func TestControlCortaLaSalida(t *testing.T) {
 	}
 }
 
+// Los perfiles canónicos van en inglés; sistema y memoria siguen valiendo como alias.
+func TestPollPerfilesEnIngles(t *testing.T) {
+	a := snmptest.New(t, "lab-ro", nil)
+	var got []Sample
+	err := Poll(context.Background(), v2(a), []string{"system", "memory"}, 100*time.Millisecond, 1, func(s Sample) { got = append(got, s) })
+	if err != nil || len(got) != 1 || got[0].System["sysName"] != "SW1" || len(got[0].Memory) != 1 {
+		t.Fatalf("muestras %+v: %v", got, err)
+	}
+}
+
 func TestPollPerfiles(t *testing.T) {
 	a := snmptest.New(t, "lab-ro", nil)
 	var got []Sample

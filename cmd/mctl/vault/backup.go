@@ -13,8 +13,6 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
 
-var acciones = map[string]bool{"renombrar": true, "reemplazar": true, "omitir": true}
-
 // confirmed: --yes, o «s» en la terminal. Sin terminal y sin --yes no se exporta: el archivo trae todas las credenciales.
 func confirmed(c *cli.Env, yes bool) error {
 	if yes {
@@ -91,13 +89,17 @@ func backupImport(c *cli.Env, args []string) error {
 	if fs.NArg() != 1 {
 		return errors.New("uso: mctl cred backup import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]")
 	}
-	if all != "" && !acciones[all] {
-		return cli.Err("mctl.import_a.bad_all", "value", all)
+	if all != "" {
+		var ok bool
+		if all, ok = cli.Decision(all); !ok {
+			return cli.Err("mctl.import_a.bad_all", "value", all)
+		}
 	}
 	dec := map[string]string{}
 	for _, d := range decs {
 		k, act, ok := strings.Cut(d, "=")
-		if !ok || k == "" || !acciones[act] {
+		act, valid := cli.Decision(act)
+		if !ok || k == "" || !valid {
 			return cli.Err("mctl.import_a.bad_decision", "value", d)
 		}
 		dec[k] = act

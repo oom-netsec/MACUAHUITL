@@ -1,5 +1,5 @@
 // Package ports es el área de mctl para aprovisionar puertos de acceso con el modo de cambio
-// asistido (ADR 0007). Sin --asistido solo imprime el plan y no cambia nada.
+// asistido (ADR 0007). Sin --assisted solo imprime el plan y no cambia nada.
 package ports
 
 import (
@@ -13,10 +13,10 @@ import (
 )
 
 const help = `  ports set EQUIPO[:PUERTO] IF... --cred ID [--vlan N] [--voice N] [--desc T] [--shut|--no-shut]
-        [--accept HUELLA]... [--write-memory] [--asistido]
-        (sin --asistido solo muestra el plan con su reversa; con --asistido pide confirmación en cada paso: s/N, r = revertir;
+        [--accept HUELLA]... [--write-memory] [--assisted]
+        (sin --assisted solo muestra el plan con su reversa; con --assisted pide confirmación en cada paso: s/N, r = revertir;
          Ctrl-C aborta la ejecución y avisa si quedó algún equipo cambiado)
-  ports runs [--activas]            ejecuciones que el núcleo recuerda (para retomar una que quedó viva)
+  ports runs [--active]             ejecuciones que el núcleo recuerda (para retomar una que quedó viva)
   ports resume EJECUCION            retoma la confirmación de una ejecución viva`
 
 func set(c *cli.Env, args []string) error {
@@ -31,11 +31,12 @@ func set(c *cli.Env, args []string) error {
 		fs.BoolVar(&shut, "shut", false, "apagar el puerto")
 		fs.BoolVar(&noShut, "no-shut", false, "encender el puerto")
 		fs.StringVar(&credID, "cred", "", "ID de la credencial")
-		fs.BoolVar(&assisted, "asistido", false, "aplicar el cambio con confirmación por paso")
+		fs.BoolVar(&assisted, "assisted", false, "aplicar el cambio con confirmación por paso")
+		fs.BoolVar(&assisted, "asistido", false, "alias de --assisted")
 		fs.BoolVar(&writeMem, "write-memory", false, "agrega el paso final write memory")
 		fs.Var(&accept, "accept", "huella SHA256 confirmada (repetible)")
 	})
-	const usage = "uso: mctl ports set EQUIPO[:PUERTO] IF... --cred ID [--vlan N] [--voice N] [--desc T] [--shut|--no-shut] [--asistido]"
+	const usage = "uso: mctl ports set EQUIPO[:PUERTO] IF... --cred ID [--vlan N] [--voice N] [--desc T] [--shut|--no-shut] [--assisted]"
 	if err != nil || fs.NArg() < 2 || credID == "" {
 		return errors.New(usage)
 	}
@@ -85,9 +86,12 @@ func set(c *cli.Env, args []string) error {
 
 func runs(c *cli.Env, args []string) error {
 	var onlyActive bool
-	fs, err := cli.Flags("ports runs", args, func(fs *flag.FlagSet) { fs.BoolVar(&onlyActive, "activas", false, "solo las que siguen vivas") })
+	fs, err := cli.Flags("ports runs", args, func(fs *flag.FlagSet) {
+		fs.BoolVar(&onlyActive, "active", false, "solo las que siguen vivas")
+		fs.BoolVar(&onlyActive, "activas", false, "alias de --active")
+	})
 	if err != nil || fs.NArg() != 0 {
-		return errors.New("uso: mctl ports runs [--activas]")
+		return errors.New("uso: mctl ports runs [--active]")
 	}
 	r, err := v1.NewAssistServiceClient(c.Conn).ListRuns(context.Background(), &v1.ListRunsRequest{ActiveOnly: onlyActive})
 	if err != nil {

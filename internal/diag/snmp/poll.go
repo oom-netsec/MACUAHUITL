@@ -14,7 +14,18 @@ import (
 )
 
 // Perfiles de sondeo: OIDs útiles en un caso TAC.
-var Profiles = []string{"sistema", "interfaces", "cpu", "memoria"}
+var Profiles = []string{"system", "interfaces", "cpu", "memory"}
+
+// canonProfile lleva los alias en español (sistema, memoria) al perfil canónico en inglés.
+func canonProfile(p string) string {
+	switch p {
+	case "sistema":
+		return "system"
+	case "memoria":
+		return "memory"
+	}
+	return p
+}
 
 var sysOIDs = map[string]string{
 	".1.3.6.1.2.1.1.1.0": "sysDescr", ".1.3.6.1.2.1.1.2.0": "sysObjectID", ".1.3.6.1.2.1.1.3.0": "sysUpTime",
@@ -251,13 +262,14 @@ func pollSystem(x *gosnmp.GoSNMP) (map[string]string, error) {
 func Poll(ctx context.Context, t Target, profiles []string, interval time.Duration, count int, onSample func(Sample)) error {
 	want := map[string]bool{}
 	for _, p := range profiles {
+		p = canonProfile(p)
 		if !contains(Profiles, p) {
 			return i18n.Wrap("snmp.err.profile", ErrInvalid, i18n.A("profile", p, "profiles", strings.Join(Profiles, ", ")))
 		}
 		want[p] = true
 	}
 	if len(want) == 0 {
-		want["sistema"], want["interfaces"] = true, true
+		want["system"], want["interfaces"] = true, true
 	}
 	if interval < time.Second/10 {
 		interval = time.Second / 10
@@ -283,9 +295,9 @@ func Poll(ctx context.Context, t Target, profiles []string, interval time.Durati
 				s.Errors, s.ErrorTexts = append(s.Errors, t.In(i18n.Es)), append(s.ErrorTexts, t)
 			}
 		}
-		if want["sistema"] {
+		if want["system"] {
 			s.System, err = pollSystem(x)
-			note("sistema", err)
+			note("system", err)
 		}
 		if want["interfaces"] {
 			if r, err := x.Get([]string{".1.3.6.1.2.1.1.3.0"}); err == nil && len(r.Variables) == 1 {
@@ -298,9 +310,9 @@ func Poll(ctx context.Context, t Target, profiles []string, interval time.Durati
 			s.CPU, err = pollCPU(x)
 			note("cpu", err)
 		}
-		if want["memoria"] {
+		if want["memory"] {
 			s.Memory, err = pollMemory(x)
-			note("memoria", err)
+			note("memory", err)
 		}
 		if ctx.Err() != nil {
 			return nil

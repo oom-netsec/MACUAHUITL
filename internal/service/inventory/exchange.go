@@ -205,7 +205,7 @@ func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsReques
 			invalid, err = true, service.Err(ctx, codes.InvalidArgument, "hostimport.dup_decision", i18n.A("key", d.Key))
 			break
 		}
-		dec[d.Key] = d.Action
+		dec[d.Key] = i18n.Decision(d.Action)
 	}
 	if err == nil {
 		err = s.tx(func(tx *sql.Tx) error {

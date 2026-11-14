@@ -329,8 +329,6 @@ func export(c *cli.Env, args []string) error {
 	return nil
 }
 
-var acciones = map[string]bool{"renombrar": true, "reemplazar": true, "omitir": true}
-
 // scripts import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
 func importCmd(c *cli.Env, args []string) error {
 	var decs cli.List
@@ -347,7 +345,7 @@ func importCmd(c *cli.Env, args []string) error {
 	if fs.NArg() != 1 {
 		return errors.New("uso: mctl scripts import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]")
 	}
-	dec, err := parseDecs(decs, all)
+	dec, all, err := parseDecs(decs, all)
 	if err != nil {
 		return err
 	}

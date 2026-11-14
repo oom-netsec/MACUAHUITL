@@ -149,10 +149,10 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 		if strings.Contains(d.GetItemId(), "/") {
 			m = pbDec
 		}
-		if _, dup := m[d.GetItemId()]; dup || d.GetAction() == scripts.Reemplazar {
+		if _, dup := m[d.GetItemId()]; dup || i18n.Decision(d.GetAction()) == scripts.Reemplazar {
 			return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.import.decision", i18n.A("id", d.GetItemId()))
 		}
-		m[d.GetItemId()] = d.GetAction()
+		m[d.GetItemId()] = i18n.Decision(d.GetAction())
 	}
 	var pbRes *dom.PlaybookResult
 	var sres scripts.Resultado

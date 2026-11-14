@@ -120,7 +120,7 @@ func TestPortsSetCtrlCDuringFailingApplyAborts(t *testing.T) {
 	if o := out.String(); !strings.Contains(o, "[aborted]") || !strings.Contains(o, "quedó cambiado") {
 		t.Fatalf("salida:\n%s", o)
 	}
-	if l := must(t, "", "ports", "runs", "--activas"); !strings.Contains(l, "No hay ejecuciones") {
+	if l := must(t, "", "ports", "runs", "--active"); !strings.Contains(l, "No hay ejecuciones") {
 		t.Fatalf("la ejecución quedó viva:\n%s", l)
 	}
 }
