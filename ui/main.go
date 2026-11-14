@@ -18,6 +18,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"github.com/oom-netsec/MACUAHUITL/ui/bridge"
@@ -37,7 +38,7 @@ const coreLocalize = true
 func main() {
 	// La contraseña maestra y las credenciales pasan por el puente: sin volcados de memoria si la UI se cae.
 	for _, w := range sys.NoDump() {
-		log.Println("macuahuitl:", w)
+		log.Println("macuahuitl:", w.In(i18n.En))
 	}
 	dist, err := fs.Sub(assets, "frontend/dist")
 	if err != nil {
