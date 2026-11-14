@@ -2680,6 +2680,12 @@ export const es = {
   "diag.bind.gone": "La IP {ip} ya no es de esta máquina (cambió la red): elige otra y vuelve a ejecutar.",
   "paste.controls": "Contiene caracteres de control o invisibles: {codes}",
   "shell.moduleError": "El módulo falló al mostrarse",
+  "patrol.pb.own": "Propio",
+  "patrol.pb.base": "Base",
+  "patrol.param.kind.vrf": "VRF",
+  "patrol.param.vrf": "Tenant y VRF con la forma tenant:vrf, por ejemplo common:default.",
+  "patrol.param.kind.vnid": "VNID",
+  "patrol.param.vnid": "Entero de 1 a 16777215, por ejemplo 2850817.",
 };
 
 export type Key = keyof typeof es;

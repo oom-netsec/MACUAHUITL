@@ -33,17 +33,18 @@ export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: C
     if (job.state !== "armed" || grid) return;
     const r = job.round || 1;
     let off = false;
-    (async () => {
+    const rebuild = async () => {
       const cur = await core.getRun(job.id, r);
       // La ronda en curso solo trae los equipos que ya terminaron: la lista completa es la unión con la anterior.
       const prev = r > 1 ? await core.getRun(job.id, r - 1) : [];
       const devices = [...new Set([...prev, ...cur].map((d) => d.target))];
-      if (off || !devices.length) return;
+      if (off) return; // ronda 1 sin equipos terminados: grilla vacía; DeviceGrid agrega cada equipo con su primer evento
       setGrid((g) => g ?? {
         devices,
         initial: cur.length ? Object.fromEntries(cur.map((d) => [d.target, { state: d.state, progress: "", detail: d.detail }])) : undefined,
       });
-    })().catch(() => {});
+    };
+    rebuild().catch(() => {});
     return () => { off = true; };
   }, [core, job.id, job.state, job.round, grid]);
 
@@ -158,7 +159,7 @@ export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: C
 
       <Phases phases={phases} />
 
-      {grid && grid.devices.length > 0 && (
+      {grid && (
         <Section title={t("patrol.grid.title")}>
           <DeviceGrid core={core} jobId={job.id} devices={grid.devices} initial={grid.initial} cpu={cpu} />
         </Section>
