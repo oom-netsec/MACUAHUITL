@@ -108,6 +108,10 @@ func runs(c *cli.Env, args []string) error {
 
 // resume retoma una ejecución viva: muestra dónde quedó, pide la decisión pendiente y sigue el resto.
 func resume(c *cli.Env, args []string) error {
+	args, err := cli.NoFlags("ports resume", args)
+	if err != nil {
+		return err
+	}
 	if len(args) != 1 {
 		return errors.New("uso: mctl ports resume EJECUCION")
 	}

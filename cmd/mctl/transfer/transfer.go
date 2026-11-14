@@ -379,7 +379,10 @@ func stop(c *cli.Env, args []string) error {
 	return nil
 }
 
-func list(c *cli.Env, _ []string) error {
+func list(c *cli.Env, args []string) error {
+	if _, err := cli.NoFlags("transfer list", args); err != nil {
+		return err
+	}
 	r, err := v1.NewTransferServiceClient(c.Conn).ListServers(context.Background(), &v1.ListServersRequest{})
 	if err != nil {
 		return err

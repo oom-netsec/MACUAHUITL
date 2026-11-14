@@ -165,6 +165,10 @@ func items(c *cli.Env, args []string) error {
 }
 
 func list(c *cli.Env, args []string) error {
+	args, err := cli.NoFlags("pack list", args)
+	if err != nil {
+		return err
+	}
 	if len(args) != 0 {
 		return errors.New("uso: mctl pack list")
 	}
@@ -182,6 +186,10 @@ func list(c *cli.Env, args []string) error {
 }
 
 func show(c *cli.Env, args []string) error {
+	args, err := cli.NoFlags("pack show", args)
+	if err != nil {
+		return err
+	}
 	if len(args) != 1 {
 		return errors.New("uso: mctl pack show <id>")
 	}
@@ -199,6 +207,10 @@ func show(c *cli.Env, args []string) error {
 }
 
 func remove(c *cli.Env, args []string) error {
+	args, err := cli.NoFlags("pack remove", args)
+	if err != nil {
+		return err
+	}
 	if len(args) != 1 {
 		return errors.New("uso: mctl pack remove <id>")
 	}

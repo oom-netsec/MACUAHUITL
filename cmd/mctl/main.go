@@ -125,6 +125,7 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if !ok {
 		return errors.New(cli.Help(areas))
 	}
+	cli.ResetHelp(out)
 	c := &cli.Env{In: bufio.NewReader(stdin), Out: out}
 	if f, ok := stdin.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
 		c.TTY = f
@@ -149,5 +150,11 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if !cmd.Raw { // la consola es una sesión cruda: sin sanear ni pintar
 		c.Out = cli.NewOut(out, color, termcolor.Lookup(pal), termcolor.Truecolor(os.Getenv))
 	}
-	return cli.LocalizeUsage(cmd.Run(c, rest))
+	// -h: Flags escribe las banderas antes de cualquier llamada al núcleo (lo vigila una prueba); el dial es diferido,
+	// así que la ayuda sale aunque el núcleo no esté.
+	err = cmd.Run(c, rest)
+	if cli.HelpShown() {
+		return nil
+	}
+	return cli.LocalizeUsage(err)
 }
