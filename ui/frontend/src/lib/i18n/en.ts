@@ -2579,4 +2579,6 @@ export const en: Record<Key, string> = {
   "security.chain.usage": "Key usage",
   "security.chain.selfSigned": "Self-signed",
   "security.chain.sigInvalid": "CSR signature invalid",
+  "diag.canceled": "Canceled by the user.",
+  "diag.status.canceled": "Canceled",
 };

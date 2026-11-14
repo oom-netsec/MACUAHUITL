@@ -600,6 +600,10 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 		for {
 			r, err := st.Recv()
 			if err != nil {
+				if ctx.Err() != nil { // el usuario canceló: no es un fallo
+					b.emit("diag:done", map[string]any{"runId": id, "exitCode": -1, "outputPath": "", "canceled": true})
+					return
+				}
 				b.emit("diag:done", map[string]any{"runId": id, "exitCode": -1, "outputPath": "", "error": err.Error(), "errorInfo": errorInfo(err)})
 				return
 			}

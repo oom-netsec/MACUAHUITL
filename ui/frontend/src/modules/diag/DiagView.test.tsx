@@ -69,3 +69,16 @@ test("el botón de ejecutar queda deshabilitado hasta que hay destino", async ()
   await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
   expect(screen.getByRole("button", { name: /Ejecutar/ })).toBeEnabled();
 });
+
+test("cancelar no es un fallo: estado neutro «Cancelado» y sin mensaje de error", async () => {
+  const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
+  render(<DiagView core={core} tool="ping" />);
+  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
+  await userEvent.click(await screen.findByRole("button", { name: "Cancelar" }));
+  act(() => core.emitDiag({ runId: "r1", done: true, exitCode: -1, canceled: true }));
+  expect(await screen.findByText("Cancelado")).toBeInTheDocument();
+  expect(screen.getByText("Cancelado por el usuario.")).toBeInTheDocument();
+  expect(screen.queryByText(/Con error|Error:/)).not.toBeInTheDocument();
+});

@@ -2577,6 +2577,8 @@ export const es = {
   "security.chain.usage": "Usos de la llave",
   "security.chain.selfSigned": "Autofirmado",
   "security.chain.sigInvalid": "Firma del CSR inválida",
+  "diag.canceled": "Cancelado por el usuario.",
+  "diag.status.canceled": "Cancelado",
 };
 
 export type Key = keyof typeof es;

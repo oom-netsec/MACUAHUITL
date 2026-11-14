@@ -213,6 +213,8 @@ func TestDiagBridgeStreamsAndCancels(t *testing.T) {
 	if rec.count("diag:line") >= 3 {
 		t.Fatalf("cancel did not stop the stream: %v", rec.evs)
 	}
+	// Cancelar no es un fallo: diag:done lleva canceled y ningún error.
+	rec.waitFor(t, `diag:done {"canceled":true,"exitCode":-1,"outputPath":"","runId":"`+id2+`"}`)
 }
 
 // resubscribe (al conectar) puede reemplazar el stream de un trabajo mientras Subscribe

@@ -28,7 +28,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const [filter, setFilter] = useState("");
   const [runId, setRunId] = useState("");
   const [lines, setLines] = useState<string[]>([]);
-  const [result, setResult] = useState<{ ok: boolean; text: string; code?: number; path?: string } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; text: string; code?: number; path?: string; canceled?: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [t0, setT0] = useState(0); // inicio de la ejecución en segundos Unix: eje de tiempo de las gráficas
   const [err, setErr] = useState("");
@@ -48,7 +48,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
 
   const apply = (e: DiagEvent) => {
     if (e.done) {
-      setResult(e.error
+      setResult(e.canceled ? { ok: false, canceled: true, text: t("diag.canceled") } : e.error
         ? { ok: false, text: t("diag.error", { msg: errorText(new Error(e.error)) }) }
         : { ok: true, text: t("diag.done", { code: e.exitCode ?? 0, path: e.outputPath ?? "" }), code: e.exitCode ?? 0, path: e.outputPath });
       runRef.current = "";
@@ -100,6 +100,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
 
   const copy = async () => { await core.copyText(lines.join("\n")); setCopied(true); window.setTimeout(() => setCopied(false), 1500); };
   const status = runId ? { tone: "info" as const, label: t("diag.status.running") }
+    : result?.canceled ? { tone: "" as const, label: t("diag.status.canceled") }
     : result ? (result.ok ? { tone: "ok" as const, label: t("diag.status.done") } : { tone: "bad" as const, label: t("diag.status.failed") }) : undefined;
   const started = !!runId || lines.length > 0 || !!result || !!err;
 
@@ -136,8 +137,8 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       {!started && <EmptyState icon="pulse" title={t("diag.empty.title")}>{t("diag.empty")}</EmptyState>}
       {started && <DiagViz tool={tool} lines={lines} t0={t0} path={result?.ok ? result.path : undefined} />}
       {started && (
-        <ResultPanel title={t("common.output")} status={status} error={err || (result && !result.ok ? result.text : "")}
-          meta={result?.ok ? t("diag.done", { code: result.code ?? 0, path: result.path ?? "" }) : undefined}
+        <ResultPanel title={t("common.output")} status={status} error={err || (result && !result.ok && !result.canceled ? result.text : "")}
+          meta={result?.ok ? t("diag.done", { code: result.code ?? 0, path: result.path ?? "" }) : result?.canceled ? result.text : undefined}
           actions={<>
             {tool === "pcap" && result?.ok && result.path && <button className="primary sm" onClick={() => go("pcap", result.path)}>{t("diag.analyze")}</button>}
             <button className="quiet sm" disabled={!lines.length} onClick={copy}><Icon name="copy" size={14} />{t(copied ? "common.copied" : "common.copy")}</button>
