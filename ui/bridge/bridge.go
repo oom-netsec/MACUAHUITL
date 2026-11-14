@@ -407,6 +407,9 @@ func (b *Bridge) Subscribe(_ context.Context, jobIDs []string) error {
 	return nil
 }
 
+// headerWait es cuánto espera open los encabezados del núcleo antes de seguir sin ellos (variable para las pruebas).
+var headerWait = 10 * time.Second
+
 func (b *Bridge) open(jobID string) error {
 	c, err := b.client()
 	if err != nil {
@@ -431,13 +434,22 @@ func (b *Bridge) open(jobID string) error {
 	if err == nil {
 		// El núcleo manda los encabezados ya suscrito al bus: esperarlos asegura que no se pierde un evento publicado
 		// justo después (armed, la ronda 1). Un error del núcleo (NotFound) llega sin encabezados, en el primer Recv.
-		var md metadata.MD
-		if md, err = st.Header(); err == nil && md == nil {
-			if _, err = st.Recv(); err == nil || errors.Is(err, io.EOF) {
-				err = nil // terminó sin error ni eventos: no hay nada que vigilar
-				markDead()
-				return nil
+		// La espera tiene plazo: resubscribe corre en el bucle de reconexión y un núcleo atorado no debe pararlo.
+		type header struct {
+			md  metadata.MD
+			err error
+		}
+		hc := make(chan header, 1)
+		go func() { md, err := st.Header(); hc <- header{md, err} }()
+		select {
+		case h := <-hc:
+			if err = h.err; err == nil && h.md == nil {
+				if _, err = st.Recv(); err == nil || errors.Is(err, io.EOF) { // terminó sin error ni eventos
+					markDead()
+					return nil
+				}
 			}
+		case <-time.After(headerWait):
 		}
 	}
 	if err != nil {

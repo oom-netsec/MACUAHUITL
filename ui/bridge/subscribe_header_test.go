@@ -20,12 +20,23 @@ import (
 type headerEvents struct {
 	v1.UnimplementedEventServiceServer
 	missing    bool
+	silent     bool // nunca manda encabezados (un núcleo atorado)
+	empty      bool // termina sin error ni encabezados
+	opens      atomic.Int32
 	subscribed atomic.Bool
 }
 
 func (f *headerEvents) Subscribe(r *v1.SubscribeRequest, st v1.EventService_SubscribeServer) error {
+	f.opens.Add(1)
 	if f.missing {
 		return status.Error(codes.NotFound, "no existe el trabajo")
+	}
+	if f.empty {
+		return nil
+	}
+	if f.silent {
+		<-st.Context().Done()
+		return nil
 	}
 	time.Sleep(200 * time.Millisecond) // bus.Subscribe
 	f.subscribed.Store(true)
@@ -71,5 +82,38 @@ func TestSubscribeVuelveConElNucleoYaSuscrito(t *testing.T) {
 	}
 	if !f.subscribed.Load() {
 		t.Fatal("Subscribe volvió antes de que el núcleo se suscribiera al bus")
+	}
+}
+
+// Un núcleo que acepta el stream pero nunca manda encabezados no deja colgado a Subscribe (ni al bucle de reconexión
+// que llama a resubscribe): pasado el plazo vuelve como antes.
+func TestSubscribeNoSeCuelgaSinEncabezados(t *testing.T) {
+	old := headerWait
+	headerWait = 100 * time.Millisecond
+	defer func() { headerWait = old }()
+	b := headerBridge(t, &headerEvents{silent: true})
+	done := make(chan error, 1)
+	go func() { done <- b.Subscribe(b.ctx, []string{"j1"}) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Subscribe se colgó esperando los encabezados")
+	}
+}
+
+// Un stream que termina sin error ni encabezados queda muerto: el siguiente Subscribe lo vuelve a abrir.
+func TestSubscribeStreamVacioQuedaMuerto(t *testing.T) {
+	f := &headerEvents{empty: true}
+	b := headerBridge(t, f)
+	for i := 0; i < 2; i++ {
+		if err := b.Subscribe(b.ctx, []string{"j1"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := f.opens.Load(); n != 2 {
+		t.Fatalf("aperturas = %d; el stream vacío debía quedar muerto y reabrirse", n)
 	}
 }
