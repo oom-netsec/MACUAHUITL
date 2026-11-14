@@ -33,6 +33,8 @@ var reservedSegments = map[string]bool{
 	"ha": true, "ctx": true,
 	// Los de oom/ftd (además de plat, l1, l3, fw, vpn, ha, svc y tac, ya reservados): Snort y gestión con el FMC.
 	"snort": true, "mgmt": true,
+	// El de oom/ise (además de plat, l1, l3, svc y tac, ya reservados): logs de la aplicación.
+	"logs": true,
 }
 
 // IsReservedSegment dice si s es un primer segmento reservado para contenido oficial.

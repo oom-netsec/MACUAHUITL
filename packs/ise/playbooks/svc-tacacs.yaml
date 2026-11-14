@@ -1,0 +1,19 @@
+# Propósito: Servicio TACACS+: proceso, puerto y log.
+# Cuándo usarlo: Fallan las autenticaciones o autorizaciones de administración de dispositivos.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/ise/3-1/cli_ref_guide/b_ise_CLI_Reference_Guide_31.html
+# Sin validar en laboratorio (no hay ISE en el laboratorio; comandos de la documentación de Cisco).
+id: svc-tacacs
+platform: ise
+name: ISE · Servicios · TACACS+
+name_en: ISE · Services · TACACS+
+commands:
+  - cmd: show clock
+  - cmd: show application status ise
+  - cmd: show ports | include 49
+    timeout: 120s
+  - cmd: show ntp
+  - cmd: show interface | include inet
+  - cmd: show logging application ise-psc.log | include TACACS
+    timeout: 120s
+  - cmd: show logging application ise-psc.log | last 100
+    timeout: 120s
