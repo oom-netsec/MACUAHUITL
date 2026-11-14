@@ -124,6 +124,7 @@ type Core struct {
 	mu       sync.Mutex
 	vault    *vault.Vault
 	jobs     map[string]*job
+	sleepGen uint64 // sube en cada OnSleep (bajo mu): resumePaused no reanuda si cambió mientras rearmaba
 	activity time.Time
 	stop     chan struct{}
 	watchers sync.WaitGroup
@@ -439,6 +440,7 @@ func (c *Core) vaultState() v1.VaultState {
 // OnSleep: suspensión o apagado. Cierra todo y pausa los trabajos armados (spec §10.4).
 func (c *Core) OnSleep() {
 	c.mu.Lock()
+	c.sleepGen++
 	if c.vault != nil {
 		c.vault.LockAll()
 	}
@@ -473,6 +475,7 @@ func (c *Core) resumePaused() {
 		}
 	}
 	v := c.vault
+	gen := c.sleepGen
 	c.mu.Unlock()
 	for _, j := range paused {
 		if err := v.Arm(j.id, j.Until, j.creds); err != nil {
@@ -480,7 +483,8 @@ func (c *Core) resumePaused() {
 			continue
 		}
 		c.mu.Lock()
-		if j.closing || j.state != "armed" { // empezó a cerrar mientras se armaba: no dejar la DEK viva para un trabajo terminado
+		// Empezó a cerrar, o el equipo se suspendió, mientras se armaba: no dejar la DEK viva ni reanudar.
+		if j.closing || j.state != "armed" || c.sleepGen != gen {
 			c.mu.Unlock()
 			v.Disarm(j.id)
 			continue

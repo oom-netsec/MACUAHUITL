@@ -280,3 +280,38 @@ func TestResumePausedRetiraLaVentanaSiElTrabajoCerroMientrasTanto(t *testing.T) 
 		t.Fatal("no debía reanudarse")
 	}
 }
+
+// Si el equipo se suspende mientras resumePaused rearma la ventana (Arm va sin el candado del núcleo), el trabajo
+// sigue pausado: reanudarlo lo pondría a correr con la bóveda cerrada y el planificador en pausa por OnSleep.
+func TestResumePausedNoReanudaSiSeSuspendioMientrasTanto(t *testing.T) {
+	var core atomic.Pointer[Core]
+	var armando atomic.Bool
+	h := newHarness(t, func(o *Options) {
+		o.Now = func() time.Time {
+			if c := core.Load(); c != nil && armando.Load() {
+				c.mu.Lock()
+				c.sleepGen++ // lo que hace OnSleep en el núcleo; su LockAll esperaría el candado de la bóveda que tiene Arm
+				c.mu.Unlock()
+			}
+			return time.Now()
+		}
+	})
+	core.Store(h.core)
+	cred := h.ready(t)
+	j := &job{id: "j-suspende", state: "armed", paused: true, Until: time.Now().Add(time.Hour), creds: []string{cred}}
+	h.core.mu.Lock()
+	h.core.jobs[j.id] = j
+	h.core.mu.Unlock()
+	armando.Store(true)
+	h.core.resumePaused()
+	armando.Store(false)
+	h.core.mu.Lock()
+	paused := j.paused
+	h.core.mu.Unlock()
+	if !paused {
+		t.Fatal("se reanudó un trabajo aunque el equipo se suspendió durante Arm")
+	}
+	if ws := h.core.vault.Windows(); len(ws) != 0 {
+		t.Fatalf("quedó la ventana armada: %v", ws)
+	}
+}
