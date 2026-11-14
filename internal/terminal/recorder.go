@@ -54,8 +54,9 @@ type Recorder struct {
 	tail    []byte // últimos bytes de salida desde el último Enter, para reconocer el prompt
 	fresh   bool   // llegó salida desde el último Enter
 	held    []string
-	hidden  bool   // lo tecleado es una contraseña: no se graba
-	line    []byte // lo tecleado en la línea actual
+	heldBlk []string // bloque del prompt con que se tecleó cada línea retenida
+	hidden  bool     // lo tecleado es una contraseña: no se graba
+	line    []byte   // lo tecleado en la línea actual
 	lastCR  bool
 	max     int64 // tope de la grabación en bytes
 	written int64
@@ -134,6 +135,10 @@ func blockOfPrompt(p string) string {
 		return "tacacs"
 	case strings.Contains(p, "(config-server-radius)"):
 		return "radius"
+	case strings.Contains(p, "(config-aaa-server-host)"):
+		return "aaaserver"
+	case strings.Contains(p, "(config-smart-lic)"), strings.Contains(p, "(config-license)"):
+		return "licsmart"
 	}
 	return ""
 }
@@ -153,7 +158,7 @@ func (r *Recorder) settle() {
 	switch {
 	case len(r.held) == 0:
 	case r.asksSecret():
-		r.held = r.held[1:]
+		r.held, r.heldBlk = r.held[1:], r.heldBlk[1:]
 		r.input("[oculto]")
 		r.tail = nil
 	case shellPrompt.MatchString(r.lastLine()):
@@ -163,10 +168,10 @@ func (r *Recorder) settle() {
 
 // commitHeld graba como comandos las líneas retenidas. Requiere r.mu.
 func (r *Recorder) commitHeld() {
-	h := r.held
-	r.held = nil
-	for _, l := range h {
-		r.input(maskTyped(l))
+	h, hb := r.held, r.heldBlk
+	r.held, r.heldBlk = nil, nil
+	for i, l := range h {
+		r.input(maskTyped(l, hb[i]))
 	}
 }
 
@@ -199,7 +204,12 @@ func (r *Recorder) Input(p []byte) {
 	}
 }
 
-func maskTyped(s string) string {
+// maskTyped enmascara una línea tecleada; block es el bloque que da el prompt en que se tecleó.
+func maskTyped(s, block string) string {
+	if block != "" {
+		st := mask.Stream{}
+		return st.Prompted(s, block)
+	}
 	text, _ := mask.Apply("ios-xe", s)
 	return text
 }
@@ -207,6 +217,7 @@ func maskTyped(s string) string {
 // flush trata la línea tecleada al pulsar Enter. Requiere r.mu.
 func (r *Recorder) flush() {
 	line, hidden, fresh := string(r.line), r.hidden, r.fresh
+	blk := blockOfPrompt(promptRe.FindString(r.lastLine()))
 	// Un nuevo prompt de contraseña tiene que llegar en la salida: lo ya visto no vale para la línea siguiente.
 	r.hidden, r.line, r.tail, r.fresh = false, r.line[:0], nil, false
 	switch {
@@ -214,13 +225,14 @@ func (r *Recorder) flush() {
 		r.input("[oculto]")
 	case line == "":
 	case fresh && len(r.held) == 0:
-		r.input(maskTyped(line)) // shortcut: ver la nota del paquete sobre abreviaturas
+		r.input(maskTyped(line, blk)) // shortcut: ver la nota del paquete sobre abreviaturas
 	default:
 		// Sin salida nueva desde el Enter anterior: el equipo aún no mostró su prompt y esta línea
 		// podría ser la contraseña que el prompt de secreto va a pedir. Se decide al llegar la salida.
-		if r.held = append(r.held, line); len(r.held) > heldMax {
-			r.input(maskTyped(r.held[0]))
-			r.held = r.held[1:]
+		r.held, r.heldBlk = append(r.held, line), append(r.heldBlk, blk)
+		if len(r.held) > heldMax {
+			r.input(maskTyped(r.held[0], r.heldBlk[0]))
+			r.held, r.heldBlk = r.held[1:], r.heldBlk[1:]
 		}
 	}
 }
@@ -244,7 +256,7 @@ func (r *Recorder) Close() {
 	}
 	r.commitHeld()
 	if !r.hidden && len(r.line) > 0 {
-		r.input(maskTyped(string(r.line)))
+		r.input(maskTyped(string(r.line), ""))
 	}
 	r.hidden, r.line = false, nil
 }

@@ -32,6 +32,32 @@ var asaCases = []struct{ in, want string }{
 	{"aaa-server RAD (inside) host 10.1.1.5", "aaa-server RAD (inside) host 10.1.1.5"},
 	{"aaa-server RAD (inside) host 10.1.1.5 timeout 5", "aaa-server RAD (inside) host 10.1.1.5 timeout 5"},
 	{"aaa-server RAD protocol radius", "aaa-server RAD protocol radius"},
+	// Revisión: tipos de cifrado 0/8.
+	{"failover key 0 FoSecret", "failover key 0 <MASKED:failover-key>"},
+	{"failover key 8 FoEnc", "failover key 8 <MASKED:failover-key>"},
+	{"failover ipsec pre-shared-key 0 FoSecret", "failover ipsec pre-shared-key 0 <MASKED:failover-key>"},
+	{"failover ipsec pre-shared-key 8 FoEnc", "failover ipsec pre-shared-key 8 <MASKED:failover-key>"},
+	{"snmp-server host inside 10.1.1.1 community 0 CommClear version 2c", "snmp-server host inside 10.1.1.1 community 0 <MASKED:snmp-community> version 2c"},
+	{"snmp-server host inside 10.1.1.1 community 8 CommEnc version 2c", "snmp-server host inside 10.1.1.1 community 8 <MASKED:snmp-community> version 2c"},
+	{"snmp-server community 0 CommClear", "snmp-server community 0 <MASKED:snmp-community>"},
+	{"snmp-server community 0 CommClear RO", "snmp-server community 0 <MASKED:snmp-community> RO"},
+	{" authentication key eigrp 100 8 EigEnc key-id 1", " authentication key eigrp 100 8 <MASKED:eigrp-key> key-id 1"},
+	{" authentication key eigrp 100 0 EigClear key-id 1", " authentication key eigrp 100 0 <MASKED:eigrp-key> key-id 1"},
+	// Host por nombre: la palabra community marca el valor.
+	{"snmp-server host inside nms01 community CommHost version 2c", "snmp-server host inside nms01 community <MASKED:snmp-community> version 2c"},
+	{"snmp-server host inside nms01 poll community CommHost", "snmp-server host inside nms01 poll community <MASKED:snmp-community>"},
+	// IOS/NX-OS: comunidad con forma de IP no se confunde con la forma ASA.
+	{"snmp-server host 10.1.1.1 1.2.3.4", "snmp-server host 10.1.1.1 <MASKED:snmp-community>"},
+	{"snmp-server host 10.1.1.1 ab:cd udp-port 162", "snmp-server host 10.1.1.1 <MASKED:snmp-community> udp-port 162"},
+	// Otras claves de ASA.
+	{" radius-common-pw CommonPw", " radius-common-pw <MASKED:radius-key>"},
+	{"vpdn username u1 password VpdnPw", "vpdn username u1 password <MASKED:user-secret>"},
+	{"vpdn username u1 password VpdnPw store-local", "vpdn username u1 password <MASKED:user-secret> store-local"},
+	// Mayúsculas al teclear.
+	{"FAILOVER KEY FoSecret", "FAILOVER KEY <MASKED:failover-key>"},
+	{"ENABLE PASSWORD Secret", "ENABLE PASSWORD <MASKED:enable-secret>"},
+	// Solo «*****» exacto queda igual: una clave real de asteriscos se tapa.
+	{"failover key ********", "failover key <MASKED:failover-key>"},
 	// Sin falsos positivos.
 	{" description key server for vpn", " description key server for vpn"},
 	{"ssh key-exchange group dh-group14-sha256", "ssh key-exchange group dh-group14-sha256"},
@@ -99,5 +125,14 @@ Stateful Failover Logical Update Statistics
 	got, n := Apply("asa", in)
 	if got != in || len(n) != 0 {
 		t.Fatalf("cambió: %q %v", got, n)
+	}
+}
+
+// La forma de una línea de ASA y bloques en mayúsculas.
+func TestASABloquesMayusculas(t *testing.T) {
+	in := "AAA-SERVER RAD (inside) host 10.1.1.5\n RADIUS-COMMON-PW Common1\n KEY K1\n"
+	want := "AAA-SERVER RAD (inside) host 10.1.1.5\n RADIUS-COMMON-PW <MASKED:radius-key>\n KEY <MASKED:aaa-key>\n"
+	if got, _ := Apply("asa", in); got != want {
+		t.Fatalf("got:\n%s", got)
 	}
 }

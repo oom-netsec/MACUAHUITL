@@ -211,3 +211,28 @@ func TestLineaTecleadaTieneTope(t *testing.T) {
 		t.Errorf("len=%d", b.Len())
 	}
 }
+
+// El eco de ASA bajo aaa-server host y license smart: el prompt da el bloque.
+func TestEnmascaraEcoDeBloquesDeASA(t *testing.T) {
+	for _, prompt := range []string{"ciscoasa(config-aaa-server-host)#key TypedKey", "ciscoasa(config-smart-lic)#token ABC123", "ciscoasa(config-license)#token ABC123"} {
+		r, b := newRec()
+		r.Output([]byte(prompt + "\r\nciscoasa(config)#"))
+		r.Close()
+		out := b.String()
+		if strings.Contains(out, "TypedKey") || strings.Contains(out, "ABC123") || !strings.Contains(out, "<MASKED:") {
+			t.Errorf("%q:\n%s", prompt, out)
+		}
+	}
+}
+
+// Lo tecleado bajo aaa-server host (prompt de ASA) también sale enmascarado.
+func TestEnmascaraTecleadoEnBloqueDeASA(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("ciscoasa(config-aaa-server-host)#"))
+	r.Input([]byte("key TypedKey\r"))
+	r.Output([]byte("key TypedKey\r\nciscoasa(config-aaa-server-host)#"))
+	r.Close()
+	if out := b.String(); strings.Contains(out, "TypedKey") {
+		t.Errorf("%s", out)
+	}
+}
