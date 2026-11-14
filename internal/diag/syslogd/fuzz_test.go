@@ -72,3 +72,15 @@ func FuzzReadStream(f *testing.F) {
 		})
 	})
 }
+
+// Regresión del fuzz: «<-1>» daba Facility 0 y Severity -1 (Atoi acepta signo); el PRI son solo dígitos.
+func TestParsePRISoloDigitos(t *testing.T) {
+	for _, s := range []string{"<-1>x", "<+5>x", "<-0>x", "< 5>x", "<>x"} {
+		if m := Parse([]byte(s)); m.Facility != -1 || m.Severity != -1 || m.Text != s {
+			t.Errorf("%q: %+v", s, m)
+		}
+	}
+	if m := Parse([]byte("<13>x")); m.Facility != 1 || m.Severity != 5 {
+		t.Errorf("<13>: %+v", m)
+	}
+}

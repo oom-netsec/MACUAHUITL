@@ -340,7 +340,7 @@ func Parse(raw []byte) Message {
 	rest := s
 	if strings.HasPrefix(s, "<") {
 		if end := strings.IndexByte(s, '>'); end > 1 && end <= 4 {
-			if pri, err := strconv.Atoi(s[1:end]); err == nil && pri <= 191 {
+			if pri, err := strconv.Atoi(s[1:end]); err == nil && pri <= 191 && s[1] >= '0' && s[1] <= '9' { // Atoi acepta «-1» y «+5»: el PRI son solo dígitos
 				m.Facility, m.Severity = pri/8, pri%8
 				rest = s[end+1:]
 				m.Text = rest
