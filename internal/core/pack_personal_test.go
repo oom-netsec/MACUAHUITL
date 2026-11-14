@@ -453,3 +453,43 @@ func TestPackImportNoTomaLaBaseAntesDelAlmacen(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// La biblioteca contra la que el import confirmado compara sus scripts se toma bajo el candado del almacén: un Install
+// que termina mientras el import espera ese candado ya cuenta (su script con el mismo nombre es un conflicto).
+func TestPackImportVeLaBibliotecaDelInstallQueTerminoAntes(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	script := func(id string) []byte {
+		return []byte(`{"formato":"macuahuitl-scripts","version":1,"exportado":"2026-11-12T00:00:00Z","scripts":[{"id":"` + id +
+			`","name":"Duplicado","tech":"l2","platform":"ios-xe","description":"","commands":["show clock"],"tags":[],"origin":"biblioteca","created_at":"2026-11-07T00:00:00Z","updated_at":"2026-11-07T00:00:00Z"}]}`)
+	}
+	inst, _ := os.ReadFile(hostile(t, func(f map[string][]byte) { f["scripts.json"] = script("lib-acme-uno") }))
+	inside, release, installed := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		_, err := h.core.packs.InstallWith(inst, true, func(*pack.Pack, string) error { close(inside); <-release; return nil }, nil)
+		installed <- err
+	}()
+	<-inside // el Install tiene el almacén
+	imp := hostile(t, func(f map[string][]byte) {
+		f["manifest.yaml"] = []byte(strings.Replace(string(f["manifest.yaml"]), "acme/evil", "acme/otro", 1))
+		delete(f, "playbooks/acme-evil.yaml")
+		f["playbooks/acme-otro.yaml"] = []byte("id: acme-otro\nplatform: ios-xe\nname: O\nname_en: O\ncommands:\n  - cmd: show clock\n")
+		f["scripts.json"] = script("lib-acme-dos")
+	})
+	done := make(chan error, 1)
+	go func() {
+		_, err := pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: imp, Confirm: true}))
+		done <- err
+	}()
+	time.Sleep(300 * time.Millisecond) // el Import ya leyó el archivo y espera el almacén
+	close(release)
+	if err := <-installed; err != nil {
+		t.Fatal(err)
+	}
+	err := <-done
+	var n int
+	h.core.db.QueryRow(`SELECT count(*) FROM scripts WHERE name = 'Duplicado'`).Scan(&n)
+	if err == nil && n > 0 {
+		t.Fatalf("el import guardó un script con el nombre de uno de la biblioteca instalada (%d)", n)
+	}
+}
