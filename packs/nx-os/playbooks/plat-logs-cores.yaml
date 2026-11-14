@@ -16,5 +16,5 @@ commands:
     timeout: 180s
   - cmd: show accounting log | last 50
     timeout: 120s
-  - cmd: show logging last 300 | include CRIT|ALERT|EMERG
+  - cmd: show logging last 300 | egrep "CRIT|ALERT|EMERG"
     timeout: 180s

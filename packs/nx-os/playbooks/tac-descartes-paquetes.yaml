@@ -16,7 +16,7 @@ commands:
   - cmd: show hardware capacity interface  # N9K
   - cmd: show hardware internal buffer info pkt-stats  # N9K
   - cmd: show hardware rate-limiter
-  - cmd: show policy-map interface control-plane | include violate|drop
+  - cmd: show policy-map interface control-plane | egrep "violate|drop"
     timeout: 180s
   - cmd: show hardware access-list resource utilization  # N9K
   - cmd: show logging last 200 | include drop

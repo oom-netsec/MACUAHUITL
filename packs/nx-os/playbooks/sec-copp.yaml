@@ -10,7 +10,7 @@ commands:
   - cmd: show copp status
   - cmd: show policy-map interface control-plane
     timeout: 180s
-  - cmd: show policy-map interface control-plane | include violate|drop
+  - cmd: show policy-map interface control-plane | egrep "violate|drop"
     timeout: 180s
   - cmd: show hardware rate-limiter
   - cmd: show processes cpu sort | head lines 15

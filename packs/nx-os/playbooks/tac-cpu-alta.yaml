@@ -12,7 +12,7 @@ commands:
   - cmd: show processes cpu sort | head lines 20
   - cmd: show processes cpu history
   - cmd: show system internal processes cpu  # N9K
-  - cmd: show policy-map interface control-plane | include violate|drop
+  - cmd: show policy-map interface control-plane | egrep "violate|drop"
     timeout: 180s
   - cmd: show hardware rate-limiter
   - cmd: show ip arp statistics

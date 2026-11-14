@@ -14,18 +14,43 @@ var nxFirst = []word{{"show", "sh"}, {"dir", "dir"}, {"ping", "pi"}, {"ping6", "
 // reconocemos podría ser un sumidero).
 var nxPipeOK = []string{"include", "exclude", "begin", "section", "count", "grep", "egrep", "head", "last", "wc", "sort", "uniq", "json", "json-pretty", "xml", "no-more", "end"}
 
-// Sumideros de pipe: escriben a flash, a la red o abren un shell/pager. En los segmentos tras el primero se rechaza
-// todo lo que abrevie uno de ellos, salvo un operador permitido escrito completo.
-// shortcut: a prueba de fallas, una alternancia de regex como «include a|email» (o «include a|b», pues «b» abrevia
-// bash) se rechaza; se escribe el filtro sin «|» o en dos playbooks.
-var nxSinks = []string{"redirect", "tee", "append", "email", "bash", "python", "vsh", "less", "diff"}
+// Tokens que hacen escribir a show tech-support (y a otros show) en NX-OS: «binary <uri>», «tar», «compressed», «gzip».
+// shortcut: lista de la doc de show tech-support de NX-OS 9.x/10.x recordada, sin validar en equipo; revisar en la T5.
+var nxWriteArgs = []string{"binary", "tar", "compressed", "gzip"}
 
-// checkNXOS aplica las reglas de CheckDenied a un comando de NX-OS (ya validado como ASCII imprimible).
+// Palabras de ping/traceroute de NX-OS que abren un sub-diálogo o cambian el modo: un destino que las abrevie se rechaza.
+var nxProbeKeywords = []string{"vrf", "multicast", "mpls", "nve", "ip", "ipv6", "ethernet", "mac", "source", "source-interface"}
+
+// splitPipes parte cmd por «|» fuera de comillas dobles; false si quedó una comilla sin cerrar. NX-OS trata cada «|»
+// como un pipe nuevo, pero dentro de comillas es parte de la expresión regular («egrep "A|B"»).
+func splitPipes(cmd string) ([]string, bool) {
+	if strings.Contains(cmd, `""`) || strings.Contains(cmd, `\"`) { // cómo las lee NX-OS (¿comilla escapada?) no está claro: fuera
+		return nil, false
+	}
+	var segs []string
+	start, in := 0, false
+	for i := 0; i < len(cmd); i++ {
+		switch cmd[i] {
+		case '"':
+			in = !in
+		case '|':
+			if !in {
+				segs, start = append(segs, cmd[start:i]), i+1
+			}
+		}
+	}
+	return append(segs, cmd[start:]), !in
+}
+
+// checkNXOS aplica las reglas de CheckDenied a un comando de NX-OS (ya validado como ASCII imprimible y sin «;»).
 func checkNXOS(cmd string) error {
 	if strings.Contains(cmd, ">") { // «> bootflash:f» y «>> f» escriben
 		return denied(cmd, "playbook.why.redirect")
 	}
-	segs := strings.Split(strings.ToLower(cmd), "|")
+	segs, ok := splitPipes(strings.ToLower(cmd))
+	if !ok {
+		return denied(cmd, "playbook.why.quote")
+	}
 	fields := strings.Fields(segs[0])
 	if len(fields) == 0 {
 		if len(segs) > 1 {
@@ -36,7 +61,7 @@ func checkNXOS(cmd string) error {
 	switch {
 	case matchAny(nxFirst, fields[0]):
 		if !(word{"show", "sh"}).matches(fields[0]) && !(word{"dir", "dir"}).matches(fields[0]) && !validNXProbe(fields) {
-			return denied(cmd, "playbook.why.probe")
+			return denied(cmd, "playbook.why.probe_nxos")
 		}
 	case (word{"terminal", "ter"}).matches(fields[0]):
 		if len(fields) != 3 || !matchAny(allowedTerminal, fields[1]) {
@@ -45,32 +70,26 @@ func checkNXOS(cmd string) error {
 	default:
 		return denied(cmd, "playbook.why.not_read")
 	}
+	tech := len(fields) > 1 && len(fields[1]) >= 4 && strings.HasPrefix("tech-support", fields[1])
 	for _, f := range fields[1:] {
 		if remotePath(f) {
 			return denied(cmd, "playbook.why.remote")
 		}
+		if f != "" && strings.HasPrefix("to-file", f) { // sin equivalente en NX-OS, pero igual de peligroso si existiera
+			return denied(cmd, "playbook.why.to_file")
+		}
+		if tech && len(f) >= 2 {
+			for _, w := range nxWriteArgs {
+				if strings.HasPrefix(w, f) {
+					return denied(cmd, "playbook.why.write_nxos")
+				}
+			}
+		}
 	}
-	for i, seg := range segs[1:] {
+	for _, seg := range segs[1:] { // lista blanca en TODOS los segmentos, con la palabra completa
 		f := strings.Fields(seg)
-		if len(f) == 0 {
-			if i == 0 {
-				return denied(cmd, "playbook.why.empty_pipe")
-			}
-			continue // parte de una expresión regular
-		}
-		if i == 0 {
-			if !slices.Contains(nxPipeOK, f[0]) {
-				return denied(cmd, "playbook.why.pipe_filter")
-			}
-			continue
-		}
-		if slices.Contains(nxPipeOK, f[0]) {
-			continue
-		}
-		for _, s := range nxSinks {
-			if Abbrev(f[0], s) {
-				return denied(cmd, "playbook.why.pipe_sink")
-			}
+		if len(f) == 0 || !slices.Contains(nxPipeOK, f[0]) {
+			return denied(cmd, "playbook.why.pipe_filter_nxos")
 		}
 	}
 	return nil
@@ -86,6 +105,13 @@ func validNXProbe(f []string) bool {
 		return false
 	}
 	// «{ip}» sin sustituir (al cargar el playbook): Expand vuelve a pasar CheckDenied con el valor ya validado.
+	if !placeholder.MatchString(f[0]) {
+		for _, k := range nxProbeKeywords {
+			if strings.HasPrefix(k, f[0]) {
+				return false
+			}
+		}
+	}
 	if holder := placeholder.FindString(f[0]) == f[0]; !holder && !probeName(f[0]) {
 		return false
 	} else if holder {

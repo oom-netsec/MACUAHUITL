@@ -2,6 +2,7 @@ package playbook
 
 import (
 	"net/netip"
+	"slices"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -39,6 +40,9 @@ var allowedTerminal = []word{{"length", "len"}, {"width", "wid"}}
 // Primer operador tras "|": solo filtros. redirect, tee y append escriben a flash o a la red.
 var allowedPipe = []word{{"include", "i"}, {"exclude", "e"}, {"begin", "b"}, {"section", "s"}, {"count", "c"}}
 
+// Comandos de shell o de escritura de NX-OS que un pipe posterior podría invocar si el host está mal marcado.
+var shellTokens = []string{"sed", "awk", "python", "python3", "bash", "run", "source", "tclsh", "vsh", "email", "diff", "less", "xargs"}
+
 var pipeSinks = []word{{"redirect", "r"}, {"tee", "t"}, {"append", "a"}}
 
 // Abbrev dice si tok es una abreviatura (prefijo no vacío) de la palabra completa full: IOS ejecuta
@@ -67,6 +71,11 @@ func CheckDenied(platform, cmd string) error {
 		if r < 0x20 || r > 0x7e {
 			return denied(cmd, "playbook.why.ascii")
 		}
+	}
+	// NX-OS encadena comandos con «;» («show version ; reload»): se rechaza en todas las plataformas, por si el host
+	// de un Nexus está mal marcado y se aplicaran las reglas de IOS.
+	if strings.Contains(cmd, ";") {
+		return denied(cmd, "playbook.why.chain")
 	}
 	if platform == "nx-os" {
 		return checkNXOS(cmd)
@@ -113,6 +122,9 @@ func CheckDenied(platform, cmd string) error {
 		}
 		if matchAny(pipeSinks, f[0]) {
 			return denied(cmd, "playbook.why.pipe_sink")
+		}
+		if i > 0 && slices.Contains(shellTokens, f[0]) { // plataforma mal marcada: en un Nexus cada «|» es un pipe nuevo
+			return denied(cmd, "playbook.why.pipe_shell")
 		}
 		if i == 0 && !matchAny(allowedPipe, f[0]) {
 			return denied(cmd, "playbook.why.pipe_filter")

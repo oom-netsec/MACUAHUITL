@@ -9,7 +9,7 @@ name_en: TAC · Loop or broadcast storm
 commands:
   - cmd: show clock
   - cmd: show spanning-tree summary
-  - cmd: show spanning-tree detail | include occurred|from
+  - cmd: show spanning-tree detail | egrep "occurred|from"
     timeout: 120s
   - cmd: show interface counters storm-control
   - cmd: show mac address-table notification mac-move

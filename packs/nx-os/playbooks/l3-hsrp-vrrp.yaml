@@ -14,5 +14,5 @@ commands:
   - cmd: show hsrp statistics
   - cmd: show vrrp
   - cmd: show ip interface brief
-  - cmd: show logging last 200 | include HSRP|VRRP
+  - cmd: show logging last 200 | egrep "HSRP|VRRP"
     timeout: 180s

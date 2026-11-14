@@ -15,5 +15,5 @@ commands:
   - cmd: show port-channel traffic
   - cmd: show port-channel load-balance
   - cmd: show lacp system-identifier
-  - cmd: show logging last 200 | include LACP|PORT-CHANNEL
+  - cmd: show logging last 200 | egrep "LACP|PORT-CHANNEL"
     timeout: 180s

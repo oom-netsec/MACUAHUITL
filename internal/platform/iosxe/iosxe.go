@@ -116,9 +116,9 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 		if err != nil {
 			return err
 		}
-		// NX-OS no admite ancho 0 («% Invalid…» o «range is…»): su máximo es 511. Así las tablas no se parten
+		// NX-OS no admite ancho 0 («% Invalid number, range is (24:511)», «% Invalid parameter…»): su máximo es 511. Así las tablas no se parten
 		// aunque la plataforma del host sea fija y no se llame a Detect.
-		if c == "terminal width 0" && (out.Invalid || strings.Contains(out.Text, "range is")) {
+		if c == "terminal width 0" && hasPercentLine(out.Text) {
 			if _, err := d.Run(ctx, "terminal width 511", 10*time.Second); err != nil {
 				return err
 			}
@@ -286,8 +286,30 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 		text = text[:strings.LastIndexByte(text, '\n')+1]
 	}
 	out.Text = text
-	out.Invalid = strings.Contains(text, "% Invalid input")
+	out.Invalid = invalidOutput(text)
 	return out, err
+}
+
+// Respuestas de error de IOS («% Invalid input») y de NX-OS («% Invalid command», «% Invalid parameter», «% Incomplete command»).
+var invalidMarks = []string{"% Invalid input", "% Invalid command", "% Invalid parameter", "% Incomplete command"}
+
+func invalidOutput(text string) bool {
+	for _, m := range invalidMarks {
+		if strings.Contains(text, m) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasPercentLine: alguna línea de text empieza por «%» (el equipo rechazó el comando).
+func hasPercentLine(text string) bool {
+	for _, l := range strings.Split(text, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(l), "%") {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *driver) Hostname() string { return d.hostname }

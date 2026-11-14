@@ -348,7 +348,7 @@ func TestDetectMencionNXOSNoEsNexus(t *testing.T) {
 }
 
 // fakeNX es un equipo mínimo que contesta línea por línea y anota lo recibido.
-func fakeNX(t *testing.T, rejectWidth0 bool) (*driver, *[]string) {
+func fakeNX(t *testing.T, width0Reply string) (*driver, *[]string) {
 	t.Helper()
 	devR, drvW := io.Pipe()
 	drvR, devW := io.Pipe()
@@ -371,8 +371,11 @@ func fakeNX(t *testing.T, rejectWidth0 bool) (*driver, *[]string) {
 			buf = buf[:0]
 			got = append(got, line)
 			out := line + "\r\n"
-			if line == "terminal width 0" && rejectWidth0 {
-				out += "% Invalid input detected at '^' marker.\r\n"
+			if line == "terminal width 0" {
+				out += width0Reply
+			}
+			if line == "show nada" {
+				out += "% Invalid command at '^' marker.\r\n"
 			}
 			io.WriteString(devW, out+"N9K# ")
 		}
@@ -385,14 +388,37 @@ func fakeNX(t *testing.T, rejectWidth0 bool) (*driver, *[]string) {
 	return d, &got
 }
 
-// NX-OS no tiene enable y su ancho máximo es 511: solo si rechazó «terminal width 0» se manda 511.
+// NX-OS no tiene enable y su ancho máximo es 511: se manda 511 si la respuesta a «terminal width 0» trae una línea con «%».
 func TestAnchoNXOSSoloSiRechazaCero(t *testing.T) {
-	_, got := fakeNX(t, true)
-	if want := []string{"terminal length 0", "terminal width 0", "terminal width 511"}; !slices.Equal(*got, want) {
-		t.Fatalf("rechazado: %q", *got)
+	rechazos := []string{
+		"% Invalid number, range is (24:511)\r\n", "% Invalid parameter detected at '^' marker.\r\n",
+		"\r\n  % Invalid command at '^' marker.\r\n", "% Incomplete command\r\n",
 	}
-	_, got = fakeNX(t, false)
+	for _, r := range rechazos {
+		_, got := fakeNX(t, r)
+		if want := []string{"terminal length 0", "terminal width 0", "terminal width 511"}; !slices.Equal(*got, want) {
+			t.Fatalf("%q rechazado: %q", r, *got)
+		}
+	}
+	_, got := fakeNX(t, "")
 	if want := []string{"terminal length 0", "terminal width 0"}; !slices.Equal(*got, want) {
 		t.Fatalf("aceptado: %q", *got)
+	}
+}
+
+// Los errores de NX-OS cuentan como comando inválido.
+func TestInvalidosDeNXOS(t *testing.T) {
+	d, _ := fakeNX(t, "")
+	out, err := d.Run(context.Background(), "show nada", 5*time.Second)
+	if err != nil || !out.Invalid {
+		t.Fatalf("out = %+v, %v", out, err)
+	}
+	for _, txt := range []string{"% Invalid command at '^' marker.", "% Invalid parameter detected at '^' marker.", "% Incomplete command", "% Invalid input detected at '^' marker."} {
+		if !invalidOutput(txt) {
+			t.Errorf("%q no cuenta como inválido", txt)
+		}
+	}
+	if invalidOutput("Interface Eth1/1 is up") {
+		t.Error("salida normal marcada inválida")
 	}
 }

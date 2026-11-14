@@ -13,7 +13,7 @@ commands:
   - cmd: show spanning-tree root
   - cmd: show spanning-tree blockedports
   - cmd: show spanning-tree inconsistentports
-  - cmd: show spanning-tree detail | include occurred|from
+  - cmd: show spanning-tree detail | egrep "occurred|from"
     timeout: 120s
   - cmd: show vlan all-ports
     timeout: 120s

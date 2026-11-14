@@ -10,7 +10,7 @@ commands:
   - cmd: show clock
   - cmd: show mac address-table notification mac-move
   - cmd: show mac address-table count
-  - cmd: show spanning-tree detail | include occurred|from
+  - cmd: show spanning-tree detail | egrep "occurred|from"
     timeout: 120s
   - cmd: show spanning-tree summary
   - cmd: show vpc
