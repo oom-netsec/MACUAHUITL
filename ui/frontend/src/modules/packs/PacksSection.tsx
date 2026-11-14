@@ -3,6 +3,8 @@ import type { CoreAPI, PackDetail, PackInfo, PackInspectResult } from "../../lib
 import { Check, ConfirmButton, Notice, errorText } from "../../components/Field";
 import { Dialog } from "../../components/Dialog";
 import { useLang, useT } from "../../lib/i18n";
+import { ExportDialog, ImportDialog } from "./PackPersonal";
+import type { PackImportResult } from "./api";
 import "./packs.css";
 
 // Todo texto del paquete (nombre, README, IDs) se dibuja como texto de React: sin HTML, imágenes ni enlaces (ADR 0010).
@@ -117,6 +119,9 @@ export function PacksSection({ core }: { core: CoreAPI }) {
   const [showing, setShowing] = useState("");
   const [preview, setPreview] = useState<{ path: string; info: PackInspectResult } | null>(null);
 
+  const [exporting, setExporting] = useState(false);
+  const [imp, setImp] = useState<{ path: string; preview: PackImportResult } | null>(null);
+
   const refresh = useCallback(() => core.packList().then(setPacks, (e) => setErr(errorText(e))), [core]);
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -125,6 +130,13 @@ export function PacksSection({ core }: { core: CoreAPI }) {
     try {
       const path = await core.pickPath({ title: t("packs.pick"), filters: [{ name: "MACUAHUITL", pattern: "*.mpack" }] });
       if (path) setPreview({ path, info: await core.packInspect(path, true) });
+    } catch (e) { setErr(errorText(e)); }
+  };
+  const pickImport = async () => {
+    setErr(""); setMsg("");
+    try {
+      const path = await core.pickPath({ title: t("packs.pick"), filters: [{ name: "MACUAHUITL", pattern: "*.mpack" }] });
+      if (path) setImp({ path, preview: await core.packImportPreview(path) });
     } catch (e) { setErr(errorText(e)); }
   };
   const remove = async (id: string) => {
@@ -136,7 +148,9 @@ export function PacksSection({ core }: { core: CoreAPI }) {
 
   return (
     <div className="packs">
-      <div className="actions"><button type="button" onClick={pick}>{t("packs.install")}</button></div>
+      <div className="actions"><button type="button" onClick={pick}>{t("packs.install")}</button>
+        <button type="button" onClick={() => setExporting(true)}>{t("packs.export.open")}</button>
+        <button type="button" onClick={pickImport}>{t("packs.import.open")}</button></div>
       {err && <Notice kind="error">{err}</Notice>}
       {msg && <Notice kind="info">{msg}</Notice>}
       {packs?.length === 0 && <p className="hint">{t("packs.empty")}</p>}
@@ -156,6 +170,8 @@ export function PacksSection({ core }: { core: CoreAPI }) {
         ))}
       </ul>
       {showing && <PackDetailDialog core={core} id={showing} onChange={merge} onClose={() => setShowing("")} />}
+      {exporting && <ExportDialog core={core} onClose={() => setExporting(false)} />}
+      {imp && <ImportDialog core={core} path={imp.path} preview={imp.preview} onDone={refresh} onClose={() => setImp(null)} />}
       {preview && <InstallDialog core={core} path={preview.path} info={preview.info} onDone={refresh} onClose={() => setPreview(null)} />}
     </div>
   );

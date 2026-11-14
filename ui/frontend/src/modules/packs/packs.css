@@ -6,3 +6,7 @@
 .pack-readme { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 14rem; overflow: auto; }
 .pack-items { display: grid; gap: var(--s-1); }
 .pack-items h4 { margin: var(--s-2) 0 0; }
+
+/* Fase 21i: paquete personal. */
+.pack-import-items { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.pack-import-items li { overflow-wrap: anywhere; min-width: 0; }
