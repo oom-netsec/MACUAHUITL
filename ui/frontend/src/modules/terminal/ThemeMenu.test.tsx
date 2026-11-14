@@ -13,7 +13,7 @@ test("con el idioma en inglés el menú muestra los nombres de las paletas en in
   const names = within(screen.getByRole("menu")).getAllByRole("menuitemradio").map((i) => i.querySelector(".theme-name")!.textContent);
   expect(names).toHaveLength(PALETTES.length);
   expect(names).toContain("Midnight");
-  expect(names).toContain("Console dark");
+  expect(names).toContain("Dark console");
   expect(names).not.toContain("Medianoche");
   names.forEach((n, i) => expect(n, PALETTES[i].id).not.toMatch(/^term\.palette\./)); // una clave que falta se vería como la clave
 });

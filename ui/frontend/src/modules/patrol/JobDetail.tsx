@@ -116,7 +116,7 @@ export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: C
         <Section title={t("patrol.login.title")} description={t("patrol.login.intro")}>
           {login.length > 0 && (
             <>
-              <div className="table-wrap">
+              <div className="table-wrap login-test">
                 <table>
                   <thead><tr><th>{t("patrol.login.col.device")}</th><th>{t("patrol.login.col.result")}</th><th>{t("patrol.login.col.decision")}</th></tr></thead>
                   <tbody>

@@ -239,8 +239,8 @@ describe("exportar e importar colecciones", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Collections" }));
     await userEvent.click(screen.getByRole("button", { name: "Import…" }));
     const preview = await screen.findByRole("region", { name: "Collections import preview" });
-    expect(within(preview).getByText("The file has no checksum (sha256): it cannot be verified that it was not altered.")).toBeInTheDocument();
-    expect(within(preview).getByText(/Collection "Nueva": the script lib-de-otra-version is not in the local library and will be skipped\./)).toBeInTheDocument();
+    expect(within(preview).getByText("The file has no checksum (sha256): its integrity cannot be verified.")).toBeInTheDocument();
+    expect(within(preview).getByText(/Collection “Nueva”: the script lib-de-otra-version is not in the local library and will be skipped\./)).toBeInTheDocument();
     expect(within(preview).getByText("Same name, different ID")).toBeInTheDocument();
     expect(within(preview).getAllByText("Favorites").length).toBeGreaterThan(0); // el nombre fijo del núcleo, en el idioma elegido
     expect(preview.textContent).not.toMatch(/sin suma|Favoritos|se omitió/);
@@ -267,10 +267,10 @@ describe("revisión: avisos, datos, límite, foco y favoritos", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Collections" }));
     await userEvent.click(screen.getByRole("button", { name: "Import…" }));
     const preview = await screen.findByRole("region", { name: "Collections import preview" });
-    expect(within(preview).getByText('Collection "Nueva": the script lib-x is not in the local library and will be skipped.')).toBeInTheDocument();
+    expect(within(preview).getByText('Collection “Nueva”: the script lib-x is not in the local library and will be skipped.')).toBeInTheDocument();
     await userEvent.click(within(preview).getByRole("button", { name: "Apply import" }));
-    expect(await screen.findByText('Collection "Nueva": the script lib-y is not in the local library and was skipped.')).toBeInTheDocument();
-    expect(screen.getByText('Collection "Nueva": the script lib-z was not imported and was removed from the collection.')).toBeInTheDocument();
+    expect(await screen.findByText('Collection “Nueva”: the script lib-y is not in the local library and was skipped.')).toBeInTheDocument();
+    expect(screen.getByText('Collection “Nueva”: the script lib-z was not imported and was removed from the collection.')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/se omit|no se import|biblioteca local;/);
   });
 

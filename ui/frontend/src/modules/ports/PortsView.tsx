@@ -93,7 +93,7 @@ export function PortsView({ core }: { core: CoreAPI }) {
       </Section>
       <Section title={t("ports.section.run")}>
         <Check label={t("assist.writeMem")} checked={writeMem} onChange={setWriteMem} />
-        <Field label={t("fps.accepted")} value={fps} onChange={setFps} w="full" mono />
+        <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={fps} onChange={setFps} w="full" mono />
       </Section>
       <div className="actions">
         <button className="primary" disabled={!canPlan || active} onClick={doPlan}>{t("assist.plan")}</button>

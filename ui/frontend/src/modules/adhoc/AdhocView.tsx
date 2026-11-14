@@ -79,7 +79,7 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
       <Select label={t("assist.cred")} value={cred} onChange={setCred} options={creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])} w="lg" />
       <TextArea label={t("adhoc.devices")} value={devices} onChange={setDevices} rows={3} />
       <TextArea label={t("adhoc.commands")} value={commands} onChange={setCommands} rows={5} />
-      <Field label={t("fps.accepted")} value={accept} onChange={setAccept} w="lg" mono />
+      <Field label={t("fps.accepted")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="lg" mono />
       <div className="actions">
         <button className="primary" disabled={r.busy || !cred || !devices.trim() || !commands.trim()} aria-busy={r.busy} onClick={run}>
           {t(r.busy ? "adhoc.running" : "adhoc.run")}<kbd aria-hidden="true">Ctrl ↵</kbd>
