@@ -5,10 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 )
 
-// Fase 30e: las validaciones propias del puente salen en el idioma de la app; con es (o sin Localize), las de siempre.
+// Fase 30e: las validaciones propias del puente salen en el idioma de la app; con es las de siempre; sin Localize, inglés.
 func TestValidacionesDelPuenteEsYEn(t *testing.T) {
 	abs := filepath.Join(t.TempDir(), "a.txt")
 	cases := []struct {
@@ -40,7 +41,11 @@ func TestValidacionesDelPuenteEsYEn(t *testing.T) {
 			lang     string
 			localize bool
 			want     string
-		}{{"es", true, c.es}, {"en", false, c.es}, {"en", true, c.en}} {
+		}{{"es", true, c.es}, {"en", false, c.en}, {"en", true, c.en}} {
+			if !loc.localize { // sin Localize el puente no manda idioma: sale el de omisión, inglés
+				prev := i18n.SetDefault(i18n.En)
+				t.Cleanup(func() { i18n.SetDefault(prev) })
+			}
 			b, _ := i18nBridge(t, loc.lang, loc.localize)
 			err := c.call(b)
 			if err == nil || err.Error() != loc.want {

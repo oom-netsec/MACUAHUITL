@@ -79,14 +79,12 @@ func (b *Bridge) bridgeErr(err error) error {
 		return out
 	}
 	be.Reason, be.Metadata = c.Reason(), c.Metadata()
-	if loc := b.locale(); loc != i18n.Es {
-		be.msg = i18n.In(loc, err)
-	}
+	be.msg = i18n.In(b.locale(), err)
 	return be
 }
 
 // Idioma: con la bandera Localize encendida el puente manda el metadato accept-language con la preferencia ui.language.
-// Apagada (por omisión) no manda nada y el núcleo contesta en español, como antes.
+// Apagada (por omisión) no manda nada y el núcleo contesta en inglés, su idioma canónico.
 const langPref = "ui.language"
 
 type langCache struct {
@@ -134,10 +132,10 @@ func (b *Bridge) callCtx() context.Context {
 	return b.ctx
 }
 
-// locale es el idioma de los textos que arma el propio puente (es sin Localize).
+// locale es el idioma de los textos que arma el propio puente (en sin Localize).
 func (b *Bridge) locale() string {
 	if !b.Localize || strings.TrimSpace(b.language()) == "" {
-		return i18n.Es
+		return i18n.Locale(context.Background())
 	}
 	return b.language()
 }

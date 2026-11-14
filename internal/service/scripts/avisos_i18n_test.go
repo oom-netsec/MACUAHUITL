@@ -58,7 +58,7 @@ func avisosCasos(t *testing.T, ctx context.Context) map[string]string {
 }
 
 func TestAvisosImportEspanolRegresion(t *testing.T) {
-	i18ntest.Golden(t, "testdata/avisos_es.golden.json", avisosCasos(t, context.Background()))
+	i18ntest.Golden(t, "testdata/avisos_es.golden.json", avisosCasos(t, i18n.WithLocale(context.Background(), "es")))
 }
 
 func TestAvisosImportEn(t *testing.T) {
