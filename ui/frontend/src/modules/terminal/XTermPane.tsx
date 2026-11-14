@@ -9,7 +9,7 @@ import { useT } from "../../lib/i18n";
 
 export interface FindReq { q: string; dir: 1 | -1; n: number }
 interface Props {
-  runId: string; screenReader?: boolean; onCopy: (text: string) => void; onPaste: () => Promise<string>; active: boolean; shown?: boolean; label?: string; done: boolean; theme: ITheme; search?: FindReq;
+  runId: string; screenReader?: boolean; onCopy: (text: string) => void; onPaste: (given?: string) => Promise<string>; active: boolean; shown?: boolean; label?: string; done: boolean; theme: ITheme; search?: FindReq;
   bind: (runId: string, write: ((d: string) => void) | null) => void; // la vista manda aquí lo que llega del equipo
   onInput: (d: string) => void; // teclas en crudo hacia el equipo
   onSize: (rows: number, cols: number) => void;
@@ -68,13 +68,21 @@ export default function XTermPane(p: Props) {
       if (s) { props.current.onCopy(s); x.clearSelection(); } else pasteClip();
     };
     el.addEventListener("contextmenu", onContext);
+    // Pegado nativo (clic central con la selección PRIMARY, menú del sistema): xterm lo pegaría directo, sin la confirmación.
+    // En captura sobre el contenedor se adelanta al listener de xterm y pasa por el mismo camino que Ctrl+Mayús+V.
+    const onNativePaste = (e: ClipboardEvent) => {
+      e.preventDefault(); e.stopPropagation();
+      const given = e.clipboardData?.getData("text/plain") ?? "";
+      if (given) void props.current.onPaste(given).then((txt) => { if (txt) x.paste(txt); }).catch(() => {});
+    };
+    el.addEventListener("paste", onNativePaste, true);
     props.current.bind(props.current.runId, (d) => x.write(d));
     const ro = new ResizeObserver(() => fit.current());
     ro.observe(el);
     // Con la fuente cargada la celda mide distinto: xterm solo vuelve a medir si cambia la familia, por eso el truco del espacio.
     let gone = false;
     void document.fonts?.load(FONT_PROBE).then(() => { if (!gone) { x.options.fontFamily = `${FONT} `; fit.current(); } }).catch(() => {});
-    return () => { gone = true; el.removeEventListener("contextmenu", onContext); clearTimeout(timer); props.current.bind(props.current.runId, null); ro.disconnect(); x.dispose(); term.current = null; find.current = null; };
+    return () => { gone = true; el.removeEventListener("contextmenu", onContext); el.removeEventListener("paste", onNativePaste, true); clearTimeout(timer); props.current.bind(props.current.runId, null); ro.disconnect(); x.dispose(); term.current = null; find.current = null; };
   }, []);
 
   useEffect(() => { if (term.current) term.current.options.theme = p.theme; }, [p.theme]);

@@ -7,6 +7,7 @@ import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import { cleanTerminal, useStream } from "../../lib/stream";
 import { useInbox } from "../../app/activity";
+import { pasteNeedsConfirm } from "../../lib/safeText";
 import "./console.css";
 
 // Consola serie (RS-232 / USB-serie). Vive en el grupo Acceso junto a la terminal SSH.
@@ -96,7 +97,12 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
         <div className="serial-session">
           {status && <p className="meta">{t(status.k, status.v)}</p>}
           <Terminal text={text} ref={out} aria-label={t("console.output")} />
-          <form className="serial-bar" onSubmit={(e) => { e.preventDefault(); send(cmd + "\r"); setCmd(""); }}>
+          <form className="serial-bar" onSubmit={async (e) => {
+            e.preventDefault();
+            // Un control pegado en el campo (Ctrl+Z, ESC…) no se ve: se confirma con la vista previa que lo marca.
+            if (pasteNeedsConfirm(cmd) && !(await core.confirmPaste(cmd, port))) return;
+            send(cmd + "\r"); setCmd("");
+          }}>
             <Field label={t("console.cmd")} value={cmd} onChange={setCmd} w="full" mono />
             <button type="submit" disabled={!runId}>{t("console.send")}</button>
           </form>

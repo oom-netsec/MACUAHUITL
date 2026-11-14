@@ -418,6 +418,30 @@ describe("pegado de varias líneas", () => {
     await waitFor(() => expect(x.paste).toHaveBeenCalledWith("a\nb"));
   });
 
+  test("una sola línea con un control (Ctrl+Z) también pide confirmación", async () => {
+    const { core } = setup({ pasteText: vi.fn(async () => "shutdown\x1a"), confirmPaste: vi.fn(async () => false) });
+    await abrir("sw1");
+    const x = await term();
+    ctrlV(x);
+    await waitFor(() => expect(core.confirmPaste).toHaveBeenCalledWith("shutdown\x1a", "sw1"));
+    expect(x.paste).not.toHaveBeenCalled();
+  });
+
+  test("el pegado nativo (clic central) no llega directo a xterm: pasa por la confirmación", async () => {
+    const { core } = setup({ confirmPaste: vi.fn(async () => false) });
+    await abrir("sw1");
+    const x = await term();
+    const ev = new Event("paste", { bubbles: true, cancelable: true }) as ClipboardEvent;
+    Object.defineProperty(ev, "clipboardData", { value: { getData: () => "conf t\nshutdown" } });
+    const inner = document.createElement("textarea");
+    group().appendChild(inner);
+    act(() => { inner.dispatchEvent(ev); });
+    expect(ev.defaultPrevented).toBe(true);
+    await waitFor(() => expect(core.confirmPaste).toHaveBeenCalledWith("conf t\nshutdown", "sw1"));
+    expect(x.paste).not.toHaveBeenCalled();
+    expect(core.pasteText).not.toHaveBeenCalled();
+  });
+
   test("una sola línea se pega directo, sin preguntar", async () => {
     const { core } = setup({ pasteText: vi.fn(async () => "show version") });
     await abrir("sw1");

@@ -12,6 +12,7 @@ import { vocab } from "../lib/vocab";
 import type { Key } from "../lib/i18n/es";
 import { ModuleIdContext } from "../app/activity";
 import { assistOwner, assistOwnerKey } from "../app/useShellStatus";
+import { showHidden } from "../lib/safeText";
 
 export type AssistRunCore = Pick<CoreAPI, "assistStart" | "assistWatch" | "assistListRuns" | "assistConfirm" | "assistAbort" | "assistRollback" | "onAssist" | "onAssistDone">;
 
@@ -66,7 +67,7 @@ export function targetOf(equipo: string, credentialId: string) {
 
 // Líneas de configuración con su marca (+ aplicar, ↺ reversa) y resaltado de palabras clave.
 function CodeLines({ lines, mark }: { lines: string[]; mark?: string }) {
-  return <pre className="code">{lines.map((l, i) => <div key={i}>{mark && <span className="mark" aria-hidden="true">{mark} </span>}<Hl text={l} /></div>)}</pre>;
+  return <pre className="code">{lines.map((l, i) => <div key={i}>{mark && <span className="mark" aria-hidden="true">{mark} </span>}<Hl text={showHidden(l)} /></div>)}</pre>;
 }
 
 export function PlanView({ r }: { r: PortsPlanResult }) {
