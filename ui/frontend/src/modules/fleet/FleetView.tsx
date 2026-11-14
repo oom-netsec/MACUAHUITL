@@ -1,3 +1,4 @@
+import { plural } from "../../lib/plural";
 import { useEffect, useMemo, useState } from "react";
 import { vocab } from "../../lib/vocab";
 import type { CapacityResult, CoreAPI, FindResult, HealthResult, InventoryResult, PathResult, SummaryResult, TraceResult } from "../../lib/core";
@@ -88,7 +89,7 @@ function Found({ core, q, setQ }: { core: CoreAPI; q: string; setQ: (v: string) 
       {!f.data && !f.error && <EmptyState icon="search" title={t("fleet.find.empty")}>{t("fleet.find.prompt")}</EmptyState>}
       {f.data && (
         <ResultPanel title={t("fleet.sub.result")} status={hits.length ? { tone: "info", label: t("fleet.find.count", { n: hits.length }) } : { tone: "warn", label: t("fleet.find.none") }}>
-          <Caption>{t("fleet.find.caption", { n: hits.length, q: f.data.query, mode: f.data.mode, d: f.data.devices })}</Caption>
+          <Caption>{t("fleet.find.caption", { n: hits.length, q: f.data.query, mode: f.data.mode, d: plural(t, "unit.device", f.data.devices) })}</Caption>
           {hits.length > 0 && <DataTable label={t("fleet.sub.result")} columns={cols} rows={hits} rowKey={keyer(hits)} exportName={t("file.busqueda")} height={tableH(hits.length)} />}
         </ResultPanel>
       )}
@@ -328,7 +329,7 @@ function Inventory({ core }: { core: CoreAPI }) {
               <DownloadButton name={`${t("file.inventario")}.csv`} data={() => d.csv} label={t("fleet.inv.csv")} />
               <DownloadButton name={`${t("file.inventario")}.md`} data={() => d.markdown} label={t("fleet.inv.md")} />
             </>}>
-            <Caption>{t("fleet.inv.caption", { n: rows.length, d: d.result.devices })}</Caption>
+            <Caption>{t("fleet.inv.caption", { n: rows.length, d: plural(t, "unit.device", d.result.devices) })}</Caption>
             {rows.length > 0 && <DataTable label={t("fleet.sub.inventory")} columns={cols} rows={rows} rowKey={keyer(rows)} exportName={t("file.inventario")} height={tableH(rows.length)} />}
           </ResultPanel>
           <Warnings list={d.result.warnings} />

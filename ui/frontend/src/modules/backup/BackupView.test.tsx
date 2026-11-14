@@ -22,7 +22,7 @@ test("respalda una vez, espera el resultado, avisa y recarga la lista", async ()
   await userEvent.click(screen.getByLabelText("Incluir también el startup-config"));
   await userEvent.click(await screen.findByRole("button", { name: "Respaldar ahora" }));
   expect(core.backupStart).toHaveBeenCalledWith(expect.objectContaining({ targets: [{ address: "192.0.2.1", port: 2222 }], credentialId: "c1", startup: true, keep: 30, intervalSeconds: 0, rounds: 0, secrets: false }));
-  expect(await screen.findByText(/1 respaldo\(s\) guardado\(s\)\. Avisos: SW1/)).toBeInTheDocument();
+  expect(await screen.findByText(/1 respaldo guardado\. Avisos: SW1/)).toBeInTheDocument();
   expect(core.backupCollect).toHaveBeenCalledTimes(2);
   expect(await screen.findByText(a.device)).toBeInTheDocument();
   expect(screen.getByText(/Aviso: Los respaldos marcados «enmascarado»/)).toBeInTheDocument();

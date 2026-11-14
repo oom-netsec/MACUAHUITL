@@ -1,3 +1,4 @@
+import { plural } from "../../lib/plural";
 import { useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Field, Notice } from "../../components/Field";
@@ -54,7 +55,7 @@ export function FlapSection({ core }: { core: CoreAPI }) {
       {!rep && !q.error && <FirstRun what="forensic.empty.flap" />}
       {rep && (
         <>
-          <p className="meta">{t("forensic.flap.summary", { n: rep.interfaces, tr: rep.transitions, src: rep.source })}</p>
+          <p className="meta">{t("forensic.flap.summary", { ifaces: plural(t, "unit.interface", rep.interfaces), tr: plural(t, "unit.transition", rep.transitions), src: rep.source })}</p>
           <Warnings list={rep.warnings} />
           {rep.flaps.length === 0 ? <Notice kind="info">{t("forensic.flap.none")}</Notice> : (
             <ResultPanel title={t("forensic.flap.caption")}>

@@ -1,3 +1,4 @@
+import { plural } from "../../lib/plural";
 import { useEffect, useRef, useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Check, Field, Notice, errorText } from "../../components/Field";
@@ -63,7 +64,7 @@ export function PatternsSection({ core, refreshMs = 10_000 }: { core: CoreAPI; r
       {!rep && !err && <FirstRun what="forensic.empty.patterns" />}
       {rep && (
         <>
-          <p className="meta">{t("forensic.pat.summary", { n: rep.entries, p: rep.patterns.length, src: rep.source })}</p>
+          <p className="meta">{t("forensic.pat.summary", { msgs: plural(t, "unit.message", rep.entries), p: plural(t, "unit.pattern", rep.patterns.length), src: rep.source })}</p>
           <Warnings list={rep.warnings} />
           {rep.patterns.length > 0 && (
             <ResultPanel title={t("forensic.sec.patterns")}>

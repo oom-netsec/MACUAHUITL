@@ -160,7 +160,7 @@ test("debugs: manda el ruido línea por línea, los umbrales y muestra anomalía
   await userEvent.type(screen.getByLabelText("Ruido a ocultar (un texto por línea)"), "cdp-pa{Enter}  {Enter}ntp");
   await userEvent.click(btn);
   expect(core.forensicDebugs).toHaveBeenCalledWith("OSPF-1 ADJ", "", ["cdp-pa", "ntp"], 20, 2, 0);
-  expect(await screen.findByText(/70 línea\(s\): 6 ocultas por ruido/)).toBeInTheDocument();
+  expect(await screen.findByText(/70 líneas: 6 ocultas por ruido/)).toBeInTheDocument();
   expect(screen.getByText(/Línea 68/)).toBeInTheDocument();
   const t = screen.getByRole("table", { name: "Patrones más frecuentes" });
   expect(within(t).getByText("60")).toBeInTheDocument();
