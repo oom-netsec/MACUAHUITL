@@ -252,7 +252,7 @@ func snmpTraps(c *cli.Env, args []string) error {
 		return err
 	}
 	st, err := v1.NewVisibilityServiceClient(c.Conn).SnmpTraps(context.Background(), &v1.SnmpTrapsRequest{Addr: lf.addr, AllowAny: lf.any, DurationSeconds: dur, Save: lf.save,
-		V3CredentialId: cred, AuthProtocol: auth, PrivProtocol: priv, NameTemplate: inf.Name, Format: inf.Format,
+		V3CredentialId: cred, AuthProtocol: auth, PrivProtocol: priv, NameTemplate: inf.Name, Format: cli.WireFormat(inf.Format),
 		RatePerSource: v.Rate, BurstPerSource: v.Burst, RateGlobal: v.RateG, BurstGlobal: v.BurstG, QueueSize: v.Queue, RotateMb: v.RotMB, RotateMinutes: v.RotMin, MaxFiles: v.MaxFiles})
 	if err != nil {
 		return err
@@ -317,7 +317,7 @@ func flowsListen(c *cli.Env, args []string) error {
 		return err
 	}
 	st, err := v1.NewVisibilityServiceClient(c.Conn).Flows(context.Background(), &v1.FlowsRequest{Addr: lf.addr, AllowAny: lf.any, DurationSeconds: dur, Save: lf.save, Top: topN, EverySeconds: everyN,
-		NameTemplate: inf.Name, Format: inf.Format,
+		NameTemplate: inf.Name, Format: cli.WireFormat(inf.Format),
 		RatePerSource: v.Rate, BurstPerSource: v.Burst, RateGlobal: v.RateG, BurstGlobal: v.BurstG, QueueSize: v.Queue, RotateMb: v.RotMB, RotateMinutes: v.RotMin, MaxFiles: v.MaxFiles})
 	if err != nil {
 		return err
@@ -484,6 +484,7 @@ const help = `  topo  build TRABAJO|CARPETA [--pcap ARCHIVO] [--svg ARCHIVO] [--
   flows listen [--addr IP:PUERTO] [--any] [--for S] [--top N] [--every S] [--json] [topes y archivo]
         topes y archivo: [--rate N] [--burst N] [--rate-global N] [--burst-global N] [--queue N]
         [--save [--rotate-mb N] [--rotate-min N] [--name PLANTILLA] [--max-files N] [--format texto|crudo|jsonl]]
+        (--name admite {fecha} {hora} {origen}; también valen {date} {time} {source})
         en flows el tope cuenta datagramas (no flujos), solo rige con --save (1000/s por exportador y 5000/s global por defecto);
         un datagrama de plantilla v9/IPFIX descartado retrasa la decodificación hasta que el exportador la repita
   gnmi  get|subscribe HOST RUTA... --cred ID [--ca CA.pem] [--port N] [--mode sample|on_change]`

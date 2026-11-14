@@ -50,3 +50,23 @@ func TestPrintDrops(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+// WireFormat manda por el cable el valor histórico (texto o crudo) aunque se escriba text o raw.
+func TestWireFormat(t *testing.T) {
+	for in, want := range map[string]string{"text": "texto", "raw": "crudo", "texto": "texto", "crudo": "crudo", "jsonl": "jsonl", "": ""} {
+		if got := WireFormat(in); got != want {
+			t.Errorf("%q: %q", in, got)
+		}
+	}
+}
+
+// La ayuda visible (help_en.txt, la de --lang es sale de los Usage) documenta los dos juegos de tokens de --name y
+// los valores canónicos de --format.
+func TestAyudaTokensYFormato(t *testing.T) {
+	if n := strings.Count(helpEn, "--name takes {date} {time} {source}; the Spanish {fecha} {hora} {origen} also work"); n != 2 {
+		t.Errorf("tokens en la ayuda inglesa: %d líneas", n)
+	}
+	if strings.Contains(helpEn, "texto|crudo") || !strings.Contains(helpEn, "--format text|raw|jsonl") {
+		t.Error("--format en inglés debe ser text|raw|jsonl")
+	}
+}

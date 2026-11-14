@@ -19,7 +19,8 @@
         trace|zone|dnssec NAME --deep   (contacts roots and authoritative servers; audited)
   tls   inspect HOST[:PORT] [--sni NAME]
   syslog listen [--addr IP:PORT] [--tcp] [--any] [--for SECONDS] [--rate N] [--burst N] [--rate-global N] [--burst-global N] [--queue N]
-        [--save [--rotate-mb N] [--rotate-min N] [--name TEMPLATE] [--max-files N] [--format texto|crudo|jsonl]]
+        [--save [--rotate-mb N] [--rotate-min N] [--name TEMPLATE] [--max-files N] [--format text|raw|jsonl]]
+        (--name takes {date} {time} {source}; the Spanish {fecha} {hora} {origen} also work)
   radius test SERVER[:PORT] --user U|--cred ID [--secret-cred ID] [--method pap|chap|mschapv2]
         [--nas-ip IP] [--port-type T] [--service-type T] [--called X] [--calling MAC] [--acct] [--status]
   tacacs test SERVER[:PORT] --user U|--cred ID [--secret-cred ID] [--type ascii|pap] [--cmd COMMAND] [--acct]
@@ -37,7 +38,8 @@
         traps listen [--addr IP:PORT] [--any] [--for S] [--v3-cred ID] [limits and file]   (1162 by default)
   flows listen [--addr IP:PORT] [--any] [--for S] [--top N] [--every S] [--json] [limits and file]
         limits and file: [--rate N] [--burst N] [--rate-global N] [--burst-global N] [--queue N]
-        [--save [--rotate-mb N] [--rotate-min N] [--name TEMPLATE] [--max-files N] [--format texto|crudo|jsonl]]
+        [--save [--rotate-mb N] [--rotate-min N] [--name TEMPLATE] [--max-files N] [--format text|raw|jsonl]]
+        (--name takes {date} {time} {source}; the Spanish {fecha} {hora} {origen} also work)
         in flows the limit counts datagrams (not flows), only applies with --save (1000/s per exporter and 5000/s global by default);
         a dropped v9/IPFIX template datagram delays decoding until the exporter repeats it
   gnmi  get|subscribe HOST PATH... --cred ID [--ca CA.pem] [--port N] [--mode sample|on_change]
@@ -89,7 +91,7 @@
          --update-cred leaves the secret in the vault and the previous credential is kept as "<label> (anterior)";
          if the new session does not get in or you reject write memory, the rollback is proposed through the original session)
   backup run -d DEVICE[:PORT]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept FINGERPRINT] [--exclude DEVICE] [--timeout 10m] [--json]
-        (saves show running-config in outputs/respaldos/DEVICE/ with 0600; a Patrol job: read-only.
+        (saves show running-config in the backups folder, outputs/respaldos/DEVICE/, with 0600; a Patrol job: read-only.
          With --every and --rounds it is scheduled and the core saves each round)
   backup collect JOB [--keep N] [--json]   saves what a job has collected (idempotent)
   backup list [DEVICE] [--json]            saved backups (flags those with masked secrets)
@@ -177,7 +179,7 @@
         (the terminal's short bar: at most 5 pinned scripts, separate from collections; without arguments it lists them in order)
   prefs show [--json]  |  prefs set [--outputs DIR] [--rotate-mb N] [--rotate-min N] [--max-files N] [--format F]
         (set changes only what is asked; 0 or "" returns that value to the factory one. The folder must be absolute, exist, be yours, writable and mode 0700;
-         applies to whatever starts afterwards and the previous data is not moved. rotate-mb 1-1024, rotate-min 1-10080, max-files 1-1000, format texto|crudo|jsonl)
+         applies to whatever starts afterwards and the previous data is not moved. rotate-mb 1-1024, rotate-min 1-10080, max-files 1-1000, format text|raw|jsonl)
   pack install <file.mpack> [--allow-unsigned] [--hide ITEM]...  |  pack list  |  pack show <id>  |  pack remove <id>
         (content packages: playbooks and scripts per technology; downloaded by hand from the releases and nothing is downloaded on its own.
          A package without an official signature is third-party and is only installed with --allow-unsigned; it carries read commands only.

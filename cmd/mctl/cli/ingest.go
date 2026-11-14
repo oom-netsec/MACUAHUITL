@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
@@ -29,9 +30,13 @@ func (f *IngestFlags) Register(fs *flag.FlagSet, defName string) {
 	fs.IntVar(&f.Queue, "queue", 0, "cola antes de escribir (4096 por defecto; 64-65536)")
 	fs.IntVar(&f.RotMB, "rotate-mb", 0, "con --save, rotar cada N MB (50 por defecto; 1-1024)")
 	fs.IntVar(&f.RotMin, "rotate-min", 0, "con --save, rotar cada N minutos (0 = no; 1-10080)")
-	fs.StringVar(&f.Name, "name", "", "con --save, plantilla del nombre con {fecha} {hora} {origen} ("+defName+")")
+	name := "con --save, plantilla del nombre con {fecha} {hora} {origen} (" + defName + ")"
+	if locale == "en" { // los tokens ingleses valen igual que los españoles, que se conservan por las configuraciones guardadas
+		name = strings.NewReplacer("con --save, plantilla del nombre con", "with --save, file name template using", "{fecha}", "{date}", "{hora}", "{time}", "{origen}", "{source}").Replace(name)
+	}
+	fs.StringVar(&f.Name, "name", "", name)
 	fs.IntVar(&f.MaxFiles, "max-files", 0, "con --save, archivos que se conservan (20 por defecto; 1-1000)")
-	fs.StringVar(&f.Format, "format", "", "con --save: texto (por defecto), crudo o jsonl")
+	fs.StringVar(&f.Format, "format", "", "con --save: texto|text (por defecto), crudo|raw o jsonl")
 }
 
 // Int32 rechaza lo que no cabe en el int32 del contrato, en vez de truncarlo en silencio.
@@ -66,4 +71,15 @@ func PrintDrops(w io.Writer, d *v1.SyslogDrops) {
 		fmt.Fprintf(w, " %s=%d", s.Source, s.Count)
 	}
 	fmt.Fprintln(w)
+}
+
+// WireFormat lleva --format a lo que el núcleo acepta: text pasa a texto y raw a crudo (con los españoles no cambia nada).
+func WireFormat(v string) string {
+	switch v {
+	case "text":
+		return "texto"
+	case "raw":
+		return "crudo"
+	}
+	return v
 }
