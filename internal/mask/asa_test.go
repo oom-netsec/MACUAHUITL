@@ -24,6 +24,14 @@ var asaCases = []struct{ in, want string }{
 	{"snmp-server host inside 10.1.1.1 version 3 user1", "snmp-server host inside 10.1.1.1 version 3 user1"},
 	{"snmp-server host 10.1.1.1 version 2c Comm1", "snmp-server host 10.1.1.1 version 2c <MASKED:snmp-community>"},
 	{"snmp-server host 10.1.1.1 Comm1", "snmp-server host 10.1.1.1 <MASKED:snmp-community>"},
+	// aaa-server en una línea: «host IP KEY [timeout N]».
+	{"aaa-server RAD (inside) host 10.1.1.5 RadK3y timeout 5", "aaa-server RAD (inside) host 10.1.1.5 <MASKED:aaa-key> timeout 5"},
+	{"aaa-server RAD (inside) host 10.1.1.5 RadK3y", "aaa-server RAD (inside) host 10.1.1.5 <MASKED:aaa-key>"},
+	{"aaa-server RAD host 10.1.1.5 RadK3y", "aaa-server RAD host 10.1.1.5 <MASKED:aaa-key>"},
+	{"aaa-server RAD (inside) host 10.1.1.5 *****", "aaa-server RAD (inside) host 10.1.1.5 *****"},
+	{"aaa-server RAD (inside) host 10.1.1.5", "aaa-server RAD (inside) host 10.1.1.5"},
+	{"aaa-server RAD (inside) host 10.1.1.5 timeout 5", "aaa-server RAD (inside) host 10.1.1.5 timeout 5"},
+	{"aaa-server RAD protocol radius", "aaa-server RAD protocol radius"},
 	// Sin falsos positivos.
 	{" description key server for vpn", " description key server for vpn"},
 	{"ssh key-exchange group dh-group14-sha256", "ssh key-exchange group dh-group14-sha256"},

@@ -119,6 +119,7 @@ var iosRules = []rule{
 	R("eigrp-key", "", `\s*eigrp authentication key \d+ `),
 	R("eigrp-key", "", `\s*authentication key eigrp \d+ `),
 	R("aaa-key", "aaaserver", `\s+key `+typ),
+	R("aaa-key", "", `\s*aaa-server \S+ (?:\(\S+\) )?host \S+ `).guarded(), // forma de una línea
 	R("token", "licsmart", `\s+token `),
 	// VPN y PKI.
 	R("psk", "", `\s*authentication (?:local|remote) pre-share key `+typ),
