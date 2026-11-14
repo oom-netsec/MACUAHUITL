@@ -34,6 +34,8 @@ const cases: [string, Vars, string, string][] = [
   ["hosts.data.export.done", { n: 1, path: "/p" }, "1 host exported to /p.", "Se exportó 1 host a /p."],
   ["hosts.data.export.done", { n: 2, path: "/p" }, "2 hosts exported to /p.", "Se exportaron 2 hosts a /p."],
   ["vault.backup.exported", { n: 1, path: "/p" }, "Backup of 1 credential saved to /p.", "Respaldo de 1 credencial guardado en /p."],
+  ["hosts.data.import.applyNote", { n: 1 }, "Only valid rows are applied; the invalid row is skipped.", "Solo se aplican las filas válidas; la fila inválida se omite."],
+  ["hosts.data.import.applyNote", { n: 2 }, "Only valid rows are applied; the 2 invalid ones are skipped.", "Solo se aplican las filas válidas; las 2 inválidas se omiten."],
   ["packs.removedFavs", { n: 1 }, "Removed 1 favorite that pointed to the pack's scripts.", "Se quitó 1 favorito de los scripts del paquete."],
   ["fleet.find.caption", { n: 1, q: "a", mode: "m", d: "1 device" }, "1 match for “a” (m) in 1 device", "1 coincidencia de «a» (m) en 1 device"],
   ["fleet.health.caption", { n: 1 }, "1 interface with problems, most severe first (counters accumulated since the last clear counters)", "1 interfaz con problema, de la más grave a la menos (contadores acumulados desde el último clear counters)"],

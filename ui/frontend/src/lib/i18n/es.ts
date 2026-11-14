@@ -2068,7 +2068,7 @@ export const es = {
   "scripts.noSend": "Los scripts de configuración no se envían a la terminal: cada salto de línea ejecutaría una línea. Aplícalos con un snippet en modo asistido o pégalos tú.",
   "scripts.copy": "Copiar",
   "scripts.import.expired": "La vista previa venció o ya se usó: vuelve a abrir el archivo.",
-  "paste.script": "Script «{name}»: ¿insertar {n} líneas en {host}? Se ejecutarán {run} líneas; la última queda sin Enter.\n\n{preview}",
+  "paste.script": "Script «{name}»: ¿insertar {n} líneas en {host}? Líneas que se ejecutarán: {run}; la última queda sin Enter.\n\n{preview}",
   "nav.settings": "Ajustes",
   "settings.title": "Ajustes",
   "settings.desc": "Preferencias de la aplicación. Los cambios se aplican al momento.",
@@ -2726,6 +2726,7 @@ export const es = {
   "hosts.data.export.done.one": "Se exportó 1 host a {path}.",
   "vault.backup.exported.one": "Respaldo de 1 credencial guardado en {path}.",
   "packs.removedFavs.one": "Se quitó 1 favorito de los scripts del paquete.",
+  "hosts.data.import.applyNote.one": "Solo se aplican las filas válidas; la fila inválida se omite.",
 };
 
 export type Key = keyof typeof es;

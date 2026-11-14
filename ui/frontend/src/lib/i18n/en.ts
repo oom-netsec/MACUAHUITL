@@ -2070,7 +2070,7 @@ export const en: Record<Key, string> = {
   "scripts.noSend": "Configuration scripts are not sent to the terminal: each line break would run a line. Apply them with a snippet in assisted mode or paste them yourself.",
   "scripts.copy": "Copy",
   "scripts.import.expired": "The preview expired or was already used: open the file again.",
-  "paste.script": "Script “{name}”: insert {n} lines into {host}? {run} lines will run; the last one is left without Enter.\n\n{preview}",
+  "paste.script": "Script “{name}”: insert {n} lines into {host}? Lines that will run: {run}; the last one is left without Enter.\n\n{preview}",
   "nav.settings": "Settings",
   "settings.title": "Settings",
   "settings.desc": "Application preferences. Changes apply immediately.",
@@ -2728,4 +2728,5 @@ export const en: Record<Key, string> = {
   "hosts.data.export.done.one": "1 host exported to {path}.",
   "vault.backup.exported.one": "Backup of 1 credential saved to {path}.",
   "packs.removedFavs.one": "Removed 1 favorite that pointed to the pack's scripts.",
+  "hosts.data.import.applyNote.one": "Only valid rows are applied; the invalid row is skipped.",
 };

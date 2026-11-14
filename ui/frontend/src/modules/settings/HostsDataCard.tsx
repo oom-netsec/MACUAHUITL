@@ -212,7 +212,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
               </div>
             </>
           )}
-          {prev.errors.length > 0 && <p className="hint">{t("hosts.data.import.applyNote", { n: String(prev.errors.length) })}</p>}
+          {prev.errors.length > 0 && <p className="hint">{t("hosts.data.import.applyNote", { n: prev.errors.length })}</p>}
           <div className="actions">
             <button type="button" className="primary" disabled={busy || prev.items.length === 0} onClick={() => void apply()}>{t("hosts.data.import.apply")}</button>
             <button type="button" onClick={() => setPrev(null)}>{t("hosts.data.import.cancel")}</button>
