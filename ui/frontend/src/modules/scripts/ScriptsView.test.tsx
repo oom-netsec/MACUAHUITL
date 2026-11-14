@@ -334,3 +334,15 @@ test("una plataforma que el front no conoce se muestra tal cual, sin clave cruda
   expect(screen.getByText("abc")).toBeInTheDocument();
   expect(screen.queryByText(/scripts\.(plat|tech)\./)).not.toBeInTheDocument();
 });
+
+test("en una sola columna (ventana angosta) elegir un script lleva el detalle a la vista", async () => {
+  const prev = window.matchMedia; // jsdom no lo trae
+  window.matchMedia = ((q: string) => ({ matches: q.includes("1150"), media: q })) as unknown as typeof window.matchMedia;
+  const scroll = vi.fn();
+  Element.prototype.scrollIntoView = scroll;
+  try {
+    setup();
+    await userEvent.click(await screen.findByRole("button", { name: "L2 · STP" }));
+    expect(scroll).toHaveBeenCalled();
+  } finally { window.matchMedia = prev; }
+});

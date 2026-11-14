@@ -12,7 +12,8 @@
 .scr-row > .scr-meta { grid-area: meta; }
 .scr-row > .scr-acts { grid-area: star; display: flex; align-items: center; gap: 2px; }
 .scr-name, .scr-name:hover { background: transparent; }
-.scr-name { display: block; text-align: left; height: auto; padding: 2px 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* block: el «…» no aplica al texto de un contenedor flex */
+.scr-name { justify-content: flex-start; text-align: left; height: auto; padding: 2px 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scr-name .ell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* el «…» va en un span: en un botón (flex en WebKit) no aplica al texto suelto */
 .scr-meta { display: flex; flex-wrap: wrap; gap: var(--s-1); align-items: center; margin: 0 0 var(--s-3); }
 .scr-row > .scr-meta { margin: 0; }
 .scr-star[aria-pressed="true"] { color: var(--warning); }
