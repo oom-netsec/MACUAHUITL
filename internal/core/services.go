@@ -352,6 +352,9 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 			}
 		}
 	}
+	c.mu.Lock()
+	gen := c.sleepGen // una suspensión durante el armado cierra la ventana que crea Arm
+	c.mu.Unlock()
 	if err := v.Arm(j.id, until, creds); err != nil {
 		return fail(service.VaultErr(ctx, err), i18n.English(err))
 	}
@@ -421,6 +424,10 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	}
 	c.mu.Lock()
 	j.state, j.ArmedAt = "armed", c.o.Now()
+	if c.sleepGen != gen { // OnSleep no vio este trabajo como armado: queda pausado y resumePaused lo reanuda
+		j.paused = true
+		c.sched.Pause(j.id)
+	}
 	late := j.cancelReq // la cancelación llegó entre la revisión y el armado
 	j.cancelReq = false
 	c.mu.Unlock()
