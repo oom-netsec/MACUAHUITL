@@ -212,6 +212,7 @@ func newServeSink(audit func(action, target, detail string), send func(*v1.Serve
 }
 
 func (k *serveSink) onTransfer(t fileserve.Transfer) {
+	t.DirCode = service.DirEN(t.Dir)
 	b, _ := json.Marshal(t)
 	ev := &v1.ServeFilesResponse{TransferJson: string(b)}
 	if t.Rejected {
