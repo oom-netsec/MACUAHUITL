@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/pack"
@@ -409,5 +410,46 @@ func TestPackExportSoloPlaybooks(t *testing.T) {
 	r, err := pk.Export(ctx(t), &v1.PackServiceExportRequest{EditorName: "acme/mio", IncludePlaybooks: true, Path: filepath.Join(t.TempDir(), "p.mpack")})
 	if err != nil || r.Playbooks != 1 || r.Scripts != 0 {
 		t.Fatalf("%+v %v", r, err)
+	}
+}
+
+// Orden de candados: el almacén de paquetes primero y la base después, en Install y en Import. Con un Install dentro
+// del almacén, un Import no debe quedarse con el bloqueo de escritura de la base (haría fallar al Install por busy_timeout).
+func TestPackImportNoTomaLaBaseAntesDelAlmacen(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	a := h.saveScript(t, "Uno", "ios", "show version")
+	out := filepath.Join(t.TempDir(), "p.mpack")
+	if _, err := pk.Export(ctx(t), &v1.PackServiceExportRequest{EditorName: "acme/mio", ScriptIds: []string{a.Id}, Path: out}); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(out)
+	inside, release, installed := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	go func() {
+		_, err := h.core.packs.InstallWith(raw, true, func(*pack.Pack, string) error { close(inside); <-release; return nil })
+		installed <- err
+	}()
+	<-inside // Install tiene el almacén
+	imp := hostile(t, func(f map[string][]byte) {
+		delete(f, "playbooks/acme-evil.yaml")
+		f["playbooks/acme-p.yaml"] = []byte("id: acme-p\nplatform: ios\nname: P\nname_en: P\ncommands:\n  - cmd: show clock\n")
+		f["manifest.yaml"] = []byte(strings.Replace(string(f["manifest.yaml"]), "[ios-xe]", "[ios]", 1))
+	})
+	done := make(chan error, 1)
+	go func() {
+		_, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: imp, Confirm: true})
+		done <- err
+	}()
+	time.Sleep(300 * time.Millisecond) // el Import espera el almacén
+	start := time.Now()
+	if _, err := h.core.db.Exec(`CREATE TABLE IF NOT EXISTS zz_candados(x)`); err != nil || time.Since(start) > time.Second {
+		t.Errorf("el Import retiene la base mientras espera el almacén: %v tras %v", err, time.Since(start))
+	}
+	close(release)
+	if err := <-installed; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

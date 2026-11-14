@@ -202,32 +202,39 @@ func (s *svc) Import(ctx context.Context, r *v1.PackServiceImportRequest) (*v1.P
 	}
 	var pbRes *dom.PlaybookResult
 	var sres scripts.Resultado
-	tx, err := s.d.DB().Begin()
-	if err != nil {
-		return nil, internal(err)
-	}
-	defer tx.Rollback()
-	user, err := loadUser(tx)
-	if err != nil {
-		return nil, internal(err)
-	}
-	if sres, err = scripts.Apply(scripts.Plan(p.Scripts, user, lib), scDec, user, lib, s.d.Now().UTC().Truncate(time.Second)); err != nil {
-		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
-	}
-	for _, x := range sres.Writes {
-		if err := put(tx, x); err != nil {
-			return nil, internal(err)
+	// Orden de candados: primero el del almacén, después la base (Install toma el del almacén y luego abre su transacción).
+	err = s.store.Locked(func() error {
+		tx, err := s.d.DB().Begin()
+		if err != nil {
+			return internal(err)
 		}
-	}
-	// shortcut: los playbooks se escriben antes del commit de la base; si el proceso cae entre los dos quedan archivos sin
-	// scripts (no se pierde nada, y reimportar los ve como conflicto y pide decisión). Mejorar con un diario si hiciera falta.
-	if pbRes, err = s.store.ImportPlaybooks(p, dir, userIDs, pbDec); err != nil {
-		tx.Rollback() // la auditoría escribe en la misma base: no puede haber una transacción abierta
-		return nil, s.reject(ctx, err, p, sum, path)
-	}
-	if err := tx.Commit(); err != nil {
-		pbRes.Undo(dir)
-		return nil, internal(err)
+		defer tx.Rollback()
+		user, err := loadUser(tx)
+		if err != nil {
+			return internal(err)
+		}
+		if sres, err = scripts.Apply(scripts.Plan(p.Scripts, user, lib), scDec, user, lib, s.d.Now().UTC().Truncate(time.Second)); err != nil {
+			return service.ErrFrom(ctx, codes.InvalidArgument, err)
+		}
+		for _, x := range sres.Writes {
+			if err := put(tx, x); err != nil {
+				return internal(err)
+			}
+		}
+		// shortcut: los playbooks se escriben antes del commit de la base; si el proceso cae entre los dos quedan archivos sin
+		// scripts (no se pierde nada, y reimportar los ve como conflicto y pide decisión). Mejorar con un diario si hiciera falta.
+		if pbRes, err = s.store.ImportPlaybooksLocked(p, dir, userIDs, pbDec); err != nil {
+			tx.Rollback() // la auditoría escribe en la misma base: no puede haber una transacción abierta
+			return s.reject(ctx, err, p, sum, path)
+		}
+		if err := tx.Commit(); err != nil {
+			pbRes.Undo(dir)
+			return internal(err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	if s.cfg.Reload != nil {
 		if err := s.cfg.Reload(); err != nil { // los archivos ya están: el catálogo los toma en el próximo arranque

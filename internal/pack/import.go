@@ -116,6 +116,19 @@ func (r *PlaybookResult) Undo(dir string) {
 func (s *Store) ImportPlaybooks(p *Pack, dir string, userIDs map[string]bool, dec map[string]string) (*PlaybookResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.ImportPlaybooksLocked(p, dir, userIDs, dec)
+}
+
+// Locked corre f con el candado del almacén. Orden único de candados: primero este, después la base de datos (quien
+// abre una transacción y necesita el almacén, como el import del paquete personal, la abre dentro de f).
+func (s *Store) Locked(f func() error) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return f()
+}
+
+// ImportPlaybooksLocked es ImportPlaybooks para quien ya está dentro de Locked.
+func (s *Store) ImportPlaybooksLocked(p *Pack, dir string, userIDs map[string]bool, dec map[string]string) (*PlaybookResult, error) {
 	plan := s.plan(p, dir, userIDs)
 	known := map[string]bool{}
 	for _, it := range plan {
