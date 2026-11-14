@@ -19,7 +19,7 @@ const cases: [string, Vars, string, string][] = [
   ["backup.saved", { n: 3 }, "3 backups saved", "3 respaldos guardados"],
   ["backup.savedWarn", { n: 1, warnings: "x" }, "1 backup saved. Warnings: x", "1 respaldo guardado. Avisos: x"],
   ["backup.caption", { n: 2 }, "2 backups; select two of the same device and type to compare them", "2 respaldos; marca dos del mismo equipo y tipo para compararlos"],
-  ["backup.diff.summary", { n: 1, added: 1, removed: 0 }, "1 change: 1 added, 0 removed.", "1 cambio: 1 agregadas, 0 quitadas."],
+  ["backup.diff.summary", { n: 1, added: 1, removed: 0 }, "1 change: 1 added, 0 removed.", "1 cambio (líneas agregadas: 1, quitadas: 0)."],
   ["fleet.find.caption", { n: 1, q: "a", mode: "m", d: "1 device" }, "1 match for “a” (m) in 1 device", "1 coincidencia de «a» (m) en 1 device"],
   ["fleet.health.caption", { n: 1 }, "1 interface with problems, most severe first (counters accumulated since the last clear counters)", "1 interfaz con problema, de la más grave a la menos (contadores acumulados desde el último clear counters)"],
   ["fleet.summary.meta", { n: 1, list: "l" }, "1 device. With data: l", "1 equipo. Con dato: l"],
