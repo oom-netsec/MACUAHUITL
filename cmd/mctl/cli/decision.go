@@ -15,3 +15,18 @@ func Decision(v string, allowed ...string) (string, bool) {
 	}
 	return v, slices.Contains(allowed, v)
 }
+
+// WireDecision es el valor que viaja por gRPC (histórico, no cambiar sin versionar el cable): el histórico en español (renombrar, reemplazar, omitir). Un mctl nuevo
+// con un núcleo anterior (el servicio de usuario sigue corriendo tras actualizar el paquete) lo rechazaría si mandara
+// el inglés; el núcleo nuevo acepta los dos. Lo desconocido pasa tal cual.
+func WireDecision(canon string) string {
+	switch canon {
+	case "rename":
+		return "renombrar"
+	case "replace":
+		return "reemplazar"
+	case "skip":
+		return "omitir"
+	}
+	return canon
+}

@@ -261,13 +261,14 @@ func importCmd(c *cli.Env, args []string) error {
 		if !ok || id == "" || !valid {
 			return cli.Err("mctl.pack.bad_decision", "decision", strconv.Quote(d))
 		}
-		dec[id] = a
+		dec[id] = cli.WireDecision(a)
 	}
 	if all != "" {
 		var ok bool
 		if all, ok = cli.Decision(all, "rename", "skip"); !ok {
 			return errors.New(uso)
 		}
+		all = cli.WireDecision(all)
 	}
 	path, err := filepath.Abs(fs.Arg(0))
 	if err != nil {

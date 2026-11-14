@@ -94,6 +94,7 @@ func backupImport(c *cli.Env, args []string) error {
 		if all, ok = cli.Decision(all); !ok {
 			return cli.Err("mctl.import_a.bad_all", "value", all)
 		}
+		all = cli.WireDecision(all)
 	}
 	dec := map[string]string{}
 	for _, d := range decs {
@@ -102,7 +103,7 @@ func backupImport(c *cli.Env, args []string) error {
 		if !ok || k == "" || !valid {
 			return cli.Err("mctl.import_a.bad_decision", "value", d)
 		}
-		dec[k] = act
+		dec[k] = cli.WireDecision(act)
 	}
 	path, err := filepath.Abs(fs.Arg(0))
 	if err != nil {

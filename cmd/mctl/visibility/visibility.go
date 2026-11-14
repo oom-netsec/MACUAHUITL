@@ -135,7 +135,14 @@ func snmpPoll(c *cli.Env, args []string) error {
 	if fs.NArg() != 1 {
 		return errors.New("uso: mctl snmp poll HOST --cred ID [--profile P]... [--every S] [--count N] [--for S]")
 	}
-	st, err := v1.NewVisibilityServiceClient(c.Conn).SnmpPoll(context.Background(), &v1.SnmpPollRequest{Target: sf.target(fs.Arg(0)), Profiles: profiles, IntervalSeconds: int32(every), Count: int32(count), DurationSeconds: int32(secs)})
+	wire := make([]string, len(profiles)) // el cable lleva sistema|memoria (histórico): un núcleo anterior no entiende system|memory
+	for i, p := range profiles {
+		wire[i] = map[string]string{"system": "sistema", "memory": "memoria"}[p]
+		if wire[i] == "" {
+			wire[i] = p
+		}
+	}
+	st, err := v1.NewVisibilityServiceClient(c.Conn).SnmpPoll(context.Background(), &v1.SnmpPollRequest{Target: sf.target(fs.Arg(0)), Profiles: wire, IntervalSeconds: int32(every), Count: int32(count), DurationSeconds: int32(secs)})
 	if err != nil {
 		return err
 	}

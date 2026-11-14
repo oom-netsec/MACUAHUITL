@@ -289,30 +289,30 @@ func Poll(ctx context.Context, t Target, profiles []string, interval time.Durati
 			}
 		}
 		s := Sample{Time: time.Now()}
-		note := func(p string, err error) {
+		note := func(p, es string, err error) { // es: el nombre del perfil en español (alias histórico)
 			if err != nil {
-				t := i18n.Join(": ", i18n.Lit(p, p), i18n.FromErr(err))
+				t := i18n.Join(": ", i18n.Lit(es, p), i18n.FromErr(err))
 				s.Errors, s.ErrorTexts = append(s.Errors, t.In(i18n.Es)), append(s.ErrorTexts, t)
 			}
 		}
 		if want["system"] {
 			s.System, err = pollSystem(x)
-			note("system", err)
+			note("system", "sistema", err)
 		}
 		if want["interfaces"] {
 			if r, err := x.Get([]string{".1.3.6.1.2.1.1.3.0"}); err == nil && len(r.Variables) == 1 {
 				s.Uptime = uint32(num(r.Variables[0].Value))
 			}
 			s.Interfaces, err = pollInterfaces(x)
-			note("interfaces", err)
+			note("interfaces", "interfaces", err)
 		}
 		if want["cpu"] {
 			s.CPU, err = pollCPU(x)
-			note("cpu", err)
+			note("cpu", "cpu", err)
 		}
 		if want["memory"] {
 			s.Memory, err = pollMemory(x)
-			note("memory", err)
+			note("memory", "memoria", err)
 		}
 		if ctx.Err() != nil {
 			return nil

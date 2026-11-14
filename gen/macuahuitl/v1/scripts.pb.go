@@ -1000,7 +1000,7 @@ func (x *PreviewImportResponse) GetWarnings() []string {
 type ImportDecision struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ScriptId      string                 `protobuf:"bytes,1,opt,name=script_id,json=scriptId,proto3" json:"script_id,omitempty"` // ID del script en el archivo
-	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`                     // renombrar | reemplazar | omitir
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`                     // cable histórico: renombrar | reemplazar | omitir; el núcleo acepta también rename | replace | skip
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

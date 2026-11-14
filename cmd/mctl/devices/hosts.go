@@ -233,6 +233,7 @@ func hostsImport(c *cli.Env, args []string) error {
 		if all, ok = cli.Decision(all); !ok {
 			return cli.Err("mctl.hosts.bad_all", "value", all)
 		}
+		all = cli.WireDecision(all)
 	}
 	dec := map[string]string{}
 	for _, d := range decs {
@@ -241,7 +242,7 @@ func hostsImport(c *cli.Env, args []string) error {
 		if !ok || k == "" || !valid {
 			return cli.Err("mctl.hosts.bad_decision", "value", d)
 		}
-		dec[k] = act
+		dec[k] = cli.WireDecision(act)
 	}
 	path, err := filepath.Abs(fs.Arg(0))
 	if err != nil {

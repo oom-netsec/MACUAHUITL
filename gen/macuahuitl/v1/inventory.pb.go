@@ -926,7 +926,7 @@ func (x *PreviewImportHostsResponse) GetFormat() string {
 type ImportHostDecision struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"` // renombrar, reemplazar u omitir
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"` // cable histórico: renombrar, reemplazar u omitir; el núcleo acepta también rename, replace o skip
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

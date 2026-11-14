@@ -137,7 +137,7 @@ type HostsFormatDTO struct {
 
 type HostDecisionDTO struct {
 	Key    string `json:"key"`
-	Action string `json:"action"` // renombrar | reemplazar | omitir
+	Action string `json:"action"` // cable histórico: renombrar | reemplazar | omitir (el núcleo acepta también rename | replace | skip)
 }
 
 func hostDTO(d *v1.Device) HostDTO {

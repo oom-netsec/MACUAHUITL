@@ -133,7 +133,7 @@ message PackServiceExportResponse {
 
 message PackImportDecision {
   string item_id = 1;               // ID del script o del playbook tal como viene en el archivo
-  string action = 2;                // renombrar | omitir (nunca reemplazar)
+  string action = 2;                // cable histórico: renombrar | omitir (nunca reemplazar); el núcleo acepta también rename | skip
 }
 
 message PackServiceImportRequest {

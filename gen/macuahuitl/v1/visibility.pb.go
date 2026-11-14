@@ -436,7 +436,7 @@ func (x *SnmpWalkResponse) GetReport() *ToolReport {
 type SnmpPollRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Target          *SnmpTarget            `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
-	Profiles        []string               `protobuf:"bytes,2,rep,name=profiles,proto3" json:"profiles,omitempty"`                                       // sistema, interfaces, cpu, memoria; vacío = sistema e interfaces
+	Profiles        []string               `protobuf:"bytes,2,rep,name=profiles,proto3" json:"profiles,omitempty"`                                       // cable histórico: sistema, interfaces, cpu, memoria (el núcleo acepta también system y memory); vacío = sistema e interfaces
 	IntervalSeconds int32                  `protobuf:"varint,3,opt,name=interval_seconds,json=intervalSeconds,proto3" json:"interval_seconds,omitempty"` // 10 por defecto
 	Count           int32                  `protobuf:"varint,4,opt,name=count,proto3" json:"count,omitempty"`                                            // 0 = hasta duration_seconds
 	DurationSeconds int32                  `protobuf:"varint,5,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"` // 0 = 1 h; máximo 24 h

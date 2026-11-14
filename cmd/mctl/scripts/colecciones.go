@@ -255,6 +255,7 @@ func parseDecs(decs cli.List, all string) (map[string]string, string, error) {
 		if all, ok = cli.Decision(all); !ok {
 			return nil, "", cli.Err("mctl.import_a.bad_all", "value", all)
 		}
+		all = cli.WireDecision(all)
 	}
 	dec := map[string]string{}
 	for _, d := range decs {
@@ -263,7 +264,7 @@ func parseDecs(decs cli.List, all string) (map[string]string, string, error) {
 		if !ok || id == "" || !valid {
 			return nil, "", cli.Err("mctl.import_a.bad_decision", "value", d)
 		}
-		dec[id] = act
+		dec[id] = cli.WireDecision(act)
 	}
 	return dec, all, nil
 }
