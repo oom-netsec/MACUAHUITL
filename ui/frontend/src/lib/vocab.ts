@@ -8,6 +8,8 @@ export const VOCAB = {
   findingSev: ["error", "warning", "info"],
   exchange: ["access-request", "status-server", "accounting-start", "accounting-stop", "authentication", "authorization"],
   ma: ["absent", "valid", "invalid"],
+  phase: ["established", "failed", "mixed", "incomplete", "no_data"],
+  proposal: ["accepted", "rejected"],
   source: ["patrol", "hallazgo", "log-equipo", "syslog", "auditoria", "pcap", "carpeta de Patrol"],
   hit: ["mac-table", "arp", "dhcp-snooping", "interface", "device"],
   inv: ["equipo", "modulo", "sfp"],

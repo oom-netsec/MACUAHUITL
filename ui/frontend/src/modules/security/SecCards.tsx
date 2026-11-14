@@ -5,7 +5,7 @@ import { Meter } from "../../components/charts/Mini";
 import { Terminal } from "../../components/Terminal";
 import { useT } from "../../lib/i18n";
 import { vocab } from "../../lib/vocab";
-import type { PkiReportData, RadiusReportData, TacacsReportData } from "./api";
+import type { IkeReportData, PkiReportData, RadiusReportData, TacacsReportData } from "./api";
 import { daysState, parsePki, parseRadius, parseTacacs, pkiFromData, radiusFromData, tacacsFromData, type CertInfo, type Finding } from "./parse";
 
 // Tarjetas de resultado de RADIUS y TACACS+ y cadena de certificados de PKI, a partir del informe estructurado del núcleo
@@ -54,7 +54,7 @@ export function ResultCards({ kind, text, report, fallback }: { kind: "radius" |
           const tone: Tone = !e.code ? "bad" : e.code === "Access-Accept" ? "ok" : e.code === "Access-Challenge" ? "warn" : e.code === "Access-Reject" ? "bad" : "warn";
           return (
             <ResultPanel key={i} title={vocab(t, "exchange", e.kind)} status={{ tone, label: e.code || t("security.card.noReply") }}
-              meta={e.code ? <><Duration ms={e.rttMs} /> · {t("security.card.attempt", { n: e.attempts })} · {t("security.card.ma", { v: vocab(t, "ma", e.messageAuthenticator) })}</> : undefined}>
+              meta={e.code ? <><Duration ms={e.rttMs} /> · {t("security.card.attempt", { n: e.attempts })} · {t("security.card.ma", { v: vocab(t, "ma", e.messageAuthenticator) })}{e.mschap2Verified !== undefined && <> · {t(e.mschap2Verified ? "security.card.mschap2.ok" : "security.card.mschap2.bad")}</>}</> : undefined}>
               {e.error && <p className="panel-body meta">{e.error}</p>}
               {attrTable(vocab(t, "exchange", e.kind), [t("security.card.attr"), t("security.card.value")], e.attrs.map((a) => [a.name, a.value]))
                 ?? (e.code && <p className="panel-body meta">{t("security.card.none")}</p>)}
@@ -85,6 +85,46 @@ export function ResultCards({ kind, text, report, fallback }: { kind: "radius" |
       })}
       <Findings list={r.findings} />
       <Raw text={text} />
+    </div>
+  );
+}
+
+const phaseTone = (p: string): Tone => (p === "established" ? "ok" : p === "failed" ? "bad" : p === "mixed" || p === "incomplete" ? "warn" : "info");
+
+// Decodificador IKE: tarjetas de fase 1 y 2, hallazgos con su acción y evidencia, y propuestas; todo del informe estructurado.
+export function IkeCards({ report }: { report: IkeReportData }) {
+  const t = useT();
+  return (
+    <div className="sec-cards">
+      {([[1, report.phase1], [2, report.phase2]] as const).map(([n, p]) => (
+        <ResultPanel key={n} title={t(n === 1 ? "security.ike.phase1" : "security.ike.phase2")} status={{ tone: phaseTone(p), label: vocab(t, "phase", p) }} />
+      ))}
+      {report.note && <p className="hint">{report.note}</p>}
+      {report.findings.length > 0 && (
+        <ResultPanel title={t("security.findings")} pad>
+          <ul className="findings">{report.findings.map((f, i) => (
+            <li key={i}>
+              <Badge tone={findingTone(f.severity)}>{vocab(t, "findingSev", f.severity)}</Badge> <strong>{f.title}</strong>
+              <p className="meta">{f.explanation}</p>
+              <p className="meta">{t("security.ike.action")}: {f.action}</p>
+              {f.evidence.length > 0 && <Terminal text={f.evidence.join("\n")} aria-label={t("security.ike.evidence")} />}
+            </li>
+          ))}</ul>
+        </ResultPanel>
+      )}
+      {report.proposals.length > 0 && (
+        <ResultPanel title={t("security.ike.proposals")}>
+          <div className="table-wrap flat">
+            <table aria-label={t("security.ike.proposals")}>
+              <thead><tr>{(["phase", "source", "detail", "result"] as const).map((c) => <th key={c} scope="col">{t(`security.ike.col.${c}`)}</th>)}</tr></thead>
+              <tbody>{report.proposals.map((p, i) => (
+                <tr key={i}><td>{p.phase}</td><td>{p.source}</td><td className="mono">{p.detail}</td><td>{p.result ? vocab(t, "proposal", p.result) : ""}</td></tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </ResultPanel>
+      )}
+      <Raw text={report.text} />
     </div>
   );
 }

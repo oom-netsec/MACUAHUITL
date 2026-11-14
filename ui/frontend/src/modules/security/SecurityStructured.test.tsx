@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SecurityView } from "./SecurityView";
 import { fakeCore } from "../../lib/fake";
-import type { RadiusReportData, TacacsReportData, PkiReportData } from "./api";
+import type { IkeReportData, RadiusReportData, TacacsReportData, PkiReportData } from "./api";
 
 // Fase 30b: las tarjetas salen del informe estructurado; si el método nuevo falla, del texto de siempre.
 async function fillRadius() {
@@ -47,6 +47,66 @@ test("radius cae al texto si el informe llega sin texto", async () => {
   await fillRadius();
   expect((await screen.findAllByText(/Message-Authenticator válido/)).length).toBeGreaterThan(0);
   expect(report).toHaveBeenCalled();
+});
+
+test("radius muestra mschap2Verified solo cuando viene", async () => {
+  const ex = (v?: boolean) => ({ ...radius, exchanges: [{ ...radius.exchanges[0], mschap2Verified: v }] });
+  for (const [v, text] of [[true, "Autenticación mutua verificada"], [false, "Autenticación mutua no verificada"]] as const) {
+    const core = fakeCore({ secRadiusReport: vi.fn(async () => ex(v)) });
+    const { unmount } = render(<SecurityView core={core} />);
+    await fillRadius();
+    expect(await screen.findByText(new RegExp(text))).toBeInTheDocument();
+    unmount();
+  }
+  const core = fakeCore({ secRadiusReport: vi.fn(async () => ex(undefined)) });
+  render(<SecurityView core={core} />);
+  await fillRadius();
+  await screen.findByText("The server did not answer");
+  expect(screen.queryByText(/Autenticación mutua/)).not.toBeInTheDocument();
+});
+
+const ike: IkeReportData = {
+  text: "texto ike", json: "{}", phase1: "failed", phase2: "no_data", note: "NOTA-IKE",
+  findings: [{ code: "p1-propuesta", severity: "error", phase: 1, key: "ike.finding.p1_propuesta", explanationKey: "x", title: "Phase 1 proposal mismatch",
+    explanation: "The peer rejected every transform", action: "Align encryption and hash", evidence: ["ISAKMP: encryption 3DES-CBC"] }],
+  proposals: [{ phase: 1, sourceKey: "ike.proposal.source.received", source: "Received", detail: "AES-256 SHA-1 group 14", result: "rejected" }],
+};
+
+async function pasteIke() {
+  await userEvent.click(screen.getByRole("tab", { name: "IKE/IPsec" }));
+  await userEvent.type(screen.getByLabelText(/Salida de debug/), "ISAKMP");
+  await userEvent.click(screen.getByRole("button", { name: "Decodificar" }));
+}
+
+test("ike: tarjetas de fase, hallazgos y propuestas salen del informe estructurado", async () => {
+  const core = fakeCore({ secIkeReport: vi.fn(async () => ike), secIkeDecode: vi.fn(async () => "no debe llamarse") });
+  render(<SecurityView core={core} />);
+  await pasteIke();
+  expect(await screen.findByText("Phase 1 proposal mismatch")).toBeInTheDocument();
+  expect(screen.getByText("The peer rejected every transform")).toBeInTheDocument();
+  expect(screen.getByText(/Qué hacer: Align encryption and hash/)).toBeInTheDocument();
+  expect(screen.getByText(/ISAKMP: encryption 3DES-CBC/)).toBeInTheDocument();
+  expect(screen.getByText("AES-256 SHA-1 group 14")).toBeInTheDocument();
+  expect(screen.getByText("NOTA-IKE")).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: /Fase 1/ })).toHaveTextContent("Falló");
+  expect(screen.getByRole("region", { name: /Fase 2/ })).toHaveTextContent("Sin datos");
+  expect(core.secIkeDecode).not.toHaveBeenCalled();
+});
+
+test("ike: si el informe llega sin texto cae a secIkeDecode", async () => {
+  const core = fakeCore({ secIkeDecode: vi.fn(async () => "Fase 1: falló") });
+  render(<SecurityView core={core} />);
+  await pasteIke();
+  expect(await screen.findByText("Fase 1: falló")).toBeInTheDocument();
+});
+
+test("ike: si el informe falla se muestra el error y no se repite", async () => {
+  const core = fakeCore({ secIkeReport: vi.fn(async () => { throw new Error("rpc error: code = Internal desc = boom ike"); }), secIkeDecode: vi.fn(async () => "no debe llamarse") });
+  render(<SecurityView core={core} />);
+  await pasteIke();
+  expect(await screen.findByText(/boom ike/)).toBeInTheDocument();
+  expect(core.secIkeReport).toHaveBeenCalledTimes(1);
+  expect(core.secIkeDecode).not.toHaveBeenCalled();
 });
 
 test("tacacs usa el informe estructurado", async () => {

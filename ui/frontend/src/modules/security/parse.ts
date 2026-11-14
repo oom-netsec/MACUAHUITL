@@ -6,7 +6,7 @@ import type { Certificate, PkiReportData, RadiusReportData, SecFindingData, Taca
 export interface Finding { severity: "warning" | "error" | "info"; detail: string }
 export interface Attr { name: string; value: string }
 
-export interface RadiusExchange { kind: string; code: string; rttMs: number; attempts: number; messageAuthenticator: "absent" | "valid" | "invalid" | ""; error: string; attrs: Attr[] }
+export interface RadiusExchange { kind: string; code: string; rttMs: number; attempts: number; messageAuthenticator: "absent" | "valid" | "invalid" | ""; error: string; attrs: Attr[]; mschap2Verified?: boolean }
 export interface RadiusReport { server: string; method: string; exchanges: RadiusExchange[]; findings: Finding[] }
 
 export interface TacacsStep { kind: string; status: string; rttMs: number; error: string; prompts: string[]; message: string; data: string; sent: string[]; received: string[] }
@@ -18,13 +18,14 @@ export interface CertInfo {
   usage: string; selfSigned: boolean; sigValid?: boolean; // solo del informe estructurado
 }
 
-const SEV: Record<string, Finding["severity"]> = { aviso: "warning", error: "error", info: "info" };
-const MA: Record<string, "absent" | "valid" | "invalid"> = { "ausente": "absent", "válido": "valid", "inválido": "invalid" };
+// Respaldo del texto: acepta las cadenas del catálogo del núcleo (internal/i18n/catalog_security.go) en español y en inglés.
+const SEV: Record<string, Finding["severity"]> = { aviso: "warning", warning: "warning", error: "error", info: "info" };
+const MA: Record<string, "absent" | "valid" | "invalid"> = { "ausente": "absent", "válido": "valid", "inválido": "invalid", absent: "absent", valid: "valid", invalid: "invalid" };
 const FINDING = /^ {2}\[(.+?)\] (.*)$/;
 
 function split(text: string) {
   const lines = text.split("\n");
-  const at = lines.indexOf("Hallazgos:");
+  const at = lines.findIndex((l) => l === "Hallazgos:" || l === "Findings:");
   const body = at < 0 ? lines : lines.slice(0, at);
   const findings = (at < 0 ? [] : lines.slice(at + 1)).flatMap((l): Finding[] => { const m = FINDING.exec(l); return m ? [{ severity: SEV[m[1]] ?? "info", detail: m[2] }] : []; });
   return { body, findings };
@@ -32,13 +33,13 @@ function split(text: string) {
 
 export function parseRadius(text: string): RadiusReport | null {
   const { body, findings } = split(text);
-  const head = /^Servidor RADIUS (\S+)(?: \(método (\S+)\))?$/.exec(body[0] ?? "");
+  const head = /^(?:Servidor RADIUS|RADIUS server) (\S+)(?: \((?:método|method) (\S+)\))?$/.exec(body[0] ?? "");
   if (!head) return null;
   const exchanges: RadiusExchange[] = [];
   for (const l of body.slice(1)) {
     const ex = /^(\S+): (.+)$/.exec(l);
     if (ex) {
-      const r = /^(.+?) en ([\d.]+) ms \(intento (\d+), Message-Authenticator (.+)\)$/.exec(ex[2]);
+      const r = /^(.+?) (?:en|in) ([\d.]+) ms \((?:intento|attempt) (\d+), Message-Authenticator (.+)\)$/.exec(ex[2]);
       exchanges.push({ kind: ex[1], code: r?.[1] ?? "", rttMs: r ? Number(r[2]) : 0, attempts: r ? Number(r[3]) : 0, messageAuthenticator: MA[r?.[4] ?? ""] ?? "", error: "", attrs: [] });
       continue;
     }
@@ -52,13 +53,13 @@ export function parseRadius(text: string): RadiusReport | null {
 
 export function parseTacacs(text: string): TacacsReport | null {
   const { body, findings } = split(text);
-  const head = /^Servidor TACACS\+ (\S+)$/.exec(body[0] ?? "");
+  const head = /^(?:Servidor TACACS\+|TACACS\+ server) (\S+)$/.exec(body[0] ?? "");
   if (!head) return null;
   const steps: TacacsStep[] = [];
   for (const l of body.slice(1)) {
     const st = /^(\S+): (.+)$/.exec(l);
     if (st) {
-      const r = /^(\S+) en ([\d.]+) ms$/.exec(st[2]);
+      const r = /^(\S+) (?:en|in) ([\d.]+) ms$/.exec(st[2]);
       steps.push({ kind: st[1], status: r?.[1] ?? "", rttMs: r ? Number(r[2]) : 0, error: "", prompts: [], message: "", data: "", sent: [], received: [] });
       continue;
     }
@@ -66,11 +67,11 @@ export function parseTacacs(text: string): TacacsReport | null {
     if (!cur) continue;
     let m: RegExpExecArray | null;
     if (l.startsWith("  ! ")) cur.error = l.slice(4);
-    else if ((m = /^ {2}servidor pidió: "(.*)"$/.exec(l))) cur.prompts.push(m[1]);
-    else if (l.startsWith("  mensaje: ")) cur.message = l.slice(11);
-    else if (l.startsWith("  datos: ")) cur.data = l.slice(9);
-    else if (l.startsWith("  enviado  ")) cur.sent.push(l.slice(11));
-    else if (l.startsWith("  recibido ")) cur.received.push(l.slice(11));
+    else if ((m = /^ {2}(?:servidor pidió|server asked): "(.*)"$/.exec(l))) cur.prompts.push(m[1]);
+    else if ((m = /^ {2}(?:mensaje|message): (.*)$/.exec(l))) cur.message = m[1];
+    else if ((m = /^ {2}(?:datos|data): (.*)$/.exec(l))) cur.data = m[1];
+    else if (/^ {2}(?:enviado {2}|sent {5})/.test(l)) cur.sent.push(l.slice(11)); // mismo ancho en los dos idiomas
+    else if (/^ {2}(?:recibido|received) /.test(l)) cur.received.push(l.slice(11));
   }
   return steps.length ? { server: head[1], steps, findings } : null;
 }
@@ -78,7 +79,7 @@ export function parseTacacs(text: string): TacacsReport | null {
 export function parsePki(text: string): CertInfo[] | null {
   const out: CertInfo[] = [];
   for (const l of text.split("\n")) {
-    const h = /^(certificado|CSR): (.*)$/.exec(l);
+    const h = /^(certificado|certificate|CSR): (.*)$/.exec(l);
     if (h) {
       out.push({ kind: h[1] === "CSR" ? "csr" : "certificate", subject: h[2], issuer: "", serial: "", notBefore: "", notAfter: "", daysLeft: null, keyType: "", sigAlg: "", san: "", isCA: false, sha1: "", sha256: "", warnings: [], usage: "", selfSigned: false });
       continue;
@@ -89,13 +90,13 @@ export function parsePki(text: string): CertInfo[] | null {
     // El núcleo imprime «  %-16s %s»: la clave ocupa 16 columnas.
     const k = l.slice(2, 18).trim(), v = l.slice(19);
     if (!l.startsWith("  ") || !k) continue;
-    if (k === "Emisor") c.issuer = v;
-    else if (k === "Serie") c.serial = v;
-    else if (k === "Validez") {
-      const m = /^(\S+) → (\S+) \((-?\d+) días\)$/.exec(v);
+    if (k === "Emisor" || k === "Issuer") c.issuer = v;
+    else if (k === "Serie" || k === "Serial") c.serial = v;
+    else if (k === "Validez" || k === "Validity") {
+      const m = /^(\S+) → (\S+) \((-?\d+) (?:días|days?)\)$/.exec(v);
       if (m) { c.notBefore = m[1]; c.notAfter = m[2]; c.daysLeft = Number(m[3]); }
-    } else if (k === "Llave") c.keyType = v;
-    else if (k === "Firma") c.sigAlg = v;
+    } else if (k === "Llave" || k === "Key") c.keyType = v;
+    else if (k === "Firma" || k === "Signature") c.sigAlg = v;
     else if (k === "SAN") c.san = v;
     else if (k === "CA") c.isCA = true;
     else if (k === "SHA-1") c.sha1 = v;
@@ -112,7 +113,7 @@ const findings = (f: SecFindingData[]): Finding[] => f.map((x) => ({ severity: x
 export function radiusFromData(d: RadiusReportData): RadiusReport {
   return {
     server: d.server, method: d.method ?? "", findings: findings(d.findings),
-    exchanges: d.exchanges.map((e) => ({ kind: e.kind, code: e.code ?? "", rttMs: e.rttMs, attempts: e.attempts, messageAuthenticator: e.messageAuthenticator ?? "", error: e.error?.text ?? "", attrs: e.attrs })),
+    exchanges: d.exchanges.map((e) => ({ kind: e.kind, code: e.code ?? "", rttMs: e.rttMs, attempts: e.attempts, messageAuthenticator: e.messageAuthenticator ?? "", error: e.error?.text ?? "", attrs: e.attrs, mschap2Verified: e.mschap2Verified })),
   };
 }
 
