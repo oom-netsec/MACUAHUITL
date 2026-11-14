@@ -200,15 +200,18 @@ func isTimeout(err error) bool {
 	return errors.As(err, &ne) && ne.Timeout()
 }
 
-func TestSourceKeyAgrupaIPv6Por64(t *testing.T) {
-	a, b := sourceKey("[2001:db8:1:2::10]:514"), sourceKey("[2001:db8:1:2:ffff::1]:514")
-	if a != b || a != "2001:db8:1:2::/64" {
-		t.Fatalf("%q %q", a, b)
+func TestSourceKeysIPv6PorIPYPor64(t *testing.T) {
+	a, b := sourceKeys("[2001:db8:1:2::10]:514"), sourceKeys("[2001:db8:1:2:ffff::1]:514")
+	if len(a) != 2 || a[0] == b[0] || a[1] != b[1] || a[0].max != maxPerSource || a[1].max != maxPerNet {
+		t.Fatalf("%v %v", a, b)
 	}
-	if k := sourceKey("10.0.0.1:514"); k != "10.0.0.1" {
-		t.Fatalf("%q", k)
+	if k := sourceKeys("10.0.0.1:514"); len(k) != 1 || k[0].key != "ip 10.0.0.1" {
+		t.Fatalf("%v", k)
 	}
-	if k := sourceKey("[::ffff:10.0.0.1]:514"); k == "::/64" {
-		t.Fatalf("IPv4 mapeada agrupada como IPv6: %q", k)
+	if k := sourceKeys("[::ffff:10.0.0.1]:514"); len(k) != 1 {
+		t.Fatalf("IPv4 mapeada con tope de /64: %v", k)
+	}
+	if x, y := sourceKeys("[fe80::1%eth0]:514"), sourceKeys("[fe80::1%eth1]:514"); x[1] == y[1] {
+		t.Fatalf("link-local de enlaces distintos en el mismo /64: %v %v", x, y)
 	}
 }

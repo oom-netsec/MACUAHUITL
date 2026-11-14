@@ -13,7 +13,7 @@ func TestCheckDeniedRechazaRutasRemotasYPipeInicial(t *testing.T) {
 		"verify /md5 ftp://h/x", "show file information ftp://x/y", "more scp://u@h/x", "more rcp:x", "dir sftp:",
 		"MORE FTP://H/X", "more tftp:x",
 		"| redirect flash:x", "  |redirect flash:x", "|",
-		"ping 255.255.255.255", "ping 255.255.255.255 repeat 10",
+		"ping 255.255.255.255", "ping 255.255.255.255 repeat 10", "ping 0.0.0.0", "ping ::", "ping ipv6 ::",
 	} {
 		if err := CheckDenied("ios-xe", cmd); !errors.Is(err, ErrDenied) {
 			t.Errorf("%q: se aceptó (err=%v)", cmd, err)

@@ -205,7 +205,7 @@ func validProbe(f []string) bool {
 	if len(f) == 0 || !probeName(f[0]) || probeKeyword(f[0]) { // un prefijo de palabra clave abre el diálogo interactivo
 		return false
 	}
-	if a, err := netip.ParseAddr(f[0]); err == nil && (a.IsLinkLocalUnicast() || a.IsMulticast() || a == netip.IPv4Unspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})) {
+	if a, err := netip.ParseAddr(f[0]); err == nil && (a.IsLinkLocalUnicast() || a.IsMulticast() || a.IsUnspecified() || a == netip.AddrFrom4([4]byte{255, 255, 255, 255})) {
 		return false // IOS pide «Output Interface» y abre el diálogo
 	}
 	f = f[1:]
