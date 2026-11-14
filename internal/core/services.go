@@ -484,11 +484,11 @@ func (c *Core) watch(j *job, events <-chan engine.Event, cancel func()) {
 
 func (c *Core) finish(j *job, state string) {
 	c.mu.Lock()
-	if j.state == "completed" || j.state == "cancelled" {
+	if j.closing || j.state == "completed" || j.state == "cancelled" {
 		c.mu.Unlock()
 		return
 	}
-	j.state = state
+	j.closing = true
 	w := j.writer
 	var all []patrol.DeviceResult
 	for r := 1; r <= j.rounds; r++ {
@@ -507,6 +507,10 @@ func (c *Core) finish(j *job, state string) {
 			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_PACKAGED, 0, "phase.packaged", i18n.A("path", zip))
 		}
 	}
+	// Quien vea el estado terminal (el respaldo programado, la UI) ya puede leer la carpeta completa.
+	c.mu.Lock()
+	j.state = state
+	c.mu.Unlock()
 	if v != nil {
 		v.Disarm(j.id) // al terminar la última ronda la DEK se borra si nadie más la necesita (spec §10.4)
 	}
