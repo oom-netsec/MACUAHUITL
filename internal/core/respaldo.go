@@ -145,9 +145,9 @@ const (
 	estConflicto = "conflicto_etiqueta"
 	estReservada = "reservada"
 
-	decRenombrar  = "renombrar"
-	decReemplazar = "reemplazar"
-	decOmitir     = "omitir"
+	decRenombrar  = "rename"
+	decReemplazar = "replace"
+	decOmitir     = "skip"
 )
 
 // respaldoErr traduce los errores del respaldo a gRPC sin repetir nunca lo que se escribió (frase, secretos).
@@ -371,10 +371,11 @@ func (s *vaultSvc) ApplyBackupImport(ctx context.Context, r *v1.ApplyBackupImpor
 		if _, dup := dec[d.Id]; dup {
 			return nil, bad("respaldo.err.decision_dup", "label", label[d.Id])
 		}
-		if d.Action != decRenombrar && d.Action != decReemplazar && d.Action != decOmitir {
+		act := i18n.Decision(d.Action)
+		if act != decRenombrar && act != decReemplazar && act != decOmitir {
 			return nil, bad("respaldo.err.action", "action", d.Action)
 		}
-		dec[d.Id] = d.Action
+		dec[d.Id] = act
 	}
 	// Se vuelve a comparar contra lo guardado ahora: entre la vista previa y aquí pudo cambiar.
 	plan, used, err := planImport(v, p.creds)

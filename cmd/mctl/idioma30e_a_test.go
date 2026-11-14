@@ -90,11 +90,11 @@ func TestIdioma30eScripts(t *testing.T) {
 	_, err = mctl(t, "", "scripts", "import", path)
 	errHas(t, "import sin decisión es", err, "no se importó nada: falta decidir 1 conflicto(s)", "--all=ACCIÓN: "+id)
 	_, err = en(t, "", "scripts", "import", path, "--all=fusionar")
-	errHas(t, "--all en", err, `--all="fusionar": use renombrar, reemplazar or omitir`)
+	errHas(t, "--all en", err, `--all="fusionar": use rename, replace or skip`)
 	_, err = mctl(t, "", "scripts", "import", path, "--all=fusionar")
 	errHas(t, "--all es", err, `--all="fusionar": use renombrar, reemplazar u omitir`)
 	_, err = en(t, "", "scripts", "import", path, "--decision", "malformada")
-	errHas(t, "--decision en", err, `--decision "malformada": use ID=renombrar|reemplazar|omitir`)
+	errHas(t, "--decision en", err, `--decision "malformada": use ID=rename|replace|skip`)
 	has(t, "import omitir en", enMust(t, "", "scripts", "import", path, "--all=omitir"), "1 skipped")
 
 	// archivo de comandos que no es regular y borrar
@@ -173,7 +173,7 @@ func TestIdioma30eVaultYCred(t *testing.T) {
 	has(t, "import en", enMust(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta), "LABEL", "STATE", "imported: 0 new, 0 replaced, 0 renamed, 0 skipped, 1 unchanged")
 	has(t, "import es", must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta), "ETIQUETA", "importadas: 0 nuevas, 0 reemplazadas, 0 renombradas, 0 omitidas, 1 iguales")
 	_, err = en(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--all=x")
-	errHas(t, "import all en", err, `--all="x": use renombrar, reemplazar or omitir`)
+	errHas(t, "import all en", err, `--all="x": use rename, replace or skip`)
 }
 
 func TestIdioma30eSecurityPki(t *testing.T) {

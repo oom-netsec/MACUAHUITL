@@ -1151,7 +1151,7 @@ func (x *PreviewBackupImportResponse) GetItems() []*VaultBackupItem {
 type VaultBackupDecision struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`         // ID del item en la vista previa
-	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"` // renombrar | reemplazar | omitir (obligatoria en conflicto_etiqueta)
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"` // cable histórico: renombrar | reemplazar | omitir (obligatoria en conflicto_etiqueta); el núcleo acepta también rename | replace | skip
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

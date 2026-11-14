@@ -618,7 +618,7 @@ func decisionMap(ctx context.Context, ds []*v1.ImportDecision, que string) (map[
 		if _, dup := out[d.ScriptId]; dup {
 			return nil, service.Err(ctx, codes.InvalidArgument, "scripts.svc.decision_dup_kind", i18n.A("id", d.ScriptId, "what", map[string]string{"collection": "colección"}[que]+map[string]string{"script": "script"}[que], "what_en", que))
 		}
-		out[d.ScriptId] = d.Action
+		out[d.ScriptId] = i18n.Decision(d.Action)
 	}
 	return out, nil
 }

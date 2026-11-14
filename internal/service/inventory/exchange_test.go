@@ -202,7 +202,7 @@ func TestImportEstadosYDecisiones(t *testing.T) {
 	if got := lista(t, s, &v1.ListDevicesRequest{}); len(got) != 2 {
 		t.Fatalf("no debía escribir nada: %v", got)
 	}
-	a, err := s.ApplyImportHosts(bg, &v1.ApplyImportHostsRequest{Token: p.Token, Decisions: []*v1.ImportHostDecision{{Key: "10.0.0.1:22", Action: "reemplazar"}, {Key: "10.0.0.2:2222", Action: "renombrar"}}})
+	a, err := s.ApplyImportHosts(bg, &v1.ApplyImportHostsRequest{Token: p.Token, Decisions: []*v1.ImportHostDecision{{Key: "10.0.0.1:22", Action: "replace"}, {Key: "10.0.0.2:2222", Action: "rename"}}})
 	if err != nil || a.Replaced != 1 || a.Renamed != 1 {
 		t.Fatalf("apply: %v %v", a, err)
 	}

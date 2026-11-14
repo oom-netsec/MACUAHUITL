@@ -115,7 +115,7 @@ message PreviewImportHostsResponse {
 }
 message ImportHostDecision {
   string key = 1;
-  string action = 2;                  // renombrar, reemplazar u omitir
+  string action = 2;                  // cable histórico: renombrar, reemplazar u omitir; el núcleo acepta también rename, replace o skip
 }
 message ApplyImportHostsRequest {
   string token = 1;

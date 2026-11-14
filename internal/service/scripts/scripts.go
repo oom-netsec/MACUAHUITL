@@ -605,7 +605,7 @@ func (s *svc) ApplyImport(ctx context.Context, r *v1.ApplyImportRequest) (*v1.Ap
 				invalid = true
 				return service.Err(ctx, codes.InvalidArgument, "scripts.svc.decision_dup", i18n.A("id", d.ScriptId))
 			}
-			dec[d.ScriptId] = d.Action
+			dec[d.ScriptId] = i18n.Decision(d.Action)
 		}
 		return nil
 	}()

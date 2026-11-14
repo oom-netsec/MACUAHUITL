@@ -1052,7 +1052,7 @@ func (x *PackServiceExportResponse) GetOmittedPlaybooks() []string {
 type PackImportDecision struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ItemId        string                 `protobuf:"bytes,1,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"` // ID del script o del playbook tal como viene en el archivo
-	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`               // renombrar | omitir (nunca reemplazar)
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`               // cable histórico: renombrar | omitir (nunca reemplazar); el núcleo acepta también rename | skip
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

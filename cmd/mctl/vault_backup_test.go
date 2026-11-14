@@ -93,7 +93,7 @@ func TestCredBackupExportImportPuntaAPunta(t *testing.T) {
 	if n := strings.Count(must(t, "", "cred", "list"), "\n"); n != 1 {
 		t.Fatal("importó algo sin decidir el conflicto")
 	}
-	out = nota(must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--decision", "core=renombrar"))
+	out = nota(must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--decision", "core=rename"))
 	if !strings.Contains(out, "1 nuevas") || !strings.Contains(out, "1 renombradas") {
 		t.Fatalf("import: %q", out)
 	}

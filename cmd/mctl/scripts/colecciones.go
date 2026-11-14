@@ -248,20 +248,25 @@ func colExport(c *cli.Env, args []string) error {
 	return nil
 }
 
-// parseDecs valida --decision y --all; las claves son IDs del archivo (de colección o de script).
-func parseDecs(decs cli.List, all string) (map[string]string, error) {
-	if all != "" && !acciones[all] {
-		return nil, cli.Err("mctl.import_a.bad_all", "value", all)
+// parseDecs valida --decision y --all (devuelve --all ya canónico); las claves son IDs del archivo (de colección o de script).
+func parseDecs(decs cli.List, all string) (map[string]string, string, error) {
+	if all != "" {
+		var ok bool
+		if all, ok = cli.Decision(all); !ok {
+			return nil, "", cli.Err("mctl.import_a.bad_all", "value", all)
+		}
+		all = cli.WireDecision(all)
 	}
 	dec := map[string]string{}
 	for _, d := range decs {
 		id, act, ok := strings.Cut(d, "=")
-		if !ok || id == "" || !acciones[act] {
-			return nil, cli.Err("mctl.import_a.bad_decision", "value", d)
+		act, valid := cli.Decision(act)
+		if !ok || id == "" || !valid {
+			return nil, "", cli.Err("mctl.import_a.bad_decision", "value", d)
 		}
-		dec[id] = act
+		dec[id] = cli.WireDecision(act)
 	}
-	return dec, nil
+	return dec, all, nil
 }
 
 func conflicto(state string) bool { return state == "conflicto_id" || state == "conflicto_nombre" }
@@ -284,7 +289,7 @@ func colImport(c *cli.Env, args []string) error {
 	if fs.NArg() != 1 {
 		return errors.New(uso)
 	}
-	dec, err := parseDecs(decs, all)
+	dec, all, err := parseDecs(decs, all)
 	if err != nil {
 		return err
 	}
@@ -396,18 +401,21 @@ func pin(c *cli.Env, args []string) error {
 	return nil
 }
 
-// scripts template [--kind scripts|colecciones] [--fields]
+// scripts template [--kind scripts|collections] [--fields]
 func template(c *cli.Env, args []string) error {
 	kind, fields := "scripts", false
 	fs, err := cli.Flags("scripts template", args, func(fs *flag.FlagSet) {
-		fs.StringVar(&kind, "kind", "scripts", "scripts o colecciones")
+		fs.StringVar(&kind, "kind", "scripts", "scripts o collections (colecciones también vale)")
 		fs.BoolVar(&fields, "fields", false, "lista de campos en vez del ejemplo")
 	})
 	if err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
-		return errors.New("uso: mctl scripts template [--kind scripts|colecciones] [--fields]")
+		return errors.New("uso: mctl scripts template [--kind scripts|collections] [--fields]")
+	}
+	if kind == "collections" { // el cable sigue con «colecciones» (también lo manda la UI)
+		kind = "colecciones"
 	}
 	cl := client(c)
 	if !fields {

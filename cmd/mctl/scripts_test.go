@@ -114,7 +114,7 @@ func TestScriptsExportImportDePuntaAPunta(t *testing.T) {
 		t.Fatalf("reemplazar no restauró:\n%s", out)
 	}
 	must(t, "", "scripts", "edit", a, "--desc", "otra vez")
-	if out := must(t, "", "scripts", "import", path, "--all=omitir"); !strings.Contains(out, "3 omitidos") {
+	if out := must(t, "", "scripts", "import", path, "--all=skip"); !strings.Contains(out, "3 omitidos") {
 		t.Fatalf("--all=omitir:\n%s", out)
 	}
 	for _, args := range [][]string{{"import", path, "--decision", "malformada"}, {"import", path, "--all=fusionar"}, {"import"}, {"export", a}} {
@@ -268,14 +268,14 @@ func TestScriptsColeccionesExportImportDePuntaAPunta(t *testing.T) {
 	if out := must(t, "", "scripts", "col", "show", c); !strings.Contains(out, "cambió") {
 		t.Fatalf("se importó algo sin decisión:\n%s", out)
 	}
-	must(t, "", "scripts", "col", "import", path, "--decision", c+"=reemplazar")
+	must(t, "", "scripts", "col", "import", path, "--decision", c+"=replace")
 	if out := must(t, "", "scripts", "col", "show", c); strings.Contains(out, "cambió") || !strings.Contains(out, "Dos") {
 		t.Fatalf("reemplazar no restauró:\n%s", out)
 	}
 	// una decisión por ID de script también se enruta, y --all cubre los conflictos
 	must(t, "", "scripts", "edit", a, "--desc", "otra")
 	must(t, "", "scripts", "col", "edit", c, "--desc", "otra")
-	if out := must(t, "", "scripts", "col", "import", path, "--all=omitir"); !strings.Contains(out, "1 omitidas") || !strings.Contains(out, "2 omitidos") {
+	if out := must(t, "", "scripts", "col", "import", path, "--all=skip"); !strings.Contains(out, "1 omitidas") || !strings.Contains(out, "2 omitidos") {
 		t.Fatalf("--all=omitir:\n%s", out)
 	}
 	must(t, "", "scripts", "col", "import", path, "--decision", a+"=reemplazar", "--decision", c+"=omitir")
@@ -328,7 +328,7 @@ func TestScriptsTemplateSeImportaTalCual(t *testing.T) {
 	if !regexp.MustCompile(`(?m)^sha256\s+texto\s+no\s`).MatchString(out) || !regexp.MustCompile(`(?m)^formato\s+texto\s+sí\s`).MatchString(out) {
 		t.Errorf("--fields: obligatorio:\n%s", out)
 	}
-	if out := must(t, "", "scripts", "template", "--kind", "colecciones", "--fields"); !strings.Contains(out, "colecciones[].script_ids") {
+	if out := must(t, "", "scripts", "template", "--kind", "collections", "--fields"); !strings.Contains(out, "colecciones[].script_ids") {
 		t.Errorf("--fields colecciones:\n%s", out)
 	}
 	for _, args := range [][]string{{"template", "--kind", "otra"}, {"template", "x"}} {

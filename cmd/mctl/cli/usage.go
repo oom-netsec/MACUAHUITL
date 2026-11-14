@@ -7,9 +7,10 @@ import (
 )
 
 // placeholders traduce los marcadores en mayúsculas de las líneas «uso: mctl …» (son sintaxis, no prosa); las
-// banderas y los valores técnicos (renombrar|reemplazar|omitir, --asistido) no se tocan.
+// banderas no se tocan; los valores de decisión pasan a su forma canónica en inglés.
 var placeholders = strings.NewReplacer(
 	"uso: mctl", "usage: mctl",
+	"renombrar|reemplazar|omitir", "rename|replace|skip", "renombrar|omitir", "rename|skip",
 	"campo=valor", "field=value",
 	"(mctl snippet list muestra los campos)", "(mctl snippet list shows the fields)",
 	"PUERTO-ALTO", "HIGH-PORT", "IP-DE-ESCUCHA", "LISTEN-IP",

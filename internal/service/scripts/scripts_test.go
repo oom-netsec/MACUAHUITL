@@ -417,7 +417,7 @@ func TestImportEstadosYDecisiones(t *testing.T) {
 		t.Fatal("se escribió algo con una decisión faltante")
 	}
 	ap, err := b.ApplyImport(bg, &v1.ApplyImportRequest{Token: p.Token, Decisions: []*v1.ImportDecision{
-		{ScriptId: idDe["script 01"], Action: "reemplazar"}, {ScriptId: idDe["script 02"], Action: "renombrar"}}})
+		{ScriptId: idDe["script 01"], Action: "replace"}, {ScriptId: idDe["script 02"], Action: "rename"}}})
 	if err != nil || ap.Replaced != 1 || ap.Renamed != 1 || ap.Skipped != 1 || ap.Created != 0 {
 		t.Fatalf("apply = %v err = %v", ap, err)
 	}

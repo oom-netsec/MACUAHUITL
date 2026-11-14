@@ -175,6 +175,8 @@ sudo dpkg -i macuahuitl_*.deb                 # or: sudo rpm -i macuahuitl-*.rpm
 systemctl --user enable --now macuahuitld     # as the user who will use it
 ```
 
+`macuahuitld` flags: `-version` prints the version; `-lang es|en` sets the language of what the daemon prints on its console (warnings and fatal errors; English by default, the unit does not pass it). Clients still ask for their own language per request.
+
 | Need | Packages |
 |---|---|
 | Desktop app | `libwebkit2gtk-4.1-0` (Debian/Ubuntu) or `webkit2gtk4.1` (Fedora/RHEL) |

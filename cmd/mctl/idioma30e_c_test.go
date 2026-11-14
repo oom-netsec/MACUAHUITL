@@ -19,7 +19,7 @@ func TestIdiomaDispositivosYSnippets(t *testing.T) {
 		{"hosts campos", []string{"hosts", "template", "--fields"}, "OBLIGATORIO", "REQUIRED"},
 		{"hosts tope", []string{"hosts", "template", "--fields"}, "hasta 1000 hosts y 5 MB por archivo", "up to 1000 hosts and 5 MB per file"},
 		{"hosts id", []string{"hosts", "edit", "zz", "--name", "n"}, `no hay un host de la libreta con id "zz"`, `there is no address-book host with id "zz"`},
-		{"hosts all", []string{"hosts", "import", csv, "--all", "x"}, `--all="x": use renombrar, reemplazar u omitir`, `--all="x": use renombrar, reemplazar or omitir`},
+		{"hosts all", []string{"hosts", "import", csv, "--all", "x"}, `--all="x": use renombrar, reemplazar u omitir`, `--all="x": use rename, replace or skip`},
 		{"hosts filas", []string{"hosts", "import", csv, "--preview"}, "1 filas inválidas: no se importan y cuentan como omitidas", "1 invalid rows: they are not imported and count as skipped"},
 		{"hosts fila", []string{"hosts", "import", csv, "--preview"}, `línea 2: port: "x" no es un número entero`, `line 2: port: "x" is not an integer`},
 		{"snippet vlan", []string{"snippet", "vlan", "10.0.0.1", "9999", "--cred", "x"}, `VLAN "9999": las VLAN van de 1 a 4094`, `VLAN "9999": VLANs go from 1 to 4094`},

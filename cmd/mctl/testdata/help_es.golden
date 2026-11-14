@@ -62,10 +62,10 @@ uso: mctl <comando>
   fleet summary | flash [--need 1.2G] | inventory [--csv|--md]
         (flota = última salida de cada equipo en outputs/; todas con --dir CARPETA y --json)
   ports set EQUIPO[:PUERTO] IF... --cred ID [--vlan N] [--voice N] [--desc T] [--shut|--no-shut]
-        [--accept HUELLA]... [--write-memory] [--asistido]
-        (sin --asistido solo muestra el plan con su reversa; con --asistido pide confirmación en cada paso: s/N, r = revertir;
+        [--accept HUELLA]... [--write-memory] [--assisted]
+        (sin --assisted solo muestra el plan con su reversa; con --assisted pide confirmación en cada paso: s/N, r = revertir;
          Ctrl-C aborta la ejecución y avisa si quedó algún equipo cambiado)
-  ports runs [--activas]            ejecuciones que el núcleo recuerda (para retomar una que quedó viva)
+  ports runs [--active]             ejecuciones que el núcleo recuerda (para retomar una que quedó viva)
   ports resume EJECUCION            retoma la confirmación de una ejecución viva
   run -d EQUIPO... -c "show ..." | -f ARCHIVO --cred ID [--accept HUELLA] [--csv|--md|--json]
         (lote de solo lectura: un trabajo de Patrol de una ronda; todo comando pasa por CheckDenied)
@@ -73,17 +73,17 @@ uso: mctl <comando>
         (running-config de la ronda N contra la N-1 por equipo, sin líneas volátiles; solo lee)
   config clean ARCHIVO [-o SALIDA] [--sort] [--json]
         (quita vacías y ! repetidos, recorta espacios, marca huérfanas; sin -o solo muestra el informe)
-  snippet vlan EQUIPO[:PUERTO] ID --cred ID [--name X | --remove [--accept-trunk]] [--accept-vtp] [--accept HUELLA]... [--write-memory] [--asistido]
-  snippet trunk EQUIPO[:PUERTO] IF add|remove VLAN --cred ID [--accept HUELLA]... [--write-memory] [--asistido]
-  snippet svi EQUIPO[:PUERTO] VLAN DIRECCION MASCARA --cred ID [--desc T] [--accept HUELLA]... [--write-memory] [--asistido]
+  snippet vlan EQUIPO[:PUERTO] ID --cred ID [--name X | --remove [--accept-trunk]] [--accept-vtp] [--accept HUELLA]... [--write-memory] [--assisted]
+  snippet trunk EQUIPO[:PUERTO] IF add|remove VLAN --cred ID [--accept HUELLA]... [--write-memory] [--assisted]
+  snippet svi EQUIPO[:PUERTO] VLAN DIRECCION MASCARA --cred ID [--desc T] [--accept HUELLA]... [--write-memory] [--assisted]
   snippet list [--platform P] [--json]
-  snippet run EQUIPO[:PUERTO] ID --cred ID [--set campo=valor]... [--accept HUELLA]... [--write-memory] [--asistido]
-        (sin --asistido solo muestra el plan con su reversa; con --asistido pide confirmación en cada paso: s/N, r = revertir.
+  snippet run EQUIPO[:PUERTO] ID --cred ID [--set campo=valor]... [--accept HUELLA]... [--write-memory] [--assisted]
+        (sin --assisted solo muestra el plan con su reversa; con --assisted pide confirmación en cada paso: s/N, r = revertir.
          --remove borra la VLAN (existente, activa, sin puertos, SVI ni trunk nativo; sin --name;
          si viaja por trunks pide --accept-trunk). El trunk solo admite add o remove
          de una VLAN: nunca reemplaza la lista permitida. list muestra el catálogo con los campos de cada plantilla y run la aplica con --set;
          un secreto que no viene en --set se pide por la terminal sin eco)
-  cred rotate EQUIPO[:PUERTO] --user U --cred ID [--update-cred ID] [--generate] [--accept HUELLA]... [--asistido]
+  cred rotate EQUIPO[:PUERTO] --user U --cred ID [--update-cred ID] [--generate] [--accept HUELLA]... [--assisted]
         (rota el secreto de un usuario local de un equipo; --cred es la credencial con la que te conectas y debe ser de OTRO usuario;
          el secreto nuevo se lee de la terminal o de stdin, o con --generate lo crea el núcleo (exige --update-cred); si la sesión nueva
          entra, se pide write memory (obligatorio: sin él el equipo vuelve al hash anterior al reiniciar); solo si sale [OK],
@@ -97,16 +97,16 @@ uso: mctl <comando>
   backup diff ID_A ID_B | ID_A --now -d EQUIPO --cred ID [--json]
         (diferencias entre dos respaldos, o contra el running actual: toma uno nuevo; sin líneas volátiles)
   backup export ID [-o ARCHIVO]                respaldo a la salida estándar o a un archivo nuevo 0600
-  restore diff EQUIPO[:PUERTO] RESPALDO --cred ID [--mgmt-if IF] [--max-lines N] [--parcial] [--write-memory] [--accept HUELLA]... [--asistido]
+  restore diff EQUIPO[:PUERTO] RESPALDO --cred ID [--mgmt-if IF] [--max-lines N] [--partial] [--write-memory] [--accept HUELLA]... [--assisted]
         (lleva el running-config del equipo al de un respaldo (ID de "backup list": equipo/AAAAMMDDTHHMMSSZ-running) cambiando solo las
          líneas que difieren, con su reversa. Lista cerrada: hostname, logging, ntp server, snmp-server location|contact, ip domain-name,
          ip name-server, clock, service timestamps, spanning-tree portfast default, errdisable recovery, nombre de VLAN y, en puertos físicos de acceso,
          description, VLAN de acceso y de voz, shutdown, portfast, bpduguard y storm-control. Todo lo demás (rutas, router, ACL, vrf, trunk,
          canales, SVI, line, aaa, usuarios, crypto, standby, autenticación, contraseñas) se lista para hacerlo a mano y rechaza el plan
-         entero, salvo con --parcial. Solo respaldos sin enmascarar, completos (terminan en end), con ficha firmada por la bóveda y del
+         entero, salvo con --partial. Solo respaldos sin enmascarar, completos (terminan en end), con ficha firmada por la bóveda y del
          mismo equipo (número de serie). Nunca toca la interfaz por la que te conectas ni las que llevan su VLAN: se identifica con
          show users, show tcp brief y la salida hacia ti (show ip cef); si no es segura, indícala con --mgmt-if. Tope de líneas: 200 por omisión.
-         Sin --asistido solo muestra el plan; con --asistido pide confirmación en cada paso: s/N, r = revertir)
+         Sin --assisted solo muestra el plan; con --assisted pide confirmación en cada paso: s/N, r = revertir)
   msg [MNEMONICO|PATRON] [--json]
         (base de mensajes de Cisco: significado, causa, acción y comandos de lectura; acepta comodines: %PLATFORM-3-*)
   crashinfo ARCHIVO [--json]

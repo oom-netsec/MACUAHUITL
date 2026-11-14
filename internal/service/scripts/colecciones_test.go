@@ -464,7 +464,7 @@ func TestImportColeccionesEstadosDecisionesYReferencias(t *testing.T) {
 	_, err = b.ApplyImportCollections(bg, &v1.ApplyImportCollectionsRequest{Token: p.Token, CollectionDecisions: decs(c2.Id, "reemplazar", c3.Id, "renombrar")})
 	codigo(t, err, codes.InvalidArgument)
 	ap, err := b.ApplyImportCollections(bg, &v1.ApplyImportCollectionsRequest{Token: p.Token,
-		ScriptDecisions: decs(ids[1], "reemplazar"), CollectionDecisions: decs(c2.Id, "reemplazar", c3.Id, "renombrar")})
+		ScriptDecisions: decs(ids[1], "replace"), CollectionDecisions: decs(c2.Id, "replace", c3.Id, "rename")})
 	if err != nil || ap.CollectionsReplaced != 1 || ap.CollectionsRenamed != 1 || ap.CollectionsSkipped != 1 || ap.ScriptsReplaced != 1 {
 		t.Fatalf("apply = %v err = %v", ap, err)
 	}
@@ -504,7 +504,7 @@ func TestImportColeccionesReflejaLosIDsReasignadosOmitidosYLibInexistente(t *tes
 	if len(p.Warnings) != 1 || !strings.Contains(p.Warnings[0], "lib-no-existe") {
 		t.Fatalf("avisos del preview = %v", p.Warnings)
 	}
-	ap, err := b.ApplyImportCollections(bg, &v1.ApplyImportCollectionsRequest{Token: p.Token, ScriptDecisions: decs(s1.ID, "renombrar", s3.ID, "omitir")})
+	ap, err := b.ApplyImportCollections(bg, &v1.ApplyImportCollectionsRequest{Token: p.Token, ScriptDecisions: decs(s1.ID, "rename", s3.ID, "skip")})
 	if err != nil || ap.ScriptsRenamed != 1 || ap.ScriptsCreated != 1 || ap.CollectionsCreated != 1 {
 		t.Fatalf("apply = %v err = %v", ap, err)
 	}

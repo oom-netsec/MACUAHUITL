@@ -154,7 +154,7 @@ type PackImportItemDTO struct {
 
 type PackImportDecisionDTO struct {
 	ItemID string `json:"itemId"`
-	Action string `json:"action"` // renombrar | omitir
+	Action string `json:"action"` // cable histórico: renombrar | omitir (el núcleo acepta también rename | skip)
 }
 
 type PackImportResultDTO struct {

@@ -210,8 +210,6 @@ func hostsExport(c *cli.Env, args []string) error {
 	return nil
 }
 
-var acciones = map[string]bool{"renombrar": true, "reemplazar": true, "omitir": true}
-
 // hosts import RUTA [--decision DIRECCIÓN:PUERTO=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
 func hostsImport(c *cli.Env, args []string) error {
 	var decs cli.List
@@ -230,16 +228,21 @@ func hostsImport(c *cli.Env, args []string) error {
 	if fs.NArg() != 1 {
 		return errors.New(uso)
 	}
-	if all != "" && !acciones[all] {
-		return cli.Err("mctl.hosts.bad_all", "value", all)
+	if all != "" {
+		var ok bool
+		if all, ok = cli.Decision(all); !ok {
+			return cli.Err("mctl.hosts.bad_all", "value", all)
+		}
+		all = cli.WireDecision(all)
 	}
 	dec := map[string]string{}
 	for _, d := range decs {
 		k, act, ok := strings.Cut(d, "=")
-		if !ok || k == "" || !acciones[act] {
+		act, valid := cli.Decision(act)
+		if !ok || k == "" || !valid {
 			return cli.Err("mctl.hosts.bad_decision", "value", d)
 		}
-		dec[k] = act
+		dec[k] = cli.WireDecision(act)
 	}
 	path, err := filepath.Abs(fs.Arg(0))
 	if err != nil {

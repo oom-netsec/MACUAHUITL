@@ -1,4 +1,4 @@
-// Package restore es el área de mctl para restaurar un respaldo de configuración con el modo de cambio asistido (ADR 0007). Sin --asistido
+// Package restore es el área de mctl para restaurar un respaldo de configuración con el modo de cambio asistido (ADR 0007). Sin --assisted
 // solo muestra el plan (con su reversa y lo que no se restaura); nada se cambia hasta que el ingeniero confirma cada paso.
 package restore
 
@@ -12,16 +12,16 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
 
-const help = `  restore diff EQUIPO[:PUERTO] RESPALDO --cred ID [--mgmt-if IF] [--max-lines N] [--parcial] [--write-memory] [--accept HUELLA]... [--asistido]
+const help = `  restore diff EQUIPO[:PUERTO] RESPALDO --cred ID [--mgmt-if IF] [--max-lines N] [--partial] [--write-memory] [--accept HUELLA]... [--assisted]
         (lleva el running-config del equipo al de un respaldo (ID de "backup list": equipo/AAAAMMDDTHHMMSSZ-running) cambiando solo las
          líneas que difieren, con su reversa. Lista cerrada: hostname, logging, ntp server, snmp-server location|contact, ip domain-name,
          ip name-server, clock, service timestamps, spanning-tree portfast default, errdisable recovery, nombre de VLAN y, en puertos físicos de acceso,
          description, VLAN de acceso y de voz, shutdown, portfast, bpduguard y storm-control. Todo lo demás (rutas, router, ACL, vrf, trunk,
          canales, SVI, line, aaa, usuarios, crypto, standby, autenticación, contraseñas) se lista para hacerlo a mano y rechaza el plan
-         entero, salvo con --parcial. Solo respaldos sin enmascarar, completos (terminan en end), con ficha firmada por la bóveda y del
+         entero, salvo con --partial. Solo respaldos sin enmascarar, completos (terminan en end), con ficha firmada por la bóveda y del
          mismo equipo (número de serie). Nunca toca la interfaz por la que te conectas ni las que llevan su VLAN: se identifica con
          show users, show tcp brief y la salida hacia ti (show ip cef); si no es segura, indícala con --mgmt-if. Tope de líneas: 200 por omisión.
-         Sin --asistido solo muestra el plan; con --asistido pide confirmación en cada paso: s/N, r = revertir)`
+         Sin --assisted solo muestra el plan; con --assisted pide confirmación en cada paso: s/N, r = revertir)`
 
 func diff(c *cli.Env, args []string) error {
 	var credID, mgmt string
@@ -32,13 +32,15 @@ func diff(c *cli.Env, args []string) error {
 		fs.StringVar(&credID, "cred", "", "ID de la credencial")
 		fs.StringVar(&mgmt, "mgmt-if", "", "interfaz por la que estás conectado (no se toca)")
 		fs.UintVar(&maxLines, "max-lines", 0, "tope de líneas de cambio (0 = 200; máximo 1000)")
-		fs.BoolVar(&partial, "parcial", false, "aplicar solo lo permitido y listar el resto")
-		fs.BoolVar(&assisted, "asistido", false, "aplicar el cambio con confirmación por paso")
+		fs.BoolVar(&partial, "partial", false, "aplicar solo lo permitido y listar el resto")
+		fs.BoolVar(&partial, "parcial", false, "alias de --partial")
+		fs.BoolVar(&assisted, "assisted", false, "aplicar el cambio con confirmación por paso")
+		fs.BoolVar(&assisted, "asistido", false, "alias de --assisted")
 		fs.BoolVar(&writeMe, "write-memory", false, "agrega el paso final write memory")
 		fs.Var(&accept, "accept", "huella SHA256 confirmada (repetible)")
 	})
 	if err != nil || fs.NArg() != 2 || credID == "" {
-		return errors.New("uso: mctl restore diff EQUIPO[:PUERTO] RESPALDO --cred ID [--mgmt-if IF] [--max-lines N] [--parcial] [--asistido]")
+		return errors.New("uso: mctl restore diff EQUIPO[:PUERTO] RESPALDO --cred ID [--mgmt-if IF] [--max-lines N] [--partial] [--assisted]")
 	}
 	if maxLines > 1000 {
 		return cli.Err("mctl.restore.max_lines")

@@ -257,13 +257,18 @@ func importCmd(c *cli.Env, args []string) error {
 	dec := map[string]string{}
 	for _, d := range decs {
 		id, a, ok := strings.Cut(d, "=")
-		if !ok || id == "" || (a != "renombrar" && a != "omitir") {
+		a, valid := cli.Decision(a, "rename", "skip")
+		if !ok || id == "" || !valid {
 			return cli.Err("mctl.pack.bad_decision", "decision", strconv.Quote(d))
 		}
-		dec[id] = a
+		dec[id] = cli.WireDecision(a)
 	}
-	if all != "" && all != "renombrar" && all != "omitir" {
-		return errors.New(uso)
+	if all != "" {
+		var ok bool
+		if all, ok = cli.Decision(all, "rename", "skip"); !ok {
+			return errors.New(uso)
+		}
+		all = cli.WireDecision(all)
 	}
 	path, err := filepath.Abs(fs.Arg(0))
 	if err != nil {

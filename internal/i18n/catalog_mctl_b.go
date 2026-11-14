@@ -50,11 +50,11 @@ func init() {
 		"mctl.pack.exported": e("exportado {id} {version}: {scripts} scripts, {playbooks} playbooks, sin firma, a {path}\nsha256 {sha256}",
 			"exported {id} {version}: {scripts} scripts, {playbooks} playbooks, unsigned, to {path}\nsha256 {sha256}"),
 		"mctl.pack.omitted":          e("aviso: el playbook {id} no se exportó (plataforma o ID que un paquete no acepta)", "warning: playbook {id} was not exported (platform or ID a pack does not accept)"),
-		"mctl.pack.bad_decision":     e("decisión inválida {decision}: use --decision ID=renombrar|omitir", "invalid decision {decision}: use --decision ID=renombrar|omitir"),
+		"mctl.pack.bad_decision":     e("decisión inválida {decision}: use --decision ID=renombrar|omitir", "invalid decision {decision}: use --decision ID=rename|skip"),
 		"mctl.pack.import_header":    e("TIPO\tID\tNOMBRE\tESTADO\tCHOCA CON", "KIND\tID\tNAME\tSTATE\tCONFLICTS WITH"),
 		"mctl.pack.unknown_decision": e("la decisión nombra {id}, que no está en el paquete", "the decision names {id}, which is not in the pack"),
 		"mctl.pack.undecided": e("no se importó nada: falta decidir {n} conflicto(s); use --decision ID=renombrar|omitir o --all=ACCIÓN: {list}",
-			"nothing imported: {n} conflict(s) need a decision; use --decision ID=renombrar|omitir or --all=ACTION: {list}"),
+			"nothing imported: {n} conflict(s) need a decision; use --decision ID=rename|skip or --all=ACTION: {list}"),
 		"mctl.pack.imported": e("importados: scripts {sc} nuevos, {sr} renombrados, {ss} omitidos; playbooks {pc} nuevos, {pr} renombrados, {ps} omitidos",
 			"imported: scripts {sc} new, {sr} renamed, {ss} skipped; playbooks {pc} new, {pr} renamed, {ps} skipped"),
 

@@ -44,7 +44,7 @@ func TestSnippetVlanAsistidoAsksAndApplies(t *testing.T) {
 			t.Fatalf("stdin %q: err=%v lines=%q", in, err, e.rec.Lines())
 		}
 	}
-	out := must(t, "s\ns\n", append(e.snip("vlan", "30", "--name", "Cuarentena"), "--asistido")...)
+	out := must(t, "s\ns\n", append(e.snip("vlan", "30", "--name", "Cuarentena"), "--assisted")...)
 	if !strings.Contains(out, "MODO ASISTIDO ACTIVO") || !strings.Contains(out, "Listo") {
 		t.Fatalf("salida:\n%s", out)
 	}

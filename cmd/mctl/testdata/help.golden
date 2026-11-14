@@ -1,7 +1,7 @@
 usage: mctl <command>
   vault status | create | unlock | lock | passwd
   cred  list | add --label L --user U [--no-enable] | rm ID
-  cred  backup export PATH [--overwrite] [--yes]  |  backup import PATH [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+  cred  backup export PATH [--overwrite] [--yes]  |  backup import PATH [--decision ID=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
         (encrypted vault backup with its own passphrase, different from the master one and at least 12 characters; the passphrase is read from the terminal or stdin, never as an argument.
          export requires --yes: the file holds all your credentials. import shows the state of each one: nueva, igual, conflicto_etiqueta or reservada (skipped);
          each conflict needs a decision per ID or label, or --all; if one is missing nothing is imported)
@@ -62,10 +62,10 @@ usage: mctl <command>
   fleet summary | flash [--need 1.2G] | inventory [--csv|--md]
         (fleet = the latest output of each device in outputs/; all with --dir FOLDER and --json)
   ports set DEVICE[:PORT] IF... --cred ID [--vlan N] [--voice N] [--desc T] [--shut|--no-shut]
-        [--accept FINGERPRINT]... [--write-memory] [--asistido]
-        (without --asistido it only shows the plan with its rollback; with --asistido it asks for confirmation at each step: s/N, r = revert;
+        [--accept FINGERPRINT]... [--write-memory] [--assisted]
+        (without --assisted it only shows the plan with its rollback; with --assisted it asks for confirmation at each step: y/N, r = revert;
          Ctrl-C aborts the run and warns if any device was left changed)
-  ports runs [--activas]            runs the core remembers (to resume one that was left alive)
+  ports runs [--active]             runs the core remembers (to resume one that was left alive)
   ports resume RUN                  resumes the confirmation of a live run
   run -d DEVICE... -c "show ..." | -f FILE --cred ID [--accept FINGERPRINT] [--csv|--md|--json]
         (read-only batch: a one-round Patrol job; every command goes through CheckDenied)
@@ -73,17 +73,17 @@ usage: mctl <command>
         (running-config of round N against N-1 per device, without volatile lines; read-only)
   config clean FILE [-o OUTPUT] [--sort] [--json]
         (removes empty and repeated ! lines, trims spaces, flags orphans; without -o it only shows the report)
-  snippet vlan DEVICE[:PORT] ID --cred ID [--name X | --remove [--accept-trunk]] [--accept-vtp] [--accept FINGERPRINT]... [--write-memory] [--asistido]
-  snippet trunk DEVICE[:PORT] IF add|remove VLAN --cred ID [--accept FINGERPRINT]... [--write-memory] [--asistido]
-  snippet svi DEVICE[:PORT] VLAN ADDRESS MASK --cred ID [--desc T] [--accept FINGERPRINT]... [--write-memory] [--asistido]
+  snippet vlan DEVICE[:PORT] ID --cred ID [--name X | --remove [--accept-trunk]] [--accept-vtp] [--accept FINGERPRINT]... [--write-memory] [--assisted]
+  snippet trunk DEVICE[:PORT] IF add|remove VLAN --cred ID [--accept FINGERPRINT]... [--write-memory] [--assisted]
+  snippet svi DEVICE[:PORT] VLAN ADDRESS MASK --cred ID [--desc T] [--accept FINGERPRINT]... [--write-memory] [--assisted]
   snippet list [--platform P] [--json]
-  snippet run DEVICE[:PORT] ID --cred ID [--set field=value]... [--accept FINGERPRINT]... [--write-memory] [--asistido]
-        (without --asistido it only shows the plan with its rollback; with --asistido it asks for confirmation at each step: s/N, r = revert.
+  snippet run DEVICE[:PORT] ID --cred ID [--set field=value]... [--accept FINGERPRINT]... [--write-memory] [--assisted]
+        (without --assisted it only shows the plan with its rollback; with --assisted it asks for confirmation at each step: y/N, r = revert.
          --remove deletes the VLAN (existing, active, with no ports, SVI or native trunk; without --name;
          if it travels over trunks it requires --accept-trunk). The trunk only accepts add or remove
          of one VLAN: it never replaces the allowed list. list shows the catalog with the fields of each template and run applies it with --set;
          a secret that does not come in --set is asked for on the terminal without echo)
-  cred rotate DEVICE[:PORT] --user U --cred ID [--update-cred ID] [--generate] [--accept FINGERPRINT]... [--asistido]
+  cred rotate DEVICE[:PORT] --user U --cred ID [--update-cred ID] [--generate] [--accept FINGERPRINT]... [--assisted]
         (rotates the secret of a local user on a device; --cred is the credential you connect with and must belong to ANOTHER user;
          the new secret is read from the terminal or stdin, or with --generate the core creates it (requires --update-cred); if the new session
          gets in, write memory is requested (mandatory: without it the device goes back to the previous hash on reload); only if it ends [OK],
@@ -97,16 +97,16 @@ usage: mctl <command>
   backup diff ID_A ID_B | ID_A --now -d DEVICE --cred ID [--json]
         (differences between two backups, or against the current running config: takes a new one; without volatile lines)
   backup export ID [-o FILE]               backup to standard output or to a new 0600 file
-  restore diff DEVICE[:PORT] BACKUP --cred ID [--mgmt-if IF] [--max-lines N] [--parcial] [--write-memory] [--accept FINGERPRINT]... [--asistido]
+  restore diff DEVICE[:PORT] BACKUP --cred ID [--mgmt-if IF] [--max-lines N] [--partial] [--write-memory] [--accept FINGERPRINT]... [--assisted]
         (brings the device running-config to that of a backup (ID from "backup list": device/YYYYMMDDTHHMMSSZ-running) changing only the
          lines that differ, with its rollback. Closed list: hostname, logging, ntp server, snmp-server location|contact, ip domain-name,
          ip name-server, clock, service timestamps, spanning-tree portfast default, errdisable recovery, VLAN name and, on physical access ports,
          description, access and voice VLAN, shutdown, portfast, bpduguard and storm-control. Everything else (routes, router, ACL, vrf, trunk,
          channels, SVI, line, aaa, users, crypto, standby, authentication, passwords) is listed to be done by hand and rejects the whole
-         plan, unless --parcial. Only unmasked, complete backups (ending in end), with a record signed by the vault and from the
+         plan, unless --partial. Only unmasked, complete backups (ending in end), with a record signed by the vault and from the
          same device (serial number). It never touches the interface you connect through nor those carrying its VLAN: it is identified with
          show users, show tcp brief and the output toward you (show ip cef); if it is not safe, point it out with --mgmt-if. Line limit: 200 by default.
-         Without --asistido it only shows the plan; with --asistido it asks for confirmation at each step: s/N, r = revert)
+         Without --assisted it only shows the plan; with --assisted it asks for confirmation at each step: y/N, r = revert)
   msg [MNEMONIC|PATTERN] [--json]
         (Cisco message base: meaning, cause, action and read commands; accepts wildcards: %PLATFORM-3-*)
   crashinfo FILE [--json]
@@ -146,8 +146,8 @@ usage: mctl <command>
          CSV for Excel (UTF-8, fixed header, tags separated by «;», cells starting with = + - @ get a leading apostrophe). The credential travels only as its label; without an ID it exports all, up to 1000)
   hosts template --format csv|json  |  hosts template --fields
         (prints a sample file with the header and 3 valid rows, or describes each field; both come from the same table that validates the import)
-  hosts import PATH [--format csv|json] [--decision ADDRESS:PORT=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
-        (an invalid row comes out as «line N: field: reason», does not block the others and counts as skipped; JSON without a sum warns. State of each valid host: nuevo, igual or conflicto (same address and port with other data: reemplazar or omitir; same name: also renombrar); new ones go in on their own and each conflict needs a decision, otherwise nothing is imported.
+  hosts import PATH [--format csv|json] [--decision ADDRESS:PORT=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
+        (an invalid row comes out as «line N: field: reason», does not block the others and counts as skipped; JSON without a sum warns. State of each valid host: nuevo, igual or conflicto (same address and port with other data: replace or skip; same name: also rename); new ones go in on their own and each conflict needs a decision, otherwise nothing is imported.
          The credential label is looked up in the open vault; if it is not there, the host is left without a credential)
   scripts list [TEXT] [--tech T] [--platform P] [--tag X] [--fav] [--json]  |  scripts show ID [--json]
         (script vault: yours plus the predefined library, sorted by name; read MODE = Patrol can run it. The «lib-*» IDs belong to the library and are not edited)
@@ -161,7 +161,7 @@ usage: mctl <command>
         (copies a script from an installed package, also a hidden one, to your scripts: new ID, editable, name «<name> (copia)»; removing the package does not delete it)
   scripts export --out PATH [--overwrite] ID...
         (0600 JSON file with the SHA-256 sum of the scripts (integrity, not authenticity); does not overwrite without --overwrite; favorites do not travel)
-  scripts import PATH [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+  scripts import PATH [--decision ID=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
         (shows the state of each script: nuevo, igual, conflicto_id or conflicto_nombre; new ones go in on their own and each conflict needs a decision, otherwise nothing is imported)
   scripts col list [--json]  |  scripts col show ID [--json]  |  scripts col add NAME [--desc D]  |  scripts col edit ID [--name N] [--desc D]  |  scripts col rm ID
         (collections: ordered lists of script IDs, also from the library, which are not copied; a script can be in several and deleting it removes it from all.
@@ -169,10 +169,10 @@ usage: mctl <command>
   scripts col set ID [SCRIPT_ID...] [--add ID]... [--rm ID]... [--clear]  |  scripts col order ID...
         (set leaves exactly the given SCRIPT_IDs in that order; without them it starts from what is there and applies --rm and --add; order reorders all collections, also favorites)
   scripts col export --out PATH [--overwrite] ID...
-  scripts col import PATH [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
+  scripts col import PATH [--decision ID=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
         (the file carries the collections and the user scripts they reference; library ones go by ID and those this library does not have are reported and skipped.
          States: nueva, igual, fusionar (favoritos: missing ones are added, never replaced), conflicto_id and conflicto_nombre; the decisions for collections and for the file's scripts go with --decision by ID)
-  scripts template [--kind scripts|colecciones] [--fields]
+  scripts template [--kind scripts|collections] [--fields]
         (prints a sample file that import accepts as is, or with --fields the list of fields with their type, whether they are required, an example and their description. Both come from the same rules that validate the import. The sha256 is optional: without it each field is validated and import warns)
   scripts pin [ID [--off]]  |  scripts pin --order ID...
         (the terminal's short bar: at most 5 pinned scripts, separate from collections; without arguments it lists them in order)
@@ -194,7 +194,7 @@ usage: mctl <command>
         (builds an UNSIGNED personal package with the user's scripts ID... and, with --playbooks, the ios, ios-xe and wlc-9800 ones in <config>/playbooks.
          Scripts come out as lib-<editor>-… and playbooks with the editor as prefix; other playbooks are left out with a warning. The editor is
          [a-z0-9]{1,16}, not a reserved one. Version YYYY.MMDD.HHMMSS (local time); license NOASSERTION unless you give another; favorites do not travel)
-  pack import <file.mpack> [--decision ID=renombrar|omitir]... [--all=renombrar|omitir] [--preview]
+  pack import <file.mpack> [--decision ID=rename|skip]... [--all=rename|skip] [--preview]
         (copies a .mpack without an official signature into «My scripts» and <config>/playbooks, editable, without installing it. Shows each item's state:
          nuevo, igual, conflicto_id or conflicto_nombre; every conflict needs a decision and nothing is ever overwritten. An imported playbook keeps its
          editor-prefixed ID and joins the catalog without a restart)

@@ -1,7 +1,7 @@
 package service
 
 // DecisionEN es el verbo de una decisión de importación en inglés, para la auditoría (que va siempre en
-// inglés). Los verbos del cable siguen en español; uno desconocido sale tal cual.
+// inglés). El canónico del cable es el inglés; el español (alias) también se traduce; uno desconocido sale tal cual.
 func DecisionEN(a string) string {
 	if en, ok := map[string]string{"reemplazar": "replace", "renombrar": "rename", "omitir": "skip", "fusionar": "merge"}[a]; ok {
 		return en

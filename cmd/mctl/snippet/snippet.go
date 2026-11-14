@@ -1,5 +1,5 @@
 // Package snippet es el área de mctl para los snippets del modo de cambio asistido (ADR 0007): crear o nombrar una VLAN,
-// agregar o quitar una VLAN de un trunk, crear una SVI y las plantillas del catálogo (snippet list y snippet run). Sin --asistido solo imprime el plan y no cambia nada.
+// agregar o quitar una VLAN de un trunk, crear una SVI y las plantillas del catálogo (snippet list y snippet run). Sin --assisted solo imprime el plan y no cambia nada.
 package snippet
 
 import (
@@ -13,12 +13,12 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
 
-const help = `  snippet vlan EQUIPO[:PUERTO] ID --cred ID [--name X | --remove [--accept-trunk]] [--accept-vtp] [--accept HUELLA]... [--write-memory] [--asistido]
-  snippet trunk EQUIPO[:PUERTO] IF add|remove VLAN --cred ID [--accept HUELLA]... [--write-memory] [--asistido]
-  snippet svi EQUIPO[:PUERTO] VLAN DIRECCION MASCARA --cred ID [--desc T] [--accept HUELLA]... [--write-memory] [--asistido]
+const help = `  snippet vlan EQUIPO[:PUERTO] ID --cred ID [--name X | --remove [--accept-trunk]] [--accept-vtp] [--accept HUELLA]... [--write-memory] [--assisted]
+  snippet trunk EQUIPO[:PUERTO] IF add|remove VLAN --cred ID [--accept HUELLA]... [--write-memory] [--assisted]
+  snippet svi EQUIPO[:PUERTO] VLAN DIRECCION MASCARA --cred ID [--desc T] [--accept HUELLA]... [--write-memory] [--assisted]
   snippet list [--platform P] [--json]
-  snippet run EQUIPO[:PUERTO] ID --cred ID [--set campo=valor]... [--accept HUELLA]... [--write-memory] [--asistido]
-        (sin --asistido solo muestra el plan con su reversa; con --asistido pide confirmación en cada paso: s/N, r = revertir.
+  snippet run EQUIPO[:PUERTO] ID --cred ID [--set campo=valor]... [--accept HUELLA]... [--write-memory] [--assisted]
+        (sin --assisted solo muestra el plan con su reversa; con --assisted pide confirmación en cada paso: s/N, r = revertir.
          --remove borra la VLAN (existente, activa, sin puertos, SVI ni trunk nativo; sin --name;
          si viaja por trunks pide --accept-trunk). El trunk solo admite add o remove
          de una VLAN: nunca reemplaza la lista permitida. list muestra el catálogo con los campos de cada plantilla y run la aplica con --set;
@@ -32,7 +32,8 @@ type common struct {
 
 func (g *common) flags(fs *flag.FlagSet) {
 	fs.StringVar(&g.credID, "cred", "", "ID de la credencial")
-	fs.BoolVar(&g.assisted, "asistido", false, "aplicar el cambio con confirmación por paso")
+	fs.BoolVar(&g.assisted, "assisted", false, "aplicar el cambio con confirmación por paso")
+	fs.BoolVar(&g.assisted, "asistido", false, "alias de --assisted")
 	fs.BoolVar(&g.writeMe, "write-memory", false, "agrega el paso final write memory")
 	fs.Var(&g.accept, "accept", "huella SHA256 confirmada (repetible)")
 }
@@ -46,7 +47,7 @@ func vlanNum(s string) (uint32, error) {
 	return uint32(n), nil
 }
 
-// plan pide el plan, lo muestra y, con --asistido, lo ejecuta paso a paso.
+// plan pide el plan, lo muestra y, con --assisted, lo ejecuta paso a paso.
 func plan(c *cli.Env, host string, g *common, set func(*v1.PlanSnippetRequest)) error {
 	addr, port, err := cli.SplitHost(host)
 	if err != nil {
@@ -85,7 +86,7 @@ func vlan(c *cli.Env, args []string) error {
 		fs.BoolVar(&vtp, "accept-vtp", false, "acepta que el cambio se propague por VTP")
 	})
 	if err != nil || fs.NArg() != 2 || g.credID == "" {
-		return errors.New("uso: mctl snippet vlan EQUIPO[:PUERTO] ID --cred ID [--name X | --remove [--accept-trunk]] [--accept-vtp] [--asistido]")
+		return errors.New("uso: mctl snippet vlan EQUIPO[:PUERTO] ID --cred ID [--name X | --remove [--accept-trunk]] [--accept-vtp] [--assisted]")
 	}
 	id, err := vlanNum(fs.Arg(1))
 	if err != nil {
@@ -100,7 +101,7 @@ func trunk(c *cli.Env, args []string) error {
 	var g common
 	fs, err := cli.Flags("snippet trunk", args, g.flags)
 	if err != nil || fs.NArg() != 4 || g.credID == "" {
-		return errors.New("uso: mctl snippet trunk EQUIPO[:PUERTO] IF add|remove VLAN --cred ID [--asistido]")
+		return errors.New("uso: mctl snippet trunk EQUIPO[:PUERTO] IF add|remove VLAN --cred ID [--assisted]")
 	}
 	op := fs.Arg(2)
 	if op != "add" && op != "remove" { // nunca se reemplaza la lista: ni "set" ni una lista como 10,20
@@ -123,7 +124,7 @@ func svi(c *cli.Env, args []string) error {
 		fs.StringVar(&desc, "desc", "", "descripción")
 	})
 	if err != nil || fs.NArg() != 4 || g.credID == "" {
-		return errors.New("uso: mctl snippet svi EQUIPO[:PUERTO] VLAN DIRECCION MASCARA --cred ID [--desc T] [--asistido]")
+		return errors.New("uso: mctl snippet svi EQUIPO[:PUERTO] VLAN DIRECCION MASCARA --cred ID [--desc T] [--assisted]")
 	}
 	v, err := vlanNum(fs.Arg(1))
 	if err != nil {
