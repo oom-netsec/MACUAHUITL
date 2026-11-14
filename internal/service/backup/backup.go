@@ -54,6 +54,7 @@ type backupSvc struct {
 	v1.UnimplementedBackupServiceServer
 	d      service.Deps
 	poll   time.Duration
+	quiet  time.Duration // un .txt tocado hace menos que esto puede estar a mitad de una escritura de Patrol: no se lee hasta que pase
 	ctx    context.Context
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
@@ -67,7 +68,7 @@ const maxFinal = 32
 
 func newSvc(d service.Deps) *backupSvc {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &backupSvc{d: d, poll: 2 * time.Second, ctx: ctx, cancel: cancel, jobs: map[string]*tracked{}}
+	return &backupSvc{d: d, poll: 2 * time.Second, quiet: time.Second, ctx: ctx, cancel: cancel, jobs: map[string]*tracked{}}
 }
 
 func (s *backupSvc) store() backup.Store { return s.storeOf(nil) }
@@ -284,9 +285,17 @@ func (s *backupSvc) collectLocked(ctx context.Context, job string, keep int) (co
 	if j.Dir == "" {
 		return res, nil
 	}
-	var skip func(string, int64) bool
-	if tr != nil {
-		skip = tr.skip
+	skip := func(rel string, size int64) bool {
+		if tr != nil && tr.skip(rel, size) {
+			return true
+		}
+		// Con el trabajo en marcha, Patrol puede estar escribiendo ese archivo: leerlo ahora guardaría un respaldo cortado.
+		if !terminal && s.quiet > 0 {
+			if fi, err := os.Stat(filepath.Join(j.Dir, filepath.FromSlash(rel))); err == nil && time.Since(fi.ModTime()) < s.quiet {
+				return true
+			}
+		}
+		return false
 	}
 	b, err := analyze.LoadSkipping(j.Dir, skip)
 	if err != nil {

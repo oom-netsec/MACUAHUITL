@@ -50,6 +50,7 @@ func nuevo(t *testing.T, state string) (*backupSvc, *servicetest.Deps, *service.
 	dir := t.TempDir()
 	info := &service.JobInfo{State: state, Dir: dir}
 	s := newSvc(jobDeps{sd, info})
+	s.quiet = 0 // los archivos de prueba se escriben justo antes de recolectar
 	t.Cleanup(s.close)
 	return s, sd, info, dir
 }
@@ -564,5 +565,33 @@ func TestRondaIncompletaNoFrenaElAvance(t *testing.T) {
 	}
 	if _, err := os.Stat(lote); err != nil {
 		t.Error("se borró la carpeta de Patrol con una ronda incompleta")
+	}
+}
+
+// Patrol escribe la sección de un comando de una sola vez, pero un lector puede ver la escritura a medias: con el
+// trabajo en marcha no se lee un .txt tocado hace un instante.
+func TestNoGuardaUnTxtDePatrolQueSeEstaEscribiendo(t *testing.T) {
+	s, _, info, dir := nuevo(t, "running")
+	s.quiet = time.Hour
+	carpeta(t, dir, "hostname SW1\nntp clock-period 1\n")
+	ctx := i18n.WithLocale(context.Background(), i18n.Es)
+	r, _ := s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
+	if strings.Contains(r.Report.Text, "guardado(s)") && !strings.Contains(r.Report.Text, "0 respaldo(s) guardado(s)") {
+		t.Fatalf("guardó un archivo recién tocado: %s", r.Report.Text)
+	}
+	// Quieto desde hace rato: ya se lee.
+	old := time.Now().Add(-2 * time.Hour)
+	fs, _ := filepath.Glob(filepath.Join(dir, "SW1_192.0.2.1", "*.txt"))
+	os.Chtimes(fs[0], old, old)
+	r, _ = s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
+	if !strings.Contains(r.Report.Text, "1 respaldo(s) guardado(s)") {
+		t.Fatalf("no lo leyó al quedar quieto: %s", r.Report.Text)
+	}
+	// Terminado el trabajo todo se lee aunque sea reciente.
+	carpeta(t, dir, "hostname SW1\nntp clock-period 1\n", "hostname SW1\nvlan 10\n")
+	info.State = "completed"
+	r, _ = s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
+	if !r.Done || !strings.Contains(r.Report.Text, "guardado(s)") {
+		t.Fatalf("final: %+v", r)
 	}
 }
