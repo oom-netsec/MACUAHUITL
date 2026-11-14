@@ -183,3 +183,13 @@ Se implementa tal como lo describe «Selección por elemento y paquete personal�
 - **Por qué:** detectar `cat9k` cambiaría el comportamiento en los lugares que hoy deciden por `ios-xe` (el modo de cambio asistido, las métricas de puertos, el gemelo ios/ios-xe de Patrol, `playbook.Commands`, los scripts y las listas de acceso), y no hay un equipo con el que validarlo. El riesgo no compensa; el contenido nuevo sale sin tocar nada de eso.
 - **Qué implica:** `playbook.Compatible` deja que un equipo `ios-xe` use también los playbooks de plataforma `cat9k` y `sda` (lo que un router no tenga sale inválido, como ya pasa con un `ios` ante `ios-xe`). Un `ios`, un `wlc-9800` y un `nx-os` no los ven ni los reciben. Los gemelos solo existen entre `ios` e `ios-xe`: `cat9k/x` y `sda/x` nunca son gemelos de `ios/x` ni de `ios-xe/x`, aunque compartan el ID corto. Sus comandos pasan por el `CheckDenied` de IOS, y su script derivado usa la plataforma de scripts `ios-xe`.
 - **Versión:** como el núcleo anterior rechaza esas plataformas, los paquetes `oom/cat9k` y `oom/sda` piden `min_core: 0.4.1`.
+
+## Enmienda (2026-11-14): releases solo de paquetes
+
+Un paquete nuevo o actualizado que no necesita cambios en el núcleo sale sin núcleo nuevo, con un tag `packs-AAAA-MM-DD` (o `packs-AAAA-MM-DD.N` si hay más de uno en el día). Lo publica `.github/workflows/release-packs.yml`:
+- Corre las reglas del repo y la regla de versión: un paquete que cambió desde el release anterior, sea `v*` o `packs-*`, sube de versión.
+- Firma con el código y la versión del último núcleo publicado (el `v*` anterior). Si un paquete pide un núcleo más nuevo o usa una plataforma que ese núcleo no conoce, el release falla.
+- No toca «latest»: la última versión sigue apuntando al último núcleo.
+- Sube todos los paquetes oficiales, con sus README y `SHA256SUMS`.
+
+Un paquete que depende de un driver o de reglas nuevas (ASA, FTD, AireOS…) sigue saliendo con el release `v*` que trae ese núcleo.
