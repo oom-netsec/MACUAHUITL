@@ -2680,6 +2680,8 @@ export const es = {
   "diag.port": "Puerto",
   "diag.port.hint": "De 1024 a 65535; 5201 es el de iperf3.",
   "diag.port.invalid": "Un entero de 1024 a 65535.",
+  "diag.bind.error": "No se pudieron leer las interfaces de esta máquina; reintenta cambiando de modo.",
+  "diag.bind.gone": "La IP {ip} ya no es de esta máquina (cambió la red): elige otra y vuelve a ejecutar.",
 };
 
 export type Key = keyof typeof es;

@@ -1,6 +1,6 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import type { CoreAPI, DiagEvent, NetInterface } from "../../lib/core";
-import { Field, Select, errorText } from "../../components/Field";
+import { Field, Notice, Select, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel } from "../../components/Page";
 import { Terminal } from "../../components/Terminal";
 import { Icon } from "../../components/Icon";
@@ -27,6 +27,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const [bind, setBind] = useState("");
   const [port, setPort] = useState("5201");
   const [ifaces, setIfaces] = useState<NetInterface[]>([]);
+  const [ifState, setIfState] = useState<"loading" | "ok" | "error">("loading");
   const [filter, setFilter] = useState("");
   const [runId, setRunId] = useState("");
   const [lines, setLines] = useState<string[]>([]);
@@ -45,15 +46,18 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const moduleId = useContext(ModuleIdContext);
   const needsTarget = tool !== "pcap" && !(tool === "iperf3" && mode === "server");
   useInbox(moduleId, (addr) => { if (needsTarget) setTarget(addr); });
+  // La vista queda montada toda la sesión: las interfaces se vuelven a leer al pasar a servidor y antes de arrancarlo (DHCP, VPN).
+  const loadIfaces = () => core.listInterfaces().then((l) => { setIfaces(l ?? []); setIfState("ok"); return l ?? []; }, () => { setIfaces([]); setIfState("error"); return [] as NetInterface[]; });
   useEffect(() => {
-    if (tool === "pcap" || tool === "iperf3") core.listInterfaces().then(setIfaces).catch(() => setIfaces([]));
-  }, [core, tool]);
+    if (tool === "pcap" || tool === "iperf3") void loadIfaces();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadIfaces solo usa core
+  }, [core, tool, mode]);
 
   // El servidor iperf3 escucha en una IP de esta máquina (nunca en todas; link-local no sirve con -B) y en un puerto ≥ 1024.
   const server = tool === "iperf3" && mode === "server";
   const binds = localIPs(ifaces);
   const bindIP = binds.includes(bind) ? bind : binds[0] ?? "";
-  const portOk = /^\d+$/.test(port) && Number(port) >= 1024 && Number(port) <= 65535;
+  const portOk = /^[1-9]\d{3,4}$/.test(port) && Number(port) <= 65535; // sin ceros a la izquierda: el núcleo los rechaza
   const apply = (e: DiagEvent) => {
     if (e.done) {
       setResult(e.canceled ? { ok: false, canceled: true, text: t("diag.canceled") } : e.error
@@ -80,6 +84,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   );
 
   const run = async () => {
+    if (server && !localIPs(await loadIfaces()).includes(bindIP)) return setErr(t("diag.bind.gone", { ip: bindIP })); // la IP ya no está (DHCP, VPN)
     setErr(""); setLines([]); setResult(null); setT0(Math.floor(Date.now() / 1000));
     const options: Record<string, string> = {};
     let targets: string[] = [];
@@ -126,9 +131,9 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
         {tool === "iperf3" && <Select label={t("diag.mode")} value={mode} onChange={setMode} options={[["client", t("diag.mode.client")], ["server", t("diag.mode.server")]]} w="md" />}
         {((tool === "iperf3" && !server) || tool === "pcap") && <Field label={t("diag.seconds")} type="number" value={seconds} onChange={setSeconds} w="sm" />}
         {server && binds.length > 0 && <Select label={t("diag.bind")} value={bindIP} onChange={setBind} options={binds.map((a) => [a, a] as [string, string])} w="md" />}
-        {server && <Field label={t("diag.port")} hint={t("diag.port.hint")} value={port} onChange={setPort} error={portOk ? undefined : t("diag.port.invalid")} w="sm" mono />}
+        {server && <Field label={t("diag.port")} hint={t("diag.port.hint")} value={port} onChange={setPort} error={portOk ? undefined : t("diag.port.invalid")} inputMode="numeric" w="sm" mono />}
       </div>
-      {server && binds.length === 0 && <p className="hint">{t("diag.bind.none")}</p>}
+      {server && ifState !== "loading" && binds.length === 0 && <Notice kind="warn">{t(ifState === "error" ? "diag.bind.error" : "diag.bind.none")}</Notice>}
       {tool === "nmap" && (
         <Select label={t("diag.scan")} value={scan} onChange={setScan} w="lg"
           options={[["connect", t("diag.scan.connect")], ["syn", t("diag.scan.syn")], ["udp", t("diag.scan.udp")], ["ping", t("diag.scan.ping")]]} />
