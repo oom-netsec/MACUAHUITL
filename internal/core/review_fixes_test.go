@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -220,4 +221,97 @@ func TestLoginTestOnlyOnCreatedJob(t *testing.T) {
 		t.Fatalf("login test on armed job: %v", err)
 	}
 	h.waitJob(t, job, "closed")
+}
+
+// Un trabajo que ya está cerrando (finish corriendo) no se pausa al suspender ni se vuelve a armar al desbloquear:
+// rearmar su ventana volvería a dejar la DEK viva para un trabajo terminado.
+func TestSuspenderYReanudarIgnoranTrabajosCerrando(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	j := &job{id: "j-cierra", state: "armed", closing: true, Until: time.Now().Add(time.Hour), creds: []string{cred}}
+	h.core.mu.Lock()
+	h.core.jobs[j.id] = j
+	h.core.mu.Unlock()
+	h.core.OnSleep()
+	h.core.mu.Lock()
+	paused := j.paused
+	j.paused = true // como si ya estuviera pausado cuando empezó a cerrar
+	h.core.mu.Unlock()
+	if paused {
+		t.Fatal("OnSleep pausó un trabajo que está cerrando")
+	}
+	if _, err := h.vault.Unlock(ctx(t), &v1.UnlockRequest{MasterPassword: []byte("maestra")}); err != nil { // Unlock llama a resumePaused
+		t.Fatal(err)
+	}
+	if ws := h.core.vault.Windows(); len(ws) != 0 {
+		t.Fatalf("resumePaused rearmó la ventana de un trabajo cerrando: %v", ws)
+	}
+}
+
+// Si el trabajo empieza a cerrar mientras resumePaused rearma su ventana (Arm va sin el candado del núcleo), la
+// ventana se retira: no queda la DEK viva para un trabajo terminado.
+func TestResumePausedRetiraLaVentanaSiElTrabajoCerroMientrasTanto(t *testing.T) {
+	var j *job
+	var core atomic.Pointer[Core]
+	var armando atomic.Bool
+	h := newHarness(t, func(o *Options) {
+		o.Now = func() time.Time {
+			if c := core.Load(); c != nil && armando.Load() && j != nil {
+				c.mu.Lock()
+				j.closing = true // finish arrancó justo durante Arm
+				c.mu.Unlock()
+			}
+			return time.Now()
+		}
+	})
+	core.Store(h.core)
+	cred := h.ready(t)
+	j = &job{id: "j-carrera", state: "armed", paused: true, Until: time.Now().Add(time.Hour), creds: []string{cred}}
+	h.core.mu.Lock()
+	h.core.jobs[j.id] = j
+	h.core.mu.Unlock()
+	armando.Store(true)
+	h.core.resumePaused()
+	armando.Store(false)
+	if ws := h.core.vault.Windows(); len(ws) != 0 {
+		t.Fatalf("quedó la ventana de un trabajo cerrando: %v", ws)
+	}
+	if !j.paused {
+		t.Fatal("no debía reanudarse")
+	}
+}
+
+// Si el equipo se suspende mientras resumePaused rearma la ventana (Arm va sin el candado del núcleo), el trabajo
+// sigue pausado: reanudarlo lo pondría a correr con la bóveda cerrada y el planificador en pausa por OnSleep.
+func TestResumePausedNoReanudaSiSeSuspendioMientrasTanto(t *testing.T) {
+	var core atomic.Pointer[Core]
+	var armando atomic.Bool
+	h := newHarness(t, func(o *Options) {
+		o.Now = func() time.Time {
+			if c := core.Load(); c != nil && armando.Load() {
+				c.mu.Lock()
+				c.sleepGen++ // lo que hace OnSleep en el núcleo; su LockAll esperaría el candado de la bóveda que tiene Arm
+				c.mu.Unlock()
+			}
+			return time.Now()
+		}
+	})
+	core.Store(h.core)
+	cred := h.ready(t)
+	j := &job{id: "j-suspende", state: "armed", paused: true, Until: time.Now().Add(time.Hour), creds: []string{cred}}
+	h.core.mu.Lock()
+	h.core.jobs[j.id] = j
+	h.core.mu.Unlock()
+	armando.Store(true)
+	h.core.resumePaused()
+	armando.Store(false)
+	h.core.mu.Lock()
+	paused := j.paused
+	h.core.mu.Unlock()
+	if !paused {
+		t.Fatal("se reanudó un trabajo aunque el equipo se suspendió durante Arm")
+	}
+	if ws := h.core.vault.Windows(); len(ws) != 0 {
+		t.Fatalf("quedó la ventana armada: %v", ws)
+	}
 }

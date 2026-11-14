@@ -67,6 +67,7 @@ type job struct {
 	results   map[int][]patrol.DeviceResult
 	release   func()
 	paused    bool
+	closing   bool       // finish ya corre: state pasa a completed/cancelled hasta tener manifest y zip
 	cancelReq bool       // CancelJob llegó con el trabajo en "arming": ArmJob lo cancela antes de entregarlo al planificador
 	rounds    int        // rondas terminadas, para el manifest
 	persistMu sync.Mutex // serializa foto y escritura de persistJob: la última foto es la última en llegar a la base
@@ -123,6 +124,7 @@ type Core struct {
 	mu       sync.Mutex
 	vault    *vault.Vault
 	jobs     map[string]*job
+	sleepGen uint64 // sube en cada OnSleep (bajo mu): resumePaused no reanuda si cambió mientras rearmaba
 	activity time.Time
 	stop     chan struct{}
 	watchers sync.WaitGroup
@@ -438,11 +440,12 @@ func (c *Core) vaultState() v1.VaultState {
 // OnSleep: suspensión o apagado. Cierra todo y pausa los trabajos armados (spec §10.4).
 func (c *Core) OnSleep() {
 	c.mu.Lock()
+	c.sleepGen++
 	if c.vault != nil {
 		c.vault.LockAll()
 	}
 	for _, j := range c.jobs {
-		if j.state == "armed" {
+		if j.state == "armed" && !j.closing {
 			j.paused = true
 			c.sched.Pause(j.id)
 		}
@@ -467,11 +470,12 @@ func (c *Core) resumePaused() {
 	c.mu.Lock()
 	var paused []*job
 	for _, j := range c.jobs {
-		if j.paused && j.state == "armed" {
+		if j.paused && j.state == "armed" && !j.closing {
 			paused = append(paused, j)
 		}
 	}
 	v := c.vault
+	gen := c.sleepGen
 	c.mu.Unlock()
 	for _, j := range paused {
 		if err := v.Arm(j.id, j.Until, j.creds); err != nil {
@@ -479,6 +483,12 @@ func (c *Core) resumePaused() {
 			continue
 		}
 		c.mu.Lock()
+		// Empezó a cerrar, o el equipo se suspendió, mientras se armaba: no dejar la DEK viva ni reanudar.
+		if j.closing || j.state != "armed" || c.sleepGen != gen {
+			c.mu.Unlock()
+			v.Disarm(j.id)
+			continue
+		}
 		j.paused = false
 		c.mu.Unlock()
 		c.sched.Resume(j.id)

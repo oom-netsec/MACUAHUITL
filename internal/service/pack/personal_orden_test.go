@@ -15,7 +15,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
 
-func nScripts(t *testing.T, q querier) int {
+func nScripts(t *testing.T, q scripts.Querier) int {
 	t.Helper()
 	var n int
 	if err := q.QueryRow(`SELECT count(*) FROM scripts`).Scan(&n); err != nil {
@@ -87,7 +87,7 @@ func prepImport(t *testing.T) (*svc, *servicetest.Deps, string, string) {
 		t.Fatal(err)
 	}
 	now := time.Now()
-	if err := put(d1.DB(), scripts.Script{ID: "s1", Name: "Uno", Tech: "l3", Platform: "ios", Commands: []string{"show clock"}, CreatedAt: now, UpdatedAt: now}); err != nil {
+	if err := scripts.Insert(d1.DB(), scripts.Script{ID: "s1", Name: "Uno", Tech: "l3", Platform: "ios", Commands: []string{"show clock"}, CreatedAt: now, UpdatedAt: now}); err != nil {
 		t.Fatal(err)
 	}
 	s1 := &svc{d: d1, store: st1, cfg: Module{UserPlaybooks: func() []playbook.Playbook {
