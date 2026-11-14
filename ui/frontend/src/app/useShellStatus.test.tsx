@@ -13,3 +13,12 @@ test("al terminar una ejecución asistida se borra su dueño de localStorage y l
   expect(localStorage.getItem(assistOwnerKey("r1"))).toBeNull();
   expect(localStorage.getItem(assistOwnerKey("r2"))).toBe("ports");
 });
+
+// assist:done con error es un corte del stream del watch, no el fin de la ejecución: el dueño sigue haciendo falta (franja «Ir», reenganche).
+test("un assist:done con error conserva el dueño", () => {
+  localStorage.setItem(assistOwnerKey("r3"), "snippets");
+  const ports = fakePorts();
+  renderHook(() => useShellStatus(fakeCore(ports)));
+  act(() => ports.emitAssistDone({ runId: "r3", error: "stream cortado" }));
+  expect(localStorage.getItem(assistOwnerKey("r3"))).toBe("snippets");
+});

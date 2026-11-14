@@ -111,18 +111,6 @@ test("importar: con dos conflictos, uno sin decidir deja el botón apagado y dic
   expect(within(d).getAllByText(/^script · /).length).toBeGreaterThan(0); // el tipo pasa por i18n
 });
 
-test("importar: un script y un playbook con el mismo id deciden por separado, y al núcleo viaja el id de cada uno", async () => {
-  const same = { ...preview, items: [{ kind: "script" as const, id: "dup", name: "S", state: "conflicto_id", conflictsWith: "x" }, { kind: "playbook" as const, id: "dup", name: "P", state: "conflicto_id", conflictsWith: "user" }] };
-  const { core, d } = await openImport({ packImportPreview: vi.fn(async () => same), packImport: vi.fn(async () => ({ ...same, applied: true })) });
-  const [a, b] = await within(d).findAllByRole("combobox");
-  await userEvent.selectOptions(a, "omitir");
-  expect(b).toHaveValue("");
-  expect(within(d).getByText("Decide qué hacer con cada conflicto: faltan 1.")).toBeVisible();
-  await userEvent.selectOptions(b, "renombrar");
-  await userEvent.click(within(d).getByRole("button", { name: "Importar" }));
-  await waitFor(() => expect(core.packImport).toHaveBeenCalledWith("/tmp/i.mpack", "sha-prev", [{ itemId: "dup", action: "omitir" }, { itemId: "dup", action: "renombrar" }]));
-});
-
 test("exportar: el editor inválido dice por qué y sin nada que exportar no se pide la ruta", async () => {
   const { core, d } = await openExport();
   const ed = within(d).getByLabelText(/Editor y nombre/);

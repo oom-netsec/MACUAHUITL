@@ -380,11 +380,14 @@ test("closed repetido o fuera de orden no reabre el stream ni duplica fases", as
   expect(core.subscribe).toHaveBeenCalledTimes(1);
 });
 
-test("al abrir se suscribe también a un trabajo terminado que aún puede estar empaquetando", async () => {
-  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "jc", name: "cerrando", state: "completed" }, { id: "jn", name: "nuevo", state: "created" }]) });
+// Los trabajos viejos (terminados o cancelados) no abren stream: con cientos de respaldos programados serían cientos de streams
+// y dos recargas de la lista por cada uno. El manifest y el zip se hacen mientras el trabajo sigue armado.
+test("al abrir solo se suscribe a los trabajos activos, no a los terminados ni a los creados", async () => {
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "ja", name: "armado", state: "armed" }, { id: "jc", name: "viejo", state: "completed" }, { id: "jx", name: "cancelado", state: "cancelled" }, { id: "jn", name: "nuevo", state: "created" }]) });
   render(<PatrolView core={core} />);
-  await waitFor(() => expect(core.subscribe).toHaveBeenCalledWith(["jc"]));
-  expect(core.subscribe).not.toHaveBeenCalledWith(["jn"]);
+  await waitFor(() => expect(core.subscribe).toHaveBeenCalledWith(["ja"]));
+  await act(async () => {});
+  expect(vi.mocked(core.subscribe).mock.calls.flat(2)).toEqual(["ja"]);
 });
 
 test("armar no abre un segundo stream del mismo trabajo", async () => {

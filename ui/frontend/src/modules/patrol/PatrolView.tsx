@@ -57,7 +57,9 @@ export function PatrolView({ core }: { core: CoreAPI }) {
       const js = await core.listJobs();
       if (n !== listSeq.current) return;
       setJobs(sortJobs(js));
-      await subscribeJobs(js.filter((j) => j.state !== "created").map((j) => j.id)); // también los terminados (created aún no emite): el núcleo no dice si ya cerraron (empaquetan manifest y zip) y, si cerraron, contesta «closed» y cierra el stream
+      // Solo los activos: el manifest y el zip se hacen mientras el trabajo sigue armado, y suscribir a los ya cerrados abriría un stream y
+      // dos recargas por cada trabajo viejo (los respaldos programados se cuentan por cientos).
+      await subscribeJobs(js.filter(active).map((j) => j.id));
       // Al abrir, si hay un trabajo armado, se muestra ese en lugar del formulario.
       if (!autoSelected.current) {
         autoSelected.current = true;
