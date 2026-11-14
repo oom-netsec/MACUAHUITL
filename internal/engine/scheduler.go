@@ -31,6 +31,7 @@ type armed struct {
 // Scheduler dispara rondas de trabajos armados.
 type Scheduler struct {
 	Heartbeat time.Duration // 5 s por defecto (spec §6)
+	Tick      time.Duration // cada cuánto se compara el reloj de pared con la hora esperada; 1 s por defecto
 	r         *Runner
 	bus       *Bus
 	now       func() time.Time
@@ -39,7 +40,7 @@ type Scheduler struct {
 }
 
 func NewScheduler(r *Runner, bus *Bus, now func() time.Time) *Scheduler {
-	return &Scheduler{Heartbeat: 5 * time.Second, r: r, bus: bus, now: now, jobs: map[string]*armed{}}
+	return &Scheduler{Heartbeat: 5 * time.Second, Tick: time.Second, r: r, bus: bus, now: now, jobs: map[string]*armed{}}
 }
 
 // Arm empieza a correr jobID: la primera ronda sale de inmediato, salvo con cron,
@@ -108,12 +109,8 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 			wake = until // no esperar al siguiente tic si el trabajo termina antes
 			a.next.Store(0)
 		}
-		timer := time.NewTimer(time.Until(wake))
-		select {
-		case <-ctx.Done():
-			timer.Stop()
+		if !s.sleepUntil(ctx, wake) {
 			state = "cancelled"
-		case <-timer.C:
 		}
 		if state == "cancelled" || !s.now().Before(until) {
 			break
@@ -124,12 +121,16 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 		} else {
 			next = next.Add(sc.Interval)
 		}
-		if (sc.Rounds == 0 || round < sc.Rounds) && next.Before(until) {
+		more := (sc.Rounds == 0 || round < sc.Rounds) && next.Before(until)
+		if more {
 			a.next.Store(next.UnixNano())
 		} else {
 			a.next.Store(0)
 		}
-		if a.paused.Load() || a.running.Load() {
+		// Tras una suspensión del sistema, las rondas que ya pasaron de largo se registran como omitidas en vez de
+		// salir todas de golpe; la última de la ventana sí corre.
+		missed := more && sc.Interval > 0 && s.now().Round(0).Sub(wake.Round(0)) >= sc.Interval
+		if a.paused.Load() || a.running.Load() || missed {
 			s.bus.Publish(Event{JobID: jobID, Kind: Warning, Detail: "round.skipped", Index: round})
 		} else {
 			a.running.Store(true)
@@ -153,6 +154,29 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 	s.mu.Unlock()
 	a.cancel()
 	s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: state})
+}
+
+// sleepUntil espera hasta wake mirando el reloj de pared cada Tick: los temporizadores de Go son monotónicos y no
+// avanzan mientras el sistema está suspendido, así que un solo sueño largo se pasaría de la ventana al reanudar.
+// Devuelve false si ctx se cancela antes.
+func (s *Scheduler) sleepUntil(ctx context.Context, wake time.Time) bool {
+	tick := s.Tick
+	if tick <= 0 {
+		tick = time.Second
+	}
+	for {
+		rem := wake.Round(0).Sub(s.now().Round(0)) // Round(0) quita la lectura monotónica
+		if rem <= 0 {
+			return ctx.Err() == nil
+		}
+		t := time.NewTimer(min(rem, tick))
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return false
+		case <-t.C:
+		}
+	}
 }
 
 func (s *Scheduler) get(jobID string) *armed {

@@ -298,3 +298,55 @@ func TestArmValidation(t *testing.T) {
 		t.Error("double arm accepted")
 	}
 }
+
+// reloj es un reloj de pared que la prueba adelanta a mano, como lo hace una suspensión del sistema.
+type reloj struct{ ns atomic.Int64 }
+
+func (r *reloj) now() time.Time         { return time.Unix(0, r.ns.Load()).UTC() }
+func (r *reloj) avanza(d time.Duration) { r.ns.Add(int64(d)) }
+
+// Tras una suspensión, los temporizadores monotónicos no avanzaron: el planificador mira el reloj de pared en cada
+// tic. Las rondas perdidas salen como omitidas, la última de la ventana corre y pasada la ventana el trabajo termina.
+func TestSuspensionRecalculaConElRelojDePared(t *testing.T) {
+	c := &reloj{}
+	c.ns.Store(time.Date(2026, 11, 13, 9, 0, 0, 0, time.UTC).UnixNano())
+	t0 := c.now()
+	b := NewBus(256)
+	s := NewScheduler(NewRunner(10, b), b, c.now)
+	s.Heartbeat, s.Tick = time.Hour, 5*time.Millisecond
+	ch, cancel := b.Subscribe(nil)
+	defer cancel()
+	var runs atomic.Int32
+	if err := s.Arm("j", Schedule{Interval: time.Hour}, t0.Add(10*time.Hour), []string{"x"}, func(context.Context, int, string) error {
+		runs.Add(1)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor := func(what string, ok func() bool) {
+		t.Helper()
+		for end := time.Now().Add(3 * time.Second); !ok(); time.Sleep(5 * time.Millisecond) {
+			if time.Now().After(end) {
+				t.Fatalf("no ocurrió: %s (runs=%d)", what, runs.Load())
+			}
+		}
+	}
+	waitFor("ronda 1", func() bool { return runs.Load() == 1 })
+	c.avanza(5*time.Hour + 30*time.Minute) // el sistema duerme 5 h 30 min
+	waitFor("ronda al reanudar", func() bool { return runs.Load() == 2 })
+	time.Sleep(100 * time.Millisecond)
+	if n := runs.Load(); n != 2 {
+		t.Fatalf("las rondas perdidas salieron de golpe: runs=%d", n)
+	}
+	if n := s.NextRound("j"); !n.Equal(t0.Add(6 * time.Hour)) {
+		t.Fatalf("siguiente ronda = %v", n)
+	}
+	c.avanza(6 * time.Hour) // pasada la ventana (t0+11 h)
+	evs := collect(ch, done, 3*time.Second)
+	if evs[len(evs)-1].State != "completed" || runs.Load() != 2 {
+		t.Fatalf("fuera de la ventana corrió o no terminó: runs=%d last=%+v", runs.Load(), evs[len(evs)-1])
+	}
+	if n := count(evs, Warning, "round.skipped"); n != 4 {
+		t.Fatalf("rondas omitidas = %d, quería 4", n)
+	}
+}
