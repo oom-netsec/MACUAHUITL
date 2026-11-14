@@ -404,7 +404,7 @@ const help = `  scripts list [TEXTO] [--tech T] [--platform P] [--tag X] [--fav]
   scripts add NOMBRE --tech T --platform P [--desc D] [--tag X]... [--file F|-]
   scripts edit ID [--name N] [--tech T] [--platform P] [--desc D] [--tag X]... [--file F|-]
         (los comandos van uno por línea, de un archivo o de stdin; edit solo cambia lo que se pasa y --tag o --file reemplazan la lista entera.
-         tech: l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro; platform: ios, ios-xe, nx-os, asa, ftd, wlc-aireos, cualquiera)
+         tech: l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro; platform: ios, ios-xe, nx-os, asa, ftd, wlc-aireos, ise, cualquiera)
   scripts rm ID  |  scripts fav ID [--off]  |  scripts dup ID
         (borra uno tuyo, marca o quita un favorito (también en la biblioteca), o copia cualquiera como script tuyo)
   scripts copy ID

@@ -1,0 +1,19 @@
+# Propósito: Configuración SNMP del nodo y su puerto.
+# Cuándo usarlo: El monitoreo SNMP no consulta al nodo.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/ise/3-1/cli_ref_guide/b_ise_CLI_Reference_Guide_31.html
+# Sin validar en laboratorio (no hay ISE en el laboratorio; comandos de la documentación de Cisco).
+id: svc-snmp
+platform: ise
+name: ISE · Servicios · SNMP
+name_en: ISE · Services · SNMP
+commands:
+  - cmd: show clock
+  - cmd: show running-config | include snmp
+    timeout: 120s
+    may_contain_secrets: true
+  - cmd: show ports | include 161
+    timeout: 120s
+  - cmd: show application status ise
+  - cmd: show version
+  - cmd: show uptime
+  - cmd: show interface

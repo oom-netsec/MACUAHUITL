@@ -8,7 +8,7 @@ import type { Host, HostDraft, HostPlatform } from "./api";
 export interface HostForm { name: string; address: string; port: string; platform: HostPlatform; folder: string; tags: string; credentialId: string; notes: string }
 export type HostField = keyof HostForm;
 
-export const PLATFORMS: [HostPlatform, string][] = [["ios", "IOS"], ["ios-xe", "IOS-XE"], ["nx-os", "NX-OS"], ["asa", "ASA"], ["ftd", "FTD"], ["iosxr", "IOS-XR"], ["wlc", "WLC"]];
+export const PLATFORMS: [HostPlatform, string][] = [["ios", "IOS"], ["ios-xe", "IOS-XE"], ["nx-os", "NX-OS"], ["asa", "ASA"], ["ftd", "FTD"], ["ise", "ISE"], ["iosxr", "IOS-XR"], ["wlc", "WLC"]];
 
 export const emptyForm: HostForm = { name: "", address: "", port: "22", platform: "", folder: "", tags: "", credentialId: "", notes: "" };
 

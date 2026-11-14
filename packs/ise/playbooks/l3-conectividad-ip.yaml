@@ -1,0 +1,22 @@
+# Propósito: Ping, traceroute y DNS inverso hacia una IP.
+# Cuándo usarlo: Probar desde el nodo si llega a un equipo (NAD, AD, otro nodo).
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/ise/3-1/cli_ref_guide/b_ise_CLI_Reference_Guide_31.html
+# Sin validar en laboratorio (no hay ISE en el laboratorio; comandos de la documentación de Cisco).
+id: l3-conectividad-ip
+platform: ise
+name: ISE · L3 · Conectividad a una IP
+name_en: ISE · L3 · Connectivity to an IP
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show clock
+  - cmd: ping {ip}
+  - cmd: traceroute {ip}
+  - cmd: nslookup {ip}
+  - cmd: show ip route
+    timeout: 120s
+  - cmd: show interface
+  - cmd: show running-config | include name-server
+    timeout: 120s
+    may_contain_secrets: true

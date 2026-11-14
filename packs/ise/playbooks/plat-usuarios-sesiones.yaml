@@ -1,0 +1,16 @@
+# Propósito: Quién está conectado a la CLI y desde cuándo.
+# Cuándo usarlo: Cambios inesperados en el nodo y hay que ver quién entró.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/ise/3-1/cli_ref_guide/b_ise_CLI_Reference_Guide_31.html
+# Sin validar en laboratorio (no hay ISE en el laboratorio; comandos de la documentación de Cisco).
+id: plat-usuarios-sesiones
+platform: ise
+name: ISE · Plataforma · Usuarios conectados
+name_en: ISE · Platform · Logged-in users
+commands:
+  - cmd: show clock
+  - cmd: show users
+  - cmd: show uptime
+  - cmd: show version
+  - cmd: show application status ise
+  - cmd: show logging system | last 50
+    timeout: 120s

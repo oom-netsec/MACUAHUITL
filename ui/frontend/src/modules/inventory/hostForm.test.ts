@@ -74,3 +74,7 @@ test("un error con reason ajeno a hosts no se asigna a ningún campo aunque el t
 test("ftd es una plataforma de host", () => {
   expect(PLATFORMS.map(([v]) => v)).toContain("ftd");
 });
+
+test("ise es una plataforma de host", () => {
+  expect(PLATFORMS.map(([v]) => v)).toContain("ise");
+});

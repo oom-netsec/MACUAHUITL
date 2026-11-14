@@ -1,0 +1,19 @@
+# Propósito: CPU, memoria, discos, errores de interfaz y log reciente.
+# Cuándo usarlo: El nodo o la interfaz web van lentos.
+# Fuente: https://www.cisco.com/c/en/us/td/docs/security/ise/3-1/cli_ref_guide/b_ise_CLI_Reference_Guide_31.html
+# Sin validar en laboratorio (no hay ISE en el laboratorio; comandos de la documentación de Cisco).
+id: tac-lentitud
+platform: ise
+name: ISE · TAC · Lentitud
+name_en: ISE · TAC · Slowness
+commands:
+  - cmd: show clock
+  - cmd: show uptime
+  - cmd: show cpu
+  - cmd: show cpu statistics
+  - cmd: show memory
+  - cmd: show disks
+  - cmd: show application status ise
+  - cmd: show interface | include errors
+  - cmd: show logging system | last 100
+    timeout: 120s

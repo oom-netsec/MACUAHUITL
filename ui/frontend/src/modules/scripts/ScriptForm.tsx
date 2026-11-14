@@ -6,7 +6,7 @@ import type { ScriptDraft, ScriptItem, ScriptPlatform, ScriptTech } from "./api"
 import { fieldOfError, parseCommands, parseTags, validateScript, type FormErrors } from "./text";
 
 export const TECHS: ScriptTech[] = ["l2", "l3", "gestion", "seguridad", "qos", "etherchannel", "wireless", "diagnostico", "otro"];
-export const PLATFORMS: ScriptPlatform[] = ["ios", "ios-xe", "nx-os", "asa", "ftd", "wlc-aireos", "cualquiera"];
+export const PLATFORMS: ScriptPlatform[] = ["ios", "ios-xe", "nx-os", "asa", "ftd", "wlc-aireos", "ise", "cualquiera"];
 
 // Alta y edición de un script propio. Valida junto a cada campo (tras el primer intento de guardar) y coloca
 // el error del núcleo en el campo que nombra.
