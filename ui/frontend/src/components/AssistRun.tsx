@@ -43,9 +43,10 @@ function changedText(changed: string[], t: ReturnType<typeof useT>): string {
 // protojson omite device y lines vacíos: el paso se guarda ya completo para que nada lea undefined.
 const stepOf = (s: AssistStep): AssistStep => ({ ...s, device: s.device ?? "", lines: s.lines ?? [] });
 
-// fromInfo arma el estado de la vista para una ejecución que seguía viva al abrir el módulo.
+// Reenganches seguidos, sin eventos nuevos, que se intentan tras cortes del stream antes de cerrar la vista con el error.
 const MAX_REATTACH = 3;
 
+// fromInfo arma el estado de la vista para una ejecución que seguía viva al abrir el módulo.
 function fromInfo(i: AssistRunInfo): RunState {
   return { id: i.runId, active: true, state: i.state ?? "running", pending: i.pending ? stepOf(i.pending) : null, failReason: i.failReason ?? "",
     stopped: i.state === "failed" && !!i.waiting, changed: i.changed ?? [], log: [] };

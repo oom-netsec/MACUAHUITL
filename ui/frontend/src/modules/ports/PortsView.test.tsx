@@ -159,6 +159,22 @@ test("un corte del stream con la ejecución viva se reengancha sin duplicar la s
   for (let i = 0; i < 3; i++) await act(async () => core.emitAssistDone({ runId: "r9", error: "stream cortado" }));
   await waitFor(() => expect(screen.queryByRole("region", { name: "Paso pendiente save-1" })).toBeNull());
   expect(core.assistWatch).toHaveBeenCalledTimes(4);
+  expect(screen.getByText(/stream cortado/)).toBeInTheDocument(); // se cierra mostrando el error
+});
+
+// Una ejecución sana con cortes esporádicos: un evento nuevo entre cortes reinicia la cuenta y la vista no se cierra.
+test("un evento nuevo entre cortes reinicia la cuenta de reenganches", async () => {
+  const step = { id: "save-1", kind: "save", device: "SW1", lines: ["write memory"] };
+  const info = { runId: "r9", state: "waiting-confirm", active: true, waiting: true, canRollback: true, pending: step, changed: ["SW1"] };
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), assistListRuns: vi.fn(async () => [info]) });
+  render(<PortsView core={core} />);
+  await screen.findByRole("region", { name: "Paso pendiente save-1" });
+  const cut = () => act(async () => core.emitAssistDone({ runId: "r9", error: "stream cortado" }));
+  for (let i = 0; i < 3; i++) await cut();
+  act(() => core.emitAssist({ runId: "r9", seq: 7, kind: "pending", state: "waiting-confirm", step })); // evento nuevo de verdad
+  for (let i = 0; i < 3; i++) await cut();
+  await waitFor(() => expect(core.assistWatch).toHaveBeenCalledTimes(7));
+  expect(screen.getByRole("alert")).toHaveTextContent("MODO ASISTIDO ACTIVO");
 });
 
 test("si no se puede preguntar al núcleo, un done cierra la vista como siempre", async () => {
