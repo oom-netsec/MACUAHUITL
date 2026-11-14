@@ -26,6 +26,7 @@ type armed struct {
 	paused  atomic.Bool
 	running atomic.Bool
 	next    atomic.Int64 // UnixNano de la siguiente ronda; 0 = no hay
+	until   time.Time    // fin de la ventana, sin lectura monotónica
 }
 
 // Scheduler dispara rondas de trabajos armados.
@@ -59,8 +60,10 @@ func (s *Scheduler) Arm(jobID string, sc Schedule, until time.Time, targets []st
 			return fmt.Errorf("engine: cron: %w", err)
 		}
 	}
-	if !sc.Until.IsZero() && sc.Until.Before(until) {
-		until = sc.Until
+	// Round(0) quita la lectura monotónica: en Linux no avanza con el sistema suspendido y compararía mal contra el reloj de pared.
+	until = until.Round(0)
+	if !sc.Until.IsZero() && sc.Until.Round(0).Before(until) {
+		until = sc.Until.Round(0)
 	}
 	if !until.After(s.now()) {
 		return i18n.New("engine.err.job_ended", nil)
@@ -74,7 +77,7 @@ func (s *Scheduler) Arm(jobID string, sc Schedule, until time.Time, targets []st
 		return i18n.New("engine.err.armed", i18n.A("job", jobID))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	a := &armed{cancel: cancel}
+	a := &armed{cancel: cancel, until: until}
 	s.jobs[jobID] = a
 	s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: "armed"})
 	go s.heartbeat(ctx, jobID)
@@ -98,7 +101,7 @@ func (s *Scheduler) heartbeat(ctx context.Context, jobID string) {
 func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedule, cs cron.Schedule, until time.Time, targets []string, f RunFunc) {
 	var wg sync.WaitGroup
 	state := "completed"
-	next := s.now()
+	next := s.now().Round(0)
 	if cs != nil {
 		next = cs.Next(next) // cron: la primera ronda es la primera coincidencia, no ya
 	}
@@ -117,7 +120,7 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 		}
 		// La siguiente se calcula y publica antes de lanzar esta ronda: NextRound nunca devuelve la que ya corre.
 		if cs != nil {
-			next = cs.Next(s.now())
+			next = cs.Next(s.now().Round(0))
 		} else {
 			next = next.Add(sc.Interval)
 		}

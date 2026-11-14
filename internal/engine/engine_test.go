@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -348,5 +349,18 @@ func TestSuspensionRecalculaConElRelojDePared(t *testing.T) {
 	}
 	if n := count(evs, Warning, "round.skipped"); n != 4 {
 		t.Fatalf("rondas omitidas = %d, quería 4", n)
+	}
+}
+
+// Con el reloj real (que trae lectura monotónica), el fin de la ventana se guarda solo con hora de pared: la
+// monotónica no avanza con el sistema suspendido y dejaría correr rondas fuera de la ventana al despertar.
+func TestVentanaDelPlanificadorSinLecturaMonotonica(t *testing.T) {
+	s, _ := newSched(t)
+	if err := s.Arm("j", Schedule{Interval: time.Hour}, time.Now().Add(time.Minute), []string{"x"}, func(context.Context, int, string) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Cancel("j")
+	if u := s.get("j").until; strings.Contains(u.String(), "m=") {
+		t.Fatalf("until trae lectura monotónica: %v", u)
 	}
 }
