@@ -22,6 +22,7 @@ func init() {
 		"pack.err.editor.reserved":        e("el editor {editor:q} es solo de paquetes con firma oficial", "the publisher {editor:q} is reserved for packages with an official signature", "editor"),
 		"pack.err.read":                   e("no se pudo leer el paquete: {cause}", "the package could not be read: {cause}", "cause"),
 		"pack.err.unsigned":               e("el paquete no está firmado; confirma la instalación de un paquete de terceros", "the package is not signed; confirm the installation of a third-party package"),
+		"pack.err.would_displace":         e("instalar {id} quitaría los paquetes de terceros {ids}, que chocan con él; confírmalo para continuar", "installing {id} would remove the third-party packages {ids}, which collide with it; confirm to continue", "id", "ids"),
 		"pack.err.collision":              e("{id} ya existe en {with}", "{id} already exists in {with}", "id", "with"),
 		"pack.err.version":                e("ya está instalada la versión {installed} de {id}; quítala antes de instalar la {version}", "version {installed} of {id} is already installed; remove it before installing {version}", "id", "installed", "version"),
 		"pack.err.official_replace":       e("el paquete oficial {id} solo lo reemplaza otro con firma oficial", "the official package {id} can only be replaced by another with an official signature", "id"),

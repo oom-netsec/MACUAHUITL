@@ -18,6 +18,9 @@ func TestRogueKeySignsDNSKEY(t *testing.T) {
 	ej := zones["ejemplo.lab."]
 	rogue := &dns.DNSKEY{Hdr: dns.RR_Header{Name: ej.origin, Rrtype: dns.TypeDNSKEY, Class: dns.ClassINET, Ttl: 3600}, Flags: 256, Protocol: 3, Algorithm: dns.ECDSAP256SHA256}
 	priv, err := rogue.Generate(256)
+	for err == nil && rogue.KeyTag() == 0 { // Sign rechaza KeyTag 0 (1 de cada 65536 llaves al azar)
+		priv, err = rogue.Generate(256)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

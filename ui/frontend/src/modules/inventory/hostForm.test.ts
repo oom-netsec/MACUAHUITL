@@ -1,4 +1,4 @@
-import { PLATFORMS, coreErrorField, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
+import { PLATFORMS, coreErrorField, hostPlatformOf, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
 
 const ok: HostForm = { name: "SW1", address: "10.0.0.1", port: "22", platform: "ios-xe", folder: "Lab", tags: "core dc-1", credentialId: "", notes: "" };
 
@@ -77,4 +77,12 @@ test("ftd es una plataforma de host", () => {
 
 test("ise es una plataforma de host", () => {
   expect(PLATFORMS.map(([v]) => v)).toContain("ise");
+});
+
+test("la plataforma detectada pasa a la del inventario: variantes de WLC son wlc y lo desconocido queda sin definir", () => {
+  expect(hostPlatformOf("wlc-aireos")).toBe("wlc");
+  expect(hostPlatformOf("wlc-9800")).toBe("wlc");
+  expect(hostPlatformOf("asa")).toBe("asa");
+  expect(hostPlatformOf("cat9k")).toBe("");
+  expect(hostPlatformOf("")).toBe("");
 });

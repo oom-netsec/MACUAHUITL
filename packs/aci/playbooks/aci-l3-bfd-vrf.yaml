@@ -8,7 +8,7 @@ name: ACI · L3 · BFD de una VRF
 name_en: ACI · L3 · VRF BFD
 params:
   - name: vrf
-    kind: interface
+    kind: vrf
 commands:
   - cmd: show bfd neighbors vrf {vrf}
   - cmd: show ip route vrf {vrf}

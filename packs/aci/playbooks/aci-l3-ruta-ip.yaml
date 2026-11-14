@@ -10,7 +10,7 @@ params:
   - name: ip
     kind: ip
   - name: vrf
-    kind: interface
+    kind: vrf
 commands:
   - cmd: show ip route {ip} vrf {vrf}
   - cmd: show ip arp vrf {vrf}

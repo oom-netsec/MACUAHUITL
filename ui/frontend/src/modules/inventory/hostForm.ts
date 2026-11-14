@@ -10,6 +10,12 @@ export type HostField = keyof HostForm;
 
 export const PLATFORMS: [HostPlatform, string][] = [["ios", "IOS"], ["ios-xe", "IOS-XE"], ["nx-os", "NX-OS"], ["asa", "ASA"], ["ftd", "FTD"], ["ise", "ISE"], ["iosxr", "IOS-XR"], ["wlc", "WLC"]];
 
+// Plataforma detectada (Patrol) → la del inventario: las variantes de WLC (wlc-aireos, wlc-9800) son «wlc»; lo que no exista queda sin definir.
+export const hostPlatformOf = (p: string): HostPlatform => {
+  const v = p.startsWith("wlc-") ? "wlc" : p;
+  return PLATFORMS.some(([x]) => x === v) ? (v as HostPlatform) : "";
+};
+
 export const emptyForm: HostForm = { name: "", address: "", port: "22", platform: "", folder: "", tags: "", credentialId: "", notes: "" };
 
 export const formOf = (h: Pick<Host, "name" | "address" | "port" | "platform" | "folder" | "tags" | "credentialId" | "notes">): HostForm =>

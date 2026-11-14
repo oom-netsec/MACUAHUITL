@@ -9,7 +9,9 @@ import { useHostsVersion } from "./signal";
 const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 
 // «host», «host:puerto» o «[ipv6]:puerto» como lo entiende parseTarget en el campo Equipo de la terminal; el puerto nunca se pierde.
-export const targetOf = (h: Pick<Host, "address" | "port">) => (h.port === 22 || !h.port ? h.address : h.address.includes(":") ? `[${h.address}]:${h.port}` : `${h.address}:${h.port}`);
+// Dirección con puerto para mostrar: IPv6 entre corchetes.
+export const addrPort = (h: Pick<Host, "address" | "port">) => (h.address.includes(":") ? `[${h.address}]:${h.port}` : `${h.address}:${h.port}`);
+export const targetOf = (h: Pick<Host, "address" | "port">) => (h.port === 22 || !h.port ? h.address : addrPort(h));
 
 // Elegir un host de la libreta (búsqueda + lista agrupada por carpeta) para rellenar equipo y credencial. Escribir a mano sigue valiendo.
 export function HostPicker({ core, onPick }: { core: CoreAPI; onPick: (h: Host) => void }) {
@@ -38,7 +40,7 @@ export function HostPicker({ core, onPick }: { core: CoreAPI; onPick: (h: Host) 
           <option value="">{t("hosts.pick.none")}</option>
           {groups.map(([folder, list]) => (
             <optgroup key={folder || "\0"} label={folder || t("hosts.folder.none")}>
-              {list.map((h) => <option key={h.id} value={h.id}>{h.name} · {h.address}:{h.port}</option>)}
+              {list.map((h) => <option key={h.id} value={h.id}>{h.name} · {addrPort(h)}</option>)}
             </optgroup>
           ))}
         </select>

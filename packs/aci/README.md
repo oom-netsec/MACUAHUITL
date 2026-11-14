@@ -14,8 +14,8 @@ los de vPC o L3Out no aplican. La app solo permite comandos de lectura: nada de 
 
 ### Datos
 - `ip`, `mac` e `interface`: como en el paquete oom/nx-os.
-- `vrf`: se escribe como `tenant:vrf` (p. ej. `common:default`); la app lo pide con el tipo "interfaz": debe empezar con letra, medir hasta 48 caracteres y no llamarse como un esquema (`tftp:`, `http:`…), porque la app lo rechaza.
-- `vnid`: número de VNID (p. ej. `2850817`); la app lo pide con el tipo "AP".
+- `vrf`: se escribe como `tenant:vrf` (p. ej. `common:default`), con un solo `:` y cada parte de hasta 64 caracteres (letras, dígitos, `_`, `.` y `-`, sin empezar con `-`). Desde la 1.0.1 la app lo pide con su propio tipo «vrf». No se aceptan un tenant con nombre de esquema (`tftp:x`, `ftp:x`, `http:x`…), porque el filtro de solo lectura lo tomaría por ruta remota, ni nombres que lleven `:` dentro.
+- `vnid`: número de VNID entre 1 y 16777215 (p. ej. `2850817`); desde la 1.0.1 la app lo pide con su propio tipo «vnid».
 
 Cómo cargarlo (la aplicación nunca descarga paquetes): baja `oom-aci-<versión>.mpack` de los releases de GitHub, verifica
 su suma en `SHA256SUMS` e instálalo con `mctl pack install oom-aci-<versión>.mpack` o en Ajustes → Paquetes → Instalar.
@@ -34,8 +34,8 @@ L3Out ones do not apply. The app only allows read commands: no `vsh`, `moquery`,
 
 ### Data
 - `ip`, `mac` and `interface`: as in the oom/nx-os package.
-- `vrf`: written as `tenant:vrf` (e.g. `common:default`); the app asks for it with the type "interface": it must start with a letter, be at most 48 characters and not be named like a scheme (`tftp:`, `http:`…), because the app rejects it.
-- `vnid`: VNID number (e.g. `2850817`); the app asks for it with the type "AP".
+- `vrf`: written as `tenant:vrf` (e.g. `common:default`), with a single `:` and each part up to 64 characters (letters, digits, `_`, `.` and `-`, not starting with `-`). Since 1.0.1 the app asks for it with its own "vrf" type. A tenant named like a scheme (`tftp:x`, `ftp:x`, `http:x`…) is not accepted, because the read-only filter would take it for a remote path, nor are names containing `:`.
+- `vnid`: VNID number between 1 and 16777215 (e.g. `2850817`); since 1.0.1 the app asks for it with its own "vnid" type.
 
 How to load it (the application never downloads packages): download `oom-aci-<version>.mpack` from the GitHub releases,
 check its sum in `SHA256SUMS` and install it with `mctl pack install oom-aci-<version>.mpack` or Settings → Packages → Install.

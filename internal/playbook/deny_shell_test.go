@@ -30,7 +30,7 @@ func TestDenyUnPipeSigueIgual(t *testing.T) {
 
 // Cada tipo de dato rechaza todo carácter que bash o el equipo interpretarían, y lo que acepta pasa CheckDenied.
 func TestTiposDeDatoRechazanMetacaracteres(t *testing.T) {
-	validos := map[string]string{"mac": "aabb.ccdd.eeff", "ap": "AP-1", "wlan": "10", "interface": "Gi1/0/1", "ip": "10.0.0.1"}
+	validos := map[string]string{"mac": "aabb.ccdd.eeff", "ap": "AP-1", "wlan": "10", "interface": "Gi1/0/1", "ip": "10.0.0.1", "vrf": "common:default", "vnid": "2850817"}
 	malos := []string{" ", "'", "\"", "$", "`", ";", "&", "|", "<", ">", "(", ")", "\\", "\n"}
 	for _, k := range ParamKinds {
 		base, ok := validos[k]

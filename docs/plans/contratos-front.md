@@ -1363,3 +1363,14 @@ Todos los errores son gRPC con `ErrorInfo` (reason, metadata) y salen en el idio
 ## PlaybookInfo.pack (fase 36)
 
 `PlaybookInfo` trae `pack`: el paquete de origen del playbook (`"oom/cat9k"`, `"oom/sda"`, `"oom/ios-xe"`…), `"usuario"` para los propios (`<config>/playbooks`) y `""` para el contenido base. Con la fase 36 un equipo `ios-xe` ve playbooks de tres paquetes (`oom/ios-xe`, `oom/cat9k`, `oom/sda`); el selector de Patrol debe mostrar de qué paquete viene cada uno. `listPlaybooks` del puente lo pasa tal cual (`pack` en el JSON; ausente = base).
+
+## Tipos de dato `vrf` y `vnid` (núcleo 0.4.7)
+
+`PlaybookInfo.params[].kind` suma dos valores a `mac | ap | wlan | interface | ip`:
+- `vrf`: forma `tenant:vrf` (p. ej. `common:default`), un solo `:`, cada parte de 1 a 64 caracteres `[A-Za-z0-9_.-]` sin empezar con `-`; se rechaza un tenant con nombre de esquema remoto (`tftp:`, `ftp:`, `scp:`, `http:`…).
+- `vnid`: entero de 1 a 16777215, sin ceros a la izquierda (p. ej. `2850817`).
+
+Los usa `oom/aci` 1.0.1 (antes iban como `interface` y `ap`); `oom/wlc-aireos` 1.0.1 pasa sus `wlan` a `kind: wlan`. El núcleo valida (`playbook.err.param_invalid` si no cumple); Front agrega las etiquetas `patrol.param.kind.vrf` y `patrol.param.kind.vnid` y su ayuda en es/en, y el tipo `ParamKind` en el contrato TS. Un tipo desconocido para la UI debe mostrarse como texto libre (el núcleo valida igual).
+
+## Paquetes oficiales y choques (rama fix-pack-prioridad)
+Lo oficial gana: un paquete de terceros ya instalado no puede impedir instalar o actualizar un oficial firmado que choque por nombre (es o en), ID o script. `PackServiceInspectResponse.displaced` (campo 6) lista los IDs de terceros que el oficial apartaría; la vista previa debe avisarlo antes de confirmar («se quitará acme/demo»). `PackServiceInstallResponse.displaced` (campo 3) lista los que se apartaron y se borraron del disco (auditoría `pack.conflict`, con `displaced_by` y `removed`). Un tercero que choca con un oficial se sigue rechazando con `collision`. `Remove` ahora también borra una carpeta de paquete que está en disco pero no cargada (rechazada al arrancar); lo audita `pack.remove` con `not_loaded=true`. `PackServiceInstallRequest.confirmed_displace` (campo 6, lista) es obligatorio para instalar un oficial con `displaced` no vacío: Install solo procede si lo que apartaría está dentro de esa lista; si no (p. ej. otro tercero se instaló tras la vista previa), `pack.err.would_displace` (FailedPrecondition) y no se toca nada. La UI debe mostrar el aviso con los IDs de `Inspect.displaced` y mandar `confirmed_displace` con esos IDs solo si el usuario acepta. `mctl pack install` pregunta (o `--yes`). El puente (`PackInspectDTO`, `PackInstallResultDTO`) aún no expone `displaced`.

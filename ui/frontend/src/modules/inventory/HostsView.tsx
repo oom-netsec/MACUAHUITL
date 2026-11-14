@@ -7,8 +7,9 @@ import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import { useVaultVersion } from "../../lib/vaultSignal";
 import type { Host, KnownDevice } from "./api";
-import { PLATFORMS, coreErrorField, coreErrorKey, draftOf, groupByFolder, emptyForm, formOf, validateHost, type HostField, type HostForm } from "./hostForm";
+import { PLATFORMS, coreErrorField, hostPlatformOf, coreErrorKey, draftOf, groupByFolder, emptyForm, formOf, validateHost, type HostField, type HostForm } from "./hostForm";
 import { hostsChanged, useHostsVersion } from "./signal";
+import { addrPort } from "./HostPicker";
 import "./hosts.css";
 
 const platformName = (p: string) => PLATFORMS.find(([v]) => v === p)?.[1] ?? p;
@@ -74,7 +75,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
 
   const open = (title: string, form: HostForm, id?: string, hiddenCred = "", found = false) => { origin.current = { el: document.activeElement as HTMLElement | null, found }; setSeq((q) => ({ ...q, open: q.open + 1 })); setEditing({ id, title, form, hiddenCred }); setErrs({}); setCoreDetail(""); setMsg(""); setErr(""); setWarns([]); };
   const edit = (h: Host) => open(t("hosts.form.edit", { name: h.name }), formOf(h), h.id, h.credentialId);
-  const fromFound = (d: KnownDevice) => open(t("hosts.form.new"), { ...emptyForm, name: d.hostname, address: d.address, platform: PLATFORMS.some(([v]) => v === d.platform) ? (d.platform as HostForm["platform"]) : "" }, undefined, "", true);
+  const fromFound = (d: KnownDevice) => open(t("hosts.form.new"), { ...emptyForm, name: d.hostname, address: d.address, platform: hostPlatformOf(d.platform) }, undefined, "", true);
   const set = <K extends HostField>(k: K, v: HostForm[K]) => editing && setEditing({ ...editing, form: { ...editing.form, [k]: v } });
 
   const save = async () => {
@@ -115,7 +116,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
           <Field label={t("hosts.f.port")} error={errs.port} value={f.port} onChange={(v) => set("port", v)} w="xs" mono inputMode="numeric" />
         </div>
         <div className="field-row">
-          <Select label={t("hosts.f.platform")} value={f.platform} onChange={(v) => set("platform", v)} w="md" error={errs.platform}
+          <Select label={t("hosts.f.platform")} value={f.platform} onChange={(v) => set("platform", v)} w="md" error={errs.platform} keepUnknown
             options={[["", t("hosts.platform.none")], ...PLATFORMS]} />
           <Field label={t("hosts.f.folder")} hint={t("hosts.f.folder.hint")} error={errs.folder} value={f.folder} onChange={(v) => set("folder", v)} w="md" />
           <Field label={t("hosts.f.tags")} hint={t("hosts.f.tags.hint")} error={errs.tags} value={f.tags} onChange={(v) => set("tags", v)} w="lg" mono />
@@ -137,7 +138,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
   const row = (h: Host) => (
     <tr key={h.id}>
       <td>{h.name}</td>
-      <td className="mono">{h.address}:{h.port}</td>
+      <td className="mono">{addrPort(h)}</td>
       <td>{h.platform ? <Badge>{platformName(h.platform)}</Badge> : <span className="hint">{t("hosts.platform.none")}</span>}</td>
       <td>{h.credentialLabel || creds.find((c) => c.id === h.credentialId)?.label || <span className="hint">{h.credentialId ? missing() : t("hosts.cred.none")}</span>}</td>
       <td>{h.tags.map((x) => <Badge key={x}>{x}</Badge>)}</td>
