@@ -446,3 +446,30 @@ func TestTransferCuentaActividadDeSesion(t *testing.T) {
 		})
 	}
 }
+
+// Bytes de una subida es lo que se leyó y envió, no el tamaño que tenía el archivo al abrirlo: si crece en el camino,
+// el SHA-256 y los bytes describen lo mismo.
+func TestUploadInformaLoRealmenteEnviado(t *testing.T) {
+	pub, recv := t.TempDir(), t.TempDir()
+	file := filepath.Join(pub, "r1.cfg")
+	os.WriteFile(file, []byte("uno\n"), 0o600)
+	r := startSrv(t, fileserve.Config{Proto: "ftp", FromDir: pub, Write: true, RecvDir: recv})
+	up := reqFor(t, "ftp", r, "subida.cfg")
+	up.FromDir, up.Name = pub, "r1.cfg"
+	dial := up.Net.Dial
+	up.Net.Dial = func(ctx context.Context, network, host string, port uint16) (net.Conn, error) {
+		if f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0); err == nil { // crece después del stat inicial
+			f.WriteString("dos\n")
+			f.Close()
+		}
+		return dial(ctx, network, host, port)
+	}
+	res, err := Upload(context.Background(), up)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(filepath.Join(recv, "subida.cfg"))
+	if res.Bytes != int64(len(got)) || res.SHA256 != sum(got) {
+		t.Fatalf("informó %d bytes y %s; el servidor recibió %d bytes (%s)", res.Bytes, res.SHA256, len(got), sum(got))
+	}
+}
