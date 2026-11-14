@@ -239,7 +239,7 @@ func TestFTDPromptSinEcoNoCuenta(t *testing.T) {
 // Un comando pegado de ~215 caracteres: el eco no siempre es literal (CRLF al envolver, «$» de scroll, retrocesos,
 // truncado, « \r»). Nunca debe colgarse hasta el timeout de inactividad por culpa del eco.
 func TestFTDEcoNoLiteralNoCuelga(t *testing.T) {
-	cmd := "show " + strings.Repeat("abcdefghij", 21)
+	cmd := "show " + strings.Repeat("abcdefghij", 20) + "tail-UNIQUE-98765"
 	for name, echo := range map[string]func(string) string{
 		"crlf":       func(l string) string { return l[:198] + "\r\n" + l[198:] },
 		"scroll":     func(l string) string { return l[:100] + "$" + l[100:] },
