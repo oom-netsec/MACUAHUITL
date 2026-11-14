@@ -48,7 +48,7 @@ export const sampleHostFields: HostField[] = [
   { name: "name", type: "texto", required: true, example: "SW-CORE", description: "Nombre del host: 1 a 64 caracteres, sin espacios en los extremos. No se repite (sin importar mayúsculas)." },
   { name: "address", type: "texto", required: true, example: "10.0.0.1", description: "IP o nombre DNS, sin usuario, esquema, puerto ni ruta. La dirección con el puerto no se repite." },
   { name: "port", type: "entero", required: false, example: "22", description: "Puerto SSH, de 1 a 65535. Vacío = 22." },
-  { name: "platform", type: "texto", required: false, example: "ios-xe", description: "Plataforma: ios, ios-xe, nx-os, asa, iosxr, wlc. Vacío = sin definir." },
+  { name: "platform", type: "texto", required: false, example: "ios-xe", description: "Plataforma: ios, ios-xe, nx-os, asa, ftd, iosxr, wlc. Vacío = sin definir." },
   { name: "folder", type: "texto", required: false, example: "Lab", description: "Carpeta de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -. Vacío = sin carpeta." },
   { name: "tags", type: "lista", required: false, example: "core;dc-1", description: "Hasta 10 etiquetas de 1 a 24 caracteres entre a-z, 0-9 y -. En CSV separadas por «;»; en JSON, un arreglo." },
   { name: "credential_label", type: "texto", required: false, example: "admin lab", description: "Etiqueta de una credencial de la bóveda local (nunca el usuario ni la contraseña)." },

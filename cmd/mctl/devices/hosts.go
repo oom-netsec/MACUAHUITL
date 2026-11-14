@@ -77,7 +77,7 @@ func (f *hostFields) flags(fs *flag.FlagSet) {
 	fs.StringVar(&f.name, "name", "", "nombre")
 	fs.StringVar(&f.address, "address", "", "IP o nombre DNS")
 	fs.IntVar(&f.port, "port", 0, "puerto SSH (22 por defecto)")
-	fs.StringVar(&f.platform, "platform", "", "plataforma: ios, ios-xe, nx-os, asa, iosxr, wlc")
+	fs.StringVar(&f.platform, "platform", "", "plataforma: ios, ios-xe, nx-os, asa, ftd, iosxr, wlc")
 	fs.StringVar(&f.folder, "folder", "", "carpeta (un solo nivel)")
 	fs.Var(&f.tags, "tag", "etiqueta (repetible)")
 	fs.StringVar(&f.cred, "cred", "", "id de la credencial en la bóveda")
@@ -348,7 +348,7 @@ const hostsHelp = `  hosts list [TEXTO] [--folder F] [--tag X] [--json]  |  host
         (libreta de hosts: los equipos que agregas a mano, la fuente «manual» de «devices»; se fusionan por dirección con lo descubierto. rm no borra la evidencia)
   hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
   hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
-        (A: IP o nombre DNS, sin usuario, esquema ni puerto; puerto 22 por defecto; platform: ios, ios-xe, nx-os, asa, iosxr, wlc; carpeta de un solo nivel; hasta 10 etiquetas.
+        (A: IP o nombre DNS, sin usuario, esquema ni puerto; puerto 22 por defecto; platform: ios, ios-xe, nx-os, asa, ftd, iosxr, wlc; carpeta de un solo nivel; hasta 10 etiquetas.
          --cred es el id de una credencial de la bóveda (cred list): nunca un secreto. edit solo cambia lo que se pasa; --tag reemplaza todas y un valor vacío quita el campo)
   hosts export --out RUTA [--format csv|json] [--overwrite] [ID...]
         (archivo 0600; el formato sale de la extensión (.csv / .json) o de --format. JSON versionado con suma SHA-256 (integridad, no autenticidad);
