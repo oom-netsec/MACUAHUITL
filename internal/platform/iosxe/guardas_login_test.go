@@ -23,8 +23,8 @@ var prompts = map[string]string{"ios": "Router#", "asa": "asa# ", "nxos": "nx1# 
 
 const abre = "terminal length 0|terminal width 0"
 
-// openBanner arma un equipo que imprime chunks con pausas (en ms) entre ellos y luego su prompt; devuelve el error de Open y lo escrito.
-func openBanner(t *testing.T, prompt string, cred bool, chunks ...any) (error, string) {
+// openBanner arma un equipo que imprime chunks con pausas (en ms) entre ellos y luego su prompt; devuelve lo escrito y el error de Open.
+func openBanner(t *testing.T, prompt string, cred bool, chunks ...any) (string, error) {
 	t.Helper()
 	fastSettle(t)
 	r, w, lg := scriptedDevLog(t, func(out func(string)) {
@@ -43,7 +43,7 @@ func openBanner(t *testing.T, prompt string, cred bool, chunks ...any) (error, s
 	}
 	err := d.Open(context.Background(), r, w, secret.New(nil))
 	time.Sleep(20 * time.Millisecond)
-	return err, strings.Join(lg.get(), "|")
+	return strings.Join(lg.get(), "|"), err
 }
 
 // MEDIO-1: un «User:» de banner sin el nombre del controlador en la línea anterior no recibe usuario, aunque el prompt tarde más que ftdSettle.
@@ -52,7 +52,7 @@ func TestBannerUserLentoSinNombreNoEscribe(t *testing.T) {
 		"\r\n*** Acceso ***\r\nUser:", "\r\n*** Acceso ***\r\nUser: ", "\r\nCisco Controller\r\nUser: ", "\r\n(sin cierre\r\nUser: ", "\r\n(Router) >\r\nUser: ",
 	} {
 		for name, p := range prompts {
-			err, got := openBanner(t, p, true, banner, 2*ftdSettle, "\r\n"+p)
+			got, err := openBanner(t, p, true, banner, 2*ftdSettle, "\r\n"+p)
 			if err != nil || got != abre {
 				t.Fatalf("%s %q: Open = %v, escrito %q", name, banner, err, got)
 			}
@@ -62,7 +62,7 @@ func TestBannerUserLentoSinNombreNoEscribe(t *testing.T) {
 
 // Un IOS sin plataforma marcada con un banner que imita el login («(X)» y «User:») puede recibir el usuario, pero nunca la clave: sin «Password:» antes del primer prompt no sale.
 func TestBannerImitaLoginRecibeSoloElUsuario(t *testing.T) {
-	err, got := openBanner(t, "Router#", true, "\r\n(X)\r\nUser:", 2*ftdSettle, "\r\nRouter#")
+	got, err := openBanner(t, "Router#", true, "\r\n(X)\r\nUser:", 2*ftdSettle, "\r\nRouter#")
 	if !errors.Is(err, platform.ErrLoginFailed) || got != "admin" {
 		t.Fatalf("Open = %v, escrito %q", err, got)
 	}
@@ -154,7 +154,7 @@ func TestMOTDCortadoNoEsPrimerLogin(t *testing.T) {
 		{"Note: unix password:\r", "\nx\r\n"},
 	} {
 		for name, p := range prompts {
-			err, got := openBanner(t, p, false, "\r\n"+c[0], ftdSettle/8, c[1], ftdSettle/8, "\r\n"+p)
+			got, err := openBanner(t, p, false, "\r\n"+c[0], ftdSettle/8, c[1], ftdSettle/8, "\r\n"+p)
 			if err != nil || got != abre {
 				t.Fatalf("%s %q: Open = %v, escrito %q", name, c, err, got)
 			}
@@ -165,7 +165,7 @@ func TestMOTDCortadoNoEsPrimerLogin(t *testing.T) {
 // BAJO-1: una línea de banner «(Cisco Controller) >» al final de un pedazo no hace pasar el equipo por AireOS si llega más.
 func TestBannerConPromptDeAireOSNoEsAireOS(t *testing.T) {
 	for name, p := range prompts {
-		err, got := openBanner(t, p, false, "\r\n(Cisco Controller) >", ftdSettle/8, "\r\n"+p)
+		got, err := openBanner(t, p, false, "\r\n(Cisco Controller) >", ftdSettle/8, "\r\n"+p)
 		if err != nil || got != abre {
 			t.Fatalf("%s: Open = %v, escrito %q", name, err, got)
 		}
@@ -305,7 +305,7 @@ func TestAtPromptAireOS(t *testing.T) {
 
 // «(X)» + «User:» seguido enseguida (menos de la calma) del prompt de un IOS no recibe ni el usuario.
 func TestBannerImitaLoginConPromptRapido(t *testing.T) {
-	err, got := openBanner(t, "Router#", true, "\r\n(X)\r\nUser:", ftdSettle/8, "\r\nRouter#")
+	got, err := openBanner(t, "Router#", true, "\r\n(X)\r\nUser:", ftdSettle/8, "\r\nRouter#")
 	if err != nil || got != abre {
 		t.Fatalf("Open = %v, escrito %q", err, got)
 	}
@@ -313,7 +313,7 @@ func TestBannerImitaLoginConPromptRapido(t *testing.T) {
 
 // «(Nombre) config>» de un banner tampoco se toma de golpe por el prompt de configuración de AireOS.
 func TestBannerConPromptDeConfigDeAireOS(t *testing.T) {
-	err, got := openBanner(t, "Router#", false, "\r\n(Cisco Controller) config>", ftdSettle/8, "\r\nRouter#")
+	got, err := openBanner(t, "Router#", false, "\r\n(Cisco Controller) config>", ftdSettle/8, "\r\nRouter#")
 	if err != nil || got != abre {
 		t.Fatalf("Open = %v, escrito %q", err, got)
 	}
