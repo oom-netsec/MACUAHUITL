@@ -31,3 +31,23 @@ func TestPlaybookDelUsuarioNoEsGemeloDelOficial(t *testing.T) {
 		t.Fatalf("gemelo entre playbooks del usuario: %+v", tw)
 	}
 }
+
+// Un archivo de <config>/playbooks que reemplaza un ID de la base conserva su Pack (""): sigue emparejándose como antes.
+func TestPlaybookDelUsuarioQueReemplazaALaBaseConservaPack(t *testing.T) {
+	h := newHarness(t, nil)
+	base := h.core.basePbs[slices.IndexFunc(h.core.basePbs, func(p playbook.Playbook) bool { return p.Platform == "ios-xe" })]
+	file := strings.TrimPrefix(base.ID, "ios-xe/")
+	h.userPlaybookFile(t, file+".yaml", file, "ios-xe") // mismo ID que el de la base
+	h.userPlaybookFile(t, "nuevo-propio.yaml", "nuevo-propio", "ios-xe")
+	h.restart(t)
+	pack := map[string]string{}
+	for _, p := range h.core.catalog() {
+		pack[p.ID] = p.Pack
+	}
+	if pack[base.ID] != "" {
+		t.Errorf("el que reemplaza a la base debía conservar Pack vacío: %q", pack[base.ID])
+	}
+	if pack["ios-xe/nuevo-propio"] != playbook.PackUsuario {
+		t.Errorf("uno nuevo del usuario debía ser PackUsuario: %q", pack["ios-xe/nuevo-propio"])
+	}
+}
