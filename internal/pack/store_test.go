@@ -593,16 +593,16 @@ func TestInstallWithPrepare(t *testing.T) {
 	changes := 0
 	s.OnChange = func() { changes++ }
 	boom := errors.New("boom")
-	if _, err := s.InstallWith(signedZip(t, priv, nil), false, func(*Pack, string) error { return boom }); !errors.Is(err, boom) {
+	if _, err := s.InstallWith(signedZip(t, priv, nil), false, func(*Pack, string) (func(bool) error, error) { return nil, boom }); !errors.Is(err, boom) {
 		t.Fatalf("err = %v", err)
 	}
 	if ents, _ := os.ReadDir(dir); len(ents) != 0 || len(s.Snapshot().Packs) != 0 || changes != 0 {
 		t.Fatalf("quedó %v %d", ents, changes)
 	}
 	visto := true
-	if _, err := s.InstallWith(signedZip(t, priv, nil), false, func(p *Pack, _ string) error {
+	if _, err := s.InstallWith(signedZip(t, priv, nil), false, func(p *Pack, _ string) (func(bool) error, error) {
 		visto = s.Snapshot().Find(p.ID) != nil // todavía no está publicado
-		return nil
+		return nil, nil
 	}); err != nil || visto || s.Snapshot().Find("oom/demo") == nil {
 		t.Fatalf("%v visto=%v", err, visto)
 	}

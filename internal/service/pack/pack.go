@@ -4,6 +4,7 @@ package pack
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"slices"
 
@@ -96,19 +97,29 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		return nil, reject(err, nil, "none")
 	}
 	sum := dom.SHA256(data)
-	// Lo oculto se guarda antes de publicar el paquete (en una sola transacción): si falla, no se instala nada.
-	// shortcut: si el disco falla justo después, la elección ya guardada queda aplicada a la versión que seguía instalada.
+	// Lo oculto se prepara en una transacción antes de tocar el disco y se confirma después del extract, justo antes de
+	// publicar: si algo falla antes, no se instala nada ni queda guardada la elección.
 	hide := []string{}
 	var prepErr error
-	res, err := s.store.InstallWith(data, r.GetAllowUnsigned(), func(p *dom.Pack, _ string) error {
+	res, err := s.store.InstallWith(data, r.GetAllowUnsigned(), func(p *dom.Pack, _ string) (func(bool) error, error) {
 		items := p.Items()
 		for _, id := range r.GetHide() { // los IDs que el paquete no trae se ignoran
 			if items[id] {
 				hide = append(hide, id)
 			}
 		}
-		prepErr = s.applyInstallHidden(p, hide, r.GetReplaceHidden())
-		return prepErr
+		tx, err := s.applyInstallHidden(p, hide, r.GetReplaceHidden())
+		if err != nil {
+			prepErr = err
+			return nil, err
+		}
+		return func(commit bool) error {
+			if !commit {
+				return tx.Rollback()
+			}
+			prepErr = tx.Commit()
+			return prepErr
+		}, nil
 	})
 	if prepErr != nil {
 		return nil, service.ErrFrom(ctx, codes.Internal, i18n.Wrap("pack.err.hidden_save", prepErr, nil))
@@ -162,25 +173,26 @@ func (s *svc) Inspect(ctx context.Context, r *v1.PackServiceInspectRequest) (*v1
 	return out, nil
 }
 
-// applyInstallHidden guarda lo oculto de una instalación: poda los IDs que el paquete ya no trae y, con replace, deja
-// hide como el conjunto exacto; sin replace, lo que ya estaba oculto se conserva y hide suma.
-func (s *svc) applyInstallHidden(p *dom.Pack, hide []string, replace bool) error {
+// applyInstallHidden prepara lo oculto de una instalación en una transacción que devuelve abierta (quien la llama la
+// confirma o la deshace): poda los IDs que el paquete ya no trae y, con replace, deja hide como el conjunto exacto; sin
+// replace, lo que ya estaba oculto se conserva y hide suma.
+func (s *svc) applyInstallHidden(p *dom.Pack, hide []string, replace bool) (*sql.Tx, error) {
 	tx, err := s.d.DB().Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer tx.Rollback()
-	if err := dom.PruneHidden(tx, p); err != nil {
-		return err
-	}
-	if replace {
-		if err := dom.ReplaceHidden(tx, p, hide); err != nil {
-			return err
+	if err = dom.PruneHidden(tx, p); err == nil {
+		if replace {
+			err = dom.ReplaceHidden(tx, p, hide)
+		} else {
+			_, err = dom.SetHidden(tx, p.ID, hide, nil)
 		}
-	} else if _, err := dom.SetHidden(tx, p.ID, hide, nil); err != nil {
-		return err
 	}
-	return tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	return tx, nil
 }
 
 func (s *svc) List(ctx context.Context, _ *v1.PackServiceListRequest) (*v1.PackServiceListResponse, error) {

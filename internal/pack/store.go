@@ -366,10 +366,13 @@ func (s *Store) Install(data []byte, allowUnsigned bool) (*Result, error) {
 	return s.InstallWith(data, allowUnsigned, nil)
 }
 
-// InstallWith es Install con un paso previo: prepare corre con el paquete ya validado y bajo el lock, antes de tocar
-// el disco y de publicar la foto; si falla, no se instala nada. Sirve para guardar lo que debe estar listo cuando el
-// paquete se vea (lo oculto). replaced es la versión que reemplazaría ("" si es nuevo).
-func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) error) (*Result, error) {
+// InstallWith es Install con un paso previo en dos tiempos, para guardar lo que debe estar listo cuando el paquete se
+// vea (lo oculto) sin que quede aplicado a una versión que no cambió. prepare corre con el paquete ya validado y bajo
+// el lock, antes de tocar el disco: si falla, no se instala nada. Su finish (puede ser nil) corre con commit=false si
+// el extract falla (deshacer) y con commit=true justo antes de publicar la foto; si ese commit falla, el paquete ya
+// está en disco y se publica igual, y el error se devuelve junto con el resultado. replaced es la versión que
+// reemplazaría ("" si es nuevo).
+func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pack, replaced string) (finish func(commit bool) error, err error)) (*Result, error) {
 	s.mu.Lock()
 	p, old, cur, err := s.check(data, allowUnsigned)
 	if err != nil {
@@ -379,20 +382,28 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 		}
 		return &Result{Pack: p}, err
 	}
+	var finish func(bool) error
 	if prepare != nil {
 		replaced := ""
 		if old != nil {
 			replaced = old.Version
 		}
-		if err := prepare(p, replaced); err != nil {
+		if finish, err = prepare(p, replaced); err != nil {
 			s.mu.Unlock()
 			return &Result{Pack: p}, err
 		}
 	}
 	syncWarn, err := s.extract(p)
 	if err != nil {
+		if finish != nil {
+			finish(false)
+		}
 		s.mu.Unlock()
 		return &Result{Pack: p}, err
+	}
+	var finishErr error
+	if finish != nil {
+		finishErr = finish(true)
 	}
 	next := []*Pack{p}
 	for _, o := range cur.Packs {
@@ -409,7 +420,7 @@ func (s *Store) InstallWith(data []byte, allowUnsigned bool, prepare func(p *Pac
 	if old != nil {
 		res.Replaced = old.Version
 	}
-	return res, nil
+	return res, finishErr
 }
 
 // syncDir hace fsync de una carpeta para que el rename y los archivos nuevos sobrevivan a una caída.
