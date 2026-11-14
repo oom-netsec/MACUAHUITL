@@ -1,0 +1,15 @@
+# Propósito: Óptica de todos los puertos: potencias, temperaturas y tipo.
+# Cuándo usarlo: Enlace con errores de capa 1 o una óptica que se degrada.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l1-transceptores
+platform: nx-os
+name: ACI · L1 · Transceptores y DOM
+name_en: ACI · L1 · Transceivers and DOM
+commands:
+  - cmd: show interface transceiver
+  - cmd: show interface transceiver details
+  - cmd: show interface brief
+  - cmd: show interface status
+  - cmd: show interface counters errors
+  - cmd: show module

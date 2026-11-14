@@ -1,0 +1,15 @@
+# Propósito: Estado del vPC del leaf y de los port-channels donde se aprenden endpoints.
+# Cuándo usarlo: Un host dual-homed se aprende en un solo leaf o con la MAC inestable.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-ep-puerto-vpc
+platform: nx-os
+name: ACI · Endpoints · Endpoints y puertos vPC
+name_en: ACI · Endpoints · Endpoints and vPC ports
+commands:
+  - cmd: show vpc brief
+  - cmd: show vpc role
+  - cmd: show interface brief
+  - cmd: show port-channel summary
+  - cmd: show lacp neighbor
+  - cmd: show system internal epm vlan all

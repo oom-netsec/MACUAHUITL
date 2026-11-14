@@ -1,0 +1,15 @@
+# Propósito: Túneles iVXLAN, TEP descubiertos e interfaces del overlay.
+# Cuándo usarlo: Un leaf no alcanza el TEP de otro leaf o de un spine.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-fabric-vtep-tunel
+platform: nx-os
+name: ACI · Fabric · VTEP y túneles
+name_en: ACI · Fabric · VTEPs and tunnels
+commands:
+  - cmd: show tunnel interface
+  - cmd: show isis dteps vrf overlay-1
+  - cmd: show ip route vrf overlay-1
+  - cmd: show ip interface brief vrf overlay-1
+  - cmd: show vrf
+  - cmd: show lldp neighbors

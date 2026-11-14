@@ -16,13 +16,13 @@ import (
 )
 
 // Archivos del catálogo por área (los playbooks anteriores no llevan estos prefijos; tac-baseline es anterior).
-var catalogFile = regexp.MustCompile(`^(l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob|vxlan|fex|stack|svl|poe|asic|lisp|fabric|edge|border|fw|ha|snort|mgmt|logs)-`)
+var catalogFile = regexp.MustCompile(`^(aci|l1|l2|l3|svc|plat|vpn|wan|tac|ctrl|ap|cli|rf|wlan|sec|mob|vxlan|fex|stack|svl|poe|asic|lisp|fabric|edge|border|fw|ha|snort|mgmt|logs)-`)
 
 // Comandos que pueden imprimir secretos (el enmascarado solo corre si el comando lo declara).
 var secretCmd = regexp.MustCompile(`^(show (run|start|tech|snmp (comm|host)|archive log|cts (pacs|cred)|tacacs-server|radius-server)|show (managers|network)( |$)|more )`)
 
 // Salidas sin acotar: tabla completa de rutas/BGP/CEF/MAC o todas las interfaces.
-var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*)?|ip bgp|ip cef|mac address-table|interfaces|wireless client summary|ap summary)$`)
+var bigCmd = regexp.MustCompile(`^show (ip route( vrf \*| vrf all)?|zoning-rule|vrf all detail|ip bgp|ip cef|mac address-table|interfaces|wireless client summary|ap summary)$`)
 
 // Salidas grandes de ASA: conexiones, xlates, ACL, logs, memoria, descartes de ASP, sesiones VPN y configuraciones.
 var asaBigCmd = regexp.MustCompile(`^show (conn( address .*| detail)?|local-host|xlate|access-list( .*)?|tech-support.*|logging( \|.*)?|memory detail|asp drop.*|vpn-sessiondb detail.*|running-config( .*)?|startup-config|nat detail|access-control-config.*|route|bgp|interface|crypto ipsec sa)$`)
@@ -62,6 +62,7 @@ func catalogFS(t testing.TB) fs.FS {
 	add(os.DirFS("../packs/ios/playbooks"), "cisco/ios")
 	add(os.DirFS("../packs/wlc-9800/playbooks"), "cisco/wlc-9800")
 	add(os.DirFS("../packs/nx-os/playbooks"), "cisco/nx-os")
+	add(os.DirFS("../packs/aci/playbooks"), "cisco/aci/nx-os") // ids nx-os/aci-…
 	add(os.DirFS("../packs/cat9k/playbooks"), "cisco/cat9k")
 	add(os.DirFS("../packs/sda/playbooks"), "cisco/sda")
 	add(os.DirFS("../packs/asa/playbooks"), "cisco/asa")

@@ -1,0 +1,20 @@
+# Propósito: Detalle de una VRF y sus reglas de zoning por scope.
+# Cuándo usarlo: Revisar políticas de una VRF y sus interfaces L3. Pide la VRF como tenant:vrf (p. ej. common:default). Pide el VNID como número (p. ej. 2850817).
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-pol-vrf-contratos
+platform: nx-os
+name: ACI · Contratos · VRF y reglas de un tenant
+name_en: ACI · Contracts · Tenant VRF and rules
+params:
+  - name: vrf
+    kind: interface
+  - name: vnid
+    kind: ap
+commands:
+  - cmd: show vrf {vrf} detail
+  - cmd: show zoning-rule scope {vnid}
+  - cmd: show zoning-filter
+  - cmd: show ip interface brief vrf {vrf}
+  - cmd: show ip route vrf {vrf}
+  - cmd: show ip arp vrf {vrf}

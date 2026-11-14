@@ -1,0 +1,19 @@
+# Propósito: Vecinos, interfaces y rutas OSPF de una VRF.
+# Cuándo usarlo: Un vecino OSPF de un L3Out no llega a FULL. Pide la VRF como tenant:vrf (p. ej. common:default).
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l3-ospf-vrf
+platform: nx-os
+name: ACI · L3 · OSPF de una VRF (L3Out)
+name_en: ACI · L3 · VRF OSPF (L3Out)
+params:
+  - name: vrf
+    kind: interface
+commands:
+  - cmd: show ip ospf neighbors vrf {vrf}
+  - cmd: show ip ospf vrf {vrf}
+  - cmd: show ip ospf interface vrf {vrf}
+  - cmd: show ip route vrf {vrf}
+  - cmd: show ip interface brief vrf {vrf}
+  - cmd: show logging logfile | include OSPF
+    timeout: 180s

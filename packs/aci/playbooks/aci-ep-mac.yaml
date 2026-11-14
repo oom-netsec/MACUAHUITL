@@ -1,0 +1,18 @@
+# Propósito: Cómo aprende el leaf una MAC en EPM, con VLAN, vPC y port-channels.
+# Cuándo usarlo: Una MAC se mueve, no se aprende o aparece en el puerto equivocado.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-ep-mac
+platform: nx-os
+name: ACI · Endpoints · Endpoint por MAC
+name_en: ACI · Endpoints · Endpoint by MAC
+params:
+  - name: mac
+    kind: mac
+commands:
+  - cmd: show system internal epm endpoint mac {mac}
+  - cmd: show system internal epm vlan all
+  - cmd: show vlan extended
+  - cmd: show vrf
+  - cmd: show vpc brief
+  - cmd: show port-channel summary

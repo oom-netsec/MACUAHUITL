@@ -1,0 +1,19 @@
+# Propósito: Sesiones BFD de una VRF junto con las rutas y vecinos.
+# Cuándo usarlo: Un vecino cae por BFD en un L3Out. Pide la VRF como tenant:vrf (p. ej. common:default).
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-l3-bfd-vrf
+platform: nx-os
+name: ACI · L3 · BFD de una VRF
+name_en: ACI · L3 · VRF BFD
+params:
+  - name: vrf
+    kind: interface
+commands:
+  - cmd: show bfd neighbors vrf {vrf}
+  - cmd: show ip route vrf {vrf}
+  - cmd: show ip interface brief vrf {vrf}
+  - cmd: show bgp sessions vrf {vrf}
+  - cmd: show ip ospf neighbors vrf {vrf}
+  - cmd: show logging logfile | include BFD
+    timeout: 180s

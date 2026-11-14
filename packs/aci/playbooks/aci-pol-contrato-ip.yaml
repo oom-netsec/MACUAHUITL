@@ -1,0 +1,21 @@
+# Propósito: El endpoint en EPM y las reglas de la VRF para ver qué EPG lo agrupa y qué permiten.
+# Cuándo usarlo: Una IP no alcanza a otra y se sospecha del contrato. Pide el VNID como número (p. ej. 2850817).
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-pol-contrato-ip
+platform: nx-os
+name: ACI · Contratos · Contrato de una IP
+name_en: ACI · Contracts · Contract of an IP
+params:
+  - name: ip
+    kind: ip
+  - name: vnid
+    kind: ap
+commands:
+  - cmd: show system internal epm endpoint ip {ip}
+  - cmd: show endpoint ip {ip}
+  - cmd: show zoning-rule scope {vnid}
+  - cmd: show zoning-filter
+  - cmd: show vrf
+  - cmd: show vrf all detail
+    timeout: 180s

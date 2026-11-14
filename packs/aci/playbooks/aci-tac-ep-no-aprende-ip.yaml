@@ -1,0 +1,19 @@
+# Propósito: EPM, ARP, VLAN y logs para una IP que no aparece.
+# Cuándo usarlo: El fabric no ve una IP o la ve donde no es.
+# Fuente: https://www.cisco.com/c/en/us/support/cloud-systems-management/application-policy-infrastructure-controller-apic/products-troubleshooting-guides-list.html
+# Sin validar en laboratorio: leaf/spine ACI, comandos tomados de la documentación de Cisco
+id: aci-tac-ep-no-aprende-ip
+platform: nx-os
+name: ACI · TAC · Endpoint IP que no se aprende
+name_en: ACI · TAC · IP endpoint not learned
+params:
+  - name: ip
+    kind: ip
+commands:
+  - cmd: show system internal epm endpoint ip {ip}
+  - cmd: show endpoint ip {ip}
+  - cmd: show ip arp
+  - cmd: show system internal epm vlan all
+  - cmd: show vlan extended
+  - cmd: show logging logfile | include EPM
+    timeout: 180s
