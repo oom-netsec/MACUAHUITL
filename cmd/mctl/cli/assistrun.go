@@ -97,7 +97,7 @@ func ask(c *Env, q string, intr <-chan struct{}) (a string, interrupted bool) {
 	}
 }
 
-func yes(a string) bool { return a == "s" || a == "si" || a == "sí" || a == "y" }
+func yes(a string) bool { return a == "s" || a == "si" || a == "sí" || a == "y" || a == "yes" }
 
 // Follow sigue la ejecución y pregunta en cada paso pendiente. Todo lo que no sea una afirmación
 // explícita aborta: nunca se aplica nada por omisión. Ctrl-C también aborta (no deja la ejecución
