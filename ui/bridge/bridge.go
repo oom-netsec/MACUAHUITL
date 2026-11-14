@@ -636,6 +636,9 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 	b.mu.Unlock()
 	st, err := v1.NewDiagServiceClient(c).Run(ctx, req)
 	if err != nil {
+		b.mu.Lock()
+		delete(b.runs, id)
+		b.mu.Unlock()
 		cancel()
 		return "", wrapErr(err)
 	}
@@ -816,6 +819,9 @@ func (b *Bridge) SyslogStart(addr, proto string, allowAny, save bool, o SyslogOp
 		RotateMb: int32(o.RotateMB), RotateMinutes: int32(o.RotateMinutes), NameTemplate: o.NameTemplate, MaxFiles: int32(o.MaxFiles), Format: o.Format,
 	})
 	if err != nil {
+		b.mu.Lock()
+		delete(b.runs, id)
+		b.mu.Unlock()
 		cancel()
 		return "", wrapErr(err)
 	}
