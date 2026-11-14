@@ -14,6 +14,8 @@ type rule struct {
 	block string // "" = en cualquier lugar; si no, solo dentro de ese bloque
 	re    *regexp.Regexp
 	not   *regexp.Regexp // si la línea la cumple, la regla no aplica
+	notFn func(line, platform string) bool
+	stop  *regexp.Regexp // en tipo 0, la clave llega hasta aquí (sufijo propio del comando); si no, hasta el fin de línea
 	guard bool           // si el valor es una palabra clave (md5, use-vrf, default…), la regla no aplica
 }
 
@@ -25,14 +27,18 @@ const (
 
 // R arma una regla: el prefijo (hasta el valor) es el grupo 1, el valor el 2 y el resto el 3.
 func R(kind, block, prefix string) rule {
-	return rule{kind: kind, block: block, re: regexp.MustCompile(`^(` + prefix + `)` + val)}
+	return rule{kind: kind, block: block, re: regexp.MustCompile(`(?i)^(` + prefix + `)` + val)}
 }
 
 // full arma una regla con la expresión completa (prefijo, valor y resto) para las salidas de show.
-func full(kind, expr string) rule { return rule{kind: kind, re: regexp.MustCompile(expr)} }
+func full(kind, expr string) rule { return rule{kind: kind, re: regexp.MustCompile(`(?i)` + expr)} }
 
-func (r rule) unless(not *regexp.Regexp) rule { r.not = not; return r }
-func (r rule) guarded() rule                  { r.guard = true; return r }
+func (r rule) unless(not *regexp.Regexp) rule                   { r.not = not; return r }
+func (r rule) guarded() rule                                    { r.guard = true; return r }
+func (r rule) unlessFn(f func(line, platform string) bool) rule { r.notFn = f; return r }
+
+// stopAt: la clave tipo 0 (con espacios) termina donde empieza el sufijo propio de ESE comando.
+func (r rule) stopAt(expr string) rule { r.stop = regexp.MustCompile(`(?i)` + expr); return r }
 
 // Línea de keyring IKEv1: ahí «address/hostname/ipv6» no es la llave.
 var keyringLine = regexp.MustCompile(`^\s*pre-shared-key (?:address|hostname|ipv6) \S`)
@@ -40,11 +46,40 @@ var keyringLine = regexp.MustCompile(`^\s*pre-shared-key (?:address|hostname|ipv
 // HSRP/VRRP con key-chain o sin autenticación: no hay secreto en la línea.
 var fhrpNoKey = regexp.MustCompile(`authentication (?:md5 key-chain|none)\b`)
 
+// Comunidad de ASA con tipo de cifrado (0 claro, 8 cifrada).
+const commTyp = `(?:[08] )?`
+
+var ipOnly = regexp.MustCompile(`^(?:\d{1,3}(?:\.\d{1,3}){3}|[0-9a-fA-F:.]*:[0-9a-fA-F:.]*:[0-9a-fA-F:.]*)$`)
+
+// isASASNMPHost: «snmp-server host IFNAME X …» de ASA (interfaz que no es IP y luego el destino), no IOS/NX-OS.
+// Con la palabra «community», con una IP tras la interfaz o con trap/poll/version tras el destino es ASA.
+func isASASNMPHost(line, platform string) bool {
+	f := strings.Fields(strings.ToLower(line))
+	if len(f) < 4 || f[0] != "snmp-server" || f[1] != "host" || f[2][0] < 'a' || f[2][0] > 'z' || strings.Contains(f[2], ":") {
+		return false
+	}
+	j := 4
+	for j < len(f) && (f[j] == "trap" || f[j] == "poll") {
+		j++
+	}
+	if j < len(f) && f[j] == "community" {
+		return true
+	}
+	switch f[3] {
+	case "version", "vrf", "use-vrf", "informs", "inform", "traps", "trap", "poll", "udp-port", "source-interface":
+		return false
+	}
+	if ipOnly.MatchString(f[3]) {
+		return platform == "asa" // «host nombre 1.2.3.4» en IOS es una comunidad con forma de IP
+	}
+	return len(f) > 4 && (f[4] == "trap" || f[4] == "poll" || f[4] == "version")
+}
+
 // Cada regla captura (prefijo)(valor)(resto); solo se reemplaza el valor.
 var iosRules = []rule{
 	R("enable-secret", "", `\s*enable (?:algorithm-type \S+ )?(?:secret|password) (?:level \d+ )?`+typ),
 	R("user-secret", "", `\s*username \S+ (?:.*? )?(?:secret|password) `+typ),
-	R("snmp-community", "", `\s*snmp-server community `),
+	R("snmp-community", "", `\s*snmp-server community `+commTyp).stopAt(`\s+(?:ro|rw)(?:\s+\S+)?\s*$`),
 	R("tacacs-key", "", `\s*tacacs-server (?:host \S+ (?:.*? )?)?key `+typ),
 	R("radius-key", "", `\s*radius-server (?:host \S+ .*?)?key `+typ),
 	R("psk", "", `\s*crypto isakmp key `+typ),
@@ -55,7 +90,9 @@ var iosRules = []rule{
 	R("snmp-user-auth", "", `\s*snmp-server user .*? auth (?:md5|sha-2 \d+|sha\S*) `),
 	R("snmp-user-priv", "", `\s*snmp-server user .*? priv (?:(?:des|3des|aes(?:[- ]\d+)?) )?`),
 	// La comunidad va tras vrf/use-vrf, informs/traps y version; use-vrf sin valor no es la comunidad.
-	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) )?`).guarded(),
+	// ASA: «host IFNAME IP [trap|poll] community X»; la IP no es la comunidad.
+	R("snmp-community", "", `\s*snmp-server host \S+ \S+ (?:(?:trap|poll) )*community `+commTyp).stopAt(`(?:\s+(?:version (?:1|2c|3)|udp-port \d+))+\s*$`),
+	R("snmp-community", "", `\s*snmp-server host \S+ (?:(?:use-)?vrf \S+ )*(?:(?:informs|traps) )?(?:version (?:1|2c|3 (?:auth|noauth|priv)) )?`).guarded().unlessFn(isASASNMPHost),
 	R("snmp-community", "", `\s*snmp mib community-map `),
 	R("bgp-password", "", `\s*neighbor \S+ password `+typ),
 	R("ppp-password", "", `\s*ppp (?:chap password|pap sent-username \S+ password) `+typ),
@@ -69,8 +106,8 @@ var iosRules = []rule{
 	R("client-password", "", `\s*ip (?:ftp|http client) password `+typ),
 	R("config-key", "", `\s*key config-key password-encrypt `),
 	R("config-key", "", `\s*key config-key \d+ `),
-	R("ospf-key", "", `\s*ip ospf authentication-key `+typ),
-	R("ospf-key", "", `\s*ip ospf message-digest-key \d+ md5 `+typ),
+	R("ospf-key", "", `\s*(?:ip )?ospf authentication-key `+typ),
+	R("ospf-key", "", `\s*(?:ip )?ospf message-digest-key \d+ md5 `+typ),
 	R("ospf-key", "", `\s*area \S+ virtual-link \S+ (?:.*? )?(?:message-digest-key \d+ md5|authentication-key) `+typ),
 	// OSPFv3 (IOS «ipv6 ospf», NX-OS/IOS-XE «ospfv3»): autenticación y cifrado IPsec.
 	R("ospf-key", "", `\s*(?:ipv6 ospf|ospfv3(?: \d+)?) authentication ipsec spi \d+ (?:md5|sha1) `+typ),
@@ -104,6 +141,18 @@ var iosRules = []rule{
 	R("msdp-password", "", `\s*ip msdp password (?:peer )?\S+ `+typ),
 	R("pim-key", "", `\s*ip pim hello-authentication ah-md5 `+typ),
 	R("bfd-key", "", `\s*bfd authentication \S+ key-id \d+ (?:hex-)?key `),
+	// ASA: passwd, IKEv1/IKEv2, failover, LDAP, EIGRP y licencia inteligente.
+	R("enable-secret", "", `\s*passwd `),
+	R("psk", "", `\s*(?:ikev1|ikev2 (?:local|remote)-authentication) pre-shared-key `+typ),
+	R("failover-key", "", `\s*failover (?:key (?:hex )?|ipsec pre-shared-key )`+typ),
+	R("ldap-password", "", `\s*ldap-login-password `+typ),
+	R("eigrp-key", "", `\s*eigrp authentication key \d+ `+commTyp).stopAt(`\s+key-id \d+\s*$`),
+	R("eigrp-key", "", `\s*authentication key eigrp \d+ `+commTyp).stopAt(`\s+key-id \d+\s*$`),
+	R("aaa-key", "aaaserver", `\s+key `+typ),
+	R("radius-key", "", `\s*radius-common-pw `+typ),
+	R("user-secret", "", `\s*vpdn username \S+ password `+typ).stopAt(`\s+store-local\s*$`),
+	R("aaa-key", "", `\s*aaa-server \S+ (?:\(\S+\) )?host \S+ `).guarded(), // forma de una línea
+	R("token", "licsmart", `\s+token `),
 	// VPN y PKI.
 	R("psk", "", `\s*authentication (?:local|remote) pre-share key `+typ),
 	R("psk", "ezvpn", `\s+key `+typ),
@@ -175,7 +224,7 @@ func tail(rest string) (more, left string) {
 	end, pos := 0, 0
 	for {
 		loc := nextToken.FindStringIndex(rest[pos:])
-		if loc == nil || tailStops[strings.TrimSpace(rest[pos+loc[0]:pos+loc[1]])] || typedWord.MatchString(rest[pos:]) {
+		if loc == nil || tailStops[strings.ToLower(strings.TrimSpace(rest[pos+loc[0]:pos+loc[1]]))] || typedWord.MatchString(rest[pos:]) {
 			return rest[:end], rest[end:]
 		}
 		pos += loc[1]
@@ -186,7 +235,7 @@ func tail(rest string) (more, left string) {
 var (
 	nextToken = regexp.MustCompile(`^\s+\S+`)
 	// Otra palabra de secreto con su tipo (… password 0 x secret 0 y): ahí empieza otro valor.
-	typedWord = regexp.MustCompile(`^\s+(?:password|secret|key|key-string) [0-9](?: |$)`)
+	typedWord = regexp.MustCompile(`(?i)^\s+(?:password|secret|key|key-string) [0-9](?: |$)`)
 	typeZero  = regexp.MustCompile(`(?:^|\s)0 $`)
 )
 
@@ -198,6 +247,7 @@ var (
 )
 
 func blockOf(line string) string {
+	line = strings.ToLower(line)
 	switch {
 	case strings.HasPrefix(line, "tacacs server "):
 		return "tacacs"
@@ -211,6 +261,10 @@ func blockOf(line string) string {
 		return "ezvpn"
 	case strings.HasPrefix(line, "crypto pki trustpoint "):
 		return "trustpoint"
+	case strings.HasPrefix(line, "aaa-server "):
+		return "aaaserver"
+	case strings.TrimSpace(line) == "license smart":
+		return "licsmart"
 	case strings.HasPrefix(line, "user-name "):
 		return "username"
 	case strings.HasPrefix(line, "parameter-map type umbrella"):
@@ -223,7 +277,7 @@ func blockOf(line string) string {
 // shortcut: solo reglas IOS/IOS-XE; cada plataforma de la Fase 2 agrega las suyas.
 func Apply(platform, text string) (string, map[string]int) {
 	var out strings.Builder
-	st := Stream{counts: map[string]int{}}
+	st := Stream{counts: map[string]int{}, Platform: platform}
 	for _, raw := range strings.SplitAfter(text, "\n") {
 		if l, ok := st.Line(raw); ok {
 			out.WriteString(l)
@@ -242,6 +296,8 @@ type Stream struct {
 	counts      map[string]int
 	// MaxSkip: líneas máximas que se descartan dentro de una llave o cadena sin cierre (0 = sin tope).
 	MaxSkip int
+	// Platform: la de la salida ("asa", "ios-xe"…); decide formas ambiguas entre plataformas. Vacía = no es ASA.
+	Platform string
 }
 
 // Line enmascara una línea (con su fin de línea, si lo trae). ok=false: la línea se omite (cuerpo de una llave).
@@ -289,7 +345,7 @@ func (s *Stream) Line(raw string) (out string, ok bool) {
 	if line != "" && line[0] != ' ' && line[0] != '\t' {
 		s.block = blockOf(line)
 	}
-	return maskLine(line, s.block, s.counts) + eol, true
+	return maskLine(line, s.block, s.Platform, s.counts) + eol, true
 }
 
 var (
@@ -366,14 +422,14 @@ func (s *Stream) snmpTable(line string) (string, bool) {
 	f := strings.Fields(line)
 	row, keep := s.tableRow(line, f)
 	if keep {
-		return maskLine(line, "", s.counts), true
+		return maskLine(line, "", s.Platform, s.counts), true
 	}
 	if !row {
 		s.table = ""
 		return "", false
 	}
 	s.rows++
-	line = maskLine(line, "", s.counts) // la fila también pasa por las reglas
+	line = maskLine(line, "", s.Platform, s.counts) // la fila también pasa por las reglas
 	if f = strings.Fields(line); len(f) == 0 {
 		return line, true
 	}
@@ -406,7 +462,53 @@ func (s *Stream) Prompted(line, block string) string {
 	if block == "" {
 		block = s.block
 	}
-	return maskLine(" "+line, block, s.counts)[1:]
+	return maskLine(" "+line, block, s.Platform, s.counts)[1:]
+}
+
+// SetBlock fija el bloque en curso (el que da un prompt); "" = fuera de todo bloque.
+func (s *Stream) SetBlock(block string) { s.block = block }
+
+// Typed enmascara una línea tecleada llevando el bloque entre líneas: una línea que abre un bloque
+// (aaa-server …, tacacs server …) lo fija para las siguientes, y exit/end lo cierran.
+func (s *Stream) Typed(line string) string {
+	if s.counts == nil {
+		s.counts = map[string]int{}
+	}
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "exit", "end":
+		s.block = ""
+	default:
+		if b := blockOf(strings.TrimLeft(line, " \t")); b != "" {
+			s.block = b
+		}
+	}
+	return maskLine(" "+line, s.block, s.Platform, s.counts)[1:]
+}
+
+// Peek enmascara una línea tecleada sobre una copia: ni el bloque ni los contadores de s cambian.
+func (s Stream) Peek(line string) string {
+	s.counts = nil
+	return s.Typed(line)
+}
+
+// looseBlocks son los bloques que tienen reglas propias.
+var looseBlocks = []string{"line", "aaaserver", "tacacs", "radius", "licsmart", "username", "dot1x", "ezvpn", "trustpoint", "umbrella"}
+
+// TypedLoose enmascara una línea tecleada cuyo bloque no confirmó ningún prompt: si el bloque en curso no
+// la tapa, la prueba con cada bloque que tenga reglas propias y graba la primera versión que tape algo
+// (tapar de más ahí es aceptable).
+func (s *Stream) TypedLoose(line string) string {
+	out := s.Typed(line)
+	if out != line {
+		return out
+	}
+	for _, b := range looseBlocks {
+		tmp := Stream{Platform: s.Platform}
+		if m := tmp.Prompted(line, b); m != line {
+			return m
+		}
+	}
+	return out
 }
 
 // archiveLog: línea de show archive log config; tras «|» va un comando de configuración.
@@ -417,26 +519,30 @@ var loggedCmd = regexp.MustCompile(`^(.*logged command:)(.*)$`)
 
 // maskLine aplica reglas hasta que ninguna cambie la línea: una línea puede traer
 // varios secretos (snmp-server user … auth X priv Y).
-func maskLine(line, block string, counts map[string]int) string {
+func maskLine(line, block, platform string, counts map[string]int) string {
 	if m := loggedCmd.FindStringSubmatch(line); m != nil {
-		return m[1] + maskLine(m[2], "", counts)
+		return m[1] + maskLine(m[2], "", platform, counts)
 	}
 	if m := archiveLog.FindStringSubmatch(line); m != nil {
-		return m[1] + maskLine(m[2], "", counts)
+		return m[1] + maskLine(m[2], "", platform, counts)
 	}
 	for changed := true; changed; {
 		changed = false
 		for _, r := range iosRules {
-			if r.block != "" && r.block != block || r.not != nil && r.not.MatchString(line) {
+			if r.block != "" && r.block != block || r.not != nil && r.not.MatchString(line) || r.notFn != nil && r.notFn(line, platform) {
 				continue
 			}
 			m := r.re.FindStringSubmatch(line)
-			if m == nil || strings.HasPrefix(m[2], "<MASKED:") || r.guard && isGuard(m[2]) {
+			if m == nil || strings.HasPrefix(m[2], "<MASKED:") || m[2] == "*****" || r.guard && isGuard(m[2]) {
 				continue
 			}
 			// En tipo 0 la clave puede llevar espacios: llega hasta el fin de línea o una palabra clave del comando.
 			if typeZero.MatchString(m[1]) && m[2][0] != '"' {
-				_, m[3] = tail(m[3])
+				if r.stop != nil {
+					m[3] = m[3][r.stopIndex(m[3]):]
+				} else {
+					_, m[3] = tail(m[3])
+				}
 			}
 			counts[r.kind]++
 			line, changed = m[1]+"<MASKED:"+r.kind+">"+m[3], true
@@ -472,7 +578,7 @@ func isGuard(v string) bool {
 	return guardWords[strings.ToLower(v[:wordLen(v)])]
 }
 
-var freeText = regexp.MustCompile(`^\s*(?:\d+\s+)?(?:description|remark)\s`)
+var freeText = regexp.MustCompile(`(?i)^\s*(?:\d+\s+)?(?:description|remark)\s`)
 
 // Credenciales en una URL (scp://usuario:CLAVE@host/…) en cualquier línea, también en logs.
 // configTop son palabras de primer nivel de la config de NX-OS/IOS que nunca son una fila de show snmp community.
@@ -491,7 +597,7 @@ var urlPassword = regexp.MustCompile(`([a-z][a-z0-9+.-]*://[^/\s:@]+:)(\S+)@`)
 
 // Forma genérica <palabra de secreto> <tipo de cifrado> <valor> en cualquier posición: tapa lo que ninguna regla por
 // comando conoce (0 claro; 3, 4, 5, 6, 7, 8 y 9 cifrados o con hash).
-var genericHead = regexp.MustCompile(`(?:^|[\s-])(?:password|secret|key|key-string|server-key|authentication-key|pre-shared-key|hex-key|key-octet-string) [03-9] `)
+var genericHead = regexp.MustCompile(`(?i)(?:^|[\s-])(?:password|secret|key|key-string|server-key|authentication-key|pre-shared-key|hex-key|key-octet-string) [03-9] `)
 
 func maskGeneric(line string, counts map[string]int) string {
 	var out strings.Builder
@@ -541,4 +647,12 @@ func splitEOL(s string) (string, string) {
 		return s[:len(s)-1], "\n"
 	}
 	return s, ""
+}
+
+// stopIndex: dónde empieza el sufijo propio del comando; si no hay, la clave llega al fin de la línea.
+func (r rule) stopIndex(rest string) int {
+	if loc := r.stop.FindStringIndex(rest); loc != nil {
+		return loc[0]
+	}
+	return len(rest)
 }
