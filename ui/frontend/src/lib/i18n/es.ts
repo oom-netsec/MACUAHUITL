@@ -2579,6 +2579,7 @@ export const es = {
   "security.chain.sigInvalid": "Firma del CSR inválida",
   "diag.canceled": "Cancelado por el usuario.",
   "diag.status.canceled": "Cancelado",
+  "patrol.rounds.invalid": "Escribe un entero de 0 en adelante (0 = sin límite).",
 };
 
 export type Key = keyof typeof es;

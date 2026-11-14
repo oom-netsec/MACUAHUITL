@@ -36,6 +36,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
   const [out, setOut] = useState("");
   const [minutes, setMinutes] = useState("0");
   const [rounds, setRounds] = useState("1");
+  const [roundsErr, setRoundsErr] = useState("");
   const [hours, setHours] = useState("4");
   const [cron, setCron] = useState("");
   const [split, setSplit] = useState<JobSpec["split"]>("SPLIT_STRATEGY_PER_ROUND");
@@ -52,11 +53,13 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
     const missing = ([[!name.trim(), "name"], [!devices.length, "targets"], [!cred, "cred"], [!pbs.length && !cmds.trim(), "commands"], [!out.trim(), "outDir"]] as const)
       .filter(([m]) => m).map(([, k]) => t(`patrol.missing.${k}` as Key));
     if (missing.length) return setErr(t("patrol.missing", { list: missing.join(", ") }));
+    if (!/^\d+$/.test(rounds.trim())) return setRoundsErr(t("patrol.rounds.invalid")); // vacío no es 0: 0 es sin límite
+    setRoundsErr("");
     const spec: JobSpec = {
       name, targets: devices.map((a) => ({ address: a, deviceId: a })), defaultCredentialId: cred, customCommands: cmds, playbookIds: pbs,
       outputDir: out, split, zip, deleteLooseFiles: delLoose, disableMasking: !mask, acceptChangedHostKeys: acceptChanged,
       windowHours: Math.min(96, Math.max(1, Number(hours) || 1)),
-      schedule: cron ? { cron, rounds: Number(rounds) || 0 } : { intervalSeconds: Number(minutes) * 60, rounds: Number(rounds) || 0 },
+      schedule: cron ? { cron, rounds: Number(rounds) } : { intervalSeconds: Number(minutes) * 60, rounds: Number(rounds) },
     };
     setErr(""); setBusy(true);
     try {
@@ -99,7 +102,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
         <div className="field-row">
           <Field label={t("patrol.interval")} hint={t("patrol.interval.hint")} type="number" value={minutes} onChange={setMinutes} w="sm" />
           <Field label={t("patrol.cron")} hint={t("patrol.cron.hint")} value={cron} onChange={setCron} w="sm" mono />
-          <Field label={t("patrol.rounds")} hint={t("patrol.rounds.hint")} type="number" value={rounds} onChange={setRounds} w="sm" />
+          <Field label={t("patrol.rounds")} hint={t("patrol.rounds.hint")} error={roundsErr} type="number" value={rounds} onChange={setRounds} w="sm" />
           <Field label={t("patrol.window")} hint={t("patrol.window.hint")} type="number" value={hours} onChange={setHours} w="sm" />
         </div>
       </Section>

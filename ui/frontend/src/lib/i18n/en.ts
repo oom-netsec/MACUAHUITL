@@ -2581,4 +2581,5 @@ export const en: Record<Key, string> = {
   "security.chain.sigInvalid": "CSR signature invalid",
   "diag.canceled": "Canceled by the user.",
   "diag.status.canceled": "Canceled",
+  "patrol.rounds.invalid": "Enter a whole number from 0 up (0 = no limit).",
 };
