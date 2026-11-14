@@ -820,3 +820,39 @@ func TestAireOSEcoCortoYPegado(t *testing.T) {
 		t.Errorf("valor corto en la grabación:\n%s", out)
 	}
 }
+
+// AireOS: dentro de «(Cisco Controller) config>» se teclea sin el prefijo «config»; lo tecleado y el eco salen tapados.
+// Al volver a «(Cisco Controller) >» el bloque se cierra.
+func TestAireOSConfigSinPrefijoTapaTeclasYEco(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("(Cisco Controller) >"))
+	r.Input([]byte("config\r"))
+	r.Output([]byte("config\r\n\r\n(Cisco Controller) config>"))
+	cmds := []string{"radius auth add 1 10.1.1.5 1812 ascii Rad1usK3y", "mgmtuser add op1 Secreta1 read-only", "snmp community create Comun1dad"}
+	for _, c := range cmds {
+		r.Input([]byte(c + "\r"))
+		r.Output([]byte(c + "\r\n\r\n(Cisco Controller) config>"))
+	}
+	r.Close()
+	out := b.String()
+	for _, s := range []string{"Rad1usK3y", "Secreta1", "Comun1dad"} {
+		if strings.Contains(out, s) {
+			t.Errorf("%q en la grabación:\n%s", s, out)
+		}
+	}
+	if strings.Count(out, "<MASKED:") != 6 {
+		t.Errorf("se esperaban 6 tapados (tecla y eco):\n%s", out)
+	}
+}
+
+// Fuera de config> de AireOS el «radius …» suelto no se toca (IOS-XE).
+func TestRadiusSueltoDeOtrasPlataformasNoCambia(t *testing.T) {
+	r, b := newRec()
+	r.Output([]byte("SW1(config)#"))
+	r.Input([]byte("radius auth add 1 10.1.1.5 1812 ascii Visible\r"))
+	r.Output([]byte("radius auth add 1 10.1.1.5 1812 ascii Visible\r\nSW1(config)#"))
+	r.Close()
+	if strings.Count(b.String(), "ascii Visible") != 2 {
+		t.Errorf("cambió:\n%s", b.String())
+	}
+}

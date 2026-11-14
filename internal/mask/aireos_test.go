@@ -24,6 +24,13 @@ var aireosCases = []struct{ in, want string }{
 	{"config local-auth method fast server-key FastK3y", "config local-auth method fast server-key <MASKED:psk>"},
 	{"config ap mgmtuser add username apadmin password ApPass1 secret ApSec1 all", "config ap mgmtuser add username apadmin password <MASKED:user-secret> secret <MASKED:user-secret> all"},
 	{"config ap 802.1Xuser add username ap8021 password Dot1xPw all", "config ap 802.1Xuser add username ap8021 password <MASKED:dot1x-password> all"},
+	{"config snmp community mode enable Comun1dad", "config snmp community mode enable <MASKED:snmp-community>"},
+	{"config snmp community mode disable Comun1dad", "config snmp community mode disable <MASKED:snmp-community>"},
+	{"config snmp community delete Comun1dad", "config snmp community delete <MASKED:snmp-community>"},
+	{"config wlan security static-wep-key encryption 3 104 ascii WepK3y 1", "config wlan security static-wep-key encryption 3 104 ascii <MASKED:wifi-psk> 1"},
+	{"config radius auth keywrap add ascii KekK3y MackK3y 1", "config radius auth keywrap add ascii <MASKED:radius-key> <MASKED:radius-key> 1"},
+	{"config ldap simple-bind authenticated 1 cn=x LdapPw", "config ldap simple-bind authenticated 1 cn=x <MASKED:ldap-password>"},
+	{"config ldap simple-bind authenticated 1 username cn=x password LdapPw", "config ldap simple-bind authenticated 1 username cn=x password <MASKED:ldap-password>"},
 	// show snmpcommunity: la comunidad sale en claro en la primera columna.
 	{"public                  0.0.0.0             0.0.0.0           Read Only    Enable", "<MASKED:snmp-community>                  0.0.0.0             0.0.0.0           Read Only    Enable"},
 	// Falsos positivos: nada de esto es un secreto.
@@ -52,6 +59,30 @@ func TestAireOSReglas(t *testing.T) {
 		twice, n := Apply("aireos", once)
 		if twice != once || len(n) != 0 {
 			t.Errorf("no idempotente %q: %q → %q %v", c.in, once, twice, n)
+		}
+	}
+}
+
+// En el modo «(Nombre) config>» de AireOS se teclea sin el prefijo «config»: se tapa solo con ese bloque; fuera de él
+// (IOS-XE: «radius …» suelto) la línea queda como hoy.
+func TestAireOSConfigSinPrefijo(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"radius auth add 1 10.1.1.5 1812 ascii Rad1usK3y", "radius auth add 1 10.1.1.5 1812 ascii <MASKED:radius-key>"},
+		{"mgmtuser add op1 Secreta1 read-only", "mgmtuser add op1 <MASKED:user-secret> read-only"},
+		{"snmp community create Comun1dad", "snmp community create <MASKED:snmp-community>"},
+		{"snmp community mode enable Comun1dad", "snmp community mode enable <MASKED:snmp-community>"},
+		{"wlan security static-wep-key encryption 3 104 ascii WepK3y 1", "wlan security static-wep-key encryption 3 104 ascii <MASKED:wifi-psk> 1"},
+		{"radius auth keywrap add ascii KekK3y MackK3y 1", "radius auth keywrap add ascii <MASKED:radius-key> <MASKED:radius-key> 1"},
+		{"ldap simple-bind authenticated 1 cn=x LdapPw", "ldap simple-bind authenticated 1 cn=x <MASKED:ldap-password>"},
+		{"wlan ssid 3 Corp-WiFi", "wlan ssid 3 Corp-WiFi"},
+	} {
+		var s Stream
+		if got := s.Prompted(c.in, "aireconfig"); got != c.want {
+			t.Errorf("config> %q\n got %q\nwant %q", c.in, got, c.want)
+		}
+		var o Stream
+		if got := o.Prompted(c.in, ""); got != c.in { // sin el bloque (IOS-XE y demás) queda como hoy
+			t.Errorf("fuera de config> %q cambió: %q", c.in, got)
 		}
 	}
 }

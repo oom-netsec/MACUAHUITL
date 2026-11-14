@@ -32,14 +32,15 @@ var (
 	ftdPrompt = regexp.MustCompile(`(?:^|\n)> ?$`)
 	// Primer inicio de sesión de FTD: cambio de contraseña obligatorio o EULA. Responder cambiaría el equipo.
 	ftdFirstLogin = regexp.MustCompile(`(?i)you must change your password|you must accept the eula|press <enter> to display the eula|enter new password:|confirm new password:|unix password: ?$|to agree to the eula|please enter 'yes'`)
-	more          = regexp.MustCompile(` ?(?:--More-- or \(q\)uit|--More--|<--- More --->) ?`) // el segundo es el de ASA, el primero el de AireOS
+	more          = regexp.MustCompile(` ?(?:--More-- or \(q\)uit|--More or \(q\)uit current module or <ctrl-z> to abort|--More--|<--- More --->) ?`) // el segundo es el de ASA, el primero el de AireOS
 	// AireOS: prompt «(Nombre) >» (el nombre puede llevar espacios), el de configuración «(Nombre) config>» y el login
 	// «User:»/«Password:» dentro del shell. La pregunta de confirmación se detecta solo al final de la salida.
 	airePrompt  = regexp.MustCompile(`(?:^|\n)\(([^()\r\n]{1,63})\) ?>\s?$`)
 	aireConfig  = regexp.MustCompile(`(?:^|\n)\([^()\r\n]{1,63}\) config[\w\-]*>\s?$`)
-	aireUser    = regexp.MustCompile(`(?i)(?:^|\n)(?:user|username): ?$`)
+	aireUser    = regexp.MustCompile(`(?:^|\n)User: ?$`) // solo «User:» exacto: «Username:» es de IOS/ASA/NX-OS y no se contesta
+	aireMore    = regexp.MustCompile(`--More-- or \(q\)uit$|--More or \(q\)uit current module or <ctrl-z> to abort$`)
 	airePass    = regexp.MustCompile(`(?i)(?:^|\n)password: ?$`)
-	aireConfirm = regexp.MustCompile(`(?i)(?:\(y/n\)|are you sure[^\n]*\?) *$`)
+	aireConfirm = regexp.MustCompile(`(?i)(?:[(\[](?:y/n|yes/no)[)\]]|\[confirm\]|are you sure[^\n]*\?|proceed\?) *$`)
 	aireSysinfo = regexp.MustCompile(`(?m)^Product Name\.*\s*Cisco Controller`)
 	// Secuencias con que el equipo borra el --More--: "\r    \r" o retrocesos "\b\b  \b\b".
 	erase = regexp.MustCompile(`\r +\r|\x08+ +\x08+`)
@@ -290,7 +291,7 @@ func (d *driver) atPrompt(s string) bool {
 	last := s[strings.LastIndexByte(s, '\n')+1:]
 	last = strings.TrimSuffix(last, " ")
 	if d.aire {
-		return last == "("+d.hostname+") >"
+		return last == "("+d.hostname+") >" || last == "("+d.hostname+")>"
 	}
 	if d.hostname == "" { // FTD: solo «>»
 		return last == ">"
@@ -319,7 +320,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 		from := max(bytes.LastIndexByte(d.buf, '\n'), 0)
 		tail := string(d.buf[from:])
 		// AireOS: solo el «--More-- or (q)uit» completo (un «--More--» partido entre dos lecturas no se contesta a medias).
-		if t := strings.TrimRight(tail, " "); d.aire && strings.HasSuffix(t, "--More-- or (q)uit") || !d.aire && strings.HasSuffix(t, "--More--") || strings.HasSuffix(t, "<--- More --->") {
+		if t := strings.TrimRight(tail, " "); d.aire && aireMore.MatchString(t) || !d.aire && strings.HasSuffix(t, "--More--") || strings.HasSuffix(t, "<--- More --->") {
 			tail = more.ReplaceAllString(tail, "")
 			d.buf = append(d.buf[:from], tail...)
 			if _, err := io.WriteString(d.w, " "); err != nil {
@@ -500,7 +501,7 @@ func (d *driver) quiet(ctx context.Context, n int) bool {
 // moreComing: si tail es el «> » de FTD, espera ftdSettle por más datos; si llegan, no era el prompt (era el inicio
 // de una línea de salida) y se agregan al búfer.
 func (d *driver) moreComing(ctx context.Context, tail string) bool {
-	if !ftdPrompt.MatchString(tail) {
+	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) { // «User:» de un banner puede ir seguido del prompt de otra plataforma
 		return false
 	}
 	select {

@@ -131,18 +131,6 @@ var iosRules = []rule{
 	R("user-secret", "", `\s*wireless ewc-ap (?:.*? )?password `+typ),
 	R("user-secret", "", `\s*wireless ewc-ap (?:.*? )?secret `+typ),
 	R("user-secret", "username", `\s+(?:password|secret) `+typ),
-	// AireOS (WLC 5520/8540…): sintaxis «config …» tecleada. Sin tipo de cifrado; el usuario, índice, IP, puerto y WLAN no se tapan.
-	R("radius-key", "", `\s*config radius (?:auth|acct) add \d+ \S+ \d+ (?:ascii|hex) `),
-	R("tacacs-key", "", `\s*config tacacs (?:auth|acct|athr) add \d+ \S+ \d+ (?:ascii|hex) `),
-	R("user-secret", "", `\s*config (?:mgmtuser|netuser) (?:add|password) \S+ `),
-	R("snmp-community", "", `\s*config snmp community (?:create|accessmode (?:ro|rw)|ipaddr \S+ \S+) `),
-	R("snmp-user-auth", "", `\s*config snmp v3user create \S+ \S+ \S+ \S+ `),
-	R("snmp-user-priv", "", `\s*config snmp v3user create \S+ \S+ \S+ \S+ \S+ `),
-	R("user-secret", "", `\s*config local-auth (?:.*? )?password `),
-	R("psk", "", `\s*config local-auth method fast server-key `),
-	R("user-secret", "", `\s*config ap mgmtuser add username \S+ password `),
-	R("user-secret", "", `\s*config ap mgmtuser add username \S+ password \S+ secret `),
-	R("dot1x-password", "", `\s*config ap 802\.1Xuser add username \S+ password `),
 	// LDAP (IOS «bind authenticate», NX-OS «ldap-server host … rootDN … password»), IS-IS, LDP, MSDP, PIM, BFD, GLBP.
 	R("ldap-password", "", `\s*bind authenticated? (?:.*? )?password `+typ),
 	R("ldap-password", "", `\s*ldap-server host \S+ (?:.*? )?password `+typ),
@@ -669,4 +657,31 @@ func (r rule) stopIndex(rest string) int {
 		return loc[0]
 	}
 	return len(rest)
+}
+
+// Sintaxis de configuración de AireOS: sin tipo de cifrado; el usuario, índice, IP, puerto y WLAN no se tapan. En el
+// modo «(Nombre) config>» se teclea SIN el prefijo «config»: por eso cada regla va dos veces, con «config » en
+// cualquier bloque y sin él solo en el bloque «aireconfig» (así el «radius …» suelto de otras plataformas no cambia).
+var aireosRules = []struct{ kind, body string }{
+	{"radius-key", `radius (?:auth|acct) add \d+ \S+ \d+ (?:ascii|hex) `},
+	{"radius-key", `radius auth keywrap add (?:ascii|hex) `},
+	{"radius-key", `radius auth keywrap add (?:ascii|hex) \S+ `},
+	{"tacacs-key", `tacacs (?:auth|acct|athr) add \d+ \S+ \d+ (?:ascii|hex) `},
+	{"user-secret", `(?:mgmtuser|netuser) (?:add|password) \S+ `},
+	{"snmp-community", `snmp community (?:create|delete|mode (?:enable|disable)|accessmode (?:ro|rw)|ipaddr \S+ \S+) `},
+	{"snmp-user-auth", `snmp v3user create \S+ \S+ \S+ \S+ `},
+	{"snmp-user-priv", `snmp v3user create \S+ \S+ \S+ \S+ \S+ `},
+	{"user-secret", `local-auth (?:.*? )?password `},
+	{"psk", `local-auth method fast server-key `},
+	{"user-secret", `ap mgmtuser add username \S+ password `},
+	{"user-secret", `ap mgmtuser add username \S+ password \S+ secret `},
+	{"dot1x-password", `ap 802\.1Xuser add username \S+ password `},
+	{"wifi-psk", `wlan security static-wep-key encryption \d+ \d+ (?:ascii|hex) `},
+	{"ldap-password", `ldap simple-bind authenticated \d+ (?:username \S+ password |\S+ )`},
+}
+
+func init() {
+	for _, r := range aireosRules {
+		iosRules = append(iosRules, R(r.kind, "", `\s*config `+r.body), R(r.kind, "aireconfig", `\s*`+r.body))
+	}
 }

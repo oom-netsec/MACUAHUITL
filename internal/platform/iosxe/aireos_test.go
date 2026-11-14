@@ -121,11 +121,6 @@ func TestAireOSLoginEnElShell(t *testing.T) {
 	if d.Hostname() != "Cisco Controller" || d.login != nil {
 		t.Fatalf("Hostname %q, login %v", d.Hostname(), d.login)
 	}
-	// «User:» y «Username:»
-	f, _, err = openAire(t, "Username: ", loginReply("s3cret", ""), "admin", "s3cret")
-	if err != nil || f.written() != "admin\ns3cret\n" {
-		t.Fatalf("Username: %v, escrito %q", err, f.written())
-	}
 }
 
 // Rechazo (vuelve a pedir User: o Password:), sin credencial o sin usuario: se aborta sin reintentar y sin escribir de más.
@@ -287,25 +282,27 @@ func pagedDev(t *testing.T, pages []string, cut func(page string) int) (io.Reade
 // --More-- or (q)uit se contesta con un espacio por página (varias seguidas, también con un usuario sin permiso de
 // config paging), se borra de la salida y no se confunde cuando llega partido entre dos lecturas.
 func TestAireOSPaginacion(t *testing.T) {
-	pages := []string{"a1\r\na2\r\n--More-- or (q)uit", "a3\r\na4\r\n--More-- or (q)uit", "a5\r\n\r\n" + aireP}
-	for off := -1; off <= len("--More-- or (q)uit"); off++ {
-		r, w, written := pagedDev(t, pages, func(p string) int {
-			i := strings.Index(p, "--More--")
-			if off < 0 || i < 0 {
-				return 0
+	for _, mark := range []string{"--More-- or (q)uit", "--More or (q)uit current module or <ctrl-z> to abort"} {
+		pages := []string{"a1\r\na2\r\n" + mark, "a3\r\na4\r\n" + mark, "a5\r\n\r\n" + aireP}
+		for off := -1; off <= len(mark); off++ {
+			r, w, written := pagedDev(t, pages, func(p string) int {
+				i := strings.Index(p, "--More--")
+				if off < 0 || i < 0 {
+					return 0
+				}
+				return i + off
+			})
+			d := New().(*driver)
+			if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
+				t.Fatal(err)
 			}
-			return i + off
-		})
-		d := New().(*driver)
-		if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
-			t.Fatal(err)
-		}
-		out, err := d.Run(context.Background(), "show ap summary", 2*time.Second)
-		if err != nil || strings.Join(strings.Fields(out.Text), " ") != "a1 a2 a3 a4 a5" || strings.Contains(out.Text, "More") || strings.Contains(out.Text, "quit") {
-			t.Fatalf("corte %d: out=%q err=%v", off, out.Text, err)
-		}
-		if got := written(); got != "show ap summary\n  " {
-			t.Fatalf("corte %d: escrito %q", off, got)
+			out, err := d.Run(context.Background(), "show ap summary", 2*time.Second)
+			if err != nil || strings.Join(strings.Fields(out.Text), " ") != "a1 a2 a3 a4 a5" || strings.Contains(out.Text, "More") || strings.Contains(out.Text, "quit") {
+				t.Fatalf("corte %d: out=%q err=%v", off, out.Text, err)
+			}
+			if got := written(); got != "show ap summary\n  " {
+				t.Fatalf("corte %d: escrito %q", off, got)
+			}
 		}
 	}
 }
@@ -314,7 +311,7 @@ func TestAireOSPaginacion(t *testing.T) {
 func TestAireOSPreguntaDeConfirmacion(t *testing.T) {
 	for _, q := range []string{
 		"\r\nAre you sure you want to proceed? (y/N)", "\r\nAre you sure you want to continue? (y/n) ", "\r\nSave? (Y/n)",
-		"\r\nAre you sure you want to proceed? ",
+		"\r\nAre you sure you want to proceed? ", "\r\nAre you sure you want to proceed? [y/N]", "\r\nProceed? (yes/no)", "\r\nSave configuration [confirm]", "\r\nProceed? ",
 	} {
 		f, d, err := openAire(t, aireP, func(l string) (string, string) {
 			if l == "show run-config" {
@@ -378,6 +375,56 @@ func TestBytesEscritosIOSyASA(t *testing.T) {
 		}
 		if got := f.written(); got != tc.want {
 			t.Errorf("%s: escrito %q, se esperaba %q", name, got, tc.want)
+		}
+	}
+}
+
+// Prompt sin espacio «(WLC1)>»: Open y Run lo aceptan igual.
+func TestAireOSPromptSinEspacio(t *testing.T) {
+	f, r, w := startFake(t, "(WLC1)>", "(WLC1)>", aireReply)
+	d := New().(*driver)
+	if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := d.Run(context.Background(), "show sysinfo", 2*time.Second); err != nil || !strings.Contains(out.Text, "Cisco Controller") {
+		t.Fatalf("Run = %q, %v", out.Text, err)
+	}
+	if f.written() != "show sysinfo\n" {
+		t.Fatalf("escrito %q", f.written())
+	}
+}
+
+// Un banner de IOS, ASA o NX-OS que termina en «Username:» o «User:» y poco después muestra su prompt no recibe
+// usuario ni clave: Open entra bien, con o sin credencial, y solo escribe lo suyo.
+func TestBannerConUsernameNoRecibeCredencial(t *testing.T) {
+	for _, banner := range []string{"\r\n*** Acceso ***\r\nUsername:", "\r\n*** Acceso ***\r\nUser:", "\r\n*** Acceso ***\r\nUser: "} {
+		for name, prompt := range map[string]string{"ios": "Router#", "asa": "asa# ", "nxos": "nx1# "} {
+			for _, cred := range []bool{true, false} {
+				r, w, lg := scriptedDevLog(t, func(out func(string)) {
+					out(banner)
+					time.Sleep(300 * time.Millisecond)
+					out("\r\n" + prompt)
+				}, func(line string, out func(string)) { out(line + "\r\n" + prompt) })
+				d := New().(*driver)
+				if cred {
+					d.SetLogin("admin", secret.New([]byte("s3cret")))
+				}
+				if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
+					t.Fatalf("%s %q cred=%v: Open = %v", name, banner, cred, err)
+				}
+				if got := strings.Join(lg.get(), "|"); got != "terminal length 0|terminal width 0" {
+					t.Fatalf("%s %q cred=%v: escrito %q", name, banner, cred, got)
+				}
+			}
+		}
+	}
+}
+
+// Solo el «User:» exacto de AireOS dispara el login del shell; «Username:» (IOS, ASA, NX-OS) no.
+func TestAireUserSoloExacto(t *testing.T) {
+	for s, want := range map[string]bool{"\nUser: ": true, "User:": true, "\nUsername: ": false, "Username:": false, "\nuser: ": false} {
+		if aireUser.MatchString(s) != want {
+			t.Errorf("%q: %v", s, !want)
 		}
 	}
 }

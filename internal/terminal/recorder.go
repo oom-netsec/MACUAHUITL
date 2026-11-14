@@ -315,6 +315,8 @@ func (r *Recorder) setPromptBlock(b string) {
 
 func blockOfPrompt(p string) string {
 	switch {
+	case strings.HasSuffix(strings.TrimSpace(p), ") config>"): // AireOS: se teclea sin el prefijo «config»
+		return "aireconfig"
 	case strings.Contains(p, "(config-line)"):
 		return "line"
 	case strings.Contains(p, "(config-server-tacacs)"):
