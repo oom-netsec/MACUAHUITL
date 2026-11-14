@@ -699,3 +699,21 @@ func TestRedPorContenidoNoTapaDeMas(t *testing.T) {
 		t.Errorf("el valor entero no se tapó:\n%s", out)
 	}
 }
+
+// Lo pegado tras una línea que abre el bloque abreviada se enmascara con el bloque que da el prompt al grabar.
+func TestPegadoTrasBloqueAbreviado(t *testing.T) {
+	casos := []struct{ prompt, in, echo, leak string }{
+		{"SW1(config)# ", "lin vty 0 4\rpassword K4x\r", "lin vty 0 4\r\nSW1(config-line)#password K4x\r\nSW1(config-line)# ", "K4x"},
+		{"ciscoasa(config)# ", "aaa-s RAD (inside) host 10.1.1.5\rkey K5x\r", "aaa-s RAD (inside) host 10.1.1.5\r\nciscoasa(config-aaa-server-host)#key K5x\r\nciscoasa(config-aaa-server-host)# ", "K5x"},
+	}
+	for _, c := range casos {
+		r, b := newRec()
+		r.Output([]byte(c.prompt))
+		r.Input([]byte(c.in))
+		r.Output([]byte(c.echo))
+		r.Close()
+		if out := b.String(); strings.Contains(out, c.leak) {
+			t.Errorf("%q:\n%s", c.in, out)
+		}
+	}
+}

@@ -206,15 +206,28 @@ func indexOf(l []string, s string) int {
 
 var maskedTok = regexp.MustCompile(`<MASKED:[^>]*>`)
 
+// peekSecrets alimenta la red por contenido con lo que ya se detecta en una línea retenida, sin tocar
+// el estado de bloque de lo tecleado (su bloque lo da el prompt que aún no llega).
+func (r *Recorder) peekSecrets(line string) {
+	tmp := r.typed
+	r.noteSecrets(line, tmp.Typed(line))
+}
+
 // typedLine enmascara lo tecleado y guarda en memoria los valores tapados (red por contenido).
 func (r *Recorder) typedLine(line string) string {
 	m := r.typed.Typed(line)
+	r.noteSecrets(line, m)
+	return m
+}
+
+// noteSecrets guarda en memoria los valores que la línea enmascarada m tapó en line.
+func (r *Recorder) noteSecrets(line, m string) {
 	if m == line {
-		return m
+		return
 	}
 	pieces := maskedTok.Split(m, -1)
 	if !strings.HasPrefix(line, pieces[0]) {
-		return m
+		return
 	}
 	pos := len(pieces[0])
 	for _, p := range pieces[1:] {
@@ -222,7 +235,7 @@ func (r *Recorder) typedLine(line string) string {
 		if p != "" {
 			i := strings.Index(line[pos:], p)
 			if i < 0 {
-				return m
+				return
 			}
 			end = pos + i
 		}
@@ -234,7 +247,6 @@ func (r *Recorder) typedLine(line string) string {
 		}
 		pos = end + len(p)
 	}
-	return m
 }
 
 // scrub tapa en una línea de salida los valores tapados antes: el valor completo solo como palabra entera y
@@ -340,7 +352,7 @@ func (r *Recorder) commitHeld() {
 	h := r.held
 	r.held = nil
 	for _, l := range h {
-		r.input(l)
+		r.input(r.typedLine(l))
 	}
 }
 
@@ -395,9 +407,10 @@ func (r *Recorder) flush() {
 	default:
 		// Sin salida nueva desde el Enter anterior: el equipo aún no mostró su prompt y esta línea
 		// podría ser la contraseña que el prompt de secreto va a pedir. Se decide al llegar la salida.
-		r.held = append(r.held, r.typedLine(line)) // ya enmascarada: los valores entran a la red por contenido al teclear
+		r.peekSecrets(line) // los valores ya detectados entran a la red por contenido; se graba al llegar el prompt con su bloque
+		r.held = append(r.held, line)
 		if len(r.held) > heldMax {
-			r.input(r.held[0])
+			r.input(r.typedLine(r.held[0]))
 			r.held = r.held[1:]
 		}
 	}
