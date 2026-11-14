@@ -50,17 +50,8 @@ jobs:
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - name: paquetes de contenido, reglas del repo (sin el secret)
         run: |
-          go test ./internal/pack/ -run 'TestPacksDelRepoSonValidos|TestSegmentosOficialesEstanReservados|TestBuildEsDeterminista|TestPaquetesOficialesConviven|TestChocaElNombreEnIngles'
-          prev=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
-          [ -z "$prev" ] && exit 0
-          for d in packs/*/; do
-            git diff --quiet "$prev" -- "$d" && continue
-            old=$(git show "$prev:${d}manifest.yaml" 2>/dev/null | sed -n 's/^version: *//p' || true)
-            new=$(sed -n 's/^version: *//p' "${d}manifest.yaml")
-            # mayor, no solo distinta: el núcleo rechaza instalar una versión igual o más vieja
-            [ -z "$old" ] || { [ "$old" != "$new" ] && [ "$(printf '%s\n%s\n' "$old" "$new" | sort -V | tail -1)" = "$new" ]; } ||
-              { echo "::error::${d} cambió desde $prev sin subir version ($old -> $new)"; exit 1; }
-          done
+          go test ./internal/pack/ -run 'TestPacksDelRepoSonValidos|TestSegmentosOficialesEstanReservados|TestBuildEsDeterminista|TestPaquetesOficialesConviven|TestTodosLosPaquetesOficialesConviven|TestChocaElNombreEnIngles'
+          tools/packaging/packs-version.sh "$GITHUB_REF_NAME"
       # El secret solo vive en el entorno de este paso; npm no corre en este job.
       - name: paquetes de contenido firmados (.mpack)
         env:
