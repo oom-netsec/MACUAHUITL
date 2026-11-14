@@ -2688,4 +2688,6 @@ export const en: Record<Key, string> = {
   "patrol.param.vrf": "Tenant and VRF as tenant:vrf, for example common:default.",
   "patrol.param.kind.vnid": "VNID",
   "patrol.param.vnid": "Whole number from 1 to 16777215, for example 2850817.",
+  "packs.displace": "Installing this official pack removes these third-party packs that collide with it and deletes them from disk: {ids}.",
+  "packs.displace.ok": "I understand: remove {ids}",
 };

@@ -85,14 +85,16 @@ function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; p
   const [err, setErr] = useState("");
   const [changed, setChanged] = useState(false);
   const [busy, setBusy] = useState(false);
+  const displaced = info.displaced ?? [];
+  const [okDisplace, setOkDisplace] = useState(false); // quitar terceros siempre se acepta a mano (#85)
   const install = async () => {
     setBusy(true); setErr(""); setChanged(false);
     let ok = false;
     try {
       // Un playbook tapado no se oculta (su casilla queda marcada): no viaja en hide, que con replaceHidden es el conjunto exacto.
-      await core.packInstallHiding(path, !pack.official, [...playbookIds, ...scriptIds].filter((x) => hide.has(x) && !pack.shadowed.includes(x)), true, info.sha256);
+      await core.packInstallHiding(path, !pack.official, [...playbookIds, ...scriptIds].filter((x) => hide.has(x) && !pack.shadowed.includes(x)), true, info.sha256, okDisplace ? displaced : []);
       ok = true;
-    } catch (e) { setErr(errorText(e)); setChanged(errInfo(e)?.reason === "pack.err.install.changed"); }
+    } catch (e) { setErr(errorText(e)); setChanged(["pack.err.install.changed", "pack.err.would_displace"].includes(errInfo(e)?.reason ?? "")); }
     scriptsChanged(); // también si falló: un error puede decir «el paquete quedó instalado»
     try { onDone(); } finally { setBusy(false); }
     if (ok) onClose();
@@ -107,9 +109,13 @@ function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; p
       {/* Lo derivado (lib-<id> de un playbook desmarcado) sale de la selección actual, no de lo que ya estaba oculto. */}
       <Items pack={{ ...pack, hidden: [...hide] }} playbookIds={playbookIds} scriptIds={scriptIds} isHidden={(x) => hide.has(x)} busy={busy}
         onToggle={(id, visible) => setHide((s) => { const n = new Set(s); if (visible) n.delete(id); else n.add(id); return n; })} />
+      {displaced.length > 0 && <>
+        <Notice kind="warn">{t("packs.displace", { ids: displaced.join(", ") })}</Notice>
+        <Check label={t("packs.displace.ok", { ids: displaced.join(", ") })} checked={okDisplace} onChange={setOkDisplace} />
+      </>}
       {err && <Notice kind="error">{err}</Notice>}
       {changed && <Notice kind="warn">{t("packs.import.changed")}</Notice>}
-      <div className="actions"><button type="button" className="primary" disabled={busy || changed} onClick={install}>{t("packs.install.go")}</button></div>
+      <div className="actions"><button type="button" className="primary" disabled={busy || changed || (displaced.length > 0 && !okDisplace)} onClick={install}>{t("packs.install.go")}</button></div>
     </Dialog>
   );
 }
