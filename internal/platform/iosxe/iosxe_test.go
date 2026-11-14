@@ -360,8 +360,10 @@ func fakeNX(t *testing.T, width0Reply string) (*driver, *[]string) {
 		buf := make([]byte, 0, 256)
 		b := make([]byte, 1)
 		for {
-			if _, err := devR.Read(b); err != nil {
+			if n, err := devR.Read(b); err != nil {
 				return
+			} else if n == 0 { // una escritura de 0 bytes no repite el byte anterior
+				continue
 			}
 			if b[0] != '\n' {
 				buf = append(buf, b[0])

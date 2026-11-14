@@ -130,16 +130,16 @@ func TestAireOSLoginRechazoYSinCredencial(t *testing.T) {
 		reply           func(string) (string, string)
 		want            string
 	}{
-		"rechazo con User:": {"User: ", "admin", "s3cret", func(l string) (string, string) {
+		"rechazo con User:": {"(Cisco Controller)\r\nUser: ", "admin", "s3cret", func(l string) (string, string) {
 			if l == "admin" {
 				return "", "Password: "
 			}
 			return "\r\nAuthentication failed\r\n", "User: "
 		}, "admin\ns3cret\n"},
-		"rechazo con Password:": {"User: ", "admin", "s3cret", func(l string) (string, string) { return "", "Password: " }, "admin\ns3cret\n"},
-		"sin credencial":        {"User: ", "", "", loginReply("x", ""), ""},
-		"sin usuario":           {"User: ", "", "s3cret", loginReply("x", ""), ""},
-		"sin clave":             {"User: ", "admin", "", loginReply("x", ""), ""},
+		"rechazo con Password:": {"(Cisco Controller)\r\nUser: ", "admin", "s3cret", func(l string) (string, string) { return "", "Password: " }, "admin\ns3cret\n"},
+		"sin credencial":        {"(Cisco Controller)\r\nUser: ", "", "", loginReply("x", ""), ""},
+		"sin usuario":           {"(Cisco Controller)\r\nUser: ", "", "s3cret", loginReply("x", ""), ""},
+		"sin clave":             {"(Cisco Controller)\r\nUser: ", "admin", "", loginReply("x", ""), ""},
 	} {
 		f, _, err := openAire(t, tc.first, tc.reply, tc.user, tc.pw)
 		if !errors.Is(err, platform.ErrLoginFailed) {
@@ -159,7 +159,7 @@ func TestAireOSLaClaveNoSaleEnErrorNiLogs(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { slog.SetDefault(old) })
 	const pw = "Cl4v3-Sup3r-S3cr3ta"
-	_, d, err := openAire(t, "User: ", func(l string) (string, string) {
+	_, d, err := openAire(t, "(Cisco Controller)\r\nUser: ", func(l string) (string, string) {
 		if l == "admin" {
 			return "", "Password: "
 		}
@@ -255,8 +255,10 @@ func pagedDev(t *testing.T, pages []string, cut func(page string) int) (io.Reade
 		next := 0
 		b := make([]byte, 1)
 		for {
-			if _, err := devR.Read(b); err != nil {
+			if n, err := devR.Read(b); err != nil {
 				return
+			} else if n == 0 { // una escritura de 0 bytes no repite el byte anterior
+				continue
 			}
 			mu.Lock()
 			wrote = append(wrote, b[0])

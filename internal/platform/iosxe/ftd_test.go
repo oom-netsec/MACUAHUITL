@@ -168,9 +168,11 @@ func scriptedDevLog(t *testing.T, first func(out func(string)), handle func(line
 		var buf []byte
 		b := make([]byte, 1)
 		for {
-			if _, err := devR.Read(b); err != nil {
+			if n, err := devR.Read(b); err != nil {
 				close(q)
 				return
+			} else if n == 0 { // una escritura de 0 bytes no repite el byte anterior
+				continue
 			}
 			if b[0] != '\n' {
 				buf = append(buf, b[0])
