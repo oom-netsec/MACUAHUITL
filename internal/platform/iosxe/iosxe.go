@@ -509,7 +509,7 @@ func (d *driver) quiet(ctx context.Context, n int) bool {
 // moreComing: si tail es el «> » de FTD, espera ftdSettle por más datos; si llegan, no era el prompt (era el inicio
 // de una línea de salida) y se agregan al búfer.
 func (d *driver) moreComing(ctx context.Context, tail string) bool {
-	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) { // «User:» de un banner puede ir seguido del prompt de otra plataforma
+	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) && !iseFirstLogin.MatchString(tail) { // «User:», «(y/n)» o «New password:» de un banner pueden ir seguidos del prompt de otra plataforma
 		return false
 	}
 	select {

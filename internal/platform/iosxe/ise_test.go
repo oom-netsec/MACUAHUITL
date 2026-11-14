@@ -142,3 +142,24 @@ func TestISENoCambiaIOSTerminalWidth(t *testing.T) {
 		t.Fatalf("se escribió %q", got)
 	}
 }
+
+// El banner de otra plataforma que llega sin su fin de línea y parece una pregunta o un cambio de contraseña no es un
+// primer login: el prompt llega enseguida y Open sigue normal.
+func TestISEGuardaEsperaElPromptDeOtrasPlataformas(t *testing.T) {
+	for _, c := range []struct{ banner, prompt string }{
+		{"Authorized users only. Continue? (y/n)", "\r\nSW1#"},
+		{"Access logged [yes/no]", "\r\nSW1#"},
+		{"Note: your password has expired", "\r\nasa# "},
+		{"New password:", "\r\nn9k# "},
+	} {
+		r, w := scriptedDev(t, func(out func(string)) {
+			out(c.banner)
+			time.Sleep(60 * time.Millisecond)
+			out(c.prompt)
+		}, func(line string, out func(string)) { out(line + "\r\n" + strings.TrimLeft(c.prompt, "\r\n")) })
+		d := New().(*driver)
+		if err := d.Open(context.Background(), r, w, secret.New([]byte("en"))); err != nil {
+			t.Fatalf("%q: Open = %v", c.banner, err)
+		}
+	}
+}
