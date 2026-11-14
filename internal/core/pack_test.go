@@ -3,6 +3,7 @@ package core
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -103,7 +104,7 @@ func TestPackIdaYVueltaEnCaliente(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 	au := h.auditText(t)
-	for _, want := range []string{`"action":"pack.install"`, `origin=official`, `"action":"pack.remove"`, `favorites_removed=1`, `version=1.1.0`} {
+	for _, want := range []string{`"action":"pack.install"`, `origin=official`, `"action":"pack.remove"`, `favorites_removed=1`, "version=" + ioSXEShipped(t)} {
 		if !strings.Contains(au, want) {
 			t.Errorf("la auditoría no trae %s:\n%s", want, au)
 		}
@@ -306,7 +307,7 @@ func TestPackRutaRelativaYAuditoriaDeRechazos(t *testing.T) {
 	if r, _ := reasonOf(err); r != "pack.err.version" {
 		t.Fatalf("%v", err)
 	}
-	if au := h.auditText(t); !strings.Contains(au, "id=oom/ios-xe version=1.1.0") || !strings.Contains(au, "reason=version") {
+	if au := h.auditText(t); !strings.Contains(au, "id=oom/ios-xe version="+ioSXEShipped(t)) || !strings.Contains(au, "reason=version") {
 		t.Fatalf("auditoría:\n%s", au)
 	}
 }
@@ -332,6 +333,20 @@ func TestPackTerceroNoOcupaIDsMovidos(t *testing.T) {
 	}
 }
 
+// ioSXEShipped es la versión de oom/ios-xe en el repo; las pruebas no la fijan para que subirla no las rompa.
+func ioSXEShipped(t *testing.T) string {
+	t.Helper()
+	files, err := pack.ReadSource(filepath.Join(packtest.RepoDir(), "packs", "ios-xe"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`(?m)^version: (\S+)$`).FindStringSubmatch(string(files["manifest.yaml"]))
+	if m == nil {
+		t.Fatal("manifest de oom/ios-xe sin version")
+	}
+	return m[1]
+}
+
 // ioSXEVersion es oom/ios-xe del repo con otra versión, firmado con la llave de pruebas.
 func ioSXEVersion(t *testing.T, v string, sin ...string) []byte {
 	t.Helper()
@@ -340,7 +355,7 @@ func ioSXEVersion(t *testing.T, v string, sin ...string) []byte {
 		t.Fatal(err)
 	}
 	m := string(files["manifest.yaml"])
-	files["manifest.yaml"] = []byte(strings.Replace(m, "version: 1.1.0", "version: "+v, 1))
+	files["manifest.yaml"] = []byte(strings.Replace(m, "version: "+ioSXEShipped(t), "version: "+v, 1))
 	for _, f := range sin { // archivos de playbook que esta versión ya no trae
 		delete(files, f)
 	}
@@ -408,7 +423,7 @@ func TestPackOcultarNoCambiaLoQueResuelve(t *testing.T) {
 		}
 	}
 	// Actualizar: lo oculto se conserva; reinstalar nuevo ID entra visible.
-	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1"))})); err != nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "99.0.1"))})); err != nil {
 		t.Fatal(err)
 	}
 	if slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
@@ -549,8 +564,8 @@ func TestPackInspectNoInstala(t *testing.T) {
 	}
 	// Con una versión instalada dice cuál reemplazaría; la igual da el mismo error que Install.
 	h.installIOSXE(t)
-	r, err = pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1"))})
-	if err != nil || r.ReplacedVersion != "1.1.0" {
+	r, err = pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: writeMpack(t, ioSXEVersion(t, "99.0.1"))})
+	if err != nil || r.ReplacedVersion != ioSXEShipped(t) {
 		t.Fatalf("%+v %v", r, err)
 	}
 	_, ei := pk.Inspect(ctx(t), &v1.PackServiceInspectRequest{Path: path})
@@ -638,7 +653,7 @@ func TestPackOcultosNoSeHeredan(t *testing.T) {
 	if _, err := pk.SetItems(ctx(t), &v1.PackServiceSetItemsRequest{PackId: "oom/ios-xe", Hide: []string{"ios-xe/l1-poe"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1", "playbooks/l1-poe.yaml"))})); err != nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "99.0.1", "playbooks/l1-poe.yaml"))})); err != nil {
 		t.Fatal(err)
 	}
 	var n int
@@ -646,7 +661,7 @@ func TestPackOcultosNoSeHeredan(t *testing.T) {
 	if n != 0 {
 		t.Fatalf("la v2 sin el ID debía borrar su fila: %d", n)
 	}
-	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.2"))})); err != nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "99.0.2"))})); err != nil {
 		t.Fatal(err)
 	}
 	if !slices.Contains(h.playbookIDs(t), "ios-xe/l1-poe") {
@@ -716,17 +731,17 @@ func TestPackInstallReplaceHidden(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Sin replace_hidden: se conserva y suma.
-	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.1")), Hide: []string{"ios-xe/l1-poe"}}))
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "99.0.1")), Hide: []string{"ios-xe/l1-poe"}}))
 	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l1-poe", "ios-xe/l2-stp"}) {
 		t.Fatalf("%+v %v", r, err)
 	}
 	// Con replace_hidden y hide vacío: nada oculto.
-	r, err = pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.2")), ReplaceHidden: true}))
+	r, err = pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "99.0.2")), ReplaceHidden: true}))
 	if err != nil || len(r.Pack.Hidden) != 0 || !slices.Contains(h.playbookIDs(t), "ios-xe/l2-stp") {
 		t.Fatalf("%+v %v", r, err)
 	}
 	// Con replace_hidden y hide: exactamente eso.
-	r, err = pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "1.1.3")), Hide: []string{"ios-xe/l1-poe"}, ReplaceHidden: true}))
+	r, err = pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, ioSXEVersion(t, "99.0.3")), Hide: []string{"ios-xe/l1-poe"}, ReplaceHidden: true}))
 	if err != nil || !slices.Equal(r.Pack.Hidden, []string{"ios-xe/l1-poe"}) {
 		t.Fatalf("%+v %v", r, err)
 	}
