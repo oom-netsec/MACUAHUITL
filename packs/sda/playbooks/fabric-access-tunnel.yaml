@@ -1,6 +1,6 @@
 # Propósito: Muestra los túneles de acceso y las interfaces del overlay.
 # Cuándo usarlo: El tráfico encapsulado no llega a otro edge o a un AP.
-# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
 # Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
 id: fabric-access-tunnel
 platform: sda

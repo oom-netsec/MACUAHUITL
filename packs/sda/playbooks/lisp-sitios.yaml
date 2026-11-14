@@ -1,6 +1,6 @@
 # Propósito: Lista los registros del servidor de mapeos por tipo de EID.
 # Cuándo usarlo: Un endpoint no se registra o desaparece del control plane.
-# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
 # Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
 id: lisp-sitios
 platform: sda

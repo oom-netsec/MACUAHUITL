@@ -1,7 +1,7 @@
 # Propósito: Muestra qué tráfico sube a la CPU y cómo lo limita el policer.
 # Cuándo usarlo: CPU alta con poco tráfico o protocolos que pierden vecinos.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: cpu-punt
 platform: cat9k
 name: Catalyst 9K · CPU · Punt e inject
@@ -9,9 +9,9 @@ name_en: Catalyst 9K · CPU · Punt and inject
 commands:
   - cmd: show clock
   - cmd: show processes cpu platform sorted
-  - cmd: show platform software fed switch active punt cause summary
-  - cmd: show platform software fed switch active inject cause summary
-  - cmd: show platform hardware fed switch active qos queue stats internal cpu policer
+  - cmd: show platform software fed switch active punt cause summary  # 9200/9300/9500 con stack; en 9400/9600: fed active
+  - cmd: show platform software fed switch active inject cause summary  # 9200/9300/9500 con stack; en 9400/9600: fed active
+  - cmd: show platform hardware fed switch active qos queue stats internal cpu policer  # 9200/9300/9500 con stack; en 9400/9600: fed active
   - cmd: show policy-map control-plane
   - cmd: show platform software status control-processor brief
   - cmd: show processes cpu history

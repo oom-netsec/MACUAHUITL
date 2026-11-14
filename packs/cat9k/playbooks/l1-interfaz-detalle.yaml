@@ -1,7 +1,7 @@
 # Propósito: Detalla estado, contadores, controlador y transceptor de una interfaz.
 # Cuándo usarlo: Un puerto con errores, velocidad o dúplex raros.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: l1-interfaz-detalle
 platform: cat9k
 name: Catalyst 9K · L1 · Detalle de una interfaz

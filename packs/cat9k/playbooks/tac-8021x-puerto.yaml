@@ -1,7 +1,7 @@
 # Propósito: Recolecta sesión, RADIUS y log de un puerto que no autentica.
 # Cuándo usarlo: Un endpoint queda sin acceso o en la VLAN de invitados.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: tac-8021x-puerto
 platform: cat9k
 name: Catalyst 9K · TAC · 802.1X no autentica en un puerto

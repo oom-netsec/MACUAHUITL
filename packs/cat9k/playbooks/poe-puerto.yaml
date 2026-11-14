@@ -1,7 +1,7 @@
 # Propósito: Detalla PoE, negociación CDP/LLDP y contadores de un puerto.
 # Cuándo usarlo: Un teléfono, AP o cámara no enciende en un puerto.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: poe-puerto
 platform: cat9k
 name: Catalyst 9K · PoE · Puerto con PoE

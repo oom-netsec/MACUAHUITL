@@ -1,7 +1,7 @@
 # Propósito: Lista los puertos err-disabled con su causa y recuperación.
 # Cuándo usarlo: Un puerto se apaga por BPDU guard, port-security, UDLD o flap.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: l1-err-disabled
 platform: cat9k
 name: Catalyst 9K · L1 · Puertos err-disabled

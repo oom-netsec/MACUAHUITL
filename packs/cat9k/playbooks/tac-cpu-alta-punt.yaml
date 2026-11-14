@@ -1,7 +1,7 @@
 # Propósito: Identifica el proceso y el tráfico punteado que consumen CPU.
 # Cuándo usarlo: La CPU sube y los protocolos pierden vecinos.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: tac-cpu-alta-punt
 platform: cat9k
 name: Catalyst 9K · TAC · CPU alta por punt
@@ -11,9 +11,9 @@ commands:
   - cmd: show processes cpu sorted 5sec | exclude 0.00% 0.00% 0.00%
   - cmd: show processes cpu platform sorted
   - cmd: show platform software status control-processor brief
-  - cmd: show platform software fed switch active punt cause summary
-  - cmd: show platform software fed switch active inject cause summary
-  - cmd: show platform hardware fed switch active qos queue stats internal cpu policer
+  - cmd: show platform software fed switch active punt cause summary  # 9200/9300/9500 con stack; en 9400/9600: fed active
+  - cmd: show platform software fed switch active inject cause summary  # 9200/9300/9500 con stack; en 9400/9600: fed active
+  - cmd: show platform hardware fed switch active qos queue stats internal cpu policer  # 9200/9300/9500 con stack; en 9400/9600: fed active
   - cmd: show policy-map control-plane
   - cmd: show ip traffic
   - cmd: show processes cpu history

@@ -1,7 +1,7 @@
 # Propósito: Lee potencia, temperatura y datos de los transceptores.
 # Cuándo usarlo: Pérdida de señal, fibra sucia o un módulo no soportado.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: l1-transceptores
 platform: cat9k
 name: Catalyst 9K · L1 · Transceptores DOM

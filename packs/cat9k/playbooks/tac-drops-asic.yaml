@@ -1,7 +1,7 @@
 # Propósito: Recolecta contadores, colas y recursos de un puerto con descartes.
 # Cuándo usarlo: Pérdida de paquetes sin errores aparentes en la interfaz.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: tac-drops-asic
 platform: cat9k
 name: Catalyst 9K · TAC · Descartes en el ASIC de un puerto
@@ -15,8 +15,8 @@ commands:
   - cmd: show interfaces {interface} counters errors
   - cmd: show controllers ethernet-controller {interface}
   - cmd: show policy-map interface {interface}
-  - cmd: show platform hardware fed switch active qos queue stats interface {interface}
-  - cmd: show platform hardware fed switch active qos queue config interface {interface}
-  - cmd: show platform hardware fed switch active fwd-asic resource tcam utilization
+  - cmd: show platform hardware fed switch active qos queue stats interface {interface}  # 9200/9300/9500 con stack; en 9400/9600: fed active
+  - cmd: show platform hardware fed switch active qos queue config interface {interface}  # 9200/9300/9500 con stack; en 9400/9600: fed active
+  - cmd: show platform hardware fed switch active fwd-asic resource tcam utilization  # 9200/9300/9500 con stack; en 9400/9600: fed active
   - cmd: show platform resources
-  - cmd: show platform software fed switch active punt cause summary
+  - cmd: show platform software fed switch active punt cause summary  # 9200/9300/9500 con stack; en 9400/9600: fed active

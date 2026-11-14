@@ -1,7 +1,7 @@
 # Propósito: Recolecta lo necesario cuando la pila se parte o un miembro no entra.
 # Cuándo usarlo: Dos activos, un miembro en estado distinto o versiones mezcladas.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: tac-stack-dividido
 platform: cat9k
 name: Catalyst 9K · TAC · Stack dividido o miembro que no se une

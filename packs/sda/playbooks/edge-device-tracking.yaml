@@ -1,6 +1,6 @@
 # Propósito: Revisa la base, las políticas, los contadores y los eventos de SISF.
 # Cuándo usarlo: Hosts que no se registran o pierden su entrada.
-# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
 # Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
 id: edge-device-tracking
 platform: sda

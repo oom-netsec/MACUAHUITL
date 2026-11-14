@@ -1,6 +1,6 @@
 # Propósito: Recolecta autenticación, RADIUS, CTS y DHCP del edge completo.
 # Cuándo usarlo: Varios endpoints no autentican.
-# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
 # Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
 id: tac-onboarding-falla-general
 platform: sda

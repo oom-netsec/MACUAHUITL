@@ -1,7 +1,7 @@
 # Propósito: Recolecta PoE, negociación, controlador y log de un puerto.
 # Cuándo usarlo: Un dispositivo PoE no recibe energía.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: tac-poe-no-enciende
 platform: cat9k
 name: Catalyst 9K · TAC · PoE no enciende en un puerto

@@ -1,7 +1,7 @@
 # Propósito: Muestra la base, las políticas y los contadores de device-tracking.
 # Cuándo usarlo: Hosts que no aparecen en la tabla o pierden su entrada.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: sec-device-tracking
 platform: cat9k
 name: Catalyst 9K · Seguridad · Device tracking

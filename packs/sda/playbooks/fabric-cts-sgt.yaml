@@ -1,6 +1,6 @@
 # Propósito: Muestra el entorno CTS, el mapeo de SGT y las políticas.
 # Cuándo usarlo: El tráfico se bloquea por una política de grupos.
-# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
 # Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
 id: fabric-cts-sgt
 platform: sda

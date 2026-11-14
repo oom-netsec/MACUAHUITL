@@ -1,7 +1,7 @@
 # Propósito: Lista los vecinos CDP y LLDP con detalle.
 # Cuándo usarlo: Un vecino no aparece o publica datos incorrectos.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: l2-cdp-lldp
 platform: cat9k
 name: Catalyst 9K · L2 · Vecinos CDP y LLDP

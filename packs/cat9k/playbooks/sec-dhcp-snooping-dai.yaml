@@ -1,7 +1,7 @@
 # Propósito: Revisa las tablas de snooping, las inspecciones ARP y la protección de origen.
 # Cuándo usarlo: Clientes sin DHCP, ARP bloqueado o tráfico descartado por IPSG.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: sec-dhcp-snooping-dai
 platform: cat9k
 name: Catalyst 9K · Seguridad · DHCP snooping, DAI y IPSG

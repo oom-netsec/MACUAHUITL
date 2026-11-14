@@ -1,7 +1,7 @@
 # Propósito: Lista las ACL, sus coincidencias y el uso del TCAM.
 # Cuándo usarlo: Una ACL no coincide como se espera o el TCAM se agota.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: sec-acl
 platform: cat9k
 name: Catalyst 9K · Seguridad · ACL y TCAM
@@ -12,7 +12,7 @@ commands:
     timeout: 120s
   - cmd: show ip access-lists
     timeout: 120s
-  - cmd: show platform hardware fed switch active fwd-asic resource tcam utilization
+  - cmd: show platform hardware fed switch active fwd-asic resource tcam utilization  # 9200/9300/9500 con stack; en 9400/9600: fed active
   - cmd: show ip interface | include line protocol|access list
     timeout: 120s
   - cmd: show logging | include ACL|TCAM

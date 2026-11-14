@@ -209,3 +209,26 @@ func TestTodosLosPaquetesOficialesConviven(t *testing.T) {
 		}
 	}
 }
+
+// En 9400/9600 el comando es «fed active»: toda línea de oom/cat9k con «fed switch active» lo avisa en su comentario.
+func TestCat9kFedSwitchActiveAvisaDeFedActive(t *testing.T) {
+	files, _ := filepath.Glob(filepath.Join(packtest.RepoDir(), "packs", "cat9k", "playbooks", "*.yaml"))
+	n := 0
+	for _, f := range files {
+		raw, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, ln := range strings.Split(string(raw), "\n") {
+			if strings.Contains(ln, "fed switch active") {
+				n++
+				if !strings.Contains(ln, "# ") || !strings.Contains(ln, "fed active") {
+					t.Errorf("%s: falta el comentario de fed active: %s", filepath.Base(f), ln)
+				}
+			}
+		}
+	}
+	if n == 0 {
+		t.Fatal("no se encontró ninguna línea con fed switch active")
+	}
+}

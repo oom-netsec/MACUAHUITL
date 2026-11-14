@@ -1,7 +1,7 @@
 # Propósito: Recolecta estado, log, UDLD y STP de un puerto inestable.
 # Cuándo usarlo: Un puerto sube y baja o se pone err-disabled.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: tac-flapping-puerto
 platform: cat9k
 name: Catalyst 9K · TAC · Puerto con flapping

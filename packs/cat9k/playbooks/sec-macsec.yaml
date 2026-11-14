@@ -1,7 +1,7 @@
 # Propósito: Muestra las sesiones MKA, las políticas y los contadores de MACsec.
 # Cuándo usarlo: El enlace cifrado no sube o descarta tramas.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: sec-macsec
 platform: cat9k
 name: Catalyst 9K · Seguridad · MACsec y MKA

@@ -1,7 +1,7 @@
 # Propósito: Resume versión, miembros, recursos, ambiente y mensajes recientes del Catalyst 9000.
 # Cuándo usarlo: Primera revisión de cualquier Catalyst 9000 antes de profundizar.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: plat-salud
 platform: cat9k
 name: Catalyst 9K · Plataforma · Salud general

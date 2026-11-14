@@ -1,7 +1,7 @@
 # Propósito: Reúne el motivo del último reinicio, el log y los archivos de falla.
 # Cuándo usarlo: Reinicio inesperado, tracebacks o mensajes de plataforma en el log.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: plat-logs-cores
 platform: cat9k
 name: Catalyst 9K · Plataforma · Logs, reinicios y crashinfo

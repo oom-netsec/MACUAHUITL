@@ -1,7 +1,7 @@
 # Propósito: Lista las sesiones de autenticación, RADIUS y eventos de 802.1X y MAB.
 # Cuándo usarlo: Un endpoint no autentica o queda en el método equivocado.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: sec-8021x-mab
 platform: cat9k
 name: Catalyst 9K · Seguridad · 802.1X y MAB

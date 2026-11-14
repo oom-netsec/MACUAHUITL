@@ -1,6 +1,6 @@
 # Propósito: Recolecta LISP, BGP y rutas por VRF cuando el border no tiene rutas.
 # Cuándo usarlo: Destinos externos o del tránsito inalcanzables.
-# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
 # Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
 id: tac-border-sin-rutas
 platform: sda

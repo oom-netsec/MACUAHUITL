@@ -1,7 +1,7 @@
 # Propósito: Revisa los puertos de stack, los vecinos y el anillo.
 # Cuándo usarlo: Un cable o puerto de stack falla o la pila trabaja como anillo abierto.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: stack-anillo
 platform: cat9k
 name: Catalyst 9K · Stack · Puertos y anillo de stack

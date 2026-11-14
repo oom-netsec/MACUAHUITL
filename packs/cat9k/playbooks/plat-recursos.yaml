@@ -1,7 +1,7 @@
 # Propósito: Mide CPU y memoria del plano de control y de los procesos de la plataforma.
 # Cuándo usarlo: CPU o memoria altas, o antes de actualizar el software.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: plat-recursos
 platform: cat9k
 name: Catalyst 9K · Plataforma · CPU y memoria

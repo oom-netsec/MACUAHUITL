@@ -1,6 +1,6 @@
 # Propósito: Revisa las rutas externas por VRF, CEF y los protocolos.
 # Cuándo usarlo: Un destino fuera del fabric no tiene ruta.
-# Fuente: https://www.cisco.com/c/en/us/solutions/enterprise-networks/software-defined-access/index.html
+# Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/lisp/command/lisp-cr-book.html
 # Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
 id: border-rutas-externas
 platform: sda

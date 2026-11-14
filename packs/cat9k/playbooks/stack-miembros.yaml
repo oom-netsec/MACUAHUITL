@@ -1,7 +1,7 @@
 # Propósito: Lista los miembros de la pila con rol, prioridad, versión y estado.
 # Cuándo usarlo: Un miembro no aparece, cambió el activo o hay versiones mezcladas.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: stack-miembros
 platform: cat9k
 name: Catalyst 9K · Stack · Miembros, roles y prioridades

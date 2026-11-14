@@ -1,7 +1,7 @@
 # Propósito: Sigue una MAC por MAC, sesión, snooping y device-tracking.
 # Cuándo usarlo: Un host no tiene red aunque el puerto está arriba.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: tac-host-sin-conectividad
 platform: cat9k
 name: Catalyst 9K · TAC · Host sin conectividad (una MAC)

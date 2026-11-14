@@ -1,7 +1,7 @@
 # Propósito: Lista las sesiones SPAN/ERSPAN y su origen y destino.
 # Cuándo usarlo: Un espejo no recibe tráfico o hay conflicto de destinos.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: svc-span
 platform: cat9k
 name: Catalyst 9K · Servicios · SPAN y captura

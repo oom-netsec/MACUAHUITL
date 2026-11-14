@@ -1,7 +1,7 @@
 # Propósito: Revisa la detección dual-active por PAgP, el canal y el log.
 # Cuándo usarlo: Sospecha de dual-active tras perder los enlaces SVL.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-9300-series-switches/products-command-reference-list.html
-# Validado en laboratorio: no (sin equipo; pendiente sandbox SD-Access de DevNet)
+# Validado en laboratorio: no (sin equipo)
 id: svl-dual-active
 platform: cat9k
 name: Catalyst 9K · SVL · Detección dual-active
