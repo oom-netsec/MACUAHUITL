@@ -497,10 +497,7 @@ func (v *Vault) persistReplacingBak() error {
 // chmod es variable para que las pruebas simulen un sistema de archivos sin permisos.
 var chmod = func(f *os.File, m os.FileMode) error { return f.Chmod(m) }
 
-// writeAtomic: temporal 0600 en el mismo directorio, fsync, rename y fsync del directorio.
-func writeAtomic(path string, data []byte) error { return writeAtomicOpt(path, data, nil) }
-
-// writeAtomicOpt con noPerms distinto de nil tolera que el sistema de archivos no admita chmod (EPERM o no soportado, p. ej. vfat) y lo anota.
+// writeAtomicOpt: temporal 0600 en el mismo directorio, fsync, rename y fsync del directorio; con noPerms distinto de nil tolera que el sistema de archivos no admita chmod (EPERM o no soportado, p. ej. vfat) y lo anota.
 func writeAtomicOpt(path string, data []byte, noPerms *bool) error {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".vault-*.tmp")
