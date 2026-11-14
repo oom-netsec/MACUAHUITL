@@ -2649,6 +2649,8 @@ export const es = {
   "patrol.param.kind.ap": "AP",
   "patrol.param.kind.interface": "Interfaz",
   "patrol.param.kind.ip": "Dirección IP",
+  "scripts.col.hidden": "oculto por un paquete",
+  "scripts.col.unavailable": "no disponible: instala el paquete",
 };
 
 export type Key = keyof typeof es;

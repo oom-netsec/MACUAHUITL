@@ -165,6 +165,8 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   };
 
   // Reintentar tras aceptar una huella usa el equipo y la credencial de la pestaña que falló, no lo que hay hoy en los campos.
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const open = async (accepted = accept, dev = device, credId = cred) => {
     // Dos sesiones vivas en el mismo archivo se pisarían cada 30 s.
     if (logPick && tabsRef.current.some((x) => !x.done && x.logPath === logPick)) { setErr(t("ssh.logInUse")); return; }
@@ -173,6 +175,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
       const t = parseTarget(parseTargets(dev)[0] ?? "");
       const label = dev.trim();
       const runId = await core.terminalOpen({ name: label, address: t.address, port: t.port, credentialId: credId, accept: parseFingerprints(accepted), rows: size.current.rows, cols: size.current.cols });
+      if (!alive.current) { core.terminalClose(runId).catch(() => {}); return; } // la vista se fue con la apertura en vuelo: no queda huérfana
       const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
       if (logPick) { logs.current.set(runId, { path: logPick, last: "", chain: Promise.resolve() }); setLogPick(""); } // el archivo es de esta sesión, no de las siguientes
       // La pestaña se registra ya (no al renderizar) para que ningún evento se quede sin dueño.

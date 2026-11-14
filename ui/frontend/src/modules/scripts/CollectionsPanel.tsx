@@ -86,6 +86,8 @@ export function CollectionsPanel({ core, onChanged }: { core: CoreAPI; onChanged
     setMsg(t("scripts.col.exported", { c: r.collections, s: r.scripts, path }));
   });
   const nameOf = (id: string) => byId.get(id)?.name ?? id; // un «lib-*» que la biblioteca ya no trae se ve por su ID
+  // Un «lib-*» que no resuelve ni está oculto es de un paquete quitado: no es ejecutable y no cuenta.
+  const missing = (c: Collection, id: string) => id.startsWith("lib-") && !byId.has(id) && !c.hiddenScriptIds.includes(id);
   const addable = scripts.filter((s) => sel && !sel.scriptIds.includes(s.id));
 
   return (
@@ -118,7 +120,7 @@ export function CollectionsPanel({ core, onChanged }: { core: CoreAPI; onChanged
                   <input type="checkbox" aria-label={t("scripts.col.pick", { name: colName(t, c) })} checked={picked.includes(c.id)}
                     onChange={(e) => setPicked((p) => (e.target.checked ? [...p, c.id] : p.filter((x) => x !== c.id)))} />
                   <button type="button" className="quiet scr-name" aria-label={t("scripts.col.open", { name: colName(t, c) })} onClick={() => setSelId(c.id)}>{colName(t, c)}</button>
-                  <Badge>{t("scripts.col.count", { n: String(c.scriptIds.length) })}</Badge>
+                  <Badge>{t("scripts.col.count", { n: String(c.scriptIds.filter((id) => !missing(c, id)).length) })}</Badge>
                   <button type="button" className="quiet icon sm" data-mv={`c-${c.id}-up`} disabled={i === 0} aria-label={t("scripts.col.up", { name: colName(t, c) })} onClick={() => void moveCol(i, -1)}><Icon name="up" /></button>
                   <button type="button" className="quiet icon sm" data-mv={`c-${c.id}-down`} disabled={i === cols.length - 1} aria-label={t("scripts.col.down", { name: colName(t, c) })} onClick={() => void moveCol(i, 1)}><Icon name="down" /></button>
                 </li>
@@ -144,6 +146,8 @@ export function CollectionsPanel({ core, onChanged }: { core: CoreAPI; onChanged
                     {sel.scriptIds.map((id, i) => (
                       <li key={id} className="col-row">
                         <span className="scr-name">{nameOf(id)}</span>
+                        {sel.hiddenScriptIds.includes(id) && <Badge>{t("scripts.col.hidden")}</Badge>}
+                        {missing(sel, id) && <Badge tone="warn">{t("scripts.col.unavailable")}</Badge>}
                         <button type="button" className="quiet icon sm" data-mv={`s-${id}-up`} disabled={i === 0} aria-label={t("scripts.col.sUp", { name: nameOf(id) })} onClick={() => void moveScript(sel, i, -1)}><Icon name="up" /></button>
                         <button type="button" className="quiet icon sm" data-mv={`s-${id}-down`} disabled={i === sel.scriptIds.length - 1} aria-label={t("scripts.col.sDown", { name: nameOf(id) })} onClick={() => void moveScript(sel, i, 1)}><Icon name="down" /></button>
                         <button type="button" className="quiet icon sm" data-mv={`s-${id}-rm`} aria-label={t("scripts.col.remove", { name: nameOf(id) })} onClick={() => void removeScript(sel, i)}><Icon name="close" /></button>

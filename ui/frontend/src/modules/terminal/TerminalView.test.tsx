@@ -195,6 +195,19 @@ test("al salir del módulo se cierran las sesiones vivas", async () => {
   expect(core.terminalClose).toHaveBeenCalledWith("t1");
 });
 
+test("si la vista se desmonta con terminalOpen en vuelo, la sesión que llega después se cierra", async () => {
+  let resolve!: (id: string) => void;
+  const terminalOpen = vi.fn(() => new Promise<string>((r) => { resolve = r; }));
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), terminalOpen });
+  const { unmount } = render(<TerminalView core={core} />);
+  await abrir("sw1");
+  await waitFor(() => expect(terminalOpen).toHaveBeenCalled());
+  unmount();
+  expect(core.terminalClose).not.toHaveBeenCalled();
+  await act(async () => { resolve("t9"); });
+  expect(core.terminalClose).toHaveBeenCalledWith("t9");
+});
+
 test("una credencial creada después de abrir la vista aparece sin reabrirla", async () => {
   const cred = { id: "c9", label: "Sw", username: "admin", hasEnable: false, hasSshKey: false };
   const listCredentials = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([cred]);
