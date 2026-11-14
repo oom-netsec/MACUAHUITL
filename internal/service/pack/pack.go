@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -91,11 +92,17 @@ func (s *svc) Install(ctx context.Context, r *v1.PackServiceInstallRequest) (*v1
 		return nil, err
 	}
 	reject := func(err error, p *dom.Pack, sum string) error { return s.reject(ctx, err, p, sum, path) }
+	if r.GetSha256() == "" { // la vista previa (Inspect) da el sha256: instalar sin él no ata lo revisado a lo instalado
+		return nil, service.Err(ctx, codes.InvalidArgument, "pack.err.install.sha256_missing", nil)
+	}
 	data, err := dom.ReadArchive(path)
 	if err != nil {
 		return nil, reject(err, nil, "none")
 	}
 	sum := dom.SHA256(data)
+	if !strings.EqualFold(r.GetSha256(), sum) {
+		return nil, service.Err(ctx, codes.FailedPrecondition, "pack.err.install.changed", nil)
+	}
 	// Lo oculto se guarda antes de publicar el paquete (en una sola transacción): si falla, no se instala nada.
 	// shortcut: si el disco falla justo después, la elección ya guardada queda aplicada a la versión que seguía instalada.
 	hide := []string{}
@@ -155,7 +162,7 @@ func (s *svc) Inspect(ctx context.Context, r *v1.PackServiceInspectRequest) (*v1
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	out := &v1.PackServiceInspectResponse{Pack: info, ScriptIds: res.Pack.ScriptIDs(), ReplacedVersion: res.Replaced}
+	out := &v1.PackServiceInspectResponse{Pack: info, ScriptIds: res.Pack.ScriptIDs(), ReplacedVersion: res.Replaced, Sha256: dom.SHA256(data)}
 	for _, pb := range res.Pack.Playbooks {
 		out.PlaybookIds = append(out.PlaybookIds, pb.ID)
 	}

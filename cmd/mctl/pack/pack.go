@@ -4,9 +4,13 @@ package pack
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -54,6 +58,20 @@ func line(p *v1.PackInfo) string {
 	return s
 }
 
+// fileSHA256 es la suma del archivo que mctl va a pedir instalar: el núcleo la compara con la del archivo que lee.
+func fileSHA256(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
 func install(c *cli.Env, args []string) error {
 	var unsigned bool
 	var hide multi
@@ -68,7 +86,11 @@ func install(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	r, err := v1.NewPackServiceClient(c.Conn).Install(context.Background(), &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: unsigned, Hide: hide, ReplaceHidden: len(hide) > 0})
+	sum, err := fileSHA256(path)
+	if err != nil {
+		return err
+	}
+	r, err := v1.NewPackServiceClient(c.Conn).Install(context.Background(), &v1.PackServiceInstallRequest{Path: path, AllowUnsigned: unsigned, Hide: hide, ReplaceHidden: len(hide) > 0, Sha256: sum})
 	if err != nil {
 		return err
 	}

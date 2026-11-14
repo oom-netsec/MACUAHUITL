@@ -67,7 +67,7 @@ test("un playbook tapado no se puede ocultar", async () => {
 });
 
 test("instalar de terceros: aviso, casillas precargadas y packInstallHiding con lo desmarcado", async () => {
-  const inspect = vi.fn(async () => ({ pack: { ...sampleThirdParty, hidden: ["ios-xe/mine"] }, playbookIds: ["ios-xe/l2-stp", "ios-xe/mine"], scriptIds: ["lib-l2-stp"], replacedVersion: "0.9.0" }));
+  const inspect = vi.fn(async () => ({ pack: { ...sampleThirdParty, hidden: ["ios-xe/mine"] }, playbookIds: ["ios-xe/l2-stp", "ios-xe/mine"], scriptIds: ["lib-l2-stp"], replacedVersion: "0.9.0", sha256: "abc" }));
   const install = vi.fn(async () => ({ pack: sampleThirdParty, replacedVersion: "" }));
   const list = vi.fn(async () => [samplePack]);
   const core = fakeCore({ packInspect: inspect, packInstallHiding: install, packList: list, pickPath: vi.fn(async () => "/tmp/x.mpack") });
@@ -81,7 +81,7 @@ test("instalar de terceros: aviso, casillas precargadas y packInstallHiding con 
   await userEvent.click(within(d).getByRole("checkbox", { name: /lib-l2-stp/ }));
   const calls = list.mock.calls.length;
   await userEvent.click(within(d).getByRole("button", { name: "Instalar" }));
-  await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/x.mpack", true, ["ios-xe/mine", "lib-l2-stp"], true));
+  await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/x.mpack", true, ["ios-xe/mine", "lib-l2-stp"], true, "abc"));
   await waitFor(() => expect(list.mock.calls.length).toBeGreaterThan(calls));
 });
 
@@ -92,7 +92,7 @@ test("instalar uno oficial manda allowUnsigned false y sin aviso", async () => {
   const d = await screen.findByRole("dialog");
   expect(within(d).queryByText(/no está firmado/)).toBeNull();
   await userEvent.click(within(d).getByRole("button", { name: "Instalar" }));
-  await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/o.mpack", false, [], true));
+  await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/o.mpack", false, [], true, "a".repeat(64)));
 });
 
 test("un error al instalar se muestra y aun así refresca la lista", async () => {
@@ -150,7 +150,7 @@ test("libOf arma el ID del script derivado como el núcleo", () => {
 });
 
 test("instalar: desmarcar un playbook oculta su script en la vista previa y marcarlo lo devuelve", async () => {
-  const inspect = vi.fn(async () => ({ pack: { ...sampleThirdParty, hidden: ["ios-xe/mine"] }, playbookIds: ["ios-xe/l2-stp", "ios-xe/mine"], scriptIds: ["lib-l2-stp", "lib-mine"], replacedVersion: "" }));
+  const inspect = vi.fn(async () => ({ pack: { ...sampleThirdParty, hidden: ["ios-xe/mine"] }, playbookIds: ["ios-xe/l2-stp", "ios-xe/mine"], scriptIds: ["lib-l2-stp", "lib-mine"], replacedVersion: "", sha256: "abc" }));
   const install = vi.fn(async () => ({ pack: sampleThirdParty, replacedVersion: "" }));
   view(fakeCore({ packInspect: inspect, packInstallHiding: install, pickPath: vi.fn(async () => "/tmp/x.mpack") }));
   await userEvent.click(await screen.findByRole("button", { name: "Instalar paquete…" }));
@@ -164,17 +164,17 @@ test("instalar: desmarcar un playbook oculta su script en la vista previa y marc
   expect(within(d).getByRole("checkbox", { name: /lib-l2-stp/ })).not.toBeChecked();
   expect(within(d).getByRole("checkbox", { name: /lib-l2-stp/ })).toBeDisabled();
   await userEvent.click(within(d).getByRole("button", { name: "Instalar" }));
-  await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/x.mpack", true, ["ios-xe/l2-stp"], true));
+  await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/x.mpack", true, ["ios-xe/l2-stp"], true, "abc"));
 });
 
 test("instalar: un playbook tapado que estaba oculto no viaja en hide", async () => {
-  const inspect = vi.fn(async () => ({ pack: { ...sampleThirdParty, hidden: ["ios-xe/acme-a"] }, playbookIds: ["ios-xe/acme-a"], scriptIds: [], replacedVersion: "" }));
+  const inspect = vi.fn(async () => ({ pack: { ...sampleThirdParty, hidden: ["ios-xe/acme-a"] }, playbookIds: ["ios-xe/acme-a"], scriptIds: [], replacedVersion: "", sha256: "abc" }));
   const install = vi.fn(async () => ({ pack: sampleThirdParty, replacedVersion: "" }));
   view(fakeCore({ packInspect: inspect, packInstallHiding: install, pickPath: vi.fn(async () => "/tmp/x.mpack") }));
   await userEvent.click(await screen.findByRole("button", { name: "Instalar paquete…" }));
   const d = await screen.findByRole("dialog");
   await userEvent.click(within(d).getByRole("button", { name: "Instalar" }));
-  await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/x.mpack", true, [], true));
+  await waitFor(() => expect(install).toHaveBeenCalledWith("/tmp/x.mpack", true, [], true, "abc"));
 });
 
 test("si el selector de archivos falla, el error se muestra", async () => {

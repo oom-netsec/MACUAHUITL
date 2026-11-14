@@ -27,6 +27,7 @@ type PackServiceInstallRequest struct {
 	AllowUnsigned bool                   `protobuf:"varint,2,opt,name=allow_unsigned,json=allowUnsigned,proto3" json:"allow_unsigned,omitempty"` // confirmación explícita para un paquete de terceros
 	Hide          []string               `protobuf:"bytes,3,rep,name=hide,proto3" json:"hide,omitempty"`                                         // IDs de playbook o script del paquete que quedan ocultos al instalar; los que no existan se ignoran (fase 32b)
 	ReplaceHidden bool                   `protobuf:"varint,4,opt,name=replace_hidden,json=replaceHidden,proto3" json:"replace_hidden,omitempty"` // con true, hide es el conjunto exacto de ocultos tras instalar; sin él se conserva lo oculto y hide suma
+	Sha256        string                 `protobuf:"bytes,5,opt,name=sha256,proto3" json:"sha256,omitempty"`                                     // obligatorio: el del archivo que vio la vista previa (Inspect); si falta o no coincide, no se instala (pack.err.install.sha256_missing / pack.err.install.changed)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -87,6 +88,13 @@ func (x *PackServiceInstallRequest) GetReplaceHidden() bool {
 		return x.ReplaceHidden
 	}
 	return false
+}
+
+func (x *PackServiceInstallRequest) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
 }
 
 type PackServiceInstallResponse struct {
@@ -739,6 +747,7 @@ type PackServiceInspectResponse struct {
 	PlaybookIds     []string               `protobuf:"bytes,2,rep,name=playbook_ids,json=playbookIds,proto3" json:"playbook_ids,omitempty"`
 	ScriptIds       []string               `protobuf:"bytes,3,rep,name=script_ids,json=scriptIds,proto3" json:"script_ids,omitempty"`                   // los derivados de playbooks más los de scripts.json
 	ReplacedVersion string                 `protobuf:"bytes,4,opt,name=replaced_version,json=replacedVersion,proto3" json:"replaced_version,omitempty"` // versión instalada que reemplazaría; vacío si es nuevo
+	Sha256          string                 `protobuf:"bytes,5,opt,name=sha256,proto3" json:"sha256,omitempty"`                                          // del archivo; pásalo en Install para atar la vista previa a lo que se instala
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -797,6 +806,13 @@ func (x *PackServiceInspectResponse) GetScriptIds() []string {
 func (x *PackServiceInspectResponse) GetReplacedVersion() string {
 	if x != nil {
 		return x.ReplacedVersion
+	}
+	return ""
+}
+
+func (x *PackServiceInspectResponse) GetSha256() string {
+	if x != nil {
+		return x.Sha256
 	}
 	return ""
 }
@@ -1066,7 +1082,7 @@ type PackServiceImportRequest struct {
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`        // absoluta; el .mpack no debe tener firma oficial
 	Confirm       bool                   `protobuf:"varint,2,opt,name=confirm,proto3" json:"confirm,omitempty"` // false = vista previa (no escribe nada); true = aplica con decisions
 	Decisions     []*PackImportDecision  `protobuf:"bytes,3,rep,name=decisions,proto3" json:"decisions,omitempty"`
-	Sha256        string                 `protobuf:"bytes,4,opt,name=sha256,proto3" json:"sha256,omitempty"` // opcional: el de la vista previa; con confirm, si no coincide con el archivo, falla (pack.err.import.changed)
+	Sha256        string                 `protobuf:"bytes,4,opt,name=sha256,proto3" json:"sha256,omitempty"` // con confirm es obligatorio: el de la vista previa; si falta (pack.err.import.sha256_missing) o no coincide con el archivo (pack.err.import.changed), falla
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1333,12 +1349,13 @@ var File_macuahuitl_v1_pack_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_pack_proto_rawDesc = "" +
 	"\n" +
-	"\x18macuahuitl/v1/pack.proto\x12\rmacuahuitl.v1\"\x91\x01\n" +
+	"\x18macuahuitl/v1/pack.proto\x12\rmacuahuitl.v1\"\xa9\x01\n" +
 	"\x19PackServiceInstallRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12%\n" +
 	"\x0eallow_unsigned\x18\x02 \x01(\bR\rallowUnsigned\x12\x12\n" +
 	"\x04hide\x18\x03 \x03(\tR\x04hide\x12%\n" +
-	"\x0ereplace_hidden\x18\x04 \x01(\bR\rreplaceHidden\"t\n" +
+	"\x0ereplace_hidden\x18\x04 \x01(\bR\rreplaceHidden\x12\x16\n" +
+	"\x06sha256\x18\x05 \x01(\tR\x06sha256\"t\n" +
 	"\x1aPackServiceInstallResponse\x12+\n" +
 	"\x04pack\x18\x01 \x01(\v2\x17.macuahuitl.v1.PackInfoR\x04pack\x12)\n" +
 	"\x10replaced_version\x18\x02 \x01(\tR\x0freplacedVersion\"\x18\n" +
@@ -1382,13 +1399,14 @@ const file_macuahuitl_v1_pack_proto_rawDesc = "" +
 	"\x04pack\x18\x01 \x01(\v2\x17.macuahuitl.v1.PackInfoR\x04pack\"V\n" +
 	"\x19PackServiceInspectRequest\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12%\n" +
-	"\x0eallow_unsigned\x18\x02 \x01(\bR\rallowUnsigned\"\xb6\x01\n" +
+	"\x0eallow_unsigned\x18\x02 \x01(\bR\rallowUnsigned\"\xce\x01\n" +
 	"\x1aPackServiceInspectResponse\x12+\n" +
 	"\x04pack\x18\x01 \x01(\v2\x17.macuahuitl.v1.PackInfoR\x04pack\x12!\n" +
 	"\fplaybook_ids\x18\x02 \x03(\tR\vplaybookIds\x12\x1d\n" +
 	"\n" +
 	"script_ids\x18\x03 \x03(\tR\tscriptIds\x12)\n" +
-	"\x10replaced_version\x18\x04 \x01(\tR\x0freplacedVersion\"\xe1\x02\n" +
+	"\x10replaced_version\x18\x04 \x01(\tR\x0freplacedVersion\x12\x16\n" +
+	"\x06sha256\x18\x05 \x01(\tR\x06sha256\"\xe1\x02\n" +
 	"\x18PackServiceExportRequest\x12\x1f\n" +
 	"\veditor_name\x18\x01 \x01(\tR\n" +
 	"editorName\x12\x1d\n" +

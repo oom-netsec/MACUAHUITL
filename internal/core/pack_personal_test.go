@@ -92,7 +92,7 @@ func TestPackPersonalIdaYVuelta(t *testing.T) {
 	if slices.Contains(h.playbookIDs(t), "ios-xe/acme-mio") {
 		t.Fatal("la vista previa escribió el playbook")
 	}
-	ap, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: out, Confirm: true})
+	ap, err := pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: out, Confirm: true}))
 	if err != nil || !ap.Applied || ap.ScriptsCreated != 2 || ap.PlaybooksCreated != 1 || !slices.Equal(ap.PlaybookIds, []string{"ios-xe/acme-mio"}) {
 		t.Fatalf("%+v %v", ap, err)
 	}
@@ -115,15 +115,15 @@ func TestPackPersonalIdaYVuelta(t *testing.T) {
 	if states["script"] != "igual" || states["playbook"] != "conflicto_id" {
 		t.Fatalf("%+v", pv.Items)
 	}
-	_, err = pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: out, Confirm: true})
+	_, err = pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: out, Confirm: true}))
 	if r, _ := reasonOf(err); r != "pack.err.import.missing" {
 		t.Fatalf("%v", err)
 	}
-	_, err = pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: "ios-xe/acme-mio", Action: "reemplazar"}}})
+	_, err = pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: "ios-xe/acme-mio", Action: "reemplazar"}}}))
 	if r, _ := reasonOf(err); r != "pack.err.import.decision" {
 		t.Fatalf("%v", err)
 	}
-	ap, err = pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: "ios-xe/acme-mio", Action: "renombrar"}}})
+	ap, err = pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: "ios-xe/acme-mio", Action: "renombrar"}}}))
 	if err != nil || ap.PlaybooksRenamed != 1 || !slices.Equal(ap.PlaybookIds, []string{"ios-xe/acme-mio-2"}) {
 		t.Fatalf("%+v %v", ap, err)
 	}
@@ -137,7 +137,7 @@ func TestPackPersonalIdaYVuelta(t *testing.T) {
 		}
 	}
 	// Y el .mpack exportado se instala como paquete de solo lectura con allow_unsigned (no sin él).
-	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: out}); err == nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: out})); err == nil {
 		t.Fatal("instaló sin confirmar")
 	}
 }
@@ -150,7 +150,7 @@ func TestPackPersonalExportInstalable(t *testing.T) {
 	if _, err := pk.Export(ctx(t), &v1.PackServiceExportRequest{EditorName: "acme/mio", ScriptIds: []string{a.Id}, Path: out}); err != nil {
 		t.Fatal(err)
 	}
-	r, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: out, AllowUnsigned: true})
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: out, AllowUnsigned: true}))
 	if err != nil || r.Pack.Official || r.Pack.ScriptCount != 1 {
 		t.Fatalf("%+v %v", r, err)
 	}
@@ -232,7 +232,7 @@ func TestPackImportHostil(t *testing.T) {
 		}, "pack.err.playbook.denied"},
 	}
 	for name, c := range cases {
-		_, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: hostile(t, c.mod), Confirm: true})
+		_, err := pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: hostile(t, c.mod), Confirm: true}))
 		if r, _ := reasonOf(err); r != c.reason {
 			t.Errorf("%s: %q %v", name, r, err)
 		}
@@ -246,7 +246,7 @@ func TestPackImportHostil(t *testing.T) {
 		}
 	}
 	// Choque con un paquete instalado del mismo editor: pide decisión; nunca lo tapa.
-	if _, err := pk.Install(ctx(t), &v1.PackServiceInstallRequest{Path: hostile(t, func(map[string][]byte) {}), AllowUnsigned: true}); err != nil {
+	if _, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: hostile(t, func(map[string][]byte) {}), AllowUnsigned: true})); err != nil {
 		t.Fatal(err)
 	}
 	other := hostile(t, func(f map[string][]byte) {
@@ -256,7 +256,7 @@ func TestPackImportHostil(t *testing.T) {
 	if err != nil || len(pv.Items) != 1 || pv.Items[0].State != "conflicto_id" || pv.Items[0].ConflictsWith != "acme/evil" {
 		t.Fatalf("%+v %v", pv, err)
 	}
-	if _, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: other, Confirm: true}); err == nil {
+	if _, err := pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: other, Confirm: true})); err == nil {
 		t.Fatal("aplicó un choque sin decisión")
 	}
 	if es, _ := os.ReadDir(filepath.Join(h.p.Config, "playbooks")); len(es) != 0 {
@@ -273,7 +273,7 @@ func TestPackImportHostil(t *testing.T) {
 	if pv.Items[0].State != "conflicto_id" {
 		t.Fatalf("%+v", pv.Items)
 	}
-	pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: other, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: "ios-xe/acme-evil", Action: "omitir"}}})
+	pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: other, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: "ios-xe/acme-evil", Action: "omitir"}}}))
 	if es, _ := os.ReadDir(fuera); len(es) != 0 {
 		t.Fatalf("escribió por el enlace: %v", es)
 	}
@@ -306,7 +306,7 @@ func TestPackImportRecargaConcurrente(t *testing.T) {
 			f["playbooks/"+id+".yaml"] = []byte("id: " + id + "\nplatform: ios\nname: P\nname_en: P\ncommands:\n  - cmd: show clock\n")
 			f["manifest.yaml"] = []byte(strings.Replace(string(f["manifest.yaml"]), "[ios-xe]", "[ios]", 1))
 		})
-		if _, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: p, Confirm: true}); err != nil {
+		if _, err := pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: p, Confirm: true})); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -335,14 +335,14 @@ func TestPackImportNuncaReemplazaScripts(t *testing.T) {
 	if err != nil || pv.Items[0].State != "conflicto_nombre" {
 		t.Fatalf("%+v %v", pv, err)
 	}
-	_, err = pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: pv.Items[0].Id, Action: "reemplazar"}}})
+	_, err = pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: pv.Items[0].Id, Action: "reemplazar"}}}))
 	if r, _ := reasonOf(err); r != "pack.err.import.decision" {
 		t.Fatalf("%v", err)
 	}
 	if got := h.userScripts(t)["Uno"]; got.Commands[0] != "show clock" || len(h.userScripts(t)) != 1 {
 		t.Fatal("tocó el script")
 	}
-	ap, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: pv.Items[0].Id, Action: "renombrar"}}})
+	ap, err := pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: out, Confirm: true, Decisions: []*v1.PackImportDecision{{ItemId: pv.Items[0].Id, Action: "renombrar"}}}))
 	if err != nil || ap.ScriptsRenamed != 1 || len(h.userScripts(t)) != 2 || h.userScripts(t)["Uno"].Commands[0] != "show clock" {
 		t.Fatalf("%+v %v", ap, err)
 	}
@@ -366,7 +366,7 @@ func TestPackImportsConcurrentesConservanTodo(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if _, err := pk.Import(ctx(t), &v1.PackServiceImportRequest{Path: p, Confirm: true}); err != nil {
+				if _, err := pk.Import(ctx(t), withImportSum(t, &v1.PackServiceImportRequest{Path: p, Confirm: true})); err != nil {
 					t.Error(err)
 				}
 			}()

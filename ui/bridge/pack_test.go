@@ -21,6 +21,9 @@ type fakePack struct {
 }
 
 func (fakePack) Install(_ context.Context, r *v1.PackServiceInstallRequest) (*v1.PackServiceInstallResponse, error) {
+	if r.Sha256 != "abc123" { // el puente pasa el sha256 que le dio la vista previa
+		return nil, status.Error(codes.InvalidArgument, "sin sha256")
+	}
 	if !r.AllowUnsigned {
 		return nil, status.Error(codes.FailedPrecondition, "sin firma")
 	}
@@ -45,7 +48,7 @@ func (fakePack) SetItems(_ context.Context, r *v1.PackServiceSetItemsRequest) (*
 }
 
 func (fakePack) Inspect(_ context.Context, r *v1.PackServiceInspectRequest) (*v1.PackServiceInspectResponse, error) {
-	return &v1.PackServiceInspectResponse{Pack: &v1.PackInfo{Id: r.Path}, ReplacedVersion: "0.9.0"}, nil
+	return &v1.PackServiceInspectResponse{Pack: &v1.PackInfo{Id: r.Path}, ReplacedVersion: "0.9.0", Sha256: "abc123"}, nil
 }
 
 func TestPackBridge(t *testing.T) {
@@ -59,7 +62,7 @@ func TestPackBridge(t *testing.T) {
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
 	Start(ctx, b)
 
-	if _, err := b.PackInstall("/x.mpack", false); err == nil {
+	if _, err := b.PackInstall("/x.mpack", false, "abc123"); err == nil {
 		t.Fatal("sin confirmación debe fallar")
 	} else {
 		var be *Error
@@ -67,7 +70,7 @@ func TestPackBridge(t *testing.T) {
 			t.Fatalf("el error debe pasar por wrapErr: %#v", err)
 		}
 	}
-	ins, err := b.PackInstall("/x.mpack", true)
+	ins, err := b.PackInstall("/x.mpack", true, "abc123")
 	if err != nil || ins.Pack.ID != "/x.mpack" || ins.ReplacedVersion != "0.9.0" {
 		t.Fatalf("%+v %v", ins, err)
 	}
@@ -92,10 +95,10 @@ func TestPackBridge(t *testing.T) {
 	if p, err := b.PackSetItems("oom/ios-xe", nil, []string{"ios-xe/x"}); err != nil || p.Hidden == nil {
 		t.Fatalf("hidden nunca es null: %+v %v", p, err)
 	}
-	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}, true); err != nil || ins.Pack.ID != "/y.mpack" || len(ins.Pack.Hidden) != 1 { // replace_hidden viaja
+	if ins, err := b.PackInstallHiding("/y.mpack", true, []string{"a"}, true, "abc123"); err != nil || ins.Pack.ID != "/y.mpack" || len(ins.Pack.Hidden) != 1 { // replace_hidden viaja
 		t.Fatalf("%+v %v", ins, err)
 	}
-	if in, err := b.PackInspect("/z.mpack", true); err != nil || in.Pack.ID != "/z.mpack" || in.ReplacedVersion != "0.9.0" || in.PlaybookIDs == nil || in.ScriptIDs == nil {
+	if in, err := b.PackInspect("/z.mpack", true); err != nil || in.Pack.ID != "/z.mpack" || in.ReplacedVersion != "0.9.0" || in.SHA256 != "abc123" || in.PlaybookIDs == nil || in.ScriptIDs == nil {
 		t.Fatalf("%+v %v", in, err)
 	}
 	j, _ := json.Marshal(PackInfoDTO{Platforms: strs(nil), Shadowed: strs(nil), Hidden: strs(nil)})
