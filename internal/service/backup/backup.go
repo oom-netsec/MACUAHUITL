@@ -47,6 +47,7 @@ type tracked struct {
 	done        map[string]int64 // archivos de ronda ya importados completos (equipo/archivo → tamaño)
 	warned      map[string]bool  // avisos ya auditados
 	saved       []string         // respaldos que guardó el trabajo en todas las llamadas: el informe final los cuenta todos
+	incomplete  bool             // alguna salida llegó incompleta: no se relee, pero la carpeta de Patrol se conserva
 }
 
 type backupSvc struct {
@@ -321,7 +322,9 @@ func (s *backupSvc) collectLocked(job string, keep int) (collected, error) {
 			}
 		case sec.Incomplete:
 			res.warn(i18n.Tx("backup.warn.incomplete", "device", sec.Device, "cmd", sec.Command))
-			failed = true
+			if tr != nil {
+				tr.incomplete = true
+			}
 		case !tr.inWindow(sec.At):
 			// Solo puede venir de texto del equipo que imita una cabecera: no es un respaldo.
 			res.warn(i18n.Tx("backup.warn.outside", "device", sec.Device, "cmd", sec.Command, "at", sec.At.Format(time.RFC3339)))
@@ -340,7 +343,7 @@ func (s *backupSvc) collectLocked(job string, keep int) (collected, error) {
 	}
 	serials := map[[2]string]string{} // (equipo, ronda) -> número de serie de show version
 	for _, sec := range b.Sections {
-		if !sec.Invalid && capture.Key(sec.Command) == "show version" {
+		if !sec.Invalid && !sec.Incomplete && capture.Key(sec.Command) == "show version" {
 			if v, _ := iosxe.ParseVersion(sec.Text); v.Serial != "" {
 				serials[[2]string{sec.Device, strconv.Itoa(sec.Round)}] = v.Serial
 			}
@@ -405,7 +408,7 @@ func (s *backupSvc) collectLocked(job string, keep int) (collected, error) {
 	if terminal {
 		res.errMsg = j.FinishErr
 		// Si algo no se pudo guardar o leer entero, la carpeta de Patrol queda como única copia.
-		clean := !failed && j.FinishErr == ""
+		clean := !failed && (tr == nil || !tr.incomplete) && j.FinishErr == ""
 		if !clean && tr != nil {
 			s.d.Audit("backup.kept", job, "Patrol folder kept: "+tr.lote)
 		}

@@ -521,3 +521,29 @@ func TestCollectRepiteElResultadoFinalDeUnTrabajoPropio(t *testing.T) {
 		t.Fatalf("2: %+v %v", r2, err)
 	}
 }
+
+// Una ronda incompleta no detiene el avance: no se relee en cada vuelta (Save recrearía lo que Prune borró),
+// y la carpeta de Patrol queda como única copia de lo incompleto.
+func TestRondaIncompletaNoFrenaElAvance(t *testing.T) {
+	s, sd, info, _ := nuevo(t, "running")
+	lote, pj := trabajoPropio(t, s, sd, info, 3)
+	os.MkdirAll(filepath.Join(pj, dev), 0o755)
+	r1 := filepath.Join(pj, dev, "r001_20261106-100000.txt")
+	os.WriteFile(r1, []byte("===== 2026-11-06T10:00:01Z · show running-config · incompleto =====\nhostname SW1\n"), 0o600)
+	ctx := context.Background()
+	if _, err := s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.jobs["j1"].done) != 1 {
+		t.Fatalf("la ronda incompleta se volvería a leer: done=%v", s.jobs["j1"].done)
+	}
+	info.State = "completed"
+	os.WriteFile(filepath.Join(pj, dev, "r002_20261106-101000.txt"), []byte("===== 2026-11-06T10:10:01Z · show running-config =====\nhostname SW1\n"), 0o600)
+	r, err := s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
+	if err != nil || strings.Count(ids(t, s), "-running") != 1 || !strings.Contains(r.Report.Text, "1 respaldo(s) guardado(s)") {
+		t.Fatalf("%v %s", err, r.GetReport().GetText())
+	}
+	if _, err := os.Stat(lote); err != nil {
+		t.Error("se borró la carpeta de Patrol con una ronda incompleta")
+	}
+}
