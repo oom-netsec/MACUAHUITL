@@ -25,6 +25,16 @@ export const RANGES: Record<NumKey, { lo: number; hi: number; def: string }> = {
   maxFiles: { lo: 1, hi: 1000, def: "20" },
 };
 export const DEFAULT_TEMPLATES: Record<IngestKind, string> = { syslog: "syslog_{fecha}_{hora}", traps: "traps_{fecha}_{hora}", flows: "flujos_{fecha}_{hora}" };
+// El núcleo acepta los tokens en español y en inglés: {fecha}/{date}, {hora}/{time}, {origen}/{source}.
+const TOKENS = { fecha: ["{fecha}", "{date}"], hora: ["{hora}", "{time}"], origen: ["{origen}", "{source}"] } as const;
+const hasToken = (t: string, k: keyof typeof TOKENS) => TOKENS[k].some((x) => t.includes(x));
+const fill = (t: string, v: Record<keyof typeof TOKENS, string>) =>
+  (Object.keys(TOKENS) as (keyof typeof TOKENS)[]).reduce((s, k) => TOKENS[k].reduce((a, x) => a.replaceAll(x, v[k]), s), t);
+/** La plantilla abre un archivo por origen ({origen} o {source}). */
+export const perSourceTemplate = (t: string) => hasToken(t, "origen");
+/** La plantilla por omisión con los tokens del idioma de la interfaz (el nombre de archivo que resulta es el mismo). */
+export const defaultTemplate = (kind: IngestKind, lang: string) =>
+  lang === "en" ? DEFAULT_TEMPLATES[kind].replace("{fecha}", "{date}").replace("{hora}", "{time}") : DEFAULT_TEMPLATES[kind];
 export const DEFAULT_TEMPLATE = DEFAULT_TEMPLATES.syslog;
 const NUM_KEYS = Object.keys(RANGES) as NumKey[];
 const FILE_KEYS: NumKey[] = ["rotateMb", "rotateMinutes", "maxFiles"];
@@ -59,8 +69,8 @@ export function buildOpts(f: OptForm, save: boolean, kind: IngestKind = "syslog"
 function templateError(t: string): OptError | undefined {
   if (!t) return undefined;
   if (t.length > 64) return "tplLen";
-  if (!t.includes("{fecha}") && !t.includes("{hora}")) return "tplNeed";
-  const s = t.replaceAll("{fecha}", "0").replaceAll("{hora}", "0").replaceAll("{origen}", "0");
+  if (!hasToken(t, "fecha") && !hasToken(t, "hora")) return "tplNeed";
+  const s = fill(t, { fecha: "0", hora: "0", origen: "0" });
   if (/[{}]/.test(s)) return "tplTokens";
   if (/[^A-Za-z0-9_.-]/.test(s)) return "tplChars";
   if (s.includes("..")) return "tplDots";
@@ -85,7 +95,7 @@ const p2 = (n: number) => String(n).padStart(2, "0");
 export function previewName(template: string, format: SyslogFormat, now: Date, kind: IngestKind = "syslog"): string {
   const fecha = `${now.getFullYear()}${p2(now.getMonth() + 1)}${p2(now.getDate())}`;
   const hora = `${p2(now.getHours())}${p2(now.getMinutes())}${p2(now.getSeconds())}`;
-  const base = (template.trim() || DEFAULT_TEMPLATES[kind]).replaceAll("{fecha}", fecha).replaceAll("{hora}", hora).replaceAll("{origen}", "10.0.0.9");
+  const base = fill(template.trim() || DEFAULT_TEMPLATES[kind], { fecha, hora, origen: "10.0.0.9" });
   return base + (format === "jsonl" ? ".jsonl" : ".log");
 }
 

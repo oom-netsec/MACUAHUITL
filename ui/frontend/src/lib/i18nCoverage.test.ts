@@ -6,7 +6,10 @@ import { en } from "./i18n/en";
 // Guardia del idioma: es.ts y en.ts tienen las mismas claves y ningún .tsx de la interfaz
 // lleva texto visible fijo. Los términos técnicos (lista blanca) no se traducen.
 
-const vars = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(",");
+// Estas claves muestran los tokens de plantilla de archivos (syslog/traps/flows) tal cual, sin interpolar, cada una en su idioma.
+const TEMPLATE_KEYS = /^(syslog|traps|flows)\.opt\.tokens$|^syslog\.err\.tpl(Need|Tokens)$/;
+const TEMPLATE_TOKENS = new Set(["fecha", "hora", "origen", "date", "time", "source"]);
+const vars = (s: string, k = "") => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((v) => !(TEMPLATE_KEYS.test(k) && TEMPLATE_TOKENS.has(v))).sort().join(",");
 
 test("es.ts y en.ts tienen las mismas claves, con las mismas variables", () => {
   const ke = Object.keys(es).sort();
@@ -15,7 +18,7 @@ test("es.ts y en.ts tienen las mismas claves, con las mismas variables", () => {
   expect(kn.filter((k) => !ke.includes(k)), "faltan en es.ts").toEqual([]);
   const e = es as Record<string, string>;
   const n = en as Record<string, string>;
-  expect(ke.filter((k) => vars(e[k]) !== vars(n[k])), "variables distintas").toEqual([]);
+  expect(ke.filter((k) => vars(e[k], k) !== vars(n[k], k)), "variables distintas").toEqual([]);
 });
 
 // Términos que no se traducen (siglas, protocolos, herramientas, comandos y nombres propios).
