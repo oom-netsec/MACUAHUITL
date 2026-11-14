@@ -254,7 +254,7 @@ test("dos componentes del mismo módulo: el que termina no marca libre al que si
   try {
     render(<App core={fakeCore()} />);
     expect(await screen.findByText("dos")).toBeInTheDocument();
-    expect(screen.getByText("1 en curso")).toBeInTheDocument();
+    expect(await screen.findByText("1 en curso")).toBeInTheDocument(); // el efecto de useBusy llega tras pintar
     act(() => setA(false));
     expect(screen.getByText("1 en curso")).toBeInTheDocument(); // el otro sigue ocupado
   } finally {
