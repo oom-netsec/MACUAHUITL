@@ -39,8 +39,10 @@ func startFake(t *testing.T, first, prompt string, reply func(line string) (out 
 		var buf []byte
 		b := make([]byte, 1)
 		for {
-			if _, err := devR.Read(b); err != nil {
+			if n, err := devR.Read(b); err != nil {
 				return
+			} else if n == 0 { // una escritura de 0 bytes no repite el byte anterior
+				continue
 			}
 			f.mu.Lock()
 			f.wrote = append(f.wrote, b[0])

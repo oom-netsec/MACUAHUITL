@@ -34,6 +34,7 @@ func aireReply(line string) (string, string) {
 
 func openAire(t *testing.T, first string, reply func(string) (string, string), user, pw string) (*fakeDev, *driver, error) {
 	t.Helper()
+	fastSettle(t)
 	f, r, w := startFake(t, first, aireP, reply)
 	d := New().(*driver)
 	if user != "" || pw != "" {
@@ -77,6 +78,7 @@ func TestAireOSDetectNoEsAireOS(t *testing.T) {
 
 // El prompt de configuración «(X) config>» no es de lectura: el driver nunca entra a config; si aparece, es error.
 func TestAireOSPromptDeConfiguracionEsError(t *testing.T) {
+	fastSettle(t)
 	f, r, w := startFake(t, "(Cisco Controller) config>", aireP, aireReply)
 	d := New().(*driver)
 	err := d.Open(context.Background(), r, w, secret.New(nil))
@@ -130,16 +132,16 @@ func TestAireOSLoginRechazoYSinCredencial(t *testing.T) {
 		reply           func(string) (string, string)
 		want            string
 	}{
-		"rechazo con User:": {"User: ", "admin", "s3cret", func(l string) (string, string) {
+		"rechazo con User:": {"(Cisco Controller)\r\nUser: ", "admin", "s3cret", func(l string) (string, string) {
 			if l == "admin" {
 				return "", "Password: "
 			}
 			return "\r\nAuthentication failed\r\n", "User: "
 		}, "admin\ns3cret\n"},
-		"rechazo con Password:": {"User: ", "admin", "s3cret", func(l string) (string, string) { return "", "Password: " }, "admin\ns3cret\n"},
-		"sin credencial":        {"User: ", "", "", loginReply("x", ""), ""},
-		"sin usuario":           {"User: ", "", "s3cret", loginReply("x", ""), ""},
-		"sin clave":             {"User: ", "admin", "", loginReply("x", ""), ""},
+		"rechazo con Password:": {"(Cisco Controller)\r\nUser: ", "admin", "s3cret", func(l string) (string, string) { return "", "Password: " }, "admin\ns3cret\n"},
+		"sin credencial":        {"(Cisco Controller)\r\nUser: ", "", "", loginReply("x", ""), ""},
+		"sin usuario":           {"(Cisco Controller)\r\nUser: ", "", "s3cret", loginReply("x", ""), ""},
+		"sin clave":             {"(Cisco Controller)\r\nUser: ", "admin", "", loginReply("x", ""), ""},
 	} {
 		f, _, err := openAire(t, tc.first, tc.reply, tc.user, tc.pw)
 		if !errors.Is(err, platform.ErrLoginFailed) {
@@ -159,7 +161,7 @@ func TestAireOSLaClaveNoSaleEnErrorNiLogs(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { slog.SetDefault(old) })
 	const pw = "Cl4v3-Sup3r-S3cr3ta"
-	_, d, err := openAire(t, "User: ", func(l string) (string, string) {
+	_, d, err := openAire(t, "(Cisco Controller)\r\nUser: ", func(l string) (string, string) {
 		if l == "admin" {
 			return "", "Password: "
 		}
@@ -217,7 +219,7 @@ func TestAireOSLoginTardioNoEscribe(t *testing.T) {
 	if f.written() != "" {
 		t.Fatalf("Open escribió %q con prompt directo", f.written())
 	}
-	if _, err := d.Run(context.Background(), "show x", 2*time.Second); !errors.Is(err, platform.ErrLoginFailed) {
+	if _, err := d.Run(context.Background(), "show x", 2*time.Second); !errors.Is(err, platform.ErrUnexpectedPrompt) {
 		t.Fatalf("Run = %v", err)
 	}
 	time.Sleep(20 * time.Millisecond)
@@ -229,7 +231,7 @@ func TestAireOSLoginTardioNoEscribe(t *testing.T) {
 	}
 	// Password: suelto a mitad de sesión
 	f, d, _ = openAire(t, aireP, func(l string) (string, string) { return "", "Password: " }, "admin", "s3cret")
-	if _, err := d.Run(context.Background(), "show x", 2*time.Second); !errors.Is(err, platform.ErrLoginFailed) || f.written() != "show x\n" {
+	if _, err := d.Run(context.Background(), "show x", 2*time.Second); !errors.Is(err, platform.ErrUnexpectedPrompt) || errors.Is(err, platform.ErrLoginFailed) || f.written() != "show x\n" {
 		t.Fatalf("Password: %v, escrito %q", err, f.written())
 	}
 }
@@ -255,8 +257,10 @@ func pagedDev(t *testing.T, pages []string, cut func(page string) int) (io.Reade
 		next := 0
 		b := make([]byte, 1)
 		for {
-			if _, err := devR.Read(b); err != nil {
+			if n, err := devR.Read(b); err != nil {
 				return
+			} else if n == 0 { // una escritura de 0 bytes no repite el byte anterior
+				continue
 			}
 			mu.Lock()
 			wrote = append(wrote, b[0])
@@ -282,6 +286,7 @@ func pagedDev(t *testing.T, pages []string, cut func(page string) int) (io.Reade
 // --More-- or (q)uit se contesta con un espacio por página (varias seguidas, también con un usuario sin permiso de
 // config paging), se borra de la salida y no se confunde cuando llega partido entre dos lecturas.
 func TestAireOSPaginacion(t *testing.T) {
+	fastSettle(t)
 	for _, mark := range []string{"--More-- or (q)uit", "--More or (q)uit current module or <ctrl-z> to abort"} {
 		pages := []string{"a1\r\na2\r\n" + mark, "a3\r\na4\r\n" + mark, "a5\r\n\r\n" + aireP}
 		for off := -1; off <= len(mark); off++ {
@@ -397,12 +402,13 @@ func TestAireOSPromptSinEspacio(t *testing.T) {
 // Un banner de IOS, ASA o NX-OS que termina en «Username:» o «User:» y poco después muestra su prompt no recibe
 // usuario ni clave: Open entra bien, con o sin credencial, y solo escribe lo suyo.
 func TestBannerConUsernameNoRecibeCredencial(t *testing.T) {
+	fastSettle(t)
 	for _, banner := range []string{"\r\n*** Acceso ***\r\nUsername:", "\r\n*** Acceso ***\r\nUser:", "\r\n*** Acceso ***\r\nUser: "} {
 		for name, prompt := range map[string]string{"ios": "Router#", "asa": "asa# ", "nxos": "nx1# "} {
 			for _, cred := range []bool{true, false} {
 				r, w, lg := scriptedDevLog(t, func(out func(string)) {
 					out(banner)
-					time.Sleep(300 * time.Millisecond)
+					time.Sleep(ftdSettle * 3 / 4)
 					out("\r\n" + prompt)
 				}, func(line string, out func(string)) { out(line + "\r\n" + prompt) })
 				d := New().(*driver)

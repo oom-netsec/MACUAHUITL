@@ -96,6 +96,7 @@ func TestISEMoreSeContestaConEspacio(t *testing.T) {
 
 // Primer inicio de sesión con cambio de contraseña o una pregunta (y/n): el driver aborta sin escribir nada.
 func TestISEPrimerLoginNoEscribeNada(t *testing.T) {
+	fastSettle(t)
 	for _, first := range []string{
 		"Password expired. You must change your password now.\r\nEnter new password: ",
 		"Your password has expired.\r\nChanging password for admin.\r\nNew password: ",
@@ -146,6 +147,7 @@ func TestISENoCambiaIOSTerminalWidth(t *testing.T) {
 // El banner de otra plataforma que llega sin su fin de línea y parece una pregunta o un cambio de contraseña no es un
 // primer login: el prompt llega enseguida y Open sigue normal.
 func TestISEGuardaEsperaElPromptDeOtrasPlataformas(t *testing.T) {
+	fastSettle(t)
 	for _, c := range []struct{ banner, prompt string }{
 		{"Authorized users only. Continue? (y/n)", "\r\nSW1#"},
 		{"Access logged [yes/no]", "\r\nSW1#"},
@@ -154,7 +156,7 @@ func TestISEGuardaEsperaElPromptDeOtrasPlataformas(t *testing.T) {
 	} {
 		r, w := scriptedDev(t, func(out func(string)) {
 			out(c.banner)
-			time.Sleep(60 * time.Millisecond)
+			time.Sleep(ftdSettle / 2)
 			out(c.prompt)
 		}, func(line string, out func(string)) { out(line + "\r\n" + strings.TrimLeft(c.prompt, "\r\n")) })
 		d := New().(*driver)

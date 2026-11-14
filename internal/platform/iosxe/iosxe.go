@@ -31,16 +31,19 @@ var (
 	// se confunde con él, así que solo cuenta al final del búfer y tras una pausa (ftdSettle) sin más datos.
 	ftdPrompt = regexp.MustCompile(`(?:^|\n)> ?$`)
 	// Primer inicio de sesión de FTD: cambio de contraseña obligatorio o EULA. Responder cambiaría el equipo.
-	ftdFirstLogin = regexp.MustCompile(`(?i)you must change your password|you must accept the eula|press <enter> to display the eula|enter new password:|confirm new password:|unix password: ?$|to agree to the eula|please enter 'yes'`)
+	// Solo cuenta al final de la salida (un MOTD que cite la frase y siga no es un primer login) y pasa por moreComing.
+	ftdFirstLogin = regexp.MustCompile(`(?i)(?:you must change your password|you must accept the eula|press <enter> to display the eula|enter new password:|confirm new password:|unix password:|to agree to the eula|please enter 'yes')[.:]? *$`)
 	// Primer inicio de sesión de ISE (ADE-OS): contraseña vencida o cambio obligatorio, o una pregunta (y/n) o (yes/no).
 	// Responder cambiaría el nodo: se aborta sin escribir. Solo cuenta al final de la salida.
 	iseFirstLogin = regexp.MustCompile(`(?i)(?:password (?:has )?expired|(?:must|required to) change (?:your |the )?password|changing password for|(?:enter|confirm|retype|re-enter) new password:|new password:|\(current\) password:|current password:|[(\[](?:y/n|yes/no)[)\]][?:]?) *$`)
 	more          = regexp.MustCompile(` ?(?:--More-- or \(q\)uit|--More or \(q\)uit current module or <ctrl-z> to abort|--More--|<--- More --->) ?`) // el segundo es el de ASA, el primero el de AireOS
 	// AireOS: prompt «(Nombre) >» (el nombre puede llevar espacios), el de configuración «(Nombre) config>» y el login
 	// «User:»/«Password:» dentro del shell. La pregunta de confirmación se detecta solo al final de la salida.
-	airePrompt  = regexp.MustCompile(`(?:^|\n)\(([^()\r\n]{1,63})\) ?>\s?$`)
-	aireConfig  = regexp.MustCompile(`(?:^|\n)\([^()\r\n]{1,63}\) config[\w\-]*>\s?$`)
-	aireUser    = regexp.MustCompile(`(?:^|\n)User: ?$`) // solo «User:» exacto: «Username:» es de IOS/ASA/NX-OS y no se contesta
+	airePrompt = regexp.MustCompile(`(?:^|\n)\(([^()\r\n]{1,63})\) ?>\s?$`)
+	aireConfig = regexp.MustCompile(`(?:^|\n)\([^()\r\n]{1,63}\) config[\w\-]*>\s?$`)
+	aireUser   = regexp.MustCompile(`(?:^|\n)User: ?$`) // solo «User:» exacto: «Username:» es de IOS/ASA/NX-OS y no se contesta
+	// aireCue: el login del shell solo se contesta si la línea anterior a «User:» es el nombre del controlador entre paréntesis.
+	aireCue     = regexp.MustCompile(`(?:^|\n)\([^()\r\n]{1,63}\) *\n *User: ?$`)
 	aireMore    = regexp.MustCompile(`--More-- or \(q\)uit$|--More or \(q\)uit current module or <ctrl-z> to abort$`)
 	airePass    = regexp.MustCompile(`(?i)(?:^|\n)password: ?$`)
 	aireConfirm = regexp.MustCompile(`(?i)(?:[(\[](?:y/n|yes/no)[)\]]|\[confirm\]|are you sure[^\n]*\?|proceed\?) *$`)
@@ -140,8 +143,8 @@ func (d *driver) aireLogin(ctx context.Context) (string, error) {
 	if d.user == "" || d.login.Empty() || strings.ContainsAny(d.user, "\r\n") || bytes.ContainsAny(d.login.Bytes(), "\r\n") {
 		return "", platform.ErrLoginFailed
 	}
-	next := func(s string) bool {
-		return airePass.MatchString(s) || aireUser.MatchString(s) || airePrompt.MatchString(s)
+	next := func(s string) bool { // anyPrompt: un IOS que imitó el banner responde con su prompt y no hay que esperar a que venza Open
+		return airePass.MatchString(s) || aireUser.MatchString(s) || airePrompt.MatchString(s) || anyPrompt.MatchString(s)
 	}
 	if _, err := io.WriteString(d.w, d.user+"\n"); err != nil {
 		return "", fmt.Errorf("%w: %v", platform.ErrClosed, err)
@@ -168,6 +171,15 @@ func (d *driver) aireLogin(ctx context.Context) (string, error) {
 	return text, nil
 }
 
+// loginCue: el búfer termina en «(Nombre)» + «User:» (las dos últimas líneas).
+func (d *driver) loginCue() bool {
+	i := bytes.LastIndexByte(d.buf, '\n')
+	if i > 0 {
+		i = bytes.LastIndexByte(d.buf[:i], '\n')
+	}
+	return aireCue.MatchString(clean(string(d.buf[max(i, 0):])))
+}
+
 func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *secret.Secret) error {
 	defer enable.Destroy()
 	defer d.dropLogin()
@@ -178,7 +190,7 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 	defer cancel()
 	text, err := d.until(ctx, func(s string) bool {
 		return anyPrompt.MatchString(s) || ftdPrompt.MatchString(s) || ftdFirstLogin.MatchString(s) ||
-			airePrompt.MatchString(s) || aireConfig.MatchString(s) || aireUser.MatchString(s) || iseFirstLogin.MatchString(s)
+			airePrompt.MatchString(s) || aireConfig.MatchString(s) || d.loginCue() || iseFirstLogin.MatchString(s)
 	})
 	if err != nil {
 		return d.fail(err)
@@ -186,7 +198,7 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 	if aireConfig.MatchString(text) {
 		return d.fail(platform.ErrConfigPrompt)
 	}
-	if aireUser.MatchString(text) {
+	if aireCue.MatchString(text) {
 		var err error
 		if text, err = d.aireLogin(ctx); err != nil {
 			d.buf = nil // el equipo pudo repetir la clave con eco
@@ -398,8 +410,8 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 // fuera del login (no se escribe nada), el prompt de configuración o una pregunta de confirmación (y/N).
 func (d *driver) aireGuard(ctx context.Context, tail string) error {
 	switch {
-	case aireUser.MatchString(tail) || airePass.MatchString(tail):
-		return platform.ErrLoginFailed
+	case aireUser.MatchString(tail) || airePass.MatchString(tail): // no es un rechazo de credencial: no debe disparar el respaldo
+		return platform.ErrUnexpectedPrompt
 	case aireConfig.MatchString(tail):
 		return platform.ErrConfigPrompt
 	case aireConfirm.MatchString(tail):
@@ -473,7 +485,7 @@ func echoFirst(text, cmd string) bool {
 }
 
 // ftdConfirmSettle es la calma corta antes de dar por confirmado el par de prompts: un trozo puede terminar justo en «\n>\n> ».
-const ftdConfirmSettle = 150 * time.Millisecond
+var ftdConfirmSettle = 150 * time.Millisecond // var para que las pruebas la bajen, como ftdSettle
 
 // dataWithin espera hasta dur por datos; si llegan, los agrega y devuelve true.
 func (d *driver) dataWithin(ctx context.Context, dur time.Duration) bool {
@@ -509,7 +521,12 @@ func (d *driver) quiet(ctx context.Context, n int) bool {
 // moreComing: si tail es el «> » de FTD, espera ftdSettle por más datos; si llegan, no era el prompt (era el inicio
 // de una línea de salida) y se agregan al búfer.
 func (d *driver) moreComing(ctx context.Context, tail string) bool {
-	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) && !iseFirstLogin.MatchString(tail) { // «User:», «(y/n)» o «New password:» de un banner pueden ir seguidos del prompt de otra plataforma
+	// «User:», «(y/n)», «New password:», «(Cisco Controller) >» o un aviso de contraseña de un banner pueden ir seguidos del prompt de otra plataforma.
+	// Límite conocido: con una pausa mayor a ftdSettle antes del prompt (banner lento) «\r\n> » se toma por FTD y «(y/n)» o
+	// «password has expired» dan ErrFirstLogin; es heurística y falla cerrada: nunca se escribe una credencial, aunque con
+	// «\r\n> » Open sí manda «terminal length 0» y el Enter de cola antes de fallar.
+	aireOpen := !d.aire && (airePrompt.MatchString(tail) || aireConfig.MatchString(tail)) // solo al abrir: en el Run de AireOS no se espera
+	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) && !iseFirstLogin.MatchString(tail) && !ftdFirstLogin.MatchString(tail) && !aireOpen {
 		return false
 	}
 	select {
