@@ -58,7 +58,11 @@ type backupSvc struct {
 	wg     sync.WaitGroup
 	mu     sync.Mutex // serializa collect: el vigilante y Collect no importan a la vez
 	jobs   map[string]*tracked
+	final  map[string]collected // resultado final de los últimos trabajos propios: quien llega segundo lo recibe igual
+	order  []string
 }
+
+const maxFinal = 32
 
 func newSvc(d service.Deps) *backupSvc {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -238,9 +242,30 @@ func masked(t *tracked, dir string) bool {
 	return m.Masked
 }
 
+// collect serializa collectLocked; el primero en ver el estado terminal de un trabajo propio deja su
+// resultado en final, para que el otro (vigilante o CollectBackups) no responda con la carpeta ya borrada.
 func (s *backupSvc) collect(job string, keep int) (collected, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if f, ok := s.final[job]; ok {
+		return f, nil
+	}
+	own := s.jobs[job] != nil
+	res, err := s.collectLocked(job, keep)
+	if err == nil && res.done && own {
+		if s.final == nil {
+			s.final = map[string]collected{}
+		}
+		s.final[job] = res
+		if s.order = append(s.order, job); len(s.order) > maxFinal {
+			delete(s.final, s.order[0])
+			s.order = s.order[1:]
+		}
+	}
+	return res, err
+}
+
+func (s *backupSvc) collectLocked(job string, keep int) (collected, error) {
 	j, err := s.d.Job(job)
 	if err != nil {
 		return collected{}, err

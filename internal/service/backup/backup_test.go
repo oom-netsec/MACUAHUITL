@@ -505,3 +505,19 @@ func TestSeccionIncompletaNoSeGuardaComoRespaldo(t *testing.T) {
 		t.Error("se borró la carpeta de Patrol")
 	}
 }
+
+// Quien llega segundo (vigilante o `mctl backup run`) recibe el resultado final, no un error de carpeta borrada.
+func TestCollectRepiteElResultadoFinalDeUnTrabajoPropio(t *testing.T) {
+	s, sd, info, _ := nuevo(t, "completed")
+	_, pj := trabajoPropio(t, s, sd, info, 3)
+	carpeta(t, pj, "hostname SW1\n")
+	ctx := context.Background()
+	r1, err := s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
+	if err != nil || !r1.Done || r1.Error != "" {
+		t.Fatalf("1: %+v %v", r1, err)
+	}
+	r2, err := s.CollectBackups(ctx, &v1.CollectBackupsRequest{JobId: "j1"})
+	if err != nil || !r2.Done || r2.Error != "" || r2.Report.Text != r1.Report.Text {
+		t.Fatalf("2: %+v %v", r2, err)
+	}
+}
