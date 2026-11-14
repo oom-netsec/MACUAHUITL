@@ -175,7 +175,7 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	}
 	ctx, cancel := context.WithTimeout(st.Context(), service.SyslogDuration(r.DurationSeconds))
 	defer cancel()
-	k := newServeSink(s.d.Audit, st.Send)
+	k := newServeSink(i18n.Locale(st.Context()), s.d.Audit, st.Send)
 	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, OnTransfer: k.onTransfer}
 	cfg.OnListening = func(a string) {
 		s.d.Audit("field.serve", a, fmt.Sprintf("proto=%s all=%t files=%q duration=%s", r.Protocol, r.AllowAny, r.Files, service.SyslogDuration(r.DurationSeconds)))
@@ -194,14 +194,15 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 // equivocados) solo se cuentan para el resumen y se reenvían al cliente sin bloquear:
 // si el stream va lento se descartan, y la recepción nunca espera.
 type serveSink struct {
+	loc         string // idioma de la llamada, para lo que va al cliente
 	audit       func(action, target, detail string)
 	events      chan *v1.ServeFilesResponse
 	drained     chan struct{}
 	n, rejected atomic.Int64
 }
 
-func newServeSink(audit func(action, target, detail string), send func(*v1.ServeFilesResponse) error) *serveSink {
-	k := &serveSink{audit: audit, events: make(chan *v1.ServeFilesResponse, 256), drained: make(chan struct{})}
+func newServeSink(loc string, audit func(action, target, detail string), send func(*v1.ServeFilesResponse) error) *serveSink {
+	k := &serveSink{loc: loc, audit: audit, events: make(chan *v1.ServeFilesResponse, 256), drained: make(chan struct{})}
 	go func() {
 		defer close(k.drained)
 		for ev := range k.events {
@@ -212,8 +213,10 @@ func newServeSink(audit func(action, target, detail string), send func(*v1.Serve
 }
 
 func (k *serveSink) onTransfer(t fileserve.Transfer) {
-	t.DirCode = service.DirEN(t.Dir)
-	b, _ := json.Marshal(t)
+	shown := t
+	shown.Error = fileserve.ReasonIn(k.loc, t)
+	shown.DirCode = service.DirEN(t.Dir)
+	b, _ := json.Marshal(shown)
 	ev := &v1.ServeFilesResponse{TransferJson: string(b)}
 	if t.Rejected {
 		k.rejected.Add(1)
@@ -224,7 +227,7 @@ func (k *serveSink) onTransfer(t fileserve.Transfer) {
 		return
 	}
 	k.n.Add(1)
-	k.audit("field.serve.transfer", t.Client, fmt.Sprintf("proto=%s file=%q bytes=%d duration=%s result=%s %s", t.Proto, t.File, t.Bytes, t.Duration.Round(1e6), t.Result, t.Error))
+	k.audit("field.serve.transfer", t.Client, fmt.Sprintf("proto=%s file=%q bytes=%d duration=%s result=%s error=%q", t.Proto, t.File, t.Bytes, t.Duration.Round(1e6), t.Result, fileserve.ReasonIn(i18n.En, t)))
 	k.events <- ev // viene del goroutine de la transferencia, no del de recepción
 }
 

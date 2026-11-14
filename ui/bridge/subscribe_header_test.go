@@ -21,6 +21,7 @@ type headerEvents struct {
 	v1.UnimplementedEventServiceServer
 	missing    bool
 	silent     bool // nunca manda encabezados (un núcleo atorado)
+	failFirst  bool // la primera apertura da Unavailable (transitorio)
 	empty      bool // termina sin error ni encabezados
 	opens      atomic.Int32
 	subscribed atomic.Bool
@@ -28,6 +29,9 @@ type headerEvents struct {
 
 func (f *headerEvents) Subscribe(r *v1.SubscribeRequest, st v1.EventService_SubscribeServer) error {
 	f.opens.Add(1)
+	if f.failFirst && f.opens.Load() == 1 {
+		return status.Error(codes.Unavailable, "reconectando")
+	}
 	if f.missing {
 		return status.Error(codes.NotFound, "no existe el trabajo")
 	}

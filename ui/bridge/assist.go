@@ -105,19 +105,53 @@ func (b *Bridge) AssistStart(planID string, assisted bool) (string, error) {
 // AssistWatch reenvía los eventos de la ejecución, desde el primero, como assist:event {runId, event}; al
 // cerrarse el stream emite assist:done {runId}. Sirve igual para una ejecución recién iniciada que para
 // volver a una que quedó viva (ver AssistListRuns).
+//
+// Uno por runId, por reemplazo: un segundo AssistWatch cancela el anterior (sin assist:done) y abre otro, que el
+// núcleo repite desde el evento 0. El stream cuelga de la vida del puente y termina solo al acabar la ejecución.
 func (b *Bridge) AssistWatch(runID string) error {
 	c, err := b.client()
 	if err != nil {
 		return wrapErr(err)
 	}
-	st, err := v1.NewAssistServiceClient(c).WatchRun(b.callCtx(), &v1.WatchRunRequest{RunId: runID})
+	base := b.callCtx()
+	b.mu.Lock()
+	ctx, cancel := context.WithCancel(base)
+	if old, ok := b.assists[runID]; ok {
+		old.cancel()
+	}
+	me := &stream{cancel: cancel}
+	b.assists[runID] = me
+	b.mu.Unlock()
+	forget := func() {
+		b.mu.Lock()
+		if b.assists[runID] == me {
+			delete(b.assists, runID)
+		}
+		b.mu.Unlock()
+		cancel()
+	}
+	st, err := v1.NewAssistServiceClient(c).WatchRun(ctx, &v1.WatchRunRequest{RunId: runID})
 	if err != nil {
+		forget()
+		if ctx.Err() != nil { // otro watch del mismo run lo reemplazó mientras abría: el nuevo ya cubre la ejecución
+			return nil
+		}
 		return wrapErr(err)
 	}
 	go func() {
+		defer forget()
 		for {
 			m, err := st.Recv()
+			if ctx.Err() != nil { // reemplazado o puente cerrado: ya no se emite nada
+				return
+			}
 			if err != nil {
+				b.mu.Lock()
+				vigente := b.assists[runID] == me
+				b.mu.Unlock()
+				if !vigente { // otro watch lo reemplazó: el nuevo emitirá su propio assist:done
+					return
+				}
 				if err != io.EOF {
 					b.emit("assist:done", map[string]any{"runId": runID, "error": err.Error(), "errorInfo": errorInfo(err)})
 				} else {
