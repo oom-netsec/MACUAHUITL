@@ -108,7 +108,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       early.forEach((e) => applyRef.current(e));
     } catch (e) {
       starting.current = false;
-      setErr(outputsErrorText(errorText(e), t));
+      setErr(outputsErrorText(e, t));
     } finally {
       setLaunching(false);
     }

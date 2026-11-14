@@ -107,6 +107,15 @@ test("un error al instalar se muestra y aun así refresca la lista", async () =>
   expect(list.mock.calls.length).toBeGreaterThan(calls);
 });
 
+test("si el archivo cambió desde la vista previa, el aviso pide volver a abrirlo", async () => {
+  const install = vi.fn(async () => { throw Object.assign(new Error("changed"), { cause: { code: "FailedPrecondition", reason: "pack.err.install.changed", metadata: {} } }); });
+  view(fakeCore({ packInstallHiding: install, pickPath: vi.fn(async () => "/tmp/o.mpack") }));
+  await userEvent.click(await screen.findByRole("button", { name: "Instalar paquete…" }));
+  const d = await screen.findByRole("dialog");
+  await userEvent.click(within(d).getByRole("button", { name: "Instalar" }));
+  expect(await within(d).findByText("Vuelve a abrir el archivo para revisar su vista previa de nuevo.")).toBeVisible();
+});
+
 test("quitar pide confirmación y avisa de los favoritos quitados", async () => {
   const remove = vi.fn(async () => 3);
   view(fakeCore({ packRemove: remove }));

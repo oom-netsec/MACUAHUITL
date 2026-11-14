@@ -2,7 +2,9 @@ import { expect, test } from "vitest";
 import { chmodCommand, outputsErrorText, parseOutputsError } from "./outputsError";
 
 const t = (k: string) => `[${k}]`;
-const msg = (p: string) => `prefs.outputs.permisos: la carpeta ${p} tiene modo 0755 y debe ser 0700; corrígelo con: chmod 700 ${p}`;
+const text = (p: string) => `prefs.outputs.permisos: la carpeta ${p} tiene modo 0755 y debe ser 0700; corrígelo con: chmod 700 ${p}`;
+// Error del puente con cause: el texto puede venir en cualquier idioma, lo que manda es reason y metadata.
+const msg = (p: string) => Object.assign(new Error("fix it with something else"), { cause: { code: "FailedPrecondition", reason: "prefs.outputs.permisos", metadata: { code: "permisos", path: p } } });
 
 test("la orden chmod cita lo raro y no se genera con \\, ' o control", () => {
   expect(chmodCommand("/home/u/salidas")).toBe("chmod 700 /home/u/salidas");
@@ -21,12 +23,25 @@ test("el texto de un rechazo de permisos lleva la orden solo si es segura", () =
   expect(outputsErrorText(msg("/home/u/salidas"), t as never)).toBe("[settings.storage.err.permisos] chmod 700 /home/u/salidas");
   expect(outputsErrorText(msg("/home/u/$(id)"), t as never)).toBe("[settings.storage.err.permisos] chmod 700 '/home/u/$(id)'");
   expect(outputsErrorText(msg("/x\\';echo pwned;#"), t as never)).toBe("[settings.storage.err.permisos]");
-  expect(outputsErrorText("otra cosa", t as never)).toBe("otra cosa");
+  expect(outputsErrorText(new Error("otra cosa"), t as never)).toBe("otra cosa");
 });
 
 test("la ruta es lo que sigue al sufijo «corrígelo con: chmod 700 », no una mención anterior", () => {
   const m = "prefs.outputs.permisos: la carpeta /a/chmod 700 /b tiene modo 0755 y debe ser 0700; corrígelo con: chmod 700 /a/chmod 700 /b";
-  expect(parseOutputsError(m)).toEqual({ code: "permisos", path: "/a/chmod 700 /b" });
+  expect(parseOutputsError(new Error(m))).toEqual({ code: "permisos", path: "/a/chmod 700 /b" });
+});
+
+test("con reason, el código y la ruta salen de cause y no del texto", () => {
+  expect(parseOutputsError(msg("/a b"))).toEqual({ code: "permisos", path: "/a b" });
+  const noExiste = Object.assign(new Error("folder missing"), { cause: { code: "NotFound", reason: "prefs.outputs.no_existe", metadata: { code: "no_existe", path: "/x" } } });
+  expect(parseOutputsError(noExiste)).toEqual({ code: "no_existe", path: "/x" });
+  expect(outputsErrorText(noExiste, t as never)).toBe("[settings.storage.err.no_existe]");
+  // Un reason ajeno no es un rechazo de carpeta, aunque el texto lo parezca.
+  const otro = Object.assign(new Error(text("/x")), { cause: { code: "Internal", reason: "otra.cosa", metadata: {} } });
+  expect(parseOutputsError(otro)).toBeNull();
+  expect(outputsErrorText(otro, t as never)).toBe(text("/x"));
+  // El respaldo por texto sigue sirviendo sin reason.
+  expect(parseOutputsError(new Error(text("/x")))).toEqual({ code: "permisos", path: "/x" });
 });
 
 test("los textos sirven en Ajustes, Job, Cambio y Diagnóstico", async () => {

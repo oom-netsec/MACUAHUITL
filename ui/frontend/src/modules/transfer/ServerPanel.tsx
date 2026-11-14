@@ -25,7 +25,7 @@ function Log({ lines }: { lines: TransferLine[] }) {
         {lines.map((l, i) => (
           <tr key={i}>
             <td>{l.Client}</td>
-            <td>{l.File} <span className="badge">{l.Dir === "escritura" ? t("transfer.dir.in") : t("transfer.dir.out")}</span></td>
+            <td>{l.File} <span className="badge">{l.dirCode === "write" ? t("transfer.dir.in") : t("transfer.dir.out")}</span></td>
             <td className="num">{l.Bytes}</td>
             <td className="mono hash">{l.SHA256 ?? ""}</td>
             <td><Badge tone={l.Result === "ok" ? "ok" : "bad"}>{l.Rejected ? t("transfer.log.rejected") : l.Result === "ok" ? t("transfer.log.ok") : t("transfer.log.error")}</Badge> {l.Error}</td>

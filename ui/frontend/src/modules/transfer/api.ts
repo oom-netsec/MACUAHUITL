@@ -16,7 +16,7 @@ export interface TransferReady {
 // Una transferencia o rechazo (JSON de fileserve.Transfer; Duration en nanosegundos).
 export interface TransferLine {
   Proto: string; Client: string; File: string; Bytes: number; Duration: number; Result: string;
-  Dir?: string; Path?: string; SHA256?: string; Error?: string; Rejected?: boolean;
+  Dir?: string; dirCode?: "read" | "write"; Path?: string; SHA256?: string; Error?: string; Rejected?: boolean;
 }
 export interface TransferEvent { runId: string; ready?: TransferReady; line?: TransferLine; done?: boolean; error?: string; cleanup?: string }
 export interface TransferServer { serverId: string; protocol: string; listening: string; started: number; write: boolean; recvDir: string; fromDir: string; transfers: number; rejected: number }

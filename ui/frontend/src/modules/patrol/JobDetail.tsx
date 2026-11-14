@@ -12,7 +12,7 @@ import { tones, useStateLabel } from "./JobsPanel";
 import { activeMs, clock, elapsed, when } from "./format";
 
 // Detalle de un trabajo: cifras, línea de fases, Login Test y armado, y la grilla en vivo.
-export function JobDetail({ core, job, phases, onChanged }: { core: CoreAPI; job: Job; phases: JobPhase[]; onChanged: () => void }) {
+export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: CoreAPI; job: Job; phases: JobPhase[]; onChanged: () => void; subscribe: (ids: string[]) => Promise<void> }) {
   const t = useT();
   const stateLabel = useStateLabel();
   const [login, setLogin] = useState<LoginResult[]>([]);
@@ -64,7 +64,7 @@ export function JobDetail({ core, job, phases, onChanged }: { core: CoreAPI; job
     try {
       const r = await core.armJob(job.id, [...trusted], [...excluded]);
       setArmed(r);
-      await core.subscribe([job.id]);
+      await subscribe([job.id]);
       setGrid({ devices: login.filter((l) => !excluded.has(l.target)).map((l) => l.target) });
       onChanged();
     } catch (e) {

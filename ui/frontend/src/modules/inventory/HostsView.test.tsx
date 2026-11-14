@@ -199,3 +199,16 @@ test("Guardar en la libreta enfoca el formulario y, al guardar, el foco vuelve a
   await screen.findByText("Host «SW-ACC1» guardado.");
   expect(document.activeElement).not.toBe(document.body);
 });
+
+test("con reason el campo sale de metadata.field y el texto del núcleo se muestra tal cual, en inglés también", async () => {
+  localStorage.setItem("macuahuitl.lang", "en");
+  const err = Object.assign(new Error("rpc error: code = InvalidArgument desc = the credential is not in the vault"), { cause: { code: "InvalidArgument", reason: "hosts.unknown_credential", metadata: { field: "credentialId" } } });
+  setup({ saveHost: vi.fn(async () => { throw err; }) });
+  await screen.findByRole("table", { name: "Hosts in the book" });
+  await userEvent.click(screen.getByRole("button", { name: /New host/ }));
+  await userEvent.type(screen.getByLabelText("Name"), "x1");
+  await userEvent.type(screen.getByLabelText("Address (IP or DNS name)"), "10.0.0.51");
+  await userEvent.click(screen.getByRole("button", { name: "Save host" }));
+  expect(await screen.findByText("the credential is not in the vault")).toBeVisible();
+  expect(screen.getByLabelText("Name")).not.toBeInvalid();
+});

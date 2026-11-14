@@ -332,6 +332,60 @@ test("la grilla aparece cuando un trabajo seleccionado pasa a armado", async () 
   expect(await screen.findByText("10.0.0.1")).toBeInTheDocument();
 });
 
+const bridgeErr = (reason: string) => Object.assign(new Error("rpc error"), { cause: { code: "NotFound", reason, metadata: {} } });
+
+test("un trabajo borrado entre listJobs y subscribe no tumba la vista: se sigue con los demás", async () => {
+  const subscribe = vi.fn(async (ids: string[]) => { if (ids.includes("gone")) throw bridgeErr("patrol.err.job_missing"); });
+  const core = fakeCore({
+    subscribe,
+    listJobs: vi.fn(async () => [
+      { id: "gone", name: "borrado", state: "armed", armedAt: ago(5), round: 1, rounds: 0, phases: [] },
+      { id: "ok", name: "vivo", state: "armed", armedAt: ago(4), round: 1, rounds: 0, phases: [] },
+    ]),
+  });
+  render(<PatrolView core={core} />);
+  expect(await screen.findByRole("button", { name: /vivo/ })).toBeInTheDocument();
+  await waitFor(() => expect(subscribe).toHaveBeenCalledWith(["ok"]));
+  expect(screen.queryByText(/rpc error/)).toBeNull();
+});
+
+test("otro error de subscribe sí se muestra", async () => {
+  const core = fakeCore({
+    subscribe: vi.fn(async () => { throw new Error("el núcleo no responde"); }),
+    listJobs: vi.fn(async () => [{ id: "a", name: "uno", state: "armed", armedAt: ago(5), round: 1, rounds: 0, phases: [] }]),
+  });
+  render(<PatrolView core={core} />);
+  expect(await screen.findByText(/el núcleo no responde/)).toBeInTheDocument();
+});
+
+test("closed repetido o fuera de orden no reabre el stream ni duplica fases", async () => {
+  const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j9", name: "n", state: "armed", armedAt: ago(5), round: 2, rounds: 0, phases: [] }]) });
+  render(<PatrolView core={core} />);
+  await screen.findByText("Activo: 5 min");
+  const ph = { at: ago(1), kind: "JOB_PHASE_KIND_ROUND_STARTED", round: 2 };
+  act(() => { core.emitEvent({ jobId: "j9", jobStateChanged: { state: "closed" } }); core.emitEvent({ jobId: "j9", phaseAdded: ph }); core.emitEvent({ jobId: "j9", jobStateChanged: { state: "closed" } }); core.emitEvent({ jobId: "j9", phaseAdded: ph }); });
+  await act(async () => {});
+  expect(within(await screen.findByRole("list", { name: "Fases" })).getAllByText("Ronda 2 iniciada")).toHaveLength(1);
+  expect(core.subscribe).toHaveBeenCalledTimes(1);
+});
+
+test("armar no abre un segundo stream del mismo trabajo", async () => {
+  let state = "created";
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => creds),
+    listJobs: vi.fn(async () => [{ id: "j1", name: "caso-1", state, armedAt: state === "armed" ? ago(0) : "", phases: [] }]),
+    loginTest: vi.fn(async () => [{ target: "10.0.0.2:22", passed: true, failedStep: "", detail: "", platform: "ios-xe", fingerprint: "" }]),
+    armJob: vi.fn(async () => { state = "armed"; return { windowEndsAt: "2026-11-04T10:00:00Z", missingInhibitors: [] }; }),
+  });
+  render(<PatrolView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /caso-1/ }));
+  await userEvent.click(await screen.findByRole("button", { name: "Ejecutar Login Test" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Armar trabajo" }));
+  await waitFor(() => expect(core.armJob).toHaveBeenCalled());
+  await act(async () => {});
+  expect(vi.mocked(core.subscribe).mock.calls.filter((c) => c[0].includes("j1"))).toHaveLength(1);
+});
+
 test("un evento de fase repetido por la suscripción no duplica la línea", async () => {
   const core = fakeCore({ listJobs: vi.fn(async () => [{ id: "j9", name: "n", state: "armed", armedAt: ago(5), round: 2, rounds: 0, phases: [] }]) });
   render(<PatrolView core={core} />);

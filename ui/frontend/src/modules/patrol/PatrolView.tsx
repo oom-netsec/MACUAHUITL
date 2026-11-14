@@ -4,6 +4,7 @@ import { Notice, errorText } from "../../components/Field";
 import { Page } from "../../components/Page";
 import { useBusy, useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
+import { errInfo } from "../../lib/coreError";
 import { NewJobForm } from "./NewJobForm";
 import { JobsPanel } from "./JobsPanel";
 import { JobDetail } from "./JobDetail";
@@ -34,17 +35,28 @@ export function PatrolView({ core }: { core: CoreAPI }) {
   const listSeq = useRef(0); // solo la última consulta de trabajos aplica: una respuesta vieja no pisa a la nueva
   useBusy(jobs.some(active));
 
+  // Un stream por trabajo, una sola vez (el núcleo lo cierra solo tras `closed`). Se pide id por id: un trabajo borrado
+  // entre listJobs y subscribe (patrol.err.job_missing) se descarta sin afectar a los demás.
+  const subscribeJobs = useCallback(async (ids: string[]) => {
+    const fresh = ids.filter((id) => !subscribed.current.has(id));
+    fresh.forEach((id) => subscribed.current.add(id));
+    const res = await Promise.allSettled(fresh.map((id) => core.subscribe([id])));
+    let fail: unknown;
+    res.forEach((r, i) => {
+      if (r.status === "fulfilled") return;
+      subscribed.current.delete(fresh[i]); // sin stream: se reintenta en la próxima consulta (si el trabajo sigue ahí)
+      if (errInfo(r.reason)?.reason !== "patrol.err.job_missing") fail ??= r.reason;
+    });
+    if (fail !== undefined) throw fail;
+  }, [core]);
+
   const refreshJobs = useCallback(async () => {
     const n = ++listSeq.current;
     try {
       const js = await core.listJobs();
       if (n !== listSeq.current) return;
       setJobs(sortJobs(js));
-      const fresh = js.filter((j) => active(j) && !subscribed.current.has(j.id)).map((j) => j.id);
-      if (fresh.length) {
-        fresh.forEach((id) => subscribed.current.add(id));
-        await core.subscribe(fresh);
-      }
+      await subscribeJobs(js.filter(active).map((j) => j.id));
       // Al abrir, si hay un trabajo armado, se muestra ese en lugar del formulario.
       if (!autoSelected.current) {
         autoSelected.current = true;
@@ -54,7 +66,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
     } catch (e) {
       if (n === listSeq.current) setErr(errorText(e)); // el error de una consulta vieja no pisa a una nueva
     }
-  }, [core]);
+  }, [core, subscribeJobs]);
 
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
   useEffect(() => {
@@ -88,7 +100,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
             </Notice>
           )}
           {job
-            ? <JobDetail key={job.id} core={core} job={job} phases={phases} onChanged={refreshJobs} />
+            ? <JobDetail key={job.id} core={core} job={job} phases={phases} onChanged={refreshJobs} subscribe={subscribeJobs} />
             : <NewJobForm core={core} creds={creds} onCreated={async (id) => { await refreshJobs(); setSelected(id); }} />}
         </div>
         <JobsPanel jobs={jobs} selected={job ? job.id : null} onSelect={setSelected} onNew={() => setSelected(null)} />

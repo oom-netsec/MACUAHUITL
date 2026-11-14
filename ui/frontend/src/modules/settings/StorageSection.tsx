@@ -44,7 +44,7 @@ export function StorageSection({ core }: { core: CoreAPI }) {
       setState(s); setForm(toForm(s)); setSaved(true);
     } catch (e) {
       const msg = errorText(e);
-      setSaveErr({ msg, parsed: parseOutputsError(msg) });
+      setSaveErr({ msg, parsed: parseOutputsError(e) });
     } finally { setBusy(false); }
   };
 

@@ -161,6 +161,13 @@ describe("motivos de rechazo", () => {
     expect(core.copyText).toHaveBeenCalledWith("chmod 700 '/home/u/mi salidas'");
   });
 
+  test("con cause: la ruta del chmod sale de metadata.path, no del texto", async () => {
+    const core = fakeCore({ setCorePrefs: vi.fn(async () => { throw Object.assign(new Error("the folder is open"), { cause: { code: "FailedPrecondition", reason: "prefs.outputs.permisos", metadata: { code: "permisos", path: "/home/u/mi salidas" } } }); }) });
+    view(core, "en");
+    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    expect(await screen.findByText("chmod 700 '/home/u/mi salidas'")).toBeVisible();
+  });
+
   test("el rechazo por la carpeta queda bajo su campo, marcado inválido y descrito", async () => {
     view(failing("permisos"));
     await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));
@@ -178,8 +185,8 @@ describe("motivos de rechazo", () => {
   });
 
   test("parseOutputsError: código y ruta", () => {
-    expect(parseOutputsError("prefs.outputs.permisos: x; corrígelo con: chmod 700 /a/b")).toEqual({ code: "permisos", path: "/a/b" });
-    expect(parseOutputsError("otra cosa")).toBeNull();
+    expect(parseOutputsError(new Error("prefs.outputs.permisos: x; corrígelo con: chmod 700 /a/b"))).toEqual({ code: "permisos", path: "/a/b" });
+    expect(parseOutputsError(new Error("otra cosa"))).toBeNull();
   });
 });
 

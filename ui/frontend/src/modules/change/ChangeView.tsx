@@ -57,7 +57,7 @@ function PrePost({ core }: { core: CoreAPI }) {
     try {
       await f();
     } catch (e) {
-      setErr(outputsErrorText(errorText(e), t));
+      setErr(outputsErrorText(e, t));
     }
   };
   const create = () => guard(async () => {
