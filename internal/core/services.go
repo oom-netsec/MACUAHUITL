@@ -424,15 +424,19 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	}
 	c.mu.Lock()
 	j.state, j.ArmedAt = "armed", c.o.Now()
-	if c.sleepGen != gen { // OnSleep no vio este trabajo como armado: queda pausado y resumePaused lo reanuda
+	slept := c.sleepGen != gen
+	if slept { // OnSleep no vio este trabajo como armado: queda pausado y resumePaused lo reanuda
 		j.paused = true
 		c.sched.Pause(j.id)
 	}
 	late := j.cancelReq // la cancelación llegó entre la revisión y el armado
 	j.cancelReq = false
+	vlt := c.vault
 	c.mu.Unlock()
 	if late {
 		c.sched.Cancel(j.id)
+	} else if slept && vlt != nil && vlt.Unlocked() {
+		c.resumePaused() // la bóveda ya se desbloqueó mientras armábamos: nadie más lo reanudaría
 	}
 	armed, armedArgs := "phase.devices", i18n.A("n", len(spec.Targets))
 	if n := len(r.ExcludedDeviceIds); n > 0 {
