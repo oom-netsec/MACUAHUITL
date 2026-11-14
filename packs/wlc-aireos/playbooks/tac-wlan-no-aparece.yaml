@@ -8,7 +8,7 @@ name: AireOS · TAC · WLAN no se anuncia
 name_en: AireOS · TAC · WLAN not broadcast
 params:
   - name: wlan
-    kind: ap
+    kind: wlan
 commands:
   - cmd: show time
   - cmd: show wlan {wlan}

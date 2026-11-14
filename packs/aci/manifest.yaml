@@ -1,6 +1,6 @@
 id: oom/aci
-version: 1.0.0
-min_core: 0.4.4
+version: 1.0.1
+min_core: 0.4.7
 name: Cisco ACI, leaf y spine
 name_en: Cisco ACI, leaf and spine
 description: Playbooks de solo lectura para leaf y spine Nexus 9000 en modo ACI desde su CLI - fabric (IS-IS, VTEP, MP-BGP), endpoints (EPM), contratos (zoning-rule), vPC, interfaces, L3Out (BGP, OSPF, BFD) y casos TAC; los de una IP, MAC, VRF, VNID o interfaz piden ese dato.

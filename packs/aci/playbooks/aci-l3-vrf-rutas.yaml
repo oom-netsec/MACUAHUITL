@@ -8,7 +8,7 @@ name: ACI · L3 · Rutas de una VRF
 name_en: ACI · L3 · VRF routes
 params:
   - name: vrf
-    kind: interface
+    kind: vrf
 commands:
   - cmd: show vrf {vrf} detail
   - cmd: show ip route vrf {vrf}

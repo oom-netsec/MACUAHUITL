@@ -10,7 +10,7 @@ params:
   - name: ip
     kind: ip
   - name: vnid
-    kind: ap
+    kind: vnid
 commands:
   - cmd: show system internal epm endpoint ip {ip}
   - cmd: show endpoint ip {ip}
