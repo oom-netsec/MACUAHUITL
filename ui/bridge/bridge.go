@@ -41,13 +41,14 @@ type Bridge struct {
 	ctx       context.Context               // vida del puente; los streams cuelgan de aquí, no de la llamada
 	streams   map[string]*stream            // un stream de eventos por trabajo
 	runs      map[string]context.CancelFunc // ejecuciones de diagnóstico en curso
+	assists   map[string]*stream            // un watch de asistente por ejecución (assist.go)
 	runSeq    int
 	consoles  map[string]*consoleSess // consolas serie abiertas (field.go)
 	terminals map[string]*termSess    // terminales SSH abiertas (terminal.go)
 }
 
 func New(dial func() (*ipc.ClientConn, error), emit Emitter) *Bridge {
-	return &Bridge{Interval: time.Second, dial: dial, emit: emit, ctx: context.Background(), streams: map[string]*stream{}, runs: map[string]context.CancelFunc{}}
+	return &Bridge{Interval: time.Second, dial: dial, emit: emit, ctx: context.Background(), streams: map[string]*stream{}, runs: map[string]context.CancelFunc{}, assists: map[string]*stream{}}
 }
 
 // stream es el stream de eventos de un trabajo. Su dirección es el token de generación:
