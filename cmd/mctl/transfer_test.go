@@ -32,7 +32,7 @@ func TestTransferServeGetPut(t *testing.T) {
 	var out syncBuf
 	done := make(chan error, 1)
 	go func() {
-		done <- run([]string{"transfer", "serve", "--proto", "tftp", "--listen", "127.0.0.1:0", "--write", "--allow", "127.0.0.1", "--from", pub, "--dir", recv, "--duration", "6s"}, strings.NewReader(""), &out)
+		done <- run([]string{"--lang", "es", "transfer", "serve", "--proto", "tftp", "--listen", "127.0.0.1:0", "--write", "--allow", "127.0.0.1", "--from", pub, "--dir", recv, "--duration", "6s"}, strings.NewReader(""), &out)
 	}()
 	addr := waitFor(t, &out, regexp.MustCompile(`sirviendo tftp en (127\.0\.0\.1:\d+)`))
 	waitFor(t, &out, regexp.MustCompile(`(copy running-config tftp://127\.0\.0\.1/)`)) // las líneas de carpetas y la pista salen después

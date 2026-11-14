@@ -35,11 +35,14 @@ func init() {
 		"pack.err.import.missing":        e("falta decidir qué hacer con {id}: renombrar u omitir", "a decision is missing for {id}: rename or skip", "id"),
 		"pack.err.import.decision":       e("decisión no válida para {id}: solo renombrar (si choca) u omitir, y el ID debe ser del paquete", "invalid decision for {id}: only rename (on a clash) or skip, and the ID must be in the package", "id"),
 		"pack.err.import.exists":         e("el archivo {file} ya existe; no se sobrescribe", "the file {file} already exists; it is not overwritten", "file"),
-		"pack.err.import.unsupported_fs": e("la carpeta de playbooks está en un sistema de archivos que no permite publicar {file} sin sobrescribir", "the playbooks folder is on a filesystem that cannot publish {file} without overwriting", "file"),
-		"pack.err.import.compensate":     e("no se pudo publicar los playbooks ({reason}) y tampoco retirar los scripts importados: {ids}; bórralos a mano", "could not publish the playbooks ({reason}) nor remove the imported scripts: {ids}; delete them by hand", "ids", "reason"),
 		"pack.err.import.changed":        e("el archivo cambió desde la vista previa; vuelve a revisarlo", "the file changed since the preview; review it again"),
 		"pack.err.import.unavailable":    e("este núcleo no tiene carpeta de configuración para guardar playbooks", "this core has no configuration folder to store playbooks"),
 		"pack.err.export.range":          e("se exportan hasta {max} scripts", "export up to {max} scripts", "max"),
+		"pack.err.script.platform":       e("script {id}: plataforma {platform:q} fuera de platforms del manifiesto", "script {id}: platform {platform:q} is not in the manifest platforms", "id", "platform"),
+		"pack.err.script.origin":         e("script {id}: origin biblioteca e ID lib-… obligatorios", "script {id}: origin \"biblioteca\" and a lib-... ID are required", "id"),
+		"pack.err.playbook.id":           e("playbook {id}: el id debe ser a-z, 0-9 y guion, e igual al nombre del archivo {file}", "playbook {id}: the id must be a-z, 0-9 and hyphen, and equal to the file name {file}", "id", "file"),
+		"pack.err.import.unsupported_fs": e("la carpeta de playbooks está en un sistema de archivos que no permite publicar {file} sin sobrescribir", "the playbooks folder is on a filesystem that cannot publish {file} without overwriting", "file"),
+		"pack.err.import.compensate":     e("no se pudo publicar los playbooks ({reason}) y tampoco retirar los scripts importados: {ids}; bórralos a mano", "could not publish the playbooks ({reason}) nor remove the imported scripts: {ids}; delete them by hand", "ids", "reason"),
 		"pack.missing":                   e("el playbook {playbook} viene en el paquete {pack}, que no está instalado; instálalo con «mctl pack install»", "playbook {playbook} comes in package {pack}, which is not installed; install it with \"mctl pack install\"", "playbook", "pack"),
 	})
 }

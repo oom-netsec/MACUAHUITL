@@ -71,15 +71,15 @@ func readSource(ctx context.Context, text, path string, max int) (string, error)
 	}
 	f, err := sys.OpenRegular(filepath.Clean(path))
 	if errors.Is(err, sys.ErrNotRegular) {
-		return "", status.Error(codes.InvalidArgument, err.Error())
+		return "", service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	if err != nil {
-		return "", status.Error(codes.NotFound, err.Error())
+		return "", service.ErrFrom(ctx, codes.NotFound, err)
 	}
 	defer f.Close()
 	b, err := io.ReadAll(io.LimitReader(f, int64(max)+1))
 	if err != nil {
-		return "", status.Error(codes.Internal, err.Error())
+		return "", service.ErrFrom(ctx, codes.Internal, err)
 	}
 	return string(b), nil
 }

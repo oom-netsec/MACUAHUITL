@@ -1,7 +1,6 @@
 package calc
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -39,7 +38,7 @@ func parseQty(s string, base float64, unit string) (float64, error) {
 	}
 	v, err := strconv.ParseFloat(strings.TrimSpace(t), 64)
 	if err != nil || v <= 0 || math.IsInf(v, 0) || math.IsNaN(v) {
-		return 0, fmt.Errorf("cantidad %q inválida", s)
+		return 0, i18n.New("calc.err.qty_invalid", i18n.A("value", s))
 	}
 	return v * mult, nil
 }
@@ -69,13 +68,13 @@ var mathisC = math.Sqrt(1.5)
 func TCP(bandwidth string, rttMs float64, window string, lossPct float64, mss int) (TCPResult, error) {
 	bw, err := parseQty(bandwidth, 1000, "bps")
 	if err != nil {
-		return TCPResult{}, fmt.Errorf("ancho de banda: %w", err)
+		return TCPResult{}, i18n.Wrap("calc.err.tcp_bandwidth", err, nil)
 	}
 	if rttMs <= 0 || math.IsNaN(rttMs) || math.IsInf(rttMs, 0) {
-		return TCPResult{}, errors.New("el RTT debe ser mayor que 0 ms")
+		return TCPResult{}, i18n.New("calc.err.tcp_rtt", nil)
 	}
 	if lossPct < 0 || lossPct >= 100 || math.IsNaN(lossPct) {
-		return TCPResult{}, errors.New("la pérdida va de 0 a menos de 100 %")
+		return TCPResult{}, i18n.New("calc.err.tcp_loss", nil)
 	}
 	if mss <= 0 {
 		mss = 1460
@@ -87,7 +86,7 @@ func TCP(bandwidth string, rttMs float64, window string, lossPct float64, mss in
 	}
 	if strings.TrimSpace(window) != "" {
 		if r.WindowBytes, err = parseQty(window, 1024, "b"); err != nil {
-			return TCPResult{}, fmt.Errorf("ventana: %w", err)
+			return TCPResult{}, i18n.Wrap("calc.err.tcp_window", err, nil)
 		}
 		if r.WindowLimitBps = r.WindowBytes * 8 / rtt; r.WindowLimitBps < r.MaxBps {
 			r.MaxBps, r.Limit, r.limitKey = r.WindowLimitBps, "ventana", "calc.val.limit.window"
@@ -191,7 +190,7 @@ func DSCP(query, by string) (DSCPResult, error) {
 		}
 		v, err := strconv.ParseInt(s, base, 32)
 		if err != nil || v < 0 || int(v) > max {
-			return 0, fmt.Errorf("%q no es un valor válido para %s", query, by)
+			return 0, i18n.New("calc.err.dscp_value", i18n.A("query", query, "by", by))
 		}
 		return int(v), nil
 	}
@@ -248,10 +247,10 @@ func DSCP(query, by string) (DSCPResult, error) {
 		}
 		r = match(func(e DSCPEntry) bool { return e.Precedence == v })
 	default:
-		return DSCPResult{}, fmt.Errorf("campo %q desconocido (name, dscp, binary, tos, precedence, cos, exp)", by)
+		return DSCPResult{}, i18n.New("calc.err.dscp_field", i18n.A("by", by))
 	}
 	if len(r.Entries) == 0 {
-		return DSCPResult{}, fmt.Errorf("nada coincide con %q", query)
+		return DSCPResult{}, i18n.New("calc.err.dscp_none", i18n.A("query", query))
 	}
 	return r, nil
 }
@@ -307,11 +306,11 @@ func Optics(in OpticsInput) (OpticsResult, error) {
 	if lpk <= 0 {
 		var ok bool
 		if lpk, ok = fiberLoss[strings.ToLower(in.Fiber)]; !ok {
-			return OpticsResult{}, fmt.Errorf("fibra %q desconocida (smf-1310, smf-1550, mmf-850, mmf-1300) o indica la pérdida por km", in.Fiber)
+			return OpticsResult{}, i18n.New("calc.err.optics_fiber", i18n.A("fiber", in.Fiber))
 		}
 	}
 	if in.Km < 0 || in.Connectors < 0 || in.Splices < 0 || in.ConnectorLoss < 0 || in.SpliceLoss < 0 || in.MarginDb < 0 {
-		return OpticsResult{}, errors.New("distancia, conectores, empalmes, pérdidas y margen no pueden ser negativos")
+		return OpticsResult{}, i18n.New("calc.err.optics_negative", nil)
 	}
 	r := OpticsResult{OpticsInput: in, BudgetDb: in.TxDbm - in.RxSensDbm, FiberLossDb: in.Km * lpk}
 	r.LossPerKm = lpk
@@ -362,17 +361,17 @@ func Power(s string) (PowerResult, error) {
 	case strings.HasSuffix(t, "dbm"):
 		v, err := strconv.ParseFloat(strings.TrimSuffix(t, "dbm"), 64)
 		if err != nil || math.IsInf(v, 0) || math.IsNaN(v) {
-			return PowerResult{}, fmt.Errorf("potencia %q inválida", s)
+			return PowerResult{}, i18n.New("calc.err.power_dbm", i18n.A("value", s))
 		}
 		return PowerResult{Dbm: v, Mw: math.Pow(10, v/10)}, nil
 	case strings.HasSuffix(t, "mw"):
 		v, err := strconv.ParseFloat(strings.TrimSuffix(t, "mw"), 64)
 		if err != nil || v <= 0 || math.IsInf(v, 0) {
-			return PowerResult{}, fmt.Errorf("potencia %q inválida (mW mayor que 0)", s)
+			return PowerResult{}, i18n.New("calc.err.power_mw", i18n.A("value", s))
 		}
 		return PowerResult{Dbm: 10 * math.Log10(v), Mw: v}, nil
 	}
-	return PowerResult{}, fmt.Errorf("indica la unidad: %q → -3dBm o 0.5mW", s)
+	return PowerResult{}, i18n.New("calc.err.power_unit", i18n.A("value", s))
 }
 
 func (p PowerResult) Report() Report {

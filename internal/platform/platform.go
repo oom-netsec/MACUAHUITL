@@ -7,7 +7,6 @@ package platform
 
 import (
 	"context"
-	"errors"
 	"io"
 	"time"
 
@@ -33,7 +32,7 @@ type Output struct {
 
 // ErrConfigLine: la línea no puede enviarse en modo configuración (cambiaría de modo o ejecutaría
 // un comando de exec).
-var ErrConfigLine = errors.New("platform: línea de configuración no permitida")
+var ErrConfigLine error = i18n.New("platform.err.config_line", nil)
 
 // LineResult es una línea de configuración enviada y lo que el equipo respondió.
 type LineResult struct {

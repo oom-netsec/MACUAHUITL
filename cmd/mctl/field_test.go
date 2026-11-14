@@ -31,7 +31,7 @@ func TestConsoleCommand(t *testing.T) {
 	in, keys := io.Pipe()
 	out := &syncBuf{}
 	done := make(chan error, 1)
-	go func() { done <- run([]string{"console", port, "--baud", "115200"}, in, out) }()
+	go func() { done <- run([]string{"--lang", "es", "console", port, "--baud", "115200"}, in, out) }()
 	keys.Write([]byte("show clock\r"))
 	buf := make([]byte, 64)
 	n, _ := dev.Read(buf)

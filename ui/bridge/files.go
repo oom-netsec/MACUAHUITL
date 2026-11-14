@@ -3,7 +3,6 @@ package bridge
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -23,7 +22,7 @@ var ErrFileExists = errors.New("guardar: el archivo ya existe")
 // (disco lleno) no destruye el archivo anterior. Lo usan las exportaciones: CSV, PNG, .cfg, .txt y Markdown.
 func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 	if !filepath.IsAbs(path) {
-		return wrapErr(errors.New("guardar: la ruta debe ser absoluta"))
+		return b.bridgeErr(i18n.New("bridge.err.save_abs", nil))
 	}
 	var raw []byte
 	switch encoding {
@@ -32,13 +31,13 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 	case "base64":
 		var err error
 		if raw, err = base64.StdEncoding.DecodeString(data); err != nil {
-			return wrapErr(fmt.Errorf("guardar: base64 inválido: %w", err))
+			return b.bridgeErr(i18n.Wrap("bridge.err.save_base64", err, nil))
 		}
 	default:
-		return wrapErr(fmt.Errorf("guardar: codificación %q desconocida", encoding))
+		return b.bridgeErr(i18n.New("bridge.err.save_encoding", i18n.A("encoding", encoding)))
 	}
 	if len(raw) > maxSaveBytes {
-		return wrapErr(errors.New("guardar: el archivo pasa de 64 MiB"))
+		return b.bridgeErr(i18n.New("bridge.err.save_big", nil))
 	}
 	if _, err := os.Lstat(path); err == nil && !overwrite {
 		return &Error{err: ErrFileExists, msg: i18n.Msg(b.locale(), "file.exists.save", nil), Code: "AlreadyExists", Reason: "file.exists",

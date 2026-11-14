@@ -5,6 +5,7 @@ package cli
 
 import (
 	"bufio"
+	_ "embed"
 	"flag"
 	"fmt"
 	"io"
@@ -70,13 +71,25 @@ func Find(areas []Area, args []string) (Command, []string, bool) {
 	return Command{}, nil, false
 }
 
-// Help arma el texto de uso: cabecera, el Usage de cada área en orden y --version.
+// helpEn es la ayuda en inglés (el idioma canónico), línea por línea la misma que los Usage de las áreas, que son la
+// versión en español (--lang es). help_test.go vigila que tengan las mismas líneas.
+//
+//go:embed help_en.txt
+var helpEn string
+
+// Help arma el texto de uso en el idioma de mctl: cabecera, la ayuda de las áreas en orden (en inglés el texto
+// embebido; con --lang es, el Usage de cada área) y --version.
 func Help(areas []Area) string {
 	var b strings.Builder
-	b.WriteString("uso: mctl <comando>\n")
-	for _, a := range areas {
-		b.WriteString(a.Usage)
-		b.WriteByte('\n')
+	if locale == "en" {
+		b.WriteString("usage: mctl <command>\n")
+		b.WriteString(helpEn)
+	} else {
+		b.WriteString("uso: mctl <comando>\n")
+		for _, a := range areas {
+			b.WriteString(a.Usage)
+			b.WriteByte('\n')
+		}
 	}
 	b.WriteString("  --version")
 	return b.String()
@@ -101,7 +114,7 @@ func (c *Env) Secret(prompt string) ([]byte, error) {
 	}
 	line, err := c.In.ReadString('\n')
 	if err != nil && line == "" {
-		return nil, fmt.Errorf("se esperaba %q en stdin: %w", strings.TrimSpace(prompt), err)
+		return nil, ErrWrap("mctl.cli.stdin_expected", err, "prompt", strings.TrimSpace(prompt))
 	}
 	return []byte(strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")), nil
 }
@@ -150,7 +163,7 @@ func OneArg(name string, args []string) (string, error) {
 		return "", err
 	}
 	if fs.NArg() != 1 {
-		return "", fmt.Errorf("%s necesita un ID", name)
+		return "", Err("mctl.cli.needs_id", "name", name)
 	}
 	return fs.Arg(0), nil
 }
@@ -163,4 +176,4 @@ func (l *List) Set(v string) error { *l = append(*l, v); return nil }
 
 // Common es la nota de las banderas comunes: no tiene comandos, solo su línea en la ayuda.
 var Common = Area{Usage: `  (cualquier comando: --no-color o NO_COLOR desactivan el color; con --json o sin TTY no hay color)
-  (antes del comando: --lang es|en pide los mensajes del núcleo en ese idioma; sin ella, es. mctl no lee LC_ALL, LC_MESSAGES ni LANG)`}
+  (antes del comando: --lang es|en pide los mensajes del núcleo en ese idioma; sin ella, inglés. mctl no lee LC_ALL, LC_MESSAGES ni LANG)`}

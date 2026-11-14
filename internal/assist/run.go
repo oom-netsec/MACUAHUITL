@@ -2,7 +2,6 @@ package assist
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"regexp"
@@ -51,8 +50,8 @@ type Executor interface {
 // bóveda recibe la credencial nueva (la anterior se conserva aparte); Reverted se llama cuando la reversa se cumplió, para que la
 // bóveda vuelva a como estaba. Ninguno recibe ni devuelve el secreto.
 type Verifier interface {
-	Verify(ctx context.Context, device string) (string, error)
-	Saved(ctx context.Context, device string) (string, error)
+	Verify(ctx context.Context, device string) (i18n.Text, error)
+	Saved(ctx context.Context, device string) (i18n.Text, error)
 	Reverted(ctx context.Context, device string) error
 }
 
@@ -183,7 +182,7 @@ func NewRun(o Options) (*Run, error) {
 		return nil, ErrNotAssisted
 	}
 	if o.Exec == nil || o.Audit == nil || o.ID == "" {
-		return nil, errors.New("assist: faltan el ejecutor, la auditoría o el identificador")
+		return nil, i18n.New("assist.run.missing_runner_parts", nil)
 	}
 	if err := Validate(o.Plan, o.Fn); err != nil {
 		return nil, err
@@ -207,6 +206,8 @@ func NewRun(o Options) (*Run, error) {
 
 // scrub quita de s los secretos del plan (y lo que IOS imprime tras secret/password si la función lo pide).
 func (r *Run) scrub(s string) string { return Scrub(s, r.secrets, r.fn.Scrub) }
+
+func (r *Run) scrubEN(s string) string { return scrubEN(s, r.secrets, r.fn.Scrub) }
 
 func (r *Run) scrubLines(lines []string) []string { return scrubAll(lines, r.secrets, r.fn.Scrub) }
 
@@ -299,7 +300,7 @@ func (r *Run) Events(from int) ([]Event, <-chan struct{}) {
 // emit anota un evento. Requiere r.mu.
 func (r *Run) emit(e Event) {
 	e.Seq = len(r.log)
-	e.Text, e.TextEN = r.scrub(e.Text), r.scrub(e.TextEN)
+	e.Text, e.TextEN = r.scrub(e.Text), r.scrubEN(e.TextEN)
 	if e.Kind == EvOutput && !r.fn.Scrub { // la salida cruda de una lectura puede traer llaves y contraseñas de otras secciones del running
 		e.Text, _ = mask.Apply("ios-xe", e.Text)
 		if e.TextEN != "" {
@@ -316,6 +317,13 @@ func (r *Run) setState(s State) {
 	r.mu.Lock()
 	r.state = s
 	r.emit(Event{Kind: EvState, State: s})
+	r.mu.Unlock()
+}
+
+// outT emite un texto propio del motor (no salida del equipo) en los dos idiomas.
+func (r *Run) outT(device string, t i18n.Text) {
+	r.mu.Lock()
+	r.emit(Event{Kind: EvOutput, Device: device, Text: t.In(i18n.Es), TextEN: t.In(i18n.En)})
 	r.mu.Unlock()
 }
 
@@ -514,7 +522,7 @@ func (r *Run) failT(format, en string, a ...any) outcome {
 	ea := make([]any, len(a)) // un error con código del catálogo entra en inglés al texto en inglés
 	for i, x := range a {
 		if e, ok := x.(error); ok {
-			x = i18n.English(e)
+			x = errIn(i18n.En, e)
 		}
 		ea[i] = x
 	}
@@ -523,7 +531,7 @@ func (r *Run) failT(format, en string, a ...any) outcome {
 
 // failMsg es failT con los dos textos ya armados.
 func (r *Run) failMsg(es, en string) outcome {
-	msg, msgEN := r.scrub(es), r.scrub(en)
+	msg, msgEN := r.scrub(es), r.scrubEN(en)
 	r.mu.Lock()
 	r.state, r.reason, r.reasonEN = Failed, msg, msgEN
 	o := oFailed
@@ -607,7 +615,7 @@ func (r *Run) forward(ctx context.Context) outcome {
 					r.log2("assist.verify", dp.Device, "run=%s the vault was not updated after write memory", r.id)
 					return r.failT("write memory salió bien en %s pero la bóveda no quedó con la credencial nueva: %v; edítala a mano", "write memory succeeded on %s but the vault does not hold the new credential: %v; edit it by hand", dp.Device, err)
 				}
-				r.out(dp.Device, msg)
+				r.outT(dp.Device, msg)
 			}
 		}
 	} else {
@@ -671,7 +679,7 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 			return r.failT("la credencial nueva no entró a %s con una sesión nueva: %v; la sesión original sigue abierta: propón la reversa", "the new credential did not log in to %s with a new session: %v; the original session is still open: propose the rollback", dp.Device, err), true
 		}
 		r.log2("assist.verify", dp.Device, "run=%s result=ok", r.id)
-		r.out(dp.Device, msg)
+		r.outT(dp.Device, msg)
 	}
 	if r.takeAbort() {
 		return oAborted, true
@@ -851,7 +859,9 @@ func (r *Run) revert(ctx context.Context, i int) bool {
 	} else if len(diffs) > 0 {
 		r.remember(i, dp.Baseline, outs) // un reintento parte de aquí, no lo toma por un cambio ajeno
 		r.setRecheck(i)
-		r.failT("la reversa de %s no lo dejó como estaba (%s); reintenta la reversa o corrígelo a mano", "the rollback of %s did not restore it (%s); retry the rollback or fix it by hand", dp.Device, strings.Join(diffs, "; "))
+		d := i18n.Join("; ", diffs...)
+		r.failMsg(fmt.Sprintf("la reversa de %s no lo dejó como estaba (%s); reintenta la reversa o corrígelo a mano", dp.Device, d.In(i18n.Es)),
+			fmt.Sprintf("the rollback of %s did not restore it (%s); retry the rollback or fix it by hand", dp.Device, d.In(i18n.En)))
 		return false
 	}
 	r.reverted(ctx, dp)
@@ -887,7 +897,7 @@ func statusCmds(dp DevicePlan) []string {
 }
 
 // checkBase lee cmds, el running-config de la línea base y el estado de sus puertos, y dice qué quedó distinto de ella (diffs vacío = igual).
-func (r *Run) checkBase(ctx context.Context, i int, cmds []string) (map[string]string, []string, error) {
+func (r *Run) checkBase(ctx context.Context, i int, cmds []string) (map[string]string, []i18n.Text, error) {
 	dp := r.plan.Devices[i]
 	run := runningCmds(dp)
 	cmds = slices.Clone(cmds)
@@ -900,14 +910,14 @@ func (r *Run) checkBase(ctx context.Context, i int, cmds []string) (map[string]s
 	if err != nil {
 		return nil, nil, err
 	}
-	var diffs []string
+	var diffs []i18n.Text
 	for _, c := range run {
 		got, ok := outs[c]
 		if !ok {
 			return nil, nil, cerr("assist.err.output_not_received", "command", c)
 		}
-		if d := residue(dp.Baseline[c], got); d != "" {
-			diffs = append(diffs, c+": "+d)
+		if d := residueT(dp.Baseline[c], got); !d.Empty() {
+			diffs = append(diffs, i18n.Tx("assist.residue.cmd", "command", c).With("residue", d))
 		}
 	}
 	for _, c := range statusCmds(dp) {
@@ -921,15 +931,15 @@ func (r *Run) checkBase(ctx context.Context, i int, cmds []string) (map[string]s
 		}
 		was, _ := iosxe.ParseIfStatus(dp.Baseline[c])
 		if now[0].Status == "err-disabled" && (len(was) == 0 || was[0].Status != "err-disabled") {
-			diffs = append(diffs, now[0].Port+" quedó err-disabled; la reversa no lo recupera: shutdown/no shutdown a mano")
+			diffs = append(diffs, i18n.Tx("assist.residue.err_disabled", "port", now[0].Port))
 		}
 	}
 	return outs, diffs, nil
 }
 
-// residue dice qué líneas sobran y cuáles faltan en got respecto de want (vacío si coinciden). Sin importar el orden; cada línea
+// residueT dice qué líneas sobran y cuáles faltan en got respecto de want (vacío si coinciden). Sin importar el orden; cada línea
 // con sangría cuenta junto con su sección, para que el « shutdown» de una interfaz no tape el que falta en otra.
-func residue(want, got string) string {
+func residueT(want, got string) i18n.Text {
 	// shortcut: las secciones anidadas (address-family) cuentan bajo el encabezado de primer nivel y el orden no cuenta, así que
 	// una reversa que reordena las entradas de una ACL pasa por igual; habría que comparar por secuencia si llega a importar.
 	count := func(s string) map[string]int {
@@ -955,27 +965,30 @@ func residue(want, got string) string {
 		}
 	}
 	sort.Strings(keys)
-	var out []string
+	var out []i18n.Text
 	for _, k := range keys {
 		if g[k] == w[k] {
 			continue
 		}
-		what := "falta"
+		what := "missing"
 		if g[k] > w[k] {
-			what = "sobra"
+			what = "extra"
 		}
 		line, head, ok := strings.Cut(k, "\x00")
 		if ok {
-			out = append(out, what+" «"+shown(head, line)+"» en "+shown("", head))
+			out = append(out, i18n.Tx("assist.residue."+what+"_in").With("line", shown(head, line)).With("head", shown("", head)))
 		} else {
-			out = append(out, what+" «"+shown("", line)+"»")
+			out = append(out, i18n.Tx("assist.residue."+what).With("line", shown("", line)))
 		}
 	}
 	if len(out) > 5 {
-		out = append(out[:5], fmt.Sprintf("y %d más", len(out)-5))
+		out = append(out[:5], i18n.Tx("assist.residue.more", "n", len(out)-5))
 	}
-	return strings.Join(out, ", ")
+	return i18n.Join(", ", out...)
 }
+
+// residue es residueT en español (lo que ven las pruebas y los mensajes de siempre).
+func residue(want, got string) string { return residueT(want, got).In(i18n.Es) }
 
 // reverted avisa al ejecutor que la reversa de una rotación se cumplió. Si no puede dejar la bóveda como estaba, lo dice: el equipo ya
 // volvió a la credencial anterior y eso es lo que importa decirle al ingeniero.
@@ -1009,15 +1022,15 @@ func skipLine(l string) bool {
 }
 
 // shown enmascara una línea de configuración para un mensaje: las reglas de mask anclan al inicio de línea y a su sección.
-func shown(head, line string) string {
+func shown(head, line string) i18n.Text {
 	if head == "" {
 		m, _ := mask.Apply("ios-xe", line+"\n")
-		return strings.TrimSpace(m)
+		return i18n.Lit(strings.TrimSpace(m), "")
 	}
 	m, _ := mask.Apply("ios-xe", head+"\n "+line+"\n")
 	_, l, _ := strings.Cut(strings.TrimRight(m, "\n"), "\n")
 	if l = strings.TrimSpace(l); l == "" {
-		return "(línea oculta)"
+		return i18n.Tx("assist.residue.hidden")
 	}
-	return l
+	return i18n.Lit(l, "")
 }

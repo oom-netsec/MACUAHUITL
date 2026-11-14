@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc/status"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Claves reservadas de preferences para las preferencias del núcleo (fase 29e). SetPreference
@@ -36,8 +36,8 @@ type CoreSettings struct {
 	factory    string
 	outputs    string // vacío = factory
 	ingest     IngestDefaults
-	issue      string // por qué la carpeta guardada no rige (vacío = rige); mientras tanto vale la de fábrica
-	issueAudit string // el mismo aviso para la bitácora (en inglés)
+	issue      i18n.Text // por qué la carpeta guardada no rige (vacío = rige); mientras tanto vale la de fábrica
+	issueAudit string    // el mismo aviso para la bitácora (en inglés)
 
 	// Home es la carpeta personal y Inside las carpetas del núcleo (datos, configuración, estado):
 	// la carpeta de salidas no puede ser Home ni estar dentro de ninguna de Inside.
@@ -54,17 +54,20 @@ func NewCoreSettings(factory, home string, inside ...string) *CoreSettings {
 func (s *CoreSettings) Outputs() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.outputs != "" && s.issue == "" {
+	if s.outputs != "" && s.issue.Empty() {
 		return s.outputs
 	}
 	return s.factory
 }
 
 // Issue es el motivo por el que la carpeta guardada no rige, o "".
-func (s *CoreSettings) Issue() string {
+func (s *CoreSettings) Issue() string { return s.IssueIn(i18n.Es) }
+
+// IssueIn es Issue en el idioma pedido.
+func (s *CoreSettings) IssueIn(loc string) string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.issue
+	return s.issue.In(loc)
 }
 
 // IssueAudit es el mismo aviso para la auditoría (siempre en inglés, con la carpeta y el código del motivo).
@@ -75,7 +78,7 @@ func (s *CoreSettings) IssueAudit() string {
 }
 
 // Mark anota que la carpeta guardada no rige (issue vacío la rehabilita); audit es su versión para la bitácora.
-func (s *CoreSettings) Mark(issue, audit string) {
+func (s *CoreSettings) Mark(issue i18n.Text, audit string) {
 	s.mu.Lock()
 	s.issue, s.issueAudit = issue, audit
 	s.mu.Unlock()
@@ -101,7 +104,7 @@ func (s *CoreSettings) Ingest() IngestDefaults {
 // Apply deja vigentes estos valores.
 func (s *CoreSettings) Apply(outputs string, ing IngestDefaults) {
 	s.mu.Lock()
-	s.outputs, s.ingest, s.issue = outputs, ing, ""
+	s.outputs, s.ingest, s.issue = outputs, ing, i18n.Text{}
 	s.mu.Unlock()
 }
 
@@ -140,8 +143,7 @@ func (s *CoreSettings) Load(db *sql.DB, check func(dir string) error) error {
 	s.Apply(out, ing)
 	if out != "" && check != nil {
 		if err := check(out); err != nil {
-			msg := status.Convert(err).Message()
-			s.Mark(OutputsIssue(out, msg), OutputsIssueAudit(out, msg))
+			s.Mark(OutputsIssue(out, err), OutputsIssueAudit(out, err))
 		}
 	}
 	return nil
@@ -180,14 +182,14 @@ func itoa(n int32) string {
 }
 
 // OutputsIssue es el aviso de que la carpeta de salidas guardada ya no vale y rige la de fábrica.
-func OutputsIssue(dir, reason string) string {
-	return fmt.Sprintf("la carpeta de salidas guardada (%s) ya no es válida y se usa la de fábrica: %s", dir, reason)
+func OutputsIssue(dir string, reason error) i18n.Text {
+	return i18n.Tx("prefs.outputs.issue", "dir", dir).With("reason", i18n.FromErr(reason))
 }
 
 // OutputsIssueAudit es OutputsIssue para la auditoría: la carpeta y el código del motivo (el prefijo prefs.outputs.X).
-func OutputsIssueAudit(dir, reason string) string {
+func OutputsIssueAudit(dir string, reason error) string {
 	code := "unknown"
-	if c, ok := strings.CutPrefix(reason, "prefs.outputs."); ok {
+	if c, ok := strings.CutPrefix(reason.Error(), "prefs.outputs."); ok {
 		code, _, _ = strings.Cut(c, ":")
 	}
 	return fmt.Sprintf("outputs_dir_invalid dir=%q reason=%s", dir, code)

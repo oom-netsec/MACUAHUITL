@@ -60,7 +60,7 @@ func hostsList(c *cli.Env, args []string) error {
 		return nil
 	}
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tNOMBRE\tDIRECCIÓN\tPUERTO\tPLATAFORMA\tCARPETA\tETIQUETAS\tCREDENCIAL")
+	fmt.Fprintln(tw, cli.T("mctl.hosts.head_list"))
 	for _, d := range ds {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n", d.Id, d.Name, d.GetTarget().GetAddress(), d.GetProfile().GetPort(), d.Platform, d.Folder, strings.Join(d.Tags, ","), d.CredentialLabel)
 	}
@@ -87,7 +87,7 @@ func (f *hostFields) flags(fs *flag.FlagSet) {
 func saved(c *cli.Env, verb, id, name string, warnings []string) {
 	fmt.Fprintf(c.Out, "%s %s (%s)\n", verb, id, name)
 	for _, w := range warnings {
-		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+		fmt.Fprintln(c.Out, cli.T("mctl.hosts.warning", "text", w))
 	}
 }
 
@@ -106,7 +106,7 @@ func hostsAdd(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	saved(c, "creado", r.Id, fs.Arg(0), r.Warnings)
+	saved(c, cli.T("mctl.hosts.created"), r.Id, fs.Arg(0), r.Warnings)
 	return nil
 }
 
@@ -134,7 +134,7 @@ func hostsEdit(c *cli.Env, args []string) error {
 		}
 	}
 	if cur == nil {
-		return fmt.Errorf("no hay un host de la libreta con id %q (mctl hosts list)", fs.Arg(0))
+		return cli.Err("mctl.hosts.no_id", "id", fs.Arg(0))
 	}
 	if set["name"] {
 		cur.Name = f.name
@@ -164,7 +164,7 @@ func hostsEdit(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	saved(c, "guardado", r.Id, cur.Name, r.Warnings)
+	saved(c, cli.T("mctl.hosts.saved"), r.Id, cur.Name, r.Warnings)
 	return nil
 }
 
@@ -177,7 +177,7 @@ func hostsRm(c *cli.Env, args []string) error {
 	if _, err := client(c).DeleteDevice(context.Background(), &v1.DeleteDeviceRequest{Id: id}); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "borrado %s\n", id)
+	fmt.Fprintln(c.Out, cli.T("mctl.hosts.deleted", "id", id))
 	return nil
 }
 
@@ -203,9 +203,9 @@ func hostsExport(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "exportados %d hosts a %s\n", r.Count, out)
+	fmt.Fprintln(c.Out, cli.T("mctl.hosts.exported", "n", r.Count, "path", out))
 	for _, w := range r.Warnings {
-		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+		fmt.Fprintln(c.Out, cli.T("mctl.hosts.warning", "text", w))
 	}
 	return nil
 }
@@ -231,13 +231,13 @@ func hostsImport(c *cli.Env, args []string) error {
 		return errors.New(uso)
 	}
 	if all != "" && !acciones[all] {
-		return fmt.Errorf("--all=%q: use renombrar, reemplazar u omitir", all)
+		return cli.Err("mctl.hosts.bad_all", "value", all)
 	}
 	dec := map[string]string{}
 	for _, d := range decs {
 		k, act, ok := strings.Cut(d, "=")
 		if !ok || k == "" || !acciones[act] {
-			return fmt.Errorf("--decision %q: use DIRECCIÓN:PUERTO=renombrar|reemplazar|omitir", d)
+			return cli.Err("mctl.hosts.bad_decision", "value", d)
 		}
 		dec[k] = act
 	}
@@ -251,13 +251,13 @@ func hostsImport(c *cli.Env, args []string) error {
 		return err
 	}
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "DESTINO\tNOMBRE\tESTADO\tMOTIVO\tCREDENCIAL")
+	fmt.Fprintln(tw, cli.T("mctl.hosts.head_import"))
 	var req []*v1.ImportHostDecision
 	var missing []string
 	for _, it := range p.Items {
 		cr := it.Host.CredentialLabel
 		if it.CredentialMissing {
-			cr += " (no está en la bóveda)"
+			cr += cli.T("mctl.hosts.cred_missing")
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", it.Key, it.Host.Name, it.State, it.Reason, cr)
 		a, ok := dec[it.Key]
@@ -278,27 +278,27 @@ func hostsImport(c *cli.Env, args []string) error {
 		if e.Field != "" {
 			campo = e.Field + ": "
 		}
-		fmt.Fprintf(c.Out, "línea %d: %s%s\n", e.Line, campo, e.Reason)
+		fmt.Fprintln(c.Out, cli.T("mctl.hosts.line_err", "line", e.Line, "field", campo, "reason", e.Reason))
 	}
 	if len(p.Errors) > 0 {
-		fmt.Fprintf(c.Out, "%d filas inválidas: no se importan y cuentan como omitidas\n", len(p.Errors))
+		fmt.Fprintln(c.Out, cli.T("mctl.hosts.bad_rows", "n", len(p.Errors)))
 	}
 	for _, w := range p.Warnings {
-		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+		fmt.Fprintln(c.Out, cli.T("mctl.hosts.warning", "text", w))
 	}
 	if onlyPreview {
 		return nil
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("no se importó nada: falta decidir %d conflicto(s); use --decision DIRECCIÓN:PUERTO=renombrar|reemplazar|omitir o --all=ACCIÓN: %s", len(missing), strings.Join(missing, ", "))
+		return cli.Err("mctl.hosts.undecided", "n", len(missing), "keys", strings.Join(missing, ", "))
 	}
 	r, err := cl.ApplyImportHosts(context.Background(), &v1.ApplyImportHostsRequest{Token: p.Token, Decisions: req})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "importados: %d nuevos, %d reemplazados, %d renombrados, %d omitidos", r.Created, r.Replaced, r.Renamed, r.Skipped)
+	fmt.Fprint(c.Out, cli.T("mctl.hosts.imported", "created", r.Created, "replaced", r.Replaced, "renamed", r.Renamed, "skipped", r.Skipped))
 	if r.Invalid > 0 {
-		fmt.Fprintf(c.Out, " (%d inválidos)", r.Invalid)
+		fmt.Fprint(c.Out, cli.T("mctl.hosts.invalid", "n", r.Invalid))
 	}
 	fmt.Fprintln(c.Out)
 	return nil
@@ -325,12 +325,12 @@ func hostsTemplate(c *cli.Env, args []string) error {
 			return err
 		}
 		tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "NOMBRE\tTIPO\tOBLIGATORIO\tEJEMPLO\tDESCRIPCIÓN")
+		fmt.Fprintln(tw, cli.T("mctl.hosts.head_fields"))
 		for _, f := range r.Fields {
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", f.Name, f.Type, map[bool]string{true: "sí", false: "no"}[f.Required], f.Example, f.Description)
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", f.Name, f.Type, map[bool]string{true: cli.T("mctl.hosts.yes"), false: cli.T("mctl.hosts.no")}[f.Required], f.Example, f.Description)
 		}
 		tw.Flush()
-		fmt.Fprintf(c.Out, "hasta %d hosts y %d MB por archivo\n", r.MaxRows, r.MaxBytes>>20)
+		fmt.Fprintln(c.Out, cli.T("mctl.hosts.limits", "rows", r.MaxRows, "mb", r.MaxBytes>>20))
 		return nil
 	}
 	r, err := cl.HostsImportTemplate(context.Background(), &v1.HostsImportTemplateRequest{Format: format})

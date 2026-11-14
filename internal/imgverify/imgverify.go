@@ -7,12 +7,13 @@ import (
 	"crypto/md5"
 	"crypto/sha512"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type Result struct {
@@ -34,7 +35,7 @@ func normalize(v string, hexLen int, name string) (string, error) {
 		return "", nil
 	}
 	if b, err := hex.DecodeString(v); err != nil || len(b)*2 != hexLen {
-		return "", fmt.Errorf("imgverify: el %s esperado debe tener %d dígitos hexadecimales", name, hexLen)
+		return "", i18n.New("imgverify.err.hex", i18n.A("name", name, "digits", hexLen))
 	}
 	return v, nil
 }
@@ -52,7 +53,7 @@ func match(want, got string) string {
 // Check lee el archivo una sola vez y calcula ambos resúmenes.
 func Check(path, wantMD5, wantSHA512 string) (Result, error) {
 	if !filepath.IsAbs(path) {
-		return Result{}, errors.New("imgverify: la ruta debe ser absoluta")
+		return Result{}, i18n.New("imgverify.err.abs", nil)
 	}
 	m, err := normalize(wantMD5, 32, "MD5")
 	if err != nil {

@@ -110,7 +110,7 @@ test("con la bóveda cerrada se conserva la credencial guardada al editar", asyn
 });
 
 test("en inglés no queda ningún texto en español ni clave sin traducir", async () => {
-  localStorage.setItem("macuahuitl.idioma", "en");
+  localStorage.setItem("macuahuitl.lang", "en");
   setup();
   await screen.findByRole("table", { name: "Hosts in the book" });
   await userEvent.click(screen.getByRole("button", { name: /New host/ }));
@@ -124,7 +124,7 @@ test("en inglés no queda ningún texto en español ni clave sin traducir", asyn
 });
 
 test("en inglés el error del núcleo en el formulario es genérico y no muestra su texto en español", async () => {
-  localStorage.setItem("macuahuitl.idioma", "en");
+  localStorage.setItem("macuahuitl.lang", "en");
   setup();
   await screen.findByRole("table", { name: "Hosts in the book" });
   await userEvent.click(screen.getByRole("button", { name: /New host/ }));
@@ -137,7 +137,7 @@ test("en inglés el error del núcleo en el formulario es genérico y no muestra
 });
 
 test("en inglés un error sin campo y los avisos de guardado salen como textos genéricos", async () => {
-  localStorage.setItem("macuahuitl.idioma", "en");
+  localStorage.setItem("macuahuitl.lang", "en");
   const { core } = setup();
   core.saveHost = vi.fn().mockRejectedValueOnce(new Error("el núcleo no responde")).mockResolvedValueOnce({ id: "x", warnings: ["la bóveda está cerrada: la credencial se guardó sin validar"] });
   await screen.findByRole("table", { name: "Hosts in the book" });
@@ -153,7 +153,7 @@ test("en inglés un error sin campo y los avisos de guardado salen como textos g
 
 test("la dirección repetida se marca en su campo, en español y en inglés", async () => {
   for (const [lang, name, addr, save, msg] of [["es", "Nombre", "Dirección (IP o nombre DNS)", "Guardar host", "Esta dirección y puerto ya están en la libreta."], ["en", "Name", "Address (IP or DNS name)", "Save host", "This address is already in the book."]]) {
-    localStorage.setItem("macuahuitl.idioma", lang);
+    localStorage.setItem("macuahuitl.lang", lang);
     const { unmount } = setup();
     await userEvent.click(await screen.findByRole("button", { name: lang === "es" ? /Nuevo host/ : /New host/ }));
     await userEvent.type(screen.getByLabelText(name), "OTRO");

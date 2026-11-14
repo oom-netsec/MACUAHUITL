@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Formatos del archivo de import/export.
@@ -58,7 +60,7 @@ var HostFields = []FieldSpec{
 			}
 			n, err := strconv.Atoi(v)
 			if err != nil {
-				return fmt.Errorf("%q no es un número entero", v)
+				return i18n.New("hostfield.not_int", i18n.A("value", v))
 			}
 			h.Port = n
 			return nil
@@ -119,7 +121,7 @@ func rowToHost(cells []string) (FileHost, *FieldError) {
 	var h FileHost
 	for i, f := range HostFields {
 		if err := f.set(&h, cells[i]); err != nil {
-			return h, &FieldError{f.Name, err.Error()}
+			return h, &FieldError{Field: f.Name, Reason: err.Error(), Err: err}
 		}
 	}
 	return h, nil
@@ -147,7 +149,7 @@ func ImportFormat(path, format string) (string, error) {
 		f = strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
 	}
 	if f != FormatCSV && f != FormatJSON {
-		return "", fmt.Errorf("formato no reconocido para %q: use la extensión .csv o .json, o pida el formato csv o json", path)
+		return "", i18n.New("hostfile.format_unknown", i18n.A("path", path))
 	}
 	return f, nil
 }

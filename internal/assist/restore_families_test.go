@@ -2,6 +2,7 @@ package assist
 
 import (
 	"errors"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"slices"
 	"strings"
 	"testing"
@@ -324,13 +325,13 @@ func TestRestoreReviewerSingleValueCases(t *testing.T) {
 func TestRestoreClosedListRefusesNoFormsWithTheWrongIOSMeaning(t *testing.T) {
 	rc := &rctx{live: map[string]bool{}, ifs: map[string]bool{}, max: 10}
 	for _, l := range []string{"no logging buffered 8192", "no logging buffered 8192 informational", "no ip name-server 1.1.1.1 2.2.2.2", "ip name-server 1.1.1.1 2.2.2.2"} {
-		if why := rc.refuse(nil, l, nil); why == "" {
+		if why := rc.refuse(nil, l, nil); why.Empty() {
 			t.Errorf("%q debía rechazarse", l)
 		}
 	}
 	for _, l := range []string{"no logging buffered", "logging buffered 8192", "ip name-server 1.1.1.1", "no ip name-server 1.1.1.1"} {
-		if why := rc.refuse(nil, l, nil); why != "" {
-			t.Errorf("%q debía aceptarse: %s", l, why)
+		if why := rc.refuse(nil, l, nil); !why.Empty() {
+			t.Errorf("%q debía aceptarse: %s", l, why.In(i18n.Es))
 		}
 	}
 }
@@ -376,7 +377,7 @@ func TestRestoreNTPServerWithPreferReplacesTheSameAddressWithoutNo(t *testing.T)
 	// Con key, source o version la línea sigue siendo la misma asociación, pero no es de la lista cerrada (key es un secreto).
 	rc := &rctx{live: map[string]bool{}, ifs: map[string]bool{}, max: 10}
 	for _, l := range []string{"ntp server 10.0.0.1 key 5", "ntp server 10.0.0.1 version 3", "ntp server 10.0.0.1 source Vlan99"} {
-		if rc.refuse(nil, l, nil) == "" {
+		if rc.refuse(nil, l, nil).Empty() {
 			t.Errorf("%q debía rechazarse", l)
 		}
 	}

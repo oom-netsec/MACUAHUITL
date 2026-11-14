@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
@@ -22,7 +22,7 @@ type jobDeps struct {
 	info service.JobInfo
 }
 
-func (d jobDeps) Job(string) (service.JobInfo, error) { return d.info, nil }
+func (d jobDeps) Job(context.Context, string) (service.JobInfo, error) { return d.info, nil }
 
 func TestResultadoFinalLiberaLosComandos(t *testing.T) {
 	dir := t.TempDir()
@@ -86,6 +86,50 @@ func TestAdhocDeniedAuditaEnIngles(t *testing.T) {
 		s.StartAdhoc(i18n.WithLocale(context.Background(), loc), &v1.StartAdhocRequest{Commands: "configure terminal"})
 		if got := d.AuditText(); !strings.Contains(got, `command not allowed in a collection (read-only): \"configure terminal\" (not a read command)`) {
 			t.Errorf("%q: auditoría %s", loc, got)
+		}
+	}
+}
+
+// Fase 30e: los errores de AdhocResult salen en el idioma pedido; el máximo de comandos se audita en inglés.
+func TestAdhocResultErroresEnElIdioma(t *testing.T) {
+	cases := []struct {
+		info   service.JobInfo
+		es, en string
+	}{
+		{service.JobInfo{State: "failed"}, "el núcleo se detuvo con el lote en curso; vuelve a lanzarlo", "the core stopped with the batch in progress; launch it again"},
+		{service.JobInfo{State: "completed"}, "el lote no conserva su carpeta de salida", "the batch no longer has its output folder"},
+	}
+	for _, c := range cases {
+		for loc, want := range map[string]string{"es": c.es, "en": c.en} {
+			s := &adhocSvc{d: jobDeps{servicetest.New(t), c.info}, cmds: map[string][]string{}}
+			r, err := s.AdhocResult(i18n.WithLocale(context.Background(), loc), &v1.AdhocResultRequest{JobId: "j"})
+			if err != nil || r.Error != want {
+				t.Errorf("%q %s: %q %v", loc, c.info.State, r.GetError(), err)
+			}
+		}
+	}
+	d := servicetest.New(t)
+	s := &adhocSvc{d: d, cmds: map[string][]string{}}
+	s.StartAdhoc(i18n.WithLocale(context.Background(), "es"), &v1.StartAdhocRequest{Commands: strings.Repeat("show version\n", 51)})
+	if got := d.AuditText(); !strings.Contains(got, "51 commands; the maximum is 50") {
+		t.Errorf("auditoría %s", got)
+	}
+}
+
+// Una sola familia de códigos para la carpeta de salida (la misma de diag y field).
+func TestAdhocCarpetaDeSalidaUsaElCodigoComun(t *testing.T) {
+	d := servicetest.New(t)
+	os.MkdirAll(d.Outputs(), 0o700)
+	os.WriteFile(filepath.Join(d.Outputs(), "adhoc"), nil, 0o600) // un archivo donde va la carpeta
+	s := &adhocSvc{d: d, cmds: map[string][]string{}}
+	_, err := s.StartAdhoc(i18n.WithLocale(context.Background(), "en"), &v1.StartAdhocRequest{Commands: "show version", Targets: []*v1.Target{{}}})
+	st := status.Convert(err)
+	if !strings.HasPrefix(st.Message(), "output folder: ") {
+		t.Fatalf("%v", err)
+	}
+	for _, dt := range st.Details() {
+		if ei, ok := dt.(*errdetails.ErrorInfo); ok && ei.Reason != "ingest.err.out_dir" {
+			t.Errorf("reason %q", ei.Reason)
 		}
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 )
@@ -219,5 +220,33 @@ func TestCfgErrorDecidesWhichPercentLinesStop(t *testing.T) {
 		if got := cfgError(msg + "\n"); got != stops {
 			t.Errorf("cfgError(%q) = %v, debía ser %v", msg, got, stops)
 		}
+	}
+}
+
+// Los rechazos propios del driver salen en el idioma pedido; con es, el texto de siempre.
+func TestErroresDriverEsYEn(t *testing.T) {
+	d, err := open(t, cfgSim(&simulator.Recorder{}, nil), "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, e1 := d.Configure(context.Background(), []string{"end"}, 5*time.Second)
+	_, e2 := d.Configure(context.Background(), []string{""}, 5*time.Second)
+	_, e3 := d.Configure(context.Background(), []string{"description ñ"}, 5*time.Second)
+	_, e4 := d.Run(context.Background(), "show\nversion", time.Second)
+	for i, w := range []struct {
+		err    error
+		es, en string
+	}{
+		{e1, `platform: línea de configuración no permitida: "end" cambia de modo o ejecuta fuera de la configuración`, `platform: configuration line not allowed: "end" changes mode or runs outside configuration`},
+		{e2, "platform: línea de configuración no permitida: línea vacía", "platform: configuration line not allowed: empty line"},
+		{e3, `platform: línea de configuración no permitida: "description ñ" tiene caracteres fuera de ASCII imprimible o '?'`, `platform: configuration line not allowed: "description ñ" has characters outside printable ASCII or '?'`},
+		{e4, `platform: el comando "show\nversion" tiene saltos de línea`, `platform: the command "show\nversion" contains line breaks`},
+	} {
+		if w.err == nil || w.err.Error() != w.es || i18n.In("en", w.err) != w.en {
+			t.Errorf("%d: es %q en %q, quería %q / %q", i, w.err, i18n.In("en", w.err), w.es, w.en)
+		}
+	}
+	if !errors.Is(e1, platform.ErrConfigLine) {
+		t.Error("ya no es ErrConfigLine")
 	}
 }

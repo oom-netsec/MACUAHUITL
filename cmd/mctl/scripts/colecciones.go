@@ -50,7 +50,7 @@ func colList(c *cli.Env, args []string) error {
 		return printJSON(c, res)
 	}
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ID\tORDEN\tNOMBRE\tSCRIPTS")
+	fmt.Fprintln(tw, cli.T("mctl.scripts.col_list_header"))
 	for _, x := range res.Collections {
 		fmt.Fprintf(tw, "%s\t%d\t%s\t%d\n", x.Id, x.Order, x.Name, len(x.ScriptIds))
 	}
@@ -84,19 +84,19 @@ func colShow(c *cli.Env, args []string) error {
 	for _, s := range all.Scripts {
 		names[s.Id] = s.Name
 	}
-	fmt.Fprintf(c.Out, "%s\n  id: %s · orden %d · %d scripts\n", x.Name, x.Id, x.Order, len(x.ScriptIds))
+	fmt.Fprintf(c.Out, "%s\n%s\n", x.Name, cli.T("mctl.scripts.col_show_id", "id", x.Id, "order", x.Order, "n", len(x.ScriptIds)))
 	if x.Description != "" {
 		fmt.Fprintf(c.Out, "  %s\n", x.Description)
 	}
-	fmt.Fprintf(c.Out, "  creada: %s · editada: %s\n\n", ts(x.CreatedMs), ts(x.UpdatedMs))
+	fmt.Fprint(c.Out, cli.T("mctl.scripts.col_show_dates", "created", ts(x.CreatedMs), "updated", ts(x.UpdatedMs))+"\n\n")
 	for i, id := range x.ScriptIds {
 		fmt.Fprintf(c.Out, "%3d. %s  %s\n", i+1, id, names[id])
 	}
 	return nil
 }
 
-func colSaved(c *cli.Env, verb string, x *v1.Collection) {
-	fmt.Fprintf(c.Out, "%s %s (%s)\n", verb, x.Id, x.Name)
+func colSaved(c *cli.Env, code string, x *v1.Collection) {
+	fmt.Fprintln(c.Out, cli.T(code, "id", x.Id, "name", x.Name))
 }
 
 // scripts col add NOMBRE [--desc D]
@@ -113,7 +113,7 @@ func colAdd(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	colSaved(c, "creada", r.Collection)
+	colSaved(c, "mctl.scripts.col_created", r.Collection)
 	return nil
 }
 
@@ -148,7 +148,7 @@ func colEdit(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	colSaved(c, "guardada", r.Collection)
+	colSaved(c, "mctl.scripts.col_saved", r.Collection)
 	return nil
 }
 
@@ -161,7 +161,7 @@ func colRm(c *cli.Env, args []string) error {
 	if _, err := client(c).DeleteCollection(context.Background(), &v1.DeleteCollectionRequest{Id: id}); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "borrada %s\n", id)
+	fmt.Fprintln(c.Out, cli.T("mctl.scripts.col_deleted", "id", id))
 	return nil
 }
 
@@ -203,7 +203,7 @@ func colSet(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "colección %s (%s): %d scripts\n", r.Collection.Id, r.Collection.Name, len(r.Collection.ScriptIds))
+	fmt.Fprintln(c.Out, cli.T("mctl.scripts.col_set", "id", r.Collection.Id, "name", r.Collection.Name, "n", len(r.Collection.ScriptIds)))
 	return nil
 }
 
@@ -219,7 +219,7 @@ func colOrder(c *cli.Env, args []string) error {
 	if _, err := client(c).ReorderCollections(context.Background(), &v1.ReorderCollectionsRequest{Ids: fs.Args()}); err != nil {
 		return err
 	}
-	fmt.Fprintln(c.Out, "orden guardado")
+	fmt.Fprintln(c.Out, cli.T("mctl.scripts.col_order_saved"))
 	return nil
 }
 
@@ -244,20 +244,20 @@ func colExport(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "exportadas %d colecciones y %d scripts a %s\n", r.Collections, r.Scripts, out)
+	fmt.Fprintln(c.Out, cli.T("mctl.scripts.col_exported", "collections", r.Collections, "scripts", r.Scripts, "path", out))
 	return nil
 }
 
 // parseDecs valida --decision y --all; las claves son IDs del archivo (de colección o de script).
 func parseDecs(decs cli.List, all string) (map[string]string, error) {
 	if all != "" && !acciones[all] {
-		return nil, fmt.Errorf("--all=%q: use renombrar, reemplazar u omitir", all)
+		return nil, cli.Err("mctl.import_a.bad_all", "value", all)
 	}
 	dec := map[string]string{}
 	for _, d := range decs {
 		id, act, ok := strings.Cut(d, "=")
 		if !ok || id == "" || !acciones[act] {
-			return nil, fmt.Errorf("--decision %q: use ID=renombrar|reemplazar|omitir", d)
+			return nil, cli.Err("mctl.import_a.bad_decision", "value", d)
 		}
 		dec[id] = act
 	}
@@ -301,7 +301,7 @@ func colImport(c *cli.Env, args []string) error {
 	var missing []string
 	known := map[string]bool{}
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "TIPO\tID\tNOMBRE\tESTADO\tCHOCA CON")
+	fmt.Fprintln(tw, cli.T("mctl.scripts.col_import_header"))
 	decide := func(id, state string, into *[]*v1.ImportDecision) {
 		known[id] = true
 		a, ok := dec[id]
@@ -317,37 +317,37 @@ func colImport(c *cli.Env, args []string) error {
 		}
 	}
 	for _, it := range p.Collections {
-		fmt.Fprintf(tw, "colección\t%s\t%s\t%s\t%s\n", it.Collection.Id, it.Collection.Name, it.State, it.ConflictsWith)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", cli.T("mctl.scripts.kind_collection"), it.Collection.Id, it.Collection.Name, it.State, it.ConflictsWith)
 		decide(it.Collection.Id, it.State, &cdec)
 	}
 	for _, it := range p.Scripts {
-		fmt.Fprintf(tw, "script\t%s\t%s\t%s\t%s\n", it.Script.Id, it.Script.Name, it.State, it.ConflictsWith)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", cli.T("mctl.scripts.kind_script"), it.Script.Id, it.Script.Name, it.State, it.ConflictsWith)
 		decide(it.Script.Id, it.State, &sdec)
 	}
 	tw.Flush()
 	for _, w := range p.Warnings {
-		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+		fmt.Fprintln(c.Out, cli.T("mctl.common_a.warning", "text", w))
 	}
 	for id := range dec {
 		if !known[id] {
-			return fmt.Errorf("--decision %s: no es una colección ni un script del archivo", id)
+			return cli.Err("mctl.scripts.col_decision_unknown", "id", id)
 		}
 	}
 	if onlyPreview {
 		return nil
 	}
 	if len(missing) > 0 {
-		return fmt.Errorf("no se importó nada: falta decidir %d conflicto(s); use --decision ID=renombrar|reemplazar|omitir o --all=ACCIÓN: %s", len(missing), strings.Join(missing, ", "))
+		return cli.Err("mctl.import_a.missing", "n", len(missing), "ids", strings.Join(missing, ", "))
 	}
 	r, err := cl.ApplyImportCollections(context.Background(), &v1.ApplyImportCollectionsRequest{Token: p.Token, ScriptDecisions: sdec, CollectionDecisions: cdec})
 	if err != nil {
 		return err
 	}
 	for _, w := range r.Warnings {
-		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+		fmt.Fprintln(c.Out, cli.T("mctl.common_a.warning", "text", w))
 	}
-	fmt.Fprintf(c.Out, "importadas: %d nuevas, %d reemplazadas, %d renombradas, %d fusionadas, %d omitidas; scripts: %d nuevos, %d reemplazados, %d renombrados, %d omitidos\n",
-		r.CollectionsCreated, r.CollectionsReplaced, r.CollectionsRenamed, r.CollectionsMerged, r.CollectionsSkipped, r.ScriptsCreated, r.ScriptsReplaced, r.ScriptsRenamed, r.ScriptsSkipped)
+	fmt.Fprintln(c.Out, cli.T("mctl.scripts.col_imported", "c_created", r.CollectionsCreated, "c_replaced", r.CollectionsReplaced, "c_renamed", r.CollectionsRenamed,
+		"c_merged", r.CollectionsMerged, "c_skipped", r.CollectionsSkipped, "s_created", r.ScriptsCreated, "s_replaced", r.ScriptsReplaced, "s_renamed", r.ScriptsRenamed, "s_skipped", r.ScriptsSkipped))
 	return nil
 }
 
@@ -369,19 +369,23 @@ func pin(c *cli.Env, args []string) error {
 		if _, err := cl.ReorderPinned(context.Background(), &v1.ReorderPinnedRequest{Ids: fs.Args()}); err != nil {
 			return err
 		}
-		fmt.Fprintln(c.Out, "orden de fijados guardado")
+		fmt.Fprintln(c.Out, cli.T("mctl.scripts.pin_order_saved"))
 	case !order && fs.NArg() == 1:
 		if _, err := cl.SetPinned(context.Background(), &v1.SetPinnedRequest{Id: fs.Arg(0), Pinned: !off}); err != nil {
 			return err
 		}
-		fmt.Fprintf(c.Out, "%s %s\n", map[bool]string{true: "desfijado:", false: "fijado:"}[off], fs.Arg(0))
+		code := "mctl.scripts.pin_on"
+		if off {
+			code = "mctl.scripts.pin_off"
+		}
+		fmt.Fprintln(c.Out, cli.T(code, "id", fs.Arg(0)))
 	case !order && !off && fs.NArg() == 0:
 		res, err := cl.ListPinned(context.Background(), &v1.ListPinnedRequest{})
 		if err != nil {
 			return err
 		}
 		tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-		fmt.Fprintln(tw, "N\tID\tNOMBRE\tMODO")
+		fmt.Fprintln(tw, cli.T("mctl.scripts.pin_header"))
 		for i, s := range res.Scripts {
 			fmt.Fprintf(tw, "%d\t%s\t%s\t%s\n", i+1, s.Id, s.Name, ro(s.ReadOnly))
 		}
@@ -419,9 +423,9 @@ func template(c *cli.Env, args []string) error {
 		return err
 	}
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "CAMPO\tTIPO\tOBLIGATORIO\tEJEMPLO\tDESCRIPCIÓN")
+	fmt.Fprintln(tw, cli.T("mctl.scripts.template_header"))
 	for _, f := range r.Fields {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", f.Name, f.Type, map[bool]string{true: "sí", false: "no"}[f.Required], f.Example, f.Description)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", f.Name, f.Type, yesNo(f.Required), f.Example, f.Description)
 	}
 	return tw.Flush()
 }

@@ -1,0 +1,5 @@
+{
+ "reinicio": "tasas omitidas: el equipo se reinició entre muestras (sysUpTime bajó)",
+ "trap-basura": "error verifying packet sanity: Got 2 Expected: 3",
+ "trap-vacio": "cannot unmarshal empty packet"
+}

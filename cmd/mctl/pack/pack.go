@@ -38,18 +38,18 @@ const help = `  pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM]...
 
 func origin(p *v1.PackInfo) string {
 	if p.Official {
-		return "oficial"
+		return cli.T("mctl.pack.official")
 	}
-	return "terceros"
+	return cli.T("mctl.pack.third")
 }
 
 func line(p *v1.PackInfo) string {
 	s := fmt.Sprintf("%s  %s  %s  %d playbooks  %d scripts  %s", p.Id, p.Version, origin(p), p.PlaybookCount, p.ScriptCount, p.Name)
 	if len(p.Hidden) > 0 {
-		s += fmt.Sprintf("  (%d ocultos)", len(p.Hidden))
+		s += cli.T("mctl.pack.hidden_n", "n", len(p.Hidden))
 	}
 	if len(p.Shadowed) > 0 {
-		s += "  (tapados por los tuyos: " + strings.Join(p.Shadowed, ", ") + ")"
+		s += cli.T("mctl.pack.shadowed", "list", strings.Join(p.Shadowed, ", "))
 	}
 	return s
 }
@@ -72,9 +72,9 @@ func install(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	verb := "instalado"
+	verb := cli.T("mctl.pack.installed")
 	if r.ReplacedVersion != "" {
-		verb = "actualizado (antes " + r.ReplacedVersion + ")"
+		verb = cli.T("mctl.pack.updated", "version", r.ReplacedVersion)
 	}
 	fmt.Fprintf(c.Out, "%s: %s\n", verb, line(r.Pack))
 	return nil
@@ -98,7 +98,7 @@ func inspect(c *cli.Env, args []string) error {
 	}
 	fmt.Fprintf(c.Out, "%s\n", line(r.Pack))
 	if r.ReplacedVersion != "" {
-		fmt.Fprintf(c.Out, "reemplazaría la versión %s\n", r.ReplacedVersion)
+		fmt.Fprintln(c.Out, cli.T("mctl.pack.replaces", "version", r.ReplacedVersion))
 	}
 	fmt.Fprintf(c.Out, "playbooks:\n  %s\nscripts:\n  %s\n", strings.Join(r.PlaybookIds, "\n  "), strings.Join(r.ScriptIds, "\n  "))
 	return nil
@@ -123,7 +123,7 @@ func items(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "%s\nocultos: %s\n", line(r.Pack), strings.Join(r.Pack.Hidden, ", "))
+	fmt.Fprintf(c.Out, "%s\n%s\n", line(r.Pack), cli.T("mctl.pack.hidden", "list", strings.Join(r.Pack.Hidden, ", ")))
 	return nil
 }
 
@@ -136,7 +136,7 @@ func list(c *cli.Env, args []string) error {
 		return err
 	}
 	if len(r.Packs) == 0 {
-		fmt.Fprintln(c.Out, "no hay paquetes instalados")
+		fmt.Fprintln(c.Out, cli.T("mctl.pack.none"))
 	}
 	for _, p := range r.Packs {
 		fmt.Fprintln(c.Out, line(p))
@@ -153,10 +153,10 @@ func show(c *cli.Env, args []string) error {
 		return err
 	}
 	p := r.Pack
-	fmt.Fprintf(c.Out, "id: %s\nversión: %s\norigen: %s\nnúcleo mínimo: %s\nnombre: %s\ndescripción: %s\nplataformas: %s\nautor: %s\nlicencia: %s\nplaybooks: %d\nscripts: %d\n\n%s\n",
-		p.Id, p.Version, origin(p), p.MinCore, p.Name, p.Description, strings.Join(p.Platforms, ", "), p.Author, p.License, len(r.PlaybookIds), len(r.ScriptIds), r.Readme)
+	fmt.Fprintln(c.Out, cli.T("mctl.pack.show", "id", p.Id, "version", p.Version, "origin", origin(p), "min_core", p.MinCore, "name", p.Name, "description", p.Description,
+		"platforms", strings.Join(p.Platforms, ", "), "author", p.Author, "license", p.License, "playbooks", len(r.PlaybookIds), "scripts", len(r.ScriptIds), "readme", r.Readme))
 	if len(p.Hidden) > 0 {
-		fmt.Fprintf(c.Out, "\nocultos: %s\n", strings.Join(p.Hidden, ", "))
+		fmt.Fprintf(c.Out, "\n%s\n", cli.T("mctl.pack.hidden", "list", strings.Join(p.Hidden, ", ")))
 	}
 	return nil
 }
@@ -169,7 +169,7 @@ func remove(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "quitado: %s (%d favoritos quitados)\n", args[0], r.FavoritesRemoved)
+	fmt.Fprintln(c.Out, cli.T("mctl.pack.removed", "id", args[0], "n", r.FavoritesRemoved))
 	return nil
 }
 

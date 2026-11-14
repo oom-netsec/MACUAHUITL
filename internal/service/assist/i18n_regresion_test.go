@@ -214,7 +214,7 @@ func escenarios(t *testing.T, loc string) map[string]string {
 }
 
 func TestRegresionEsByteAByte(t *testing.T) {
-	got := escenarios(t, "")
+	got := escenarios(t, "es")
 	if os.Getenv("GOLDEN_UPDATE") == "1" {
 		b, _ := json.MarshalIndent(got, "", " ")
 		if err := os.MkdirAll("testdata", 0o755); err != nil {
@@ -240,9 +240,9 @@ func TestRegresionEsByteAByte(t *testing.T) {
 	}
 }
 
-// Con es explícito (o con un idioma desconocido) la respuesta es la misma que sin idioma.
+// Con es-MX la respuesta es la misma que con es.
 func TestRegresionEsExplicito(t *testing.T) {
-	a, b := escenarios(t, ""), escenarios(t, "es-MX")
+	a, b := escenarios(t, "es"), escenarios(t, "es-MX")
 	for k := range a {
 		if a[k] != b[k] {
 			t.Errorf("%s: %q != %q", k, a[k], b[k])
@@ -258,7 +258,7 @@ var espanol = regexp.MustCompile(`[áéíóúñ¿¡«»]|\b(el equipo|la VLAN|no
 
 // Con en no queda español en lo que el núcleo escribe (los datos del equipo sí pueden venir como son).
 func TestEnSinEspanol(t *testing.T) {
-	es, en := escenarios(t, ""), escenarios(t, "en")
+	es, en := escenarios(t, "es"), escenarios(t, "en")
 	names := make([]string, 0, len(en))
 	for k := range en {
 		names = append(names, k)

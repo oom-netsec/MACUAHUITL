@@ -11,6 +11,8 @@
 package archcheck
 
 import (
+	"go/ast"
+	"go/types"
 	"strconv"
 	"strings"
 
@@ -87,6 +89,7 @@ func run(pass *analysis.Pass) (any, error) {
 	if !ok {
 		return nil, nil
 	}
+	checkTestOnlyLang(pass, rel)
 	dom := domainOf(rel)
 	isCore := under(rel, "internal/core")
 	area := serviceArea(rel)
@@ -153,4 +156,47 @@ func check(rel, dom, area string, isCore, root, isTest bool, path string) string
 		return "un dominio no importa red ni grpc; eso va en su capa de red o en service"
 	}
 	return ""
+}
+
+// checkTestOnlyLang: i18n.SetDefault e i18ntest cambian el idioma por omisión del proceso: solo valen en archivos
+// *_test.go (y en el propio apoyo de pruebas).
+func checkTestOnlyLang(pass *analysis.Pass, rel string) {
+	if under(rel, "internal/i18n") { // el paquete que lo define y su apoyo de pruebas
+		return
+	}
+	const i18nPath, testPath = ModulePath + "/internal/i18n", ModulePath + "/internal/i18n/i18ntest"
+	for _, f := range pass.Files {
+		if strings.HasSuffix(pass.Fset.File(f.Pos()).Name(), "_test.go") {
+			continue
+		}
+		for _, imp := range f.Imports {
+			if path, err := strconv.Unquote(imp.Path.Value); err == nil && path == testPath {
+				pass.Reportf(imp.Pos(), "archcheck: i18ntest es solo para pruebas (*_test.go)")
+			}
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if fn, ok := typeutilCallee(pass, call); ok && fn.Name() == "SetDefault" && fn.Pkg() != nil && fn.Pkg().Path() == i18nPath {
+				pass.Reportf(call.Pos(), "archcheck: SetDefault es solo para pruebas (*_test.go)")
+			}
+			return true
+		})
+	}
+}
+
+func typeutilCallee(pass *analysis.Pass, call *ast.CallExpr) (*types.Func, bool) {
+	var id *ast.Ident
+	switch f := call.Fun.(type) {
+	case *ast.SelectorExpr:
+		id = f.Sel
+	case *ast.Ident:
+		id = f
+	default:
+		return nil, false
+	}
+	fn, ok := pass.TypesInfo.Uses[id].(*types.Func)
+	return fn, ok
 }

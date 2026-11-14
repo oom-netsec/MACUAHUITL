@@ -29,7 +29,7 @@ func radiusExchanges(loc string, r radiustest.Report) []*v1.RadiusExchange {
 			MessageAuthenticator: radiustest.MACode(e.MessageAuthenticator), Error: secText(loc, e.ErrText)}
 		x.Mschap2Verified = e.MSCHAP2Verified
 		for _, a := range e.Attrs {
-			x.Attrs = append(x.Attrs, &v1.RadiusAttribute{Name: a.Name, Value: a.Value})
+			x.Attrs = append(x.Attrs, &v1.RadiusAttribute{Name: a.Name, Value: a.ValueIn(loc)})
 		}
 		out = append(out, x)
 	}

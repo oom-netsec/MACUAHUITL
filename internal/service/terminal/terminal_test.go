@@ -305,7 +305,7 @@ func TestRechazosAlAbrirQuedanAuditados(t *testing.T) {
 		"límite":         {func(r *rig) { r.svc.live.Store(maxSessions) }, func(r *rig) *v1.TerminalOpen { return r.open }, codes.ResourceExhausted, "at most"},
 		"guard": {func(*rig) {}, func(r *rig) *v1.TerminalOpen {
 			return &v1.TerminalOpen{Name: "X", Address: "10.0.0.1/8", Port: 22, CredentialId: r.open.CredentialId}
-		}, codes.PermissionDenied, "bits de host"},
+		}, codes.PermissionDenied, "host bits"},
 	}
 	for nombre, c := range casos {
 		r := newRig(t, simulator.Config{})

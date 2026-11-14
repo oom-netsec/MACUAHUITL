@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/devices"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
@@ -33,7 +33,7 @@ func (s *svc) ExportHosts(ctx context.Context, r *v1.ExportHostsRequest) (*v1.Ex
 	}
 	format, err := devices.ImportFormat(path, r.Format)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	all, err := loadHosts(s.d.DB())
 	if err != nil {
@@ -50,7 +50,7 @@ func (s *svc) ExportHosts(ctx context.Context, r *v1.ExportHostsRequest) (*v1.Ex
 		for _, id := range r.Ids {
 			h, ok := byID[id]
 			if !ok {
-				return nil, status.Errorf(codes.NotFound, "no hay un host de la libreta con id %q", id)
+				return nil, service.Err(ctx, codes.NotFound, "hosts.err.no_id", i18n.A("id", id))
 			}
 			if !seen[id] {
 				seen[id] = true
@@ -62,7 +62,7 @@ func (s *svc) ExportHosts(ctx context.Context, r *v1.ExportHostsRequest) (*v1.Ex
 		return nil, service.Err(ctx, codes.InvalidArgument, "hosts.err.nothing_to_export", nil)
 	}
 	if len(sel) > devices.MaxImportHosts {
-		return nil, status.Errorf(codes.InvalidArgument, "son más de %d hosts y el import no los aceptaría en un solo archivo: parte el export en varios archivos eligiendo los hosts por ids (por ejemplo, los de cada carpeta, que da la lista de la libreta)", devices.MaxImportHosts)
+		return nil, service.Err(ctx, codes.InvalidArgument, "hosts.err.export_count", i18n.A("max", devices.MaxImportHosts))
 	}
 	infos, _ := s.creds()
 	out := &v1.ExportHostsResponse{Count: int32(len(sel))}
@@ -71,7 +71,7 @@ func (s *svc) ExportHosts(ctx context.Context, r *v1.ExportHostsRequest) (*v1.Ex
 		label := ""
 		if h.CredentialID != "" {
 			if label = labelOf(infos, h.CredentialID); label == "" {
-				out.Warnings = append(out.Warnings, fmt.Sprintf("%s: no se pudo leer la etiqueta de su credencial (bóveda cerrada o credencial borrada); sale sin credencial", h.Name))
+				out.Warnings = append(out.Warnings, i18n.T(ctx, "hosts.warn.label_lost", i18n.A("name", h.Name)))
 			}
 		}
 		files[i] = devices.ToFile(h, label)
@@ -121,6 +121,14 @@ func (s *svc) resolve(files []devices.FileHost) (hosts []devices.Host, missing [
 	return
 }
 
+// lineReason es el motivo de una fila inválida en el idioma del contexto (con es, el de siempre).
+func lineReason(ctx context.Context, e devices.LineError) string {
+	if e.Err == nil {
+		return e.Reason
+	}
+	return i18n.In(i18n.Locale(ctx), e.Err)
+}
+
 func devicePB(h devices.Host, label string) *v1.Device {
 	return &v1.Device{Name: h.Name, Hostname: h.Name, Target: &v1.Target{Address: h.Address}, Profile: portPB(h), Platform: h.Platform,
 		Folder: h.Folder, Tags: h.Tags, CredentialLabel: label, Notes: h.Notes}
@@ -135,7 +143,7 @@ func (s *svc) PreviewImportHosts(ctx context.Context, r *v1.PreviewImportHostsRe
 	}
 	format, err := devices.ImportFormat(path, r.Format)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	b, err := service.ReadImport(ctx, path, devices.MaxImportBytes)
 	if err != nil {
@@ -143,7 +151,7 @@ func (s *svc) PreviewImportHosts(ctx context.Context, r *v1.PreviewImportHostsRe
 	}
 	parsed, err := devices.ParseImport(format, b)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	files := parsed.Hosts
 	saved, err := loadHosts(s.d.DB())
@@ -154,10 +162,10 @@ func (s *svc) PreviewImportHosts(ctx context.Context, r *v1.PreviewImportHostsRe
 	tok, exp := s.pend.Add(s.clock(), tokenTTL, previa{hosts, path, len(parsed.Errors)})
 	out := &v1.PreviewImportHostsResponse{Token: tok, ExpiresMs: exp.UnixMilli(), Format: format}
 	for _, e := range parsed.Errors {
-		out.Errors = append(out.Errors, &v1.ImportHostError{Line: int32(e.Line), Field: e.Field, Reason: e.Reason})
+		out.Errors = append(out.Errors, &v1.ImportHostError{Line: int32(e.Line), Field: e.Field, Reason: lineReason(ctx, e)})
 	}
 	if parsed.NoSum {
-		out.Warnings = append(out.Warnings, "archivo sin suma de verificación: nada comprueba que no esté dañado o modificado; revisa su contenido")
+		out.Warnings = append(out.Warnings, i18n.T(ctx, "hosts.warn.no_sum", nil))
 	}
 	faltan := 0
 	for i, it := range devices.Plan(hosts, saved) {
@@ -169,9 +177,9 @@ func (s *svc) PreviewImportHosts(ctx context.Context, r *v1.PreviewImportHostsRe
 	}
 	switch {
 	case faltan > 0 && !vaultOK:
-		out.Warnings = append(out.Warnings, fmt.Sprintf("la bóveda está cerrada: %d host(s) con credencial quedarían sin ella; ábrela y vuelve a abrir el archivo", faltan))
+		out.Warnings = append(out.Warnings, i18n.T(ctx, "hosts.warn.import_closed", i18n.A("n", faltan)))
 	case faltan > 0:
-		out.Warnings = append(out.Warnings, fmt.Sprintf("%d host(s) traen una etiqueta de credencial que no está en la bóveda (o está repetida) y quedarían sin credencial", faltan))
+		out.Warnings = append(out.Warnings, i18n.T(ctx, "hosts.warn.import_label", i18n.A("n", faltan)))
 	}
 	return out, nil
 }
@@ -194,7 +202,7 @@ func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsReques
 	var err error
 	for _, d := range r.Decisions {
 		if _, dup := dec[d.Key]; dup {
-			invalid, err = true, status.Errorf(codes.InvalidArgument, "decisión repetida para %s", d.Key)
+			invalid, err = true, service.Err(ctx, codes.InvalidArgument, "hostimport.dup_decision", i18n.A("key", d.Key))
 			break
 		}
 		dec[d.Key] = d.Action
@@ -208,7 +216,7 @@ func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsReques
 			}
 			if res, err = devices.Apply(devices.Plan(pv.hosts, saved), dec, saved, now.UTC().Truncate(time.Second)); err != nil {
 				invalid = true
-				return status.Error(codes.InvalidArgument, err.Error())
+				return service.ErrFrom(ctx, codes.InvalidArgument, err)
 			}
 			for _, h := range res.Writes {
 				if err := putHost(tx, h); err != nil {
@@ -244,11 +252,13 @@ func (s *svc) HostsImportTemplate(ctx context.Context, r *v1.HostsImportTemplate
 }
 
 // HostsImportFormat describe los campos del archivo de import, de la misma tabla que lo valida.
-func (s *svc) HostsImportFormat(context.Context, *v1.HostsImportFormatRequest) (*v1.HostsImportFormatResponse, error) {
+func (s *svc) HostsImportFormat(ctx context.Context, _ *v1.HostsImportFormatRequest) (*v1.HostsImportFormatResponse, error) {
 	s.d.MarkActive()
+	loc := i18n.Locale(ctx)
 	out := &v1.HostsImportFormatResponse{MaxRows: devices.MaxImportHosts, MaxBytes: devices.MaxImportBytes}
 	for _, f := range devices.HostFields {
-		out.Fields = append(out.Fields, &v1.HostField{Name: f.Name, Type: f.Type, Required: f.Required, Example: f.Examples[0], Description: f.Description})
+		out.Fields = append(out.Fields, &v1.HostField{Name: f.Name, Type: i18n.MsgOr(loc, "hostfield.type."+f.Type, f.Type), Required: f.Required, Example: f.Examples[0],
+			Description: i18n.MsgOr(loc, "hostfield.desc."+f.Name, f.Description)})
 	}
 	return out, nil
 }

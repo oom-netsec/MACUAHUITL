@@ -27,7 +27,7 @@ func hostPort(s string) (string, uint32, error) {
 	}
 	n, err := strconv.ParseUint(p, 10, 16)
 	if err != nil {
-		return "", 0, fmt.Errorf("puerto inválido %q", p)
+		return "", 0, cli.Err("mctl.common_a.bad_port", "port", p)
 	}
 	return h, uint32(n), nil
 }
@@ -47,7 +47,7 @@ func newPassword(c *cli.Env, prompt string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	b, err := c.Secret("Repite la contraseña: ")
+	b, err := c.Secret(cli.T("mctl.security.prompt_repeat"))
 	if err != nil {
 		cli.Wipe(a)
 		return nil, err
@@ -55,7 +55,7 @@ func newPassword(c *cli.Env, prompt string) ([]byte, error) {
 	defer cli.Wipe(b)
 	if string(a) != string(b) {
 		cli.Wipe(a)
-		return nil, errors.New("las contraseñas no coinciden")
+		return nil, cli.Err("mctl.security.mismatch")
 	}
 	return a, nil
 }
@@ -106,20 +106,20 @@ func radiusTest(c *cli.Env, args []string) error {
 		return err
 	}
 	if acctPort < 0 || acctPort > 0xffff {
-		return errors.New("--acct-port inválido")
+		return cli.Err("mctl.security.bad_acct_port")
 	}
 	req := &v1.RadiusTestRequest{Host: host, AuthPort: port, AcctPort: uint32(acctPort), Username: user, Method: method, NasIp: nasIP,
 		NasIdentifier: nasID, NasPortType: portType, ServiceType: svcType, CalledStationId: called, CallingStationId: calling,
 		StatusServer: status, Accounting: acct, TimeoutMs: int32(timeout), Retries: int32(retries)}
-	if req.SharedSecret, err = source(c, secretCred, "Secreto compartido RADIUS: "); err != nil {
+	if req.SharedSecret, err = source(c, secretCred, cli.T("mctl.security.prompt_radius_secret")); err != nil {
 		return err
 	}
 	defer cli.Wipe(req.SharedSecret.Value)
 	if !status {
 		if user == "" && cred == "" {
-			return errors.New("falta --user o --cred")
+			return cli.Err("mctl.security.missing_user_or_cred")
 		}
-		if req.Password, err = source(c, cred, "Contraseña de prueba: "); err != nil {
+		if req.Password, err = source(c, cred, cli.T("mctl.security.prompt_test_password")); err != nil {
 			return err
 		}
 		defer cli.Wipe(req.Password.Value)
@@ -158,11 +158,11 @@ func tacacsTest(c *cli.Env, args []string) error {
 		return err
 	}
 	req := &v1.TacacsTestRequest{Host: host, Port: port, Username: user, AuthenType: typ, Command: cmd, Accounting: acct, PrivLvl: int32(priv), TimeoutMs: int32(timeout)}
-	if req.SharedSecret, err = source(c, secretCred, "Secreto compartido TACACS+: "); err != nil {
+	if req.SharedSecret, err = source(c, secretCred, cli.T("mctl.security.prompt_tacacs_secret")); err != nil {
 		return err
 	}
 	defer cli.Wipe(req.SharedSecret.Value)
-	if req.Password, err = source(c, cred, "Contraseña de prueba: "); err != nil {
+	if req.Password, err = source(c, cred, cli.T("mctl.security.prompt_test_password")); err != nil {
 		return err
 	}
 	defer cli.Wipe(req.Password.Value)
@@ -183,9 +183,9 @@ func pkiKey(c *cli.Env, args []string) error {
 		return err
 	}
 	if out == "" {
-		return errors.New("falta -o ARCHIVO")
+		return cli.Err("mctl.security.missing_o")
 	}
-	pw, err := newPassword(c, "Contraseña para sellar la llave: ")
+	pw, err := newPassword(c, cli.T("mctl.security.prompt_seal_key"))
 	if err != nil {
 		return err
 	}
@@ -197,7 +197,7 @@ func pkiKey(c *cli.Env, args []string) error {
 	if err := writeNew(out, []byte(r.SealedKeyPem)); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "llave sellada en %s\n", out)
+	fmt.Fprintln(c.Out, cli.T("mctl.security.key_sealed", "path", out))
 	return nil
 }
 
@@ -223,7 +223,7 @@ func pkiCsr(c *cli.Env, args []string) error {
 		return err
 	}
 	if sub.Cn == "" {
-		return errors.New("falta --cn")
+		return cli.Err("mctl.security.missing_cn")
 	}
 	if prefix == "" {
 		prefix = sub.Cn
@@ -237,7 +237,7 @@ func pkiCsr(c *cli.Env, args []string) error {
 			return err
 		}
 		req.SealedKeyPem = string(b)
-		pw, err = c.Secret("Contraseña de la llave: ")
+		pw, err = c.Secret(cli.T("mctl.security.prompt_key_password"))
 		if err != nil {
 			return err
 		}
@@ -245,10 +245,10 @@ func pkiCsr(c *cli.Env, args []string) error {
 		// Fallar antes de pedir contraseñas si ya hay archivos con ese prefijo.
 		for _, f := range []string{prefix + ".csr.pem", prefix + ".key.pem"} {
 			if _, err := os.Stat(f); err == nil {
-				return fmt.Errorf("%s ya existe", f)
+				return cli.Err("mctl.security.exists", "path", f)
 			}
 		}
-		if pw, err = newPassword(c, "Contraseña para sellar la llave nueva: "); err != nil {
+		if pw, err = newPassword(c, cli.T("mctl.security.prompt_seal_new_key")); err != nil {
 			return err
 		}
 	}
@@ -267,7 +267,7 @@ func pkiCsr(c *cli.Env, args []string) error {
 		}
 	}
 	c.PrintReport(r.Report, asJSON)
-	fmt.Fprintf(c.Out, "CSR en %s.csr.pem\n", prefix)
+	fmt.Fprintln(c.Out, cli.T("mctl.security.csr_written", "prefix", prefix))
 	return nil
 }
 
@@ -296,12 +296,12 @@ func pkiCaInit(c *cli.Env, args []string) error {
 		return err
 	}
 	if name == "" {
-		return errors.New("falta --name")
+		return cli.Err("mctl.security.missing_name")
 	}
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		return err
 	}
-	pw, err := newPassword(c, "Contraseña para sellar la llave de la CA: ")
+	pw, err := newPassword(c, cli.T("mctl.security.prompt_seal_ca_key"))
 	if err != nil {
 		return err
 	}
@@ -317,7 +317,7 @@ func pkiCaInit(c *cli.Env, args []string) error {
 		return err
 	}
 	fmt.Fprintln(c.Out, r.Report.Text)
-	fmt.Fprintf(c.Out, "CA en %s/ (ca.crt.pem, ca.key.pem sellada)\n", dir)
+	fmt.Fprintln(c.Out, cli.T("mctl.security.ca_written", "dir", dir))
 	return nil
 }
 
@@ -349,7 +349,7 @@ func pkiCaSign(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	pw, err := c.Secret("Contraseña de la llave de la CA: ")
+	pw, err := c.Secret(cli.T("mctl.security.prompt_ca_key_password"))
 	if err != nil {
 		return err
 	}
@@ -362,7 +362,7 @@ func pkiCaSign(c *cli.Env, args []string) error {
 		return err
 	}
 	fmt.Fprintln(c.Out, r.Report.Text)
-	fmt.Fprintf(c.Out, "certificado en %s\n", out)
+	fmt.Fprintln(c.Out, cli.T("mctl.security.cert_written", "path", out))
 	return nil
 }
 
@@ -394,7 +394,7 @@ func pkiExport(c *cli.Env, args []string) error {
 		*dst = string(b)
 	}
 	if key != "" && (strings.HasPrefix(format, "p12") || plain) {
-		pw, err := c.Secret("Contraseña de la llave: ")
+		pw, err := c.Secret(cli.T("mctl.security.prompt_key_password"))
 		if err != nil {
 			return err
 		}
@@ -402,7 +402,7 @@ func pkiExport(c *cli.Env, args []string) error {
 		req.KeyPassword = pw
 	}
 	if strings.HasPrefix(format, "p12") {
-		pw, err := newPassword(c, "Contraseña del PKCS#12: ")
+		pw, err := newPassword(c, cli.T("mctl.security.prompt_p12_password"))
 		if err != nil {
 			return err
 		}
@@ -416,7 +416,7 @@ func pkiExport(c *cli.Env, args []string) error {
 	if err := writeNew(out, r.Data); err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "exportado a %s\n", out)
+	fmt.Fprintln(c.Out, cli.T("mctl.security.exported", "path", out))
 	return nil
 }
 

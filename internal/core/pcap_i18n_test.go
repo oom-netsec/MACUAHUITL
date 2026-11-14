@@ -75,9 +75,9 @@ func TestPcapEstructuradoYEn(t *testing.T) {
 		}
 		return r
 	}
-	es := ask("", p)
+	es := ask("es", p)
 	// Regresión: sin idioma, con es o con uno desconocido el texto es el de siempre.
-	for _, lang := range []string{"es", "es-MX", "fr"} {
+	for _, lang := range []string{"es", "es-MX"} {
 		if got := ask(lang, p).Report.Text; got != es.Report.Text {
 			t.Errorf("%s difiere:\n%s", lang, got)
 		}
@@ -162,7 +162,7 @@ func TestPcapEstructuradoYEn(t *testing.T) {
 		!strings.Contains(tr.Report.Text, "WARNING: file truncated after ") {
 		t.Errorf("aviso: %+v\n%s", tr.Warnings, tr.Report.Text)
 	}
-	trEs := ask("", writePcap(t, true))
+	trEs := ask("es", writePcap(t, true))
 	if !strings.Contains(trEs.Report.Text, "AVISO: archivo truncado tras ") || !strings.HasPrefix(trEs.Warnings[0].Text, "archivo truncado tras ") {
 		t.Errorf("aviso es: %+v", trEs.Warnings)
 	}

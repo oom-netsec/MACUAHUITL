@@ -1,0 +1,73 @@
+package i18n
+
+// Errores de las calculadoras (internal/calc): entradas inválidas que ve el ingeniero. Error() de cada uno es el
+// texto es de siempre.
+func init() {
+	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
+	add(map[string]entry{
+		// valores que coinciden de un octeto de wildcard
+		"calc.val.octet.only":  e("solo {v}", "only {v}", "v"),
+		"calc.val.octet.range": e("de {from} a {to}", "{from} to {to}", "from", "to"),
+		"calc.val.octet.even":  e("pares de 0 a 254", "even, 0 to 254"),
+		"calc.val.octet.odd":   e("impares de 1 a 255", "odd, 1 to 255"),
+		"calc.val.octet.list":  e("{list}… ({n} valores)", "{list}… ({n} values)", "list", "n"),
+		// nombres por defecto de redes (VLSM) y rutas (BGP) sin nombre; {n} es su posición
+		"calc.val.name.network": e("red {n}", "network {n}", "n"),
+		"calc.val.name.route":   e("ruta {n}", "route {n}", "n"),
+
+		// direcciones y prefijos
+		"calc.err.prefix_missing":  e("{input:q}: indica el prefijo (10.0.0.0/24 o 10.0.0.0 255.255.255.0)", "{input:q}: give the prefix (10.0.0.0/24 or 10.0.0.0 255.255.255.0)", "input"),
+		"calc.err.addr_invalid":    e("dirección {addr:q} inválida", "invalid address {addr:q}", "addr"),
+		"calc.err.mask_invalid":    e("prefijo o máscara {value:q} inválido", "invalid prefix or mask {value:q}", "value"),
+		"calc.err.mask_noncontig":  e("máscara {mask} no contigua", "mask {mask} is not contiguous", "mask"),
+		"calc.err.len_range":       e("longitud /{len} fuera de rango", "length /{len} out of range", "len"),
+		"calc.err.vlsm_none":       e("indica al menos una necesidad de hosts", "give at least one host requirement"),
+		"calc.err.vlsm_zero":       e("{name:q} pide 0 hosts", "{name:q} asks for 0 hosts", "name"),
+		"calc.err.sum_mixed":       e("no se pueden mezclar IPv4 e IPv6", "IPv4 and IPv6 cannot be mixed"),
+		"calc.err.sum_none":        e("indica al menos un prefijo", "give at least one prefix"),
+		"calc.err.wc_addr":         e("dirección IPv4 {addr:q} inválida (las ACL IPv6 usan prefijos, no wildcards)", "invalid IPv4 address {addr:q} (IPv6 ACLs use prefixes, not wildcards)", "addr"),
+		"calc.err.wc_value":        e("wildcard {value:q} inválida", "invalid wildcard {value:q}", "value"),
+		"calc.err.wc_unknown":      e("{value:q} no es prefijo, máscara ni wildcard IPv4", "{value:q} is not an IPv4 prefix, mask or wildcard", "value"),
+		"calc.err.wc_noncontig":    e("{value} no es contigua: indica la dirección de la ACL para ver qué cubre", "{value} is not contiguous: give the ACL address to see what it covers", "value"),
+		"calc.err.wc_prefix_range": e("prefijo /{len} fuera de rango", "prefix /{len} out of range", "len"),
+		"calc.err.mac_invalid":     e("MAC {mac:q} inválida", "invalid MAC {mac:q}", "mac"),
+		"calc.err.ipv6_none":       e("indica una dirección IPv6 o una MAC", "give an IPv6 address or a MAC"),
+		"calc.err.ipv6_eui_prefix": e("EUI-64 requiere un prefijo IPv6 /64 (recibí {addr:q})", "EUI-64 needs an IPv6 /64 prefix (got {addr:q})", "addr"),
+		"calc.err.ipv6_invalid":    e("dirección IPv6 {addr:q} inválida", "invalid IPv6 address {addr:q}", "addr"),
+		"calc.val.mtu.layers_help": e("gre, gre-key, esp-tunnel:CIFRADO[:AUT], esp-transport:CIFRADO[:AUT], getvpn:CIFRADO[:AUT][:tbar], nat-t, vxlan, mpls[:N], dot1q, qinq, pppoe, lisp (CIFRADO: aes-cbc, aes-gcm, 3des, des; AUT: sha1, sha256, sha384, sha512, md5)", "gre, gre-key, esp-tunnel:CIPHER[:AUTH], esp-transport:CIPHER[:AUTH], getvpn:CIPHER[:AUTH][:tbar], nat-t, vxlan, mpls[:N], dot1q, qinq, pppoe, lisp (CIPHER: aes-cbc, aes-gcm, 3des, des; AUTH: sha1, sha256, sha384, sha512, md5)"),
+		"calc.err.mtu_range":       e("MTU física {mtu} fuera de rango (68–65535)", "physical MTU {mtu} out of range (68–65535)", "mtu"),
+		"calc.err.mtu_no_layers":   withRefs(e("indica al menos una capa: {help}", "give at least one layer: {help}", "help"), "help"),
+		"calc.err.mtu_no_fit":      e("la pila deja {effective} bytes: no cabe en una MTU física de {mtu}", "the stack leaves {effective} bytes: it does not fit in a physical MTU of {mtu}", "effective", "mtu"),
+		"calc.err.mtu_natt":        e("nat-t va inmediatamente antes (por fuera) de una capa esp-tunnel o esp-transport", "nat-t goes immediately before (outside) an esp-tunnel or esp-transport layer"),
+		"calc.err.mtu_transport":   e("ESP de transporte protege un paquete IP: después solo van gre, gre-key, vxlan o lisp, no {layer:q}", "transport ESP protects an IP packet: only gre, gre-key, vxlan or lisp may follow, not {layer:q}", "layer"),
+		"calc.err.mtu_mpls":        e("etiquetas MPLS {n:q} inválidas (1–16)", "invalid MPLS label count {n:q} (1–16)", "n"),
+		"calc.err.mtu_layer":       e("capa {layer:q} inválida", "invalid layer {layer:q}", "layer"),
+		"calc.err.mtu_cipher":      e("cifrado ESP {cipher:q} desconocido en {layer:q} (aes-cbc, aes-gcm, 3des, des)", "unknown ESP cipher {cipher:q} in {layer:q} (aes-cbc, aes-gcm, 3des, des)", "cipher", "layer"),
+		"calc.err.mtu_auth_built":  e("{cipher} ya autentica: quita {auth:q}", "{cipher} already authenticates: remove {auth:q}", "cipher", "auth"),
+		"calc.err.mtu_auth":        e("autenticación ESP {auth:q} desconocida en {layer:q} (sha1, sha256, sha384, sha512, md5)", "unknown ESP authentication {auth:q} in {layer:q} (sha1, sha256, sha384, sha512, md5)", "auth", "layer"),
+		"calc.err.mtu_esp_no_fit":  e("no cabe ESP en {avail} bytes", "ESP does not fit in {avail} bytes", "avail"),
+		"calc.err.mtu_unknown":     withRefs(e("capa {layer:q} desconocida; usa {help}", "unknown layer {layer:q}; use {help}", "layer", "help"), "help"),
+		"calc.err.qty_invalid":     e("cantidad {value:q} inválida", "invalid quantity {value:q}", "value"),
+		"calc.err.tcp_bandwidth":   e("ancho de banda: {cause}", "bandwidth: {cause}", "cause"),
+		"calc.err.tcp_window":      e("ventana: {cause}", "window: {cause}", "cause"),
+		"calc.err.tcp_rtt":         e("el RTT debe ser mayor que 0 ms", "the RTT must be greater than 0 ms"),
+		"calc.err.tcp_loss":        e("la pérdida va de 0 a menos de 100 %", "loss goes from 0 to less than 100 %"),
+		"calc.err.dscp_value":      e("{query:q} no es un valor válido para {by}", "{query:q} is not a valid value for {by}", "query", "by"),
+		"calc.err.dscp_field":      e("campo {by:q} desconocido (name, dscp, binary, tos, precedence, cos, exp)", "unknown field {by:q} (name, dscp, binary, tos, precedence, cos, exp)", "by"),
+		"calc.err.dscp_none":       e("nada coincide con {query:q}", "nothing matches {query:q}", "query"),
+		"calc.err.optics_fiber":    e("fibra {fiber:q} desconocida (smf-1310, smf-1550, mmf-850, mmf-1300) o indica la pérdida por km", "unknown fiber {fiber:q} (smf-1310, smf-1550, mmf-850, mmf-1300) or give the loss per km", "fiber"),
+		"calc.err.optics_negative": e("distancia, conectores, empalmes, pérdidas y margen no pueden ser negativos", "distance, connectors, splices, losses and margin cannot be negative"),
+		"calc.err.power_dbm":       e("potencia {value:q} inválida", "invalid power {value:q}", "value"),
+		"calc.err.power_mw":        e("potencia {value:q} inválida (mW mayor que 0)", "invalid power {value:q} (mW greater than 0)", "value"),
+		"calc.err.power_unit":      e("indica la unidad: {value:q} → -3dBm o 0.5mW", "give the unit: {value:q} → -3dBm or 0.5mW", "value"),
+		"calc.err.bgp_as_nested":   e("segmentos anidados", "nested segments"),
+		"calc.err.bgp_as_close":    e("segmento mal cerrado", "badly closed segment"),
+		"calc.err.bgp_as_invalid":  e("AS {as:q} inválido", "invalid AS {as:q}", "as"),
+		"calc.err.bgp_as_open":     e("segmento sin cerrar", "unclosed segment"),
+		"calc.err.bgp_origin":      e("{name}: origin {origin:q} inválido (i, e, ?)", "{name}: invalid origin {origin:q} (i, e, ?)", "name", "origin"),
+		"calc.err.bgp_aspath":      e("{name}: AS_PATH {path:q}: {cause}", "{name}: AS_PATH {path:q}: {cause}", "name", "path", "cause"),
+		"calc.err.bgp_addr":        e("{name}: dirección {addr:q} inválida", "{name}: invalid address {addr:q}", "name", "addr"),
+		"calc.err.bgp_few":         e("indica al menos dos rutas candidatas", "give at least two candidate routes"),
+		"calc.err.bgp_unreachable": e("ninguna ruta tiene el next-hop accesible: no hay mejor ruta", "no route has a reachable next hop: there is no best route"),
+	})
+}

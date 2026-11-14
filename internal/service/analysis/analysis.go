@@ -37,7 +37,7 @@ const maxSyslogBytes = 64 << 20
 func (s *analysisSvc) bundle(ctx context.Context, job string, upTo int) (*analyze.Bundle, error) {
 	dir := filepath.Clean(job)
 	if !filepath.IsAbs(job) {
-		j, err := s.d.Job(job)
+		j, err := s.d.Job(ctx, job)
 		if err != nil {
 			return nil, err
 		}
