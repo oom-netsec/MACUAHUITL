@@ -9,7 +9,7 @@ El dueño probó la app compilada y pidió dos cosas: que no se mezclen los idio
 - Cadenas con valores: interpolación existente (`{n}`, `{device}`); plural con la variante `<clave>.one`.
 - Los estados que antes guardaban texto ya armado (`setStatus("...")`) guardan la clave y sus valores, de modo que cambian de idioma al vuelo.
 - Los nombres de las paletas de terminal (`internal/termcolor/palettes.json`) tienen clave `term.palette.<id>`; el nombre del JSON queda de respaldo.
-- El idioma por omisión sigue siendo el del sistema; las pruebas simulan `es-MX`.
+- El idioma por omisión era el del sistema; desde la decisión posterior a la fase 30e el canónico es el inglés (sin elección guardada, inglés) y las pruebas fijan el idioma que prueban.
 
 ### Prueba que falla si queda texto fijo
 

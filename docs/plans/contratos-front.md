@@ -744,11 +744,11 @@ Para la pantalla Ajustes. Son preferencias tipadas, aparte de `getPreference`/`s
 Paso 1 de 3 del inventario `docs/plans/2026-11-07-idioma-nucleo.md`: la infraestructura y los primeros códigos. El núcleo ya no obliga a leer su texto en español para saber qué pasó: cada error migrado lleva un **reason** estable y su **metadata**, y con el idioma pedido el texto sale en inglés.
 
 ### Regla de compatibilidad
-Sin el metadato `accept-language`, o con `es` (o con cualquier idioma que no sea `en`), cada respuesta del núcleo es **idéntica byte por byte** a la de antes de la fase: mismos mensajes de error, mismos detalles de fase, mismos nombres. Lo único que cambia son campos nuevos (`reason`, `args`, la metadata del error). Lo fijan pruebas de regresión con el texto en español literal. El front puede seguir parseando texto mientras no encienda la bandera.
+Con `accept-language: es`, cada respuesta del núcleo es **idéntica byte por byte** a la de antes de la fase: mismos mensajes de error, mismos detalles de fase, mismos nombres. Lo único que cambia son campos nuevos (`reason`, `args`, la metadata del error). Lo fijan pruebas de regresión con el texto en español literal, que piden `es` explícito. **El idioma canónico es el inglés** (decisión posterior a la fase 30e): sin `accept-language`, o con uno desconocido, el núcleo responde en inglés; el español es segunda lengua y se pide con `es`. El front puede seguir parseando texto mientras no encienda la bandera.
 
 ### Cómo se activa: `core.localize`
 - La bandera vive en el puente: `Bridge.Localize` (Go), apagada por omisión. En `ui/main.go` es la constante `coreLocalize` (`false`); la sesión de front la pasa a `true` cuando termine de migrar. Para probar sin recompilar: `MACUAHUITL_CORE_LOCALIZE=1` al lanzar la app.
-- Encendida, **toda** llamada y todo stream del puente lleva `accept-language` con el valor de la preferencia `ui.language` (`es` o `en`; sin valor guardado o desconocido = `es`). El puente la lee una vez y la mantiene al día cuando `setPreference("ui.language", v)` pasa por él; si la interfaz no guarda esa preferencia, no hay idioma que mandar y todo sale en español.
+- Encendida, **toda** llamada y todo stream del puente lleva `accept-language` con el valor de la preferencia `ui.language` (`es` o `en`; sin valor guardado o desconocido = `en`). El puente la lee una vez y la mantiene al día cuando `setPreference("ui.language", v)` pasa por él; si no puede leerla, no manda idioma y todo sale en inglés.
 - `ui.language` es una clave nueva de `getPreference`/`setPreference` (la lista cerrada la acepta; el núcleo solo guarda `es` o `en` y rechaza cualquier otro valor con `InvalidArgument`).
 - El núcleo acepta `es`, `en`, `es-MX`, `en-US`… y listas con `q` (`fr, en;q=0.8` da `en`); ausente o desconocido es `es`.
 - **La auditoría no depende del idioma** (decisión del 2026-11-12, rama 30a-2): su detalle irá fijo en inglés; esta fase no toca sus textos y la infraestructura no los pasa por el catálogo.
@@ -1286,10 +1286,15 @@ Con `en`, nada visible de esta área sale en español; sin idioma o con `es` el 
 
 ### mctl
 - `mctl --lang en` pide al núcleo sus mensajes en inglés y escribe en inglés los PROPIOS de mctl con el mismo catálogo (`cli.T`, `cli.Err`, `cli.ErrWrap`, `cli.SetLang`): errores de valores, encabezados y etiquetas de tablas, avisos y resúmenes, y los textos de la ejecución asistida (`assistrun.go`). Sin `--lang` o con `es`, idéntico.
-- Se queda en español a propósito: la ayuda (`--help`, `help.golden`), los errores `uso: mctl …`, los nombres y textos de las banderas, los valores aceptados (`renombrar|reemplazar|omitir`), CSV/JSON, y los errores de `--lang` mismo (se dan antes de conocer el idioma).
+- Se queda sin traducir a propósito: los nombres y textos de las banderas, los valores aceptados (`renombrar|reemplazar|omitir`), CSV/JSON, y los errores de `--lang` mismo (se dan antes de conocer el idioma).
 
 ### Qué sigue sin cubrir
 - `Deps.Job` recibe ahora el contexto de la petición: el «trabajo X no existe» de visibility, analysis, forensic, drift, metrics, backup, change y adhoc sale en el idioma pedido.
 - Los `status.Error(err.Error())` que envuelven errores de SQLite o del sistema (`internal()` de inventory y scripts, prefs, pack, diag `ListInterfaces`, `audit Verify/Export`) y los `core: …` del arranque del demonio: texto de la biblioteca, no de la app.
 - La marca `abierto/cerrado:` del log de la consola serie (es contenido del archivo de evidencia) y `HashFile` (rama 30e-b).
 - `hosts-plantilla.*` (nombre de archivo) y los valores técnicos `state/reason` de las filas del import.
+
+## Idioma canónico: inglés (después de la fase 30e)
+- El inglés es el idioma canónico de la app y el español es segunda lengua que se elige en Ajustes. La regla «sin `accept-language` = español byte a byte» de 30a a 30e deja de aplicar: **sin `accept-language` (o con uno desconocido) el núcleo responde en inglés**; `internal/i18n` (`Locale`, `Normalize`, `Parse`) devuelve `en` por omisión. Las pruebas de regresión en español piden `es` explícito (`accept-language: es`, `i18n.WithLocale(ctx, "es")` o `--lang es`) y siguen comparando con sus goldens; hay pruebas de que sin idioma sale inglés. La auditoría sigue fija en inglés.
+- mctl: sin `--lang`, inglés. La ayuda (`--help`, `-h`, `help`, sin comando) y los errores `usage: mctl …` salen en inglés (`testdata/help.golden`); con `--lang es` salen en español (`help_es.golden`, `uso: mctl …`). Los nombres de banderas y los valores técnicos (`renombrar|reemplazar|omitir`) no se traducen. La ayuda en inglés vive en `cmd/mctl/cli/help_en.txt`, línea por línea la misma que los `Usage` de las áreas (español).
+- UI: sin elección guardada la interfaz arranca en inglés (ya no mira `navigator.language`). Solo se guarda la elección explícita del selector de Ajustes, en la clave nueva `macuahuitl.lang` de `localStorage`; la clave anterior (`macuahuitl.idioma`) se ignora porque guardaba también lo autodetectado. El contexto por omisión de `i18n.tsx` y `tr` caen a inglés.
