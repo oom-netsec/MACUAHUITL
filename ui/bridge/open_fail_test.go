@@ -42,22 +42,27 @@ func TestSubscribeIntentaTodosLosIds(t *testing.T) {
 	}
 }
 
-// resubscribe abre en paralelo: con un núcleo mudo tarda ~1 plazo, no N.
+// resubscribe abre en paralelo: con un núcleo mudo las cuatro aperturas están en curso a la vez (en serie, la segunda
+// esperaría el plazo entero de la primera). Sin medir el total: bajo carga solo cambia cuánto tarda en llegar a 4.
 func TestResubscribeEsParalelo(t *testing.T) {
 	old := headerWait
-	headerWait = 300 * time.Millisecond
+	headerWait = 3 * time.Second
 	defer func() { headerWait = old }()
-	b := headerBridge(t, &headerEvents{silent: true})
+	f := &headerEvents{silent: true}
+	b := headerBridge(t, f)
 	b.mu.Lock()
 	for _, id := range []string{"a", "b", "c", "d"} {
 		b.streams[id] = &stream{cancel: func() {}}
 	}
 	b.mu.Unlock()
-	t0 := time.Now()
-	b.resubscribe()
-	if d := time.Since(t0); d > 750*time.Millisecond { // 2,5 plazos; en serie serían 4
-		t.Fatalf("resubscribe tardó %v; quería ~1 plazo", d)
+	done := make(chan struct{})
+	go func() { b.resubscribe(); close(done) }()
+	for deadline := time.Now().Add(2 * time.Second); f.opens.Load() < 4; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("aperturas en curso = %d antes del plazo; en paralelo debían ser 4", f.opens.Load())
+		}
 	}
+	<-done
 }
 
 // Un error transitorio (Unavailable) deja el trabajo muerto pero registrado: resubscribe lo reabre.
