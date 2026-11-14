@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/status"
 
@@ -794,4 +795,37 @@ func TestPackInstalarConFalloAlGuardarLoOcultoSeAudita(t *testing.T) {
 	if !strings.Contains(au, `"action":"pack.install"`) || !strings.Contains(au, "hidden_save_failed=") || strings.Contains(au, `"action":"pack.items"`) {
 		t.Fatalf("auditoría:\n%s", au)
 	}
+}
+
+// Quitar un paquete y limpiar lo suyo en la base (lo oculto, colecciones, pack_removed) es una sola operación bajo el
+// candado del almacén: un Install del mismo paquete no puede caer en medio y perder en silencio lo que ocultó.
+func TestPackQuitarLimpiaBajoElCandadoDelAlmacen(t *testing.T) {
+	h := newHarness(t, nil)
+	pk := v1.NewPackServiceClient(h.conn)
+	r, err := pk.Install(ctx(t), withSum(t, &v1.PackServiceInstallRequest{Path: writeMpack(t, packtest.IOSXE(t))}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := h.core.db.Begin() // la base ocupada: la limpieza del Remove espera aquí
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := pk.Remove(ctx(t), &v1.PackServiceRemoveRequest{Id: r.Pack.Id})
+		done <- err
+	}()
+	time.Sleep(300 * time.Millisecond) // el Remove ya quitó del almacén y espera la base
+	got := make(chan struct{})
+	go func() { h.core.packs.Locked(func() error { return nil }); close(got) }()
+	select {
+	case <-got:
+		t.Error("el almacén quedó libre entre quitar el paquete y limpiar la base")
+	case <-time.After(300 * time.Millisecond):
+	}
+	tx.Rollback()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	<-got
 }

@@ -502,15 +502,19 @@ func (s *Store) extract(p *Pack) (syncWarn, err error) {
 // Remove quita el paquete id (buscado entre los instalados) y devuelve lo que traía.
 func (s *Store) Remove(id string) (*Pack, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.RemoveLocked(id)
+}
+
+// RemoveLocked es Remove para quien ya está dentro de Locked (quitar y limpiar la base en una sola operación).
+func (s *Store) RemoveLocked(id string) (*Pack, error) {
 	cur := s.snap.Load()
 	p := cur.Find(id)
 	if p == nil {
-		s.mu.Unlock()
 		return nil, rej("not_found", "id", id)
 	}
 	// p.ID cumple la gramática del manifiesto, así que la ruta no sale de la carpeta.
 	if err := os.RemoveAll(filepath.Join(s.dir, filepath.FromSlash(p.ID))); err != nil {
-		s.mu.Unlock()
 		return nil, readErr(err)
 	}
 	var next []*Pack
@@ -523,7 +527,6 @@ func (s *Store) Remove(id string) (*Pack, error) {
 	if s.OnChange != nil {
 		s.OnChange()
 	}
-	s.mu.Unlock()
 	return p, nil
 }
 

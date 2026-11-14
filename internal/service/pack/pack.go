@@ -222,12 +222,20 @@ func (s *svc) Show(ctx context.Context, r *v1.PackServiceShowRequest) (*v1.PackS
 
 func (s *svc) Remove(ctx context.Context, r *v1.PackServiceRemoveRequest) (*v1.PackServiceRemoveResponse, error) {
 	s.d.MarkActive()
-	// Buscar y quitar es una sola operación bajo el lock del almacén: lo que se limpia después es lo que de verdad se quitó.
-	p, err := s.store.Remove(r.GetId())
-	if err != nil {
-		return nil, fail(ctx, err)
+	// Buscar, quitar y limpiar la base es una sola operación bajo el candado del almacén (almacén primero, base
+	// después): lo que se limpia es lo que de verdad se quitó, y un Install del mismo paquete no cae en medio.
+	var p *dom.Pack
+	var favs int
+	var err error
+	if lerr := s.store.Locked(func() error {
+		if p, err = s.store.RemoveLocked(r.GetId()); err != nil {
+			return err
+		}
+		favs, err = s.cleanup(p)
+		return nil
+	}); lerr != nil {
+		return nil, fail(ctx, lerr)
 	}
-	favs, err := s.cleanup(p)
 	s.d.Audit("pack.remove", p.ID, fmt.Sprintf("id=%s version=%s origin=%s playbooks=%d scripts=%d favorites_removed=%d",
 		p.ID, p.Version, p.Origin(), len(p.Playbooks), len(p.ScriptIDs()), favs))
 	if err != nil {
