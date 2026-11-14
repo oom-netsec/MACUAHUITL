@@ -1924,7 +1924,7 @@ export const en: Record<Key, string> = {
   "snippet.modo-puerto.field.interfaces": "Ports",
   "snippet.modo-puerto.field.interfaces.help": "Comma-separated list or ranges like Gi1/0/1-4; physical access ports only.",
   "snippet.modo-puerto.field.mode": "Mode",
-  "snippet.modo-puerto.field.mode.help": "fabrica = no switchport mode (the factory default, dynamic auto on an access Catalyst). Never trunk.",
+  "snippet.modo-puerto.field.mode.help": "Factory default = no switchport mode (dynamic auto on an access Catalyst). Never trunk.",
   // Syslog receiver: options, status and drops (phase 19q).
   "syslog.opts": "Options",
   "syslog.opts.flood": "Flood protection",
