@@ -18,6 +18,7 @@ var (
 	ErrPromptTimeout   error = i18n.New("platform.err.prompt_timeout", nil)
 	ErrEnableFailed    error = i18n.New("platform.err.enable_failed", nil)
 	ErrFirstLogin      error = i18n.New("platform.err.first_login", nil)
+	ErrDesync          error = i18n.New("platform.err.desync", nil)
 	ErrUnknownPlatform error = i18n.New("platform.err.unknown", nil)
 	ErrClosed          error = i18n.New("platform.err.closed", nil)
 )

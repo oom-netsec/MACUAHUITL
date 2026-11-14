@@ -250,8 +250,11 @@ func TestFTDCentinelaConfirmaFin(t *testing.T) {
 // Si el equipo leyó el Enter antes o lo descartó, queda un solo prompt: tras ~1,2 s sin datos se acepta, pero la
 // salida queda marcada como incompleta.
 func TestFTDUnSoloPromptSeAceptaIncompleto(t *testing.T) {
+	var last string
 	r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
-		if line == "" {
+		prev := last
+		last = line
+		if line == "" && prev == "show a" {
 			return // Enter descartado
 		}
 		out(line + "\r\n")
@@ -267,8 +270,12 @@ func TestFTDUnSoloPromptSeAceptaIncompleto(t *testing.T) {
 	t0 := time.Now()
 	out, err := d.Run(context.Background(), "show a", 10*time.Second)
 	el := time.Since(t0)
-	if err != nil || out.Text != "uno\n" || !out.Incomplete || el < time.Second || el > 2500*time.Millisecond {
+	if !errors.Is(err, platform.ErrDesync) || out.Text != "uno\n" || !out.Incomplete || el < time.Second || el > 2500*time.Millisecond {
 		t.Fatalf("out = %q, %v, %v, %s", out.Text, err, out.Incomplete, el)
+	}
+	// la sesión quedó inservible: el siguiente comando no corre en ella
+	if _, err := d.Run(context.Background(), "show b", time.Second); !errors.Is(err, platform.ErrDesync) {
+		t.Fatalf("show b: %v", err)
 	}
 }
 
@@ -289,7 +296,7 @@ func TestFTDPausaMayorQueLaRedDeSeguridadQuedaIncompleta(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, err := d.Run(context.Background(), "show a", 10*time.Second)
-	if err != nil || !out.Incomplete {
+	if !errors.Is(err, platform.ErrDesync) || !out.Incomplete {
 		t.Fatalf("out = %q, %v, %v", out.Text, err, out.Incomplete)
 	}
 }
@@ -327,7 +334,7 @@ func TestIOSBannerTerminaEnMayorQueNoEsFTD(t *testing.T) {
 	}
 }
 
-// Un «> » que llega antes del eco del comando no es el prompt de ese comando.
+// Un «> » suelto antes del eco del comando: no corta, pero la respuesta no empieza con el eco y la sesión se da por desfasada.
 func TestFTDPromptSinEcoNoCuenta(t *testing.T) {
 	r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
 		if line == "show c" {
@@ -343,8 +350,8 @@ func TestFTDPromptSinEcoNoCuenta(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, err := d.Run(context.Background(), "show c", 5*time.Second)
-	if err != nil || out.Text != "> show c\nc1\n" {
-		t.Fatalf("out = %q, %v", out.Text, err)
+	if !errors.Is(err, platform.ErrDesync) || !out.Incomplete || out.Text != "> show c\nc1\n" {
+		t.Fatalf("out = %q, %v, %v", out.Text, err, out.Incomplete)
 	}
 }
 
@@ -400,5 +407,28 @@ func TestFTDParDePromptsAparenteNoCorta(t *testing.T) {
 	out, err := d.Run(context.Background(), "show r", 5*time.Second)
 	if err != nil || out.Incomplete || out.Text != "linea\n>\n> 10.0.0.0/8 via x\n" {
 		t.Fatalf("out = %q, %v, %v", out.Text, err, out.Incomplete)
+	}
+}
+
+// Defensa: si la primera línea de la respuesta no es el eco del comando (la cola del anterior), la salida es incompleta
+// y la sesión queda inservible aunque se vean dos prompts.
+func TestFTDRespuestaSinEcoDesincroniza(t *testing.T) {
+	r, w := scriptedDev(t, func(out func(string)) { out("> ") }, func(line string, out func(string)) {
+		if line == "show b" {
+			out("resto\r\n> ") // la cola de «show a», sin el eco de «show b»
+			return
+		}
+		out(line + "\r\n> ")
+	})
+	d := New().(*driver)
+	if err := d.Open(context.Background(), r, w, secret.New(nil)); err != nil {
+		t.Fatal(err)
+	}
+	out, err := d.Run(context.Background(), "show b", 5*time.Second)
+	if !errors.Is(err, platform.ErrDesync) || !out.Incomplete {
+		t.Fatalf("out = %q, %v, %v", out.Text, err, out.Incomplete)
+	}
+	if _, err := d.Run(context.Background(), "show c", time.Second); !errors.Is(err, platform.ErrDesync) {
+		t.Fatalf("show c: %v", err)
 	}
 }

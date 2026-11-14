@@ -300,6 +300,8 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 }
 
 // ftdSettle es la pausa sin datos tras un «> » para aceptarlo como prompt de FTD.
+// Límites sin un marcador del equipo (no se distinguen): dos líneas seguidas tipo prompt dentro de la salida («>\n> ») con
+// una pausa de ~200 ms o más cortan en silencio; la defensa es que el siguiente comando no traiga su eco y se reconecte.
 // Es una heurística: una pausa mayor a mitad de la salida, justo tras una línea «> », aún la cortaría (sin un marcador del equipo no se cierra del todo).
 var ftdSettle = 400 * time.Millisecond
 
@@ -329,6 +331,32 @@ func bareConfirmed(buf []byte) bool {
 	}
 	n--
 	return n == 0 || buf[n-1] == '\n'
+}
+
+// echoNorm quita lo que el eco puede alterar (saltos, «$» de scroll, espacios) y aplica los retrocesos.
+func echoNorm(s string) string {
+	var out []byte
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; c {
+		case '\x08':
+			if len(out) > 0 {
+				out = out[:len(out)-1]
+			}
+		case '\r', '\n', '$', ' ':
+		default:
+			out = append(out, c)
+		}
+	}
+	return string(out)
+}
+
+// echoFirst: la respuesta empieza con el eco de cmd. Vale el eco completo o un prefijo suyo (envuelto o truncado),
+// pero no cualquier otra primera línea.
+func echoFirst(text, cmd string) bool {
+	c := echoNorm(cmd)
+	first, _, _ := strings.Cut(text, "\n")
+	f := echoNorm(first)
+	return c == "" || strings.HasPrefix(echoNorm(text), c) || f != "" && strings.HasPrefix(c, f)
 }
 
 // ftdConfirmSettle es la calma corta antes de dar por confirmado el par de prompts: un trozo puede terminar justo en «\n>\n> ».
@@ -424,6 +452,11 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	if err != nil {
 		d.fail(err)
 	}
+	// FTD: la primera línea de la respuesta debe ser el eco del comando (normalizado; envuelto o truncado también vale);
+	// si no, es la cola del comando anterior: la sesión está desfasada.
+	if d.sentinel && err == nil && !echoFirst(text, cmd) {
+		d.incomplete = true
+	}
 	// Quitar eco (primera línea) y prompt (última línea).
 	if i := strings.IndexByte(text, '\n'); i >= 0 && strings.TrimSpace(text[:i]) == cmd {
 		text = text[i+1:]
@@ -434,6 +467,9 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 			text = text[:strings.LastIndexByte(strings.TrimSuffix(text, "\n"), '\n')+1]
 		}
 		out.Incomplete = d.incomplete
+		if d.incomplete { // desfasado (calma agotada o respuesta sin eco): la sesión ya no sirve, se debe reconectar
+			err = d.fail(platform.ErrDesync)
+		}
 	}
 	out.Text = text
 	out.Invalid = invalidOutput(text)

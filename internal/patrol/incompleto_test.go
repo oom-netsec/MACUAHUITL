@@ -2,6 +2,7 @@ package patrol
 
 import (
 	"context"
+	"errors"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 	"os"
 	"path/filepath"
@@ -93,5 +94,39 @@ func TestRunDeviceConservaIncompleteDelDriver(t *testing.T) {
 	}
 	if !strings.Contains(all, " · incompleto =====") {
 		t.Fatalf("la evidencia no marca incompleto:\n%s", all[:min(len(all), 600)])
+	}
+}
+
+// desyncDrv devuelve la salida parcial de un comando con la sesión desincronizada.
+type desyncDrv struct{ platform.Driver }
+
+func (p *desyncDrv) Run(ctx context.Context, cmd string, timeout time.Duration) (platform.Output, error) {
+	out, err := p.Driver.Run(ctx, cmd, timeout)
+	if cmd != "show version" && err == nil {
+		out.Incomplete = true
+		return out, platform.ErrDesync
+	}
+	return out, err
+}
+
+// Patrol no reconecta dentro de un equipo: una sesión desincronizada falla el equipo con ese error, deja la salida
+// parcial marcada como incompleta y la ronda siguiente abre una sesión nueva.
+func TestRunDeviceFallaConSesionDesincronizada(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	drv := &desyncDrv{e.d.driver()}
+	e.d.NewDriver = func() platform.Driver { return drv }
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if res.State != "failed" || !errors.Is(res.DetailErr, platform.ErrDesync) {
+		t.Fatalf("res = %s %q %v", res.State, res.Detail, res.DetailErr)
+	}
+	var all string
+	for _, f := range w.Files() {
+		b, _ := os.ReadFile(filepath.Join(w.Dir(), f))
+		all += string(b)
+	}
+	if !strings.Contains(all, " · incompleto =====") {
+		t.Fatalf("sin marca de incompleto:\n%s", all[:min(len(all), 400)])
 	}
 }
