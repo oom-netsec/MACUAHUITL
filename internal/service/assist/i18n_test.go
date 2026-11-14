@@ -2,6 +2,7 @@ package assist
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 )
@@ -82,5 +84,40 @@ func TestTemplateEsElIdDelCatalogoEnAmbosReasons(t *testing.T) {
 	_, err := rv.svc.PlanSnippet(context.Background(), req)
 	if m := info(err); m == nil || m["reason"] != "assist.refused" || m["template"] != "vlan" {
 		t.Fatalf("vlan: %v %v", err, m)
+	}
+}
+
+// Fase 30e: los motivos de la restauración por diff salen en el idioma pedido; con es (o sin idioma) son los de siempre.
+func TestPlanRestoreRefusedWhyEsYEn(t *testing.T) {
+	r := newRestoreRig(t, restoreRunning, nil)
+	id := r.saveBackup(strings.Replace(restoreBackup, "!\nntp server", "!\nvtp mode client\nntp server", 1), false)
+	req := &v1.PlanRestoreRequest{Target: r.target, BackupId: id, AcceptedHostKeyFingerprints: []string{r.fp}}
+	es, err := r.svc.PlanRestore(context.Background(), req)
+	if err != nil || len(es.Refused) != 1 || es.Refused[0].Why != "vtp: se propaga a otros equipos" {
+		t.Fatalf("es: %v %+v", err, es)
+	}
+	en, err := r.svc.PlanRestore(i18n.WithLocale(context.Background(), "en"), req)
+	if err != nil || len(en.Refused) != 1 || en.Refused[0].Why != "vtp: it propagates to other devices" || en.Refused[0].Line != es.Refused[0].Line {
+		t.Fatalf("en: %v %+v", err, en)
+	}
+}
+
+// La salida propia de la rotación y los errores del ejecutor salen en el idioma pedido; con es son los de siempre.
+func TestRotacionTextosEsYEn(t *testing.T) {
+	e := &rotExec{rot: rotation{user: "tech"}}
+	tx, err := e.Saved(context.Background(), "SW1")
+	if err != nil || tx.In(i18n.Es) != "write memory salió bien; no se indicó credencial de la bóveda que actualizar" ||
+		tx.In(i18n.En) != "write memory succeeded; no vault credential to update was given" {
+		t.Fatalf("%q %q %v", tx.In(i18n.Es), tx.In(i18n.En), err)
+	}
+	w := i18n.Wrap("assist.svc.vault_save_new_failed", errors.New("disco lleno"), i18n.A("prev", "lab (anterior)"))
+	if w.Error() != `la bóveda no pudo guardar la credencial nueva (la anterior quedó como "lab (anterior)"): disco lleno` ||
+		w.Localize(i18n.En) != `the vault could not save the new credential (the previous one was kept as "lab (anterior)"): disco lleno` {
+		t.Fatalf("%q %q", w.Error(), w.Localize(i18n.En))
+	}
+	_, err = (&rotExec{devExec: &devExec{}}).Verify(context.Background(), "nadie")
+	var c i18n.Coded
+	if !errors.As(err, &c) || c.Reason() != "assist.svc.unknown_device" || c.Localize(i18n.En) != `unknown device "nadie"` || err.Error() != `equipo "nadie" desconocido` {
+		t.Fatalf("%v", err)
 	}
 }

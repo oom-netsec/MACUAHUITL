@@ -1,7 +1,6 @@
 package assist
 
 import (
-	"errors"
 	"fmt"
 	"net/netip"
 	"regexp"
@@ -126,7 +125,7 @@ func (r routeSpec) back() string {
 }
 
 func (r routeSpec) check() error {
-	if err := unicastIPv4("red", r.net); err != nil {
+	if err := unicastIPv4("assist.what.network", r.net); err != nil {
 		return err
 	}
 	ones, err := maskBits(r.mask)
@@ -135,27 +134,27 @@ func (r routeSpec) check() error {
 	}
 	n := netip.MustParseAddr(r.net)
 	if p, _ := n.Prefix(ones); p.Addr() != n {
-		return fmt.Errorf("la red %s tiene bits de host para la máscara %s", r.net, r.mask)
+		return lerr("la red %s tiene bits de host para la máscara %s", "the network %s has host bits for the mask %s", r.net, r.mask)
 	}
 	if r.nh == "" && r.iface == "" {
-		return errors.New("indica el siguiente salto, la interfaz de salida o ambos")
+		return lerr("indica el siguiente salto, la interfaz de salida o ambos", "give the next hop, the exit interface or both")
 	}
 	if r.nh != "" {
-		if err := unicastIPv4("siguiente salto", r.nh); err != nil {
+		if err := unicastIPv4("assist.what.next_hop", r.nh); err != nil {
 			return err
 		}
 		if p, _ := n.Prefix(ones); p.Contains(netip.MustParseAddr(r.nh)) {
-			return fmt.Errorf("el siguiente salto %s cae dentro de la propia ruta %s/%d", r.nh, r.net, ones)
+			return lerr("el siguiente salto %s cae dentro de la propia ruta %s/%d", "the next hop %s falls inside the route itself %s/%d", r.nh, r.net, ones)
 		}
 	}
 	if r.iface != "" && !ifaceNameRe.MatchString(r.iface) {
-		return fmt.Errorf("interfaz de salida inválida %q", r.iface)
+		return lerr("interfaz de salida inválida %q", "invalid exit interface %q", r.iface)
 	}
 	if r.ad != "" && !intIn(r.ad, 1, 255) {
-		return errors.New("la distancia va de 1 a 255")
+		return lerr("la distancia va de 1 a 255", "the distance goes from 1 to 255")
 	}
 	if r.name != "" && !nameWordRe.MatchString(r.name) {
-		return errors.New("el nombre de la ruta es una palabra de letras, números y _ . - (hasta 32)")
+		return lerr("el nombre de la ruta es una palabra de letras, números y _ . - (hasta 32)", "the route name is one word of letters, numbers and _ . - (up to 32)")
 	}
 	return nil
 }
@@ -175,7 +174,7 @@ func parseRouteLine(line string) (r routeSpec, neg bool, err error) {
 		f = f[1:]
 	}
 	if len(f) < 5 || !strings.EqualFold(f[0], "ip") || !strings.EqualFold(f[1], "route") || !isIPv4s(f[2]) || !isIPv4s(f[3]) {
-		return r, neg, errors.New("solo ip route RED MÁSCARA [INTERFAZ] [SALTO] [DISTANCIA] [name NOMBRE] y su no")
+		return r, neg, lerr("solo ip route RED MÁSCARA [INTERFAZ] [SALTO] [DISTANCIA] [name NOMBRE] y su no", "only ip route NETWORK MASK [INTERFACE] [HOP] [DISTANCE] [name NAME] and its no")
 	}
 	r.net, r.mask = f[2], f[3]
 	rest := f[4:]
@@ -192,7 +191,7 @@ func parseRouteLine(line string) (r routeSpec, neg bool, err error) {
 		r.name, rest = rest[1], nil
 	}
 	if len(rest) > 0 {
-		return r, neg, errors.New("sobran argumentos (solo distancia y name)")
+		return r, neg, lerr("sobran argumentos (solo distancia y name)", "too many arguments (only distance and name)")
 	}
 	if err := r.check(); err != nil {
 		return r, neg, err
@@ -227,26 +226,26 @@ var SnippetStaticRoute = Function{
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) != 1 || len(d.Rollback) != 1 {
-			return errors.New("una ruta: una línea de apply y una de reversa")
+			return lerr("una ruta: una línea de apply y una de reversa", "one route: one apply line and one rollback line")
 		}
 		a, neg, err := parseRouteLine(d.Apply[0])
 		if err != nil || neg {
-			return errors.New("el apply es `ip route ...`, nunca un no")
+			return lerr("el apply es `ip route ...`, nunca un no", "the apply is `ip route ...`, never a no")
 		}
 		if want := a.back(); squash(d.Rollback[0]) != want {
-			return fmt.Errorf("la reversa debe ser %q: el no exacto de lo agregado", want)
+			return lerr("la reversa debe ser %q: el no exacto de lo agregado", "the rollback must be %q: the exact no of what was added", want)
 		}
 		text, ok := d.Baseline[routeCmd]
 		if !ok {
-			return errors.New("falta la línea base de las rutas")
+			return lerr("falta la línea base de las rutas", "the routes baseline line is missing")
 		}
 		routes, ok := iosxe.ParseStaticRoutes(text)
 		if !ok {
-			return errors.New("la línea base de las rutas no se pudo leer")
+			return lerr("la línea base de las rutas no se pudo leer", "the routes baseline line could not be read")
 		}
 		for _, r := range routes {
 			if sameRouteDest(r, a) {
-				return errors.New("el equipo ya tiene una ruta a ese destino por ese salto: la reversa no la restauraría")
+				return lerr("el equipo ya tiene una ruta a ese destino por ese salto: la reversa no la restauraría", "the device already has a route to that destination through that hop: the rollback would not restore it")
 			}
 		}
 		return nil
@@ -358,7 +357,7 @@ func loopID(name string) (int, bool) {
 
 // checkLoopbackAddress: IPv4 unicast, máscara contigua de /8 a /32 y, salvo en /31 y /32, ni la red ni la difusión.
 func checkLoopbackAddress(addr, mask string) error {
-	if err := unicastIPv4("loopback", addr); err != nil {
+	if err := unicastIPv4("assist.what.loopback", addr); err != nil {
 		return err
 	}
 	ones, err := maskBits(mask)
@@ -481,12 +480,12 @@ var SnippetHelper = Function{
 		switch {
 		case f[0] == "interface" && len(f) == 2:
 			if !routedIfaceRe.MatchString(f[1]) {
-				return errors.New("solo una SVI, un puerto físico, un Port-channel o una subinterfaz")
+				return lerr("solo una SVI, un puerto físico, un Port-channel o una subinterfaz", "only an SVI, a physical port, a Port-channel or a subinterface")
 			}
 		case f[0] == "ip" && len(f) == 3, f[0] == "no" && len(f) == 4:
-			return unicastIPv4("helper", f[len(f)-1])
+			return unicastIPv4("assist.what.helper", f[len(f)-1])
 		default:
-			return errors.New("solo interface X, ip helper-address A y su no")
+			return lerr("solo interface X, ip helper-address A y su no", "only interface X, ip helper-address A and its no")
 		}
 		return nil
 	},
@@ -498,7 +497,7 @@ func helperPre(v Values) ([]string, error) {
 	if !routedIfaceRe.MatchString(n) {
 		return nil, cerr("assist.err.not_svi_or_port", "port", n)
 	}
-	if err := unicastIPv4("helper", v.Str("address")); err != nil {
+	if err := unicastIPv4("assist.what.helper", v.Str("address")); err != nil {
 		return nil, err
 	}
 	pre := []string{showCfg(n)}
@@ -568,7 +567,7 @@ var SnippetNTP = Function{
 		default:
 			return cerr("assist.err.ntp_form")
 		}
-		return unicastIPv4("servidor NTP", f[len(f)-1-ifElseInt(f[len(f)-1] == "prefer", 1, 0)])
+		return unicastIPv4("assist.what.ntp_server", f[len(f)-1-ifElseInt(f[len(f)-1] == "prefer", 1, 0)])
 	},
 	CheckDevice: l2Inverse(keyN("ntp server", 3), func(string) string { return ntpCmd }),
 }
@@ -581,7 +580,7 @@ func ifElseInt(c bool, a, b int) int {
 }
 
 func ntpPre(v Values) ([]string, error) {
-	if err := unicastIPv4("servidor NTP", v.Str("address")); err != nil {
+	if err := unicastIPv4("assist.what.ntp_server", v.Str("address")); err != nil {
 		return nil, err
 	}
 	return []string{ntpCmd}, nil
@@ -655,16 +654,16 @@ var SnippetLogging = Function{
 		}
 		switch {
 		case len(f) == 3 && f[1] == "host":
-			return unicastIPv4("destino de syslog", f[2])
+			return unicastIPv4("assist.what.syslog_dest", f[2])
 		case len(f) == 7 && f[1] == "host": // logging host IP transport udp|tcp port N, nada más (ni beep ni opciones extra)
 			if _, _, ok := (iosxe.LogHost{Options: f[3:]}).Transport(); !ok {
-				return errors.New("solo logging host A transport udp|tcp port N (1-65535)")
+				return lerr("solo logging host A transport udp|tcp port N (1-65535)", "only logging host A transport udp|tcp port N (1-65535)")
 			}
-			return unicastIPv4("destino de syslog", f[2])
+			return unicastIPv4("assist.what.syslog_dest", f[2])
 		case len(f) == 3 && f[1] == "trap" && !neg && slices.Contains(logLevels, f[2]):
 		case len(f) == 2 && f[1] == "trap" && neg:
 		default:
-			return errors.New("solo logging host A, logging trap NIVEL y su no")
+			return lerr("solo logging host A, logging trap NIVEL y su no", "only logging host A, logging trap LEVEL and its no")
 		}
 		return nil
 	},
@@ -676,7 +675,7 @@ var SnippetLogging = Function{
 		// Un destino con transporte y puerto se quita con su `no` completo: el corto no distingue cuál de los destinos de la IP.
 		for _, l := range d.Apply {
 			if f := strings.Fields(l); len(f) == 7 && !slices.ContainsFunc(d.Rollback, func(r string) bool { return squash(r) == "no "+squash(l) }) {
-				return fmt.Errorf("la reversa de %q debe ser %q", l, "no "+squash(l))
+				return lerr("la reversa de %q debe ser %q", "the rollback of %q must be %q", l, "no "+squash(l))
 			}
 		}
 		return nil
@@ -709,7 +708,7 @@ func loggingSpec(v Values) (apply, opts, transport string, port int) {
 }
 
 func loggingPre(v Values) ([]string, error) {
-	if err := unicastIPv4("destino de syslog", v.Str("address")); err != nil {
+	if err := unicastIPv4("assist.what.syslog_dest", v.Str("address")); err != nil {
 		return nil, err
 	}
 	if t, p := v.Str("transport"), v.Int("port"); t != "" && t != "udp" && t != "tcp" || p < 0 || p > 65535 || v.Has("port") && p == 0 {
@@ -933,7 +932,7 @@ func parseV3Line(line string) (v3Parts, error) {
 	if p.neg = len(f) > 0 && f[0] == "no"; p.neg {
 		f = f[1:]
 	}
-	bad := errors.New("solo snmp-server group G v3 priv, snmp-server user U G v3 auth sha A priv aes 128 P y su no (sin `no`, A y P de 8 a 64 caracteres)")
+	bad := lerr("solo snmp-server group G v3 priv, snmp-server user U G v3 auth sha A priv aes 128 P y su no (sin `no`, A y P de 8 a 64 caracteres)", "only snmp-server group G v3 priv, snmp-server user U G v3 auth sha A priv aes 128 P and its no (without `no`, A and P of 8 to 64 characters)")
 	if len(f) < 5 || f[0] != "snmp-server" {
 		return p, bad
 	}
@@ -963,40 +962,40 @@ var SnippetSNMPv3 = Function{
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) < 1 || len(d.Apply) > 2 {
-			return errors.New("un usuario SNMPv3 (y, si el grupo no existe, su grupo)")
+			return lerr("un usuario SNMPv3 (y, si el grupo no existe, su grupo)", "one SNMPv3 user (and, if the group does not exist, its group)")
 		}
 		u, err := parseV3Line(d.Apply[len(d.Apply)-1])
 		if err != nil || u.kind != "user" || u.neg {
-			return errors.New("el último apply es el `snmp-server user`")
+			return lerr("el último apply es el `snmp-server user`", "the last apply is the `snmp-server user`")
 		}
 		mkGroup := len(d.Apply) == 2
 		wantBack := []string{"no snmp-server user " + u.user + " " + u.group + " v3"}
 		if mkGroup {
 			g, err := parseV3Line(d.Apply[0])
 			if err != nil || g.kind != "group" || g.neg || g.group != u.group {
-				return errors.New("el primer apply es el `snmp-server group` del usuario")
+				return lerr("el primer apply es el `snmp-server group` del usuario", "the first apply is the user's `snmp-server group`")
 			}
 			wantBack = append(wantBack, "no snmp-server group "+u.group+" v3 priv")
 		}
 		if len(d.Rollback) != len(wantBack) {
-			return fmt.Errorf("la reversa son %d líneas: %s", len(wantBack), strings.Join(wantBack, ", "))
+			return lerr("la reversa son %d líneas: %s", "the rollback is %d lines: %s", len(wantBack), strings.Join(wantBack, ", "))
 		}
 		for i, w := range wantBack {
 			if squash(d.Rollback[i]) != w {
-				return fmt.Errorf("la reversa debe ser %q en ese lugar", w)
+				return lerr("la reversa debe ser %q en ese lugar", "the rollback must be %q in that place", w)
 			}
 		}
 		users, ok1 := iosxe.ParseSNMPUsers(d.Baseline[snmpUserCmd])
 		groups, ok2 := iosxe.ParseSNMPGroups(d.Baseline[snmpGroupCmd])
 		if _, has := d.Baseline[snmpUserCmd]; !has || !ok1 || !ok2 {
-			return errors.New("falta la línea base de los usuarios y los grupos SNMP, o no se pudo leer")
+			return lerr("falta la línea base de los usuarios y los grupos SNMP, o no se pudo leer", "the baseline line of the SNMP users and groups is missing, or could not be read")
 		}
 		if slices.ContainsFunc(users, func(x iosxe.SNMPUser) bool { return x.Name == u.user }) {
-			return errors.New("el equipo ya tiene ese usuario: la reversa no lo restauraría")
+			return lerr("el equipo ya tiene ese usuario: la reversa no lo restauraría", "the device already has that user: the rollback would not restore it")
 		}
 		priv := slices.ContainsFunc(groups, func(g iosxe.SNMPGroup) bool { return g.Name == u.group && g.Version == "v3" && g.Level == "priv" })
 		if mkGroup == priv {
-			return errors.New("el grupo se crea solo si no existía como v3 priv (y la reversa solo borra el que creó)")
+			return lerr("el grupo se crea solo si no existía como v3 priv (y la reversa solo borra el que creó)", "the group is created only if it did not exist as v3 priv (and the rollback deletes only the one it created)")
 		}
 		return nil
 	},
@@ -1090,22 +1089,22 @@ var SnippetVtyACL = Function{
 	Check: func(line string) error {
 		if strings.HasPrefix(strings.ToLower(line), "line ") {
 			if _, _, ok := parseVtyHead(line); !ok {
-				return errors.New("solo line vty A [B] con 0 <= A <= B <= 15")
+				return lerr("solo line vty A [B] con 0 <= A <= B <= 15", "only line vty A [B] with 0 <= A <= B <= 15")
 			}
 			return nil
 		}
 		if _, _, ok := parseAccessClassIn(line); !ok {
-			return errors.New("solo access-class ACL in y no access-class ACL in")
+			return lerr("solo access-class ACL in y no access-class ACL in", "only access-class ACL in and no access-class ACL in")
 		}
 		return nil
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) == 0 || len(d.Apply)%2 != 0 || len(d.Rollback) != len(d.Apply) {
-			return errors.New("cada bloque vty lleva su encabezado y su access-class, y la reversa los mismos")
+			return lerr("cada bloque vty lleva su encabezado y su access-class, y la reversa los mismos", "each vty block carries its header and its access-class, and the rollback the same ones")
 		}
 		blocks, ok := iosxe.ParseVtyBlocks(d.Baseline[vtyCmd])
 		if _, has := d.Baseline[vtyCmd]; !has || !ok {
-			return errors.New("falta la línea base de las líneas vty, o no se pudo leer")
+			return lerr("falta la línea base de las líneas vty, o no se pudo leer", "the baseline line of the vty lines is missing, or could not be read")
 		}
 		var acl string
 		n := len(d.Apply) / 2
@@ -1113,15 +1112,15 @@ var SnippetVtyACL = Function{
 			lo, hi, ok1 := parseVtyHead(d.Apply[2*i])
 			a, neg, ok2 := parseAccessClassIn(d.Apply[2*i+1])
 			if !ok1 || !ok2 || neg || (acl != "" && a != acl) {
-				return errors.New("el apply son pares `line vty A B` + `access-class ACL in` de una sola ACL")
+				return lerr("el apply son pares `line vty A B` + `access-class ACL in` de una sola ACL", "the apply is pairs of `line vty A B` + `access-class ACL in` of a single ACL")
 			}
 			acl = a
 			rb := d.Rollback[2*(n-1-i):]
 			if squash(rb[0]) != vtyHead(lo, hi) || squash(rb[1]) != "no access-class "+acl+" in" {
-				return fmt.Errorf("la reversa debe quitar el access-class de %s, en orden inverso", vtyHead(lo, hi))
+				return lerr("la reversa debe quitar el access-class de %s, en orden inverso", "the rollback must remove the access-class of %s, in reverse order", vtyHead(lo, hi))
 			}
 			if !slices.ContainsFunc(blocks, func(b iosxe.VtyBlock) bool { return b.Lo == lo && b.Hi == hi && !b.HasAccessIn }) {
-				return fmt.Errorf("%s no está en la línea base o ya tiene un access-class in: la reversa no lo restauraría", vtyHead(lo, hi))
+				return lerr("%s no está en la línea base o ya tiene un access-class in: la reversa no lo restauraría", "%s is not in the baseline or already has an access-class in: the rollback would not restore it", vtyHead(lo, hi))
 			}
 		}
 		return nil

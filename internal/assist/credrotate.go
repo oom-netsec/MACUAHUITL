@@ -19,6 +19,7 @@ var ErrRotateRefused = errors.New("assist: no se puede rotar esa credencial")
 const (
 	credUsersCmd = "show running-config | include ^username"
 	hidden       = "<oculto>"
+	hiddenEN     = "<hidden>"
 )
 
 var (
@@ -29,6 +30,11 @@ var (
 	// secretTail es todo lo que sigue a secret o password hasta el final de la línea (una clave puede traer espacios).
 	secretTail = regexp.MustCompile(`(?i)\b(secret|password)[ \t]+[^\r\n]*`)
 )
+
+// scrubEN es Scrub para un texto en inglés: el marcador de lo oculto también sale en inglés (en las líneas de configuración sigue siendo el mismo).
+func scrubEN(s string, secrets []string, generic bool) string {
+	return strings.ReplaceAll(Scrub(s, secrets, generic), hidden, hiddenEN)
+}
 
 // Scrub reemplaza en s cada uno de secrets y, con generic, lo que sigue a secret/password.
 func Scrub(s string, secrets []string, generic bool) string {
@@ -104,43 +110,43 @@ func GenerateSecret() (string, error) {
 func parseCredLine(line string) (user string, hash bool, err error) {
 	f := strings.Fields(line)
 	if len(f) < 4 || !strings.EqualFold(f[0], "username") {
-		return "", false, errors.New("no reconocida")
+		return "", false, lerr("no reconocida", "not recognized")
 	}
 	user = f[1]
 	if !userRe.MatchString(user) {
-		return "", false, errors.New("nombre de usuario inválido")
+		return "", false, lerr("nombre de usuario inválido", "invalid user name")
 	}
 	i := 2
 	if strings.EqualFold(f[i], "privilege") {
 		if i+1 >= len(f) {
-			return "", false, errors.New("falta el nivel")
+			return "", false, lerr("falta el nivel", "the level is missing")
 		}
 		n, e := strconv.Atoi(f[i+1])
 		if e != nil || n < 0 || n > 15 || ntoa(n) != f[i+1] {
-			return "", false, errors.New("nivel de privilegio fuera de 0-15")
+			return "", false, lerr("nivel de privilegio fuera de 0-15", "privilege level outside 0-15")
 		}
 		i += 2
 	}
 	alg := ""
 	if i < len(f) && strings.EqualFold(f[i], "algorithm-type") {
 		if i+1 >= len(f) || (f[i+1] != "scrypt" && f[i+1] != "sha256") {
-			return "", false, errors.New("algorithm-type scrypt o sha256")
+			return "", false, lerr("algorithm-type scrypt o sha256", "algorithm-type scrypt or sha256")
 		}
 		alg, i = f[i+1], i+2
 	}
 	if i >= len(f) || !strings.EqualFold(f[i], "secret") {
-		return "", false, errors.New("solo `secret` (nunca password, nopassword ni opciones extra)")
+		return "", false, lerr("solo `secret` (nunca password, nopassword ni opciones extra)", "only `secret` (never password, nopassword or extra options)")
 	}
 	switch rest := f[i+1:]; len(rest) {
 	case 1:
 		return user, false, checkSecret(rest[0])
 	case 2:
 		if alg != "" || (rest[0] != "5" && rest[0] != "8" && rest[0] != "9") || !hashRe.MatchString(rest[1]) || strings.Contains(rest[1], "?") {
-			return "", false, errors.New("la reversa lleva `secret 5|8|9 HASH` sin algorithm-type")
+			return "", false, lerr("la reversa lleva `secret 5|8|9 HASH` sin algorithm-type", "the rollback carries `secret 5|8|9 HASH` without algorithm-type")
 		}
 		return user, true, nil
 	}
-	return "", false, errors.New("sobran argumentos")
+	return "", false, lerr("sobran argumentos", "too many arguments")
 }
 
 // CredRotate rota la contraseña de un usuario local: `username U secret S` y, para la reversa, el hash previo.
@@ -154,21 +160,21 @@ var CredRotate = Function{
 	},
 	CheckDevice: func(d DevicePlan) error {
 		if len(d.Apply) != 1 || len(d.Rollback) != 1 {
-			return errors.New("la rotación es una línea de apply y una de reversa")
+			return lerr("la rotación es una línea de apply y una de reversa", "the rotation is one apply line and one rollback line")
 		}
 		u1, h1, e1 := parseCredLine(d.Apply[0])
 		u2, h2, e2 := parseCredLine(d.Rollback[0])
 		switch {
 		case e1 != nil || e2 != nil:
-			return errors.New("líneas de usuario inválidas")
+			return lerr("líneas de usuario inválidas", "invalid user lines")
 		case u1 != u2:
-			return errors.New("el apply y la reversa deben ser del mismo usuario")
+			return lerr("el apply y la reversa deben ser del mismo usuario", "the apply and the rollback must be for the same user")
 		case h1 || !h2:
-			return errors.New("el apply lleva el secreto nuevo y la reversa el hash previo")
+			return lerr("el apply lleva el secreto nuevo y la reversa el hash previo", "the apply carries the new secret and the rollback the previous hash")
 		case !d.VerifyLogin:
-			return errors.New("la rotación exige verificar la credencial nueva con una sesión nueva")
+			return lerr("la rotación exige verificar la credencial nueva con una sesión nueva", "the rotation requires verifying the new credential with a new session")
 		case len(d.Secrets) == 0:
-			return errors.New("faltan los secretos que deben ocultarse")
+			return lerr("faltan los secretos que deben ocultarse", "the secrets that must be hidden are missing")
 		}
 		return nil
 	},

@@ -67,17 +67,25 @@ func (s *assistSvc) PlanRestore(ctx context.Context, r *v1.PlanRestoreRequest) (
 	if err != nil {
 		if buildErr != nil && len(rp.Refused) > 0 && errors.Is(buildErr, assist.ErrRestoreRefused) {
 			s.d.Audit("assist.plan.refused", r.Target.Address, fmt.Sprintf("function=%s backup=%s refused=%d", assist.RestoreDiff, r.BackupId, len(rp.Refused)))
-			return &v1.PlanRestoreResponse{Refused: refusalsToProto(rp.Refused), Reason: coded(ctx, buildErr)}, nil
+			return &v1.PlanRestoreResponse{Refused: refusalsToProto(i18n.Locale(ctx), rp.Refused), Reason: coded(ctx, buildErr)}, nil
 		}
 		return nil, err
 	}
-	return &v1.PlanRestoreResponse{PlanId: id, Plan: planToProto(i18n.Locale(ctx), assist.Redact(plan, fn)), Refused: refusalsToProto(rp.Refused)}, nil
+	return &v1.PlanRestoreResponse{PlanId: id, Plan: planToProto(i18n.Locale(ctx), assist.Redact(plan, fn)), Refused: refusalsToProto(i18n.Locale(ctx), rp.Refused)}, nil
 }
 
-func refusalsToProto(rs []assist.Refusal) []*v1.RestoreRefusal {
+func refusalsToProto(loc string, rs []assist.Refusal) []*v1.RestoreRefusal {
 	var out []*v1.RestoreRefusal
 	for _, r := range rs {
-		out = append(out, &v1.RestoreRefusal{Path: r.Path, Line: r.Line, Why: r.Why})
+		out = append(out, &v1.RestoreRefusal{Path: r.Path, Line: r.Line, Why: refusalWhy(loc, r)})
 	}
 	return out
+}
+
+// refusalWhy es el motivo de una negativa en el idioma pedido (con es, el de siempre).
+func refusalWhy(loc string, r assist.Refusal) string {
+	if r.WhyT.Empty() {
+		return r.Why
+	}
+	return r.WhyT.In(loc)
 }

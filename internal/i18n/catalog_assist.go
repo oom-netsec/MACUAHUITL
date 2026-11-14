@@ -21,6 +21,7 @@ func init() {
 	val("format", "pattern", entry{Es: "{value:q} no cumple el formato esperado", En: "{value:q} does not match the expected format", Args: []string{"value"}})
 	val("not_int", "type", entry{Es: "{value:q} no es un entero (sin signo ni ceros a la izquierda)", En: "{value:q} is not an integer (no sign or leading zeros)", Args: []string{"value"}})
 	val("out_of_range", "range", entry{Es: "{value} fuera de {range}", En: "{value} is outside {range}", Args: []string{"value", "range"}})
+	val("out_of_range_min", "range", entry{Es: "{value} fuera de {lo} o más", En: "{value} is below {lo}", Args: []string{"value", "lo"}})
 	val("not_decimal", "type", entry{Es: "{value:q} no es un número con hasta dos decimales", En: "{value:q} is not a number with up to two decimals", Args: []string{"value"}})
 	val("bool", "choice", entry{Es: "{value:q}: solo true o false", En: "{value:q}: only true or false", Args: []string{"value"}})
 	val("choice", "choice", entry{Es: "{value:q}: elige una de {choices}", En: "{value:q}: choose one of {choices}", Args: []string{"value", "choices"}})
@@ -55,7 +56,7 @@ func init() {
 		"assist.err.description_too_long":                        {Es: "descripción de más de 200 caracteres", En: "description longer than 200 characters"},
 		"assist.err.description_invalid":                         {Es: "descripción: {detail}", En: "description: {detail}", Args: []string{"detail"}, Meta: map[string]string{"field": "description"}},
 		"assist.err.device_replied":                              {Es: "el equipo respondió {line:q}", En: "the device replied {line:q}", Args: []string{"line"}},
-		"assist.err.ipv4_invalid_for":                            {Es: "{what}: dirección IPv4 inválida {value:q}", En: "{what}: invalid IPv4 address {value:q}", Args: []string{"what", "value"}},
+		"assist.err.ipv4_invalid_for":                            withRefs(entry{Es: "{what}: dirección IPv4 inválida {value:q}", En: "{what}: invalid IPv4 address {value:q}", Args: []string{"what", "value"}}, "what"),
 		"assist.err.ipv4_invalid":                                {Es: "dirección IPv4 inválida {addr:q}", En: "invalid IPv4 address {addr:q}", Args: []string{"addr"}},
 		"assist.err.apply_starts_loopback":                       {Es: "el apply empieza con `interface LoopbackN`", En: "the apply starts with `interface LoopbackN`"},
 		"assist.err.apply_starts_svi":                            {Es: "el apply empieza con `interface VlanN`", En: "the apply starts with `interface VlanN`"},
@@ -94,7 +95,7 @@ func init() {
 		"assist.err.mask_invalid":                                {Es: "máscara inválida (usa la forma 255.255.255.0)", En: "invalid mask (use the form 255.255.255.0)"},
 		"assist.err.mask_not_contiguous":                         {Es: "máscara no contigua o fuera de /8-/30", En: "mask not contiguous or outside /8-/30"},
 		"assist.err.not_physical_port":                           {Es: "{port:q} no es un puerto físico (se rechazan Port-channel, Vlan, Loopback, rangos y subinterfaces)", En: "{port:q} is not a physical port (Port-channel, Vlan, Loopback, ranges and subinterfaces are rejected)", Args: []string{"port"}},
-		"assist.err.unicast_unusable":                            {Es: "{what}: {value} no es una dirección unicast utilizable", En: "{what}: {value} is not a usable unicast address", Args: []string{"what", "value"}},
+		"assist.err.unicast_unusable":                            withRefs(entry{Es: "{what}: {value} no es una dirección unicast utilizable", En: "{what}: {value} is not a usable unicast address", Args: []string{"what", "value"}}, "what"),
 		"assist.err.unicast_invalid":                             {Es: "{addr} no es una dirección unicast válida", En: "{addr} is not a valid unicast address", Args: []string{"addr"}},
 		"assist.err.not_svi_or_port":                             {Es: "{port:q} no es una SVI, un puerto físico, un Port-channel ni una subinterfaz", En: "{port:q} is not an SVI, a physical port, a Port-channel or a subinterface", Args: []string{"port"}},
 		"assist.err.ports_nothing_to_change":                     {Es: "no hay nada que cambiar: indica VLAN, VLAN de voz, descripción o shut/no shut", En: "there is nothing to change: specify a VLAN, a voice VLAN, a description or shut/no shut"},

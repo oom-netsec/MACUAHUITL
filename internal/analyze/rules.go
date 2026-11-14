@@ -81,14 +81,14 @@ func LoadRules(fsys fs.FS) ([]Rule, error) {
 		dec := yaml.NewDecoder(bytes.NewReader(b))
 		dec.KnownFields(true)
 		if err := dec.Decode(&rs); err != nil {
-			return fmt.Errorf("reglas %s: %w", name, err)
+			return i18n.Wrap("rules.err.file", err, i18n.A("file", name))
 		}
 		for _, r := range rs {
 			if err := r.compile(); err != nil {
-				return fmt.Errorf("reglas %s: %s: %w", name, r.ID, err)
+				return i18n.Wrap("rules.err.rule", err, i18n.A("file", name, "id", r.ID))
 			}
 			if ids[r.ID] {
-				return fmt.Errorf("reglas %s: id %s repetido", name, r.ID)
+				return i18n.New("rules.err.dup", i18n.A("file", name, "id", r.ID))
 			}
 			ids[r.ID] = true
 			out = append(out, r)
@@ -101,18 +101,18 @@ func LoadRules(fsys fs.FS) ([]Rule, error) {
 func (r *Rule) compile() error {
 	switch {
 	case r.ID == "" || r.Title == "" || r.Explanation == "" || r.Action == "":
-		return errors.New("id, title, explanation y action son obligatorios")
+		return i18n.New("rules.err.required", nil)
 	case sevRank[r.Severity] == 0:
-		return fmt.Errorf("severidad %q inválida (critica, alta, media, baja, info)", r.Severity)
+		return i18n.New("rules.err.severity", i18n.A("sev", r.Severity))
 	case len(r.Commands) == 0:
-		return errors.New("sin comandos")
+		return i18n.New("rules.err.no_commands", nil)
 	}
 	for i, c := range r.Commands {
 		r.Commands[i] = normCmd(c)
 	}
 	mk, ok := checks[r.Check]
 	if !ok {
-		return fmt.Errorf("check %q desconocido", r.Check)
+		return i18n.New("rules.err.check", i18n.A("check", r.Check))
 	}
 	p := &params{m: r.Params, used: map[string]bool{}}
 	run, err := mk(p)
@@ -121,7 +121,7 @@ func (r *Rule) compile() error {
 	}
 	for k := range r.Params {
 		if !p.used[k] {
-			return fmt.Errorf("parámetro %q no aplica a %s", k, r.Check)
+			return i18n.New("rules.err.param_unused", i18n.A("key", k, "check", r.Check))
 		}
 	}
 	r.run = run
@@ -160,7 +160,7 @@ func (p *params) num(k string, def float64) (float64, error) {
 	}
 	f, err := strconv.ParseFloat(v, 64)
 	if err != nil {
-		return 0, fmt.Errorf("parámetro %s: %q no es un número", k, v)
+		return 0, i18n.New("rules.err.param_num", i18n.A("key", k, "value", v))
 	}
 	return f, nil
 }
@@ -172,7 +172,7 @@ func (p *params) dur(k string, def time.Duration) (time.Duration, error) {
 	}
 	d, err := time.ParseDuration(v)
 	if err != nil || d <= 0 {
-		return 0, fmt.Errorf("parámetro %s: %q no es una duración", k, v)
+		return 0, i18n.New("rules.err.param_dur", i18n.A("key", k, "value", v))
 	}
 	return d, nil
 }
@@ -184,7 +184,7 @@ func (p *params) flag(k string) (bool, error) {
 	}
 	b, err := strconv.ParseBool(v)
 	if err != nil {
-		return false, fmt.Errorf("parámetro %s: %q no es true/false", k, v)
+		return false, i18n.New("rules.err.param_bool", i18n.A("key", k, "value", v))
 	}
 	return b, nil
 }
@@ -196,7 +196,7 @@ func (p *params) oneOf(k string, opts ...string) (string, error) {
 			return v, nil
 		}
 	}
-	return "", fmt.Errorf("parámetro %s: %q debe ser uno de %v", k, v, opts)
+	return "", i18n.New("rules.err.param_oneof", i18n.A("key", k, "value", v, "opts", opts))
 }
 
 var checks = map[string]func(*params) (checker, error){
@@ -220,13 +220,16 @@ var checks = map[string]func(*params) (checker, error){
 func checkMatch(p *params) (checker, error) {
 	pat, _ := p.get("pattern")
 	re, err := regexp.Compile(pat)
-	if err != nil || pat == "" {
-		return nil, fmt.Errorf("pattern inválido: %v", err)
+	if err != nil {
+		return nil, i18n.Wrap("rules.err.pattern", err, nil)
+	}
+	if pat == "" {
+		return nil, i18n.New("rules.err.pattern_empty", nil)
 	}
 	var ex *regexp.Regexp
 	if v, ok := p.get("exclude"); ok {
 		if ex, err = regexp.Compile(v); err != nil {
-			return nil, fmt.Errorf("exclude inválido: %w", err)
+			return nil, i18n.Wrap("rules.err.exclude", err, nil)
 		}
 	}
 	minF, err := p.num("min", 1)

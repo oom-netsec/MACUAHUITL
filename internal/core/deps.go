@@ -53,8 +53,8 @@ func (d coreDeps) SealParams() vault.Params {
 	return vault.DefaultParams
 }
 
-func (d coreDeps) Job(id string) (service.JobInfo, error) {
-	j, err := d.c.getJob(id)
+func (d coreDeps) Job(ctx context.Context, id string) (service.JobInfo, error) {
+	j, err := d.c.getJobIn(ctx, id)
 	if err != nil {
 		return service.JobInfo{}, err
 	}

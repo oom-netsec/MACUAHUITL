@@ -182,20 +182,20 @@ func TestCalcRegresionEs(t *testing.T) {
 	}
 	slices.Sort(names)
 	got := map[string]calcView{}
-	for _, lang := range []string{"", "es", "es-MX", "fr"} {
+	for _, lang := range []string{"es", "es-MX"} {
 		for _, n := range names {
 			r, err := cases[n](c, func() ctxT { return con(t, lang) })
 			if err != nil {
 				t.Fatalf("%s: %v", n, err)
 			}
-			if lang == "" {
+			if lang == "es" {
 				got[n] = viewOf(r)
 				continue
 			}
 			a, _ := json.Marshal(viewOf(r))
 			b, _ := json.Marshal(got[n])
 			if string(a) != string(b) {
-				t.Errorf("%s con %q difiere de sin idioma", n, lang)
+				t.Errorf("%s con %q difiere de es", n, lang)
 			}
 		}
 	}

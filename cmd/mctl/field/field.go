@@ -19,7 +19,7 @@ import (
 
 const escKey = 0x1d // Ctrl-]
 
-const consoleHelp = "Ctrl-] q sale · Ctrl-] b envía BREAK · Ctrl-] Ctrl-] envía Ctrl-] · Ctrl-] ? ayuda"
+func consoleHelp() string { return cli.T("mctl.field.console_help") }
 
 // escaper separa lo que va al equipo de las órdenes Ctrl-] <letra>.
 type escaper struct{ pending bool }
@@ -78,9 +78,9 @@ func console(c *cli.Env, args []string) error {
 				return nil
 			}
 			if len(r.Ports) == 0 {
-				return errors.New("no hay adaptadores USB-serie conectados (/dev/ttyUSB*, /dev/ttyACM*)")
+				return cli.Err("mctl.field.no_adapters")
 			}
-			return errors.New("hay varios puertos: indica cuál, p. ej. mctl console /dev/ttyUSB0")
+			return cli.Err("mctl.field.many_ports")
 		}
 		port = r.Ports[0]
 	}
@@ -96,7 +96,7 @@ func console(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "conectado a %s; grabando en %s\r\n%s\r\n", first.Opened, first.OutputPath, consoleHelp)
+	fmt.Fprintf(c.Out, "%s\r\n%s\r\n", cli.T("mctl.field.connected", "opened", first.Opened, "path", first.OutputPath), consoleHelp())
 	if c.TTY != nil { // modo crudo: cada tecla viaja al equipo sin eco local
 		old, err := term.MakeRaw(int(c.TTY.Fd()))
 		if err != nil {
@@ -153,9 +153,9 @@ func console(c *cli.Env, args []string) error {
 					return endConsole(c, recvDone)
 				case 'b':
 					st.Send(&v1.ConsoleRequest{Msg: &v1.ConsoleRequest_SendBreak{SendBreak: true}})
-					fmt.Fprint(c.Out, "\r\n[BREAK enviado]\r\n")
+					fmt.Fprint(c.Out, "\r\n["+cli.T("mctl.field.break_sent")+"]\r\n")
 				case '?':
-					fmt.Fprint(c.Out, "\r\n["+consoleHelp+"]\r\n")
+					fmt.Fprint(c.Out, "\r\n["+consoleHelp()+"]\r\n")
 				}
 			}
 		}
@@ -164,7 +164,7 @@ func console(c *cli.Env, args []string) error {
 
 func endConsole(c *cli.Env, recvDone chan error) error {
 	err := <-recvDone
-	fmt.Fprint(c.Out, "\r\n[consola cerrada]\r\n")
+	fmt.Fprint(c.Out, "\r\n["+cli.T("mctl.field.console_close")+"]\r\n")
 	if err == io.EOF {
 		return nil
 	}
@@ -207,7 +207,7 @@ func serve(proto string) func(*cli.Env, []string) error {
 				return err
 			}
 			if r.Listening != "" {
-				fmt.Fprintf(c.Out, "sirviendo en %s/%s\n%s", r.Listening, proto, r.Hint)
+				fmt.Fprintf(c.Out, "%s\n%s", cli.T("mctl.field.serving", "listen", r.Listening, "proto", proto), r.Hint)
 				continue
 			}
 			var t struct {
@@ -243,7 +243,7 @@ func hash(c *cli.Env, args []string) error {
 	}
 	fmt.Fprintln(c.Out, r.Report.Text)
 	if !r.Ok {
-		return errors.New("el resumen no coincide con el publicado: no instales esta imagen")
+		return cli.Err("mctl.field.hash_mismatch")
 	}
 	return nil
 }

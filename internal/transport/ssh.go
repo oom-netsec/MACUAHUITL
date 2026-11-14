@@ -220,7 +220,7 @@ func (s *Session) ShellSize(rows, cols int) (io.Reader, io.Writer, error) {
 // Resize avisa al equipo del nuevo tamaño de la ventana; solo tras ShellSize.
 func (s *Session) Resize(rows, cols int) error {
 	if s.sess == nil {
-		return errors.New("transport: sin shell abierto")
+		return i18n.New("transport.err.no_shell", nil)
 	}
 	return s.sess.WindowChange(rows, cols)
 }

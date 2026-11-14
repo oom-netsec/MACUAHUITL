@@ -41,7 +41,7 @@ func diff(c *cli.Env, args []string) error {
 		return errors.New("uso: mctl restore diff EQUIPO[:PUERTO] RESPALDO --cred ID [--mgmt-if IF] [--max-lines N] [--parcial] [--asistido]")
 	}
 	if maxLines > 1000 {
-		return errors.New("--max-lines va de 1 a 1000")
+		return cli.Err("mctl.restore.max_lines")
 	}
 	addr, port, err := cli.SplitHost(fs.Arg(0))
 	if err != nil {
@@ -54,21 +54,21 @@ func diff(c *cli.Env, args []string) error {
 		return err
 	}
 	if res.PlanId == "" {
-		fmt.Fprintf(c.Out, "PLAN RECHAZADO: %s\n", res.Reason)
-		printRefused(c, res.Refused, "No se restaura (hazlo a mano):")
-		return errors.New("el plan se rechazó: nada se cambió")
+		fmt.Fprintln(c.Out, cli.T("mctl.restore.rejected", "reason", res.Reason))
+		printRefused(c, res.Refused, cli.T("mctl.restore.refused"))
+		return cli.Err("mctl.restore.rejected_err")
 	}
 	cli.PrintPlan(c.Out, res.Plan)
-	printRefused(c, res.Refused, "\nNo se restaura (plan parcial; hazlo a mano):")
+	printRefused(c, res.Refused, "\n"+cli.T("mctl.restore.refused_partial"))
 	if !assisted {
-		fmt.Fprintln(c.Out, "\nSolo se mostró el plan: no se cambió nada. Para aplicarlo agrega --asistido.")
+		fmt.Fprintln(c.Out, "\n"+cli.T("mctl.restore.plan_only"))
 		return nil
 	}
 	run, err := cl.StartRun(context.Background(), &v1.StartRunRequest{PlanId: res.PlanId, Assisted: true})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(c.Out, "\nMODO ASISTIDO ACTIVO. Ejecución %s: cada paso que cambia la red pide confirmación.\n", run.RunId)
+	fmt.Fprintln(c.Out, "\n"+cli.T("mctl.restore.assist_active", "run", run.RunId))
 	return cli.Follow(c, cl, run.RunId, 0, nil)
 }
 

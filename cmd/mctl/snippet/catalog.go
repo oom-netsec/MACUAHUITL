@@ -60,7 +60,7 @@ func describeField(f *v1.SnippetField) string {
 		parts = append(parts, fmt.Sprintf("%g-%g", f.Min, f.Max))
 	}
 	if f.Required {
-		parts = append(parts, "(obligatorio)")
+		parts = append(parts, cli.T("mctl.snippet.required"))
 	}
 	s := strings.Join(parts, " ") + "  " + f.Label
 	if f.Help != "" {
@@ -75,10 +75,10 @@ func parseSets(sets cli.List) (map[string]string, error) {
 	for _, s := range sets {
 		k, v, ok := strings.Cut(s, "=")
 		if !ok || k == "" {
-			return nil, fmt.Errorf("--set %q: usa campo=valor", k)
+			return nil, cli.Err("mctl.snippet.bad_set", "value", k)
 		}
 		if _, dup := out[k]; dup {
-			return nil, fmt.Errorf("--set %s se repite", k)
+			return nil, cli.Err("mctl.snippet.dup_set", "name", k)
 		}
 		out[k] = v
 	}
@@ -98,7 +98,7 @@ func fillSecrets(c *cli.Env, t *v1.SnippetTemplate, vals map[string]string) erro
 		vals[f.Name] = string(b)
 		cli.Wipe(b)
 		if vals[f.Name] == "" {
-			return fmt.Errorf("%s no puede ir vacío", f.Label)
+			return cli.Err("mctl.snippet.empty", "label", f.Label)
 		}
 	}
 	return nil
@@ -130,7 +130,7 @@ func run(c *cli.Env, args []string) error {
 		}
 	}
 	if tpl == nil {
-		return fmt.Errorf("no hay una plantilla %q: mctl snippet list muestra el catálogo", fs.Arg(1))
+		return cli.Err("mctl.snippet.no_template", "id", fs.Arg(1))
 	}
 	if err := fillSecrets(c, tpl, vals); err != nil {
 		return err

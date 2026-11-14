@@ -10,6 +10,8 @@ import (
 )
 
 func TestIngestFlagsParseAndRangeCheck(t *testing.T) {
+	SetLang("es")
+	t.Cleanup(func() { SetLang("") })
 	var f IngestFlags
 	fs := flag.NewFlagSet("x", flag.ContinueOnError)
 	f.Register(fs, "traps_{fecha}_{hora}")
@@ -40,6 +42,8 @@ func TestIngestFlagsParseAndRangeCheck(t *testing.T) {
 }
 
 func TestPrintDrops(t *testing.T) {
+	SetLang("es")
+	t.Cleanup(func() { SetLang("") })
 	var b bytes.Buffer
 	PrintDrops(&b, &v1.SyslogDrops{Total: 9, PorOrigen: 5, Global: 3, ColaLlena: 1, Top: []*v1.SyslogSourceDrops{{Source: "10.0.0.1", Count: 7}, {Source: "otros", Count: 2}}})
 	if got := b.String(); got != "descartes: 9 (por origen 5, global 3, cola llena 1) 10.0.0.1=7 otros=2\n" {

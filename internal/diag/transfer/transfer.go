@@ -27,10 +27,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 )
@@ -200,7 +200,7 @@ func Download(ctx context.Context, r Request) (Result, error) {
 	}
 	name, err := fileserve.SafeName(raw)
 	if err != nil {
-		return res, fmt.Errorf("transfer: nombre local: %w", err)
+		return res, i18n.Wrap("xfer.err.local_name", err, nil)
 	}
 	to := r.Timeout
 	if to <= 0 {

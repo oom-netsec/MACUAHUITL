@@ -18,7 +18,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"math/big"
 	"net/netip"
@@ -50,7 +49,7 @@ func GenerateKey(alg string) (crypto.Signer, error) {
 	case "p384":
 		return ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
 	}
-	return nil, fmt.Errorf("pki: algoritmo %q no soportado (%s)", alg, strings.Join(Algorithms, ", "))
+	return nil, i18n.New("pki.err.algorithm", i18n.A("alg", alg, "algs", strings.Join(Algorithms, ", ")))
 }
 
 // SealKey sella la llave en PKCS#8 dentro de un sobre MCK1 y la devuelve en PEM.
@@ -70,11 +69,11 @@ func SealKey(k crypto.Signer, password []byte, p vault.Params) ([]byte, error) {
 func OpenKey(sealed, password []byte) (crypto.Signer, error) {
 	b, _ := pem.Decode(sealed)
 	if b == nil || b.Type != SealedPEMType {
-		return nil, errors.New("pki: no es una llave sellada por MACUAHUITL (" + SealedPEMType + ")")
+		return nil, i18n.New("pki.err.not_sealed", i18n.A("type", SealedPEMType))
 	}
 	der, err := vault.Unseal(password, b.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("pki: abrir la llave: %w", err)
+		return nil, i18n.Wrap("pki.err.open_key", err, nil)
 	}
 	defer clear(der)
 	k, err := x509.ParsePKCS8PrivateKey(der)
@@ -83,7 +82,7 @@ func OpenKey(sealed, password []byte) (crypto.Signer, error) {
 	}
 	s, ok := k.(crypto.Signer)
 	if !ok {
-		return nil, errors.New("pki: tipo de llave no soportado")
+		return nil, i18n.New("pki.err.key_type", nil)
 	}
 	return s, nil
 }
@@ -110,16 +109,16 @@ type CSRRequest struct {
 
 func CreateCSR(k crypto.Signer, r CSRRequest) ([]byte, error) {
 	if strings.TrimSpace(r.Subject.CN) == "" {
-		return nil, errors.New("pki: falta el CN")
+		return nil, i18n.New("pki.err.no_cn", nil)
 	}
 	if c := r.Subject.C; c != "" && len(c) != 2 {
-		return nil, errors.New("pki: el país (C) es de 2 letras ISO 3166")
+		return nil, i18n.New("pki.err.country", nil)
 	}
 	tpl := &x509.CertificateRequest{Subject: r.Subject.name(), DNSNames: r.DNS}
 	for _, s := range r.IPs {
 		ip, err := netip.ParseAddr(s)
 		if err != nil {
-			return nil, fmt.Errorf("pki: IP %q inválida", s)
+			return nil, i18n.New("pki.err.bad_ip", i18n.A("ip", s))
 		}
 		tpl.IPAddresses = append(tpl.IPAddresses, ip.AsSlice()) // pki no importa net (noegress)
 	}
@@ -136,7 +135,7 @@ func serial() (*big.Int, error) {
 
 func validity(days, max int, now time.Time) (time.Time, time.Time, error) {
 	if days <= 0 || days > max {
-		return time.Time{}, time.Time{}, fmt.Errorf("pki: validez de %d días fuera de 1–%d", days, max)
+		return time.Time{}, time.Time{}, i18n.New("pki.err.validity", i18n.A("days", days, "max", max))
 	}
 	now = now.Truncate(time.Second)
 	return now.Add(-5 * time.Minute), now.Add(time.Duration(days) * 24 * time.Hour), nil // margen para relojes desfasados
@@ -145,7 +144,7 @@ func validity(days, max int, now time.Time) (time.Time, time.Time, error) {
 // InitCA crea la raíz autofirmada de laboratorio (pathlen 0: no admite subordinadas).
 func InitCA(k crypto.Signer, cn string, days int, now time.Time) ([]byte, error) {
 	if strings.TrimSpace(cn) == "" {
-		return nil, errors.New("pki: falta el nombre de la CA")
+		return nil, i18n.New("pki.err.no_ca_name", nil)
 	}
 	nb, na, err := validity(days, maxCADays, now)
 	if err != nil {
@@ -174,7 +173,7 @@ var profiles = map[string][]x509.ExtKeyUsage{
 func firstCert(p []byte) (*x509.Certificate, error) {
 	b, _ := pem.Decode(p)
 	if b == nil || b.Type != "CERTIFICATE" {
-		return nil, errors.New("pki: se esperaba un certificado PEM")
+		return nil, i18n.New("pki.err.want_cert", nil)
 	}
 	return x509.ParseCertificate(b.Bytes)
 }
@@ -194,22 +193,22 @@ func Sign(caPEM []byte, caKey crypto.Signer, csrPEM []byte, profile string, days
 		return nil, err
 	}
 	if !ca.IsCA {
-		return nil, errors.New("pki: el certificado indicado no es de una CA")
+		return nil, i18n.New("pki.err.not_ca", nil)
 	}
 	eku, ok := profiles[profile]
 	if !ok {
-		return nil, fmt.Errorf("pki: perfil %q desconocido (server, client, server-client)", profile)
+		return nil, i18n.New("pki.err.profile", i18n.A("profile", profile))
 	}
 	b, _ := pem.Decode(csrPEM)
 	if b == nil || !strings.HasSuffix(b.Type, "CERTIFICATE REQUEST") {
-		return nil, errors.New("pki: se esperaba un CSR PEM")
+		return nil, i18n.New("pki.err.want_csr", nil)
 	}
 	csr, err := x509.ParseCertificateRequest(b.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("pki: CSR: %w", err)
+		return nil, i18n.Wrap("pki.err.csr", err, nil)
 	}
 	if err := csr.CheckSignature(); err != nil {
-		return nil, fmt.Errorf("pki: la firma del CSR no verifica: %w", err)
+		return nil, i18n.Wrap("pki.err.csr_sig", err, nil)
 	}
 	nb, na, err := validity(days, maxLeafDays, now)
 	if err != nil {
@@ -250,12 +249,12 @@ func Export(format string, certPEM, chainPEM []byte, key crypto.Signer, password
 		}
 		c, err := x509.ParseCertificate(b.Bytes)
 		if err != nil {
-			return nil, fmt.Errorf("pki: cadena: %w", err)
+			return nil, i18n.Wrap("pki.err.chain", err, nil)
 		}
 		chain = append(chain, c)
 	}
 	if key != nil && !sameKey(cert.PublicKey, key.Public()) {
-		return nil, errors.New("pki: la llave no corresponde al certificado")
+		return nil, i18n.New("pki.err.key_mismatch", nil)
 	}
 	switch format {
 	case "der":
@@ -276,7 +275,7 @@ func Export(format string, certPEM, chainPEM []byte, key crypto.Signer, password
 		return out.Bytes(), nil
 	case "p12", "p12-legacy":
 		if key == nil || password == "" {
-			return nil, errors.New("pki: PKCS#12 necesita la llave y una contraseña de exportación")
+			return nil, i18n.New("pki.err.p12_needs", nil)
 		}
 		enc := pkcs12.Modern2023
 		if format == "p12-legacy" {
@@ -284,7 +283,7 @@ func Export(format string, certPEM, chainPEM []byte, key crypto.Signer, password
 		}
 		return enc.Encode(key, cert, chain, password)
 	}
-	return nil, fmt.Errorf("pki: formato %q desconocido (pem, der, p12, p12-legacy)", format)
+	return nil, i18n.New("pki.err.format", i18n.A("format", format))
 }
 
 // Summary es el resumen legible de un certificado o CSR.
@@ -437,17 +436,17 @@ func Decode(in []byte, now time.Time) ([]Summary, error) {
 		case b.Type == "CERTIFICATE":
 			c, err := x509.ParseCertificate(b.Bytes)
 			if err != nil {
-				return nil, fmt.Errorf("pki: certificado: %w", err)
+				return nil, i18n.Wrap("pki.err.cert", err, nil)
 			}
 			out = append(out, summarizeCert(c, now))
 		case strings.HasSuffix(b.Type, "CERTIFICATE REQUEST"):
 			r, err := x509.ParseCertificateRequest(b.Bytes)
 			if err != nil {
-				return nil, fmt.Errorf("pki: CSR: %w", err)
+				return nil, i18n.Wrap("pki.err.csr", err, nil)
 			}
 			out = append(out, summarizeCSR(r))
 		default:
-			return nil, fmt.Errorf("pki: bloque PEM %q no soportado (solo certificados y CSR; no pegues llaves privadas)", b.Type)
+			return nil, i18n.New("pki.err.pem_block", i18n.A("type", b.Type))
 		}
 	}
 	if len(out) > 0 {
@@ -459,7 +458,7 @@ func Decode(in []byte, now time.Time) ([]Summary, error) {
 	if r, err := x509.ParseCertificateRequest(in); err == nil {
 		return []Summary{summarizeCSR(r)}, nil
 	}
-	return nil, errors.New("pki: no se reconoce un certificado ni un CSR (PEM o DER)")
+	return nil, i18n.New("pki.err.unrecognized", nil)
 }
 
 // Text es el informe legible en español.

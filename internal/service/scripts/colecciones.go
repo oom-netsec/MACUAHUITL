@@ -743,9 +743,10 @@ func (s *svc) ImportFormat(ctx context.Context, r *v1.ImportFormatRequest) (*v1.
 	if err != nil {
 		return nil, internal(err)
 	}
+	loc := i18n.Locale(ctx)
 	out := &v1.ImportFormatResponse{}
 	for _, c := range cs {
-		out.Fields = append(out.Fields, &v1.FormatField{Name: c.Nombre, Type: c.Tipo, Required: c.Obligatorio, Example: c.Ejemplo, Description: c.Descripcion})
+		out.Fields = append(out.Fields, &v1.FormatField{Name: c.Nombre, Type: c.TipoT.In(loc), Required: c.Obligatorio, Example: c.Ejemplo, Description: c.Desc.In(loc)})
 	}
 	return out, nil
 }

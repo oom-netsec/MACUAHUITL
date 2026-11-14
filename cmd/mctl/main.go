@@ -84,14 +84,14 @@ var outIsTTY = func(w io.Writer) bool {
 }
 
 func run(args []string, stdin io.Reader, out io.Writer) error {
-	usage := cli.Help(areas)
+	cli.SetLang("")
 	// Ayuda y versión también valen con las banderas globales delante (--lang en --help).
 	info := func(args []string) (done bool) {
 		switch {
 		case len(args) == 1 && (args[0] == "--version" || args[0] == "-version"):
 			fmt.Fprintln(out, version.String())
 		case len(args) == 1 && (args[0] == "--help" || args[0] == "-h" || args[0] == "help"):
-			fmt.Fprintln(out, usage)
+			fmt.Fprintln(out, cli.Help(areas))
 		default:
 			return false
 		}
@@ -101,32 +101,33 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 		return nil
 	}
 	if len(args) < 1 {
-		return errors.New(usage)
+		return errors.New(cli.Help(areas))
 	}
 	args, noColor := cli.StripFlag(args, "--no-color")
 	if len(args) < 1 {
-		return errors.New(usage)
+		return errors.New(cli.Help(areas))
 	}
 	args, lang, err := cli.StripLang(args)
 	if err != nil {
 		return err
 	}
+	cli.SetLang(lang) // antes de la ayuda: --lang es --help sale en español
 	if info(args) {
 		return nil
 	}
 	if len(args) < 1 {
-		return errors.New(usage)
+		return errors.New(cli.Help(areas))
 	}
 	cmd, rest, ok := cli.Find(areas, args)
 	if !ok {
-		return errors.New(usage)
+		return errors.New(cli.Help(areas))
 	}
 	c := &cli.Env{In: bufio.NewReader(stdin), Out: out}
 	if f, ok := stdin.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
 		c.TTY = f
 	}
 	// Conectar solo cuando el comando es válido: un error de uso no debe hablar del socket.
-	// Solo --lang explícito pide idioma: mctl no lee LC_ALL, LC_MESSAGES ni LANG mientras sus textos sigan en español.
+	// Solo --lang explícito pide idioma: mctl no lee LC_ALL, LC_MESSAGES ni LANG (el inglés es el de omisión).
 	var dialOpts []ipc.DialOption
 	if lang != "" {
 		dialOpts = ipc.WithLanguage(lang)
@@ -145,5 +146,5 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	if !cmd.Raw { // la consola es una sesión cruda: sin sanear ni pintar
 		c.Out = cli.NewOut(out, color, termcolor.Lookup(pal), termcolor.Truecolor(os.Getenv))
 	}
-	return cmd.Run(c, rest)
+	return cli.LocalizeUsage(cmd.Run(c, rest))
 }

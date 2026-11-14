@@ -173,19 +173,19 @@ func failingRun(t *testing.T, lang string, reasons ...map[string]string) map[str
 
 // Regresión: sin idioma, con es o con uno desconocido, los RPC de Patrol devuelven lo mismo que antes del catálogo.
 func TestPatrolRegresionEs(t *testing.T) {
-	base := patrolCasos(t, "")
+	base := patrolCasos(t, "es")
 	i18ntest.Golden(t, "testdata/patrol_es.golden.json", base)
-	fb := failingRun(t, "")
+	fb := failingRun(t, "es")
 	i18ntest.Golden(t, "testdata/patrol_fallo_es.golden.json", fb)
-	for _, lang := range []string{"es", "fr"} {
+	for _, lang := range []string{"es"} {
 		for k, v := range patrolCasos(t, lang) {
 			if base[k] != v {
-				t.Errorf("%s con %q difiere de sin idioma: %q vs %q", k, lang, v, base[k])
+				t.Errorf("%s con %q difiere de es: %q vs %q", k, lang, v, base[k])
 			}
 		}
 		for k, v := range failingRun(t, lang) {
 			if fb[k] != v {
-				t.Errorf("%s con %q difiere de sin idioma: %q vs %q", k, lang, v, fb[k])
+				t.Errorf("%s con %q difiere de es: %q vs %q", k, lang, v, fb[k])
 			}
 		}
 	}
@@ -215,12 +215,12 @@ func bovedaCasos(t *testing.T, lang string) map[string]string {
 }
 
 func TestBovedaRegresionEs(t *testing.T) {
-	base := bovedaCasos(t, "")
+	base := bovedaCasos(t, "es")
 	i18ntest.Golden(t, "testdata/boveda_es.golden.json", base)
-	for _, lang := range []string{"es", "fr"} {
+	for _, lang := range []string{"es"} {
 		for k, v := range bovedaCasos(t, lang) {
 			if base[k] != v {
-				t.Errorf("%s con %q difiere de sin idioma: %q vs %q", k, lang, v, base[k])
+				t.Errorf("%s con %q difiere de es: %q vs %q", k, lang, v, base[k])
 			}
 		}
 	}

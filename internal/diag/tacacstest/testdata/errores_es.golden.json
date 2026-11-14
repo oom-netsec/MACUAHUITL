@@ -1,0 +1,10 @@
+{
+ "av": "tacacs: el AV pair \"cmd=aaaaaaaaaaaaaaaa\"… mide 304 bytes; el máximo es 255 (acorta el comando)",
+ "limite": "cuerpo de 131072 bytes excede el límite",
+ "secreto": "tacacs: falta el secreto compartido (sin él el tráfico viaja en claro)",
+ "servidor": "tacacs: servidor inválido",
+ "tipo": "tacacs: tipo de autenticación \"chap\" no soportado (ascii, pap)",
+ "truncado": "cuerpo truncado",
+ "usuario": "tacacs: usuario vacío o campos de más de 255 bytes",
+ "version": "versión mayor 0x3: no es TACACS+"
+}

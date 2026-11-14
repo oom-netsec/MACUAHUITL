@@ -31,15 +31,42 @@ func StripLang(args []string) (rest []string, lang string, err error) {
 		}
 		if !hasVal {
 			if i+1 >= len(args) {
-				return nil, "", fmt.Errorf("--lang pide un idioma (es o en)")
+				return nil, "", fmt.Errorf("--lang needs a language (es or en)")
 			}
 			i++
 			val = args[i]
 		}
 		if !validLang(val) {
-			return nil, "", fmt.Errorf("idioma inválido %q (usa es o en)", val)
+			return nil, "", fmt.Errorf("invalid language %q (use es or en)", val)
 		}
 		lang = i18n.Parse(val)
 	}
 	return append(rest, args[i:]...), lang, nil
+}
+
+// locale es el idioma de los mensajes propios de mctl (los del núcleo ya llegan en él por accept-language): en salvo
+// que main reciba --lang es. Se fija una vez, antes de despachar el comando.  La ayuda y los «uso: mctl …» siguen el mismo idioma.
+var locale = i18n.En
+
+// SetLang fija el idioma de los mensajes propios de mctl (el que devuelve StripLang; "" = en).
+func SetLang(lang string) { locale = i18n.Normalize(lang) }
+
+// Lang es el idioma vigente de los mensajes propios de mctl (es o en).
+func Lang() string { return locale }
+
+// T es el texto del código del catálogo en el idioma de mctl; los pares son nombre, valor (como i18n.A).
+func T(code string, kv ...any) string { return i18n.Msg(locale, code, i18n.A(kv...)) }
+
+// coded es un error con código del catálogo que se escribe en el idioma de mctl (con es, el texto de siempre).
+type coded struct{ e *i18n.Error }
+
+func (c coded) Error() string { return c.e.Localize(locale) }
+func (c coded) Unwrap() error { return c.e }
+
+// Err es un error con el texto del código en el idioma de mctl.
+func Err(code string, kv ...any) error { return coded{i18n.New(code, i18n.A(kv...))} }
+
+// ErrWrap es Err con una causa: la plantilla la usa como {cause} y errors.Is/As la alcanzan.
+func ErrWrap(code string, cause error, kv ...any) error {
+	return coded{i18n.Wrap(code, cause, i18n.A(kv...))}
 }

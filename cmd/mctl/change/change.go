@@ -60,17 +60,17 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 			return err
 		}
 		if fs.NArg() != 1 {
-			return fmt.Errorf("change %s necesita el ID del cambio", name)
+			return cli.Err("mctl.change.need_id", "name", name)
 		}
 		r, err := v1.NewChangeServiceClient(c.Conn).CaptureChange(context.Background(), &v1.CaptureChangeRequest{ChangeId: fs.Arg(0), Phase: phase, AcceptedHostKeyFingerprints: accept, ExcludedDeviceIds: exclude})
 		if err != nil {
 			return err
 		}
 		if !r.Armed {
-			fmt.Fprintf(c.Out, "trabajo %s creado sin armar: %s\nrevisa con: mctl job logintest %s\ny repite con: mctl change %s --accept HUELLA %s (o arma con mctl job arm)\n", r.JobId, r.Detail, r.JobId, name, fs.Arg(0))
-			return errors.New("captura " + name + " sin armar")
+			fmt.Fprintln(c.Out, cli.T("mctl.change.unarmed", "job", r.JobId, "detail", r.Detail, "name", name, "id", fs.Arg(0)))
+			return cli.Err("mctl.change.unarmed_er", "name", name)
 		}
-		fmt.Fprintf(c.Out, "captura %s en trabajo %s; síguela con: mctl job watch %s\n", name, r.JobId, r.JobId)
+		fmt.Fprintln(c.Out, cli.T("mctl.change.capturing", "name", name, "job", r.JobId))
 		return nil
 	}
 }
@@ -138,7 +138,7 @@ func changeReport(c *cli.Env, args []string) error {
 		}
 	}
 	if n > 0 {
-		return fmt.Errorf("%d equipos con regresión", n)
+		return cli.Err("mctl.change.regression", "n", n)
 	}
 	return nil
 }
@@ -190,7 +190,7 @@ func upgradeCheck(c *cli.Env, args []string) error {
 		}
 	}
 	if n > 0 {
-		return fmt.Errorf("%d verificaciones fallaron", n)
+		return cli.Err("mctl.change.checks_failed", "n", n)
 	}
 	return nil
 }
@@ -224,7 +224,7 @@ func complianceCheck(c *cli.Env, args []string) error {
 	var rep struct{ Fail int }
 	json.Unmarshal([]byte(r.Report.Json), &rep)
 	if rep.Fail > 0 {
-		return fmt.Errorf("%d reglas fallaron", rep.Fail)
+		return cli.Err("mctl.change.rules_failed", "n", rep.Fail)
 	}
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 )
 
@@ -44,7 +45,7 @@ type SnmpTargetDTO struct {
 
 func (t SnmpTargetDTO) proto() (*v1.SnmpTarget, error) {
 	if t.Port < 0 || t.Port > 65535 {
-		return nil, fmt.Errorf("puerto %d inválido", t.Port)
+		return nil, i18n.New("bridge.err.port", i18n.A("port", t.Port))
 	}
 	return &v1.SnmpTarget{Host: t.Host, Port: uint32(t.Port), Version: t.Version, CredentialId: t.CredentialId, AuthProtocol: t.Auth, PrivProtocol: t.Priv}, nil
 }
@@ -52,7 +53,7 @@ func (t SnmpTargetDTO) proto() (*v1.SnmpTarget, error) {
 func (b *Bridge) SnmpGet(t SnmpTargetDTO, oids []string) (string, error) {
 	pt, err := t.proto()
 	if err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewVisibilityServiceClient(c).SnmpGet(ctx, &v1.SnmpGetRequest{Target: pt, Oids: oids})
@@ -63,7 +64,7 @@ func (b *Bridge) SnmpGet(t SnmpTargetDTO, oids []string) (string, error) {
 func (b *Bridge) SnmpWalk(t SnmpTargetDTO, oid string, bulk bool) (string, error) {
 	pt, err := t.proto()
 	if err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewVisibilityServiceClient(c).SnmpWalk(ctx, &v1.SnmpWalkRequest{Target: pt, Oid: oid, Bulk: bulk})
@@ -122,7 +123,7 @@ func (b *Bridge) stream(name string, open func(ctx context.Context, c *ipc.Clien
 func (b *Bridge) SnmpPollStart(t SnmpTargetDTO, profiles []string, every int) (string, error) {
 	pt, err := t.proto()
 	if err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	return b.stream("snmp", func(ctx context.Context, c *ipc.ClientConn) (func() (map[string]any, error), error) {
 		st, err := v1.NewVisibilityServiceClient(c).SnmpPoll(ctx, &v1.SnmpPollRequest{Target: pt, Profiles: profiles, IntervalSeconds: int32(every)})
@@ -140,7 +141,7 @@ func (b *Bridge) SnmpPollStart(t SnmpTargetDTO, profiles []string, every int) (s
 // outputPath es la carpeta y rotatedPath cada archivo nuevo. Topes y archivo, como en SyslogStart.
 func (b *Bridge) TrapsStart(addr string, allowAny, save bool, v3Cred, auth, priv string, o SyslogOptions) (string, error) {
 	if err := o.check(); err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	return b.stream("traps", func(ctx context.Context, c *ipc.ClientConn) (func() (map[string]any, error), error) {
 		st, err := v1.NewVisibilityServiceClient(c).SnmpTraps(ctx, &v1.SnmpTrapsRequest{Addr: addr, AllowAny: allowAny, Save: save, V3CredentialId: v3Cred, AuthProtocol: auth, PrivProtocol: priv,
@@ -164,10 +165,10 @@ func (b *Bridge) TrapsStart(addr string, allowAny, save bool, v3Cred, auth, priv
 // Los topes de tasa cuentan datagramas de exportación y solo rigen con save (defaults 1000/s por exportador y 5000/s global).
 func (b *Bridge) FlowsStart(addr string, allowAny, save bool, top int, o SyslogOptions) (string, error) {
 	if int(int32(top)) != top { // el proto es int32: no se trunca en silencio
-		return "", wrapErr(fmt.Errorf("top fuera de rango: %d", top))
+		return "", b.bridgeErr(i18n.New("bridge.err.top", i18n.A("value", top)))
 	}
 	if err := o.check(); err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	return b.stream("flows", func(ctx context.Context, c *ipc.ClientConn) (func() (map[string]any, error), error) {
 		st, err := v1.NewVisibilityServiceClient(c).Flows(ctx, &v1.FlowsRequest{Addr: addr, AllowAny: allowAny, Save: save, Top: int32(top),
@@ -197,7 +198,7 @@ type GnmiTargetDTO struct {
 
 func (t GnmiTargetDTO) proto() (*v1.GnmiTarget, error) {
 	if t.Port < 0 || t.Port > 65535 {
-		return nil, fmt.Errorf("puerto %d inválido", t.Port)
+		return nil, i18n.New("bridge.err.port", i18n.A("port", t.Port))
 	}
 	return &v1.GnmiTarget{Host: t.Host, Port: uint32(t.Port), CredentialId: t.CredentialId, CaPath: t.CaPath, ServerName: t.ServerName}, nil
 }
@@ -205,7 +206,7 @@ func (t GnmiTargetDTO) proto() (*v1.GnmiTarget, error) {
 func (b *Bridge) GnmiGet(t GnmiTargetDTO, paths []string, encoding string) (string, error) {
 	pt, err := t.proto()
 	if err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewVisibilityServiceClient(c).GnmiGet(ctx, &v1.GnmiGetRequest{Target: pt, Paths: paths, Encoding: encoding})
@@ -217,7 +218,7 @@ func (b *Bridge) GnmiGet(t GnmiTargetDTO, paths []string, encoding string) (stri
 func (b *Bridge) GnmiSubscribeStart(t GnmiTargetDTO, paths []string, mode string, every int) (string, error) {
 	pt, err := t.proto()
 	if err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	return b.stream("gnmi", func(ctx context.Context, c *ipc.ClientConn) (func() (map[string]any, error), error) {
 		st, err := v1.NewVisibilityServiceClient(c).GnmiSubscribe(ctx, &v1.GnmiSubscribeRequest{Target: pt, Paths: paths, Mode: mode, IntervalSeconds: int32(every)})

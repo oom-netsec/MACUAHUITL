@@ -2,8 +2,8 @@ package bridge
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -47,7 +47,7 @@ var changePhases = map[string]v1.ChangePhase{"pre": v1.ChangePhase_CHANGE_PHASE_
 func (b *Bridge) ChangeCapture(changeID, phase string, accept, exclude []string) (CaptureDTO, error) {
 	ph, ok := changePhases[phase]
 	if !ok {
-		return CaptureDTO{}, wrapErr(fmt.Errorf("fase %q desconocida", phase))
+		return CaptureDTO{}, b.bridgeErr(i18n.New("bridge.err.phase", i18n.A("phase", phase)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (CaptureDTO, error) {
 		r, err := v1.NewChangeServiceClient(c).CaptureChange(ctx, &v1.CaptureChangeRequest{ChangeId: changeID, Phase: ph, AcceptedHostKeyFingerprints: accept, ExcludedDeviceIds: exclude})

@@ -8,12 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
-	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Error es todo error que el puente devuelve a TypeScript. Error() es el texto de siempre; además viaja como
@@ -69,23 +69,40 @@ func wrapErr(err error) error {
 	return out
 }
 
+// bridgeErr es wrapErr para un error propio del puente con código del catálogo: suma su reason y su metadata y, con
+// la app en otro idioma, lo escribe en él (en es, el texto de siempre). Un error sin código sale como wrapErr.
+func (b *Bridge) bridgeErr(err error) error {
+	out := wrapErr(err)
+	var c i18n.Coded
+	var be *Error
+	if !errors.As(out, &be) || !errors.As(err, &c) || be.Reason != "" || be.msg != "" {
+		return out
+	}
+	be.Reason, be.Metadata = c.Reason(), c.Metadata()
+	be.msg = i18n.In(b.locale(), err)
+	return be
+}
+
 // Idioma: con la bandera Localize encendida el puente manda el metadato accept-language con la preferencia ui.language.
-// Apagada (por omisión) no manda nada y el núcleo contesta en español, como antes.
+// Apagada (por omisión) no manda nada y el núcleo contesta en inglés, su idioma canónico.
 const langPref = "ui.language"
 
 type langCache struct {
-	mu     sync.Mutex
-	value  string
-	loaded bool
+	mu      sync.Mutex
+	value   string
+	loaded  bool
+	pending string // idioma elegido con el núcleo caído: se manda al reconectar
 }
 
 // language devuelve el idioma de la interfaz (preferencia ui.language), o "" si no se pudo leer. Se guarda en memoria
 // y SetPreference lo renueva.
 func (b *Bridge) language() string {
+	// lang.mu no se retiene durante client() ni el RPC: client() puede llamar a disconnected(), que también lo toma.
 	b.lang.mu.Lock()
-	defer b.lang.mu.Unlock()
-	if b.lang.loaded {
-		return b.lang.value
+	loaded, v := b.lang.loaded, b.lang.value
+	b.lang.mu.Unlock()
+	if loaded {
+		return v
 	}
 	c, err := b.client()
 	if err != nil {
@@ -97,8 +114,14 @@ func (b *Bridge) language() string {
 	if err != nil {
 		return ""
 	}
-	b.lang.value, b.lang.loaded = i18n.Normalize(r.GetValue()), true
-	return b.lang.value
+	v = i18n.Normalize(r.GetValue())
+	b.lang.mu.Lock()
+	defer b.lang.mu.Unlock()
+	if b.lang.loaded { // setLanguage ganó mientras leíamos: el valor leído es el viejo
+		return b.lang.value
+	}
+	b.lang.value, b.lang.loaded = v, true
+	return v
 }
 
 func (b *Bridge) setLanguage(v string) {
@@ -118,10 +141,10 @@ func (b *Bridge) callCtx() context.Context {
 	return b.ctx
 }
 
-// locale es el idioma de los textos que arma el propio puente (es sin Localize).
+// locale es el idioma de los textos que arma el propio puente (en sin Localize).
 func (b *Bridge) locale() string {
 	if !b.Localize || strings.TrimSpace(b.language()) == "" {
-		return i18n.Es
+		return i18n.Locale(context.Background())
 	}
 	return b.language()
 }

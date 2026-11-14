@@ -10,9 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
@@ -29,11 +27,8 @@ var (
 // números y unos pocos signos; nada de espacios, comillas, $ ni caracteres de formato (bidi).
 var safeShellPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N}/._+,@%=:-]+$`)
 
-// outputsErr arma el error con el código estable prefs.outputs.<motivo> al inicio (el paso de idioma de la
-// fase 30a lo traduce); el texto va en español.
-func outputsErr(code, format string, a ...any) error {
-	return status.Errorf(codes.InvalidArgument, "prefs.outputs.%s: %s", code, fmt.Sprintf(format, a...))
-}
+// outputsErr arma el error del código prefs.outputs.<motivo> (el prefijo va dentro del texto de es y de en).
+func outputsErr(code string, kv ...any) error { return i18n.New(code, i18n.A(kv...)) }
 
 // resolve sigue los enlaces si puede; si la ruta no existe devuelve la limpia.
 func resolve(p string) string {
@@ -52,27 +47,27 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 		return "", nil
 	}
 	if !filepath.IsAbs(dir) {
-		return "", outputsErr("relativa", "la ruta debe ser absoluta: %q", dir)
+		return "", outputsErr("prefs.outputs.relativa", "dir", dir)
 	}
 	if slices.Contains(strings.Split(dir, string(filepath.Separator)), "..") {
-		return "", outputsErr("punto_punto", "la ruta no puede llevar \"..\": %q", dir)
+		return "", outputsErr("prefs.outputs.punto_punto", "dir", dir)
 	}
 	real, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return "", outputsErr("no_existe", "la carpeta no existe: %s (créala con permisos 0700)", dir)
+			return "", outputsErr("prefs.outputs.no_existe", "dir", dir)
 		}
-		return "", outputsErr("ilegible", "no se pudo leer la carpeta %s: %v", dir, err)
+		return "", outputsErr("prefs.outputs.ilegible", "dir", dir, "err", err)
 	}
 	fi, err := os.Stat(real)
 	if err != nil {
-		return "", outputsErr("ilegible", "no se pudo leer la carpeta %s: %v", real, err)
+		return "", outputsErr("prefs.outputs.ilegible", "dir", real, "err", err)
 	}
 	if !fi.IsDir() {
-		return "", outputsErr("no_directorio", "%s no es una carpeta", real)
+		return "", outputsErr("prefs.outputs.no_directorio", "dir", real)
 	}
 	if real == "/" || (st.Home != "" && real == resolve(st.Home)) || real == resolve("/tmp") {
-		return "", outputsErr("reservada", "%s no puede ser la carpeta de salidas", real)
+		return "", outputsErr("prefs.outputs.reservada", "dir", real)
 	}
 	reserved := slices.Clone(st.Inside)
 	if st.Home != "" {
@@ -84,31 +79,31 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 		}
 		r = resolve(r)
 		if inside(real, r) {
-			return "", outputsErr("reservada", "%s está dentro de una carpeta reservada (%s)", real, r)
+			return "", outputsErr("prefs.outputs.reservada_dentro", "dir", real, "res", r)
 		}
 		if inside(r, real) { // la elegida contiene una reservada: el núcleo escribiría entre sus propios datos
-			return "", outputsErr("reservada", "%s contiene la carpeta reservada %s", real, r)
+			return "", outputsErr("prefs.outputs.reservada_contiene", "dir", real, "res", r)
 		}
 	}
 	if uid, ok := FileOwner(fi); !ok || uid != uint32(ProcUID()) {
-		return "", outputsErr("otro_dueno", "la carpeta %s no es del usuario que corre el núcleo", real)
+		return "", outputsErr("prefs.outputs.otro_dueno", "dir", real)
 	}
 	if m := fi.Mode().Perm(); m != 0o700 {
-		hint := ""
+		code := "prefs.outputs.permisos"
 		if safeShellPath.MatchString(real) { // sin comillas ni metacaracteres: la orden se puede pegar tal cual
-			hint = "; corrígelo con: chmod 700 " + real
+			code += "_orden"
 		}
-		return "", outputsErr("permisos", "la carpeta %s tiene modo %04o y debe ser 0700%s", real, m, hint)
+		return "", outputsErr(code, "dir", real, "mode", fmt.Sprintf("%04o", m))
 	}
 	// Un ancestro que otros pueden escribir (grupo u otros) deja que alguien reemplace la ruta, o la cree 0777 tras
 	// una limpieza de tmpfiles: no se acepta si no es del usuario (/tmp, /var/tmp y /dev/shm caen aquí).
 	for a := filepath.Dir(real); ; a = filepath.Dir(a) {
 		mode, uid, err := AncestorInfo(a)
 		if err != nil {
-			return "", outputsErr("ilegible", "no se pudo leer %s: %v", a, err)
+			return "", outputsErr("prefs.outputs.ilegible_ruta", "dir", a, "err", err)
 		}
 		if mode&0o022 != 0 && uid != uint32(ProcUID()) {
-			return "", outputsErr("ancestro_inseguro", "%s cuelga de %s, que otros usuarios pueden escribir (modo %s, dueño uid %d): otro usuario podría reemplazar la ruta; elige una carpeta bajo tu carpeta personal", real, a, mode, uid)
+			return "", outputsErr("prefs.outputs.ancestro_inseguro", "dir", real, "anc", a, "mode", mode, "uid", uid)
 		}
 		if a == "/" || a == filepath.Dir(a) {
 			break
@@ -119,7 +114,7 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 	}
 	f, err := CreateTemp(real, ".mcw-")
 	if err != nil {
-		return "", outputsErr("no_escribible", "no se puede escribir en %s: %v", real, err)
+		return "", outputsErr("prefs.outputs.no_escribible", "dir", real, "err", err)
 	}
 	f.Close()
 	os.Remove(f.Name())

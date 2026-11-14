@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -60,15 +61,28 @@ var ErrDisconnected = errors.New("núcleo desconectado")
 
 func (b *Bridge) client() (*ipc.ClientConn, error) {
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	if b.conn == nil {
 		c, err := b.dial()
 		if err != nil {
-			return nil, ErrDisconnected
+			b.mu.Unlock()
+			return nil, b.disconnected()
 		}
 		b.conn = c
 	}
+	defer b.mu.Unlock()
 	return b.conn, nil
+}
+
+// disconnected es ErrDisconnected en el idioma ya conocido de la app (sin núcleo no se puede leer la preferencia: si
+// no se había leído, en). errors.Is(err, ErrDisconnected) sigue valiendo.
+func (b *Bridge) disconnected() error {
+	loc := i18n.Locale(context.Background())
+	b.lang.mu.Lock()
+	if b.Localize && b.lang.loaded {
+		loc = b.lang.value
+	}
+	b.lang.mu.Unlock()
+	return &Error{err: ErrDisconnected, msg: i18n.Msg(loc, "bridge.err.disconnected", nil)}
 }
 
 // Status es el último estado conocido; la UI lo pide al montar porque el primer
@@ -119,6 +133,9 @@ func (b *Bridge) run(ctx context.Context) {
 		} else if b.setStatus("connected") {
 			b.resubscribe()
 		}
+		if err == nil {
+			b.syncLanguage(c)
+		}
 		select {
 		case <-ctx.Done():
 			b.mu.Lock()
@@ -133,6 +150,26 @@ func (b *Bridge) run(ctx context.Context) {
 		case <-t.C:
 		}
 	}
+}
+
+// syncLanguage manda al núcleo el idioma elegido mientras estaba caído.
+func (b *Bridge) syncLanguage(c *ipc.ClientConn) {
+	b.lang.mu.Lock()
+	v := b.lang.pending
+	b.lang.mu.Unlock()
+	if v == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(b.ctx, 3*time.Second)
+	defer cancel()
+	if _, err := v1.NewPrefsServiceClient(c).SetPreference(ctx, &v1.SetPreferenceRequest{Key: langPref, Value: v}); err != nil {
+		return
+	}
+	b.lang.mu.Lock()
+	if b.lang.pending == v {
+		b.lang.pending = ""
+	}
+	b.lang.mu.Unlock()
 }
 
 func call[T any](b *Bridge, f func(context.Context, *ipc.ClientConn) (T, error)) (T, error) {
@@ -568,7 +605,7 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 	enum, ok := map[string]v1.DiagTool{"ping": v1.DiagTool_DIAG_TOOL_PING, "traceroute": v1.DiagTool_DIAG_TOOL_TRACEROUTE,
 		"nmap": v1.DiagTool_DIAG_TOOL_NMAP, "iperf3": v1.DiagTool_DIAG_TOOL_IPERF3, "pcap": v1.DiagTool_DIAG_TOOL_PCAP}[tool]
 	if !ok {
-		return "", wrapErr(fmt.Errorf("herramienta %q desconocida", tool))
+		return "", b.bridgeErr(i18n.New("bridge.err.tool", i18n.A("tool", tool)))
 	}
 	c, err := b.client()
 	if err != nil {
@@ -646,7 +683,7 @@ func (b *Bridge) DiagCancel(runID string) error {
 	cancel, ok := b.runs[runID]
 	b.mu.Unlock()
 	if !ok {
-		return wrapErr(fmt.Errorf("ejecución %q no existe o ya terminó", runID))
+		return b.bridgeErr(i18n.New("bridge.err.run_gone", i18n.A("id", runID)))
 	}
 	cancel()
 	return nil
@@ -678,7 +715,7 @@ var dnsModes = map[string]v1.DnsMode{
 func (b *Bridge) ToolsDns(d DnsDTO) (string, error) {
 	mode, ok := dnsModes[d.Mode]
 	if !ok {
-		return "", wrapErr(fmt.Errorf("modo DNS %q desconocido", d.Mode))
+		return "", b.bridgeErr(i18n.New("bridge.err.dns_mode", i18n.A("mode", d.Mode)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewToolsServiceClient(c).Dns(ctx, &v1.DnsRequest{Mode: mode, Name: d.Name, Type: d.Type, Servers: d.Servers, Deep: d.Deep, Dnssec: d.Dnssec})
@@ -688,7 +725,7 @@ func (b *Bridge) ToolsDns(d DnsDTO) (string, error) {
 
 func (b *Bridge) ToolsTls(host string, port int, sni string) (string, error) {
 	if port < 0 || port > 65535 {
-		return "", wrapErr(fmt.Errorf("puerto %d inválido", port))
+		return "", b.bridgeErr(i18n.New("bridge.err.port", i18n.A("port", port)))
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewToolsServiceClient(c).InspectTls(ctx, &v1.InspectTlsRequest{Host: host, Port: uint32(port), Sni: sni})
@@ -715,7 +752,7 @@ func (o SyslogOptions) check() error {
 	for name, v := range map[string]int{"ratePerSource": o.RatePerSource, "burstPerSource": o.BurstPerSource, "rateGlobal": o.RateGlobal, "burstGlobal": o.BurstGlobal,
 		"queueSize": o.QueueSize, "rotateMb": o.RotateMB, "rotateMinutes": o.RotateMinutes, "maxFiles": o.MaxFiles} {
 		if int(int32(v)) != v {
-			return wrapErr(fmt.Errorf("%s fuera de rango: %d", name, v))
+			return i18n.New("bridge.err.range", i18n.A("name", name, "value", v))
 		}
 	}
 	return nil
@@ -748,7 +785,7 @@ func dropsDTO(d *v1.SyslogDrops) syslogDropsDTO {
 // drops es el acumulado de descartes; rotatedPath, un archivo nuevo. Se detiene con DiagCancel(id).
 func (b *Bridge) SyslogStart(addr, proto string, allowAny, save bool, o SyslogOptions) (string, error) {
 	if err := o.check(); err != nil {
-		return "", wrapErr(err)
+		return "", b.bridgeErr(err)
 	}
 	c, err := b.client()
 	if err != nil {

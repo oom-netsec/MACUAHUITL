@@ -33,7 +33,7 @@ func TestSeguridadRegresionEs(t *testing.T) {
 	const want = "Servidor RADIUS 127.0.0.1 (método PAP)\n\naccess-request: sin respuesta\n  ! sin respuesta tras 1 intentos de 100ms\n\n" +
 		"Hallazgos:\n  [error] access-request: el servidor no respondió. Causas usuales: este equipo no está dado de alta como NAS/dispositivo de red en el servidor, " +
 		"secreto compartido distinto (la petición se descarta por Message-Authenticator), UDP 1812 filtrado o puerto equivocado (1645/1646 heredados).\n"
-	for _, lang := range []string{"", "es", "es-MX", "fr"} {
+	for _, lang := range []string{"es", "es-MX"} {
 		if got := radiusClosed(t, c, lang).Report.Text; got != want {
 			t.Errorf("radius con %q:\n%q", lang, got)
 		}
@@ -43,7 +43,7 @@ func TestSeguridadRegresionEs(t *testing.T) {
 	defer f.Close()
 	host, port := split(t, f.Addr())
 	var first string
-	for _, lang := range []string{"", "es", "fr"} {
+	for _, lang := range []string{"es"} {
 		r, err := c.TacacsTest(con(t, lang), &v1.TacacsTestRequest{Host: host, Port: port, Username: "admin", SharedSecret: &v1.SecretSource{Value: []byte("s")},
 			Password: &v1.SecretSource{Value: []byte("pw")}, Command: "show version", Accounting: true})
 		if err != nil {
@@ -86,7 +86,7 @@ func TestRadiusEstructuradoYEn(t *testing.T) {
 		}
 		return r
 	}
-	r := ask("")
+	r := ask("es")
 	var js struct {
 		Server    string
 		Method    string
@@ -159,7 +159,7 @@ func TestTacacsEstructuradoYEn(t *testing.T) {
 		}
 		return r
 	}
-	r := ask("", "MARCA-PW", "show version")
+	r := ask("es", "MARCA-PW", "show version")
 	var js struct {
 		Server string
 		Steps  []struct {
@@ -307,10 +307,10 @@ func TestIkeDecodeEstructuradoYEn(t *testing.T) {
 		}
 		return r
 	}
-	base := ask("")
-	for _, lang := range []string{"es", "es-MX", "fr"} {
+	base := ask("es")
+	for _, lang := range []string{"es", "es-MX"} {
 		if r := ask(lang); r.Report.Text != base.Report.Text || r.Report.Json != base.Report.Json {
-			t.Errorf("%s difiere de sin idioma", lang)
+			t.Errorf("%s difiere de es", lang)
 		}
 	}
 	if base.Phase1 != "failed" || base.Phase2 != "no_data" || len(base.Findings) != 1 || len(base.Proposals) != 1 {

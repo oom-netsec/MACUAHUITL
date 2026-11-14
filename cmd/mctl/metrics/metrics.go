@@ -119,24 +119,24 @@ func writeCSV(c *cli.Env, r *v1.GetJobMetricsResponse) error {
 
 func writeText(c *cli.Env, r *v1.GetJobMetricsResponse) {
 	for _, d := range r.Devices {
-		fmt.Fprintf(c.Out, "%s (%s) · %d rondas\n", d.Hostname, d.Address, d.Rounds)
+		fmt.Fprintln(c.Out, cli.T("mctl.metrics.device", "host", d.Hostname, "addr", d.Address, "n", d.Rounds))
 		if n := len(d.Cpu); n > 0 {
 			l := d.Cpu[n-1]
 			var peak float64
 			for _, p := range d.Cpu {
 				peak = max(peak, p.FiveSec)
 			}
-			fmt.Fprintf(c.Out, "  CPU    último 5s/1min/5min: %s/%s/%s %%   pico 5s: %s %%\n", f(l.FiveSec), f(l.OneMin), f(l.FiveMin), f(peak))
+			fmt.Fprintln(c.Out, cli.T("mctl.metrics.cpu", "five", f(l.FiveSec), "one", f(l.OneMin), "fivemin", f(l.FiveMin), "peak", f(peak)))
 		}
 		for _, m := range d.Memory {
 			if n := len(m.Points); n > 0 {
 				l := m.Points[n-1]
-				fmt.Fprintf(c.Out, "  Memoria %-10s usado %d de %d bytes (%.1f %%)\n", m.Pool, l.Used, l.Total, float64(l.Used)*100/float64(max(l.Total, 1)))
+				fmt.Fprintln(c.Out, cli.T("mctl.metrics.memory", "pool", fmt.Sprintf("%-10s", m.Pool), "used", l.Used, "total", l.Total, "pct", fmt.Sprintf("%.1f", float64(l.Used)*100/float64(max(l.Total, 1)))))
 			}
 		}
 		if len(d.Interfaces) > 0 {
 			tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-			fmt.Fprintln(tw, "  INTERFAZ\tBW\tPICO UTIL %\tENTRADA bps\tSALIDA bps\tERRORES\tDESCARTES\tCRC\tRESETS")
+			fmt.Fprintln(tw, cli.T("mctl.metrics.iface_header"))
 			for _, s := range d.Interfaces {
 				var in, out float64
 				var errs, drops, crc, resets int64
@@ -157,18 +157,18 @@ func writeText(c *cli.Env, r *v1.GetJobMetricsResponse) {
 			}
 			tw.Flush()
 			if int(d.InterfaceTotal) > len(d.Interfaces) {
-				fmt.Fprintf(c.Out, "  (%d de %d interfaces; --top N o --iface NOMBRE para otras)\n", len(d.Interfaces), d.InterfaceTotal)
+				fmt.Fprintln(c.Out, cli.T("mctl.metrics.iface_more", "shown", len(d.Interfaces), "total", d.InterfaceTotal))
 			}
 		}
 		for _, w := range d.Warnings {
-			fmt.Fprintf(c.Out, "  aviso: %s\n", w)
+			fmt.Fprintln(c.Out, cli.T("mctl.common_a.warning_indented", "text", w))
 		}
 	}
 	for _, w := range r.Warnings {
-		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+		fmt.Fprintln(c.Out, cli.T("mctl.common_a.warning", "text", w))
 	}
 	if len(r.Devices) == 0 && len(r.Warnings) == 0 {
-		fmt.Fprintln(c.Out, "el trabajo no tiene datos de equipos")
+		fmt.Fprintln(c.Out, cli.T("mctl.metrics.no_data"))
 	}
 }
 
@@ -205,8 +205,8 @@ func portsStatus(c *cli.Env, args []string) error {
 	}
 	r, err := v1.NewMetricsServiceClient(c.Conn).GetPortStatus(context.Background(), req)
 	if err != nil {
-		if i := strings.Index(err.Error(), "SHA256:"); i >= 0 && strings.Contains(err.Error(), "llave de host") {
-			return fmt.Errorf("%w\nsi esa huella es la del equipo, repite con --accept-host-key %s", err, strings.Fields(err.Error()[i:])[0])
+		if i := strings.Index(err.Error(), "SHA256:"); i >= 0 && (strings.Contains(err.Error(), "llave de host") || strings.Contains(err.Error(), "host key")) {
+			return cli.ErrWrap("mctl.common_a.accept_host_key", err, "fp", strings.Fields(err.Error()[i:])[0])
 		}
 		return err
 	}
@@ -220,7 +220,7 @@ func portsStatus(c *cli.Env, args []string) error {
 	}
 	fmt.Fprintf(c.Out, "%s (%s) · %s · %s\n", r.Hostname, r.Address, r.Source, ts(r.AtMs))
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "PUERTO\tM/S/N\tESTADO\tVLAN\tDÚPLEX\tVELOCIDAD\tTIPO\tNOTAS\tDESCRIPCIÓN")
+	fmt.Fprintln(tw, cli.T("mctl.metrics.ports_header"))
 	for _, p := range r.Ports {
 		var notes []string
 		if p.Trunk {
@@ -237,10 +237,10 @@ func portsStatus(c *cli.Env, args []string) error {
 		for _, x := range ch.Members {
 			m = append(m, x.Port+"("+x.Flags+")")
 		}
-		fmt.Fprintf(c.Out, "canal %s (%s, %s): %s\n", ch.Name, ch.State, ch.Protocol, strings.Join(m, " "))
+		fmt.Fprintln(c.Out, cli.T("mctl.metrics.channel", "name", ch.Name, "state", ch.State, "proto", ch.Protocol, "members", strings.Join(m, " ")))
 	}
 	for _, w := range r.Warnings {
-		fmt.Fprintf(c.Out, "aviso: %s\n", w)
+		fmt.Fprintln(c.Out, cli.T("mctl.common_a.warning", "text", w))
 	}
 	return nil
 }

@@ -2,7 +2,6 @@ package assist
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math/bits"
 	"net/netip"
 	"regexp"
@@ -75,36 +74,36 @@ func sectionLike(line string) bool {
 
 // hygiene son las reglas de toda línea, de cualquier familia: ASCII, '?', la lista negra del motor, enmascarados y todo lo que lleve un
 // secreto o una autenticación.
-func hygiene(line string) string {
+func hygiene(line string) i18n.Text {
 	if err := asciiOnly(line); err != nil {
-		return "caracteres fuera de ASCII imprimible (0x20-0x7e): IOS los recorta y una línea podría colar otro comando; hazlo a mano"
+		return lt("caracteres fuera de ASCII imprimible (0x20-0x7e): IOS los recorta y una línea podría colar otro comando; hazlo a mano", "characters outside printable ASCII (0x20-0x7e): IOS trims them and a line could smuggle in another command; do it by hand")
 	}
 	if strings.Contains(line, "?") {
-		return "'?' abre la ayuda de IOS sin Enter"
+		return lt("'?' abre la ayuda de IOS sin Enter", "'?' opens the IOS help without Enter")
 	}
 	if isDenied(line) {
-		return "comando prohibido en modo asistido"
+		return lt("comando prohibido en modo asistido", "command forbidden in assisted mode")
 	}
 	if maskRe.MatchString(line) {
-		return "tiene secretos enmascarados"
+		return lt("tiene secretos enmascarados", "has masked secrets")
 	}
 	if i, why := secretAt(tokens(line)); i >= 0 {
 		return why
 	}
-	return ""
+	return i18n.Text{}
 }
 
 // secretAt da la posición de la primera palabra que marca un secreto o una autenticación (y por qué), o -1.
-func secretAt(f []string) (int, string) {
+func secretAt(f []string) (int, i18n.Text) {
 	for i, w := range f {
 		if slices.Contains(secretWords, w) || strings.HasSuffix(w, "-password") || strings.HasSuffix(w, "-key") {
-			return i, "lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+			return i, lt("lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación", "carries a secret or a reversible hash: it is neither shown nor audited; do it by hand or with the rotation")
 		}
 		if len(w) >= 5 && strings.HasPrefix("authentication", w) {
-			return i, "authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
+			return i, lt("authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano", "authentication: carries keys or changes how traffic is admitted; do it by hand")
 		}
 	}
-	return -1, ""
+	return -1, i18n.Text{}
 }
 
 // redact es lo único de una línea rechazada que sale del núcleo: si lleva un secreto, solo los tokens anteriores a la palabra del secreto y
@@ -133,55 +132,55 @@ func redact(line string) string {
 // lo que no está en la lista cerrada se rechaza igual.
 var forbidden = []struct {
 	w   word
-	why string
+	why i18n.Text
 }{
-	{word{"ip", "route"}, "ruta estática: puede cortar el acceso o el tráfico; hazla a mano"},
-	{word{"ipv6", "route"}, "ruta estática IPv6: puede cortar el acceso o el tráfico; hazla a mano"},
-	{word{"ip", "default-gateway"}, "ruta por omisión (ip default-gateway): puede cortar el acceso"},
-	{word{"ip", "routing"}, "ip routing: cambia el modo del equipo"},
-	{word{"router"}, "router *: protocolo de enrutamiento; hazlo a mano"},
-	{word{"access-list"}, "ACL numerada (access-list): hazla a mano"},
-	{word{"ip", "access-list"}, "ACL: hazla a mano"},
-	{word{"ipv6", "access-list"}, "ACL IPv6: hazla a mano"},
-	{word{"mac", "access-list"}, "ACL MAC: hazla a mano"},
-	{word{"ip", "access-group"}, "ACL aplicada a una interfaz: hazla a mano"},
-	{word{"ipv6", "traffic-filter"}, "ACL IPv6 aplicada a una interfaz: hazla a mano"},
-	{word{"route-map"}, "route-map: hazlo a mano"},
-	{word{"ip", "prefix-list"}, "prefix-list: hazla a mano"},
-	{word{"ip", "vrf"}, "vrf: hazlo a mano"},
-	{word{"vrf"}, "vrf: hazlo a mano"},
-	{word{"line"}, "line (consola, auxiliar y vty): un error corta el acceso"},
-	{word{"aaa"}, "aaa: un error corta el acceso al equipo"},
-	{word{"username"}, "usuarios locales: para eso está la rotación de credenciales"},
-	{word{"enable"}, "enable secret/password: para eso está la rotación de credenciales"},
-	{word{"crypto"}, "llaves y certificados (crypto): no se pueden inversar con certeza"},
-	{word{"standby"}, "standby (HSRP): hazlo a mano"},
-	{word{"vrrp"}, "vrrp: hazlo a mano"},
-	{word{"glbp"}, "glbp: hazlo a mano"},
-	{word{"ip", "ssh"}, "ip ssh: un error corta el acceso"},
-	{word{"snmp-server", "community"}, "lleva un secreto (la comunidad): no se muestra ni se audita"},
-	{word{"snmp-server", "user"}, "lleva un secreto: no se muestra ni se audita"},
-	{word{"snmp-server", "host"}, "lleva un secreto (la comunidad): no se muestra ni se audita"},
-	{word{"banner"}, "banner: texto con delimitadores, no se inversa con certeza"},
-	{word{"macro"}, "macro: texto con delimitadores, no se inversa con certeza"},
-	{word{"menu"}, "menu: texto con delimitadores, no se inversa con certeza"},
-	{word{"vtp"}, "vtp: se propaga a otros equipos"},
-	{word{"boot"}, "boot: cambia el arranque del equipo"},
-	{word{"config-register"}, "config-register: cambia el arranque del equipo"},
-	{word{"license"}, "licencias"},
-	{word{"kron"}, "kron: ejecuta comandos programados"},
-	{word{"archive"}, "archive: lo usa configure replace"},
-	{word{"event"}, "eem: ejecuta comandos"},
-	{word{"spanning-tree", "mode"}, "spanning-tree mode: reconverge todo el árbol, el uplink de gestión incluido; hazlo a mano"},
-	{word{"spanning-tree", "extend"}, "spanning-tree extend system-id: cambia el identificador del puente y reconverge todo el árbol; hazlo a mano"},
-	{word{"channel-group"}, "channel-group: parte de un Port-channel"},
-	{word{"switchport", "trunk"}, "trunk: puede cortar el acceso"},
-	{word{"switchport", "mode"}, "switchport mode: el modo del puerto no se cambia"},
-	{word{"no", "switchport"}, "no switchport: pasa el puerto a capa 3"},
-	{word{"interface"}, "interfaz completa: crearla o borrarla no se inversa con certeza"},
+	{word{"ip", "route"}, lt("ruta estática: puede cortar el acceso o el tráfico; hazla a mano", "static route: it can cut access or traffic; do it by hand")},
+	{word{"ipv6", "route"}, lt("ruta estática IPv6: puede cortar el acceso o el tráfico; hazla a mano", "IPv6 static route: it can cut access or traffic; do it by hand")},
+	{word{"ip", "default-gateway"}, lt("ruta por omisión (ip default-gateway): puede cortar el acceso", "default route (ip default-gateway): it can cut access")},
+	{word{"ip", "routing"}, lt("ip routing: cambia el modo del equipo", "ip routing: it changes the device mode")},
+	{word{"router"}, lt("router *: protocolo de enrutamiento; hazlo a mano", "router *: routing protocol; do it by hand")},
+	{word{"access-list"}, lt("ACL numerada (access-list): hazla a mano", "numbered ACL (access-list): do it by hand")},
+	{word{"ip", "access-list"}, lt("ACL: hazla a mano", "ACL: do it by hand")},
+	{word{"ipv6", "access-list"}, lt("ACL IPv6: hazla a mano", "IPv6 ACL: do it by hand")},
+	{word{"mac", "access-list"}, lt("ACL MAC: hazla a mano", "MAC ACL: do it by hand")},
+	{word{"ip", "access-group"}, lt("ACL aplicada a una interfaz: hazla a mano", "ACL applied to an interface: do it by hand")},
+	{word{"ipv6", "traffic-filter"}, lt("ACL IPv6 aplicada a una interfaz: hazla a mano", "IPv6 ACL applied to an interface: do it by hand")},
+	{word{"route-map"}, lt("route-map: hazlo a mano", "route-map: do it by hand")},
+	{word{"ip", "prefix-list"}, lt("prefix-list: hazla a mano", "prefix-list: do it by hand")},
+	{word{"ip", "vrf"}, lt("vrf: hazlo a mano", "vrf: do it by hand")},
+	{word{"vrf"}, lt("vrf: hazlo a mano", "vrf: do it by hand")},
+	{word{"line"}, lt("line (consola, auxiliar y vty): un error corta el acceso", "line (console, auxiliary and vty): a mistake cuts access")},
+	{word{"aaa"}, lt("aaa: un error corta el acceso al equipo", "aaa: a mistake cuts access to the device")},
+	{word{"username"}, lt("usuarios locales: para eso está la rotación de credenciales", "local users: that is what the credential rotation is for")},
+	{word{"enable"}, lt("enable secret/password: para eso está la rotación de credenciales", "enable secret/password: that is what the credential rotation is for")},
+	{word{"crypto"}, lt("llaves y certificados (crypto): no se pueden inversar con certeza", "keys and certificates (crypto): they cannot be reversed with certainty")},
+	{word{"standby"}, lt("standby (HSRP): hazlo a mano", "standby (HSRP): do it by hand")},
+	{word{"vrrp"}, lt("vrrp: hazlo a mano", "vrrp: do it by hand")},
+	{word{"glbp"}, lt("glbp: hazlo a mano", "glbp: do it by hand")},
+	{word{"ip", "ssh"}, lt("ip ssh: un error corta el acceso", "ip ssh: a mistake cuts access")},
+	{word{"snmp-server", "community"}, lt("lleva un secreto (la comunidad): no se muestra ni se audita", "carries a secret (the community): it is neither shown nor audited")},
+	{word{"snmp-server", "user"}, lt("lleva un secreto: no se muestra ni se audita", "carries a secret: it is neither shown nor audited")},
+	{word{"snmp-server", "host"}, lt("lleva un secreto (la comunidad): no se muestra ni se audita", "carries a secret (the community): it is neither shown nor audited")},
+	{word{"banner"}, lt("banner: texto con delimitadores, no se inversa con certeza", "banner: text with delimiters, it cannot be reversed with certainty")},
+	{word{"macro"}, lt("macro: texto con delimitadores, no se inversa con certeza", "macro: text with delimiters, it cannot be reversed with certainty")},
+	{word{"menu"}, lt("menu: texto con delimitadores, no se inversa con certeza", "menu: text with delimiters, it cannot be reversed with certainty")},
+	{word{"vtp"}, lt("vtp: se propaga a otros equipos", "vtp: it propagates to other devices")},
+	{word{"boot"}, lt("boot: cambia el arranque del equipo", "boot: it changes the device startup")},
+	{word{"config-register"}, lt("config-register: cambia el arranque del equipo", "config-register: it changes the device startup")},
+	{word{"license"}, lt("licencias", "licenses")},
+	{word{"kron"}, lt("kron: ejecuta comandos programados", "kron: it runs scheduled commands")},
+	{word{"archive"}, lt("archive: lo usa configure replace", "archive: used by configure replace")},
+	{word{"event"}, lt("eem: ejecuta comandos", "eem: it runs commands")},
+	{word{"spanning-tree", "mode"}, lt("spanning-tree mode: reconverge todo el árbol, el uplink de gestión incluido; hazlo a mano", "spanning-tree mode: it reconverges the whole tree, the management uplink included; do it by hand")},
+	{word{"spanning-tree", "extend"}, lt("spanning-tree extend system-id: cambia el identificador del puente y reconverge todo el árbol; hazlo a mano", "spanning-tree extend system-id: it changes the bridge identifier and reconverges the whole tree; do it by hand")},
+	{word{"channel-group"}, lt("channel-group: parte de un Port-channel", "channel-group: part of a Port-channel")},
+	{word{"switchport", "trunk"}, lt("trunk: puede cortar el acceso", "trunk: it can cut access")},
+	{word{"switchport", "mode"}, lt("switchport mode: el modo del puerto no se cambia", "switchport mode: the port mode is not changed")},
+	{word{"no", "switchport"}, lt("no switchport: pasa el puerto a capa 3", "no switchport: it turns the port into layer 3")},
+	{word{"interface"}, lt("interfaz completa: crearla o borrarla no se inversa con certeza", "whole interface: creating or deleting it cannot be reversed with certainty")},
 }
 
-func forbiddenWhy(f []string) string {
+func forbiddenWhy(f []string) i18n.Text {
 	for _, x := range forbidden {
 		g := f
 		if x.w[0] != "no" {
@@ -191,7 +190,7 @@ func forbiddenWhy(f []string) string {
 			return x.why
 		}
 	}
-	return ""
+	return i18n.Text{}
 }
 
 // ---- familias permitidas ----
@@ -217,35 +216,35 @@ type rctx struct {
 type fam struct {
 	w      word
 	no     bool // admite `no`
-	chk    func(rc *rctx, neg bool, args []string) string
+	chk    func(rc *rctx, neg bool, args []string) i18n.Text
 	one    bool
 	keepNo bool
 	keyN   int
 }
 
-func nargs(min, max int, ok func(string) bool) func(*rctx, bool, []string) string {
-	return func(_ *rctx, neg bool, a []string) string {
+func nargs(min, max int, ok func(string) bool) func(*rctx, bool, []string) i18n.Text {
+	return func(_ *rctx, neg bool, a []string) i18n.Text {
 		lo := min
 		if neg {
 			lo = 0
 		}
 		for _, x := range a {
 			if x == "vrf" {
-				return "nombra una VRF: hazlo a mano"
+				return lt("nombra una VRF: hazlo a mano", "names a VRF: do it by hand")
 			}
 		}
 		if len(a) < lo || len(a) > max {
-			return "forma que la lista cerrada no restaura (argumentos de más o de menos); hazlo a mano"
+			return lt("forma que la lista cerrada no restaura (argumentos de más o de menos); hazlo a mano", "form that the closed list does not restore (too many or too few arguments); do it by hand")
 		}
 		for _, x := range a {
 			if x == "vrf" {
-				return "nombra una VRF: hazlo a mano"
+				return lt("nombra una VRF: hazlo a mano", "names a VRF: do it by hand")
 			}
 			if ok != nil && !ok(x) {
-				return fmt.Sprintf("argumento %q no válido para la lista cerrada", x)
+				return lt("argumento %q no válido para la lista cerrada", "argument %q is not valid for the closed list", x)
 			}
 		}
-		return ""
+		return i18n.Text{}
 	}
 }
 
@@ -253,66 +252,66 @@ func isIP(s string) bool   { _, err := netip.ParseAddr(s); return err == nil }
 func isWord(s string) bool { return wordRe.MatchString(s) }
 func isName(s string) bool { return nameRe.MatchString(s) }
 
-func freeText(_ *rctx, neg bool, a []string) string {
+func freeText(_ *rctx, neg bool, a []string) i18n.Text {
 	if len(a) == 0 && !neg {
-		return "sin texto"
+		return lt("sin texto", "no text")
 	}
 	if len(strings.Join(a, " ")) > 200 {
-		return "texto de más de 200 caracteres"
+		return lt("texto de más de 200 caracteres", "text longer than 200 characters")
 	}
-	return ""
+	return i18n.Text{}
 }
 
-func ntpServer(rc *rctx, neg bool, a []string) string {
+func ntpServer(rc *rctx, neg bool, a []string) i18n.Text {
 	if len(a) == 0 && neg {
-		return ""
+		return i18n.Text{}
 	}
 	if len(a) < 1 || len(a) > 2 || !isIP(a[0]) || len(a) == 2 && a[1] != "prefer" {
-		return "ntp server solo con una dirección IP (y prefer); hazlo a mano"
+		return lt("ntp server solo con una dirección IP (y prefer); hazlo a mano", "ntp server only with an IP address (and prefer); do it by hand")
 	}
-	return ""
+	return i18n.Text{}
 }
 
-func srcIf(rc *rctx, neg bool, a []string) string {
+func srcIf(rc *rctx, neg bool, a []string) i18n.Text {
 	if len(a) != 1 || !rc.ifs[strings.ToLower(iosxe.ShortIf(a[0]))] {
-		return "nombra una interfaz que el equipo no tiene"
+		return lt("nombra una interfaz que el equipo no tiene", "names an interface that the device does not have")
 	}
-	return ""
+	return i18n.Text{}
 }
 
-func errdisableInterval(_ *rctx, neg bool, a []string) string {
+func errdisableInterval(_ *rctx, neg bool, a []string) i18n.Text {
 	if len(a) == 0 && neg || len(a) == 1 && isNum(a[0], 30, 86400) {
-		return ""
+		return i18n.Text{}
 	}
-	return "errdisable recovery interval solo con un número de 30 a 86400"
+	return lt("errdisable recovery interval solo con un número de 30 a 86400", "errdisable recovery interval only with a number from 30 to 86400")
 }
 
 // loggingBuffered: IOS deja `no logging buffered` (sin argumentos) y apaga el buffer; `no logging buffered N` no es una forma que se restaure.
-func loggingBuffered(rc *rctx, neg bool, a []string) string {
+func loggingBuffered(rc *rctx, neg bool, a []string) i18n.Text {
 	if neg && len(a) > 0 {
-		return "`no logging buffered N`: IOS lo deja como `no logging buffered` y apaga el buffer; hazlo a mano"
+		return lt("`no logging buffered N`: IOS lo deja como `no logging buffered` y apaga el buffer; hazlo a mano", "`no logging buffered N`: IOS leaves it as `no logging buffered` and turns the buffer off; do it by hand")
 	}
 	return nargs(0, 2, isWord)(rc, neg, a)
 }
 
-func stormLevel(_ *rctx, neg bool, a []string) string {
+func stormLevel(_ *rctx, neg bool, a []string) i18n.Text {
 	if len(a) == 0 && neg || len(a) >= 2 && len(a) <= 5 && a[0] == "level" {
 		for _, x := range a {
 			if !isWord(x) {
-				return "argumento de storm-control no válido"
+				return lt("argumento de storm-control no válido", "invalid storm-control argument")
 			}
 		}
-		return ""
+		return i18n.Text{}
 	}
-	return "storm-control solo broadcast|multicast|unicast level X o action shutdown|trap"
+	return lt("storm-control solo broadcast|multicast|unicast level X o action shutdown|trap", "storm-control only broadcast|multicast|unicast level X or action shutdown|trap")
 }
 
-func oneOfArg(vals ...string) func(*rctx, bool, []string) string {
-	return func(_ *rctx, neg bool, a []string) string {
+func oneOfArg(vals ...string) func(*rctx, bool, []string) i18n.Text {
+	return func(_ *rctx, neg bool, a []string) i18n.Text {
 		if len(a) != 1 || !slices.Contains(vals, a[0]) {
-			return "valor fuera de la lista cerrada (" + strings.Join(vals, "|") + ")"
+			return lt("valor fuera de la lista cerrada (%s)", "value outside the closed list (%s)", strings.Join(vals, "|"))
 		}
-		return ""
+		return i18n.Text{}
 	}
 }
 
@@ -322,22 +321,22 @@ func isNum(s string, lo, hi int) bool {
 }
 
 // vlanArg revisa la VLAN que nombra una línea de interfaz: existe, está activa y no es la de gestión.
-func (rc *rctx) vlanArg(neg bool, a []string, special ...string) string {
+func (rc *rctx) vlanArg(neg bool, a []string, special ...string) i18n.Text {
 	switch {
 	case len(a) == 0 && neg:
-		return ""
+		return i18n.Text{}
 	case len(a) != 1:
-		return "falta la VLAN o sobran argumentos"
+		return lt("falta la VLAN o sobran argumentos", "the VLAN is missing or there are too many arguments")
 	case slices.Contains(special, a[0]):
-		return ""
+		return i18n.Text{}
 	case !isNum(a[0], 1, 4094):
-		return "VLAN fuera de 1-4094"
+		return lt("VLAN fuera de 1-4094", "VLAN outside 1-4094")
 	case rc.mgVlans[a[0]]:
-		return "nombra la VLAN de gestión: no se toca"
+		return lt("nombra la VLAN de gestión: no se toca", "names the management VLAN: it is not touched")
 	case !neg && !rc.live[a[0]]:
-		return "nombra una VLAN que el equipo no tiene activa (IOS la crearía y, con VTP servidor, la propagaría): créala por separado"
+		return lt("nombra una VLAN que el equipo no tiene activa (IOS la crearía y, con VTP servidor, la propagaría): créala por separado", "names a VLAN that the device does not have active (IOS would create it and, with a VTP server, propagate it): create it separately")
 	}
-	return ""
+	return i18n.Text{}
 }
 
 var globalFams = []fam{
@@ -365,8 +364,8 @@ var globalFams = []fam{
 
 var ifaceFams = []fam{
 	{w: word{"description"}, no: true, chk: freeText, one: true},
-	{w: word{"switchport", "access", "vlan"}, no: true, chk: func(rc *rctx, neg bool, a []string) string { return rc.vlanArg(neg, a) }, one: true},
-	{w: word{"switchport", "voice", "vlan"}, no: true, chk: func(rc *rctx, neg bool, a []string) string { return rc.vlanArg(neg, a, "dot1p", "untagged", "none") }, one: true},
+	{w: word{"switchport", "access", "vlan"}, no: true, chk: func(rc *rctx, neg bool, a []string) i18n.Text { return rc.vlanArg(neg, a) }, one: true},
+	{w: word{"switchport", "voice", "vlan"}, no: true, chk: func(rc *rctx, neg bool, a []string) i18n.Text { return rc.vlanArg(neg, a, "dot1p", "untagged", "none") }, one: true},
 	{w: word{"shutdown"}, no: true, chk: nargs(0, 0, nil)},
 	{w: word{"spanning-tree", "portfast"}, no: true, chk: nargs(0, 1, func(s string) bool { return s == "disable" }), one: true},
 	{w: word{"spanning-tree", "bpduguard"}, no: true, chk: nargs(0, 1, func(s string) bool { return s == "enable" || s == "disable" }), one: true},
@@ -378,11 +377,11 @@ var ifaceFams = []fam{
 }
 
 // vlanFams: dentro de `vlan N` solo el nombre; `no name` lo regresa al nombre por omisión (VLANxxxx).
-var vlanFams = []fam{{w: word{"name"}, no: true, chk: func(_ *rctx, _ bool, a []string) string {
+var vlanFams = []fam{{w: word{"name"}, no: true, chk: func(_ *rctx, _ bool, a []string) i18n.Text {
 	if len(a) != 1 || !isName(a[0]) || len(a[0]) > 32 {
-		return "de una VLAN solo se restaura el nombre (name)"
+		return lt("de una VLAN solo se restaura el nombre (name)", "only the name (name) of a VLAN is restored")
 	}
-	return ""
+	return i18n.Text{}
 }, one: true}}
 
 // engineAllowed son los prefijos que el motor exige además (el filtro fino es CheckDevice).
@@ -396,38 +395,38 @@ func engineAllowed() []string {
 	return out
 }
 
-func (rc *rctx) matchFam(fams []fam, line string) string {
+func (rc *rctx) matchFam(fams []fam, line string) i18n.Text {
 	f := tokens(line)
 	body := unNo(f)
 	neg := len(body) != len(f)
 	for _, fm := range fams {
 		if hasPrefix(body, fm.w) {
 			if neg && !fm.no {
-				return "no se restaura con `no`: hazlo a mano"
+				return lt("no se restaura con `no`: hazlo a mano", "it is not restored with `no`: do it by hand")
 			}
 			return fm.chk(rc, neg, body[len(fm.w):])
 		}
 	}
-	if why := forbiddenWhy(f); why != "" {
+	if why := forbiddenWhy(f); !why.Empty() {
 		return why
 	}
 	for _, fm := range fams {
 		if abbrevPrefix(body, fm.w) {
-			return fmt.Sprintf("abreviatura de %q: IOS la expande, pero el plan exige la palabra completa", strings.Join(fm.w, " "))
+			return lt("abreviatura de %q: IOS la expande, pero el plan exige la palabra completa", "abbreviation of %q: IOS expands it, but the plan requires the full word", strings.Join(fm.w, " "))
 		}
 	}
-	return "fuera de la lista cerrada de restore-diff: hazlo a mano"
+	return lt("fuera de la lista cerrada de restore-diff: hazlo a mano", "outside the closed restore-diff list: do it by hand")
 }
 
 // access revisa que la interfaz sea un puerto físico de acceso (la misma que acepta ports) en cada estado dado, que no sea la de gestión
 // y que no lleve su VLAN.
-func (rc *rctx) access(hdr string, sides []cfgState) string {
+func (rc *rctx) access(hdr string, sides []cfgState) i18n.Text {
 	name := strings.TrimSpace(strings.TrimPrefix(hdr, "interface "))
 	switch {
 	case rc.mgIfaces[strings.ToLower(iosxe.ShortIf(name))]:
-		return "interfaz de gestión: por ella estás conectado, no se toca"
+		return lt("interfaz de gestión: por ella estás conectado, no se toca", "management interface: you are connected through it, it is not touched")
 	case !ValidInterface(name):
-		return "no es un puerto físico (SVI, Port-channel, loopback, subinterfaz...): hazlo a mano"
+		return lt("no es un puerto físico (SVI, Port-channel, loopback, subinterfaz...): hazlo a mano", "not a physical port (SVI, Port-channel, loopback, subinterface...): do it by hand")
 	}
 	for _, st := range sides {
 		access, vlan := false, "1" // sin `switchport access vlan` el puerto está en la VLAN 1
@@ -439,32 +438,32 @@ func (rc *rctx) access(hdr string, sides []cfgState) string {
 			case hasPrefix(f, word{"switchport", "mode"}), hasPrefix(f, word{"switchport", "trunk"}), hasPrefix(f, word{"channel-group"}),
 				hasPrefix(f, word{"ip", "address"}), hasPrefix(f, word{"ipv6", "address"}), hasPrefix(f, word{"vrf", "forwarding"}),
 				hasPrefix(f, word{"ip", "vrf", "forwarding"}), l == "no switchport":
-				return "no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano"
+				return lt("no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano", "not a physical access port (switchport mode access, no trunk, channel, layer 3 or VRF) on the device and in the backup: do it by hand")
 			case hasPrefix(f, word{"switchport", "access", "vlan"}):
 				vlan = f[len(f)-1]
 			case hasPrefix(f, word{"switchport", "voice", "vlan"}):
 				if rc.mgVlans[f[len(f)-1]] {
-					return "lleva la VLAN de gestión (" + f[len(f)-1] + "): cambiarla podría cortar la sesión"
+					return lt("lleva la VLAN de gestión (%s): cambiarla podría cortar la sesión", "carries the management VLAN (%s): changing it could cut the session", f[len(f)-1])
 				}
 			}
 		}
 		if rc.mgVlans[vlan] {
-			return "lleva la VLAN de gestión (" + vlan + "): cambiarla podría cortar la sesión"
+			return lt("lleva la VLAN de gestión (%s): cambiarla podría cortar la sesión", "carries the management VLAN (%s): changing it could cut the session", vlan)
 		}
 		if !access {
-			return "no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano"
+			return lt("no es un puerto físico de acceso (switchport mode access, sin trunk, canal, capa 3 ni VRF) en el equipo y en el respaldo: hazlo a mano", "not a physical access port (switchport mode access, no trunk, channel, layer 3 or VRF) on the device and in the backup: do it by hand")
 		}
 	}
-	return ""
+	return i18n.Text{}
 }
 
 // refuse dice por qué una línea (en su sección) no se restaura; vacío si se puede. sides son los estados en que la interfaz debe ser de acceso.
-func (rc *rctx) refuse(path []string, line string, sides []cfgState) string {
-	if why := hygiene(line); why != "" {
+func (rc *rctx) refuse(path []string, line string, sides []cfgState) i18n.Text {
+	if why := hygiene(line); !why.Empty() {
 		return why
 	}
 	if len(path) > 0 {
-		if why := hygiene(path[0]); why != "" {
+		if why := hygiene(path[0]); !why.Empty() {
 			return why
 		}
 	}
@@ -472,7 +471,7 @@ func (rc *rctx) refuse(path []string, line string, sides []cfgState) string {
 	case len(path) == 0:
 		return rc.matchFam(globalFams, line)
 	case len(path) == 1 && strings.HasPrefix(path[0], "interface "):
-		if why := rc.access(path[0], sides); why != "" {
+		if why := rc.access(path[0], sides); !why.Empty() {
 			return why
 		}
 		return rc.matchFam(ifaceFams, line)
@@ -480,19 +479,19 @@ func (rc *rctx) refuse(path []string, line string, sides []cfgState) string {
 		f := tokens(path[0])
 		switch g := unNo(tokens(line)); {
 		case len(f) != 2 || !isNum(f[1], 1, 4094):
-			return "VLAN no válida"
+			return lt("VLAN no válida", "invalid VLAN")
 		case rc.mgVlans[f[1]]:
-			return "VLAN de la interfaz de gestión: no se toca"
+			return lt("VLAN de la interfaz de gestión: no se toca", "VLAN of the management interface: it is not touched")
 		case len(g) == 0 || g[0] != "name":
-			return "de una VLAN solo se restaura el nombre (name)"
+			return lt("de una VLAN solo se restaura el nombre (name)", "only the name (name) of a VLAN is restored")
 		}
 		return rc.matchFam(vlanFams, line)
 	}
 	why := forbiddenWhy(tokens(path[0]))
-	if why == "" {
-		why = "sección fuera de la lista cerrada de restore-diff"
+	if why.Empty() {
+		why = lt("sección fuera de la lista cerrada de restore-diff", "section outside the closed restore-diff list")
 	}
-	return why + " (" + path[0] + "): hazlo a mano"
+	return i18n.Join("", why, lt(" (%s): hazlo a mano", " (%s): do it by hand", path[0]))
 }
 
 // ---- gestión ----

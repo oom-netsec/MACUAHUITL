@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/devices"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
@@ -36,7 +36,7 @@ func (Module) Register(s ipc.Registrar, d service.Deps) {
 // ListDevices: Device.Id es la dirección, o «nombre:<host>» si solo se conoce por respaldos sin IPv4 en la carpeta;
 // en un equipo con host de la libreta es el id de ese host (con el que se edita o se borra). Los hosts de la
 // libreta se fusionan por dirección con lo descubierto y suman la fuente «manual».
-func (s *svc) ListDevices(_ context.Context, r *v1.ListDevicesRequest) (*v1.ListDevicesResponse, error) {
+func (s *svc) ListDevices(ctx context.Context, r *v1.ListDevicesRequest) (*v1.ListDevicesResponse, error) {
 	s.d.MarkActive()
 	hosts, err := loadHosts(s.d.DB())
 	if err != nil {
@@ -48,12 +48,12 @@ func (s *svc) ListDevices(_ context.Context, r *v1.ListDevicesRequest) (*v1.List
 	res, err := devices.Collect(s.d.Outputs(), service.JobOutputRoots(s.d)...)
 	if err != nil {
 		if len(hosts) == 0 {
-			return nil, status.Error(codes.FailedPrecondition, err.Error())
+			return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 		}
-		res = devices.Result{Warnings: []string{err.Error()}} // la libreta se ve aunque aún no haya evidencia
+		res = devices.Result{Warnings: []string{i18n.In(i18n.Locale(ctx), err)}} // la libreta se ve aunque aún no haya evidencia
 	}
 	infos := s.credsFor(hosts)
-	out := &v1.ListDevicesResponse{Warnings: res.Warnings}
+	out := &v1.ListDevicesResponse{Warnings: warnsIn(ctx, res)}
 	for _, e := range devices.FilterEntries(devices.Merge(res.Devices, hosts), r.Query, r.Folder, r.Tag) {
 		id := e.Address
 		if id == "" {
@@ -69,6 +69,19 @@ func (s *svc) ListDevices(_ context.Context, r *v1.ListDevicesRequest) (*v1.List
 		out.Devices = append(out.Devices, k)
 	}
 	return out, nil
+}
+
+// warnsIn da los avisos de la lista de equipos en el idioma del contexto (con es, los de siempre).
+func warnsIn(ctx context.Context, res devices.Result) []string {
+	loc := i18n.Locale(ctx)
+	if loc == i18n.Es || len(res.WarnErrs) != len(res.Warnings) {
+		return res.Warnings
+	}
+	out := make([]string, len(res.WarnErrs))
+	for i, e := range res.WarnErrs {
+		out[i] = i18n.In(loc, e)
+	}
+	return out
 }
 
 // credsFor lee la bóveda solo si algún host tiene credencial.

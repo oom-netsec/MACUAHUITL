@@ -1,0 +1,18 @@
+{
+ "cidr": "10.0.0.0/24 no acepta rangos CIDR",
+ "destino-vacio": "destino \"-x\" inválido",
+ "herramienta": "herramienta \"x\" desconocida",
+ "iperf": "iperf3 cliente: se necesita exactamente un destino",
+ "no-es-ip": "destino \"a b\" no es IP, nombre ni CIDR",
+ "no-instalado": "diag: herramienta no instalada: ping (instala: sudo apt install iputils-ping)",
+ "numero": "count debe ser un número entre 1 y 100",
+ "opcion": "opción \"zz\" no existe para esta herramienta",
+ "pcap-carpeta": "la captura necesita una carpeta de salida",
+ "pcap-destino": "la captura no lleva destino; usa el filtro",
+ "pcap-iface": "interfaz inválida o ausente",
+ "ports": "ports \"x\" inválido; usa 22,80,443-445",
+ "prefijo": "prefijo \"a/b\" inválido",
+ "run-build": "diag: se necesita exactamente un destino",
+ "un-destino": "se necesita exactamente un destino",
+ "uno-de": "scan debe ser uno de connect|syn|udp|ping"
+}
