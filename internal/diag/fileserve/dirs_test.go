@@ -2,10 +2,12 @@ package fileserve
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"net/netip"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -380,4 +382,179 @@ func testSource(t *testing.T, s *source) *source {
 		t.Cleanup(s.close)
 	}
 	return s
+}
+
+// Los archivos sueltos pasan por la misma lista de carpetas sensibles que FromDir y RecvDir.
+func TestPublishRechazaArchivosSensibles(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	os.MkdirAll(filepath.Join(home, ".ssh"), 0o700)
+	key := filepath.Join(home, ".ssh", "id_ed25519")
+	os.WriteFile(key, []byte("k"), 0o600)
+	cfgDir := t.TempDir()
+	cfg := filepath.Join(cfgDir, "vault.mcv")
+	os.WriteFile(cfg, []byte("v"), 0o600)
+	link := filepath.Join(t.TempDir(), "inocente.txt") // un enlace a la llave no la disfraza
+	os.Symlink(key, link)
+	for name, c := range map[string]struct {
+		f    string
+		deny []string
+	}{"ssh": {key, nil}, "enlace": {link, nil}, "config de la app": {cfg, []string{cfgDir}}, "etc": {"/etc/hostname", nil}} {
+		if _, err := Publish([]string{c.f}, c.deny...); err == nil {
+			t.Errorf("%s: publicado", name)
+		}
+		if _, _, err := prepare(Config{Addr: "127.0.0.1:0", Proto: "http", Files: []string{c.f}, DenyDirs: c.deny}); err == nil {
+			t.Errorf("%s: prepare lo aceptó", name)
+		}
+	}
+	for _, n := range []string{".bash_history", ".netrc"} {
+		h := filepath.Join(home, n)
+		os.WriteFile(h, []byte("h"), 0o600)
+		if _, err := Publish([]string{h}); err == nil {
+			t.Errorf("~/%s publicado", n)
+		}
+	}
+	vis := filepath.Join(t.TempDir(), "visible.txt") // enlace visible a un oculto de $HOME
+	os.Symlink(filepath.Join(home, ".netrc"), vis)
+	if _, err := Publish([]string{vis}); err == nil {
+		t.Error("enlace visible a ~/.netrc publicado")
+	}
+	fw := filepath.Join(home, "firmware.bin")
+	os.WriteFile(fw, []byte("f"), 0o600)
+	if _, err := Publish([]string{fw}); err != nil {
+		t.Errorf("~/firmware.bin visible debe poder publicarse: %v", err)
+	}
+	ok := filepath.Join(t.TempDir(), "a.bin")
+	os.WriteFile(ok, []byte("x"), 0o600)
+	if _, err := Publish([]string{ok}); err != nil {
+		t.Errorf("archivo normal: %v", err)
+	}
+}
+
+// Todo lo oculto bajo $HOME (no solo la lista fija) se rechaza, como archivo suelto y como carpeta de envío/recepción.
+func TestOcultosBajoHomeSeRechazan(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	for _, d := range []string{".password-store", ".thunderbird/x.default", ".cache/app", "Descargas/.oculta", "Descargas"} {
+		os.MkdirAll(filepath.Join(home, d), 0o700)
+	}
+	for _, f := range []string{".password-store/x.gpg", ".thunderbird/x.default/logins.json", ".cache/app/a", "Descargas/.oculta/a", "Descargas/.env"} {
+		os.WriteFile(filepath.Join(home, f), []byte("s"), 0o600)
+		if _, err := Publish([]string{filepath.Join(home, f)}); err == nil {
+			t.Errorf("~/%s publicado", f)
+		}
+	}
+	for _, d := range []string{".password-store", ".thunderbird/x.default", ".cache/app", "Descargas/.oculta"} {
+		if _, err := ValidateDir(filepath.Join(home, d)); err == nil {
+			t.Errorf("~/%s aceptada como carpeta", d)
+		}
+	}
+	os.WriteFile(filepath.Join(home, "c9300.bin"), []byte("f"), 0o600)
+	os.WriteFile(filepath.Join(home, "Descargas", "r.cfg"), []byte("f"), 0o600)
+	for _, f := range []string{"c9300.bin", "Descargas/r.cfg"} {
+		if _, err := Publish([]string{filepath.Join(home, f)}); err != nil {
+			t.Errorf("~/%s: %v", f, err)
+		}
+	}
+	if _, err := ValidateDir(filepath.Join(home, "Descargas")); err != nil {
+		t.Errorf("~/Descargas: %v", err)
+	}
+}
+
+// Se sirve la ruta real resuelta una sola vez: un enlace que cambia de destino después de publicar no desvía lo servido.
+func TestPublishSirveLaRutaRealYNoSigueAlEnlace(t *testing.T) {
+	d := t.TempDir()
+	a, b := filepath.Join(d, "a.bin"), filepath.Join(d, "b.bin")
+	os.WriteFile(a, []byte("AAA"), 0o600)
+	os.WriteFile(b, []byte("BBB"), 0o600)
+	link := filepath.Join(d, "l.bin")
+	os.Symlink(a, link)
+	files, infos, err := publish([]string{link}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if files["l.bin"] != a {
+		t.Fatalf("debía guardar la ruta real: %q", files["l.bin"])
+	}
+	os.Remove(link)
+	os.Symlink(b, link)
+	src := &source{files: files, infos: infos}
+	f, _, err := src.open("l.bin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	got, _ := io.ReadAll(f)
+	if string(got) != "AAA" {
+		t.Fatalf("se sirvió %q tras cambiar el enlace", got)
+	}
+}
+
+// Si no se puede resolver la ruta, se rechaza (no se sigue con la ruta sin resolver).
+func TestPublishRechazaSiFallaEvalSymlinks(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "a.bin")
+	os.WriteFile(f, []byte("x"), 0o600)
+	old := evalSymlinks
+	evalSymlinks = func(string) (string, error) { return "", errors.New("boom") }
+	defer func() { evalSymlinks = old }()
+	if _, err := Publish([]string{f}); err == nil {
+		t.Fatal("publicó con EvalSymlinks fallando")
+	}
+}
+
+// Con $HOME vacío se usa el de la cuenta; si no hay ninguno, se rechaza (fail-closed).
+func TestHomeVacioUsaLaCuentaYSinHomeRechaza(t *testing.T) {
+	t.Setenv("HOME", "")
+	u, err := user.Current()
+	if err != nil || !filepath.IsAbs(u.HomeDir) {
+		t.Skip("sin usuario con home")
+	}
+	if _, err := ValidateDir(filepath.Join(u.HomeDir, ".ssh")); err == nil {
+		t.Error("~/.ssh aceptada con $HOME vacío")
+	}
+	if _, err := ValidateDir(u.HomeDir); err == nil {
+		t.Error("$HOME de la cuenta aceptado con $HOME vacío")
+	}
+	old := homeDir
+	homeDir = func() (string, error) { return "", errors.New("sin home") }
+	defer func() { homeDir = old }()
+	f := filepath.Join(t.TempDir(), "a.bin")
+	os.WriteFile(f, []byte("x"), 0o600)
+	if _, err := Publish([]string{f}); err == nil {
+		t.Error("Publish sin home conocido")
+	}
+	if _, err := ValidateDir(t.TempDir()); err == nil {
+		t.Error("ValidateDir sin home conocido")
+	}
+}
+
+// Si no se puede resolver $HOME, se compara con el $HOME sin resolver (no se salta la comprobación).
+func TestHomeSinResolverSigueRechazando(t *testing.T) {
+	base := t.TempDir()
+	realHome := filepath.Join(base, "var-home")
+	os.MkdirAll(filepath.Join(realHome, ".cache"), 0o700)
+	home := filepath.Join(base, "home") // $HOME es un enlace (como /home -> /var/home en Silverblue)
+	os.Symlink(realHome, home)
+	t.Setenv("HOME", home)
+	old := evalSymlinks
+	evalSymlinks = func(p string) (string, error) {
+		if p == home {
+			return "", errors.New("boom")
+		}
+		return filepath.EvalSymlinks(p)
+	}
+	defer func() { evalSymlinks = old }()
+	for _, d := range []string{home, realHome, filepath.Join(realHome, ".cache")} {
+		if _, err := ValidateDir(d); err == nil {
+			t.Errorf("%s aceptada sin poder resolver $HOME", d)
+		}
+	}
+}
+
+func TestPublishArchivoInexistenteDiceQueNoExiste(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "no-esta.bin")
+	_, err := Publish([]string{f})
+	if !errors.Is(err, os.ErrNotExist) || err.Error() != "fileserve: stat "+f+": no such file or directory" {
+		t.Fatalf("err = %v; quiero el mensaje de stat de siempre", err)
+	}
 }

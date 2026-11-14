@@ -30,17 +30,22 @@ func (x tapR) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// tapW cuenta lo escrito como actividad. Decisión (revisión de seguridad): no se descuenta la ventana inicial.
+// Un par que no lee solo deja pasar lo que cabe en su ventana de canal (≈2 MiB en OpenSSH y x/crypto) una vez:
+// sin que ajuste la ventana, los Write siguientes se bloquean y el contador se detiene, así que el crédito falso
+// está acotado y el keepalive cierra a los 3 fallos. En cambio, no contar esos primeros bytes cerraría una subida
+// sana a la flash de un equipo con ventana chica (3560), que tarda en contestar mientras escribe.
 type tapW struct {
 	w io.WriteCloser
 	t tap
 }
 
-func (x tapW) Write(p []byte) (int, error) {
+func (x *tapW) Write(p []byte) (int, error) {
 	n, err := x.w.Write(p)
 	x.t(n)
 	return n, err
 }
-func (x tapW) Close() error { return x.w.Close() }
+func (x *tapW) Close() error { return x.w.Close() }
 
 // tapOf da el Activity de la sesión (*transport.Session) o uno nulo si no lo tiene.
 func tapOf(s SSHSession) tap {
@@ -145,7 +150,7 @@ func scpStart(c *ssh.Client, flag, file string, t tap) (*scpSession, error) {
 		s.Close()
 		return nil, err
 	}
-	return &scpSession{in: tapW{in, t}, out: bufio.NewReaderSize(tapR{out, t}, maxCtlLine), s: s}, nil
+	return &scpSession{in: &tapW{w: in, t: t}, out: bufio.NewReaderSize(tapR{out, t}, maxCtlLine), s: s}, nil
 }
 
 // maxCtlLine es el tope de una línea de control (scp y FTP): un servidor no nos hace leer sin fin.

@@ -224,7 +224,7 @@ func sftpOpen(c *ssh.Client, limit int64, t tap) (*sftp.Client, error) {
 		s.Close()
 		return nil, fmt.Errorf("%w: %v", errNoSubsystem, err)
 	}
-	cl, err := sftp.NewClientPipe(io.LimitReader(tapR{rd, t}, limit), tapW{wr, t})
+	cl, err := sftp.NewClientPipe(io.LimitReader(tapR{rd, t}, limit), &tapW{w: wr, t: t})
 	if err != nil {
 		s.Close()
 		return nil, err

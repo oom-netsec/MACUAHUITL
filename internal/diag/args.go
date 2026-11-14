@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/ifaces"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
@@ -204,9 +205,18 @@ func Build(r Request) (bin string, argv []string, err error) {
 			}
 			argv = []string{"-c", host}
 		case "server":
-			argv = []string{"-s"}
+			// Nunca en todas las interfaces: -B con una IP de esta máquina; puerto no privilegiado.
+			b, _ := o.str("bind")
+			if a, err := netip.ParseAddr(b); err != nil || !isLocalIP(a) || a.IsLinkLocalUnicast() { // -B sin zona falla con link-local
+				return "", nil, i18n.New("diag.err.iperf_bind", i18n.A("value", b))
+			}
+			argv = []string{"-s", "-B", b}
 		}
-		if v, ok := o.num("port", 1, 65535); ok {
+		lo := 1.0
+		if mode == "server" {
+			lo = 1024
+		}
+		if v, ok := o.num("port", lo, 65535); ok {
 			argv = append(argv, "-p", v)
 		}
 		if mode == "server" {
@@ -264,6 +274,33 @@ func Build(r Request) (bin string, argv []string, err error) {
 	return bin, argv, nil
 }
 
-var literalFlags = map[string]bool{"-n": true, "-c": true, "-i": true, "-s": true, "-m": true, "-sT": true, "-sS": true, "-sU": true, "-sn": true,
+// localIPs lista las direcciones de las interfaces de esta máquina; las pruebas la sustituyen.
+var localIPs = realLocalIPs
+
+func realLocalIPs() (out []netip.Addr) {
+	ifs, _ := ifaces.List()
+	for _, i := range ifs {
+		for _, a := range i.Addresses {
+			if p, err := netip.ParsePrefix(a); err == nil {
+				out = append(out, p.Addr())
+			}
+		}
+	}
+	return out
+}
+
+func isLocalIP(a netip.Addr) bool {
+	if a.IsUnspecified() {
+		return false
+	}
+	for _, l := range localIPs() {
+		if l == a {
+			return true
+		}
+	}
+	return false
+}
+
+var literalFlags = map[string]bool{"-B": true, "-n": true, "-c": true, "-i": true, "-s": true, "-m": true, "-sT": true, "-sS": true, "-sU": true, "-sn": true,
 	"-p": true, "-T0": true, "-T1": true, "-T2": true, "-T3": true, "-T4": true, "-T5": true, "-sV": true, "-6": true, "-oG": true, "-": true,
 	"-P": true, "-R": true, "-u": true, "-t": true, "-1": true, "-a": true, "-f": true, "-w": true}
