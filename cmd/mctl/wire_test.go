@@ -7,8 +7,6 @@ import (
 	"slices"
 	"testing"
 
-	"google.golang.org/grpc"
-
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 )
@@ -30,7 +28,7 @@ func (f *fakeCore) ApplyImportHosts(_ context.Context, r *v1.ApplyImportHostsReq
 	return &v1.ApplyImportHostsResponse{}, nil
 }
 
-func (f *fakeCore) SnmpPoll(r *v1.SnmpPollRequest, _ grpc.ServerStreamingServer[v1.SnmpPollResponse]) error {
+func (f *fakeCore) SnmpPoll(r *v1.SnmpPollRequest, _ v1.VisibilityService_SnmpPollServer) error {
 	f.profiles = r.Profiles
 	return nil
 }
@@ -46,7 +44,7 @@ func startFake(t *testing.T) *fakeCore {
 		t.Fatal(err)
 	}
 	f := &fakeCore{}
-	s := grpc.NewServer()
+	s := ipc.NewServer() // mismo servidor que el núcleo; mctl no importa grpc (noegress)
 	v1.RegisterInventoryServiceServer(s, f)
 	v1.RegisterVisibilityServiceServer(s, f)
 	go s.Serve(l)
