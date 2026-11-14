@@ -850,3 +850,26 @@ func TestInstallConfirmedSoloLoConfirmado(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 }
+
+// El borrado del apartado tampoco sigue un enlace en el editor: nada se borra afuera y queda sin DisplacedRemoved.
+func TestApartadoNoSigueEnlaces(t *testing.T) {
+	pub, priv := testKey(t)
+	dir, fuera := t.TempDir(), t.TempDir()
+	s, _ := openStore(t, dir, pub, Base{})
+	if _, err := s.Install(mustZip(t, thirdParty()), true); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(dir, "acme"), filepath.Join(fuera, "acme")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(fuera, "acme"), filepath.Join(dir, "acme")); err != nil {
+		t.Skip(err)
+	}
+	res, err := s.InstallConfirmed(signedZip(t, priv, nil), false, []string{"acme/demo"}, nil, nil)
+	if err != nil || len(res.Displaced) != 1 || len(res.DisplacedRemoved) != 0 {
+		t.Fatalf("%v %+v", err, res)
+	}
+	if _, err := os.Stat(filepath.Join(fuera, "acme", "demo")); err != nil {
+		t.Fatal("borró fuera del almacén")
+	}
+}

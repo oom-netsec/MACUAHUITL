@@ -475,7 +475,7 @@ func (s *Store) install(data []byte, allowUnsigned bool, allow func(ids []string
 	s.publish(next)
 	var removed []string
 	for _, d := range displaced { // el oficial ya está publicado: ahora sí se borra al apartado
-		if os.RemoveAll(filepath.Join(s.dir, filepath.FromSlash(d.ID))) == nil { // el ID viene de un paquete cargado: cumple idRe
+		if s.removePackDir(d.ID) == nil {
 			removed = append(removed, d.ID)
 		}
 	}
@@ -568,6 +568,27 @@ func (s *Store) extract(p *Pack) (syncWarn, err error) {
 	return syncDir(filepath.Dir(final)), nil // si falla, el paquete ya entró: solo se avisa
 }
 
+var errNotPackDir = errors.New("not a real package directory")
+
+// removePackDir borra <almacén>/<editor>/<nombre> dentro de un os.Root: ni el editor ni el nombre pueden ser enlaces
+// ni quedar fuera del almacén (errNotPackDir). Es el único borrado de carpetas de paquete.
+func (s *Store) removePackDir(id string) error {
+	if !idRe.MatchString(id) {
+		return errNotPackDir
+	}
+	root, err := os.OpenRoot(s.dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	for _, part := range []string{path.Dir(id), id} {
+		if st, err := root.Lstat(part); err != nil || !st.IsDir() {
+			return errNotPackDir
+		}
+	}
+	return root.RemoveAll(id)
+}
+
 // Remove quita el paquete id (buscado entre los instalados) y devuelve lo que traía.
 func (s *Store) Remove(id string) (*Pack, error) {
 	s.mu.Lock()
@@ -583,23 +604,14 @@ func (s *Store) RemoveLocked(id string) (*Pack, error) {
 		if !idRe.MatchString(id) {
 			return nil, rej("not_found", "id", id)
 		}
-		root, err := os.OpenRoot(s.dir) // un enlace en el editor o en el nombre no saca el borrado del almacén
-		if err != nil {
-			return nil, readErr(err)
-		}
-		defer root.Close()
-		for _, part := range []string{path.Dir(id), id} { // ninguno de los dos tramos puede ser un enlace
-			if st, err := root.Lstat(part); err != nil || !st.IsDir() {
-				return nil, rej("not_found", "id", id)
-			}
-		}
-		if err := root.RemoveAll(id); err != nil {
+		if err := s.removePackDir(id); errors.Is(err, errNotPackDir) {
+			return nil, rej("not_found", "id", id)
+		} else if err != nil {
 			return nil, readErr(err)
 		}
 		return &Pack{Manifest: Manifest{ID: id}, Official: strings.HasPrefix(id, "oom/")}, nil // el origen se deduce del editor
 	}
-	// p.ID cumple la gramática del manifiesto, así que la ruta no sale de la carpeta.
-	if err := os.RemoveAll(filepath.Join(s.dir, filepath.FromSlash(p.ID))); err != nil {
+	if err := s.removePackDir(p.ID); err != nil {
 		return nil, readErr(err)
 	}
 	var next []*Pack
