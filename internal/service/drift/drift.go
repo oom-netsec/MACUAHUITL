@@ -55,7 +55,7 @@ func (s *driftSvc) Drift(ctx context.Context, r *v1.DriftRequest) (*v1.DriftResp
 	// device → ronda → running-config
 	cfg := map[string]map[int]string{}
 	for _, sec := range b.Sections {
-		if sec.Invalid || !drift.IsRunningConfig(sec.Command) {
+		if sec.Invalid || sec.Incomplete || !drift.IsRunningConfig(sec.Command) {
 			continue
 		}
 		if cfg[sec.Device] == nil {

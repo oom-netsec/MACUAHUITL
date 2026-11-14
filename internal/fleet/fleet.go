@@ -82,7 +82,7 @@ var (
 	maxDevs          = 2000      // equipos
 )
 
-var headerRe = regexp.MustCompile(`^===== (?:ronda \d+ · )?(\S+) · (.*?)( · comando inválido)? =====$`)
+var headerRe = regexp.MustCompile(`^===== (?:ronda \d+ · )?(\S+) · (.*?)( · comando inválido)?( · incompleto)? =====$`)
 
 // NewDev arma un equipo en memoria (pruebas).
 func NewDev(key string, ev map[string]Evidence) *Dev {
@@ -338,7 +338,7 @@ func (f *Fleet) parse(w *ws, devs map[string]*Dev, key, job string, r io.Reader)
 					devs[key] = d
 				}
 				sections++
-				cmd, cur = m[2], &Evidence{At: at.UTC(), Job: job, Invalid: m[3] != ""}
+				cmd, cur = m[2], &Evidence{At: at.UTC(), Job: job, Invalid: m[3] != "", Truncated: m[4] != ""}
 				continue
 			}
 		}

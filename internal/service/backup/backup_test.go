@@ -483,3 +483,25 @@ func TestCollectedTextNuncaMezclaAvisos(t *testing.T) {
 		t.Errorf("pareados: %q", en)
 	}
 }
+
+// La salida parcial de un comando cortado (« · incompleto») no se guarda como respaldo y conserva la carpeta de Patrol.
+func TestSeccionIncompletaNoSeGuardaComoRespaldo(t *testing.T) {
+	s, sd, info, _ := nuevo(t, "completed")
+	lote, pj := trabajoPropio(t, s, sd, info, 3)
+	os.MkdirAll(filepath.Join(pj, dev), 0o755)
+	txt := "===== 2026-11-06T10:00:01Z · show running-config · incompleto =====\nhostname SW1\n"
+	os.WriteFile(filepath.Join(pj, dev, "r001_20261106-100000.txt"), []byte(txt), 0o600)
+	r, err := s.CollectBackups(context.Background(), &v1.CollectBackupsRequest{JobId: "j1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(t, s); strings.Contains(got, "-running") {
+		t.Errorf("se guardó una salida incompleta: %s", got)
+	}
+	if !strings.Contains(r.Report.Text, "incompleta") {
+		t.Errorf("sin aviso: %s", r.Report.Text)
+	}
+	if _, err := os.Stat(lote); err != nil {
+		t.Error("se borró la carpeta de Patrol")
+	}
+}

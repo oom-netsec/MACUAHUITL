@@ -294,6 +294,9 @@ func (s *backupSvc) collect(job string, keep int) (collected, error) {
 			if kind == backup.Startup {
 				res.warn(i18n.Tx("backup.warn.no_startup", "device", sec.Device))
 			}
+		case sec.Incomplete:
+			res.warn(i18n.Tx("backup.warn.incomplete", "device", sec.Device, "cmd", sec.Command))
+			failed = true
 		case !tr.inWindow(sec.At):
 			// Solo puede venir de texto del equipo que imita una cabecera: no es un respaldo.
 			res.warn(i18n.Tx("backup.warn.outside", "device", sec.Device, "cmd", sec.Command, "at", sec.At.Format(time.RFC3339)))

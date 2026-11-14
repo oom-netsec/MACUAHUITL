@@ -28,7 +28,7 @@ var prompt = regexp.MustCompile(`^[A-Za-z0-9][\w.\-]*#\s*(\S.*)?$`)
 
 // Split parte texto en salidas por comando. Entiende las cabeceras de Patrol
 // ("===== hora · comando =====") y, si no hay, los prompts de una sesión pegada ("SW1#show version").
-// Las salidas de comandos inválidos se descartan.
+// Las salidas de comandos inválidos o incompletas se descartan.
 func Split(text string) map[string]string {
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	out := map[string]string{}
@@ -52,7 +52,9 @@ func Split(text string) map[string]string {
 			cur, invalid = "", false
 			if len(parts) >= 2 {
 				cur = Key(parts[1])
-				invalid = len(parts) > 2 && strings.Contains(parts[2], "inválido")
+				for _, p := range parts[2:] {
+					invalid = invalid || strings.Contains(p, "inválido") || p == "incompleto"
+				}
 			}
 			continue
 		}

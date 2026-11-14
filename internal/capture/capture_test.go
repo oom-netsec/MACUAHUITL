@@ -79,3 +79,13 @@ func TestReadDir(t *testing.T) {
 		t.Fatal("dir without manifest accepted")
 	}
 }
+
+// Una salida marcada « · incompleto» (comando cortado) no sirve como evidencia.
+func TestSplitDescartaLasIncompletas(t *testing.T) {
+	text := "===== 2026-11-04T10:00:00Z · show version · incompleto =====\nCisco IO\n" +
+		"===== 2026-11-04T10:00:01Z · show clock =====\n10:00:01\n"
+	m := Split(text)
+	if _, ok := m["show version"]; ok || m["show clock"] != "10:00:01\n" {
+		t.Fatalf("m = %q", m)
+	}
+}

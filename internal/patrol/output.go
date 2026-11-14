@@ -82,6 +82,9 @@ func (w *Writer) Write(dev Device, round int, roundStart time.Time, out platform
 	if out.Invalid {
 		note = " · comando inválido"
 	}
+	if out.Incomplete {
+		note += " · incompleto" // salida parcial de un comando cortado o fallido; los lectores no la toman por completa
+	}
 	devDir := DeviceDir(dev.Host, dev.IP)
 	var rel, header string
 	if w.split == SplitConsolidated {
