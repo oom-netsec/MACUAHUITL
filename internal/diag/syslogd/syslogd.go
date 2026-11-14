@@ -212,7 +212,7 @@ func listenTCP(ctx context.Context, c Config, emit emitFunc) error {
 			conn.Close() // demasiadas conexiones; se rechaza en vez de agotar recursos
 			continue
 		}
-		src, _, _ := net.SplitHostPort(conn.RemoteAddr().String())
+		src := sourceKey(conn.RemoteAddr().String())
 		mu.Lock()
 		perSource[src]++
 		full := perSource[src] > maxPerSource
@@ -232,6 +232,16 @@ func listenTCP(ctx context.Context, c Config, emit emitFunc) error {
 			readStream(bufio.NewReaderSize(conn, MaxMessage+16), conn.RemoteAddr().String(), emit)
 		}()
 	}
+}
+
+// sourceKey es la clave del tope por origen: la IP, o su /64 en IPv6 (un host tiene un /64 entero de direcciones).
+func sourceKey(addr string) string {
+	h, _, _ := net.SplitHostPort(addr)
+	a, err := netip.ParseAddr(h)
+	if err != nil || a.Unmap().Is4() {
+		return h
+	}
+	return netip.PrefixFrom(a, 64).Masked().String()
 }
 
 // readStream separa mensajes por conteo de octetos ("<len> <msg>") o por salto de línea.

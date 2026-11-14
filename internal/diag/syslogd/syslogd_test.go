@@ -199,3 +199,16 @@ func isTimeout(err error) bool {
 	var ne net.Error
 	return errors.As(err, &ne) && ne.Timeout()
 }
+
+func TestSourceKeyAgrupaIPv6Por64(t *testing.T) {
+	a, b := sourceKey("[2001:db8:1:2::10]:514"), sourceKey("[2001:db8:1:2:ffff::1]:514")
+	if a != b || a != "2001:db8:1:2::/64" {
+		t.Fatalf("%q %q", a, b)
+	}
+	if k := sourceKey("10.0.0.1:514"); k != "10.0.0.1" {
+		t.Fatalf("%q", k)
+	}
+	if k := sourceKey("[::ffff:10.0.0.1]:514"); k == "::/64" {
+		t.Fatalf("IPv4 mapeada agrupada como IPv6: %q", k)
+	}
+}
