@@ -35,3 +35,17 @@ test("ignora líneas con otro formato dentro de la sección", () => {
   expect(p.talkers).toEqual([{ ip: "10.0.0.1", packets: 3, bytes: 30 }]);
   expect(p.conversations).toEqual([]);
 });
+
+// Misma forma con la interfaz en inglés (catálogo pcap.* del núcleo, con plural).
+test("lee el informe en inglés, con singular y plural", () => {
+  const p = parsePcap(`== Top conversations by bytes
+  tcp  10.0.0.5:51000 ↔ 10.0.0.9:443  12 packets  9000 bytes
+  udp  10.0.0.5:5353 ↔ 8.8.8.8:53  1 packet  1 byte
+
+== Top talkers
+  10.0.0.5  13 packets  9001 bytes
+`)!;
+  expect(p.conversations).toHaveLength(2);
+  expect(p.conversations[1]).toEqual({ proto: "udp", a: "10.0.0.5:5353", b: "8.8.8.8:53", packets: 1, bytes: 1 });
+  expect(p.talkers).toEqual([{ ip: "10.0.0.5", packets: 13, bytes: 9001 }]);
+});

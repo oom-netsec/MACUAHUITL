@@ -6,6 +6,9 @@ import type { Key } from "../../lib/i18n/es";
 import { certTone, type TlsInfo } from "./tlsChain";
 import "./tools.css";
 
+const verifyCodes = ["unknown_authority", "hostname", "expired", "not_yet_valid"];
+const verifyKey = (c?: string) => (c && verifyCodes.includes(c) ? c : "other"); // código desconocido o ausente = other
+
 export function TlsChain({ info }: { info: TlsInfo }) {
   const t = useT();
   return (
@@ -14,7 +17,7 @@ export function TlsChain({ info }: { info: TlsInfo }) {
         <p className="tls-status">
           <StatusPill tone={info.verified ? "ok" : "bad"} label={t(info.verified ? "tls.verified" : "tls.unverified")} />{" "}
           <StatusPill tone={info.nameMatches ? "ok" : "bad"} label={t(info.nameMatches ? "tls.nameOk" : "tls.nameBad")} />
-          {info.verifyError && <span className="hint"> {info.verifyError}</span>}
+          {!info.verified && <span className="hint" title={info.verifyError || undefined}> {info.verifyCode !== undefined || !info.verifyError ? t(`tls.verify.${verifyKey(info.verifyCode)}` as Key) : info.verifyError}</span>}
         </p>
         <ol className="tls-chain" aria-label={t("tls.chain.title")}>
           {info.chain.map((c, i) => {
