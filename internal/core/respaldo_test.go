@@ -618,3 +618,38 @@ func TestRespaldoDosReemplazosAlMismoDestino(t *testing.T) {
 		t.Fatalf("corregida: %+v %v", ap, err)
 	}
 }
+
+// Una credencial del respaldo «igual» a la local y otra «reemplazar» hacia esa misma: el informe mentiría, se rechaza.
+func TestRespaldoIgualYReemplazoAlMismoDestino(t *testing.T) {
+	h := newHarness(t, nil)
+	h.ready(t)
+	h.put(t, "dup", "u1", "PW-UNO")
+	h.put(t, "dup", "u2", "PW-DOS")
+	path := filepath.Join(t.TempDir(), "d.mcvault")
+	if _, err := h.vault.ExportBackup(ctx(t), &v1.ExportBackupRequest{Path: path, Passphrase: []byte(fraseResp), Confirm: true}); err != nil {
+		t.Fatal(err)
+	}
+	o := newHarness(t, nil)
+	o.vault.Create(ctx(t), &v1.CreateRequest{MasterPassword: []byte("otra-maestra")})
+	o.put(t, "dup", "u1", "PW-UNO")
+	pr, err := o.preview(t, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var conflicto string
+	for _, i := range pr.Items {
+		if i.Label == "dup" && i.State == "conflicto_etiqueta" {
+			conflicto = i.Id
+		}
+	}
+	if conflicto == "" {
+		t.Fatalf("sin conflicto: %v", estados(pr))
+	}
+	_, err = o.vault.ApplyBackupImport(ctx(t), &v1.ApplyBackupImportRequest{Token: pr.Token, Decisions: []*v1.VaultBackupDecision{{Id: conflicto, Action: "reemplazar"}}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("igual + reemplazo: %v", err)
+	}
+	if got := o.labels(t); got["dup"] != "PW-UNO" || len(got) != 1 {
+		t.Fatalf("escribió algo: %v", got)
+	}
+}
