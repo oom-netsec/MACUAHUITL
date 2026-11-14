@@ -132,7 +132,8 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 		}
 		// Tras una suspensión del sistema, las rondas que ya pasaron de largo se registran como omitidas en vez de
 		// salir todas de golpe; la última de la ventana sí corre.
-		missed := more && sc.Interval > 0 && s.now().Round(0).Sub(wake.Round(0)) >= sc.Interval
+		late := s.now().Round(0).Sub(wake.Round(0))
+		missed := more && sc.Interval > 0 && roundLost(late, sc.Interval, s.tick())
 		if a.paused.Load() || a.running.Load() || missed {
 			s.bus.Publish(Event{JobID: jobID, Kind: Warning, Detail: "round.skipped", Index: round})
 		} else {
@@ -159,14 +160,24 @@ func (s *Scheduler) loop(ctx context.Context, a *armed, jobID string, sc Schedul
 	s.bus.Publish(Event{JobID: jobID, Kind: JobState, State: state})
 }
 
+// roundLost: una ronda se da por perdida (suspensión del sistema) si llega al menos un intervalo tarde y más de dos
+// tics; una pausa corta del proceso (GC, carga) no cuenta.
+func roundLost(late, interval, tick time.Duration) bool {
+	return interval > 0 && late >= interval && late > 2*tick
+}
+
+func (s *Scheduler) tick() time.Duration {
+	if s.Tick <= 0 {
+		return time.Second
+	}
+	return s.Tick
+}
+
 // sleepUntil espera hasta wake mirando el reloj de pared cada Tick: los temporizadores de Go son monotónicos y no
 // avanzan mientras el sistema está suspendido, así que un solo sueño largo se pasaría de la ventana al reanudar.
 // Devuelve false si ctx se cancela antes.
 func (s *Scheduler) sleepUntil(ctx context.Context, wake time.Time) bool {
-	tick := s.Tick
-	if tick <= 0 {
-		tick = time.Second
-	}
+	tick := s.tick()
 	for {
 		rem := wake.Round(0).Sub(s.now().Round(0)) // Round(0) quita la lectura monotónica
 		if rem <= 0 {

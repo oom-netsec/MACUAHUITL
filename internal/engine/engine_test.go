@@ -364,3 +364,23 @@ func TestVentanaDelPlanificadorSinLecturaMonotonica(t *testing.T) {
 		t.Fatalf("until trae lectura monotónica: %v", u)
 	}
 }
+
+// Una ronda es «perdida» solo si llega al menos un intervalo tarde y más de dos tics: una pausa corta del proceso
+// (GC, carga) no omite rondas aunque el intervalo sea menor.
+func TestRondaPerdidaExigeMasDeDosTics(t *testing.T) {
+	tick := time.Second
+	for _, c := range []struct {
+		late, interval time.Duration
+		want           bool
+	}{
+		{50 * time.Millisecond, 10 * time.Millisecond, false}, // tarde varios intervalos, pero fue una pausa corta
+		{2 * time.Second, time.Millisecond, false},
+		{2*time.Second + 1, time.Millisecond, true},
+		{5 * time.Hour, time.Hour, true},
+		{30 * time.Minute, time.Hour, false}, // menos de un intervalo
+	} {
+		if got := roundLost(c.late, c.interval, tick); got != c.want {
+			t.Errorf("late=%v interval=%v: %v, quería %v", c.late, c.interval, got, c.want)
+		}
+	}
+}
