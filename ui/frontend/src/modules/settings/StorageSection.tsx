@@ -1,3 +1,4 @@
+import { errInfo } from "../../lib/coreError";
 import { useCallback, useEffect, useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Field, Notice, PathField, Select, errorText } from "../../components/Field";
@@ -14,7 +15,7 @@ const NUMS = ["rotateMb", "rotateMinutes", "maxFiles"] as const;
 export { parseOutputsError };
 
 type Form = { outputsDir: string; rotateMb: string; rotateMinutes: string; maxFiles: string; format: CorePrefs["format"] };
-type SaveErr = { msg: string; parsed: ReturnType<typeof parseOutputsError> };
+type SaveErr = { msg: string; parsed: ReturnType<typeof parseOutputsError>; coded: boolean };
 const toForm = (s: CorePrefsState): Form => ({ outputsDir: s.outputsDir, rotateMb: s.rotateMb ? String(s.rotateMb) : "", rotateMinutes: s.rotateMin ? String(s.rotateMin) : "", maxFiles: s.maxFiles ? String(s.maxFiles) : "", format: s.format });
 const num = (v: string) => (v.trim() ? Number(v.trim()) : 0);
 
@@ -44,7 +45,7 @@ export function StorageSection({ core }: { core: CoreAPI }) {
       setState(s); setForm(toForm(s)); setSaved(true);
     } catch (e) {
       const msg = errorText(e);
-      setSaveErr({ msg, parsed: parseOutputsError(e) });
+      setSaveErr({ msg, parsed: parseOutputsError(e), coded: !!errInfo(e) });
     } finally { setBusy(false); }
   };
 
@@ -98,7 +99,7 @@ export function StorageSection({ core }: { core: CoreAPI }) {
       </fieldset>
 
       {(!!state.note || fellBack) && <Notice kind="warn">{noteText}</Notice>}
-      {saveErr && !parsedErr && <Notice kind="error">{lang === "es" ? saveErr.msg : t("settings.storage.err.save")}</Notice>}
+      {saveErr && !parsedErr && <Notice kind="error">{lang === "es" || saveErr.coded ? saveErr.msg : t("settings.storage.err.save")}</Notice>}
       {saved && !saveErr && <Notice kind="ok">{t("settings.storage.saved")}</Notice>}
       <div className="actions">
         <button type="button" className="primary" disabled={busy || Object.keys(errs).length > 0} onClick={() => void save()}>{t("settings.storage.save")}</button>

@@ -44,17 +44,17 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
 
   useEffect(() => {
     let live = true;
-    core.hostsImportFormat().then((f) => { if (live) setFmt(f); }, (e) => { if (live) setErr(ct(errorText(e), "hosts.coreError")); });
+    core.hostsImportFormat().then((f) => { if (live) setFmt(f); }, (e) => { if (live) setErr(ct(errorText(e), "hosts.coreError", e)); });
     return () => { live = false; };
   }, [core]);
   useEffect(() => {
     if (scope !== "some") return;
     let live = true;
-    core.listHosts().then((l) => { if (live) { setBook(l); setPicked((p) => new Set([...p].filter((id) => l.some((h) => h.id === id)))); } }, (e) => { if (live) setErr(ct(errorText(e), "hosts.coreError")); });
+    core.listHosts().then((l) => { if (live) { setBook(l); setPicked((p) => new Set([...p].filter((id) => l.some((h) => h.id === id)))); } }, (e) => { if (live) setErr(ct(errorText(e), "hosts.coreError", e)); });
     return () => { live = false; };
   }, [core, scope, hv]);
 
-  const run = async (f: () => Promise<void>) => { setErr(""); setMsg(""); setWarn(""); setBusy(true); try { await f(); } catch (e) { setErr(ct(errorText(e), "hosts.coreError")); } finally { setBusy(false); } };
+  const run = async (f: () => Promise<void>) => { setErr(""); setMsg(""); setWarn(""); setBusy(true); try { await f(); } catch (e) { setErr(ct(errorText(e), "hosts.coreError", e)); } finally { setBusy(false); } };
 
   const template = (format: HostFileFormat) => run(async () => {
     const tpl = await core.hostsImportTemplate(format);

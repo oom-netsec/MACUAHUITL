@@ -37,8 +37,9 @@ export function PatrolView({ core }: { core: CoreAPI }) {
 
   // Un stream por trabajo, una sola vez (el núcleo lo cierra solo tras `closed`). Se pide id por id: un trabajo borrado
   // entre listJobs y subscribe (patrol.err.job_missing) se descarta sin afectar a los demás.
-  const subscribeJobs = useCallback(async (ids: string[]) => {
-    const fresh = ids.filter((id) => !subscribed.current.has(id));
+  // force: al armar se pide igual aunque ya figure suscrito, porque el puente reabre un stream que tenga muerto (y no duplica uno vivo).
+  const subscribeJobs = useCallback(async (ids: string[], force = false) => {
+    const fresh = force ? ids : ids.filter((id) => !subscribed.current.has(id));
     fresh.forEach((id) => subscribed.current.add(id));
     const res = await Promise.allSettled(fresh.map((id) => core.subscribe([id])));
     let fail: unknown;

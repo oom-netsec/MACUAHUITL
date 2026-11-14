@@ -211,4 +211,5 @@ test("con reason el campo sale de metadata.field y el texto del núcleo se muest
   await userEvent.click(screen.getByRole("button", { name: "Save host" }));
   expect(await screen.findByText("the credential is not in the vault")).toBeVisible();
   expect(screen.getByLabelText("Name")).not.toBeInvalid();
+  expect(screen.getByLabelText("Vault credential")).toBeInvalid(); // el error va al campo que dice metadata.field
 });

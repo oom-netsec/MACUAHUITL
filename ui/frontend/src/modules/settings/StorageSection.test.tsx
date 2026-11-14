@@ -199,3 +199,12 @@ test("Ajustes → Datos: la tarjeta de la bóveda explica el respaldo y navega a
   await userEvent.click(screen.getByRole("button", { name: "Abrir la bóveda" }));
   expect(go).toHaveBeenCalledWith("vault");
 });
+
+// Un error con código que no es de la carpeta ya llega traducido: en inglés se muestra tal cual, no el genérico.
+test("en inglés, un error con reason que no es de carpeta se muestra tal cual", async () => {
+  const err = Object.assign(new Error("rpc error: code = InvalidArgument desc = rotate size out of range"), { cause: { code: "InvalidArgument", reason: "prefs.err.rotate", metadata: {} } });
+  view(fakeCore({ setCorePrefs: vi.fn(async () => { throw err; }) }), "en");
+  await folder();
+  await userEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText("rotate size out of range")).toBeVisible();
+});

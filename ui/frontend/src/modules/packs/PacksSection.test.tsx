@@ -114,6 +114,7 @@ test("si el archivo cambió desde la vista previa, el aviso pide volver a abrirl
   const d = await screen.findByRole("dialog");
   await userEvent.click(within(d).getByRole("button", { name: "Instalar" }));
   expect(await within(d).findByText("Vuelve a abrir el archivo para revisar su vista previa de nuevo.")).toBeVisible();
+  expect(within(d).getByRole("button", { name: "Instalar" })).toBeDisabled(); // reintentar con el sha256 viejo daría el mismo error
 });
 
 test("quitar pide confirmación y avisa de los favoritos quitados", async () => {

@@ -109,7 +109,7 @@ function InstallDialog({ core, path, info, onDone, onClose }: { core: CoreAPI; p
         onToggle={(id, visible) => setHide((s) => { const n = new Set(s); if (visible) n.delete(id); else n.add(id); return n; })} />
       {err && <Notice kind="error">{err}</Notice>}
       {changed && <Notice kind="warn">{t("packs.import.changed")}</Notice>}
-      <div className="actions"><button type="button" className="primary" disabled={busy} onClick={install}>{t("packs.install.go")}</button></div>
+      <div className="actions"><button type="button" className="primary" disabled={busy || changed} onClick={install}>{t("packs.install.go")}</button></div>
     </Dialog>
   );
 }

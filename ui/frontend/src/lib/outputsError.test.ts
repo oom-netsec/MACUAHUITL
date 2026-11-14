@@ -16,6 +16,7 @@ test("la orden chmod cita lo raro y no se genera con \\, ' o control", () => {
   // Un C1 o un bidi no se ejecuta entre comillas, pero puede hacer que la orden se vea distinta de lo que se pega.
   expect(chmodCommand("/x\u0085y")).toBe("");
   expect(chmodCommand("/x\u202ey")).toBe("");
+  for (const inv of ["\u200b", "\u200e", "\u200f", "\u2028", "\u2060", "\ufeff"]) expect(chmodCommand(`/x${inv}y`)).toBe("");
   expect(chmodCommand("/home/u/Música/salidas")).toBe("chmod 700 '/home/u/Música/salidas'");
 });
 
