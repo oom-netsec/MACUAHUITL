@@ -80,3 +80,37 @@ func TestNextRound(t *testing.T) {
 		t.Fatalf("after cancel next = %v", n)
 	}
 }
+
+// Mientras corre una ronda, NextRound ya da la siguiente (no la que corre), y en la última da cero.
+func TestNextRoundDuranteLaRonda(t *testing.T) {
+	s, b := newSched(t)
+	ch, cancel := b.Subscribe(nil)
+	defer cancel()
+	release := make(chan struct{})
+	start := time.Now()
+	s.Arm("j", Schedule{Interval: time.Hour, Rounds: 2}, start.Add(3*time.Hour), []string{"x"}, func(context.Context, int, string) error {
+		<-release
+		return nil
+	})
+	collect(ch, func(e Event) bool { return e.State == "round.start" }, 2*time.Second)
+	n := s.NextRound("j")
+	close(release)
+	if n.Sub(start) < 59*time.Minute || n.Sub(start) > 61*time.Minute {
+		t.Fatalf("durante la ronda 1, next = %v después de armar; want ~1h", n.Sub(start))
+	}
+	s.Cancel("j")
+	collect(ch, func(e Event) bool { return e.JobID == "j" && done(e) }, 2*time.Second)
+
+	last := make(chan struct{})
+	s.Arm("u", Schedule{Interval: time.Hour, Rounds: 1}, time.Now().Add(3*time.Hour), []string{"x"}, func(context.Context, int, string) error {
+		<-last
+		return nil
+	})
+	collect(ch, func(e Event) bool { return e.JobID == "u" && e.State == "round.start" }, 2*time.Second)
+	n = s.NextRound("u")
+	close(last)
+	if !n.IsZero() {
+		t.Fatalf("durante la última ronda, next = %v; want cero", n)
+	}
+	collect(ch, func(e Event) bool { return e.JobID == "u" && done(e) }, 2*time.Second)
+}
