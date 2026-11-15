@@ -192,23 +192,57 @@ func TestDiffComandosVolatiles(t *testing.T) {
 }
 
 func ec(flag string) string {
-	return "Group  Port-channel  Protocol    Ports\n------+-------------+-----------+-----------------------------------------------\n1      Po1(SU)         LACP      Et0/2(P)    Et0/3(" + flag + ")\n"
+	return "Group  Port-channel  Protocol    Ports\n------+-------------+-----------+-----------------------------------------------\n1      Po1(SU)         LACP      Gi1/0/7(P)  Gi1/0/8(" + flag + ")\n"
 }
 
 func TestDiffEtherChannel(t *testing.T) {
 	r, _ := Diff(bundleOf("show etherchannel summary", ec("P"), ec("D")), 1, 2, "")
 	n := r.Devices[0].Neighbors
-	if len(n) != 1 || n[0].Protocol != "etherchannel" || n[0].Change != "cambió" || n[0].From != "P" || n[0].To != "D" || n[0].ID != "Po1 miembro Eth0/3" {
+	if len(n) != 1 || n[0].Protocol != "etherchannel" || n[0].Change != "cambió" || n[0].From != "P" || n[0].To != "D" || n[0].ID != "Po1 miembro Gi1/0/8" {
 		t.Fatalf("neighbors = %+v", n)
 	}
-	if es, en := r.TextIn("es"), r.TextIn("en"); !strings.Contains(es, "etherchannel Po1 miembro Eth0/3 cambió P → D") || !strings.Contains(en, "etherchannel Po1 member Eth0/3 changed P → D") {
+	if es, en := r.TextIn("es"), r.TextIn("en"); !strings.Contains(es, "etherchannel Po1 miembro Gi1/0/8 cambió P → D") || !strings.Contains(en, "etherchannel Po1 member Gi1/0/8 changed P → D") {
 		t.Fatalf("es:\n%s\nen:\n%s", es, en)
 	}
 	// miembro nuevo
-	one := "Group  Port-channel  Protocol    Ports\n------+-------------+-----------+-----------------------------------------------\n1      Po1(SU)         LACP      Et0/2(P)\n"
+	one := "Group  Port-channel  Protocol    Ports\n------+-------------+-----------+-----------------------------------------------\n1      Po1(SU)         LACP      Gi1/0/7(P)\n"
 	r, _ = Diff(bundleOf("show etherchannel summary", one, ec("P")), 1, 2, "")
 	n = r.Devices[0].Neighbors
-	if len(n) != 1 || n[0].Change != "apareció" || n[0].To != "P" || !strings.Contains(n[0].ID, "Et") {
+	if len(n) != 1 || n[0].Change != "apareció" || n[0].To != "P" || !strings.Contains(n[0].ID, "Gi1/0/8") {
 		t.Fatalf("miembro nuevo: %+v", n)
+	}
+}
+
+// Un canal que desaparece entero, o que cambia de estado sin miembros, sale en el resumen.
+func TestDiffEtherChannelCanalEntero(t *testing.T) {
+	head := "Group  Port-channel  Protocol    Ports\n------+-------------+-----------+-----------------------------------------------\n"
+	uno := head + "2      Po2(SU)         LACP      Gi1/0/5(P)\n"
+	r, _ := Diff(bundleOf("show etherchannel summary", uno, head), 1, 2, "")
+	if n := r.Devices[0].Neighbors; len(n) != 2 || n[0].Change != "desapareció" || n[1].Change != "desapareció" {
+		t.Fatalf("canal borrado: %+v", n)
+	}
+	vacio := head + "3      Po3(SU)         LACP      \n"
+	caido := head + "3      Po3(SD)         LACP      \n"
+	r, _ = Diff(bundleOf("show etherchannel summary", vacio, caido), 1, 2, "")
+	if n := r.Devices[0].Neighbors; len(n) != 1 || n[0].ID != "Po3" || n[0].From != "SU" || n[0].To != "SD" {
+		t.Fatalf("estado del canal: %+v", n)
+	}
+}
+
+// show clock detail: la hora es volátil, la fuente de hora no.
+func TestDiffClockDetailFuenteDeHora(t *testing.T) {
+	a := "14:19:54.123 UTC Sun Nov 15 2026\nTime source is NTP\n"
+	z := "*14:29:54.456 UTC Sun Nov 15 2026\nNo time source\n"
+	r, _ := Diff(bundleOf("show clock detail", a, z), 1, 2, "")
+	if len(r.Devices[0].Text) != 1 || !strings.Contains(strings.Join(r.Devices[0].Text[0].Lines, "|"), "No time source") {
+		t.Fatalf("la fuente de hora cambió: %+v", r.Devices[0].Text)
+	}
+	r, _ = Diff(bundleOf("show clock detail", a, "15:00:00.000 UTC Sun Nov 15 2026\nTime source is NTP\n"), 1, 2, "")
+	if len(r.Devices[0].Text) != 0 {
+		t.Fatalf("solo cambió la hora: %+v", r.Devices[0].Text)
+	}
+	u := "*15:00:00.000 UTC Sun Nov 15 2026\nNo time source\n"
+	if r, _ = Diff(bundleOf("show clock detail", z, u), 1, 2, ""); len(r.Devices[0].Text) != 0 {
+		t.Fatalf("reloj sin sincronizar en las dos rondas: %+v", r.Devices[0].Text)
 	}
 }

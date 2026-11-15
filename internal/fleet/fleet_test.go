@@ -510,3 +510,14 @@ func TestTraceIPPrefiereVLANDelARP(t *testing.T) {
 		t.Fatalf("%+v", r)
 	}
 }
+
+// Si la VLAN que sale del ARP no está en la CAM (subinterfaz .1020 con dot1Q 20), se elige como antes: la DYNAMIC.
+func TestTraceVLANAusenteSigueLaDinamica(t *testing.T) {
+	cam := "Vlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n" +
+		"  10    aabb.cc00.0a01    STATIC      Gi1/0/1\n  30    aabb.cc00.0a01    DYNAMIC     Gi1/0/3\n"
+	arp := "Protocol  Address     Age (min)  Hardware Addr   Type   Interface\nInternet  10.1.20.3         5   aabb.cc00.0a01  ARPA   GigabitEthernet0/0.1020\n"
+	a := devFrom("A_10.0.0.1", map[string]string{"show ip arp": arp, "show mac address-table": cam})
+	if r := New([]*Dev{a}, now).Trace("10.1.20.3"); len(r.Hops) != 1 || r.Hops[0].VLAN != "30" {
+		t.Fatalf("%+v", r)
+	}
+}

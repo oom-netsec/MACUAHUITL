@@ -116,7 +116,7 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 				d.Text = append(d.Text, TextDiff{Command: cmd, Lines: []string{}, Note: n.In(i18n.Es), NoteTx: n})
 			case x != y:
 				if f := volatileLines[cmd]; f != nil {
-					if x, y = dropLines(x, f), dropLines(y, f); x == y {
+					if x, y = cleanLines(x, f), cleanLines(y, f); x == y {
 						continue
 					}
 				}
@@ -278,7 +278,9 @@ func diffHSRP(d *DeviceDiff, a, z string) {
 func diffEtherChannel(d *DeviceDiff, a, z string) {
 	ea, ok1 := iosxe.ParseEtherChannels(a)
 	ez, ok2 := iosxe.ParseEtherChannels(z)
-	if !ok1 || !ok2 || a == "" || z == "" {
+	// Sin canales, la tabla con su cabecera también vale: el canal que desapareció entero tiene que salir.
+	ok1, ok2 = ok1 || ecHeadRe.MatchString(a), ok2 || ecHeadRe.MatchString(z)
+	if !ok1 || !ok2 {
 		return
 	}
 	sa, sz := map[string]string{}, map[string]string{}
@@ -288,6 +290,7 @@ func diffEtherChannel(d *DeviceDiff, a, z string) {
 		dst map[string]string
 	}{{ea, sa}, {ez, sz}} {
 		for _, c := range side.chs {
+			side.dst[c.Name] = c.State // estado del canal (SU, SD…), con o sin miembros
 			for _, m := range c.Members {
 				l := etherChannelLabel(c.Name, m.Port)
 				side.dst[l.In(i18n.Es)], labels[l.In(i18n.Es)] = m.Flags, l
@@ -299,19 +302,34 @@ func diffEtherChannel(d *DeviceDiff, a, z string) {
 
 // Comandos que cambian solos en cada ronda: se saltan enteros, o se les quitan las líneas volátiles antes del diff.
 var (
-	volatileCmds = map[string]bool{"show clock": true, "show clock detail": true, "show calendar": true}
+	volatileCmds = map[string]bool{"show calendar": true}
 	// En adjacency solo son volátiles los contadores de eventos; el número de adyacencias es un cambio real.
-	volatileLines = map[string]func(string) bool{"show adjacency summary": func(l string) bool {
-		return adjEventsRe.MatchString(l)
-	}}
+	// En show clock solo la línea de la hora: la fuente («Time source is NTP» → «No time source») sí cuenta, y
+	// la marca de reloj sin sincronizar (* o .) se conserva.
+	volatileLines = map[string]func(string) (string, bool){
+		"show adjacency summary": func(l string) (string, bool) { return l, !adjEventsRe.MatchString(l) },
+		"show clock":             clockLine,
+		"show clock detail":      clockLine,
+	}
 	adjEventsRe = regexp.MustCompile(`^\s*Summary events (epoch is \d+|queue contains \d+ events? \(high water mark \d+ events?\))\s*$`)
+	clockTimeRe = regexp.MustCompile(`^\s*([*.]?)\d{1,2}:\d{2}:\d{2}(\.\d+)?\s`)
+	ecHeadRe    = regexp.MustCompile(`(?m)^Group\s+Port-channel\s+Protocol`)
 )
 
-func dropLines(text string, drop func(string) bool) string {
+// clockLine deja de la línea de la hora solo su marca de sincronía (* sin sincronizar, . dudosa).
+func clockLine(l string) (string, bool) {
+	if m := clockTimeRe.FindStringSubmatch(l); m != nil {
+		return m[1] + "<hora>", true
+	}
+	return l, true
+}
+
+// cleanLines pasa cada línea por clean: la reescribe o la quita (keep=false).
+func cleanLines(text string, clean func(string) (string, bool)) string {
 	var keep []string
 	for _, l := range lines(text) {
-		if !drop(l) {
-			keep = append(keep, l)
+		if c, ok := clean(l); ok {
+			keep = append(keep, c)
 		}
 	}
 	return strings.Join(keep, "\n")

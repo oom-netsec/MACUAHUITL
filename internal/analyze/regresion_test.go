@@ -131,8 +131,8 @@ func regCases(t *testing.T) (map[string]golden, map[string]any) {
 	// EtherChannel entre rondas: un miembro pasa de P a D y otro aparece
 	ecHead := "Group  Port-channel  Protocol    Ports\n------+-------------+-----------+-----------------------------------------------\n"
 	ecd := synth(t, map[string]map[string]string{"R1_10.0.0.1": {
-		"r001_20261104-100000.txt": sec("2026-11-04T10:00:01Z", "show etherchannel summary", ecHead+"1      Po1(SU)         LACP      Et0/2(P)    Et0/3(P)\n"),
-		"r002_20261104-101000.txt": sec("2026-11-04T10:10:01Z", "show etherchannel summary", ecHead+"1      Po1(SU)         LACP      Et0/2(P)    Et0/3(D)    Et0/4(P)\n"),
+		"r001_20261104-100000.txt": sec("2026-11-04T10:00:01Z", "show etherchannel summary", ecHead+"1      Po1(SU)         LACP      Gi1/0/7(P)  Gi1/0/8(P)\n"),
+		"r002_20261104-101000.txt": sec("2026-11-04T10:10:01Z", "show etherchannel summary", ecHead+"1      Po1(SU)         LACP      Gi1/0/7(P)  Gi1/0/8(D)  Gi1/0/9(P)\n"),
 	}})
 	de, err := Diff(ecd, 1, 2, "")
 	if err != nil {

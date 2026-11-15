@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -339,6 +340,14 @@ func (g *l2) macEntry(d *Dev, mac, vlan string) (struct {
 		iosxe.MACEntry
 	}
 	ok := false
+	if vlan != "" && !slices.ContainsFunc(g.mac, func(r struct {
+		tag
+		iosxe.MACEntry
+	}) bool {
+		return r.Dev == d && r.MAC == mac && r.VLAN == vlan
+	}) {
+		vlan = "" // la VLAN pedida no está en esta CAM: se elige como sin preferencia (DYNAMIC primero)
+	}
 	for _, r := range g.mac {
 		if r.Dev != d || r.MAC != mac {
 			continue
