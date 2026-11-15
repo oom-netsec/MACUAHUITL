@@ -98,3 +98,30 @@ func TestRollbackPlanWarnsWhenTheOriginalRunWroteMemory(t *testing.T) {
 		t.Fatal("sin write memory no hay aviso")
 	}
 }
+
+// Una línea base vacía de un comando de configuración es un estado válido («no había nada»): es el caso común de
+// snmp-trap-host, logging-host o netflow-export en un equipo sin esa sección. La vuelta se verifica igual, y falla si
+// queda alguna línea.
+func TestRollbackPlanVerifiesAnEmptyConfigBaseline(t *testing.T) {
+	c := "show running-config | include ^snmp-server"
+	d := LeftDevice{Device: "A", Apply: []string{"snmp-server host 192.0.2.9 version 2c X udp-port 162"},
+		Rollback: []string{"no snmp-server host 192.0.2.9 version 2c X udp-port 162"}, Post: []string{c},
+		Baseline: map[string]string{c: ""}, State: map[string]string{c: "snmp-server host 192.0.2.9 version 2c X udp-port 162\n"}}
+	plan, fn, err := RollbackPlan(Leftover{Devices: []LeftDevice{d}})
+	if err != nil {
+		t.Fatalf("una línea base vacía es verificable: %v", err)
+	}
+	if err := Validate(plan, fn); err != nil {
+		t.Fatalf("el plan de la reversa debe validar para poder correr: %v", err)
+	}
+	e := plan.Devices[0].Expect
+	if len(e) != 1 || e[0].Command != c {
+		t.Fatalf("Expect = %+v", e)
+	}
+	if f := EvalExpect(e, map[string]string{c: ""}); len(f) != 0 {
+		t.Fatalf("de vuelta sin nada debía pasar: %v", f)
+	}
+	if f := EvalExpect(e, map[string]string{c: "snmp-server community X RO\n"}); len(f) == 0 {
+		t.Fatal("una línea snmp-server que quedó debía fallar la verificación")
+	}
+}

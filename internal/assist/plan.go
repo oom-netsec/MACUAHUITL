@@ -221,7 +221,8 @@ func Validate(p Plan, fn Function) error {
 			post[c] = true
 		}
 		for _, e := range d.Expect {
-			if !post[e.Command] || strings.TrimSpace(e.Line) == "" {
+			// same-state compara la salida entera: vacía es un estado válido (la reversa pendiente de un equipo sin esa sección).
+			if !post[e.Command] || strings.TrimSpace(e.Line) == "" && e.Column != "same-state" {
 				add(name, lerr("Expect %q no corresponde a un comando de Post", "Expect %q does not match a Post command", e.Command))
 			}
 		}
