@@ -123,11 +123,11 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 
 ## Content packs
 
-Playbooks and scripts come in **content packs** (`.mpack`), one per technology. Install the ones for the platforms you work on and leave the rest out. Each pack has its own version, so newer content installs on the core you already have. Manage them in **Settings → Packages** (install with a preview, remove, hide single playbooks or scripts, export your own as a personal pack) or with `mctl pack`.
+Playbooks and scripts come in **content packs** (`.mpack`), one per technology. Install the ones for the platforms you work on and leave the rest out. Each pack has its own version, so newer content installs on the core you already have. Manage them in **Settings → Packs** (install with a preview, remove, hide single playbooks or scripts, export your own as a personal pack) or with `mctl pack`.
 
 ```sh
-mctl pack inspect oom-ios-xe-1.1.1.mpack    # preview: what it brings and what it replaces
-mctl pack install oom-ios-xe-1.1.1.mpack    # from the release page; the app never downloads anything
+mctl pack inspect oom-ios-xe-*.mpack       # preview: what it brings and what it replaces
+mctl pack install oom-ios-xe-*.mpack       # from the release page; the app never downloads anything
 mctl pack list                              # installed packs, version, official or third-party
 mctl pack show oom/ios-xe                   # manifest and the pack's own README
 mctl pack remove oom/ios-xe
@@ -183,36 +183,65 @@ Each platform is covered by an official content pack. Install the packs you need
 | Firepower Threat Defense (FTD) | `oom/ftd` | 64 | not yet validated on a lab device |
 | ISE | `oom/ise` | 36 | not yet validated on a lab device |
 
-Counts as of v0.4.8. A few IOS-XE playbooks (`tac-baseline`, `analisis`, `metricas`, `pre-post`, `upgrade-check`) ship inside the binary. ACLs are imported, analyzed and translated between IOS-XE, NX-OS and ASA without any pack.
+Counts match the packs in this repository (a test keeps them in sync). A few IOS-XE playbooks (`tac-baseline`, `analisis`, `metricas`, `pre-post`, `upgrade-check`) ship inside the binary. ACLs are imported, analyzed and translated between IOS-XE, NX-OS and ASA without any pack.
 
 > [!NOTE]
 > **Lab validation is in progress.** Commands and parsers come from Cisco documentation; only `oom/ios` has been checked end to end on a real device so far, and the `oom/wlc-9800` commands on a 9120 EWC. Playbooks only read, so an unvalidated one can at worst collect less than expected. Please report any output that is parsed wrong.
 
 ## Install
 
-`.deb` and `.rpm` packages are attached to each [release](../../releases), built reproducibly with an SBOM.
+Each [release](../../releases/latest) is built reproducibly and ships an SBOM. From its assets you need:
+
+- `macuahuitl_<version>_amd64.deb` (Debian/Ubuntu) **or** `macuahuitl-<version>-1.x86_64.rpm` (Fedora/RHEL);
+- the `oom-<platform>-<version>.mpack` packs for the platforms you work on (see [Supported platforms and packs](#supported-platforms-and-packs));
+- `SHA256SUMS`, to check the downloads.
+
+Run these in the folder you downloaded to, with one version of each file in it (the `*` patterns below and in the quick start match every version present):
 
 ```sh
-sudo dpkg -i macuahuitl_*.deb                 # or: sudo rpm -i macuahuitl-*.rpm
+sha256sum -c --ignore-missing SHA256SUMS      # every file you downloaded must say OK
+sudo apt install ./macuahuitl_*.deb           # or: sudo dnf install ./macuahuitl-*.rpm
 systemctl --user enable --now macuahuitld     # as the user who will use it
 ```
+
+Use `apt` or `dnf` rather than `dpkg -i` or `rpm -i`: they install the dependencies too. apt may print a harmless note that the download is performed unsandboxed as root; that is expected for a local file. Packs need no extra step: the core checks the Ed25519 signature of every official pack against the key built into it, refuses an `oom/*` pack that fails it, and `mctl pack inspect` or the install preview shows `official` or `third-party`.
+
+A few one-time settings, all optional:
+
+- **Long Patrol jobs with the session closed.** The core is a user service, so it stops when you log out. `sudo loginctl enable-linger $USER` keeps it running.
+- **Locked memory.** To let the core keep secrets out of swap, an administrator raises the limit of the systemd user manager (a user service cannot go above it) and reboots:
+  ```sh
+  sudo mkdir -p /etc/systemd/system/user@.service.d
+  printf '[Service]\nLimitMEMLOCK=infinity\n' | sudo tee /etc/systemd/system/user@.service.d/macuahuitl.conf
+  ```
+  Without it the core starts anyway and records a warning in the audit log.
+- **Packet capture.** Install `wireshark-common` (Debian/Ubuntu; allow non-root capture with `sudo dpkg-reconfigure wireshark-common`) or `wireshark-cli` (Fedora), add yourself with `sudo usermod -aG wireshark $USER` and log in again.
 
 `macuahuitld` flags: `-version` prints the version; `-lang es|en` sets the language of what the daemon prints on its console (warnings and fatal errors; English by default, the unit does not pass it). Clients still ask for their own language per request.
 
 | Need | Packages |
 |---|---|
 | Desktop app | `libwebkit2gtk-4.1-0` (Debian/Ubuntu) or `webkit2gtk4.1` (Fedora/RHEL) |
-| Diagnostics | `nmap`, `iperf3`, `wireshark-common` (`dumpcap`, with your user in the `wireshark` group) |
+| Diagnostics | `nmap`, `iperf3`, `wireshark-common` or `wireshark-cli` on Fedora (`dumpcap`, with your user in the `wireshark` group) |
 
 `ping` and `tracepath` come with the system. The core and `mctl` have no system dependencies.
 
 ## Quick start
 
-Download the packs for your platforms from the [latest release](../../releases/latest) (`oom-<platform>-<version>.mpack`), then:
+### In the app
+
+1. Open **MACUAHUITL** from the applications menu. If the status bar says *Core disconnected*, the service is not running: check `systemctl --user status macuahuitld`.
+2. **Vault → Create vault** sets the master password. It cannot be recovered, so keep it somewhere safe.
+3. **Settings → Packs → Install pack…** previews and installs each `.mpack` you downloaded.
+4. **Vault → New credential** stores the device login.
+5. **Patrol → New job**: targets, credential, playbooks and schedule. From the job: **Run Login Test**, confirm the SSH host keys, then **Arm job**.
+6. The app opens in English; **Settings → Language** switches it to Spanish.
+
+### From the terminal
 
 ```sh
 mctl -h                                     # every command, with its options
-mctl pack install oom-ios-xe-1.1.1.mpack    # the IOS-XE playbooks
+mctl pack install oom-ios-xe-*.mpack       # the IOS-XE playbooks
 mctl playbooks --platform ios-xe            # what you can collect
 mctl vault create                           # set the master password (no echo)
 mctl cred add --label lab --user admin      # device credential
@@ -223,7 +252,7 @@ mctl job watch ID                           # live status until the package is r
 mctl audit verify                           # check the audit chain
 ```
 
-The app does the same from **Patrol → New job**. Commands and flags are in English; Spanish output is one flag away (`mctl --lang es`).
+Commands and flags are in English; Spanish output is one flag away (`mctl --lang es`).
 
 <details>
 <summary><b>Example <code>job.yaml</code></b></summary>
@@ -272,7 +301,7 @@ task ui-build   # desktop app
 
 ## Docs
 
-- [Roadmap](docs/roadmap.md): what is built up to v0.4.8, what is left for 1.0.0 (lab validation and stability) and the phases after it (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging, Windows and macOS)
+- [Roadmap](docs/roadmap.md): what is built so far, what is left for 1.0.0 (lab validation and stability) and the phases after it (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging, Windows and macOS)
 - [Architecture design](docs/architecture/2026-11-02-macuahuitl-architecture-design.md) · [Decision records](docs/adr/)
 - [Threat model](docs/security/THREAT_MODEL.md) · [Cryptography](docs/security/CRYPTO.md) · [Auditor's guide](docs/security/AUDIT_GUIDE.md)
 

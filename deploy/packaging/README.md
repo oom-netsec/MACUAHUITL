@@ -8,7 +8,7 @@ task ui-build                       # UI en bin/
 VERSION=v1.0.0 task package         # dist/*.deb y dist/*.rpm
 ```
 
-Instalación: `sudo dpkg -i dist/macuahuitl_*.deb` y después, como el usuario que lo usará, `systemctl --user enable --now macuahuitld`.
+Instalación: `sudo apt install ./dist/macuahuitl_*.deb` (o `sudo dnf install ./dist/macuahuitl-*.rpm`; `dpkg -i` no resuelve las dependencias) y después, como el usuario que lo usará, `systemctl --user enable --now macuahuitld`.
 
 ## Dependencias de la UI de escritorio
 
