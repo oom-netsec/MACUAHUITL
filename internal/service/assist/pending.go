@@ -149,7 +149,8 @@ func (s *assistSvc) isDiscarded(runID string) bool {
 	return s.discarded[runID]
 }
 
-// reversing dice si hay una ejecución de reversa viva de la entrada de runID.
+// reversing dice si hay una ejecución de reversa de la entrada de runID que todavía no cerró: se mira finished y no
+// run.Done(), que se cierra antes de que afterRun borre la entrada de una reversa completada.
 func (s *assistSvc) reversing(runID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -158,7 +159,7 @@ func (s *assistSvc) reversing(runID string) bool {
 			continue
 		}
 		select {
-		case <-rr.run.Done():
+		case <-rr.finished:
 		default:
 			return true
 		}
