@@ -245,6 +245,28 @@ func flowBack(iface string) []string {
 	return []string{"interface " + iface, "no ip flow monitor " + flowMon + " input", "no flow monitor " + flowMon, "no flow exporter " + flowExp, "no flow record " + flowRec}
 }
 
+// flowUndo deja de la reversa solo lo que el apply alcanzó a crear: IOS contesta «does not exist» al `no` de lo que no existe y eso cortaría la reversa.
+func flowUndo(rollback, applied []string) []string {
+	made := func(l string) bool { return slices.Contains(applied, l) }
+	var out []string
+	for _, l := range rollback {
+		switch {
+		case l == "no ip flow monitor "+flowMon+" input":
+			if made("ip flow monitor " + flowMon + " input") {
+				out = append(out, l)
+			}
+		case strings.HasPrefix(l, "no flow "):
+			if made(strings.TrimPrefix(l, "no ")) {
+				out = append(out, l)
+			}
+		}
+	}
+	if made("ip flow monitor " + flowMon + " input") { // el `interface X` de la reversa solo si se llegó a la interfaz
+		out = append([]string{rollback[0]}, out...)
+	}
+	return out
+}
+
 var flowFixed = []string{
 	"flow record " + flowRec, "match ipv4 protocol", "match ipv4 source address", "match ipv4 destination address", "match transport source-port",
 	"match transport destination-port", "collect counter bytes long", "collect counter packets long", "flow exporter " + flowExp, "export-protocol netflow-v9",
@@ -257,6 +279,7 @@ var SnippetNetflow = Function{
 	Allowed: []string{"flow record", "flow exporter", "flow monitor", "match", "collect", "destination", "transport", "export-protocol", "source", "record",
 		"exporter", "cache", "ip flow monitor", "interface"},
 	AllowNo: true,
+	Undo:    flowUndo,
 	Check: func(line string) error {
 		bad := lerr("solo las líneas del record, exporter y monitor MX-* de Flexible NetFlow, su ip flow monitor MX-MON input y sus no", "only the lines of the MX-* Flexible NetFlow record, exporter and monitor, its ip flow monitor MX-MON input and their no")
 		l := squash(line)
@@ -284,6 +307,9 @@ var SnippetNetflow = Function{
 		port := 0
 		for _, l := range d.Apply {
 			f := strings.Fields(l)
+			if len(f) < 2 { // configLine ya la rechazó; Validate llama aquí igual
+				continue
+			}
 			switch {
 			case f[0] == "destination" && len(f) == 2:
 				addr = f[1]
@@ -417,10 +443,12 @@ func netflowPlan(device string, v Values, outs map[string]string) (DevicePlan, e
 	exp := []Expect{
 		{Command: flowCmd, Line: "flow record " + flowRec + sep + "collect counter packets long", Present: true, Column: "section-line"},
 		{Command: flowCmd, Line: "flow exporter " + flowExp + sep + "destination " + addr, Present: true, Column: "section-line"},
-		{Command: flowCmd, Line: "flow exporter " + flowExp + sep + "transport udp " + pn, Present: true, Column: "section-line"},
 		{Command: flowCmd, Line: "flow monitor " + flowMon + sep + "exporter " + flowExp, Present: true, Column: "section-line"},
 		{Command: showCfg(iface), Line: "ip flow monitor " + flowMon + " input", Present: true},
 		{Command: showStatus(iface), Line: "connected", Present: true, Column: "status"}, // up/up: si el monitor la tiró, falla y se ofrece la reversa
+	}
+	if port != 9995 { // 9995 es el puerto por omisión del exporter: IOS no imprime `transport udp 9995`
+		exp = append(exp, Expect{Command: flowCmd, Line: "flow exporter " + flowExp + sep + "transport udp " + pn, Present: true, Column: "section-line"})
 	}
 	return assembleG(device, SnippetNetflow, pre, []l2Scope{{
 		baseCmd: flowCmd, baseText: flowText, post: []string{flowCmd, showCfg(iface), showStatus(iface)}, base: map[string]string{showCfg(iface): ifText},

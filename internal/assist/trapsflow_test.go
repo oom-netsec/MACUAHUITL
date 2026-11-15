@@ -1,6 +1,7 @@
 package assist
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -487,5 +488,94 @@ func TestNetflowPostCheckInterfaceStaysUp(t *testing.T) {
 		if len(fails) != 1 || !strings.Contains(fails[0], st) {
 			t.Errorf("%s: %v", st, fails)
 		}
+	}
+}
+
+// strictExec es un equipo que rechaza una línea del apply y, como IOS, también el `no` de lo que no existe («does not exist»).
+type strictExec struct {
+	*fakeExec
+	dev    *l3Dev
+	reject string
+	gone   []string
+}
+
+func (s *strictExec) Configure(_ context.Context, _ string, lines []string) ([]Sent, error) {
+	var sent, acc = []Sent(nil), []string(nil)
+	exists := func(head string) bool {
+		return !slices.Contains(s.gone, head) && (slices.ContainsFunc(s.dev.flows, func(b *vtyBlk) bool { return b.head == head }) || slices.Contains(acc, head))
+	}
+	for _, l := range lines {
+		bad := l == s.reject
+		if rest, ok := strings.CutPrefix(l, "no flow "); ok && !exists("flow "+rest) {
+			bad = true
+		}
+		if l == "no ip flow monitor MX-MON input" && !slices.Contains(acc, "ip flow monitor MX-MON input") && !slices.Contains(s.dev.ifaces[nfIf], "ip flow monitor MX-MON input") {
+			bad = true
+		}
+		if bad {
+			sent = append(sent, Sent{Line: l, Output: "% does not exist", Failed: true})
+			break
+		}
+		if rest, ok := strings.CutPrefix(l, "no flow "); ok {
+			s.gone = append(s.gone, "flow "+rest)
+		}
+		acc = append(acc, l)
+		sent = append(sent, Sent{Line: l})
+	}
+	s.dev.apply(acc)
+	return sent, nil
+}
+
+// Un apply que el equipo corta a mitad: la reversa deja el equipo como estaba, sin tropezar con lo que nunca se creó.
+func TestNetflowRollbackAfterPartialApply(t *testing.T) {
+	for _, reject := range []string{"collect counter bytes long", "flow exporter MX-EXP", "flow monitor MX-MON", "ip flow monitor MX-MON input", "interface " + nfIf} {
+		t.Run(reject, func(t *testing.T) {
+			dev := nfDev()
+			dp, err := l3Plan(t, "netflow-export", nfVals(), dev)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tpl := mustTemplate(t, "netflow-export")
+			fx := &fakeExec{echo: true}
+			fx.readFunc = func(_, cmd string) string { return dev.read([]string{cmd})[cmd] }
+			r, err := NewRun(Options{ID: "run1", Plan: Plan{Function: tpl.Fn.Name, Devices: []DevicePlan{dp}}, Fn: tpl.Fn, Assisted: true,
+				Exec: &strictExec{fakeExec: fx, dev: dev, reject: reject}, Audit: func(a, b, c string) {}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.Start(context.Background())
+			pending(t, r, "apply-1")
+			r.Confirm("apply-1")
+			wait(t, r, Failed)
+			if err := r.Rollback(); err != nil {
+				t.Fatal(err)
+			}
+			pending(t, r, "rollback-1")
+			r.Confirm("rollback-1")
+			wait(t, r, RolledBack)
+			if len(dev.flows) != 1 || dev.flows[0].head != "flow exporter OTRO" || !slices.Equal(dev.ifaces[nfIf], []string{"switchport mode access", "description PC"}) {
+				t.Errorf("no quedó como al inicio: %v %v", dev.flows, dev.ifaces[nfIf])
+			}
+		})
+	}
+}
+
+// CheckDevice no entra en pánico con líneas cortas que configLine ya rechazó.
+func TestNetflowCheckDeviceShortLines(t *testing.T) {
+	for _, l := range []string{"", "source", "interface", "destination", "transport"} {
+		_ = SnippetNetflow.CheckDevice(DevicePlan{Apply: []string{l}})
+	}
+}
+
+// El puerto 9995 es el de omisión del exporter: IOS no imprime `transport udp 9995` y el post-check no debe fallar por eso.
+func TestNetflowDefaultPortPostCheck(t *testing.T) {
+	dev := nfDev()
+	dp := l3RoundTrip(t, "netflow-export", nfVals("port", "9995"), dev)
+	dev.apply(dp.Apply)
+	for _, b := range dev.flows {
+		b.lines = slices.DeleteFunc(b.lines, func(l string) bool { return l == "transport udp 9995" })
+	}
+	if fails := EvalExpect(dp.Expect, dev.read(dp.Post)); len(fails) != 0 {
+		t.Errorf("fallos con el puerto por omisión: %v", fails)
 	}
 }

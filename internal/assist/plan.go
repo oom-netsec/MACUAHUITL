@@ -76,6 +76,9 @@ type Function struct {
 	Scrub bool
 	// AllowNo: las líneas de Allowed también se aceptan con un `no` delante (quitar lo que se agregó).
 	AllowNo bool
+	// Undo recorta la reversa a lo que un apply cortado a mitad sí dejó en el equipo (applied = líneas aceptadas); puede ser nil
+	// (entonces la reversa va completa). Solo se usa tras un apply parcial: IOS contesta «does not exist» al `no` de lo que nunca se creó.
+	Undo func(rollback, applied []string) []string
 }
 
 // Lo que ninguna función puede enviar aunque su lista lo permita. Cada palabra se compara
