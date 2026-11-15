@@ -22,7 +22,10 @@ func write(t *testing.T, path, text string) {
 }
 
 // fixture arma un trabajo de una ronda contra sw1 y un paquete con dos playbooks (ios/a, ios/b).
-func fixture(t *testing.T) (job, pack string) {
+func fixture(t *testing.T) (job, pack string) { return fixtureWith(t, "SuperSecreto123") }
+
+// fixtureWith es fixture con el valor de «password 0 <valor>» en la evidencia (línea 25 del archivo de la ronda).
+func fixtureWith(t *testing.T, value string) (job, pack string) {
 	t.Helper()
 	root := t.TempDir()
 	pack = filepath.Join(root, "pack")
@@ -76,7 +79,7 @@ show foo
 ===== 2026-11-14T10:00:02Z · show bar =====
 Incorrect usage. Use the '?' or <TAB> key to list commands.
 ===== 2026-11-14T10:00:02Z · show perm =====
-% Permission denied for the role
+% Permission denied for the role, password 0 `+value+`
 ===== 2026-11-14T10:00:02Z · show dup =====
 
 ===== 2026-11-14T10:00:03Z · show empty =====
@@ -91,8 +94,19 @@ tacacs-server key 7 0822455D0A16
  ip ospf message-digest-key 1 md5 7 1234ABCD
 snmp-server user u1 g1 auth md5 0xabcdef0123 priv 0x99887766
 username x password <MASKED:secret> secret suelto123
+username y password 0 `+value+`
+ntp authentication-key 1 md5 `+value+` 7
+ pre-shared-key local `+value+`
+ pre-shared-key address 0.0.0.0 0.0.0.0 key `+value+`
+ security wpa psk set-key ascii 0 `+value+`
+Community name: `+value+`
+enable password level 15 7 `+value+`
+password "dos `+value+`"
+snmp-server user u2 g2 auth sha `+value+` priv aes-128 0xabc
+crypto isakmp key `+value+` address 1.1.1.1 password x
+{"k":"-----BEGIN RSA PRIVATE KEY-----\n`+value+`\n"}
 ===== 2026-11-14T10:01:01Z · show extra =====
-algo
+%PARSER-5-CFGLOG_LOGGEDCMD: User:x logged command:crypto isakmp key `+value+` address 1.1.1.1
 `)
 	return job, pack
 }
@@ -117,7 +131,7 @@ func TestReporte(t *testing.T) {
 		return rest
 	}
 	a, b := section("ios/a"), section("ios/b")
-	for _, want := range []string{"`show foo` — rechazado: % Invalid input detected", "`show bar` — rechazado: Incorrect usage",
+	for _, want := range []string{"`show foo` — rechazado: % Invalid input", "`show bar` — rechazado: Incorrect usage",
 		"`show perm` — rechazado: % Permission denied", "`show nunca` — no corrió"} {
 		if !strings.Contains(a, want) {
 			t.Errorf("ios/a sin %q:\n%s", want, a)
@@ -140,13 +154,20 @@ func TestReporte(t *testing.T) {
 		t.Errorf("show extra no sale fuera de playbook:\n%s", got)
 	}
 	sec := section("Posibles secretos")
-	for _, want := range []string{"snmp-server community public RO", "tacacs-server key 7 0822455D0A16", "message-digest-key 1 md5 7 1234ABCD",
-		"auth md5 0xabcdef0123", "secret suelto123"} {
+	// Cada candidato sale como comando · palabra clave · marcador · archivo:línea, sin texto de la línea.
+	f := "sw1_10.0.0.1/r001_20261114-100000.txt:"
+	for _, want := range []string{"community ⟦secreto? ", f + "19", "key ⟦secreto? ", f + "21",
+		"message-digest-key ⟦secreto? ", f + "22", "auth ⟦secreto? ", f + "23",
+		"secret ⟦secreto? ", f + "24", "`show running-config` · password ⟦secreto? 17 car.⟧ · " + f + "25",
+		f + "26", f + "27", f + "28", f + "29", f + "30", f + "31", f + "32", f + "33", f + "34", f + "35"} {
 		if !strings.Contains(sec, want) {
 			t.Errorf("secreto sin detectar %q:\n%s", want, sec)
 		}
 	}
-	if strings.Contains(sec, "community <MASKED:snmp-community> RO") {
+	if !strings.Contains(got, "`show extra` — rechazado: % (otro mensaje del equipo)") {
+		t.Errorf("la línea %% desconocida no salió como rechazo sin texto:\n%s", got)
+	}
+	if strings.Contains(sec, f+"20") { // community <MASKED:...>: no es candidato
 		t.Errorf("una línea enmascarada salió como secreto:\n%s", sec)
 	}
 	if !strings.Contains(got, "sw1") || !strings.Contains(got, "completed") {
@@ -197,5 +218,44 @@ func TestEquipoSinSalidaMuestraSuEstado(t *testing.T) {
 	}
 	if got := out.String(); !strings.Contains(got, "failed") || !strings.Contains(got, "credencial rechazada") {
 		t.Fatalf("falta el estado del equipo:\n%s", got)
+	}
+}
+
+// El reporte nunca muestra un secreto: con dos valores distintos del mismo largo la salida es idéntica, así que
+// ninguna parte del valor llega a ella (solo su largo).
+func TestElReporteNoMuestraSecretos(t *testing.T) {
+	run := func(value string) string {
+		job, pack := fixtureWith(t, value)
+		var out strings.Builder
+		if err := report(&out, job, []string{pack}, 30*time.Second); err != nil {
+			t.Fatal(err)
+		}
+		// la carpeta temporal cambia entre corridas: solo cuenta lo que sigue al título
+		return strings.SplitN(out.String(), "\n", 2)[1]
+	}
+	a, b := run("SuperSecreto123"), run("QxQxQxQxQxQxQxQ")
+	if a != b {
+		t.Fatalf("la salida depende del valor del secreto:\n%s\n---\n%s", a, b)
+	}
+	for _, leak := range []string{"SuperSecreto123", "suelto123", "0822455D0A16", "1234ABCD", "0xabcdef0123", "public", "0x99887766", "logged command"} {
+		if strings.Contains(a, leak) {
+			t.Errorf("el reporte muestra %q:\n%s", leak, a)
+		}
+	}
+}
+
+// El detalle del manifest sale tal cual salvo que parezca traer un secreto.
+func TestDetalleConSecretoSeOmite(t *testing.T) {
+	job, pack := fixture(t)
+	m := patrol.Manifest{Playbooks: []patrol.PlaybookRef{{ID: "ios/a"}}, Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "10.0.0.1"},
+		Hostname: "sw1", Round: 1, State: "failed", Detail: "prompt: username y password 0 SuperSecreto123"}}}
+	b, _ := json.Marshal(m)
+	write(t, filepath.Join(job, "manifest.json"), string(b))
+	var out strings.Builder
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); strings.Contains(got, "SuperSecreto123") || !strings.Contains(got, "detalle omitido") {
+		t.Fatalf("detalle con secreto:\n%s", got)
 	}
 }

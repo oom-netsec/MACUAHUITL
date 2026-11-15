@@ -15,8 +15,9 @@ Reglas que no cambian:
 - 3560CX: `show` libres. 9120 EWC: **solo show**. Ningún paso de este runbook escribe en un equipo.
 - DevNet sale a Internet: solo con el «listo» del dueño. Las credenciales están en la bóveda.
 - La huella SSH de cada equipo la confirma el dueño antes de armar.
-- El reporte puede traer líneas con secretos que el enmascarado no atrapó: **no lo pegues** en un PR, un issue ni nada
-  público. Se comparte solo entre las sesiones locales.
+- El reporte no muestra secretos ni texto de las salidas del equipo: un candidato sale como palabra clave,
+  `⟦secreto? N car.⟧` y el archivo y la línea de la evidencia. Para verlo, abre ese archivo tú mismo (el dueño, en su editor). Aun así el reporte describe
+  la red: se comparte solo entre las sesiones locales, nunca en GitHub.
 
 ## 1. Preparación (una vez)
 
@@ -185,9 +186,11 @@ Cada reporte trae:
 - El estado del equipo según el manifest: completed o failed con su motivo, comandos e inválidos, y si se enmascaró
   con los conteos por tipo.
 - Una sección por playbook con algún problema; los que salieron limpios solo se cuentan. Por comando:
-  - `rechazado: …`: la línea de error en las primeras de la salida. Cuenta toda línea que empieza con `%`
-    (`% Invalid`, `% Incomplete`, `% Ambiguous`, `% Permission denied`…), además de `Incorrect usage` (AireOS),
-    `Syntax error`, `ERROR: %` (ASA/FTD) y `Command authorization failed` (AAA).
+  - `rechazado: …`: la marca de error que apareció en las primeras líneas de la salida (`% Invalid input`,
+    `% Incomplete command`, `% Ambiguous command`, `% Permission denied`, `Incorrect usage` de AireOS, `Syntax error`,
+    `ERROR: %` de ASA/FTD, `Authorization failed` de AAA…). Otra línea que empiece con `%` sale como
+    `% (otro mensaje del equipo)`. Nunca se imprime el texto del equipo: podría traer un secreto (un `%PARSER` con el
+    comando registrado, por ejemplo).
   - `incompleto`: el comando se cortó o falló.
   - `truncado al leer`: pasó el tope de lectura.
   - `salida vacía`.
@@ -199,8 +202,12 @@ Cada reporte trae:
 - **Avisos**: lo que el lector no pudo leer entero, o la carpeta sin salidas (equipo que no conectó).
 - **Posibles secretos sin enmascarar**: valores tras `password`, `secret`, `key-string`, `community`,
   `pre-shared-key`, `psk`, `key 7`, `message-digest-key`, `auth`/`priv 0x…` (SNMPv3), un hash `$n$…` o una llave
-  privada, que no son `<MASKED:…>`. Son candidatos a revisar a mano: muchos son
-  texto inocente («Password encryption…»). Uno real es un hueco de `internal/mask`.
+  privada, que no son `<MASKED:…>`. **El reporte no muestra secretos**: cada candidato sale como
+  `` `comando` · palabra clave ⟦secreto? N car.⟧ · archivo:línea[, archivo:línea…] `` (N es el largo de lo que sigue a la
+  palabra clave), sin ningún texto de la línea; para verlos, abre el archivo indicado tú mismo. Son candidatos: muchos
+  son texto inocente («Password encryption…»); uno real es un hueco de `internal/mask`. Lo que esté en un `.zip` no se
+  revisa (por eso `zip: ZIP_POLICY_NONE`). El motivo de un equipo que falló también se omite si parece traer un
+  secreto.
 
 Complemento con lo que mctl ya da: `mctl analyze "$D"/validacion-3560cx_*` corre las reglas de análisis (avisa de los
 comandos rechazados que usan) y `mctl audit verify` confirma la cadena de auditoría del día.

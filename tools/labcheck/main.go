@@ -6,17 +6,20 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
@@ -43,10 +46,13 @@ func main() {
 	}
 }
 
-// Respuestas de rechazo que no empiezan con «%» (AireOS, ISE, ASA/FTD, AAA de IOS). Toda línea que empieza con «%»
-// cuenta (% Invalid, % Incomplete, % Ambiguous, % Permission denied...). El driver solo marca algunas como «comando
-// inválido»; aquí se buscan en las primeras líneas (más abajo podrían ser texto de un log y no la respuesta).
-var rejectMarks = []string{"Incorrect usage", "Syntax error", "ERROR: %", "uthorization failed"}
+// Respuestas de rechazo conocidas de IOS, IOS-XE, NX-OS, AireOS, ISE, ASA/FTD y AAA; las más largas primero. El
+// reporte imprime solo la marca, nunca la línea del equipo (podría traer un secreto, p. ej. un %PARSER con el comando
+// registrado). Toda otra línea que empieza con «%» cuenta como rechazo sin texto. Se buscan en las primeras líneas
+// (más abajo podrían ser texto de un log y no la respuesta).
+var rejectMarks = []string{"% Invalid input", "% Invalid command", "% Invalid parameter", "% Incomplete command", "% Ambiguous command",
+	"% Permission denied", "% Unrecognized", "% Invalid", "% Incomplete", "% Ambiguous", "Incorrect usage", "Syntax error", "ERROR: %",
+	"Authorization failed"}
 
 // Valores con pinta de secreto: tras una palabra clave (con su número de tipo opcional), key/message-digest-key con
 // tipo, auth/priv 0x de SNMPv3 (NX-OS), un hash crypt ($1$, $8$, $9$...) o una llave privada. Cada alternativa
@@ -55,16 +61,81 @@ var secretRe = regexp.MustCompile(`(?i)\b(?:password|secret|key-string|pre-share
 	`|\bmessage-digest-key\s+\d+\s+md5\s+(?:[0-9]\s+)?(\S+)|\bkey\s+[0-9]\s+(\S+)|\b(?:auth|priv)\s+(?:\S+\s+)?(0x[0-9a-f]+)` +
 	`|(\$[1-9][a-z]?\$\S{4,})|(BEGIN [A-Z ]*PRIVATE KEY)`)
 
-// leaks dice si la línea trae algún valor con pinta de secreto que no esté enmascarado.
-func leaks(ln string) bool {
+// secretAt dice si la línea trae un valor con pinta de secreto que no sea <MASKED:...>, con la palabra clave y el
+// largo de lo que la sigue hasta el fin de línea. El reporte imprime solo eso: el regex captura un token y el secreto
+// puede ser otro de la misma línea (ntp authentication-key 1 md5 X, pre-shared-key local X...), así que nada del
+// texto de la línea sale, ni lo que va antes.
+func secretAt(ln string) (kw string, n int, ok bool) {
 	for _, m := range secretRe.FindAllStringSubmatchIndex(ln, -1) {
 		for g := 2; g < len(m); g += 2 {
-			if m[g] >= 0 && !strings.HasPrefix(ln[m[g]:], "<MASKED:") {
-				return true
+			if m[g] < 0 || strings.HasPrefix(ln[m[g]:], "<MASKED:") {
+				continue
 			}
+			word := strings.Fields(ln[m[0]:m[1]])[0]
+			switch {
+			case strings.HasPrefix(word, "$"):
+				kw = "hash"
+			case strings.EqualFold(word, "begin"):
+				kw = "llave privada"
+			default:
+				kw = strings.ToLower(word) // una de las palabras del regex
+			}
+			return kw, utf8.RuneCountInString(strings.TrimSpace(ln[m[0]+len(word):])), true
 		}
 	}
-	return false
+	return "", 0, false
+}
+
+// Cabecera de sección que escribe patrol.Writer; una línea del equipo que la imita viene escapada con «\».
+var headerRe = regexp.MustCompile(`^===== (?:ronda \d+ · )?\S+ · (.*?)(?: · comando inválido)?(?: · incompleto)? =====$`)
+
+// secretsIn busca candidatos a secreto en los .txt de la carpeta de un equipo, con archivo y número de línea para que
+// el dueño los abra él mismo. Los iguales (comando, palabra clave y largo) salen en una línea con todas sus ubicaciones.
+func secretsIn(jobDir, dev string) (out []string, err error) {
+	ents, err := os.ReadDir(filepath.Join(jobDir, dev))
+	if err != nil {
+		return nil, err
+	}
+	var keys []string
+	locs := map[string][]string{}
+	for _, e := range ents {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".txt" {
+			continue
+		}
+		rel := filepath.Join(dev, e.Name())
+		f, err := os.Open(filepath.Join(jobDir, rel))
+		if err != nil {
+			return nil, err
+		}
+		sc := bufio.NewScanner(f)
+		sc.Buffer(make([]byte, 64<<10), 16<<20)
+		cmd := ""
+		for n := 1; sc.Scan(); n++ {
+			ln := sc.Text()
+			if m := headerRe.FindStringSubmatch(ln); m != nil {
+				cmd = m[1] // texto del playbook, no del equipo
+				continue
+			}
+			kw, size, ok := secretAt(ln)
+			if !ok {
+				continue
+			}
+			k := fmt.Sprintf("`%s` · %s ⟦secreto? %d car.⟧", cmd, kw, size)
+			if locs[k] == nil {
+				keys = append(keys, k)
+			}
+			locs[k] = append(locs[k], fmt.Sprintf("%s:%d", rel, n))
+		}
+		err = sc.Err()
+		f.Close()
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", rel, err)
+		}
+	}
+	for _, k := range keys {
+		out = append(out, "- "+k+" · "+strings.Join(locs[k], ", "))
+	}
+	return out, nil
 }
 
 type expected struct {
@@ -100,7 +171,9 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 	}
 	for _, r := range m.Devices {
 		fmt.Fprintf(w, "- %s (%s) ronda %d: %s · %d comandos, %d inválidos según el driver", r.Hostname, r.Target.Address, r.Round, r.State, r.Commands, r.Invalid)
-		if r.Detail != "" {
+		if _, _, secret := secretAt(r.Detail); secret {
+			fmt.Fprint(w, " · (detalle omitido: parece traer un secreto; míralo en la auditoría)")
+		} else if r.Detail != "" {
 			fmt.Fprintf(w, " · %s", r.Detail)
 		}
 		fmt.Fprintln(w)
@@ -114,10 +187,12 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 	if err != nil {
 		notes, b = append(notes, "- "+err.Error()), &analyze.Bundle{}
 	}
+	if zips, _ := filepath.Glob(filepath.Join(jobDir, "*.zip")); len(zips) > 0 {
+		notes = append(notes, "- hay .zip en la carpeta: labcheck no busca secretos dentro (usa zip: ZIP_POLICY_NONE)")
+	}
 	for _, wn := range b.Warnings { // lo que el lector no pudo leer entero: lo que sigue puede salir como «no corrió»
 		notes = append(notes, fmt.Sprintf("- %s · `%s`: %s", wn.Device, wn.Command, wn.Msg))
 	}
-	seenSecret := map[string]bool{}
 	for _, r := range m.Devices {
 		// shortcut: sin Ran se toman todos los playbooks del manifest; en un trabajo con varios equipos y gemelos
 		// (ios/ios-xe) los del otro equipo saldrían como «no corrió». El runbook usa un equipo por trabajo.
@@ -188,17 +263,11 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 			if pb == "" && len(problems(s, end, slow)) == 0 {
 				outside = append(outside, fmt.Sprintf("- `%s`", s.Command))
 			}
-			for _, ln := range strings.Split(s.Text, "\n") {
-				ln = strings.TrimSpace(ln)
-				if !leaks(ln) || seenSecret[dev+ln] {
-					continue
-				}
-				seenSecret[dev+ln] = true
-				if len(ln) > 200 {
-					ln = ln[:200] + "…"
-				}
-				secrets = append(secrets, fmt.Sprintf("- %s · `%s`: %s", dev, s.Command, ln))
-			}
+		}
+		if sec, err := secretsIn(jobDir, dev); err == nil {
+			secrets = append(secrets, sec...)
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			notes = append(notes, "- secretos sin revisar: "+err.Error())
 		}
 		for _, e := range exp {
 			if !e.done {
@@ -242,8 +311,12 @@ func problems(s analyze.Section, end time.Time, slow time.Duration) (out []strin
 		if n++; n > 5 {
 			break
 		}
-		if strings.HasPrefix(ln, "%") || slices.ContainsFunc(rejectMarks, func(mk string) bool { return strings.Contains(ln, mk) }) {
-			rejected = ln
+		if i := slices.IndexFunc(rejectMarks, func(mk string) bool { return strings.Contains(strings.ToLower(ln), strings.ToLower(mk)) }); i >= 0 {
+			rejected = rejectMarks[i]
+			break
+		}
+		if strings.HasPrefix(ln, "%") {
+			rejected = "% (otro mensaje del equipo)"
 			break
 		}
 	}
