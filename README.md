@@ -172,21 +172,21 @@ Each platform is covered by an official content pack. Install the packs you need
 | Platform | Pack | Playbooks | Validation |
 |---|---|---:|---|
 | Cisco IOS (classic: Catalyst 2960/3560/3750, ISR G2) | `oom/ios` | 52 | ✅ lab-validated (Catalyst 3560CX) |
-| Cisco IOS-XE (switches and routers) | `oom/ios-xe` | 69 | not yet validated on a lab device |
-| Catalyst 9000 (IOS-XE 17.x) | `oom/cat9k` | 55 | not yet validated on a lab device |
-| SD-Access fabric on Catalyst 9000 | `oom/sda` | 26 | not yet validated on a lab device |
+| Cisco IOS-XE (switches and routers) | `oom/ios-xe` | 69 | commands checked on a Catalyst 9000v and a Catalyst 8000v (CML) |
+| Catalyst 9000 (IOS-XE 17.x) | `oom/cat9k` | 55 | commands checked on a Catalyst 9000v; stack and PoE need hardware |
+| SD-Access fabric on Catalyst 9000 | `oom/sda` | 26 | commands checked on a Catalyst 9000v; a real fabric run is pending |
 | Catalyst 9800 WLC and embedded WLC (EWC) | `oom/wlc-9800` | 47 | ✅ commands checked on a 9120 EWC (IOS-XE 17.12); full lab run pending |
 | AireOS WLC | `oom/wlc-aireos` | 64 | not yet validated on a lab device |
 | Nexus (NX-OS) | `oom/nx-os` | 68 | not yet validated on a lab device |
 | ACI leaf and spine (Nexus 9000 CLI) | `oom/aci` | 45 | not yet validated on a lab device |
-| ASA | `oom/asa` | 68 | not yet validated on a lab device |
+| ASA | `oom/asa` | 68 | commands checked on ASAv, single context and Active/Standby failover (CML) |
 | Firepower Threat Defense (FTD) | `oom/ftd` | 64 | not yet validated on a lab device |
 | ISE | `oom/ise` | 36 | not yet validated on a lab device |
 
 Counts match the packs in this repository (a test keeps them in sync). A few IOS-XE playbooks (`tac-baseline`, `analisis`, `metricas`, `pre-post`, `upgrade-check`) ship inside the binary. ACLs are imported, analyzed and translated between IOS-XE, NX-OS and ASA without any pack.
 
 > [!NOTE]
-> **Lab validation is in progress.** Commands and parsers come from Cisco documentation; only `oom/ios` has been checked end to end on a real device so far, and the `oom/wlc-9800` commands on a 9120 EWC. Playbooks only read, so an unvalidated one can at worst collect less than expected. Please report any output that is parsed wrong.
+> **Lab validation is in progress.** Commands and parsers come from Cisco documentation; only `oom/ios` has been checked end to end on a real device so far. The commands of `oom/wlc-9800` were checked on a 9120 EWC, those of `oom/ios-xe`, `oom/cat9k` and `oom/sda` on a Catalyst 9000v, and those of `oom/asa` on ASAv. Playbooks only read, so an unvalidated one can at worst collect less than expected. Please report any output that is parsed wrong.
 
 ## Install
 
