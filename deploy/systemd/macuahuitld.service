@@ -1,8 +1,8 @@
 # Núcleo de MACUAHUITL como servicio de usuario (spec §5.1).
-# Instalar en ~/.config/systemd/user/ y activar con:
-#   systemctl --user daemon-reload && systemctl --user enable --now macuahuitld
+# El paquete .deb/.rpm la instala en /usr/lib/systemd/user/; cada usuario la activa con:
+#   systemctl --user enable --now macuahuitld
 [Unit]
-Description=MACUAHUITL núcleo
+Description=MACUAHUITL core
 Documentation=https://github.com/oom-netsec/MACUAHUITL
 # Si ya hay un núcleo corriendo (ErrAlreadyRunning) no tiene caso reintentar sin fin.
 StartLimitIntervalSec=60

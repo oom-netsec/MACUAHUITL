@@ -8,9 +8,9 @@ section: net
 priority: optional
 maintainer: Os Ordonez <190461823+oom-netsec@users.noreply.github.com>
 description: |
-  Recolección automatizada de evidencia de equipos Cisco (nivel TAC), bóveda local
-  de credenciales, auditoría encadenada, diagnóstico de red y generador de ACLs.
-  Todo local: sin nube ni telemetría.
+  TAC-grade evidence collection for Cisco devices, local credential vault,
+  hash-chained audit log, network diagnostics and ACL tools.
+  Everything runs locally: no cloud, no telemetry.
 vendor: MACUAHUITL
 homepage: https://github.com/oom-netsec/MACUAHUITL
 license: Apache-2.0

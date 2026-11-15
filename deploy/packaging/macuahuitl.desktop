@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=MACUAHUITL
-Comment=Recolección TAC, bóveda de credenciales y diagnóstico de red Cisco
+Comment=TAC evidence collection, credential vault and network diagnostics for Cisco
 Exec=/usr/bin/macuahuitl
 Icon=macuahuitl
 StartupWMClass=macuahuitl
