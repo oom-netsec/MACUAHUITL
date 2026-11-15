@@ -70,6 +70,10 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
     setFieldErr(({ [name]: _, ...rest }) => rest);
   };
 
+  // Al iniciar, el plan ya vive en el núcleo: los secretos (community, auth/priv de SNMPv3…) no se quedan en el formulario.
+  // Antes de iniciar se conservan para volver a planear (write memory, huellas) sin reescribirlos.
+  const clearSecrets = () => setValues((cur) => ({ ...cur, ...Object.fromEntries((sel?.fields ?? []).filter((f) => f.type === "secret").map((f) => [f.name, ""])) }));
+
   const doPlan = async () => {
     if (!sel) return;
     clearMsgs(); setPlan(null); setPlanned(true);
@@ -80,11 +84,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
         target: targetOf(equipo, credId), id: sel.id, values: valuesToSend(sel, values),
         ...(writeMem ? { writeMemory: true } : {}), ...(accepted.length ? { acceptedHostKeyFingerprints: accepted } : {}),
       });
-      if (mine === seq.current) {
-        setPlan(res);
-        // El plan ya vive en el núcleo: los secretos (community, auth/priv de SNMPv3…) no se quedan en el formulario.
-        setValues((cur) => ({ ...cur, ...Object.fromEntries(sel.fields.filter((f) => f.type === "secret").map((f) => [f.name, ""])) }));
-      }
+      if (mine === seq.current) setPlan(res);
     } catch (e) {
       if (mine !== seq.current) return;
       const { code, desc } = parseCoreError(e);
@@ -148,7 +148,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
       {warn && <Notice kind="warn">{warn}</Notice>}
       {err && <Notice kind="error">{err}</Notice>}
       {!planned && !active && <EmptyState icon="ops" title={t("snippets.empty.title")}>{t("snippets.empty")}</EmptyState>}
-      <AssistExecution core={core} plan={plan} onStarted={() => setPlan(null)} onActive={setActive} onError={setErr} />
+      <AssistExecution core={core} plan={plan} onStarted={() => { setPlan(null); clearSecrets(); }} onActive={setActive} onError={setErr} />
     </Page>
   );
 }

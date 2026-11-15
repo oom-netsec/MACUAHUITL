@@ -495,7 +495,7 @@ test("ejecución asistida: el registro del equipo tiene tope", async () => {
   expect(pre.textContent).toContain("l5199");
 });
 
-test("tras planear, el secreto no se queda en el formulario (pero sí viajó)", async () => {
+test("el secreto se conserva para volver a planear y se borra al iniciar la ejecución", async () => {
   const core = await open(withDemo as never);
   await choose("Demo de tipos");
   await userEvent.type(screen.getByLabelText("Texto *"), "abc");
@@ -503,6 +503,10 @@ test("tras planear, el secreto no se queda en el formulario (pero sí viajó)", 
   await userEvent.type(screen.getByLabelText("Clave"), "s3cr3t");
   await userEvent.click(planBtn());
   expect(core.planTemplateSnippet).toHaveBeenCalledWith(expect.objectContaining({ values: expect.objectContaining({ pw: "s3cr3t" }) }));
+  const start = await screen.findByRole("button", { name: START });
+  expect(screen.getByLabelText("Clave")).toHaveValue("s3cr3t"); // planear otra vez (write memory, huellas) no obliga a reescribirlo
+  await userEvent.click(screen.getByLabelText("Activar el modo asistido para esta ejecución"));
+  await userEvent.click(start);
   await waitFor(() => expect(screen.getByLabelText("Clave")).toHaveValue(""));
   expect(screen.getByLabelText("Texto *")).toHaveValue("abc"); // lo demás se conserva
 });
