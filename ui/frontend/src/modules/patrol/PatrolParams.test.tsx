@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { findPb } from "./pbTestUtil";
 import { PatrolView } from "./PatrolView";
 import { fakeCore } from "../../lib/fake";
 import { scriptsChanged } from "../scripts/signal";
@@ -22,7 +23,7 @@ const create = () => userEvent.click(screen.getByRole("button", { name: "Crear t
 
 test("un playbook con datos pide sus campos, los exige sin vacíos y los manda en params (un campo por nombre)", async () => {
   const core = await setup([pbMac, pbMac2, pbPlain]);
-  await userEvent.click(await screen.findByRole("checkbox", { name: "STP" }));
+  await userEvent.click(await findPb("STP"));
   expect(screen.queryByLabelText(/\(mac\)/)).toBeNull();
   await userEvent.click(screen.getByRole("checkbox", { name: "Rastreo MAC" }));
   const mac = screen.getByLabelText(/\(mac\)/);
@@ -46,7 +47,7 @@ test("un playbook con datos pide sus campos, los exige sin vacíos y los manda e
 
 test("desmarcar el playbook quita el dato y el JobSpec no lleva params", async () => {
   const core = await setup([pbMac, pbPlain]);
-  await userEvent.click(await screen.findByRole("checkbox", { name: "Rastreo MAC" }));
+  await userEvent.click(await findPb("Rastreo MAC"));
   await userEvent.type(screen.getByLabelText(/\(mac\)/), "aa:bb:cc:dd:ee:ff");
   await userEvent.click(screen.getByRole("checkbox", { name: "Rastreo MAC" }));
   await userEvent.click(screen.getByRole("checkbox", { name: "STP" }));
@@ -58,7 +59,7 @@ test("desmarcar el playbook quita el dato y el JobSpec no lleva params", async (
 test("el rechazo del núcleo de un dato sale junto a su campo", async () => {
   const cause = { code: "InvalidArgument", reason: "playbook.err.param_invalid", metadata: { field: "params", name: "mac", kind: "mac" } };
   await setup([pbMac], { createJob: vi.fn(async () => { throw Object.assign(new Error("rpc error: code = InvalidArgument desc = patrol: params: MAC inválida"), { cause }); }) });
-  await userEvent.click(await screen.findByRole("checkbox", { name: "Rastreo MAC" }));
+  await userEvent.click(await findPb("Rastreo MAC"));
   await userEvent.type(screen.getByLabelText(/\(mac\)/), "zz");
   await create();
   await waitFor(() => expect(screen.getByLabelText(/\(mac\)/)).toBeInvalid());
@@ -70,7 +71,7 @@ test("el rechazo del núcleo de un dato sale junto a su campo", async () => {
 test("un rechazo de un dato que el formulario no muestra queda en el aviso general", async () => {
   const cause = { code: "InvalidArgument", reason: "playbook.err.param_missing", metadata: { field: "params", name: "otro", kind: "ip" } };
   await setup([pbMac], { createJob: vi.fn(async () => { throw Object.assign(new Error("rpc error: code = InvalidArgument desc = patrol: params: falta el dato otro"), { cause }); }) });
-  await userEvent.click(await screen.findByRole("checkbox", { name: "Rastreo MAC" }));
+  await userEvent.click(await findPb("Rastreo MAC"));
   await userEvent.type(screen.getByLabelText(/\(mac\)/), "aa:bb:cc:dd:ee:ff");
   await create();
   expect(await screen.findByRole("alert")).toHaveTextContent("falta el dato otro");
@@ -79,7 +80,7 @@ test("un rechazo de un dato que el formulario no muestra queda en el aviso gener
 // Patrol sigue montada (oculta) mientras se instala un paquete en Ajustes: el catálogo se vuelve a pedir.
 test("el catálogo de playbooks se vuelve a pedir cuando cambia el contenido (paquete instalado o importado)", async () => {
   const core = await setup([pbPlain]);
-  await screen.findByRole("checkbox", { name: "STP" });
+  await findPb("STP");
   const before = vi.mocked(core.listPlaybooks).mock.calls.length;
   act(() => scriptsChanged());
   await waitFor(() => expect(vi.mocked(core.listPlaybooks).mock.calls.length).toBeGreaterThan(before));
@@ -88,7 +89,7 @@ test("el catálogo de playbooks se vuelve a pedir cuando cambia el contenido (pa
 test("un tipo de dato desconocido usa el nombre del dato como etiqueta y sin ayuda, no claves crudas", async () => {
   const pbNew = { id: "ios-xe/nuevo", platform: "ios-xe", name: "TAC · Nuevo", commands: ["show x {vrf}"], params: [{ name: "vrf", kind: "xyz" }] };
   await setup([pbNew]);
-  await userEvent.click(await screen.findByRole("checkbox", { name: /Nuevo/ }));
+  await userEvent.click(await findPb(/Nuevo/));
   expect(screen.getByLabelText("vrf")).toBeInTheDocument();
   expect(document.body.textContent).not.toContain("patrol.param");
 });
@@ -96,7 +97,7 @@ test("un tipo de dato desconocido usa el nombre del dato como etiqueta y sin ayu
 test("los tipos vrf y vnid (ACI) llevan su etiqueta y su ayuda", async () => {
   const pbAci = { id: "aci/ep", platform: "nx-os", name: "ACI · EP", commands: ["show x {vrf} {vnid}"], params: [{ name: "vrf", kind: "vrf" }, { name: "vnid", kind: "vnid" }] };
   await setup([pbAci]);
-  await userEvent.click(await screen.findByRole("checkbox", { name: /EP/ }));
+  await userEvent.click(await findPb(/EP/));
   expect(screen.getByLabelText("VRF (vrf)")).toHaveAccessibleDescription(/tenant:vrf/);
   expect(screen.getByLabelText("VNID (vnid)")).toHaveAccessibleDescription(/16777215/);
 });

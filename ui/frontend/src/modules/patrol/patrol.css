@@ -81,8 +81,13 @@ tr[data-state="bad"] td:nth-child(2) { color: var(--critical); }
 
 /* Selector de playbooks: grupos por área en columnas, comandos plegados bajo cada uno. */
 .pb-picker { display: grid; gap: 12px; margin-bottom: 16px; }
-.pb-group { border: 1px solid var(--hairline); border-radius: var(--radius, 8px); padding: 8px 12px 10px; margin: 0; }
-.pb-group > legend { padding: 0 6px; font-weight: 600; font-size: 0.8125rem; color: var(--text-2); }
+.pb-group { border: 1px solid var(--hairline); border-radius: var(--radius, 8px); padding: 4px 12px 6px; margin: 0; }
+.pb-head { display: flex; align-items: center; gap: 8px; }
+.pb-toggle { all: unset; box-sizing: border-box; flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 6px 0; cursor: pointer; font-weight: 600; font-size: 0.8125rem; color: var(--text-2); }
+.pb-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.pb-toggle svg { flex: none; transition: transform 0.12s; }
+.pb-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.pb-name { overflow-wrap: anywhere; }
 .pb-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 12px; padding: 2px 0; } /* nombre · paquete · «Commands (N)» en una fila */
 .pb-item details { justify-self: end; }
 .pb-item details[open] { grid-column: 1 / -1; justify-self: stretch; }

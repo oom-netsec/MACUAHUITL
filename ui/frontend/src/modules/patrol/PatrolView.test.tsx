@@ -1,3 +1,4 @@
+import { findPb } from "./pbTestUtil";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PatrolView, parseTargets } from "./PatrolView";
@@ -264,7 +265,7 @@ test("se eligen playbooks del catálogo y van en playbookIds; sin comandos pegad
   await userEvent.type(await screen.findByLabelText("Nombre del trabajo"), "caso-2");
   await userEvent.type(screen.getByLabelText("Equipos"), "10.0.0.1");
   await userEvent.selectOptions(screen.getByLabelText("Credencial"), "c1");
-  await userEvent.click(await screen.findByRole("checkbox", { name: "STP" }));
+  await userEvent.click(await findPb("STP"));
   await userEvent.type(screen.getByLabelText("Carpeta de salida"), "/home/u/out");
   await userEvent.click(screen.getByRole("button", { name: "Crear trabajo" }));
   await waitFor(() => expect(core.createJob).toHaveBeenCalled());
@@ -285,7 +286,7 @@ test("el catálogo de playbooks se vuelve a pedir al cambiar de idioma (el núcl
   let confirm = () => {};
   const onLang = (l: string) => (l === "en" ? new Promise<void>((r) => { confirm = r; }) : undefined);
   render(<I18nProvider onLang={onLang}><LanguageSwitch /><PatrolView core={core} /></I18nProvider>);
-  await screen.findByRole("checkbox", { name: "STP" });
+  await findPb("STP");
   expect(listPlaybooks).toHaveBeenCalledTimes(1);
   await userEvent.click(screen.getByRole("radio", { name: "English" }));
   expect(listPlaybooks).toHaveBeenCalledTimes(1); // aún no: el núcleo no confirmó el idioma y contestaría en el anterior
@@ -298,7 +299,7 @@ test("el catálogo que falló se puede reintentar", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks });
   render(<PatrolView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: "Reintentar" }));
-  expect(await screen.findByRole("checkbox", { name: "STP" })).toBeInTheDocument();
+  expect(await findPb("STP")).toBeInTheDocument();
 });
 
 test("el tiempo activo se detiene en la fase de cierre", () => {
