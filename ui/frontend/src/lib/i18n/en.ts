@@ -2761,4 +2761,7 @@ export const en: Record<Key, string> = {
   "pending.kind.snippet": "Snippet: {name}",
   "assist.gone": "The run is no longer alive in the core; if it changed anything, its rollback is in Pending rollbacks (Changes).",
   "assist.reapply.propose": "Propose re-applying the original change",
+  "patrol.pb.selectAll": "Select all {group}",
+  "patrol.pb.groupCount": "({n} selected / {total})",
+  "patrol.pb.groupCount.one": "(1 selected / {total})",
 };

@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Icon } from "../../components/Icon";
 import { Check, Field } from "../../components/Field";
 import { useT } from "../../lib/i18n";
 import type { PlaybookInfo } from "./api";
@@ -22,7 +23,17 @@ export function PlaybookPicker({ playbooks, selected, onChange }: { playbooks: P
     playbooks.filter(hit).forEach((p) => m.set(areaOf(p.name), [...(m.get(areaOf(p.name)) ?? []), p]));
     return [...m].sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b, undefined, { numeric: true })));
   }, [playbooks, q, t]);
-  const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id].sort());
+  // Lo que la persona abrió o cerró a mano; una búsqueda nueva lo olvida y vuelve la regla por omisión.
+  const [manual, setManual] = useState<{ q: string; v: Record<string, boolean> }>({ q: "", v: {} });
+  const open = (area: string, list: PlaybookInfo[]) => (manual.q === q ? manual.v[area] : undefined) ?? (q.trim() !== "" || list.some((p) => selected.includes(p.id)));
+  const setOpen = (area: string, v: boolean) => setManual((m) => ({ q, v: { ...(m.q === q ? m.v : {}), [area]: v } }));
+  // Elegir o quitar fija el estado visible para que el grupo no se pliegue bajo los dedos al vaciarlo.
+  const toggle = (area: string, id: string) => { setOpen(area, true); onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id].sort()); };
+  const toggleGroup = (area: string, list: PlaybookInfo[]) => {
+    const ids = list.map((p) => p.id);
+    setOpen(area, true);
+    onChange(ids.every((id) => selected.includes(id)) ? selected.filter((x) => !ids.includes(x)) : [...new Set([...selected, ...ids])].sort());
+  };
   return (
     <div className="pb-picker">
       <div className="field-row end">
@@ -31,11 +42,11 @@ export function PlaybookPicker({ playbooks, selected, onChange }: { playbooks: P
       </div>
       {groups.length === 0 && <p className="empty">{t("patrol.pb.none")}</p>}
       {groups.map(([area, list]) => (
-        <fieldset key={area} className="pb-group">
-          <legend>{area || t("patrol.pb.other")}</legend>
+        <Group key={area} name={area || t("patrol.pb.other")} list={list} selected={selected} open={open(area, list)}
+          onOpen={(v) => setOpen(area, v)} onAll={() => toggleGroup(area, list)}>
           {list.map((p) => (
             <div key={p.id} className="pb-item">
-              <Check label={topicOf(p.name)} checked={selected.includes(p.id)} onChange={() => toggle(p.id)} />
+              <Check label={topicOf(p.name)} checked={selected.includes(p.id)} onChange={() => toggle(area, p.id)} />
               <span className="meta">{packLabel(p.pack)}</span>
               <details>
                 <summary className="meta">{t("patrol.pb.cmds", { n: p.commands.length })}<span className="sr"> · {p.name}</span></summary>
@@ -43,8 +54,30 @@ export function PlaybookPicker({ playbooks, selected, onChange }: { playbooks: P
               </details>
             </div>
           ))}
-        </fieldset>
+        </Group>
       ))}
+    </div>
+  );
+}
+
+// Grupo plegable: botón de plegado (aria-expanded) y, aparte, la casilla que elige o quita lo visible del grupo.
+function Group({ name, list, selected, open, onOpen, onAll, children }: { name: string; list: PlaybookInfo[]; selected: string[]; open: boolean; onOpen: (v: boolean) => void; onAll: () => void; children: React.ReactNode }) {
+  const t = useT();
+  const bodyId = useId();
+  const box = useRef<HTMLInputElement>(null);
+  const n = list.filter((p) => selected.includes(p.id)).length;
+  useEffect(() => { if (box.current) box.current.indeterminate = n > 0 && n < list.length; }, [n, list.length]);
+  return (
+    <div className="pb-group" role="group" aria-labelledby={`${bodyId}-h`}>
+      <div className="pb-head">
+        <input ref={box} type="checkbox" checked={n === list.length} aria-label={t("patrol.pb.selectAll", { group: name })} onChange={onAll} />
+        <button type="button" id={`${bodyId}-h`} className="pb-toggle" aria-expanded={open} aria-controls={bodyId} onClick={() => onOpen(!open)}>
+          <Icon name="chevron" size={14} />
+          <span className="pb-name">{name}</span>
+          <span className="meta">{t("patrol.pb.groupCount", { n, total: list.length })}</span>
+        </button>
+      </div>
+      {open && <div id={bodyId}>{children}</div>}
     </div>
   );
 }

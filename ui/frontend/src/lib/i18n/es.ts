@@ -2759,6 +2759,9 @@ export const es = {
   "pending.kind.snippet": "Snippet: {name}",
   "assist.gone": "La ejecución ya no está viva en el núcleo; si cambió algo, su reversa está en Reversas pendientes (Cambios).",
   "assist.reapply.propose": "Proponer reaplicar el cambio original",
+  "patrol.pb.selectAll": "Seleccionar todo {group}",
+  "patrol.pb.groupCount": "({n} seleccionados / {total})",
+  "patrol.pb.groupCount.one": "(1 seleccionado / {total})",
 };
 
 export type Key = keyof typeof es;

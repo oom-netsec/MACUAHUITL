@@ -12,6 +12,7 @@ const chosen = () => screen.getByLabelText("elegidos").textContent;
 
 test("agrupa por el área antes del «·», cuenta comandos y permite elegir varios", async () => {
   render(<Harness />);
+  for (const a of ["L2", "TAC"]) await userEvent.click(screen.getByRole("button", { name: new RegExp(`^${a}`) }));
   const l2 = screen.getByRole("group", { name: /^L2/ });
   expect(within(l2).getByRole("checkbox", { name: /STP/ })).toBeInTheDocument();
   expect(screen.getByRole("group", { name: /^TAC/ })).toBeInTheDocument();
@@ -43,6 +44,7 @@ test("un elegido que la búsqueda oculta sigue elegido y se ve el resumen", asyn
 
 test("muestra los comandos de cada playbook antes de elegirlo", async () => {
   render(<Harness />);
+  await userEvent.click(screen.getByRole("button", { name: /^L2/ }));
   const stp = screen.getByRole("checkbox", { name: "STP" }).closest(".pb-item")!;
   await userEvent.click(within(stp as HTMLElement).getByText("Comandos (4)"));
   expect(screen.getByText("show spanning-tree detail")).toBeInTheDocument();
@@ -68,6 +70,7 @@ test("cada fila muestra su paquete de origen y la búsqueda lo encuentra", async
     { id: "a/tres", platform: "ios-xe", name: "L2 · Tres", commands: ["show c"], params: [], pack: "" },
   ];
   render(<PlaybookPicker playbooks={pbs} selected={[]} onChange={() => {}} />);
+  await userEvent.click(screen.getByRole("button", { name: /^L2/ }));
   expect(screen.getByText("oom/cat9k")).toBeInTheDocument();
   expect(screen.getByText("Propio")).toBeInTheDocument();
   expect(screen.getByText("Base")).toBeInTheDocument();
@@ -78,4 +81,89 @@ test("cada fila muestra su paquete de origen y la búsqueda lo encuentra", async
   await userEvent.type(screen.getByRole("searchbox", { name: "Buscar playbook" }), "propio"); // busca lo que la etiqueta muestra
   expect(screen.getByRole("checkbox", { name: /Dos/ })).toBeInTheDocument();
   expect(screen.queryByRole("checkbox", { name: /Uno/ })).not.toBeInTheDocument();
+});
+
+const hdr = (a: string) => screen.getByRole("button", { name: new RegExp(`^${a}`) });
+const all = (a: string) => screen.getByRole("checkbox", { name: `Seleccionar todo ${a}` }) as HTMLInputElement;
+
+test("los grupos arrancan plegados con su conteo y aria-expanded", async () => {
+  render(<Harness />);
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "false");
+  expect(hdr("L2")).toHaveTextContent("(0 seleccionados / 2)");
+  expect(hdr("L3")).toHaveTextContent("(0 seleccionados / 1)");
+  expect(screen.queryByRole("checkbox", { name: "STP" })).not.toBeInTheDocument();
+  await userEvent.click(hdr("L2"));
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByRole("checkbox", { name: "STP" })).toBeInTheDocument();
+  expect(document.getElementById(hdr("L2").getAttribute("aria-controls")!)).toContainElement(screen.getByRole("checkbox", { name: "STP" }));
+});
+
+test("el teclado pliega y despliega con Enter y Espacio", async () => {
+  render(<Harness />);
+  hdr("L3").focus();
+  await userEvent.keyboard("{Enter}");
+  expect(hdr("L3")).toHaveAttribute("aria-expanded", "true");
+  await userEvent.keyboard(" ");
+  expect(hdr("L3")).toHaveAttribute("aria-expanded", "false");
+});
+
+test("un grupo con algo elegido arranca desplegado y el conteo singular dice 1", () => {
+  render(<Harness initial={["ios-xe/l3-ospf"]} />);
+  expect(hdr("L3")).toHaveAttribute("aria-expanded", "true");
+  expect(hdr("L3")).toHaveTextContent("(1 seleccionado / 1)");
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "false");
+});
+
+test("la búsqueda despliega los grupos con resultados; vaciarla vuelve a la regla y respeta lo manual", async () => {
+  render(<Harness />);
+  const q = screen.getByRole("searchbox", { name: "Buscar playbook" });
+  await userEvent.type(q, "stp");
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "true");
+  expect(screen.queryByRole("button", { name: /^TAC/ })).not.toBeInTheDocument();
+  await userEvent.click(hdr("L2")); // la persona lo cierra a mano
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "false");
+  await userEvent.clear(q);
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "false");
+  expect(hdr("TAC")).toHaveAttribute("aria-expanded", "false");
+});
+
+test("la casilla del grupo elige y quita lo visible, queda indeterminada si es parcial y no pliega", async () => {
+  render(<Harness />);
+  await userEvent.click(all("L2"));
+  expect(chosen()).toBe("ios-xe/l2-stp,ios-xe/l2-vlan-troncales");
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "true"); // elegir abre; el clic no alterna
+  expect(all("L2").checked).toBe(true);
+  await userEvent.click(screen.getByRole("checkbox", { name: "STP" }));
+  expect(all("L2").checked).toBe(false);
+  expect(all("L2").indeterminate).toBe(true);
+  await userEvent.click(all("L2"));
+  expect(chosen()).toBe("ios-xe/l2-stp,ios-xe/l2-vlan-troncales");
+  await userEvent.click(all("L2"));
+  expect(chosen()).toBe("");
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "true"); // quitar todo no lo cierra bajo los dedos
+});
+
+test("la casilla del grupo solo actúa sobre lo que el filtro deja ver", async () => {
+  render(<Harness initial={["ios-xe/l2-vlan-troncales"]} />);
+  await userEvent.type(screen.getByRole("searchbox", { name: "Buscar playbook" }), "stp");
+  expect(all("L2").checked).toBe(false);
+  await userEvent.click(all("L2"));
+  expect(chosen()).toBe("ios-xe/l2-stp,ios-xe/l2-vlan-troncales");
+});
+
+test("una búsqueda nueva olvida lo cerrado a mano", async () => {
+  render(<Harness />);
+  const q = screen.getByRole("searchbox", { name: "Buscar playbook" });
+  await userEvent.type(q, "stp");
+  await userEvent.click(hdr("L2"));
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "false");
+  await userEvent.type(q, " s");
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "true");
+});
+
+test("quitar el último elegido de un grupo no lo pliega bajo los dedos", async () => {
+  render(<Harness initial={["ios-xe/l3-ospf"]} />);
+  await userEvent.click(screen.getByRole("checkbox", { name: "OSPF" }));
+  expect(chosen()).toBe("");
+  expect(hdr("L3")).toHaveAttribute("aria-expanded", "true");
 });
