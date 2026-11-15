@@ -56,32 +56,35 @@ const (
 
 // Recorder es seguro entre goroutines: la salida y el teclado llegan por separado.
 type Recorder struct {
-	mu      sync.Mutex
-	w       io.Writer
-	now     func() time.Time
-	pend    []byte    // línea de salida sin terminar
-	pendAt  time.Time // hora de su primer byte (cero = no hay línea abierta)
-	drop    bool      // la línea de salida pasó el tope: se descarta hasta el salto
-	stream  mask.Stream
-	tail    []byte // últimos bytes de salida desde el último Enter, para reconocer el prompt
-	fresh   bool   // llegó salida desde el último Enter
-	held    []string
-	lastBlk string      // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
-	typed   mask.Stream // lleva el bloque entre las líneas tecleadas
-	sent    []string    // líneas tecleadas y enviadas cuyo eco aún no llegó completo (solo en memoria, con tope)
-	pi      int         // índice en sent de la línea cuyo eco quedó partido
-	secrets []string    // valores tapados en lo tecleado, en memoria, mientras dure su ventana
-	win     int         // líneas de salida que le quedan a la ventana
-	acc     string      // lo recibido del eco partido hasta ahora
-	cont    bool        // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
-	cfg     bool        // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
-	cfgOK   bool        // hay prompt conocido para lo que se teclea; si no, se tapa como en config
-	hidden  bool        // lo tecleado es una contraseña: no se graba
-	line    []byte      // lo tecleado en la línea actual
-	lastCR  bool
-	max     int64 // tope de la grabación en bytes
-	written int64
-	cut     bool
+	mu       sync.Mutex
+	w        io.Writer
+	now      func() time.Time
+	pend     []byte    // línea de salida sin terminar
+	pendAt   time.Time // hora de su primer byte (cero = no hay línea abierta)
+	drop     bool      // la línea de salida pasó el tope: se descarta hasta el salto
+	stream   mask.Stream
+	tail     []byte // últimos bytes de salida desde el último Enter, para reconocer el prompt
+	fresh    bool   // llegó salida desde el último Enter
+	held     []string
+	lastBlk  string      // último bloque que dio un prompt: vale para lo tecleado sin prompt propio (pegado, log intercalado, cierre)
+	typed    mask.Stream // lleva el bloque entre las líneas tecleadas
+	sent     []string    // líneas tecleadas y enviadas cuyo eco aún no llegó completo (solo en memoria, con tope)
+	pi       int         // índice en sent de la línea cuyo eco quedó partido
+	secrets  []string    // valores tapados en lo tecleado, en memoria, mientras dure su ventana
+	win      int         // líneas de salida que le quedan a la ventana
+	secrets2 []string    // lo mismo para los valores que tapa mask.CutCommand (lista y ventana aparte: no tocan el estado de las reglas)
+	win2     int
+	blk2     string // bloque del prompt para mask.CutCommand («keychain» además de los de lastBlk)
+	acc      string // lo recibido del eco partido hasta ahora
+	cont     bool   // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
+	cfg      bool   // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
+	cfgOK    bool   // hay prompt conocido para lo que se teclea; si no, se tapa como en config
+	hidden   bool   // lo tecleado es una contraseña: no se graba
+	line     []byte // lo tecleado en la línea actual
+	lastCR   bool
+	max      int64 // tope de la grabación en bytes
+	written  int64
+	cut      bool
 }
 
 func NewRecorder(w io.Writer, now func() time.Time) *Recorder {
@@ -141,6 +144,11 @@ func (r *Recorder) outLine(l string) {
 			r.secrets = nil
 		}
 	}
+	if r.win2 > 0 {
+		if r.win2--; r.win2 == 0 {
+			r.secrets2 = nil
+		}
+	}
 	out, keep := "", true
 	pr := promptRe.FindString(l)
 	weak := ""
@@ -151,14 +159,23 @@ func (r *Recorder) outLine(l string) {
 		r.setPrompt(pr)
 		// El eco también pasa por scrub: lo que ya se tapó al teclear se tapa en el eco aunque la línea se haya
 		// desplazado («R1(config)#$min GRP v3 auth sha X …») y las reglas no la reconozcan.
-		_, echo := maskTyped(l[len(pr):], func(x string) string { return r.stream.Prompted(x, r.lastBlk) }, isConfigPrompt(pr))
-		echo = r.scrub(echo, len(r.sent) > 0)
+		src, echo := maskTyped(l[len(pr):], func(x string) string { return r.stream.Prompted(x, r.lastBlk) }, isConfigPrompt(pr))
+		echo = r.scrub(echo, len(r.sent) > 0) // S1: de aquí salen las decisiones; el corte solo cambia lo que se escribe
+		shown, vis := echo, pr
+		if isConfigPrompt(pr) {
+			// Un eco desplazado con «#» o «>» se lee como un prompt largo: lo que sobra del primero es eco.
+			sh := ""
+			if i := strings.IndexAny(pr, "#>"); i >= 0 && i < len(pr)-1 {
+				vis, sh = pr[:i+1], pr[i+1:]
+			}
+			shown = r.hide(sh+src, sh+echo)
+		}
 		// Eco partido: se sigue tecleando, o el texto recibido es un prefijo estricto de la primera línea enviada
 		// que aún espera su eco. Un eco completo la saca de la cola; lo que no cuadra la vacía.
 		text := strings.TrimLeft(l[len(pr):], " \t") // tras el prompt va un espacio antes del eco
 		partial := false
 		if len(r.sent) == 0 {
-			r.secrets, r.win = nil, 0 // prompt sin pendientes: la ventana de la red por contenido vence
+			r.secrets, r.win, r.secrets2, r.win2 = nil, 0, nil, 0 // prompt sin pendientes: la ventana de la red por contenido vence
 		} else if text != "" { // un Enter vacío no saca nada
 			if i := indexOf(r.sent, text); i >= 0 {
 				r.sent = r.sent[i+1:] // lo anterior se perdió en el eco (p. ej. tabulador completado)
@@ -173,7 +190,7 @@ func (r *Recorder) outLine(l string) {
 		}
 		r.cont = echo != l[len(pr):] && (len(r.line) > 0 || partial)
 		r.acc = text
-		out = pr + echo
+		out = vis + shown
 	} else if r.cont && !equipoMsg(l) {
 		// Desde un eco enmascarado hasta el siguiente prompt, lo que no es syslog ni aviso del equipo
 		// es el resto del eco (partido por logs asíncronos): se tapa entero.
@@ -199,6 +216,7 @@ func (r *Recorder) outLine(l string) {
 		out, keep = r.stream.Line(l)
 		if keep && !equipoMsg(l) {
 			out = r.scrub(out, len(r.sent) > 0)
+			out = r.scrub2(out, len(r.sent) > 0)
 		}
 	}
 	if keep {
@@ -260,6 +278,8 @@ var maskedTok = regexp.MustCompile(`<MASKED:[^>]*>`)
 func (r *Recorder) peekSecrets(line string) {
 	line, m := maskTyped(line, r.typed.Peek, true) // sin prompt que lo confirme: se tapa como en config
 	r.noteSecrets(line, m)
+	_, vals := mask.CutCommand(r.blk2, line, m)
+	r.note2(vals)
 }
 
 // typedLine enmascara lo tecleado y guarda en memoria los valores tapados (red por contenido).
@@ -268,13 +288,43 @@ func (r *Recorder) typedLine(line string, loose bool) string {
 	if loose {
 		f = r.typed.TypedLoose
 	}
-	line, m := maskTyped(line, f, loose || !r.cfgOK || r.cfg)
+	cfg := loose || !r.cfgOK || r.cfg
+	line, m := maskTyped(line, f, cfg)
 	// Un Tab (se graba como «^I») hace que el equipo complete palabras que las reglas no ven: desde el primero se tapa todo.
 	if i := strings.Index(m, "^I"); i >= 0 {
 		m = m[:i] + "<MASKED:secret>"
 	}
 	r.noteSecrets(line, m)
+	if cfg { // el corte: S1 (m) con lo que Command tapa; no cambia ningún estado
+		var vals []string
+		m, vals = mask.CutCommand(r.blk2, line, m)
+		r.note2(vals)
+	}
 	return m
+}
+
+// hide es el corte para el eco: s1 (ya con la red por contenido de las reglas) con lo que Command tapa y la lista M₂.
+func (r *Recorder) hide(src, s1 string) string {
+	pre := ""
+	if strings.HasPrefix(src, "$") && strings.HasPrefix(s1, "$") { // eco desplazado de IOS («R1(config)#$cola…»): el «$» no es del comando
+		pre, src, s1 = "$", src[1:], s1[1:]
+	}
+	out, vals := mask.CutCommand(r.blk2, src, s1)
+	r.note2(vals)
+	frag := len(r.sent) > 0
+	return pre + r.scrub2(r.scrub(out, frag), frag)
+}
+
+// note2 guarda en memoria los valores que tapó mask.CutCommand (con su propio tope y ventana).
+func (r *Recorder) note2(vals []string) {
+	for _, v := range vals {
+		if len(v) >= 4 && !strings.HasPrefix(v, "<MASKED:") && indexOf(r.secrets2, v) < 0 {
+			if r.secrets2 = append(r.secrets2, v); len(r.secrets2) > secretsMax {
+				r.secrets2 = r.secrets2[1:]
+			}
+			r.win2 = secretsWin
+		}
+	}
 }
 
 // noteSecrets guarda en memoria los valores que la línea enmascarada m tapó en line.
@@ -310,19 +360,30 @@ func (r *Recorder) noteSecrets(line, m string) {
 // de 4 o más caracteres; y, mientras algún eco siga pendiente (frag), trozos de 2 o más caracteres: un sufijo
 // del valor al inicio de la línea o un prefijo al final, que es lo que deja un eco partido. Nunca entra en un
 // <MASKED:…> que ya está en la línea.
-func (r *Recorder) scrub(l string, frag bool) string {
+func (r *Recorder) scrub(l string, frag bool) string { return r.scrubIn(l, frag, r.secrets) }
+
+// scrub2 es scrub con la lista M₂, un valor por pasada: así un valor corto («secret») no entra en el <MASKED:…> que dejó otro.
+func (r *Recorder) scrub2(l string, frag bool) string {
+	for _, v := range r.secrets2 {
+		l = r.scrubIn(l, frag, []string{v})
+	}
+	return l
+}
+
+// scrubIn es scrub con la lista de valores que se le dé.
+func (r *Recorder) scrubIn(l string, frag bool, list []string) string {
 	var b strings.Builder
 	pos := 0
 	for _, loc := range maskedTok.FindAllStringIndex(l, -1) {
-		b.WriteString(r.scrubSeg(l[pos:loc[0]], frag, pos == 0, false) + l[loc[0]:loc[1]])
+		b.WriteString(scrubSeg(list, l[pos:loc[0]], frag, pos == 0, false) + l[loc[0]:loc[1]])
 		pos = loc[1]
 	}
-	return b.String() + r.scrubSeg(l[pos:], frag, pos == 0, true)
+	return b.String() + scrubSeg(list, l[pos:], frag, pos == 0, true)
 }
 
 // scrubSeg: first/last dicen si el tramo toca el inicio/fin de la línea (solo ahí valen los trozos de un eco partido).
-func (r *Recorder) scrubSeg(l string, frag, first, last bool) string {
-	for _, v := range r.secrets {
+func scrubSeg(list []string, l string, frag, first, last bool) string {
+	for _, v := range list {
 		if len(v) >= 4 {
 			l = replaceWord(l, v)
 		}
@@ -372,6 +433,9 @@ func replaceWord(l, v string) string {
 func (r *Recorder) setPrompt(pr string) {
 	r.setPromptBlock(blockOfPrompt(pr))
 	r.cfg, r.cfgOK = isConfigPrompt(pr), true
+	if r.blk2 = r.lastBlk; strings.Contains(pr, "(config-keychain)") {
+		r.blk2 = "keychain"
+	}
 }
 
 // isConfigPrompt: el prompt es de modo config o de un submodo («R1(config-if)#», «(Cisco Controller) config>»).

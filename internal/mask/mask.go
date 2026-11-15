@@ -291,10 +291,20 @@ func blockOf(line string) string {
 // Apply devuelve text con los secretos reemplazados por <MASKED:tipo> y cuántos hubo por tipo.
 // shortcut: solo reglas IOS/IOS-XE; cada plataforma de la Fase 2 agrega las suyas.
 func Apply(platform, text string) (string, map[string]int) {
+	return apply(platform, text, (*Stream).Line)
+}
+
+// ApplyPlain es Apply sin el corte de union.go: exactamente la cadena de la v0.6.5. Es para quien compone él mismo
+// (syslogd) y necesita S1 intacto.
+func ApplyPlain(platform, text string) (string, map[string]int) {
+	return apply(platform, text, (*Stream).line1)
+}
+
+func apply(platform, text string, line func(*Stream, string) (string, bool)) (string, map[string]int) {
 	var out strings.Builder
 	st := Stream{counts: map[string]int{}, Platform: platform}
 	for _, raw := range strings.SplitAfter(text, "\n") {
-		if l, ok := st.Line(raw); ok {
+		if l, ok := line(&st, raw); ok {
 			out.WriteString(l)
 		}
 	}
@@ -317,7 +327,23 @@ type Stream struct {
 }
 
 // Line enmascara una línea (con su fin de línea, si lo trae). ok=false: la línea se omite (cuerpo de una llave).
-func (s *Stream) Line(raw string) (out string, ok bool) {
+// Es line1 (la v0.6.5) más el corte de los comandos citados (union.go); el estado del flujo lo decide line1.
+func (s *Stream) Line(raw string) (string, bool) {
+	out, ok := s.line1(raw)
+	if !ok {
+		return out, ok
+	}
+	line, eol := splitEOL(raw)
+	orig, spans := lineSpans(line, s.Platform)
+	if len(spans) == 0 || !strings.HasSuffix(out, eol) || strings.Contains(out[:len(out)-len(eol)], "\n") {
+		return out, ok
+	}
+	cutOut, n := cut(orig, out[:len(out)-len(eol)], spans)
+	s.counts["secret"] += n
+	return cutOut + eol, ok
+}
+
+func (s *Stream) line1(raw string) (out string, ok bool) {
 	if s.counts == nil {
 		s.counts = map[string]int{}
 	}
@@ -650,7 +676,7 @@ func Cmd(platform, cmd string) string {
 	counts := map[string]int{}
 	lines := strings.Split(cmd, "\n")
 	for i, l := range lines {
-		lines[i] = maskLogged(l, platform, counts)
+		lines[i], _ = cut(l, maskLogged(l, platform, counts), commandSpans(spLogBlock, l))
 	}
 	return strings.Join(lines, "\n")
 }

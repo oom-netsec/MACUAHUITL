@@ -154,6 +154,9 @@ type via struct {
 	f      func(im impl, plat, c string) string
 }
 
+// sueltas: vías de una línea de configuración impresa, no de un comando: solo cuenta la propiedad diferencial.
+var sueltas = map[string]bool{"Apply suelto": true, "Stream suelto": true}
+
 func conSalto(c string) string { return c + "\n" }
 
 var vias = []via{
