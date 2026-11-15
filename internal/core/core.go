@@ -82,6 +82,7 @@ type jobHistory struct {
 	Round     int       `json:"round,omitempty"`     // ronda en curso o la última
 	OK        int       `json:"ok,omitempty"`        // equipos de esa ronda que terminaron bien
 	Failed    int       `json:"failed,omitempty"`
+	Partial   int       `json:"partial,omitempty"` // equipos que terminaron con comandos cortados (no cuentan en OK ni en Failed)
 	Phases    []phase   `json:"phases,omitempty"`
 	FinishErr string    `json:"finishErr,omitempty"` // por qué no cerró el manifest o el zip; sobrevive al reinicio
 }
@@ -101,8 +102,28 @@ const maxPhases = 200
 // enterRound reinicia los conteos al empezar una ronda nueva. Requiere c.mu.
 func (j *job) enterRound(round int) {
 	if round > j.Round {
-		j.Round, j.OK, j.Failed = round, 0, 0
+		j.Round, j.OK, j.Failed, j.Partial = round, 0, 0, 0
 	}
+}
+
+// tally cuenta el resultado de un equipo en la ronda en curso. Requiere c.mu.
+func (j *job) tally(state string) {
+	switch state {
+	case "completed":
+		j.OK++
+	case "partial":
+		j.Partial++
+	default:
+		j.Failed++
+	}
+}
+
+// roundPhase es el texto de fin de ronda: con equipos parciales lleva su conteo.
+func roundPhase(ok, partial, failed int) (string, i18n.Args) {
+	if partial == 0 {
+		return "phase.ok_failed", i18n.A("ok", ok, "failed", failed)
+	}
+	return "phase.ok_partial_failed", i18n.A("ok", ok, "partial", partial, "failed", failed)
 }
 
 // Core es el núcleo: dueño de la bóveda, el motor, la red y la auditoría.
@@ -641,7 +662,7 @@ func (c *Core) summary(loc string, j *job) *v1.JobSummary {
 	}
 	s := &v1.JobSummary{JobId: j.id, Name: j.spec.Name, State: j.state, NextRoundAt: tsOrNil(c.sched.NextRound(j.id)),
 		ArmedAt: tsOrNil(j.ArmedAt), WindowEndsAt: tsOrNil(j.Until), Round: uint32(j.Round), Rounds: rounds,
-		DevicesTotal: uint32(len(j.spec.Targets)), DevicesOk: uint32(j.OK), DevicesFailed: uint32(j.Failed), OutputDir: out, Kind: cmp.Or(j.spec.Kind, "patrol")}
+		DevicesTotal: uint32(len(j.spec.Targets)), DevicesOk: uint32(j.OK), DevicesFailed: uint32(j.Failed), DevicesPartial: uint32(j.Partial), OutputDir: out, Kind: cmp.Or(j.spec.Kind, "patrol")}
 	for _, p := range j.Phases {
 		s.Phases = append(s.Phases, phaseToProto(loc, p))
 	}

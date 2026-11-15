@@ -22,7 +22,6 @@ func init() {
 		"patrol.writable.no_write":        e("sin permiso de escritura: {cause}", "no write permission: {cause}", "cause"),
 		"patrol.err.credential":           e("patrol: credencial: {cause}", "patrol: credential: {cause}", "cause"),
 		"patrol.err.window_ended":         e("terminó la ventana del trabajo con el equipo a medias", "the job window ended while the device was still being processed"),
-		"patrol.dev.partial":              e("{cut} comando(s) cortado(s) y {reconnects} reconexión(es); el primero: {first}", "{cut} command(s) cut and {reconnects} reconnect(s); first: {first}", "cut", "reconnects", "first"),
 		"patrol.err.audit":                e("auditoría: {error}", "audit: {error}", "error"),
 		"patrol.err.playbook_platform":    e("patrol: el playbook {id} es para {platform} y el equipo es {detected}", "patrol: playbook {id} is for {platform} and the device is {detected}", "id", "platform", "detected"),
 		"transport.err.not_authorized":    e("transport: destino no autorizado", "transport: destination not authorized"),
@@ -50,5 +49,6 @@ func init() {
 		"patrol.svc.job_state":            e("el trabajo está {state}", "the job is {state}", "state"),
 		"patrol.svc.no_devices_left":      e("no quedan equipos", "no devices are left"),
 		"patrol.svc.login_failed":         e("Login Test falló; excluye o corrige: {failed}", "the Login Test failed; exclude or fix: {failed}", "failed"),
+		"patrol.dev.partial":              e("{cut} comando(s) cortado(s) y {reconnects} reconexión(es); el primero: {first}", "{cut} command(s) cut and {reconnects} reconnect(s); first: {first}", "cut", "reconnects", "first"),
 	})
 }

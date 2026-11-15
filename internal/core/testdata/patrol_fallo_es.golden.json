@@ -1,4 +1,4 @@
 {
- "evento": "[\"platform: el equipo cerró la sesión: EOF\",\"platform: el equipo cerró la sesión: EOF\"]",
- "getrun": "platform: el equipo cerró la sesión: EOF"
+ "evento": "[\"1 comando(s) cortado(s) y 1 reconexión(es); el primero: show running-config\",\"1 comando(s) cortado(s) y 1 reconexión(es); el primero: show running-config\"]",
+ "getrun": "1 comando(s) cortado(s) y 1 reconexión(es); el primero: show running-config"
 }

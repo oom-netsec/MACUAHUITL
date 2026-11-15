@@ -51,6 +51,7 @@ var deviceStates = map[string]v1.DeviceState{
 	"connecting": v1.DeviceState_DEVICE_STATE_CONNECTING, "running": v1.DeviceState_DEVICE_STATE_RUNNING,
 	"completed": v1.DeviceState_DEVICE_STATE_COMPLETED, "failed": v1.DeviceState_DEVICE_STATE_FAILED,
 	"skipped": v1.DeviceState_DEVICE_STATE_SKIPPED, "cancelled": v1.DeviceState_DEVICE_STATE_CANCELLED,
+	"partial": v1.DeviceState_DEVICE_STATE_PARTIAL,
 }
 
 var loginSteps = map[string]v1.LoginTestStep{

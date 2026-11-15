@@ -273,15 +273,15 @@ func TestPatrolCodigosYArgumentos(t *testing.T) {
 	}
 }
 
-// El equipo que corta la sesión: el detalle del evento y de GetRun sale en el idioma pedido y trae su código.
+// El equipo que corta la sesión en un comando: se reconecta y termina partial. El detalle del evento y de GetRun sale en el idioma pedido y trae su código.
 func TestPatrolDetalleDeEquipoEnYCodigo(t *testing.T) {
 	reasons := map[string]string{}
 	got := failingRun(t, "en", reasons)
-	if a := reasons["auditoria"]; !strings.Contains(a, `error=\"platform: the device closed the session`) || strings.Contains(a, "cerró la sesión") {
+	if a := reasons["auditoria"]; !strings.Contains(a, `cause=\"platform: the device closed the session`) || strings.Contains(a, "cerró la sesión") || !strings.Contains(a, "device.reconnect") {
 		t.Errorf("la auditoría del equipo debe ir en inglés:\n%s", a)
 	}
 	for _, k := range []string{"evento", "getrun"} {
-		if reasons[k] != "platform.err.closed" || !strings.Contains(got[k], "platform: the device closed the session: EOF") {
+		if reasons[k] != "patrol.dev.partial" || !strings.Contains(got[k], "1 command(s) cut and 1 reconnect(s); first: show running-config") {
 			t.Errorf("%s: reason %q detalle %q", k, reasons[k], got[k])
 		}
 	}
