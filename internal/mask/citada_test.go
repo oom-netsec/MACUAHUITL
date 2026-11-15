@@ -3,6 +3,7 @@ package mask
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // Hueco real visto en el ASAv de CML (2026-11-14): show tech-support repite líneas de configuración entre comillas en
@@ -115,5 +116,56 @@ func TestLineaEnormeCitada(t *testing.T) {
 	in := strings.Repeat(`"a" `, 100) + `"enable password En0rme"` + strings.Repeat(" x", 5000) + "\n"
 	if out, _ := Apply("asa", in); strings.Contains(out, "En0rme") {
 		t.Fatal("la línea enorme dejó la clave")
+	}
+}
+
+// Segunda revisión de seguridad: prompts con espacio y modo, diff con sangría, apóstrofo dentro de CMD: '…'.
+func TestFormatosRepetidosSegundaRevision(t *testing.T) {
+	for _, tc := range []struct{ platform, in, leak string }{
+		{"asa", `ASA(config)# enable password Esp4cio`, "Esp4cio"},
+		{"nx-os", `switch(config)# snmp-server community NxEsp4cio group network-operator`, "NxEsp4cio"},
+		{"ios-xe", `R1(config-line)#password M0doLinea`, "M0doLinea"},
+		{"ios-xe", ` +password 0 D1ffSangria`, "D1ffSangria"},
+		{"ios-xe", ` +password D1ffSangria2`, "D1ffSangria2"},
+		{"ios-xe", `CMD: 'username a password 0 ab'Ap0strofo' 10:00:01 UTC Fri Nov 14 2026`, "Ap0strofo"},
+	} {
+		if out, _ := Apply(tc.platform, tc.in+"\n"); strings.Contains(out, tc.leak) {
+			t.Errorf("%s %q → %q", tc.platform, tc.in, out)
+		}
+	}
+}
+
+// Sin tapar de más: prosa con comillas, descripciones con dos puntos o en JSON, el accounting de un show (con su
+// resultado) y una fila de AireOS con «#» en el nombre.
+func TestCitasQueNoSeTocanSegundaRevision(t *testing.T) {
+	for _, tc := range []struct{ platform, in string }{
+		{"asa", `Interface "outside" key exchange failed`},
+		{"asa", `Tunnel "vpn1" password expired for user`},
+		{"ios-xe", `  Description: uplink "key ring"`},
+		{"nx-os", `  "description": "password reset portal",`},
+		{"nx-os", `Fri Nov 14 10:00:00 2026:type=stop:id=vsh.2:user=admin:cmd=show crypto key mypubkey rsa (SUCCESS)`},
+	} {
+		if out, _ := Apply(tc.platform, tc.in+"\n"); out != tc.in+"\n" {
+			t.Errorf("%s cambió: %q → %q", tc.platform, tc.in, out)
+		}
+	}
+}
+
+// El recorrido por comillas es lineal: una línea de 1 MB con miles de comillas termina rápido.
+func TestCitasLineal(t *testing.T) {
+	in := strings.Repeat(`x "a" `, 170000) + "\n"
+	start := time.Now()
+	Apply("asa", in)
+	if d := time.Since(start); d > 5*time.Second {
+		t.Fatalf("1 MB con 340k comillas tardó %v", d)
+	}
+}
+
+// En AireOS una comunidad con «#» en el nombre se tapa entera (no se toma por un prompt con eco).
+func TestAireOSComunidadConNumeral(t *testing.T) {
+	in := "abc#def                 0.0.0.0             0.0.0.0           Read Only    Enable\n"
+	out, _ := Apply("wlc-aireos", in)
+	if strings.Contains(out, "abc") || strings.Contains(out, "def ") {
+		t.Fatalf("%q", out)
 	}
 }
