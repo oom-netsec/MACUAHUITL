@@ -63,3 +63,57 @@ func TestLineaCitadaPasaPorMaskCited(t *testing.T) {
 		t.Fatalf("%q", out)
 	}
 }
+
+// Casos de la revisión de seguridad: comillas mal formadas, el terminal y formatos que repiten configuración sin comillas.
+func TestCitasMalFormadasYFormatosSinComillas(t *testing.T) {
+	for _, tc := range []struct{ platform, in, leak string }{
+		{"asa", `5" cable, "enable password Cl4veImpar"`, "Cl4veImpar"},                   // comilla impar antes de la cita
+		{"asa", `ERROR: % Unable to apply "enable password Cl4veAbierta`, "Cl4veAbierta"}, // cita sin cerrar
+		{"asa", `ERROR: "username bob password "Mi Cl4ve" privilege 15"`, "Cl4ve"},        // comillas dentro de la cita
+		{"nx-os", `ERROR: "username bob password 0 \"Esc4pada X\" role network-admin"`, "Esc4pada"},
+		{"ios-xe", `CMD: 'snmp-server community HistComm RO' 10:00:01 UTC Fri Nov 14 2026`, "HistComm"}, // show history all
+		{"ios-xe", `+snmp-server community DiffComm RO`, "DiffComm"},                                    // show archive config differences
+		{"nx-os", `Fri Nov 14 10:00:00 2026:type=update:id=vsh.1:user=admin:cmd=configure terminal ; snmp-server community AcctComm group network-operator (SUCCESS)`, "AcctComm"},
+		{"ios-xe", `R1(config)#enable password Ec0Prompt`, "Ec0Prompt"}, // eco con prompt
+	} {
+		out, _ := Apply(tc.platform, tc.in+"\n")
+		if strings.Contains(out, tc.leak) {
+			t.Errorf("%s %q → %q", tc.platform, tc.in, out)
+		}
+	}
+}
+
+// El terminal también pasa lo citado por las reglas: un applet de EEM tecleado con la clave entre comillas.
+func TestTerminalCitado(t *testing.T) {
+	var s Stream
+	s.Platform = "ios-xe"
+	if out := s.Typed(` action 1.0 cli command "enable password T3cleada"`); strings.Contains(out, "T3cleada") {
+		t.Errorf("Typed: %q", out)
+	}
+	if out := s.Prompted(`action 2.0 cli command "username x password 0 Pr0mpted"`, ""); strings.Contains(out, "Pr0mpted") {
+		t.Errorf("Prompted: %q", out)
+	}
+}
+
+// No se enmascara de más: descripciones y remarks son texto libre, el inventario y la prosa entre comillas no cambian.
+func TestCitasQueNoSeTocan(t *testing.T) {
+	for _, in := range []string{
+		` description "password reset portal"`,
+		` 10 remark "rotate the key monthly"`,
+		`NAME: "Secret Module", DESCR: "Secret Module key 100W"`,
+		`System image file is "bootflash:packages.conf"`,
+		`INFO: "Press any key to continue"`,
+	} {
+		if out, _ := Apply("ios-xe", in+"\n"); out != in+"\n" {
+			t.Errorf("cambió: %q → %q", in, out)
+		}
+	}
+}
+
+// Una línea enorme (JSON de MB) usa el modo por pares, lineal: lo citado igual se enmascara.
+func TestLineaEnormeCitada(t *testing.T) {
+	in := strings.Repeat(`"a" `, 100) + `"enable password En0rme"` + strings.Repeat(" x", 5000) + "\n"
+	if out, _ := Apply("asa", in); strings.Contains(out, "En0rme") {
+		t.Fatal("la línea enorme dejó la clave")
+	}
+}

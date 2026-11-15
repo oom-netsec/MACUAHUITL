@@ -361,30 +361,68 @@ func (s *Stream) Line(raw string) (out string, ok bool) {
 	if line != "" && line[0] != ' ' && line[0] != '\t' {
 		s.block = blockOf(line)
 	}
-	return maskLine(s.quoted(line), s.block, s.Platform, s.counts) + eol, true
+	return s.quoted(maskLine(line, s.block, s.Platform, s.counts)) + eol, true // las reglas propias primero; lo citado, después
 }
 
-// quotedSeg: un segmento entre comillas dobles de una línea de salida.
+// quotedSeg: un segmento entre comillas dobles (modo por pares, para líneas enormes).
 var quotedSeg = regexp.MustCompile(`"([^"\n]*)"`)
+
+// notQuotedCfg: líneas cuyo texto entre comillas no es configuración (texto libre, inventario, imagen de arranque).
+var notQuotedCfg = regexp.MustCompile(`(?i)^\s*(?:(?:\d+\s+)?(?:description|remark)\s|NAME:\s*"|System image file is)`)
+
+// Topes del recorrido por comillas: por encima (JSON de MB en una línea) se usa el modo por pares, que es lineal.
+const maxQuotedLen, maxQuotes = 8192, 64
 
 // quoted enmascara lo que una línea de salida cita entre comillas con las mismas reglas que la línea suelta: show tech
 // del ASA repite líneas de configuración en sus avisos («*** Output from config line 9, "enable password …"»), y los
-// ERROR:/WARNING: y los errores de parser de IOS-XE y NX-OS hacen lo mismo (hueco real visto en CML, 2026-11-14). Un
-// segmento con sangría hereda el bloque de la última línea citada sin sangría, como en la configuración de verdad.
+// ERROR:/WARNING: y los errores de parser de IOS-XE y NX-OS hacen lo mismo (hueco real visto en CML, 2026-11-14).
+// Como las comillas pueden venir impares, sin cerrar, anidadas o escapadas, tras cada comilla (de derecha a izquierda)
+// se prueba el tramo hasta la siguiente y, si ese no cambia, todo el resto de la línea. Un tramo con sangría
+// hereda el bloque de la última línea citada sin sangría, como en la configuración de verdad.
 func (s *Stream) quoted(line string) string {
-	if !strings.Contains(line, `"`) {
+	if !strings.Contains(line, `"`) || notQuotedCfg.MatchString(line) {
 		return line
 	}
-	return quotedSeg.ReplaceAllStringFunc(line, func(q string) string {
-		inner := q[1 : len(q)-1]
-		if inner == "" {
-			return q
+	var idx []int
+	for i := 0; i < len(line); i++ {
+		if line[i] == '"' {
+			idx = append(idx, i)
 		}
-		if inner[0] != ' ' && inner[0] != '\t' {
-			s.qblock = blockOf(inner)
+	}
+	if len(line) > maxQuotedLen || len(idx) > maxQuotes {
+		return quotedSeg.ReplaceAllStringFunc(line, func(q string) string { return `"` + s.maskQuoted(q[1:len(q)-1], true) + `"` })
+	}
+	for k := len(idx) - 1; k >= 0; k-- {
+		i := idx[k]
+		rest := line[i+1:]
+		seg := rest
+		if k+1 < len(idx) {
+			seg = line[i+1 : idx[k+1]]
 		}
-		return `"` + maskCited(maskLine(inner, s.qblock, s.Platform, s.counts), s.counts) + `"`
-	})
+		if m := s.maskQuoted(seg, true); m != seg {
+			line = line[:i+1] + m + rest[len(seg):]
+		} else if full := s.maskQuoted(rest, false); full != rest { // la clave puede ir entre comillas dentro de la cita
+			line = line[:i+1] + full
+		}
+	}
+	return line
+}
+
+// maskQuoted aplica las reglas a un tramo citado. maskCited (key/password/secret/community sueltos) solo corre sobre lo
+// que parece configuración (empieza en minúscula o con sangría): así «Press any key to continue» no cambia.
+// own: el tramo es la cita en sí (fija el bloque); con el resto de la línea, que lleva la comilla de cierre, no.
+func (s *Stream) maskQuoted(t string, own bool) string {
+	if t == "" {
+		return t
+	}
+	if own && t[0] != ' ' && t[0] != '\t' {
+		s.qblock = blockOf(t)
+	}
+	out := maskLine(t, s.qblock, s.Platform, s.counts)
+	if c := t[0]; c == ' ' || c == '\t' || c >= 'a' && c <= 'z' {
+		out = maskCited(out, s.counts)
+	}
+	return out
 }
 
 var (
@@ -501,7 +539,7 @@ func (s *Stream) Prompted(line, block string) string {
 	if block == "" {
 		block = s.block
 	}
-	return maskLine(" "+line, block, s.Platform, s.counts)[1:]
+	return s.quoted(maskLine(" "+line, block, s.Platform, s.counts)[1:])
 }
 
 // SetBlock fija el bloque en curso (el que da un prompt); "" = fuera de todo bloque.
@@ -521,7 +559,7 @@ func (s *Stream) Typed(line string) string {
 			s.block = b
 		}
 	}
-	return maskLine(" "+line, s.block, s.Platform, s.counts)[1:]
+	return s.quoted(maskLine(" "+line, s.block, s.Platform, s.counts)[1:])
 }
 
 // Peek enmascara una línea tecleada sobre una copia: ni el bloque ni los contadores de s cambian.
@@ -555,6 +593,16 @@ var archiveLog = regexp.MustCompile(`^(\s*\d+\s+\d+\s+\S+\s+\|)(.*)$`)
 
 // loggedCmd: mensaje de syslog (%PARSER-5-CFGLOG_LOGGEDCMD) con el comando de configuración tras «logged command:».
 var loggedCmd = regexp.MustCompile(`^(.*logged command:)(.*)$`)
+
+// Otras salidas que repiten configuración: show history all de IOS-XE («CMD: 'comando' hora»), el accounting de
+// NX-OS («…:cmd=configure terminal ; snmp-server community X …»), show archive config differences («+línea» / «-línea»)
+// y el eco de un comando tras el prompt («R1(config)#enable password X»).
+var (
+	histCmd    = regexp.MustCompile(`^(\s*CMD: ')(.*?)('.*)$`)
+	acctCmd    = regexp.MustCompile(`^(.*?:cmd=)(.*)$`)
+	diffLine   = regexp.MustCompile(`^([+-])([a-z].*)$`)
+	promptEcho = regexp.MustCompile(`^([\w.\-/:]{1,63}(?:\([\w.\-]+\))?[#>])(\S.*)$`)
+)
 
 // cmdSyslog: syslogs de ASA/FTD que citan el comando ejecutado (111008, 111009, 111010); el comando va entre comillas.
 var cmdSyslog = []*regexp.Regexp{
@@ -591,6 +639,22 @@ func maskLine(line, block, platform string, counts map[string]int) string {
 		}
 	}
 	if m := archiveLog.FindStringSubmatch(line); m != nil {
+		return m[1] + maskLine(m[2], "", platform, counts)
+	}
+	if m := histCmd.FindStringSubmatch(line); m != nil {
+		return m[1] + maskCited(maskLine(m[2], "", platform, counts), counts) + m[3]
+	}
+	if m := acctCmd.FindStringSubmatch(line); m != nil {
+		parts := strings.Split(m[2], " ; ")
+		for i, p := range parts {
+			parts[i] = maskCited(maskLine(p, "", platform, counts), counts)
+		}
+		return m[1] + strings.Join(parts, " ; ")
+	}
+	if m := diffLine.FindStringSubmatch(line); m != nil {
+		return m[1] + maskLine(m[2], "", platform, counts)
+	}
+	if m := promptEcho.FindStringSubmatch(line); m != nil {
 		return m[1] + maskLine(m[2], "", platform, counts)
 	}
 	for changed := true; changed; {
