@@ -1751,7 +1751,7 @@ export const en: Record<Key, string> = {
   "patrol.pb.other": "Other",
   "patrol.pb.cmds": "Commands ({n})",
   "patrol.pb.title": "Catalog playbooks",
-  "patrol.pb.hint": "Read-only: the core rejects anything that is not a read command for the device platform. Playbooks can be combined with pasted commands.",
+  "patrol.pb.hint": "Read-only: the core rejects anything that is not a read command for the device's platform. Playbooks can be combined with pasted commands.",
   "patrol.pb.unavailable": "The core's playbook catalog could not be read; you can still paste commands.",
   "patrol.missing.commands": "a playbook or commands",
   "ssh.termHint": "Inside the terminal every key goes to the device (Tab, ?, arrows, Ctrl+C). Ctrl+Shift+K moves focus out of the terminal; Ctrl+Shift+C copies the selection and Ctrl+Shift+V pastes; right-click copies the selection or, with none, pastes.",
