@@ -86,7 +86,7 @@ func (s *driftSvc) Drift(ctx context.Context, r *v1.DriftRequest) (*v1.DriftResp
 			rep.Warnings, rep.WarningsTx = append(rep.Warnings, wt.In(i18n.Es)), append(rep.WarningsTx, wt)
 			continue
 		}
-		cs, ign := drift.Compare(cfg[dev][from], cfg[dev][to])
+		cs, ign := drift.CompareMasked(cfg[dev][from], cfg[dev][to], "") // un trabajo sin enmascarar no muestra secretos ni hashes en el informe
 		rep.Devices = append(rep.Devices, drift.NewDevice(dev, from, to, cs, ign))
 	}
 	if len(rep.Devices) == 0 {

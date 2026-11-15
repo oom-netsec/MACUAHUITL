@@ -22,6 +22,7 @@ func init() {
 		"cleaner.text.orphan":  e("línea {line}: {text} — {why}", "line {line}: {text} — {why}", "line", "text", "why"),
 		"cleaner.text.footer":  e("Las huérfanas solo se marcan: la limpieza nunca las quita.", "Orphans are only marked: the cleanup never removes them."),
 
+		"drift.secret_changed": e("(la clave cambió; no se muestra)", "(secret changed; not shown)"),
 		"drift.masked_notice": e("los cambios en secretos no son visibles porque el trabajo enmascara secretos", "changes to secrets are not visible because the job masks secrets"),
 		"drift.err.no_pair":   e("ningún equipo tiene dos rondas con show running-config; usa un playbook que lo recolecte y espera la segunda ronda", "no device has two rounds with show running-config; use a playbook that collects it and wait for the second round"),
 		"drift.warn.no_pair":  e("{dev}: sin dos rondas con running-config (tiene {have})", "{dev}: no two rounds with running-config (has {have})", "dev", "have"),

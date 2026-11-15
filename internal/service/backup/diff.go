@@ -46,7 +46,7 @@ func (r diffReport) text(loc string) string {
 			}
 			last = c.Path
 		}
-		fmt.Fprintf(&b, "    %s %s\n", c.Op, strings.ReplaceAll(c.Line, "\n", "\n      "))
+		fmt.Fprintf(&b, "    %s\n", c.TextIn(loc))
 	}
 	if len(r.Ignored) > 0 {
 		b.WriteString(i18n.Msg(loc, "backup.diff.ignored", i18n.A("list", strings.Join(r.Ignored, "; "))) + "\n")
@@ -68,7 +68,7 @@ func (s *backupSvc) DiffBackups(ctx context.Context, r *v1.DiffBackupsRequest) (
 	if from.Device != to.Device || from.Kind != to.Kind {
 		return nil, service.Err(ctx, codes.InvalidArgument, "backup.err.diff_mismatch", nil)
 	}
-	cs, ign := drift.Compare(a, b)
+	cs, ign := drift.CompareMasked(a, b, "") // nunca un secreto ni un hash en pantalla, ni diferencias falsas por el enmascarado
 	d := drift.NewDevice(to.Device, 0, 0, cs, ign)
 	rep := diffReport{From: from, To: to, Added: d.Added, Removed: d.Removed, Changes: d.Changes, Ignored: d.Ignored, Masked: from.Masked || to.Masked}
 	s.d.Audit("backup.diff", to.Device, fmt.Sprintf("from=%s to=%s changes=%d", from.ID, to.ID, len(cs)))

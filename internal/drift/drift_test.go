@@ -118,3 +118,35 @@ func TestPair(t *testing.T) {
 		}
 	}
 }
+
+// CompareMasked: nada de secretos ni hashes en los cambios, sin diferencias falsas por un lado enmascarado, y una clave
+// que cambió sale como «~» enmascarada en su contexto (también la que depende del bloque, como la de line vty).
+func TestCompareMasked(t *testing.T) {
+	prev := "hostname R1\nenable secret 5 $1$a$Viejo\nline vty 0 4\n password VtyVieja\n login\n"
+	cur := "hostname R1\nenable secret 5 $1$b$Nuevo\nline vty 0 4\n password VtyNueva\n login\n"
+	cs, _ := CompareMasked(prev, cur, "")
+	var all strings.Builder
+	for _, c := range cs {
+		all.WriteString(c.Op + " " + c.Path + " | " + c.Line + "\n")
+		if c.Op != "~" {
+			t.Errorf("cambio que no es de clave: %+v", c)
+		}
+	}
+	got := all.String()
+	for _, leak := range []string{"Viejo", "Nuevo", "VtyVieja", "VtyNueva", "$1$"} {
+		if strings.Contains(got, leak) {
+			t.Errorf("sale %q:\n%s", leak, got)
+		}
+	}
+	if len(cs) != 2 || !strings.Contains(got, "~  | enable secret 5 <MASKED:") || !strings.Contains(got, "~ line vty 0 4 | password <MASKED:") {
+		t.Errorf("faltan las dos claves cambiadas:\n%s", got)
+	}
+	// un lado ya enmascarado: no hay diferencia (ni se sabe si cambió)
+	masked := "hostname R1\nenable secret 5 <MASKED:enable-secret>\nline vty 0 4\n password <MASKED:line-password>\n login\n"
+	if cs, _ := CompareMasked(prev, masked, ""); len(cs) != 0 {
+		t.Errorf("diferencia falsa por el enmascarado: %+v", cs)
+	}
+	if cs, _ := CompareMasked(masked, cur, ""); len(cs) != 0 { // también con el lado viejo enmascarado
+		t.Errorf("diferencia falsa con el viejo enmascarado: %+v", cs)
+	}
+}

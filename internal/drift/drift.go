@@ -13,6 +13,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 )
 
 // volatile: líneas que cambian solas entre rondas y no son deriva.
@@ -105,6 +106,75 @@ func Compare(prev, cur string) (changes []Change, ignored []string) {
 	return changes, ignored
 }
 
+// TextIn es el cambio como se imprime: «+ línea», «- línea» o, si solo cambió el secreto, «~ línea (la clave cambió)».
+func (c Change) TextIn(loc string) string {
+	s := c.Op + " " + strings.ReplaceAll(c.Line, "\n", "\n      ")
+	if c.Op == "~" {
+		s += " " + i18n.Msg(loc, "drift.secret_changed", nil)
+	}
+	return s
+}
+
+// CompareMasked es Compare para mostrar: enmascara los dos lados con las mismas reglas, así ningún secreto ni hash
+// (tipo 5/7, que se rompen) sale en el informe y un lado ya enmascarado no da diferencias falsas. Si los dos traían el
+// valor real y una línea solo cambió en su secreto, sale una vez con Op "~", enmascarada en su contexto: el informe
+// dice que la clave cambió sin mostrarla.
+func CompareMasked(prev, cur, platform string) (changes []Change, ignored []string) {
+	mp, _ := mask.Apply(platform, prev)
+	mc, _ := mask.Apply(platform, cur)
+	changes, ignored = Compare(mp, mc)
+	raw, _ := Compare(prev, cur)
+	type key struct{ path, line string }
+	removed := map[key]int{}
+	for _, c := range raw {
+		if c.Op == "-" && !strings.Contains(c.Line, "<MASKED:") { // un lado ya enmascarado no sabe si la clave cambió
+			path, line := maskInContext(platform, c.Path, c.Line)
+			removed[key{path, line}]++
+		}
+	}
+	for _, c := range raw {
+		if c.Op != "+" || strings.Contains(c.Line, "<MASKED:") {
+			continue
+		}
+		path, line := maskInContext(platform, c.Path, c.Line)
+		if k := (key{path, line}); removed[k] > 0 { // misma línea enmascarada que salió: solo cambió el secreto
+			removed[k]--
+			changes = append(changes, Change{"~", path, line})
+		}
+	}
+	return changes, ignored
+}
+
+// maskInContext enmascara una línea con sus secciones delante (una regla puede depender del bloque, como el password
+// de line vty) y devuelve la ruta y la línea ya enmascaradas.
+func maskInContext(platform, path, line string) (string, string) {
+	var segs []string
+	if path != "" {
+		segs = strings.Split(path, " > ")
+	}
+	var b strings.Builder
+	for i, seg := range segs {
+		b.WriteString(strings.Repeat(" ", i) + seg + "\n")
+	}
+	ind := strings.Repeat(" ", len(segs))
+	for _, l := range strings.Split(line, "\n") {
+		b.WriteString(ind + l + "\n")
+	}
+	out, _ := mask.Apply(platform, b.String())
+	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
+	if len(lines) < len(segs) { // no debería pasar: el enmascarado no quita líneas de una config; se descarta entera
+		return "", "<MASKED:secret>"
+	}
+	for i := range segs {
+		segs[i] = strings.TrimPrefix(lines[i], strings.Repeat(" ", i))
+	}
+	body := lines[len(segs):]
+	for i := range body {
+		body[i] = strings.TrimPrefix(body[i], ind)
+	}
+	return strings.Join(segs, " > "), strings.Join(body, "\n")
+}
+
 type DeviceDrift struct {
 	Device  string   `json:"device"`
 	From    int      `json:"from"`
@@ -176,7 +246,7 @@ func (r Report) TextIn(loc string) string {
 					}
 					last = c.Path
 				}
-				fmt.Fprintf(&b, "    %s %s\n", c.Op, strings.ReplaceAll(c.Line, "\n", "\n      "))
+				fmt.Fprintf(&b, "    %s\n", c.TextIn(loc))
 			}
 		}
 		if len(d.Ignored) > 0 {
