@@ -169,3 +169,37 @@ func TestAireOSComunidadConNumeral(t *testing.T) {
 		t.Fatalf("%q", out)
 	}
 }
+
+// Tercera revisión: una comilla impar antes de la cita la deja en un tramo «de afuera» por paridad; con un total impar
+// de comillas, maskCited corre en todos los tramos. Las comillas escapadas son comillas internas.
+func TestTerceraRevisionFugas(t *testing.T) {
+	for _, tc := range []struct{ platform, in, leak string }{
+		{"asa", `5" x "aaa-server X host 1.1.1.1 key K3yAaa"`, "K3yAaa"},
+		{"asa", `5" x "  key Cl4veSu3lta" ignored`, "Cl4veSu3lta"},
+		{"asa", `5" *** Output from config line 3, " password Pw1Impar"`, "Pw1Impar"},
+		{"nx-os", `ERROR: "snmp-server community \"Esc4 Comm\" group x"`, "Esc4"},
+		{"ios-xe", `R1(config-line)#password M0doLinea2`, "M0doLinea2"},
+	} {
+		if out, _ := Apply(tc.platform, tc.in+"\n"); strings.Contains(out, tc.leak) {
+			t.Errorf("%s %q → %q", tc.platform, tc.in, out)
+		}
+	}
+}
+
+// Sin tapar de más: un show tras el prompt, prosa tras algo que parece prompt, un guion en prosa con sangría, y la fila
+// de comunidades de AireOS aunque el terminal no fije la plataforma.
+func TestTerceraRevisionNoSeTocan(t *testing.T) {
+	for _, tc := range []struct{ platform, in string }{
+		{"ios-xe", `R1#show crypto key mypubkey rsa`},
+		{"ios-xe", `Note> key rotation is pending`},
+		{"ios-xe", `  -password reset required for user`},
+	} {
+		if out, _ := Apply(tc.platform, tc.in+"\n"); out != tc.in+"\n" {
+			t.Errorf("%s cambió: %q → %q", tc.platform, tc.in, out)
+		}
+	}
+	in := "abc#def                 0.0.0.0             0.0.0.0           Read Only    Enable\n"
+	if out, _ := Apply("", in); strings.Contains(out, "abc#<MASKED") { // el eco del prompt no tapa a medias
+		t.Fatalf("sin plataforma, la comunidad quedó a medias: %q", out)
+	}
+}

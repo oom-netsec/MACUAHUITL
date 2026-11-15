@@ -378,10 +378,14 @@ var notQuotedCfg = regexp.MustCompile(`(?i)^\s*(?:(?:\d+\s+)?(?:description|rema
 // («Interface "outside" key exchange failed») solo pasa por las reglas. Un tramo con sangría hereda el bloque de la
 // última línea citada sin sangría, como en la configuración de verdad.
 func (s *Stream) quoted(line string) string {
+	if strings.Contains(line, `\"`) { // comillas escapadas: son comillas internas de la cita
+		line = strings.ReplaceAll(line, `\"`, `"`)
+	}
 	first := strings.IndexByte(line, '"')
 	if first < 0 || notQuotedCfg.MatchString(line) {
 		return line
 	}
+	odd := strings.Count(line, `"`)%2 == 1 // con un total impar, la paridad no dice qué va dentro: maskCited en todos
 	var b strings.Builder
 	b.WriteString(line[:first+1])
 	for k, rest := 0, line[first+1:]; ; k++ {
@@ -389,7 +393,7 @@ func (s *Stream) quoted(line string) string {
 		if j := strings.IndexByte(rest, '"'); j >= 0 {
 			seg, next, more = rest[:j], rest[j+1:], true
 		}
-		b.WriteString(s.maskQuoted(seg, k%2 == 0))
+		b.WriteString(s.maskQuoted(seg, odd || k%2 == 0))
 		if !more {
 			break
 		}
@@ -596,7 +600,7 @@ var loggedCmd = regexp.MustCompile(`^(.*logged command:)(.*)$`)
 var (
 	histCmd    = regexp.MustCompile(`^(\s*CMD: ')(.*)('.*)$`) // hasta el último apóstrofo: el comando puede llevar otros
 	acctCmd    = regexp.MustCompile(`^(.*?:cmd=)(.*?)(\s*\((?:SUCCESS|FAILURE)\))?$`)
-	diffLine   = regexp.MustCompile(`^(\s*[+-])([a-z].*)$`)
+	diffLine   = regexp.MustCompile(`^( ?[+-])([a-z].*)$`) // el diff de IOS usa a lo sumo un espacio antes del signo
 	promptEcho = regexp.MustCompile(`^([\w.\-/:]{1,63}(?:\([\w.\-]+\))?[#>] ?)(\S.*)$`)
 )
 
@@ -652,8 +656,13 @@ func maskLine(line, block, platform string, counts map[string]int) string {
 	if m := diffLine.FindStringSubmatch(line); m != nil { // fuera de su bloque: maskCited tapa key/password/secret sueltos
 		return m[1] + maskCited(maskLine(m[2], "", platform, counts), counts)
 	}
-	if m := promptEcho.FindStringSubmatch(line); m != nil && platform != "wlc-aireos" { // en AireOS, «abc#def» es una comunidad
-		return m[1] + maskCited(maskLine(m[2], "", platform, counts), counts)
+	// En AireOS «abc#def  0.0.0.0 …» es una fila de comunidades, no un prompt con eco.
+	if m := promptEcho.FindStringSubmatch(line); m != nil && platform != "wlc-aireos" {
+		block := ""
+		if strings.Contains(m[1], "(config-line)") {
+			block = "line"
+		}
+		return m[1] + maskLine(" "+m[2], block, platform, counts)[1:] // como Typed; sin maskCited: «R1#show crypto key mypubkey rsa» no lleva secreto
 	}
 	for changed := true; changed; {
 		changed = false
