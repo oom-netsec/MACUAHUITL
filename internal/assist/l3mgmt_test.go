@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
 // l3Dev es un modelo mínimo de cómo IOS guarda el lote L3 y gestión de la fase 28d: líneas globales en el orden en que se aplicaron,
@@ -24,6 +26,7 @@ type l3Dev struct {
 	src    string            // IP local de la sesión
 	seen   string            // IP de origen que el equipo ve en show users (con NAT difiere de src); vacía = show users no la muestra
 	hide   map[string]bool   // comandos que contestan con un aviso de error
+	status map[string]string // Status de show interfaces X status por puerto; sin entrada, connected
 }
 
 type vtyBlk struct {
@@ -280,6 +283,14 @@ func (d *l3Dev) read(cmds []string) map[string]string {
 			out[c] = s
 		case strings.HasPrefix(c, "show ip access-lists "):
 			out[c] = d.acls[strings.TrimPrefix(c, "show ip access-lists ")]
+		case strings.HasPrefix(c, "show interfaces ") && strings.HasSuffix(c, " status"):
+			n := strings.TrimSuffix(strings.TrimPrefix(c, "show interfaces "), " status")
+			st := "connected"
+			if s, ok := d.status[n]; ok {
+				st = s
+			}
+			out[c] = "Port      Name               Status       Vlan       Duplex  Speed Type\n" +
+				fmt.Sprintf("%-9s %-18s %-12s %-10s %-7s %-5s %s\n", iosxe.ShortIf(n), "uplink", st, "trunk", "a-full", "a-1000", "10/100/1000BaseTX")
 		case strings.HasSuffix(c, " switchport"):
 			n := strings.TrimSuffix(strings.TrimPrefix(c, "show interfaces "), " switchport")
 			if d.l2[n] {

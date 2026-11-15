@@ -1,6 +1,7 @@
 package assist
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -414,5 +415,77 @@ func TestNetflowPostCheck(t *testing.T) {
 	}
 	if fails := EvalExpect(dp.Expect, dev.read(dp.Post)); len(fails) != 2 {
 		t.Errorf("sin monitor y con otro destino: %v", fails)
+	}
+}
+
+// ---- netflow-export: el uplink de una casa ----
+
+// Bajo la interfaz el apply solo lleva el monitor: nada de shutdown, description ni otra línea.
+func TestNetflowApplyOnlyTouchesTheMonitorOnTheInterface(t *testing.T) {
+	dp, err := l3Plan(t, "netflow-export", nfVals("source", "Vlan1"), nfDev())
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.Index(dp.Apply, "interface "+nfIf)
+	if i < 0 || !slices.Equal(dp.Apply[i:], []string{"interface " + nfIf, "ip flow monitor MX-MON input"}) {
+		t.Fatalf("bajo la interfaz debe ir solo el monitor: %v", dp.Apply)
+	}
+	// Un plan manipulado con otra línea bajo la interfaz se rechaza con el motivo propio.
+	tpl := mustTemplate(t, "netflow-export")
+	for _, extra := range []string{"shutdown", "description x", "no shutdown"} {
+		d := dp
+		d.Apply = append(slices.Clone(dp.Apply), extra)
+		err := tpl.Fn.CheckDevice(d)
+		if err == nil || !strings.Contains(err.Error(), "bajo la interfaz") {
+			t.Errorf("%q bajo la interfaz: %v", extra, err)
+		}
+	}
+}
+
+// La reversa quita el monitor de la interfaz antes que cualquier `no flow`.
+func TestNetflowRollbackRemovesInterfaceMonitorFirst(t *testing.T) {
+	dp, err := l3Plan(t, "netflow-export", nfVals(), nfDev())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dp.Rollback) < 3 || dp.Rollback[0] != "interface "+nfIf || dp.Rollback[1] != "no ip flow monitor MX-MON input" {
+		t.Fatalf("la reversa debe abrir con la interfaz y su monitor: %v", dp.Rollback)
+	}
+	for i, l := range dp.Rollback[2:] {
+		if !strings.HasPrefix(l, "no flow ") {
+			t.Errorf("línea %d de la reversa tras el monitor: %q", i+2, l)
+		}
+	}
+}
+
+// El pre-check rechaza una interfaz que no está up/up: si ya estaba caída, el post-check no distinguiría.
+func TestNetflowRefusesInterfaceNotUp(t *testing.T) {
+	for _, st := range []string{"notconnect", "disabled", "err-disabled", "inactive"} {
+		d := nfDev()
+		d.status = map[string]string{nfIf: st}
+		_, err := l3Plan(t, "netflow-export", nfVals(), d)
+		if !errors.Is(err, ErrSnippetRefused) || !strings.Contains(err.Error(), st) {
+			t.Errorf("%s: %v", st, err)
+		}
+	}
+	d := nfDev()
+	d.hide[showStatus(nfIf)] = true
+	l3Refused(t, "estado ilegible", "netflow-export", nfVals(), d)
+}
+
+// Tras el apply la interfaz debe seguir up/up: si queda down o up/down (notconnect), el post-check falla.
+func TestNetflowPostCheckInterfaceStaysUp(t *testing.T) {
+	dev := nfDev()
+	dp := l3RoundTrip(t, "netflow-export", nfVals(), dev)
+	dev.apply(dp.Apply)
+	if !slices.Contains(dp.Post, showStatus(nfIf)) {
+		t.Fatalf("el post no lee el estado de la interfaz: %v", dp.Post)
+	}
+	for _, st := range []string{"notconnect", "disabled", "err-disabled"} {
+		dev.status = map[string]string{nfIf: st}
+		fails := EvalExpect(dp.Expect, dev.read(dp.Post))
+		if len(fails) != 1 || !strings.Contains(fails[0], st) {
+			t.Errorf("%s: %v", st, fails)
+		}
 	}
 }

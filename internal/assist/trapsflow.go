@@ -295,6 +295,10 @@ var SnippetNetflow = Function{
 				iface = f[1]
 			}
 		}
+		// Bajo la interfaz solo va el monitor: ni shutdown, ni description, ni otra línea (el uplink puede llevar la conexión de una casa).
+		if i := slices.Index(d.Apply, "interface "+iface); i < 0 || !slices.Equal(d.Apply[i+1:], []string{"ip flow monitor " + flowMon + " input"}) {
+			return lerr("bajo la interfaz el apply solo puede llevar ip flow monitor MX-MON input", "under the interface the apply can only carry ip flow monitor MX-MON input")
+		}
 		if want := flowApply(addr, port, iface, source); !slices.EqualFunc(d.Apply, want, func(a, b string) bool { return squash(a) == b }) {
 			return lerr("el apply debe ser el record, el exporter y el monitor en ese orden y el monitor en la interfaz", "the apply must be the record, the exporter and the monitor in that order and the monitor on the interface")
 		}
@@ -339,7 +343,7 @@ func netflowPre(v Values) ([]string, error) {
 	if !ValidInterface(iface) { // Vlan, Port-channel, Loopback, Tunnel y subinterfaces no
 		return nil, cerr("assist.err.not_physical_port", "port", iface)
 	}
-	pre := []string{flowCmd, showCfg(iface)}
+	pre := []string{flowCmd, showCfg(iface), showStatus(iface)}
 	if source != "" {
 		if !ifaceNameRe.MatchString(source) {
 			return nil, lerr("interfaz de origen inválida %q", "invalid source interface %q", source)
@@ -392,6 +396,18 @@ func netflowPlan(device string, v Values, outs map[string]string) (DevicePlan, e
 			return DevicePlan{}, refuseSnippet("assist.refused.la_interfaz_source_no_existe", "port", source, "device", device)
 		}
 	}
+	// Up/up antes del apply: si ya estaba caída, el post-check no podría distinguir que la plantilla no la tiró.
+	st, ok := outs[showStatus(iface)]
+	if !ok {
+		return DevicePlan{}, cerr("assist.err.capture_missing", "port", iface)
+	}
+	rows, _ := iosxe.ParseIfStatus(st)
+	switch {
+	case len(rows) == 0:
+		return DevicePlan{}, refuseSnippet("assist.refused.no_se_pudo_leer_el_estado", "port", iface, "device", device)
+	case rows[0].Status != "connected":
+		return DevicePlan{}, refuseSnippet("assist.refused.la_interfaz_no_esta_up", "port", iface, "device", device, "status", rows[0].Status)
+	}
 	feats := make([]l2Feature, 0, 24)
 	for _, l := range flowApply(addr, port, iface, source) {
 		feats = append(feats, l2Feature{apply: l})
@@ -404,9 +420,10 @@ func netflowPlan(device string, v Values, outs map[string]string) (DevicePlan, e
 		{Command: flowCmd, Line: "flow exporter " + flowExp + sep + "transport udp " + pn, Present: true, Column: "section-line"},
 		{Command: flowCmd, Line: "flow monitor " + flowMon + sep + "exporter " + flowExp, Present: true, Column: "section-line"},
 		{Command: showCfg(iface), Line: "ip flow monitor " + flowMon + " input", Present: true},
+		{Command: showStatus(iface), Line: "connected", Present: true, Column: "status"}, // up/up: si el monitor la tiró, falla y se ofrece la reversa
 	}
 	return assembleG(device, SnippetNetflow, pre, []l2Scope{{
-		baseCmd: flowCmd, baseText: flowText, post: []string{flowCmd, showCfg(iface)}, base: map[string]string{showCfg(iface): ifText},
+		baseCmd: flowCmd, baseText: flowText, post: []string{flowCmd, showCfg(iface), showStatus(iface)}, base: map[string]string{showCfg(iface): ifText},
 		feats: feats, expect: exp, rollback: flowBack(iface),
 	}}, []i18n.Text{note("assist.note.netflow_input_only")}, nil)
 }

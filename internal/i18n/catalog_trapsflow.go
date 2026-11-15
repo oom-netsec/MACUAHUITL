@@ -32,5 +32,8 @@ func init() {
 		"snippet.netflow-export.field.interface.help": e("Puerto físico donde se monitorea el tráfico de entrada; no Vlan, Port-channel, Loopback ni Tunnel.", "Physical port where ingress traffic is monitored; not Vlan, Port-channel, Loopback or Tunnel."),
 		"snippet.netflow-export.field.source":         e("Interfaz de origen", "Source interface"),
 		"snippet.netflow-export.field.source.help":    e("Opcional, por ejemplo Vlan1: la IP desde la que el equipo exporta.", "Optional, for example Vlan1: the IP the device exports from."),
+
+		"assist.refused.la_interfaz_no_esta_up":    e("{port} de {device} no está up/up (estado {status}): si ya estaba caída, después del apply no se sabría si la plantilla la tiró", "{port} on {device} is not up/up (state {status}): if it was already down, after the apply there would be no way to tell whether the template took it down", "port", "device", "status"),
+		"assist.refused.no_se_pudo_leer_el_estado": e("no se pudo leer el estado de {port} en {device}", "could not read the state of {port} on {device}", "port", "device"),
 	})
 }
