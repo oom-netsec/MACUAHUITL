@@ -14,5 +14,7 @@ func init() {
 		"topo.finding.native_vlan":  e("{where}: VLAN nativa distinta ({a} vs {b})", "{where}: native VLAN mismatch ({a} vs {b})", "where", "a", "b"),
 		"topo.finding.duplex":       e("{where}: duplex distinto ({a} vs {b})", "{where}: duplex mismatch ({a} vs {b})", "where", "a", "b"),
 		"topo.finding.port_channel": e("{device} {po}: miembros hacia vecinos distintos ({peers}); correcto solo con vPC, StackWise Virtual o MLAG", "{device} {po}: members go to different neighbors ({peers}); correct only with vPC, StackWise Virtual or MLAG", "device", "po", "peers"),
+		"topo.segment.name":         e("segmento compartido ({n} equipos)", "shared segment ({n} {n|device|devices})", "n"),
+		"topo.text.members":         e("miembros: {list}", "members: {list}", "list"),
 	})
 }

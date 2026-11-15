@@ -127,5 +127,6 @@ func init() {
 		"analyze.detail.track_down":       e("track {id} ({type} {instance} {parameter}) en Down", "track {id} ({type} {instance} {parameter}) is Down", "id", "type", "instance", "parameter"),
 		"analyze.key.eigrp":               e("{address} por {iface} (AS {as})", "{address} on {iface} (AS {as})", "address", "iface", "as"),
 		"analyze.key.ldp":                 e("{peer}", "{peer}", "peer"),
+		"analyze.detail.bgp_pfx_zero":     e("{id} (AS {as}): sigue Established pero pasó de {from} prefijos a 0", "{id} (AS {as}): still Established but went from {from} prefixes to 0", "id", "as", "from"),
 	})
 }

@@ -35,6 +35,8 @@ type Section struct {
 	// Incomplete: el comando falló o se cortó y Text es solo lo que alcanzó a llegar.
 	Incomplete bool
 	Text       string
+	// peer da la salida de otro comando del mismo equipo y ronda (lo llena seriesFor); nil fuera del análisis.
+	peer func(cmd string) (string, bool)
 }
 
 // Bundle es el paquete de salida de un trabajo de Patrol ya leído.
@@ -99,7 +101,7 @@ func SetLimits(section, total int64) (restore func()) {
 
 // Cabeceras que escribe patrol.Writer (internal/patrol/output.go).
 var (
-	headerRe    = regexp.MustCompile(`^===== (?:ronda (\d+) · )?(\S+) · (.*?)( · comando inválido)?( · incompleto)? =====$`)
+	headerRe    = regexp.MustCompile(`^===== (?:(?:ronda|round) (\d+) · )?(\S+) · (.*?)( · (?:comando inválido|invalid command))?( · (?:incompleto|incomplete))? =====$`)
 	roundFileRe = regexp.MustCompile(`^r(\d+)_\d{8}-\d{6}\.txt$`)
 )
 
@@ -344,6 +346,16 @@ func (b *Bundle) find(device string, round int, cmd string) *Section {
 		}
 	}
 	return nil
+}
+
+// textOf es la salida completa y válida de cmd en ese equipo y ronda.
+func (b *Bundle) textOf(device string, round int, cmd string) (string, bool) {
+	for _, s := range b.Sections {
+		if s.Device == device && s.Round == round && normCmd(s.Command) == cmd && !s.Invalid && !s.Incomplete {
+			return s.Text, true
+		}
+	}
+	return "", false
 }
 
 // matchDevice: el filtro de equipo acepta nombre, IP o cualquier parte de la carpeta.

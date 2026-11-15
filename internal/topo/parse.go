@@ -24,7 +24,7 @@ type Device struct {
 	Outputs                     map[string]string // comando tal como se ejecutó → texto
 }
 
-var header = regexp.MustCompile(`^===== (?:ronda \d+ · )?\S+ · (.+?)( · comando inválido)?( · incompleto)? =====$`)
+var header = regexp.MustCompile(`^===== (?:(?:ronda|round) \d+ · )?\S+ · (.+?)( · (?:comando inválido|invalid command))?( · (?:incompleto|incomplete))? =====$`)
 
 // LoadPatrolDir lee la carpeta de salida de un trabajo (un subdirectorio
 // <equipo>_<IP> por equipo con archivos .txt). Si un comando aparece en varias

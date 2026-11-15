@@ -599,7 +599,7 @@ func checkSTP(p *params) (checker, error) {
 }
 
 func checkBGP(p *params) (checker, error) {
-	mode, err := p.oneOf("mode", "down", "flap")
+	mode, err := p.oneOf("mode", "down", "flap", "pfx_zero")
 	if err != nil {
 		return nil, err
 	}
@@ -609,20 +609,38 @@ func checkBGP(p *params) (checker, error) {
 	}
 	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
+		var prev map[string]int // prefijos de los vecinos Established de la ronda anterior (pfx_zero)
+		prevRound := 0
 		for _, s := range series {
 			ns, ok := iosxe.ParseBGP(s.Text)
 			if !ok {
 				warn(s, i18n.Tx("analyze.warn.format_no_nbrs"))
+				prev = nil
 				continue
 			}
 			var ev []string
 			var det []i18n.Text
+			cur := map[string]int{}
+			boot, bootOK := time.Duration(0), false
+			if mode == "flap" && s.peer != nil {
+				if v, ok := s.peer("show version"); ok {
+					boot, bootOK = bgpBootUptime(v, below)
+				}
+			}
 			for _, n := range ns {
+				if n.Established {
+					cur[n.ID] = n.Prefixes
+				}
 				switch {
+				case mode == "pfx_zero" && n.Established && n.Prefixes == 0 && prev != nil && prevRound == s.Round-1 && prev[n.ID] > 0:
+					ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_pfx_zero", "id", n.ID, "as", n.AS, "from", prev[n.ID]))
 				case mode == "down" && !n.Established && !strings.Contains(n.State, "Admin"):
 					ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_down", "id", n.ID, "as", n.AS, "state", n.State, "updown", n.UpDown))
 				case mode == "flap" && n.Established:
-					if d, ok := iosxe.IOSDuration(n.UpDown); ok && d < below {
+					// La sesión que subió con el arranque la explica la recarga (reload-*): no se repite aquí.
+					// shortcut: un flap real en los primeros 10 min tras el arranque también se omite (no se distingue de
+					// la subida con el equipo), mejorar si hace falta con el contador de transiciones del vecino.
+					if d, ok := iosxe.IOSDuration(n.UpDown); ok && d < below && !(bootOK && d >= boot-10*time.Minute) {
 						ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_flap", "id", n.ID, "as", n.AS, "updown", n.UpDown))
 					}
 				}
@@ -630,9 +648,16 @@ func checkBGP(p *params) (checker, error) {
 			if len(ev) > 0 {
 				out = append(out, hit{s.Round, ev, i18n.Join("; ", det...)})
 			}
+			prev, prevRound = cur, s.Round
 		}
 		return out
 	}, nil
+}
+
+// bgpBootUptime da el uptime del show version de la misma ronda si es menor que below (el equipo recargó hace poco).
+func bgpBootUptime(version string, below time.Duration) (time.Duration, bool) {
+	u, ok := parseUptime(version)
+	return u.D, ok && u.D < below
 }
 
 func checkOSPF(p *params) (checker, error) {

@@ -168,3 +168,15 @@ func TestUnmaskedConManifestFIFONoCuelga(t *testing.T) {
 		t.Fatal("Unmasked se colgó con una FIFO")
 	}
 }
+
+// Cabecera vieja (español) y nueva (inglés): las dos marcan el comando como no válido como evidencia.
+func TestSplitCabeceraEspanolEIngles(t *testing.T) {
+	text := "===== ronda 1 · 2026-11-04T10:00:00Z · show a · comando inválido =====\nx\n" +
+		"===== round 1 · 2026-11-04T10:00:01Z · show b · invalid command =====\ny\n" +
+		"===== round 1 · 2026-11-04T10:00:02Z · show c · incomplete =====\nz\n" +
+		"===== round 1 · 2026-11-04T10:00:03Z · show d =====\nok\n"
+	m := Split(text)
+	if len(m) != 1 || m["show d"] != "ok\n" {
+		t.Fatalf("m = %q", m)
+	}
+}

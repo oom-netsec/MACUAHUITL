@@ -23,6 +23,17 @@
   title_en: "BGP neighbor recently reset"
   explanation_en: "The session is up but its Up/Down time is short; it was reset recently."
   action_en: "Look for %BGP-5-ADJCHANGE in the log and the remote syslog to find the cause of the previous drop."
+- id: bgp-prefijos-a-cero
+  title: Vecino BGP Established que dejó de recibir prefijos
+  severity: alta
+  commands: [show ip bgp summary, show bgp summary, show bgp ipv4 unicast summary, show bgp ipv6 unicast summary]
+  check: bgp_neighbors
+  params: {mode: pfx_zero}
+  explanation: La sesión sigue Established pero el vecino pasó de anunciar prefijos (PfxRcd > 0) a cero en la ronda inmediata anterior; el vecino dejó de anunciarlos o un filtro los descarta.
+  action: Revisa network/redistribución en el vecino, los filtros de entrada (route-map, prefix-list) y, si hay soft-reconfiguration, show ip bgp neighbors <ip> received-routes.
+  title_en: "Established BGP neighbor stopped sending prefixes"
+  explanation_en: "The session is still Established but the neighbor went from advertising prefixes (PfxRcd > 0) to zero in the immediately previous round; the neighbor stopped advertising them or a filter drops them."
+  action_en: "Check network/redistribution on the neighbor, the inbound filters (route-map, prefix-list) and, with soft-reconfiguration, show ip bgp neighbors <ip> received-routes."
 - id: ospf-vecino-no-full
   title: Vecino OSPF sin llegar a FULL
   severity: alta

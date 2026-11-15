@@ -219,6 +219,13 @@ func regCases(t *testing.T) (map[string]golden, map[string]any) {
 	e4, w4 := BundleEvents(lg, nil)
 	tl4 := TimelineReport{Dir: lg.Dir, Events: Timeline(e4, TimelineOptions{}), Warnings: w4}
 	add("timeline-log", &tl4, tl4.Text())
+	// v0.6.2: un vecino BGP Established que pasa de 5 prefijos a 0
+	bgpH := "Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd\n"
+	bz := synth(t, map[string]map[string]string{"R1_10.0.0.1": {
+		"r001_20261104-100000.txt": sec("2026-11-04T10:00:01Z", "show ip bgp summary", bgpH+"10.0.12.1       4        65000    1234    1200      145    0    0 1w2d           5\n"),
+		"r002_20261104-101000.txt": sec("2026-11-04T10:10:01Z", "show ip bgp summary", bgpH+"10.0.12.1       4        65000    1240    1205      146    0    0 1w2d           0\n"),
+	}})
+	run("bgp-pfx-zero", bz, Options{})
 	// las rutas de las carpetas temporales cambian en cada corrida: no entran en el golden
 	for k, g := range out {
 		for _, d := range tmpDirs {

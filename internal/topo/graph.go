@@ -24,7 +24,8 @@ type Node struct {
 	Platform  string  `json:"platform,omitempty"`
 	MgmtIP    string  `json:"mgmt_ip,omitempty"`
 	Version   string  `json:"version,omitempty"`
-	Collected bool    `json:"collected"` // hay salidas CDP/LLDP propias (Patrol) o es el punto de captura
+	Kind      string  `json:"kind,omitempty"` // "segment" para un segmento compartido; vacío para un equipo
+	Collected bool    `json:"collected"`      // hay salidas CDP/LLDP propias (Patrol) o es el punto de captura
 	RootVLANs []int   `json:"root_vlans,omitempty"`
 	X         float64 `json:"x"`
 	Y         float64 `json:"y"`
@@ -98,7 +99,13 @@ type builder struct {
 	g     Graph
 	byIP  map[string]string
 	links map[string]*Link
+	obs   []observation
+	// absorbed son los enlaces que quedaron dentro de un segmento: ya no se dibujan, pero se siguen revisando.
+	absorbed []Link
 }
+
+// observation es lo que un equipo vio por una interfaz local: base para detectar segmentos compartidos.
+type observation struct{ local, lif, remote, rif string }
 
 func (b *builder) add(name, ip string) *Node {
 	id := nodeID(name)
@@ -139,6 +146,10 @@ func (b *builder) observe(local string, n iosxe.Neighbor, source string) {
 	fill(&remote.Version, n.Version)
 	ai, bi := iosxe.ShortIf(n.LocalIf), iosxe.ShortIf(n.RemoteIf)
 	a, bn := local, remote.ID
+	// La observación va antes del flip: es (equipo local, su interfaz, vecino, la que anuncia).
+	if ai != "" {
+		b.obs = append(b.obs, observation{local, ai, remote.ID, bi})
+	}
 	flip := a > bn || (a == bn && ai > bi)
 	if flip {
 		a, bn, ai, bi = bn, a, bi, ai
@@ -213,6 +224,7 @@ func Build(devs []Device, pcapNeighbors []pcapan.Neighbor, pcapName string) Grap
 			b.observe(cap.ID, n, "pcap")
 		}
 	}
+	segNodes, segLinks := b.segments()
 	keys := make([]string, 0, len(b.links))
 	for k := range b.links {
 		keys = append(keys, k)
@@ -221,6 +233,8 @@ func Build(devs []Device, pcapNeighbors []pcapan.Neighbor, pcapName string) Grap
 	for _, k := range keys {
 		b.g.Links = append(b.g.Links, *b.links[k])
 	}
+	b.g.Nodes = append(b.g.Nodes, segNodes...)
+	b.g.Links = append(b.g.Links, segLinks...)
 	for _, l := range locals {
 		b.portChannels(l.id, iosxe.ParsePortChannels(firstOutput(l.dev, "show etherchannel summary", "show port-channel summary")))
 	}
@@ -248,13 +262,116 @@ func (b *builder) checkLinks() {
 			}
 			b.g.Findings = append(b.g.Findings, finding("one_sided", "warning", "one_sided", "where", where, "other", b.g.node(other).Name))
 		}
-		if l.vlanMismatch() {
-			b.g.Findings = append(b.g.Findings, finding("native_vlan", "error", "native_vlan", "where", where, "a", l.ANativeVLAN, "b", l.BNativeVLAN))
+		b.checkMismatch(l, where)
+	}
+	// Los enlaces absorbidos por un segmento ya no son aristas, pero su VLAN nativa y duplex siguen contando.
+	// El one_sided no aplica: el segmento no tiene "dos lados".
+	for _, l := range b.absorbed {
+		b.checkMismatch(l, fmt.Sprintf("%s %s ↔ %s %s", b.g.node(l.A).Name, l.AIf, b.g.node(l.B).Name, l.BIf))
+	}
+}
+
+func (b *builder) checkMismatch(l Link, where string) {
+	if l.vlanMismatch() {
+		b.g.Findings = append(b.g.Findings, finding("native_vlan", "error", "native_vlan", "where", where, "a", l.ANativeVLAN, "b", l.BNativeVLAN))
+	}
+	if l.duplexMismatch() {
+		b.g.Findings = append(b.g.Findings, finding("duplex", "error", "duplex", "where", where, "a", l.ADuplex, "b", l.BDuplex))
+	}
+}
+
+// KindSegment marca el nodo que representa un medio compartido (hub, bridge de gestión, VLAN sin CDP).
+const KindSegment = "segment"
+
+// segmentMin es el mínimo de vecinos distintos por una misma interfaz para considerarla un segmento compartido.
+const segmentMin = 3
+
+// segments sustituye las mallas de enlaces por nodos segmento. Una interfaz (equipo, ifaz) que ve a
+// segmentMin o más vecinos distintos es de un segmento; ella y sus vecinos (con la interfaz que anuncian)
+// son miembros, y los miembros que comparten (equipo, ifaz) se funden en un solo segmento.
+// Quita de b.links los enlaces que quedan dentro de un segmento y devuelve los nodos y enlaces nuevos.
+func (b *builder) segments() ([]Node, []Link) {
+	peers := map[string]map[string]bool{}
+	for _, o := range b.obs {
+		k := o.local + "|" + o.lif
+		if peers[k] == nil {
+			peers[k] = map[string]bool{}
 		}
-		if l.duplexMismatch() {
-			b.g.Findings = append(b.g.Findings, finding("duplex", "error", "duplex", "where", where, "a", l.ADuplex, "b", l.BDuplex))
+		peers[k][o.remote] = true
+	}
+	uf := map[string]string{}
+	var find func(string) string
+	find = func(x string) string {
+		if uf[x] == "" {
+			uf[x] = x
+		}
+		if uf[x] != x {
+			uf[x] = find(uf[x])
+		}
+		return uf[x]
+	}
+	for _, o := range b.obs {
+		k := o.local + "|" + o.lif
+		if len(peers[k]) >= segmentMin {
+			uf[find(k)] = find(o.remote + "|" + o.rif)
 		}
 	}
+	srcs := map[string][]string{} // miembro -> fuentes de los enlaces absorbidos
+	for k, l := range b.links {
+		ka, kb := l.A+"|"+l.AIf, l.B+"|"+l.BIf
+		if _, ok := uf[ka]; !ok {
+			continue
+		}
+		if _, ok := uf[kb]; ok && find(ka) == find(kb) {
+			for _, s := range l.Sources {
+				if !contains(srcs[ka], s) {
+					srcs[ka] = append(srcs[ka], s)
+				}
+				if !contains(srcs[kb], s) {
+					srcs[kb] = append(srcs[kb], s)
+				}
+			}
+			b.absorbed = append(b.absorbed, *l)
+			delete(b.links, k)
+		}
+	}
+	// Miembros por segmento: los de algún par que cumple el umbral y sus vecinos.
+	comps := map[string][]string{}
+	for _, o := range b.obs {
+		if len(peers[o.local+"|"+o.lif]) < segmentMin {
+			continue
+		}
+		r := find(o.local + "|" + o.lif)
+		for _, m := range []string{o.local + "|" + o.lif, o.remote + "|" + o.rif} {
+			if !contains(comps[r], m) {
+				comps[r] = append(comps[r], m)
+			}
+		}
+	}
+	var nodes []Node
+	var links []Link
+	roots := make([]string, 0, len(comps))
+	for r := range comps {
+		roots = append(roots, r)
+	}
+	sort.Strings(roots)
+	for _, r := range roots {
+		ms := comps[r]
+		sort.Strings(ms)
+		devs := map[string]bool{}
+		for _, m := range ms {
+			d, _, _ := strings.Cut(m, "|")
+			devs[d] = true
+		}
+		id := "seg:" + ms[0]
+		nodes = append(nodes, Node{ID: id, Name: i18n.Msg(i18n.Es, "topo.segment.name", i18n.A("n", len(devs))), Kind: KindSegment})
+		for _, m := range ms {
+			d, ifc, _ := strings.Cut(m, "|")
+			sort.Strings(srcs[m])
+			links = append(links, Link{A: d, AIf: ifc, B: id, Sources: srcs[m], SeenBy: []string{}})
+		}
+	}
+	return nodes, links
 }
 
 // portChannels marca port-channels cuyos miembros llegan a vecinos distintos.
@@ -351,7 +468,17 @@ func (g Graph) TextIn(loc string) string {
 	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "%s\n\n%s\n", m("topo.text.header", "nodes", len(g.Nodes), "links", len(g.Links)), m("topo.text.devices"))
+	name := func(n Node) string {
+		if n.Kind == KindSegment {
+			return m("topo.segment.name", "n", g.deviceCount(n.ID))
+		}
+		return n.Name
+	}
 	for _, n := range g.Nodes {
+		if n.Kind == KindSegment {
+			fmt.Fprintf(&sb, "  %-24s %s\n", name(n), m("topo.text.members", "list", strings.Join(g.members(n.ID), ", ")))
+			continue
+		}
 		fmt.Fprintf(&sb, "  %-24s %-18s %-16s %s", n.Name, n.Platform, n.MgmtIP, n.Version)
 		if len(n.RootVLANs) > 0 {
 			fmt.Fprintf(&sb, "  %s", m("topo.text.stp_root", "vlans", fmt.Sprint(n.RootVLANs)))
@@ -360,7 +487,7 @@ func (g Graph) TextIn(loc string) string {
 	}
 	fmt.Fprintf(&sb, "\n%s\n", m("topo.text.links"))
 	for _, l := range g.Links {
-		fmt.Fprintf(&sb, "  %s %s ↔ %s %s  [%s]\n", g.node(l.A).Name, l.AIf, g.node(l.B).Name, l.BIf, strings.Join(l.Sources, ","))
+		fmt.Fprintf(&sb, "  %s %s ↔ %s %s  [%s]\n", name(*g.node(l.A)), l.AIf, name(*g.node(l.B)), l.BIf, strings.Join(l.Sources, ","))
 	}
 	if len(g.Findings) > 0 {
 		fmt.Fprintf(&sb, "\n%s\n", m("topo.text.findings"))
@@ -373,4 +500,25 @@ func (g Graph) TextIn(loc string) string {
 		}
 	}
 	return sb.String()
+}
+
+// members son los nombres de los equipos unidos al segmento id, con su interfaz.
+func (g Graph) members(id string) []string {
+	var out []string
+	for _, l := range g.Links {
+		if l.B == id {
+			out = append(out, g.node(l.A).Name+" "+l.AIf)
+		}
+	}
+	return out
+}
+
+func (g Graph) deviceCount(id string) int {
+	seen := map[string]bool{}
+	for _, l := range g.Links {
+		if l.B == id {
+			seen[l.A] = true
+		}
+	}
+	return len(seen)
 }

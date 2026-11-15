@@ -83,7 +83,7 @@ var (
 	maxDevs          = 2000      // equipos
 )
 
-var headerRe = regexp.MustCompile(`^===== (?:ronda \d+ · )?(\S+) · (.*?)( · comando inválido)?( · incompleto)? =====$`)
+var headerRe = regexp.MustCompile(`^===== (?:(?:ronda|round) \d+ · )?(\S+) · (.*?)( · (?:comando inválido|invalid command))?( · (?:incompleto|incomplete))? =====$`)
 
 // NewDev arma un equipo en memoria (pruebas).
 func NewDev(key string, ev map[string]Evidence) *Dev {

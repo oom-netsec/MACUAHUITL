@@ -97,16 +97,16 @@ func (w *Writer) Write(dev Device, round int, roundStart time.Time, out platform
 	}
 	note := ""
 	if out.Invalid {
-		note = " · comando inválido"
+		note = " · invalid command"
 	}
 	if out.Incomplete {
-		note += " · incompleto" // salida parcial de un comando cortado o fallido; los lectores no la toman por completa
+		note += " · incomplete" // salida parcial de un comando cortado o fallido; los lectores no la toman por completa
 	}
 	devDir := DeviceDirOf(dev.Host, Target{Address: dev.IP, Port: dev.Port})
 	var rel, header string
 	if w.split == SplitConsolidated {
 		rel = filepath.Join(devDir, dirName(dev.Host)+".txt")
-		header = fmt.Sprintf("===== ronda %d · %s · %s%s =====\n", round, out.Started.UTC().Format(time.RFC3339), out.Command, note)
+		header = fmt.Sprintf("===== round %d · %s · %s%s =====\n", round, out.Started.UTC().Format(time.RFC3339), out.Command, note)
 	} else {
 		rel = filepath.Join(devDir, fmt.Sprintf("r%03d_%s.txt", round, roundStart.Format(stamp)))
 		header = fmt.Sprintf("===== %s · %s%s =====\n", out.Started.UTC().Format(time.RFC3339), out.Command, note)
