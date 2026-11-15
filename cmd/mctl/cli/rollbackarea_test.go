@@ -22,3 +22,14 @@ func TestRollbackAreaPorTipo(t *testing.T) {
 	}
 	SetLang("")
 }
+
+// El uso y las banderas de «snippet rollback» y «restore rollback» nombran su propio subcomando, no «ports rollback».
+func TestRollbackUsoNombraSuArea(t *testing.T) {
+	for _, area := range []string{"ports", "snippet", "restore"} {
+		var out strings.Builder
+		err := RollbackIn(area)(&Env{Out: &out}, nil)
+		if err == nil || !strings.Contains(err.Error(), "mctl "+area+" rollback") || (area != "ports" && strings.Contains(err.Error(), "ports rollback")) {
+			t.Errorf("%s: %v", area, err)
+		}
+	}
+}

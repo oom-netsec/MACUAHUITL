@@ -321,8 +321,14 @@ func printPending(w io.Writer, p *v1.PendingRollback) {
 	}
 }
 
-// Rollback aplica una reversa guardada con confirmación por paso, igual que --assisted (`ports|snippet|restore rollback RUN [--accept-age]`).
-func Rollback(c *Env, args []string) error {
+// RollbackIn es el handler de «AREA rollback» (ports, snippet o restore): aplican la misma reversa, pero el uso y las
+// banderas nombran el subcomando que el usuario escribió.
+func RollbackIn(area string) func(*Env, []string) error {
+	return func(c *Env, args []string) error { return rollback(c, args, area) }
+}
+
+// rollback aplica una reversa guardada con confirmación por paso, igual que --assisted (`AREA rollback RUN [--accept-age]`).
+func rollback(c *Env, args []string, area string) error {
 	if len(args) == 2 && args[0] == "discard" { // `rollback discard RUN`: descarta sin aplicar
 		_, err := v1.NewAssistServiceClient(c.Conn).DiscardPendingRollback(context.Background(), &v1.DiscardPendingRollbackRequest{RunId: args[1]})
 		if err == nil {
@@ -331,11 +337,11 @@ func Rollback(c *Env, args []string) error {
 		return err
 	}
 	var acceptAge bool
-	fs, err := Flags("ports rollback", args, func(fs *flag.FlagSet) {
+	fs, err := Flags(area+" rollback", args, func(fs *flag.FlagSet) {
 		fs.BoolVar(&acceptAge, "accept-age", false, "aceptar una reversa de más de 24 h")
 	})
 	if err != nil || fs.NArg() != 1 {
-		return errors.New("uso: mctl ports rollback EJECUCION [--accept-age] | mctl ports rollback discard EJECUCION")
+		return fmt.Errorf("uso: mctl %[1]s rollback EJECUCION [--accept-age] | mctl %[1]s rollback discard EJECUCION", area)
 	}
 	cl := v1.NewAssistServiceClient(c.Conn)
 	l, err := cl.ListPendingRollbacks(context.Background(), &v1.ListPendingRollbacksRequest{})
