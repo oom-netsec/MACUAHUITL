@@ -2783,6 +2783,10 @@ export const es = {
   "patrol.grid.reconnects": "{n} reconexiones",
   "patrol.grid.reconnects.one": "1 reconexión",
   "patrol.grid.partialDetail": "{cut} · {rec}",
+  "patrol.grid.partialFirst": " · primero: {first}",
+  "patrol.devices.partial": "correctos: {ok} · parciales: {partial} · con fallas: {failed} · {total} equipos",
+  "patrol.devices.partial.one": "correctos: {ok} · parciales: {partial} · con fallas: {failed} · 1 equipo",
+  "patrol.phaseReason.phase.ok_partial_failed": "{ok}, {partial}, {failed} con fallas",
 };
 
 export type Key = keyof typeof es;

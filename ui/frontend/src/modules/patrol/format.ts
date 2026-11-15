@@ -20,5 +20,8 @@ export function activeMs(armedAt: string, state: string, phases: { at: string; k
   return (end ? Date.parse(end.at) : now) - Date.parse(armedAt);
 }
 
-// " · 2 parciales" para el resumen de equipos; vacío sin parciales.
-export const partialSuffix = (t: ReturnType<typeof useT>, n = 0) => (n > 0 ? ` · ${t("patrol.partialCount", { n })}` : "");
+// Resumen de equipos de un trabajo; la variante con parciales solo sale si los hay.
+export const devicesText = (t: ReturnType<typeof useT>, j: { devicesTotal?: number; devicesOk?: number; devicesFailed?: number; devicesPartial?: number }) => {
+  const partial = j.devicesPartial ?? 0;
+  return t(partial > 0 ? "patrol.devices.partial" : "patrol.devices", { ok: j.devicesOk ?? 0, partial, failed: j.devicesFailed ?? 0, total: j.devicesTotal ?? 0, n: j.devicesTotal ?? 0 });
+};

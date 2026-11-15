@@ -2782,7 +2782,11 @@ export const en: Record<Key, string> = {
   "patrol.partialCount.one": "1 partial",
   "patrol.grid.cut": "{n} commands cut",
   "patrol.grid.cut.one": "1 command cut",
-  "patrol.grid.reconnects": "{n} reconnects",
-  "patrol.grid.reconnects.one": "1 reconnect",
+  "patrol.grid.reconnects": "{n} reconnections",
+  "patrol.grid.reconnects.one": "1 reconnection",
   "patrol.grid.partialDetail": "{cut} · {rec}",
+  "patrol.grid.partialFirst": " · first: {first}",
+  "patrol.devices.partial": "{ok} succeeded · {partial} partial · {failed} failed · {total} devices",
+  "patrol.devices.partial.one": "{ok} succeeded · {partial} partial · {failed} failed · 1 device",
+  "patrol.phaseReason.phase.ok_partial_failed": "{ok}, {partial}, {failed} failed",
 };
