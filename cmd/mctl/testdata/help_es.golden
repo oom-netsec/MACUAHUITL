@@ -69,6 +69,9 @@ uso: mctl <comando>
          Ctrl-C aborta la ejecución y avisa si quedó algún equipo cambiado)
   ports runs [--active]             ejecuciones que el núcleo recuerda (para retomar una que quedó viva)
   ports resume EJECUCION            retoma la confirmación de una ejecución viva
+  ports rollbacks                   reversas guardadas de ejecuciones que dejaron equipos cambiados (sobreviven al reinicio; cred rotate no: es a mano)
+  ports rollback EJECUCION [--accept-age]  aplica esa reversa con confirmación por paso (también snippet rollback y restore rollback; --accept-age si pasaron más de 24 h)
+  ports rollback discard EJECUCION  descarta esa reversa sin aplicarla
   run -d EQUIPO... -c "show ..." | -f ARCHIVO --cred ID [--accept HUELLA] [--csv|--md|--json]
         (lote de solo lectura: un trabajo de Patrol de una ronda; todo comando pasa por CheckDenied)
   drift TRABAJO|CARPETA [--round N] [--device EQUIPO] [--json]

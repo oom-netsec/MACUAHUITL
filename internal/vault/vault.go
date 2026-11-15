@@ -318,9 +318,45 @@ func (v *Vault) Put(c Credential) (string, error) {
 }
 
 // PutBatch es Put para varias credenciales con una sola escritura: o quedan todas o no queda ninguna.
-func (v *Vault) PutBatch(cs []Credential) ([]string, error) {
+func (v *Vault) PutBatch(cs []Credential) ([]string, error) { return v.putBatch(cs, false) }
+
+// PutReserved crea o reemplaza (por etiqueta) una entrada reservada del sistema; la etiqueta debe ser reservada. Ignora c.ID: la entrada
+// a reemplazar sale solo de la etiqueta, y la búsqueda y la escritura van en la misma sección crítica (dos llamadas no la duplican).
+func (v *Vault) PutReserved(c Credential) error {
+	if !Reserved(c.Label) {
+		return ErrNotFound
+	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	if err := v.requireFull(); err != nil {
+		return err
+	}
+	c.ID = ""
+	for _, e := range v.entries {
+		old, err := v.decrypt(e)
+		if err != nil {
+			return err
+		}
+		old.Password.Destroy()
+		old.Enable.Destroy()
+		old.SSHKey.Destroy()
+		if old.Label == c.Label {
+			c.ID = old.ID
+			break
+		}
+	}
+	_, err := v.putBatchLocked([]Credential{c}, true)
+	return err
+}
+
+func (v *Vault) putBatch(cs []Credential, reserved bool) ([]string, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	return v.putBatchLocked(cs, reserved)
+}
+
+// putBatchLocked es PutBatch con v.mu ya tomado; reserved deja reemplazar una entrada reservada.
+func (v *Vault) putBatchLocked(cs []Credential, reserved bool) ([]string, error) {
 	if err := v.requireFull(); err != nil {
 		return nil, err
 	}
@@ -334,7 +370,7 @@ func (v *Vault) PutBatch(cs []Credential) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
-			if err := v.guardReserved(i); err != nil {
+			if err := v.guardReserved(i); err != nil && !reserved {
 				return nil, err
 			}
 			idx, e.ID = i, v.entries[i].ID
@@ -433,6 +469,38 @@ func (v *Vault) Delete(id string) error {
 		return err
 	}
 	return nil
+}
+
+// DeleteReserved borra la entrada reservada con esa etiqueta (Delete por ID las rechaza). ErrNotFound si no existe.
+func (v *Vault) DeleteReserved(label string) error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if err := v.requireFull(); err != nil {
+		return err
+	}
+	if !Reserved(label) {
+		return ErrNotFound
+	}
+	for i, e := range v.entries {
+		c, err := v.decrypt(e)
+		if err != nil {
+			return err
+		}
+		c.Password.Destroy()
+		c.Enable.Destroy()
+		c.SSHKey.Destroy()
+		if c.Label != label {
+			continue
+		}
+		prev := v.entries
+		v.entries = append(append([]rawEntry(nil), v.entries[:i]...), v.entries[i+1:]...)
+		if err := v.persistReplacingBak(); err != nil {
+			v.entries = prev
+			return err
+		}
+		return nil
+	}
+	return ErrNotFound
 }
 
 // ChangeMasterPassword vuelve a cifrar la DEK con una KEK nueva (sal nueva).

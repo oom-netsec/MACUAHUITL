@@ -68,6 +68,9 @@
          Ctrl-C aborts the run and warns if any device was left changed)
   ports runs [--active]             runs the core remembers (to resume one that was left alive)
   ports resume RUN                  resumes the confirmation of a live run
+  ports rollbacks                   saved rollbacks of runs that left devices changed (they survive a restart; cred rotate does not: it is by hand)
+  ports rollback RUN [--accept-age]  applies that rollback with a confirmation at each step (also snippet rollback and restore rollback; --accept-age if more than 24 h have passed)
+  ports rollback discard RUN        discards that rollback without applying it
   run -d DEVICE... -c "show ..." | -f FILE --cred ID [--accept FINGERPRINT] [--csv|--md|--json]
         (read-only batch: a one-round Patrol job; every command goes through CheckDenied)
   drift JOB|FOLDER [--round N] [--device DEVICE] [--json]

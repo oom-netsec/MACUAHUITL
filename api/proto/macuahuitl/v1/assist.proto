@@ -27,6 +27,12 @@ service AssistService {
   // ListRuns y GetAssistRun permiten volver a una ejecución que sigue viva (la UI se cerró o mctl murió).
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
   rpc GetAssistRun(GetAssistRunRequest) returns (GetAssistRunResponse);
+  // Reversa asistida (seguridad operativa): una ejecución que terminó aborted, failed o abandoned con equipos cambiados deja su reversa guardada
+  // (cifrada en la bóveda, sobrevive al reinicio). StartPendingRollback la aplica como una ejecución asistida más (WatchRun, Confirm, Abort, Rollback).
+  rpc ListPendingRollbacks(ListPendingRollbacksRequest) returns (ListPendingRollbacksResponse);
+  rpc StartPendingRollback(StartPendingRollbackRequest) returns (StartPendingRollbackResponse);
+  // Descarta una reversa pendiente (también una ilegible); queda auditado.
+  rpc DiscardPendingRollback(DiscardPendingRollbackRequest) returns (DiscardPendingRollbackResponse);
 }
 
 message AssistTarget {
@@ -292,3 +298,40 @@ message PlanRestoreResponse {
   repeated RestoreRefusal refused = 3;   // lo que el diff tocaría y no se restaura
   string reason = 4;                     // por qué se rechazó el plan
 }
+
+message ListPendingRollbacksRequest {}
+
+message PendingRollbackDevice {
+  string device = 1;
+  repeated string rollback_lines = 2; // lo que se mandará, sin secretos
+}
+
+message PendingRollback {
+  string run_id = 1;                 // la ejecución original
+  string kind = 2;                   // función del plan: ports, snippet, restore...
+  repeated PendingRollbackDevice devices = 3;
+  int64 ended_unix = 4;
+  int64 age_seconds = 5;
+  bool write_memory = 6;             // la ejecución pedía write memory: la startup-config puede conservar el cambio; la reversa no hace write memory
+  bool unreadable = 7;               // la entrada no se pudo leer: solo run_id; se puede descartar
+}
+
+message ListPendingRollbacksResponse {
+  repeated PendingRollback rollbacks = 1;
+}
+
+message StartPendingRollbackRequest {
+  string run_id = 1;     // la ejecución original
+  bool accept_age = 2;   // obligatorio si pasaron más de 24 h desde que terminó
+  bool assisted = 3;     // regla 1 del ADR 0007: sin true explícito no se conecta ni se cambia nada
+}
+
+message StartPendingRollbackResponse {
+  string run_id = 1;     // la ejecución nueva, para WatchRun, Confirm, Abort y Rollback
+}
+
+message DiscardPendingRollbackRequest {
+  string run_id = 1;
+}
+
+message DiscardPendingRollbackResponse {}

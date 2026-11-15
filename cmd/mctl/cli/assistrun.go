@@ -3,10 +3,13 @@ package cli
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -248,7 +251,10 @@ func Follow(c *Env, cl v1.AssistServiceClient, runID string, from uint32, first 
 		if len(lastChanged) > 1 {
 			code = "mctl.run.warn_many"
 		}
-		fmt.Fprintln(c.Out, T(code, "devices", strings.Join(lastChanged, ", ")))
+		if l, err := cl.ListPendingRollbacks(ctx, &v1.ListPendingRollbacksRequest{}); err == nil && slices.ContainsFunc(l.Rollbacks, func(p *v1.PendingRollback) bool { return p.RunId == runID }) {
+			code = "mctl.run.warn_pending" // la reversa quedó guardada: hay comando para aplicarla (cred rotate no la guarda y sigue diciendo «a mano»)
+		}
+		fmt.Fprintln(c.Out, T(code, "devices", strings.Join(lastChanged, ", "), "run", runID))
 	}
 	switch {
 	case final == "done":
@@ -262,4 +268,74 @@ func Follow(c *Env, cl v1.AssistServiceClient, runID string, from uint32, first 
 		return Err("mctl.run.err_failed")
 	}
 	return Err("mctl.run.err_final", "state", final)
+}
+
+// PendingRollbacks lista las reversas guardadas de ejecuciones que dejaron equipos cambiados (`ports rollbacks`).
+func PendingRollbacks(c *Env, args []string) error {
+	args, err := NoFlags("ports rollbacks", args)
+	if err != nil || len(args) != 0 {
+		return errors.New("uso: mctl ports rollbacks")
+	}
+	l, err := v1.NewAssistServiceClient(c.Conn).ListPendingRollbacks(context.Background(), &v1.ListPendingRollbacksRequest{})
+	if err != nil {
+		return err
+	}
+	if len(l.Rollbacks) == 0 {
+		fmt.Fprintln(c.Out, T("mctl.ports.no_rollbacks"))
+	}
+	for _, p := range l.Rollbacks {
+		printPending(c.Out, p)
+	}
+	return nil
+}
+
+func printPending(w io.Writer, p *v1.PendingRollback) {
+	if p.Unreadable {
+		fmt.Fprintln(w, T("mctl.ports.rollback_unreadable", "run", p.RunId))
+		return
+	}
+	fmt.Fprintln(w, T("mctl.ports.rollback_header", "run", p.RunId, "kind", p.Kind, "age", (time.Duration(p.AgeSeconds)*time.Second).String()))
+	if p.WriteMemory {
+		fmt.Fprintln(w, T("mctl.ports.rollback_write_memory"))
+	}
+	for _, d := range p.Devices {
+		fmt.Fprintf(w, "  %s:\n", d.Device)
+		for _, l := range d.RollbackLines {
+			fmt.Fprintf(w, "    %s\n", l)
+		}
+	}
+}
+
+// Rollback aplica una reversa guardada con confirmación por paso, igual que --assisted (`ports|snippet|restore rollback RUN [--accept-age]`).
+func Rollback(c *Env, args []string) error {
+	if len(args) == 2 && args[0] == "discard" { // `rollback discard RUN`: descarta sin aplicar
+		_, err := v1.NewAssistServiceClient(c.Conn).DiscardPendingRollback(context.Background(), &v1.DiscardPendingRollbackRequest{RunId: args[1]})
+		if err == nil {
+			fmt.Fprintln(c.Out, T("mctl.ports.rollback_discarded", "run", args[1]))
+		}
+		return err
+	}
+	var acceptAge bool
+	fs, err := Flags("ports rollback", args, func(fs *flag.FlagSet) {
+		fs.BoolVar(&acceptAge, "accept-age", false, "aceptar una reversa de más de 24 h")
+	})
+	if err != nil || fs.NArg() != 1 {
+		return errors.New("uso: mctl ports rollback EJECUCION [--accept-age] | mctl ports rollback discard EJECUCION")
+	}
+	cl := v1.NewAssistServiceClient(c.Conn)
+	l, err := cl.ListPendingRollbacks(context.Background(), &v1.ListPendingRollbacksRequest{})
+	if err != nil {
+		return err
+	}
+	for _, p := range l.Rollbacks {
+		if p.RunId == fs.Arg(0) {
+			printPending(c.Out, p)
+		}
+	}
+	run, err := cl.StartPendingRollback(context.Background(), &v1.StartPendingRollbackRequest{RunId: fs.Arg(0), AcceptAge: acceptAge, Assisted: true})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(c.Out, "\n"+T("mctl.ports.rollback_started", "run", run.RunId))
+	return Follow(c, cl, run.RunId, 0, nil)
 }

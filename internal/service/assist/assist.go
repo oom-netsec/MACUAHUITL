@@ -42,6 +42,17 @@ type planRec struct {
 	t       target
 	created time.Time
 	rot     *rotation // solo la rotación de credenciales
+	// devices: los equipos del plan, si no es solo label (la reversa pendiente; todos comparten la conexión t)
+	devices []string
+}
+
+// targets da, por etiqueta de equipo del plan, la conexión: una sola para todos.
+func (p *planRec) targets() map[string]target {
+	out := map[string]target{p.label: p.t}
+	for _, d := range p.devices {
+		out[d] = p.t
+	}
+	return out
 }
 
 type runRec struct {
@@ -50,6 +61,7 @@ type runRec struct {
 	started  time.Time
 	ended    time.Time // cero mientras viva; protegido por assistSvc.mu
 	keys     []string  // (equipo, interfaz) que la ejecución tiene tomados
+	origin   string    // si es una ejecución de reversa, la ejecución original cuya reversa aplica
 }
 
 type assistSvc struct {
@@ -61,12 +73,13 @@ type assistSvc struct {
 	// ctx vive mientras el núcleo: cancelarlo (Close) hace que las ejecuciones se abandonen.
 	ctx             context.Context
 	cancel          context.CancelFunc
-	decisionTimeout time.Duration // 0 = assist.DefaultDecisionTimeout
+	decisionTimeout time.Duration   // 0 = assist.DefaultDecisionTimeout
+	discarded       map[string]bool // reversas pendientes descartadas: ni Persist ni afterRun las vuelven a guardar (protegido por mu)
 }
 
 func newSvc(d service.Deps) *assistSvc {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &assistSvc{d: d, plans: map[string]*planRec{}, runs: map[string]*runRec{}, ctx: ctx, cancel: cancel}
+	return &assistSvc{d: d, plans: map[string]*planRec{}, runs: map[string]*runRec{}, discarded: map[string]bool{}, ctx: ctx, cancel: cancel}
 }
 
 // Close cancela las ejecuciones vivas y espera a que cada una cierre su sesión, audite en qué quedó y
@@ -516,12 +529,22 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 	if !ok {
 		return nil, service.Err(ctx, codes.NotFound, "assist.svc.el_plan_no_existe_caduco", nil)
 	}
-	if err := s.vault(ctx); err != nil {
+	runID, err := s.launch(ctx, rec, r.PlanId, portKeys(rec), "")
+	if err != nil {
 		return nil, err
+	}
+	return &v1.StartRunResponse{RunId: runID}, nil
+}
+
+// launch arma la ejecución de rec con la bóveda y el guard abiertos solo mientras dure. planID vacío = no viene de un plan guardado
+// (una reversa pendiente); origin es la ejecución original cuya reversa se aplica.
+func (s *assistSvc) launch(ctx context.Context, rec *planRec, planID string, keys []string, origin string) (string, error) {
+	if err := s.vault(ctx); err != nil {
+		return "", err
 	}
 	runID := service.NewID()
 	if err := s.d.Guard().Allow(ctx, runID, []string{rec.t.host}); err != nil {
-		return nil, status.Error(codes.PermissionDenied, err.Error())
+		return "", status.Error(codes.PermissionDenied, err.Error())
 	}
 	v := s.d.Vault()
 	creds := []string{rec.t.cred}
@@ -530,35 +553,38 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 	}
 	if err := v.Arm(runID, s.d.Now().Add(runWindow), creds); err != nil {
 		s.d.Guard().Revoke(runID)
-		return nil, service.VaultErr(ctx, err)
+		return "", service.VaultErr(ctx, err)
 	}
 	release := func() { s.d.Guard().Revoke(runID); v.Disarm(runID) }
-	var ex assist.Executor = newExec(s.d, runID, map[string]target{rec.label: rec.t}, transport.HostKeyPolicy{})
+	var ex assist.Executor = newExec(s.d, runID, rec.targets(), transport.HostKeyPolicy{})
 	if rec.rot != nil {
 		ex = &rotExec{devExec: ex.(*devExec), rot: *rec.rot}
 	}
-	run, err := assist.NewRun(assist.Options{ID: runID, Plan: rec.plan, Fn: rec.fn, Assisted: r.Assisted, Exec: ex, Audit: s.d.Audit,
-		DecisionTimeout: s.decisionTimeout})
+	opts := assist.Options{ID: runID, Plan: rec.plan, Fn: rec.fn, Assisted: true, Exec: ex, Audit: s.d.Audit, DecisionTimeout: s.decisionTimeout}
+	pers := &persister{s: s, runID: runID, t: rec.t}
+	if origin == "" { // la reversa se guarda mientras la ejecución avanza; una ejecución de reversa no guarda otra
+		opts.Persist = pers.sync
+	}
+	run, err := assist.NewRun(opts)
 	if err != nil {
 		release()
-		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
+		return "", service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	s.mu.Lock()
-	if _, ok := s.plans[r.PlanId]; !ok { // otro StartRun ganó la carrera
+	if _, ok := s.plans[planID]; planID != "" && !ok { // otro StartRun ganó la carrera
 		s.mu.Unlock()
 		release()
-		return nil, service.Err(ctx, codes.NotFound, "assist.svc.el_plan_ya_se_uso", nil)
+		return "", service.Err(ctx, codes.NotFound, "assist.svc.el_plan_ya_se_uso", nil)
 	}
-	keys := portKeys(rec)
 	if other, busy := s.busyLocked(keys); busy { // un puerto, una ejecución a la vez
 		s.mu.Unlock()
 		release()
-		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.la_ejecucion_sigue_activa_sobre", i18n.A("other", other))
+		return "", service.Err(ctx, codes.FailedPrecondition, "assist.svc.la_ejecucion_sigue_activa_sobre", i18n.A("other", other))
 	}
-	delete(s.plans, r.PlanId)
+	delete(s.plans, planID)
 	now := s.d.Now()
 	s.pruneRunsLocked(now)
-	rr := &runRec{run: run, finished: make(chan struct{}), started: now, keys: keys}
+	rr := &runRec{run: run, finished: make(chan struct{}), started: now, keys: keys, origin: origin}
 	s.runs[runID] = rr
 	s.mu.Unlock()
 	run.Start(s.ctx)
@@ -568,9 +594,10 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 		s.mu.Lock()
 		rr.ended = s.d.Now()
 		s.mu.Unlock()
+		s.afterRun(rr, pers, origin) // antes de close(finished): quien espera el fin ya ve la reversa guardada
 		close(rr.finished)
 	}()
-	return &v1.StartRunResponse{RunId: runID}, nil
+	return runID, nil
 }
 
 func (s *assistSvc) get(ctx context.Context, id string) (*runRec, error) {
@@ -650,6 +677,11 @@ func (s *assistSvc) WatchRun(r *v1.WatchRunRequest, st v1.AssistService_WatchRun
 		}
 		select {
 		case <-rr.run.Done():
+			select { // ya quedó guardada (o borrada) la reversa pendiente
+			case <-rr.finished:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 			evs, _ := rr.run.Events(from)
 			return send(evs)
 		case <-more:

@@ -90,5 +90,5 @@ func printRefused(c *cli.Env, rs []*v1.RestoreRefusal, title string) {
 
 // Area registra restore diff.
 func Area() cli.Area {
-	return cli.Area{Usage: help, Commands: []cli.Command{{Name: "restore diff", Run: diff}}}
+	return cli.Area{Usage: help, Commands: []cli.Command{{Name: "restore diff", Run: diff}, {Name: "restore rollback", Run: cli.Rollback}}}
 }

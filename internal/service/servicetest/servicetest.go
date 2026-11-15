@@ -87,10 +87,13 @@ func (d *Deps) Audit(action, target, detail string) {
 func (d *Deps) ExportAudit(ctx context.Context, w io.Writer, from, to time.Time) error {
 	return d.Log.Export(ctx, w, from, to)
 }
-func (d *Deps) MarkActive()             {}
-func (d *Deps) Now() time.Time          { return d.clock() }
-func (d *Deps) Guard() *transport.Guard { return d.G }
-func (d *Deps) Vault() *vault.Vault     { return d.V }
+func (d *Deps) MarkActive()    {}
+func (d *Deps) Now() time.Time { return d.clock() }
+
+// SetClock cambia la hora que ven los servicios (no la de la bitácora).
+func (d *Deps) SetClock(f func() time.Time) { d.clock = f }
+func (d *Deps) Guard() *transport.Guard     { return d.G }
+func (d *Deps) Vault() *vault.Vault         { return d.V }
 func (d *Deps) SealParams() vault.Params {
 	return vault.Params{MemoryKiB: 8192, Iterations: 1, Threads: 1}
 }

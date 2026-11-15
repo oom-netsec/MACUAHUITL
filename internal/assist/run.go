@@ -125,6 +125,9 @@ type Options struct {
 	// DecisionTimeout es cuánto espera el motor una decisión; al vencer la ejecución pasa a abandoned.
 	// Cero = DefaultDecisionTimeout.
 	DecisionTimeout time.Duration
+	// Persist, si viene, recibe lo que la ejecución tiene sin revertir cada vez que cambia (un equipo pasa a cambiado, se relee su estado o
+	// se revierte); nil = ya no queda nada. Así una caída del núcleo no pierde la reversa. Se llama sin candados, desde el hilo del motor.
+	Persist func(*Leftover)
 }
 
 type decision int
@@ -153,6 +156,7 @@ type Run struct {
 	plan     Plan
 	exec     Executor
 	audit    func(action, target, detail string)
+	persist  func(*Leftover)
 	done     chan struct{}
 	dec      chan decision
 	mu       sync.Mutex
@@ -197,7 +201,7 @@ func NewRun(o Options) (*Run, error) {
 			return nil, cerr("assist.no_verifier")
 		}
 	}
-	r := &Run{id: o.ID, plan: o.Plan, exec: o.Exec, state: Planned, timeout: o.DecisionTimeout, fn: o.Fn, secrets: secrets,
+	r := &Run{persist: o.Persist, id: o.ID, plan: o.Plan, exec: o.Exec, state: Planned, timeout: o.DecisionTimeout, fn: o.Fn, secrets: secrets,
 		snap: map[int]map[string]string{}, recheck: map[int]bool{}, done: make(chan struct{}), dec: make(chan decision, 1), notify: make(chan struct{})}
 	// Único punto por el que sale la auditoría: ningún detalle lleva secretos.
 	r.audit = func(action, target, detail string) { o.Audit(action, target, r.scrub(detail)) }
@@ -643,6 +647,7 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 	r.mu.Lock()
 	r.changed = append(r.changed, i)
 	r.mu.Unlock()
+	r.sync()
 	sent, err := r.exec.Configure(ctx, dp.Device, dp.Apply)
 	if len(sent) == 0 { // ninguna línea llegó a mandarse (no se pudo conectar ni entrar a configuración): el equipo sigue igual
 		r.unchange(i)
@@ -699,17 +704,26 @@ func (r *Run) remember(i int, base map[string]string, outs map[string]string) {
 	r.mu.Lock()
 	r.snap[i] = m
 	r.mu.Unlock()
+	r.sync()
+}
+
+// sync avisa a Persist de lo que la ejecución tiene sin revertir ahora.
+func (r *Run) sync() {
+	if r.persist != nil {
+		r.persist(r.Leftover())
+	}
 }
 
 func (r *Run) unchange(i int) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	for k, c := range r.changed {
 		if c == i {
 			r.changed = append(r.changed[:k:k], r.changed[k+1:]...)
-			return
+			break
 		}
 	}
+	r.mu.Unlock()
+	r.sync()
 }
 
 func sortedCmds(m map[string]string) []string {
