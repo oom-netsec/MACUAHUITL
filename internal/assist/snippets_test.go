@@ -505,7 +505,7 @@ func TestSnippetTrunkPlanShapeMustBeInverse(t *testing.T) {
 }
 
 func TestTrunkPlanAddAndRemoveWithInverseRollback(t *testing.T) {
-	outs := trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk", "switchport trunk allowed vlan 10,20"), swTrunk)
+	outs := with(trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk", "switchport trunk allowed vlan 10,20"), swTrunk), onGi48)
 	dp, err := TrunkPlan("SW1", TrunkChange{Interface: gi1, Op: "add", Vlan: 30}, outs)
 	if err != nil {
 		t.Fatal(err)
@@ -549,7 +549,7 @@ func TestTrunkPlanAddAndRemoveWithInverseRollback(t *testing.T) {
 }
 
 func TestTrunkPlanNeverEmitsBareAllowedVlan(t *testing.T) {
-	outs := trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk", "switchport trunk allowed vlan 10,20"), swTrunk)
+	outs := with(trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk", "switchport trunk allowed vlan 10,20"), swTrunk), onGi48)
 	for _, op := range []string{"add", "remove"} {
 		for _, v := range []int{10, 30} {
 			dp, err := TrunkPlan("SW1", TrunkChange{Interface: gi1, Op: op, Vlan: v}, outs)
