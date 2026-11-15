@@ -281,7 +281,7 @@ func TestPatrolDetalleDeEquipoEnYCodigo(t *testing.T) {
 		t.Errorf("la auditoría del equipo debe ir en inglés:\n%s", a)
 	}
 	for _, k := range []string{"evento", "getrun"} {
-		if reasons[k] != "patrol.dev.partial" || !strings.Contains(got[k], "1 command(s) cut and 1 reconnect(s); first: show running-config") {
+		if reasons[k] != "patrol.dev.partial" || !strings.Contains(got[k], "1 command cut and 1 reconnect; first: show running-config") {
 			t.Errorf("%s: reason %q detalle %q", k, reasons[k], got[k])
 		}
 	}

@@ -634,7 +634,7 @@ func (s *patrolSvc) GetRun(ctx context.Context, r *v1.GetRunRequest) (*v1.GetRun
 		detail, reason, args := detailOf(i18n.Locale(ctx), d.Detail, d.DetailErr)
 		out.Devices = append(out.Devices, &v1.RunDevice{Target: &v1.Target{Address: d.Target.Address, Port: uint32(patrol.EffectivePort(d.Target.Port)), DeviceId: d.Target.DeviceID},
 			State: deviceStates[d.State], Detail: detail, Reason: reason, Args: args,
-			CutCommands: uint32(len(d.CutCommands)), Reconnects: uint32(d.Reconnects)})
+			CutCommands: cutOf(d).cut, Reconnects: cutOf(d).reconnects})
 	}
 	return out, nil
 }

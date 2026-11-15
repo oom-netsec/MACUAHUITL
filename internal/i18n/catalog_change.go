@@ -53,6 +53,8 @@ func init() {
 		"change.text.level.info":         e("info", "info"),
 		"change.text.level.review":       e("revisar", "review"),
 		"change.text.level.regression":   e("REGRESIÓN", "REGRESSION"),
+		"change.detail.pre_partial":      e("la captura PRE quedó parcial ({detail}): la línea base tiene huecos", "the PRE capture is partial ({detail}): the baseline has gaps", "detail"),
+		"change.detail.post_partial":     e("la captura POST quedó parcial ({detail}): lo que falta no se compara", "the POST capture is partial ({detail}): what is missing is not compared", "detail"),
 	})
 }
 

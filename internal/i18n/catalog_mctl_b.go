@@ -157,5 +157,6 @@ func init() {
 		"mctl.prefs.default": e("de fábrica", "factory default"),
 		"mctl.prefs.show": e("carpeta de salidas: {dir}{suffix}\nrotar_mb: {mb}\nrotar_min: {min}\nmax_archivos: {max}\nformato: {format}",
 			"outputs folder: {dir}{suffix}\nrotate_mb: {mb}\nrotate_min: {min}\nmax_files: {max}\nformat: {format}"),
+		"mctl.change.device_partial": e("{name}: {list} quedó parcial (comandos cortados); la comparación tiene huecos, revisa el detalle del equipo", "{name}: {list} is partial (commands were cut); the comparison has gaps, check the device detail"),
 	})
 }

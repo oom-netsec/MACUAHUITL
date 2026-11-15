@@ -168,3 +168,18 @@ func TestCompareSinSalidasReconocidas(t *testing.T) {
 		}
 	}
 }
+
+// Una captura partial sirve: se compara y el hueco se avisa (nunca es «falló»).
+func TestCompareParcial(t *testing.T) {
+	pre, post := dev(t, "pre.txt"), dev(t, "pre.txt")
+	pre.State, pre.Detail = "partial", "1 comando(s) cortado(s)"
+	d := Compare([]capture.Device{pre}, []capture.Device{post}).Devices[0]
+	if d.Verdict != Review || len(d.Findings) != 1 || d.Findings[0].Facet != "captura" || !strings.Contains(d.Findings[0].Detail, "parcial") {
+		t.Fatalf("pre partial = %+v", d)
+	}
+	pre.State, post.State, post.Detail = "completed", "partial", "1 comando(s) cortado(s)"
+	d = Compare([]capture.Device{pre}, []capture.Device{post}).Devices[0]
+	if d.Verdict != Review || len(d.Findings) != 1 || strings.Contains(d.Findings[0].Detail, "falló") || !strings.Contains(d.Findings[0].Detail, "POST") {
+		t.Fatalf("post partial = %+v", d)
+	}
+}

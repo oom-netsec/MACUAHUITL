@@ -5,6 +5,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
 // Un equipo partial no cuenta como correcto ni como fallido.
@@ -51,4 +52,16 @@ func argsKV(a i18n.Args) []any {
 		kv = append(kv, k, v)
 	}
 	return kv
+}
+
+// En el proto, los cortes solo viajan con partial; un equipo failed tras un corte va con 0.
+func TestCutOfSoloConParcial(t *testing.T) {
+	d := patrol.DeviceResult{State: "partial", CutCommands: []string{"a", "b"}, Reconnects: 2}
+	if c := cutOf(d); c.cut != 2 || c.reconnects != 2 {
+		t.Fatalf("partial: %+v", c)
+	}
+	d.State = "failed"
+	if c := cutOf(d); c.cut != 0 || c.reconnects != 0 {
+		t.Fatalf("failed: %+v", c)
+	}
 }

@@ -89,3 +89,11 @@ func detailOf(loc, es string, err error) (detail, reason string, args map[string
 	}
 	return i18n.In(loc, err), c.Reason(), c.Metadata()
 }
+
+// cutOf da los conteos de cortes que viajan en RunDevice: solo con partial; en el manifest quedan en cualquier estado.
+func cutOf(d patrol.DeviceResult) (c struct{ cut, reconnects uint32 }) {
+	if d.State == "partial" {
+		c.cut, c.reconnects = uint32(len(d.CutCommands)), uint32(d.Reconnects)
+	}
+	return c
+}

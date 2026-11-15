@@ -122,7 +122,7 @@ func TestComandoCortadoDejaElEquipoParcial(t *testing.T) {
 		t.Fatalf("res = %+v", res)
 	}
 	var c interface{ Reason() string }
-	if !errors.As(res.DetailErr, &c) || c.Reason() != "patrol.dev.partial" || res.Detail != "1 comando(s) cortado(s) y 1 reconexión(es); el primero: show running-config" {
+	if !errors.As(res.DetailErr, &c) || c.Reason() != "patrol.dev.partial" || res.Detail != "1 comando cortado y 1 reconexión; el primero: show running-config" {
 		t.Fatalf("detalle = %q %v", res.Detail, res.DetailErr)
 	}
 	if st.count("show running-config") != 1 || st.count("show ip interface brief") != 1 {
@@ -194,6 +194,9 @@ func TestReconexionFallidaFallaElEquipo(t *testing.T) {
 	res, _ := runPartial(t, e, context.Background())
 	if res.State != "failed" || !errors.Is(res.DetailErr, platform.ErrEnableFailed) {
 		t.Fatalf("res = %+v", res)
+	}
+	if res.Reconnects != 1 || len(res.CutCommands) != 1 { // el manifest conserva el rastro aunque el equipo falle
+		t.Fatalf("rastro: %+v", res)
 	}
 	if st.close != 2 {
 		t.Fatalf("cerradas = %d", st.close)

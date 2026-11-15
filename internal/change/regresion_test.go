@@ -96,6 +96,12 @@ func regCases(t *testing.T) (map[string]golden, map[string]any) {
 	add("sin-post", Compare([]capture.Device{devOf(a, "DIST-01", "completed", pre)}, nil))
 	add("solo-post", Compare(nil, []capture.Device{devOf(a, "DIST-01", "completed", post)}))
 	add("post-fallida", Compare([]capture.Device{devOf(a, "DIST-01", "completed", pre)}, []capture.Device{{Address: a, Hostname: "DIST-01", State: "failed", Detail: "timeout"}}))
+	part := func(d capture.Device) capture.Device {
+		d.State, d.Detail = "partial", "1 comando cortado y 1 reconexión; el primero: show ip route"
+		return d
+	}
+	add("pre-parcial", Compare([]capture.Device{part(devOf(a, "DIST-01", "partial", pre))}, []capture.Device{devOf(a, "DIST-01", "completed", pre)}))
+	add("post-parcial", Compare([]capture.Device{devOf(a, "DIST-01", "completed", pre)}, []capture.Device{part(devOf(a, "DIST-01", "partial", pre))}))
 	add("pre-fallida", Compare([]capture.Device{{Address: a, State: "failed", Detail: "sin ruta"}}, []capture.Device{devOf(a, "DIST-01", "completed", post)}))
 	add("vacias", Compare([]capture.Device{devOf(b, "", "completed", "nada")}, []capture.Device{devOf(b, "", "completed", "nada")}))
 	return out, ptrs

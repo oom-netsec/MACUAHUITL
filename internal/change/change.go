@@ -85,13 +85,19 @@ func Compare(pre, post []capture.Device) Report {
 		switch {
 		case !ok:
 			d.Findings = []Finding{finding("captura", Regression, "no_post")}
-		case b.State != "completed":
+		case b.State != "completed" && b.State != "partial": // partial: evidencia útil con huecos, se compara avisándolo
 			d.Findings = []Finding{finding("captura", Regression, "post_failed", "detail", b.Detail)}
-		case a.State != "completed":
+		case a.State != "completed" && a.State != "partial":
 			d.Findings = []Finding{finding("captura", Review, "pre_failed", "detail", a.Detail)}
 			fallthrough
 		default:
-			if ok && b.State == "completed" {
+			if ok && a.State == "partial" {
+				d.Findings = append(d.Findings, finding("captura", Review, "pre_partial", "detail", a.Detail))
+			}
+			if ok && b.State == "partial" {
+				d.Findings = append(d.Findings, finding("captura", Review, "post_partial", "detail", b.Detail))
+			}
+			if ok {
 				sa, sb := Parse(a.Outputs), Parse(b.Outputs)
 				sa.Platform, sb.Platform = a.Platform, b.Platform
 				fs, diff, tx := compareDevice(sa, sb)
