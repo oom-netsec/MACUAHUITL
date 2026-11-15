@@ -109,7 +109,10 @@ func inactive(text string) (string, bool) {
 // captura el valor; los que son <MASKED:...> no cuentan. Da candidatos para revisar a mano, no veredictos.
 var secretRe = regexp.MustCompile(`(?i)\b(?:password|secret|key-string|pre-shared-key|shared-secret|passphrase|community|server-key|authentication-key|wpa-psk|psk)\s+(?:[0-9]\s+)?(\S+)` +
 	`|\bmessage-digest-key\s+\d+\s+md5\s+(?:[0-9]\s+)?(\S+)|\bkey\s+[0-9]\s+(\S+)|\b(?:(?:tacacs|radius)-server\s+(?:host\s+\S+\s+)?|crypto\s+isakmp\s+)key\s+(?:[0-9]\s+)?(\S+)|\b(?:auth|priv)\s+(?:\S+\s+)?(0x[0-9a-f]+)` +
-	`|(\$[1-9][a-z]?\$\S{4,})|(BEGIN [A-Z ]*PRIVATE KEY)`)
+	`|(\$[1-9][a-z]?\$\S{4,})|(BEGIN [A-Z ]*PRIVATE KEY)` +
+	// Sin tipo de cifrado: «key X» y «token X» solo al inicio de línea (submodo; «Press any key», «Token Ring» no cuentan) y
+	// «authentication text X». «key 1» (un número solo) y «key chain …» no son un valor.
+	`|^\s*key\s+([A-Za-z_<*]\S*|\d+[^\s\d]\S*)|^\s*(?-i:token)\s+(\S+)|\bauthentication\s+text\s+(\S+)`)
 
 // labelRe: un contador o estado de show, «Etiqueta de palabras : valor» con espacio a los dos lados del «:» y una
 // etiqueta sin dígitos (así no calza «password 0 abc:123» ni «Community name: 123456», que sí pueden ser claves);
@@ -124,7 +127,7 @@ var (
 // benignFollow: palabras que siguen a la palabra clave y no son un valor («password encryption aes», «psk provisioning»,
 // «Mesh PSK Config»). «name» va aparte (maskedNear y nameCounter).
 var benignFollow = map[string]bool{"encryption": true, "provisioning": true, "config": true, "configuration": true,
-	"keychain(s)": true, "keychain": true, "keychains": true, // «MKA PSK Keychain(s) Summary» (show mka keychains)
+	"keychain(s)": true, "keychain": true, "keychains": true, "chain": true, "config-key": true, "generate": true, "zeroize": true, "exchange": true, "pubkey-chain": true, // «MKA PSK Keychain(s) Summary» (show mka keychains)
 	// prosa de show password-policy y el contador de show crypto accelerator statistics (ASAv de CML, 2026-11-14)
 	"length": true, "must": true, "policy": true, "complexity": true, "lifetime": true, "keys": true}
 

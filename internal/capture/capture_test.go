@@ -59,7 +59,7 @@ func TestReadDir(t *testing.T) {
 	w.Write(dev, 2, start.Add(time.Minute), platform.Output{Command: "show version", Text: "Version 17.9", Started: start}, false)
 	m := patrol.Manifest{Name: "cambio-pre", Devices: []patrol.DeviceResult{
 		{Target: patrol.Target{Address: "192.0.2.10"}, Round: 1, Hostname: "SW-LAB-01", State: "failed"},
-		{Target: patrol.Target{Address: "192.0.2.10"}, Round: 2, Hostname: "SW-LAB-01", State: "completed"},
+		{Target: patrol.Target{Address: "192.0.2.10"}, Round: 2, Hostname: "SW-LAB-01", Platform: "asa", State: "completed"},
 		{Target: patrol.Target{Address: "192.0.2.11"}, Round: 2, State: "failed", Detail: "auth"},
 	}}
 	b, _ := json.Marshal(m)
@@ -68,7 +68,7 @@ func TestReadDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(devs) != 2 || devs[0].Address != "192.0.2.10" || devs[0].State != "completed" || devs[0].Hostname != "SW-LAB-01" {
+	if len(devs) != 2 || devs[0].Address != "192.0.2.10" || devs[0].State != "completed" || devs[0].Hostname != "SW-LAB-01" || devs[0].Platform != "asa" {
 		t.Fatalf("devs = %+v", devs)
 	}
 	if devs[0].Outputs["show clock"] != "dos\n" || devs[0].Outputs["show version"] != "Version 17.9\n" {

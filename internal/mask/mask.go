@@ -86,7 +86,7 @@ var iosRules = []rule{
 	R("snmp-community", "", `\s*snmp-server community `+commTyp).stopAt(`\s+(?:ro|rw)(?:\s+\S+)?\s*$`),
 	R("tacacs-key", "", `\s*tacacs-server (?:host \S+ (?:.*? )?)?key `+typ),
 	R("radius-key", "", `\s*radius-server (?:host \S+ .*?)?key `+typ),
-	R("psk", "", `\s*crypto isakmp key `+typ),
+	R("psk", "", `\s*(?:crypto )?isakmp key `+typ), // ASA anterior a 8.4: «isakmp key X address …»
 	// Keyring IKEv1: la llave va tras «key», no tras address/hostname/ipv6.
 	R("psk", "", `\s*pre-shared-key (?:address|hostname|ipv6) .*? key `+typ),
 	R("psk", "", `\s*pre-shared-key (?:local |remote )?`+typ).unless(keyringLine),
@@ -105,7 +105,7 @@ var iosRules = []rule{
 	R("wifi-psk", "", `\s*psk key `+typ),
 	R("fhrp-key", "", `\s*(?:standby|vrrp)(?: \d+)? authentication (?:md5 key-string `+typ+`|text )?`).unless(fhrpNoKey),
 	R("fhrp-key", "", `\s*glbp \d+ authentication (?:md5 key-string `+typ+`|text )`),
-	R("fhrp-key", "", `\s+authentication (?:text |md5 key-string `+typ+`)`), // NX-OS: anidado bajo hsrp/vrrp/glbp
+	R("fhrp-key", "", `\s*authentication (?:text |md5 key-string `+typ+`)`), // NX-OS: anidado bajo hsrp/vrrp/glbp (o suelto en un log)
 	R("key-string", "", `\s*key-string `+typ),
 	R("tacacs-key", "", `\s*server-private \S+ (?:.*? )?key `+typ),
 	R("client-password", "", `\s*ip (?:ftp|http client) password `+typ),
@@ -193,6 +193,7 @@ var iosRules = []rule{
 	R("snmp-community", "", `\s*Community (?:name|Index|SecurityName): `),
 	full("snmp-community", `^(\s*user: )(\S+)(\s+security model: v(?:1|2c)\b.*)$`),
 	// Otras salidas de show que imprimen secretos.
+	// NX-OS en JSON/XML (en cualquier parte de la línea): ver maskStructured.
 	full("psk", `^(\s*Pre-[Ss]hared [Kk]ey(?: \(\w+\))?\s*[:=]\s*)(\S.*?)(\s*)$`),
 	full("key-string", `^(\s*[Kk]ey \d+ -- text (?:\d+ )?)("[^"]*"|\S+)(.*)$`), // show key chain
 	full("fhrp-key", `^(\s*Authentication text, string )("[^"]*"|\S+)(.*)$`),   // show standby / show glbp
@@ -420,7 +421,7 @@ func (s *Stream) maskQuoted(t string, inside bool) string {
 	}
 	out := maskLine(t, s.qblock, s.Platform, s.counts)
 	if c := t[0]; inside && (c == ' ' || c == '\t' || c >= 'a' && c <= 'z') {
-		out = maskCited(out, s.counts)
+		out = maskCitedText(out, s.counts)
 	}
 	return out
 }
@@ -589,7 +590,11 @@ func (s *Stream) TypedLoose(line string) string {
 }
 
 // archiveLog: línea de show archive log config; tras «|» va un comando de configuración.
-var archiveLog = regexp.MustCompile(`^(\s*\d+\s+\d+\s+\S+\s+\|)(.*)$`)
+// Las líneas de continuación traen solo la barra («|  key X»).
+var archiveLog = regexp.MustCompile(`^(\s*\d+\s+\d+\s+\S+\s+\||\s*\|\s)(.*)$`)
+
+// cliHistory: línea numerada de show cli history de NX-OS («  12  09:01:55  comando»; la hora puede faltar).
+var cliHistory = regexp.MustCompile(`(?i)^(\s*\d+:?\s+(?:\d\d:\d\d:\d\d\s+)?)([a-z].*)$`)
 
 // loggedCmd: mensaje de syslog (%PARSER-5-CFGLOG_LOGGEDCMD) con el comando de configuración tras «logged command:».
 var loggedCmd = regexp.MustCompile(`^(.*logged command:)(.*)$`)
@@ -606,27 +611,60 @@ var (
 
 // cmdSyslog: syslogs de ASA/FTD que citan el comando ejecutado (111008, 111009, 111010); el comando va entre comillas.
 var cmdSyslog = []*regexp.Regexp{
-	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111008: User '[^']*' executed the ')(.*)(' command\.?\s*)$`),
-	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111010: User '[^']*', running '[^']*' from IP \S+, executed ')(.*)('\s*)$`),
-	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111009: User '[^']*' executed cmd: )(.*)()$`),
+	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111008: User '.*?' executed the ')(.*)(' command\.?\s*)$`),
+	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111010: User '.*?', running '.*?' from IP \S+, executed ')(.*)('\s*)$`),
+	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111009: User '.*?' executed cmd: )(.*)()$`),
 }
-
-// citedSecret: en un comando citado por un syslog se pierde el bloque (cluster, aaa-server…): se tapa el valor tras estas palabras.
-var citedSecret = regexp.MustCompile(`(?i)((?:^|\s)(?:key|password|secret|community) (?:[0-9] )?)("[^"]*"|\S+)`)
 
 // negada: sangría y uno o más «no»/«default» (en cualquier caja: IOS acepta NO y la terminal guarda lo tecleado); el
 // resto es el comando. Se quitan todos de una pasada: «no no no …» no debe volverse cuadrático.
 var negada = regexp.MustCompile(`(?i)^(\s*(?:(?:no|default)\s+)+)(\S.*)$`)
 
+// maskLogged tapa un comando citado por un log (CFGLOG, archive log): las reglas y, como el bloque se perdió y el
+// comando puede venir abreviado, Command (que no toca una descripción ni un remark).
+func maskLogged(cmd, platform string, counts map[string]int) string {
+	out, _ := maskCommand(maskLine(cmd, "", platform, counts), counts, false)
+	return out
+}
+
+// Path enmascara una ruta «sección > línea» (la de iosconf.Node.Path): cada nivel va con su sangría para que valgan las
+// reglas de bloque («radius server R > key 7 X»). Devuelve la ruta con <MASKED:tipo> en lugar de los valores.
+func Path(platform, path string) string {
+	parts := strings.Split(path, " > ")
+	var b strings.Builder
+	for i, p := range parts {
+		b.WriteString(strings.Repeat(" ", min(i, 1)) + p + "\n")
+	}
+	m, _ := Apply(platform, b.String())
+	lines := strings.Split(strings.TrimSuffix(m, "\n"), "\n")
+	for i := range lines {
+		lines[i] = strings.TrimPrefix(lines[i], " ")
+	}
+	return strings.Join(lines, " > ")
+}
+
+// Cmd enmascara un comando suelto del que se perdió su bloque (una línea rechazada, citada en un log): las reglas más
+// los key/password/secret/token sueltos. Para quien muestra una línea sin saber de qué sección venía.
+// Si trae varias líneas, cada una se procesa por separado.
+func Cmd(platform, cmd string) string {
+	counts := map[string]int{}
+	lines := strings.Split(cmd, "\n")
+	for i, l := range lines {
+		lines[i] = maskLogged(l, platform, counts)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// maskCited tapa en un comando citado los valores tras las palabras de secreto, también abreviadas (ver Command).
 func maskCited(cmd string, counts map[string]int) string {
-	return citedSecret.ReplaceAllStringFunc(cmd, func(m string) string {
-		sm := citedSecret.FindStringSubmatch(m)
-		if strings.HasPrefix(sm[2], "<MASKED:") || isGuard(sm[2]) || strings.EqualFold(sm[2], "config-key") {
-			return m
-		}
-		counts["secret"]++
-		return sm[1] + "<MASKED:secret>"
-	})
+	out, _ := maskCommand(cmd, counts, false)
+	return out
+}
+
+// maskCitedText es maskCited para un texto entre comillas cualquiera: ahí «token X» es una palabra más.
+func maskCitedText(cmd string, counts map[string]int) string {
+	out, _ := maskCommand(cmd, counts, true)
+	return out
 }
 
 // maskLine aplica reglas hasta que ninguna cambie la línea: una línea puede traer
@@ -638,7 +676,7 @@ func maskLine(line, block, platform string, counts map[string]int) string {
 		return m[1] + maskLine(ind+m[2], block, platform, counts)[len(ind):]
 	}
 	if m := loggedCmd.FindStringSubmatch(line); m != nil {
-		return m[1] + maskLine(m[2], "", platform, counts)
+		return m[1] + maskLogged(m[2], platform, counts)
 	}
 	if strings.Contains(line, "-1110") { // filtro barato: las expresiones de cmdSyslog corren por cada línea
 		for _, re := range cmdSyslog {
@@ -647,8 +685,11 @@ func maskLine(line, block, platform string, counts map[string]int) string {
 			}
 		}
 	}
-	if m := archiveLog.FindStringSubmatch(line); m != nil {
-		return m[1] + maskLine(m[2], "", platform, counts)
+	if m := archiveLog.FindStringSubmatch(line); m != nil && !strings.HasSuffix(strings.TrimRight(line, " \t"), "|") { // una fila de tabla markdown termina en «|»
+		return m[1] + maskLogged(m[2], platform, counts)
+	}
+	if m := cliHistory.FindStringSubmatch(line); m != nil && platform == "nx-os" {
+		return m[1] + maskLogged(m[2], platform, counts)
 	}
 	if m := histCmd.FindStringSubmatch(line); m != nil {
 		return m[1] + maskCited(maskLine(m[2], "", platform, counts), counts) + m[3]
@@ -699,6 +740,7 @@ func maskLine(line, block, platform string, counts map[string]int) string {
 	if freeText.MatchString(line) {
 		return line
 	}
+	line = maskStructured(line, counts)
 	line = maskGeneric(line, counts)
 	return urlPassword.ReplaceAllStringFunc(line, func(m string) string {
 		sm := urlPassword.FindStringSubmatch(m)
@@ -708,6 +750,36 @@ func maskLine(line, block, platform string, counts map[string]int) string {
 		counts["url-password"]++
 		return sm[1] + "<MASKED:url-password>@"
 	})
+}
+
+// Campos de NX-OS (show … | json / xml) que llevan un secreto.
+const structFields = `community_name|snmp_community|community|password|passphrase|secret|shared_secret|key|key_string|keystring|pre_shared_key|secname|tacacs_key|radius_key|auth_password|priv_password`
+
+var (
+	jsonSecret = regexp.MustCompile(`(?i)("(?:` + structFields + `)"\s*:\s*")([^"]*)(")`)
+	// XML con prefijo de namespace («<nf:community_name>») y CDATA; un valor ya tapado empieza con «<» y no casa.
+	xmlSecret = regexp.MustCompile(`(?i)(<(?:[\w.-]+:)?(?:` + structFields + `)>\s*(?:<!\[CDATA\[)?)([^<\]\s][^<\]]*?)(\s*(?:\]\]>)?\s*</)`)
+)
+
+// maskStructured tapa los campos JSON y XML de secreto en cualquier parte de la línea (NX-OS imprime el JSON compacto
+// en una sola línea). shortcut: el valor en la línea siguiente al campo no se cubre (NX-OS no lo imprime así).
+func maskStructured(line string, counts map[string]int) string {
+	if !strings.ContainsAny(line, `":<`) {
+		return line
+	}
+	sub := func(re *regexp.Regexp) {
+		line = re.ReplaceAllStringFunc(line, func(m string) string {
+			sm := re.FindStringSubmatch(m)
+			if sm[2] == "" || strings.HasPrefix(sm[2], "<MASKED:") {
+				return m
+			}
+			counts["secret"]++
+			return sm[1] + "<MASKED:secret>" + sm[3]
+		})
+	}
+	sub(jsonSecret)
+	sub(xmlSecret)
+	return line
 }
 
 // wordLen: largo de la primera palabra (sin recorrer toda la línea).

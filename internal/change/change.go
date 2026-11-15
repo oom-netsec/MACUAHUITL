@@ -9,6 +9,7 @@
 package change
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
 	"sort"
@@ -17,6 +18,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 )
 
 // Level es el nivel de un hallazgo y también el semáforo del equipo (el peor de sus hallazgos).
@@ -90,7 +92,9 @@ func Compare(pre, post []capture.Device) Report {
 			fallthrough
 		default:
 			if ok && b.State == "completed" {
-				fs, diff, tx := compareDevice(Parse(a.Outputs), Parse(b.Outputs))
+				sa, sb := Parse(a.Outputs), Parse(b.Outputs)
+				sa.Platform, sb.Platform = a.Platform, b.Platform
+				fs, diff, tx := compareDevice(sa, sb)
 				d.Findings, d.ConfigDiff, d.ConfigDiffTx = append(d.Findings, fs...), diff, tx
 			}
 		}
@@ -293,7 +297,7 @@ func compareDevice(a, b Snapshot) ([]Finding, []string, []i18n.Text) {
 	var diff []string
 	var tx []i18n.Text
 	if both("config") {
-		diff = configDiff(a.Config, b.Config)
+		diff = configDiff(a.Config, b.Config, cmp.Or(b.Platform, a.Platform))
 		added, removed := 0, 0
 		for _, d := range diff {
 			if strings.HasPrefix(d, "+") {
@@ -321,8 +325,9 @@ func drop(a, b int) bool { return a > 0 && float64(b) < float64(a)*macDrop }
 // volatile: líneas que cambian solas sin que nadie toque la configuración.
 var volatile = regexp.MustCompile(`^ntp clock-period \d+$`)
 
-// configDiff compara por ruta jerárquica: reordenar secciones no cuenta como cambio.
-func configDiff(a, b *iosconf.Node) []string {
+// configDiff compara por ruta jerárquica: reordenar secciones no cuenta como cambio. Las líneas salen siempre
+// enmascaradas (aunque la evidencia venga sin máscara): el valor de un secreto cambiado no se muestra, solo que cambió.
+func configDiff(a, b *iosconf.Node, platform string) []string {
 	paths := func(n *iosconf.Node) map[string]int {
 		m := map[string]int{}
 		n.Walk(func(x *iosconf.Node) {
@@ -336,10 +341,10 @@ func configDiff(a, b *iosconf.Node) []string {
 	var out []string
 	for _, p := range keys(pa, pb) {
 		for i := pb[p]; i < pa[p]; i++ {
-			out = append(out, "- "+p)
+			out = append(out, "- "+mask.Path(platform, p))
 		}
 		for i := pa[p]; i < pb[p]; i++ {
-			out = append(out, "+ "+p)
+			out = append(out, "+ "+mask.Path(platform, p))
 		}
 	}
 	return out

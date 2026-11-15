@@ -1,10 +1,31 @@
 package syslogd
 
 import (
+	"bytes"
+	"strings"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 )
+
+// maskRaw enmascara un mensaje antes de parsearlo: lo parseado (texto, mnemónico) sale ya limpio. Un receptor no
+// sabe de qué equipo viene el mensaje: la plataforma es la genérica (reglas de IOS) y «asa» solo si el mensaje trae
+// un mnemónico %ASA/%FTD (ahí «snmp-server host IFNAME IP» tiene otra forma). No hay modo «sin enmascarar».
+func maskRaw(raw []byte) []byte {
+	platform := ""
+	if bytes.Contains(raw, []byte("%ASA-")) || bytes.Contains(raw, []byte("%FTD-")) {
+		platform = "asa"
+	}
+	out, _ := mask.Apply(platform, string(raw))
+	// Línea por línea no basta: sanitize junta las líneas y la continuación de un comando citado («…command:key\nX»)
+	// solo se reconoce unida; se vuelve a enmascarar con los saltos como espacios (lo ya tapado no cambia).
+	if strings.ContainsAny(out, "\r\n") {
+		out = strings.Join(strings.Fields(strings.NewReplacer("\r", " ", "\n", " ").Replace(out)), " ")
+		out, _ = mask.Apply(platform, out)
+	}
+	return []byte(out)
+}
 
 // API que syslogd ha tenido siempre; el código vive en ingest y lo comparten
 // los receptores de traps y flujos.
@@ -36,7 +57,7 @@ func newPipeline(c Config, w *ingest.Writer, cancel func()) *pipeline {
 	p.Pipeline = ingest.NewPipeline(ingest.PipelineConfig[item]{
 		Limits: c.Limits, Now: c.Now, Writer: w, Cancel: cancel, OnDrops: c.OnDrops, DropEvery: dropInterval,
 		Handle: func(it item) {
-			m := Parse(it.raw)
+			m := Parse(maskRaw(it.raw))
 			m.Time, m.From, m.Truncated = it.at, it.from, it.truncated
 			if c.Out != nil {
 				c.Out.Write(m.Line("texto"))

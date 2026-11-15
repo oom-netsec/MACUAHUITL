@@ -291,6 +291,25 @@ func TestSecretAtSinFalsosPositivosDelLaboratorio(t *testing.T) {
 	}
 }
 
+// Formas sin tipo de cifrado: «key X» y «token X» al inicio de línea (submodos de radius/tacacs, Umbrella) y «authentication
+// text X» (HSRP/VRRP). Los usos que no son secretos (key chain, key config-key, crypto key generate, key 1) no cuentan.
+func TestSecretAtFormasSinTipo(t *testing.T) {
+	for _, ln := range []string{" key RADLAB1", "key RADLAB2", " token UMBTOK1", "token UMBTOK2", " authentication text FHRPLAB1", "standby 1 authentication text FHRPLAB2", "  key 12ab"} {
+		if _, _, ok := secretAt(ln); !ok {
+			t.Errorf("secreto sin detectar: %q", ln)
+		}
+	}
+	for _, ln := range []string{
+		"key chain KC1", " key chain KC1", "key config-key password-encrypt", "crypto key generate rsa", "crypto key zeroize rsa", " key 1", "key 10",
+		"Press any key to continue", " key <MASKED:radius-key>", " key *****", " token <MASKED:token>", "Token Ring is not supported", " authentication text <MASKED:fhrp-key>",
+		"key exchange failed", "key-string 7 <MASKED:key-string>", "authentication md5 key-chain KC1",
+	} {
+		if kw, n, ok := secretAt(ln); ok {
+			t.Errorf("falso positivo %q: %s %d", ln, kw, n)
+		}
+	}
+}
+
 // «Función no activa» (% LLDP is not enabled, % BGP not active...) no es un error del paquete: sale en su sección y
 // el playbook no cuenta como con problemas. «% Error: Unsupported command» sí es rechazo, y un % informativo
 // (% Key pair was generated at...) no se presenta como rechazo.

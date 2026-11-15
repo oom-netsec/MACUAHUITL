@@ -7,8 +7,10 @@
 // shortcut: el prompt de contraseña se reconoce por el texto que lo precede ("Password:", "Secret:",
 // "passphrase"); un equipo que pida un secreto con otra palabra, o un secreto tecleado en un comando
 // (se enmascaran los de IOS conocidos, ver internal/mask), podría grabarse. Ampliar la lista si hace falta.
-// shortcut: las abreviaturas de IOS (`usern bob sec 0 X`) no las reconoce mask y quedan en claro; ampliar
-// las reglas de internal/mask si hace falta.
+// Las formas que IOS acepta y mask no ve (abreviaturas, doble espacio, comandos de NX-OS separados por « ; ») se
+// tapan aquí con una regla conservadora: ver maskTyped. Se prefiere tapar de más en la terminal que filtrar.
+// shortcut: la edición de línea con el cursor (Ctrl-A, Ctrl-B, Ctrl-F, flechas) no se sigue; solo Ctrl-U, Ctrl-W y
+// el retroceso. Si hace falta, seguir la posición del cursor.
 // shortcut: la salida se graba por línea completa (con el prompt a medias retenido hasta el salto o el
 // cierre); el modo del prompt solo cambia el bloque para line, tacacs y radius.
 package terminal
@@ -25,8 +27,13 @@ import (
 
 const stamp = "2006-01-02T15:04:05.000Z07:00"
 
-// secretPrompt: la última línea de la salida pide una contraseña, secreto o frase.
-var secretPrompt = regexp.MustCompile(`(?i)\b(pass(word|phrase|code)|secret)\b[^:\r\n]{0,30}:\s*$`)
+// secretPrompt: la última línea de la salida pide un secreto: termina en «:» y trae key, password, pass phrase,
+// secret, psk, token, pin o community string poco antes («New key:», «Enter TACACS+ key:», «PIN:»…). «Press any key
+// to continue:» no cuenta (anyKey).
+var (
+	secretPrompt = regexp.MustCompile(`(?i)\b(?:pass(?:word|phrase|code)|pass phrase|secret|psk|token|pin|key|community string)\b[^:\r\n]{0,30}:\s*$`)
+	anyKey       = regexp.MustCompile(`(?i)\bany key\b`)
+)
 
 var (
 	ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b.`)
@@ -67,6 +74,8 @@ type Recorder struct {
 	win     int         // líneas de salida que le quedan a la ventana
 	acc     string      // lo recibido del eco partido hasta ahora
 	cont    bool        // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
+	cfg     bool        // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
+	cfgOK   bool        // hay prompt conocido para lo que se teclea; si no, se tapa como en config
 	hidden  bool        // lo tecleado es una contraseña: no se graba
 	line    []byte      // lo tecleado en la línea actual
 	lastCR  bool
@@ -139,8 +148,11 @@ func (r *Recorder) outLine(l string) {
 		weak, pr = pr, "" // «> x», «*> 10.0.0.0/8»: parece prompt, pero lo que sigue no es el eco de nada tecleado
 	}
 	if pr != "" {
-		r.setPromptBlock(blockOfPrompt(pr))
-		echo := r.stream.Prompted(l[len(pr):], r.lastBlk)
+		r.setPrompt(pr)
+		// El eco también pasa por scrub: lo que ya se tapó al teclear se tapa en el eco aunque la línea se haya
+		// desplazado («R1(config)#$min GRP v3 auth sha X …») y las reglas no la reconozcan.
+		_, echo := maskTyped(l[len(pr):], func(x string) string { return r.stream.Prompted(x, r.lastBlk) }, isConfigPrompt(pr))
+		echo = r.scrub(echo, len(r.sent) > 0)
 		// Eco partido: se sigue tecleando, o el texto recibido es un prefijo estricto de la primera línea enviada
 		// que aún espera su eco. Un eco completo la saca de la cola; lo que no cuadra la vacía.
 		text := strings.TrimLeft(l[len(pr):], " \t") // tras el prompt va un espacio antes del eco
@@ -183,10 +195,11 @@ func (r *Recorder) outLine(l string) {
 				l, r.cont, r.acc = weak+m, len(r.line) > 0, ""
 			}
 		}
-		if !equipoMsg(l) {
-			l = r.scrub(l, len(r.sent) > 0)
-		}
+		// Primero las reglas (reconocen el comando completo) y después la red por contenido, que no entra en lo ya tapado.
 		out, keep = r.stream.Line(l)
+		if keep && !equipoMsg(l) {
+			out = r.scrub(out, len(r.sent) > 0)
+		}
 	}
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
@@ -245,17 +258,17 @@ var maskedTok = regexp.MustCompile(`<MASKED:[^>]*>`)
 // peekSecrets alimenta la red por contenido con lo que ya se detecta en una línea retenida, sin tocar
 // el estado de bloque de lo tecleado (su bloque lo da el prompt que aún no llega).
 func (r *Recorder) peekSecrets(line string) {
-	r.noteSecrets(line, r.typed.Peek(line))
+	line, m := maskTyped(line, r.typed.Peek, true) // sin prompt que lo confirme: se tapa como en config
+	r.noteSecrets(line, m)
 }
 
 // typedLine enmascara lo tecleado y guarda en memoria los valores tapados (red por contenido).
 func (r *Recorder) typedLine(line string, loose bool) string {
-	var m string
+	f := r.typed.Typed
 	if loose {
-		m = r.typed.TypedLoose(line)
-	} else {
-		m = r.typed.Typed(line)
+		f = r.typed.TypedLoose
 	}
+	line, m := maskTyped(line, f, loose || !r.cfgOK || r.cfg)
 	// Un Tab (se graba como «^I») hace que el equipo complete palabras que las reglas no ven: desde el primero se tapa todo.
 	if i := strings.Index(m, "^I"); i >= 0 {
 		m = m[:i] + "<MASKED:secret>"
@@ -283,7 +296,7 @@ func (r *Recorder) noteSecrets(line, m string) {
 			}
 			end = pos + i
 		}
-		if v := line[pos:end]; len(v) >= 2 && !strings.HasPrefix(v, "<MASKED:") && indexOf(r.secrets, v) < 0 {
+		if v := line[pos:end]; len(v) >= 4 && !strings.HasPrefix(v, "<MASKED:") && indexOf(r.secrets, v) < 0 {
 			if r.secrets = append(r.secrets, v); len(r.secrets) > secretsMax {
 				r.secrets = r.secrets[1:]
 			}
@@ -295,8 +308,20 @@ func (r *Recorder) noteSecrets(line, m string) {
 
 // scrub tapa en una línea de salida los valores tapados antes: el valor completo solo como palabra entera y
 // de 4 o más caracteres; y, mientras algún eco siga pendiente (frag), trozos de 2 o más caracteres: un sufijo
-// del valor al inicio de la línea o un prefijo al final, que es lo que deja un eco partido.
+// del valor al inicio de la línea o un prefijo al final, que es lo que deja un eco partido. Nunca entra en un
+// <MASKED:…> que ya está en la línea.
 func (r *Recorder) scrub(l string, frag bool) string {
+	var b strings.Builder
+	pos := 0
+	for _, loc := range maskedTok.FindAllStringIndex(l, -1) {
+		b.WriteString(r.scrubSeg(l[pos:loc[0]], frag, pos == 0, false) + l[loc[0]:loc[1]])
+		pos = loc[1]
+	}
+	return b.String() + r.scrubSeg(l[pos:], frag, pos == 0, true)
+}
+
+// scrubSeg: first/last dicen si el tramo toca el inicio/fin de la línea (solo ahí valen los trozos de un eco partido).
+func (r *Recorder) scrubSeg(l string, frag, first, last bool) string {
 	for _, v := range r.secrets {
 		if len(v) >= 4 {
 			l = replaceWord(l, v)
@@ -304,13 +329,13 @@ func (r *Recorder) scrub(l string, frag bool) string {
 		if !frag {
 			continue
 		}
-		for k := len(v) - 1; k >= 2; k-- {
+		for k := len(v) - 1; first && k >= 2; k-- {
 			if strings.HasPrefix(l, v[len(v)-k:]) {
 				l = "<MASKED:secret>" + l[k:]
 				break
 			}
 		}
-		for k := len(v) - 1; k >= 2; k-- {
+		for k := len(v) - 1; last && k >= 2; k-- {
 			if strings.HasSuffix(l, v[:k]) {
 				l = l[:len(l)-k] + "<MASKED:secret>"
 				break
@@ -343,6 +368,17 @@ func replaceWord(l, v string) string {
 	return out.String() + l
 }
 
+// setPrompt toma el bloque y el modo (config o no) de un prompt visto.
+func (r *Recorder) setPrompt(pr string) {
+	r.setPromptBlock(blockOfPrompt(pr))
+	r.cfg, r.cfgOK = isConfigPrompt(pr), true
+}
+
+// isConfigPrompt: el prompt es de modo config o de un submodo («R1(config-if)#», «(Cisco Controller) config>»).
+func isConfigPrompt(pr string) bool {
+	return strings.Contains(pr, "(") && !strings.HasPrefix(pr, "(") || strings.HasSuffix(strings.TrimSpace(pr), ") config>")
+}
+
 // setPromptBlock recuerda el bloque del prompt; solo si cambia reinicia el de lo tecleado (un prompt
 // viejo que llega tarde no debe borrar el bloque que abrió una línea pegada).
 func (r *Recorder) setPromptBlock(b string) {
@@ -360,8 +396,16 @@ func blockOfPrompt(p string) string {
 		return "line"
 	case strings.Contains(p, "(config-server-tacacs)"):
 		return "tacacs"
-	case strings.Contains(p, "(config-server-radius)"):
+	case strings.Contains(p, "(config-server-radius)"), strings.Contains(p, "(config-radius-server)"):
 		return "radius"
+	case strings.Contains(p, "(config-dot1x-cred"): // IOS-XE lo acorta: «(config-dot1x-creden)»
+		return "dot1x"
+	case strings.Contains(p, "(config-isakmp-group)"), strings.Contains(p, "(config-isakmp-client-group)"):
+		return "ezvpn"
+	case strings.Contains(p, "(config-profile)"), strings.Contains(p, "(config-umbrella"): // parameter-map type umbrella; otros profile tapan de más
+		return "umbrella"
+	case strings.Contains(p, "(config-username)"): // ASA: user-name X
+		return "username"
 	case strings.Contains(p, "(config-aaa-server-host)"):
 		return "aaaserver"
 	case strings.Contains(p, "(cfg-cluster)"):
@@ -381,7 +425,10 @@ func (r *Recorder) lastLine() string {
 }
 
 // asksSecret dice si la salida termina pidiendo una contraseña.
-func (r *Recorder) asksSecret() bool { return secretPrompt.MatchString(r.lastLine()) }
+func (r *Recorder) asksSecret() bool {
+	l := r.lastLine()
+	return secretPrompt.MatchString(l) && !anyKey.MatchString(l)
+}
 
 // settle decide sobre las líneas retenidas con la salida nueva: si pide un secreto, la primera era
 // la contraseña; si es el prompt normal del equipo, eran comandos. Con otra cosa sigue esperando.
@@ -421,6 +468,11 @@ func (r *Recorder) Input(p []byte) {
 		case r.hidden && c == 0x03: // Ctrl-C cancela el prompt
 			r.hidden = false
 		case r.hidden:
+		case c == 0x15: // Ctrl-U: borra la línea (lo anterior no se ejecuta)
+			r.line = r.line[:0]
+		case c == 0x17: // Ctrl-W: borra la palabra anterior
+			w := strings.TrimRight(string(r.line), " ")
+			r.line = []byte(w[:strings.LastIndexByte(w, ' ')+1])
 		case c == 0x7f || c == 0x08:
 			if n := len(r.line); n > 0 {
 				r.line = r.line[:n-1]
@@ -440,10 +492,11 @@ func (r *Recorder) flush() {
 	line, hidden, fresh := string(r.line), r.hidden, r.fresh
 	// Un prompt con letras fija el bloque siempre; uno débil («>», «*>») solo si es el prompt solo o lo que sigue es el
 	// eco (parcial, con los retrocesos aplicados) de lo tecleado.
+	r.cfgOK = false
 	if ll := applyBackspaces(r.lastLine()); promptRe.FindString(ll) != "" {
 		pr := promptRe.FindString(ll)
 		if text := strings.TrimLeft(ll[len(pr):], " \t"); !weakPrompt(pr) || text == "" || strings.HasPrefix(line, text) || r.echoOf(text) {
-			r.setPromptBlock(blockOfPrompt(pr))
+			r.setPrompt(pr)
 		}
 	}
 	// Un nuevo prompt de contraseña tiene que llegar en la salida: lo ya visto no vale para la línea siguiente.
@@ -509,4 +562,47 @@ func applyBackspaces(s string) string {
 		}
 	}
 	return string(out)
+}
+
+// maskTyped aplica base (las reglas de mask) a una línea tecleada o a su eco, con las formas que IOS acepta: espacios
+// repetidos (se juntan; reglas de mask piden uno), comandos de NX-OS separados por « ; » (cada uno por separado) y,
+// en modo config (cfg), abreviaturas y tabuladores (mask.Command). Devuelve la línea que se enmascaró (con los espacios
+// juntos, para localizar los valores tapados) y el resultado; si nada se tapó, el resultado es la línea original.
+// Command solo recibe lo que se teclea o su eco, nunca salida de un show.
+func maskTyped(s string, base func(string) string, cfg bool) (src, out string) {
+	sq := squeeze(s)
+	parts := strings.Split(sq, " ; ")
+	for i, p := range parts {
+		p = base(p)
+		if cfg {
+			p, _ = mask.Command(p)
+		}
+		parts[i] = p
+	}
+	if m := strings.Join(parts, " ; "); m != sq {
+		return sq, m
+	}
+	return s, s
+}
+
+// squeeze junta los espacios repetidos fuera de comillas (conserva la sangría).
+func squeeze(s string) string {
+	if !strings.Contains(s, "  ") {
+		return s
+	}
+	var b strings.Builder
+	q, lead := false, true
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c == '"':
+			q = !q
+		case c != ' ':
+			lead = false
+		case !q && !lead && i > 0 && s[i-1] == ' ':
+			continue
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
 }

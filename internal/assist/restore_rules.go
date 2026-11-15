@@ -11,6 +11,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 )
 
@@ -123,7 +124,8 @@ func redact(line string) string {
 		}
 	}
 	if cut < 0 {
-		return Scrub(line, nil, true)
+		// Sin su sección no se sabe si «token X» o «key X» son secretos: mask.Cmd los tapa sueltos.
+		return mask.Cmd("ios-xe", Scrub(line, nil, true))
 	}
 	return strings.TrimSpace(strings.Join(f[:cut], " ") + " " + hidden)
 }
