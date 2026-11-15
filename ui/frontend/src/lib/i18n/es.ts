@@ -427,7 +427,7 @@ export const es = {
   "credrotate.vault.none": "(ninguna)",
   "credrotate.generate": "Que el núcleo genere el secreto (solo se recupera desde la bóveda)",
   "credrotate.secret": "Secreto nuevo",
-  "credrotate.wm": "write memory es obligatorio en la rotación: sin él el equipo vuelve al hash anterior al reiniciar y la bóveda quedaría con el nuevo. Se pide al final, con confirmación; si se rechaza la ejecución no termina y se propone la reversa. La bóveda se actualiza solo después de que write memory salga con [OK], y la credencial anterior se conserva como «etiqueta (anterior)» hasta que se borre a mano.",
+  "credrotate.wm": "write memory es obligatorio en la rotación: sin él el equipo vuelve al hash anterior al reiniciar y la bóveda quedaría con el nuevo. Se pide al final, con confirmación; si se rechaza la ejecución no termina y se propone la reversa. La bóveda se actualiza solo después de que write memory salga con [OK], y la credencial anterior se conserva como «etiqueta (previous)» hasta que se borre a mano.",
 
   "security.title": "Seguridad",
   "security.tool": "Herramienta de seguridad",

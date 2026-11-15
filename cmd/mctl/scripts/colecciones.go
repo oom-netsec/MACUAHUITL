@@ -322,11 +322,11 @@ func colImport(c *cli.Env, args []string) error {
 		}
 	}
 	for _, it := range p.Collections {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", cli.T("mctl.scripts.kind_collection"), it.Collection.Id, it.Collection.Name, it.State, it.ConflictsWith)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", cli.T("mctl.scripts.kind_collection"), it.Collection.Id, it.Collection.Name, cli.StateText(it.State), it.ConflictsWith)
 		decide(it.Collection.Id, it.State, &cdec)
 	}
 	for _, it := range p.Scripts {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", cli.T("mctl.scripts.kind_script"), it.Script.Id, it.Script.Name, it.State, it.ConflictsWith)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", cli.T("mctl.scripts.kind_script"), it.Script.Id, it.Script.Name, cli.StateText(it.State), it.ConflictsWith)
 		decide(it.Script.Id, it.State, &sdec)
 	}
 	tw.Flush()

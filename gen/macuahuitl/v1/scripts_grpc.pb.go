@@ -94,7 +94,7 @@ type ScriptsServiceClient interface {
 	ImportTemplate(ctx context.Context, in *ImportTemplateRequest, opts ...grpc.CallOption) (*ImportTemplateResponse, error)
 	// Los campos del archivo (cabecera incluida) con tipo, si son obligatorios, un ejemplo y su descripción.
 	ImportFormat(ctx context.Context, in *ImportFormatRequest, opts ...grpc.CallOption) (*ImportFormatResponse, error)
-	// Copia un script de un paquete instalado a «Mis scripts» (fase 32b): ID nuevo, editable, nombre «<nombre> (copia)».
+	// Copia un script de un paquete instalado a «Mis scripts» (fase 32b): ID nuevo, editable, nombre «<nombre> (copy)».
 	CopyFromPack(ctx context.Context, in *CopyFromPackRequest, opts ...grpc.CallOption) (*CopyFromPackResponse, error)
 }
 
@@ -395,7 +395,7 @@ type ScriptsServiceServer interface {
 	ImportTemplate(context.Context, *ImportTemplateRequest) (*ImportTemplateResponse, error)
 	// Los campos del archivo (cabecera incluida) con tipo, si son obligatorios, un ejemplo y su descripción.
 	ImportFormat(context.Context, *ImportFormatRequest) (*ImportFormatResponse, error)
-	// Copia un script de un paquete instalado a «Mis scripts» (fase 32b): ID nuevo, editable, nombre «<nombre> (copia)».
+	// Copia un script de un paquete instalado a «Mis scripts» (fase 32b): ID nuevo, editable, nombre «<nombre> (copy)».
 	CopyFromPack(context.Context, *CopyFromPackRequest) (*CopyFromPackResponse, error)
 	mustEmbedUnimplementedScriptsServiceServer()
 }

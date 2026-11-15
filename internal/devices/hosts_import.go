@@ -157,7 +157,7 @@ func Apply(items []Item, dec map[string]string, guardados []Host, ahora time.Tim
 			r.Replaced++
 		case d == Renombrar:
 			x.ID = NewID()
-			x.Name = NombreLibre(x.Name, "importado", func(n string) bool { _, ok := nombres[NameKey(n)]; return ok || delArchivo[NameKey(n)] })
+			x.Name = NombreLibre(x.Name, "imported", func(n string) bool { _, ok := nombres[NameKey(n)]; return ok || delArchivo[NameKey(n)] })
 			r.Renamed++
 		default: // nuevo
 			x.ID = NewID()

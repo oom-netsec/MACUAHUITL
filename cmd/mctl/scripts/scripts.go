@@ -99,6 +99,7 @@ func list(c *cli.Env, args []string) error {
 		return errors.New("uso: mctl scripts list [TEXTO] [--tech T] [--platform P] [--tag X] [--fav] [--json]")
 	}
 	r.Text = fs.Arg(0)
+	r.Tech, r.Platform = cli.ScriptValueWire(r.Tech), cli.ScriptValueWire(r.Platform)
 	res, err := client(c).ListScripts(context.Background(), &r)
 	if err != nil {
 		return err
@@ -109,7 +110,7 @@ func list(c *cli.Env, args []string) error {
 	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, cli.T("mctl.scripts.list_header"))
 	for _, s := range res.Scripts {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.Id, star(s.Favorite), s.Name, s.Tech, s.Platform, ro(s.ReadOnly), s.Origin)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", s.Id, star(s.Favorite), s.Name, cli.ScriptValueText(s.Tech), cli.ScriptValueText(s.Platform), ro(s.ReadOnly), s.Origin)
 	}
 	return tw.Flush()
 }
@@ -137,7 +138,7 @@ func show(c *cli.Env, args []string) error {
 		idCode = "mctl.scripts.show_id_pinned"
 	}
 	fmt.Fprintf(c.Out, "%s%s\n%s\n", s.Name, map[bool]string{true: " *", false: ""}[s.Favorite],
-		cli.T(idCode, "id", s.Id, "origin", s.Origin, "tech", s.Tech, "platform", s.Platform, "mode", ro(s.ReadOnly)))
+		cli.T(idCode, "id", s.Id, "origin", s.Origin, "tech", cli.ScriptValueText(s.Tech), "platform", cli.ScriptValueText(s.Platform), "mode", ro(s.ReadOnly)))
 	if len(s.Collections) > 0 {
 		fmt.Fprintln(c.Out, cli.T("mctl.scripts.show_collections", "list", strings.Join(s.Collections, ", ")))
 	}
@@ -186,7 +187,7 @@ func add(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	r, err := client(c).SaveScript(context.Background(), &v1.SaveScriptRequest{Script: &v1.Script{Name: fs.Arg(0), Tech: f.tech, Platform: f.platform,
+	r, err := client(c).SaveScript(context.Background(), &v1.SaveScriptRequest{Script: &v1.Script{Name: fs.Arg(0), Tech: cli.ScriptValueWire(f.tech), Platform: cli.ScriptValueWire(f.platform),
 		Description: f.desc, Commands: cmds, Tags: f.tags}})
 	if err != nil {
 		return err
@@ -218,10 +219,10 @@ func edit(c *cli.Env, args []string) error {
 		s.Name = f.name
 	}
 	if set["tech"] {
-		s.Tech = f.tech
+		s.Tech = cli.ScriptValueWire(f.tech)
 	}
 	if set["platform"] {
-		s.Platform = f.platform
+		s.Platform = cli.ScriptValueWire(f.platform)
 	}
 	if set["desc"] {
 		s.Description = f.desc
@@ -363,7 +364,7 @@ func importCmd(c *cli.Env, args []string) error {
 	var req []*v1.ImportDecision
 	var missing []string
 	for _, it := range p.Items {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", it.Script.Id, it.Script.Name, it.State, it.ConflictsWith)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", it.Script.Id, it.Script.Name, cli.StateText(it.State), it.ConflictsWith)
 		if it.State != "conflicto_id" && it.State != "conflicto_nombre" {
 			if a, ok := dec[it.Script.Id]; ok {
 				req = append(req, &v1.ImportDecision{ScriptId: it.Script.Id, Action: a})
@@ -402,24 +403,24 @@ const help = `  scripts list [TEXTO] [--tech T] [--platform P] [--tag X] [--fav]
   scripts add NOMBRE --tech T --platform P [--desc D] [--tag X]... [--file F|-]
   scripts edit ID [--name N] [--tech T] [--platform P] [--desc D] [--tag X]... [--file F|-]
         (los comandos van uno por línea, de un archivo o de stdin; edit solo cambia lo que se pasa y --tag o --file reemplazan la lista entera.
-         tech: l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro; platform: ios, ios-xe, nx-os, asa, ftd, wlc-aireos, ise, cualquiera)
+         tech: l2, l3, management, security, qos, etherchannel, wireless, diagnostics, other (los nombres en español gestion, seguridad, diagnostico, otro también valen); platform: ios, ios-xe, nx-os, asa, ftd, wlc-aireos, ise, any (cualquiera también vale))
   scripts rm ID  |  scripts fav ID [--off]  |  scripts dup ID
         (borra uno tuyo, marca o quita un favorito (también en la biblioteca), o copia cualquiera como script tuyo)
   scripts copy ID
-        (copia un script de un paquete instalado, también uno oculto, a tus scripts: ID nuevo, editable, nombre «<nombre> (copia)»; quitar el paquete no la borra)
+        (copy un script de un paquete instalado, también uno oculto, a tus scripts: ID nuevo, editable, nombre «<nombre> (copy)»; quitar el paquete no la borra)
   scripts export --out RUTA [--overwrite] ID...
         (archivo JSON 0600 con la suma SHA-256 de los scripts (integridad, no autenticidad); no sobrescribe sin --overwrite; los favoritos no viajan)
   scripts import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
-        (muestra el estado de cada script: nuevo, igual, conflicto_id o conflicto_nombre; los nuevos entran solos y cada conflicto necesita una decisión, si no, no se importa nada)
+        (muestra el estado de cada script: new, same, id_conflict o name_conflict; los nuevos entran solos y cada conflicto necesita una decisión, si no, no se importa nada)
   scripts col list [--json]  |  scripts col show ID [--json]  |  scripts col add NOMBRE [--desc D]  |  scripts col edit ID [--name N] [--desc D]  |  scripts col rm ID
         (colecciones: listas ordenadas de IDs de script, también de la biblioteca, que no se copian; un script puede estar en varias y borrarlo lo quita de todas.
-         «favoritos» es la colección por defecto: no se borra ni se renombra, y scripts fav la usa)
+         La colección por defecto «favorites» (ID favoritos) no se borra ni se renombra, y scripts fav la usa)
   scripts col set ID [SCRIPT_ID...] [--add ID]... [--rm ID]... [--clear]  |  scripts col order ID...
         (set deja exactamente los SCRIPT_ID dados y en ese orden; sin ellos parte de lo que hay y aplica --rm y --add; order reordena todas las colecciones, también favoritos)
   scripts col export --out RUTA [--overwrite] ID...
   scripts col import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
         (el archivo lleva las colecciones y los scripts de usuario que referencian; los de biblioteca van por ID y los que esta biblioteca no trae se avisan y se omiten.
-         Estados: nueva, igual, fusionar (favoritos: se le agregan los que falten, nunca se reemplaza), conflicto_id y conflicto_nombre; las decisiones de colecciones y de scripts del archivo van con --decision por ID)
+         Estados: new, same, merge (favoritos: se le agregan los que falten, nunca se reemplaza), id_conflict y name_conflict; las decisiones de colecciones y de scripts del archivo van con --decision por ID)
   scripts template [--kind scripts|colecciones] [--fields]
         (imprime un archivo de ejemplo que el import acepta tal cual, o con --fields la lista de campos con su tipo, si son obligatorios, un ejemplo y su descripción. Ambos salen de las mismas reglas que validan el import. El sha256 es opcional: sin él se valida campo por campo y el import avisa)
   scripts pin [ID [--off]]  |  scripts pin --order ID...

@@ -156,7 +156,7 @@ func TestHostsExportImportDePuntaAPunta(t *testing.T) {
 
 	// lo mismo que ya está guardado: todo «igual»
 	out := must(t, "", "hosts", "import", path)
-	if strings.Count(out, "igual") != 2 || !strings.Contains(out, "0 nuevos") {
+	if strings.Count(out, "same") != 2 || !strings.Contains(out, "0 nuevos") {
 		t.Fatalf("import:\n%s", out)
 	}
 	// «Uno» difiere en la dirección:puerto igual → conflicto; sin decisión no se importa nada
@@ -165,7 +165,7 @@ func TestHostsExportImportDePuntaAPunta(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "no se importó nada") || !strings.Contains(err.Error(), "10.0.0.1:22") {
 		t.Fatalf("sin decisión: %v", err)
 	}
-	if out := must(t, "", "hosts", "import", path, "--preview"); !strings.Contains(out, "conflicto") || strings.Contains(out, "importados") {
+	if out := must(t, "", "hosts", "import", path, "--preview"); !strings.Contains(out, "conflict") || strings.Contains(out, "importados") {
 		t.Fatalf("--preview:\n%s", out)
 	}
 	must(t, "", "hosts", "import", path, "--decision", "10.0.0.1:22=replace")
@@ -182,7 +182,7 @@ func TestHostsExportImportDePuntaAPunta(t *testing.T) {
 	if out := must(t, "", "hosts", "import", path, "--decision", "10.0.0.2:22=renombrar", "--all=skip"); !strings.Contains(out, "1 renombrados") {
 		t.Fatalf("renombrar:\n%s", out)
 	}
-	if out := must(t, "", "hosts", "list"); !strings.Contains(out, "Dos (importado)") {
+	if out := must(t, "", "hosts", "list"); !strings.Contains(out, "Dos (imported)") {
 		t.Fatalf("falta el renombrado:\n%s", out)
 	}
 	// un byte cambiado da error de suma
@@ -225,7 +225,7 @@ func TestHostsCSVYErroresPorLinea(t *testing.T) {
 		"corta,10.0.0.7\n"+
 		"Uno,10.0.0.1,22,ios-xe,,,,\n"), 0o600)
 	out := must(t, "", "hosts", "import", mix, "--preview")
-	for _, want := range []string{"línea 3: address:", "línea 4: ", "nuevo", "igual", "2 filas inválidas"} {
+	for _, want := range []string{"línea 3: address:", "línea 4: ", "new", "same", "2 filas inválidas"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("falta %q en:\n%s", want, out)
 		}
@@ -257,7 +257,7 @@ func TestHostsPlantilla(t *testing.T) {
 		ruta := filepath.Join(dir, "plantilla."+f)
 		os.WriteFile(ruta, []byte(out), 0o600)
 		pv := must(t, "", "hosts", "import", ruta, "--preview")
-		if strings.Count(pv, "nuevo") != 3 || strings.Contains(pv, "inválid") || strings.Contains(pv, "conflicto") {
+		if strings.Count(pv, "new") != 3 || strings.Contains(pv, "inválid") || strings.Contains(pv, "conflict") {
 			t.Fatalf("la plantilla %s no pasa limpia:\n%s", f, pv)
 		}
 		if f == "csv" && !strings.HasPrefix(out, "\xef\xbb\xbfname,address,port,platform,folder,tags,credential_label,notes\n") {

@@ -134,7 +134,7 @@ SIGNATURE                  opcional; solo la llevan los paquetes oficiales
   - La elección se guarda por paquete y por ID y se respeta al instalar una versión nueva; un elemento nuevo de esa versión entra visible. Al quitar el paquete se borra la elección junto con sus favoritos.
 - **Copiar a «Mis scripts».**
   - Cualquier script de un paquete se copia a la colección del usuario con un ID nuevo de usuario y queda editable. Así se toma 1 script de un paquete y 3 de otro. Quitar el paquete no borra las copias.
-  - Como el nombre original sigue ocupado mientras el paquete esté instalado, la copia recibe el nombre libre `<nombre> (copia)` (`NombreLibre`).
+  - Como el nombre original sigue ocupado mientras el paquete esté instalado, la copia recibe el nombre libre `<nombre> (copy)` (`NombreLibre`).
   - Si es un script derivado, la copia lleva los comandos de `pre` más los del playbook.
 - **Paquete personal (export).** `mctl pack export` y Ajustes → Paquetes → Exportar arman un `.mpack` sin firma con los scripts del usuario que se elijan (con su tecnología, plataforma y etiquetas), sus playbooks de `<config>/playbooks` si se piden, y un README generado.
   - El usuario da `<editor>/<nombre>`, con las reglas de editores reservados.

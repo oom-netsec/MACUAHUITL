@@ -40,7 +40,7 @@ func list(c *cli.Env, args []string) error {
 	for _, t := range res.Templates {
 		if t.Tech != tech {
 			tech = t.Tech
-			fmt.Fprintf(c.Out, "\n%s\n", tech)
+			fmt.Fprintf(c.Out, "\n%s\n", cli.ScriptValueText(tech))
 		}
 		fmt.Fprintf(c.Out, "  %s: %s [%s]\n", t.Id, t.Name, strings.Join(t.Platforms, ", "))
 		for _, f := range t.Fields {

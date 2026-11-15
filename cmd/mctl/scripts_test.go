@@ -57,7 +57,7 @@ func TestScriptsListShowAddEditRmFavDup(t *testing.T) {
 	if out := must(t, "", "scripts", "list", "--fav"); strings.Contains(out, id) {
 		t.Errorf("--off:\n%s", out)
 	}
-	if out := must(t, "", "scripts", "dup", "lib-l2-stp"); !strings.Contains(out, "L2 · STP (copia)") {
+	if out := must(t, "", "scripts", "dup", "lib-l2-stp"); !strings.Contains(out, "L2 · STP (copy)") {
 		t.Errorf("dup:\n%s", out)
 	}
 	must(t, "", "scripts", "rm", id)
@@ -94,7 +94,7 @@ func TestScriptsExportImportDePuntaAPunta(t *testing.T) {
 
 	// con los mismos scripts ya guardados todo es «igual»; el de la biblioteca también (es la misma biblioteca local)
 	out = must(t, "", "scripts", "import", path)
-	if strings.Count(out, "igual") != 3 || !strings.Contains(out, "0 nuevos") {
+	if strings.Count(out, "same") != 3 || !strings.Contains(out, "0 nuevos") {
 		t.Fatalf("import:\n%s", out)
 	}
 	// ahora «Uno» difiere: conflicto_id, y sin decisión no se importa nada
@@ -103,7 +103,7 @@ func TestScriptsExportImportDePuntaAPunta(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "no se importó nada") || !strings.Contains(err.Error(), a) {
 		t.Fatalf("sin decisión: %v", err)
 	}
-	if out := must(t, "", "scripts", "import", path, "--preview"); !strings.Contains(out, "conflicto_id") || strings.Contains(out, "importados") {
+	if out := must(t, "", "scripts", "import", path, "--preview"); !strings.Contains(out, "id_conflict") || strings.Contains(out, "importados") {
 		t.Fatalf("--preview:\n%s", out)
 	}
 	if out := must(t, "", "scripts", "show", a); !strings.Contains(out, "cambió") {
@@ -252,7 +252,7 @@ func TestScriptsColeccionesExportImportDePuntaAPunta(t *testing.T) {
 	must(t, "", "scripts", "col", "export", "--out", path, "--overwrite", c)
 	// con lo mismo guardado todo es «igual»
 	out = must(t, "", "scripts", "col", "import", path)
-	if strings.Count(out, "igual") != 3 || !strings.Contains(out, "0 nuevas") {
+	if strings.Count(out, "same") != 3 || !strings.Contains(out, "0 nuevas") {
 		t.Fatalf("import igual:\n%s", out)
 	}
 	// la colección cambia y sin decisión no se importa nada
@@ -262,7 +262,7 @@ func TestScriptsColeccionesExportImportDePuntaAPunta(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "no se importó nada") || !strings.Contains(err.Error(), c) {
 		t.Fatalf("sin decisión: %v", err)
 	}
-	if out := must(t, "", "scripts", "col", "import", path, "--preview"); !strings.Contains(out, "conflicto_id") || strings.Contains(out, "importadas") {
+	if out := must(t, "", "scripts", "col", "import", path, "--preview"); !strings.Contains(out, "id_conflict") || strings.Contains(out, "importadas") {
 		t.Fatalf("--preview:\n%s", out)
 	}
 	if out := must(t, "", "scripts", "col", "show", c); !strings.Contains(out, "cambió") {
@@ -295,7 +295,7 @@ func TestScriptsColeccionesExportImportDePuntaAPunta(t *testing.T) {
 func TestScriptsTemplateSeImportaTalCual(t *testing.T) {
 	startCore(t)
 	dir := t.TempDir()
-	for _, c := range []struct{ kind, estado string }{{"scripts", "nuevo"}, {"colecciones", "nueva"}} {
+	for _, c := range []struct{ kind, estado string }{{"scripts", "new"}, {"colecciones", "new"}} {
 		out := must(t, "", "scripts", "template", "--kind", c.kind)
 		if strings.Contains(out, "sha256") || !strings.Contains(out, `"formato": "macuahuitl-`+c.kind+`"`) {
 			t.Fatalf("template %s:\n%s", c.kind, out)
@@ -307,7 +307,7 @@ func TestScriptsTemplateSeImportaTalCual(t *testing.T) {
 			args = []string{"scripts", "col", "import", path}
 		}
 		prev := must(t, "", append(args, "--preview")...)
-		if !strings.Contains(prev, "archivo sin suma de verificación") || strings.Contains(prev, "conflicto") || !strings.Contains(prev, c.estado) {
+		if !strings.Contains(prev, "archivo sin suma de verificación") || strings.Contains(prev, "conflict") || !strings.Contains(prev, c.estado) {
 			t.Errorf("%s preview:\n%s", c.kind, prev)
 		}
 		if res := must(t, "", args...); !strings.Contains(res, "importad") {
@@ -336,4 +336,42 @@ func TestScriptsTemplateSeImportaTalCual(t *testing.T) {
 			t.Errorf("%v debió fallar", args)
 		}
 	}
+}
+
+// --tech y --platform aceptan el inglés canónico y el alias en español; el cable (y el JSON) llevan el valor histórico
+// en español y el texto muestra el inglés.
+func TestScriptsTechPlatformEnInglesYAlias(t *testing.T) {
+	startCore(t)
+	add := func(name, tech, plat string) string {
+		out := must(t, "show version\n", "scripts", "add", name, "--tech", tech, "--platform", plat)
+		m := idRe.FindStringSubmatch(out)
+		if m == nil {
+			t.Fatalf("add: %q", out)
+		}
+		return m[1]
+	}
+	a := add("En inglés", "management", "any")
+	b := add("Alias", "gestion", "cualquiera")
+	for _, id := range []string{a, b} {
+		if out := must(t, "", "scripts", "show", id, "--json"); !jsonHas(out, "tech", "gestion") || !jsonHas(out, "platform", "cualquiera") {
+			t.Errorf("el JSON debe llevar el valor del cable:\n%s", out)
+		}
+		if out := must(t, "", "scripts", "show", id); !strings.Contains(out, "management") || !strings.Contains(out, "any") || strings.Contains(out, "gestion") {
+			t.Errorf("show en inglés:\n%s", out)
+		}
+	}
+	if out := must(t, "", "scripts", "list", "--tech", "management", "--platform", "any"); !strings.Contains(out, a) || !strings.Contains(out, b) || strings.Contains(out, "gestion") {
+		t.Errorf("list --tech management:\n%s", out)
+	}
+	if out := must(t, "", "scripts", "list", "--tech", "gestion"); !strings.Contains(out, a) {
+		t.Errorf("list --tech gestion:\n%s", out)
+	}
+	must(t, "", "scripts", "edit", a, "--tech", "security", "--platform", "ios")
+	if out := must(t, "", "scripts", "show", a, "--json"); !jsonHas(out, "tech", "seguridad") || !jsonHas(out, "platform", "ios") {
+		t.Errorf("edit --tech security:\n%s", out)
+	}
+}
+
+func jsonHas(out, k, v string) bool {
+	return regexp.MustCompile(`"` + k + `":\s+"` + v + `"`).MatchString(out)
 }

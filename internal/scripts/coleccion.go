@@ -255,7 +255,7 @@ func ApplyColecciones(items []ItemCol, dec map[string]string, locales []Coleccio
 			r.Replaced++
 		case d == Renombrar:
 			c.ID = NewID()
-			c.Name = NombreLibre(c.Name, "importado", func(n string) bool { _, ok := nombres[NameKey(n)]; return ok || delArchivo[NameKey(n)] })
+			c.Name = NombreLibre(c.Name, "imported", func(n string) bool { _, ok := nombres[NameKey(n)]; return ok || delArchivo[NameKey(n)] })
 			c.ScriptIDs = refs(c)
 			r.Renamed++
 		default: // nueva

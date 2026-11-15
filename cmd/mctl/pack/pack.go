@@ -34,7 +34,7 @@ const help = `  pack install <archivo.mpack> [--allow-unsigned] [--hide ITEM]...
          [a-z0-9]{1,16}, sin los reservados. Versión AAAA.MMDD.HHMMSS (hora local); licencia NOASSERTION si no das otra; los favoritos no viajan)
   pack import <archivo.mpack> [--decision ID=renombrar|omitir]... [--all=renombrar|omitir] [--preview]
         (copia un .mpack sin firma oficial a «Mis scripts» y a <config>/playbooks, editables, sin instalarlo. Muestra el estado de cada elemento:
-         nuevo, igual, conflicto_id o conflicto_nombre; cada conflicto pide decisión y nunca se sobrescribe nada. Un playbook importado conserva su ID con
+         new, same, id_conflict o name_conflict; cada conflicto pide decisión y nunca se sobrescribe nada. Un playbook importado conserva su ID con
          prefijo de editor y entra al catálogo sin reiniciar)`
 
 func origin(p *v1.PackInfo) string {
@@ -296,7 +296,7 @@ func importCmd(c *cli.Env, args []string) error {
 	var req []*v1.PackImportDecision
 	var missing []string
 	for _, it := range pv.Items {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", it.Kind, it.Id, it.Name, it.State, it.ConflictsWith)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", it.Kind, it.Id, it.Name, cli.StateText(it.State), it.ConflictsWith)
 		a, ok := dec[it.Id]
 		if !ok && (it.State == "conflicto_id" || it.State == "conflicto_nombre") {
 			if a = all; a == "" {

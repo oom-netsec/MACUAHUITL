@@ -85,7 +85,7 @@ func TestApplyDecisiones(t *testing.T) {
 	if w := byName["uno-nuevo"]; w.ID != "a" || w.Notes != "x" || !w.CreatedAt.Equal(ahora) || w.UpdatedAt.IsZero() {
 		t.Fatalf("reemplazo = %+v", w)
 	}
-	if w := byName["Dos (importado)"]; w.ID == "" || w.ID == "b" || w.Address != "10.0.0.20" {
+	if w := byName["Dos (imported)"]; w.ID == "" || w.ID == "b" || w.Address != "10.0.0.20" {
 		t.Fatalf("renombrado = %+v", w)
 	}
 	if w := byName["tres"]; len(w.ID) != 32 || w.ID == "a" {
@@ -139,16 +139,16 @@ func TestApplyRechazos(t *testing.T) {
 		t.Fatalf("mover: %+v %v", r, err)
 	}
 	// el renombrado no toma el nombre de otro host del archivo
-	entrante := []Host{h("", "dos", "10.0.0.20"), h("", "dos (importado)", "10.0.0.21")}
+	entrante := []Host{h("", "dos", "10.0.0.20"), h("", "dos (imported)", "10.0.0.21")}
 	r, err = Apply(Plan(entrante, guardados), dec("10.0.0.20:22", Renombrar), guardados, ahora)
-	if err != nil || r.Writes[0].Name != "dos (importado 2)" {
+	if err != nil || r.Writes[0].Name != "dos (imported 2)" {
 		t.Fatalf("renombrado repetido: %+v %v", r.Writes, err)
 	}
 	// el renombrado recorta la base para no pasar de 64
 	largo := h("", strings.Repeat("n", 64), "10.0.0.30")
 	g2 := append([]Host{h("z", strings.Repeat("n", 64), "10.0.0.31")}, guardados...)
 	r, err = Apply(Plan([]Host{largo}, g2), dec("10.0.0.30:22", Renombrar), g2, ahora)
-	if err != nil || len([]rune(r.Writes[0].Name)) > MaxHostName || !strings.HasSuffix(r.Writes[0].Name, "(importado)") {
+	if err != nil || len([]rune(r.Writes[0].Name)) > MaxHostName || !strings.HasSuffix(r.Writes[0].Name, "(imported)") {
 		t.Fatalf("recorte: %+v %v", r.Writes, err)
 	}
 }

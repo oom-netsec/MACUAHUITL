@@ -34,7 +34,7 @@ describe("scripts api", () => {
     await expect(f.deleteScript("lib-l2-stp")).rejects.toThrow();
     const copia = await f.duplicateScript("lib-l2-stp");
     expect(copia.origin).toBe("usuario");
-    expect(copia.name).toBe("L2 · STP (copia)");
+    expect(copia.name).toBe("L2 · STP (copy)");
     await f.setScriptFavorite("lib-l2-stp", true);
     expect((await f.listScripts({ onlyFavorites: true })).map((s) => s.id)).toEqual(["lib-l2-stp"]);
   });

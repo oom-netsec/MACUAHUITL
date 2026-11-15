@@ -168,7 +168,7 @@ func Apply(items []Item, dec map[string]string, guardados, biblioteca []Script, 
 			r.Replaced++
 		case d == Renombrar:
 			s.ID = NewID()
-			s.Name = NombreLibre(s.Name, "importado", func(n string) bool { _, ok := nombres[NameKey(n)]; return ok || delArchivo[NameKey(n)] })
+			s.Name = NombreLibre(s.Name, "imported", func(n string) bool { _, ok := nombres[NameKey(n)]; return ok || delArchivo[NameKey(n)] })
 			r.Renamed++
 		default: // nuevo
 			if IsLib(s.ID) {

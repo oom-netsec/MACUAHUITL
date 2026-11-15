@@ -120,7 +120,7 @@ func (b *Bridge) DuplicateScript(id string) (ScriptDTO, error) {
 	})
 }
 
-// CopyFromPack copia un script de un paquete instalado (también oculto) a «Mis scripts»: ID nuevo, editable, nombre «<nombre> (copia)».
+// CopyFromPack copia un script de un paquete instalado (también oculto) a «Mis scripts»: ID nuevo, editable, nombre «<nombre> (copy)».
 func (b *Bridge) CopyFromPack(id string) (ScriptDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (ScriptDTO, error) {
 		r, err := scriptsClient(c).CopyFromPack(ctx, &v1.CopyFromPackRequest{Id: id})

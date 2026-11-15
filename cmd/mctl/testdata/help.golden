@@ -3,7 +3,7 @@ usage: mctl <command>
   cred  list | add --label L --user U [--no-enable] | rm ID
   cred  backup export PATH [--overwrite] [--yes]  |  backup import PATH [--decision ID=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
         (encrypted vault backup with its own passphrase, different from the master one and at least 12 characters; the passphrase is read from the terminal or stdin, never as an argument.
-         export requires --yes: the file holds all your credentials. import shows the state of each one: nueva, igual, conflicto_etiqueta or reservada (skipped);
+         export requires --yes: the file holds all your credentials. import shows the state of each one: new, same, label_conflict or reserved (skipped);
          each conflict needs a decision per ID or label, or --all; if one is missing nothing is imported)
   job   create -f job.yaml [--param name=value]... | logintest ID | arm [--accept FINGERPRINT]... [--exclude DEVICE]... ID
         cancel ID | list | watch ID
@@ -89,7 +89,7 @@ usage: mctl <command>
         (rotates the secret of a local user on a device; --cred is the credential you connect with and must belong to ANOTHER user;
          the new secret is read from the terminal or stdin, or with --generate the core creates it (requires --update-cred); if the new session
          gets in, write memory is requested (mandatory: without it the device goes back to the previous hash on reload); only if it ends [OK],
-         --update-cred leaves the secret in the vault and the previous credential is kept as "<label> (anterior)";
+         --update-cred leaves the secret in the vault and the previous credential is kept as "<label> (previous)";
          if the new session does not get in or you reject write memory, the rollback is proposed through the original session)
   backup run -d DEVICE[:PORT]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept FINGERPRINT] [--exclude DEVICE] [--timeout 10m] [--json]
         (saves show running-config in the backups folder, outputs/respaldos/DEVICE/, with 0600; a Patrol job: read-only.
@@ -136,9 +136,9 @@ usage: mctl <command>
   ports status JOB|FOLDER [--device EQ] [--json]  |  ports status --device HOST[:PORT] --cred ID [--accept-host-key SHA256:...] [--legacy-ssh] [--json]
         (state of a switch's physical ports for the front end: from a job's evidence (show interfaces status, trunk and etherchannel summary) or live over SSH, read-only)
   devices [TEXT] [--json]
-        (devices known from Patrol jobs, the fleet, the backups and the host book, without duplicates per address; TEXT filters by address, name, platform, folder or tag)
+        (devices known from Patrol jobs, the fleet, the backups and the saved hosts, without duplicates per address; TEXT filters by address, name, platform, folder or tag)
   hosts list [TEXT] [--folder F] [--tag X] [--json]  |  hosts rm ID
-        (host book: the devices you add by hand, the «manual» source of «devices»; merged by address with what was discovered. rm does not delete the evidence)
+        (saved hosts: the devices you add by hand, the «manual» source of «devices»; merged by address with what was discovered. rm does not delete the evidence)
   hosts add NAME --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
   hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
         (A: IP or DNS name, without user, scheme or port; port 22 by default; platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc; single-level folder; up to 10 tags.
@@ -149,31 +149,31 @@ usage: mctl <command>
   hosts template --format csv|json  |  hosts template --fields
         (prints a sample file with the header and 3 valid rows, or describes each field; both come from the same table that validates the import)
   hosts import PATH [--format csv|json] [--decision ADDRESS:PORT=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
-        (an invalid row comes out as «line N: field: reason», does not block the others and counts as skipped; JSON without a sum warns. State of each valid host: nuevo, igual or conflicto (same address and port with other data: replace or skip; same name: also rename); new ones go in on their own and each conflict needs a decision, otherwise nothing is imported.
+        (an invalid row comes out as «line N: field: reason», does not block the others and counts as skipped; JSON without a sum warns. State of each valid host: new, same or conflict (same address and port with other data: replace or skip; same name: also rename); new ones go in on their own and each conflict needs a decision, otherwise nothing is imported.
          The credential label is looked up in the open vault; if it is not there, the host is left without a credential)
   scripts list [TEXT] [--tech T] [--platform P] [--tag X] [--fav] [--json]  |  scripts show ID [--json]
         (script vault: yours plus the predefined library, sorted by name; read MODE = Patrol can run it. The «lib-*» IDs belong to the library and are not edited)
   scripts add NAME --tech T --platform P [--desc D] [--tag X]... [--file F|-]
   scripts edit ID [--name N] [--tech T] [--platform P] [--desc D] [--tag X]... [--file F|-]
         (commands go one per line, from a file or stdin; edit only changes what is passed and --tag or --file replace the whole list.
-         tech: l2, l3, gestion, seguridad, qos, etherchannel, wireless, diagnostico, otro; platform: ios, ios-xe, nx-os, asa, ftd, wlc-aireos, ise, cualquiera)
+         tech: l2, l3, management, security, qos, etherchannel, wireless, diagnostics, other (the Spanish names gestion, seguridad, diagnostico, otro also work); platform: ios, ios-xe, nx-os, asa, ftd, wlc-aireos, ise, any (cualquiera also works))
   scripts rm ID  |  scripts fav ID [--off]  |  scripts dup ID
         (deletes one of yours, sets or clears a favorite (also on the library), or copies any as a script of yours)
   scripts copy ID
-        (copies a script from an installed package, also a hidden one, to your scripts: new ID, editable, name «<name> (copia)»; removing the package does not delete it)
+        (copies a script from an installed package, also a hidden one, to your scripts: new ID, editable, name «<name> (copy)»; removing the package does not delete it)
   scripts export --out PATH [--overwrite] ID...
         (0600 JSON file with the SHA-256 sum of the scripts (integrity, not authenticity); does not overwrite without --overwrite; favorites do not travel)
   scripts import PATH [--decision ID=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
-        (shows the state of each script: nuevo, igual, conflicto_id or conflicto_nombre; new ones go in on their own and each conflict needs a decision, otherwise nothing is imported)
+        (shows the state of each script: new, same, id_conflict or name_conflict; new ones go in on their own and each conflict needs a decision, otherwise nothing is imported)
   scripts col list [--json]  |  scripts col show ID [--json]  |  scripts col add NAME [--desc D]  |  scripts col edit ID [--name N] [--desc D]  |  scripts col rm ID
         (collections: ordered lists of script IDs, also from the library, which are not copied; a script can be in several and deleting it removes it from all.
-         «favoritos» is the default collection: it is not deleted or renamed, and scripts fav uses it)
+         The default collection «favorites» (ID favoritos) is not deleted or renamed, and scripts fav uses it)
   scripts col set ID [SCRIPT_ID...] [--add ID]... [--rm ID]... [--clear]  |  scripts col order ID...
         (set leaves exactly the given SCRIPT_IDs in that order; without them it starts from what is there and applies --rm and --add; order reorders all collections, also favorites)
   scripts col export --out PATH [--overwrite] ID...
   scripts col import PATH [--decision ID=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
         (the file carries the collections and the user scripts they reference; library ones go by ID and those this library does not have are reported and skipped.
-         States: nueva, igual, fusionar (favoritos: missing ones are added, never replaced), conflicto_id and conflicto_nombre; the decisions for collections and for the file's scripts go with --decision by ID)
+         States: new, same, merge (favorites: missing ones are added, never replaced), id_conflict and name_conflict; the decisions for collections and for the file's scripts go with --decision by ID)
   scripts template [--kind scripts|collections] [--fields]
         (prints a sample file that import accepts as is, or with --fields the list of fields with their type, whether they are required, an example and their description. Both come from the same rules that validate the import. The sha256 is optional: without it each field is validated and import warns)
   scripts pin [ID [--off]]  |  scripts pin --order ID...
@@ -198,6 +198,6 @@ usage: mctl <command>
          [a-z0-9]{1,16}, not a reserved one. Version YYYY.MMDD.HHMMSS (local time); license NOASSERTION unless you give another; favorites do not travel)
   pack import <file.mpack> [--decision ID=rename|skip]... [--all=rename|skip] [--preview]
         (copies a .mpack without an official signature into «My scripts» and <config>/playbooks, editable, without installing it. Shows each item's state:
-         nuevo, igual, conflicto_id or conflicto_nombre; every conflict needs a decision and nothing is ever overwritten. An imported playbook keeps its
+         new, same, id_conflict or name_conflict; every conflict needs a decision and nothing is ever overwritten. An imported playbook keeps its
          editor-prefixed ID and joins the catalog without a restart)
   --version

@@ -248,7 +248,7 @@ func (r *rotRig) vaultPw() string {
 	return string(c.Password.Bytes())
 }
 
-// previous devuelve las contraseñas de las entradas "tech (anterior)" de la bóveda.
+// previous devuelve las contraseñas de las entradas "tech (previous)" de la bóveda.
 func (r *rotRig) previous() (pws []string) {
 	r.t.Helper()
 	infos, err := r.d.V.List()
@@ -256,7 +256,7 @@ func (r *rotRig) previous() (pws []string) {
 		r.t.Fatal(err)
 	}
 	for _, i := range infos {
-		if i.Label != "tech (anterior)" {
+		if i.Label != "tech (previous)" {
 			continue
 		}
 		c, err := r.d.V.Get(i.ID)

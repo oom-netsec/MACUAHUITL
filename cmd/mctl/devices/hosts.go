@@ -262,7 +262,7 @@ func hostsImport(c *cli.Env, args []string) error {
 		if it.CredentialMissing {
 			cr += cli.T("mctl.hosts.cred_missing")
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", it.Key, it.Host.Name, it.State, it.Reason, cr)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", it.Key, it.Host.Name, cli.StateText(it.State), it.Reason, cr)
 		a, ok := dec[it.Key]
 		if !ok && it.State == "conflicto" {
 			if a = all; a == "" {
@@ -359,5 +359,5 @@ const hostsHelp = `  hosts list [TEXTO] [--folder F] [--tag X] [--json]  |  host
   hosts template --format csv|json  |  hosts template --fields
         (imprime un archivo de ejemplo con el encabezado y 3 filas válidas, o describe cada campo; ambos salen de la misma tabla que valida el import)
   hosts import RUTA [--format csv|json] [--decision DIRECCIÓN:PUERTO=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
-        (una fila inválida sale como «línea N: campo: motivo», no bloquea las demás y cuenta como omitida; el JSON sin suma avisa. Estado de cada host válido: nuevo, igual o conflicto (misma dirección y puerto con otros datos: reemplazar u omitir; mismo nombre: también renombrar); los nuevos entran solos y cada conflicto necesita una decisión, si no, no se importa nada.
+        (una fila inválida sale como «línea N: campo: motivo», no bloquea las demás y cuenta como omitida; el JSON sin suma avisa. Estado de cada host válido: new, same o conflict (misma dirección y puerto con otros datos: reemplazar u omitir; mismo nombre: también renombrar); los nuevos entran solos y cada conflicto necesita una decisión, si no, no se importa nada.
          La etiqueta de la credencial se busca en la bóveda abierta; si no está, el host queda sin credencial)`

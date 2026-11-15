@@ -98,7 +98,7 @@ func TestApplyColeccionesDecisiones(t *testing.T) {
 	if err != nil || r.Created != 1 || r.Renamed != 1 || len(r.Writes) != 2 {
 		t.Fatalf("nueva+renombrar: %+v %v", r, err)
 	}
-	if r.Writes[0].ID != nueva.ID || r.Writes[1].ID == choca.ID || r.Writes[1].Name != "a (importado)" {
+	if r.Writes[0].ID != nueva.ID || r.Writes[1].ID == choca.ID || r.Writes[1].Name != "a (imported)" {
 		t.Errorf("escrituras: %+v", r.Writes)
 	}
 	// reemplazar conserva el ID y la fecha de creación locales
@@ -157,13 +157,13 @@ func TestApplyColeccionesDosReemplazosSobreLaMisma(t *testing.T) {
 func TestApplyColeccionesRenombreEvitaNombresDelArchivoYSigma(t *testing.T) {
 	u1 := NewID()
 	a := col("aς", u1)
-	choca := col("aσ", u1)             // choca con «aς» por la clave de nombre
-	ocupa := col("aσ (importado)", u1) // el archivo ya usa el nombre al que iría el renombrado
+	choca := col("aσ", u1)            // choca con «aς» por la clave de nombre
+	ocupa := col("aσ (imported)", u1) // el archivo ya usa el nombre al que iría el renombrado
 	r, err := applyCol(t, []Coleccion{choca, ocupa}, []Coleccion{a}, map[string]string{choca.ID: Renombrar}, map[string]string{u1: u1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Writes[0].Name != "aσ (importado 2)" {
+	if r.Writes[0].Name != "aσ (imported 2)" {
 		t.Errorf("nombre = %q", r.Writes[0].Name)
 	}
 }
@@ -192,7 +192,7 @@ func TestApplyColeccionesFavoritosSeFusionaYNuncaSeReemplaza(t *testing.T) {
 		t.Error("reemplazar favoritos con otra colección debió fallar")
 	}
 	r, err = applyCol(t, []Coleccion{falsa}, []Coleccion{local}, map[string]string{falsa.ID: Renombrar}, mapa)
-	if err != nil || r.Writes[0].Name != "FAVORITOS (importado)" {
+	if err != nil || r.Writes[0].Name != "FAVORITOS (imported)" {
 		t.Fatalf("renombrar: %+v %v", r, err)
 	}
 	// fusionar con omitir

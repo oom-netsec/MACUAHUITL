@@ -213,7 +213,7 @@ func TestImportEstadosYDecisiones(t *testing.T) {
 			t.Fatal("reemplazar conserva el id")
 		}
 	}
-	if got := strings.Join(nombres, ","); got != "SW-CORE/nota privada,SW-ACC (importado)/,sw-acc/" {
+	if got := strings.Join(nombres, ","); got != "SW-CORE/nota privada,SW-ACC (imported)/,sw-acc/" {
 		t.Fatalf("hosts = %s", got)
 	}
 }
