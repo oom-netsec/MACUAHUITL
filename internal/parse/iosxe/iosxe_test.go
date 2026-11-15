@@ -617,6 +617,12 @@ func TestVRRPv3(t *testing.T) {
 		vr[1].Group != "2/IPv6" || vr[1].State != "BACKUP" || vr[1].VIP != "2001:DB8::254" {
 		t.Errorf("vrrp v3 %+v", vr)
 	}
+	// En INIT el master no se conoce: IOS-XE pone AF-UNDEFINED en esa columna.
+	vi, ok := ParseVRRP("  Interface          Grp  A-F Pri  Time Own Pre State   Master addr/Group addr\n" +
+		"  Gi2                  3 IPv4 110     0  N   Y  INIT    AF-UNDEFINED    192.0.2.254\n")
+	if !ok || len(vi) != 1 || vi[0].Group != "3/IPv4" || vi[0].State != "INIT" || vi[0].Active != "AF-UNDEFINED" || vi[0].VIP != "192.0.2.254" {
+		t.Errorf("vrrp v3 en INIT %+v", vi)
+	}
 }
 
 // Una fila de track con un Parameter de dos palabras no se descarta.
