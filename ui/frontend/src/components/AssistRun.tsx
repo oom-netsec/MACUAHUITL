@@ -234,7 +234,8 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
     core.assistListRuns().then((runs) => {
       // La engancha el módulo dueño. Una sin dueño (almacenamiento borrado, o iniciada desde mctl) la toma el primer módulo
       // que la vea y queda como su dueño: así la franja del shell lleva a él y nunca se queda sin quién la confirme o aborte.
-      const live = runs.find((r) => r.active && [moduleId, ""].includes(assistOwner(r.runId)));
+      // Primero la propia: si también hay una sin dueño, no se queda con esa y deja la suya sin vista.
+      const live = runs.find((r) => r.active && assistOwner(r.runId) === moduleId) ?? runs.find((r) => r.active && !assistOwner(r.runId));
       if (!alive || !live || runId.current) return;
       if (!assistOwner(live.runId) && moduleId) try { localStorage.setItem(assistOwnerKey(live.runId), moduleId); } catch { /* sin almacenamiento */ }
       runId.current = live.runId; lastSeq.current = 0; maxSeq.current = 0; retries.current = 0;

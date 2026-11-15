@@ -27,7 +27,8 @@ const ageNow = (r: PendingRollback) => (r.endedUnix > 0 ? Math.max(0, Math.floor
 // Plan sintético: cada equipo aplica sus líneas de reversa. No se dibuja (la entrada ya las muestra); solo alimenta al flujo asistido.
 const planOf = (r: PendingRollback): PortsPlanResult => ({ planId: r.runId, plan: { function: r.kind, devices: r.devices.map((d) => ({ device: d.device, pre: [], apply: d.rollbackLines, rollback: [], post: [] })) } });
 
-function Entry({ core, r, onStarted, onChanged, onActive }: { core: AssistRunCore; r: PendingRollback; onStarted: (r: PendingRollback) => void; onChanged: () => void; onActive: (id: string, active: boolean) => void }) {
+// gone: el núcleo ya no la lista (la reversa terminó bien y se borró): queda solo el resultado, sin acciones.
+function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: AssistRunCore; r: PendingRollback; gone: boolean; onStarted: (r: PendingRollback) => void; onChanged: () => void; onActive: (id: string, active: boolean) => void }) {
   const t = useT();
   const [applying, setApplying] = useState(false);
   const [plan, setPlan] = useState<PortsPlanResult | null>(null);
@@ -78,7 +79,7 @@ function Entry({ core, r, onStarted, onChanged, onActive }: { core: AssistRunCor
         {applying && (
           <AssistExecution core={core} plan={gated ? null : plan} start={start} onStarted={() => { setPlan(null); onStarted(r); }} onActive={report} onError={setErr} />
         )}
-        {!live && (
+        {!live && !gone && (
           <div className="actions">
             {!r.unreadable && !plan && <button className="primary" onClick={apply}>{t("pending.apply")}</button>}
             <ConfirmButton label={t("pending.discard")} confirmLabel={t("pending.discard.confirm")} onConfirm={discard} />
@@ -107,6 +108,7 @@ export function PendingRollbacks({ core, runId, onActive }: { core: AssistRunCor
   const report = useCallback((id: string, a: boolean) => setLiveIds((l) => (a ? (l.includes(id) ? l : [...l, id]) : l.filter((x) => x !== id))), []);
   const any = liveIds.length > 0;
   useEffect(() => { onActive?.(any); }, [any, onActive]);
+  useEffect(() => () => onActive?.(false), [onActive]); // al desmontarse no deja al anfitrión creyendo que hay una reversa viva
 
   const base = list ?? [];
   const shown = [...base, ...sticky.filter((s) => !base.some((b) => b.runId === s.runId))].filter((r) => !runId || r.runId === runId);
@@ -116,7 +118,7 @@ export function PendingRollbacks({ core, runId, onActive }: { core: AssistRunCor
       {locked && <Notice kind="warn">{t("pending.locked")}</Notice>}
       {err && <Notice kind="error">{err}</Notice>}
       {list && !runId && !locked && shown.length === 0 && <p className="meta">{t("pending.empty")}</p>}
-      {shown.map((r) => <Entry key={r.runId} core={core} r={r} onStarted={(x) => setSticky((s) => [...s, x])} onChanged={refresh} onActive={report} />)}
+      {shown.map((r) => <Entry key={r.runId} core={core} r={r} gone={list !== null && !locked && !base.some((b) => b.runId === r.runId)} onStarted={(x) => setSticky((s) => [...s, x])} onChanged={refresh} onActive={report} />)}
     </div>
   );
 }

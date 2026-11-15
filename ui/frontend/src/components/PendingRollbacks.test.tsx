@@ -248,3 +248,30 @@ test("el tipo se muestra legible y uno desconocido tal cual", async () => {
   expect(await screen.findByText("Tipo: Restauración de respaldo")).toBeInTheDocument();
   expect(screen.getByText("Tipo: algo-nuevo")).toBeInTheDocument();
 });
+
+test("una reversa que terminó bien (el núcleo ya no la lista) queda con su resultado, sin Aplicar ni Descartar", async () => {
+  const list = [rb()];
+  const core = fakeCore({ assistListPendingRollbacks: vi.fn(async () => [...list]) });
+  render(<PendingRollbacks core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Aplicar reversa" }));
+  await armAndStart();
+  list.length = 0; // el núcleo la borra al terminar en done
+  act(() => core.emitAssist({ runId: "rb1", kind: "state", state: "done" }));
+  act(() => core.emitAssistDone({ runId: "rb1" }));
+  await waitFor(() => expect(core.assistListPendingRollbacks).toHaveBeenCalledTimes(2));
+  expect(await screen.findByText(/el cambio se aplicó y pasó el post-check/)).toBeInTheDocument(); // terminó: su resultado sigue a la vista
+  expect(screen.getByText(/SW1/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Aplicar reversa" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Descartar" })).not.toBeInTheDocument();
+});
+
+test("al desmontarse no deja al anfitrión con el aviso de reversa viva encendido", async () => {
+  const onActive = vi.fn();
+  const core = coreWith([rb()]);
+  const { unmount } = render(<PendingRollbacks core={core} onActive={onActive} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Aplicar reversa" }));
+  await armAndStart();
+  await waitFor(() => expect(onActive).toHaveBeenLastCalledWith(true));
+  unmount();
+  expect(onActive).toHaveBeenLastCalledWith(false);
+});
