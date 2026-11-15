@@ -78,3 +78,6 @@ func (p *pipeline) submit(from string, raw []byte, truncated bool) {
 		p.Enqueue(key, item{p.Now(), from, append([]byte(nil), raw...), truncated})
 	}
 }
+
+// MaskRaw es el enmascarado que recibe cada mensaje antes de parsearlo; se expone para las pruebas de canales de mask.
+func MaskRaw(raw []byte) []byte { return maskRaw(raw) }
