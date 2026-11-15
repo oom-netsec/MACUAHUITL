@@ -97,6 +97,36 @@ func regCases(t *testing.T) (map[string]golden, map[string]any) {
 	d0, _ := Diff(bb, 1, 1, "")
 	add("diff-same", &d0, d0.Text())
 
+	// v0.6.1: EIGRP, LDP, track, GLBP, VRRP y router-id OSPF cambiado entre dos rondas
+	ospfH := "Neighbor ID     Pri   State           Dead Time   Address         Interface\n"
+	ron := func(ts string, eigrp, ldp, track, ospf, glbp, vrrp string) string {
+		return strings.Join([]string{
+			sec(ts+"1Z", "show ip eigrp neighbors", eigrp), sec(ts+"2Z", "show mpls ldp neighbor", ldp), sec(ts+"3Z", "show track brief", track),
+			sec(ts+"4Z", "show ip ospf neighbor", ospf), sec(ts+"5Z", "show glbp brief", glbp), sec(ts+"6Z", "show vrrp brief", vrrp),
+		}, "")
+	}
+	eh := "EIGRP-IPv4 Neighbors for AS(100)\nH   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq\n"
+	th := "Track Type        Instance                  Parameter        State Last Change\n"
+	gh := "Interface   Grp  Fwd Pri State    Address         Active router   Standby router\n"
+	vh := "Interface          Grp Pri Time  Own Pre State   Master addr     Group addr\n"
+	v061 := synth(t, map[string]map[string]string{"R1_10.0.0.1": {
+		"r001_20261104-100000.txt": ron("2026-11-04T10:00:0",
+			eh+"0   10.0.12.2               Et0/1                    12 00:05:23    8   100  0  15\n1   10.0.13.2               Et0/2                    11 00:00:48   20   120  0  7\n",
+			"    Peer LDP Ident: 10.255.0.2:0; Local LDP Ident 10.255.0.1:0\n        State: Oper; Msgs sent/rcvd: 28/27; Downstream\n    Peer LDP Ident: 10.255.0.3:0; Local LDP Ident 10.255.0.1:0\n        State: Oper; Msgs sent/rcvd: 14/13; Downstream\n",
+			th+"2     interface   Ethernet0/1               line-protocol    Up    1d02h\n",
+			ospfH+"10.255.0.1        1   FULL/DR         00:00:33    10.0.12.2       Ethernet0/1\n10.255.0.3        1   FULL/DR         00:00:33    10.0.13.2       Ethernet0/2\n",
+			gh+"Et0/0       50   -   110 Active   10.0.0.254      local           10.0.0.2\n",
+			vh+"Gi0/0                1 110 3570       Y  Master  10.0.0.1        10.0.0.254\n"),
+		"r002_20261104-101000.txt": ron("2026-11-04T10:10:0",
+			eh+"0   10.0.12.2               Et0/1                    12 00:15:23    8   100  0  15\n",
+			"    Peer LDP Ident: 10.255.0.2:0; Local LDP Ident 10.255.0.1:0\n        State: Oper; Msgs sent/rcvd: 28/27; Downstream\n",
+			th+"1     ip sla      1                         reachability     Down  00:01:02\n2     interface   Ethernet0/1               line-protocol    Up    1d02h\n",
+			ospfH+"10.255.0.1        1   FULL/DR         00:00:33    10.0.12.2       Ethernet0/1\n10.255.0.1        1   FULL/DR         00:00:33    10.0.13.2       Ethernet0/2\n",
+			gh+"Et0/0       50   -   110 Speak    10.0.0.254      unknown         unknown\n",
+			vh+"Gi0/0                1 110 3570       Y  Init    0.0.0.0         10.0.0.254\n"),
+	}})
+	run("v061", v061, Options{})
+
 	// topes: salida recortada y paquete leído a medias
 	restore := SetLimits(120, 1<<30)
 	trunc := synth(t, map[string]map[string]string{"R1_10.0.0.1": {"r001_20261104-100000.txt": sec("2026-11-04T10:00:01Z", "show logging", strings.Repeat("x", 400))}})

@@ -116,3 +116,16 @@ func init() {
 		"analyze.key.etherchannel":   e("{po} miembro {port}", "{po} member {port}", "po", "port"),
 	})
 }
+
+// Detecciones de la v0.6.1: router-id OSPF, track, EIGRP y LDP.
+func init() {
+	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
+	add(map[string]entry{
+		"analyze.detail.ospf_rid_changed": e("el vecino en {iface} ({address}) cambió de router-id {from} → {to}", "the neighbor on {iface} ({address}) changed router-id {from} → {to}", "iface", "address", "from", "to"),
+		"analyze.detail.ospf_rid_dup":     e("el mismo router-id aparece en {other}: posible router-id duplicado", "the same router-id appears on {other}: possible duplicate router-id", "other"),
+		"analyze.detail.vrrp_bad":         e("{key}: {state} (maestro {master})", "{key}: {state} (master {master})", "key", "state", "master"),
+		"analyze.detail.track_down":       e("track {id} ({type} {instance} {parameter}) en Down", "track {id} ({type} {instance} {parameter}) is Down", "id", "type", "instance", "parameter"),
+		"analyze.key.eigrp":               e("{address} por {iface}", "{address} on {iface}", "address", "iface"),
+		"analyze.key.ldp":                 e("{peer}", "{peer}", "peer"),
+	})
+}

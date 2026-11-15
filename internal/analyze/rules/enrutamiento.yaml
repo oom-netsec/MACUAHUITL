@@ -45,3 +45,47 @@
   title_en: "OSPF neighbor disappeared"
   explanation_en: "A neighbor seen in the previous round no longer appears."
   action_en: "Check the indicated interface and %OSPF-5-ADJCHG in the log to learn why it dropped."
+- id: ospf-router-id-cambio
+  title: Vecino OSPF cambió de router-id
+  severity: alta
+  commands: [show ip ospf neighbor]
+  check: ospf_neighbors
+  params: {mode: rid_changed}
+  explanation: El vecino de una misma interfaz y dirección apareció con otro router-id que en la ronda anterior. Si ese router-id también lo usa otro vecino, hay un router-id duplicado y las adyacencias serán inestables.
+  action: Revisa en el vecino el router-id configurado (router-id, o la mayor IP de loopback) y %OSPF-4-DUP_RTRID_NBR en el log; un router-id debe ser único en el dominio OSPF. Tras corregirlo, clear ip ospf process.
+  title_en: "OSPF neighbor changed router-id"
+  explanation_en: "The neighbor on the same interface and address showed up with a different router-id than in the previous round. If another neighbor also uses that router-id there is a duplicate router-id and the adjacencies will be unstable."
+  action_en: "Check the configured router-id on the neighbor (router-id, or the highest loopback IP) and %OSPF-4-DUP_RTRID_NBR in the log; a router-id must be unique in the OSPF domain. After fixing it, clear ip ospf process."
+- id: eigrp-vecino-perdido
+  title: Vecino EIGRP desaparecido
+  severity: alta
+  commands: [show ip eigrp neighbors]
+  check: eigrp_neighbors
+  params: {mode: lost}
+  explanation: Un vecino EIGRP visto en la ronda anterior ya no aparece en la tabla.
+  action: Revisa la interfaz indicada y %DUAL-5-NBRCHANGE en el log. Causas habituales, autenticación (key chain y su vigencia), K-values distintos, número de AS distinto, o el enlace y la interfaz caídos.
+  title_en: "EIGRP neighbor disappeared"
+  explanation_en: "An EIGRP neighbor seen in the previous round no longer appears in the table."
+  action_en: "Check the indicated interface and %DUAL-5-NBRCHANGE in the log. Usual causes are authentication (key chain and its lifetime), mismatched K-values, a different AS number, or the link and interface being down."
+- id: ldp-vecino-perdido
+  title: Vecino LDP desaparecido
+  severity: alta
+  commands: [show mpls ldp neighbor]
+  check: ldp_neighbors
+  params: {mode: lost}
+  explanation: Un Peer LDP Ident visto en la ronda anterior ya no aparece; los LSP que dependían de él se caen.
+  action: Verifica mpls ip en la interfaz hacia el vecino, que el router-id LDP (loopback) sea alcanzable por el IGP en ambos sentidos y que el transporte TCP 646 no esté filtrado. Revisa %LDP-5-NBRCHG en el log.
+  title_en: "LDP neighbor disappeared"
+  explanation_en: "A Peer LDP Ident seen in the previous round no longer appears; the LSPs that depended on it go down."
+  action_en: "Verify mpls ip on the interface toward the neighbor, that the LDP router-id (loopback) is reachable through the IGP in both directions and that TCP 646 transport is not filtered. Check %LDP-5-NBRCHG in the log."
+- id: track-caido
+  title: Objeto de seguimiento (track) en Down
+  severity: media
+  commands: [show track brief]
+  check: track
+  params: {mode: down}
+  explanation: Un objeto track está en Down. Puede estar moviendo rutas estáticas, HSRP o PBR, así que el tráfico puede estar saliendo por otro camino.
+  action: Identifica qué depende de ese track (show track, show standby, rutas estáticas con track) y revisa la causa con show ip sla statistics si es una sonda IP SLA, o el estado de la interfaz si es line-protocol.
+  title_en: "Tracked object Down"
+  explanation_en: "A track object is Down. It may be moving static routes, HSRP or PBR, so traffic may be leaving by another path."
+  action_en: "Identify what depends on that track (show track, show standby, static routes with track) and check the cause with show ip sla statistics if it is an IP SLA probe, or the interface state if it is line-protocol."

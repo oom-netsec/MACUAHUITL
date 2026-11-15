@@ -200,18 +200,21 @@ func (p *params) oneOf(k string, opts ...string) (string, error) {
 }
 
 var checks = map[string]func(*params) (checker, error){
-	"match":          checkMatch,
-	"cpu_high":       checkCPUHigh,
-	"cpu_trend":      checkCPUTrend,
-	"mem_low":        checkMemLow,
-	"mem_leak":       checkMemLeak,
-	"iface_counter":  checkIfaceCounter,
-	"uptime":         checkUptime,
-	"uptime_reset":   checkUptimeReset,
-	"stp_changes":    checkSTP,
-	"bgp_neighbors":  checkBGP,
-	"ospf_neighbors": checkOSPF,
-	"hsrp":           checkHSRP,
+	"match":           checkMatch,
+	"cpu_high":        checkCPUHigh,
+	"cpu_trend":       checkCPUTrend,
+	"mem_low":         checkMemLow,
+	"mem_leak":        checkMemLeak,
+	"iface_counter":   checkIfaceCounter,
+	"uptime":          checkUptime,
+	"uptime_reset":    checkUptimeReset,
+	"stp_changes":     checkSTP,
+	"bgp_neighbors":   checkBGP,
+	"ospf_neighbors":  checkOSPF,
+	"hsrp":            checkHSRP,
+	"eigrp_neighbors": checkEIGRP,
+	"ldp_neighbors":   checkLDP,
+	"track":           checkTrack,
 }
 
 // checkMatch busca líneas por expresión regular. Un mensaje ya reportado en una
@@ -633,7 +636,7 @@ func checkBGP(p *params) (checker, error) {
 }
 
 func checkOSPF(p *params) (checker, error) {
-	mode, err := p.oneOf("mode", "stuck", "lost")
+	mode, err := p.oneOf("mode", "stuck", "lost", "rid_changed")
 	if err != nil {
 		return nil, err
 	}
@@ -657,13 +660,33 @@ func checkOSPF(p *params) (checker, error) {
 					ev, det = append(ev, n.Line), append(det, i18n.Tx("analyze.detail.ospf_stuck", "id", n.ID, "state", n.State, "iface", n.Interface))
 				}
 			}
-			if mode == "lost" && prev != nil && prevRound == s.Round-1 {
+			if mode != "stuck" && prev != nil && prevRound == s.Round-1 {
 				for _, k := range sortedKeys(prev) {
-					if _, ok := cur[k]; !ok {
+					if _, ok := cur[k]; ok {
+						continue
+					}
+					// Misma interfaz y misma dirección con otro ID: el vecino sigue ahí, cambió de router-id.
+					nn, changed := ospfSameLink(ns, prev[k])
+					switch {
+					case mode == "lost" && !changed:
 						det = append(det, i18n.Tx("analyze.detail.ospf_lost", "round", prevRound).With("key", ospfLabel(prev[k])))
+					case mode == "rid_changed" && changed:
+						d := i18n.Tx("analyze.detail.ospf_rid_changed", "iface", nn.Interface, "address", nn.Address, "from", prev[k].ID, "to", nn.ID)
+						ev = append(ev, nn.Line)
+						// El mismo RID en dos enlaces es legítimo solo si ya estaba así; aquí el RID nuevo llegó por un cambio.
+						var otras []string
+						for _, o := range ns {
+							if o.ID == nn.ID && o.Interface != nn.Interface {
+								otras, ev = append(otras, o.Interface), append(ev, o.Line)
+							}
+						}
+						if len(otras) > 0 {
+							d = i18n.Join("; ", d, i18n.Tx("analyze.detail.ospf_rid_dup", "other", strings.Join(otras, ", ")))
+						}
+						det = append(det, d)
 					}
 				}
-				if len(det) > 0 {
+				if mode == "lost" && len(det) > 0 {
 					// La evidencia es la tabla actual: el vecino perdido es justo lo que falta en ella.
 					for _, n := range ns {
 						ev = append(ev, n.Line)
@@ -682,6 +705,108 @@ func checkOSPF(p *params) (checker, error) {
 	}, nil
 }
 
+// ospfSameLink busca en la tabla actual al vecino de la misma interfaz y dirección que old, pero con otro router-id.
+func ospfSameLink(ns []iosxe.OSPFNeighbor, old iosxe.OSPFNeighbor) (iosxe.OSPFNeighbor, bool) {
+	for _, n := range ns {
+		if n.Interface == old.Interface && n.Address == old.Address && n.ID != old.ID {
+			return n, true
+		}
+	}
+	return iosxe.OSPFNeighbor{}, false
+}
+
+// lostCheck avisa de las entradas de la tabla de la ronda inmediata anterior que ya no están.
+// La evidencia es la tabla actual (o, si quedó vacía, su primera línea con texto).
+func lostCheck[T any](parse func(string) ([]T, bool), key func(T) i18n.Text, line func(T) string) checker {
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
+		var out []hit
+		var prev map[string]T
+		prevRound := 0
+		for _, s := range series {
+			ns, ok := parse(s.Text)
+			if !ok {
+				warn(s, i18n.Tx("analyze.warn.format_no_nbrs"))
+				prev = nil
+				continue
+			}
+			cur := map[string]T{}
+			var ev []string
+			for _, n := range ns {
+				cur[key(n).In(i18n.Es)] = n
+				ev = append(ev, line(n))
+			}
+			var det []i18n.Text
+			if prev != nil && prevRound == s.Round-1 {
+				for _, k := range sortedKeys(prev) {
+					if _, ok := cur[k]; !ok {
+						det = append(det, i18n.Tx("analyze.detail.ospf_lost", "round", prevRound).With("key", key(prev[k])))
+					}
+				}
+			}
+			if len(det) > 0 {
+				if len(ev) == 0 {
+					for _, ln := range lines(s.Text) {
+						if strings.TrimSpace(ln) != "" {
+							ev = []string{strings.TrimSpace(ln)}
+							break
+						}
+					}
+				}
+				out = append(out, hit{s.Round, ev, i18n.Join("; ", det...)})
+			}
+			prev, prevRound = cur, s.Round
+		}
+		return out
+	}
+}
+
+func checkEIGRP(p *params) (checker, error) {
+	if _, err := p.oneOf("mode", "lost"); err != nil {
+		return nil, err
+	}
+	return lostCheck(iosxe.ParseEIGRP,
+		func(n iosxe.EIGRPNeighbor) i18n.Text {
+			return i18n.Tx("analyze.key.eigrp", "address", n.Address, "iface", n.Interface)
+		},
+		func(n iosxe.EIGRPNeighbor) string { return n.Line }), nil
+}
+
+func checkLDP(p *params) (checker, error) {
+	if _, err := p.oneOf("mode", "lost"); err != nil {
+		return nil, err
+	}
+	return lostCheck(iosxe.ParseLDPNeighbors,
+		func(n iosxe.LDPNeighbor) i18n.Text { return i18n.Tx("analyze.key.ldp", "peer", n.PeerID) },
+		func(n iosxe.LDPNeighbor) string { return n.Line }), nil
+}
+
+func checkTrack(p *params) (checker, error) {
+	if _, err := p.oneOf("mode", "down"); err != nil {
+		return nil, err
+	}
+	return func(series []Section, warn func(Section, i18n.Text)) []hit {
+		var out []hit
+		for _, s := range series {
+			ts, ok := iosxe.ParseTrack(s.Text)
+			if !ok {
+				warn(s, i18n.Tx("analyze.warn.format_missing", "what", "Track Type Instance Parameter State"))
+				continue
+			}
+			var ev []string
+			var det []i18n.Text
+			for _, t := range ts {
+				if t.State == "Down" {
+					ev, det = append(ev, t.Line), append(det, i18n.Tx("analyze.detail.track_down", "id", t.ID, "type", t.Type, "instance", t.Instance, "parameter", t.Parameter))
+				}
+			}
+			if len(ev) > 0 {
+				out = append(out, hit{s.Round, ev, i18n.Join("; ", det...)})
+			}
+		}
+		return out
+	}, nil
+}
+
 func firstMatch(text string, re *regexp.Regexp) string {
 	for _, ln := range lines(text) {
 		if re.MatchString(ln) {
@@ -693,6 +818,31 @@ func firstMatch(text string, re *regexp.Regexp) string {
 
 var hsrpBad = map[string]bool{"init": true, "learn": true, "speak": true}
 
+// fhrpParse elige el parser según el comando de la sección: show glbp brief, show vrrp brief o (por omisión) show standby brief.
+func fhrpParse(cmd string) (proto string, parse func(string) ([]iosxe.HSRPGroup, bool)) {
+	switch c := normCmd(cmd); {
+	case strings.HasPrefix(c, "show glbp"):
+		return "glbp", iosxe.ParseGLBP
+	case strings.HasPrefix(c, "show vrrp"):
+		return "vrrp", iosxe.ParseVRRP
+	}
+	return "hsrp", iosxe.ParseHSRP
+}
+
+// fhrpBad dice si el grupo está en un estado sin redundancia efectiva. Listen es normal en GLBP (AVF de respaldo);
+// en VRRP lo único anómalo es Init.
+func fhrpBad(proto string, g iosxe.HSRPGroup) bool {
+	st := strings.ToLower(g.State)
+	switch proto {
+	case "glbp":
+		return st == "init" || !strings.Contains(g.Group, "/") && g.Active == "unknown"
+	case "vrrp":
+		return st == "init"
+	}
+	return hsrpBad[st] || g.Active == "unknown" || g.Standby == "unknown"
+}
+
+// checkHSRP sirve también a GLBP y VRRP: el parser sale del comando de cada sección.
 func checkHSRP(p *params) (checker, error) {
 	mode, err := p.oneOf("mode", "changed", "bad")
 	if err != nil {
@@ -703,7 +853,8 @@ func checkHSRP(p *params) (checker, error) {
 		var prev map[string]string
 		prevRound := 0
 		for _, s := range series {
-			gs, ok := iosxe.ParseHSRP(s.Text)
+			proto, parse := fhrpParse(s.Command)
+			gs, ok := parse(s.Text)
 			if !ok {
 				warn(s, i18n.Tx("analyze.warn.format_no_groups"))
 				prev = nil
@@ -719,8 +870,12 @@ func checkHSRP(p *params) (checker, error) {
 					if ps, ok := prev[hsrpKey(g)]; ok && ps != g.State {
 						ev, det = append(ev, g.Line), append(det, i18n.Tx("analyze.detail.hsrp_changed", "from", ps, "to", g.State).With("key", hsrpLabel(g)))
 					}
-				case mode == "bad" && (hsrpBad[strings.ToLower(g.State)] || g.Active == "unknown" || g.Standby == "unknown"):
-					ev, det = append(ev, g.Line), append(det, i18n.Tx("analyze.detail.hsrp_bad", "state", g.State, "active", g.Active, "standby", g.Standby).With("key", hsrpLabel(g)))
+				case mode == "bad" && fhrpBad(proto, g):
+					d := i18n.Tx("analyze.detail.hsrp_bad", "state", g.State, "active", g.Active, "standby", g.Standby)
+					if proto == "vrrp" {
+						d = i18n.Tx("analyze.detail.vrrp_bad", "state", g.State, "master", g.Active)
+					}
+					ev, det = append(ev, g.Line), append(det, d.With("key", hsrpLabel(g)))
 				}
 			}
 			if len(ev) > 0 {
