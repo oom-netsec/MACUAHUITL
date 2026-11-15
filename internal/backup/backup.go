@@ -39,6 +39,9 @@ const (
 
 const stampLayout = "20060102T150405Z"
 
+// maxBump: segundos que Save recorre tras el sello pedido; sin hueco libre no guarda y da error (nunca pisa).
+const maxBump = 60
+
 // DefaultKeep es la retención por equipo y tipo cuando la petición no dice otra.
 const DefaultKeep = 30
 
@@ -168,30 +171,50 @@ func (s Store) dir(device string, create bool) (string, error) {
 	return d, nil
 }
 
-// Save guarda text. Si ese equipo, tipo y momento ya existen no lo pisa y devuelve created=false.
+// Save guarda text. Si ese equipo, tipo y momento ya existen con la misma captura (trabajo y ronda) no lo pisa y
+// devuelve created=false. Si el sello es de otra captura (dos rondas en el mismo segundo), toma el primer segundo
+// libre del minuto que sigue: el ID solo tiene segundos y la segunda ronda se perdería en silencio.
 func (s Store) Save(e Entry, text string) (Entry, bool, error) {
 	e.Device = Sanitize(e.Device)
 	if e.Kind != Running && e.Kind != Startup {
 		return e, false, i18n.New("backup.store.bad_kind", i18n.A("kind", string(e.Kind)))
 	}
 	e.At = e.At.UTC().Truncate(time.Second)
-	e.ID = e.Device + "/" + e.At.Format(stampLayout) + "-" + string(e.Kind)
 	sum := sha256.Sum256([]byte(text))
 	e.Bytes, e.SHA256 = len(text), hex.EncodeToString(sum[:])
-	e.Sig = ""
-	if len(s.Key) > 0 {
-		e.Sig = e.Sign(s.Key)
-	}
 	if _, err := s.dir(e.Device, true); err != nil {
 		return e, false, err
 	}
-	cfg := e.Path(s.Root)
-	if _, err := os.Lstat(cfg); err == nil {
-		if old, _, err := s.Get(e.ID); err == nil {
+	// Se recorre el minuto entero: la ranura de esta captura puede estar después de un hueco que dejó la retención.
+	free := time.Time{}
+	for i := range maxBump + 1 {
+		at := e.At.Add(time.Duration(i) * time.Second)
+		id := e.Device + "/" + at.Format(stampLayout) + "-" + string(e.Kind)
+		if _, err := os.Lstat(Entry{Device: e.Device, Kind: e.Kind, At: at}.Path(s.Root)); err != nil {
+			if free.IsZero() {
+				free = at
+			}
+			continue
+		}
+		old, _, err := s.Get(id)
+		if err != nil {
+			continue // ocupado por algo ilegible: no se pisa y se busca otro
+		}
+		// Misma captura, o una ficha sin trabajo (como antes del cambio): ya está guardado.
+		if old.Job == e.Job && old.Round == e.Round || old.Job == "" && i == 0 {
 			return old, false, nil
 		}
-		return e, false, nil
 	}
+	if free.IsZero() {
+		return e, false, i18n.New("backup.store.no_slot", i18n.A("id", e.Device+"/"+e.At.Format(stampLayout)+"-"+string(e.Kind)))
+	}
+	e.At = free
+	e.ID = e.Device + "/" + e.At.Format(stampLayout) + "-" + string(e.Kind)
+	e.Sig = ""
+	if len(s.Key) > 0 {
+		e.Sig = e.Sign(s.Key) // la firma cubre el ID: va después de elegir el sello
+	}
+	cfg := e.Path(s.Root)
 	meta, _ := json.Marshal(e)
 	// La ficha va primero: nunca queda un .cfg sin ella.
 	if err := writeNew(metaPath(cfg), meta, true); err != nil {

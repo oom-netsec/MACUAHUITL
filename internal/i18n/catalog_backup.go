@@ -7,6 +7,7 @@ func init() {
 	add(map[string]entry{
 		"backup.store.bad_device":   e("backup: nombre de equipo {device:q} inválido", "backup: invalid device name {device:q}", "device"),
 		"backup.store.not_dir":      e("backup: {dir} no es una carpeta de verdad (¿enlace simbólico?)", "backup: {dir} is not a real folder (a symbolic link?)", "dir"),
+		"backup.store.no_slot":      e("backup: no hay un sello libre para {id}: demasiadas rondas en el mismo minuto", "backup: no free timestamp for {id}: too many rounds in the same minute", "id"),
 		"backup.store.bad_kind":     e("backup: tipo {kind:q} inválido", "backup: invalid type {kind:q}", "kind"),
 		"backup.store.not_regular":  e("backup: {path} no es un archivo regular", "backup: {path} is not a regular file", "path"),
 		"backup.store.bad_meta":     e("ficha no válida", "invalid metadata file"),
