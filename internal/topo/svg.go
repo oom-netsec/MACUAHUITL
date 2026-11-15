@@ -37,6 +37,11 @@ func (g Graph) SVG() string {
 		if n.Collected {
 			fill = "#bfdbfe"
 		}
+		if n.Kind == KindSegment {
+			fmt.Fprintf(&sb, `<g><ellipse cx="%.1f" cy="%.1f" rx="30" ry="12" fill="#fef3c7" stroke="#b45309" stroke-dasharray="4 3"/>`, n.X, n.Y)
+			fmt.Fprintf(&sb, `<text x="%.1f" y="%.1f" text-anchor="middle" font-weight="bold" fill="#78350f">%s</text></g>`, n.X, n.Y+28, esc(n.Name))
+			continue
+		}
 		fmt.Fprintf(&sb, `<g><circle cx="%.1f" cy="%.1f" r="18" fill="%s" stroke="#1e293b"/>`, n.X, n.Y, fill)
 		fmt.Fprintf(&sb, `<text x="%.1f" y="%.1f" text-anchor="middle" font-weight="bold" fill="#0f172a">%s</text>`, n.X, n.Y+32, esc(n.Name))
 		sub := strings.TrimSpace(n.Platform + " " + n.MgmtIP)

@@ -127,3 +127,119 @@ func TestTextInIdioma(t *testing.T) {
 		}
 	}
 }
+
+// cdpDe arma un "show cdp neighbors detail" donde el equipo ve a cada vecino por lif y ellos anuncian rif.
+func cdpDe(lif, rif string, vecinos ...string) string {
+	var sb strings.Builder
+	for _, v := range vecinos {
+		sb.WriteString("-------------------------\nDevice ID: " + v + "\nPlatform: cisco IOSv,  Capabilities: Router \nInterface: " + lif + ",  Port ID (outgoing port): " + rif + "\nHoldtime : 150 sec\n\n")
+	}
+	return sb.String()
+}
+
+func labCML(orden []string) []Device {
+	var devs []Device
+	for _, n := range orden {
+		var otros []string
+		for _, o := range []string{"R1", "R2", "R3", "R4", "R5"} {
+			if o != n {
+				otros = append(otros, o)
+			}
+		}
+		out := cdpDe("Ethernet0/0", "Ethernet0/0", otros...)
+		// punto a punto R1-R2 por Et0/1
+		switch n {
+		case "R1":
+			out += cdpDe("Ethernet0/1", "Ethernet0/1", "R2")
+		case "R2":
+			out += cdpDe("Ethernet0/1", "Ethernet0/1", "R1")
+		}
+		devs = append(devs, Device{Name: n, Outputs: map[string]string{"show cdp neighbors detail": out}})
+	}
+	return devs
+}
+
+func TestSegmentoCompartido(t *testing.T) {
+	g := Build(labCML([]string{"R1", "R2", "R3", "R4", "R5"}), nil, "")
+	segs, alSeg, p2p := 0, 0, 0
+	for _, n := range g.Nodes {
+		if n.Kind == KindSegment {
+			segs++
+			if n.Collected || n.Name != "segmento compartido (5 equipos)" {
+				t.Fatalf("segmento = %+v", n)
+			}
+		}
+	}
+	for _, l := range g.Links {
+		if strings.HasPrefix(l.B, "seg:") {
+			alSeg++
+			if l.AIf != "Eth0/0" || len(l.Sources) != 1 || l.Sources[0] != "cdp" {
+				t.Fatalf("enlace al segmento = %+v", l)
+			}
+		} else {
+			p2p++
+		}
+	}
+	if segs != 1 || alSeg != 5 || p2p != 1 || len(g.Links) != 6 || len(g.Findings) != 0 {
+		t.Fatalf("segs=%d alSeg=%d p2p=%d findings=%+v\n%s", segs, alSeg, p2p, g.Findings, g.Text())
+	}
+	if !strings.Contains(g.SVG(), "<ellipse") {
+		t.Fatal("el SVG no dibuja el segmento")
+	}
+}
+
+func TestSegmentoIDEstable(t *testing.T) {
+	id := func(g Graph) string {
+		for _, n := range g.Nodes {
+			if n.Kind == KindSegment {
+				return n.ID
+			}
+		}
+		return ""
+	}
+	a := id(Build(labCML([]string{"R1", "R2", "R3", "R4", "R5"}), nil, ""))
+	b := id(Build(labCML([]string{"R5", "R3", "R1", "R4", "R2"}), nil, ""))
+	if a == "" || a != b || a != "seg:r1|Eth0/0" {
+		t.Fatalf("ids: %q %q", a, b)
+	}
+}
+
+func TestDosVecinosNoSonSegmento(t *testing.T) {
+	g := Build([]Device{
+		{Name: "R1", Outputs: map[string]string{"show cdp neighbors detail": cdpDe("Ethernet0/0", "Ethernet0/0", "R2")}},
+		{Name: "R2", Outputs: map[string]string{"show cdp neighbors detail": cdpDe("Ethernet0/0", "Ethernet0/0", "R1")}},
+	}, nil, "")
+	if len(g.Nodes) != 2 || len(g.Links) != 1 {
+		t.Fatalf("grafo = %s", g.Text())
+	}
+}
+
+// Los vecinos no se recolectaron: aun así R1 ve 3 por la misma interfaz.
+func TestSegmentoConVecinosSinRecolectar(t *testing.T) {
+	g := Build([]Device{{Name: "R1", Outputs: map[string]string{"show cdp neighbors detail": cdpDe("Ethernet0/0", "Ethernet0/0", "A", "B", "C")}}}, nil, "")
+	if len(g.Nodes) != 5 || len(g.Links) != 4 {
+		t.Fatalf("grafo = %s", g.Text())
+	}
+	if len(g.Findings) != 0 {
+		t.Fatalf("hallazgos = %+v", g.Findings)
+	}
+}
+
+func TestTextInSegmento(t *testing.T) {
+	g := Build(labCML([]string{"R1", "R2", "R3", "R4", "R5"}), nil, "")
+	es, en := g.TextIn("es"), g.TextIn("en")
+	if !strings.Contains(es, "segmento compartido (5 equipos)") || !strings.Contains(es, "miembros: ") {
+		t.Fatalf("es:\n%s", es)
+	}
+	if !strings.Contains(en, "shared segment (5 devices)") || !strings.Contains(en, "members: ") || strings.Contains(en, "segmento") || strings.Contains(en, "miembros") {
+		t.Fatalf("en:\n%s", en)
+	}
+}
+
+// Con 2 vecinos por la misma interfaz sigue habiendo enlaces punto a punto.
+func TestDosVecinosPorInterfazNoSonSegmento(t *testing.T) {
+	g := Build([]Device{{Name: "R1", Outputs: map[string]string{"show cdp neighbors detail": cdpDe("Ethernet0/0", "Ethernet0/0", "A", "B")}}}, nil, "")
+	if len(g.Nodes) != 3 || len(g.Links) != 2 {
+		t.Fatalf("grafo = %s", g.Text())
+	}
+}

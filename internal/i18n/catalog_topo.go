@@ -10,6 +10,9 @@ func init() {
 		"topo.text.findings": e("Hallazgos:", "Findings:"),
 		"topo.text.stp_root": e("root STP en {vlans}", "STP root on {vlans}", "vlans"),
 
+		"topo.segment.name": e("segmento compartido ({n} equipos)", "shared segment ({n} {n|device|devices})", "n"),
+		"topo.text.members": e("miembros: {list}", "members: {list}", "list"),
+
 		"topo.finding.one_sided":    e("{where}: solo lo ve un lado; {other} no lo reporta (CDP/LLDP apagado en el puerto, enlace unidireccional o cableado distinto)", "{where}: only one side sees it; {other} does not report it (CDP/LLDP off on the port, unidirectional link or different cabling)", "where", "other"),
 		"topo.finding.native_vlan":  e("{where}: VLAN nativa distinta ({a} vs {b})", "{where}: native VLAN mismatch ({a} vs {b})", "where", "a", "b"),
 		"topo.finding.duplex":       e("{where}: duplex distinto ({a} vs {b})", "{where}: duplex mismatch ({a} vs {b})", "where", "a", "b"),
