@@ -1749,7 +1749,7 @@ export const es = {
   "patrol.pb.other": "Otros",
   "patrol.pb.cmds": "Comandos ({n})",
   "patrol.pb.title": "Playbooks del catálogo",
-  "patrol.pb.hint": "Solo lectura: el núcleo rechaza cualquier comando que no sea show, dir, more, ping, traceroute o verify. Se pueden combinar con comandos pegados.",
+  "patrol.pb.hint": "Solo lectura: el núcleo rechaza todo lo que no sea un comando de lectura para la plataforma del equipo. Los playbooks se pueden combinar con comandos pegados.",
   "patrol.pb.unavailable": "No se pudo leer el catálogo de playbooks del núcleo; se pueden usar comandos pegados.",
   "patrol.missing.commands": "un playbook o comandos",
   "ssh.termHint": "Dentro de la terminal todas las teclas van al equipo (Tab, ?, flechas, Ctrl-C). Ctrl+Mayús+K saca el foco de la terminal; Ctrl+Mayús+C copia la selección y Ctrl+Mayús+V pega; el clic derecho copia la selección o, sin selección, pega.",

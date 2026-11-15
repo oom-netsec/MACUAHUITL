@@ -59,7 +59,7 @@ func main() {
 	})
 	// Sin marco: la UI dibuja sus propios controles y zonas de arrastre (ui/frontend/src/app).
 	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "MACUAHUITL", Width: 1280, Height: 800, MinWidth: 960, MinHeight: 640, Frameless: true,
+		Title: "MACUAHUITL", Width: bridge.WindowWidth, Height: bridge.WindowHeight, MinWidth: bridge.WindowMinWidth, MinHeight: bridge.WindowMinHeight, Frameless: true,
 		Linux: application.LinuxWindow{Icon: icon}, EnableFileDrop: true,
 	})
 	// Archivos soltados sobre una zona [data-file-drop-target]: la UI recibe las rutas y el id de la zona.
@@ -104,6 +104,23 @@ func main() {
 			d.SetDefaultButton(stay)
 			d.SetCancelButton(stay)
 			d.Show()
+		}()
+	})
+	// En una pantalla chica (1366×768) el tamaño preferido deja la barra de estado fuera: al arrancar se ajusta al 90 %
+	// del área de trabajo de la pantalla de la ventana, sin bajar del mínimo.
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		go func() {
+			s, err := win.GetScreen()
+			if err != nil || s == nil {
+				s = app.Screen.GetPrimary()
+			}
+			if s == nil {
+				return
+			}
+			if w, h := bridge.InitialSize(s.WorkArea.Width, s.WorkArea.Height); w != bridge.WindowWidth || h != bridge.WindowHeight {
+				win.SetSize(w, h)
+				win.Center()
+			}
 		}()
 	})
 	ctx, cancel := context.WithCancel(context.Background())
