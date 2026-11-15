@@ -158,16 +158,17 @@ func l2Pre(mode statusMode) func(Values) ([]string, error) {
 				pre = append(pre, showStatus(n))
 			}
 		}
-		return pre, nil
+		return append(pre, showUsersCmd), nil // para ubicar el puerto de la sesión (SessionPortReads sigue la cadena)
 	}
 }
 
 // l2PortTemplate arma la plantilla de un cambio por puerto a partir de lo que cada una decide: qué líneas lleva cada puerto.
-func l2PortTemplate(id, name string, fields []Field, fn Function, mode statusMode, notes []i18n.Text, build func(Values, l2Port) ([]l2Feature, error)) Template {
+// cuts dice qué línea de una plantilla puede cortar el acceso si cae en el puerto por donde llega la sesión: ese puerto no se cambia.
+func l2PortTemplate(id, name string, fields []Field, fn Function, mode statusMode, notes []i18n.Text, cuts func(l2Feature) bool, build func(Values, l2Port) ([]l2Feature, error)) Template {
 	fields = append([]Field{{Name: "interfaces", Label: "Puertos", Type: TypeInterfaces, Required: true,
 		Help: "Lista separada por comas o rangos como Gi1/0/1-4; solo puertos físicos."}}, fields...)
 	pre := l2Pre(mode)
-	return Template{ID: id, Tech: "l2", Name: name, Platforms: bothPlatforms, Fields: fields, Fn: fn, Pre: pre,
+	return Template{ID: id, Tech: "l2", Name: name, Platforms: bothPlatforms, Fields: fields, Fn: fn, Pre: pre, SessionPort: true,
 		Plan: func(device string, v Values, outs map[string]string) (DevicePlan, error) {
 			names, err := ParseInterfaceList(v.Str("interfaces"))
 			if err != nil {
@@ -178,11 +179,22 @@ func l2PortTemplate(id, name string, fields []Field, fn Function, mode statusMod
 				return DevicePlan{}, err
 			}
 			pre, _ := pre(v)
+			sp := sessionPorts(outs)
+			notes := slices.Clone(notes)
 			var scopes []l2Scope
 			for _, p := range caps {
 				feats, err := build(v, p)
 				if err != nil {
 					return DevicePlan{}, err
+				}
+				if slices.ContainsFunc(feats, cuts) {
+					why, warn := sp.check(p.name, uplinkOf(p))
+					if !why.Empty() {
+						return DevicePlan{}, &SnippetRefusal{Detail: why.In(i18n.Es), Why: why}
+					}
+					if !warn.Empty() {
+						notes = append(notes, warn)
+					}
 				}
 				sc := l2Scope{header: "interface " + p.name, baseCmd: showCfg(p.name), baseText: p.text, post: []string{showCfg(p.name)}, feats: feats}
 				if mode != statusNone {
@@ -842,6 +854,7 @@ func portModePlan(device string, v Values, outs map[string]string) (DevicePlan, 
 	}
 	target := ifElse(want == "factory", "dynamic auto", want)
 	notes := []i18n.Text{portModeNote}
+	sp := sessionPorts(outs)
 	var scopes []l2Scope
 	for _, p := range caps {
 		now, err := portModeNow(p, want != "access")
@@ -851,6 +864,13 @@ func portModePlan(device string, v Values, outs map[string]string) (DevicePlan, 
 		if now == target && (want != "factory" || p.cur.Mode == "") {
 			notes = append(notes, note("assist.note.port_mode_same", "port", p.name, "mode", now))
 			continue
+		}
+		why, warn := sp.check(p.name, uplinkOf(p)) // cualquier cambio de modo puede cortar el acceso por el puerto de la sesión
+		if !why.Empty() {
+			return DevicePlan{}, &SnippetRefusal{Detail: why.In(i18n.Es), Why: why}
+		}
+		if !warn.Empty() {
+			notes = append(notes, warn)
 		}
 		f := l2Feature{apply: ifElse(want == "factory", "no switchport mode", "switchport mode "+want),
 			back: ifElse(p.cur.Mode != "", "switchport mode "+p.cur.Mode, "no switchport mode")}
@@ -893,22 +913,25 @@ func l2PortTemplates() []Template {
 		}, SnippetSpeedDuplex, statusNone,
 			// Sin Expect de estado: el post-check corre en cuanto termina el apply y el enlace sigue renegociando.
 			[]i18n.Text{note("assist.note.speed_duplex")},
-			speedDuplexBuild),
+			func(l2Feature) bool { return true }, speedDuplexBuild),
 		l2PortTemplate("storm-control", "Storm-control de puertos", []Field{
 			{Name: "broadcast", Label: "Umbral de difusión (%)", Type: TypeDecimal, Min: 0, Max: 100, Help: "0.00-100.00; vacío no lo toca."},
 			{Name: "multicast", Label: "Umbral de multicast (%)", Type: TypeDecimal, Min: 0, Max: 100},
 			{Name: "unicast", Label: "Umbral de unicast (%)", Type: TypeDecimal, Min: 0, Max: 100},
 			{Name: "action", Label: "Acción al superarlo", Type: TypeChoice, Choices: []string{"shutdown", "trap"}, Help: "Vacío no la toca. shutdown y trap son independientes: se pueden tener las dos."},
-		}, SnippetStormControl, statusGuard, []i18n.Text{errdisabledNote}, stormBuild),
+		}, SnippetStormControl, statusGuard, []i18n.Text{errdisabledNote},
+			func(f l2Feature) bool { return f.apply != "storm-control action trap" }, stormBuild), // los umbrales también descartan tráfico: solo trap es inocuo
 		l2PortTemplate("portfast-bpduguard", "Portfast y BPDU guard en puertos de acceso", []Field{
 			{Name: "portfast", Label: "Portfast", Type: TypeBool, Default: "true", Help: "Solo puertos de acceso hacia equipos finales."},
 			{Name: "bpduguard", Label: "BPDU guard", Type: TypeBool, Default: "true"},
-		}, SnippetPortfast, statusGuard, []i18n.Text{errdisabledNote}, portfastBuild),
+		}, SnippetPortfast, statusGuard, []i18n.Text{errdisabledNote},
+			func(f l2Feature) bool { return strings.HasPrefix(f.apply, "spanning-tree bpduguard enable") }, portfastBuild), // portfast solo no corta
 		l2PortTemplate("port-security", "Port-security en puertos de acceso", []Field{
 			{Name: "maximum", Label: "Máximo de direcciones MAC", Type: TypeInt, Min: 1, Max: 3072, Default: "1"},
 			{Name: "violation", Label: "Acción ante violación", Type: TypeChoice, Choices: []string{"protect", "restrict", "shutdown"}, Default: "shutdown"},
 			{Name: "aging_time", Label: "Envejecimiento (minutos)", Type: TypeInt, Min: 0, Max: 1440, Help: "0 = no envejece."},
-		}, SnippetPortSecurity, statusGuard, []i18n.Text{errdisabledNote}, portSecurityBuild),
+		}, SnippetPortSecurity, statusGuard, []i18n.Text{errdisabledNote},
+			func(l2Feature) bool { return true }, portSecurityBuild),
 		{ID: "errdisable-recovery", Tech: "l2", Name: "Recuperación automática de errdisable", Platforms: bothPlatforms, Fn: SnippetErrdisable,
 			Fields: append(func() []Field {
 				var fs []Field
@@ -925,7 +948,7 @@ func l2PortTemplates() []Template {
 				{Name: "mode", Label: "Modo", Type: TypeChoice, Required: true, Choices: []string{"access", "dynamic auto", "dynamic desirable", "factory"}, Aliases: map[string]string{"fabrica": "factory"},
 					Help: "factory = no switchport mode (el valor de fábrica, dynamic auto en un Catalyst de acceso). Nunca trunk."},
 			},
-			Pre:  l2Pre(statusNone),
+			Pre: l2Pre(statusNone), SessionPort: true,
 			Plan: portModePlan},
 	}
 }

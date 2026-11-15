@@ -59,7 +59,7 @@ func cfgOnly(m map[string]string) map[string]string {
 
 func TestPortsPrePlansReadOnlyCommands(t *testing.T) {
 	pre, err := PortsPre([]string{gi1, gi2}, PortChange{Vlan: 20, Voice: 120})
-	want := []string{showCfg(gi1), showStatus(gi1), showSwitchport(gi1), showCfg(gi2), showStatus(gi2), showSwitchport(gi2), "show vlan id 20", "show vlan id 120"}
+	want := []string{showCfg(gi1), showStatus(gi1), showSwitchport(gi1), showCfg(gi2), showStatus(gi2), showSwitchport(gi2), "show vlan id 20", "show vlan id 120", showUsersCmd}
 	if err != nil || strings.Join(pre, "|") != strings.Join(want, "|") {
 		t.Fatalf("%v %v", pre, err)
 	}
@@ -79,7 +79,7 @@ func TestPortsPrePlansReadOnlyCommands(t *testing.T) {
 // Las escrituras distintas de una misma interfaz se deduplican; si Vlan y Voice son iguales, se verifica una vez.
 func TestPortsPreDedupesInterfacesAndVlans(t *testing.T) {
 	pre, err := PortsPre([]string{gi1, strings.ToLower(gi1), "Gi1/0/1", gi2}, PortChange{Vlan: 20, Voice: 20})
-	if err != nil || len(pre) != 7 || pre[0] != showCfg(gi1) || pre[3] != showCfg(gi2) || pre[6] != "show vlan id 20" {
+	if err != nil || len(pre) != 8 || pre[0] != showCfg(gi1) || pre[3] != showCfg(gi2) || pre[6] != "show vlan id 20" || pre[7] != showUsersCmd {
 		t.Fatalf("%v %v", pre, err)
 	}
 	dp, err := PortsPlan("SW1", []string{gi1, "gi1/0/1", gi2}, PortChange{Vlan: 20}, captured())
@@ -90,7 +90,7 @@ func TestPortsPreDedupesInterfacesAndVlans(t *testing.T) {
 
 func TestPortsPlanRollbackRestoresCapturedValues(t *testing.T) {
 	ch := PortChange{Vlan: 20, Voice: 120, Description: str("Telefono"), Shutdown: yes(false)}
-	dp, err := PortsPlan("SW1", []string{gi1, gi2}, ch, captured())
+	dp, err := PortsPlan("SW1", []string{gi1, gi2}, ch, with(captured(), onGi48))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestPortsPlanRollbackRestoresCapturedValues(t *testing.T) {
 	if strings.Join(dp.Rollback, "|") != strings.Join(wantRoll, "|") {
 		t.Fatalf("Rollback = %q", dp.Rollback)
 	}
-	if len(dp.Pre) != 8 || len(dp.Post) != 4 || len(dp.Expect) != 12 || len(dp.Baseline) != 2 {
+	if len(dp.Pre) != 9 || len(dp.Post) != 4 || len(dp.Expect) != 12 || len(dp.Baseline) != 2 {
 		t.Fatalf("pre=%d post=%d expect=%d base=%d", len(dp.Pre), len(dp.Post), len(dp.Expect), len(dp.Baseline))
 	}
 	if err := Validate(Plan{Function: "ports", Devices: []DevicePlan{dp}}, Ports); err != nil {

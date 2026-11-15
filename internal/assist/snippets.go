@@ -394,7 +394,11 @@ func TrunkPre(c TrunkChange) ([]string, error) {
 	if err := c.check(); err != nil {
 		return nil, err
 	}
-	return []string{showCfg(c.Interface), showSwitchport(c.Interface)}, nil
+	pre := []string{showCfg(c.Interface), showSwitchport(c.Interface)}
+	if c.Op == "remove" {
+		pre = append(pre, showUsersCmd) // para ubicar el puerto de la sesión
+	}
+	return pre, nil
 }
 
 // TrunkPlan arma el plan de un trunk. Se rechaza si la interfaz no es trunk, si es miembro de un canal o ruteada, y si el cambio
@@ -428,6 +432,11 @@ func TrunkPlan(device string, c TrunkChange, outs map[string]string) (DevicePlan
 		return DevicePlan{}, cerr("assist.err.vlan_already_allowed", "vlan", c.Vlan, "interface", c.Interface)
 	case c.Op == "remove" && !allowed:
 		return DevicePlan{}, cerr("assist.err.vlan_not_allowed", "vlan", c.Vlan, "interface", c.Interface)
+	}
+	if c.Op == "remove" {
+		if why := sessionPorts(outs).checkTrunkRemove(c.Interface, c.Vlan); !why.Empty() {
+			return DevicePlan{}, &SnippetRefusal{Detail: why.In(i18n.Es), Why: why}
+		}
 	}
 	inverse := map[string]string{"add": "remove", "remove": "add"}[c.Op]
 	line := func(op string) string { return fmt.Sprintf("switchport trunk allowed vlan %s %d", op, c.Vlan) }
@@ -596,7 +605,7 @@ func SVIPre(c SVIChange) ([]string, error) {
 	if err := c.check(); err != nil {
 		return nil, err
 	}
-	return []string{showCfg("Vlan" + ntoa(c.VlanID)), showIPBrief}, nil
+	return []string{showCfg("Vlan" + ntoa(c.VlanID)), showIPBrief, showUsersCmd}, nil
 }
 
 // SVIPlan arma el plan. La reversa es `no interface VlanN` solo si la SVI no existía, y eso se confirma con dos comandos
@@ -635,6 +644,12 @@ func SVIPlan(device string, c SVIChange, outs map[string]string) (DevicePlan, er
 		return DevicePlan{}, refuseSnippet("assist.refused.la_configuracion_y_show_ip", "name", name, "device", device)
 	case exists && (cur.L3 || cur.Routed):
 		return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_direccion_ip_o", "name", name)
+	}
+	// Una SVI ya con IP se rechaza arriba, así que aquí la dirección es nueva: su subred no puede contener al origen de la sesión.
+	_, ones, _ := parseMask(c.Mask)
+	subnet, _ := netip.MustParseAddr(c.Address).Prefix(ones)
+	if err := coversSession(device, subnet, outs); err != nil {
+		return DevicePlan{}, err
 	}
 	dp := DevicePlan{Device: device, Pre: pre, Post: []string{showCfg(name)}, Baseline: map[string]string{showCfg(name): text}}
 	dp.Apply = []string{"interface " + name}

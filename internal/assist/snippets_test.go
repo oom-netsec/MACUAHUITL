@@ -505,7 +505,7 @@ func TestSnippetTrunkPlanShapeMustBeInverse(t *testing.T) {
 }
 
 func TestTrunkPlanAddAndRemoveWithInverseRollback(t *testing.T) {
-	outs := trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk", "switchport trunk allowed vlan 10,20"), swTrunk)
+	outs := with(trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk", "switchport trunk allowed vlan 10,20"), swTrunk), onGi48)
 	dp, err := TrunkPlan("SW1", TrunkChange{Interface: gi1, Op: "add", Vlan: 30}, outs)
 	if err != nil {
 		t.Fatal(err)
@@ -534,7 +534,7 @@ func TestTrunkPlanAddAndRemoveWithInverseRollback(t *testing.T) {
 		t.Error("remove de una VLAN que no está permitida")
 	}
 	// Con la lista en "todas" (sin línea) add no cambia nada y remove sí.
-	all := trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk"), swTrunk)
+	all := with(trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk"), swTrunk), onGi48)
 	if _, err := TrunkPlan("SW1", TrunkChange{Interface: gi1, Op: "add", Vlan: 10}, all); err == nil {
 		t.Error("add con todas las VLAN permitidas")
 	}
@@ -549,7 +549,7 @@ func TestTrunkPlanAddAndRemoveWithInverseRollback(t *testing.T) {
 }
 
 func TestTrunkPlanNeverEmitsBareAllowedVlan(t *testing.T) {
-	outs := trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk", "switchport trunk allowed vlan 10,20"), swTrunk)
+	outs := with(trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk", "switchport trunk allowed vlan 10,20"), swTrunk), onGi48)
 	for _, op := range []string{"add", "remove"} {
 		for _, v := range []int{10, 30} {
 			dp, err := TrunkPlan("SW1", TrunkChange{Interface: gi1, Op: op, Vlan: v}, outs)
@@ -576,7 +576,7 @@ func TestTrunkPlanRejectsInterfaceThatIsNotTrunk(t *testing.T) {
 		}
 	}
 	// Un trunk negociado (el modo administrativo dice trunk aunque la configuración no lo fije) sí es trunk.
-	neg := trunkOuts(gi1, trunkCfg(gi1, "description x"), swTrunk)
+	neg := with(trunkOuts(gi1, trunkCfg(gi1, "description x"), swTrunk), onGi48)
 	if _, err := TrunkPlan("SW1", TrunkChange{Interface: gi1, Op: "remove", Vlan: 30}, neg); errors.Is(err, ErrSnippetRefused) {
 		t.Errorf("modo administrativo trunk: %v", err)
 	}
@@ -603,7 +603,7 @@ func TestTrunkPlanRejectsInterfaceThatIsNotTrunk(t *testing.T) {
 const ipBriefHead = "Interface              IP-Address      OK? Method Status                Protocol\n"
 
 func sviOuts(cfgVlan string, brief string) map[string]string {
-	return map[string]string{showCfg("Vlan99"): cfgVlan, "show ip interface brief": ipBriefHead + brief}
+	return map[string]string{showCfg("Vlan99"): cfgVlan, "show ip interface brief": ipBriefHead + brief, showUsersCmd: sviUsers}
 }
 
 const noIface = "                 ^\n% Invalid input detected at '^' marker.\n"

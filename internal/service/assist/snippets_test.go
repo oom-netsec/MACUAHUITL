@@ -103,7 +103,7 @@ func TestSnippetTrunkAddRemoveEndToEndNeverBare(t *testing.T) {
 	r := newRig(t, simulator.Config{Interfaces: map[string][]string{
 		up:  {"switchport mode trunk", "switchport trunk allowed vlan 10,20"},
 		gi1: {"switchport mode access", "switchport access vlan 10"},
-	}})
+	}, Commands: sessionCmds("Gi1/0/47", nil)}) // la sesión entra por otro puerto
 	res, err := r.snippet(trunkReq(up, "add", 30))
 	if err != nil {
 		t.Fatal(err)
@@ -139,13 +139,42 @@ func TestSnippetTrunkAddRemoveEndToEndNeverBare(t *testing.T) {
 	}
 }
 
+// El plan de un trunk pide en rondas las lecturas que ubican el puerto de la sesión (ARP, ruta, tabla MAC) y rechaza quitar la VLAN que la lleva.
+func TestSnippetTrunkRemoveRefusesTheSessionPort(t *testing.T) {
+	const up = "GigabitEthernet1/0/48"
+	mk := func(sessionPort string) *rig {
+		return newRig(t, simulator.Config{Interfaces: map[string][]string{up: {"switchport mode trunk", "switchport trunk allowed vlan 10,20,30"}},
+			Commands: sessionCmds(sessionPort, nil)})
+	}
+	r := mk("Gi1/0/48")
+	if _, err := r.snippet(trunkReq(up, "remove", 20)); code(err) != 9 || !strings.Contains(msg(err), "puerto por donde llega esta sesión") {
+		t.Fatalf("la VLAN de la sesión en su uplink: %v", err)
+	}
+	if _, err := r.snippet(trunkReq(up, "remove", 30)); err != nil {
+		t.Fatalf("otra VLAN del uplink: %v", err)
+	}
+	if _, err := mk("Gi1/0/47").snippet(trunkReq(up, "remove", 20)); err != nil {
+		t.Fatalf("la sesión entra por otro puerto: %v", err)
+	}
+	// Sin tabla MAC el puerto no se ubica: el trunk se rechaza.
+	noCam := sessionCmds("Gi1/0/48", nil)
+	delete(noCam, "show mac address-table address aabb.cc00.0100")
+	rn := newRig(t, simulator.Config{Interfaces: map[string][]string{up: {"switchport mode trunk", "switchport trunk allowed vlan 10,20,30"}}, Commands: noCam})
+	if _, err := rn.snippet(trunkReq(up, "remove", 20)); code(err) != 9 {
+		t.Fatalf("sin tabla MAC: %v", err)
+	}
+	if len(r.rec.Lines()) != 0 {
+		t.Fatalf("planear no configura: %q", r.rec.Lines())
+	}
+}
+
 func sviReq(vlan uint32, desc *string, addr string) *v1.PlanSnippetRequest {
 	return &v1.PlanSnippetRequest{Snippet: &v1.PlanSnippetRequest_Svi{Svi: &v1.SviSnippet{Vlan: vlan, Description: desc, Address: addr, Mask: "255.255.255.0"}}}
 }
 
 func TestSnippetSVIEndToEndRollbackRemovesNewInterface(t *testing.T) {
 	r := newRig(t, simulator.Config{
-		Commands:     map[string]string{"show ip interface brief": briefHdr + "Vlan1                  unassigned      YES unset  up                    down\n"},
+		Commands:     sessionCmds("Gi1/0/47", map[string]string{"show ip interface brief": briefHdr + "Vlan1                  unassigned      YES unset  up                    down\n"}),
 		ConfigErrors: map[string]string{"no shutdown": "% Invalid input detected at '^' marker."}})
 	res, err := r.snippet(sviReq(99, ptr("Servidores"), "10.9.9.1"))
 	if err != nil {

@@ -300,3 +300,17 @@ func init() {
 		"assist.run.vault_not_restored":        {Es: "ATENCIÓN: la bóveda no volvió a la credencial anterior: {error}", En: "WARNING: the vault did not return to the previous credential: {error}", Args: []string{"error"}},
 	})
 }
+
+// Puerto por donde llega la sesión: las plantillas por puerto y la de trunk no lo cambian (corta el acceso y la reversa no llegaría).
+func init() {
+	add(map[string]entry{
+		"assist.refused.puerto_de_la_sesion": {Es: "{port} es el puerto por donde llega esta sesión (MAC del siguiente salto {mac}): cambiarlo puede cortar el acceso; hazlo desde la consola",
+			En: "{port} is the port this session arrives on (next-hop MAC {mac}): changing it can cut off access; do it from the console", Args: []string{"port", "mac"}},
+		"assist.refused.puerto_de_la_sesion_dudoso": {Es: "{port} es un trunk o un Port-channel y no se pudo identificar el puerto por donde llega esta sesión (falta la IP de origen, el ARP o la entrada en la tabla MAC): cambiarlo puede cortar el acceso; hazlo desde la consola",
+			En: "{port} is a trunk or a Port-channel and the port this session arrives on could not be identified (the source IP, the ARP entry or the MAC table entry is missing): changing it can cut off access; do it from the console", Args: []string{"port"}},
+		"assist.refused.vlan_de_la_sesion": {Es: "{port} es el puerto por donde llega esta sesión (MAC del siguiente salto {mac}) y la VLAN {vlan} es la que la lleva: quitarla corta el acceso; hazlo desde la consola",
+			En: "{port} is the port this session arrives on (next-hop MAC {mac}) and VLAN {vlan} is the one carrying it: removing it cuts off access; do it from the console", Args: []string{"port", "vlan", "mac"}},
+		"assist.note.puerto_de_la_sesion_dudoso": {Es: "No se pudo identificar el puerto por donde llega esta sesión (sin ARP, sin entrada en la tabla MAC o con la MAC en varios puertos): {port} se aceptó porque es un puerto de acceso, no un trunk ni un Port-channel. Revisa que no sea el de tu sesión.",
+			En: "The port this session arrives on could not be identified (no ARP, no MAC table entry or the MAC on several ports): {port} was accepted because it is an access port, not a trunk or a Port-channel. Check that it is not your session's port.", Args: []string{"port"}},
+	})
+}

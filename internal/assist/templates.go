@@ -77,6 +77,8 @@ type Template struct {
 	// Ambos reciben valores que ya pasaron ValidateValues y aun así rechazan lo que su reversa no sabría deshacer.
 	Pre  func(Values) ([]string, error)
 	Plan func(device string, v Values, outs map[string]string) (DevicePlan, error)
+	// SessionPort: Pre lee show users y el servicio completa con SessionPortReads las lecturas que ubican el puerto de la sesión.
+	SessionPort bool
 }
 
 // ErrInvalidValues envuelve todo rechazo de ValidateValues.
@@ -402,7 +404,7 @@ func baseTemplates() []Template {
 			Plan: func(d string, v Values, o map[string]string) (DevicePlan, error) {
 				return VlanPlan(d, vlanChange(v), o)
 			}},
-		{ID: "trunk", Tech: "l2", Name: "Agregar o quitar una VLAN de un trunk", Platforms: bothPlatforms, Fn: SnippetTrunk,
+		{ID: "trunk", Tech: "l2", Name: "Agregar o quitar una VLAN de un trunk", Platforms: bothPlatforms, Fn: SnippetTrunk, SessionPort: true,
 			Fields: []Field{
 				{Name: "interface", Label: "Trunk", Type: TypeInterface, Required: true, Help: "Puerto físico o Port-channel que ya sea trunk."},
 				{Name: "op", Label: "Operación", Type: TypeChoice, Required: true, Choices: []string{"add", "remove"}, Default: "add", Help: "Nunca reemplaza la lista permitida."},

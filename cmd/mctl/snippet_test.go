@@ -14,7 +14,12 @@ func snippetRig(t *testing.T, errs map[string]string, mods ...func(*simulator.Co
 	t.Helper()
 	all := append([]func(*simulator.Config){func(c *simulator.Config) {
 		c.Vlans = []int{1, 10}
-		c.Commands = map[string]string{"show vtp status": vtpTransparent, "show interfaces trunk": "Port        Mode             Encapsulation  Status        Native vlan\nGi1/0/48    on               802.1q         trunking      1\n\nPort        Vlans allowed on trunk\nGi1/0/48    10,20\n\nPort        Vlans allowed and active in management domain\nGi1/0/48    10\n", "show ip interface brief": "Interface              IP-Address      OK? Method Status                Protocol\nVlan1                  unassigned      YES unset  up                    down\n"}
+		c.Commands = map[string]string{"show vtp status": vtpTransparent, "show interfaces trunk": "Port        Mode             Encapsulation  Status        Native vlan\nGi1/0/48    on               802.1q         trunking      1\n\nPort        Vlans allowed on trunk\nGi1/0/48    10,20\n\nPort        Vlans allowed and active in management domain\nGi1/0/48    10\n", "show ip interface brief": "Interface              IP-Address      OK? Method Status                Protocol\nVlan1                  unassigned      YES unset  up                    down\n",
+			// La sesión entra por 127.0.0.1 (otra subred que la SVI de la prueba) y el ARP/tabla MAC la ubican en Gi1/0/47, no en el trunk que se prueba.
+			"show users":              "*  2 vty 0     admin      idle                 00:00:00 127.0.0.1\n",
+			"show ip arp 127.0.0.1":   "Protocol  Address          Age (min)  Hardware Addr   Type   Interface\nInternet  127.0.0.1               3   aabb.cc00.0100  ARPA   Vlan20\n",
+			"show ip route 127.0.0.1": "Routing entry for 127.0.0.0/8\n  Known via \"connected\", distance 0, metric 0 (connected, via interface)\n  Routing Descriptor Blocks:\n  * directly connected, via Vlan20\n",
+			"show mac address-table address aabb.cc00.0100": "          Mac Address Table\n-------------------------------------------\n\nVlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n  20    aabb.cc00.0100    DYNAMIC     Gi1/0/47\nTotal Mac Addresses for this criterion: 1\n"}
 		c.Interfaces["GigabitEthernet1/0/48"] = []string{"switchport mode trunk", "switchport trunk allowed vlan 10,20"}
 	}}, mods...)
 	return portsRigFull(t, errs, all...)
