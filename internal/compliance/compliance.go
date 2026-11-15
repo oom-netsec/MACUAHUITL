@@ -128,17 +128,7 @@ var maskedMark = regexp.MustCompile(`<MASKED:[^>]*>`)
 // común (internal/mask) con sus secciones: line es la ruta «sección > línea» y cada nivel se manda con su sangría para
 // que valgan las reglas de bloque (radius server X > key …). Después, las formas propias de abajo (idempotentes).
 func maskSecrets(line, hidden string) string {
-	parts := strings.Split(line, " > ")
-	var b strings.Builder
-	for i, p := range parts {
-		b.WriteString(strings.Repeat(" ", min(i, 1)) + p + "\n")
-	}
-	m, _ := mask.Apply("", b.String())
-	lines := strings.Split(strings.TrimSuffix(m, "\n"), "\n")
-	for i := range lines {
-		lines[i] = strings.TrimPrefix(lines[i], " ")
-	}
-	line = maskedMark.ReplaceAllString(strings.Join(lines, " > "), hidden)
+	line = maskedMark.ReplaceAllString(mask.Path("", line), hidden)
 	for _, r := range secretVals {
 		line = r.re.ReplaceAllString(line, strings.Replace(r.repl, "%s", hidden, 1))
 	}

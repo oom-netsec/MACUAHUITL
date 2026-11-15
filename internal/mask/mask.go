@@ -645,6 +645,22 @@ func maskLogged(cmd, platform string, counts map[string]int) string {
 	})
 }
 
+// Path enmascara una ruta «sección > línea» (la de iosconf.Node.Path): cada nivel va con su sangría para que valgan las
+// reglas de bloque («radius server R > key 7 X»). Devuelve la ruta con <MASKED:tipo> en lugar de los valores.
+func Path(platform, path string) string {
+	parts := strings.Split(path, " > ")
+	var b strings.Builder
+	for i, p := range parts {
+		b.WriteString(strings.Repeat(" ", min(i, 1)) + p + "\n")
+	}
+	m, _ := Apply(platform, b.String())
+	lines := strings.Split(strings.TrimSuffix(m, "\n"), "\n")
+	for i := range lines {
+		lines[i] = strings.TrimPrefix(lines[i], " ")
+	}
+	return strings.Join(lines, " > ")
+}
+
 // Cmd enmascara un comando suelto del que se perdió su bloque (una línea rechazada, citada en un log): las reglas más
 // los key/password/secret/token sueltos. Para quien muestra una línea sin saber de qué sección venía.
 func Cmd(platform, cmd string) string {

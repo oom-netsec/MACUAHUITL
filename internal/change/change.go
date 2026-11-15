@@ -17,6 +17,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 )
 
 // Level es el nivel de un hallazgo y también el semáforo del equipo (el peor de sus hallazgos).
@@ -321,7 +322,8 @@ func drop(a, b int) bool { return a > 0 && float64(b) < float64(a)*macDrop }
 // volatile: líneas que cambian solas sin que nadie toque la configuración.
 var volatile = regexp.MustCompile(`^ntp clock-period \d+$`)
 
-// configDiff compara por ruta jerárquica: reordenar secciones no cuenta como cambio.
+// configDiff compara por ruta jerárquica: reordenar secciones no cuenta como cambio. Las líneas salen siempre
+// enmascaradas (aunque la evidencia venga sin máscara): el valor de un secreto cambiado no se muestra, solo que cambió.
 func configDiff(a, b *iosconf.Node) []string {
 	paths := func(n *iosconf.Node) map[string]int {
 		m := map[string]int{}
@@ -336,10 +338,10 @@ func configDiff(a, b *iosconf.Node) []string {
 	var out []string
 	for _, p := range keys(pa, pb) {
 		for i := pb[p]; i < pa[p]; i++ {
-			out = append(out, "- "+p)
+			out = append(out, "- "+mask.Path("", p))
 		}
 		for i := pa[p]; i < pb[p]; i++ {
-			out = append(out, "+ "+p)
+			out = append(out, "+ "+mask.Path("", p))
 		}
 	}
 	return out
