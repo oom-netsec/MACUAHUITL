@@ -599,7 +599,7 @@ func checkSTP(p *params) (checker, error) {
 }
 
 func checkBGP(p *params) (checker, error) {
-	mode, err := p.oneOf("mode", "down", "flap")
+	mode, err := p.oneOf("mode", "down", "flap", "pfx_zero")
 	if err != nil {
 		return nil, err
 	}
@@ -609,16 +609,25 @@ func checkBGP(p *params) (checker, error) {
 	}
 	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
+		var prev map[string]int // prefijos de los vecinos Established de la ronda anterior (pfx_zero)
+		prevRound := 0
 		for _, s := range series {
 			ns, ok := iosxe.ParseBGP(s.Text)
 			if !ok {
 				warn(s, i18n.Tx("analyze.warn.format_no_nbrs"))
+				prev = nil
 				continue
 			}
 			var ev []string
 			var det []i18n.Text
+			cur := map[string]int{}
 			for _, n := range ns {
+				if n.Established {
+					cur[n.ID] = n.Prefixes
+				}
 				switch {
+				case mode == "pfx_zero" && n.Established && n.Prefixes == 0 && prev != nil && prevRound == s.Round-1 && prev[n.ID] > 0:
+					ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_pfx_zero", "id", n.ID, "as", n.AS, "from", prev[n.ID]))
 				case mode == "down" && !n.Established && !strings.Contains(n.State, "Admin"):
 					ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_down", "id", n.ID, "as", n.AS, "state", n.State, "updown", n.UpDown))
 				case mode == "flap" && n.Established:
@@ -630,6 +639,7 @@ func checkBGP(p *params) (checker, error) {
 			if len(ev) > 0 {
 				out = append(out, hit{s.Round, ev, i18n.Join("; ", det...)})
 			}
+			prev, prevRound = cur, s.Round
 		}
 		return out
 	}, nil
