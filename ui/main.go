@@ -59,7 +59,7 @@ func main() {
 	})
 	// Sin marco: la UI dibuja sus propios controles y zonas de arrastre (ui/frontend/src/app).
 	win := app.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title: "MACUAHUITL", Width: 1280, Height: 800, MinWidth: 960, MinHeight: 640, Frameless: true,
+		Title: "MACUAHUITL", Width: bridge.WindowWidth, Height: bridge.WindowHeight, MinWidth: bridge.WindowMinWidth, MinHeight: bridge.WindowMinHeight, Frameless: true,
 		Linux: application.LinuxWindow{Icon: icon}, EnableFileDrop: true,
 	})
 	// Archivos soltados sobre una zona [data-file-drop-target]: la UI recibe las rutas y el id de la zona.
@@ -105,6 +105,25 @@ func main() {
 			d.SetCancelButton(stay)
 			d.Show()
 		}()
+	})
+	// En una pantalla chica (1366×768) el tamaño preferido deja la barra de estado fuera: al arrancar se ajusta al 90 %
+	// del área de trabajo de la pantalla, sin bajar del mínimo, y se centra en ella. El área de trabajo real (sin paneles)
+	// es la de la pantalla principal; si su caché aún no está, la geometría completa de la pantalla de la ventana.
+	// Wails ya corre cada escucha en su propia goroutine (con recuperación de pánicos).
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		s := app.Screen.GetPrimary()
+		if s == nil {
+			s, _ = win.GetScreen()
+		}
+		if s == nil {
+			return
+		}
+		wa := s.WorkArea
+		if w, h := bridge.InitialSize(wa.Width, wa.Height); w != bridge.WindowWidth || h != bridge.WindowHeight {
+			win.SetSize(w, h)
+			// Center usaría el tamaño que GTK reporta antes de aplicar SetSize: la posición se calcula con el nuevo.
+			win.SetRelativePosition(wa.X-s.Bounds.X+max(0, (wa.Width-w)/2), wa.Y-s.Bounds.Y+max(0, (wa.Height-h)/2))
+		}
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

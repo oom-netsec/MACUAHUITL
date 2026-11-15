@@ -83,7 +83,7 @@ tr[data-state="bad"] td:nth-child(2) { color: var(--critical); }
 .pb-picker { display: grid; gap: 12px; margin-bottom: 16px; }
 .pb-group { border: 1px solid var(--hairline); border-radius: var(--radius, 8px); padding: 8px 12px 10px; margin: 0; }
 .pb-group > legend { padding: 0 6px; font-weight: 600; font-size: 0.8125rem; color: var(--text-2); }
-.pb-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; padding: 2px 0; }
+.pb-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 12px; padding: 2px 0; } /* nombre · paquete · «Commands (N)» en una fila */
 .pb-item details { justify-self: end; }
 .pb-item details[open] { grid-column: 1 / -1; justify-self: stretch; }
 .pb-cmds { margin: 4px 0 6px 28px; padding: 0; list-style: none; font-size: 0.8125rem; color: var(--text-2); }
