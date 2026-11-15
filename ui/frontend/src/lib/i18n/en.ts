@@ -2777,4 +2777,12 @@ export const en: Record<Key, string> = {
   "pending.discard.vaultStaleGen": "The vault credential of {user} keeps the old password and no longer logs in with it.",
   "pending.discard.generated.saved": "The app generated the new password and nobody knows it: that user has no access until another privileged account changes it, or until you apply this rollback and then save the configuration (write memory). The rollback does not save it: after a reload the device would load the new password again.",
   "pending.discard.saveAfter": "To go back to the previous password, apply the rollback and then save the configuration (write memory). The rollback does not save it: after a reload the device would load the new password again.",
+  "device.PARTIAL": "Partial",
+  "patrol.partialCount": "{n} partial",
+  "patrol.partialCount.one": "1 partial",
+  "patrol.grid.cut": "{n} commands cut",
+  "patrol.grid.cut.one": "1 command cut",
+  "patrol.grid.reconnects": "{n} reconnects",
+  "patrol.grid.reconnects.one": "1 reconnect",
+  "patrol.grid.partialDetail": "{cut} · {rec}",
 };

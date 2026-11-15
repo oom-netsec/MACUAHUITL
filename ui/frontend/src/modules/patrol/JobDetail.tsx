@@ -9,7 +9,7 @@ import { DeviceGrid, type Row } from "./DeviceGrid";
 import { MetricsPanel, useMetrics } from "./MetricsPanel";
 import { perRound } from "./metrics";
 import { tones, useStateLabel } from "./JobsPanel";
-import { activeMs, clock, elapsed, when } from "./format";
+import { partialSuffix, activeMs, clock, elapsed, when } from "./format";
 
 // Detalle de un trabajo: cifras, línea de fases, Login Test y armado, y la grilla en vivo.
 export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: CoreAPI; job: Job; phases: JobPhase[]; onChanged: () => void; subscribe: (ids: string[], force?: boolean) => Promise<void> }) {
@@ -41,7 +41,7 @@ export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: C
       if (off) return; // ronda 1 sin equipos terminados: grilla vacía; DeviceGrid agrega cada equipo con su primer evento
       setGrid((g) => g ?? {
         devices,
-        initial: cur.length ? Object.fromEntries(cur.map((d) => [d.target, { state: d.state, progress: "", detail: d.detail }])) : undefined,
+        initial: cur.length ? Object.fromEntries(cur.map((d) => [d.target, { state: d.state, progress: "", detail: d.detail, cut: d.cutCommands ?? 0, reconnects: d.reconnects ?? 0 }])) : undefined,
       });
     };
     rebuild().catch(() => {});
@@ -106,7 +106,7 @@ export function JobDetail({ core, job, phases, onChanged, subscribe }: { core: C
         {job.armedAt && <div><dt>{t("patrol.stat.elapsed")}</dt><dd>{elapsed(activeMs(job.armedAt, job.state, phases))}</dd></div>}
         {!!job.round && <div><dt>{t("patrol.stat.round")}</dt><dd>{job.rounds ? t("patrol.round", { n: job.round, total: job.rounds }) : job.round}</dd></div>}
         {job.rounds !== undefined && <div><dt>{t("patrol.stat.rounds")}</dt><dd>{job.rounds || t("patrol.untilWindow")}</dd></div>}
-        {!!job.round && !!job.devicesTotal && <div data-wide><dt>{t("patrol.stat.devices")}</dt><dd>{t("patrol.devices", { ok: job.devicesOk ?? 0, failed: job.devicesFailed ?? 0, total: job.devicesTotal, n: job.devicesTotal })}</dd></div>}
+        {!!job.round && !!job.devicesTotal && <div data-wide><dt>{t("patrol.stat.devices")}</dt><dd>{t("patrol.devices", { ok: job.devicesOk ?? 0, failed: job.devicesFailed ?? 0, total: job.devicesTotal, n: job.devicesTotal }) + partialSuffix(t, job.devicesPartial)}</dd></div>}
         {job.nextRoundAt && Date.parse(job.nextRoundAt) > Date.now() && <div><dt>{t("patrol.stat.next")}</dt><dd>{when(job.nextRoundAt)}</dd></div>}
         {job.windowEndsAt && <div><dt>{t("patrol.stat.windowEnds")}</dt><dd>{when(job.windowEndsAt)}</dd></div>}
       </dl>

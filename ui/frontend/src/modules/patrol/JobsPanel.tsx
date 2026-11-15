@@ -4,7 +4,7 @@ import { Badge, EmptyState, type Tone } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import { Segmented } from "../../components/Segmented";
-import { elapsed } from "./format";
+import { partialSuffix, elapsed } from "./format";
 
 export const tones: Record<string, Tone> = { armed: "ok", arming: "ok", completed: "", cancelled: "", failed: "bad", created: "warn" };
 
@@ -52,7 +52,7 @@ export function JobsPanel({ jobs, selected, onSelect, onNew }: { jobs: Job[]; se
                 <span className="meta">{j.rounds ? t("patrol.round", { n: j.round, total: j.rounds }) : t("patrol.roundOpen", { n: j.round })}</span>
               )}
               {!!j.round && !!j.devicesTotal && (
-                <span className="meta">{t("patrol.devices", { ok: j.devicesOk ?? 0, failed: j.devicesFailed ?? 0, total: j.devicesTotal, n: j.devicesTotal })}</span>
+                <span className="meta">{t("patrol.devices", { ok: j.devicesOk ?? 0, failed: j.devicesFailed ?? 0, total: j.devicesTotal, n: j.devicesTotal }) + partialSuffix(t, j.devicesPartial)}</span>
               )}
             </button>
           </li>

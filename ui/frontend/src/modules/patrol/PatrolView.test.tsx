@@ -512,3 +512,41 @@ test("con la ronda 1 sin equipos terminados la grilla se arma con los eventos: c
   expect(screen.getByRole("row", { name: /10\.0\.0\.6:22/ })).toBeInTheDocument();
   expect(core.getRun).toHaveBeenCalledTimes(1); // los eventos no vuelven a pedir la ronda
 });
+
+test("PARTIAL: etiqueta ámbar y cortados/reconexiones por evento y por GetRun", async () => {
+  const core = fakeCore();
+  render(<DeviceGrid core={core} jobId="j1" devices={["10.0.0.1:22", "10.0.0.2:22"]} initial={{ "10.0.0.2:22": { state: "DEVICE_STATE_PARTIAL", progress: "", detail: "x", cut: 1, reconnects: 1 } }} />);
+  act(() => core.emitEvent({ jobId: "j1", deviceStateChanged: { deviceId: "10.0.0.1:22", state: "DEVICE_STATE_PARTIAL", detail: "texto del núcleo", reason: "patrol.dev.partial", args: { cut: "2", reconnects: "1", first: "show tech" } } }));
+  const ev = screen.getByRole("row", { name: /10\.0\.0\.1:22/ });
+  expect(ev).toHaveAttribute("data-state", "DEVICE_STATE_PARTIAL");
+  expect(within(ev).getByText("Parcial")).toBeInTheDocument();
+  expect(within(ev).getByText("2 comandos cortados · 1 reconexión")).toBeInTheDocument();
+  const run = screen.getByRole("row", { name: /10\.0\.0\.2:22/ });
+  expect(within(run).getByText("1 comando cortado · 1 reconexión")).toBeInTheDocument();
+});
+
+test("el resumen del trabajo cuenta los parciales (1 y N) y omite 0", async () => {
+  const core = fakeCore({
+    listJobs: vi.fn(async () => [
+      { id: "a", name: "solo-uno", state: "armed", round: 1, devicesTotal: 5, devicesOk: 3, devicesFailed: 0, devicesPartial: 1 },
+      { id: "b", name: "varios", state: "armed", round: 1, devicesTotal: 5, devicesOk: 1, devicesFailed: 0, devicesPartial: 3 },
+      { id: "c", name: "ninguno", state: "armed", round: 1, devicesTotal: 5, devicesOk: 5, devicesFailed: 0 },
+    ]),
+  });
+  render(<PatrolView core={core} />);
+  const panel = await screen.findByRole("region", { name: "Trabajos" });
+  expect(await within(panel).findByRole("button", { name: /solo-uno/ })).toHaveTextContent("5 equipos · 1 parcial");
+  expect(within(panel).getByRole("button", { name: /varios/ })).toHaveTextContent("5 equipos · 3 parciales");
+  expect(within(panel).getByRole("button", { name: /ninguno/ })).not.toHaveTextContent("parcial");
+});
+
+test("PARTIAL es terminal: el reabrir con GetRun lo muestra sin volver a Ejecutando", async () => {
+  const core = fakeCore({
+    listJobs: vi.fn(async () => [{ id: "j9", name: "nocturno", state: "armed" }]),
+    getRun: vi.fn(async () => [{ target: "10.0.0.5:22", state: "DEVICE_STATE_PARTIAL", detail: "", cutCommands: 1, reconnects: 2 }]),
+  });
+  render(<PatrolView core={core} />);
+  const row = await screen.findByRole("row", { name: /10\.0\.0\.5:22/ });
+  expect(within(row).getByText("Parcial")).toBeInTheDocument();
+  expect(within(row).getByText("1 comando cortado · 2 reconexiones")).toBeInTheDocument();
+});

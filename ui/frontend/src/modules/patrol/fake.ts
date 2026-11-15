@@ -57,7 +57,7 @@ export const samplePlaybooks: PlaybookInfo[] = [
 export function fakePatrol() {
   const events = new Set<(e: CoreEvent) => void>();
   return {
-    getRun: vi.fn(async () => [] as { target: string; state: string; detail: string }[]),
+    getRun: vi.fn(async () => [] as { target: string; state: string; detail: string; cutCommands?: number; reconnects?: number }[]),
     onEvent: (cb: (e: CoreEvent) => void) => (events.add(cb), () => events.delete(cb)),
     createJob: vi.fn(async () => "j1"),
     loginTest: vi.fn(async () => []),

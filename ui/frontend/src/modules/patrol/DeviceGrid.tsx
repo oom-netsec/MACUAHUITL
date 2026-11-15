@@ -6,7 +6,7 @@ import type { Key } from "../../lib/i18n/es";
 import { DeviceMenu } from "../../components/DeviceMenu";
 import { Meter, Sparkline } from "../../components/charts/Mini";
 
-export interface Row { state: string; progress: string; detail: string }
+export interface Row { state: string; progress: string; detail: string; cut?: number; reconnects?: number } // cut y reconnects: solo con PARTIAL
 
 // Grilla en vivo por equipo (spec §12.3). Virtualizada: con miles de equipos solo se dibuja lo visible.
 // "10.0.0.1:22" -> "10.0.0.1": la dirección que usan el menú de equipo y las métricas.
@@ -30,7 +30,7 @@ export function DeviceGrid({ core, jobId, devices: known, initial, cpu }: { core
         setRows((r) => {
           const cur = r[d.deviceId] ?? { state: "DEVICE_STATE_QUEUED", progress: "", detail: "" };
           const next = e.deviceStateChanged
-            ? { ...cur, state: e.deviceStateChanged.state, detail: e.deviceStateChanged.detail ?? "" }
+            ? { ...cur, state: e.deviceStateChanged.state, detail: e.deviceStateChanged.detail ?? "", cut: Number(e.deviceStateChanged.args?.cut) || 0, reconnects: Number(e.deviceStateChanged.args?.reconnects) || 0 }
             : { ...cur, state: "DEVICE_STATE_RUNNING", progress: `${e.commandProgress!.index ?? 0}/${e.commandProgress!.total ?? 0} ${e.commandProgress!.command}` };
           return { ...r, [d.deviceId]: next };
         });
@@ -63,7 +63,7 @@ export function DeviceGrid({ core, jobId, devices: known, initial, cpu }: { core
                   <td>{label(r.state)}</td>
                   <td>{cpuCell(cpu?.[addressOf(dev)], t("patrol.grid.cpuLabel", { device: addressOf(dev) }))}</td>
                   {hasProgress && <td className="mono">{r.progress}</td>}
-                  <td>{r.detail}</td>
+                  <td>{r.state === "DEVICE_STATE_PARTIAL" && (r.cut || r.reconnects) ? t("patrol.grid.partialDetail", { cut: t("patrol.grid.cut", { n: r.cut ?? 0 }), rec: t("patrol.grid.reconnects", { n: r.reconnects ?? 0 }) }) : r.detail}</td>
                 </tr>
               );
             })}

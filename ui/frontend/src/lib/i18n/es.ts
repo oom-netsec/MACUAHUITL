@@ -2775,6 +2775,14 @@ export const es = {
   "pending.discard.vaultStaleGen": "La credencial de {user} en la bóveda conserva la anterior y ya no entra con ella.",
   "pending.discard.generated.saved": "La app generó la contraseña nueva y nadie la conoce: ese usuario queda sin acceso hasta que otra cuenta con privilegios la cambie, o hasta que apliques esta reversa y después guardes la configuración (write memory). La reversa no la guarda: tras un reinicio el equipo volvería a cargar la contraseña nueva.",
   "pending.discard.saveAfter": "Para volver a la contraseña anterior, aplica la reversa y después guarda la configuración (write memory). La reversa no la guarda: tras un reinicio el equipo volvería a cargar la contraseña nueva.",
+  "device.PARTIAL": "Parcial",
+  "patrol.partialCount": "{n} parciales",
+  "patrol.partialCount.one": "1 parcial",
+  "patrol.grid.cut": "{n} comandos cortados",
+  "patrol.grid.cut.one": "1 comando cortado",
+  "patrol.grid.reconnects": "{n} reconexiones",
+  "patrol.grid.reconnects.one": "1 reconexión",
+  "patrol.grid.partialDetail": "{cut} · {rec}",
 };
 
 export type Key = keyof typeof es;
