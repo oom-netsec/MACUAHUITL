@@ -268,6 +268,9 @@ func checkFamily(cmd string, head func(cmd string, fields []string) error) error
 		if i > 0 && len(f) > 0 && sink(f[0]) {
 			return denied(cmd, "playbook.why.pipe_sink")
 		}
+		if i > 0 && len(f) > 0 && shellToken(f[0]) { // como en IOS: sscp, email, vsh, bash, python… tras un segundo «|»
+			return denied(cmd, "playbook.why.pipe_shell")
+		}
 		for _, tok := range f {
 			if remotePath(tok) {
 				return denied(cmd, "playbook.why.remote")

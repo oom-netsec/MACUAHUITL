@@ -179,3 +179,22 @@ func TestASARutaDelEquipoTieneMotivoPropio(t *testing.T) {
 		t.Errorf("tftp: motivo %q", r)
 	}
 }
+
+// Tras el segundo «|» de un ASA o FTD tampoco van los comandos de shell de NX-OS (sscp, email, vsh, bash, python).
+func TestFamiliaASARechazaShellEnPipesPosteriores(t *testing.T) {
+	for _, p := range []string{"asa", "ftd"} {
+		for _, cmd := range []string{
+			"show version | include x | sscp conn1 out.txt", "show version | include x | email a@b.c", "show version | include x | vsh",
+			"show version | include x | bash", "show version | include x | python",
+		} {
+			if err := CheckDenied(p, cmd); !errors.Is(err, ErrDenied) {
+				t.Errorf("%s %q: se aceptó (err=%v)", p, cmd, err)
+			}
+		}
+		for _, cmd := range []string{"show run | include x", "show conn count", "show run | in x | b", "show xlate | include 10.0.0.1|10.0.0.2"} {
+			if err := CheckDenied(p, cmd); err != nil {
+				t.Errorf("%s %q: se rechazó (%v)", p, cmd, err)
+			}
+		}
+	}
+}
