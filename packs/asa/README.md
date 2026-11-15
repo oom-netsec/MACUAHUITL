@@ -14,7 +14,8 @@ lentitud, OSPF/BGP y cluster).
 
 Los playbooks que declaran datos piden la interfaz (`interface`, el nombre `nameif` en packet-tracer), la IP (`ip`,
 `src`, `dst`) o el peer (`peer`); el núcleo los valida antes de armar los comandos. Validado en un ASAv 9.x de CML
-con un solo contexto (2026-11-14); el failover A/S, el multicontexto y el cluster siguen sin validar. La app solo permite en ASA comandos de lectura: `show`, `ping`,
+con un solo contexto (2026-11-14); también con dos ASAv en failover A/S, incluido un failover provocado; el
+multicontexto y el cluster siguen sin validar (el ASAv no acepta `mode multiple`). La app solo permite en ASA comandos de lectura: `show`, `ping`,
 `traceroute`, `packet-tracer` (forma estricta) y `dir`; sin `more`, `copy`, `capture`, `changeto`, `failover`,
 `clear`, `debug`, `| redirect` ni `show … file`. Los comandos vienen de la documentación pública de Cisco. Ojo: `packet-tracer` es una simulación, pero sube los
 contadores `hitcnt` de las ACL que toca y, si el flujo es tráfico interesante para un crypto map, puede iniciar la
@@ -46,7 +47,8 @@ blocks, ASP drops, slowness, OSPF/BGP and cluster).
 
 Playbooks that declare data ask for the interface (`interface`, the `nameif` name in packet-tracer), the IP (`ip`,
 `src`, `dst`) or the peer (`peer`); the core validates them before building the commands. Validated on an ASAv 9.x in
-CML with a single context (2026-11-14); A/S failover, multiple context and clustering remain unvalidated. On ASA the app only allows read commands: `show`, `ping`, `traceroute`,
+CML with a single context (2026-11-14); also with two ASAv in A/S failover, including a forced failover; multiple
+context and clustering remain unvalidated (ASAv does not accept `mode multiple`). On ASA the app only allows read commands: `show`, `ping`, `traceroute`,
 `packet-tracer` (strict form) and `dir`; no `more`, `copy`, `capture`, `changeto`, `failover`, `clear`, `debug`,
 `| redirect` or `show … file`. Commands come from Cisco's public documentation. Note: `packet-tracer` is a simulation, but it increments the `hitcnt`
 counters of the ACLs it touches and, if the flow is interesting traffic for a crypto map, it can start the IKE
