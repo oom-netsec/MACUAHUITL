@@ -351,3 +351,18 @@ func TestPortsRollbackAppliesTheSavedRollback(t *testing.T) {
 		t.Fatalf("tras aplicarla no queda pendiente:\n%s", out)
 	}
 }
+
+func TestPortsRollbackDiscard(t *testing.T) {
+	e := portsRigFull(t, nil)
+	mctl(t, "s\nn\n", append(e.args, "--vlan", "20", "--asistido")...)
+	m := regexp.MustCompile(`ejecución (\S+) \(ports\)`).FindStringSubmatch(must(t, "", "ports", "rollbacks"))
+	if m == nil {
+		t.Fatal("sin pendiente")
+	}
+	if out := must(t, "", "ports", "rollback", "discard", m[1]); !strings.Contains(out, "descartada") {
+		t.Fatalf("%s", out)
+	}
+	if out := must(t, "", "ports", "rollbacks"); !strings.Contains(out, "No hay reversas pendientes") {
+		t.Fatalf("%s", out)
+	}
+}

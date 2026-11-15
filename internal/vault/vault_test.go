@@ -565,3 +565,25 @@ func TestDeleteReservedOnlyRemovesTheReservedEntry(t *testing.T) {
 		t.Fatalf("la credencial normal se perdió: %+v", infos)
 	}
 }
+
+// PutReserved reemplaza la entrada de esa etiqueta (no la duplica) y solo acepta etiquetas reservadas.
+func TestPutReservedReplacesByLabel(t *testing.T) {
+	v, _ := newVault(t)
+	for _, val := range []string{"UNO", "DOS"} {
+		if err := v.PutReserved(Credential{Label: ReservedPrefix + "x", Username: "u", Password: secret.New(pw(val))}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	all, _ := v.ListAll()
+	if len(all) != 1 {
+		t.Fatalf("se duplicó: %+v", all)
+	}
+	c, err := v.GetReserved(ReservedPrefix + "x")
+	if err != nil || string(c.Password.Bytes()) != "DOS" {
+		t.Fatalf("no se reemplazó: %v", err)
+	}
+	c.Password.Destroy()
+	if err := v.PutReserved(Credential{Label: "normal", Password: secret.New(pw("x"))}); err == nil {
+		t.Fatal("una etiqueta normal no es reservada")
+	}
+}

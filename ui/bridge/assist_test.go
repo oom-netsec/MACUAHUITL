@@ -96,9 +96,16 @@ func (f *fakeAssist) ListPendingRollbacks(context.Context, *v1.ListPendingRollba
 
 func (f *fakeAssist) StartPendingRollback(_ context.Context, r *v1.StartPendingRollbackRequest) (*v1.StartPendingRollbackResponse, error) {
 	f.mu.Lock()
-	f.confirms = append(f.confirms, "pending/"+r.RunId+"/"+strconv.FormatBool(r.AcceptAge))
+	f.confirms = append(f.confirms, "pending/"+r.RunId+"/"+strconv.FormatBool(r.AcceptAge)+"/"+strconv.FormatBool(r.Assisted))
 	f.mu.Unlock()
 	return &v1.StartPendingRollbackResponse{RunId: "r2"}, nil
+}
+
+func (f *fakeAssist) DiscardPendingRollback(_ context.Context, r *v1.DiscardPendingRollbackRequest) (*v1.DiscardPendingRollbackResponse, error) {
+	f.mu.Lock()
+	f.confirms = append(f.confirms, "discard/"+r.RunId)
+	f.mu.Unlock()
+	return &v1.DiscardPendingRollbackResponse{}, nil
 }
 
 func (f *fakeAssist) Confirm(_ context.Context, r *v1.ConfirmRequest) (*v1.ConfirmResponse, error) {
@@ -259,10 +266,13 @@ func TestAssistPendingRollbackBridge(t *testing.T) {
 	if err != nil || !strings.Contains(out, `"runId":"r0"`) || !strings.Contains(out, `"ageSeconds":"90000"`) || !strings.Contains(out, `"rollbackLines":["shutdown"]`) {
 		t.Fatalf("%q %v", out, err)
 	}
-	if id, err := b.AssistStartPendingRollback("r0", true); err != nil || id != "r2" {
+	if id, err := b.AssistStartPendingRollback("r0", true, true); err != nil || id != "r2" {
 		t.Fatalf("%q %v", id, err)
 	}
-	if fa.confirms[0] != "pending/r0/true" {
+	if err := b.AssistDiscardPendingRollback("r0"); err != nil {
+		t.Fatal(err)
+	}
+	if fa.confirms[0] != "pending/r0/true/true" || fa.confirms[1] != "discard/r0" {
 		t.Fatalf("%v", fa.confirms)
 	}
 }

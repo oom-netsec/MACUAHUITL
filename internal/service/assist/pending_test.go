@@ -2,6 +2,7 @@ package assist
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,6 +11,8 @@ import (
 	"google.golang.org/grpc/codes"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/secret"
+	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 )
 
@@ -44,7 +47,7 @@ func (r *rig) pending() []*v1.PendingRollback {
 }
 
 func (r *rig) startPending(run string, age bool) (string, error) {
-	res, err := r.svc.StartPendingRollback(context.Background(), &v1.StartPendingRollbackRequest{RunId: run, AcceptAge: age})
+	res, err := r.svc.StartPendingRollback(context.Background(), &v1.StartPendingRollbackRequest{RunId: run, AcceptAge: age, Assisted: true})
 	if err != nil {
 		return "", err
 	}
@@ -202,5 +205,270 @@ func TestPendingRollbackNotSavedWhenVaultIsLocked(t *testing.T) {
 	r.waitDone(run)
 	if txt := r.d.AuditText(); !strings.Contains(txt, "assist.pending_rollback.save_failed") {
 		t.Fatalf("debía auditar que no se pudo guardar:\n%s", txt)
+	}
+}
+
+// ---- revisión de seguridad ----
+
+func (r *rig) pendingLabels() (n int) {
+	r.t.Helper()
+	all, err := r.d.V.ListAll()
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	for _, i := range all {
+		if strings.HasPrefix(i.Label, pendingPrefix) {
+			n++
+		}
+	}
+	return n
+}
+
+// startAt deja un puerto cambiado y la ejecución esperando el paso de cierre.
+func (r *rig) changedAtClose() string {
+	r.t.Helper()
+	plan, err := r.plan(&v1.PlanPortsRequest{Vlan: 20})
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	run := r.start(plan.PlanId)
+	r.waitState(run, "waiting-confirm")
+	r.confirm(run, "apply-1")
+	r.waitState(run, "waiting-confirm")
+	return run
+}
+
+// Mientras la ejecución vive la reversa ya está guardada (una caída no la pierde), no se ofrece en este núcleo y un núcleo nuevo sobre la
+// misma bóveda la ve.
+func TestPendingRollbackIsSavedWhileTheRunIsAliveAndSurvivesACrash(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run := r.changedAtClose()
+	if r.pendingLabels() != 1 {
+		t.Fatal("al pasar a cambiado debía quedar guardada")
+	}
+	if len(r.pending()) != 0 {
+		t.Fatal("con la ejecución viva en este núcleo no se ofrece")
+	}
+	if _, err := r.startPending(run, false); code(err) != codes.FailedPrecondition {
+		t.Fatalf("iniciar la reversa de una ejecución viva: %v", err)
+	}
+	if _, err := r.svc.DiscardPendingRollback(context.Background(), &v1.DiscardPendingRollbackRequest{RunId: run}); code(err) != codes.FailedPrecondition {
+		t.Fatalf("descartar una ejecución viva: %v", err)
+	}
+	crashed := newSvc(r.d) // el núcleo cayó sin dejar estado terminal: otro servicio sobre la misma bóveda
+	t.Cleanup(crashed.Close)
+	l, err := crashed.ListPendingRollbacks(context.Background(), &v1.ListPendingRollbacksRequest{})
+	if err != nil || len(l.Rollbacks) != 1 || l.Rollbacks[0].RunId != run {
+		t.Fatalf("%v %+v", err, l)
+	}
+}
+
+// El ingeniero dejó el cambio a propósito (confirmó el cierre) o la ejecución se revirtió sola: nunca queda candidata.
+func TestDoneAndRolledBackRunsAreNeverPendingCandidates(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run := r.changedAtClose()
+	r.confirm(run, "close")
+	r.waitState(run, "done")
+	r.waitDone(run)
+	if r.pendingLabels() != 0 || len(r.pending()) != 0 {
+		t.Fatal("una ejecución cerrada con «dejarlo» no es candidata")
+	}
+	plan, _ := r.plan(&v1.PlanPortsRequest{Vlan: 30})
+	run = r.start(plan.PlanId)
+	r.waitState(run, "waiting-confirm")
+	r.confirm(run, "apply-1")
+	r.waitState(run, "waiting-confirm")
+	if r.pendingLabels() != 1 {
+		t.Fatal("cambiado: guardada")
+	}
+	if _, err := r.svc.Rollback(context.Background(), &v1.RollbackRequest{RunId: run}); err != nil {
+		t.Fatal(err)
+	}
+	r.waitState(run, "waiting-confirm")
+	r.confirm(run, "rollback-1")
+	r.waitState(run, "rolled-back")
+	r.waitDone(run)
+	if r.pendingLabels() != 0 {
+		t.Fatal("revertida por la propia ejecución: no queda nada")
+	}
+}
+
+func TestFailedAndAbandonedRunsLeavePendingRollbacks(t *testing.T) {
+	r := newRig(t, simulator.Config{ConfigErrors: map[string]string{"description Telefono": "% Invalid input detected at '^' marker."}})
+	plan, _ := r.plan(&v1.PlanPortsRequest{Vlan: 20, Description: ptr("Telefono"), Shutdown: ptr(false)})
+	run := r.start(plan.PlanId)
+	r.waitState(run, "waiting-confirm")
+	r.confirm(run, "apply-1")
+	r.waitState(run, "failed")
+	r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: run})
+	r.waitDone(run)
+	if p := r.pending(); len(p) != 1 || p[0].RunId != run {
+		t.Fatalf("failed: %+v", p)
+	}
+	nrun, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.confirmAll(nrun, "done")
+	if len(r.pending()) != 0 {
+		t.Fatal("aplicada: se borra")
+	}
+
+	r2 := newRig(t, simulator.Config{})
+	r2.svc.decisionTimeout = 200 * time.Millisecond
+	run2 := r2.changedAtClose()
+	r2.waitState(run2, "abandoned")
+	r2.waitDone(run2)
+	p := r2.pending()
+	if len(p) != 1 || p[0].RunId != run2 {
+		t.Fatalf("abandoned: %+v", p)
+	}
+	r2.svc.decisionTimeout = 0
+	nrun, err = r2.startPending(run2, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2.confirmAll(nrun, "done")
+}
+
+// El equipo no responde en el pre-check: failed sin cambiar nada y la reversa se conserva.
+func TestPendingRollbackWithUnreachableDeviceFailsAndIsKept(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	rec, err := r.svc.loadPending(pendingPrefix + run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec.Port = 1 // nadie escucha
+	if err := r.svc.savePending(rec); err != nil {
+		t.Fatal(err)
+	}
+	nrun, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := r.waitState(nrun, "failed")
+	if len(s.Changed) != 0 || s.Pending != nil {
+		t.Fatalf("%+v", s)
+	}
+	r.waitDone(nrun)
+	if len(r.pending()) != 1 {
+		t.Fatal("se conserva")
+	}
+}
+
+func TestPendingRollbackSecretsNeverLeak(t *testing.T) {
+	const comm = "Zx9-Secreta.Comm"
+	r := newRig(t, simulator.Config{Running: "hostname SW1\nsnmp-server community otra RO\n!\nend\n"})
+	res, err := r.snippet(tplReq("snmp-community", map[string]string{"community": comm}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := r.start(res.PlanId)
+	r.waitState(run, "waiting-confirm")
+	r.confirm(run, "apply-1")
+	r.waitState(run, "waiting-confirm")
+	r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: run})
+	r.waitState(run, "aborted")
+	r.waitDone(run)
+	p := r.pending()
+	if len(p) != 1 || strings.Contains(fmt.Sprint(p), comm) {
+		t.Fatalf("la lista cita la community: %v", p)
+	}
+	nrun, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.confirmAll(nrun, "done")
+	rec, _ := r.svc.get(context.Background(), nrun)
+	evs, _ := rec.run.Events(0)
+	if strings.Contains(fmt.Sprint(evs), comm) || strings.Contains(r.d.AuditText(), comm) {
+		t.Fatal("la community salió en eventos o auditoría")
+	}
+	if got := strings.Join(r.rec.Lines(), "|"); !strings.Contains(got, "no snmp-server community "+comm) {
+		t.Fatalf("el equipo no recibió la reversa: %s", got)
+	}
+}
+
+func TestPendingRollbackCannotBeStartedTwiceAndAbortKeepsIt(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	n1, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.waitState(n1, "waiting-confirm")
+	if _, err := r.startPending(run, false); code(err) != codes.FailedPrecondition {
+		t.Fatalf("el segundo arranque debía rechazarse: %v", err)
+	}
+	r.confirm(n1, "apply-1")
+	if s := r.waitState(n1, "waiting-confirm"); s.Pending.Kind != "close" {
+		t.Fatalf("%+v", s.Pending)
+	}
+	r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: n1}) // abort en el cierre de la ejecución de reversa
+	r.waitState(n1, "aborted")
+	r.waitDone(n1)
+	if len(r.pending()) != 1 || r.pendingLabels() != 1 {
+		t.Fatal("una reversa que no terminó done conserva la entrada (y no guarda otra)")
+	}
+}
+
+func TestStartPendingRollbackNeedsAssisted(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	_, err := r.svc.StartPendingRollback(context.Background(), &v1.StartPendingRollbackRequest{RunId: run})
+	if code(err) != codes.FailedPrecondition {
+		t.Fatalf("sin assisted: %v", err)
+	}
+}
+
+func TestDiscardPendingRollbackAndUnreadableEntries(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	if err := r.d.V.PutReserved(vault.Credential{Label: pendingPrefix + "rota", Username: "x", Password: secret.New([]byte("{no es json"))}); err != nil {
+		t.Fatal(err)
+	}
+	p := r.pending()
+	if len(p) != 2 {
+		t.Fatalf("la ilegible no debe tumbar la lista: %+v", p)
+	}
+	var bad *v1.PendingRollback
+	for _, x := range p {
+		if x.Unreadable {
+			bad = x
+		}
+	}
+	if bad == nil || bad.RunId != "rota" {
+		t.Fatalf("falta la ilegible: %+v", p)
+	}
+	ctx := context.Background()
+	for _, id := range []string{"rota", run} {
+		if _, err := r.svc.DiscardPendingRollback(ctx, &v1.DiscardPendingRollbackRequest{RunId: id}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(r.pending()) != 0 || r.pendingLabels() != 0 {
+		t.Fatal("seguían ahí")
+	}
+	if _, err := r.svc.DiscardPendingRollback(ctx, &v1.DiscardPendingRollbackRequest{RunId: run}); code(err) != codes.NotFound {
+		t.Fatalf("descartar dos veces: %v", err)
+	}
+	if !strings.Contains(r.d.AuditText(), "assist.pending_rollback.discard") {
+		t.Fatal("falta la auditoría")
+	}
+}
+
+func TestPendingRollbackWarnsAboutWriteMemory(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	plan, _ := r.plan(&v1.PlanPortsRequest{Vlan: 20, WriteMemory: true})
+	run := r.start(plan.PlanId)
+	r.waitState(run, "waiting-confirm")
+	r.confirm(run, "apply-1")
+	r.waitState(run, "waiting-confirm") // save-1
+	r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: run})
+	r.waitState(run, "aborted")
+	r.waitDone(run)
+	if p := r.pending(); len(p) != 1 || !p[0].WriteMemory {
+		t.Fatalf("%+v", p)
 	}
 }

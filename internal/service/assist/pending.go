@@ -26,23 +26,64 @@ const pendingMaxAge = 24 * time.Hour
 const pendingPrefix = vault.ReservedPrefix + "reversa-pendiente:"
 
 // pendingRec es lo que se guarda (cifrado, como secreto de una entrada reservada) de una ejecución que dejó equipos cambiados.
-// Las líneas pueden llevar secretos (community SNMP, usuarios): por eso viaja entero por la bóveda.
+// Las líneas pueden llevar secretos (community SNMP, usuarios): por eso viaja entero por la bóveda. Se escribe en cuanto un equipo pasa a
+// cambiado y se actualiza mientras la ejecución avanza (una caída del núcleo no la pierde); Ended es cero hasta que la ejecución termina.
 // shortcut: no guarda huellas SSH aceptadas porque StartRun tampoco las usa (HostKeyPolicy vacía: el equipo debe estar ya en known hosts).
 type pendingRec struct {
 	RunID    string
 	Kind     string // función del plan: ports, snippet, restore...
 	Ended    time.Time
+	Updated  time.Time
 	Host     string
 	Port     uint16
 	Cred     string
-	Label    string
-	Scrub    bool
 	Leftover assist.Leftover
 }
 
-// afterRun corre al terminar una ejecución, ya soltados guard y ventana. Una ejecución normal que dejó equipos cambiados guarda su reversa;
-// una ejecución de reversa borra la entrada si terminó bien y la conserva si no.
-func (s *assistSvc) afterRun(rr *runRec, t target, origin string) {
+// base es desde cuándo cuenta la antigüedad: el fin de la ejecución o, si el núcleo cayó antes, la última vez que se escribió.
+func (p pendingRec) base() time.Time {
+	if p.Ended.IsZero() {
+		return p.Updated
+	}
+	return p.Ended
+}
+
+// persister guarda y borra la reversa pendiente de una ejecución (solo la usa el hilo del motor y, ya terminado este, afterRun).
+type persister struct {
+	s     *assistSvc
+	runID string
+	t     target
+	saved bool
+}
+
+// sync es el Persist del motor: lo que sigue sin revertir (nil = nada).
+func (p *persister) sync(lo *assist.Leftover) {
+	if lo == nil {
+		if p.saved {
+			p.saved = !p.s.deletePending(p.runID)
+		}
+		return
+	}
+	p.save(lo, time.Time{}, "")
+}
+
+func (p *persister) save(lo *assist.Leftover, ended time.Time, st assist.State) {
+	rec := pendingRec{RunID: p.runID, Kind: lo.Function, Ended: ended, Updated: p.s.d.Now(), Host: p.t.host, Port: p.t.port, Cred: p.t.cred, Leftover: *lo}
+	if err := p.s.savePending(rec); err != nil {
+		p.s.d.Audit("assist.pending_rollback.save_failed", rec.RunID, "the pending rollback could not be saved: "+i18n.English(err))
+		return
+	}
+	p.saved = true
+	if ended.IsZero() {
+		return
+	}
+	p.s.d.Audit("assist.pending_rollback.saved", rec.RunID, fmt.Sprintf("kind=%s state=%s devices=%d", rec.Kind, st, len(lo.Devices)))
+}
+
+// afterRun corre al terminar una ejecución, ya soltados guard y ventana. Una ejecución que terminó done (el ingeniero dejó el cambio a
+// propósito) o sin equipos cambiados no deja reversa; las demás la dejan con su hora de fin. Una ejecución de reversa borra la entrada
+// original si terminó bien y la conserva si no.
+func (s *assistSvc) afterRun(rr *runRec, pers *persister, origin string) {
 	st := rr.run.State()
 	if origin != "" {
 		deleted := false
@@ -52,19 +93,12 @@ func (s *assistSvc) afterRun(rr *runRec, t target, origin string) {
 		s.d.Audit("assist.pending_rollback.end", origin, fmt.Sprintf("run=%s state=%s deleted=%t", rr.run.ID(), st, deleted))
 		return
 	}
-	if st != assist.Aborted && st != assist.Failed && st != assist.Abandoned {
-		return
-	}
 	lo := rr.run.Leftover()
-	if lo == nil {
+	if st == assist.Done || lo == nil {
+		pers.sync(nil)
 		return
 	}
-	rec := pendingRec{RunID: rr.run.ID(), Kind: lo.Function, Ended: rr.ended, Host: t.host, Port: t.port, Cred: t.cred, Leftover: *lo}
-	if err := s.savePending(rec); err != nil {
-		s.d.Audit("assist.pending_rollback.save_failed", rec.RunID, "the pending rollback could not be saved: "+i18n.English(err))
-		return
-	}
-	s.d.Audit("assist.pending_rollback.saved", rec.RunID, fmt.Sprintf("kind=%s state=%s devices=%d", rec.Kind, st, len(lo.Devices)))
+	pers.save(lo, rr.ended, st)
 }
 
 func (s *assistSvc) savePending(rec pendingRec) error {
@@ -76,8 +110,7 @@ func (s *assistSvc) savePending(rec pendingRec) error {
 	if err != nil {
 		return err
 	}
-	_, err = v.Put(vault.Credential{Label: pendingPrefix + rec.RunID, Username: "pending-rollback", Password: secret.New(raw)})
-	return err
+	return v.PutReserved(vault.Credential{Label: pendingPrefix + rec.RunID, Username: "pending-rollback", Password: secret.New(raw)})
 }
 
 func (s *assistSvc) deletePending(runID string) bool {
@@ -101,6 +134,22 @@ func (s *assistSvc) loadPending(label string) (pendingRec, error) {
 	return rec, json.Unmarshal(c.Password.Bytes(), &rec)
 }
 
+// live dice si la ejecución sigue viva en este núcleo (su reversa no se ofrece hasta que termine).
+func (s *assistSvc) live(runID string) bool {
+	s.mu.Lock()
+	rr, ok := s.runs[runID]
+	s.mu.Unlock()
+	if !ok {
+		return false
+	}
+	select {
+	case <-rr.run.Done():
+		return false
+	default:
+		return true
+	}
+}
+
 func (s *assistSvc) ListPendingRollbacks(ctx context.Context, _ *v1.ListPendingRollbacksRequest) (*v1.ListPendingRollbacksResponse, error) {
 	s.d.MarkActive()
 	if err := s.vault(ctx); err != nil {
@@ -116,29 +165,60 @@ func (s *assistSvc) ListPendingRollbacks(ctx context.Context, _ *v1.ListPendingR
 		if !strings.HasPrefix(in.Label, pendingPrefix) {
 			continue
 		}
-		rec, err := s.loadPending(in.Label)
-		if err != nil {
-			return nil, service.Err(ctx, codes.Internal, "assist.svc.reversa_ilegible", i18n.A("id", strings.TrimPrefix(in.Label, pendingPrefix), "cause", err.Error()))
+		id := strings.TrimPrefix(in.Label, pendingPrefix)
+		if s.live(id) {
+			continue
 		}
-		pr := &v1.PendingRollback{RunId: rec.RunID, Kind: rec.Kind, EndedUnix: rec.Ended.Unix(), AgeSeconds: int64(now.Sub(rec.Ended).Seconds())}
+		rec, err := s.loadPending(in.Label)
+		if err != nil { // una entrada ilegible no tumba la lista: se muestra para poder descartarla
+			out.Rollbacks = append(out.Rollbacks, &v1.PendingRollback{RunId: id, Unreadable: true})
+			continue
+		}
+		pr := &v1.PendingRollback{RunId: rec.RunID, Kind: rec.Kind, EndedUnix: rec.base().Unix(), AgeSeconds: int64(now.Sub(rec.base()).Seconds()), WriteMemory: rec.Leftover.WriteMemory}
 		for _, d := range rec.Leftover.Devices {
 			pr.Devices = append(pr.Devices, &v1.PendingRollbackDevice{Device: d.Device, RollbackLines: assist.ScrubLines(d.Rollback, d.Secrets, rec.Leftover.Scrub)})
 		}
 		out.Rollbacks = append(out.Rollbacks, pr)
 	}
-	sort.Slice(out.Rollbacks, func(i, j int) bool { return out.Rollbacks[i].EndedUnix > out.Rollbacks[j].EndedUnix })
+	sort.SliceStable(out.Rollbacks, func(i, j int) bool { return out.Rollbacks[i].EndedUnix > out.Rollbacks[j].EndedUnix })
 	return out, nil
+}
+
+// DiscardPendingRollback borra una reversa pendiente (también una ilegible) sin aplicarla.
+func (s *assistSvc) DiscardPendingRollback(ctx context.Context, r *v1.DiscardPendingRollbackRequest) (*v1.DiscardPendingRollbackResponse, error) {
+	s.d.MarkActive()
+	if err := s.vault(ctx); err != nil {
+		return nil, err
+	}
+	if s.live(r.RunId) {
+		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_en_curso", i18n.A("id", r.RunId))
+	}
+	if err := s.d.Vault().DeleteReserved(pendingPrefix + r.RunId); err != nil {
+		if errors.Is(err, vault.ErrNotFound) {
+			return nil, service.Err(ctx, codes.NotFound, "assist.svc.reversa_no_existe", i18n.A("id", r.RunId))
+		}
+		return nil, service.VaultErr(ctx, err)
+	}
+	s.d.Audit("assist.pending_rollback.discard", r.RunId, "discarded by the engineer")
+	return &v1.DiscardPendingRollbackResponse{}, nil
 }
 
 // StartPendingRollback aplica la reversa guardada como una ejecución asistida nueva: confirmación por paso, sin write memory, y con el
 // estado en que la ejecución dejó el equipo como pre-check (si ya no coincide, no se manda nada).
 func (s *assistSvc) StartPendingRollback(ctx context.Context, r *v1.StartPendingRollbackRequest) (*v1.StartPendingRollbackResponse, error) {
 	s.d.MarkActive()
+	// Regla 1 del ADR 0007: sin assisted explícito no se conecta ni se cambia nada.
+	if !r.Assisted {
+		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.el_modo_asistido_esta_apagado", nil)
+	}
 	if s.ctx.Err() != nil {
 		return nil, service.Err(ctx, codes.Unavailable, "assist.svc.el_nucleo_se_esta_cerrando", nil)
 	}
 	if err := s.vault(ctx); err != nil {
 		return nil, err
+	}
+	if s.live(r.RunId) {
+		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_en_curso", i18n.A("id", r.RunId))
 	}
 	rec, err := s.loadPending(pendingPrefix + r.RunId)
 	if err != nil {
@@ -147,7 +227,7 @@ func (s *assistSvc) StartPendingRollback(ctx context.Context, r *v1.StartPending
 		}
 		return nil, service.Err(ctx, codes.Internal, "assist.svc.reversa_ilegible", i18n.A("id", r.RunId, "cause", err.Error()))
 	}
-	age := s.d.Now().Sub(rec.Ended)
+	age := s.d.Now().Sub(rec.base())
 	if age > pendingMaxAge && !r.AcceptAge {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_vieja", i18n.A("age", age.Round(time.Minute).String()))
 	}

@@ -2642,6 +2642,8 @@ type PendingRollback struct {
 	Devices       []*PendingRollbackDevice `protobuf:"bytes,3,rep,name=devices,proto3" json:"devices,omitempty"`
 	EndedUnix     int64                    `protobuf:"varint,4,opt,name=ended_unix,json=endedUnix,proto3" json:"ended_unix,omitempty"`
 	AgeSeconds    int64                    `protobuf:"varint,5,opt,name=age_seconds,json=ageSeconds,proto3" json:"age_seconds,omitempty"`
+	WriteMemory   bool                     `protobuf:"varint,6,opt,name=write_memory,json=writeMemory,proto3" json:"write_memory,omitempty"` // la ejecución pedía write memory: la startup-config puede conservar el cambio; la reversa no hace write memory
+	Unreadable    bool                     `protobuf:"varint,7,opt,name=unreadable,proto3" json:"unreadable,omitempty"`                      // la entrada no se pudo leer: solo run_id; se puede descartar
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2711,6 +2713,20 @@ func (x *PendingRollback) GetAgeSeconds() int64 {
 	return 0
 }
 
+func (x *PendingRollback) GetWriteMemory() bool {
+	if x != nil {
+		return x.WriteMemory
+	}
+	return false
+}
+
+func (x *PendingRollback) GetUnreadable() bool {
+	if x != nil {
+		return x.Unreadable
+	}
+	return false
+}
+
 type ListPendingRollbacksResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Rollbacks     []*PendingRollback     `protobuf:"bytes,1,rep,name=rollbacks,proto3" json:"rollbacks,omitempty"`
@@ -2759,6 +2775,7 @@ type StartPendingRollbackRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`              // la ejecución original
 	AcceptAge     bool                   `protobuf:"varint,2,opt,name=accept_age,json=acceptAge,proto3" json:"accept_age,omitempty"` // obligatorio si pasaron más de 24 h desde que terminó
+	Assisted      bool                   `protobuf:"varint,3,opt,name=assisted,proto3" json:"assisted,omitempty"`                    // regla 1 del ADR 0007: sin true explícito no se conecta ni se cambia nada
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2807,6 +2824,13 @@ func (x *StartPendingRollbackRequest) GetAcceptAge() bool {
 	return false
 }
 
+func (x *StartPendingRollbackRequest) GetAssisted() bool {
+	if x != nil {
+		return x.Assisted
+	}
+	return false
+}
+
 type StartPendingRollbackResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"` // la ejecución nueva, para WatchRun, Confirm, Abort y Rollback
@@ -2849,6 +2873,86 @@ func (x *StartPendingRollbackResponse) GetRunId() string {
 		return x.RunId
 	}
 	return ""
+}
+
+type DiscardPendingRollbackRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscardPendingRollbackRequest) Reset() {
+	*x = DiscardPendingRollbackRequest{}
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscardPendingRollbackRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscardPendingRollbackRequest) ProtoMessage() {}
+
+func (x *DiscardPendingRollbackRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscardPendingRollbackRequest.ProtoReflect.Descriptor instead.
+func (*DiscardPendingRollbackRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *DiscardPendingRollbackRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+type DiscardPendingRollbackResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiscardPendingRollbackResponse) Reset() {
+	*x = DiscardPendingRollbackResponse{}
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiscardPendingRollbackResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiscardPendingRollbackResponse) ProtoMessage() {}
+
+func (x *DiscardPendingRollbackResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_assist_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiscardPendingRollbackResponse.ProtoReflect.Descriptor instead.
+func (*DiscardPendingRollbackResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_assist_proto_rawDescGZIP(), []int{46}
 }
 
 var File_macuahuitl_v1_assist_proto protoreflect.FileDescriptor
@@ -3054,7 +3158,7 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\x1bListPendingRollbacksRequest\"V\n" +
 	"\x15PendingRollbackDevice\x12\x16\n" +
 	"\x06device\x18\x01 \x01(\tR\x06device\x12%\n" +
-	"\x0erollback_lines\x18\x02 \x03(\tR\rrollbackLines\"\xbc\x01\n" +
+	"\x0erollback_lines\x18\x02 \x03(\tR\rrollbackLines\"\xff\x01\n" +
 	"\x0fPendingRollback\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12>\n" +
@@ -3062,15 +3166,24 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\n" +
 	"ended_unix\x18\x04 \x01(\x03R\tendedUnix\x12\x1f\n" +
 	"\vage_seconds\x18\x05 \x01(\x03R\n" +
-	"ageSeconds\"\\\n" +
+	"ageSeconds\x12!\n" +
+	"\fwrite_memory\x18\x06 \x01(\bR\vwriteMemory\x12\x1e\n" +
+	"\n" +
+	"unreadable\x18\a \x01(\bR\n" +
+	"unreadable\"\\\n" +
 	"\x1cListPendingRollbacksResponse\x12<\n" +
-	"\trollbacks\x18\x01 \x03(\v2\x1e.macuahuitl.v1.PendingRollbackR\trollbacks\"S\n" +
+	"\trollbacks\x18\x01 \x03(\v2\x1e.macuahuitl.v1.PendingRollbackR\trollbacks\"o\n" +
 	"\x1bStartPendingRollbackRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x1d\n" +
 	"\n" +
-	"accept_age\x18\x02 \x01(\bR\tacceptAge\"5\n" +
+	"accept_age\x18\x02 \x01(\bR\tacceptAge\x12\x1a\n" +
+	"\bassisted\x18\x03 \x01(\bR\bassisted\"5\n" +
 	"\x1cStartPendingRollbackResponse\x12\x15\n" +
-	"\x06run_id\x18\x01 \x01(\tR\x05runId2\xda\t\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\"6\n" +
+	"\x1dDiscardPendingRollbackRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\" \n" +
+	"\x1eDiscardPendingRollbackResponse2\xd1\n" +
+	"\n" +
 	"\rAssistService\x12N\n" +
 	"\tPlanPorts\x12\x1f.macuahuitl.v1.PlanPortsRequest\x1a .macuahuitl.v1.PlanPortsResponse\x12T\n" +
 	"\vPlanSnippet\x12!.macuahuitl.v1.PlanSnippetRequest\x1a\".macuahuitl.v1.PlanSnippetResponse\x12o\n" +
@@ -3085,7 +3198,8 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\bListRuns\x12\x1e.macuahuitl.v1.ListRunsRequest\x1a\x1f.macuahuitl.v1.ListRunsResponse\x12W\n" +
 	"\fGetAssistRun\x12\".macuahuitl.v1.GetAssistRunRequest\x1a#.macuahuitl.v1.GetAssistRunResponse\x12o\n" +
 	"\x14ListPendingRollbacks\x12*.macuahuitl.v1.ListPendingRollbacksRequest\x1a+.macuahuitl.v1.ListPendingRollbacksResponse\x12o\n" +
-	"\x14StartPendingRollback\x12*.macuahuitl.v1.StartPendingRollbackRequest\x1a+.macuahuitl.v1.StartPendingRollbackResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
+	"\x14StartPendingRollback\x12*.macuahuitl.v1.StartPendingRollbackRequest\x1a+.macuahuitl.v1.StartPendingRollbackResponse\x12u\n" +
+	"\x16DiscardPendingRollback\x12,.macuahuitl.v1.DiscardPendingRollbackRequest\x1a-.macuahuitl.v1.DiscardPendingRollbackResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
 
 var (
 	file_macuahuitl_v1_assist_proto_rawDescOnce sync.Once
@@ -3099,61 +3213,63 @@ func file_macuahuitl_v1_assist_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_assist_proto_rawDescData
 }
 
-var file_macuahuitl_v1_assist_proto_msgTypes = make([]protoimpl.MessageInfo, 47)
+var file_macuahuitl_v1_assist_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
 var file_macuahuitl_v1_assist_proto_goTypes = []any{
-	(*AssistTarget)(nil),                 // 0: macuahuitl.v1.AssistTarget
-	(*PlanPortsRequest)(nil),             // 1: macuahuitl.v1.PlanPortsRequest
-	(*AssistExpect)(nil),                 // 2: macuahuitl.v1.AssistExpect
-	(*AssistDevicePlan)(nil),             // 3: macuahuitl.v1.AssistDevicePlan
-	(*AssistNote)(nil),                   // 4: macuahuitl.v1.AssistNote
-	(*AssistPlan)(nil),                   // 5: macuahuitl.v1.AssistPlan
-	(*PlanPortsResponse)(nil),            // 6: macuahuitl.v1.PlanPortsResponse
-	(*StartRunRequest)(nil),              // 7: macuahuitl.v1.StartRunRequest
-	(*StartRunResponse)(nil),             // 8: macuahuitl.v1.StartRunResponse
-	(*ConfirmRequest)(nil),               // 9: macuahuitl.v1.ConfirmRequest
-	(*ConfirmResponse)(nil),              // 10: macuahuitl.v1.ConfirmResponse
-	(*AbortRequest)(nil),                 // 11: macuahuitl.v1.AbortRequest
-	(*AbortResponse)(nil),                // 12: macuahuitl.v1.AbortResponse
-	(*RollbackRequest)(nil),              // 13: macuahuitl.v1.RollbackRequest
-	(*RollbackResponse)(nil),             // 14: macuahuitl.v1.RollbackResponse
-	(*WatchRunRequest)(nil),              // 15: macuahuitl.v1.WatchRunRequest
-	(*ListRunsRequest)(nil),              // 16: macuahuitl.v1.ListRunsRequest
-	(*ListRunsResponse)(nil),             // 17: macuahuitl.v1.ListRunsResponse
-	(*GetAssistRunRequest)(nil),          // 18: macuahuitl.v1.GetAssistRunRequest
-	(*GetAssistRunResponse)(nil),         // 19: macuahuitl.v1.GetAssistRunResponse
-	(*WatchRunResponse)(nil),             // 20: macuahuitl.v1.WatchRunResponse
-	(*AssistStep)(nil),                   // 21: macuahuitl.v1.AssistStep
-	(*AssistRunState)(nil),               // 22: macuahuitl.v1.AssistRunState
-	(*AssistEvent)(nil),                  // 23: macuahuitl.v1.AssistEvent
-	(*VlanSnippet)(nil),                  // 24: macuahuitl.v1.VlanSnippet
-	(*TrunkSnippet)(nil),                 // 25: macuahuitl.v1.TrunkSnippet
-	(*SviSnippet)(nil),                   // 26: macuahuitl.v1.SviSnippet
-	(*PlanSnippetRequest)(nil),           // 27: macuahuitl.v1.PlanSnippetRequest
-	(*TemplateSnippet)(nil),              // 28: macuahuitl.v1.TemplateSnippet
-	(*ListSnippetTemplatesRequest)(nil),  // 29: macuahuitl.v1.ListSnippetTemplatesRequest
-	(*ListSnippetTemplatesResponse)(nil), // 30: macuahuitl.v1.ListSnippetTemplatesResponse
-	(*SnippetTemplate)(nil),              // 31: macuahuitl.v1.SnippetTemplate
-	(*SnippetField)(nil),                 // 32: macuahuitl.v1.SnippetField
-	(*PlanSnippetResponse)(nil),          // 33: macuahuitl.v1.PlanSnippetResponse
-	(*PlanCredRotateRequest)(nil),        // 34: macuahuitl.v1.PlanCredRotateRequest
-	(*PlanCredRotateResponse)(nil),       // 35: macuahuitl.v1.PlanCredRotateResponse
-	(*PlanRestoreRequest)(nil),           // 36: macuahuitl.v1.PlanRestoreRequest
-	(*RestoreRefusal)(nil),               // 37: macuahuitl.v1.RestoreRefusal
-	(*PlanRestoreResponse)(nil),          // 38: macuahuitl.v1.PlanRestoreResponse
-	(*ListPendingRollbacksRequest)(nil),  // 39: macuahuitl.v1.ListPendingRollbacksRequest
-	(*PendingRollbackDevice)(nil),        // 40: macuahuitl.v1.PendingRollbackDevice
-	(*PendingRollback)(nil),              // 41: macuahuitl.v1.PendingRollback
-	(*ListPendingRollbacksResponse)(nil), // 42: macuahuitl.v1.ListPendingRollbacksResponse
-	(*StartPendingRollbackRequest)(nil),  // 43: macuahuitl.v1.StartPendingRollbackRequest
-	(*StartPendingRollbackResponse)(nil), // 44: macuahuitl.v1.StartPendingRollbackResponse
-	nil,                                  // 45: macuahuitl.v1.AssistNote.ArgsEntry
-	nil,                                  // 46: macuahuitl.v1.TemplateSnippet.ValuesEntry
+	(*AssistTarget)(nil),                   // 0: macuahuitl.v1.AssistTarget
+	(*PlanPortsRequest)(nil),               // 1: macuahuitl.v1.PlanPortsRequest
+	(*AssistExpect)(nil),                   // 2: macuahuitl.v1.AssistExpect
+	(*AssistDevicePlan)(nil),               // 3: macuahuitl.v1.AssistDevicePlan
+	(*AssistNote)(nil),                     // 4: macuahuitl.v1.AssistNote
+	(*AssistPlan)(nil),                     // 5: macuahuitl.v1.AssistPlan
+	(*PlanPortsResponse)(nil),              // 6: macuahuitl.v1.PlanPortsResponse
+	(*StartRunRequest)(nil),                // 7: macuahuitl.v1.StartRunRequest
+	(*StartRunResponse)(nil),               // 8: macuahuitl.v1.StartRunResponse
+	(*ConfirmRequest)(nil),                 // 9: macuahuitl.v1.ConfirmRequest
+	(*ConfirmResponse)(nil),                // 10: macuahuitl.v1.ConfirmResponse
+	(*AbortRequest)(nil),                   // 11: macuahuitl.v1.AbortRequest
+	(*AbortResponse)(nil),                  // 12: macuahuitl.v1.AbortResponse
+	(*RollbackRequest)(nil),                // 13: macuahuitl.v1.RollbackRequest
+	(*RollbackResponse)(nil),               // 14: macuahuitl.v1.RollbackResponse
+	(*WatchRunRequest)(nil),                // 15: macuahuitl.v1.WatchRunRequest
+	(*ListRunsRequest)(nil),                // 16: macuahuitl.v1.ListRunsRequest
+	(*ListRunsResponse)(nil),               // 17: macuahuitl.v1.ListRunsResponse
+	(*GetAssistRunRequest)(nil),            // 18: macuahuitl.v1.GetAssistRunRequest
+	(*GetAssistRunResponse)(nil),           // 19: macuahuitl.v1.GetAssistRunResponse
+	(*WatchRunResponse)(nil),               // 20: macuahuitl.v1.WatchRunResponse
+	(*AssistStep)(nil),                     // 21: macuahuitl.v1.AssistStep
+	(*AssistRunState)(nil),                 // 22: macuahuitl.v1.AssistRunState
+	(*AssistEvent)(nil),                    // 23: macuahuitl.v1.AssistEvent
+	(*VlanSnippet)(nil),                    // 24: macuahuitl.v1.VlanSnippet
+	(*TrunkSnippet)(nil),                   // 25: macuahuitl.v1.TrunkSnippet
+	(*SviSnippet)(nil),                     // 26: macuahuitl.v1.SviSnippet
+	(*PlanSnippetRequest)(nil),             // 27: macuahuitl.v1.PlanSnippetRequest
+	(*TemplateSnippet)(nil),                // 28: macuahuitl.v1.TemplateSnippet
+	(*ListSnippetTemplatesRequest)(nil),    // 29: macuahuitl.v1.ListSnippetTemplatesRequest
+	(*ListSnippetTemplatesResponse)(nil),   // 30: macuahuitl.v1.ListSnippetTemplatesResponse
+	(*SnippetTemplate)(nil),                // 31: macuahuitl.v1.SnippetTemplate
+	(*SnippetField)(nil),                   // 32: macuahuitl.v1.SnippetField
+	(*PlanSnippetResponse)(nil),            // 33: macuahuitl.v1.PlanSnippetResponse
+	(*PlanCredRotateRequest)(nil),          // 34: macuahuitl.v1.PlanCredRotateRequest
+	(*PlanCredRotateResponse)(nil),         // 35: macuahuitl.v1.PlanCredRotateResponse
+	(*PlanRestoreRequest)(nil),             // 36: macuahuitl.v1.PlanRestoreRequest
+	(*RestoreRefusal)(nil),                 // 37: macuahuitl.v1.RestoreRefusal
+	(*PlanRestoreResponse)(nil),            // 38: macuahuitl.v1.PlanRestoreResponse
+	(*ListPendingRollbacksRequest)(nil),    // 39: macuahuitl.v1.ListPendingRollbacksRequest
+	(*PendingRollbackDevice)(nil),          // 40: macuahuitl.v1.PendingRollbackDevice
+	(*PendingRollback)(nil),                // 41: macuahuitl.v1.PendingRollback
+	(*ListPendingRollbacksResponse)(nil),   // 42: macuahuitl.v1.ListPendingRollbacksResponse
+	(*StartPendingRollbackRequest)(nil),    // 43: macuahuitl.v1.StartPendingRollbackRequest
+	(*StartPendingRollbackResponse)(nil),   // 44: macuahuitl.v1.StartPendingRollbackResponse
+	(*DiscardPendingRollbackRequest)(nil),  // 45: macuahuitl.v1.DiscardPendingRollbackRequest
+	(*DiscardPendingRollbackResponse)(nil), // 46: macuahuitl.v1.DiscardPendingRollbackResponse
+	nil,                                    // 47: macuahuitl.v1.AssistNote.ArgsEntry
+	nil,                                    // 48: macuahuitl.v1.TemplateSnippet.ValuesEntry
 }
 var file_macuahuitl_v1_assist_proto_depIdxs = []int32{
 	0,  // 0: macuahuitl.v1.PlanPortsRequest.target:type_name -> macuahuitl.v1.AssistTarget
 	2,  // 1: macuahuitl.v1.AssistDevicePlan.expect:type_name -> macuahuitl.v1.AssistExpect
 	4,  // 2: macuahuitl.v1.AssistDevicePlan.notes_structured:type_name -> macuahuitl.v1.AssistNote
-	45, // 3: macuahuitl.v1.AssistNote.args:type_name -> macuahuitl.v1.AssistNote.ArgsEntry
+	47, // 3: macuahuitl.v1.AssistNote.args:type_name -> macuahuitl.v1.AssistNote.ArgsEntry
 	3,  // 4: macuahuitl.v1.AssistPlan.devices:type_name -> macuahuitl.v1.AssistDevicePlan
 	5,  // 5: macuahuitl.v1.PlanPortsResponse.plan:type_name -> macuahuitl.v1.AssistPlan
 	22, // 6: macuahuitl.v1.ConfirmResponse.run:type_name -> macuahuitl.v1.AssistRunState
@@ -3169,7 +3285,7 @@ var file_macuahuitl_v1_assist_proto_depIdxs = []int32{
 	25, // 16: macuahuitl.v1.PlanSnippetRequest.trunk:type_name -> macuahuitl.v1.TrunkSnippet
 	26, // 17: macuahuitl.v1.PlanSnippetRequest.svi:type_name -> macuahuitl.v1.SviSnippet
 	28, // 18: macuahuitl.v1.PlanSnippetRequest.template:type_name -> macuahuitl.v1.TemplateSnippet
-	46, // 19: macuahuitl.v1.TemplateSnippet.values:type_name -> macuahuitl.v1.TemplateSnippet.ValuesEntry
+	48, // 19: macuahuitl.v1.TemplateSnippet.values:type_name -> macuahuitl.v1.TemplateSnippet.ValuesEntry
 	31, // 20: macuahuitl.v1.ListSnippetTemplatesResponse.templates:type_name -> macuahuitl.v1.SnippetTemplate
 	32, // 21: macuahuitl.v1.SnippetTemplate.fields:type_name -> macuahuitl.v1.SnippetField
 	5,  // 22: macuahuitl.v1.PlanSnippetResponse.plan:type_name -> macuahuitl.v1.AssistPlan
@@ -3194,22 +3310,24 @@ var file_macuahuitl_v1_assist_proto_depIdxs = []int32{
 	18, // 41: macuahuitl.v1.AssistService.GetAssistRun:input_type -> macuahuitl.v1.GetAssistRunRequest
 	39, // 42: macuahuitl.v1.AssistService.ListPendingRollbacks:input_type -> macuahuitl.v1.ListPendingRollbacksRequest
 	43, // 43: macuahuitl.v1.AssistService.StartPendingRollback:input_type -> macuahuitl.v1.StartPendingRollbackRequest
-	6,  // 44: macuahuitl.v1.AssistService.PlanPorts:output_type -> macuahuitl.v1.PlanPortsResponse
-	33, // 45: macuahuitl.v1.AssistService.PlanSnippet:output_type -> macuahuitl.v1.PlanSnippetResponse
-	30, // 46: macuahuitl.v1.AssistService.ListSnippetTemplates:output_type -> macuahuitl.v1.ListSnippetTemplatesResponse
-	35, // 47: macuahuitl.v1.AssistService.PlanCredRotate:output_type -> macuahuitl.v1.PlanCredRotateResponse
-	38, // 48: macuahuitl.v1.AssistService.PlanRestore:output_type -> macuahuitl.v1.PlanRestoreResponse
-	8,  // 49: macuahuitl.v1.AssistService.StartRun:output_type -> macuahuitl.v1.StartRunResponse
-	10, // 50: macuahuitl.v1.AssistService.Confirm:output_type -> macuahuitl.v1.ConfirmResponse
-	12, // 51: macuahuitl.v1.AssistService.Abort:output_type -> macuahuitl.v1.AbortResponse
-	14, // 52: macuahuitl.v1.AssistService.Rollback:output_type -> macuahuitl.v1.RollbackResponse
-	20, // 53: macuahuitl.v1.AssistService.WatchRun:output_type -> macuahuitl.v1.WatchRunResponse
-	17, // 54: macuahuitl.v1.AssistService.ListRuns:output_type -> macuahuitl.v1.ListRunsResponse
-	19, // 55: macuahuitl.v1.AssistService.GetAssistRun:output_type -> macuahuitl.v1.GetAssistRunResponse
-	42, // 56: macuahuitl.v1.AssistService.ListPendingRollbacks:output_type -> macuahuitl.v1.ListPendingRollbacksResponse
-	44, // 57: macuahuitl.v1.AssistService.StartPendingRollback:output_type -> macuahuitl.v1.StartPendingRollbackResponse
-	44, // [44:58] is the sub-list for method output_type
-	30, // [30:44] is the sub-list for method input_type
+	45, // 44: macuahuitl.v1.AssistService.DiscardPendingRollback:input_type -> macuahuitl.v1.DiscardPendingRollbackRequest
+	6,  // 45: macuahuitl.v1.AssistService.PlanPorts:output_type -> macuahuitl.v1.PlanPortsResponse
+	33, // 46: macuahuitl.v1.AssistService.PlanSnippet:output_type -> macuahuitl.v1.PlanSnippetResponse
+	30, // 47: macuahuitl.v1.AssistService.ListSnippetTemplates:output_type -> macuahuitl.v1.ListSnippetTemplatesResponse
+	35, // 48: macuahuitl.v1.AssistService.PlanCredRotate:output_type -> macuahuitl.v1.PlanCredRotateResponse
+	38, // 49: macuahuitl.v1.AssistService.PlanRestore:output_type -> macuahuitl.v1.PlanRestoreResponse
+	8,  // 50: macuahuitl.v1.AssistService.StartRun:output_type -> macuahuitl.v1.StartRunResponse
+	10, // 51: macuahuitl.v1.AssistService.Confirm:output_type -> macuahuitl.v1.ConfirmResponse
+	12, // 52: macuahuitl.v1.AssistService.Abort:output_type -> macuahuitl.v1.AbortResponse
+	14, // 53: macuahuitl.v1.AssistService.Rollback:output_type -> macuahuitl.v1.RollbackResponse
+	20, // 54: macuahuitl.v1.AssistService.WatchRun:output_type -> macuahuitl.v1.WatchRunResponse
+	17, // 55: macuahuitl.v1.AssistService.ListRuns:output_type -> macuahuitl.v1.ListRunsResponse
+	19, // 56: macuahuitl.v1.AssistService.GetAssistRun:output_type -> macuahuitl.v1.GetAssistRunResponse
+	42, // 57: macuahuitl.v1.AssistService.ListPendingRollbacks:output_type -> macuahuitl.v1.ListPendingRollbacksResponse
+	44, // 58: macuahuitl.v1.AssistService.StartPendingRollback:output_type -> macuahuitl.v1.StartPendingRollbackResponse
+	46, // 59: macuahuitl.v1.AssistService.DiscardPendingRollback:output_type -> macuahuitl.v1.DiscardPendingRollbackResponse
+	45, // [45:60] is the sub-list for method output_type
+	30, // [30:45] is the sub-list for method input_type
 	30, // [30:30] is the sub-list for extension type_name
 	30, // [30:30] is the sub-list for extension extendee
 	0,  // [0:30] is the sub-list for field type_name
@@ -3234,7 +3352,7 @@ func file_macuahuitl_v1_assist_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_assist_proto_rawDesc), len(file_macuahuitl_v1_assist_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   47,
+			NumMessages:   49,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

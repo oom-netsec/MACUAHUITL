@@ -290,7 +290,14 @@ func PendingRollbacks(c *Env, args []string) error {
 }
 
 func printPending(w io.Writer, p *v1.PendingRollback) {
+	if p.Unreadable {
+		fmt.Fprintln(w, T("mctl.ports.rollback_unreadable", "run", p.RunId))
+		return
+	}
 	fmt.Fprintln(w, T("mctl.ports.rollback_header", "run", p.RunId, "kind", p.Kind, "age", (time.Duration(p.AgeSeconds)*time.Second).String()))
+	if p.WriteMemory {
+		fmt.Fprintln(w, T("mctl.ports.rollback_write_memory"))
+	}
 	for _, d := range p.Devices {
 		fmt.Fprintf(w, "  %s:\n", d.Device)
 		for _, l := range d.RollbackLines {
@@ -301,12 +308,19 @@ func printPending(w io.Writer, p *v1.PendingRollback) {
 
 // Rollback aplica una reversa guardada con confirmación por paso, igual que --assisted (`ports|snippet|restore rollback RUN [--accept-age]`).
 func Rollback(c *Env, args []string) error {
+	if len(args) == 2 && args[0] == "discard" { // `rollback discard RUN`: descarta sin aplicar
+		_, err := v1.NewAssistServiceClient(c.Conn).DiscardPendingRollback(context.Background(), &v1.DiscardPendingRollbackRequest{RunId: args[1]})
+		if err == nil {
+			fmt.Fprintln(c.Out, T("mctl.ports.rollback_discarded", "run", args[1]))
+		}
+		return err
+	}
 	var acceptAge bool
 	fs, err := Flags("ports rollback", args, func(fs *flag.FlagSet) {
 		fs.BoolVar(&acceptAge, "accept-age", false, "aceptar una reversa de más de 24 h")
 	})
 	if err != nil || fs.NArg() != 1 {
-		return errors.New("uso: mctl ports rollback EJECUCION [--accept-age]")
+		return errors.New("uso: mctl ports rollback EJECUCION [--accept-age] | mctl ports rollback discard EJECUCION")
 	}
 	cl := v1.NewAssistServiceClient(c.Conn)
 	l, err := cl.ListPendingRollbacks(context.Background(), &v1.ListPendingRollbacksRequest{})
@@ -318,7 +332,7 @@ func Rollback(c *Env, args []string) error {
 			printPending(c.Out, p)
 		}
 	}
-	run, err := cl.StartPendingRollback(context.Background(), &v1.StartPendingRollbackRequest{RunId: fs.Arg(0), AcceptAge: acceptAge})
+	run, err := cl.StartPendingRollback(context.Background(), &v1.StartPendingRollbackRequest{RunId: fs.Arg(0), AcceptAge: acceptAge, Assisted: true})
 	if err != nil {
 		return err
 	}

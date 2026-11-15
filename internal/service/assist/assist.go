@@ -558,8 +558,12 @@ func (s *assistSvc) launch(ctx context.Context, rec *planRec, planID string, key
 	if rec.rot != nil {
 		ex = &rotExec{devExec: ex.(*devExec), rot: *rec.rot}
 	}
-	run, err := assist.NewRun(assist.Options{ID: runID, Plan: rec.plan, Fn: rec.fn, Assisted: true, Exec: ex, Audit: s.d.Audit,
-		DecisionTimeout: s.decisionTimeout})
+	opts := assist.Options{ID: runID, Plan: rec.plan, Fn: rec.fn, Assisted: true, Exec: ex, Audit: s.d.Audit, DecisionTimeout: s.decisionTimeout}
+	pers := &persister{s: s, runID: runID, t: rec.t}
+	if origin == "" { // la reversa se guarda mientras la ejecución avanza; una ejecución de reversa no guarda otra
+		opts.Persist = pers.sync
+	}
+	run, err := assist.NewRun(opts)
 	if err != nil {
 		release()
 		return "", service.ErrFrom(ctx, codes.InvalidArgument, err)
@@ -588,7 +592,7 @@ func (s *assistSvc) launch(ctx context.Context, rec *planRec, planID string, key
 		s.mu.Lock()
 		rr.ended = s.d.Now()
 		s.mu.Unlock()
-		s.afterRun(rr, rec.t, origin) // antes de close(finished): quien espera el fin ya ve la reversa guardada
+		s.afterRun(rr, pers, origin) // antes de close(finished): quien espera el fin ya ve la reversa guardada
 		close(rr.finished)
 	}()
 	return runID, nil
@@ -671,7 +675,11 @@ func (s *assistSvc) WatchRun(r *v1.WatchRunRequest, st v1.AssistService_WatchRun
 		}
 		select {
 		case <-rr.run.Done():
-			<-rr.finished // ya quedó guardada (o borrada) la reversa pendiente
+			select { // ya quedó guardada (o borrada) la reversa pendiente
+			case <-rr.finished:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 			evs, _ := rr.run.Events(from)
 			return send(evs)
 		case <-more:

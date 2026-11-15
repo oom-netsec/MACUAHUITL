@@ -192,12 +192,22 @@ func (b *Bridge) AssistListPendingRollbacks() (string, error) {
 }
 
 // AssistStartPendingRollback inicia la reversa guardada de runID y devuelve el id de la ejecución nueva, que se sigue con AssistWatch,
-// AssistConfirm, AssistAbort y AssistRollback como cualquier otra. acceptAge es la confirmación de antigüedad (más de 24 h).
-func (b *Bridge) AssistStartPendingRollback(runID string, acceptAge bool) (string, error) {
+// AssistConfirm, AssistAbort y AssistRollback como cualquier otra. acceptAge es la confirmación de antigüedad (más de 24 h); assisted es la
+// casilla de esa ejecución (ADR 0007, regla 1), como en AssistStart.
+func (b *Bridge) AssistStartPendingRollback(runID string, acceptAge, assisted bool) (string, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
-		r, err := v1.NewAssistServiceClient(c).StartPendingRollback(ctx, &v1.StartPendingRollbackRequest{RunId: runID, AcceptAge: acceptAge})
+		r, err := v1.NewAssistServiceClient(c).StartPendingRollback(ctx, &v1.StartPendingRollbackRequest{RunId: runID, AcceptAge: acceptAge, Assisted: assisted})
 		return r.GetRunId(), err
 	})
+}
+
+// AssistDiscardPendingRollback descarta la reversa guardada de runID sin aplicarla (también una ilegible).
+func (b *Bridge) AssistDiscardPendingRollback(runID string) error {
+	_, err := call(b, func(ctx context.Context, c *ipc.ClientConn) (struct{}, error) {
+		_, err := v1.NewAssistServiceClient(c).DiscardPendingRollback(ctx, &v1.DiscardPendingRollbackRequest{RunId: runID})
+		return struct{}{}, err
+	})
+	return err
 }
 
 func (b *Bridge) AssistConfirm(runID, stepID string) error {

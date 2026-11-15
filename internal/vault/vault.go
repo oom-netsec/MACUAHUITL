@@ -318,7 +318,38 @@ func (v *Vault) Put(c Credential) (string, error) {
 }
 
 // PutBatch es Put para varias credenciales con una sola escritura: o quedan todas o no queda ninguna.
-func (v *Vault) PutBatch(cs []Credential) ([]string, error) {
+func (v *Vault) PutBatch(cs []Credential) ([]string, error) { return v.putBatch(cs, false) }
+
+// PutReserved crea o reemplaza (por etiqueta) una entrada reservada del sistema; la etiqueta debe ser reservada.
+func (v *Vault) PutReserved(c Credential) error {
+	if !Reserved(c.Label) {
+		return ErrNotFound
+	}
+	v.mu.Lock()
+	if err := v.requireFull(); err != nil {
+		v.mu.Unlock()
+		return err
+	}
+	for _, e := range v.entries {
+		old, err := v.decrypt(e)
+		if err != nil {
+			v.mu.Unlock()
+			return err
+		}
+		old.Password.Destroy()
+		old.Enable.Destroy()
+		old.SSHKey.Destroy()
+		if old.Label == c.Label {
+			c.ID = old.ID
+			break
+		}
+	}
+	v.mu.Unlock()
+	_, err := v.putBatch([]Credential{c}, true)
+	return err
+}
+
+func (v *Vault) putBatch(cs []Credential, reserved bool) ([]string, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if err := v.requireFull(); err != nil {
@@ -334,7 +365,7 @@ func (v *Vault) PutBatch(cs []Credential) ([]string, error) {
 			if err != nil {
 				return nil, err
 			}
-			if err := v.guardReserved(i); err != nil {
+			if err := v.guardReserved(i); err != nil && !reserved {
 				return nil, err
 			}
 			idx, e.ID = i, v.entries[i].ID

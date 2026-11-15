@@ -19,7 +19,8 @@ const help = `  ports set EQUIPO[:PUERTO] IF... --cred ID [--vlan N] [--voice N]
   ports runs [--active]             ejecuciones que el núcleo recuerda (para retomar una que quedó viva)
   ports resume EJECUCION            retoma la confirmación de una ejecución viva
   ports rollbacks                   reversas guardadas de ejecuciones que dejaron equipos cambiados (sobreviven al reinicio; cred rotate no: es a mano)
-  ports rollback EJECUCION [--accept-age]  aplica esa reversa con confirmación por paso (también snippet rollback y restore rollback; --accept-age si pasaron más de 24 h)`
+  ports rollback EJECUCION [--accept-age]  aplica esa reversa con confirmación por paso (también snippet rollback y restore rollback; --accept-age si pasaron más de 24 h)
+  ports rollback discard EJECUCION  descarta esa reversa sin aplicarla`
 
 func set(c *cli.Env, args []string) error {
 	var vlan, voice int

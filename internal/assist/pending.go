@@ -27,7 +27,9 @@ type LeftDevice struct {
 type Leftover struct {
 	Function string
 	Scrub    bool
-	Devices  []LeftDevice // en el orden en que se aplicaron
+	// WriteMemory: la ejecución pedía write memory; si falló tras escribir, la startup-config puede conservar el cambio.
+	WriteMemory bool
+	Devices     []LeftDevice // en el orden en que se aplicaron
 }
 
 // Leftover devuelve los equipos que la ejecución dejó cambiados, o nil si no hay ninguno o la ejecución cambia credenciales (su reversa
@@ -35,7 +37,7 @@ type Leftover struct {
 func (r *Run) Leftover() *Leftover {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := &Leftover{Function: r.plan.Function, Scrub: r.fn.Scrub}
+	out := &Leftover{Function: r.plan.Function, Scrub: r.fn.Scrub, WriteMemory: r.plan.WriteMemory}
 	for _, i := range r.changed {
 		dp := r.plan.Devices[i]
 		if dp.VerifyLogin {
@@ -73,15 +75,26 @@ func RollbackPlan(l Leftover) (Plan, Function, error) {
 		if len(d.State) == 0 {
 			return Plan{}, fn, cerr("assist.pending.no_state", "device", d.Device)
 		}
-		dp := DevicePlan{Device: d.Device, Pre: sortedCmds(d.State), Baseline: d.State, Apply: d.Rollback, Rollback: d.Apply,
-			Post: sortedCmds(d.Baseline), Secrets: d.Secrets}
-		for _, c := range dp.Post {
-			if txt := d.Baseline[c]; strings.TrimSpace(txt) != "" && !isStatusCmd(c) {
+		// Un State a medias (se cortó la lectura del post-check) dejaría sin pre-check a un equipo que otro pudo cambiar: se exige completo.
+		for c := range d.Baseline {
+			if _, ok := d.State[c]; !ok && !isStatusCmd(c) && slices.Contains(d.Post, c) {
+				return Plan{}, fn, cerr("assist.pending.no_state", "device", d.Device)
+			}
+		}
+		dp := DevicePlan{Device: d.Device, Pre: sortedCmds(d.State), Baseline: d.State, Apply: d.Rollback, Rollback: d.Apply, Secrets: d.Secrets}
+		// La vuelta se verifica solo con configuración (running-config, show snmp user): la salida de comandos operativos cambia sin que nadie toque el equipo.
+		for _, c := range sortedCmds(d.Baseline) {
+			if txt := d.Baseline[c]; isConfigCmd(c) && strings.TrimSpace(txt) != "" {
+				dp.Post = append(dp.Post, c)
 				dp.Expect = append(dp.Expect, Expect{Command: c, Line: txt, Present: true, Column: "same-state"})
 			}
 		}
 		if len(dp.Expect) == 0 {
 			return Plan{}, fn, cerr("assist.pending.not_verifiable", "device", d.Device)
+		}
+		if l.WriteMemory {
+			n := note("assist.pending.write_memory")
+			dp.NoteItems, dp.Notes = []i18n.Text{n}, []string{n.In(i18n.Es)}
 		}
 		for _, line := range append(slices.Clone(d.Apply), d.Rollback...) {
 			fn.Allowed = append(fn.Allowed, strings.Join(strings.Fields(strings.ToLower(line)), " "))
@@ -89,6 +102,10 @@ func RollbackPlan(l Leftover) (Plan, Function, error) {
 		plan.Devices = append(plan.Devices, dp)
 	}
 	return plan, fn, nil
+}
+
+func isConfigCmd(c string) bool {
+	return strings.HasPrefix(c, "show running-config") || c == snmpUserCmd
 }
 
 // sameState dice si got es el estado want de cmd; para el running-config usa la misma comparación que la reversa del motor
