@@ -13,15 +13,15 @@ packet-tracer, NAT, túnel que no sube, AnyConnect, failover inesperado, CPU alt
 lentitud, OSPF/BGP y cluster).
 
 Los playbooks que declaran datos piden la interfaz (`interface`, el nombre `nameif` en packet-tracer), la IP (`ip`,
-`src`, `dst`) o el peer (`peer`); el núcleo los valida antes de armar los comandos. Validado en un ASAv 9.x de CML
+`src`, `dst`) o el peer (`peer`); el núcleo los valida antes de armar los comandos. Comandos revisados en un ASAv 9.x de CML
 con un solo contexto (2026-11-14); también con dos ASAv en failover A/S, incluido un failover provocado; el
-multicontexto y el cluster siguen sin validar (el ASAv no acepta `mode multiple`). La app solo permite en ASA comandos de lectura: `show`, `ping`,
+multicontexto y el cluster siguen sin revisar (el ASAv no acepta `mode multiple`). La app solo permite en ASA comandos de lectura: `show`, `ping`,
 `traceroute`, `packet-tracer` (forma estricta) y `dir`; sin `more`, `copy`, `capture`, `changeto`, `failover`,
 `clear`, `debug`, `| redirect` ni `show … file`. Los comandos vienen de la documentación pública de Cisco. Ojo: `packet-tracer` es una simulación, pero sube los
 contadores `hitcnt` de las ACL que toca y, si el flujo es tráfico interesante para un crypto map, puede iniciar la
 negociación IKE; los playbooks que lo usan lo avisan en su cabecera.
 
-Anotaciones al final de la línea de un comando (validadas en un ASAv 9.x de CML el 2026-11-14): `# no existe en ASAv`, el comando es de hardware (por ejemplo `show environment`) y el ASAv virtual lo rechaza; `# solo multicontexto (espacio del sistema)`, solo funciona en modo multicontexto y desde el espacio del sistema.
+Anotaciones al final de la línea de un comando (revisadas en un ASAv 9.x de CML el 2026-11-14): `# no existe en ASAv`, el comando es de hardware (por ejemplo `show environment`) y el ASAv virtual lo rechaza; `# solo multicontexto (espacio del sistema)`, solo funciona en modo multicontexto y desde el espacio del sistema.
 
 Primer inicio de sesión: según la versión y la configuración, el ASA 9.x puede pedir a un usuario nuevo que cambie su
 contraseña al entrar por primera vez («This is your first login»). La aplicación no la cambia: el Login Test falla de inmediato con «primer inicio de sesión». Entra
@@ -30,7 +30,7 @@ una vez por consola o SSH y fija la contraseña (el ASAv 9.x del laboratorio pid
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
 1. Baja `oom-asa-<versión>.mpack` de los releases de GitHub y verifica su suma en `SHA256SUMS`.
-2. Con la línea de comandos: `mctl pack install oom-asa-<versión>.mpack`. En la aplicación: Ajustes → Paquetes → Instalar.
+2. Con la línea de comandos: `mctl pack install oom-asa-<versión>.mpack`. En la aplicación: Ajustes → Paquetes → Instalar paquete…
 3. Revisa con `mctl pack list` o en Ajustes → Paquetes.
 
 ## English
@@ -46,15 +46,15 @@ cases (traffic not passing with packet-tracer, NAT, tunnel not coming up, AnyCon
 blocks, ASP drops, slowness, OSPF/BGP and cluster).
 
 Playbooks that declare data ask for the interface (`interface`, the `nameif` name in packet-tracer), the IP (`ip`,
-`src`, `dst`) or the peer (`peer`); the core validates them before building the commands. Validated on an ASAv 9.x in
+`src`, `dst`) or the peer (`peer`); the core validates them before building the commands. Commands checked on an ASAv 9.x in
 CML with a single context (2026-11-14); also with two ASAv in A/S failover, including a forced failover; multiple
-context and clustering remain unvalidated (ASAv does not accept `mode multiple`). On ASA the app only allows read commands: `show`, `ping`, `traceroute`,
+context and clustering remain unchecked (ASAv does not accept `mode multiple`). On ASA the app only allows read commands: `show`, `ping`, `traceroute`,
 `packet-tracer` (strict form) and `dir`; no `more`, `copy`, `capture`, `changeto`, `failover`, `clear`, `debug`,
 `| redirect` or `show … file`. Commands come from Cisco's public documentation. Note: `packet-tracer` is a simulation, but it increments the `hitcnt`
 counters of the ACLs it touches and, if the flow is interesting traffic for a crypto map, it can start the IKE
 negotiation; the playbooks that use it say so in their header.
 
-Notes at the end of a command line (validated on an ASAv 9.x in CML on 2026-11-14): `# no existe en ASAv` means the command is hardware-only (for example `show environment`) and the virtual ASAv rejects it; `# solo multicontexto (espacio del sistema)` means it only works in multiple context mode from the system execution space.
+Notes at the end of a command line (checked on an ASAv 9.x in CML on 2026-11-14): `# no existe en ASAv` means the command is hardware-only (for example `show environment`) and the virtual ASAv rejects it; `# solo multicontexto (espacio del sistema)` means it only works in multiple context mode from the system execution space.
 
 First login: depending on the version and configuration, ASA 9.x may require a new user to change their password on
 the first login («This is your first login»). The
@@ -64,5 +64,5 @@ and set the password (the lab ASAv 9.x required 8 to 127 characters, no 3 sequen
 How to load it (the application never downloads packages):
 
 1. Download `oom-asa-<version>.mpack` from the GitHub releases and check its sum in `SHA256SUMS`.
-2. From the command line: `mctl pack install oom-asa-<version>.mpack`. In the app: Settings → Packages → Install.
-3. Check with `mctl pack list` or in Settings → Packages.
+2. From the command line: `mctl pack install oom-asa-<version>.mpack`. In the app: Settings → Packs → Install pack…
+3. Check with `mctl pack list` or in Settings → Packs.
