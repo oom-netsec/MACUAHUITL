@@ -102,10 +102,33 @@ func TestWriteFileNoReemplazaLoQueNoEsArchivo(t *testing.T) {
 	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
 		t.Skip("sin mkfifo:", err)
 	}
-	if err := b.WriteFile(fifo, "x", "utf8", true); err == nil {
-		t.Fatal("una FIFO no debe reemplazarse aunque haya overwrite")
+	var be *Error
+	if err := b.WriteFile(fifo, "x", "utf8", true); !errors.As(err, &be) || be.Reason != "bridge.err.save_not_regular" {
+		t.Fatalf("una FIFO no debe reemplazarse aunque haya overwrite: %v", err)
 	}
-	if fi, _ := os.Lstat(fifo); fi.Mode()&os.ModeNamedPipe == 0 {
-		t.Fatal("la FIFO debe seguir ahí")
+	if fi, err := os.Lstat(fifo); err != nil || fi.Mode()&os.ModeNamedPipe == 0 {
+		t.Fatalf("la FIFO debe seguir ahí: %v", err)
+	}
+}
+
+func TestWriteFileReemplazaElEnlaceNoSuDestino(t *testing.T) {
+	b := New(nil, nil)
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "destino.txt")
+	if err := os.WriteFile(dest, []byte("intacto"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "enlace.csv")
+	if err := os.Symlink(dest, link); err != nil {
+		t.Skip("sin enlaces simbólicos:", err)
+	}
+	if err := b.WriteFile(link, "nuevo", "utf8", true); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Lstat(link); err != nil || !fi.Mode().IsRegular() {
+		t.Fatalf("el enlace debe quedar como archivo regular: %v", err)
+	}
+	if got, _ := os.ReadFile(dest); string(got) != "intacto" {
+		t.Fatalf("el destino del enlace no se toca: %q", got)
 	}
 }

@@ -120,3 +120,6 @@ tbody tr:hover td { background: var(--hover); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* App publicada (Wails production): un textarea de solo lectura (PEM, exportaciones) conserva el menú de copiar con clic derecho. */
+textarea[readonly] { --default-contextmenu: show; }
