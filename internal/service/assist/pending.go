@@ -286,7 +286,7 @@ func (s *assistSvc) StartPendingRollback(ctx context.Context, r *v1.StartPending
 		pr.devices = append(pr.devices, d.Device)
 	}
 	// Una reversa pendiente toca varios objetos de un equipo: un solo candado del equipo entero, como restaurar.
-	keys := []string{strings.ToLower(fmt.Sprintf("%s:%d|*", rec.Host, rec.Port))}
+	keys := []string{lockKey(rec.Host, rec.Port, "*")}
 	runID, err := s.launch(ctx, pr, "", keys, rec.RunID)
 	if err != nil {
 		return nil, err

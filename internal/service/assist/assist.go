@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/netip"
 	"slices"
 	"sort"
 	"strconv"
@@ -139,14 +140,30 @@ func (s *assistSvc) pruneRunsLocked(now time.Time) {
 	}
 }
 
+// lockKey arma la clave de candado «host:puerto|resto» con el host normalizado.
+func lockKey(host string, port uint16, rest string) string {
+	return fmt.Sprintf("%s:%d|%s", lockHost(host), port, strings.ToLower(rest))
+}
+
+// lockHost normaliza la dirección de un equipo para los candados: sin espacios ni punto final, en minúsculas, sin corchetes y con las
+// IP en su forma canónica (también ::ffff:a.b.c.d como a.b.c.d). Límite: no resuelve nombres (hace falta red), así que la IP y el
+// nombre DNS del mismo equipo siguen siendo claves distintas; el candado del equipo entero (restaurar, reversa pendiente) tampoco las une.
+func lockHost(h string) string {
+	h = strings.TrimSuffix(strings.Trim(strings.ToLower(strings.TrimSpace(h)), "[]"), ".")
+	if a, err := netip.ParseAddr(h); err == nil {
+		h = a.Unmap().String()
+	}
+	return h
+}
+
 // portKeys son los objetos (equipo, interfaz | VLAN | usuario) que un plan va a cambiar; sirven de candado entre ejecuciones.
 func portKeys(rec *planRec) []string {
 	var keys []string
 	add := func(kind, obj string) {
-		keys = append(keys, strings.ToLower(fmt.Sprintf("%s:%d|%s%s", rec.t.host, rec.t.port, kind, obj)))
+		keys = append(keys, lockKey(rec.t.host, rec.t.port, kind+obj))
 	}
 	if rec.plan.Function == assist.RestoreDiff { // restaurar toca el equipo entero: un solo candado que choca con cualquier otro del equipo
-		return []string{strings.ToLower(fmt.Sprintf("%s:%d|*", rec.t.host, rec.t.port))}
+		return []string{lockKey(rec.t.host, rec.t.port, "*")}
 	}
 	for _, dp := range rec.plan.Devices {
 		for _, l := range dp.Apply {
