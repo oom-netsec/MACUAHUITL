@@ -489,6 +489,7 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	secret := r.NewSecret
+	generated := false
 	switch {
 	case secret == "" && r.UpdateCredentialId == "":
 		return nil, service.Err(ctx, codes.InvalidArgument, "assist.svc.un_secreto_generado_por_el", nil)
@@ -496,6 +497,7 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 		if secret, err = assist.GenerateSecret(); err != nil {
 			return nil, service.Err(ctx, codes.Internal, "assist.svc.no_se_pudo_generar_el", nil)
 		}
+		generated = true
 	default:
 		if err := assist.ValidateSecret(secret); err != nil {
 			return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
@@ -517,7 +519,7 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 			return nil, service.Err(ctx, codes.InvalidArgument, "assist.svc.la_credencial_es_del_usuario", i18n.A("credential", r.UpdateCredentialId, "actual", u, "wanted", r.User))
 		}
 	}
-	rot := &rotation{user: r.User, secret: secret, updateCred: r.UpdateCredentialId}
+	rot := &rotation{user: r.User, secret: secret, updateCred: r.UpdateCredentialId, generated: generated}
 	id, plan, err := s.planOn(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, assist.CredRotate, true /* write memory es obligatorio */, "user="+r.User, rot,
 		func(label string, outs map[string]string) (assist.DevicePlan, error) {
 			return assist.CredRotatePlan(label, assist.CredRotateChange{User: r.User, NewSecret: secret, ConnectedUser: connected}, outs)
@@ -591,7 +593,7 @@ func (s *assistSvc) launch(ctx context.Context, rec *planRec, planID string, key
 		ex = &rotExec{devExec: ex.(*devExec), rot: *rec.rot}
 	}
 	opts := assist.Options{ID: runID, Plan: rec.plan, Fn: rec.fn, Assisted: true, Exec: ex, Audit: s.d.Audit, DecisionTimeout: s.decisionTimeout}
-	pers := &persister{s: s, runID: runID, t: rec.t}
+	pers := &persister{s: s, runID: runID, t: rec.t, generated: rec.rot != nil && rec.rot.generated}
 	if origin == "" { // la reversa se guarda mientras la ejecución avanza; una ejecución de reversa no guarda otra
 		opts.Persist = pers.sync
 	}

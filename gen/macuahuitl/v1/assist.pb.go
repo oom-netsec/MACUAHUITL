@@ -2636,16 +2636,17 @@ func (x *PendingRollbackDevice) GetRollbackLines() []string {
 }
 
 type PendingRollback struct {
-	state         protoimpl.MessageState   `protogen:"open.v1"`
-	RunId         string                   `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"` // la ejecución original
-	Kind          string                   `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`                // función del plan: ports, snippet, restore...
-	Devices       []*PendingRollbackDevice `protobuf:"bytes,3,rep,name=devices,proto3" json:"devices,omitempty"`
-	EndedUnix     int64                    `protobuf:"varint,4,opt,name=ended_unix,json=endedUnix,proto3" json:"ended_unix,omitempty"`
-	AgeSeconds    int64                    `protobuf:"varint,5,opt,name=age_seconds,json=ageSeconds,proto3" json:"age_seconds,omitempty"`
-	WriteMemory   bool                     `protobuf:"varint,6,opt,name=write_memory,json=writeMemory,proto3" json:"write_memory,omitempty"` // la ejecución pedía write memory: la startup-config puede conservar el cambio; la reversa no hace write memory
-	Unreadable    bool                     `protobuf:"varint,7,opt,name=unreadable,proto3" json:"unreadable,omitempty"`                      // la entrada no se pudo leer: solo run_id; se puede descartar
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState   `protogen:"open.v1"`
+	RunId           string                   `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"` // la ejecución original
+	Kind            string                   `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`                // función del plan: ports, snippet, restore...
+	Devices         []*PendingRollbackDevice `protobuf:"bytes,3,rep,name=devices,proto3" json:"devices,omitempty"`
+	EndedUnix       int64                    `protobuf:"varint,4,opt,name=ended_unix,json=endedUnix,proto3" json:"ended_unix,omitempty"`
+	AgeSeconds      int64                    `protobuf:"varint,5,opt,name=age_seconds,json=ageSeconds,proto3" json:"age_seconds,omitempty"`
+	WriteMemory     bool                     `protobuf:"varint,6,opt,name=write_memory,json=writeMemory,proto3" json:"write_memory,omitempty"`             // la ejecución pedía write memory: la startup-config puede conservar el cambio; la reversa no hace write memory
+	Unreadable      bool                     `protobuf:"varint,7,opt,name=unreadable,proto3" json:"unreadable,omitempty"`                                  // la entrada no se pudo leer: solo run_id; se puede descartar
+	GeneratedSecret bool                     `protobuf:"varint,8,opt,name=generated_secret,json=generatedSecret,proto3" json:"generated_secret,omitempty"` // rotación de credenciales cuyo secreto nuevo generó la app (no lo escribió la persona)
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *PendingRollback) Reset() {
@@ -2723,6 +2724,13 @@ func (x *PendingRollback) GetWriteMemory() bool {
 func (x *PendingRollback) GetUnreadable() bool {
 	if x != nil {
 		return x.Unreadable
+	}
+	return false
+}
+
+func (x *PendingRollback) GetGeneratedSecret() bool {
+	if x != nil {
+		return x.GeneratedSecret
 	}
 	return false
 }
@@ -3158,7 +3166,7 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\x1bListPendingRollbacksRequest\"V\n" +
 	"\x15PendingRollbackDevice\x12\x16\n" +
 	"\x06device\x18\x01 \x01(\tR\x06device\x12%\n" +
-	"\x0erollback_lines\x18\x02 \x03(\tR\rrollbackLines\"\xff\x01\n" +
+	"\x0erollback_lines\x18\x02 \x03(\tR\rrollbackLines\"\xaa\x02\n" +
 	"\x0fPendingRollback\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12>\n" +
@@ -3170,7 +3178,8 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\fwrite_memory\x18\x06 \x01(\bR\vwriteMemory\x12\x1e\n" +
 	"\n" +
 	"unreadable\x18\a \x01(\bR\n" +
-	"unreadable\"\\\n" +
+	"unreadable\x12)\n" +
+	"\x10generated_secret\x18\b \x01(\bR\x0fgeneratedSecret\"\\\n" +
 	"\x1cListPendingRollbacksResponse\x12<\n" +
 	"\trollbacks\x18\x01 \x03(\v2\x1e.macuahuitl.v1.PendingRollbackR\trollbacks\"o\n" +
 	"\x1bStartPendingRollbackRequest\x12\x15\n" +

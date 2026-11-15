@@ -206,6 +206,41 @@ func TestAbortedCredRotateLeavesAPendingRollback(t *testing.T) {
 	}
 }
 
+// generated_secret: true solo si la rotación usó un secreto que generó la app; con uno escrito por la persona o con otra función, false.
+func TestPendingRollbackMarksGeneratedSecret(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		req  *v1.PlanCredRotateRequest
+		want bool
+	}{
+		{"generado", &v1.PlanCredRotateRequest{User: "tech"}, true},
+		{"dado", &v1.PlanCredRotateRequest{User: "tech", NewSecret: newSec}, false},
+	} {
+		r := newRotRig(t, simulator.Config{})
+		c.req.UpdateCredentialId = r.tech
+		res, err := r.rotate(c.req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		run := r.start(res.PlanId)
+		r.waitState(run, "waiting-confirm")
+		r.confirm(run, "apply-1")
+		r.waitState(run, "waiting-confirm")
+		r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: run})
+		r.waitState(run, "failed")
+		r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: run})
+		r.waitDone(run)
+		if p := r.pending(); len(p) != 1 || p[0].GeneratedSecret != c.want {
+			t.Errorf("%s: %+v, generated_secret debía ser %v", c.name, p, c.want)
+		}
+	}
+	r := newRig(t, simulator.Config{})
+	r.abortedChanged()
+	if p := r.pending(); len(p) != 1 || p[0].GeneratedSecret {
+		t.Errorf("otra función: %+v", p)
+	}
+}
+
 func TestPendingRollbackNotSavedWhenVaultIsLocked(t *testing.T) {
 	r := newRig(t, simulator.Config{})
 	plan, _ := r.plan(&v1.PlanPortsRequest{Vlan: 20})

@@ -14,7 +14,11 @@ import (
 
 // rotation es lo que el servicio guarda de una rotación hasta que la ejecución empieza: a quién, con qué secreto y qué credencial de la
 // bóveda recibe el secreto cuando la sesión nueva entre. El secreto no sale de aquí ni del plan.
-type rotation struct{ user, secret, updateCred string }
+// generated: el secreto lo generó la app (la persona no escribió uno).
+type rotation struct {
+	user, secret, updateCred string
+	generated                bool
+}
 
 // rotExec es el ejecutor de una rotación: el de siempre más la verificación con una sesión nueva y el cuidado de la bóveda.
 type rotExec struct {

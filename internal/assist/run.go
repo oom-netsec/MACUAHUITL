@@ -593,6 +593,9 @@ func (r *Run) forward(ctx context.Context) outcome {
 		}
 		for cmd, was := range dp.Baseline {
 			if !sameOut(cmd, outs[cmd], was) {
+				if dp.Provisional {
+					return r.failT("%s no está como la línea base (%s): el núcleo se cortó a mitad de aplicar y el equipo pudo quedar con parte del cambio; revísalo y revierte a mano", "%s differs from the baseline (%s): the core was cut off halfway through applying and the device may hold part of the change; check it and revert by hand", dp.Device, cmd)
+				}
 				return r.failT("%s cambió desde que se hizo el plan (%s); vuelve a planear", "%s changed since the plan was made (%s); plan again", dp.Device, cmd)
 			}
 		}
@@ -625,7 +628,7 @@ func (r *Run) forward(ctx context.Context) outcome {
 				msg, err := r.exec.(Verifier).Saved(ctx, dp.Device)
 				if err != nil {
 					r.log2("assist.verify", dp.Device, "run=%s the vault was not updated after write memory", r.id)
-					return r.failT("write memory salió bien en %s pero la bóveda no quedó con la credencial nueva: %v; edítala a mano", "write memory succeeded on %s but the vault does not hold the new credential: %v; edit it by hand", dp.Device, err)
+					return r.failT("write memory salió bien en %s pero la bóveda no quedó con la credencial nueva: %v; elige una sola salida: (a) aplica la reversa pendiente y la bóveda queda con la credencial anterior, o (b) guarda a mano la credencial nueva en la bóveda y descarta la reversa pendiente", "write memory succeeded on %s but the vault does not hold the new credential: %v; choose one way out only: (a) apply the pending rollback and the vault keeps the previous credential, or (b) store the new credential in the vault by hand and discard the pending rollback", dp.Device, err)
 				}
 				r.outT(dp.Device, msg)
 				r.mu.Lock()
@@ -633,7 +636,7 @@ func (r *Run) forward(ctx context.Context) outcome {
 				r.mu.Unlock()
 				r.sync() // con la bóveda al día no queda reversa que ofrecer: revertir la dejaría desfasada
 			}
-			if r.takeAbort() { // un Abort aceptado mientras corría write memory: se respeta al terminar ese paso
+			if i < len(r.plan.Devices)-1 && r.takeAbort() { // un Abort aceptado mientras corría write memory: se respeta si quedan equipos por guardar
 				return oAborted
 			}
 		}
@@ -654,7 +657,12 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 		return stop(d), true
 	}
 	// Otra vez la línea base, ya con la confirmación dada: el equipo pudo cambiar mientras se decidía.
-	if msg, en := r.drift(ctx, i, dp.Baseline, "desde que se hizo el plan", "since the plan was made"); msg != "" {
+	since, sinceEN := "desde que se hizo el plan", "since the plan was made"
+	if dp.Provisional {
+		since = "respecto a la línea base: el núcleo se cortó a mitad de aplicar y el equipo pudo quedar con parte del cambio; revísalo y revierte a mano"
+		sinceEN = "from the baseline: the core was cut off halfway through applying and the device may hold part of the change; check it and revert by hand"
+	}
+	if msg, en := r.drift(ctx, i, dp.Baseline, since, sinceEN); msg != "" {
 		return r.failMsg(msg, en), true
 	}
 	// Desde aquí el equipo puede haber cambiado, aunque la línea que falle sea la primera.

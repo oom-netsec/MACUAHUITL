@@ -314,6 +314,7 @@ message PendingRollback {
   int64 age_seconds = 5;
   bool write_memory = 6;             // la ejecución pedía write memory: la startup-config puede conservar el cambio; la reversa no hace write memory
   bool unreadable = 7;               // la entrada no se pudo leer: solo run_id; se puede descartar
+  bool generated_secret = 8;         // rotación de credenciales cuyo secreto nuevo generó la app (no lo escribió la persona)
 }
 
 message ListPendingRollbacksResponse {

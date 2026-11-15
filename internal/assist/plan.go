@@ -53,6 +53,9 @@ type DevicePlan struct {
 	NoteItems []i18n.Text
 	// VerifyLogin: tras aplicar y pasar el post-check, el ejecutor abre una sesión nueva con la credencial nueva (Verifier).
 	VerifyLogin bool
+	// Provisional: el Baseline es el estado provisional de una reversa pendiente (el núcleo se cortó a mitad de aplicar): si el pre-check falla,
+	// el equipo pudo quedar con parte del cambio y no se manda «vuelve a planear».
+	Provisional bool
 }
 
 // Plan es un cambio completo de una función sobre uno o más equipos.

@@ -2,6 +2,7 @@ package assist
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"sync"
@@ -190,4 +191,124 @@ func TestCaidaAMitadDeConfigureDejaEstadoYAuditoria(t *testing.T) {
 	r.Confirm("save-1")
 	wait(t, r, Done)
 	<-r.Done()
+}
+
+// saveHook corre algo dentro de Save (donde un Abort llega «mientras corre write memory»).
+type saveHook struct {
+	*fakeExec
+	on func(dev string)
+}
+
+func (s *saveHook) Save(ctx context.Context, dev string) (string, error) {
+	s.on(dev)
+	return s.fakeExec.Save(ctx, dev)
+}
+
+// Un Abort aceptado durante el write memory del último equipo no convierte en Aborted una ejecución que ya terminó; en el primero de dos, sí.
+func TestAbortEnWriteMemoryDelUltimoEquipoTerminaDone(t *testing.T) {
+	for _, c := range []struct {
+		abortOn string
+		want    State
+	}{{"SW2", Done}, {"SW1", Aborted}} {
+		p := twoDevices()
+		p.WriteMemory = true
+		var r *Run
+		ex := &saveHook{fakeExec: &fakeExec{}}
+		ex.on = func(dev string) {
+			if dev == c.abortOn {
+				r.Abort()
+			}
+		}
+		a := &auditRec{}
+		var err error
+		r, err = NewRun(Options{ID: "run1", Plan: p, Fn: Ports, Assisted: true, Exec: ex, Audit: a.add})
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Start(context.Background())
+		for _, id := range []string{"apply-1", "apply-2", "save-1"} {
+			pending(t, r, id)
+			r.Confirm(id)
+		}
+		if c.want == Done {
+			pending(t, r, "save-2")
+			r.Confirm("save-2")
+		}
+		wait(t, r, c.want)
+		<-r.Done()
+	}
+}
+
+// Con la bóveda caída tras write memory, el texto da dos salidas excluyentes (no «edítala a mano» a secas, que con la reversa pendiente deja equipo y bóveda desfasados).
+func TestBovedaCaidaTrasWriteMemoryDaDosOpcionesExcluyentes(t *testing.T) {
+	r, _, _ := rotationRunWith(t, nil, func(v *verifyExec) { v.savedErr = errors.New("bloqueada") })
+	r.Start(context.Background())
+	pending(t, r, "apply-1")
+	r.Confirm("apply-1")
+	pending(t, r, "save-1")
+	r.Confirm("save-1")
+	wait(t, r, Failed)
+	es, en := r.FailReason(), r.Snapshot().ReasonEN
+	for _, s := range []string{"(a)", "(b)", "descarta"} {
+		if !strings.Contains(es, s) {
+			t.Errorf("es sin %q: %s", s, es)
+		}
+	}
+	for _, s := range []string{"(a)", "(b)", "discard"} {
+		if !strings.Contains(en, s) {
+			t.Errorf("en sin %q: %s", s, en)
+		}
+	}
+	r.Abort()
+	<-r.Done()
+}
+
+// El pre-check de una reversa pendiente con State provisional dice que el núcleo se cortó a mitad de aplicar, no «vuelve a planear».
+func TestPreCheckConStateProvisionalDiceQueElNucleoSeCorto(t *testing.T) {
+	r, _, _ := rotationRun(t, nil)
+	pr := &persistRec{}
+	r.persist = pr.set
+	var mid *Leftover
+	fx := r.exec.(*verifyExec).fakeExec
+	prev := fx.onConfigure
+	fx.onConfigure = func(d string, l []string) { mid = pr.get(); prev(d, l) }
+	r.Start(context.Background())
+	pending(t, r, "apply-1")
+	r.Confirm("apply-1")
+	pending(t, r, "save-1")
+	r.Confirm("save-1")
+	wait(t, r, Done)
+	<-r.Done()
+	if mid == nil || !mid.Devices[0].Provisional {
+		t.Fatalf("a mitad de Configure el State debe marcarse provisional: %+v", mid)
+	}
+	for _, c := range []struct {
+		l          Leftover
+		es, en, no string
+	}{
+		{*mid, "a mitad de aplicar", "halfway through applying", "vuelve a planear"},
+		{func() Leftover {
+			l := *mid
+			l.Devices = []LeftDevice{l.Devices[0]}
+			l.Devices[0].Provisional = false
+			return l
+		}(), "vuelve a planear", "plan again", "a mitad de aplicar"},
+	} {
+		plan, fn, err := RollbackPlan(c.l)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ex := &fakeExec{readFunc: func(_, _ string) string { return "otra cosa" }}
+		rr, err := NewRun(Options{ID: "p1", Plan: plan, Fn: fn, Assisted: true, Exec: ex, Audit: func(a, b, c string) {}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		rr.Start(context.Background())
+		wait(t, rr, Failed) // el pre-check corre antes de pedir la confirmación
+		if es, en := rr.FailReason(), rr.Snapshot().ReasonEN; !strings.Contains(es, c.es) || !strings.Contains(en, c.en) || strings.Contains(es, c.no) {
+			t.Errorf("es=%q en=%q", es, en)
+		}
+		rr.Abort()
+		<-rr.Done()
+	}
 }

@@ -21,6 +21,9 @@ type LeftDevice struct {
 	Baseline map[string]string // el estado de antes de la ejecución
 	Secrets  []string
 	State    map[string]string // el estado en que la ejecución dejó el equipo (r.snap; mientras Configure corre, la línea base)
+	// Provisional: State es la línea base porque el núcleo se cortó (o la relectura falló) a mitad de Configure; no es lo que dejó el cambio.
+	// Un Leftover viejo sin el campo se lee como false.
+	Provisional bool
 }
 
 // Leftover es lo que una ejecución terminada dejó sin revertir.
@@ -30,6 +33,8 @@ type Leftover struct {
 	// WriteMemory: la ejecución pedía write memory; si falló tras escribir, la startup-config puede conservar el cambio.
 	WriteMemory bool
 	Devices     []LeftDevice // en el orden en que se aplicaron
+	// GeneratedSecret: rotación de credenciales cuyo secreto nuevo generó la app. Lo llena el servicio; un Leftover viejo sin el campo es false.
+	GeneratedSecret bool
 }
 
 // Leftover devuelve los equipos que la ejecución dejó cambiados, o nil si no hay ninguno. Una rotación de credencial cuya bóveda ya
@@ -57,13 +62,14 @@ func (r *Run) Leftover() *Leftover {
 		if ok, cut := r.partial[i]; cut && len(ok) > 0 {
 			ap = ok
 		}
-		state := r.snap[i]
-		if state == nil { // Configure sigue o la relectura falló: la línea base es el único estado conocido
+		state, prov := r.snap[i], false
+		if state == nil {
+			prov = true // Configure sigue o la relectura falló: la línea base es el único estado conocido
 			state = r.prov[i]
 		}
 		out.Devices = append(out.Devices, LeftDevice{Device: dp.Device, Apply: slices.Clone(ap), Rollback: slices.Clone(rb),
 			Pre: slices.Clone(dp.Pre), Post: slices.Clone(dp.Post), Expect: slices.Clone(dp.Expect), Baseline: cloneMap(dp.Baseline),
-			Secrets: slices.Clone(dp.Secrets), State: cloneMap(state)})
+			Secrets: slices.Clone(dp.Secrets), State: cloneMap(state), Provisional: prov})
 	}
 	if len(out.Devices) == 0 {
 		return nil
@@ -99,7 +105,7 @@ func RollbackPlan(l Leftover) (Plan, Function, error) {
 				return Plan{}, fn, cerr("assist.pending.no_state", "device", d.Device)
 			}
 		}
-		dp := DevicePlan{Device: d.Device, Pre: sortedCmds(d.State), Baseline: d.State, Apply: d.Rollback, Rollback: d.Apply, Secrets: d.Secrets}
+		dp := DevicePlan{Device: d.Device, Pre: sortedCmds(d.State), Baseline: d.State, Apply: d.Rollback, Rollback: d.Apply, Secrets: d.Secrets, Provisional: d.Provisional}
 		// La vuelta se verifica solo con configuración (running-config, show snmp user): la salida de comandos operativos cambia sin que nadie toque el equipo.
 		// Una línea base vacía también cuenta: «no había nada» (p. ej. ninguna línea snmp-server) es un estado que se puede verificar.
 		for _, c := range sortedCmds(d.Baseline) {

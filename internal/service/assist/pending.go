@@ -56,6 +56,8 @@ type persister struct {
 	saved bool
 	// failed: el fallo de guardado ya se auditó (una sola vez por ejecución, aunque la bóveda siga cerrada en cada sync)
 	failed bool
+	// generated: el secreto nuevo de la rotación lo generó la app; se guarda en el Leftover para que la pantalla lo diga.
+	generated bool
 }
 
 // sync es el Persist del motor: lo que sigue sin revertir (nil = nada).
@@ -73,6 +75,7 @@ func (p *persister) save(lo *assist.Leftover, ended time.Time, st assist.State) 
 	if p.s.isDiscarded(p.runID) {
 		return
 	}
+	lo.GeneratedSecret = p.generated && lo.Function == assist.CredRotate.Name
 	rec := pendingRec{RunID: p.runID, Kind: lo.Function, Ended: ended, Updated: p.s.d.Now(), Host: p.t.host, Port: p.t.port, Cred: p.t.cred, Leftover: *lo}
 	if err := p.s.savePending(rec); err != nil {
 		if p.failed {
@@ -207,7 +210,7 @@ func (s *assistSvc) ListPendingRollbacks(ctx context.Context, _ *v1.ListPendingR
 			out.Rollbacks = append(out.Rollbacks, &v1.PendingRollback{RunId: id, Unreadable: true})
 			continue
 		}
-		pr := &v1.PendingRollback{RunId: rec.RunID, Kind: rec.Kind, EndedUnix: rec.base().Unix(), AgeSeconds: int64(now.Sub(rec.base()).Seconds()), WriteMemory: rec.Leftover.WriteMemory}
+		pr := &v1.PendingRollback{RunId: rec.RunID, Kind: rec.Kind, EndedUnix: rec.base().Unix(), AgeSeconds: int64(now.Sub(rec.base()).Seconds()), WriteMemory: rec.Leftover.WriteMemory, GeneratedSecret: rec.Leftover.GeneratedSecret}
 		for _, d := range rec.Leftover.Devices {
 			pr.Devices = append(pr.Devices, &v1.PendingRollbackDevice{Device: d.Device, RollbackLines: assist.ScrubLines(d.Rollback, d.Secrets, rec.Leftover.Scrub)})
 		}

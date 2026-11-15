@@ -69,8 +69,9 @@ var cfgPrompt = regexp.MustCompile(`^\(config[\w\-]*\)#$`)
 // Errores de configuración que detienen la sesión (regla 5 del ADR 0007).
 // «Command rejected: ...» (a veces sin %) es que IOS no admitió la línea por un conflicto con otra configuración del puerto.
 // «% Specify remote-as...» es que el neighbor ya no existe; «% Interface X removed» es que un comando borró una interfaz entera.
-// Los demás avisos con % (%Warning de portfast, %LINK, «Not all config may be removed») son informativos: no detienen la ejecución y
-// quedan en la bitácora con la respuesta de cada línea.
+// Cualquier otro «% texto» también detiene (falla cerrado), salvo los avisos informativos conocidos de infoPercent
+// (%Warning/%Portfast de portfast, «Not all config may be removed», etc.); %LINK (syslog) no lleva espacio y no entra.
+// Lo que no detiene queda en la bitácora con la respuesta de cada línea.
 var cfgErrors = []string{"% Invalid input", "% Incomplete command", "% Ambiguous command", "% Error", "% Specify remote-as", "Command rejected", "% Command rejected"}
 
 var interfaceRemoved = regexp.MustCompile(`^% Interface \S+ removed`)
@@ -79,7 +80,7 @@ var interfaceRemoved = regexp.MustCompile(`^% Interface \S+ removed`)
 var cfgWarnings = []string{"Creating vlan", "does not exist"}
 
 // infoPercent son los «% …» informativos de IOS en modo configuración: no detienen la ejecución.
-var infoPercent = regexp.MustCompile(`(?i)^% (?:warning|note|generating|not all config may be removed)`)
+var infoPercent = regexp.MustCompile(`(?i)^% ?(?:info|notice|portfast|applying|please|remember|note|warning|generating|not all config may be removed)`)
 
 var asaSetPassword = regexp.MustCompile(`(?i)The enable password is not set|(?:enter|repeat)\s+password: ?$`)
 

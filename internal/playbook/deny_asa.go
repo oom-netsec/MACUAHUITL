@@ -261,15 +261,13 @@ func checkFamily(cmd string, head func(cmd string, fields []string) error) error
 	if sink(t[0]) && len(t) > 1 { // «a prueba de fallas»: la regex no abre con un sumidero seguido de un destino; «| i redirect» solo sí
 		return denied(cmd, "playbook.why.pipe_sink")
 	}
-	// Algunas versiones de ASA aceptan «| redirect» o «| append» tras el filtro: tras cada «|» posterior tampoco va un
+	// Tras el filtro (include/exclude/begin/grep) todo es la regex: «a|sscp» es alternancia, no un pipe a un shell, así que aquí no se
+	// buscan comandos de shell. Algunas versiones de ASA aceptan «| redirect» o «| append» tras el filtro: tras cada «|» posterior tampoco va un
 	// sumidero, y ningún token de la parte del pipe puede ser una ruta del equipo o remota (tapar de más está bien).
 	for i, seg := range strings.Split(pipe, "|") {
 		f := strings.Fields(seg)
 		if i > 0 && len(f) > 0 && sink(f[0]) {
 			return denied(cmd, "playbook.why.pipe_sink")
-		}
-		if i > 0 && len(f) > 0 && shellToken(f[0]) { // como en IOS: sscp, email, vsh, bash, python… tras un segundo «|»
-			return denied(cmd, "playbook.why.pipe_shell")
 		}
 		for _, tok := range f {
 			if remotePath(tok) {
