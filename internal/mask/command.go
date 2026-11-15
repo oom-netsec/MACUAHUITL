@@ -35,17 +35,17 @@ var (
 	cmdPlain  = regexp.MustCompile(`(?i)^\s*(?:(?:no|default)\s+)*(?:(?:\d+\s+)?(?:description|remark)|banner|alias)\s`)
 	cmdDigits = regexp.MustCompile(`^\d+$`)
 	// Palabras que siguen a key/password pero son parte del comando, no el valor.
-	cmdNotSecret = map[string]bool{"chain": true, "generate": true, "zeroize": true, "config-key": true, "export": true, "import": true, "exchange": true}
+	cmdNotSecret = map[string]bool{"chain": true, "generate": true, "zeroize": true, "config-key": true, "export": true, "import": true, "exchange": true, "add": true, "delete": true, "keywrap": true}
 )
 
 // cmdKeyword dice si w es una palabra de secreto o su abreviatura (2 o más letras); keyed: de las familias auth/priv.
 func cmdKeyword(w string, noToken bool) (ok, keyed bool) {
 	w = strings.ToLower(w)
-	if len(w) < 2 || w == "authentication" {
+	if len(w) < 2 || w == "authentication" || w == "message-digest" { // palabras del comando, no del secreto
 		return false, false
 	}
 	for _, k := range cmdKeys {
-		if strings.HasPrefix(k.word, w) && !(noToken && k.word == "token") {
+		if (strings.HasPrefix(k.word, w) || hyphenPrefix(k.word, w)) && !(noToken && k.word == "token") {
 			ok, keyed = true, keyed || k.keyed
 		}
 	}
@@ -83,7 +83,7 @@ func maskCommand(cmd string, counts map[string]int, noToken bool) (string, []str
 			switch {
 			case len(w) == 1 && w[0] >= '0' && w[0] <= '9':
 				zero = w == "0"
-			case cmdAlgo.MatchString(w), lw == "hex", lw == "ascii", lw == "encrypted", lw == "hash", lw == "plain", lw == "local", lw == "remote":
+			case cmdAlgo.MatchString(w), lw == "hex", lw == "ascii", lw == "encrypted", lw == "hash", lw == "plain", lw == "local", lw == "remote", lw == "create":
 			case lw == "level" || lw == "address" || lw == "hostname" || lw == "ipv6": // lleva su operando
 				j++
 			case keyed && cmdDigits.MatchString(w) && j < len(toks)-1:
@@ -116,4 +116,18 @@ func maskCommand(cmd string, counts map[string]int, noToken bool) (string, []str
 		return cmd, nil
 	}
 	return b.String() + cmd[last:], vals
+}
+
+// hyphenPrefix: w abrevia cada segmento de word por separado («auth-key» de «authentication-key»).
+func hyphenPrefix(word, w string) bool {
+	a, b := strings.Split(word, "-"), strings.Split(w, "-")
+	if len(a) != len(b) || len(a) == 1 {
+		return false
+	}
+	for i := range a {
+		if b[i] == "" || !strings.HasPrefix(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
 }

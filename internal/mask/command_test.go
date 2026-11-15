@@ -88,3 +88,16 @@ func TestCmdMultilinea(t *testing.T) {
 		}
 	}
 }
+
+func TestCommandAbreviaturasConGuion(t *testing.T) {
+	for _, in := range []string{"ip ospf auth-key ZQ80xx", "ip ospf authentication-k ZQ80xx", "ip ospf message-d 1 md5 ZQ80xx", "key-str ZQ80xx"} {
+		if out, _ := Command(in); strings.Contains(out, "ZQ80xx") {
+			t.Errorf("%q → %q", in, out)
+		}
+	}
+	for _, in := range []string{"ip ospf authentication message-digest", "ip ospf message-digest", "key-chain KC1", "ntp server 1.1.1.1 key-id 3"} {
+		if out, _ := Command(in); out != in {
+			t.Errorf("%q → %q", in, out)
+		}
+	}
+}
