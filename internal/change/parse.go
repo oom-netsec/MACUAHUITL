@@ -44,7 +44,7 @@ type Snapshot struct {
 	STPRoot       map[string]string    // VLAN → "prioridad MAC" de la raíz
 	STPPort       map[string]string    // VLAN → puerto raíz
 	Config        *iosconf.Node
-	Platform      string // la del manifest; decide formas ambiguas al enmascarar (host SNMP de ASA)
+	Platform      string          // la del manifest; decide formas ambiguas al enmascarar (host SNMP de ASA)
 	Have          map[string]bool // facetas con salida
 }
 

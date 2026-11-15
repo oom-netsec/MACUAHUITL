@@ -64,3 +64,16 @@ func TestReceptorEnmascaraSecretos(t *testing.T) {
 		t.Errorf("se perdió el mnemónico: %+v", got[0])
 	}
 }
+
+// Un mensaje con saltos de línea se enmascara también ya unido (como lo guarda sanitize): la continuación no escapa.
+func TestMensajeMultilineaSeEnmascaraUnido(t *testing.T) {
+	for _, raw := range []string{
+		"<189>Nov 15 10:00:00 R1 %PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:radius server R\nkey ZQML1xx",
+		"<189>Nov 15 10:00:00 R1 %PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:snmp-server\r\ncommunity ZQML2xx RO",
+	} {
+		m := Parse(maskRaw([]byte(raw)))
+		if strings.Contains(m.Raw, "ZQML") || strings.Contains(m.Text, "ZQML") {
+			t.Errorf("fuga: %q", m.Raw)
+		}
+	}
+}

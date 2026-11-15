@@ -2,6 +2,7 @@ package syslogd
 
 import (
 	"bytes"
+	"strings"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
@@ -17,6 +18,12 @@ func maskRaw(raw []byte) []byte {
 		platform = "asa"
 	}
 	out, _ := mask.Apply(platform, string(raw))
+	// Línea por línea no basta: sanitize junta las líneas y la continuación de un comando citado («…command:key\nX»)
+	// solo se reconoce unida; se vuelve a enmascarar con los saltos como espacios (lo ya tapado no cambia).
+	if strings.ContainsAny(out, "\r\n") {
+		out = strings.Join(strings.Fields(strings.NewReplacer("\r", " ", "\n", " ").Replace(out)), " ")
+		out, _ = mask.Apply(platform, out)
+	}
 	return []byte(out)
 }
 
