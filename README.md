@@ -69,11 +69,11 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
   </tr>
   <tr>
     <td><img src="docs/assets/screens/hosts-dark.png" alt="Saved hosts across platforms"><br><sub><b>Saved hosts.</b> Your devices with platform, folder, tags and vault credential, ready for the SSH terminal.</sub></td>
-    <td><img src="docs/assets/screens/assist-hidden-dark.png" alt="Assisted change plan with hidden characters marked"><br><sub><b>Nothing hidden.</b> Bidi and zero-width characters are shown as ⟦U+202E⟧ before you confirm a change or a paste.</sub></td>
+    <td><img src="docs/assets/screens/assist-hidden-dark.png" alt="Assisted change plan with hidden characters marked"><br><sub><b>Nothing hidden.</b> Bidi and zero-width characters are shown as ⟦U+202E⟧ before you confirm a change, and in the paste confirmation.</sub></td>
   </tr>
   <tr>
     <td width="50%"><img src="docs/assets/screens/backup-dark.png" alt="Backups with saved versions"><br><sub><b>Backups.</b> Scheduled or on-demand config backups, diffed before any restore.</sub></td>
-    <td width="50%"><img src="docs/assets/screens/credrotate-dark.png" alt="Credential rotation"><br><sub><b>Credential rotation.</b> Rotate local passwords across the fleet and verify the new access before closing.</sub></td>
+    <td width="50%"><img src="docs/assets/screens/credrotate-dark.png" alt="Credential rotation"><br><sub><b>Credential rotation.</b> Rotate a local password on a device and verify the new access before closing.</sub></td>
   </tr>
   <tr>
     <td><img src="docs/assets/screens/security-dark.png" alt="RADIUS and TACACS+ tester"><br><sub><b>Security.</b> Test RADIUS and TACACS+ with credentials from the vault.</sub></td>
@@ -175,7 +175,7 @@ Each platform is covered by an official content pack. Install the packs you need
 | Cisco IOS-XE (switches and routers) | `oom/ios-xe` | 69 | not yet validated on a lab device |
 | Catalyst 9000 (IOS-XE 17.x) | `oom/cat9k` | 55 | not yet validated on a lab device |
 | SD-Access fabric on Catalyst 9000 | `oom/sda` | 26 | not yet validated on a lab device |
-| Catalyst 9800 WLC and embedded WLC (EWC) | `oom/wlc-9800` | 47 | not yet validated on a lab device |
+| Catalyst 9800 WLC and embedded WLC (EWC) | `oom/wlc-9800` | 47 | ✅ commands checked on a 9120 EWC (IOS-XE 17.12); full lab run pending |
 | AireOS WLC | `oom/wlc-aireos` | 64 | not yet validated on a lab device |
 | Nexus (NX-OS) | `oom/nx-os` | 68 | not yet validated on a lab device |
 | ACI leaf and spine (Nexus 9000 CLI) | `oom/aci` | 45 | not yet validated on a lab device |
@@ -186,7 +186,7 @@ Each platform is covered by an official content pack. Install the packs you need
 Counts as of v0.4.8. A few IOS-XE playbooks (`tac-baseline`, `analisis`, `metricas`, `pre-post`, `upgrade-check`) ship inside the binary. ACLs are imported, analyzed and translated between IOS-XE, NX-OS and ASA without any pack.
 
 > [!NOTE]
-> **Lab validation is in progress.** Commands and parsers come from Cisco documentation; only `oom/ios` has been checked end to end on a real device so far. Playbooks only read, so an unvalidated one can at worst collect less than expected. Please report any output that is parsed wrong.
+> **Lab validation is in progress.** Commands and parsers come from Cisco documentation; only `oom/ios` has been checked end to end on a real device so far, and the `oom/wlc-9800` commands on a 9120 EWC. Playbooks only read, so an unvalidated one can at worst collect less than expected. Please report any output that is parsed wrong.
 
 ## Install
 
@@ -223,7 +223,7 @@ mctl job watch ID                           # live status until the package is r
 mctl audit verify                           # check the audit chain
 ```
 
-The app does the same from **Patrol → New job**. Commands and values are in English; Spanish output is one flag away (`mctl --lang es`).
+The app does the same from **Patrol → New job**. Commands and flags are in English; Spanish output is one flag away (`mctl --lang es`).
 
 <details>
 <summary><b>Example <code>job.yaml</code></b></summary>
@@ -235,7 +235,6 @@ targets:
     device_id: core-1
 default_credential_id: <ID from mctl cred list>
 playbook_ids: [ios-xe/tac-baseline]
-output_dir: /home/me/MACUAHUITL/outputs
 window_hours: 8
 schedule:
   interval_seconds: 1800

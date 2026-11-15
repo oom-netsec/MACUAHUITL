@@ -65,8 +65,8 @@ export function sample(): Partial<CoreAPI> {
     ] } }),
     fleetHealth: async () => ({ devices: 12, warnings: [], issues: [
       { device: "ACC1", port: "Gi1/0/9", severity: "critica" as const, problems: [{ kind: "err-disabled", evidence: "Gi1/0/9 err-disabled (psecure-violation)" }], source: "show interfaces status", at: ago(30) },
-      { device: "ACC1", port: "Gi1/0/12", severity: "media" as const, problems: [{ kind: "crc", value: 412, evidence: "412 CRC" }], source: "show interfaces", at: ago(30) },
       { device: "ACC2", port: "Gi1/0/3", severity: "alta" as const, problems: [{ kind: "crc", value: 9120, evidence: "9120 CRC" }, { kind: "duplex", evidence: "half-duplex" }], source: "show interfaces", at: ago(32) },
+      { device: "ACC1", port: "Gi1/0/12", severity: "media" as const, problems: [{ kind: "crc", value: 412, evidence: "412 CRC" }], source: "show interfaces", at: ago(30) },
       { device: "DIST1", port: "Te1/1/1", severity: "baja" as const, problems: [{ kind: "drops", value: 31, evidence: "31 output drops" }], source: "show interfaces", at: ago(33) },
     ] }),
     fleetSummary: async () => ({ devices: 12, checked: { cpu: 12, ntp: 12, reboot: 12, memory: 12, flash: 12 }, warnings: [], rows: [
@@ -269,14 +269,14 @@ const packsEn: PackInfo[] = [
   pack("oom/ise", "1.0.0", "ISE · Cisco Identity Services Engine, TAC diagnostics", "Read-only playbooks for Cisco ISE 3.x nodes (PAN, MnT, PSN and pxGrid) from their ADE-OS CLI - version and patches, application process status, CPU, memory and disks, backups, interfaces, routes, ports, DNS and NTP, services (RADIUS, TACACS+, pxGrid, certificates, Active Directory, replication), application logs and TAC cases; the connectivity one asks for the target IP.", "ise", 36),
 ];
 const sdaIds = ["border-handoff-bgp", "border-rutas-externas", "border-transit", "edge-device-tracking", "edge-dhcp", "edge-sesiones", "fabric-aaa-ise", "fabric-access-tunnel", "fabric-cts-credenciales", "fabric-cts-sgt", "fabric-roles", "fabric-vn-vrf", "lisp-base-datos", "lisp-eid-ip", "lisp-eid-mac", "lisp-map-cache", "lisp-publicaciones", "lisp-sesiones", "lisp-sitios", "tac-border-sin-rutas", "tac-endpoint-sin-conectividad-ip", "tac-endpoint-sin-conectividad-mac", "tac-onboarding-falla-general", "tac-onboarding-falla", "tac-roaming-edges", "tac-sgt-trafico-denegado"];
-// The restore plan of the Backups preview carries two restored lines with hidden characters (U+202E bidi, U+200B zero width): the plan shows them as ⟦U+XXXX⟧.
+// The restore plan of the Backups preview carries two restored lines with hidden characters (U+202E bidi, U+200B zero width): the plan shows them as ⟦U+XXXX⟧. Both are lines restore accepts (snmp-server contact/location).
 const restoreBase = swap(sampleRestore, [["PC-contabilidad", "PC-accounting"], ["PC-ventas", "PC-sales"]]);
 const restoreEn: typeof restoreBase = {
   ...restoreBase,
   plan: { ...restoreBase.plan!, devices: restoreBase.plan!.devices.map((d) => ({
     ...d,
-    apply: [...d.apply, "banner motd ^C\u202eEnd of maintenance window^C", "snmp-server location Rack-12\u200b-DC1"],
-    rollback: [...d.rollback, "no banner motd", "snmp-server location Rack-12"],
+    apply: [...d.apply, "snmp-server contact NOC\u202e-24x7", "snmp-server location Rack-12\u200b-DC1"],
+    rollback: [...d.rollback, "snmp-server contact NOC", "snmp-server location Rack-12"],
   })) },
 };
 

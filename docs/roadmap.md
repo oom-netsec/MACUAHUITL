@@ -11,7 +11,7 @@ Principios: local primero y auditado, secretos en la bóveda, sin falsos "todo b
 | Base | Núcleo, bóveda, auditoría encadenada, Patrol, CLI y app (fases 0–6) |
 | Herramientas | Analizador PCAP, DNS ligero y profundo, inspector TLS, receptor syslog (7) |
 | Análisis | 27 reglas, diff entre rondas, línea de tiempo correlacionada; en la app, «Análisis de trabajos» (9) |
-| Campo y transferencias | Consola serie, servidores y clientes temporales TFTP/HTTP/FTP/SCP/SFTP, MD5/SHA-512 (10, 22.1) |
+| Campo y transferencias | Consola serie, servidores y clientes temporales TFTP/HTTP/FTP/SCP/SFTP, MD5/SHA-512 (10, 22a) |
 | Cambios | Pre/post con semáforo, asistente de upgrade (verificación), plantillas doradas y hardening (11) |
 | Visibilidad | Topología CDP/LLDP (SVG), SNMP y traps, NetFlow/IPFIX/sFlow, gNMI (12) |
 | Calculadoras | Subredes/VLSM, MTU/MSS, TCP, QoS, óptica, selección de ruta BGP (13) |
@@ -25,7 +25,7 @@ Principios: local primero y auditado, secretos en la bóveda, sin falsos "todo b
 
 ## Lo que falta para 1.0.0
 
-1. **Validación en laboratorio** de los paquetes con equipos reales, según el [runbook](plans/validacion-labs.md) y `tools/labcheck` (reporte por playbook). Hoy solo `oom/ios` está validado de punta a punta (3560CX); siguen `oom/wlc-9800` (9120 EWC), `oom/nx-os` y `oom/ios-xe` (DevNet). Lo que falle se corrige en el paquete y se publica como release `packs-*`.
+1. **Validación en laboratorio** de los paquetes con equipos reales, según el [runbook](plans/validacion-labs.md) y `tools/labcheck` (reporte por playbook). Hoy solo `oom/ios` está validado de punta a punta (3560CX) y los comandos de `oom/wlc-9800` se revisaron en un 9120 EWC; siguen la corrida completa de `oom/wlc-9800` y `oom/nx-os` y `oom/ios-xe` (DevNet). Lo que falle se corrige en el paquete y se publica como release `packs-*`.
 2. **Estabilidad**: cero hallazgos abiertos de severidad alta o media, suite completa y CI en verde sin pruebas intermitentes, e instalación limpia de los `.deb` y `.rpm` en una máquina nueva.
 3. **Anuncio público** con el README y las capturas al día.
 
@@ -33,11 +33,11 @@ Lo que no esté en esa lista no bloquea 1.0.0: las fases de abajo siguen despué
 
 ## Prerrequisito transversal: evidencia real
 
-Todo lo que lee salidas de equipos necesita transcripciones reales para validarse. Fuente: la [batería de laboratorio](plans/laboratorio-bateria-de-pruebas.md). Las **fases 2 y 3** (NX-OS, ASA y más plataformas) se desbloquean con lo mismo y son requisito de todo ítem que diga NX-OS o ASA.
+Todo lo que lee salidas de equipos necesita transcripciones reales para validarse. Fuente: la [batería de laboratorio](plans/laboratorio-bateria-de-pruebas.md). Los paquetes de NX-OS, ASA y las demás plataformas ya están publicados con comandos de la documentación de Cisco; su validación con equipos reales es parte de lo que falta para 1.0.0.
 
 ## Fases
 
-Cada fase es una rama y un PR, con su plan en `docs/plans/`, TDD, revisión independiente y como máximo 2–3 agentes a la vez. Primero va el día a día, porque se usa todos los días y se apoya en lo que Patrol ya recolecta.
+Cada fase es una rama y un PR, con su plan en `docs/plans/`, TDD, revisión independiente y como máximo 2–3 agentes a la vez.
 
 Las fases 15 (flota), 16 (operación) y 17 (forense) ya están hechas (ver arriba). Las que siguen son posteriores a 1.0.0.
 
@@ -117,7 +117,7 @@ Los playbooks y scripts de cada tecnología se publican como paquetes `.mpack` f
 | `oom/ios-xe` (switches y routers IOS-XE) | 69 | Pendiente (DevNet Cat8000v) |
 | `oom/cat9k` (Catalyst 9000) | 55 | Pendiente |
 | `oom/sda` (SD-Access) | 26 | Pendiente |
-| `oom/wlc-9800` (Catalyst 9800 y EWC) | 47 | Pendiente (9120 EWC) |
+| `oom/wlc-9800` (Catalyst 9800 y EWC) | 47 | Comandos revisados en un 9120 EWC (17.12.6a); falta la corrida completa con labcheck |
 | `oom/wlc-aireos` (AireOS) | 64 | Pendiente |
 | `oom/nx-os` (Nexus) | 68 | Pendiente (DevNet NX-OS) |
 | `oom/aci` (leaf y spine ACI) | 45 | Pendiente |
@@ -147,7 +147,7 @@ Todo pasa por el modo de cambio asistido (ADR 0007), construido en la fase 16.
 
 | Función | Fase |
 |---|---|
-| Ejecutor en lote (configuración), snippets, aprovisionamiento, restauración, rotación de credenciales | 16 |
+| Snippets en uno o varios equipos, aprovisionamiento de puertos, restauración, rotación de credenciales | 16 |
 | Generador de tramas | 18 |
 | Prueba de cable TDR | 20 |
 | MOP ejecutado y rollback | 21 |
