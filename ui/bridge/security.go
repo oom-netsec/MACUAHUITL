@@ -174,7 +174,7 @@ func (b *Bridge) SecPkiExport(d ExportDTO) (string, error) {
 	}
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
 		r, err := v1.NewSecurityServiceClient(c).PkiExport(ctx, &v1.PkiExportRequest{Format: d.Format, CertPem: d.Cert, ChainPem: d.Chain,
-			SealedKeyPem: d.SealedKey, KeyPassword: []byte(d.KeyPassword), ExportPassword: []byte(d.ExportPassword), IncludePlainKey: d.PlainKey})
+			SealedKeyPem: d.SealedKey, KeyPassword: []byte(d.KeyPassword), ExportPassword: []byte(d.ExportPassword), IncludePlainKey: d.PlainKey, DestPath: d.Path})
 		if err != nil {
 			return "", err
 		}

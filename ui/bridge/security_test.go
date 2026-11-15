@@ -4,11 +4,15 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 )
+
+// lastExportDest guarda el dest_path del último PkiExport recibido.
+var lastExportDest atomic.Value
 
 type fakeSec struct {
 	v1.UnimplementedSecurityServiceServer
@@ -21,6 +25,7 @@ func (f fakeSec) RadiusTest(_ context.Context, r *v1.RadiusTestRequest) (*v1.Rad
 }
 
 func (fakeSec) PkiExport(_ context.Context, r *v1.PkiExportRequest) (*v1.PkiExportResponse, error) {
+	lastExportDest.Store(r.DestPath)
 	return &v1.PkiExportResponse{Data: []byte{0, 1, 2, 0xff}}, nil
 }
 
@@ -56,6 +61,9 @@ func TestSecurityBridge(t *testing.T) {
 	}
 	if raw, _ := os.ReadFile(dst); len(raw) != 4 || raw[3] != 0xff {
 		t.Fatalf("%x", raw)
+	}
+	if got, _ := lastExportDest.Load().(string); got != dst {
+		t.Fatalf("dest_path = %q, quería %q", got, dst)
 	}
 	if _, err := b.SecPkiExport(ExportDTO{Format: "p12", Cert: "c", Path: dst}); err == nil {
 		t.Fatal("sobrescribió el archivo")

@@ -300,7 +300,7 @@ func (s *securitySvc) PkiExport(ctx context.Context, r *v1.PkiExportRequest) (*v
 	if err != nil {
 		return nil, pkiErr(ctx, err)
 	}
-	s.d.Audit("pki.export", "", fmt.Sprintf("format=%s key=%s", r.Format, map[bool]string{true: "included", false: "no"}[k != nil]))
+	s.d.Audit("pki.export", "", fmt.Sprintf("format=%s key=%s dest=%q", r.Format, map[bool]string{true: "included", false: "no"}[k != nil], r.DestPath))
 	return &v1.PkiExportResponse{Data: out}, nil
 }
 

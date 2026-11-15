@@ -2587,6 +2587,7 @@ type PendingRollbackDevice struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Device        string                 `protobuf:"bytes,1,opt,name=device,proto3" json:"device,omitempty"`
 	RollbackLines []string               `protobuf:"bytes,2,rep,name=rollback_lines,json=rollbackLines,proto3" json:"rollback_lines,omitempty"` // lo que se mandará, sin secretos
+	Provisional   bool                   `protobuf:"varint,3,opt,name=provisional,proto3" json:"provisional,omitempty"`                         // el State guardado es el provisional: el núcleo cayó a mitad de Configure
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2635,18 +2636,27 @@ func (x *PendingRollbackDevice) GetRollbackLines() []string {
 	return nil
 }
 
+func (x *PendingRollbackDevice) GetProvisional() bool {
+	if x != nil {
+		return x.Provisional
+	}
+	return false
+}
+
 type PendingRollback struct {
-	state           protoimpl.MessageState   `protogen:"open.v1"`
-	RunId           string                   `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"` // la ejecución original
-	Kind            string                   `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`                // función del plan: ports, snippet, restore...
-	Devices         []*PendingRollbackDevice `protobuf:"bytes,3,rep,name=devices,proto3" json:"devices,omitempty"`
-	EndedUnix       int64                    `protobuf:"varint,4,opt,name=ended_unix,json=endedUnix,proto3" json:"ended_unix,omitempty"`
-	AgeSeconds      int64                    `protobuf:"varint,5,opt,name=age_seconds,json=ageSeconds,proto3" json:"age_seconds,omitempty"`
-	WriteMemory     bool                     `protobuf:"varint,6,opt,name=write_memory,json=writeMemory,proto3" json:"write_memory,omitempty"`             // la ejecución pedía write memory: la startup-config puede conservar el cambio; la reversa no hace write memory
-	Unreadable      bool                     `protobuf:"varint,7,opt,name=unreadable,proto3" json:"unreadable,omitempty"`                                  // la entrada no se pudo leer: solo run_id; se puede descartar
-	GeneratedSecret bool                     `protobuf:"varint,8,opt,name=generated_secret,json=generatedSecret,proto3" json:"generated_secret,omitempty"` // rotación de credenciales cuyo secreto nuevo generó la app (no lo escribió la persona)
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state              protoimpl.MessageState   `protogen:"open.v1"`
+	RunId              string                   `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"` // la ejecución original
+	Kind               string                   `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`                // función del plan: ports, snippet, restore...
+	Devices            []*PendingRollbackDevice `protobuf:"bytes,3,rep,name=devices,proto3" json:"devices,omitempty"`
+	EndedUnix          int64                    `protobuf:"varint,4,opt,name=ended_unix,json=endedUnix,proto3" json:"ended_unix,omitempty"`
+	AgeSeconds         int64                    `protobuf:"varint,5,opt,name=age_seconds,json=ageSeconds,proto3" json:"age_seconds,omitempty"`
+	WriteMemory        bool                     `protobuf:"varint,6,opt,name=write_memory,json=writeMemory,proto3" json:"write_memory,omitempty"`                        // la ejecución pedía write memory: la startup-config puede conservar el cambio; la reversa no hace write memory
+	Unreadable         bool                     `protobuf:"varint,7,opt,name=unreadable,proto3" json:"unreadable,omitempty"`                                             // la entrada no se pudo leer: solo run_id; se puede descartar
+	GeneratedSecret    bool                     `protobuf:"varint,8,opt,name=generated_secret,json=generatedSecret,proto3" json:"generated_secret,omitempty"`            // rotación de credenciales cuyo secreto nuevo generó la app (no lo escribió la persona)
+	RotatedUser        string                   `protobuf:"bytes,9,opt,name=rotated_user,json=rotatedUser,proto3" json:"rotated_user,omitempty"`                         // usuario rotado; solo con kind credrotate
+	UpdateCredentialId string                   `protobuf:"bytes,10,opt,name=update_credential_id,json=updateCredentialId,proto3" json:"update_credential_id,omitempty"` // credencial de bóveda asociada al usuario rotado que se iba a actualizar; vacío si no
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *PendingRollback) Reset() {
@@ -2733,6 +2743,20 @@ func (x *PendingRollback) GetGeneratedSecret() bool {
 		return x.GeneratedSecret
 	}
 	return false
+}
+
+func (x *PendingRollback) GetRotatedUser() string {
+	if x != nil {
+		return x.RotatedUser
+	}
+	return ""
+}
+
+func (x *PendingRollback) GetUpdateCredentialId() string {
+	if x != nil {
+		return x.UpdateCredentialId
+	}
+	return ""
 }
 
 type ListPendingRollbacksResponse struct {
@@ -3163,10 +3187,11 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\x04plan\x18\x02 \x01(\v2\x19.macuahuitl.v1.AssistPlanR\x04plan\x127\n" +
 	"\arefused\x18\x03 \x03(\v2\x1d.macuahuitl.v1.RestoreRefusalR\arefused\x12\x16\n" +
 	"\x06reason\x18\x04 \x01(\tR\x06reason\"\x1d\n" +
-	"\x1bListPendingRollbacksRequest\"V\n" +
+	"\x1bListPendingRollbacksRequest\"x\n" +
 	"\x15PendingRollbackDevice\x12\x16\n" +
 	"\x06device\x18\x01 \x01(\tR\x06device\x12%\n" +
-	"\x0erollback_lines\x18\x02 \x03(\tR\rrollbackLines\"\xaa\x02\n" +
+	"\x0erollback_lines\x18\x02 \x03(\tR\rrollbackLines\x12 \n" +
+	"\vprovisional\x18\x03 \x01(\bR\vprovisional\"\xff\x02\n" +
 	"\x0fPendingRollback\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x12\n" +
 	"\x04kind\x18\x02 \x01(\tR\x04kind\x12>\n" +
@@ -3179,7 +3204,10 @@ const file_macuahuitl_v1_assist_proto_rawDesc = "" +
 	"\n" +
 	"unreadable\x18\a \x01(\bR\n" +
 	"unreadable\x12)\n" +
-	"\x10generated_secret\x18\b \x01(\bR\x0fgeneratedSecret\"\\\n" +
+	"\x10generated_secret\x18\b \x01(\bR\x0fgeneratedSecret\x12!\n" +
+	"\frotated_user\x18\t \x01(\tR\vrotatedUser\x120\n" +
+	"\x14update_credential_id\x18\n" +
+	" \x01(\tR\x12updateCredentialId\"\\\n" +
 	"\x1cListPendingRollbacksResponse\x12<\n" +
 	"\trollbacks\x18\x01 \x03(\v2\x1e.macuahuitl.v1.PendingRollbackR\trollbacks\"o\n" +
 	"\x1bStartPendingRollbackRequest\x12\x15\n" +

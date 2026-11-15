@@ -58,6 +58,8 @@ type persister struct {
 	failed bool
 	// generated: el secreto nuevo de la rotación lo generó la app; se guarda en el Leftover para que la pantalla lo diga.
 	generated bool
+	// rotUser y rotCred: usuario rotado y credencial de bóveda a actualizar; se guardan en el Leftover.
+	rotUser, rotCred string
 }
 
 // sync es el Persist del motor: lo que sigue sin revertir (nil = nada).
@@ -75,7 +77,12 @@ func (p *persister) save(lo *assist.Leftover, ended time.Time, st assist.State) 
 	if p.s.isDiscarded(p.runID) {
 		return
 	}
-	lo.GeneratedSecret = p.generated && lo.Function == assist.CredRotate.Name
+	isRot := lo.Function == assist.CredRotate.Name
+	lo.GeneratedSecret = p.generated && isRot
+	lo.RotatedUser, lo.UpdateCredentialID = "", ""
+	if isRot {
+		lo.RotatedUser, lo.UpdateCredentialID = p.rotUser, p.rotCred
+	}
 	rec := pendingRec{RunID: p.runID, Kind: lo.Function, Ended: ended, Updated: p.s.d.Now(), Host: p.t.host, Port: p.t.port, Cred: p.t.cred, Leftover: *lo}
 	if err := p.s.savePending(rec); err != nil {
 		if p.failed {
@@ -210,9 +217,9 @@ func (s *assistSvc) ListPendingRollbacks(ctx context.Context, _ *v1.ListPendingR
 			out.Rollbacks = append(out.Rollbacks, &v1.PendingRollback{RunId: id, Unreadable: true})
 			continue
 		}
-		pr := &v1.PendingRollback{RunId: rec.RunID, Kind: rec.Kind, EndedUnix: rec.base().Unix(), AgeSeconds: int64(now.Sub(rec.base()).Seconds()), WriteMemory: rec.Leftover.WriteMemory, GeneratedSecret: rec.Leftover.GeneratedSecret}
+		pr := &v1.PendingRollback{RunId: rec.RunID, Kind: rec.Kind, EndedUnix: rec.base().Unix(), AgeSeconds: int64(now.Sub(rec.base()).Seconds()), WriteMemory: rec.Leftover.WriteMemory, GeneratedSecret: rec.Leftover.GeneratedSecret, RotatedUser: rec.Leftover.RotatedUser, UpdateCredentialId: rec.Leftover.UpdateCredentialID}
 		for _, d := range rec.Leftover.Devices {
-			pr.Devices = append(pr.Devices, &v1.PendingRollbackDevice{Device: d.Device, RollbackLines: assist.ScrubLines(d.Rollback, d.Secrets, rec.Leftover.Scrub)})
+			pr.Devices = append(pr.Devices, &v1.PendingRollbackDevice{Device: d.Device, RollbackLines: assist.ScrubLines(d.Rollback, d.Secrets, rec.Leftover.Scrub), Provisional: d.Provisional})
 		}
 		out.Rollbacks = append(out.Rollbacks, pr)
 	}

@@ -304,6 +304,7 @@ message ListPendingRollbacksRequest {}
 message PendingRollbackDevice {
   string device = 1;
   repeated string rollback_lines = 2; // lo que se mandará, sin secretos
+  bool provisional = 3;               // el State guardado es el provisional: el núcleo cayó a mitad de Configure
 }
 
 message PendingRollback {
@@ -315,6 +316,8 @@ message PendingRollback {
   bool write_memory = 6;             // la ejecución pedía write memory: la startup-config puede conservar el cambio; la reversa no hace write memory
   bool unreadable = 7;               // la entrada no se pudo leer: solo run_id; se puede descartar
   bool generated_secret = 8;         // rotación de credenciales cuyo secreto nuevo generó la app (no lo escribió la persona)
+  string rotated_user = 9;           // usuario rotado; solo con kind credrotate
+  string update_credential_id = 10;  // credencial de bóveda asociada al usuario rotado que se iba a actualizar; vacío si no
 }
 
 message ListPendingRollbacksResponse {
