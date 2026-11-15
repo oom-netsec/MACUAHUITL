@@ -268,6 +268,16 @@ func evalExpect(ex []Expect, outputs map[string]string) []i18n.Text {
 			}
 			continue
 		}
+		if e.Column == "same-state" && ran { // la salida entera igual a la guardada en Line (la vuelta al estado de antes de una reversa pendiente)
+			if same, d := sameState(e.Command, e.Line, text); same != e.Present {
+				if d.Empty() {
+					fails = append(fails, note("assist.post.not_restored", "command", e.Command))
+				} else {
+					fails = append(fails, note("assist.residue.cmd", "command", e.Command).With("residue", d))
+				}
+			}
+			continue
+		}
 		if e.Column == "section-line" && ran {
 			// Una línea dentro de su sección del running-config (Line es «sección␟línea»).
 			root, ok := parsed[e.Command]

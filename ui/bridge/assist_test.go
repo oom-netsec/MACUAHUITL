@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -86,6 +87,18 @@ func (f *fakeAssist) ListRuns(_ context.Context, r *v1.ListRunsRequest) (*v1.Lis
 	f.activeOnly = append(f.activeOnly, r.ActiveOnly)
 	f.mu.Unlock()
 	return &v1.ListRunsResponse{Runs: []*v1.AssistRunState{{RunId: "r1", State: "waiting-confirm", Active: true, Changed: []string{"SW1"}}}}, nil
+}
+
+func (f *fakeAssist) ListPendingRollbacks(context.Context, *v1.ListPendingRollbacksRequest) (*v1.ListPendingRollbacksResponse, error) {
+	return &v1.ListPendingRollbacksResponse{Rollbacks: []*v1.PendingRollback{{RunId: "r0", Kind: "ports", AgeSeconds: 90000,
+		Devices: []*v1.PendingRollbackDevice{{Device: "SW1", RollbackLines: []string{"shutdown"}}}}}}, nil
+}
+
+func (f *fakeAssist) StartPendingRollback(_ context.Context, r *v1.StartPendingRollbackRequest) (*v1.StartPendingRollbackResponse, error) {
+	f.mu.Lock()
+	f.confirms = append(f.confirms, "pending/"+r.RunId+"/"+strconv.FormatBool(r.AcceptAge))
+	f.mu.Unlock()
+	return &v1.StartPendingRollbackResponse{RunId: "r2"}, nil
 }
 
 func (f *fakeAssist) Confirm(_ context.Context, r *v1.ConfirmRequest) (*v1.ConfirmResponse, error) {
@@ -230,4 +243,26 @@ func (r *recorder) countPrefix(p string) int {
 		}
 	}
 	return n
+}
+
+func TestAssistPendingRollbackBridge(t *testing.T) {
+	d, _ := os.MkdirTemp("", "brg")
+	defer os.RemoveAll(d)
+	sock := filepath.Join(d, "core.sock")
+	l, _ := ipc.Listen(sock)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	fa := &fakeAssist{}
+	go ipc.Serve(ctx, l, func(r ipc.Registrar) { v1.RegisterAssistServiceServer(r, fa) })
+	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, (&recorder{}).emit)
+	out, err := b.AssistListPendingRollbacks()
+	if err != nil || !strings.Contains(out, `"runId":"r0"`) || !strings.Contains(out, `"ageSeconds":"90000"`) || !strings.Contains(out, `"rollbackLines":["shutdown"]`) {
+		t.Fatalf("%q %v", out, err)
+	}
+	if id, err := b.AssistStartPendingRollback("r0", true); err != nil || id != "r2" {
+		t.Fatalf("%q %v", id, err)
+	}
+	if fa.confirms[0] != "pending/r0/true" {
+		t.Fatalf("%v", fa.confirms)
+	}
 }

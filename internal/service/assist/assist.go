@@ -42,6 +42,17 @@ type planRec struct {
 	t       target
 	created time.Time
 	rot     *rotation // solo la rotación de credenciales
+	// devices: los equipos del plan, si no es solo label (la reversa pendiente; todos comparten la conexión t)
+	devices []string
+}
+
+// targets da, por etiqueta de equipo del plan, la conexión: una sola para todos.
+func (p *planRec) targets() map[string]target {
+	out := map[string]target{p.label: p.t}
+	for _, d := range p.devices {
+		out[d] = p.t
+	}
+	return out
 }
 
 type runRec struct {
@@ -516,12 +527,22 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 	if !ok {
 		return nil, service.Err(ctx, codes.NotFound, "assist.svc.el_plan_no_existe_caduco", nil)
 	}
-	if err := s.vault(ctx); err != nil {
+	runID, err := s.launch(ctx, rec, r.PlanId, portKeys(rec), "")
+	if err != nil {
 		return nil, err
+	}
+	return &v1.StartRunResponse{RunId: runID}, nil
+}
+
+// launch arma la ejecución de rec con la bóveda y el guard abiertos solo mientras dure. planID vacío = no viene de un plan guardado
+// (una reversa pendiente); origin es la ejecución original cuya reversa se aplica.
+func (s *assistSvc) launch(ctx context.Context, rec *planRec, planID string, keys []string, origin string) (string, error) {
+	if err := s.vault(ctx); err != nil {
+		return "", err
 	}
 	runID := service.NewID()
 	if err := s.d.Guard().Allow(ctx, runID, []string{rec.t.host}); err != nil {
-		return nil, status.Error(codes.PermissionDenied, err.Error())
+		return "", status.Error(codes.PermissionDenied, err.Error())
 	}
 	v := s.d.Vault()
 	creds := []string{rec.t.cred}
@@ -530,32 +551,31 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 	}
 	if err := v.Arm(runID, s.d.Now().Add(runWindow), creds); err != nil {
 		s.d.Guard().Revoke(runID)
-		return nil, service.VaultErr(ctx, err)
+		return "", service.VaultErr(ctx, err)
 	}
 	release := func() { s.d.Guard().Revoke(runID); v.Disarm(runID) }
-	var ex assist.Executor = newExec(s.d, runID, map[string]target{rec.label: rec.t}, transport.HostKeyPolicy{})
+	var ex assist.Executor = newExec(s.d, runID, rec.targets(), transport.HostKeyPolicy{})
 	if rec.rot != nil {
 		ex = &rotExec{devExec: ex.(*devExec), rot: *rec.rot}
 	}
-	run, err := assist.NewRun(assist.Options{ID: runID, Plan: rec.plan, Fn: rec.fn, Assisted: r.Assisted, Exec: ex, Audit: s.d.Audit,
+	run, err := assist.NewRun(assist.Options{ID: runID, Plan: rec.plan, Fn: rec.fn, Assisted: true, Exec: ex, Audit: s.d.Audit,
 		DecisionTimeout: s.decisionTimeout})
 	if err != nil {
 		release()
-		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
+		return "", service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	s.mu.Lock()
-	if _, ok := s.plans[r.PlanId]; !ok { // otro StartRun ganó la carrera
+	if _, ok := s.plans[planID]; planID != "" && !ok { // otro StartRun ganó la carrera
 		s.mu.Unlock()
 		release()
-		return nil, service.Err(ctx, codes.NotFound, "assist.svc.el_plan_ya_se_uso", nil)
+		return "", service.Err(ctx, codes.NotFound, "assist.svc.el_plan_ya_se_uso", nil)
 	}
-	keys := portKeys(rec)
 	if other, busy := s.busyLocked(keys); busy { // un puerto, una ejecución a la vez
 		s.mu.Unlock()
 		release()
-		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.la_ejecucion_sigue_activa_sobre", i18n.A("other", other))
+		return "", service.Err(ctx, codes.FailedPrecondition, "assist.svc.la_ejecucion_sigue_activa_sobre", i18n.A("other", other))
 	}
-	delete(s.plans, r.PlanId)
+	delete(s.plans, planID)
 	now := s.d.Now()
 	s.pruneRunsLocked(now)
 	rr := &runRec{run: run, finished: make(chan struct{}), started: now, keys: keys}
@@ -568,9 +588,10 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 		s.mu.Lock()
 		rr.ended = s.d.Now()
 		s.mu.Unlock()
+		s.afterRun(rr, rec.t, origin) // antes de close(finished): quien espera el fin ya ve la reversa guardada
 		close(rr.finished)
 	}()
-	return &v1.StartRunResponse{RunId: runID}, nil
+	return runID, nil
 }
 
 func (s *assistSvc) get(ctx context.Context, id string) (*runRec, error) {
@@ -650,6 +671,7 @@ func (s *assistSvc) WatchRun(r *v1.WatchRunRequest, st v1.AssistService_WatchRun
 		}
 		select {
 		case <-rr.run.Done():
+			<-rr.finished // ya quedó guardada (o borrada) la reversa pendiente
 			evs, _ := rr.run.Events(from)
 			return send(evs)
 		case <-more:

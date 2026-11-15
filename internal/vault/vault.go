@@ -435,6 +435,38 @@ func (v *Vault) Delete(id string) error {
 	return nil
 }
 
+// DeleteReserved borra la entrada reservada con esa etiqueta (Delete por ID las rechaza). ErrNotFound si no existe.
+func (v *Vault) DeleteReserved(label string) error {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if err := v.requireFull(); err != nil {
+		return err
+	}
+	if !Reserved(label) {
+		return ErrNotFound
+	}
+	for i, e := range v.entries {
+		c, err := v.decrypt(e)
+		if err != nil {
+			return err
+		}
+		c.Password.Destroy()
+		c.Enable.Destroy()
+		c.SSHKey.Destroy()
+		if c.Label != label {
+			continue
+		}
+		prev := v.entries
+		v.entries = append(append([]rawEntry(nil), v.entries[:i]...), v.entries[i+1:]...)
+		if err := v.persistReplacingBak(); err != nil {
+			v.entries = prev
+			return err
+		}
+		return nil
+	}
+	return ErrNotFound
+}
+
 // ChangeMasterPassword vuelve a cifrar la DEK con una KEK nueva (sal nueva).
 func (v *Vault) ChangeMasterPassword(old, new []byte) error {
 	defer wipe(old)

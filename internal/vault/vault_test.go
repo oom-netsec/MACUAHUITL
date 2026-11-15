@@ -539,3 +539,29 @@ func TestUnlockMigraElBakViejo(t *testing.T) {
 		t.Fatalf("el .bak aún trae la borrada: %v", err)
 	}
 }
+
+// DeleteReserved borra solo la entrada reservada con esa etiqueta: ni credenciales de conexión ni etiquetas ajenas.
+func TestDeleteReservedOnlyRemovesTheReservedEntry(t *testing.T) {
+	v, _ := newVault(t)
+	if _, err := v.Put(cred("core", "pw", "en")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.Put(Credential{Label: ReservedPrefix + "a", Username: "x", Password: secret.New(pw("A"))}); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.DeleteReserved("core"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("una credencial normal no se borra por aquí: %v", err)
+	}
+	if err := v.DeleteReserved(ReservedPrefix + "b"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("sin esa entrada: %v", err)
+	}
+	if err := v.DeleteReserved(ReservedPrefix + "a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := v.GetReserved(ReservedPrefix + "a"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("seguía ahí: %v", err)
+	}
+	if infos, _ := v.List(); len(infos) != 1 {
+		t.Fatalf("la credencial normal se perdió: %+v", infos)
+	}
+}

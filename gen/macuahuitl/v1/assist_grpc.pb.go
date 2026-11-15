@@ -31,6 +31,8 @@ const (
 	AssistService_WatchRun_FullMethodName             = "/macuahuitl.v1.AssistService/WatchRun"
 	AssistService_ListRuns_FullMethodName             = "/macuahuitl.v1.AssistService/ListRuns"
 	AssistService_GetAssistRun_FullMethodName         = "/macuahuitl.v1.AssistService/GetAssistRun"
+	AssistService_ListPendingRollbacks_FullMethodName = "/macuahuitl.v1.AssistService/ListPendingRollbacks"
+	AssistService_StartPendingRollback_FullMethodName = "/macuahuitl.v1.AssistService/StartPendingRollback"
 )
 
 // AssistServiceClient is the client API for AssistService service.
@@ -60,6 +62,10 @@ type AssistServiceClient interface {
 	// ListRuns y GetAssistRun permiten volver a una ejecución que sigue viva (la UI se cerró o mctl murió).
 	ListRuns(ctx context.Context, in *ListRunsRequest, opts ...grpc.CallOption) (*ListRunsResponse, error)
 	GetAssistRun(ctx context.Context, in *GetAssistRunRequest, opts ...grpc.CallOption) (*GetAssistRunResponse, error)
+	// Reversa asistida (seguridad operativa): una ejecución que terminó aborted, failed o abandoned con equipos cambiados deja su reversa guardada
+	// (cifrada en la bóveda, sobrevive al reinicio). StartPendingRollback la aplica como una ejecución asistida más (WatchRun, Confirm, Abort, Rollback).
+	ListPendingRollbacks(ctx context.Context, in *ListPendingRollbacksRequest, opts ...grpc.CallOption) (*ListPendingRollbacksResponse, error)
+	StartPendingRollback(ctx context.Context, in *StartPendingRollbackRequest, opts ...grpc.CallOption) (*StartPendingRollbackResponse, error)
 }
 
 type assistServiceClient struct {
@@ -199,6 +205,26 @@ func (c *assistServiceClient) GetAssistRun(ctx context.Context, in *GetAssistRun
 	return out, nil
 }
 
+func (c *assistServiceClient) ListPendingRollbacks(ctx context.Context, in *ListPendingRollbacksRequest, opts ...grpc.CallOption) (*ListPendingRollbacksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPendingRollbacksResponse)
+	err := c.cc.Invoke(ctx, AssistService_ListPendingRollbacks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *assistServiceClient) StartPendingRollback(ctx context.Context, in *StartPendingRollbackRequest, opts ...grpc.CallOption) (*StartPendingRollbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartPendingRollbackResponse)
+	err := c.cc.Invoke(ctx, AssistService_StartPendingRollback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AssistServiceServer is the server API for AssistService service.
 // All implementations must embed UnimplementedAssistServiceServer
 // for forward compatibility.
@@ -226,6 +252,10 @@ type AssistServiceServer interface {
 	// ListRuns y GetAssistRun permiten volver a una ejecución que sigue viva (la UI se cerró o mctl murió).
 	ListRuns(context.Context, *ListRunsRequest) (*ListRunsResponse, error)
 	GetAssistRun(context.Context, *GetAssistRunRequest) (*GetAssistRunResponse, error)
+	// Reversa asistida (seguridad operativa): una ejecución que terminó aborted, failed o abandoned con equipos cambiados deja su reversa guardada
+	// (cifrada en la bóveda, sobrevive al reinicio). StartPendingRollback la aplica como una ejecución asistida más (WatchRun, Confirm, Abort, Rollback).
+	ListPendingRollbacks(context.Context, *ListPendingRollbacksRequest) (*ListPendingRollbacksResponse, error)
+	StartPendingRollback(context.Context, *StartPendingRollbackRequest) (*StartPendingRollbackResponse, error)
 	mustEmbedUnimplementedAssistServiceServer()
 }
 
@@ -271,6 +301,12 @@ func (UnimplementedAssistServiceServer) ListRuns(context.Context, *ListRunsReque
 }
 func (UnimplementedAssistServiceServer) GetAssistRun(context.Context, *GetAssistRunRequest) (*GetAssistRunResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAssistRun not implemented")
+}
+func (UnimplementedAssistServiceServer) ListPendingRollbacks(context.Context, *ListPendingRollbacksRequest) (*ListPendingRollbacksResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPendingRollbacks not implemented")
+}
+func (UnimplementedAssistServiceServer) StartPendingRollback(context.Context, *StartPendingRollbackRequest) (*StartPendingRollbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartPendingRollback not implemented")
 }
 func (UnimplementedAssistServiceServer) mustEmbedUnimplementedAssistServiceServer() {}
 func (UnimplementedAssistServiceServer) testEmbeddedByValue()                       {}
@@ -502,6 +538,42 @@ func _AssistService_GetAssistRun_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AssistService_ListPendingRollbacks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPendingRollbacksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AssistServiceServer).ListPendingRollbacks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AssistService_ListPendingRollbacks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AssistServiceServer).ListPendingRollbacks(ctx, req.(*ListPendingRollbacksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AssistService_StartPendingRollback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartPendingRollbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AssistServiceServer).StartPendingRollback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AssistService_StartPendingRollback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AssistServiceServer).StartPendingRollback(ctx, req.(*StartPendingRollbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AssistService_ServiceDesc is the grpc.ServiceDesc for AssistService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -552,6 +624,14 @@ var AssistService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAssistRun",
 			Handler:    _AssistService_GetAssistRun_Handler,
+		},
+		{
+			MethodName: "ListPendingRollbacks",
+			Handler:    _AssistService_ListPendingRollbacks_Handler,
+		},
+		{
+			MethodName: "StartPendingRollback",
+			Handler:    _AssistService_StartPendingRollback_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

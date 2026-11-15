@@ -27,6 +27,10 @@ service AssistService {
   // ListRuns y GetAssistRun permiten volver a una ejecución que sigue viva (la UI se cerró o mctl murió).
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
   rpc GetAssistRun(GetAssistRunRequest) returns (GetAssistRunResponse);
+  // Reversa asistida (seguridad operativa): una ejecución que terminó aborted, failed o abandoned con equipos cambiados deja su reversa guardada
+  // (cifrada en la bóveda, sobrevive al reinicio). StartPendingRollback la aplica como una ejecución asistida más (WatchRun, Confirm, Abort, Rollback).
+  rpc ListPendingRollbacks(ListPendingRollbacksRequest) returns (ListPendingRollbacksResponse);
+  rpc StartPendingRollback(StartPendingRollbackRequest) returns (StartPendingRollbackResponse);
 }
 
 message AssistTarget {
@@ -291,4 +295,32 @@ message PlanRestoreResponse {
   AssistPlan plan = 2;
   repeated RestoreRefusal refused = 3;   // lo que el diff tocaría y no se restaura
   string reason = 4;                     // por qué se rechazó el plan
+}
+
+message ListPendingRollbacksRequest {}
+
+message PendingRollbackDevice {
+  string device = 1;
+  repeated string rollback_lines = 2; // lo que se mandará, sin secretos
+}
+
+message PendingRollback {
+  string run_id = 1;                 // la ejecución original
+  string kind = 2;                   // función del plan: ports, snippet, restore...
+  repeated PendingRollbackDevice devices = 3;
+  int64 ended_unix = 4;
+  int64 age_seconds = 5;
+}
+
+message ListPendingRollbacksResponse {
+  repeated PendingRollback rollbacks = 1;
+}
+
+message StartPendingRollbackRequest {
+  string run_id = 1;     // la ejecución original
+  bool accept_age = 2;   // obligatorio si pasaron más de 24 h desde que terminó
+}
+
+message StartPendingRollbackResponse {
+  string run_id = 1;     // la ejecución nueva, para WatchRun, Confirm, Abort y Rollback
 }

@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -316,5 +317,37 @@ func TestPortsRunsListsAndResumeTakesOverLiveRun(t *testing.T) {
 	}
 	if l := must(t, "", "ports", "runs"); !strings.Contains(l, st.RunId) || !strings.Contains(l, "done") {
 		t.Fatalf("runs:\n%s", l)
+	}
+}
+
+// Una ejecución abortada con el equipo cambiado deja su reversa guardada: mctl lo dice, la lista y la aplica con confirmación por paso.
+func TestPortsRollbackAppliesTheSavedRollback(t *testing.T) {
+	e := portsRigFull(t, nil)
+	if out := must(t, "", "ports", "rollbacks"); !strings.Contains(out, "No hay reversas pendientes") {
+		t.Fatalf("sin pendientes:\n%s", out)
+	}
+	out, err := mctl(t, "s\nn\n", append(e.args, "--vlan", "20", "--asistido")...) // aplica y rechaza el cierre
+	if err == nil || !strings.Contains(out, "mctl ports rollback ") {
+		t.Fatalf("debía avisar del comando de reversa: err=%v\n%s", err, out)
+	}
+	list := must(t, "", "ports", "rollbacks")
+	m := regexp.MustCompile(`ejecución (\S+) \(ports\)`).FindStringSubmatch(list)
+	if m == nil || !strings.Contains(list, "switchport access vlan 10") {
+		t.Fatalf("lista:\n%s", list)
+	}
+	if !strings.Contains(out, "mctl ports rollback "+m[1]) {
+		t.Fatalf("el aviso no trae el ID de la ejecución:\n%s", out)
+	}
+	for _, name := range []string{"ports rollback", "snippet rollback", "restore rollback"} { // el mismo comando bajo tres áreas
+		if _, err := mctl(t, "n\n", append(strings.Fields(name), "nope")...); err == nil {
+			t.Fatalf("%s: una ejecución inexistente debe fallar", name)
+		}
+	}
+	out, err = mctl(t, "s\ns\n", "ports", "rollback", m[1])
+	if err != nil || !strings.Contains(out, "[done]") || !strings.Contains(strings.Join(e.rec.Lines(), "|"), "switchport access vlan 10") {
+		t.Fatalf("err=%v\n%s", err, out)
+	}
+	if out := must(t, "", "ports", "rollbacks"); !strings.Contains(out, "No hay reversas pendientes") {
+		t.Fatalf("tras aplicarla no queda pendiente:\n%s", out)
 	}
 }
