@@ -1,7 +1,7 @@
 # Propósito: Descartes del acelerador de rutas rápidas (ASP) y eventos de plano de datos.
 # Cuándo usarlo: Se necesita saber por qué el ASA descarta paquetes (acl-drop, no-route, tcp-not-syn, etc.).
 # Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
-# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+# Validado en laboratorio: ASAv 9.x en CML, un solo contexto (2026-11-14), salvo los marcados «no existe en ASAv» o «solo multicontexto».
 id: l1-descartes-asp
 platform: asa
 name: ASA · Capa 1 · Descartes de ASP

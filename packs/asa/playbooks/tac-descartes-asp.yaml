@@ -1,7 +1,7 @@
 # Propósito: Contadores de ASP y flujos descartados con el contexto de interfaces y políticas.
 # Cuándo usarlo: Hay descartes (acl-drop, no-route, inspect-*, tcp-*, etc.) y se necesita acotarlos.
 # Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
-# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+# Validado en laboratorio: ASAv 9.x en CML, un solo contexto (2026-11-14), salvo los marcados «no existe en ASAv» o «solo multicontexto».
 id: tac-descartes-asp
 platform: asa
 name: ASA · TAC · Descartes de ASP
