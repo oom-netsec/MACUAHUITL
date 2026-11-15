@@ -17,7 +17,7 @@ commands:
   - cmd: show ip nhrp nhs detail
   - cmd: show ip route static
   - cmd: show ip access-lists
-  - cmd: show crypto pki certificates  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto pki certificates
   - cmd: show platform hardware qfp active statistics drop  # no existe en Cat9k (solo routers)
   - cmd: show logging | include IKE|CRYPTO|IPSEC|NHRP|TUN|LINEPROTO
   - cmd: show running-config | section crypto|tunnel

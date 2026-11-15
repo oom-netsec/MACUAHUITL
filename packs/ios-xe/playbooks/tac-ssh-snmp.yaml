@@ -21,7 +21,7 @@ commands:
   - cmd: show processes cpu sorted
   - cmd: show processes cpu history
   - cmd: show ip access-lists
-  - cmd: show crypto key mypubkey rsa  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto key mypubkey rsa
   - cmd: show logging | include SSH|SNMP|LOGIN|AAA|VTY|TACACS|RADIUS|CPUHOG
   - cmd: show running-config | section line vty|ip ssh|snmp-server|access-class|aaa
     may_contain_secrets: true

@@ -14,9 +14,9 @@ commands:
   - cmd: show crypto ikev2 diagnose error  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
   - cmd: show crypto ikev2 profile  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
   - cmd: show crypto ikev2 authorization policy  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
-  - cmd: show crypto pki trustpoints  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
-  - cmd: show crypto pki certificates  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
-  - cmd: show crypto key mypubkey rsa  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto pki trustpoints
+  - cmd: show crypto pki certificates
+  - cmd: show crypto key mypubkey rsa
   - cmd: show ip interface brief | include Virtual-Access|Tunnel
   - cmd: show logging | include IKEV2|CRYPTO|PKI|IPSEC
   - cmd: show running-config | section crypto ikev2|crypto ipsec|Virtual-Template|interface Tunnel
