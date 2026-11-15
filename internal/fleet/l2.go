@@ -280,7 +280,7 @@ func (f *Fleet) Find(q string) FindResult {
 			w.tx("fleet.warn.no_source", "cmd", c, "devs", strings.Join(miss, ", "))
 		}
 	}
-	res.Warnings, res.WarningsTx = w.list, w.txs
+	res.Warnings, res.WarningsTx = w.out()
 	return res
 }
 
@@ -510,13 +510,14 @@ func (f *Fleet) Trace(q string) TraceResult {
 		}
 		if res.MAC == "" {
 			w.tx("fleet.warn.ip_no_arp", "ip", res.IP)
-			res.End, res.Warnings, res.WarningsTx = "not-found", w.list, w.txs
+			res.End = "not-found"
+			res.Warnings, res.WarningsTx = w.out()
 			return res
 		}
 	} else {
 		res.End = "not-found"
 		w.tx("fleet.warn.bad_query", "query", q)
-		res.Warnings, res.WarningsTx = w.list, w.txs
+		res.Warnings, res.WarningsTx = w.out()
 		return res
 	}
 	res.Hops, res.End, res.Access = f.walk(g, w, res.MAC, nil, vlanOfIface(viaIface))
@@ -530,6 +531,6 @@ func (f *Fleet) Trace(q string) TraceResult {
 			seen[r.Dev.Name] = true
 		}
 	}
-	res.Warnings, res.WarningsTx = w.list, w.txs
+	res.Warnings, res.WarningsTx = w.out()
 	return res
 }

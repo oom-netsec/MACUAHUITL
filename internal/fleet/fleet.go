@@ -213,7 +213,7 @@ func Load(dir string, now time.Time, extra ...string) (*Fleet, error) {
 	for _, r := range roots {
 		readJob(r, 0)
 	}
-	f.Warnings, f.WarnTx = w.list, w.txs
+	f.Warnings, f.WarnTx = w.out()
 	if len(devs) == 0 {
 		return nil, i18n.New("fleet.err.no_outputs", i18n.A("dir", dir))
 	}
@@ -382,6 +382,54 @@ type ws struct {
 	seen map[string]bool
 	list []string
 	txs  []i18n.Text
+	rej  map[string]*rejGroup // comando → rechazos; ocupan un lugar fijo en list
+}
+
+type rejGroup struct {
+	at   int         // lugar del aviso en list
+	devs [][2]string // (equipo, hora)
+}
+
+// reject anota que un equipo rechazó un comando; out los agrupa en una línea por comando.
+func (w *ws) reject(dev, cmd, at string) {
+	if w.rej == nil {
+		w.rej = map[string]*rejGroup{}
+	}
+	g := w.rej[cmd]
+	if g == nil {
+		g = &rejGroup{at: len(w.list)}
+		w.rej[cmd] = g
+		w.list = append(w.list, "")
+		w.txs = append(w.txs, i18n.Text{})
+	}
+	g.devs = append(g.devs, [2]string{dev, at})
+}
+
+const maxRejNames = 10
+
+// out devuelve los avisos con cada grupo de rechazos escrito en su lugar.
+func (w *ws) out() ([]string, []i18n.Text) {
+	list, txs := append([]string(nil), w.list...), append([]i18n.Text(nil), w.txs...)
+	for cmd, g := range w.rej {
+		rs := g.devs
+		sort.Slice(rs, func(i, j int) bool { return rs[i][0] < rs[j][0] })
+		var t i18n.Text
+		if len(rs) == 1 {
+			t = i18n.Tx("fleet.warn.rejected", "dev", rs[0][0], "cmd", cmd, "at", rs[0][1])
+		} else {
+			names := make([]string, 0, maxRejNames+1)
+			for _, r := range rs {
+				if len(names) == maxRejNames {
+					names = append(names, "…")
+					break
+				}
+				names = append(names, r[0])
+			}
+			t = i18n.Tx("fleet.warn.rejected_many", "cmd", cmd, "n", len(rs), "devs", strings.Join(names, ", "))
+		}
+		list[g.at], txs[g.at] = t.In(i18n.Es), t
+	}
+	return list, txs
 }
 
 // tx agrega un aviso del catálogo.
@@ -426,7 +474,7 @@ func read[T any](w *ws, d *Dev, cmd string, p func(string) ([]T, bool)) ([]T, Ev
 		return nil, e, false
 	}
 	if rejected(e) {
-		w.tx("fleet.warn.rejected", "dev", d.Name, "cmd", cmd, "at", e.At.Format("2006-01-02 15:04Z"))
+		w.reject(d.Name, cmd, e.At.Format("2006-01-02 15:04Z"))
 		return nil, e, false
 	}
 	rows, ok := p(e.Text)

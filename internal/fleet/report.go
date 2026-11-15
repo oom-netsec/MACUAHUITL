@@ -166,7 +166,7 @@ func (f *Fleet) Health() HealthResult {
 		}
 		return x.Device+x.Port < y.Device+y.Port
 	})
-	res.Warnings, res.WarningsTx = w.list, w.txs
+	res.Warnings, res.WarningsTx = w.out()
 	return res
 }
 
@@ -237,7 +237,7 @@ func (f *Fleet) Summary() SummaryResult {
 			}
 		}
 	}
-	res.Warnings, res.WarningsTx = w.list, w.txs
+	res.Warnings, res.WarningsTx = w.out()
 	return res
 }
 
@@ -326,7 +326,7 @@ func (f *Fleet) Capacity(need int64) CapacityResult {
 			res.DRAMNoData = append(res.DRAMNoData, d.Name)
 		}
 	}
-	res.Warnings, res.WarningsTx = w.list, w.txs
+	res.Warnings, res.WarningsTx = w.out()
 	return res
 }
 
@@ -388,7 +388,7 @@ func (f *Fleet) Inventory() InventoryResult {
 			}
 		}
 	}
-	res.Warnings, res.WarningsTx = w.list, w.txs
+	res.Warnings, res.WarningsTx = w.out()
 	return res
 }
 

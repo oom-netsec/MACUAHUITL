@@ -88,7 +88,7 @@ func (f *Fleet) Path(src, dst string) PathResult {
 	da, ok2 := f.endpoint(dst)
 	if !ok1 || !ok2 {
 		w.tx("fleet.warn.bad_endpoints", "src", src, "dst", dst)
-		res.Warnings, res.WarningsTx = w.list, w.txs
+		res.Warnings, res.WarningsTx = w.out()
 		return res
 	}
 	p := &pather{f: f, w: w, g: f.gather(w), rt: map[string]rtab{}, owners: map[string]*Dev{}, res: &res, dst: da}
@@ -121,7 +121,7 @@ func (f *Fleet) Path(src, dst string) PathResult {
 	if len(starts) == 0 {
 		res.Hops = []PathHop{{ID: 0, Parent: -1, Device: sa.String(), Status: "cut"}}
 		i18n.Put(&res.Hops[0].Reason, &res.Hops[0].ReasonTx, "fleet.reason.no_source", "src", sa)
-		res.Warnings, res.WarningsTx = w.list, w.txs
+		res.Warnings, res.WarningsTx = w.out()
 		return res
 	}
 	if len(starts) > 1 {
@@ -133,7 +133,7 @@ func (f *Fleet) Path(src, dst string) PathResult {
 			res.Arrived = true
 		}
 	}
-	res.Warnings, res.WarningsTx = w.list, w.txs
+	res.Warnings, res.WarningsTx = w.out()
 	return res
 }
 
