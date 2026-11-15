@@ -45,8 +45,15 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 		return &Error{err: ErrFileExists, msg: i18n.Msg(b.locale(), "file.exists.save", nil), Code: "AlreadyExists", Reason: "file.exists",
 			Metadata: i18n.Metadata("file.exists.save", i18n.A("path", path))}
 	}
-	if _, err := os.Lstat(path); err == nil && !overwrite {
-		return wrapErr(exists())
+	if fi, err := os.Lstat(path); err == nil {
+		if !overwrite {
+			return wrapErr(exists())
+		}
+		// Solo se reemplaza un archivo regular (o el enlace mismo, que rename no sigue): nunca una FIFO, un socket ni un
+		// dispositivo, igual que las exportaciones del núcleo (service.WriteExport).
+		if !fi.Mode().IsRegular() && fi.Mode()&fs.ModeSymlink == 0 {
+			return b.bridgeErr(i18n.New("bridge.err.save_not_regular", nil))
+		}
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".guardar-*")
 	if err != nil {

@@ -55,6 +55,9 @@ jobs:
       - name: main de Wails compila (sin WebKitGTK, etiqueta purego)
         working-directory: .
         run: CGO_ENABLED=0 go vet -tags 'wails purego' ./ui/
+      - name: noegress también en ui/main.go (solo se compila con la etiqueta wails)
+        working-directory: .
+        run: CGO_ENABLED=0 GOFLAGS=-tags=wails,purego go run ./tools/noegress/cmd/noegress ./ui/
 
   proto:
     runs-on: ubuntu-latest

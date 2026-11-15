@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
@@ -92,5 +93,19 @@ func TestWriteFileSinLinkNiNoReplace(t *testing.T) {
 	}
 	if got, _ := os.ReadFile(p); string(got) != "mio" {
 		t.Fatalf("se reemplazó: %q", got)
+	}
+}
+
+func TestWriteFileNoReemplazaLoQueNoEsArchivo(t *testing.T) {
+	b := New(nil, nil)
+	fifo := filepath.Join(t.TempDir(), "tubo")
+	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
+		t.Skip("sin mkfifo:", err)
+	}
+	if err := b.WriteFile(fifo, "x", "utf8", true); err == nil {
+		t.Fatal("una FIFO no debe reemplazarse aunque haya overwrite")
+	}
+	if fi, _ := os.Lstat(fifo); fi.Mode()&os.ModeNamedPipe == 0 {
+		t.Fatal("la FIFO debe seguir ahí")
 	}
 }

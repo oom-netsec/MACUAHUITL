@@ -72,7 +72,7 @@ jobs:
           path: ui/frontend/dist
       - name: UI
         run: |
-          CGO_ENABLED=1 go build -tags 'wails gtk3' -trimpath -ldflags "-s -w -X github.com/oom-netsec/MACUAHUITL/internal/version.Version=${GITHUB_REF_NAME}" -o bin/macuahuitl ./ui
+          CGO_ENABLED=1 go build -tags 'wails gtk3 production' -trimpath -ldflags "-s -w -X github.com/oom-netsec/MACUAHUITL/internal/version.Version=${GITHUB_REF_NAME}" -o bin/macuahuitl ./ui
       - name: paquetes
         run: |
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.48.0

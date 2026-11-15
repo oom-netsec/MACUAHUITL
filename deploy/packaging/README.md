@@ -19,7 +19,7 @@ El binario `macuahuitl` (Wails v3) usa el motor web del sistema. Para compilarlo
 | Ubuntu / Debian | `libgtk-3-dev libwebkit2gtk-4.1-dev build-essential pkg-config` |
 | Fedora / RHEL | `gtk3-devel webkit2gtk4.1-devel gcc pkgconf-pkg-config` |
 
-Se compila con `task ui-build`, que usa las etiquetas `wails gtk3`: Wails 3.1 usa GTK4 y WebKitGTK 6.0 por defecto, y estas distribuciones traen GTK3 con WebKitGTK 4.1.
+Se compila con `task ui-build`, que usa las etiquetas `wails gtk3 production` (`production` apaga el inspector web y el servidor de desarrollo de Wails en la app publicada): Wails 3.1 usa GTK4 y WebKitGTK 6.0 por defecto, y estas distribuciones traen GTK3 con WebKitGTK 4.1.
 
 Para ejecutarlo basta con las versiones de runtime (`libwebkit2gtk-4.1-0`, `webkit2gtk4.1`).
 

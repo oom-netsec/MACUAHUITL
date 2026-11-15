@@ -8,6 +8,9 @@ export PATH="/usr/local/go/bin:$HOME/go/bin:$PATH"
 if [[ "${1:-}" == "test" ]]; then
   go test -race ./...
   go run ./tools/noegress/cmd/noegress ./...
+  # ui/main.go solo se compila con la etiqueta wails y embebe frontend/dist: se revisa aparte, como en CI.
+  [[ -f ui/frontend/dist/index.html ]] || (cd ui/frontend && npm run build >/dev/null)
+  CGO_ENABLED=0 GOFLAGS=-tags=wails,purego go run ./tools/noegress/cmd/noegress ./ui/
   go run ./tools/archcheck/cmd/archcheck ./...
   (cd ui/frontend && npm test)
   echo "Pruebas en verde. Ojo: la prueba de empaquetado reescribe bin/; corre ./dev.sh para recompilar."
