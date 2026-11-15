@@ -1,0 +1,49 @@
+# Un prompt por línea; las líneas con # son comentarios de grupo.
+# Grupo 1: prompt hostname context (por omisión en multicontexto).
+asa/ctx1#
+asa/ctx1>
+asa/ctx1(config)#
+asa/admin#
+asa/admin(config)#
+# Grupo 2: prompt hostname priority state (failover habilitado).
+fw-a/pri/act#
+fw-a/pri/act(config)#
+fw-b/sec/stby#
+fw-b/sec/stby(config)#
+# Grupo 3: prompt hostname context priority state.
+fw-a/ctx1/pri/act#
+fw-a/ctx1/pri/act(config)#
+fw-b/ctx1/sec/stby#
+fw-b/ctx1/sec/stby(config)#
+# Grupo 4: prompt hostname priority state context (orden de palabras distinto).
+fw-a/pri/stby/ctx1#
+fw-a/pri/stby/ctx1(config)#
+fw-b/sec/act/ctx1#
+fw-b/sec/act/ctx1(config)#
+# Grupo 5: prompt hostname priority state, failover deshabilitado (actNoFailover, stbyNoFailover).
+fw-a/pri/actNoFailover#
+fw-a/pri/actNoFailover(config)#
+fw-a/pri/stbyNoFailover#
+fw-a/pri/stbyNoFailover(config)#
+# Grupo 6: prompt hostname cluster-unit state (versión 9.19(1) o posterior: control/data).
+asa/unit-1-1/control#
+asa/unit-1-1/control(config)#
+asa/unit-1-2/data#
+asa/unit-1-2/data(config)#
+# Grupo 7: prompt hostname cluster-unit state (versión anterior a 9.19(1): master/slave).
+asa/unit-1-1/master#
+asa/unit-1-1/master(config)#
+asa/unit-1-2/slave#
+asa/unit-1-2/slave(config)#
+# Grupo 8: prompt hostname cluster-unit state, forma literal del ejemplo de la documentación ("control node"/"data node", con espacio).
+asa/cl1/control node#
+asa/cl2/data node#
+asa/cl2/data node(config)#
+# Grupo 9: prompt hostname domain priority state (el dominio lleva puntos).
+asa/example.com/pri/act#
+asa/example.com/pri/act(config)#
+asa/lab.example.com/sec/stby#
+asa/lab.example.com/sec/stby(config)#
+# Grupo 10: prompt hostname context domain priority state.
+asa/ctx1/example.com/pri/act#
+asa/ctx1/example.com/pri/act(config)#

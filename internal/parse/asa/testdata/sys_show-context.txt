@@ -1,0 +1,9 @@
+asa# show context
+Context Name      Interfaces                    URL
+*admin            GigabitEthernet0/1.100        disk0:/admin.cfg
+                  GigabitEthernet0/1.101
+contexta          GigabitEthernet0/1.200        disk0:/contexta.cfg
+                  GigabitEthernet0/1.201
+contextb          GigabitEthernet0/1.300        disk0:/contextb.cfg
+                  GigabitEthernet0/1.301
+Total active Security Contexts: 3

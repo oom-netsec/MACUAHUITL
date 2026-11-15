@@ -1,0 +1,2 @@
+asa# show cluster conn count
+  200 in use (cluster-wide aggregated)

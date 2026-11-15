@@ -1,0 +1,16 @@
+asa# show context detail
+Context "admin", has been created, but initial ACL rules not complete
+  Config URL: disk0:/admin.cfg
+  Real Interfaces: Management0/0
+  Mapped Interfaces: Management0/0
+  Flags: 0x00000013, ID: 1
+Context "system", is a system resource
+  Config URL: startup-config
+  Real Interfaces:
+  Mapped Interfaces: Management0/0
+  Flags: 0x00000019, ID: 257
+Context "null", is a system resource
+  Config URL: ... null ...
+  Real Interfaces:
+  Mapped Interfaces:
+  Flags: 0x00000009, ID: 258

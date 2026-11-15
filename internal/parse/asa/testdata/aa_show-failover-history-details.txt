@@ -1,0 +1,34 @@
+asa# show failover history details
+==========================================================================
+From State                 To State                   Reason
+==========================================================================
+09:58:07 UTC Jan 18 2017
+Not Detected               Negotiation                No Error
+09:58:10 UTC Jan 18 2017
+Negotiation                Just Active                No Active unit found
+09:58:10 UTC Jan 18 2017
+Just Active                Active Drain               No Active unit found
+09:58:10 UTC Jan 18 2017
+Active Drain               Active Applying Config     No Active unit found
+09:58:10 UTC Jan 18 2017
+Active Applying Config    Active Config Applied       No Active unit found
+09:58:10 UTC Jan 18 2017
+Active Config Applied     Active                      No Active unit found
+==========================================================================
+PEER History Collected at 09:58:54 UTC Jan 18 2017
+=======================PEER-HISTORY=========================================
+From State                To State                    Reason
+=========================PEER-HISTORY=======================================
+09:57:46 UTC Jan 18 2017
+Not Detected              Negotiation                 No Error
+09:58:19 UTC Jan 18 2017
+Negotiation               Cold Standby                Detected an Active mate
+09:58:21 UTC Jan 18 2017
+Cold Standby             Sync Config                  Detected an Active mate
+09:58:29 UTC Jan 18 2017
+Sync Config             Sync File System              Detected an Active mate
+09:58:29 UTC Jan 18 2017
+Sync File System        Bulk Sync                     Detected an Active mate
+09:58:42 UTC Jan 18 2017
+Bulk Sync               Standby Ready                 Detected an Active mate
+=========================PEER-HISTORY=====================================

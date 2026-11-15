@@ -1,0 +1,7 @@
+asa(config)# show running-config cluster
+cluster group pod1
+  local-unit node1
+  cluster-interface vni1 ip 192.0.2.1 255.255.255.0
+  priority 1
+  key clave-de-prueba
+  enable noconfirm

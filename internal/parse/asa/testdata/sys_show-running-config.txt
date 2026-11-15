@@ -1,0 +1,54 @@
+asa# show running-config
+: Saved
+:
+: Serial Number: FCH0000A001
+: Hardware:   FPR-2130, 13703 MB RAM, CPU MIPS 1200 MHz, 1 CPU (12 cores)
+:
+ASA Version 9.17(1)
+!
+terminal width 511
+hostname asa
+!
+interface GigabitEthernet0/1
+ no shutdown
+!
+interface GigabitEthernet0/1.100
+ vlan 100
+!
+interface GigabitEthernet0/1.101
+ vlan 101
+!
+interface GigabitEthernet0/1.200
+ vlan 200
+!
+interface GigabitEthernet0/1.201
+ vlan 201
+!
+interface Management0/0
+ management-only
+ no shutdown
+!
+class gold
+  limit-resource Conns 10%
+  limit-resource Telnet 5
+!
+admin-context admin
+context admin
+  allocate-interface Management0/0
+  allocate-interface GigabitEthernet0/1.100
+  allocate-interface GigabitEthernet0/1.101
+  config-url disk0:/admin.cfg
+!
+context contexta
+  member gold
+  allocate-interface GigabitEthernet0/1.200
+  allocate-interface GigabitEthernet0/1.201
+  config-url disk0:/contexta.cfg
+!
+context contextb
+  allocate-interface GigabitEthernet0/1.300
+  allocate-interface GigabitEthernet0/1.301
+  config-url ftp://192.0.2.10/contextb.cfg
+!
+Cryptochecksum:00000000000000000000000000000000
+: end

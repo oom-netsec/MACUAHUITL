@@ -1,0 +1,6 @@
+asa# show resource usage system
+Resource              Current         Peak      Limit    Denied  Context
+Telnet                      3            5        100         0  System
+SSH                         5            7        100         0  System
+Conns                      40           55        N/A         0  System
+Hosts                      44           56        N/A         0  System
