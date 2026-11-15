@@ -304,6 +304,7 @@ func Apply(platform, text string) (string, map[string]int) {
 // cadenas de certificados), para enmascarar una salida que llega por trozos.
 type Stream struct {
 	block, skip string
+	qblock      string // bloque de la última línea de configuración citada sin sangría (quoted)
 	table       string // tabla de NX-OS/IOS en curso: "community", "host" o "isakmp"
 	rows        int    // filas vistas de la tabla en curso
 	n           int
@@ -360,7 +361,30 @@ func (s *Stream) Line(raw string) (out string, ok bool) {
 	if line != "" && line[0] != ' ' && line[0] != '\t' {
 		s.block = blockOf(line)
 	}
-	return maskLine(line, s.block, s.Platform, s.counts) + eol, true
+	return maskLine(s.quoted(line), s.block, s.Platform, s.counts) + eol, true
+}
+
+// quotedSeg: un segmento entre comillas dobles de una línea de salida.
+var quotedSeg = regexp.MustCompile(`"([^"\n]*)"`)
+
+// quoted enmascara lo que una línea de salida cita entre comillas con las mismas reglas que la línea suelta: show tech
+// del ASA repite líneas de configuración en sus avisos («*** Output from config line 9, "enable password …"»), y los
+// ERROR:/WARNING: y los errores de parser de IOS-XE y NX-OS hacen lo mismo (hueco real visto en CML, 2026-11-14). Un
+// segmento con sangría hereda el bloque de la última línea citada sin sangría, como en la configuración de verdad.
+func (s *Stream) quoted(line string) string {
+	if !strings.Contains(line, `"`) {
+		return line
+	}
+	return quotedSeg.ReplaceAllStringFunc(line, func(q string) string {
+		inner := q[1 : len(q)-1]
+		if inner == "" {
+			return q
+		}
+		if inner[0] != ' ' && inner[0] != '\t' {
+			s.qblock = blockOf(inner)
+		}
+		return `"` + maskCited(maskLine(inner, s.qblock, s.Platform, s.counts), s.counts) + `"`
+	})
 }
 
 var (

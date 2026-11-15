@@ -154,15 +154,34 @@ func nameCounter(ln string, a, b int) bool {
 // puede ser otro de la misma línea (ntp authentication-key 1 md5 X, pre-shared-key local X...), así que nada del
 // texto de la línea sale, ni lo que va antes.
 func secretAt(ln string) (kw string, n int, ok bool) {
+	// Lo citado entre comillas (show tech del ASA: «*** Output from config line N, "…"», ERROR:/WARNING: que repiten
+	// una línea de configuración) se revisa sin los descartes de la salida normal: ahí pueden esconder una clave real.
+	for _, q := range quotedRe.FindAllStringSubmatch(ln, -1) {
+		if kw, n, ok := scan(q[1], true); ok {
+			return kw, n, true
+		}
+	}
 	if l := labelRe.FindStringSubmatch(ln); l != nil && benignValueRe.MatchString(l[1]) {
 		return "", 0, false // «Wrong PSK : 132», «PSK : Enabled»: contador o estado, no una clave
 	}
+	return scan(ln, false)
+}
+
+// quotedRe: un segmento entre comillas dobles.
+var quotedRe = regexp.MustCompile(`"([^"]*)"`)
+
+// scan busca un valor con pinta de secreto sin <MASKED:...>; strict deja fuera los descartes de la salida normal
+// (palabras de configuración, PC de show memory, contadores de community, <MASKED: cercano).
+func scan(ln string, strict bool) (kw string, n int, ok bool) {
 	for _, m := range secretRe.FindAllStringSubmatchIndex(ln, -1) {
-		if maskedNear(strings.Fields(ln[m[0]:])[1:]) {
+		if !strict && maskedNear(strings.Fields(ln[m[0]:])[1:]) {
 			continue
 		}
 		for g := 2; g < len(m); g += 2 {
-			if m[g] < 0 || strings.HasPrefix(ln[m[g]:], "<MASKED:") || benignFollow[strings.ToLower(ln[m[g]:m[g+1]])] || pcRe.MatchString(ln[m[g]:m[g+1]]) || nameCounter(ln, m[g], m[g+1]) {
+			if m[g] < 0 || strings.HasPrefix(ln[m[g]:], "<MASKED:") {
+				continue
+			}
+			if !strict && (benignFollow[strings.ToLower(ln[m[g]:m[g+1]])] || pcRe.MatchString(ln[m[g]:m[g+1]]) || nameCounter(ln, m[g], m[g+1])) {
 				continue
 			}
 			word := strings.Fields(ln[m[0]:m[1]])[0]
