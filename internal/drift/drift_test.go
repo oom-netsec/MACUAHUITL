@@ -118,3 +118,62 @@ func TestPair(t *testing.T) {
 		}
 	}
 }
+
+// CompareMasked: nada de secretos ni hashes en los cambios, sin diferencias falsas por un lado enmascarado, y una clave
+// que cambió sale como «~» enmascarada en su contexto (también la que depende del bloque, como la de line vty).
+func TestCompareMasked(t *testing.T) {
+	prev := "hostname R1\nenable secret 5 $1$a$Viejo\nline vty 0 4\n password VtyVieja\n login\n"
+	cur := "hostname R1\nenable secret 5 $1$b$Nuevo\nline vty 0 4\n password VtyNueva\n login\n"
+	cs, _ := CompareMasked(prev, cur, "")
+	var all strings.Builder
+	for _, c := range cs {
+		all.WriteString(c.Op + " " + c.Path + " | " + c.Line + "\n")
+		if c.Op != "~" {
+			t.Errorf("cambio que no es de clave: %+v", c)
+		}
+	}
+	got := all.String()
+	for _, leak := range []string{"Viejo", "Nuevo", "VtyVieja", "VtyNueva", "$1$"} {
+		if strings.Contains(got, leak) {
+			t.Errorf("sale %q:\n%s", leak, got)
+		}
+	}
+	if len(cs) != 2 || !strings.Contains(got, "~  | enable secret 5 <MASKED:") || !strings.Contains(got, "~ line vty 0 4 | password <MASKED:") {
+		t.Errorf("faltan las dos claves cambiadas:\n%s", got)
+	}
+	// un lado ya enmascarado: no hay diferencia (ni se sabe si cambió)
+	masked := "hostname R1\nenable secret 5 <MASKED:enable-secret>\nline vty 0 4\n password <MASKED:line-password>\n login\n"
+	if cs, _ := CompareMasked(prev, masked, ""); len(cs) != 0 {
+		t.Errorf("diferencia falsa por el enmascarado: %+v", cs)
+	}
+	if cs, _ := CompareMasked(masked, cur, ""); len(cs) != 0 { // también con el lado viejo enmascarado
+		t.Errorf("diferencia falsa con el viejo enmascarado: %+v", cs)
+	}
+}
+
+// Varias líneas iguales una vez enmascaradas: cada «-» empareja con un solo «+» (dos comunidades nuevas contra una vieja
+// dan un «~» y un «+», no dos «~»). Un cambio de certificado (la cadena se enmascara entera) no es un «~». Los «~» no
+// cuentan como agregadas ni quitadas.
+func TestCompareMaskedEmparejaUnoAUno(t *testing.T) {
+	cs, _ := CompareMasked("hostname R1\nsnmp-server community Vieja RO\n", "hostname R1\nsnmp-server community Nueva1 RO\nsnmp-server community Nueva2 RO\n", "")
+	n := map[string]int{}
+	for _, c := range cs {
+		n[c.Op]++
+	}
+	if n["~"] != 1 || n["+"] != 1 || n["-"] != 0 {
+		t.Fatalf("cambios = %+v", cs)
+	}
+	d := NewDevice("R1", 1, 2, cs, nil)
+	if d.Added != 1 || d.Removed != 0 {
+		t.Fatalf("conteos con «~»: agregadas %d, quitadas %d", d.Added, d.Removed)
+	}
+	cert := func(hex string) string {
+		return "hostname R1\ncrypto pki certificate chain TP-self-signed-1\n certificate self-signed 01\n  " + hex + "\n  \tquit\n"
+	}
+	cs, _ = CompareMasked(cert("3082AAAA"), cert("3082BBBB"), "")
+	for _, c := range cs {
+		if c.Op == "~" {
+			t.Fatalf("un certificado no es un «~»: %+v", cs)
+		}
+	}
+}

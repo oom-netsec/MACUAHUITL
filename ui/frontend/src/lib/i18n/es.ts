@@ -2759,6 +2759,7 @@ export const es = {
   "pending.kind.snippet-ntp-server": "Snippet: servidor NTP",
   "pending.kind.credrotate": "Rotación de credencial",
   "pending.kind.restore-diff": "Restauración de respaldo",
+  "drift.maskedChanged": "(cambió un valor enmascarado; no se muestra)",
 };
 
 export type Key = keyof typeof es;

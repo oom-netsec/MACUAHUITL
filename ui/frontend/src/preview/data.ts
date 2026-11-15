@@ -185,7 +185,12 @@ certificate: CN=Lab Root CA,O=Lab
     // Backups: two devices with several snapshots; content and diff come from sample configurations.
     backupList: async () => ({ masked: false, backups }),
     backupGet: async (id: string) => { const i = Math.max(0, backups.findIndex((x) => x.id === id)); return { meta: backups[i], text: backupConfig(backups[i].device, i) }; },
-    backupDiff: async (from: string, to: string) => ({ from: backups.find((x) => x.id === from) ?? backups[1], to: backups.find((x) => x.id === to) ?? backups[0], added: 0, removed: 0, changes: [], ignored: ["ntp clock-period 36029"], masked: false }),
+    backupDiff: async (from: string, to: string) => {
+      const at = (id: string, def: number) => { const i = backups.findIndex((x) => x.id === id); return i < 0 ? def : i; };
+      const [i, j] = [at(from, 1), at(to, 0)];
+      return { from: backups[i], to: backups[j], added: 0, removed: 0, changes: [], ignored: ["ntp clock-period 36029"], masked: false,
+        before: backupConfig(backups[i].device, i), after: backupConfig(backups[j].device, j) };
+    },
   };
 }
 

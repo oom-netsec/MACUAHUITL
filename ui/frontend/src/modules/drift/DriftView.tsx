@@ -48,7 +48,7 @@ export function DriftView({ core }: { core: CoreAPI }) {
                       <div className="drift-changes">
                         <Terminal as="ul" aria-label={t("drift.changes.aria", { device: d.device })}>
                           {d.changes.map((c, i) => (
-                            <li key={i} data-op={c.op}><Hl text={`${c.op} ${c.path ? `${c.path} › ` : ""}${c.line}`} /></li>
+                            <li key={i} data-op={c.op}><Hl text={`${c.op} ${c.path ? `${c.path} › ` : ""}${c.line}${c.op === "~" ? ` ${t("drift.maskedChanged")}` : ""}`} /></li>
                           ))}
                         </Terminal>
                       </div>

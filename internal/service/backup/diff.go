@@ -11,6 +11,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/backup"
 	"github.com/oom-netsec/MACUAHUITL/internal/drift"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
@@ -25,6 +26,10 @@ type diffReport struct {
 	Ignored []string       `json:"ignored"`
 	// Masked: alguno de los dos se tomó enmascarado, así que un cambio de secretos no se ve.
 	Masked bool `json:"masked"`
+	// Before y After son los dos respaldos enmascarados, para el visor de la UI: comparar no muestra secretos aunque
+	// un respaldo se haya tomado con --secrets (para verlo entero está «ver», que se audita como export).
+	Before string `json:"before"`
+	After  string `json:"after"`
 }
 
 func (r diffReport) text(loc string) string {
@@ -46,7 +51,7 @@ func (r diffReport) text(loc string) string {
 			}
 			last = c.Path
 		}
-		fmt.Fprintf(&b, "    %s %s\n", c.Op, strings.ReplaceAll(c.Line, "\n", "\n      "))
+		fmt.Fprintf(&b, "    %s\n", c.TextIn(loc))
 	}
 	if len(r.Ignored) > 0 {
 		b.WriteString(i18n.Msg(loc, "backup.diff.ignored", i18n.A("list", strings.Join(r.Ignored, "; "))) + "\n")
@@ -68,9 +73,12 @@ func (s *backupSvc) DiffBackups(ctx context.Context, r *v1.DiffBackupsRequest) (
 	if from.Device != to.Device || from.Kind != to.Kind {
 		return nil, service.Err(ctx, codes.InvalidArgument, "backup.err.diff_mismatch", nil)
 	}
-	cs, ign := drift.Compare(a, b)
+	cs, ign := drift.CompareMasked(a, b, "") // nunca un secreto ni un hash en pantalla, ni diferencias falsas por el enmascarado
 	d := drift.NewDevice(to.Device, 0, 0, cs, ign)
-	rep := diffReport{From: from, To: to, Added: d.Added, Removed: d.Removed, Changes: d.Changes, Ignored: d.Ignored, Masked: from.Masked || to.Masked}
+	ma, _ := mask.Apply("", a)
+	mb, _ := mask.Apply("", b)
+	rep := diffReport{From: from, To: to, Added: d.Added, Removed: d.Removed, Changes: d.Changes, Ignored: d.Ignored, Masked: from.Masked || to.Masked,
+		Before: ma, After: mb}
 	s.d.Audit("backup.diff", to.Device, fmt.Sprintf("from=%s to=%s changes=%d", from.ID, to.ID, len(cs)))
 	return &v1.DiffBackupsResponse{Report: service.Report(rep, rep.text(i18n.Locale(ctx)))}, nil
 }

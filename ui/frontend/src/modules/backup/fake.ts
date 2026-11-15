@@ -27,6 +27,6 @@ export function fakeBackup() {
     backupCollect: vi.fn(async () => ({ state: "completed", done: true, saved: [], skipped: 0, pruned: 0, warnings: [] }) as BackupCollect),
     backupList: vi.fn(async () => ({ backups: [], masked: false }) as BackupList),
     backupGet: vi.fn(async () => ({ meta: sampleEntry(), text: "" })),
-    backupDiff: vi.fn(async () => ({ from: sampleEntry(), to: sampleEntry(), added: 0, removed: 0, changes: [], ignored: [], masked: false }) as BackupDiff),
+    backupDiff: vi.fn(async () => ({ from: sampleEntry(), to: sampleEntry(), added: 0, removed: 0, changes: [], ignored: [], masked: false, before: "", after: "" }) as BackupDiff),
   };
 }

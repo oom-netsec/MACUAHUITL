@@ -1,6 +1,7 @@
 // Contrato del módulo con el puente (ui/bridge) y su implementación de Wails.
 // Deriva (Fase 16a): JSON de internal/drift. op "+" entró, "-" salió; path es la sección.
-export interface DriftChange { op: "+" | "-"; path: string; line: string }
+// op «~»: cambió un valor enmascarado (una clave) y el núcleo no lo muestra.
+export interface DriftChange { op: "+" | "-" | "~"; path: string; line: string }
 export interface DriftDevice { device: string; from: number; to: number; added: number; removed: number; changes: DriftChange[]; ignored: string[] }
 export interface DriftReport { dir: string; from: number; to: number; devices: DriftDevice[]; warnings: string[]; masked?: boolean }
 
