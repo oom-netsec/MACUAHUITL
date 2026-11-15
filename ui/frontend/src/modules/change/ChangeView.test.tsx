@@ -2,9 +2,25 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ChangeView } from "./ChangeView";
 import { fakeCore } from "../../lib/fake";
-import { CoreContext } from "../../app/activity";
+import { CoreContext, ModuleIdContext } from "../../app/activity";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
+
+test("tras recargar, una reversa viva iniciada en Cambios se reengancha y se avisa como modo activo", async () => {
+  localStorage.setItem("macuahuitl.assist.rbv", "change");
+  const core = fakeCore({ assistListRuns: vi.fn(async () => [{ runId: "rbv", active: true, state: "running" }]) });
+  render(<ModuleIdContext.Provider value="change"><CoreContext.Provider value={core}><ChangeView core={core} /></CoreContext.Provider></ModuleIdContext.Provider>);
+  await waitFor(() => expect(core.assistWatch).toHaveBeenCalledWith("rbv"));
+  expect(await screen.findByText(/MODO ASISTIDO ACTIVO/)).toBeInTheDocument();
+  localStorage.removeItem("macuahuitl.assist.rbv");
+});
+
+test("la sección Reversas pendientes lista las guardadas", async () => {
+  const core = fakeCore({ assistListPendingRollbacks: vi.fn(async () => [{ runId: "a", kind: "ports", devices: [{ device: "SW1", rollbackLines: ["no shutdown"] }], endedUnix: 1, ageSeconds: 60, writeMemory: false, unreadable: false }]) });
+  render(<CoreContext.Provider value={core}><ChangeView core={core} /></CoreContext.Provider>);
+  expect(await screen.findByRole("heading", { name: "Reversas pendientes" })).toBeInTheDocument();
+  expect(await screen.findByRole("region", { name: "Reversa de la ejecución a" })).toBeInTheDocument();
+});
 
 test("crea el cambio, confirma la huella y captura PRE", async () => {
   const core = fakeCore({

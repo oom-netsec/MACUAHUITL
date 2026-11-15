@@ -12,6 +12,9 @@ import { jobState } from "../../lib/vocab";
 import type { Key } from "../../lib/i18n/es";
 import "./change.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
+import { PendingRollbacks } from "../../components/PendingRollbacks";
+import { AssistBanner, AssistExecution } from "../../components/AssistRun";
+import { assistOwner } from "../../app/useShellStatus";
 
 // Ventana de cambio: la app solo recolecta (Patrol, comandos de lectura) y compara.
 // Nunca aplica configuración.
@@ -232,12 +235,27 @@ function Compliance({ core }: { core: CoreAPI }) {
 export function ChangeView({ core }: { core: CoreAPI }) {
   const t = useT();
   const [sub, setSub] = useState<Sub>("prepost");
+  // La reversa retomada y las de la lista avisan por separado: si una termina, no apaga el aviso de la otra.
+  const [activeLive, setActiveLive] = useState(false);
+  const [activeList, setActiveList] = useState(false);
+  const active = activeLive || activeList;
+  const [liveErr, setLiveErr] = useState("");
+  const [live, setLive] = useState(false); // una reversa viva iniciada aquí (se recargó la UI): se retoma sin esperar a que se pulse nada
+  useEffect(() => {
+    let alive = true;
+    core.assistListRuns().then((rs) => { if (alive) setLive(rs.some((r) => r.active && assistOwner(r.runId) === "change")); }, () => {});
+    return () => { alive = false; };
+  }, [core]);
   return (
     <Page title={t("nav.change")} description={t("change.desc")}
       tabs={<Tabs label={t("change.tool")} value={sub} onChange={setSub} tabs={subs.map(([s, l]) => [s, t(l)] as [Sub, string])} />}>
       {sub === "prepost" && <PrePost core={core} />}
       {sub === "upgrade" && <Upgrade core={core} />}
       {sub === "compliance" && <Compliance core={core} />}
+      <AssistBanner active={active} />
+      {liveErr && <Notice kind="error">{liveErr}</Notice>}
+      {live && <AssistExecution core={core} plan={null} onStarted={() => {}} onActive={setActiveLive} onError={setLiveErr} />}
+      <PendingRollbacks core={core} onActive={setActiveList} />
     </Page>
   );
 }

@@ -24,6 +24,17 @@ export interface AssistStep { id: string; kind: string; device?: string; lines?:
 export interface AssistEvent { runId: string; seq?: number; kind: "state" | "pending" | "output" | "fail"; state?: string; step?: AssistStep; device?: string; text?: string; changed?: string[] }
 // Una ejecución que el núcleo recuerda (ListRuns); sirve para volver a una que sigue viva.
 export interface AssistRunInfo { runId: string; state?: string; pending?: AssistStep; failReason?: string; changed?: string[]; active?: boolean; waiting?: boolean; canRollback?: boolean; devices?: string[] }
+// Una reversa guardada de una ejecución que dejó equipos cambiados (ListPendingRollbacks). Las líneas ya vienen sin secretos.
+export interface PendingRollback { runId: string; kind: string; devices: { device: string; rollbackLines: string[] }[]; endedUnix: number; ageSeconds: number; writeMemory: boolean; unreadable: boolean }
+
+// protojson omite listas vacías y ceros, y manda los int64 (endedUnix, ageSeconds) como cadena.
+export function parsePendingRollbacks(json: string): PendingRollback[] {
+  type Raw = { runId: string; kind?: string; devices?: { device: string; rollbackLines?: string[] }[]; endedUnix?: string | number; ageSeconds?: string | number; writeMemory?: boolean; unreadable?: boolean };
+  return ((JSON.parse(json).rollbacks ?? []) as Raw[]).map((r) => ({
+    runId: r.runId, kind: r.kind ?? "", devices: (r.devices ?? []).map((d) => ({ device: d.device, rollbackLines: d.rollbackLines ?? [] })),
+    endedUnix: Number(r.endedUnix ?? 0), ageSeconds: Number(r.ageSeconds ?? 0), writeMemory: !!r.writeMemory, unreadable: !!r.unreadable,
+  }));
+}
 export interface AssistDone { runId: string; error?: string }
 
 // Un puerto como lo dibuja la vista de frente; sale de PortInfo (core.portStatus, docs/plans/contratos-front.md §2) con toFront.
@@ -46,6 +57,10 @@ export interface PortsAPI {
   assistConfirm(runId: string, stepId: string): Promise<void>;
   assistAbort(runId: string): Promise<void>;
   assistRollback(runId: string): Promise<void>;
+  assistListPendingRollbacks(): Promise<PendingRollback[]>;
+  // Devuelve el id de la ejecución nueva (luego assistWatch). acceptAge: el ingeniero aceptó una reversa de más de 24 h.
+  assistStartPendingRollback(runId: string, acceptAge: boolean, assisted: boolean): Promise<string>;
+  assistDiscardPendingRollback(runId: string): Promise<void>;
   onAssist(cb: (e: AssistEvent) => void): () => void;
   onAssistDone(cb: (e: AssistDone) => void): () => void;
 }
@@ -60,6 +75,9 @@ export const portsWails = (call: Call): PortsAPI => ({
   assistConfirm: (r, s) => call("AssistConfirm", r, s),
   assistAbort: (r) => call("AssistAbort", r),
   assistRollback: (r) => call("AssistRollback", r),
+  assistListPendingRollbacks: async () => parsePendingRollbacks(await call<string>("AssistListPendingRollbacks")),
+  assistStartPendingRollback: (r, a, s) => call("AssistStartPendingRollback", r, a, s),
+  assistDiscardPendingRollback: (r) => call("AssistDiscardPendingRollback", r),
   onAssist: (cb) => Events.On("assist:event", (e) => {
     const d = e.data as { runId: string; event: Omit<AssistEvent, "runId"> };
     cb({ ...d.event, runId: d.runId });
