@@ -20,6 +20,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
   <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
   <a href="#everything-inside">Everything inside</a> &nbsp;·&nbsp;
   <a href="#content-packs">Content packs</a> &nbsp;·&nbsp;
+  <a href="#supported-platforms-and-packs">Platforms</a> &nbsp;·&nbsp;
   <a href="#security">Security</a> &nbsp;·&nbsp;
   <a href="#what-it-does-not-do">What it does not do</a> &nbsp;·&nbsp;
   <a href="docs/roadmap.md">Roadmap</a>
@@ -59,12 +60,24 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 
 <table>
   <tr>
+    <td width="50%"><img src="docs/assets/screens/packs-dark.png" alt="Installed official content packs in Settings"><br><sub><b>Content packs.</b> Eleven signed official packs, installed and removed from Settings or with <code>mctl pack</code>.</sub></td>
+    <td width="50%"><img src="docs/assets/screens/packs-install-dark.png" alt="Install preview of a content pack"><br><sub><b>Install preview.</b> See every playbook and script a pack brings, and hide what you do not need, before installing.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screens/patrol-playbooks-dark.png" alt="Patrol playbook picker with the pack of each playbook"><br><sub><b>Playbook picker.</b> Playbooks from every installed pack, grouped by area and labeled with their pack.</sub></td>
+    <td><img src="docs/assets/screens/analysis-dark.png" alt="Job analysis with findings"><br><sub><b>Job analysis.</b> Findings, round-to-round differences and a timeline for finished Patrol jobs, each finding with its evidence.</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screens/hosts-dark.png" alt="Saved hosts across platforms"><br><sub><b>Saved hosts.</b> Your devices with platform, folder, tags and vault credential, ready for the SSH terminal.</sub></td>
+    <td><img src="docs/assets/screens/assist-hidden-dark.png" alt="Assisted change plan with hidden characters marked"><br><sub><b>Nothing hidden.</b> Bidi and zero-width characters are shown as ⟦U+202E⟧ before you confirm a change, and in the paste confirmation.</sub></td>
+  </tr>
+  <tr>
     <td width="50%"><img src="docs/assets/screens/backup-dark.png" alt="Backups with saved versions"><br><sub><b>Backups.</b> Scheduled or on-demand config backups, diffed before any restore.</sub></td>
-    <td width="50%"><img src="docs/assets/screens/credrotate-dark.png" alt="Credential rotation"><br><sub><b>Credential rotation.</b> Rotate local passwords across the fleet and verify the new access before closing.</sub></td>
+    <td width="50%"><img src="docs/assets/screens/credrotate-dark.png" alt="Credential rotation"><br><sub><b>Credential rotation.</b> Rotate a local password on a device and verify the new access before closing.</sub></td>
   </tr>
   <tr>
     <td><img src="docs/assets/screens/security-dark.png" alt="RADIUS and TACACS+ tester"><br><sub><b>Security.</b> Test RADIUS and TACACS+ with credentials from the vault.</sub></td>
-    <td><img src="docs/assets/screens/fleet-dark.png" alt="Fleet search"><br><sub><b>Fleet.</b> Search, L2 trace, path, health, dashboard, flash and inventory from evidence already collected.</sub></td>
+    <td><img src="docs/assets/screens/fleet-dark.png" alt="Fleet interface health"><br><sub><b>Fleet.</b> Interface health, morning check, search, L2 trace, path, flash and inventory from evidence already collected.</sub></td>
   </tr>
 </table>
 
@@ -86,9 +99,9 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 | **Patrol** | Scheduled, unattended collection across many devices. Mandatory Login Test, explicit arming, live progress, output per round or consolidated, `.zip` package with `manifest.json`. |
 | **Vault** | Local credential store. Argon2id + AES-256-GCM, data key in locked memory. |
 | **Audit** | Hash-chained log of every action. `mctl audit verify` proves it is intact; each package carries an anchor of the chain. |
-| **Access** | Multi-tab SSH terminal with session recording. Serial console for first boot, recovery and ROMMON. |
+| **Access** | Multi-tab SSH terminal with session recording, saved hosts, and a paste confirmation that shows control and hidden characters. Serial console for first boot, recovery and ROMMON. |
 | **Diagnostics** | ping, traceroute, nmap, iperf3 and local packet capture, all audited. |
-| **Analysis** | 27 rules over collected evidence, diff between rounds, configuration drift, correlated timeline, PCAP summary (TCP, DNS, TLS, ICMP, CDP/LLDP, ARP), DNS and TLS inspection. |
+| **Analysis** | Job analysis: 27 rules over collected evidence, diff between rounds, configuration drift, correlated timeline, PCAP summary (TCP, DNS, TLS, ICMP, CDP/LLDP, ARP), DNS and TLS inspection. |
 | **Fleet** | Find any IP, MAC or hostname, trace a MAC to its access port, L3/L2 path between two hosts, interface health, morning dashboard, flash/DRAM headroom, exportable inventory. |
 | **ACLs** | Import, analyze (shadowed, redundant, impossible rules) and translate between IOS-XE, NX-OS and ASA. |
 | **Operations** | Assisted change mode, read-only batches, access-port provisioning, config snippets, pre/post checks, upgrade pre-flight, golden templates and hardening, backup and restore, config cleaner, bulk credential rotation. |
@@ -98,7 +111,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 | **Field tools** | Temporary TFTP/HTTP/FTP/SCP/SFTP servers and clients, MD5/SHA-512 verification. |
 | **Calculators** | Subnets, VLSM, summarization, wildcards, IPv6, MTU/MSS, TCP throughput, DSCP/QoS, optical budget, BGP best path. |
 | **Syslog** | Local receiver that feeds the timeline. |
-| **Content packs** | Playbooks and scripts per technology in `.mpack` bundles, official ones signed. Install only what you use; read-only playbooks, checked on install and at every start. |
+| **Content packs** | Eleven official packs, about 600 read-only playbooks across eleven Cisco platforms, in signed `.mpack` bundles. Install only what you use; every playbook is checked on install and at every start. |
 
 ### A Patrol job, step by step
 
@@ -113,21 +126,20 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 Playbooks and scripts come in **content packs** (`.mpack`), one per technology. Install the ones for the platforms you work on and leave the rest out. Each pack has its own version, so newer content installs on the core you already have. Manage them in **Settings → Packages** (install with a preview, remove, hide single playbooks or scripts, export your own as a personal pack) or with `mctl pack`.
 
 ```sh
-mctl pack install oom-ios-xe-<version>.mpack    # from the release page; the app never downloads anything
+mctl pack inspect oom-ios-xe-1.1.1.mpack    # preview: what it brings and what it replaces
+mctl pack install oom-ios-xe-1.1.1.mpack    # from the release page; the app never downloads anything
 mctl pack list                              # installed packs, version, official or third-party
 mctl pack show oom/ios-xe                   # manifest and the pack's own README
 mctl pack remove oom/ios-xe
 ```
 
-- **Official packs** (`oom/*`) are signed with Ed25519 and published as release assets with their README and checksum. The public key is compiled into the core. Packs that need no core change also ship on their own, in **Content packs** releases (`packs-YYYY-MM-DD`) that install on the latest core.
+- **Official packs** (`oom/*`) are signed with Ed25519 and published as assets of every release, each with its README and checksum. The public key is compiled into the core. Pack updates that need no core change ship on their own, in **Content packs** releases tagged `packs-YYYY-MM-DD`, and install on the latest core.
+- **An official pack always wins.** If a third-party pack collides with an official one, installing the official pack shows which third-party packs it would remove and asks you to confirm.
 - **Third-party packs** install only with `--allow-unsigned` (or a confirmation in the app) and carry their publisher prefix in every ID, so they can never take over an official playbook.
 - **Playbooks stay read-only.** Every playbook command in a pack passes the same deny list as the built-in ones, on install and again at every start. Scripts are never run: the terminal pastes them without pressing Enter, like the built-in library. Nothing executable travels in a pack, and change templates stay in the core.
 - **Each pack carries its own README** with what it contains and how to load it.
 
-Official packs today: `oom/ios-xe`, `oom/ios` (classic IOS) and `oom/wlc-9800` (Catalyst 9800 and EWC, v0.4.0+). NX-OS, ASA/FTD, ACI, AireOS, ISE and SD-Access follow as each platform gets its driver and read-only rules. The format is defined in [ADR 0010](docs/adr/0010-paquetes-de-contenido.md).
-
-> [!NOTE]
-> Content packs arrive with **v0.3.0**. From that version, 52 IOS-XE playbooks move out of the binary into `oom/ios-xe`: install it after upgrading. A job that asks for a playbook from a missing pack fails with a message naming the pack to install.
+The official packs and the platforms they cover are listed in [Supported platforms and packs](#supported-platforms-and-packs). The format is defined in [ADR 0010](docs/adr/0010-paquetes-de-contenido.md).
 
 ## Security
 
@@ -150,21 +162,31 @@ Known limits are declared, not hidden, in the [threat model](docs/security/THREA
 - **No privileged code.** No setuid helpers, no raw sockets of its own, no embedded Wireshark or tshark.
 - **Cannot protect you from malware running as your own user** while the vault is open. No user-space app can.
 - **Cannot recover a lost master password.**
-- **Linux only**, for now. Windows and macOS are on the [roadmap](docs/roadmap.md), after the content packs for every technology.
+- **Linux only**, for now. Windows and macOS come after 1.0.0 (see the [roadmap](docs/roadmap.md)).
 - **English** by default (app, core and `mctl`). Spanish is available in Settings, and with `mctl --lang es`.
 
-## Supported platforms
+## Supported platforms and packs
 
-| Platform | Status |
-|---|---|
-| Cisco IOS / IOS-XE | ✅ Patrol, analysis, fleet, operations |
-| ACLs: IOS-XE, NX-OS, ASA | ✅ Import, analysis, translation |
-| WLC 9800 / EWC | ✅ `oom/wlc-9800` content pack (v0.4.0+) |
-| NX-OS, Catalyst 9000, ASA | 🔜 Next, needs real device transcripts |
-| AireOS, ISE, FTD/Firepower, SD-Access | 🗺️ Planned |
+Each platform is covered by an official content pack. Install the packs you need; playbooks for a platform you have not installed simply do not appear.
+
+| Platform | Pack | Playbooks | Validation |
+|---|---|---:|---|
+| Cisco IOS (classic: Catalyst 2960/3560/3750, ISR G2) | `oom/ios` | 52 | ✅ lab-validated (Catalyst 3560CX) |
+| Cisco IOS-XE (switches and routers) | `oom/ios-xe` | 69 | not yet validated on a lab device |
+| Catalyst 9000 (IOS-XE 17.x) | `oom/cat9k` | 55 | not yet validated on a lab device |
+| SD-Access fabric on Catalyst 9000 | `oom/sda` | 26 | not yet validated on a lab device |
+| Catalyst 9800 WLC and embedded WLC (EWC) | `oom/wlc-9800` | 47 | ✅ commands checked on a 9120 EWC (IOS-XE 17.12); full lab run pending |
+| AireOS WLC | `oom/wlc-aireos` | 64 | not yet validated on a lab device |
+| Nexus (NX-OS) | `oom/nx-os` | 68 | not yet validated on a lab device |
+| ACI leaf and spine (Nexus 9000 CLI) | `oom/aci` | 45 | not yet validated on a lab device |
+| ASA | `oom/asa` | 68 | not yet validated on a lab device |
+| Firepower Threat Defense (FTD) | `oom/ftd` | 64 | not yet validated on a lab device |
+| ISE | `oom/ise` | 36 | not yet validated on a lab device |
+
+Counts as of v0.4.8. A few IOS-XE playbooks (`tac-baseline`, `analisis`, `metricas`, `pre-post`, `upgrade-check`) ship inside the binary. ACLs are imported, analyzed and translated between IOS-XE, NX-OS and ASA without any pack.
 
 > [!NOTE]
-> **Pre-1.0.** Parsers and analysis rules are being validated against real devices. Expect rough edges, and please report any output that is parsed wrong.
+> **Lab validation is in progress.** Commands and parsers come from Cisco documentation; only `oom/ios` has been checked end to end on a real device so far, and the `oom/wlc-9800` commands on a 9120 EWC. Playbooks only read, so an unvalidated one can at worst collect less than expected. Please report any output that is parsed wrong.
 
 ## Install
 
@@ -186,8 +208,12 @@ systemctl --user enable --now macuahuitld     # as the user who will use it
 
 ## Quick start
 
+Download the packs for your platforms from the [latest release](../../releases/latest) (`oom-<platform>-<version>.mpack`), then:
+
 ```sh
-mctl pack install oom-ios-xe-<version>.mpack    # v0.3.0+: the IOS-XE playbooks (from the release page)
+mctl -h                                     # every command, with its options
+mctl pack install oom-ios-xe-1.1.1.mpack    # the IOS-XE playbooks
+mctl playbooks --platform ios-xe            # what you can collect
 mctl vault create                           # set the master password (no echo)
 mctl cred add --label lab --user admin      # device credential
 mctl job create -f job.yaml                 # returns the job ID
@@ -196,6 +222,8 @@ mctl job arm --accept SHA256:... ID         # arm the job
 mctl job watch ID                           # live status until the package is ready
 mctl audit verify                           # check the audit chain
 ```
+
+The app does the same from **Patrol → New job**. Commands and flags are in English; Spanish output is one flag away (`mctl --lang es`).
 
 <details>
 <summary><b>Example <code>job.yaml</code></b></summary>
@@ -207,7 +235,6 @@ targets:
     device_id: core-1
 default_credential_id: <ID from mctl cred list>
 playbook_ids: [ios-xe/tac-baseline]
-output_dir: /home/me/MACUAHUITL/outputs
 window_hours: 8
 schedule:
   interval_seconds: 1800
@@ -245,7 +272,7 @@ task ui-build   # desktop app
 
 ## Docs
 
-- [Roadmap](docs/roadmap.md): what is built and the phases ahead (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging, then Windows and macOS)
+- [Roadmap](docs/roadmap.md): what is built up to v0.4.8, what is left for 1.0.0 (lab validation and stability) and the phases after it (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging, Windows and macOS)
 - [Architecture design](docs/architecture/2026-11-02-macuahuitl-architecture-design.md) · [Decision records](docs/adr/)
 - [Threat model](docs/security/THREAT_MODEL.md) · [Cryptography](docs/security/CRYPTO.md) · [Auditor's guide](docs/security/AUDIT_GUIDE.md)
 
