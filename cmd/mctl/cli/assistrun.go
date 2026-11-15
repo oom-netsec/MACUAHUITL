@@ -251,10 +251,13 @@ func Follow(c *Env, cl v1.AssistServiceClient, runID string, from uint32, first 
 		if len(lastChanged) > 1 {
 			code = "mctl.run.warn_many"
 		}
-		if l, err := cl.ListPendingRollbacks(ctx, &v1.ListPendingRollbacksRequest{}); err == nil && slices.ContainsFunc(l.Rollbacks, func(p *v1.PendingRollback) bool { return p.RunId == runID }) {
-			code = "mctl.run.warn_pending" // la reversa quedó guardada: hay comando para aplicarla (cred rotate no la guarda y sigue diciendo «a mano»)
+		area := "ports"
+		if l, err := cl.ListPendingRollbacks(ctx, &v1.ListPendingRollbacksRequest{}); err == nil {
+			if i := slices.IndexFunc(l.Rollbacks, func(p *v1.PendingRollback) bool { return p.RunId == runID }); i >= 0 {
+				code, area = "mctl.run.warn_pending", rollbackArea(l.Rollbacks[i].Kind) // la reversa quedó guardada: hay comando para aplicarla (cred rotate no la guarda y sigue diciendo «a mano»)
+			}
 		}
-		fmt.Fprintln(c.Out, T(code, "devices", strings.Join(lastChanged, ", "), "run", runID))
+		fmt.Fprintln(c.Out, T(code, "devices", strings.Join(lastChanged, ", "), "run", runID, "area", area))
 	}
 	switch {
 	case final == "done":
@@ -268,6 +271,18 @@ func Follow(c *Env, cl v1.AssistServiceClient, runID string, from uint32, first 
 		return Err("mctl.run.err_failed")
 	}
 	return Err("mctl.run.err_final", "state", final)
+}
+
+// rollbackArea es el área de mctl cuyo «rollback» nombra el aviso según la función de la ejecución (snippet-*, restore-*,
+// ports); las tres áreas aplican la misma reversa, pero el aviso nombra la que el usuario acaba de usar.
+func rollbackArea(kind string) string {
+	switch {
+	case strings.HasPrefix(kind, "snippet"):
+		return "snippet"
+	case strings.HasPrefix(kind, "restore"):
+		return "restore"
+	}
+	return "ports"
 }
 
 // PendingRollbacks lista las reversas guardadas de ejecuciones que dejaron equipos cambiados (`ports rollbacks`).

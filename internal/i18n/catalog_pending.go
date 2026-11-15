@@ -17,7 +17,7 @@ func init() {
 		"assist.svc.reversa_vieja":         e("la reversa pendiente terminó hace {age}: el equipo pudo cambiar desde entonces; repite con la confirmación de antigüedad (--accept-age)", "the pending rollback ended {age} ago: the device may have changed since; repeat with the age confirmation (--accept-age)", "age"),
 		"assist.svc.reversa_ilegible":      e("la reversa pendiente {id} no se pudo leer: {cause}", "the pending rollback {id} could not be read: {cause}", "id", "cause"),
 		"mctl.flag.accept-age":             e("aceptar una reversa de más de 24 h", "accept a rollback older than 24 h"),
-		"mctl.run.warn_pending":            e("\nATENCIÓN: {devices} quedó cambiado. La reversa quedó guardada: mctl ports rollback {run}", "\nATTENTION: {devices} was left changed. The rollback was saved: mctl ports rollback {run}", "devices", "run"),
+		"mctl.run.warn_pending":            e("\nATENCIÓN: {devices} quedó cambiado. La reversa quedó guardada: mctl {area} rollback {run}", "\nATTENTION: {devices} was left changed. The rollback was saved: mctl {area} rollback {run}", "devices", "run", "area"),
 		"mctl.ports.no_rollbacks":          e("No hay reversas pendientes.", "There are no pending rollbacks."),
 		"mctl.ports.rollback_header":       e("Reversa de la ejecución {run} ({kind}), terminó hace {age}:", "Rollback of run {run} ({kind}), ended {age} ago:", "run", "kind", "age"),
 		"mctl.ports.rollback_started":      e("Ejecución de reversa {run}: confirma cada paso.", "Rollback run {run}: confirm each step.", "run"),
