@@ -38,7 +38,7 @@ var (
 	iseFirstLogin = regexp.MustCompile(`(?i)(?:password (?:has )?expired|(?:must|required to) change (?:your |the )?password|changing password for|(?:enter|confirm|retype|re-enter) new password:|new password:|\(current\) password:|current password:|[(\[](?:y/n|yes/no)[)\]][?:]?) *$`)
 	// Primer inicio de sesión de un usuario nuevo del ASA 9.x: pide cambiar la contraseña. Responder cambiaría el equipo:
 	// se aborta sin escribir. Solo cuenta al final de la salida (un banner que cite la frase y siga no es un primer login).
-	asaFirstLogin = regexp.MustCompile(`(?i)(?:this is your first login\.?|please set a new password(?: before proceeding)?\.?|enter old password:) *$`)
+	asaFirstLogin = regexp.MustCompile(`(?i)(?:this is your first login\.?|please set a new password(?: before proceeding)?\.?|(?:enter )?old password:) *$`)
 	more          = regexp.MustCompile(` ?(?:--More-- or \(q\)uit|--More or \(q\)uit current module or <ctrl-z> to abort|--More--|<--- More --->) ?`) // el segundo es el de ASA, el primero el de AireOS
 	// AireOS: prompt «(Nombre) >» (el nombre puede llevar espacios), el de configuración «(Nombre) config>» y el login
 	// «User:»/«Password:» dentro del shell. La pregunta de confirmación se detecta solo al final de la salida.

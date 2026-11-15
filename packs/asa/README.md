@@ -20,9 +20,9 @@ laboratorio (no hay ASA en el laboratorio). La app solo permite en ASA comandos 
 contadores `hitcnt` de las ACL que toca y, si el flujo es tráfico interesante para un crypto map, puede iniciar la
 negociación IKE; los playbooks que lo usan lo avisan en su cabecera.
 
-Primer inicio de sesión: un usuario nuevo del ASA 9.x debe cambiar su contraseña al entrar por primera vez («This is
-your first login»). La aplicación no la cambia: el Login Test falla de inmediato con «primer inicio de sesión». Entra
-una vez por consola o SSH y fija la contraseña (de 8 a 127 caracteres, sin 3 caracteres seguidos ni repetidos).
+Primer inicio de sesión: según la versión y la configuración, el ASA 9.x puede pedir a un usuario nuevo que cambie su
+contraseña al entrar por primera vez («This is your first login»). La aplicación no la cambia: el Login Test falla de inmediato con «primer inicio de sesión». Entra
+una vez por consola o SSH y fija la contraseña (el ASAv 9.x del laboratorio pidió de 8 a 127 caracteres, sin 3 caracteres seguidos ni repetidos).
 
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
@@ -50,9 +50,10 @@ in the lab (there is no ASA in the lab). On ASA the app only allows read command
 counters of the ACLs it touches and, if the flow is interesting traffic for a crypto map, it can start the IKE
 negotiation; the playbooks that use it say so in their header.
 
-First login: a new ASA 9.x user must change their password on the first login («This is your first login»). The
+First login: depending on the version and configuration, ASA 9.x may require a new user to change their password on
+the first login («This is your first login»). The
 application does not change it: the Login Test fails right away with «first login». Log in once over console or SSH
-and set the password (8 to 127 characters, no 3 sequential or repeated characters).
+and set the password (the lab ASAv 9.x required 8 to 127 characters, no 3 sequential or repeated characters).
 
 How to load it (the application never downloads packages):
 

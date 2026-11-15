@@ -302,6 +302,7 @@ func TestASAPrimerLoginNoEscribeNada(t *testing.T) {
 		"This is your first login.",
 		"Please set a new password before proceeding.",
 		"Enter old password:",
+		"Old password: ",
 	} {
 		f, r, w := startFake(t, first, "asa# ", asaReply(true))
 		d := New().(*driver)
@@ -316,6 +317,17 @@ func TestASAPrimerLoginNoEscribeNada(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		if got := f.written(); got != "" {
 			t.Fatalf("%q: se escribió %q", first, got)
+		}
+	}
+}
+
+// Un banner que termina justo en la frase y el prompt llega enseguida (antes de ftdSettle): moreComing espera y abre.
+func TestASABannerQueTerminaEnLaFraseYSigueElPrompt(t *testing.T) {
+	fastSettle(t) // antes de calcular ftdSettle/4: openBanner lo baja recién al entrar
+	for _, banner := range []string{"\r\nRecuerda: This is your first login.", "\r\nAviso de la norma: Enter old password:"} {
+		got, err := openBanner(t, "asa# ", false, banner, ftdSettle/4, "\r\nasa# ")
+		if err != nil || got != abre {
+			t.Fatalf("%q: Open = %v, escrito %q", banner, err, got)
 		}
 	}
 }
