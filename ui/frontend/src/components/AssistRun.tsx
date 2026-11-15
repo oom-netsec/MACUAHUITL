@@ -167,6 +167,7 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
   const moduleId = useContext(ModuleIdContext);
   const [armed, setArmed] = useState(false); // por ejecución: nunca se recuerda
   const [run, setRun] = useState<RunState | null>(null);
+  const hasStart = !!start;
   const runId = useRef("");
   const lastSeq = useRef(0); // el núcleo repite el historial: un seq ya visto no se aplica dos veces
   // Reenganches tras un corte del stream: se cuentan seguidos hasta que llega un evento nuevo de verdad (seq mayor que el máximo visto en
@@ -228,6 +229,7 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
 
   // Al abrir el módulo, volver a una ejecución que quedó viva (la ventana se cerró o se reinició la UI).
   useEffect(() => {
+    if (hasStart) return; // una reversa pendiente maneja solo la suya: no le roba el stream a otra ejecución viva
     let alive = true;
     core.assistListRuns().then((runs) => {
       // La engancha el módulo dueño. Una sin dueño (almacenamiento borrado, o iniciada desde mctl) la toma el primer módulo
@@ -240,7 +242,7 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
       return core.assistWatch(live.runId); // el núcleo repite el historial: el estado se reconstruye solo
     }).catch((e) => alive && onError(errorText(e)));
     return () => { alive = false; };
-  }, [core, onError, moduleId]);
+  }, [core, onError, moduleId, hasStart]);
 
   const doStart = async () => {
     if (!plan || !armed) return;
@@ -265,7 +267,7 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
     <div data-assist>
       {plan && (
         <>
-          <PlanView r={plan} />
+          {!start && <PlanView r={plan} />}
           <Check label={t("assist.arm")} checked={armed} onChange={setArmed} />
           <div className="actions"><button className="danger" disabled={!armed} onClick={doStart}>{t("assist.start", { n: plan.plan.devices.length })}</button></div>
         </>
@@ -290,7 +292,7 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
           {!run.active && run.failReason && !run.stopped && <Notice kind="error">{t("assist.reason", { reason: run.failReason })}</Notice>}
           {terminal && <Notice kind={run.state === "done" || run.state === "rolled-back" ? "ok" : "info"}>{terminal}</Notice>}
           {!run.active && run.state === "done" && run.unsaved && <Notice kind="warn">{t("assist.final.unsaved", { x: run.unsaved.join(", ") || "—" })}</Notice>}
-          {!run.active && run.state !== "done" && run.state !== "rolled-back" && run.changed.length > 0 && <><p role="status" className="warn">{changedText(run.changed, t)}</p><PendingRollbacks core={core} runId={run.id} /></>}
+          {!run.active && run.state !== "done" && run.state !== "rolled-back" && run.changed.length > 0 && <><p role="status" className="warn">{changedText(run.changed, t)}</p><PendingRollbacks core={core} runId={run.id} onActive={onActive} /></>}
           <details className="plan-more"><summary>{t("assist.deviceOutput")}</summary><Terminal text={run.log.join("\n")} /></details>
         </div>
       )}

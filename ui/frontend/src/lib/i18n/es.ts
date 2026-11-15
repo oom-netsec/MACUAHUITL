@@ -2747,6 +2747,18 @@ export const es = {
   "pending.err.old": "La reversa tiene más de 24 h: marca la casilla para aplicarla.",
   "pending.err.manual": "No hay un estado verificable para revertir automáticamente: revierte a mano.",
   "pending.offer": "Aplicar la reversa de esta ejecución",
+  "pending.revertNote": "Revertir durante la reversa vuelve a aplicar el cambio original.",
+  "pending.err.applying": "La reversa se está aplicando: no se puede descartar ahora.",
+  "pending.kind.ports": "Puertos",
+  "pending.kind.snippet-vlan": "Snippet: VLAN",
+  "pending.kind.snippet-trunk": "Snippet: trunk",
+  "pending.kind.snippet-svi": "Snippet: SVI",
+  "pending.kind.snippet-ruta-estatica": "Snippet: ruta estática",
+  "pending.kind.snippet-loopback": "Snippet: loopback",
+  "pending.kind.snippet-helper-address": "Snippet: helper-address",
+  "pending.kind.snippet-ntp-server": "Snippet: servidor NTP",
+  "pending.kind.credrotate": "Rotación de credencial",
+  "pending.kind.restore-diff": "Restauración de respaldo",
 };
 
 export type Key = keyof typeof es;

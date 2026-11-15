@@ -3,11 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { PendingRollbacks } from "./PendingRollbacks";
 import { fakeCore } from "../lib/fake";
 import { START, lineText } from "../lib/assistTestkit";
+import { vaultChanged } from "../lib/vaultSignal";
 import type { PendingRollback } from "../modules/ports/api";
 
 const rb = (over: Partial<PendingRollback> = {}): PendingRollback => ({
   runId: "a", kind: "ports", devices: [{ device: "SW1", rollbackLines: ["interface Gi1/0/1", "switchport access vlan 10"] }],
-  endedUnix: 1700000000, ageSeconds: 7200, writeMemory: false, unreadable: false, ...over,
+  endedUnix: Math.floor(Date.now() / 1000) - (over.ageSeconds ?? 7200), ageSeconds: 7200, writeMemory: false, unreadable: false, ...over,
 });
 const coreWith = (list: PendingRollback[]) => fakeCore({ assistListPendingRollbacks: vi.fn(async () => list) });
 const fail = (reason: string) => Object.assign(new Error("x"), { cause: { code: "FailedPrecondition", reason, metadata: {} } });
@@ -26,7 +27,7 @@ test("lista: equipo, tipo, antigüedad, líneas y aviso de write memory", async 
   render(<PendingRollbacks core={coreWith([rb({ writeMemory: true })])} />);
   const s = within(await screen.findByRole("region", { name: "Reversa de la ejecución a" }));
   expect(s.getByText("SW1")).toBeInTheDocument();
-  expect(s.getByText("Tipo: ports")).toBeInTheDocument();
+  expect(s.getByText("Tipo: Puertos")).toBeInTheDocument();
   expect(s.getByText("Hace 2 h")).toBeInTheDocument();
   expect(s.getByText(lineText("switchport access vlan 10"))).toBeInTheDocument();
   expect(s.getByText(/no hace write memory/)).toBeInTheDocument();
@@ -34,7 +35,7 @@ test("lista: equipo, tipo, antigüedad, líneas y aviso de write memory", async 
 
 test("sin write memory no hay aviso", async () => {
   render(<PendingRollbacks core={coreWith([rb()])} />);
-  await screen.findByText("Tipo: ports");
+  await screen.findByText("Tipo: Puertos");
   expect(screen.queryByText(/no hace write memory/)).not.toBeInTheDocument();
 });
 
@@ -94,7 +95,7 @@ test("ilegible: solo runId y Descartar, sin Aplicar", async () => {
 });
 
 test("bóveda bloqueada: solo el aviso", async () => {
-  const core = fakeCore({ assistListPendingRollbacks: vi.fn(async () => { throw fail("vault.locked"); }) });
+  const core = fakeCore({ assistListPendingRollbacks: vi.fn(async () => { throw fail("assist.svc.abre_la_boveda_el_modo"); }) });
   render(<PendingRollbacks core={core} />);
   expect(await screen.findByText(/bóveda está cerrada/)).toBeInTheDocument();
   expect(screen.queryByRole("button")).not.toBeInTheDocument();
@@ -112,8 +113,9 @@ test("al terminar una ejecución asistida la lista se refresca", async () => {
 test("el aviso de equipo cambiado de una ejecución ofrece su reversa", async () => {
   const { AssistExecution } = await import("./AssistRun");
   const { samplePlan } = await import("../modules/ports/fake");
+  const onActive = vi.fn();
   const core = coreWith([rb({ runId: "r1" }), rb({ runId: "otra" })]);
-  render(<AssistExecution core={core} plan={samplePlan} onStarted={() => {}} onActive={() => {}} onError={() => {}} />);
+  render(<AssistExecution core={core} plan={samplePlan} onStarted={() => {}} onActive={onActive} onError={() => {}} />);
   await userEvent.click(screen.getByLabelText("Activar el modo asistido para esta ejecución"));
   await userEvent.click(screen.getByRole("button", { name: START }));
   await screen.findByText(/Ejecución r1|r1/);
@@ -121,4 +123,128 @@ test("el aviso de equipo cambiado de una ejecución ofrece su reversa", async ()
   act(() => core.emitAssistDone({ runId: "r1" }));
   expect(await screen.findByRole("region", { name: "Reversa de la ejecución r1" })).toBeInTheDocument();
   expect(screen.queryByRole("region", { name: "Reversa de la ejecución otra" })).not.toBeInTheDocument();
+  vi.mocked(core.assistStartPendingRollback).mockResolvedValueOnce("rbx");
+  onActive.mockClear();
+  await userEvent.click(screen.getByRole("button", { name: "Aplicar reversa" }));
+  await armStartIn("r1");
+  await waitFor(() => expect(onActive).toHaveBeenLastCalledWith(true));
+});
+
+const regionOf = (id: string) => within(screen.getByRole("region", { name: `Reversa de la ejecución ${id}` }));
+const armStartIn = async (id: string) => {
+  const r = regionOf(id);
+  await userEvent.click(r.getByLabelText("Activar el modo asistido para esta ejecución"));
+  await userEvent.click(r.getByRole("button", { name: START }));
+};
+const applyIn = async (id: string) => userEvent.click(regionOf(id).getByRole("button", { name: "Aplicar reversa" }));
+
+test("dos entradas aplicando: ninguna se reengancha a una ejecución viva ajena y cada una arranca la suya", async () => {
+  const core = coreWith([rb({ runId: "a" }), rb({ runId: "b" })]);
+  vi.mocked(core.assistListRuns).mockResolvedValue([{ runId: "x", active: true, state: "running" }]);
+  vi.mocked(core.assistStartPendingRollback).mockResolvedValueOnce("ra").mockResolvedValueOnce("rbb");
+  render(<PendingRollbacks core={core} />);
+  await screen.findByRole("region", { name: "Reversa de la ejecución b" });
+  await applyIn("a"); await applyIn("b");
+  await armStartIn("a"); await armStartIn("b");
+  expect(core.assistStartPendingRollback).toHaveBeenNthCalledWith(1, "a", false, true);
+  expect(core.assistStartPendingRollback).toHaveBeenNthCalledWith(2, "b", false, true);
+  expect(core.assistWatch).not.toHaveBeenCalledWith("x");
+  expect(core.assistWatch).toHaveBeenCalledWith("ra");
+  expect(core.assistWatch).toHaveBeenCalledWith("rbb");
+});
+
+test("la reversa viva avisa al anfitrión con onActive", async () => {
+  const core = coreWith([rb()]);
+  const onActive = vi.fn();
+  render(<PendingRollbacks core={core} onActive={onActive} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Aplicar reversa" }));
+  await armAndStart();
+  await waitFor(() => expect(onActive).toHaveBeenLastCalledWith(true));
+});
+
+test("con reversa pendiente no se dibuja el plan del núcleo: solo la nota de revertir", async () => {
+  await openApply(coreWith([rb()]));
+  expect(screen.queryByRole("region", { name: "Reversa" })).not.toBeInTheDocument();
+  expect(screen.queryByText("Lo que se espera")).not.toBeInTheDocument();
+  expect(screen.getByText(/Revertir durante la reversa vuelve a aplicar el cambio original/)).toBeInTheDocument();
+});
+
+test("tras una reversa fallida se ofrece reintentar y descartar; mientras vive no hay acciones", async () => {
+  const core = coreWith([rb()]);
+  render(<PendingRollbacks core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Aplicar reversa" }));
+  await armAndStart();
+  expect(screen.queryByRole("button", { name: "Aplicar reversa" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Descartar" })).not.toBeInTheDocument();
+  act(() => core.emitAssist({ runId: "rb1", kind: "fail", text: "boom", changed: ["SW1"] }));
+  act(() => core.emitAssistDone({ runId: "rb1" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Aplicar reversa" }));
+  expect(screen.getByRole("button", { name: "Descartar" })).toBeInTheDocument();
+  await armAndStart();
+  expect(core.assistStartPendingRollback).toHaveBeenCalledTimes(2);
+});
+
+test("reversa_vieja: se marca la casilla, se reintenta y sale acceptAge=true", async () => {
+  const core = coreWith([rb()]);
+  vi.mocked(core.assistStartPendingRollback).mockRejectedValueOnce(fail("assist.svc.reversa_vieja"));
+  await openApply(core);
+  await armAndStart();
+  await userEvent.click(await screen.findByLabelText(/Acepto aplicar una reversa de hace/));
+  await armAndStart();
+  expect(core.assistStartPendingRollback).toHaveBeenLastCalledWith("a", true, true);
+});
+
+test("la casilla de antigüedad de una entrada no afecta a la otra", async () => {
+  const core = coreWith([rb({ runId: "a", ageSeconds: OLD }), rb({ runId: "b", ageSeconds: OLD })]);
+  render(<PendingRollbacks core={core} />);
+  await screen.findByRole("region", { name: "Reversa de la ejecución b" });
+  await applyIn("a"); await applyIn("b");
+  await userEvent.click(regionOf("a").getByLabelText(/Acepto aplicar una reversa/));
+  expect(regionOf("a").getByRole("button", { name: START })).toBeInTheDocument();
+  expect(regionOf("b").queryByRole("button", { name: START })).not.toBeInTheDocument();
+});
+
+test("la antigüedad sale de endedUnix y la hora actual, no de ageSeconds congelado", async () => {
+  const core = coreWith([rb({ ageSeconds: 60, endedUnix: Math.floor(Date.now() / 1000) - OLD })]);
+  await openApply(core);
+  expect(screen.getByLabelText(/Acepto aplicar una reversa de hace 1 d/)).toBeInTheDocument();
+});
+
+test("bóveda cerrada por su reason: aviso junto a lo ya arrancado, y se refresca al abrirla", async () => {
+  const core = coreWith([]);
+  vi.mocked(core.assistListPendingRollbacks).mockRejectedValueOnce(fail("assist.svc.abre_la_boveda_el_modo"));
+  render(<PendingRollbacks core={core} />);
+  expect(await screen.findByText(/bóveda está cerrada/)).toBeInTheDocument();
+  vi.mocked(core.assistListPendingRollbacks).mockResolvedValue([rb()]);
+  act(() => vaultChanged());
+  expect(await screen.findByRole("region", { name: "Reversa de la ejecución a" })).toBeInTheDocument();
+  expect(screen.queryByText(/bóveda está cerrada/)).not.toBeInTheDocument();
+});
+
+test("otro FailedPrecondition al listar no se toma por bóveda cerrada", async () => {
+  const core = fakeCore({ assistListPendingRollbacks: vi.fn(async () => { throw fail("otra.cosa"); }) });
+  render(<PendingRollbacks core={core} />);
+  expect(await screen.findByRole("alert")).toBeInTheDocument();
+  expect(screen.queryByText(/bóveda está cerrada/)).not.toBeInTheDocument();
+});
+
+test("descartar: reversa_aplicandose tiene texto propio y reversa_no_existe solo refresca", async () => {
+  const core = coreWith([rb()]);
+  vi.mocked(core.assistDiscardPendingRollback).mockRejectedValueOnce(fail("assist.svc.reversa_aplicandose"));
+  render(<PendingRollbacks core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Descartar" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar: descartar" }));
+  expect(await screen.findByText(/se está aplicando/)).toBeInTheDocument();
+  vi.mocked(core.assistDiscardPendingRollback).mockRejectedValueOnce(fail("assist.svc.reversa_no_existe"));
+  vi.mocked(core.assistListPendingRollbacks).mockClear();
+  await userEvent.click(screen.getByRole("button", { name: "Descartar" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar: descartar" }));
+  await waitFor(() => expect(core.assistListPendingRollbacks).toHaveBeenCalled());
+  expect(screen.queryByText(/se está aplicando/)).not.toBeInTheDocument();
+});
+
+test("el tipo se muestra legible y uno desconocido tal cual", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ runId: "a", kind: "restore-diff" }), rb({ runId: "b", kind: "algo-nuevo" })])} />);
+  expect(await screen.findByText("Tipo: Restauración de respaldo")).toBeInTheDocument();
+  expect(screen.getByText("Tipo: algo-nuevo")).toBeInTheDocument();
 });
