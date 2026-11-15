@@ -126,6 +126,8 @@ func seriesFor(b *Bundle, dev string, rule *Rule, upTo int, warn func(Warning)) 
 			warn(Warn(dev, s.Round, s.Command, "analyze.warn.incomplete"))
 			continue
 		}
+		dev, round := s.Device, s.Round
+		s.peer = func(cmd string) (string, bool) { return b.textOf(dev, round, cmd) }
 		out = append(out, s)
 		last = s.Round
 	}

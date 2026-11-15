@@ -621,6 +621,12 @@ func checkBGP(p *params) (checker, error) {
 			var ev []string
 			var det []i18n.Text
 			cur := map[string]int{}
+			boot, bootOK := time.Duration(0), false
+			if mode == "flap" && s.peer != nil {
+				if v, ok := s.peer("show version"); ok {
+					boot, bootOK = bgpBootUptime(v, below)
+				}
+			}
 			for _, n := range ns {
 				if n.Established {
 					cur[n.ID] = n.Prefixes
@@ -631,7 +637,8 @@ func checkBGP(p *params) (checker, error) {
 				case mode == "down" && !n.Established && !strings.Contains(n.State, "Admin"):
 					ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_down", "id", n.ID, "as", n.AS, "state", n.State, "updown", n.UpDown))
 				case mode == "flap" && n.Established:
-					if d, ok := iosxe.IOSDuration(n.UpDown); ok && d < below {
+					// La sesión que subió con el arranque la explica la recarga (reload-*): no se repite aquí.
+					if d, ok := iosxe.IOSDuration(n.UpDown); ok && d < below && !(bootOK && d >= boot-10*time.Minute) {
 						ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_flap", "id", n.ID, "as", n.AS, "updown", n.UpDown))
 					}
 				}
@@ -643,6 +650,12 @@ func checkBGP(p *params) (checker, error) {
 		}
 		return out
 	}, nil
+}
+
+// bgpBootUptime da el uptime del show version de la misma ronda si es menor que below (el equipo recargó hace poco).
+func bgpBootUptime(version string, below time.Duration) (time.Duration, bool) {
+	u, ok := parseUptime(version)
+	return u.D, ok && u.D < below
 }
 
 func checkOSPF(p *params) (checker, error) {

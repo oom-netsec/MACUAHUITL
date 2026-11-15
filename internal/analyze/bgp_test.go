@@ -60,3 +60,30 @@ func TestBGPPrefijosACero(t *testing.T) {
 		t.Errorf("hallazgo: %+v", f)
 	}
 }
+
+// Si el equipo recargó hace poco, el reset de la sesión ya lo explica el hallazgo de recarga.
+func TestBGPFlapTrasRecarga(t *testing.T) {
+	rs := rules(t)
+	mk := func(version, updown string) *Bundle {
+		b := bgpRounds(bgpSummary(updown, "5"))
+		if version != "" {
+			b.Sections = append(b.Sections, Section{Device: "X_10.9.9.9", Round: 1, Command: "show version", Text: version})
+		}
+		return b
+	}
+	for name, c := range map[string]struct {
+		version, updown string
+		want            bool
+	}{
+		"uptime 20 min y sesión 18 min":             {"R uptime is 20 minutes\n", "00:18:03", false},
+		"uptime 3 días y sesión 18 min":             {"R uptime is 3 days, 2 hours, 1 minute\n", "00:18:03", true},
+		"sin show version":                          {"", "00:18:03", true},
+		"uptime 20 min y sesión 2 min":              {"R uptime is 20 minutes\n", "00:02:00", true},
+		"uptime 50 min y sesión 2 min (sube tarde)": {"R uptime is 50 minutes\n", "00:02:00", true},
+	} {
+		r := Analyze(mk(c.version, c.updown), rs, Options{})
+		if got := hasRule(r, "bgp-vecino-flap"); got != c.want {
+			t.Errorf("%s: disparó=%v, quería %v (%v)", name, got, c.want, keys(r.Findings))
+		}
+	}
+}
