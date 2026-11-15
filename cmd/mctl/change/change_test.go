@@ -116,3 +116,21 @@ func TestHostOnly(t *testing.T) {
 		}
 	}
 }
+
+// Si alguna captura se recogió sin enmascarar, el diff lo dice antes de los equipos y lo conserva en --json.
+func TestDiffAvisaSinEnmascarar(t *testing.T) {
+	var b bytes.Buffer
+	c := &cli.Env{Out: &b}
+	if err := printDiff(c, informe, "", false); err != nil || strings.Contains(b.String(), cli.T("evidence.unmasked")) {
+		t.Fatalf("avisó sin motivo: %v\n%s", err, b.String())
+	}
+	sin := strings.Replace(informe, `{"devices"`, `{"unmasked":true,"devices"`, 1)
+	b.Reset()
+	if err := printDiff(c, sin, "", false); err != nil || !strings.HasPrefix(b.String(), cli.T("drift.text.warning", "message", cli.T("evidence.unmasked"))) {
+		t.Fatalf("falta el aviso al inicio: %v\n%s", err, b.String())
+	}
+	b.Reset()
+	if err := printDiff(c, sin, "sw1", true); err != nil || !strings.Contains(b.String(), `"unmasked":true`) {
+		t.Fatalf("--json sin unmasked: %v\n%s", err, b.String())
+	}
+}

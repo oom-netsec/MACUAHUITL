@@ -52,7 +52,7 @@ func Analyze(b *Bundle, rules []Rule, o Options) Report {
 		}
 	}
 	for _, w := range b.Warnings {
-		if matchDevice(w.Device, o.Device) {
+		if w.Device == "" || matchDevice(w.Device, o.Device) { // sin equipo: es de todo el trabajo
 			addWarn(w)
 		}
 	}

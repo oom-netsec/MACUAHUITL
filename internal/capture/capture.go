@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"io"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // maxFile acota lo que se lee por archivo: un show tech de varios cientos de MB no cabe en un reporte.
@@ -161,7 +161,7 @@ func ReadDir(dir string) ([]Device, error) {
 }
 
 func readLimited(p string) ([]byte, error) {
-	f, err := os.Open(p)
+	f, err := sys.OpenRegular(p) // la carpeta puede venir del cliente: una FIFO colgaría la RPC
 	if err != nil {
 		return nil, err
 	}

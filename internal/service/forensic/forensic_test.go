@@ -528,3 +528,21 @@ func TestOverlap(t *testing.T) {
 		}
 	}
 }
+
+// Un trabajo recogido sin enmascarar avisa: los mensajes de log pueden traer comandos con secretos.
+func TestTrabajoSinEnmascararAvisa(t *testing.T) {
+	sd := servicetest.New(t)
+	dir := t.TempDir()
+	ronda(t, dir, "SW1_192.0.2.1", 1, map[string]string{"show logging": "*Nov  6 10:00:01.100: %LINK-3-UPDOWN: Interface Gi0/3, changed state to down"})
+	s := &forensicSvc{d: sd}
+	r, err := s.LogPatterns(context.Background(), &v1.LogPatternsRequest{Source: &v1.LogSource{Job: dir}})
+	if err != nil || strings.Contains(r.Report.Text, "sin enmascarar") {
+		t.Fatalf("sin manifest no debe avisar: %v %v", r, err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(`{"masked":false}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if r, err = s.LogPatterns(context.Background(), &v1.LogPatternsRequest{Source: &v1.LogSource{Job: dir}}); err != nil || !strings.Contains(r.Report.Text, "sin enmascarar") {
+		t.Fatalf("falta el aviso: %v %v", r, err)
+	}
+}

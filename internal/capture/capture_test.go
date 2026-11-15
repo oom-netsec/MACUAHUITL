@@ -10,6 +10,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 func TestSplitPatrolHeaders(t *testing.T) {
@@ -148,5 +149,22 @@ func TestReadDirReintentoNoTomaLaCarpetaDeOtroEquipo(t *testing.T) {
 	devs, err := ReadDir(w.Dir())
 	if err != nil || len(devs) != 2 || devs[0].Outputs["show clock"] != "del22\n" || len(devs[1].Outputs) != 0 {
 		t.Fatalf("%v %+v", err, devs)
+	}
+}
+
+func TestUnmaskedConManifestFIFONoCuelga(t *testing.T) {
+	dir := t.TempDir()
+	if err := sys.Mkfifo(filepath.Join(dir, "manifest.json")); err != nil {
+		t.Skip(err)
+	}
+	done := make(chan bool, 1)
+	go func() { done <- Unmasked(dir) }()
+	select {
+	case u := <-done:
+		if u {
+			t.Fatal("una FIFO no es un manifest")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Unmasked se colgó con una FIFO")
 	}
 }
