@@ -36,6 +36,9 @@ var (
 	// Primer inicio de sesión de ISE (ADE-OS): contraseña vencida o cambio obligatorio, o una pregunta (y/n) o (yes/no).
 	// Responder cambiaría el nodo: se aborta sin escribir. Solo cuenta al final de la salida.
 	iseFirstLogin = regexp.MustCompile(`(?i)(?:password (?:has )?expired|(?:must|required to) change (?:your |the )?password|changing password for|(?:enter|confirm|retype|re-enter) new password:|new password:|\(current\) password:|current password:|[(\[](?:y/n|yes/no)[)\]][?:]?) *$`)
+	// Primer inicio de sesión de un usuario nuevo del ASA 9.x: pide cambiar la contraseña. Responder cambiaría el equipo:
+	// se aborta sin escribir. Solo cuenta al final de la salida (un banner que cite la frase y siga no es un primer login).
+	asaFirstLogin = regexp.MustCompile(`(?i)(?:this is your first login\.?|please set a new password(?: before proceeding)?\.?|enter old password:) *$`)
 	more          = regexp.MustCompile(` ?(?:--More-- or \(q\)uit|--More or \(q\)uit current module or <ctrl-z> to abort|--More--|<--- More --->) ?`) // el segundo es el de ASA, el primero el de AireOS
 	// AireOS: prompt «(Nombre) >» (el nombre puede llevar espacios), el de configuración «(Nombre) config>» y el login
 	// «User:»/«Password:» dentro del shell. La pregunta de confirmación se detecta solo al final de la salida.
@@ -190,7 +193,8 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 	defer cancel()
 	text, err := d.until(ctx, func(s string) bool {
 		return anyPrompt.MatchString(s) || ftdPrompt.MatchString(s) || ftdFirstLogin.MatchString(s) ||
-			airePrompt.MatchString(s) || aireConfig.MatchString(s) || d.loginCue() || iseFirstLogin.MatchString(s)
+			airePrompt.MatchString(s) || aireConfig.MatchString(s) || d.loginCue() || iseFirstLogin.MatchString(s) ||
+			asaFirstLogin.MatchString(s)
 	})
 	if err != nil {
 		return d.fail(err)
@@ -526,7 +530,8 @@ func (d *driver) moreComing(ctx context.Context, tail string) bool {
 	// «password has expired» dan ErrFirstLogin; es heurística y falla cerrada: nunca se escribe una credencial, aunque con
 	// «\r\n> » Open sí manda «terminal length 0» y el Enter de cola antes de fallar.
 	aireOpen := !d.aire && (airePrompt.MatchString(tail) || aireConfig.MatchString(tail)) // solo al abrir: en el Run de AireOS no se espera
-	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) && !iseFirstLogin.MatchString(tail) && !ftdFirstLogin.MatchString(tail) && !aireOpen {
+	if !ftdPrompt.MatchString(tail) && !aireUser.MatchString(tail) && !iseFirstLogin.MatchString(tail) && !ftdFirstLogin.MatchString(tail) &&
+		!asaFirstLogin.MatchString(tail) && !aireOpen {
 		return false
 	}
 	select {

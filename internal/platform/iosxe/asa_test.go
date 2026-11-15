@@ -291,3 +291,40 @@ func TestASANuncaMandaConfigure(t *testing.T) {
 		t.Fatalf("se escribió %q", got)
 	}
 }
+
+// Primer inicio de sesión de un usuario nuevo del ASA 9.x (visto en CML): pide cambiar la contraseña. El driver aborta
+// al instante con ErrFirstLogin, sin escribir nada y antes de saber la plataforma (antes esperaba el prompt hasta el
+// timeout y el Login Test decía «the device did not show a prompt in time»).
+func TestASAPrimerLoginNoEscribeNada(t *testing.T) {
+	fastSettle(t)
+	for _, first := range []string{
+		"This is your first login. Please set a new password before proceeding.\r\nEnter old password: ",
+		"This is your first login.",
+		"Please set a new password before proceeding.",
+		"Enter old password:",
+	} {
+		f, r, w := startFake(t, first, "asa# ", asaReply(true))
+		d := New().(*driver)
+		start := time.Now()
+		err := d.Open(context.Background(), r, w, secret.New([]byte("en")))
+		if !errors.Is(err, platform.ErrFirstLogin) {
+			t.Fatalf("%q: Open = %v", first, err)
+		}
+		if time.Since(start) > 5*time.Second {
+			t.Fatalf("%q: tardó %v (esperó el timeout)", first, time.Since(start))
+		}
+		time.Sleep(20 * time.Millisecond)
+		if got := f.written(); got != "" {
+			t.Fatalf("%q: se escribió %q", first, got)
+		}
+	}
+}
+
+// Un banner que cita la frase y sigue (llega antes que el prompt) no es un primer login: el ancla al final del búfer lo
+// distingue, y el prompt que llega después abre la sesión normal.
+func TestASABannerQueCitaElPrimerLoginNoEsPrimerLogin(t *testing.T) {
+	got, err := openBanner(t, "asa# ", false, "\r\nAviso: This is your first login? No, see policy.", 2*ftdSettle, "\r\nasa# ")
+	if err != nil || got != abre {
+		t.Fatalf("Open = %v, escrito %q", err, got)
+	}
+}
