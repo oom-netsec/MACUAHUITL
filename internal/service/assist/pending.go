@@ -259,6 +259,9 @@ func (s *assistSvc) StartPendingRollback(ctx context.Context, r *v1.StartPending
 	if s.live(r.RunId) {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_en_curso", i18n.A("id", r.RunId))
 	}
+	if s.reversing(r.RunId) { // como Discard y List: su reversa ya corre
+		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_ya_aplicandose", i18n.A("id", r.RunId))
+	}
 	rec, err := s.loadPending(pendingPrefix + r.RunId)
 	if err != nil {
 		if errors.Is(err, vault.ErrNotFound) {

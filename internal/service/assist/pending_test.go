@@ -555,3 +555,19 @@ func TestListHidesTheEntryWhileItsRollbackRunIsAlive(t *testing.T) {
 		}
 	}
 }
+
+// Arrancar la reversa de una entrada cuya reversa ya corre da su propio motivo (reversa_ya_aplicandose), no el del candado.
+func TestStartPendingRollbackMientrasSeAplicaSuReversa(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	n1, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.waitState(n1, "waiting-confirm")
+	_, err = r.startPending(run, false)
+	if code(err) != codes.FailedPrecondition || err == nil || !strings.Contains(err.Error(), "ya se está aplicando") {
+		t.Fatalf("start: %v", err)
+	}
+	r.confirmAll(n1, "done")
+}
