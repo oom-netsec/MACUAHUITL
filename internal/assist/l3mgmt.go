@@ -334,6 +334,21 @@ func l3ColumnMatch(e Expect, text string) (match, ok bool) {
 			t, p, ok := h.Transport()
 			return wok && ok && t == wt && p == wp
 		}), true
+	case "snmp-host": // Line es «IP PUERTO» de `snmp-server host`; el puerto que el running omite es 162
+		hosts, ok := iosxe.ParseSNMPHosts(text)
+		addr, port, _ := strings.Cut(e.Line, " ")
+		n, _ := strconv.Atoi(port)
+		return slices.ContainsFunc(hosts, func(h iosxe.SNMPHost) bool { return h.Addr == addr && h.Port == n }), ok
+	case "snmp-traps": // Line es «snmp A B C» o «config»: todos esos traps activos
+		tr, ok := iosxe.ParseSNMPTraps(text)
+		f := strings.Fields(e.Line)
+		if !ok || len(f) == 0 {
+			return false, false
+		}
+		if f[0] == "config" {
+			return tr.HasConfig(), true
+		}
+		return !slices.ContainsFunc(f[1:], func(a string) bool { return !tr.HasSnmp(a) }), true
 	case "snmp-user":
 		users, ok := iosxe.ParseSNMPUsers(text)
 		user, group, _ := strings.Cut(e.Line, " ")

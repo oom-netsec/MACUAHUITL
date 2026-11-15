@@ -177,6 +177,9 @@ var forbidden = []struct {
 	{word{"switchport", "trunk"}, lt("trunk: puede cortar el acceso", "trunk: it can cut access")},
 	{word{"switchport", "mode"}, lt("switchport mode: el modo del puerto no se cambia", "switchport mode: the port mode is not changed")},
 	{word{"no", "switchport"}, lt("no switchport: pasa el puerto a capa 3", "no switchport: it turns the port into layer 3")},
+	{word{"snmp-server", "enable"}, lt("traps SNMP (snmp-server enable traps): quitar solo los que se agregaron no se infiere de una copia; usa la plantilla snmp-trap-host o hazlo a mano", "SNMP traps (snmp-server enable traps): removing only the ones that were added cannot be inferred from a backup; use the snmp-trap-host template or do it by hand")},
+	{word{"flow"}, lt("Flexible NetFlow (flow record, exporter y monitor): bloques con orden de dependencias; usa la plantilla netflow-export o hazlo a mano", "Flexible NetFlow (flow record, exporter and monitor): blocks with ordered dependencies; use the netflow-export template or do it by hand")},
+	{word{"ip", "flow"}, lt("ip flow monitor: depende de un monitor de Flexible NetFlow; usa la plantilla netflow-export o hazlo a mano", "ip flow monitor: it depends on a Flexible NetFlow monitor; use the netflow-export template or do it by hand")},
 	{word{"interface"}, lt("interfaz completa: crearla o borrarla no se inversa con certeza", "whole interface: creating or deleting it cannot be reversed with certainty")},
 }
 

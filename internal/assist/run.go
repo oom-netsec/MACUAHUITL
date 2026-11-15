@@ -178,6 +178,8 @@ type Run struct {
 	snap map[int]map[string]string
 	// recheck: equipos cuya reversa ya se mandó y no se pudo dar por buena; el reintento primero mira si ya están en su línea base.
 	recheck map[int]bool
+	// partial: equipos cuyo apply se cortó, con las líneas que el equipo sí aceptó (para recortar la reversa con Function.Undo).
+	partial map[int][]string
 }
 
 // NewRun valida el plan otra vez (reglas 2 y 3) y exige assisted (regla 1); no toca ningún equipo.
@@ -202,7 +204,7 @@ func NewRun(o Options) (*Run, error) {
 		}
 	}
 	r := &Run{persist: o.Persist, id: o.ID, plan: o.Plan, exec: o.Exec, state: Planned, timeout: o.DecisionTimeout, fn: o.Fn, secrets: secrets,
-		snap: map[int]map[string]string{}, recheck: map[int]bool{}, done: make(chan struct{}), dec: make(chan decision, 1), notify: make(chan struct{})}
+		snap: map[int]map[string]string{}, recheck: map[int]bool{}, partial: map[int][]string{}, done: make(chan struct{}), dec: make(chan decision, 1), notify: make(chan struct{})}
 	// Único punto por el que sale la auditoría: ningún detalle lleva secretos.
 	r.audit = func(action, target, detail string) { o.Audit(action, target, r.scrub(detail)) }
 	return r, nil
@@ -654,6 +656,16 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 	}
 	failed, failedEN := r.sent(dp.Device, sent)
 	if (err != nil || failed != "") && len(sent) > 0 {
+		var ok []string
+		for _, s := range sent {
+			if !s.Failed {
+				ok = append(ok, s.Line)
+			}
+		}
+		r.mu.Lock()
+		r.partial[i] = ok
+		r.mu.Unlock()
+		r.sync() // lo persistido lleva ya la reversa recortada aunque la relectura de abajo falle
 		// Lo que quedó a medias es la referencia de una reversa tardía; si la relectura coincide con la línea base
 		// (p. ej. el equipo rechazó la primera línea), no cambió nada. Si la relectura falla, queda como cambiado.
 		if r.resync(ctx, i) {
@@ -792,11 +804,23 @@ func (r *Run) rollback(ctx context.Context) {
 	r.finish(RolledBack)
 }
 
+// rollbackLines es la reversa del equipo i: la del plan, recortada con Undo si el apply quedó a medias.
+func (r *Run) rollbackLines(i int) []string {
+	dp := r.plan.Devices[i]
+	r.mu.Lock()
+	ok, cut := r.partial[i]
+	r.mu.Unlock()
+	if cut && r.fn.Undo != nil {
+		return r.fn.Undo(dp.Rollback, ok)
+	}
+	return dp.Rollback
+}
+
 // rollbackOne confirma y aplica la reversa de un equipo. Si falla se queda esperando una decisión:
 // reintentar (Rollback) o abortar. false = la ejecución terminó aquí.
 func (r *Run) rollbackOne(ctx context.Context, i int) bool {
 	dp := r.plan.Devices[i]
-	step := Step{ID: fmt.Sprintf("rollback-%d", i+1), Kind: StepRollback, Device: dp.Device, Lines: r.scrubLines(dp.Rollback)}
+	step := Step{ID: fmt.Sprintf("rollback-%d", i+1), Kind: StepRollback, Device: dp.Device, Lines: r.scrubLines(r.rollbackLines(i))}
 	for {
 		if r.takeAbort() { // un Abort aceptado mientras corría la reversa anterior
 			r.finishFor(dAbort)
@@ -848,7 +872,7 @@ func (r *Run) finishFor(d decision) {
 // revert manda la reversa; false si falló (r.fail ya dejó el motor esperando).
 func (r *Run) revert(ctx context.Context, i int) bool {
 	dp := r.plan.Devices[i]
-	sent, err := r.exec.Configure(ctx, dp.Device, dp.Rollback)
+	sent, err := r.exec.Configure(ctx, dp.Device, r.rollbackLines(i))
 	failed, failedEN := r.sent(dp.Device, sent)
 	if err != nil {
 		failed, failedEN = fmt.Sprintf("reversa de %s: %v", dp.Device, err), fmt.Sprintf("rollback of %s: %v", dp.Device, i18n.English(err))

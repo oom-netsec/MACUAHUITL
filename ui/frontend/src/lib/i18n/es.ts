@@ -2762,6 +2762,22 @@ export const es = {
   "pending.kind.restore-diff": "Restauración de respaldo",
   "drift.maskedChanged": "(cambió un valor enmascarado; no se muestra)",
   "evidence.unmasked": "Aviso: esta evidencia se recogió sin enmascarar: puede traer secretos.",
+  "snippet.snmp-trap-host.name": "Destino de traps SNMP",
+  "snippet.snmp-trap-host.field.address": "Servidor de traps",
+  "snippet.snmp-trap-host.field.port": "Puerto UDP",
+  "snippet.snmp-trap-host.field.port.help": "1-65535; por omisión 162.",
+  "snippet.snmp-trap-host.field.community": "Community",
+  "snippet.snmp-trap-host.field.community.help": "4-32 caracteres, sin espacios ni @. No se muestra en ninguna parte. Si no existe en el equipo, IOS la crea de solo lectura y la reversa la quita.",
+  "snippet.snmp-trap-host.field.traps": "Traps",
+  "snippet.snmp-trap-host.field.traps.help": "snmp = linkdown, linkup y coldstart; config = cambios de configuración. Solo se agregan (y se quitan) los que el equipo no tenía.",
+  "snippet.netflow-export.name": "Exportar NetFlow (Flexible NetFlow v9)",
+  "snippet.netflow-export.field.address": "Colector",
+  "snippet.netflow-export.field.port": "Puerto UDP",
+  "snippet.netflow-export.field.port.help": "1-65535; por omisión 2055.",
+  "snippet.netflow-export.field.interface": "Interfaz",
+  "snippet.netflow-export.field.interface.help": "Puerto físico donde se monitorea el tráfico de entrada; no Vlan, Port-channel, Loopback ni Tunnel.",
+  "snippet.netflow-export.field.source": "Interfaz de origen",
+  "snippet.netflow-export.field.source.help": "Opcional, por ejemplo Vlan1: la IP desde la que el equipo exporta.",
 };
 
 export type Key = keyof typeof es;
