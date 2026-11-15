@@ -80,7 +80,11 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
         target: targetOf(equipo, credId), id: sel.id, values: valuesToSend(sel, values),
         ...(writeMem ? { writeMemory: true } : {}), ...(accepted.length ? { acceptedHostKeyFingerprints: accepted } : {}),
       });
-      if (mine === seq.current) setPlan(res);
+      if (mine === seq.current) {
+        setPlan(res);
+        // El plan ya vive en el núcleo: los secretos (community, auth/priv de SNMPv3…) no se quedan en el formulario.
+        setValues((cur) => ({ ...cur, ...Object.fromEntries(sel.fields.filter((f) => f.type === "secret").map((f) => [f.name, ""])) }));
+      }
     } catch (e) {
       if (mine !== seq.current) return;
       const { code, desc } = parseCoreError(e);

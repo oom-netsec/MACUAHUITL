@@ -295,3 +295,14 @@ test("una llave de host nueva en inglés, con reason, también pide aceptar la h
   await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
   expect(await screen.findByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeInTheDocument();
 });
+
+test("al cerrarse el servidor, la contraseña efímera y los comandos de IOS (que la llevan en la URL) dejan de verse", async () => {
+  const core = await openServer(setup());
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ protocol: "ftp", listening: "192.0.2.10:2121", user: "mac", password: "s3cret-pass" }) }));
+  const card = await screen.findByRole("group", { name: "FTP 192.0.2.10:2121" });
+  expect(within(card).getByText("s3cret-pass")).toBeInTheDocument();
+  act(() => core.emitTransfer({ runId: "r1", done: true }));
+  await waitFor(() => expect(within(card).queryByText("s3cret-pass")).toBeNull());
+  expect(within(card).queryByRole("log", { name: "Comandos de IOS" })).toBeNull();
+  expect(card.textContent).not.toContain("s3cret-pass");
+});

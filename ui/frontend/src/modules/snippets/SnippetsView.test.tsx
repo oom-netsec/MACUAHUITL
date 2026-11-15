@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SnippetsView } from "./SnippetsView";
 import { fakeCore } from "../../lib/fake";
@@ -493,4 +493,16 @@ test("ejecución asistida: el registro del equipo tiene tope", async () => {
   const pre = (await screen.findByText("Salida del equipo")).closest("details")!.querySelector("pre")!;
   expect(pre.textContent!.split("\n").length).toBeLessThan(5100);
   expect(pre.textContent).toContain("l5199");
+});
+
+test("tras planear, el secreto no se queda en el formulario (pero sí viajó)", async () => {
+  const core = await open(withDemo as never);
+  await choose("Demo de tipos");
+  await userEvent.type(screen.getByLabelText("Texto *"), "abc");
+  await userEvent.selectOptions(screen.getByLabelText("Opción obligatoria *"), "add");
+  await userEvent.type(screen.getByLabelText("Clave"), "s3cr3t");
+  await userEvent.click(planBtn());
+  expect(core.planTemplateSnippet).toHaveBeenCalledWith(expect.objectContaining({ values: expect.objectContaining({ pw: "s3cr3t" }) }));
+  await waitFor(() => expect(screen.getByLabelText("Clave")).toHaveValue(""));
+  expect(screen.getByLabelText("Texto *")).toHaveValue("abc"); // lo demás se conserva
 });
