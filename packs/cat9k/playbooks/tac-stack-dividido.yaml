@@ -9,9 +9,9 @@ name_en: Catalyst 9K · TAC · Split stack or member that will not join
 commands:
   - cmd: show clock
   - cmd: show switch
-  - cmd: show switch detail
-  - cmd: show switch stack-ports
-  - cmd: show switch neighbors
+  - cmd: show switch detail  # solo en stack, SVL o PoE físico
+  - cmd: show switch stack-ports  # solo en stack, SVL o PoE físico
+  - cmd: show switch neighbors  # solo en stack, SVL o PoE físico
   - cmd: show version | include Switch|image
   - cmd: show install summary
   - cmd: show boot

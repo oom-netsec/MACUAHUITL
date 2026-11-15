@@ -13,7 +13,6 @@ commands:
   - cmd: show license usage
   - cmd: show license udi
   - cmd: show license authorization
-  - cmd: show license feature
   - cmd: show version | include License|Level|Package
   - cmd: show logging | include SMART_LIC|LICENSE|SMART
   - cmd: show license all

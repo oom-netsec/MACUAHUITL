@@ -12,4 +12,6 @@ commands:
   # abrevia «environment». all trae temperatura, ventiladores y fuentes. Sin validar todavía en laboratorio.
   - cmd: show env all
   - cmd: show inventory
+  - cmd: show power inline  # presupuesto de PoE: solo en switches con PoE (no existe en ISR sin módulo PoE)
+  - cmd: show version | include uptime|System returned|System restarted|Last reload|reason
   - cmd: show logging | include ENVIRONMENT|FAN|TEMP|POWER|PWR|SUPPLY|THERMAL|RPS

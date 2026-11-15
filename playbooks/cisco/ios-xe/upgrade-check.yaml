@@ -10,7 +10,6 @@ commands:
   - cmd: "dir bootflash:"
     platforms: [ios-xe] # IOS clásico no tiene bootflash:
   - cmd: show boot
-  - cmd: show bootvar
   - cmd: show install summary
   - cmd: show redundancy
   - cmd: show running-config | include boot

@@ -18,8 +18,8 @@ commands:
   - cmd: show bgp all summary
   - cmd: show bfd neighbors
   - cmd: show crypto session
-  - cmd: show dmvpn
+  - cmd: show dmvpn  # no existe en Cat9k (solo routers)
   - cmd: show track brief
   - cmd: show ip sla summary
-  - cmd: show platform hardware qfp active statistics drop
+  - cmd: show platform hardware qfp active statistics drop  # no existe en Cat9k (solo routers)
   - cmd: show logging | include UPDOWN|ADJCHG|BFD|TRACK|BGP|OSPF|EIGRP|CRYPTO

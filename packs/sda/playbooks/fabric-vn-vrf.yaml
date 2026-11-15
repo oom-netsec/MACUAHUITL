@@ -13,4 +13,4 @@ commands:
   - cmd: show ip route vrf * summary
   - cmd: show ip interface brief
   - cmd: show vlan brief
-  - cmd: show lisp all instance-id * ipv4 summary
+  - cmd: show lisp all instance-id * ipv4 database  # «… ipv4 summary» no existe en 17.15 (Cat9000v)

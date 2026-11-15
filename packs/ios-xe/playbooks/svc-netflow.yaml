@@ -14,8 +14,6 @@ commands:
   - cmd: show flow monitor
   - cmd: show flow record
   - cmd: show flow interface
-  - cmd: show ip flow export
-  - cmd: show ip flow interface
   - cmd: show ip cache flow
   - cmd: show running-config | section flow
     may_contain_secrets: true

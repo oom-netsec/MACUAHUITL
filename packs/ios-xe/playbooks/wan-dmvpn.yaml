@@ -8,7 +8,7 @@ name: WAN · DMVPN y NHRP
 name_en: WAN · DMVPN and NHRP
 commands:
   - cmd: show clock
-  - cmd: show dmvpn
+  - cmd: show dmvpn  # no existe en Cat9k (solo routers)
   - cmd: show ip nhrp nhs detail
   - cmd: show ip nhrp traffic
   - cmd: show crypto session
@@ -22,7 +22,7 @@ commands:
     may_contain_secrets: true
   - cmd: show ip nhrp
     timeout: 120s
-  - cmd: show dmvpn detail
+  - cmd: show dmvpn detail  # no existe en Cat9k (solo routers)
     timeout: 120s
   - cmd: show crypto ipsec sa
     timeout: 120s

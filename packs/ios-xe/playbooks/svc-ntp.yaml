@@ -8,7 +8,7 @@ name: Servicios · NTP
 name_en: Services · NTP
 commands:
   - cmd: show clock detail
-  - cmd: show calendar
+  - cmd: show calendar  # no existe en Cat9k (solo routers con reloj de hardware)
   - cmd: show ntp status
   - cmd: show ntp associations
   - cmd: show ntp associations detail

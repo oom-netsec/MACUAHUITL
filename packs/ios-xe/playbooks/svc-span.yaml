@@ -8,7 +8,6 @@ name: Servicios · SPAN
 name_en: Services · SPAN
 commands:
   - cmd: show clock
-  - cmd: show monitor
   - cmd: show monitor session all
   - cmd: show monitor session all detail
   - cmd: show monitor capture

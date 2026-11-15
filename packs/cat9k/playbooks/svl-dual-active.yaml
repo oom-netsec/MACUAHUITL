@@ -8,9 +8,9 @@ name: Catalyst 9K · SVL · Detección dual-active
 name_en: Catalyst 9K · SVL · Dual-active detection
 commands:
   - cmd: show clock
-  - cmd: show stackwise-virtual dual-active-detection
-  - cmd: show stackwise-virtual dual-active-detection pagp
-  - cmd: show stackwise-virtual link
+  - cmd: show stackwise-virtual dual-active-detection  # solo en stack, SVL o PoE físico
+  - cmd: show stackwise-virtual dual-active-detection pagp  # solo en stack, SVL o PoE físico
+  - cmd: show stackwise-virtual link  # solo en stack, SVL o PoE físico
   - cmd: show etherchannel summary
   - cmd: show pagp neighbor
   - cmd: show redundancy

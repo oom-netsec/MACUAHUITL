@@ -9,10 +9,10 @@ name_en: Platform · Stack
 commands:
   - cmd: show clock
   - cmd: show switch
-  - cmd: show switch detail
-  - cmd: show switch stack-ports
-  - cmd: show switch stack-ports summary
-  - cmd: show switch neighbors
+  - cmd: show switch detail  # solo en stack, SVL o PoE físico
+  - cmd: show switch stack-ports  # solo en stack, SVL o PoE físico
+  - cmd: show switch stack-ports summary  # solo en stack, SVL o PoE físico
+  - cmd: show switch neighbors  # solo en stack, SVL o PoE físico
   - cmd: show inventory
   - cmd: show module
   - cmd: show redundancy

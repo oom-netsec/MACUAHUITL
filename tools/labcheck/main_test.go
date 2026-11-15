@@ -270,6 +270,8 @@ func TestSecretAtSinFalsosPositivosDelLaboratorio(t *testing.T) {
 		"password encryption aes", "wireless mesh security psk provisioning inuse 1", "Mesh PSK Config",
 		"security wpa psk set-key ascii 8 <MASKED:wifi-psk>", "    0 Unknown community name",
 		"    0 Illegal operation for community name supplied",
+		// Cat9000v (IOS-XE 17.15): nombre de proceso con dirección (show memory) y encabezado de show mka keychains
+		"      123       4  Ion Password           :7F3A2B1C0D9E+1A2B3C4", "MKA PSK Keychain(s) Summary...",
 	} {
 		if kw, n, ok := secretAt(ln); ok {
 			t.Errorf("falso positivo %q: %s %d", ln, kw, n)
@@ -303,6 +305,10 @@ commands:
   - cmd: show spanning-tree mst
   - cmd: show snmp pending
   - cmd: show crypto key mypubkey rsa
+  - cmd: show macsec summary
+  - cmd: show device-tracking counters
+  - cmd: show platform software process slot switch active r0 monitor
+  - cmd: show rara
   - cmd: show wireless mobility summary
 `)
 	m := patrol.Manifest{EndedAt: time.Date(2026, 11, 14, 10, 0, 10, 0, time.UTC), Playbooks: []patrol.PlaybookRef{{ID: "ios/c"}},
@@ -320,6 +326,14 @@ commands:
 ===== 2026-11-14T10:00:04Z · show crypto key mypubkey rsa =====
 % Key pair was generated at: 05:13:27 MX Apr 9 2001
 Key name: TP-self-signed
+===== 2026-11-14T10:00:04Z · show macsec summary =====
+%No Secure Channels
+===== 2026-11-14T10:00:04Z · show device-tracking counters =====
+% no ipv6 snooping policy attached on Box
+===== 2026-11-14T10:00:04Z · show platform software process slot switch active r0 monitor =====
+%Cpu(s): 33.9 us, 26.8 sy,  0.0 ni, 39.3 id
+===== 2026-11-14T10:00:04Z · show rara =====
+%Algo raro del equipo
 ===== 2026-11-14T10:00:05Z · show wireless mobility summary =====
 % Error: Unsupported command 'show_wireless_mobility_summary_req'
 `)
@@ -329,19 +343,22 @@ Key name: TP-self-signed
 	}
 	got := out.String()
 	inactive := got[strings.Index(got, "## Funciones no activas"):]
-	for _, want := range []string{"`show lldp` — not enabled", "`show ip bgp summary` — not active", "`show spanning-tree mst` — not in", "`show snmp pending` — not enabled"} {
+	for _, want := range []string{"`show lldp` — not enabled", "`show ip bgp summary` — not active", "`show spanning-tree mst` — not in", "`show snmp pending` — not enabled",
+		"`show macsec summary` — not configured", "`show device-tracking counters` — not configured"} {
 		if !strings.Contains(inactive, want) {
 			t.Errorf("falta %q en funciones no activas:\n%s", want, got)
 		}
 	}
 	c := got[strings.Index(got, "## ios/c"):]
 	c = c[:strings.Index(c, "playbooks sin problemas")]
-	for _, no := range []string{"show lldp", "show ip bgp", "show spanning-tree", "show snmp pending"} {
+	// %Cpu(s) (top) y «% Key pair was generated at» son salida normal: ni problema ni aviso.
+	for _, no := range []string{"show lldp", "show ip bgp", "show spanning-tree", "show snmp pending", "show macsec", "show device-tracking",
+		"show platform software process", "show crypto key"} {
 		if strings.Contains(c, no) {
 			t.Errorf("%s salió como problema del playbook:\n%s", no, c)
 		}
 	}
-	for _, want := range []string{"`show wireless mobility summary` — rechazado: Unsupported command", "`show crypto key mypubkey rsa` — aviso % del equipo (revisar)"} {
+	for _, want := range []string{"`show wireless mobility summary` — rechazado: Unsupported command", "`show rara` — aviso % del equipo (revisar)"} {
 		if !strings.Contains(c, want) {
 			t.Errorf("falta %q:\n%s", want, c)
 		}
@@ -384,5 +401,28 @@ func TestFuncionNoActivaNoTapaRechazos(t *testing.T) {
 	}
 	if p, ok := inactiveOnly(analyze.Section{Command: "show lldp", Text: "% LLDP is not enabled\n"}); !ok || p != "not enabled" {
 		t.Errorf("función no activa = %q %v", p, ok)
+	}
+}
+
+// Evidencia de una versión anterior del paquete: un comando que ya no está en su playbook (show viejo) pero sí en uno
+// posterior no puede arrastrar la alineación hasta allá y dejar como «no corrió» todo lo intermedio.
+func TestAlineacionConEvidenciaDeOtraVersion(t *testing.T) {
+	job, pack := fixture(t)
+	write(t, filepath.Join(pack, "playbooks", "c.yaml"), "id: c\nplatform: ios\nname: C\ncommands:\n  - cmd: show uno\n  - cmd: show dos\n")
+	write(t, filepath.Join(pack, "playbooks", "d.yaml"), "id: d\nplatform: ios\nname: D\ncommands:\n  - cmd: show tres\n  - cmd: show cuatro\n  - cmd: show viejo\n")
+	m := patrol.Manifest{Playbooks: []patrol.PlaybookRef{{ID: "ios/c"}, {ID: "ios/d"}},
+		Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "10.0.0.1"}, Round: 1, Hostname: "sw1", Platform: "ios", State: "completed"}}}
+	b, _ := json.Marshal(m)
+	write(t, filepath.Join(job, "manifest.json"), string(b))
+	// en la versión vieja, c traía show viejo entre uno y dos
+	write(t, filepath.Join(job, "sw1_10.0.0.1", "r001_20261114-100000.txt"), "===== 2026-11-14T10:00:00Z · show uno =====\na\n"+
+		"===== 2026-11-14T10:00:00Z · show viejo =====\nb\n===== 2026-11-14T10:00:00Z · show dos =====\nc\n"+
+		"===== 2026-11-14T10:00:00Z · show tres =====\nd\n===== 2026-11-14T10:00:00Z · show cuatro =====\ne\n===== 2026-11-14T10:00:00Z · show viejo =====\nf\n")
+	var out strings.Builder
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); strings.Contains(got, "no corrió") || !strings.Contains(got, "2 de 2 playbooks sin problemas") {
+		t.Fatalf("alineación rota:\n%s", got)
 	}
 }

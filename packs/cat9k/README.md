@@ -14,7 +14,8 @@ dual-active y 802.1X).
 
 Los playbooks que declaran datos piden la interfaz (`interface`) o la MAC (`mac`); el núcleo los valida antes de armar
 los comandos. Los comandos solo de un chasis o de un modo llevan un comentario en su línea (`# 9400/9600`, `# SVL`).
-Todo está sin validar en laboratorio (sin equipo; pendiente el sandbox de DevNet). Los comandos vienen de la
+Comandos revisados en un Catalyst 9000v (IOS-XE 17.15) de DevNet el 2026-11-14, sin validar en un equipo físico: lo que
+falla solo por ser un switch virtual sin stack, SVL ni PoE lleva `# solo en stack, SVL o PoE físico`. Los comandos vienen de la
 documentación pública de Cisco y pasan las mismas reglas de solo lectura que los de IOS: sin `debug`, `clear`,
 `to-file`, `install` (salvo `show install`) ni redirecciones.
 
@@ -38,7 +39,8 @@ and 802.1X).
 
 Playbooks that declare data ask for the interface (`interface`) or the MAC (`mac`); the core validates them before
 building the commands. Commands that only apply to one chassis or mode carry a comment on their line (`# 9400/9600`,
-`# SVL`). Everything is unvalidated in the lab (no device; pending the DevNet sandbox). Commands come from Cisco's
+`# SVL`). Commands checked on a Catalyst 9000v (IOS-XE 17.15) DevNet sandbox on 2026-11-14, not lab-validated on physical hardware:
+those that fail only because it is a virtual switch without stack, SVL or PoE carry `# solo en stack, SVL o PoE físico`. Commands come from Cisco's
 public documentation and pass the same read-only rules as IOS: no `debug`, `clear`, `to-file`, `install` (except
 `show install`) or redirections.
 
