@@ -1723,8 +1723,8 @@ export const es = {
   "files.saveError": "No se pudo guardar el archivo",
   "patrol.metrics.if.capped": "Mostrando las {n} interfaces de mayor uso de {total}; las demás no entran en estas gráficas ni en los conteos.",
   "patrol.pb.search": "Buscar playbook",
-  "patrol.pb.selected": "{n} playbooks elegidos",
-  "patrol.pb.selected.one": "1 playbook elegido",
+  "patrol.pb.selected": "{n} playbooks seleccionados",
+  "patrol.pb.selected.one": "1 playbook seleccionado",
   "patrol.pb.none": "Ningún playbook coincide con la búsqueda.",
   "patrol.pb.other": "Otros",
   "patrol.pb.cmds": "Comandos ({n})",
@@ -2762,6 +2762,8 @@ export const es = {
   "patrol.pb.selectAll": "Seleccionar todo {group}",
   "patrol.pb.groupCount": "({n} seleccionados / {total})",
   "patrol.pb.groupCount.one": "(1 seleccionado / {total})",
+  "patrol.pb.selectVisible": "Seleccionar los {n} visibles de {group}",
+  "patrol.pb.selectVisible.one": "Seleccionar el visible de {group}",
 };
 
 export type Key = keyof typeof es;

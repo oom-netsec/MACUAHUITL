@@ -19,7 +19,7 @@ test("agrupa por el área antes del «·», cuenta comandos y permite elegir var
   await userEvent.click(within(l2).getByRole("checkbox", { name: /STP/ }));
   await userEvent.click(screen.getByRole("checkbox", { name: /Usuario sin red/ }));
   expect(chosen()).toBe("ios-xe/l2-stp,ios-xe/tac-usuario-sin-red");
-  expect(screen.getByText("2 playbooks elegidos")).toBeInTheDocument();
+  expect(screen.getByText("2 playbooks seleccionados")).toBeInTheDocument();
   await userEvent.click(within(l2).getByRole("checkbox", { name: /STP/ }));
   expect(chosen()).toBe("ios-xe/tac-usuario-sin-red");
 });
@@ -39,7 +39,7 @@ test("un elegido que la búsqueda oculta sigue elegido y se ve el resumen", asyn
   render(<Harness initial={["ios-xe/l3-ospf"]} />);
   await userEvent.type(screen.getByRole("searchbox", { name: "Buscar playbook" }), "stp");
   expect(chosen()).toBe("ios-xe/l3-ospf");
-  expect(screen.getByText("1 playbook elegido")).toBeInTheDocument();
+  expect(screen.getByText("1 playbook seleccionado")).toBeInTheDocument();
 });
 
 test("muestra los comandos de cada playbook antes de elegirlo", async () => {
@@ -146,8 +146,9 @@ test("la casilla del grupo elige y quita lo visible, queda indeterminada si es p
 test("la casilla del grupo solo actúa sobre lo que el filtro deja ver", async () => {
   render(<Harness initial={["ios-xe/l2-vlan-troncales"]} />);
   await userEvent.type(screen.getByRole("searchbox", { name: "Buscar playbook" }), "stp");
-  expect(all("L2").checked).toBe(false);
-  await userEvent.click(all("L2"));
+  const box = screen.getByRole("checkbox", { name: "Seleccionar el visible de L2" }) as HTMLInputElement;
+  expect(box.checked).toBe(false);
+  await userEvent.click(box);
   expect(chosen()).toBe("ios-xe/l2-stp,ios-xe/l2-vlan-troncales");
 });
 
@@ -166,4 +167,47 @@ test("quitar el último elegido de un grupo no lo pliega bajo los dedos", async 
   await userEvent.click(screen.getByRole("checkbox", { name: "OSPF" }));
   expect(chosen()).toBe("");
   expect(hdr("L3")).toHaveAttribute("aria-expanded", "true");
+});
+
+test("el conteo del encabezado cuenta el grupo entero aunque la búsqueda oculte lo elegido", async () => {
+  render(<Harness initial={["ios-xe/l2-vlan-troncales"]} />);
+  await userEvent.type(screen.getByRole("searchbox", { name: "Buscar playbook" }), "stp");
+  expect(hdr("L2")).toHaveTextContent("(1 seleccionado / 2)");
+});
+
+test("con filtro la casilla del grupo dice cuántos visibles toca y no quita lo oculto", async () => {
+  render(<Harness initial={["ios-xe/l2-vlan-troncales"]} />);
+  const q = screen.getByRole("searchbox", { name: "Buscar playbook" });
+  expect(screen.queryByRole("checkbox", { name: "Seleccionar todo L2" })).toBeInTheDocument();
+  await userEvent.type(q, "stp");
+  const box = screen.getByRole("checkbox", { name: "Seleccionar el visible de L2" });
+  await userEvent.click(box);
+  expect(chosen()).toBe("ios-xe/l2-stp,ios-xe/l2-vlan-troncales");
+  await userEvent.click(box);
+  expect(chosen()).toBe("ios-xe/l2-vlan-troncales");
+  await userEvent.clear(q);
+  await userEvent.type(q, "l2");
+  expect(screen.getByRole("checkbox", { name: "Seleccionar los 2 visibles de L2" })).toBeInTheDocument();
+});
+
+test("el indeterminado sale de la selección inicial y el grupo se nombra sin el conteo", () => {
+  render(<Harness initial={["ios-xe/l2-stp"]} />);
+  expect(all("L2").indeterminate).toBe(true);
+  expect(screen.getByRole("group", { name: "L2" })).toBeInTheDocument();
+});
+
+test("aria-controls solo existe con el grupo abierto", async () => {
+  render(<Harness />);
+  expect(hdr("L2")).not.toHaveAttribute("aria-controls");
+  await userEvent.click(hdr("L2"));
+  expect(hdr("L2")).toHaveAttribute("aria-controls");
+});
+
+test("lo cerrado a mano sobrevive mientras la búsqueda no cambie de verdad (espacios no cuentan)", async () => {
+  render(<Harness />);
+  const q = screen.getByRole("searchbox", { name: "Buscar playbook" });
+  await userEvent.type(q, "stp");
+  await userEvent.click(hdr("L2"));
+  await userEvent.type(q, " ");
+  expect(hdr("L2")).toHaveAttribute("aria-expanded", "false");
 });

@@ -2764,4 +2764,6 @@ export const en: Record<Key, string> = {
   "patrol.pb.selectAll": "Select all {group}",
   "patrol.pb.groupCount": "({n} selected / {total})",
   "patrol.pb.groupCount.one": "(1 selected / {total})",
+  "patrol.pb.selectVisible": "Select the {n} visible in {group}",
+  "patrol.pb.selectVisible.one": "Select the one visible in {group}",
 };
