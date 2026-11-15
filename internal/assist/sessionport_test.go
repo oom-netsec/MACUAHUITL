@@ -364,3 +364,33 @@ func TestL2TemplatesUnknownSession(t *testing.T) {
 		}
 	}
 }
+
+// Con rutas de igual costo IOS marca con * solo el camino en uso para el próximo paquete; los otros salen sin *.
+// Cualquiera puede llevar la sesión (CEF reparte por flujo): no hay certeza.
+func TestSessionPortECMPWithOneStar(t *testing.T) {
+	o := sess{origin: "10.30.0.50", gw: "10.1.1.2", mac: "aabb.cc00.0200", port: "Gi1/0/47"}.outs()
+	o["show ip route 10.30.0.50"] += "    10.1.1.6, from 10.30.0.1, 00:10:00 ago, via Vlan11\n      Route metric is 2, traffic share count is 1\n"
+	if sp := sessionPorts(o); sp.known {
+		t.Errorf("ECMP con un solo *: %+v", sp)
+	}
+	// Estática con dos saltos: la segunda línea es solo la IP.
+	o = sess{origin: "10.30.0.50", gw: "10.1.1.2", mac: "aabb.cc00.0200", port: "Gi1/0/47"}.outs()
+	o["show ip route 10.30.0.50"] += "    10.1.1.6\n      Route metric is 0, traffic share count is 1\n"
+	if sp := sessionPorts(o); sp.known {
+		t.Errorf("estática con dos saltos: %+v", sp)
+	}
+}
+
+// Un «puerto» que no es una interfaz física ni un canal (BDI, túnel, Drop, Router de la tabla MAC) no identifica el puerto de la sesión.
+func TestSessionPortNonPhysicalIsUnknown(t *testing.T) {
+	for _, port := range []string{"Drop", "Router", "Switch", "Tu0", "L2LI0"} {
+		if sp := sessionPorts(sess{port: port}.outs()); sp.known {
+			t.Errorf("tabla MAC con %q: %+v", port, sp)
+		}
+	}
+	for _, ifc := range []string{"BDI10", "Tunnel0"} {
+		if sp := sessionPorts(sess{ifc: ifc}.outs()); sp.known {
+			t.Errorf("ARP por %q: %+v", ifc, sp)
+		}
+	}
+}

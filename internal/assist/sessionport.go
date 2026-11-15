@@ -29,7 +29,9 @@ type sessionPort struct {
 	mac   string          // MAC del siguiente salto
 }
 
-var hopRe = regexp.MustCompile(`(?i)^(?:\*\s*|default gateway is\s+)(\d+\.\d+\.\d+\.\d+)(?:[,\s]|$)`)
+// Con rutas de igual costo IOS marca con * solo un camino; los demás salen sin * (`10.1.1.6, from …` o, en una estática, la IP sola):
+// se cuentan todos. La caché de redirect de un switch L2 tiene filas «IP  IP  …» con más columnas, que no casan.
+var hopRe = regexp.MustCompile(`(?i)^(?:(?:\*\s*)?(\d+\.\d+\.\d+\.\d+)(?:,|$)|default gateway is\s+(\d+\.\d+\.\d+\.\d+))`)
 
 // nextHopOf lee el gateway de `show ip route ORIGEN` (`* 10.1.1.2, from ..., via Vlan10`) o de un switch L2 (`Default gateway is X`).
 // Sin salto, o con varios distintos (rutas de igual costo), no hay certeza.
@@ -37,7 +39,7 @@ func nextHopOf(route string) (netip.Addr, bool) {
 	var hops []netip.Addr
 	for _, l := range strings.Split(route, "\n") {
 		if m := hopRe.FindStringSubmatch(strings.TrimSpace(l)); m != nil {
-			if a, err := netip.ParseAddr(m[1]); err == nil && !slices.Contains(hops, a) {
+			if a, err := netip.ParseAddr(m[1] + m[2]); err == nil && !slices.Contains(hops, a) {
 				hops = append(hops, a)
 			}
 		}
@@ -125,6 +127,10 @@ func sessionStep(outs map[string]string) (cmds []string, sp sessionPort) {
 			return nil, sp
 		}
 		port = seen[0]
+	}
+	// Solo una interfaz física o un canal identifica el puerto: BDI, túneles o «Drop»/«Router» de la tabla MAC no se pueden proteger.
+	if !ValidTrunkInterface(iosxe.ShortIf(strings.SplitN(port, ".", 2)[0])) && !ValidTrunkInterface(strings.SplitN(port, ".", 2)[0]) {
+		return nil, sp
 	}
 	sp.ports = map[string]bool{}
 	for _, p := range []string{port, strings.SplitN(port, ".", 2)[0]} { // una subinterfaz protege también a su puerto
