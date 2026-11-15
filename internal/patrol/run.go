@@ -143,20 +143,23 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			runErr = werr
 		}
 		res.Commands++
-		if runErr != nil && werr == nil && ctx.Err() == nil && res.Reconnects < maxReconnects &&
-			(errors.Is(cutErr, platform.ErrPromptTimeout) || errors.Is(cutErr, platform.ErrClosed)) && !errors.Is(cutErr, ErrWindowEnded) {
+		// Una cancelación (fin de ventana o trabajo cancelado) no es un corte del equipo.
+		cut := runErr != nil && ctx.Err() == nil && (errors.Is(cutErr, platform.ErrPromptTimeout) || errors.Is(cutErr, platform.ErrClosed))
+		if cut && werr == nil && res.Reconnects < maxReconnects && i < len(cmds)-1 && !errors.Is(cutErr, ErrWindowEnded) {
 			// Un comando cortado no se reintenta (puede seguir corriendo en la sesión vieja): se reabre y sigue el siguiente.
+			// En el último no hay nada que seguir: no se reconecta y el equipo queda partial.
 			res.CutCommands = append(res.CutCommands, cmd.Text)
 			res.Reconnects++
+			// El fallo de auditoría aquí se ignora, como en auditor(): lo atrapa el device.round final.
 			d.Audit.Append(context.WithoutCancel(ctx), audit.Entry{Actor: "patrol", Action: "device.reconnect", Target: hp,
 				Detail: fmt.Sprintf("job=%s round=%d command=%q cause=%q attempt=%d", jobID, round, cmd.Text, i18n.English(cutErr), res.Reconnects)})
 			emit(Progress{Target: hp, State: "connecting"})
 			c.close()
 			c = nil
 			nc, err := connect(ctx, d, jobID, s, t, transport.HostKeyPolicy{AcceptChanged: s.AcceptChangedHostKeys}, onEvent, d.PrimaryVerified[hp], d.backoff())
-			if err == nil {
+			if err == nil { // si en la reconexión cambió la llave de host, el equipo queda failed y no skipped: ya hay evidencia escrita
 				c = nc
-				err = rerunPre(ctx, c, pre, cmds[:i+1])
+				err = rerunPre(ctx, c, pre, cmds[:i])
 			}
 			if err != nil {
 				err = windowEnded(ctx, err)
@@ -167,7 +170,11 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			continue
 		}
 		if runErr != nil {
-			if errors.Is(cutErr, platform.ErrPromptTimeout) || errors.Is(cutErr, platform.ErrClosed) {
+			if cut && werr == nil && !errors.Is(cutErr, ErrWindowEnded) && i == len(cmds)-1 && res.Reconnects < maxReconnects {
+				res.CutCommands = append(res.CutCommands, cmd.Text) // el último cortado: partial, sin reconectar
+				continue
+			}
+			if cut {
 				res.CutCommands = append(res.CutCommands, cmd.Text)
 			}
 			res.State, res.Detail, res.DetailErr = "failed", runErr.Error(), runErr

@@ -131,7 +131,7 @@ func TestComandoCortadoDejaElEquipoParcial(t *testing.T) {
 	if st.opened != 2 || st.close != 2 {
 		t.Fatalf("sesiones abiertas=%d cerradas=%d", st.opened, st.close)
 	}
-	if !strings.Contains(evidence(w), "show running-config · incompleto =====") {
+	if !strings.Contains(evidence(w), "show running-config · incomplete =====") {
 		t.Fatal("el cortado no quedó marcado incompleto")
 	}
 	if n := slices.Index(states, "connecting"); n < 0 || slices.Index(states[n+1:], "connecting") < 0 {
@@ -216,5 +216,41 @@ func TestPreVuelveACorrerEnLaSesionNueva(t *testing.T) {
 	}
 	if n := strings.Count(evidence(w), "show clock"); n != 1 {
 		t.Fatalf("el Pre repetido no debe ir a la evidencia: %d", n)
+	}
+}
+
+func TestCorteEnElUltimoComandoNoReconecta(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.spec.CustomCommands = "show version\nshow running-config"
+	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
+	res, _ := runPartial(t, e, context.Background())
+	if res.State != "partial" || res.Reconnects != 0 || st.opened != 1 || !slices.Equal(res.CutCommands, []string{"show running-config"}) {
+		t.Fatalf("res = %+v opened=%d", res, st.opened)
+	}
+}
+
+func TestPreCortadoNoSeRepite(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.d.Playbooks = append(e.d.Playbooks, playbook.Playbook{ID: "ios-xe/pre-prueba", Platform: "ios-xe", Name: "pre", Pre: []string{"show clock"},
+		Commands: []playbook.Command{{Text: "show version", Timeout: time.Minute}, {Text: "show running-config", Timeout: time.Minute}}})
+	e.spec.PlaybookIDs, e.spec.CustomCommands = []string{"ios-xe/pre-prueba"}, ""
+	st := newCut(t, e, map[string]error{"show clock": platform.ErrPromptTimeout})
+	res, _ := runPartial(t, e, context.Background())
+	if res.State != "partial" || st.count("show clock") != 1 {
+		t.Fatalf("res = %+v ran=%v", res, st.ran)
+	}
+}
+
+func TestCancelacionNoSeAnotaComoCorte(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	st := newCut(t, e, map[string]error{"show running-config": fmt.Errorf("%w: %w", platform.ErrPromptTimeout, context.Canceled)})
+	ctx, cancel := context.WithCancel(context.Background())
+	st.onCut = cancel
+	res, _ := runPartial(t, e, ctx)
+	if res.State != "failed" || len(res.CutCommands) != 0 {
+		t.Fatalf("res = %+v", res)
 	}
 }

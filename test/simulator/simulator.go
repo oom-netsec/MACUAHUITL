@@ -35,6 +35,7 @@ type Config struct {
 	IgnoreTerminalLength                 bool          // la paginación sigue activa aunque pidan terminal length 0
 	HangAfterLogin                       bool          // nunca muestra prompt
 	DropDuringCommand                    string        // al recibir este comando manda media salida y corta
+	DropDuringCommands                   []string      // lo mismo con varios comandos: cada sesión corta en el primero de la lista que reciba
 	KeyboardInteractive                  bool          // además de password, ofrece keyboard-interactive y re-pregunta 3 veces como IOS
 	Attempts                             *atomic.Int32 // si no es nil, cuenta cada contraseña recibida (password o KI)
 	SlowCommand                          string        // este comando tarda SlowDelay en responder
@@ -384,7 +385,7 @@ func (s *session) run() {
 					break // el cliente se fue
 				}
 			}
-		case cmd == s.c.DropDuringCommand:
+		case cmd == s.c.DropDuringCommand || slices.Contains(s.c.DropDuringCommands, cmd):
 			out := s.outputs[cmd]
 			s.write(out[:len(out)/2])
 			return
