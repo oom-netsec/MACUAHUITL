@@ -43,7 +43,7 @@ function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: Assist
   const [typed, setTyped] = useState("");
   // Con el usuario rotado y la credencial asociada (campos 9 y 10 del núcleo) el aviso es exacto; sin ellos, el texto general.
   const rotationText = !r.rotatedUser ? [t("pending.discard.rotation", { device: rotDevice })]
-    : [t("pending.discard.rotation.user", { device: rotDevice, user: r.rotatedUser }), t(r.updateCredentialId ? "pending.discard.vaultStale" : "pending.discard.noVaultCred", { user: r.rotatedUser })];
+    : [t("pending.discard.rotation.user", { device: rotDevice, user: r.rotatedUser }), t(!r.updateCredentialId ? "pending.discard.noVaultCred" : r.generatedSecret ? "pending.discard.vaultStaleGen" : "pending.discard.vaultStale", { user: r.rotatedUser })];
   if (r.generatedSecret) rotationText.push(t("pending.discard.generated"));
   const old = age > OLD_SECONDS || needAge;
   const ageLabel = ageText(age, t);

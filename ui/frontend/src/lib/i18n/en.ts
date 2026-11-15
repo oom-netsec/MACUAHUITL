@@ -2772,6 +2772,7 @@ export const en: Record<Key, string> = {
   "pending.discard.typeHint": "“Discard” is enabled once you type the exact device name.",
   "pending.discard.rotation.user": "Discarding this rollback may leave {device} with the new password of {user} (at least in the running-config). The credential the app connects with does not change.",
   "pending.discard.vaultStale": "The vault credential of {user} keeps the old password unless you updated it by hand, and no longer logs in with it.",
-  "pending.discard.noVaultCred": "The vault does not hold a credential for {user}.",
-  "pending.provisional": "The interruption happened mid-configuration on {devices}: the device may have kept part of the change. Check its configuration before deciding.",
+  "pending.discard.noVaultCred": "No vault credential was chosen to receive the new password: if the vault holds one for {user}, it keeps the old password and no longer logs in with it.",
+  "pending.provisional": "The interruption happened mid-configuration on {devices}: the device may have kept part or all of the change. “Apply rollback” stops without touching the device if it is no longer as before the change; in that case, roll back manually.",
+  "pending.discard.vaultStaleGen": "The vault credential of {user} keeps the old password and no longer logs in with it.",
 };
