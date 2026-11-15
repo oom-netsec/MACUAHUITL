@@ -7,6 +7,8 @@ import { samplePlaybooks } from "../modules/patrol/fake";
 import { sampleRestore } from "../modules/backup/fake";
 import { fakeSettings } from "../modules/settings/fake";
 import type { Host } from "../modules/inventory/api";
+import type { PlaybookInfo } from "../modules/patrol/api";
+import type { PackInfo } from "../modules/packs/api";
 
 // Sample data (in English, the app's canonical language) so every view looks like real use; extended module by module.
 export function sample(): Partial<CoreAPI> {
@@ -20,6 +22,9 @@ export function sample(): Partial<CoreAPI> {
     hostsImportFormat: async () => ({ fields: hostFieldsEn, maxRows: 1000, maxBytes: 5 << 20 }),
     hostsImportTemplate: async (format: "csv" | "json") => hostsTemplate(format),
     listPlaybooks: async () => playbooksEn,
+    packList: async () => packsEn,
+    packInspect: async () => ({ pack: packsEn[3], playbookIds: sdaIds.map((i) => "sda/" + i), scriptIds: sdaIds.map((i) => "lib-sda-" + i), replacedVersion: "", sha256: "a".repeat(64), displaced: [] as string[] }),
+    pickPath: async () => "/home/user/Downloads/oom-sda-1.0.0.mpack",
     assistPlanRestore: async () => restoreEn,
     setCorePrefs: async (p: Parameters<typeof settings.setCorePrefs>[0]) => { const r = await settings.setCorePrefs(p); return r.note ? { ...r, note: "The change applies to what starts afterwards: jobs and listeners already running keep the folder they started with. Data in the previous folder is not moved." } : r; },
     getCorePrefs: settings.getCorePrefs,
@@ -193,9 +198,14 @@ const swap = <T,>(v: T, pairs: [string, string][]): T => {
   return m(v) as T;
 };
 const hostsEn: Host[] = [
-  { id: "a".repeat(32), name: "LAB-CORE", address: "10.9.0.1", port: 22, platform: "ios-xe", folder: "Lab", tags: ["core"], credentialId: "c".repeat(32), credentialLabel: "lab-admin", notes: "floor 2" },
-  { id: "b".repeat(32), name: "LAB-AP", address: "ap1.lab", port: 2222, platform: "wlc", folder: "Lab", tags: [], credentialId: "", credentialLabel: "", notes: "" },
-  { id: "d".repeat(32), name: "OFFICE-SW", address: "10.8.0.1", port: 22, platform: "", folder: "Office", tags: ["access", "dc-1"], credentialId: "", credentialLabel: "", notes: "" },
+  { id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", name: "LAB-CORE", address: "10.9.0.1", port: 22, platform: "ios-xe", folder: "Lab", tags: ["core"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "lab-admin", notes: "" },
+  { id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", name: "LAB-NXOS-LEAF1", address: "10.9.1.11", port: 22, platform: "nx-os", folder: "Lab", tags: ["leaf", "dc-1"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "lab-admin", notes: "" },
+  { id: "cccccccccccccccccccccccccccccccc", name: "DC-ASA-01", address: "10.20.0.5", port: 22, platform: "asa", folder: "Datacenter", tags: ["firewall"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "Core DC", notes: "" },
+  { id: "dddddddddddddddddddddddddddddddd", name: "DC-FTD-01", address: "10.20.0.6", port: 22, platform: "ftd", folder: "Datacenter", tags: ["firewall", "ha"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "Core DC", notes: "" },
+  { id: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", name: "ISE-PAN-01", address: "10.20.0.30", port: 22, platform: "ise", folder: "Datacenter", tags: ["aaa"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "ISE (RADIUS secret)", notes: "" },
+  { id: "ffffffffffffffffffffffffffffffff", name: "WLC-9800-HQ", address: "10.30.0.10", port: 22, platform: "wlc", folder: "Campus", tags: ["wifi"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "Branch access", notes: "" },
+  { id: "00000000000000000000000000000000", name: "OFFICE-SW", address: "10.8.0.1", port: 22, platform: "", folder: "Office", tags: ["access", "dc-1"], credentialId: "", credentialLabel: "", notes: "" },
+  { id: "11111111111111111111111111111111", name: "LAB-AP", address: "192.0.2.40", port: 22, platform: "wlc", folder: "Lab", tags: [], credentialId: "", credentialLabel: "", notes: "" },
 ];
 const devicesEn = swap(sampleDevices, [["CAIDO", "DOWN-SW"], ["SOLO-RESP", "BACKUP-ONLY"]]);
 const importEn = swap(sampleHostsImport, [
@@ -221,8 +231,54 @@ const hostsTemplate = (format: "csv" | "json") => {
   return { format, filename: `hosts-plantilla.${format}`, content: format === "csv" ? "\ufeff" + [names, ...rows].map((r) => r.join(",")).join("\n") + "\n"
     : JSON.stringify({ formato: "macuahuitl-hosts", version: 1, exportado: new Date().toISOString(), hosts: rows.map((r) => Object.fromEntries(names.map((n, i) => [n, r[i]]))) }, null, 2) };
 };
-const playbooksEn = swap(samplePlaybooks, [["TAC · Línea base", "TAC · Baseline"], ["TAC · Usuario sin red", "TAC · User with no connectivity"], ["L2 · VLAN y troncales", "L2 · VLANs, trunks and VTP"]]);
-const restoreEn = swap(sampleRestore, [["PC-contabilidad", "PC-accounting"], ["PC-ventas", "PC-sales"]]);
+const playbooksEn: PlaybookInfo[] = [
+  ...swap(samplePlaybooks, [["TAC · Línea base", "TAC · Baseline"], ["TAC · Usuario sin red", "TAC · User with no connectivity"], ["L2 · VLAN y troncales", "L2 · VLANs, trunks and VTP"]]).map((p) => ({ ...p, pack: "oom/ios-xe" })),
+  { id: "ios-xe/tac-lentitud-intermitente", platform: "ios-xe", name: "TAC · Intermittent slowness", commands: ["show clock", "show processes cpu sorted", "show processes cpu history", "show platform resources", "show interfaces summary"], params: [], pack: "oom/ios-xe" },
+  { id: "asa/fw-conexiones", platform: "asa", name: "ASA · Firewall · Active connections", commands: ["show clock", "show conn count", "show resource usage resource conns", "show perfmon", "show local-host"], params: [], pack: "oom/asa" },
+  { id: "asa/fw-nat-ip", platform: "asa", name: "ASA · Firewall · NAT of one IP", commands: ["show clock", "show xlate local {ip}", "show xlate global {ip}", "show nat detail", "show conn address {ip}"], params: [{"name": "ip", "kind": "ip"}], pack: "oom/asa" },
+  { id: "asa/ha-failover-estado", platform: "asa", name: "ASA · High availability · Failover status", commands: ["show clock", "show failover", "show failover state", "show failover interface", "show failover statistics"], params: [], pack: "oom/asa" },
+  { id: "ftd/snort-conexion-ip", platform: "ftd", name: "FTD · Snort · Snort and connections of one IP", commands: ["show clock", "show conn address {ip} detail", "show snort statistics", "show xlate local {ip}", "show route {ip}"], params: [{"name": "ip", "kind": "ip"}], pack: "oom/ftd" },
+  { id: "ftd/ha-failover-estado", platform: "ftd", name: "FTD · High availability · Failover status", commands: ["show clock", "show failover", "show failover state", "show high-availability config", "show running-config failover"], params: [], pack: "oom/ftd" },
+  { id: "ftd/l3-bgp", platform: "ftd", name: "FTD · Layer 3 · BGP", commands: ["show clock", "show bgp summary", "show bgp neighbors", "show bgp", "show route bgp"], params: [], pack: "oom/ftd" },
+  { id: "wlc-aireos/ap-union", platform: "wlc-aireos", name: "AireOS · AP · AP join", commands: ["show time", "show ap summary", "show ap join stats summary all", "show ap config global", "show ap max-count summary"], params: [], pack: "oom/wlc-aireos" },
+  { id: "wlc-aireos/sec-radius-cliente", platform: "wlc-aireos", name: "AireOS · Security · RADIUS of a client", commands: ["show time", "show client detail {mac}", "show radius auth statistics", "show radius summary", "show exclusionlist"], params: [{"name": "mac", "kind": "mac"}], pack: "oom/wlc-aireos" },
+  { id: "wlc-aireos/cli-roaming", platform: "wlc-aireos", name: "AireOS · Clients · Client roaming", commands: ["show time", "show client detail {mac}", "grep include \"{mac}\" \"show client summary\"", "show advanced client-handoff", "show mobility summary"], params: [{"name": "mac", "kind": "mac"}], pack: "oom/wlc-aireos" },
+  { id: "ise/l3-conectividad-ip", platform: "ise", name: "ISE · L3 · Connectivity to an IP", commands: ["show clock", "ping {ip}", "traceroute {ip}", "nslookup {ip}", "show ip route"], params: [{"name": "ip", "kind": "ip"}], pack: "oom/ise" },
+  { id: "ise/plat-discos", platform: "ise", name: "ISE · Platform · Disks and backups", commands: ["show clock", "show disks", "show backup history", "show backup status", "show application status ise"], params: [], pack: "oom/ise" },
+  { id: "ise/logs-ise-psc-errores", platform: "ise", name: "ISE · Logs · ise-psc errors", commands: ["show clock", "show logging application ise-psc.log | include ERROR", "show logging application ise-psc.log | include FATAL", "show logging application ise-psc.log | include WARN", "show logging application ise-psc.log | last 200"], params: [], pack: "oom/ise" },
+  { id: "nx-os/aci-ep-ip", platform: "nx-os", name: "ACI · Endpoints · Endpoint by IP", commands: ["show system internal epm endpoint ip {ip}", "show endpoint ip {ip}", "show ip arp", "show system internal epm vlan all", "show vlan extended"], params: [{"name": "ip", "kind": "ip"}], pack: "oom/aci" },
+  { id: "nx-os/aci-l2-vpc", platform: "nx-os", name: "ACI · L2 · vPC state", commands: ["show vpc", "show vpc brief", "show vpc role", "show lacp neighbor", "show vpc extended"], params: [], pack: "oom/aci" },
+  { id: "nx-os/aci-tac-contrato-bloquea", platform: "nx-os", name: "ACI · TAC · Contract blocking traffic", commands: ["show system internal epm endpoint ip {ip}", "show endpoint ip {ip}", "show zoning-rule scope {vnid}", "show zoning-filter", "show logging logfile | include ACLQOS"], params: [{"name": "ip", "kind": "ip"}, {"name": "vnid", "kind": "vnid"}], pack: "oom/aci" },
+];
+// The 11 official packs (texts from packs/*/manifest.yaml) and the real playbook ids of oom/sda for the install preview.
+const pack = (id: string, version: string, nameEn: string, descriptionEn: string, platform: string, playbookCount: number): PackInfo => ({
+  id, version, minCore: "0.3.1", name: nameEn, nameEn, description: descriptionEn, descriptionEn, platforms: [platform], author: "oom-netsec", license: "Apache-2.0",
+  official: true, playbookCount, scriptCount: playbookCount, shadowed: [], hidden: [],
+});
+const packsEn: PackInfo[] = [
+  pack("oom/ios", "1.1.1", "IOS classic, TAC diagnostics", "Read-only layer 1, 2, 3, platform, services and VPN playbooks for classic IOS 12.2/15.x (Catalyst 2960/3560/3750 and ISR G2), with their script library.", "ios", 52),
+  pack("oom/ios-xe", "1.1.1", "IOS-XE, TAC diagnostics", "Read-only layer 1, 2, 3, platform, services, VPN and router WAN playbooks for IOS-XE, with their script library.", "ios-xe", 69),
+  pack("oom/cat9k", "1.0.0", "Catalyst 9000, TAC diagnostics", "Read-only playbooks for Catalyst 9200/9300/9400/9500/9600 running IOS-XE 17.x - platform, stack and StackWise Virtual, PoE, ASIC, CPU and punt, security, services, L1, L2, L3 and TAC cases; the per-interface and per-MAC ones ask for that datum.", "cat9k", 55),
+  pack("oom/sda", "1.0.0", "SD-Access, TAC diagnostics", "Read-only playbooks for the SD-Access fabric on Catalyst 9000 running IOS-XE 17.x - LISP, fabric (roles, VNs, access tunnels, CTS/SGT), edge, border and TAC cases; the per-endpoint ones ask for its MAC, IP or interface.", "sda", 26),
+  pack("oom/wlc-9800", "1.0.0", "Catalyst 9800, TAC diagnostics", "Read-only playbooks for the Catalyst 9800 wireless controller (appliance, 9800-CL and EWC on 9100/9120 APs) with IOS-XE 17.x - controller, APs, clients, RF, WLANs, security, mobility and TAC cases; the per-client and per-AP ones ask for the MAC or name.", "wlc-9800", 47),
+  pack("oom/wlc-aireos", "1.0.1", "AireOS · Cisco wireless controllers, TAC diagnostics", "Read-only playbooks for Cisco AireOS wireless controllers 8.5 to 8.10 (2504, 3504, 5508, 5520, 8540, vWLC) - platform and health, APs (CAPWAP join, inventory, radios), clients, WLANs, RF/RRM and CleanAir, mobility and anchors, security (RADIUS, TACACS, rogues, ACLs), interfaces and ports, services and TAC cases; the per-AP, per-client and per-WLAN ones ask for that datum.", "wlc-aireos", 64),
+  pack("oom/nx-os", "1.0.1", "Nexus NX-OS, TAC diagnostics", "Read-only playbooks for Cisco Nexus switches running NX-OS (9000, 7000, 5000/6000, 3000) - platform, interfaces, L2 and vPC, VXLAN/EVPN, routing, FEX, security, services and TAC cases; the per-interface, per-IP and per-MAC ones ask for that datum.", "nx-os", 68),
+  pack("oom/aci", "1.0.1", "Cisco ACI, leaf and spine", "Read-only playbooks for Nexus 9000 leaf and spine switches in ACI mode from their CLI - fabric (IS-IS, VTEP, MP-BGP), endpoints (EPM), contracts (zoning-rule), vPC, interfaces, L3Out (BGP, OSPF, BFD) and TAC cases; the per-IP, per-MAC, per-VRF, per-VNID and per-interface ones ask for that datum.", "nx-os", 45),
+  pack("oom/asa", "1.0.0", "Cisco ASA, TAC diagnostics", "Read-only playbooks for Cisco ASA 9.x (ASAv, 5500-X, Firepower with ASA image), in single and multiple context mode - platform, interfaces, firewall (connections, NAT, ACLs, inspection), VPN, failover and cluster, contexts, routing, security, services and TAC cases; the per-interface, per-IP and per-peer ones ask for that datum.", "asa", 68),
+  pack("oom/ftd", "1.0.0", "Cisco Secure Firewall Threat Defense (FTD), TAC diagnostics", "Read-only playbooks for Cisco Secure Firewall Threat Defense (FTD 7.x, managed by FMC or FDM) from its normal CLI - platform and health, interfaces, firewall (connections, NAT, lina ACLs, access control policy), Snort, VPN, high availability and cluster, management with the FMC, routing, services and TAC cases; the per-interface, per-IP and per-peer ones ask for that datum.", "ftd", 64),
+  pack("oom/ise", "1.0.0", "ISE · Cisco Identity Services Engine, TAC diagnostics", "Read-only playbooks for Cisco ISE 3.x nodes (PAN, MnT, PSN and pxGrid) from their ADE-OS CLI - version and patches, application process status, CPU, memory and disks, backups, interfaces, routes, ports, DNS and NTP, services (RADIUS, TACACS+, pxGrid, certificates, Active Directory, replication), application logs and TAC cases; the connectivity one asks for the target IP.", "ise", 36),
+];
+const sdaIds = ["border-handoff-bgp", "border-rutas-externas", "border-transit", "edge-device-tracking", "edge-dhcp", "edge-sesiones", "fabric-aaa-ise", "fabric-access-tunnel", "fabric-cts-credenciales", "fabric-cts-sgt", "fabric-roles", "fabric-vn-vrf", "lisp-base-datos", "lisp-eid-ip", "lisp-eid-mac", "lisp-map-cache", "lisp-publicaciones", "lisp-sesiones", "lisp-sitios", "tac-border-sin-rutas", "tac-endpoint-sin-conectividad-ip", "tac-endpoint-sin-conectividad-mac", "tac-onboarding-falla-general", "tac-onboarding-falla", "tac-roaming-edges", "tac-sgt-trafico-denegado"];
+// The restore plan of the Backups preview carries two restored lines with hidden characters (U+202E bidi, U+200B zero width): the plan shows them as ⟦U+XXXX⟧.
+const restoreBase = swap(sampleRestore, [["PC-contabilidad", "PC-accounting"], ["PC-ventas", "PC-sales"]]);
+const restoreEn: typeof restoreBase = {
+  ...restoreBase,
+  plan: { ...restoreBase.plan!, devices: restoreBase.plan!.devices.map((d) => ({
+    ...d,
+    apply: [...d.apply, "banner motd ^C\u202eEnd of maintenance window^C", "snmp-server location Rack-12\u200b-DC1"],
+    rollback: [...d.rollback, "no banner motd", "snmp-server location Rack-12"],
+  })) },
+};
 
 type Ago = (min: number) => string;
 const stamp = (iso: string) => iso.replace(/[-:]|\.\d+/g, "");
