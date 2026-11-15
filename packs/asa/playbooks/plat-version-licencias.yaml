@@ -8,6 +8,7 @@ name: ASA · Plataforma · Versión y licencias
 name_en: ASA · Platform · Version and licensing
 commands:
   - cmd: show version
+  - cmd: show activation-key  # no existe en ASAv ni con Smart Licensing (ASA 5500-X con licencia PAK)
   - cmd: show license features
   - cmd: show license summary
   - cmd: show license status
