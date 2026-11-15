@@ -110,12 +110,17 @@ func Analyze(b *Bundle, rules []Rule, o Options) Report {
 }
 
 // seriesFor da la salida del comando de la regla por ronda (la primera si hay varias),
-// hasta la ronda pedida. Un comando inválido en el equipo se avisa y se omite.
+// hasta la ronda pedida. La serie se queda con el comando de su primera ronda: comparar rondas con comandos
+// distintos (por ejemplo, familias de direcciones) daría cambios que no existen. Un comando inválido en el equipo se avisa y se omite.
 func seriesFor(b *Bundle, dev string, rule *Rule, upTo int, warn func(Warning)) []Section {
 	var out []Section
 	last := -1
+	cmd := ""
 	for _, s := range b.Sections {
 		if s.Device != dev || !rule.matches(s.Command) || (upTo > 0 && s.Round > upTo) || s.Round == last {
+			continue
+		}
+		if cmd != "" && normCmd(s.Command) != cmd {
 			continue
 		}
 		if s.Invalid {
@@ -129,7 +134,7 @@ func seriesFor(b *Bundle, dev string, rule *Rule, upTo int, warn func(Warning)) 
 		dev, round := s.Device, s.Round
 		s.peer = func(cmd string) (string, bool) { return b.textOf(dev, round, cmd) }
 		out = append(out, s)
-		last = s.Round
+		last, cmd = s.Round, normCmd(s.Command)
 	}
 	return out
 }

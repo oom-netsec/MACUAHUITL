@@ -100,6 +100,8 @@ type builder struct {
 	byIP  map[string]string
 	links map[string]*Link
 	obs   []observation
+	// absorbed son los enlaces que quedaron dentro de un segmento: ya no se dibujan, pero se siguen revisando.
+	absorbed []Link
 }
 
 // observation es lo que un equipo vio por una interfaz local: base para detectar segmentos compartidos.
@@ -144,12 +146,13 @@ func (b *builder) observe(local string, n iosxe.Neighbor, source string) {
 	fill(&remote.Version, n.Version)
 	ai, bi := iosxe.ShortIf(n.LocalIf), iosxe.ShortIf(n.RemoteIf)
 	a, bn := local, remote.ID
+	// La observación va antes del flip: es (equipo local, su interfaz, vecino, la que anuncia).
+	if ai != "" {
+		b.obs = append(b.obs, observation{local, ai, remote.ID, bi})
+	}
 	flip := a > bn || (a == bn && ai > bi)
 	if flip {
 		a, bn, ai, bi = bn, a, bi, ai
-	}
-	if ai != "" {
-		b.obs = append(b.obs, observation{local, ai, remote.ID, bi})
 	}
 	k := a + "|" + ai + "|" + bn + "|" + bi
 	l := b.links[k]
@@ -259,12 +262,21 @@ func (b *builder) checkLinks() {
 			}
 			b.g.Findings = append(b.g.Findings, finding("one_sided", "warning", "one_sided", "where", where, "other", b.g.node(other).Name))
 		}
-		if l.vlanMismatch() {
-			b.g.Findings = append(b.g.Findings, finding("native_vlan", "error", "native_vlan", "where", where, "a", l.ANativeVLAN, "b", l.BNativeVLAN))
-		}
-		if l.duplexMismatch() {
-			b.g.Findings = append(b.g.Findings, finding("duplex", "error", "duplex", "where", where, "a", l.ADuplex, "b", l.BDuplex))
-		}
+		b.checkMismatch(l, where)
+	}
+	// Los enlaces absorbidos por un segmento ya no son aristas, pero su VLAN nativa y duplex siguen contando.
+	// El one_sided no aplica: el segmento no tiene "dos lados".
+	for _, l := range b.absorbed {
+		b.checkMismatch(l, fmt.Sprintf("%s %s ↔ %s %s", b.g.node(l.A).Name, l.AIf, b.g.node(l.B).Name, l.BIf))
+	}
+}
+
+func (b *builder) checkMismatch(l Link, where string) {
+	if l.vlanMismatch() {
+		b.g.Findings = append(b.g.Findings, finding("native_vlan", "error", "native_vlan", "where", where, "a", l.ANativeVLAN, "b", l.BNativeVLAN))
+	}
+	if l.duplexMismatch() {
+		b.g.Findings = append(b.g.Findings, finding("duplex", "error", "duplex", "where", where, "a", l.ADuplex, "b", l.BDuplex))
 	}
 }
 
@@ -319,6 +331,7 @@ func (b *builder) segments() ([]Node, []Link) {
 					srcs[kb] = append(srcs[kb], s)
 				}
 			}
+			b.absorbed = append(b.absorbed, *l)
 			delete(b.links, k)
 		}
 	}

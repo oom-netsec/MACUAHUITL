@@ -638,6 +638,8 @@ func checkBGP(p *params) (checker, error) {
 					ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_down", "id", n.ID, "as", n.AS, "state", n.State, "updown", n.UpDown))
 				case mode == "flap" && n.Established:
 					// La sesión que subió con el arranque la explica la recarga (reload-*): no se repite aquí.
+					// shortcut: un flap real en los primeros 10 min tras el arranque también se omite (no se distingue de
+					// la subida con el equipo), mejorar si hace falta con el contador de transiciones del vecino.
 					if d, ok := iosxe.IOSDuration(n.UpDown); ok && d < below && !(bootOK && d >= boot-10*time.Minute) {
 						ev, det = append(ev, n.Lines...), append(det, i18n.Tx("analyze.detail.bgp_flap", "id", n.ID, "as", n.AS, "updown", n.UpDown))
 					}

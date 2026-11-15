@@ -4,6 +4,8 @@ import (
 	"encoding/xml"
 	"fmt"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 func esc(s string) string {
@@ -14,7 +16,10 @@ func esc(s string) string {
 
 // SVG dibuja el grafo sin scripts ni recursos externos: se puede abrir o adjuntar tal cual.
 // Los nombres vienen de la red (CDP/LLDP) y siempre se escapan.
-func (g Graph) SVG() string {
+func (g Graph) SVG() string { return g.SVGIn(i18n.Es) }
+
+// SVGIn es SVG con el nombre de los segmentos en el idioma pedido. Node.Name (el json) queda en español.
+func (g Graph) SVGIn(loc string) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %.0f %.0f" width="%.0f" height="%.0f" font-family="sans-serif" font-size="11">`, Width, Height, Width, Height)
 	sb.WriteString(`<rect width="100%" height="100%" fill="#ffffff"/>`)
@@ -39,7 +44,7 @@ func (g Graph) SVG() string {
 		}
 		if n.Kind == KindSegment {
 			fmt.Fprintf(&sb, `<g><ellipse cx="%.1f" cy="%.1f" rx="30" ry="12" fill="#fef3c7" stroke="#b45309" stroke-dasharray="4 3"/>`, n.X, n.Y)
-			fmt.Fprintf(&sb, `<text x="%.1f" y="%.1f" text-anchor="middle" font-weight="bold" fill="#78350f">%s</text></g>`, n.X, n.Y+28, esc(n.Name))
+			fmt.Fprintf(&sb, `<text x="%.1f" y="%.1f" text-anchor="middle" font-weight="bold" fill="#78350f">%s</text></g>`, n.X, n.Y+28, esc(i18n.Msg(loc, "topo.segment.name", i18n.A("n", g.deviceCount(n.ID)))))
 			continue
 		}
 		fmt.Fprintf(&sb, `<g><circle cx="%.1f" cy="%.1f" r="18" fill="%s" stroke="#1e293b"/>`, n.X, n.Y, fill)
