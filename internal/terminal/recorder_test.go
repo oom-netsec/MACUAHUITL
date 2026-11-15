@@ -45,7 +45,7 @@ func TestNoGrabaLoTecleadoEnUnPromptDeContrasena(t *testing.T) {
 		if strings.Contains(out, "s3cr3t") {
 			t.Errorf("%q: la contraseña quedó grabada:\n%s", prompt, out)
 		}
-		if !strings.Contains(out, ">>> [oculto]") || !strings.Contains(out, ">>> show clock") {
+		if !strings.Contains(out, ">>> [hidden]") || !strings.Contains(out, ">>> show clock") {
 			t.Errorf("%q: faltan la marca o el comando posterior:\n%s", prompt, out)
 		}
 	}
@@ -167,7 +167,7 @@ func TestContrasenaTecleadaAntesDelPrompt(t *testing.T) {
 		r.Input([]byte("show clock\r"))
 		r.Close()
 		out := b.String()
-		if strings.Contains(out, "EnSecret9") || !strings.Contains(out, ">>> [oculto]") || !strings.Contains(out, ">>> enable") || !strings.Contains(out, ">>> show clock") {
+		if strings.Contains(out, "EnSecret9") || !strings.Contains(out, ">>> [hidden]") || !strings.Contains(out, ">>> enable") || !strings.Contains(out, ">>> show clock") {
 			t.Errorf("%s:\n%s", nombre, out)
 		}
 	}
@@ -760,7 +760,7 @@ func TestAireOSLoginNoGrabaLaClave(t *testing.T) {
 	r.Output([]byte("show sysinfo\r\nProduct Name.... Cisco Controller\r\n\r\n(Cisco Controller) >"))
 	r.Close()
 	out := b.String()
-	if strings.Contains(out, "Secreta1") || !strings.Contains(out, ">>> [oculto]") || !strings.Contains(out, ">>> show sysinfo") {
+	if strings.Contains(out, "Secreta1") || !strings.Contains(out, ">>> [hidden]") || !strings.Contains(out, ">>> show sysinfo") {
 		t.Errorf("login AireOS mal grabado:\n%s", out)
 	}
 }

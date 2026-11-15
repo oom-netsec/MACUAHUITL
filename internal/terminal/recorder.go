@@ -390,7 +390,7 @@ func (r *Recorder) settle() {
 	case len(r.held) == 0:
 	case r.asksSecret():
 		r.held = r.held[1:]
-		r.input("[oculto]")
+		r.input("[hidden]")
 		r.tail = nil
 	case shellPrompt.MatchString(r.lastLine()):
 		r.commitHeld(false)
@@ -455,7 +455,7 @@ func (r *Recorder) flush() {
 	}
 	switch {
 	case hidden:
-		r.input("[oculto]")
+		r.input("[hidden]")
 	case line == "":
 	case fresh && len(r.held) == 0:
 		r.input(r.typedLine(line, false)) // shortcut: ver la nota del paquete sobre abreviaturas

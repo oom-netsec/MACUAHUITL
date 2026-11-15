@@ -52,7 +52,7 @@ func abbrevPrefix(f []string, w word) bool {
 }
 
 var (
-	maskRe = regexp.MustCompile(`(?i)<masked|<oculto>`)
+	maskRe = regexp.MustCompile(`(?i)<masked|<hidden>|<oculto>`)
 	// secretWords: una línea con alguna de estas palabras (o una que acabe en -password o -key) lleva un secreto o un hash reversible. No se
 	// muestra, no se audita y no se restaura: para eso está la rotación de credenciales.
 	secretWords   = []string{"password", "secret", "key", "key-string", "authentication-key", "message-digest-key", "pre-shared-key", "community-string", "nopassword"}
@@ -107,7 +107,7 @@ func secretAt(f []string) (int, i18n.Text) {
 }
 
 // redact es lo único de una línea rechazada que sale del núcleo: si lleva un secreto, solo los tokens anteriores a la palabra del secreto y
-// <oculto>. No depende del enmascarado (que puede ocultar la palabra equivocada). snmp-server community|host|user|group lleva el secreto
+// <hidden>. No depende del enmascarado (que puede ocultar la palabra equivocada). snmp-server community|host|user|group lleva el secreto
 // justo después del subcomando.
 func redact(line string) string {
 	f, l := strings.Fields(line), tokens(line)
@@ -125,7 +125,7 @@ func redact(line string) string {
 	if cut < 0 {
 		return Scrub(line, nil, true)
 	}
-	return strings.TrimSpace(strings.Join(f[:cut], " ") + " <oculto>")
+	return strings.TrimSpace(strings.Join(f[:cut], " ") + " " + hidden)
 }
 
 // forbidden da el motivo de las familias que más se parecen a un cambio permitido; se comparan con abreviaturas. Es solo para explicar:

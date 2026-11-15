@@ -293,7 +293,7 @@ func TestCredRotateEndToEndVerifiesNewLoginAndUpdatesVault(t *testing.T) {
 		t.Fatalf("el plan que ve el cliente trae el secreto o el hash: %s", txt)
 	}
 	dp := res.Plan.Devices[0]
-	if !strings.Contains(dp.Apply[0], "<oculto>") || !strings.Contains(dp.Rollback[0], "<oculto>") {
+	if !strings.Contains(dp.Apply[0], "<hidden>") || !strings.Contains(dp.Rollback[0], "<hidden>") {
 		t.Fatalf("el plan debe mostrar los secretos ocultos: %v %v", dp.Apply, dp.Rollback)
 	}
 	if len(r.rec.Lines()) != 0 || r.vaultPw() != oldPw {

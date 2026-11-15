@@ -469,7 +469,7 @@ func TestRestoreAccessPortWithoutVlanLineIsInTheDefaultVlan(t *testing.T) {
 	}
 }
 
-// Las líneas rechazadas con un secreto salen cortadas en la palabra del secreto, sin depender del enmascarado: solo los tokens anteriores y <oculto>.
+// Las líneas rechazadas con un secreto salen cortadas en la palabra del secreto, sin depender del enmascarado: solo los tokens anteriores y <hidden>.
 func TestRestoreRefusedLinesAreCutAtTheSecretWord(t *testing.T) {
 	secrets := "tacacs server T1\n address ipv4 10.1.1.1\n key 7 0822455D0A16\n!\n" +
 		"radius server R1\n address ipv4 10.2.2.2 auth-port 1812\n key 0 RADIUSKEY\n!\n" +
@@ -492,9 +492,9 @@ func TestRestoreRefusedLinesAreCutAtTheSecretWord(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"tacacs server T1 | <oculto>", "radius server R1 | <oculto>", "crypto keyring KR1 | <oculto>",
-		" | username tech privilege 1 <oculto>", " | enable <oculto>", " | snmp-server community <oculto>",
-		" | crypto isakmp <oculto>", " | ntp <oculto>",
+		"tacacs server T1 | <hidden>", "radius server R1 | <hidden>", "crypto keyring KR1 | <hidden>",
+		" | username tech privilege 1 <hidden>", " | enable <hidden>", " | snmp-server community <hidden>",
+		" | crypto isakmp <hidden>", " | ntp <hidden>",
 	} {
 		if !got[want] {
 			t.Errorf("faltaba %q en %v", want, got)

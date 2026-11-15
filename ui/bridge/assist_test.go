@@ -58,7 +58,7 @@ func (f *fakeAssist) PlanCredRotate(_ context.Context, r *v1.PlanCredRotateReque
 	f.mu.Lock()
 	f.rotSecret = r.NewSecret
 	f.mu.Unlock()
-	d := &v1.AssistDevicePlan{Device: r.Target.Name, Apply: []string{"username " + r.User + " secret <oculto>"}, Rollback: []string{"x"}}
+	d := &v1.AssistDevicePlan{Device: r.Target.Name, Apply: []string{"username " + r.User + " secret <hidden>"}, Rollback: []string{"x"}}
 	return &v1.PlanCredRotateResponse{PlanId: "c1", Plan: &v1.AssistPlan{Function: "credrotate", Devices: []*v1.AssistDevicePlan{d}}}, nil
 }
 

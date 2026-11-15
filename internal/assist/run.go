@@ -211,7 +211,7 @@ func NewRun(o Options) (*Run, error) {
 // scrub quita de s los secretos del plan (y lo que IOS imprime tras secret/password si la función lo pide).
 func (r *Run) scrub(s string) string { return Scrub(s, r.secrets, r.fn.Scrub) }
 
-func (r *Run) scrubEN(s string) string { return scrubEN(s, r.secrets, r.fn.Scrub) }
+func (r *Run) scrubEN(s string) string { return Scrub(s, r.secrets, r.fn.Scrub) }
 
 func (r *Run) scrubLines(lines []string) []string { return scrubAll(lines, r.secrets, r.fn.Scrub) }
 

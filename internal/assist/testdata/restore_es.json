@@ -45,11 +45,11 @@
  ],
  "closed/abreviatura snmp-s comm": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
-  " | snmp-s comm \u003coculto\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
+  " | snmp-s comm \u003chidden\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
  ],
  "closed/abreviatura snmp-s comm/parcial": [
   "ERR assist: el equipo ya coincide con el respaldo",
-  " | snmp-s comm \u003coculto\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
+  " | snmp-s comm \u003chidden\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
  ],
  "closed/access-class de la vty": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
@@ -63,11 +63,11 @@
  ],
  "closed/authentication": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
-  " | ip ospf \u003coculto\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
+  " | ip ospf \u003chidden\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
  ],
  "closed/authentication/parcial": [
   "ERR assist: el equipo ya coincide con el respaldo",
-  " | ip ospf \u003coculto\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
+  " | ip ospf \u003chidden\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
  ],
  "closed/cambio de remote-as": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
@@ -137,11 +137,11 @@
  ],
  "closed/nopassword": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
-  "line vty 0 4 | no \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+  "line vty 0 4 | no \u003chidden\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
  ],
  "closed/nopassword/parcial": [
   "ERR assist: el equipo ya coincide con el respaldo",
-  "line vty 0 4 | no \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+  "line vty 0 4 | no \u003chidden\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
  ],
  "closed/puerto que pasa a la VLAN de gestión": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 2 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
@@ -203,11 +203,11 @@
  ],
  "closed/standby authentication": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
-  "interface Vlan10 | standby 1 \u003coculto\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
+  "interface Vlan10 | standby 1 \u003chidden\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
  ],
  "closed/standby authentication/parcial": [
   "ERR assist: el equipo ya coincide con el respaldo",
-  "interface Vlan10 | standby 1 \u003coculto\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
+  "interface Vlan10 | standby 1 \u003chidden\u003e | authentication: lleva llaves o cambia cómo entra el tráfico; hazlo a mano"
  ],
  "closed/uplink con la VLAN de gestión (apagar)": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
@@ -269,7 +269,7 @@
  ],
  "refusal/crypto": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
-  " | crypto \u003coculto\u003e | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; llaves y certificados (crypto): no se pueden inversar con certeza"
+  " | crypto \u003chidden\u003e | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; llaves y certificados (crypto): no se pueden inversar con certeza"
  ],
  "refusal/crypto pki": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
@@ -281,15 +281,15 @@
  ],
  "refusal/crypto/parcial": [
   "ERR assist: el equipo ya coincide con el respaldo",
-  " | crypto \u003coculto\u003e | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; llaves y certificados (crypto): no se pueden inversar con certeza"
+  " | crypto \u003chidden\u003e | sección nueva en el respaldo: para revertirla habría que borrarla completa; créala a mano; llaves y certificados (crypto): no se pueden inversar con certeza"
  ],
  "refusal/enable secret": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
-  " | enable \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+  " | enable \u003chidden\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
  ],
  "refusal/enable secret/parcial": [
   "ERR assist: el equipo ya coincide con el respaldo",
-  " | enable \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+  " | enable \u003chidden\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
  ],
  "refusal/global que no está en la lista": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
@@ -385,11 +385,11 @@
  ],
  "refusal/snmp community": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
-  " | snmp-server community \u003coculto\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
+  " | snmp-server community \u003chidden\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
  ],
  "refusal/snmp community/parcial": [
   "ERR assist: el equipo ya coincide con el respaldo",
-  " | snmp-server community \u003coculto\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
+  " | snmp-server community \u003chidden\u003e | lleva un secreto (la comunidad): no se muestra ni se audita"
  ],
  "refusal/spanning-tree extend system-id": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
@@ -425,19 +425,19 @@
  ],
  "refusal/tacacs key": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
-  " | tacacs-server \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+  " | tacacs-server \u003chidden\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
  ],
  "refusal/tacacs key/parcial": [
   "ERR assist: el equipo ya coincide con el respaldo",
-  " | tacacs-server \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+  " | tacacs-server \u003chidden\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
  ],
  "refusal/username nuevo": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",
-  " | username tech privilege 1 \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+  " | username tech privilege 1 \u003chidden\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
  ],
  "refusal/username nuevo/parcial": [
   "ERR assist: el equipo ya coincide con el respaldo",
-  " | username tech privilege 1 \u003coculto\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
+  " | username tech privilege 1 \u003chidden\u003e | lleva un secreto o un hash reversible: no se muestra ni se audita; hazlo a mano o con la rotación"
  ],
  "refusal/vlan nueva": [
   "ERR assist: no se puede restaurar ese respaldo: el diff toca 1 cosas que no se restauran con seguridad (lista abajo); hazlas a mano o pide el plan parcial",

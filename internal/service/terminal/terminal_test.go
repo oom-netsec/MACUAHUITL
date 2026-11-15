@@ -210,7 +210,7 @@ func TestNoGrabaLaContrasenaDelPrompt(t *testing.T) {
 	if strings.Contains(string(b), enableSecret) || strings.Contains(r.d.AuditText(), enableSecret) {
 		t.Fatalf("el secreto quedó grabado:\n%s", b)
 	}
-	if !strings.Contains(string(b), ">>> [oculto]") || !strings.Contains(string(b), ">>> enable") || !strings.Contains(string(b), ">>> show version") {
+	if !strings.Contains(string(b), ">>> [hidden]") || !strings.Contains(string(b), ">>> enable") || !strings.Contains(string(b), ">>> show version") {
 		t.Errorf("grabación:\n%s", b)
 	}
 }

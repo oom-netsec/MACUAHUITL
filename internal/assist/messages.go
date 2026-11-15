@@ -134,11 +134,7 @@ func (e *planError) Localize(loc string) string {
 	for i, f := range e.bad {
 		parts[i] = f(loc)
 	}
-	scrub := Scrub
-	if loc == i18n.En {
-		scrub = scrubEN
-	}
-	return i18n.Msg(loc, "assist.invalid_plan", i18n.A("detail", scrub(strings.Join(parts, "; "), e.secrets, e.generic)))
+	return i18n.Msg(loc, "assist.invalid_plan", i18n.A("detail", Scrub(strings.Join(parts, "; "), e.secrets, e.generic)))
 }
 
 // sentinel es un error con código del catálogo que sigue reconociéndose como su centinela (errors.Is).
