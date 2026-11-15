@@ -7,7 +7,9 @@ Paquete oficial con los playbooks de diagnóstico de solo lectura para IOS clás
 los comandos que solo existen en IOS-XE (`show platform software/hardware fed`, `bootflash:`, licencias inteligentes) y
 con el equivalente clásico cuando existe (`show platform tcam utilization`, `show controllers cpu-interface`,
 `show license detail`). Los comandos vienen de la documentación pública de Cisco y se validaron en un WS-C3560CX-12PC-S con IOS 15.2(7)E4
-(2026-11-13); los que no existen en ese modelo (stack, SSO, MPLS, módulos, ambiente) llevan la nota «no existe en 3560CX».
+(2026-11-13); los que no existen en ese modelo (stack, SSO, MPLS, módulos) llevan la nota «no existe en 3560CX», y los playbooks de
+stack y SSO dicen en su nombre «solo en stack o chasis». El ambiente usa `show env all`: el 3560CX aceptó «env» y rechazó
+«environment» (2026-11-14); en ISR G2 «env» abrevia «environment». Falta validarlo en laboratorio.
 Los scripts de biblioteca derivados llevan el prefijo `lib-ios-`, así que conviven con los de `oom/ios-xe`. Con los dos
 paquetes instalados, un equipo detectado como IOS clásico corre el playbook de este paquete aunque se haya elegido el
 de `oom/ios-xe` con el mismo nombre (y al revés en IOS-XE), así una ronda sobre una flota mixta usa en cada equipo sus
@@ -26,7 +28,9 @@ Official package with the read-only diagnostic playbooks for classic IOS 12.2/15
 without the commands that only exist on IOS-XE (`show platform software/hardware fed`, `bootflash:`, Smart Licensing)
 and with the classic equivalent where one exists (`show platform tcam utilization`, `show controllers cpu-interface`,
 `show license detail`). Commands come from Cisco's public documentation and were validated on a WS-C3560CX-12PC-S running IOS 15.2(7)E4
-(2026-11-13); those that do not exist on that model (stack, SSO, MPLS, modules, environment) carry the note «no existe en 3560CX».
+(2026-11-13); those that do not exist on that model (stack, SSO, MPLS, modules) carry the note «no existe en 3560CX», and the stack
+and SSO playbooks say «stack or chassis only» in their name. Environment uses `show env all`: the 3560CX accepted «env» and
+rejected «environment» (2026-11-14); on ISR G2 «env» abbreviates «environment». Not yet validated in the lab.
 The derived library scripts use the `lib-ios-` prefix, so they coexist with those of `oom/ios-xe`. With both packages
 installed, a device detected as classic IOS runs this package's playbook even if the `oom/ios-xe` one with the same
 name was chosen (and the other way around on IOS-XE), so a round over a mixed fleet uses each device's own commands.

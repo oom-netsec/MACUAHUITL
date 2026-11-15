@@ -10,7 +10,7 @@ commands:
   - cmd: show clock
   - cmd: show file systems
   - cmd: show boot
-  - cmd: show bootvar
+  - cmd: show bootvar  # no existe en Cat9k (solo routers)
   - cmd: show version | include System image|image file|uptime
   - cmd: dir
   - cmd: "dir flash:"

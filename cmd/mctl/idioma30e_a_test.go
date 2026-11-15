@@ -271,8 +271,8 @@ func TestIdioma30ePortsStatusYSet(t *testing.T) {
 
 func TestIdioma30ePortsSet(t *testing.T) {
 	args, rec := portsRig(t, nil)
-	has(t, "plan en", enMust(t, "", append(args, "--vlan", "20")...), "Only the plan was shown: nothing was changed. To apply it, add --asistido.")
-	has(t, "plan es", must(t, "", append(args, "--vlan", "20")...), "Solo se mostró el plan: no se cambió nada. Para aplicarlo agrega --asistido.")
+	has(t, "plan en", enMust(t, "", append(args, "--vlan", "20")...), "Only the plan was shown: nothing was changed. To apply it, add --assisted.")
+	has(t, "plan es", must(t, "", append(args, "--vlan", "20")...), "Solo se mostró el plan: no se cambió nada. Para aplicarlo agrega --assisted.")
 	_, err := en(t, "", append(args, "--shut", "--no-shut")...)
 	errHas(t, "shut en", err, "--shut and --no-shut are mutually exclusive")
 	_, err = mctl(t, "", append(args, "--shut", "--no-shut")...)

@@ -9,7 +9,7 @@ name_en: Catalyst 9K · Platform · Hardware and modules
 commands:
   - cmd: show clock
   - cmd: show platform
-  - cmd: show switch detail
+  - cmd: show switch detail  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show module  # 9400/9600
   - cmd: show inventory
   - cmd: show platform software status control-processor brief

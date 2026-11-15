@@ -145,7 +145,7 @@ func init() {
 		// ports
 		"mctl.ports.shut_exclusive":   e("--shut y --no-shut son excluyentes", "--shut and --no-shut are mutually exclusive"),
 		"mctl.ports.vlan_range":       e("las VLAN van de 1 a 4094", "VLANs range from 1 to 4094"),
-		"mctl.ports.plan_only":        e("Solo se mostró el plan: no se cambió nada. Para aplicarlo agrega --asistido.", "Only the plan was shown: nothing was changed. To apply it, add --asistido."),
+		"mctl.ports.plan_only":        e("Solo se mostró el plan: no se cambió nada. Para aplicarlo agrega --assisted.", "Only the plan was shown: nothing was changed. To apply it, add --assisted."),
 		"mctl.ports.assisted_started": e("MODO ASISTIDO ACTIVO. Ejecución {run}: cada paso que cambia la red pide confirmación.", "ASSISTED MODE ACTIVE. Run {run}: every step that changes the network asks for confirmation."),
 		"mctl.ports.no_runs":          e("No hay ejecuciones.", "There are no runs."),
 		"mctl.ports.run_finished":     e("la ejecución {run} ya terminó: {state}", "run {run} has already finished: {state}"),

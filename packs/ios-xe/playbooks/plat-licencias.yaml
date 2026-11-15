@@ -13,7 +13,7 @@ commands:
   - cmd: show license usage
   - cmd: show license udi
   - cmd: show license authorization
-  - cmd: show license feature
+  - cmd: show license feature  # no existe en 17.3+ ni en Cat9k (routers 16.x con licencia anterior a SLP)
   - cmd: show version | include License|Level|Package
   - cmd: show logging | include SMART_LIC|LICENSE|SMART
   - cmd: show license all

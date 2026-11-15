@@ -12,8 +12,8 @@ acceso, SGT y CTS, credenciales y PAC, AAA hacia ISE), `edge` (sesiones de endpo
 roaming entre edges, border sin rutas, tráfico denegado por SGT).
 
 Los playbooks que declaran datos piden la MAC (`mac`), la IP (`ip`) o la interfaz (`interface`); el núcleo los valida
-antes de armar los comandos. Los comandos usan `show lisp all instance-id *` para cubrir todas las instancias. Todo
-está sin validar en laboratorio (sin equipo; pendiente el sandbox de SD-Access de DevNet): la sintaxis de LISP cambia
+antes de armar los comandos. Los comandos usan `show lisp all instance-id *` para cubrir todas las instancias. Comandos
+revisados en un Catalyst 9000v (IOS-XE 17.15) de DevNet el 2026-11-14, sin fabric y sin validar en un equipo físico: la sintaxis de LISP cambia
 entre versiones 17.x y un comando no soportado queda marcado como fallido sin afectar al resto. Los comandos pasan las
 reglas de solo lectura de IOS: sin `debug`, `clear`, `to-file` ni redirecciones; `show cts credentials` y `show cts
 pacs` están marcados como posibles secretos.
@@ -36,8 +36,8 @@ tunnels, SGTs and CTS, credentials and PACs, AAA to ISE), `edge` (endpoint sessi
 onboarding, roaming between edges, border with no routes, traffic denied by SGT).
 
 Playbooks that declare data ask for the MAC (`mac`), the IP (`ip`) or the interface (`interface`); the core validates
-them before building the commands. Commands use `show lisp all instance-id *` to cover every instance. Everything is
-unvalidated in the lab (no device; pending the DevNet SD-Access sandbox): LISP syntax changes between 17.x releases
+them before building the commands. Commands use `show lisp all instance-id *` to cover every instance. Commands
+checked on a Catalyst 9000v (IOS-XE 17.15) DevNet sandbox on 2026-11-14, without a fabric and not lab-validated: LISP syntax changes between 17.x releases
 and an unsupported command is marked as failed without affecting the rest. Commands pass the IOS read-only rules: no
 `debug`, `clear`, `to-file` or redirections; `show cts credentials` and `show cts pacs` are flagged as possible
 secrets.

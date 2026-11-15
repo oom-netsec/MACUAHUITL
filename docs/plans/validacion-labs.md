@@ -188,8 +188,8 @@ Cada reporte trae:
 - Una sección por playbook con algún problema; los que salieron limpios solo se cuentan. Por comando:
   - `rechazado: …`: la marca de error que apareció en las primeras líneas de la salida (`% Invalid input`,
     `% Incomplete command`, `% Ambiguous command`, `% Permission denied`, `Incorrect usage` de AireOS, `Syntax error`,
-    `ERROR: %` de ASA/FTD, `Authorization failed` de AAA…). Otra línea que empiece con `%` sale como
-    `% (otro mensaje del equipo)`. Nunca se imprime el texto del equipo: podría traer un secreto (un `%PARSER` con el
+    `ERROR: %` de ASA/FTD, `Authorization failed` de AAA, `Unsupported command`…). Otra línea que empiece con `%` sale
+    como `aviso % del equipo (revisar)`: puede ser salida normal (`% Key pair was generated at…`). Nunca se imprime el texto del equipo: podría traer un secreto (un `%PARSER` con el
     comando registrado, por ejemplo).
   - `incompleto`: el comando se cortó o falló.
   - `truncado al leer`: pasó el tope de lectura.
@@ -197,6 +197,9 @@ Cada reporte trae:
   - `lento: N s`: el tiempo hasta el siguiente comando superó `-lento`. Es aproximado, a ±1 s.
   - `no corrió`: falta en la evidencia. Lo que el playbook marca para otra plataforma (`platforms:`) no se espera.
   - Un playbook que no está en `-pack` o cuyos datos no sirven sale con ese problema, nunca como limpio.
+- **Funciones no activas en el equipo**: `% LLDP is not enabled`, `% BGP not active`, `%SNMP manager not enabled`,
+  `% Switch is not in mst mode`… El comando existe y la función está apagada: no es un error del paquete y el playbook
+  no cuenta como con problemas.
 - **Fuera de playbook**: comandos de la evidencia que no son de ningún playbook dado. Si aparece algo aquí, revisa
   que `-pack` y la versión instalada coincidan.
 - **Avisos**: lo que el lector no pudo leer entero, o la carpeta sin salidas (equipo que no conectó).
@@ -205,7 +208,9 @@ Cada reporte trae:
   privada, que no son `<MASKED:…>`. **El reporte no muestra secretos**: cada candidato sale como
   `` `comando` · palabra clave ⟦secreto? N car.⟧ · archivo:línea[, archivo:línea…] `` (N es el largo de lo que sigue a la
   palabra clave), sin ningún texto de la línea; para verlos, abre el archivo indicado tú mismo. Son candidatos: muchos
-  son texto inocente («Password encryption…»); uno real es un hueco de `internal/mask`. Lo que esté en un `.zip` no se
+  son texto inocente; uno real es un hueco de `internal/mask`. No cuentan los contadores y estados «etiqueta : valor»
+  (`Wrong PSK : 132`, `PSK : Enabled`), las palabras de configuración (`password encryption aes`, `psk provisioning`,
+  `Mesh PSK Config`, el contador `Unknown community name`) ni una línea con `<MASKED:…>` poco después de la palabra clave. Lo que esté en un `.zip` no se
   revisa (por eso `zip: ZIP_POLICY_NONE`). El motivo de un equipo que falló también se omite si parece traer un
   secreto.
 

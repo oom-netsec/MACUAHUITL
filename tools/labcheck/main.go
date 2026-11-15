@@ -52,7 +52,56 @@ func main() {
 // (más abajo podrían ser texto de un log y no la respuesta).
 var rejectMarks = []string{"% Invalid input", "% Invalid command", "% Invalid parameter", "% Incomplete command", "% Ambiguous command",
 	"% Permission denied", "% Unrecognized", "% Invalid", "% Incomplete", "% Ambiguous", "Incorrect usage", "Syntax error", "ERROR: %",
-	"Authorization failed"}
+	"Authorization failed", "Unsupported command", "% No such", "% No matching"}
+
+// unknownPercent es la etiqueta de una línea con «%» que no es ni un rechazo conocido ni una función apagada: puede ser
+// salida normal («% Key pair was generated at...»), así que no se presenta como rechazo.
+const unknownPercent = "aviso % del equipo (revisar)"
+
+// inactiveRe: el equipo dice que la función no está activa («% LLDP is not enabled», «% BGP not active», «%SNMP manager
+// not enabled», «% Switch is not in mst mode»). No es un error del paquete: el comando existe y la función está apagada.
+var inactiveRe = regexp.MustCompile(`(?i)^%.*\b(not enabled|not active|not configured|not running|is not in)\b`)
+
+// noneRe: «%No Secure Channels» (MACsec), «% no ipv6 snooping policy attached»: nada configurado, tampoco es error.
+// Acotada a esos casos: «% No such interface», «% No matching…» son rechazos (un dato que no existe en el equipo).
+var noneRe = regexp.MustCompile(`(?i)^%\s*(No Secure Channels|no\s.*\bpolicy attached\b)`)
+
+// normalPercentRe: líneas con «%» que son salida normal, no un mensaje: top (%Cpu(s)) y la fecha de la llave RSA.
+var normalPercentRe = regexp.MustCompile(`^%(Cpu\(s\)|\s*Key pair was generated)`)
+
+// inactiveOnly es inactive solo si no hay nada más que reportar: ni una marca de rechazo en las primeras líneas, ni lo
+// que marcó el driver (inválido, incompleto) o el lector (truncado). Así una función apagada nunca tapa un error.
+func inactiveOnly(s analyze.Section) (string, bool) {
+	if s.Invalid || s.Incomplete || s.Truncated {
+		return "", false
+	}
+	for _, p := range problems(s, s.At, time.Hour) { // sin «lento»: end = At
+		if strings.HasPrefix(p, "rechazado") {
+			return "", false
+		}
+	}
+	return inactive(s.Text)
+}
+
+// inactive da la frase fija (nunca la línea del equipo) si alguna de las primeras líneas dice que la función está apagada.
+func inactive(text string) (string, bool) {
+	n := 0
+	for _, ln := range strings.Split(text, "\n") {
+		if ln = strings.TrimSpace(ln); ln == "" {
+			continue
+		}
+		if n++; n > 5 {
+			break
+		}
+		if m := inactiveRe.FindStringSubmatch(ln); m != nil {
+			return strings.TrimPrefix(strings.ToLower(m[1]), "is "), true
+		}
+		if noneRe.MatchString(ln) {
+			return "not configured", true
+		}
+	}
+	return "", false
+}
 
 // Valores con pinta de secreto: tras una palabra clave (con su número de tipo opcional), key/message-digest-key con
 // tipo, auth/priv 0x de SNMPv3 (NX-OS), un hash crypt ($1$, $8$, $9$...) o una llave privada. Cada alternativa
@@ -61,14 +110,59 @@ var secretRe = regexp.MustCompile(`(?i)\b(?:password|secret|key-string|pre-share
 	`|\bmessage-digest-key\s+\d+\s+md5\s+(?:[0-9]\s+)?(\S+)|\bkey\s+[0-9]\s+(\S+)|\b(?:auth|priv)\s+(?:\S+\s+)?(0x[0-9a-f]+)` +
 	`|(\$[1-9][a-z]?\$\S{4,})|(BEGIN [A-Z ]*PRIVATE KEY)`)
 
+// labelRe: un contador o estado de show, «Etiqueta de palabras : valor» con espacio a los dos lados del «:» y una
+// etiqueta sin dígitos (así no calza «password 0 abc:123» ni «Community name: 123456», que sí pueden ser claves);
+// benignValueRe: valores que no pueden ser una clave (un PSK WPA tiene al menos 8 caracteres).
+var (
+	labelRe       = regexp.MustCompile(`^\s*[A-Za-z][A-Za-z \-/().]*?\s+:\s+(\S+)\s*$`)
+	benignValueRe = regexp.MustCompile(`(?i)^(enabled|disabled|yes|no|none|n/a|true|false|on|off|\d{1,7})$`)
+	// structuralRe: tokens de sintaxis que pueden ir entre la palabra clave y el <MASKED:...> (tipo, formato, dirección).
+	structuralRe = regexp.MustCompile(`(?i)^(\d|set-key|ascii|hex|aes|des|md5|sha|encrypted|unencrypted|key|address|local|remote|\d+\.\d+\.\d+\.\d+)$`)
+)
+
+// benignFollow: palabras que siguen a la palabra clave y no son un valor («password encryption aes», «psk provisioning»,
+// «Mesh PSK Config»). «name» va aparte (maskedNear y nameCounter).
+var benignFollow = map[string]bool{"encryption": true, "provisioning": true, "config": true, "configuration": true,
+	"keychain(s)": true, "keychain": true, "keychains": true} // «MKA PSK Keychain(s) Summary» (show mka keychains)
+
+// pcRe: «:dirección+desplazamiento» en hexadecimal, el PC de show memory allocating-process («Ion Password  :7F3A…+1A2B»).
+var pcRe = regexp.MustCompile(`^:[0-9A-Fa-f]+\+[0-9A-Fa-f]+$`)
+
+// maskedNear: tras la palabra clave solo hay tokens de sintaxis y luego un <MASKED:...> («psk set-key ascii 8 <MASKED:...>»):
+// el enmascarado ya tapó el valor. Un token cualquiera antes del <MASKED: (S3cret, hunter2) puede ser la clave.
+func maskedNear(after []string) bool {
+	for _, t := range after[:min(len(after), 4)] {
+		if strings.HasPrefix(t, "<MASKED:") {
+			return true
+		}
+		if !structuralRe.MatchString(t) {
+			return false
+		}
+	}
+	return false
+}
+
+// nameCounter: «community name» al final de la línea o seguido de «supplied» es un contador de show snmp
+// («0 Unknown community name»), no una comunidad; «community name S3cret» sí se marca.
+func nameCounter(ln string, a, b int) bool {
+	rest := strings.TrimSpace(ln[b:])
+	return strings.EqualFold(ln[a:b], "name") && (rest == "" || rest == "supplied")
+}
+
 // secretAt dice si la línea trae un valor con pinta de secreto que no sea <MASKED:...>, con la palabra clave y el
 // largo de lo que la sigue hasta el fin de línea. El reporte imprime solo eso: el regex captura un token y el secreto
 // puede ser otro de la misma línea (ntp authentication-key 1 md5 X, pre-shared-key local X...), así que nada del
 // texto de la línea sale, ni lo que va antes.
 func secretAt(ln string) (kw string, n int, ok bool) {
+	if l := labelRe.FindStringSubmatch(ln); l != nil && benignValueRe.MatchString(l[1]) {
+		return "", 0, false // «Wrong PSK : 132», «PSK : Enabled»: contador o estado, no una clave
+	}
 	for _, m := range secretRe.FindAllStringSubmatchIndex(ln, -1) {
+		if maskedNear(strings.Fields(ln[m[0]:])[1:]) {
+			continue
+		}
 		for g := 2; g < len(m); g += 2 {
-			if m[g] < 0 || strings.HasPrefix(ln[m[g]:], "<MASKED:") {
+			if m[g] < 0 || strings.HasPrefix(ln[m[g]:], "<MASKED:") || benignFollow[strings.ToLower(ln[m[g]:m[g+1]])] || pcRe.MatchString(ln[m[g]:m[g+1]]) || nameCounter(ln, m[g], m[g+1]) {
 				continue
 			}
 			word := strings.Fields(ln[m[0]:m[1]])[0]
@@ -138,6 +232,43 @@ func secretsIn(jobDir, dev string) (out []string, err error) {
 	return out, nil
 }
 
+// align empareja cada sección de la evidencia con un comando esperado (en orden) maximizando los emparejamientos: la
+// subsecuencia común más larga. Una búsqueda hacia adelante sin más se iba hasta otra aparición lejana de un comando que
+// la versión del paquete ya no trae en su lugar, y dejaba como «no corrió» todo lo de en medio. Marca exp[j].done y da,
+// por sección, el playbook (vacío = fuera de playbook).
+func align(secs []analyze.Section, exp []expected) []string {
+	n, m := len(secs), len(exp)
+	dp := make([][]int32, n+1) // dp[i][j]: emparejamientos posibles entre secs[i:] y exp[j:]
+	for i := range dp {
+		dp[i] = make([]int32, m+1)
+	}
+	for i := n - 1; i >= 0; i-- {
+		for j := m - 1; j >= 0; j-- {
+			switch {
+			case secs[i].Command == exp[j].cmd:
+				dp[i][j] = dp[i+1][j+1] + 1
+			case dp[i+1][j] >= dp[i][j+1]:
+				dp[i][j] = dp[i+1][j]
+			default:
+				dp[i][j] = dp[i][j+1]
+			}
+		}
+	}
+	pbOf := make([]string, n)
+	for i, j := 0, 0; i < n && j < m; {
+		switch {
+		case secs[i].Command == exp[j].cmd && dp[i][j] == dp[i+1][j+1]+1:
+			exp[j].done, pbOf[i] = true, exp[j].pb
+			i, j = i+1, j+1
+		case dp[i][j+1] >= dp[i+1][j]: // ante un empate, saltar lo esperado: la sección puede emparejar más adelante
+			j++
+		default:
+			i++
+		}
+	}
+	return pbOf
+}
+
 type expected struct {
 	pb, cmd string
 	done    bool
@@ -181,7 +312,7 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 	fmt.Fprintf(w, "- enmascarado: %v · conteos: %v\n", m.Masked, m.MaskCounts)
 
 	issues := map[string][]string{} // playbook -> líneas
-	var order, outside, notes, secrets []string
+	var order, outside, notes, secrets, inactives []string
 	// Sin salidas (el equipo falló al conectar) analyze da error: el estado ya salió arriba y lo demás queda «no corrió».
 	b, err := analyze.Load(jobDir)
 	if err != nil {
@@ -239,18 +370,18 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 				secs = append(secs, s)
 			}
 		}
-		next := 0
+		pbOf := align(secs, exp)
 		for i, s := range secs {
-			pb := ""
-			for j := next; j < len(exp); j++ {
-				if exp[j].cmd == s.Command {
-					exp[j].done, pb, next = true, exp[j].pb, j+1
-					break
-				}
-			}
+			pb := pbOf[i]
 			end := m.EndedAt
 			if i+1 < len(secs) {
 				end = secs[i+1].At
+			}
+			if phrase, ok := inactiveOnly(s); ok { // función apagada en el equipo: no es un problema del paquete
+				if line := fmt.Sprintf("- `%s` — %s", s.Command, phrase); !slices.Contains(inactives, line) { // el mismo comando en varios playbooks
+					inactives = append(inactives, line)
+				}
+				continue
 			}
 			for _, prob := range problems(s, end, slow) {
 				line := fmt.Sprintf("- `%s` — %s", s.Command, prob)
@@ -292,7 +423,7 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 	for _, part := range []struct {
 		title string
 		lines []string
-	}{{"Fuera de playbook", outside}, {"Avisos", notes}, {"Posibles secretos sin enmascarar (revisar a mano)", secrets}} {
+	}{{"Fuera de playbook", outside}, {"Funciones no activas en el equipo (no son errores del paquete)", inactives}, {"Avisos", notes}, {"Posibles secretos sin enmascarar (revisar a mano)", secrets}} {
 		if len(part.lines) > 0 {
 			fmt.Fprintf(w, "\n## %s\n\n%s\n", part.title, strings.Join(part.lines, "\n"))
 		}
@@ -311,16 +442,21 @@ func problems(s analyze.Section, end time.Time, slow time.Duration) (out []strin
 		if n++; n > 5 {
 			break
 		}
+		if normalPercentRe.MatchString(ln) {
+			continue
+		}
 		if i := slices.IndexFunc(rejectMarks, func(mk string) bool { return strings.Contains(strings.ToLower(ln), strings.ToLower(mk)) }); i >= 0 {
 			rejected = rejectMarks[i]
 			break
 		}
 		if strings.HasPrefix(ln, "%") {
-			rejected = "% (otro mensaje del equipo)"
+			rejected = unknownPercent
 			break
 		}
 	}
 	switch {
+	case rejected == unknownPercent:
+		out = append(out, unknownPercent)
 	case rejected != "":
 		out = append(out, "rechazado: "+rejected)
 	case s.Invalid:

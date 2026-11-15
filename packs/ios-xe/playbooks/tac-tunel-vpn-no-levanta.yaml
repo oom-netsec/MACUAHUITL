@@ -13,12 +13,12 @@ commands:
   - cmd: show crypto session
   - cmd: show crypto isakmp sa
   - cmd: show crypto ikev2 sa
-  - cmd: show dmvpn
+  - cmd: show dmvpn  # no existe en Cat9k (solo routers)
   - cmd: show ip nhrp nhs detail
   - cmd: show ip route static
   - cmd: show ip access-lists
   - cmd: show crypto pki certificates
-  - cmd: show platform hardware qfp active statistics drop
+  - cmd: show platform hardware qfp active statistics drop  # no existe en Cat9k (solo routers)
   - cmd: show logging | include IKE|CRYPTO|IPSEC|NHRP|TUN|LINEPROTO
   - cmd: show running-config | section crypto|tunnel
     may_contain_secrets: true

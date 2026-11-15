@@ -9,7 +9,7 @@ name_en: Services · CoPP
 commands:
   - cmd: show clock
   - cmd: show policy-map control-plane
-  - cmd: show control-plane host open-ports
+  - cmd: show control-plane host open-ports  # no existe en Cat9k (solo routers)
   - cmd: show processes cpu sorted
   - cmd: show platform software fed switch active punt cause summary
   - cmd: show platform hardware fed switch active qos queue stats internal cpu policer

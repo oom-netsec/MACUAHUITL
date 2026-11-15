@@ -10,7 +10,7 @@ commands:
   - cmd: "dir bootflash:"
     platforms: [ios-xe] # IOS clásico no tiene bootflash:
   - cmd: show boot
-  - cmd: show bootvar
+  - cmd: show bootvar  # no existe en Cat9k (solo routers); upgrade lo usa donde show boot no existe
   - cmd: show install summary
   - cmd: show redundancy
   - cmd: show running-config | include boot

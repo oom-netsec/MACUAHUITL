@@ -16,7 +16,7 @@ commands:
   - cmd: show ip route summary
   - cmd: show ip route static
   - cmd: show ip route track-table
-  - cmd: show platform hardware qfp active statistics drop
+  - cmd: show platform hardware qfp active statistics drop  # no existe en Cat9k (solo routers)
   - cmd: show logging | include ROUTE_MAP|PBR|TRACK
   - cmd: show running-config | section route-map|ip policy|ip local policy|access-list
     may_contain_secrets: true

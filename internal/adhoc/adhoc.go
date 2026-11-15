@@ -43,6 +43,8 @@ type Row struct {
 	OK      bool   `json:"ok"`
 	Output  string `json:"output"`
 	Note    string `json:"note,omitempty"`
+	// NoteTx es Note como texto de catálogo (vacío si es el detalle del equipo tal cual): ReportL lo traduce en el JSON.
+	NoteTx i18n.Text `json:"-"`
 }
 
 type Report struct {
@@ -67,9 +69,14 @@ func Build(devs []capture.Device, cmds []string) Report {
 			} else if d.State != "completed" && d.Detail != "" {
 				row.Note = d.Detail
 			} else if d.State == "completed" {
-				row.Note = "sin salida (comando inválido en el equipo)"
+				row.NoteTx = i18n.Tx("adhoc.note.invalid")
+			} else if d.State == "" {
+				row.NoteTx = i18n.Tx("adhoc.note.no_round")
 			} else {
-				row.Note = "sin salida (equipo " + or(d.State, "sin ronda") + ")"
+				row.NoteTx = i18n.Tx("adhoc.note.device", "state", d.State)
+			}
+			if !row.NoteTx.Empty() {
+				row.Note = row.NoteTx.In(i18n.Es)
 			}
 			r.Rows = append(r.Rows, row)
 		}
@@ -77,18 +84,11 @@ func Build(devs []capture.Device, cmds []string) Report {
 	return r
 }
 
-func or(s, def string) string {
-	if s == "" {
-		return def
-	}
-	return s
-}
-
-func (r Row) state() string {
+func (r Row) state(loc string) string {
 	if r.OK {
 		return "ok"
 	}
-	return "sin salida"
+	return i18n.Msg(loc, "adhoc.rep.state_none", nil)
 }
 
 // cell: lo que se escribe en la celda; sin salida va la nota.
@@ -100,12 +100,12 @@ func (r Row) cell() string {
 }
 
 // CSV neutraliza celdas que una hoja de cálculo ejecutaría como fórmula: la salida es de un equipo, no de confianza.
-func (r Report) CSV() string {
+func (r Report) CSV(loc string) string {
 	var b strings.Builder
 	w := csv.NewWriter(&b)
-	w.Write([]string{"equipo", "direccion", "comando", "estado", "salida"})
+	w.Write(strings.Split(i18n.Msg(loc, "adhoc.rep.csv_header", nil), ","))
 	for _, x := range r.Rows {
-		w.Write([]string{safe(x.Device), safe(x.Address), safe(x.Command), x.state(), safe(x.cell())})
+		w.Write([]string{safe(x.Device), safe(x.Address), safe(x.Command), x.state(loc), safe(x.cell())})
 	}
 	w.Flush()
 	return b.String()
@@ -119,22 +119,22 @@ func safe(c string) string {
 }
 
 // Markdown escapa HTML, barras y comillas invertidas: nombres y salidas son de un equipo, no de confianza.
-func (r Report) Markdown() string {
+func (r Report) Markdown(loc string) string {
 	var b strings.Builder
-	b.WriteString("| Equipo | Dirección | Comando | Estado | Salida |\n|---|---|---|---|---|\n")
+	b.WriteString(i18n.Msg(loc, "adhoc.rep.md_header", nil) + "\n|---|---|---|---|---|\n")
 	html := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
 	esc := func(s string) string {
 		return strings.NewReplacer("|", `\|`, "\r", "", "\n", "<br>").Replace(html.Replace(s))
 	}
 	for _, x := range r.Rows {
 		cmd := strings.ReplaceAll(esc(x.Command), "`", "&#96;")
-		fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s |\n", esc(x.Device), esc(x.Address), cmd, x.state(), esc(x.cell()))
+		fmt.Fprintf(&b, "| %s | %s | `%s` | %s | %s |\n", esc(x.Device), esc(x.Address), cmd, x.state(loc), esc(x.cell()))
 	}
 	return b.String()
 }
 
-// Text es la vista por equipo: encabezado y, por comando, su salida completa.
-func (r Report) Text() string {
+// Text es la vista por equipo en el idioma loc: encabezado y, por comando, su salida completa.
+func (r Report) Text(loc string) string {
 	var b strings.Builder
 	whole, last := map[string]bool{}, ""
 	for _, x := range r.Rows {
@@ -150,7 +150,7 @@ func (r Report) Text() string {
 		if x.OK {
 			b.WriteString(x.Output + "\n")
 		} else {
-			fmt.Fprintf(&b, "SIN SALIDA: %s\n", x.Note)
+			b.WriteString(i18n.Msg(loc, "adhoc.rep.no_output", i18n.A("note", x.Note)) + "\n")
 		}
 	}
 	n := 0
@@ -159,6 +159,6 @@ func (r Report) Text() string {
 			n++
 		}
 	}
-	fmt.Fprintf(&b, "\n%d equipos, %d con salida completa\n", r.Devices, n)
+	b.WriteString("\n" + i18n.Msg(loc, "adhoc.rep.summary", i18n.A("n", r.Devices, "ok", n)) + "\n")
 	return b.String()
 }

@@ -13,4 +13,3 @@ commands:
   - cmd: show cts role-based permissions
   - cmd: show cts role-based counters
   - cmd: show cts server-list
-  - cmd: show cts role-based enforcement

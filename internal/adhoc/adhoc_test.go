@@ -47,32 +47,40 @@ func TestBuildTablaConsolidada(t *testing.T) {
 	if !r.Rows[0].OK || r.Rows[0].Output != "10:00:00" || r.Rows[2].OK || r.Rows[2].Note != "tiempo agotado" {
 		t.Fatalf("rows = %+v", r.Rows)
 	}
-	csv := r.CSV()
+	csv := r.CSV(i18n.Es)
 	if !strings.HasPrefix(csv, "equipo,direccion,comando,estado,salida\n") || !strings.Contains(csv, `SW1,192.0.2.1,show clock,ok,10:00:00`) ||
 		!strings.Contains(csv, "\"SW1 uptime | 3 days\nline2\"") {
 		t.Fatalf("csv = %q", csv)
 	}
-	md := r.Markdown()
+	md := r.Markdown(i18n.Es)
 	if !strings.Contains(md, "| SW1 | 192.0.2.1 | `show clock` | ok | 10:00:00 |") || !strings.Contains(md, `SW1 uptime \| 3 days<br>line2`) ||
 		!strings.Contains(md, "tiempo agotado") {
 		t.Fatalf("md = %q", md)
 	}
-	txt := r.Text()
+	txt := r.Text(i18n.Es)
 	if !strings.Contains(txt, "== SW1 (192.0.2.1) ==") || !strings.Contains(txt, "SIN SALIDA") || !strings.Contains(txt, "2 equipos, 1 con salida completa") {
 		t.Fatalf("text = %q", txt)
+	}
+	// En inglés, con el plural del catálogo (antes salía en español y con «1 equipos»).
+	if en := r.Text(i18n.En); !strings.Contains(en, "NO OUTPUT") || !strings.Contains(en, "2 devices, 1 with complete output") || strings.Contains(en, "equipos") {
+		t.Fatalf("text en = %q", en)
+	}
+	one := Build(devices()[:1], []string{"show clock"})
+	if es, en := one.Text(i18n.Es), one.Text(i18n.En); !strings.Contains(es, "1 equipo, 1 con salida completa") || !strings.Contains(en, "1 device, 1 with complete output") {
+		t.Fatalf("singular: %q / %q", es, en)
 	}
 }
 
 func TestCSVNeutralizaFormulas(t *testing.T) {
 	r := Build([]capture.Device{{Address: "a", Hostname: "h", State: "completed", Outputs: map[string]string{"show x": "=HYPERLINK(\"x\")"}}}, []string{"show x"})
-	if !strings.Contains(r.CSV(), "'=HYPERLINK") {
-		t.Fatalf("csv = %q", r.CSV())
+	if !strings.Contains(r.CSV(i18n.Es), "'=HYPERLINK") {
+		t.Fatalf("csv = %q", r.CSV(i18n.Es))
 	}
 }
 
 func TestCSVNeutralizaTodasLasCeldas(t *testing.T) {
 	r := Build([]capture.Device{{Address: "@a", Hostname: "=h", State: "completed", Outputs: map[string]string{"show x": "\rfila", "show y": "\tfila"}}}, []string{"show x", "show y", "-cmd"})
-	got := r.CSV()
+	got := r.CSV(i18n.Es)
 	for _, want := range []string{"'=h,'@a,show x,ok,\"'\rfila\"", "'=h,'@a,show y,ok,'\tfila", "'-cmd"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("falta %q en %q", want, got)
@@ -82,7 +90,7 @@ func TestCSVNeutralizaTodasLasCeldas(t *testing.T) {
 
 func TestMarkdownEscapaHTMLYComillas(t *testing.T) {
 	r := Build([]capture.Device{{Address: "a<b", Hostname: "h&<img>", State: "completed", Outputs: map[string]string{"show x `y`": "<script>a&b</script>"}}}, []string{"show x `y`"})
-	got := r.Markdown()
+	got := r.Markdown(i18n.Es)
 	for _, bad := range []string{"<script>", "<img>", "a<b", "`y`"} {
 		if strings.Contains(got, bad) {
 			t.Errorf("sin escapar %q en %q", bad, got)
@@ -102,7 +110,7 @@ func TestBuildSinSalidaNoMezclaElEstado(t *testing.T) {
 		{Hostname: "SW2", Address: "192.0.2.2", State: "failed", Outputs: map[string]string{}},
 	}
 	r := Build(devs, []string{"show environment all"})
-	if r.Rows[0].Note != "sin salida (comando inválido en el equipo)" || r.Rows[1].Note != "sin salida (equipo failed)" {
+	if r.Rows[0].Note != "comando inválido en el equipo" || r.Rows[1].Note != "equipo failed" {
 		t.Fatalf("notas = %q, %q", r.Rows[0].Note, r.Rows[1].Note)
 	}
 }
@@ -116,5 +124,31 @@ func TestMaximoDeComandosTieneCodigo(t *testing.T) {
 	}
 	if got := i18n.English(err); !strings.HasPrefix(got, en) || !strings.Contains(got, "split the batch into runs of 50 commands or fewer") {
 		t.Fatalf("en: %q", got)
+	}
+}
+
+// En inglés todo el informe va en inglés: notas, estado, encabezados del CSV y del Markdown. La nota es el motivo
+// («command invalid on the device»), sin repetir «no output», que ya dice el estado o la línea de texto.
+func TestInformeEnIngles(t *testing.T) {
+	devs := []capture.Device{{Address: "192.0.2.1", Hostname: "SW1", State: "completed", Outputs: map[string]string{"show clock": "10:00\n"}},
+		{Address: "192.0.2.3", Hostname: "SW3", State: "skipped", Outputs: map[string]string{}}}
+	r := Build(devs, []string{"show clock", "show nada"})
+	es := r.Text(i18n.Es)
+	if !strings.Contains(es, "SIN SALIDA: comando inválido en el equipo") || strings.Contains(es, "SIN SALIDA: sin salida") || !strings.Contains(es, "SIN SALIDA: equipo skipped") {
+		t.Fatalf("es = %q", es)
+	}
+	keys := i18n.Localize(&r, i18n.En)
+	if len(keys) == 0 {
+		t.Fatal("las notas no llevan texto de catálogo")
+	}
+	en, csv, md := r.Text(i18n.En), r.CSV(i18n.En), r.Markdown(i18n.En)
+	if !strings.Contains(en, "NO OUTPUT: command invalid on the device") || !strings.Contains(en, "NO OUTPUT: device skipped") || strings.Contains(en, "equipo") {
+		t.Fatalf("en = %q", en)
+	}
+	if !strings.HasPrefix(csv, "device,address,command,state,output\n") || !strings.Contains(csv, "no output,command invalid on the device") {
+		t.Fatalf("csv en = %q", csv)
+	}
+	if !strings.HasPrefix(md, "| Device | Address | Command | State | Output |") || !strings.Contains(md, "| no output | command invalid on the device |") {
+		t.Fatalf("md en = %q", md)
 	}
 }

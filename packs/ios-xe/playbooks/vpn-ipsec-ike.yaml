@@ -23,6 +23,6 @@ commands:
   - cmd: show crypto map
   - cmd: show ip interface brief | include Tunnel
   - cmd: show logging | include CRYPTO|IKE|IPSEC|ISAKMP
-  - cmd: show crypto engine connections active
+  - cmd: show crypto engine connections active  # no existe en Cat9k (solo routers)
   - cmd: show running-config | section crypto|tunnel
     may_contain_secrets: true

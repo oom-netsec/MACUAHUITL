@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
@@ -164,7 +165,7 @@ func TestReporte(t *testing.T) {
 			t.Errorf("secreto sin detectar %q:\n%s", want, sec)
 		}
 	}
-	if !strings.Contains(got, "`show extra` — rechazado: % (otro mensaje del equipo)") {
+	if !strings.Contains(got, "`show extra` — aviso % del equipo (revisar)") {
 		t.Errorf("la línea %% desconocida no salió como rechazo sin texto:\n%s", got)
 	}
 	if strings.Contains(sec, f+"20") { // community <MASKED:...>: no es candidato
@@ -257,5 +258,189 @@ func TestDetalleConSecretoSeOmite(t *testing.T) {
 	}
 	if got := out.String(); strings.Contains(got, "SuperSecreto123") || !strings.Contains(got, "detalle omitido") {
 		t.Fatalf("detalle con secreto:\n%s", got)
+	}
+}
+
+// Falsos positivos del laboratorio del 2026-11-14 (9120 EWC y 3560CX): contadores y estados «etiqueta : valor», palabras
+// de configuración que no son secretos y líneas ya enmascaradas tras la palabra clave. Los secretos reales siguen.
+func TestSecretAtSinFalsosPositivosDelLaboratorio(t *testing.T) {
+	for _, ln := range []string{
+		"AAA override passphrase : No", "Wrong PSK : 132", "EasyPSK PSK mismatch error : 0", "PSK mode failure : 0",
+		"PSK Provisioning : DISABLED", "PSK : Enabled", "FT PSK : Disabled", "PSK Key-Index key number : 1",
+		"password encryption aes", "wireless mesh security psk provisioning inuse 1", "Mesh PSK Config",
+		"security wpa psk set-key ascii 8 <MASKED:wifi-psk>", "    0 Unknown community name",
+		"    0 Illegal operation for community name supplied",
+		// Cat9000v (IOS-XE 17.15): nombre de proceso con dirección (show memory) y encabezado de show mka keychains
+		"      123       4  Ion Password           :7F3A2B1C0D9E+1A2B3C4", "MKA PSK Keychain(s) Summary...",
+	} {
+		if kw, n, ok := secretAt(ln); ok {
+			t.Errorf("falso positivo %q: %s %d", ln, kw, n)
+		}
+	}
+	for _, ln := range []string{
+		"username y password 0 SuperSecreto123", "Community name: Xyz123abc", "PSK : Xyz123abc456",
+		" security wpa psk set-key ascii 0 Xyz123abc456", "ntp authentication-key 1 md5 0822455D0A16 7",
+		"snmp-server community public RO", "username x password <MASKED:secret> secret suelto123",
+		// de la revisión: las reglas de descarte no pueden esconder un secreto antes de los dos puntos ni junto a un <MASKED:
+		"username admin password 0 abc:123", "key-string 0 MyKey:2024", "Community name: 123456",
+		"snmp-server community S3cret RO <MASKED:x>", "username bob password 0 hunter2 <MASKED:x>", "community name S3cret",
+	} {
+		if _, _, ok := secretAt(ln); !ok {
+			t.Errorf("secreto sin detectar: %q", ln)
+		}
+	}
+}
+
+// «Función no activa» (% LLDP is not enabled, % BGP not active...) no es un error del paquete: sale en su sección y
+// el playbook no cuenta como con problemas. «% Error: Unsupported command» sí es rechazo, y un % informativo
+// (% Key pair was generated at...) no se presenta como rechazo.
+func TestFuncionNoActivaVaAparte(t *testing.T) {
+	job, pack := fixture(t)
+	write(t, filepath.Join(pack, "playbooks", "c.yaml"), `id: c
+platform: ios
+name: C
+commands:
+  - cmd: show lldp
+  - cmd: show ip bgp summary
+  - cmd: show spanning-tree mst
+  - cmd: show snmp pending
+  - cmd: show crypto key mypubkey rsa
+  - cmd: show macsec summary
+  - cmd: show device-tracking counters
+  - cmd: show platform software process slot switch active r0 monitor
+  - cmd: show rara
+  - cmd: show wireless mobility summary
+`)
+	m := patrol.Manifest{EndedAt: time.Date(2026, 11, 14, 10, 0, 10, 0, time.UTC), Playbooks: []patrol.PlaybookRef{{ID: "ios/c"}},
+		Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "10.0.0.1"}, Round: 1, Hostname: "sw1", Platform: "ios", State: "completed"}}}
+	b, _ := json.Marshal(m)
+	write(t, filepath.Join(job, "manifest.json"), string(b))
+	write(t, filepath.Join(job, "sw1_10.0.0.1", "r001_20261114-100000.txt"), `===== 2026-11-14T10:00:00Z · show lldp =====
+% LLDP is not enabled
+===== 2026-11-14T10:00:01Z · show ip bgp summary =====
+% BGP not active
+===== 2026-11-14T10:00:02Z · show spanning-tree mst =====
+% Switch is not in mst mode
+===== 2026-11-14T10:00:03Z · show snmp pending =====
+%SNMP manager not enabled
+===== 2026-11-14T10:00:04Z · show crypto key mypubkey rsa =====
+% Key pair was generated at: 05:13:27 MX Apr 9 2001
+Key name: TP-self-signed
+===== 2026-11-14T10:00:04Z · show macsec summary =====
+%No Secure Channels
+===== 2026-11-14T10:00:04Z · show device-tracking counters =====
+% no ipv6 snooping policy attached on Box
+===== 2026-11-14T10:00:04Z · show platform software process slot switch active r0 monitor =====
+%Cpu(s): 33.9 us, 26.8 sy,  0.0 ni, 39.3 id
+===== 2026-11-14T10:00:04Z · show rara =====
+%Algo raro del equipo
+===== 2026-11-14T10:00:05Z · show wireless mobility summary =====
+% Error: Unsupported command 'show_wireless_mobility_summary_req'
+`)
+	var out strings.Builder
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	inactive := got[strings.Index(got, "## Funciones no activas"):]
+	for _, want := range []string{"`show lldp` — not enabled", "`show ip bgp summary` — not active", "`show spanning-tree mst` — not in", "`show snmp pending` — not enabled",
+		"`show macsec summary` — not configured", "`show device-tracking counters` — not configured"} {
+		if !strings.Contains(inactive, want) {
+			t.Errorf("falta %q en funciones no activas:\n%s", want, got)
+		}
+	}
+	c := got[strings.Index(got, "## ios/c"):]
+	c = c[:strings.Index(c, "playbooks sin problemas")]
+	// %Cpu(s) (top) y «% Key pair was generated at» son salida normal: ni problema ni aviso.
+	for _, no := range []string{"show lldp", "show ip bgp", "show spanning-tree", "show snmp pending", "show macsec", "show device-tracking",
+		"show platform software process", "show crypto key"} {
+		if strings.Contains(c, no) {
+			t.Errorf("%s salió como problema del playbook:\n%s", no, c)
+		}
+	}
+	for _, want := range []string{"`show wireless mobility summary` — rechazado: Unsupported command", "`show rara` — aviso % del equipo (revisar)"} {
+		if !strings.Contains(c, want) {
+			t.Errorf("falta %q:\n%s", want, c)
+		}
+	}
+}
+
+// La misma función apagada vista por dos playbooks sale una vez.
+func TestFuncionNoActivaSinRepetir(t *testing.T) {
+	job, pack := fixture(t)
+	for _, f := range []string{"c.yaml", "d.yaml"} {
+		write(t, filepath.Join(pack, "playbooks", f), "id: "+f[:1]+"\nplatform: ios\nname: X\ncommands:\n  - cmd: show lldp\n")
+	}
+	m := patrol.Manifest{Playbooks: []patrol.PlaybookRef{{ID: "ios/c"}, {ID: "ios/d"}},
+		Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "10.0.0.1"}, Round: 1, Hostname: "sw1", Platform: "ios", State: "completed"}}}
+	b, _ := json.Marshal(m)
+	write(t, filepath.Join(job, "manifest.json"), string(b))
+	write(t, filepath.Join(job, "sw1_10.0.0.1", "r001_20261114-100000.txt"), "===== 2026-11-14T10:00:00Z · show lldp =====\n% LLDP is not enabled\n===== 2026-11-14T10:00:01Z · show lldp =====\n% LLDP is not enabled\n")
+	var out strings.Builder
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(out.String(), "`show lldp` — not enabled"); n != 1 {
+		t.Fatalf("show lldp sale %d veces:\n%s", n, out.String())
+	}
+}
+
+// «Función no activa» no tapa un rechazo en las mismas líneas ni lo que el driver marcó (inválido, incompleto).
+func TestFuncionNoActivaNoTapaRechazos(t *testing.T) {
+	s := analyze.Section{Command: "show x", Text: "% Invalid input detected; feature not enabled\n"}
+	if _, ok := inactiveOnly(s); ok {
+		t.Error("un rechazo con «not enabled» salió como función no activa")
+	}
+	s = analyze.Section{Command: "show x", Text: "% LLDP is not enabled\n", Invalid: true}
+	if _, ok := inactiveOnly(s); ok {
+		t.Error("lo marcado inválido por el driver salió como función no activa")
+	}
+	s = analyze.Section{Command: "show x", Text: "% LLDP is not enabled\n", Incomplete: true}
+	if _, ok := inactiveOnly(s); ok {
+		t.Error("una salida incompleta salió como función no activa")
+	}
+	if p, ok := inactiveOnly(analyze.Section{Command: "show lldp", Text: "% LLDP is not enabled\n"}); !ok || p != "not enabled" {
+		t.Errorf("función no activa = %q %v", p, ok)
+	}
+}
+
+// Evidencia de una versión anterior del paquete: un comando que ya no está en su playbook (show viejo) pero sí en uno
+// posterior no puede arrastrar la alineación hasta allá y dejar como «no corrió» todo lo intermedio.
+func TestAlineacionConEvidenciaDeOtraVersion(t *testing.T) {
+	job, pack := fixture(t)
+	write(t, filepath.Join(pack, "playbooks", "c.yaml"), "id: c\nplatform: ios\nname: C\ncommands:\n  - cmd: show uno\n  - cmd: show dos\n")
+	write(t, filepath.Join(pack, "playbooks", "d.yaml"), "id: d\nplatform: ios\nname: D\ncommands:\n  - cmd: show tres\n  - cmd: show cuatro\n  - cmd: show viejo\n")
+	m := patrol.Manifest{Playbooks: []patrol.PlaybookRef{{ID: "ios/c"}, {ID: "ios/d"}},
+		Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "10.0.0.1"}, Round: 1, Hostname: "sw1", Platform: "ios", State: "completed"}}}
+	b, _ := json.Marshal(m)
+	write(t, filepath.Join(job, "manifest.json"), string(b))
+	// en la versión vieja, c traía show viejo entre uno y dos
+	write(t, filepath.Join(job, "sw1_10.0.0.1", "r001_20261114-100000.txt"), "===== 2026-11-14T10:00:00Z · show uno =====\na\n"+
+		"===== 2026-11-14T10:00:00Z · show viejo =====\nb\n===== 2026-11-14T10:00:00Z · show dos =====\nc\n"+
+		"===== 2026-11-14T10:00:00Z · show tres =====\nd\n===== 2026-11-14T10:00:00Z · show cuatro =====\ne\n===== 2026-11-14T10:00:00Z · show viejo =====\nf\n")
+	var out strings.Builder
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); strings.Contains(got, "no corrió") || !strings.Contains(got, "2 de 2 playbooks sin problemas") {
+		t.Fatalf("alineación rota:\n%s", got)
+	}
+}
+
+// «% No such interface» (un dato que no existe en el equipo) es un rechazo, no una función apagada; MACsec y
+// device-tracking sin configurar sí lo son.
+func TestNoSuchEsRechazo(t *testing.T) {
+	for _, ln := range []string{"% No such interface", "% No such VRF", "% No matching route", "% No hay tal cosa en el equipo"} {
+		if p, ok := inactiveOnly(analyze.Section{Command: "show x", Text: ln + "\n"}); ok {
+			t.Errorf("%q salió como función no activa (%s)", ln, p)
+		}
+	}
+	if got := problems(analyze.Section{Command: "show x", Text: "% No such interface\n"}, time.Time{}, time.Hour); len(got) == 0 || got[0] != "rechazado: % No such" {
+		t.Errorf("problems = %v", got)
+	}
+	for _, ln := range []string{"%No Secure Channels", "% no ipv6 snooping policy attached on Box"} {
+		if p, ok := inactiveOnly(analyze.Section{Command: "show x", Text: ln + "\n"}); !ok || p != "not configured" {
+			t.Errorf("%q = %q %v", ln, p, ok)
+		}
 	}
 }

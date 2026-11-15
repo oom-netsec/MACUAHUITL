@@ -11,7 +11,7 @@ func init() {
 		"mctl.backup.written":        e("escrito {path}", "written {path}"),
 		"mctl.backup.job_failed":     e("el trabajo {job} terminó con error: {error}", "job {job} finished with an error: {error}"),
 		"mctl.restore.assist_active": e("MODO ASISTIDO ACTIVO. Ejecución {run}: cada paso que cambia la red pide confirmación.", "ASSISTED MODE ACTIVE. Run {run}: every step that changes the network asks for confirmation."),
-		"mctl.restore.plan_only":     e("Solo se mostró el plan: no se cambió nada. Para aplicarlo agrega --asistido.", "Only the plan was shown: nothing was changed. To apply it add --asistido."),
+		"mctl.restore.plan_only":     e("Solo se mostró el plan: no se cambió nada. Para aplicarlo agrega --assisted.", "Only the plan was shown: nothing was changed. To apply it add --assisted."),
 
 		// patrol
 		"mctl.patrol.param_form":    e("--param {param:q}: use nombre=valor", "--param {param:q}: use name=value"),

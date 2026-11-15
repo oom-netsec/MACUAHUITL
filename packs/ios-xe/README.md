@@ -9,6 +9,12 @@ tracking e IP SLA, ZBFW, PPPoE, DHCP, NAT de borde, QoS, redundancia) y cuatro c
 trae su script de la biblioteca con el mismo ID de siempre (`lib-<id>`), así que tus favoritos se conservan. Los
 playbooks de línea base, pre/post, métricas, análisis y verificación de actualización siguen dentro de la aplicación.
 
+Comandos revisados en un Catalyst 9000v (IOS-XE 17.15) de DevNet el 2026-11-14. Desde la 1.1.2 ya no traen
+`show mls qos` (sigue en oom/ios) ni `show monitor` sin `session`. Los que solo existen en routers (QFP, DMVPN, ZBFW,
+PPPoE, `show bootvar`, `show ip flow`, `show control-plane host open-ports`) llevan `# no existe en Cat9k`;
+`show license feature` solo existe en routers 16.x, y lo que falla en el Cat9000v virtual (stack, SVL, PoE,
+`show calendar`) lleva su comentario.
+
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
 1. Baja `oom-ios-xe-<versión>.mpack` de los releases de GitHub y verifica su suma en `SHA256SUMS`.
@@ -24,6 +30,12 @@ router WAN and TAC cases). Since 1.1.0 it also covers IOS-XE routers (ISR 1000/4
 ZBFW, PPPoE, DHCP, edge NAT, QoS, redundancy) and four router `tac-` cases. Each playbook brings its library script
 with the same ID as before (`lib-<id>`), so your favorites are kept. The baseline, pre/post, metrics, analysis and
 upgrade-check playbooks stay inside the application.
+
+Commands checked on a Catalyst 9000v (IOS-XE 17.15) DevNet sandbox on 2026-11-14. Since 1.1.2 they no longer include
+`show mls qos` (still in oom/ios) or `show monitor` without `session`. Router-only ones (QFP, DMVPN, ZBFW, PPPoE,
+`show bootvar`, `show ip flow`, `show control-plane host open-ports`) carry `# no existe en Cat9k`; `show license
+feature` only exists on 16.x routers, and what fails on the virtual Cat9000v (stack, SVL, PoE, `show calendar`)
+carries its comment.
 
 How to load it (the application never downloads packages):
 

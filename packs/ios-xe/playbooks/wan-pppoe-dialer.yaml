@@ -8,10 +8,10 @@ name: WAN · PPPoE y dialer
 name_en: WAN · PPPoE and dialer
 commands:
   - cmd: show clock
-  - cmd: show pppoe summary
-  - cmd: show pppoe session
-  - cmd: show pppoe session all
-  - cmd: show pppoe session packets
+  - cmd: show pppoe summary  # no existe en Cat9k (solo routers)
+  - cmd: show pppoe session  # no existe en Cat9k (solo routers)
+  - cmd: show pppoe session all  # no existe en Cat9k (solo routers)
+  - cmd: show pppoe session packets  # no existe en Cat9k (solo routers)
   - cmd: show dialer
   - cmd: show ip interface brief
   - cmd: show logging | include PPP|PPPOE|DIALER|LINEPROTO

@@ -17,6 +17,14 @@ func TestPackListShowRemoveInstall(t *testing.T) {
 	if out := must(t, "", "pack", "list"); !strings.Contains(out, "oom/ios-xe  "+versionIOSXE(t)+"  oficial") {
 		t.Fatalf("list: %q", out)
 	}
+	// El nombre del paquete sigue el idioma de mctl: name_en con la CLI en inglés (antes salía «diagnóstico TAC»).
+	if en, es := must(t, "", "--lang", "en", "pack", "list"), must(t, "", "pack", "list"); !strings.Contains(en, "IOS-XE, TAC diagnostics") ||
+		strings.Contains(en, "diagnóstico TAC") || !strings.Contains(es, "IOS-XE, diagnóstico TAC") {
+		t.Fatalf("nombre por idioma: en=%q es=%q", en, es)
+	}
+	if en := must(t, "", "--lang", "en", "pack", "show", "oom/ios-xe"); !strings.Contains(en, "IOS-XE, TAC diagnostics") || !strings.Contains(en, "Read-only") {
+		t.Fatalf("show en: %q", en)
+	}
 	if out := must(t, "", "pack", "show", "oom/ios-xe"); !strings.Contains(out, "licencia: Apache-2.0") || !strings.Contains(out, "mctl pack install") {
 		t.Fatalf("show: %q", out)
 	}

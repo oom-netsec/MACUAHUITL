@@ -13,13 +13,13 @@ commands:
   - cmd: show interfaces summary
   - cmd: show interfaces | include line protocol|output drops|Total output drops|Queueing strategy|txload
     timeout: 120s
-  - cmd: show platform hardware qfp active statistics drop
-  - cmd: show platform hardware qfp active datapath utilization summary
+  - cmd: show platform hardware qfp active statistics drop  # no existe en Cat9k (solo routers)
+  - cmd: show platform hardware qfp active datapath utilization summary  # no existe en Cat9k (solo routers)
   - cmd: show platform hardware qfp active feature lic-bw oversubscription # no existe en ASR 1000 ni C8500
   - cmd: show platform hardware throughput level # no existe en ASR 1000 ni C8500
   - cmd: show running-config | section policy-map|class-map|service-policy
     may_contain_secrets: true
   - cmd: show policy-map interface
     timeout: 120s
-  - cmd: show platform hardware qfp active infrastructure bqs queue output default all
+  - cmd: show platform hardware qfp active infrastructure bqs queue output default all  # no existe en Cat9k (solo routers)
     timeout: 120s

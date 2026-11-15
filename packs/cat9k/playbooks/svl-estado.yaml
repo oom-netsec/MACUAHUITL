@@ -9,9 +9,9 @@ name_en: Catalyst 9K · SVL · StackWise Virtual links and status
 commands:
   - cmd: show clock
   - cmd: show stackwise-virtual  # SVL
-  - cmd: show stackwise-virtual link
-  - cmd: show stackwise-virtual bandwidth
-  - cmd: show stackwise-virtual neighbors
+  - cmd: show stackwise-virtual link  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show stackwise-virtual bandwidth  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show stackwise-virtual neighbors  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show switch
   - cmd: show redundancy
   - cmd: show module  # 9400/9600

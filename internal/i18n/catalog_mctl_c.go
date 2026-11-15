@@ -45,7 +45,7 @@ func init() {
 		"mctl.run.err_final":     e("la ejecución terminó en {state} sin completarse", "the run ended in {state} without completing"),
 
 		"mctl.snippet.bad_vlan":    e("VLAN {value:q}: las VLAN van de 1 a 4094", "VLAN {value:q}: VLANs go from 1 to 4094"),
-		"mctl.snippet.plan_only":   e("\nSolo se mostró el plan: no se cambió nada. Para aplicarlo agrega --asistido.", "\nOnly the plan was shown: nothing was changed. To apply it add --asistido."),
+		"mctl.snippet.plan_only":   e("\nSolo se mostró el plan: no se cambió nada. Para aplicarlo agrega --assisted.", "\nOnly the plan was shown: nothing was changed. To apply it add --assisted."),
 		"mctl.snippet.assisted":    e("\nMODO ASISTIDO ACTIVO. Ejecución {id}: cada paso que cambia la red pide confirmación.", "\nASSISTED MODE ON. Run {id}: every step that changes the network asks for confirmation."),
 		"mctl.snippet.bad_op":      e("la operación es add o remove: el trunk nunca reemplaza su lista de VLAN permitidas", "the operation is add or remove: the trunk never replaces its allowed VLAN list"),
 		"mctl.snippet.bad_set":     e("--set {value:q}: usa campo=valor", "--set {value:q}: use field=value"),

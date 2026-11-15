@@ -9,7 +9,7 @@ name_en: Catalyst 9K · Stack · Priority and provisioning
 commands:
   - cmd: show clock
   - cmd: show switch
-  - cmd: show switch detail
+  - cmd: show switch detail  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show boot
   - cmd: show running-config | include ^switch
     may_contain_secrets: true

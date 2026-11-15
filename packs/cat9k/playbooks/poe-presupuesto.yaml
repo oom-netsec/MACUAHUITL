@@ -9,7 +9,7 @@ name_en: Catalyst 9K · PoE · Budget and consumption
 commands:
   - cmd: show clock
   - cmd: show power inline
-  - cmd: show power inline detail
+  - cmd: show power inline detail  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
     timeout: 120s
   - cmd: show environment power
   - cmd: show inventory

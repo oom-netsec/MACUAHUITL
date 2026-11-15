@@ -9,10 +9,10 @@ name_en: Platform · Stack
 commands:
   - cmd: show clock
   - cmd: show switch
-  - cmd: show switch detail
-  - cmd: show switch stack-ports
-  - cmd: show switch stack-ports summary
-  - cmd: show switch neighbors
+  - cmd: show switch detail  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show switch stack-ports  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show switch stack-ports summary  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show switch neighbors  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show inventory
   - cmd: show module
   - cmd: show redundancy

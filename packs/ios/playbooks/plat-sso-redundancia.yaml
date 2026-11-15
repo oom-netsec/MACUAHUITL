@@ -2,10 +2,11 @@
 # Cuándo usarlo: Failover entre supervisores, standby que no sincroniza o pérdidas durante una conmutación SSO.
 # Fuente: https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/ha/command/ha-cr-book.html
 # Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13), salvo los marcados «no existe en 3560CX».
+# Solo en stack o chasis con supervisor redundante: en un switch suelto (el 3560CX) solo corren show clock, show cef state y el log.
 id: plat-sso-redundancia
 platform: ios
-name: Plataforma · SSO y redundancia (IOS)
-name_en: Platform · SSO and redundancy (IOS)
+name: Plataforma · SSO y redundancia (IOS, solo en stack o chasis)
+name_en: Platform · SSO and redundancy (IOS, stack or chassis only)
 commands:
   - cmd: show clock
   - cmd: show redundancy  # no existe en 3560CX

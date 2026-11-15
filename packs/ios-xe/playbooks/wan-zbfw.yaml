@@ -8,20 +8,20 @@ name: WAN · Firewall por zonas (ZBFW)
 name_en: WAN · Zone-based firewall (ZBFW)
 commands:
   - cmd: show clock
-  - cmd: show zone security
-  - cmd: show zone-pair security
-  - cmd: show policy-map type inspect
-  - cmd: show class-map type inspect
-  - cmd: show parameter-map type inspect
-  - cmd: show policy-firewall stats global
-  - cmd: show policy-firewall stats zone
-  - cmd: show platform hardware qfp active feature firewall drop all
-  - cmd: show platform hardware qfp active statistics drop
-  - cmd: show platform hardware qfp active feature firewall memory
+  - cmd: show zone security  # no existe en Cat9k (solo routers)
+  - cmd: show zone-pair security  # no existe en Cat9k (solo routers)
+  - cmd: show policy-map type inspect  # no existe en Cat9k (solo routers)
+  - cmd: show class-map type inspect  # no existe en Cat9k (solo routers)
+  - cmd: show parameter-map type inspect  # no existe en Cat9k (solo routers)
+  - cmd: show policy-firewall stats global  # no existe en Cat9k (solo routers)
+  - cmd: show policy-firewall stats zone  # no existe en Cat9k (solo routers)
+  - cmd: show platform hardware qfp active feature firewall drop all  # no existe en Cat9k (solo routers)
+  - cmd: show platform hardware qfp active statistics drop  # no existe en Cat9k (solo routers)
+  - cmd: show platform hardware qfp active feature firewall memory  # no existe en Cat9k (solo routers)
   - cmd: show logging | include FW|ZBFW
   - cmd: show running-config | section zone|class-map type inspect|policy-map type inspect
     may_contain_secrets: true
-  - cmd: show policy-map type inspect zone-pair sessions
+  - cmd: show policy-map type inspect zone-pair sessions  # no existe en Cat9k (solo routers)
     timeout: 120s
-  - cmd: show policy-firewall sessions platform
+  - cmd: show policy-firewall sessions platform  # no existe en Cat9k (solo routers)
     timeout: 120s
