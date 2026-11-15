@@ -251,6 +251,7 @@ func init() {
 		"mctl.flag.nas-id":                       {Es: "NAS-Identifier", En: "NAS-Identifier"},
 		"mctl.flag.nas-ip":                       {Es: "NAS-IP-Address", En: "NAS-IP-Address"},
 		"mctl.flag.need":                         {Es: "tamaño que debe caber (800M, 1.2G)", En: "size that must fit (800M, 1.2G)"},
+		"mctl.flag.no-wait":                      {Es: "no esperar a que termine la captura", En: "do not wait for the capture to finish"},
 		"mctl.flag.no-enable":                    {Es: "no pedir el enable", En: "do not ask for the enable password"},
 		"mctl.flag.no-shut":                      {Es: "encender el puerto", En: "turn the port on"},
 		"mctl.flag.notes":                        {Es: "notas", En: "notes"},

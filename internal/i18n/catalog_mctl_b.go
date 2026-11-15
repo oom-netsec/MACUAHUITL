@@ -127,8 +127,11 @@ func init() {
 		"mctl.change.unarmed":        e("trabajo {job} creado sin armar: {detail}\nrevisa con: mctl job logintest {job}\ny repite con: mctl change {name} --accept HUELLA {id} (o arma con mctl job arm)", "job {job} created but not armed: {detail}\ncheck with: mctl job logintest {job}\nand repeat with: mctl change {name} --accept FINGERPRINT {id} (or arm with mctl job arm)"),
 		"mctl.change.unarmed_er":     e("captura {name} sin armar", "capture {name} not armed"),
 		"mctl.change.capturing":      e("captura {name} en trabajo {job}; síguela con: mctl job watch {job}", "capture {name} in job {job}; follow it with: mctl job watch {job}"),
+		"mctl.change.capture_failed": e("la captura {name} terminó en estado {state}", "capture {name} ended in state {state}"),
 		"mctl.change.diff_none":      e("sin diferencias de configuración", "no configuration differences"),
 		"mctl.change.diff_no_device": e("ningún equipo del cambio coincide con «{device}»", "no device of the change matches \"{device}\""),
+		"mctl.change.done_pre":       e("pre completa: ya puedes aplicar el cambio", "pre complete: you can apply the change now"),
+		"mctl.change.done_post":      e("post completa: corre mctl change report {id}", "post complete: run mctl change report {id}"),
 		"mctl.change.regression":     e("{n} equipos con regresión", "{n} {n|device|devices} with regression"),
 
 		// cleaner

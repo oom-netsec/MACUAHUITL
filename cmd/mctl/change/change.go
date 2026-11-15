@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"gopkg.in/yaml.v3"
@@ -53,9 +54,11 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 	name := map[v1.ChangePhase]string{v1.ChangePhase_CHANGE_PHASE_PRE: "pre", v1.ChangePhase_CHANGE_PHASE_POST: "post"}[phase]
 	return func(c *cli.Env, args []string) error {
 		var accept, exclude cli.List
+		var noWait bool
 		fs, err := cli.Flags("change "+name, args, func(fs *flag.FlagSet) {
 			fs.Var(&accept, "accept", "huella SHA256 confirmada (repetible)")
 			fs.Var(&exclude, "exclude", "equipo a excluir (repetible)")
+			fs.BoolVar(&noWait, "no-wait", false, "no esperar a que termine la captura")
 		})
 		if err != nil {
 			return err
@@ -72,7 +75,48 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 			return cli.Err("mctl.change.unarmed_er", "name", name)
 		}
 		fmt.Fprintln(c.Out, cli.T("mctl.change.capturing", "name", name, "job", r.JobId))
+		if noWait {
+			return nil
+		}
+		// Esperar evita que el ingeniero aplique su cambio mientras la captura PRE sigue corriendo.
+		if err := waitCapture(context.Background(), v1.NewChangeServiceClient(c.Conn), fs.Arg(0), phase, 300*time.Millisecond); err != nil {
+			return err
+		}
+		fmt.Fprintln(c.Out, cli.T("mctl.change.done_"+name, "id", fs.Arg(0)))
 		return nil
+	}
+}
+
+// waitCapture sondea change list hasta que el trabajo de la fase termina; un trabajo que no queda completed es un error.
+// Se sondea (y no job watch) porque una captura de una ronda puede cerrar antes de que la suscripción llegue.
+func waitCapture(ctx context.Context, cl v1.ChangeServiceClient, id string, phase v1.ChangePhase, every time.Duration) error {
+	name := map[v1.ChangePhase]string{v1.ChangePhase_CHANGE_PHASE_PRE: "pre", v1.ChangePhase_CHANGE_PHASE_POST: "post"}[phase]
+	for {
+		r, err := cl.ListChanges(ctx, &v1.ListChangesRequest{})
+		if err != nil {
+			return err
+		}
+		for _, ch := range r.Changes {
+			if ch.ChangeId != id {
+				continue
+			}
+			st := ch.PreState
+			if phase == v1.ChangePhase_CHANGE_PHASE_POST {
+				st = ch.PostState
+			}
+			switch st {
+			case "completed":
+				return nil
+			case "arming", "armed", "created":
+			default:
+				return cli.Err("mctl.change.capture_failed", "name", name, "state", or(st, "?"))
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(every):
+		}
 	}
 }
 
@@ -296,7 +340,7 @@ func complianceCheck(c *cli.Env, args []string) error {
 }
 
 // help son las líneas de este área en mctl --help.
-const help = `  change create -f cambio.yaml | pre|post [--accept HUELLA]... [--exclude EQUIPO]... ID | list
+const help = `  change create -f cambio.yaml | pre|post [--accept HUELLA]... [--exclude EQUIPO]... [--no-wait] ID | list
          diff ID [--device EQUIPO] [--json]   (líneas de configuración que cambiaron entre PRE y POST)
          report ID | report --pre CARPETA --post CARPETA   [--json]
   upgrade check --outputs ARCHIVO --image NOMBRE [--size BYTES] [--md5 HEX] [--verify ARCHIVO] [--json]

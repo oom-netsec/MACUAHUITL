@@ -343,9 +343,20 @@ func TestChangeCommands(t *testing.T) {
 	job := regexp.MustCompile(`trabajo ([0-9a-f]+)`).FindStringSubmatch(out)[1]
 	lt, _ := mctl(t, "", "job", "logintest", job)
 	fp := regexp.MustCompile(`SHA256:\S+`).FindString(lt)
-	pre := regexp.MustCompile(`trabajo ([0-9a-f]+)`).FindStringSubmatch(must(t, "", "change", "pre", "--accept", fp, id))[1]
+	outPre := must(t, "", "change", "pre", "--accept", fp, id)
+	pre := regexp.MustCompile(`trabajo ([0-9a-f]+)`).FindStringSubmatch(outPre)[1]
+	if !strings.Contains(outPre, "pre completa: ya puedes aplicar el cambio") { // espera por omisión, y la captura ya terminó
+		t.Fatalf("change pre debía esperar: %q", outPre)
+	}
+	if st := must(t, "", "change", "list"); !strings.Contains(st, "pre="+pre+" completed") {
+		t.Fatalf("al volver change pre la captura debía estar completed: %q", st)
+	}
 	waitChange(t, id, "pre="+pre+" completed")
-	post := regexp.MustCompile(`trabajo ([0-9a-f]+)`).FindStringSubmatch(must(t, "", "change", "post", id))[1]
+	outPost := must(t, "", "change", "post", "--no-wait", id)
+	post := regexp.MustCompile(`trabajo ([0-9a-f]+)`).FindStringSubmatch(outPost)[1]
+	if strings.Contains(outPost, "post completa") {
+		t.Fatalf("--no-wait no debe esperar: %q", outPost)
+	}
 	waitChange(t, id, "post="+post+" completed")
 	if out := must(t, "", "change", "list"); !strings.Contains(out, id) || !strings.Contains(out, "crq-1") {
 		t.Fatalf("list = %q", out)
