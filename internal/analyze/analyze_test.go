@@ -574,3 +574,19 @@ func TestAvisoSinEquipoSobreviveAlFiltro(t *testing.T) {
 		t.Fatalf("el filtro por equipo se comió el aviso: %+v", r.Warnings)
 	}
 }
+
+// El reloj no autoritativo (sin NTP) ya no dispara log-critico: tiene su propia regla, de severidad baja.
+func TestLogRelojNoAutoritativo(t *testing.T) {
+	rs := rules(t)
+	log := "*Nov 15 14:19:54.123: %PKI-2-NON_AUTHORITATIVE_CLOCK: PKI-2-NON_AUTHORITATIVE_CLOCK: System clock has not been set.\n"
+	r := Analyze(bundleOf("show logging", log), rs, Options{})
+	for _, k := range keys(r.Findings) {
+		if strings.HasPrefix(k, "log-critico") {
+			t.Fatalf("log-critico disparó: %v", keys(r.Findings))
+		}
+	}
+	f := finding(t, r.Findings, "log-reloj-no-autoritativo X r1")
+	if f.Severity != "baja" || !strings.Contains(f.Action, "NTP") {
+		t.Fatalf("hallazgo: %+v", f)
+	}
+}

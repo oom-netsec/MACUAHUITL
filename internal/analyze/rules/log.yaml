@@ -39,12 +39,23 @@
   severity: alta
   commands: [show logging]
   check: match
-  params: {pattern: '%[A-Z0-9_]+-[0-2]-[A-Z0-9_]+:', exclude: '%SYS-2-MALLOCFAIL'}
+  params: {pattern: '%[A-Z0-9_]+-[0-2]-[A-Z0-9_]+:', exclude: '%SYS-2-MALLOCFAIL|%PKI-2-NON_AUTHORITATIVE_CLOCK'}
   explanation: Hay mensajes de emergencia, alerta o crítico (severidad 0 a 2).
   action: Lee cada mensaje con su mnemónico en la guía de mensajes de sistema de la versión.
   title_en: "Severity 0-2 message in the log"
   explanation_en: "There are emergency, alert or critical messages (severity 0 to 2)."
   action_en: "Read each message with its mnemonic in the system message guide for the version."
+- id: log-reloj-no-autoritativo
+  title: Reloj sin fuente autoritativa
+  severity: baja
+  commands: [show logging]
+  check: match
+  params: {pattern: '%PKI-2-NON_AUTHORITATIVE_CLOCK'}
+  explanation: El certificado no se puede validar bien porque el reloj del equipo no tiene una fuente autoritativa (sin NTP o sin sincronizar).
+  action: Configura NTP (ntp server) y confirma la sincronía con show ntp status; luego revisa de nuevo los certificados PKI.
+  title_en: "Clock without an authoritative source"
+  explanation_en: "The certificate cannot be validated properly because the device clock has no authoritative source (no NTP or not synchronized)."
+  action_en: "Configure NTP (ntp server) and confirm synchronization with show ntp status; then re-check the PKI certificates."
 - id: log-flap-interfaz
   title: Interfaz con flaps
   severity: media
