@@ -22,6 +22,14 @@ const openTimeout = 15 * time.Second
 // maxRun es lo más que corre un comando aunque su salida siga llegando (el timeout de Run es de inactividad).
 var maxRun = 30 * time.Minute
 
+// maxOutput es el tope de bytes que se guardan de la salida de un comando (igual que maxFile de fleet, 64 MiB). Al pasarlo
+// se conservan el inicio y los últimos outTail bytes (para seguir viendo el prompt), el resto se descarta mientras el
+// equipo termina de hablar y la salida sale Incomplete. No es error: el equipo y la sesión siguen sanos, solo falta el medio.
+var maxOutput = 64 << 20
+
+// outTail es la cola que se revisa en busca de prompt y --More--: un prompt mide a lo sumo ~130 bytes.
+const outTail = 4096
+
 // maxDetect es lo más que tarda Detect: una reconexión no debe quedar retenida por un equipo que contesta a goteo.
 var maxDetect = 2 * time.Minute
 
@@ -70,6 +78,9 @@ var interfaceRemoved = regexp.MustCompile(`^% Interface \S+ removed`)
 // Avisos que IOS da cuando la línea sí se aplicó pero creó algo que nadie pidió (una VLAN nueva, que con VTP servidor se propaga).
 var cfgWarnings = []string{"Creating vlan", "does not exist"}
 
+// infoPercent son los «% …» informativos de IOS en modo configuración: no detienen la ejecución.
+var infoPercent = regexp.MustCompile(`(?i)^% (?:warning|note|generating|not all config may be removed)`)
+
 var asaSetPassword = regexp.MustCompile(`(?i)The enable password is not set|(?:enter|repeat)\s+password: ?$`)
 
 var passwordPrompt = regexp.MustCompile(`(?i)password: ?$`)
@@ -89,6 +100,7 @@ type driver struct {
 	// FTD (hostname vacío): sentinel = Run manda un Enter vacío tras el comando; el fin confirmado son dos prompts
 	// seguidos. confirmed/incomplete los deja untilIdle para Run.
 	sentinel, confirmed, incomplete bool
+	dropped                         bool // add descartó bytes del medio por maxOutput
 }
 
 // fail guarda el primer error y suelta al lector.
@@ -341,7 +353,8 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 	for {
 		// El prompt y el --More-- están siempre en la última línea: se revisa solo desde el último salto (incluido,
 		// por los patrones con (?:^|\n)). Limpiar todo el búfer en cada pedazo costaba tiempo cuadrático: 63 s con 1 MB.
-		from := max(bytes.LastIndexByte(d.buf, '\n'), 0)
+		// Sin saltos (un «| json» de una línea, un equipo hostil) la «última línea» sería todo el búfer: se acota a outTail.
+		from := max(bytes.LastIndexByte(d.buf, '\n'), len(d.buf)-outTail, 0)
 		tail := string(d.buf[from:])
 		// AireOS: solo el «--More-- or (q)uit» completo (un «--More--» partido entre dos lecturas no se contesta a medias).
 		if t := strings.TrimRight(tail, " "); d.aire && aireMore.MatchString(t) || !d.aire && strings.HasSuffix(t, "--More--") || strings.HasSuffix(t, "<--- More --->") {
@@ -392,7 +405,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				if !ok {
 					return d.closedErr()
 				}
-				d.buf = append(d.buf, c...)
+				d.add(c)
 				timer.Reset(idle)
 				continue
 			default:
@@ -402,12 +415,25 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 			if !ok {
 				return d.closedErr()
 			}
-			d.buf = append(d.buf, c...)
+			d.add(c)
 			if timer != nil {
 				timer.Reset(idle)
 			}
 		}
 	}
+}
+
+// add agrega un pedazo al búfer respetando maxOutput: pasado el tope se conserva el inicio y se reemplaza la cola
+// por los últimos outTail bytes, de modo que el prompt final se siga reconociendo y la memoria no crezca.
+func (d *driver) add(c []byte) {
+	if len(d.buf)+len(c) <= maxOutput {
+		d.buf = append(d.buf, c...)
+		return
+	}
+	d.dropped = true
+	head := min(len(d.buf), max(maxOutput-outTail, 0))
+	win := append(append([]byte(nil), d.buf[head:]...), c...)
+	d.buf = append(d.buf[:head], win[max(len(win)-outTail, 0):]...)
 }
 
 // aireGuard corta el comando si el final de la salida es algo que el driver nunca contesta: un «User:»/«Password:»
@@ -496,7 +522,7 @@ func (d *driver) dataWithin(ctx context.Context, dur time.Duration) bool {
 	select {
 	case c, ok := <-d.chunks:
 		if ok {
-			d.buf = append(d.buf, c...)
+			d.add(c)
 		}
 		return ok
 	case <-time.After(dur):
@@ -511,7 +537,7 @@ func (d *driver) quiet(ctx context.Context, n int) bool {
 		select {
 		case c, ok := <-d.chunks:
 			if ok {
-				d.buf = append(d.buf, c...)
+				d.add(c)
 			}
 			return false
 		case <-time.After(ftdSettle):
@@ -537,7 +563,7 @@ func (d *driver) moreComing(ctx context.Context, tail string) bool {
 	select {
 	case c, ok := <-d.chunks:
 		if ok {
-			d.buf = append(d.buf, c...)
+			d.add(c)
 			return true
 		}
 		return false // el cierre lo reporta la vuelta siguiente
@@ -575,7 +601,7 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 	if _, err := io.WriteString(d.w, cmd+"\n"); err != nil {
 		return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
 	}
-	d.confirmed, d.incomplete = false, false
+	d.confirmed, d.incomplete, d.dropped = false, false, false
 	if d.sentinel = d.hostname == ""; d.sentinel { // FTD: un Enter vacío en cola da el segundo prompt cuando el comando termina
 		defer func() { d.sentinel = false }()
 		if _, err := io.WriteString(d.w, "\n"); err != nil {
@@ -601,7 +627,7 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 		}
 		// Cierre por calma: incompleto, pero la sesión sigue (si el equipo descarta el Enter de cola, todos los comandos
 		// cerrarían así). Respuesta sin eco: es la cola del comando anterior, la sesión ya no sirve y se debe reconectar.
-		out.Incomplete = d.incomplete || desync
+		out.Incomplete = d.incomplete || d.dropped || desync
 		if desync {
 			err = d.fail(platform.ErrDesync)
 		}
@@ -720,6 +746,11 @@ func cfgError(text string) bool {
 			if strings.HasPrefix(l, "%") && strings.Contains(l, w) {
 				return true
 			}
+		}
+		// Cualquier otro «% texto» es un error de IOS que la lista cerrada no conoce (falla cerrado): solo los avisos
+		// conocidos pasan. «%LINK-3-UPDOWN» (syslog) no lleva espacio tras el «%» y no entra aquí.
+		if strings.HasPrefix(l, "% ") && !infoPercent.MatchString(l) {
+			return true
 		}
 	}
 	return false

@@ -432,3 +432,62 @@ func TestInvalidosDeNXOS(t *testing.T) {
 		t.Error("salida normal marcada inválida")
 	}
 }
+
+// feed arma un driver con n bytes en pedazos de 4 KB (sin salto de línea salvo el último) y el prompt al final.
+func feed(n int, prompt string) *driver {
+	d := &driver{w: io.Discard, chunks: make(chan []byte, n/4096+4), readErr: make(chan error, 1), quit: make(chan struct{}), hostname: "SW"}
+	blk := []byte(strings.Repeat("x", 4096))
+	for range n / 4096 {
+		d.chunks <- blk
+	}
+	d.chunks <- []byte("\r\n" + prompt)
+	return d
+}
+
+// Una salida sin saltos de línea (un «| json» de NX-OS, un equipo hostil) no debe costar tiempo cuadrático: con 4 veces
+// más bytes tarda unas 4 veces más (cuadrático serían 16). Mínimo de tres corridas, como TestCitasLineal.
+func TestSalidaSinSaltosEsLineal(t *testing.T) {
+	best := func(n int) time.Duration {
+		m := time.Duration(1<<63 - 1)
+		for range 3 {
+			d := feed(n, "SW#")
+			start := time.Now()
+			if _, err := d.untilIdle(context.Background(), time.Second, d.atPrompt); err != nil {
+				t.Fatal(err)
+			}
+			m = min(m, time.Since(start))
+		}
+		return m
+	}
+	small, big := best(256<<10), best(1024<<10)
+	if big > 10*small {
+		t.Fatalf("4 veces más bytes sin salto tardó %v contra %v: no es lineal", big, small)
+	}
+}
+
+// El tope de la cola no rompe el reconocimiento de prompts largos (ASA multicontexto) tras una línea enorme.
+func TestPromptLargoTrasLineaEnorme(t *testing.T) {
+	host := strings.Repeat("c", 100)
+	d := feed(64<<10, host+"/ctx/act#")
+	d.hostname = host + "/ctx/act"
+	if _, err := d.untilIdle(context.Background(), time.Second, d.atPrompt); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// La salida de un comando tiene tope de memoria: al pasarlo se conserva el inicio y el final (el prompt se sigue
+// reconociendo), el resto se descarta, el búfer no crece y la salida sale Incomplete sin error.
+func TestSalidaConTopeDeMemoria(t *testing.T) {
+	old := maxOutput
+	maxOutput = 100 << 10
+	defer func() { maxOutput = old }()
+	d := feed(2<<20, "SW#")
+	peak := 0
+	text, err := d.untilIdle(context.Background(), time.Second, func(s string) bool { peak = max(peak, cap(d.buf)); return d.atPrompt(s) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.dropped || len(text) > maxOutput+1024 || !strings.HasSuffix(text, "SW#") || peak > 4*maxOutput {
+		t.Fatalf("dropped=%v len=%d peak=%d", d.dropped, len(text), peak)
+	}
+}

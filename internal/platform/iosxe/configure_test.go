@@ -215,7 +215,13 @@ func TestCfgErrorDecidesWhichPercentLinesStop(t *testing.T) {
 		"%Warning: portfast should only be enabled on ports connected to a single host.": false, // informativo de spanning-tree portfast
 		"%Portfast has been configured on GigabitEthernet1/0/1 but will only have effect when the interface is in a non-trunking mode.": false,
 		"% Not all config may be removed and may reappear after reactivating the logical-interface/sub-interfaces":                      false,
-		"%LINK-5-CHANGED: Interface GigabitEthernet1/0/1, changed state to administratively down":                                       false,
+		"% 10.20.0.0 overlaps with Vlan1":                                                         true, // error de IOS que no está en la lista cerrada
+		"% Access VLAN does not exist. Creating vlan 20":                                          true,
+		"% Warning: this is only a warning":                                                       false,
+		"% Note: this is only a note":                                                             false,
+		"% Generating 1024 bit RSA keys, keys will be non-exportable...":                          false,
+		"Cannot find community foo":                                                               false, // IOS 15.2 en una reversa legítima, sin «%»
+		"%LINK-5-CHANGED: Interface GigabitEthernet1/0/1, changed state to administratively down": false,
 	} {
 		if got := cfgError(msg + "\n"); got != stops {
 			t.Errorf("cfgError(%q) = %v, debía ser %v", msg, got, stops)
