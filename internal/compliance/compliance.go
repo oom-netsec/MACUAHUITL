@@ -14,6 +14,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/iosconf"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 )
 
 type Status string
@@ -121,8 +122,23 @@ var secretVals = []struct {
 	{regexp.MustCompile(`^(ntp authentication-key \d+ \S+) \S+( [0-9])?$`), "${1} %s"},
 }
 
-// maskSecrets cambia por hidden el valor de los secretos de una línea de configuración.
+var maskedMark = regexp.MustCompile(`<MASKED:[^>]*>`)
+
+// maskSecrets cambia por hidden el valor de los secretos de una línea de configuración. Primero pasa por el enmascarado
+// común (internal/mask) con sus secciones: line es la ruta «sección > línea» y cada nivel se manda con su sangría para
+// que valgan las reglas de bloque (radius server X > key …). Después, las formas propias de abajo (idempotentes).
 func maskSecrets(line, hidden string) string {
+	parts := strings.Split(line, " > ")
+	var b strings.Builder
+	for i, p := range parts {
+		b.WriteString(strings.Repeat(" ", min(i, 1)) + p + "\n")
+	}
+	m, _ := mask.Apply("", b.String())
+	lines := strings.Split(strings.TrimSuffix(m, "\n"), "\n")
+	for i := range lines {
+		lines[i] = strings.TrimPrefix(lines[i], " ")
+	}
+	line = maskedMark.ReplaceAllString(strings.Join(lines, " > "), hidden)
 	for _, r := range secretVals {
 		line = r.re.ReplaceAllString(line, strings.Replace(r.repl, "%s", hidden, 1))
 	}
