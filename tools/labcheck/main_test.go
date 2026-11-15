@@ -549,3 +549,29 @@ func TestAvisoSinEnmascarar(t *testing.T) {
 		t.Fatalf("sin enmascarar avisa: %v\n%s", err, out.String())
 	}
 }
+
+func TestSecretAtVeFormasNegadas(t *testing.T) {
+	for _, ln := range []string{
+		"no snmp-server community Cl4veX RO",
+		"  no username U secret 0 Cl4veX",
+		"no ntp authentication-key 1 md5 Cl4veX",
+		"no tacacs-server key Cl4veX",
+		"  no radius-server host 1.1.1.1 key Cl4veX",
+		"no crypto isakmp key Cl4veX address 1.1.1.1",
+		"tacacs-server key Cl4veX",
+	} {
+		if _, _, ok := secretAt(ln); !ok {
+			t.Errorf("secretAt no ve %q", ln)
+		}
+	}
+	// El número de tipo no es el valor: ya enmascaradas no avisan.
+	for _, ln := range []string{
+		"tacacs-server host 1.1.1.1 key 7 <MASKED:tacacs-key>",
+		"crypto isakmp key 6 <MASKED:psk> address 1.1.1.1",
+		`*** Output from config line 3, "tacacs-server key 7 <MASKED:tacacs-key>"`,
+	} {
+		if kw, n, ok := secretAt(ln); ok {
+			t.Errorf("falso positivo %q: %s %d", ln, kw, n)
+		}
+	}
+}

@@ -600,7 +600,7 @@ var loggedCmd = regexp.MustCompile(`^(.*logged command:)(.*)$`)
 var (
 	histCmd    = regexp.MustCompile(`^(\s*CMD: ')(.*)('.*)$`) // hasta el último apóstrofo: el comando puede llevar otros
 	acctCmd    = regexp.MustCompile(`^(.*?:cmd=)(.*?)(\s*\((?:SUCCESS|FAILURE)\))?$`)
-	diffLine   = regexp.MustCompile(`^( ?[+-])([a-z].*)$`) // el diff de IOS usa a lo sumo un espacio antes del signo
+	diffLine   = regexp.MustCompile(`^( ?[+-])((?i:\s+(?:no|default)\s+)?[a-z].*)$`) // el diff de IOS usa a lo sumo un espacio antes del signo; «- no cmd» con espacio también
 	promptEcho = regexp.MustCompile(`^([\w.\-/:]{1,63}(?:\([\w.\-]+\))?[#>] ?)(\S.*)$`)
 )
 
@@ -613,6 +613,10 @@ var cmdSyslog = []*regexp.Regexp{
 
 // citedSecret: en un comando citado por un syslog se pierde el bloque (cluster, aaa-server…): se tapa el valor tras estas palabras.
 var citedSecret = regexp.MustCompile(`(?i)((?:^|\s)(?:key|password|secret|community) (?:[0-9] )?)("[^"]*"|\S+)`)
+
+// negada: sangría y uno o más «no»/«default» (en cualquier caja: IOS acepta NO y la terminal guarda lo tecleado); el
+// resto es el comando. Se quitan todos de una pasada: «no no no …» no debe volverse cuadrático.
+var negada = regexp.MustCompile(`(?i)^(\s*(?:(?:no|default)\s+)+)(\S.*)$`)
 
 func maskCited(cmd string, counts map[string]int) string {
 	return citedSecret.ReplaceAllStringFunc(cmd, func(m string) string {
@@ -628,6 +632,11 @@ func maskCited(cmd string, counts map[string]int) string {
 // maskLine aplica reglas hasta que ninguna cambie la línea: una línea puede traer
 // varios secretos (snmp-server user … auth X priv Y).
 func maskLine(line, block, platform string, counts map[string]int) string {
+	// «no <comando>» (reversas, scripts de cambio, diffs) lleva el mismo secreto que el comando: se enmascara el resto.
+	if m := negada.FindStringSubmatch(line); m != nil {
+		ind := m[1][:len(m[1])-len(strings.TrimLeft(m[1], " \t"))]
+		return m[1] + maskLine(ind+m[2], block, platform, counts)[len(ind):]
+	}
 	if m := loggedCmd.FindStringSubmatch(line); m != nil {
 		return m[1] + maskLine(m[2], "", platform, counts)
 	}
