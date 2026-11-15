@@ -541,3 +541,15 @@ func TestParseProcessMemory(t *testing.T) {
 		t.Fatalf("%v %+v", ok, ps)
 	}
 }
+
+// Un switch sin SVI ni ARP en la VRF global no imprime nada: es una tabla vacía válida, no un formato roto.
+func TestARPVacio(t *testing.T) {
+	for _, in := range []string{"", "\n\n", "  \n \t\n"} {
+		if rows, ok := ParseARP(in); !ok || len(rows) != 0 {
+			t.Errorf("ParseARP(%q) = %v, %v", in, rows, ok)
+		}
+	}
+	if _, ok := ParseARP("% Invalid input"); ok {
+		t.Error("la basura debe seguir dando false")
+	}
+}

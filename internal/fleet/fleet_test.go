@@ -481,3 +481,12 @@ func TestSinEvidenciaNoEsTodoBien(t *testing.T) {
 		t.Errorf("capacity: %+v", c)
 	}
 }
+
+// Un show ip arp vacío (sin ARP en la VRF global) no es un formato inesperado.
+func TestARPVacioNoAvisa(t *testing.T) {
+	a := devFrom("A_10.0.0.1", map[string]string{"show ip arp": "\n", "show mac address-table": macTbl})
+	r := New([]*Dev{a}, now).Trace("aabb.cc00.0a01")
+	if w := strings.Join(r.Warnings, "|"); strings.Contains(w, "formato") {
+		t.Fatalf("avisó formato: %s", w)
+	}
+}

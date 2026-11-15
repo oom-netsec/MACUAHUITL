@@ -61,6 +61,7 @@ type ARP struct{ IP, MAC, Iface string }
 
 var arpRe = regexp.MustCompile(`^Internet\s+(\S+)\s+\S+\s+([0-9a-fA-F.]{14})\s+ARPA\s+(\S+)`)
 
+// Una salida vacía es una tabla vacía válida (sin SVI ni ARP en la VRF global el equipo no imprime nada).
 func ParseARP(text string) ([]ARP, bool) {
 	var out []ARP
 	head := false
@@ -74,7 +75,7 @@ func ParseARP(text string) ([]ARP, bool) {
 			}
 		}
 	}
-	return out, head || len(out) > 0
+	return out, head || len(out) > 0 || strings.TrimSpace(text) == ""
 }
 
 // ---- show mac address-table ----
