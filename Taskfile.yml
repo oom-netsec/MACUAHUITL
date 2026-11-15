@@ -27,7 +27,7 @@ tasks:
     cmds:
       - cd ui/frontend && npm ci && npm run build
       # gtk3: Wails 3.1 usa GTK4/WebKitGTK 6.0 por defecto; Ubuntu/Debian traen webkit2gtk-4.1.
-      - CGO_ENABLED=1 go build -tags 'wails gtk3' -trimpath -o bin/macuahuitl ./ui
+      - CGO_ENABLED=1 go build -tags 'wails gtk3 production' -trimpath -o bin/macuahuitl ./ui
   release-build:
     # Núcleo y CLI reproducibles (dos compilaciones dan la misma suma). VERSION=vX.Y.Z
     cmds:

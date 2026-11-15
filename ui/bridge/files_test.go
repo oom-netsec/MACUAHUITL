@@ -94,3 +94,41 @@ func TestWriteFileSinLinkNiNoReplace(t *testing.T) {
 		t.Fatalf("se reemplazó: %q", got)
 	}
 }
+
+func TestWriteFileNoReemplazaLoQueNoEsArchivo(t *testing.T) {
+	// Un directorio cuenta igual que una FIFO o un socket (no regular); syscall no se importa aquí (noegress).
+	b := New(nil, nil)
+	dir := filepath.Join(t.TempDir(), "carpeta")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	var be *Error
+	if err := b.WriteFile(dir, "x", "utf8", true); !errors.As(err, &be) || be.Reason != "bridge.err.save_not_regular" {
+		t.Fatalf("lo que no es un archivo no debe reemplazarse aunque haya overwrite: %v", err)
+	}
+	if fi, err := os.Lstat(dir); err != nil || !fi.IsDir() {
+		t.Fatalf("la carpeta debe seguir ahí: %v", err)
+	}
+}
+
+func TestWriteFileReemplazaElEnlaceNoSuDestino(t *testing.T) {
+	b := New(nil, nil)
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "destino.txt")
+	if err := os.WriteFile(dest, []byte("intacto"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "enlace.csv")
+	if err := os.Symlink(dest, link); err != nil {
+		t.Skip("sin enlaces simbólicos:", err)
+	}
+	if err := b.WriteFile(link, "nuevo", "utf8", true); err != nil {
+		t.Fatal(err)
+	}
+	if fi, err := os.Lstat(link); err != nil || !fi.Mode().IsRegular() {
+		t.Fatalf("el enlace debe quedar como archivo regular: %v", err)
+	}
+	if got, _ := os.ReadFile(dest); string(got) != "intacto" {
+		t.Fatalf("el destino del enlace no se toca: %q", got)
+	}
+}
