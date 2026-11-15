@@ -86,7 +86,7 @@ var iosRules = []rule{
 	R("snmp-community", "", `\s*snmp-server community `+commTyp).stopAt(`\s+(?:ro|rw)(?:\s+\S+)?\s*$`),
 	R("tacacs-key", "", `\s*tacacs-server (?:host \S+ (?:.*? )?)?key `+typ),
 	R("radius-key", "", `\s*radius-server (?:host \S+ .*?)?key `+typ),
-	R("psk", "", `\s*crypto isakmp key `+typ),
+	R("psk", "", `\s*(?:crypto )?isakmp key `+typ), // ASA anterior a 8.4: «isakmp key X address …»
 	// Keyring IKEv1: la llave va tras «key», no tras address/hostname/ipv6.
 	R("psk", "", `\s*pre-shared-key (?:address|hostname|ipv6) .*? key `+typ),
 	R("psk", "", `\s*pre-shared-key (?:local |remote )?`+typ).unless(keyringLine),
@@ -105,7 +105,7 @@ var iosRules = []rule{
 	R("wifi-psk", "", `\s*psk key `+typ),
 	R("fhrp-key", "", `\s*(?:standby|vrrp)(?: \d+)? authentication (?:md5 key-string `+typ+`|text )?`).unless(fhrpNoKey),
 	R("fhrp-key", "", `\s*glbp \d+ authentication (?:md5 key-string `+typ+`|text )`),
-	R("fhrp-key", "", `\s+authentication (?:text |md5 key-string `+typ+`)`), // NX-OS: anidado bajo hsrp/vrrp/glbp
+	R("fhrp-key", "", `\s*authentication (?:text |md5 key-string `+typ+`)`), // NX-OS: anidado bajo hsrp/vrrp/glbp (o suelto en un log)
 	R("key-string", "", `\s*key-string `+typ),
 	R("tacacs-key", "", `\s*server-private \S+ (?:.*? )?key `+typ),
 	R("client-password", "", `\s*ip (?:ftp|http client) password `+typ),
@@ -193,6 +193,9 @@ var iosRules = []rule{
 	R("snmp-community", "", `\s*Community (?:name|Index|SecurityName): `),
 	full("snmp-community", `^(\s*user: )(\S+)(\s+security model: v(?:1|2c)\b.*)$`),
 	// Otras salidas de show que imprimen secretos.
+	// NX-OS en JSON/XML: «"community_name": "X"» y «<community_name>X</community_name>».
+	full("secret", `^(\s*"(?:community_name|snmp_community|community|password|passphrase|secret|shared_secret|key|key_string|keystring|pre_shared_key)"\s*:\s*")([^"]+)(".*)$`),
+	full("secret", `^(\s*<(?:community_name|snmp_community|community|password|passphrase|secret|shared_secret|key|key_string|keystring|pre_shared_key)>)([^<]+)(</.*)$`),
 	full("psk", `^(\s*Pre-[Ss]hared [Kk]ey(?: \(\w+\))?\s*[:=]\s*)(\S.*?)(\s*)$`),
 	full("key-string", `^(\s*[Kk]ey \d+ -- text (?:\d+ )?)("[^"]*"|\S+)(.*)$`), // show key chain
 	full("fhrp-key", `^(\s*Authentication text, string )("[^"]*"|\S+)(.*)$`),   // show standby / show glbp
@@ -589,7 +592,11 @@ func (s *Stream) TypedLoose(line string) string {
 }
 
 // archiveLog: línea de show archive log config; tras «|» va un comando de configuración.
-var archiveLog = regexp.MustCompile(`^(\s*\d+\s+\d+\s+\S+\s+\|)(.*)$`)
+// Las líneas de continuación traen solo la barra («|  key X»).
+var archiveLog = regexp.MustCompile(`^(\s*\d+\s+\d+\s+\S+\s+\||\s*\|\s)(.*)$`)
+
+// cliHistory: línea numerada de show cli history de NX-OS («  12  09:01:55  comando»; la hora puede faltar).
+var cliHistory = regexp.MustCompile(`^(\s*\d+:?\s+(?:\d\d:\d\d:\d\d\s+)?)([a-z].*)$`)
 
 // loggedCmd: mensaje de syslog (%PARSER-5-CFGLOG_LOGGEDCMD) con el comando de configuración tras «logged command:».
 var loggedCmd = regexp.MustCompile(`^(.*logged command:)(.*)$`)
@@ -612,11 +619,31 @@ var cmdSyslog = []*regexp.Regexp{
 }
 
 // citedSecret: en un comando citado por un syslog se pierde el bloque (cluster, aaa-server…): se tapa el valor tras estas palabras.
-var citedSecret = regexp.MustCompile(`(?i)((?:^|\s)(?:key|password|secret|community) (?:[0-9] )?)("[^"]*"|\S+)`)
+var citedSecret = regexp.MustCompile(`(?i)((?:^|\s)(?:authentication text|key-string|key|password|pas(?:s(?:w(?:o(?:r(?:d)?)?)?)?)?|secret|sec(?:r(?:e)?)?|community|comm(?:u(?:n(?:i(?:t)?)?)?)?) (?:[0-9] )?)("[^"]*"|\S+)`)
 
 // negada: sangría y uno o más «no»/«default» (en cualquier caja: IOS acepta NO y la terminal guarda lo tecleado); el
 // resto es el comando. Se quitan todos de una pasada: «no no no …» no debe volverse cuadrático.
 var negada = regexp.MustCompile(`(?i)^(\s*(?:(?:no|default)\s+)+)(\S.*)$`)
+
+// loggedToken: en un log de comandos se pierde el bloque (license smart, umbrella): «token X» se tapa siempre.
+var loggedToken = regexp.MustCompile(`(?i)((?:^|\s)token )("[^"]*"|\S+)`)
+
+// maskLogged tapa un comando citado por un log (CFGLOG, archive log): las reglas y, como el bloque se perdió, también
+// los key/password/secret/token sueltos. Una descripción o un remark es texto libre y no se toca.
+func maskLogged(cmd, platform string, counts map[string]int) string {
+	cmd = maskLine(cmd, "", platform, counts)
+	if freeText.MatchString(cmd) {
+		return cmd
+	}
+	return loggedToken.ReplaceAllStringFunc(maskCited(cmd, counts), func(m string) string {
+		sm := loggedToken.FindStringSubmatch(m)
+		if strings.HasPrefix(sm[2], "<MASKED:") || isGuard(sm[2]) {
+			return m
+		}
+		counts["secret"]++
+		return sm[1] + "<MASKED:secret>"
+	})
+}
 
 func maskCited(cmd string, counts map[string]int) string {
 	return citedSecret.ReplaceAllStringFunc(cmd, func(m string) string {
@@ -638,7 +665,7 @@ func maskLine(line, block, platform string, counts map[string]int) string {
 		return m[1] + maskLine(ind+m[2], block, platform, counts)[len(ind):]
 	}
 	if m := loggedCmd.FindStringSubmatch(line); m != nil {
-		return m[1] + maskLine(m[2], "", platform, counts)
+		return m[1] + maskLogged(m[2], platform, counts)
 	}
 	if strings.Contains(line, "-1110") { // filtro barato: las expresiones de cmdSyslog corren por cada línea
 		for _, re := range cmdSyslog {
@@ -648,7 +675,10 @@ func maskLine(line, block, platform string, counts map[string]int) string {
 		}
 	}
 	if m := archiveLog.FindStringSubmatch(line); m != nil {
-		return m[1] + maskLine(m[2], "", platform, counts)
+		return m[1] + maskLogged(m[2], platform, counts)
+	}
+	if m := cliHistory.FindStringSubmatch(line); m != nil && platform == "nx-os" {
+		return m[1] + maskLogged(m[2], platform, counts)
 	}
 	if m := histCmd.FindStringSubmatch(line); m != nil {
 		return m[1] + maskCited(maskLine(m[2], "", platform, counts), counts) + m[3]
