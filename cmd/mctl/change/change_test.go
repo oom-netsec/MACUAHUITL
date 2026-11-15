@@ -108,3 +108,11 @@ func TestDiffDeviceExacto(t *testing.T) {
 		t.Fatalf("10.0.0.1 no debe traer 10.0.0.10: %v\n%s", err, b.String())
 	}
 }
+
+func TestHostOnly(t *testing.T) {
+	for in, want := range map[string]string{"10.0.0.1:2222": "10.0.0.1", "10.0.0.1": "10.0.0.1", "[2001:db8::1]:22": "2001:db8::1", "2001:db8::1": "2001:db8::1", "sw1:22": "sw1"} {
+		if got := hostOnly(in); got != want {
+			t.Errorf("hostOnly(%q) = %q, quiero %q", in, got, want)
+		}
+	}
+}

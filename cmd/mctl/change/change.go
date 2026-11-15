@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -195,7 +194,7 @@ func printDiff(c *cli.Env, reportJSON, device string, asJSON bool) error {
 	}
 	var sel []dev
 	for _, d := range rep.Devices {
-		host, _, _ := net.SplitHostPort(d.Address) // la dirección puede traer puerto
+		host := hostOnly(d.Address) // la dirección puede traer puerto
 		if device == "" || strings.Contains(strings.ToLower(d.Hostname), strings.ToLower(device)) || d.Address == device || host == device {
 			sel = append(sel, d)
 		}
@@ -413,4 +412,18 @@ func Area() cli.Area {
 		{Name: "upgrade check", Run: upgradeCheck},
 		{Name: "compliance check", Run: complianceCheck},
 	}}
+}
+
+// hostOnly quita el puerto de «host:puerto» o «[ipv6]:puerto» sin importar net (noegress: mctl no toca la red).
+// Una IPv6 sin corchetes (varios «:») se deja igual.
+func hostOnly(addr string) string {
+	if strings.HasPrefix(addr, "[") {
+		if i := strings.Index(addr, "]"); i > 0 {
+			return addr[1:i]
+		}
+	}
+	if strings.Count(addr, ":") == 1 {
+		return addr[:strings.Index(addr, ":")]
+	}
+	return addr
 }
