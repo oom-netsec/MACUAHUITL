@@ -8,8 +8,8 @@ name: Plataforma · SDM y TCAM (IOS)
 name_en: Platform · SDM and TCAM (IOS)
 commands:
   - cmd: show clock
-  - cmd: show sdm prefer
-  - cmd: show platform tcam utilization
+  - cmd: show sdm prefer  # falla en IOSvL2 virtual
+  - cmd: show platform tcam utilization  # falla en IOSvL2 virtual
   - cmd: show mac address-table count
   - cmd: show ip route summary
   - cmd: show ipv6 route summary

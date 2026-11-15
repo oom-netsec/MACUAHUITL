@@ -10,8 +10,8 @@ commands:
   - cmd: show clock
   - cmd: show threat-detection rate
   - cmd: show threat-detection statistics
-  - cmd: show threat-detection scanning-threat attackers
-  - cmd: show threat-detection scanning-threat targets
+  - cmd: show threat-detection scanning-threat attacker
+  - cmd: show threat-detection scanning-threat target
   - cmd: show threat-detection shun
   - cmd: show running-config threat-detection
     timeout: 120s

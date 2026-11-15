@@ -18,9 +18,9 @@ commands:
   - cmd: show interfaces
     timeout: 120s
   - cmd: show ip interface brief
-  - cmd: show environment all
+  - cmd: show environment all  # falla en Cat8000v virtual
   - cmd: show redundancy
-  - cmd: show switch
+  - cmd: show switch  # no existe en routers IOS-XE (solo switches)
   - cmd: show tech-support
     timeout: 600s
     may_contain_secrets: true

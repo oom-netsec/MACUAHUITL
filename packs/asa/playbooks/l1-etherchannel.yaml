@@ -8,9 +8,9 @@ name: ASA · Capa 1 · EtherChannel y LACP
 name_en: ASA · Layer 1 · EtherChannel and LACP
 commands:
   - cmd: show clock
-  - cmd: show port-channel summary
-  - cmd: show port-channel
-  - cmd: show lacp neighbor
-  - cmd: show lacp counters
-  - cmd: show lacp internal
+  - cmd: show port-channel summary  # no existe en ASAv
+  - cmd: show port-channel  # no existe en ASAv
+  - cmd: show lacp neighbor  # no existe en ASAv
+  - cmd: show lacp counters  # no existe en ASAv
+  - cmd: show lacp internal  # no existe en ASAv
   - cmd: show interface ip brief

@@ -10,8 +10,8 @@ commands:
   - cmd: show clock
   - cmd: show interfaces status
   - cmd: show inventory
-  - cmd: show interfaces transceiver
-  - cmd: show interfaces transceiver detail
-  - cmd: show interfaces transceiver properties
+  - cmd: show interfaces transceiver  # falla en Cat8000v virtual
+  - cmd: show interfaces transceiver detail  # falla en Cat8000v virtual
+  - cmd: show interfaces transceiver properties  # falla en Cat8000v virtual
   - cmd: show interfaces counters errors
   - cmd: show logging | include XCVR|SFP|TRANSCEIVER|DOM

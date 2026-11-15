@@ -8,10 +8,10 @@ name: L1 · Storm control
 name_en: L1 · Storm control
 commands:
   - cmd: show clock
-  - cmd: show storm-control
-  - cmd: show storm-control broadcast
-  - cmd: show storm-control multicast
-  - cmd: show storm-control unicast
+  - cmd: show storm-control  # no existe en routers IOS-XE (solo switches)
+  - cmd: show storm-control broadcast  # no existe en routers IOS-XE (solo switches)
+  - cmd: show storm-control multicast  # no existe en routers IOS-XE (solo switches)
+  - cmd: show storm-control unicast  # no existe en routers IOS-XE (solo switches)
   - cmd: show interfaces status err-disabled
   - cmd: show errdisable recovery
   - cmd: show interfaces counters

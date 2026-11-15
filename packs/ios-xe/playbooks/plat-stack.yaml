@@ -8,12 +8,12 @@ name: Plataforma · Stack
 name_en: Platform · Stack
 commands:
   - cmd: show clock
-  - cmd: show switch
+  - cmd: show switch  # no existe en routers IOS-XE (solo switches)
   - cmd: show switch detail  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show switch stack-ports  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show switch stack-ports summary  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show switch neighbors  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show inventory
-  - cmd: show module
+  - cmd: show module  # falla en Cat8000v virtual
   - cmd: show redundancy
   - cmd: show logging | include STACKMGR|STACK|SWITCH|RPS|DUAL

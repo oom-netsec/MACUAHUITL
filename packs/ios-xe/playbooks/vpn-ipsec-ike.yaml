@@ -8,19 +8,19 @@ name: VPN · IPsec/IKE
 name_en: VPN · IPsec/IKE
 commands:
   - cmd: show clock
-  - cmd: show crypto session
-  - cmd: show crypto isakmp sa
-  - cmd: show crypto ikev2 sa
-  - cmd: show crypto ikev2 sa detail
-  - cmd: show crypto session detail
-  - cmd: show crypto ipsec sa
-  - cmd: show crypto isakmp policy
-  - cmd: show crypto ikev2 proposal
-  - cmd: show crypto ikev2 policy
-  - cmd: show crypto ikev2 profile
-  - cmd: show crypto ikev2 stats
-  - cmd: show crypto ipsec transform-set
-  - cmd: show crypto map
+  - cmd: show crypto session  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto isakmp sa  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto ikev2 sa  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto ikev2 sa detail  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto session detail  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto ipsec sa  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto isakmp policy  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto ikev2 proposal  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto ikev2 policy  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto ikev2 profile  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto ikev2 stats  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto ipsec transform-set  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show crypto map  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
   - cmd: show ip interface brief | include Tunnel
   - cmd: show logging | include CRYPTO|IKE|IPSEC|ISAKMP
   - cmd: show crypto engine connections active  # no existe en Cat9k (solo routers)

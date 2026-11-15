@@ -8,7 +8,7 @@ name: ASA · Plataforma · Versión y licencias
 name_en: ASA · Platform · Version and licensing
 commands:
   - cmd: show version
-  - cmd: show activation-key
+  - cmd: show license features
   - cmd: show license summary
   - cmd: show license status
   - cmd: show license usage

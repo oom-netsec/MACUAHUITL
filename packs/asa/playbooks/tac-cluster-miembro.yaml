@@ -13,7 +13,7 @@ commands:
   - cmd: show cluster info transport cp
   - cmd: show cluster info incompatible-config
   - cmd: show cluster info load-monitor
-  - cmd: show port-channel summary
+  - cmd: show port-channel summary  # no existe en ASAv
   - cmd: show interface ip brief
   - cmd: show asp cluster counter
   - cmd: show running-config cluster

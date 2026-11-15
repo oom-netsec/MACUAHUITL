@@ -14,5 +14,5 @@ commands:
   - cmd: show blocks
   - cmd: show interface ip brief
   - cmd: show failover state
-  - cmd: show environment
+  - cmd: show environment  # no existe en ASAv
   - cmd: show resource usage summary

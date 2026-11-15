@@ -17,7 +17,7 @@ commands:
   - cmd: show ip bgp summary
   - cmd: show bgp all summary
   - cmd: show bfd neighbors
-  - cmd: show crypto session
+  - cmd: show crypto session  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
   - cmd: show dmvpn  # no existe en Cat9k (solo routers)
   - cmd: show track brief
   - cmd: show ip sla summary

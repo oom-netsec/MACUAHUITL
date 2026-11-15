@@ -10,7 +10,7 @@ commands:
   - cmd: show clock
   - cmd: show version
   - cmd: show failover state
-  - cmd: show context detail
+  - cmd: show context detail  # solo multicontexto (espacio del sistema)
   - cmd: show running-config
     timeout: 120s
     may_contain_secrets: true

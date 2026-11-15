@@ -9,8 +9,8 @@ name_en: ASA · Contexts · Per-context resources
 commands:
   - cmd: show clock
   - cmd: show resource types
-  - cmd: show resource allocation
+  - cmd: show resource allocation  # solo multicontexto (espacio del sistema)
   - cmd: show resource usage summary
-  - cmd: show resource usage top 5
-  - cmd: show resource usage context all
+  - cmd: show resource usage top 5  # solo multicontexto (espacio del sistema)
+  - cmd: show resource usage context all  # solo multicontexto (espacio del sistema)
   - cmd: show resource usage detail

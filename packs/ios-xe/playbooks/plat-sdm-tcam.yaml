@@ -8,9 +8,9 @@ name: Plataforma · SDM y TCAM
 name_en: Platform · SDM and TCAM
 commands:
   - cmd: show clock
-  - cmd: show sdm prefer
+  - cmd: show sdm prefer  # no existe en routers IOS-XE (solo switches)
   - cmd: show platform resources
-  - cmd: show platform hardware fed switch active fwd-asic resource tcam utilization
+  - cmd: show platform hardware fed switch active fwd-asic resource tcam utilization  # no existe en routers IOS-XE (solo switches)
   - cmd: show mac address-table count
   - cmd: show ip route summary
   - cmd: show ipv6 route summary

@@ -11,7 +11,7 @@ commands:
   - cmd: show shun
   - cmd: show shun statistics
   - cmd: show threat-detection shun
-  - cmd: show threat-detection scanning-threat attackers
+  - cmd: show threat-detection scanning-threat attacker
   - cmd: show running-config threat-detection
     timeout: 120s
     may_contain_secrets: true

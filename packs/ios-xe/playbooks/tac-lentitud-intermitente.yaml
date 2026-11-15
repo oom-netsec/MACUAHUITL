@@ -20,7 +20,7 @@ commands:
   - cmd: show ip route summary
   - cmd: show mac address-table count
   - cmd: show ntp status
-  - cmd: show platform hardware fed switch active qos queue stats internal cpu policer
+  - cmd: show platform hardware fed switch active qos queue stats internal cpu policer  # no existe en routers IOS-XE (solo switches)
   - cmd: show logging | include CPUHOG|DUPLEX|FLAP|STORM|MACFLAP|UPDOWN
   - cmd: show spanning-tree detail | include occurred|from
   - cmd: show policy-map interface

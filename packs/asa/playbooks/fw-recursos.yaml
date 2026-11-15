@@ -11,7 +11,7 @@ commands:
   - cmd: show resource usage
   - cmd: show resource usage resource conns
   - cmd: show resource usage resource xlates
-  - cmd: show resource usage resource inspects
-  - cmd: show resource allocation
+  - cmd: show resource usage resource inspects  # solo multicontexto (espacio del sistema)
+  - cmd: show resource allocation  # solo multicontexto (espacio del sistema)
   - cmd: show conn count
   - cmd: show xlate count

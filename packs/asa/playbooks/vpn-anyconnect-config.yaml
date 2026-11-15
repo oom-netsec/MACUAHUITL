@@ -21,6 +21,5 @@ commands:
   - cmd: show running-config ip local pool
     timeout: 120s
     may_contain_secrets: true
-  - cmd: show ip local pool
   - cmd: show ssl
   - cmd: show ssl cipher

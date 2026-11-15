@@ -12,7 +12,7 @@ commands:
   - cmd: show spanning-tree blockedports
   - cmd: show spanning-tree inconsistentports
   - cmd: show logging | include LOOP|FLAP|MACFLAP|STORM|SPANTREE|BPDU
-  - cmd: show storm-control
+  - cmd: show storm-control  # falla en IOSvL2 virtual
   - cmd: show errdisable detect
   - cmd: show interfaces status err-disabled
   - cmd: show etherchannel summary

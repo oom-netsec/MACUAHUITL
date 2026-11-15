@@ -15,6 +15,8 @@ PPPoE, `show bootvar`, `show ip flow`, `show control-plane host open-ports`) lle
 `show license feature` solo existe en routers 16.x, y lo que falla en el Cat9000v virtual (stack, SVL, PoE,
 `show calendar`) lleva su comentario.
 
+Desde la 1.1.3 también se probó en un Cat8000v 17.15 sin nivel de licencia en CML (2026-11-14). Los comentarios al final de la línea significan: `# no existe en routers IOS-XE (solo switches)`, el comando es de switch y un router lo rechaza; `# falla en Cat8000v virtual`, lo rechaza la plataforma virtual aunque exista en hardware; `# requiere nivel de licencia (en Cat8000v sin licencia no existe)`, necesita un nivel de licencia que el Cat8000v de prueba no tenía.
+
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
 1. Baja `oom-ios-xe-<versión>.mpack` de los releases de GitHub y verifica su suma en `SHA256SUMS`.
@@ -36,6 +38,8 @@ Commands checked on a Catalyst 9000v (IOS-XE 17.15) DevNet sandbox on 2026-11-14
 `show bootvar`, `show ip flow`, `show control-plane host open-ports`) carry `# no existe en Cat9k`; `show license
 feature` only exists on 16.x routers, and what fails on the virtual Cat9000v (stack, SVL, PoE, `show calendar`)
 carries its comment.
+
+Since 1.1.3 it was also tested on a Cat8000v 17.15 with no license level in CML (2026-11-14). The end-of-line comments mean: `# no existe en routers IOS-XE (solo switches)`, a switch-only command that a router rejects; `# falla en Cat8000v virtual`, rejected by the virtual platform even if it exists on hardware; `# requiere nivel de licencia (en Cat8000v sin licencia no existe)`, it needs a license level the test Cat8000v did not have.
 
 How to load it (the application never downloads packages):
 

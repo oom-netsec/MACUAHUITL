@@ -13,7 +13,7 @@ commands:
   - cmd: show dhcpd statistics
   - cmd: show dhcprelay state
   - cmd: show dhcprelay statistics
-  - cmd: show ip address dhcp
+  - cmd: show ip address
   - cmd: show running-config dhcpd
     timeout: 120s
     may_contain_secrets: true

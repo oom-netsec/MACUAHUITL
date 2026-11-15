@@ -10,7 +10,7 @@ commands:
   - cmd: show clock
   - cmd: show aaa-server
   - cmd: show aaa-server protocol radius
-  - cmd: show aaa local user locked
+  - cmd: show aaa local user
   - cmd: show uauth
   - cmd: show running-config aaa
     timeout: 120s
