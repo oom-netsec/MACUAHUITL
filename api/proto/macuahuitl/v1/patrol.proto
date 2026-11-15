@@ -146,6 +146,8 @@ message JobSummary {
   repeated JobPhase phases = 13;
   // patrol, adhoc, backup o change (un trabajo guardado antes de existir el campo sale como patrol).
   string kind = 14;
+  // Equipos de la ronda que terminaron en PARTIAL; no cuentan en devices_ok ni en devices_failed.
+  uint32 devices_partial = 15;
 }
 
 enum JobPhaseKind {
@@ -188,6 +190,9 @@ message RunDevice {
   // Código estable del catálogo del error de detail y sus argumentos; vacío si el detalle es texto de sistema.
   string reason = 4;
   map<string, string> args = 5;
+  // Con state PARTIAL: comandos cortados y reconexiones de la ronda (0 en los demás estados).
+  uint32 cut_commands = 6;
+  uint32 reconnects = 7;
 }
 
 message GetRunRequest {

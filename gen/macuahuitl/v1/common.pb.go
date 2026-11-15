@@ -36,21 +36,25 @@ const (
 	DeviceState_DEVICE_STATE_CANCELLED          DeviceState = 8
 	// Omitido en la ronda: falló el Login Test silencioso o cambió la llave de host (spec §12.2).
 	DeviceState_DEVICE_STATE_SKIPPED DeviceState = 9
+	// Terminó la ronda con comandos cortados (timeout o sesión caída) y siguió tras reconectar: la evidencia sirve
+	// pero tiene huecos. Los cortados quedan marcados «incomplete» en la evidencia y no se reintentan.
+	DeviceState_DEVICE_STATE_PARTIAL DeviceState = 10
 )
 
 // Enum value maps for DeviceState.
 var (
 	DeviceState_name = map[int32]string{
-		0: "DEVICE_STATE_UNSPECIFIED",
-		1: "DEVICE_STATE_QUEUED",
-		2: "DEVICE_STATE_CONNECTING",
-		3: "DEVICE_STATE_AUTHENTICATING",
-		4: "DEVICE_STATE_DETECTING_PLATFORM",
-		5: "DEVICE_STATE_RUNNING",
-		6: "DEVICE_STATE_COMPLETED",
-		7: "DEVICE_STATE_FAILED",
-		8: "DEVICE_STATE_CANCELLED",
-		9: "DEVICE_STATE_SKIPPED",
+		0:  "DEVICE_STATE_UNSPECIFIED",
+		1:  "DEVICE_STATE_QUEUED",
+		2:  "DEVICE_STATE_CONNECTING",
+		3:  "DEVICE_STATE_AUTHENTICATING",
+		4:  "DEVICE_STATE_DETECTING_PLATFORM",
+		5:  "DEVICE_STATE_RUNNING",
+		6:  "DEVICE_STATE_COMPLETED",
+		7:  "DEVICE_STATE_FAILED",
+		8:  "DEVICE_STATE_CANCELLED",
+		9:  "DEVICE_STATE_SKIPPED",
+		10: "DEVICE_STATE_PARTIAL",
 	}
 	DeviceState_value = map[string]int32{
 		"DEVICE_STATE_UNSPECIFIED":        0,
@@ -63,6 +67,7 @@ var (
 		"DEVICE_STATE_FAILED":             7,
 		"DEVICE_STATE_CANCELLED":          8,
 		"DEVICE_STATE_SKIPPED":            9,
+		"DEVICE_STATE_PARTIAL":            10,
 	}
 )
 
@@ -162,7 +167,7 @@ const file_macuahuitl_v1_common_proto_rawDesc = "" +
 	"\x06Target\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\rR\x04port\x12\x1b\n" +
-	"\tdevice_id\x18\x03 \x01(\tR\bdeviceId*\xac\x02\n" +
+	"\tdevice_id\x18\x03 \x01(\tR\bdeviceId*\xc6\x02\n" +
 	"\vDeviceState\x12\x1c\n" +
 	"\x18DEVICE_STATE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13DEVICE_STATE_QUEUED\x10\x01\x12\x1b\n" +
@@ -173,7 +178,9 @@ const file_macuahuitl_v1_common_proto_rawDesc = "" +
 	"\x16DEVICE_STATE_COMPLETED\x10\x06\x12\x17\n" +
 	"\x13DEVICE_STATE_FAILED\x10\a\x12\x1a\n" +
 	"\x16DEVICE_STATE_CANCELLED\x10\b\x12\x18\n" +
-	"\x14DEVICE_STATE_SKIPPED\x10\tBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
+	"\x14DEVICE_STATE_SKIPPED\x10\t\x12\x18\n" +
+	"\x14DEVICE_STATE_PARTIAL\x10\n" +
+	"BAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
 
 var (
 	file_macuahuitl_v1_common_proto_rawDescOnce sync.Once
