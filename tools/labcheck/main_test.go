@@ -476,3 +476,61 @@ func TestFalsosPositivosDelASAv(t *testing.T) {
 		t.Error("lo citado se descartó")
 	}
 }
+
+// dosPlaybooks arma un trabajo con c y d, que piden ambos show comun; el texto de la evidencia lo pone cada prueba.
+func dosPlaybooks(t *testing.T, evidence string) string {
+	t.Helper()
+	job, pack := fixture(t)
+	write(t, filepath.Join(pack, "playbooks", "c.yaml"), "id: c\nplatform: ios\nname: C\ncommands:\n  - cmd: show uno\n  - cmd: show comun\n")
+	write(t, filepath.Join(pack, "playbooks", "d.yaml"), "id: d\nplatform: ios\nname: D\ncommands:\n  - cmd: show comun\n  - cmd: show dos\n")
+	m := patrol.Manifest{Playbooks: []patrol.PlaybookRef{{ID: "ios/c"}, {ID: "ios/d"}},
+		Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "10.0.0.1"}, Round: 1, Hostname: "sw1", Platform: "ios", State: "completed"}}}
+	b, _ := json.Marshal(m)
+	write(t, filepath.Join(job, "manifest.json"), string(b))
+	write(t, filepath.Join(job, "sw1_10.0.0.1", "r001_20261114-100000.txt"), evidence)
+	t.Setenv("LABCHECK_PACK", pack)
+	return job
+}
+
+func reportOf(t *testing.T, job string) string {
+	t.Helper()
+	var out strings.Builder
+	if err := report(&out, job, []string{filepath.Join(os.Getenv("LABCHECK_PACK"))}, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	return out.String()
+}
+
+const h = "===== 2026-11-14T10:00:00Z · "
+
+// Con la deduplicación, show comun sale una vez en la evidencia: no es «no corrió» para el segundo playbook, y si el
+// equipo lo rechaza, falla en los dos.
+func TestComandoCompartidoSeAtribuyeATodos(t *testing.T) {
+	ok := reportOf(t, dosPlaybooks(t, h+"show uno =====\na\n"+h+"show comun =====\nb\n"+h+"show dos =====\nc\n"))
+	if strings.Contains(ok, "no corrió") || !strings.Contains(ok, "2 de 2 playbooks sin problemas") {
+		t.Fatalf("falsos:\n%s", ok)
+	}
+	bad := reportOf(t, dosPlaybooks(t, h+"show uno =====\na\n"+h+"show comun · comando inválido =====\n% Invalid input detected\n"+h+"show dos =====\nc\n"))
+	for _, id := range []string{"## ios/c", "## ios/d"} {
+		i := strings.Index(bad, id)
+		if i < 0 || !strings.Contains(bad[i:], "`show comun` — rechazado") {
+			t.Fatalf("%s sin el rechazo:\n%s", id, bad)
+		}
+	}
+	if strings.Contains(bad, "no corrió") {
+		t.Fatalf("falso no corrió:\n%s", bad)
+	}
+	// no emparejado en la evidencia: sale «no corrió» en los dos
+	miss := reportOf(t, dosPlaybooks(t, h+"show uno =====\na\n"+h+"show dos =====\nc\n"))
+	if strings.Count(miss, "`show comun` — no corrió") != 2 {
+		t.Fatalf("debía faltar en los dos:\n%s", miss)
+	}
+}
+
+// Evidencia de antes de la deduplicación (show comun dos veces): se alinea como siempre.
+func TestEvidenciaViejaConDuplicadosSigueIgual(t *testing.T) {
+	got := reportOf(t, dosPlaybooks(t, h+"show uno =====\na\n"+h+"show comun =====\nb\n"+h+"show comun =====\nb\n"+h+"show dos =====\nc\n"))
+	if strings.Contains(got, "no corrió") || strings.Contains(got, "Fuera de playbook") || !strings.Contains(got, "2 de 2 playbooks sin problemas") {
+		t.Fatalf("evidencia vieja rota:\n%s", got)
+	}
+}
