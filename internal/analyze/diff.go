@@ -312,14 +312,19 @@ var (
 		"show clock detail":      clockLine,
 	}
 	adjEventsRe = regexp.MustCompile(`^\s*Summary events (epoch is \d+|queue contains \d+ events? \(high water mark \d+ events?\))\s*$`)
-	clockTimeRe = regexp.MustCompile(`^\s*([*.]?)\d{1,2}:\d{2}:\d{2}(\.\d+)?\s`)
+	clockTimeRe = regexp.MustCompile(`^\s*([*.]?)\d{1,2}:\d{2}:\d{2}(?:\.\d+)?(?:\s+(\S+))?`)
 	ecHeadRe    = regexp.MustCompile(`(?m)^Group\s+Port-channel\s+Protocol`)
 )
 
-// clockLine deja de la línea de la hora solo su marca de sincronía (* sin sincronizar, . dudosa).
+// clockLine neutraliza la hora (HH:MM:SS) y descarta la fecha, que cambia entre rondas; conserva la marca de
+// sincronía (* sin sincronizar, . dudosa) y la zona horaria, cuyo cambio sí es un hallazgo.
 func clockLine(l string) (string, bool) {
 	if m := clockTimeRe.FindStringSubmatch(l); m != nil {
-		return m[1] + "<hora>", true
+		out := m[1] + "HH:MM:SS"
+		if m[2] != "" {
+			out += " " + m[2]
+		}
+		return out, true
 	}
 	return l, true
 }

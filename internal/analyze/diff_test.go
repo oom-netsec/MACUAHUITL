@@ -246,3 +246,35 @@ func TestDiffClockDetailFuenteDeHora(t *testing.T) {
 		t.Fatalf("reloj sin sincronizar en las dos rondas: %+v", r.Devices[0].Text)
 	}
 }
+
+// clockLine neutraliza solo la hora y la fecha: la zona y la marca de sincronía siguen en el diff.
+func TestClockLineConservaZonaYMarca(t *testing.T) {
+	for in, want := range map[string]string{
+		"*14:19:54.123 UTC Sun Nov 15 2026": "*HH:MM:SS UTC",
+		"10:00:00.000 CST Mon Nov 16 2026":  "HH:MM:SS CST",
+		".09:05:01 UTC Sun Nov 15 2026":     ".HH:MM:SS UTC",
+		"10:00:00.000":                      "HH:MM:SS",
+		"Time source is NTP":                "Time source is NTP",
+	} {
+		if got, _ := clockLine(in); got != want || strings.Contains(got, "<hora>") {
+			t.Errorf("clockLine(%q) = %q, quería %q", in, got, want)
+		}
+	}
+}
+
+func TestDiffClockZonaMarcaYFecha(t *testing.T) {
+	base := "14:19:54.123 UTC Sun Nov 15 2026\nTime source is NTP\n"
+	n := func(z string) int {
+		r, _ := Diff(bundleOf("show clock detail", base, z), 1, 2, "")
+		return len(r.Devices[0].Text)
+	}
+	if n("10:00:00.000 CST Sun Nov 15 2026\nTime source is NTP\n") != 1 {
+		t.Error("el cambio de zona debe salir")
+	}
+	if n("*14:19:54.123 UTC Sun Nov 15 2026\nTime source is NTP\n") != 1 {
+		t.Error("el cambio de marca debe salir")
+	}
+	if n("15:00:00.000 UTC Mon Nov 16 2026\nTime source is NTP\n") != 0 {
+		t.Error("solo hora y fecha no debe salir")
+	}
+}
