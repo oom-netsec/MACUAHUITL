@@ -145,7 +145,7 @@ func sviReq(vlan uint32, desc *string, addr string) *v1.PlanSnippetRequest {
 
 func TestSnippetSVIEndToEndRollbackRemovesNewInterface(t *testing.T) {
 	r := newRig(t, simulator.Config{
-		Commands:     map[string]string{"show ip interface brief": briefHdr + "Vlan1                  unassigned      YES unset  up                    down\n"},
+		Commands:     sessionCmds("Gi1/0/47", map[string]string{"show ip interface brief": briefHdr + "Vlan1                  unassigned      YES unset  up                    down\n"}),
 		ConfigErrors: map[string]string{"no shutdown": "% Invalid input detected at '^' marker."}})
 	res, err := r.snippet(sviReq(99, ptr("Servidores"), "10.9.9.1"))
 	if err != nil {

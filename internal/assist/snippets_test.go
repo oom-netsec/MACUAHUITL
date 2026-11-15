@@ -603,7 +603,7 @@ func TestTrunkPlanRejectsInterfaceThatIsNotTrunk(t *testing.T) {
 const ipBriefHead = "Interface              IP-Address      OK? Method Status                Protocol\n"
 
 func sviOuts(cfgVlan string, brief string) map[string]string {
-	return map[string]string{showCfg("Vlan99"): cfgVlan, "show ip interface brief": ipBriefHead + brief}
+	return map[string]string{showCfg("Vlan99"): cfgVlan, "show ip interface brief": ipBriefHead + brief, showUsersCmd: sviUsers}
 }
 
 const noIface = "                 ^\n% Invalid input detected at '^' marker.\n"

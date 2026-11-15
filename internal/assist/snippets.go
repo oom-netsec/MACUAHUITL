@@ -596,7 +596,7 @@ func SVIPre(c SVIChange) ([]string, error) {
 	if err := c.check(); err != nil {
 		return nil, err
 	}
-	return []string{showCfg("Vlan" + ntoa(c.VlanID)), showIPBrief}, nil
+	return []string{showCfg("Vlan" + ntoa(c.VlanID)), showIPBrief, showUsersCmd}, nil
 }
 
 // SVIPlan arma el plan. La reversa es `no interface VlanN` solo si la SVI no existía, y eso se confirma con dos comandos
@@ -635,6 +635,12 @@ func SVIPlan(device string, c SVIChange, outs map[string]string) (DevicePlan, er
 		return DevicePlan{}, refuseSnippet("assist.refused.la_configuracion_y_show_ip", "name", name, "device", device)
 	case exists && (cur.L3 || cur.Routed):
 		return DevicePlan{}, refuseSnippet("assist.refused.ya_tiene_direccion_ip_o", "name", name)
+	}
+	// Una SVI ya con IP se rechaza arriba, así que aquí la dirección es nueva: su subred no puede contener al origen de la sesión.
+	_, ones, _ := parseMask(c.Mask)
+	subnet, _ := netip.MustParseAddr(c.Address).Prefix(ones)
+	if err := coversSession(device, subnet, outs); err != nil {
+		return DevicePlan{}, err
 	}
 	dp := DevicePlan{Device: device, Pre: pre, Post: []string{showCfg(name)}, Baseline: map[string]string{showCfg(name): text}}
 	dp.Apply = []string{"interface " + name}

@@ -321,6 +321,21 @@ func TestPlanSnippetVtyACLEndToEndRolledBack(t *testing.T) {
 	}
 }
 
+// sessionCmds son las lecturas con que el equipo ubica la sesión (que entra por 127.0.0.1) en el puerto port: show users, el ARP y la ruta del
+// origen, y la tabla MAC. Formatos de la documentación de Cisco, sin validar en laboratorio.
+func sessionCmds(port string, more map[string]string) map[string]string {
+	c := map[string]string{
+		"show users":              showUsersFrom("127.0.0.1"),
+		"show ip arp 127.0.0.1":   "Protocol  Address          Age (min)  Hardware Addr   Type   Interface\nInternet  127.0.0.1               3   aabb.cc00.0100  ARPA   Vlan20\n",
+		"show ip route 127.0.0.1": "Routing entry for 127.0.0.0/8\n  Known via \"connected\", distance 0, metric 0 (connected, via interface)\n  Routing Descriptor Blocks:\n  * directly connected, via Vlan20\n",
+		"show mac address-table address aabb.cc00.0100": "          Mac Address Table\n-------------------------------------------\n\nVlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n  20    aabb.cc00.0100    DYNAMIC     " + port + "\nTotal Mac Addresses for this criterion: 1\n",
+	}
+	for k, v := range more {
+		c[k] = v
+	}
+	return c
+}
+
 func showUsersFrom(ip string) string {
 	return "    Line       User       Host(s)              Idle       Location\n   0 con 0                idle                 00:00:00\n*  2 vty 0     admin      idle                 00:00:00 " + ip + "\n"
 }
