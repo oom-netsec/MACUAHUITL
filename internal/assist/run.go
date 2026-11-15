@@ -211,7 +211,7 @@ func NewRun(o Options) (*Run, error) {
 // scrub quita de s los secretos del plan (y lo que IOS imprime tras secret/password si la función lo pide).
 func (r *Run) scrub(s string) string { return Scrub(s, r.secrets, r.fn.Scrub) }
 
-func (r *Run) scrubEN(s string) string { return scrubEN(s, r.secrets, r.fn.Scrub) }
+func (r *Run) scrubEN(s string) string { return Scrub(s, r.secrets, r.fn.Scrub) }
 
 func (r *Run) scrubLines(lines []string) []string { return scrubAll(lines, r.secrets, r.fn.Scrub) }
 
@@ -654,7 +654,11 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 	}
 	failed, failedEN := r.sent(dp.Device, sent)
 	if (err != nil || failed != "") && len(sent) > 0 {
-		r.resync(ctx, i) // lo que quedó a medias es la referencia de una reversa tardía
+		// Lo que quedó a medias es la referencia de una reversa tardía; si la relectura coincide con la línea base
+		// (p. ej. el equipo rechazó la primera línea), no cambió nada. Si la relectura falla, queda como cambiado.
+		if r.resync(ctx, i) {
+			r.unchange(i)
+		}
 	}
 	if err != nil {
 		return r.failT("configuración de %s: %v", "configuration of %s: %v", dp.Device, err), true

@@ -1920,7 +1920,7 @@ export const es = {
   "snippet.modo-puerto.field.interfaces": "Puertos",
   "snippet.modo-puerto.field.interfaces.help": "Lista separada por comas o rangos como Gi1/0/1-4; solo puertos físicos de acceso.",
   "snippet.modo-puerto.field.mode": "Modo",
-  "snippet.modo-puerto.field.mode.help": "fabrica = no switchport mode (el valor de fábrica, dynamic auto en un Catalyst de acceso). Nunca trunk.",
+  "snippet.modo-puerto.field.mode.help": "factory = no switchport mode (el valor de fábrica, dynamic auto en un Catalyst de acceso). Nunca trunk.",
   // Receptor syslog: opciones, estado y descartes (fase 19q).
   "syslog.opts": "Opciones",
   "syslog.opts.flood": "Contra inundación",
@@ -2450,6 +2450,7 @@ export const es = {
   "snippet.vty-acl.field.acl.help": "Nombre o número de una ACL estándar que ya exista y permita la IP desde la que se administra; si dejara fuera al administrador, se rechaza.",
   "snippet.vty-acl.field.lines": "Líneas vty",
   "snippet.vty-acl.field.lines.help": "Cada bloque vty del equipo dentro del rango recibe el access-class.",
+  "vocab.choice.factory": "De fábrica (no switchport mode)",
   "vocab.choice.fabrica": "De fábrica (no switchport mode)",
   "file.saltos": "saltos-contadores",
   "file.topologia": "topologia",

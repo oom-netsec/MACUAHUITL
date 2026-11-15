@@ -1,7 +1,7 @@
 # Propósito: Sesión, conexiones y logs del cliente con la IP indicada.
 # Cuándo usarlo: Un cliente AnyConnect concreto cae, no conecta o va lento.
 # Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
-# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+# Validado en laboratorio: ASAv 9.x en CML, un solo contexto (2026-11-14), salvo los marcados «no existe en ASAv» o «solo multicontexto».
 id: tac-anyconnect-no-conecta-ip
 platform: asa
 name: ASA · TAC · AnyConnect de un cliente (IP)

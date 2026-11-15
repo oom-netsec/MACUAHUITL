@@ -11,7 +11,7 @@ commands:
   - cmd: show monitor session all
   - cmd: show monitor session all detail
   - cmd: show monitor capture
-  - cmd: show vlan remote-span
+  - cmd: show vlan remote-span  # no existe en routers IOS-XE (solo switches)
   - cmd: show interfaces status
   - cmd: show logging | include SPAN|MONITOR
   - cmd: show running-config | include monitor session

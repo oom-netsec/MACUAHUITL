@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"gopkg.in/yaml.v3"
@@ -52,9 +54,11 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 	name := map[v1.ChangePhase]string{v1.ChangePhase_CHANGE_PHASE_PRE: "pre", v1.ChangePhase_CHANGE_PHASE_POST: "post"}[phase]
 	return func(c *cli.Env, args []string) error {
 		var accept, exclude cli.List
+		var noWait bool
 		fs, err := cli.Flags("change "+name, args, func(fs *flag.FlagSet) {
 			fs.Var(&accept, "accept", "huella SHA256 confirmada (repetible)")
 			fs.Var(&exclude, "exclude", "equipo a excluir (repetible)")
+			fs.BoolVar(&noWait, "no-wait", false, "no esperar a que termine la captura")
 		})
 		if err != nil {
 			return err
@@ -71,8 +75,168 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 			return cli.Err("mctl.change.unarmed_er", "name", name)
 		}
 		fmt.Fprintln(c.Out, cli.T("mctl.change.capturing", "name", name, "job", r.JobId))
+		if noWait {
+			return nil
+		}
+		// Esperar evita que el ingeniero aplique su cambio mientras la captura PRE sigue corriendo.
+		cl := v1.NewChangeServiceClient(c.Conn)
+		list := func(ctx context.Context) (*v1.ListChangesResponse, error) {
+			return cl.ListChanges(ctx, &v1.ListChangesRequest{})
+		}
+		if err := waitCapture(context.Background(), list, fs.Arg(0), phase, 300*time.Millisecond); err != nil {
+			return err
+		}
+		// El trabajo puede quedar completed con equipos que fallaron: sin su línea base no hay cambio seguro.
+		run, err := v1.NewPatrolServiceClient(c.Conn).GetRun(context.Background(), &v1.GetRunRequest{JobId: r.JobId, Round: 1})
+		if err != nil {
+			return err
+		}
+		if err := checkDevices(name, run.Devices); err != nil {
+			return err
+		}
+		fmt.Fprintln(c.Out, cli.T("mctl.change.done_"+name, "id", fs.Arg(0)))
 		return nil
 	}
+}
+
+// waitCapture sondea change list hasta que el trabajo de la fase termina; un trabajo que no queda completed es un error.
+// Se sondea (y no job watch) porque una captura de una ronda puede cerrar antes de que la suscripción llegue.
+// list es ListChanges ya ligado al cliente (así las pruebas no necesitan un cliente gRPC).
+func waitCapture(ctx context.Context, list func(context.Context) (*v1.ListChangesResponse, error), id string, phase v1.ChangePhase, every time.Duration) error {
+	name := map[v1.ChangePhase]string{v1.ChangePhase_CHANGE_PHASE_PRE: "pre", v1.ChangePhase_CHANGE_PHASE_POST: "post"}[phase]
+	for {
+		r, err := list(ctx)
+		if err != nil {
+			return err
+		}
+		for _, ch := range r.Changes {
+			if ch.ChangeId != id {
+				continue
+			}
+			st := ch.PreState
+			if phase == v1.ChangePhase_CHANGE_PHASE_POST {
+				st = ch.PostState
+			}
+			switch st {
+			case "completed":
+				return nil
+			case "arming", "armed", "created":
+			default:
+				return cli.Err("mctl.change.capture_failed", "name", name, "state", or(st, "?"))
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(every):
+		}
+	}
+}
+
+// checkDevices falla nombrando los equipos de la captura que no quedaron completed (los excluidos a propósito no cuentan).
+// El estado por equipo no trae el hostname: se nombra por dirección.
+func checkDevices(name string, devs []*v1.RunDevice) error {
+	var bad []string
+	for _, d := range devs {
+		if d.State == v1.DeviceState_DEVICE_STATE_COMPLETED || d.State == v1.DeviceState_DEVICE_STATE_SKIPPED {
+			continue
+		}
+		who := d.Target.GetAddress()
+		if d.Detail != "" {
+			who += " (" + d.Detail + ")"
+		}
+		bad = append(bad, who)
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+	return cli.Err("mctl.change.device_failed_"+name, "list", strings.Join(bad, ", "))
+}
+
+// changeDiff compara la captura PRE con la POST de un cambio: las líneas de configuración que cambiaron, por equipo.
+// Reusa el informe del núcleo (el mismo de la app). Las capturas se guardan enmascaradas salvo que el cambio se creó con
+// disable_masking: true; shortcut: el informe no trae ese dato, así que en ese caso el diff puede mostrar secretos
+// (el aviso queda pendiente hasta que el informe lo exponga).
+func changeDiff(c *cli.Env, args []string) error {
+	var device string
+	var asJSON bool
+	fs, err := cli.Flags("change diff", args, func(fs *flag.FlagSet) {
+		fs.StringVar(&device, "device", "", "equipo (parte del nombre o la IP)")
+		fs.BoolVar(&asJSON, "json", false, "salida JSON")
+	})
+	if err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return cli.Err("mctl.change.need_id", "name", "diff")
+	}
+	r, err := v1.NewChangeServiceClient(c.Conn).GetChangeReport(context.Background(), &v1.GetChangeReportRequest{ChangeId: fs.Arg(0)})
+	if err != nil {
+		return err
+	}
+	return printDiff(c, r.Report.Json, device, asJSON)
+}
+
+func printDiff(c *cli.Env, reportJSON, device string, asJSON bool) error {
+	type dev struct {
+		Address    string   `json:"address"`
+		Hostname   string   `json:"hostname"`
+		ConfigDiff []string `json:"config_diff"`
+		Findings   []struct {
+			Facet, Detail string
+		} `json:"findings"`
+	}
+	var rep struct {
+		Devices []dev `json:"devices"`
+	}
+	if err := json.Unmarshal([]byte(reportJSON), &rep); err != nil {
+		return err
+	}
+	var sel []dev
+	for _, d := range rep.Devices {
+		host := hostOnly(d.Address) // la dirección puede traer puerto
+		if device == "" || strings.Contains(strings.ToLower(d.Hostname), strings.ToLower(device)) || d.Address == device || host == device {
+			sel = append(sel, d)
+		}
+	}
+	if len(sel) == 0 {
+		return cli.Err("mctl.change.diff_no_device", "device", device)
+	}
+	if asJSON {
+		for i := range sel {
+			if sel[i].ConfigDiff == nil {
+				sel[i].ConfigDiff = []string{}
+			}
+		}
+		b, err := json.Marshal(map[string]any{"devices": sel})
+		fmt.Fprintln(c.Out, string(b))
+		return err
+	}
+	missing := 0
+	for _, d := range sel {
+		fmt.Fprintf(c.Out, "%s (%s)\n", or(d.Hostname, "?"), d.Address)
+		noCap := false
+		for _, f := range d.Findings {
+			if f.Facet == "captura" { // falta la PRE o la POST, o falló: «sin diferencias» sería mentira
+				fmt.Fprintln(c.Out, "  "+cli.T("mctl.change.diff_nocapture", "detail", f.Detail))
+				noCap = true
+			}
+		}
+		if noCap {
+			missing++
+			continue
+		}
+		if len(d.ConfigDiff) == 0 {
+			fmt.Fprintln(c.Out, "  "+cli.T("mctl.change.diff_none"))
+		}
+		for _, l := range d.ConfigDiff {
+			fmt.Fprintln(c.Out, "  "+l)
+		}
+	}
+	if missing > 0 {
+		return cli.Err("mctl.change.diff_incomplete", "n", missing)
+	}
+	return nil
 }
 
 func changeList(c *cli.Env, args []string) error {
@@ -230,7 +394,8 @@ func complianceCheck(c *cli.Env, args []string) error {
 }
 
 // help son las líneas de este área en mctl --help.
-const help = `  change create -f cambio.yaml | pre|post [--accept HUELLA]... [--exclude EQUIPO]... ID | list
+const help = `  change create -f cambio.yaml | pre|post [--accept HUELLA]... [--exclude EQUIPO]... [--no-wait] ID | list
+         diff ID [--device EQUIPO] [--json]   (líneas de configuración que cambiaron entre PRE y POST)
          report ID | report --pre CARPETA --post CARPETA   [--json]
   upgrade check --outputs ARCHIVO --image NOMBRE [--size BYTES] [--md5 HEX] [--verify ARCHIVO] [--json]
   compliance check --config ARCHIVO [--template ARCHIVO] [--json]`
@@ -242,8 +407,23 @@ func Area() cli.Area {
 		{Name: "change pre", Run: changeCapture(v1.ChangePhase_CHANGE_PHASE_PRE)},
 		{Name: "change post", Run: changeCapture(v1.ChangePhase_CHANGE_PHASE_POST)},
 		{Name: "change list", Run: changeList},
+		{Name: "change diff", Run: changeDiff},
 		{Name: "change report", Run: changeReport},
 		{Name: "upgrade check", Run: upgradeCheck},
 		{Name: "compliance check", Run: complianceCheck},
 	}}
+}
+
+// hostOnly quita el puerto de «host:puerto» o «[ipv6]:puerto» sin importar net (noegress: mctl no toca la red).
+// Una IPv6 sin corchetes (varios «:») se deja igual.
+func hostOnly(addr string) string {
+	if strings.HasPrefix(addr, "[") {
+		if i := strings.Index(addr, "]"); i > 0 {
+			return addr[1:i]
+		}
+	}
+	if strings.Count(addr, ":") == 1 {
+		return addr[:strings.Index(addr, ":")]
+	}
+	return addr
 }

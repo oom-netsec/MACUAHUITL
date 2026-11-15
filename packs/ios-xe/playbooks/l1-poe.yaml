@@ -9,8 +9,8 @@ name_en: L1 · PoE
 commands:
   - cmd: show clock
   - cmd: show power inline
-  - cmd: show power inline police
-  - cmd: show environment power all
+  - cmd: show power inline police  # no existe en routers IOS-XE (solo switches)
+  - cmd: show environment power all  # no existe en routers IOS-XE (solo switches)
   - cmd: show interfaces status
   - cmd: show cdp neighbors
   - cmd: show logging | include ILPOWER|POWER_GRANTED|POWER_DENY|POE

@@ -13,7 +13,7 @@ commands:
   - cmd: show spanning-tree bridge
   - cmd: show spanning-tree blockedports
   - cmd: show spanning-tree inconsistentports
-  - cmd: show spanning-tree mst
+  - cmd: show spanning-tree mst  # no existe en routers IOS-XE (solo switches)
   - cmd: show logging | include SPANTREE|STP|BPDU
   - cmd: show spanning-tree detail | include occurred|from|Number of topology
   - cmd: show spanning-tree

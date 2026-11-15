@@ -12,8 +12,8 @@ commands:
   - cmd: show ip access-lists
   - cmd: show ipv6 access-list
   - cmd: show time-range
-  - cmd: show vlan access-map
-  - cmd: show vlan filter
+  - cmd: show vlan access-map  # no existe en routers IOS-XE (solo switches)
+  - cmd: show vlan filter  # no existe en routers IOS-XE (solo switches)
   - cmd: show ip interface | include line protocol|access list
   - cmd: show logging | include SEC-6-IPACCESSLOG|ACL|IPACCESS
   - cmd: show running-config | section access-list|access-group

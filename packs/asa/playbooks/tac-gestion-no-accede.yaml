@@ -1,7 +1,7 @@
 # Propósito: SSH, ASDM, AAA, llaves y syslogs de acceso.
 # Cuándo usarlo: SSH o ASDM no entran al ASA o falla la autenticación de gestión.
 # Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
-# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+# Validado en laboratorio: ASAv 9.x en CML, un solo contexto (2026-11-14), salvo los marcados «no existe en ASAv» o «solo multicontexto».
 id: tac-gestion-no-accede
 platform: asa
 name: ASA · TAC · No se puede administrar el ASA

@@ -18,8 +18,7 @@ var ErrRotateRefused = errors.New("assist: no se puede rotar esa credencial")
 
 const (
 	credUsersCmd = "show running-config | include ^username"
-	hidden       = "<oculto>"
-	hiddenEN     = "<hidden>"
+	hidden       = "<hidden>"
 )
 
 var (
@@ -30,11 +29,6 @@ var (
 	// secretTail es todo lo que sigue a secret o password hasta el final de la línea (una clave puede traer espacios).
 	secretTail = regexp.MustCompile(`(?i)\b(secret|password)[ \t]+[^\r\n]*`)
 )
-
-// scrubEN es Scrub para un texto en inglés: el marcador de lo oculto también sale en inglés (en las líneas de configuración sigue siendo el mismo).
-func scrubEN(s string, secrets []string, generic bool) string {
-	return strings.ReplaceAll(Scrub(s, secrets, generic), hidden, hiddenEN)
-}
 
 // Scrub reemplaza en s cada uno de secrets y, con generic, lo que sigue a secret/password.
 func Scrub(s string, secrets []string, generic bool) string {

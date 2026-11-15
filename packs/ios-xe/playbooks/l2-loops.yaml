@@ -12,7 +12,7 @@ commands:
   - cmd: show spanning-tree blockedports
   - cmd: show spanning-tree inconsistentports
   - cmd: show logging | include LOOP|FLAP|MACFLAP|STORM|SPANTREE|BPDU
-  - cmd: show storm-control
+  - cmd: show storm-control  # no existe en routers IOS-XE (solo switches)
   - cmd: show errdisable detect
   - cmd: show interfaces status err-disabled
   - cmd: show etherchannel summary

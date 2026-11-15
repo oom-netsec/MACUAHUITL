@@ -11,11 +11,11 @@ commands:
   - cmd: show vrf
   - cmd: show ip vrf
   - cmd: show ip vrf interfaces
-  - cmd: show mpls interfaces
+  - cmd: show mpls interfaces  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
   - cmd: show ip vrf detail
   - cmd: show bgp vpnv4 unicast all summary
-  - cmd: show mpls ldp neighbor
-  - cmd: show mpls forwarding-table
+  - cmd: show mpls ldp neighbor  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
+  - cmd: show mpls forwarding-table  # requiere nivel de licencia (en Cat8000v sin licencia no existe)
     timeout: 120s
   - cmd: show ip route vrf *
     timeout: 300s

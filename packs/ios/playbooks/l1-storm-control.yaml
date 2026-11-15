@@ -8,10 +8,10 @@ name: L1 · Storm control (IOS)
 name_en: L1 · Storm control (IOS)
 commands:
   - cmd: show clock
-  - cmd: show storm-control
-  - cmd: show storm-control broadcast
-  - cmd: show storm-control multicast
-  - cmd: show storm-control unicast
+  - cmd: show storm-control  # falla en IOSvL2 virtual
+  - cmd: show storm-control broadcast  # falla en IOSvL2 virtual
+  - cmd: show storm-control multicast  # falla en IOSvL2 virtual
+  - cmd: show storm-control unicast  # falla en IOSvL2 virtual
   - cmd: show interfaces status err-disabled
   - cmd: show errdisable recovery
   - cmd: show interfaces counters

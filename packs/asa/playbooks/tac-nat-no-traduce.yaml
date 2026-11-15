@@ -1,7 +1,7 @@
 # Propósito: packet-tracer más reglas NAT, pools, xlates y conflictos. Ojo: packet-tracer sube los contadores hitcnt de las ACL y, con tráfico interesante para un crypto map, puede iniciar la negociación IKE.
 # Cuándo usarlo: Un host no se traduce, sale con otra IP o el PAT se agota.
 # Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-troubleshooting-guides-list.html
-# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+# Validado en laboratorio: ASAv 9.x en CML, un solo contexto (2026-11-14), salvo los marcados «no existe en ASAv» o «solo multicontexto».
 id: tac-nat-no-traduce
 platform: asa
 name: ASA · TAC · NAT que no traduce

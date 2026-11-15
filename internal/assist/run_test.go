@@ -932,3 +932,58 @@ func TestEmitSaneaUTF8Invalido(t *testing.T) {
 		t.Fatalf("texto = %q", last.Text)
 	}
 }
+
+// runRechazo corre SW1 hasta que el equipo rechaza la línea failLine y devuelve la ejecución y lo último que recibió Persist.
+func runRechazo(t *testing.T, ex *fakeExec, failLine string) (*Run, func() *Leftover) {
+	t.Helper()
+	ex.failCfg = map[string]string{"SW1": failLine}
+	var mu sync.Mutex
+	var last *Leftover
+	r, err := NewRun(Options{ID: "run1", Plan: twoDevices(), Fn: Ports, Assisted: true, Exec: ex, Audit: (&auditRec{}).add,
+		Persist: func(l *Leftover) { mu.Lock(); last = l; mu.Unlock() }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Start(context.Background())
+	pending(t, r, "apply-1")
+	r.Confirm("apply-1")
+	wait(t, r, Failed)
+	return r, func() *Leftover { mu.Lock(); defer mu.Unlock(); return last }
+}
+
+// Si el equipo rechaza la primera línea y la relectura coincide con la línea base, no quedó cambiado: ni aviso ni reversa pendiente.
+func TestFirstLineRejectedLeavesDeviceUnchanged(t *testing.T) {
+	ex := &fakeExec{readFunc: func(dev, cmd string) string { return "base" }}
+	r, left := runRechazo(t, ex, "interface GigabitEthernet1/0/1")
+	select {
+	case <-r.Done():
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("la ejecución sigue esperando una decisión que no existe")
+	}
+	if len(r.Changed()) != 0 || left() != nil {
+		t.Fatalf("cambiados %v, reversa pendiente %+v", r.Changed(), left())
+	}
+}
+
+// Con algo ya aplicado (la relectura difiere de la línea base) el equipo sí queda cambiado y con reversa pendiente.
+func TestMidwayRejectionKeepsDeviceChanged(t *testing.T) {
+	ex := &fakeExec{}
+	r, left := runRechazo(t, ex, "switchport access vlan 20")
+	if !reflect.DeepEqual(r.Changed(), []string{"SW1"}) || left() == nil {
+		t.Fatalf("cambiados %v, reversa pendiente %+v", r.Changed(), left())
+	}
+}
+
+// Si la relectura falla no se sabe cómo quedó: lo seguro es dejarlo como cambiado.
+func TestRejectionWithFailedRereadKeepsDeviceChanged(t *testing.T) {
+	ex := &fakeExec{readFunc: func(dev, cmd string) string { return "base" }}
+	hook(ex, func(dev string, lines []string) {
+		ex.mu.Lock()
+		ex.readErr = func(string) error { return errors.New("sin conexión") }
+		ex.mu.Unlock()
+	})
+	r, left := runRechazo(t, ex, "interface GigabitEthernet1/0/1")
+	if !reflect.DeepEqual(r.Changed(), []string{"SW1"}) || left() == nil {
+		t.Fatalf("cambiados %v, reversa pendiente %+v", r.Changed(), left())
+	}
+}

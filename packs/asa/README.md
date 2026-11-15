@@ -13,12 +13,19 @@ packet-tracer, NAT, túnel que no sube, AnyConnect, failover inesperado, CPU alt
 lentitud, OSPF/BGP y cluster).
 
 Los playbooks que declaran datos piden la interfaz (`interface`, el nombre `nameif` en packet-tracer), la IP (`ip`,
-`src`, `dst`) o el peer (`peer`); el núcleo los valida antes de armar los comandos. Todo está sin validar en
-laboratorio (no hay ASA en el laboratorio). La app solo permite en ASA comandos de lectura: `show`, `ping`,
+`src`, `dst`) o el peer (`peer`); el núcleo los valida antes de armar los comandos. Validado en un ASAv 9.x de CML
+con un solo contexto (2026-11-14); también con dos ASAv en failover A/S, incluido un failover provocado; el
+multicontexto y el cluster siguen sin validar (el ASAv no acepta `mode multiple`). La app solo permite en ASA comandos de lectura: `show`, `ping`,
 `traceroute`, `packet-tracer` (forma estricta) y `dir`; sin `more`, `copy`, `capture`, `changeto`, `failover`,
 `clear`, `debug`, `| redirect` ni `show … file`. Los comandos vienen de la documentación pública de Cisco. Ojo: `packet-tracer` es una simulación, pero sube los
 contadores `hitcnt` de las ACL que toca y, si el flujo es tráfico interesante para un crypto map, puede iniciar la
 negociación IKE; los playbooks que lo usan lo avisan en su cabecera.
+
+Anotaciones al final de la línea de un comando (validadas en un ASAv 9.x de CML el 2026-11-14): `# no existe en ASAv`, el comando es de hardware (por ejemplo `show environment`) y el ASAv virtual lo rechaza; `# solo multicontexto (espacio del sistema)`, solo funciona en modo multicontexto y desde el espacio del sistema.
+
+Primer inicio de sesión: según la versión y la configuración, el ASA 9.x puede pedir a un usuario nuevo que cambie su
+contraseña al entrar por primera vez («This is your first login»). La aplicación no la cambia: el Login Test falla de inmediato con «primer inicio de sesión». Entra
+una vez por consola o SSH y fija la contraseña (el ASAv 9.x del laboratorio pidió de 8 a 127 caracteres, sin 3 caracteres seguidos ni repetidos).
 
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
@@ -39,12 +46,20 @@ cases (traffic not passing with packet-tracer, NAT, tunnel not coming up, AnyCon
 blocks, ASP drops, slowness, OSPF/BGP and cluster).
 
 Playbooks that declare data ask for the interface (`interface`, the `nameif` name in packet-tracer), the IP (`ip`,
-`src`, `dst`) or the peer (`peer`); the core validates them before building the commands. Everything is unvalidated
-in the lab (there is no ASA in the lab). On ASA the app only allows read commands: `show`, `ping`, `traceroute`,
+`src`, `dst`) or the peer (`peer`); the core validates them before building the commands. Validated on an ASAv 9.x in
+CML with a single context (2026-11-14); also with two ASAv in A/S failover, including a forced failover; multiple
+context and clustering remain unvalidated (ASAv does not accept `mode multiple`). On ASA the app only allows read commands: `show`, `ping`, `traceroute`,
 `packet-tracer` (strict form) and `dir`; no `more`, `copy`, `capture`, `changeto`, `failover`, `clear`, `debug`,
 `| redirect` or `show … file`. Commands come from Cisco's public documentation. Note: `packet-tracer` is a simulation, but it increments the `hitcnt`
 counters of the ACLs it touches and, if the flow is interesting traffic for a crypto map, it can start the IKE
 negotiation; the playbooks that use it say so in their header.
+
+Notes at the end of a command line (validated on an ASAv 9.x in CML on 2026-11-14): `# no existe en ASAv` means the command is hardware-only (for example `show environment`) and the virtual ASAv rejects it; `# solo multicontexto (espacio del sistema)` means it only works in multiple context mode from the system execution space.
+
+First login: depending on the version and configuration, ASA 9.x may require a new user to change their password on
+the first login («This is your first login»). The
+application does not change it: the Login Test fails right away with «first login». Log in once over console or SSH
+and set the password (the lab ASAv 9.x required 8 to 127 characters, no 3 sequential or repeated characters).
 
 How to load it (the application never downloads packages):
 

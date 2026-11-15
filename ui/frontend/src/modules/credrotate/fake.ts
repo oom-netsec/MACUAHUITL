@@ -8,8 +8,8 @@ export const sampleRotatePlan: PortsPlanResult = {
     devices: [{
       device: "SW1",
       pre: ["show running-config | include ^username", "show version"],
-      apply: ["username tech privilege 15 algorithm-type scrypt secret <oculto>"],
-      rollback: ["username tech privilege 15 secret <oculto> <oculto>"],
+      apply: ["username tech privilege 15 algorithm-type scrypt secret <hidden>"],
+      rollback: ["username tech privilege 15 secret <hidden> <hidden>"],
       post: ["show running-config | include ^username"],
       expect: [{ command: "show running-config | include ^username", line: "tech 9", present: true }],
     }],

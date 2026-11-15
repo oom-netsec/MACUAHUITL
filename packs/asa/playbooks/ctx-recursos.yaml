@@ -1,7 +1,7 @@
 # Propósito: Uso de recursos del sistema y de cada contexto contra su clase.
 # Cuándo usarlo: Un contexto topa con su límite de conexiones, xlates o ancho de banda.
 # Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
-# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+# Validado en laboratorio: ASAv 9.x en CML, un solo contexto (2026-11-14), salvo los marcados «no existe en ASAv» o «solo multicontexto».
 id: ctx-recursos
 platform: asa
 name: ASA · Contextos · Recursos por contexto
@@ -9,8 +9,8 @@ name_en: ASA · Contexts · Per-context resources
 commands:
   - cmd: show clock
   - cmd: show resource types
-  - cmd: show resource allocation
+  - cmd: show resource allocation  # solo multicontexto (espacio del sistema)
   - cmd: show resource usage summary
-  - cmd: show resource usage top 5
-  - cmd: show resource usage context all
+  - cmd: show resource usage top 5  # solo multicontexto (espacio del sistema)
+  - cmd: show resource usage context all  # solo multicontexto (espacio del sistema)
   - cmd: show resource usage detail

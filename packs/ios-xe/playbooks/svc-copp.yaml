@@ -11,8 +11,8 @@ commands:
   - cmd: show policy-map control-plane
   - cmd: show control-plane host open-ports  # no existe en Cat9k (solo routers)
   - cmd: show processes cpu sorted
-  - cmd: show platform software fed switch active punt cause summary
-  - cmd: show platform hardware fed switch active qos queue stats internal cpu policer
+  - cmd: show platform software fed switch active punt cause summary  # no existe en routers IOS-XE (solo switches)
+  - cmd: show platform hardware fed switch active qos queue stats internal cpu policer  # no existe en routers IOS-XE (solo switches)
   - cmd: show processes cpu platform sorted
   - cmd: show running-config | section control-plane|policy-map|class-map
     may_contain_secrets: true

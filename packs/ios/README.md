@@ -15,6 +15,8 @@ paquetes instalados, un equipo detectado como IOS clásico corre el playbook de 
 de `oom/ios-xe` con el mismo nombre (y al revés en IOS-XE), así una ronda sobre una flota mixta usa en cada equipo sus
 comandos. Al crear el trabajo se acepta un ID faltante si tiene gemelo; en los equipos de la otra plataforma ese playbook falla al correr con `pack.missing`. Los comandos de switch (`mls qos`, `sdm`, `power inline`, stack) darán inválido en un ISR.
 
+Desde la 1.1.3 también se probó en un IOSvL2 15.2 en CML (2026-11-14). `# falla en IOSvL2 virtual` marca lo que existe en un 3560CX físico pero el IOSvL2 virtual rechaza o no soporta (transceptores, licencias, `mls qos`, PoE, `sdm`, `storm-control`, TCAM, CPU, ambiente); en hardware real deberían funcionar.
+
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
 1. Baja `oom-ios-<versión>.mpack` de los releases de GitHub y verifica su suma en `SHA256SUMS`.
@@ -35,6 +37,8 @@ The derived library scripts use the `lib-ios-` prefix, so they coexist with thos
 installed, a device detected as classic IOS runs this package's playbook even if the `oom/ios-xe` one with the same
 name was chosen (and the other way around on IOS-XE), so a round over a mixed fleet uses each device's own commands.
 Switch commands (`mls qos`, `sdm`, `power inline`, stack) will be invalid on an ISR.
+
+Since 1.1.3 it was also tested on an IOSvL2 15.2 in CML (2026-11-14). `# falla en IOSvL2 virtual` marks what exists on a physical 3560CX but the virtual IOSvL2 rejects or does not support (transceivers, licenses, `mls qos`, PoE, `sdm`, `storm-control`, TCAM, CPU, environment); on real hardware they should work.
 
 How to load it (the application never downloads packages):
 

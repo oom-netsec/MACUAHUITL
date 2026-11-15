@@ -32,7 +32,7 @@ test("el secreto viaja una vez, el campo se borra y nunca aparece en pantalla", 
   expect(await screen.findByRole("region", { name: "Reversa" })).toBeInTheDocument();
   expect(screen.getByLabelText("Secreto nuevo")).toHaveValue("");
   expect(document.body.textContent).not.toContain(NEW);
-  expect(screen.getAllByText(/<oculto>/).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/<hidden>/).length).toBeGreaterThan(0);
   expect(core.assistStart).not.toHaveBeenCalled();
 });
 
@@ -70,7 +70,7 @@ test("ejecución asistida: aviso rojo, confirmación por paso y la sesión nueva
   await userEvent.click(screen.getByRole("button", { name: START }));
   expect(core.assistStart).toHaveBeenCalledWith("c1", true);
   expect(await screen.findByRole("alert")).toHaveTextContent("MODO ASISTIDO ACTIVO");
-  act(() => core.emitAssist({ runId: "r1", kind: "pending", state: "waiting-confirm", step: { id: "apply-1", kind: "apply", device: "SW1", lines: ["username tech privilege 15 algorithm-type scrypt secret <oculto>"] } }));
+  act(() => core.emitAssist({ runId: "r1", kind: "pending", state: "waiting-confirm", step: { id: "apply-1", kind: "apply", device: "SW1", lines: ["username tech privilege 15 algorithm-type scrypt secret <hidden>"] } }));
   await clickWhenReady(await screen.findByRole("button", { name: confirmStep("apply-1") }));
   expect(core.assistConfirm).toHaveBeenCalledWith("r1", "apply-1");
   act(() => core.emitAssist({ runId: "r1", kind: "fail", state: "failed", text: "la credencial nueva no entró a SW1 con una sesión nueva: acceso denegado", changed: ["SW1"] }));

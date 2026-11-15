@@ -123,7 +123,12 @@ var (
 // benignFollow: palabras que siguen a la palabra clave y no son un valor («password encryption aes», «psk provisioning»,
 // «Mesh PSK Config»). «name» va aparte (maskedNear y nameCounter).
 var benignFollow = map[string]bool{"encryption": true, "provisioning": true, "config": true, "configuration": true,
-	"keychain(s)": true, "keychain": true, "keychains": true} // «MKA PSK Keychain(s) Summary» (show mka keychains)
+	"keychain(s)": true, "keychain": true, "keychains": true, // «MKA PSK Keychain(s) Summary» (show mka keychains)
+	// prosa de show password-policy y el contador de show crypto accelerator statistics (ASAv de CML, 2026-11-14)
+	"length": true, "must": true, "policy": true, "complexity": true, "lifetime": true, "keys": true}
+
+// hiddenRe: el ASA ya oculta el valor con asteriscos («enable password ***** pbkdf2»).
+var hiddenRe = regexp.MustCompile(`^\*+$`)
 
 // pcRe: «:dirección+desplazamiento» en hexadecimal, el PC de show memory allocating-process («Ion Password  :7F3A…+1A2B»).
 var pcRe = regexp.MustCompile(`^:[0-9A-Fa-f]+\+[0-9A-Fa-f]+$`)
@@ -179,6 +184,9 @@ func scan(ln string, strict bool) (kw string, n int, ok bool) {
 		}
 		for g := 2; g < len(m); g += 2 {
 			if m[g] < 0 || strings.HasPrefix(ln[m[g]:], "<MASKED:") {
+				continue
+			}
+			if hiddenRe.MatchString(ln[m[g]:m[g+1]]) { // asteriscos: ya oculto, también dentro de una cita
 				continue
 			}
 			if !strict && (benignFollow[strings.ToLower(ln[m[g]:m[g+1]])] || pcRe.MatchString(ln[m[g]:m[g+1]]) || nameCounter(ln, m[g], m[g+1])) {

@@ -8,11 +8,11 @@ name: Plataforma · Ambiente
 name_en: Platform · Environment
 commands:
   - cmd: show clock
-  - cmd: show environment all
-  - cmd: show environment temperature
-  - cmd: show environment temperature status
-  - cmd: show environment fan
-  - cmd: show environment power
-  - cmd: show environment power all
+  - cmd: show environment all  # falla en Cat8000v virtual
+  - cmd: show environment temperature  # falla en Cat8000v virtual
+  - cmd: show environment temperature status  # falla en Cat8000v virtual
+  - cmd: show environment fan  # falla en Cat8000v virtual
+  - cmd: show environment power  # falla en Cat8000v virtual
+  - cmd: show environment power all  # no existe en routers IOS-XE (solo switches)
   - cmd: show inventory
   - cmd: show logging | include ENVIRONMENT|FAN|TEMP|POWER|PWR|SUPPLY|THERMAL|RPS

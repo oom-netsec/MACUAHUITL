@@ -8,5 +8,5 @@ commands:
   - cmd: show processes cpu sorted
   - cmd: show processes cpu history
   - cmd: show interfaces summary
-  - cmd: show controllers cpu-interface
+  - cmd: show controllers cpu-interface  # falla en IOSvL2 virtual
   - cmd: show logging | include CPU|HOG|MEM

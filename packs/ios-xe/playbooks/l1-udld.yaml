@@ -8,13 +8,13 @@ name: L1 · UDLD
 name_en: L1 · UDLD
 commands:
   - cmd: show clock
-  - cmd: show udld
-  - cmd: show udld neighbors
+  - cmd: show udld  # no existe en routers IOS-XE (solo switches)
+  - cmd: show udld neighbors  # no existe en routers IOS-XE (solo switches)
   - cmd: show errdisable detect
   - cmd: show errdisable recovery
   - cmd: show interfaces status err-disabled
   - cmd: show cdp neighbors
-  - cmd: show interfaces transceiver detail
+  - cmd: show interfaces transceiver detail  # falla en Cat8000v virtual
   - cmd: show logging | include UDLD
   - cmd: show running-config | include udld|^interface
     may_contain_secrets: true

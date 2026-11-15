@@ -13,7 +13,7 @@ commands:
   - cmd: show interfaces counters errors
   - cmd: show vlan brief
   - cmd: show interfaces trunk
-  - cmd: show power inline
+  - cmd: show power inline  # falla en IOSvL2 virtual
   - cmd: show port-security
   - cmd: show authentication sessions
   - cmd: show dot1x all summary

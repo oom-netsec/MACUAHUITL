@@ -14,7 +14,7 @@ commands:
   - cmd: show errdisable recovery
   - cmd: show interfaces status err-disabled
   - cmd: show cdp neighbors
-  - cmd: show interfaces transceiver detail
+  - cmd: show interfaces transceiver detail  # falla en IOSvL2 virtual
   - cmd: show logging | include UDLD
   - cmd: show running-config | include udld|^interface
     may_contain_secrets: true

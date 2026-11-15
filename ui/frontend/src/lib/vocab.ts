@@ -14,7 +14,7 @@ export const VOCAB = {
   hit: ["mac-table", "arp", "dhcp-snooping", "interface", "device"],
   inv: ["equipo", "modulo", "sfp"],
   problem: ["err-disabled", "half-duplex", "crc", "input_errors", "output_errors", "runts", "giants", "drops"],
-  choice: ["fabrica"], // opciones de plantillas que no son palabras de IOS (modo-puerto)
+  choice: ["factory", "fabrica"], // opciones de plantillas que no son palabras de IOS (modo-puerto)
 } as const;
 
 export type VocabGroup = keyof typeof VOCAB;

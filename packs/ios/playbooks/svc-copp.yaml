@@ -11,6 +11,6 @@ commands:
   - cmd: show policy-map control-plane
   - cmd: show control-plane host open-ports  # no existe en 3560CX
   - cmd: show processes cpu sorted
-  - cmd: show controllers cpu-interface
+  - cmd: show controllers cpu-interface  # falla en IOSvL2 virtual
   - cmd: show running-config | section control-plane|policy-map|class-map
     may_contain_secrets: true

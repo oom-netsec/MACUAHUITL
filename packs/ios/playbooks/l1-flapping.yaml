@@ -12,6 +12,6 @@ commands:
   - cmd: show logging | include UPDOWN|CHANGED|FLAP|LINK-3|LINEPROTO
   - cmd: show interfaces counters errors
   - cmd: show errdisable flap-values
-  - cmd: show interfaces transceiver
+  - cmd: show interfaces transceiver  # falla en IOSvL2 virtual
   - cmd: show interfaces summary
   - cmd: show spanning-tree detail | include occurred|from

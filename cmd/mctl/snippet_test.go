@@ -139,7 +139,7 @@ func TestCredRotateNeverPrintsSecretAndUpdatesVault(t *testing.T) {
 	if !strings.Contains(out, "no se cambió nada") || strings.Contains(out, techNew) || len(e.rec.Lines()) != 0 {
 		t.Fatalf("sin --asistido solo se muestra el plan (y sin el secreto):\n%s", out)
 	}
-	if !strings.Contains(out, "<oculto>") {
+	if !strings.Contains(out, "<hidden>") {
 		t.Fatalf("el plan debe mostrar los secretos ocultos:\n%s", out)
 	}
 	if !strings.Contains(out, "write memory es obligatorio") || !strings.Contains(out, "(previous)") {

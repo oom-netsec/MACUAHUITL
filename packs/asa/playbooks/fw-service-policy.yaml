@@ -1,7 +1,7 @@
 # Propósito: Políticas globales y por interfaz, motores de inspección y sus contadores.
 # Cuándo usarlo: Una aplicación falla por inspección (FTP, SIP, DNS, HTTP) o se sospecha de un class-map.
 # Fuente: https://www.cisco.com/c/en/us/support/security/adaptive-security-appliance-asa-software/products-command-reference-list.html
-# Sin validar en laboratorio (no hay ASA en el laboratorio; comandos de la documentación de Cisco).
+# Validado en laboratorio: ASAv 9.x en CML, un solo contexto (2026-11-14), salvo los marcados «no existe en ASAv» o «solo multicontexto».
 id: fw-service-policy
 platform: asa
 name: ASA · Firewall · Service-policy e inspección

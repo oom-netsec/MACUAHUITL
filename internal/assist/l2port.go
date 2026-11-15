@@ -709,7 +709,7 @@ func hasErrdisableRequest(v Values) bool {
 
 var modeKeys = keyByPrefix("switchport mode")
 
-// SnippetPortMode fija el modo de un puerto de acceso: access, dynamic auto, dynamic desirable o el de fábrica. Nunca trunk.
+// SnippetPortMode fija el modo de un puerto de acceso: access, dynamic auto, dynamic desirable o el de fábrica (factory). Nunca trunk.
 var SnippetPortMode = Function{
 	Name:    "snippet-modo-puerto",
 	Allowed: []string{"interface", "switchport mode", "no switchport mode"},
@@ -830,7 +830,10 @@ func portModePlan(device string, v Values, outs map[string]string) (DevicePlan, 
 	}
 	pre, _ := l2Pre(statusNone)(v)
 	want := v.Str("mode")
-	target := ifElse(want == "fabrica", "dynamic auto", want)
+	if want == "fabrica" { // alias histórico de factory
+		want = "factory"
+	}
+	target := ifElse(want == "factory", "dynamic auto", want)
 	notes := []i18n.Text{portModeNote}
 	var scopes []l2Scope
 	for _, p := range caps {
@@ -838,11 +841,11 @@ func portModePlan(device string, v Values, outs map[string]string) (DevicePlan, 
 		if err != nil {
 			return DevicePlan{}, err
 		}
-		if now == target && (want != "fabrica" || p.cur.Mode == "") {
+		if now == target && (want != "factory" || p.cur.Mode == "") {
 			notes = append(notes, note("assist.note.port_mode_same", "port", p.name, "mode", now))
 			continue
 		}
-		f := l2Feature{apply: ifElse(want == "fabrica", "no switchport mode", "switchport mode "+want),
+		f := l2Feature{apply: ifElse(want == "factory", "no switchport mode", "switchport mode "+want),
 			back: ifElse(p.cur.Mode != "", "switchport mode "+p.cur.Mode, "no switchport mode")}
 		sc := l2Scope{header: "interface " + p.name, baseCmd: showCfg(p.name), baseText: p.text, post: []string{showCfg(p.name)}}
 		switch want {
@@ -862,7 +865,7 @@ func portModePlan(device string, v Values, outs map[string]string) (DevicePlan, 
 			}
 			// dynamic auto y fábrica: la línea no sale en el running-config; el modo se lee del switchport.
 			f.exp = Expect{Command: sw, Line: "Administrative Mode: dynamic auto", Present: true}
-			if want == "fabrica" {
+			if want == "factory" {
 				sc.expect = append(sc.expect, Expect{Command: showCfg(p.name), Line: "switchport mode", Prefix: true})
 			}
 		}
@@ -912,8 +915,8 @@ func l2PortTemplates() []Template {
 		{ID: "modo-puerto", Tech: "l2", Name: "Modo del puerto (acceso o dinámico)", Platforms: bothPlatforms, Fn: SnippetPortMode,
 			Fields: []Field{
 				{Name: "interfaces", Label: "Puertos", Type: TypeInterfaces, Required: true, Help: "Lista separada por comas o rangos como Gi1/0/1-4; solo puertos físicos de acceso."},
-				{Name: "mode", Label: "Modo", Type: TypeChoice, Required: true, Choices: []string{"access", "dynamic auto", "dynamic desirable", "fabrica"},
-					Help: "fabrica = no switchport mode (el valor de fábrica, dynamic auto en un Catalyst de acceso). Nunca trunk."},
+				{Name: "mode", Label: "Modo", Type: TypeChoice, Required: true, Choices: []string{"access", "dynamic auto", "dynamic desirable", "factory"}, Aliases: map[string]string{"fabrica": "factory"},
+					Help: "factory = no switchport mode (el valor de fábrica, dynamic auto en un Catalyst de acceso). Nunca trunk."},
 			},
 			Pre:  l2Pre(statusNone),
 			Plan: portModePlan},

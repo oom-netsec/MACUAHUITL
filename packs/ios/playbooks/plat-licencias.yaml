@@ -8,12 +8,12 @@ name: Plataforma · Licencias (IOS)
 name_en: Platform · Licensing (IOS)
 commands:
   - cmd: show clock
-  - cmd: show license
-  - cmd: show license detail
-  - cmd: show license status
-  - cmd: show license udi
-  - cmd: show license feature
+  - cmd: show license  # falla en IOSvL2 virtual
+  - cmd: show license detail  # falla en IOSvL2 virtual
+  - cmd: show license status  # falla en IOSvL2 virtual
+  - cmd: show license udi  # falla en IOSvL2 virtual
+  - cmd: show license feature  # falla en IOSvL2 virtual
   - cmd: show version | include License|Level|Package
   - cmd: show logging | include LICENSE|LIC_
-  - cmd: show license all
+  - cmd: show license all  # falla en IOSvL2 virtual
     may_contain_secrets: true

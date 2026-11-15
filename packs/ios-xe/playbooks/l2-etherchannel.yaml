@@ -9,15 +9,15 @@ name_en: L2 · EtherChannel
 commands:
   - cmd: show clock
   - cmd: show etherchannel summary
-  - cmd: show etherchannel port-channel
-  - cmd: show etherchannel load-balance
+  - cmd: show etherchannel port-channel  # falla en Cat8000v virtual
+  - cmd: show etherchannel load-balance  # falla en Cat8000v virtual
   - cmd: show lacp sys-id
   - cmd: show lacp neighbor
   - cmd: show lacp counters
   - cmd: show lacp internal
-  - cmd: show pagp neighbor
-  - cmd: show pagp counters
+  - cmd: show pagp neighbor  # no existe en routers IOS-XE (solo switches)
+  - cmd: show pagp counters  # no existe en routers IOS-XE (solo switches)
   - cmd: show interfaces trunk
   - cmd: show spanning-tree summary
   - cmd: show logging | include LACP|PAGP|ETHCNT|EC-5|PM-4
-  - cmd: show etherchannel detail
+  - cmd: show etherchannel detail  # falla en Cat8000v virtual

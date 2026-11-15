@@ -8,8 +8,8 @@ name: L1 · PoE (IOS)
 name_en: L1 · PoE (IOS)
 commands:
   - cmd: show clock
-  - cmd: show power inline
-  - cmd: show power inline police
+  - cmd: show power inline  # falla en IOSvL2 virtual
+  - cmd: show power inline police  # falla en IOSvL2 virtual
   - cmd: show interfaces status
   - cmd: show cdp neighbors
   - cmd: show logging | include ILPOWER|POWER_GRANTED|POWER_DENY|POE

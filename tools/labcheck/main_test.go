@@ -460,3 +460,19 @@ func TestLineaCitadaNuncaSeDescarta(t *testing.T) {
 		}
 	}
 }
+
+// Falsos positivos del ASAv de CML (2026-11-14): el ASA ya oculta con asteriscos, el contador de llaves de
+// show crypto accelerator statistics y la prosa de show password-policy. Lo citado entre comillas sí se sigue marcando.
+func TestFalsosPositivosDelASAv(t *testing.T) {
+	for _, ln := range []string{
+		"enable password ***** pbkdf2", "username cisco password ***** encrypted privilege 15",
+		"Secret keys derived: 0", "Minimum allowed password length is 8", "Password must contain:",
+	} {
+		if kw, n, ok := secretAt(ln); ok {
+			t.Errorf("falso positivo %q: %s %d", ln, kw, n)
+		}
+	}
+	if _, _, ok := secretAt(`*** Output from config line 9, "password length Cl4ve"`); !ok {
+		t.Error("lo citado se descartó")
+	}
+}

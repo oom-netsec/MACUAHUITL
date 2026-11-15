@@ -58,7 +58,7 @@ test("el plan rechazado lista lo que hay que hacer a mano y no ofrece ejecutar",
 });
 
 test("plan parcial: manda allowPartial y muestra lo que se deja fuera junto al plan", async () => {
-  const core = await open({ assistPlanRestore: vi.fn(async () => ({ ...sampleRestore, refused: [{ line: "snmp-server community <oculto>", why: "secreto" }] })) });
+  const core = await open({ assistPlanRestore: vi.fn(async () => ({ ...sampleRestore, refused: [{ line: "snmp-server community <hidden>", why: "secreto" }] })) });
   await userEvent.click(screen.getByLabelText(/Plan parcial/));
   await userEvent.click(planBtn());
   expect(core.assistPlanRestore).toHaveBeenCalledWith(expect.objectContaining({ allowPartial: true }));

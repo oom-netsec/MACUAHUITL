@@ -11,11 +11,11 @@ commands:
   - cmd: show ip dhcp snooping
   - cmd: show ip dhcp snooping statistics
   - cmd: show ip dhcp snooping database
-  - cmd: show ip arp inspection
-  - cmd: show ip arp inspection interfaces
-  - cmd: show ip arp inspection statistics
-  - cmd: show ip arp inspection log
-  - cmd: show ip verify source
+  - cmd: show ip arp inspection  # no existe en routers IOS-XE (solo switches)
+  - cmd: show ip arp inspection interfaces  # no existe en routers IOS-XE (solo switches)
+  - cmd: show ip arp inspection statistics  # no existe en routers IOS-XE (solo switches)
+  - cmd: show ip arp inspection log  # no existe en routers IOS-XE (solo switches)
+  - cmd: show ip verify source  # no existe en routers IOS-XE (solo switches)
   - cmd: show ip source binding
   - cmd: show errdisable recovery
   - cmd: show logging | include DHCP_SNOOPING|SW_DAI|IPSG|RATE_LIMIT

@@ -14,6 +14,6 @@ commands:
   - cmd: show redundancy counters
   - cmd: show redundancy history
   - cmd: show cef state
-  - cmd: show switch
-  - cmd: show module
+  - cmd: show switch  # no existe en routers IOS-XE (solo switches)
+  - cmd: show module  # falla en Cat8000v virtual
   - cmd: show logging | include RF|REDUNDANCY|SSO|STANDBY
