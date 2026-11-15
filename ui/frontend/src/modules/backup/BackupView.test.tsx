@@ -175,3 +175,13 @@ test("comparar y ver avisan si el respaldo se tomó sin enmascarar, y no si sí"
   await userEvent.click(screen.getByRole("button", { name: `Ver ${b.id}` })); // b se tomó sin enmascarar
   expect(await screen.findByText(/esta evidencia se recogió sin enmascarar/)).toBeInTheDocument();
 });
+
+// ---- Fase 24a ----
+test("una restauración viva retomada muestra el aviso rojo del modo asistido", async () => {
+  localStorage.setItem("macuahuitl.assist.r7", "backup");
+  try {
+    const core = withCreds({ assistListRuns: vi.fn(async () => [{ runId: "r7", state: "running", active: true }]) });
+    render(<ModuleIdContext.Provider value="backup"><BackupView core={core} /></ModuleIdContext.Provider>);
+    expect(await screen.findByRole("alert")).toHaveTextContent("MODO ASISTIDO ACTIVO");
+  } finally { localStorage.removeItem("macuahuitl.assist.r7"); }
+});

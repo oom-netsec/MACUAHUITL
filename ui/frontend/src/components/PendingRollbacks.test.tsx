@@ -275,3 +275,29 @@ test("al desmontarse no deja al anfitrión con el aviso de reversa viva encendid
   unmount();
   expect(onActive).toHaveBeenLastCalledWith(false);
 });
+
+// ---- Fase 24a ----
+test("un snippet sin clave propia muestra el nombre de su plantilla; sin plantilla, el id", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ runId: "a", kind: "snippet-snmp-trap-host" }), rb({ runId: "b", kind: "snippet-inexistente" })])} />);
+  expect(await screen.findByText("Tipo: Snippet: Destino de traps SNMP")).toBeInTheDocument();
+  expect(screen.getByText("Tipo: snippet-inexistente")).toBeInTheDocument();
+});
+
+test("dentro de una reversa pendiente el botón de revertir dice que reaplica el cambio original", async () => {
+  const core = coreWith([rb()]);
+  render(<PendingRollbacks core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Aplicar reversa" }));
+  await armAndStart();
+  act(() => core.emitAssist({ runId: "rb1", kind: "pending", state: "waiting-confirm", step: { id: "apply-1", kind: "apply", device: "SW1", lines: ["x"] } }));
+  expect(await screen.findByRole("button", { name: "Reaplicar el cambio original" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Revertir lo ya cambiado" })).not.toBeInTheDocument();
+});
+
+test("dentro de una reversa pendiente detenida se ofrece «Proponer reaplicar el cambio original»", async () => {
+  const core = coreWith([rb()]);
+  render(<PendingRollbacks core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Aplicar reversa" }));
+  await armAndStart();
+  act(() => core.emitAssist({ runId: "rb1", kind: "fail", state: "failed", text: "boom", changed: ["SW1"] }));
+  expect(await screen.findByRole("button", { name: "Proponer reaplicar el cambio original" })).toBeInTheDocument();
+});

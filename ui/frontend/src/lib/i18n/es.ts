@@ -2752,6 +2752,13 @@ export const es = {
   "snippet.netflow-export.field.interface.help": "Puerto físico donde se monitorea el tráfico de entrada; no Vlan, Port-channel, Loopback ni Tunnel.",
   "snippet.netflow-export.field.source": "Interfaz de origen",
   "snippet.netflow-export.field.source.help": "Opcional, por ejemplo Vlan1: la IP desde la que el equipo exporta.",
+  "assist.offline": "Sin conexión con la ejecución: puede seguir viva en el núcleo. Vuelve a engancharla para decidir los pasos.",
+  "assist.reattach": "Volver a enganchar",
+  "assist.ready": "Listo para aplicar.",
+  "assist.reapply": "Reaplicar el cambio original",
+  "pending.kind.snippet": "Snippet: {name}",
+  "assist.gone": "La ejecución ya no está viva en el núcleo; si cambió algo, su reversa está en Reversas pendientes (Cambios).",
+  "assist.reapply.propose": "Proponer reaplicar el cambio original",
 };
 
 export type Key = keyof typeof es;
