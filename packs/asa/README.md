@@ -20,6 +20,8 @@ laboratorio (no hay ASA en el laboratorio). La app solo permite en ASA comandos 
 contadores `hitcnt` de las ACL que toca y, si el flujo es tráfico interesante para un crypto map, puede iniciar la
 negociación IKE; los playbooks que lo usan lo avisan en su cabecera.
 
+Anotaciones al final de la línea de un comando (validadas en un ASAv 9.x de CML el 2026-11-14): `# no existe en ASAv`, el comando es de hardware (por ejemplo `show environment`) y el ASAv virtual lo rechaza; `# solo multicontexto (espacio del sistema)`, solo funciona en modo multicontexto y desde el espacio del sistema.
+
 Primer inicio de sesión: según la versión y la configuración, el ASA 9.x puede pedir a un usuario nuevo que cambie su
 contraseña al entrar por primera vez («This is your first login»). La aplicación no la cambia: el Login Test falla de inmediato con «primer inicio de sesión». Entra
 una vez por consola o SSH y fija la contraseña (el ASAv 9.x del laboratorio pidió de 8 a 127 caracteres, sin 3 caracteres seguidos ni repetidos).
@@ -49,6 +51,8 @@ in the lab (there is no ASA in the lab). On ASA the app only allows read command
 `| redirect` or `show … file`. Commands come from Cisco's public documentation. Note: `packet-tracer` is a simulation, but it increments the `hitcnt`
 counters of the ACLs it touches and, if the flow is interesting traffic for a crypto map, it can start the IKE
 negotiation; the playbooks that use it say so in their header.
+
+Notes at the end of a command line (validated on an ASAv 9.x in CML on 2026-11-14): `# no existe en ASAv` means the command is hardware-only (for example `show environment`) and the virtual ASAv rejects it; `# solo multicontexto (espacio del sistema)` means it only works in multiple context mode from the system execution space.
 
 First login: depending on the version and configuration, ASA 9.x may require a new user to change their password on
 the first login («This is your first login»). The
