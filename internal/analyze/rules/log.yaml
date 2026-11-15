@@ -67,3 +67,80 @@
   title_en: "Routing adjacency down"
   explanation_en: "A BGP session or an OSPF adjacency went down."
   action_en: "Check the reason given in the message (notification, dead timer, interface) and the current state with show ip bgp summary / show ip ospf neighbor."
+- id: log-eigrp-vecino-caido
+  title: Vecino EIGRP caído
+  severity: media
+  commands: [show logging]
+  check: match
+  params: {pattern: '%DUAL-5-NBRCHANGE: .* is down'}
+  explanation: Una adyacencia EIGRP se cayó; el mensaje trae el motivo al final.
+  action: Lee el motivo del mensaje. «Auth failure» apunta al key chain o a la autenticación; «holding time expired» a hellos perdidos (enlace, ACL, CPU); «K-value mismatch» a los K-values; «peer restarted» a un reinicio del vecino. Confirma con show ip eigrp neighbors.
+  title_en: "EIGRP neighbor down"
+  explanation_en: "An EIGRP adjacency went down; the message carries the reason at the end."
+  action_en: "Read the reason in the message. 'Auth failure' points to the key chain or authentication; 'holding time expired' to lost hellos (link, ACL, CPU); 'K-value mismatch' to the K-values; 'peer restarted' to a neighbor reload. Confirm with show ip eigrp neighbors."
+- id: log-ldp-vecino-caido
+  title: Vecino LDP caído
+  severity: media
+  commands: [show logging]
+  check: match
+  params: {pattern: '%LDP-5-NBRCHG: .* is DOWN'}
+  explanation: Una sesión LDP se cayó; las etiquetas MPLS aprendidas de ese vecino se pierden.
+  action: Revisa el motivo entre paréntesis del mensaje, que mpls ip siga en la interfaz, la alcanzabilidad del router-id LDP y el transporte TCP 646. Confirma con show mpls ldp neighbor.
+  title_en: "LDP neighbor down"
+  explanation_en: "An LDP session went down; the MPLS labels learned from that neighbor are lost."
+  action_en: "Check the reason in parentheses in the message, that mpls ip is still on the interface, reachability of the LDP router-id and TCP 646 transport. Confirm with show mpls ldp neighbor."
+- id: log-track-caido
+  title: Objeto de seguimiento (track) caído
+  severity: media
+  commands: [show logging]
+  check: match
+  params: {pattern: '%TRACK(?:ING)?-\d-STATE: .* Up ?-> ?Down'}
+  explanation: Un objeto track pasó a Down; si gobierna rutas estáticas, HSRP o PBR, el tráfico cambia de camino.
+  action: Revisa qué usa ese track (show track, show standby, rutas estáticas) y la causa (show ip sla statistics si es una sonda IP SLA, o la interfaz si es line-protocol).
+  title_en: "Tracked object down"
+  explanation_en: "A track object went Down; if it drives static routes, HSRP or PBR, traffic changes path."
+  action_en: "Check what uses that track (show track, show standby, static routes) and the cause (show ip sla statistics for an IP SLA probe, or the interface for line-protocol)."
+- id: log-fhrp-inestable
+  title: Grupo HSRP/GLBP/VRRP cayó a un estado sin servicio
+  severity: media
+  commands: [show logging]
+  check: match
+  params: {pattern: '%(HSRP|GLBP|VRRP)-\d-STATE(CHANGE)?: .* -> (Init|Speak|Listen)'}
+  explanation: Un grupo FHRP pasó a Init, Speak o Listen; el gateway virtual puede haber perdido redundancia o servicio.
+  action: Verifica que la interfaz o SVI esté arriba, que los pares se vean (grupo, versión, autenticación) y el track asociado. Confirma con show standby brief, show glbp brief o show vrrp brief.
+  title_en: "HSRP/GLBP/VRRP group fell to a non-forwarding state"
+  explanation_en: "An FHRP group moved to Init, Speak or Listen; the virtual gateway may have lost redundancy or service."
+  action_en: "Verify the interface or SVI is up, that the peers see each other (group, version, authentication) and the associated track. Confirm with show standby brief, show glbp brief or show vrrp brief."
+- id: log-ospf-router-id-duplicado
+  title: Router-id OSPF duplicado
+  severity: alta
+  commands: [show logging]
+  check: match
+  params: {pattern: '%OSPF-4-DUP_RTRID'}
+  explanation: OSPF detectó otro router con el mismo router-id; las adyacencias y la base de datos quedan inestables.
+  action: Identifica los dos equipos con ese router-id (la dirección del mensaje es el otro), cambia uno con router-id y reinicia el proceso con clear ip ospf process.
+  title_en: "Duplicate OSPF router-id"
+  explanation_en: "OSPF detected another router with the same router-id; adjacencies and the database become unstable."
+  action_en: "Identify the two devices with that router-id (the address in the message is the other one), change one with router-id and restart the process with clear ip ospf process."
+- id: log-bfd-sesion-caida
+  title: Sesión BFD caída
+  severity: media
+  commands: [show logging]
+  check: match
+  params: {pattern: '%BFDFSM-6-BFD_SESS_DOWN'}
+  explanation: Una sesión BFD se cayó; los protocolos que dependen de ella reconvergen.
+  action: Lee el motivo (ECHO FAILURE, control detection time expired, admin down), revisa el enlace y la ACL del puerto UDP 3784/3785, y show bfd neighbors details.
+  title_en: "BFD session down"
+  explanation_en: "A BFD session went down; the protocols that depend on it reconverge."
+  action_en: "Read the reason (ECHO FAILURE, control detection time expired, admin down), check the link and any ACL on UDP port 3784/3785, and show bfd neighbors details."
+- id: log-isis-adyacencia-caida
+  title: Adyacencia IS-IS caída
+  severity: media
+  commands: [show logging]
+  check: match
+  params: {pattern: '%CLNS-5-ADJCHANGE: .* Down'}
+  explanation: Una adyacencia IS-IS se cayó; el mensaje trae el motivo al final.
+  action: Revisa el motivo (hold time expired, interface down, authentication), el MTU y el nivel (L1/L2) de ambos lados con show clns neighbors.
+  title_en: "IS-IS adjacency down"
+  explanation_en: "An IS-IS adjacency went down; the message carries the reason at the end."
+  action_en: "Check the reason (hold time expired, interface down, authentication), the MTU and the level (L1/L2) on both sides with show clns neighbors."

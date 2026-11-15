@@ -159,7 +159,7 @@ func TestAnalyzeFixture(t *testing.T) {
 		"hsrp-estado-anomalo RTR2 r3", "hsrp-inestable RTR2 r2", "hsrp-inestable RTR2 r3",
 		"interfaz-crc SW1 r1", "interfaz-crc-creciente SW1 r2", "interfaz-drops-salida SW1 r2", "interfaz-errores-entrada SW1 r2",
 		"log-adyacencia-caida RTR2 r2", "log-adyacencia-caida RTR2 r3",
-		"log-cpuhog SW1 r2", "log-flap-interfaz SW1 r2", "log-mallocfail SW1 r2", "log-traceback SW1 r2",
+		"log-cpuhog SW1 r2", "log-fhrp-inestable RTR2 r2", "log-flap-interfaz SW1 r2", "log-mallocfail SW1 r2", "log-traceback SW1 r2",
 		"memoria-baja SW1 r3", "memoria-fuga SW1 r3",
 		"ospf-vecino-no-full RTR2 r2", "ospf-vecino-perdido RTR2 r3",
 		"reload-causa-falla SW1 r3", "reload-entre-rondas SW1 r3", "reload-reciente SW1 r3",
