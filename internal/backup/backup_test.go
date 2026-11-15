@@ -315,3 +315,75 @@ func TestSinSelloLibreNoPisa(t *testing.T) {
 		}
 	}
 }
+
+// Si la retención borró la ranura del primer segundo, volver a guardar la ronda 2 la encuentra donde está y no la duplica.
+func TestRelecturaTrasPodarNoDuplica(t *testing.T) {
+	s := Store{Root: t.TempDir()}
+	save := func(round int) (Entry, bool) {
+		t.Helper()
+		e, created, err := s.Save(Entry{Device: "SW1", Kind: Running, At: at(10), Job: "j1", Round: round}, "x\n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e, created
+	}
+	save(1)
+	r2, _ := save(2)
+	if n, err := s.Prune("SW1", 1); err != nil || n != 1 {
+		t.Fatalf("prune = %d %v", n, err)
+	}
+	if again, created := save(2); created || again.ID != r2.ID {
+		t.Fatalf("la ronda 2 se duplicó en el hueco: %v %s (era %s)", created, again.ID, r2.ID)
+	}
+}
+
+// La última ranura del minuto, si es de la misma captura, es idempotente y no «sin sello libre».
+func TestUltimaRanuraPropiaEsIdempotente(t *testing.T) {
+	s := Store{Root: t.TempDir()}
+	var last Entry
+	for r := 1; r <= maxBump+1; r++ {
+		e, _, err := s.Save(Entry{Device: "SW1", Kind: Running, At: at(10), Job: "j1", Round: r}, "x\n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		last = e
+	}
+	e, created, err := s.Save(Entry{Device: "SW1", Kind: Running, At: at(10), Job: "j1", Round: maxBump + 1}, "x\n")
+	if err != nil || created || e.ID != last.ID {
+		t.Fatalf("relectura de la última: %v %v %s", created, err, e.ID)
+	}
+}
+
+// Una ranura ocupada por algo ilegible (un enlace) no se pisa, pero la ronda tampoco se pierde: va al siguiente segundo.
+func TestRanuraIlegibleNoPierdeLaRonda(t *testing.T) {
+	s := Store{Root: t.TempDir()}
+	probe := Entry{Device: "SW1", Kind: Running, At: at(10)}
+	if _, err := s.dir("SW1", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/dev/null", probe.Path(s.Root)); err != nil {
+		t.Fatal(err)
+	}
+	e, created, err := s.Save(Entry{Device: "SW1", Kind: Running, At: at(10), Job: "j1", Round: 1}, "x\n")
+	if err != nil || !created || e.At.Equal(at(10)) {
+		t.Fatalf("ronda perdida o en la ranura del enlace: %v %v %s", created, err, e.ID)
+	}
+	if fi, err := os.Lstat(probe.Path(s.Root)); err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("se tocó el enlace")
+	}
+}
+
+// Sin ficha (borrada o de un intento cortado) no se sabe de qué captura es: volver a guardar en ese sello no duplica.
+func TestSinFichaNoDuplica(t *testing.T) {
+	s := Store{Root: t.TempDir()}
+	e, _, err := s.Save(Entry{Device: "SW1", Kind: Running, At: at(10), Job: "j1", Round: 1}, "x\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(metaPath(e.Path(s.Root))); err != nil {
+		t.Fatal(err)
+	}
+	if again, created, err := s.Save(Entry{Device: "SW1", Kind: Running, At: at(10), Job: "j1", Round: 1}, "x\n"); err != nil || created || again.ID != e.ID {
+		t.Fatalf("sin ficha se duplicó: %v %v %s", created, err, again.ID)
+	}
+}
