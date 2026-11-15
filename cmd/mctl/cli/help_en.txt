@@ -29,6 +29,7 @@
         export --cert C [--chain CA] [--key KEY] --format p12|p12-legacy|pem|der -o OUTPUT | decode -f FILE
   ike   decode -f FILE [--json]   (IKEv1, IKEv2 and IPsec debug/show)
   change create -f change.yaml | pre|post [--accept FINGERPRINT]... [--exclude DEVICE]... ID | list
+         diff ID [--device DEVICE] [--json]   (configuration lines that changed between PRE and POST)
          report ID | report --pre FOLDER --post FOLDER   [--json]
   upgrade check --outputs FILE --image NAME [--size BYTES] [--md5 HEX] [--verify FILE] [--json]
   compliance check --config FILE [--template FILE] [--json]

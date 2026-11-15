@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"gopkg.in/yaml.v3"
@@ -73,6 +74,71 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 		fmt.Fprintln(c.Out, cli.T("mctl.change.capturing", "name", name, "job", r.JobId))
 		return nil
 	}
+}
+
+// changeDiff compara la captura PRE con la POST de un cambio: las líneas de configuración que cambiaron, por equipo.
+// Reusa el informe del núcleo (el mismo de la app): las capturas ya se guardaron enmascaradas, así que no muestra secretos.
+func changeDiff(c *cli.Env, args []string) error {
+	var device string
+	var asJSON bool
+	fs, err := cli.Flags("change diff", args, func(fs *flag.FlagSet) {
+		fs.StringVar(&device, "device", "", "equipo (parte del nombre o la IP)")
+		fs.BoolVar(&asJSON, "json", false, "salida JSON")
+	})
+	if err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return cli.Err("mctl.change.need_id", "name", "diff")
+	}
+	r, err := v1.NewChangeServiceClient(c.Conn).GetChangeReport(context.Background(), &v1.GetChangeReportRequest{ChangeId: fs.Arg(0)})
+	if err != nil {
+		return err
+	}
+	return printDiff(c, r.Report.Json, device, asJSON)
+}
+
+func printDiff(c *cli.Env, reportJSON, device string, asJSON bool) error {
+	type dev struct {
+		Address    string   `json:"address"`
+		Hostname   string   `json:"hostname"`
+		ConfigDiff []string `json:"config_diff"`
+	}
+	var rep struct {
+		Devices []dev `json:"devices"`
+	}
+	if err := json.Unmarshal([]byte(reportJSON), &rep); err != nil {
+		return err
+	}
+	var sel []dev
+	for _, d := range rep.Devices {
+		if device == "" || strings.Contains(strings.ToLower(d.Hostname), strings.ToLower(device)) || strings.Contains(d.Address, device) {
+			sel = append(sel, d)
+		}
+	}
+	if len(sel) == 0 {
+		return cli.Err("mctl.change.diff_no_device", "device", device)
+	}
+	if asJSON {
+		for i := range sel {
+			if sel[i].ConfigDiff == nil {
+				sel[i].ConfigDiff = []string{}
+			}
+		}
+		b, err := json.Marshal(map[string]any{"devices": sel})
+		fmt.Fprintln(c.Out, string(b))
+		return err
+	}
+	for _, d := range sel {
+		fmt.Fprintf(c.Out, "%s (%s)\n", or(d.Hostname, "?"), d.Address)
+		if len(d.ConfigDiff) == 0 {
+			fmt.Fprintln(c.Out, "  "+cli.T("mctl.change.diff_none"))
+		}
+		for _, l := range d.ConfigDiff {
+			fmt.Fprintln(c.Out, "  "+l)
+		}
+	}
+	return nil
 }
 
 func changeList(c *cli.Env, args []string) error {
@@ -231,6 +297,7 @@ func complianceCheck(c *cli.Env, args []string) error {
 
 // help son las líneas de este área en mctl --help.
 const help = `  change create -f cambio.yaml | pre|post [--accept HUELLA]... [--exclude EQUIPO]... ID | list
+         diff ID [--device EQUIPO] [--json]   (líneas de configuración que cambiaron entre PRE y POST)
          report ID | report --pre CARPETA --post CARPETA   [--json]
   upgrade check --outputs ARCHIVO --image NOMBRE [--size BYTES] [--md5 HEX] [--verify ARCHIVO] [--json]
   compliance check --config ARCHIVO [--template ARCHIVO] [--json]`
@@ -242,6 +309,7 @@ func Area() cli.Area {
 		{Name: "change pre", Run: changeCapture(v1.ChangePhase_CHANGE_PHASE_PRE)},
 		{Name: "change post", Run: changeCapture(v1.ChangePhase_CHANGE_PHASE_POST)},
 		{Name: "change list", Run: changeList},
+		{Name: "change diff", Run: changeDiff},
 		{Name: "change report", Run: changeReport},
 		{Name: "upgrade check", Run: upgradeCheck},
 		{Name: "compliance check", Run: complianceCheck},

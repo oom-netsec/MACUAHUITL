@@ -30,6 +30,7 @@ uso: mctl <comando>
         export --cert C [--chain CA] [--key LLAVE] --format p12|p12-legacy|pem|der -o SALIDA | decode -f ARCHIVO
   ike   decode -f ARCHIVO [--json]   (debug/show de IKEv1, IKEv2 e IPsec)
   change create -f cambio.yaml | pre|post [--accept HUELLA]... [--exclude EQUIPO]... ID | list
+         diff ID [--device EQUIPO] [--json]   (líneas de configuración que cambiaron entre PRE y POST)
          report ID | report --pre CARPETA --post CARPETA   [--json]
   upgrade check --outputs ARCHIVO --image NOMBRE [--size BYTES] [--md5 HEX] [--verify ARCHIVO] [--json]
   compliance check --config ARCHIVO [--template ARCHIVO] [--json]

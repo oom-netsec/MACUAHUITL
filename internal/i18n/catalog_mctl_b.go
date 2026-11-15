@@ -123,11 +123,13 @@ func init() {
 		"mctl.calc.route_num":    e("ruta {route:q}: {key}={value:q} no es un número", "route {route:q}: {key}={value:q} is not a number"),
 
 		// change
-		"mctl.change.need_id":    e("change {name} necesita el ID del cambio", "change {name} needs the change ID"),
-		"mctl.change.unarmed":    e("trabajo {job} creado sin armar: {detail}\nrevisa con: mctl job logintest {job}\ny repite con: mctl change {name} --accept HUELLA {id} (o arma con mctl job arm)", "job {job} created but not armed: {detail}\ncheck with: mctl job logintest {job}\nand repeat with: mctl change {name} --accept FINGERPRINT {id} (or arm with mctl job arm)"),
-		"mctl.change.unarmed_er": e("captura {name} sin armar", "capture {name} not armed"),
-		"mctl.change.capturing":  e("captura {name} en trabajo {job}; síguela con: mctl job watch {job}", "capture {name} in job {job}; follow it with: mctl job watch {job}"),
-		"mctl.change.regression": e("{n} equipos con regresión", "{n} {n|device|devices} with regression"),
+		"mctl.change.need_id":        e("change {name} necesita el ID del cambio", "change {name} needs the change ID"),
+		"mctl.change.unarmed":        e("trabajo {job} creado sin armar: {detail}\nrevisa con: mctl job logintest {job}\ny repite con: mctl change {name} --accept HUELLA {id} (o arma con mctl job arm)", "job {job} created but not armed: {detail}\ncheck with: mctl job logintest {job}\nand repeat with: mctl change {name} --accept FINGERPRINT {id} (or arm with mctl job arm)"),
+		"mctl.change.unarmed_er":     e("captura {name} sin armar", "capture {name} not armed"),
+		"mctl.change.capturing":      e("captura {name} en trabajo {job}; síguela con: mctl job watch {job}", "capture {name} in job {job}; follow it with: mctl job watch {job}"),
+		"mctl.change.diff_none":      e("sin diferencias de configuración", "no configuration differences"),
+		"mctl.change.diff_no_device": e("ningún equipo del cambio coincide con «{device}»", "no device of the change matches \"{device}\""),
+		"mctl.change.regression":     e("{n} equipos con regresión", "{n} {n|device|devices} with regression"),
 
 		// cleaner
 		"mctl.cleaner.same_file": e("la salida no puede ser el archivo de entrada: la limpieza no sobrescribe el original", "the output cannot be the input file: cleaning does not overwrite the original"),

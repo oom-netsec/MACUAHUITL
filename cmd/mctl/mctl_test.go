@@ -358,6 +358,15 @@ func TestChangeCommands(t *testing.T) {
 	if !strings.Contains(out, "SIN CAMBIOS INESPERADOS") {
 		t.Fatalf("report = %q", out)
 	}
+	if out := must(t, "", "change", "diff", id); !strings.Contains(out, "sin diferencias de configuración") {
+		t.Fatalf("diff de una captura idéntica = %q", out)
+	}
+	if out := must(t, "", "change", "diff", id, "--json"); !strings.Contains(out, `"config_diff":[]`) {
+		t.Fatalf("diff --json = %q", out)
+	}
+	if _, err := mctl(t, "", "change", "diff", id, "--device", "no-existe"); err == nil {
+		t.Fatal("diff con un --device inexistente debía fallar")
+	}
 	dirs, _ := filepath.Glob(filepath.Join(e.out, "crq-1-p*_*"))
 	sort.Strings(dirs) // crq-1-post_… antes que crq-1-pre_…
 	if out := must(t, "", "change", "report", "--pre", dirs[1], "--post", dirs[0], "--json"); !strings.Contains(out, `"verdict":"ok"`) {

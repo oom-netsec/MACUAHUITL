@@ -67,6 +67,8 @@ func init() {
 		"mctl.flag.cert":                         {Es: "certificado PEM", En: "PEM certificate"},
 		"mctl.flag.chain":                        {Es: "cadena PEM (p. ej. ca.crt.pem)", En: "PEM chain (e.g. ca.crt.pem)"},
 		"mctl.flag.change.create.f":              {Es: "archivo YAML (mismo formato que job create)", En: "YAML file (same format as job create)"},
+		"mctl.flag.change.diff.device":           {Es: "equipo (parte del nombre o la IP)", En: "device (part of the name or the IP)"},
+		"mctl.flag.change.diff.json":             {Es: "salida JSON", En: "JSON output"},
 		"mctl.flag.change.report.json":           {Es: "salida JSON", En: "JSON output"},
 		"mctl.flag.cmd":                          {Es: "comando a autorizar, p. ej. \"show running-config\"", En: "command to authorize, e.g. \"show running-config\""},
 		"mctl.flag.cn":                           {Es: "Common Name", En: "Common Name"},
