@@ -645,6 +645,12 @@ func maskLogged(cmd, platform string, counts map[string]int) string {
 	})
 }
 
+// Cmd enmascara un comando suelto del que se perdió su bloque (una línea rechazada, citada en un log): las reglas más
+// los key/password/secret/token sueltos. Para quien muestra una línea sin saber de qué sección venía.
+func Cmd(platform, cmd string) string {
+	return maskLogged(cmd, platform, map[string]int{})
+}
+
 func maskCited(cmd string, counts map[string]int) string {
 	return citedSecret.ReplaceAllStringFunc(cmd, func(m string) string {
 		sm := citedSecret.FindStringSubmatch(m)
