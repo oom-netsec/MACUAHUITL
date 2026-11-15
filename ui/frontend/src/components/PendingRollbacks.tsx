@@ -41,6 +41,10 @@ function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: Assist
   const rotation = r.kind === "credrotate" && !r.unreadable;
   const rotDevice = (r.devices[0]?.device || r.runId).trim(); // nunca vacío: escribir nada no habilita Descartar
   const [typed, setTyped] = useState("");
+  // Con el usuario rotado y la credencial asociada (campos 9 y 10 del núcleo) el aviso es exacto; sin ellos, el texto general.
+  const rotationText = !r.rotatedUser ? [t("pending.discard.rotation", { device: rotDevice })]
+    : [t("pending.discard.rotation.user", { device: rotDevice, user: r.rotatedUser }), t(!r.updateCredentialId ? "pending.discard.noVaultCred" : r.generatedSecret ? "pending.discard.vaultStaleGen" : "pending.discard.vaultStale", { user: r.rotatedUser })];
+  if (r.generatedSecret) rotationText.push(t("pending.discard.generated"));
   const old = age > OLD_SECONDS || needAge;
   const ageLabel = ageText(age, t);
   const gated = plan && old && !accepted; // sin aceptar, el flujo asistido no recibe el plan: no hay con qué iniciar
@@ -79,6 +83,7 @@ function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: Assist
         {r.unreadable ? <Notice kind="warn">{t("pending.unreadable")}</Notice> : <>
           {r.devices.map((d) => <div key={d.device}>{r.devices.length > 1 && <p className="meta">{d.device}</p>}<CodeLines lines={d.rollbackLines} mark="↺" /></div>)}
           {r.writeMemory && <Notice kind="warn">{t("pending.writeMem")}</Notice>}
+          {r.devices.some((d) => d.provisional) && <Notice kind="warn">{t("pending.provisional", { devices: r.devices.filter((d) => d.provisional).map((d) => d.device).join(", ") })}</Notice>}
         </>}
         {err && <Notice kind="error">{err}</Notice>}
         {applying && <p className="meta">{t("pending.revertNote")}</p>}
@@ -95,7 +100,7 @@ function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: Assist
         {!live && !gone && rotation && (
           // Descartar una rotación deja al equipo con la contraseña nueva y a la bóveda con la anterior: aviso y nombre del equipo escrito.
           <div className="pending-discard-rotation">
-            <Notice kind="warn">{t("pending.discard.rotation", { device: rotDevice })}{r.generatedSecret && <> {t("pending.discard.generated")}</>}</Notice>
+            <Notice kind="warn">{rotationText.join(" ")}</Notice>
             <Field label={t("pending.discard.typeName", { device: rotDevice })} hint={t("pending.discard.typeHint")} value={typed} onChange={setTyped} w="md" mono />
             <div className="actions">
               {typed.trim() === rotDevice

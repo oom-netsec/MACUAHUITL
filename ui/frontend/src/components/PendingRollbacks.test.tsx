@@ -306,6 +306,7 @@ test("descartar una rotación avisa que la bóveda queda con la contraseña ante
   const core = coreWith([rb({ kind: "credrotate", devices: [{ device: "SW1", rollbackLines: ["username admin secret ⟦oculto⟧"] }] })]);
   render(<PendingRollbacks core={core} />);
   expect(await screen.findByText(/puede dejar a SW1 con la contraseña nueva/)).toBeInTheDocument();
+  expect(screen.getByText(/Si la bóveda guarda la credencial de ese usuario/)).toBeInTheDocument(); // texto general: reversa sin usuario rotado
   expect(screen.queryByText(/nadie la conoce/)).toBeNull(); // la escribió la persona
   const discardBtn = () => screen.getByRole("button", { name: "Descartar" });
   expect(discardBtn()).toBeDisabled();
@@ -344,4 +345,34 @@ test("nombres con espacios alrededor se comparan recortados", async () => {
   render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", devices: [{ device: " SW1 ", rollbackLines: [] }] })])} />);
   await userEvent.type(await screen.findByLabelText("Escribe SW1 para confirmar que descartas"), "SW1 ");
   expect(screen.getByRole("button", { name: "Descartar" })).toBeEnabled();
+});
+
+test("con el usuario rotado y su credencial de bóveda, el aviso los nombra", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", rotatedUser: "netops", updateCredentialId: "c1" })])} />);
+  expect(await screen.findByText(/contraseña nueva de netops/)).toBeInTheDocument();
+  expect(screen.getByText(/La credencial de netops en la bóveda conserva la anterior/)).toBeInTheDocument();
+});
+
+test("sin credencial de bóveda asociada, el aviso lo dice en vez de hablar de desfase", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", rotatedUser: "netops", updateCredentialId: "" })])} />);
+  expect(await screen.findByText(/No se eligió una credencial de la bóveda.*alguna de netops/)).toBeInTheDocument();
+  expect(screen.queryByText(/si no la actualizaste a mano/)).toBeNull();
+});
+
+test("un equipo provisional avisa que pudo quedar con parte del cambio (cualquier tipo de reversa)", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ devices: [{ device: "SW1", rollbackLines: ["x"], provisional: true }] })])} />);
+  expect(await screen.findByText(/a mitad de la configuración en SW1/)).toBeInTheDocument();
+});
+
+test("sin equipos provisionales no hay aviso de corte a mitad de la configuración", async () => {
+  render(<PendingRollbacks core={coreWith([rb()])} />);
+  await screen.findByRole("button", { name: "Aplicar reversa" });
+  expect(screen.queryByText(/a mitad de la configuración/)).toBeNull();
+});
+
+test("secreto generado con usuario rotado: sin «si no la actualizaste a mano» y con «nadie la conoce»", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", rotatedUser: "netops", updateCredentialId: "c1", generatedSecret: true })])} />);
+  expect(await screen.findByText(/La credencial de netops en la bóveda conserva la anterior y ya no entra/)).toBeInTheDocument();
+  expect(screen.queryByText(/si no la actualizaste a mano/)).toBeNull();
+  expect(screen.getByText(/nadie la conoce/)).toBeInTheDocument();
 });

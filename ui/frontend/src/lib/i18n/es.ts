@@ -2768,6 +2768,11 @@ export const es = {
   "pending.discard.generated": "La app generó la contraseña nueva y nadie la conoce: ese usuario queda sin acceso hasta que otra cuenta con privilegios la cambie o apliques esta reversa.",
   "pending.discard.typeName": "Escribe {device} para confirmar que descartas",
   "pending.discard.typeHint": "«Descartar» se habilita al escribir el nombre exacto del equipo.",
+  "pending.discard.rotation.user": "Descartar esta reversa puede dejar a {device} con la contraseña nueva de {user} (al menos en la running-config). La credencial con la que la app se conecta no cambia.",
+  "pending.discard.vaultStale": "La credencial de {user} en la bóveda conserva la anterior si no la actualizaste a mano, y ya no entra con ella.",
+  "pending.discard.noVaultCred": "No se eligió una credencial de la bóveda para recibir la contraseña nueva: si la bóveda guarda alguna de {user}, conserva la anterior y ya no entra con ella.",
+  "pending.provisional": "El corte fue a mitad de la configuración en {devices}: el equipo pudo quedar con parte o todo el cambio. «Aplicar reversa» se detiene sin tocar el equipo si ya no está como antes del cambio; en ese caso, revierte a mano.",
+  "pending.discard.vaultStaleGen": "La credencial de {user} en la bóveda conserva la anterior y ya no entra con ella.",
 };
 
 export type Key = keyof typeof es;
