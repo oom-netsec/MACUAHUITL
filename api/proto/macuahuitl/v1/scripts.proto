@@ -51,7 +51,7 @@ service ScriptsService {
   rpc ImportTemplate(ImportTemplateRequest) returns (ImportTemplateResponse);
   // Los campos del archivo (cabecera incluida) con tipo, si son obligatorios, un ejemplo y su descripción.
   rpc ImportFormat(ImportFormatRequest) returns (ImportFormatResponse);
-  // Copia un script de un paquete instalado a «Mis scripts» (fase 32b): ID nuevo, editable, nombre «<nombre> (copia)».
+  // Copia un script de un paquete instalado a «Mis scripts» (fase 32b): ID nuevo, editable, nombre «<nombre> (copy)».
   rpc CopyFromPack(CopyFromPackRequest) returns (CopyFromPackResponse);
 }
 

@@ -453,7 +453,7 @@ func (s *svc) CopyFromPack(ctx context.Context, r *v1.CopyFromPackRequest) (*v1.
 	return &v1.CopyFromPackResponse{Script: toPB(c, meta{})}, nil
 }
 
-// duplicate guarda como script del usuario una copia del script id (nombre «<nombre> (copia)»); si ok no es nil, se
+// duplicate guarda como script del usuario una copia del script id (nombre «<nombre> (copy)»); si ok no es nil, se
 // consulta antes de copiar.
 func (s *svc) duplicate(ctx context.Context, id string, ok func(dom.Script) error) (dom.Script, error) {
 	var c dom.Script
@@ -474,7 +474,7 @@ func (s *svc) duplicate(ctx context.Context, id string, ok func(dom.Script) erro
 		now := s.clock().UTC().Truncate(time.Second)
 		c = x
 		c.ID, c.Origin, c.CreatedAt, c.UpdatedAt = dom.NewID(), dom.OrigenUsuario, now, now
-		c.Name = dom.NombreLibre(x.Name, "copia", func(n string) bool { t, _ := s.nameTaken(ctx, user, n, ""); return t })
+		c.Name = dom.NombreLibre(x.Name, "copy", func(n string) bool { t, _ := s.nameTaken(ctx, user, n, ""); return t })
 		if err := put(tx, c); err != nil {
 			return internal(err)
 		}

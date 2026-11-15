@@ -40,7 +40,7 @@ test("write memory es obligatorio: no hay casilla y el aviso explica la bóveda 
   const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
   await open(core);
   expect(screen.queryByLabelText(/write memory/i)).not.toBeInTheDocument();
-  expect(screen.getByText(/write memory es obligatorio/)).toHaveTextContent(/\(anterior\)/);
+  expect(screen.getByText(/write memory es obligatorio/)).toHaveTextContent(/\(previous\)/);
   expect(screen.getByText(/write memory es obligatorio/)).toHaveTextContent(/se propone la reversa/);
   await userEvent.type(screen.getByLabelText("Secreto nuevo"), NEW);
   await userEvent.click(planBtn());

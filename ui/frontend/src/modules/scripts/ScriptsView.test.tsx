@@ -73,7 +73,7 @@ test("un script de la biblioteca se ve con sus comandos, sin editar ni borrar, p
   await userEvent.click(within(detail).getByRole("button", { name: "Duplicar" }));
   expect(core.duplicateScript).toHaveBeenCalledWith("lib-l2-stp");
   await mine();
-  expect(await screen.findByRole("button", { name: "L2 · STP (copia)" })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "L2 · STP (copy)" })).toBeInTheDocument();
 });
 
 test("borrar un script propio pide confirmación", async () => {

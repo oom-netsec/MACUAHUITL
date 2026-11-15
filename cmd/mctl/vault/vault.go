@@ -164,7 +164,7 @@ const help = `  vault status | create | unlock | lock | passwd
   cred  list | add --label L --user U [--no-enable] | rm ID
   cred  backup export RUTA [--overwrite] [--yes]  |  backup import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
         (respaldo cifrado de la bóveda con una frase propia, distinta de la maestra y de al menos 12 caracteres; la frase se lee de la terminal o de stdin, nunca como argumento.
-         export exige --yes: el archivo trae todas tus credenciales. import muestra el estado de cada una: nueva, igual, conflicto_etiqueta o reservada (se omite);
+         export exige --yes: el archivo trae todas tus credenciales. import muestra el estado de cada una: new, same, label_conflict o reserved (se omite);
          cada conflicto necesita una decisión por ID o etiqueta, o --all; si falta una no se importa nada)`
 
 // Area registra los comandos de vault.

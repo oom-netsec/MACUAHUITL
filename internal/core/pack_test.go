@@ -512,11 +512,11 @@ func TestPackCopiarAMisScripts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Script.Id == "lib-l2-stp" || c.Script.Origin != "usuario" || c.Script.Name != orig.Script.Name+" (copia)" || !slices.Equal(c.Script.Commands, orig.Script.Commands) {
+	if c.Script.Id == "lib-l2-stp" || c.Script.Origin != "usuario" || c.Script.Name != orig.Script.Name+" (copy)" || !slices.Equal(c.Script.Commands, orig.Script.Commands) {
 		t.Fatalf("copia = %+v", c.Script)
 	}
 	c2, err := sc.CopyFromPack(ctx(t), &v1.CopyFromPackRequest{Id: "lib-l2-stp"})
-	if err != nil || c2.Script.Name != orig.Script.Name+" (copia 2)" {
+	if err != nil || c2.Script.Name != orig.Script.Name+" (copy 2)" {
 		t.Fatalf("segunda copia = %+v %v", c2, err)
 	}
 	// Editable.

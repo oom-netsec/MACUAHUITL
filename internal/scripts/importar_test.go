@@ -77,17 +77,17 @@ func TestApplyDecisiones(t *testing.T) {
 	if x := w[a.ID]; x.Commands[0] != "show clock" || !x.CreatedAt.Equal(a.CreatedAt) || !x.UpdatedAt.Equal(ahora) {
 		t.Errorf("reemplazo = %+v", x)
 	}
-	// renombrar: ID nuevo y «(importado)»
+	// renombrar: ID nuevo y «(imported)»
 	var ren Script
 	for id, x := range w {
-		if strings.HasSuffix(x.Name, "(importado)") {
+		if strings.HasSuffix(x.Name, "(imported)") {
 			ren = x
 			if id == cnom.ID {
 				t.Error("renombrar debe dar un ID nuevo")
 			}
 		}
 	}
-	if ren.Name != b.Name+" (importado)" {
+	if ren.Name != b.Name+" (imported)" {
 		t.Errorf("renombrado = %q", ren.Name)
 	}
 }
@@ -165,7 +165,7 @@ func TestApplyRenombreEvitaNombresDelArchivo(t *testing.T) {
 	g := muestra(1)
 	g.Name = "Foo"
 	f1 := con(muestra(2), func(s *Script) { s.Name = "Foo" })
-	f2 := con(muestra(3), func(s *Script) { s.Name = "Foo (importado)" })
+	f2 := con(muestra(3), func(s *Script) { s.Name = "Foo (imported)" })
 	items := Plan([]Script{f1, f2}, []Script{g}, nil)
 	r, err := Apply(items, map[string]string{f1.ID: Renombrar}, []Script{g}, nil, ahora)
 	if err != nil || len(r.Writes) != 2 {
@@ -178,7 +178,7 @@ func TestApplyRenombreEvitaNombresDelArchivo(t *testing.T) {
 		}
 		nombres[NameKey(w.Name)] = true
 	}
-	if !nombres[NameKey("Foo (importado 2)")] {
+	if !nombres[NameKey("Foo (imported 2)")] {
 		t.Errorf("nombres = %v", nombres)
 	}
 }
@@ -199,7 +199,7 @@ func TestPlanYApplyContraLaBibliotecaLocal(t *testing.T) {
 		t.Fatalf("reemplazar la biblioteca: %v", err)
 	}
 	r, err := Apply(p, map[string]string{otra.ID: Renombrar}, nil, []Script{lib}, ahora)
-	if err != nil || r.Writes[0].Name != "L2 · STP (importado)" || IsLib(r.Writes[0].ID) {
+	if err != nil || r.Writes[0].Name != "L2 · STP (imported)" || IsLib(r.Writes[0].ID) {
 		t.Fatalf("renombrar: %+v %v", r, err)
 	}
 	// un script de usuario con el nombre de uno de la biblioteca también choca con ella
@@ -214,16 +214,16 @@ func TestPlanYApplyContraLaBibliotecaLocal(t *testing.T) {
 }
 
 func TestNombreLibre(t *testing.T) {
-	tomados := map[string]bool{"x (importado)": true, "x (importado 2)": true}
+	tomados := map[string]bool{"x (imported)": true, "x (imported 2)": true}
 	usado := func(n string) bool { return tomados[n] }
-	if got := NombreLibre("x", "importado", usado); got != "x (importado 3)" {
+	if got := NombreLibre("x", "imported", usado); got != "x (imported 3)" {
 		t.Errorf("got %q", got)
 	}
-	if got := NombreLibre("y", "importado", usado); got != "y (importado)" {
+	if got := NombreLibre("y", "imported", usado); got != "y (imported)" {
 		t.Errorf("got %q", got)
 	}
 	largo := strings.Repeat("n", 64)
-	if got := NombreLibre(largo, "copia", func(string) bool { return false }); len([]rune(got)) > MaxName || !strings.HasSuffix(got, " (copia)") {
+	if got := NombreLibre(largo, "copy", func(string) bool { return false }); len([]rune(got)) > MaxName || !strings.HasSuffix(got, " (copy)") {
 		t.Errorf("largo: %q", got)
 	}
 }

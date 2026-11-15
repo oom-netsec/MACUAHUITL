@@ -16,7 +16,7 @@ const help = `  cred rotate EQUIPO[:PUERTO] --user U --cred ID [--update-cred ID
         (rota el secreto de un usuario local de un equipo; --cred es la credencial con la que te conectas y debe ser de OTRO usuario;
          el secreto nuevo se lee de la terminal o de stdin, o con --generate lo crea el núcleo (exige --update-cred); si la sesión nueva
          entra, se pide write memory (obligatorio: sin él el equipo vuelve al hash anterior al reiniciar); solo si sale [OK],
-         --update-cred deja el secreto en la bóveda y la credencial anterior se conserva como "<etiqueta> (anterior)";
+         --update-cred deja el secreto en la bóveda y la credencial anterior se conserva como "<etiqueta> (previous)";
          si la sesión nueva no entra o rechazas write memory, se propone la reversa por la sesión original)`
 
 func rotate(c *cli.Env, args []string) error {

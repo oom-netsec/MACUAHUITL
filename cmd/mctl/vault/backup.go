@@ -124,7 +124,7 @@ func backupImport(c *cli.Env, args []string) error {
 	var req []*v1.VaultBackupDecision
 	var missing []string
 	for _, it := range p.Items {
-		fmt.Fprintf(tw, "%s\t%s\t%s\n", it.Id, it.Label, it.State)
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", it.Id, it.Label, cli.StateText(it.State))
 		a, ok := dec[it.Id]
 		if !ok {
 			a, ok = dec[it.Label]

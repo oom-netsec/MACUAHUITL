@@ -48,7 +48,7 @@ func TestCredBackupExportImportPuntaAPunta(t *testing.T) {
 
 	// Importar sobre la misma bóveda: todo igual.
 	out = nota(must(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta))
-	if strings.Count(out, "igual") < 2 || !strings.Contains(out, "2 iguales") {
+	if strings.Count(out, "same") < 2 || !strings.Contains(out, "2 iguales") {
 		t.Fatalf("import igual:\n%s", out)
 	}
 	if strings.Contains(out, "USR-") {
@@ -80,7 +80,7 @@ func TestCredBackupExportImportPuntaAPunta(t *testing.T) {
 	must(t, "OTRO-PW\n", "cred", "add", "--label", "core", "--user", "USR-CORE", "--no-enable")
 	out, err := mctl(t, "frase-respaldo-1\n", "cred", "backup", "import", ruta, "--preview")
 	nota(out)
-	if err != nil || !strings.Contains(out, "conflicto_etiqueta") || !strings.Contains(out, "nueva") {
+	if err != nil || !strings.Contains(out, "label_conflict") || !strings.Contains(out, "new") {
 		t.Fatalf("preview: %v\n%s", err, out)
 	}
 	if n := strings.Count(must(t, "", "cred", "list"), "\n"); n != 1 {

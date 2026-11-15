@@ -80,7 +80,7 @@ func TestPackExportImport(t *testing.T) {
 		t.Fatal("pisó el archivo")
 	}
 	must(t, "", "scripts", "rm", id)
-	if o := must(t, "", "pack", "import", f, "--preview"); !strings.Contains(o, "nuevo") || strings.Contains(o, "importados") {
+	if o := must(t, "", "pack", "import", f, "--preview"); !strings.Contains(o, "new") || strings.Contains(o, "importados") {
 		t.Fatalf("preview: %q", o)
 	}
 	if o := must(t, "", "pack", "import", f); !strings.Contains(o, "scripts 1 nuevos") {
@@ -90,7 +90,7 @@ func TestPackExportImport(t *testing.T) {
 		t.Fatalf("list: %q", o)
 	}
 	// Sin decisión para un conflicto no se importa nada; con --all=renombrar entra con otro nombre.
-	if o := must(t, "", "pack", "import", f); !strings.Contains(o, "igual") {
+	if o := must(t, "", "pack", "import", f); !strings.Contains(o, "same") {
 		t.Fatalf("segundo import: %q", o)
 	}
 	if _, err := mctl(t, "", "pack", "import", f, "--decision", "x=reemplazar"); err == nil {
@@ -134,7 +134,7 @@ func TestPackExportImportEnIngles(t *testing.T) {
 	has(t, "export en", enMust(t, "", "pack", "export", "acme/mio", id, "--out", f), "exported acme/mio", "unsigned, to "+f, "sha256 ")
 	must(t, "", "scripts", "rm", id)
 	must(t, "show version\n", "scripts", "add", "Mi script", "--tech", "l2", "--platform", "ios-xe") // mismo nombre, otro contenido
-	has(t, "preview en", enMust(t, "", "pack", "import", f, "--preview"), "KIND", "NAME", "STATE", "CONFLICTS WITH", "conflicto_nombre")
+	has(t, "preview en", enMust(t, "", "pack", "import", f, "--preview"), "KIND", "NAME", "STATE", "CONFLICTS WITH", "name_conflict")
 	_, err := en(t, "", "pack", "import", f)
 	if err == nil || !strings.Contains(err.Error(), "nothing imported: 1 conflict(s) need a decision") {
 		t.Fatalf("sin decidir: %v", err)

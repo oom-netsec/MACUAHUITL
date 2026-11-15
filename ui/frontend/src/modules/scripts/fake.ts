@@ -93,7 +93,7 @@ export function fakeScripts(initial: ScriptItem[] = sampleScripts) {
     }),
     duplicateScript: vi.fn(async (id: string) => {
       const src = find(id);
-      const copy = { ...src, id: String(++n).padStart(32, "0"), name: `${src.name} (copia)`, origin: "usuario" as const };
+      const copy = { ...src, id: String(++n).padStart(32, "0"), name: `${src.name} (copy)`, origin: "usuario" as const };
       all = [...all, copy];
       return view(copy);
     }),

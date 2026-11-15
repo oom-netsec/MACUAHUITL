@@ -476,7 +476,7 @@ func TestImportColeccionesEstadosDecisionesYReferencias(t *testing.T) {
 	if rep.Name != "Choca ID" || unidos(rep.ScriptIds) != unidos([]string{ids[0], ids[1]}) || rep.Order != 2 {
 		t.Errorf("reemplazada = %v", rep)
 	}
-	ren := porNombre(l.Collections, "Choca nombre (importado)")
+	ren := porNombre(l.Collections, "Choca nombre (imported)")
 	if ren == nil || ren.Id == c3.Id || unidos(ren.ScriptIds) != ids[1] {
 		t.Errorf("renombrada = %v", ren)
 	}
@@ -517,7 +517,7 @@ func TestImportColeccionesReflejaLosIDsReasignadosOmitidosYLibInexistente(t *tes
 	}
 	// la primera referencia apunta al ID nuevo del renombrado, no al del archivo
 	ren := get(t, b, got.ScriptIds[0])
-	if got.ScriptIds[0] == s1.ID || ren.Name != "mio (importado)" || ren.Origin != "usuario" {
+	if got.ScriptIds[0] == s1.ID || ren.Name != "mio (imported)" || ren.Origin != "usuario" {
 		t.Errorf("referencia reasignada = %s (%v)", got.ScriptIds[0], ren)
 	}
 	for _, id := range got.ScriptIds {
@@ -862,7 +862,7 @@ func TestImportFavoritosRecibeLaCopiaRenombrada(t *testing.T) {
 		t.Fatalf("apply = %v err = %v", ap, err)
 	}
 	fav := colGet(t, a, "favoritos").ScriptIds
-	if len(fav) != 2 || fav[0] != x.Id || get(t, a, fav[1]).Name != "X (importado)" {
+	if len(fav) != 2 || fav[0] != x.Id || get(t, a, fav[1]).Name != "X (imported)" {
 		t.Errorf("favoritos = %v", fav)
 	}
 }

@@ -142,7 +142,7 @@ func TestCredRotateNeverPrintsSecretAndUpdatesVault(t *testing.T) {
 	if !strings.Contains(out, "<oculto>") {
 		t.Fatalf("el plan debe mostrar los secretos ocultos:\n%s", out)
 	}
-	if !strings.Contains(out, "write memory es obligatorio") || !strings.Contains(out, "(anterior)") {
+	if !strings.Contains(out, "write memory es obligatorio") || !strings.Contains(out, "(previous)") {
 		t.Fatalf("el plan debe avisar de write memory obligatorio y de la credencial anterior:\n%s", out)
 	}
 	out = must(t, techNew+"\ns\ns\n", append(args, "--asistido")...) // aplicar y write memory
@@ -158,7 +158,7 @@ func TestCredRotateNeverPrintsSecretAndUpdatesVault(t *testing.T) {
 	if got := strings.Join(e.rec.Lines(), "|"); !strings.Contains(got, "secret "+techNew) || !strings.Contains(got, "!write memory") {
 		t.Fatalf("el equipo recibió %q", got)
 	}
-	if l := must(t, "", "cred", "list"); !strings.Contains(l, "tech (anterior)") {
+	if l := must(t, "", "cred", "list"); !strings.Contains(l, "tech (previous)") {
 		t.Fatalf("la credencial anterior debe conservarse en la bóveda:\n%s", l)
 	}
 }
@@ -174,7 +174,7 @@ func TestCredRotateRejectedWriteMemoryOffersRollbackAndKeepsVault(t *testing.T) 
 	if got := strings.Join(e.rec.Lines(), "|"); strings.Contains(got, "!write memory") || !strings.Contains(got, "secret 9 $9$") {
 		t.Fatalf("el equipo recibió %q", got)
 	}
-	if l := must(t, "", "cred", "list"); strings.Contains(l, "(anterior)") {
+	if l := must(t, "", "cred", "list"); strings.Contains(l, "(previous)") {
 		t.Fatalf("la bóveda no debía cambiar:\n%s", l)
 	}
 	for _, s := range []string{techNew, techOld} {
@@ -222,13 +222,13 @@ func TestSnippetListShowsTheCatalogByTech(t *testing.T) {
 	snippetRig(t, nil)
 	out := must(t, "", "snippet", "list")
 	for _, w := range []string{"l2", "speed-duplex", "storm-control", "port-security", "errdisable-recovery", "interfaces", "ipv4_mask", "(obligatorio)", "shutdown|trap",
-		"\ngestion\n", "\nseguridad\n", "ruta-estatica", "loopback", "helper-address", "ntp-server", "logging-host", "snmp-community", "snmpv3-usuario", "banner-motd", "vty-acl", "secret"} {
+		"\nmanagement\n", "\nsecurity\n", "ruta-estatica", "loopback", "helper-address", "ntp-server", "logging-host", "snmp-community", "snmpv3-usuario", "banner-motd", "vty-acl", "secret"} {
 		if !strings.Contains(out, w) {
 			t.Errorf("falta %q:\n%s", w, out)
 		}
 	}
 	last := -1
-	for _, tech := range []string{"\nl2\n", "\nl3\n", "\ngestion\n", "\nseguridad\n"} {
+	for _, tech := range []string{"\nl2\n", "\nl3\n", "\nmanagement\n", "\nsecurity\n"} {
 		if i := strings.Index(out, tech); i < last {
 			t.Errorf("la tecnología %q va fuera del orden del catálogo:\n%s", tech, out)
 		} else {

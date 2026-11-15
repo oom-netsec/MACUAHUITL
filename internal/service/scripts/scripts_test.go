@@ -240,10 +240,10 @@ func TestDuplicar(t *testing.T) {
 	s, _ := nuevoSvc(t)
 	a := guardar(t, s, "Uno", "show clock")
 	c1, err := s.DuplicateScript(bg, &v1.DuplicateScriptRequest{Id: a.Id})
-	if err != nil || c1.Script.Name != "Uno (copia)" || c1.Script.Id == a.Id || c1.Script.Origin != "usuario" || c1.Script.Commands[0] != "show clock" {
+	if err != nil || c1.Script.Name != "Uno (copy)" || c1.Script.Id == a.Id || c1.Script.Origin != "usuario" || c1.Script.Commands[0] != "show clock" {
 		t.Fatalf("copia = %v err = %v", c1, err)
 	}
-	if c2, _ := s.DuplicateScript(bg, &v1.DuplicateScriptRequest{Id: a.Id}); c2.Script.Name != "Uno (copia 2)" {
+	if c2, _ := s.DuplicateScript(bg, &v1.DuplicateScriptRequest{Id: a.Id}); c2.Script.Name != "Uno (copy 2)" {
 		t.Errorf("segunda copia = %q", c2.Script.Name)
 	}
 	// duplicar uno de la biblioteca da un script del usuario editable
@@ -424,7 +424,7 @@ func TestImportEstadosYDecisiones(t *testing.T) {
 	if get(t, b, idDe["script 01"]).Commands[0] != "show vlan id 2" {
 		t.Error("reemplazar no cambió el contenido")
 	}
-	if r, _ := b.ListScripts(bg, &v1.ListScriptsRequest{Text: "script 02 (importado)"}); len(r.Scripts) != 1 {
+	if r, _ := b.ListScripts(bg, &v1.ListScriptsRequest{Text: "script 02 (imported)"}); len(r.Scripts) != 1 {
 		t.Errorf("renombrado: %d", len(r.Scripts))
 	}
 }
@@ -508,9 +508,9 @@ func TestNombresDeLaBibliotecaEstanOcupados(t *testing.T) {
 	a := guardar(t, s, "Mio", "show clock")
 	_, err = s.SaveScript(bg, &v1.SaveScriptRequest{Script: &v1.Script{Id: a.Id, Name: nombre, Tech: "l2", Platform: "ios-xe", Commands: []string{"show clock"}}})
 	codigo(t, err, codes.AlreadyExists)
-	// duplicar da un nombre libre aunque exista el «(copia)» en la biblioteca
+	// duplicar da un nombre libre aunque exista el «(copy)» en la biblioteca
 	d, err := s.DuplicateScript(bg, &v1.DuplicateScriptRequest{Id: lib[0].ID})
-	if err != nil || d.Script.Name != nombre+" (copia)" {
+	if err != nil || d.Script.Name != nombre+" (copy)" {
 		t.Fatalf("dup = %v %v", d, err)
 	}
 	// importar un script del usuario con el nombre de uno de la biblioteca: conflicto contra la biblioteca

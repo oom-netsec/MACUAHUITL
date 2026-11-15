@@ -59,7 +59,7 @@ func (e *rotExec) Verify(ctx context.Context, dev string) (i18n.Text, error) {
 }
 
 // Saved se llama cuando write memory salió bien con [OK]: solo entonces la bóveda deja de coincidir con el arranque del equipo si no se
-// actualiza. La credencial anterior se guarda como una entrada aparte ("<etiqueta> (anterior)") y la indicada queda con el secreto nuevo.
+// actualiza. La credencial anterior se guarda como una entrada aparte ("<etiqueta> (previous)") y la indicada queda con el secreto nuevo.
 // La entrada anterior solo se borra a mano.
 func (e *rotExec) Saved(_ context.Context, _ string) (i18n.Text, error) {
 	if e.rot.updateCred == "" {
@@ -70,7 +70,7 @@ func (e *rotExec) Saved(_ context.Context, _ string) (i18n.Text, error) {
 	if err != nil {
 		return i18n.Text{}, i18n.Wrap("assist.svc.vault_read_failed", err, nil)
 	}
-	prevLabel := cur.Label + " (anterior)"
+	prevLabel := cur.Label + " (previous)"
 	// Primero la copia: si falla, la credencial vigente no se toca.
 	if _, err = v.Put(vault.Credential{Label: prevLabel, Username: cur.Username, Password: cur.Password, Enable: cur.Enable, SSHKey: cur.SSHKey}); err != nil {
 		cur.Password.Destroy()

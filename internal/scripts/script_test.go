@@ -188,3 +188,16 @@ func TestValidateAceptaFormatoLegitimo(t *testing.T) {
 		t.Fatal("U+061C aceptado")
 	}
 }
+
+// El error de tecnología o plataforma fuera de la lista nombra también el nombre canónico en inglés de cada valor.
+func TestErrorDeTecnologiaListaTambienElIngles(t *testing.T) {
+	s := Script{ID: "lib-x", Origin: OrigenBiblioteca, Name: "X", Tech: "managment", Platform: "ios", Commands: []string{"show clock"}}
+	err := s.Validate()
+	if err == nil || !strings.Contains(err.Error(), "gestion/management") || !strings.Contains(err.Error(), "diagnostico/diagnostics") {
+		t.Fatalf("err = %v", err)
+	}
+	s.Tech, s.Platform = "l2", "cualquier"
+	if err := s.Validate(); err == nil || !strings.Contains(err.Error(), "cualquiera/any") {
+		t.Fatalf("err = %v", err)
+	}
+}
