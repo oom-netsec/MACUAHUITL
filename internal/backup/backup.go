@@ -39,6 +39,9 @@ const (
 
 const stampLayout = "20060102T150405Z"
 
+// maxBump: segundos que Save avanza buscando un sello libre; si no lo halla, no guarda y da error (nunca pisa).
+const maxBump = 60
+
 // DefaultKeep es la retención por equipo y tipo cuando la petición no dice otra.
 const DefaultKeep = 30
 
@@ -168,30 +171,42 @@ func (s Store) dir(device string, create bool) (string, error) {
 	return d, nil
 }
 
-// Save guarda text. Si ese equipo, tipo y momento ya existen no lo pisa y devuelve created=false.
+// Save guarda text. Si ese equipo, tipo y momento ya existen con la misma captura (trabajo y ronda) no lo pisa y
+// devuelve created=false. Si el sello es de otra captura (dos rondas en el mismo segundo), toma el siguiente segundo
+// libre: el ID solo tiene segundos y la segunda ronda se perdería en silencio.
 func (s Store) Save(e Entry, text string) (Entry, bool, error) {
 	e.Device = Sanitize(e.Device)
 	if e.Kind != Running && e.Kind != Startup {
 		return e, false, i18n.New("backup.store.bad_kind", i18n.A("kind", string(e.Kind)))
 	}
 	e.At = e.At.UTC().Truncate(time.Second)
-	e.ID = e.Device + "/" + e.At.Format(stampLayout) + "-" + string(e.Kind)
 	sum := sha256.Sum256([]byte(text))
 	e.Bytes, e.SHA256 = len(text), hex.EncodeToString(sum[:])
-	e.Sig = ""
-	if len(s.Key) > 0 {
-		e.Sig = e.Sign(s.Key)
-	}
 	if _, err := s.dir(e.Device, true); err != nil {
 		return e, false, err
 	}
-	cfg := e.Path(s.Root)
-	if _, err := os.Lstat(cfg); err == nil {
-		if old, _, err := s.Get(e.ID); err == nil {
+	for i := 0; ; i++ {
+		e.ID = e.Device + "/" + e.At.Format(stampLayout) + "-" + string(e.Kind)
+		if _, err := os.Lstat(e.Path(s.Root)); err != nil {
+			break
+		}
+		if i == maxBump {
+			return e, false, i18n.New("backup.store.no_slot", i18n.A("id", e.ID))
+		}
+		old, _, err := s.Get(e.ID)
+		if err != nil {
+			return e, false, nil // ocupado por algo ilegible: no se pisa
+		}
+		if old.Job == e.Job && old.Round == e.Round {
 			return old, false, nil
 		}
-		return e, false, nil
+		e.At = e.At.Add(time.Second)
 	}
+	e.Sig = ""
+	if len(s.Key) > 0 {
+		e.Sig = e.Sign(s.Key) // la firma cubre el ID: va después de elegir el sello
+	}
+	cfg := e.Path(s.Root)
 	meta, _ := json.Marshal(e)
 	// La ficha va primero: nunca queda un .cfg sin ella.
 	if err := writeNew(metaPath(cfg), meta, true); err != nil {

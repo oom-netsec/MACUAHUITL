@@ -268,3 +268,50 @@ func TestFichaSinFirmaOAlteradaNoVerifica(t *testing.T) {
 		t.Error("la ficha original sí verifica")
 	}
 }
+
+// Dos rondas del mismo equipo cuyo comando cae en el mismo segundo son dos respaldos: la segunda toma el siguiente
+// segundo libre en vez de perderse en silencio. Repetir el guardado de una ronda sigue sin duplicar.
+func TestDosRondasEnElMismoSegundoNoSePierden(t *testing.T) {
+	s := Store{Root: t.TempDir()}
+	save := func(round int, text string) (Entry, bool) {
+		t.Helper()
+		e, created, err := s.Save(Entry{Device: "SW1", Kind: Running, At: at(10), Job: "j1", Round: round}, text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e, created
+	}
+	r1, c1 := save(1, "uno\n")
+	r2, c2 := save(2, "dos\n")
+	if !c1 || !c2 || r1.ID == r2.ID {
+		t.Fatalf("ronda 2 perdida: %v %v %s %s", c1, c2, r1.ID, r2.ID)
+	}
+	if _, text, err := s.Get(r2.ID); err != nil || text != "dos\n" {
+		t.Fatalf("ronda 2: %q %v", text, err)
+	}
+	if again, created := save(2, "dos\n"); created || again.ID != r2.ID {
+		t.Fatalf("repetir la ronda 2 duplicó: %v %s", created, again.ID)
+	}
+	if es, _ := s.List("SW1"); len(es) != 2 {
+		t.Fatalf("respaldos = %d, quiero 2", len(es))
+	}
+}
+
+// Sin sello libre en el minuto, Save no pisa ninguna ficha: da error.
+func TestSinSelloLibreNoPisa(t *testing.T) {
+	s := Store{Root: t.TempDir()}
+	for r := 1; r <= maxBump+1; r++ {
+		if _, created, err := s.Save(Entry{Device: "SW1", Kind: Running, At: at(10), Job: "j1", Round: r}, "x\n"); err != nil || !created {
+			t.Fatalf("ronda %d: %v %v", r, created, err)
+		}
+	}
+	if _, created, err := s.Save(Entry{Device: "SW1", Kind: Running, At: at(10), Job: "j1", Round: maxBump + 2}, "y\n"); err == nil || created {
+		t.Fatalf("sin hueco debería fallar: %v %v", created, err)
+	}
+	es, _ := s.List("SW1")
+	for _, e := range es {
+		if e.Round == maxBump+2 {
+			t.Fatalf("se pisó una ficha: %+v", e)
+		}
+	}
+}

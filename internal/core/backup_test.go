@@ -81,11 +81,12 @@ func TestRespaldoDeExtremoAExtremo(t *testing.T) {
 	actionsInOrder(t, audit, "job.arm", "job.finish")
 }
 
-// Programado: el vigilante guarda cada ronda sin que nadie pregunte.
+// Programado: el vigilante guarda cada ronda sin que nadie pregunte. Intervalo de 2 s: con 1 s y -race en CI la
+// ronda 1 podía seguir corriendo al tocar la 2, que entonces se omite por diseño (spec §10.4).
 func TestRespaldoProgramadoSeGuardaSolo(t *testing.T) {
 	h := newHarness(t, nil)
 	cred := h.ready(t)
-	h.backupRun(t, cred, func(r *v1.StartBackupRequest) { r.Startup, r.IntervalSeconds, r.Rounds, r.Keep = false, 1, 2, 5 })
+	h.backupRun(t, cred, func(r *v1.StartBackupRequest) { r.Startup, r.IntervalSeconds, r.Rounds, r.Keep = false, 2, 2, 5 })
 	bc := v1.NewBackupServiceClient(h.conn)
 	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
 		l, err := bc.ListBackups(ctx(t), &v1.ListBackupsRequest{})
@@ -96,5 +97,6 @@ func TestRespaldoProgramadoSeGuardaSolo(t *testing.T) {
 			return
 		}
 	}
-	t.Fatal("no se guardaron las dos rondas")
+	// round.skipped en la auditoría = la ronda 1 seguía corriendo al tocar la 2 (se omite por diseño, spec §10.4).
+	t.Fatalf("no se guardaron las dos rondas; auditoría:\n%s", h.auditText(t))
 }
