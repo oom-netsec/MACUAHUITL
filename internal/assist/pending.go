@@ -91,8 +91,9 @@ func RollbackPlan(l Leftover) (Plan, Function, error) {
 		}
 		dp := DevicePlan{Device: d.Device, Pre: sortedCmds(d.State), Baseline: d.State, Apply: d.Rollback, Rollback: d.Apply, Secrets: d.Secrets}
 		// La vuelta se verifica solo con configuración (running-config, show snmp user): la salida de comandos operativos cambia sin que nadie toque el equipo.
+		// Una línea base vacía también cuenta: «no había nada» (p. ej. ninguna línea snmp-server) es un estado que se puede verificar.
 		for _, c := range sortedCmds(d.Baseline) {
-			if txt := d.Baseline[c]; isConfigCmd(c) && strings.TrimSpace(txt) != "" {
+			if txt := d.Baseline[c]; isConfigCmd(c) {
 				dp.Post = append(dp.Post, c)
 				dp.Expect = append(dp.Expect, Expect{Command: c, Line: txt, Present: true, Column: "same-state"})
 			}
