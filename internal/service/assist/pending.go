@@ -198,7 +198,7 @@ func (s *assistSvc) ListPendingRollbacks(ctx context.Context, _ *v1.ListPendingR
 			continue
 		}
 		id := strings.TrimPrefix(in.Label, pendingPrefix)
-		if s.live(id) {
+		if s.live(id) || s.reversing(id) { // con su ejecución o su reversa en curso, el núcleo rechaza aplicarla o descartarla
 			continue
 		}
 		rec, err := s.loadPending(in.Label)

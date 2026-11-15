@@ -521,3 +521,25 @@ func TestSaveFailedIsAuditedOncePerRun(t *testing.T) {
 		t.Fatalf("save_failed auditado %d veces", n)
 	}
 }
+
+// Mientras corre la reversa de una entrada, la lista no la ofrece (antes salía con «Aplicar» y «Descartar», que el núcleo
+// rechazaba); al terminar sin completar vuelve a aparecer.
+func TestListHidesTheEntryWhileItsRollbackRunIsAlive(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	nrun, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.waitState(nrun, "waiting-confirm")
+	l, err := r.svc.ListPendingRollbacks(context.Background(), &v1.ListPendingRollbacksRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range l.Rollbacks {
+		if p.RunId == run {
+			t.Fatalf("la entrada %s se ofrece con su reversa en curso", run)
+		}
+	}
+	r.confirmAll(nrun, "done")
+}
