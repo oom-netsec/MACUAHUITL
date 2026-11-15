@@ -54,6 +54,8 @@ type persister struct {
 	runID string
 	t     target
 	saved bool
+	// failed: el fallo de guardado ya se auditó (una sola vez por ejecución, aunque la bóveda siga cerrada en cada sync)
+	failed bool
 }
 
 // sync es el Persist del motor: lo que sigue sin revertir (nil = nada).
@@ -68,12 +70,19 @@ func (p *persister) sync(lo *assist.Leftover) {
 }
 
 func (p *persister) save(lo *assist.Leftover, ended time.Time, st assist.State) {
+	if p.s.isDiscarded(p.runID) {
+		return
+	}
 	rec := pendingRec{RunID: p.runID, Kind: lo.Function, Ended: ended, Updated: p.s.d.Now(), Host: p.t.host, Port: p.t.port, Cred: p.t.cred, Leftover: *lo}
 	if err := p.s.savePending(rec); err != nil {
+		if p.failed {
+			return
+		}
+		p.failed = true
 		p.s.d.Audit("assist.pending_rollback.save_failed", rec.RunID, "the pending rollback could not be saved: "+i18n.English(err))
 		return
 	}
-	p.saved = true
+	p.saved, p.failed = true, false
 	if ended.IsZero() {
 		return
 	}
@@ -132,6 +141,29 @@ func (s *assistSvc) loadPending(label string) (pendingRec, error) {
 	defer c.SSHKey.Destroy()
 	var rec pendingRec
 	return rec, json.Unmarshal(c.Password.Bytes(), &rec)
+}
+
+func (s *assistSvc) isDiscarded(runID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.discarded[runID]
+}
+
+// reversing dice si hay una ejecución de reversa viva de la entrada de runID.
+func (s *assistSvc) reversing(runID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, rr := range s.runs {
+		if rr.origin != runID {
+			continue
+		}
+		select {
+		case <-rr.run.Done():
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 // live dice si la ejecución sigue viva en este núcleo (su reversa no se ofrece hasta que termine).
@@ -193,6 +225,12 @@ func (s *assistSvc) DiscardPendingRollback(ctx context.Context, r *v1.DiscardPen
 	if s.live(r.RunId) {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_en_curso", i18n.A("id", r.RunId))
 	}
+	if s.reversing(r.RunId) {
+		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_aplicandose", i18n.A("id", r.RunId))
+	}
+	s.mu.Lock()
+	s.discarded[r.RunId] = true // antes de borrar: una ejecución que justo termina no la vuelve a guardar
+	s.mu.Unlock()
 	if err := s.d.Vault().DeleteReserved(pendingPrefix + r.RunId); err != nil {
 		if errors.Is(err, vault.ErrNotFound) {
 			return nil, service.Err(ctx, codes.NotFound, "assist.svc.reversa_no_existe", i18n.A("id", r.RunId))

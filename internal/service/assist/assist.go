@@ -61,6 +61,7 @@ type runRec struct {
 	started  time.Time
 	ended    time.Time // cero mientras viva; protegido por assistSvc.mu
 	keys     []string  // (equipo, interfaz) que la ejecución tiene tomados
+	origin   string    // si es una ejecución de reversa, la ejecución original cuya reversa aplica
 }
 
 type assistSvc struct {
@@ -72,12 +73,13 @@ type assistSvc struct {
 	// ctx vive mientras el núcleo: cancelarlo (Close) hace que las ejecuciones se abandonen.
 	ctx             context.Context
 	cancel          context.CancelFunc
-	decisionTimeout time.Duration // 0 = assist.DefaultDecisionTimeout
+	decisionTimeout time.Duration   // 0 = assist.DefaultDecisionTimeout
+	discarded       map[string]bool // reversas pendientes descartadas: ni Persist ni afterRun las vuelven a guardar (protegido por mu)
 }
 
 func newSvc(d service.Deps) *assistSvc {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &assistSvc{d: d, plans: map[string]*planRec{}, runs: map[string]*runRec{}, ctx: ctx, cancel: cancel}
+	return &assistSvc{d: d, plans: map[string]*planRec{}, runs: map[string]*runRec{}, discarded: map[string]bool{}, ctx: ctx, cancel: cancel}
 }
 
 // Close cancela las ejecuciones vivas y espera a que cada una cierre su sesión, audite en qué quedó y
@@ -582,7 +584,7 @@ func (s *assistSvc) launch(ctx context.Context, rec *planRec, planID string, key
 	delete(s.plans, planID)
 	now := s.d.Now()
 	s.pruneRunsLocked(now)
-	rr := &runRec{run: run, finished: make(chan struct{}), started: now, keys: keys}
+	rr := &runRec{run: run, finished: make(chan struct{}), started: now, keys: keys, origin: origin}
 	s.runs[runID] = rr
 	s.mu.Unlock()
 	run.Start(s.ctx)

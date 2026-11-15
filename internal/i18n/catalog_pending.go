@@ -11,6 +11,7 @@ func init() {
 		"mctl.ports.rollback_write_memory": e("  AVISO: la startup-config puede conservar el cambio; la reversa no hace write memory.", "  NOTE: the startup-config may keep the change; the rollback does not do write memory."),
 		"mctl.ports.rollback_unreadable":   e("Reversa de la ejecución {run}: ilegible (descártala con: mctl ports rollback discard {run})", "Rollback of run {run}: unreadable (discard it with: mctl ports rollback discard {run})", "run"),
 		"mctl.ports.rollback_discarded":    e("Reversa {run} descartada.", "Rollback {run} discarded.", "run"),
+		"assist.svc.reversa_aplicandose":   e("la reversa de {id} se está aplicando ahora: no se puede descartar", "the rollback of {id} is being applied now: it cannot be discarded", "id"),
 		"assist.post.not_restored":         e("{command} no volvió a su estado de antes", "{command} did not return to its previous state", "command"),
 		"assist.svc.reversa_no_existe":     e("no hay una reversa pendiente de la ejecución {id}", "there is no pending rollback for run {id}", "id"),
 		"assist.svc.reversa_vieja":         e("la reversa pendiente terminó hace {age}: el equipo pudo cambiar desde entonces; repite con la confirmación de antigüedad (--accept-age)", "the pending rollback ended {age} ago: the device may have changed since; repeat with the age confirmation (--accept-age)", "age"),

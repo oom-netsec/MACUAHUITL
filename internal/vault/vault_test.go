@@ -587,3 +587,48 @@ func TestPutReservedReplacesByLabel(t *testing.T) {
 		t.Fatal("una etiqueta normal no es reservada")
 	}
 }
+
+// Un ID fabricado no hace que PutReserved pise otra entrada (la llave de respaldos, una credencial): solo manda la etiqueta.
+func TestPutReservedIgnoresTheCallersID(t *testing.T) {
+	v, _ := newVault(t)
+	keyID, err := v.Put(Credential{Label: ReservedPrefix + "llave", Username: "hmac", Password: secret.New(pw("LLAVE"))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	normal, err := v.Put(cred("core", "pw", "en"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{keyID, normal} {
+		if err := v.PutReserved(Credential{ID: id, Label: ReservedPrefix + "otra", Username: "u", Password: secret.New(pw("X"))}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c, err := v.GetReserved(ReservedPrefix + "llave")
+	if err != nil || string(c.Password.Bytes()) != "LLAVE" {
+		t.Fatalf("la llave se pisó: %v", err)
+	}
+	c.Password.Destroy()
+	if infos, _ := v.List(); len(infos) != 1 || infos[0].Label != "core" {
+		t.Fatalf("la credencial normal se pisó: %+v", infos)
+	}
+}
+
+// Dos PutReserved simultáneos de la misma etiqueta dejan una sola entrada.
+func TestPutReservedConcurrentSameLabelDoesNotDuplicate(t *testing.T) {
+	v, _ := newVault(t)
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := v.PutReserved(Credential{Label: ReservedPrefix + "x", Username: "u", Password: secret.New(pw("V"))}); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+	if all, _ := v.ListAll(); len(all) != 1 {
+		t.Fatalf("se duplicó: %d", len(all))
+	}
+}

@@ -320,20 +320,21 @@ func (v *Vault) Put(c Credential) (string, error) {
 // PutBatch es Put para varias credenciales con una sola escritura: o quedan todas o no queda ninguna.
 func (v *Vault) PutBatch(cs []Credential) ([]string, error) { return v.putBatch(cs, false) }
 
-// PutReserved crea o reemplaza (por etiqueta) una entrada reservada del sistema; la etiqueta debe ser reservada.
+// PutReserved crea o reemplaza (por etiqueta) una entrada reservada del sistema; la etiqueta debe ser reservada. Ignora c.ID: la entrada
+// a reemplazar sale solo de la etiqueta, y la búsqueda y la escritura van en la misma sección crítica (dos llamadas no la duplican).
 func (v *Vault) PutReserved(c Credential) error {
 	if !Reserved(c.Label) {
 		return ErrNotFound
 	}
 	v.mu.Lock()
+	defer v.mu.Unlock()
 	if err := v.requireFull(); err != nil {
-		v.mu.Unlock()
 		return err
 	}
+	c.ID = ""
 	for _, e := range v.entries {
 		old, err := v.decrypt(e)
 		if err != nil {
-			v.mu.Unlock()
 			return err
 		}
 		old.Password.Destroy()
@@ -344,14 +345,18 @@ func (v *Vault) PutReserved(c Credential) error {
 			break
 		}
 	}
-	v.mu.Unlock()
-	_, err := v.putBatch([]Credential{c}, true)
+	_, err := v.putBatchLocked([]Credential{c}, true)
 	return err
 }
 
 func (v *Vault) putBatch(cs []Credential, reserved bool) ([]string, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	return v.putBatchLocked(cs, reserved)
+}
+
+// putBatchLocked es PutBatch con v.mu ya tomado; reserved deja reemplazar una entrada reservada.
+func (v *Vault) putBatchLocked(cs []Credential, reserved bool) ([]string, error) {
 	if err := v.requireFull(); err != nil {
 		return nil, err
 	}

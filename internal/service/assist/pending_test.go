@@ -472,3 +472,52 @@ func TestPendingRollbackWarnsAboutWriteMemory(t *testing.T) {
 		t.Fatalf("%+v", p)
 	}
 }
+
+// No se puede descartar mientras corre la ejecución de reversa de esa entrada.
+func TestDiscardIsRefusedWhileItsRollbackRunIsAlive(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	nrun, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.waitState(nrun, "waiting-confirm")
+	discard := &v1.DiscardPendingRollbackRequest{RunId: run}
+	if _, err := r.svc.DiscardPendingRollback(context.Background(), discard); code(err) != codes.FailedPrecondition {
+		t.Fatalf("descartar con la reversa en curso: %v", err)
+	}
+	r.confirmAll(nrun, "done")
+}
+
+// Un descarte en la ventana entre run.Done() y afterRun no se revierte: afterRun y Persist no la vuelven a guardar.
+func TestDiscardedPendingRollbackIsNotSavedAgain(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	if _, err := r.svc.DiscardPendingRollback(context.Background(), &v1.DiscardPendingRollbackRequest{RunId: run}); err != nil {
+		t.Fatal(err)
+	}
+	rr, _ := r.svc.get(context.Background(), run)
+	pers := &persister{s: r.svc, runID: run, t: target{host: "x", port: 22, cred: "c"}}
+	r.svc.afterRun(rr, pers, "") // lo que haría el hilo de la ejecución si el descarte llegó antes
+	pers.sync(rr.run.Leftover())
+	if r.pendingLabels() != 0 {
+		t.Fatal("el descarte se revirtió")
+	}
+}
+
+// Con la bóveda cerrada el fallo de guardado se audita una sola vez por ejecución, no en cada sync.
+func TestSaveFailedIsAuditedOncePerRun(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	plan, _ := r.plan(&v1.PlanPortsRequest{Vlan: 20})
+	run := r.start(plan.PlanId)
+	r.waitState(run, "waiting-confirm")
+	r.d.V.LockAll()
+	r.confirm(run, "apply-1") // cambiado, estado releído y fin: tres intentos de guardar
+	r.waitState(run, "waiting-confirm")
+	r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: run})
+	r.waitState(run, "aborted")
+	r.waitDone(run)
+	if n := strings.Count(r.d.AuditText(), "assist.pending_rollback.save_failed"); n != 1 {
+		t.Fatalf("save_failed auditado %d veces", n)
+	}
+}
