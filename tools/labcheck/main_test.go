@@ -426,3 +426,21 @@ func TestAlineacionConEvidenciaDeOtraVersion(t *testing.T) {
 		t.Fatalf("alineación rota:\n%s", got)
 	}
 }
+
+// «% No such interface» (un dato que no existe en el equipo) es un rechazo, no una función apagada; MACsec y
+// device-tracking sin configurar sí lo son.
+func TestNoSuchEsRechazo(t *testing.T) {
+	for _, ln := range []string{"% No such interface", "% No such VRF", "% No matching route", "% No hay tal cosa en el equipo"} {
+		if p, ok := inactiveOnly(analyze.Section{Command: "show x", Text: ln + "\n"}); ok {
+			t.Errorf("%q salió como función no activa (%s)", ln, p)
+		}
+	}
+	if got := problems(analyze.Section{Command: "show x", Text: "% No such interface\n"}, time.Time{}, time.Hour); len(got) == 0 || got[0] != "rechazado: % No such" {
+		t.Errorf("problems = %v", got)
+	}
+	for _, ln := range []string{"%No Secure Channels", "% no ipv6 snooping policy attached on Box"} {
+		if p, ok := inactiveOnly(analyze.Section{Command: "show x", Text: ln + "\n"}); !ok || p != "not configured" {
+			t.Errorf("%q = %q %v", ln, p, ok)
+		}
+	}
+}

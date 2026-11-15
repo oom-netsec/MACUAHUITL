@@ -52,7 +52,7 @@ func main() {
 // (más abajo podrían ser texto de un log y no la respuesta).
 var rejectMarks = []string{"% Invalid input", "% Invalid command", "% Invalid parameter", "% Incomplete command", "% Ambiguous command",
 	"% Permission denied", "% Unrecognized", "% Invalid", "% Incomplete", "% Ambiguous", "Incorrect usage", "Syntax error", "ERROR: %",
-	"Authorization failed", "Unsupported command"}
+	"Authorization failed", "Unsupported command", "% No such", "% No matching"}
 
 // unknownPercent es la etiqueta de una línea con «%» que no es ni un rechazo conocido ni una función apagada: puede ser
 // salida normal («% Key pair was generated at...»), así que no se presenta como rechazo.
@@ -63,7 +63,8 @@ const unknownPercent = "aviso % del equipo (revisar)"
 var inactiveRe = regexp.MustCompile(`(?i)^%.*\b(not enabled|not active|not configured|not running|is not in)\b`)
 
 // noneRe: «%No Secure Channels» (MACsec), «% no ipv6 snooping policy attached»: nada configurado, tampoco es error.
-var noneRe = regexp.MustCompile(`(?i)^%\s*no\s`)
+// Acotada a esos casos: «% No such interface», «% No matching…» son rechazos (un dato que no existe en el equipo).
+var noneRe = regexp.MustCompile(`(?i)^%\s*(No Secure Channels|no\s.*\bpolicy attached\b)`)
 
 // normalPercentRe: líneas con «%» que son salida normal, no un mensaje: top (%Cpu(s)) y la fecha de la llave RSA.
 var normalPercentRe = regexp.MustCompile(`^%(Cpu\(s\)|\s*Key pair was generated)`)

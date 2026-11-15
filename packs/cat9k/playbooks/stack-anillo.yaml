@@ -8,10 +8,10 @@ name: Catalyst 9K · Stack · Puertos y anillo de stack
 name_en: Catalyst 9K · Stack · Stack ports and ring
 commands:
   - cmd: show clock
-  - cmd: show switch stack-ports  # solo en stack, SVL o PoE físico
-  - cmd: show switch stack-ports summary  # solo en stack, SVL o PoE físico
-  - cmd: show switch neighbors  # solo en stack, SVL o PoE físico
-  - cmd: show switch detail  # solo en stack, SVL o PoE físico
+  - cmd: show switch stack-ports  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show switch stack-ports summary  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show switch neighbors  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show switch detail  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show environment all
   - cmd: show logging | include STACKMGR|STACK|SWITCH
     timeout: 180s

@@ -9,7 +9,7 @@ name_en: Catalyst 9K · Stack · Members, roles and priorities
 commands:
   - cmd: show clock
   - cmd: show switch
-  - cmd: show switch detail  # solo en stack, SVL o PoE físico
+  - cmd: show switch detail  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show version | include Switch|image
   - cmd: show install summary
   - cmd: show inventory

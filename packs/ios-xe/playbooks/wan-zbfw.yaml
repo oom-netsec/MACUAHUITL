@@ -19,7 +19,7 @@ commands:
   - cmd: show platform hardware qfp active statistics drop  # no existe en Cat9k (solo routers)
   - cmd: show platform hardware qfp active feature firewall memory  # no existe en Cat9k (solo routers)
   - cmd: show logging | include FW|ZBFW
-  - cmd: show running-config | section zone|class-map type inspect|policy-map type inspect  # no existe en Cat9k (solo routers)
+  - cmd: show running-config | section zone|class-map type inspect|policy-map type inspect
     may_contain_secrets: true
   - cmd: show policy-map type inspect zone-pair sessions  # no existe en Cat9k (solo routers)
     timeout: 120s

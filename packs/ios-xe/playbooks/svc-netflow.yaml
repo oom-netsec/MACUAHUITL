@@ -14,6 +14,8 @@ commands:
   - cmd: show flow monitor
   - cmd: show flow record
   - cmd: show flow interface
+  - cmd: show ip flow export  # no existe en Cat9k (solo routers)
+  - cmd: show ip flow interface  # no existe en Cat9k (solo routers)
   - cmd: show ip cache flow
   - cmd: show running-config | section flow
     may_contain_secrets: true

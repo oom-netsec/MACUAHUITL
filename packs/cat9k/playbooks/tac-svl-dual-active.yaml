@@ -8,10 +8,10 @@ name: Catalyst 9K · TAC · StackWise Virtual dual-active
 name_en: Catalyst 9K · TAC · StackWise Virtual dual-active
 commands:
   - cmd: show clock
-  - cmd: show stackwise-virtual  # solo en stack, SVL o PoE físico
-  - cmd: show stackwise-virtual link  # solo en stack, SVL o PoE físico
-  - cmd: show stackwise-virtual dual-active-detection  # solo en stack, SVL o PoE físico
-  - cmd: show stackwise-virtual dual-active-detection pagp  # solo en stack, SVL o PoE físico
+  - cmd: show stackwise-virtual  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show stackwise-virtual link  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show stackwise-virtual dual-active-detection  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
+  - cmd: show stackwise-virtual dual-active-detection pagp  # falla en Cat9000v virtual (sin stack, SVL ni PoE)
   - cmd: show redundancy
   - cmd: show switch
   - cmd: show etherchannel summary
