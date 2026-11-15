@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,6 +87,14 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 		if err := waitCapture(context.Background(), list, fs.Arg(0), phase, 300*time.Millisecond); err != nil {
 			return err
 		}
+		// El trabajo puede quedar completed con equipos que fallaron: sin su línea base no hay cambio seguro.
+		run, err := v1.NewPatrolServiceClient(c.Conn).GetRun(context.Background(), &v1.GetRunRequest{JobId: r.JobId, Round: 1})
+		if err != nil {
+			return err
+		}
+		if err := checkDevices(name, run.Devices); err != nil {
+			return err
+		}
 		fmt.Fprintln(c.Out, cli.T("mctl.change.done_"+name, "id", fs.Arg(0)))
 		return nil
 	}
@@ -125,8 +134,30 @@ func waitCapture(ctx context.Context, list func(context.Context) (*v1.ListChange
 	}
 }
 
+// checkDevices falla nombrando los equipos de la captura que no quedaron completed (los excluidos a propósito no cuentan).
+// El estado por equipo no trae el hostname: se nombra por dirección.
+func checkDevices(name string, devs []*v1.RunDevice) error {
+	var bad []string
+	for _, d := range devs {
+		if d.State == v1.DeviceState_DEVICE_STATE_COMPLETED || d.State == v1.DeviceState_DEVICE_STATE_SKIPPED {
+			continue
+		}
+		who := d.Target.GetAddress()
+		if d.Detail != "" {
+			who += " (" + d.Detail + ")"
+		}
+		bad = append(bad, who)
+	}
+	if len(bad) == 0 {
+		return nil
+	}
+	return cli.Err("mctl.change.device_failed_"+name, "list", strings.Join(bad, ", "))
+}
+
 // changeDiff compara la captura PRE con la POST de un cambio: las líneas de configuración que cambiaron, por equipo.
-// Reusa el informe del núcleo (el mismo de la app): las capturas ya se guardaron enmascaradas, así que no muestra secretos.
+// Reusa el informe del núcleo (el mismo de la app). Las capturas se guardan enmascaradas salvo que el cambio se creó con
+// disable_masking: true; shortcut: el informe no trae ese dato, así que en ese caso el diff puede mostrar secretos
+// (el aviso queda pendiente hasta que el informe lo exponga).
 func changeDiff(c *cli.Env, args []string) error {
 	var device string
 	var asJSON bool
@@ -152,6 +183,9 @@ func printDiff(c *cli.Env, reportJSON, device string, asJSON bool) error {
 		Address    string   `json:"address"`
 		Hostname   string   `json:"hostname"`
 		ConfigDiff []string `json:"config_diff"`
+		Findings   []struct {
+			Facet, Detail string
+		} `json:"findings"`
 	}
 	var rep struct {
 		Devices []dev `json:"devices"`
@@ -161,7 +195,8 @@ func printDiff(c *cli.Env, reportJSON, device string, asJSON bool) error {
 	}
 	var sel []dev
 	for _, d := range rep.Devices {
-		if device == "" || strings.Contains(strings.ToLower(d.Hostname), strings.ToLower(device)) || strings.Contains(d.Address, device) {
+		host, _, _ := net.SplitHostPort(d.Address) // la dirección puede traer puerto
+		if device == "" || strings.Contains(strings.ToLower(d.Hostname), strings.ToLower(device)) || d.Address == device || host == device {
 			sel = append(sel, d)
 		}
 	}
@@ -178,14 +213,29 @@ func printDiff(c *cli.Env, reportJSON, device string, asJSON bool) error {
 		fmt.Fprintln(c.Out, string(b))
 		return err
 	}
+	missing := 0
 	for _, d := range sel {
 		fmt.Fprintf(c.Out, "%s (%s)\n", or(d.Hostname, "?"), d.Address)
+		noCap := false
+		for _, f := range d.Findings {
+			if f.Facet == "captura" { // falta la PRE o la POST, o falló: «sin diferencias» sería mentira
+				fmt.Fprintln(c.Out, "  "+cli.T("mctl.change.diff_nocapture", "detail", f.Detail))
+				noCap = true
+			}
+		}
+		if noCap {
+			missing++
+			continue
+		}
 		if len(d.ConfigDiff) == 0 {
 			fmt.Fprintln(c.Out, "  "+cli.T("mctl.change.diff_none"))
 		}
 		for _, l := range d.ConfigDiff {
 			fmt.Fprintln(c.Out, "  "+l)
 		}
+	}
+	if missing > 0 {
+		return cli.Err("mctl.change.diff_incomplete", "n", missing)
 	}
 	return nil
 }

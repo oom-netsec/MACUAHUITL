@@ -64,3 +64,47 @@ func TestRenderDiff(t *testing.T) {
 		t.Fatal("un --device sin coincidencias debe fallar")
 	}
 }
+
+// Un trabajo completed puede traer equipos que fallaron: la espera lo dice y nombra el equipo.
+func TestRevisarEquipos(t *testing.T) {
+	ok := &v1.RunDevice{Target: &v1.Target{Address: "10.0.0.1"}, State: v1.DeviceState_DEVICE_STATE_COMPLETED}
+	mal := &v1.RunDevice{Target: &v1.Target{Address: "10.0.0.2"}, State: v1.DeviceState_DEVICE_STATE_FAILED, Detail: "timeout"}
+	if err := checkDevices("pre", []*v1.RunDevice{ok}); err != nil {
+		t.Fatalf("todo bien no debe fallar: %v", err)
+	}
+	err := checkDevices("pre", []*v1.RunDevice{ok, mal})
+	if err == nil || !strings.Contains(err.Error(), "10.0.0.2") || strings.Contains(err.Error(), "10.0.0.1") || !strings.Contains(err.Error(), "timeout") {
+		t.Fatalf("debía nombrar solo al equipo fallido: %v", err)
+	}
+	skip := &v1.RunDevice{Target: &v1.Target{Address: "10.0.0.3"}, State: v1.DeviceState_DEVICE_STATE_SKIPPED}
+	if err := checkDevices("post", []*v1.RunDevice{ok, skip}); err != nil {
+		t.Fatalf("un equipo excluido a propósito no es falla: %v", err)
+	}
+}
+
+const informeSinCaptura = `{"devices":[
+ {"address":"10.0.0.1","hostname":"SW1","config_diff":[],"findings":[{"facet":"captura","level":"regression","detail":"no está en la captura POST"}]},
+ {"address":"10.0.0.2","hostname":"SW2","config_diff":[],"findings":[]}]}`
+
+func TestDiffSinCaptura(t *testing.T) {
+	var b bytes.Buffer
+	err := printDiff(&cli.Env{Out: &b}, informeSinCaptura, "", false)
+	if err == nil {
+		t.Fatal("un equipo sin captura debe dar código distinto de 0")
+	}
+	out := b.String()
+	if !strings.Contains(out, "SW1") || !strings.Contains(out, "no está en la captura POST") || strings.Contains(out[:strings.Index(out, "SW2")], cli.T("mctl.change.diff_none")) {
+		t.Fatalf("SW1 no debe decir «sin diferencias»:\n%s", out)
+	}
+	if !strings.Contains(out, "SW2") || !strings.Contains(out, cli.T("mctl.change.diff_none")) {
+		t.Fatalf("SW2 sí:\n%s", out)
+	}
+}
+
+func TestDiffDeviceExacto(t *testing.T) {
+	rep := `{"devices":[{"address":"10.0.0.1","hostname":"SW1","config_diff":[]},{"address":"10.0.0.10","hostname":"CORE","config_diff":[]}]}`
+	var b bytes.Buffer
+	if err := printDiff(&cli.Env{Out: &b}, rep, "10.0.0.1", false); err != nil || strings.Contains(b.String(), "CORE") {
+		t.Fatalf("10.0.0.1 no debe traer 10.0.0.10: %v\n%s", err, b.String())
+	}
+}
