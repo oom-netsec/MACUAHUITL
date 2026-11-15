@@ -553,3 +553,51 @@ func TestARPVacio(t *testing.T) {
 		t.Error("la basura debe seguir dando false")
 	}
 }
+
+// EIGRP, LDP, track, GLBP y VRRP (v0.6.1): fixtures a mano en el formato de la documentación de Cisco.
+func TestProtocolosV061(t *testing.T) {
+	ei, ok := ParseEIGRP(fx(t, "iosxe_show-ip-eigrp-neighbors"))
+	if !ok || len(ei) != 2 || ei[1].Address != "10.0.12.2" || ei[1].Interface != "Eth0/1" || ei[1].AS != "100" || !strings.HasPrefix(ei[1].Line, "0   10.0.12.2") {
+		t.Errorf("eigrp %+v", ei)
+	}
+	ei, ok = ParseEIGRP(fx(t, "iosxe_show-ip-eigrp-neighbors-named"))
+	if !ok || len(ei) != 1 || ei[0].Address != "192.0.2.2" || ei[0].Interface != "Gi1" || ei[0].AS != "200" {
+		t.Errorf("eigrp con nombre %+v", ei)
+	}
+	ld, ok := ParseLDPNeighbors(fx(t, "iosxe_show-mpls-ldp-neighbor"))
+	if !ok || len(ld) != 2 || ld[0].PeerID != "10.255.0.2:0" || ld[1].PeerID != "10.255.0.3:0" || ld[0].State != "Oper" || !strings.Contains(ld[1].Line, "Peer LDP Ident: 10.255.0.3:0") {
+		t.Errorf("ldp %+v", ld)
+	}
+	tr, ok := ParseTrack(fx(t, "iosxe_show-track-brief"))
+	if !ok || len(tr) != 2 || tr[0] != (TrackObject{ID: "1", Type: "ip sla", Instance: "1", Parameter: "reachability", State: "Down", Line: tr[0].Line}) ||
+		tr[1].Type != "interface" || tr[1].Instance != "Ethernet0/1" || tr[1].State != "Up" || tr[1].Line == "" {
+		t.Errorf("track %+v", tr)
+	}
+	gl, ok := ParseGLBP(fx(t, "iosxe_show-glbp-brief"))
+	if !ok || len(gl) != 3 || gl[0].Group != "50" || gl[0].VIP != "10.0.0.254" || gl[0].State != "Active" || gl[1].Group != "50/1" || gl[2].Group != "50/2" || gl[2].State != "Listen" || gl[2].Active != "10.0.0.2" {
+		t.Errorf("glbp %+v", gl)
+	}
+	vr, ok := ParseVRRP(fx(t, "iosxe_show-vrrp-brief"))
+	if !ok || len(vr) != 2 || vr[0].State != "Master" || vr[0].Active != "10.0.0.1" || vr[0].VIP != "10.0.0.254" || vr[1].State != "Backup" || vr[1].Active != "10.0.1.2" || vr[1].Group != "2" {
+		t.Errorf("vrrp %+v", vr)
+	}
+	// una salida vacía es una tabla vacía válida; la basura no
+	junk := "% Invalid input detected at '^' marker.\n"
+	for name, f := range map[string]func(string) (int, bool){
+		"eigrp": func(s string) (int, bool) { r, ok := ParseEIGRP(s); return len(r), ok },
+		"ldp":   func(s string) (int, bool) { r, ok := ParseLDPNeighbors(s); return len(r), ok },
+		"track": func(s string) (int, bool) { r, ok := ParseTrack(s); return len(r), ok },
+		"glbp":  func(s string) (int, bool) { r, ok := ParseGLBP(s); return len(r), ok },
+		"vrrp":  func(s string) (int, bool) { r, ok := ParseVRRP(s); return len(r), ok },
+	} {
+		if n, ok := f(""); n != 0 || !ok {
+			t.Errorf("%s vacío: %d %v", name, n, ok)
+		}
+		if n, ok := f("\n  \n"); n != 0 || !ok {
+			t.Errorf("%s en blanco: %d %v", name, n, ok)
+		}
+		if _, ok := f(junk); ok {
+			t.Errorf("%s acepta basura", name)
+		}
+	}
+}
