@@ -171,7 +171,7 @@ func TestPendingRollbackOlderThanADayNeedsAcceptAge(t *testing.T) {
 	r.confirmAll(nrun, "done")
 }
 
-func TestAbortedCredRotateLeavesNoPendingRollback(t *testing.T) {
+func TestAbortedCredRotateLeavesAPendingRollback(t *testing.T) {
 	r := newRotRig(t, simulator.Config{})
 	res, err := r.rotate(&v1.PlanCredRotateRequest{User: "tech", NewSecret: newSec, UpdateCredentialId: r.tech})
 	if err != nil {
@@ -188,8 +188,21 @@ func TestAbortedCredRotateLeavesNoPendingRollback(t *testing.T) {
 	if st := r.state(run); len(st.Changed) != 1 {
 		t.Fatalf("el equipo debía seguir cambiado: %+v", st)
 	}
+	// La bóveda aún guarda el secreto anterior y el equipo ya tiene el nuevo: la reversa pendiente devuelve el hash previo.
+	p := r.pending()
+	if len(p) != 1 || len(p[0].Devices) != 1 || !strings.Contains(strings.Join(p[0].Devices[0].RollbackLines, "\n"), "username tech") {
+		t.Fatalf("una rotación sin terminar debe dejar su reversa: %+v", p)
+	}
+	if strings.Contains(fmt.Sprint(p), newSec) {
+		t.Fatal("la reversa pendiente muestra el secreto nuevo")
+	}
+	nrun, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.confirmAll(nrun, "done")
 	if len(r.pending()) != 0 {
-		t.Fatal("la reversa de cred rotate toca la bóveda: no se guarda")
+		t.Fatal("la reversa aplicada debe borrar la entrada")
 	}
 }
 
