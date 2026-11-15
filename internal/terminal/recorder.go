@@ -7,8 +7,10 @@
 // shortcut: el prompt de contraseña se reconoce por el texto que lo precede ("Password:", "Secret:",
 // "passphrase"); un equipo que pida un secreto con otra palabra, o un secreto tecleado en un comando
 // (se enmascaran los de IOS conocidos, ver internal/mask), podría grabarse. Ampliar la lista si hace falta.
-// shortcut: las abreviaturas de IOS (`usern bob sec 0 X`) no las reconoce mask y quedan en claro; ampliar
-// las reglas de internal/mask si hace falta.
+// Las formas que IOS acepta y mask no ve (abreviaturas, doble espacio, comandos de NX-OS separados por « ; ») se
+// tapan aquí con una regla conservadora: ver maskTyped. Se prefiere tapar de más en la terminal que filtrar.
+// shortcut: la edición de línea con el cursor (Ctrl-A, Ctrl-B, Ctrl-F, flechas) no se sigue; solo Ctrl-U, Ctrl-W y
+// el retroceso. Si hace falta, seguir la posición del cursor.
 // shortcut: la salida se graba por línea completa (con el prompt a medias retenido hasta el salto o el
 // cierre); el modo del prompt solo cambia el bloque para line, tacacs y radius.
 package terminal
@@ -26,7 +28,9 @@ import (
 const stamp = "2006-01-02T15:04:05.000Z07:00"
 
 // secretPrompt: la última línea de la salida pide una contraseña, secreto o frase.
-var secretPrompt = regexp.MustCompile(`(?i)\b(pass(word|phrase|code)|secret)\b[^:\r\n]{0,30}:\s*$`)
+// Incluye los avisos de llave: «New key:» (key config-key password-encrypt de IOS/ASA), «New Master Key:» (NX-OS key
+// config-key ascii) y «Enter pre-shared key:».
+var secretPrompt = regexp.MustCompile(`(?i)\b(pass(word|phrase|code)|secret)\b[^:\r\n]{0,30}:\s*$|\b(?:(?:new|old|confirm|retype|re-?enter|enter|verify)(?: (?:new|old|the|master|shared|pre-?shared))*|pre-?shared|master) key\b[^:\r\n]{0,30}:\s*$`)
 
 var (
 	ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b.`)
@@ -140,7 +144,10 @@ func (r *Recorder) outLine(l string) {
 	}
 	if pr != "" {
 		r.setPromptBlock(blockOfPrompt(pr))
-		echo := r.stream.Prompted(l[len(pr):], r.lastBlk)
+		// El eco también pasa por scrub: lo que ya se tapó al teclear se tapa en el eco aunque la línea se haya
+		// desplazado («R1(config)#$min GRP v3 auth sha X …») y las reglas no la reconozcan.
+		_, echo := maskTyped(l[len(pr):], func(x string) string { return r.stream.Prompted(x, r.lastBlk) })
+		echo = r.scrub(echo, len(r.sent) > 0)
 		// Eco partido: se sigue tecleando, o el texto recibido es un prefijo estricto de la primera línea enviada
 		// que aún espera su eco. Un eco completo la saca de la cola; lo que no cuadra la vacía.
 		text := strings.TrimLeft(l[len(pr):], " \t") // tras el prompt va un espacio antes del eco
@@ -245,17 +252,17 @@ var maskedTok = regexp.MustCompile(`<MASKED:[^>]*>`)
 // peekSecrets alimenta la red por contenido con lo que ya se detecta en una línea retenida, sin tocar
 // el estado de bloque de lo tecleado (su bloque lo da el prompt que aún no llega).
 func (r *Recorder) peekSecrets(line string) {
-	r.noteSecrets(line, r.typed.Peek(line))
+	line, m := maskTyped(line, r.typed.Peek)
+	r.noteSecrets(line, m)
 }
 
 // typedLine enmascara lo tecleado y guarda en memoria los valores tapados (red por contenido).
 func (r *Recorder) typedLine(line string, loose bool) string {
-	var m string
+	f := r.typed.Typed
 	if loose {
-		m = r.typed.TypedLoose(line)
-	} else {
-		m = r.typed.Typed(line)
+		f = r.typed.TypedLoose
 	}
+	line, m := maskTyped(line, f)
 	// Un Tab (se graba como «^I») hace que el equipo complete palabras que las reglas no ven: desde el primero se tapa todo.
 	if i := strings.Index(m, "^I"); i >= 0 {
 		m = m[:i] + "<MASKED:secret>"
@@ -360,8 +367,16 @@ func blockOfPrompt(p string) string {
 		return "line"
 	case strings.Contains(p, "(config-server-tacacs)"):
 		return "tacacs"
-	case strings.Contains(p, "(config-server-radius)"):
+	case strings.Contains(p, "(config-server-radius)"), strings.Contains(p, "(config-radius-server)"):
 		return "radius"
+	case strings.Contains(p, "(config-dot1x-cred"): // IOS-XE lo acorta: «(config-dot1x-creden)»
+		return "dot1x"
+	case strings.Contains(p, "(config-isakmp-group)"), strings.Contains(p, "(config-isakmp-client-group)"):
+		return "ezvpn"
+	case strings.Contains(p, "(config-profile)"), strings.Contains(p, "(config-umbrella"): // parameter-map type umbrella; otros profile tapan de más
+		return "umbrella"
+	case strings.Contains(p, "(config-username)"): // ASA: user-name X
+		return "username"
 	case strings.Contains(p, "(config-aaa-server-host)"):
 		return "aaaserver"
 	case strings.Contains(p, "(cfg-cluster)"):
@@ -421,6 +436,11 @@ func (r *Recorder) Input(p []byte) {
 		case r.hidden && c == 0x03: // Ctrl-C cancela el prompt
 			r.hidden = false
 		case r.hidden:
+		case c == 0x15: // Ctrl-U: borra la línea (lo anterior no se ejecuta)
+			r.line = r.line[:0]
+		case c == 0x17: // Ctrl-W: borra la palabra anterior
+			w := strings.TrimRight(string(r.line), " ")
+			r.line = []byte(w[:strings.LastIndexByte(w, ' ')+1])
 		case c == 0x7f || c == 0x08:
 			if n := len(r.line); n > 0 {
 				r.line = r.line[:n-1]
@@ -509,4 +529,100 @@ func applyBackspaces(s string) string {
 		}
 	}
 	return string(out)
+}
+
+// maskTyped aplica base (las reglas de mask) a una línea tecleada o a su eco, con las formas que IOS acepta: espacios
+// repetidos (se juntan; reglas de mask piden uno), comandos de NX-OS separados por « ; » (cada uno por separado) y
+// abreviaturas de las palabras de secreto (maskAbbrev). Devuelve la línea que se enmascaró (con los espacios juntos,
+// para localizar los valores tapados) y el resultado; si nada se tapó, el resultado es la línea original.
+func maskTyped(s string, base func(string) string) (src, out string) {
+	sq := squeeze(s)
+	parts := strings.Split(sq, " ; ")
+	for i, p := range parts {
+		parts[i] = maskAbbrev(base(p))
+	}
+	if m := strings.Join(parts, " ; "); m != sq {
+		return sq, m
+	}
+	return s, s
+}
+
+// squeeze junta los espacios repetidos fuera de comillas (conserva la sangría).
+func squeeze(s string) string {
+	if !strings.Contains(s, "  ") {
+		return s
+	}
+	var b strings.Builder
+	q, lead := false, true
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c == '"':
+			q = !q
+		case c != ' ':
+			lead = false
+		case !q && !lead && i > 0 && s[i-1] == ' ':
+			continue
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
+}
+
+// secretWords son las palabras clave de secreto cuyas abreviaturas se tapan.
+var secretWords = []string{"secret", "password", "key", "community", "key-string", "token", "pre-shared-key", "auth", "priv"}
+
+// algoWord: lo que va entre «auth»/«priv» y la clave en snmp-server user (md5, sha, sha-2 256, aes 128…).
+var algoWord = regexp.MustCompile(`(?i)^(?:md5|sha[\w-]*|hmac[\w-]*|des|3des|aes|\d+)$`)
+
+// maskAbbrev tapa, tras una palabra que es prefijo (de 2 o más letras) de una palabra clave de secreto sin ser la
+// palabra entera, la palabra siguiente y el número de tipo si lo hay («usern bob sec 0 X» → «usern bob sec <MASKED:secret>»).
+// Las palabras enteras ya las cubren las reglas de mask. Tapa de más a propósito («pri 15» también): en la terminal
+// es mejor eso que filtrar.
+func maskAbbrev(s string) string {
+	locs := wordRe.FindAllStringIndex(s, -1)
+	if len(locs) < 2 {
+		return s
+	}
+	var b strings.Builder
+	last := 0
+	for i := 0; i < len(locs)-1; i++ {
+		if !abbrevOfSecret(strings.ToLower(s[locs[i][0]:locs[i][1]])) {
+			continue
+		}
+		j := i + 1
+		kw := strings.ToLower(s[locs[i][0]:locs[i][1]])
+		if strings.HasPrefix("auth", kw) || strings.HasPrefix("priv", kw) {
+			for n := 0; j < len(locs)-1 && n < 4 && algoWord.MatchString(s[locs[j][0]:locs[j][1]]); n++ {
+				j++
+			}
+		} else if w := s[locs[j][0]:locs[j][1]]; len(w) == 1 && w[0] >= '0' && w[0] <= '9' && j < len(locs)-1 {
+			j++ // el número de tipo y la clave
+		}
+		if w := s[locs[j][0]:locs[j][1]]; strings.HasPrefix(w, "<MASKED:") || locs[j][0] < last {
+			continue
+		}
+		b.WriteString(s[last:locs[j][0]] + "<MASKED:secret>")
+		last = locs[j][1]
+	}
+	return b.String() + s[last:]
+}
+
+var wordRe = regexp.MustCompile(`\S+`)
+
+func abbrevOfSecret(w string) bool {
+	if len(w) < 2 {
+		return false
+	}
+	for _, k := range secretWords {
+		if w == k {
+			return false
+		}
+	}
+	for _, k := range secretWords {
+		if strings.HasPrefix(k, w) {
+			return true
+		}
+	}
+	return false
 }
