@@ -186,7 +186,7 @@ func quotedSpans(line string) (spans [][2]int) {
 			spans = append(spans, shiftSpans(sp, pos)...)
 			// El valor trae comillas propias («enable secret "x y"», «secret x"y»): la comilla que cierra el tramo lo abre.
 			if end+1 < len(line) && (len(sp) > 0 && (strings.HasSuffix(seg, " ") || reach && !strings.ContainsRune(" \t,;)}]:.", rune(line[end+1]))) ||
-				len(sp) == 0 && endsInKeyword(seg)) {
+				len(sp) == 0 && strings.HasSuffix(seg, " ") && endsInKeyword(seg)) {
 				spans = append(spans, [2]int{end, len(line)})
 			}
 		}
