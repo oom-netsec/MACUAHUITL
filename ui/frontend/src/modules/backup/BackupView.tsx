@@ -94,11 +94,12 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
     const at = (id: string) => list.backups.find((x) => x.id === id)?.at ?? "";
     const [a, b] = [...sel].sort((x, y) => at(x).localeCompare(at(y)));
     try {
-      // El núcleo dice qué líneas son volátiles; el visor muestra los textos completos sin ellas.
-      const [meta, x, y] = await Promise.all([core.backupDiff(a, b), core.backupGet(a), core.backupGet(b)]);
+      // El núcleo manda los dos textos ya enmascarados (un respaldo tomado con secretos no muestra sus hashes al comparar)
+      // y dice qué líneas son volátiles; el visor los muestra sin ellas.
+      const meta = await core.backupDiff(a, b);
       const skip = new Set(meta.ignored);
       const clean = (txt: string) => txt.split("\n").filter((l) => !skip.has(l.trim())).join("\n");
-      setDiff({ meta, before: clean(x.text), after: clean(y.text) });
+      setDiff({ meta, before: clean(meta.before), after: clean(meta.after) });
     } catch (e) { setErr(errorText(e)); }
   };
   const view = async (id: string) => {

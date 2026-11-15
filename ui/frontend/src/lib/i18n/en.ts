@@ -2761,4 +2761,5 @@ export const en: Record<Key, string> = {
   "pending.kind.snippet-ntp-server": "Snippet: NTP server",
   "pending.kind.credrotate": "Credential rotation",
   "pending.kind.restore-diff": "Backup restore",
+  "drift.maskedChanged": "(a masked value changed; not shown)",
 };

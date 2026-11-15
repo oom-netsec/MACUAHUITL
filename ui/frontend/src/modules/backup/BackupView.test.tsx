@@ -69,10 +69,15 @@ test("la línea de tiempo agrupa por equipo y ordena del más nuevo al más viej
 });
 
 test("compara dos respaldos, el más viejo primero, en el visor de diferencias", async () => {
-  const diff = { from: a, to: b, added: 1, removed: 1, ignored: ["ntp clock-period 1", "ntp clock-period 2"], masked: true, changes: [] };
+  // El núcleo manda los dos textos ya enmascarados: el visor nunca pide el respaldo entero (que puede traer hashes).
+  const diff = {
+    from: a, to: b, added: 1, removed: 1, ignored: ["ntp clock-period 1", "ntp clock-period 2"], masked: true, changes: [],
+    before: "hostname SW1\nenable secret 5 <MASKED:enable-secret>\ninterface Gi1/0/1\n description PC-01\nntp clock-period 1\n",
+    after: "hostname SW1\nenable secret 5 <MASKED:enable-secret>\ninterface Gi1/0/1\n description PC-02\nntp clock-period 2\n",
+  };
   const texts: Record<string, string> = {
-    [a.id]: "hostname SW1\ninterface Gi1/0/1\n description PC-01\nntp clock-period 1\n",
-    [b.id]: "hostname SW1\ninterface Gi1/0/1\n description PC-02\nntp clock-period 2\n",
+    [a.id]: "hostname SW1\nenable secret 5 $1$abcd$HashViejo\ninterface Gi1/0/1\n description PC-01\nntp clock-period 1\n",
+    [b.id]: "hostname SW1\nenable secret 5 <MASKED:enable-secret>\ninterface Gi1/0/1\n description PC-02\nntp clock-period 2\n",
   };
   const core = withCreds({
     backupList: vi.fn(async () => ({ backups: [b, a], masked: true })), backupDiff: vi.fn(async () => diff),
@@ -86,6 +91,7 @@ test("compara dos respaldos, el más viejo primero, en el visor de diferencias",
   await userEvent.click(screen.getByLabelText(`Comparar ${a.id}`));
   await userEvent.click(cmp);
   expect(core.backupDiff).toHaveBeenCalledWith(a.id, b.id);
+  expect(core.backupGet).not.toHaveBeenCalled();
   const reg = await screen.findByRole("region", { name: "Diferencias" });
   expect(within(reg).getByText("1 cambio", { exact: false })).toBeInTheDocument();
   expect(within(reg).getByText((_, el) => el?.tagName === "CODE" && el.textContent === " description PC-02" && el.closest("[data-op]")?.getAttribute("data-op") === "+")).toBeInTheDocument();
@@ -93,6 +99,7 @@ test("compara dos respaldos, el más viejo primero, en el visor de diferencias",
   expect(within(reg).queryByText(/clock-period 2/)).not.toBeInTheDocument();
   expect(screen.getByText(/no son visibles porque alguno de los dos respaldos se tomó enmascarado/)).toBeInTheDocument();
   expect(screen.getByText(/Ignoradas por volátiles: ntp clock-period 1/)).toBeInTheDocument();
+  expect(document.body.textContent).not.toMatch(/HashViejo|\$1\$/);
 });
 
 test("ver ofrece descargar el .cfg con el nombre del equipo y la fecha, y copiar el contenido", async () => {

@@ -117,8 +117,8 @@ func (c Change) TextIn(loc string) string {
 
 // CompareMasked es Compare para mostrar: enmascara los dos lados con las mismas reglas, así ningún secreto ni hash
 // (tipo 5/7, que se rompen) sale en el informe y un lado ya enmascarado no da diferencias falsas. Si los dos traían el
-// valor real y una línea solo cambió en su secreto, sale una vez con Op "~", enmascarada en su contexto: el informe
-// dice que la clave cambió sin mostrarla.
+// valor real y una línea solo cambió en un valor que se enmascara (una clave; en ASA sin plataforma, también la IP de
+// snmp-server host), sale una vez con Op "~", enmascarada en su contexto: el informe dice que cambió sin mostrarlo.
 func CompareMasked(prev, cur, platform string) (changes []Change, ignored []string) {
 	mp, _ := mask.Apply(platform, prev)
 	mc, _ := mask.Apply(platform, cur)
@@ -128,16 +128,17 @@ func CompareMasked(prev, cur, platform string) (changes []Change, ignored []stri
 	removed := map[key]int{}
 	for _, c := range raw {
 		if c.Op == "-" && !strings.Contains(c.Line, "<MASKED:") { // un lado ya enmascarado no sabe si la clave cambió
-			path, line := maskInContext(platform, c.Path, c.Line)
-			removed[key{path, line}]++
+			if path, line, ok := maskInContext(platform, c.Path, c.Line); ok {
+				removed[key{path, line}]++
+			}
 		}
 	}
 	for _, c := range raw {
 		if c.Op != "+" || strings.Contains(c.Line, "<MASKED:") {
 			continue
 		}
-		path, line := maskInContext(platform, c.Path, c.Line)
-		if k := (key{path, line}); removed[k] > 0 { // misma línea enmascarada que salió: solo cambió el secreto
+		path, line, ok := maskInContext(platform, c.Path, c.Line)
+		if k := (key{path, line}); ok && removed[k] > 0 { // misma línea enmascarada que salió: solo cambió el secreto
 			removed[k]--
 			changes = append(changes, Change{"~", path, line})
 		}
@@ -147,7 +148,7 @@ func CompareMasked(prev, cur, platform string) (changes []Change, ignored []stri
 
 // maskInContext enmascara una línea con sus secciones delante (una regla puede depender del bloque, como el password
 // de line vty) y devuelve la ruta y la línea ya enmascaradas.
-func maskInContext(platform, path, line string) (string, string) {
+func maskInContext(platform, path, line string) (string, string, bool) {
 	var segs []string
 	if path != "" {
 		segs = strings.Split(path, " > ")
@@ -162,8 +163,8 @@ func maskInContext(platform, path, line string) (string, string) {
 	}
 	out, _ := mask.Apply(platform, b.String())
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
-	if len(lines) < len(segs) { // no debería pasar: el enmascarado no quita líneas de una config; se descarta entera
-		return "", "<MASKED:secret>"
+	if len(lines) != len(segs)+strings.Count(line, "\n")+1 { // el enmascarado quitó o juntó líneas (cadena de certificados): no se alinea
+		return "", "", false
 	}
 	for i := range segs {
 		segs[i] = strings.TrimPrefix(lines[i], strings.Repeat(" ", i))
@@ -172,7 +173,7 @@ func maskInContext(platform, path, line string) (string, string) {
 	for i := range body {
 		body[i] = strings.TrimPrefix(body[i], ind)
 	}
-	return strings.Join(segs, " > "), strings.Join(body, "\n")
+	return strings.Join(segs, " > "), strings.Join(body, "\n"), true
 }
 
 type DeviceDrift struct {
@@ -195,11 +196,12 @@ func NewDevice(device string, from, to int, cs []Change, ignored []string) Devic
 		d.Ignored = []string{}
 	}
 	for _, c := range cs {
-		if c.Op == "+" {
+		switch c.Op {
+		case "+":
 			d.Added++
-		} else {
+		case "-":
 			d.Removed++
-		}
+		} // «~»: cambió un valor enmascarado; no es ni agregada ni quitada
 	}
 	return d
 }

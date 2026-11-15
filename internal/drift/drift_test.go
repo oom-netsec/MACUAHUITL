@@ -150,3 +150,30 @@ func TestCompareMasked(t *testing.T) {
 		t.Errorf("diferencia falsa con el viejo enmascarado: %+v", cs)
 	}
 }
+
+// Varias líneas iguales una vez enmascaradas: cada «-» empareja con un solo «+» (dos comunidades nuevas contra una vieja
+// dan un «~» y un «+», no dos «~»). Un cambio de certificado (la cadena se enmascara entera) no es un «~». Los «~» no
+// cuentan como agregadas ni quitadas.
+func TestCompareMaskedEmparejaUnoAUno(t *testing.T) {
+	cs, _ := CompareMasked("hostname R1\nsnmp-server community Vieja RO\n", "hostname R1\nsnmp-server community Nueva1 RO\nsnmp-server community Nueva2 RO\n", "")
+	n := map[string]int{}
+	for _, c := range cs {
+		n[c.Op]++
+	}
+	if n["~"] != 1 || n["+"] != 1 || n["-"] != 0 {
+		t.Fatalf("cambios = %+v", cs)
+	}
+	d := NewDevice("R1", 1, 2, cs, nil)
+	if d.Added != 1 || d.Removed != 0 {
+		t.Fatalf("conteos con «~»: agregadas %d, quitadas %d", d.Added, d.Removed)
+	}
+	cert := func(hex string) string {
+		return "hostname R1\ncrypto pki certificate chain TP-self-signed-1\n certificate self-signed 01\n  " + hex + "\n  \tquit\n"
+	}
+	cs, _ = CompareMasked(cert("3082AAAA"), cert("3082BBBB"), "")
+	for _, c := range cs {
+		if c.Op == "~" {
+			t.Fatalf("un certificado no es un «~»: %+v", cs)
+		}
+	}
+}

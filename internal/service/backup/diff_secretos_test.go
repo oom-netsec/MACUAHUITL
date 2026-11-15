@@ -37,6 +37,11 @@ func TestDiffNoMuestraSecretos(t *testing.T) {
 			t.Errorf("el diff muestra %q:\n%s", leak, r.Report.Text)
 		}
 	}
+	for _, side := range []string{`"before"`, `"after"`} { // los textos para el visor de la UI, ya enmascarados
+		if !strings.Contains(r.Report.Json, side) {
+			t.Errorf("falta %s en el JSON", side)
+		}
+	}
 	if strings.Contains(r.Report.Text, "enable secret") {
 		t.Errorf("diferencia falsa por el enmascarado:\n%s", r.Report.Text)
 	}
@@ -45,7 +50,7 @@ func TestDiffNoMuestraSecretos(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(r.Report.Text, "Hash5") || !strings.Contains(r.Report.Text, "~ enable secret 5 <MASKED:enable-secret> (la clave cambió") || strings.Contains(r.Report.Text, "username cisco") {
+	if strings.Contains(r.Report.Text, "Hash5") || !strings.Contains(r.Report.Text, "~ enable secret 5 <MASKED:enable-secret> (cambió un valor enmascarado") || strings.Contains(r.Report.Text, "username cisco") {
 		t.Errorf("con dos respaldos con secretos debe decir que la clave cambió, sin el valor, y no listar la que no cambió:\n%s", r.Report.Text)
 	}
 }

@@ -52,3 +52,17 @@ test("el error del núcleo se muestra como alerta y borra el resultado anterior"
   expect(await screen.findByRole("alert")).toHaveTextContent("ningún equipo tiene dos rondas");
   expect(screen.queryByRole("region", { name: "SW1_192.0.2.1" })).not.toBeInTheDocument();
 });
+
+test("un «~» dice que cambió un valor enmascarado, sin mostrarlo", async () => {
+  const r = { dir: "/o/job", from: 1, to: 2, warnings: [], devices: [
+    { device: "SW1_192.0.2.1", from: 1, to: 2, added: 0, removed: 0, ignored: [], changes: [
+      { op: "~" as const, path: "", line: "enable secret 5 <MASKED:enable-secret>" },
+    ] },
+  ] };
+  const core = fakeCore({ driftRun: vi.fn(async () => r) });
+  render(<DriftView core={core} />);
+  await userEvent.type(screen.getByLabelText("Trabajo o carpeta"), "/o/job");
+  await userEvent.click(screen.getByRole("button", { name: "Comparar" }));
+  const sw1 = await screen.findByRole("region", { name: "SW1_192.0.2.1" });
+  expect(within(sw1).getByText(termText(/^~ enable secret 5 <MASKED:enable-secret> \(cambió un valor enmascarado; no se muestra\)$/))).toBeInTheDocument();
+});
