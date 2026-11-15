@@ -490,3 +490,23 @@ func TestARPVacioNoAvisa(t *testing.T) {
 		t.Fatalf("avisó formato: %s", w)
 	}
 }
+
+// Las subinterfaces de un router comparten MAC: la VLAN de la interfaz de la fila ARP decide qué entrada CAM se sigue.
+func TestTraceIPPrefiereVLANDelARP(t *testing.T) {
+	cam := "Vlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n" +
+		"  10    aabb.cc00.0a01    DYNAMIC     Gi1/0/1\n  20    aabb.cc00.0a01    DYNAMIC     Gi1/0/2\n"
+	for _, iface := range []string{"Vlan20", "Et0/1.20", "GigabitEthernet0/0.20"} {
+		arp := "Protocol  Address     Age (min)  Hardware Addr   Type   Interface\nInternet  10.1.20.3         5   aabb.cc00.0a01  ARPA   " + iface + "\n"
+		a := devFrom("A_10.0.0.1", map[string]string{"show ip arp": arp, "show mac address-table": cam})
+		r := New([]*Dev{a}, now).Trace("10.1.20.3")
+		if len(r.Hops) != 1 || r.Hops[0].VLAN != "20" || r.Hops[0].Port != "Gi1/0/2" {
+			t.Fatalf("%s: %+v", iface, r)
+		}
+	}
+	// Sin dato de VLAN o sin entrada en esa VLAN, sigue con la que haya.
+	arp := "Protocol  Address     Age (min)  Hardware Addr   Type   Interface\nInternet  10.1.30.3         5   aabb.cc00.0a01  ARPA   Vlan30\n"
+	a := devFrom("A_10.0.0.1", map[string]string{"show ip arp": arp, "show mac address-table": cam})
+	if r := New([]*Dev{a}, now).Trace("10.1.30.3"); len(r.Hops) != 1 || r.End != "access" {
+		t.Fatalf("%+v", r)
+	}
+}

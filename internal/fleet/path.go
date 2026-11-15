@@ -212,7 +212,7 @@ func (p *pather) segment(d *Dev, iface, ip string) *Segment {
 		p.w.tx("fleet.warn.no_arp_l2", "dev", d.Name, "ip", ip)
 		return s
 	}
-	s.L2, s.L2End, _ = p.f.walk(p.g, p.w, mac, d)
+	s.L2, s.L2End, _ = p.f.walk(p.g, p.w, mac, d, "")
 	return s
 }
 
