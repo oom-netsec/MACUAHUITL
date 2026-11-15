@@ -105,10 +105,13 @@ export function PlanView({ r }: { r: PortsPlanResult }) {
 
 // Paso que espera decisión. "Aplicar" no recibe el foco y se habilita tras un momento: nunca se confirma por inercia.
 export const CONFIRM_DELAY_MS = 1500;
-function PendingStep({ step, changed, notes, ready, reapply, onConfirm, onRevert, onAbort }: { step: AssistStep; changed: string[]; notes: string[]; ready: boolean; reapply: boolean; onConfirm: () => void; onRevert: () => void; onAbort: () => void }) {
+function PendingStep({ step, changed, notes, ready, offline, reapply, onConfirm, onRevert, onAbort }: { step: AssistStep; changed: string[]; notes: string[]; ready: boolean; offline: boolean; reapply: boolean; onConfirm: () => void; onRevert: () => void; onAbort: () => void }) {
   const t = useT();
   const head = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { head.current?.focus(); }, [step.id]); // el paso nuevo anuncia su título; el foco no cae en «Aplicar»
+  useEffect(() => { // el paso nuevo anuncia su título (el foco no cae en «Aplicar»), sin quitarle el campo a quien escribe fuera de la ejecución
+    const a = document.activeElement;
+    if (a === document.body || head.current?.closest("[data-assist]")?.contains(a)) head.current?.focus();
+  }, [step.id]);
   const lines = step.lines ?? []; // protojson omite la lista vacía (el paso close no trae líneas)
   const device = step.device ?? "";
   const n = lines.length;
@@ -132,7 +135,7 @@ function PendingStep({ step, changed, notes, ready, reapply, onConfirm, onRevert
         </>}
         <div className="actions">
           <button className="primary" disabled={!ready} onClick={onConfirm}>{label}</button>
-          {(step.kind === "apply" || step.kind === "save" || close) && <button onClick={onRevert}>{t(reapply ? "assist.reapply" : close ? "assist.revert.all" : "assist.revert")}</button>}
+          {(step.kind === "apply" || step.kind === "save" || close) && <button disabled={offline} onClick={onRevert}>{t(reapply ? "assist.reapply" : close ? "assist.revert.all" : "assist.revert")}</button>}
           <button className="quiet" onClick={onAbort}>{t("assist.abort")}</button>
         </div>
       </div>
@@ -173,17 +176,17 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
   const maxSeq = useRef(0);
   const retries = useRef(0);
   const starting = useRef(false); // doble clic en «Iniciar»: un solo assistStart
-  const [ready, setReady] = useState(false); // «Aplicar» habilitado; el aviso vive aquí, siempre montado, para que los lectores lo lean
+  const [readyId, setReadyId] = useState(""); // id del paso ya habilitado; el aviso vive aquí, siempre montado, para que los lectores lo lean
   const head = useRef<HTMLHeadingElement>(null);
   const hadPending = useRef(false);
 
   useEffect(() => setArmed(false), [plan]);
   useEffect(() => { onActive(!!run?.active); }, [run?.active, onActive]);
   const pid = run?.pending?.id;
+  const ready = !!pid && readyId === pid; // por id: un paso nuevo nace deshabilitado en su primer render, sin esperar efectos
   useEffect(() => {
-    setReady(false);
     if (!pid) return;
-    const id = window.setTimeout(() => setReady(true), CONFIRM_DELAY_MS);
+    const id = window.setTimeout(() => setReadyId(pid), CONFIRM_DELAY_MS);
     return () => window.clearTimeout(id);
   }, [pid]);
   // Al quedar sin paso (confirmado, abortado) el paso se desmonta con el foco dentro: pasa al encabezado de la ejecución.
@@ -239,7 +242,7 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
         retries.current++;
         lastSeq.current = 0;
         setRun((r) => ({ ...fromInfo(live), notes: r?.notes })); // estado del núcleo (paso pendiente incluido) y registro vacío: la repetición lo vuelve a llenar sin duplicar
-        core.assistWatch(e.runId).catch((err) => onErrorRef.current(errorText(err)));
+        core.assistWatch(e.runId).catch((err) => { setRun((r) => (r ? { ...r, offline: true } : r)); onErrorRef.current(errorText(err)); });
         return;
       }
       setRun((r) => (r ? { ...r, active: false, pending: null, stopped: false, failReason: r.failReason || e.error || "" } : r));
@@ -266,17 +269,23 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
   }, [core, onError, moduleId, hasStart]);
 
   // Volver a enganchar la ejecución que quedó sin conexión: si el núcleo ya no la tiene viva, la vista se cierra.
+  const reattaching = useRef(false);
   const reattach = async () => {
     const id = runId.current;
+    if (reattaching.current) return; // doble clic: un solo intento
+    reattaching.current = true;
     try {
       const live = (await core.assistListRuns()).find((x) => x.runId === id && x.active);
       if (id !== runId.current) return;
-      if (!live) { setRun((r) => (r ? { ...r, active: false, pending: null, stopped: false, offline: false } : r)); return; }
+      if (!live) { setRun((r) => (r ? { ...r, active: false, pending: null, stopped: false, offline: false, failReason: r.failReason || t("assist.gone") } : r)); return; }
       lastSeq.current = 0; retries.current = 0;
       setRun((r) => ({ ...fromInfo(live), notes: r?.notes }));
       await core.assistWatch(id);
     } catch (e) {
+      setRun((r) => (r ? { ...r, offline: true } : r)); // sin stream: sigue sin conexión, con su botón
       onError(errorText(e));
+    } finally {
+      reattaching.current = false;
     }
   };
 
@@ -324,14 +333,14 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
             </div>
           )}
           {run.pending && (
-            <PendingStep key={run.pending.id} step={run.pending} changed={run.changed} notes={run.notes?.[run.pending.device ?? ""] ?? []} ready={ready} reapply={hasStart} onConfirm={() => act(() => core.assistConfirm(run.id, run.pending!.id))}
+            <PendingStep key={run.pending.id} step={run.pending} changed={run.changed} notes={run.notes?.[run.pending.device ?? ""] ?? []} ready={ready && !run.offline} offline={!!run.offline} reapply={hasStart} onConfirm={() => act(() => core.assistConfirm(run.id, run.pending!.id))}
               onRevert={() => act(() => core.assistRollback(run.id))} onAbort={() => act(() => core.assistAbort(run.id))} />
           )}
           {run.stopped && (
             <div>
               <Notice kind="error">{t("assist.stopped", { reason: run.failReason })}{run.changed.length > 0 && <> {changedText(run.changed, t)}</>}</Notice>
               <div className="actions">
-                <button onClick={() => act(() => core.assistRollback(run.id))}>{t("assist.proposeRollback")}</button>
+                <button onClick={() => act(() => core.assistRollback(run.id))}>{t(hasStart ? "assist.reapply.propose" : "assist.proposeRollback")}</button>
                 <button onClick={() => act(() => core.assistAbort(run.id))}>{t("assist.abort")}</button>
               </div>
             </div>

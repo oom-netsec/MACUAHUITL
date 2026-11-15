@@ -27,7 +27,14 @@ func Busy(b *Bridge) bool {
 	if err != nil {
 		return false
 	}
-	ctx, cancel := context.WithTimeout(b.callCtx(), busyPlazo)
+	// Sin callCtx: puede leer la preferencia de idioma (hasta 3 s) y aquí el idioma no hace falta.
+	b.mu.Lock()
+	base := b.ctx
+	b.mu.Unlock()
+	if base == nil {
+		base = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(base, busyPlazo)
 	defer cancel()
 	r, err := v1.NewAssistServiceClient(c).ListRuns(ctx, &v1.ListRunsRequest{ActiveOnly: true})
 	return err == nil && len(r.GetRuns()) > 0

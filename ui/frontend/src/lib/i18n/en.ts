@@ -2754,9 +2754,11 @@ export const en: Record<Key, string> = {
   "snippet.netflow-export.field.interface.help": "Physical port where ingress traffic is monitored; not Vlan, Port-channel, Loopback or Tunnel.",
   "snippet.netflow-export.field.source": "Source interface",
   "snippet.netflow-export.field.source.help": "Optional, for example Vlan1: the IP the device exports from.",
-  "assist.offline": "No connection to the run: it is still alive in the core. Re-attach to decide its steps.",
+  "assist.offline": "No connection to the run: it may still be alive in the core. Re-attach to decide its steps.",
   "assist.reattach": "Re-attach",
   "assist.ready": "Ready to apply.",
   "assist.reapply": "Re-apply the original change",
   "pending.kind.snippet": "Snippet: {name}",
+  "assist.gone": "The run is no longer alive in the core; if it changed anything, its rollback is in Pending rollbacks (Changes).",
+  "assist.reapply.propose": "Propose re-applying the original change",
 };

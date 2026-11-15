@@ -292,3 +292,12 @@ test("dentro de una reversa pendiente el botón de revertir dice que reaplica el
   expect(await screen.findByRole("button", { name: "Reaplicar el cambio original" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Revertir lo ya cambiado" })).not.toBeInTheDocument();
 });
+
+test("dentro de una reversa pendiente detenida se ofrece «Proponer reaplicar el cambio original»", async () => {
+  const core = coreWith([rb()]);
+  render(<PendingRollbacks core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Aplicar reversa" }));
+  await armAndStart();
+  act(() => core.emitAssist({ runId: "rb1", kind: "fail", state: "failed", text: "boom", changed: ["SW1"] }));
+  expect(await screen.findByRole("button", { name: "Proponer reaplicar el cambio original" })).toBeInTheDocument();
+});

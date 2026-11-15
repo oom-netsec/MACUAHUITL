@@ -96,3 +96,12 @@ func TestCloseTextSigueElIdiomaDeLaInterfaz(t *testing.T) {
 		t.Fatalf("en: %+v", got)
 	}
 }
+
+// Busy no depende de b.callCtx (puede leer la preferencia de idioma): sin Start (b.ctx nulo) tampoco entra en pánico.
+func TestBusyNoUsaCallCtx(t *testing.T) {
+	b := busyConNucleo(t, &slowAssist{runs: []*v1.AssistRunState{{RunId: "r1", Active: true}}})
+	b.ctx = nil
+	if !Busy(b) {
+		t.Fatal("debe consultar al núcleo sin depender del idioma ni de Start")
+	}
+}

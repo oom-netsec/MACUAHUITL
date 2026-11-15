@@ -401,3 +401,72 @@ test("accesibilidad: el paso recibe el foco en su título, el aviso cambia a «L
   await waitFor(() => expect(screen.queryByRole("region", { name: "Paso pendiente apply-1" })).toBeNull());
   expect(screen.getByRole("heading", { name: /r1/ })).toHaveFocus();
 });
+
+// ---- Fase 24a, revisión independiente ----
+const stepB = { id: "apply-2", kind: "apply", device: "SW1", lines: ["interface GigabitEthernet1/0/2"] };
+const liveInfo = { runId: "r9", state: "waiting-confirm", active: true, waiting: true, canRollback: true, pending: applyStep, changed: ["SW1"] };
+
+test("un paso nuevo nace con «Aplicar» deshabilitado en el mismo render aunque el anterior ya estuviera listo", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  await plan(core);
+  await start();
+  act(() => core.emitAssist({ runId: "r1", kind: "pending", state: "waiting-confirm", step: applyStep }));
+  await waitFor(() => expect(screen.getByRole("button", { name: confirmStep("apply-1") })).toBeEnabled(), { timeout: 3000 });
+  act(() => core.emitAssist({ runId: "r1", kind: "pending", state: "waiting-confirm", step: stepB }));
+  expect(screen.getByRole("button", { name: confirmStep("apply-2") })).toBeDisabled();
+});
+
+test("sin conexión, «Aplicar» y «Revertir» quedan apagados y «Abortar» sigue activo", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), assistListRuns: vi.fn().mockResolvedValueOnce([liveInfo]).mockRejectedValue(new Error("x")) });
+  render(<PortsView core={core} />);
+  await screen.findByRole("region", { name: "Paso pendiente apply-1" });
+  await new Promise((r) => setTimeout(r, 1700)); // pasa CONFIRM_DELAY_MS: sin la guarda «Aplicar» ya estaría habilitado
+  await act(async () => core.emitAssistDone({ runId: "r9" }));
+  await screen.findByText(/Sin conexión con la ejecución/);
+  expect(screen.getByRole("button", { name: confirmStep("apply-1") })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Revertir lo ya cambiado" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Abortar" })).toBeEnabled();
+});
+
+test("si assistWatch falla al reenganchar, la vista sigue sin conexión con su botón", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), assistListRuns: vi.fn().mockResolvedValueOnce([liveInfo]).mockRejectedValueOnce(new Error("x")).mockResolvedValue([liveInfo]) });
+  render(<PortsView core={core} />);
+  await screen.findByRole("region", { name: "Paso pendiente apply-1" });
+  await act(async () => core.emitAssistDone({ runId: "r9" }));
+  await screen.findByText(/Sin conexión con la ejecución/);
+  vi.mocked(core.assistWatch).mockRejectedValueOnce(new Error("corte"));
+  await userEvent.click(screen.getByRole("button", { name: "Volver a enganchar" }));
+  await waitFor(() => expect(core.assistWatch).toHaveBeenCalledTimes(2));
+  expect(await screen.findByText(/Sin conexión con la ejecución/)).toBeInTheDocument();
+});
+
+test("reenganchar una ejecución que ya terminó muestra el final y no el estado viejo", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), assistListRuns: vi.fn().mockResolvedValueOnce([liveInfo]).mockRejectedValueOnce(new Error("x")).mockResolvedValue([]) });
+  render(<PortsView core={core} />);
+  await screen.findByRole("region", { name: "Paso pendiente apply-1" });
+  await act(async () => core.emitAssistDone({ runId: "r9" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Volver a enganchar" }));
+  expect(await screen.findByText(/ya no está viva en el núcleo/)).toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "Paso pendiente apply-1" })).not.toBeInTheDocument();
+});
+
+test("doble clic en «Volver a enganchar» consulta una sola vez", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), assistListRuns: vi.fn().mockResolvedValueOnce([liveInfo]).mockRejectedValueOnce(new Error("x")).mockImplementation(() => new Promise((r) => setTimeout(() => r([liveInfo]), 50))) });
+  render(<PortsView core={core} />);
+  await screen.findByRole("region", { name: "Paso pendiente apply-1" });
+  await act(async () => core.emitAssistDone({ runId: "r9" }));
+  await userEvent.dblClick(await screen.findByRole("button", { name: "Volver a enganchar" }));
+  await waitFor(() => expect(core.assistWatch).toHaveBeenCalledTimes(2));
+  expect(core.assistListRuns).toHaveBeenCalledTimes(3);
+});
+
+test("un paso nuevo no le quita el foco a un campo donde se está escribiendo", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  await plan(core);
+  await start();
+  const campo = screen.getByLabelText("Equipo (IP o nombre[:puerto])");
+  campo.focus();
+  act(() => core.emitAssist({ runId: "r1", kind: "pending", state: "waiting-confirm", step: applyStep }));
+  await screen.findByRole("region", { name: "Paso pendiente apply-1" });
+  expect(campo).toHaveFocus();
+});
