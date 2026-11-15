@@ -58,13 +58,13 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
       <dl className="stats">
         <div><dt>{t("transfer.addr")}</dt><dd className="mono">{r.listening} <CopyButton value={r.listening} label={t("transfer.addr")} /></dd></div>
         {r.user && <div><dt>{t("transfer.user")}</dt><dd className="mono">{r.user} <CopyButton value={r.user} label={t("transfer.user")} /></dd></div>}
-        {r.user && <div><dt>{t("transfer.password")}</dt><dd className="mono">{r.password} <CopyButton value={r.password} label={t("transfer.password")} /></dd></div>}
+        {r.user && !s.done && <div><dt>{t("transfer.password")}</dt><dd className="mono">{r.password} <CopyButton value={r.password} label={t("transfer.password")} /></dd></div>}
         {r.recvDir && <div><dt>{t("transfer.recvAt")}</dt><dd className="mono">{r.recvDir}</dd></div>}
         {r.fromDir && <div><dt>{t("transfer.sendFrom")}</dt><dd className="mono">{r.fromDir}</dd></div>}
       </dl>
       {r.user && <p className="hint">{t("transfer.cred.note")}</p>}
       {r.fingerprints?.map((fp, i) => <p key={fp} className="meta">{t("transfer.fingerprint", { n: i + 1 })}: <code>{fp}</code> <CopyButton value={fp} label={t("transfer.fingerprint", { n: i + 1 })} /></p>)}
-      <Console label={t("transfer.ios")} text={cmds} copy={core.copyText} />
+      {!s.done && <Console label={t("transfer.ios")} text={cmds} copy={core.copyText} />/* cerrado: la contraseña efímera ya no sirve y no se deja a la vista (va dentro de la URL ftp://) */}
       {hint && (
         <>
           <Notice kind="warn">{t("transfer.privileged", { std: hint.standardPort, port })}</Notice>

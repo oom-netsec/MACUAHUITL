@@ -262,6 +262,7 @@ function CaCard({ core }: { core: CoreAPI }) {
         </div>
         <div className="field-row">
           <Select label={t("security.ca.algorithm")} value={algorithm} onChange={setAlgorithm} options={algorithms} w="md" />
+          {/* La contraseña de la CA se conserva a propósito tras crearla: «Firmar» la usa enseguida y la borra al firmar. */}
           <Field label={t("security.ca.password")} type="password" value={password} onChange={setPassword} autoComplete="new-password" w="md" />
         </div>
         <div className="actions">

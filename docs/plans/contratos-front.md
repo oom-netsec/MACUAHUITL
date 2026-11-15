@@ -714,7 +714,7 @@ Exportar todas las credenciales a un archivo cifrado con una frase **distinta de
 
 Auditoría: `vault.respaldo.exportar` (ruta y conteo) y `vault.respaldo.importar` (ruta, conteos y decisiones por etiqueta). Nunca secretos, usuarios ni frases.
 
-Límite declarado: las frases llegan del webview como `string` y no se pueden borrar de su memoria; la vista vacía los campos al enviarlas y no las guarda. La sección Datos de Ajustes (`settings.data.body`) todavía dice que el respaldo de la bóveda «no está disponible»: cuando la conecte, que use estas tres llamadas.
+Límite declarado: las frases llegan del webview como `string` y no se pueden borrar de su memoria; la vista vacía los campos al enviarlas y no las guarda.
 
 ## Preferencias del núcleo: carpeta de salidas y defaults de archivo (fase 29e)
 
