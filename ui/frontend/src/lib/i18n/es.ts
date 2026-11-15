@@ -2764,6 +2764,9 @@ export const es = {
   "patrol.pb.groupCount.one": "(1 seleccionado / {total})",
   "patrol.pb.selectVisible": "Seleccionar los {n} visibles de {group}",
   "patrol.pb.selectVisible.one": "Seleccionar el visible de {group}",
+  "pending.discard.rotation": "Descartar esta reversa deja a {device} con la contraseña nueva, y la bóveda conserva la anterior: la credencial de la bóveda ya no entra a ese equipo.",
+  "pending.discard.generated": "Nadie conoce la contraseña nueva (la generó la app): ese usuario queda sin acceso hasta que la cambies por consola.",
+  "pending.discard.typeName": "Escribe {device} para confirmar que descartas",
 };
 
 export type Key = keyof typeof es;

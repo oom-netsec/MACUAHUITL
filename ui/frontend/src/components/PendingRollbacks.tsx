@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PendingRollback, PortsPlanResult } from "../modules/ports/api";
 import { AssistExecution, CodeLines, type AssistRunCore } from "./AssistRun";
-import { Check, ConfirmButton, Notice, errorText } from "./Field";
+import { Check, ConfirmButton, Field, Notice, errorText } from "./Field";
 import { Badge } from "./Page";
 import { useT } from "../lib/i18n";
 import type { Key } from "../lib/i18n/es";
@@ -38,6 +38,9 @@ function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: Assist
   const [accepted, setAccepted] = useState(false);
   const [live, setLive] = useState(false); // la ejecución de reversa de esta entrada sigue viva
   const [err, setErr] = useState("");
+  const rotation = r.kind === "credrotate" && !r.unreadable;
+  const rotDevice = r.devices[0]?.device ?? "";
+  const [typed, setTyped] = useState("");
   const old = age > OLD_SECONDS || needAge;
   const ageLabel = ageText(age, t);
   const gated = plan && old && !accepted; // sin aceptar, el flujo asistido no recibe el plan: no hay con qué iniciar
@@ -86,7 +89,19 @@ function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: Assist
         {!live && !gone && (
           <div className="actions">
             {!r.unreadable && !plan && <button className="primary" onClick={apply}>{t("pending.apply")}</button>}
-            <ConfirmButton label={t("pending.discard")} confirmLabel={t("pending.discard.confirm")} onConfirm={discard} />
+            {!rotation && <ConfirmButton label={t("pending.discard")} confirmLabel={t("pending.discard.confirm")} onConfirm={discard} />}
+          </div>
+        )}
+        {!live && !gone && rotation && (
+          // Descartar una rotación deja al equipo con la contraseña nueva y a la bóveda con la anterior: aviso y nombre del equipo escrito.
+          <div className="pending-discard-rotation">
+            <Notice kind="warn">{t("pending.discard.rotation", { device: rotDevice })}{r.generatedSecret && <> {t("pending.discard.generated")}</>}</Notice>
+            <Field label={t("pending.discard.typeName", { device: rotDevice })} value={typed} onChange={setTyped} w="md" mono />
+            <div className="actions">
+              {typed.trim() === rotDevice
+                ? <ConfirmButton label={t("pending.discard")} confirmLabel={t("pending.discard.confirm")} onConfirm={discard} />
+                : <button type="button" className="quiet danger-text" disabled>{t("pending.discard")}</button>}
+            </div>
           </div>
         )}
       </div>

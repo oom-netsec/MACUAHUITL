@@ -8,7 +8,7 @@ import type { PendingRollback } from "../modules/ports/api";
 
 const rb = (over: Partial<PendingRollback> = {}): PendingRollback => ({
   runId: "a", kind: "ports", devices: [{ device: "SW1", rollbackLines: ["interface Gi1/0/1", "switchport access vlan 10"] }],
-  endedUnix: Math.floor(Date.now() / 1000) - (over.ageSeconds ?? 7200), ageSeconds: 7200, writeMemory: false, unreadable: false, ...over,
+  endedUnix: Math.floor(Date.now() / 1000) - (over.ageSeconds ?? 7200), ageSeconds: 7200, writeMemory: false, unreadable: false, generatedSecret: false, ...over,
 });
 const coreWith = (list: PendingRollback[]) => fakeCore({ assistListPendingRollbacks: vi.fn(async () => list) });
 const fail = (reason: string) => Object.assign(new Error("x"), { cause: { code: "FailedPrecondition", reason, metadata: {} } });
@@ -300,4 +300,29 @@ test("dentro de una reversa pendiente detenida se ofrece «Proponer reaplicar el
   await armAndStart();
   act(() => core.emitAssist({ runId: "rb1", kind: "fail", state: "failed", text: "boom", changed: ["SW1"] }));
   expect(await screen.findByRole("button", { name: "Proponer reaplicar el cambio original" })).toBeInTheDocument();
+});
+
+test("descartar una rotación avisa que la bóveda queda con la contraseña anterior y exige escribir el nombre del equipo", async () => {
+  const core = coreWith([rb({ kind: "credrotate", devices: [{ device: "SW1", rollbackLines: ["username admin secret ⟦oculto⟧"] }] })]);
+  render(<PendingRollbacks core={core} />);
+  expect(await screen.findByText(/deja a SW1 con la contraseña nueva/)).toBeInTheDocument();
+  expect(screen.queryByText(/Nadie conoce la contraseña nueva/)).toBeNull(); // la escribió la persona
+  const discardBtn = () => screen.getByRole("button", { name: "Descartar" });
+  expect(discardBtn()).toBeDisabled();
+  await userEvent.type(screen.getByLabelText("Escribe SW1 para confirmar que descartas"), "SW");
+  expect(discardBtn()).toBeDisabled();
+  await userEvent.type(screen.getByLabelText("Escribe SW1 para confirmar que descartas"), "1");
+  await userEvent.click(discardBtn());
+  await userEvent.click(screen.getByRole("button", { name: /Confirmar descartar|Confirmar/ }));
+  await waitFor(() => expect(core.assistDiscardPendingRollback).toHaveBeenCalledWith("a"));
+});
+
+test("con el secreto generado por la app, el aviso dice que nadie lo conoce", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", generatedSecret: true })])} />);
+  expect(await screen.findByText(/Nadie conoce la contraseña nueva/)).toBeInTheDocument();
+});
+
+test("parsePendingRollbacks lee generatedSecret (ausente = false)", async () => {
+  const { parsePendingRollbacks } = await import("../modules/ports/api");
+  expect(parsePendingRollbacks('{"rollbacks":[{"runId":"a","kind":"credrotate","generatedSecret":true},{"runId":"b","kind":"ports"}]}').map((r) => r.generatedSecret)).toEqual([true, false]);
 });

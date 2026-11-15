@@ -2766,4 +2766,7 @@ export const en: Record<Key, string> = {
   "patrol.pb.groupCount.one": "(1 selected / {total})",
   "patrol.pb.selectVisible": "Select the {n} visible in {group}",
   "patrol.pb.selectVisible.one": "Select the one visible in {group}",
+  "pending.discard.rotation": "Discarding this rollback leaves {device} with the new password while the vault keeps the old one: the vault credential no longer logs in to that device.",
+  "pending.discard.generated": "Nobody knows the new password (the app generated it): that user has no access until you change it from the console.",
+  "pending.discard.typeName": "Type {device} to confirm the discard",
 };

@@ -16,7 +16,7 @@ test("tras recargar, una reversa viva iniciada en Cambios se reengancha y se avi
 });
 
 test("la sección Reversas pendientes lista las guardadas", async () => {
-  const core = fakeCore({ assistListPendingRollbacks: vi.fn(async () => [{ runId: "a", kind: "ports", devices: [{ device: "SW1", rollbackLines: ["no shutdown"] }], endedUnix: 1, ageSeconds: 60, writeMemory: false, unreadable: false }]) });
+  const core = fakeCore({ assistListPendingRollbacks: vi.fn(async () => [{ runId: "a", kind: "ports", devices: [{ device: "SW1", rollbackLines: ["no shutdown"] }], endedUnix: 1, ageSeconds: 60, writeMemory: false, unreadable: false, generatedSecret: false }]) });
   render(<CoreContext.Provider value={core}><ChangeView core={core} /></CoreContext.Provider>);
   expect(await screen.findByRole("heading", { name: "Reversas pendientes" })).toBeInTheDocument();
   expect(await screen.findByRole("region", { name: "Reversa de la ejecución a" })).toBeInTheDocument();
