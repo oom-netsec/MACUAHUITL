@@ -64,11 +64,11 @@ func escenarios(t *testing.T, loc string) map[string]string {
 	two := map[string][]string{gi1: {"description Impresora", "switchport access vlan 10", "switchport mode access", "shutdown"}, gi2: {"switchport mode dynamic desirable"}}
 
 	// Avisos de los planes.
-	r := newRig(t, simulator.Config{})
+	r := newRig(t, simulator.Config{Commands: sessionCmds("Gi1/0/48", nil)}) // la sesión entra por otro puerto: sin la nota de «no se pudo ubicar»
 	out["nota speed-duplex"] = planSnippet(ctx, r, tplReq("speed-duplex", map[string]string{"interfaces": gi1, "speed": "100"}))
 	out["nota port-security"] = planSnippet(ctx, r, tplReq("port-security", map[string]string{"interfaces": gi1}))
 	out["nota modo-puerto"] = planSnippet(ctx, r, tplReq("modo-puerto", map[string]string{"interfaces": gi1, "mode": "dynamic auto"}))
-	r2 := newRig(t, simulator.Config{Interfaces: two})
+	r2 := newRig(t, simulator.Config{Interfaces: two, Commands: sessionCmds("Gi1/0/48", nil)})
 	out["nota modo-puerto ya estaba"] = planSnippet(ctx, r2, tplReq("modo-puerto", map[string]string{"interfaces": gi1 + "," + gi2, "mode": "access"}))
 	// Errores de armado y de uso.
 	out["snippet vacío"] = planSnippet(ctx, r, &v1.PlanSnippetRequest{})

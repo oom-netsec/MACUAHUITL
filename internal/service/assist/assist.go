@@ -307,15 +307,23 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 	if a := ex.SourceAddr(label); a != "" { // lo usa vty-acl para no dejar fuera a esta sesión
 		byCmd[assist.SessionSourceKey] = a
 	}
-	if more != nil {
-		if extra := more(byCmd); len(extra) > 0 {
-			outs, err = ex.Read(ctx, label, extra)
-			if err != nil {
-				return "", assist.Plan{}, connErr(ctx, err)
+	// Rondas de lecturas que dependen de las anteriores (el puerto de la sesión son cuatro encadenadas); solo se leen las que faltan.
+	for round := 0; more != nil && round < 5; round++ {
+		var extra []string
+		for _, c := range more(byCmd) {
+			if _, done := byCmd[c]; !done {
+				extra = append(extra, c)
 			}
-			for _, o := range outs {
-				byCmd[o.Command] = o.Text
-			}
+		}
+		if len(extra) == 0 {
+			break
+		}
+		outs, err = ex.Read(ctx, label, extra)
+		if err != nil {
+			return "", assist.Plan{}, connErr(ctx, err)
+		}
+		for _, o := range outs {
+			byCmd[o.Command] = o.Text
 		}
 	}
 	if p := ex.Platform(label); len(platforms) > 0 && !slices.Contains(platforms, p) {
@@ -349,7 +357,8 @@ func (s *assistSvc) PlanPorts(ctx context.Context, r *v1.PlanPortsRequest) (*v1.
 	if err != nil {
 		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
-	id, plan, err := s.planOn(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, assist.Ports, r.WriteMemory, fmt.Sprintf("interfaces=%v", r.Interfaces), nil,
+	fn := assist.Ports
+	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, assist.SessionPortReads, &fn, nil, r.WriteMemory, fmt.Sprintf("interfaces=%v", r.Interfaces), nil,
 		func(label string, outs map[string]string) (assist.DevicePlan, error) {
 			return assist.PortsPlan(label, r.Interfaces, ch, outs)
 		})
@@ -365,6 +374,7 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 		return nil, err
 	}
 	var (
+		more      func(map[string]string) []string // lecturas que dependen de las de pre
 		fn        assist.Function
 		platforms []string // las que soporta la plantilla; vacío = no se compara
 		pre       []string
@@ -382,7 +392,7 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 	case *v1.PlanSnippetRequest_Trunk:
 		ctx = context.WithValue(ctx, templateKey{}, "trunk")
 		ch := assist.TrunkChange{Interface: sn.Trunk.Interface, Op: sn.Trunk.Op, Vlan: int(sn.Trunk.Vlan)}
-		fn, detail = assist.SnippetTrunk, fmt.Sprintf("interface=%s %s vlan=%d", ch.Interface, ch.Op, ch.Vlan)
+		fn, detail, more = assist.SnippetTrunk, fmt.Sprintf("interface=%s %s vlan=%d", ch.Interface, ch.Op, ch.Vlan), assist.SessionPortReads
 		pre, err = assist.TrunkPre(ch)
 		build = func(l string, o map[string]string) (assist.DevicePlan, error) { return assist.TrunkPlan(l, ch, o) }
 	case *v1.PlanSnippetRequest_Svi:
@@ -398,6 +408,9 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 			return nil, e
 		}
 		fn, detail, platforms = t.Fn, assist.DescribeValues(t, vals), t.Platforms
+		if t.SessionPort {
+			more = assist.SessionPortReads
+		}
 		pre, err = t.Pre(vals)
 		build = func(l string, o map[string]string) (assist.DevicePlan, error) { return t.Plan(l, vals, o) }
 	default:
@@ -406,7 +419,7 @@ func (s *assistSvc) PlanSnippet(ctx context.Context, r *v1.PlanSnippetRequest) (
 	if err != nil {
 		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
-	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, nil, &fn, platforms, r.WriteMemory, detail, nil, build)
+	id, plan, err := s.planWith(ctx, r.Target, r.AcceptedHostKeyFingerprints, pre, more, &fn, platforms, r.WriteMemory, detail, nil, build)
 	if err != nil {
 		return nil, err
 	}

@@ -394,7 +394,11 @@ func TrunkPre(c TrunkChange) ([]string, error) {
 	if err := c.check(); err != nil {
 		return nil, err
 	}
-	return []string{showCfg(c.Interface), showSwitchport(c.Interface)}, nil
+	pre := []string{showCfg(c.Interface), showSwitchport(c.Interface)}
+	if c.Op == "remove" {
+		pre = append(pre, showUsersCmd) // para ubicar el puerto de la sesión
+	}
+	return pre, nil
 }
 
 // TrunkPlan arma el plan de un trunk. Se rechaza si la interfaz no es trunk, si es miembro de un canal o ruteada, y si el cambio
@@ -428,6 +432,11 @@ func TrunkPlan(device string, c TrunkChange, outs map[string]string) (DevicePlan
 		return DevicePlan{}, cerr("assist.err.vlan_already_allowed", "vlan", c.Vlan, "interface", c.Interface)
 	case c.Op == "remove" && !allowed:
 		return DevicePlan{}, cerr("assist.err.vlan_not_allowed", "vlan", c.Vlan, "interface", c.Interface)
+	}
+	if c.Op == "remove" {
+		if why := sessionPorts(outs).checkTrunkRemove(c.Interface, c.Vlan); !why.Empty() {
+			return DevicePlan{}, &SnippetRefusal{Detail: why.In(i18n.Es), Why: why}
+		}
 	}
 	inverse := map[string]string{"add": "remove", "remove": "add"}[c.Op]
 	line := func(op string) string { return fmt.Sprintf("switchport trunk allowed vlan %s %d", op, c.Vlan) }

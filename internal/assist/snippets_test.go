@@ -534,7 +534,7 @@ func TestTrunkPlanAddAndRemoveWithInverseRollback(t *testing.T) {
 		t.Error("remove de una VLAN que no está permitida")
 	}
 	// Con la lista en "todas" (sin línea) add no cambia nada y remove sí.
-	all := trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk"), swTrunk)
+	all := with(trunkOuts(gi1, trunkCfg(gi1, "switchport mode trunk"), swTrunk), onGi48)
 	if _, err := TrunkPlan("SW1", TrunkChange{Interface: gi1, Op: "add", Vlan: 10}, all); err == nil {
 		t.Error("add con todas las VLAN permitidas")
 	}
@@ -576,7 +576,7 @@ func TestTrunkPlanRejectsInterfaceThatIsNotTrunk(t *testing.T) {
 		}
 	}
 	// Un trunk negociado (el modo administrativo dice trunk aunque la configuración no lo fije) sí es trunk.
-	neg := trunkOuts(gi1, trunkCfg(gi1, "description x"), swTrunk)
+	neg := with(trunkOuts(gi1, trunkCfg(gi1, "description x"), swTrunk), onGi48)
 	if _, err := TrunkPlan("SW1", TrunkChange{Interface: gi1, Op: "remove", Vlan: 30}, neg); errors.Is(err, ErrSnippetRefused) {
 		t.Errorf("modo administrativo trunk: %v", err)
 	}

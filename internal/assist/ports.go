@@ -87,6 +87,11 @@ type PortChange struct {
 	Shutdown    *bool // true = shutdown, false = no shutdown
 }
 
+// cuts dice si el cambio puede cortar el acceso en el puerto por donde llega la sesión: apagarlo o cambiarle la VLAN de acceso o la de voz.
+func (c PortChange) cuts() bool {
+	return c.Vlan != 0 || c.Voice != 0 || c.Shutdown != nil && *c.Shutdown
+}
+
 var portfastRe = regexp.MustCompile(`(?m)^\s+spanning-tree portfast\b`)
 
 func showCfg(iface string) string        { return "show running-config interface " + iface }
@@ -151,6 +156,9 @@ func PortsPre(ifaces []string, ch PortChange) ([]string, error) {
 	}
 	for _, v := range vlansToCheck(ch) {
 		pre = append(pre, showVlan(v))
+	}
+	if ch.cuts() {
+		pre = append(pre, showUsersCmd) // para ubicar el puerto de la sesión (SessionPortReads sigue la cadena)
 	}
 	return pre, nil
 }
@@ -249,6 +257,7 @@ func PortsPlan(device string, ifaces []string, ch PortChange, outs map[string]st
 		}
 	}
 	dp := DevicePlan{Device: device, Pre: pre, Baseline: map[string]string{}}
+	sp := sessionPorts(outs)
 	var rollback [][]string
 	for _, n := range names {
 		text, ok := outs[showCfg(n)]
@@ -262,6 +271,15 @@ func PortsPlan(device string, ifaces []string, ch PortChange, outs map[string]st
 		toAccess, err := accessPort(n, cur, outs[showSwitchport(n)])
 		if err != nil {
 			return DevicePlan{}, err
+		}
+		if ch.cuts() { // accessPort ya descartó los trunks y canales: aquí solo un puerto de acceso (uplink=false)
+			why, warn := sp.check(n, false)
+			if !why.Empty() {
+				return DevicePlan{}, newRefusal(ErrPortRefused, "assist.port_refused", why)
+			}
+			if !warn.Empty() {
+				addNote(&dp, warn)
+			}
 		}
 		// Solo una VLAN de acceso o de voz exige modo access: descripción y shut/no shut no tocan el modo del puerto.
 		toAccess = toAccess && (ch.Vlan != 0 || ch.Voice != 0)
