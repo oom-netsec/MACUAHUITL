@@ -177,3 +177,31 @@ func TestDerivedCat9kSDAUsaIOSXE(t *testing.T) {
 		}
 	}
 }
+
+// Los scripts de configuración van en inglés (la app es canónica en inglés), usan la sintaxis de IOS 15.x e IOS-XE 17
+// y crean la VLAN 999 antes de asignarla.
+func TestConfiguracionEnInglesYSintaxisValida(t *testing.T) {
+	lib, _, err := LibraryWith(playbooks.FS, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range lib {
+		if !strings.HasPrefix(s.ID, "lib-cfg-") {
+			continue
+		}
+		txt := strings.Join(s.Commands, "\n")
+		for _, es := range []string{"ejemplo", "USUARIOS", "SIN-USO", "CAMBIAR", "Acceso solo"} {
+			if strings.Contains(txt, es) {
+				t.Errorf("%s: texto en español %q en los comandos", s.ID, es)
+			}
+		}
+		if strings.Contains(txt, "ip domain-name") {
+			t.Errorf("%s: ip domain-name da %% Invalid input en IOS-XE 17", s.ID)
+		}
+		if s.ID == "lib-cfg-puertos-sin-uso" {
+			if v, a := strings.Index(txt, "vlan 999\n"), strings.Index(txt, "switchport access vlan 999"); v < 0 || a < 0 || v > a {
+				t.Errorf("la VLAN 999 se asigna sin crearla antes:\n%s", txt)
+			}
+		}
+	}
+}

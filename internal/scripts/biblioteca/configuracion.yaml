@@ -12,7 +12,7 @@
   commands:
     - configure terminal
     - vlan 10
-    - name USUARIOS
+    - name USERS
     - exit
     - interface GigabitEthernet1/0/1
     - switchport mode access
@@ -76,7 +76,7 @@
     - ip access-list standard SNMP-RO
     - permit 192.0.2.0 0.0.0.255
     - exit
-    - snmp-server community CAMBIAR-COMUNIDAD RO SNMP-RO
+    - snmp-server community CHANGE-COMMUNITY RO SNMP-RO
     - end
 - id: cfg-banner
   name: Config · Aviso de acceso (banner)
@@ -88,7 +88,7 @@
   tags: [banner]
   commands:
     - configure terminal
-    - banner motd ^Acceso solo para personal autorizado. La actividad se registra.^
+    - banner motd ^Authorized access only. Activity is logged.^
     - end
 - id: cfg-bpduguard
   name: Config · PortFast con BPDU Guard en acceso
@@ -130,7 +130,7 @@
   tags: [ssh, vty]
   commands:
     - configure terminal
-    - ip domain-name ejemplo.local
+    - ip domain name example.local
     - crypto key generate rsa modulus 2048
     - ip ssh version 2
     - line vty 0 15
@@ -141,15 +141,18 @@
   name: Config · Apagar puertos sin uso
   tech: seguridad
   platform: ios-xe
-  description: Manda los puertos sin uso a una VLAN aislada y los apaga. Cambia el rango y la VLAN.
+  description: Crea la VLAN 999, manda los puertos sin uso a ella y los apaga. Cambia el rango y la VLAN. Con VTP en modo servidor, la VLAN creada se propaga al dominio.
   name_en: "Config · Shut down unused ports"
-  description_en: "Sends unused ports to an isolated VLAN and shuts them down. Change the range and the VLAN."
+  description_en: "Creates VLAN 999, sends unused ports to it and shuts them down. Change the range and the VLAN. With VTP in server mode, the created VLAN is propagated to the domain."
   tags: [puertos, hardening]
   commands:
     - configure terminal
+    - vlan 999
+    - name UNUSED
+    - exit
     - interface range GigabitEthernet1/0/10 - 20
     - switchport mode access
     - switchport access vlan 999
-    - description SIN-USO
+    - description UNUSED
     - shutdown
     - end
