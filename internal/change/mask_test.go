@@ -23,3 +23,15 @@ func TestConfigDiffEnmascaraLosSecretos(t *testing.T) {
 		t.Errorf("el diff cambió de forma:\n%s", all)
 	}
 }
+
+// M4: con la plataforma real (ASA) el host SNMP «host IFNAME IP» se ve y la comunidad no.
+func TestConfigDiffUsaLaPlataformaDelEquipo(t *testing.T) {
+	a := Snapshot{Platform: "asa", Have: map[string]bool{"config": true}, Config: iosconf.Parse("hostname fw\n")}
+	b := Snapshot{Platform: "asa", Have: map[string]bool{"config": true}, Config: iosconf.Parse(
+		"hostname fw\nsnmp-server host inside 10.0.0.1\nsnmp-server host inside 10.0.0.2 community ZQCOM1 version 2c\n")}
+	_, diff, _ := compareDevice(a, b)
+	all := strings.Join(diff, "\n")
+	if !strings.Contains(all, "host inside 10.0.0.1") || !strings.Contains(all, "10.0.0.2") || strings.Contains(all, "ZQCOM1") {
+		t.Errorf("%s", all)
+	}
+}

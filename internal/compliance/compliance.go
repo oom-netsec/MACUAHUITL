@@ -127,8 +127,8 @@ var maskedMark = regexp.MustCompile(`<MASKED:[^>]*>`)
 // maskSecrets cambia por hidden el valor de los secretos de una línea de configuración. Primero pasa por el enmascarado
 // común (internal/mask) con sus secciones: line es la ruta «sección > línea» y cada nivel se manda con su sangría para
 // que valgan las reglas de bloque (radius server X > key …). Después, las formas propias de abajo (idempotentes).
-func maskSecrets(line, hidden string) string {
-	line = maskedMark.ReplaceAllString(mask.Path("", line), hidden)
+func maskSecrets(line, hidden, platform string) string {
+	line = maskedMark.ReplaceAllString(mask.Path(platform, line), hidden)
 	for _, r := range secretVals {
 		line = r.re.ReplaceAllString(line, strings.Replace(r.repl, "%s", hidden, 1))
 	}
@@ -138,10 +138,29 @@ func maskSecrets(line, hidden string) string {
 // lineListTx es la lista «línea N: texto» de los nodos, sin el valor de los secretos (la marca es <oculto> en es y
 // <hidden> en en).
 func lineListTx(ns []*iosconf.Node) i18n.Text {
+	platform := platformOf(ns)
 	var parts []i18n.Text
 	for _, n := range ns {
 		p := n.Path()
-		parts = append(parts, i18n.Tx("compliance.line", "n", n.Num).With("text", i18n.Lit(maskSecrets(p, "<oculto>"), maskSecrets(p, "<hidden>"))))
+		parts = append(parts, i18n.Tx("compliance.line", "n", n.Num).With("text", i18n.Lit(maskSecrets(p, "<oculto>", platform), maskSecrets(p, "<hidden>", platform))))
 	}
 	return i18n.Join("; ", parts...)
+}
+
+// platformOf: el informe no recibe la plataforma, pero una configuración de ASA empieza con «ASA Version»; da "asa" y si
+// no, "" (las reglas de IOS). Sirve para que «snmp-server host IFNAME IP» conserve la IP.
+func platformOf(ns []*iosconf.Node) string {
+	if len(ns) == 0 {
+		return ""
+	}
+	root := ns[0]
+	for root.Parent != nil {
+		root = root.Parent
+	}
+	for _, c := range root.Children {
+		if strings.HasPrefix(c.Line, "ASA Version ") {
+			return "asa"
+		}
+	}
+	return ""
 }

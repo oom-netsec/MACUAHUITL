@@ -28,3 +28,16 @@ func TestInformeNoCitaSecretosDeOtrasFormas(t *testing.T) {
 		t.Errorf("sin marca de oculto:\n%s", r.Text())
 	}
 }
+
+// M4: una configuración de ASA («ASA Version») cita el host SNMP «host IFNAME IP» con su IP y sin la comunidad.
+func TestInformeDeASAConservaLaIPDelHostSNMP(t *testing.T) {
+	cfg := "ASA Version 9.16(1)\nhostname fw\nsnmp-server host inside 10.0.0.1\nsnmp-server host inside 10.0.0.2 community ZQCOM1\nenable password ZQEN1\n"
+	r, err := Check(cfg, "- snmp-server host .*\n- enable password .*\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	txt := r.Text()
+	if !strings.Contains(txt, "10.0.0.1") || strings.Contains(txt, "ZQCOM1") || strings.Contains(txt, "ZQEN1") {
+		t.Errorf("%s", txt)
+	}
+}

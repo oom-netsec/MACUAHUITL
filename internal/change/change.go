@@ -9,6 +9,7 @@
 package change
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
 	"sort"
@@ -91,7 +92,9 @@ func Compare(pre, post []capture.Device) Report {
 			fallthrough
 		default:
 			if ok && b.State == "completed" {
-				fs, diff, tx := compareDevice(Parse(a.Outputs), Parse(b.Outputs))
+				sa, sb := Parse(a.Outputs), Parse(b.Outputs)
+				sa.Platform, sb.Platform = a.Platform, b.Platform
+				fs, diff, tx := compareDevice(sa, sb)
 				d.Findings, d.ConfigDiff, d.ConfigDiffTx = append(d.Findings, fs...), diff, tx
 			}
 		}
@@ -294,7 +297,7 @@ func compareDevice(a, b Snapshot) ([]Finding, []string, []i18n.Text) {
 	var diff []string
 	var tx []i18n.Text
 	if both("config") {
-		diff = configDiff(a.Config, b.Config)
+		diff = configDiff(a.Config, b.Config, cmp.Or(b.Platform, a.Platform))
 		added, removed := 0, 0
 		for _, d := range diff {
 			if strings.HasPrefix(d, "+") {
@@ -324,7 +327,7 @@ var volatile = regexp.MustCompile(`^ntp clock-period \d+$`)
 
 // configDiff compara por ruta jerárquica: reordenar secciones no cuenta como cambio. Las líneas salen siempre
 // enmascaradas (aunque la evidencia venga sin máscara): el valor de un secreto cambiado no se muestra, solo que cambió.
-func configDiff(a, b *iosconf.Node) []string {
+func configDiff(a, b *iosconf.Node, platform string) []string {
 	paths := func(n *iosconf.Node) map[string]int {
 		m := map[string]int{}
 		n.Walk(func(x *iosconf.Node) {
@@ -338,10 +341,10 @@ func configDiff(a, b *iosconf.Node) []string {
 	var out []string
 	for _, p := range keys(pa, pb) {
 		for i := pb[p]; i < pa[p]; i++ {
-			out = append(out, "- "+mask.Path("", p))
+			out = append(out, "- "+mask.Path(platform, p))
 		}
 		for i := pa[p]; i < pb[p]; i++ {
-			out = append(out, "+ "+mask.Path("", p))
+			out = append(out, "+ "+mask.Path(platform, p))
 		}
 	}
 	return out
