@@ -119,6 +119,8 @@ func (c Change) TextIn(loc string) string {
 // (tipo 5/7, que se rompen) sale en el informe y un lado ya enmascarado no da diferencias falsas. Si los dos traían el
 // valor real y una línea solo cambió en un valor que se enmascara (una clave; en ASA sin plataforma, también la IP de
 // snmp-server host), sale una vez con Op "~", enmascarada en su contexto: el informe dice que cambió sin mostrarlo.
+// Límite: una cadena de certificados se enmascara entera en los dos lados, así que renovar un certificado (que es
+// público) no se ve en el informe; para eso está ver el respaldo.
 func CompareMasked(prev, cur, platform string) (changes []Change, ignored []string) {
 	mp, _ := mask.Apply(platform, prev)
 	mc, _ := mask.Apply(platform, cur)

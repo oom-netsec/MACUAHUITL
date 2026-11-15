@@ -145,6 +145,10 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
         <>
           {diff.meta.masked && <Notice kind="warn">{t("backup.diff.maskedWarn")}</Notice>}
           <DiffView label={t("backup.diff.title")} before={diff.before} after={diff.after} />
+          {/* Un valor enmascarado que cambió (una clave rotada) no se ve en los textos enmascarados: se lista aparte, sin mostrarlo. */}
+          {diff.meta.changes.filter((c) => c.op === "~").map((c, i) => (
+            <p key={i} className="meta"><code>{`~ ${c.path ? `${c.path} › ` : ""}${c.line} ${t("drift.maskedChanged")}`}</code></p>
+          ))}
           {diff.meta.ignored.length > 0 && <p className="meta">{t("backup.diff.ignored", { list: diff.meta.ignored.join("; ") })}</p>}
         </>
       )}

@@ -140,3 +140,17 @@ test("una restauración viva de Respaldos se engancha sin elegir entrada", async
     await waitFor(() => expect(core.assistWatch).toHaveBeenCalledWith("r7"));
   } finally { localStorage.removeItem("macuahuitl.assist.r7"); }
 });
+
+test("comparar dos respaldos con secretos donde solo cambió una clave lo dice, sin mostrarla", async () => {
+  const diff = {
+    from: a, to: b, added: 0, removed: 0, ignored: [], masked: false,
+    changes: [{ op: "~", path: "", line: "enable secret 5 <MASKED:enable-secret>" }],
+    before: "hostname SW1\nenable secret 5 <MASKED:enable-secret>\n", after: "hostname SW1\nenable secret 5 <MASKED:enable-secret>\n",
+  };
+  const core = withCreds({ backupList: vi.fn(async () => ({ backups: [b, a], masked: false })), backupDiff: vi.fn(async () => diff) });
+  render(<BackupView core={core} />);
+  await userEvent.click(await screen.findByLabelText(`Comparar ${b.id}`));
+  await userEvent.click(screen.getByLabelText(`Comparar ${a.id}`));
+  await userEvent.click(screen.getByRole("button", { name: "Comparar" }));
+  expect(await screen.findByText(/enable secret 5 <MASKED:enable-secret> \(cambió un valor enmascarado; no se muestra\)/)).toBeInTheDocument();
+});
