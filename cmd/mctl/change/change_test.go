@@ -76,6 +76,10 @@ func TestRevisarEquipos(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "10.0.0.2") || strings.Contains(err.Error(), "10.0.0.1") || !strings.Contains(err.Error(), "timeout") {
 		t.Fatalf("debía nombrar solo al equipo fallido: %v", err)
 	}
+	part := &v1.RunDevice{Target: &v1.Target{Address: "10.0.0.4"}, State: v1.DeviceState_DEVICE_STATE_PARTIAL, CutCommands: 1}
+	if err := checkDevices("pre", []*v1.RunDevice{ok, part}); err != nil || partialDevices([]*v1.RunDevice{ok, part}) != "10.0.0.4" {
+		t.Fatalf("un equipo parcial no es falla y se avisa: %v", err)
+	}
 	skip := &v1.RunDevice{Target: &v1.Target{Address: "10.0.0.3"}, State: v1.DeviceState_DEVICE_STATE_SKIPPED}
 	if err := checkDevices("post", []*v1.RunDevice{ok, skip}); err != nil {
 		t.Fatalf("un equipo excluido a propósito no es falla: %v", err)

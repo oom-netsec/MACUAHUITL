@@ -293,3 +293,16 @@ func TestCollectCarpetaViejaIPv6ConPuerto(t *testing.T) {
 	}
 	t.Fatalf("la carpeta vieja no se reconoció: %+v", r.Devices)
 }
+
+// Un equipo partial inició sesión: cuenta como visto.
+func TestCollectEquipoParcialSeVio(t *testing.T) {
+	out := t.TempDir()
+	write(t, filepath.Join(out, "j1_20261104-100000", "manifest.json"), manifest(d1.Format(time.RFC3339), "PAR|10.0.0.7|ios-xe|partial"), d1)
+	r, err := Collect(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := find(r, "10.0.0.7"); p == nil || !p.LastSeen.Equal(d1) {
+		t.Fatalf("partial = %+v", p)
+	}
+}

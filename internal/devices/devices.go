@@ -192,7 +192,7 @@ func (c *collector) job(dir, name string) {
 			}
 			for _, d := range m.Devices {
 				seen := time.Time{}
-				if d.State == "completed" {
+				if d.State == "completed" || d.State == "partial" { // partial también inició sesión: el equipo se vio
 					seen = at
 				}
 				c.add(obs{addr: clean(d.Target.Address), host: clean(d.Hostname), platform: clean(d.Platform), src: SrcPatrol, at: seen})
