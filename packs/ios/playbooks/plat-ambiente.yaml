@@ -8,9 +8,8 @@ name: Plataforma · Ambiente (IOS)
 name_en: Platform · Environment (IOS)
 commands:
   - cmd: show clock
-  - cmd: show environment all  # no existe en 3560CX
-  - cmd: show environment temperature  # no existe en 3560CX
-  - cmd: show environment fan  # no existe en 3560CX
-  - cmd: show environment power  # no existe en 3560CX
+  # En Catalyst clásico la palabra es «env» (el 3560CX rechazó «environment» en la «i» el 2026-11-14); en ISR G2 «env»
+  # abrevia «environment». all trae temperatura, ventiladores y fuentes. Sin validar todavía en laboratorio.
+  - cmd: show env all
   - cmd: show inventory
   - cmd: show logging | include ENVIRONMENT|FAN|TEMP|POWER|PWR|SUPPLY|THERMAL|RPS

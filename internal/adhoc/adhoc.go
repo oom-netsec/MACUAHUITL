@@ -133,8 +133,8 @@ func (r Report) Markdown() string {
 	return b.String()
 }
 
-// Text es la vista por equipo: encabezado y, por comando, su salida completa.
-func (r Report) Text() string {
+// Text es la vista por equipo en el idioma loc: encabezado y, por comando, su salida completa.
+func (r Report) Text(loc string) string {
 	var b strings.Builder
 	whole, last := map[string]bool{}, ""
 	for _, x := range r.Rows {
@@ -150,7 +150,7 @@ func (r Report) Text() string {
 		if x.OK {
 			b.WriteString(x.Output + "\n")
 		} else {
-			fmt.Fprintf(&b, "SIN SALIDA: %s\n", x.Note)
+			b.WriteString(i18n.Msg(loc, "adhoc.rep.no_output", i18n.A("note", x.Note)) + "\n")
 		}
 	}
 	n := 0
@@ -159,6 +159,6 @@ func (r Report) Text() string {
 			n++
 		}
 	}
-	fmt.Fprintf(&b, "\n%d equipos, %d con salida completa\n", r.Devices, n)
+	b.WriteString("\n" + i18n.Msg(loc, "adhoc.rep.summary", i18n.A("n", r.Devices, "ok", n)) + "\n")
 	return b.String()
 }

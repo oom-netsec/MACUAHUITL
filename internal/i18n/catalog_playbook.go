@@ -54,6 +54,8 @@ func init() {
 		"adhoc.err.max":                 e("adhoc: {n} comandos; el máximo es {max}. El tope es de diseño: cada comando es una ida y vuelta por equipo y un lote largo acapara la sesión del equipo; divide el lote en tandas de {max} comandos o menos y ejecútalas una tras otra", "adhoc: {n} commands; the maximum is {max}. The cap is by design: every command is a round trip per device and a long batch ties up the device session; split the batch into runs of {max} commands or fewer and run them one after another", "n", "max"),
 		"adhoc.err.node_stopped":        e("el núcleo se detuvo con el lote en curso; vuelve a lanzarlo", "the core stopped with the batch in progress; launch it again"),
 		"adhoc.err.no_dir":              e("el lote no conserva su carpeta de salida", "the batch no longer has its output folder"),
+		"adhoc.rep.no_output":           e("SIN SALIDA: {note}", "NO OUTPUT: {note}", "note"),
+		"adhoc.rep.summary":             e("{n} {n|equipo|equipos}, {ok} con salida completa", "{n} {n|device|devices}, {ok} with complete output", "n", "ok"),
 		"playbook.err.none":             e("playbook: no hay comandos", "playbook: there are no commands"),
 	})
 }

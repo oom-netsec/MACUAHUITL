@@ -122,7 +122,7 @@ func (s *adhocSvc) AdhocResult(ctx context.Context, r *v1.AdhocResultRequest) (*
 	}
 	rep := adhoc.Build(devs, cmds)
 	s.d.Audit("adhoc.result", r.JobId, fmt.Sprintf("devices=%d rows=%d", len(devs), len(rep.Rows)))
-	out.Done, out.Report, out.Csv, out.Markdown = true, service.Report(rep, rep.Text()), rep.CSV(), rep.Markdown()
+	out.Done, out.Report, out.Csv, out.Markdown = true, service.Report(rep, rep.Text(i18n.Locale(ctx))), rep.CSV(), rep.Markdown()
 	return out, nil
 }
 

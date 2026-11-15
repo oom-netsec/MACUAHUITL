@@ -13,7 +13,7 @@ commands:
   - cmd: show clock
   - cmd: show wireless client mac-address {mac} detail
     timeout: 120s
-  - cmd: show wireless client mac-address {mac} mobility history  # no existe en EWC
+  - cmd: show wireless client mac-address {mac} mobility history  # no existe en EWC (sin movilidad); sintaxis de la Command Reference del 9800 17.x
   - cmd: show wireless client summary
     timeout: 180s
   - cmd: show wireless stats client delete reasons

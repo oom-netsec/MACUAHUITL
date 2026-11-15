@@ -57,9 +57,17 @@ func TestBuildTablaConsolidada(t *testing.T) {
 		!strings.Contains(md, "tiempo agotado") {
 		t.Fatalf("md = %q", md)
 	}
-	txt := r.Text()
+	txt := r.Text(i18n.Es)
 	if !strings.Contains(txt, "== SW1 (192.0.2.1) ==") || !strings.Contains(txt, "SIN SALIDA") || !strings.Contains(txt, "2 equipos, 1 con salida completa") {
 		t.Fatalf("text = %q", txt)
+	}
+	// En inglés, con el plural del catálogo (antes salía en español y con «1 equipos»).
+	if en := r.Text(i18n.En); !strings.Contains(en, "NO OUTPUT") || !strings.Contains(en, "2 devices, 1 with complete output") || strings.Contains(en, "equipos") {
+		t.Fatalf("text en = %q", en)
+	}
+	one := Build(devices()[:1], []string{"show clock"})
+	if es, en := one.Text(i18n.Es), one.Text(i18n.En); !strings.Contains(es, "1 equipo, 1 con salida completa") || !strings.Contains(en, "1 device, 1 with complete output") {
+		t.Fatalf("singular: %q / %q", es, en)
 	}
 }
 

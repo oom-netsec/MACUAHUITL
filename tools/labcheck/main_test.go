@@ -164,7 +164,7 @@ func TestReporte(t *testing.T) {
 			t.Errorf("secreto sin detectar %q:\n%s", want, sec)
 		}
 	}
-	if !strings.Contains(got, "`show extra` — rechazado: % (otro mensaje del equipo)") {
+	if !strings.Contains(got, "`show extra` — aviso % del equipo (revisar)") {
 		t.Errorf("la línea %% desconocida no salió como rechazo sin texto:\n%s", got)
 	}
 	if strings.Contains(sec, f+"20") { // community <MASKED:...>: no es candidato
@@ -257,5 +257,109 @@ func TestDetalleConSecretoSeOmite(t *testing.T) {
 	}
 	if got := out.String(); strings.Contains(got, "SuperSecreto123") || !strings.Contains(got, "detalle omitido") {
 		t.Fatalf("detalle con secreto:\n%s", got)
+	}
+}
+
+// Falsos positivos del laboratorio del 2026-11-14 (9120 EWC y 3560CX): contadores y estados «etiqueta : valor», palabras
+// de configuración que no son secretos y líneas ya enmascaradas tras la palabra clave. Los secretos reales siguen.
+func TestSecretAtSinFalsosPositivosDelLaboratorio(t *testing.T) {
+	for _, ln := range []string{
+		"AAA override passphrase : No", "Wrong PSK : 132", "EasyPSK PSK mismatch error : 0", "PSK mode failure : 0",
+		"PSK Provisioning : DISABLED", "PSK : Enabled", "FT PSK : Disabled", "PSK Key-Index key number : 1",
+		"password encryption aes", "wireless mesh security psk provisioning inuse 1", "Mesh PSK Config",
+		"security wpa psk set-key ascii 8 <MASKED:wifi-psk>", "    0 Unknown community name",
+		"    0 Illegal operation for community name supplied",
+	} {
+		if kw, n, ok := secretAt(ln); ok {
+			t.Errorf("falso positivo %q: %s %d", ln, kw, n)
+		}
+	}
+	for _, ln := range []string{
+		"username y password 0 SuperSecreto123", "Community name: Xyz123abc", "PSK : Xyz123abc456",
+		" security wpa psk set-key ascii 0 Xyz123abc456", "ntp authentication-key 1 md5 0822455D0A16 7",
+		"snmp-server community public RO", "username x password <MASKED:secret> secret suelto123",
+	} {
+		if _, _, ok := secretAt(ln); !ok {
+			t.Errorf("secreto sin detectar: %q", ln)
+		}
+	}
+}
+
+// «Función no activa» (% LLDP is not enabled, % BGP not active...) no es un error del paquete: sale en su sección y
+// el playbook no cuenta como con problemas. «% Error: Unsupported command» sí es rechazo, y un % informativo
+// (% Key pair was generated at...) no se presenta como rechazo.
+func TestFuncionNoActivaVaAparte(t *testing.T) {
+	job, pack := fixture(t)
+	write(t, filepath.Join(pack, "playbooks", "c.yaml"), `id: c
+platform: ios
+name: C
+commands:
+  - cmd: show lldp
+  - cmd: show ip bgp summary
+  - cmd: show spanning-tree mst
+  - cmd: show snmp pending
+  - cmd: show crypto key mypubkey rsa
+  - cmd: show wireless mobility summary
+`)
+	m := patrol.Manifest{EndedAt: time.Date(2026, 11, 14, 10, 0, 10, 0, time.UTC), Playbooks: []patrol.PlaybookRef{{ID: "ios/c"}},
+		Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "10.0.0.1"}, Round: 1, Hostname: "sw1", Platform: "ios", State: "completed"}}}
+	b, _ := json.Marshal(m)
+	write(t, filepath.Join(job, "manifest.json"), string(b))
+	write(t, filepath.Join(job, "sw1_10.0.0.1", "r001_20261114-100000.txt"), `===== 2026-11-14T10:00:00Z · show lldp =====
+% LLDP is not enabled
+===== 2026-11-14T10:00:01Z · show ip bgp summary =====
+% BGP not active
+===== 2026-11-14T10:00:02Z · show spanning-tree mst =====
+% Switch is not in mst mode
+===== 2026-11-14T10:00:03Z · show snmp pending =====
+%SNMP manager not enabled
+===== 2026-11-14T10:00:04Z · show crypto key mypubkey rsa =====
+% Key pair was generated at: 05:13:27 MX Apr 9 2001
+Key name: TP-self-signed
+===== 2026-11-14T10:00:05Z · show wireless mobility summary =====
+% Error: Unsupported command 'show_wireless_mobility_summary_req'
+`)
+	var out strings.Builder
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	inactive := got[strings.Index(got, "## Funciones no activas"):]
+	for _, want := range []string{"`show lldp` — not enabled", "`show ip bgp summary` — not active", "`show spanning-tree mst` — not in", "`show snmp pending` — not enabled"} {
+		if !strings.Contains(inactive, want) {
+			t.Errorf("falta %q en funciones no activas:\n%s", want, got)
+		}
+	}
+	c := got[strings.Index(got, "## ios/c"):]
+	c = c[:strings.Index(c, "playbooks sin problemas")]
+	for _, no := range []string{"show lldp", "show ip bgp", "show spanning-tree", "show snmp pending"} {
+		if strings.Contains(c, no) {
+			t.Errorf("%s salió como problema del playbook:\n%s", no, c)
+		}
+	}
+	for _, want := range []string{"`show wireless mobility summary` — rechazado: Unsupported command", "`show crypto key mypubkey rsa` — aviso % del equipo (revisar)"} {
+		if !strings.Contains(c, want) {
+			t.Errorf("falta %q:\n%s", want, c)
+		}
+	}
+}
+
+// La misma función apagada vista por dos playbooks sale una vez.
+func TestFuncionNoActivaSinRepetir(t *testing.T) {
+	job, pack := fixture(t)
+	for _, f := range []string{"c.yaml", "d.yaml"} {
+		write(t, filepath.Join(pack, "playbooks", f), "id: "+f[:1]+"\nplatform: ios\nname: X\ncommands:\n  - cmd: show lldp\n")
+	}
+	m := patrol.Manifest{Playbooks: []patrol.PlaybookRef{{ID: "ios/c"}, {ID: "ios/d"}},
+		Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "10.0.0.1"}, Round: 1, Hostname: "sw1", Platform: "ios", State: "completed"}}}
+	b, _ := json.Marshal(m)
+	write(t, filepath.Join(job, "manifest.json"), string(b))
+	write(t, filepath.Join(job, "sw1_10.0.0.1", "r001_20261114-100000.txt"), "===== 2026-11-14T10:00:00Z · show lldp =====\n% LLDP is not enabled\n===== 2026-11-14T10:00:01Z · show lldp =====\n% LLDP is not enabled\n")
+	var out strings.Builder
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(out.String(), "`show lldp` — not enabled"); n != 1 {
+		t.Fatalf("show lldp sale %d veces:\n%s", n, out.String())
 	}
 }

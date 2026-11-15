@@ -2,10 +2,11 @@
 # Cuándo usarlo: Un miembro del stack no se une o cambia de rol, puertos de stack caídos o sospecha de doble activo.
 # Fuente: https://www.cisco.com/c/en/us/support/switches/catalyst-3560-series-switches/products-command-reference-list.html
 # Validado en laboratorio: WS-C3560CX-12PC-S con IOS 15.2(7)E4 (2026-11-13), salvo los marcados «no existe en 3560CX».
+# Solo en stack o chasis: en un switch suelto (el 3560CX) solo corren show clock, show inventory y el log.
 id: plat-stack
 platform: ios
-name: Plataforma · Stack (IOS)
-name_en: Platform · Stack (IOS)
+name: Plataforma · Stack (IOS, solo en stack o chasis)
+name_en: Platform · Stack (IOS, stack or chassis only)
 commands:
   - cmd: show clock
   - cmd: show switch  # no existe en 3560CX

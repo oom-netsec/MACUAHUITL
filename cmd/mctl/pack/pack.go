@@ -14,6 +14,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	dompack "github.com/oom-netsec/MACUAHUITL/internal/pack"
 )
 
@@ -45,7 +46,7 @@ func origin(p *v1.PackInfo) string {
 }
 
 func line(p *v1.PackInfo) string {
-	s := fmt.Sprintf("%s  %s  %s  %d playbooks  %d scripts  %s", p.Id, p.Version, origin(p), p.PlaybookCount, p.ScriptCount, p.Name)
+	s := fmt.Sprintf("%s  %s  %s  %d playbooks  %d scripts  %s", p.Id, p.Version, origin(p), p.PlaybookCount, p.ScriptCount, packName(p))
 	if len(p.Hidden) > 0 {
 		s += cli.T("mctl.pack.hidden_n", "n", len(p.Hidden))
 	}
@@ -53,6 +54,22 @@ func line(p *v1.PackInfo) string {
 		s += cli.T("mctl.pack.shadowed", "list", strings.Join(p.Shadowed, ", "))
 	}
 	return s
+}
+
+// packName es el nombre en el idioma de mctl: name_en salvo con --lang es (o si el paquete no lo trae).
+func packName(p *v1.PackInfo) string {
+	if cli.Lang() != i18n.Es && p.NameEn != "" {
+		return p.NameEn
+	}
+	return p.Name
+}
+
+// packDescription es como packName para la descripción.
+func packDescription(p *v1.PackInfo) string {
+	if cli.Lang() != i18n.Es && p.DescriptionEn != "" {
+		return p.DescriptionEn
+	}
+	return p.Description
 }
 
 // fileSHA256 es la suma del archivo que mctl va a pedir instalar: el núcleo la compara con la del archivo que lee.
@@ -198,7 +215,7 @@ func show(c *cli.Env, args []string) error {
 		return err
 	}
 	p := r.Pack
-	fmt.Fprintln(c.Out, cli.T("mctl.pack.show", "id", p.Id, "version", p.Version, "origin", origin(p), "min_core", p.MinCore, "name", p.Name, "description", p.Description,
+	fmt.Fprintln(c.Out, cli.T("mctl.pack.show", "id", p.Id, "version", p.Version, "origin", origin(p), "min_core", p.MinCore, "name", packName(p), "description", packDescription(p),
 		"platforms", strings.Join(p.Platforms, ", "), "author", p.Author, "license", p.License, "playbooks", len(r.PlaybookIds), "scripts", len(r.ScriptIds), "readme", r.Readme))
 	if len(p.Hidden) > 0 {
 		fmt.Fprintf(c.Out, "\n%s\n", cli.T("mctl.pack.hidden", "list", strings.Join(p.Hidden, ", ")))
