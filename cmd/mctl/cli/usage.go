@@ -11,7 +11,7 @@ import (
 var placeholders = strings.NewReplacer(
 	"uso: mctl", "usage: mctl",
 	"renombrar|reemplazar|omitir", "rename|replace|skip", "renombrar|omitir", "rename|skip",
-	"campo=valor", "field=value",
+	"campo=valor", "field=value", "clave=valor", "key=value",
 	"(mctl snippet list muestra los campos)", "(mctl snippet list shows the fields)",
 	"PUERTO-ALTO", "HIGH-PORT", "IP-DE-ESCUCHA", "LISTEN-IP",
 	"<archivo.mpack>", "<file.mpack>", "<editor/nombre>", "<editor/name>", "(todas las colecciones, también favoritos)", "(all collections, including favorites)",
@@ -22,10 +22,11 @@ var placeholderWord = map[string]string{
 	"NOMBRE": "NAME", "TEXTO": "TEXT", "HUELLA": "FINGERPRINT", "DIRECCIÓN": "ADDRESS", "DIRECCION": "ADDRESS",
 	"VALOR": "VALUE", "SERVIDOR": "SERVER", "SEG": "SEC", "SALIDA": "OUTPUT", "PREFIJO": "PREFIX",
 	"MÁSCARA": "MASK", "MASCARA": "MASK", "COMANDO": "COMMAND", "RESPALDO": "BACKUP", "RED": "NETWORK",
+	"ORIGEN": "SOURCE", "DESTINO": "DESTINATION", "TAMAÑO": "SIZE", "EQ": "DEV", "ETIQUETA": "LABEL", "HERRAMIENTA": "TOOL",
 	"PATRON": "PATTERN", "MNEMONICO": "MNEMONIC", "LLAVE": "KEY", "EJECUCION": "RUN",
 }
 
-var upperWord = regexp.MustCompile(`[A-ZÁÉÍÓÚ][A-ZÁÉÍÓÚ_-]+`)
+var upperWord = regexp.MustCompile(`[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ_-]+`)
 
 // LocalizeUsage escribe en inglés los errores «uso: mctl …» cuando mctl va en inglés (por omisión); con --lang es
 // quedan como están.
