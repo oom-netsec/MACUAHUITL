@@ -36,8 +36,10 @@ type DeviceResult struct {
 	// Skipped: comandos que no corren en la plataforma detectada (platforms: del playbook); van en el manifest.
 	Skipped []string `json:",omitempty"`
 	// Ran: IDs que de verdad corrieron cuando difieren de los elegidos (gemelo de la plataforma); va en el manifest.
-	Ran            []string       `json:",omitempty"`
-	ChangedHostKey *HostKeyChange `json:",omitempty"`
+	Ran []string `json:",omitempty"`
+	// Requested: texto expandido de cada comando que pidió más de un playbook -> sus IDs. Corrió una sola vez.
+	Requested      map[string][]string `json:",omitempty"`
+	ChangedHostKey *HostKeyChange      `json:",omitempty"`
 }
 
 // auditResult registra el resultado del equipo en la ronda (spec §12.2). Si la auditoría
@@ -94,13 +96,13 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	}
 	defer c.close()
 	res.Hostname, res.Platform = c.drv.Hostname(), c.platform
-	cmds, skipped, err := commands(s, c.platform, d.Playbooks, d.MissingPack)
+	cmds, skipped, requested, err := plan(s, c.platform, d.Playbooks, d.MissingPack)
 	if err != nil {
 		res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
 		emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})
 		return res
 	}
-	res.Skipped = skipped
+	res.Skipped, res.Requested = skipped, requested
 	if ran, _ := resolve(s, c.platform, d.Playbooks, d.MissingPack); len(ran) > 0 {
 		for _, p := range ran {
 			res.Ran = append(res.Ran, p.ID)

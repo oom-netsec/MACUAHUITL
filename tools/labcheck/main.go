@@ -22,6 +22,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
@@ -262,8 +263,8 @@ func secretsIn(jobDir, dev string) (out []string, err error) {
 // align empareja cada sección de la evidencia con un comando esperado (en orden) maximizando los emparejamientos: la
 // subsecuencia común más larga. Una búsqueda hacia adelante sin más se iba hasta otra aparición lejana de un comando que
 // la versión del paquete ya no trae en su lugar, y dejaba como «no corrió» todo lo de en medio. Marca exp[j].done y da,
-// por sección, el playbook (vacío = fuera de playbook).
-func align(secs []analyze.Section, exp []expected) []string {
+// por sección, los playbooks que la pidieron (vacío = fuera de playbook).
+func align(secs []analyze.Section, exp []expected) [][]string {
 	n, m := len(secs), len(exp)
 	dp := make([][]int32, n+1) // dp[i][j]: emparejamientos posibles entre secs[i:] y exp[j:]
 	for i := range dp {
@@ -281,11 +282,11 @@ func align(secs []analyze.Section, exp []expected) []string {
 			}
 		}
 	}
-	pbOf := make([]string, n)
+	pbOf := make([][]string, n)
 	for i, j := 0, 0; i < n && j < m; {
 		switch {
 		case secs[i].Command == exp[j].cmd && dp[i][j] == dp[i+1][j+1]+1:
-			exp[j].done, pbOf[i] = true, exp[j].pb
+			exp[j].done, pbOf[i] = true, exp[j].pbs
 			i, j = i+1, j+1
 		case dp[i][j+1] >= dp[i+1][j]: // ante un empate, saltar lo esperado: la sección puede emparejar más adelante
 			j++
@@ -296,9 +297,44 @@ func align(secs []analyze.Section, exp []expected) []string {
 	return pbOf
 }
 
+// expected es un comando que debió correr y los playbooks que lo pidieron (con la deduplicación de patrol, varios).
 type expected struct {
-	pb, cmd string
-	done    bool
+	pbs  []string
+	cmd  string
+	done bool
+}
+
+// expect da los comandos esperados en orden. Patrol corre cada uno una sola vez por equipo y ronda (patrol.Dedupe):
+// se aplica la misma regla y cada uno se atribuye a todos los playbooks que lo pidieron. Una evidencia con secciones
+// repetidas es de antes de la deduplicación: se espera la lista cruda, un comando por playbook, como entonces.
+func expect(items []patrol.Item, secs []analyze.Section) (exp []expected) {
+	seen := map[string]bool{}
+	legacy := false
+	for _, s := range secs {
+		legacy = legacy || seen[s.Command]
+		seen[s.Command] = true
+	}
+	if legacy {
+		for _, it := range items {
+			exp = append(exp, expected{pbs: []string{it.PB}, cmd: it.Cmd.Text})
+		}
+		return exp
+	}
+	cmds, req := patrol.Dedupe(items)
+	first := map[string]string{}
+	for _, it := range items {
+		if _, ok := first[it.Cmd.Text]; !ok {
+			first[it.Cmd.Text] = it.PB
+		}
+	}
+	for _, c := range cmds {
+		pbs := req[c.Text]
+		if pbs == nil {
+			pbs = []string{first[c.Text]}
+		}
+		exp = append(exp, expected{pbs: pbs, cmd: c.Text})
+	}
+	return exp
 }
 
 func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) error {
@@ -324,6 +360,9 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 		}
 	}
 	fmt.Fprintf(w, "# labcheck · %s\n\n", filepath.Base(jobDir))
+	if !m.Masked { // el manifest siempre trae masked; false = el trabajo corrió con disable_masking
+		fmt.Fprintf(w, "AVISO: %s\n\n", i18n.Msg(i18n.Es, "evidence.unmasked", nil))
+	}
 	if len(m.Devices) == 0 {
 		return errors.New("el manifest no trae equipos: no corrió ninguna ronda")
 	}
@@ -360,7 +399,7 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 				ids = append(ids, p.ID)
 			}
 		}
-		var exp []expected
+		var items []patrol.Item
 		for _, id := range ids {
 			if !slices.Contains(order, id) {
 				order = append(order, id)
@@ -382,11 +421,11 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 				continue
 			}
 			for _, c := range p.Pre {
-				exp = append(exp, expected{pb: id, cmd: c})
+				items = append(items, patrol.Item{Cmd: playbook.Command{Text: c, Timeout: 60 * time.Second}, PB: id})
 			}
 			for _, c := range cmds {
 				if c.Applies(r.Platform) { // como patrol.commands: los de otra plataforma no corren ni se esperan
-					exp = append(exp, expected{pb: id, cmd: c.Text})
+					items = append(items, patrol.Item{Cmd: c, PB: id})
 				}
 			}
 		}
@@ -397,9 +436,10 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 				secs = append(secs, s)
 			}
 		}
+		exp := expect(items, secs)
 		pbOf := align(secs, exp)
 		for i, s := range secs {
-			pb := pbOf[i]
+			pbs := pbOf[i]
 			end := m.EndedAt
 			if i+1 < len(secs) {
 				end = secs[i+1].At
@@ -412,13 +452,14 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 			}
 			for _, prob := range problems(s, end, slow) {
 				line := fmt.Sprintf("- `%s` — %s", s.Command, prob)
-				if pb == "" {
+				if len(pbs) == 0 {
 					outside = append(outside, line)
-				} else {
+				}
+				for _, pb := range pbs { // un comando pedido por varios playbooks falla en todos
 					issues[pb] = append(issues[pb], line)
 				}
 			}
-			if pb == "" && len(problems(s, end, slow)) == 0 {
+			if len(pbs) == 0 && len(problems(s, end, slow)) == 0 {
 				outside = append(outside, fmt.Sprintf("- `%s`", s.Command))
 			}
 		}
@@ -429,7 +470,9 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 		}
 		for _, e := range exp {
 			if !e.done {
-				issues[e.pb] = append(issues[e.pb], fmt.Sprintf("- `%s` — no corrió (sin salida en la evidencia)", e.cmd))
+				for _, pb := range e.pbs {
+					issues[pb] = append(issues[pb], fmt.Sprintf("- `%s` — no corrió (sin salida en la evidencia)", e.cmd))
+				}
 			}
 		}
 	}

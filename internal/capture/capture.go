@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"io"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // maxFile acota lo que se lee por archivo: un show tech de varios cientos de MB no cabe en un reporte.
@@ -94,6 +94,19 @@ type Device struct {
 
 // ReadDir lee una carpeta de trabajo de Patrol (con su manifest.json). Un equipo
 // aparece una vez, con su última ronda; sus salidas son las de la última ronda que las tenga.
+// Unmasked dice si el manifest del trabajo declara que se recogió sin enmascarar (masked: false). Sin manifest o sin
+// el campo no se sabe y no se avisa.
+func Unmasked(dir string) bool {
+	b, err := readLimited(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		return false
+	}
+	var m struct {
+		Masked *bool `json:"masked"`
+	}
+	return json.Unmarshal(b, &m) == nil && m.Masked != nil && !*m.Masked
+}
+
 func ReadDir(dir string) ([]Device, error) {
 	b, err := readLimited(filepath.Join(dir, "manifest.json"))
 	if err != nil {
@@ -148,7 +161,7 @@ func ReadDir(dir string) ([]Device, error) {
 }
 
 func readLimited(p string) ([]byte, error) {
-	f, err := os.Open(p)
+	f, err := sys.OpenRegular(p) // la carpeta puede venir del cliente: una FIFO colgaría la RPC
 	if err != nil {
 		return nil, err
 	}

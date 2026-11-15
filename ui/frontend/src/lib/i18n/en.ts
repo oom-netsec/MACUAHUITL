@@ -2763,4 +2763,5 @@ export const en: Record<Key, string> = {
   "pending.kind.credrotate": "Credential rotation",
   "pending.kind.restore-diff": "Backup restore",
   "drift.maskedChanged": "(a masked value changed; not shown)",
+  "evidence.unmasked": "Warning: this evidence was collected without masking: it may contain secrets.",
 };

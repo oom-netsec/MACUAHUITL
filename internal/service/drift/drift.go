@@ -13,6 +13,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
+	"github.com/oom-netsec/MACUAHUITL/internal/capture"
 	"github.com/oom-netsec/MACUAHUITL/internal/drift"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
@@ -63,7 +64,7 @@ func (s *driftSvc) Drift(ctx context.Context, r *v1.DriftRequest) (*v1.DriftResp
 		}
 		cfg[sec.Device][sec.Round] = sec.Text
 	}
-	rep := drift.Report{Dir: b.Dir, From: max(int(r.Round)-1, 0), To: int(r.Round), Devices: []drift.DeviceDrift{}, Warnings: []string{}, Masked: masked(b.Dir)}
+	rep := drift.Report{Dir: b.Dir, From: max(int(r.Round)-1, 0), To: int(r.Round), Devices: []drift.DeviceDrift{}, Warnings: []string{}, Masked: masked(b.Dir), Unmasked: capture.Unmasked(b.Dir)}
 	for _, w := range b.Warnings {
 		rep.Warnings = append(rep.Warnings, strings.Join(nonEmpty(w.Device, w.Command, w.Msg), ": "))
 		rep.WarningsTx = append(rep.WarningsTx, i18n.Join(": ", i18n.Lit(w.Device, w.Device), i18n.Lit(w.Command, w.Command), w.MsgTx))

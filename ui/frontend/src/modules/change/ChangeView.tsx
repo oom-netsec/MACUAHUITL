@@ -47,6 +47,7 @@ function PrePost({ core }: { core: CoreAPI }) {
   const [devices, setDevices] = useState<DeviceReport[] | null>(null);
   const [note, setNote] = useState("");
   const [rep, setRep] = useState<{ name: string; json: string } | null>(null);
+  const [unmasked, setUnmasked] = useState(false);
 
   const refresh = () => core.listChanges().then(setChanges).catch((e) => setErr(errorText(e)));
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
@@ -82,8 +83,8 @@ function PrePost({ core }: { core: CoreAPI }) {
   });
   const showReport = (id: string) => guard(async () => {
     const r = await core.changeReport(id, "", "");
-    const rep = JSON.parse(r.json) as { devices?: DeviceReport[]; note?: string };
-    setDevices(rep.devices ?? []); setNote(rep.note ?? "");
+    const rep = JSON.parse(r.json) as { devices?: DeviceReport[]; note?: string; unmasked?: boolean };
+    setDevices(rep.devices ?? []); setNote(rep.note ?? ""); setUnmasked(!!rep.unmasked);
     setRep({ name: changes.find((c) => c.id === id)?.name ?? id, json: JSON.stringify(rep, null, 2) });
   });
   const toggle = (fp: string, on: boolean) => setTrusted((s) => { const n = new Set(s); if (on) n.add(fp); else n.delete(fp); return n; });
@@ -167,6 +168,7 @@ function PrePost({ core }: { core: CoreAPI }) {
               {d.findings.length === 0 && d.config_diff.length === 0 && <p className="panel-body meta">{t("change.noFindings")}</p>}
             </ResultPanel>
           ))}
+          {unmasked && <Notice kind="warn">{t("evidence.unmasked")}</Notice>}
           {note && <Notice kind="info">{note}</Notice>}
         </div>
       )}

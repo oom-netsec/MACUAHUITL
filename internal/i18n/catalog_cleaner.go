@@ -24,6 +24,7 @@ func init() {
 
 		"drift.secret_changed": e("(cambió un valor enmascarado; no se muestra)", "(a masked value changed; not shown)"),
 		"drift.masked_notice":  e("los cambios en secretos no son visibles porque el trabajo enmascara secretos", "changes to secrets are not visible because the job masks secrets"),
+		"evidence.unmasked":    e("esta evidencia se recogió sin enmascarar: puede traer secretos", "this evidence was collected without masking: it may contain secrets"),
 		"drift.err.no_pair":    e("ningún equipo tiene dos rondas con show running-config; usa un playbook que lo recolecte y espera la segunda ronda", "no device has two rounds with show running-config; use a playbook that collects it and wait for the second round"),
 		"drift.warn.no_pair":   e("{dev}: sin dos rondas con running-config (tiene {have})", "{dev}: no two rounds with running-config (has {have})", "dev", "have"),
 		"drift.text.warning":   e("AVISO: {message}", "WARNING: {message}", "message"),

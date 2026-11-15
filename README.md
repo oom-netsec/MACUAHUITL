@@ -118,7 +118,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 1. **Create** the job: targets, credential, playbooks, output folder, schedule and window (1 to 96 hours).
 2. **Login Test** every device. New SSH host keys are shown for you to confirm. A changed key blocks by default.
 3. **Arm** it. The vault stays usable for the window and the laptop is kept awake while rounds run.
-4. **Watch** it live: per-device status, progress and phases.
+4. **Watch** it live: per-device status, progress and phases. A command asked for by several playbooks (or typed twice) runs once per device and round, and the report credits it to each playbook that asked for it.
 5. **Collect** the package: evidence, masked secrets and a `manifest.json` anchored to the audit chain.
 
 ## Content packs

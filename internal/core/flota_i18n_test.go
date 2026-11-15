@@ -47,7 +47,7 @@ func changeDirs(t *testing.T) (pre, post string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		man := patrol.Manifest{Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "192.0.2.1"}, Round: 1, Hostname: "DIST-01", State: "completed"}}}
+		man := patrol.Manifest{Masked: true, Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "192.0.2.1"}, Round: 1, Hostname: "DIST-01", State: "completed"}}}
 		mb, _ := json.Marshal(man)
 		os.WriteFile(filepath.Join(dir, "manifest.json"), mb, 0o600)
 		dd := filepath.Join(dir, patrol.DeviceDir("DIST-01", "192.0.2.1"))

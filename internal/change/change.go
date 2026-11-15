@@ -57,6 +57,8 @@ type Report struct {
 	Devices []Device  `json:"devices"`
 	Note    string    `json:"note"`
 	NoteTx  i18n.Text `json:"-"`
+	// Unmasked: alguna de las dos capturas se recogió sin enmascarar y puede traer secretos.
+	Unmasked bool `json:"unmasked,omitempty"`
 }
 
 var noteTx = i18n.Tx("change.note")
@@ -386,6 +388,9 @@ func (r Report) Text() string { return r.TextIn(i18n.Es) }
 func (r Report) TextIn(loc string) string {
 	var b strings.Builder
 	m := func(key string) string { return i18n.Msg(loc, key, nil) }
+	if r.Unmasked {
+		b.WriteString(i18n.Msg(loc, "drift.text.warning", i18n.A("message", m("evidence.unmasked"))) + "\n\n")
+	}
 	for _, d := range r.Devices {
 		fmt.Fprintf(&b, "%s (%s): %s\n", or(d.Hostname, "?"), d.Address, m("change.text.verdict."+string(d.Verdict)))
 		for _, f := range d.Findings {

@@ -144,6 +144,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
       {diff && (
         <>
           {diff.meta.masked && <Notice kind="warn">{t("backup.diff.maskedWarn")}</Notice>}
+          {diff.meta.unmasked && <Notice kind="warn">{t("evidence.unmasked")}</Notice>}
           <DiffView label={t("backup.diff.title")} before={diff.before} after={diff.after} />
           {/* Un valor enmascarado que cambió (una clave rotada) no se ve en los textos enmascarados: se lista aparte, sin mostrarlo. */}
           {diff.meta.changes.filter((c) => c.op === "~").map((c, i) => (
@@ -158,6 +159,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
           <DownloadButton name={`${shown.meta.device}-${shown.meta.at.replace(/[-:]/g, "")}.cfg`} data={() => shown.text} label={t("backup.download")} />
         </>}>
           {shown.meta.masked && <div className="panel-body"><Notice kind="warn">{t("backup.shownMasked")}</Notice></div>}
+          {!shown.meta.masked && <div className="panel-body"><Notice kind="warn">{t("evidence.unmasked")}</Notice></div>}
           <Terminal text={shown.text} aria-label={shown.meta.id} />
         </ResultPanel>
       )}

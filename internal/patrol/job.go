@@ -339,24 +339,67 @@ func resolve(s Spec, detected string, pbs []playbook.Playbook, missing func(stri
 	return out, nil
 }
 
-// commands arma la lista para la plataforma detectada: playbooks elegidos y luego los pegados. Los comandos
-// marcados para otras plataformas (platforms:) no entran; skipped trae su texto, para anotarlo en el manifest.
+// Item es un comando pedido por un playbook (PB vacío: pegado a mano) antes de deduplicar.
+type Item struct {
+	Cmd playbook.Command
+	PB  string
+}
+
+// Dedupe aplica la regla de la ronda: un comando (su texto ya expandido) corre una sola vez por equipo, en el orden
+// de su primera aparición, con el mayor de los timeouts y MaySecrets si alguna aparición lo pide. requested trae,
+// solo de los comandos que pidió más de un playbook, sus IDs en orden y sin repetir. labcheck usa esta misma regla.
+func Dedupe(items []Item) (out []playbook.Command, requested map[string][]string) {
+	idx := map[string]int{}
+	owners := map[string][]string{}
+	for _, it := range items {
+		i, seen := idx[it.Cmd.Text]
+		if !seen {
+			idx[it.Cmd.Text] = len(out)
+			out = append(out, it.Cmd)
+		} else {
+			out[i].Timeout = max(out[i].Timeout, it.Cmd.Timeout)
+			out[i].MaySecrets = out[i].MaySecrets || it.Cmd.MaySecrets
+		}
+		if it.PB != "" && !slices.Contains(owners[it.Cmd.Text], it.PB) {
+			owners[it.Cmd.Text] = append(owners[it.Cmd.Text], it.PB)
+		}
+	}
+	for t, ids := range owners {
+		if len(ids) > 1 {
+			if requested == nil {
+				requested = map[string][]string{}
+			}
+			requested[t] = ids
+		}
+	}
+	return out, requested
+}
+
+// commands arma la lista para la plataforma detectada: playbooks elegidos y luego los pegados, sin repetir comandos
+// (Dedupe). Los comandos marcados para otras plataformas (platforms:) no entran; skipped trae su texto, para anotarlo
+// en el manifest.
 func commands(s Spec, detected string, pbs []playbook.Playbook, missing func(string) string) (out []playbook.Command, skipped []string, err error) {
+	out, skipped, _, err = plan(s, detected, pbs, missing)
+	return out, skipped, err
+}
+
+func plan(s Spec, detected string, pbs []playbook.Playbook, missing func(string) string) (out []playbook.Command, skipped []string, requested map[string][]string, err error) {
 	ran, err := resolve(s, detected, pbs, missing)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
+	var items []Item
 	for _, p := range ran {
 		for _, pre := range p.Pre {
-			out = append(out, playbook.Command{Text: pre, Timeout: 60 * time.Second})
+			items = append(items, Item{playbook.Command{Text: pre, Timeout: 60 * time.Second}, p.ID})
 		}
 		cmds, err := p.Expand(paramsOf(p, s.Params))
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		for _, c := range cmds {
 			if c.Applies(detected) {
-				out = append(out, c)
+				items = append(items, Item{c, p.ID})
 			} else {
 				skipped = append(skipped, c.Text)
 			}
@@ -365,11 +408,14 @@ func commands(s Spec, detected string, pbs []playbook.Playbook, missing func(str
 	if s.CustomCommands != "" {
 		p, err := playbook.Ephemeral(detected, s.CustomCommands)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
-		out = append(out, p.Commands...)
+		for _, c := range p.Commands {
+			items = append(items, Item{Cmd: c})
+		}
 	}
-	return out, skipped, nil
+	out, requested = Dedupe(items)
+	return out, skipped, requested, nil
 }
 
 func credentialsFor(s Spec, t Target) (primary, fallback string) {

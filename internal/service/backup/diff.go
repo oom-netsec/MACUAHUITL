@@ -26,6 +26,8 @@ type diffReport struct {
 	Ignored []string       `json:"ignored"`
 	// Masked: alguno de los dos se tomó enmascarado, así que un cambio de secretos no se ve.
 	Masked bool `json:"masked"`
+	// Unmasked: alguno de los dos se tomó sin enmascarar (--secrets): la evidencia puede traer secretos.
+	Unmasked bool `json:"unmasked,omitempty"`
 	// Before y After son los dos respaldos enmascarados, para el visor de la UI: comparar no muestra secretos aunque
 	// un respaldo se haya tomado con --secrets (para verlo entero está «ver», que se audita como export).
 	Before string `json:"before"`
@@ -36,6 +38,9 @@ func (r diffReport) text(loc string) string {
 	var b strings.Builder
 	if r.Masked {
 		b.WriteString(i18n.Msg(loc, "backup.rep.notice", i18n.A("w", i18n.Msg(loc, "drift.masked_notice", nil))) + "\n\n")
+	}
+	if r.Unmasked {
+		b.WriteString(i18n.Msg(loc, "backup.rep.notice", i18n.A("w", i18n.Msg(loc, "evidence.unmasked", nil))) + "\n\n")
 	}
 	b.WriteString(i18n.Msg(loc, "backup.diff.head", i18n.A("device", r.To.Device, "to", r.To.ID[strings.Index(r.To.ID, "/")+1:], "from", r.From.ID[strings.Index(r.From.ID, "/")+1:])) + "\n")
 	if len(r.Changes) == 0 {
@@ -77,7 +82,7 @@ func (s *backupSvc) DiffBackups(ctx context.Context, r *v1.DiffBackupsRequest) (
 	d := drift.NewDevice(to.Device, 0, 0, cs, ign)
 	ma, _ := mask.Apply("", a)
 	mb, _ := mask.Apply("", b)
-	rep := diffReport{From: from, To: to, Added: d.Added, Removed: d.Removed, Changes: d.Changes, Ignored: d.Ignored, Masked: from.Masked || to.Masked,
+	rep := diffReport{From: from, To: to, Added: d.Added, Removed: d.Removed, Changes: d.Changes, Ignored: d.Ignored, Masked: from.Masked || to.Masked, Unmasked: !from.Masked || !to.Masked,
 		Before: ma, After: mb}
 	s.d.Audit("backup.diff", to.Device, fmt.Sprintf("from=%s to=%s changes=%d", from.ID, to.ID, len(cs)))
 	return &v1.DiffBackupsResponse{Report: service.Report(rep, rep.text(i18n.Locale(ctx)))}, nil

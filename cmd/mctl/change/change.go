@@ -187,7 +187,8 @@ func printDiff(c *cli.Env, reportJSON, device string, asJSON bool) error {
 		} `json:"findings"`
 	}
 	var rep struct {
-		Devices []dev `json:"devices"`
+		Unmasked bool  `json:"unmasked"` // alguna captura se recogió sin enmascarar
+		Devices  []dev `json:"devices"`
 	}
 	if err := json.Unmarshal([]byte(reportJSON), &rep); err != nil {
 		return err
@@ -208,9 +209,12 @@ func printDiff(c *cli.Env, reportJSON, device string, asJSON bool) error {
 				sel[i].ConfigDiff = []string{}
 			}
 		}
-		b, err := json.Marshal(map[string]any{"devices": sel})
+		b, err := json.Marshal(map[string]any{"unmasked": rep.Unmasked, "devices": sel})
 		fmt.Fprintln(c.Out, string(b))
 		return err
+	}
+	if rep.Unmasked {
+		fmt.Fprintln(c.Out, cli.T("drift.text.warning", "message", cli.T("evidence.unmasked")))
 	}
 	missing := 0
 	for _, d := range sel {

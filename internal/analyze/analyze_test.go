@@ -566,3 +566,11 @@ func TestCabeceraIncompletaSeLee(t *testing.T) {
 		t.Fatalf("%+v", b.Sections)
 	}
 }
+
+// Un aviso de todo el trabajo (sin equipo) sigue saliendo aunque se filtre por equipo.
+func TestAvisoSinEquipoSobreviveAlFiltro(t *testing.T) {
+	b := &Bundle{Warnings: []Warning{Warn("", 0, "", "evidence.unmasked")}}
+	if r := Analyze(b, nil, Options{Device: "sw1"}); len(r.Warnings) != 1 {
+		t.Fatalf("el filtro por equipo se comió el aviso: %+v", r.Warnings)
+	}
+}

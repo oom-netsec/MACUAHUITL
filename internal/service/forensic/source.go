@@ -15,6 +15,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
+	"github.com/oom-netsec/MACUAHUITL/internal/capture"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/logintel"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -169,6 +170,9 @@ func (s *forensicSvc) loadLogs(ctx context.Context, src *v1.LogSource) (*loaded,
 		}
 		l.source = srcName{t: i18n.Tx("forensic.source.job", "dir", b.Dir)}
 		l.bundle = b
+		if capture.Unmasked(b.Dir) {
+			l.warn("evidence.unmasked")
+		}
 		seen := map[string]bool{}     // mensajes con hora: una vez por equipo, hora y texto
 		prev := map[string][]string{} // textos sin hora de la ronda anterior de cada equipo
 		offs := analyze.ClockOffsets(b)

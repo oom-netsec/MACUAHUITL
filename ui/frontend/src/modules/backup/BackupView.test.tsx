@@ -154,3 +154,24 @@ test("comparar dos respaldos con secretos donde solo cambió una clave lo dice, 
   await userEvent.click(screen.getByRole("button", { name: "Comparar" }));
   expect(await screen.findByText(/enable secret 5 <MASKED:enable-secret> \(cambió un valor enmascarado; no se muestra\)/)).toBeInTheDocument();
 });
+
+test("comparar y ver avisan si el respaldo se tomó sin enmascarar, y no si sí", async () => {
+  const diff = (unmasked: boolean) => ({ from: a, to: b, added: 0, removed: 0, ignored: [], masked: !unmasked, ...(unmasked ? { unmasked } : {}), changes: [], before: "x\n", after: "x\n" });
+  const core = withCreds({
+    backupList: vi.fn(async () => ({ backups: [b, a], masked: false })),
+    backupDiff: vi.fn().mockResolvedValueOnce(diff(true)).mockResolvedValueOnce(diff(false)),
+    backupGet: vi.fn(async (id: string) => ({ meta: id === a.id ? a : b, text: "hostname SW1\n" })),
+  });
+  render(<BackupView core={core} />);
+  await userEvent.click(await screen.findByLabelText(`Comparar ${b.id}`));
+  await userEvent.click(screen.getByLabelText(`Comparar ${a.id}`));
+  await userEvent.click(screen.getByRole("button", { name: "Comparar" }));
+  expect(await screen.findByText(/esta evidencia se recogió sin enmascarar: puede traer secretos/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Comparar" }));
+  await waitFor(() => expect(screen.queryByText(/esta evidencia se recogió/)).not.toBeInTheDocument());
+  await userEvent.click(screen.getByRole("button", { name: `Ver ${a.id}` })); // a está enmascarado: sin aviso
+  await screen.findByRole("region", { name: "Contenido" });
+  expect(screen.queryByText(/esta evidencia se recogió/)).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: `Ver ${b.id}` })); // b se tomó sin enmascarar
+  expect(await screen.findByText(/esta evidencia se recogió sin enmascarar/)).toBeInTheDocument();
+});
