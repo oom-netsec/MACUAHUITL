@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
@@ -44,6 +44,12 @@ export function RestorePanel({ core, entry, creds, onClose }: { core: CoreAPI; e
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
   const [active, setActive] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => { // al abrir, el foco va al título del panel (queda en la fila si no)
+    const h = box.current?.querySelector("h3");
+    h?.setAttribute("tabindex", "-1");
+    h?.focus();
+  }, []);
 
   const doPlan = async () => {
     setErr(""); setPlan(null); setRefused([]); setReason("");
@@ -66,7 +72,7 @@ export function RestorePanel({ core, entry, creds, onClose }: { core: CoreAPI; e
   const canPlan = equipo.trim() !== "" && credId !== "" && Number(maxLines) >= 0 && Number(maxLines) <= 1000;
 
   return (
-    <div className="restore-block"><Section title={t("backup.restore.heading", { id: entry.id })}>
+    <div className="restore-block" ref={box}><Section title={t("backup.restore.heading", { id: entry.id })}>
       <AssistBanner active={active} />
       <Notice kind="warn">{t("backup.restore.warn")}</Notice>
       <div className="field-row">

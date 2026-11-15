@@ -31,7 +31,7 @@ export function BackupTimeline({ backups, sel, onToggle, onView, onRestore }: {
                 <Badge tone={b.masked ? "info" : "warn"}>{t(b.masked ? "backup.masked" : "backup.plain")}</Badge>
                 <span className="row-actions">
                   <button className="sm" aria-label={t("backup.viewAria", { id: b.id })} onClick={() => onView(b.id)}>{t("backup.view")}</button>
-                  <button className="sm inline" aria-label={t("backup.restoreAria", { id: b.id })} disabled={b.masked} title={b.masked ? t("backup.maskedNoRestore") : undefined} onClick={() => onRestore(b)}>{t("backup.restore")}</button>
+                  <button className="sm inline" data-restore={b.id} aria-label={t("backup.restoreAria", { id: b.id })} disabled={b.masked} title={b.masked ? t("backup.maskedNoRestore") : undefined} onClick={() => onRestore(b)}>{t("backup.restore")}</button>
                 </span>
               </li>
             ))}

@@ -7,7 +7,7 @@ import { DiffView } from "../../components/DiffView";
 import { CopyButton } from "../../components/Data";
 import { DownloadButton } from "../../components/Files";
 import { parseTargets } from "../patrol/PatrolView";
-import { AssistExecution } from "../../components/AssistRun";
+import { AssistBanner, AssistExecution } from "../../components/AssistRun";
 import { assistOwner } from "../../app/useShellStatus";
 
 const noop = () => {};
@@ -39,6 +39,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [liveRestore, setLiveRestore] = useState(false);
+  const [liveActive, setLiveActive] = useState(false);
   useEffect(() => {
     let alive = true;
     core.assistListRuns().then((rs) => { if (alive) setLiveRestore(rs.some((r) => r.active && assistOwner(r.runId) === "backup")); }, () => {});
@@ -137,9 +138,13 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
           <button className="quiet" onClick={reload}>{t("backup.refresh")}</button>
         </div>
       </Section>
-      {restoring && <RestorePanel key={restoring.id} core={core} entry={restoring} creds={creds} onClose={() => setRestoring(null)} />}
+      {restoring && <RestorePanel key={restoring.id} core={core} entry={restoring} creds={creds} onClose={() => { // el foco vuelve al «Restaurar» de la fila; si no, caería en <body>
+        const id = restoring.id;
+        setRestoring(null);
+        [...document.querySelectorAll<HTMLElement>("[data-restore]")].find((b) => b.dataset.restore === id)?.focus();
+      }} />}
       {/* Una restauración que quedó viva (se cerró la app) se retoma aquí aunque no haya entrada elegida: confirmar, revertir o abortar. */}
-      {!restoring && liveRestore && <AssistExecution core={core} plan={null} onStarted={noop} onActive={noop} onError={setErr} />}
+      {!restoring && liveRestore && <><AssistBanner active={liveActive} /><AssistExecution core={core} plan={null} onStarted={noop} onActive={setLiveActive} onError={setErr} /></>}
 
       {diff && (
         <>

@@ -8,6 +8,7 @@ import { Badge } from "./Page";
 import { useT } from "../lib/i18n";
 import type { Key } from "../lib/i18n/es";
 import { errInfo } from "../lib/coreError";
+import { es } from "../lib/i18n/es";
 import { useVaultVersion } from "../lib/vaultSignal";
 
 // Más de 24 h exige aceptación explícita (el núcleo lo valida igual con assist.svc.reversa_vieja).
@@ -59,7 +60,10 @@ function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: Assist
     else setErr(reason === "assist.svc.reversa_aplicandose" ? t("pending.err.applying") : reason === "assist.svc.reversa_en_curso" ? t("pending.err.busy") : errorText(e));
   }));
   const apply = () => { setErr(""); setAge(ageNow(r)); setAccepted(false); setApplying(true); setPlan(planOf(r)); };
-  const kind = KINDS.includes(r.kind) ? t(`pending.kind.${r.kind}` as Key) : r.kind;
+  // Los snippet-* sin clave propia llevan el nombre de su plantilla (snippet.<id>.name); sin esa clave, el id.
+  const tpl = `snippet.${r.kind.replace(/^snippet-/, "")}.name`;
+  const kind = KINDS.includes(r.kind) ? t(`pending.kind.${r.kind}` as Key)
+    : r.kind.startsWith("snippet-") && tpl in es ? t("pending.kind.snippet", { name: t(tpl as Key) }) : r.kind;
 
   return (
     <section className="panel flush" aria-label={t("pending.run", { id: r.runId })}>

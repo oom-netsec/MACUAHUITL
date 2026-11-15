@@ -83,3 +83,10 @@ test("ejecución asistida: la casilla es por ejecución, aviso rojo y confirmaci
   act(() => core.emitAssist({ runId: "r1", kind: "state", state: "done" }));
   expect(screen.queryByRole("button", { name: START })).not.toBeInTheDocument();
 });
+
+test("el foco va al título del panel al abrirlo y vuelve al botón «Restaurar» de la fila al cerrarlo", async () => {
+  await open();
+  expect(screen.getByRole("heading", { level: 3, name: /Restaurar/ })).toHaveFocus();
+  await userEvent.click(screen.getByRole("button", { name: /^Cerrar/ }));
+  expect(screen.getByRole("button", { name: `Restaurar ${clear.id}` })).toHaveFocus();
+});
