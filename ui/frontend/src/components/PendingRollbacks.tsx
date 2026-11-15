@@ -39,7 +39,7 @@ function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: Assist
   const [live, setLive] = useState(false); // la ejecución de reversa de esta entrada sigue viva
   const [err, setErr] = useState("");
   const rotation = r.kind === "credrotate" && !r.unreadable;
-  const rotDevice = r.devices[0]?.device ?? "";
+  const rotDevice = (r.devices[0]?.device || r.runId).trim(); // nunca vacío: escribir nada no habilita Descartar
   const [typed, setTyped] = useState("");
   const old = age > OLD_SECONDS || needAge;
   const ageLabel = ageText(age, t);
@@ -96,7 +96,7 @@ function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: Assist
           // Descartar una rotación deja al equipo con la contraseña nueva y a la bóveda con la anterior: aviso y nombre del equipo escrito.
           <div className="pending-discard-rotation">
             <Notice kind="warn">{t("pending.discard.rotation", { device: rotDevice })}{r.generatedSecret && <> {t("pending.discard.generated")}</>}</Notice>
-            <Field label={t("pending.discard.typeName", { device: rotDevice })} value={typed} onChange={setTyped} w="md" mono />
+            <Field label={t("pending.discard.typeName", { device: rotDevice })} hint={t("pending.discard.typeHint")} value={typed} onChange={setTyped} w="md" mono />
             <div className="actions">
               {typed.trim() === rotDevice
                 ? <ConfirmButton label={t("pending.discard")} confirmLabel={t("pending.discard.confirm")} onConfirm={discard} />

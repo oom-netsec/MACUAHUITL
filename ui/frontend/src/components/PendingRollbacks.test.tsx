@@ -305,24 +305,43 @@ test("dentro de una reversa pendiente detenida se ofrece «Proponer reaplicar el
 test("descartar una rotación avisa que la bóveda queda con la contraseña anterior y exige escribir el nombre del equipo", async () => {
   const core = coreWith([rb({ kind: "credrotate", devices: [{ device: "SW1", rollbackLines: ["username admin secret ⟦oculto⟧"] }] })]);
   render(<PendingRollbacks core={core} />);
-  expect(await screen.findByText(/deja a SW1 con la contraseña nueva/)).toBeInTheDocument();
-  expect(screen.queryByText(/Nadie conoce la contraseña nueva/)).toBeNull(); // la escribió la persona
+  expect(await screen.findByText(/puede dejar a SW1 con la contraseña nueva/)).toBeInTheDocument();
+  expect(screen.queryByText(/nadie la conoce/)).toBeNull(); // la escribió la persona
   const discardBtn = () => screen.getByRole("button", { name: "Descartar" });
   expect(discardBtn()).toBeDisabled();
   await userEvent.type(screen.getByLabelText("Escribe SW1 para confirmar que descartas"), "SW");
   expect(discardBtn()).toBeDisabled();
   await userEvent.type(screen.getByLabelText("Escribe SW1 para confirmar que descartas"), "1");
   await userEvent.click(discardBtn());
-  await userEvent.click(screen.getByRole("button", { name: /Confirmar descartar|Confirmar/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar: descartar" }));
   await waitFor(() => expect(core.assistDiscardPendingRollback).toHaveBeenCalledWith("a"));
 });
 
 test("con el secreto generado por la app, el aviso dice que nadie lo conoce", async () => {
   render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", generatedSecret: true })])} />);
-  expect(await screen.findByText(/Nadie conoce la contraseña nueva/)).toBeInTheDocument();
+  expect(await screen.findByText(/nadie la conoce/)).toBeInTheDocument();
 });
 
 test("parsePendingRollbacks lee generatedSecret (ausente = false)", async () => {
   const { parsePendingRollbacks } = await import("../modules/ports/api");
   expect(parsePendingRollbacks('{"rollbacks":[{"runId":"a","kind":"credrotate","generatedSecret":true},{"runId":"b","kind":"ports"}]}').map((r) => r.generatedSecret)).toEqual([true, false]);
+});
+
+test("una reversa que no es rotación no pide el nombre del equipo", async () => {
+  render(<PendingRollbacks core={coreWith([rb()])} />);
+  await screen.findByRole("button", { name: "Aplicar reversa" });
+  expect(screen.queryByLabelText(/para confirmar que descartas/)).toBeNull();
+  expect(screen.getByRole("button", { name: "Descartar" })).toBeEnabled();
+});
+
+test("rotación sin equipos: se pide el id de la ejecución (escribir nada no habilita Descartar)", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", devices: [] })])} />);
+  expect(await screen.findByLabelText("Escribe a para confirmar que descartas")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Descartar" })).toBeDisabled();
+});
+
+test("nombres con espacios alrededor se comparan recortados", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", devices: [{ device: " SW1 ", rollbackLines: [] }] })])} />);
+  await userEvent.type(await screen.findByLabelText("Escribe SW1 para confirmar que descartas"), "SW1 ");
+  expect(screen.getByRole("button", { name: "Descartar" })).toBeEnabled();
 });

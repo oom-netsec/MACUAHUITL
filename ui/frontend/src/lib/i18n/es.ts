@@ -2715,7 +2715,7 @@ export const es = {
   "pending.apply": "Aplicar reversa",
   "pending.discard": "Descartar",
   "pending.discard.confirm": "Confirmar: descartar",
-  "pending.unreadable": "No se pudo leer la reversa guardada. Solo puede descartarse.",
+  "pending.unreadable": "No se pudo leer la reversa guardada. Solo puede descartarse; si era una rotación de credencial, el equipo puede quedar con la contraseña nueva.",
   "pending.acceptAge": "Acepto aplicar una reversa de hace {age}",
   "pending.err.gone": "Esa reversa ya no existe.",
   "pending.err.busy": "La ejecución original sigue en curso: espera a que termine.",
@@ -2764,9 +2764,10 @@ export const es = {
   "patrol.pb.groupCount.one": "(1 seleccionado / {total})",
   "patrol.pb.selectVisible": "Seleccionar los {n} visibles de {group}",
   "patrol.pb.selectVisible.one": "Seleccionar el visible de {group}",
-  "pending.discard.rotation": "Descartar esta reversa deja a {device} con la contraseña nueva, y la bóveda conserva la anterior: la credencial de la bóveda ya no entra a ese equipo.",
-  "pending.discard.generated": "Nadie conoce la contraseña nueva (la generó la app): ese usuario queda sin acceso hasta que la cambies por consola.",
+  "pending.discard.rotation": "Descartar esta reversa puede dejar a {device} con la contraseña nueva del usuario rotado (al menos en la running-config). Si la bóveda guarda la credencial de ese usuario y no la actualizaste a mano, conserva la anterior y ya no entra con ella. La credencial con la que la app se conecta no cambia.",
+  "pending.discard.generated": "La app generó la contraseña nueva y nadie la conoce: ese usuario queda sin acceso hasta que otra cuenta con privilegios la cambie o apliques esta reversa.",
   "pending.discard.typeName": "Escribe {device} para confirmar que descartas",
+  "pending.discard.typeHint": "«Descartar» se habilita al escribir el nombre exacto del equipo.",
 };
 
 export type Key = keyof typeof es;
