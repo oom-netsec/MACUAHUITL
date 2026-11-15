@@ -7,20 +7,17 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 )
 
-// listaFalsa devuelve en cada ListChanges el siguiente estado de la captura PRE.
+// listaFalsa devuelve en cada consulta el siguiente estado de la captura PRE.
 type listaFalsa struct {
-	v1.ChangeServiceClient
 	estados []string
 	n       int
 }
 
-func (l *listaFalsa) ListChanges(context.Context, *v1.ListChangesRequest, ...grpc.CallOption) (*v1.ListChangesResponse, error) {
+func (l *listaFalsa) list(context.Context) (*v1.ListChangesResponse, error) {
 	s := l.estados[min(l.n, len(l.estados)-1)]
 	l.n++
 	return &v1.ListChangesResponse{Changes: []*v1.ChangeSummary{{ChangeId: "c1", PreJobId: "j1", PreState: s}}}, nil
@@ -29,12 +26,12 @@ func (l *listaFalsa) ListChanges(context.Context, *v1.ListChangesRequest, ...grp
 func TestEsperarCaptura(t *testing.T) {
 	pre := v1.ChangePhase_CHANGE_PHASE_PRE
 	l := &listaFalsa{estados: []string{"armed", "armed", "completed"}}
-	if err := waitCapture(context.Background(), l, "c1", pre, time.Millisecond); err != nil || l.n != 3 {
+	if err := waitCapture(context.Background(), l.list, "c1", pre, time.Millisecond); err != nil || l.n != 3 {
 		t.Fatalf("debía esperar hasta completed: err=%v consultas=%d", err, l.n)
 	}
 	for _, mal := range []string{"failed", "cancelled"} {
 		l := &listaFalsa{estados: []string{"armed", mal}}
-		if err := waitCapture(context.Background(), l, "c1", pre, time.Millisecond); err == nil || !strings.Contains(err.Error(), mal) {
+		if err := waitCapture(context.Background(), l.list, "c1", pre, time.Millisecond); err == nil || !strings.Contains(err.Error(), mal) {
 			t.Fatalf("%s debía fallar diciendo el estado: %v", mal, err)
 		}
 	}

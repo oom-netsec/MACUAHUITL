@@ -79,7 +79,11 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 			return nil
 		}
 		// Esperar evita que el ingeniero aplique su cambio mientras la captura PRE sigue corriendo.
-		if err := waitCapture(context.Background(), v1.NewChangeServiceClient(c.Conn), fs.Arg(0), phase, 300*time.Millisecond); err != nil {
+		cl := v1.NewChangeServiceClient(c.Conn)
+		list := func(ctx context.Context) (*v1.ListChangesResponse, error) {
+			return cl.ListChanges(ctx, &v1.ListChangesRequest{})
+		}
+		if err := waitCapture(context.Background(), list, fs.Arg(0), phase, 300*time.Millisecond); err != nil {
 			return err
 		}
 		fmt.Fprintln(c.Out, cli.T("mctl.change.done_"+name, "id", fs.Arg(0)))
@@ -89,10 +93,11 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 
 // waitCapture sondea change list hasta que el trabajo de la fase termina; un trabajo que no queda completed es un error.
 // Se sondea (y no job watch) porque una captura de una ronda puede cerrar antes de que la suscripción llegue.
-func waitCapture(ctx context.Context, cl v1.ChangeServiceClient, id string, phase v1.ChangePhase, every time.Duration) error {
+// list es ListChanges ya ligado al cliente (así las pruebas no necesitan un cliente gRPC).
+func waitCapture(ctx context.Context, list func(context.Context) (*v1.ListChangesResponse, error), id string, phase v1.ChangePhase, every time.Duration) error {
 	name := map[v1.ChangePhase]string{v1.ChangePhase_CHANGE_PHASE_PRE: "pre", v1.ChangePhase_CHANGE_PHASE_POST: "post"}[phase]
 	for {
-		r, err := cl.ListChanges(ctx, &v1.ListChangesRequest{})
+		r, err := list(ctx)
 		if err != nil {
 			return err
 		}
