@@ -133,3 +133,21 @@ func TestAdhocCarpetaDeSalidaUsaElCodigoComun(t *testing.T) {
 		}
 	}
 }
+
+// Con la CLI en inglés el informe entero sale en inglés: el texto, el JSON (notas traducidas en su sitio) y el CSV.
+func TestAdhocResultInformeEnIngles(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(`{"devices":[{"Target":{"Address":"192.0.2.1"},"Round":1,"Hostname":"SW1","State":"completed"}]}`), 0o600)
+	s := &adhocSvc{d: jobDeps{servicetest.New(t), service.JobInfo{State: "completed", Dir: dir}}, cmds: map[string][]string{"j1": {"show nada"}}}
+	r, err := s.AdhocResult(i18n.WithLocale(context.Background(), i18n.En), &v1.AdhocResultRequest{JobId: "j1"})
+	if err != nil || !r.Done {
+		t.Fatalf("%+v %v", r, err)
+	}
+	if txt, js := r.Report.Text, r.Report.Json; !strings.Contains(txt, "NO OUTPUT: command invalid on the device") || !strings.Contains(txt, "1 device,") ||
+		!strings.Contains(js, "command invalid on the device") || strings.Contains(txt+js+r.Csv+r.Markdown, "equipo") {
+		t.Fatalf("text=%q json=%q", txt, js)
+	}
+	if !strings.HasPrefix(r.Csv, "device,address,command,state,output\n") || !strings.Contains(r.Csv, "no output,command invalid on the device") {
+		t.Fatalf("csv=%q", r.Csv)
+	}
+}

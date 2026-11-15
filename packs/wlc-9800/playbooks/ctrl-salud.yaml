@@ -14,6 +14,7 @@ commands:
     timeout: 180s
   - cmd: show wireless client summary
     timeout: 180s
+  - cmd: show platform resources  # no existe en EWC (QFP, DRAM y TCAM en chasis y CL; en EWC % Incomplete)
   - cmd: show processes cpu platform sorted
   - cmd: show processes memory platform sorted
   - cmd: show platform software status control-processor brief

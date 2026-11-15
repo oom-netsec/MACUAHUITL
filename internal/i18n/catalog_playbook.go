@@ -55,6 +55,12 @@ func init() {
 		"adhoc.err.node_stopped":        e("el núcleo se detuvo con el lote en curso; vuelve a lanzarlo", "the core stopped with the batch in progress; launch it again"),
 		"adhoc.err.no_dir":              e("el lote no conserva su carpeta de salida", "the batch no longer has its output folder"),
 		"adhoc.rep.no_output":           e("SIN SALIDA: {note}", "NO OUTPUT: {note}", "note"),
+		"adhoc.note.invalid":            e("comando inválido en el equipo", "command invalid on the device"),
+		"adhoc.note.no_round":           e("equipo sin ronda", "device without a round"),
+		"adhoc.note.device":             e("equipo {state}", "device {state}", "state"),
+		"adhoc.rep.state_none":          e("sin salida", "no output"),
+		"adhoc.rep.csv_header":          e("equipo,direccion,comando,estado,salida", "device,address,command,state,output"),
+		"adhoc.rep.md_header":           e("| Equipo | Dirección | Comando | Estado | Salida |", "| Device | Address | Command | State | Output |"),
 		"adhoc.rep.summary":             e("{n} {n|equipo|equipos}, {ok} con salida completa", "{n} {n|device|devices}, {ok} with complete output", "n", "ok"),
 		"playbook.err.none":             e("playbook: no hay comandos", "playbook: there are no commands"),
 	})

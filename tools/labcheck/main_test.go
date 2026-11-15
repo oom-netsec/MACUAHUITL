@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 )
 
@@ -278,6 +279,9 @@ func TestSecretAtSinFalsosPositivosDelLaboratorio(t *testing.T) {
 		"username y password 0 SuperSecreto123", "Community name: Xyz123abc", "PSK : Xyz123abc456",
 		" security wpa psk set-key ascii 0 Xyz123abc456", "ntp authentication-key 1 md5 0822455D0A16 7",
 		"snmp-server community public RO", "username x password <MASKED:secret> secret suelto123",
+		// de la revisión: las reglas de descarte no pueden esconder un secreto antes de los dos puntos ni junto a un <MASKED:
+		"username admin password 0 abc:123", "key-string 0 MyKey:2024", "Community name: 123456",
+		"snmp-server community S3cret RO <MASKED:x>", "username bob password 0 hunter2 <MASKED:x>", "community name S3cret",
 	} {
 		if _, _, ok := secretAt(ln); !ok {
 			t.Errorf("secreto sin detectar: %q", ln)
@@ -361,5 +365,24 @@ func TestFuncionNoActivaSinRepetir(t *testing.T) {
 	}
 	if n := strings.Count(out.String(), "`show lldp` — not enabled"); n != 1 {
 		t.Fatalf("show lldp sale %d veces:\n%s", n, out.String())
+	}
+}
+
+// «Función no activa» no tapa un rechazo en las mismas líneas ni lo que el driver marcó (inválido, incompleto).
+func TestFuncionNoActivaNoTapaRechazos(t *testing.T) {
+	s := analyze.Section{Command: "show x", Text: "% Invalid input detected; feature not enabled\n"}
+	if _, ok := inactiveOnly(s); ok {
+		t.Error("un rechazo con «not enabled» salió como función no activa")
+	}
+	s = analyze.Section{Command: "show x", Text: "% LLDP is not enabled\n", Invalid: true}
+	if _, ok := inactiveOnly(s); ok {
+		t.Error("lo marcado inválido por el driver salió como función no activa")
+	}
+	s = analyze.Section{Command: "show x", Text: "% LLDP is not enabled\n", Incomplete: true}
+	if _, ok := inactiveOnly(s); ok {
+		t.Error("una salida incompleta salió como función no activa")
+	}
+	if p, ok := inactiveOnly(analyze.Section{Command: "show lldp", Text: "% LLDP is not enabled\n"}); !ok || p != "not enabled" {
+		t.Errorf("función no activa = %q %v", p, ok)
 	}
 }

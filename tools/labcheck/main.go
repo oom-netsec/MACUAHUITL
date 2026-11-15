@@ -62,6 +62,20 @@ const unknownPercent = "aviso % del equipo (revisar)"
 // not enabled», «% Switch is not in mst mode»). No es un error del paquete: el comando existe y la función está apagada.
 var inactiveRe = regexp.MustCompile(`(?i)^%.*\b(not enabled|not active|not configured|not running|is not in)\b`)
 
+// inactiveOnly es inactive solo si no hay nada más que reportar: ni una marca de rechazo en las primeras líneas, ni lo
+// que marcó el driver (inválido, incompleto) o el lector (truncado). Así una función apagada nunca tapa un error.
+func inactiveOnly(s analyze.Section) (string, bool) {
+	if s.Invalid || s.Incomplete || s.Truncated {
+		return "", false
+	}
+	for _, p := range problems(s, s.At, time.Hour) { // sin «lento»: end = At
+		if strings.HasPrefix(p, "rechazado") {
+			return "", false
+		}
+	}
+	return inactive(s.Text)
+}
+
 // inactive da la frase fija (nunca la línea del equipo) si alguna de las primeras líneas dice que la función está apagada.
 func inactive(text string) (string, bool) {
 	n := 0
@@ -86,15 +100,40 @@ var secretRe = regexp.MustCompile(`(?i)\b(?:password|secret|key-string|pre-share
 	`|\bmessage-digest-key\s+\d+\s+md5\s+(?:[0-9]\s+)?(\S+)|\bkey\s+[0-9]\s+(\S+)|\b(?:auth|priv)\s+(?:\S+\s+)?(0x[0-9a-f]+)` +
 	`|(\$[1-9][a-z]?\$\S{4,})|(BEGIN [A-Z ]*PRIVATE KEY)`)
 
-// labelRe: una línea «etiqueta : valor» de un show (un solo «:»); benignValueRe: valores que no pueden ser una clave.
+// labelRe: un contador o estado de show, «Etiqueta de palabras : valor» con espacio a los dos lados del «:» y una
+// etiqueta sin dígitos (así no calza «password 0 abc:123» ni «Community name: 123456», que sí pueden ser claves);
+// benignValueRe: valores que no pueden ser una clave (un PSK WPA tiene al menos 8 caracteres).
 var (
-	labelRe       = regexp.MustCompile(`^[^:]+:\s*([^:]+?)\s*$`)
-	benignValueRe = regexp.MustCompile(`(?i)^(enabled|disabled|yes|no|none|n/a|true|false|on|off|not configured|\d{1,7})$`)
+	labelRe       = regexp.MustCompile(`^\s*[A-Za-z][A-Za-z \-/().]*?\s+:\s+(\S+)\s*$`)
+	benignValueRe = regexp.MustCompile(`(?i)^(enabled|disabled|yes|no|none|n/a|true|false|on|off|\d{1,7})$`)
+	// structuralRe: tokens de sintaxis que pueden ir entre la palabra clave y el <MASKED:...> (tipo, formato, dirección).
+	structuralRe = regexp.MustCompile(`(?i)^(\d|set-key|ascii|hex|aes|des|md5|sha|encrypted|unencrypted|key|address|local|remote|\d+\.\d+\.\d+\.\d+)$`)
 )
 
 // benignFollow: palabras que siguen a la palabra clave y no son un valor («password encryption aes», «psk provisioning»,
-// «Mesh PSK Config», «0 Unknown community name»). «name:» con dos puntos (show snmp community) sí cuenta.
-var benignFollow = map[string]bool{"encryption": true, "provisioning": true, "config": true, "configuration": true, "name": true}
+// «Mesh PSK Config»). «name» va aparte (maskedNear y nameCounter).
+var benignFollow = map[string]bool{"encryption": true, "provisioning": true, "config": true, "configuration": true}
+
+// maskedNear: tras la palabra clave solo hay tokens de sintaxis y luego un <MASKED:...> («psk set-key ascii 8 <MASKED:...>»):
+// el enmascarado ya tapó el valor. Un token cualquiera antes del <MASKED: (S3cret, hunter2) puede ser la clave.
+func maskedNear(after []string) bool {
+	for _, t := range after[:min(len(after), 4)] {
+		if strings.HasPrefix(t, "<MASKED:") {
+			return true
+		}
+		if !structuralRe.MatchString(t) {
+			return false
+		}
+	}
+	return false
+}
+
+// nameCounter: «community name» al final de la línea o seguido de «supplied» es un contador de show snmp
+// («0 Unknown community name»), no una comunidad; «community name S3cret» sí se marca.
+func nameCounter(ln string, a, b int) bool {
+	rest := strings.TrimSpace(ln[b:])
+	return strings.EqualFold(ln[a:b], "name") && (rest == "" || rest == "supplied")
+}
 
 // secretAt dice si la línea trae un valor con pinta de secreto que no sea <MASKED:...>, con la palabra clave y el
 // largo de lo que la sigue hasta el fin de línea. El reporte imprime solo eso: el regex captura un token y el secreto
@@ -105,11 +144,11 @@ func secretAt(ln string) (kw string, n int, ok bool) {
 		return "", 0, false // «Wrong PSK : 132», «PSK : Enabled»: contador o estado, no una clave
 	}
 	for _, m := range secretRe.FindAllStringSubmatchIndex(ln, -1) {
-		if near := strings.Fields(ln[m[0]:]); slices.ContainsFunc(near[1:min(len(near), 5)], func(t string) bool { return strings.HasPrefix(t, "<MASKED:") }) {
-			continue // «security wpa psk set-key ascii 8 <MASKED:wifi-psk>»: el enmascarado ya tapó el valor
+		if maskedNear(strings.Fields(ln[m[0]:])[1:]) {
+			continue
 		}
 		for g := 2; g < len(m); g += 2 {
-			if m[g] < 0 || strings.HasPrefix(ln[m[g]:], "<MASKED:") || benignFollow[strings.ToLower(ln[m[g]:m[g+1]])] {
+			if m[g] < 0 || strings.HasPrefix(ln[m[g]:], "<MASKED:") || benignFollow[strings.ToLower(ln[m[g]:m[g+1]])] || nameCounter(ln, m[g], m[g+1]) {
 				continue
 			}
 			word := strings.Fields(ln[m[0]:m[1]])[0]
@@ -293,7 +332,7 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 			if i+1 < len(secs) {
 				end = secs[i+1].At
 			}
-			if phrase, ok := inactive(s.Text); ok { // función apagada en el equipo: no es un problema del paquete
+			if phrase, ok := inactiveOnly(s); ok { // función apagada en el equipo: no es un problema del paquete
 				if line := fmt.Sprintf("- `%s` — %s", s.Command, phrase); !slices.Contains(inactives, line) { // el mismo comando en varios playbooks
 					inactives = append(inactives, line)
 				}

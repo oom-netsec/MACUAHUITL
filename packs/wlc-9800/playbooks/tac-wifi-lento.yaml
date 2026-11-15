@@ -18,7 +18,8 @@ commands:
   - cmd: show ap dot11 5ghz cleanair air-quality worst
   - cmd: show wireless stats client delete reasons
   - cmd: show wireless stats client detail
-  - cmd: show platform software status control-processor brief  # en lugar de show platform resources, que el EWC no tiene
+  - cmd: show platform resources  # no existe en EWC (QFP, DRAM y TCAM en chasis y CL; en EWC % Incomplete)
+  - cmd: show platform software status control-processor brief  # carga del sistema en EWC y en chasis
   - cmd: show processes cpu platform sorted
   - cmd: show logging | include DOT11|CAPWAP|CPUHOG|RADIUS
   - cmd: show wireless load-balancing

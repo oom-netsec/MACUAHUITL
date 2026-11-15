@@ -122,7 +122,10 @@ func (s *adhocSvc) AdhocResult(ctx context.Context, r *v1.AdhocResultRequest) (*
 	}
 	rep := adhoc.Build(devs, cmds)
 	s.d.Audit("adhoc.result", r.JobId, fmt.Sprintf("devices=%d rows=%d", len(devs), len(rep.Rows)))
-	out.Done, out.Report, out.Csv, out.Markdown = true, service.Report(rep, rep.Text(i18n.Locale(ctx))), rep.CSV(), rep.Markdown()
+	loc := i18n.Locale(ctx)
+	// ReportL traduce las notas de rep en su sitio con en: el texto, el CSV y el Markdown se arman después y ya las ven así.
+	report := service.ReportL(ctx, &rep, func(loc string) string { return rep.Text(loc) })
+	out.Done, out.Report, out.Csv, out.Markdown = true, report, rep.CSV(loc), rep.Markdown(loc)
 	return out, nil
 }
 

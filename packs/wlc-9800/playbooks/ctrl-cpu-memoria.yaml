@@ -8,6 +8,7 @@ name: Controlador · CPU y memoria (wncd)
 name_en: Controller · CPU and memory (wncd)
 commands:
   - cmd: show clock
+  - cmd: show platform resources  # no existe en EWC (QFP, DRAM y TCAM en chasis y CL; en EWC % Incomplete)
   - cmd: show processes cpu platform sorted
   - cmd: show processes cpu sorted
   - cmd: show processes cpu history
