@@ -4,13 +4,13 @@ Misión: poner un TAC en la laptop de cada ingeniero, útil para **todo** el tra
 
 Principios: local primero y auditado, secretos en la bóveda, sin falsos "todo bien", licencias permisivas y sin código privilegiado. Leer y analizar es libre. **Cambiar la red** se hace con el [modo de cambio asistido](adr/0007-modo-cambio-asistido.md): comando visible, confirmación, pre/post-check, reversa y auditoría.
 
-## Hecho hasta v0.4.8
+## Hecho hasta v0.6.5
 
 | Área | Qué hay |
 |---|---|
 | Base | Núcleo, bóveda, auditoría encadenada, Patrol, CLI y app (fases 0–6) |
 | Herramientas | Analizador PCAP, DNS ligero y profundo, inspector TLS, receptor syslog (7) |
-| Análisis | 27 reglas, diff entre rondas, línea de tiempo correlacionada; en la app, «Análisis de trabajos» (9) |
+| Análisis | 44 reglas, diff entre rondas, línea de tiempo correlacionada; en la app, «Análisis de trabajos» (9) |
 | Campo y transferencias | Consola serie, servidores y clientes temporales TFTP/HTTP/FTP/SCP/SFTP, MD5/SHA-512 (10, 22a) |
 | Cambios | Pre/post con semáforo, asistente de upgrade (verificación), plantillas doradas y hardening (11) |
 | Visibilidad | Topología CDP/LLDP (SVG), SNMP y traps, NetFlow/IPFIX/sFlow, gNMI (12) |
@@ -22,10 +22,14 @@ Principios: local primero y auditado, secretos en la bóveda, sin falsos "todo b
 | Forense | Crashinfo, base de mensajes Cisco, flapping silencioso, patrones de syslog, filtro de debugs, fugas de memoria entre rondas (17) |
 | Paquetes de contenido | 11 paquetes oficiales firmados (≈600 playbooks), vista previa de instalación, ocultar por elemento, paquete personal, releases `packs-AAAA-MM-DD`; un oficial aparta a un tercero que choca solo con confirmación ([ADR 0010](adr/0010-paquetes-de-contenido.md)) |
 | Idioma | Inglés canónico en app, núcleo y `mctl`; español en Ajustes y con `--lang es` |
+| Laboratorio | Corridas de solo lectura con `tools/labcheck` en 3560CX, 9120 EWC y Catalyst 9000v (DevNet) (v0.5.0), y en Cisco Modeling Labs: ASAv con failover A/S, Catalyst 8000v e IOSvL2 (v0.5.4); las 21 plantillas de escritura aplicadas, verificadas y revertidas en equipos de laboratorio, CML y el 3560CX (v0.5.4, v0.6.4) |
+| Patrol y análisis | Cada comando corre una vez por equipo y ronda aunque lo pidan varios playbooks (v0.6.0); detecciones de routing (EIGRP, LDP, track, GLBP/VRRP, router-id OSPF duplicado, BGP sin prefijos), segmentos compartidos en la topología y diff entre rondas sin ruido (v0.6.1, v0.6.2) |
+| Enmascarado y modo asistido | Enmascarado de lo citado, de `backup diff` y drift, de líneas negadas, de la terminal, los logs que citan comandos, el syslog y las abreviaturas, con aviso en la evidencia sin enmascarar (v0.5.2–v0.6.5); plantillas `snmp-trap-host` y `netflow-export`; las plantillas no cortan el puerto de la sesión y un error `%` desconocido detiene la aplicación; reversas pendientes en la app, también de rotación de credenciales; `change diff` y espera de captura; primer login de ASA detectado (v0.5.1–v0.6.5) |
+| Robustez | App publicada con la etiqueta `production` de Wails; cada comando guarda como máximo 64 MiB (v0.6.5) |
 
 ## Lo que falta para 1.0.0
 
-1. **Validación en laboratorio** de los paquetes con equipos reales, según el [runbook](plans/validacion-labs.md) y `tools/labcheck` (reporte por playbook). Hoy solo `oom/ios` está validado de punta a punta (3560CX) y los comandos de `oom/wlc-9800` se revisaron en un 9120 EWC; siguen la corrida completa de `oom/wlc-9800` y `oom/nx-os` y `oom/ios-xe` (DevNet). Lo que falle se corrige en el paquete y se publica como release `packs-*`.
+1. **Validación en laboratorio** de los paquetes con equipos reales, según el [runbook](plans/validacion-labs.md) y `tools/labcheck` (reporte por playbook). Hoy solo `oom/ios` está validado de punta a punta (3560CX); los comandos de `oom/wlc-9800` se revisaron en un 9120 EWC, los de `oom/ios-xe`, `oom/cat9k` y `oom/sda` en Catalyst 9000v (y `oom/ios-xe` también en Catalyst 8000v) y los de `oom/asa` en ASAv. Siguen `oom/wlc-9800` en un 9800 de chasis o 9800-CL, `oom/sda` en un fabric real, `oom/cat9k` en hardware físico (stack, StackWise Virtual, PoE), `oom/ios-xe` con nivel de licencia (crypto VPN, MPLS), `oom/asa` en multicontexto y cluster, `oom/nx-os` (DevNet) y las plataformas sin laboratorio todavía. Lo que falle se corrige en el paquete y se publica como release `packs-*`.
 2. **Estabilidad**: cero hallazgos abiertos de severidad alta o media, suite completa y CI en verde sin pruebas intermitentes, e instalación limpia de los `.deb` y `.rpm` en una máquina nueva.
 3. **Anuncio público** con el README y las capturas al día.
 
@@ -109,19 +113,19 @@ Se define junto con la **vista de líder** del [backlog](backlog.md).
 
 ## Paquetes de contenido por tecnología
 
-Los playbooks y scripts de cada tecnología se publican como paquetes `.mpack` firmados ([ADR 0010](adr/0010-paquetes-de-contenido.md)), y cada quien instala solo los que usa. Todos están publicados en v0.4.8:
+Los playbooks y scripts de cada tecnología se publican como paquetes `.mpack` firmados ([ADR 0010](adr/0010-paquetes-de-contenido.md)), y cada quien instala solo los que usa. Todos están publicados; van adjuntos a cada release de la app y a las releases `packs-*`:
 
 | Paquete | Playbooks | Validación en laboratorio |
 |---|---:|---|
 | `oom/ios` (IOS clásico) | 52 | Validado (3560CX) |
-| `oom/ios-xe` (switches y routers IOS-XE) | 69 | Pendiente (DevNet Cat8000v) |
-| `oom/cat9k` (Catalyst 9000) | 55 | Pendiente |
-| `oom/sda` (SD-Access) | 26 | Pendiente |
-| `oom/wlc-9800` (Catalyst 9800 y EWC) | 47 | Comandos revisados en un 9120 EWC (17.12.6a); falta la corrida completa con labcheck |
+| `oom/ios-xe` (switches y routers IOS-XE) | 69 | Comandos revisados en Catalyst 9000v (DevNet) y Catalyst 8000v (CML) |
+| `oom/cat9k` (Catalyst 9000) | 55 | Comandos revisados en Catalyst 9000v (DevNet); stack, StackWise Virtual y PoE piden hardware físico |
+| `oom/sda` (SD-Access) | 26 | Comandos revisados en Catalyst 9000v (DevNet) sin fabric; falta un fabric real |
+| `oom/wlc-9800` (Catalyst 9800 y EWC) | 47 | Comandos revisados en un 9120 EWC (17.12.6a); falta un 9800 de chasis o 9800-CL |
 | `oom/wlc-aireos` (AireOS) | 64 | Pendiente |
 | `oom/nx-os` (Nexus) | 68 | Pendiente (DevNet NX-OS) |
 | `oom/aci` (leaf y spine ACI) | 45 | Pendiente |
-| `oom/asa` | 68 | Pendiente |
+| `oom/asa` | 68 | Comandos revisados en ASAv (contexto único y failover A/S, CML); multicontexto y cluster pendientes |
 | `oom/ftd` (Firepower Threat Defense) | 64 | Pendiente |
 | `oom/ise` | 36 | Pendiente |
 
