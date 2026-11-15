@@ -74,7 +74,7 @@ type rawDevice struct {
 type parseFn func(cmd, text string) (any, bool)
 
 var (
-	hdrRe   = regexp.MustCompile(`^===== (?:ronda (\d+) · )?(\S+) · (.+?)( · comando inválido)?( · incompleto)? =====$`)
+	hdrRe   = regexp.MustCompile(`^===== (?:(?:ronda|round) (\d+) · )?(\S+) · (.+?)( · (?:comando inválido|invalid command))?( · (?:incompleto|incomplete))? =====$`)
 	roundRe = regexp.MustCompile(`^r(\d+)_`)
 )
 

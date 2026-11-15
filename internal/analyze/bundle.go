@@ -99,7 +99,7 @@ func SetLimits(section, total int64) (restore func()) {
 
 // Cabeceras que escribe patrol.Writer (internal/patrol/output.go).
 var (
-	headerRe    = regexp.MustCompile(`^===== (?:ronda (\d+) · )?(\S+) · (.*?)( · comando inválido)?( · incompleto)? =====$`)
+	headerRe    = regexp.MustCompile(`^===== (?:(?:ronda|round) (\d+) · )?(\S+) · (.*?)( · (?:comando inválido|invalid command))?( · (?:incompleto|incomplete))? =====$`)
 	roundFileRe = regexp.MustCompile(`^r(\d+)_\d{8}-\d{6}\.txt$`)
 )
 

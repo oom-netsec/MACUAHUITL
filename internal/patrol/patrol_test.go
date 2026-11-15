@@ -245,7 +245,7 @@ func TestConsolidatedFile(t *testing.T) {
 		t.Fatalf("files = %v", files)
 	}
 	b, _ := os.ReadFile(files[0])
-	if strings.Count(string(b), "===== ronda 1 ·") != 3 || strings.Count(string(b), "===== ronda 2 ·") != 3 {
+	if strings.Count(string(b), "===== round 1 ·") != 3 || strings.Count(string(b), "===== round 2 ·") != 3 {
 		t.Fatalf("headers wrong:\n%s", b[:min(len(b), 400)])
 	}
 }

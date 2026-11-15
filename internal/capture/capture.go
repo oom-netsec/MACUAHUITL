@@ -47,14 +47,14 @@ func Split(text string) map[string]string {
 		if patrolFmt && strings.HasPrefix(body, "===== ") && strings.HasSuffix(body, " =====") {
 			flush()
 			parts := strings.Split(strings.TrimSuffix(strings.TrimPrefix(body, "===== "), " ====="), " · ")
-			if strings.HasPrefix(parts[0], "ronda ") {
+			if strings.HasPrefix(parts[0], "ronda ") || strings.HasPrefix(parts[0], "round ") {
 				parts = parts[1:]
 			}
 			cur, invalid = "", false
 			if len(parts) >= 2 {
 				cur = Key(parts[1])
 				for _, p := range parts[2:] {
-					invalid = invalid || strings.Contains(p, "inválido") || p == "incompleto"
+					invalid = invalid || strings.Contains(p, "inválido") || p == "invalid command" || p == "incompleto" || p == "incomplete"
 				}
 			}
 			continue

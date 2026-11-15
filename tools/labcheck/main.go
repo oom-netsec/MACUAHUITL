@@ -209,7 +209,7 @@ func scan(ln string, strict bool) (kw string, n int, ok bool) {
 }
 
 // Cabecera de sección que escribe patrol.Writer; una línea del equipo que la imita viene escapada con «\».
-var headerRe = regexp.MustCompile(`^===== (?:ronda \d+ · )?\S+ · (.*?)(?: · comando inválido)?(?: · incompleto)? =====$`)
+var headerRe = regexp.MustCompile(`^===== (?:(?:ronda|round) \d+ · )?\S+ · (.*?)(?: · (?:comando inválido|invalid command))?(?: · (?:incompleto|incomplete))? =====$`)
 
 // secretsIn busca candidatos a secreto en los .txt de la carpeta de un equipo, con archivo y número de línea para que
 // el dueño los abra él mismo. Los iguales (comando, palabra clave y largo) salen en una línea con todas sus ubicaciones.

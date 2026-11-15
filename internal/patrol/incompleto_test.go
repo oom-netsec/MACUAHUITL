@@ -13,7 +13,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 )
 
-// La salida parcial de un comando fallido lleva la marca « · incompleto» en su cabecera.
+// La salida parcial de un comando fallido lleva la marca « · incomplete» en su cabecera.
 func TestWriteMarcaLaSalidaIncompleta(t *testing.T) {
 	w, err := NewWriter(t.TempDir(), Spec{Name: "j"}, time.Now())
 	if err != nil {
@@ -29,7 +29,7 @@ func TestWriteMarcaLaSalidaIncompleta(t *testing.T) {
 	}
 	b, _ := os.ReadFile(filepath.Join(w.Dir(), w.Files()[0]))
 	hs := strings.Split(strings.TrimSpace(string(b)), "\n")
-	if hs[0] != "===== 2026-11-06T10:00:00Z · show run =====" || hs[2] != "===== 2026-11-06T10:00:00Z · show run · incompleto =====" {
+	if hs[0] != "===== 2026-11-06T10:00:00Z · show run =====" || hs[2] != "===== 2026-11-06T10:00:00Z · show run · incomplete =====" {
 		t.Fatalf("cabeceras: %q", hs)
 	}
 }
@@ -76,7 +76,7 @@ func (p *incompletoDrv) Run(ctx context.Context, cmd string, timeout time.Durati
 	return out, err
 }
 
-// Un Incomplete que el driver marca sin error llega a la evidencia con « · incompleto»; el equipo no falla.
+// Un Incomplete que el driver marca sin error llega a la evidencia con « · incomplete»; el equipo no falla.
 func TestRunDeviceConservaIncompleteDelDriver(t *testing.T) {
 	e := newEnv(t, simulator.Config{})
 	e.trust(t)
@@ -92,7 +92,7 @@ func TestRunDeviceConservaIncompleteDelDriver(t *testing.T) {
 		b, _ := os.ReadFile(filepath.Join(w.Dir(), f))
 		all += string(b)
 	}
-	if !strings.Contains(all, " · incompleto =====") {
+	if !strings.Contains(all, " · incomplete =====") {
 		t.Fatalf("la evidencia no marca incompleto:\n%s", all[:min(len(all), 600)])
 	}
 }
@@ -127,7 +127,7 @@ func TestRunDeviceFallaConSesionDesincronizada(t *testing.T) {
 		b, _ := os.ReadFile(filepath.Join(w.Dir(), f))
 		all += string(b)
 	}
-	if !strings.Contains(all, " · incompleto =====") {
+	if !strings.Contains(all, " · incomplete =====") {
 		t.Fatalf("sin marca de incompleto:\n%s", all[:min(len(all), 400)])
 	}
 }
