@@ -565,7 +565,7 @@ func TestProtocolosV061(t *testing.T) {
 		t.Errorf("eigrp con nombre %+v", ei)
 	}
 	ld, ok := ParseLDPNeighbors(fx(t, "iosxe_show-mpls-ldp-neighbor"))
-	if !ok || len(ld) != 2 || ld[0].PeerID != "10.255.0.2:0" || ld[1].PeerID != "10.255.0.3:0" || ld[0].State != "Oper" || !strings.Contains(ld[1].Line, "Peer LDP Ident: 10.255.0.3:0") {
+	if !ok || len(ld) != 2 || ld[0].PeerID != "192.0.2.2:0" || ld[1].PeerID != "192.0.2.3:0" || ld[0].State != "Oper" || !strings.Contains(ld[1].Line, "Peer LDP Ident: 192.0.2.3:0") {
 		t.Errorf("ldp %+v", ld)
 	}
 	tr, ok := ParseTrack(fx(t, "iosxe_show-track-brief"))
@@ -574,7 +574,7 @@ func TestProtocolosV061(t *testing.T) {
 		t.Errorf("track %+v", tr)
 	}
 	gl, ok := ParseGLBP(fx(t, "iosxe_show-glbp-brief"))
-	if !ok || len(gl) != 3 || gl[0].Group != "50" || gl[0].VIP != "10.0.0.254" || gl[0].State != "Active" || gl[1].Group != "50/1" || gl[2].Group != "50/2" || gl[2].State != "Listen" || gl[2].Active != "10.0.0.2" {
+	if !ok || len(gl) != 3 || gl[0].Group != "10" || gl[0].VIP != "10.0.0.254" || gl[0].State != "Active" || gl[1].Group != "10/1" || gl[2].Group != "10/2" || gl[2].State != "Listen" || gl[2].Active != "10.0.0.2" {
 		t.Errorf("glbp %+v", gl)
 	}
 	vr, ok := ParseVRRP(fx(t, "iosxe_show-vrrp-brief"))
@@ -599,5 +599,38 @@ func TestProtocolosV061(t *testing.T) {
 		if _, ok := f(junk); ok {
 			t.Errorf("%s acepta basura", name)
 		}
+	}
+}
+
+// Sin vecinos, IOS imprime solo la línea del AS: es una tabla vacía válida, no un formato roto.
+func TestEIGRPSinVecinos(t *testing.T) {
+	for _, s := range []string{"EIGRP-IPv4 Neighbors for AS(100)\n", "EIGRP-IPv4 VR(X) Address-Family Neighbors for AS(100)\n"} {
+		if r, ok := ParseEIGRP(s); !ok || len(r) != 0 {
+			t.Errorf("%q: %v %v", s, r, ok)
+		}
+	}
+}
+
+func TestVRRPv3(t *testing.T) {
+	vr, ok := ParseVRRP(fx(t, "iosxe_show-vrrp-brief-v3"))
+	if !ok || len(vr) != 2 || vr[0].Interface != "Gi1" || vr[0].Group != "1/IPv4" || vr[0].State != "MASTER" || vr[0].Active != "10.0.0.1(local)" || vr[0].VIP != "10.0.0.254" ||
+		vr[1].Group != "2/IPv6" || vr[1].State != "BACKUP" || vr[1].VIP != "2001:DB8::254" {
+		t.Errorf("vrrp v3 %+v", vr)
+	}
+}
+
+// Una fila de track con un Parameter de dos palabras no se descarta.
+func TestTrackParametroDePalabras(t *testing.T) {
+	tr, ok := ParseTrack("Track Type        Instance                  Parameter        State Last Change\n3   ip route   10.0.0.0/8   metric threshold   Down   00:00:10\n")
+	if !ok || len(tr) != 1 || tr[0].ID != "3" || tr[0].State != "Down" {
+		t.Errorf("track %+v", tr)
+	}
+}
+
+// «State:» antes de cualquier «Peer LDP Ident» no entra en pánico ni crea entradas.
+func TestLDPEstadoSinPeer(t *testing.T) {
+	ld, ok := ParseLDPNeighbors("        State: Oper; Msgs sent/rcvd: 1/1; Downstream\n")
+	if ok || len(ld) != 0 {
+		t.Errorf("ldp %+v %v", ld, ok)
 	}
 }

@@ -387,11 +387,11 @@ type ws struct {
 
 type rejGroup struct {
 	at   int         // lugar del aviso en list
-	devs [][2]string // (equipo, hora)
+	devs [][3]string // (equipo, hora, IP)
 }
 
 // reject anota que un equipo rechazó un comando; out los agrupa en una línea por comando.
-func (w *ws) reject(dev, cmd, at string) {
+func (w *ws) reject(dev, cmd, at, ip string) {
 	if w.rej == nil {
 		w.rej = map[string]*rejGroup{}
 	}
@@ -402,7 +402,7 @@ func (w *ws) reject(dev, cmd, at string) {
 		w.list = append(w.list, "")
 		w.txs = append(w.txs, i18n.Text{})
 	}
-	g.devs = append(g.devs, [2]string{dev, at})
+	g.devs = append(g.devs, [3]string{dev, at, ip})
 }
 
 const maxRejNames = 10
@@ -417,13 +417,21 @@ func (w *ws) out() ([]string, []i18n.Text) {
 		if len(rs) == 1 {
 			t = i18n.Tx("fleet.warn.rejected", "dev", rs[0][0], "cmd", cmd, "at", rs[0][1])
 		} else {
+			n := map[string]int{}
+			for _, r := range rs {
+				n[r[0]]++
+			}
 			names := make([]string, 0, maxRejNames+1)
 			for _, r := range rs {
 				if len(names) == maxRejNames {
 					names = append(names, "…")
 					break
 				}
-				names = append(names, r[0])
+				if n[r[0]] > 1 && r[2] != "" { // mismo hostname con otra IP: se distingue por la dirección
+					names = append(names, r[0]+" ("+r[2]+")")
+				} else {
+					names = append(names, r[0])
+				}
 			}
 			t = i18n.Tx("fleet.warn.rejected_many", "cmd", cmd, "n", len(rs), "devs", strings.Join(names, ", "))
 		}
@@ -474,7 +482,7 @@ func read[T any](w *ws, d *Dev, cmd string, p func(string) ([]T, bool)) ([]T, Ev
 		return nil, e, false
 	}
 	if rejected(e) {
-		w.reject(d.Name, cmd, e.At.Format("2006-01-02 15:04Z"))
+		w.reject(d.Name, cmd, e.At.Format("2006-01-02 15:04Z"), d.IP)
 		return nil, e, false
 	}
 	rows, ok := p(e.Text)

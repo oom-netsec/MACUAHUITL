@@ -111,18 +111,18 @@ func regCases(t *testing.T) (map[string]golden, map[string]any) {
 	vh := "Interface          Grp Pri Time  Own Pre State   Master addr     Group addr\n"
 	v061 := synth(t, map[string]map[string]string{"R1_10.0.0.1": {
 		"r001_20261104-100000.txt": ron("2026-11-04T10:00:0",
-			eh+"0   10.0.12.2               Et0/1                    12 00:05:23    8   100  0  15\n1   10.0.13.2               Et0/2                    11 00:00:48   20   120  0  7\n",
-			"    Peer LDP Ident: 10.255.0.2:0; Local LDP Ident 10.255.0.1:0\n        State: Oper; Msgs sent/rcvd: 28/27; Downstream\n    Peer LDP Ident: 10.255.0.3:0; Local LDP Ident 10.255.0.1:0\n        State: Oper; Msgs sent/rcvd: 14/13; Downstream\n",
+			eh+"0   10.0.12.2               Et0/1                    12 00:05:23    8   100  0  15\n1   10.0.14.2               Et0/3                    13 00:02:10   16    96  0  9\n",
+			"    Peer LDP Ident: 192.0.2.2:0; Local LDP Ident 192.0.2.1:0\n        State: Oper; Msgs sent/rcvd: 28/27; Downstream\n    Peer LDP Ident: 192.0.2.3:0; Local LDP Ident 192.0.2.1:0\n        State: Oper; Msgs sent/rcvd: 14/13; Downstream\n",
 			th+"2     interface   Ethernet0/1               line-protocol    Up    1d02h\n",
-			ospfH+"10.255.0.1        1   FULL/DR         00:00:33    10.0.12.2       Ethernet0/1\n10.255.0.3        1   FULL/DR         00:00:33    10.0.13.2       Ethernet0/2\n",
-			gh+"Et0/0       50   -   110 Active   10.0.0.254      local           10.0.0.2\n",
+			ospfH+"192.0.2.1        1   FULL/DR         00:00:33    10.0.12.2       Ethernet0/1\n192.0.2.3        1   FULL/DR         00:00:33    10.0.13.2       Ethernet0/2\n",
+			gh+"Et0/0       10   -   110 Active   10.0.0.254      local           10.0.0.2\n",
 			vh+"Gi0/0                1 110 3570       Y  Master  10.0.0.1        10.0.0.254\n"),
 		"r002_20261104-101000.txt": ron("2026-11-04T10:10:0",
 			eh+"0   10.0.12.2               Et0/1                    12 00:15:23    8   100  0  15\n",
-			"    Peer LDP Ident: 10.255.0.2:0; Local LDP Ident 10.255.0.1:0\n        State: Oper; Msgs sent/rcvd: 28/27; Downstream\n",
+			"    Peer LDP Ident: 192.0.2.2:0; Local LDP Ident 192.0.2.1:0\n        State: Oper; Msgs sent/rcvd: 28/27; Downstream\n",
 			th+"1     ip sla      1                         reachability     Down  00:01:02\n2     interface   Ethernet0/1               line-protocol    Up    1d02h\n",
-			ospfH+"10.255.0.1        1   FULL/DR         00:00:33    10.0.12.2       Ethernet0/1\n10.255.0.1        1   FULL/DR         00:00:33    10.0.13.2       Ethernet0/2\n",
-			gh+"Et0/0       50   -   110 Speak    10.0.0.254      unknown         unknown\n",
+			ospfH+"192.0.2.1        1   FULL/DR         00:00:33    10.0.12.2       Ethernet0/1\n192.0.2.1        1   FULL/DR         00:00:33    10.0.13.2       Ethernet0/2\n",
+			gh+"Et0/0       10   -   110 Speak    10.0.0.254      unknown         unknown\n",
 			vh+"Gi0/0                1 110 3570       Y  Init    0.0.0.0         10.0.0.254\n"),
 	}})
 	run("v061", v061, Options{})

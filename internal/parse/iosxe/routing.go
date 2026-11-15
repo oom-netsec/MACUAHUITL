@@ -244,7 +244,7 @@ func ParseEIGRP(text string) ([]EIGRPNeighbor, bool) {
 	header, as := false, ""
 	for _, ln := range lines(text) {
 		if m := eigrpASRe.FindStringSubmatch(ln); m != nil {
-			as = m[1]
+			as, header = m[1], true // sin vecinos IOS imprime solo esta línea
 		} else if eigrpHeaderRe.MatchString(ln) {
 			header = true
 		} else if m := eigrpRowRe.FindStringSubmatch(ln); header && m != nil {
@@ -292,6 +292,8 @@ var (
 	trackHeaderRe = regexp.MustCompile(`^Track\s+Type\s+Instance\s+Parameter\s+State`)
 	// el tipo puede ser de dos palabras (ip sla, ip route) separadas por un solo espacio
 	trackRowRe = regexp.MustCompile(`^(\d+)\s+(\S+(?: \S+)?)\s+(\S+)\s+(\S+)\s+(Up|Down)\s+\S+\s*$`)
+	// respaldo: ID al inicio y «Up|Down Last-Change» al final; lo del medio se reparte como se pueda
+	trackLooseRe = regexp.MustCompile(`^(\d+)\s+(.+?)\s+(Up|Down)\s+\S+\s*$`)
 )
 
 func ParseTrack(text string) ([]TrackObject, bool) {
@@ -305,8 +307,23 @@ func ParseTrack(text string) ([]TrackObject, bool) {
 			header = true
 			continue
 		}
-		if m := trackRowRe.FindStringSubmatch(ln); header && m != nil {
+		if !header {
+			continue
+		}
+		if m := trackRowRe.FindStringSubmatch(ln); m != nil {
 			out = append(out, TrackObject{ID: m[1], Type: m[2], Instance: m[3], Parameter: m[4], State: m[5], Line: ln})
+		} else if m := trackLooseRe.FindStringSubmatch(ln); m != nil {
+			t := TrackObject{ID: m[1], State: m[3], Line: ln}
+			mid := strings.Fields(m[2])
+			switch {
+			case len(mid) >= 3:
+				t.Type, t.Instance, t.Parameter = mid[0], mid[1], strings.Join(mid[2:], " ")
+			case len(mid) == 2:
+				t.Type, t.Instance = mid[0], mid[1]
+			default:
+				t.Type = m[2]
+			}
+			out = append(out, t)
 		}
 	}
 	return out, header
@@ -346,11 +363,14 @@ func ParseGLBP(text string) ([]HSRPGroup, bool) {
 // ---- show vrrp brief ----
 
 var (
-	vrrpHeaderRe = regexp.MustCompile(`^Interface\s+Grp\s+Pri\s+Time`)
-	vrrpRowRe    = regexp.MustCompile(`^(\S+)\s+(\d+)\s+\d+\s+\d+\s+(?:Y\s+)?(?:Y\s+)?(\S+)\s+(\S+)\s+(\S+)\s*$`)
+	vrrpHeaderRe = regexp.MustCompile(`^\s*Interface\s+Grp\s+(?:A-F\s+)?Pri\s+Time`)
+	vrrpRowRe    = regexp.MustCompile(`^\s*(\S+)\s+(\d+)\s+\d+\s+\d+\s+(?:Y\s+)?(?:Y\s+)?(\S+)\s+(\S+)\s+(\S+)\s*$`)
+	// VRRPv3 (fhrp version vrrp v3): columna A-F, Own y Pre como Y/N y estados en mayúsculas
+	vrrp3RowRe = regexp.MustCompile(`^\s*(\S+)\s+(\d+)\s+(IPv[46])\s+\d+\s+\d+\s+[YN]\s+[YN]\s+(\S+)\s+(\S+)\s+(\S+)\s*$`)
 )
 
 // ParseVRRP reutiliza HSRPGroup: State es el estado y Active la dirección del master.
+// En VRRPv3 Group lleva la familia («1/IPv4») para no mezclar IPv4 con IPv6.
 func ParseVRRP(text string) ([]HSRPGroup, bool) {
 	if blank(text) {
 		return nil, true
@@ -362,7 +382,9 @@ func ParseVRRP(text string) ([]HSRPGroup, bool) {
 			header = true
 			continue
 		}
-		if m := vrrpRowRe.FindStringSubmatch(ln); header && m != nil {
+		if m := vrrp3RowRe.FindStringSubmatch(ln); header && m != nil {
+			out = append(out, HSRPGroup{Interface: m[1], Group: m[2] + "/" + m[3], State: m[4], Active: m[5], VIP: m[6], Line: ln})
+		} else if m := vrrpRowRe.FindStringSubmatch(ln); header && m != nil {
 			out = append(out, HSRPGroup{Interface: m[1], Group: m[2], State: m[3], Active: m[4], VIP: m[5], Line: ln})
 		}
 	}

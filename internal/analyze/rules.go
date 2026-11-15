@@ -717,7 +717,7 @@ func ospfSameLink(ns []iosxe.OSPFNeighbor, old iosxe.OSPFNeighbor) (iosxe.OSPFNe
 
 // lostCheck avisa de las entradas de la tabla de la ronda inmediata anterior que ya no están.
 // La evidencia es la tabla actual (o, si quedó vacía, su primera línea con texto).
-func lostCheck[T any](parse func(string) ([]T, bool), key func(T) i18n.Text, line func(T) string) checker {
+func lostCheck[T any](parse func(string) ([]T, bool), key func(T) i18n.Text, line func(T) string, header string) checker {
 	return func(series []Section, warn func(Section, i18n.Text)) []hit {
 		var out []hit
 		var prev map[string]T
@@ -751,6 +751,9 @@ func lostCheck[T any](parse func(string) ([]T, bool), key func(T) i18n.Text, lin
 							break
 						}
 					}
+					if len(ev) == 0 { // salida en blanco: se cita la cabecera esperada
+						ev = []string{header}
+					}
 				}
 				out = append(out, hit{s.Round, ev, i18n.Join("; ", det...)})
 			}
@@ -766,9 +769,9 @@ func checkEIGRP(p *params) (checker, error) {
 	}
 	return lostCheck(iosxe.ParseEIGRP,
 		func(n iosxe.EIGRPNeighbor) i18n.Text {
-			return i18n.Tx("analyze.key.eigrp", "address", n.Address, "iface", n.Interface)
+			return i18n.Tx("analyze.key.eigrp", "address", n.Address, "iface", n.Interface, "as", n.AS)
 		},
-		func(n iosxe.EIGRPNeighbor) string { return n.Line }), nil
+		func(n iosxe.EIGRPNeighbor) string { return n.Line }, "H   Address   Interface   Hold Uptime   SRTT   RTO  Q  Seq"), nil
 }
 
 func checkLDP(p *params) (checker, error) {
@@ -777,7 +780,7 @@ func checkLDP(p *params) (checker, error) {
 	}
 	return lostCheck(iosxe.ParseLDPNeighbors,
 		func(n iosxe.LDPNeighbor) i18n.Text { return i18n.Tx("analyze.key.ldp", "peer", n.PeerID) },
-		func(n iosxe.LDPNeighbor) string { return n.Line }), nil
+		func(n iosxe.LDPNeighbor) string { return n.Line }, "Peer LDP Ident"), nil
 }
 
 func checkTrack(p *params) (checker, error) {

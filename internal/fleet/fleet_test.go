@@ -521,3 +521,14 @@ func TestTraceVLANAusenteSigueLaDinamica(t *testing.T) {
 		t.Fatalf("%+v", r)
 	}
 }
+
+// Dos equipos con el mismo hostname y distinta IP se distinguen por la dirección en los rechazos agrupados.
+func TestRechazosAgrupadosMismoNombre(t *testing.T) {
+	w := &ws{}
+	w.reject("R1", "show x", "ahora", "10.0.0.1")
+	w.reject("R1", "show x", "ahora", "10.0.0.2")
+	l, _ := w.out()
+	if len(l) != 1 || !strings.Contains(l[0], "R1 (10.0.0.1), R1 (10.0.0.2)") {
+		t.Errorf("%q", l)
+	}
+}

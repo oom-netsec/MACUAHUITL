@@ -1,18 +1,18 @@
-    Peer LDP Ident: 10.255.0.2:0; Local LDP Ident 10.255.0.1:0
-        TCP connection: 10.255.0.2.646 - 10.255.0.1.31234
+    Peer LDP Ident: 192.0.2.2:0; Local LDP Ident 192.0.2.1:0
+        TCP connection: 192.0.2.2.646 - 192.0.2.1.31234
         Password: not required, none, in use
         State: Oper; Msgs sent/rcvd: 28/27; Downstream
         Up time: 00:03:21
         LDP discovery sources:
           Ethernet0/1, Src IP addr: 10.0.12.2
         Addresses bound to peer LDP Ident:
-          10.0.12.2       10.255.0.2
-    Peer LDP Ident: 10.255.0.3:0; Local LDP Ident 10.255.0.1:0
-        TCP connection: 10.255.0.3.646 - 10.255.0.1.40012
+          10.0.12.2       192.0.2.2
+    Peer LDP Ident: 192.0.2.3:0; Local LDP Ident 192.0.2.1:0
+        TCP connection: 192.0.2.3.646 - 192.0.2.1.40012
         Password: not required, none, in use
         State: Oper; Msgs sent/rcvd: 14/13; Downstream
         Up time: 00:01:02
         LDP discovery sources:
           Ethernet0/2, Src IP addr: 10.0.13.2
         Addresses bound to peer LDP Ident:
-          10.0.13.2       10.255.0.3
+          10.0.13.2       192.0.2.3

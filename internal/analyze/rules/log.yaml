@@ -101,15 +101,15 @@
   explanation_en: "A track object went Down; if it drives static routes, HSRP or PBR, traffic changes path."
   action_en: "Check what uses that track (show track, show standby, static routes) and the cause (show ip sla statistics for an IP SLA probe, or the interface for line-protocol)."
 - id: log-fhrp-inestable
-  title: Grupo HSRP/GLBP/VRRP cayó a un estado sin servicio
+  title: Grupo HSRP/GLBP/VRRP cayó a Init
   severity: media
   commands: [show logging]
   check: match
-  params: {pattern: '%(HSRP|GLBP|VRRP)-\d-STATE(CHANGE)?: .* -> (Init|Speak|Listen)'}
-  explanation: Un grupo FHRP pasó a Init, Speak o Listen; el gateway virtual puede haber perdido redundancia o servicio.
+  params: {pattern: '(?i)%(HSRP|GLBP|VRRP)-\d-STATE(CHANGE)?: .* -> Init\b'}
+  explanation: Un grupo FHRP pasó a Init (la interfaz o el grupo dejó de participar); el gateway virtual puede haber perdido redundancia o servicio. Los cambios normales de un failover (Active, Standby, Speak, Listen) no se reportan aquí.
   action: Verifica que la interfaz o SVI esté arriba, que los pares se vean (grupo, versión, autenticación) y el track asociado. Confirma con show standby brief, show glbp brief o show vrrp brief.
-  title_en: "HSRP/GLBP/VRRP group fell to a non-forwarding state"
-  explanation_en: "An FHRP group moved to Init, Speak or Listen; the virtual gateway may have lost redundancy or service."
+  title_en: "HSRP/GLBP/VRRP group fell to Init"
+  explanation_en: "An FHRP group moved to Init (the interface or group stopped participating); the virtual gateway may have lost redundancy or service. Normal failover changes (Active, Standby, Speak, Listen) are not reported here."
   action_en: "Verify the interface or SVI is up, that the peers see each other (group, version, authentication) and the associated track. Confirm with show standby brief, show glbp brief or show vrrp brief."
 - id: log-ospf-router-id-duplicado
   title: Router-id OSPF duplicado

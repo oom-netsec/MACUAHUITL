@@ -10,9 +10,9 @@ import (
 func TestRechazosSeAgrupanPorComando(t *testing.T) {
 	w := &ws{}
 	for _, d := range []string{"CE2", "CE1", "CE3"} {
-		w.reject(d, "show mac address-table", "2026-01-01 10:00Z")
+		w.reject(d, "show mac address-table", "2026-01-01 10:00Z", "")
 	}
-	w.reject("R9", "show ip dhcp snooping binding", "2026-01-01 10:00Z")
+	w.reject("R9", "show ip dhcp snooping binding", "2026-01-01 10:00Z", "")
 	list, txs := w.out()
 	if len(list) != 2 || len(txs) != 2 {
 		t.Fatalf("%q", list)
@@ -34,7 +34,7 @@ func TestRechazosSeAgrupanPorComando(t *testing.T) {
 func TestRechazosCortanLaListaLarga(t *testing.T) {
 	w := &ws{}
 	for i := 0; i < 12; i++ {
-		w.reject("R"+string(rune('A'+i)), "show x", "t")
+		w.reject("R"+string(rune('A'+i)), "show x", "t", "")
 	}
 	list, _ := w.out()
 	if len(list) != 1 || !strings.Contains(list[0], "(12)") || !strings.HasSuffix(list[0], "RJ, …; se ignora") {
