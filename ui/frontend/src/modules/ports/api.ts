@@ -25,14 +25,14 @@ export interface AssistEvent { runId: string; seq?: number; kind: "state" | "pen
 // Una ejecución que el núcleo recuerda (ListRuns); sirve para volver a una que sigue viva.
 export interface AssistRunInfo { runId: string; state?: string; pending?: AssistStep; failReason?: string; changed?: string[]; active?: boolean; waiting?: boolean; canRollback?: boolean; devices?: string[] }
 // Una reversa guardada de una ejecución que dejó equipos cambiados (ListPendingRollbacks). Las líneas ya vienen sin secretos.
-export interface PendingRollback { runId: string; kind: string; devices: { device: string; rollbackLines: string[] }[]; endedUnix: number; ageSeconds: number; writeMemory: boolean; unreadable: boolean }
+export interface PendingRollback { runId: string; kind: string; devices: { device: string; rollbackLines: string[] }[]; endedUnix: number; ageSeconds: number; writeMemory: boolean; unreadable: boolean; generatedSecret: boolean } // generatedSecret: rotación con secreto generado por la app (nadie lo conoce)
 
 // protojson omite listas vacías y ceros, y manda los int64 (endedUnix, ageSeconds) como cadena.
 export function parsePendingRollbacks(json: string): PendingRollback[] {
-  type Raw = { runId: string; kind?: string; devices?: { device: string; rollbackLines?: string[] }[]; endedUnix?: string | number; ageSeconds?: string | number; writeMemory?: boolean; unreadable?: boolean };
+  type Raw = { runId: string; kind?: string; devices?: { device: string; rollbackLines?: string[] }[]; endedUnix?: string | number; ageSeconds?: string | number; writeMemory?: boolean; unreadable?: boolean; generatedSecret?: boolean };
   return ((JSON.parse(json).rollbacks ?? []) as Raw[]).map((r) => ({
     runId: r.runId, kind: r.kind ?? "", devices: (r.devices ?? []).map((d) => ({ device: d.device, rollbackLines: d.rollbackLines ?? [] })),
-    endedUnix: Number(r.endedUnix ?? 0), ageSeconds: Number(r.ageSeconds ?? 0), writeMemory: !!r.writeMemory, unreadable: !!r.unreadable,
+    endedUnix: Number(r.endedUnix ?? 0), ageSeconds: Number(r.ageSeconds ?? 0), writeMemory: !!r.writeMemory, unreadable: !!r.unreadable, generatedSecret: !!r.generatedSecret,
   }));
 }
 export interface AssistDone { runId: string; error?: string }

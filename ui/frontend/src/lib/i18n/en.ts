@@ -2717,7 +2717,7 @@ export const en: Record<Key, string> = {
   "pending.apply": "Apply rollback",
   "pending.discard": "Discard",
   "pending.discard.confirm": "Confirm: discard",
-  "pending.unreadable": "The saved rollback could not be read. It can only be discarded.",
+  "pending.unreadable": "The saved rollback could not be read. It can only be discarded; if it was a credential rotation, the device may keep the new password.",
   "pending.acceptAge": "I accept applying a rollback from {age} ago",
   "pending.err.gone": "That rollback no longer exists.",
   "pending.err.busy": "The original run is still in progress: wait for it to finish.",
@@ -2766,4 +2766,8 @@ export const en: Record<Key, string> = {
   "patrol.pb.groupCount.one": "(1 selected / {total})",
   "patrol.pb.selectVisible": "Select the {n} visible in {group}",
   "patrol.pb.selectVisible.one": "Select the one visible in {group}",
+  "pending.discard.rotation": "Discarding this rollback may leave {device} with the rotated user's new password (at least in the running-config). If the vault holds that user's credential and you did not update it by hand, it keeps the old one and no longer logs in with it. The credential the app connects with does not change.",
+  "pending.discard.generated": "The app generated the new password and nobody knows it: that user has no access until another privileged account changes it or you apply this rollback.",
+  "pending.discard.typeName": "Type {device} to confirm the discard",
+  "pending.discard.typeHint": "“Discard” is enabled once you type the exact device name.",
 };
