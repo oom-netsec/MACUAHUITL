@@ -594,6 +594,9 @@ func (s *assistSvc) launch(ctx context.Context, rec *planRec, planID string, key
 	}
 	opts := assist.Options{ID: runID, Plan: rec.plan, Fn: rec.fn, Assisted: true, Exec: ex, Audit: s.d.Audit, DecisionTimeout: s.decisionTimeout}
 	pers := &persister{s: s, runID: runID, t: rec.t, generated: rec.rot != nil && rec.rot.generated}
+	if rec.rot != nil {
+		pers.rotUser, pers.rotCred = rec.rot.user, rec.rot.updateCred
+	}
 	if origin == "" { // la reversa se guarda mientras la ejecución avanza; una ejecución de reversa no guarda otra
 		opts.Persist = pers.sync
 	}

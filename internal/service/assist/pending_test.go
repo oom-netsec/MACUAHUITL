@@ -232,12 +232,36 @@ func TestPendingRollbackMarksGeneratedSecret(t *testing.T) {
 		r.waitDone(run)
 		if p := r.pending(); len(p) != 1 || p[0].GeneratedSecret != c.want {
 			t.Errorf("%s: %+v, generated_secret debía ser %v", c.name, p, c.want)
+		} else if p[0].RotatedUser != "tech" || p[0].UpdateCredentialId != r.tech {
+			t.Errorf("%s: rotated_user=%q update_credential_id=%q", c.name, p[0].RotatedUser, p[0].UpdateCredentialId)
 		}
 	}
 	r := newRig(t, simulator.Config{})
 	r.abortedChanged()
 	if p := r.pending(); len(p) != 1 || p[0].GeneratedSecret {
 		t.Errorf("otra función: %+v", p)
+	} else if p[0].RotatedUser != "" || p[0].UpdateCredentialId != "" {
+		t.Errorf("otra función con datos de rotación: %+v", p[0])
+	}
+}
+
+// provisional: true si el State guardado de ese equipo es el provisional (el núcleo cayó a mitad de Configure).
+func TestPendingRollbackMarksProvisionalDevice(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	if p := r.pending(); len(p) != 1 || len(p[0].Devices) == 0 || p[0].Devices[0].Provisional {
+		t.Fatalf("no debía ser provisional: %+v", p)
+	}
+	rec, err := r.svc.loadPending(pendingPrefix + run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec.Leftover.Devices[0].Provisional = true
+	if err := r.svc.savePending(rec); err != nil {
+		t.Fatal(err)
+	}
+	if p := r.pending(); len(p) != 1 || !p[0].Devices[0].Provisional {
+		t.Fatalf("debía ser provisional: %+v", p)
 	}
 }
 

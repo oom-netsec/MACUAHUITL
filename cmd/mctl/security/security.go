@@ -382,7 +382,7 @@ func pkiExport(c *cli.Env, args []string) error {
 	if cert == "" || out == "" {
 		return errors.New("uso: mctl pki export --cert CERT.pem [--chain CA.pem] [--key LLAVE.pem] --format p12|p12-legacy|pem|der -o SALIDA")
 	}
-	req := &v1.PkiExportRequest{Format: format, IncludePlainKey: plain}
+	req := &v1.PkiExportRequest{Format: format, IncludePlainKey: plain, DestPath: out}
 	for p, dst := range map[string]*string{cert: &req.CertPem, chain: &req.ChainPem, key: &req.SealedKeyPem} {
 		if p == "" {
 			continue

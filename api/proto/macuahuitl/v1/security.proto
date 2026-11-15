@@ -242,6 +242,7 @@ message PkiExportRequest {
   bytes key_password = 5;
   bytes export_password = 6;
   bool include_plain_key = 7; // pem: exportar la llave SIN cifrar (decisión explícita)
+  string dest_path = 8; // la ruta donde el cliente escribirá el archivo; solo para la auditoría
 }
 
 message PkiExportResponse {

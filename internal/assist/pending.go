@@ -35,6 +35,8 @@ type Leftover struct {
 	Devices     []LeftDevice // en el orden en que se aplicaron
 	// GeneratedSecret: rotación de credenciales cuyo secreto nuevo generó la app. Lo llena el servicio; un Leftover viejo sin el campo es false.
 	GeneratedSecret bool
+	// RotatedUser y UpdateCredentialID: usuario rotado y credencial de bóveda que se iba a actualizar (solo credrotate). Un Leftover viejo se lee vacío.
+	RotatedUser, UpdateCredentialID string
 }
 
 // Leftover devuelve los equipos que la ejecución dejó cambiados, o nil si no hay ninguno. Una rotación de credencial cuya bóveda ya

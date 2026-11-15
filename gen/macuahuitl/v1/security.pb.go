@@ -1935,6 +1935,7 @@ type PkiExportRequest struct {
 	KeyPassword     []byte                 `protobuf:"bytes,5,opt,name=key_password,json=keyPassword,proto3" json:"key_password,omitempty"`
 	ExportPassword  []byte                 `protobuf:"bytes,6,opt,name=export_password,json=exportPassword,proto3" json:"export_password,omitempty"`
 	IncludePlainKey bool                   `protobuf:"varint,7,opt,name=include_plain_key,json=includePlainKey,proto3" json:"include_plain_key,omitempty"` // pem: exportar la llave SIN cifrar (decisión explícita)
+	DestPath        string                 `protobuf:"bytes,8,opt,name=dest_path,json=destPath,proto3" json:"dest_path,omitempty"`                         // la ruta donde el cliente escribirá el archivo; solo para la auditoría
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -2016,6 +2017,13 @@ func (x *PkiExportRequest) GetIncludePlainKey() bool {
 		return x.IncludePlainKey
 	}
 	return false
+}
+
+func (x *PkiExportRequest) GetDestPath() string {
+	if x != nil {
+		return x.DestPath
+	}
+	return ""
 }
 
 type PkiExportResponse struct {
@@ -2680,7 +2688,7 @@ const file_macuahuitl_v1_security_proto_rawDesc = "" +
 	"\x06report\x18\x02 \x01(\v2\x19.macuahuitl.v1.ToolReportR\x06report\x12A\n" +
 	"\fcertificates\x18\x03 \x03(\v2\x1d.macuahuitl.v1.PkiCertificateR\fcertificates\x12\x1f\n" +
 	"\vlab_warning\x18\x04 \x01(\bR\n" +
-	"labWarning\"\x80\x02\n" +
+	"labWarning\"\x9d\x02\n" +
 	"\x10PkiExportRequest\x12\x16\n" +
 	"\x06format\x18\x01 \x01(\tR\x06format\x12\x19\n" +
 	"\bcert_pem\x18\x02 \x01(\tR\acertPem\x12\x1b\n" +
@@ -2688,7 +2696,8 @@ const file_macuahuitl_v1_security_proto_rawDesc = "" +
 	"\x0esealed_key_pem\x18\x04 \x01(\tR\fsealedKeyPem\x12!\n" +
 	"\fkey_password\x18\x05 \x01(\fR\vkeyPassword\x12'\n" +
 	"\x0fexport_password\x18\x06 \x01(\fR\x0eexportPassword\x12*\n" +
-	"\x11include_plain_key\x18\a \x01(\bR\x0fincludePlainKey\"'\n" +
+	"\x11include_plain_key\x18\a \x01(\bR\x0fincludePlainKey\x12\x1b\n" +
+	"\tdest_path\x18\b \x01(\tR\bdestPath\"'\n" +
 	"\x11PkiExportResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\"&\n" +
 	"\x10PkiDecodeRequest\x12\x12\n" +
