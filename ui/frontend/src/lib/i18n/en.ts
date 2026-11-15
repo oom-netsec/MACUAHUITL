@@ -2452,6 +2452,7 @@ export const en: Record<Key, string> = {
   "snippet.vty-acl.field.acl.help": "Name or number of a standard ACL that already exists and permits the IP used to manage the device; if it would lock the administrator out, it is rejected.",
   "snippet.vty-acl.field.lines": "vty lines",
   "snippet.vty-acl.field.lines.help": "access-class is applied to every vty line in the range.",
+  "vocab.choice.factory": "Factory default (no switchport mode)",
   "vocab.choice.fabrica": "Factory default (no switchport mode)",
   "file.saltos": "counter-jumps",
   "file.topologia": "topology",

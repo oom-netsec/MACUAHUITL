@@ -67,7 +67,7 @@ func init() {
 		"snippet.modo-puerto.field.interfaces":                      e("Puertos", "Ports"),
 		"snippet.modo-puerto.field.interfaces.help":                 e("Lista separada por comas o rangos como Gi1/0/1-4; solo puertos físicos de acceso.", "Comma-separated list or ranges like Gi1/0/1-4; physical access ports only."),
 		"snippet.modo-puerto.field.mode":                            e("Modo", "Mode"),
-		"snippet.modo-puerto.field.mode.help":                       e("fabrica = no switchport mode (el valor de fábrica, dynamic auto en un Catalyst de acceso). Nunca trunk.", "Factory default = no switchport mode (dynamic auto on most Catalyst access switches). Never trunk."),
+		"snippet.modo-puerto.field.mode.help":                       e("factory = no switchport mode (el valor de fábrica, dynamic auto en un Catalyst de acceso). Nunca trunk.", "Factory default = no switchport mode (dynamic auto on most Catalyst access switches). Never trunk."),
 		"snippet.svi.name":                                          e("Interfaz VLAN (SVI) con dirección IP", "VLAN interface (SVI) with IP address"),
 		"snippet.svi.field.vlan":                                    e("VLAN", "VLAN"),
 		"snippet.svi.field.description":                             e("Descripción", "Description"),

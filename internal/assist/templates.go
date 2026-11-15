@@ -50,6 +50,7 @@ type Field struct {
 	Min, Max    float64
 	Pattern     string
 	Choices     []string
+	Aliases     map[string]string // valor aceptado -> valor canónico de Choices (p. ej. el histórico en español)
 	Default     string
 	Help        string
 }
@@ -232,7 +233,7 @@ func checkValue(f Field, val string) error {
 			return vbad("bool", "value", val)
 		}
 	case TypeChoice:
-		if !slices.Contains(f.Choices, val) {
+		if !slices.Contains(f.Choices, val) && !slices.Contains(f.Choices, f.Aliases[val]) {
 			return vbad("choice", "value", val, "choices", strings.Join(f.Choices, ", "))
 		}
 	case TypeIPv4:

@@ -57,8 +57,10 @@ type Config struct {
 	// Running (fase 16c): running-config completo y jerárquico; `show running-config` lo muestra tal como lo dejan las líneas de configuración.
 	Running      string
 	ConfigErrors map[string]string
-	Commands     map[string]string
-	Recorder     *Recorder
+	// ConfigWarnings responde con ese texto a la línea indicada pero la aplica (IOS al crear una VLAN al asignarla a un puerto).
+	ConfigWarnings map[string]string
+	Commands       map[string]string
+	Recorder       *Recorder
 }
 
 // Recorder anota lo que el equipo simulado recibió en modo configuración.
@@ -697,6 +699,9 @@ func (s *session) configLine(cmd string) {
 	if msg, ok := s.c.ConfigErrors[cmd]; ok {
 		s.write("                 ^\n" + msg + "\n\n")
 		return
+	}
+	if msg, ok := s.c.ConfigWarnings[cmd]; ok {
+		defer s.write("                 ^\n" + msg + "\n\n")
 	}
 	switch {
 	case cmd == "end":

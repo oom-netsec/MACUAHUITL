@@ -28,7 +28,7 @@ func TestModoPuertoApplyAndRollbackPerMode(t *testing.T) {
 		"access a desirable":  {"dynamic desirable", accessGi(), "switchport mode dynamic desirable", "switchport mode access"},
 		"desirable a access":  {"access", []string{"switchport mode dynamic desirable"}, "switchport mode access", "switchport mode dynamic desirable"},
 		"desirable a auto":    {"dynamic auto", []string{"switchport mode dynamic desirable"}, "switchport mode dynamic auto", "switchport mode dynamic desirable"},
-		"access a fábrica":    {"fabrica", accessGi(), "no switchport mode", "switchport mode access"},
+		"access a fábrica":    {"factory", accessGi(), "no switchport mode", "switchport mode access"},
 		"desirable a fábrica": {"fabrica", []string{"switchport mode dynamic desirable"}, "no switchport mode", "switchport mode dynamic desirable"},
 	} {
 		dp, _ := modoRT(t, c.mode, c.cfg)
@@ -221,7 +221,7 @@ func TestModoPuertoFieldsAndCatalog(t *testing.T) {
 			t.Errorf("interfaces = %+v", f)
 		}
 	}
-	if !slices.Equal(mode.Choices, []string{"access", "dynamic auto", "dynamic desirable", "fabrica"}) || !mode.Required {
+	if !slices.Equal(mode.Choices, []string{"access", "dynamic auto", "dynamic desirable", "factory"}) || !mode.Required {
 		t.Errorf("mode = %+v", mode)
 	}
 	for _, bad := range []string{"trunk", "dynamic", "ACCESS"} {
@@ -274,5 +274,20 @@ func TestModoPuertoCheckDeviceNeedsReadableBaseline(t *testing.T) {
 		if err := check(d); err == nil {
 			t.Errorf("%s: pasó Validate", name)
 		}
+	}
+}
+
+// «factory» es el valor canónico y «fabrica» (el histórico en español) sigue valiendo: mismo plan y los dos pasan la validación.
+func TestModoPuertoFactoryAliasFabrica(t *testing.T) {
+	tpl, _ := TemplateByID("modo-puerto")
+	for _, m := range []string{"factory", "fabrica"} {
+		if err := ValidateValues(tpl, Values{"interfaces": gi1, "mode": m}); err != nil {
+			t.Errorf("mode=%s: %v", m, err)
+		}
+	}
+	a, _ := modoRT(t, "factory", accessGi())
+	b, _ := modoRT(t, "fabrica", accessGi())
+	if joined(a.Apply) != joined(b.Apply) || joined(a.Apply) != "interface "+gi1+"|no switchport mode" {
+		t.Errorf("factory %q, fabrica %q", a.Apply, b.Apply)
 	}
 }

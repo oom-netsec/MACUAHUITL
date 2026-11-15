@@ -436,7 +436,7 @@ func TestPlanPortsRefusesVlanThatDoesNotExist(t *testing.T) {
 
 // Hallazgo 5: si el equipo avisa que crea la VLAN, la ejecución se detiene y ofrece la reversa.
 func TestCreatingVlanWarningStopsRun(t *testing.T) {
-	r := newRig(t, simulator.Config{ConfigErrors: map[string]string{"switchport access vlan 20": "% Access VLAN does not exist. Creating vlan 20"}})
+	r := newRig(t, simulator.Config{Interfaces: map[string][]string{gi1: nil}, ConfigWarnings: map[string]string{"switchport access vlan 20": "% Access VLAN does not exist. Creating vlan 20"}}) // el equipo aplica la línea y avisa: sí quedó cambiado
 	res, err := r.plan(&v1.PlanPortsRequest{Vlan: 20, Description: ptr("x")})
 	if err != nil {
 		t.Fatal(err)
