@@ -134,5 +134,5 @@ func resume(c *cli.Env, args []string) error {
 // Area registra ports set.
 func Area() cli.Area {
 	return cli.Area{Usage: help, Commands: []cli.Command{{Name: "ports set", Run: set}, {Name: "ports runs", Run: runs}, {Name: "ports resume", Run: resume},
-		{Name: "ports rollbacks", Run: cli.PendingRollbacks}, {Name: "ports rollback", Run: cli.Rollback}}}
+		{Name: "ports rollbacks", Run: cli.PendingRollbacks}, {Name: "ports rollback", Run: cli.RollbackIn("ports")}}}
 }

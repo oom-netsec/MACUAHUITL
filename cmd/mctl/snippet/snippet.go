@@ -144,5 +144,5 @@ func svi(c *cli.Env, args []string) error {
 // Area registra snippet vlan|trunk|svi.
 func Area() cli.Area {
 	return cli.Area{Usage: help, Commands: []cli.Command{{Name: "snippet vlan", Run: vlan}, {Name: "snippet trunk", Run: trunk}, {Name: "snippet svi", Run: svi},
-		{Name: "snippet list", Run: list}, {Name: "snippet run", Run: run}, {Name: "snippet rollback", Run: cli.Rollback}}}
+		{Name: "snippet list", Run: list}, {Name: "snippet run", Run: run}, {Name: "snippet rollback", Run: cli.RollbackIn("snippet")}}}
 }
