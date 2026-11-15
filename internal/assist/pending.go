@@ -13,14 +13,14 @@ const PendingFunction = "pending-rollback"
 // LeftDevice es lo que hace falta para revertir un equipo que una ejecución dejó cambiado.
 type LeftDevice struct {
 	Device   string
-	Apply    []string
+	Apply    []string // lo que el equipo aceptó del apply (el plan entero si no se cortó)
 	Rollback []string
 	Pre      []string
 	Post     []string
 	Expect   []Expect
 	Baseline map[string]string // el estado de antes de la ejecución
 	Secrets  []string
-	State    map[string]string // el estado en que la ejecución dejó el equipo (r.snap)
+	State    map[string]string // el estado en que la ejecución dejó el equipo (r.snap; mientras Configure corre, la línea base)
 }
 
 // Leftover es lo que una ejecución terminada dejó sin revertir.
@@ -32,16 +32,17 @@ type Leftover struct {
 	Devices     []LeftDevice // en el orden en que se aplicaron
 }
 
-// Leftover devuelve los equipos que la ejecución dejó cambiados, o nil si no hay ninguno o la ejecución cambia credenciales (su reversa
-// toca la bóveda y se hace a mano). Solo tiene sentido con la ejecución terminada.
+// Leftover devuelve los equipos que la ejecución dejó cambiados, o nil si no hay ninguno. Una rotación de credencial cuya bóveda ya
+// recibió el secreto nuevo (write memory salió bien) no cuenta: revertirla dejaría la bóveda desfasada. Una rotación sin terminar
+// (abortada, vencida, con el login nuevo fallido) sí: la bóveda aún guarda el secreto anterior, que es el que la reversa devuelve al equipo.
 func (r *Run) Leftover() *Leftover {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := &Leftover{Function: r.plan.Function, Scrub: r.fn.Scrub, WriteMemory: r.plan.WriteMemory}
 	for _, i := range r.changed {
 		dp := r.plan.Devices[i]
-		if dp.VerifyLogin {
-			return nil
+		if dp.VerifyLogin && r.vaulted[i] {
+			continue
 		}
 		// La reversa guardada es la que se mostraría en vivo: recortada a lo aplicado si el apply quedó a medias (con r.mu
 		// tomado no se puede llamar a rollbackLines). Si el recorte queda vacío se guarda la completa: RollbackPlan exige líneas.
@@ -51,9 +52,18 @@ func (r *Run) Leftover() *Leftover {
 				rb = u
 			}
 		}
-		out.Devices = append(out.Devices, LeftDevice{Device: dp.Device, Apply: slices.Clone(dp.Apply), Rollback: slices.Clone(rb),
+		// Apply guarda lo que el equipo aceptó, no el plan entero: es la «reversa de la reversa» y no debe crear objetos que nunca existieron.
+		ap := dp.Apply
+		if ok, cut := r.partial[i]; cut && len(ok) > 0 {
+			ap = ok
+		}
+		state := r.snap[i]
+		if state == nil { // Configure sigue o la relectura falló: la línea base es el único estado conocido
+			state = r.prov[i]
+		}
+		out.Devices = append(out.Devices, LeftDevice{Device: dp.Device, Apply: slices.Clone(ap), Rollback: slices.Clone(rb),
 			Pre: slices.Clone(dp.Pre), Post: slices.Clone(dp.Post), Expect: slices.Clone(dp.Expect), Baseline: cloneMap(dp.Baseline),
-			Secrets: slices.Clone(dp.Secrets), State: cloneMap(r.snap[i])})
+			Secrets: slices.Clone(dp.Secrets), State: cloneMap(state)})
 	}
 	if len(out.Devices) == 0 {
 		return nil
