@@ -1,18 +1,17 @@
-asa# show running-config
+asa# more system:running-config
 : Saved
 :
-ASA Version 9.17(1)
+ASA Version 9.17(1) <system>
 !
 hostname asa
 !
 failover
 failover lan unit primary
-failover lan interface folink GigabitEthernet0/2
+failover lan interface folink Ethernet1/8
 failover key clave-de-prueba
-failover link folink GigabitEthernet0/2
+failover link folink Ethernet1/8
 failover interface ip folink 10.132.9.5 255.255.255.0 standby 10.132.9.6
 failover group 1
-  primary
   preempt
 failover group 2
   secondary
@@ -20,13 +19,16 @@ failover group 2
 !
 admin-context admin
 context admin
-  allocate-interface Management0/0
+  allocate-interface Management1/1
   config-url ftp://usuario:clave-de-prueba@192.0.2.10/admin.cfg
-  join-failover-group 1
 !
 context ctx1
-  allocate-interface GigabitEthernet0/1.200
+  allocate-interface Ethernet1/1.200
   config-url ftp://usuario:clave-de-prueba@192.0.2.10/ctx1.cfg
+!
+context ctx2
+  allocate-interface Ethernet1/1.300
+  config-url https://usuario:clave-de-prueba@192.0.2.11/ctx2.cfg
   join-failover-group 2
 !
 Cryptochecksum:00000000000000000000000000000000

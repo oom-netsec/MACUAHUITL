@@ -1,9 +1,9 @@
 asa# show context
-Context Name      Interfaces                    URL
-*admin            GigabitEthernet0/1.100        disk0:/admin.cfg
-                  GigabitEthernet0/1.101
-contexta          GigabitEthernet0/1.200        disk0:/contexta.cfg
-                  GigabitEthernet0/1.201
-contextb          GigabitEthernet0/1.300        disk0:/contextb.cfg
-                  GigabitEthernet0/1.301
+Context Name      Class                Interfaces           Mode         URL
+*admin            default              Ethernet1/1.100,     Routed       disk0:/admin.cfg
+                                       Management1/1
+ ctx1             gold                 Ethernet1/1.200,     Routed       disk0:/ctx1.cfg
+                                       Ethernet1/2
+ ctx2             default              Ethernet1/1.300      Transparent  ftp://192.0.2.10/ctx2.cfg
+
 Total active Security Contexts: 3

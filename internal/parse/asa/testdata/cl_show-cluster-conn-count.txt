@@ -1,2 +1,8 @@
 asa# show cluster conn count
+Usage Summary In Cluster:*********************
   200 in use (cluster-wide aggregated)
+     cl2(LOCAL):***********************
+  100 in use, 100 most used
+
+     cl1:******************************
+  100 in use, 100 most used

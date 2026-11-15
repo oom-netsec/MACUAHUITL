@@ -9,6 +9,7 @@ System image file is "disk0:/mnt/boot/installables/switch/fxos-k8-fp2k-npu.2.11.
 Config file at boot was "startup-config"
 
 asa up 1 day 23 hours
+failover cluster up 1 day 23 hours
 Start-up time 2 mins 40 secs
 
 Hardware:   FPR-2130, 13703 MB RAM, CPU MIPS 1200 MHz, 1 CPU (12 cores)
@@ -28,7 +29,7 @@ Inside Hosts                      : Unlimited
 Failover                          : Active/Active
 Encryption-DES                    : Enabled
 Encryption-3DES-AES               : Disabled
-Security Contexts                 : 2
+Security Contexts                 : 5
 Carrier                           : Disabled
 AnyConnect Premium Peers          : 7500
 AnyConnect Essentials             : Disabled

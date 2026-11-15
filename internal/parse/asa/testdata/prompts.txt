@@ -1,4 +1,8 @@
 # Un prompt por línea; las líneas con # son comentarios de grupo.
+# Grupo 0: espacio del sistema y modo de un solo contexto (prompt por omisión, solo hostname).
+asa#
+asa>
+asa(config)#
 # Grupo 1: prompt hostname context (por omisión en multicontexto).
 asa/ctx1#
 asa/ctx1>
@@ -35,15 +39,11 @@ asa/unit-1-1/master#
 asa/unit-1-1/master(config)#
 asa/unit-1-2/slave#
 asa/unit-1-2/slave(config)#
-# Grupo 8: prompt hostname cluster-unit state, forma literal del ejemplo de la documentación ("control node"/"data node", con espacio).
-asa/cl1/control node#
-asa/cl2/data node#
-asa/cl2/data node(config)#
-# Grupo 9: prompt hostname domain priority state (el dominio lleva puntos).
+# Grupo 8: prompt hostname domain priority state (el dominio lleva puntos).
 asa/example.com/pri/act#
 asa/example.com/pri/act(config)#
 asa/lab.example.com/sec/stby#
 asa/lab.example.com/sec/stby(config)#
-# Grupo 10: prompt hostname context domain priority state.
+# Grupo 9: prompt hostname context domain priority state.
 asa/ctx1/example.com/pri/act#
 asa/ctx1/example.com/pri/act(config)#

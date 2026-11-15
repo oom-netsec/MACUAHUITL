@@ -1,4 +1,4 @@
-asa(config)# show failover state
+asa# show failover state
                State          Last Failure Reason      Date/Time
 This host  -   Secondary
     Group 1    Failed         Backplane Failure        03:42:29 UTC Apr 17 2009

@@ -1,7 +1,7 @@
-asa# show running-config failover
+asa# more system:running-config | include ^failover
 failover
 failover lan unit primary
-failover lan interface folink GigabitEthernet0/2
+failover lan interface folink Ethernet1/8
 failover key hex 0123456789abcdef0123456789abcdef
-failover link folink GigabitEthernet0/2
+failover link folink Ethernet1/8
 failover interface ip folink 10.132.9.5 255.255.255.0 standby 10.132.9.6

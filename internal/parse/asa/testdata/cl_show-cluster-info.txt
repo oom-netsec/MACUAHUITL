@@ -1,4 +1,4 @@
-asa(config)# show cluster info
+asa# show cluster info
 Cluster cluster1: On
     Interface mode: spanned
     This is "unit-1-2" in state MASTER

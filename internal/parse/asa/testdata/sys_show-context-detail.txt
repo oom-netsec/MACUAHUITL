@@ -1,16 +1,32 @@
 asa# show context detail
-Context "admin", has been created, but initial ACL rules not complete
+Context "admin", has been created
   Config URL: disk0:/admin.cfg
-  Real Interfaces: Management0/0
-  Mapped Interfaces: Management0/0
-  Flags: 0x00000013, ID: 1
+  Real Interfaces: Ethernet1/1.100, Management1/1
+  Mapped Interfaces: Ethernet1/1.100, Management1/1
+  Class: default, Flags: 0x00000813, ID: 1
+
+Context "ctx1", has been created
+  Config URL: disk0:/ctx1.cfg
+  Real Interfaces: Ethernet1/1.200, Ethernet1/2
+  Mapped Interfaces: Ethernet1/1.200, Ethernet1/2
+  Class: gold, Flags: 0x00000811, ID: 2
+
+Context "ctx2", has been created
+  Config URL: ftp://192.0.2.10/ctx2.cfg
+  Real Interfaces: Ethernet1/1.300
+  Mapped Interfaces: Ethernet1/1.300
+  Class: default, Flags: 0x00000815, ID: 3
+
 Context "system", is a system resource
   Config URL: startup-config
   Real Interfaces:
-  Mapped Interfaces: Management0/0
-  Flags: 0x00000019, ID: 257
+  Mapped Interfaces: Control0/0, Ethernet1/1, Ethernet1/1.100,
+     Ethernet1/1.200, Ethernet1/1.300, Ethernet1/2, Ethernet1/8,
+     Management1/1
+  Class: default, Flags: 0x00000819, ID: 0
+
 Context "null", is a system resource
   Config URL: ... null ...
   Real Interfaces:
   Mapped Interfaces:
-  Flags: 0x00000009, ID: 258
+  Class: default, Flags: 0x00000809, ID: 507

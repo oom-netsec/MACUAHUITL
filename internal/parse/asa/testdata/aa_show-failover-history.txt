@@ -1,4 +1,4 @@
-asa(config)# show failover history
+asa# show failover history
 ===================================================
 From State                 To State                   Reason
 ===================================================

@@ -1,4 +1,4 @@
-asa/admin# show resource usage context admin
+asa/admin# show resource usage
 Resource              Current         Peak      Limit    Denied  Context
 Telnet                      1            1          5         0  admin
 Conns                      44           55        N/A         0  admin
