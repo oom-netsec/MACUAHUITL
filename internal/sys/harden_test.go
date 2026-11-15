@@ -58,10 +58,10 @@ func TestMlockSkippedWithFiniteLimit(t *testing.T) {
 // El aviso de MEMLOCK sale completo en cada idioma, sin mezclar.
 func TestMlockWarningIdiomas(t *testing.T) {
 	w := mlockWarning(8 << 20)
-	if got, want := w.In("en"), "RLIMIT_MEMLOCK is 8388608 bytes; not all memory is locked. Set LimitMEMLOCK=infinity in the systemd unit"; got != want {
+	if got, want := w.In("en"), "RLIMIT_MEMLOCK is 8388608 bytes; not all memory is locked. raise it for the user manager with LimitMEMLOCK=infinity in /etc/systemd/system/user@.service.d/ (README, Install)"; got != want {
 		t.Fatalf("en = %q", got)
 	}
-	if got, want := w.In("es"), "RLIMIT_MEMLOCK es de 8388608 bytes; no toda la memoria queda bloqueada. Pon LimitMEMLOCK=infinity en la unidad de systemd"; got != want {
+	if got, want := w.In("es"), "RLIMIT_MEMLOCK es de 8388608 bytes; no toda la memoria queda bloqueada. súbelo para el gestor de usuario con LimitMEMLOCK=infinity en /etc/systemd/system/user@.service.d/ (README, Install)"; got != want {
 		t.Fatalf("es = %q", got)
 	}
 }

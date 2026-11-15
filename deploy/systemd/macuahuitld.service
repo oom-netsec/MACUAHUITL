@@ -24,10 +24,11 @@ RestrictNamespaces=yes
 SystemCallArchitectures=native
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 LimitCORE=0
-# Permite bloquear toda la memoria del núcleo. Un servicio de usuario no puede subir
-# el límite duro por sí mismo: el administrador debe conceder DefaultLimitMEMLOCK=infinity
-# en /etc/systemd/user.conf.d/macuahuitl.conf (o en limits.conf). Sin eso el núcleo
-# arranca igual y deja un aviso en la auditoría (internal/sys).
+# Permite bloquear toda la memoria del núcleo. Un servicio de usuario no puede pasar del
+# límite duro del gestor de usuario (user@.service): el administrador lo sube con
+# LimitMEMLOCK=infinity en /etc/systemd/system/user@.service.d/ y un reinicio.
+# DefaultLimitMEMLOCK en user.conf.d no basta. Sin eso el núcleo arranca igual y deja
+# un aviso en la auditoría (internal/sys).
 LimitMEMLOCK=infinity
 UMask=0077
 

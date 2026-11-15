@@ -19,6 +19,7 @@ func leer(t *testing.T, partes ...string) string {
 }
 
 // Lo que el usuario ve al instalar va en inglés (lengua canónica); los comentarios siguen en español.
+// shortcut: busca letras del español, así que una frase sin tildes pasa; basta mientras los textos sean estos pocos.
 func TestTextosDelPaqueteEnIngles(t *testing.T) {
 	nfpm := leer(t, "deploy", "packaging", "nfpm.yaml")
 	_, desc, _ := strings.Cut(nfpm, "description: |\n")
@@ -29,16 +30,18 @@ func TestTextosDelPaqueteEnIngles(t *testing.T) {
 	visibles := map[string]string{
 		"nfpm.yaml description": desc,
 		"postinstall.sh":        msg,
+		"macuahuitl.desktop":    "",
+		"macuahuitld.service":   "",
 	}
+	// Las claves traducidas (Comment[es]=…) sí pueden ir en español.
+	traducida := regexp.MustCompile(`^\s*[A-Za-z]+\[[a-zA-Z_@]+\]\s*=`)
 	for _, l := range strings.Split(leer(t, "deploy", "packaging", "macuahuitl.desktop"), "\n") {
-		if !strings.HasPrefix(l, "#") {
+		if !strings.HasPrefix(strings.TrimSpace(l), "#") && !traducida.MatchString(l) {
 			visibles["macuahuitl.desktop"] += l + "\n"
 		}
 	}
-	for _, l := range strings.Split(leer(t, "deploy", "systemd", "macuahuitld.service"), "\n") {
-		if strings.HasPrefix(l, "Description=") {
-			visibles["macuahuitld.service"] = l
-		}
+	for _, m := range regexp.MustCompile(`(?m)^\s*Description\s*=(.*)$`).FindAllStringSubmatch(leer(t, "deploy", "systemd", "macuahuitld.service"), -1) {
+		visibles["macuahuitld.service"] += m[1]
 	}
 	espanol := regexp.MustCompile(`[áéíóúñÁÉÍÓÚÑ¿¡]`)
 	for donde, txt := range visibles {
@@ -56,8 +59,18 @@ func TestReadmeCuentaPlaybooksDePacks(t *testing.T) {
 	fila := regexp.MustCompile("(?m)^\\|[^|]+\\| `oom/([a-z0-9-]+)` \\| (\\d+) \\|")
 	filas := fila.FindAllStringSubmatch(leer(t, "README.md"), -1)
 	dirs, _ := filepath.Glob(filepath.Join(repoRoot(), "packs", "*", "manifest.yaml"))
-	if len(filas) == 0 || len(filas) != len(dirs) {
-		t.Fatalf("README tiene %d filas de paquetes y packs/ tiene %d paquetes", len(filas), len(dirs))
+	faltan := map[string]bool{}
+	for _, d := range dirs {
+		faltan[filepath.Base(filepath.Dir(d))] = true
+	}
+	for _, f := range filas {
+		if !faltan[f[1]] {
+			t.Errorf("README: oom/%s repetido o sin carpeta en packs/", f[1])
+		}
+		delete(faltan, f[1])
+	}
+	for d := range faltan {
+		t.Errorf("README: falta la fila de oom/%s", d)
 	}
 	for _, f := range filas {
 		pbs, _ := filepath.Glob(filepath.Join(repoRoot(), "packs", f[1], "playbooks", "*.yaml"))

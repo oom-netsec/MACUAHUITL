@@ -80,3 +80,7 @@ overrides:
       - webkit2gtk4.1
       - gtk3
       - iputils
+    recommends:
+      - nmap
+      - iperf3
+      - wireshark-cli

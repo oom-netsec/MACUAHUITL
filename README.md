@@ -196,26 +196,33 @@ Each [release](../../releases/latest) is built reproducibly and ships an SBOM. F
 - the `oom-<platform>-<version>.mpack` packs for the platforms you work on (see [Supported platforms and packs](#supported-platforms-and-packs));
 - `SHA256SUMS`, to check the downloads.
 
+Run these in the folder you downloaded to, with one version of each file in it (the `*` patterns below and in the quick start match every version present):
+
 ```sh
 sha256sum -c --ignore-missing SHA256SUMS      # every file you downloaded must say OK
 sudo apt install ./macuahuitl_*.deb           # or: sudo dnf install ./macuahuitl-*.rpm
 systemctl --user enable --now macuahuitld     # as the user who will use it
 ```
 
-Use `apt` or `dnf` rather than `dpkg -i` or `rpm -i`: they install the dependencies too. Packs need no extra step: the core checks the Ed25519 signature of every official pack against the key built into it, refuses an `oom/*` pack that fails it, and `mctl pack inspect` or the install preview shows `official` or `third-party`.
+Use `apt` or `dnf` rather than `dpkg -i` or `rpm -i`: they install the dependencies too. apt may print a harmless note that the download is performed unsandboxed as root; that is expected for a local file. Packs need no extra step: the core checks the Ed25519 signature of every official pack against the key built into it, refuses an `oom/*` pack that fails it, and `mctl pack inspect` or the install preview shows `official` or `third-party`.
 
 A few one-time settings, all optional:
 
 - **Long Patrol jobs with the session closed.** The core is a user service, so it stops when you log out. `sudo loginctl enable-linger $USER` keeps it running.
-- **Locked memory.** To let the core keep secrets out of swap, an administrator creates `/etc/systemd/user.conf.d/macuahuitl.conf` with `[Manager]` and `DefaultLimitMEMLOCK=infinity`, then you log out of every session (or reboot) so the user manager picks it up. Without it the core starts anyway and records a warning in the audit log.
-- **Packet capture.** Install `wireshark-common`, allow non-root capture (`sudo dpkg-reconfigure wireshark-common` on Debian/Ubuntu), add yourself with `sudo usermod -aG wireshark $USER` and log in again.
+- **Locked memory.** To let the core keep secrets out of swap, an administrator raises the limit of the systemd user manager (a user service cannot go above it) and reboots:
+  ```sh
+  sudo mkdir -p /etc/systemd/system/user@.service.d
+  printf '[Service]\nLimitMEMLOCK=infinity\n' | sudo tee /etc/systemd/system/user@.service.d/macuahuitl.conf
+  ```
+  Without it the core starts anyway and records a warning in the audit log.
+- **Packet capture.** Install `wireshark-common` (Debian/Ubuntu; allow non-root capture with `sudo dpkg-reconfigure wireshark-common`) or `wireshark-cli` (Fedora), add yourself with `sudo usermod -aG wireshark $USER` and log in again.
 
 `macuahuitld` flags: `-version` prints the version; `-lang es|en` sets the language of what the daemon prints on its console (warnings and fatal errors; English by default, the unit does not pass it). Clients still ask for their own language per request.
 
 | Need | Packages |
 |---|---|
 | Desktop app | `libwebkit2gtk-4.1-0` (Debian/Ubuntu) or `webkit2gtk4.1` (Fedora/RHEL) |
-| Diagnostics | `nmap`, `iperf3`, `wireshark-common` (`dumpcap`, with your user in the `wireshark` group) |
+| Diagnostics | `nmap`, `iperf3`, `wireshark-common` or `wireshark-cli` on Fedora (`dumpcap`, with your user in the `wireshark` group) |
 
 `ping` and `tracepath` come with the system. The core and `mctl` have no system dependencies.
 
