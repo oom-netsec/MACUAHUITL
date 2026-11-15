@@ -36,3 +36,12 @@ func TestScriptValueWireYText(t *testing.T) {
 		}
 	}
 }
+
+// --tech Management o « security » también se traducen: el usuario no tiene por qué saber que el cable es en minúsculas.
+func TestScriptValueWireIgnoraMayusculasYEspacios(t *testing.T) {
+	for in, want := range map[string]string{"Management": "gestion", " security ": "seguridad", "ANY": "cualquiera", "IOS-XE": "ios-xe"} {
+		if got := ScriptValueWire(in); got != want {
+			t.Errorf("ScriptValueWire(%q) = %q, quiero %q", in, got, want)
+		}
+	}
+}

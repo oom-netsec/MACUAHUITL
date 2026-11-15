@@ -160,7 +160,7 @@ uso: mctl <comando>
   scripts rm ID  |  scripts fav ID [--off]  |  scripts dup ID
         (borra uno tuyo, marca o quita un favorito (también en la biblioteca), o copia cualquiera como script tuyo)
   scripts copy ID
-        (copy un script de un paquete instalado, también uno oculto, a tus scripts: ID nuevo, editable, nombre «<nombre> (copy)»; quitar el paquete no la borra)
+        (copia un script de un paquete instalado, también uno oculto, a tus scripts: ID nuevo, editable, nombre «<nombre> (copy)»; quitar el paquete no la borra)
   scripts export --out RUTA [--overwrite] ID...
         (archivo JSON 0600 con la suma SHA-256 de los scripts (integridad, no autenticidad); no sobrescribe sin --overwrite; los favoritos no viajan)
   scripts import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]

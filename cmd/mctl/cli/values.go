@@ -1,5 +1,7 @@
 package cli
 
+import "strings"
+
 // stateEn lleva el estado de import del cable (en español, histórico) al inglés canónico que ve el usuario.
 var stateEn = map[string]string{
 	"nuevo": "new", "nueva": "new", "igual": "same", "conflicto": "conflict",
@@ -21,8 +23,10 @@ var scriptWire = map[string]string{
 	"management": "gestion", "security": "seguridad", "diagnostics": "diagnostico", "other": "otro", "any": "cualquiera",
 }
 
-// ScriptValueWire lleva el valor de --tech o --platform al del cable; el alias en español y lo desconocido pasan tal cual.
+// ScriptValueWire lleva el valor de --tech o --platform al del cable, sin importar mayúsculas ni espacios alrededor (los
+// valores del cable son todos en minúsculas); el alias en español y lo desconocido pasan tal cual.
 func ScriptValueWire(v string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
 	if w, ok := scriptWire[v]; ok {
 		return w
 	}

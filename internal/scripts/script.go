@@ -35,7 +35,21 @@ const (
 var (
 	Techs     = []string{"l2", "l3", "gestion", "seguridad", "qos", "etherchannel", "wireless", "diagnostico", "otro"}
 	Platforms = []string{"ios", "ios-xe", "nx-os", "asa", "ftd", "wlc-aireos", "ise", "cualquiera"}
+	// en: nombre canónico en inglés de los valores que no lo son; mctl acepta los dos y el error los nombra juntos.
+	en = map[string]string{"gestion": "management", "seguridad": "security", "diagnostico": "diagnostics", "otro": "other", "cualquiera": "any"}
 )
+
+// listed es la lista para el error, con el inglés junto al valor que el núcleo guarda (gestion/management).
+func listed(vals []string) string {
+	out := make([]string, len(vals))
+	for i, v := range vals {
+		out[i] = v
+		if e, ok := en[v]; ok {
+			out[i] += "/" + e
+		}
+	}
+	return strings.Join(out, ", ")
+}
 
 var (
 	tagRe         = regexp.MustCompile(`^[a-z0-9-]{1,24}$`)
@@ -111,10 +125,10 @@ func (s Script) Validate() error {
 		return i18n.New("scripts.err.origin", i18n.A("origin", s.Origin))
 	}
 	if !in(Techs, s.Tech) {
-		return i18n.New("scripts.err.tech", i18n.A("tech", s.Tech, "list", strings.Join(Techs, ", ")))
+		return i18n.New("scripts.err.tech", i18n.A("tech", s.Tech, "list", listed(Techs)))
 	}
 	if !in(Platforms, s.Platform) {
-		return i18n.New("scripts.err.platform", i18n.A("platform", s.Platform, "list", strings.Join(Platforms, ", ")))
+		return i18n.New("scripts.err.platform", i18n.A("platform", s.Platform, "list", listed(Platforms)))
 	}
 	if utf8.RuneCountInString(s.Description) > MaxDescription || hasControl(s.Description, true) {
 		return i18n.New("scripts.err.description", i18n.A("max", MaxDescription))

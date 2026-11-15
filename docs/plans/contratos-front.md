@@ -395,7 +395,7 @@ Notas:
 - **`readOnly`** es verdadero solo si la plataforma es `ios` o `ios-xe` y todos los comandos pasan `playbook.CheckDenied` y ninguno lleva `;`. Para `nx-os`, `asa` y `cualquiera` es **siempre falso** mientras `CheckDenied` solo modele IOS (cuando tenga reglas por plataforma se mide contra ellas). Las **líneas que empiezan con «!» en la columna 0 son comentario y se ignoran** (` !x`, con espacio, no lo es y cuenta como comando). Quien ejecute un script (Patrol, en otra rama) debe usar la misma regla con `scripts.Runnable(cmds)`, que devuelve los comandos sin esas líneas, y exigir `readOnly`.
 - `listScripts` junta biblioteca y usuario, por nombre sin importar mayúsculas. `text` busca en nombre, descripción, etiquetas y comandos. Con `platform` también entran los `cualquiera`.
 - `saveScript`: sin `id` crea; con el `id` de un script del usuario edita (conserva `createdMs`). Origen, fechas, `readOnly` y `favorite` se ignoran al guardar. Rechaza `lib-*` y un nombre repetido (`AlreadyExists`). El nombre se recorta de espacios.
-- `duplicateScript` acepta también los de la biblioteca y crea un script del usuario llamado «<nombre> (copia)», con número si ya existe. Es la forma de «editar» uno de la biblioteca.
+- `duplicateScript` acepta también los de la biblioteca y crea un script del usuario llamado «<nombre> (copy)», con número si ya existe. Es la forma de «editar» uno de la biblioteca.
 - `setScriptFavorite` vale para ambos orígenes. Borrar un script borra su favorito.
 - La **biblioteca** (IDs estables `lib-<nombre>`): un script de diagnóstico por cada playbook de `playbooks/cisco/ios-xe` (mismos comandos; `readOnly` verdadero) más 10 de configuración comunes (`lib-cfg-*`: VLAN de acceso, trunk, NTP, logging, SNMP RO, banner, BPDU Guard, EtherChannel LACP, SSH, puertos sin uso; `readOnly` falso, plantillas «sin validar en laboratorio»). Se deriva de los playbooks al cargar, así que no se desincroniza. El ID es `lib-<id>` para `ios-xe` y `lib-<plataforma>-<id>` para las demás plataformas (los de ios-xe no cambian); la carga falla con un error claro si dos scripts de la biblioteca repiten ID o nombre.
 - **Nombres**: se comparan sin importar mayúsculas (una sola regla, también para «ς» y «σ») y **los nombres de la biblioteca cuentan como ocupados**: `saveScript` y `duplicateScript` no los dan a un script del usuario (`AlreadyExists`). Así un export de scripts propios y de biblioteca siempre se puede reimportar.
@@ -416,7 +416,7 @@ Notas:
    - `conflicto_id`: mismo ID, contenido distinto; `conflictsWith` es ese ID.
    - `conflicto_nombre`: otro ID, mismo nombre; `conflictsWith` es el script propio que lo tiene, o un `lib-*` local si el nombre es de la biblioteca (un `lib-*` ajeno que difiere del local, o un script de usuario con un nombre de la biblioteca). Un `lib-*` de otra instalación sin coincidencia es `nuevo` y se importa como script del usuario con ID nuevo.
 2. `applyScriptsImport(token, decisions)` con `{ scriptId, action }` por cada conflicto (`scriptId` es el ID del script **en el archivo**):
-   - `renombrar`: ID nuevo y nombre «<nombre> (importado)», con número si choca con un guardado, con la biblioteca o con otro nombre del mismo archivo.
+   - `renombrar`: ID nuevo y nombre «<nombre> (imported)», con número si choca con un guardado, con la biblioteca o con otro nombre del mismo archivo.
    - `reemplazar`: pisa el script propio con el que choca (conserva su ID, su fecha de creación y su favorito). No vale contra la biblioteca, y dos decisiones `reemplazar` que apunten al mismo script guardado son un error.
    - `omitir`.
 
@@ -540,7 +540,7 @@ Reglas:
    - `fusionar`: solo `favoritos` cuando trae scripts que a la local le faltan; no pide decisión (`omitir` vale). Si no le falta nada es `igual`.
 
    Los `scripts` llevan el estado de siempre (`nuevo`, `igual`, `conflicto_id`, `conflicto_nombre`). `warnings` avisa de cada `lib-*` que esta biblioteca no trae: se omite de la colección al importar.
-2. `applyCollectionsImport(token, scriptDecisions, collectionDecisions)` con `{ scriptId, action }` (el campo se llama `scriptId` en las dos listas; en `collectionDecisions` es el ID de la **colección** del archivo). Mismas acciones y reglas que el import de scripts: `renombrar` (ID nuevo y «<nombre> (importado)»), `reemplazar` (conserva el ID local, la fecha de creación y el lugar en el orden), `omitir`. Falta una decisión, una acción desconocida, una decisión para un ID ajeno, dos `reemplazar` sobre la misma colección local, un reemplazo que dejaría dos nombres iguales o pasar de 100 colecciones → `InvalidArgument`, **sin escribir nada** y con el token vivo. `favoritos` solo admite `omitir`: nunca se reemplaza ni se renombra.
+2. `applyCollectionsImport(token, scriptDecisions, collectionDecisions)` con `{ scriptId, action }` (el campo se llama `scriptId` en las dos listas; en `collectionDecisions` es el ID de la **colección** del archivo). Mismas acciones y reglas que el import de scripts: `renombrar` (ID nuevo y «<nombre> (imported)»), `reemplazar` (conserva el ID local, la fecha de creación y el lugar en el orden), `omitir`. Falta una decisión, una acción desconocida, una decisión para un ID ajeno, dos `reemplazar` sobre la misma colección local, un reemplazo que dejaría dos nombres iguales o pasar de 100 colecciones → `InvalidArgument`, **sin escribir nada** y con el token vivo. `favoritos` solo admite `omitir`: nunca se reemplaza ni se renombra.
    - Scripts y colecciones se aplican **en una sola transacción**: si falla uno, no entra ninguno.
    - Los IDs de script que cambian al importar (renombrados, o un `lib-*` ajeno que pasa a ser de usuario) se reflejan en las referencias de las colecciones importadas. Un script omitido o un `lib-*` inexistente se quita de la colección y sale en `warnings`.
    - `favoritos` importado se **fusiona**: se agregan los que falten, sin duplicar, después de los locales.
@@ -627,7 +627,7 @@ Notas:
      - `conflicto` con `reason: "nombre"`: otro destino pero el mismo nombre. `renombrar`, `reemplazar` u `omitir`. Si chocan las dos cosas con hosts distintos, manda la dirección.
      - `credentialMissing`: el archivo trae una etiqueta y en la bóveda local no hay credencial con ella (o hay varias): el host quedaría **sin credencial**. Con la bóveda cerrada pasa con todas; `warnings` lo explica.
 2. `applyHostsImport(token, decisions)` con `{ key, action }` por cada conflicto:
-   - `renombrar`: id nuevo y nombre «<nombre> (importado)», con número si choca con un guardado o con otro nombre del archivo.
+   - `renombrar`: id nuevo y nombre «<nombre> (imported)», con número si choca con un guardado o con otro nombre del archivo.
    - `reemplazar`: pisa el host guardado con el que choca (conserva su id y su fecha de creación). Falla si el nombre o el destino resultante ya es de otro host, y dos `reemplazar` sobre el mismo host guardado son un error.
    - `omitir`.
 
@@ -1219,7 +1219,7 @@ Spec: ADR 0010, «Selección por elemento y paquete personal». Aquí solo lo qu
 - Un paquete que `PackInstall` rechazaría (versión igual o menor, choque de IDs, firma inválida) también se rechaza aquí con el mismo reason.
 
 ### Copiar a «Mis scripts»
-- `CopyFromPack(id)` → `ScriptDTO` (puente) / `ScriptsService.CopyFromPack`: copia un script de un paquete instalado, también uno oculto, como script del usuario con ID nuevo, editable, nombre `<nombre> (copia)` (o `(copia 2)`…). Si es derivado de un playbook lleva `pre` más sus comandos. Un ID que no es de un paquete instalado (base, del usuario o inexistente) falla con `scripts.svc.not_from_pack` (`id`; InvalidArgument) o `scripts.svc.not_found`.
+- `CopyFromPack(id)` → `ScriptDTO` (puente) / `ScriptsService.CopyFromPack`: copia un script de un paquete instalado, también uno oculto, como script del usuario con ID nuevo, editable, nombre `<nombre> (copy)` (o `(copy 2)`…). Si es derivado de un playbook lleva `pre` más sus comandos. Un ID que no es de un paquete instalado (base, del usuario o inexistente) falla con `scripts.svc.not_from_pack` (`id`; InvalidArgument) o `scripts.svc.not_found`.
 - Quitar el paquete no borra las copias. Auditoría: `scripts.copy`. `DuplicateScript` sigue igual.
 
 ### Reasons nuevos
@@ -1329,7 +1329,7 @@ Con `en`, nada visible de esta área sale en español; sin idioma o con `es` el 
 - Asistente: el motivo de una reversa que no restauró el equipo (`assist.residue.*`: falta, sobra, «y N más», línea oculta, err-disabled), la etiqueta de la dirección validada (`assist.what.*`, resueltas como Refs) y el rango sin tope (`assist.invalid_value.out_of_range_min`) salen en el idioma pedido. Las líneas de configuración no se traducen.
 - `ImportFormat` (scripts y colecciones): `description` y `type` por campo en el idioma (`scriptsfmt.desc.*`, `scriptsfmt.type.*`); es es idéntico.
 - Paquetes: `pack.err.script.platform|origin` y `pack.err.playbook.id`.
-- `mctl.credrotate.note_3` en inglés cita la etiqueta real guardada en la bóveda, `"<label> (anterior)"` (no se cambia la etiqueta: ya existe en bóvedas de usuarios y se busca por ella). El respaldo programado audita `backup.failed` en inglés.
+- `mctl.credrotate.note_3` cita la etiqueta real que se guarda en la bóveda, `"<label> (previous)"`. Desde que los valores son canónicos en inglés, las rotaciones nuevas usan «(previous)»; las entradas «(anterior)» que ya existan se quedan como están (nada busca por esa etiqueta). El respaldo programado audita `backup.failed` en inglés.
 
 ## Idioma canónico: inglés (después de la fase 30e)
 - El inglés es el idioma canónico de la app y el español es segunda lengua que se elige en Ajustes. La regla «sin `accept-language` = español byte a byte» de 30a a 30e deja de aplicar: **sin `accept-language` (o con uno desconocido) el núcleo responde en inglés**; `internal/i18n` (`Locale`, `Normalize`, `Parse`) devuelve `en` por omisión. Las pruebas de regresión en español piden `es` explícito (`accept-language: es`, `i18n.WithLocale(ctx, "es")` o `--lang es`) y siguen comparando con sus goldens; hay pruebas de que sin idioma sale inglés. La auditoría sigue fija en inglés.
@@ -1378,3 +1378,6 @@ Lo oficial gana: un paquete de terceros ya instalado no puede impedir instalar o
 ## Cierre de la ventana (fase 21u)
 
 `ui/main.go` registra un hook de `WindowClosing`: si `bridge.Busy` ve algo que se cortaría (ejecuciones con stream, watch de un cambio asistido, consolas serie, terminales SSH), cancela el cierre y pregunta con un diálogo nativo en el idioma de la interfaz (`bridge.CloseTextFor`). Al confirmar emite `ui:closing` (sin datos), espera 700 ms y cierra. El front lo escucha con `core.onClosing(cb)`: la terminal hace ahí la escritura final de su registro. Los trabajos de Patrol y los respaldos programados siguen en el núcleo y no cuentan.
+
+## Sufijos de nombres generados en inglés (2026-11-14)
+Los nombres que la app genera al crear datos van en inglés canónico: «<nombre> (copy)» al duplicar o copiar un script, «<nombre> (imported)» al renombrar en un import (scripts, colecciones, hosts) y «<etiqueta> (previous)» al rotar una credencial. Los datos ya guardados con «(copia)», «(importado)» o «(anterior)» no se tocan. El cable de los estados de import (nuevo, igual, conflicto_*...) y de las tecnologías y plataformas de scripts (gestion, seguridad, diagnostico, otro, cualquiera) no cambia: la UI los traduce al mostrarlos.
