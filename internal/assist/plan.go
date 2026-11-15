@@ -364,7 +364,7 @@ func columnMatch(e Expect, text string) (match, ok bool) {
 		}
 		set, all := iosxe.TrunkAllowedSet(cur.TrunkAllowed)
 		return all || set[n], true
-	case "static-route", "logging-host", "snmp-user":
+	case "static-route", "logging-host", "snmp-user", "snmp-host", "snmp-traps":
 		return l3ColumnMatch(e, text)
 	case "user-secret":
 		user, typ, _ := strings.Cut(e.Line, " ")

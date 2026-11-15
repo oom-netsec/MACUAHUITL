@@ -29,6 +29,7 @@ type l2Scope struct {
 	base                      map[string]string // más comandos de la línea base (el estado del puerto, para ver que la reversa no lo deja err-disabled)
 	expect                    []Expect          // más condiciones, ya con su Command
 	feats                     []l2Feature
+	rollback                  []string // si no es nil, es la reversa de este alcance, tal cual (cuando no es la inversa línea por línea de feats)
 }
 
 // assembleL2 arma el DevicePlan: apply en orden, reversa en orden inverso (también entre puertos), post y expect. Un alcance sin cambios no
@@ -55,6 +56,9 @@ func assembleG(device string, fn Function, pre []string, scopes []l2Scope, notes
 		for _, f := range sc.feats {
 			apply = append(apply, f.apply)
 			e := f.exp
+			if e == (Expect{}) { // una línea sin condición propia (los hijos de un bloque que otro Expect verifica)
+				continue
+			}
 			if e.Command == "" {
 				e.Command = sc.baseCmd
 			}
@@ -62,6 +66,9 @@ func assembleG(device string, fn Function, pre []string, scopes []l2Scope, notes
 		}
 		for i := len(sc.feats) - 1; i >= 0; i-- { // dentro del puerto la reversa también va al revés
 			rb = append(rb, sc.feats[i].back)
+		}
+		if sc.rollback != nil {
+			rb = sc.rollback
 		}
 		if sc.status != "" {
 			for _, bad := range []string{"inactive", "err-disabled"} {

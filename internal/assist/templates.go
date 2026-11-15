@@ -334,7 +334,7 @@ func ParseInterfaceList(s string) ([]string, error) {
 
 // Templates devuelve el catálogo en orden: por tecnología (TechOrder) y, dentro de cada una, el orden en que se declaran.
 func Templates() []Template {
-	all := slices.Concat(baseTemplates(), l2PortTemplates(), l3MgmtTemplates())
+	all := slices.Concat(baseTemplates(), l2PortTemplates(), l3MgmtTemplates(), trapsFlowTemplates())
 	slices.SortStableFunc(all, func(a, b Template) int { return slices.Index(TechOrder, a.Tech) - slices.Index(TechOrder, b.Tech) })
 	return all
 }

@@ -16,6 +16,7 @@ type l3Dev struct {
 	global []string
 	ifaces map[string][]string
 	vty    []*vtyBlk
+	flows  []*vtyBlk         // bloques `flow record|exporter|monitor X` (Flexible NetFlow)
 	users  []string          // «usuario grupo»
 	acls   map[string]string // salida de show ip access-lists NOMBRE
 	l2     map[string]bool   // puertos con switchport habilitado
@@ -45,6 +46,22 @@ func (d *l3Dev) apply(lines []string) {
 	var iface string
 	for _, l := range lines {
 		switch {
+		case strings.HasPrefix(l, "flow "): // un bloque global de Flexible NetFlow; también se entra desde el submodo de otra interfaz
+			ctx, blk = "flow", nil
+			for _, b := range d.flows {
+				if b.head == l {
+					blk = b
+				}
+			}
+			if blk == nil {
+				blk = &vtyBlk{head: l}
+				d.flows = append(d.flows, blk)
+			}
+			continue
+		case strings.HasPrefix(l, "no flow "):
+			d.flows = slices.DeleteFunc(d.flows, func(b *vtyBlk) bool { return b.head == strings.TrimPrefix(l, "no ") })
+			ctx = ""
+			continue
 		case strings.HasPrefix(l, "interface "):
 			iface, ctx, blk = strings.TrimPrefix(l, "interface "), "if", nil
 			if _, ok := d.ifaces[iface]; !ok {
@@ -81,6 +98,10 @@ func (d *l3Dev) apply(lines []string) {
 				d.ifaces[iface] = append(cur, body)
 			case !slices.Contains(cur, body):
 				d.ifaces[iface] = append(cur, body)
+			}
+		case "flow":
+			if !neg {
+				blk.lines = append(blk.lines, body)
 			}
 		case "vty":
 			if strings.HasPrefix(body, "access-class ") {
@@ -122,6 +143,17 @@ func (d *l3Dev) applyGlobal(body string, neg bool) {
 		} else if f[2] != "informational" { // el nivel de fábrica no se muestra
 			d.global = append(d.global, body)
 		}
+	case f[0] == "snmp-server" && f[1] == "enable" && f[2] == "traps" && len(f) > 4 && f[3] == "snmp": // IOS junta los traps en una sola línea
+		d.mergeTraps(f[4:], neg)
+	case !neg && f[0] == "snmp-server" && f[1] == "host": // una community que no existe se crea implícita y de solo lectura
+		if !slices.ContainsFunc(d.global, func(x string) bool { return hasWordPrefix(x, "snmp-server community "+f[5]) }) {
+			d.global = append(d.global, "snmp-server community "+f[5]+" RO")
+		}
+		d.global = append(d.global, ifElse(f[len(f)-1] == "162", strings.Join(f[:len(f)-2], " "), body))
+	case neg && f[0] == "snmp-server" && f[1] == "host":
+		d.removeGlobal(func(x string) bool {
+			return hasWordPrefix(x, "snmp-server host "+f[2]) && slices.Contains(strings.Fields(x), f[5])
+		})
 	case neg && f[0] == "snmp-server" && f[1] == "community":
 		d.removeGlobal(func(x string) bool { return hasWordPrefix(x, "snmp-server community "+f[2]) })
 	case f[0] == "snmp-server" && f[1] == "user" && !neg: // IOS no lo escribe en el running
@@ -132,6 +164,35 @@ func (d *l3Dev) applyGlobal(body string, neg bool) {
 		d.removeGlobal(func(x string) bool { return x == body })
 	case !slices.Contains(d.global, body):
 		d.global = append(d.global, body)
+	}
+}
+
+// mergeTraps suma o quita traps de la línea `snmp-server enable traps snmp ...` y la borra si queda vacía.
+func (d *l3Dev) mergeTraps(args []string, neg bool) {
+	const head = "snmp-server enable traps snmp"
+	var cur []string
+	for _, g := range d.global {
+		if hasWordPrefix(g, head) {
+			cur = strings.Fields(g)[4:]
+		}
+	}
+	for _, a := range args {
+		switch has := slices.Contains(cur, a); {
+		case neg && has:
+			cur = slices.DeleteFunc(cur, func(x string) bool { return x == a })
+		case !neg && !has:
+			cur = append(cur, a)
+		}
+	}
+	i := slices.IndexFunc(d.global, func(x string) bool { return hasWordPrefix(x, head) })
+	line := head + " " + strings.Join(cur, " ")
+	switch {
+	case i >= 0 && len(cur) == 0:
+		d.global = slices.Delete(d.global, i, i+1)
+	case i >= 0:
+		d.global[i] = line
+	case len(cur) > 0:
+		d.global = append(d.global, line)
 	}
 }
 
@@ -177,6 +238,15 @@ func (d *l3Dev) read(cmds []string) map[string]string {
 		case c == vtyCmd:
 			s := ""
 			for _, b := range d.vty {
+				s += b.head + "\n"
+				for _, x := range b.lines {
+					s += " " + x + "\n"
+				}
+			}
+			out[c] = s
+		case c == flowCmd:
+			s := ""
+			for _, b := range d.flows {
 				s += b.head + "\n"
 				for _, x := range b.lines {
 					s += " " + x + "\n"
