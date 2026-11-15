@@ -235,7 +235,11 @@ function Compliance({ core }: { core: CoreAPI }) {
 export function ChangeView({ core }: { core: CoreAPI }) {
   const t = useT();
   const [sub, setSub] = useState<Sub>("prepost");
-  const [active, setActive] = useState(false);
+  // La reversa retomada y las de la lista avisan por separado: si una termina, no apaga el aviso de la otra.
+  const [activeLive, setActiveLive] = useState(false);
+  const [activeList, setActiveList] = useState(false);
+  const active = activeLive || activeList;
+  const [liveErr, setLiveErr] = useState("");
   const [live, setLive] = useState(false); // una reversa viva iniciada aquí (se recargó la UI): se retoma sin esperar a que se pulse nada
   useEffect(() => {
     let alive = true;
@@ -249,8 +253,9 @@ export function ChangeView({ core }: { core: CoreAPI }) {
       {sub === "upgrade" && <Upgrade core={core} />}
       {sub === "compliance" && <Compliance core={core} />}
       <AssistBanner active={active} />
-      {live && <AssistExecution core={core} plan={null} onStarted={() => {}} onActive={setActive} onError={() => {}} />}
-      <PendingRollbacks core={core} onActive={setActive} />
+      {liveErr && <Notice kind="error">{liveErr}</Notice>}
+      {live && <AssistExecution core={core} plan={null} onStarted={() => {}} onActive={setActiveLive} onError={setLiveErr} />}
+      <PendingRollbacks core={core} onActive={setActiveList} />
     </Page>
   );
 }
