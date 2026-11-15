@@ -9,6 +9,19 @@ import (
 // ya lo dejaba visible viejo y en el mismo sitio. Es el helper con el que se comprueba que una prueba exacta puede
 // cambiar su valor esperado.
 func superconjunto(nuevo, viejo string) bool {
+	if k := strings.Count(nuevo, " ; "); k > 0 && k == strings.Count(viejo, " ; ") { // una región por segmento
+		ns, vs := strings.Split(nuevo, " ; "), strings.Split(viejo, " ; ")
+		for i := range ns {
+			if !superconjunto1(ns[i], vs[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	return superconjunto1(nuevo, viejo)
+}
+
+func superconjunto1(nuevo, viejo string) bool {
 	n, v := markerOK.ReplaceAllString(nuevo, "\x00"), markerOK.ReplaceAllString(viejo, "\x00")
 	c := 0
 	for c < len(n) && c < len(v) && n[c] == v[c] {
