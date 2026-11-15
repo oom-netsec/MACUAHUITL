@@ -249,7 +249,8 @@ func TestSTPRoots(t *testing.T) {
 
 func TestShortIf(t *testing.T) {
 	for in, want := range map[string]string{"GigabitEthernet1/0/1": "Gi1/0/1", "Gi1/0/1": "Gi1/0/1", "Ethernet1/49": "Eth1/49", "Eth1/49": "Eth1/49",
-		"TenGigabitEthernet1/1/1": "Te1/1/1", "Port-channel1": "Po1", "FastEthernet0/1": "Fa0/1", "mgmt0": "mgmt0", "TwentyFiveGigE1/0/1": "Twe1/0/1"} {
+		"TenGigabitEthernet1/1/1": "Te1/1/1", "Port-channel1": "Po1", "FastEthernet0/1": "Fa0/1", "mgmt0": "mgmt0", "TwentyFiveGigE1/0/1": "Twe1/0/1",
+		"Et0/2": "Eth0/2", "Ethernet0/2": "Eth0/2", "Eth0/2": "Eth0/2", "Etherchannel": "Etherchannel"} {
 		if got := ShortIf(in); got != want {
 			t.Errorf("ShortIf(%q) = %q, quiero %q", in, got, want)
 		}

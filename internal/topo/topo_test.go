@@ -92,3 +92,38 @@ func TestLoadPatrolDirSaltaSeccionesIncompletas(t *testing.T) {
 		t.Fatalf("%v %+v", err, devs)
 	}
 }
+
+// Un equipo ve el enlace por LLDP como Et0/2 y el otro por CDP como Ethernet0/2: es un solo enlace.
+func TestEnlaceUnicoEtVsEthernet(t *testing.T) {
+	lldp := "------------------------------------------------\nLocal Intf: Et0/2\nChassis id: aabb.cc00.0200\nPort id: Et0/2\nSystem Name: R2\n\nTotal entries displayed: 1\n"
+	cdp := "-------------------------\nDevice ID: R1\nEntry address(es): \n  IP address: 10.0.0.1\nPlatform: cisco IOSv,  Capabilities: Router \nInterface: Ethernet0/2,  Port ID (outgoing port): Ethernet0/2\nHoldtime : 150 sec\n\nTotal cdp entries displayed : 1\n"
+	g := Build([]Device{
+		{Name: "R1", IP: "10.0.0.1", Outputs: map[string]string{"show lldp neighbors detail": lldp}},
+		{Name: "R2", IP: "10.0.0.2", Outputs: map[string]string{"show cdp neighbors detail": cdp}},
+	}, nil, "")
+	if len(g.Links) != 1 || len(g.Links[0].Sources) != 2 || len(g.Links[0].SeenBy) != 2 || g.Links[0].AIf != "Eth0/2" || g.Links[0].BIf != "Eth0/2" {
+		t.Fatalf("enlaces = %+v", g.Links)
+	}
+}
+
+func TestTextInIdioma(t *testing.T) {
+	devs, _ := LoadPatrolDir("testdata/trabajo_20261104-100000")
+	g := Build(devs, nil, "")
+	es, en := g.TextIn("es"), g.TextIn("en")
+	if es != g.Text() || !strings.Contains(es, "Topología: 4 equipos, 4 enlaces") || !strings.Contains(es, "Hallazgos:") || !strings.Contains(es, "VLAN nativa distinta") || !strings.Contains(es, "root STP en") {
+		t.Fatalf("es:\n%s", es)
+	}
+	for _, w := range []string{"Topología", "Enlaces", "Equipos", "Hallazgos", "root STP en", "VLAN nativa", "duplex distinto", "solo lo ve", "miembros hacia"} {
+		if strings.Contains(en, w) {
+			t.Fatalf("en trae %q:\n%s", w, en)
+		}
+	}
+	if !strings.Contains(en, "Topology: 4 devices, 4 links") || !strings.Contains(en, "native VLAN mismatch") || !strings.Contains(en, "STP root on") {
+		t.Fatalf("en:\n%s", en)
+	}
+	for _, f := range g.Findings {
+		if f.Text == "" || f.TextTx.Empty() {
+			t.Fatalf("hallazgo sin texto: %+v", f)
+		}
+	}
+}

@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/pcapan"
 )
@@ -56,6 +57,14 @@ type Finding struct {
 	Kind     string `json:"kind"` // one_sided, native_vlan, duplex, port_channel
 	Severity string `json:"severity"`
 	Text     string `json:"text"`
+	// TextTx es Text en el idioma pedido (ver i18n.Localize); Text queda en español.
+	TextTx i18n.Text `json:"-"`
+}
+
+// finding arma un hallazgo con el texto en es y su versión localizable.
+func finding(kind, sev, key string, kv ...any) Finding {
+	t := i18n.Tx("topo.finding."+key, kv...)
+	return Finding{Kind: kind, Severity: sev, Text: t.In(i18n.Es), TextTx: t}
 }
 
 type Graph struct {
@@ -237,16 +246,13 @@ func (b *builder) checkLinks() {
 			if l.SeenBy[0] == l.A {
 				other = l.B
 			}
-			b.g.Findings = append(b.g.Findings, Finding{"one_sided", "warning",
-				fmt.Sprintf("%s: solo lo ve un lado; %s no lo reporta (CDP/LLDP apagado en el puerto, enlace unidireccional o cableado distinto)", where, b.g.node(other).Name)})
+			b.g.Findings = append(b.g.Findings, finding("one_sided", "warning", "one_sided", "where", where, "other", b.g.node(other).Name))
 		}
 		if l.vlanMismatch() {
-			b.g.Findings = append(b.g.Findings, Finding{"native_vlan", "error",
-				fmt.Sprintf("%s: VLAN nativa distinta (%s vs %s)", where, l.ANativeVLAN, l.BNativeVLAN)})
+			b.g.Findings = append(b.g.Findings, finding("native_vlan", "error", "native_vlan", "where", where, "a", l.ANativeVLAN, "b", l.BNativeVLAN))
 		}
 		if l.duplexMismatch() {
-			b.g.Findings = append(b.g.Findings, Finding{"duplex", "error",
-				fmt.Sprintf("%s: duplex distinto (%s vs %s)", where, l.ADuplex, l.BDuplex)})
+			b.g.Findings = append(b.g.Findings, finding("duplex", "error", "duplex", "where", where, "a", l.ADuplex, "b", l.BDuplex))
 		}
 	}
 }
@@ -278,8 +284,7 @@ func (b *builder) portChannels(id string, pcs map[string][]string) {
 		}
 		if len(peers) > 1 {
 			sort.Strings(peers)
-			b.g.Findings = append(b.g.Findings, Finding{"port_channel", "warning",
-				fmt.Sprintf("%s %s: miembros hacia vecinos distintos (%s); correcto solo con vPC, StackWise Virtual o MLAG", b.g.node(id).Name, po, strings.Join(peers, ", "))})
+			b.g.Findings = append(b.g.Findings, finding("port_channel", "warning", "port_channel", "device", b.g.node(id).Name, "po", po, "peers", strings.Join(peers, ", ")))
 		}
 	}
 }
@@ -338,25 +343,33 @@ func layout(nodes []Node, links []Link) {
 	}
 }
 
-// Text es el resumen legible.
-func (g Graph) Text() string {
+// Text es el resumen legible, en español.
+func (g Graph) Text() string { return g.TextIn(i18n.Es) }
+
+// TextIn es el resumen en el idioma pedido; los hallazgos salen de su TextTx (con es, el Text de siempre).
+func (g Graph) TextIn(loc string) string {
+	m := func(key string, kv ...any) string { return i18n.Msg(loc, key, i18n.A(kv...)) }
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "Topología: %d equipos, %d enlaces\n\nEquipos:\n", len(g.Nodes), len(g.Links))
+	fmt.Fprintf(&sb, "%s\n\n%s\n", m("topo.text.header", "nodes", len(g.Nodes), "links", len(g.Links)), m("topo.text.devices"))
 	for _, n := range g.Nodes {
 		fmt.Fprintf(&sb, "  %-24s %-18s %-16s %s", n.Name, n.Platform, n.MgmtIP, n.Version)
 		if len(n.RootVLANs) > 0 {
-			fmt.Fprintf(&sb, "  root STP en %v", n.RootVLANs)
+			fmt.Fprintf(&sb, "  %s", m("topo.text.stp_root", "vlans", fmt.Sprint(n.RootVLANs)))
 		}
 		sb.WriteString("\n")
 	}
-	sb.WriteString("\nEnlaces:\n")
+	fmt.Fprintf(&sb, "\n%s\n", m("topo.text.links"))
 	for _, l := range g.Links {
 		fmt.Fprintf(&sb, "  %s %s ↔ %s %s  [%s]\n", g.node(l.A).Name, l.AIf, g.node(l.B).Name, l.BIf, strings.Join(l.Sources, ","))
 	}
 	if len(g.Findings) > 0 {
-		sb.WriteString("\nHallazgos:\n")
+		fmt.Fprintf(&sb, "\n%s\n", m("topo.text.findings"))
 		for _, f := range g.Findings {
-			fmt.Fprintf(&sb, "  [%s] %s\n", f.Severity, f.Text)
+			txt := f.Text
+			if !f.TextTx.Empty() {
+				txt = f.TextTx.In(loc)
+			}
+			fmt.Fprintf(&sb, "  [%s] %s\n", f.Severity, txt)
 		}
 	}
 	return sb.String()
