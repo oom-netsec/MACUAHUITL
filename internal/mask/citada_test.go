@@ -151,13 +151,24 @@ func TestCitasQueNoSeTocanSegundaRevision(t *testing.T) {
 	}
 }
 
-// El recorrido por comillas es lineal: una línea de 1 MB con miles de comillas termina rápido.
+// El recorrido por comillas es lineal: con 4 veces más comillas tarda unas 4 veces más (cuadrático serían 16). Se mide
+// la escala y no un tiempo fijo, que falla con -race o con la máquina cargada; se toma el mínimo de tres corridas.
 func TestCitasLineal(t *testing.T) {
-	in := strings.Repeat(`x "a" `, 170000) + "\n"
-	start := time.Now()
-	Apply("asa", in)
-	if d := time.Since(start); d > 5*time.Second {
-		t.Fatalf("1 MB con 340k comillas tardó %v", d)
+	best := func(n int) time.Duration {
+		in := strings.Repeat(`x "a" `, n) + "\n"
+		min := time.Duration(1<<63 - 1)
+		for range 3 {
+			start := time.Now()
+			Apply("asa", in)
+			if d := time.Since(start); d < min {
+				min = d
+			}
+		}
+		return min
+	}
+	small, big := best(2500), best(10000)
+	if big > 10*small {
+		t.Fatalf("4 veces más comillas tardó %v contra %v: no es lineal", big, small)
 	}
 }
 
