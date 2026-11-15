@@ -176,19 +176,22 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
   const maxSeq = useRef(0);
   const retries = useRef(0);
   const starting = useRef(false); // doble clic en «Iniciar»: un solo assistStart
-  const [readyId, setReadyId] = useState(""); // id del paso ya habilitado; el aviso vive aquí, siempre montado, para que los lectores lo lean
+  // El paso ya habilitado, por objeto y no por id: el motor repite ids (apply-1, rollback-1 al proponer otra reversa, apply-1 en la
+  // ejecución siguiente) y cada evento «pending» crea un objeto nuevo. El aviso vive aquí, siempre montado, para que los lectores lo lean.
+  const [readyStep, setReadyStep] = useState<AssistStep | null>(null);
   const head = useRef<HTMLHeadingElement>(null);
   const hadPending = useRef(false);
 
   useEffect(() => setArmed(false), [plan]);
   useEffect(() => { onActive(!!run?.active); }, [run?.active, onActive]);
   const pid = run?.pending?.id;
-  const ready = !!pid && readyId === pid; // por id: un paso nuevo nace deshabilitado en su primer render, sin esperar efectos
+  const pendingStep = run?.pending ?? null;
+  const ready = !!pendingStep && readyStep === pendingStep; // un paso que llega (aunque repita id) nace deshabilitado en su primer render
   useEffect(() => {
-    if (!pid) return;
-    const id = window.setTimeout(() => setReadyId(pid), CONFIRM_DELAY_MS);
+    if (!pendingStep) return;
+    const id = window.setTimeout(() => setReadyStep(pendingStep), CONFIRM_DELAY_MS);
     return () => window.clearTimeout(id);
-  }, [pid]);
+  }, [pendingStep]);
   // Al quedar sin paso (confirmado, abortado) el paso se desmonta con el foco dentro: pasa al encabezado de la ejecución.
   useEffect(() => {
     if (pid) hadPending.current = true;
@@ -263,7 +266,10 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
       if (!assistOwner(live.runId) && moduleId) try { localStorage.setItem(assistOwnerKey(live.runId), moduleId); } catch { /* sin almacenamiento */ }
       runId.current = live.runId; lastSeq.current = 0; maxSeq.current = 0; retries.current = 0;
       setRun((r) => ({ ...fromInfo(live), notes: r?.notes }));
-      return core.assistWatch(live.runId); // el núcleo repite el historial: el estado se reconstruye solo
+      return core.assistWatch(live.runId).catch((e) => { // sin stream: queda «sin conexión» con «Volver a enganchar»
+        if (runId.current === live.runId) setRun((r) => (r ? { ...r, offline: true } : r));
+        throw e;
+      }); // el núcleo repite el historial: el estado se reconstruye solo
     }).catch((e) => alive && onError(errorText(e)));
     return () => { alive = false; };
   }, [core, onError, moduleId, hasStart]);
@@ -301,7 +307,12 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
       const notes = Object.fromEntries(plan.plan.devices.filter((d) => (d.notes ?? []).length > 0).map((d) => [d.device, d.notes!]));
       setRun({ id, active: true, state: "running", pending: null, failReason: "", stopped: false, changed: [], log: [], notes });
       onStarted(); setArmed(false); // el plan se usa una sola vez
-      await core.assistWatch(id); // con el id ya guardado: el núcleo repite desde el primer evento, ninguno se pierde
+      try {
+        await core.assistWatch(id); // con el id ya guardado: el núcleo repite desde el primer evento, ninguno se pierde
+      } catch (e) {
+        if (runId.current === id) setRun((r) => (r ? { ...r, offline: true } : r)); // la ejecución ya arrancó: sin stream, «Volver a enganchar»
+        throw e;
+      }
     } catch (e) {
       onError(errorText(e));
     } finally {
@@ -325,7 +336,7 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
       {run && (
         <div>
           <header className="page-head run-head"><h3 ref={head} tabIndex={-1}>{t("assist.run", { id: run.id, state: vocab(t, "assistState", run.state) })}</h3></header>
-          <p className="meta" role="status">{run.pending ? t(ready ? "assist.ready" : run.pending.kind === "close" ? "assist.readFirst.close" : "assist.readFirst") : ""}</p>
+          <p className="meta" role="status">{run.pending ? t(ready && !run.offline ? "assist.ready" : run.pending.kind === "close" ? "assist.readFirst.close" : "assist.readFirst") : ""}</p>
           {run.offline && run.active && (
             <div>
               <Notice kind="warn">{t("assist.offline")}</Notice>
@@ -340,7 +351,7 @@ export function AssistExecution({ core, plan, start, onStarted, onActive, onErro
             <div>
               <Notice kind="error">{t("assist.stopped", { reason: run.failReason })}{run.changed.length > 0 && <> {changedText(run.changed, t)}</>}</Notice>
               <div className="actions">
-                <button onClick={() => act(() => core.assistRollback(run.id))}>{t(hasStart ? "assist.reapply.propose" : "assist.proposeRollback")}</button>
+                <button disabled={!!run.offline} onClick={() => act(() => core.assistRollback(run.id))}>{t(hasStart ? "assist.reapply.propose" : "assist.proposeRollback")}</button>
                 <button onClick={() => act(() => core.assistAbort(run.id))}>{t("assist.abort")}</button>
               </div>
             </div>

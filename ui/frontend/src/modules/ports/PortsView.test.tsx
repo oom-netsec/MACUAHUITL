@@ -470,3 +470,26 @@ test("un paso nuevo no le quita el foco a un campo donde se está escribiendo", 
   await screen.findByRole("region", { name: "Paso pendiente apply-1" });
   expect(campo).toHaveFocus();
 });
+
+test("un paso que vuelve con el mismo id (otra reversa propuesta) nace con «Aplicar» deshabilitado", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds) });
+  await plan(core);
+  await start();
+  act(() => core.emitAssist({ runId: "r1", kind: "fail", state: "failed", text: "falló" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Proponer la reversa" }));
+  const rb = { id: "rollback-1", kind: "rollback", device: "SW1", lines: ["switchport access vlan 10"] };
+  act(() => core.emitAssist({ runId: "r1", seq: 2, kind: "pending", state: "waiting-confirm", step: rb }));
+  await clickWhenReady(await screen.findByRole("button", { name: confirmStep("rollback-1") }));
+  // La reversa falla y se propone otra: el motor vuelve a pedir rollback-1.
+  act(() => core.emitAssist({ runId: "r1", seq: 3, kind: "fail", state: "failed", text: "falló la reversa" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Proponer la reversa" }));
+  act(() => core.emitAssist({ runId: "r1", seq: 4, kind: "pending", state: "waiting-confirm", step: rb }));
+  expect(screen.getByRole("button", { name: confirmStep("rollback-1") })).toBeDisabled(); // sin la espera, no por herencia del id
+});
+
+test("si assistWatch falla justo al arrancar, la ejecución queda «sin conexión» con «Volver a enganchar»", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => creds), assistWatch: vi.fn(async () => { throw new Error("socket cerrado"); }) });
+  await plan(core);
+  await start();
+  expect(await screen.findByRole("button", { name: /Volver a enganchar/ })).toBeInTheDocument();
+});
