@@ -12,6 +12,7 @@ import { jobState } from "../../lib/vocab";
 import type { Key } from "../../lib/i18n/es";
 import "./change.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
+import { PendingRollbacks } from "../../components/PendingRollbacks";
 
 // Ventana de cambio: la app solo recolecta (Patrol, comandos de lectura) y compara.
 // Nunca aplica configuración.
@@ -238,6 +239,7 @@ export function ChangeView({ core }: { core: CoreAPI }) {
       {sub === "prepost" && <PrePost core={core} />}
       {sub === "upgrade" && <Upgrade core={core} />}
       {sub === "compliance" && <Compliance core={core} />}
+      <PendingRollbacks core={core} />
     </Page>
   );
 }

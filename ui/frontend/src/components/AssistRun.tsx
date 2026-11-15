@@ -7,6 +7,7 @@ import { Check, Notice, errorText } from "./Field";
 import { Badge } from "./Page";
 import { Icon } from "./Icon";
 import { Hl, Terminal } from "./Terminal";
+import { PendingRollbacks } from "./PendingRollbacks";
 import { useT } from "../lib/i18n";
 import { vocab } from "../lib/vocab";
 import type { Key } from "../lib/i18n/es";
@@ -14,7 +15,7 @@ import { ModuleIdContext } from "../app/activity";
 import { assistOwner, assistOwnerKey } from "../app/useShellStatus";
 import { showHidden } from "../lib/safeText";
 
-export type AssistRunCore = Pick<CoreAPI, "assistStart" | "assistWatch" | "assistListRuns" | "assistConfirm" | "assistAbort" | "assistRollback" | "onAssist" | "onAssistDone">;
+export type AssistRunCore = Pick<CoreAPI, "assistStart" | "assistWatch" | "assistListRuns" | "assistConfirm" | "assistAbort" | "assistRollback" | "onAssist" | "onAssistDone" | "assistListPendingRollbacks" | "assistStartPendingRollback" | "assistDiscardPendingRollback">;
 
 interface RunState {
   id: string;
@@ -66,7 +67,7 @@ export function targetOf(equipo: string, credentialId: string) {
 }
 
 // Líneas de configuración con su marca (+ aplicar, ↺ reversa) y resaltado de palabras clave.
-function CodeLines({ lines, mark }: { lines: string[]; mark?: string }) {
+export function CodeLines({ lines, mark }: { lines: string[]; mark?: string }) {
   return <pre className="code">{lines.map((l, i) => <div key={i}>{mark && <span className="mark" aria-hidden="true">{mark} </span>}<Hl text={showHidden(l)} /></div>)}</pre>;
 }
 
@@ -154,9 +155,10 @@ export function AssistBanner({ active }: { active: boolean }) {
 
 // AssistExecution muestra el plan (si hay), pide activar el modo para esta ejecución y sigue la ejecución. onActive avisa si hay una viva
 // (para apagar el botón de planear); onStarted, que el plan ya se usó (se usa una sola vez); onError, un fallo del núcleo.
-export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
+export function AssistExecution({ core, plan, start, onStarted, onActive, onError }: {
   core: AssistRunCore;
   plan: PortsPlanResult | null;
+  start?: (assisted: boolean) => Promise<string>; // otra forma de arrancar (reversa pendiente); por omisión assistStart del plan
   onStarted: () => void;
   onActive: (active: boolean) => void;
   onError: (msg: string) => void;
@@ -244,7 +246,7 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
     if (!plan || !armed) return;
     onError("");
     try {
-      const id = await core.assistStart(plan.planId, true);
+      const id = await (start ? start(true) : core.assistStart(plan.planId, true));
       runId.current = id; lastSeq.current = 0; maxSeq.current = 0; retries.current = 0;
       // El núcleo no sabe qué módulo inició la ejecución; la franja del shell lo necesita para llevar de vuelta.
       try { if (moduleId) localStorage.setItem(assistOwnerKey(id), moduleId); } catch { /* sin almacenamiento */ }
@@ -288,7 +290,7 @@ export function AssistExecution({ core, plan, onStarted, onActive, onError }: {
           {!run.active && run.failReason && !run.stopped && <Notice kind="error">{t("assist.reason", { reason: run.failReason })}</Notice>}
           {terminal && <Notice kind={run.state === "done" || run.state === "rolled-back" ? "ok" : "info"}>{terminal}</Notice>}
           {!run.active && run.state === "done" && run.unsaved && <Notice kind="warn">{t("assist.final.unsaved", { x: run.unsaved.join(", ") || "—" })}</Notice>}
-          {!run.active && run.state !== "done" && run.state !== "rolled-back" && run.changed.length > 0 && <p role="status" className="warn">{changedText(run.changed, t)}</p>}
+          {!run.active && run.state !== "done" && run.state !== "rolled-back" && run.changed.length > 0 && <><p role="status" className="warn">{changedText(run.changed, t)}</p><PendingRollbacks core={core} runId={run.id} /></>}
           <details className="plan-more"><summary>{t("assist.deviceOutput")}</summary><Terminal text={run.log.join("\n")} /></details>
         </div>
       )}

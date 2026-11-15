@@ -1,6 +1,6 @@
 // Doble del puente de Puertos para pruebas: registra llamadas y permite emitir eventos.
 import { vi } from "vitest";
-import type { AssistDone, AssistEvent, AssistRunInfo, FrontPort, PortsPlanResult } from "./api";
+import type { AssistDone, AssistEvent, AssistRunInfo, FrontPort, PendingRollback, PortsPlanResult } from "./api";
 
 export const samplePlan: PortsPlanResult = {
   planId: "p1",
@@ -49,6 +49,9 @@ export function fakePorts() {
     assistConfirm: vi.fn(async () => {}),
     assistAbort: vi.fn(async () => {}),
     assistRollback: vi.fn(async () => {}),
+    assistListPendingRollbacks: vi.fn(async () => [] as PendingRollback[]),
+    assistStartPendingRollback: vi.fn(async () => "rb1"),
+    assistDiscardPendingRollback: vi.fn(async () => {}),
     onAssist: (cb: (e: AssistEvent) => void) => (evs.add(cb), () => { evs.delete(cb); }),
     onAssistDone: (cb: (e: AssistDone) => void) => (done.add(cb), () => { done.delete(cb); }),
     emitAssist: (e: AssistEvent) => { history.push(e); evs.forEach((cb) => cb(e)); },

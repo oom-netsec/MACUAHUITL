@@ -6,6 +6,13 @@ import { CoreContext } from "../../app/activity";
 
 const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 
+test("la sección Reversas pendientes lista las guardadas", async () => {
+  const core = fakeCore({ assistListPendingRollbacks: vi.fn(async () => [{ runId: "a", kind: "ports", devices: [{ device: "SW1", rollbackLines: ["no shutdown"] }], endedUnix: 1, ageSeconds: 60, writeMemory: false, unreadable: false }]) });
+  render(<CoreContext.Provider value={core}><ChangeView core={core} /></CoreContext.Provider>);
+  expect(await screen.findByRole("heading", { name: "Reversas pendientes" })).toBeInTheDocument();
+  expect(await screen.findByRole("region", { name: "Reversa de la ejecución a" })).toBeInTheDocument();
+});
+
 test("crea el cambio, confirma la huella y captura PRE", async () => {
   const core = fakeCore({
     listCredentials: vi.fn(async () => creds),
