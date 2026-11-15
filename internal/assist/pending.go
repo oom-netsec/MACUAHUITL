@@ -43,7 +43,15 @@ func (r *Run) Leftover() *Leftover {
 		if dp.VerifyLogin {
 			return nil
 		}
-		out.Devices = append(out.Devices, LeftDevice{Device: dp.Device, Apply: slices.Clone(dp.Apply), Rollback: slices.Clone(dp.Rollback),
+		// La reversa guardada es la que se mostraría en vivo: recortada a lo aplicado si el apply quedó a medias (con r.mu
+		// tomado no se puede llamar a rollbackLines). Si el recorte queda vacío se guarda la completa: RollbackPlan exige líneas.
+		rb := dp.Rollback
+		if ok, cut := r.partial[i]; cut && r.fn.Undo != nil {
+			if u := r.fn.Undo(dp.Rollback, ok); len(u) > 0 {
+				rb = u
+			}
+		}
+		out.Devices = append(out.Devices, LeftDevice{Device: dp.Device, Apply: slices.Clone(dp.Apply), Rollback: slices.Clone(rb),
 			Pre: slices.Clone(dp.Pre), Post: slices.Clone(dp.Post), Expect: slices.Clone(dp.Expect), Baseline: cloneMap(dp.Baseline),
 			Secrets: slices.Clone(dp.Secrets), State: cloneMap(r.snap[i])})
 	}

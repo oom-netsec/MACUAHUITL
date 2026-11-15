@@ -579,3 +579,34 @@ func TestNetflowDefaultPortPostCheck(t *testing.T) {
 		t.Errorf("fallos con el puerto por omisión: %v", fails)
 	}
 }
+
+// La reversa pendiente que se guarda (la que se usa si la ejecución queda abandonada o la app se reinicia) es la
+// recortada a lo aplicado, no la completa: la completa choca con «does not exist» y deja residuo.
+func TestNetflowPendingRollbackIsTrimmed(t *testing.T) {
+	dev := nfDev()
+	dp, err := l3Plan(t, "netflow-export", nfVals(), dev)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpl := mustTemplate(t, "netflow-export")
+	fx := &fakeExec{echo: true}
+	fx.readFunc = func(_, cmd string) string { return dev.read([]string{cmd})[cmd] }
+	var saved *Leftover
+	r, err := NewRun(Options{ID: "run1", Plan: Plan{Function: tpl.Fn.Name, Devices: []DevicePlan{dp}}, Fn: tpl.Fn, Assisted: true,
+		Exec: &strictExec{fakeExec: fx, dev: dev, reject: "collect counter bytes long"}, Audit: func(a, b, c string) {},
+		Persist: func(l *Leftover) { saved = l }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Start(context.Background())
+	pending(t, r, "apply-1")
+	r.Confirm("apply-1")
+	wait(t, r, Failed)
+	want := []string{"no flow record MX-REC"}
+	if l := r.Leftover(); l == nil || !slices.Equal(l.Devices[0].Rollback, want) {
+		t.Fatalf("Leftover = %+v, quería la reversa %v", l, want)
+	}
+	if saved == nil || !slices.Equal(saved.Devices[0].Rollback, want) {
+		t.Fatalf("lo persistido = %+v, quería la reversa %v", saved, want)
+	}
+}

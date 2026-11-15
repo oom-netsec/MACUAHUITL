@@ -665,6 +665,7 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 		r.mu.Lock()
 		r.partial[i] = ok
 		r.mu.Unlock()
+		r.sync() // lo persistido lleva ya la reversa recortada aunque la relectura de abajo falle
 		// Lo que quedó a medias es la referencia de una reversa tardía; si la relectura coincide con la línea base
 		// (p. ej. el equipo rechazó la primera línea), no cambió nada. Si la relectura falla, queda como cambiado.
 		if r.resync(ctx, i) {
@@ -803,8 +804,6 @@ func (r *Run) rollback(ctx context.Context) {
 	r.finish(RolledBack)
 }
 
-// rollbackOne confirma y aplica la reversa de un equipo. Si falla se queda esperando una decisión:
-// reintentar (Rollback) o abortar. false = la ejecución terminó aquí.
 // rollbackLines es la reversa del equipo i: la del plan, recortada con Undo si el apply quedó a medias.
 func (r *Run) rollbackLines(i int) []string {
 	dp := r.plan.Devices[i]
@@ -817,6 +816,8 @@ func (r *Run) rollbackLines(i int) []string {
 	return dp.Rollback
 }
 
+// rollbackOne confirma y aplica la reversa de un equipo. Si falla se queda esperando una decisión:
+// reintentar (Rollback) o abortar. false = la ejecución terminó aquí.
 func (r *Run) rollbackOne(ctx context.Context, i int) bool {
 	dp := r.plan.Devices[i]
 	step := Step{ID: fmt.Sprintf("rollback-%d", i+1), Kind: StepRollback, Device: dp.Device, Lines: r.scrubLines(r.rollbackLines(i))}
