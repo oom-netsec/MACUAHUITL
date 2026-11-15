@@ -444,3 +444,19 @@ func TestNoSuchEsRechazo(t *testing.T) {
 		}
 	}
 }
+
+// Lo que viene de una línea citada entre comillas (show tech del ASA: «*** Output from config line N, "…"») nunca se
+// descarta: ahí los descartes de la salida normal (etiqueta : valor, palabras de configuración, <MASKED: cercano) pueden
+// esconder una clave real.
+func TestLineaCitadaNuncaSeDescarta(t *testing.T) {
+	for _, ln := range []string{
+		`*** Output from config line 9, "enable password cisco"`,
+		`*** Output from config line 4, "password encryption Sup3rS3cret"`,
+		`*** Output from config line 5, "snmp-server community name"`,
+		`WARNING: "psk provisioning K3yPr0v" ignored`,
+	} {
+		if _, _, ok := secretAt(ln); !ok {
+			t.Errorf("descartó una línea citada: %q", ln)
+		}
+	}
+}
