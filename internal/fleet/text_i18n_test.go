@@ -108,6 +108,7 @@ func TestEscenariosCubrenTodasLasClavesDeFlota(t *testing.T) {
 		"fleet.warn.zip_entry":        "una entrada de zip que no abre exige un zip corrupto por dentro",
 		"fleet.reason.rec_not_ip":     "el siguiente salto siempre es una IP legible",
 		"fleet.reason.rec_no_nexthop": "una ruta sin siguiente salto ni interfaz no sale del parser",
+		"fleet.warn.rejected_many":    "lo cubre TestRechazosSeAgrupanPorComando (los escenarios solo rechazan en un equipo)",
 		"fleet.warn.dir_unreadable":   "exige un usuario sin privilegios (se omite si corre como root)",
 	}
 	for _, prefix := range []string{"fleet.warn.", "fleet.reason.", "fleet.note.", "fleet.value.", "fleet.detail.", "fleet.evidence."} {

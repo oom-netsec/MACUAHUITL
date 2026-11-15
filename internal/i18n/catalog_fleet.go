@@ -103,5 +103,7 @@ func init() {
 		"fleet.err.not_dir":       e("{path} no es una carpeta", "{path} is not a folder", "path"),
 		"fleet.err.load":          e("flota: {cause}", "fleet: {cause}", "cause"),
 		"fleet.err.no_outputs":    e("flota: {dir} no contiene salidas de Patrol (carpetas <equipo>_<ip> con encabezados =====)", "fleet: {dir} has no Patrol outputs (<device>_<ip> folders with ===== headers)", "dir"),
+
+		"fleet.warn.rejected_many": e("{cmd}: los equipos lo rechazaron ({n}): {devs}; se ignora", "{cmd}: rejected by {n} devices: {devs}; ignored", "cmd", "n", "devs"),
 	})
 }

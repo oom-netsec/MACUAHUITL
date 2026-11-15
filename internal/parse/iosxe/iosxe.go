@@ -41,7 +41,7 @@ func NormMAC(s string) (string, bool) {
 var ifPrefixes = []struct{ long, short string }{
 	{"twentyfivegige", "Twe"}, {"hundredgige", "Hu"}, {"fortygigabitethernet", "Fo"}, {"tengigabitethernet", "Te"},
 	{"gigabitethernet", "Gi"}, {"fastethernet", "Fa"}, {"ethernet", "Eth"}, {"port-channel", "Po"},
-	{"twe", "Twe"}, {"hu", "Hu"}, {"fo", "Fo"}, {"te", "Te"}, {"gi", "Gi"}, {"fa", "Fa"}, {"eth", "Eth"}, {"po", "Po"},
+	{"twe", "Twe"}, {"hu", "Hu"}, {"fo", "Fo"}, {"te", "Te"}, {"gi", "Gi"}, {"fa", "Fa"}, {"eth", "Eth"}, {"et", "Eth"}, {"po", "Po"},
 }
 
 // ShortIf lleva el nombre de interfaz a la abreviatura de IOS (GigabitEthernet1/0/1 → Gi1/0/1).
@@ -61,6 +61,7 @@ type ARP struct{ IP, MAC, Iface string }
 
 var arpRe = regexp.MustCompile(`^Internet\s+(\S+)\s+\S+\s+([0-9a-fA-F.]{14})\s+ARPA\s+(\S+)`)
 
+// Una salida vacía es una tabla vacía válida (sin SVI ni ARP en la VRF global el equipo no imprime nada).
 func ParseARP(text string) ([]ARP, bool) {
 	var out []ARP
 	head := false
@@ -74,7 +75,7 @@ func ParseARP(text string) ([]ARP, bool) {
 			}
 		}
 	}
-	return out, head || len(out) > 0
+	return out, head || len(out) > 0 || strings.TrimSpace(text) == ""
 }
 
 // ---- show mac address-table ----

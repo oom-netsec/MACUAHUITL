@@ -221,6 +221,176 @@ func ParseHSRP(text string) ([]HSRPGroup, bool) {
 	return out, header
 }
 
+// ---- show ip eigrp neighbors ----
+
+type EIGRPNeighbor struct {
+	Address, Interface, AS string
+	Line                   string
+}
+
+var (
+	eigrpASRe     = regexp.MustCompile(`^EIGRP-IPv[46] .*Neighbors for AS\((\d+)\)`)
+	eigrpHeaderRe = regexp.MustCompile(`^H\s+Address\s+Interface`)
+	eigrpRowRe    = regexp.MustCompile(`^\d+\s+(\S+)\s+(\S+)\s+\d+\s+\S+\s+\d+\s+\d+\s+\d+\s+\d+\s*$`)
+)
+
+// ParseEIGRP lee el formato clásico y el nombrado. shortcut: el vecino IPv6 (dirección en la línea siguiente)
+// no se lee; llegar a él cuando haya una salida de EIGRP para IPv6.
+func ParseEIGRP(text string) ([]EIGRPNeighbor, bool) {
+	if blank(text) {
+		return nil, true
+	}
+	var out []EIGRPNeighbor
+	header, as := false, ""
+	for _, ln := range lines(text) {
+		if m := eigrpASRe.FindStringSubmatch(ln); m != nil {
+			as, header = m[1], true // sin vecinos IOS imprime solo esta línea
+		} else if eigrpHeaderRe.MatchString(ln) {
+			header = true
+		} else if m := eigrpRowRe.FindStringSubmatch(ln); header && m != nil {
+			out = append(out, EIGRPNeighbor{Address: m[1], Interface: ShortIf(m[2]), AS: as, Line: ln})
+		}
+	}
+	return out, header
+}
+
+// ---- show mpls ldp neighbor ----
+
+type LDPNeighbor struct {
+	PeerID, State string
+	Line          string // la línea «Peer LDP Ident»
+}
+
+var (
+	ldpPeerRe  = regexp.MustCompile(`^\s*Peer LDP Ident: (\S+?);`)
+	ldpStateRe = regexp.MustCompile(`^\s*State: (\w+)`)
+)
+
+func ParseLDPNeighbors(text string) ([]LDPNeighbor, bool) {
+	if blank(text) {
+		return nil, true
+	}
+	var out []LDPNeighbor
+	for _, ln := range lines(text) {
+		if m := ldpPeerRe.FindStringSubmatch(ln); m != nil {
+			out = append(out, LDPNeighbor{PeerID: m[1], Line: ln})
+		} else if m := ldpStateRe.FindStringSubmatch(ln); m != nil && len(out) > 0 {
+			out[len(out)-1].State = m[1]
+		}
+	}
+	return out, len(out) > 0
+}
+
+// ---- show track brief ----
+
+type TrackObject struct {
+	ID, Type, Instance, Parameter, State string
+	Line                                 string
+}
+
+var (
+	trackHeaderRe = regexp.MustCompile(`^Track\s+Type\s+Instance\s+Parameter\s+State`)
+	// el tipo puede ser de dos palabras (ip sla, ip route) separadas por un solo espacio
+	trackRowRe = regexp.MustCompile(`^(\d+)\s+(\S+(?: \S+)?)\s+(\S+)\s+(\S+)\s+(Up|Down)\s+\S+\s*$`)
+	// respaldo: ID al inicio y «Up|Down Last-Change» al final; lo del medio se reparte como se pueda
+	trackLooseRe = regexp.MustCompile(`^(\d+)\s+(.+?)\s+(Up|Down)\s+\S+\s*$`)
+)
+
+func ParseTrack(text string) ([]TrackObject, bool) {
+	if blank(text) {
+		return nil, true
+	}
+	var out []TrackObject
+	header := false
+	for _, ln := range lines(text) {
+		if trackHeaderRe.MatchString(ln) {
+			header = true
+			continue
+		}
+		if !header {
+			continue
+		}
+		if m := trackRowRe.FindStringSubmatch(ln); m != nil {
+			out = append(out, TrackObject{ID: m[1], Type: m[2], Instance: m[3], Parameter: m[4], State: m[5], Line: ln})
+		} else if m := trackLooseRe.FindStringSubmatch(ln); m != nil {
+			t := TrackObject{ID: m[1], State: m[3], Line: ln}
+			mid := strings.Fields(m[2])
+			switch {
+			case len(mid) >= 3:
+				t.Type, t.Instance, t.Parameter = mid[0], mid[1], strings.Join(mid[2:], " ")
+			case len(mid) == 2:
+				t.Type, t.Instance = mid[0], mid[1]
+			default:
+				t.Type = m[2]
+			}
+			out = append(out, t)
+		}
+	}
+	return out, header
+}
+
+// ---- show glbp brief ----
+
+var (
+	glbpHeaderRe = regexp.MustCompile(`^Interface\s+Grp\s+Fwd\s+Pri\s+State`)
+	glbpRowRe    = regexp.MustCompile(`^(\S+)\s+(\d+)\s+(-|\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$`)
+)
+
+// ParseGLBP reutiliza HSRPGroup. Group es «50» para el AVG y «50/1» para el AVF 1, para que la clave sea única;
+// VIP es la IP virtual (AVG) o la MAC virtual (AVF).
+func ParseGLBP(text string) ([]HSRPGroup, bool) {
+	if blank(text) {
+		return nil, true
+	}
+	var out []HSRPGroup
+	header := false
+	for _, ln := range lines(text) {
+		if glbpHeaderRe.MatchString(ln) {
+			header = true
+			continue
+		}
+		if m := glbpRowRe.FindStringSubmatch(ln); header && m != nil {
+			grp := m[2]
+			if m[3] != "-" {
+				grp += "/" + m[3]
+			}
+			out = append(out, HSRPGroup{Interface: m[1], Group: grp, State: m[5], VIP: m[6], Active: m[7], Standby: m[8], Line: ln})
+		}
+	}
+	return out, header
+}
+
+// ---- show vrrp brief ----
+
+var (
+	vrrpHeaderRe = regexp.MustCompile(`^\s*Interface\s+Grp\s+(?:A-F\s+)?Pri\s+Time`)
+	vrrpRowRe    = regexp.MustCompile(`^\s*(\S+)\s+(\d+)\s+\d+\s+\d+\s+(?:Y\s+)?(?:Y\s+)?(\S+)\s+(\S+)\s+(\S+)\s*$`)
+	// VRRPv3 (fhrp version vrrp v3): columna A-F, Own y Pre como Y/N y estados en mayúsculas
+	vrrp3RowRe = regexp.MustCompile(`^\s*(\S+)\s+(\d+)\s+(IPv[46])\s+\d+\s+\d+\s+[YN]\s+[YN]\s+(\S+)\s+(\S+)\s+(\S+)\s*$`)
+)
+
+// ParseVRRP reutiliza HSRPGroup: State es el estado y Active la dirección del master.
+// En VRRPv3 Group lleva la familia («1/IPv4») para no mezclar IPv4 con IPv6.
+func ParseVRRP(text string) ([]HSRPGroup, bool) {
+	if blank(text) {
+		return nil, true
+	}
+	var out []HSRPGroup
+	header := false
+	for _, ln := range lines(text) {
+		if vrrpHeaderRe.MatchString(ln) {
+			header = true
+			continue
+		}
+		if m := vrrp3RowRe.FindStringSubmatch(ln); header && m != nil {
+			out = append(out, HSRPGroup{Interface: m[1], Group: m[2] + "/" + m[3], State: m[4], Active: m[5], VIP: m[6], Line: ln})
+		} else if m := vrrpRowRe.FindStringSubmatch(ln); header && m != nil {
+			out = append(out, HSRPGroup{Interface: m[1], Group: m[2], State: m[3], Active: m[4], VIP: m[5], Line: ln})
+		}
+	}
+	return out, header
+}
+
 // ---- show ip route summary ----
 
 // RouteSummary es una fila por origen ("ospf 1", "bgp 65001", "connected").

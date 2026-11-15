@@ -481,3 +481,54 @@ func TestSinEvidenciaNoEsTodoBien(t *testing.T) {
 		t.Errorf("capacity: %+v", c)
 	}
 }
+
+// Un show ip arp vacío (sin ARP en la VRF global) no es un formato inesperado.
+func TestARPVacioNoAvisa(t *testing.T) {
+	a := devFrom("A_10.0.0.1", map[string]string{"show ip arp": "\n", "show mac address-table": macTbl})
+	r := New([]*Dev{a}, now).Trace("aabb.cc00.0a01")
+	if w := strings.Join(r.Warnings, "|"); strings.Contains(w, "formato") {
+		t.Fatalf("avisó formato: %s", w)
+	}
+}
+
+// Las subinterfaces de un router comparten MAC: la VLAN de la interfaz de la fila ARP decide qué entrada CAM se sigue.
+func TestTraceIPPrefiereVLANDelARP(t *testing.T) {
+	cam := "Vlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n" +
+		"  10    aabb.cc00.0a01    DYNAMIC     Gi1/0/1\n  20    aabb.cc00.0a01    DYNAMIC     Gi1/0/2\n"
+	for _, iface := range []string{"Vlan20", "Et0/1.20", "GigabitEthernet0/0.20"} {
+		arp := "Protocol  Address     Age (min)  Hardware Addr   Type   Interface\nInternet  10.1.20.3         5   aabb.cc00.0a01  ARPA   " + iface + "\n"
+		a := devFrom("A_10.0.0.1", map[string]string{"show ip arp": arp, "show mac address-table": cam})
+		r := New([]*Dev{a}, now).Trace("10.1.20.3")
+		if len(r.Hops) != 1 || r.Hops[0].VLAN != "20" || r.Hops[0].Port != "Gi1/0/2" {
+			t.Fatalf("%s: %+v", iface, r)
+		}
+	}
+	// Sin dato de VLAN o sin entrada en esa VLAN, sigue con la que haya.
+	arp := "Protocol  Address     Age (min)  Hardware Addr   Type   Interface\nInternet  10.1.30.3         5   aabb.cc00.0a01  ARPA   Vlan30\n"
+	a := devFrom("A_10.0.0.1", map[string]string{"show ip arp": arp, "show mac address-table": cam})
+	if r := New([]*Dev{a}, now).Trace("10.1.30.3"); len(r.Hops) != 1 || r.End != "access" {
+		t.Fatalf("%+v", r)
+	}
+}
+
+// Si la VLAN que sale del ARP no está en la CAM (subinterfaz .1020 con dot1Q 20), se elige como antes: la DYNAMIC.
+func TestTraceVLANAusenteSigueLaDinamica(t *testing.T) {
+	cam := "Vlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n" +
+		"  10    aabb.cc00.0a01    STATIC      Gi1/0/1\n  30    aabb.cc00.0a01    DYNAMIC     Gi1/0/3\n"
+	arp := "Protocol  Address     Age (min)  Hardware Addr   Type   Interface\nInternet  10.1.20.3         5   aabb.cc00.0a01  ARPA   GigabitEthernet0/0.1020\n"
+	a := devFrom("A_10.0.0.1", map[string]string{"show ip arp": arp, "show mac address-table": cam})
+	if r := New([]*Dev{a}, now).Trace("10.1.20.3"); len(r.Hops) != 1 || r.Hops[0].VLAN != "30" {
+		t.Fatalf("%+v", r)
+	}
+}
+
+// Dos equipos con el mismo hostname y distinta IP se distinguen por la dirección en los rechazos agrupados.
+func TestRechazosAgrupadosMismoNombre(t *testing.T) {
+	w := &ws{}
+	w.reject("R1", "show x", "ahora", "10.0.0.1")
+	w.reject("R1", "show x", "ahora", "10.0.0.2")
+	l, _ := w.out()
+	if len(l) != 1 || !strings.Contains(l[0], "R1 (10.0.0.1), R1 (10.0.0.2)") {
+		t.Errorf("%q", l)
+	}
+}

@@ -1,0 +1,4 @@
+EIGRP-IPv4 VR(CORP) Address-Family Neighbors for AS(200)
+H   Address                 Interface              Hold Uptime   SRTT   RTO  Q  Seq
+                                                   (sec)         (ms)       Cnt Num
+0   192.0.2.2               Gi1                      14 1d02h       1   100  0  42

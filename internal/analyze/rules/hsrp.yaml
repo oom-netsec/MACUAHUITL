@@ -23,3 +23,47 @@
   title_en: "HSRP in an abnormal state"
   explanation_en: "The group is in Init/Learn/Speak or does not know the Active/Standby; there is no effective redundancy."
   action_en: "Verify the SVI is up and the peers can see each other (same version, group and authentication)."
+- id: glbp-inestable
+  title: GLBP cambió de estado entre rondas
+  severity: alta
+  commands: [show glbp brief]
+  check: hsrp
+  params: {mode: changed}
+  explanation: Un AVG o un AVF de GLBP cambió de estado entre rondas; el reparto del gateway virtual se movió.
+  action: Revisa %GLBP-6-STATECHANGE en el log, el weighting y el seguimiento (track), y la pérdida de hellos entre pares.
+  title_en: "GLBP changed state between rounds"
+  explanation_en: "A GLBP AVG or AVF changed state between rounds; the virtual gateway distribution moved."
+  action_en: "Check %GLBP-6-STATECHANGE in the log, the weighting and tracking (track), and hello loss between peers."
+- id: glbp-estado-anomalo
+  title: GLBP en estado anómalo
+  severity: media
+  commands: [show glbp brief]
+  check: hsrp
+  params: {mode: bad}
+  explanation: Un grupo GLBP está en Init o su AVG no conoce al Active router (unknown); no hay redundancia efectiva. Listen es normal en un AVF.
+  action: Verifica que la interfaz esté arriba y que los pares se vean (mismo grupo, autenticación y multicast 224.0.0.102).
+  title_en: "GLBP in an abnormal state"
+  explanation_en: "A GLBP group is in Init or its AVG does not know the Active router (unknown); there is no effective redundancy. Listen is normal on an AVF."
+  action_en: "Verify the interface is up and the peers can see each other (same group, authentication and multicast 224.0.0.102)."
+- id: vrrp-inestable
+  title: VRRP cambió de estado entre rondas
+  severity: alta
+  commands: [show vrrp brief]
+  check: hsrp
+  params: {mode: changed}
+  explanation: El grupo VRRP cambió de estado entre rondas; el master se movió.
+  action: Revisa %VRRP-6-STATECHANGE en el log, el seguimiento (track) y la pérdida de anuncios entre pares.
+  title_en: "VRRP changed state between rounds"
+  explanation_en: "The VRRP group changed state between rounds; the master moved."
+  action_en: "Check %VRRP-6-STATECHANGE in the log, tracking (track) and advertisement loss between peers."
+- id: vrrp-estado-anomalo
+  title: VRRP en estado anómalo
+  severity: media
+  commands: [show vrrp brief]
+  check: hsrp
+  params: {mode: bad}
+  explanation: El grupo VRRP está en Init; no participa en la elección y no hay redundancia efectiva.
+  action: Verifica que la interfaz esté arriba y con IP, que el grupo tenga su dirección virtual y que los pares se vean (versión, autenticación).
+  title_en: "VRRP in an abnormal state"
+  explanation_en: "The VRRP group is in Init; it does not take part in the election and there is no effective redundancy."
+  action_en: "Verify the interface is up with an IP, that the group has its virtual address and that the peers can see each other (version, authentication)."

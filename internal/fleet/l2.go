@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -279,7 +280,7 @@ func (f *Fleet) Find(q string) FindResult {
 			w.tx("fleet.warn.no_source", "cmd", c, "devs", strings.Join(miss, ", "))
 		}
 	}
-	res.Warnings, res.WarningsTx = w.list, w.txs
+	res.Warnings, res.WarningsTx = w.out()
 	return res
 }
 
@@ -339,6 +340,14 @@ func (g *l2) macEntry(d *Dev, mac, vlan string) (struct {
 		iosxe.MACEntry
 	}
 	ok := false
+	if vlan != "" && !slices.ContainsFunc(g.mac, func(r struct {
+		tag
+		iosxe.MACEntry
+	}) bool {
+		return r.Dev == d && r.MAC == mac && r.VLAN == vlan
+	}) {
+		vlan = "" // la VLAN pedida no está en esta CAM: se elige como sin preferencia (DYNAMIC primero)
+	}
 	for _, r := range g.mac {
 		if r.Dev != d || r.MAC != mac {
 			continue
@@ -382,17 +391,38 @@ func (f *Fleet) resolve(n iosxe.Neighbor) *Dev {
 	return nil
 }
 
-// walk sigue la MAC desde start (nil = elige).
-func (f *Fleet) walk(g *l2, w *ws, mac string, start *Dev) (hops []TraceHop, end string, access *TraceHop) {
+// vlanOfIface saca la VLAN preferida del nombre de la interfaz de la fila ARP (Vl20, Vlan20, Et0/1.20).
+// shortcut: usa la convención "subinterfaz .N = VLAN N" y no lee encapsulation dot1Q; revisarlo si hay que ser exacto.
+func vlanOfIface(iface string) string {
+	l := strings.ToLower(iface)
+	var n string
+	switch {
+	case strings.HasPrefix(l, "vlan"):
+		n = l[4:]
+	case strings.HasPrefix(l, "vl"):
+		n = l[2:]
+	default:
+		if i := strings.LastIndexByte(l, '.'); i >= 0 {
+			n = l[i+1:]
+		}
+	}
+	if n == "" || strings.Trim(n, "0123456789") != "" {
+		return ""
+	}
+	return n
+}
+
+// walk sigue la MAC desde start (nil = elige). vlan0 es la VLAN que se prefiere en el primer salto ("" = cualquiera).
+func (f *Fleet) walk(g *l2, w *ws, mac string, start *Dev, vlan0 string) (hops []TraceHop, end string, access *TraceHop) {
 	if start == nil {
 		var cands []*Dev
 		for _, d := range f.Devs {
-			if e, ok := g.macEntry(d, mac, ""); ok && e.Port != "CPU" {
+			if e, ok := g.macEntry(d, mac, vlan0); ok && e.Port != "CPU" {
 				cands = append(cands, d)
 			}
 		}
 		for _, d := range cands { // preferir quien la ve por un enlace a otro equipo
-			e, _ := g.macEntry(d, mac, "")
+			e, _ := g.macEntry(d, mac, vlan0)
 			if _, has := g.neighborOf(d, e.Port); has && start == nil {
 				start = d
 			}
@@ -406,7 +436,7 @@ func (f *Fleet) walk(g *l2, w *ws, mac string, start *Dev) (hops []TraceHop, end
 		}
 	}
 	visited := map[string]bool{}
-	vlan := ""
+	vlan := vlan0
 	for cur := start; len(hops) < maxTrace; {
 		e, ok := g.macEntry(cur, mac, vlan)
 		if !ok {
@@ -460,6 +490,7 @@ func (f *Fleet) Trace(q string) TraceResult {
 	w := f.newWS()
 	g := f.gather(w)
 	res := TraceResult{Query: strings.TrimSpace(q)}
+	viaIface := "" // interfaz de la fila ARP elegida
 	if m, ok := iosxe.NormMAC(q); ok {
 		res.MAC = m
 	} else if a, err := netip.ParseAddr(strings.TrimSpace(q)); err == nil {
@@ -470,7 +501,7 @@ func (f *Fleet) Trace(q string) TraceResult {
 			if r.IP == res.IP {
 				macs[r.MAC] = true
 				if r.At.After(at) {
-					at, res.MAC = r.At, r.MAC
+					at, res.MAC, viaIface = r.At, r.MAC, r.Iface
 				}
 			}
 		}
@@ -479,16 +510,17 @@ func (f *Fleet) Trace(q string) TraceResult {
 		}
 		if res.MAC == "" {
 			w.tx("fleet.warn.ip_no_arp", "ip", res.IP)
-			res.End, res.Warnings, res.WarningsTx = "not-found", w.list, w.txs
+			res.End = "not-found"
+			res.Warnings, res.WarningsTx = w.out()
 			return res
 		}
 	} else {
 		res.End = "not-found"
 		w.tx("fleet.warn.bad_query", "query", q)
-		res.Warnings, res.WarningsTx = w.list, w.txs
+		res.Warnings, res.WarningsTx = w.out()
 		return res
 	}
-	res.Hops, res.End, res.Access = f.walk(g, w, res.MAC, nil)
+	res.Hops, res.End, res.Access = f.walk(g, w, res.MAC, nil, vlanOfIface(viaIface))
 	seen := map[string]bool{}
 	for _, h := range res.Hops {
 		seen[h.Device] = true
@@ -499,6 +531,6 @@ func (f *Fleet) Trace(q string) TraceResult {
 			seen[r.Dev.Name] = true
 		}
 	}
-	res.Warnings, res.WarningsTx = w.list, w.txs
+	res.Warnings, res.WarningsTx = w.out()
 	return res
 }

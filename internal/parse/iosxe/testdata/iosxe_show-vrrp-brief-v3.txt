@@ -1,0 +1,3 @@
+  Interface          Grp  A-F Pri  Time Own Pre State   Master addr/Group addr
+  Gi1                  1 IPv4 100     0  N   Y  MASTER  10.0.0.1(local) 10.0.0.254
+  Gi1                  2 IPv6 100     0  N   Y  BACKUP  FE80::1         2001:DB8::254

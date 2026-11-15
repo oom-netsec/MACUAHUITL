@@ -69,7 +69,7 @@ func (s *visibilitySvc) BuildTopology(ctx context.Context, r *v1.BuildTopologyRe
 		neigh = rep.Neighbors
 	}
 	g := topo.Build(devs, neigh, filepath.Base(r.PcapPath))
-	return &v1.BuildTopologyResponse{Report: service.Report(g, g.Text()), Svg: g.SVG()}, nil
+	return &v1.BuildTopologyResponse{Report: service.ReportL(ctx, &g, g.TextIn), Svg: g.SVG()}, nil
 }
 
 // credential descifra una credencial de la bóveda; quien llama hace Destroy.

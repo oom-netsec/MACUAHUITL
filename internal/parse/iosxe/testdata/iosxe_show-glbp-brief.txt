@@ -1,0 +1,4 @@
+Interface   Grp  Fwd Pri State    Address         Active router   Standby router
+Et0/0       10   -   110 Active   10.0.0.254      local           10.0.0.2
+Et0/0       10   1   -   Active   0007.b400.0a01  local           -
+Et0/0       10   2   -   Listen   0007.b400.0a02  10.0.0.2        -
