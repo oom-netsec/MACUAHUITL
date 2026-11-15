@@ -108,7 +108,7 @@ func inactive(text string) (string, bool) {
 // tipo, auth/priv 0x de SNMPv3 (NX-OS), un hash crypt ($1$, $8$, $9$...) o una llave privada. Cada alternativa
 // captura el valor; los que son <MASKED:...> no cuentan. Da candidatos para revisar a mano, no veredictos.
 var secretRe = regexp.MustCompile(`(?i)\b(?:password|secret|key-string|pre-shared-key|shared-secret|passphrase|community|server-key|authentication-key|wpa-psk|psk)\s+(?:[0-9]\s+)?(\S+)` +
-	`|\bmessage-digest-key\s+\d+\s+md5\s+(?:[0-9]\s+)?(\S+)|\bkey\s+[0-9]\s+(\S+)|\b(?:auth|priv)\s+(?:\S+\s+)?(0x[0-9a-f]+)` +
+	`|\bmessage-digest-key\s+\d+\s+md5\s+(?:[0-9]\s+)?(\S+)|\bkey\s+[0-9]\s+(\S+)|\b(?:(?:tacacs|radius)-server\s+(?:host\s+\S+\s+)?|crypto\s+isakmp\s+)key\s+(?:[0-9]\s+)?(\S+)|\b(?:auth|priv)\s+(?:\S+\s+)?(0x[0-9a-f]+)` +
 	`|(\$[1-9][a-z]?\$\S{4,})|(BEGIN [A-Z ]*PRIVATE KEY)`)
 
 // labelRe: un contador o estado de show, «Etiqueta de palabras : valor» con espacio a los dos lados del «:» y una
