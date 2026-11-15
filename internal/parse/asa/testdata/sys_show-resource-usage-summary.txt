@@ -1,0 +1,12 @@
+asa# show resource usage summary
+Resource              Current         Peak      Limit     Denied Context
+Syslogs [rate]           1743         2132      12000(U)       0 Summary
+Conns                     584          763     100000(S)       0 Summary
+Xlates                   8526         8966      93400          0 Summary
+Hosts                     254          254     262144          0 Summary
+Conns [rate]              270          535      42200       1704 Summary
+Inspects [rate]           270          535     100000(S)       0 Summary
+Other VPN Sessions          0           10         10        740 Summary
+Other VPN Burst             0           10         10        730 Summary
+U = Some contexts are unlimited and are not included in the total.
+S = System: Combined context limits exceed the system limit; the system limit is shown.

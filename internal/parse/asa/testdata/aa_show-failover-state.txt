@@ -1,0 +1,12 @@
+asa# show failover state
+               State          Last Failure Reason      Date/Time
+This host  -   Secondary
+    Group 1    Failed         Backplane Failure        03:42:29 UTC Apr 17 2009
+    Group 2    Failed         Backplane Failure        03:42:29 UTC Apr 17 2009
+Other host -   Primary
+    Group 1    Active         Comm Failure             03:41:12 UTC Apr 17 2009
+    Group 2    Active         Comm Failure             03:41:12 UTC Apr 17 2009
+====Configuration State===
+        Sync Done
+====Communication State===
+        Mac set

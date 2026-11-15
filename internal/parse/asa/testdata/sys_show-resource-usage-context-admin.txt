@@ -1,0 +1,5 @@
+asa# show resource usage context admin
+Resource              Current         Peak      Limit    Denied  Context
+Telnet                      1            1          5         0  admin
+Conns                      44           55        N/A         0  admin
+Hosts                      45           56        N/A         0  admin

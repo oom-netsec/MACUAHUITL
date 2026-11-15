@@ -1,0 +1,27 @@
+asa# show failover history
+===================================================
+From State                 To State                   Reason
+===================================================
+11:59:31 UTC Jan 13 2017
+Active Config Applied      Active                     No Active unit found
+
+06:17:51 UTC Jan 15 2017
+Active                     Failed                     Interface check
+                                                              This Host:3
+                                                                admin: inside
+                                                                ctx-1: ctx1-1
+                                                                ctx-2: ctx2-1
+                                                              Other Host:0
+03:58:49 UTC Feb 3 2017
+Active                     Cold Standby               Failover state check delayed due to  mate failure
+
+03:58:51 UTC Feb 3 2017
+Cold Standby               Sync Config                Failover state check delayed due to  mate failure
+
+03:59:18 UTC Feb 3 2017
+Sync Config                Sync File System           Failover state check delayed due to  mate failure
+23:11:39 UTC Jan 13 2017
+Cold Standby               Failed                     HA state progression failed as response not heard from mate
+
+23:19:01 UTC Jan 13 2017
+Sync Config                Not Detected               HA state progression failed as configuration sync timeout expired

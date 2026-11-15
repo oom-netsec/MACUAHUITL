@@ -1,0 +1,82 @@
+asa# show failover
+Failover On
+Failover unit Primary
+Failover LAN Interface: folink Ethernet1/8 (up)
+Reconnect timeout 0:00:00
+Unit Poll frequency 1 seconds, holdtime 15 seconds
+Interface Poll frequency 5 seconds, holdtime 25 seconds
+Interface Policy 1
+Monitored Interfaces 6 of 1292 maximum
+MAC Address Move Notification Interval not set
+failover replication http
+Version: Ours 9.17(1), Mate 9.17(1)
+Serial Number: Ours FCH0000A001, Mate FCH0000A002
+Group 1 last failover at: 13:40:18 UTC Nov 9 2026
+Group 2 last failover at: 13:40:06 UTC Nov 9 2026
+
+  This host:    Primary
+  Group 1       State:          Active
+                Active time:    2896 (sec)
+  Group 2       State:          Standby Ready
+                Active time:    0 (sec)
+
+                slot 0: FPR-2130 hw/sw rev (1.0/9.17(1)) status (Up Sys)
+                admin Interface management (10.132.8.5): Normal (Monitored)
+                admin Interface inside (10.130.8.5/fe80::1:5): Normal (Monitored)
+                ctx1 Interface outside (10.1.1.1): Normal (Monitored)
+                ctx1 Interface inside (10.2.2.1): Normal (Monitored)
+                ctx2 Interface outside (10.3.3.2): Normal (Waiting)
+                ctx2 Interface inside (10.4.4.2): Normal (Monitored)
+
+  Other host:   Secondary
+  Group 1       State:          Standby Ready
+                Active time:    190 (sec)
+  Group 2       State:          Active
+                Active time:    3322 (sec)
+
+                slot 0: FPR-2130 hw/sw rev (1.0/9.17(1)) status (Up Sys)
+                admin Interface management (10.132.8.6): Normal (Monitored)
+                admin Interface inside (10.130.8.6/fe80::1:6): Normal (Monitored)
+                ctx1 Interface outside (10.1.1.2): Normal (Monitored)
+                ctx1 Interface inside (10.2.2.2): Normal (Monitored)
+                ctx2 Interface outside (10.3.3.1): Normal (Waiting)
+                ctx2 Interface inside (10.4.4.1): Normal (Monitored)
+
+Stateful Failover Logical Update Statistics
+        Link : folink Ethernet1/8 (up)
+        Stateful Obj    xmit       xerr       rcv        rerr
+        General         1959       0          1873       0
+        sys cmd         380        0          380        0
+        up time         0          0          0          0
+        RPC services    0          0          0          0
+        TCP conn        1435       0          1450       0
+        UDP conn        0          0          0          0
+        ARP tbl         124        0          65         0
+        Xlate_Timeout   0          0          0          0
+        IPv6 ND tbl     20         0          0          0
+        VPN IKEv1 SA    0          0          0          0
+        VPN IKEv1 P2    0          0          0          0
+        VPN IKEv2 SA    0          0          0          0
+        VPN IKEv2 P2    0          0          0          0
+        VPN CTCP upd    0          0          0          0
+        VPN SDI upd     0          0          0          0
+        VPN DHCP upd    0          0          0          0
+        SIP Session     0          0          0          0
+        SIP Tx  0          0          0          0
+        SIP Pinhole     0          0          0          0
+        Route Session   0          0          0          0
+        Router ID       0          0          0          0
+        User-Identity   0          0          0          0
+        CTS SGTNAME     0          0          0          0
+        CTS PAC         0          0          0          0
+        TrustSec-SXP    0          0          0          0
+        IPv6 Route      0          0          0          0
+        STS Table       0          0          0          0
+        Rule DB B-Sync  0          0          0          0
+        Rule DB P-Sync  0          0          0          0
+        Rule DB Delete  0          0          0          0
+
+        Logical Update Queue Information
+                        Cur     Max     Total
+        Recv Q:         0       5       1873
+        Xmit Q:         0       11      2394

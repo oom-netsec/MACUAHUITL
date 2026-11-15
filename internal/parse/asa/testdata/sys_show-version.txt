@@ -1,0 +1,47 @@
+asa# show version
+
+Cisco Adaptive Security Appliance Software Version 9.17(1)
+SSP Operating System Version 2.11(1.288i)
+Device Manager Version 7.17(1)
+
+Compiled on Tue 06-Apr-21 05:41 GMT by builders
+System image file is "disk0:/mnt/boot/installables/switch/fxos-k8-fp2k-npu.2.11.1.288i.SSB"
+Config file at boot was "startup-config"
+
+asa up 1 day 23 hours
+failover cluster up 1 day 23 hours
+Start-up time 2 mins 40 secs
+
+Hardware:   FPR-2130, 13703 MB RAM, CPU MIPS 1200 MHz, 1 CPU (12 cores)
+
+
+ 1: Int: Internal-Data0/1    : address is 000f.0000.0001, irq 0
+ 3: Int: Not licensed        : irq 0
+ 4: Ext: Management1/1       : address is 2cf8.0000.0002, irq 0
+ 5: Int: Internal-Data1/1    : address is 0000.0100.0001, irq 0
+
+License mode: Smart Licensing
+
+Licensed features for this platform:
+Maximum Physical Interfaces       : Unlimited
+Maximum VLANs                     : 1024
+Inside Hosts                      : Unlimited
+Failover                          : Active/Active
+Encryption-DES                    : Enabled
+Encryption-3DES-AES               : Disabled
+Security Contexts                 : 5
+Carrier                           : Disabled
+AnyConnect Premium Peers          : 7500
+AnyConnect Essentials             : Disabled
+Other VPN Peers                   : 7500
+Total VPN Peers                   : 7500
+AnyConnect for Mobile             : Enabled
+AnyConnect for Cisco VPN Phone    : Enabled
+Advanced Endpoint Assessment      : Enabled
+Shared License                    : Disabled
+Total TLS Proxy Sessions          : 8000
+Cluster                           : Disabled
+
+Serial Number: FCH0000A001
+Configuration register is 0x1
+Configuration has not been modified since last system restart.

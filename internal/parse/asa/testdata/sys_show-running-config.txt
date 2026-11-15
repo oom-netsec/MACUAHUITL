@@ -1,0 +1,78 @@
+asa# show running-config
+: Saved
+:
+: Serial Number: FCH0000A001
+: Hardware:   FPR-2130, 13703 MB RAM, CPU MIPS 1200 MHz, 1 CPU (12 cores)
+:
+ASA Version 9.17(1) <system>
+!
+hostname asa
+enable password ***** pbkdf2
+mac-address auto
+!
+interface Ethernet1/1
+!
+interface Ethernet1/1.100
+ vlan 100
+!
+interface Ethernet1/1.200
+ vlan 200
+!
+interface Ethernet1/1.300
+ vlan 300
+!
+interface Ethernet1/2
+!
+interface Ethernet1/8
+ description LAN Failover Interface
+!
+interface Management1/1
+ management-only
+!
+class default
+  limit-resource All 0
+  limit-resource ASDM 5
+  limit-resource SSH 5
+  limit-resource Telnet 5
+!
+class gold
+  limit-resource Conns 10%
+  limit-resource Telnet 5
+!
+ftp mode passive
+pager lines 24
+failover
+failover lan unit primary
+failover lan interface folink Ethernet1/8
+failover key *****
+failover link folink Ethernet1/8
+failover interface ip folink 10.132.9.5 255.255.255.0 standby 10.132.9.6
+failover group 1
+  preempt
+failover group 2
+  secondary
+  preempt
+no asdm history enable
+arp timeout 14400
+console timeout 0
+!
+admin-context admin
+context admin
+  allocate-interface Ethernet1/1.100
+  allocate-interface Management1/1
+  config-url disk0:/admin.cfg
+!
+context ctx1
+  member gold
+  allocate-interface Ethernet1/1.200
+  allocate-interface Ethernet1/2
+  config-url disk0:/ctx1.cfg
+!
+context ctx2
+  allocate-interface Ethernet1/1.300
+  config-url ftp://192.0.2.10/ctx2.cfg
+  join-failover-group 2
+!
+prompt hostname context
+Cryptochecksum:00000000000000000000000000000000
+: end

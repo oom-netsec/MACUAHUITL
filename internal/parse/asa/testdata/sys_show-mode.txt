@@ -1,0 +1,2 @@
+asa# show mode
+Security context mode: multiple

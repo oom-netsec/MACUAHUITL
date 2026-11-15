@@ -1,0 +1,7 @@
+asa# more system:running-config | begin cluster group
+cluster group pod1
+  key clave-de-prueba
+  local-unit node1
+  cluster-interface vni1 ip 192.0.2.1 255.255.255.0
+  priority 1
+  enable
