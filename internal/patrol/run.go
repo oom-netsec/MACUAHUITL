@@ -9,6 +9,8 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/platform"
+	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 )
 
@@ -29,10 +31,14 @@ type DeviceResult struct {
 	Target             Target
 	Round              int
 	Hostname, Platform string
-	State              string // completed, failed, skipped
+	State              string // completed, partial, failed, skipped
 	Detail             string
 	DetailErr          error `json:"-"` // el error de Detail, para darlo en el idioma del cliente (i18n.In)
 	Commands, Invalid  int
+	// CutCommands: los comandos que se cortaron (timeout o sesión caída), en orden, y Reconnects las reconexiones que
+	// hizo la ronda para seguir. Van en el manifest.
+	CutCommands []string `json:",omitempty"`
+	Reconnects  int      `json:",omitempty"`
 	// Skipped: comandos que no corren en la plataforma detectada (platforms: del playbook); van en el manifest.
 	Skipped []string `json:",omitempty"`
 	// Ran: IDs que de verdad corrieron cuando difieren de los elegidos (gemelo de la plataforma); va en el manifest.
@@ -94,7 +100,11 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})
 		return res
 	}
-	defer c.close()
+	defer func() { // c cambia al reconectar: se cierra la última sesión (nil si una reconexión falló y ya cerró la vieja)
+		if c != nil {
+			c.close()
+		}
+	}()
 	res.Hostname, res.Platform = c.drv.Hostname(), c.platform
 	cmds, skipped, requested, err := plan(s, c.platform, d.Playbooks, d.MissingPack)
 	if err != nil {
@@ -103,8 +113,10 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		return res
 	}
 	res.Skipped, res.Requested = skipped, requested
+	var pre []string
 	if ran, _ := resolve(s, c.platform, d.Playbooks, d.MissingPack); len(ran) > 0 {
 		for _, p := range ran {
+			pre = append(pre, p.Pre...)
 			res.Ran = append(res.Ran, p.ID)
 		}
 		if slices.Equal(res.Ran, s.PlaybookIDs) {
@@ -125,19 +137,72 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			res.Invalid++
 		}
 		out.Incomplete = out.Incomplete || runErr != nil
-		if werr := w.Write(dev, round, roundStart, out, !s.DisableMasking); werr != nil {
+		werr := w.Write(dev, round, roundStart, out, !s.DisableMasking)
+		cutErr := runErr
+		if werr != nil {
 			runErr = werr
 		}
 		res.Commands++
+		if runErr != nil && werr == nil && ctx.Err() == nil && res.Reconnects < maxReconnects &&
+			(errors.Is(cutErr, platform.ErrPromptTimeout) || errors.Is(cutErr, platform.ErrClosed)) && !errors.Is(cutErr, ErrWindowEnded) {
+			// Un comando cortado no se reintenta (puede seguir corriendo en la sesión vieja): se reabre y sigue el siguiente.
+			res.CutCommands = append(res.CutCommands, cmd.Text)
+			res.Reconnects++
+			d.Audit.Append(context.WithoutCancel(ctx), audit.Entry{Actor: "patrol", Action: "device.reconnect", Target: hp,
+				Detail: fmt.Sprintf("job=%s round=%d command=%q cause=%q attempt=%d", jobID, round, cmd.Text, i18n.English(cutErr), res.Reconnects)})
+			emit(Progress{Target: hp, State: "connecting"})
+			c.close()
+			c = nil
+			nc, err := connect(ctx, d, jobID, s, t, transport.HostKeyPolicy{AcceptChanged: s.AcceptChangedHostKeys}, onEvent, d.PrimaryVerified[hp], d.backoff())
+			if err == nil {
+				c = nc
+				err = rerunPre(ctx, c, pre, cmds[:i+1])
+			}
+			if err != nil {
+				err = windowEnded(ctx, err)
+				res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
+				emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})
+				return res
+			}
+			continue
+		}
 		if runErr != nil {
+			if errors.Is(cutErr, platform.ErrPromptTimeout) || errors.Is(cutErr, platform.ErrClosed) {
+				res.CutCommands = append(res.CutCommands, cmd.Text)
+			}
 			res.State, res.Detail, res.DetailErr = "failed", runErr.Error(), runErr
 			emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})
 			return res
 		}
 	}
 	res.State = "completed"
-	emit(Progress{Target: hp, State: res.State, Index: len(cmds), Total: len(cmds), Bytes: bytes})
+	if len(res.CutCommands) > 0 {
+		res.State = "partial"
+		res.DetailErr = i18n.New("patrol.dev.partial", i18n.A("cut", len(res.CutCommands), "reconnects", res.Reconnects, "first", res.CutCommands[0]))
+		res.Detail = res.DetailErr.Error()
+	}
+	emit(Progress{Target: hp, State: res.State, Index: len(cmds), Total: len(cmds), Bytes: bytes, Detail: res.Detail, Err: res.DetailErr})
 	return res
+}
+
+// maxReconnects son las reconexiones que hace un equipo en una ronda; el corte siguiente lo deja en failed.
+const maxReconnects = 2
+
+// rerunPre repite en la sesión nueva los Pre de los playbooks (ajustes de sesión como la paginación) que ya corrieron
+// antes del corte; su salida no va a la evidencia. Open ya apaga la paginación del driver.
+func rerunPre(ctx context.Context, c *connected, pre []string, done []playbook.Command) error {
+	for _, p := range pre {
+		if !slices.ContainsFunc(done, func(x playbook.Command) bool { return x.Text == p }) {
+			continue
+		}
+		cctx, cancel := context.WithTimeout(ctx, maxCmd(60*time.Second))
+		_, err := c.drv.Run(cctx, p, 60*time.Second)
+		cancel()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // maxCmd es el tope total de un comando: 5 veces su timeout de inactividad, y no menos de 5 minutos.
