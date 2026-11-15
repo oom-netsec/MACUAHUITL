@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -519,5 +520,38 @@ func TestSaveFailedIsAuditedOncePerRun(t *testing.T) {
 	r.waitDone(run)
 	if n := strings.Count(r.d.AuditText(), "assist.pending_rollback.save_failed"); n != 1 {
 		t.Fatalf("save_failed auditado %d veces", n)
+	}
+}
+
+// Mientras corre la reversa de una entrada, la lista no la ofrece (antes salía con «Aplicar» y «Descartar», que el núcleo
+// rechazaba); si la reversa se aborta sin completar, la entrada vuelve a aparecer.
+func TestListHidesTheEntryWhileItsRollbackRunIsAlive(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	listed := func() bool {
+		l, err := r.svc.ListPendingRollbacks(context.Background(), &v1.ListPendingRollbacksRequest{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return slices.ContainsFunc(l.Rollbacks, func(p *v1.PendingRollback) bool { return p.RunId == run })
+	}
+	if !listed() {
+		t.Fatal("la entrada no aparece antes de la reversa")
+	}
+	nrun, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.waitState(nrun, "waiting-confirm")
+	if listed() {
+		t.Fatalf("la entrada %s se ofrece con su reversa en curso", run)
+	}
+	if _, err := r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: nrun}); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(5 * time.Second); !listed(); time.Sleep(20 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("la entrada no reaparece tras abortar su reversa")
+		}
 	}
 }
