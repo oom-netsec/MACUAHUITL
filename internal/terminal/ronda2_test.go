@@ -208,3 +208,29 @@ func TestLaSalidaNoPasaPorCommand(t *testing.T) {
 		t.Errorf("%s", b.String())
 	}
 }
+
+// Un valor tecleado que coincide con una palabra del comando de la salida («enable», «secret») no desarma las reglas
+// ancladas ni se mete dentro de un <MASKED:…>.
+func TestValorTecleadoIgualAPalabraDeLaSalida(t *testing.T) {
+	for _, val := range []string{"enable", "secret", "username"} {
+		r, b := newRec()
+		r.Output([]byte("R1(config)#"))
+		r.Input([]byte("username bob secret 0 " + val + "\r"))
+		r.Output([]byte("username bob secret 0 " + val + "\r\nR1(config)#"))
+		r.Input([]byte("do show run\r"))
+		r.Output([]byte("do show run\r\nenable secret 9 $9$HASHENABLE0123$abcdefghijklmnopqrstuv\r\n" +
+			"username admin privilege 15 secret 9 $9$HASHADMIN0123$abcdefghijklmnopqrstuv\r\nR1(config)#"))
+		r.Close()
+		noLeaks(t, val, b.String(), "HASHENABLE0123", "HASHADMIN0123")
+	}
+}
+
+// Solo valores de 4 o más caracteres entran a la red por contenido.
+func TestRedPorContenidoIgnoraValoresCortos(t *testing.T) {
+	r, _ := newRec()
+	r.Output([]byte("R1(config)#"))
+	r.Input([]byte("ena secret ab\r"))
+	if len(r.secrets) != 0 {
+		t.Errorf("se anotó un valor corto: %v", r.secrets)
+	}
+}

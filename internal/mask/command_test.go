@@ -101,3 +101,11 @@ func TestCommandAbreviaturasConGuion(t *testing.T) {
 		}
 	}
 }
+
+// Tras un «|» no se toca nada, ni siquiera con otra palabra de secreto.
+func TestCommandNoTocaTrasLaBarra(t *testing.T) {
+	in := "ena secret ZQ90xx | sec password"
+	if out, _ := Command(in); strings.Contains(out, "ZQ90xx") || !strings.HasSuffix(out, "| sec password") {
+		t.Errorf("%q", out)
+	}
+}
