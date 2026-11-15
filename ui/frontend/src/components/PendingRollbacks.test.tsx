@@ -345,3 +345,20 @@ test("nombres con espacios alrededor se comparan recortados", async () => {
   await userEvent.type(await screen.findByLabelText("Escribe SW1 para confirmar que descartas"), "SW1 ");
   expect(screen.getByRole("button", { name: "Descartar" })).toBeEnabled();
 });
+
+test("con el usuario rotado y su credencial de bóveda, el aviso los nombra", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", rotatedUser: "netops", updateCredentialId: "c1" })])} />);
+  expect(await screen.findByText(/contraseña nueva de netops/)).toBeInTheDocument();
+  expect(screen.getByText(/La credencial de netops en la bóveda conserva la anterior/)).toBeInTheDocument();
+});
+
+test("sin credencial de bóveda asociada, el aviso lo dice en vez de hablar de desfase", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", rotatedUser: "netops", updateCredentialId: "" })])} />);
+  expect(await screen.findByText(/La bóveda no guarda una credencial de netops/)).toBeInTheDocument();
+  expect(screen.queryByText(/conserva la anterior/)).toBeNull();
+});
+
+test("un equipo provisional avisa que pudo quedar con parte del cambio (cualquier tipo de reversa)", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ devices: [{ device: "SW1", rollbackLines: ["x"], provisional: true }] })])} />);
+  expect(await screen.findByText(/a mitad de la configuración en SW1/)).toBeInTheDocument();
+});
