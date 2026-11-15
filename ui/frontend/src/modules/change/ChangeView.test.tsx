@@ -125,3 +125,16 @@ test("upgrade y cumplimiento mandan lo escrito y muestran el texto", async () =>
   await userEvent.click(screen.getByRole("button", { name: "Evaluar" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(/^compliance: la configuración está vacía$/);
 });
+
+test("el reporte avisa si la evidencia se recogió sin enmascarar, y no si no", async () => {
+  const mk = (unmasked: boolean) => JSON.stringify({ devices: [{ address: "192.0.2.2", hostname: "DIST-02", verdict: "ok", findings: [], config_diff: [] }], note: "n", ...(unmasked ? { unmasked } : {}) });
+  const core = fakeCore({
+    listChanges: vi.fn(async () => [{ id: "ch1", name: "CRQ-1", preJobId: "j1", preState: "completed", postJobId: "j2", postState: "completed" }]),
+    changeReport: vi.fn().mockResolvedValueOnce({ json: mk(true), text: "t" }).mockResolvedValueOnce({ json: mk(false), text: "t" }),
+  });
+  render(<ChangeView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /Reporte de CRQ-1/ }));
+  expect(await screen.findByText(/esta evidencia se recogió sin enmascarar: puede traer secretos/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /Reporte de CRQ-1/ }));
+  await waitFor(() => expect(screen.queryByText(/sin enmascarar/)).not.toBeInTheDocument());
+});

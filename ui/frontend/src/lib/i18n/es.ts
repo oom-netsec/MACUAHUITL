@@ -2761,6 +2761,7 @@ export const es = {
   "pending.kind.credrotate": "Rotación de credencial",
   "pending.kind.restore-diff": "Restauración de respaldo",
   "drift.maskedChanged": "(cambió un valor enmascarado; no se muestra)",
+  "evidence.unmasked": "Aviso: esta evidencia se recogió sin enmascarar: puede traer secretos.",
 };
 
 export type Key = keyof typeof es;

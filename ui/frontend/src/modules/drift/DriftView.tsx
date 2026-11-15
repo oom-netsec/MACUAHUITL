@@ -37,6 +37,7 @@ export function DriftView({ core }: { core: CoreAPI }) {
       {rep && (
         <>
           {rep.masked && <Notice kind="warn">{t("drift.masked")}</Notice>}
+          {rep.unmasked && <Notice kind="warn">{t("evidence.unmasked")}</Notice>}
           {rep.devices.map((d) => (
             <ResultPanel key={d.device} title={d.device} meta={t("drift.rounds", { to: d.to, from: d.from })}
               status={d.changes.length ? { tone: "warn", label: t("drift.status.changed") } : { tone: "ok", label: t("drift.none") }}>

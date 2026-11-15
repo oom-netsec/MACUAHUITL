@@ -66,3 +66,14 @@ test("un «~» dice que cambió un valor enmascarado, sin mostrarlo", async () =
   const sw1 = await screen.findByRole("region", { name: "SW1_192.0.2.1" });
   expect(within(sw1).getByText(termText(/^~ enable secret 5 <MASKED:enable-secret> \(cambió un valor enmascarado; no se muestra\)$/))).toBeInTheDocument();
 });
+
+test("avisa cuando el trabajo se recogió sin enmascarar, y no cuando sí", async () => {
+  const core = fakeCore({ driftRun: vi.fn().mockResolvedValueOnce({ ...report, unmasked: true }).mockResolvedValueOnce(report) });
+  render(<DriftView core={core} />);
+  await userEvent.type(screen.getByLabelText("Trabajo o carpeta"), "j1");
+  await userEvent.click(screen.getByRole("button", { name: "Comparar" }));
+  expect(await screen.findByText(/esta evidencia se recogió sin enmascarar: puede traer secretos/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Comparar" }));
+  await screen.findByRole("region", { name: "SW1_192.0.2.1" });
+  expect(screen.queryByText(/sin enmascarar/)).not.toBeInTheDocument();
+});

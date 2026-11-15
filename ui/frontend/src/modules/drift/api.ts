@@ -3,7 +3,7 @@
 // op «~»: cambió un valor enmascarado (una clave) y el núcleo no lo muestra.
 export interface DriftChange { op: "+" | "-" | "~"; path: string; line: string }
 export interface DriftDevice { device: string; from: number; to: number; added: number; removed: number; changes: DriftChange[]; ignored: string[] }
-export interface DriftReport { dir: string; from: number; to: number; devices: DriftDevice[]; warnings: string[]; masked?: boolean }
+export interface DriftReport { dir: string; from: number; to: number; devices: DriftDevice[]; warnings: string[]; masked?: boolean; unmasked?: boolean }
 
 /** Clave del catálogo de un texto del json y sus argumentos (fase 30c), por ruta JSON: "rows.2.detail". */
 export interface DriftTextKey { key: string; args?: Record<string, string> }

@@ -534,3 +534,18 @@ func TestEvidenciaViejaConDuplicadosSigueIgual(t *testing.T) {
 		t.Fatalf("evidencia vieja rota:\n%s", got)
 	}
 }
+
+func TestAvisoSinEnmascarar(t *testing.T) {
+	const aviso = "esta evidencia se recogió sin enmascarar: puede traer secretos"
+	job, pack := fixture(t) // Masked: true
+	var out strings.Builder
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil || strings.Contains(out.String(), aviso) {
+		t.Fatalf("enmascarado no avisa: %v\n%s", err, out.String())
+	}
+	raw, _ := os.ReadFile(filepath.Join(job, "manifest.json"))
+	write(t, filepath.Join(job, "manifest.json"), strings.Replace(string(raw), `"masked":true`, `"masked":false`, 1))
+	out.Reset()
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil || !strings.Contains(out.String(), aviso) {
+		t.Fatalf("sin enmascarar avisa: %v\n%s", err, out.String())
+	}
+}

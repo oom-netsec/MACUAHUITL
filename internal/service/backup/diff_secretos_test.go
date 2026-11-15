@@ -54,3 +54,28 @@ func TestDiffNoMuestraSecretos(t *testing.T) {
 		t.Errorf("con dos respaldos con secretos debe decir que la clave cambió, sin el valor, y no listar la que no cambió:\n%s", r.Report.Text)
 	}
 }
+
+// Aviso de evidencia sin enmascarar: sale si alguno de los dos respaldos se tomó con --secrets, y no si los dos se enmascararon.
+func TestDiffAvisaSinEnmascarar(t *testing.T) {
+	s, _, _, _ := nuevo(t, "completed")
+	save := func(h int, masked bool) string {
+		e, _, err := s.store().Save(backup.Entry{Device: dev, Kind: backup.Running, At: time.Date(2026, 11, 6, h, 0, 0, 0, time.UTC), Masked: masked}, "hostname SW"+string(rune('A'+h))+"\n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e.ID
+	}
+	m1, m2, u := save(8, true), save(9, true), save(10, false)
+	for _, c := range []struct {
+		a, b string
+		want bool
+	}{{m1, m2, false}, {m1, u, true}, {u, m2, true}} {
+		r, err := s.DiffBackups(context.Background(), &v1.DiffBackupsRequest{From: c.a, To: c.b})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(r.Report.Text, "sin enmascarar: puede traer secretos"); got != c.want || strings.Contains(r.Report.Json, `"unmasked":true`) != c.want {
+			t.Errorf("aviso=%v, quería %v:\n%s", got, c.want, r.Report.Text)
+		}
+	}
+}

@@ -118,7 +118,7 @@ func TestDriftAvisaDeSecretosEnmascaradosYAvisosDelPaquete(t *testing.T) {
 		t.Errorf("sin los avisos del paquete: %s", r.Report.Text)
 	}
 	os.WriteFile(filepath.Join(dir, "manifest.json"), []byte(`{"masked":false}`), 0o600)
-	if r, _ = dc.Drift(ctx(t), &v1.DriftRequest{Job: dir}); strings.Contains(r.Report.Text, "enmascara") {
-		t.Errorf("enmascarado apagado no avisa: %s", r.Report.Text)
+	if r, _ = dc.Drift(ctx(t), &v1.DriftRequest{Job: dir}); strings.Contains(r.Report.Text, "porque el trabajo enmascara") || !strings.Contains(r.Report.Text, "sin enmascarar: puede traer secretos") {
+		t.Errorf("sin enmascarar avisa del otro modo: %s", r.Report.Text)
 	}
 }

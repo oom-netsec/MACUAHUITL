@@ -22,6 +22,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
@@ -359,6 +360,9 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 		}
 	}
 	fmt.Fprintf(w, "# labcheck · %s\n\n", filepath.Base(jobDir))
+	if !m.Masked { // el manifest siempre trae masked; false = el trabajo corrió con disable_masking
+		fmt.Fprintf(w, "AVISO: %s\n\n", i18n.Msg(i18n.Es, "evidence.unmasked", nil))
+	}
 	if len(m.Devices) == 0 {
 		return errors.New("el manifest no trae equipos: no corrió ninguna ronda")
 	}

@@ -211,6 +211,7 @@ func (s *changeSvc) GetChangeReport(ctx context.Context, r *v1.GetChangeReportRe
 		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
 	rep := change.Compare(a, b)
+	rep.Unmasked = capture.Unmasked(preDir) || capture.Unmasked(postDir)
 	s.d.Audit("change.report", r.ChangeId, fmt.Sprintf("pre=%s post=%s devices=%d", preDir, postDir, len(rep.Devices)))
 	return &v1.GetChangeReportResponse{Report: service.ReportL(ctx, &rep, func(loc string) string { return rep.TextIn(loc) })}, nil
 }

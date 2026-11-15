@@ -14,7 +14,7 @@ export interface BackupCollect { state: string; done: boolean; error?: string; s
 // op «~»: cambió un valor enmascarado (una clave); el núcleo no lo muestra.
 export interface BackupChange { op: "+" | "-" | "~"; path: string; line: string }
 // before/after: los dos respaldos ya enmascarados por el núcleo, para el visor (comparar nunca muestra secretos).
-export interface BackupDiff { from: BackupEntry; to: BackupEntry; added: number; removed: number; changes: BackupChange[]; ignored: string[]; masked: boolean; before: string; after: string }
+export interface BackupDiff { from: BackupEntry; to: BackupEntry; added: number; removed: number; changes: BackupChange[]; ignored: string[]; masked: boolean; unmasked?: boolean; before: string; after: string }
 
 export interface RestoreRequest {
   target: { name: string; address: string; port?: number; credentialId: string };

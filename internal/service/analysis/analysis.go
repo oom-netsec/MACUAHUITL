@@ -12,6 +12,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
+	"github.com/oom-netsec/MACUAHUITL/internal/capture"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/pcapan"
@@ -49,6 +50,9 @@ func (s *analysisSvc) bundle(ctx context.Context, job string, upTo int) (*analyz
 	b, err := analyze.LoadUpTo(dir, upTo)
 	if err != nil {
 		return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
+	}
+	if capture.Unmasked(dir) {
+		b.Warnings = append(b.Warnings, analyze.Warn("", 0, "", "evidence.unmasked"))
 	}
 	return b, nil
 }

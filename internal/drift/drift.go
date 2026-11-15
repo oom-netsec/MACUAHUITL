@@ -218,6 +218,8 @@ type Report struct {
 	WarningsTx []i18n.Text `json:"-"`
 	// Masked: el trabajo enmascaró secretos, así que un cambio de enable secret, snmp community o key-string no se ve.
 	Masked bool `json:"masked"`
+	// Unmasked: el trabajo se recogió sin enmascarar: la evidencia puede traer secretos.
+	Unmasked bool `json:"unmasked,omitempty"`
 }
 
 // MaskedNotice es el aviso (en español) que acompaña al informe cuando Masked es verdadero. Su texto vive en el
@@ -235,6 +237,9 @@ func (r Report) TextIn(loc string) string {
 	n := 0
 	if r.Masked {
 		fmt.Fprintf(&b, "%s\n\n", m("drift.text.warning", "message", m("drift.masked_notice")))
+	}
+	if r.Unmasked {
+		fmt.Fprintf(&b, "%s\n\n", m("drift.text.warning", "message", m("evidence.unmasked")))
 	}
 	for _, d := range r.Devices {
 		if len(d.Changes) == 0 {
