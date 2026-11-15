@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
@@ -97,17 +96,18 @@ func TestWriteFileSinLinkNiNoReplace(t *testing.T) {
 }
 
 func TestWriteFileNoReemplazaLoQueNoEsArchivo(t *testing.T) {
+	// Un directorio cuenta igual que una FIFO o un socket (no regular); syscall no se importa aquí (noegress).
 	b := New(nil, nil)
-	fifo := filepath.Join(t.TempDir(), "tubo")
-	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
-		t.Skip("sin mkfifo:", err)
+	dir := filepath.Join(t.TempDir(), "carpeta")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
 	}
 	var be *Error
-	if err := b.WriteFile(fifo, "x", "utf8", true); !errors.As(err, &be) || be.Reason != "bridge.err.save_not_regular" {
-		t.Fatalf("una FIFO no debe reemplazarse aunque haya overwrite: %v", err)
+	if err := b.WriteFile(dir, "x", "utf8", true); !errors.As(err, &be) || be.Reason != "bridge.err.save_not_regular" {
+		t.Fatalf("lo que no es un archivo no debe reemplazarse aunque haya overwrite: %v", err)
 	}
-	if fi, err := os.Lstat(fifo); err != nil || fi.Mode()&os.ModeNamedPipe == 0 {
-		t.Fatalf("la FIFO debe seguir ahí: %v", err)
+	if fi, err := os.Lstat(dir); err != nil || !fi.IsDir() {
+		t.Fatalf("la carpeta debe seguir ahí: %v", err)
 	}
 }
 
