@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Modelo de IOS sin validar en laboratorio: dynamic auto es el valor de fábrica y no sale en el running-config (ni aun escrito a mano);
@@ -289,5 +291,14 @@ func TestModoPuertoFactoryAliasFabrica(t *testing.T) {
 	b, _ := modoRT(t, "fabrica", accessGi())
 	if joined(a.Apply) != joined(b.Apply) || joined(a.Apply) != "interface "+gi1+"|no switchport mode" {
 		t.Errorf("factory %q, fabrica %q", a.Apply, b.Apply)
+	}
+}
+
+// El rechazo de un puerto dynamic (el modo de fábrica del 3560-CX) nombra la plantilla que lo resuelve.
+func TestDynamicRefusalNamesModoPuerto(t *testing.T) {
+	for loc, want := range map[string]string{i18n.Es: "modo-puerto", i18n.En: "Port mode"} {
+		if m := i18n.Msg(loc, "assist.refused.esta_en_modo_dynamic_esta", i18n.A("port", "Gi0/12")); !strings.Contains(m, want) {
+			t.Errorf("%s: %q", loc, m)
+		}
 	}
 }
