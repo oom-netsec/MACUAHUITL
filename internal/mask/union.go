@@ -164,17 +164,15 @@ func loggedSpans(line, platform string) [][2]int {
 	return nil
 }
 
-// quotedSpans: los tramos de line que son texto citado entre comillas (ver Stream.quoted): todo lo que sigue a la primera
-// comilla y, con un total par, también cada tramo de dentro por separado.
+// quotedSpans: los tramos de line que son texto citado entre comillas (ver Stream.quoted): cada tramo de dentro y, con
+// un total impar de comillas, todo lo que sigue a la primera.
 func quotedSpans(line string) (spans [][2]int) {
 	first := strings.IndexByte(line, '"')
 	if first < 0 || notQuotedCfg.MatchString(line) {
 		return nil
 	}
-	// Todo lo que sigue a la primera comilla, como la v0.6.5 con un total impar: el valor puede llevar sus propias comillas.
-	spans = shiftSpans(spansIn("", line[first+1:], true), first+1)
 	if strings.Count(line, `"`)%2 == 1 {
-		return spans
+		return shiftSpans(spansIn("", line[first+1:], true), first+1)
 	}
 	pos := first + 1
 	for k := 0; pos <= len(line); k++ {
@@ -182,8 +180,15 @@ func quotedSpans(line string) (spans [][2]int) {
 		if j := strings.IndexByte(line[pos:], '"'); j >= 0 {
 			end = pos + j
 		}
-		if k%2 == 0 {
-			spans = append(spans, shiftSpans(spansIn("", line[pos:end], true), pos)...)
+		if seg := line[pos:end]; k%2 == 0 {
+			sp := spansIn("", seg, true)
+			reach := len(sp) > 0 && sp[len(sp)-1][1] == len(seg) // antes de mover los tramos
+			spans = append(spans, shiftSpans(sp, pos)...)
+			// El valor trae comillas propias («enable secret "x y"», «secret x"y»): la comilla que cierra el tramo lo abre.
+			if end+1 < len(line) && (len(sp) > 0 && (strings.HasSuffix(seg, " ") || reach && !strings.ContainsRune(" \t,;)}]:.", rune(line[end+1]))) ||
+				len(sp) == 0 && endsInKeyword(seg)) {
+				spans = append(spans, [2]int{end, len(line)})
+			}
 		}
 		pos = end + 1
 	}
@@ -228,4 +233,10 @@ func CutText(platform, orig, s1 string) string {
 	o, spans := lineSpans(orig, platform)
 	out, _ := cut(o, s1, spans)
 	return out
+}
+
+// endsInKeyword: el tramo termina en una palabra de secreto que aún no tiene valor.
+func endsInKeyword(seg string) bool {
+	d := spansIn("", seg+" X", true)
+	return len(d) > 0 && d[len(d)-1][0] == len(seg)+1
 }

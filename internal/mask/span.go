@@ -66,7 +66,8 @@ func spKeyword(w string, noToken bool, block string, isFirst bool) bool {
 // spProse: palabras que, tras una palabra de secreto, delatan prosa de un aviso y no un comando («password mismatch for
 // user», «key changed»). Solo se miran en el texto citado entre comillas.
 var spProse = map[string]bool{"mismatch": true, "failed": true, "expired": true, "rejected": true, "changed": true, "will": true,
-	"is": true, "has": true, "for": true, "from": true}
+	"is": true, "has": true, "for": true, "from": true, "to": true, "not": true, "was": true, "must": true, "cannot": true,
+	"invalid": true, "required": true, "missing": true, "incorrect": true, "does": true}
 
 // commandSpans devuelve, para un comando tecleado o citado, los tramos [s, t) del original que Command tapa: uno por
 // segmento « ; » (NX-OS), desde el valor (el token que sigue a la palabra de secreto) hasta el fin del segmento. No

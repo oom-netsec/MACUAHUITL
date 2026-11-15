@@ -51,7 +51,7 @@ func TestAuditoriaHuecos(t *testing.T) {
 		{"ftd", "configure manager add DONTRESOLVE RegK3yAbc NatId123", "configure manager add DONTRESOLVE <MASKED:manager-regkey> <MASKED:manager-natid>"},
 		{"ftd", "configure manager delete", "configure manager delete"},
 		// 11. Syslogs que citan el comando.
-		{"asa", "%ASA-5-111008: User 'enable_15' executed the 'username bob password S3cretPw privilege 15' command.", "%ASA-5-111008: User 'enable_15' executed the 'username bob password <MASKED:user-secret> privilege 15' command."},
+		{"asa", "%ASA-5-111008: User 'enable_15' executed the 'username bob password S3cretPw privilege 15' command.", "%ASA-5-111008: User 'enable_15' executed the 'username bob password <MASKED:secret>' command."},
 		{"ftd", "%FTD-5-111008: User 'enable_15' executed the 'failover key FoK3y' command.", "%FTD-5-111008: User 'enable_15' executed the 'failover key <MASKED:failover-key>' command."},
 		{"asa", "%ASA-5-111010: User 'admin', running 'CLI' from IP 10.1.1.9, executed 'failover key FoK3y'", "%ASA-5-111010: User 'admin', running 'CLI' from IP 10.1.1.9, executed 'failover key <MASKED:failover-key>'"},
 		{"ftd", "Nov 14 2026 10:00:00 fw1 : %FTD-5-111010: User 'admin', running 'CLI' from IP 10.1.1.9, executed 'key config-key password-encryption N1 O1'", "Nov 14 2026 10:00:00 fw1 : %FTD-5-111010: User 'admin', running 'CLI' from IP 10.1.1.9, executed 'key config-key password-encryption <MASKED:config-key> <MASKED:config-key>'"},

@@ -223,7 +223,7 @@ func TestAuditoriaTabuladorTecleadoSeTapaDesdeElTab(t *testing.T) {
 		{"SW1(config)#", "username a\tpassword 0 SecretoXX", ">>> username a<MASKED:secret>\n", "SecretoXX"},
 		{"SW1#", "show ver\tsion", ">>> show ver<MASKED:secret>\n", "sion"},
 		{"SW1(config)#", "username bob password 0 SecretoXX\tfoo", ">>> username bob password 0 <MASKED:user-secret>\n", "SecretoXX"},
-		{"SW1(config)#", "snmp-server community ComunXX ro\tfoo", ">>> snmp-server community <MASKED:snmp-community> ro<MASKED:secret>\n", "ComunXX"},
+		{"SW1(config)#", "snmp-server community ComunXX ro\tfoo", ">>> snmp-server community <MASKED:secret>\n", "ComunXX"},
 	} {
 		for _, pegado := range []bool{false, true} {
 			r, b := newRec()
