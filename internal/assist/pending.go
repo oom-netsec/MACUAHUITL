@@ -13,14 +13,17 @@ const PendingFunction = "pending-rollback"
 // LeftDevice es lo que hace falta para revertir un equipo que una ejecución dejó cambiado.
 type LeftDevice struct {
 	Device   string
-	Apply    []string
+	Apply    []string // lo que el equipo aceptó del apply (el plan entero si no se cortó)
 	Rollback []string
 	Pre      []string
 	Post     []string
 	Expect   []Expect
 	Baseline map[string]string // el estado de antes de la ejecución
 	Secrets  []string
-	State    map[string]string // el estado en que la ejecución dejó el equipo (r.snap)
+	State    map[string]string // el estado en que la ejecución dejó el equipo (r.snap; mientras Configure corre, la línea base)
+	// Provisional: State es la línea base porque el núcleo se cortó (o la relectura falló) a mitad de Configure; no es lo que dejó el cambio.
+	// Un Leftover viejo sin el campo se lee como false.
+	Provisional bool
 }
 
 // Leftover es lo que una ejecución terminada dejó sin revertir.
@@ -30,18 +33,21 @@ type Leftover struct {
 	// WriteMemory: la ejecución pedía write memory; si falló tras escribir, la startup-config puede conservar el cambio.
 	WriteMemory bool
 	Devices     []LeftDevice // en el orden en que se aplicaron
+	// GeneratedSecret: rotación de credenciales cuyo secreto nuevo generó la app. Lo llena el servicio; un Leftover viejo sin el campo es false.
+	GeneratedSecret bool
 }
 
-// Leftover devuelve los equipos que la ejecución dejó cambiados, o nil si no hay ninguno o la ejecución cambia credenciales (su reversa
-// toca la bóveda y se hace a mano). Solo tiene sentido con la ejecución terminada.
+// Leftover devuelve los equipos que la ejecución dejó cambiados, o nil si no hay ninguno. Una rotación de credencial cuya bóveda ya
+// recibió el secreto nuevo (write memory salió bien) no cuenta: revertirla dejaría la bóveda desfasada. Una rotación sin terminar
+// (abortada, vencida, con el login nuevo fallido) sí: la bóveda aún guarda el secreto anterior, que es el que la reversa devuelve al equipo.
 func (r *Run) Leftover() *Leftover {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	out := &Leftover{Function: r.plan.Function, Scrub: r.fn.Scrub, WriteMemory: r.plan.WriteMemory}
 	for _, i := range r.changed {
 		dp := r.plan.Devices[i]
-		if dp.VerifyLogin {
-			return nil
+		if dp.VerifyLogin && r.vaulted[i] {
+			continue
 		}
 		// La reversa guardada es la que se mostraría en vivo: recortada a lo aplicado si el apply quedó a medias (con r.mu
 		// tomado no se puede llamar a rollbackLines). Si el recorte queda vacío se guarda la completa: RollbackPlan exige líneas.
@@ -51,9 +57,19 @@ func (r *Run) Leftover() *Leftover {
 				rb = u
 			}
 		}
-		out.Devices = append(out.Devices, LeftDevice{Device: dp.Device, Apply: slices.Clone(dp.Apply), Rollback: slices.Clone(rb),
+		// Apply guarda lo que el equipo aceptó, no el plan entero: es la «reversa de la reversa» y no debe crear objetos que nunca existieron.
+		ap := dp.Apply
+		if ok, cut := r.partial[i]; cut && len(ok) > 0 {
+			ap = ok
+		}
+		state, prov := r.snap[i], false
+		if state == nil {
+			prov = true // Configure sigue o la relectura falló: la línea base es el único estado conocido
+			state = r.prov[i]
+		}
+		out.Devices = append(out.Devices, LeftDevice{Device: dp.Device, Apply: slices.Clone(ap), Rollback: slices.Clone(rb),
 			Pre: slices.Clone(dp.Pre), Post: slices.Clone(dp.Post), Expect: slices.Clone(dp.Expect), Baseline: cloneMap(dp.Baseline),
-			Secrets: slices.Clone(dp.Secrets), State: cloneMap(r.snap[i])})
+			Secrets: slices.Clone(dp.Secrets), State: cloneMap(state), Provisional: prov})
 	}
 	if len(out.Devices) == 0 {
 		return nil
@@ -89,7 +105,7 @@ func RollbackPlan(l Leftover) (Plan, Function, error) {
 				return Plan{}, fn, cerr("assist.pending.no_state", "device", d.Device)
 			}
 		}
-		dp := DevicePlan{Device: d.Device, Pre: sortedCmds(d.State), Baseline: d.State, Apply: d.Rollback, Rollback: d.Apply, Secrets: d.Secrets}
+		dp := DevicePlan{Device: d.Device, Pre: sortedCmds(d.State), Baseline: d.State, Apply: d.Rollback, Rollback: d.Apply, Secrets: d.Secrets, Provisional: d.Provisional}
 		// La vuelta se verifica solo con configuración (running-config, show snmp user): la salida de comandos operativos cambia sin que nadie toque el equipo.
 		// Una línea base vacía también cuenta: «no había nada» (p. ej. ninguna línea snmp-server) es un estado que se puede verificar.
 		for _, c := range sortedCmds(d.Baseline) {

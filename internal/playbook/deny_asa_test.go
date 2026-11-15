@@ -179,3 +179,23 @@ func TestASARutaDelEquipoTieneMotivoPropio(t *testing.T) {
 		t.Errorf("tftp: motivo %q", r)
 	}
 }
+
+// En ASA y FTD todo lo que sigue a include/exclude/begin/grep es la regex: una segunda «|» es alternancia, no un pipe a un shell.
+func TestFamiliaASAAlternanciaEnLaRegexNoEsPipe(t *testing.T) {
+	for _, p := range []string{"asa", "ftd"} {
+		for _, cmd := range []string{
+			"show running-config | include nat|source", "show running-config | include smtp|email", "show running-config | include line protocol|sh",
+			"show version | include x | sscp conn1 out.txt", "show version | include x | bash", "show run | include a|b|vsh",
+			"show run | include x", "show conn count", "show run | in x | b", "show xlate | include 10.0.0.1|10.0.0.2",
+		} {
+			if err := CheckDenied(p, cmd); err != nil {
+				t.Errorf("%s %q: se rechazó (%v)", p, cmd, err)
+			}
+		}
+		for _, cmd := range []string{"show version | include x | redirect disk0:/a", "show version | include x | tee y"} {
+			if err := CheckDenied(p, cmd); !errors.Is(err, ErrDenied) {
+				t.Errorf("%s %q: se aceptó (err=%v)", p, cmd, err)
+			}
+		}
+	}
+}

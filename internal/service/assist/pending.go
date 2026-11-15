@@ -56,6 +56,8 @@ type persister struct {
 	saved bool
 	// failed: el fallo de guardado ya se auditó (una sola vez por ejecución, aunque la bóveda siga cerrada en cada sync)
 	failed bool
+	// generated: el secreto nuevo de la rotación lo generó la app; se guarda en el Leftover para que la pantalla lo diga.
+	generated bool
 }
 
 // sync es el Persist del motor: lo que sigue sin revertir (nil = nada).
@@ -73,6 +75,7 @@ func (p *persister) save(lo *assist.Leftover, ended time.Time, st assist.State) 
 	if p.s.isDiscarded(p.runID) {
 		return
 	}
+	lo.GeneratedSecret = p.generated && lo.Function == assist.CredRotate.Name
 	rec := pendingRec{RunID: p.runID, Kind: lo.Function, Ended: ended, Updated: p.s.d.Now(), Host: p.t.host, Port: p.t.port, Cred: p.t.cred, Leftover: *lo}
 	if err := p.s.savePending(rec); err != nil {
 		if p.failed {
@@ -207,7 +210,7 @@ func (s *assistSvc) ListPendingRollbacks(ctx context.Context, _ *v1.ListPendingR
 			out.Rollbacks = append(out.Rollbacks, &v1.PendingRollback{RunId: id, Unreadable: true})
 			continue
 		}
-		pr := &v1.PendingRollback{RunId: rec.RunID, Kind: rec.Kind, EndedUnix: rec.base().Unix(), AgeSeconds: int64(now.Sub(rec.base()).Seconds()), WriteMemory: rec.Leftover.WriteMemory}
+		pr := &v1.PendingRollback{RunId: rec.RunID, Kind: rec.Kind, EndedUnix: rec.base().Unix(), AgeSeconds: int64(now.Sub(rec.base()).Seconds()), WriteMemory: rec.Leftover.WriteMemory, GeneratedSecret: rec.Leftover.GeneratedSecret}
 		for _, d := range rec.Leftover.Devices {
 			pr.Devices = append(pr.Devices, &v1.PendingRollbackDevice{Device: d.Device, RollbackLines: assist.ScrubLines(d.Rollback, d.Secrets, rec.Leftover.Scrub)})
 		}
@@ -259,6 +262,9 @@ func (s *assistSvc) StartPendingRollback(ctx context.Context, r *v1.StartPending
 	if s.live(r.RunId) {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_en_curso", i18n.A("id", r.RunId))
 	}
+	if s.reversing(r.RunId) { // como Discard y List: su reversa ya corre
+		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_ya_aplicandose", i18n.A("id", r.RunId))
+	}
 	rec, err := s.loadPending(pendingPrefix + r.RunId)
 	if err != nil {
 		if errors.Is(err, vault.ErrNotFound) {
@@ -283,7 +289,7 @@ func (s *assistSvc) StartPendingRollback(ctx context.Context, r *v1.StartPending
 		pr.devices = append(pr.devices, d.Device)
 	}
 	// Una reversa pendiente toca varios objetos de un equipo: un solo candado del equipo entero, como restaurar.
-	keys := []string{strings.ToLower(fmt.Sprintf("%s:%d|*", rec.Host, rec.Port))}
+	keys := []string{lockKey(rec.Host, rec.Port, "*")}
 	runID, err := s.launch(ctx, pr, "", keys, rec.RunID)
 	if err != nil {
 		return nil, err

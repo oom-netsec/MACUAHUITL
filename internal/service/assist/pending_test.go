@@ -171,7 +171,7 @@ func TestPendingRollbackOlderThanADayNeedsAcceptAge(t *testing.T) {
 	r.confirmAll(nrun, "done")
 }
 
-func TestAbortedCredRotateLeavesNoPendingRollback(t *testing.T) {
+func TestAbortedCredRotateLeavesAPendingRollback(t *testing.T) {
 	r := newRotRig(t, simulator.Config{})
 	res, err := r.rotate(&v1.PlanCredRotateRequest{User: "tech", NewSecret: newSec, UpdateCredentialId: r.tech})
 	if err != nil {
@@ -188,8 +188,56 @@ func TestAbortedCredRotateLeavesNoPendingRollback(t *testing.T) {
 	if st := r.state(run); len(st.Changed) != 1 {
 		t.Fatalf("el equipo debía seguir cambiado: %+v", st)
 	}
+	// La bóveda aún guarda el secreto anterior y el equipo ya tiene el nuevo: la reversa pendiente devuelve el hash previo.
+	p := r.pending()
+	if len(p) != 1 || len(p[0].Devices) != 1 || !strings.Contains(strings.Join(p[0].Devices[0].RollbackLines, "\n"), "username tech") {
+		t.Fatalf("una rotación sin terminar debe dejar su reversa: %+v", p)
+	}
+	if strings.Contains(fmt.Sprint(p), newSec) {
+		t.Fatal("la reversa pendiente muestra el secreto nuevo")
+	}
+	nrun, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.confirmAll(nrun, "done")
 	if len(r.pending()) != 0 {
-		t.Fatal("la reversa de cred rotate toca la bóveda: no se guarda")
+		t.Fatal("la reversa aplicada debe borrar la entrada")
+	}
+}
+
+// generated_secret: true solo si la rotación usó un secreto que generó la app; con uno escrito por la persona o con otra función, false.
+func TestPendingRollbackMarksGeneratedSecret(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		req  *v1.PlanCredRotateRequest
+		want bool
+	}{
+		{"generado", &v1.PlanCredRotateRequest{User: "tech"}, true},
+		{"dado", &v1.PlanCredRotateRequest{User: "tech", NewSecret: newSec}, false},
+	} {
+		r := newRotRig(t, simulator.Config{})
+		c.req.UpdateCredentialId = r.tech
+		res, err := r.rotate(c.req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		run := r.start(res.PlanId)
+		r.waitState(run, "waiting-confirm")
+		r.confirm(run, "apply-1")
+		r.waitState(run, "waiting-confirm")
+		r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: run})
+		r.waitState(run, "failed")
+		r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: run})
+		r.waitDone(run)
+		if p := r.pending(); len(p) != 1 || p[0].GeneratedSecret != c.want {
+			t.Errorf("%s: %+v, generated_secret debía ser %v", c.name, p, c.want)
+		}
+	}
+	r := newRig(t, simulator.Config{})
+	r.abortedChanged()
+	if p := r.pending(); len(p) != 1 || p[0].GeneratedSecret {
+		t.Errorf("otra función: %+v", p)
 	}
 }
 
@@ -554,4 +602,20 @@ func TestListHidesTheEntryWhileItsRollbackRunIsAlive(t *testing.T) {
 			t.Fatal("la entrada no reaparece tras abortar su reversa")
 		}
 	}
+}
+
+// Arrancar la reversa de una entrada cuya reversa ya corre da su propio motivo (reversa_ya_aplicandose), no el del candado.
+func TestStartPendingRollbackMientrasSeAplicaSuReversa(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	n1, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.waitState(n1, "waiting-confirm")
+	_, err = r.startPending(run, false)
+	if code(err) != codes.FailedPrecondition || err == nil || !strings.Contains(err.Error(), "ya se está aplicando") {
+		t.Fatalf("start: %v", err)
+	}
+	r.confirmAll(n1, "done")
 }

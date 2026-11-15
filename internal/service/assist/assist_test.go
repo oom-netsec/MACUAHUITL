@@ -676,3 +676,18 @@ func TestExecReadRechazaNoASCIIConMotivoDeCatalogo(t *testing.T) {
 		t.Errorf("en: %q", got)
 	}
 }
+
+// B6: la misma dirección escrita distinto (mayúsculas, punto final, corchetes, IPv4 mapeada) es un solo candado.
+func TestPortKeysNormalizaLaDireccion(t *testing.T) {
+	mk := func(h string) []string {
+		return portKeys(&planRec{t: target{host: h, port: 22}, plan: assist.Plan{Devices: []assist.DevicePlan{{Apply: []string{"interface Gi1/0/1", "shutdown"}}}}})
+	}
+	for _, c := range [][2]string{{"SW1.Example.com.", "sw1.example.com"}, {"[2001:DB8::1]", "2001:db8::1"}, {"::ffff:10.0.0.1", " 10.0.0.1 "}} {
+		if a, b := mk(c[0]), mk(c[1]); !reflect.DeepEqual(a, b) {
+			t.Errorf("%q → %v, %q → %v", c[0], a, c[1], b)
+		}
+	}
+	if reflect.DeepEqual(mk("10.0.0.1"), mk("10.0.0.2")) {
+		t.Error("equipos distintos comparten candado")
+	}
+}

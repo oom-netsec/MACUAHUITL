@@ -180,6 +180,11 @@ type Run struct {
 	recheck map[int]bool
 	// partial: equipos cuyo apply se cortó, con las líneas que el equipo sí aceptó (para recortar la reversa con Function.Undo).
 	partial map[int][]string
+	// prov: el estado de antes de cada equipo que ya empezó a recibir líneas, como State provisional de lo que se persiste mientras
+	// Configure corre (si el núcleo cae a medias, la reversa pendiente tiene al menos un pre-check). No lo usa la reversa en vivo.
+	prov map[int]map[string]string
+	// vaulted: equipos de una rotación cuya bóveda ya recibió la credencial nueva (tras write memory): ya no se ofrece revertirlos.
+	vaulted map[int]bool
 }
 
 // NewRun valida el plan otra vez (reglas 2 y 3) y exige assisted (regla 1); no toca ningún equipo.
@@ -204,7 +209,7 @@ func NewRun(o Options) (*Run, error) {
 		}
 	}
 	r := &Run{persist: o.Persist, id: o.ID, plan: o.Plan, exec: o.Exec, state: Planned, timeout: o.DecisionTimeout, fn: o.Fn, secrets: secrets,
-		snap: map[int]map[string]string{}, recheck: map[int]bool{}, partial: map[int][]string{}, done: make(chan struct{}), dec: make(chan decision, 1), notify: make(chan struct{})}
+		snap: map[int]map[string]string{}, recheck: map[int]bool{}, partial: map[int][]string{}, prov: map[int]map[string]string{}, vaulted: map[int]bool{}, done: make(chan struct{}), dec: make(chan decision, 1), notify: make(chan struct{})}
 	// Único punto por el que sale la auditoría: ningún detalle lleva secretos.
 	r.audit = func(action, target, detail string) { o.Audit(action, target, r.scrub(detail)) }
 	return r, nil
@@ -588,6 +593,9 @@ func (r *Run) forward(ctx context.Context) outcome {
 		}
 		for cmd, was := range dp.Baseline {
 			if !sameOut(cmd, outs[cmd], was) {
+				if dp.Provisional {
+					return r.failT("%s no está como la línea base (%s): el núcleo se cortó a mitad de aplicar y el equipo pudo quedar con parte del cambio; revísalo y revierte a mano", "%s differs from the baseline (%s): the core was cut off halfway through applying and the device may hold part of the change; check it and revert by hand", dp.Device, cmd)
+				}
 				return r.failT("%s cambió desde que se hizo el plan (%s); vuelve a planear", "%s changed since the plan was made (%s); plan again", dp.Device, cmd)
 			}
 		}
@@ -620,9 +628,16 @@ func (r *Run) forward(ctx context.Context) outcome {
 				msg, err := r.exec.(Verifier).Saved(ctx, dp.Device)
 				if err != nil {
 					r.log2("assist.verify", dp.Device, "run=%s the vault was not updated after write memory", r.id)
-					return r.failT("write memory salió bien en %s pero la bóveda no quedó con la credencial nueva: %v; edítala a mano", "write memory succeeded on %s but the vault does not hold the new credential: %v; edit it by hand", dp.Device, err)
+					return r.failT("write memory salió bien en %s pero la bóveda no quedó con la credencial nueva: %v; elige una sola salida: (a) aplica la reversa pendiente y la bóveda queda con la credencial anterior, o (b) guarda a mano la credencial nueva en la bóveda y descarta la reversa pendiente", "write memory succeeded on %s but the vault does not hold the new credential: %v; choose one way out only: (a) apply the pending rollback and the vault keeps the previous credential, or (b) store the new credential in the vault by hand and discard the pending rollback", dp.Device, err)
 				}
 				r.outT(dp.Device, msg)
+				r.mu.Lock()
+				r.vaulted[i] = true
+				r.mu.Unlock()
+				r.sync() // con la bóveda al día no queda reversa que ofrecer: revertir la dejaría desfasada
+			}
+			if i < len(r.plan.Devices)-1 && r.takeAbort() { // un Abort aceptado mientras corría write memory: se respeta si quedan equipos por guardar
+				return oAborted
 			}
 		}
 	} else {
@@ -642,14 +657,23 @@ func (r *Run) applyOne(ctx context.Context, i int) (outcome, bool) {
 		return stop(d), true
 	}
 	// Otra vez la línea base, ya con la confirmación dada: el equipo pudo cambiar mientras se decidía.
-	if msg, en := r.drift(ctx, i, dp.Baseline, "desde que se hizo el plan", "since the plan was made"); msg != "" {
+	since, sinceEN := "desde que se hizo el plan", "since the plan was made"
+	if dp.Provisional {
+		since = "respecto a la línea base: el núcleo se cortó a mitad de aplicar y el equipo pudo quedar con parte del cambio; revísalo y revierte a mano"
+		sinceEN = "from the baseline: the core was cut off halfway through applying and the device may hold part of the change; check it and revert by hand"
+	}
+	if msg, en := r.drift(ctx, i, dp.Baseline, since, sinceEN); msg != "" {
 		return r.failMsg(msg, en), true
 	}
 	// Desde aquí el equipo puede haber cambiado, aunque la línea que falle sea la primera.
 	r.mu.Lock()
 	r.changed = append(r.changed, i)
+	r.prov[i] = cloneMap(dp.Baseline)
 	r.mu.Unlock()
 	r.sync()
+	// Regla 6: lo que se va a mandar queda en la bitácora antes de mandarlo (con el enmascarado de siempre); si el núcleo cae a mitad
+	// de Configure, la auditoría ya dice qué se intentó. La respuesta de cada línea se audita después (assist.line).
+	r.log2("assist.send", dp.Device, "run=%s lines=%s", r.id, strings.Join(r.scrubLines(dp.Apply), " ; "))
 	sent, err := r.exec.Configure(ctx, dp.Device, dp.Apply)
 	if len(sent) == 0 { // ninguna línea llegó a mandarse (no se pudo conectar ni entrar a configuración): el equipo sigue igual
 		r.unchange(i)
@@ -872,6 +896,7 @@ func (r *Run) finishFor(d decision) {
 // revert manda la reversa; false si falló (r.fail ya dejó el motor esperando).
 func (r *Run) revert(ctx context.Context, i int) bool {
 	dp := r.plan.Devices[i]
+	r.log2("assist.send", dp.Device, "run=%s rollback lines=%s", r.id, strings.Join(r.scrubLines(r.rollbackLines(i)), " ; "))
 	sent, err := r.exec.Configure(ctx, dp.Device, r.rollbackLines(i))
 	failed, failedEN := r.sent(dp.Device, sent)
 	if err != nil {
