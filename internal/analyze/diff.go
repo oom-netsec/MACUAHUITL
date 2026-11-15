@@ -2,6 +2,7 @@ package analyze
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -17,7 +18,7 @@ type CounterDelta struct {
 }
 
 type NeighborChange struct {
-	Protocol string    `json:"protocol"` // bgp, ospf, hsrp
+	Protocol string    `json:"protocol"` // bgp, ospf, hsrp, etherchannel
 	ID       string    `json:"id"`
 	IDTx     i18n.Text `json:"-"`      // ID en el idioma pedido (vecino OSPF y grupo HSRP); vacío si es un dato (BGP)
 	Change   string    `json:"change"` // apareció, desapareció, cambió
@@ -88,6 +89,7 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 		diffBGP(&d, firstOf(a, "show ip bgp summary", "show bgp summary", "show bgp ipv4 unicast summary", "show bgp ipv6 unicast summary"), firstOf(z, "show ip bgp summary", "show bgp summary", "show bgp ipv4 unicast summary", "show bgp ipv6 unicast summary"))
 		diffOSPF(&d, a["show ip ospf neighbor"], z["show ip ospf neighbor"])
 		diffHSRP(&d, a["show standby brief"], z["show standby brief"])
+		diffEtherChannel(&d, a["show etherchannel summary"], z["show etherchannel summary"])
 		for _, side := range []struct {
 			round int
 			inc   map[string]bool
@@ -100,6 +102,9 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 			if ia[cmd] || iz[cmd] {
 				continue // salida cortada en una de las rondas: no se compara
 			}
+			if volatileCmds[cmd] {
+				continue // el reloj cambia en cada ronda: no es una diferencia
+			}
 			x, okx := a[cmd]
 			y, oky := z[cmd]
 			switch {
@@ -110,6 +115,11 @@ func Diff(b *Bundle, from, to int, device string) (DiffReport, error) {
 				n := i18n.Tx("analyze.diff.only_in", "round", from)
 				d.Text = append(d.Text, TextDiff{Command: cmd, Lines: []string{}, Note: n.In(i18n.Es), NoteTx: n})
 			case x != y:
+				if f := volatileLines[cmd]; f != nil {
+					if x, y = dropLines(x, f), dropLines(y, f); x == y {
+						continue
+					}
+				}
 				ls, note := lineDiff(lines(x), lines(y))
 				d.Text = append(d.Text, TextDiff{Command: cmd, Lines: ls, Note: note.In(i18n.Es), NoteTx: note})
 			}
@@ -265,6 +275,48 @@ func diffHSRP(d *DeviceDiff, a, z string) {
 	states(d, "hsrp", sa, sz, labels)
 }
 
+func diffEtherChannel(d *DeviceDiff, a, z string) {
+	ea, ok1 := iosxe.ParseEtherChannels(a)
+	ez, ok2 := iosxe.ParseEtherChannels(z)
+	if !ok1 || !ok2 || a == "" || z == "" {
+		return
+	}
+	sa, sz := map[string]string{}, map[string]string{}
+	labels := map[string]i18n.Text{}
+	for _, side := range []struct {
+		chs []iosxe.EtherChannel
+		dst map[string]string
+	}{{ea, sa}, {ez, sz}} {
+		for _, c := range side.chs {
+			for _, m := range c.Members {
+				l := etherChannelLabel(c.Name, m.Port)
+				side.dst[l.In(i18n.Es)], labels[l.In(i18n.Es)] = m.Flags, l
+			}
+		}
+	}
+	states(d, "etherchannel", sa, sz, labels)
+}
+
+// Comandos que cambian solos en cada ronda: se saltan enteros, o se les quitan las líneas volátiles antes del diff.
+var (
+	volatileCmds = map[string]bool{"show clock": true, "show clock detail": true, "show calendar": true}
+	// En adjacency solo son volátiles los contadores de eventos; el número de adyacencias es un cambio real.
+	volatileLines = map[string]func(string) bool{"show adjacency summary": func(l string) bool {
+		return adjEventsRe.MatchString(l)
+	}}
+	adjEventsRe = regexp.MustCompile(`^\s*Summary events (epoch is \d+|queue contains \d+ events? \(high water mark \d+ events?\))\s*$`)
+)
+
+func dropLines(text string, drop func(string) bool) string {
+	var keep []string
+	for _, l := range lines(text) {
+		if !drop(l) {
+			keep = append(keep, l)
+		}
+	}
+	return strings.Join(keep, "\n")
+}
+
 const (
 	maxDiffCells = 4_000_000 // tabla LCS: ~16 MB como máximo
 	maxDiffLines = 400
@@ -341,7 +393,11 @@ func (r DiffReport) TextIn(loc string) string {
 			fmt.Fprintf(&b, "%s\n", m("analyze.text.counter", "iface", c.Interface, "counter", c.Counter, "from", c.From, "to", c.To, "delta", fmt.Sprintf("%+d", c.Delta)))
 		}
 		for _, n := range d.Neighbors {
-			fmt.Fprintf(&b, "%s %s %s %s\n", n.Protocol, n.ID, m("analyze.change."+changeCode[n.Change]), strings.Trim(n.From+" → "+n.To, " →"))
+			id := n.ID
+			if !n.IDTx.Empty() {
+				id = n.IDTx.In(loc)
+			}
+			fmt.Fprintf(&b, "%s %s %s %s\n", n.Protocol, id, m("analyze.change."+changeCode[n.Change]), strings.Trim(n.From+" → "+n.To, " →"))
 		}
 		for _, p := range d.Prefixes {
 			fmt.Fprintf(&b, "%s\n", m("analyze.text.prefixes", "neighbor", p.Neighbor, "from", p.From, "to", p.To))

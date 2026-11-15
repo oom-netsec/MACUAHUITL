@@ -30,6 +30,10 @@ func hsrpLabel(g iosxe.HSRPGroup) i18n.Text {
 	return i18n.Tx("analyze.key.hsrp", "iface", g.Interface, "group", g.Group)
 }
 
+func etherChannelLabel(po, port string) i18n.Text {
+	return i18n.Tx("analyze.key.etherchannel", "po", po, "port", port)
+}
+
 // CounterNames son los contadores que entiende iface_counter y el diff.
 var CounterNames = []string{"crc", "input_errors", "output_errors", "output_drops", "input_drops", "resets"}
 

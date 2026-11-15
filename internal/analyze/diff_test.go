@@ -164,3 +164,51 @@ func TestSeriesForAvisaYOmiteIncompletas(t *testing.T) {
 		t.Fatalf("%+v %+v", got, ws)
 	}
 }
+
+func adj(n int, epoch int) string {
+	return fmt.Sprintf("Protocol Interface                 Address\nIP       GigabitEthernet0/0         10.0.0.2(7)\n\nAdjacency table has %d adjacency\nSummary events epoch is %d\nSummary events queue contains 0 events (high water mark 1 event)\n", n, epoch)
+}
+
+func TestDiffComandosVolatiles(t *testing.T) {
+	for _, cmd := range []string{"show calendar", "show clock", "show clock detail"} {
+		r, _ := Diff(bundleOf(cmd, "10:00:01.123 UTC Wed Nov 4 2026\n", "10:10:02.456 UTC Wed Nov 4 2026\n"), 1, 2, "")
+		if len(r.Devices[0].Text) != 0 {
+			t.Errorf("%s salió como diferencia: %+v", cmd, r.Devices[0].Text)
+		}
+	}
+	r, _ := Diff(bundleOf("show adjacency summary", adj(6, 100), adj(6, 250)), 1, 2, "")
+	if len(r.Devices[0].Text) != 0 {
+		t.Fatalf("solo cambió el epoch: %+v", r.Devices[0].Text)
+	}
+	r, _ = Diff(bundleOf("show adjacency summary", adj(6, 100), adj(4, 250)), 1, 2, "")
+	if len(r.Devices[0].Text) != 1 {
+		t.Fatalf("de 6 a 4 adyacencias es un cambio real: %+v", r.Devices[0].Text)
+	}
+	for _, l := range r.Devices[0].Text[0].Lines {
+		if strings.Contains(l, "epoch") {
+			t.Errorf("el epoch no debe salir: %q", l)
+		}
+	}
+}
+
+func ec(flag string) string {
+	return "Group  Port-channel  Protocol    Ports\n------+-------------+-----------+-----------------------------------------------\n1      Po1(SU)         LACP      Et0/2(P)    Et0/3(" + flag + ")\n"
+}
+
+func TestDiffEtherChannel(t *testing.T) {
+	r, _ := Diff(bundleOf("show etherchannel summary", ec("P"), ec("D")), 1, 2, "")
+	n := r.Devices[0].Neighbors
+	if len(n) != 1 || n[0].Protocol != "etherchannel" || n[0].Change != "cambió" || n[0].From != "P" || n[0].To != "D" || n[0].ID != "Po1 miembro Eth0/3" {
+		t.Fatalf("neighbors = %+v", n)
+	}
+	if es, en := r.TextIn("es"), r.TextIn("en"); !strings.Contains(es, "etherchannel Po1 miembro Eth0/3 cambió P → D") || !strings.Contains(en, "etherchannel Po1 member Eth0/3 changed P → D") {
+		t.Fatalf("es:\n%s\nen:\n%s", es, en)
+	}
+	// miembro nuevo
+	one := "Group  Port-channel  Protocol    Ports\n------+-------------+-----------+-----------------------------------------------\n1      Po1(SU)         LACP      Et0/2(P)\n"
+	r, _ = Diff(bundleOf("show etherchannel summary", one, ec("P")), 1, 2, "")
+	n = r.Devices[0].Neighbors
+	if len(n) != 1 || n[0].Change != "apareció" || n[0].To != "P" || !strings.Contains(n[0].ID, "Et") {
+		t.Fatalf("miembro nuevo: %+v", n)
+	}
+}

@@ -113,5 +113,6 @@ func init() {
 		"analyze.err.not_dir":        e("analyze: {path} no es una carpeta", "analyze: {path} is not a folder", "path"),
 		"analyze.err.no_outputs":     e("analyze: {path} no contiene salidas de Patrol", "analyze: {path} has no Patrol outputs", "path"),
 		"analyze.err.read":           e("analyze: {cause}", "analyze: {cause}", "cause"),
+		"analyze.key.etherchannel":   e("{po} miembro {port}", "{po} member {port}", "po", "port"),
 	})
 }

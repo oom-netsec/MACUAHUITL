@@ -128,6 +128,18 @@ func regCases(t *testing.T) (map[string]golden, map[string]any) {
 	}
 	add("diff-notes", &dd, dd.Text())
 
+	// EtherChannel entre rondas: un miembro pasa de P a D y otro aparece
+	ecHead := "Group  Port-channel  Protocol    Ports\n------+-------------+-----------+-----------------------------------------------\n"
+	ecd := synth(t, map[string]map[string]string{"R1_10.0.0.1": {
+		"r001_20261104-100000.txt": sec("2026-11-04T10:00:01Z", "show etherchannel summary", ecHead+"1      Po1(SU)         LACP      Et0/2(P)    Et0/3(P)\n"),
+		"r002_20261104-101000.txt": sec("2026-11-04T10:10:01Z", "show etherchannel summary", ecHead+"1      Po1(SU)         LACP      Et0/2(P)    Et0/3(D)    Et0/4(P)\n"),
+	}})
+	de, err := Diff(ecd, 1, 2, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	add("diff-etherchannel", &de, de.Text())
+
 	// línea de tiempo: eventos de pcap, auditoría y syslog con avisos
 	pr := pcapan.Report{}
 	at := time.Date(2026, 11, 4, 10, 9, 18, 0, time.UTC)
