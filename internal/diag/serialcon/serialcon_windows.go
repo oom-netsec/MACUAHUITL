@@ -85,8 +85,10 @@ func open(c Config) (*Port, error) {
 // SHARING_VIOLATION; se reporta como ErrPermission/permission_hint (su texto en Windows es el de «en uso»).
 func openErr(path string, err error) error {
 	switch {
+	// Un COM abierto por otra app da ACCESS_DENIED o SHARING_VIOLATION: es «en uso» (como EBUSY en Linux), no un permiso
+	// que dar (en Windows no hay grupo dialout). El texto de Windows sale de serial.err.busy.windows.
 	case errors.Is(err, windows.ERROR_ACCESS_DENIED), errors.Is(err, windows.ERROR_SHARING_VIOLATION):
-		return i18n.Wrap("serial.err.permission_hint", ErrPermission, i18n.A("path", path))
+		return i18n.New("serial.err.busy", i18n.A("path", path))
 	case errors.Is(err, windows.ERROR_FILE_NOT_FOUND), errors.Is(err, windows.ERROR_PATH_NOT_FOUND):
 		return i18n.New("serial.err.missing", i18n.A("path", path))
 	}
