@@ -313,3 +313,25 @@ func TestApostrofosYDiffConMayusculaInicialIgualAV065(t *testing.T) {
 		}
 	}
 }
+
+// Hallazgo 4: con varias citas en una línea la extensión de quoteTail no se come la prosa que sigue a la cita que cierra.
+func TestQuoteTailConVariasCitasConservaLaProsa(t *testing.T) {
+	casos := map[string]string{
+		`ERROR: "enable secret abc" is invalid, see "help" for details`:       `ERROR: "enable secret <MASKED:secret>" is invalid, see "help" for details`,
+		`ERROR: "enable secret abc", see "help" for details`:                  `ERROR: "enable secret <MASKED:secret>", see "help" for details`,
+		`ERROR: "snmp-server community Zq1 RO" rejected; use "snmp-server x"`: `ERROR: "snmp-server community <MASKED:snmp-community> RO" rejected; use "snmp-server x"`,
+	}
+	for in, want := range casos {
+		got := nuevo.apply("ios-xe", in+"\n")
+		if strings.Contains(got, "Zq1") || !strings.Contains(got, `see "help" for details`) && strings.Contains(in, "see") || !strings.Contains(got, "rejected") && strings.Contains(in, "rejected") {
+			t.Errorf("%q\n  salida: %q\n  espero: %q", in, got, want)
+		}
+		if strings.Contains(in, "enable secret abc") && strings.Contains(got, "abc") {
+			t.Errorf("%q: abc visible: %q", in, got)
+		}
+	}
+	// una comilla del valor pegada a texto sigue extendiendo hasta la que cierra
+	if got := nuevo.apply("ios-xe", `ERROR: "crypto pki export TP pem terminal 3des Zq04206"Zq04207" see "x"`+"\n"); strings.Contains(got, "Zq0420") {
+		t.Errorf("fuga: %q", got)
+	}
+}

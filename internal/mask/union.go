@@ -328,20 +328,28 @@ func quoteTail(orig, s1 string) [][2]int {
 	if !quotedCmdLine.MatchString(orig) {
 		return nil
 	}
-	f, l := strings.IndexByte(orig, '"'), strings.LastIndexByte(orig, '"')
+	f := strings.IndexByte(orig, '"')
 	p := lcp(orig, s1)
 	if f < 0 || f >= p || p >= len(orig) {
 		return nil
 	}
-	n := strings.Count(orig[p:], `"`)
-	closing := l+1 >= len(orig) || strings.ContainsRune(" \t,;)}]:.", rune(orig[l+1])) // una comilla pegada a lo que sigue no cierra la cita
-	switch {
-	case n >= 2 && closing:
-		return [][2]int{{p, l}}
-	case n >= 1 && !closing:
+	// Las comillas tras el cambio: la primera que cierra (seguida de espacio, puntuación o el fin) deja la cita como está, que
+	// es lo normal. Una pegada a texto («Zq1"Zq2») es del valor: el tramo sigue hasta la siguiente que cierra, o al fin.
+	for i := p; i < len(orig); i++ {
+		if orig[i] != '"' {
+			continue
+		}
+		if i+1 >= len(orig) || strings.ContainsRune(" \t,;)}]:.", rune(orig[i+1])) {
+			if i > p && strings.Contains(orig[p:i], `"`) {
+				return [][2]int{{p, i}}
+			}
+			return nil
+		}
+	}
+	if strings.Contains(orig[p:], `"`) {
 		return [][2]int{{p, len(orig)}}
 	}
-	return nil // una sola comilla tras el cambio, que cierra la cita: lo normal
+	return nil
 }
 
 // cmdSyslogOpen: los syslog de ASA/FTD 111008 y 111010 sin el cierre del comando citado.
