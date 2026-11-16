@@ -465,6 +465,31 @@ func TestSalidaSinSaltosEsLineal(t *testing.T) {
 	}
 }
 
+// Con 16 MiB sin saltos (tamaño real de un «| json» grande) el costo por lectura no depende del tamaño del búfer: la búsqueda del último
+// salto mira solo la ventana final. Con la búsqueda sobre todo el búfer, 16 MiB tardaba ~8,7 s contra ~0,9 s de 4 MiB (cuadrático: ~16x).
+func TestSalidaSinSaltosGrandeEsLineal(t *testing.T) {
+	small, big := 4<<20, 16<<20
+	if raceOn || testing.Short() {
+		small, big = 1<<20, 4<<20
+	}
+	best := func(n int) time.Duration {
+		m := time.Duration(1<<63 - 1)
+		for range 2 {
+			d := feed(n, "SW#")
+			start := time.Now()
+			if _, err := d.untilIdle(context.Background(), 5*time.Second, d.atPrompt); err != nil {
+				t.Fatal(err)
+			}
+			m = min(m, time.Since(start))
+		}
+		return m
+	}
+	a, b := best(small), best(big)
+	if b > 6*a {
+		t.Fatalf("4 veces más bytes sin salto tardó %v contra %v: no es lineal", b, a)
+	}
+}
+
 // El tope de la cola no rompe el reconocimiento de prompts largos (ASA multicontexto) tras una línea enorme.
 func TestPromptLargoTrasLineaEnorme(t *testing.T) {
 	host := strings.Repeat("c", 100)

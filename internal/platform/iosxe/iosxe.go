@@ -358,7 +358,12 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 		// El prompt y el --More-- están siempre en la última línea: se revisa solo desde el último salto (incluido,
 		// por los patrones con (?:^|\n)). Limpiar todo el búfer en cada pedazo costaba tiempo cuadrático: 63 s con 1 MB.
 		// Sin saltos (un «| json» de una línea, un equipo hostil) la «última línea» sería todo el búfer: se acota a outTail.
-		from := max(bytes.LastIndexByte(d.buf, '\n'), len(d.buf)-outTail, 0)
+		// El salto se busca solo en esa ventana final: buscarlo en todo el búfer recorría 16 MiB en cada lectura.
+		w := max(len(d.buf)-outTail, 0)
+		from := w
+		if i := bytes.LastIndexByte(d.buf[w:], '\n'); i >= 0 {
+			from = w + i
+		}
 		tail := string(d.buf[from:])
 		// AireOS: solo el «--More-- or (q)uit» completo (un «--More--» partido entre dos lecturas no se contesta a medias).
 		if t := strings.TrimRight(tail, " "); d.aire && aireMore.MatchString(t) || !d.aire && strings.HasSuffix(t, "--More--") || strings.HasSuffix(t, "<--- More --->") {
