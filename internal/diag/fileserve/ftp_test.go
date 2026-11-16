@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 type ftpC struct {
@@ -130,9 +132,7 @@ func TestFTPServer(t *testing.T) {
 	if got, _ := os.ReadFile(filepath.Join(recv, "running-config")); !bytes.Equal(got, data) {
 		t.Fatal("STOR: contenido distinto")
 	}
-	if st, _ := os.Stat(filepath.Join(recv, "running-config")); st.Mode().Perm() != 0o600 {
-		t.Fatalf("permisos %v", st.Mode())
-	}
+	systest.Private(t, filepath.Join(recv, "running-config"), 0o600)
 	f.pasv()
 	f.cmd(550, "STOR running-config") // no sobrescribe
 	// Nombre con ruta: solo la base, dentro de la carpeta.

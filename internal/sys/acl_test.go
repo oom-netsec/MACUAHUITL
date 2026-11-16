@@ -1,6 +1,9 @@
 package sys
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 const (
 	sidUser   = "S-1-5-21-1-2-3-1001"
@@ -50,5 +53,18 @@ func TestIsPrivateACL(t *testing.T) {
 	}
 	if isPrivateACL(sidUser, sidUser, true, append(propias[:3:3], ace{sid: sidUsers, mask: 1})) {
 		t.Fatal("ACE para Usuarios no es privada")
+	}
+}
+
+func TestIgnoreUnsupported(t *testing.T) {
+	boom := errors.New("boom")
+	if err := ignoreUnsupported(errors.Join(errors.ErrUnsupported, boom)); err != nil {
+		t.Fatalf("un FS sin ACL no debe fallar: %v", err)
+	}
+	if err := ignoreUnsupported(boom); err != boom {
+		t.Fatalf("otro error debe pasar: %v", err)
+	}
+	if ignoreUnsupported(nil) != nil {
+		t.Fatal("nil")
 	}
 }

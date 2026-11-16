@@ -129,9 +129,9 @@ func MkdirPrivate(path string) error {
 // ProtectFile deja el archivo con dueño el usuario y DACL protegida sin herencia (usuario, SYSTEM, Administradores).
 func ProtectFile(path string) error { return protect(path, false) }
 
-// ProtectNew protege un archivo recién creado (ver la versión de Linux). Un sistema de archivos sin ACL (FAT, exFAT)
-// devuelve un error que cumple errors.Is(err, errors.ErrUnsupported), para que quien tolere la falta de permisos lo vea.
-func ProtectNew(path string) error { return protect(path, false) }
+// ProtectNewStrict deja el archivo recién creado con la DACL protegida sin herencia. Un sistema de archivos sin ACL
+// (FAT, exFAT) devuelve un error que cumple errors.Is(err, errors.ErrUnsupported).
+func ProtectNewStrict(path string) error { return protect(path, false) }
 
 // ReadOnlyDir pone en la carpeta una ACE de «negar» crear archivos, subcarpetas y borrar hijos a todos (también al
 // usuario: las de negar van primero) y devuelve cómo restaurar la DACL privada. Es para pruebas: chmod no cierra una

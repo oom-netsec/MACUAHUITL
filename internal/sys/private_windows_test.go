@@ -186,7 +186,7 @@ func TestProtectNewDejaElArchivoPrivadoAntesDeEscribir(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer fh.Close()
-	if err := ProtectNew(f); err != nil {
+	if err := ProtectNewStrict(f); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := fh.WriteString("secreto"); err != nil { // el handle abierto sigue valiendo

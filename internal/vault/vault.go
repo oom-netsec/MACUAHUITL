@@ -583,7 +583,7 @@ func writeAtomicOpt(path string, data []byte, noPerms *bool) error {
 	}
 	// En Windows chmod no protege nada: la ACL del archivo es la heredada. Se protege antes de escribir y con la misma
 	// tolerancia (FAT, exFAT); en Linux ProtectNew no hace nada.
-	if err := sys.ProtectNew(tmp.Name()); err != nil {
+	if err := sys.ProtectNewStrict(tmp.Name()); err != nil {
 		if noPerms == nil || !errors.Is(err, errors.ErrUnsupported) {
 			tmp.Close()
 			return fmt.Errorf("vault: %w", err)

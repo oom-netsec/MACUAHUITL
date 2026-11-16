@@ -3,7 +3,10 @@ package sys
 // Lógica de ACL sin llamadas al sistema, para probarla en Linux: la lectura y la escritura de la DACL son de Windows
 // (private_windows.go) y entregan aquí los SID como texto.
 
-import "slices"
+import (
+	"errors"
+	"slices"
+)
 
 // SID conocidos (ADR 0012, c). El usuario no es fijo: es el SID del token del proceso.
 const (
@@ -87,3 +90,16 @@ func (e *PrivateDirError) Error() string {
 }
 
 func (e *PrivateDirError) Unwrap() error { return e.Err }
+
+// ProtectNew deja un archivo recién creado (con O_CREATE y 0600) igual de privado en los dos sistemas: en Linux no hace
+// nada, porque ya nació 0600; en Windows nació con la ACL heredada y aquí queda con la DACL protegida (llámala antes de
+// escribir el secreto). Como Linux en un vfat, en un sistema de archivos sin ACL (FAT, exFAT) lo deja como está y no
+// falla; quien necesite saberlo, como los respaldos de la bóveda, usa ProtectNewStrict.
+func ProtectNew(path string) error { return ignoreUnsupported(ProtectNewStrict(path)) }
+
+func ignoreUnsupported(err error) error {
+	if errors.Is(err, errors.ErrUnsupported) {
+		return nil
+	}
+	return err
+}

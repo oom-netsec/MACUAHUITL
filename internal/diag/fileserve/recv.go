@@ -147,8 +147,14 @@ func (r *receiver) create(raw string, announced int64) (*recvFile, error) {
 		err = errTooMany
 	default:
 		if f, err = sys.OpenNewIn(r.root, name); err == nil {
-			r.inFlight[name] = true
-			r.files++
+			if err = sys.ProtectNew(path); err != nil { // en Windows nace con la ACL heredada; en Linux no hace nada
+				f.Close()
+				r.root.Remove(name)
+				f = nil
+			} else {
+				r.inFlight[name] = true
+				r.files++
+			}
 		}
 	}
 	r.mu.Unlock()

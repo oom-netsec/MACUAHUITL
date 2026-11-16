@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 func TestRunGeneraParVerificableYNoPisa(t *testing.T) {
@@ -12,13 +14,7 @@ func TestRunGeneraParVerificableYNoPisa(t *testing.T) {
 	if err := run(priv, pub); err != nil {
 		t.Fatal(err)
 	}
-	st, err := os.Stat(priv)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if st.Mode().Perm() != 0o600 {
-		t.Fatalf("permisos de la privada = %v, quiero 0600", st.Mode().Perm())
-	}
+	systest.Private(t, priv, 0o600) // en Windows, ProtectNew: dueño y DACL protegida con solo el usuario, SYSTEM y Administradores
 	if err := verifica(priv, pub); err != nil {
 		t.Fatal(err)
 	}

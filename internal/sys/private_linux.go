@@ -11,15 +11,13 @@ func MkdirPrivate(path string) error { return os.MkdirAll(path, 0o700) }
 // ProtectFile deja el archivo en 0600: para los que se escriben fuera de las carpetas propias del núcleo.
 func ProtectFile(path string) error { return os.Chmod(path, 0o600) }
 
+// ProtectNewStrict protege un archivo recién creado con O_CREATE y 0600 (que en Linux ya nació privado): no hace nada.
+func ProtectNewStrict(string) error { return nil }
+
 // OnlyOwnAccess dice si nadie más que el usuario puede tocar el archivo o carpeta. En Linux es lo mismo que IsPrivate.
 // En Windows no exige dueño ni DACL protegida: basta que ninguna ACE (heredada o no) dé acceso a un SID que no sea el
 // usuario, SYSTEM o Administradores. Es lo que cumple lo que se crea dentro de una carpeta hecha con MkdirPrivate.
 func OnlyOwnAccess(path string) (bool, error) { return IsPrivate(path) }
-
-// ProtectNew es ProtectFile para un archivo recién creado con O_CREATE y 0600 (que ya nació privado): en Linux no hace
-// nada, así un sistema de archivos sin permisos (vfat) no falla donde antes no fallaba. En Windows el archivo nace con
-// la ACL heredada y aquí se protege; llámala antes de escribir el secreto.
-func ProtectNew(string) error { return nil }
 
 // ReadOnlyDir deja la carpeta sin permiso de escritura (0500) y devuelve cómo restaurarla. Es para pruebas: en Windows
 // chmod no cierra una carpeta, ahí se pone una ACE de «negar» escritura.

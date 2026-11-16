@@ -45,6 +45,9 @@ func build(t *testing.T, out, version string) {
 }
 
 func TestReproducibleAndPackaged(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("empaqueta un .deb con nfpm y dpkg-deb y arma un script /bin/sh: solo Linux")
+	}
 	if testing.Short() {
 		t.Skip("compila dos veces y empaqueta")
 	}

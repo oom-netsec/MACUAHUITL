@@ -216,6 +216,11 @@ func Download(ctx context.Context, r Request) (Result, error) {
 	if err != nil {
 		return res, fmt.Errorf("transfer: %w", err)
 	}
+	if err := sys.ProtectNew(dst); err != nil { // en Windows nace con la ACL heredada; en Linux no hace nada
+		f.Close()
+		root.Remove(name)
+		return res, fmt.Errorf("transfer: %w", err)
+	}
 	r.track = newTracker(r.OnProgress, nil)
 	sk := &sink{f: f, max: max, md5: md5.New(), sha: sha256.New(), track: r.track}
 	start := time.Now()
