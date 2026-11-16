@@ -74,12 +74,17 @@ var spProse = map[string]bool{"mismatch": true, "failed": true, "expired": true,
 // commandSpans devuelve, para un comando tecleado o citado, los tramos [s, t) del original que Command tapa: uno por
 // segmento « ; » (NX-OS), desde el valor (el token que sigue a la palabra de secreto) hasta el fin del segmento. No
 // combina nada con las reglas: de eso se encarga cut.
-func commandSpans(block, cmd string) [][2]int { return spansIn(block, cmd, false) }
+func commandSpans(block, cmd string) [][2]int {
+	sp := spansIn(block, cmd, false)
+	if n := normSpaces(cmd); n != cmd { // IOS toma el NBSP como parte del token: se prueba el original y la copia, y se juntan
+		sp = mergeSpans(append(sp, spansIn(block, n, false)...))
+	}
+	return sp
+}
 
 // spansIn es commandSpans; quoted: cmd es un texto citado entre comillas («token X» es una palabra más y la prosa de la
 // lista spProse no es un comando).
 func spansIn(block, cmd string, quoted bool) (spans [][2]int) {
-	cmd = normSpaces(cmd)
 	pos := 0
 	for _, seg := range strings.Split(cmd, spSep) { // cada comando de NX-OS por separado: el primero de cada uno decide
 		spans = append(spans, shiftSpans(spansSeg(block, seg, quoted), pos)...)

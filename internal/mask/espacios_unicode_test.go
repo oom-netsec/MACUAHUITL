@@ -72,3 +72,22 @@ func anyIn(s string, ms []string) bool {
 	}
 	return false
 }
+
+// Un espacio Unicode dentro del valor es parte del token para IOS: no se parte el valor (la vía de eco desplazado
+// depende de recordar el valor entero).
+func TestEspacioUnicodeDentroDelValorNoLoParte(t *testing.T) {
+	for _, sp := range []string{" ", " ", " ", "　", "\t", " ", "\u0085", " "} {
+		cmd := "pre-shared-key local #AbCd" + sp + "Zq02231 remote AbCd" + sp + "Zq02232!"
+		for _, ch := range canales {
+			if sp == "\t" && strings.HasPrefix(ch.nombre, "12") {
+				continue
+			}
+			out := ch.f("ios-xe", cmd)
+			for _, m := range []string{"Zq02231", "Zq02232"} {
+				if strings.Contains(out, m) {
+					t.Errorf("[%s] %q: %s visible: %q", ch.nombre, sp, m, out)
+				}
+			}
+		}
+	}
+}

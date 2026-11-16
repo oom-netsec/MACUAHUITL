@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 )
 
 var marcado = regexp.MustCompile(`<MASKED:[^>]*>`)

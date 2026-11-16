@@ -209,10 +209,18 @@ func lineSpans(line, platform string) (string, [][2]int) {
 	if strings.Contains(line, `\"`) {
 		line = strings.ReplaceAll(line, `\"`, `"`)
 	}
-	n := normSpaces(line) // los tramos se calculan sobre la copia (mismos índices); el corte, sobre el original
-	sp := loggedSpans(n, platform)
-	if quotedCmdLine.MatchString(n) { // M₂ solo actúa sobre comandos: las demás comillas de un show quedan como en la v0.6.5
-		sp = append(sp, quotedSpans(n)...)
+	// Los tramos salen del original y de la copia con los espacios Unicode normalizados (mismos índices): IOS toma el NBSP
+	// como parte del token, así que un valor puede llevarlo adentro. Se juntan; el corte es sobre el original.
+	spansOf := func(t string) [][2]int {
+		sp := loggedSpans(t, platform)
+		if quotedCmdLine.MatchString(t) { // M₂ solo actúa sobre comandos: las demás comillas de un show quedan como en la v0.6.5
+			sp = append(sp, quotedSpans(t)...)
+		}
+		return sp
+	}
+	sp := spansOf(line)
+	if n := normSpaces(line); n != line {
+		sp = append(sp, spansOf(n)...)
 	}
 	return line, mergeSpans(sp)
 }
@@ -228,11 +236,15 @@ func CutCommand(block, orig, s1 string) (string, []string) {
 	if strings.Contains(orig, `\"`) {
 		orig = strings.ReplaceAll(orig, `\"`, `"`)
 	}
-	n := normSpaces(orig) // mismos índices que orig: los tramos y los valores salen de la copia
-	spans := mergeSpans(append(commandSpans(block, n), quotedSpans(n)...))
+	n := normSpaces(orig) // mismos índices que orig: los tramos y los valores salen de los dos textos
+	spans := append(commandSpans(block, orig), quotedSpans(orig)...)
+	if n != orig {
+		spans = append(spans, quotedSpans(n)...) // commandSpans ya probó la copia
+	}
+	spans = mergeSpans(spans)
 	var vals []string
 	for _, sp := range spans {
-		for _, v := range SecretValues(n[sp[0]:sp[1]]) {
+		for _, v := range append(SecretValues(orig[sp[0]:sp[1]]), SecretValues(n[sp[0]:sp[1]])...) {
 			vals = append(vals, v)
 			// un valor con forma de URL («ftp://u:CLAVE@host/f»): también sus partes, que un eco partido deja sueltas
 			for _, p := range strings.FieldsFunc(v, func(r rune) bool { return r == '/' || r == '@' || r == ':' }) {
