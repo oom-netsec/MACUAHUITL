@@ -127,8 +127,11 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 					rec.Mark("BREAK")
 				}
 			case len(m.GetData()) > 0:
-				n, _ := p.Write(m.GetData())
+				n, err := p.Write(m.GetData())
 				tx.Add(int64(n))
+				if err != nil && !errors.Is(err, os.ErrClosed) { // escritura corta o fallida: que quede en el registro
+					rec.Mark("WRITE ERROR")
+				}
 			}
 		}
 	}()
