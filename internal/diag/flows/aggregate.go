@@ -163,6 +163,9 @@ func (a *Aggregator) Snapshot(n int) Snapshot {
 		s.Exporters = append(s.Exporters, *e)
 	}
 	sort.Slice(s.Exporters, func(i, j int) bool {
+		if ei, ej := s.Exporters[i].Errors > 0, s.Exporters[j].Errors > 0; ei != ej { // los que mandan paquetes malformados van primero: no desaparecen del tope
+			return ei
+		}
 		if s.Exporters[i].Bytes != s.Exporters[j].Bytes {
 			return s.Exporters[i].Bytes > s.Exporters[j].Bytes
 		}

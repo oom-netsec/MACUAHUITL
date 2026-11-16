@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -420,5 +421,18 @@ func TestSnapshotBoundsExporters(t *testing.T) {
 	}
 	if all := a.Snapshot(0); len(all.Exporters) != 120000 {
 		t.Errorf("n=0 no acota: %d", len(all.Exporters))
+	}
+}
+
+// Un exportador que solo manda paquetes malformados (cero bytes, solo errores) no desaparece del top por tener cero bytes.
+func TestSnapshotKeepsExportersThatOnlySendErrors(t *testing.T) {
+	a := NewAggregator(1000)
+	for i := range 50 {
+		a.Add(Flow{Exporter: fmt.Sprintf("10.0.0.%d", i+1), Src: "192.0.2.1", Dst: "192.0.2.2", Proto: 6, Bytes: 1000, Packets: 1})
+	}
+	a.Error("10.9.9.9", errors.New("paquete malformado"))
+	s := a.Snapshot(5)
+	if len(s.Exporters) != 5 || s.Exporters[0].Exporter != "10.9.9.9" || s.Exporters[0].Errors != 1 {
+		t.Fatalf("exportadores = %+v", s.Exporters)
 	}
 }
