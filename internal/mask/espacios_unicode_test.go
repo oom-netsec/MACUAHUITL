@@ -13,6 +13,9 @@ import (
 func TestEspaciosUnicodeNingunSecretoSeVe(t *testing.T) {
 	espacios := map[string]string{"NBSP U+00A0": "\u00a0", "U+2009": "\u2009", "U+202F": "\u202f", "U+3000": "\u3000", "tab": "\t",
 		"U+2003": "\u2003", "U+0085": "\u0085", "U+1680": "\u1680", "ZWSP": "\u200b"}
+	if raceOn { // con -race, una muestra: el NBSP (2 bytes) y U+3000 (3 bytes); el corpus completo corre sin -race (ver raceOn)
+		espacios = map[string]string{"NBSP U+00A0": "\u00a0", "U+3000": "\u3000"}
+	}
 	cmds, plats := canalCasos(len(canalPlantillas))
 	formas := map[string]func(c, sp string) string{
 		"uno":         func(c, sp string) string { return strings.Replace(c, " ", sp, 1) },
