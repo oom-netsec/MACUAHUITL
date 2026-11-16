@@ -2787,6 +2787,16 @@ export const es = {
   "patrol.devices.partial": "correctos: {ok} · parciales: {partial} · con fallas: {failed} · {total} equipos",
   "patrol.devices.partial.one": "correctos: {ok} · parciales: {partial} · con fallas: {failed} · 1 equipo",
   "patrol.phaseReason.phase.ok_partial_failed": "{ok}, {partial}, {failed} con fallas",
+  // Windows (ADR 0012): variantes "<clave>.windows" que i18n.tsx usa en lugar de la clave cuando la app corre en Windows.
+  "shell.coreDown.cmd": "systemctl --user status macuahuitld",
+  "shell.coreDown.windows": "Núcleo desconectado. Reintentando la conexión. Si el problema persiste, revisar el registro del núcleo:",
+  "shell.coreDown.cmd.windows": "%LOCALAPPDATA%\\MACUAHUITL\\state\\macuahuitld.log",
+  "console.none.windows": "No se detectan adaptadores USB-serie (puertos COM). Revisa el Administrador de dispositivos → Puertos (COM y LPT): si el adaptador no aparece, falta su controlador.",
+  "console.defaults.windows": "Cisco: 9600 8N1 sin control de flujo. Si el puerto está en uso, otra aplicación lo tiene abierto: ciérrala.",
+  "backup.intro.b.windows": " con acceso solo para tu usuario y los administradores del equipo, y con retención. Respaldar solo lee los equipos; restaurar cambia la configuración y pasa por el modo asistido.",
+  "backup.secretsWarn.windows": "El archivo tendrá contraseñas y llaves en claro (acceso solo para tu usuario y los administradores del equipo). Protege la carpeta outputs/respaldos/.",
+  "ssh.note.windows": "Terminal manual: lo que se teclea va directo al equipo, sin modo asistido ni lista cerrada de comandos. Se graba lo que devuelve el equipo y lo tecleado, salvo lo que se escriba en un prompt de contraseña o secreto, en outputs/terminal/ (acceso solo para tu usuario y los administradores del equipo).",
+  "vault.backup.noPerms.windows": "El sistema de archivos no admite permisos por usuario (p. ej. una memoria FAT32 o exFAT): el contenido va cifrado, pero cuida quién puede leer el archivo.",
 };
 
 export type Key = keyof typeof es;

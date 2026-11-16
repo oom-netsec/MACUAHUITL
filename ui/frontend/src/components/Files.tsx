@@ -2,6 +2,7 @@
 import { useContext, useEffect, useId, useRef, useState } from "react";
 import { CoreContext } from "../app/activity";
 import { useT } from "../lib/i18n";
+import { baseName } from "../lib/paths";
 import type { Key } from "../lib/i18n/es";
 import { Icon } from "./Icon";
 import { Notice } from "./Field";
@@ -26,7 +27,7 @@ export function DropZone({ label, accept, multiple = true, onPaths }: { label: s
   useEffect(() => core?.onFilesDropped((e) => {
     if (e.target !== id) return;
     const good = e.paths.filter(ok);
-    setRejected(e.paths.filter((p) => !ok(p)).map((p) => p.split("/").pop() ?? p));
+    setRejected(e.paths.filter((p) => !ok(p)).map(baseName));
     if (good.length) cb.current(multiple ? good : good.slice(0, 1));
   }), [core, id]);
   const pick = async () => {

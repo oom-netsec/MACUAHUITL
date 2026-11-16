@@ -1,5 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { setOSForTests } from "./platform";
 import { I18nProvider, LanguageSwitch, langStorageKey, setFallbackLangForTests, tr, useCoreLang, useT } from "./i18n";
 
 function Probe() {
@@ -93,4 +94,14 @@ function Missing() {
 test("una clave inexistente se muestra tal cual en lugar de romper la vista", () => {
   render(<I18nProvider><Missing /></I18nProvider>);
   expect(screen.getByText("fleet.sev.desconocida")).toBeInTheDocument();
+});
+
+test("en Windows se usa la variante «.windows» de una clave si existe; si no, la de siempre", () => {
+  setOSForTests("windows");
+  try {
+    expect(tr("console.none")).toContain("COM");
+    expect(tr("console.none")).not.toContain("/dev/tty");
+    expect(tr("shell.coreStatus.connected")).toBe("Núcleo conectado");
+  } finally { setOSForTests(undefined); }
+  expect(tr("console.none")).toContain("/dev/ttyUSB");
 });

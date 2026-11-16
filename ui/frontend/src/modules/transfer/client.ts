@@ -1,6 +1,8 @@
 // Formulario del cliente de transferencias: la URL se arma desde los campos y la petición al núcleo sale del mismo estado.
 import type { Key } from "../../lib/i18n/es";
 import { parseFingerprints } from "../../lib/hostkeys";
+import { baseName, dirName, isAbsWindows } from "../../lib/paths";
+import { isWindows } from "../../lib/platform";
 import type { TransferGetParams, TransferPutParams } from "./api";
 import { expectedHash, isIP } from "./validate";
 
@@ -67,7 +69,7 @@ export function clientErrors(f: ClientForm): ClientErrors {
   if (usesSsh(f.proto) && !f.cred) e.cred = "transfer.err.cred";
   if (f.dir === "get" && expectedHash(f.hash) === null) e.hash = "transfer.err.hash";
   if (f.dir === "put" && !f.src) e.src = "transfer.err.src";
-  else if (f.dir === "put" && (f.src.lastIndexOf("/") < 0 || f.src.endsWith("/"))) e.src = "transfer.err.srcPath";
+  else if (f.dir === "put" && (!dirName(f.src) || !baseName(f.src) || (isWindows() && !isAbsWindows(f.src)))) e.src = "transfer.err.srcPath";
   const m = f.minutes.trim();
   if (m && !(/^\d+$/.test(m) && Number(m) >= 1 && Number(m) <= 240)) e.minutes = "transfer.err.cminutes";
   const mb = f.maxMB.trim();
@@ -94,9 +96,8 @@ export function getParams(f: ClientForm): TransferGetParams {
 }
 
 export function putParams(f: ClientForm): TransferPutParams {
-  const i = f.src.lastIndexOf("/");
   return {
-    url: buildURL(f), fromDir: f.src.slice(0, i) || "/", name: f.src.slice(i + 1), credentialId: usesCred(f.proto) ? f.cred : "",
+    url: buildURL(f), fromDir: dirName(f.src), name: baseName(f.src), credentialId: usesCred(f.proto) ? f.cred : "",
     acceptedHostKeys: usesSsh(f.proto) ? parseFingerprints(f.accepted) : [], legacySsh: usesSsh(f.proto) && f.legacy, ...limits(f),
   };
 }

@@ -2,6 +2,7 @@ import { createContext, useContext, useLayoutEffect, useState, type ReactNode } 
 import { Segmented } from "../components/Segmented";
 import { es, type Key } from "./i18n/es";
 import { en } from "./i18n/en";
+import { isWindows } from "./platform";
 
 // Textos de la interfaz en español e inglés. Los mensajes que vienen del núcleo no se traducen.
 export type Lang = "es" | "en";
@@ -11,9 +12,11 @@ const dicts: Record<Lang, Record<Key, string>> = { es, en };
 export const langStorageKey = "macuahuitl.lang";
 
 type T = (key: Key, vars?: Record<string, string | number>) => string;
-// Con n = 1 se usa la variante "<clave>.one" si existe ("1 equipo", no "1 equipos").
-const make = (lang: Lang): T => (key, vars) => {
+// Con n = 1 se usa la variante "<clave>.one" si existe ("1 equipo", no "1 equipos"). En Windows, "<clave>.windows" si
+// existe reemplaza a la clave (textos que nombran algo de Linux: systemd, /dev/ttyUSB, 0600…).
+const make = (lang: Lang): T => (k, vars) => {
   const d = dicts[lang] as Record<string, string>;
+  const key = isWindows() && d[`${k}.windows`] ? `${k}.windows` : k;
   const text = (vars?.n === 1 && d[`${key}.one`]) || d[key] || key; // una clave que falta se ve, no deja la vista en blanco
   return text.replace(/\{(\w+)\}/g, (_, v: string) => String(vars?.[v] ?? `{${v}}`));
 };

@@ -182,7 +182,7 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
         <div className="content" ref={content}>
           {status === "disconnected" && (
             <div role="alert" className="notice error">
-              <Icon name="error" /><div className="notice-body">{t("shell.coreDown")} <code>systemctl --user status macuahuitld</code></div>
+              <Icon name="error" /><div className="notice-body">{t("shell.coreDown")} <code>{t("shell.coreDown.cmd")}</code></div>
             </div>
           )}
           <NavContext.Provider value={nav}>

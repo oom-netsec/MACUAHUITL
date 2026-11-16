@@ -22,6 +22,18 @@ test("es.ts y en.ts tienen las mismas claves, con las mismas variables", () => {
   expect(ke.filter((k) => vars(e[k], k) !== vars(n[k], k)), "variables distintas").toEqual([]);
 });
 
+test("cada variante «.windows» reemplaza a una clave que existe y lleva sus mismas variables", () => {
+  const e = es as Record<string, string>;
+  const win = Object.keys(es).filter((k) => k.endsWith(".windows"));
+  expect(win.length).toBeGreaterThan(0);
+  for (const k of win) {
+    const base = k.slice(0, -".windows".length);
+    expect(e[base], `${k} sin clave base`).toBeDefined();
+    expect(vars(e[k]), `${k}: variables distintas de ${base}`).toBe(vars(e[base]));
+    if (e[`${base}.one`] !== undefined) expect(e[`${k}.one`], `${k}.one: sin ella Windows pierde el singular`).toBeDefined();
+  }
+});
+
 // Términos que no se traducen (siglas, protocolos, herramientas, comandos y nombres propios).
 const TECH = [
   "SSH", "VLAN", "ACL", "ACLs", "Ping", "ping", "nmap", "iperf3", "PCAP", "pcap", "pcapng", "TLS", "SNI", "DNS", "DNSSEC", "DoT", "DoH",

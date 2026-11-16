@@ -1,3 +1,4 @@
+import { setOSForTests } from "../../lib/platform";
 import { buildURL, clientErrors, defaultClientPort, getParams, parseClientURL, putParams, type ClientForm } from "./client";
 
 const base: ClientForm = {
@@ -144,4 +145,16 @@ test("el archivo de envío necesita carpeta y nombre", () => {
   expect(clientErrors(f({ dir: "put", src: "r1.txt" })).src).toBe("transfer.err.srcPath");
   expect(clientErrors(f({ dir: "put", src: "/home/u/" })).src).toBe("transfer.err.srcPath");
   expect(clientErrors(f({ dir: "put", src: "/r1.txt" })).src).toBeUndefined();
+});
+
+test("en Windows el origen local acepta «\\» y la raíz de la unidad; en Linux «\\» no separa", () => {
+  setOSForTests("windows");
+  try {
+    expect(clientErrors(f({ dir: "put", src: "C:\\x\\f.bin" })).src).toBeUndefined();
+    expect(clientErrors(f({ dir: "put", src: "C:\\x\\" })).src).toBe("transfer.err.srcPath");
+    for (const src of ["\\f.bin", "C:f.bin", "\\\\srv\\f.bin"]) expect(clientErrors(f({ dir: "put", src })).src, src).toBe("transfer.err.srcPath");
+    expect(putParams(f({ dir: "put", src: "C:\\x\\f.bin", proto: "tftp" }))).toMatchObject({ fromDir: "C:\\x", name: "f.bin" });
+    expect(putParams(f({ dir: "put", src: "C:\\f.bin", proto: "tftp" }))).toMatchObject({ fromDir: "C:\\", name: "f.bin" });
+  } finally { setOSForTests(undefined); }
+  expect(clientErrors(f({ dir: "put", src: "C:\\x\\f.bin" })).src).toBe("transfer.err.srcPath");
 });
