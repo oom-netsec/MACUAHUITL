@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
+	"slices"
 
 	"golang.org/x/term"
 
@@ -46,7 +48,9 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/transfer"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/vault"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/visibility"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"github.com/oom-netsec/MACUAHUITL/internal/termcolor"
 	"github.com/oom-netsec/MACUAHUITL/internal/version"
 )
@@ -73,6 +77,7 @@ var areas = []cli.Area{
 }
 
 func main() {
+	sys.ConsoleUTF8() // en Windows, la consola cp437 rompe los acentos
 	if err := run(os.Args[1:], os.Stdin, os.Stdout); err != nil {
 		printErr(os.Stderr, err)
 		os.Exit(cli.ExitCode(err))
@@ -80,7 +85,14 @@ func main() {
 }
 
 // printErr escribe el error saneado: puede traer texto de un paquete de terceros o de un equipo.
-func printErr(w io.Writer, err error) { fmt.Fprintln(w, "mctl:", cli.Sanitize(err.Error())) }
+func printErr(w io.Writer, err error) {
+	fmt.Fprintln(w, "mctl:", cli.Sanitize(i18n.In(cli.Lang(), err))) // los errores del catálogo salen en el idioma de mctl
+}
+
+// elevatedBlocked dice si mctl debe negarse a hablar con el núcleo por estar en una terminal elevada: solo en Windows,
+// donde el núcleo corre sin elevar (Medium) y su pipe no deja que un proceso elevado lea el token del cliente (el núcleo
+// cierra la conexión, fallo cerrado). Es variable para probarla en Linux; en Linux root ya tiene su propio camino.
+var elevatedBlocked = func() bool { return runtime.GOOS == "windows" && sys.Privileged() }
 
 // outIsTTY es variable para que las pruebas simulen una terminal.
 var outIsTTY = func(w io.Writer) bool {
@@ -137,6 +149,9 @@ func run(args []string, stdin io.Reader, out io.Writer) error {
 	var dialOpts []ipc.DialOption
 	if lang != "" {
 		dialOpts = ipc.WithLanguage(lang)
+	}
+	if elevatedBlocked() && !slices.ContainsFunc(rest, func(a string) bool { return a == "-h" || a == "--help" || a == "-help" }) {
+		return cli.Err("mctl.err.elevated")
 	}
 	conn, err := ipc.Dial(context.Background(), dialOpts...)
 	if err != nil {

@@ -1,6 +1,7 @@
 package i18n
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -35,5 +36,15 @@ func TestMotivoDeCarpetaDeSalidasIgualAlPrefijo(t *testing.T) {
 	}
 	if n < 12 {
 		t.Fatalf("solo %d códigos", n)
+	}
+}
+
+// Los errores de arranque del núcleo llevan su causa en el texto, en los dos idiomas.
+func TestErroresDeArranqueDelNucleo(t *testing.T) {
+	for code, want := range map[string][2]string{"core.err.prefs": {"core: preferencias: boom", "core: preferences: boom"}, "core.err.packs": {"core: paquetes: boom", "core: packages: boom"}} {
+		e := Wrap(code, errors.New("boom"), nil)
+		if e.Localize(Es) != want[0] || e.Localize(En) != want[1] {
+			t.Errorf("%s: %q / %q", code, e.Localize(Es), e.Localize(En))
+		}
 	}
 }

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // ServerPID es el PID del proceso que atiende el pipe name (GetNamedPipeServerProcessId), ya comprobado contra el SID
@@ -23,7 +25,7 @@ func ServerPID(name string) (int, error) {
 	}
 	c.Close()
 	if pid == 0 {
-		return 0, fmt.Errorf("ipc: el pipe %s devolvió un PID inválido", name)
+		return 0, i18n.New("ipc.err.pipe_bad_pid", i18n.A("name", name))
 	}
 	return int(pid), nil
 }

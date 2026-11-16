@@ -20,6 +20,7 @@ import (
 )
 
 func main() {
+	sys.ConsoleUTF8() // en Windows, la consola cp437 rompe los acentos
 	showVersion := flag.Bool("version", false, "imprime la versión y sale")
 	lang := flag.String("lang", "", "idioma de los avisos de la consola: en (por omisión) o es")
 	flag.Parse()
@@ -37,12 +38,40 @@ func main() {
 		msg := i18n.In(consoleLang, err)
 		fmt.Fprintln(os.Stderr, "macuahuitld:", msg)
 		// Sin consola el error se perdería: va al registro, salvo si otro núcleo ya tiene el canal (no se toca su registro).
-		if st := core.ResolvePaths(os.Getenv).State; st != "" && !errors.Is(err, ipc.ErrAlreadyRunning) && !sys.Privileged() { // elevado no se escribe en disco
-			sys.LogFailure(filepath.Join(st, logName), "macuahuitld: "+msg)
+		if st := core.ResolvePaths(os.Getenv).State; st != "" {
+			if !errors.Is(err, ipc.ErrAlreadyRunning) && !sys.Privileged() { // elevado no se escribe en el registro
+				sys.LogFailure(filepath.Join(st, logName), "macuahuitld: "+msg)
+			}
+			writeStartup(st, err, ipc.CoreRunning) // la UI lo lee; un proceso elevado no escribe (sys.WriteStartup)
 		}
 		os.Exit(1)
 	}
 }
+
+// startupWanted dice si el fallo va a macuahuitld.startup (ADR 0012 g). No cuando ya corre un núcleo del mismo usuario (la
+// app se conecta a ese), pero sí cuando el canal lo tiene otro usuario: eso lo envuelve en ErrAlreadyRunning.
+func startupWanted(err error) bool {
+	var ie *i18n.Error
+	return err != nil && (!errors.Is(err, ipc.ErrAlreadyRunning) || (errors.As(err, &ie) && ie.Code == "ipc.err.pipe_other_user"))
+}
+
+// writeStartup deja la causa en macuahuitld.startup si startupWanted y no corre ya un núcleo sano del mismo usuario (una
+// causa vieja sobre un núcleo que sirve sería falsa). running es la sonda, inyectable para probarla; si falla se escribe.
+func writeStartup(state string, err error, running func() (bool, error)) {
+	if !startupWanted(err) {
+		return
+	}
+	if up, rerr := running(); rerr == nil && up {
+		return
+	}
+	sys.WriteStartup(state, err)
+}
+
+// consoleErr es un error con código que se escribe en el idioma de la consola; conserva el código (Unwrap) para macuahuitld.startup.
+type consoleErr struct{ err error }
+
+func (e consoleErr) Error() string { return i18n.In(consoleLang, e.err) }
+func (e consoleErr) Unwrap() error { return e.err }
 
 // logName es el registro del núcleo dentro de State (Windows, ADR 0012 g).
 const logName = "macuahuitld.log"
@@ -57,11 +86,11 @@ func run(harden func() ([]i18n.Text, error)) error {
 		if runtime.GOOS == "windows" {
 			key = "harden.err.elevated"
 		}
-		return errors.New(i18n.Msg(consoleLang, key, nil))
+		return consoleErr{i18n.New(key, nil)}
 	}
 	hw, err := harden() // antes de tocar cualquier secreto
 	if err != nil {
-		return errors.New(i18n.In(consoleLang, err))
+		return consoleErr{err}
 	}
 	warns := make([]string, len(hw))
 	for i, w := range hw {
@@ -69,10 +98,10 @@ func run(harden func() ([]i18n.Text, error)) error {
 	}
 	p := core.ResolvePaths(os.Getenv)
 	if p.Config == "" || p.Data == "" || p.State == "" {
-		return errors.New(i18n.Msg(consoleLang, "harden.err.localappdata", nil)) // solo Windows: no se cae a %APPDATA%
+		return consoleErr{i18n.New("harden.err.localappdata", nil)} // solo Windows: no se cae a %APPDATA%
 	}
 	if runtime.GOOS != "windows" && p.Runtime == "" { // en Windows no hay carpeta runtime: el canal es un named pipe
-		return errors.New(i18n.Msg(consoleLang, "harden.err.runtime_dir", nil))
+		return consoleErr{i18n.New("harden.err.runtime_dir", nil)}
 	}
 	// El canal primero: un segundo núcleo que pierde el pipe (o el socket) sale sin tocar nada del primero, ni su registro.
 	addr, err := ipc.CoreAddr(p.Runtime)
@@ -83,6 +112,7 @@ func run(harden func() ([]i18n.Text, error)) error {
 	if err != nil {
 		return err
 	}
+	sys.ClearStartup(p.State) // el núcleo arrancó: la causa de un fallo anterior ya no vale
 	// Sin consola (-H windowsgui) la salida va a <State>\macuahuitld.log; en Linux no hace nada (stderr, journal).
 	if err := sys.RedirectStderr(filepath.Join(p.State, logName)); err != nil {
 		l.Close()
