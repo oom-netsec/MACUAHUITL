@@ -21,6 +21,7 @@ func (f *slowAssist) ListRuns(ctx context.Context, _ *v1.ListRunsRequest) (*v1.L
 	select {
 	case <-time.After(f.delay):
 	case <-ctx.Done():
+		return nil, ctx.Err() // un núcleo que no contestó a tiempo no entrega ejecuciones: si no, la respuesta le gana al plazo del cliente
 	}
 	return &v1.ListRunsResponse{Runs: f.runs}, nil
 }
