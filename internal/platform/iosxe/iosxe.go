@@ -82,6 +82,9 @@ var cfgWarnings = []string{"Creating vlan", "does not exist"}
 // infoPercent son los «% …» informativos de IOS en modo configuración: no detienen la ejecución.
 var infoPercent = regexp.MustCompile(`(?i)^% ?(?:info|notice|portfast|applying|please|remember|note|warning|generating|not all config may be removed)`)
 
+// syslogLine es un mensaje de syslog (%FACILIDAD-severidad-MNEMÓNICO:) que el equipo intercala en la consola: no es una respuesta al comando.
+var syslogLine = regexp.MustCompile(`^%[A-Z0-9_]+-\d-[A-Z0-9_]+:`)
+
 var asaSetPassword = regexp.MustCompile(`(?i)The enable password is not set|(?:enter|repeat)\s+password: ?$`)
 
 var passwordPrompt = regexp.MustCompile(`(?i)password: ?$`)
@@ -749,8 +752,9 @@ func cfgError(text string) bool {
 			}
 		}
 		// Cualquier otro «% texto» es un error de IOS que la lista cerrada no conoce (falla cerrado): solo los avisos
-		// conocidos pasan. «%LINK-3-UPDOWN» (syslog) no lleva espacio tras el «%» y no entra aquí.
-		if strings.HasPrefix(l, "% ") && !infoPercent.MatchString(l) {
+		// conocidos pasan. Con o sin espacio tras el «%» («%VTP VLAN configuration not allowed…» también es un error); solo el syslog
+		// («%LINK-3-UPDOWN: …») no entra aquí.
+		if strings.HasPrefix(l, "%") && !syslogLine.MatchString(l) && !infoPercent.MatchString(l) {
 			return true
 		}
 	}

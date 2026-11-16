@@ -215,20 +215,33 @@ func TestCfgErrorDecidesWhichPercentLinesStop(t *testing.T) {
 		"%Warning: portfast should only be enabled on ports connected to a single host.": false, // informativo de spanning-tree portfast
 		"%Portfast has been configured on GigabitEthernet1/0/1 but will only have effect when the interface is in a non-trunking mode.": false,
 		"% Not all config may be removed and may reappear after reactivating the logical-interface/sub-interfaces":                      false,
-		"% 10.20.0.0 overlaps with Vlan1":                                true, // error de IOS que no está en la lista cerrada
-		"% Access VLAN does not exist. Creating vlan 20":                 true,
-		"% Warning: this is only a warning":                              false,
-		"% Info: algo informativo":                                       false,
-		"% info: sin mayúsculas":                                         false,
-		"%Notice: aviso":                                                 false,
-		"% Portfast has been configured":                                 false,
-		"% Applying the configuration":                                   false,
-		"% Please define a key":                                          false,
-		"% Remember to save":                                             false,
-		"% Invalid input detected":                                       true,
-		"% Note: this is only a note":                                    false,
-		"% Generating 1024 bit RSA keys, keys will be non-exportable...": false,
-		"Cannot find community foo":                                      false, // IOS 15.2 en una reversa legítima, sin «%»
+		"% 10.20.0.0 overlaps with Vlan1":                                       true, // error de IOS que no está en la lista cerrada
+		"% Access VLAN does not exist. Creating vlan 20":                        true,
+		"% Warning: this is only a warning":                                     false,
+		"% Info: algo informativo":                                              false,
+		"% info: sin mayúsculas":                                                false,
+		"%Notice: aviso":                                                        false,
+		"% Portfast has been configured":                                        false,
+		"% Applying the configuration":                                          false,
+		"% Please define a key":                                                 false,
+		"% Remember to save":                                                    false,
+		"% Invalid input detected":                                              true,
+		"% Note: this is only a note":                                           false,
+		"% Generating 1024 bit RSA keys, keys will be non-exportable...":        false,
+		"%VTP VLAN configuration not allowed when device is in CLIENT mode.":    true, // sin espacio tras el %
+		"%Invalid next hop address (it's this router)":                          true,
+		"%SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.9)": false, // syslog
+		"%Warning: portfast should only be enabled":                             false,
+		"%Note: algo":                   false,
+		"%Info: algo":                   false,
+		"%Notice: algo":                 false,
+		"%Applying the configuration":   false,
+		"%Please define a key":          false,
+		"%Remember to save":             false,
+		"%Generating 1024 bit RSA keys": false,
+		"%Not all config may be removed and may reappear": false,
+		"%NOT ALL CONFIG MAY BE REMOVED":                  false,
+		"Cannot find community foo":                       false, // IOS 15.2 en una reversa legítima, sin «%»
 		"%LINK-5-CHANGED: Interface GigabitEthernet1/0/1, changed state to administratively down": false,
 	} {
 		if got := cfgError(msg + "\n"); got != stops {
