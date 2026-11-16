@@ -284,7 +284,22 @@ func CutCommandV(block, orig, s1 string) (string, []SecretValue) {
 	var vals []SecretValue
 	for _, sp := range spans {
 		host := hostCmd.MatchString(orig[:sp[0]])
-		for _, v := range append(SecretValuesV(orig[sp[0]:sp[1]], host), SecretValuesV(n[sp[0]:sp[1]], host)...) {
+		sv := append(SecretValuesV(orig[sp[0]:sp[1]], host), SecretValuesV(n[sp[0]:sp[1]], host)...)
+		// un tramo que arranca en un « ; » («secret ; username b password FRASE»): cada comando tras un « ; » interno se lee
+		// también por sí solo, para que su valor sea el primero de su grupo (y se recuerde tras el prompt) como sin ese adelanto
+		// shortcut: solo los primeros 8 « ; » del tramo (el tapado no depende de esto, solo lo que se recuerda); evita costo
+		// cuadrático en una línea con miles de « ; »
+		for i, k := sp[0], 0; i < sp[1] && k < 8; i++ {
+			if strings.HasPrefix(orig[i:sp[1]], spSep) {
+				k++
+				for _, t := range []string{orig[i+len(spSep) : sp[1]], n[i+len(spSep) : sp[1]]} {
+					for _, s2 := range commandSpans(block, t) {
+						sv = append(sv, SecretValuesV(t[s2[0]:s2[1]], hostCmd.MatchString(t[:s2[0]]))...)
+					}
+				}
+			}
+		}
+		for _, v := range sv {
 			vals = append(vals, v)
 			// un valor con forma de URL («ftp://u:CLAVE@host/f»): también sus partes, que un eco partido deja sueltas
 			for _, p := range strings.FieldsFunc(v.Text, func(r rune) bool { return r == '/' || r == '@' || r == ':' }) {

@@ -94,8 +94,9 @@ func spansIn(block, cmd string, quoted bool) (spans [][2]int) {
 	segs := strings.Split(cmd, spSep)
 	for i, seg := range segs {
 		sp := spansSeg(block, seg, quoted)
-		if len(sp) == 0 && i < len(segs)-1 {
-			// el segmento termina en una palabra de secreto sin valor («password ; X»): lo que sigue al « ; » es el valor
+		if len(sp) == 0 && i < len(segs)-1 && !(quoted && spProse[strings.ToLower(firstField(segs[i+1]))]) {
+			// el segmento termina en una palabra de secreto sin valor («password ; X»): lo que sigue al « ; » es el valor;
+			// en una cita, «password ; is wrong» es prosa
 			if d := spansSeg(block, seg+" X", quoted); len(d) > 0 && d[len(d)-1][0] == len(seg)+1 {
 				sp = [][2]int{{len(seg), len(seg)}}
 			}
@@ -433,4 +434,11 @@ func twinSpans(orig string, chain func(string) string) [][2]int {
 		sp[i] = [2]int{idx[sp[i][0]], idx[sp[i][1]]}
 	}
 	return sp
+}
+
+func firstField(s string) string {
+	if f := strings.Fields(s); len(f) > 0 {
+		return f[0]
+	}
+	return ""
 }

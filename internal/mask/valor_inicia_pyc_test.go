@@ -2,7 +2,10 @@ package mask_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 )
 
 // Un valor que empieza con « ; » («username a password ; Zq1234»): el segmento termina en la palabra de secreto sin
@@ -35,5 +38,25 @@ func TestValorQueEmpiezaConPuntoYComaNoFuga(t *testing.T) {
 	}
 	if malos > 0 {
 		t.Errorf("%d fugas en total", malos)
+	}
+}
+
+// Revisión: un segmento previo que termina en palabra de secreto adelanta el tramo; la frase del secreto real (que va en
+// un segmento posterior) se sigue recordando tras el prompt como antes.
+func TestFraseTrasSegmentoConPalabraSinValorSeRecuerda(t *testing.T) {
+	for _, cmd := range []string{"enable secret ; username b password abcd efgh", "snmp-server community ; tacacs-server key abcd efgh"} {
+		out := grabar(nuevo, func(r sesionRec) { sesionPosterior(r, cmd, "abcd efgh", nil, false) })
+		if strings.Contains(marcado.ReplaceAllString(out, "\x00"), "linea abcd efgh fin") {
+			t.Errorf("%q: la frase se ve tras el prompt\n%s", cmd, out)
+		}
+	}
+}
+
+// Revisión: prosa citada con «password ;» o «key ;» seguida de una palabra de prosa no se tapa.
+func TestProsaCitadaConPuntoYComaTrasPalabraDeSecreto(t *testing.T) {
+	for l, prosa := range map[string]string{`ERROR: "password ; is wrong"`: "is wrong", `WARNING: "enter key ; not accepted"`: "not accepted"} {
+		if got, _ := mask.Apply("ios-xe", l); !strings.Contains(got, prosa) {
+			t.Errorf("%q: la prosa %q quedó tapada: %q", l, prosa, got)
+		}
 	}
 }
