@@ -209,8 +209,17 @@ func lineSpans(line, platform string) (string, [][2]int) {
 	if strings.Contains(line, `\"`) {
 		line = strings.ReplaceAll(line, `\"`, `"`)
 	}
-	return line, mergeSpans(append(loggedSpans(line, platform), quotedSpans(line)...))
+	sp := loggedSpans(line, platform)
+	if quotedCmdLine.MatchString(line) { // M₂ solo actúa sobre comandos: las demás comillas de un show quedan como en la v0.6.5
+		sp = append(sp, quotedSpans(line)...)
+	}
+	return line, mergeSpans(sp)
 }
+
+// quotedCmdLine: las líneas de salida cuyo texto entre comillas cita un comando: el aviso de show tech del ASA
+// («*** Output from config line N, "…"») y los ERROR:/WARNING:/INFO:. Los syslog 1110xx y las demás vías de log ya
+// los resuelve loggedSpans.
+var quotedCmdLine = regexp.MustCompile(`Output from config line|\b(?:ERROR|WARNING|INFO):`)
 
 // CutCommand es el corte para un comando tecleado (con el bloque del prompt): s1 es lo que la cadena de reglas dejó de
 // orig; devuelve s1 con lo que Command tapa y los valores tapados (para tapar su repetición por contenido).
