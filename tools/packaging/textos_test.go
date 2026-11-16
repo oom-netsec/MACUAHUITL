@@ -83,17 +83,35 @@ func TestReadmeCuentaPlaybooksDePacks(t *testing.T) {
 	}
 }
 
-// El README (tabla y texto alternativo de bento.jpg) dice cuántas reglas de análisis trae el núcleo; render.cjs dibuja el mismo
-// número en la imagen.
+// El README (tabla y texto alternativo de bento.jpg) y el roadmap dicen cuántas reglas de análisis trae el núcleo; render.cjs
+// dibuja en la imagen las que cuenta con «^- id:», así que ese conteo también tiene que dar lo mismo.
 func TestReadmeCuentaReglas(t *testing.T) {
 	rules, err := analyze.DefaultRules()
 	if err != nil {
 		t.Fatal(err)
 	}
-	readme := leer(t, "README.md")
-	for _, want := range []string{fmt.Sprintf("%d analysis rules", len(rules)), fmt.Sprintf("%d rules over", len(rules))} {
-		if !strings.Contains(readme, want) {
-			t.Errorf("README sin %q (el núcleo trae %d reglas; regenera bento.jpg con docs/assets/pro/src/render.cjs)", want, len(rules))
+	yamls, _ := filepath.Glob(filepath.Join(repoRoot(), "internal", "analyze", "rules", "*.yaml"))
+	ids := 0
+	for _, y := range yamls {
+		raw, _ := os.ReadFile(y)
+		ids += len(regexp.MustCompile(`(?m)^- id:`).FindAll(raw, -1))
+	}
+	if ids != len(rules) {
+		t.Errorf("render.cjs contaría %d reglas con «^- id:» y el núcleo trae %d: ajusta su conteo", ids, len(rules))
+	}
+	for _, c := range []struct{ file, re string }{
+		{"README.md", `\b(\d+) analysis rules\b`},
+		{"README.md", `\b(\d+) rules over\b`},
+		{filepath.Join("docs", "roadmap.md"), `\b(\d+) reglas\b`},
+	} {
+		ms := regexp.MustCompile(c.re).FindAllStringSubmatch(leer(t, c.file), -1)
+		if len(ms) == 0 {
+			t.Errorf("%s: no encontré %s", c.file, c.re)
+		}
+		for _, m := range ms {
+			if m[1] != fmt.Sprint(len(rules)) {
+				t.Errorf("%s dice %q y el núcleo trae %d reglas (regenera bento.jpg con docs/assets/pro/src/render.cjs)", c.file, m[0], len(rules))
+			}
 		}
 	}
 }
