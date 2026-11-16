@@ -17,6 +17,7 @@ func TestEspaciosUnicodeNingunSecretoSeVe(t *testing.T) {
 		espacios = map[string]string{"NBSP U+00A0": "\u00a0", "U+3000": "\u3000"}
 	}
 	cmds, plats := canalCasos(len(canalPlantillas))
+	cmds, plats = muestra(cmds, plats, 4) // con -race, una de cada 4 plantillas (semilla del día)
 	formas := map[string]func(c, sp string) string{
 		"uno":         func(c, sp string) string { return strings.Replace(c, " ", sp, 1) },
 		"todos":       func(c, sp string) string { return strings.ReplaceAll(c, " ", sp) },

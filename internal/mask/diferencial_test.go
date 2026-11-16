@@ -283,7 +283,7 @@ func casosDif() (cmds, plats []string) {
 	for n := 0; n < azar; n++ {
 		cmds, plats = append(cmds, fuzzCmd(r, 90000+n)), append(plats, pl[r.Intn(len(pl))])
 	}
-	return
+	return muestra(cmds, plats, 3) // con -race, un tercio (semilla del día)
 }
 
 func TestDiferencialNuevoNuncaMuestraMas(t *testing.T) {
