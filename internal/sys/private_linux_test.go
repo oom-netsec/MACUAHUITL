@@ -59,3 +59,18 @@ func TestPrivateDirEnLinux(t *testing.T) {
 		t.Fatalf("bajo /tmp: %v", err)
 	}
 }
+
+// ProtectNew no toca el modo en Linux: el archivo ya nació 0600 y un sistema sin permisos no debe fallar.
+func TestProtectNewNoHaceNadaEnLinux(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "x")
+	if err := os.WriteFile(f, nil, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	os.Chmod(f, 0o640)
+	if err := ProtectNew(f); err != nil {
+		t.Fatal(err)
+	}
+	if fi, _ := os.Stat(f); fi.Mode().Perm() != 0o640 {
+		t.Fatalf("modo %v", fi.Mode().Perm())
+	}
+}

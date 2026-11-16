@@ -178,3 +178,21 @@ func TestIsPrivateRechazaTerceros(t *testing.T) {
 		t.Fatalf("IsPrivate = %v, %v", ok, err)
 	}
 }
+
+func TestProtectNewDejaElArchivoPrivadoAntesDeEscribir(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "nuevo")
+	fh, err := os.OpenFile(f, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fh.Close()
+	if err := ProtectNew(f); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fh.WriteString("secreto"); err != nil { // el handle abierto sigue valiendo
+		t.Fatal(err)
+	}
+	if ok, err := IsPrivate(f); !ok || err != nil {
+		t.Fatalf("IsPrivate = %v, %v", ok, err)
+	}
+}

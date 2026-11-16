@@ -1,6 +1,7 @@
 package sys
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"unsafe"
@@ -81,9 +82,13 @@ func protect(path string, inherit bool) error {
 	if err != nil {
 		return err
 	}
-	return windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT,
+	err = windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT,
 		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
 		user, nil, acl, nil)
+	if errors.Is(err, windows.ERROR_NOT_SUPPORTED) || errors.Is(err, windows.ERROR_INVALID_FUNCTION) {
+		err = errors.Join(errors.ErrUnsupported, err)
+	}
+	return err
 }
 
 // MkdirPrivate crea la carpeta y los padres que falten (como MkdirAll) y les pone la DACL protegida con herencia
@@ -123,6 +128,10 @@ func MkdirPrivate(path string) error {
 
 // ProtectFile deja el archivo con dueño el usuario y DACL protegida sin herencia (usuario, SYSTEM, Administradores).
 func ProtectFile(path string) error { return protect(path, false) }
+
+// ProtectNew protege un archivo recién creado (ver la versión de Linux). Un sistema de archivos sin ACL (FAT, exFAT)
+// devuelve un error que cumple errors.Is(err, errors.ErrUnsupported), para que quien tolere la falta de permisos lo vea.
+func ProtectNew(path string) error { return protect(path, false) }
 
 // IsPrivate dice si el archivo o la carpeta es del usuario, tiene la DACL protegida y solo da acceso al usuario, a
 // SYSTEM y a Administradores. Es para pruebas.

@@ -11,6 +11,11 @@ func MkdirPrivate(path string) error { return os.MkdirAll(path, 0o700) }
 // ProtectFile deja el archivo en 0600: para los que se escriben fuera de las carpetas propias del núcleo.
 func ProtectFile(path string) error { return os.Chmod(path, 0o600) }
 
+// ProtectNew es ProtectFile para un archivo recién creado con O_CREATE y 0600 (que ya nació privado): en Linux no hace
+// nada, así un sistema de archivos sin permisos (vfat) no falla donde antes no fallaba. En Windows el archivo nace con
+// la ACL heredada y aquí se protege; llámala antes de escribir el secreto.
+func ProtectNew(string) error { return nil }
+
 // IsPrivate dice si el archivo o la carpeta no da acceso a grupo ni a otros. Es para pruebas.
 func IsPrivate(path string) (bool, error) {
 	fi, err := os.Stat(path)
