@@ -10,13 +10,13 @@
 ./internal/core/power
 ./internal/crashinfo
 ./internal/diag/dnsq
-./internal/diag/flows
+# ./internal/diag/flows  (43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL)
 ./internal/diag/gnmic
 ./internal/diag/ifaces
-./internal/diag/ingest
+# ./internal/diag/ingest  (43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL)
 ./internal/diag/listen
 ./internal/diag/radiustest
-./internal/diag/snmp
+# ./internal/diag/snmp  (43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL)
 ./internal/diag/snmp/snmptest
 ./internal/diag/syslogd
 ./internal/diag/syslogd/syslogdtest
@@ -39,7 +39,7 @@
 ./internal/playbook
 ./internal/scripts
 ./internal/secret
-./internal/store
+# ./internal/store  (43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL)
 ./internal/termcolor
 ./internal/terminal
 ./internal/version

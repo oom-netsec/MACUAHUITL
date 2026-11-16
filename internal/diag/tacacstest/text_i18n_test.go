@@ -7,9 +7,12 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 )
 
+// winRefused: el mismo «connection refused» como lo escribe Windows; el golden guarda el texto de Linux.
+var winRefused = strings.NewReplacer("connectex: No connection could be made because the target machine actively refused it.", "connect: connection refused")
 var volatile = regexp.MustCompile(`[0-9]+\.[0-9] ms|"RTTMillis":[0-9.]+|127\.0\.0\.1:[0-9]+|(task_id|start_time|stop_time)=[0-9]+`)
 
 // escenarios corre las pruebas contra el servidor de mentira; cubren todos los hallazgos y errores que imprime Text.
@@ -46,7 +49,7 @@ func escenarios(t *testing.T) map[string]Report {
 
 func view(r Report) map[string]string {
 	b, _ := json.Marshal(r)
-	return map[string]string{"json": volatile.ReplaceAllString(string(b), "X"), "text": volatile.ReplaceAllString(r.Text(), "X")}
+	return map[string]string{"json": volatile.ReplaceAllString(winRefused.Replace(string(b)), "X"), "text": volatile.ReplaceAllString(winRefused.Replace(r.Text()), "X")}
 }
 
 // Regresión: el texto en español de cada prueba es el de antes del catálogo (UPDATE_GOLDEN=1 lo reescribe).

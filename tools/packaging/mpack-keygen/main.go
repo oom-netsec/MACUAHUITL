@@ -39,7 +39,8 @@ func run(privPath, pubPath string) error {
 	if err != nil {
 		return err
 	}
-	if rel, err := filepath.Rel(cwd, privPath); !filepath.IsAbs(privPath) || err != nil || filepath.IsLocal(rel) {
+	// En Windows, Rel entre unidades distintas (C: y D:) da error: eso ya queda fuera del directorio de trabajo.
+	if rel, err := filepath.Rel(cwd, privPath); !filepath.IsAbs(privPath) || err == nil && filepath.IsLocal(rel) {
 		return fmt.Errorf("-priv tiene que ser una ruta absoluta fuera de %s", cwd)
 	}
 	pk, sk, err := ed25519.GenerateKey(rand.Reader)
