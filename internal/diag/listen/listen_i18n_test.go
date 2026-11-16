@@ -2,6 +2,7 @@ package listen
 
 import (
 	"errors"
+	"runtime"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -9,6 +10,8 @@ import (
 
 // Regresión: el texto en es de cada rechazo de dirección es el de siempre; con en sale traducido y el campo es addr.
 func TestValidateAddrTextoEsYEn(t *testing.T) {
+	privilegedPorts = true
+	t.Cleanup(func() { privilegedPorts = runtime.GOOS != "windows" })
 	for _, tc := range []struct {
 		addr, es, en string
 		any          bool

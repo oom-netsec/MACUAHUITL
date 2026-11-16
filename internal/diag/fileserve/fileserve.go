@@ -17,6 +17,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -108,6 +109,9 @@ func (c Config) permits(ip netip.Addr) bool {
 	return false
 }
 
+// privilegedPorts: Windows no tiene puertos privilegiados (ADR 0012 h); variable para que las pruebas fijen los dos valores.
+var privilegedPorts = runtime.GOOS != "windows"
+
 func (c Config) permitsAddr(a net.Addr) bool {
 	ap, err := netip.ParseAddrPort(a.String())
 	return err == nil && c.permits(ap.Addr())
@@ -147,6 +151,9 @@ func RedirectHint(proto, ip string, port int) string { return RedirectHintIn(i18
 
 // RedirectHintIn es RedirectHint con el texto en el idioma dado.
 func RedirectHintIn(loc, proto, ip string, port int) string {
+	if isWindows() {
+		return firewallRule(loc, proto, ip, port, exePath())
+	}
 	s, ok := standard[proto]
 	if !ok {
 		return ""
@@ -162,6 +169,9 @@ func RedirectHintIn(loc, proto, ip string, port int) string {
 // RedirectCleanup es el comando que quita la regla de RedirectHint ("" si el protocolo no
 // tiene puerto privilegiado). Se muestra al cerrar el servidor.
 func RedirectCleanup(proto, ip string, port int) string {
+	if isWindows() {
+		return firewallRemove(proto, port)
+	}
 	if _, ok := standard[proto]; !ok {
 		return ""
 	}
@@ -186,6 +196,9 @@ func SetcapHint(binary string) string { return SetcapHintIn(i18n.Es, binary) }
 
 // SetcapHintIn es SetcapHint con el texto en el idioma dado.
 func SetcapHintIn(loc, binary string) string {
+	if isWindows() {
+		return "" // sin setcap en Windows (ADR 0012 h)
+	}
 	return "sudo setcap cap_net_bind_service=+ep " + binary + "   " + i18n.Msg(loc, "fileserve.hint.setcap_warn", i18n.A("bin", binary))
 }
 
@@ -211,7 +224,11 @@ func HintIn(loc, proto, listen string, files []string) string {
 	}
 	if proto == "tftp" {
 		port, _ := strconv.Atoi(p)
-		b.WriteString(i18n.Msg(loc, "fileserve.hint.tftp_redir", nil) + "\n  " + RedirectHintIn(loc, "tftp", h, port) + "\n")
+		code := "fileserve.hint.tftp_redir"
+		if isWindows() {
+			code = "fileserve.hint.win_tftp_redir"
+		}
+		b.WriteString(i18n.Msg(loc, code, nil) + "\n  " + RedirectHintIn(loc, "tftp", h, port) + "\n")
 	}
 	return b.String()
 }
@@ -227,7 +244,7 @@ func ValidateAddr(addr string, allowAny bool) error {
 	if err != nil {
 		return i18n.New("fileserve.err.port_invalid", i18n.A("port", p))
 	}
-	if port != 0 && port < 1024 {
+	if privilegedPorts && port != 0 && port < 1024 {
 		return i18n.New("fileserve.err.port_privileged", i18n.A("port", port))
 	}
 	ip, err := netip.ParseAddr(h)
@@ -312,7 +329,7 @@ func prepare(c Config) (src *source, rcv *receiver, err error) {
 		return nil, nil, i18n.New("fileserve.err.http_ro", nil)
 	}
 	if lo, hi := c.PassivePorts[0], c.PassivePorts[1]; lo != 0 || hi != 0 {
-		if lo < 1024 || hi < lo {
+		if lo == 0 || (privilegedPorts && lo < 1024) || hi < lo {
 			return nil, nil, i18n.New("fileserve.err.passive_range", i18n.A("lo", lo, "hi", hi))
 		}
 	}
