@@ -12,7 +12,7 @@ import (
 )
 
 // ifaceRe acepta solo puertos físicos: nunca Port-channel, Vlan, Loopback, Tunnel ni subinterfaces.
-var ifaceRe = regexp.MustCompile(`(?i)^(gigabitethernet|tengigabitethernet|fastethernet|twentyfivegige|fortygigabitethernet|hundredgige|ethernet|gi|te|fa|twe|fo|hu|eth)\d+(/\d+){0,3}$`)
+var ifaceRe = regexp.MustCompile(`(?i)^(gigabitethernet|tengigabitethernet|fastethernet|twentyfivegige|twogigabitethernet|fivegigabitethernet|fortygigabitethernet|hundredgige|ethernet|gi|te|fa|twe|tw|fi|fo|hu|eth)\d+(/\d+){0,3}$`)
 
 // ValidInterface dice si name es un puerto físico que la función ports acepta.
 func ValidInterface(name string) bool { return ifaceRe.MatchString(name) }

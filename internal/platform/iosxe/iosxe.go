@@ -80,7 +80,10 @@ var interfaceRemoved = regexp.MustCompile(`^% Interface \S+ removed`)
 var cfgWarnings = []string{"Creating vlan", "does not exist"}
 
 // infoPercent son los «% …» informativos de IOS en modo configuración: no detienen la ejecución.
-var infoPercent = regexp.MustCompile(`(?i)^% ?(?:info|notice|portfast|applying|please|remember|note|warning|generating|not all config may be removed)`)
+var infoPercent = regexp.MustCompile(`(?i)^% ?(?:info|notice|portfast|applying|please|remember|note|warning|generating|not all config may be removed|default route without gateway|no matching route to delete)`)
+
+// syslogLine es un mensaje de syslog (%FACILIDAD-severidad-MNEMÓNICO:) que el equipo intercala en la consola: no es una respuesta al comando.
+var syslogLine = regexp.MustCompile(`^%[A-Z0-9_]+(?:-[A-Z0-9_]+)*-\d-[A-Z0-9_]+:`)
 
 var asaSetPassword = regexp.MustCompile(`(?i)The enable password is not set|(?:enter|repeat)\s+password: ?$`)
 
@@ -102,6 +105,7 @@ type driver struct {
 	// seguidos. confirmed/incomplete los deja untilIdle para Run.
 	sentinel, confirmed, incomplete bool
 	dropped                         bool // add descartó bytes del medio por maxOutput
+	headLen, markLen, omitted       int  // con dropped: bytes de la cabeza, del separador y omitidos
 }
 
 // fail guarda el primer error y suelta al lector.
@@ -218,7 +222,7 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 	if aireCue.MatchString(text) {
 		var err error
 		if text, err = d.aireLogin(ctx); err != nil {
-			d.buf = nil // el equipo pudo repetir la clave con eco
+			d.clearBuf() // el equipo pudo repetir la clave con eco
 			return d.fail(err)
 		}
 	}
@@ -355,7 +359,12 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 		// El prompt y el --More-- están siempre en la última línea: se revisa solo desde el último salto (incluido,
 		// por los patrones con (?:^|\n)). Limpiar todo el búfer en cada pedazo costaba tiempo cuadrático: 63 s con 1 MB.
 		// Sin saltos (un «| json» de una línea, un equipo hostil) la «última línea» sería todo el búfer: se acota a outTail.
-		from := max(bytes.LastIndexByte(d.buf, '\n'), len(d.buf)-outTail, 0)
+		// El salto se busca solo en esa ventana final: buscarlo en todo el búfer recorría 16 MiB en cada lectura.
+		w := max(len(d.buf)-outTail, 0)
+		from := w
+		if i := bytes.LastIndexByte(d.buf[w:], '\n'); i >= 0 {
+			from = w + i
+		}
 		tail := string(d.buf[from:])
 		// AireOS: solo el «--More-- or (q)uit» completo (un «--More--» partido entre dos lecturas no se contesta a medias).
 		if t := strings.TrimRight(tail, " "); d.aire && aireMore.MatchString(t) || !d.aire && strings.HasSuffix(t, "--More--") || strings.HasSuffix(t, "<--- More --->") {
@@ -377,7 +386,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				}
 				d.confirmed = true
 				text := clean(string(d.buf))
-				d.buf = nil
+				d.clearBuf()
 				return text, nil
 			}
 			if ftdPrompt.MatchString(clean(tail)) {
@@ -386,7 +395,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				}
 				d.incomplete = true // un solo «> » y nada más en ~1,2 s: se acepta, pero incompleto
 				text := clean(string(d.buf))
-				d.buf = nil
+				d.clearBuf()
 				return text, nil
 			}
 		} else if ct := clean(tail); done(ct) {
@@ -394,7 +403,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				continue
 			}
 			text := clean(string(d.buf))
-			d.buf = nil
+			d.clearBuf()
 			return text, nil
 		}
 		select {
@@ -424,6 +433,9 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 	}
 }
 
+// clearBuf vacía el búfer al terminar de leer un comando y reinicia el estado del recorte: el siguiente comando cuenta sus propios bytes omitidos.
+func (d *driver) clearBuf() { d.buf, d.headLen, d.markLen, d.omitted = nil, 0, 0, 0 }
+
 // add agrega un pedazo al búfer respetando maxOutput: pasado el tope se conserva el inicio y se reemplaza la cola
 // por los últimos outTail bytes, de modo que el prompt final se siga reconociendo y la memoria no crezca.
 func (d *driver) add(c []byte) {
@@ -432,9 +444,19 @@ func (d *driver) add(c []byte) {
 		return
 	}
 	d.dropped = true
-	head := min(len(d.buf), max(maxOutput-outTail, 0))
-	win := append(append([]byte(nil), d.buf[head:]...), c...)
-	d.buf = append(d.buf[:head], win[max(len(win)-outTail, 0):]...)
+	// Cabeza | separador | cola: la cola (los últimos outTail bytes) empieza en línea nueva y dice cuántos bytes se omitieron entre las dos.
+	head, tail := min(len(d.buf), max(maxOutput-outTail, 0)), []byte(nil)
+	if d.omitted > 0 && len(d.buf) >= d.headLen+d.markLen { // ya recortado antes: cabeza y cola de siempre
+		head, tail = d.headLen, d.buf[d.headLen+d.markLen:]
+	} else {
+		d.omitted, tail = 0, d.buf[head:]
+	}
+	win := append(append([]byte(nil), tail...), c...)
+	cut := max(len(win)-outTail, 0)
+	d.omitted += cut
+	mark := fmt.Appendf(nil, "\n[… output truncated: %d bytes omitted …]\n", d.omitted)
+	d.headLen, d.markLen = head, len(mark)
+	d.buf = append(append(d.buf[:head], mark...), win[cut:]...)
 }
 
 // aireGuard corta el comando si el final de la salida es algo que el driver nunca contesta: un «User:»/«Password:»
@@ -603,6 +625,7 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 		return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
 	}
 	d.confirmed, d.incomplete, d.dropped = false, false, false
+	d.headLen, d.markLen, d.omitted = 0, 0, 0
 	if d.sentinel = d.hostname == ""; d.sentinel { // FTD: un Enter vacío en cola da el segundo prompt cuando el comando termina
 		defer func() { d.sentinel = false }()
 		if _, err := io.WriteString(d.w, "\n"); err != nil {
@@ -749,8 +772,9 @@ func cfgError(text string) bool {
 			}
 		}
 		// Cualquier otro «% texto» es un error de IOS que la lista cerrada no conoce (falla cerrado): solo los avisos
-		// conocidos pasan. «%LINK-3-UPDOWN» (syslog) no lleva espacio tras el «%» y no entra aquí.
-		if strings.HasPrefix(l, "% ") && !infoPercent.MatchString(l) {
+		// conocidos pasan. Con o sin espacio tras el «%» («%VTP VLAN configuration not allowed…» también es un error); solo el syslog
+		// («%LINK-3-UPDOWN: …») no entra aquí.
+		if strings.HasPrefix(l, "%") && !syslogLine.MatchString(l) && !infoPercent.MatchString(l) {
 			return true
 		}
 	}

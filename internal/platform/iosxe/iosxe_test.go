@@ -3,6 +3,7 @@ package iosxe
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/netip"
 	"os"
@@ -465,6 +466,52 @@ func TestSalidaSinSaltosEsLineal(t *testing.T) {
 	}
 }
 
+// Con 16 MiB sin saltos (tamaño real de un «| json» grande) el costo por lectura no depende del tamaño del búfer: la búsqueda del último
+// salto mira solo la ventana final. Con la búsqueda sobre todo el búfer, 16 MiB tardaba ~8,7 s contra ~0,9 s de 4 MiB (cuadrático: ~16x).
+func TestSalidaSinSaltosGrandeEsLineal(t *testing.T) {
+	small, big := 4<<20, 16<<20
+	if raceOn || testing.Short() {
+		small, big = 1<<20, 4<<20
+	}
+	best := func(n int) time.Duration {
+		m := time.Duration(1<<63 - 1)
+		for range 2 {
+			d := feed(n, "SW#")
+			start := time.Now()
+			if _, err := d.untilIdle(context.Background(), 5*time.Second, d.atPrompt); err != nil {
+				t.Fatal(err)
+			}
+			m = min(m, time.Since(start))
+		}
+		return m
+	}
+	a, b := best(small), best(big)
+	if b > 6*a {
+		t.Fatalf("4 veces más bytes sin salto tardó %v contra %v: no es lineal", b, a)
+	}
+}
+
+// Al recortar, la cola no se pega a la cabeza: entre las dos hay una línea propia que dice cuántos bytes se omitieron.
+func TestSalidaRecortadaTraeSeparador(t *testing.T) {
+	old := maxOutput
+	maxOutput = 100 << 10
+	defer func() { maxOutput = old }()
+	n := 2 << 20
+	d := feed(n, "SW#")
+	text, err := d.untilIdle(context.Background(), time.Second, d.atPrompt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf("\n[… output truncated: %d bytes omitted …]\n", n+len("\r\nSW#")-maxOutput)
+	if strings.Count(text, "[… output truncated:") != 1 || !strings.Contains(text, want) {
+		i := strings.Index(text, "[…")
+		t.Fatalf("falta el separador %q (en %d: %.80q)", want, i, text[max(i, 0):])
+	}
+	if !strings.HasSuffix(text, "SW#") {
+		t.Errorf("la cola debe conservar el prompt")
+	}
+}
+
 // El tope de la cola no rompe el reconocimiento de prompts largos (ASA multicontexto) tras una línea enorme.
 func TestPromptLargoTrasLineaEnorme(t *testing.T) {
 	host := strings.Repeat("c", 100)
@@ -489,5 +536,34 @@ func TestSalidaConTopeDeMemoria(t *testing.T) {
 	}
 	if !d.dropped || len(text) > maxOutput+1024 || !strings.HasSuffix(text, "SW#") || peak > 4*maxOutput {
 		t.Fatalf("dropped=%v len=%d peak=%d", d.dropped, len(text), peak)
+	}
+}
+
+// Dos comandos seguidos que pasan el tope: cada uno trae su propio N exacto (el estado del recorte no se arrastra al siguiente comando).
+func TestSalidaRecortadaSeReiniciaEntreComandos(t *testing.T) {
+	old := maxOutput
+	maxOutput = 100 << 10
+	defer func() { maxOutput = old }()
+	n := 512 << 10
+	d := feed(n, "SW#")
+	for i := range 2 {
+		if i > 0 {
+			for range n / 4096 {
+				d.chunks <- []byte(strings.Repeat("y", 4096))
+			}
+			d.chunks <- []byte("\r\nSW#")
+		}
+		text, err := d.untilIdle(context.Background(), time.Second, d.atPrompt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := fmt.Sprintf("\n[… output truncated: %d bytes omitted …]\n", n+len("\r\nSW#")-maxOutput)
+		if !strings.Contains(text, want) {
+			j := strings.Index(text, "[…")
+			t.Fatalf("comando %d: falta %q (hay %.60q)", i+1, want, text[max(j, 0):])
+		}
+		if !strings.HasSuffix(text, "SW#") {
+			t.Errorf("comando %d: sin prompt", i+1)
+		}
 	}
 }

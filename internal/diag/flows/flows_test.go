@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -405,5 +406,49 @@ func TestListenNoDejaResumenEnCurso(t *testing.T) {
 		}
 		_ = inCall
 		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// La instantánea acota también los exportadores: con 120 000 orígenes distintos trae a lo más n, los de más bytes.
+func TestSnapshotBoundsExporters(t *testing.T) {
+	a := NewAggregator(200000)
+	for i := range 120000 {
+		a.Add(Flow{Exporter: fmt.Sprintf("10.%d.%d.%d", i>>16, i>>8&255, i&255), Src: "192.0.2.1", Dst: "192.0.2.2", Proto: 6, Bytes: uint64(i + 1), Packets: 1})
+	}
+	s := a.Snapshot(5)
+	if len(s.Exporters) != 5 || s.Exporters[0].Bytes != 120000 || s.Exporters[4].Bytes != 119996 {
+		t.Fatalf("exportadores = %d", len(s.Exporters))
+	}
+	if all := a.Snapshot(0); len(all.Exporters) != 120000 {
+		t.Errorf("n=0 no acota: %d", len(all.Exporters))
+	}
+}
+
+// Los errores solo desempatan por bytes: con sitio en el tope, el exportador que solo manda paquetes malformados (0 bytes) aparece; con miles de
+// exportadores de basura (errores y 0 bytes) los reales no se desplazan.
+func TestSnapshotErrorsOnlyBreakTies(t *testing.T) {
+	a := NewAggregator(200000)
+	for i := range 3 {
+		a.Add(Flow{Exporter: fmt.Sprintf("10.0.0.%d", i+1), Src: "192.0.2.1", Dst: "192.0.2.2", Proto: 6, Bytes: 1000, Packets: 1})
+	}
+	a.Error("10.9.9.9", errors.New("paquete malformado"))
+	s := a.Snapshot(5)
+	if len(s.Exporters) != 4 || s.Exporters[3].Exporter != "10.9.9.9" || s.Exporters[3].Errors != 1 {
+		t.Fatalf("con sitio, el de solo errores debe aparecer: %+v", s.Exporters)
+	}
+	for i := range 120000 {
+		a.Error(fmt.Sprintf("172.%d.%d.%d", 16+i>>16, i>>8&255, i&255), errors.New("basura"))
+	}
+	for i := 3; i < 5; i++ {
+		a.Add(Flow{Exporter: fmt.Sprintf("10.0.0.%d", i+1), Src: "192.0.2.1", Dst: "192.0.2.2", Proto: 6, Bytes: 1000, Packets: 1})
+	}
+	s = a.Snapshot(5)
+	if len(s.Exporters) != 5 {
+		t.Fatalf("exportadores = %d", len(s.Exporters))
+	}
+	for _, e := range s.Exporters {
+		if e.Bytes != 1000 {
+			t.Fatalf("la basura desplazó a un real: %+v", e)
+		}
 	}
 }

@@ -482,7 +482,7 @@ func loopPlan(device string, v Values, outs map[string]string) (DevicePlan, erro
 
 // ---- helper-address ----
 
-var routedIfaceRe = regexp.MustCompile(`(?i)^(vlan\d{1,4}|(port-channel|po|gigabitethernet|tengigabitethernet|fastethernet|twentyfivegige|fortygigabitethernet|hundredgige|ethernet|gi|te|fa|twe|fo|hu|eth)\d+(/\d+){0,3}(\.\d+)?)$`)
+var routedIfaceRe = regexp.MustCompile(`(?i)^(vlan\d{1,4}|(port-channel|po|gigabitethernet|tengigabitethernet|fastethernet|twentyfivegige|twogigabitethernet|fivegigabitethernet|fortygigabitethernet|hundredgige|ethernet|gi|te|fa|twe|tw|fi|fo|hu|eth)\d+(/\d+){0,3}(\.\d+)?)$`)
 
 func isVlanIf(n string) bool { return strings.HasPrefix(strings.ToLower(n), "vlan") }
 

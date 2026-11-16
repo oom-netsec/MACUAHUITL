@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -642,4 +643,64 @@ func TestStartPendingRollbackMientrasSeAplicaSuReversa(t *testing.T) {
 		t.Fatalf("start: %v", err)
 	}
 	r.confirmAll(n1, "done")
+}
+
+// Descartar justo después de que Start leyó la entrada y antes de que su reversa quede registrada borraba la entrada y la reversa se aplicaba
+// igual. Ahora Start se registra antes de leer, y Descartar en esa ventana se rechaza como «ya se está aplicando».
+func TestDiscardDuringStartPendingRollbackIsRefused(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	var discardErr error
+	r.svc.afterLoadPending = func() {
+		_, discardErr = r.svc.DiscardPendingRollback(context.Background(), &v1.DiscardPendingRollbackRequest{RunId: run})
+	}
+	n1, err := r.startPending(run, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code(discardErr) != codes.FailedPrecondition {
+		t.Fatalf("descartar en la ventana debía rechazarse: %v", discardErr)
+	}
+	if _, err := r.svc.loadPending(pendingPrefix + run); err != nil {
+		t.Fatalf("la entrada debe seguir ahí mientras su reversa corre: %v", err)
+	}
+	r.confirmAll(n1, "done")
+}
+
+// Lo mismo con dos goroutines reales (corre con -race): nunca tienen éxito las dos.
+func TestDiscardAndStartPendingRollbackNeverBothSucceed(t *testing.T) {
+	for range 8 {
+		r := newRig(t, simulator.Config{})
+		run, _ := r.abortedChanged()
+		var wg sync.WaitGroup
+		var startErr, discardErr error
+		var n1 string
+		wg.Add(2)
+		go func() { defer wg.Done(); n1, startErr = r.startPending(run, false) }()
+		go func() {
+			defer wg.Done()
+			_, discardErr = r.svc.DiscardPendingRollback(context.Background(), &v1.DiscardPendingRollbackRequest{RunId: run})
+		}()
+		wg.Wait()
+		if startErr == nil && discardErr == nil {
+			t.Fatal("la reversa se aplica y la entrada se descartó a la vez")
+		}
+		if startErr == nil {
+			r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: n1})
+		}
+	}
+}
+
+// El hueco simétrico: Descartar ya pasó sus comprobaciones y Start entra antes del borrado. Los dos no pueden tener éxito: Start se rechaza.
+func TestStartPendingRollbackDuringDiscardIsRefused(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	var startErr error
+	r.svc.beforeDeletePending = func() { _, startErr = r.startPending(run, false) }
+	if _, err := r.svc.DiscardPendingRollback(context.Background(), &v1.DiscardPendingRollbackRequest{RunId: run}); err != nil {
+		t.Fatal(err)
+	}
+	if code(startErr) != codes.FailedPrecondition {
+		t.Fatalf("Start en la ventana de Descartar debía rechazarse: %v", startErr)
+	}
 }

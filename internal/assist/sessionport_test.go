@@ -2,6 +2,7 @@ package assist
 
 import (
 	"errors"
+	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 	"maps"
 	"slices"
 	"strings"
@@ -20,6 +21,10 @@ type sess struct {
 	two      string // un segundo puerto donde también la aprendió (MAC flapping)
 	noARP    bool   // el equipo no tiene ARP del siguiente salto
 	channels string // salida de show etherchannel summary (si el puerto es un Po)
+	vrf      string // VRF de la interfaz que lleva la sesión (gestión en banda en una VRF); vacío = la global
+	local    string // IP local de la sesión (la de la SVI); por omisión 10.20.0.1
+	vrfRows  string // filas extra de show ip vrf interfaces (otras interfaces en VRF)
+	vrfOut   string // si se da, reemplaza toda la salida de show ip vrf interfaces
 }
 
 func (s sess) outs() map[string]string {
@@ -31,23 +36,41 @@ func (s sess) outs() map[string]string {
 	o := map[string]string{
 		showUsersCmd: "    Line       User       Host(s)              Idle       Location\n   0 con 0                idle                 00:00:00\n*  2 vty 0     admin      idle                 00:00:00 " + origin + "\n",
 	}
+	local := ifElse(s.local != "", s.local, "10.20.0.1")
+	o[showTCPCmd] = "TCB       Local Address               Foreign Address             (state)\n7F1A2B3C  " + local + ".22               " + origin + ".51234             ESTAB\n"
+	vi := "Interface              IP-Address      VRF                              Protocol\n" + s.vrfRows
+	briefRows := "Interface              IP-Address      OK? Method Status                Protocol\nVlan20                 " + local + "      YES manual up                    up\n"
+	if s.vrf != "" {
+		vi += "Vl20                   " + local + "      " + s.vrf + "                             up\n"
+	}
+	if s.vrfRows == "" && s.vrf == "" {
+		vi = ""
+	}
+	if s.vrfOut != "" {
+		vi = s.vrfOut
+	}
+	o[showVRFCmd], o[showIPBrief] = vi, briefRows
+	arpT, routeT := "show ip arp ", "show ip route "
+	if s.vrf != "" {
+		arpT, routeT = "show ip arp vrf "+s.vrf+" ", "show ip route vrf "+s.vrf+" "
+	}
 	hop := origin
 	switch {
 	case s.gw == "":
-		o["show ip arp "+origin] = arpHead + "Internet  " + origin + "              3   " + mac + "  ARPA   " + ifc + "\n"
-		o["show ip route "+origin] = "Routing entry for 10.20.0.0/24\n  Known via \"connected\", distance 0, metric 0 (connected, via interface)\n  Routing Descriptor Blocks:\n  * directly connected, via " + ifc + "\n      Route metric is 0, traffic share count is 1\n"
+		o[arpT+origin] = arpHead + "Internet  " + origin + "              3   " + mac + "  ARPA   " + ifc + "\n"
+		o[routeT+origin] = "Routing entry for 10.20.0.0/24\n  Known via \"connected\", distance 0, metric 0 (connected, via interface)\n  Routing Descriptor Blocks:\n  * directly connected, via " + ifc + "\n      Route metric is 0, traffic share count is 1\n"
 	default:
 		hop = s.gw
-		o["show ip arp "+origin] = arpHead // sin fila: el origen no está en un segmento conectado
+		o[arpT+origin] = arpHead // sin fila: el origen no está en un segmento conectado
 		if s.l2 {
-			o["show ip route "+origin] = "Default gateway is " + s.gw + "\n\nHost               Gateway           Last Use    Total Uses  Interface\nICMP redirect cache is empty\n"
+			o[routeT+origin] = "Default gateway is " + s.gw + "\n\nHost               Gateway           Last Use    Total Uses  Interface\nICMP redirect cache is empty\n"
 		} else {
-			o["show ip route "+origin] = "Routing entry for 10.30.0.0/24\n  Known via \"ospf 1\", distance 110, metric 20, type intra area\n  Last update from " + s.gw + " on " + ifc + ", 00:10:00 ago\n  Routing Descriptor Blocks:\n  * " + s.gw + ", from 10.30.0.1, 00:10:00 ago, via " + ifc + "\n      Route metric is 20, traffic share count is 1\n"
+			o[routeT+origin] = "Routing entry for 10.30.0.0/24\n  Known via \"ospf 1\", distance 110, metric 20, type intra area\n  Last update from " + s.gw + " on " + ifc + ", 00:10:00 ago\n  Routing Descriptor Blocks:\n  * " + s.gw + ", from 10.30.0.1, 00:10:00 ago, via " + ifc + "\n      Route metric is 20, traffic share count is 1\n"
 		}
-		o["show ip arp "+hop] = arpHead + "Internet  " + hop + "              5   " + mac + "  ARPA   " + ifc + "\n"
+		o[arpT+hop] = arpHead + "Internet  " + hop + "              5   " + mac + "  ARPA   " + ifc + "\n"
 	}
 	if s.noARP {
-		o["show ip arp "+hop] = arpHead
+		o[arpT+hop] = arpHead
 		return o
 	}
 	if !strings.HasPrefix(strings.ToLower(ifc), "vlan") {
@@ -94,7 +117,7 @@ func TestSessionPortReadsFollowTheChain(t *testing.T) {
 			have[c] = full[c]
 		}
 	}
-	want := "show ip arp 10.20.0.50|show ip route 10.20.0.50|show mac address-table address aabb.cc00.0100|show etherchannel summary"
+	want := "show tcp brief|show ip vrf interfaces|show ip interface brief|show ip arp 10.20.0.50|show ip route 10.20.0.50|show mac address-table address aabb.cc00.0100|show etherchannel summary"
 	if strings.Join(asked, "|") != want {
 		t.Errorf("lecturas = %v", asked)
 	}
@@ -391,6 +414,172 @@ func TestSessionPortNonPhysicalIsUnknown(t *testing.T) {
 	for _, ifc := range []string{"BDI10", "Tunnel0"} {
 		if sp := sessionPorts(sess{ifc: ifc}.outs()); sp.known {
 			t.Errorf("ARP por %q: %+v", ifc, sp)
+		}
+	}
+}
+
+// ---- gestión en banda dentro de una VRF ----
+
+// Escenario de la auditoría: la sesión entra por Vlan20 en la VRF MGMT, la tabla global tiene su propia ruta por omisión por otro uplink (Gi1/0/47)
+// y el ARP global del origen está vacío. Sin leer la VRF se terminaba en la CAM del otro uplink con known=true y el puerto real sin protección.
+func vrfAuditOuts() map[string]string {
+	o := sess{origin: "10.99.0.50", vrf: "MGMT", ifc: "Vlan20", mac: "aabb.cc00.0100", port: "Gi1/0/48"}.outs()
+	// Lo que respondería la tabla global: sin ARP del origen y una ruta por omisión vía 10.1.1.2 (Gi1/0/47).
+	o["show ip arp 10.99.0.50"] = "Protocol  Address          Age (min)  Hardware Addr   Type   Interface\n"
+	o["show ip route 10.99.0.50"] = "Routing entry for 0.0.0.0/0, supernet\n  Known via \"static\", distance 1, metric 0, candidate default path\n  Routing Descriptor Blocks:\n  * 10.1.1.2\n      Route metric is 0, traffic share count is 1\n"
+	o["show ip arp 10.1.1.2"] = "Protocol  Address          Age (min)  Hardware Addr   Type   Interface\nInternet  10.1.1.2              5   aabb.cc00.0200  ARPA   Vlan10\n"
+	o["show mac address-table address aabb.cc00.0200"] = "Vlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n  10    aabb.cc00.0200    DYNAMIC     Gi1/0/47\nTotal Mac Addresses for this criterion: 1\n"
+	return o
+}
+
+func TestSessionPortInVRFUsesTheVRFTables(t *testing.T) {
+	sp := sessionPorts(vrfAuditOuts())
+	if !sp.known || !sp.isSession("Gi1/0/48") || sp.isSession("Gi1/0/47") {
+		t.Errorf("sesión en VRF: %+v", sp)
+	}
+	// Las lecturas piden la VRF, nunca la tabla global.
+	o := vrfAuditOuts()
+	have := map[string]string{showUsersCmd: o[showUsersCmd]}
+	var asked []string
+	for range 6 {
+		next := SessionPortReads(have)
+		if len(next) == 0 {
+			break
+		}
+		asked = append(asked, next...)
+		for _, c := range next {
+			have[c] = o[c]
+		}
+	}
+	if j := strings.Join(asked, "|"); !strings.Contains(j, "show ip arp vrf MGMT 10.99.0.50") || !strings.Contains(j, "show ip route vrf MGMT 10.99.0.50") || strings.Contains(j, "show ip arp 10.99.0.50") {
+		t.Errorf("lecturas = %v", asked)
+	}
+}
+
+func TestTrunkRemoveManagementVLANInVRFRefusesRealUplink(t *testing.T) {
+	const gi48 = "GigabitEthernet1/0/48"
+	o := with(trunkOuts(gi48, trunkCfg(gi48, "switchport mode trunk", "switchport trunk allowed vlan 10,20,99"), swTrunk), sess{})
+	maps.Copy(o, vrfAuditOuts())
+	if _, err := TrunkPlan("SW1", TrunkChange{Interface: gi48, Op: "remove", Vlan: 20}, o); !errors.Is(err, ErrSnippetRefused) {
+		t.Errorf("gestión en VRF, quitar su VLAN del uplink real: %v", err)
+	}
+	// Si la VRF no se puede determinar, no hay certeza: el trunk se rechaza igual.
+	for name, mut := range map[string]func(map[string]string){
+		"sin tabla de VRF":        func(m map[string]string) { m[showVRFCmd] = "% Authorization failed.\n" },
+		"sin IP local":            func(m map[string]string) { m[showTCPCmd] = "" },
+		"IP local en ningún lado": func(m map[string]string) { m[showTCPCmd] = strings.ReplaceAll(m[showTCPCmd], "10.20.0.1", "10.77.7.7") },
+	} {
+		m := maps.Clone(o)
+		mut(m)
+		if sessionPorts(m).known {
+			t.Errorf("%s: known=true", name)
+		}
+		if _, err := TrunkPlan("SW1", TrunkChange{Interface: gi48, Op: "remove", Vlan: 20}, m); !errors.Is(err, ErrSnippetRefused) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestSessionPortGlobalAndOutOfBandVRF(t *testing.T) {
+	// Sesión en la global con una interfaz de gestión fuera de banda (Gi0/0 en Mgmt-vrf, como trae un Cat9k): sigue funcionando.
+	oob := "Gi0/0                  192.168.100.5   Mgmt-vrf                         up\n"
+	sp := sessionPorts(sess{port: "Gi1/0/48", vrfRows: oob}.outs())
+	if !sp.known || !sp.isSession("Gi1/0/48") {
+		t.Errorf("global con Mgmt-vrf: %+v", sp)
+	}
+	// Sesión por Gi0/0 en Mgmt-vrf (fuera de banda): se busca en la VRF, y la interfaz de gestión no es un puerto de la tabla MAC.
+	o := sess{origin: "192.168.100.9", local: "192.168.100.5", vrf: "Mgmt-vrf", ifc: "Gi0/0"}.outs()
+	if sp := sessionPorts(o); !sp.known || !sp.isSession("Gi0/0") || sp.isSession("Gi1/0/48") {
+		t.Errorf("Gi0/0 en Mgmt-vrf: %+v", sp)
+	}
+	// Equipo que no conoce el comando (sin VRF): la sesión es global.
+	if sp := sessionPorts(sess{port: "Gi1/0/48", vrfOut: "                 ^\n% Invalid input detected at '^' marker.\n"}.outs()); !sp.known {
+		t.Errorf("sin soporte de VRF: %+v", sp)
+	}
+}
+
+// La cadena más larga (sesión en una VRF por un Port-channel) cabe en las 5 rondas de planWith.
+func TestSessionPortChainFitsInFiveRounds(t *testing.T) {
+	o := sess{vrf: "MGMT", port: "Po1", channels: ecSummary}.outs()
+	have := map[string]string{showUsersCmd: o[showUsersCmd]}
+	rounds := 0
+	for ; ; rounds++ {
+		next := SessionPortReads(have)
+		if len(next) == 0 {
+			break
+		}
+		for _, c := range next {
+			have[c] = o[c]
+		}
+	}
+	// La ronda de show users es la de Pre: aquí cuentan las que pide planWith.
+	if rounds > 5 || !sessionPorts(have).known {
+		t.Errorf("rondas = %d, %+v", rounds, sessionPorts(have))
+	}
+}
+
+// Puertos multigigabit de un Cat9k (Tw, Fi) y los largos: se aceptan como puerto físico y se abrevian sin chocar con Twe.
+func TestValidInterfaceMultigig(t *testing.T) {
+	for _, n := range []string{"Tw1/0/1", "Fi1/0/1", "TwoGigabitEthernet1/0/1", "FiveGigabitEthernet1/0/2", "Twe1/0/1", "TwentyFiveGigE1/0/1"} {
+		if !ValidTrunkInterface(n) || !ValidInterface(n) {
+			t.Errorf("%s no es válido", n)
+		}
+	}
+	for _, n := range []string{"Tw", "Twx1/0/1", "Fi", "Tunnel0"} {
+		if ValidInterface(n) {
+			t.Errorf("%s no debe ser válido", n)
+		}
+	}
+	for in, want := range map[string]string{"TwoGigabitEthernet1/0/1": "Tw1/0/1", "FiveGigabitEthernet1/0/1": "Fi1/0/1", "TwentyFiveGigE1/0/1": "Twe1/0/1", "Twe1/0/1": "Twe1/0/1", "Tw1/0/1": "Tw1/0/1", "Fi1/0/1": "Fi1/0/1"} {
+		if got := iosxe.ShortIf(in); got != want {
+			t.Errorf("ShortIf(%s) = %s, quería %s", in, got, want)
+		}
+	}
+}
+
+// La misma IP local en una VRF y en la tabla global: no se sabe cuál lleva la sesión, y el puerto de una VRF no se da por el de la sesión.
+func TestSessionPortSameLocalIPInGlobalAndVRFIsUnknown(t *testing.T) {
+	const gi48 = "GigabitEthernet1/0/48"
+	o := sess{vrf: "TENANT", port: "Gi1/0/47"}.outs()
+	o[showIPBrief] += "Vlan1                  10.20.0.1       YES manual up                    up\n"
+	if sp := sessionPorts(o); sp.known {
+		t.Errorf("IP repetida en la global y en una VRF: %+v", sp)
+	}
+	up := with(trunkOuts(gi48, trunkCfg(gi48, "switchport mode trunk", "switchport trunk allowed vlan 10,20,30"), swTrunk), sess{})
+	maps.Copy(up, o)
+	if _, err := TrunkPlan("SW1", TrunkChange{Interface: gi48, Op: "remove", Vlan: 20}, up); !errors.Is(err, ErrSnippetRefused) {
+		t.Errorf("trunk remove con IP repetida: %v", err)
+	}
+	// Dos VRF con esa IP: tampoco.
+	o2 := sess{vrf: "TENANT", port: "Gi1/0/47", vrfRows: "Vl30                   10.20.0.1       OTRA                             up\n"}.outs()
+	if sp := sessionPorts(o2); sp.known {
+		t.Errorf("dos VRF con la IP: %+v", sp)
+	}
+}
+
+// Sin filas de VRF (tabla vacía o el equipo no conoce el comando) la sesión solo es global si la IP local está en show ip interface brief.
+func TestSessionPortWithoutVRFRowsNeedsTheLocalIPInBrief(t *testing.T) {
+	invalid := "                 ^\n% Invalid input detected at '^' marker.\n"
+	for name, vrfOut := range map[string]string{"sin comando": invalid, "tabla vacía": "Interface              IP-Address      VRF                              Protocol\n"} {
+		// 3560CX con la gestión por una SVI global: sigue con certeza.
+		if sp := sessionPorts(sess{port: "Gi1/0/48", vrfOut: vrfOut}.outs()); !sp.known || !sp.isSession("Gi1/0/48") {
+			t.Errorf("%s, IP local en la brief: %+v", name, sp)
+		}
+		o := sess{port: "Gi1/0/48", vrfOut: vrfOut}.outs()
+		o[showIPBrief] = "Interface              IP-Address      OK? Method Status                Protocol\nVlan1                  10.77.7.7       YES manual up                    up\n"
+		if sp := sessionPorts(o); sp.known {
+			t.Errorf("%s, IP local fuera de la brief: %+v", name, sp)
+		}
+	}
+}
+
+// Con la IP local en una fila de VRF pero sin una brief legible no se descarta que también esté en la global: sin certeza.
+func TestSessionPortVRFRowWithoutBriefIsUnknown(t *testing.T) {
+	for name, brief := range map[string]string{"vacía": "", "sin comando": "                 ^\n% Invalid input detected at '^' marker.\n"} {
+		o := sess{vrf: "MGMT", port: "Gi1/0/47"}.outs()
+		o[showIPBrief] = brief
+		if sp := sessionPorts(o); sp.known {
+			t.Errorf("brief %s con fila de VRF: %+v", name, sp)
 		}
 	}
 }

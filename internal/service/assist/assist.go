@@ -72,15 +72,18 @@ type assistSvc struct {
 	plans map[string]*planRec // shortcut: en memoria; un reinicio del núcleo descarta planes y ejecuciones
 	runs  map[string]*runRec
 	// ctx vive mientras el núcleo: cancelarlo (Close) hace que las ejecuciones se abandonen.
-	ctx             context.Context
-	cancel          context.CancelFunc
-	decisionTimeout time.Duration   // 0 = assist.DefaultDecisionTimeout
-	discarded       map[string]bool // reversas pendientes descartadas: ni Persist ni afterRun las vuelven a guardar (protegido por mu)
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	decisionTimeout     time.Duration   // 0 = assist.DefaultDecisionTimeout
+	starting            map[string]bool // reversas pendientes que StartPendingRollback está armando: Descartar las rechaza como si ya corrieran (protegido por mu)
+	beforeDeletePending func()          // solo pruebas: se llama en Descartar entre sus comprobaciones y el borrado
+	afterLoadPending    func()          // solo pruebas: se llama en la ventana entre leer la entrada y registrar la reversa
+	discarded           map[string]bool // reversas pendientes descartadas: ni Persist ni afterRun las vuelven a guardar (protegido por mu)
 }
 
 func newSvc(d service.Deps) *assistSvc {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &assistSvc{d: d, plans: map[string]*planRec{}, runs: map[string]*runRec{}, discarded: map[string]bool{}, ctx: ctx, cancel: cancel}
+	return &assistSvc{d: d, plans: map[string]*planRec{}, runs: map[string]*runRec{}, discarded: map[string]bool{}, starting: map[string]bool{}, ctx: ctx, cancel: cancel}
 }
 
 // Close cancela las ejecuciones vivas y espera a que cada una cierre su sesión, audite en qué quedó y
