@@ -21,6 +21,19 @@ func OnlyOwnAccess(path string) (bool, error) { return IsPrivate(path) }
 // la ACL heredada y aquí se protege; llámala antes de escribir el secreto.
 func ProtectNew(string) error { return nil }
 
+// ReadOnlyDir deja la carpeta sin permiso de escritura (0500) y devuelve cómo restaurarla. Es para pruebas: en Windows
+// chmod no cierra una carpeta, ahí se pone una ACE de «negar» escritura.
+func ReadOnlyDir(path string) (restore func(), err error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(path, 0o500); err != nil {
+		return nil, err
+	}
+	return func() { os.Chmod(path, fi.Mode().Perm()) }, nil
+}
+
 // IsPrivate dice si el archivo o la carpeta no da acceso a grupo ni a otros. Es para pruebas.
 func IsPrivate(path string) (bool, error) {
 	fi, err := os.Stat(path)

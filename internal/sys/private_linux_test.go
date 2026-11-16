@@ -74,3 +74,19 @@ func TestProtectNewNoHaceNadaEnLinux(t *testing.T) {
 		t.Fatalf("modo %v", fi.Mode().Perm())
 	}
 }
+
+func TestReadOnlyDirEnLinux(t *testing.T) {
+	d := t.TempDir()
+	antes, _ := os.Stat(d)
+	restore, err := ReadOnlyDir(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi, _ := os.Stat(d); fi.Mode().Perm() != 0o500 {
+		t.Fatalf("modo %v", fi.Mode().Perm())
+	}
+	restore()
+	if fi, _ := os.Stat(d); fi.Mode().Perm() != antes.Mode().Perm() {
+		t.Fatalf("restaurado %v", fi.Mode().Perm())
+	}
+}

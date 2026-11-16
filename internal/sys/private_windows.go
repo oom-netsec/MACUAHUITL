@@ -133,6 +133,34 @@ func ProtectFile(path string) error { return protect(path, false) }
 // devuelve un error que cumple errors.Is(err, errors.ErrUnsupported), para que quien tolere la falta de permisos lo vea.
 func ProtectNew(path string) error { return protect(path, false) }
 
+// ReadOnlyDir pone en la carpeta una ACE de «negar» crear archivos, subcarpetas y borrar hijos a todos (también al
+// usuario: las de negar van primero) y devuelve cómo restaurar la DACL privada. Es para pruebas: chmod no cierra una
+// carpeta en Windows.
+func ReadOnlyDir(path string) (restore func(), err error) {
+	user, err := currentSID()
+	if err != nil {
+		return nil, err
+	}
+	todos, err := windows.StringToSid("S-1-1-0")
+	if err != nil {
+		return nil, err
+	}
+	acl, err := windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{
+		{AccessPermissions: fileAddFile | fileAddSubdir | fileDeleteChild, AccessMode: windows.DENY_ACCESS,
+			Trustee: windows.TRUSTEE{TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeValue: windows.TrusteeValueFromSID(todos)}},
+		{AccessPermissions: fileAllAccess, AccessMode: windows.GRANT_ACCESS,
+			Trustee: windows.TRUSTEE{TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeValue: windows.TrusteeValueFromSID(user)}},
+	}, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT,
+		windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION, nil, nil, acl, nil); err != nil {
+		return nil, err
+	}
+	return func() { protect(path, true) }, nil
+}
+
 // IsPrivate dice si el archivo o la carpeta es del usuario, tiene la DACL protegida y solo da acceso al usuario, a
 // SYSTEM y a Administradores. Es para pruebas.
 func IsPrivate(path string) (bool, error) {

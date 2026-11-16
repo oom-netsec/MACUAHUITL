@@ -212,3 +212,30 @@ func TestOnlyOwnAccess(t *testing.T) {
 		t.Fatalf("con Usuarios: %v, %v", ok, err)
 	}
 }
+
+func TestReadOnlyDirNiegaCrearYSeRestaura(t *testing.T) {
+	d := privateTemp(t)
+	restore, err := ReadOnlyDir(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f, err := os.Create(filepath.Join(d, "x")); err == nil {
+		f.Close()
+		t.Fatal("se pudo crear un archivo en la carpeta de solo lectura")
+	}
+	restore()
+	f, err := os.Create(filepath.Join(d, "x"))
+	if err != nil {
+		t.Fatalf("tras restaurar: %v", err)
+	}
+	f.Close()
+}
+
+func privateTemp(t *testing.T) string {
+	t.Helper()
+	d := t.TempDir()
+	if err := MkdirPrivate(d); err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
