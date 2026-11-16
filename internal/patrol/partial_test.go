@@ -3,6 +3,8 @@ package patrol
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,8 +17,6 @@ import (
 	"time"
 
 	"errors"
-
-	"golang.org/x/crypto/ssh"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
@@ -302,7 +302,7 @@ func TestReconexionConservaLaPrimeraLlaveCambiada(t *testing.T) {
 	st.onCut = func() { e.d.Hosts.Add(hp, k2) } // la reconexión ve otra llave cambiada
 	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
 	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
-	if res.State != "partial" || res.ChangedHostKey == nil || res.ChangedHostKey.Old != ssh.FingerprintSHA256(k1) {
+	if res.State != "partial" || res.ChangedHostKey == nil || res.ChangedHostKey.Old != fp(k1.Marshal()) {
 		t.Fatalf("la primera llave cambiada se perdió: %+v", res.ChangedHostKey)
 	}
 }
@@ -353,4 +353,10 @@ func TestCmdNoTocaLosComandosDeLosPlaybooks(t *testing.T) {
 			}
 		}
 	}
+}
+
+// fp es la huella SHA256 de una llave pública en wire format (como la de ssh.FingerprintSHA256).
+func fp(b []byte) string {
+	h := sha256.Sum256(b)
+	return "SHA256:" + base64.RawStdEncoding.EncodeToString(h[:])
 }
