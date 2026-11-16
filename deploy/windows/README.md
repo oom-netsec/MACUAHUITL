@@ -6,6 +6,7 @@ El instalador de Windows (ADR 0012, «Instalador»): NSIS, por usuario y sin adm
 |---|---|
 | `macuahuitl.nsi` | La plantilla del instalador y del desinstalador. |
 | `build-installer.sh` | La arma: genera el `.ico` con `tools/icowin` y llama a `makensis`. Corre en Linux (paquete `nsis`) o en Git Bash en Windows. |
+| `build-release.sh` | Lo que corre `release.yml` en cada tag: compila los tres `.exe` dos veces y exige los mismos bytes, arma `macuahuitl_X.Y.Z_windows_amd64.zip` y el instalador. Las sumas y la atestación las agrega `release.yml` como con el resto. |
 | `test-installer.ps1` | Instala y desinstala en un Windows desechable (el runner de CI) y revisa el resultado. **No lo corras en tu equipo:** desinstala MACUAHUITL del usuario actual. |
 
 ```sh
