@@ -117,6 +117,21 @@ try {
   Must ($r.Code -ne 0 -and $r.Out -notmatch 'unlocked|locked') "mctl del usuario 2 no conecta (salida $($r.Code): $($r.Err.Trim()))"
   Must ((MctlOk $u1 @('vault', 'status')) -match 'unlocked') 'y el núcleo del usuario 1 sigue bien'
 
+  # 4b) el usuario 2 abre DIRECTAMENTE el pipe del usuario 1: la DACL lo niega (no un timeout ni «no existe»).
+  $probe = "`$c = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'macuahuitl-$($u1.Sid)', 'InOut'); " +
+    "try { `$c.Connect(2000); Write-Output 'EXC:ninguna (conectó)' } catch { Write-Output ('EXC:' + `$_.Exception.GetType().FullName + ': ' + `$_.Exception.Message) }"
+  $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($probe))
+  $r = Invoke-As $u2 "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" @('-NoProfile', '-EncodedCommand', $enc)
+  Write-Host "excepción del usuario 2 al abrir el pipe del usuario 1: $($r.Out.Trim()) $($r.Err.Trim())"
+  Must ($r.Out -match 'EXC:System\.UnauthorizedAccessException') 'el usuario 2 recibe acceso denegado (UnauthorizedAccessException) al abrir el pipe del usuario 1'
+  # 4c) PENDIENTE (Backend): mctl no tiene variable de entorno ni bandera para apuntar a otro pipe (ipc.SocketPath solo usa el SID
+  # del proceso), así que no se puede hacer que mctl del usuario 2 marque al pipe del usuario 1. 4b cubre lo mismo sin mctl.
+  Write-Host 'pendiente: 4c, mctl no ofrece forzar el pipe a dial (Backend); cubierto por 4b'
+  # 4d) la auditoría del núcleo del usuario 1 no menciona al usuario 2 (ni su SID): sus intentos nunca llegaron al núcleo.
+  $aud = MctlOk $u1 @('audit', 'export')
+  Must ($aud.Length -gt 0 -and $aud -notmatch [regex]::Escape($u2.Sid) -and $aud -notmatch [regex]::Escape($u2.Name)) 'la auditoría del usuario 1 no registra nada del usuario 2'
+  Must ((MctlOk $u1 @('audit', 'verify')) -match '.') 'y la cadena de auditoría está íntegra'
+
   # 5) ACL de la carpeta de datos: solo el usuario, SYSTEM y Administradores, por SID.
   $data = Join-Path $local 'data'
   $acl = Get-Acl $data
