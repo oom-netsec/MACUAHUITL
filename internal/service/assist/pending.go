@@ -164,6 +164,9 @@ func (s *assistSvc) isDiscarded(runID string) bool {
 func (s *assistSvc) reversing(runID string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.starting[runID] {
+		return true
+	}
 	for _, rr := range s.runs {
 		if rr.origin != runID {
 			continue
@@ -175,6 +178,32 @@ func (s *assistSvc) reversing(runID string) bool {
 		}
 	}
 	return false
+}
+
+// beginStart marca la reversa de runID como «arrancando»; false si ya hay una arrancando o corriendo.
+func (s *assistSvc) beginStart(runID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.starting[runID] {
+		return false
+	}
+	for _, rr := range s.runs {
+		if rr.origin == runID {
+			select {
+			case <-rr.finished:
+			default:
+				return false
+			}
+		}
+	}
+	s.starting[runID] = true
+	return true
+}
+
+func (s *assistSvc) endStart(runID string) {
+	s.mu.Lock()
+	delete(s.starting, runID)
+	s.mu.Unlock()
 }
 
 // live dice si la ejecución sigue viva en este núcleo (su reversa no se ofrece hasta que termine).
@@ -269,15 +298,21 @@ func (s *assistSvc) StartPendingRollback(ctx context.Context, r *v1.StartPending
 	if s.live(r.RunId) {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_en_curso", i18n.A("id", r.RunId))
 	}
-	if s.reversing(r.RunId) { // como Discard y List: su reversa ya corre
+	// Registrarse antes de leer la entrada: un Descartar que llegue entre la lectura y el registro de la reversa la borraría y la reversa se
+	// aplicaría igual. La marca y la comprobación de que no hay otra reversa van juntas bajo el candado.
+	if !s.beginStart(r.RunId) {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_ya_aplicandose", i18n.A("id", r.RunId))
 	}
+	defer s.endStart(r.RunId)
 	rec, err := s.loadPending(pendingPrefix + r.RunId)
 	if err != nil {
 		if errors.Is(err, vault.ErrNotFound) {
 			return nil, service.Err(ctx, codes.NotFound, "assist.svc.reversa_no_existe", i18n.A("id", r.RunId))
 		}
 		return nil, service.Err(ctx, codes.Internal, "assist.svc.reversa_ilegible", i18n.A("id", r.RunId, "cause", err.Error()))
+	}
+	if s.afterLoadPending != nil {
+		s.afterLoadPending()
 	}
 	age := s.d.Now().Sub(rec.base())
 	if age > pendingMaxAge && !r.AcceptAge {
