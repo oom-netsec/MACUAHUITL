@@ -183,3 +183,23 @@ func TestBuildComandoQueMaskCmdCambia(t *testing.T) {
 		t.Fatalf("el cortado enmascarado no se reconoce: %+v", r.Rows[0])
 	}
 }
+
+// Dos comandos del lote que mask.Cmd enmascara igual: la salida guardada bajo la clave enmascarada no se sabe de cuál es,
+// así que ninguna de las dos filas la toma (antes la fila A mostraba la salida de B).
+func TestBuildClaveEnmascaradaAmbigua(t *testing.T) {
+	a, b := "show run | include key 7 0822455D0A16", "show run | include key 7 045802150C2E"
+	if mask.Cmd("ios-xe", a) != mask.Cmd("ios-xe", b) {
+		t.Fatal("la prueba necesita dos comandos que se enmascaren igual")
+	}
+	d := capture.Device{Address: "a", Hostname: "h", Platform: "ios-xe", State: "completed", Outputs: map[string]string{capture.Key(mask.Cmd("ios-xe", a)): "salida de B"}}
+	r := Build([]capture.Device{d}, []string{a, b})
+	for _, row := range r.Rows {
+		if row.OK || row.Output != "" || !strings.Contains(row.Note, "ambiguo") {
+			t.Fatalf("row = %+v", row)
+		}
+	}
+	// Con un solo comando del lote la clave enmascarada sí vale.
+	if r = Build([]capture.Device{d}, []string{a}); !r.Rows[0].OK {
+		t.Fatalf("row = %+v", r.Rows[0])
+	}
+}

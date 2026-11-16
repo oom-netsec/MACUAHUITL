@@ -64,17 +64,26 @@ func Build(devs []capture.Device, cmds []string) Report {
 		if name == "" {
 			name = d.Address
 		}
+		masked := map[string]int{} // cuántos comandos del lote caen en cada clave enmascarada
+		for _, c := range cmds {
+			masked[capture.Key(mask.Cmd(d.Platform, c))]++
+		}
 		for _, c := range cmds {
 			row := Row{Device: name, Address: d.Address, Command: c}
-			// La evidencia y los cortados guardan el comando pasado por mask.Cmd: se busca por el crudo y por el enmascarado.
+			// La evidencia y los cortados guardan el comando pasado por mask.Cmd: se busca por el crudo y por el enmascarado,
+			// este último solo si ningún otro comando del lote se enmascara igual (si no, no se sabe de cuál es la salida).
 			k, km := capture.Key(c), capture.Key(mask.Cmd(d.Platform, c))
+			amb := km != k && masked[km] > 1
 			out, ok := d.Outputs[k]
-			if !ok {
+			_, okm := d.Outputs[km]
+			if !ok && !amb {
 				out, ok = d.Outputs[km]
 			}
-			if ok {
+			if amb && !ok && (okm || slices.ContainsFunc(d.Cut, func(x string) bool { return capture.Key(x) == km })) {
+				row.NoteTx = i18n.Tx("adhoc.note.ambiguous")
+			} else if ok {
 				row.OK, row.Output = true, strings.TrimRight(out, "\r\n")
-			} else if d.State == "partial" && slices.ContainsFunc(d.Cut, func(x string) bool { kx := capture.Key(x); return kx == k || kx == km }) {
+			} else if d.State == "partial" && slices.ContainsFunc(d.Cut, func(x string) bool { kx := capture.Key(x); return kx == k || kx == km && !amb }) {
 				row.Note = d.Detail // solo el comando cortado lleva el detalle del corte
 			} else if d.State != "completed" && d.State != "partial" && d.Detail != "" {
 				row.Note = d.Detail

@@ -55,6 +55,7 @@ func init() {
 		"adhoc.err.node_stopped":        e("el núcleo se detuvo con el lote en curso; vuelve a lanzarlo", "the core stopped with the batch in progress; launch it again"),
 		"adhoc.err.no_dir":              e("el lote no conserva su carpeta de salida", "the batch no longer has its output folder"),
 		"adhoc.rep.no_output":           e("SIN SALIDA: {note}", "NO OUTPUT: {note}", "note"),
+		"adhoc.note.ambiguous":          e("ambiguo: otro comando del lote se enmascara igual y no se sabe de cuál es la salida", "ambiguous: another command in the batch is masked the same way, so the output cannot be attributed"),
 		"adhoc.note.invalid":            e("comando inválido en el equipo", "command invalid on the device"),
 		"adhoc.note.no_round":           e("equipo sin ronda", "device without a round"),
 		"adhoc.note.device":             e("equipo {state}", "device {state}", "state"),
