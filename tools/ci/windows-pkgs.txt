@@ -6,7 +6,7 @@
 ./internal/adhoc
 ./internal/analyze  # 43a3: sus pruebas dependen de chmod 0 y de Geteuid; en Windows va por ACL
 ./internal/assist
-./internal/audit  # pendiente: SQLITE_BUSY con un escritor en bucle en otra conexión (3 de 200 Append perdidos en windows-latest); se investiga aparte
+./internal/audit
 ./internal/backup  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
 ./internal/calc
 ./internal/capture

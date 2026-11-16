@@ -143,14 +143,18 @@ type Core struct {
 	bus      *engine.Bus
 	sched    *engine.Scheduler
 
-	mu       sync.Mutex
-	vault    *vault.Vault
-	jobs     map[string]*job
-	sleepGen uint64 // sube en cada OnSleep (bajo mu): resumePaused no reanuda si cambió mientras rearmaba
-	activity time.Time
-	stop     chan struct{}
-	watchers sync.WaitGroup
-	closers  []func() // de los servicios (service.Deps.OnClose); corren antes de cerrar la base
+	mu          sync.Mutex
+	vault       *vault.Vault
+	jobs        map[string]*job
+	sleepGen    uint64 // sube en cada OnSleep (bajo mu): resumePaused no reanuda si cambió mientras rearmaba
+	activity    time.Time
+	stop        chan struct{}
+	watchers    sync.WaitGroup
+	busy        []func(context.Context) []string // fuentes de trabajo vivo de los servicios (Shutdown las consulta)
+	cancelServe context.CancelFunc               // termina Serve (Shutdown); nil si no sirve
+	closers     []func()                         // de los servicios (service.Deps.OnClose); corren antes de cerrar la base
+
+	live *ipc.Live // streams de trabajo abiertos
 
 	respaldos respaldoStore // vistas previas de import de respaldos de la bóveda (con credenciales descifradas)
 }
@@ -185,7 +189,7 @@ func New(p Paths, o Options) (*Core, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Core{p: p, o: o, db: db, jobs: map[string]*job{}, activity: o.Now(), stop: make(chan struct{})}
+	c := &Core{p: p, o: o, db: db, jobs: map[string]*job{}, activity: o.Now(), stop: make(chan struct{}), live: ipc.NewLive(liveIgnore...).CountUnary(liveUnary...)}
 	c.settings = service.NewCoreSettings(p.Outputs, p.Home, p.Config, p.Data, p.State, p.Runtime)
 	c.log = audit.New(db, o.Now)
 	// Se revalida la carpeta de salidas guardada (dueño, 0700, ancestros): si ya no vale rige la de fábrica y queda en la auditoría.
@@ -374,24 +378,34 @@ func (c *Core) missingPack(id string) string {
 
 func (c *Core) vaultPath() string { return filepath.Join(c.p.Data, "vault.mcv") }
 
-// audit avisa con la acción perdida si Append falla (Append ya reintenta con la base ocupada), en vez de
-// descartarla en silencio (la bitácora es de seguridad).
+// appendAudit anota en la bitácora y devuelve el error (Append ya reintenta con la base ocupada).
+func (c *Core) appendAudit(action, target, detail string) error {
+	_, err := c.log.Append(context.Background(), audit.Entry{Actor: c.o.Actor, Action: action, Target: target, Detail: detail})
+	return err
+}
+
+// audit avisa con la acción perdida si Append falla, en vez de descartarla en silencio (la bitácora es de seguridad).
 // shortcut: no falla la operación auditada, solo avisa; endurecer si se exige "sin auditoría no hay acción".
+// (Shutdown sí lo exige: usa appendAudit.)
 func (c *Core) audit(action, target, detail string) {
-	e := audit.Entry{Actor: c.o.Actor, Action: action, Target: target, Detail: detail}
-	if _, err := c.log.Append(context.Background(), e); err != nil {
+	if err := c.appendAudit(action, target, detail); err != nil {
 		fmt.Fprintf(c.o.ErrOut, "macuahuitld: auditoría perdida accion=%q objetivo=%q: %v\n", action, target, err)
 	}
 }
 
 // Serve atiende gRPC en l hasta que ctx termine.
 func (c *Core) Serve(ctx context.Context, l ipc.Listener) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	c.mu.Lock()
+	c.cancelServe = cancel
+	c.mu.Unlock()
 	return ipc.Serve(ctx, l, func(s ipc.Registrar) {
 		d := coreDeps{c}
 		for _, m := range modules(c) {
 			m.Register(s, d)
 		}
-	}, ipc.LocaleOptions()...)
+	}, append(ipc.LocaleOptions(), c.live.Options()...)...)
 }
 
 func (c *Core) Close() {

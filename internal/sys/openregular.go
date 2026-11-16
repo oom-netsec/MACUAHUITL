@@ -59,3 +59,6 @@ func OpenNew(path string) (*os.File, error) {
 func OpenNewIn(root *os.Root, name string) (*os.File, error) {
 	return root.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL|ONoFollow, 0o600)
 }
+
+// ErrWaitTimeout: WaitExit venció el plazo con el proceso aún vivo.
+var ErrWaitTimeout = i18n.New("sys.err.wait_timeout", nil)

@@ -204,4 +204,8 @@ uso: mctl <comando>
         (copia un .mpack sin firma oficial a «Mis scripts» y a <config>/playbooks, editables, sin instalarlo. Muestra el estado de cada elemento:
          new, same, id_conflict o name_conflict; cada conflicto pide decisión y nunca se sobrescribe nada. Un playbook importado conserva su ID con
          prefijo de editor y entra al catálogo sin reiniciar)
+  core stop [--timeout 10s]
+        (apaga el núcleo de forma ordenada y espera a que su proceso termine. Con trabajo en curso (ejecuciones asistidas, escuchas, capturas,
+         servidores, terminales o trabajos de Patrol armados) se niega, lo lista y sale con 3 sin cortar nada. Si el núcleo no corre, avisa y sale con 0;
+         core stop nunca lo arranca. Sale con 1 si vence el plazo)
   --version

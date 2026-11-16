@@ -66,6 +66,7 @@ type harness struct {
 	stop   func()
 	p      Paths
 	o      Options
+	served <-chan struct{}                            // se cierra cuando Serve termina solo (apagado ordenado)
 	subs   map[string]v1.EventService_SubscribeClient // suscripciones tomadas por arm antes de armar, que waitJob consume
 }
 
@@ -109,7 +110,7 @@ func newHarness(t *testing.T, mut func(*Options)) *harness {
 	os.MkdirAll(p.Outputs, 0o700)
 	return &harness{core: c, conn: conn, vault: v1.NewVaultServiceClient(conn), patrol: v1.NewPatrolServiceClient(conn),
 		events: v1.NewEventServiceClient(conn), audit: v1.NewAuditServiceClient(conn), inh: inh,
-		target: &v1.Target{Address: ap.Addr().String(), Port: uint32(ap.Port()), DeviceId: "sw1"}, out: p.Outputs, stop: stop, p: p, o: o}
+		target: &v1.Target{Address: ap.Addr().String(), Port: uint32(ap.Port()), DeviceId: "sw1"}, out: p.Outputs, stop: stop, served: served, p: p, o: o}
 }
 
 // restart cierra el núcleo y abre otro sobre la misma carpeta de datos, como tras reiniciar macuahuitld.

@@ -731,6 +731,11 @@ func (s *assistSvc) WatchRun(r *v1.WatchRunRequest, st v1.AssistService_WatchRun
 
 // ListRuns da las ejecuciones que el núcleo recuerda, las más recientes primero.
 func (s *assistSvc) ListRuns(ctx context.Context, r *v1.ListRunsRequest) (*v1.ListRunsResponse, error) {
+	return &v1.ListRunsResponse{Runs: s.list(ctx, r.ActiveOnly)}, nil
+}
+
+// list es la fuente de ListRuns; la comparte busy para que el apagado y el aviso de la UI vean lo mismo.
+func (s *assistSvc) list(ctx context.Context, activeOnly bool) []*v1.AssistRunState {
 	s.mu.Lock()
 	recs := make([]*runRec, 0, len(s.runs))
 	for _, rr := range s.runs {
@@ -738,13 +743,22 @@ func (s *assistSvc) ListRuns(ctx context.Context, r *v1.ListRunsRequest) (*v1.Li
 	}
 	s.mu.Unlock()
 	sort.Slice(recs, func(i, j int) bool { return recs[i].started.After(recs[j].started) })
-	out := &v1.ListRunsResponse{}
+	var out []*v1.AssistRunState
 	for _, rr := range recs {
-		if st := snapshot(i18n.Locale(ctx), rr); !r.ActiveOnly || st.Active {
-			out.Runs = append(out.Runs, st)
+		if st := snapshot(i18n.Locale(ctx), rr); !activeOnly || st.Active {
+			out = append(out, st)
 		}
 	}
-	return out, nil
+	return out
+}
+
+// busy enumera las ejecuciones asistidas vivas («assist run ID (equipos)»).
+func (s *assistSvc) busy(ctx context.Context) []string {
+	var out []string
+	for _, st := range s.list(ctx, true) {
+		out = append(out, "assist run "+st.RunId+" ("+strings.Join(st.Devices, ",")+")")
+	}
+	return out
 }
 
 func (s *assistSvc) GetAssistRun(ctx context.Context, r *v1.GetAssistRunRequest) (*v1.GetAssistRunResponse, error) {
@@ -755,11 +769,17 @@ func (s *assistSvc) GetAssistRun(ctx context.Context, r *v1.GetAssistRunRequest)
 	return &v1.GetAssistRunResponse{Run: snapshot(i18n.Locale(ctx), rr)}, nil
 }
 
-// Module registra el servicio Assist.
-type Module struct{}
+// Module registra el servicio Assist. Busy, si no es nil, recibe de dónde leer el trabajo vivo de este servicio
+// (lo que el apagado ordenado del núcleo consulta).
+type Module struct {
+	Busy func(func(context.Context) []string)
+}
 
-func (Module) Register(s ipc.Registrar, d service.Deps) {
+func (m Module) Register(s ipc.Registrar, d service.Deps) {
 	svc := newSvc(d)
+	if m.Busy != nil {
+		m.Busy(svc.busy)
+	}
 	d.OnClose(svc.Close)
 	v1.RegisterAssistServiceServer(s, svc)
 }

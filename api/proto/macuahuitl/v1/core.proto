@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package macuahuitl.v1;
+
+option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
+
+// Ciclo de vida del núcleo (fase 43b, ADR 0012 g).
+service CoreService {
+  // Shutdown apaga el núcleo de forma ordenada, igual que SIGTERM. Solo vale para el cliente local ya verificado
+  // (SO_PEERCRED en Linux). Con trabajo vivo (ejecuciones asistidas, escuchas, capturas, servidores, terminales,
+  // trabajos de Patrol armados) no apaga nada y responde FAILED_PRECONDITION con la lista en el mensaje. Si no
+  // puede auditar core.shutdown, tampoco apaga.
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
+}
+
+message ShutdownRequest {}
+
+message ShutdownResponse {}

@@ -305,6 +305,7 @@ func init() {
 		"mctl.flag.ports.status.legacy-ssh":      {Es: "en vivo: equipos con SSH antiguo (queda auditado)", En: "allow legacy SSH algorithms (audited)"},
 		"mctl.flag.post":                         {Es: "carpeta del trabajo POST", En: "POST job folder"},
 		"mctl.flag.pre":                          {Es: "carpeta del trabajo PRE", En: "PRE job folder"},
+		"mctl.flag.core.stop.timeout":            {Es: "plazo para que el núcleo termine", En: "time allowed for the core to exit"},
 		"mctl.flag.prefs.set.format":             {Es: "texto, crudo o jsonl (vacío = de fábrica)", En: "text, raw or jsonl (empty = factory default)"},
 		"mctl.flag.prefs.set.max-files":          {Es: "archivos que se conservan (0 = de fábrica; 1-1000)", En: "files to keep (0 = factory default; 1-1000)"},
 		"mctl.flag.prefs.set.outputs":            {Es: "carpeta base de salidas (vacía = la de fábrica)", En: "base output folder (empty = factory default)"},
