@@ -1,6 +1,38 @@
 # Paquetes que compilan y pasan sus pruebas en Windows (fase 43, ADR 0012). Crece PR a PR; al cerrar 43a se reemplaza por ./...
 # Todos compilan en Windows: go-checks les corre GOOS=windows go vet y el job windows noegress y archcheck.
 # Los que llevan « # motivo» compilan pero sus pruebas esperan esa fase: el job windows no les corre go test.
+./cmd/macuahuitld  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./cmd/mctl  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./cmd/mctl/acl
+./cmd/mctl/adhoc
+./cmd/mctl/analysis
+./cmd/mctl/audit
+./cmd/mctl/backup
+./cmd/mctl/calc
+./cmd/mctl/change
+./cmd/mctl/cleaner
+./cmd/mctl/cli
+./cmd/mctl/core
+./cmd/mctl/credrotate
+./cmd/mctl/devices
+./cmd/mctl/diag
+./cmd/mctl/drift
+./cmd/mctl/field
+./cmd/mctl/fleet
+./cmd/mctl/forensic
+./cmd/mctl/metrics
+./cmd/mctl/pack
+./cmd/mctl/patrol  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./cmd/mctl/ports
+./cmd/mctl/prefs
+./cmd/mctl/restore
+./cmd/mctl/scripts
+./cmd/mctl/security
+./cmd/mctl/snippet
+./cmd/mctl/tools
+./cmd/mctl/transfer  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./cmd/mctl/vault
+./cmd/mctl/visibility
 ./gen/macuahuitl/v1
 ./internal/acl
 ./internal/adhoc
@@ -13,9 +45,11 @@
 ./internal/change
 ./internal/cleaner
 ./internal/compliance
+./internal/core  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
 ./internal/core/power
 ./internal/crashinfo
 ./internal/devices
+./internal/diag  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
 ./internal/diag/dnsq
 ./internal/diag/fileserve  # sus pruebas de enlaces simbólicos y de carpetas sensibles (HOME) sin validar en Windows
 ./internal/diag/flows
@@ -24,6 +58,7 @@
 ./internal/diag/ingest
 ./internal/diag/listen
 ./internal/diag/radiustest
+./internal/diag/serialcon
 ./internal/diag/snmp
 ./internal/diag/snmp/snmptest
 ./internal/diag/syslogd
@@ -40,6 +75,7 @@
 ./internal/ikedec
 ./internal/imgverify
 ./internal/iosconf
+./internal/ipc
 ./internal/logintel
 ./internal/mask
 ./internal/mask/internal/ref065
@@ -58,8 +94,34 @@
 ./internal/playbook
 ./internal/scripts
 ./internal/secret
+./internal/service  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/acl
+./internal/service/adhoc  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/analysis
+./internal/service/assist  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/backup  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/calc
+./internal/service/change
+./internal/service/cleaner
+./internal/service/diag
+./internal/service/drift
+./internal/service/field  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/fleet
+./internal/service/forensic  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/inventory  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/metrics  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/pack
+./internal/service/prefs  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/scripts  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/security  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/servicetest
+./internal/service/terminal
+./internal/service/tools
+./internal/service/transfer  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/service/visibility  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
 ./internal/store
 ./internal/sys
+./internal/sys/systest
 ./internal/termcolor
 ./internal/terminal
 ./internal/topo
@@ -71,8 +133,12 @@
 ./test/simulator
 ./tools/archcheck
 ./tools/archcheck/cmd/archcheck
+./tools/ci
+./tools/icowin
 ./tools/labcheck
 ./tools/noegress
 ./tools/noegress/cmd/noegress
 ./tools/packaging
 ./tools/packaging/mpack-keygen
+./tools/packaging/mpack-sign
+./ui/bridge  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
