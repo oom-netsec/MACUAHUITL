@@ -46,7 +46,7 @@ function ProfileOf($u) { (Get-CimInstance Win32_UserProfile -Filter "SID='$($u.S
 function Invoke-As($u, $exe, [string[]]$argv = @(), $stdin = $null, [switch]$NoWait) {
   $id = [guid]::NewGuid().ToString('N').Substring(0, 8)
   $o = "$work\$id.out"; $e = "$work\$id.err"
-  $sp = @{ FilePath = $exe; Credential = $u.Cred; LoadUserProfile = $true; WorkingDirectory = $work; RedirectStandardOutput = $o
+  $sp = @{ FilePath = $exe; Credential = $u.Cred; LoadUserProfile = $true; UseNewEnvironment = $true; WorkingDirectory = $work; RedirectStandardOutput = $o
     RedirectStandardError = $e; PassThru = $true; WindowStyle = 'Hidden' }
   if ($argv.Count) { $sp.ArgumentList = $argv }
   $in = $null
