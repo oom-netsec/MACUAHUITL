@@ -1,18 +1,39 @@
-# Política de seguridad
+# Security policy
 
-## Promesas
+## Promises
 
-MACUAHUITL promete, y cualquiera puede verificar (ver [Guía para auditores](docs/security/AUDIT_GUIDE.md)):
+MACUAHUITL makes four promises that anyone can verify with the [auditor's guide](docs/security/AUDIT_GUIDE.md):
 
-1. Ninguna credencial se escribe en claro a disco.
-2. Ninguna credencial aparece en logs, auditoría, outputs, mensajes de error ni volcados de memoria.
-3. La aplicación solo conecta a destinos que escribió el ingeniero.
-4. La contraseña maestra nunca se guarda. Si se pierde, la bóveda es irrecuperable, y eso es intencional.
+1. No credential is ever written to disk in clear text.
+2. No vault credential appears in logs, the audit log, outputs, error messages or memory dumps. Secrets that devices print inside the evidence (configuration, logs, terminal recordings) are masked; masking has documented limits, listed in the notes of the [latest release](https://github.com/oom-netsec/MACUAHUITL/releases/latest) and in the [threat model](docs/security/THREAT_MODEL.md).
+3. The app only connects to destinations the engineer typed. No telemetry, no update checks.
+4. The master password is never stored. If it is lost, the vault cannot be recovered, by design.
 
-Los límites conocidos de estas promesas están declarados en el [modelo de amenazas](docs/security/THREAT_MODEL.md#límites-declarados).
+The known limits of these promises are declared in the [threat model](docs/security/THREAT_MODEL.md#declared-limits).
 
-## Reportar una vulnerabilidad
+## Supported versions
 
-No abras un issue público. Usa el reporte privado de vulnerabilidades de GitHub en este repositorio (pestaña *Security → Report a vulnerability*).
+Only the [latest release](https://github.com/oom-netsec/MACUAHUITL/releases/latest) receives security fixes. Update before you report a problem, and check that it still happens.
 
-Incluye versión, pasos para reproducir e impacto. Respondemos en un máximo de 7 días.
+## Verify a release
+
+Every release ships a `SHA256SUMS` file. In the folder you downloaded to:
+
+```sh
+sha256sum -c --ignore-missing SHA256SUMS
+```
+
+`SHA256SUMS` catches a broken download. To check that a file was built by this repository's release workflow (from v1.0.0 on), verify its signed provenance with the [GitHub CLI](https://cli.github.com/):
+
+```sh
+gh attestation verify macuahuitl_*.deb --repo oom-netsec/MACUAHUITL \
+  --signer-workflow oom-netsec/MACUAHUITL/.github/workflows/release.yml
+```
+
+It works the same for the `.rpm`, the binaries and the packs published with each core release. Official content packs are also signed with Ed25519, and the core checks that signature when it installs a pack.
+
+## Report a vulnerability
+
+Do not open a public issue. Use GitHub's private vulnerability reporting in this repository (*Security → Report a vulnerability*).
+
+Include the version, steps to reproduce and the impact. We answer within 7 days.

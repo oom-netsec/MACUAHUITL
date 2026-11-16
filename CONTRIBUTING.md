@@ -1,19 +1,20 @@
-# Cómo contribuir
+# Contributing
 
-- **Pruebas primero.** Todo cambio de comportamiento llega con una prueba que falló antes del cambio.
-- **Red solo donde se permite.** El código de red vive en `internal/transport`, `internal/diag` e `internal/ipc`. `internal/sys` puede usar `golang.org/x/sys/unix` solo para endurecer el proceso. También pueden importar red `gen/` (código generado de gRPC, que va en el binario), `test/simulator` y `tools/` (estos dos no van en el binario). El analizador `noegress` corre en CI y rompe el build si otro paquete importa red, sockets de bajo nivel, cgo o ejecución de procesos.
-- **`os.StartProcess`** lanza procesos sin importar `os/exec` y el analizador no lo ve. Está prohibido fuera de `internal/diag`; la revisión de código lo vigila.
-- **Secretos.** Nunca uses `string` para un secreto fuera de `internal/secret`. Nunca registres un secreto, ni siquiera parcial.
-- **Idioma.** Comentarios, documentación y mensajes al usuario en español. Identificadores en inglés.
-- **Commits.** Formato `tipo(alcance): resumen` (`feat`, `fix`, `docs`, `chore`, `ci`, `test`).
-- **Decisiones.** Un cambio de arquitectura llega con un ADR nuevo en `docs/adr/`.
+- **Tests first.** Every change in behavior comes with a test that failed before the change.
+- **Network only where allowed.** Network code lives in `internal/transport`, `internal/diag` and `internal/ipc`. `internal/sys` may use `golang.org/x/sys/unix` only to harden the process. `gen/` (generated gRPC code, part of the binary), `test/simulator` and `tools/` (neither is part of the binary) may also import network packages. The `noegress` analyzer runs in CI and breaks the build if any other package imports network, low-level sockets, cgo or process execution.
+- **`os.StartProcess`** starts processes without importing `os/exec`, and the analyzer does not see it. It is forbidden outside `internal/diag`; code review watches for it.
+- **Secrets.** Never use a `string` for a secret outside `internal/secret`. Never log a secret, not even part of one.
+- **Language.** Every visible text goes through i18n, with English (canonical) and Spanish (`ui/frontend/src/lib/i18n/en.ts` and `es.ts`, and the core's catalog in `internal/i18n`); a test fails on hard-coded text. Identifiers are in English. The project's code comments and commit messages are usually in Spanish; contributions with comments and commits in English are welcome. Design records (ADRs and plans) are written in Spanish.
+- **Commits.** Every pull request is squashed into one commit on `main`. Its title follows the style in `git log`: `Area: summary`, for example `Patrol: …`, `packs: …` or `README: …`, and the body says what changed and why.
+- **Decisions.** An architecture change comes with a new ADR in `docs/adr/`.
 
-Al contribuir aceptas que tu aporte se publique bajo la licencia [Apache-2.0](LICENSE) del proyecto.
+By contributing you agree that your contribution is published under the project's [Apache-2.0](LICENSE) license.
 
-Antes de abrir un PR:
+Before opening a pull request:
 
 ```sh
-task test
-task lint
-task proto-lint
+./dev.sh test                          # Go tests (with -race), noegress, archcheck and the UI tests
+gofmt -l cmd internal ui/bridge tools  # must print nothing
+task lint                              # go vet, noegress, archcheck and staticcheck
+task proto-lint                        # after changing api/proto; then regenerate gen/ and commit it
 ```

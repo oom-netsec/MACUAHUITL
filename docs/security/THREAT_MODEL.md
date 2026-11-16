@@ -1,55 +1,55 @@
-# Modelo de amenazas
+# Threat model
 
-Referencia: [diseño de arquitectura](../architecture/2026-11-02-macuahuitl-architecture-design.md), §10–§12.
+Reference: [architecture design](../architecture/2026-11-02-macuahuitl-architecture-design.md), §10–§12.
 
-## Activos
+## Assets
 
-| Activo | Dónde vive | Impacto si se filtra |
+| Asset | Where it lives | Impact if leaked |
 |---|---|---|
-| Credenciales de equipos | `vault.mcv` cifrado; en claro solo en memoria durante la autenticación | Acceso administrativo a la red del cliente |
-| DEK (llave de datos) | Memoria bloqueada del núcleo mientras la bóveda está abierta o armada | Descifra todas las credenciales |
-| Contraseña maestra | Solo en memoria durante `Unlock`, `Create` y `ChangeMasterPassword` | Igual que la DEK |
-| Outputs | Carpeta elegida por el ingeniero, con o sin enmascarado | Configuración y secretos del cliente si el enmascarado está apagado |
-| Log de auditoría | SQLite local | Pérdida de trazabilidad |
+| Device credentials | Encrypted `vault.mcv`; plaintext only in memory during authentication | Administrative access to the customer's network |
+| DEK (data key) | Locked core memory while the vault is open or armed | Decrypts all credentials |
+| Master password | Only in memory during `Unlock`, `Create` and `ChangeMasterPassword` | Same as the DEK |
+| Outputs | Folder chosen by the engineer, with or without masking | Customer configuration and secrets if masking is off |
+| Audit log | Local SQLite | Loss of traceability |
 
-## Actores
+## Actors
 
-| Actor | Capacidad supuesta |
+| Actor | Assumed capability |
 |---|---|
-| Ladrón de la laptop | Acceso al disco apagado |
-| Malware con el UID de otro usuario | Puede intentar conectarse al socket o leer archivos |
-| Malware con el UID del ingeniero | Lo mismo que el ingeniero mientras está activo |
-| Intermediario en la red | Intercepta o suplanta SSH/HTTPS hacia los equipos |
-| Dependencia comprometida | Código malicioso en una librería |
-| Auditor externo | Lee el código, compila y observa la ejecución |
+| Laptop thief | Access to the powered-off disk |
+| Malware running as another user's UID | May try to connect to the socket or read files |
+| Malware running as the engineer's UID | Same as the engineer while the engineer is active |
+| Man in the middle | Intercepts or spoofs SSH/HTTPS to devices |
+| Compromised dependency | Malicious code in a library |
+| External auditor | Reads the code, builds it and observes execution |
 
-## Amenazas y mitigaciones
+## Threats and mitigations
 
-| Amenaza | Mitigación |
+| Threat | Mitigation |
 |---|---|
-| Robo de disco | Bóveda cifrada con Argon2id + AES-256-GCM; la DEK nunca toca disco en claro |
-| Fuerza bruta de la contraseña maestra | Argon2id calibrado a ~1 s, 256 MiB de memoria |
-| Alteración del archivo de bóveda | AES-GCM con datos asociados (ID de bóveda, ID de entrada, versión) |
-| Otro usuario local usa el socket | Permisos 0600 y verificación `SO_PEERCRED` del UID |
-| Volcado de memoria del núcleo | `PR_SET_DUMPABLE=0`, `RLIMIT_CORE=0` |
-| Secreto en un log por accidente | Tipo `Secret` con redacción en todos los formateadores; prueba de no-filtración con contraseña marcador |
-| Conexión a destino no autorizado | `noegress` en CI, `EgressGuard` en tiempo de ejecución, sin telemetría ni actualizaciones |
-| Suplantación SSH | Confianza en el primer uso con confirmación; llave cambiada bloquea por defecto |
-| Herramienta externa usada para exfiltrar | Argumentos validados, sin shell, sin opciones que lean destinos de archivos o scripts; todo en auditoría |
-| Dependencia comprometida | `govulncheck` en CI, SBOM, versiones fijadas en `go.sum`, compilación reproducible |
-| Comando de configuración en una recolección | Lista de denegación por plataforma en `internal/playbook` |
+| Disk theft | Vault encrypted with Argon2id + AES-256-GCM; the DEK never touches disk in plaintext |
+| Brute force of the master password | Argon2id calibrated to ~1 s, 256 MiB of memory |
+| Tampering with the vault file | AES-GCM with associated data (vault ID, entry ID, version) |
+| Another local user uses the socket | 0600 permissions and `SO_PEERCRED` UID check |
+| Core memory dump | `PR_SET_DUMPABLE=0`, `RLIMIT_CORE=0` |
+| Secret in a log by accident | `Secret` type with redaction in every formatter; no-leak test with a marker password |
+| Connection to an unauthorized destination | `noegress` in CI, `EgressGuard` at runtime, no telemetry or updates |
+| SSH spoofing | Trust on first use with confirmation; a changed key blocks by default |
+| External tool used to exfiltrate | Validated arguments, no shell, no options that read destinations from files or scripts; everything in the audit log |
+| Compromised dependency | `govulncheck` in CI, SBOM, versions pinned in `go.sum`, reproducible build |
+| Configuration command in a collection | Per-platform denylist in `internal/playbook` |
 
-## Límites declarados
+## Declared limits
 
-Estas son las cosas que MACUAHUITL **no** garantiza. Se declaran para que nadie las suponga.
+These are the things MACUAHUITL does **not** guarantee. They are declared so that nobody assumes them.
 
-1. **Copia de la contraseña en `x/crypto/ssh`.** La librería SSH recibe la contraseña como `string` de Go, que no se puede borrar. Se crea en el momento de enviarla, una sola vez por conexión, y vive hasta que el recolector de basura la libera. Una llave SSH privada, si se usa, queda parseada en memoria normal mientras dure la sesión.
-2. **Swap e hibernación.** El núcleo intenta `mlockall`, pero si falla, el sistema operativo podría escribir memoria con secretos a swap o a la imagen de hibernación. El núcleo avisa si hay swap sin cifrar o hibernación activa.
-3. **Malware con el UID del ingeniero.** Mientras la bóveda está abierta o armada, un proceso con el mismo usuario puede depurar el núcleo o usar el socket. Ninguna aplicación de usuario puede defenderse de su propio usuario.
-4. **Reescritura local del log de auditoría.** La cadena de hashes detecta daños accidentales. Quien controle el usuario puede reescribirla entera. El ancla en cada `manifest.json` protege lo que ya se entregó a terceros.
-5. **Casilla "aceptar llaves de host cambiadas".** Si el ingeniero la marca en un trabajo, un intermediario podría recibir la credencial. Cada aceptación queda en auditoría y en el manifest.
-6. **Enmascarado apagado.** Si el ingeniero apaga el enmascarado, los outputs contienen los secretos de los equipos.
-7. **DEK en memoria durante ventanas armadas.** Hasta 96 h con la DEK en memoria del núcleo.
-8. **Análisis estático de red.** `noegress` revisa los imports del código propio, no el de las dependencias ni llamadas como `os.StartProcess`. Una dependencia maliciosa podría abrir conexiones. Mitigación: dependencias mínimas, `govulncheck`, SBOM y la observación en ejecución de la guía de auditoría.
-9. **Borrado o reversión de entradas de la bóveda.** Quien tenga acceso al disco puede borrar una entrada o devolverla a su versión de `vault.mcv.bak` sin que se detecte. No puede leerla ni moverla de posición.
-10. **Llave AES expandida en memoria normal.** `crypto/aes` copia la llave a su propia estructura (rondas expandidas y tabla GHASH) en memoria del recolector de basura, que no se bloquea ni se puede borrar. Aplica a la KEK durante cada derivación y a la DEK mientras la bóveda está abierta o armada. Mitigación: una sola expansión de la DEK por vida de la DEK (no una por operación), `PR_SET_DUMPABLE=0` y los límites 2 y 3.
+1. **Password copy in `x/crypto/ssh`.** The SSH library receives the password as a Go `string`, which cannot be erased. It is created at the moment it is sent, once per connection, and lives until the garbage collector frees it. A private SSH key, if used, stays parsed in normal memory for the length of the session.
+2. **Swap and hibernation.** The core tries `mlockall`, but if it fails, the operating system could write memory containing secrets to swap or to the hibernation image. The core warns if unencrypted swap or hibernation is active.
+3. **Malware running as the engineer's UID.** While the vault is open or armed, a process of the same user can debug the core or use the socket. No user application can defend itself from its own user.
+4. **Local rewrite of the audit log.** The hash chain detects accidental damage. Whoever controls the user can rewrite the whole chain. The anchor in each `manifest.json` protects what has already been delivered to third parties.
+5. **"Accept changed host keys" checkbox.** If the engineer ticks it on a job, a man in the middle could receive the credential. Each acceptance is recorded in the audit log and in the manifest.
+6. **Masking off.** If the engineer turns masking off, the outputs contain the devices' secrets.
+7. **DEK in memory during armed windows.** Up to 96 h with the DEK in core memory.
+8. **Static network analysis.** `noegress` checks the imports of our own code, not those of dependencies, nor calls such as `os.StartProcess`. A malicious dependency could open connections. Mitigation: minimal dependencies, `govulncheck`, SBOM and the runtime observation in the audit guide.
+9. **Deletion or rollback of vault entries.** Whoever has disk access can delete an entry or revert it to its `vault.mcv.bak` version without detection. They cannot read it or move it to another position.
+10. **Expanded AES key in normal memory.** `crypto/aes` copies the key into its own structure (expanded rounds and GHASH table) in garbage-collected memory, which is not locked and cannot be erased. It applies to the KEK during each derivation and to the DEK while the vault is open or armed. Mitigation: a single expansion of the DEK per DEK lifetime (not one per operation), `PR_SET_DUMPABLE=0` and limits 2 and 3.

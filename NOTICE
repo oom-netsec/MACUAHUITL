@@ -2,7 +2,7 @@ MACUAHUITL
 Copyright 2026 Os Ordonez
 
 Licenciado bajo la Licencia Apache, versión 2.0 (archivo LICENSE).
-"MACUAHUITL" y su ícono son marcas de Os Ordonez (archivo MARCA.md).
+"MACUAHUITL" y su ícono son marcas de Os Ordonez (archivo TRADEMARK.md).
 
 Los módulos Go compilados en los binarios (Wails, gRPC, protobuf, golang.org/x, gopacket, miekg/dns,
 SQLite de modernc y demás) traen su licencia y sus avisos completos en THIRD_PARTY_LICENSES.

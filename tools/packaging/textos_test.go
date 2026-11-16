@@ -102,7 +102,7 @@ func TestReadmeCuentaReglas(t *testing.T) {
 	for _, c := range []struct{ file, re string }{
 		{"README.md", `\b(\d+) analysis rules\b`},
 		{"README.md", `\b(\d+) rules over\b`},
-		{filepath.Join("docs", "roadmap.md"), `\b(\d+) reglas\b`},
+		{filepath.Join("docs", "roadmap.md"), `\b(\d+) analysis rules\b`},
 	} {
 		ms := regexp.MustCompile(c.re).FindAllStringSubmatch(leer(t, c.file), -1)
 		if len(ms) == 0 {
@@ -121,5 +121,28 @@ func TestReadmeCuentaReglas(t *testing.T) {
 func TestPostinstallSinDaemonReloadGlobal(t *testing.T) {
 	if strings.Contains(leer(t, "deploy", "packaging", "postinstall.sh"), "daemon-reload") {
 		t.Error("postinstall.sh llama a daemon-reload: no es válido con --global")
+	}
+}
+
+// Los documentos públicos que ve quien llega al repo van en inglés (lengua canónica); lo interno (docs/adr, docs/plans,
+// docs/architecture, docs/backlog) sigue en español.
+// shortcut: busca letras del español, así que una frase sin tildes pasa; basta para que no vuelva un documento entero.
+func TestDocsPublicosEnIngles(t *testing.T) {
+	docs := []string{"README.md", "SECURITY.md", "CONTRIBUTING.md", "TRADEMARK.md", filepath.Join("docs", "roadmap.md")}
+	sec, _ := filepath.Glob(filepath.Join(repoRoot(), "docs", "security", "*.md"))
+	if len(sec) == 0 {
+		t.Fatal("no encontré docs/security/*.md")
+	}
+	for _, f := range sec {
+		rel, _ := filepath.Rel(repoRoot(), f)
+		docs = append(docs, rel)
+	}
+	espanol := regexp.MustCompile(`[áéíóúñÁÉÍÓÚÑ¿¡]`)
+	for _, d := range docs {
+		for i, l := range strings.Split(leer(t, d), "\n") {
+			if m := espanol.FindString(l); m != "" {
+				t.Errorf("%s:%d lleva texto en español (%q): %s", d, i+1, m, l)
+			}
+		}
 	}
 }

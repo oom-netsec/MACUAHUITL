@@ -332,7 +332,7 @@ task ui-build   # desktop app
 - [Architecture design](docs/architecture/2026-11-02-macuahuitl-architecture-design.md) · [Decision records](docs/adr/)
 - [Threat model](docs/security/THREAT_MODEL.md) · [Cryptography](docs/security/CRYPTO.md) · [Auditor's guide](docs/security/AUDIT_GUIDE.md)
 
-Design documents are currently written in Spanish.
+Design records (ADRs and plans) are written in Spanish.
 
 ## Contributing
 
@@ -342,4 +342,4 @@ Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 [Apache-2.0](LICENSE). Use, modify and distribute MACUAHUITL, commercially too, keeping the [NOTICE](NOTICE).
 
-The name **MACUAHUITL** and its icon are not covered by the license: a modified version must use a different name. See [MARCA.md](MARCA.md).
+The name **MACUAHUITL** and its icon are not covered by the license: a modified version must use a different name. See [TRADEMARK.md](TRADEMARK.md).

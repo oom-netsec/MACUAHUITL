@@ -1,46 +1,46 @@
-# Guía para auditores
+# Auditor guide
 
-Cómo verificar cada promesa de [SECURITY.md](../../SECURITY.md) sin confiar en nuestra palabra. Los comandos marcados *(Fase N)* existirán al terminar esa fase.
+How to verify each promise in [SECURITY.md](../../SECURITY.md) without taking our word for it. Commands marked *(Phase N)* will exist when that phase is finished.
 
-## 1. Ninguna credencial en claro a disco
+## 1. No plaintext credentials on disk
 
-- Lee el formato en [CRYPTO.md](CRYPTO.md) y compáralo con `internal/vault`.
-- Corre la prueba de no-filtración *(Fase 1)*: `go test ./test/e2e/ -run TestNoLeak`. Crea una bóveda con una contraseña marcador aleatoria, corre un Patrol completo contra el simulador y busca el marcador en bruto, en base64 y en hex en todos los archivos que tocó la app.
-- Por tu cuenta: crea una credencial con un valor único y busca ese valor con `grep -r` en `~/.local/share/macuahuitl`, `~/.local/state/macuahuitl`, `~/.config/macuahuitl` y la carpeta de outputs.
+- Read the format in [CRYPTO.md](CRYPTO.md) and compare it with `internal/vault`.
+- Run the no-leak test *(Phase 1)*: `go test ./test/e2e/ -run TestNoLeak`. It creates a vault with a random marker password, runs a full Patrol against the simulator and searches for the marker in raw, base64 and hex form in every file the app touched.
+- On your own: create a credential with a unique value and search for that value with `grep -r` in `~/.local/share/macuahuitl`, `~/.local/state/macuahuitl`, `~/.config/macuahuitl` and the outputs folder.
 
-## 2. Ninguna credencial en logs, auditoría, outputs ni volcados
+## 2. No credentials in logs, audit, outputs or dumps
 
-- Revisa que todo secreto use el tipo `Secret` de `internal/secret` y que sus métodos `String`, `Format`, `MarshalJSON` y `LogValue` devuelvan `[REDACTED]`.
-- La misma prueba de no-filtración cubre logs, SQLite y outputs.
-- Volcados: con el núcleo corriendo, `prlimit --pid $(pidof macuahuitld) --core` debe mostrar `0`. Además `stat -c %U /proc/$(pidof macuahuitld)/mem` debe mostrar `root`: es el efecto de `PR_SET_DUMPABLE=0`, que impide a otros procesos del usuario leer su memoria sin ptrace.
+- Check that every secret uses the `Secret` type from `internal/secret` and that its `String`, `Format`, `MarshalJSON` and `LogValue` methods return `[REDACTED]`.
+- The same no-leak test covers logs, SQLite and outputs.
+- Dumps: with the core running, `prlimit --pid $(pidof macuahuitld) --core` must show `0`. Also `stat -c %U /proc/$(pidof macuahuitld)/mem` must show `root`: this is the effect of `PR_SET_DUMPABLE=0`, which stops other processes of the same user from reading its memory without ptrace.
 
-## 3. Solo destinos escritos por el ingeniero
+## 3. Only destinations typed by the engineer
 
-- **Estático:** `go run ./tools/noegress/cmd/noegress ./...` debe salir con código 0. Prohíbe fuera de los paquetes permitidos: la familia `net/` (salvo `net/netip`, `net/url` y `net/mail`), `golang.org/x/net/...`, `crypto/tls`, `log/syslog`, `syscall`, `golang.org/x/sys/unix`, `os/exec`, cgo (`import "C"`), `golang.org/x/crypto/ssh` y la raíz de gRPC.
-- **Paquetes permitidos:** `internal/transport`, `internal/diag` e `internal/ipc` tienen la red del producto; léelos completos. `internal/sys` usa `golang.org/x/sys/unix` solo para `prctl`, `setrlimit` y `mlockall`; léelo completo, es corto. `gen/` es código generado de gRPC que también va en el binario. `test/simulator` y `tools/` no van en el binario.
-- **Límites del análisis estático:** no ve `os.StartProcess`, ni el código de dependencias externas, que se revisan con `go list -deps ./cmd/...` y `govulncheck`. Una verificación transitiva de dependencias llega en la Fase 6.
-- **Sin telemetría:** `grep -rn "http" --include=*.go internal/ cmd/` no debe mostrar URLs fijas.
-- **En ejecución *(Fase 1)*:** corre un trabajo y observa con `ss -tnp | grep macuahuitld` o con un firewall de salida. Solo deben aparecer los destinos del trabajo. Los intentos rechazados por `EgressGuard` aparecen en la auditoría.
-- **Herramientas externas *(Fase 4)*:** cada ejecución de nmap, ping, traceroute, iperf3 o dumpcap queda en la auditoría con su línea de argumentos completa.
+- **Static:** `go run ./tools/noegress/cmd/noegress ./...` must exit with code 0. Outside the allowed packages it forbids: the `net/` family (except `net/netip`, `net/url` and `net/mail`), `golang.org/x/net/...`, `crypto/tls`, `log/syslog`, `syscall`, `golang.org/x/sys/unix`, `os/exec`, cgo (`import "C"`), `golang.org/x/crypto/ssh` and the gRPC root.
+- **Allowed packages:** `internal/transport`, `internal/diag` and `internal/ipc` hold the product's networking; read them in full. `internal/sys` uses `golang.org/x/sys/unix` only for `prctl`, `setrlimit` and `mlockall`; read it in full, it is short. `gen/` is generated gRPC code that also ships in the binary. `test/simulator` and `tools/` do not ship in the binary.
+- **Limits of static analysis:** it does not see `os.StartProcess`, nor the code of external dependencies, which are reviewed with `go list -deps ./cmd/...` and `govulncheck`. A transitive dependency check arrives in Phase 6.
+- **No telemetry:** `grep -rn "http" --include=*.go internal/ cmd/` must not show hardcoded URLs.
+- **At runtime *(Phase 1)*:** run a job and watch with `ss -tnp | grep macuahuitld` or with an egress firewall. Only the job's destinations must appear. Attempts rejected by `EgressGuard` appear in the audit log.
+- **External tools *(Phase 4)*:** every run of nmap, ping, traceroute, iperf3 or dumpcap is recorded in the audit log with its full argument line.
 
-## 4. La contraseña maestra nunca se guarda
+## 4. The master password is never stored
 
-- En [CRYPTO.md](CRYPTO.md) no hay ningún campo que la contenga ni un hash de ella. Solo la sal y los parámetros de Argon2id.
-- La DEK cifrada es la única forma de comprobar que la contraseña es correcta: si GCM falla, la contraseña es incorrecta.
+- In [CRYPTO.md](CRYPTO.md) there is no field that contains it, nor a hash of it. Only the salt and the Argon2id parameters.
+- The encrypted DEK is the only way to check that the password is correct: if GCM fails, the password is wrong.
 
-## 5. El binario corresponde al código
+## 5. The binary matches the code
 
-Cada release en GitHub publica `SHA256SUMS`, `BUILD-INFO.txt` (versión de Go, tag y commit), un SBOM en SPDX y los paquetes. Para reproducir el núcleo y la CLI:
+Each release on GitHub publishes `SHA256SUMS`, `BUILD-INFO.txt` (Go version, tag and commit), an SPDX SBOM and the packages. To reproduce the core and the CLI:
 
 ```sh
 git checkout vX.Y.Z
 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -buildid= -X github.com/oom-netsec/MACUAHUITL/internal/version.Version=vX.Y.Z" -o verif/ ./cmd/macuahuitld ./cmd/mctl
-sha256sum verif/macuahuitld verif/mctl   # deben coincidir con SHA256SUMS del release
+sha256sum verif/macuahuitld verif/mctl   # must match SHA256SUMS in the release
 ```
 
-Hace falta la misma versión de Go que dice `BUILD-INFO.txt`. La UI (`macuahuitl`) se compila con cgo contra WebKitGTK y no es reproducible byte a byte; su suma se publica igual. CI compila el núcleo dos veces en cada push y falla si las sumas difieren.
+You need the same Go version that `BUILD-INFO.txt` states. The UI (`macuahuitl`) is built with cgo against WebKitGTK and is not byte-for-byte reproducible; its checksum is still published. CI builds the core twice on every push and fails if the checksums differ.
 
-## 6. Integridad del log de auditoría
+## 6. Audit log integrity
 
-- *(Fase 1)* `mctl audit verify` recorre la cadena y reporta el primer registro roto.
-- Cada `manifest.json` entregado incluye el hash de cabeza de la cadena en ese momento. Compara ese valor con el registro correspondiente del log.
+- *(Phase 1)* `mctl audit verify` walks the chain and reports the first broken record.
+- Every delivered `manifest.json` includes the head hash of the chain at that moment. Compare that value with the matching record in the log.
