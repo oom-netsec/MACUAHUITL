@@ -1,6 +1,7 @@
 package mask_test
 
 import (
+	"fmt"
 	"github.com/oom-netsec/MACUAHUITL/internal/mask/internal/ref065"
 	"regexp"
 	"strings"
@@ -82,20 +83,50 @@ func TestMarcaRecorteCierraLaTablaSNMP(t *testing.T) {
 	}
 }
 
-// Con la marca entre cada par de entradas de la propiedad diferencial, la salida nueva nunca muestra más semillas que
-// ref065 con la marca ni que la nueva sin ella.
-func TestMarcaRecorteEntreParesNuncaMuestraMas(t *testing.T) {
+// nuncaMas: la salida nueva de con (el texto con marca) no muestra más semillas que ref065 con la marca ni que ref065 sin ella.
+func nuncaMas(plat, con, sin string) (bool, string) {
+	n, _ := mask.Apply(plat, con)
+	o, _ := ref065.Apply(plat, con)
+	s, _ := ref065.Apply(plat, sin)
+	return visibles(n) <= visibles(o) && visibles(n) <= visibles(s), fmt.Sprintf("\n nueva %q\n ref con %q\n ref sin %q", n, o, s)
+}
+
+// La marca dentro de una tabla isakmp: la fila siguiente se tapa (ref065 cuenta la marca como fila y la tabla sigue abierta).
+func TestMarcaRecorteEnTablaIsakmp(t *testing.T) {
+	in := "Keyring      Hostname/Address      Preshared Key\n\ndefault      10.1.1.1              Zq00005\n" + marcaRecorte + "\ndefault      10.1.1.2              Zq00006\n"
+	for _, plat := range []string{"ios-xe", "nx-os", "asa"} {
+		n, _ := mask.Apply(plat, in)
+		if visibles(n) != 0 {
+			t.Errorf("%s: %q", plat, n)
+		}
+	}
+}
+
+// Con la marca entre cada par de entradas de la propiedad diferencial y dentro de cada tabla SNMP/isakmp, nunca se ve
+// más que con ref065 con la marca ni que con ref065 sin ella.
+func TestMarcaRecorteNuncaMuestraMas(t *testing.T) {
 	cmds, plats := casosDif()
+	heads := []struct{ head, fila string }{
+		{"Community            Group / Access      context    acl_filter\n---------            --------------      -------    ----------\n", "SecretComm           network-admin\n"},
+		{"Host                            Port Version  Level  Type   SecName\n-------------------------------------------------------------------\n", "10.1.1.1                        162  v2c      noauth trap   Zq00007\n"},
+		{"Keyring      Hostname/Address      Preshared Key\n\n", "default      10.1.1.1              Zq00005\n"},
+	}
 	malos := 0
-	for i := 0; i+1 < len(cmds); i++ {
-		con, sin := cmds[i]+"\n"+marcaRecorte+"\n"+cmds[i+1]+"\n", cmds[i]+"\n"+cmds[i+1]+"\n"
-		n, _ := mask.Apply(plats[i], con)
-		o, _ := ref065.Apply(plats[i], con)
-		s, _ := mask.Apply(plats[i], sin)
-		if visibles(n) > visibles(o) || visibles(n) > visibles(s) {
+	check := func(plat, con, sin string) {
+		if ok, det := nuncaMas(plat, con, sin); !ok {
 			if malos++; malos <= 10 {
-				t.Errorf("(%s) %q\n nueva %q\n ref   %q\n sin   %q", plats[i], con, n, o, s)
+				t.Errorf("(%s) %q%s", plat, con, det)
 			}
 		}
+	}
+	for i := 0; i+1 < len(cmds); i++ {
+		check(plats[i], cmds[i]+"\n"+marcaRecorte+"\n"+cmds[i+1]+"\n", cmds[i]+"\n"+cmds[i+1]+"\n")
+		h := heads[i%len(heads)]
+		for _, plat := range []string{plats[i], "nx-os", "ios-xe", "asa"} {
+			check(plat, h.head+h.fila+marcaRecorte+"\n"+cmds[i]+"\n"+h.fila+cmds[i+1]+"\n", h.head+h.fila+cmds[i]+"\n"+h.fila+cmds[i+1]+"\n")
+		}
+	}
+	if malos > 10 {
+		t.Errorf("%d violaciones en total", malos)
 	}
 }
