@@ -105,6 +105,7 @@ type driver struct {
 	// seguidos. confirmed/incomplete los deja untilIdle para Run.
 	sentinel, confirmed, incomplete bool
 	dropped                         bool // add descartó bytes del medio por maxOutput
+	headLen, markLen, omitted       int  // con dropped: bytes de la cabeza, del separador y omitidos
 }
 
 // fail guarda el primer error y suelta al lector.
@@ -440,9 +441,19 @@ func (d *driver) add(c []byte) {
 		return
 	}
 	d.dropped = true
-	head := min(len(d.buf), max(maxOutput-outTail, 0))
-	win := append(append([]byte(nil), d.buf[head:]...), c...)
-	d.buf = append(d.buf[:head], win[max(len(win)-outTail, 0):]...)
+	// Cabeza | separador | cola: la cola (los últimos outTail bytes) empieza en línea nueva y dice cuántos bytes se omitieron entre las dos.
+	head, tail := min(len(d.buf), max(maxOutput-outTail, 0)), []byte(nil)
+	if d.omitted > 0 && len(d.buf) >= d.headLen+d.markLen { // ya recortado antes: cabeza y cola de siempre
+		head, tail = d.headLen, d.buf[d.headLen+d.markLen:]
+	} else {
+		d.omitted, tail = 0, d.buf[head:]
+	}
+	win := append(append([]byte(nil), tail...), c...)
+	cut := max(len(win)-outTail, 0)
+	d.omitted += cut
+	mark := fmt.Appendf(nil, "\n[… salida recortada: %d bytes omitidos …]\n", d.omitted)
+	d.headLen, d.markLen = head, len(mark)
+	d.buf = append(append(d.buf[:head], mark...), win[cut:]...)
 }
 
 // aireGuard corta el comando si el final de la salida es algo que el driver nunca contesta: un «User:»/«Password:»

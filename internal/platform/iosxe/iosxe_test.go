@@ -3,6 +3,7 @@ package iosxe
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/netip"
 	"os"
@@ -487,6 +488,27 @@ func TestSalidaSinSaltosGrandeEsLineal(t *testing.T) {
 	a, b := best(small), best(big)
 	if b > 6*a {
 		t.Fatalf("4 veces más bytes sin salto tardó %v contra %v: no es lineal", b, a)
+	}
+}
+
+// Al recortar, la cola no se pega a la cabeza: entre las dos hay una línea propia que dice cuántos bytes se omitieron.
+func TestSalidaRecortadaTraeSeparador(t *testing.T) {
+	old := maxOutput
+	maxOutput = 100 << 10
+	defer func() { maxOutput = old }()
+	n := 2 << 20
+	d := feed(n, "SW#")
+	text, err := d.untilIdle(context.Background(), time.Second, d.atPrompt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf("\n[… salida recortada: %d bytes omitidos …]\n", n+len("\r\nSW#")-maxOutput)
+	if strings.Count(text, "[… salida recortada:") != 1 || !strings.Contains(text, want) {
+		i := strings.Index(text, "[…")
+		t.Fatalf("falta el separador %q (en %d: %.80q)", want, i, text[max(i, 0):])
+	}
+	if !strings.HasSuffix(text, "SW#") {
+		t.Errorf("la cola debe conservar el prompt")
 	}
 }
 
