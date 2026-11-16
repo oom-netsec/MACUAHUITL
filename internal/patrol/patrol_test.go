@@ -22,6 +22,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/store"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 	"github.com/oom-netsec/MACUAHUITL/playbooks"
@@ -114,8 +115,11 @@ func (e *env) trust(t *testing.T) {
 func TestValidateRejects(t *testing.T) {
 	e := newEnv(t, simulator.Config{})
 	ro := t.TempDir()
-	os.Chmod(ro, 0o500)
-	t.Cleanup(func() { os.Chmod(ro, 0o700) })
+	restore, err := sys.ReadOnlyDir(ro) // 0500 en Linux; en Windows una ACE que niega crear
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(restore)
 	cases := map[string]func(*Spec){
 		"targets":                func(s *Spec) { s.Targets = nil },
 		"credential":             func(s *Spec) { s.DefaultCredentialID = "" },

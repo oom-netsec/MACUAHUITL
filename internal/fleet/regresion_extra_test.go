@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -129,7 +130,9 @@ func extraCases(t *testing.T, add func(name string, v any, text string)) {
 	add("x-health-half", &rh, fh.HealthText(rh))
 
 	// carga: carpeta ilegible y topes
-	if os.Geteuid() != 0 {
+	// chmod 0 no quita el acceso en Windows y el golden trae el texto de Linux («permission denied», rutas con /): ahí el
+	// escenario se omite (ADR 0012, c). La DACL vacía lo reproduciría, pero no el texto del error.
+	if os.Geteuid() != 0 && runtime.GOOS != "windows" {
 		d := t.TempDir()
 		put(t, d, "trabajo_1/SW1_10.0.0.1/r001.txt", errDis)
 		blocked := filepath.Join(d, "trabajo_1", "bloqueada")

@@ -16,6 +16,7 @@ import (
 	"github.com/gosnmp/gosnmp"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 func TestTrapTextIsOneLine(t *testing.T) {
@@ -161,7 +162,7 @@ func TestTrapsSinkFormatsRotationAndRetention(t *testing.T) {
 			return strings.HasPrefix(b, `{"Time":`) && strings.Contains(b, `"Name":"linkDown"`)
 		},
 	} {
-		dir := filepath.Join(t.TempDir(), "traps")
+		dir := filepath.Join(systest.TempDir(t), "traps")
 		addr, stop := listenWith(t, TrapConfig{Sink: &ingest.Sink{Dir: dir, Template: "traps_{fecha}_{hora}", MaxFiles: 5, Format: format}, OnTrap: func(Trap) {}})
 		sendFrom(t, addr, "127.0.0.1", 1)
 		time.Sleep(300 * time.Millisecond)
@@ -179,11 +180,9 @@ func TestTrapsSinkFormatsRotationAndRetention(t *testing.T) {
 		if b, _ := os.ReadFile(fs[0]); !check(string(b)) {
 			t.Errorf("%s: %q", format, b)
 		}
-		if st, _ := os.Stat(fs[0]); st.Mode().Perm() != 0o600 {
-			t.Errorf("%s: permisos %v", format, st.Mode())
-		}
+		systest.Inherited(t, fs[0], 0o600)
 	}
-	dir := filepath.Join(t.TempDir(), "traps")
+	dir := filepath.Join(systest.TempDir(t), "traps")
 	os.MkdirAll(dir, 0o700)
 	os.WriteFile(filepath.Join(dir, "notas.log"), []byte("mío"), 0o600)
 	var clock atomic.Int64
@@ -214,7 +213,7 @@ func TestTrapsSinkFormatsRotationAndRetention(t *testing.T) {
 
 // Si el archivo falla (el disco «desaparece»), la escucha termina con el error en vez de seguir en silencio.
 func TestTrapsStopsWhenSinkFails(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "traps")
+	dir := filepath.Join(systest.TempDir(t), "traps")
 	ready := make(chan string, 1)
 	done := make(chan error, 1)
 	go func() {
@@ -274,7 +273,7 @@ func TestTrapV3UndecodedNeverKeepsPacket(t *testing.T) {
 		v3   *Target
 	}{{"sin credencial", nil}, {"usuario distinto", &Target{User: "noc", AuthProto: "SHA", AuthPass: "authpass123", PrivProto: "AES", PrivPass: "privpass123"}}} {
 		for _, format := range []string{"texto", "crudo", "jsonl"} {
-			dir := filepath.Join(t.TempDir(), "traps")
+			dir := filepath.Join(systest.TempDir(t), "traps")
 			var out bytes.Buffer
 			var mu sync.Mutex
 			sink := &trapSink{}

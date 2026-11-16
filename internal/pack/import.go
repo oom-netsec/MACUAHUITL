@@ -163,10 +163,7 @@ func (r *PlaybookResult) Publish(dir string) error {
 		r.published = append(r.published, f.final)
 		root.Remove(f.tmp) // si falla queda un temporal único, que el barrido de writePlaybooks retira con el tiempo
 	}
-	if d, err := root.Open("."); err == nil { // que los archivos nuevos sobrevivan a una caída
-		d.Sync()
-		d.Close()
-	}
+	sys.SyncDir(root.Name()) // que los archivos nuevos sobrevivan a una caída (el error se ignora, como antes)
 	return nil
 }
 
@@ -310,9 +307,6 @@ func writePlaybooks(dir string, files map[string][]byte) ([]staged, error) {
 			return fail(err, name)
 		}
 	}
-	if d, err := root.Open("."); err == nil { // que los archivos nuevos sobrevivan a una caída
-		d.Sync()
-		d.Close()
-	}
+	sys.SyncDir(root.Name()) // que los archivos nuevos sobrevivan a una caída (el error se ignora, como antes)
 	return done, nil
 }

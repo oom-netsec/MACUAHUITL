@@ -13,6 +13,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 func newKey(t *testing.T) ssh.PublicKey {
@@ -34,7 +35,7 @@ const hp = "10.0.0.1:22"
 
 func openKH(t *testing.T) (*KnownHosts, string) {
 	t.Helper()
-	p := filepath.Join(t.TempDir(), "known_hosts")
+	p := filepath.Join(systest.TempDir(t), "known_hosts")
 	k, err := OpenKnownHosts(p)
 	if err != nil {
 		t.Fatal(err)
@@ -109,11 +110,5 @@ func TestChangedAcceptedWhenAllowed(t *testing.T) {
 
 func TestKnownHostsPerms(t *testing.T) {
 	_, p := openKH(t)
-	fi, err := os.Stat(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fi.Mode().Perm() != 0o600 {
-		t.Fatalf("perm = %o", fi.Mode().Perm())
-	}
+	systest.Inherited(t, p, 0o600)
 }

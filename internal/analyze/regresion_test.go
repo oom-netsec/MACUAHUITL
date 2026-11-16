@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -195,7 +196,9 @@ func regCases(t *testing.T) (map[string]golden, map[string]any) {
 	stp := "VLAN0010 is executing the rstp compatible Spanning Tree protocol\n  Current root has priority 24586, address 0011.2233.4455\n  Number of topology changes 46 last change occurred 00:00:35 ago\n          from GigabitEthernet1/0/7\n"
 	zb := synth(t, map[string]map[string]string{"R1_10.0.0.1": {"r001_20261104-100000.txt": sec("2026-11-04T10:00:01Z", "show spanning-tree detail", stp)}, "": {"roto.zip": "esto no es un zip"}})
 	run("stp-zip", zb, Options{})
-	if os.Geteuid() != 0 {
+	// chmod 0 no quita el acceso en Windows y el golden trae el texto de Linux («permission denied», rutas con /): ahí el
+	// escenario se omite (ADR 0012, c). La DACL vacía lo reproduciría, pero no el texto del error.
+	if os.Geteuid() != 0 && runtime.GOOS != "windows" {
 		ub := t.TempDir()
 		os.MkdirAll(filepath.Join(ub, "R1_10.0.0.1"), 0o755)
 		os.WriteFile(filepath.Join(ub, "R1_10.0.0.1", "r001_20261104-100000.txt"), []byte(sec("2026-11-04T10:00:01Z", "show version", "x")), 0o600)
@@ -253,6 +256,9 @@ func TestRegresionEs(t *testing.T) {
 	var want map[string]golden
 	if err := json.Unmarshal(raw, &want); err != nil {
 		t.Fatal(err)
+	}
+	if runtime.GOOS == "windows" {
+		delete(want, "analyze-unreadable") // el escenario no corre en Windows
 	}
 	names := make([]string, 0, len(got))
 	for n := range got {

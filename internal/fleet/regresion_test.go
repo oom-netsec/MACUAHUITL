@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -132,6 +133,9 @@ func TestRegresionEs(t *testing.T) {
 	var want map[string]golden
 	if err := json.Unmarshal(raw, &want); err != nil {
 		t.Fatal(err)
+	}
+	if runtime.GOOS == "windows" {
+		delete(want, "x-load-unreadable") // el escenario no corre en Windows
 	}
 	names := make([]string, 0, len(got))
 	for n := range got {

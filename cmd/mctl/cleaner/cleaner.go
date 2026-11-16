@@ -9,6 +9,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 func clean(c *cli.Env, args []string) error {
@@ -52,7 +53,7 @@ func clean(c *cli.Env, args []string) error {
 
 // writeNew crea el archivo solo si no existe (O_EXCL tampoco sigue enlaces simbólicos): nunca pisa ni cambia permisos.
 func writeNew(path, text string) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := sys.OpenNewPrivate(path) // nace 0600 (en Windows, con la DACL protegida desde el CreateFile)
 	if err != nil {
 		return cli.ErrWrap("mctl.backup.write_out", err)
 	}

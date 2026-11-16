@@ -15,7 +15,7 @@ func TestMkfifoNoSoportadoEnWindows(t *testing.T) {
 	}
 }
 
-// Sin verificación por SID todavía (43a3): Owner falla cerrado.
+// Owner (uid) no tiene sentido en Windows y falla cerrado; el dueño por SID lo cubre PrivateDir.
 func TestOwnerFallaCerradoEnWindows(t *testing.T) {
 	fi, err := os.Stat(t.TempDir())
 	if err != nil {

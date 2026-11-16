@@ -209,7 +209,7 @@ func Download(ctx context.Context, r Request) (Result, error) {
 	ctx, cancel := context.WithTimeout(ctx, to)
 	defer cancel()
 	dst := filepath.Join(dir, name)
-	f, err := sys.OpenNewIn(root, name)
+	f, err := sys.OpenNewPrivateIn(root, name) // 0600; en Windows nace con la DACL protegida
 	if errors.Is(err, os.ErrExist) {
 		return res, i18n.New("xfer.err.exists", i18n.A("path", dst))
 	}

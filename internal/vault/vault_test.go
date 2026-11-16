@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 var testParams = Params{MemoryKiB: 8192, Iterations: 1, Threads: 1}
@@ -195,13 +196,7 @@ func TestFilePerms(t *testing.T) {
 	v, p := newVault(t)
 	v.Put(cred("a", "x", ""))
 	for _, f := range []string{p, p + ".bak"} {
-		fi, err := os.Stat(f)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if fi.Mode().Perm() != 0o600 {
-			t.Errorf("%s perm = %o", f, fi.Mode().Perm())
-		}
+		systest.Private(t, f, 0o600)
 	}
 }
 

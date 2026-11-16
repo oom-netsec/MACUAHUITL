@@ -493,14 +493,7 @@ func (s *Store) install(data []byte, allowUnsigned bool, allow func(ids []string
 // syncDir hace fsync de una carpeta para que el rename y los archivos nuevos sobrevivan a una caída.
 var syncDir = syncDirOS // variable para que las pruebas simulen un fallo
 
-func syncDirOS(d string) error {
-	f, err := os.Open(d)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return f.Sync()
-}
+func syncDirOS(d string) error { return sys.SyncDir(d) }
 
 func writeSync(path string, b []byte) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)

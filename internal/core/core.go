@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -32,6 +33,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 	scriptsvc "github.com/oom-netsec/MACUAHUITL/internal/service/scripts"
 	"github.com/oom-netsec/MACUAHUITL/internal/store"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 	"github.com/oom-netsec/MACUAHUITL/internal/version"
@@ -181,7 +183,12 @@ func New(p Paths, o Options) (*Core, error) {
 		}
 	}
 	for _, d := range []string{p.Config, p.Data, p.State} {
-		if err := os.MkdirAll(d, 0o700); err != nil {
+		if err := sys.MkdirPrivate(d); err != nil { // en Windows, DACL protegida que heredan los hijos; la UI pudo crearla antes
+			return nil, fmt.Errorf("core: %w", err)
+		}
+	}
+	if runtime.GOOS == "windows" && p.Outputs != "" { // la de fábrica vive en el perfil, fuera de Data: sus subcarpetas nacen después, perezosas, y heredan esta
+		if err := sys.MkdirPrivate(p.Outputs); err != nil {
 			return nil, fmt.Errorf("core: %w", err)
 		}
 	}

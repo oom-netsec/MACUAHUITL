@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 const frase = "frase del respaldo 1"
@@ -148,9 +149,7 @@ func TestWriteBackupArchivo(t *testing.T) {
 	if _, err := WriteBackup(v, dst, pw(frase), false); err != nil {
 		t.Fatal(err)
 	}
-	if fi, _ := os.Stat(dst); fi.Mode().Perm() != 0o600 {
-		t.Fatalf("modo %v", fi.Mode())
-	}
+	systest.Private(t, dst, 0o600) // ProtectNew del temporal: el rename conserva su DACL protegida
 	if es, _ := os.ReadDir(dir); len(es) != 1 {
 		t.Fatalf("quedaron restos: %v", es)
 	}

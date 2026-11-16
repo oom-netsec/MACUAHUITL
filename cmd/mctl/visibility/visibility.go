@@ -13,6 +13,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // topo build JOB|CARPETA [--pcap ARCHIVO] [--svg ARCHIVO] [--json]
@@ -50,7 +51,11 @@ func topoBuild(c *cli.Env, args []string) error {
 		return err
 	}
 	if svg != "" {
-		if err := os.WriteFile(svg, []byte(r.Svg), 0o600); err != nil {
+		err := os.WriteFile(svg, []byte(r.Svg), 0o600)
+		if err == nil {
+			err = sys.ProtectNew(svg) // el SVG no es secreto, pero el archivo se queda como los demás: solo el usuario
+		}
+		if err != nil {
 			return err
 		}
 	}

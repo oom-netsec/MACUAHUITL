@@ -16,6 +16,8 @@ import (
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 func sshDial(addr, user, pass string, legacyOnly bool) (*ssh.Client, error) {
@@ -88,10 +90,10 @@ func TestSFTPServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := os.ReadFile(filepath.Join(recv, "running-config"))
-	st, _ := os.Stat(filepath.Join(recv, "running-config"))
-	if !bytes.Equal(got, data) || st.Mode().Perm() != 0o600 {
-		t.Fatalf("recibido mal (%v)", st.Mode())
+	if !bytes.Equal(got, data) {
+		t.Fatal("recibido mal")
 	}
+	systest.Private(t, filepath.Join(recv, "running-config"), 0o600)
 	// Nombre con ruta y "..": cae como nombre base dentro de la carpeta.
 	w, err = cl.Create("/../../tmp/evil")
 	if err != nil {

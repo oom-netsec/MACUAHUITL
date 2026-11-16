@@ -13,6 +13,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 const runUsage = "backup run -d EQUIPO[:PUERTO]... --cred ID [--startup] [--keep N] [--every 24h --rounds N] [--secrets] [--accept HUELLA] [--exclude EQUIPO] [--timeout 10m] [--json]"
@@ -224,7 +225,7 @@ func export(c *cli.Env, args []string) error {
 		return nil
 	}
 	// O_EXCL: no pisa un archivo existente ni sigue un enlace simbólico.
-	f, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := sys.OpenNewPrivate(out) // nace 0600 (en Windows, con la DACL protegida desde el CreateFile)
 	if err != nil {
 		return cli.ErrWrap("mctl.backup.write_out", err)
 	}

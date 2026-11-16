@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 func main() {
@@ -77,7 +79,11 @@ func run(privPath, pubPath string) error {
 
 // escribe crea el archivo (nunca pisa) y lo borra si no queda completo en disco.
 func escribe(path string, key []byte, perm os.FileMode) (err error) {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
+	open := func() (*os.File, error) { return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm) }
+	if perm == 0o600 { // la privada nace con la DACL protegida en Windows
+		open = func() (*os.File, error) { return sys.OpenNewPrivate(path) }
+	}
+	f, err := open()
 	if err != nil {
 		return err
 	}

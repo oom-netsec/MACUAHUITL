@@ -8,6 +8,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // ---- Seguridad (RADIUS, TACACS+, PKI de laboratorio, IKE) ----
@@ -178,7 +179,7 @@ func (b *Bridge) SecPkiExport(d ExportDTO) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		f, err := os.OpenFile(d.Path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		f, err := sys.OpenNewPrivate(d.Path) // nace 0600 (en Windows, con la DACL protegida desde el CreateFile)
 		if err != nil {
 			return "", err
 		}

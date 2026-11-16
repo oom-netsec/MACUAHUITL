@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -189,8 +190,8 @@ func TestEscenariosCubrenTodasLasClavesDeAnalisis(t *testing.T) {
 		"analyze.warn.incomplete": "exige una salida marcada incompleta; la cubre TestSeriesForAvisaYOmiteIncompletas",
 		"analyze.warn.pcap":       "lo arma el servicio con los avisos de la captura (la regresión por RPC lo cubre)",
 	}
-	if os.Geteuid() == 0 {
-		sinDatos["analyze.warn.system"] = "exige un archivo ilegible, y como root todo se lee"
+	if os.Geteuid() == 0 || runtime.GOOS == "windows" {
+		sinDatos["analyze.warn.system"] = "exige un archivo ilegible: como root todo se lee y en Windows chmod 0 no lo logra"
 	}
 	for _, prefix := range []string{"analyze.detail.", "analyze.warn.", "analyze.event.", "analyze.diff.", "analyze.key."} {
 		for _, k := range i18n.Codes() {

@@ -32,7 +32,7 @@ func AbsPathReason(ctx context.Context, p, reason string) (string, error) {
 // carpeta y se renombra, así un enlace simbólico en la ruta no desvía la escritura y un fallo no destruye el anterior.
 func WriteExport(ctx context.Context, path string, data []byte, overwrite bool) error {
 	if !overwrite {
-		f, err := sys.OpenNew(path)
+		f, err := sys.OpenNewPrivate(path) // nace 0600 (en Windows, con la DACL protegida desde el CreateFile)
 		if errors.Is(err, fs.ErrExist) {
 			return Err(ctx, codes.AlreadyExists, "file.exists", i18n.A("path", path))
 		}
@@ -52,7 +52,7 @@ func WriteExport(ctx context.Context, path string, data []byte, overwrite bool) 
 	if fi, err := os.Lstat(path); err == nil && !fi.Mode().IsRegular() {
 		return Err(ctx, codes.FailedPrecondition, "file.err.export_not_regular", nil)
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".export-*") // 0600
+	tmp, err := sys.CreateTempPrivate(filepath.Dir(path), ".export-*") // 0600; en Windows nace con la DACL protegida y el rename la conserva
 	if err != nil {
 		return ErrFrom(ctx, codes.FailedPrecondition, err)
 	}

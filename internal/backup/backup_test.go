@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 func at(h int) time.Time { return time.Date(2026, 11, 6, h, 0, 0, 0, time.UTC) }
@@ -20,21 +22,17 @@ func mustSave(t *testing.T, s Store, dev string, k Kind, h int, text string) Ent
 }
 
 func TestGuardaConPermisos0600(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "respaldos")
+	root := filepath.Join(systest.TempDir(t), "respaldos")
 	s := Store{Root: root}
 	e := mustSave(t, s, "SW1_192.0.2.1", Running, 10, "hostname SW1\n")
 	if e.ID != "SW1_192.0.2.1/20261106T100000Z-running" || e.Bytes != 13 || e.SHA256 == "" {
 		t.Fatalf("entrada = %+v", e)
 	}
 	for _, p := range []string{e.Path(root), strings.TrimSuffix(e.Path(root), ".cfg") + ".json"} {
-		if fi, err := os.Stat(p); err != nil || fi.Mode().Perm() != 0o600 {
-			t.Errorf("%s: %v %v", p, fi, err)
-		}
+		systest.Inherited(t, p, 0o600)
 	}
 	for _, d := range []string{root, filepath.Join(root, "SW1_192.0.2.1")} {
-		if fi, _ := os.Stat(d); fi.Mode().Perm() != 0o700 {
-			t.Errorf("%s = %v", d, fi.Mode().Perm())
-		}
+		systest.Inherited(t, d, 0o700)
 	}
 }
 

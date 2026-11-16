@@ -491,9 +491,12 @@ func TestErrorDeLecturaSinRutas(t *testing.T) {
 	pub, priv := testKey(t)
 	dir := t.TempDir()
 	s, _ := openStore(t, dir, pub, Base{})
-	os.Chmod(dir, 0o500)
-	defer os.Chmod(dir, 0o700)
-	_, err := s.Install(signedZip(t, priv, nil), false)
+	restore, err := sys.ReadOnlyDir(dir) // 0500 en Linux; en Windows una ACE que niega crear
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restore()
+	_, err = s.Install(signedZip(t, priv, nil), false)
 	if Reason(err) != "read" || strings.Contains(err.Error(), dir) {
 		t.Fatalf("%v", err)
 	}

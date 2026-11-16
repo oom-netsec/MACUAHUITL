@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 )
@@ -28,6 +29,9 @@ func TestPacketToOnlyAuthorizedIP(t *testing.T) {
 		t.Fatal(err)
 	}
 	buf := make([]byte, 10)
+	// Plazos: una lectura sin plazo cuelga el paquete entero si el datagrama no llega.
+	srv.SetReadDeadline(time.Now().Add(5 * time.Second))
+	pc.SetReadDeadline(time.Now().Add(5 * time.Second))
 	n, _, _ := srv.ReadFrom(buf)
 	if string(buf[:n]) != "hola" {
 		t.Fatal("no llegó")
@@ -35,7 +39,9 @@ func TestPacketToOnlyAuthorizedIP(t *testing.T) {
 	// El servidor responde desde otro puerto: el socket sin conectar lo recibe.
 	other, _ := net.ListenPacket("udp", "127.0.0.1:0")
 	defer other.Close()
-	other.WriteTo([]byte("tid"), pc.LocalAddr())
+	// El socket del guard escucha en el comodín (0.0.0.0): en Windows enviar a 0.0.0.0 no es una dirección válida y el
+	// datagrama se pierde en silencio; se envía a 127.0.0.1 con el mismo puerto.
+	other.WriteTo([]byte("tid"), &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: pc.LocalAddr().(*net.UDPAddr).Port})
 	n, _, _ = pc.ReadFrom(buf)
 	if string(buf[:n]) != "tid" {
 		t.Fatal("respuesta desde otro puerto perdida")

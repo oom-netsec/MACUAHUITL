@@ -4,10 +4,10 @@
 ./gen/macuahuitl/v1
 ./internal/acl
 ./internal/adhoc
-./internal/analyze  # 43a3: sus pruebas dependen de chmod 0 y de Geteuid; en Windows va por ACL
+./internal/analyze  # la regresión por golden normaliza rutas /tmp y textos de Linux; sin validar en Windows
 ./internal/assist
 ./internal/audit
-./internal/backup  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
+./internal/backup
 ./internal/calc
 ./internal/capture
 ./internal/change
@@ -17,14 +17,14 @@
 ./internal/crashinfo
 ./internal/devices
 ./internal/diag/dnsq
-./internal/diag/fileserve  # 43a3: sus pruebas exigen modo 0600/0700 y sockets Unix; en Windows va por ACL
-./internal/diag/flows  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
+./internal/diag/fileserve  # sus pruebas de enlaces simbólicos y de carpetas sensibles (HOME) sin validar en Windows
+./internal/diag/flows
 ./internal/diag/gnmic
 ./internal/diag/ifaces
-./internal/diag/ingest  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
+./internal/diag/ingest
 ./internal/diag/listen
 ./internal/diag/radiustest
-./internal/diag/snmp  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
+./internal/diag/snmp
 ./internal/diag/snmp/snmptest
 ./internal/diag/syslogd
 ./internal/diag/syslogd/syslogdtest
@@ -34,7 +34,7 @@
 ./internal/diag/transfer/transfertest
 ./internal/drift
 ./internal/engine
-./internal/fleet  # 43a3: sus pruebas dependen de chmod 0 y de Geteuid; en Windows va por ACL
+./internal/fleet  # la regresión por golden normaliza rutas /tmp y textos de Linux; sin validar en Windows
 ./internal/i18n
 ./internal/i18n/i18ntest
 ./internal/ikedec
@@ -45,12 +45,12 @@
 ./internal/mask/internal/ref065
 ./internal/metrics
 ./internal/msgkb
-./internal/pack  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
+./internal/pack
 ./internal/pack/packtest
 ./internal/parse/asa
 ./internal/parse/iosxe
 ./internal/paths
-./internal/patrol  # 43a3: sus pruebas dependen de chmod; en Windows va por ACL
+./internal/patrol
 ./internal/pcapan
 ./internal/pki
 ./internal/platform
@@ -58,14 +58,14 @@
 ./internal/playbook
 ./internal/scripts
 ./internal/secret
-./internal/store  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
+./internal/store
 ./internal/sys
 ./internal/termcolor
 ./internal/terminal
 ./internal/topo
-./internal/transport  # 43a3: sus pruebas exigen modo 0600/0700 en known_hosts; en Windows va por ACL
+./internal/transport
 ./internal/upgrade
-./internal/vault  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
+./internal/vault
 ./internal/version
 ./playbooks
 ./test/simulator
@@ -74,5 +74,5 @@
 ./tools/labcheck
 ./tools/noegress
 ./tools/noegress/cmd/noegress
-./tools/packaging  # 43a3: su prueba usa un script /bin/sh y modos Unix
-./tools/packaging/mpack-keygen  # 43a3: su prueba exige modo 0600 en la llave privada; en Windows va por ACL
+./tools/packaging
+./tools/packaging/mpack-keygen

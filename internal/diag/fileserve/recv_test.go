@@ -17,6 +17,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 // startCfg abre un servidor con la configuración dada (Addr y callbacks los pone aquí).
@@ -107,9 +109,7 @@ func TestReceiverNeverOverwrites(t *testing.T) {
 	if err != nil || size != 4 || sum != hex.EncodeToString(want[:]) {
 		t.Fatalf("commit = %s %d %v", sum, size, err)
 	}
-	if st, _ := os.Stat(f.path); st.Mode().Perm() != 0o600 {
-		t.Fatalf("permisos %v", st.Mode())
-	}
+	systest.Private(t, f.path, 0o600)
 }
 
 func TestReceiverCaps(t *testing.T) {
@@ -201,10 +201,10 @@ func TestTFTPWrite(t *testing.T) {
 		t.Fatalf("transferencia = %+v", x)
 	}
 	got, _ := os.ReadFile(x.Path)
-	st, _ := os.Stat(x.Path)
-	if !bytes.Equal(got, data) || st.Mode().Perm() != 0o600 {
-		t.Fatalf("archivo guardado mal: %v", st.Mode())
+	if !bytes.Equal(got, data) {
+		t.Fatal("archivo guardado mal")
 	}
+	systest.Private(t, x.Path, 0o600)
 	// Con opciones, bloque exacto (cierra con bloque vacío) y nombre con ruta y "..".
 	data2 := bytes.Repeat([]byte{7}, 1024*2)
 	if code := dialTFTP(t, s.addr).put("../../r2/crashinfo", data2, 1024, "blksize", "1024", "tsize", "2048"); code != 0 {

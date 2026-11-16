@@ -146,7 +146,7 @@ func (r *receiver) create(raw string, announced int64) (*recvFile, error) {
 	case r.files >= r.maxFiles:
 		err = errTooMany
 	default:
-		if f, err = sys.OpenNewIn(r.root, name); err == nil {
+		if f, err = sys.OpenNewPrivateIn(r.root, name); err == nil { // 0600; en Windows nace con la DACL protegida
 			r.inFlight[name] = true
 			r.files++
 		}

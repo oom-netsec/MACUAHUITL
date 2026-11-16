@@ -127,7 +127,7 @@ func Finish(ctx context.Context, d Deps, w *Writer, s Spec, rounds int, results 
 		if err != nil {
 			return m, fmt.Errorf("patrol: %w", err)
 		}
-		m.Files = append(m.Files, FileRef{Path: rel, SHA256: h})
+		m.Files = append(m.Files, FileRef{Path: filepath.ToSlash(rel), SHA256: h}) // el manifest y el zip llevan «/» en todos los sistemas
 	}
 	if _, err := d.Audit.Append(ctx, audit.Entry{Actor: "patrol", Action: "job.finish", Target: s.Name,
 		Detail: fmt.Sprintf("rounds=%d files=%d masked=%v", rounds, len(m.Files), m.Masked)}); err != nil {

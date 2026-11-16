@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 func TestFlowRecordLines(t *testing.T) {
@@ -103,7 +104,7 @@ func readAll(t *testing.T, dir string) string {
 
 // Una ráfaga de un exportador no le quita lugar a otro, y los descartes se cuentan por origen.
 func TestListenFloodFromOneExporterLeavesRoomForAnother(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "flows")
+	dir := filepath.Join(systest.TempDir(t), "flows")
 	var mu sync.Mutex
 	var last ingest.Drops
 	addr, stop := start(t, Config{Limits: ingest.Limits{PerSource: 1, PerSourceBurst: 3, Global: 1000}, Sink: &ingest.Sink{Dir: dir, Template: "f_{fecha}", MaxFiles: 5, Format: "crudo"},
@@ -178,7 +179,7 @@ func TestListenSinkFormatsRotationAndRetention(t *testing.T) {
 			return strings.HasPrefix(b, `{"Time":`) && strings.Contains(b, `"Dst":"10.0.0.2"`)
 		},
 	} {
-		dir := filepath.Join(t.TempDir(), "flows")
+		dir := filepath.Join(systest.TempDir(t), "flows")
 		addr, stop := start(t, Config{Sink: &ingest.Sink{Dir: dir, Template: "flujos_{fecha}_{hora}", MaxFiles: 5, Format: format}})
 		sendFrom(t, addr, "127.0.0.1", 1)
 		time.Sleep(300 * time.Millisecond)
@@ -196,11 +197,9 @@ func TestListenSinkFormatsRotationAndRetention(t *testing.T) {
 		if b := readAll(t, dir); !check(b) {
 			t.Errorf("%s: %q", format, b)
 		}
-		if st, _ := os.Stat(fs[0]); st.Mode().Perm() != 0o600 {
-			t.Errorf("%s: permisos %v", format, st.Mode())
-		}
+		systest.Inherited(t, fs[0], 0o600)
 	}
-	dir := filepath.Join(t.TempDir(), "flows")
+	dir := filepath.Join(systest.TempDir(t), "flows")
 	os.MkdirAll(dir, 0o700)
 	os.WriteFile(filepath.Join(dir, "notas.log"), []byte("mío"), 0o600)
 	var clock atomic.Int64
@@ -230,7 +229,7 @@ func TestListenSinkFormatsRotationAndRetention(t *testing.T) {
 
 // Si el archivo falla (el disco «desaparece»), la escucha termina con el error en vez de seguir en silencio.
 func TestListenStopsWhenSinkFails(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "flows")
+	dir := filepath.Join(systest.TempDir(t), "flows")
 	ready := make(chan string, 1)
 	done := make(chan error, 1)
 	go func() {
