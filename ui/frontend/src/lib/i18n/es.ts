@@ -2773,6 +2773,8 @@ export const es = {
   "pending.discard.noVaultCred": "No se eligió una credencial de la bóveda para recibir la contraseña nueva: si la bóveda guarda alguna de {user}, conserva la anterior y ya no entra con ella.",
   "pending.provisional": "El corte fue a mitad de la configuración en {devices}: el equipo pudo quedar con parte o todo el cambio. «Aplicar reversa» se detiene sin tocar el equipo si ya no está como antes del cambio; en ese caso, revierte a mano.",
   "pending.discard.vaultStaleGen": "La credencial de {user} en la bóveda conserva la anterior y ya no entra con ella.",
+  "pending.discard.generated.saved": "La app generó la contraseña nueva y nadie la conoce: ese usuario queda sin acceso hasta que otra cuenta con privilegios la cambie, o hasta que apliques esta reversa y después guardes la configuración (write memory). La reversa no la guarda: tras un reinicio el equipo volvería a cargar la contraseña nueva.",
+  "pending.discard.saveAfter": "Para volver a la anterior, aplica la reversa y después guarda la configuración (write memory); la reversa no la guarda.",
 };
 
 export type Key = keyof typeof es;

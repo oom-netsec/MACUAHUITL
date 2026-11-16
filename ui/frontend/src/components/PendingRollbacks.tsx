@@ -44,7 +44,9 @@ function Entry({ core, r, gone, onStarted, onChanged, onActive }: { core: Assist
   // Con el usuario rotado y la credencial asociada (campos 9 y 10 del núcleo) el aviso es exacto; sin ellos, el texto general.
   const rotationText = !r.rotatedUser ? [t("pending.discard.rotation", { device: rotDevice })]
     : [t("pending.discard.rotation.user", { device: rotDevice, user: r.rotatedUser }), t(!r.updateCredentialId ? "pending.discard.noVaultCred" : r.generatedSecret ? "pending.discard.vaultStaleGen" : "pending.discard.vaultStale", { user: r.rotatedUser })];
-  if (r.generatedSecret) rotationText.push(t("pending.discard.generated"));
+  // Con write memory la startup ya tiene la contraseña nueva y la reversa no guarda: hay que guardar después (auditoría 2).
+  if (r.generatedSecret) rotationText.push(t(r.writeMemory ? "pending.discard.generated.saved" : "pending.discard.generated"));
+  else if (r.writeMemory) rotationText.push(t("pending.discard.saveAfter"));
   const old = age > OLD_SECONDS || needAge;
   const ageLabel = ageText(age, t);
   const gated = plan && old && !accepted; // sin aceptar, el flujo asistido no recibe el plan: no hay con qué iniciar
