@@ -81,7 +81,7 @@ Var PrevInstall ; carpeta de una instalación anterior (HKCU), vacía si es la p
 LangString SecDesktop ${LANG_ENGLISH} "Desktop shortcut"
 LangString SecDesktop ${LANG_SPANISH} "Acceso directo en el escritorio"
 ; El mismo texto que ui.webview2_missing (internal/i18n/catalog_webview2.go), que la app muestra al abrirse.
-LangString WV2Missing ${LANG_ENGLISH} "The Microsoft WebView2 Runtime is not installed on this computer, and MACUAHUITL needs it for its window. Download and install it from ${WV2_URL}, then open MACUAHUITL."
+LangString WV2Missing ${LANG_ENGLISH} "The Microsoft WebView2 Runtime is not installed on this computer, and MACUAHUITL needs it for its window. Download and install it from ${WV2_URL}, then open MACUAHUITL again."
 LangString WV2Missing ${LANG_SPANISH} "En este equipo no está instalado el runtime WebView2 de Microsoft, que MACUAHUITL necesita para su ventana. Descárgalo e instálalo desde ${WV2_URL} y vuelve a abrir MACUAHUITL."
 LangString CoreBusy ${LANG_ENGLISH} "MACUAHUITL has work in progress (a Patrol job, a transfer or a capture). Close or cancel what is running in MACUAHUITL and try again. Nothing was changed."
 LangString CoreBusy ${LANG_SPANISH} "MACUAHUITL tiene trabajo en curso (un trabajo de Patrol, una transferencia o una captura). Cierra o cancela lo que está corriendo en MACUAHUITL y vuelve a intentarlo. No se cambió nada."
@@ -107,6 +107,9 @@ LangString AskData ${LANG_SPANISH} "¿Borrar también los datos de MACUAHUITL en
     ${EndIf}
   ${EndIf}
 !macroend
+
+LangString DataLeft ${LANG_ENGLISH} "Some MACUAHUITL data could not be deleted (a file in use or without permission). Delete this folder by hand:$\r$\n${DATA_DIR}"
+LangString DataLeft ${LANG_SPANISH} "No se pudieron borrar todos los datos de MACUAHUITL (un archivo en uso o sin permiso). Borra a mano esta carpeta:$\r$\n${DATA_DIR}"
 
 ; StopCoreAll: antes de reemplazar o borrar los ejecutables (Windows no deja tocar un .exe en uso).
 ; 1. La app abierta la cierra el usuario: se revisa antes de tocar el núcleo, para que «no se cambió nada» sea cierto.
@@ -301,6 +304,9 @@ Section "Uninstall"
     MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "$(AskData)" /SD ${DATA_DEFAULT} IDNO keepData
     Push "${DATA_DIR}"
     Call un.SafeRemove
+    ${If} ${FileExists} "${DATA_DIR}\*.*" ; algo bloqueado o sin permiso: que el usuario lo sepa y lo borre a mano
+      MessageBox MB_ICONEXCLAMATION "$(DataLeft)" /SD IDOK
+    ${EndIf}
     keepData:
   ${EndIf}
 SectionEnd

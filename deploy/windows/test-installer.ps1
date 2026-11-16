@@ -67,7 +67,16 @@ New-Item -ItemType Directory -Force (Join-Path $data 'data') | Out-Null
 Set-Content (Join-Path $data 'data\vault.db') 'bóveda de prueba'
 New-Item -ItemType Junction -Path (Join-Path $data 'data\enlace-junction') -Target $outside | Out-Null
 New-Item -ItemType SymbolicLink -Path (Join-Path $data 'enlace-symlink') -Target $outside | Out-Null
+New-Item -ItemType SymbolicLink -Path (Join-Path $data 'data\enlace-archivo.txt') -Target (Join-Path $outside 'no-borrar.txt') | Out-Null
 Must ((RunWait (Join-Path $inst 'uninstall.exe') @('/S', "_?=$inst")) -eq 0) 'desinstala contestando Sí a borrar los datos'
 Must (-not (Test-Path $data)) 'contestando Sí, se borran los datos'
 Must ((Get-Content (Join-Path $outside 'no-borrar.txt')) -eq 'ajeno') 'lo que está del otro lado de un junction o symlink queda intacto'
+Must (Test-Path (Join-Path $outside 'no-borrar.txt')) 'un symlink de archivo se borra sin borrar su destino'
+
+# La carpeta de datos misma como junction: se quita el enlace, nunca lo que apunta.
+Must ((RunWait $DeleteDataInstaller '/S') -eq 0) 'reinstala la compilación de prueba del borrado'
+New-Item -ItemType Junction -Path $data -Target $outside | Out-Null
+Must ((RunWait (Join-Path $inst 'uninstall.exe') @('/S', "_?=$inst")) -eq 0) 'desinstala con la carpeta de datos como junction'
+Must (-not (Test-Path $data)) 'se quita el junction de la carpeta de datos'
+Must ((Get-Content (Join-Path $outside 'no-borrar.txt')) -eq 'ajeno') 'y lo que apuntaba queda intacto'
 Remove-Item -Recurse -Force $inst, $outside
