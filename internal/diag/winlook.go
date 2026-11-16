@@ -106,11 +106,11 @@ func installErr(goos, bin string) error {
 	}
 	switch bin {
 	case "nmap":
-		return i18n.Wrap("diag.err.install.windows", ErrNotInstalled, i18n.A("bin", bin, "url", "https://nmap.org/download"))
+		return i18n.Wrap("diag.err.install_win", ErrNotInstalled, i18n.A("bin", bin, "url", "https://nmap.org/download"))
 	case "dumpcap":
-		return i18n.Wrap("diag.err.install.windows", ErrNotInstalled, i18n.A("bin", "dumpcap (Wireshark/Npcap)", "url", "https://www.wireshark.org/download.html"))
+		return i18n.Wrap("diag.err.install_win", ErrNotInstalled, i18n.A("bin", "dumpcap (Wireshark/Npcap)", "url", "https://www.wireshark.org/download.html"))
 	case "iperf3":
-		return i18n.Wrap("diag.err.install_iperf.windows", ErrNotInstalled, nil)
+		return i18n.Wrap("diag.err.install_iperf_win", ErrNotInstalled, nil)
 	}
-	return i18n.Wrap("diag.err.install_sys.windows", ErrNotInstalled, i18n.A("bin", bin))
+	return i18n.Wrap("diag.err.install_sys_win", ErrNotInstalled, i18n.A("bin", bin))
 }
