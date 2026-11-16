@@ -19,7 +19,7 @@ import type { DnsReportData, PcapReportData, TlsReportData } from "./api";
 import { PcapReport } from "./PcapReport";
 import { parseTrace } from "./dnsTrace";
 import { DnsTree } from "./DnsTree";
-import { parseTls } from "./tlsChain";
+import { parseTls } from "./tlsCerts";
 import { TlsChain } from "./TlsChain";
 import "./tools.css";
 

@@ -3,7 +3,7 @@ import { CopyButton, StatusPill } from "../../components/Data";
 import { Badge, Section } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
-import { certTone, type TlsInfo } from "./tlsChain";
+import { certTone, type TlsInfo } from "./tlsCerts";
 import "./tools.css";
 
 const verifyCodes = ["unknown_authority", "hostname", "expired", "not_yet_valid"];
