@@ -6,14 +6,13 @@ El instalador de Windows (ADR 0012, «Instalador»): NSIS, por usuario y sin adm
 |---|---|
 | `macuahuitl.nsi` | La plantilla del instalador y del desinstalador. |
 | `build-installer.sh` | La arma: genera el `.ico` con `tools/icowin` y llama a `makensis`. Corre en Linux (paquete `nsis`) o en Git Bash en Windows. |
-| `fetch-webview2.ps1` | Baja el Evergreen Bootstrapper de WebView2 y comprueba que lo firmó Microsoft. |
 | `test-installer.ps1` | Instala y desinstala en un Windows desechable (el runner de CI) y revisa el resultado. **No lo corras en tu equipo:** desinstala MACUAHUITL del usuario actual. |
 
 ```sh
 VERSION=1.2.3 BIN=<carpeta> deploy/windows/build-installer.sh dist/MACUAHUITL-1.2.3-setup.exe
 ```
 
-`BIN` trae `macuahuitl.exe`, `macuahuitld.exe`, `mctl.exe` y `MicrosoftEdgeWebview2Setup.exe`.
+`BIN` trae `macuahuitl.exe`, `macuahuitld.exe` y `mctl.exe`.
 
 ## Qué instala
 
@@ -21,7 +20,7 @@ VERSION=1.2.3 BIN=<carpeta> deploy/windows/build-installer.sh dist/MACUAHUITL-1.
 - **Accesos directos:** uno en el menú Inicio del usuario. El del escritorio es opcional y viene apagado.
 - **Entrada `Run` en HKCU:** arranca el núcleo al iniciar sesión, con la ruta absoluta de `macuahuitld.exe`.
 - **Clave de desinstalación en HKCU.** Nada en HKLM y nada que pida UAC.
-- **WebView2:** el runtime se instala solo si falta, con el bootstrapper sin elevar, que instala por usuario. Si falla, por ejemplo sin internet, la instalación sigue y la app avisa con el enlace al abrirse.
+- **WebView2:** nada de Microsoft va dentro ni se descarga. Su licencia exige indemnizar a Microsoft a quien redistribuye el runtime o su bootstrapper (ADR 0012). Si falta, el instalador avisa al final con el enlace oficial, y la app avisa lo mismo al abrirse. Windows 11 ya lo trae.
 
 ## Actualizar y desinstalar
 

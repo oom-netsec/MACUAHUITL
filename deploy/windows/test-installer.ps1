@@ -1,7 +1,9 @@
 # Prueba del instalador en un Windows desechable (el runner de CI): instala en silencio, revisa lo que deja, comprueba que
 # la desinstalación se detiene si un ejecutable está en uso y que /S nunca borra los datos. No usar en un equipo propio:
-# instala y desinstala MACUAHUITL del usuario actual. Uso: test-installer.ps1 -Installer <instalador.exe> -Version X.Y.Z
-param([Parameter(Mandatory = $true)][string]$Installer, [Parameter(Mandatory = $true)][string]$Version)
+# instala y desinstala MACUAHUITL del usuario actual. Uso:
+#   test-installer.ps1 -Installer <instalador.exe> -DeleteDataInstaller <armado con TEST_DELETE_DATA=1> -Version X.Y.Z
+param([Parameter(Mandatory = $true)][string]$Installer, [Parameter(Mandatory = $true)][string]$DeleteDataInstaller,
+  [Parameter(Mandatory = $true)][string]$Version)
 $ErrorActionPreference = 'Stop'
 $inst = Join-Path $env:LOCALAPPDATA 'Programs\MACUAHUITL'
 $data = Join-Path $env:LOCALAPPDATA 'MACUAHUITL'
@@ -54,3 +56,18 @@ Must (-not (Test-Path $unKey)) 'quitada la clave de desinstalación'
 Must (-not (Test-Path $startLnk)) 'quitado el acceso directo'
 Must ((Get-Content (Join-Path $data 'data\vault.db')) -eq 'bóveda de prueba') 'con /S los datos quedan intactos'
 Remove-Item -Recurse -Force $inst, $data
+
+# Contestar Sí a borrar los datos (compilación de prueba, que contesta Sí en silencioso): RMDir /r borra los enlaces que
+# haya dentro, nunca lo que está del otro lado. La documentación de NSIS no lo garantiza; esta prueba sí.
+$outside = Join-Path $env:TEMP 'macuahuitl-fuera'
+New-Item -ItemType Directory -Force $outside | Out-Null
+Set-Content (Join-Path $outside 'no-borrar.txt') 'ajeno'
+Must ((RunWait $DeleteDataInstaller '/S') -eq 0) 'instala la compilación de prueba del borrado'
+New-Item -ItemType Directory -Force (Join-Path $data 'data') | Out-Null
+Set-Content (Join-Path $data 'data\vault.db') 'bóveda de prueba'
+New-Item -ItemType Junction -Path (Join-Path $data 'data\enlace-junction') -Target $outside | Out-Null
+New-Item -ItemType SymbolicLink -Path (Join-Path $data 'enlace-symlink') -Target $outside | Out-Null
+Must ((RunWait (Join-Path $inst 'uninstall.exe') @('/S', "_?=$inst")) -eq 0) 'desinstala contestando Sí a borrar los datos'
+Must (-not (Test-Path $data)) 'contestando Sí, se borran los datos'
+Must ((Get-Content (Join-Path $outside 'no-borrar.txt')) -eq 'ajeno') 'lo que está del otro lado de un junction o symlink queda intacto'
+Remove-Item -Recurse -Force $inst, $outside

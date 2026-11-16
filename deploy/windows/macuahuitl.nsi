@@ -2,10 +2,11 @@
 ; Parte de la plantilla NSIS de Wails v3 (MIT, Lea Anthony; en THIRD_PARTY_LICENSES), reducida a lo que se usa.
 ; Lo arma deploy/windows/build-installer.sh, que pasa:
 ;   VERSION  X.Y.Z
-;   BIN      carpeta con macuahuitl.exe, macuahuitld.exe, mctl.exe, macuahuitl.ico y MicrosoftEdgeWebview2Setup.exe
+;   BIN      carpeta con macuahuitl.exe, macuahuitld.exe, mctl.exe y macuahuitl.ico
 ;   SRC      raíz del repo (LICENSE, NOTICE, THIRD_PARTY_LICENSES, TRADEMARK.md)
 ;   OUT      ruta del instalador
 ;   SIGN     opcional: orden de firma con %1 en lugar del archivo; sin ella no se firma (la beta sale sin firmar)
+;   TEST_DELETE_DATA  solo para test-installer.ps1 (nunca en un release): en silencioso la pregunta de datos contesta Sí
 
 Unicode true
 ManifestDPIAware true
@@ -30,6 +31,7 @@ SetCompressor /SOLID lzma
 !define RUN_VALUE "MACUAHUITL core"
 !define DATA_DIR "$LOCALAPPDATA\MACUAHUITL"
 !define WV2_CLIENT "Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+!define WV2_URL "https://developer.microsoft.com/microsoft-edge/webview2/consumer/"
 
 !ifdef SIGN
   !finalize `${SIGN}`
@@ -78,10 +80,9 @@ Var PrevInstall ; carpeta de una instalación anterior (HKCU), vacía si es la p
 
 LangString SecDesktop ${LANG_ENGLISH} "Desktop shortcut"
 LangString SecDesktop ${LANG_SPANISH} "Acceso directo en el escritorio"
-LangString WV2Installing ${LANG_ENGLISH} "Installing the Microsoft WebView2 Runtime…"
-LangString WV2Installing ${LANG_SPANISH} "Instalando el runtime WebView2 de Microsoft…"
-LangString WV2Failed ${LANG_ENGLISH} "The Microsoft WebView2 Runtime could not be installed (it needs an internet connection). MACUAHUITL will be installed anyway; when it opens, it shows the official download link."
-LangString WV2Failed ${LANG_SPANISH} "No se pudo instalar el runtime WebView2 de Microsoft (necesita conexión a internet). MACUAHUITL se instala de todos modos; al abrirlo muestra el enlace oficial de descarga."
+; El mismo texto que ui.webview2_missing (internal/i18n/catalog_webview2.go), que la app muestra al abrirse.
+LangString WV2Missing ${LANG_ENGLISH} "The Microsoft WebView2 Runtime is not installed on this computer, and MACUAHUITL needs it for its window. Download and install it from ${WV2_URL}, then open MACUAHUITL."
+LangString WV2Missing ${LANG_SPANISH} "En este equipo no está instalado el runtime WebView2 de Microsoft, que MACUAHUITL necesita para su ventana. Descárgalo e instálalo desde ${WV2_URL} y vuelve a abrir MACUAHUITL."
 LangString CoreBusy ${LANG_ENGLISH} "MACUAHUITL has work in progress (a Patrol job, a transfer or a capture). Close or cancel what is running in MACUAHUITL and try again. Nothing was changed."
 LangString CoreBusy ${LANG_SPANISH} "MACUAHUITL tiene trabajo en curso (un trabajo de Patrol, una transferencia o una captura). Cierra o cancela lo que está corriendo en MACUAHUITL y vuelve a intentarlo. No se cambió nada."
 LangString AppOpen ${LANG_ENGLISH} "MACUAHUITL is open. Close it and try again. Nothing was changed."
@@ -170,9 +171,12 @@ Function LaunchApp
   Exec '"$WINDIR\explorer.exe" "$INSTDIR\macuahuitl.exe"'
 FunctionEnd
 
-; WebView2: solo si falta (valor «pv» vacío o 0.0.0.0 en HKLM y en HKCU, método 1 de Microsoft). Sin elevar, el
-; bootstrapper instala por usuario. Si falla (sin internet), se sigue: la app avisa con el enlace (ui/webview2_windows.go).
+; WebView2: no se empaqueta ni se descarga (ADR 0012, «Instalación del runtime»: su licencia exige indemnizar a Microsoft
+; a quien lo redistribuye). Si falta (valor «pv» vacío o 0.0.0.0 en HKLM y en HKCU, método 1 de Microsoft), se avisa al
+; final con el enlace oficial, la vía que documenta Microsoft; la app avisa lo mismo al abrirse (ui/webview2_windows.go).
+Var WV2Missing
 Function WebView2
+  StrCpy $WV2Missing 0
   ReadRegStr $0 HKLM "SOFTWARE\WOW6432Node\${WV2_CLIENT}" "pv"
   ${If} $0 != ""
   ${AndIf} $0 != "0.0.0.0"
@@ -183,15 +187,7 @@ Function WebView2
   ${AndIf} $0 != "0.0.0.0"
     Return
   ${EndIf}
-  DetailPrint "$(WV2Installing)"
-  InitPluginsDir
-  File "/oname=$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe" "${BIN}\MicrosoftEdgeWebview2Setup.exe"
-  ClearErrors
-  ExecWait '"$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe" /silent /install' $0
-  ${If} ${Errors} ; no llegó a ejecutarse: $0 no cambia
-  ${OrIf} $0 != 0
-    MessageBox MB_ICONEXCLAMATION "$(WV2Failed)" /SD IDOK
-  ${EndIf}
+  StrCpy $WV2Missing 1
 FunctionEnd
 
 Section "MACUAHUITL" SecMain
@@ -220,6 +216,9 @@ Section "MACUAHUITL" SecMain
   WriteRegStr HKCU "${UNINST_KEY}" "QuietUninstallString" '"$INSTDIR\uninstall.exe" /S'
   WriteRegDWORD HKCU "${UNINST_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINST_KEY}" "NoRepair" 1
+  ${If} $WV2Missing = 1
+    MessageBox MB_ICONINFORMATION "$(WV2Missing)" /SD IDOK
+  ${EndIf}
 SectionEnd
 
 Section /o "$(SecDesktop)" SecDesktop
@@ -244,9 +243,19 @@ Section "Uninstall"
   Delete "$INSTDIR\uninstall.exe"
   RMDir "$INSTDIR" ; solo si quedó vacía: nada ajeno que el usuario haya puesto ahí se borra
   DeleteRegKey HKCU "${UNINST_KEY}"
-  ${IfNot} ${Silent}
+  StrCpy $3 1 ; preguntar por los datos: nunca en silencioso
+  ${If} ${Silent}
+    StrCpy $3 0
+  ${EndIf}
+!ifdef TEST_DELETE_DATA ; solo la compilación de test-installer.ps1: en silencioso contesta Sí, para probar el borrado
+  StrCpy $3 1
+  !define DATA_DEFAULT IDYES
+!else
+  !define DATA_DEFAULT IDNO
+!endif
+  ${If} $3 = 1
   ${AndIf} ${FileExists} "${DATA_DIR}\*.*"
-    MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "$(AskData)" /SD IDNO IDNO keepData
+    MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "$(AskData)" /SD ${DATA_DEFAULT} IDNO keepData
     RMDir /r "${DATA_DIR}"
     keepData:
   ${EndIf}
