@@ -37,7 +37,7 @@ Do not run an installer that fails either check.
 The beta has no code signature. Verification relies on `SHA256SUMS`, the attestation above and the open source code. This has consequences:
 
 - **SmartScreen** shows "Windows protected your PC". Choose **More info**, then **Run anyway**. It comes back with every new version.
-- **Smart App Control** (Windows 11), if it is on, blocks an unsigned executable completely, with no option to run it. On many Windows 11 versions, turning it back on requires reinstalling Windows. That decision is yours; the project does not recommend it.
+- **Smart App Control** (Windows 11), if it is on, blocks an unsigned executable completely, with no option to run it. Depending on your Windows 11 version, turning it back on may require reinstalling Windows. That decision is yours; the project does not recommend it.
 - **Microsoft Defender** may flag an unsigned Go binary as a false positive. If it does, report it to Microsoft as a false positive.
 
 ## What it installs and where
