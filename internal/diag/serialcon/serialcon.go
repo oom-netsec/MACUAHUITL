@@ -1,22 +1,20 @@
 // Package serialcon abre la consola serie de un equipo (USB-serie /dev/ttyUSB*,
-// /dev/ttyACM*) con termios directo, sin dependencias: 9600 8N1 sin control de
-// flujo por defecto, como espera la consola de Cisco. No usa red.
+// /dev/ttyACM* en Linux con termios; COMn en Windows con DCB) sin dependencias
+// externas: 9600 8N1 sin control de flujo por defecto, como espera la consola de
+// Cisco. No usa red. Lo propio de cada sistema vive en serialcon_linux.go y
+// serialcon_windows.go.
 package serialcon
 
 import (
-	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
-	"golang.org/x/sys/unix"
 )
 
 type Config struct {
-	Path     string // absoluto, bajo /dev
+	Path     string // Linux: absoluto, bajo /dev; Windows: COMn
 	Baud     int    // 9600 por defecto
 	DataBits int    // 5 a 8; 8 por defecto
 	Parity   string // none, even, odd
@@ -24,12 +22,7 @@ type Config struct {
 	Flow     string // none, rtscts, xonxoff
 }
 
-var bauds = map[int]uint32{
-	1200: unix.B1200, 2400: unix.B2400, 4800: unix.B4800, 9600: unix.B9600, 19200: unix.B19200, 38400: unix.B38400,
-	57600: unix.B57600, 115200: unix.B115200, 230400: unix.B230400, 460800: unix.B460800, 921600: unix.B921600,
-}
-
-var csize = map[int]uint32{5: unix.CS5, 6: unix.CS6, 7: unix.CS7, 8: unix.CS8}
+var validBauds = []int{1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600}
 
 func (c Config) withDefaults() Config {
 	if c.Baud == 0 {
@@ -66,13 +59,13 @@ func (c Config) AuditString() string {
 }
 
 func (c Config) validate() error {
-	if !filepath.IsAbs(c.Path) || !strings.HasPrefix(filepath.Clean(c.Path), "/dev/") {
-		return i18n.New("serial.err.path", i18n.A("path", c.Path))
+	if err := validPath(c.Path); err != nil {
+		return err
 	}
-	if _, ok := bauds[c.Baud]; !ok {
+	if !slices.Contains(validBauds, c.Baud) {
 		return i18n.New("serial.err.baud", i18n.A("baud", c.Baud))
 	}
-	if _, ok := csize[c.DataBits]; !ok {
+	if c.DataBits < 5 || c.DataBits > 8 {
 		return i18n.New("serial.err.data_bits", i18n.A("bits", c.DataBits))
 	}
 	if !slices.Contains([]string{"none", "even", "odd"}, c.Parity) {
@@ -90,11 +83,6 @@ func (c Config) validate() error {
 // ErrPermission indica que el usuario no puede abrir el puerto (falta el grupo dialout).
 var ErrPermission error = i18n.New("serial.err.permission", nil)
 
-type Port struct {
-	f   *os.File
-	Cfg Config
-}
-
 // Normalize aplica los valores por defecto y valida.
 func (c Config) Normalize() (Config, error) {
 	c = c.withDefaults()
@@ -108,131 +96,4 @@ func Open(c Config) (*Port, error) {
 		return nil, err
 	}
 	return open(c)
-}
-
-func open(c Config) (*Port, error) {
-	// O_NONBLOCK deja el descriptor en el poller de Go: Close desbloquea un Read pendiente.
-	f, err := os.OpenFile(c.Path, os.O_RDWR|unix.O_NOCTTY|unix.O_NONBLOCK, 0)
-	if err != nil {
-		return nil, openErr(c.Path, err)
-	}
-	p := &Port{f: f, Cfg: c}
-	var cerr error
-	p.control(func(fd int) {
-		tio, err := unix.IoctlGetTermios(fd, unix.TCGETS)
-		if err != nil {
-			cerr = i18n.Wrap("serial.err.not_serial", err, i18n.A("path", c.Path))
-			return
-		}
-		// TIOCEXCL: un segundo programa no puede abrirlo y mezclar lo que se teclea.
-		if err := unix.IoctlSetInt(fd, unix.TIOCEXCL, 0); err != nil {
-			cerr = fmt.Errorf("serialcon: %s: %w", c.Path, err)
-			return
-		}
-		raw(tio, c)
-		if err := unix.IoctlSetTermios(fd, unix.TCSETS, tio); err != nil {
-			cerr = i18n.Wrap("serial.err.configure", err, i18n.A("path", c.Path))
-		}
-	})
-	if cerr != nil {
-		f.Close()
-		return nil, cerr
-	}
-	return p, nil
-}
-
-func openErr(path string, err error) error {
-	switch {
-	case errors.Is(err, os.ErrPermission):
-		return i18n.Wrap("serial.err.permission_hint", ErrPermission, i18n.A("path", path))
-	case errors.Is(err, unix.EBUSY):
-		return i18n.New("serial.err.busy", i18n.A("path", path))
-	case errors.Is(err, os.ErrNotExist):
-		return i18n.New("serial.err.missing", i18n.A("path", path))
-	}
-	return fmt.Errorf("serialcon: %w", err)
-}
-
-// raw equivale a cfmakeraw más los parámetros de línea pedidos.
-func raw(t *unix.Termios, c Config) {
-	t.Iflag &^= unix.IGNBRK | unix.BRKINT | unix.PARMRK | unix.ISTRIP | unix.INLCR | unix.IGNCR | unix.ICRNL | unix.IXON | unix.IXOFF | unix.IXANY
-	t.Oflag &^= unix.OPOST
-	t.Lflag &^= unix.ECHO | unix.ECHONL | unix.ICANON | unix.ISIG | unix.IEXTEN
-	t.Cflag &^= unix.CSIZE | unix.PARENB | unix.PARODD | unix.CSTOPB | unix.CRTSCTS | unix.CBAUD
-	t.Cflag |= csize[c.DataBits] | unix.CLOCAL | unix.CREAD | bauds[c.Baud]
-	t.Ispeed, t.Ospeed = bauds[c.Baud], bauds[c.Baud]
-	switch c.Parity {
-	case "even":
-		t.Cflag |= unix.PARENB
-	case "odd":
-		t.Cflag |= unix.PARENB | unix.PARODD
-	}
-	if c.StopBits == 2 {
-		t.Cflag |= unix.CSTOPB
-	}
-	switch c.Flow {
-	case "rtscts":
-		t.Cflag |= unix.CRTSCTS
-	case "xonxoff":
-		t.Iflag |= unix.IXON | unix.IXOFF
-	}
-	t.Cc[unix.VMIN], t.Cc[unix.VTIME] = 1, 0
-}
-
-func (p *Port) control(fn func(fd int)) {
-	rc, err := p.f.SyscallConn()
-	if err != nil {
-		return
-	}
-	rc.Control(func(fd uintptr) { fn(int(fd)) })
-}
-
-func (p *Port) Read(b []byte) (int, error)  { return p.f.Read(b) }
-func (p *Port) Write(b []byte) (int, error) { return p.f.Write(b) }
-func (p *Port) Close() error                { return p.f.Close() }
-
-// Break envía una señal BREAK de 0.25 a 0.5 s (tcsendbreak): entra a ROMMON durante
-// el arranque para recuperar la contraseña.
-func (p *Port) Break() error {
-	var err error
-	p.control(func(fd int) { err = unix.IoctlSetInt(fd, unix.TCSBRK, 0) })
-	if err != nil {
-		return fmt.Errorf("serialcon: BREAK: %w", err)
-	}
-	return nil
-}
-
-// List devuelve los adaptadores USB-serie presentes (ttyUSB: FTDI, Prolific, CP210x;
-// ttyACM: la consola USB mini-B/USB-C de los Catalyst e ISR).
-func List() []string { return list("/dev") }
-
-func list(dir string) []string {
-	var out []string
-	for _, pat := range []string{"ttyACM*", "ttyUSB*"} {
-		m, _ := filepath.Glob(filepath.Join(dir, pat))
-		out = append(out, m...)
-	}
-	return out
-}
-
-// Pty abre un pseudo-terminal y devuelve el maestro y la ruta del esclavo. El
-// esclavo se comporta como un puerto serie: sirve de equipo falso en pruebas.
-func Pty() (*os.File, string, error) {
-	m, err := os.OpenFile("/dev/ptmx", os.O_RDWR|unix.O_NOCTTY, 0)
-	if err != nil {
-		return nil, "", err
-	}
-	rc, _ := m.SyscallConn()
-	var n int
-	var perr error
-	rc.Control(func(fd uintptr) {
-		if perr = unix.IoctlSetPointerInt(int(fd), unix.TIOCSPTLCK, 0); perr == nil {
-			n, perr = unix.IoctlGetInt(int(fd), unix.TIOCGPTN)
-		}
-	})
-	if perr != nil {
-		m.Close()
-		return nil, "", perr
-	}
-	return m, fmt.Sprintf("/dev/pts/%d", n), nil
 }
