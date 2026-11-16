@@ -36,7 +36,7 @@ func ProtectNewStrict(string) error { return nil }
 func OnlyOwnAccess(path string) (bool, error) { return IsPrivate(path) }
 
 // ReadOnlyDir deja la carpeta sin permiso de escritura (0500) y devuelve cómo restaurarla. Es para pruebas: en Windows
-// chmod no cierra una carpeta, ahí se pone una ACE de «negar» escritura.
+// chmod no cierra una carpeta, ahí se deja una DACL de solo lectura (sin ACE de escritura).
 func ReadOnlyDir(path string) (restore func(), err error) {
 	fi, err := os.Stat(path)
 	if err != nil {

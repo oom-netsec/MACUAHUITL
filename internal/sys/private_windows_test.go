@@ -314,3 +314,31 @@ func TestOpenNewPrivateNaceProtegido(t *testing.T) {
 		t.Fatalf("CreateTempPrivate: %v, %v", ok, err)
 	}
 }
+
+// Lo que llega por red no se desvía: si la carpeta de recepción (ya abierta) se renombra y en su lugar queda una
+// junction a otro sitio, OpenNewPrivateIn rechaza y no se escribe nada allá (a lo sumo queda un archivo vacío).
+func TestOpenNewPrivateInRechazaCarpetaCambiadaPorJunction(t *testing.T) {
+	base := t.TempDir()
+	recv, otro := filepath.Join(base, "recv"), filepath.Join(base, "otro")
+	for _, d := range []string{recv, otro} {
+		if err := MkdirPrivate(d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root, err := os.OpenRoot(recv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	if err := os.Rename(recv, filepath.Join(base, "recv-movida")); err != nil {
+		t.Skipf("no se pudo renombrar la carpeta abierta: %v", err)
+	}
+	mklinkJunction(t, recv, otro)
+	if f, err := OpenNewPrivateIn(root, "x.bat"); err == nil {
+		f.Close()
+		t.Fatal("OpenNewPrivateIn creó el archivo a través de la junction")
+	}
+	if fi, err := os.Stat(filepath.Join(otro, "x.bat")); err == nil && fi.Size() != 0 {
+		t.Fatalf("se escribió contenido en el destino de la junction (%d bytes)", fi.Size())
+	}
+}

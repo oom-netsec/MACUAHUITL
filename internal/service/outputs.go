@@ -162,7 +162,12 @@ func windowsOutputsErr(real string, err error) error {
 		}
 		var rm []string
 		for _, sid := range pe.SIDs {
-			rm = append(rm, `/remove "*`+sid+`"`)
+			if strings.HasPrefix(sid, "S-1-") { // «enlace» o «tipo-ace-N» no son SID: no hay nada que quitar con icacls
+				rm = append(rm, `/remove "*`+sid+`"`)
+			}
+		}
+		if len(rm) == 0 {
+			code = "prefs.outputs.permisos" // sin orden: una junction o un tipo de ACE raro no se arreglan con icacls
 		}
 		return outputsErr(code+".windows", "dir", real, "sid", pe.SID, "remove", strings.Join(rm, " "))
 	case sys.PrivateDirAncestor:

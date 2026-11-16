@@ -188,15 +188,26 @@ func OpenNewPrivate(path string) (*os.File, error) {
 	return os.NewFile(uintptr(h), path), nil
 }
 
-// OpenNewPrivateIn es OpenNewPrivate dentro de una carpeta ya abierta (os.Root). shortcut: arma la ruta con
-// root.Name() en vez de operar sobre el handle de la carpeta (como RenameNoReplaceIn): cambiar la carpeta por un
-// enlace entre la apertura y la creación podría desviar la escritura; pasar a NtCreateFile con RootDirectory si hace
-// falta cerrarlo.
+// OpenNewPrivateIn es OpenNewPrivate dentro de una carpeta ya abierta (os.Root). Crea por nombre (root.Name()) y luego
+// comprueba que el archivo creado sea el mismo que ve la carpeta abierta: si alguien renombró la carpeta y puso una
+// junction en su lugar, el archivo cayó en otro sitio y se rechaza antes de escribir nada (a lo sumo queda ahí un
+// archivo vacío y privado). Va con lo que se recibe por red (fileserve, transfer), cuyo nombre elige quien envía.
+// shortcut: NtCreateFile con RootDirectory (el handle de la carpeta) cerraría también ese archivo vacío.
 func OpenNewPrivateIn(root *os.Root, name string) (*os.File, error) {
 	if filepath.Base(name) != name || !filepath.IsLocal(name) {
 		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
 	}
-	return OpenNewPrivate(filepath.Join(root.Name(), name))
+	f, err := OpenNewPrivate(filepath.Join(root.Name(), name))
+	if err != nil {
+		return nil, err
+	}
+	fst, e1 := f.Stat()
+	rst, e2 := root.Lstat(name)
+	if e1 != nil || e2 != nil || !os.SameFile(fst, rst) {
+		f.Close()
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
+	}
+	return f, nil
 }
 
 // CreateTempPrivate es os.CreateTemp con OpenNewPrivate: el temporal nace privado.
