@@ -1,0 +1,36 @@
+asa# packet-tracer input inside tcp 10.0.0.10 12345 198.51.100.7 443 xml
+<Phase>
+<id>1</id>
+<type>ACCESS-LIST</type>
+<subtype>log</subtype>
+<result>ALLOW</result>
+<config>
+access-group inside_in in interface inside
+access-list inside_in extended permit tcp 10.0.0.0 255.255.255.0 any eq https
+</config>
+<extra>
+ Forward Flow based lookup yields rule:
+ in  id=0x1234abcd, priority=13, domain=permit, deny=false
+</extra>
+</Phase>
+<Phase>
+<id>2</id>
+<type>NAT</type>
+<subtype></subtype>
+<result>ALLOW</result>
+<config>
+nat (inside,outside) source dynamic any interface
+</config>
+<extra>
+Dynamic translate 10.0.0.10/12345 to 192.0.2.1/12345
+</extra>
+</Phase>
+<result>
+<input-interface>inside</input-interface>
+<input-status>up</input-status>
+<input-line-status>up</input-line-status>
+<output-interface>outside</output-interface>
+<output-status>up</output-status>
+<output-line-status>up</output-line-status>
+<action>allow</action>
+</result>

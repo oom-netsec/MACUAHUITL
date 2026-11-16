@@ -1,0 +1,54 @@
+asa# show failover
+Failover On
+Failover unit Primary
+Failover LAN Interface: folink GigabitEthernet0/3 (up)
+Reconnect timeout 0:00:00
+Unit Poll frequency 1 seconds, holdtime 15 seconds
+Interface Poll frequency 5 seconds, holdtime 25 seconds
+Interface Policy 1
+Monitored Interfaces 2 of 1292 maximum
+MAC Address Move Notification Interval not set
+failover replication http
+Version: Ours 9.22(1)7, Mate 9.22(1)7
+Serial Number: Ours 9ABCDEF0001, Mate 9ABCDEF0002
+Last Failover at: 10:21:44 UTC Nov 9 2026
+
+	This host: Primary - Active 
+		Active time: 5120 (sec)
+		slot 0: ASAv hw/sw rev (/9.22(1)7) status (Up Sys)
+		  Interface outside (203.0.113.1): Normal (Monitored)
+		  Interface inside (10.0.0.1): Normal (Monitored)
+	Other host: Secondary - Standby Ready 
+		Active time: 0 (sec)
+		slot 0: ASAv hw/sw rev (/9.22(1)7) status (Up Sys)
+		  Interface outside (203.0.113.2): Normal (Monitored)
+		  Interface inside (10.0.0.2): Failed (Waiting)
+
+Stateful Failover Logical Update Statistics
+	Link : folink GigabitEthernet0/3 (up)
+	Stateful Obj	xmit		xerr		rcv		rerr
+	General	1959		0		1873		0
+	sys cmd	380		0		380		0
+	up time	0		0		0		0
+	RPC services	0		0		0		0
+	TCP conn	1435		0		1450		0
+	UDP conn	0		0		0		0
+	ARP tbl	124		0		65		0
+	Xlate_Timeout	0		0		0		0
+	IPv6 ND tbl	20		0		0		0
+	VPN IKEv1 SA	0		0		0		0
+	VPN IKEv1 P2	0		0		0		0
+	VPN IKEv2 SA	0		0		0		0
+	VPN IKEv2 P2	0		0		0		0
+	SIP Session	0		0		0		0
+	Route Session	0		0		0		0
+	Router ID	0		0		0		0
+	User-Identity	0		0		0		0
+	IPv6 Route	0		0		0		0
+	STS Table	0		0		0		2
+	Umbrella Device-ID	0		0		0		0
+
+	Logical Update Queue Information
+			Cur	Max	Total
+	Recv Q:	0	4	1873
+	Xmit Q:	0	9	2394

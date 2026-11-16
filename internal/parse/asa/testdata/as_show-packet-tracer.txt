@@ -1,0 +1,47 @@
+asa# packet-tracer input inside tcp 10.0.0.10 12345 198.51.100.7 443
+
+Phase: 1
+Type: CAPTURE
+Subtype:
+Result: ALLOW
+Config:
+Additional Information:
+MAC Access list
+
+Phase: 2
+Type: ACCESS-LIST
+Subtype:
+Result: ALLOW
+Config:
+Implicit Rule
+Additional Information:
+MAC Access list
+
+Phase: 3
+Type: ROUTE-LOOKUP
+Subtype: Resolve Egress Interface
+Result: ALLOW
+Config:
+Additional Information:
+found next-hop 192.0.2.254 using egress ifc outside
+
+Phase: 4
+Type: ACCESS-LIST
+Subtype: log
+Result: ALLOW
+Config:
+access-group inside_in in interface inside
+access-list inside_in extended permit tcp 10.0.0.0 255.255.255.0 any eq https
+Additional Information:
+ Forward Flow based lookup yields rule:
+ in  id=0x1234abcd, priority=13, domain=permit, deny=false
+	hits=4, user_data=0x5678, cs_id=0x0, use_real_addr, flags=0x0, protocol=6
+
+Result:
+input-interface: inside
+input-status: up
+input-line-status: up
+output-interface: outside
+output-status: up
+output-line-status: up
+Action: allow

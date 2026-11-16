@@ -1,0 +1,6 @@
+asa# show conn count
+40 in use, 55 most used
+Cluster:
+	fwd connections: 0 in use, 0 most used
+	dir connections: 0 in use, 0 most used
+	centralized connections: 0 in use, 0 most used

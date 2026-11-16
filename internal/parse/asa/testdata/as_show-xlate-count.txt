@@ -1,0 +1,3 @@
+asa# show xlate count
+12 in use, 31 most used
+Cumulative allocated xlates: 530

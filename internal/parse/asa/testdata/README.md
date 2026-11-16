@@ -8,6 +8,8 @@ Ninguno es una transcripción de un equipo real: cada archivo sigue el formato d
 - **Citados** (líneas del ejemplo publicado, con valores adaptados): `show failover state`, `show failover history` (con y sin `details`), `show resource usage` (sistema, resumen y un contexto), `show version`, `show mode` y `show cluster info` con MASTER/SLAVE.
 - **Reconstruidos en el formato de 9.x** a partir de la documentación y del conocimiento de la salida del ASA, sin una salida publicada completa delante: `aa_show-failover.txt` (el ejemplo publicado es de 7.0; se le agregaron las líneas de 9.x `Version: Ours/Mate`, `Serial Number: Ours/Mate`, `Reconnect timeout`, `MAC Address Move Notification Interval`, `Normal (Monitored)`, las filas nuevas de la tabla y `Logical Update Queue Information`), `sys_show-context.txt` (columnas Class y Mode de 9.x), `sys_show-context-detail.txt`, los `show running-config` / `more system:running-config` del sistema y del cluster, `cl_show-cluster-conn-count.txt` y `cl_show-cluster-info-control-data.txt` (derivado del de MASTER/SLAVE cambiando solo las palabras de estado; no trae los campos nuevos de 9.20, como `Cluster Member Limit` o `Site ID`).
 
+**Fixtures de 42c** (todas reconstruidas, sin validar en laboratorio, "not yet tested in a lab"; prefijo `as_` = contexto único, A/S, 9.22): `as_show-failover.txt`, `as_show-failover-state.txt`, `as_show-checksum.txt`, `as_show-conn-count.txt`, `as_show-xlate-count.txt`, `as_show-asp-drop.txt`, `as_show-packet-tracer.txt`, `as_show-packet-tracer-drop.txt`, `as_show-packet-tracer-xml.txt` y `cl_show-cluster-info-health.txt` (no hay salida publicada de `health`: el formato es una suposición razonable). `aa_show-failover.txt` se ajustó con rasgos observados en un equipo real, sin copiar su salida: sangrías y columnas con tabulaciones, la línea `Link :`, la fila `Umbrella Device-ID` y la cola con columnas Cur/Max/Total por tabulaciones; `as_show-failover.txt` trae además la línea de la unidad con un espacio al final y filas de 9.22 con valores inventados. Los parsers tratan tabulaciones y espacios por igual y guardan las filas desconocidas de la tabla de estadísticas.
+
 Antes de que un parser dependa de un detalle (espacios, orden de campos), coteja ese archivo con la página abierta en el navegador o con una salida de laboratorio.
 
 Las URL de la columna «Fuente» son las páginas de Cisco de donde sale el formato. Abreviatura: CR = https://www.cisco.com/c/en/us/td/docs/security/asa/asa-cli-reference/S/asa-command-ref-S (ASA Command Reference, show commands); CFG = https://www.cisco.com/c/en/us/td/docs/security/asa (CLI Book 1, General Operations).
@@ -81,10 +83,9 @@ Sin ejemplo publicado que se pudiera consultar, no se inventaron:
 
 - `show resource usage context all` (todos los contextos): la documentación solo trae sistema, resumen y un contexto.
 - `show failover group 1`: la documentación solo describe la sintaxis.
-- `show cluster info health`, `show cluster history`, `show cluster info conn-distribution`, `show cluster info packet-distribution`, `show cluster cpu`, `show cluster memory`: las páginas de Cisco que se pudieron leer los describen sin salida de ejemplo (la referencia de comandos de la sección show cluster no se pudo leer completa). Hay que revisar esa referencia a mano.
+- `show cluster history`, `show cluster info conn-distribution`, `show cluster info packet-distribution`, `show cluster cpu`, `show cluster memory`: las páginas de Cisco que se pudieron leer los describen sin salida de ejemplo (la referencia de comandos de la sección show cluster no se pudo leer completa). Hay que revisar esa referencia a mano.
 - `cluster-key`: no hay ejemplo publicado con ese comando.
 - `show running-config` completo del sistema: solo hay fragmentos; el fixture está armado con ellos.
-- `show checksum`.
 - `show running-config` dentro de un contexto (con `ASA Version … <context>`).
 - `show conn count` y `show xlate count` por contexto.
 - Prompt de cluster con espacio (`data node`) del ejemplo del comando `prompt`.

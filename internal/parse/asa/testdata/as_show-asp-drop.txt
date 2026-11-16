@@ -1,0 +1,18 @@
+asa# show asp drop
+
+Frame drop:
+  Invalid encapsulation                                      (invalid-encap)                  3
+  Invalid tcp length                                         (invalid-tcp-hdr-length)         1
+  No route to host                                           (no-route)                      14
+  Flow is denied by configured rule                          (acl-drop)                    2210
+  Reverse-path verify failed                                 (rpf-violated)                  57
+  TCP packet SEQ past window                                 (tcp-seq-past-win)               9
+
+Last clearing: 08:15:02 UTC Nov 9 2026 by enable_15
+
+Flow drop:
+  Flow is denied by access rule                              (acl-drop)                       8
+  NAT failed                                                 (nat-failed)                     2
+  Need to start IKE negotiation                              (need-ike)                       0
+
+Last clearing: Never
