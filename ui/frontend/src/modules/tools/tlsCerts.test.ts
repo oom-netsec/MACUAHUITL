@@ -1,4 +1,4 @@
-import { certTone, parseTls } from "./tlsChain";
+import { certTone, parseTls } from "./tlsCerts";
 import { tlsSample } from "./samples";
 
 test("ordena la cadena del servidor a la raíz con su rol y los días restantes", () => {

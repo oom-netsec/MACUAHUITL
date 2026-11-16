@@ -13,6 +13,8 @@ if [[ "${1:-}" == "test" ]]; then
   [[ -f ui/frontend/dist/index.html ]] || (cd ui/frontend && npm run build >/dev/null)
   CGO_ENABLED=0 GOFLAGS=-tags=wails,purego go run ./tools/noegress/cmd/noegress ./ui/
   go run ./tools/archcheck/cmd/archcheck ./...
+  # En Windows y macOS dos rutas que solo difieren en mayúsculas son el mismo archivo: git deja uno solo al hacer checkout.
+  dup=$(git ls-files | sort -f | uniq -di); [[ -z $dup ]] || { echo "rutas que chocan sin mayúsculas:"; echo "$dup"; exit 1; }
   (cd ui/frontend && npm test)
   echo "Pruebas en verde. Ojo: la prueba de empaquetado reescribe bin/; corre ./dev.sh para recompilar."
   exit 0
