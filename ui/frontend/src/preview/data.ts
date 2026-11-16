@@ -4,6 +4,7 @@ import { fakeScripts } from "../modules/scripts/fake";
 import type { ScriptItem } from "../modules/scripts/api";
 import { fakeInventory, sampleDevices, sampleHostFields, sampleHostsImport } from "../modules/inventory/fake";
 import { samplePlaybooks } from "../modules/patrol/fake";
+import { sampleMetrics } from "../modules/metrics/fake";
 import { sampleRestore } from "../modules/backup/fake";
 import { fakeSettings } from "../modules/settings/fake";
 import type { Host } from "../modules/inventory/api";
@@ -22,6 +23,8 @@ export function sample(): Partial<CoreAPI> {
     hostsImportFormat: async () => ({ fields: hostFieldsEn, maxRows: 1000, maxBytes: 5 << 20 }),
     hostsImportTemplate: async (format: "csv" | "json") => hostsTemplate(format),
     listPlaybooks: async () => playbooksEn,
+    // Documentation addresses (RFC 5737) for screenshots; the test double keeps its own.
+    jobMetrics: async () => ({ ...sampleMetrics, devices: sampleMetrics.devices.map((d) => ({ ...d, address: "192.0.2.11" })) }),
     packList: async () => packsEn,
     packInspect: async () => ({ pack: packsEn[3], playbookIds: sdaIds.map((i) => "sda/" + i), scriptIds: sdaIds.map((i) => "lib-sda-" + i), replacedVersion: "", sha256: "a".repeat(64), displaced: [] as string[] }),
     pickPath: async () => "/home/user/Downloads/oom-sda-1.0.0.mpack",
@@ -38,9 +41,9 @@ export function sample(): Partial<CoreAPI> {
       { id: "c5", label: "WAN edge", username: "wanops", hasEnable: true, hasSshKey: false },
     ],
     getRun: async () => [
-      { target: "10.0.0.1:22", state: "DEVICE_STATE_COMPLETED", detail: "" },
-      { target: "10.0.0.2:22", state: "DEVICE_STATE_RUNNING", detail: "" },
-      { target: "10.0.0.3:22", state: "DEVICE_STATE_FAILED", detail: "timed out" },
+      { target: "192.0.2.11:22", state: "DEVICE_STATE_COMPLETED", detail: "" },
+      { target: "192.0.2.12:22", state: "DEVICE_STATE_RUNNING", detail: "" },
+      { target: "192.0.2.13:22", state: "DEVICE_STATE_FAILED", detail: "timed out" },
     ],
     auditVerify: async () => ({ intact: true, firstBroken: 0, head: "7f3a9c01d4e2b685a0c7e1f93b24d86a5c10e7ab9d3f2468c1b05e7a94d3c2f8" }),
     listJobs: async () => [
@@ -265,11 +268,11 @@ const packsEn: PackInfo[] = [
   pack("oom/ios-xe", "1.1.1", "IOS-XE, TAC diagnostics", "Read-only layer 1, 2, 3, platform, services, VPN and router WAN playbooks for IOS-XE, with their script library.", "ios-xe", 69),
   pack("oom/cat9k", "1.0.0", "Catalyst 9000, TAC diagnostics", "Read-only playbooks for Catalyst 9200/9300/9400/9500/9600 running IOS-XE 17.x - platform, stack and StackWise Virtual, PoE, ASIC, CPU and punt, security, services, L1, L2, L3 and TAC cases; the per-interface and per-MAC ones ask for that datum.", "cat9k", 55),
   pack("oom/sda", "1.0.0", "SD-Access, TAC diagnostics", "Read-only playbooks for the SD-Access fabric on Catalyst 9000 running IOS-XE 17.x - LISP, fabric (roles, VNs, access tunnels, CTS/SGT), edge, border and TAC cases; the per-endpoint ones ask for its MAC, IP or interface.", "sda", 26),
-  pack("oom/wlc-9800", "1.0.0", "Catalyst 9800, TAC diagnostics", "Read-only playbooks for the Catalyst 9800 wireless controller (appliance, 9800-CL and EWC on 9100/9120 APs) with IOS-XE 17.x - controller, APs, clients, RF, WLANs, security, mobility and TAC cases; the per-client and per-AP ones ask for the MAC or name.", "wlc-9800", 47),
+  pack("oom/wlc-9800", "1.0.2", "Catalyst 9800, TAC diagnostics", "Read-only playbooks for the Catalyst 9800 wireless controller (appliance, 9800-CL and EWC on 9100/9120 APs) with IOS-XE 17.x - controller, APs, clients, RF, WLANs, security, mobility and TAC cases; the per-client and per-AP ones ask for the MAC or name.", "wlc-9800", 47),
   pack("oom/wlc-aireos", "1.0.1", "AireOS · Cisco wireless controllers, TAC diagnostics", "Read-only playbooks for Cisco AireOS wireless controllers 8.5 to 8.10 (2504, 3504, 5508, 5520, 8540, vWLC) - platform and health, APs (CAPWAP join, inventory, radios), clients, WLANs, RF/RRM and CleanAir, mobility and anchors, security (RADIUS, TACACS, rogues, ACLs), interfaces and ports, services and TAC cases; the per-AP, per-client and per-WLAN ones ask for that datum.", "wlc-aireos", 64),
   pack("oom/nx-os", "1.0.1", "Nexus NX-OS, TAC diagnostics", "Read-only playbooks for Cisco Nexus switches running NX-OS (9000, 7000, 5000/6000, 3000) - platform, interfaces, L2 and vPC, VXLAN/EVPN, routing, FEX, security, services and TAC cases; the per-interface, per-IP and per-MAC ones ask for that datum.", "nx-os", 68),
   pack("oom/aci", "1.0.1", "Cisco ACI, leaf and spine", "Read-only playbooks for Nexus 9000 leaf and spine switches in ACI mode from their CLI - fabric (IS-IS, VTEP, MP-BGP), endpoints (EPM), contracts (zoning-rule), vPC, interfaces, L3Out (BGP, OSPF, BFD) and TAC cases; the per-IP, per-MAC, per-VRF, per-VNID and per-interface ones ask for that datum.", "nx-os", 45),
-  pack("oom/asa", "1.0.0", "Cisco ASA, TAC diagnostics", "Read-only playbooks for Cisco ASA 9.x (ASAv, 5500-X, Firepower with ASA image), in single and multiple context mode - platform, interfaces, firewall (connections, NAT, ACLs, inspection), VPN, failover and cluster, contexts, routing, security, services and TAC cases; the per-interface, per-IP and per-peer ones ask for that datum.", "asa", 68),
+  pack("oom/asa", "1.0.2", "Cisco ASA, TAC diagnostics", "Read-only playbooks for Cisco ASA 9.x (ASAv, 5500-X, Firepower with ASA image), in single and multiple context mode - platform, interfaces, firewall (connections, NAT, ACLs, inspection), VPN, failover and cluster, contexts, routing, security, services and TAC cases; the per-interface, per-IP and per-peer ones ask for that datum.", "asa", 68),
   pack("oom/ftd", "1.0.0", "Cisco Secure Firewall Threat Defense (FTD), TAC diagnostics", "Read-only playbooks for Cisco Secure Firewall Threat Defense (FTD 7.x, managed by FMC or FDM) from its normal CLI - platform and health, interfaces, firewall (connections, NAT, lina ACLs, access control policy), Snort, VPN, high availability and cluster, management with the FMC, routing, services and TAC cases; the per-interface, per-IP and per-peer ones ask for that datum.", "ftd", 64),
   pack("oom/ise", "1.0.0", "ISE · Cisco Identity Services Engine, TAC diagnostics", "Read-only playbooks for Cisco ISE 3.x nodes (PAN, MnT, PSN and pxGrid) from their ADE-OS CLI - version and patches, application process status, CPU, memory and disks, backups, interfaces, routes, ports, DNS and NTP, services (RADIUS, TACACS+, pxGrid, certificates, Active Directory, replication), application logs and TAC cases; the connectivity one asks for the target IP.", "ise", 36),
 ];

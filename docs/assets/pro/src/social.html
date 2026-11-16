@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- Fuente de docs/assets/portada.png (portada del README y vista social de GitHub, 2560×1280). Se cambia este archivo,
+     no el PNG; las capturas de shots/ salen de capture.cjs y la imagen de render.cjs (ver README.md aquí). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>social</title>
+<style>
+  @font-face { font-family: "Inter"; src: url("../../../../ui/frontend/src/assets/fonts/InterVariable-latin.woff2") format("woff2"); font-weight: 100 900; }
+  :root { --ink: #f4f4f5; --dim: #9b9ea4; --teal: #4fd1b5; --line: rgba(255, 255, 255, 0.09); }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; color: var(--ink); font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased; }
+  body {
+    position: relative;
+    background:
+      radial-gradient(ellipse 700px 420px at 12% 18%, rgba(79, 209, 181, 0.13), transparent 70%),
+      radial-gradient(ellipse 600px 380px at 82% 95%, rgba(79, 209, 181, 0.07), transparent 70%),
+      linear-gradient(180deg, #0a0f0e, #050606);
+  }
+  body::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 64px 64px; opacity: 0.35;
+    mask-image: radial-gradient(ellipse 900px 520px at 30% 40%, #000 20%, transparent 80%);
+  }
+  .left { position: absolute; left: 64px; top: 150px; width: 520px; }
+  .brand { display: flex; align-items: center; gap: 18px; }
+  .brand img { width: 68px; height: 68px; }
+  .brand h1 { font-size: 64px; font-weight: 750; letter-spacing: -0.01em; line-height: 1; }
+  .acr { margin-top: 26px; color: var(--dim); font-size: 15.5px; line-height: 1.55; letter-spacing: 0.005em; }
+  .acr b { color: var(--teal); font-weight: 650; }
+  .claim { margin-top: 26px; font-size: 34px; font-weight: 720; letter-spacing: -0.03em; line-height: 1.12; }
+  .claim span { display: block; color: var(--teal); }
+  .tags { padding: 0; margin-top: 28px; display: flex; flex-wrap: wrap; gap: 10px; width: 540px; }
+  .tags li { list-style: none; display: inline-flex; align-items: center; gap: 9px; padding: 8px 15px 8px 13px; border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px; background: rgba(255, 255, 255, 0.035); font-size: 16.5px; font-weight: 560; letter-spacing: -0.005em; white-space: nowrap; }
+  .tags li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--teal); }
+  .tags li.key { border-color: rgba(79, 209, 181, 0.55); background: rgba(79, 209, 181, 0.08); }
+  .shot { position: absolute; left: 626px; top: 112px; width: 630px; height: 394px; border-radius: 14px; overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(0, 0, 0, 0.5); }
+  .shot img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .shot .light { clip-path: polygon(76% 0, 100% 0, 100% 100%, 73.5% 100%); }
+  .shot svg { position: absolute; inset: 0; }
+  .chip { position: absolute; top: 46px; padding: 5px 11px; border-radius: 8px; font-size: 12.5px; font-weight: 700; letter-spacing: 0.16em; }
+  .chip.d { right: 160px; color: var(--teal); background: #0b1311; border: 1px solid rgba(79, 209, 181, 0.6); }
+  .chip.l { right: 14px; color: #0f766e; background: #fff; border: 1px solid #99e2d1; }
+</style>
+</head>
+<body>
+  <section class="left">
+    <div class="brand"><img src="../../../../ui/frontend/public/favicon.svg" alt=""><h1>MACUAHUITL</h1></div>
+    <p class="acr"><b>M</b>ulti-vendor <b>A</b>utomated <b>C</b>ommand &amp; <b>U</b>nitary <b>A</b>udit <b>H</b>ub<br>
+      <b>U</b>nified for <b>I</b>nterface <b>T</b>elemetry &amp; <b>L</b>ogging</p>
+    <p class="claim">TAC-grade network engineering.<span>100% local. Zero cloud.</span></p>
+    <ul class="tags">
+      <li class="key">Assisted changes · exact rollback</li>
+      <li class="key">Secrets masked</li>
+      <li>Patrol</li>
+      <li>Signed packs</li>
+      <li>Hash-chained audit</li>
+      <li>Argon2id + AES-GCM vault</li>
+    </ul>
+  </section>
+  <figure class="shot">
+    <img src="shots/patrol-dark.png" alt="">
+    <img class="light" src="shots/patrol-light.png" alt="">
+    <svg viewBox="0 0 630 394" preserveAspectRatio="none"><line x1="478.8" y1="0" x2="463" y2="394" stroke="#4fd1b5" stroke-width="2.5"/></svg>
+    <span class="chip d">DARK</span><span class="chip l">LIGHT</span>
+  </figure>
+</body>
+</html>
