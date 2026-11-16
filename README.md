@@ -3,8 +3,8 @@
 <h3 align="center">A TAC in every network engineer's laptop.</h3>
 
 <p align="center">
-Collect evidence from Cisco devices on a schedule, analyze it, change the network safely<br>
-and keep a verifiable record of everything. On your machine. Nowhere else.
+A Linux desktop app for network and TAC engineers. Collect evidence from Cisco devices on a schedule,<br>
+analyze it, change the network safely and keep a verifiable record of everything. On your machine. Nowhere else.
 </p>
 
 <p align="center">
@@ -18,6 +18,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 <p align="center">
   <a href="#install"><b>Install</b></a> &nbsp;·&nbsp;
   <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
+  <a href="#safe-by-design">Safe by design</a> &nbsp;·&nbsp;
   <a href="#everything-inside">Everything inside</a> &nbsp;·&nbsp;
   <a href="#content-packs">Content packs</a> &nbsp;·&nbsp;
   <a href="#supported-platforms-and-packs">Platforms</a> &nbsp;·&nbsp;
@@ -25,6 +26,15 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
   <a href="#what-it-does-not-do">What it does not do</a> &nbsp;·&nbsp;
   <a href="docs/roadmap.md">Roadmap</a>
 </p>
+
+### Why not a folder of scripts?
+
+Scripts collect. MACUAHUITL also analyzes what it collected and changes the network with guard rails:
+
+- **Every change is planned first.** You see each line and its exact rollback before anything is sent, and confirm one step at a time.
+- **It never cuts the branch you sit on.** Port templates refuse the port your own SSH session arrives on, and an SVI whose subnet holds your address.
+- **Secrets stay masked** in evidence, terminal recordings, logs and syslog, and credentials live in an encrypted local vault.
+- **Everything is audited** in a hash-chained log you can verify with one command.
 
 <br>
 
@@ -43,6 +53,23 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 <p align="center"><img src="docs/assets/pro/change.jpg" alt="Changes: change windows with proof. Pre/post comparison with a verdict per device."></p>
 
 **Changes** come with proof. Capture the same commands before and after a window and get a verdict per device, plus upgrade pre-flight and compliance against golden templates. Anything that touches configuration runs in **assisted change mode**: every command shown first, every step confirmed, the rollback ready.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/screens/assist-plan-dark.png" alt="Assisted change plan: the lines to apply next to their exact rollback, and the line that must appear afterwards"><br><sub><b>The plan.</b> The lines to send, next to the rollback that restores the captured configuration, and what the post-check expects.</sub></td>
+    <td width="50%"><img src="docs/assets/screens/assist-confirm-dark.png" alt="Assisted change step waiting for confirmation, with the exact lines that will be sent"><br><sub><b>One step at a time.</b> Each step waits for you with exactly the lines it will send. Roll back or abort at any point.</sub></td>
+  </tr>
+</table>
+
+### Safe by design
+
+Each of these was checked on lab devices or a real desktop, and is in the release notes:
+
+- **Your own session is off limits.** Port templates refuse the port your SSH session arrives on, and an SVI whose subnet holds your address. On a Catalyst 3560-CX, `shutdown` on the session's port was refused with *"Gi0/3 is the port this session arrives on"* ([v0.6.5](../../releases/tag/v0.6.5)).
+- **Rollback means the configuration as it was.** All 21 write templates were applied, verified and rolled back on lab devices (Cisco Modeling Labs and a Catalyst 3560-CX); the configuration was identical after every rollback ([v0.5.4](../../releases/tag/v0.5.4), [v0.6.4](../../releases/tag/v0.6.4)).
+- **An unknown error stops the change.** Any unrecognized `% …` reply in configuration mode stops the apply and offers the rollback ([v0.6.5](../../releases/tag/v0.6.5)).
+- **Secrets are masked everywhere they can show up**, including abbreviated IOS forms typed at the terminal. Masking is fuzz-tested and was checked on every lab run; known gaps are listed in the release notes, never hidden ([v0.5.0](../../releases/tag/v0.5.0), [v0.6.5](../../releases/tag/v0.6.5)).
+- **The published app is a production build**, without the web inspector that could call the app's internal functions ([v0.6.5](../../releases/tag/v0.6.5)).
 
 <br>
 
