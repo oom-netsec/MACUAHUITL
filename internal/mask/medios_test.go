@@ -156,8 +156,7 @@ func informar(t *testing.T, malos []string) {
 	}
 }
 
-// Punto a: « | » y « ; » dentro de un secreto. Donde la plataforma no separa comandos con « ; » (IOS, o no se sabe) el
-// tramo llega hasta el fin de la línea; y en un comando con secreto no hay filtro tras «|».
+// Punto a: « | » y « ; » dentro de un secreto. En todas las plataformas el tramo llega hasta el fin de la línea; y en un comando con secreto no hay filtro tras «|».
 func TestBarraYPuntoYComaDentroDelSecreto(t *testing.T) {
 	cmds := []string{
 		"username u secret 0 Zq00001 | Zq00002", "username u secret 0 Zq00001|Zq00002;Zq00003", "username u secret 0 Zq00001 ; Zq00002",
@@ -167,8 +166,10 @@ func TestBarraYPuntoYComaDentroDelSecreto(t *testing.T) {
 	for _, p := range []string{"ios-xe", "", "asa", "ftd"} {
 		informar(t, fugasEnVias(p, cmds, nil))
 	}
-	// NX-OS e ISE separan comandos con « ; »: lo que sigue es otro comando, también en el accounting (que lo trae por definición).
-	informar(t, fugasEnVias("nx-os", []string{"enable secret Zq00001 | Zq00002", "snmp-server community Zq00001 | Zq00002"}, nil))
+	// NX-OS e ISE también: un « ; » dentro del valor es el resto del secreto (ver nxos_punto_y_coma_test.go).
+	for _, p := range []string{"nx-os", "ise"} {
+		informar(t, fugasEnVias(p, cmds, nil))
+	}
 }
 
 // Punto e, sin la red por contenido: un valor solo de dígitos y de menos de 8 no se recuerda (spValue), así que el resto

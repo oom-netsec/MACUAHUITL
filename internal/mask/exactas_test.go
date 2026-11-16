@@ -9,10 +9,14 @@ import (
 // ya lo dejaba visible viejo y en el mismo sitio. Es el helper con el que se comprueba que una prueba exacta puede
 // cambiar su valor esperado.
 func superconjunto(nuevo, viejo string) bool {
-	if k := strings.Count(nuevo, " ; "); k > 0 && k == strings.Count(viejo, " ; ") { // una región por segmento
-		ns, vs := strings.Split(nuevo, " ; "), strings.Split(viejo, " ; ")
+	ns, vs := strings.Split(nuevo, " ; "), strings.Split(viejo, " ; ")
+	if len(ns) > 1 && len(ns) <= len(vs) { // una región por segmento; el último de nuevo puede juntar el resto de la línea (el secreto llega hasta el fin)
 		for i := range ns {
-			if !superconjunto1(ns[i], vs[i]) {
+			v := vs[i]
+			if i == len(ns)-1 {
+				v = strings.Join(vs[i:], " ; ")
+			}
+			if !superconjunto1(ns[i], v) {
 				return false
 			}
 		}
