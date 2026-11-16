@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 	"google.golang.org/grpc"
@@ -114,4 +115,25 @@ func peerUID(c net.Conn) int {
 // DialPath conecta a un socket concreto (pruebas y diagnóstico).
 func DialPath(path string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	return grpc.NewClient("unix://"+path, baseDial(opts)...)
+}
+
+// CoreRunning dice si el núcleo del usuario escucha: conecta al socket y lo cierra, sin sesión gRPC.
+func CoreRunning() (bool, error) {
+	p, err := SocketPath()
+	if err != nil {
+		return false, err
+	}
+	return coreRunning(p)
+}
+
+func coreRunning(path string) (bool, error) {
+	c, err := net.DialTimeout("unix", path, 2*time.Second)
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ECONNREFUSED) {
+		return false, nil // sin socket, o el socket quedó de un núcleo muerto
+	}
+	if err != nil {
+		return false, fmt.Errorf("ipc: %w", err)
+	}
+	c.Close()
+	return true, nil
 }
