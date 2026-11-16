@@ -55,6 +55,7 @@ tr[data-state="bad"] td:nth-child(2) { color: var(--critical); }
 .grid tbody tr { position: absolute; top: 0; left: 0; }
 .grid td { vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grid tr[data-state="DEVICE_STATE_FAILED"] td:nth-child(2) { color: var(--critical); }
+.grid tr[data-state="DEVICE_STATE_PARTIAL"] td:nth-child(2) { color: var(--warning); }
 
 @media (max-width: 1100px) {
   .patrol { grid-template-columns: 1fr; }

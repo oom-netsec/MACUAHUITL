@@ -76,11 +76,32 @@ type fakePatrol struct {
 func (fakePatrol) ListJobs(context.Context, *v1.ListJobsRequest) (*v1.ListJobsResponse, error) {
 	return &v1.ListJobsResponse{Jobs: []*v1.JobSummary{
 		{JobId: "j1", Name: "caso-1", State: "armed", NextRoundAt: timestamppb.New(t0.Add(time.Hour)), ArmedAt: timestamppb.New(t0),
-			WindowEndsAt: timestamppb.New(t0.Add(4 * time.Hour)), Round: 1, Rounds: 3, DevicesTotal: 4, DevicesOk: 3, DevicesFailed: 1, OutputDir: "/o/caso-1_x", Kind: "backup",
+			WindowEndsAt: timestamppb.New(t0.Add(4 * time.Hour)), Round: 1, Rounds: 3, DevicesTotal: 4, DevicesOk: 3, DevicesFailed: 1, DevicesPartial: 2, OutputDir: "/o/caso-1_x", Kind: "backup",
 			Phases: []*v1.JobPhase{{At: timestamppb.New(t0), Kind: v1.JobPhaseKind_JOB_PHASE_KIND_ARMED, Detail: "4 equipos"},
 				{At: timestamppb.New(t0.Add(time.Minute)), Kind: v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_FINISHED, Round: 1, Detail: "3 correctos, 1 con fallas"}}},
 		{JobId: "j2", Name: "nuevo", State: "created", Rounds: 1},
 	}}, nil
+}
+
+func (fakePatrol) GetRun(context.Context, *v1.GetRunRequest) (*v1.GetRunResponse, error) {
+	return &v1.GetRunResponse{Devices: []*v1.RunDevice{
+		{Target: &v1.Target{Address: "10.0.0.1", Port: 22}, State: v1.DeviceState_DEVICE_STATE_PARTIAL, CutCommands: 2, Reconnects: 1},
+		{Target: &v1.Target{Address: "10.0.0.2", Port: 22}, State: v1.DeviceState_DEVICE_STATE_COMPLETED},
+	}}, nil
+}
+
+// Los comandos cortados y las reconexiones de un equipo PARTIAL viajan al front; en los demás se omiten.
+func TestGetRunPartial(t *testing.T) {
+	b, _ := startServices(t, func(r ipc.Registrar) { v1.RegisterPatrolServiceServer(r, fakePatrol{}) })
+	got, err := b.GetRun("j1", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `[{"target":"10.0.0.1:22","state":"DEVICE_STATE_PARTIAL","detail":"","cutCommands":2,"reconnects":1},` +
+		`{"target":"10.0.0.2:22","state":"DEVICE_STATE_COMPLETED","detail":""}]`
+	if s := jsonOf(t, got); s != want {
+		t.Fatalf("json = %s", s)
+	}
 }
 
 type fakePhaseEvents struct {
@@ -104,11 +125,11 @@ func TestJobDTOAndPhaseEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := `[{"id":"j1","name":"caso-1","state":"armed","nextRoundAt":"2026-11-04T19:00:00Z","armedAt":"2026-11-04T18:00:00Z",` +
-		`"windowEndsAt":"2026-11-04T22:00:00Z","round":1,"rounds":3,"devicesTotal":4,"devicesOk":3,"devicesFailed":1,"outputDir":"/o/caso-1_x","kind":"backup",` +
+		`"windowEndsAt":"2026-11-04T22:00:00Z","round":1,"rounds":3,"devicesTotal":4,"devicesOk":3,"devicesFailed":1,"devicesPartial":2,"outputDir":"/o/caso-1_x","kind":"backup",` +
 		`"phases":[{"at":"2026-11-04T18:00:00Z","kind":"JOB_PHASE_KIND_ARMED","round":0,"detail":"4 equipos"},` +
 		`{"at":"2026-11-04T18:01:00Z","kind":"JOB_PHASE_KIND_ROUND_FINISHED","round":1,"detail":"3 correctos, 1 con fallas"}]},` +
 		`{"id":"j2","name":"nuevo","state":"created","nextRoundAt":"","armedAt":"","windowEndsAt":"","round":0,"rounds":1,` +
-		`"devicesTotal":0,"devicesOk":0,"devicesFailed":0,"outputDir":"","kind":"","phases":[]}]`
+		`"devicesTotal":0,"devicesOk":0,"devicesFailed":0,"devicesPartial":0,"outputDir":"","kind":"","phases":[]}]`
 	if s := jsonOf(t, jobs); s != want {
 		t.Fatalf("json =\n%s\nwant\n%s", s, want)
 	}

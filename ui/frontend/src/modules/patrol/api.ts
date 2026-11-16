@@ -9,7 +9,7 @@ export interface JobPhase { at: string; kind: string; round?: number; detail?: s
 export interface Job {
   id: string; name: string; state: string;
   armedAt?: string; windowEndsAt?: string; nextRoundAt?: string;
-  round?: number; rounds?: number; devicesTotal?: number; devicesOk?: number; devicesFailed?: number;
+  round?: number; rounds?: number; devicesTotal?: number; devicesOk?: number; devicesFailed?: number; devicesPartial?: number;
   outputDir?: string; phases?: JobPhase[];
   kind?: string; // patrol, adhoc, backup o change; un núcleo anterior no lo manda
 }
@@ -40,7 +40,8 @@ export interface JobSpec {
   schedule: { intervalSeconds?: number; rounds?: number; cron?: string };
   params?: Record<string, string>; // un valor por dato que piden los playbooks elegidos
 }
-export interface RunDevice { target: string; state: string; detail: string; reason?: string; args?: Record<string, string> }
+// cutCommands y reconnects solo vienen con estado PARTIAL; ausentes = 0.
+export interface RunDevice { target: string; state: string; detail: string; reason?: string; args?: Record<string, string>; cutCommands?: number; reconnects?: number }
 // Un playbook del catálogo: id "ios-xe/stp", nombre "L2 · STP" (área antes del «·») y los comandos que corre.
 export type ParamKind = "mac" | "ap" | "wlan" | "interface" | "ip" | "vrf" | "vnid";
 export interface PlaybookParam { name: string; kind: ParamKind }

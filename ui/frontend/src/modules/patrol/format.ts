@@ -1,3 +1,4 @@
+import type { useT } from "../../lib/i18n";
 // Duración legible para un ingeniero de guardia: "< 1 min", "5 min", "2 h 15 min", "1 d 2 h".
 export function elapsed(ms: number): string {
   const min = Math.floor(ms / 60_000);
@@ -18,3 +19,9 @@ export function activeMs(armedAt: string, state: string, phases: { at: string; k
   const end = ["armed", "arming"].includes(state) ? undefined : phases.find((p) => /_(COMPLETED|CANCELLED|FAILED)$/.test(p.kind));
   return (end ? Date.parse(end.at) : now) - Date.parse(armedAt);
 }
+
+// Resumen de equipos de un trabajo; la variante con parciales solo sale si los hay.
+export const devicesText = (t: ReturnType<typeof useT>, j: { devicesTotal?: number; devicesOk?: number; devicesFailed?: number; devicesPartial?: number }) => {
+  const partial = j.devicesPartial ?? 0;
+  return t(partial > 0 ? "patrol.devices.partial" : "patrol.devices", { ok: j.devicesOk ?? 0, partial, failed: j.devicesFailed ?? 0, total: j.devicesTotal ?? 0, n: j.devicesTotal ?? 0 });
+};

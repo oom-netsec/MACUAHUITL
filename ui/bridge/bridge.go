@@ -345,20 +345,22 @@ func (b *Bridge) CancelJob(jobID string) error {
 
 // Las horas van en RFC 3339 (UTC); vacías si no aplican.
 type JobDTO struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	State         string     `json:"state"`
-	NextRoundAt   string     `json:"nextRoundAt"`
-	ArmedAt       string     `json:"armedAt"`
-	WindowEndsAt  string     `json:"windowEndsAt"`
-	Round         uint32     `json:"round"`
-	Rounds        uint32     `json:"rounds"` // 0 = hasta que termine la ventana
-	DevicesTotal  uint32     `json:"devicesTotal"`
-	DevicesOK     uint32     `json:"devicesOk"`
-	DevicesFailed uint32     `json:"devicesFailed"`
-	OutputDir     string     `json:"outputDir"`
-	Kind          string     `json:"kind"` // patrol, adhoc, backup o change
-	Phases        []PhaseDTO `json:"phases"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	State         string `json:"state"`
+	NextRoundAt   string `json:"nextRoundAt"`
+	ArmedAt       string `json:"armedAt"`
+	WindowEndsAt  string `json:"windowEndsAt"`
+	Round         uint32 `json:"round"`
+	Rounds        uint32 `json:"rounds"` // 0 = hasta que termine la ventana
+	DevicesTotal  uint32 `json:"devicesTotal"`
+	DevicesOK     uint32 `json:"devicesOk"`
+	DevicesFailed uint32 `json:"devicesFailed"`
+	// DevicesPartial: equipos con evidencia parcial (un comando se cortó y el núcleo reconectó); no cuentan en ok ni en fallidos.
+	DevicesPartial uint32     `json:"devicesPartial"`
+	OutputDir      string     `json:"outputDir"`
+	Kind           string     `json:"kind"` // patrol, adhoc, backup o change
+	Phases         []PhaseDTO `json:"phases"`
 }
 
 type PhaseDTO struct {
@@ -388,7 +390,7 @@ func (b *Bridge) ListJobs() ([]JobDTO, error) {
 		for _, j := range r.Jobs {
 			d := JobDTO{ID: j.JobId, Name: j.Name, State: j.State, NextRoundAt: rfc3339(j.NextRoundAt), ArmedAt: rfc3339(j.ArmedAt),
 				WindowEndsAt: rfc3339(j.WindowEndsAt), Round: j.Round, Rounds: j.Rounds, DevicesTotal: j.DevicesTotal, DevicesOK: j.DevicesOk,
-				DevicesFailed: j.DevicesFailed, OutputDir: j.OutputDir, Kind: j.Kind, Phases: []PhaseDTO{}}
+				DevicesFailed: j.DevicesFailed, DevicesPartial: j.DevicesPartial, OutputDir: j.OutputDir, Kind: j.Kind, Phases: []PhaseDTO{}}
 			for _, p := range j.Phases {
 				d.Phases = append(d.Phases, PhaseDTO{At: rfc3339(p.At), Kind: p.Kind.String(), Round: p.Round, Detail: p.Detail, Reason: p.Reason, Args: p.Args})
 			}
@@ -534,6 +536,9 @@ type RunDeviceDTO struct {
 	// Reason y Args son el código estable del error de Detail y sus argumentos; vacíos si es texto de sistema.
 	Reason string            `json:"reason,omitempty"`
 	Args   map[string]string `json:"args,omitempty"`
+	// CutCommands y Reconnects solo son distintos de 0 con estado PARTIAL.
+	CutCommands uint32 `json:"cutCommands,omitempty"`
+	Reconnects  uint32 `json:"reconnects,omitempty"`
 }
 
 // targetLabel es "dirección:puerto" igual que patrol.hostport en el núcleo (IPv6 entre corchetes): así la fila coincide con el deviceId de los eventos.
@@ -553,7 +558,7 @@ func (b *Bridge) GetRun(jobID string, round uint32) ([]RunDeviceDTO, error) {
 		}
 		out := []RunDeviceDTO{}
 		for _, d := range r.Devices {
-			out = append(out, RunDeviceDTO{Target: targetLabel(d.Target.GetAddress(), d.Target.GetPort()), State: d.State.String(), Detail: d.Detail, Reason: d.Reason, Args: d.Args})
+			out = append(out, RunDeviceDTO{Target: targetLabel(d.Target.GetAddress(), d.Target.GetPort()), State: d.State.String(), Detail: d.Detail, Reason: d.Reason, Args: d.Args, CutCommands: d.CutCommands, Reconnects: d.Reconnects})
 		}
 		return out, nil
 	})
