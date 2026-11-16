@@ -80,10 +80,10 @@ var interfaceRemoved = regexp.MustCompile(`^% Interface \S+ removed`)
 var cfgWarnings = []string{"Creating vlan", "does not exist"}
 
 // infoPercent son los «% …» informativos de IOS en modo configuración: no detienen la ejecución.
-var infoPercent = regexp.MustCompile(`(?i)^% ?(?:info|notice|portfast|applying|please|remember|note|warning|generating|not all config may be removed)`)
+var infoPercent = regexp.MustCompile(`(?i)^% ?(?:info|notice|portfast|applying|please|remember|note|warning|generating|not all config may be removed|default route without gateway|no matching route to delete)`)
 
 // syslogLine es un mensaje de syslog (%FACILIDAD-severidad-MNEMÓNICO:) que el equipo intercala en la consola: no es una respuesta al comando.
-var syslogLine = regexp.MustCompile(`^%[A-Z0-9_]+-\d-[A-Z0-9_]+:`)
+var syslogLine = regexp.MustCompile(`^%[A-Z0-9_]+(?:-[A-Z0-9_]+)*-\d-[A-Z0-9_]+:`)
 
 var asaSetPassword = regexp.MustCompile(`(?i)The enable password is not set|(?:enter|repeat)\s+password: ?$`)
 

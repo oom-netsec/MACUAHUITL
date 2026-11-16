@@ -239,9 +239,18 @@ func TestCfgErrorDecidesWhichPercentLinesStop(t *testing.T) {
 		"%Please define a key":          false,
 		"%Remember to save":             false,
 		"%Generating 1024 bit RSA keys": false,
-		"%Not all config may be removed and may reappear": false,
-		"%NOT ALL CONFIG MAY BE REMOVED":                  false,
-		"Cannot find community foo":                       false, // IOS 15.2 en una reversa legítima, sin «%»
+		"%Not all config may be removed and may reappear":                                         false,
+		"%NOT ALL CONFIG MAY BE REMOVED":                                                          false,
+		"%Default route without gateway, if not a point-to-point interface, may not be useful":    false,
+		"%No matching route to delete":                                                            false,
+		"% No matching route to delete":                                                           false,
+		"%LINK-SP-3-UPDOWN: Interface Gi1/0/1, changed state to down":                             false, // syslog con subfacilidad
+		"%C4K_EBM-4-HOSTFLAPPING: Host aabb.cc00.0100 in vlan 1 is flapping":                      false,
+		"%DUAL-5-NBRCHANGE: EIGRP-IPv4 1: Neighbor 10.0.0.2 (Gi0/1) is down":                      false,
+		"%SW_MATM-4-MACFLAP_NOTIF: Host moving":                                                   false,
+		"%Invalid next hop address":                                                               true,
+		"%LINK-3 sin dos puntos":                                                                  true,
+		"Cannot find community foo":                                                               false, // IOS 15.2 en una reversa legítima, sin «%»
 		"%LINK-5-CHANGED: Interface GigabitEthernet1/0/1, changed state to administratively down": false,
 	} {
 		if got := cfgError(msg + "\n"); got != stops {
