@@ -46,11 +46,17 @@ func cut(orig, s1 string, spans [][2]int) (string, int) {
 	}
 	if k := strings.Count(orig, spSep); k > 0 && k == strings.Count(s1, spSep) {
 		os, ss := strings.Split(orig, spSep), strings.Split(s1, spSep)
-		pos, total := 0, 0
+		pos, total, j := 0, 0, 0
 		for i := range os {
 			lo, hi := -1, -1
-			for _, sp := range spans {
-				if a, b := max(sp[0], pos), min(sp[1], pos+len(os[i])); a < b {
+			end := pos + len(os[i])
+			// Los tramos vienen ordenados y sin cruzarse (mergeSpans): los que terminaron antes de este segmento ya no sirven.
+			for j < len(spans) && spans[j][1] <= pos {
+				j++
+			}
+			for k := j; k < len(spans) && spans[k][0] < end; k++ {
+				sp := spans[k]
+				if a, b := max(sp[0], pos), min(sp[1], end); a < b {
 					if lo < 0 || a-pos < lo {
 						lo = a - pos
 					}
