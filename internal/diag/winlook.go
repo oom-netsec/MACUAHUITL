@@ -69,13 +69,34 @@ func winChildEnv(env func(string) string, tool string) []string {
 	out := []string{"SystemRoot=" + root}
 	for _, k := range []string{"TEMP", "TMP"} {
 		t, ok := winAbs(env(k))
-		if !ok {
-			t = root + `\Temp`
+		if !ok { // nunca C:\Windows\Temp: sin TEMP válido, el de la cuenta; y si tampoco, ninguno
+			if l, lok := winAbs(env("LOCALAPPDATA")); lok {
+				t, ok = l+`\Temp`, true
+			}
 		}
-		out = append(out, k+"="+t)
+		if ok {
+			out = append(out, k+"="+t)
+		}
 	}
 	dir := tool[:max(strings.LastIndexByte(tool, '\\'), 0)]
 	return append(out, `PATH=`+root+`\System32;`+dir)
+}
+
+// winAdapter es un adaptador de red real del sistema: su nombre amistoso y su GUID («{…}»).
+type winAdapter struct{ Friendly, Name string }
+
+// winAdapters lista los adaptadores reales; en Windows lo reemplaza GetAdaptersAddresses.
+var winAdapters = func() []winAdapter { return nil }
+
+// winIfaceName traduce un nombre amistoso («Ethernet 2») a \Device\NPF_{GUID} solo si es IGUAL al de un adaptador
+// real; todo lo demás queda como vino y lo decide winIfaceRe. Así no se acepta nada que el sistema no tenga.
+func winIfaceName(name string, ads []winAdapter) string {
+	for _, a := range ads {
+		if a.Friendly == name {
+			return `\Device\NPF_` + a.Name
+		}
+	}
+	return name
 }
 
 // installErr es el error de herramienta no instalada, con la instrucción propia del sistema.

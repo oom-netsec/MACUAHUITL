@@ -284,6 +284,7 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 		re := ifaceRe
 		if win {
 			re = winIfaceRe
+			iface = winIfaceName(iface, winAdapters()) // nombre amistoso -> NPF; el resultado también se valida
 		}
 		if !ok || !re.MatchString(iface) {
 			return "", nil, i18n.New("diag.err.pcap_iface", nil)
@@ -309,13 +310,20 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 	if err := o.done(); err != nil {
 		return "", nil, err
 	}
-	// Defensa final: ningún valor que venga del usuario puede parecer una bandera.
-	for i, a := range argv {
-		if strings.HasPrefix(a, "-") && !literalFlags[a] && !(i > 0 && argv[i-1] == "-f") {
-			return "", nil, i18n.New("diag.err.flag_like", i18n.A("value", a))
-		}
+	if err := checkFlagLike(argv, win); err != nil {
+		return "", nil, err
 	}
 	return bin, argv, nil
+}
+
+// checkFlagLike es la defensa final: ningún valor que venga del usuario puede parecer una bandera (en Windows, tampoco «/x»).
+func checkFlagLike(argv []string, win bool) error {
+	for i, a := range argv {
+		if (strings.HasPrefix(a, "-") && !literalFlags[a] || win && strings.HasPrefix(a, "/")) && !(i > 0 && argv[i-1] == "-f") {
+			return i18n.New("diag.err.flag_like", i18n.A("value", a))
+		}
+	}
+	return nil
 }
 
 // localIPs lista las direcciones de las interfaces de esta máquina; las pruebas la sustituyen.

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,6 +31,15 @@ func TestHelperProcess(t *testing.T) {
 }
 
 func TestConfineMataElArbol(t *testing.T) {
+	confineProbe(t, func(cancel func(), _ func()) { cancel() })
+}
+
+// Cerrar el job (done) sin cancelar también mata al nieto: KILL_ON_JOB_CLOSE.
+func TestConfineCerrarElJobMataElArbol(t *testing.T) {
+	confineProbe(t, func(_ func(), done func()) { done() })
+}
+
+func confineProbe(t *testing.T, kill func(cancel func(), done func())) {
 	pidFile := filepath.Join(t.TempDir(), "pid")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -39,7 +49,9 @@ func TestConfineMataElArbol(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer done()
+	var once sync.Once
+	closeJob := func() { once.Do(done) }
+	defer closeJob()
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +74,8 @@ func TestConfineMataElArbol(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer windows.CloseHandle(h)
-	cancel()
+	kill(cancel, closeJob)
+	cmd.Process.Kill() // el hijo directo no es lo que se prueba; el nieto sí
 	cmd.Wait()
 	if ev, _ := windows.WaitForSingleObject(h, 5000); ev != windows.WAIT_OBJECT_0 {
 		t.Fatal("el nieto sigue vivo tras cancelar")

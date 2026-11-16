@@ -28,6 +28,30 @@ func lastSep(s string) int {
 	return -1
 }
 
+func init() { winAdapters = realAdapters }
+
+// realAdapters lista los adaptadores con GetAdaptersAddresses.
+func realAdapters() []winAdapter {
+	size := uint32(15000)
+	for range 3 {
+		buf := make([]byte, size)
+		aa := (*windows.IpAdapterAddresses)(unsafe.Pointer(&buf[0]))
+		err := windows.GetAdaptersAddresses(windows.AF_UNSPEC, windows.GAA_FLAG_SKIP_ANYCAST|windows.GAA_FLAG_SKIP_MULTICAST|windows.GAA_FLAG_SKIP_DNS_SERVER, 0, aa, &size)
+		if err == windows.ERROR_BUFFER_OVERFLOW {
+			continue
+		}
+		if err != nil {
+			return nil
+		}
+		var out []winAdapter
+		for ; aa != nil; aa = aa.Next {
+			out = append(out, winAdapter{Friendly: windows.UTF16PtrToString(aa.FriendlyName), Name: windows.BytePtrToString(aa.AdapterName)})
+		}
+		return out
+	}
+	return nil
+}
+
 func childEnv(tool string) []string { return winChildEnv(os.Getenv, tool) }
 
 // confine mete el hijo en un Job Object con KILL_ON_JOB_CLOSE: cancelar o cerrar el job mata todo el árbol. El hijo
@@ -43,11 +67,15 @@ func confine(cmd *exec.Cmd) (started func() error, done func(), err error) {
 		windows.CloseHandle(job)
 		return nil, nil, err
 	}
-	cmd.SysProcAttr = &windows.SysProcAttr{CreationFlags: windows.CREATE_SUSPENDED}
+	cmd.SysProcAttr = &windows.SysProcAttr{CreationFlags: windows.CREATE_SUSPENDED | windows.CREATE_NO_WINDOW}
 	cmd.WaitDelay = 3 * time.Second
+	// Las DLL que falten se buscan junto a la herramienta, no en el cwd heredado.
+	if i := lastSep(cmd.Path); i > 0 {
+		cmd.Dir = cmd.Path[:i]
+	}
 	cmd.Cancel = func() error {
 		// El proceso aún puede no estar en el job (cancelación durante el arranque): Kill cubre ese caso.
-		windows.TerminateJobObject(job, 1)
+		windows.TerminateJobObject(job, 143) // como el 143 de Linux
 		if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 			return err
 		}

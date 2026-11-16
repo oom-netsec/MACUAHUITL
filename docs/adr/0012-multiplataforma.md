@@ -102,6 +102,8 @@ Hoy el ADR 0003 exige tres cosas: que solo el usuario pueda conectarse, que el n
 ### (f) Herramientas externas
 
 - **Rutas.** Se resuelven a rutas absolutas conocidas, nunca por el `PATH` del usuario (secuestro de `PATH`). Primero `%SystemRoot%\System32` para `ping.exe` y `tracert.exe`; luego `%ProgramFiles%\Nmap`, `%ProgramFiles%\Wireshark` y `%ProgramFiles%\iperf3`. El entorno del hijo lleva solo `SystemRoot`, `TEMP` y un `PATH` mínimo.
+- **iperf3 en la carpeta del núcleo.** Además de `%ProgramFiles%\iperf3\iperf3.exe`, se busca `<carpeta del ejecutable>\tools\iperf3.exe`. Lo pone el usuario ahí; el instalador no lo empaqueta. No abre un hueco nuevo: quien pueda escribir en esa carpeta ya puede reemplazar el propio núcleo.
+- **Interfaces de captura.** `ifaces` da nombres amistosos («Ethernet 2»). Solo en Windows, `diag` traduce una interfaz pedida a `\Device\NPF_{GUID}` si es igual al nombre amistoso de un adaptador real (`GetAdaptersAddresses`); el resultado igual se valida contra `\Device\NPF_{GUID}`, `\Device\NPF_Loopback` o un índice. Un nombre que el sistema no tenga nunca se acepta.
 - **Banderas.** Las arma `diag.Build` por sistema:
   - `ping`: `-n` en lugar de `-c`, `-w` en milisegundos;
   - `tracert`: `-d -h N -w ms` en lugar de `traceroute -n -m`; en Windows no hay `tracepath`.

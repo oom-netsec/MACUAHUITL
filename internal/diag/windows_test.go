@@ -74,6 +74,21 @@ func TestBuildWindowsRechaza(t *testing.T) {
 			t.Errorf("%s: debió fallar", n)
 		}
 	}
+	// el rechazo del intervalo es el propio, no cualquier error
+	_, _, err := buildWindows(cases["ping interval sin equivalente"])
+	if err == nil || !strings.Contains(i18n.In(i18n.En, err), "does not exist on Windows") {
+		t.Errorf("interval: %v", err)
+	}
+	// en Windows «/x» es una opción: la defensa final lo rechaza (un destino no puede empezar con «/», pero el filtro de pcap sí)
+	if _, _, err := buildWindows(req(Pcap, "", map[string]string{"interface": "3", "filter": "/?"}, `C:\o`)); err != nil {
+		t.Errorf("filtro tras -f no es una opción: %v", err)
+	}
+	if err := checkFlagLike([]string{"-i", "3", "/?"}, true); err == nil {
+		t.Error("«/?» debe rechazarse en Windows")
+	}
+	if err := checkFlagLike([]string{"-i", "3", "/?"}, false); err != nil {
+		t.Error("en Linux «/?» no es una bandera")
+	}
 	if _, _, err := Build(req(Ping, "192.0.2.1", map[string]string{"interval": "1"}, "")); err != nil && runtime.GOOS == "linux" {
 		t.Errorf("en Linux interval sigue siendo válido: %v", err)
 	}
@@ -134,9 +149,18 @@ func TestWinLook(t *testing.T) {
 func TestWinChildEnv(t *testing.T) {
 	e := map[string]string{"SystemRoot": `C:\Windows`, "TEMP": `C:\T`, "TMP": `\\evil\x`, "PATH": `C:\evil`, "USERPROFILE": `C:\Users\u`}
 	got := strings.Join(winChildEnv(env(e), `C:\Program Files\Nmap\nmap.exe`), "|")
-	want := `SystemRoot=C:\Windows|TEMP=C:\T|TMP=C:\Windows\Temp|PATH=C:\Windows\System32;C:\Program Files\Nmap`
+	want := `SystemRoot=C:\Windows|TEMP=C:\T|PATH=C:\Windows\System32;C:\Program Files\Nmap`
 	if got != want {
 		t.Errorf("\n got %s\nwant %s", got, want)
+	}
+	// TEMP inválido: %LOCALAPPDATA%\Temp si es válida; si no, sin TEMP ni TMP (nunca C:\Windows\Temp)
+	e["LOCALAPPDATA"] = `C:\Users\u\AppData\Local`
+	if got := strings.Join(winChildEnv(env(e), `C:\x\a.exe`), "|"); got != `SystemRoot=C:\Windows|TEMP=C:\T|TMP=C:\Users\u\AppData\Local\Temp|PATH=C:\Windows\System32;C:\x` {
+		t.Errorf("con LOCALAPPDATA: %s", got)
+	}
+	e["LOCALAPPDATA"] = `rel`
+	if got := strings.Join(winChildEnv(env(e), `C:\x\a.exe`), "|"); strings.Contains(got, "TMP=") {
+		t.Errorf("sin LOCALAPPDATA válida no hay TMP: %s", got)
 	}
 }
 
@@ -151,5 +175,31 @@ func TestInstallErr(t *testing.T) {
 	}
 	if s := installErr("linux", "nmap").Error(); !strings.Contains(s, "apt install nmap") {
 		t.Errorf("linux: %q", s)
+	}
+}
+
+func TestWinIfaceName(t *testing.T) {
+	ads := []winAdapter{{Friendly: "Ethernet 2", Name: "{1A2B3C4D-0000-4abc-9DEF-0123456789AB}"}, {Friendly: "Wi-Fi", Name: "{AAAAAAAA-0000-4abc-9DEF-0123456789AB}"}}
+	if got := winIfaceName("Ethernet 2", ads); got != `\Device\NPF_{1A2B3C4D-0000-4abc-9DEF-0123456789AB}` {
+		t.Errorf("amistoso: %q", got)
+	}
+	for _, in := range []string{"ethernet 2", "Ethernet 2 ", "-w", "3", `\Device\NPF_Loopback`, "Nada", ""} {
+		if got := winIfaceName(in, ads); got != in {
+			t.Errorf("%q debe quedar igual, dio %q", in, got)
+		}
+	}
+	// un adaptador cuyo nombre amistoso es «-w» no puede colar una opción: el resultado igual pasa por winIfaceRe
+	bad := []winAdapter{{Friendly: "x y", Name: "-w"}}
+	r := req(Pcap, "", map[string]string{"interface": "x y"}, `C:\o`)
+	old := winAdapters
+	winAdapters = func() []winAdapter { return bad }
+	t.Cleanup(func() { winAdapters = old })
+	if _, _, err := buildWindows(r); err == nil {
+		t.Error("el nombre traducido también se valida")
+	}
+	winAdapters = func() []winAdapter { return ads }
+	_, argv, err := buildWindows(req(Pcap, "", map[string]string{"interface": "Wi-Fi", "seconds": "5"}, `C:\o`))
+	if err != nil || strings.Join(argv, " ") != `-i \Device\NPF_{AAAAAAAA-0000-4abc-9DEF-0123456789AB} -a duration:5` {
+		t.Errorf("%v %v", argv, err)
 	}
 }

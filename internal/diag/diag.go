@@ -37,7 +37,17 @@ type Result struct {
 // iperfServerMax es el tope de vida del servidor de iperf3 (-s -1 espera un cliente indefinidamente).
 var iperfServerMax = 10 * time.Minute
 
-// Runner ejecuta herramientas. LookPath nil usa exec.LookPath.
+// discard cierra el .txt y lo borra (en Windows no se borra un archivo abierto).
+func discard(out *os.File, path string) {
+	if out != nil {
+		out.Close()
+	}
+	if path != "" {
+		os.Remove(path)
+	}
+}
+
+// Runner ejecuta herramientas. LookPath nil usa exec.LookPath en Linux y winLook (rutas absolutas conocidas) en Windows.
 type Runner struct {
 	LookPath func(string) (string, error)
 	extraEnv []string // solo pruebas
@@ -104,9 +114,7 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	// El hijo y sus nietos se cancelan juntos (grupo de procesos en Linux, Job Object en Windows).
 	started, done, err := confine(cmd)
 	if err != nil {
-		if res.OutputPath != "" {
-			os.Remove(res.OutputPath)
-		}
+		discard(out, res.OutputPath)
 		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	defer done()
@@ -125,14 +133,12 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	so, se := &lineWriter{emit: emit}, &lineWriter{emit: emit}
 	cmd.Stdout, cmd.Stderr = so, se
 	if err := cmd.Start(); err != nil {
-		if res.OutputPath != "" {
-			os.Remove(res.OutputPath)
-		}
+		discard(out, res.OutputPath)
 		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	if err := started(); err != nil {
 		cmd.Wait()
-		os.Remove(res.OutputPath)
+		discard(out, res.OutputPath)
 		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	err = cmd.Wait()

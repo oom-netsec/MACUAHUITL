@@ -51,7 +51,7 @@ type Deps interface {
 	Outputs() string
 	// Settings son las preferencias del núcleo (carpeta de salidas y defaults de archivo de los receptores).
 	Settings() *CoreSettings
-	// DiagLookPath resuelve binarios de diag; nil = exec.LookPath.
+	// DiagLookPath resuelve binarios de diag; nil = exec.LookPath en Linux, winLook en Windows.
 	DiagLookPath() func(string) (string, error)
 	// Job devuelve la foto de un trabajo de Patrol, o NotFound.
 	Job(ctx context.Context, id string) (JobInfo, error) // ctx da el idioma del «trabajo no existe»
