@@ -328,7 +328,7 @@ task ui-build   # desktop app
 
 ## Docs
 
-- [Roadmap](docs/roadmap.md): what is built so far, what is left for 1.0.0 (lab validation and stability) and the phases after it (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging, Windows and macOS)
+- [Roadmap](docs/roadmap.md): what is built so far, what is open after 1.0.0 (lab validation) and the phases after it (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging, Windows and macOS)
 - [Architecture design](docs/architecture/2026-11-02-macuahuitl-architecture-design.md) · [Decision records](docs/adr/)
 - [Threat model](docs/security/THREAT_MODEL.md) · [Cryptography](docs/security/CRYPTO.md) · [Auditor's guide](docs/security/AUDIT_GUIDE.md)
 
