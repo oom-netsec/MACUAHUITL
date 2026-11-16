@@ -43,4 +43,4 @@ jobs:
           VERSION=0.0.0 BIN=bin-win deploy/windows/build-installer.sh dist-win/MACUAHUITL-setup.exe
       - name: windows-e2e (usuarios estándar, pipe, bóveda, Patrol, instalador)
         shell: pwsh
-        run: tools/ci/windows-e2e.ps1 -Bin bin-win -Installer dist-win/MACUAHUITL-setup.exe -Transcripts "$PWD/test/transcripts/ios-xe" -Version 0.0.0
+        run: tools/ci/windows-e2e.ps1 -BinDir bin-win -Installer dist-win/MACUAHUITL-setup.exe -Transcripts "$PWD/test/transcripts/ios-xe" -Version 0.0.0

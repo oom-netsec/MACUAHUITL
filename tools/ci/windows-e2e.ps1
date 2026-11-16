@@ -1,11 +1,11 @@
 # Prueba de punta a punta de MACUAHUITL en un Windows desechable (el runner de CI; ADR 0012). Crea usuarios locales
 # ESTÁNDAR y corre el núcleo y mctl como ellos: el runner es administrador con token elevado y el núcleo se niega a correr
 # así, además de que el pipe lleva el SID de quien lo abre. NO usar en un equipo propio: crea y borra usuarios.
-# Uso: windows-e2e.ps1 -Bin <carpeta con macuahuitl.exe macuahuitld.exe mctl.exe simserver.exe> -Installer <setup.exe> `
+# Uso: windows-e2e.ps1 -BinDir <carpeta con macuahuitl.exe macuahuitld.exe mctl.exe simserver.exe> -Installer <setup.exe> `
 #        -Transcripts <test/transcripts/ios-xe> -Version X.Y.Z
 # Contraseñas: se generan aquí (nunca en el log: ::add-mask::). Las que mctl lee por stdin pasan por un archivo en una
 # carpeta con ACL solo del usuario (y Administradores, para poder borrarla al final); se borra en cada uso y al terminar.
-param([Parameter(Mandatory = $true)][string]$Bin, [Parameter(Mandatory = $true)][string]$Installer,
+param([Parameter(Mandatory = $true)][string]$BinDir, [Parameter(Mandatory = $true)][string]$Installer,
   [Parameter(Mandatory = $true)][string]$Transcripts, [Parameter(Mandatory = $true)][string]$Version)
 $ErrorActionPreference = 'Stop'
 $root = 'C:\e2e'
@@ -83,7 +83,7 @@ function WaitPipe($sid, $want) {
 $u1 = $null; $u2 = $null; $core = $null; $sim = $null
 try {
   New-Item -ItemType Directory -Force $work, $bin | Out-Null
-  Copy-Item "$Bin\*.exe" $bin
+  Copy-Item "$BinDir\*.exe" $bin
   $adm = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
   Must $adm 'el runner es administrador (token elevado)'
 
