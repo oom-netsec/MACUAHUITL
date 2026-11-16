@@ -2,6 +2,7 @@ package dnsq
 
 import (
 	"context"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -30,10 +31,13 @@ func TestParseServer(t *testing.T) {
 	}
 }
 
+// minRTT: en Windows el reloj monotónico avanza a saltos (de 0.5 a 15.6 ms) y una consulta a localhost puede medir 0.
+var minRTT = map[bool]time.Duration{true: 0, false: time.Nanosecond}[runtime.GOOS == "windows"]
+
 func TestQueryAuthoritative(t *testing.T) {
 	l, _, _ := hierarchy(t, false)
 	a, err := Query(context.Background(), l.dial, Server{Transport: "udp", Host: "127.0.0.4", Port: 53}, "www.ejemplo.lab", dns.TypeA, opts())
-	if err != nil || a.RCode != "NOERROR" || !a.Flags.AA || len(a.Answer) != 1 || !strings.Contains(a.Answer[0], "192.0.2.10") || a.RTT <= 0 {
+	if err != nil || a.RCode != "NOERROR" || !a.Flags.AA || len(a.Answer) != 1 || !strings.Contains(a.Answer[0], "192.0.2.10") || a.RTT < minRTT {
 		t.Fatalf("a=%+v err=%v", a, err)
 	}
 }
