@@ -322,7 +322,20 @@ test("Windows: TFTP por omisión en el 69, puerto 1-65535 y la regla de firewall
     const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:69" });
     expect(await within(card).findByRole("log", { name: "Regla de firewall (PowerShell, como administrador)" })).toHaveTextContent(/New-NetFirewallRule/);
     expect(within(card).getByText(/una vez, como administrador/)).toBeInTheDocument();
+    expect(within(card).getByText(/escucha ahí/)).toBeInTheDocument(); // puerto estándar: sin «IOS usa el 69; escucha en el 69»
+    expect(within(card).getByText(/CANCELAS/)).toBeInTheDocument();
     expect(within(card).queryByText(/nftables/)).not.toBeInTheDocument();
     expect(core.transferHint).toHaveBeenCalledWith("tftp", "192.0.2.10", 69);
+  } finally { setOSForTests(undefined); }
+});
+
+test("Windows: con un puerto distinto del estándar el texto dice que IOS necesita abrirlo en el estándar", async () => {
+  setOSForTests("windows");
+  try {
+    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "New-NetFirewallRule x", setcap: "", remove: "Remove-NetFirewallRule x" })) });
+    await openServer(core);
+    act(() => core.emitTransfer({ runId: "r1", ready: ready() }));
+    const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+    expect(await within(card).findByText(/ábrelo en el estándar/)).toBeInTheDocument();
   } finally { setOSForTests(undefined); }
 });

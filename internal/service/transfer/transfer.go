@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -39,8 +40,16 @@ const (
 	closeWait       = 10 * time.Second
 )
 
-// Puertos altos por omisión: ninguno privilegiado (ADR 0004).
-var defaultPort = map[string]uint16{"tftp": 6969, "ftp": 2121, "scp": 2222, "sftp": 2222, "http": 8080}
+// Puertos altos por omisión: ninguno privilegiado (ADR 0004). En Windows, los estándar: allí no hay puertos
+// privilegiados ni redirección, e IOS no deja elegir el de TFTP (ADR 0012 h).
+var defaultPort = defaultPorts(runtime.GOOS)
+
+func defaultPorts(goos string) map[string]uint16 {
+	if goos == "windows" {
+		return map[string]uint16{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22, "http": 8080}
+	}
+	return map[string]uint16{"tftp": 6969, "ftp": 2121, "scp": 2222, "sftp": 2222, "http": 8080}
+}
 
 type server struct {
 	id, proto, listening string
@@ -228,7 +237,7 @@ func (s *svc) ListServers(context.Context, *v1.ListServersRequest) (*v1.ListServ
 
 func (s *svc) RedirectHint(ctx context.Context, r *v1.RedirectHintRequest) (*v1.RedirectHintResponse, error) {
 	if r.Ip != "" {
-		if _, err := netip.ParseAddr(strings.Trim(r.Ip, "[]")); err != nil {
+		if a, err := netip.ParseAddr(strings.Trim(r.Ip, "[]")); err != nil || a.Zone() != "" { // la zona acabaría dentro de un comando
 			return nil, bad(ctx, "transfer.svc.bad_listen", "ip", r.Ip)
 		}
 	}

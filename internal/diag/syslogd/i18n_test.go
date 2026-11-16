@@ -3,12 +3,15 @@ package syslogd
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 func TestValidacionDeDireccionYProtocolo(t *testing.T) {
+	privilegedPorts = true
+	t.Cleanup(func() { privilegedPorts = runtime.GOOS != "windows" })
 	for _, tc := range []struct {
 		err           error
 		es, en, field string

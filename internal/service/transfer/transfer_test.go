@@ -455,3 +455,22 @@ func TestRedirectHintRPCEn(t *testing.T) {
 
 // Un renombre de Session.Activity rompe la compilación en vez de apagar en silencio el keepalive de scp/sftp.
 var _ interface{ Activity(int) } = (*transport.Session)(nil)
+
+func TestPuertosPorOmisionPorSistema(t *testing.T) {
+	if p := defaultPorts("linux"); p["tftp"] != 6969 || p["ftp"] != 2121 || p["scp"] != 2222 {
+		t.Errorf("linux: %v", p)
+	}
+	if p := defaultPorts("windows"); p["tftp"] != 69 || p["ftp"] != 21 || p["scp"] != 22 || p["sftp"] != 22 || p["http"] != 8080 {
+		t.Errorf("windows: %v", p)
+	}
+}
+
+// La zona de una IP link-local acabaría dentro de un comando (nft o PowerShell): se rechaza.
+func TestRedirectHintRechazaZona(t *testing.T) {
+	s, _ := newTest(t)
+	for _, ip := range []string{"fe80::1%a;calc", "fe80::1%$(calc)", "fe80::1%eth0"} {
+		if _, err := s.RedirectHint(context.Background(), &v1.RedirectHintRequest{Protocol: "tftp", Port: 6969, Ip: ip}); err == nil {
+			t.Errorf("%q aceptada", ip)
+		}
+	}
+}

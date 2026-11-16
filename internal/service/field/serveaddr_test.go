@@ -27,3 +27,12 @@ func TestServeAddrPuertoPorOmision(t *testing.T) {
 		t.Error("ftp no se publica: debe dar ok=false")
 	}
 }
+
+func TestPuertosPorOmisionPorSistema(t *testing.T) {
+	if p := defaultServePorts("linux"); p["tftp"] != 6969 || p["http"] != 8080 {
+		t.Errorf("linux: %v", p)
+	}
+	if p := defaultServePorts("windows"); p["tftp"] != 69 || p["http"] != 8080 {
+		t.Errorf("windows: %v", p)
+	}
+}

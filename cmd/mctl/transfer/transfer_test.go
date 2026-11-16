@@ -3,6 +3,7 @@ package transfer
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -36,5 +37,15 @@ func TestFilesRelativosAFrom(t *testing.T) {
 	// sin --from sigue siendo relativo al cwd
 	if got, err = resolveFiles([]string{"fuera.bin"}, ""); err != nil || got[0] != filepath.Join(otro, "fuera.bin") {
 		t.Fatalf("sin from: %v %v", got, err)
+	}
+}
+
+// ADR 0012 h: en Windows la ayuda no habla de «puerto alto» ni de 6969.
+func TestAyudaPorSistema(t *testing.T) {
+	if !strings.Contains(helpFor("linux"), "tftp 6969") || !strings.Contains(usageHint("linux"), "PUERTO-ALTO") {
+		t.Error("linux cambió")
+	}
+	if h := helpFor("windows"); strings.Contains(h, "6969") || !strings.Contains(h, "tftp 69") || strings.Contains(usageHint("windows"), "ALTO") {
+		t.Error(h)
 	}
 }

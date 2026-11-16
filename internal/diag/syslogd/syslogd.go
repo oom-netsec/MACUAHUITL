@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/netip"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -81,6 +82,9 @@ type Config struct {
 // dropInterval es cada cuánto se reportan los descartes.
 var dropInterval = time.Second
 
+// privilegedPorts: Windows no tiene puertos privilegiados (ADR 0012 h); variable para que las pruebas fijen los dos valores.
+var privilegedPorts = runtime.GOOS != "windows"
+
 // ValidateAddr exige un host explícito, puerto no privilegiado y, salvo que se
 // pida, nada de escuchar en todas las interfaces.
 func ValidateAddr(addr string, allowAny bool) error {
@@ -92,7 +96,7 @@ func ValidateAddr(addr string, allowAny bool) error {
 	if err != nil {
 		return i18n.New("ingest.invalid.addr.port", i18n.A("port", p))
 	}
-	if port != 0 && port < 1024 {
+	if privilegedPorts && port != 0 && port < 1024 {
 		return i18n.New("ingest.invalid.addr.privileged", i18n.A("port", port))
 	}
 	ip, err := netip.ParseAddr(h)

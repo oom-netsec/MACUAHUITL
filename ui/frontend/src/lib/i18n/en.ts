@@ -2809,9 +2809,10 @@ export const en: Record<Key, string> = {
   // Ports on Windows (ADR 0012 h): no privileged ports; what is needed is the inbound firewall rule.
   "transfer.port.hint.windows": "1 to 65535: Windows has no privileged ports. The protocol's standard port by default.",
   "transfer.err.port.windows": "The port must be between 1 and 65535.",
-  "transfer.privileged.windows": "IOS uses the standard port {std}; this server listens on {port}. For the traffic to get in, run this inbound Windows Firewall rule once, as administrator (or accept the firewall dialog when the server opens). The app never applies it.",
+  "transfer.privileged.windows": "IOS uses the standard port {std} and Windows has no redirection: this server listens on {port}, so open it on the standard port for IOS to reach it. The rule is for the port it listens on now: run it once, as administrator, in PowerShell (or accept the firewall dialog when the server opens; if you CANCEL it, Windows creates block rules that win over allow rules: check them in Windows Firewall → Advanced settings → Inbound Rules). The app never applies it.",
+  "transfer.privilegedSame": "IOS uses the standard port {std} and this server listens there. For the traffic to get in, run this inbound Windows Firewall rule once, as administrator (or accept the firewall dialog when the server opens; if you CANCEL it, Windows creates block rules that win over allow rules: check them in Windows Firewall → Advanced settings → Inbound Rules). The app never applies it.",
   "transfer.redirect.windows": "Firewall rule (PowerShell, as administrator)",
-  "transfer.redirect.narrow.windows": "The rule only lets in traffic addressed to the listen address {ip}, for this program and this port. For FTP it does not cover the passive data range.",
+  "transfer.redirect.narrow.windows": "The rule only lets in traffic addressed to the listen address {ip}, for this program and this port. For FTP the rule leaves the local port as Any (passive data uses others), limited by the program and the IP.",
   "transfer.closed.cleanup.windows": "Server closed. If you applied the firewall rule, remove it with this command.",
   "diag.port.hint.windows": "1 to 65535; 5201 is the iperf3 default.",
   "diag.port.invalid.windows": "A whole number from 1 to 65535.",

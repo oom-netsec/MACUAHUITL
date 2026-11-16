@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -406,7 +407,7 @@ func hint(c *cli.Env, args []string) error {
 		port, _ = strconv.Atoi(fs.Arg(1))
 	}
 	if fs.NArg() < 2 || fs.NArg() > 3 || port == 0 {
-		return errors.New("uso: mctl transfer hint tftp|ftp|scp|sftp PUERTO-ALTO [IP-DE-ESCUCHA]")
+		return errors.New(usageHint(runtime.GOOS))
 	}
 	r, err := v1.NewTransferServiceClient(c.Conn).RedirectHint(context.Background(), &v1.RedirectHintRequest{Protocol: fs.Arg(0), Port: int32(port), Ip: fs.Arg(2)})
 	if err != nil {
@@ -416,7 +417,24 @@ func hint(c *cli.Env, args []string) error {
 	return nil
 }
 
-const help = `  transfer serve --proto tftp|ftp|scp|sftp|http --listen IP[:PUERTO] [--write] [--allow IP]... [--dir CARPETA] [--from CARPETA] [--files A,B] [--duration 30m] [--legacy-ssh] [--pasv-ports MIN-MAX]
+// helpFor y usageHint dan el texto del sistema (ADR 0012 h): en Windows los puertos por omisión son los estándar y no hay «puerto alto».
+func helpFor(goos string) string {
+	if goos != "windows" {
+		return helpText
+	}
+	return strings.Replace(helpText, "puerto alto: tftp 6969, ftp 2121, scp/sftp 2222, http 8080", "sin puertos privilegiados: tftp 69, ftp 21, scp/sftp 22, http 8080 (la regla del firewall la corres tú)", 1)
+}
+
+func usageHint(goos string) string {
+	if goos == "windows" {
+		return "uso: mctl transfer hint tftp|ftp|scp|sftp PUERTO [IP-DE-ESCUCHA]"
+	}
+	return "uso: mctl transfer hint tftp|ftp|scp|sftp PUERTO-ALTO [IP-DE-ESCUCHA]"
+}
+
+var help = helpFor(runtime.GOOS)
+
+const helpText = `  transfer serve --proto tftp|ftp|scp|sftp|http --listen IP[:PUERTO] [--write] [--allow IP]... [--dir CARPETA] [--from CARPETA] [--files A,B] [--duration 30m] [--legacy-ssh] [--pasv-ports MIN-MAX]
         (servidor temporal, puerto alto: tftp 6969, ftp 2121, scp/sftp 2222, http 8080; --dir recibe, --from publica; ftp/scp/sftp muestran usuario y contraseña de la sesión (FTP las manda en claro); recibir por tftp exige --allow; --legacy-ssh activa los algoritmos de IOS 15.x; Ctrl-C lo detiene)
   transfer get URL [LOCAL] [--dir CARPETA] [--cred ID] [--sha256 H] [--md5 H] [--sha512 H] [--insecure] [--legacy-ssh] [--accept-host-key SHA256:...]
         (tftp://, ftp://, scp://, sftp://, http://, https://; archivo nuevo en la carpeta, con MD5 y SHA-256)

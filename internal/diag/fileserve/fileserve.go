@@ -131,7 +131,7 @@ var standard = map[string]struct {
 // (si es 0.0.0.0, :: o no es una IP, se pide la de la máquina: la regla no queda ancha).
 func redirTarget(loc, ip string) (family, addr string) {
 	a, err := netip.ParseAddr(strings.Trim(ip, "[]"))
-	if err != nil || a.IsUnspecified() {
+	if err != nil || a.IsUnspecified() || a.Zone() != "" { // con zona (fe80::1%x) se pide la IP de la máquina: la zona acaba en un comando
 		return "ip", i18n.Msg(loc, "fileserve.hint.this_host", nil)
 	}
 	if a = a.Unmap(); a.Is6() {
@@ -152,7 +152,7 @@ func RedirectHint(proto, ip string, port int) string { return RedirectHintIn(i18
 // RedirectHintIn es RedirectHint con el texto en el idioma dado.
 func RedirectHintIn(loc, proto, ip string, port int) string {
 	if isWindows() {
-		return firewallRule(loc, proto, ip, port, exePath())
+		return firewallRule(loc, proto, ip, port, exePath(), [2]uint16{})
 	}
 	s, ok := standard[proto]
 	if !ok {
@@ -170,7 +170,7 @@ func RedirectHintIn(loc, proto, ip string, port int) string {
 // tiene puerto privilegiado). Se muestra al cerrar el servidor.
 func RedirectCleanup(proto, ip string, port int) string {
 	if isWindows() {
-		return firewallRemove(proto, port)
+		return firewallRemove(proto, ip, port)
 	}
 	if _, ok := standard[proto]; !ok {
 		return ""
@@ -224,11 +224,14 @@ func HintIn(loc, proto, listen string, files []string) string {
 	}
 	if proto == "tftp" {
 		port, _ := strconv.Atoi(p)
-		code := "fileserve.hint.tftp_redir"
-		if isWindows() {
+		code, kv := "fileserve.hint.tftp_redir", i18n.A()
+		if isWindows() { // el texto dice la verdad según el puerto real: en Windows no hay redirección al 69
 			code = "fileserve.hint.win_tftp_redir"
+			if port != 69 {
+				code, kv = "fileserve.hint.win_tftp_redir_other", i18n.A("port", port)
+			}
 		}
-		b.WriteString(i18n.Msg(loc, code, nil) + "\n  " + RedirectHintIn(loc, "tftp", h, port) + "\n")
+		b.WriteString(i18n.Msg(loc, code, kv) + "\n  " + RedirectHintIn(loc, "tftp", h, port) + "\n")
 	}
 	return b.String()
 }

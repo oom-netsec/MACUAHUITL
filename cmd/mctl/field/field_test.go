@@ -1,6 +1,9 @@
 package field
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestEscaper(t *testing.T) {
 	var e escaper
@@ -22,5 +25,14 @@ func TestEscaper(t *testing.T) {
 		if string(data) != c.data || string(acts) != c.acts {
 			t.Errorf("%q → %q %q; se esperaba %q %q", c.in, data, acts, c.data, c.acts)
 		}
+	}
+}
+
+func TestAyudaPorSistema(t *testing.T) {
+	if !strings.Contains(helpFor("linux"), "nftables") {
+		t.Error("linux cambió")
+	}
+	if h := helpFor("windows"); strings.Contains(h, "nftables") || !strings.Contains(h, "firewall") {
+		t.Error(h)
 	}
 }

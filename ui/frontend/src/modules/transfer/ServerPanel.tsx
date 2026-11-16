@@ -67,7 +67,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
       {!s.done && <Console label={t("transfer.ios")} text={cmds} copy={core.copyText} />/* cerrado: la contraseña efímera ya no sirve y no se deja a la vista (va dentro de la URL ftp://) */}
       {hint && (
         <>
-          <Notice kind="warn">{t("transfer.privileged", { std: hint.standardPort, port })}</Notice>
+          <Notice kind="warn">{t(hint.standardPort === port ? "transfer.privilegedSame" : "transfer.privileged", { std: hint.standardPort, port })}</Notice>
           <Console label={t("transfer.redirect")} text={hint.nftables} copy={core.copyText} />
           <p className="hint">{t("transfer.redirect.narrow", { ip: host })}</p>
           {hint.remove && <Console label={t("transfer.redirect.remove")} text={hint.remove} copy={core.copyText} />}

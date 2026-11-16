@@ -71,8 +71,12 @@ func ServerHintIn(loc string, c Config, r Ready, names []string) string {
 	if s, ok := standard[c.Proto]; ok {
 		p, _ := strconv.Atoi(port)
 		if isWindows() {
-			b.WriteString(t("fileserve.hint.win_std_port", "std", s.port, "proto", c.Proto, "port", p) + "\n")
-			b.WriteString("  " + t("fileserve.hint.win_redirect", "cmd", RedirectHintIn(loc, c.Proto, host, p)) + "\n")
+			code := "fileserve.hint.win_std_port"
+			if p == s.port {
+				code = "fileserve.hint.win_std_port_ok"
+			}
+			b.WriteString(t(code, "std", s.port, "proto", c.Proto, "port", p) + "\n")
+			b.WriteString("  " + t("fileserve.hint.win_redirect", "cmd", firewallRule(loc, c.Proto, host, p, exePath(), c.PassivePorts)) + "\n")
 		} else {
 			b.WriteString(t("fileserve.hint.std_port", "std", s.port, "proto", c.Proto, "port", p) + "\n")
 			b.WriteString("  " + t("fileserve.hint.redirect", "cmd", RedirectHintIn(loc, c.Proto, host, p)) + "\n")
