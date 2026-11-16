@@ -424,15 +424,31 @@ func TestSnapshotBoundsExporters(t *testing.T) {
 	}
 }
 
-// Un exportador que solo manda paquetes malformados (cero bytes, solo errores) no desaparece del top por tener cero bytes.
-func TestSnapshotKeepsExportersThatOnlySendErrors(t *testing.T) {
-	a := NewAggregator(1000)
-	for i := range 50 {
+// Los errores solo desempatan por bytes: con sitio en el tope, el exportador que solo manda paquetes malformados (0 bytes) aparece; con miles de
+// exportadores de basura (errores y 0 bytes) los reales no se desplazan.
+func TestSnapshotErrorsOnlyBreakTies(t *testing.T) {
+	a := NewAggregator(200000)
+	for i := range 3 {
 		a.Add(Flow{Exporter: fmt.Sprintf("10.0.0.%d", i+1), Src: "192.0.2.1", Dst: "192.0.2.2", Proto: 6, Bytes: 1000, Packets: 1})
 	}
 	a.Error("10.9.9.9", errors.New("paquete malformado"))
 	s := a.Snapshot(5)
-	if len(s.Exporters) != 5 || s.Exporters[0].Exporter != "10.9.9.9" || s.Exporters[0].Errors != 1 {
-		t.Fatalf("exportadores = %+v", s.Exporters)
+	if len(s.Exporters) != 4 || s.Exporters[3].Exporter != "10.9.9.9" || s.Exporters[3].Errors != 1 {
+		t.Fatalf("con sitio, el de solo errores debe aparecer: %+v", s.Exporters)
+	}
+	for i := range 120000 {
+		a.Error(fmt.Sprintf("172.%d.%d.%d", 16+i>>16, i>>8&255, i&255), errors.New("basura"))
+	}
+	for i := 3; i < 5; i++ {
+		a.Add(Flow{Exporter: fmt.Sprintf("10.0.0.%d", i+1), Src: "192.0.2.1", Dst: "192.0.2.2", Proto: 6, Bytes: 1000, Packets: 1})
+	}
+	s = a.Snapshot(5)
+	if len(s.Exporters) != 5 {
+		t.Fatalf("exportadores = %d", len(s.Exporters))
+	}
+	for _, e := range s.Exporters {
+		if e.Bytes != 1000 {
+			t.Fatalf("la basura desplazó a un real: %+v", e)
+		}
 	}
 }
