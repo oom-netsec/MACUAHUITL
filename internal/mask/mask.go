@@ -341,6 +341,9 @@ func (s *Stream) Line(raw string) (string, bool) {
 // contenido propia (la terminal) la corre antes de CutLine: S1 → red M₁ → corte M₂.
 func (s *Stream) LineS1(raw string) (string, bool) {
 	s.twin = nil
+	if isTruncMark(raw) {
+		return raw, true
+	}
 	if line, eol := splitEOL(raw); hasHigh(line) {
 		// Las reglas de configuración impresa solo ven el espacio ASCII (NBSP entre «api-key» y el valor): se corre la misma
 		// cadena sobre la copia normalizada, con el estado de antes de esta línea, y lo que tape se corta sobre S1 en CutLine.
@@ -354,8 +357,20 @@ func (s *Stream) LineS1(raw string) (string, bool) {
 	return s.line1(raw)
 }
 
+// truncMark es la línea fija que el driver inserta al recortar una salida enorme (iosxe.add). No lleva ningún valor, así
+// que es transparente: se emite tal cual y no toca el estado (bloque, llave, cadena), y S1 ve el texto como si no existiera.
+var truncMark = regexp.MustCompile(`^\[\x{2026} output truncated: \d+ bytes omitted \x{2026}\]$`)
+
+func isTruncMark(raw string) bool {
+	line, _ := splitEOL(raw)
+	return truncMark.MatchString(line)
+}
+
 // CutLine es el corte de Line sobre s1, la salida (de LineS1, quizá con la red por contenido ya aplicada) de raw.
 func (s *Stream) CutLine(raw, s1 string) string {
+	if isTruncMark(raw) {
+		return s1
+	}
 	line, eol := splitEOL(raw)
 	orig, spans := lineSpans(line, s.Platform)
 	spans = mergeSpans(append(spans, s.twin...))
