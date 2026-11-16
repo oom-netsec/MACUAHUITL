@@ -10,7 +10,7 @@ cliente), `rf` (radios, RRM, CleanAir, perfiles), `wlan`, `sec` (AAA, rogues, we
 que no se une; con versión general y versión para un cliente o AP).
 
 Los playbooks que declaran datos piden la MAC del cliente (`mac`) o el nombre del AP (`ap`); el núcleo los valida
-antes de armar los comandos. Validado en un C9120AXI-A en modo EWC con IOS-XE 17.12.6a (2026-11-13, revalidado el 2026-11-14): 15 comandos son solo
+antes de armar los comandos. Comandos revisados en un C9120AXI-A en modo EWC con IOS-XE 17.12.6a (2026-11-13, revisados de nuevo el 2026-11-14): 15 comandos son solo
 de 9800 de chasis o CL. Lo que el EWC no tiene (grupos de movilidad, Smart Licensing, VLAN/trunks/CDP/LLDP, IGMP
 snooping, `show chassis rmi`, `show platform resources`) lleva el comentario `# no existe en EWC`; la carga del sistema también sale de
 `show platform software status control-processor brief`, que existe en los dos. No hay debugs, trazas ni nada que escriba en flash.
@@ -19,7 +19,7 @@ Los comandos vienen de la documentación pública de Cisco.
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
 1. Baja `oom-wlc-9800-<versión>.mpack` de los releases de GitHub y verifica su suma en `SHA256SUMS`.
-2. Con la línea de comandos: `mctl pack install oom-wlc-9800-<versión>.mpack`. En la aplicación: Ajustes → Paquetes → Instalar.
+2. Con la línea de comandos: `mctl pack install oom-wlc-9800-<versión>.mpack`. En la aplicación: Ajustes → Paquetes → Instalar paquete…
 3. Revisa con `mctl pack list` o en Ajustes → Paquetes.
 
 ## English
@@ -32,7 +32,7 @@ certificates), `ap` (CAPWAP join, inventory, images, tags, reboots, a single AP)
 join; each with a general version and a per-client or per-AP version).
 
 Playbooks that declare data ask for the client MAC (`mac`) or the AP name (`ap`); the core validates them before
-building the commands. Validated on a 9120 EWC (C9120AXI-A, IOS-XE 17.12.6a; 2026-11-13, revalidated 2026-11-14): 15 commands are
+building the commands. Commands checked on a 9120 EWC (C9120AXI-A, IOS-XE 17.12.6a; 2026-11-13, rechecked 2026-11-14): 15 commands are
 9800-appliance or 9800-CL only. What EWC lacks and an appliance or 9800-CL has (mobility groups, Smart Licensing,
 VLAN/trunks/CDP/LLDP, IGMP snooping, `show chassis rmi`, `show platform resources`) carries the comment `# no existe en EWC`; system load also comes
 from `show platform software status control-processor brief`, which exists on both. No debugs, traces or anything that writes to flash.
@@ -41,5 +41,5 @@ Commands come from Cisco's public documentation.
 How to load it (the application never downloads packages):
 
 1. Download `oom-wlc-9800-<version>.mpack` from the GitHub releases and check its sum in `SHA256SUMS`.
-2. From the command line: `mctl pack install oom-wlc-9800-<version>.mpack`. In the app: Settings → Packages → Install.
-3. Check with `mctl pack list` or in Settings → Packages.
+2. From the command line: `mctl pack install oom-wlc-9800-<version>.mpack`. In the app: Settings → Packs → Install pack…
+3. Check with `mctl pack list` or in Settings → Packs.

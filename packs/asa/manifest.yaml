@@ -1,5 +1,5 @@
 id: oom/asa
-version: 1.0.1
+version: 1.0.2
 min_core: 0.4.3
 name: Cisco ASA, diagnóstico TAC
 name_en: Cisco ASA, TAC diagnostics
