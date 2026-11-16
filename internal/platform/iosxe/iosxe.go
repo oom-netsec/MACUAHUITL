@@ -371,12 +371,12 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 			tail = more.ReplaceAllString(tail, "")
 			d.buf = append(d.buf[:from], tail...)
 			if _, err := io.WriteString(d.w, " "); err != nil {
-				return clean(string(d.buf)), err
+				return cleanBuf(d.buf), err
 			}
 		}
 		if d.aire {
 			if err := d.aireGuard(ctx, clean(tail)); err != nil {
-				return clean(string(d.buf)), err
+				return cleanBuf(d.buf), err
 			}
 		}
 		if d.sentinel {
@@ -385,7 +385,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 					continue
 				}
 				d.confirmed = true
-				text := clean(string(d.buf))
+				text := cleanBuf(d.buf)
 				d.clearBuf()
 				return text, nil
 			}
@@ -394,7 +394,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 					continue
 				}
 				d.incomplete = true // un solo «> » y nada más en ~1,2 s: se acepta, pero incompleto
-				text := clean(string(d.buf))
+				text := cleanBuf(d.buf)
 				d.clearBuf()
 				return text, nil
 			}
@@ -402,13 +402,13 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 			if d.moreComing(ctx, ct) { // llegaron datos en la pausa: se revisa de nuevo
 				continue
 			}
-			text := clean(string(d.buf))
+			text := cleanBuf(d.buf)
 			d.clearBuf()
 			return text, nil
 		}
 		select {
 		case <-ctx.Done():
-			return clean(string(d.buf)), fmt.Errorf("%w: %w", platform.ErrPromptTimeout, ctx.Err())
+			return cleanBuf(d.buf), fmt.Errorf("%w: %w", platform.ErrPromptTimeout, ctx.Err())
 		case <-quiet:
 			select { // llegó un pedazo justo al vencer el plazo: cuenta como actividad
 			case c, ok := <-d.chunks:
@@ -420,7 +420,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				continue
 			default:
 			}
-			return clean(string(d.buf)), platform.ErrPromptTimeout
+			return cleanBuf(d.buf), platform.ErrPromptTimeout
 		case c, ok := <-d.chunks:
 			if !ok {
 				return d.closedErr()
@@ -601,7 +601,42 @@ func (d *driver) moreComing(ctx context.Context, tail string) bool {
 func (d *driver) closedErr() (string, error) {
 	err := <-d.readErr
 	d.readErr <- err
-	return clean(string(d.buf)), fmt.Errorf("%w: %v", platform.ErrClosed, err)
+	return cleanBuf(d.buf), fmt.Errorf("%w: %v", platform.ErrClosed, err)
+}
+
+// cleanBuf es clean(string(b)) sin las 5 o 6 copias de la salida entera: clean no cruza un salto de línea (ni el borrado de
+// --More-- ni el «\r\n»), así que se limpia por trozos que terminan en «\n» y el resultado se arma una sola vez.
+func cleanBuf(b []byte) string {
+	const chunk = 64 << 10
+	if len(b) <= chunk {
+		return clean(string(b))
+	}
+	var sb strings.Builder
+	sb.Grow(len(b))
+	for len(b) > 0 {
+		n := len(b)
+		if n > chunk {
+			if i := bytes.IndexByte(b[chunk:], '\n'); i >= 0 {
+				n = chunk + i + 1
+			}
+		}
+		c := b[:n]
+		if bytes.IndexByte(c, 8) < 0 && !bytes.Contains(c, []byte("\r ")) && !bytes.Contains(c, []byte("More")) {
+			// Sin borrados ni --More--, clean solo quita los retornos de carro: sin copias intermedias.
+			for len(c) > 0 {
+				i := bytes.IndexByte(c, '\r')
+				if i < 0 {
+					i = len(c)
+				}
+				sb.Write(c[:i])
+				c = c[min(i+1, len(c)):]
+			}
+		} else {
+			sb.WriteString(clean(string(c)))
+		}
+		b = b[n:]
+	}
+	return sb.String()
 }
 
 func clean(s string) string {
