@@ -58,7 +58,7 @@ func TestRenameNoReplaceInNoSaleDeLaCarpeta(t *testing.T) {
 
 // UNC y rutas de dispositivo se rechazan antes de abrir nada (SMB saldría a la red y filtraría el hash NTLM).
 func TestRutasUNCYDispositivoRechazadas(t *testing.T) {
-	for _, p := range []string{`\\host\share\f`, `//host/share/f`, `\\?\C:\Windows\win.ini`, `\\.\pipe\x`, `\\.\COM1`} {
+	for _, p := range []string{`\\host\share\f`, `//host/share/f`, `\\?\C:\Windows\win.ini`, `\\.\pipe\x`, `\\.\COM1`, `COM1`, `NUL`, `C:\x\CON`, `aux.txt`} {
 		if _, err := OpenRegular(p); !errors.Is(err, fs.ErrInvalid) {
 			t.Errorf("OpenRegular(%q): %v", p, err)
 		}

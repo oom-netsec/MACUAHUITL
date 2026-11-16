@@ -38,7 +38,8 @@ func HardLinkedFile(f *os.File) (bool, error) {
 // checkPath rechaza antes de abrir las rutas UNC y de dispositivo: \\host\share abre SMB (salida a la red fuera de
 // EgressGuard y hash NTLM filtrado) y \\.\pipe\x o \\.\COM1 se abren antes de que Stat los rechace.
 func checkPath(path string) error {
-	if unsafeVolume(filepath.VolumeName(path)) {
+	// Un nombre reservado (NUL, COM1, CON…) abre el dispositivo aunque vaya en una carpeta: IsLocal los marca.
+	if unsafeVolume(filepath.VolumeName(path)) || !filepath.IsLocal(filepath.Base(path)) {
 		return fmt.Errorf("%s: %w", path, fs.ErrInvalid)
 	}
 	return nil
