@@ -18,7 +18,7 @@ var spKeys = []string{
 // corta chocaría con «area 0», «domain name»… Se tapa lo que sigue.
 var spDashKeys = []string{
 	"area-password", "domain-password", "radius-common-pw", "ldap-login-password", "wpa-psk", "set-key", "password-encryption",
-	"auth-password", "priv-password", "shared-secret", "server-key", "enable-password", "login-password", "tunnel-password",
+	"auth-password", "priv-password", "shared-secret", "server-key", "enable-password", "login-password", "tunnel-password", "session-key",
 }
 
 // Submodos donde IOS acepta «k» por key (el bloque que da el prompt: ver blockOfPrompt de la terminal).
@@ -74,35 +74,46 @@ var spProse = map[string]bool{"mismatch": true, "failed": true, "expired": true,
 // commandSpans devuelve, para un comando tecleado o citado, los tramos [s, t) del original que Command tapa: uno por
 // segmento « ; » (NX-OS), desde el valor (el token que sigue a la palabra de secreto) hasta el fin del segmento. No
 // combina nada con las reglas: de eso se encarga cut.
-func commandSpans(block, cmd string) [][2]int {
-	sp := spansIn(block, cmd, false)
+func commandSpans(block, cmd string, split bool) [][2]int {
+	sp := spansIn(block, cmd, false, split)
 	if n := normSpaces(cmd); n != cmd { // IOS toma el NBSP como parte del token: se prueba el original y la copia, y se juntan
-		sp = mergeSpans(append(sp, spansIn(block, n, false)...))
+		sp = mergeSpans(append(sp, spansIn(block, n, false, split)...))
 	}
 	return sp
 }
 
 // spansIn es commandSpans; quoted: cmd es un texto citado entre comillas («token X» es una palabra más y la prosa de la
 // lista spProse no es un comando).
-func spansIn(block, cmd string, quoted bool) (spans [][2]int) {
+//
+// split: la plataforma separa comandos con « ; » (NX-OS, ISE). Sin ella (IOS, o plataforma desconocida) un « ; » puede ser
+// parte del valor: el tramo llega hasta el fin de la línea y se tapa de más, nunca de menos.
+func spansIn(block, cmd string, quoted, split bool) (spans [][2]int) {
 	pos := 0
 	for _, seg := range strings.Split(cmd, spSep) { // cada comando de NX-OS por separado: el primero de cada uno decide
 		spans = append(spans, shiftSpans(spansSeg(block, seg, quoted), pos)...)
 		pos += len(seg) + len(spSep)
 	}
+	if !split { // un « ; » puede ser del valor: el primer tramo se alarga hasta el fin de la línea
+		if len(spans) > 0 {
+			spans = [][2]int{{spans[0][0], len(cmd)}}
+		}
+	}
 	return spans
 }
 
+// splitsSemi: la plataforma usa « ; » como separador de comandos.
+func splitsSemi(platform string) bool { return platform == "nx-os" || platform == "ise" }
+
 func spansSeg(block, cmd string, quoted bool) (spans [][2]int) {
 	toks := spToken.FindAllStringIndex(cmd, -1)
+	n := len(toks) // las palabras de secreto se buscan hasta la barra; el valor, una vez hallada la palabra, llega al fin
 	for i, t := range toks {
-		if cmd[t[0]:t[1]] == "|" { // lo que sigue a la barra es un filtro, no un secreto
-			toks = toks[:i]
+		if cmd[t[0]:t[1]] == "|" { // lo que sigue a la barra es un filtro de un show, no un secreto; en un comando con secreto no hay filtro
+			n = i
 			break
 		}
 	}
-	n := len(toks)
-	if t := toks[max(n-1, 0):]; quoted && len(t) == 1 && t[0][1]-t[0][0] > 1 && cmd[t[0][1]-1] == '"' && cmd[t[0][0]] != '"' { // la comilla que cierra la cita no es del último token
+	if t := toks[max(len(toks)-1, 0):]; quoted && len(t) == 1 && t[0][1]-t[0][0] > 1 && cmd[t[0][1]-1] == '"' && cmd[t[0][0]] != '"' { // la comilla que cierra la cita no es del último token
 		t[0][1]--
 	}
 	tok := func(i int) string { return cmd[toks[i][0]:toks[i][1]] }
@@ -136,19 +147,18 @@ func spansSeg(block, cmd string, quoted bool) (spans [][2]int) {
 		// «snmp-server host IP …»: la community va por posición (tras vrf, informs, version…): se tapa todo lo que sigue a la IP.
 		// «tacacs-server k X»: IOS acepta «k» por key justo tras tacacs-server o radius-server.
 		// «ip nhrp authentication X»: ahí «authentication» sí lleva el secreto.
-		nhrp := i == first+2 && spPrefix("nhrp", low(first+1), 2) && spPrefix("authentication", low(i), 4)
-		short := i == first+1 && low(i) == "k" && (spPrefix("tacacs-server", low(first), 5) || spPrefix("radius-server", low(first), 5))
+		// «standby 1 authentication X» / «glbp 1 authentication X»: igual, tras el número de grupo.
+		nhrp := i == first+2 && spPrefix("authentication", low(i), 4) && (spPrefix("nhrp", low(first+1), 2) ||
+			(spPrefix("standby", low(first), 3) || spPrefix("glbp", low(first), 2)) && spDigits.MatchString(tok(first+1)))
+		short := i == first+1 && low(i) == "k" && (spPrefix("tacacs-server", low(first), 3) || spPrefix("radius-server", low(first), 3))
 		if !(host && i == first+2) && !short && !nhrp && (!spKeyword(tok(i), quoted && !spPrefix("license", low(first), 3), block, i == first) || notKeyword(low, tok, i, first, n, block)) {
 			continue
 		}
 		j := i + 1
-		if j >= n || tok(j) == ";" || notSecretValue(low, i, j, first, n) || quoted && spProse[low(j)] {
+		if j >= n || notSecretValue(low, i, j, first, n) || quoted && spProse[low(j)] {
 			continue
 		}
-		e := j
-		for e < n && tok(e) != ";" { // « ; » separa comandos en NX-OS
-			e++
-		}
+		e := len(toks)                  // hasta el fin del segmento, también pasada una barra o un « ; » (con split, el segmento ya no los trae)
 		if onlyMasked(cmd, toks[j:e]) { // el único valor ya está tapado (con su tipo)
 			i = e - 1
 			continue
@@ -171,7 +181,7 @@ var (
 		"encrypted": true, "hash": true, "plain": true, "pbkdf2": true, "scrypt": true, "aes": true, "aes-128": true, "aes-192": true, "aes-256": true}
 	spStruct = map[string]bool{"inform": true, "informs": true, "traps": true, "trap": true, "poll": true, "ro": true, "rw": true, "role": true, "address": true, "hostname": true, "network-admin": true, "network-operator": true,
 		"network-user": true, "vdc-admin": true, "vdc-operator": true, "level-1": true, "level-2": true, "level-1-2": true, "localizedkey": true, "view": true,
-		"group": true, "prefer": true, "encryption": true, "key-id": true}
+		"group": true, "prefer": true, "encryption": true, "key-id": true, "single-connection": true}
 	spStructNum = map[string]bool{"level": true, "timeout": true, "access": true, "privilege": true, "priv": true, "port": true, "auth-port": true,
 		"acct-port": true, "udp-port": true, "retransmit": true, "expire": true, "key-id": true, "vrf": true, "use-vrf": true, "version": true}
 )
@@ -195,40 +205,97 @@ func structWord(w string, m map[string]bool) bool {
 // spAlgoExacto: algoritmos de verdad (no cualquier palabra que empiece con sha, aes o hmac: «Shadow2024x» es una contraseña).
 var spAlgoExacto = regexp.MustCompile(`(?i)^(?:sha(?:-?(?:1|2|224|256|384|512))?|hmac-?(?:md5|sha(?:-?(?:1|2|224|256|384|512))?(?:-(?:256|384|512))?)(?:-96)?|aes-?(?:128|192|256)(?:-cmac)?|cmac(?:-aes-128)?)$`)
 
-// SecretValues devuelve los valores que Command tapó en un tramo (lo que sigue a una palabra de secreto): el primer
-// token tras cada palabra de secreto del tramo que no sea un tipo (0-9), un algoritmo, otra palabra de secreto ni
-// estructura del comando, y que sirva para tapar su repetición por contenido (spValue). Un tramo de un solo token es
-// ese valor. Sirve para que la terminal tape el valor, y no «RO» o «level», si luego lo ve repetido en un eco.
-func SecretValues(span string) []string {
+// SecretValue es un valor que Command tapó, para que la terminal tape su repetición por contenido. Primary: el primer valor
+// de un secreto (no se desaloja de la lista antes que las palabras que lo siguen). Persist: sigue vigente tras el prompt sin
+// pendientes (la frase de un secreto de varias palabras y sus palabras que no son minúsculas puras).
+type SecretValue struct {
+	Text             string
+	Primary, Persist bool
+}
+
+// secretGroups: los valores de un tramo, cada uno como la lista de sus palabras. Un valor es el primer token tras una
+// palabra de secreto que no sea un tipo (0-9), un algoritmo, otra palabra de secreto ni estructura del comando y que sirva
+// para tapar su repetición (spValue); si le siguen más palabras (tipo 0 con espacios: «Pa55w0rd Xq7z9») son del mismo valor
+// hasta la primera palabra estructural o de secreto. Pasada una estructura («RO», «view V», «timeout 5») ya no se recuerda
+// nada hasta la siguiente palabra de secreto: «VIEWALL» o «ACL_SNMP» no son el secreto.
+func secretGroups(span string) (groups [][]string) {
 	toks := spToken.FindAllString(span, -1)
-	if len(toks) == 1 {
-		if v := strings.Trim(toks[0], `"`); spValue(v) {
-			return []string{v}
-		}
-		return nil
-	}
-	var vals []string
+	armed, have := true, false
 	for i := 0; i < len(toks); {
 		w := strings.ToLower(toks[i])
 		switch {
-		case len(w) == 1 && w[0] >= '0' && w[0] <= '9', structWord(w, spAlgo), spAlgoExacto.MatchString(w), spKeyword(w, false, spLogBlock, false), localRemote(w):
+		case spKeyword(w, false, spLogBlock, false), localRemote(w):
+			armed, have = true, false
+			i++
+			continue
+		case len(w) == 1 && w[0] >= '0' && w[0] <= '9', structWord(w, spAlgo), spAlgoExacto.MatchString(w):
 			i++
 			continue
 		case structWord(w, spStruct):
+			armed = armed && !have
 			i++
 			continue
 		case structWord(w, spStructNum):
+			armed = armed && !have
 			i += 2
 			continue
 		}
 		v := strings.Trim(toks[i], `"`)
-		if !spValue(v) { // un número corto, una IP o una interfaz no es el valor: se sigue buscando
+		if !armed || !spValue(v) { // un número corto, una IP o una interfaz no es el valor: se sigue buscando
 			i++
 			continue
 		}
-		vals = append(vals, v)
-		// el resto del valor (tipo 0 con espacios) y lo que sigue hasta la próxima palabra de secreto no se mira
-		for i++; i < len(toks) && !spKeyword(toks[i], false, spLogBlock, false) && !localRemote(strings.ToLower(toks[i])); i++ {
+		g := []string{v}
+		j := i + 1
+		for ; j < len(toks); j++ {
+			t := strings.ToLower(toks[j])
+			if spKeyword(t, false, spLogBlock, false) || localRemote(t) || spStruct[t] || spStructNum[t] || spNotSecret[t] || len(t) >= 3 && (structWord(t, spStruct) || structWord(t, spStructNum)) {
+				break
+			}
+			g = append(g, strings.Trim(toks[j], `"`))
+		}
+		for len(g) > 1 && !spValue(g[len(g)-1]) && (spDigits.MatchString(g[len(g)-1]) || ipOnly.MatchString(g[len(g)-1])) { // «X 7», «X 10»: el tipo o el ACL que sigue no es del valor
+			g = g[:len(g)-1]
+		}
+		groups = append(groups, g)
+		have = true
+		i = j
+	}
+	return groups
+}
+
+var pureLower = regexp.MustCompile(`^[a-z]+$`)
+
+// SecretValuesV devuelve los valores de un tramo con sus marcas; firstOnly: solo el primero («snmp-server host IP … COMM
+// config syslog…»: lo que sigue a la community son opciones, no secretos).
+func SecretValuesV(span string, firstOnly bool) (out []SecretValue) {
+	for gi, g := range secretGroups(span) {
+		if firstOnly && gi > 0 {
+			break
+		}
+		if firstOnly {
+			g = g[:1] // solo la community, no las opciones que le siguen
+		}
+		if len(g) > 1 {
+			out = append(out, SecretValue{Text: strings.Join(g, " "), Primary: true, Persist: gi == 0}) // solo la frase del primer valor: lo que sigue a una palabra de secreto en medio es otro valor
+		}
+		for k, w := range g {
+			if spValue(w) {
+				out = append(out, SecretValue{Text: w, Primary: k == 0, Persist: len(g) > 1 && !pureLower.MatchString(w)})
+			}
+		}
+	}
+	return out
+}
+
+// SecretValues son las palabras de SecretValuesV (sin la frase).
+func SecretValues(span string) []string {
+	var vals []string
+	for _, g := range secretGroups(span) {
+		for _, w := range g {
+			if spValue(w) {
+				vals = append(vals, w)
+			}
 		}
 	}
 	return vals
@@ -322,4 +389,43 @@ func normSpaces(s string) string {
 		i += w
 	}
 	return b.String()
+}
+
+// normOne es normSpaces con un solo espacio ASCII por cada espacio Unicode (las reglas de la v0.6.5 piden uno): la copia ya
+// no tiene el largo del original, así que devuelve también el desplazamiento en s de cada byte de la copia (con uno más al
+// final, el largo de s).
+func normOne(s string) (string, []int) {
+	var b strings.Builder
+	idx := make([]int, 0, len(s)+1)
+	for i := 0; i < len(s); {
+		r, w := utf8.DecodeRuneInString(s[i:])
+		if r != utf8.RuneError && (unicode.IsSpace(r) || r == 0x200B || r == 0x200C || r == 0x200D || r == 0x2060 || r == 0xFEFF) {
+			b.WriteByte(' ')
+			idx = append(idx, i)
+		} else {
+			b.WriteString(s[i : i+w])
+			for k := 0; k < w; k++ {
+				idx = append(idx, i+k)
+			}
+		}
+		i += w
+	}
+	return b.String(), append(idx, len(s))
+}
+
+// twinSpans: los tramos de orig que la cadena de reglas taparía si vieran los espacios Unicode como un espacio ASCII: corre
+// chain sobre la copia (normOne) y lleva lo que cambió de vuelta a las coordenadas de orig.
+func twinSpans(orig string, chain func(string) string) [][2]int {
+	if !hasHigh(orig) {
+		return nil
+	}
+	n, idx := normOne(orig)
+	if n == orig {
+		return nil
+	}
+	sp := diffSpans(n, chain(n))
+	for i := range sp {
+		sp[i] = [2]int{idx[sp[i][0]], idx[sp[i][1]]}
+	}
+	return sp
 }

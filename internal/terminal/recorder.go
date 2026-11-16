@@ -44,14 +44,15 @@ var (
 )
 
 const (
-	tailMax    = 256
-	lineMax    = 64 << 10 // una línea (de salida o tecleada) más larga se recorta
-	heldMax    = 32       // líneas tecleadas retenidas a la espera de saber si eran una contraseña
-	secretsMax = 16
-	secretsWin = 50   // líneas de salida que dura la red por contenido
-	sentMax    = 32   // líneas enviadas que esperan su eco
-	skipMax    = 4096 // líneas que se descartan dentro de una llave privada sin cierre
-	totalMax   = 256 << 20
+	tailMax     = 256
+	lineMax     = 64 << 10 // una línea (de salida o tecleada) más larga se recorta
+	heldMax     = 32       // líneas tecleadas retenidas a la espera de saber si eran una contraseña
+	secretsMax  = 16
+	secrets2Max = 64   // tope de la lista M₂ (secretsMax sigue siendo el de la v0.6.5)
+	secretsWin  = 50   // líneas de salida que dura la red por contenido
+	sentMax     = 32   // líneas enviadas que esperan su eco
+	skipMax     = 4096 // líneas que se descartan dentro de una llave privada sin cierre
+	totalMax    = 256 << 20
 )
 
 // Recorder es seguro entre goroutines: la salida y el teclado llegan por separado.
@@ -74,17 +75,19 @@ type Recorder struct {
 	win      int         // líneas de salida que le quedan a la ventana
 	secrets2 []string    // lo mismo para los valores que tapa mask.CutCommand (lista y ventana aparte: no tocan el estado de las reglas)
 	win2     int
-	blk2     string   // bloque del prompt para mask.CutCommand («keychain» además de los de lastBlk)
-	acc      string   // lo recibido del eco partido hasta ahora
-	esent    []string // copia aparte de las líneas enviadas, solo para reconocer el resto de un eco (no la leen ni escriben las decisiones de la v0.6.5)
-	eacc     string   // lo recibido del eco pendiente hasta ahora (estado aparte de acc)
-	epart    bool     // hay un eco pendiente: lo que lo continúe, aunque parezca un prompt, es su resto
-	eshift   bool     // el eco empezó con «$» (IOS lo desplaza): su texto es un trozo de la línea, no su comienzo
-	cont     bool     // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
-	cfg      bool     // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
-	cfgOK    bool     // hay prompt conocido para lo que se teclea; si no, se tapa como en config
-	hidden   bool     // lo tecleado es una contraseña: no se graba
-	line     []byte   // lo tecleado en la línea actual
+	prim2    map[string]bool // valores de secrets2 que son el primer valor de un secreto (se desalojan al final)
+	multi2   map[string]bool // valores de secrets2 que vienen de un secreto de varias palabras: pasan el prompt sin pendientes
+	blk2     string          // bloque del prompt para mask.CutCommand («keychain» además de los de lastBlk)
+	acc      string          // lo recibido del eco partido hasta ahora
+	esent    []string        // copia aparte de las líneas enviadas, solo para reconocer el resto de un eco (no la leen ni escriben las decisiones de la v0.6.5)
+	eacc     string          // lo recibido del eco pendiente hasta ahora (estado aparte de acc)
+	epart    bool            // hay un eco pendiente: lo que lo continúe, aunque parezca un prompt, es su resto
+	eshift   bool            // el eco empezó con «$» (IOS lo desplaza): su texto es un trozo de la línea, no su comienzo
+	cont     bool            // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
+	cfg      bool            // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
+	cfgOK    bool            // hay prompt conocido para lo que se teclea; si no, se tapa como en config
+	hidden   bool            // lo tecleado es una contraseña: no se graba
+	line     []byte          // lo tecleado en la línea actual
 	lastCR   bool
 	max      int64 // tope de la grabación en bytes
 	written  int64
@@ -150,7 +153,7 @@ func (r *Recorder) outLine(l string) {
 	}
 	if r.win2 > 0 {
 		if r.win2--; r.win2 == 0 {
-			r.secrets2 = nil
+			r.secrets2, r.multi2, r.prim2 = nil, nil, nil
 		}
 	}
 	out, keep := "", true
@@ -158,8 +161,10 @@ func (r *Recorder) outLine(l string) {
 	// un prompt. Estado aparte (eacc/epart/esent): las decisiones de la v0.6.5 no cambian y lo único que se agrega es tapar
 	// la línea emitida. La línea sigue su camino normal.
 	rest := false
+	cover := -1 // desde dónde la línea cae dentro del secreto de lo tecleado (eco partido); solo agrega tapado
 	if r.epart && l != "" && !equipoMsg(l) {
 		if match, done := r.echoMatch(r.eacc + l); match {
+			cover = r.echoCover(r.eacc, l)
 			rest, r.eacc, r.epart = promptRe.MatchString(l), r.eacc+l, !done
 		} else {
 			r.epart = false
@@ -190,7 +195,19 @@ func (r *Recorder) outLine(l string) {
 		text := strings.TrimLeft(l[len(pr):], " \t") // tras el prompt va un espacio antes del eco
 		partial := false
 		if len(r.sent) == 0 {
-			r.secrets, r.win, r.secrets2, r.win2 = nil, 0, nil, 0 // prompt sin pendientes: la ventana de la red por contenido vence
+			// prompt sin pendientes: la ventana de la red M₁ vence (la v0.6.5). La M₂ solo conserva los valores de varias palabras
+			// («Pa55w0rd Xq7z9»), que el equipo puede repetir más tarde; vencen por las líneas de la ventana.
+			r.secrets = nil
+			r.win = 0
+			keep := r.secrets2[:0:0]
+			for _, v := range r.secrets2 {
+				if r.multi2[v] {
+					keep = append(keep, v)
+				}
+			}
+			if r.secrets2 = keep; len(keep) == 0 {
+				r.win2 = 0
+			}
 		} else if text != "" { // un Enter vacío no saca nada
 			if i := indexOf(r.sent, text); i >= 0 {
 				r.sent = r.sent[i+1:] // lo anterior se perdió en el eco (p. ej. tabulador completado)
@@ -213,6 +230,12 @@ func (r *Recorder) outLine(l string) {
 				match, done = r.echoMatch(r.eacc)
 			}
 			r.epart = match && !done
+			if match && isConfigPrompt(pr) {
+				cover = r.echoCover("", r.eacc)
+				if cover >= 0 {
+					cover += len(l) - len(r.eacc)
+				}
+			}
 		}
 		out = vis + shown
 	} else if r.cont && !equipoMsg(l) {
@@ -253,6 +276,8 @@ func (r *Recorder) outLine(l string) {
 	}
 	if rest {
 		out = "<MASKED:secret>"
+	} else if cover >= 0 && keep {
+		out = mask.CutFrom(l, out, cover)
 	}
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
@@ -271,6 +296,37 @@ func (r *Recorder) echoMatch(x string) (match, done bool) {
 		}
 	}
 	return match, false
+}
+
+// echoCover: el trozo piece del eco (que sigue a prev, lo recibido antes) cae dentro del secreto de alguna línea enviada
+// desde el desplazamiento que devuelve (0 = entero); -1 si no cae en ninguno. Con el eco desplazado el trozo es un
+// pedazo cualquiera de la línea. Los cortes solo agregan tapado.
+func (r *Recorder) echoCover(prev, piece string) int {
+	if r.cfgOK && !r.cfg { // como lo tecleado: Command solo actúa en modo config
+		return -1
+	}
+	best := -1
+	for _, s := range append(r.esent[:len(r.esent):len(r.esent)], string(r.line)) {
+		pos := -1
+		if r.eshift {
+			if i := strings.Index(s, prev+piece); i >= 0 {
+				pos = i + len(prev)
+			}
+		} else if strings.HasPrefix(s, prev+piece) {
+			pos = len(prev)
+		}
+		if pos < 0 {
+			continue
+		}
+		a := mask.SecretStart(r.blk2, s)
+		if a < 0 || a >= pos+len(piece) {
+			continue
+		}
+		if off := max(a-pos, 0); best < 0 || off < best {
+			best = off
+		}
+	}
+	return best
 }
 
 // weakPrompt: el «prompt» no tiene letras ni dígitos («>», «*>»): lo mismo es una fila de salida que el de FTD.
@@ -327,7 +383,7 @@ var maskedTok = regexp.MustCompile(`<MASKED:[^>]*>`)
 func (r *Recorder) peekSecrets(line string) {
 	line, m := maskTyped(line, r.typed.Peek, true) // sin prompt que lo confirme: se tapa como en config
 	r.noteSecrets(line, m)
-	_, vals := mask.CutCommand(r.blk2, line, m)
+	_, vals := mask.CutCommandV(r.blk2, line, m)
 	r.note2(vals)
 }
 
@@ -345,8 +401,8 @@ func (r *Recorder) typedLine(line string, loose bool) string {
 	}
 	r.noteSecrets(line, m)
 	if cfg { // el corte: S1 (m) con lo que Command tapa; no cambia ningún estado
-		var vals []string
-		m, vals = mask.CutCommand(r.blk2, line, m)
+		var vals []mask.SecretValue
+		m, vals = mask.CutCommandV(r.blk2, line, m)
 		r.note2(vals)
 	}
 	return m
@@ -358,21 +414,48 @@ func (r *Recorder) hide(src, s1 string) string {
 	if strings.HasPrefix(src, "$") && strings.HasPrefix(s1, "$") { // eco desplazado de IOS («R1(config)#$cola…»): el «$» no es del comando
 		pre, src, s1 = "$", src[1:], s1[1:]
 	}
-	out, vals := mask.CutCommand(r.blk2, src, s1)
+	out, vals := mask.CutCommandV(r.blk2, src, s1)
 	r.note2(vals)
 	frag := len(r.sent) > 0
 	return pre + r.scrub2(r.scrub(out, frag), frag)
 }
 
-// note2 guarda en memoria los valores que tapó mask.CutCommand (con su propio tope y ventana).
-func (r *Recorder) note2(vals []string) {
+// note2 guarda en memoria los valores que tapó mask.CutCommandV (con su propio tope y ventana). Al pasar secrets2Max se
+// desaloja la más antigua de las palabras que no son el primer valor de un secreto: un comando largo no saca de la lista
+// el valor de otro anterior.
+func (r *Recorder) note2(vals []mask.SecretValue) {
 	for _, v := range vals {
-		if len(v) >= 4 && !strings.HasPrefix(v, "<MASKED:") && indexOf(r.secrets2, v) < 0 {
-			if r.secrets2 = append(r.secrets2, v); len(r.secrets2) > secretsMax {
-				r.secrets2 = r.secrets2[1:]
-			}
-			r.win2 = secretsWin
+		if len(v.Text) < 4 || strings.HasPrefix(v.Text, "<MASKED:") {
+			continue
 		}
+		if v.Persist {
+			if r.multi2 == nil {
+				r.multi2 = map[string]bool{}
+			}
+			r.multi2[v.Text] = true
+		}
+		if v.Primary {
+			if r.prim2 == nil {
+				r.prim2 = map[string]bool{}
+			}
+			r.prim2[v.Text] = true
+		}
+		if indexOf(r.secrets2, v.Text) < 0 {
+			r.secrets2 = append(r.secrets2, v.Text)
+			if len(r.secrets2) > secrets2Max {
+				k := 0
+				for i, x := range r.secrets2 {
+					if !r.prim2[x] {
+						k = i
+						break
+					}
+				}
+				delete(r.multi2, r.secrets2[k])
+				delete(r.prim2, r.secrets2[k])
+				r.secrets2 = append(r.secrets2[:k], r.secrets2[k+1:]...)
+			}
+		}
+		r.win2 = secretsWin
 	}
 }
 
