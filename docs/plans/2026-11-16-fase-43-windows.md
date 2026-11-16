@@ -36,12 +36,23 @@ Reparto:
 
 ## 43b: app e instalador (Front)
 
-**Pendiente de la sección de Front.** Se integra en el ADR 0012 y aquí.
+Detalle en el ADR 0012, «La app (Wails v3) en Windows» e «Instalador». Bloques:
+
+- MessageBox si falta WebView2, con prueba.
+- `NonClientRegionSupport` y `WebviewUserDataPath` en State.
+- Helper `baseName`/`dirName` para `transfer/client.ts` y `Files.tsx`.
+- Textos por sistema (`….windows`) en la UI.
+- Instalador NSIS por usuario: bootstrapper de Evergreen, entrada de `Run`, y desinstalación que pregunta por los datos con «No» por omisión y nunca los borra con `/S`.
+- Job `ui-windows`.
+
+Front empieza cuando el ADR esté en `main`.
 
 ## 43c: release y firma (Release)
 
 - **`release.yml`**: artefactos de Windows (zip del núcleo y mctl, e instalador), con sumas SHA-256 y atestación SLSA como hoy, y reproducibilidad comprobada igual que en Linux.
-- **Firma**: según lo que decida el dueño entre las opciones del ADR 0012. Sin decisión, la beta sale sin firmar y con aviso.
+- **Firma**: decidido por el dueño, la beta sale **sin firmar** («vamos como open source»).
+  - La verificación se apoya en las sumas, la atestación SLSA y los binarios reproducibles.
+  - Las notas del release y el README explican Smart App Control, SmartScreen y los falsos positivos de Defender (ADR 0012, i).
 
 ## Validación
 
@@ -55,7 +66,7 @@ El CI de Windows prueba el código, pero no el uso real. Antes de llamarla beta 
 - bloquear la pantalla con la bóveda abierta, que debe cerrarla;
 - suspender en medio de un trabajo.
 
-Quién la hace y dónde se decide con Release. Si es una VM local, al terminar se borran la ISO y la VM.
+La hace Release, en una VM local con la ISO de evaluación de Windows 11 de Microsoft (gratis, 90 días), contra el 3560CX solo con show. Al terminar se borran la ISO y la VM.
 
 ## Fuera de esta fase
 

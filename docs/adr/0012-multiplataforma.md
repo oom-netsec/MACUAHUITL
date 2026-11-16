@@ -1,6 +1,6 @@
 # ADR 0012: Multiplataforma (primero Windows)
 
-Fecha: 2026-11-16 · Estado: propuesto
+Fecha: 2026-11-16 · Estado: aceptado
 
 ## Contexto
 
@@ -32,7 +32,17 @@ Además, hay supuestos que compilan pero fallan en ejecución. Son los más peli
 - Lo que cambia por sistema vive en archivos `_linux.go` y `_windows.go`, dentro de los mismos paquetes de hoy: `internal/sys`, `internal/ipc`, `internal/diag`, `internal/diag/serialcon` y `internal/core/power`. La API de cada paquete no cambia; los llamadores no llevan build tags.
 - `golang.org/x/sys/windows` (BSD, el módulo ya es dependencia) solo se importa en esos paquetes. Un caso nuevo en archcheck lo hace cumplir, igual que noegress con `net`.
 - Dependencia nueva: `github.com/Microsoft/go-winio` (MIT, la usa Docker), solo para el named pipe; antes de agregarla se lee su LICENSE. El resto de las llamadas sale de `x/sys/windows`.
-- Rutas en Windows: `%LOCALAPPDATA%\MACUAHUITL\{config,data,state}`. Nunca `%APPDATA%`: esa carpeta es *roaming*, y en un dominio subiría la bóveda a un servidor.
+- Rutas en Windows (el spec §14 hoy es XDG):
+
+  | Ruta | Carpeta |
+  |---|---|
+  | Config | `%LOCALAPPDATA%\MACUAHUITL\config` |
+  | Data (bóveda) | `%LOCALAPPDATA%\MACUAHUITL\data` |
+  | State (auditoría, registros, caché de WebView2) | `%LOCALAPPDATA%\MACUAHUITL\state` |
+  | Outputs | `%USERPROFILE%\MACUAHUITL\outputs`, como `~/MACUAHUITL/outputs` en Linux |
+
+  - **Nada va en `%APPDATA%`**, que es *roaming*: en un dominio subiría la bóveda a un servidor. Config tampoco va ahí, aunque Front lo propuso por ser chica: guarda los paquetes `.mpack` y los playbooks del usuario, que son contenido que se ejecuta, y un perfil roaming dejaría que otro equipo del dominio los cambie.
+  - **No hay carpeta runtime**: el named pipe no la necesita, y `FILE_FLAG_FIRST_PIPE_INSTANCE` hace de candado de instancia única.
 
 ### (a) Canal local: named pipe con ACL y verificación del cliente
 
@@ -65,6 +75,8 @@ Hoy el ADR 0003 exige tres cosas: que solo el usuario pueda conectarse, que el n
 - **`openregular` y los enlaces.** Abre con `CreateFile(…, FILE_FLAG_OPEN_REPARSE_POINT)`, para no seguir el último componente si es enlace simbólico o *junction*. Con `GetFileInformationByHandle` rechaza `FILE_ATTRIBUTE_REPARSE_POINT` y lo que no sea archivo regular. `HardLinked` usa `NumberOfLinks` y `Owner` usa el SID del dueño en lugar del uid; la firma cambia a un tipo opaco por sistema.
 - **`RenameNoReplaceIn`** pasa a `MoveFileEx` sin `MOVEFILE_REPLACE_EXISTING`, que en Windows ya falla si el destino existe. Es más simple que `renameat2`.
 - **Identidad del proceso.** `ProcUID` y la negativa a correr como root se reemplazan por el SID del token. El núcleo **se niega a correr elevado** (token con `TokenElevation`), igual que hoy se niega a correr como root.
+  - **Limitación conocida.** Una cuenta con UAC desactivado, o el Administrador integrado, tiene el token siempre elevado y no puede usar la app.
+  - El núcleo lo dice con un mensaje claro: usar una cuenta estándar, o una de administrador con UAC activo, que arranca con token sin elevar. Así no queda un cierre sin explicación.
 
 ### (d) Inhibir la suspensión y enterarse de suspensión y bloqueo
 
@@ -95,14 +107,19 @@ Hoy el ADR 0003 exige tres cosas: que solo el usuario pueda conectarse, que el n
 ### (g) Arranque del núcleo sin servicio ni admin
 
 - **Arranque**: una entrada en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` lanza el núcleo al iniciar sesión. Además, la app y mctl lo lanzan bajo demanda si no encuentran el pipe.
-- **Por qué no una tarea programada.** Release propuso una tarea al iniciar sesión, pero crear una tarea con disparador *ONLOGON* puede pedir elevación según la política del equipo. La clave `Run` de HKCU nunca la pide y es el equivalente de `systemctl --user enable`.
+  - El núcleo lanzado bajo demanda corre **separado** de quien lo lanzó (`DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW`, fuera de cualquier Job Object de la app). Si no, moriría al cerrar la UI y cortaría un trabajo de Patrol a medias.
+  - El instalador da de alta la entrada de `Run` y la desinstalación la quita.
+- **Por qué no una tarea programada.** Release y Front propusieron una tarea «al iniciar sesión». Crear una tarea propia no pide admin, pero el disparador *ONLOGON* sí puede pedir elevación, según la versión y la política del equipo. La clave `Run` de HKCU nunca la pide y es el equivalente de `systemctl --user enable`.
 - Nada de servicio de Windows: correría como SYSTEM o con otra cuenta, y eso choca con el ADR 0004.
-- El núcleo corre sin consola: es un binario `-H windowsgui`, o lo lanza la app con `CREATE_NO_WINDOW`.
+- **Sin consola.** El núcleo es un binario `-H windowsgui`, así que no tiene stdout ni stderr. Su registro va a `%LOCALAPPDATA%\MACUAHUITL\state\macuahuitld.log`, con la misma rotación que en Linux. La app lo enlaza para soporte.
 
 ### (h) Puertos 21 y 69
 
 - **Puertos bajos sin privilegios.** Windows **no** tiene puertos privilegiados: un usuario normal puede escuchar en 21 y 69. El impedimento real es el Firewall de Windows. La primera escucha dispara su diálogo, y permitir la entrada pide admin.
-- **Decisión.** En Windows el servidor escucha en el puerto que el usuario elija, 69 o 21 incluidos, con la misma IP explícita, duración acotada y auditoría de siempre. La regla de entrada del firewall es un paso del usuario, documentado con su orden exacta: `netsh advfirewall firewall add rule … program="…\macuahuitld.exe" dir=in action=allow localip=<IP>`. Se hace una vez, como admin, o aceptando el diálogo.
+- **Decisión.** En Windows el servidor escucha en el puerto que el usuario elija, 69, 21 y 162 incluidos, con la misma IP explícita, duración acotada y auditoría de siempre.
+  - La regla de entrada del firewall es un paso del usuario, igual que hoy la regla de nftables: la app la muestra y nunca la aplica.
+  - La orden exacta es `New-NetFirewallRule -DisplayName MACUAHUITL-TFTP -Direction Inbound -Program "…\macuahuitld.exe" -LocalAddress <IP> -Protocol UDP -LocalPort 69 -Action Allow`. Se corre una vez, como admin, o se acepta el diálogo del firewall.
+  - Los textos de puertos privilegiados, `setcap` y nftables, de la UI y del núcleo, tienen su variante para Windows.
 - **No se usa `netsh interface portproxy`.** Solo redirige TCP, así que no sirve para TFTP (UDP 69), pide admin y deja una regla persistente que sobrevive a la app.
 
 ### (i) Qué puede faltar en la primera versión de Windows
@@ -113,7 +130,14 @@ La primera versión de Windows se llama **beta**. No promete paridad. Puede sali
 - el bloqueo de toda la memoria del proceso: solo se bloquean los rangos del material de llaves (ver b);
 - protección contra procesos del mismo usuario, que no existe en Windows sin admin (ver b);
 - la consola serie, si su validación en hardware real no está lista: se marca «sin validar» y no se bloquea la beta;
-- ARM64: solo amd64 al principio.
+- ARM64: solo amd64 al principio;
+- el escaneo SYN de nmap. En Windows necesita Npcap, que no es parte del producto, y su comportamiento sin admin depende de cómo se instaló. La beta esconde la opción SYN y deja el escaneo por conexión.
+
+Limitaciones de una beta sin firma. Van en las notas del release y en el README, dichas tal cual:
+
+- **Smart App Control** de Windows 11, si está activo, bloquea por completo un ejecutable sin firma, sin opción de ejecutarlo. Desactivarlo no tiene vuelta atrás sin reinstalar Windows, así que esa decisión es del usuario. No la tomamos ni la recomendamos por él.
+- **SmartScreen** muestra «Windows protegió su PC». Se sigue con «Más información → Ejecutar de todas formas», y en cada versión nueva vuelve a aparecer.
+- **Defender** puede marcar como falso positivo un binario Go sin firma. Se reporta a Microsoft como falso positivo y se avisa en el release.
 
 Todo lo demás debe funcionar igual que en Linux. Eso incluye la bóveda, Patrol, el cambio asistido, los paquetes `.mpack`, el enmascarado, la auditoría y el terminal SSH. Esa es la vara del CI.
 
@@ -125,19 +149,77 @@ Todo lo demás debe funcionar igual que en Linux. Eso incluye la bóveda, Patrol
 - **Mientras dure 43a**, el job arranca con `continue-on-error` y una lista de paquetes que crece PR a PR. Al cerrar 43a pasa a ser obligatorio en la protección de `main`, junto a go, ui y proto.
 - **En el job `go-checks` de Linux**, un paso barato `GOOS=windows go vet ./...` detecta antes de llegar a Windows que algo dejó de compilar.
 
-### Instalador y firma
+### La app (Wails v3) en Windows
 
-**Sección de Front (app Wails, WebView2, instalador y su CI): pendiente de integrar.**
+Propuesta de Front, verificada sobre el código de wails/v3 v3.1.0 (la versión del `go.mod`) y una compilación de prueba del 2026-11-16.
 
-Opciones de firma, a decidir por el dueño. Los costos son aproximados y se confirman antes de comprar.
+- **Compilación.** `GOOS=windows CGO_ENABLED=0 go build -tags wails ./ui` compila sin cgo: en Windows, Wails carga WebView2 con go-webview2, en Go puro. Se compila en cruzado desde Linux. Hoy solo fallan `internal/ipc` e `internal/sys`, que son del núcleo.
+- **Runtime de WebView2: Evergreen, nunca Fixed Version.**
+  - Fixed Version pesa más de 250 MB.
+  - No se actualiza sola, así que los parches de Chromium dependerían de nuestros releases.
+  - En Windows 10 pide un `icacls` a mano.
+- **Instalación del runtime.** El instalador busca la clave `pv` (HKLM y HKCU). Solo si falta, corre el Evergreen Bootstrapper empaquetado (unos 2 MB) con `/silent /install`. Sin elevar, el bootstrapper instala por usuario (ADR 0004). Para equipos sin internet, el Standalone Installer de Microsoft no se empaqueta (pesa más de 100 MB): se enlaza en el mensaje de error y en la documentación.
+- **Sin WebView2, hoy la app se cerraría muda.** Wails llama a `os.Exit(1)` y escribe en stderr, y una app GUI no tiene consola. En `ui/main.go`, solo en Windows, antes de `application.New` se consulta `GetAvailableCoreWebView2BrowserVersionString`. Si falla, sale un MessageBox nativo en es/en con el enlace de descarga, y la app termina. Lleva prueba.
+- **Puente.** Solo usa `ipc.Dial` e `ipc.ClientConn`. El `ipc_windows.go` del canal (a) da el mismo `Dial`, así que ni `bridge.go` ni sus módulos cambian. `sys.NoDump`, `sys.RenameNoReplaceIn` y `NoAtomicRename` conservan su firma en Windows (ver b y c).
+- **Ventana.**
+  - Los controles propios ya están en el orden de Windows.
+  - Se enciende `Windows.NonClientRegionSupport`, para que Windows 11 conserve Snap Layouts con la ventana `Frameless`.
+  - `WebviewUserDataPath` va dentro de State, no en `%APPDATA%\macuahuitl.exe`, que es lo que pone Wails por omisión.
+- **Rutas con «/» en la UI.** Se corrigen con un helper `baseName`/`dirName` que acepta los dos separadores, y con pruebas. Los casos:
+  - `modules/transfer/client.ts` (origen local de «put»);
+  - `components/Files.tsx` (nombre del archivo rechazado).
+- **Textos por sistema.**
+  - El puente expone `runtime.GOOS` y la UI elige entre la clave `…` y `….windows`. Las dos van en `es.ts` y `en.ts`, y las cubre `i18nCoverage`.
+  - El catálogo de `internal/i18n` sigue el mismo patrón.
+  - Claves de la UI que cambian: `systemctl --user` en `shell.coreDown` y `App.tsx`; `/dev/ttyUSB*` y `dialout` en la consola; CAP_NET_RAW y SYN; puertos menores a 1024 y nftables; 0600 y 0700, `chmod`, `/tmp` y `~/.ssh` en Almacenamiento y respaldos.
+  - Claves del núcleo que cambian: `setcap`, `nft_remove`, `listen.privileged`, `serial.err.permission_hint`, `/dev/ttyUSB0` → `COM3`, `harden.*` y `harden.err.runtime_dir`.
+- **Fuentes OFL.** Inter y JetBrains Mono viajan embebidas en `macuahuitl.exe` (Vite → `dist` → `go:embed`). El instalador solo lleva sus licencias en `THIRD_PARTY_LICENSES` y `NOTICE`.
 
-| Opción | Costo | SmartScreen | Notas |
-|---|---|---|---|
-| Azure Artifact Signing (antes Trusted Signing) | ~9.99 USD/mes, plan Basic | Reputación que se acumula | **Solo personas físicas de EE. UU. y Canadá**, u organizaciones de EE. UU., Canadá, UE o Reino Unido. Una persona física en México hoy no califica; habría que confirmarlo. |
-| Certificado OV | ~150–300 USD/año | Reputación que se acumula por firma | La llave va en token o HSM (exigencia del CA/B Forum desde 2023). |
-| Certificado EV | ~400+ USD/año | **Igual que OV** desde agosto de 2024: ya no da reputación inmediata | No vale el sobreprecio para evitar SmartScreen. |
-| SignPath Foundation | Gratis para proyectos de código abierto que califiquen | Igual que OV | El proyecto es Apache-2.0; hay que solicitarlo y cumplir sus reglas de build. |
-| Primera beta sin firmar | 0 | Aviso «Windows protegió su PC» | Se mitiga con las sumas SHA-256 y la atestación SLSA que ya publica `release.yml`, y un aviso claro en la página de descarga. |
+### Instalador
+
+- **NSIS por usuario, no MSIX.**
+  - MSIX redirige `%APPDATA%` y `%LOCALAPPDATA%` a una carpeta del paquete. Al desinstalar, Windows la borra sin preguntar, y con ella la bóveda.
+  - MSIX además exige firma (Microsoft Learn, «Understanding how packaged desktop apps run on Windows»).
+  - La plantilla de Wails ya trae `WAILS_INSTALL_SCOPE "user"`, que pone `RequestExecutionLevel user`. Instala en `$LOCALAPPDATA\Programs\MACUAHUITL`, la desinstalación queda en HKCU, sin UAC, y los accesos directos van en el menú Inicio del usuario. El del escritorio es opcional, con la casilla apagada.
+- **Desinstalación.**
+  - Se borran solo `$INSTDIR`, los accesos directos, la clave de desinstalación y la entrada de `Run`.
+  - Los datos (bóveda, auditoría, configuración) se borran solo si el usuario dice que sí en una pregunta aparte, con **«No» por omisión**. Con `/S` **nunca** se borran.
+  - Antes de borrar, se cierran la app y el núcleo. Si siguen abiertos, la desinstalación falla con un mensaje.
+  - Se quita de la plantilla de Wails el `RMDir /r "$AppData\<exe>"`.
+- **Contenido del instalador:**
+  - `macuahuitl.exe`, `macuahuitld.exe` y `mctl.exe`;
+  - `LICENSE`, `NOTICE`, `THIRD_PARTY_LICENSES` y `TRADEMARK.md`;
+  - el `.ico`, generado del SVG;
+  - el bootstrapper de WebView2.
+  - Nada de nmap, Npcap, Wireshark ni iperf3 (ver f).
+- **CI de la app.** Un job `ui-windows` en `windows-latest` corre:
+  - `npm ci`, `npm test` y `npm run build`;
+  - `go test ./ui/bridge/...`;
+  - `CGO_ENABLED=0 go vet -tags wails ./ui/`.
+
+  Corre en paralelo con el resto, así que se estima que agrega de 0 a 2 minutos al reloj del CI. Pasa a obligatorio cuando esté estable.
+
+### Firma: decidido, la beta sale sin firmar
+
+**Decisión del dueño (2026-11-16): «sin firmar, vamos como open source».** La beta de Windows sale **sin firma de código**. La verificación se apoya en lo abierto:
+- `SHA256SUMS` y la atestación SLSA (`gh attestation verify`), que ya publica `release.yml`;
+- el código Apache-2.0;
+- binarios reproducibles.
+
+Las limitaciones que esto trae están en (i).
+
+Referencia futura, sin decisión pendiente. Costos aproximados, a confirmar si algún día se retoma:
+
+| Opción | Costo | Notas |
+|---|---|---|
+| SignPath Foundation | 0 | **Posible más adelante, sin costo, si el dueño lo solicita.** El editor que aparece es «SignPath Foundation», no el autor. Pide licencia OSI, MFA y crédito en la política de firma. |
+| Certum Open Source Code Signing | desde ~69 EUR, con lector | **Posible más adelante, si el dueño lo solicita.** Se emite a la persona, con el prefijo «Open Source Developer». |
+| Azure Artifact Signing (antes Trusted Signing) | ~9.99 USD/mes | Hoy solo personas físicas de EE. UU. y Canadá, u organizaciones de EE. UU., Canadá, UE o Reino Unido. Una persona física en México no califica. |
+| Certificado OV (Sectigo, SSL.com, Certum) | ~170–400 USD/año | Llave en HSM, token o nube. Desde el 2026-02-27 un certificado dura como máximo ~460 días. |
+| Certificado EV | ~300–600 USD/año | Desde agosto de 2024 da la misma reputación de SmartScreen que OV; no vale el sobreprecio. |
+| Microsoft Store | — | Evita SmartScreen, pero exige MSIX, que borra la bóveda al desinstalar. Descartada. |
+
+Ninguna firma evita el aviso de SmartScreen en las primeras descargas. Con firma, la reputación se acumula por certificado y pasa a las versiones siguientes. Sin firma, empieza de cero en cada versión.
 
 ## Consecuencias
 
