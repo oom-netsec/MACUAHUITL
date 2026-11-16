@@ -75,17 +75,17 @@ type Recorder struct {
 	secrets2 []string    // lo mismo para los valores que tapa mask.CutCommand (lista y ventana aparte: no tocan el estado de las reglas)
 	win2     int
 	multi2   map[string]bool // valores de secrets2 que vienen de un secreto de varias palabras: pasan el prompt sin pendientes
-	blk2     string   // bloque del prompt para mask.CutCommand («keychain» además de los de lastBlk)
-	acc      string   // lo recibido del eco partido hasta ahora
-	esent    []string // copia aparte de las líneas enviadas, solo para reconocer el resto de un eco (no la leen ni escriben las decisiones de la v0.6.5)
-	eacc     string   // lo recibido del eco pendiente hasta ahora (estado aparte de acc)
-	epart    bool     // hay un eco pendiente: lo que lo continúe, aunque parezca un prompt, es su resto
-	eshift   bool     // el eco empezó con «$» (IOS lo desplaza): su texto es un trozo de la línea, no su comienzo
-	cont     bool     // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
-	cfg      bool     // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
-	cfgOK    bool     // hay prompt conocido para lo que se teclea; si no, se tapa como en config
-	hidden   bool     // lo tecleado es una contraseña: no se graba
-	line     []byte   // lo tecleado en la línea actual
+	blk2     string          // bloque del prompt para mask.CutCommand («keychain» además de los de lastBlk)
+	acc      string          // lo recibido del eco partido hasta ahora
+	esent    []string        // copia aparte de las líneas enviadas, solo para reconocer el resto de un eco (no la leen ni escriben las decisiones de la v0.6.5)
+	eacc     string          // lo recibido del eco pendiente hasta ahora (estado aparte de acc)
+	epart    bool            // hay un eco pendiente: lo que lo continúe, aunque parezca un prompt, es su resto
+	eshift   bool            // el eco empezó con «$» (IOS lo desplaza): su texto es un trozo de la línea, no su comienzo
+	cont     bool            // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
+	cfg      bool            // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
+	cfgOK    bool            // hay prompt conocido para lo que se teclea; si no, se tapa como en config
+	hidden   bool            // lo tecleado es una contraseña: no se graba
+	line     []byte          // lo tecleado en la línea actual
 	lastCR   bool
 	max      int64 // tope de la grabación en bytes
 	written  int64
