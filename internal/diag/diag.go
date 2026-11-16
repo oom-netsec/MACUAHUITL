@@ -14,7 +14,6 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -101,15 +100,8 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 
 	cmd := exec.CommandContext(ctx, path, argv...)
 	cmd.Env = append([]string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C"}, r.extraEnv...)
-	// Grupo de procesos propio: al cancelar, la señal alcanza también a los hijos de la
-	// herramienta, que si no heredarían la tubería y la dejarían abierta.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.WaitDelay = 3 * time.Second // tras SIGTERM, SIGKILL al grupo entero y cierre de tuberías
-	cmd.Cancel = func() error {
-		pgid := -cmd.Process.Pid
-		time.AfterFunc(cmd.WaitDelay, func() { syscall.Kill(pgid, syscall.SIGKILL) })
-		return syscall.Kill(pgid, syscall.SIGTERM)
-	}
+	setupKill(cmd)
+	cmd.WaitDelay = 3 * time.Second // tras la señal, muerte forzosa y cierre de tuberías
 	var mu sync.Mutex
 	emit := func(line string) {
 		mu.Lock()
