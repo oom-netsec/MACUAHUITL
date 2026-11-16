@@ -1,7 +1,7 @@
 // Contrato del módulo con el puente (ui/bridge) y su implementación de Wails.
 export type VaultState = "absent" | "locked" | "unlocked";
 export interface VaultStatus { state: VaultState; armedJobs: string[] | null }
-export interface Credential { id: string; label: string; username: string; hasEnable: boolean; hasSshKey: boolean }
+export interface Credential { id: string; label: string; username: string; kind: "password" | "key"; hasEnable: boolean; hasSshKey: boolean }
 
 
 // Respaldo cifrado (fase 29d): archivo de bóveda con frase propia; el import va en dos pasos con un token de 10 minutos.
@@ -21,6 +21,9 @@ export interface VaultAPI {
   listCredentials(): Promise<Credential[]>;
   putCredential(label: string, username: string, password: string, enable: string): Promise<string>;
   deleteCredential(id: string): Promise<void>;
+  // Fase 44: ed25519 generada en el núcleo; la privada nunca sale. publicKey es una línea de authorized_keys. No hay import de privadas.
+  createKeyCredential(label: string, username: string): Promise<{ id: string; publicKey: string }>;
+  credentialPublicKey(id: string): Promise<string>;
   // Devuelve cuántas credenciales guardó. La frase tiene 12 caracteres o más y es distinta de la maestra; confirm es la confirmación explícita.
   exportVaultBackup(path: string, passphrase: string, overwrite: boolean, confirm: boolean): Promise<VaultBackupExport>;
   // Borra el archivo vacío que dejó pickSavePath si el export falló: solo un archivo regular de 0 bytes en esa ruta exacta.
@@ -39,6 +42,9 @@ export const vaultWails = (call: Call): VaultAPI => ({
   listCredentials: () => call("ListCredentials"),
   putCredential: (l, u, p, e) => call("PutCredential", l, u, p, e),
   deleteCredential: (id) => call("DeleteCredential", id),
+  // contrato provisional, fase 44
+  createKeyCredential: (l, u) => call("CreateKeyCredential", l, u),
+  credentialPublicKey: (id) => call("CredentialPublicKey", id),
   exportVaultBackup: (p, f, o, c) => call("ExportVaultBackup", p, f, o, c),
   removeEmptyFile: (p) => call("RemoveEmptyFile", p),
   previewVaultBackupImport: (p, f) => call("PreviewVaultBackupImport", p, f),

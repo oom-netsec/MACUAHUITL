@@ -14,7 +14,7 @@ const info = (p: FrontPort): PortInfo => ({
 });
 const live = { source: "live" as const, address: "10.0.0.5", hostname: "SW5", atMs: 0, ports: samplePorts().map(info), channels: [], warnings: [] };
 
-const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
+const creds = [{ id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: true, hasSshKey: false }];
 
 async function read(over: Record<string, unknown> = {}) {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), portStatus: vi.fn(async () => live), ...over });

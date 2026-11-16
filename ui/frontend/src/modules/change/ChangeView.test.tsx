@@ -4,7 +4,7 @@ import { ChangeView } from "./ChangeView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext, ModuleIdContext } from "../../app/activity";
 
-const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
+const creds = [{ id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: true, hasSshKey: false }];
 
 test("tras recargar, una reversa viva iniciada en Cambios se reengancha y se avisa como modo activo", async () => {
   localStorage.setItem("macuahuitl.assist.rbv", "change");

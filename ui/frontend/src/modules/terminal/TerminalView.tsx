@@ -22,6 +22,7 @@ import { xtermTheme } from "./termTheme";
 import "./terminal.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
 import { HostPicker, targetOf } from "../inventory/HostPicker";
+import { SavedHosts } from "./SavedHosts";
 import { hostKeyFromError, parseFingerprints } from "../../lib/hostkeys";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import type { ScriptItem } from "../scripts/api";
@@ -37,7 +38,7 @@ const XTermPane = lazy(() => import("./XTermPane"));
 // La salida viva se resalta con las reglas de la app (lib/termAnsi): solo líneas completas y sin ESC; el texto limpio (búsqueda, descarga y registro) no lleva códigos.
 
 interface Tab {
-  key: number; label: string; device: string; cred: string; runId: string; status: { k: Key; v?: Record<string, string> }; err: string; errInfo?: ErrInfo; done: boolean;
+  key: number; label: string; device: string; cred: string; hostId?: string; runId: string; status: { k: Key; v?: Record<string, string> }; err: string; errInfo?: ErrInfo; done: boolean;
   logPath: string; logAt: Date | null; logErr: string; // registro opcional en el archivo que eligió la persona
 }
 interface LogState { path: string; last: string; chain: Promise<void> }
@@ -169,16 +170,18 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   // Reintentar tras aceptar una huella usa el equipo y la credencial de la pestaña que falló, no lo que hay hoy en los campos.
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  const open = async (accepted = accept, dev = device, credId = cred) => {
+  // hostId: conexión de un clic a un host guardado; el núcleo pone dirección, puerto, credencial y orden de inicio (la UI no los manda).
+  const open = async (accepted = accept, dev = device, credId = cred, hostId?: string) => {
     // Dos sesiones vivas en el mismo archivo se pisarían cada 30 s.
     if (logPick && tabsRef.current.some((x) => !x.done && x.logPath === logPick)) { setErr(t("ssh.logInUse")); return; }
     setErr(""); setBusy(true);
     try {
-      const t = parseTarget(parseTargets(dev)[0] ?? "");
       const label = dev.trim();
-      const runId = await core.terminalOpen({ name: label, address: t.address, port: t.port, credentialId: credId, accept: parseFingerprints(accepted), rows: size.current.rows, cols: size.current.cols });
+      const tg = parseTarget(parseTargets(dev)[0] ?? "");
+      const base = { name: label, accept: parseFingerprints(accepted), rows: size.current.rows, cols: size.current.cols };
+      const runId = await core.terminalOpen(hostId ? { ...base, hostId } : { ...base, address: tg.address, port: tg.port, credentialId: credId });
       if (!alive.current) { core.terminalClose(runId).catch(() => {}); return; } // la vista se fue con la apertura en vuelo: no queda huérfana
-      const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
+      const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, hostId, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
       if (logPick) { logs.current.set(runId, { path: logPick, last: "", chain: Promise.resolve() }); setLogPick(""); } // el archivo es de esta sesión, no de las siguientes
       // La pestaña se registra ya (no al renderizar) para que ningún evento se quede sin dueño.
       tabsRef.current = [...tabsRef.current, tab];
@@ -284,7 +287,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
             <p>{t(hk.changed ? "transfer.hostKey.changed" : "transfer.hostKey.new")}</p>
             <p><code>{hk.fp}</code></p>
             {/* Aceptar es explícito: agrega la huella al campo del formulario y abre otra pestaña con ella. */}
-            <button type="button" disabled={busy} onClick={() => { const next = `${accept} ${hk.fp}`.trim(); setAccept(next); void open(next, tab.device, tab.cred); }}>{t("transfer.hostKey.accept")}</button>
+            <button type="button" disabled={busy} onClick={() => { const next = `${accept} ${hk.fp}`.trim(); setAccept(next); void open(next, tab.device, tab.cred, tab.hostId); }}>{t("transfer.hostKey.accept")}</button>
           </Notice>
         )}
       </>
@@ -302,6 +305,7 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   );
   const form = (
     <>
+      <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id); }} />
       <HostPicker core={core} onPick={(h) => { const ok = creds.some((c) => c.id === h.credentialId); setDevice(targetOf(h)); setCred(ok ? h.credentialId : ""); setNoCred(!ok); }} />
       <div className="field-row">
         <Select label={t("ssh.cred")} value={cred} onChange={(v) => { setCred(v); setNoCred(false); }} w="md" placeholder={noCred ? t("ssh.credPick") : undefined} hint={noCred ? t("hosts.pick.noCred") : undefined} options={creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])} />

@@ -12,7 +12,7 @@ vi.mock("@xterm/addon-fit", async () => ({ FitAddon: (await import("./xtermMock"
 vi.mock("@xterm/addon-search", async () => ({ SearchAddon: (await import("./xtermMock")).FakeSearch }));
 vi.mock("@xterm/addon-webgl", async () => ({ WebglAddon: (await import("./xtermMock")).FakeWebgl }));
 
-const cred = { id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false };
+const cred = { id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false };
 beforeEach(() => {
   FakeTerm.all.length = 0; FakeSearch.all.length = 0;
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} unobserve() {} });

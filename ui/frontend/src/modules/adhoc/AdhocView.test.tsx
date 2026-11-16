@@ -4,7 +4,7 @@ import { AdhocView, parseTarget } from "./AdhocView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
 
-const cred = { id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false };
+const cred = { id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: true, hasSshKey: false };
 const report = { commands: ["show clock"], devices: 2, rows: [
   { device: "SW1", address: "192.0.2.1", command: "show clock", ok: true, output: "10:00:00" },
   { device: "SW2", address: "192.0.2.2", command: "show clock", ok: false, output: "", note: "tiempo agotado" },

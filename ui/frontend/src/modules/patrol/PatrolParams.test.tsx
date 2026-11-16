@@ -5,7 +5,7 @@ import { PatrolView } from "./PatrolView";
 import { fakeCore } from "../../lib/fake";
 import { scriptsChanged } from "../scripts/signal";
 
-const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
+const creds = [{ id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: true, hasSshKey: false }];
 const pbMac = { id: "ios-xe/rastreo-mac", platform: "ios-xe", name: "TAC · Rastreo MAC", commands: ["show mac address-table address {mac}"], params: [{ name: "mac", kind: "mac" as const }] };
 const pbMac2 = { id: "ios-xe/rastreo-mac2", platform: "ios-xe", name: "TAC · Rastreo MAC 2", commands: ["show mac address-table address {mac}"], params: [{ name: "mac", kind: "mac" as const }, { name: "iface", kind: "interface" as const }] };
 const pbPlain = { id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: ["show spanning-tree"], params: [] };

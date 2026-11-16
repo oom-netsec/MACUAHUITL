@@ -8,7 +8,7 @@ import { sampleEntry } from "./fake";
 const a = sampleEntry();
 const b = sampleEntry({ id: "SW1_192.0.2.1/20261106T110000Z-running", at: "2026-11-06T11:00:00Z", masked: false });
 
-const cred = { id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false };
+const cred = { id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false };
 const withCreds = (over = {}) => fakeCore({ listCredentials: vi.fn(async () => [cred]), ...over });
 
 test("respalda una vez, espera el resultado, avisa y recarga la lista", async () => {

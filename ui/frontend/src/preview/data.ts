@@ -34,11 +34,11 @@ export function sample(): Partial<CoreAPI> {
     ...previewTerminal(),
     ...previewScriptsApi(),
     listCredentials: async () => [
-      { id: "c1", label: "Core DC", username: "netops", hasEnable: true, hasSshKey: false },
-      { id: "c2", label: "Branch access", username: "tac", hasEnable: false, hasSshKey: true },
-      { id: "c3", label: "lab-admin", username: "lab", hasEnable: true, hasSshKey: true },
-      { id: "c4", label: "ISE (RADIUS secret)", username: "-", hasEnable: false, hasSshKey: false },
-      { id: "c5", label: "WAN edge", username: "wanops", hasEnable: true, hasSshKey: false },
+      { id: "c1", label: "Core DC", username: "netops", kind: "password" as const, hasEnable: true, hasSshKey: false },
+      { id: "c2", label: "Branch access", username: "tac", kind: "key", hasEnable: false, hasSshKey: true },
+      { id: "c3", label: "lab-admin", username: "lab", kind: "key", hasEnable: true, hasSshKey: true },
+      { id: "c4", label: "ISE (RADIUS secret)", username: "-", kind: "password" as const, hasEnable: false, hasSshKey: false },
+      { id: "c5", label: "WAN edge", username: "wanops", kind: "password" as const, hasEnable: true, hasSshKey: false },
     ],
     getRun: async () => [
       { target: "192.0.2.11:22", state: "DEVICE_STATE_COMPLETED", detail: "" },

@@ -4,7 +4,7 @@ import { ClientPanel } from "./ClientPanel";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
 
-const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false }];
+const creds = [{ id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false }];
 const setup = (over = {}) => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), ...over });
   render(<CoreContext.Provider value={core}><ClientPanel core={core} /></CoreContext.Provider>);

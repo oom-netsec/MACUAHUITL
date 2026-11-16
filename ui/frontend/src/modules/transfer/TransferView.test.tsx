@@ -227,7 +227,7 @@ test("una llave de host nueva pide aceptar la huella y reintenta con ella", asyn
   const get = vi.fn()
     .mockRejectedValueOnce(new Error("rpc error: code = FailedPrecondition desc = transport: llave de host desconocida de 192.0.2.1:22: SHA256:AbC123+/x"))
     .mockResolvedValueOnce({ path: "/o/x", bytes: 1, md5: "a".repeat(32), sha256: "b".repeat(64), verified: "", seconds: 0, report: "" });
-  const core = setup({ transferGet: get, listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false }]) });
+  const core = setup({ transferGet: get, listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false }]) });
   await client(core, "scp://admin@192.0.2.1/ios.bin");
   await userEvent.selectOptions(await screen.findByLabelText("Credencial de la bóveda"), "c1");
   await userEvent.click(screen.getByRole("button", { name: "Descargar" }));
@@ -349,7 +349,7 @@ test("el aviso de hash distinto también sale con el SHA-512 publicado (por reas
 test("una llave de host nueva en inglés, con reason, también pide aceptar la huella", async () => {
   const cause = { code: "FailedPrecondition", reason: "transport.hostkey.unknown", metadata: { host: "192.0.2.1:22", fingerprint: "SHA256:AbC123+/x" } };
   const get = vi.fn().mockRejectedValueOnce(Object.assign(new Error("transport: unknown host key from 192.0.2.1:22: SHA256:AbC123+/x"), { cause }));
-  const core = setup({ transferGet: get, listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false }]) });
+  const core = setup({ transferGet: get, listCredentials: vi.fn(async () => [{ id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false }]) });
   await client(core, "scp://admin@192.0.2.1/ios.bin");
   await userEvent.selectOptions(await screen.findByLabelText("Credencial de la bóveda"), "c1");
   await userEvent.click(screen.getByRole("button", { name: "Descargar" }));

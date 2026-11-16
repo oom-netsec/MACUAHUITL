@@ -23,6 +23,8 @@ export function fakeVault() {
     listCredentials: vi.fn(async () => []),
     putCredential: vi.fn(async () => "c1"),
     deleteCredential: vi.fn(async () => {}),
+    createKeyCredential: vi.fn(async () => ({ id: "k1", publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIfake macuahuitl" })),
+    credentialPublicKey: vi.fn(async () => "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIfake macuahuitl"),
     exportVaultBackup: vi.fn(async () => ({ count: 3, noPermissions: false })),
     removeEmptyFile: vi.fn(async () => {}),
     previewVaultBackupImport: vi.fn(async () => sampleVaultBackup),

@@ -18,7 +18,7 @@ vi.mock("uplot", () => ({
 }));
 beforeEach(() => { made.length = 0; });
 
-const creds = [{ id: "c1", label: "snmp-lab", username: "snmp", hasEnable: false, hasSshKey: false }];
+const creds = [{ id: "c1", label: "snmp-lab", username: "snmp", kind: "password" as const, hasEnable: false, hasSshKey: false }];
 
 test("topología: construye desde una carpeta, dibuja el SVG y ofrece exportar", async () => {
   const core = fakeCore({ topoBuild: vi.fn(async () => ({ text: "Hallazgos:\n  [error] VLAN nativa distinta", json: '{"nodes":[]}', svg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>' })) });
