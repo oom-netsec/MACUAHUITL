@@ -5,5 +5,6 @@ func init() {
 	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
 	add(map[string]entry{
 		"serial.err.path_win": e("serialcon: {path:q} no es un puerto COM (por ejemplo COM3)", "serialcon: {path:q} is not a COM port (for example COM3)", "path"),
+		"serial.err.lost":     e("serialcon: se perdió el puerto {path}; ¿se desconectó el adaptador USB-serie?", "serialcon: lost port {path}; was the USB-serial adapter unplugged?", "path"),
 	})
 }

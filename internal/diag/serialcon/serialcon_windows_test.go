@@ -42,3 +42,10 @@ func TestOpenErrEnUso(t *testing.T) {
 		t.Errorf("no existe: %v", err)
 	}
 }
+
+func TestNormalizeDejaCOMn(t *testing.T) {
+	c, err := Config{Path: `\\.\com3`}.Normalize()
+	if err != nil || c.Path != "COM3" {
+		t.Fatalf("Path = %q, %v", c.Path, err)
+	}
+}

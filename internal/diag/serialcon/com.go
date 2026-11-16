@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Nombres COMn de Windows. Es lógica pura (sin API de Windows) para probarla en todos los sistemas.
@@ -18,6 +19,12 @@ func comNum(name string) (int, bool) {
 	}
 	n, _ := strconv.Atoi(d)
 	return n, n >= 1 && n <= 255
+}
+
+// comName devuelve el nombre corto COMn (COM3), el que usan el registro y los archivos de salida.
+func comName(name string) (string, bool) {
+	n, ok := comNum(name)
+	return "COM" + strconv.Itoa(n), ok
 }
 
 // comPath normaliza COM3 a \\.\COM3 (COM10 en adelante exige el prefijo). Nunca acepta otra ruta.
@@ -61,4 +68,33 @@ func dcbFlags(c Config) uint32 {
 		f |= 1 << 12 // RTS_CONTROL_ENABLE
 	}
 	return f
+}
+
+// dcbStopBits da el StopBits de la DCB: ONESTOPBIT 0, ONE5STOPBITS 1, TWOSTOPBITS 2. Windows exige 1.5
+// bits de parada con 5 de datos (lo que Linux hace con CSTOPB), y no admite 2.
+func dcbStopBits(c Config) uint8 {
+	switch {
+	case c.StopBits != 2:
+		return 0
+	case c.DataBits == 5:
+		return 1
+	}
+	return 2
+}
+
+// emptyReadsMax lecturas vacías e instantáneas seguidas = puerto perdido.
+const emptyReadsMax = 5
+
+// emptyReads detecta un adaptador USB desconectado: algunos drivers devuelven 0 bytes con éxito al
+// instante en vez de esperar el timeout, y el bucle de Read giraría al 100 % de CPU.
+type emptyReads struct{ n int }
+
+// lost registra una lectura (bytes leídos y lo que tardó) y dice si ya hay que darlo por perdido.
+func (e *emptyReads) lost(got int, took, timeout time.Duration) bool {
+	if got > 0 || took >= timeout/2 {
+		e.n = 0
+		return false
+	}
+	e.n++
+	return e.n >= emptyReadsMax
 }

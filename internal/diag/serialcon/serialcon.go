@@ -86,7 +86,11 @@ var ErrPermission error = i18n.New("serial.err.permission", nil)
 // Normalize aplica los valores por defecto y valida.
 func (c Config) Normalize() (Config, error) {
 	c = c.withDefaults()
-	return c, c.validate()
+	if err := c.validate(); err != nil {
+		return c, err
+	}
+	c.Path = normPath(c.Path)
+	return c, nil
 }
 
 // Open abre el puerto en exclusiva y en modo crudo.

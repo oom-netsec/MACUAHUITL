@@ -20,6 +20,9 @@ var bauds = map[int]uint32{
 
 var csize = map[int]uint32{5: unix.CS5, 6: unix.CS6, 7: unix.CS7, 8: unix.CS8}
 
+// normPath: en Linux la ruta queda como viene.
+func normPath(p string) string { return p }
+
 func validPath(p string) error {
 	if !filepath.IsAbs(p) || !strings.HasPrefix(filepath.Clean(p), "/dev/") {
 		return i18n.New("serial.err.path", i18n.A("path", p))
