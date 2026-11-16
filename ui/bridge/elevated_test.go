@@ -12,4 +12,8 @@ func TestElevatedTextBilingue(t *testing.T) {
 	if en < 0 || es < 0 || en > es {
 		t.Fatalf("falta un idioma o el orden no es en, es: %q", m)
 	}
+	// Quien usó «Ejecutar como administrador» con UAC activo tiene que saber que basta con abrirla normal; sin «ADR».
+	if !strings.Contains(m, "Run as administrator") || !strings.Contains(m, "Ejecutar como administrador") || strings.Contains(m, "ADR") {
+		t.Fatalf("%q", m)
+	}
 }

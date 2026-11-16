@@ -12,7 +12,9 @@ import (
 )
 
 // checkElevated sale con un MessageBox si la app corre elevada: el núcleo que lanzaría (o el de la entrada Run) se niega
-// a correr así, y sin esto la app solo mostraría «desconectado» sin decir por qué (hallazgo en Windows 11 real).
+// a correr así, y sin esto la app solo mostraría «desconectado» sin decir por qué (hallazgo en Windows 11 real). Más
+// estricto que lo mínimo a propósito: una app de integridad alta que confía en un núcleo de integridad media del mismo
+// SID abriría un camino de elevación (un malware sin elevar podría ganar la carrera por el nombre del pipe).
 func checkElevated() {
 	if !sys.Privileged() {
 		return
