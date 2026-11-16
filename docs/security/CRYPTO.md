@@ -1,95 +1,95 @@
-# Criptografía de la bóveda
+# Vault cryptography
 
-Referencia: diseño §10.2–§10.4. Solo primitivas estándar: `crypto/aes`, `crypto/cipher`, `crypto/rand`, `golang.org/x/crypto/argon2`.
+Reference: design §10.2–§10.4. Standard primitives only: `crypto/aes`, `crypto/cipher`, `crypto/rand`, `golang.org/x/crypto/argon2`.
 
-## Jerarquía de llaves
+## Key hierarchy
 
 ```
-contraseña maestra ──Argon2id(sal, m, t, p)──► KEK (32 B)
+master password ──Argon2id(salt, m, t, p)──► KEK (32 B)
                                                 │
                                    AES-256-GCM  ▼
-DEK (32 B aleatorios) ◄──── descifra ──── DEK cifrada (en el encabezado)
+DEK (32 random bytes) ◄──── decrypts ──── encrypted DEK (in the header)
    │
-   └── AES-256-GCM ──► cada entrada de credencial
+   └── AES-256-GCM ──► each credential entry
 ```
 
-- Cambiar la contraseña maestra solo vuelve a cifrar la DEK.
-- La KEK existe solo mientras se descifra la DEK y se borra enseguida.
+- Changing the master password only re-encrypts the DEK.
+- The KEK exists only while the DEK is being decrypted and is wiped right after.
 
-## Formato de `vault.mcv` (versión 1)
+## `vault.mcv` format (version 1)
 
-Todos los enteros en big-endian.
+All integers are big-endian.
 
-| Desplazamiento | Tamaño | Campo |
+| Offset | Size | Field |
 |---|---|---|
-| 0 | 4 | Mágico `MCV1` (`0x4D 0x43 0x56 0x31`) |
-| 4 | 2 | Versión de formato = 1 |
-| 6 | 16 | ID de bóveda (aleatorio) |
-| 22 | 4 | Argon2id memoria en KiB |
-| 26 | 4 | Argon2id iteraciones |
-| 30 | 1 | Argon2id hilos |
-| 31 | 16 | Sal |
-| 47 | 12 | Nonce de la DEK cifrada |
-| 59 | 48 | DEK cifrada (32 B + etiqueta GCM de 16 B) |
-| 107 | 4 | Número de entradas N |
-| 111 | … | N entradas |
+| 0 | 4 | Magic `MCV1` (`0x4D 0x43 0x56 0x31`) |
+| 4 | 2 | Format version = 1 |
+| 6 | 16 | Vault ID (random) |
+| 22 | 4 | Argon2id memory in KiB |
+| 26 | 4 | Argon2id iterations |
+| 30 | 1 | Argon2id threads |
+| 31 | 16 | Salt |
+| 47 | 12 | Nonce of the encrypted DEK |
+| 59 | 48 | Encrypted DEK (32 B + 16 B GCM tag) |
+| 107 | 4 | Number of entries N |
+| 111 | … | N entries |
 
-Datos asociados de la DEK cifrada: los bytes 0–46 del encabezado. Cambiar cualquier parámetro invalida la DEK.
+Associated data of the encrypted DEK: header bytes 0–46. Changing any parameter invalidates the DEK.
 
-### Entrada
+### Entry
 
-| Tamaño | Campo |
+| Size | Field |
 |---|---|
-| 16 | ID de entrada (aleatorio) |
+| 16 | Entry ID (random) |
 | 12 | Nonce |
-| 4 | Longitud L del texto cifrado, incluida la etiqueta GCM de 16 bytes (L ≥ 16) |
-| L | Texto cifrado + etiqueta GCM |
+| 4 | Length L of the ciphertext, including the 16-byte GCM tag (L ≥ 16) |
+| L | Ciphertext + GCM tag |
 
-- Datos asociados: ID de bóveda (16 B) ‖ ID de entrada (16 B) ‖ versión de formato (2 B, big-endian).
-- Texto en claro: 6 campos `uint32 longitud (big-endian) ‖ bytes`, en orden etiqueta, usuario, contraseña, enable, llave SSH y uno reservado vacío. Todo va cifrado, incluida la etiqueta. Se eligió este formato y no Protocol Buffers para no depender de código generado dentro del paquete criptográfico y poder borrar cada campo de memoria.
-- El nonce es aleatorio de 96 bits y se renueva en cada escritura de la entrada. Con el volumen de una bóveda individual, el riesgo de colisión es despreciable.
+- Associated data: vault ID (16 B) ‖ entry ID (16 B) ‖ format version (2 B, big-endian).
+- Plaintext: 6 fields `uint32 length (big-endian) ‖ bytes`, in the order label, user, password, enable, SSH key and one empty reserved field. Everything is encrypted, including the label. This format was chosen over Protocol Buffers to avoid depending on generated code inside the cryptographic package and to be able to wipe each field from memory.
+- The nonce is a random 96-bit value and is renewed on every write of the entry. At the volume of a single vault, the collision risk is negligible.
 
-## Validación al leer
+## Validation on read
 
-Antes de derivar cualquier llave, el archivo se rechaza como dañado si:
+Before deriving any key, the file is rejected as corrupt if:
 
-- mide menos de 111 bytes, el mágico no es `MCV1` o la versión no es 1;
-- la memoria de Argon2id está fuera de [256 MiB, 4 GiB], las iteraciones fuera de [1, 10] o los hilos fuera de [1, 16];
-- el número de entradas no cabe en el resto del archivo, alguna entrada tiene L < 16 o excede el archivo, o sobran bytes al final.
+- it is shorter than 111 bytes, the magic is not `MCV1` or the version is not 1;
+- the Argon2id memory is outside [256 MiB, 4 GiB], the iterations outside [1, 10] or the threads outside [1, 16];
+- the number of entries does not fit in the rest of the file, any entry has L < 16 or extends past the file, or bytes are left over at the end.
 
-Así un encabezado alterado no puede pedir terabytes de memoria.
+This way a tampered header cannot request terabytes of memory.
 
-## Parámetros de Argon2id
+## Argon2id parameters
 
-- Base: 256 MiB, 3 iteraciones, 4 hilos.
-- En `Create` se calibran para tardar cerca de 1 s en la máquina, sin bajar de la base de memoria.
-- Los parámetros quedan en el encabezado, así que una bóveda creada en una máquina abre en otra.
+- Baseline: 256 MiB, 3 iterations, 4 threads.
+- On `Create` they are calibrated to take about 1 s on the machine, without going below the memory baseline.
+- The parameters are stored in the header, so a vault created on one machine opens on another.
 
-## Escritura
+## Writing
 
-Archivo temporal en el mismo directorio, `fsync`, `rename`, `fsync` del directorio. Antes se copia el archivo vigente a `vault.mcv.bak`. Permisos 0600.
+Temporary file in the same directory, `fsync`, `rename`, `fsync` of the directory. Before that, the current file is copied to `vault.mcv.bak`. Permissions 0600.
 
-## Vida en memoria
+## Lifetime in memory
 
-- DEK en un búfer bloqueado (`mlock`, páginas guardia) vía `memguard`. Su expansión AES vive en memoria normal: se crea una sola vez al abrir la bóveda y se suelta al destruir la DEK (límite declarado 10 del modelo de amenazas).
-- Al cambiar la contraseña maestra también se reescribe `vault.mcv.bak`, para que ninguna copia quede sellada con la contraseña anterior.
-- El respaldo `.bak` se escribe igual que el archivo principal: temporal, `fsync`, `rename`.
-- Una credencial se descifra justo antes de autenticar y se borra al terminar. Ver límite declarado sobre `x/crypto/ssh` en el [modelo de amenazas](THREAT_MODEL.md#límites-declarados).
+- The DEK lives in a locked buffer (`mlock`, guard pages) via `memguard`. Its AES expansion lives in normal memory: it is created once when the vault is opened and released when the DEK is destroyed (declared limit 10 of the threat model).
+- When the master password is changed, `vault.mcv.bak` is also rewritten, so that no copy stays sealed with the old password.
+- The `.bak` backup is written the same way as the main file: temporary file, `fsync`, `rename`.
+- A credential is decrypted right before authenticating and wiped when done. See the declared limit on `x/crypto/ssh` in the [threat model](THREAT_MODEL.md#declared-limits).
 
-## Sobre `MCK1` (llaves de la PKI de laboratorio)
+## About `MCK1` (lab PKI keys)
 
-Las llaves privadas que genera la herramienta PKI (llaves de CSR y la de la CA de laboratorio) se guardan en un sobre con el mismo esquema que la DEK, sin pasar por la bóveda: `vault.Seal`/`vault.Unseal`.
+The private keys generated by the PKI tool (CSR keys and the lab CA key) are stored in an envelope with the same scheme as the DEK, without going through the vault: `vault.Seal`/`vault.Unseal`.
 
-| Tamaño | Campo |
+| Size | Field |
 |---|---|
-| 4 | Mágico `MCK1` |
-| 4 | Argon2id memoria en KiB |
-| 4 | Argon2id iteraciones |
-| 1 | Argon2id hilos |
-| 16 | Sal |
+| 4 | Magic `MCK1` |
+| 4 | Argon2id memory in KiB |
+| 4 | Argon2id iterations |
+| 1 | Argon2id threads |
+| 16 | Salt |
 | 12 | Nonce |
-| … | PKCS#8 DER cifrado con AES-256-GCM + etiqueta |
+| … | PKCS#8 DER encrypted with AES-256-GCM + tag |
 
-- Datos asociados: los 29 bytes anteriores al nonce; cambiar un parámetro invalida el sobre.
-- Antes de derivar se validan los parámetros con topes más estrictos que los de `vault.mcv`, porque el sobre llega pegado por el usuario: memoria entre el mínimo de la bóveda y 1 GiB, 1–10 iteraciones y 1–8 hilos. Un sobre fuera de rango se rechaza como dañado sin derivar nada.
-- En disco viaja como PEM `MACUAHUITL SEALED PRIVATE KEY`. Para llevar la llave a otro equipo se exporta a PKCS#12 con contraseña (o PEM sin cifrar, solo si se pide de forma explícita).
+- Associated data: the 29 bytes before the nonce; changing a parameter invalidates the envelope.
+- Before deriving, the parameters are validated with stricter caps than those of `vault.mcv`, because the envelope arrives pasted by the user: memory between the vault minimum and 1 GiB, 1–10 iterations and 1–8 threads. An out-of-range envelope is rejected as corrupt without deriving anything.
+- On disk it travels as PEM `MACUAHUITL SEALED PRIVATE KEY`. To move the key to another machine, it is exported to PKCS#12 with a password (or unencrypted PEM, only if explicitly requested).
