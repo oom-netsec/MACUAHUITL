@@ -25,5 +25,7 @@ func TestAnalyzer(t *testing.T) {
 		m+"internal/audit",
 		m+"internal/languso",
 		m+"internal/i18n/i18ntest",
+		m+"internal/vault",
+		m+"internal/ipc",
 	)
 }

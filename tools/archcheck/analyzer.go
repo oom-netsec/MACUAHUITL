@@ -13,6 +13,7 @@ package archcheck
 import (
 	"go/ast"
 	"go/types"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -90,6 +91,7 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, nil
 	}
 	checkTestOnlyLang(pass, rel)
+	checkWinSys(pass, rel)
 	dom := domainOf(rel)
 	isCore := under(rel, "internal/core")
 	area := serviceArea(rel)
@@ -156,6 +158,23 @@ func check(rel, dom, area string, isCore, root, isTest bool, path string) string
 		return "un dominio no importa red ni grpc; eso va en su capa de red o en service"
 	}
 	return ""
+}
+
+// winSysOK son los únicos paquetes que llaman a la API de Windows (ADR 0012): la lista es exacta, sin subpaquetes.
+var winSysOK = []string{"internal/sys", "internal/ipc", "internal/diag", "internal/diag/serialcon", "internal/core/power", "ui"}
+
+// checkWinSys: golang.org/x/sys/windows (y sus subpaquetes) solo en winSysOK, en cualquier paquete del módulo.
+func checkWinSys(pass *analysis.Pass, rel string) {
+	if slices.Contains(winSysOK, rel) {
+		return
+	}
+	for _, f := range pass.Files {
+		for _, imp := range f.Imports {
+			if path, err := strconv.Unquote(imp.Path.Value); err == nil && (path == "golang.org/x/sys/windows" || strings.HasPrefix(path, "golang.org/x/sys/windows/")) {
+				pass.Reportf(imp.Pos(), "archcheck: %s importa %q: x/sys/windows solo en %s (ADR 0012)", rel, path, strings.Join(winSysOK[:len(winSysOK)-1], ", ")+" y "+winSysOK[len(winSysOK)-1])
+			}
+		}
+	}
 }
 
 // checkTestOnlyLang: i18n.SetDefault e i18ntest cambian el idioma por omisión del proceso: solo valen en archivos
