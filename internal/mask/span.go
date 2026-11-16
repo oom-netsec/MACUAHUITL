@@ -4,6 +4,8 @@ import (
 	"net/netip"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // spKeys: palabras de secreto.
@@ -72,7 +74,13 @@ var spProse = map[string]bool{"mismatch": true, "failed": true, "expired": true,
 // commandSpans devuelve, para un comando tecleado o citado, los tramos [s, t) del original que Command tapa: uno por
 // segmento « ; » (NX-OS), desde el valor (el token que sigue a la palabra de secreto) hasta el fin del segmento. No
 // combina nada con las reglas: de eso se encarga cut.
-func commandSpans(block, cmd string) [][2]int { return spansIn(block, cmd, false) }
+func commandSpans(block, cmd string) [][2]int {
+	sp := spansIn(block, cmd, false)
+	if n := normSpaces(cmd); n != cmd { // IOS toma el NBSP como parte del token: se prueba el original y la copia, y se juntan
+		sp = mergeSpans(append(sp, spansIn(block, n, false)...))
+	}
+	return sp
+}
 
 // spansIn es commandSpans; quoted: cmd es un texto citado entre comillas («token X» es una palabra más y la prosa de la
 // lista spProse no es un comando).
@@ -184,6 +192,9 @@ func structWord(w string, m map[string]bool) bool {
 	return false
 }
 
+// spAlgoExacto: algoritmos de verdad (no cualquier palabra que empiece con sha, aes o hmac: «Shadow2024x» es una contraseña).
+var spAlgoExacto = regexp.MustCompile(`(?i)^(?:sha(?:-?(?:1|2|224|256|384|512))?|hmac-?(?:md5|sha(?:-?(?:1|2|224|256|384|512))?(?:-(?:256|384|512))?)(?:-96)?|aes-?(?:128|192|256)(?:-cmac)?|cmac(?:-aes-128)?)$`)
+
 // SecretValues devuelve los valores que Command tapó en un tramo (lo que sigue a una palabra de secreto): el primer
 // token tras cada palabra de secreto del tramo que no sea un tipo (0-9), un algoritmo, otra palabra de secreto ni
 // estructura del comando, y que sirva para tapar su repetición por contenido (spValue). Un tramo de un solo token es
@@ -200,7 +211,7 @@ func SecretValues(span string) []string {
 	for i := 0; i < len(toks); {
 		w := strings.ToLower(toks[i])
 		switch {
-		case len(w) == 1 && w[0] >= '0' && w[0] <= '9', structWord(w, spAlgo), spKeyword(w, false, spLogBlock, false), localRemote(w):
+		case len(w) == 1 && w[0] >= '0' && w[0] <= '9', structWord(w, spAlgo), spAlgoExacto.MatchString(w), spKeyword(w, false, spLogBlock, false), localRemote(w):
 			i++
 			continue
 		case structWord(w, spStruct):
@@ -282,4 +293,33 @@ func notSecretValue(low func(int) string, i, j, first, n int) bool {
 // localRemote: «local»/«remote» (o su abreviatura) separan las dos llaves de «pre-shared-key local X remote Y».
 func localRemote(w string) bool {
 	return len(w) >= 2 && (strings.HasPrefix("local", w) || strings.HasPrefix("remote", w))
+}
+
+// normSpaces devuelve una copia de s con cada espacio Unicode (NBSP, U+2000–U+200A, U+202F, U+205F, U+3000, U+1680,
+// U+0085…) y cada carácter invisible de ancho cero (ZWSP, ZWNJ, ZWJ, U+2060, BOM) cambiado por tantos espacios ASCII
+// como bytes ocupa: los índices del original siguen valiendo. \s y \S de RE2 solo conocen el espacio ASCII, y un
+// valor pegado desde Word, Confluence o un correo trae NBSP entre la palabra clave y el valor. Solo para calcular
+// tramos (M₂, que únicamente agrega cortes): lo que ve la cadena de la v0.6.5 no cambia.
+func normSpaces(s string) string {
+	ascii := true
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			ascii = false
+			break
+		}
+	}
+	if ascii {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		r, w := utf8.DecodeRuneInString(s[i:])
+		if r != utf8.RuneError && (unicode.IsSpace(r) || r == 0x200B || r == 0x200C || r == 0x200D || r == 0x2060 || r == 0xFEFF) {
+			b.WriteString(strings.Repeat(" ", w))
+		} else {
+			b.WriteString(s[i : i+w])
+		}
+		i += w
+	}
+	return b.String()
 }
