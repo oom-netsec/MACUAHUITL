@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
-import { chmodCommand, outputsErrorText, parseOutputsError } from "./outputsError";
+import { chmodCommand, icaclsCommand, outputsErrorText, parseOutputsError } from "./outputsError";
+import { setOSForTests } from "./platform";
 
 const t = (k: string) => `[${k}]`;
 const text = (p: string) => `prefs.outputs.permisos: la carpeta ${p} tiene modo 0755 y debe ser 0700; corrígelo con: chmod 700 ${p}`;
@@ -55,4 +56,33 @@ test("los textos sirven en Ajustes, Job, Cambio y Diagnóstico", async () => {
   expect(en["settings.storage.err.permisos"]).not.toMatch(/this command/);
   expect(es["change.outDir"]).toMatch(/subcarpeta/);
   expect(en["change.outDir"]).toMatch(/subfolder/);
+});
+
+const IC_OK = 'icacls "C:\\Users\\ana\\salidas" /inheritance:r /remove "*S-1-1-0" /grant:r "*S-1-5-21-1-2-3-1001:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F"';
+
+test("icaclsCommand: toma lo que sigue a la frase, en español o inglés", () => {
+  const cmd = 'icacls "C:\\Users\\ana\\salidas" /inheritance:r /remove "*S-1-1-0" /grant:r "*S-1-5-18:(OI)(CI)F"';
+  expect(icaclsCommand(`prefs.outputs.permisos: x; corrígelo en cmd con: ${cmd}`)).toBe(cmd);
+  expect(icaclsCommand(`prefs.outputs.permisos: x; fix it in cmd with: ${cmd}`)).toBe(cmd);
+  expect(icaclsCommand("prefs.outputs.permisos: sin orden")).toBe("");
+  expect(icaclsCommand("x; fix it in cmd with: del /q C:\\*")).toBe(""); // no empieza con icacls "
+  expect(icaclsCommand(`x; fix it in cmd with: ${IC_OK}`)).toBe(IC_OK);
+});
+
+test("icaclsCommand: descarta la orden con %, !, saltos, controles o invisibles", () => {
+  for (const bad of ["%USERNAME%", "!x!", "\n& calc", "\x07", "\u202e", "\u200b", "\u2028", "\ufeff", "\u0085"]) {
+    expect(icaclsCommand(`x; fix it in cmd with: icacls "C:\\a" ${bad}`)).toBe("");
+  }
+});
+
+test("Windows: el texto de permisos lleva la orden icacls; en Linux sigue el chmod", () => {
+  const win = Object.assign(new Error(`prefs.outputs.permisos: la carpeta C:\\s da acceso a S-1-1-0; corrígelo en cmd con: ${IC_OK}`), { cause: { code: "FailedPrecondition", reason: "prefs.outputs.permisos", metadata: { code: "permisos", path: "C:\\s" } } });
+  try {
+    setOSForTests("windows");
+    expect(outputsErrorText(win, t as never)).toBe(`[settings.storage.err.permisos] ${IC_OK}`);
+    expect(outputsErrorText(Object.assign(new Error("x; corrígelo en cmd con: icacls \"C:\\a\" %PATH%"), { cause: (win as { cause: object }).cause }), t as never)).toBe("[settings.storage.err.permisos]");
+    setOSForTests("linux");
+    expect(outputsErrorText(msg("/home/u/salidas"), t as never)).toBe("[settings.storage.err.permisos] chmod 700 /home/u/salidas");
+    expect(outputsErrorText(win, t as never)).toBe("[settings.storage.err.permisos]"); // con ruta de Windows y en Linux: sin chmod (lleva \\)
+  } finally { setOSForTests(undefined); }
 });

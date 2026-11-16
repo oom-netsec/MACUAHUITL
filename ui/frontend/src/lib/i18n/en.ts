@@ -2798,4 +2798,12 @@ export const en: Record<Key, string> = {
   "backup.secretsWarn.windows": "The file will contain passwords and keys in clear text (access only for your user and the computer's administrators). Protect the outputs/respaldos/ folder.",
   "ssh.note.windows": "Manual terminal: whatever is typed goes straight to the device, with no assisted mode and no command allowlist. The device output and the typed input are recorded in outputs/terminal/ (access only for your user and the computer's administrators), except what is typed at a password or secret prompt.",
   "vault.backup.noPerms.windows": "The file system does not support per-user permissions (e.g. a FAT32 or exFAT drive): the content is encrypted, but be careful who can read the file.",
+  // Storage on Windows (phase 43b2): ACL instead of 0700 (ADR 0012).
+  "settings.storage.rules.windows": "It must be an absolute folder that already exists, owned by you, with no access for other users (only your user, SYSTEM and Administrators), outside the data and configuration folders of %LOCALAPPDATA%\\MACUAHUITL and %USERPROFILE%\\.ssh, and not under a folder where other users can write (e.g. C:\\Users\\Public).",
+  "settings.storage.chmod.windows": "the icacls command",
+  "settings.storage.err.relativa.windows": "The path must be absolute (e.g. C:\\Users\\your-user\\outputs).",
+  "settings.storage.err.no_existe.windows": "The folder does not exist. Create it and try again.",
+  "settings.storage.err.reservada.windows": "That folder is reserved (data, configuration, your user profile or .ssh) or contains one of them. Pick a subfolder of your own, for example inside your user profile.",
+  "settings.storage.err.permisos.windows": "The folder gives access to other users. The application does not change it: fix it with the icacls command in cmd and try again.",
+  "settings.storage.err.ancestro_inseguro.windows": "The folder is inside a directory that other users can write to (e.g. C:\\Users\\Public), so they could replace the path. Pick a folder under your user profile.",
 };
