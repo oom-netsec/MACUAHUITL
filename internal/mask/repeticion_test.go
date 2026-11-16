@@ -63,7 +63,11 @@ func rpVisibles(out string, val []string) map[string]bool {
 func TestRepeticionDeFraseSecretaEnLaTerminal(t *testing.T) {
 	r := rand.New(rand.NewSource(11))
 	casos, hallados := 0, 0
-	for id := 1; id <= 60; id++ {
+	rondas := 60
+	if raceOn { // ver raceOn
+		rondas = 10
+	}
+	for id := 1; id <= rondas; id++ {
 		for _, f := range rpFormas {
 			for _, n := range []int{1, 2, 4} {
 				val := rpValor(r, n, id)

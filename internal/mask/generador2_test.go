@@ -259,6 +259,9 @@ func gen2Casos() (cmds, plats []string) {
 	for i, l := range gen2Plantillas {
 		plat, tpl, _ := strings.Cut(l, "|")
 		for v := 0; v < 3; v++ {
+			if raceOn && v > 0 { // ver raceOn: con -race, un estilo de valor por plantilla
+				continue
+			}
 			v1 := gen2Valor(i*3+v, 1)
 			if strings.Contains(tpl, "://") && strings.ContainsAny(v1, `" `) { // la clave de una URL no lleva comillas ni espacios
 				v1 = fmt.Sprintf("Zq%05d", (i*3+v)*10+1)

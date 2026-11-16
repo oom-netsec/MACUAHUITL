@@ -271,12 +271,16 @@ func fuzzCmd(r *rand.Rand, n int) string {
 
 // casosDif: las entradas de la propiedad diferencial: las plantillas de los dos generadores y comandos al azar.
 func casosDif() (cmds, plats []string) {
-	cmds, plats = canalCasos(len(canalPlantillas) * 3)
+	vueltas, azar := 3, 1500
+	if raceOn { // ver raceOn
+		vueltas, azar = 1, 0
+	}
+	cmds, plats = canalCasos(len(canalPlantillas) * vueltas)
 	c2, p2 := gen2Casos()
 	cmds, plats = append(cmds, c2...), append(plats, p2...)
 	r := rand.New(rand.NewSource(77))
 	pl := []string{"ios-xe", "nx-os", "asa", "ftd", "wlc-aireos", "ise", ""}
-	for n := 0; n < 1500; n++ {
+	for n := 0; n < azar; n++ {
 		cmds, plats = append(cmds, fuzzCmd(r, 90000+n)), append(plats, pl[r.Intn(len(pl))])
 	}
 	return

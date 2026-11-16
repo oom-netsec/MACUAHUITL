@@ -131,6 +131,14 @@ var canalMarca = regexp.MustCompile(`Zq\d{5}`)
 
 type canalFallo struct{ canal, plat, in, out string }
 
+// canalTotal: el corpus completo, o una vuelta por plantilla con -race (ver raceOn).
+func canalTotal() int {
+	if raceOn {
+		return len(canalPlantillas)
+	}
+	return 7150
+}
+
 func canalCasos(total int) (cmds []string, plats []string) {
 	r := rand.New(rand.NewSource(20261115))
 	for n := 0; n < total; n++ {
@@ -210,7 +218,7 @@ var canales = []struct {
 }
 
 func TestCanalesNingunSecretoSeVe(t *testing.T) {
-	cmds, plats := canalCasos(7150)
+	cmds, plats := canalCasos(canalTotal())
 	porCanal := map[string]int{}
 	var fallos []canalFallo
 	for i, c := range cmds {
@@ -253,7 +261,7 @@ func TestCanalesNingunSecretoSeVe(t *testing.T) {
 
 // Canal 13: idempotencia. Aplicar dos veces no tapa más que una.
 func TestCanalesIdempotencia(t *testing.T) {
-	cmds, plats := canalCasos(7150)
+	cmds, plats := canalCasos(canalTotal())
 	malos := 0
 	for i, c := range cmds {
 		for _, in := range []string{c, "%PARSER-5-CFGLOG_LOGGEDCMD: User:bob  logged command:" + c} {
