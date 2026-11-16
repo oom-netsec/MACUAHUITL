@@ -11,6 +11,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
+	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
 // changetoTimeout es la inactividad que se tolera en un changeto o en show context.
@@ -38,6 +39,9 @@ func parseShowContext(text string) []string {
 // changeto es la única ruta que manda «changeto» a un equipo (ADR 0011): audita antes de mandarlo (sin rastro no
 // se manda) y el driver verifica el prompt de llegada. to es "system" o un nombre de contexto ya validado.
 func changeto(ctx context.Context, d Deps, jobID, hp string, round int, sw platform.ContextSwitcher, to string) error {
+	if _, err := playbook.ValidateValue("context", to); err != nil { // nunca se audita ni se manda lo que no es un nombre válido
+		return i18n.New("platform.err.changeto_name", i18n.A("name", to))
+	}
 	from := sw.Prompt().Context
 	if from == "" {
 		from = "system"
@@ -88,7 +92,8 @@ func enterContext(ctx context.Context, d Deps, jobID, hp string, round int, c *c
 // leaveContext vuelve al contexto de entrada (entry vacío = sistema), aunque el trabajo haya fallado o se haya cancelado.
 func leaveContext(ctx context.Context, d Deps, jobID, hp string, round int, c *connected, entry string) {
 	sw, ok := c.drv.(platform.ContextSwitcher)
-	if !ok || c.drv.Err() != nil {
+	// Con el trabajo cancelado o la ventana vencida no se manda nada más: la sesión se cierra igual.
+	if !ok || c.platform != "asa" || ctx.Err() != nil || c.drv.Err() != nil {
 		return
 	}
 	if entry == "" {

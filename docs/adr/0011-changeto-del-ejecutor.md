@@ -51,7 +51,19 @@ Dura lo que la sesión. El driver sigue sin entrar nunca a configuración (`(con
 | Cambios sin rastro | Auditoría `patrol.changeto` antes de mandar; sin rastro no se manda |
 | Un failover cambia el rol del prompt a mitad de corrida | El prompt se compara por segmentos estables; el rol se informa aparte |
 
-Límite conocido: un contexto llamado `act`, `pri`, `control` o similar es ambiguo con el rol en el prompt.
+Límites conocidos del parser de prompt (si dudan, fallan del lado seguro):
+
+- Un contexto llamado `act`, `pri`, `sec`, `stby`, `control`, `data`, `master` o `slave` es ambiguo con el rol. El
+  prompt se lee como rol, el contexto no coincide y el destino falla sin evidencia (hay prueba).
+- Cluster: la unidad se reconoce por la forma `unit-N-M`. Con cluster y un solo segmento desconocido, se toma por unidad
+  aunque no tenga esa forma; con dos, el que tiene forma de unidad es la unidad y el otro el contexto, y si ninguno la
+  tiene, el primero es el contexto. Un prompt con un nombre de unidad sin esa forma puede mal leerse.
+- `asa/ctx1/control#` (contexto sin unidad) se lee como `Unit=ctx1` y no como contexto: el `changeto` a `ctx1` falla del
+  lado seguro.
+- El tope de prompt sube solo para la forma con segmentos: sin `/`, 63 caracteres como siempre; con `/`, hasta 9
+  segmentos de 63. Así un banner largo que termine en `#` no se toma por prompt.
+- Efecto en otras plataformas: `Open` ahora reconoce `X(config…)#` (con o sin segmentos) en todas las plataformas y
+  falla con `ErrConfigPrompt` en vez de esperar al timeout.
 
 ## Alternativas descartadas
 

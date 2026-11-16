@@ -22,7 +22,7 @@ var (
 	unitRe    = regexp.MustCompile(`^unit-\d+-\d+$`)
 	ctxNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$`)
 	// anyCfgPrompt: prompt de configuración con segmentos (asa/ctx(config)#); en Open es ErrConfigPrompt.
-	anyCfgPrompt = regexp.MustCompile(`(?:^|\n)[\w.\-@/:]{1,160}\(config[\w\-]*\)# ?$`)
+	anyCfgPrompt = regexp.MustCompile(`(?:^|\n)(?:[\w.\-@/:]{1,63}|[\w.\-@:]{1,63}(?:/[\w.\-@:]{1,63}){1,8})\(config[\w\-]*\)# ?$`)
 )
 
 // ParsePrompt separa un prompt de ASA en segmentos por «/»: el primero es el hostname; pri/sec, act/stby/actNoFailover/
@@ -174,7 +174,7 @@ func (d *driver) ChangeTo(ctx context.Context, target string, timeout time.Durat
 			clean = false
 		}
 	}
-	if !clean || got.Host != d.pr.Host || got.Context != want || got.Domain != d.pr.Domain {
+	if !clean || got.Host != d.pr.Host || got.Context != want || got.Domain != d.pr.Domain || got.Unit != d.pr.Unit {
 		return d.fail(i18n.New("platform.err.changeto_prompt", i18n.A("got", lastLine(text), "want", want)))
 	}
 	d.pr, d.hostname = got, stableName(got)

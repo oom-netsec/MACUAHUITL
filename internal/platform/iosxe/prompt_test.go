@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -223,5 +224,86 @@ func TestChangeTo(t *testing.T) {
 	}
 	if err := d2.ChangeTo(ctx, "system", time.Second); !errors.Is(err, platform.ErrChangetoUnsupported) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// Un banner de IOS cuya última línea mide 70 caracteres y termina en «#» no es un prompt: el prompt real llega en
+// otro paquete. Sin «/» el tope sigue siendo 63 (igual que en main).
+func TestOpenBannerLargoQueTerminaEnAlmohadilla(t *testing.T) {
+	devR, drvW := io.Pipe()
+	drvR, devW := io.Pipe()
+	go func() {
+		io.WriteString(devW, "Banner-"+strings.Repeat("x", 62)+"#") // 70 caracteres sin espacios
+		time.Sleep(300 * time.Millisecond)
+		io.WriteString(devW, "\r\nSW1# ")
+		buf := bufio.NewReader(devR)
+		for {
+			l, err := buf.ReadString('\n')
+			if err != nil {
+				return
+			}
+			io.WriteString(devW, l[:len(l)-1]+"\r\nSW1# ")
+		}
+	}()
+	t.Cleanup(func() { drvW.Close(); devW.Close() })
+	d := New().(*driver)
+	if err := d.Open(context.Background(), drvR, drvW, secret.New(nil)); err != nil || d.Hostname() != "SW1" {
+		t.Fatalf("err = %v, hostname = %q", err, d.Hostname())
+	}
+}
+
+// El prompt de ASA más largo posible: host 63, contexto 32, dominio 63 y /sec/stbyNoFailover (179 caracteres).
+func TestOpenPromptASAMaximo(t *testing.T) {
+	p := strings.Repeat("h", 63) + "/" + strings.Repeat("c", 32) + "/" + strings.Repeat("d", 59) + ".com/sec/stbyNoFailover"
+	if len(p) != 63+1+32+1+63+len("/sec/stbyNoFailover") {
+		t.Fatalf("len = %d", len(p))
+	}
+	_, r, w := startFake(t, p+"# ", p+"# ", func(string) (string, string) { return "", "" })
+	if err := New().(*driver).Open(context.Background(), r, w, secret.New(nil)); err != nil {
+		t.Fatal(err)
+	}
+	_, r, w = startFake(t, p+"(config)# ", p+"# ", func(string) (string, string) { return "", "" })
+	if err := New().(*driver).Open(context.Background(), r, w, secret.New(nil)); !errors.Is(err, platform.ErrConfigPrompt) {
+		t.Fatalf("config: %v", err)
+	}
+}
+
+// ChangeTo compara también el dominio y la unidad, y no admite texto del equipo entre el eco y el prompt.
+func TestChangeToVerificaDominioUnidadYSalida(t *testing.T) {
+	ctx := context.Background()
+	open := func(first, land, out string) *driver {
+		_, r, w := startFake(t, first, first, func(line string) (string, string) {
+			switch {
+			case line == "show version":
+				return "Cisco Adaptive Security Appliance Software Version 9.22(1)\r\n", ""
+			case strings.HasPrefix(line, "changeto"):
+				return out, land
+			}
+			return "", ""
+		})
+		d := New().(*driver)
+		if err := d.Open(ctx, r, w, secret.New(nil)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := d.Detect(ctx); err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+	for _, c := range []struct {
+		name, first, land, out, to string
+		ok                         bool
+	}{
+		{"dominio distinto", "asa/admin# ", "asa/ctx1/example.com# ", "", "ctx1", false},
+		{"mismo dominio", "asa/admin/example.com# ", "asa/ctx1/example.com# ", "", "ctx1", true},
+		{"unidad distinta", "asa/unit-1-1/control# ", "asa/ctx1/unit-1-2/data# ", "", "ctx1", false},
+		{"misma unidad, otro rol", "asa/unit-1-1/control# ", "asa/ctx1/unit-1-1/data# ", "", "ctx1", true},
+		{"error entre el eco y el prompt", "asa/admin# ", "asa/ctx1# ", "ERROR: algo salio mal\r\n", "ctx1", false},
+		{"syslog entre el eco y el prompt", "asa/admin# ", "asa/ctx1# ", "%ASA-6-302013: Built inbound TCP connection\r\n", "ctx1", true},
+	} {
+		d := open(c.first, c.land, c.out)
+		if err := d.ChangeTo(ctx, c.to, 5*time.Second); (err == nil) != c.ok {
+			t.Errorf("%s: err = %v", c.name, err)
+		}
 	}
 }

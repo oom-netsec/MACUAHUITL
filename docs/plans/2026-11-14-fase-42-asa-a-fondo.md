@@ -148,6 +148,11 @@ unidad, así que la IP no identifica a la unidad.
   cojo (solo se ve la activa, con los datos de la pareja que da `show failover`).
 - A futuro, fuera de esta fase: `failover exec mate show …` como **operación del ejecutor**, con el comando de adentro
   pasado por CheckDenied. Mismo patrón que el `changeto` de D1. Hoy `failover exec` sigue denegado.
+- **Pendiente de 42a hacia D4:** el rol del prompt (pri/sec y act/stby) ya sale del driver (`Prompt()`), pero todavía
+  **no se guarda en `DeviceResult`**. Si un failover ocurre entre dos reconexiones de la misma ronda, la evidencia puede
+  mezclar las dos unidades sin que quede constancia; eso lo resuelve D4 al agrupar por (serie, contexto) y registrar el
+  rol por salida. La comprobación de «mismo equipo al reconectar» (hostname y plataforma) que agrega la rama
+  `fix-revision-final` en `run.go` no se duplica en 42a; se integra en el rebase posterior a la v1.0.0.
 
 ## 4. Detalle
 

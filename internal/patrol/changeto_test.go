@@ -5,13 +5,16 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform/iosxe"
+	"github.com/oom-netsec/MACUAHUITL/internal/store"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 )
 
@@ -174,5 +177,148 @@ func TestParseShowContext(t *testing.T) {
 	}
 	if got := parseShowContext(string(b)); !slices.Equal(got, []string{"admin", "ctx1", "ctx2"}) {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// hookDrv deja que una prueba intercepte comandos de un driver real que sigue siendo ContextSwitcher.
+type hookDrv struct {
+	platform.Driver
+	hook func(cmd string) (platform.Output, error, bool)
+}
+
+func (h hookDrv) Run(ctx context.Context, cmd string, to time.Duration) (platform.Output, error) {
+	if h.hook != nil {
+		if out, err, ok := h.hook(cmd); ok {
+			return out, err
+		}
+	}
+	return h.Driver.Run(ctx, cmd, to)
+}
+func (h hookDrv) Prompt() platform.Prompt { return h.Driver.(platform.ContextSwitcher).Prompt() }
+func (h hookDrv) ChangeTo(ctx context.Context, t string, to time.Duration) error {
+	return h.Driver.(platform.ContextSwitcher).ChangeTo(ctx, t, to)
+}
+
+// Un corte a mitad del bloque reconecta: la sesión nueva entra por admin y el changeto (con su show context) se repite;
+// si no, la evidencia siguiente saldría del contexto equivocado.
+func TestChangetoSeRepiteAlReconectar(t *testing.T) {
+	e, rec := asaEnv(t, "")
+	e.spec.CustomCommands = "show clock\nshow version\n"
+	var showContext, cuts int
+	e.d.NewDriver = func() platform.Driver {
+		return hookDrv{Driver: iosxe.New(), hook: func(cmd string) (platform.Output, error, bool) {
+			switch cmd {
+			case "show context":
+				showContext++
+			case "show clock":
+				if cuts == 0 {
+					cuts++
+					return platform.Output{Command: cmd}, platform.ErrClosed, true
+				}
+			}
+			return platform.Output{}, nil, false
+		}}
+	}
+	res, _ := runCtx(t, e, "ctx1")
+	if res.State != "partial" && res.State != "completed" || res.Reconnects != 1 {
+		t.Fatalf("res = %+v", res)
+	}
+	n := 0
+	for _, l := range rec.Lines() {
+		if l == "!changeto context ctx1" {
+			n++
+		}
+	}
+	if showContext != 2 || n != 2 {
+		t.Fatalf("show context %d veces, %d changeto a ctx1: %q", showContext, n, rec.Lines())
+	}
+}
+
+// Un IOS con Target.Context no deja ningún rastro de changeto: nunca se mandó.
+func TestChangetoIOSNoAudita(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	if res, _ := runCtx(t, e, "ctx1"); res.State != "failed" {
+		t.Fatalf("res = %+v", res)
+	}
+	if a := auditText(t, e); strings.Contains(a, "patrol.changeto") {
+		t.Fatalf("auditoría de un changeto que no se mandó: %s", a)
+	}
+}
+
+// changeto no audita ni manda un destino que no es un nombre de contexto válido.
+func TestChangetoValidaAntesDeAuditar(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	sw := &recSwitch{}
+	for _, to := range []string{"", "x; reload", "a b", "../x"} {
+		if err := changeto(context.Background(), e.d, "j", "h", 1, sw, to); err == nil {
+			t.Errorf("%q aceptado", to)
+		}
+	}
+	if sw.sent != 0 || strings.Contains(auditText(t, e), "patrol.changeto") {
+		t.Fatalf("sent=%d audit=%s", sw.sent, auditText(t, e))
+	}
+}
+
+type recSwitch struct{ sent int }
+
+func (r *recSwitch) Prompt() platform.Prompt { return platform.Prompt{} }
+func (r *recSwitch) ChangeTo(context.Context, string, time.Duration) error {
+	r.sent++
+	return nil
+}
+
+// Si la auditoría no se puede escribir (almacén cerrado), no se manda nada.
+func TestChangetoSinAuditoriaNoSeManda(t *testing.T) {
+	e, rec := asaEnv(t, "")
+	db, err := store.Open(filepath.Join(t.TempDir(), "x.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	e.d.Audit = audit.New(db, time.Now)
+	res, w := runCtx(t, e, "ctx1")
+	if res.State != "failed" || len(rec.Lines()) != 0 || len(w.Files()) != 0 {
+		t.Fatalf("res = %+v, changeto = %q, files = %v", res, rec.Lines(), w.Files())
+	}
+}
+
+// Un contexto con nombre de rol (act, pri...) se leería como parte del prompt: el destino falla del lado seguro.
+func TestChangetoContextoConNombreDeRol(t *testing.T) {
+	for _, name := range []string{"act", "pri", "stby", "sec", "control", "data", "master", "slave"} {
+		rec := &simulator.Recorder{}
+		e := newEnv(t, simulator.Config{Hostname: "asa", Transcripts: transcripts("asa-asav"), Contexts: []string{"admin", name}, Recorder: rec,
+			Commands: map[string]string{"show clock": "10:00:00.000 UTC Mon Nov 3 2026\n"}})
+		e.spec.CustomCommands = "show clock\n"
+		e.trust(t)
+		res, w := runCtx(t, e, name)
+		if res.State != "failed" || len(w.Files()) != 0 {
+			t.Errorf("%s: res = %+v, files = %v", name, res, w.Files())
+		}
+	}
+}
+
+// Con el trabajo cancelado (o la ventana vencida) no se manda la vuelta: la sesión se cierra igual.
+func TestChangetoNoVuelveConElTrabajoCancelado(t *testing.T) {
+	e, rec := asaEnv(t, "")
+	ctx, cancel := context.WithCancel(context.Background())
+	e.d.NewDriver = func() platform.Driver {
+		return hookDrv{Driver: iosxe.New(), hook: func(cmd string) (platform.Output, error, bool) {
+			if cmd == "show clock" {
+				cancel()
+				return platform.Output{Command: cmd}, errors.New("boom"), true
+			}
+			return platform.Output{}, nil, false
+		}}
+	}
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	tg := e.spec.Targets[0]
+	tg.Context = "ctx1"
+	res := RunDevice(ctx, e.d, "j", e.spec, w, 1, tg, func(Progress) {})
+	if res.State != "failed" {
+		t.Fatalf("res = %+v", res)
+	}
+	if l := rec.Lines(); !slices.Equal(l, []string{"!changeto system", "!changeto context ctx1"}) {
+		t.Fatalf("changeto = %q", l)
 	}
 }

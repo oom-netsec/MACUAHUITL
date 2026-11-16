@@ -35,7 +35,7 @@ const outTail = 4096
 var maxDetect = 2 * time.Minute
 
 var (
-	anyPrompt = regexp.MustCompile(`(?:^|\n)([\w.\-@/:]{1,160})([>#]) ?$`)
+	anyPrompt = regexp.MustCompile(`(?:^|\n)([\w.\-@/:]{1,63}|[\w.\-@:]{1,63}(?:/[\w.\-@:]{1,63}){1,8})([>#]) ?$`)
 	// FTD: la CLI normal tiene el prompt «> » sin nombre de host. Una línea de salida que empiece con «>» (BGP, tablas)
 	// se confunde con él, así que solo cuenta al final del búfer y tras una pausa (ftdSettle) sin más datos.
 	ftdPrompt = regexp.MustCompile(`(?:^|\n)> ?$`)
