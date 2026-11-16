@@ -9,6 +9,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
@@ -145,14 +146,18 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		res.Commands++
 		// Una cancelación (fin de ventana o trabajo cancelado) no es un corte del equipo.
 		cut := runErr != nil && ctx.Err() == nil && (errors.Is(cutErr, platform.ErrPromptTimeout) || errors.Is(cutErr, platform.ErrClosed))
+		shown := cmd.Text // el comando cortado va a la auditoría, al detalle y al manifest: con el mismo enmascarado que la evidencia
+		if !s.DisableMasking {
+			shown = mask.Cmd(c.platform, cmd.Text)
+		}
 		if cut && werr == nil && res.Reconnects < maxReconnects && i < len(cmds)-1 && !errors.Is(cutErr, ErrWindowEnded) {
 			// Un comando cortado no se reintenta (puede seguir corriendo en la sesión vieja): se reabre y sigue el siguiente.
 			// En el último no hay nada que seguir: no se reconecta y el equipo queda partial.
-			res.CutCommands = append(res.CutCommands, cmd.Text)
+			res.CutCommands = append(res.CutCommands, shown)
 			res.Reconnects++
 			// El fallo de auditoría aquí se ignora, como en auditor(): lo atrapa el device.round final.
 			d.Audit.Append(context.WithoutCancel(ctx), audit.Entry{Actor: "patrol", Action: "device.reconnect", Target: hp,
-				Detail: fmt.Sprintf("job=%s round=%d command=%q cause=%q attempt=%d", jobID, round, cmd.Text, i18n.English(cutErr), res.Reconnects)})
+				Detail: fmt.Sprintf("job=%s round=%d command=%q cause=%q attempt=%d", jobID, round, shown, i18n.English(cutErr), res.Reconnects)})
 			emit(Progress{Target: hp, State: "connecting"})
 			c.close()
 			c = nil
@@ -175,11 +180,11 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		}
 		if runErr != nil {
 			if cut && werr == nil && !errors.Is(cutErr, ErrWindowEnded) && i == len(cmds)-1 {
-				res.CutCommands = append(res.CutCommands, cmd.Text) // el último cortado: partial, sin reconectar
+				res.CutCommands = append(res.CutCommands, shown) // el último cortado: partial, sin reconectar
 				continue
 			}
 			if cut {
-				res.CutCommands = append(res.CutCommands, cmd.Text)
+				res.CutCommands = append(res.CutCommands, shown)
 			}
 			res.State, res.Detail, res.DetailErr = "failed", runErr.Error(), runErr
 			emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})

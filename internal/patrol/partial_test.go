@@ -3,6 +3,7 @@ package patrol
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
@@ -313,5 +315,42 @@ func TestCorteEnElUltimoConReconexionesAgotadasEsParcial(t *testing.T) {
 	res, _ := runPartial(t, e, context.Background())
 	if res.State != "partial" || res.Reconnects != maxReconnects || len(res.CutCommands) != 3 {
 		t.Fatalf("res = %+v", res)
+	}
+}
+
+// Un comando cortado con secreto (uno personalizado) no deja el valor en la auditoría, el detalle, el manifest ni la cabecera.
+func TestComandoCortadoSecretoVaEnmascarado(t *testing.T) {
+	const cmd, val = "show running-config interface Gi1 key 7 0822455D0A16", "0822455D0A16"
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.spec.CustomCommands = "show version\n" + cmd + "\nshow clock"
+	newCut(t, e, map[string]error{cmd: platform.ErrPromptTimeout})
+	res, w := runPartial(t, e, context.Background())
+	if res.State != "partial" || len(res.CutCommands) != 1 {
+		t.Fatalf("res = %+v", res)
+	}
+	m, _ := Finish(context.Background(), e.d, w, e.spec, 1, []DeviceResult{res})
+	mj, _ := json.Marshal(m)
+	var buf bytes.Buffer
+	e.d.Audit.Export(context.Background(), &buf, time.Time{}, time.Now().Add(time.Hour))
+	for name, txt := range map[string]string{"detalle": res.Detail, "cortados": strings.Join(res.CutCommands, "|"), "manifest": string(mj), "auditoría": buf.String(), "evidencia": evidence(w)} {
+		if strings.Contains(txt, val) {
+			t.Errorf("%s trae el valor: %s", name, txt)
+		}
+	}
+	if !strings.Contains(evidence(w), "show running-config interface Gi1 key 7 <MASKED:secret> · incomplete") {
+		t.Fatalf("cabecera: %s", evidence(w))
+	}
+}
+
+// Enmascarar el comando de la cabecera no debe tocar ningún comando de los playbooks.
+func TestCmdNoTocaLosComandosDeLosPlaybooks(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	for _, p := range e.d.Playbooks {
+		for _, c := range p.Commands {
+			if got := mask.Cmd(p.Platform, c.Text); got != c.Text {
+				t.Errorf("%s: %q -> %q", p.ID, c.Text, got)
+			}
+		}
 	}
 }
