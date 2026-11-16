@@ -225,6 +225,49 @@ Section /o "$(SecDesktop)" SecDesktop
   CreateShortcut "$DESKTOP\MACUAHUITL.lnk" "$INSTDIR\macuahuitl.exe" "" "$INSTDIR\macuahuitl.ico"
 SectionEnd
 
+; SafeRemove: borra la ruta que está en la pila sin seguir reparse points. Un junction o symlink se borra como enlace
+; (RMDir o Delete sobre el enlace mismo) y nunca se entra en él; una carpeta normal se recorre y se borra. RMDir /r de
+; NSIS sí los sigue y borra lo que está del otro lado (lo mostró test-installer.ps1), por eso no se usa con los datos.
+; Recursiva: guarda y restaura $R0-$R3 en la pila.
+!define FILE_ATTRIBUTE_DIRECTORY 0x10
+!define FILE_ATTRIBUTE_REPARSE_POINT 0x400
+Function un.SafeRemove
+  Exch $R0
+  Push $R1
+  Push $R2
+  Push $R3
+  System::Call 'kernel32::GetFileAttributesW(w R0) i .R3'
+  ${If} $R3 <> -1 ; -1: no existe o no se puede leer, no se toca
+    IntOp $R1 $R3 & ${FILE_ATTRIBUTE_REPARSE_POINT}
+    IntOp $R2 $R3 & ${FILE_ATTRIBUTE_DIRECTORY}
+    ${If} $R1 <> 0
+      ${If} $R2 <> 0
+        RMDir "$R0" ; sin /r: quita el junction o el symlink de carpeta, no su destino
+      ${Else}
+        Delete "$R0"
+      ${EndIf}
+    ${ElseIf} $R2 <> 0
+      FindFirst $R1 $R2 "$R0\*"
+      ${DoWhile} $R2 != ""
+        ${If} $R2 != "."
+        ${AndIf} $R2 != ".."
+          Push "$R0\$R2"
+          Call un.SafeRemove
+        ${EndIf}
+        FindNext $R1 $R2
+      ${Loop}
+      FindClose $R1
+      RMDir "$R0"
+    ${Else}
+      Delete "$R0"
+    ${EndIf}
+  ${EndIf}
+  Pop $R3
+  Pop $R2
+  Pop $R1
+  Pop $R0
+FunctionEnd
+
 ; Desinstalar quita solo lo que puso el instalador. Los datos (bóveda, auditoría, configuración) se borran solo si el
 ; usuario dice que sí, con No por omisión, y nunca en modo silencioso (/S). La carpeta de salidas nunca se toca.
 Section "Uninstall"
@@ -256,7 +299,8 @@ Section "Uninstall"
   ${If} $3 = 1
   ${AndIf} ${FileExists} "${DATA_DIR}\*.*"
     MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "$(AskData)" /SD ${DATA_DEFAULT} IDNO keepData
-    RMDir /r "${DATA_DIR}"
+    Push "${DATA_DIR}"
+    Call un.SafeRemove
     keepData:
   ${EndIf}
 SectionEnd

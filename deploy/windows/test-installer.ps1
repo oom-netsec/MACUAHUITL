@@ -57,8 +57,8 @@ Must (-not (Test-Path $startLnk)) 'quitado el acceso directo'
 Must ((Get-Content (Join-Path $data 'data\vault.db')) -eq 'bóveda de prueba') 'con /S los datos quedan intactos'
 Remove-Item -Recurse -Force $inst, $data
 
-# Contestar Sí a borrar los datos (compilación de prueba, que contesta Sí en silencioso): RMDir /r borra los enlaces que
-# haya dentro, nunca lo que está del otro lado. La documentación de NSIS no lo garantiza; esta prueba sí.
+# Contestar Sí a borrar los datos (compilación de prueba, que contesta Sí en silencioso): se borran los enlaces que haya
+# dentro, nunca lo que está del otro lado. RMDir /r de NSIS sí los seguía (esta prueba lo mostró): el .nsi usa SafeRemove.
 $outside = Join-Path $env:TEMP 'macuahuitl-fuera'
 New-Item -ItemType Directory -Force $outside | Out-Null
 Set-Content (Join-Path $outside 'no-borrar.txt') 'ajeno'
