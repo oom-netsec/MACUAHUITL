@@ -1,7 +1,12 @@
 import type { Key } from "../../lib/i18n/es";
 import type { TransferProto } from "./api";
+import { isWindows } from "../../lib/platform";
 
 export const defaultPort: Record<TransferProto, string> = { tftp: "6969", ftp: "2121", scp: "2222", sftp: "2222", http: "8080" };
+
+// ADR 0012 (h): en Windows no hay puertos privilegiados, así que se escucha directo en el estándar (la regla de firewall hace el resto).
+const windowsPort: Record<TransferProto, string> = { ...defaultPort, tftp: "69", ftp: "21", scp: "22", sftp: "22" };
+export const portFor = (p: TransferProto) => (isWindows() ? windowsPort : defaultPort)[p];
 
 export const isIP = (s: string) =>
   (/^\d{1,3}(\.\d{1,3}){3}$/.test(s) && s.split(".").every((n) => Number(n) <= 255)) || (s.includes(":") && /^[0-9a-f:.]+$/i.test(s) && (s.match(/:/g) ?? []).length >= 2);
@@ -14,7 +19,7 @@ export interface ServeForm { proto: TransferProto; any: boolean; listen: string;
 export function serveProblem(f: ServeForm): Key | null {
   if (!f.any && !f.listen) return "transfer.err.listen";
   const port = Number(f.port);
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) return "transfer.err.port";
+  if (!Number.isInteger(port) || port < (isWindows() ? 1 : 1024) || port > 65535) return "transfer.err.port";
   if (!f.write && !f.fromDir && splitList(f.files).length === 0) return "transfer.err.nothing";
   if (!splitList(f.allow).every(isIP)) return "transfer.err.allow";
   const none = splitList(f.allow).length === 0;

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { DiagView } from "./DiagView";
 import { fakeCore } from "../../lib/fake";
 import { I18nProvider, useSetLang } from "../../lib/i18n";
+import { setOSForTests } from "../../lib/platform";
 
 test("ejecuta ping, muestra la salida en vivo y la ruta al terminar", async () => {
   const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
@@ -90,6 +91,27 @@ test("iperf3 servidor: un puerto menor que 1024, con ceros a la izquierda o no e
     expect(screen.getByText("Un entero de 1024 a 65535.")).toBeInTheDocument();
   }
   expect(core.diagRun).not.toHaveBeenCalled();
+});
+
+test("iperf3 servidor en Windows: acepta el 1-65535 con sus textos; sigue rechazando ceros a la izquierda y no enteros", async () => {
+  setOSForTests("windows");
+  try {
+    const core = await server();
+    await screen.findByLabelText("Escuchar en");
+    const port = screen.getByLabelText("Puerto");
+    expect(port).toHaveAccessibleDescription("De 1 a 65535; 5201 es el de iperf3.");
+    await userEvent.clear(port);
+    await userEvent.type(port, "162");
+    expect(port).toBeValid();
+    await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+    await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("iperf3", [], { mode: "server", bind: "192.168.3.10", port: "162" }));
+    for (const bad of ["0", "", "5201.5", "70000", "05201"]) {
+      await userEvent.clear(port);
+      if (bad) await userEvent.type(port, bad);
+      expect(port).toBeInvalid();
+      expect(screen.getByText("Un entero de 1 a 65535.")).toBeInTheDocument();
+    }
+  } finally { setOSForTests(undefined); }
 });
 
 test("iperf3 servidor: se puede elegir otra IP y se manda esa", async () => {
@@ -181,4 +203,18 @@ test("un evento posterior al cambio de idioma se escribe en el idioma vigente, n
   await userEvent.click(screen.getByRole("button", { name: "a-en" }));
   act(() => core.emitDiag({ runId: "r1", done: true, exitCode: -1, canceled: true }));
   expect(await screen.findByText("Canceled by the user.")).toBeInTheDocument();
+});
+
+// ADR 0012 (i): en Windows el SYN de nmap necesita Npcap, que no es parte del producto; la beta lo esconde.
+test("nmap en Windows no ofrece el escaneo SYN; en Linux sí", () => {
+  setOSForTests("windows");
+  try {
+    const { unmount } = render(<DiagView core={fakeCore()} tool="nmap" />);
+    const opts = () => screen.getAllByRole("option").map((o) => o.getAttribute("value"));
+    expect(opts()).not.toContain("syn");
+    expect(opts()).toEqual(expect.arrayContaining(["connect", "udp", "ping"]));
+    unmount();
+  } finally { setOSForTests(undefined); }
+  render(<DiagView core={fakeCore()} tool="nmap" />);
+  expect(screen.getAllByRole("option").map((o) => o.getAttribute("value"))).toContain("syn");
 });

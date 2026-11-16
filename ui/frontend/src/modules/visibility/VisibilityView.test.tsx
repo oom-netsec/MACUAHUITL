@@ -4,6 +4,7 @@ import { VisibilityView } from "./VisibilityView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
 import type { CoreAPI } from "../../lib/core";
+import { setOSForTests } from "../../lib/platform";
 
 // jsdom no tiene canvas: uPlot se sustituye y se revisan las opciones y los datos que recibe.
 const made: { opts: Record<string, unknown>; data: unknown[][] }[] = [];
@@ -247,4 +248,18 @@ test("gnmi: Limpiar también descarta los eventos que esperaban en el lote", asy
   await new Promise((r) => setTimeout(r, 250)); // más que el intervalo del lote
   expect(screen.queryByText("/p/b = 2")).toBeNull();
   expect(screen.queryByText("/p/a = 1")).toBeNull();
+});
+
+test("traps: la nota del 162 cambia en Windows (sin puertos privilegiados, regla de firewall) y en Linux sigue igual", async () => {
+  setOSForTests("windows");
+  try {
+    const { unmount } = render(<VisibilityView core={fakeCore()} />);
+    await userEvent.click(screen.getByRole("tab", { name: "Traps" }));
+    expect(screen.getByText(/puedes escuchar directo en el 162/)).toBeInTheDocument();
+    expect(screen.queryByText(/nftables/)).not.toBeInTheDocument();
+    unmount();
+  } finally { setOSForTests(undefined); }
+  render(<VisibilityView core={fakeCore()} />);
+  await userEvent.click(screen.getByRole("tab", { name: "Traps" }));
+  expect(screen.getByText(/162 es privilegiado/)).toBeInTheDocument();
 });

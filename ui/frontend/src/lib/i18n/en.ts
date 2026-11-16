@@ -2806,4 +2806,14 @@ export const en: Record<Key, string> = {
   "settings.storage.err.reservada.windows": "That folder is reserved (data, configuration, your user profile or .ssh) or contains one of them. Pick a subfolder of your own, for example inside your user profile.",
   "settings.storage.err.permisos.windows": "The folder gives access to other users. The application does not change it: remove that access (Properties → Security, or with icacls in cmd) and try again.",
   "settings.storage.err.ancestro_inseguro.windows": "The folder is inside a directory that other users can write to (e.g. C:\\Users\\Public), so they could replace the path. Pick a folder under your user profile.",
+  // Ports on Windows (ADR 0012 h): no privileged ports; what is needed is the inbound firewall rule.
+  "transfer.port.hint.windows": "1 to 65535: Windows has no privileged ports. The protocol's standard port by default.",
+  "transfer.err.port.windows": "The port must be between 1 and 65535.",
+  "transfer.privileged.windows": "IOS uses the standard port {std}; this server listens on {port}. For the traffic to get in, run this inbound Windows Firewall rule once, as administrator (or accept the firewall dialog when the server opens). The app never applies it.",
+  "transfer.redirect.windows": "Firewall rule (PowerShell, as administrator)",
+  "transfer.redirect.narrow.windows": "The rule only lets in traffic addressed to the listen address {ip}, for this program and this port. For FTP it does not cover the passive data range.",
+  "transfer.closed.cleanup.windows": "Server closed. If you applied the firewall rule, remove it with this command.",
+  "diag.port.hint.windows": "1 to 65535; 5201 is the iperf3 default.",
+  "diag.port.invalid.windows": "A whole number from 1 to 65535.",
+  "visibility.traps.note.windows": "Windows has no privileged ports: you can listen on 162 directly (or use 1162). An inbound Windows Firewall rule for UDP on that port is needed: run it once as administrator or accept the firewall dialog; the app never applies it.",
 };
