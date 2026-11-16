@@ -50,6 +50,7 @@ func main() {
 	b := bridge.New(func() (*ipc.ClientConn, error) { return ipc.Dial(context.Background()) },
 		func(name string, data any) { app.Event.Emit(name, data) })
 	b.Localize = coreLocalize || os.Getenv("MACUAHUITL_CORE_LOCALIZE") == "1"
+	b.Launcher = coreLauncher() // Windows: arranca el núcleo si no corre; nil en Linux
 	app = application.New(application.Options{
 		Name: "MACUAHUITL",
 		Icon: icon,
