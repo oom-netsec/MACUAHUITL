@@ -162,6 +162,14 @@ func (a *Aggregator) Snapshot(n int) Snapshot {
 	for _, e := range a.exporters {
 		s.Exporters = append(s.Exporters, *e)
 	}
-	sort.Slice(s.Exporters, func(i, j int) bool { return s.Exporters[i].Bytes > s.Exporters[j].Bytes })
+	sort.Slice(s.Exporters, func(i, j int) bool {
+		if s.Exporters[i].Bytes != s.Exporters[j].Bytes {
+			return s.Exporters[i].Bytes > s.Exporters[j].Bytes
+		}
+		return s.Exporters[i].Exporter < s.Exporters[j].Exporter
+	})
+	if n > 0 && len(s.Exporters) > n { // como los demás rankings: con hasta 100 000 exportadores la instantánea no los manda todos
+		s.Exporters = s.Exporters[:n]
+	}
 	return s
 }
