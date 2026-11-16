@@ -132,6 +132,9 @@ var standard = map[string]struct {
 func redirTarget(loc, ip string) (family, addr string) {
 	a, err := netip.ParseAddr(strings.Trim(ip, "[]"))
 	if err != nil || a.IsUnspecified() || a.Zone() != "" { // con zona (fe80::1%x) se pide la IP de la máquina: la zona acaba en un comando
+		if err == nil && a.Unmap().Is6() {
+			return "ip6", i18n.Msg(loc, "fileserve.hint.this_host", nil)
+		}
 		return "ip", i18n.Msg(loc, "fileserve.hint.this_host", nil)
 	}
 	if a = a.Unmap(); a.Is6() {
@@ -149,10 +152,23 @@ func nftTable(proto string, port int) string { return fmt.Sprintf("macuahuitl_%s
 // cómo quitarla. La app nunca la ejecuta. En FTP solo se redirige el puerto de control.
 func RedirectHint(proto, ip string, port int) string { return RedirectHintIn(i18n.Es, proto, ip, port) }
 
-// RedirectHintIn es RedirectHint con el texto en el idioma dado.
+// RedirectHintIn es RedirectHint con el texto en el idioma dado: el comando y, al final, cómo quitarlo.
 func RedirectHintIn(loc, proto, ip string, port int) string {
 	if isWindows() {
 		return firewallRule(loc, proto, ip, port, exePath(), [2]uint16{})
+	}
+	c := RedirectCommandIn(loc, proto, ip, port)
+	if c == "" {
+		return ""
+	}
+	return c + "   " + i18n.Msg(loc, "fileserve.hint.nft_remove", i18n.A("cmd", RedirectCleanup(proto, ip, port)))
+}
+
+// RedirectCommandIn es solo el comando, sin la nota de cómo quitarlo: lo que la UI copia (la nota en medio lo
+// rompería en bash y en PowerShell) y lo que imprime mctl, que muestra el de quitar aparte.
+func RedirectCommandIn(loc, proto, ip string, port int) string {
+	if isWindows() {
+		return firewallCommand(loc, proto, ip, port, exePath(), [2]uint16{})
 	}
 	s, ok := standard[proto]
 	if !ok {
@@ -162,8 +178,7 @@ func RedirectHintIn(loc, proto, ip string, port int) string {
 	t := nftTable(proto, port)
 	return fmt.Sprintf("sudo nft add table %[1]s %[2]s; "+
 		"sudo nft add chain %[1]s %[2]s pre '{ type nat hook prerouting priority dstnat; }'; "+
-		"sudo nft add rule %[1]s %[2]s pre %[1]s daddr %[3]s %[4]s dport %[5]d redirect to :%[6]d   "+
-		"%[7]s", fam, t, addr, s.trans, s.port, port, i18n.Msg(loc, "fileserve.hint.nft_remove", i18n.A("cmd", RedirectCleanup(proto, ip, port))))
+		"sudo nft add rule %[1]s %[2]s pre %[1]s daddr %[3]s %[4]s dport %[5]d redirect to :%[6]d", fam, t, addr, s.trans, s.port, port)
 }
 
 // RedirectCleanup es el comando que quita la regla de RedirectHint ("" si el protocolo no

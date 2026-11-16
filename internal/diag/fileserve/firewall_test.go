@@ -42,7 +42,7 @@ func TestReglaFirewallWindows(t *testing.T) {
 	if !strings.HasPrefix(h, want) || !strings.Contains(h, `Remove-NetFirewallRule -DisplayName 'MACUAHUITL tftp 10.0.0.5 69'`) {
 		t.Errorf("tftp:\n%s", h)
 	}
-	if h := RedirectHintIn("en", "ftp", "0.0.0.0", 21); !strings.Contains(h, "-LocalAddress IP-OF-THIS-MACHINE -Protocol TCP -LocalPort Any") || !strings.Contains(h, "'MACUAHUITL ftp any 21'") {
+	if h := RedirectHintIn("en", "ftp", "0.0.0.0", 21); !strings.Contains(h, "-LocalAddress IP-OF-THIS-MACHINE -Protocol TCP -LocalPort 21,22-53") || !strings.Contains(h, "'MACUAHUITL ftp any 21'") {
 		t.Errorf("ftp:\n%s", h)
 	}
 	if got := RedirectCleanup("tftp", "10.0.0.5", 6969); got != `Remove-NetFirewallRule -DisplayName 'MACUAHUITL tftp 10.0.0.5 6969'` {
@@ -97,7 +97,7 @@ func TestReglaFirewallSinRutaNoEmiteRegla(t *testing.T) {
 	}
 }
 
-// FTP pasivo: con rango, el de control y el de datos; sin rango, Any (acotado por programa e IP).
+// FTP pasivo: con rango, el de control y el de datos; sin rango, los de ftp.go (puerto+1 a puerto+32), o Any si no caben.
 func TestReglaFirewallFTPPasivo(t *testing.T) {
 	fijaWindows(t, "windows")
 	sh := ServerHintIn("es", Config{Proto: "ftp", PassivePorts: [2]uint16{50000, 50031}}, Ready{Addr: "10.0.0.5:21"}, nil)
@@ -105,8 +105,11 @@ func TestReglaFirewallFTPPasivo(t *testing.T) {
 		t.Errorf("con rango:\n%s", sh)
 	}
 	sh = ServerHintIn("es", Config{Proto: "ftp"}, Ready{Addr: "10.0.0.5:21"}, nil)
-	if !strings.Contains(sh, "-LocalPort Any") {
+	if !strings.Contains(sh, "-LocalPort 21,22-53") {
 		t.Errorf("sin rango:\n%s", sh)
+	}
+	if sh = ServerHintIn("es", Config{Proto: "ftp"}, Ready{Addr: "10.0.0.5:65520"}, nil); !strings.Contains(sh, "-LocalPort Any") {
+		t.Errorf("sin rango y sin espacio arriba:\n%s", sh)
 	}
 }
 
@@ -138,6 +141,17 @@ func TestIPConZonaNoLlegaAlComando(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// Una IPv6 con zona cae al marcador, pero la familia de nft sigue siendo ip6 (con ip, nft no acepta la IPv6 del usuario).
+func TestIPv6ConZonaFamiliaIP6(t *testing.T) {
+	fijaWindows(t, "linux")
+	if h := RedirectHintIn("es", "tftp", "fe80::1%eth0", 6969); !strings.Contains(h, "nft add table ip6 ") || !strings.Contains(h, "ip6 daddr") {
+		t.Errorf("%s", h)
+	}
+	if c := RedirectCleanup("tftp", "fe80::1%eth0", 6969); !strings.HasPrefix(c, "sudo nft delete table ip6 ") {
+		t.Errorf("%s", c)
 	}
 }
 

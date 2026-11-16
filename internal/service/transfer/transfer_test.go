@@ -444,12 +444,13 @@ func TestRedirectHintRPCEn(t *testing.T) {
 	s, _ := newTest(t)
 	req := &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"}
 	en, err := s.RedirectHint(i18n.WithLocale(context.Background(), "en"), req)
-	if err != nil || !strings.Contains(en.Setcap, "WARNING") || !strings.Contains(en.Nftables, "(remove when done: sudo nft delete table ip macuahuitl_ftp_2121)") || !strings.Contains(en.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") {
+	// Nftables es solo el comando (se copia tal cual); el de quitar va en Remove.
+	if err != nil || !strings.Contains(en.Setcap, "WARNING") || strings.Contains(en.Nftables, "remove when done") || !strings.HasSuffix(en.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") || en.Remove != "sudo nft delete table ip macuahuitl_ftp_2121" {
 		t.Fatalf("%+v %v", en, err)
 	}
 	es, _ := s.RedirectHint(context.Background(), req)
-	if !strings.Contains(es.Nftables, "(quitar al terminar: sudo nft delete table ip macuahuitl_ftp_2121)") {
-		t.Errorf("es cambió: %s", es.Nftables)
+	if es.Nftables != en.Nftables {
+		t.Errorf("el comando no depende del idioma: %s", es.Nftables)
 	}
 }
 

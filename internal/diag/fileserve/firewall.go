@@ -46,9 +46,18 @@ func fwName(proto, ip string, port int) string {
 // firewallRule es la regla de entrada del Firewall de Windows (ADR 0012 h) que el usuario corre una vez como
 // administrador; la app nunca la aplica. No hay redirección: IOS usa el puerto estándar y el servidor escucha
 // ahí mismo, así que la regla abre el puerto de escucha, solo para esa IP y ese programa.
-// FTP: los datos pasivos van por otros puertos; con rango (pasv) se abren junto al de control y sin rango el puerto
-// queda en Any, acotado por -Program y -LocalAddress. Sin ruta del programa (exe vacío) no hay regla y se dice.
+// FTP: los datos pasivos van por otros puertos; con rango (pasv) se abren junto al de control y sin rango los de
+// ftp.go (puerto+1 a puerto+ftpPassive), o Any si se saldrían de 65535. Sin ruta del programa (exe vacío) no hay regla
+// y se dice. firewallRule le agrega cómo quitarla; firewallCommand es solo el comando (lo que se copia).
 func firewallRule(loc, proto, ip string, port int, exe string, pasv [2]uint16) string {
+	c := firewallCommand(loc, proto, ip, port, exe, pasv)
+	if c == "" || exe == "" {
+		return c
+	}
+	return c + "   " + i18n.Msg(loc, "fileserve.hint.nft_remove", i18n.A("cmd", firewallRemove(proto, ip, port)))
+}
+
+func firewallCommand(loc, proto, ip string, port int, exe string, pasv [2]uint16) string {
 	s, ok := standard[proto]
 	if !ok {
 		return ""
@@ -59,13 +68,17 @@ func firewallRule(loc, proto, ip string, port int, exe string, pasv [2]uint16) s
 	_, addr := redirTarget(loc, ip)
 	lp := strconv.Itoa(port)
 	if proto == "ftp" {
-		lp = "Any"
-		if pasv[0] != 0 || pasv[1] != 0 {
+		switch {
+		case pasv[0] != 0 || pasv[1] != 0:
 			lp = fmt.Sprintf("%d,%d-%d", port, pasv[0], pasv[1])
+		case port+ftpPassive < 65536:
+			lp = fmt.Sprintf("%d,%d-%d", port, port+1, port+ftpPassive)
+		default:
+			lp = "Any" // ftp.go tampoco fija rango ahí: el sistema elige
 		}
 	}
-	return fmt.Sprintf(`New-NetFirewallRule -DisplayName %s -Direction Inbound -Program %s -LocalAddress %s -Protocol %s -LocalPort %s -Action Allow   %s`,
-		psq(fwName(proto, ip, port)), psq(exe), addr, strings.ToUpper(s.trans), lp, i18n.Msg(loc, "fileserve.hint.nft_remove", i18n.A("cmd", firewallRemove(proto, ip, port))))
+	return fmt.Sprintf(`New-NetFirewallRule -DisplayName %s -Direction Inbound -Program %s -LocalAddress %s -Protocol %s -LocalPort %s -Action Allow`,
+		psq(fwName(proto, ip, port)), psq(exe), addr, strings.ToUpper(s.trans), lp)
 }
 
 // firewallRemove quita la regla de firewallRule ("" si el protocolo no tiene puerto estándar).

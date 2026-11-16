@@ -242,7 +242,7 @@ func (s *svc) RedirectHint(ctx context.Context, r *v1.RedirectHintRequest) (*v1.
 		}
 	}
 	loc := i18n.Locale(ctx)
-	h := fileserve.RedirectHintIn(loc, r.Protocol, r.Ip, int(r.Port))
+	h := fileserve.RedirectCommandIn(loc, r.Protocol, r.Ip, int(r.Port)) // sin la nota: se copia tal cual; Remove va aparte
 	if h == "" || r.Port <= 0 || r.Port > 65535 {
 		return nil, bad(ctx, "transfer.svc.no_redirect", "proto", r.Protocol)
 	}
