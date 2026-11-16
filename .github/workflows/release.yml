@@ -36,6 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write # atestación de procedencia (Sigstore, sin llaves propias)
+      attestations: write
     steps:
       # Todas las acciones fijadas por SHA; checkout sin guardar el token en .git/config.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -92,6 +94,11 @@ jobs:
           (cd dist && sha256sum -c --quiet "$RUNNER_TEMP/mpack.sha256") # contra accidentes; contra alteraciones protege la firma
           cd dist && sha256sum * > SHA256SUMS
           { echo "go: $(go version)"; echo "tag: ${GITHUB_REF_NAME}"; echo "commit: ${GITHUB_SHA}"; echo "reproducible: macuahuitld, mctl (CGO_ENABLED=0 -trimpath -ldflags '-s -w -buildid=')"; echo "no reproducible byte a byte: macuahuitl (UI con cgo/WebKitGTK)"; } > BUILD-INFO.txt
+      # Procedencia firmada de todo lo que lista SHA256SUMS (.deb, .rpm, binarios, .mpack, SBOM):
+      # se verifica con «gh attestation verify ARCHIVO --repo oom-netsec/MACUAHUITL».
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: dist/*
