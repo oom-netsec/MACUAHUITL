@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/version"
 )
@@ -79,6 +80,13 @@ func playbookSHA(p *playbook.Playbook) string {
 
 // Finish escribe manifest.json (con el hash de cabeza de la auditoría) y aplica la política de zip.
 func Finish(ctx context.Context, d Deps, w *Writer, s Spec, rounds int, results []DeviceResult) (Manifest, error) {
+	// El manifest va en el idioma canónico: el Detail que sale de un error i18n se guarda en inglés (DetailErr sigue para el cliente).
+	results = slices.Clone(results)
+	for i, r := range results {
+		if r.DetailErr != nil {
+			results[i].Detail = i18n.English(r.DetailErr)
+		}
+	}
 	m := Manifest{
 		Name: s.Name, AppVersion: version.Version, StartedAt: w.started, EndedAt: d.Now(),
 		Devices: results, Rounds: rounds, Masked: !s.DisableMasking, MaskCounts: w.masks(),
