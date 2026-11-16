@@ -138,7 +138,7 @@ try {
   $spec = "$work\job.yaml"
   Set-Content $spec "name: lab`ntargets:`n  - address: $simHost`n    port: $simPort`n    device_id: sw1`ndefault_credential_id: $cred`ncustom_commands: |`n  show version`noutput_dir: '$outs'`nwindow_hours: 1`nschedule:`n  interval_seconds: 1`n  rounds: 2`n"
   $job = (MctlOk $u1 @('job', 'create', '-f', $spec)).Trim()
-  $lt = MctlOk $u1 @('job', 'logintest', $job)
+  $lt = (Mctl $u1 @('job', 'logintest', $job)).Out # sale 1 a propósito: la llave del equipo aún no está aceptada
   $fp = [regex]::Match($lt, 'SHA256:\S+').Value
   Must ($fp -ne '') "logintest da la huella $fp"
   MctlOk $u1 @('job', 'arm', '--accept', $fp, $job) | Out-Null
