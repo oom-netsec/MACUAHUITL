@@ -247,3 +247,46 @@ func TestDiffConMayusculasYBOM(t *testing.T) {
 	}
 	informar(t, malos)
 }
+
+// Punto f: abreviaturas mínimas de IOS («tac k X», «rad k X») y las citas de los avisos del equipo («% Ambiguous command:
+// "…"», «Error:» en minúsculas, comillas simples).
+func TestAbreviaturasMinimasYCitasDeAvisos(t *testing.T) {
+	cmds := []string{"tac k Zq04206", "rad k Zq04206", "tac k 7 Zq04206", "tacacs-s k Zq04206", "rad key 0 Zq04206 Zq04207", "snmp-s comm Zq04206", "cry isa key Zq04206 add 1.1.1.1",
+		"usern u sec 0 Zq04206 Zq04207", "ena sec Zq04206", "ena pass 7 Zq04206"}
+	informar(t, fugasEnVias("ios-xe", cmds, nil))
+	envolturas := []string{"% Ambiguous command:  \"@\"", "% Invalid input detected at '^' marker: \"@\"", "Error: \"@\"", "error: '@'",
+		"warning: \"@\"", "% Ambiguous command: '@' (try again)", "Info: \"@\""}
+	var malos []string
+	for _, c := range cmds {
+		for _, w := range envolturas {
+			l := strings.Replace(w, "@", c, 1)
+			for nom, n := range map[string]string{"Apply": nuevo.apply("ios-xe", l+"\n"), "Stream": nuevo.stream("ios-xe", l+"\n"), "syslog": nuevo.raw(l),
+				"terminal": sesion(nuevo, []ev{{false, "R1(config)#"}, {false, "\r\n" + l + "\r\nR1(config)#"}}, 1)} {
+				if len(marcas(n)) > 0 {
+					malos = append(malos, fmt.Sprintf("[%s] %q\n  salida: %q", nom, l, n))
+				}
+			}
+		}
+	}
+	informar(t, malos)
+}
+
+// Punto g: espacios Unicode en la configuración impresa («api-key X», «ip pim hello-authentication ah-md5 X»…): las
+// reglas de la v0.6.5 solo ven el espacio ASCII; la pasada M₂ las corre sobre la copia normalizada.
+func TestEspaciosUnicodeEnConfiguracionImpresa(t *testing.T) {
+	cmds := []string{"api-key Zq04206", "crypto pki export TP pem terminal 3des Zq04206", "crypto pki export TP pem terminal 3des Zq04206",
+		"set session-key 7 cipher Zq04206", "ip pim hello-authentication ah-md5 Zq04206", "ip pim hello-authentication ah-md5 Zq04206",
+		"api-key Zq04206", "api-key Zq04206", "api-key　Zq04206"}
+	for _, p := range []string{"ios-xe", "asa", ""} {
+		informar(t, fugasEnVias(p, cmds, nil))
+		var malos []string
+		for _, c := range cmds { // configuración impresa: sin pasar por Command
+			for nom, n := range map[string]string{"Apply": nuevo.apply(p, c+"\n"), "Stream": nuevo.stream(p, c+"\n"), "syslog": nuevo.raw(c)} {
+				if len(marcas(n)) > 0 {
+					malos = append(malos, fmt.Sprintf("[%s] (%s) %q\n  salida: %q", nom, p, c, n))
+				}
+			}
+		}
+		informar(t, malos)
+	}
+}

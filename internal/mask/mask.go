@@ -315,9 +315,10 @@ func apply(platform, text string, line func(*Stream, string) (string, bool)) (st
 // cadenas de certificados), para enmascarar una salida que llega por trozos.
 type Stream struct {
 	block, skip string
-	qblock      string // bloque de la última línea de configuración citada sin sangría (quoted)
-	table       string // tabla de NX-OS/IOS en curso: "community", "host" o "isakmp"
-	rows        int    // filas vistas de la tabla en curso
+	qblock      string   // bloque de la última línea de configuración citada sin sangría (quoted)
+	twin        [][2]int // tramos que taparía la cadena de reglas sobre la copia con los espacios Unicode normalizados (LineS1)
+	table       string   // tabla de NX-OS/IOS en curso: "community", "host" o "isakmp"
+	rows        int      // filas vistas de la tabla en curso
 	n           int
 	counts      map[string]int
 	// MaxSkip: líneas máximas que se descartan dentro de una llave o cadena sin cierre (0 = sin tope).
@@ -329,7 +330,7 @@ type Stream struct {
 // Line enmascara una línea (con su fin de línea, si lo trae). ok=false: la línea se omite (cuerpo de una llave).
 // Es line1 (la v0.6.5) más el corte de los comandos citados (union.go); el estado del flujo lo decide line1.
 func (s *Stream) Line(raw string) (string, bool) {
-	out, ok := s.line1(raw)
+	out, ok := s.LineS1(raw)
 	if !ok {
 		return out, ok
 	}
@@ -338,12 +339,26 @@ func (s *Stream) Line(raw string) (string, bool) {
 
 // LineS1 es Line sin el corte: la salida de la v0.6.5 (S1) y el estado del flujo. Quien aplica sobre S1 una red por
 // contenido propia (la terminal) la corre antes de CutLine: S1 → red M₁ → corte M₂.
-func (s *Stream) LineS1(raw string) (string, bool) { return s.line1(raw) }
+func (s *Stream) LineS1(raw string) (string, bool) {
+	s.twin = nil
+	if line, eol := splitEOL(raw); hasHigh(line) {
+		// Las reglas de configuración impresa solo ven el espacio ASCII (NBSP entre «api-key» y el valor): se corre la misma
+		// cadena sobre la copia normalizada, con el estado de antes de esta línea, y lo que tape se corta sobre S1 en CutLine.
+		pre := *s
+		pre.counts = map[string]int{}
+		s.twin = twinSpans(line, func(n string) string {
+			t, _ := pre.line1(n + eol)
+			return strings.TrimSuffix(t, eol)
+		})
+	}
+	return s.line1(raw)
+}
 
 // CutLine es el corte de Line sobre s1, la salida (de LineS1, quizá con la red por contenido ya aplicada) de raw.
 func (s *Stream) CutLine(raw, s1 string) string {
 	line, eol := splitEOL(raw)
 	orig, spans := lineSpans(line, s.Platform)
+	spans = mergeSpans(append(spans, s.twin...))
 	if strings.HasSuffix(s1, eol) {
 		spans = mergeSpans(append(spans, quoteTail(orig, s1[:len(s1)-len(eol)])...))
 	}
@@ -691,7 +706,9 @@ func Cmd(platform, cmd string) string {
 	counts := map[string]int{}
 	lines := strings.Split(cmd, "\n")
 	for i, l := range lines {
-		lines[i], _ = cut(l, maskLogged(l, platform, counts), commandSpans(spLogBlock, l, splitsSemi(platform)))
+		sp := commandSpans(spLogBlock, l, splitsSemi(platform))
+		sp = mergeSpans(append(sp, twinSpans(l, func(n string) string { return maskLogged(n, platform, counts) })...)) // las reglas solo ven el espacio ASCII
+		lines[i], _ = cut(l, maskLogged(l, platform, counts), sp)
 	}
 	return strings.Join(lines, "\n")
 }

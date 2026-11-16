@@ -18,7 +18,7 @@ var spKeys = []string{
 // corta chocaría con «area 0», «domain name»… Se tapa lo que sigue.
 var spDashKeys = []string{
 	"area-password", "domain-password", "radius-common-pw", "ldap-login-password", "wpa-psk", "set-key", "password-encryption",
-	"auth-password", "priv-password", "shared-secret", "server-key", "enable-password", "login-password", "tunnel-password",
+	"auth-password", "priv-password", "shared-secret", "server-key", "enable-password", "login-password", "tunnel-password", "session-key",
 }
 
 // Submodos donde IOS acepta «k» por key (el bloque que da el prompt: ver blockOfPrompt de la terminal).
@@ -150,7 +150,7 @@ func spansSeg(block, cmd string, quoted bool) (spans [][2]int) {
 		// «standby 1 authentication X» / «glbp 1 authentication X»: igual, tras el número de grupo.
 		nhrp := i == first+2 && spPrefix("authentication", low(i), 4) && (spPrefix("nhrp", low(first+1), 2) ||
 			(spPrefix("standby", low(first), 3) || spPrefix("glbp", low(first), 2)) && spDigits.MatchString(tok(first+1)))
-		short := i == first+1 && low(i) == "k" && (spPrefix("tacacs-server", low(first), 5) || spPrefix("radius-server", low(first), 5))
+		short := i == first+1 && low(i) == "k" && (spPrefix("tacacs-server", low(first), 3) || spPrefix("radius-server", low(first), 3))
 		if !(host && i == first+2) && !short && !nhrp && (!spKeyword(tok(i), quoted && !spPrefix("license", low(first), 3), block, i == first) || notKeyword(low, tok, i, first, n, block)) {
 			continue
 		}
@@ -330,4 +330,43 @@ func normSpaces(s string) string {
 		i += w
 	}
 	return b.String()
+}
+
+// normOne es normSpaces con un solo espacio ASCII por cada espacio Unicode (las reglas de la v0.6.5 piden uno): la copia ya
+// no tiene el largo del original, así que devuelve también el desplazamiento en s de cada byte de la copia (con uno más al
+// final, el largo de s).
+func normOne(s string) (string, []int) {
+	var b strings.Builder
+	idx := make([]int, 0, len(s)+1)
+	for i := 0; i < len(s); {
+		r, w := utf8.DecodeRuneInString(s[i:])
+		if r != utf8.RuneError && (unicode.IsSpace(r) || r == 0x200B || r == 0x200C || r == 0x200D || r == 0x2060 || r == 0xFEFF) {
+			b.WriteByte(' ')
+			idx = append(idx, i)
+		} else {
+			b.WriteString(s[i : i+w])
+			for k := 0; k < w; k++ {
+				idx = append(idx, i+k)
+			}
+		}
+		i += w
+	}
+	return b.String(), append(idx, len(s))
+}
+
+// twinSpans: los tramos de orig que la cadena de reglas taparía si vieran los espacios Unicode como un espacio ASCII: corre
+// chain sobre la copia (normOne) y lleva lo que cambió de vuelta a las coordenadas de orig.
+func twinSpans(orig string, chain func(string) string) [][2]int {
+	if !hasHigh(orig) {
+		return nil
+	}
+	n, idx := normOne(orig)
+	if n == orig {
+		return nil
+	}
+	sp := diffSpans(n, chain(n))
+	for i := range sp {
+		sp[i] = [2]int{idx[sp[i][0]], idx[sp[i][1]]}
+	}
+	return sp
 }

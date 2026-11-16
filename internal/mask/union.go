@@ -182,18 +182,22 @@ func loggedSpans(line, platform string) [][2]int {
 
 // quotedSpans: los tramos de line que son texto citado entre comillas (ver Stream.quoted): cada tramo de dentro y, con
 // un total impar de comillas, todo lo que sigue a la primera.
-func quotedSpans(line string) (spans [][2]int) {
-	first := strings.IndexByte(line, '"')
+func quotedSpans(line string) [][2]int { return quotedSpansQ(line, '"') }
+
+// quotedSpansQ es quotedSpans con la comilla q (la simple también cita: «% Ambiguous command: 'tac k X'»).
+func quotedSpansQ(line string, q byte) (spans [][2]int) {
+	first := strings.IndexByte(line, q)
 	if first < 0 || notQuotedCfg.MatchString(line) {
 		return nil
 	}
-	if strings.Count(line, `"`)%2 == 1 {
+	qs := string(q)
+	if strings.Count(line, qs)%2 == 1 {
 		return shiftSpans(spansIn("", line[first+1:], true, false), first+1)
 	}
 	pos := first + 1
 	for k := 0; pos <= len(line); k++ {
 		end := len(line)
-		if j := strings.IndexByte(line[pos:], '"'); j >= 0 {
+		if j := strings.IndexByte(line[pos:], q); j >= 0 {
 			end = pos + j
 		}
 		if seg := line[pos:end]; k%2 == 0 {
@@ -223,6 +227,7 @@ func lineSpans(line, platform string) (string, [][2]int) {
 		sp := loggedSpans(t, platform)
 		if quotedCmdLine.MatchString(t) { // M₂ solo actúa sobre comandos: las demás comillas de un show quedan como en la v0.6.5
 			sp = append(sp, quotedSpans(t)...)
+			sp = append(sp, quotedSpansQ(t, '\'')...)
 		}
 		return sp
 	}
@@ -236,7 +241,7 @@ func lineSpans(line, platform string) (string, [][2]int) {
 // quotedCmdLine: las líneas de salida cuyo texto entre comillas cita un comando: el aviso de show tech del ASA
 // («*** Output from config line N, "…"») y los ERROR:/WARNING:/INFO:. Los syslog 1110xx y las demás vías de log ya
 // los resuelve loggedSpans.
-var quotedCmdLine = regexp.MustCompile(`Output from config line|\b(?:ERROR|WARNING|INFO):`)
+var quotedCmdLine = regexp.MustCompile(`Output from config line|(?i:\b(?:error|warning|info):)|% (?:Ambiguous command|Invalid input detected|Unknown command)`)
 
 // CutCommand es el corte para un comando tecleado (con el bloque del prompt): s1 es lo que la cadena de reglas dejó de
 // orig; devuelve s1 con lo que Command tapa y los valores tapados (para tapar su repetición por contenido).
@@ -249,6 +254,8 @@ func CutCommand(block, orig, s1 string) (string, []string) {
 	if n != orig {
 		spans = append(spans, quotedSpans(n)...) // commandSpans ya probó la copia
 	}
+	// las reglas solo ven el espacio ASCII (api-key NBSP X): lo que tapan sobre la copia normalizada se corta aquí
+	spans = append(spans, twinSpans(orig, func(n string) string { var st Stream; return st.Prompted(n, block) })...)
 	spans = mergeSpans(spans)
 	var vals []string
 	for _, sp := range spans {
@@ -278,6 +285,7 @@ func CutCommand(block, orig, s1 string) (string, []string) {
 // sobre orig.
 func CutText(platform, orig, s1 string) string {
 	o, spans := lineSpans(orig, platform)
+	spans = append(spans, twinSpans(o, func(n string) string { t, _ := ApplyPlain(platform, n); return t })...) // misma cadena sobre la copia sin espacios Unicode
 	out, _ := cut(o, s1, mergeSpans(append(spans, quoteTail(o, s1)...)))
 	return out
 }
@@ -340,3 +348,23 @@ var cmdSyslogOpen = []*regexp.Regexp{
 // diffLineM2: el diff de show archive config differences, como diffLine pero sin exigir minúscula tras el signo
 // («+NO snmp-server…», «+ENABLE SECRET…», que IOS acepta) y con un BOM delante. Solo lo usa M₂: diffLine es de la v0.6.5.
 var diffLineM2 = regexp.MustCompile(`^(\x{FEFF}? ?[+-])((?i:\s+(?:no|default)\s+)?[A-Za-z].*)$`)
+
+func hasHigh(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return true
+		}
+	}
+	return false
+}
+
+// diffSpans: la región de n que la cadena de reglas cambió para dar t (entre el prefijo y el sufijo comunes), en
+// coordenadas de n; nil si no cambió nada.
+func diffSpans(n, t string) [][2]int {
+	if n == t {
+		return nil
+	}
+	p := lcp(n, t)
+	q := min(lcs(n, t), len(t)-p, len(n)-p)
+	return [][2]int{{p, len(n) - q}}
+}
