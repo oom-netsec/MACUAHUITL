@@ -438,7 +438,7 @@ func twinSpans(orig string, chain func(string) string) [][2]int {
 
 func firstField(s string) string {
 	if f := strings.Fields(s); len(f) > 0 {
-		return f[0]
+		return strings.Trim(f[0], `"'`)
 	}
 	return ""
 }

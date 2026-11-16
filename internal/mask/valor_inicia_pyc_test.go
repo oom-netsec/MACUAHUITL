@@ -44,9 +44,12 @@ func TestValorQueEmpiezaConPuntoYComaNoFuga(t *testing.T) {
 // Revisión: un segmento previo que termina en palabra de secreto adelanta el tramo; la frase del secreto real (que va en
 // un segmento posterior) se sigue recordando tras el prompt como antes.
 func TestFraseTrasSegmentoConPalabraSinValorSeRecuerda(t *testing.T) {
-	for _, cmd := range []string{"enable secret ; username b password abcd efgh", "snmp-server community ; tacacs-server key abcd efgh"} {
-		out := grabar(nuevo, func(r sesionRec) { sesionPosterior(r, cmd, "abcd efgh", nil, false) })
-		if strings.Contains(marcado.ReplaceAllString(out, "\x00"), "linea abcd efgh fin") {
+	for cmd, v := range map[string]string{"enable secret ; username b password abcd efgh": "abcd efgh",
+		"snmp-server community ; tacacs-server key abcd efgh":                        "abcd efgh",
+		"enable secret ; snmp-server host 10.1.1.1 Zq12345 config syslog":            "Zq12345",
+		"username a password ; snmp-server host 10.1.1.1 version 2c Zq12345 Zq67890": "Zq12345"} {
+		out := grabar(nuevo, func(r sesionRec) { sesionPosterior(r, cmd, v, nil, false) })
+		if strings.Contains(marcado.ReplaceAllString(out, "\x00"), "linea "+v+" fin") {
 			t.Errorf("%q: la frase se ve tras el prompt\n%s", cmd, out)
 		}
 	}

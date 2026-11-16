@@ -294,7 +294,7 @@ func CutCommandV(block, orig, s1 string) (string, []SecretValue) {
 				k++
 				for _, t := range []string{orig[i+len(spSep) : sp[1]], n[i+len(spSep) : sp[1]]} {
 					for _, s2 := range commandSpans(block, t) {
-						sv = append(sv, SecretValuesV(t[s2[0]:s2[1]], hostCmd.MatchString(t[:s2[0]]))...)
+						sv = append(sv, SecretValuesV(t[s2[0]:s2[1]], hostCmd.MatchString(orig[:i+len(spSep)+s2[0]]))...) // host: con el prefijo de la línea, como sin el adelanto
 					}
 				}
 			}
