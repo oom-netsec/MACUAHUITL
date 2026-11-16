@@ -1,6 +1,10 @@
 package ipc
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+)
 
 func TestSameSID(t *testing.T) {
 	const me = "S-1-5-21-111-222-333-1001"
@@ -20,6 +24,15 @@ func TestSameSID(t *testing.T) {
 	} {
 		if got := sameSID(c.peer, c.own); got != c.want {
 			t.Errorf("%s: sameSID(%q, %q) = %v, quería %v", c.name, c.peer, c.own, got, c.want)
+		}
+	}
+}
+
+// El mensaje de «el canal lo tiene otro usuario» (ipc_windows.go) existe en los dos idiomas.
+func TestMensajePipeDeOtroUsuario(t *testing.T) {
+	for _, loc := range []string{"es", "en"} {
+		if m := i18n.Msg(loc, "ipc.err.pipe_other_user", nil); m == "" || m == "ipc.err.pipe_other_user" {
+			t.Errorf("%s: sin texto (%q)", loc, m)
 		}
 	}
 }

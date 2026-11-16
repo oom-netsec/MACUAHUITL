@@ -5,6 +5,7 @@ go 1.27
 toolchain go1.27.4
 
 require (
+	github.com/Microsoft/go-winio v0.6.2
 	github.com/awnumar/memguard v0.23.0
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/gopacket/gopacket v1.7.7
@@ -27,7 +28,6 @@ require (
 )
 
 require (
-	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/awnumar/memcall v0.4.0 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect

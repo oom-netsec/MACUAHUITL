@@ -115,7 +115,7 @@ Hoy el ADR 0003 exige tres cosas: que solo el usuario pueda conectarse, que el n
 ### (g) Arranque del núcleo sin servicio ni admin
 
 - **Arranque**: una entrada en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` lanza el núcleo al iniciar sesión. Además, la app y mctl lo lanzan bajo demanda si no encuentran el pipe.
-  - El núcleo lanzado bajo demanda corre **separado** de quien lo lanzó (`DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW`, fuera de cualquier Job Object de la app). Si no, moriría al cerrar la UI y cortaría un trabajo de Patrol a medias.
+  - El núcleo lanzado bajo demanda corre **separado** de quien lo lanzó (`sys.StartDetached`: `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB`, fuera de cualquier Job Object de la app; si el job niega el breakaway con `ERROR_ACCESS_DENIED` se reintenta una vez sin él. Sin `CREATE_NO_WINDOW`: con `-H windowsgui` el núcleo no abre consola y `DETACHED_PROCESS` basta. Solo rutas absolutas y archivos regulares, sin UNC ni de dispositivo). Si no, moriría al cerrar la UI y cortaría un trabajo de Patrol a medias.
   - El instalador da de alta la entrada de `Run` y la desinstalación la quita.
   - La app y la entrada de `Run` usan la ruta absoluta de `macuahuitld.exe`, en la misma carpeta que `macuahuitl.exe`; nunca lo buscan por el `PATH` (secuestro de `PATH`, como en f).
 - **Por qué no una tarea programada.** Release y Front propusieron una tarea «al iniciar sesión». Crear una tarea propia no pide admin, pero el disparador *ONLOGON* sí puede pedir elevación, según la versión y la política del equipo. La clave `Run` de HKCU nunca la pide y es el equivalente de `systemctl --user enable`.

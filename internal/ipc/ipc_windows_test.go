@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 	"google.golang.org/grpc/codes"
@@ -78,9 +80,16 @@ func TestPipePeerInfoDaPID(t *testing.T) {
 	v1.RegisterVaultServiceServer(s, sv)
 	go s.Serve(l)
 	t.Cleanup(s.Stop)
-	call(t, l.Addr().String())
-	if pi := <-sv.got; pi.PID != os.Getpid() || pi.UID != -1 {
-		t.Fatalf("PeerInfo = %+v, quería pid %d uid -1", pi, os.Getpid())
+	if err := call(t, l.Addr().String()); status.Code(err) != codes.OK {
+		t.Fatalf("call = %v", err)
+	}
+	select {
+	case pi := <-sv.got:
+		if pi.PID != os.Getpid() || pi.UID != -1 {
+			t.Fatalf("PeerInfo = %+v, quería pid %d uid -1", pi, os.Getpid())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("el servicio no vio la llamada")
 	}
 }
 
@@ -97,7 +106,40 @@ func TestPipeNombreLlevaElSID(t *testing.T) {
 }
 
 func TestPipeSDDLSoloElUsuario(t *testing.T) {
-	if got := pipeSDDL("S-1-5-21-1-2-3-1001"); got != "D:P(A;;GA;;;S-1-5-21-1-2-3-1001)" {
+	if got := pipeSDDL("S-1-5-21-1-2-3-1001"); got != "O:S-1-5-21-1-2-3-1001D:P(A;;GA;;;S-1-5-21-1-2-3-1001)" {
 		t.Fatalf("pipeSDDL = %q", got)
+	}
+}
+
+// El pipe que crea Listen tiene como dueño al usuario y una DACL protegida con una sola ACE, la del usuario; dialPipe
+// lo comprueba (B1) y la prueba lo lee con el mismo handle del cliente.
+func TestPipeDuenoYDACL(t *testing.T) {
+	name := sockPath(t)
+	l, err := Listen(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serve(t, l)
+	own, _ := ownSID()
+	c, _, err := dialPipe(context.Background(), name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if o, err := pipeOwner(c); err != nil || o != own {
+		t.Fatalf("dueño = %q, %v; quería %q", o, err, own)
+	}
+	sd, err := windows.GetSecurityInfo(windows.Handle(c.(interface{ Fd() uintptr }).Fd()), windows.SE_KERNEL_OBJECT, windows.DACL_SECURITY_INFORMATION)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctrl, _, _ := sd.Control()
+	acl, _, err := sd.DACL()
+	if err != nil || acl == nil || acl.AceCount != 1 || ctrl&windows.SE_DACL_PROTECTED == 0 {
+		t.Fatalf("DACL = %+v, control %x, %v; quería una ACE y protegida", acl, ctrl, err)
+	}
+	var a *windows.ACCESS_ALLOWED_ACE
+	if err := windows.GetAce(acl, 0, &a); err != nil || (*windows.SID)(unsafe.Pointer(&a.SidStart)).String() != own {
+		t.Fatalf("la única ACE no es del usuario: %v", err)
 	}
 }
