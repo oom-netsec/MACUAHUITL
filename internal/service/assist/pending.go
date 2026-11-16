@@ -265,8 +265,13 @@ func (s *assistSvc) DiscardPendingRollback(ctx context.Context, r *v1.DiscardPen
 	if s.live(r.RunId) {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_en_curso", i18n.A("id", r.RunId))
 	}
-	if s.reversing(r.RunId) {
+	// La misma marca que usa Start: con las dos operaciones excluyéndose, no pueden tener éxito las dos sobre la misma entrada.
+	if !s.beginStart(r.RunId) {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "assist.svc.reversa_aplicandose", i18n.A("id", r.RunId))
+	}
+	defer s.endStart(r.RunId)
+	if s.beforeDeletePending != nil {
+		s.beforeDeletePending()
 	}
 	s.mu.Lock()
 	s.discarded[r.RunId] = true // antes de borrar: una ejecución que justo termina no la vuelve a guardar

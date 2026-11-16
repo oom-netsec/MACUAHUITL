@@ -690,3 +690,17 @@ func TestDiscardAndStartPendingRollbackNeverBothSucceed(t *testing.T) {
 		}
 	}
 }
+
+// El hueco simétrico: Descartar ya pasó sus comprobaciones y Start entra antes del borrado. Los dos no pueden tener éxito: Start se rechaza.
+func TestStartPendingRollbackDuringDiscardIsRefused(t *testing.T) {
+	r := newRig(t, simulator.Config{})
+	run, _ := r.abortedChanged()
+	var startErr error
+	r.svc.beforeDeletePending = func() { _, startErr = r.startPending(run, false) }
+	if _, err := r.svc.DiscardPendingRollback(context.Background(), &v1.DiscardPendingRollbackRequest{RunId: run}); err != nil {
+		t.Fatal(err)
+	}
+	if code(startErr) != codes.FailedPrecondition {
+		t.Fatalf("Start en la ventana de Descartar debía rechazarse: %v", startErr)
+	}
+}
