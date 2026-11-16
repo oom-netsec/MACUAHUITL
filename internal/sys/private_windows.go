@@ -326,3 +326,13 @@ func PrivateDir(path string) error {
 		}
 	}
 }
+
+// startupOwners son el SID del dueño de la carpeta y el del usuario del proceso, para startupDirOK.
+func startupOwners(path string, _ fs.FileInfo) (owner, user string, err error) {
+	u, err := currentSID()
+	if err != nil {
+		return "", "", err
+	}
+	owner, _, _, err = readACL(path)
+	return owner, u.String(), err
+}

@@ -1,8 +1,11 @@
 package sys
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 // MkdirPrivate crea la carpeta y sus padres con 0700 (ADR 0012, c); la ruta debe ser absoluta. En Windows la deja con
@@ -84,4 +87,13 @@ func PrivateDir(path string) error {
 			return nil
 		}
 	}
+}
+
+// startupOwners son el dueño de la carpeta y el usuario del proceso, como texto, para startupDirOK.
+func startupOwners(_ string, fi fs.FileInfo) (owner, user string, err error) {
+	uid, ok := Owner(fi)
+	if !ok {
+		return "", "", errors.New("sin dueño")
+	}
+	return strconv.FormatUint(uint64(uid), 10), strconv.Itoa(os.Geteuid()), nil
 }
