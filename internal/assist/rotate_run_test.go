@@ -410,3 +410,34 @@ func TestEmitScrubsEnglishTextToo(t *testing.T) {
 		t.Fatalf("el secreto salió: %q / %q", e.Text, e.TextEN)
 	}
 }
+
+// Con write memory [OK] y la bóveda sin actualizar, la salida (a) tiene que decir que la reversa NO guarda: sin write memory después, al reiniciar
+// el equipo vuelve a cargar la credencial nueva que la bóveda no tiene. La reversa pendiente lleva la nota de write memory.
+func TestRotationVaultFailureMessageSaysRollbackMustBeSaved(t *testing.T) {
+	r, _, _ := rotationRunWith(t, nil, func(v *verifyExec) { v.savedErr = errors.New("la bóveda está bloqueada") })
+	r.Start(context.Background())
+	pending(t, r, "apply-1")
+	r.Confirm("apply-1")
+	pending(t, r, "save-1")
+	r.Confirm("save-1")
+	wait(t, r, Failed)
+	r.mu.Lock()
+	es, en := r.reason, r.reasonEN
+	r.mu.Unlock()
+	if !strings.Contains(es, "aplica la reversa pendiente y después guarda la configuración (write memory) en el equipo") || !strings.Contains(es, "al reiniciar vuelve la credencial nueva") {
+		t.Errorf("es: %s", es)
+	}
+	if !strings.Contains(en, "apply the pending rollback and then save the configuration (write memory) on the device") || !strings.Contains(en, "after a reload the new credential comes back") {
+		t.Errorf("en: %s", en)
+	}
+	l := r.Leftover()
+	if l == nil || !l.WriteMemory {
+		t.Fatalf("la reversa pendiente debe recordar el write memory: %+v", l)
+	}
+	plan, _, err := RollbackPlan(*l)
+	if err != nil || len(plan.Devices) != 1 || len(plan.Devices[0].Notes) != 1 || !strings.Contains(plan.Devices[0].Notes[0], "la reversa no hace write memory") {
+		t.Errorf("nota de write memory: %v %+v", err, plan.Devices)
+	}
+	r.Abort()
+	<-r.Done()
+}
