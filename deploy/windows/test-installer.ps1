@@ -22,6 +22,17 @@ Must (-not (Test-Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall
 Must (Test-Path $startLnk) 'acceso directo en el menú Inicio'
 Must (-not (Test-Path $deskLnk)) 'sin acceso directo en el escritorio por omisión'
 
+# Actualizar encima: sin nada abierto termina bien; con la app abierta se detiene antes de tocar nada (ni el núcleo).
+Must ((RunWait $Installer '/S') -eq 0) 'actualizar encima de una instalación termina sin error'
+Set-Content (Join-Path $inst 'macuahuitld.exe') 'núcleo de la versión anterior' # marca: el instalador trae otro contenido
+$core = Get-Content -Raw (Join-Path $inst 'macuahuitld.exe')
+Copy-Item -Force "$env:SystemRoot\System32\ping.exe" (Join-Path $inst 'macuahuitl.exe')
+$app = Start-Process -FilePath (Join-Path $inst 'macuahuitl.exe') -ArgumentList '-n', '60', '127.0.0.1' -PassThru -WindowStyle Hidden
+try {
+  Must ((RunWait $Installer '/S') -eq 2) 'con la app abierta, actualizar se detiene'
+  Must ((Get-Content -Raw (Join-Path $inst 'macuahuitld.exe')) -eq $core) 'y no reemplazó el núcleo'
+} finally { Stop-Process -Id $app.Id -Force; $app.WaitForExit() }
+
 # Datos de una instalación en uso: /S nunca los borra.
 New-Item -ItemType Directory -Force (Join-Path $data 'data') | Out-Null
 Set-Content (Join-Path $data 'data\vault.db') 'bóveda de prueba'

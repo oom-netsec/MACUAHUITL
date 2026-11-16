@@ -6,9 +6,11 @@
 # SIGN_CMD (opcional) es la orden de firma con %1 en lugar del archivo: sin ella el instalador sale sin firmar, que es lo
 # decidido para la beta (ADR 0012, «Firma»). Así firmar después no obliga a rehacer nada.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
 : "${VERSION:?falta VERSION (X.Y.Z)}" "${BIN:?falta BIN}"
 out=${1:?uso: VERSION=… BIN=… $0 instalador.exe}
+# BIN y la salida se resuelven desde donde se llamó, antes de ir a la raíz del repo.
+BIN=$(realpath "$BIN") out=$(realpath -m "$out")
+cd "$(dirname "$0")/../.."
 v=${VERSION#v}
 [[ $v =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "VERSION debe ser X.Y.Z: $VERSION" >&2; exit 1; }
 for f in macuahuitl.exe macuahuitld.exe mctl.exe MicrosoftEdgeWebview2Setup.exe; do
