@@ -37,7 +37,7 @@ No ejecutes un instalador que falle cualquiera de las dos comprobaciones.
 La beta no lleva firma de código. La verificación se apoya en `SHA256SUMS`, la atestación de arriba y el código abierto. Eso trae consecuencias:
 
 - **SmartScreen** muestra «Windows protegió su PC». Elige **Más información** y luego **Ejecutar de todas formas**. Vuelve a aparecer con cada versión nueva.
-- **Smart App Control** (Windows 11; en español, «Control inteligente de aplicaciones, si está activo, bloquea por completo un ejecutable sin firma, sin opción de ejecutarlo. En muchas versiones de Windows 11, volver a activarlo requiere reinstalar Windows. Esa decisión es tuya; el proyecto no la recomienda.
+- **Smart App Control** (Windows 11; en español, «Control inteligente de aplicaciones»), si está activo, bloquea por completo un ejecutable sin firma, sin opción de ejecutarlo. En muchas versiones de Windows 11, volver a activarlo requiere reinstalar Windows. Esa decisión es tuya; el proyecto no la recomienda.
 - **Microsoft Defender** puede marcar un binario Go sin firma como falso positivo. Si pasa, repórtalo a Microsoft como falso positivo.
 
 ## Qué instala y dónde
