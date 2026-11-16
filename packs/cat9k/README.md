@@ -22,7 +22,7 @@ documentación pública de Cisco y pasan las mismas reglas de solo lectura que l
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
 1. Baja `oom-cat9k-<versión>.mpack` de los releases de GitHub y verifica su suma en `SHA256SUMS`.
-2. Con la línea de comandos: `mctl pack install oom-cat9k-<versión>.mpack`. En la aplicación: Ajustes → Paquetes → Instalar.
+2. Con la línea de comandos: `mctl pack install oom-cat9k-<versión>.mpack`. En la aplicación: Ajustes → Paquetes → Instalar paquete…
 3. Revisa con `mctl pack list` o en Ajustes → Paquetes.
 
 ## English
@@ -47,5 +47,5 @@ public documentation and pass the same read-only rules as IOS: no `debug`, `clea
 How to load it (the application never downloads packages):
 
 1. Download `oom-cat9k-<version>.mpack` from the GitHub releases and check its sum in `SHA256SUMS`.
-2. From the command line: `mctl pack install oom-cat9k-<version>.mpack`. In the app: Settings → Packages → Install.
-3. Check with `mctl pack list` or in Settings → Packages.
+2. From the command line: `mctl pack install oom-cat9k-<version>.mpack`. In the app: Settings → Packs → Install pack…
+3. Check with `mctl pack list` or in Settings → Packs.

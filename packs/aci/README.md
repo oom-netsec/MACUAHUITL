@@ -18,7 +18,7 @@ los de vPC o L3Out no aplican. La app solo permite comandos de lectura: nada de 
 - `vnid`: número de VNID entre 1 y 16777215 (p. ej. `2850817`); desde la 1.0.1 la app lo pide con su propio tipo «vnid».
 
 Cómo cargarlo (la aplicación nunca descarga paquetes): baja `oom-aci-<versión>.mpack` de los releases de GitHub, verifica
-su suma en `SHA256SUMS` e instálalo con `mctl pack install oom-aci-<versión>.mpack` o en Ajustes → Paquetes → Instalar.
+su suma en `SHA256SUMS` e instálalo con `mctl pack install oom-aci-<versión>.mpack` o en Ajustes → Paquetes → Instalar paquete…
 
 ## English
 
@@ -38,4 +38,4 @@ L3Out ones do not apply. The app only allows read commands: no `vsh`, `moquery`,
 - `vnid`: VNID number between 1 and 16777215 (e.g. `2850817`); since 1.0.1 the app asks for it with its own "vnid" type.
 
 How to load it (the application never downloads packages): download `oom-aci-<version>.mpack` from the GitHub releases,
-check its sum in `SHA256SUMS` and install it with `mctl pack install oom-aci-<version>.mpack` or Settings → Packages → Install.
+check its sum in `SHA256SUMS` and install it with `mctl pack install oom-aci-<version>.mpack` or Settings → Packs → Install pack…

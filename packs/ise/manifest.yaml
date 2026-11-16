@@ -1,5 +1,5 @@
 id: oom/ise
-version: 1.0.0
+version: 1.0.1
 min_core: 0.4.4
 name: ISE · Cisco Identity Services Engine, diagnóstico TAC
 name_en: ISE · Cisco Identity Services Engine, TAC diagnostics

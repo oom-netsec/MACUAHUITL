@@ -22,7 +22,7 @@ hazlo a mano una vez.
 Cómo cargarlo (la aplicación nunca descarga paquetes):
 
 1. Baja `oom-ise-<versión>.mpack` de los releases de GitHub y verifica su suma en `SHA256SUMS`.
-2. Con la línea de comandos: `mctl pack install oom-ise-<versión>.mpack`. En la aplicación: Ajustes → Paquetes → Instalar.
+2. Con la línea de comandos: `mctl pack install oom-ise-<versión>.mpack`. En la aplicación: Ajustes → Paquetes → Instalar paquete…
 3. Revisa con `mctl pack list` o en Ajustes → Paquetes.
 
 ## English
@@ -47,5 +47,5 @@ it by hand once.
 How to load it (the application never downloads packages):
 
 1. Download `oom-ise-<version>.mpack` from the GitHub releases and check its sum in `SHA256SUMS`.
-2. From the command line: `mctl pack install oom-ise-<version>.mpack`. In the app: Settings → Packages → Install.
-3. Check with `mctl pack list` or in Settings → Packages.
+2. From the command line: `mctl pack install oom-ise-<version>.mpack`. In the app: Settings → Packs → Install pack…
+3. Check with `mctl pack list` or in Settings → Packs.
