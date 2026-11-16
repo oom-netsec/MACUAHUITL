@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -138,9 +139,17 @@ func Parse(header string) string {
 // maxHeader acota el Accept-Language que se analiza.
 const maxHeader = 256
 
-// Msg es el texto del código en el idioma dado; un código que no existe se devuelve tal cual.
+// goos es el sistema donde corre el proceso; solo las pruebas lo cambian.
+var goos = runtime.GOOS
+
+// Msg es el texto del código en el idioma dado; un código que no existe se devuelve tal cual. En Windows,
+// «<código>.windows» reemplaza al código si existe: textos que nombran algo de Linux (systemd, setcap, nftables,
+// /dev/ttyUSB0…) tienen ahí su versión, sin que el llamador elija (ADR 0012, como «.windows» en la UI).
 func Msg(loc, code string, args Args) string {
 	e, ok := catalog[code]
+	if w, wok := catalog[code+".windows"]; wok && goos == "windows" {
+		e, ok = w, true
+	}
 	if !ok {
 		return code
 	}
