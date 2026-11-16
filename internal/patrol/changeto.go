@@ -4,37 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/parse/asa"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
 // changetoTimeout es la inactividad que se tolera en un changeto o en show context.
 const changetoTimeout = 30 * time.Second
-
-// ctxLineRe: línea de show context con un contexto; el nombre va tras un espacio o el «*» del contexto admin y
-// la siguiente columna (Class) ya trae texto. Las líneas de continuación de Interfaces empiezan con muchos espacios.
-var ctxLineRe = regexp.MustCompile(`^[ *]([A-Za-z0-9][A-Za-z0-9_-]{0,31}) +\S`)
-
-// parseShowContext saca los nombres de contexto de la salida de show context (espacio del sistema).
-// shortcut: parser mínimo hasta que internal/parse/asa (42c) traiga el de show context; entonces se integra y esto se borra.
-func parseShowContext(text string) []string {
-	var out []string
-	for _, l := range strings.Split(text, "\n") {
-		if strings.HasPrefix(l, "Total active") {
-			break
-		}
-		if m := ctxLineRe.FindStringSubmatch(l); m != nil && m[1] != "Context" {
-			out = append(out, m[1])
-		}
-	}
-	return out
-}
 
 // changeto es la única ruta que manda «changeto» a un equipo (ADR 0011): audita antes de mandarlo (sin rastro no
 // se manda) y el driver verifica el prompt de llegada. to es "system" o un nombre de contexto ya validado.
@@ -78,11 +60,8 @@ func enterContext(ctx context.Context, d Deps, jobID, hp string, round int, c *c
 		if out.Invalid {
 			return i18n.New("patrol.err.context_list", i18n.A("error", strings.TrimSpace(out.Text)))
 		}
-		found := false
-		for _, n := range parseShowContext(out.Text) {
-			found = found || n == target
-		}
-		if !found {
+		list, _, _ := asa.ParseContexts(out.Text) // sin el encabezado de show context la lista sale vacía y no se manda nada
+		if !slices.ContainsFunc(list, func(c asa.Context) bool { return c.Name == target }) {
 			return i18n.New("patrol.err.context_not_listed", i18n.A("context", target))
 		}
 	}

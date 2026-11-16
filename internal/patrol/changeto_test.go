@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform/iosxe"
+	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 	"github.com/oom-netsec/MACUAHUITL/internal/store"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
 )
@@ -170,16 +170,6 @@ func TestChangetoSoloASA(t *testing.T) {
 	}
 }
 
-func TestParseShowContext(t *testing.T) {
-	b, err := os.ReadFile("../parse/asa/testdata/sys_show-context.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := parseShowContext(string(b)); !slices.Equal(got, []string{"admin", "ctx1", "ctx2"}) {
-		t.Fatalf("got %q", got)
-	}
-}
-
 // hookDrv deja que una prueba intercepte comandos de un driver real que sigue siendo ContextSwitcher.
 type hookDrv struct {
 	platform.Driver
@@ -323,5 +313,35 @@ func TestChangetoNoVuelveConElTrabajoCancelado(t *testing.T) {
 	}
 	if l := rec.Lines(); !slices.Equal(l, []string{"!changeto system", "!changeto context ctx1"}) {
 		t.Fatalf("changeto = %q", l)
+	}
+}
+
+// Al reconectar, el orden es el de la ronda normal: primero el changeto (con su show context) y después los Pre, para
+// que un Pre que dependa del contexto corra en el contexto del trabajo y no en el de entrada.
+func TestReconectarCambiaDeContextoAntesDeLosPre(t *testing.T) {
+	e, _ := asaEnv(t, "")
+	e.d.Playbooks = append(e.d.Playbooks, playbook.Playbook{ID: "asa/pre-prueba", Platform: "asa", Name: "pre", Pre: []string{"show clock"},
+		Commands: []playbook.Command{{Text: "show version", Timeout: time.Minute}, {Text: "show running-config", Timeout: time.Minute}, {Text: "show interface", Timeout: time.Minute}}})
+	e.spec.PlaybookIDs, e.spec.CustomCommands = []string{"asa/pre-prueba"}, ""
+	var ran []string
+	cut := false
+	e.d.NewDriver = func() platform.Driver {
+		return hookDrv{Driver: iosxe.New(), hook: func(cmd string) (platform.Output, error, bool) {
+			ran = append(ran, cmd)
+			if cmd == "show running-config" && !cut {
+				cut = true
+				return platform.Output{Command: cmd}, platform.ErrClosed, true
+			}
+			return platform.Output{}, nil, false
+		}}
+	}
+	res, _ := runCtx(t, e, "ctx1")
+	if res.Reconnects != 1 {
+		t.Fatalf("res = %+v ran=%q", res, ran)
+	}
+	after := ran[slices.Index(ran, "show running-config")+1:]
+	ctxAt, preAt := slices.Index(after, "show context"), slices.Index(after, "show clock")
+	if ctxAt < 0 || preAt < 0 || ctxAt > preAt {
+		t.Fatalf("en la sesión nueva el changeto debe ir antes del Pre: %q", after)
 	}
 }
