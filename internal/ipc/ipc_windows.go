@@ -158,8 +158,11 @@ func CoreRunning() (bool, error) {
 	return coreRunning(p)
 }
 
+// coreRunningWait: CoreRunning vuelve antes del tic de 1 s del puente; con todas las instancias ocupadas el pipe existe.
+const coreRunningWait = 500 * time.Millisecond
+
 func coreRunning(name string) (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), coreRunningWait) // el puente lo consulta cada segundo
 	defer cancel()
 	c, _, err := dialPipe(ctx, name)
 	switch {
