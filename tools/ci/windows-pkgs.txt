@@ -49,4 +49,4 @@
 ./tools/archcheck/cmd/archcheck
 ./tools/noegress
 ./tools/noegress/cmd/noegress
-./tools/packaging/mpack-keygen
+# ./tools/packaging/mpack-keygen  (43a3: su prueba exige modo 0600 en la llave privada; en Windows va por ACL)
