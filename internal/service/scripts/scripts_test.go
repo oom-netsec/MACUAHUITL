@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -634,10 +635,11 @@ func TestImportRechazaArchivosMalos(t *testing.T) {
 		t.Error("una carpeta debió fallar")
 	}
 	fifo := filepath.Join(dir, "fifo")
-	if err := sys.Mkfifo(fifo); err != nil {
+	if err := sys.Mkfifo(fifo); errors.Is(err, errors.ErrUnsupported) { // en Windows no hay FIFO
+		t.Log("sin FIFO en este sistema")
+	} else if err != nil {
 		t.Fatal(err)
-	}
-	if err := preview(fifo); err == nil {
+	} else if err := preview(fifo); err == nil {
 		t.Error("una FIFO debió fallar")
 	}
 	if err := preview("relativa.json"); status.Code(err) != codes.InvalidArgument {

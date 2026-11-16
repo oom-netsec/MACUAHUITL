@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -38,8 +39,21 @@ func TestErroresFatalesPorIdioma(t *testing.T) {
 	}
 	for lang, want := range map[string]string{"en": "XDG_RUNTIME_DIR is not set", "es": "XDG_RUNTIME_DIR no está definido"} {
 		consoleLang = lang
-		if err := run(func() []i18n.Text { return nil }); err == nil || err.Error() != want {
+		if err := run(func() ([]i18n.Text, error) { return nil, nil }); err == nil || err.Error() != want {
 			t.Errorf("%s: %v", lang, err)
 		}
+	}
+}
+
+// Si el endurecimiento falla (p. ej. no se pudo asegurar el bloqueo de memoria), el núcleo no arranca.
+func TestHardenFallidoNoArranca(t *testing.T) {
+	defer func(l string) { consoleLang = l }(consoleLang)
+	consoleLang = "en"
+	if os.Geteuid() == 0 {
+		t.Skip("root")
+	}
+	err := run(func() ([]i18n.Text, error) { return nil, i18n.New("harden.err.lockquota", i18n.A("cause", "boom")) })
+	if err == nil || !strings.Contains(err.Error(), "boom") || !strings.Contains(err.Error(), "does not start") {
+		t.Fatalf("err = %v", err)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/core"
@@ -42,17 +43,27 @@ func main() {
 var consoleLang = i18n.En
 
 // run recibe el endurecimiento como dependencia: en producción sys.Harden; las pruebas pasan una falsa (mlockall no va en go test).
-func run(harden func() []i18n.Text) error {
-	if os.Geteuid() == 0 {
-		return errors.New(i18n.Msg(consoleLang, "harden.err.root", nil))
+func run(harden func() ([]i18n.Text, error)) error {
+	if sys.Privileged() {
+		key := "harden.err.root"
+		if runtime.GOOS == "windows" {
+			key = "harden.err.elevated"
+		}
+		return errors.New(i18n.Msg(consoleLang, key, nil))
 	}
-	hw := harden() // antes de tocar cualquier secreto
+	hw, err := harden() // antes de tocar cualquier secreto
+	if err != nil {
+		return errors.New(i18n.In(consoleLang, err))
+	}
 	warns := make([]string, len(hw))
 	for i, w := range hw {
 		warns[i] = w.In(i18n.En) // la auditoría va siempre en inglés
 	}
 	p := core.ResolvePaths(os.Getenv)
-	if p.Runtime == "" {
+	if p.Config == "" || p.Data == "" || p.State == "" {
+		return errors.New(i18n.Msg(consoleLang, "harden.err.localappdata", nil)) // solo Windows: no se cae a %APPDATA%
+	}
+	if runtime.GOOS != "windows" && p.Runtime == "" { // en Windows no hay carpeta runtime: el named pipe llega en 43a4
 		return errors.New(i18n.Msg(consoleLang, "harden.err.runtime_dir", nil))
 	}
 	l, err := ipc.Listen(filepath.Join(p.Runtime, "core.sock"))

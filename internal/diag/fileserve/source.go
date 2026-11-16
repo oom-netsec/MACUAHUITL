@@ -99,7 +99,12 @@ func (s *source) open(name string) (*os.File, os.FileInfo, error) {
 		return nil, nil, err
 	}
 	fi, err := f.Stat()
-	if err != nil || (li != nil && !os.SameFile(li, fi)) || sys.HardLinked(fi) {
+	if err != nil || (li != nil && !os.SameFile(li, fi)) {
+		f.Close()
+		return nil, nil, errNotPublished
+	}
+	// Decide el handle ya abierto (en Windows un FileInfo no trae la cuenta de enlaces); si no se puede saber, se rechaza.
+	if hl, err := sys.HardLinkedFile(f); err != nil || hl {
 		f.Close()
 		return nil, nil, errNotPublished
 	}

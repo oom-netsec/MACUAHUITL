@@ -106,7 +106,7 @@ func TestSourceFolder(t *testing.T) {
 	secret := filepath.Join(t.TempDir(), "secreto")
 	os.WriteFile(secret, []byte("no"), 0o600)
 	os.Symlink(secret, filepath.Join(dir, "enlace"))
-	if err := sys.Mkfifo(filepath.Join(dir, "tuberia")); err != nil {
+	if err := sys.Mkfifo(filepath.Join(dir, "tuberia")); err != nil && !errors.Is(err, errors.ErrUnsupported) { // en Windows no hay FIFO
 		t.Fatal(err)
 	}
 	s := testSource(t, &source{dir: dir})
@@ -367,6 +367,32 @@ func TestHardLinkedFilesNotPublished(t *testing.T) {
 	}
 	if strings.Join(names, ",") != "normal" {
 		t.Errorf("list = %v", names)
+	}
+}
+
+// Un archivo que gana un segundo nombre después de publicarse se rechaza al abrirlo: decide el handle, no el listado.
+// El segundo nombre se crea después de prepare (que ya miró el FileInfo). En Linux el FileInfo del handle también trae
+// Nlink, así que aquí no se distingue; en Windows HardLinked(fi) siempre es false y solo pasa si se usa HardLinkedFile.
+func TestHardLinkedRejectedOnHandle(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "unico")
+	os.WriteFile(f, []byte("ok"), 0o600)
+	src, rcv, err := prepare(Config{Addr: "127.0.0.1:6969", Proto: "tftp", Files: []string{f}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeAll(src, rcv)
+	if g, _, err := src.open("unico"); err != nil {
+		t.Fatal(err)
+	} else {
+		g.Close()
+	}
+	if err := os.Link(f, filepath.Join(t.TempDir(), "otro-nombre")); err != nil {
+		t.Skip("sin enlaces duros:", err)
+	}
+	if g, _, err := src.open("unico"); err == nil {
+		g.Close()
+		t.Fatal("se sirvió un archivo con dos nombres")
 	}
 }
 

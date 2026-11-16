@@ -9,7 +9,14 @@ import (
 	"log/slog"
 
 	"github.com/awnumar/memguard"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
+
+// memguard hace panic si VirtualLock falla, y en Windows el working set mínimo por omisión alcanza para unas 40
+// páginas: se sube antes del primer buffer, en el núcleo, la UI y las pruebas. Si falla, Harden devuelve el mismo error
+// y el núcleo no arranca. En Linux no hace nada.
+func init() { _ = sys.EnsureLockQuota() }
 
 // Redacted es lo único que un Secret imprime, serializa o registra.
 const Redacted = "[REDACTED]"

@@ -42,6 +42,7 @@ func run(privPath, pubPath string) error {
 	// En Windows, Rel entre unidades distintas (C: y D:) da error y eso ya es fuera del directorio de trabajo; con otra
 	// forma del mismo volumen (\\?\C:, UNC) también da error, así que el error solo se acepta con una letra de unidad simple.
 	rel, err := filepath.Rel(cwd, privPath)
+	// shortcut: una unidad hecha con subst o mapeada sobre el repo pasa el chequeo (es otra letra); resolver la ruta final con GetFinalPathNameByHandle si la herramienta se usa en Windows.
 	if !filepath.IsAbs(privPath) || (err == nil && filepath.IsLocal(rel)) || (err != nil && len(filepath.VolumeName(privPath)) != 2) {
 		return fmt.Errorf("-priv tiene que ser una ruta absoluta fuera de %s", cwd)
 	}

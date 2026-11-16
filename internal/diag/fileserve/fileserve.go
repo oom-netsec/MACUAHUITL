@@ -272,12 +272,18 @@ func publish(files []string, extraDeny []string) (map[string]string, map[string]
 		if err != nil {
 			return nil, nil, fmt.Errorf("fileserve: %w", err)
 		}
+		// En Windows el id del archivo se carga perezoso en el primer SameFile (os/types_windows.go, loadFileId): se
+		// fija ahora, para que la comparación de source.open sea contra el archivo publicado y no contra el que esté
+		// ahí después. En Linux no hace nada.
+		os.SameFile(st, st)
 		if !st.Mode().IsRegular() {
 			return nil, nil, i18n.New("fileserve.err.not_regular", i18n.A("path", f))
 		}
 		if err := checkPathsDeny(extraDeny, filepath.Clean(f), real); err != nil {
 			return nil, nil, err
 		}
+		// Rechazo temprano con el FileInfo (en Windows no ve enlaces); al servir, source.open vuelve a decidir con
+		// HardLinkedFile sobre el archivo abierto.
 		if sys.HardLinked(st) {
 			return nil, nil, i18n.New("fileserve.err.hardlinks", i18n.A("path", f))
 		}
