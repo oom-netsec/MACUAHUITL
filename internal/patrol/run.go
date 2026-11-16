@@ -84,7 +84,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	emit(Progress{Target: hp, State: "connecting"})
 	base := auditor(context.WithoutCancel(ctx), d) // un corte en pleno handshake no debe dejar eventos sin auditar
 	onEvent := func(e audit.Entry) {
-		if ch := changeOf(e, hp); ch != nil {
+		if ch := changeOf(e, hp); ch != nil && res.ChangedHostKey == nil { // se guarda la primera: la reconexión no la pisa
 			res.ChangedHostKey = ch
 		}
 		base(e)
@@ -157,7 +157,11 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			c.close()
 			c = nil
 			nc, err := connect(ctx, d, jobID, s, t, transport.HostKeyPolicy{AcceptChanged: s.AcceptChangedHostKeys}, onEvent, d.PrimaryVerified[hp], d.backoff())
-			if err == nil { // si en la reconexión cambió la llave de host, el equipo queda failed y no skipped: ya hay evidencia escrita
+			if err == nil && (nc.drv.Hostname() != res.Hostname || nc.platform != res.Platform) {
+				// Otro equipo tras la misma IP (un par en failover con la llave replicada): no se escribe nada más en la carpeta del primero.
+				err = i18n.New("patrol.err.reconnect_other_device", i18n.A("from", res.Hostname+" ("+res.Platform+")", "to", nc.drv.Hostname()+" ("+nc.platform+")"))
+				nc.close()
+			} else if err == nil { // si en la reconexión cambió la llave de host, el equipo queda failed y no skipped: ya hay evidencia escrita
 				c = nc
 				err = rerunPre(ctx, c, pre, cmds[:i])
 			}

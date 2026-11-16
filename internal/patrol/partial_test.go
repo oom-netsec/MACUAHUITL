@@ -15,6 +15,8 @@ import (
 
 	"errors"
 
+	"golang.org/x/crypto/ssh"
+
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
@@ -31,11 +33,13 @@ type cutState struct {
 	opened, close int
 	failOpenFrom  int    // desde esta sesión (1 = la primera), Open falla
 	onCut         func() // se llama al cortar un comando
+	hostFrom2     string // desde la segunda sesión el driver dice llamarse así (otro equipo tras la misma IP)
 }
 
 type cutDrv struct {
 	platform.Driver
 	st *cutState
+	n  int // número de sesión de este driver (1 = la primera)
 }
 
 func newCut(t *testing.T, e *env, cut map[string]error) *cutState {
@@ -45,7 +49,7 @@ func newCut(t *testing.T, e *env, cut map[string]error) *cutState {
 		st.mu.Lock()
 		defer st.mu.Unlock()
 		st.opened++
-		return &cutDrv{Driver: iosxe.New(), st: st}
+		return &cutDrv{Driver: iosxe.New(), st: st, n: st.opened}
 	}
 	return st
 }
@@ -59,6 +63,15 @@ func (p *cutDrv) Open(ctx context.Context, r io.Reader, w io.Writer, en *secret.
 		return platform.ErrEnableFailed
 	}
 	return p.Driver.Open(ctx, r, w, en)
+}
+
+func (p *cutDrv) Hostname() string {
+	p.st.mu.Lock()
+	defer p.st.mu.Unlock()
+	if p.n >= 2 && p.st.hostFrom2 != "" {
+		return p.st.hostFrom2
+	}
+	return p.Driver.Hostname()
 }
 
 func (p *cutDrv) Close() {
@@ -252,5 +265,41 @@ func TestCancelacionNoSeAnotaComoCorte(t *testing.T) {
 	res, _ := runPartial(t, e, ctx)
 	if res.State != "failed" || len(res.CutCommands) != 0 {
 		t.Fatalf("res = %+v", res)
+	}
+}
+
+func TestReconexionAOtroEquipoFalla(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
+	st.hostFrom2 = "OTRO-FW"
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if res.State != "failed" || !strings.Contains(res.Detail, "SW-LAB-01") || !strings.Contains(res.Detail, "OTRO-FW") {
+		t.Fatalf("res = %+v", res)
+	}
+	var c interface{ Reason() string }
+	if !errors.As(res.DetailErr, &c) || c.Reason() != "patrol.err.reconnect_other_device" {
+		t.Fatalf("razón: %v", res.DetailErr)
+	}
+	if st.count("show ip interface brief") != 0 || st.opened != 2 || st.close != 2 {
+		t.Fatalf("no debe correr nada en el otro equipo: ran=%v opened=%d closed=%d", st.ran, st.opened, st.close)
+	}
+}
+
+func TestReconexionConservaLaPrimeraLlaveCambiada(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	_, k1 := simulator.Start(t, e.simCfg)
+	_, k2 := simulator.Start(t, e.simCfg)
+	hp := hostport(e.spec.Targets[0])
+	e.d.Hosts.Add(hp, k1)
+	e.spec.AcceptChangedHostKeys = true
+	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
+	st.onCut = func() { e.d.Hosts.Add(hp, k2) } // la reconexión ve otra llave cambiada
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if res.State != "partial" || res.ChangedHostKey == nil || res.ChangedHostKey.Old != ssh.FingerprintSHA256(k1) {
+		t.Fatalf("la primera llave cambiada se perdió: %+v", res.ChangedHostKey)
 	}
 }
