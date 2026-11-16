@@ -24,20 +24,35 @@ function NewSecret {
 }
 function Grant($path, $sid) { icacls $path /grant "*${sid}:(OI)(CI)F" | Out-Null; if ($LASTEXITCODE) { throw "icacls $path" } }
 
+# La carpeta solo tiene el SID del usuario y Administradores (S-1-5-32-544), con DACL protegida (por SID, no por nombres).
+function AssertPrivateAcl($path, $sid) {
+  $acl = Get-Acl $path
+  $sids = @($acl.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique)
+  $extra = @($sids | Where-Object { $_ -notin @($sid, 'S-1-5-32-544') })
+  if ($extra.Count -or -not $acl.AreAccessRulesProtected -or $sid -notin $sids) { throw "FALLA: ACL de $path no es privada ($($sids -join ', '))" }
+}
+# Carpeta solo del usuario (y Administradores, para poder borrarla al final).
+function New-PrivateDir($path, $sid) {
+  New-Item -ItemType Directory $path | Out-Null
+  icacls $path /inheritance:r | Out-Null; if ($LASTEXITCODE) { throw "icacls /inheritance:r $path" }
+  Grant $path $sid; Grant $path 'S-1-5-32-544'
+  AssertPrivateAcl $path $sid
+}
+
 # Usuario estándar (grupo Usuarios, S-1-5-32-545) con contraseña aleatoria y carpeta de secretos solo suya.
 function New-E2EUser($name) {
   $pw = NewSecret
   New-LocalUser -Name $name -Password (ConvertTo-SecureString $pw -AsPlainText -Force) -AccountNeverExpires -PasswordNeverExpires | Out-Null
-  Add-LocalGroupMember -SID 'S-1-5-32-545' -Member $name
-  $sid = (Get-LocalUser $name).SID.Value
-  $sec = "$root\secret-$name"
-  New-Item -ItemType Directory $sec | Out-Null
-  icacls $sec /inheritance:r | Out-Null
-  Grant $sec $sid; Grant $sec 'S-1-5-32-544'
-  Grant $work $sid
-  $u = @{ Name = $name; Sid = $sid; Secret = $sec; Vault = (NewSecret)
-    Cred = New-Object Management.Automation.PSCredential(".\$name", (ConvertTo-SecureString $pw -AsPlainText -Force)) }
+  # Se registra ya: el finally lo borra aunque falle lo que sigue (el SID se completa después).
+  $u = @{ Name = $name; Sid = $null }
   $script:users += $u
+  Add-LocalGroupMember -SID 'S-1-5-32-545' -Member $name
+  $u.Sid = (Get-LocalUser $name).SID.Value
+  $u.Secret = "$root\secret-$name"; $u.Work = "$root\work-$name"
+  New-PrivateDir $u.Secret $u.Sid # contraseñas de bóveda por stdin
+  New-PrivateDir $u.Work $u.Sid   # salidas de sus procesos: un usuario no lee las del otro
+  $u.Vault = NewSecret
+  $u.Cred = New-Object Management.Automation.PSCredential(".\$name", (ConvertTo-SecureString $pw -AsPlainText -Force))
   $u
 }
 function ProfileOf($u) { (Get-CimInstance Win32_UserProfile -Filter "SID='$($u.Sid)'").LocalPath }
@@ -45,8 +60,8 @@ function ProfileOf($u) { (Get-CimInstance Win32_UserProfile -Filter "SID='$($u.S
 # Corre un programa como el usuario y espera. stdin va por archivo (nunca por argumento); la salida, a archivos de work.
 function Invoke-As($u, $exe, [string[]]$argv = @(), $stdin = $null, [switch]$NoWait) {
   $id = [guid]::NewGuid().ToString('N').Substring(0, 8)
-  $o = "$work\$id.out"; $e = "$work\$id.err"
-  $sp = @{ FilePath = $exe; Credential = $u.Cred; LoadUserProfile = $true; UseNewEnvironment = $true; WorkingDirectory = $work; RedirectStandardOutput = $o
+  $o = "$($u.Work)\$id.out"; $e = "$($u.Work)\$id.err"
+  $sp = @{ FilePath = $exe; Credential = $u.Cred; LoadUserProfile = $true; UseNewEnvironment = $true; WorkingDirectory = $u.Work; RedirectStandardOutput = $o
     RedirectStandardError = $e; PassThru = $true; WindowStyle = 'Hidden' }
   if ($argv.Count) { $sp.ArgumentList = $argv }
   $in = $null
@@ -83,14 +98,18 @@ function WaitPipe($sid, $want) {
 $u1 = $null; $u2 = $null; $core = $null; $sim = $null
 try {
   New-Item -ItemType Directory -Force $work, $bin | Out-Null
+  icacls $work /inheritance:r /grant '*S-1-5-32-544:(OI)(CI)F' | Out-Null; if ($LASTEXITCODE) { throw 'icacls work' }
   Copy-Item "$BinDir\*.exe" $bin
   $adm = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
   Must $adm 'el runner es administrador (token elevado)'
 
   # 0) elevado, el núcleo se niega y no crea el pipe.
   $runnerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-  $p = Start-Process "$bin\macuahuitld.exe" -PassThru -Wait -WindowStyle Hidden -RedirectStandardError "$work\elev.err"
-  Must ($p.ExitCode -ne 0) "macuahuitld elevado se niega (salida $($p.ExitCode): $((Get-Content -Raw "$work\elev.err")))"
+  $p = Start-Process "$bin\macuahuitld.exe" -PassThru -WindowStyle Hidden -RedirectStandardError "$work\elev.err"
+  $null = $p.Handle
+  if (-not $p.WaitForExit(30000)) { $p.Kill(); throw 'FALLA: macuahuitld elevado no terminó (¿arrancó?)' }
+  $elevErr = Get-Content -Raw "$work\elev.err"
+  Must ($null -ne $p.ExitCode -and $p.ExitCode -ne 0 -and $elevErr -match 'does not run elevated') "macuahuitld elevado se niega (salida $($p.ExitCode): $($elevErr.Trim()))"
   Must (-not ((PipeNames) -contains "\\.\pipe\macuahuitl-$runnerSid".ToLowerInvariant())) 'y no creó el pipe del runner'
 
   # 1) usuario estándar: su núcleo crea el pipe con su SID.
@@ -109,12 +128,13 @@ try {
 
   # 3) un segundo núcleo del mismo usuario se niega y el primero sigue vivo.
   $r = Invoke-As $u1 "$bin\macuahuitld.exe"
-  Must ($r.Code -ne 0) "un segundo macuahuitld del mismo usuario se niega (salida $($r.Code): $($r.Err.Trim()))"
+  # Ambos textos envuelven ipc.ErrAlreadyRunning (el segundo es ipc.err.pipe_other_user, que Listen da si no puede abrir el pipe).
+  Must ($r.Code -ne 0 -and $r.Err -match 'ya hay un núcleo escuchando|core channel is held by another user') "un segundo macuahuitld del mismo usuario se niega con ErrAlreadyRunning (salida $($r.Code): $($r.Err.Trim()))"
   Must ((MctlOk $u1 @('vault', 'status')) -match 'unlocked') 'el primer núcleo sigue respondiendo'
 
   # 4) otro usuario no conecta al pipe ajeno.
   $r = Mctl $u2 @('vault', 'status')
-  Must ($r.Code -ne 0 -and $r.Out -notmatch 'unlocked|locked') "mctl del usuario 2 no conecta (salida $($r.Code): $($r.Err.Trim()))"
+  Must ($r.Code -ne 0 -and $r.Out -notmatch 'unlocked|locked' -and $r.Err -match 'cannot find the file specified') "sin núcleo propio, mctl del usuario 2 falla (su pipe no existe; salida $($r.Code): $($r.Err.Trim()))"
   Must ((MctlOk $u1 @('vault', 'status')) -match 'unlocked') 'y el núcleo del usuario 1 sigue bien'
 
   # 4b) el usuario 2 abre DIRECTAMENTE el pipe del usuario 1: la DACL lo niega (no un timeout ni «no existe»).
@@ -144,13 +164,14 @@ try {
   $addrFile = "$work\sim.addr"
   $sim = Start-Process "$bin\simserver.exe" -ArgumentList '-transcripts', $Transcripts, '-addrfile', $addrFile -PassThru -WindowStyle Hidden
   $script:procs += $sim
-  for ($i = 0; $i -lt 40 -and -not (Test-Path $addrFile); $i++) { Start-Sleep -Milliseconds 250 }
-  Must (Test-Path $addrFile) 'el simulador escucha'
-  $hostPort = (Get-Content -Raw $addrFile).Trim(); $simHost, $simPort = $hostPort -split ':'
+  $hostPort = ''
+  for ($i = 0; $i -lt 40 -and $hostPort -notmatch ':\d+$'; $i++) { Start-Sleep -Milliseconds 250; if (Test-Path $addrFile) { $hostPort = (Get-Content -Raw $addrFile).Trim() } }
+  Must ($hostPort -match ':\d+$') "el simulador escucha en $hostPort"
+  $simHost, $simPort = $hostPort -split ':'
   $cred = (MctlOk $u1 @('cred', 'add', '--label', 'lab', '--user', 'admin') "pw-lab`nen-lab`n").Trim()
   $outs = Join-Path (ProfileOf $u1) 'MACUAHUITL\outputs'
   $null = Invoke-As $u1 "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" @('-NoProfile', '-Command', "New-Item -ItemType Directory -Force '$outs'")
-  $spec = "$work\job.yaml"
+  $spec = "$($u1.Work)\job.yaml"
   Set-Content $spec "name: lab`ntargets:`n  - address: $simHost`n    port: $simPort`n    device_id: sw1`ndefault_credential_id: $cred`ncustom_commands: |`n  show version`noutput_dir: '$outs'`nwindow_hours: 1`nschedule:`n  interval_seconds: 1`n  rounds: 2`n"
   $job = (MctlOk $u1 @('job', 'create', '-f', $spec)).Trim()
   $lt = (Mctl $u1 @('job', 'logintest', $job)).Out # sale 1 a propósito: la llave del equipo aún no está aceptada
@@ -184,15 +205,16 @@ try {
   Write-Host 'windows-e2e: todo ok'
 } catch {
   Write-Host "::error::$($_.Exception.Message)"
-  foreach ($f in Get-ChildItem $work -Filter *.err -ErrorAction SilentlyContinue) { Write-Host "--- $($f.Name)"; Get-Content $f.FullName }
+  foreach ($f in Get-ChildItem $root -Recurse -Filter *.err -ErrorAction SilentlyContinue) { Write-Host "--- $($f.Name)"; Get-Content $f.FullName }
   if ($u1) { $log = Join-Path (ProfileOf $u1) 'AppData\Local\MACUAHUITL\state\macuahuitld.log'; if (Test-Path $log) { Write-Host '--- macuahuitld.log'; Get-Content $log } }
   throw
 } finally {
   foreach ($p in $script:procs) { try { if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force } } catch {} }
   Start-Sleep -Seconds 1
   foreach ($u in $script:users) {
-    try { Get-CimInstance Win32_UserProfile -Filter "SID='$($u.Sid)'" | Remove-CimInstance } catch { Write-Host "perfil $($u.Name): $_" }
+    if (-not $u.Sid) { try { $u.Sid = (Get-LocalUser $u.Name).SID.Value } catch {} }
+    try { if ($u.Sid) { Get-CimInstance Win32_UserProfile -Filter "SID='$($u.Sid)'" | Remove-CimInstance } } catch { Write-Host "perfil $($u.Name): $_" }
     try { Remove-LocalUser $u.Name } catch { Write-Host "usuario $($u.Name): $_" }
   }
-  try { takeown /f $root /r /d y | Out-Null; icacls $root /grant 'Administrators:(OI)(CI)F' /t | Out-Null; Remove-Item -Recurse -Force $root } catch { Write-Host "limpieza: $_" }
+  try { icacls $root /setowner '*S-1-5-32-544' /t /c | Out-Null; icacls $root /grant '*S-1-5-32-544:(OI)(CI)F' /t /c | Out-Null; Remove-Item -Recurse -Force $root } catch { Write-Host "limpieza: $_" }
 }

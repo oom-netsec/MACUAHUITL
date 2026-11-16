@@ -214,6 +214,7 @@ jobs:
   # (el runner es administrador y el núcleo se niega a correr elevado). Informativo, como el job windows.
   windows-e2e:
     runs-on: windows-latest
+    timeout-minutes: 30
     continue-on-error: true
     env:
       CGO_ENABLED: "0"

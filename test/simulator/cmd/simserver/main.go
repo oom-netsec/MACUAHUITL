@@ -28,7 +28,13 @@ func main() {
 		os.Exit(2)
 	}
 	addr, _ := simulator.Start(tb{}, simulator.Config{Hostname: "SW-LAB-01", Username: "admin", Password: "pw-lab", Enable: "en-lab", Transcripts: *transcripts})
-	if err := os.WriteFile(*addrFile, []byte(addr), 0o644); err != nil {
+	// Atómico: el script nunca lee un archivo a medio escribir.
+	tmp := *addrFile + ".tmp"
+	err := os.WriteFile(tmp, []byte(addr), 0o644)
+	if err == nil {
+		err = os.Rename(tmp, *addrFile)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
