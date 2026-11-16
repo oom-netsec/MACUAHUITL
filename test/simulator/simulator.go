@@ -62,6 +62,12 @@ type Config struct {
 	ConfigWarnings map[string]string
 	Commands       map[string]string
 	Recorder       *Recorder
+	// ASA multicontexto (fase 42a): Contexts da los contextos; la sesión entra al primero y el prompt es host/contexto
+	// (host a secas en el espacio del sistema). Entiende changeto y, solo en el sistema, show context. Cada changeto
+	// queda en Recorder como "!changeto system" o "!changeto context X". ChangetoLandsIn, si no está vacío, es el
+	// contexto donde aterriza cualquier changeto (un equipo que no obedece, para probar la verificación del prompt).
+	Contexts        []string
+	ChangetoLandsIn string
 }
 
 // Recorder anota lo que el equipo simulado recibió en modo configuración.
@@ -268,6 +274,8 @@ type session struct {
 	mode    string   // "" = exec; "config", "config-if", "config-if-range", "config-vlan"
 	cur     []string // interfaces del contexto config-if
 	rctx    []string // contexto del running-config completo (Config.Running)
+	actx    string   // ASA multicontexto: contexto actual; "" = espacio del sistema
+	asaInit bool
 }
 
 func (s *session) write(str string) error {
@@ -275,7 +283,55 @@ func (s *session) write(str string) error {
 	return err
 }
 
+// asaCtx entiende changeto y show context de un ASA multicontexto; dice si atendió el comando.
+func (s *session) asaCtx(cmd string) bool {
+	if len(s.c.Contexts) == 0 {
+		return false
+	}
+	switch {
+	case cmd == "changeto system" || strings.HasPrefix(cmd, "changeto context "):
+		s.c.Recorder.add("!" + cmd)
+		name := strings.TrimPrefix(cmd, "changeto context ")
+		if cmd == "changeto system" {
+			name = ""
+		} else if !slices.Contains(s.c.Contexts, name) {
+			s.write("ERROR: Context " + name + " does not exist\n")
+			return true
+		}
+		if l := s.c.ChangetoLandsIn; l != "" {
+			name = l
+		}
+		s.actx = name
+		return true
+	case cmd == "show context" && s.actx == "":
+		var b strings.Builder
+		b.WriteString("Context Name      Class                Interfaces           Mode         URL\n")
+		for i, c := range s.c.Contexts {
+			m := " "
+			if i == 0 {
+				m = "*"
+			}
+			fmt.Fprintf(&b, "%s%-17s default              Management1/1        Routed       disk0:/%s.cfg\n", m, c, c)
+		}
+		fmt.Fprintf(&b, "\nTotal active Security Contexts: %d\n", len(s.c.Contexts))
+		s.write(b.String())
+		return true
+	}
+	return false
+}
+
 func (s *session) prompt() {
+	if len(s.c.Contexts) > 0 && !s.asaInit {
+		s.asaInit, s.actx = true, s.c.Contexts[0]
+	}
+	if len(s.c.Contexts) > 0 && s.mode == "" {
+		h := s.c.Hostname
+		if s.actx != "" {
+			h += "/" + s.actx
+		}
+		s.write(h + "#")
+		return
+	}
 	if s.mode != "" {
 		host := s.c.Hostname
 		if len(host) > 16 { // IOS acorta el nombre en el prompt de configuración
@@ -369,6 +425,7 @@ func (s *session) run() {
 			}
 		case strings.HasPrefix(cmd, "show running-config interface ") && s.dev.has(strings.TrimPrefix(cmd, "show running-config interface ")):
 			s.write(s.dev.show(strings.TrimPrefix(cmd, "show running-config interface ")))
+		case s.asaCtx(cmd):
 		case s.showModeled(cmd):
 		case s.c.Commands[cmd] != "":
 			s.write(s.c.Commands[cmd])

@@ -199,3 +199,26 @@ func TestFamiliaASAAlternanciaEnLaRegexNoEsPipe(t *testing.T) {
 		}
 	}
 }
+
+// El changeto solo sale del ejecutor de Patrol (ADR 0011): ningún texto de playbook lo manda, con ningún destino.
+func TestASADeniegaChangetoEnPlaybooks(t *testing.T) {
+	for _, c := range []string{"changeto system", "changeto context ctx1", "CHANGETO SYSTEM", "  changeto   system", "changeto context admin"} {
+		if err := CheckDenied("asa", c); err == nil {
+			t.Errorf("%q no se negó", c)
+		}
+	}
+	p := Playbook{Platform: "asa", Params: []Param{{"c", "context"}}, Commands: []Command{{Text: "changeto context {c}"}}}
+	if _, err := p.Expand(map[string]string{"c": "ctx1"}); err == nil {
+		t.Error("changeto con dato context pasó Expand")
+	}
+	for _, v := range []string{"ctx1", "system", "A_b-9"} {
+		if _, err := ValidateValue("context", v); err != nil {
+			t.Errorf("context %q: %v", v, err)
+		}
+	}
+	for _, v := range []string{"", "-x", "ctx 1", "a/b", strings.Repeat("a", 33), "ñ"} {
+		if _, err := ValidateValue("context", v); err == nil {
+			t.Errorf("context %q aceptado", v)
+		}
+	}
+}
