@@ -49,7 +49,7 @@ func (c *Core) busyWork(ctx context.Context) []string {
 		out = append(out, f(ctx)...)
 	}
 	for _, m := range c.live.Active() {
-		out = append(out, "stream "+m)
+		out = append(out, "rpc "+m) // streams y unarios largos
 	}
 	return append(out, jobs...)
 }

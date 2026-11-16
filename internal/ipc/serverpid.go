@@ -21,7 +21,9 @@ var ErrNotRunning = errors.New("ipc: el núcleo no está corriendo")
 // shortcut: el PID puede reutilizarse entre esta lectura y WaitExit (ventana de milisegundos); en el peor caso core stop
 // espera de más y sale con 1.
 // En Windows el equivalente (GetNamedPipeServerProcessId sobre el pipe) llega con 43a4.
-func ServerPID(path string) (int, error) {
+func ServerPID(path string) (int, error) { return serverPID(path, os.Getuid()) }
+
+func serverPID(path string, uid int) (int, error) {
 	c, err := net.DialTimeout("unix", path, 2*time.Second)
 	if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ECONNREFUSED) {
 		return 0, ErrNotRunning
@@ -42,7 +44,7 @@ func ServerPID(path string) (int, error) {
 	if cerr != nil {
 		return 0, fmt.Errorf("ipc: %w", cerr)
 	}
-	if int(cred.Uid) != os.Getuid() || cred.Pid <= 0 { // el socket lo escucha otro usuario: no es nuestro núcleo
+	if int(cred.Uid) != uid || cred.Pid <= 0 { // el socket lo escucha otro usuario: no es nuestro núcleo
 		return 0, fmt.Errorf("ipc: el socket %s lo atiende otro usuario o un PID inválido", path)
 	}
 	return int(cred.Pid), nil

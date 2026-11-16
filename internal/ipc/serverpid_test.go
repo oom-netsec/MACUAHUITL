@@ -51,6 +51,10 @@ func TestServerPID(t *testing.T) {
 	if err != nil || pid != cmd.Process.Pid || pid == os.Getpid() {
 		t.Fatalf("ServerPID = %d, %v; quería %d", pid, err, cmd.Process.Pid)
 	}
+	// Un socket que atiende otro usuario no es nuestro núcleo: core stop no debe esperar a ese PID.
+	if pid, err := serverPID(p, os.Getuid()+1); err == nil {
+		t.Fatalf("serverPID con otro UID = %d, sin error", pid)
+	}
 }
 
 func TestServerPIDNoCorre(t *testing.T) {
