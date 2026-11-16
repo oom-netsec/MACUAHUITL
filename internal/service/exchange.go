@@ -39,6 +39,11 @@ func WriteExport(ctx context.Context, path string, data []byte, overwrite bool) 
 		if err != nil {
 			return ErrFrom(ctx, codes.FailedPrecondition, err)
 		}
+		if err := sys.ProtectNew(path); err != nil { // antes de escribir; en Windows nace con la ACL heredada
+			f.Close()
+			os.Remove(path)
+			return ErrFrom(ctx, codes.Internal, err)
+		}
 		_, err = f.Write(data)
 		if cerr := f.Close(); err == nil {
 			err = cerr
@@ -56,7 +61,11 @@ func WriteExport(ctx context.Context, path string, data []byte, overwrite bool) 
 	if err != nil {
 		return ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
-	defer os.Remove(tmp.Name()) // tras el rename ya no existe
+	defer os.Remove(tmp.Name())                        // tras el rename ya no existe
+	if err := sys.ProtectNew(tmp.Name()); err != nil { // el rename conserva la ACL del temporal
+		tmp.Close()
+		return ErrFrom(ctx, codes.Internal, err)
+	}
 	_, err = tmp.Write(data)
 	if cerr := tmp.Close(); err == nil {
 		err = cerr

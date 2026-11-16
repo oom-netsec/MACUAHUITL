@@ -9,6 +9,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 func clean(c *cli.Env, args []string) error {
@@ -54,6 +55,11 @@ func clean(c *cli.Env, args []string) error {
 func writeNew(path, text string) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
+		return cli.ErrWrap("mctl.backup.write_out", err)
+	}
+	if err := sys.ProtectNew(path); err != nil {
+		f.Close()
+		os.Remove(path)
 		return cli.ErrWrap("mctl.backup.write_out", err)
 	}
 	if _, err := f.WriteString(text); err != nil {

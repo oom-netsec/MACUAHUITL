@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 func main() {
@@ -86,6 +88,12 @@ func escribe(path string, key []byte, perm os.FileMode) (err error) {
 			os.Remove(path)
 		}
 	}()
+	if perm == 0o600 { // la privada: en Windows nace con la ACL heredada y se protege antes de escribirla
+		if err = sys.ProtectNew(path); err != nil {
+			f.Close()
+			return err
+		}
+	}
 	if _, err = f.WriteString(base64.StdEncoding.EncodeToString(key) + "\n"); err != nil {
 		f.Close()
 		return err

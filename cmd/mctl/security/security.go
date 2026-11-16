@@ -12,6 +12,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // hostPort separa HOST[:PUERTO] (o [IPv6]:PUERTO); sin puerto devuelve 0.
@@ -64,6 +65,11 @@ func newPassword(c *cli.Env, prompt string) ([]byte, error) {
 func writeNew(path string, data []byte) error {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
+		return err
+	}
+	if err := sys.ProtectNew(path); err != nil { // antes de escribir la llave: en Windows nace con la ACL heredada
+		f.Close()
+		os.Remove(path)
 		return err
 	}
 	if _, err := f.Write(data); err != nil {
@@ -299,6 +305,9 @@ func pkiCaInit(c *cli.Env, args []string) error {
 		return cli.Err("mctl.security.missing_name")
 	}
 	if err := os.Mkdir(dir, 0o700); err != nil {
+		return err
+	}
+	if err := sys.MkdirPrivate(dir); err != nil { // en Linux no hace nada más; en Windows le pone la DACL protegida
 		return err
 	}
 	pw, err := newPassword(c, cli.T("mctl.security.prompt_seal_ca_key"))

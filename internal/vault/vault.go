@@ -22,6 +22,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 var (
@@ -575,6 +576,15 @@ func writeAtomicOpt(path string, data []byte, noPerms *bool) error {
 	defer os.Remove(tmp.Name())
 	if err := chmod(tmp, 0o600); err != nil {
 		if noPerms == nil || !(errors.Is(err, os.ErrPermission) || errors.Is(err, errors.ErrUnsupported)) {
+			tmp.Close()
+			return fmt.Errorf("vault: %w", err)
+		}
+		*noPerms = true
+	}
+	// En Windows chmod no protege nada: la ACL del archivo es la heredada. Se protege antes de escribir y con la misma
+	// tolerancia (FAT, exFAT); en Linux ProtectNew no hace nada.
+	if err := sys.ProtectNew(tmp.Name()); err != nil {
+		if noPerms == nil || !errors.Is(err, errors.ErrUnsupported) {
 			tmp.Close()
 			return fmt.Errorf("vault: %w", err)
 		}

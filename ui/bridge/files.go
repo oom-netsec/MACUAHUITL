@@ -59,7 +59,11 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 	if err != nil {
 		return wrapErr(err)
 	}
-	defer os.Remove(tmp.Name()) // tras el rename ya no existe
+	defer os.Remove(tmp.Name())                        // tras el rename ya no existe
+	if err := sys.ProtectNew(tmp.Name()); err != nil { // el rename conserva la ACL del temporal (en Linux CreateTemp ya es 0600)
+		tmp.Close()
+		return wrapErr(err)
+	}
 	if _, err := tmp.Write(raw); err != nil {
 		tmp.Close()
 		return wrapErr(err)
