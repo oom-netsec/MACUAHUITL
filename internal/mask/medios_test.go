@@ -192,3 +192,22 @@ func TestEcoPartidoTapaPorPosicionElRestoDelSecreto(t *testing.T) {
 		}
 	}
 }
+
+// Punto b: una «"» dentro del valor en una línea que cita un comando entre comillas: la cita termina en la última comilla.
+func TestComillaDentroDelValorEnLineaCitada(t *testing.T) {
+	cmds := []string{
+		`crypto pki export TP pem terminal 3des Zq04206"Zq04207`, `crypto pki export TP pem terminal Zq04206"Zq04207`,
+		`crypto key export rsa K pem terminal aes Zq04206"Zq04207`, `crypto pki export TP pem url ftp://u:Zq04206"Zq04207@h/f 3des password Zq04208"Zq04209`,
+		`crypto ca export TP pkcs12 flash:tp.p12 Zq04206"Zq04207`, `crypto pki import TP pem terminal Zq04206"Zq04207`,
+		`enable secret 5 Zq04206"Zq04207`,
+	}
+	solo := map[string]bool{}
+	for _, v := range vias {
+		if v.nombre != "show tech ASA" && v.nombre != "ERROR comillas" && v.nombre != "ERROR comilla impar" {
+			solo[v.nombre] = true
+		}
+	}
+	for _, p := range []string{"ios-xe", "asa"} {
+		informar(t, fugasEnVias(p, cmds, solo))
+	}
+}

@@ -344,6 +344,9 @@ func (s *Stream) LineS1(raw string) (string, bool) { return s.line1(raw) }
 func (s *Stream) CutLine(raw, s1 string) string {
 	line, eol := splitEOL(raw)
 	orig, spans := lineSpans(line, s.Platform)
+	if strings.HasSuffix(s1, eol) {
+		spans = mergeSpans(append(spans, quoteTail(orig, s1[:len(s1)-len(eol)])...))
+	}
 	if len(spans) == 0 || !strings.HasSuffix(s1, eol) || strings.Contains(s1[:len(s1)-len(eol)], "\n") {
 		return s1
 	}

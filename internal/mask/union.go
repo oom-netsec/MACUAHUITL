@@ -270,7 +270,7 @@ func CutCommand(block, orig, s1 string) (string, []string) {
 // sobre orig.
 func CutText(platform, orig, s1 string) string {
 	o, spans := lineSpans(orig, platform)
-	out, _ := cut(o, s1, spans)
+	out, _ := cut(o, s1, mergeSpans(append(spans, quoteTail(o, s1)...)))
 	return out
 }
 
@@ -298,4 +298,27 @@ func SecretStart(block, cmd string) int {
 func CutFrom(orig, s1 string, from int) string {
 	out, _ := cut(orig, s1, [][2]int{{min(from, len(orig)), len(orig)}})
 	return out
+}
+
+// quoteTail: en una línea que cita un comando entre comillas (quotedCmdLine), si la cadena de reglas tapó algo dentro de la
+// cita, el valor puede traer comillas propias («3des Zq1"Zq2»): las reglas paran en la primera y lo que sigue queda a la
+// vista. La cita termina en la última comilla de la línea: se tapa desde donde s1 empezó a cambiar hasta ahí.
+func quoteTail(orig, s1 string) [][2]int {
+	if !quotedCmdLine.MatchString(orig) {
+		return nil
+	}
+	f, l := strings.IndexByte(orig, '"'), strings.LastIndexByte(orig, '"')
+	p := lcp(orig, s1)
+	if f < 0 || f >= p || p >= len(orig) {
+		return nil
+	}
+	n := strings.Count(orig[p:], `"`)
+	closing := l+1 >= len(orig) || strings.ContainsRune(" \t,;)}]:.", rune(orig[l+1])) // una comilla pegada a lo que sigue no cierra la cita
+	switch {
+	case n >= 2 && closing:
+		return [][2]int{{p, l}}
+	case n >= 1 && !closing:
+		return [][2]int{{p, len(orig)}}
+	}
+	return nil // una sola comilla tras el cambio, que cierra la cita: lo normal
 }
