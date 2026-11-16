@@ -374,16 +374,12 @@ func (c *Core) missingPack(id string) string {
 
 func (c *Core) vaultPath() string { return filepath.Join(c.p.Data, "vault.mcv") }
 
-// audit reintenta una vez; si aun así falla, avisa con la acción perdida
-// en vez de descartarla en silencio (la bitácora es de seguridad).
+// audit avisa con la acción perdida si Append falla (Append ya reintenta con la base ocupada), en vez de
+// descartarla en silencio (la bitácora es de seguridad).
 // shortcut: no falla la operación auditada, solo avisa; endurecer si se exige "sin auditoría no hay acción".
 func (c *Core) audit(action, target, detail string) {
 	e := audit.Entry{Actor: c.o.Actor, Action: action, Target: target, Detail: detail}
-	_, err := c.log.Append(context.Background(), e)
-	if err != nil {
-		_, err = c.log.Append(context.Background(), e)
-	}
-	if err != nil {
+	if _, err := c.log.Append(context.Background(), e); err != nil {
 		fmt.Fprintf(c.o.ErrOut, "macuahuitld: auditoría perdida accion=%q objetivo=%q: %v\n", action, target, err)
 	}
 }

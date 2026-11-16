@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -70,6 +71,32 @@ func hashOf(prev string, seq uint64, at string, e Entry) string {
 func (l *Log) Append(ctx context.Context, e Entry) (Record, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	// Otra conexión que retiene el bloqueo de escritura más que busy_timeout da SQLITE_BUSY; una entrada de auditoría
+	// no se pierde por eso: se reintenta (cada intento rehace la transacción completa, seq y hash incluidos). En Windows
+	// los bloqueos de archivo son mucho más lentos y basta un escritor insistente para agotar busy_timeout.
+	for try := 1; ; try++ {
+		r, err := l.appendOnce(ctx, e)
+		if err == nil || !busy(err) || try == appendTries {
+			return r, err
+		}
+		select {
+		case <-ctx.Done():
+			return r, err
+		case <-time.After(time.Duration(try) * 50 * time.Millisecond):
+		}
+	}
+}
+
+// appendTries: con busy_timeout de 5 s por intento, una entrada espera hasta ~25 s antes de fallar.
+const appendTries = 5
+
+// busy: SQLITE_BUSY o una de sus variantes extendidas (el código primario va en el byte bajo).
+func busy(err error) bool {
+	var c interface{ Code() int }
+	return errors.As(err, &c) && c.Code()&0xff == 5
+}
+
+func (l *Log) appendOnce(ctx context.Context, e Entry) (Record, error) {
 	tx, err := l.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Record{}, fmt.Errorf("audit: %w", err)
