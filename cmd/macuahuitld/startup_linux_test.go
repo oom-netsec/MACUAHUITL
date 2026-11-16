@@ -4,7 +4,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"syscall"
 	"testing"
 	"time"
 
@@ -30,7 +29,7 @@ func TestRunBorraLaCausaAlAbrirElCanal(t *testing.T) {
 		t.Fatalf("la prueba no armó el archivo: %v", err)
 	}
 	sig := make(chan os.Signal, 1) // absorbe el SIGTERM si llega antes de que run lo escuche
-	signal.Notify(sig, syscall.SIGTERM)
+	signal.Notify(sig, os.Interrupt)
 	defer signal.Stop(sig)
 	done := make(chan error, 1)
 	go func() { done <- run(func() ([]i18n.Text, error) { return nil, nil }) }()
@@ -42,7 +41,8 @@ func TestRunBorraLaCausaAlAbrirElCanal(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	_, statErr := os.Stat(file)
-	syscall.Kill(os.Getpid(), syscall.SIGTERM)
+	p, _ := os.FindProcess(os.Getpid())
+	p.Signal(os.Interrupt)
 	select {
 	case <-done:
 	case <-time.After(10 * time.Second):
