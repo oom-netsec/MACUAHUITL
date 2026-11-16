@@ -4,7 +4,7 @@ Mission: put a TAC on every engineer's laptop, useful for **all** daily work and
 
 Principles: local first and audited, secrets in the vault, no false "all clear", permissive licenses and no privileged code. Reading and analyzing are free. **Changing the network** goes through the [assisted change mode](adr/0007-modo-cambio-asistido.md): visible command, confirmation, pre/post-check, rollback and audit.
 
-## Done up to v0.6.5
+## Done up to v1.0.0
 
 | Area | What's included |
 |---|---|
@@ -26,18 +26,15 @@ Principles: local first and audited, secrets in the vault, no false "all clear",
 | Patrol and analysis | Each command runs once per device and round even if several playbooks ask for it (v0.6.0); routing detections (EIGRP, LDP, track, GLBP/VRRP, duplicate OSPF router-id, BGP without prefixes), shared segments in the topology and noise-free diff between rounds (v0.6.1, v0.6.2) |
 | Masking and assisted mode | Masking of quoted content, of `backup diff` and drift, of negated lines, of the terminal, of logs that quote commands, of syslog and of abbreviations, with a warning on unmasked evidence (v0.5.2–v0.6.5); `snmp-trap-host` and `netflow-export` templates; templates do not cut the session's port and an unknown `%` error stops the apply; pending rollbacks in the app, also for credential rotation; `change diff` and capture wait; first ASA login detected (v0.5.1–v0.6.5) |
 | Robustness | App published with the Wails `production` tag; each command stores at most 64 MiB (v0.6.5) |
+| Hardening for 1.0 | Two security audits and a final independent review with every finding closed; masking never shows less than v0.6.5 (v0.6.6–v0.7.1); assisted changes find the session's port also through a management VRF; Patrol reconnects after a cut command and marks the device partial (v0.7.0); signed build provenance for every release file (v0.7.0); full masking corpus under `-race` and long fuzzing nightly and before each release |
 
-## What is missing for 1.0.0
+## Open after 1.0.0
 
-1. **Lab validation** of the packs with real devices, following the [runbook](plans/validacion-labs.md) and `tools/labcheck` (per-playbook report). Today only `oom/ios` is validated end to end (3560CX); the `oom/wlc-9800` commands were checked on a 9120 EWC, those of `oom/ios-xe`, `oom/cat9k` and `oom/sda` on a Catalyst 9000v (and `oom/ios-xe` also on a Catalyst 8000v) and those of `oom/asa` on an ASAv. Still pending: `oom/wlc-9800` on a chassis 9800 or 9800-CL, `oom/sda` on a real fabric, `oom/cat9k` on physical hardware (stack, StackWise Virtual, PoE), `oom/ios-xe` with a license level (crypto VPN, MPLS), `oom/asa` in multi-context and cluster, `oom/nx-os` (DevNet) and the platforms without a lab so far. Whatever fails is fixed in the pack and published as a `packs-*` release.
-2. **Stability**: zero open findings of high or medium severity, full suite and CI green with no flaky tests, and a clean install of the `.deb` and `.rpm` packages on a fresh machine.
-3. **Public announcement** with the README and screenshots up to date.
-
-Anything not on this list does not block 1.0.0: the phases below come after.
+**Lab validation** of the packs with real devices, following the [runbook](plans/validacion-labs.md) and `tools/labcheck` (per-playbook report). Today only `oom/ios` is validated end to end (3560CX); the `oom/wlc-9800` commands were checked on a 9120 EWC, those of `oom/ios-xe`, `oom/cat9k` and `oom/sda` on a Catalyst 9000v (and `oom/ios-xe` also on a Catalyst 8000v) and those of `oom/asa` on an ASAv. Still pending: `oom/wlc-9800` on a chassis 9800 or 9800-CL, `oom/sda` on a real fabric, `oom/cat9k` on physical hardware (stack, StackWise Virtual, PoE), `oom/ios-xe` with a license level (crypto VPN, MPLS), `oom/asa` in multi-context and cluster, `oom/nx-os` (DevNet) and the platforms without a lab so far. Whatever fails is fixed in the pack and published as a `packs-*` release.
 
 ## Cross-cutting prerequisite: real evidence
 
-Everything that reads device output needs real transcripts to be validated. Source: the [lab test battery](plans/laboratorio-bateria-de-pruebas.md). The NX-OS, ASA and other platform packs are already published with commands from Cisco documentation; validating them on real devices is part of what is missing for 1.0.0.
+Everything that reads device output needs real transcripts to be validated. Source: the [lab test battery](plans/laboratorio-bateria-de-pruebas.md). The NX-OS, ASA and other platform packs are already published with commands from Cisco documentation; validating them on real devices is still open.
 
 ## Phases
 
