@@ -13,6 +13,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
@@ -65,9 +66,15 @@ func Build(devs []capture.Device, cmds []string) Report {
 		}
 		for _, c := range cmds {
 			row := Row{Device: name, Address: d.Address, Command: c}
-			if out, ok := d.Outputs[capture.Key(c)]; ok {
+			// La evidencia y los cortados guardan el comando pasado por mask.Cmd: se busca por el crudo y por el enmascarado.
+			k, km := capture.Key(c), capture.Key(mask.Cmd(d.Platform, c))
+			out, ok := d.Outputs[k]
+			if !ok {
+				out, ok = d.Outputs[km]
+			}
+			if ok {
 				row.OK, row.Output = true, strings.TrimRight(out, "\r\n")
-			} else if d.State == "partial" && slices.ContainsFunc(d.Cut, func(x string) bool { return capture.Key(x) == capture.Key(c) }) {
+			} else if d.State == "partial" && slices.ContainsFunc(d.Cut, func(x string) bool { kx := capture.Key(x); return kx == k || kx == km }) {
 				row.Note = d.Detail // solo el comando cortado lleva el detalle del corte
 			} else if d.State != "completed" && d.State != "partial" && d.Detail != "" {
 				row.Note = d.Detail

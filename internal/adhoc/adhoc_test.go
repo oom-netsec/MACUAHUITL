@@ -7,6 +7,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
@@ -160,5 +161,25 @@ func TestBuildEquipoParcial(t *testing.T) {
 	// solo el cortado lleva el detalle del corte; un comando inválido que no se cortó conserva su nota
 	if !r.Rows[0].OK || r.Rows[1].OK || r.Rows[1].Note != "1 comando cortado" || r.Rows[2].Note != "comando inválido en el equipo" {
 		t.Fatalf("rows = %+v", r.Rows)
+	}
+}
+
+// La cabecera de la evidencia y los cortados van pasados por mask.Cmd: el comando personalizado con «password 7 …» sale
+// distinto en el disco y Build debe encontrarlo igual (no «comando inválido»).
+func TestBuildComandoQueMaskCmdCambia(t *testing.T) {
+	const c = "show run | i password 7 0822455D0A16 | count"
+	m := mask.Cmd("ios-xe", c)
+	if m == c {
+		t.Fatalf("mask.Cmd no cambia %q: la prueba no prueba nada", c)
+	}
+	d := capture.Device{Address: "a", Hostname: "h", Platform: "ios-xe", State: "partial", Detail: "1 comando cortado", Cut: []string{m + "x"},
+		Outputs: map[string]string{capture.Key(m): "Number of lines which match regexp = 3"}}
+	r := Build([]capture.Device{d}, []string{c})
+	if !r.Rows[0].OK {
+		t.Fatalf("row = %+v", r.Rows[0])
+	}
+	d = capture.Device{Address: "a", Hostname: "h", Platform: "ios-xe", State: "partial", Detail: "1 comando cortado", Cut: []string{m}, Outputs: map[string]string{}}
+	if r = Build([]capture.Device{d}, []string{c}); r.Rows[0].Note != "1 comando cortado" {
+		t.Fatalf("el cortado enmascarado no se reconoce: %+v", r.Rows[0])
 	}
 }
