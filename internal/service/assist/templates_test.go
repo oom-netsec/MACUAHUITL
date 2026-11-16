@@ -325,9 +325,11 @@ func TestPlanSnippetVtyACLEndToEndRolledBack(t *testing.T) {
 // origen, y la tabla MAC. Formatos de la documentación de Cisco, sin validar en laboratorio.
 func sessionCmds(port string, more map[string]string) map[string]string {
 	c := map[string]string{
-		"show users":              showUsersFrom("127.0.0.1"),
-		"show ip arp 127.0.0.1":   "Protocol  Address          Age (min)  Hardware Addr   Type   Interface\nInternet  127.0.0.1               3   aabb.cc00.0100  ARPA   Vlan20\n",
-		"show ip route 127.0.0.1": "Routing entry for 127.0.0.0/8\n  Known via \"connected\", distance 0, metric 0 (connected, via interface)\n  Routing Descriptor Blocks:\n  * directly connected, via Vlan20\n",
+		"show users":                                    showUsersFrom("127.0.0.1"),
+		"show tcp brief":                                "TCB       Local Address               Foreign Address             (state)\n7F1A2B3C  127.0.0.2.22               127.0.0.1.51234             ESTAB\n",
+		"show ip vrf interfaces":                        "Interface              IP-Address      VRF                              Protocol\n", // sin interfaces en VRF: la sesión es de la tabla global
+		"show ip arp 127.0.0.1":                         "Protocol  Address          Age (min)  Hardware Addr   Type   Interface\nInternet  127.0.0.1               3   aabb.cc00.0100  ARPA   Vlan20\n",
+		"show ip route 127.0.0.1":                       "Routing entry for 127.0.0.0/8\n  Known via \"connected\", distance 0, metric 0 (connected, via interface)\n  Routing Descriptor Blocks:\n  * directly connected, via Vlan20\n",
 		"show mac address-table address aabb.cc00.0100": "          Mac Address Table\n-------------------------------------------\n\nVlan    Mac Address       Type        Ports\n----    -----------       --------    -----\n  20    aabb.cc00.0100    DYNAMIC     " + port + "\nTotal Mac Addresses for this criterion: 1\n",
 	}
 	for k, v := range more {

@@ -15,11 +15,17 @@ import (
 // de la VLAN de gestión: en un switch de fábrica todo está en la VLAN 1 y el laboratorio usa puertos libres de ella.
 //
 // Se descubre con lecturas encadenadas (cada una depende de la anterior, por eso el servicio las pide en rondas con SessionPortReads):
-// show users (origen) → show ip arp ORIGEN y show ip route ORIGEN (siguiente salto: el propio origen si hay ARP de él, si no el gateway) →
+// show users (origen) → show tcp brief + show ip vrf interfaces + show ip interface brief (la VRF de la interfaz que lleva la sesión; sin ella
+// la gestión en banda en una VRF se buscaría en la tabla global y se daría por conocido el puerto de otro uplink, y la gestión fuera de banda
+// en Mgmt-vrf también se leería en la global) → show ip arp [vrf V] ORIGEN y show ip route ORIGEN (siguiente salto: el propio origen si hay ARP de él, si no el gateway) →
 // show ip arp SALTO (MAC e interfaz) → show mac address-table address MAC (puerto) → show etherchannel summary (si es un canal: sus miembros).
 // Formatos de la documentación de Cisco, sin validar en laboratorio.
 
-const showEtherchannelCmd = "show etherchannel summary"
+const (
+	showEtherchannelCmd = "show etherchannel summary"
+	showTCPCmd          = "show tcp brief"
+	showVRFCmd          = "show ip vrf interfaces"
+)
 
 // sessionPort es lo que se sabe del puerto de la sesión. known solo es true si se identificó con certeza un único puerto.
 type sessionPort struct {
@@ -90,7 +96,20 @@ func sessionStep(outs map[string]string) (cmds []string, sp sessionPort) {
 	if !ok || !origin.Is4() { // shortcut: solo IPv4, con IPv6 no se identifica y se aplica la regla de trunk/canal; ampliar si hace falta
 		return nil, sp
 	}
-	arpO, route := "show ip arp "+origin.String(), "show ip route "+origin.String()
+	// La sesión puede entrar por una interfaz en una VRF (gestión en banda en una VRF): el ARP y la ruta del origen están en esa tabla, no en la
+	// global, y buscarlos en la global llevaría a la CAM de otro uplink con certeza falsa. Sin saber la VRF no se da nada por conocido.
+	if c := unread(outs, showTCPCmd, showVRFCmd, showIPBrief); c != nil {
+		return c, sp
+	}
+	vrf, ok := sessionVRF(origin, outs)
+	if !ok {
+		return nil, sp
+	}
+	arpT, routeT := "show ip arp ", "show ip route "
+	if vrf != "" {
+		arpT, routeT = "show ip arp vrf "+vrf+" ", "show ip route vrf "+vrf+" "
+	}
+	arpO, route := arpT+origin.String(), routeT+origin.String()
 	if c := unread(outs, arpO, route); c != nil {
 		return c, sp
 	}
@@ -100,7 +119,7 @@ func sessionStep(outs map[string]string) (cmds []string, sp sessionPort) {
 			return nil, sp
 		}
 	}
-	arpH := "show ip arp " + hop.String()
+	arpH := arpT + hop.String()
 	if c := unread(outs, arpH); c != nil {
 		return c, sp
 	}
@@ -151,6 +170,75 @@ func sessionStep(outs map[string]string) (cmds []string, sp sessionPort) {
 	}
 	sp.known = true
 	return nil, sp
+}
+
+// vrfRow es una fila de `show ip vrf interfaces` (IOS e IOS-XE, con `ip vrf` o `vrf definition`): interfaz, IP, VRF.
+type vrfRow struct{ iface, ip, vrf string }
+
+// parseVRFInterfaces lee `show ip vrf interfaces`. ok es false si la salida no se puede leer (error del equipo distinto de «el comando no
+// existe», sin cabecera o con una fila que no se entiende): entonces no se sabe si hay VRF. Vacía, o un equipo que no conoce el comando
+// (`% Invalid input`), es «sin VRF».
+func parseVRFInterfaces(text string) (rows []vrfRow, ok bool) {
+	if strings.Contains(text, "% Invalid input") { // IOS imprime antes una línea con el «^»
+		return nil, true
+	}
+	head := false
+	for _, l := range strings.Split(text, "\n") {
+		f := strings.Fields(l)
+		switch {
+		case len(f) == 0:
+		case !head:
+			if len(f) < 3 || f[0] != "Interface" || f[1] != "IP-Address" || f[2] != "VRF" {
+				return nil, false
+			}
+			head = true
+		case len(f) < 3:
+			return nil, false
+		default:
+			rows = append(rows, vrfRow{f[0], f[1], f[2]})
+		}
+	}
+	return rows, true
+}
+
+// sessionVRF da la VRF de la interfaz que lleva la sesión ("" = la global). ok es false si no se puede saber con certeza: no se leyó la tabla
+// de VRF, no se sabe la IP local de la sesión (show users + show tcp brief), o hay interfaces en VRF y la IP local no está en ninguna ni se
+// ve en la tabla global (show ip interface brief). Un equipo sin interfaces en VRF no pregunta nada más: la sesión es global.
+func sessionVRF(origin netip.Addr, outs map[string]string) (vrf string, ok bool) {
+	rows, readable := parseVRFInterfaces(outs[showVRFCmd])
+	if !readable {
+		return "", false
+	}
+	if len(rows) == 0 {
+		return "", true
+	}
+	locals := sessionLocals(outs[showUsersCmd], outs[showTCPCmd])
+	if len(locals) != 1 || !origin.Is4() {
+		return "", false
+	}
+	local := locals[0].String()
+	for _, r := range rows {
+		if r.ip == local {
+			if !nameRe.MatchString(r.vrf) {
+				return "", false
+			}
+			if vrf != "" && vrf != r.vrf {
+				return "", false
+			}
+			vrf = r.vrf
+		}
+	}
+	if vrf != "" {
+		return vrf, true
+	}
+	// Fuera de toda VRF: tiene que ser una IP de una interfaz de la tabla global para darla por tal.
+	brief, _ := iosxe.ParseIPBrief(outs[showIPBrief])
+	for _, b := range brief {
+		if b.IP == local {
+			return "", true
+		}
+	}
+	return "", false
 }
 
 func (sp sessionPort) isSession(name string) bool {
