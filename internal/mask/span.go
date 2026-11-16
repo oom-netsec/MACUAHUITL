@@ -71,13 +71,13 @@ var spProse = map[string]bool{"mismatch": true, "failed": true, "expired": true,
 	"is": true, "has": true, "for": true, "from": true, "to": true, "not": true, "was": true, "must": true, "cannot": true,
 	"invalid": true, "required": true, "missing": true, "incorrect": true, "does": true}
 
-// commandSpans devuelve, para un comando tecleado o citado, los tramos [s, t) del original que Command tapa: uno por
-// segmento « ; » (NX-OS), desde el valor (el token que sigue a la palabra de secreto) hasta el fin del segmento. No
-// combina nada con las reglas: de eso se encarga cut.
-func commandSpans(block, cmd string, split bool) [][2]int {
-	sp := spansIn(block, cmd, false, split)
+// commandSpans devuelve, para un comando tecleado o citado, los tramos [s, t) del original que Command tapa: desde el
+// valor (el token que sigue a la palabra de secreto) hasta el fin de la línea. No combina nada con las reglas: de eso se
+// encarga cut.
+func commandSpans(block, cmd string) [][2]int {
+	sp := spansIn(block, cmd, false)
 	if n := normSpaces(cmd); n != cmd { // IOS toma el NBSP como parte del token: se prueba el original y la copia, y se juntan
-		sp = mergeSpans(append(sp, spansIn(block, n, false, split)...))
+		sp = mergeSpans(append(sp, spansIn(block, n, false)...))
 	}
 	return sp
 }
@@ -85,24 +85,21 @@ func commandSpans(block, cmd string, split bool) [][2]int {
 // spansIn es commandSpans; quoted: cmd es un texto citado entre comillas («token X» es una palabra más y la prosa de la
 // lista spProse no es un comando).
 //
-// split: la plataforma separa comandos con « ; » (NX-OS, ISE). Sin ella (IOS, o plataforma desconocida) un « ; » puede ser
-// parte del valor: el tramo llega hasta el fin de la línea y se tapa de más, nunca de menos.
-func spansIn(block, cmd string, quoted, split bool) (spans [][2]int) {
+// Cada segmento « ; » se evalúa por separado para reconocer su primer comando (los anteriores al de la palabra de secreto
+// quedan visibles), pero el primer tramo se alarga hasta el fin de la línea, también en NX-OS e ISE: ahí « ; » separa
+// comandos, y lo que sigue a un « ; » dentro de un valor («password abc ; def») es el resto del secreto; adivinar dónde
+// termina falla hacia el lado de mostrar. Costo aceptado: no se ven los comandos posteriores al secreto.
+func spansIn(block, cmd string, quoted bool) (spans [][2]int) {
 	pos := 0
-	for _, seg := range strings.Split(cmd, spSep) { // cada comando de NX-OS por separado: el primero de cada uno decide
+	for _, seg := range strings.Split(cmd, spSep) {
 		spans = append(spans, shiftSpans(spansSeg(block, seg, quoted), pos)...)
 		pos += len(seg) + len(spSep)
 	}
-	if !split { // un « ; » puede ser del valor: el primer tramo se alarga hasta el fin de la línea
-		if len(spans) > 0 {
-			spans = [][2]int{{spans[0][0], len(cmd)}}
-		}
+	if len(spans) > 0 {
+		spans = [][2]int{{spans[0][0], len(cmd)}}
 	}
 	return spans
 }
-
-// splitsSemi: la plataforma usa « ; » como separador de comandos.
-func splitsSemi(platform string) bool { return platform == "nx-os" || platform == "ise" }
 
 func spansSeg(block, cmd string, quoted bool) (spans [][2]int) {
 	toks := spToken.FindAllStringIndex(cmd, -1)

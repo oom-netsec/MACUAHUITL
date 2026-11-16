@@ -706,7 +706,7 @@ func Cmd(platform, cmd string) string {
 	counts := map[string]int{}
 	lines := strings.Split(cmd, "\n")
 	for i, l := range lines {
-		sp := commandSpans(spLogBlock, l, splitsSemi(platform))
+		sp := commandSpans(spLogBlock, l)
 		sp = mergeSpans(append(sp, twinSpans(l, func(n string) string { return maskLogged(n, platform, counts) })...)) // las reglas solo ven el espacio ASCII
 		lines[i], _ = cut(l, maskLogged(l, platform, counts), sp)
 	}

@@ -44,11 +44,12 @@ func cut(orig, s1 string, spans [][2]int) (string, int) {
 	if len(spans) == 0 {
 		return s1, 0
 	}
+	spans = mergeSpans(spans)
 	if k := strings.Count(orig, spSep); k > 0 && k == strings.Count(s1, spSep) {
 		os, ss := strings.Split(orig, spSep), strings.Split(s1, spSep)
 		pos, total, j := 0, 0, 0
 		for i := range os {
-			lo, hi := -1, -1
+			lo, hi, toEOL := -1, -1, false
 			end := pos + len(os[i])
 			// Los tramos vienen ordenados y sin cruzarse (mergeSpans): los que terminaron antes de este segmento ya no sirven.
 			for j < len(spans) && spans[j][1] <= pos {
@@ -61,7 +62,12 @@ func cut(orig, s1 string, spans [][2]int) (string, int) {
 						lo = a - pos
 					}
 					hi = max(hi, b-pos)
+					toEOL = toEOL || sp[1] > end && sp[1] == len(orig)
 				}
+			}
+			if lo >= 0 && toEOL { // el tramo llega al fin de la línea: lo que sigue a un « ; » es el resto del secreto
+				tail, n := cutOne(strings.Join(os[i:], spSep), strings.Join(ss[i:], spSep), lo, len(orig)-pos)
+				return strings.Join(append(ss[:i:i], tail), spSep), total + n
 			}
 			if lo >= 0 {
 				var n int
@@ -148,7 +154,7 @@ func loggedSpans(line, platform string) [][2]int {
 		return shiftSpans(loggedSpans(ind+line[m[4]:], platform), m[4]-len(ind))
 	}
 	at := func(m []int) [][2]int {
-		return shiftSpans(spansIn(spLogBlock, line[m[4]:m[5]], false, splitsSemi(platform)), m[4])
+		return shiftSpans(spansIn(spLogBlock, line[m[4]:m[5]], false), m[4])
 	}
 	if m := loggedCmd.FindStringSubmatchIndex(line); m != nil {
 		return at(m)
@@ -197,7 +203,7 @@ func quotedSpansQ(line string, q byte) (spans [][2]int) {
 	}
 	qs := string(q)
 	if strings.Count(line, qs)%2 == 1 {
-		return shiftSpans(spansIn("", line[first+1:], true, false), first+1)
+		return shiftSpans(spansIn("", line[first+1:], true), first+1)
 	}
 	pos := first + 1
 	for k := 0; pos <= len(line); k++ {
@@ -206,7 +212,7 @@ func quotedSpansQ(line string, q byte) (spans [][2]int) {
 			end = pos + j
 		}
 		if seg := line[pos:end]; k%2 == 0 {
-			sp := spansIn("", seg, true, false)
+			sp := spansIn("", seg, true)
 			reach := len(sp) > 0 && sp[len(sp)-1][1] == len(seg) // antes de mover los tramos
 			spans = append(spans, shiftSpans(sp, pos)...)
 			// El valor trae comillas propias («enable secret "x y"», «secret x"y»): la comilla que cierra el tramo lo abre.
@@ -268,7 +274,7 @@ func CutCommandV(block, orig, s1 string) (string, []SecretValue) {
 		orig = strings.ReplaceAll(orig, `\"`, `"`)
 	}
 	n := normSpaces(orig) // mismos índices que orig: los tramos y los valores salen de los dos textos
-	spans := append(commandSpans(block, orig, false), quotedSpans(orig)...)
+	spans := append(commandSpans(block, orig), quotedSpans(orig)...)
 	if n != orig {
 		spans = append(spans, quotedSpans(n)...) // commandSpans ya probó la copia
 	}
@@ -313,7 +319,7 @@ func CutText(platform, orig, s1 string) string {
 
 // endsInKeyword: el tramo termina en una palabra de secreto que aún no tiene valor.
 func endsInKeyword(seg string) bool {
-	d := spansIn("", seg+" X", true, false)
+	d := spansIn("", seg+" X", true)
 	return len(d) > 0 && d[len(d)-1][0] == len(seg)+1
 }
 
@@ -321,7 +327,7 @@ func endsInKeyword(seg string) bool {
 // Sirve para saber qué parte de un eco partido por un syslog cae dentro del secreto.
 func SecretStart(block, cmd string) int {
 	cmd = strings.ReplaceAll(cmd, `\"`, `"`)
-	spans := append(commandSpans(block, cmd, false), quotedSpans(cmd)...)
+	spans := append(commandSpans(block, cmd), quotedSpans(cmd)...)
 	if n := normSpaces(cmd); n != cmd {
 		spans = append(spans, quotedSpans(n)...)
 	}
