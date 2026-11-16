@@ -20,6 +20,7 @@ import (
 )
 
 func main() {
+	sys.ConsoleUTF8() // en Windows, la consola cp437 rompe los acentos
 	showVersion := flag.Bool("version", false, "imprime la versión y sale")
 	lang := flag.String("lang", "", "idioma de los avisos de la consola: en (por omisión) o es")
 	flag.Parse()

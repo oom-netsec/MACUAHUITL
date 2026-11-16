@@ -41,3 +41,17 @@ func RedirectStderr(path string) error {
 	redirected = true
 	return nil
 }
+
+// cpUTF8 es CP_UTF8.
+const cpUTF8 = 65001
+
+// ConsoleUTF8 pone la página de códigos de salida de la consola en UTF-8 (CP_UTF8): con la cp437 de siempre los acentos
+// salen rotos. Solo si stdout es una consola (GetConsoleMode); con -H windowsgui o con la salida redirigida no hay consola
+// que cambiar y no hace nada. Mejor esfuerzo: un fallo se ignora.
+func ConsoleUTF8() {
+	var mode uint32
+	if windows.GetConsoleMode(windows.Handle(os.Stdout.Fd()), &mode) != nil {
+		return
+	}
+	windows.SetConsoleOutputCP(cpUTF8)
+}

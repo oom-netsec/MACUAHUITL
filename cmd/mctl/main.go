@@ -48,6 +48,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/visibility"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"github.com/oom-netsec/MACUAHUITL/internal/termcolor"
 	"github.com/oom-netsec/MACUAHUITL/internal/version"
 )
@@ -74,6 +75,7 @@ var areas = []cli.Area{
 }
 
 func main() {
+	sys.ConsoleUTF8() // en Windows, la consola cp437 rompe los acentos
 	if err := run(os.Args[1:], os.Stdin, os.Stdout); err != nil {
 		printErr(os.Stderr, err)
 		os.Exit(cli.ExitCode(err))

@@ -18,3 +18,9 @@ func TestOpenLogNacePrivadoEnWindows(t *testing.T) {
 	f.Close()
 	systest.Private(t, p, 0o600)
 }
+
+// Sin consola (el runner de CI redirige stdout) ConsoleUTF8 no falla ni cambia nada.
+func TestConsoleUTF8SinConsola(t *testing.T) {
+	sys.ConsoleUTF8()
+	sys.ConsoleUTF8() // idempotente
+}
