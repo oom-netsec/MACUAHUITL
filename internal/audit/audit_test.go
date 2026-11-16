@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -281,5 +282,44 @@ func TestVerifyConRegistrosMixtosEspanolEIngles(t *testing.T) {
 	var b bytes.Buffer
 	if err := l.Export(ctx, &b, time.Time{}, time.Now().Add(time.Hour)); err != nil || !bytes.Contains(b.Bytes(), []byte("pasaron=1 de 2")) || !bytes.Contains(b.Bytes(), []byte("passed=1 of 2")) {
 		t.Fatalf("export: %v\n%s", err, b.String())
+	}
+}
+
+// Un Append que choca con un escritor de otra conexión más allá de busy_timeout se reintenta: la entrada no se pierde.
+// En windows-latest bastó un escritor en bucle para perder 3 de 200 (los bloqueos de archivo de Windows son mucho más
+// lentos); aquí se reproduce en cualquier sistema con un busy_timeout corto y un bloqueo de escritura que dura más.
+func TestAppendReintentaConLaBaseOcupada(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "m.db")
+	db0, err := store.Open(path) // crea el esquema
+	if err != nil {
+		t.Fatal(err)
+	}
+	db0.Close()
+	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(20)&_txlock=immediate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	other, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { other.Close() })
+	conn, err := other.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		t.Fatal(err)
+	}
+	released := make(chan error, 1)
+	time.AfterFunc(150*time.Millisecond, func() { _, err := conn.ExecContext(ctx, "COMMIT"); released <- err })
+	if _, err := New(db, time.Now).Append(ctx, Entry{Actor: "t", Action: "prueba"}); err != nil {
+		t.Fatalf("Append con la base ocupada 150 ms (busy_timeout 20 ms): %v", err)
+	}
+	if err := <-released; err != nil {
+		t.Fatal(err)
 	}
 }
