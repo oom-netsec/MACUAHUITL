@@ -315,6 +315,7 @@ func apply(platform, text string, line func(*Stream, string) (string, bool)) (st
 // cadenas de certificados), para enmascarar una salida que llega por trozos.
 type Stream struct {
 	block, skip string
+	shadow      *Stream  // tras una marca de recorte: la v0.6.5 con la marca como una línea más (ver shadowSpans)
 	qblock      string   // bloque de la última línea de configuración citada sin sangría (quoted)
 	twin        [][2]int // tramos que taparía la cadena de reglas sobre la copia con los espacios Unicode normalizados (LineS1)
 	table       string   // tabla de NX-OS/IOS en curso: "community", "host" o "isakmp"
@@ -341,6 +342,17 @@ func (s *Stream) Line(raw string) (string, bool) {
 // contenido propia (la terminal) la corre antes de CutLine: S1 → red M₁ → corte M₂.
 func (s *Stream) LineS1(raw string) (string, bool) {
 	s.twin = nil
+	if isTruncMark(raw) {
+		// La marca es transparente para S1 (sombra a), pero la v0.6.5 la ve como una línea más (sombra b): desde aquí corren las
+		// dos y cada línea se tapa con la unión de lo que tapan (ver shadowSpans).
+		if s.shadow == nil {
+			c := *s
+			c.counts, c.shadow = map[string]int{}, nil
+			s.shadow = &c
+		}
+		s.shadow.line1(raw)
+		return raw, true
+	}
 	if line, eol := splitEOL(raw); hasHigh(line) {
 		// Las reglas de configuración impresa solo ven el espacio ASCII (NBSP entre «api-key» y el valor): se corre la misma
 		// cadena sobre la copia normalizada, con el estado de antes de esta línea, y lo que tape se corta sobre S1 en CutLine.
@@ -351,11 +363,42 @@ func (s *Stream) LineS1(raw string) (string, bool) {
 			return strings.TrimSuffix(t, eol)
 		})
 	}
-	return s.line1(raw)
+	out, ok := s.line1(raw)
+	if s.shadow != nil {
+		s.shadowSpans(raw, out, ok)
+	}
+	return out, ok
+}
+
+// shadowSpans corre la sombra b (la v0.6.5 con la marca como una línea más) sobre raw y, si su salida difiere de la de a
+// (outA), suma a s.twin lo que b tapa y a no: CutLine lo corta sobre la salida de a. La salida es la unión de a y b; nunca
+// muestra más que ref065 con la marca ni sin ella. La sombra solo existe tras una marca (salidas de más de 64 MiB) y dura
+// hasta el fin del flujo o el siguiente prompt (Prompted).
+func (s *Stream) shadowSpans(raw, outA string, okA bool) {
+	line, eol := splitEOL(raw)
+	t, okB := s.shadow.line1(raw)
+	switch {
+	case !okB && okA: // b descarta la línea (cuerpo de una llave): a la deja entera, se tapa entera
+		s.twin = append(s.twin, [2]int{0, len(line)})
+	case okB && t != outA: // si b tapa lo mismo que a no se suma nada: no se pierde el tipo del marcador ni sube el conteo
+		s.twin = append(s.twin, diffSpans(line, strings.TrimSuffix(t, eol))...)
+	}
+}
+
+// truncMark es la línea fija que el driver inserta al recortar una salida enorme (iosxe.add). No lleva ningún valor, así
+// que es transparente: se emite tal cual y no toca el estado (bloque, llave, cadena, tabla), y S1 ve el texto como si no existiera.
+var truncMark = regexp.MustCompile(`^\[\x{2026} output truncated: \d+ bytes omitted \x{2026}\]$`)
+
+func isTruncMark(raw string) bool {
+	line, _ := splitEOL(raw)
+	return truncMark.MatchString(line)
 }
 
 // CutLine es el corte de Line sobre s1, la salida (de LineS1, quizá con la red por contenido ya aplicada) de raw.
 func (s *Stream) CutLine(raw, s1 string) string {
+	if isTruncMark(raw) {
+		return s1
+	}
 	line, eol := splitEOL(raw)
 	orig, spans := lineSpans(line, s.Platform)
 	spans = mergeSpans(append(spans, s.twin...))
@@ -588,8 +631,9 @@ func (s *Stream) Prompted(line, block string) string {
 	if s.counts == nil {
 		s.counts = map[string]int{}
 	}
-	s.table = "" // ni una tabla de show sigue abierta tras un prompt
-	s.skip = ""  // un prompt no es cuerpo de llave ni de certificado: lo que esté abierto termina aquí
+	s.table = ""   // ni una tabla de show sigue abierta tras un prompt
+	s.shadow = nil // ni la sombra de una marca de recorte: su tabla tampoco sigue abierta
+	s.skip = ""    // un prompt no es cuerpo de llave ni de certificado: lo que esté abierto termina aquí
 	if line != "" {
 		s.block = blockOf(line)
 	}

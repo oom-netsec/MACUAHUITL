@@ -3,6 +3,9 @@ package patrol
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -15,6 +18,7 @@ import (
 
 	"errors"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform"
 	"github.com/oom-netsec/MACUAHUITL/internal/platform/iosxe"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
@@ -29,13 +33,16 @@ type cutState struct {
 	cut           map[string]error // comando -> error que devuelve la primera vez que corre
 	ran           []string
 	opened, close int
-	failOpenFrom  int    // desde esta sesión (1 = la primera), Open falla
-	onCut         func() // se llama al cortar un comando
+	failOpenFrom  int      // desde esta sesión (1 = la primera), Open falla
+	onCut         func()   // se llama al cortar un comando
+	hostFrom2     string   // desde la segunda sesión el prompt dice este nombre (el mismo equipo con otro prompt, p. ej. prompt hostname state)
+	serialsFrom2  []string // desde la segunda sesión el driver dice estas series (otro equipo tras la misma IP)
 }
 
 type cutDrv struct {
 	platform.Driver
 	st *cutState
+	n  int // número de sesión de este driver (1 = la primera)
 }
 
 func newCut(t *testing.T, e *env, cut map[string]error) *cutState {
@@ -45,7 +52,7 @@ func newCut(t *testing.T, e *env, cut map[string]error) *cutState {
 		st.mu.Lock()
 		defer st.mu.Unlock()
 		st.opened++
-		return &cutDrv{Driver: iosxe.New(), st: st}
+		return &cutDrv{Driver: iosxe.New(), st: st, n: st.opened}
 	}
 	return st
 }
@@ -59,6 +66,24 @@ func (p *cutDrv) Open(ctx context.Context, r io.Reader, w io.Writer, en *secret.
 		return platform.ErrEnableFailed
 	}
 	return p.Driver.Open(ctx, r, w, en)
+}
+
+func (p *cutDrv) Hostname() string {
+	p.st.mu.Lock()
+	defer p.st.mu.Unlock()
+	if p.n >= 2 && p.st.hostFrom2 != "" {
+		return p.st.hostFrom2
+	}
+	return p.Driver.Hostname()
+}
+
+func (p *cutDrv) Serials() []string {
+	p.st.mu.Lock()
+	defer p.st.mu.Unlock()
+	if p.n >= 2 && p.st.serialsFrom2 != nil {
+		return p.st.serialsFrom2
+	}
+	return p.Driver.(interface{ Serials() []string }).Serials()
 }
 
 func (p *cutDrv) Close() {
@@ -251,6 +276,213 @@ func TestCancelacionNoSeAnotaComoCorte(t *testing.T) {
 	st.onCut = cancel
 	res, _ := runPartial(t, e, ctx)
 	if res.State != "failed" || len(res.CutCommands) != 0 {
+		t.Fatalf("res = %+v", res)
+	}
+}
+
+func TestReconexionAOtroEquipoFalla(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
+	st.serialsFrom2 = []string{"OTRA-SERIE"} // mismo prompt, otra unidad (un par en failover con prompt por omisión)
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if res.State != "failed" || !strings.Contains(res.Detail, "FOC0000X0XX") || !strings.Contains(res.Detail, "OTRA-SERIE") {
+		t.Fatalf("res = %+v", res)
+	}
+	var c interface{ Reason() string }
+	if !errors.As(res.DetailErr, &c) || c.Reason() != "patrol.err.reconnect_other_device" {
+		t.Fatalf("razón: %v", res.DetailErr)
+	}
+	if st.count("show ip interface brief") != 0 || st.opened != 2 || st.close != 2 {
+		t.Fatalf("no debe correr nada en el otro equipo: ran=%v opened=%d closed=%d", st.ran, st.opened, st.close)
+	}
+}
+
+// El mismo equipo con otro prompt (prompt hostname state, %n de la línea vty) no es otro equipo: sigue.
+func TestReconexionMismaSerieConOtroPromptSigue(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
+	st.hostFrom2 = "OTRO-PROMPT"
+	res, _ := runPartial(t, e, context.Background())
+	if res.State != "partial" || res.Reconnects != 1 {
+		t.Fatalf("res = %+v", res)
+	}
+}
+
+func TestReconexionConservaLaPrimeraLlaveCambiada(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	_, k1 := simulator.Start(t, e.simCfg)
+	_, k2 := simulator.Start(t, e.simCfg)
+	hp := hostport(e.spec.Targets[0])
+	e.d.Hosts.Add(hp, k1)
+	e.spec.AcceptChangedHostKeys = true
+	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
+	st.onCut = func() { e.d.Hosts.Add(hp, k2) } // la reconexión ve otra llave cambiada
+	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
+	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
+	if res.State != "partial" || res.ChangedHostKey == nil || res.ChangedHostKey.Old != fp(k1.Marshal()) {
+		t.Fatalf("la primera llave cambiada se perdió: %+v", res.ChangedHostKey)
+	}
+}
+
+func TestCorteEnElUltimoConReconexionesAgotadasYUnaSalidaCompletaEsParcial(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.spec.CustomCommands = "show version\nshow clock\nshow users\nshow running-config"
+	newCut(t, e, map[string]error{"show clock": platform.ErrPromptTimeout, "show users": platform.ErrClosed, "show running-config": platform.ErrPromptTimeout})
+	res, _ := runPartial(t, e, context.Background())
+	if res.State != "partial" || res.Reconnects != maxReconnects || len(res.CutCommands) != 3 { // show version salió completo
+		t.Fatalf("res = %+v", res)
+	}
+}
+
+// Un comando cortado con secreto (uno personalizado) no deja el valor en la auditoría, el detalle, el manifest ni la cabecera.
+func TestComandoCortadoSecretoVaEnmascarado(t *testing.T) {
+	const cmd, val = "show running-config interface Gi1 key 7 0822455D0A16", "0822455D0A16"
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.spec.CustomCommands = "show version\n" + cmd + "\nshow clock"
+	newCut(t, e, map[string]error{cmd: platform.ErrPromptTimeout})
+	res, w := runPartial(t, e, context.Background())
+	if res.State != "partial" || len(res.CutCommands) != 1 {
+		t.Fatalf("res = %+v", res)
+	}
+	m, _ := Finish(context.Background(), e.d, w, e.spec, 1, []DeviceResult{res})
+	mj, _ := json.Marshal(m)
+	var buf bytes.Buffer
+	e.d.Audit.Export(context.Background(), &buf, time.Time{}, time.Now().Add(time.Hour))
+	for name, txt := range map[string]string{"detalle": res.Detail, "cortados": strings.Join(res.CutCommands, "|"), "manifest": string(mj), "auditoría": buf.String(), "evidencia": evidence(w)} {
+		if strings.Contains(txt, val) {
+			t.Errorf("%s trae el valor: %s", name, txt)
+		}
+	}
+	if !strings.Contains(evidence(w), "show running-config interface Gi1 key 7 <MASKED:secret> · incomplete") {
+		t.Fatalf("cabecera: %s", evidence(w))
+	}
+}
+
+// Enmascarar el comando de la cabecera no debe tocar ningún comando de los playbooks.
+func TestCmdNoTocaLosComandosDeLosPlaybooks(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	for _, p := range e.d.Playbooks {
+		for _, c := range p.Commands {
+			if got := mask.Cmd(p.Platform, c.Text); got != c.Text {
+				t.Errorf("%s: %q -> %q", p.ID, c.Text, got)
+			}
+		}
+	}
+}
+
+// fp es la huella SHA256 de una llave pública en wire format (como la de ssh.FingerprintSHA256).
+func fp(b []byte) string {
+	h := sha256.Sum256(b)
+	return "SHA256:" + base64.RawStdEncoding.EncodeToString(h[:])
+}
+
+// Partial solo con al menos una salida completa que no sea inválida: si todo se cortó (o lo demás fue inválido) el equipo
+// queda failed, con 1, 2 o 3 comandos y sin importar las reconexiones.
+func TestTodoCortadoOSoloInvalidoFalla(t *testing.T) {
+	cortes := func(cs ...string) map[string]error {
+		m := map[string]error{}
+		for _, c := range cs {
+			m[c] = platform.ErrPromptTimeout
+		}
+		return m
+	}
+	for name, c := range map[string]struct {
+		cmds string
+		cut  map[string]error
+	}{
+		"uno":                     {"show version", cortes("show version")},
+		"dos":                     {"show version\nshow users", cortes("show version", "show users")},
+		"tres":                    {"show version\nshow users\nshow running-config", cortes("show version", "show users", "show running-config")},
+		"un invalido y dos":       {"show clock\nshow version\nshow users", cortes("show version", "show users")},
+		"uno completo y un corte": {"show version\nshow users", cortes("show users")}, // este sí es partial
+	} {
+		e := newEnv(t, simulator.Config{})
+		e.trust(t)
+		e.spec.CustomCommands = c.cmds
+		newCut(t, e, c.cut)
+		res, _ := runPartial(t, e, context.Background())
+		want := "failed"
+		if strings.HasPrefix(name, "uno completo") {
+			want = "partial"
+		}
+		if res.State != want || (want == "failed" && res.DetailErr == nil) {
+			t.Errorf("%s: res = %+v", name, res)
+		}
+	}
+}
+
+// Qué hace la reconexión con las series de las dos sesiones (fixtures inventadas: un stack de 3 con switchover, un par ASA
+// en failover, una sesión sin serie y un FTD con UUID).
+func TestOtroEquipoSegunLasSeries(t *testing.T) {
+	stack := []string{"FCW2233A0AA", "FCW2233A0BB", "FCW2233A0CC"}
+	for name, c := range map[string]struct {
+		hostA, platA string
+		serA         []string
+		hostB, platB string
+		serB         []string
+		other, note  bool
+	}{
+		"stack con switchover: interseccion, sigue y se audita": {"SW1", "ios-xe", stack, "SW1", "ios-xe", []string{"FCW2233A0BB", "FCW2233A0CC"}, false, true},
+		"stack igual: sigue sin nota":                           {"SW1", "ios-xe", stack, "SW1", "ios-xe", stack, false, false},
+		"par asa: disjuntos":                                    {"asa", "asa", []string{"JAD2233A0AA"}, "asa", "asa", []string{"JAD2233A0BB"}, true, false},
+		"sin serie, mismo hostname: sigue":                      {"WLC1", "wlc-aireos", nil, "WLC1", "wlc-aireos", nil, false, false},
+		"sin serie, otro hostname: otro":                        {"ISE1", "ise", nil, "ISE2", "ise", nil, true, false},
+		"a una le falta la serie, otro hostname: otro":          {"SW1", "ios-xe", stack, "SW2", "ios-xe", nil, true, false},
+		"ftd con uuid":                                          {"fw", "ftd", []string{"1b2c3d4e-0000"}, "fw", "ftd", []string{"1b2c3d4e-0000"}, false, false},
+		"dos virtuales con serie de relleno y UUID distinto":    {"fw", "ftd", []string{"1b2c3d4e-0001"}, "fw", "ftd", []string{"1b2c3d4e-0002"}, true, false},
+		"otra plataforma":                                       {"fw", "asa", []string{"X"}, "fw", "ftd", []string{"X"}, true, false},
+	} {
+		other, note := otherDevice(c.hostA, c.platA, c.serA, c.hostB, c.platB, c.serB)
+		if other != c.other || note != c.note {
+			t.Errorf("%s: other=%v note=%v", name, other, note)
+		}
+	}
+}
+
+// Un switchover que cambia el conjunto de series pero conserva alguna: la ronda sigue y la auditoría deja la nota.
+func TestReconexionConInterseccionDeSeriesSeAudita(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
+	st.serialsFrom2 = []string{"FOC0000X0XX", "FOC0000X0YY"}
+	res, _ := runPartial(t, e, context.Background())
+	var buf bytes.Buffer
+	e.d.Audit.Export(context.Background(), &buf, time.Time{}, time.Now().Add(time.Hour))
+	if res.State != "partial" || !strings.Contains(buf.String(), "serial set changed") {
+		t.Fatalf("res = %+v\n%s", res, buf.String())
+	}
+}
+
+// Los Pre de un playbook (ajustes de sesión) no son una salida completa: si todo lo demás se corta, el equipo queda failed.
+func TestSoloPreCompletoFalla(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.d.Playbooks = append(e.d.Playbooks, playbook.Playbook{ID: "ios-xe/pre-prueba", Platform: "ios-xe", Name: "pre", Pre: []string{"show ip interface brief"},
+		Commands: []playbook.Command{{Text: "show version", Timeout: time.Minute}, {Text: "show users", Timeout: time.Minute}}})
+	e.spec.PlaybookIDs, e.spec.CustomCommands = []string{"ios-xe/pre-prueba"}, ""
+	newCut(t, e, map[string]error{"show version": platform.ErrPromptTimeout, "show users": platform.ErrPromptTimeout})
+	res, _ := runPartial(t, e, context.Background())
+	if res.State != "failed" {
+		t.Fatalf("res = %+v", res)
+	}
+}
+
+// Un texto que es Pre de un playbook y también comando de evidencia (de otro o de los propios) cuenta como salida completa.
+func TestPreQueTambienEsEvidenciaCuenta(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.d.Playbooks = append(e.d.Playbooks, playbook.Playbook{ID: "ios-xe/pre-prueba", Platform: "ios-xe", Name: "pre", Pre: []string{"show ip interface brief"},
+		Commands: []playbook.Command{{Text: "show version", Timeout: time.Minute}, {Text: "show users", Timeout: time.Minute}}})
+	e.spec.PlaybookIDs, e.spec.CustomCommands = []string{"ios-xe/pre-prueba"}, "show ip interface brief\n"
+	newCut(t, e, map[string]error{"show version": platform.ErrPromptTimeout, "show users": platform.ErrPromptTimeout})
+	res, _ := runPartial(t, e, context.Background())
+	if res.State != "partial" {
 		t.Fatalf("res = %+v", res)
 	}
 }

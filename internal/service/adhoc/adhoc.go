@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -60,7 +61,11 @@ func (s *adhocSvc) StartAdhoc(ctx context.Context, r *v1.StartAdhocRequest) (*v1
 	s.mu.Lock()
 	s.cmds[cj.JobId] = cmds
 	s.mu.Unlock()
-	s.d.Audit("adhoc.start", cj.JobId, fmt.Sprintf("devices=%d commands=%q", len(r.Targets), cmds))
+	shown := make([]string, len(cmds)) // la plataforma del destino no se conoce aún: mask.Cmd funciona sin ella
+	for i, c := range cmds {
+		shown[i] = mask.Cmd("", c)
+	}
+	s.d.Audit("adhoc.start", cj.JobId, fmt.Sprintf("devices=%d commands=%q", len(r.Targets), shown))
 	ar, err := p.ArmJob(ctx, &v1.ArmJobRequest{JobId: cj.JobId, AcceptedHostKeyFingerprints: r.AcceptedHostKeyFingerprints, ExcludedDeviceIds: r.ExcludedDeviceIds})
 	if err != nil {
 		// El trabajo queda creado: se revisa con LoginTest y se arma con ArmJob, como cualquier otro.

@@ -132,3 +132,9 @@
   - `TestHeartbeat`: con reloj real y latido configurable a 50 ms en la prueba, llegan ≥ 2 latidos en 150 ms.
 - [ ] **Step 2:** FAIL. **Step 3:** Implementar. **Step 4:** `go test -race ./...` → PASS; noegress → 0.
 - [ ] **Step 5:** Commit `feat(engine): scheduler, runner con límite global y EventBus`.
+
+## Reconexión tras un corte (v0.7.1)
+
+- El equipo reconectado debe ser el mismo: se comparan los conjuntos de series del `show version` (`Detect`: `System serial number` de cada miembro de un stack, `Processor board ID`, `Serial Number:` de ASA, UUID de FTD). Con intersección sigue (y la auditoría anota `serial set changed` si el conjunto cambió); disjuntos, el equipo queda failed («el equipo tras la reconexión es otro»). Sin serie en alguna sesión se compara hostname y plataforma. El prompt no sirve: un par ASA lo repite y un clúster con `prompt hostname state` lo cambia.
+- **Limitación conocida:** tras un switchover SSO (VSS/SVL, 9800 HA SSO, N7K con dos supervisoras) cuyo `show version` de la activa no liste la serie de la otra, la reconexión puede parar con «otro equipo»; se repite el trabajo. Falla del lado seguro; falta validarla en laboratorio.
+- `partial` exige al menos una salida completa que no sea inválida; si no, `failed`.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -97,6 +98,7 @@ type driver struct {
 	err      error // primer error; desde ahí el driver no se reutiliza
 	buf      []byte
 	hostname string
+	serials  []string // las series que mostró el show version de Detect (todas las del stack, ordenadas); vacío si no trae
 	// AireOS: aire se activa al ver su prompt; user/login son la credencial del shell (login se destruye tras usarla).
 	aire  bool
 	user  string
@@ -742,6 +744,36 @@ var (
 
 var asa = regexp.MustCompile(`(?m)^Cisco Adaptive Security Appliance Software Version`)
 
+// serialRe: «System serial number» (cada miembro de un stack), «Processor board ID» (IOS, IOS-XE, NX-OS), «Serial Number:»
+// (ASA) y el UUID de FTD.
+var serialRe = regexp.MustCompile(`(?im)^\s*(?:System serial number\s*:|Processor board ID\s|Serial Number\s*:|UUID\s*:)\s*(\S+)`)
+
+// parseSerials da las series de un show version, sin duplicados y ordenadas; nil si no trae ninguna.
+func parseSerials(text string) []string {
+	var out []string
+	for _, m := range serialRe.FindAllStringSubmatch(text, -1) {
+		if !serialFiller(m[1]) {
+			out = append(out, m[1])
+		}
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// serialFiller: valores de relleno que dos unidades distintas (virtuales) comparten y no identifican nada: None, N/A, NA,
+// Unknown, "-" y los ceros puros, sin distinguir mayúsculas.
+func serialFiller(v string) bool {
+	switch strings.ToLower(v) {
+	case "none", "n/a", "na", "unknown", "-", "null", "not": // «Not Available» llega como «Not» (la regex toma \S+)
+		return true
+	}
+	return strings.Trim(v, "0-") == "" // ceros puros, también un UUID todo en ceros
+}
+
+// Serials son las series que vio Detect (vacío si no trae ninguna): la identidad del equipo, a diferencia del prompt, que
+// un par en failover repite y un clúster cambia de unidad a unidad.
+func (d *driver) Serials() []string { return d.serials }
+
 func (d *driver) Detect(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, maxDetect)
 	defer cancel()
@@ -759,6 +791,7 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	d.serials = parseSerials(out.Text)
 	switch {
 	case adeOS.MatchString(out.Text) && iseApp.MatchString(out.Text): // ADE-OS de otro producto no es ISE
 		return "ise", nil

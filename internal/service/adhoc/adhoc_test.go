@@ -151,3 +151,26 @@ func TestAdhocResultInformeEnIngles(t *testing.T) {
 		t.Fatalf("csv=%q", r.Csv)
 	}
 }
+
+type fakePatrol struct {
+	v1.UnimplementedPatrolServiceServer
+}
+
+func (fakePatrol) CreateJob(context.Context, *v1.CreateJobRequest) (*v1.CreateJobResponse, error) {
+	return &v1.CreateJobResponse{JobId: "j1"}, nil
+}
+
+type patrolDeps struct{ *servicetest.Deps }
+
+func (patrolDeps) Patrol() v1.PatrolServiceServer { return fakePatrol{} }
+
+// La auditoría adhoc.start no guarda el valor secreto de un comando.
+func TestStartAdhocAuditaLosComandosEnmascarados(t *testing.T) {
+	d := servicetest.New(t)
+	s := &adhocSvc{d: patrolDeps{d}, cmds: map[string][]string{}}
+	s.StartAdhoc(context.Background(), &v1.StartAdhocRequest{Targets: []*v1.Target{{Address: "10.0.0.1"}}, Commands: "show running-config interface Gi1 key 7 0822455D0A16"})
+	got := d.AuditText()
+	if !strings.Contains(got, "adhoc.start") || strings.Contains(got, "0822455D0A16") {
+		t.Fatalf("auditoría:\n%s", got)
+	}
+}

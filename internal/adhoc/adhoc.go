@@ -13,6 +13,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
 
@@ -63,11 +64,30 @@ func Build(devs []capture.Device, cmds []string) Report {
 		if name == "" {
 			name = d.Address
 		}
+		masked := map[string]map[string]bool{} // por clave enmascarada, las claves crudas distintas del lote que caen en ella
+		for _, c := range cmds {
+			km := capture.Key(mask.Cmd(d.Platform, c))
+			if masked[km] == nil {
+				masked[km] = map[string]bool{}
+			}
+			masked[km][capture.Key(c)] = true
+		}
 		for _, c := range cmds {
 			row := Row{Device: name, Address: d.Address, Command: c}
-			if out, ok := d.Outputs[capture.Key(c)]; ok {
+			// La evidencia y los cortados guardan el comando pasado por mask.Cmd: se busca por el crudo y por el enmascarado,
+			// este último solo si ningún otro comando del lote se enmascara igual (si no, no se sabe de cuál es la salida).
+			k, km := capture.Key(c), capture.Key(mask.Cmd(d.Platform, c))
+			amb := km != k && len(masked[km]) > 1 // el mismo comando repetido no es ambiguo
+			out, ok := d.Outputs[k]
+			_, okm := d.Outputs[km]
+			if !ok && !amb {
+				out, ok = d.Outputs[km]
+			}
+			if amb && !ok && (okm || slices.ContainsFunc(d.Cut, func(x string) bool { return capture.Key(x) == km })) {
+				row.NoteTx = i18n.Tx("adhoc.note.ambiguous")
+			} else if ok {
 				row.OK, row.Output = true, strings.TrimRight(out, "\r\n")
-			} else if d.State == "partial" && slices.ContainsFunc(d.Cut, func(x string) bool { return capture.Key(x) == capture.Key(c) }) {
+			} else if d.State == "partial" && slices.ContainsFunc(d.Cut, func(x string) bool { kx := capture.Key(x); return kx == k || kx == km && !amb }) {
 				row.Note = d.Detail // solo el comando cortado lleva el detalle del corte
 			} else if d.State != "completed" && d.State != "partial" && d.Detail != "" {
 				row.Note = d.Detail

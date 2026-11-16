@@ -94,6 +94,41 @@ func TestDetectIOSXE(t *testing.T) {
 	}
 }
 
+// Detect guarda las series del show version para que Patrol distinga dos equipos con el mismo prompt.
+func TestDetectGuardaLasSeries(t *testing.T) {
+	d, err := open(t, simulator.Config{}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Detect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if s := d.(interface{ Serials() []string }).Serials(); !slices.Equal(s, []string{"FOC0000X0XX"}) {
+		t.Fatalf("Serials = %q", s)
+	}
+}
+
+// parseSerials sobre salidas inventadas en el formato de la documentación de Cisco.
+func TestParseSerials(t *testing.T) {
+	for name, c := range map[string]struct {
+		text string
+		want []string
+	}{
+		"stack de 3": {"Switch 01\n---------\nSystem serial number            : FCW2233A0AA\nSwitch 02\nSystem serial number            : FCW2233A0BB\nSwitch 03\nSystem Serial Number            : FCW2233A0CC\nProcessor board ID FCW2233A0AA\n",
+			[]string{"FCW2233A0AA", "FCW2233A0BB", "FCW2233A0CC"}},
+		"asa":      {"Hardware:   ASA5516, 8192 MB RAM, CPU Atom C2000 2000 MHz\nSerial Number: JAD2233A0AA\n", []string{"JAD2233A0AA"}},
+		"nx-os":    {"  Processor Board ID FOC1234ABCD\n", []string{"FOC1234ABCD"}},
+		"ftd":      {"---[ Cisco Firepower Threat Defense ]---\nUUID      : 1b2c3d4e-0000-1111-2222-333344445555\n", []string{"1b2c3d4e-0000-1111-2222-333344445555"}},
+		"sin":      {"Cisco IOS XE Software, Version 17.9.4a\n", nil},
+		"relleno":  {"Serial Number: None\nProcessor board ID N/A\nSystem serial number : 000000\nSerial Number: -\nSerial Number: UNKNOWN\nSerial Number: Not Available\nUUID : 00000000-0000-0000-0000-000000000000\nUUID : 1b2c3d4e-0000\n", []string{"1b2c3d4e-0000"}},
+		"repetida": {"Processor board ID FCW1\nSystem serial number : FCW1\n", []string{"FCW1"}},
+	} {
+		if got := parseSerials(c.text); !slices.Equal(got, c.want) {
+			t.Errorf("%s: %q != %q", name, got, c.want)
+		}
+	}
+}
+
 func TestDetectIOS(t *testing.T) {
 	d, err := open(t, simulator.Config{Transcripts: dir("ios")}, "en", context.Background())
 	if err != nil {

@@ -23,6 +23,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 	"github.com/oom-netsec/MACUAHUITL/internal/patrol"
 	"github.com/oom-netsec/MACUAHUITL/internal/playbook"
 )
@@ -379,6 +380,9 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 		if len(r.CutCommands) > 0 { // los comandos cortados no tienen salida: se listan para repetirlos a mano
 			q := make([]string, len(r.CutCommands))
 			for i, c := range r.CutCommands {
+				if m.Masked {
+					c = mask.Cmd(r.Platform, c)
+				}
 				q[i] = fmt.Sprintf("%q", c)
 			}
 			fmt.Fprintf(w, " · comandos cortados: %s · %d reconexiones", strings.Join(q, ", "), r.Reconnects)

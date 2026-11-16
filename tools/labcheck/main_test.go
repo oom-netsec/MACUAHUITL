@@ -612,3 +612,19 @@ func TestEquipoParcialListaLosCortados(t *testing.T) {
 		t.Fatalf("reporte:\n%s", got)
 	}
 }
+
+// Un manifest con un comando cortado con secreto (de antes del enmascarado de patrol) no lo deja en el reporte.
+func TestComandoCortadoConSecretoSeEnmascaraEnElReporte(t *testing.T) {
+	job, pack := fixture(t)
+	m := patrol.Manifest{Playbooks: []patrol.PlaybookRef{{ID: "ios/a"}}, Masked: true, Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "10.0.0.1"},
+		Round: 1, Hostname: "sw1", Platform: "ios-xe", State: "partial", CutCommands: []string{"show running-config interface Gi1 key 7 0822455D0A16"}, Reconnects: 1}}}
+	b, _ := json.Marshal(m)
+	write(t, filepath.Join(job, "manifest.json"), string(b))
+	var out strings.Builder
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); strings.Contains(got, "0822455D0A16") || !strings.Contains(got, "<MASKED:") {
+		t.Fatalf("reporte:\n%s", got)
+	}
+}

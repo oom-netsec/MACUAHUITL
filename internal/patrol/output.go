@@ -81,8 +81,9 @@ func (w *Writer) Dir() string { return w.dir }
 
 // Write agrega la salida de un comando. roundStart fija el nombre del archivo de la ronda.
 func (w *Writer) Write(dev Device, round int, roundStart time.Time, out platform.Output, applyMask bool) error {
-	text := out.Text
+	text, command := out.Text, out.Command
 	if applyMask {
+		command = mask.Cmd(dev.Platform, command)
 		var counts map[string]int
 		text, counts = mask.Apply(dev.Platform, text)
 		w.mu.Lock()
@@ -106,10 +107,10 @@ func (w *Writer) Write(dev Device, round int, roundStart time.Time, out platform
 	var rel, header string
 	if w.split == SplitConsolidated {
 		rel = filepath.Join(devDir, dirName(dev.Host)+".txt")
-		header = fmt.Sprintf("===== round %d · %s · %s%s =====\n", round, out.Started.UTC().Format(time.RFC3339), out.Command, note)
+		header = fmt.Sprintf("===== round %d · %s · %s%s =====\n", round, out.Started.UTC().Format(time.RFC3339), command, note)
 	} else {
 		rel = filepath.Join(devDir, fmt.Sprintf("r%03d_%s.txt", round, roundStart.Format(stamp)))
-		header = fmt.Sprintf("===== %s · %s%s =====\n", out.Started.UTC().Format(time.RFC3339), out.Command, note)
+		header = fmt.Sprintf("===== %s · %s%s =====\n", out.Started.UTC().Format(time.RFC3339), command, note)
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
