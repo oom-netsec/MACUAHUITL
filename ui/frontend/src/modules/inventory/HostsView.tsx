@@ -228,7 +228,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
                 </tr></thead>
                 {groups.map(([name, list]) => (
                   <tbody key={name || "\0"} aria-label={name || t("hosts.folder.none")} className={over === name ? "hosts-over" : undefined}
-                    onDragOver={(e) => { if (!drag.current) return;e.dataTransfer.dropEffect = "move"; setOver(name); }}
+                    onDragOver={(e) => { if (!drag.current) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; setOver(name); }}
                     onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver((o) => (o === name ? null : o)); }}
                     onDrop={(e) => { e.preventDefault(); dropOn(name, e.dataTransfer.getData("text/plain")); }}>
                     <tr className="hosts-folder">
