@@ -189,7 +189,7 @@ func New(p Paths, o Options) (*Core, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Core{p: p, o: o, db: db, jobs: map[string]*job{}, activity: o.Now(), stop: make(chan struct{}), live: ipc.NewLive(liveIgnore...)}
+	c := &Core{p: p, o: o, db: db, jobs: map[string]*job{}, activity: o.Now(), stop: make(chan struct{}), live: ipc.NewLive(liveIgnore...).CountUnary(liveUnary...)}
 	c.settings = service.NewCoreSettings(p.Outputs, p.Home, p.Config, p.Data, p.State, p.Runtime)
 	c.log = audit.New(db, o.Now)
 	// Se revalida la carpeta de salidas guardada (dueño, 0700, ancestros): si ya no vale rige la de fábrica y queda en la auditoría.

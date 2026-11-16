@@ -2,6 +2,8 @@ package core
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -46,8 +48,9 @@ func TestShutdownSinTrabajoAuditaYTerminaServe(t *testing.T) {
 	}
 	// Serve ya terminó: la auditoría se lee de la bitácora, no del RPC.
 	var n int
-	if err := h.core.db.QueryRow(`SELECT count(*) FROM audit_log WHERE action = 'core.shutdown'`).Scan(&n); err != nil || n != 1 {
-		t.Fatalf("core.shutdown auditado %d veces (%v)", n, err)
+	want := fmt.Sprintf("pid=%d uid=%d", os.Getpid(), os.Getuid())
+	if err := h.core.db.QueryRow(`SELECT count(*) FROM audit_log WHERE action = 'core.shutdown' AND detail = ?`, want).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("core.shutdown con %q auditado %d veces (%v)", want, n, err)
 	}
 }
 
@@ -87,5 +90,86 @@ func TestShutdownSinAuditoriaNoApaga(t *testing.T) {
 	}
 	if !h.sigueServiendo(t) {
 		t.Fatal("se apagó sin poder auditar")
+	}
+}
+
+// espera a que el contador de trabajo vivo del núcleo muestre algo con ese texto.
+func (h *harness) esperaVivo(t *testing.T, texto string) {
+	t.Helper()
+	for i := 0; i < 500; i++ {
+		for _, l := range h.core.live.Active() {
+			if strings.Contains(l, texto) {
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("no apareció %q en %v", texto, h.core.live.Active())
+}
+
+func (h *harness) noSeApago(t *testing.T, err error, texto string) {
+	t.Helper()
+	if status.Code(err) != codes.FailedPrecondition || !strings.Contains(err.Error(), texto) {
+		t.Fatalf("Shutdown = %v, quería FailedPrecondition con %q", err, texto)
+	}
+	if !h.sigueServiendo(t) {
+		t.Fatal("se apagó con trabajo vivo")
+	}
+}
+
+// Un stream real de trabajo (escucha de syslog) que no está en liveIgnore bloquea el apagado: fija c.live en Serve.
+func TestShutdownConStreamDeEscuchaSeNiega(t *testing.T) {
+	h := newHarness(t, nil)
+	sc, cancel := context.WithCancel(ctx(t))
+	defer cancel()
+	st, err := v1.NewToolsServiceClient(h.conn).Syslog(sc, &v1.SyslogRequest{Addr: "127.0.0.1:0", DurationSeconds: 30})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Recv(); err != nil {
+		t.Fatal(err)
+	}
+	h.noSeApago(t, h.shutdown(t), "ToolsService/Syslog")
+	cancel() // al cerrar la escucha, el núcleo ya puede apagarse
+	h.esperaSinVivo(t)
+	if err := h.shutdown(t); err != nil {
+		t.Fatalf("sin escucha, Shutdown = %v", err)
+	}
+}
+
+func (h *harness) esperaSinVivo(t *testing.T) {
+	t.Helper()
+	for i := 0; i < 500 && len(h.core.live.Active()) > 0; i++ {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if a := h.core.live.Active(); len(a) > 0 {
+		t.Fatalf("sigue vivo: %v", a)
+	}
+}
+
+// Una transferencia unaria viva (Get hacia un TFTP que no contesta) bloquea el apagado.
+func TestShutdownConTransferenciaUnariaSeNiega(t *testing.T) {
+	h := newHarness(t, nil)
+	gc, cancel := context.WithCancel(ctx(t))
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		v1.NewTransferServiceClient(h.conn).Get(gc, &v1.GetRequest{Url: "tftp://127.0.0.1:1/x.bin", DestDir: h.out, TimeoutSeconds: 20})
+		close(done)
+	}()
+	h.esperaVivo(t, "TransferService/Get")
+	h.noSeApago(t, h.shutdown(t), "TransferService/Get")
+	cancel()
+	<-done
+}
+
+// El Busy de assist está cableado al apagado (assist.Module{Busy: c.addBusy}): sin él, una ejecución asistida viva no se vería.
+func TestShutdownTieneLaFuenteDeAssist(t *testing.T) {
+	h := newHarness(t, nil)
+	h.core.mu.Lock()
+	n := len(h.core.busy)
+	h.core.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("fuentes de trabajo registradas = %d, quería 1 (assist)", n)
 	}
 }

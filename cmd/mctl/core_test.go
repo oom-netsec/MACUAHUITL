@@ -132,8 +132,9 @@ func TestCoreStopUnavailableEsperaAlPID(t *testing.T) {
 }
 
 func TestCoreStopPIDInvalidoSale1(t *testing.T) {
-	coreStopEnv(t, func() error { return nil })
+	coreStopEnv(t, func() error { t.Error("llamó a Shutdown con PID 0"); return nil })
 	corecmd.ServerPID = func(string) (int, error) { return 0, nil }
+	corecmd.WaitExit = func(int, time.Duration) error { t.Error("no debía llamar a Shutdown ni esperar con PID 0"); return nil }
 	if _, err := mctlRaw(t, "", "core", "stop"); err == nil || cli.ExitCode(err) != 1 {
 		t.Fatalf("err = %v", err)
 	}

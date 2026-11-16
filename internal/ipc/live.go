@@ -1,6 +1,7 @@
 package ipc
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -16,36 +17,62 @@ type Live struct {
 	mu     sync.Mutex
 	n      map[string]int
 	ignore map[string]bool
+	unary  map[string]bool
 }
 
 // NewLive arma el contador; ignore son métodos «Servicio/Método» (sin el prefijo del paquete).
 func NewLive(ignore ...string) *Live {
-	l := &Live{n: map[string]int{}, ignore: map[string]bool{}}
+	l := &Live{n: map[string]int{}, ignore: map[string]bool{}, unary: map[string]bool{}}
 	for _, m := range ignore {
 		l.ignore[m] = true
 	}
 	return l
 }
 
-// Options es el interceptor de streams del contador, para NewServer o Serve.
-func (l *Live) Options() []ServerOption { return []ServerOption{grpc.ChainStreamInterceptor(l.stream)} }
+// CountUnary hace contar también estos métodos unarios («Servicio/Método»): los largos, como una transferencia de
+// imagen. Solo una lista explícita; contar todos los unarios haría «ocupado» a cada sondeo de la interfaz.
+func (l *Live) CountUnary(methods ...string) *Live {
+	for _, m := range methods {
+		l.unary[m] = true
+	}
+	return l
+}
+
+// Options son los interceptores del contador (de streams y de los unarios listados), para NewServer o Serve.
+func (l *Live) Options() []ServerOption {
+	return []ServerOption{grpc.ChainStreamInterceptor(l.stream), grpc.ChainUnaryInterceptor(l.unaryCall)}
+}
+
+// track cuenta m como abierto y devuelve cómo descontarlo.
+func (l *Live) track(m string) func() {
+	l.mu.Lock()
+	l.n[m]++
+	l.mu.Unlock()
+	return func() {
+		l.mu.Lock()
+		if l.n[m]--; l.n[m] == 0 {
+			delete(l.n, m)
+		}
+		l.mu.Unlock()
+	}
+}
 
 func (l *Live) stream(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, h grpc.StreamHandler) error {
 	m := shortMethod(info.FullMethod)
 	if l.ignore[m] {
 		return h(srv, ss)
 	}
-	l.mu.Lock()
-	l.n[m]++
-	l.mu.Unlock()
-	defer func() {
-		l.mu.Lock()
-		if l.n[m]--; l.n[m] == 0 {
-			delete(l.n, m)
-		}
-		l.mu.Unlock()
-	}()
+	defer l.track(m)()
 	return h(srv, ss)
+}
+
+func (l *Live) unaryCall(ctx context.Context, req any, info *grpc.UnaryServerInfo, h grpc.UnaryHandler) (any, error) {
+	m := shortMethod(info.FullMethod)
+	if !l.unary[m] {
+		return h(ctx, req)
+	}
+	defer l.track(m)()
+	return h(ctx, req)
 }
 
 // shortMethod quita «/macuahuitl.v1.» de «/macuahuitl.v1.FieldService/ServeFiles».

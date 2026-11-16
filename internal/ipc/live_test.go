@@ -74,3 +74,58 @@ func TestLiveCuentaStreamsAbiertos(t *testing.T) {
 		})
 	}
 }
+
+type slowVault struct {
+	v1.UnimplementedVaultServiceServer
+	in, out chan struct{}
+}
+
+func (s slowVault) Status(context.Context, *v1.StatusRequest) (*v1.StatusResponse, error) {
+	s.in <- struct{}{}
+	<-s.out
+	return &v1.StatusResponse{}, nil
+}
+
+// Un unario largo (una transferencia) cuenta solo si está en la lista explícita: el resto, como los sondeos, no.
+func TestLiveCuentaUnariosDeLaLista(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		listed []string
+		want   []string
+	}{
+		{"en la lista", []string{"VaultService/Status"}, []string{"VaultService/Status"}},
+		{"fuera de la lista", []string{"TransferService/Get"}, nil},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			live := NewLive().CountUnary(c.listed...)
+			l, err := Listen(sockPath(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			s := NewServer(live.Options()...)
+			sv := slowVault{in: make(chan struct{}), out: make(chan struct{})}
+			v1.RegisterVaultServiceServer(s, sv)
+			go s.Serve(l)
+			t.Cleanup(s.Stop)
+			conn, err := DialPath(l.Addr().String())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer conn.Close()
+			done := make(chan error, 1)
+			go func() {
+				_, err := v1.NewVaultServiceClient(conn).Status(context.Background(), &v1.StatusRequest{})
+				done <- err
+			}()
+			<-sv.in
+			if got := live.Active(); !slices.Equal(got, c.want) {
+				t.Fatalf("Active = %v, quería %v", got, c.want)
+			}
+			close(sv.out)
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+			eventually(t, func() bool { return len(live.Active()) == 0 })
+		})
+	}
+}

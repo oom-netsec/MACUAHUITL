@@ -2,14 +2,15 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/peer"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
@@ -17,6 +18,11 @@ import (
 // (escuchas de syslog, traps y flujos, capturas, servidores de archivos, terminales, consolas, transferencias)
 // cuenta como trabajo vivo mientras esté abierto.
 var liveIgnore = []string{"EventService/Subscribe", "AssistService/WatchRun", "AuditService/Export"}
+
+// liveUnary son los unarios largos que cuentan como trabajo vivo: bajar o subir una imagen (Transferencias), recolectar
+// respaldos, capturar un cambio y la comparación de deriva. El resto de los unarios (sondeos, listas) no.
+var liveUnary = []string{"TransferService/Get", "TransferService/Put", "TransferService/Browse",
+	"BackupService/CollectBackups", "ChangeService/CaptureChange", "DriftService/Drift"}
 
 // addBusy registra una fuente de trabajo vivo: devuelve una línea por cosa que correría y se cortaría al apagar.
 func (c *Core) addBusy(f func(context.Context) []string) {
@@ -61,12 +67,12 @@ func (s *coreSvc) Shutdown(ctx context.Context, _ *v1.ShutdownRequest) (*v1.Shut
 	if work := s.c.busyWork(ctx); len(work) > 0 {
 		return nil, service.Err(ctx, codes.FailedPrecondition, "core.svc.shutdown_busy", i18n.A("work", strings.Join(work, "; ")))
 	}
-	who := "unix"
-	if p, ok := peer.FromContext(ctx); ok && p.Addr != nil {
-		who = p.Addr.String()
+	who := "pid=? uid=?"
+	if p, ok := ipc.PeerFromContext(ctx); ok {
+		who = fmt.Sprintf("pid=%d uid=%d", p.PID, p.UID)
 	}
 	// Sin rastro no hay acción: si no se puede auditar, el núcleo sigue en pie.
-	if err := s.c.appendAudit("core.shutdown", "core", "peer="+who); err != nil {
+	if err := s.c.appendAudit("core.shutdown", "core", who); err != nil {
 		return nil, service.Err(ctx, codes.Internal, "core.svc.shutdown_audit", i18n.A("err", err.Error()))
 	}
 	s.c.mu.Lock()
