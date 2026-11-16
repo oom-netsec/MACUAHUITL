@@ -2,6 +2,7 @@ package sys
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -88,5 +89,40 @@ func TestReadOnlyDirEnLinux(t *testing.T) {
 	restore()
 	if fi, _ := os.Stat(d); fi.Mode().Perm() != antes.Mode().Perm() {
 		t.Fatalf("restaurado %v", fi.Mode().Perm())
+	}
+}
+
+func TestMkdirPrivateRechazaRutasRelativas(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, p := range []string{"", "rel", "./rel"} {
+		if err := MkdirPrivate(p); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("MkdirPrivate(%q) = %v", p, err)
+		}
+	}
+	if es, _ := os.ReadDir("."); len(es) != 0 {
+		t.Fatalf("creó algo en el directorio actual: %v", es)
+	}
+}
+
+func TestOpenNewPrivateYCreateTempPrivateEnLinux(t *testing.T) {
+	d := t.TempDir()
+	f, err := OpenNewPrivate(filepath.Join(d, "a"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	if ok, _ := IsPrivate(filepath.Join(d, "a")); !ok {
+		t.Fatal("OpenNewPrivate no dejó 0600")
+	}
+	if _, err := OpenNewPrivate(filepath.Join(d, "a")); !errors.Is(err, fs.ErrExist) {
+		t.Fatalf("segunda vez: %v", err)
+	}
+	tmp, err := CreateTempPrivate(d, ".x-*.tmp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp.Close()
+	if ok, _ := IsPrivate(tmp.Name()); !ok {
+		t.Fatal("CreateTempPrivate no dejó 0600")
 	}
 }

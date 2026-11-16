@@ -187,7 +187,7 @@ func New(p Paths, o Options) (*Core, error) {
 			return nil, fmt.Errorf("core: %w", err)
 		}
 	}
-	if runtime.GOOS == "windows" { // la de fábrica vive en el perfil, fuera de Data: sus subcarpetas nacen después, perezosas, y heredan esta
+	if runtime.GOOS == "windows" && p.Outputs != "" { // la de fábrica vive en el perfil, fuera de Data: sus subcarpetas nacen después, perezosas, y heredan esta
 		if err := sys.MkdirPrivate(p.Outputs); err != nil {
 			return nil, fmt.Errorf("core: %w", err)
 		}

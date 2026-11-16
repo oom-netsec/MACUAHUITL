@@ -5,10 +5,26 @@ import (
 	"path/filepath"
 )
 
-// MkdirPrivate crea la carpeta y sus padres con 0700 (ADR 0012, c). En Windows la deja con una DACL protegida.
-func MkdirPrivate(path string) error { return os.MkdirAll(path, 0o700) }
+// MkdirPrivate crea la carpeta y sus padres con 0700 (ADR 0012, c); la ruta debe ser absoluta. En Windows la deja con
+// una DACL protegida.
+func MkdirPrivate(path string) error {
+	if err := requireAbs(path); err != nil {
+		return err
+	}
+	return os.MkdirAll(path, 0o700)
+}
 
-// ProtectFile deja el archivo en 0600: para los que se escriben fuera de las carpetas propias del núcleo.
+// OpenNewPrivate es OpenNew: el archivo nace 0600 (O_EXCL|O_NOFOLLOW). En Windows nace con la DACL protegida.
+func OpenNewPrivate(path string) (*os.File, error) { return OpenNew(path) }
+
+// OpenNewPrivateIn es OpenNewIn: nace 0600, dentro de una carpeta ya abierta.
+func OpenNewPrivateIn(root *os.Root, name string) (*os.File, error) { return OpenNewIn(root, name) }
+
+// CreateTempPrivate es os.CreateTemp, que ya crea 0600.
+func CreateTempPrivate(dir, pattern string) (*os.File, error) { return os.CreateTemp(dir, pattern) }
+
+// ProtectFile deja el archivo en 0600. Para uno que ya existe; hoy ninguna ruta de producción la necesita (los archivos
+// nuevos nacen privados con OpenNewPrivate), queda para eso y para las pruebas.
 func ProtectFile(path string) error { return os.Chmod(path, 0o600) }
 
 // ProtectNewStrict protege un archivo recién creado con O_CREATE y 0600 (que en Linux ya nació privado): no hace nada.

@@ -63,13 +63,8 @@ func newPassword(c *cli.Env, prompt string) ([]byte, error) {
 
 // writeNew nunca sobrescribe: perder una llave sellada no tiene vuelta.
 func writeNew(path string, data []byte) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	f, err := sys.OpenNewPrivate(path) // nace 0600 (en Windows, con la DACL protegida desde el CreateFile)
 	if err != nil {
-		return err
-	}
-	if err := sys.ProtectNew(path); err != nil { // antes de escribir la llave: en Windows nace con la ACL heredada
-		f.Close()
-		os.Remove(path)
 		return err
 	}
 	if _, err := f.Write(data); err != nil {
@@ -307,7 +302,9 @@ func pkiCaInit(c *cli.Env, args []string) error {
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		return err
 	}
-	if err := sys.MkdirPrivate(dir); err != nil { // en Linux no hace nada más; en Windows le pone la DACL protegida
+	if abs, err := filepath.Abs(dir); err != nil { // MkdirPrivate pide ruta absoluta
+		return err
+	} else if err := sys.MkdirPrivate(abs); err != nil { // en Linux no hace nada más; en Windows le pone la DACL protegida
 		return err
 	}
 	pw, err := newPassword(c, cli.T("mctl.security.prompt_seal_ca_key"))

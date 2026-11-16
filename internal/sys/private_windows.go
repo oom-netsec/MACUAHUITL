@@ -2,8 +2,12 @@ package sys
 
 import (
 	"errors"
+	"io/fs"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -19,7 +23,7 @@ func currentSID() (*windows.SID, error) {
 	return u.User.Sid, nil
 }
 
-// readACL lee dueño, protección y ACE de «permitir» de la DACL. Una DACL nula da acceso total a todos.
+// readACL lee dueño, protección y ACE que dan acceso de la DACL (ver aceFromRaw). Una DACL nula da acceso total a todos.
 func readACL(path string) (owner string, protected bool, aces []ace, err error) {
 	sd, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
 	if err != nil {
@@ -45,11 +49,13 @@ func readACL(path string) (owner string, protected bool, aces []ace, err error) 
 		if err := windows.GetAce(acl, i, &a); err != nil {
 			return "", false, nil, err
 		}
-		if a.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE {
-			continue // las de «negar» no dan acceso; los tipos de objeto no se usan en archivos
+		var sid string // solo los tipos 0x0 y 0x9 traen el SID en SidStart; en los de objeto la posición cambia
+		if t := a.Header.AceType; t == windows.ACCESS_ALLOWED_ACE_TYPE || t == 0x9 {
+			sid = (*windows.SID)(unsafe.Pointer(&a.SidStart)).String()
 		}
-		sid := (*windows.SID)(unsafe.Pointer(&a.SidStart))
-		aces = append(aces, ace{sid: sid.String(), mask: uint32(a.Mask), inheritOnly: a.Header.AceFlags&windows.INHERIT_ONLY_ACE != 0})
+		if e, ok := aceFromRaw(a.Header.AceType, a.Header.AceFlags, uint32(a.Mask), sid); ok {
+			aces = append(aces, e)
+		}
 	}
 	return o.String(), ctrl&windows.SE_DACL_PROTECTED != 0, aces, nil
 }
@@ -82,9 +88,13 @@ func protect(path string, inherit bool) error {
 	if err != nil {
 		return err
 	}
-	err = windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT,
-		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
-		user, nil, acl, nil)
+	// Cambiar el dueño exige WRITE_OWNER, que quien solo tiene «Modificar» no tiene: solo se pide si hace falta.
+	info, owner := windows.SECURITY_INFORMATION(windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION), (*windows.SID)(nil)
+	if cur, _, _, rerr := readACL(path); rerr != nil || cur != user.String() {
+		info |= windows.OWNER_SECURITY_INFORMATION
+		owner = user
+	}
+	err = windows.SetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, info, owner, nil, acl, nil)
 	if errors.Is(err, windows.ERROR_NOT_SUPPORTED) || errors.Is(err, windows.ERROR_INVALID_FUNCTION) {
 		err = errors.Join(errors.ErrUnsupported, err)
 	}
@@ -92,9 +102,16 @@ func protect(path string, inherit bool) error {
 }
 
 // MkdirPrivate crea la carpeta y los padres que falten (como MkdirAll) y les pone la DACL protegida con herencia
-// OI|CI, para que lo que se cree adentro la herede. Si la carpeta ya existe (la UI puede crearla antes que el núcleo,
-// con la ACL heredada) y su dueño es el usuario, se le reaplica; si el dueño es otro SID devuelve el error sys.err.not_owner.
+// OI|CI, para que lo que se cree adentro la herede. La ruta debe ser absoluta. Si la carpeta ya existe (la UI puede
+// crearla antes que el núcleo, con la ACL heredada):
+//   - un enlace simbólico o una junction se rechaza (PrivateDirACL): la ACL que se leería es la del destino;
+//   - si su dueño es el usuario o Administradores (el dueño por omisión de un token elevado) se le reaplica la DACL,
+//     que deja al usuario como dueño, salvo que ya sea privada y heredable, para no recorrer el árbol en cada arranque;
+//   - si el dueño es otro SID devuelve el error sys.err.not_owner.
 func MkdirPrivate(path string) error {
+	if err := requireAbs(path); err != nil {
+		return err
+	}
 	user, err := currentSID()
 	if err != nil {
 		return err
@@ -107,11 +124,23 @@ func MkdirPrivate(path string) error {
 		}
 		nuevas = append(nuevas, p)
 	}
-	if len(nuevas) == 0 || nuevas[0] != path { // ya existía: solo se reaplica si es del usuario
-		if owner, _, _, err := readACL(path); err != nil {
+	if len(nuevas) == 0 || nuevas[0] != path { // ya existía
+		fi, err := os.Lstat(path)
+		if err != nil {
 			return err
-		} else if owner != user.String() {
+		}
+		if !fi.IsDir() { // junction (ModeIrregular) o enlace simbólico (ModeSymlink)
+			return &PrivateDirError{Reason: PrivateDirACL, Path: path, SID: "enlace", SIDs: []string{"enlace"}}
+		}
+		owner, protected, aces, err := readACL(path)
+		if err != nil {
+			return err
+		}
+		if !ownerAcceptable(owner, user.String()) {
 			return i18n.New("sys.err.not_owner", i18n.A("path", path))
+		}
+		if isPrivateACL(owner, user.String(), protected, aces) && allInherit(aces) {
+			return nil
 		}
 		nuevas = append(nuevas, path)
 	}
@@ -126,7 +155,63 @@ func MkdirPrivate(path string) error {
 	return nil
 }
 
-// ProtectFile deja el archivo con dueño el usuario y DACL protegida sin herencia (usuario, SYSTEM, Administradores).
+// OpenNewPrivate crea un archivo nuevo para leer y escribir que NACE con la DACL protegida (dueño el usuario; usuario,
+// SYSTEM y Administradores, sin herencia): el descriptor va en el CreateFile, así que no hay un hueco con la ACL heredada
+// en el que otro usuario con acceso a la carpeta pueda abrir el archivo. Como OpenNew, falla si la ruta existe y no
+// sigue enlaces (CREATE_NEW con FILE_FLAG_OPEN_REPARSE_POINT) y rechaza rutas UNC y de dispositivo. Un sistema de
+// archivos sin ACL (FAT, exFAT) ignora el descriptor y el archivo se crea igual.
+func OpenNewPrivate(path string) (*os.File, error) {
+	if err := checkPath(path); err != nil {
+		return nil, err
+	}
+	user, err := currentSID()
+	if err != nil {
+		return nil, err
+	}
+	sd, err := windows.SecurityDescriptorFromString(privateSDDL(user.String()))
+	if err != nil {
+		return nil, err
+	}
+	sa := &windows.SecurityAttributes{Length: uint32(unsafe.Sizeof(windows.SecurityAttributes{})), SecurityDescriptor: sd}
+	name, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return nil, &fs.PathError{Op: "open", Path: path, Err: err}
+	}
+	h, err := windows.CreateFile(name, windows.GENERIC_READ|windows.GENERIC_WRITE, windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
+		sa, windows.CREATE_NEW, windows.FILE_ATTRIBUTE_NORMAL|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	if err != nil {
+		return nil, &fs.PathError{Op: "open", Path: path, Err: err}
+	}
+	return os.NewFile(uintptr(h), path), nil
+}
+
+// OpenNewPrivateIn es OpenNewPrivate dentro de una carpeta ya abierta (os.Root). shortcut: arma la ruta con
+// root.Name() en vez de operar sobre el handle de la carpeta (como RenameNoReplaceIn): cambiar la carpeta por un
+// enlace entre la apertura y la creación podría desviar la escritura; pasar a NtCreateFile con RootDirectory si hace
+// falta cerrarlo.
+func OpenNewPrivateIn(root *os.Root, name string) (*os.File, error) {
+	if filepath.Base(name) != name || !filepath.IsLocal(name) {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrInvalid}
+	}
+	return OpenNewPrivate(filepath.Join(root.Name(), name))
+}
+
+// CreateTempPrivate es os.CreateTemp con OpenNewPrivate: el temporal nace privado.
+func CreateTempPrivate(dir, pattern string) (*os.File, error) {
+	pre, suf, _ := strings.Cut(pattern, "*")
+	for i := 0; i < 10000; i++ {
+		f, err := OpenNewPrivate(filepath.Join(dir, pre+strconv.FormatUint(uint64(rand.Uint32()), 10)+suf))
+		if errors.Is(err, fs.ErrExist) {
+			continue
+		}
+		return f, err
+	}
+	return nil, &fs.PathError{Op: "createtemp", Path: filepath.Join(dir, pattern), Err: fs.ErrExist}
+}
+
+// ProtectFile deja un archivo que ya existe con dueño el usuario y DACL protegida sin herencia (usuario, SYSTEM,
+// Administradores). Hoy ninguna ruta de producción la necesita (los archivos nuevos nacen privados con OpenNewPrivate);
+// queda para eso y para las pruebas.
 func ProtectFile(path string) error { return protect(path, false) }
 
 // ProtectNewStrict deja el archivo recién creado con la DACL protegida sin herencia. Un sistema de archivos sin ACL
@@ -197,23 +282,31 @@ func PrivateDir(path string) error {
 	if err != nil {
 		return err
 	}
+	// Desde Go 1.23 EvalSymlinks no resuelve las junctions y readACL leería la ACL del destino: se rechaza el enlace.
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return &PrivateDirError{Reason: PrivateDirRead, Path: path, Err: err}
+	}
+	if !fi.IsDir() {
+		return &PrivateDirError{Reason: PrivateDirACL, Path: path, SID: "enlace", SIDs: []string{"enlace"}}
+	}
 	owner, _, aces, err := readACL(path)
 	if err != nil {
 		return &PrivateDirError{Reason: PrivateDirRead, Path: path, Err: err}
 	}
 	if owner != user.String() {
-		return &PrivateDirError{Reason: PrivateDirOwner, Path: path, SID: owner}
+		return &PrivateDirError{Reason: PrivateDirOwner, Path: path, SID: owner, SIDs: []string{owner}}
 	}
-	if sid := foreignSID(aces, user.String(), anyAccess, false); sid != "" {
-		return &PrivateDirError{Reason: PrivateDirACL, Path: path, SID: sid}
+	if sids := foreignSIDs(aces, user.String(), anyAccess, false); len(sids) > 0 {
+		return &PrivateDirError{Reason: PrivateDirACL, Path: path, SID: strings.Join(sids, ", "), SIDs: sids}
 	}
 	for a := filepath.Dir(path); ; a = filepath.Dir(a) {
 		_, _, aces, err := readACL(a)
 		if err != nil {
 			return &PrivateDirError{Reason: PrivateDirRead, Path: a, Err: err}
 		}
-		if sid := foreignSID(aces, user.String(), writeMask, true, ancestorIgnore...); sid != "" {
-			return &PrivateDirError{Reason: PrivateDirAncestor, Path: a, SID: sid}
+		if sids := foreignSIDs(aces, user.String(), writeMask, true, ancestorIgnore...); len(sids) > 0 {
+			return &PrivateDirError{Reason: PrivateDirAncestor, Path: a, SID: strings.Join(sids, ", "), SIDs: sids}
 		}
 		if a == filepath.Dir(a) {
 			return nil

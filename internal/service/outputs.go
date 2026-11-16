@@ -160,7 +160,11 @@ func windowsOutputsErr(real string, err error) error {
 		if safeCmdPath.MatchString(real) {
 			code += "_orden"
 		}
-		return outputsErr(code+".windows", "dir", real, "sid", pe.SID)
+		var rm []string
+		for _, sid := range pe.SIDs {
+			rm = append(rm, `/remove "*`+sid+`"`)
+		}
+		return outputsErr(code+".windows", "dir", real, "sid", pe.SID, "remove", strings.Join(rm, " "))
 	case sys.PrivateDirAncestor:
 		return outputsErr("prefs.outputs.ancestro_inseguro.windows", "dir", real, "anc", pe.Path, "sid", pe.SID)
 	}

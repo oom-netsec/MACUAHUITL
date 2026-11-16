@@ -569,7 +569,7 @@ var chmod = func(f *os.File, m os.FileMode) error { return f.Chmod(m) }
 // writeAtomicOpt: temporal 0600 en el mismo directorio, fsync, rename y fsync del directorio; con noPerms distinto de nil tolera que el sistema de archivos no admita chmod (EPERM o no soportado, p. ej. vfat) y lo anota.
 func writeAtomicOpt(path string, data []byte, noPerms *bool) error {
 	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".vault-*.tmp")
+	tmp, err := sys.CreateTempPrivate(dir, ".vault-*.tmp")
 	if err != nil {
 		return fmt.Errorf("vault: %w", err)
 	}
@@ -581,8 +581,9 @@ func writeAtomicOpt(path string, data []byte, noPerms *bool) error {
 		}
 		*noPerms = true
 	}
-	// En Windows chmod no protege nada: la ACL del archivo es la heredada. Se protege antes de escribir y con la misma
-	// tolerancia (FAT, exFAT); en Linux ProtectNew no hace nada.
+	// En Windows chmod no protege nada, pero el temporal ya nació con la DACL protegida (CreateTempPrivate). Esto solo
+	// detecta un sistema de archivos sin ACL (FAT, exFAT) para anotar «sin permisos», con la misma tolerancia que chmod;
+	// en Linux no hace nada.
 	if err := sys.ProtectNewStrict(tmp.Name()); err != nil {
 		if noPerms == nil || !errors.Is(err, errors.ErrUnsupported) {
 			tmp.Close()

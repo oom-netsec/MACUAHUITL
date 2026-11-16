@@ -225,13 +225,8 @@ func export(c *cli.Env, args []string) error {
 		return nil
 	}
 	// O_EXCL: no pisa un archivo existente ni sigue un enlace simbólico.
-	f, err := os.OpenFile(out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := sys.OpenNewPrivate(out) // nace 0600 (en Windows, con la DACL protegida desde el CreateFile)
 	if err != nil {
-		return cli.ErrWrap("mctl.backup.write_out", err)
-	}
-	if err := sys.ProtectNew(out); err != nil { // antes de escribir: en Windows el archivo nace con la ACL heredada
-		f.Close()
-		os.Remove(out)
 		return cli.ErrWrap("mctl.backup.write_out", err)
 	}
 	if _, err := f.WriteString(r.Text); err != nil {

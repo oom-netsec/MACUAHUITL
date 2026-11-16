@@ -146,15 +146,9 @@ func (r *receiver) create(raw string, announced int64) (*recvFile, error) {
 	case r.files >= r.maxFiles:
 		err = errTooMany
 	default:
-		if f, err = sys.OpenNewIn(r.root, name); err == nil {
-			if err = sys.ProtectNew(path); err != nil { // en Windows nace con la ACL heredada; en Linux no hace nada
-				f.Close()
-				r.root.Remove(name)
-				f = nil
-			} else {
-				r.inFlight[name] = true
-				r.files++
-			}
+		if f, err = sys.OpenNewPrivateIn(r.root, name); err == nil { // 0600; en Windows nace con la DACL protegida
+			r.inFlight[name] = true
+			r.files++
 		}
 	}
 	r.mu.Unlock()

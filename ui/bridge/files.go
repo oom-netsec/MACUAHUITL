@@ -55,15 +55,11 @@ func (b *Bridge) WriteFile(path, data, encoding string, overwrite bool) error {
 			return b.bridgeErr(i18n.New("bridge.err.save_not_regular", nil))
 		}
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".guardar-*")
+	tmp, err := sys.CreateTempPrivate(filepath.Dir(path), ".guardar-*") // nace privado; el rename conserva su ACL
 	if err != nil {
 		return wrapErr(err)
 	}
-	defer os.Remove(tmp.Name())                        // tras el rename ya no existe
-	if err := sys.ProtectNew(tmp.Name()); err != nil { // el rename conserva la ACL del temporal (en Linux CreateTemp ya es 0600)
-		tmp.Close()
-		return wrapErr(err)
-	}
+	defer os.Remove(tmp.Name()) // tras el rename ya no existe
 	if _, err := tmp.Write(raw); err != nil {
 		tmp.Close()
 		return wrapErr(err)

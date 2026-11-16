@@ -2,7 +2,9 @@ package sys
 
 import (
 	"errors"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -238,4 +240,65 @@ func privateTemp(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return d
+}
+
+func mklinkJunction(t *testing.T, link, target string) {
+	t.Helper()
+	if out, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput(); err != nil {
+		t.Skipf("mklink /J no disponible: %v %s", err, out)
+	}
+}
+
+// Una junction como carpeta de salidas: readACL leería la ACL del destino, así que se rechaza.
+func TestPrivateDirYMkdirPrivateRechazanJunction(t *testing.T) {
+	base := t.TempDir()
+	destino := filepath.Join(base, "destino")
+	if err := MkdirPrivate(destino); err != nil {
+		t.Fatal(err)
+	}
+	junction := filepath.Join(base, "j")
+	mklinkJunction(t, junction, destino)
+	if pe := privateDirReason(t, PrivateDir(junction)); pe.Reason != PrivateDirACL || pe.Path != junction {
+		t.Fatalf("PrivateDir = %+v", pe)
+	}
+	if pe := privateDirReason(t, MkdirPrivate(junction)); pe.Reason != PrivateDirACL {
+		t.Fatalf("MkdirPrivate = %+v", pe)
+	}
+}
+
+func TestMkdirPrivateRechazaRutasRelativasEnWindows(t *testing.T) {
+	if err := MkdirPrivate(""); !errors.Is(err, fs.ErrInvalid) {
+		t.Fatalf("MkdirPrivate(\"\") = %v", err)
+	}
+}
+
+// El archivo nace privado: se mira con el handle aún abierto, antes de cualquier ProtectNew.
+func TestOpenNewPrivateNaceProtegido(t *testing.T) {
+	d := t.TempDir()
+	f := filepath.Join(d, "nuevo")
+	fh, err := OpenNewPrivate(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fh.Close()
+	if ok, err := IsPrivate(f); !ok || err != nil {
+		t.Fatalf("IsPrivate = %v, %v", ok, err)
+	}
+	if _, err := fh.WriteString("x"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenNewPrivate(f); !errors.Is(err, fs.ErrExist) {
+		t.Fatalf("existente: %v", err)
+	}
+	if _, err := OpenNewPrivate(`\\?\C:\x`); err == nil {
+		t.Fatal("aceptó una ruta de dispositivo")
+	}
+	tmp, err := CreateTempPrivate(d, ".t-*.tmp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp.Close()
+	if ok, err := IsPrivate(tmp.Name()); !ok || err != nil {
+		t.Fatalf("CreateTempPrivate: %v, %v", ok, err)
+	}
 }
