@@ -49,6 +49,8 @@ func init() {
 		"playbook.err.text":             e("{field} lleva caracteres de control o de dirección (bidi) que cambian cómo se ve el texto", "{field} contains control or direction (bidi) characters that change how the text looks", "field"),
 		"playbook.err.timeout":          e("timeout {timeout:q} inválido en {cmd:q}", "invalid timeout {timeout:q} in {cmd:q}", "timeout", "cmd"),
 		"playbook.err.timeout_max":      e("timeout {timeout:q} de {cmd:q} pasa el máximo de {max}", "timeout {timeout:q} of {cmd:q} exceeds the maximum of {max}", "timeout", "cmd", "max"),
+		"core.svc.shutdown_busy":        e("hay trabajo en curso, no se apaga: {work}", "work is running, not shutting down: {work}", "work"),
+		"core.svc.shutdown_audit":       e("no se pudo auditar core.shutdown, el núcleo no se apaga: {err}", "core.shutdown could not be audited, the core is not shutting down: {err}", "err"),
 		"sys.err.not_regular":           e("la ruta no es un archivo regular", "the path is not a regular file"),
 		"sys.err.wait_timeout":          e("el proceso no terminó en el plazo", "the process did not exit in time"),
 		"adhoc.err.no_targets":          e("indica al menos un equipo", "specify at least one device"),

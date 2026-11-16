@@ -44,7 +44,7 @@ func modules(c *Core) []service.Module {
 		security.Module{},
 		tools.Module{},
 		visibility.Module{},
-		assist.Module{},
+		assist.Module{Busy: c.addBusy},
 		adhoc.Module{},
 		drift.Module{},
 		cleaner.Module{},
@@ -69,4 +69,5 @@ func (n nucleo) Register(s ipc.Registrar, _ service.Deps) {
 	v1.RegisterPatrolServiceServer(s, &patrolSvc{c: n.c})
 	v1.RegisterEventServiceServer(s, &eventSvc{c: n.c})
 	v1.RegisterAuditServiceServer(s, &auditSvc{c: n.c})
+	v1.RegisterCoreServiceServer(s, &coreSvc{c: n.c})
 }
