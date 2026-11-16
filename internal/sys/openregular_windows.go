@@ -45,7 +45,8 @@ func checkPath(path string) error {
 	return nil
 }
 
-// Owner falla cerrado en Windows: (0, false). La verificación del dueño por SID va en 43a3.
+// Owner falla cerrado en Windows: (0, false). El dueño por SID lo compara PrivateDir; Owner solo queda para el gancho
+// FileOwner de service, que en Windows no se usa.
 func Owner(os.FileInfo) (uid uint32, ok bool) { return 0, false }
 
 // ONoFollow es 0 en Windows. Basta con O_EXCL: Go abre con CREATE_NEW y FILE_FLAG_OPEN_REPARSE_POINT
