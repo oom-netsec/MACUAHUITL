@@ -1,0 +1,46 @@
+name: e2e-tmp
+on:
+  push:
+    branches: [fase-43-e2e-windows]
+permissions:
+  contents: read
+jobs:
+  # (el runner es administrador y el núcleo se niega a correr elevado). Informativo, como el job windows.
+  windows-e2e:
+    runs-on: windows-latest
+    continue-on-error: true
+    env:
+      CGO_ENABLED: "0"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: compila núcleo, mctl y simulador
+        run: |
+          mkdir -p bin-win
+          go build -trimpath -o bin-win/ ./cmd/macuahuitld ./cmd/mctl
+          go build -trimpath -o bin-win/simserver.exe ./test/simulator/cmd/simserver
+      - name: compila la app (con binario de relleno si no compila en Windows todavía)
+        run: |
+          (cd ui/frontend && npm ci && npm run build)
+          if go build -tags wails,production -ldflags -H=windowsgui -o bin-win/macuahuitl.exe ./ui; then
+            echo "app macuahuitl.exe compilada de verdad"
+          else
+            echo "::warning::la app no compila en Windows todavía: se usa un binario de relleno SOLO para macuahuitl.exe"
+            echo "binario de relleno" > bin-win/macuahuitl.exe
+          fi
+      - name: instalador NSIS
+        run: |
+          command -v makensis >/dev/null || export PATH="$PATH:/c/Program Files (x86)/NSIS"
+          command -v makensis >/dev/null || { choco install nsis -y --no-progress >/dev/null && export PATH="$PATH:/c/Program Files (x86)/NSIS"; }
+          VERSION=0.0.0 BIN=bin-win deploy/windows/build-installer.sh dist-win/MACUAHUITL-setup.exe
+      - name: windows-e2e (usuarios estándar, pipe, bóveda, Patrol, instalador)
+        shell: pwsh
+        run: tools/ci/windows-e2e.ps1 -Bin bin-win -Installer dist-win/MACUAHUITL-setup.exe -Transcripts "$PWD/test/transcripts/ios-xe" -Version 0.0.0
