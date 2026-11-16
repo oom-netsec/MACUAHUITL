@@ -193,7 +193,7 @@ func structWord(w string, m map[string]bool) bool {
 }
 
 // spAlgoExacto: algoritmos de verdad (no cualquier palabra que empiece con sha, aes o hmac: «Shadow2024x» es una contraseña).
-var spAlgoExacto = regexp.MustCompile(`(?i)^(?:sha(?:-?(?:1|2|224|256|384|512))?|hmac-?(?:md5|sha(?:-?(?:1|224|256|384|512))?)(?:-96)?|aes-?(?:128|192|256)(?:-cmac)?)$`)
+var spAlgoExacto = regexp.MustCompile(`(?i)^(?:sha(?:-?(?:1|2|224|256|384|512))?|hmac-?(?:md5|sha(?:-?(?:1|2|224|256|384|512))?(?:-(?:256|384|512))?)(?:-96)?|aes-?(?:128|192|256)(?:-cmac)?|cmac(?:-aes-128)?)$`)
 
 // SecretValues devuelve los valores que Command tapó en un tramo (lo que sigue a una palabra de secreto): el primer
 // token tras cada palabra de secreto del tramo que no sea un tipo (0-9), un algoritmo, otra palabra de secreto ni
