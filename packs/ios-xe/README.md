@@ -21,7 +21,7 @@ Cómo cargarlo (la aplicación nunca descarga paquetes):
 
 1. Baja `oom-ios-xe-<versión>.mpack` de los releases de GitHub y verifica su suma en `SHA256SUMS`.
 2. Con la línea de comandos: `mctl pack install oom-ios-xe-<versión>.mpack`.
-   En la aplicación: Ajustes → Paquetes → Instalar.
+   En la aplicación: Ajustes → Paquetes → Instalar paquete…
 3. Revisa con `mctl pack list` o en Ajustes → Paquetes.
 
 ## English
@@ -44,5 +44,5 @@ Since 1.1.3 it was also tested on a Cat8000v 17.15 with no license level in CML 
 How to load it (the application never downloads packages):
 
 1. Download `oom-ios-xe-<version>.mpack` from the GitHub releases and check its sum in `SHA256SUMS`.
-2. From the command line: `mctl pack install oom-ios-xe-<version>.mpack`. In the app: Settings → Packages → Install.
-3. Check with `mctl pack list` or in Settings → Packages.
+2. From the command line: `mctl pack install oom-ios-xe-<version>.mpack`. In the app: Settings → Packs → Install pack…
+3. Check with `mctl pack list` or in Settings → Packs.

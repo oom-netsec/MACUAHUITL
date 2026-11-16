@@ -1,5 +1,5 @@
 id: oom/nx-os
-version: 1.0.1
+version: 1.0.2
 min_core: 0.4.1
 name: Nexus NX-OS, diagnóstico TAC
 name_en: Nexus NX-OS, TAC diagnostics

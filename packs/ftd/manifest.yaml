@@ -1,5 +1,5 @@
 id: oom/ftd
-version: 1.0.0
+version: 1.0.1
 min_core: 0.4.3
 name: Cisco Secure Firewall Threat Defense (FTD), diagnóstico TAC
 name_en: Cisco Secure Firewall Threat Defense (FTD), TAC diagnostics
