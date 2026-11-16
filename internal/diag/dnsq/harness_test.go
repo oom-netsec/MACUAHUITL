@@ -234,22 +234,23 @@ type lab struct {
 
 func (l *lab) serve(t *testing.T, ip string, h dns.Handler) {
 	t.Helper()
-	// El mismo puerto en UDP y TCP: el que da el sistema para UDP puede estar ocupado o reservado en TCP (en Windows,
-	// los rangos excluidos de Hyper-V dan WSAEACCES), así que se reintenta con otro.
+	// El mismo puerto en TCP y UDP. Se pide primero TCP en :0: el sistema nunca da un puerto TCP de un rango excluido
+	// (en Windows, Hyper-V reserva rangos enteros y un bind a uno de ellos da WSAEACCES); luego UDP en ese puerto, y si
+	// está ocupado se reintenta con otro.
 	var pc net.PacketConn
 	var ln net.Listener
 	var port int
 	for try := 0; ; try++ {
 		var err error
-		if pc, err = net.ListenPacket("udp", ip+":0"); err != nil {
+		if ln, err = net.Listen("tcp", ip+":0"); err != nil {
 			t.Fatal(err)
 		}
-		port = pc.LocalAddr().(*net.UDPAddr).Port
-		if ln, err = net.Listen("tcp", fmt.Sprintf("%s:%d", ip, port)); err == nil {
+		port = ln.Addr().(*net.TCPAddr).Port
+		if pc, err = net.ListenPacket("udp", fmt.Sprintf("%s:%d", ip, port)); err == nil {
 			break
 		}
-		pc.Close()
-		if try == 20 {
+		ln.Close()
+		if try == 50 {
 			t.Fatal(err)
 		}
 	}
