@@ -119,10 +119,10 @@ try {
 
   # 4b) el usuario 2 abre DIRECTAMENTE el pipe del usuario 1: la DACL lo niega (no un timeout ni «no existe»).
   $probe = "`$c = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'macuahuitl-$($u1.Sid)', 'InOut'); " +
-    "try { `$c.Connect(2000); Write-Output 'EXC:ninguna (conectó)' } catch { Write-Output ('EXC:' + `$_.Exception.GetType().FullName + ': ' + `$_.Exception.Message) }"
+    "try { `$c.Connect(2000); Write-Output 'EXC:ninguna (conectó)' } catch { `$e = `$_.Exception; if (`$e.InnerException) { `$e = `$e.InnerException }; Write-Output ('EXC:' + `$e.GetType().FullName + ': ' + `$e.Message) }"
   $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($probe))
   $r = Invoke-As $u2 "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" @('-NoProfile', '-EncodedCommand', $enc)
-  Write-Host "excepción del usuario 2 al abrir el pipe del usuario 1: $($r.Out.Trim()) $($r.Err.Trim())"
+  Write-Host "excepción del usuario 2 al abrir el pipe del usuario 1: $(($r.Out -split "`n" | Where-Object { $_ -like 'EXC:*' }) -join ' ')"
   Must ($r.Out -match 'EXC:System\.UnauthorizedAccessException') 'el usuario 2 recibe acceso denegado (UnauthorizedAccessException) al abrir el pipe del usuario 1'
   # 4c) PENDIENTE (Backend): mctl no tiene variable de entorno ni bandera para apuntar a otro pipe (ipc.SocketPath solo usa el SID
   # del proceso), así que no se puede hacer que mctl del usuario 2 marque al pipe del usuario 1. 4b cubre lo mismo sin mctl.
