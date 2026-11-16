@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -26,6 +27,10 @@ var (
 // safeShellPath son las rutas que se pueden poner en una orden de terminal sin citar: letras (también con acento),
 // números y unos pocos signos; nada de espacios, comillas, $ ni caracteres de formato (bidi).
 var safeShellPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N}/._+,@%=:-]+$`)
+
+// safeCmdPath son las rutas de Windows que van entre comillas en una orden de cmd sin que nada se expanda: sin %, !, ^,
+// $ ni comillas invertidas ni caracteres de formato (bidi).
+var safeCmdPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N} :\\/._+,@=()-]+$`)
 
 // outputsErr arma el error del código prefs.outputs.<motivo> (el prefijo va dentro del texto de es y de en).
 func outputsErr(code string, kv ...any) error {
@@ -89,28 +94,34 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 			return "", outputsErr("prefs.outputs.reservada_contiene", "dir", real, "res", r)
 		}
 	}
-	if uid, ok := FileOwner(fi); !ok || uid != uint32(ProcUID()) {
-		return "", outputsErr("prefs.outputs.otro_dueno", "dir", real)
-	}
-	if m := fi.Mode().Perm(); m != 0o700 {
-		code := "prefs.outputs.permisos"
-		if safeShellPath.MatchString(real) { // sin comillas ni metacaracteres: la orden se puede pegar tal cual
-			code += "_orden"
+	if runtime.GOOS == "windows" { // dueño, ACL y ancestros por SID (ADR 0012, c); sin modos ni uid
+		if err := sys.PrivateDir(real); err != nil {
+			return "", windowsOutputsErr(real, err)
 		}
-		return "", outputsErr(code, "dir", real, "mode", fmt.Sprintf("%04o", m))
-	}
-	// Un ancestro que otros pueden escribir (grupo u otros) deja que alguien reemplace la ruta, o la cree 0777 tras
-	// una limpieza de tmpfiles: no se acepta si no es del usuario (/tmp, /var/tmp y /dev/shm caen aquí).
-	for a := filepath.Dir(real); ; a = filepath.Dir(a) {
-		mode, uid, err := AncestorInfo(a)
-		if err != nil {
-			return "", outputsErr("prefs.outputs.ilegible_ruta", "dir", a, "err", err)
+	} else {
+		if uid, ok := FileOwner(fi); !ok || uid != uint32(ProcUID()) {
+			return "", outputsErr("prefs.outputs.otro_dueno", "dir", real)
 		}
-		if mode&0o022 != 0 && uid != uint32(ProcUID()) {
-			return "", outputsErr("prefs.outputs.ancestro_inseguro", "dir", real, "anc", a, "mode", mode, "uid", uid)
+		if m := fi.Mode().Perm(); m != 0o700 {
+			code := "prefs.outputs.permisos"
+			if safeShellPath.MatchString(real) { // sin comillas ni metacaracteres: la orden se puede pegar tal cual
+				code += "_orden"
+			}
+			return "", outputsErr(code, "dir", real, "mode", fmt.Sprintf("%04o", m))
 		}
-		if a == "/" || a == filepath.Dir(a) {
-			break
+		// Un ancestro que otros pueden escribir (grupo u otros) deja que alguien reemplace la ruta, o la cree 0777 tras
+		// una limpieza de tmpfiles: no se acepta si no es del usuario (/tmp, /var/tmp y /dev/shm caen aquí).
+		for a := filepath.Dir(real); ; a = filepath.Dir(a) {
+			mode, uid, err := AncestorInfo(a)
+			if err != nil {
+				return "", outputsErr("prefs.outputs.ilegible_ruta", "dir", a, "err", err)
+			}
+			if mode&0o022 != 0 && uid != uint32(ProcUID()) {
+				return "", outputsErr("prefs.outputs.ancestro_inseguro", "dir", real, "anc", a, "mode", mode, "uid", uid)
+			}
+			if a == "/" || a == filepath.Dir(a) {
+				break
+			}
 		}
 	}
 	if !probe {
@@ -132,4 +143,26 @@ func RealAncestorInfo(p string) (os.FileMode, uint32, error) {
 	}
 	uid, _ := FileOwner(fi)
 	return fi.Mode(), uid, nil
+}
+
+// windowsOutputsErr traduce el rechazo de sys.PrivateDir al código prefs.outputs.* de siempre, con la variante de
+// Windows (orden icacls, SID en vez de modo y uid). Es pura para probarla en Linux.
+func windowsOutputsErr(real string, err error) error {
+	var pe *sys.PrivateDirError
+	if !errors.As(err, &pe) {
+		return outputsErr("prefs.outputs.ilegible", "dir", real, "err", err)
+	}
+	switch pe.Reason {
+	case sys.PrivateDirOwner:
+		return outputsErr("prefs.outputs.otro_dueno", "dir", real)
+	case sys.PrivateDirACL:
+		code := "prefs.outputs.permisos"
+		if safeCmdPath.MatchString(real) {
+			code += "_orden"
+		}
+		return outputsErr(code+".windows", "dir", real, "sid", pe.SID)
+	case sys.PrivateDirAncestor:
+		return outputsErr("prefs.outputs.ancestro_inseguro.windows", "dir", real, "anc", pe.Path, "sid", pe.SID)
+	}
+	return outputsErr("prefs.outputs.ilegible_ruta", "dir", pe.Path, "err", pe.Err)
 }
