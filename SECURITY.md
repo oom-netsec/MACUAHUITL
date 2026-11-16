@@ -30,7 +30,7 @@ gh attestation verify macuahuitl_*.deb --repo oom-netsec/MACUAHUITL \
   --signer-workflow oom-netsec/MACUAHUITL/.github/workflows/release.yml
 ```
 
-It works the same for the `.rpm`, the binaries and the packs published with each core release. Official content packs are also signed with Ed25519, and the core checks that signature when it installs a pack.
+It works the same for the `.rpm`, the binaries and the packs published with each core release; packs-only releases rely on the pack signature. Official content packs are signed with Ed25519: the core refuses a pack with an invalid signature and an unsigned `oom/*` pack, and installs an unsigned third-party pack only after you confirm it.
 
 ## Report a vulnerability
 

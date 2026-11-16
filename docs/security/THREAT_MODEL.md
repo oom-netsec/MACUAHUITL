@@ -9,7 +9,7 @@ Reference: [architecture design](../architecture/2026-11-02-macuahuitl-architect
 | Device credentials | Encrypted `vault.mcv`; plaintext only in memory during authentication | Administrative access to the customer's network |
 | DEK (data key) | Locked core memory while the vault is open or armed | Decrypts all credentials |
 | Master password | Only in memory during `Unlock`, `Create` and `ChangeMasterPassword` | Same as the DEK |
-| Outputs | Folder chosen by the engineer, with or without masking | Customer configuration and secrets if masking is off |
+| Outputs | Folder chosen by the engineer, with or without masking | Customer configuration, and secrets if masking is off or misses a format |
 | Audit log | Local SQLite | Loss of traceability |
 
 ## Actors
@@ -18,7 +18,7 @@ Reference: [architecture design](../architecture/2026-11-02-macuahuitl-architect
 |---|---|
 | Laptop thief | Access to the powered-off disk |
 | Malware running as another user's UID | May try to connect to the socket or read files |
-| Malware running as the engineer's UID | Same as the engineer while the engineer is active |
+| Malware running as the engineer's UID | Same as the engineer, while it runs |
 | Man in the middle | Intercepts or spoofs SSH/HTTPS to devices |
 | Compromised dependency | Malicious code in a library |
 | External auditor | Reads the code, builds it and observes execution |
@@ -33,7 +33,7 @@ Reference: [architecture design](../architecture/2026-11-02-macuahuitl-architect
 | Another local user uses the socket | 0600 permissions and `SO_PEERCRED` UID check |
 | Core memory dump | `PR_SET_DUMPABLE=0`, `RLIMIT_CORE=0` |
 | Secret in a log by accident | `Secret` type with redaction in every formatter; no-leak test with a marker password |
-| Connection to an unauthorized destination | `noegress` in CI, `EgressGuard` at runtime, no telemetry or updates |
+| Connection to an unauthorized destination | `noegress` in CI, `EgressGuard` at runtime, no telemetry or update checks |
 | SSH spoofing | Trust on first use with confirmation; a changed key blocks by default |
 | External tool used to exfiltrate | Validated arguments, no shell, no options that read destinations from files or scripts; everything in the audit log |
 | Compromised dependency | `govulncheck` in CI, SBOM, versions pinned in `go.sum`, reproducible build |
@@ -53,3 +53,4 @@ These are the things MACUAHUITL does **not** guarantee. They are declared so tha
 8. **Static network analysis.** `noegress` checks the imports of our own code, not those of dependencies, nor calls such as `os.StartProcess`. A malicious dependency could open connections. Mitigation: minimal dependencies, `govulncheck`, SBOM and the runtime observation in the audit guide.
 9. **Deletion or rollback of vault entries.** Whoever has disk access can delete an entry or revert it to its `vault.mcv.bak` version without detection. They cannot read it or move it to another position.
 10. **Expanded AES key in normal memory.** `crypto/aes` copies the key into its own structure (expanded rounds and GHASH table) in garbage-collected memory, which is not locked and cannot be erased. It applies to the KEK during each derivation and to the DEK while the vault is open or armed. Mitigation: a single expansion of the DEK per DEK lifetime (not one per operation), `PR_SET_DUMPABLE=0` and limits 2 and 3.
+11. **Masking is best effort.** Masking recognizes the secret formats it knows. A format it does not know, an abbreviation it does not expand or an echo it does not follow stays in clear text in the outputs and terminal recordings. The known gaps are listed in the notes of each [release](https://github.com/oom-netsec/MACUAHUITL/releases/latest). In the terminal, a password prompt is recognized by the text before it (`Password:`, `Secret:` and similar): a secret typed at a prompt it does not recognize is recorded.

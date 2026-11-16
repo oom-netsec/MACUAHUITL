@@ -8,7 +8,7 @@ Reference: design §10.2–§10.4. Standard primitives only: `crypto/aes`, `cryp
 master password ──Argon2id(salt, m, t, p)──► KEK (32 B)
                                                 │
                                    AES-256-GCM  ▼
-DEK (32 random B) ◄──── decrypts ──── encrypted DEK (in the header)
+DEK (32 random bytes) ◄──── decrypts ──── encrypted DEK (in the header)
    │
    └── AES-256-GCM ──► each credential entry
 ```

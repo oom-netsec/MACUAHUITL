@@ -6,13 +6,13 @@ Principles: local first and audited, secrets in the vault, no false "all clear",
 
 ## Done up to v0.6.5
 
-| Area | What is there |
+| Area | What's included |
 |---|---|
 | Base | Core, vault, chained audit log, Patrol, CLI and app (phases 0–6) |
 | Tools | PCAP analyzer, light and deep DNS, TLS inspector, syslog receiver (7) |
 | Analysis | 44 analysis rules, diff between rounds, correlated timeline; in the app, "Job analysis" (9) |
 | Field and transfers | Serial console, temporary TFTP/HTTP/FTP/SCP/SFTP servers and clients, MD5/SHA-512 (10, 22a) |
-| Changes | Pre/post with a verdict per device, upgrade assistant (verification), golden templates and hardening (11) |
+| Changes | Pre/post with a traffic-light verdict, upgrade assistant (verification), golden templates and hardening (11) |
 | Visibility | CDP/LLDP topology (SVG), SNMP and traps, NetFlow/IPFIX/sFlow, gNMI (12) |
 | Calculators | Subnets/VLSM, MTU/MSS, TCP, QoS, optics, BGP path selection (13) |
 | Security | RADIUS/TACACS+ probes, lab PKI, IKE/IPsec decoder (14) |
@@ -20,7 +20,7 @@ Principles: local first and audited, secrets in the vault, no false "all clear",
 | Fleet | Global search, L2 tracing, L3/L2 path, interface health, morning check, flash/DRAM, inventory (15) |
 | Operations | Assisted change mode, read-only batches, snippets, port provisioning, backup and restore, drift, Cleaner, credential rotation, multi-tab SSH terminal and saved hosts (16) |
 | Forensics | Crashinfo, Cisco message database, silent flapping, syslog patterns, debug filter, memory leaks across rounds (17) |
-| Content packs | 11 signed official packs (≈600 playbooks), install preview, hide per item, personal pack, `packs-YYYY-MM-DD` releases; an official pack displaces a third-party one that collides only with confirmation ([ADR 0010](adr/0010-paquetes-de-contenido.md)) |
+| Content packs | 11 signed official packs (≈600 playbooks), install preview, hide per item, personal pack, `packs-YYYY-MM-DD` releases; an official pack displaces a colliding third-party pack only after confirmation ([ADR 0010](adr/0010-paquetes-de-contenido.md)) |
 | Language | English is canonical in the app, core and `mctl`; Spanish in Settings and with `--lang es` |
 | Lab | Read-only runs with `tools/labcheck` on a 3560CX, a 9120 EWC and a Catalyst 9000v (DevNet) (v0.5.0), and in Cisco Modeling Labs: ASAv with A/S failover, Catalyst 8000v and IOSvL2 (v0.5.4); the 21 write templates applied, verified and rolled back on lab devices, CML and the 3560CX (v0.5.4, v0.6.4) |
 | Patrol and analysis | Each command runs once per device and round even if several playbooks ask for it (v0.6.0); routing detections (EIGRP, LDP, track, GLBP/VRRP, duplicate OSPF router-id, BGP without prefixes), shared segments in the topology and noise-free diff between rounds (v0.6.1, v0.6.2) |

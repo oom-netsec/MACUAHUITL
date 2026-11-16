@@ -67,7 +67,7 @@ func OpenSSH(ctx context.Context, g *Guard, jobID, host string, port uint16, cre
 	if !cred.Password.Empty() {
 		// La contraseña se manda una sola vez por conexión, por password o por keyboard-interactive:
 		// nunca se reintenta un rechazo (spec §6, bloqueo de cuentas TACACS).
-		// Límite declarado (THREAT_MODEL §Límites 1): x/crypto/ssh exige string, que no se puede borrar;
+		// Límite declarado (THREAT_MODEL §Declared limits 1): x/crypto/ssh exige string, que no se puede borrar;
 		// se crea en el momento del envío y no queda guardado en la configuración de la sesión.
 		sent := false
 		once := func() (string, error) {
