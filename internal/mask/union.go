@@ -209,9 +209,10 @@ func lineSpans(line, platform string) (string, [][2]int) {
 	if strings.Contains(line, `\"`) {
 		line = strings.ReplaceAll(line, `\"`, `"`)
 	}
-	sp := loggedSpans(line, platform)
-	if quotedCmdLine.MatchString(line) { // M₂ solo actúa sobre comandos: las demás comillas de un show quedan como en la v0.6.5
-		sp = append(sp, quotedSpans(line)...)
+	n := normSpaces(line) // los tramos se calculan sobre la copia (mismos índices); el corte, sobre el original
+	sp := loggedSpans(n, platform)
+	if quotedCmdLine.MatchString(n) { // M₂ solo actúa sobre comandos: las demás comillas de un show quedan como en la v0.6.5
+		sp = append(sp, quotedSpans(n)...)
 	}
 	return line, mergeSpans(sp)
 }
@@ -227,10 +228,11 @@ func CutCommand(block, orig, s1 string) (string, []string) {
 	if strings.Contains(orig, `\"`) {
 		orig = strings.ReplaceAll(orig, `\"`, `"`)
 	}
-	spans := mergeSpans(append(commandSpans(block, orig), quotedSpans(orig)...))
+	n := normSpaces(orig) // mismos índices que orig: los tramos y los valores salen de la copia
+	spans := mergeSpans(append(commandSpans(block, n), quotedSpans(n)...))
 	var vals []string
 	for _, sp := range spans {
-		for _, v := range SecretValues(orig[sp[0]:sp[1]]) {
+		for _, v := range SecretValues(n[sp[0]:sp[1]]) {
 			vals = append(vals, v)
 			// un valor con forma de URL («ftp://u:CLAVE@host/f»): también sus partes, que un eco partido deja sueltas
 			for _, p := range strings.FieldsFunc(v, func(r rune) bool { return r == '/' || r == '@' || r == ':' }) {

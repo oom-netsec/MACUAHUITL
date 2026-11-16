@@ -81,3 +81,8 @@ S1 es la salida completa de la v0.6.5 con sus dos pasadas (`maskRaw`). M₂ se c
 - **Consumidores que comparan texto enmascarado:** drift.go:132/139, backup/diff.go:83, compliance.go:131 y assist/run.go:1095. Tapar de más en líneas con comillas (EEM `cli command "…"`) puede cambiar su resultado. Lleva prueba.
 - **`key N` en un key chain** solo se reconoce con el bloque `keychain`. En un log, `key 1` se tapa: es tapado de más aceptado.
 - **Rendimiento:** dos pasadas (v0.6.5 y Command) más el corte, que es lineal. Va con un benchmark contra ref065 en el PR.
+
+## Notas de la segunda auditoría (antes de la v1.0.0)
+
+- **Resto de un eco con `#` o `>` en el secreto** (`Pa55w0rd#Xq7z9`, `Cisco>Admin123`): con el eco partido por un syslog, el resto se leía como un prompt y quedaba el prefijo visible. Ahora, si hay un eco pendiente (`sent[pi]` con `acc`, o la línea que aún se teclea) y `acc + línea` es su comienzo, la línea que `promptRe` tomaría por prompt va por la rama del resto del eco y sale como `<MASKED:secret>`. Solo cambia lo que la v0.6.5 leía como prompt y solo tapa más; S1 no cambia. Prueba por bytes (ningún 4-grama del valor) en todas las posiciones de corte, pegado y carácter a carácter.
+- **Espacios Unicode** (NBSP, U+2009, U+202F, U+3000, U+1680, U+0085…; y ZWSP/ZWNJ/ZWJ/U+2060/BOM como espacio): `normSpaces` (span.go) hace una copia con cada uno cambiado por tantos espacios ASCII como bytes ocupa, y los tramos de M₂ se calculan sobre esa copia; el corte se aplica sobre S1 con los mismos índices. Solo M₂: las reglas de la v0.6.5 (configuración impresa, p. ej. `api-key X`, `crypto pki export … terminal 3des X`) no ven esos espacios y siguen igual. `SecretValues` también salta algoritmos tipo `sha1`.

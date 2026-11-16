@@ -4,6 +4,8 @@ import (
 	"net/netip"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // spKeys: palabras de secreto.
@@ -77,6 +79,7 @@ func commandSpans(block, cmd string) [][2]int { return spansIn(block, cmd, false
 // spansIn es commandSpans; quoted: cmd es un texto citado entre comillas («token X» es una palabra más y la prosa de la
 // lista spProse no es un comando).
 func spansIn(block, cmd string, quoted bool) (spans [][2]int) {
+	cmd = normSpaces(cmd)
 	pos := 0
 	for _, seg := range strings.Split(cmd, spSep) { // cada comando de NX-OS por separado: el primero de cada uno decide
 		spans = append(spans, shiftSpans(spansSeg(block, seg, quoted), pos)...)
@@ -200,7 +203,7 @@ func SecretValues(span string) []string {
 	for i := 0; i < len(toks); {
 		w := strings.ToLower(toks[i])
 		switch {
-		case len(w) == 1 && w[0] >= '0' && w[0] <= '9', structWord(w, spAlgo), spKeyword(w, false, spLogBlock, false), localRemote(w):
+		case len(w) == 1 && w[0] >= '0' && w[0] <= '9', structWord(w, spAlgo), cmdAlgo.MatchString(w), spKeyword(w, false, spLogBlock, false), localRemote(w):
 			i++
 			continue
 		case structWord(w, spStruct):
@@ -282,4 +285,33 @@ func notSecretValue(low func(int) string, i, j, first, n int) bool {
 // localRemote: «local»/«remote» (o su abreviatura) separan las dos llaves de «pre-shared-key local X remote Y».
 func localRemote(w string) bool {
 	return len(w) >= 2 && (strings.HasPrefix("local", w) || strings.HasPrefix("remote", w))
+}
+
+// normSpaces devuelve una copia de s con cada espacio Unicode (NBSP, U+2000–U+200A, U+202F, U+205F, U+3000, U+1680,
+// U+0085…) y cada carácter invisible de ancho cero (ZWSP, ZWNJ, ZWJ, U+2060, BOM) cambiado por tantos espacios ASCII
+// como bytes ocupa: los índices del original siguen valiendo. \s y \S de RE2 solo conocen el espacio ASCII, y un
+// valor pegado desde Word, Confluence o un correo trae NBSP entre la palabra clave y el valor. Solo para calcular
+// tramos (M₂, que únicamente agrega cortes): lo que ve la cadena de la v0.6.5 no cambia.
+func normSpaces(s string) string {
+	ascii := true
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			ascii = false
+			break
+		}
+	}
+	if ascii {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		r, w := utf8.DecodeRuneInString(s[i:])
+		if r != utf8.RuneError && (unicode.IsSpace(r) || r == 0x200B || r == 0x200C || r == 0x200D || r == 0x2060 || r == 0xFEFF) {
+			b.WriteString(strings.Repeat(" ", w))
+		} else {
+			b.WriteString(s[i : i+w])
+		}
+		i += w
+	}
+	return b.String()
 }
