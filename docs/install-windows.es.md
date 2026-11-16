@@ -51,12 +51,13 @@ Si el instalador se abre como administrador, te avisa: ábrelo de nuevo sin «Ej
 
 Windows no tiene puertos privilegiados, así que los servidores TFTP, FTP, SCP/SFTP, syslog y traps escuchan en su puerto estándar. Lo que estorba es el Firewall de Windows.
 
-La app muestra la orden `New-NetFirewallRule` exacta del servidor que inicias, limitada al programa del núcleo, la IP, el protocolo y el puerto. Córrela una vez en un PowerShell de administrador. La app nunca la aplica por ti. Por ejemplo:
+La app muestra la orden `New-NetFirewallRule` exacta del servidor que inicias, limitada al programa del núcleo, la IP, el protocolo y el puerto. Córrela una vez en un PowerShell de administrador. La app nunca la aplica por ti. Copia la que muestra la app, que lleva tu ruta y tu IP. Se ve así, para un TFTP en 10.0.0.5:
 
 ```powershell
-New-NetFirewallRule -DisplayName MACUAHUITL-TFTP -Direction Inbound `
-  -Program "<carpeta>\macuahuitld.exe" -LocalAddress <IP> -Protocol UDP -LocalPort 69 -Action Allow
+New-NetFirewallRule -DisplayName 'MACUAHUITL tftp 10.0.0.5 69' -Direction Inbound -Program 'C:\Users\<tú>\AppData\Local\Programs\MACUAHUITL\macuahuitld.exe' -LocalAddress 10.0.0.5 -Protocol UDP -LocalPort 69 -Action Allow
 ```
+
+La app también muestra la orden `Remove-NetFirewallRule` para quitarla al terminar. En lugar de la regla, también sirve aceptar el diálogo del Firewall que aparece la primera vez que un servidor escucha.
 
 Si cancelas el diálogo del Firewall la primera vez que un servidor escucha, Windows crea reglas de **bloqueo** para el programa, y el bloqueo gana a las reglas de permiso. Quítalas en *Firewall de Windows Defender con seguridad avanzada → Reglas de entrada* (busca `macuahuitld.exe`) y luego agrega la regla de permiso.
 

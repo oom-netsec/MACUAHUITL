@@ -51,12 +51,13 @@ If the installer is started as administrator, it warns you: run it again without
 
 Windows has no privileged ports, so the TFTP, FTP, SCP/SFTP, syslog and trap servers listen on their standard ports. What stands in the way is Windows Firewall.
 
-The app shows the exact `New-NetFirewallRule` command for the server you start, limited to the core program, the IP, the protocol and the port. Run it once in an administrator PowerShell. The app never applies it for you. For example:
+The app shows the exact `New-NetFirewallRule` command for the server you start, limited to the core program, the IP, the protocol and the port. Run it once in an administrator PowerShell. The app never applies it for you. Copy the one the app shows, which has your path and IP. It looks like this, for a TFTP server on 10.0.0.5:
 
 ```powershell
-New-NetFirewallRule -DisplayName MACUAHUITL-TFTP -Direction Inbound `
-  -Program "<folder>\macuahuitld.exe" -LocalAddress <IP> -Protocol UDP -LocalPort 69 -Action Allow
+New-NetFirewallRule -DisplayName 'MACUAHUITL tftp 10.0.0.5 69' -Direction Inbound -Program 'C:\Users\<you>\AppData\Local\Programs\MACUAHUITL\macuahuitld.exe' -LocalAddress 10.0.0.5 -Protocol UDP -LocalPort 69 -Action Allow
 ```
+
+The app also shows the `Remove-NetFirewallRule` command to remove it when you are done. Instead of the rule, accepting the Firewall dialog that appears the first time a server listens also works.
 
 If you cancel the Windows Firewall dialog the first time a server listens, Windows creates **block** rules for the program, and block rules win over allow rules. Remove them in *Windows Defender Firewall with Advanced Security → Inbound Rules* (look for `macuahuitld.exe`), then add the allow rule.
 

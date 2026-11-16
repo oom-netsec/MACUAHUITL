@@ -215,8 +215,6 @@ Counts match the packs in this repository (a test keeps them in sync). A few IOS
 
 ## Install
 
-Windows (beta, unsigned): see [Install on Windows](docs/install-windows.md). The rest of this section is for Linux.
-
 Each [release](../../releases/latest) is built reproducibly and ships an SBOM. From its assets you need:
 
 - `macuahuitl_<version>_amd64.deb` (Debian/Ubuntu) **or** `macuahuitl-<version>-1.x86_64.rpm` (Fedora/RHEL);
