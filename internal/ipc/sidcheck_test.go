@@ -36,3 +36,24 @@ func TestMensajePipeDeOtroUsuario(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckServer(t *testing.T) {
+	const me, other = "S-1-5-21-1-2-3-1001", "S-1-5-21-1-2-3-1002"
+	for _, c := range []struct {
+		name            string
+		owner, sid, own string
+		ok              bool
+	}{
+		{"bueno", me, me, me, true},
+		{"dueño ajeno", other, me, me, false},
+		{"SID del proceso ajeno", me, other, me, false},
+		{"los dos ajenos", other, other, me, false},
+		{"dueño vacío", "", me, me, false},
+		{"SID vacío", me, "", me, false},
+		{"propio vacío", me, me, "", false},
+	} {
+		if err := checkServer(c.owner, c.sid, c.own); (err == nil) != c.ok {
+			t.Errorf("%s: checkServer = %v, quería ok=%v", c.name, err, c.ok)
+		}
+	}
+}

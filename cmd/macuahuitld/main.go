@@ -37,7 +37,7 @@ func main() {
 		msg := i18n.In(consoleLang, err)
 		fmt.Fprintln(os.Stderr, "macuahuitld:", msg)
 		// Sin consola el error se perdería: va al registro, salvo si otro núcleo ya tiene el canal (no se toca su registro).
-		if st := core.ResolvePaths(os.Getenv).State; st != "" && !errors.Is(err, ipc.ErrAlreadyRunning) {
+		if st := core.ResolvePaths(os.Getenv).State; st != "" && !errors.Is(err, ipc.ErrAlreadyRunning) && !sys.Privileged() { // elevado no se escribe en disco
 			sys.LogFailure(filepath.Join(st, logName), "macuahuitld: "+msg)
 		}
 		os.Exit(1)

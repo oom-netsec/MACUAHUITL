@@ -51,7 +51,18 @@ func Listen(name string) (net.Listener, error) {
 		return nil, fmt.Errorf("ipc: %w", err)
 	}
 	l, err := winio.ListenPipe(name, &winio.PipeConfig{SecurityDescriptor: pipeSDDL(sid), InputBufferSize: 64 << 10, OutputBufferSize: 64 << 10})
-	if errors.Is(err, windows.ERROR_ACCESS_DENIED) { // el nombre existe y su DACL no nos deja ni crear otra instancia: lo tiene otro usuario
+	if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+		// FILE_CREATE sobre un pipe que ya existe da ACCESS_DENIED aunque sea del mismo usuario (el caso común: otro núcleo
+		// nuestro). Se sondea: si conecta y pasa la verificación es nuestro; si no, lo tiene otro usuario.
+		ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+		c, _, perr := dialPipe(ctx, name)
+		if perr == nil {
+			c.Close()
+		}
+		if perr == nil || errors.Is(perr, context.DeadlineExceeded) { // ocupado: existe y no se sabe de quién; no se acusa
+			return nil, fmt.Errorf("%w (%v)", ErrAlreadyRunning, err)
+		}
 		return nil, i18n.Wrap("ipc.err.pipe_other_user", ErrAlreadyRunning, nil)
 	}
 	if errors.Is(err, windows.ERROR_ALREADY_EXISTS) || errors.Is(err, windows.ERROR_PIPE_BUSY) {
@@ -154,19 +165,14 @@ func dialPipe(ctx context.Context, name string) (net.Conn, uint32, error) {
 	// El PID solo no basta: GetNamedPipeServerProcessId da el de quien creó la instancia aunque ya haya muerto, y otro
 	// proceso pudo heredar ese PID. El dueño del objeto pipe (fijado en pipeSDDL) no se puede reutilizar así: se
 	// comprueba además. Con el handle del cliente, que ya tiene READ_CONTROL.
-	owner, err := pipeOwner(c)
-	if err == nil && !sameSID(owner, own) {
-		err = errors.New("dueño distinto")
-	}
-	var pid uint32
+	owner, oerr := pipeOwner(c)
+	pid, perr := pidOf(c, windows.GetNamedPipeServerProcessId)
 	var sid string
-	if err == nil {
-		pid, err = pidOf(c, windows.GetNamedPipeServerProcessId)
+	var serr error
+	if perr == nil {
+		sid, serr = pidSID(pid)
 	}
-	if err == nil {
-		sid, err = pidSID(pid)
-	}
-	if err != nil || !sameSID(sid, own) {
+	if err := errors.Join(oerr, perr, serr); err != nil || checkServer(owner, sid, own) != nil {
 		c.Close()
 		return nil, 0, fmt.Errorf("ipc: el pipe %s no lo atiende un proceso de este usuario", name)
 	}

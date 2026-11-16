@@ -9,11 +9,13 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 type peerVault struct {
@@ -46,8 +48,13 @@ func TestPipeSegundoListenRechazado(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l.Close()
-	if _, err := Listen(name); !errors.Is(err, ErrAlreadyRunning) {
+	_, err = Listen(name)
+	if !errors.Is(err, ErrAlreadyRunning) {
 		t.Fatalf("segundo Listen = %v, quería ErrAlreadyRunning (FIRST_PIPE_INSTANCE)", err)
+	}
+	var ce *i18n.Error
+	if errors.As(err, &ce) && ce.Code == "ipc.err.pipe_other_user" {
+		t.Fatalf("el pipe es del mismo usuario y el error dice que es de otro: %v", err)
 	}
 }
 
@@ -141,5 +148,21 @@ func TestPipeDuenoYDACL(t *testing.T) {
 	var a *windows.ACCESS_ALLOWED_ACE
 	if err := windows.GetAce(acl, 0, &a); err != nil || (*windows.SID)(unsafe.Pointer(&a.SidStart)).String() != own {
 		t.Fatalf("la única ACE no es del usuario: %v", err)
+	}
+}
+
+// Un pipe cuyo dueño no es el usuario (aquí Administradores, O:BA) se rechaza aunque su DACL deje entrar y su proceso
+// sea el propio: es la comprobación del dueño de dialPipe (B1), de punta a punta.
+func TestDialPipeRechazaDuenoAjeno(t *testing.T) {
+	name := sockPath(t)
+	own, _ := ownSID()
+	l, err := winio.ListenPipe(name, &winio.PipeConfig{SecurityDescriptor: "O:BAD:P(A;;GA;;;" + own + ")"})
+	if err != nil {
+		t.Skipf("este token no puede fijar a Administradores como dueño: %v", err) // ERROR_INVALID_OWNER sin elevar
+	}
+	serve(t, l)
+	if c, _, err := dialPipe(context.Background(), name); err == nil {
+		c.Close()
+		t.Fatal("dialPipe aceptó un pipe de otro dueño")
 	}
 }
