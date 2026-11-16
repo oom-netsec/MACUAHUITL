@@ -64,16 +64,20 @@ func Build(devs []capture.Device, cmds []string) Report {
 		if name == "" {
 			name = d.Address
 		}
-		masked := map[string]int{} // cuántos comandos del lote caen en cada clave enmascarada
+		masked := map[string]map[string]bool{} // por clave enmascarada, las claves crudas distintas del lote que caen en ella
 		for _, c := range cmds {
-			masked[capture.Key(mask.Cmd(d.Platform, c))]++
+			km := capture.Key(mask.Cmd(d.Platform, c))
+			if masked[km] == nil {
+				masked[km] = map[string]bool{}
+			}
+			masked[km][capture.Key(c)] = true
 		}
 		for _, c := range cmds {
 			row := Row{Device: name, Address: d.Address, Command: c}
 			// La evidencia y los cortados guardan el comando pasado por mask.Cmd: se busca por el crudo y por el enmascarado,
 			// este último solo si ningún otro comando del lote se enmascara igual (si no, no se sabe de cuál es la salida).
 			k, km := capture.Key(c), capture.Key(mask.Cmd(d.Platform, c))
-			amb := km != k && masked[km] > 1
+			amb := km != k && len(masked[km]) > 1 // el mismo comando repetido no es ambiguo
 			out, ok := d.Outputs[k]
 			_, okm := d.Outputs[km]
 			if !ok && !amb {

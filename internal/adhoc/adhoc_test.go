@@ -203,3 +203,14 @@ func TestBuildClaveEnmascaradaAmbigua(t *testing.T) {
 		t.Fatalf("row = %+v", r.Rows[0])
 	}
 }
+
+// El mismo comando pegado dos veces no es ambiguo: las dos filas toman la misma salida.
+func TestBuildComandoRepetidoNoEsAmbiguo(t *testing.T) {
+	a := "show run | include key 7 0822455D0A16"
+	d := capture.Device{Address: "a", Hostname: "h", Platform: "ios-xe", State: "completed", Outputs: map[string]string{capture.Key(mask.Cmd("ios-xe", a)): "salida"}}
+	for _, row := range Build([]capture.Device{d}, []string{a, a}).Rows {
+		if !row.OK || row.Output != "salida" {
+			t.Fatalf("row = %+v", row)
+		}
+	}
+}
