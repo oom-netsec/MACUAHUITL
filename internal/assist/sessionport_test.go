@@ -2,6 +2,7 @@ package assist
 
 import (
 	"errors"
+	"github.com/oom-netsec/MACUAHUITL/internal/parse/iosxe"
 	"maps"
 	"slices"
 	"strings"
@@ -514,5 +515,24 @@ func TestSessionPortChainFitsInFiveRounds(t *testing.T) {
 	// La ronda de show users es la de Pre: aquí cuentan las que pide planWith.
 	if rounds > 5 || !sessionPorts(have).known {
 		t.Errorf("rondas = %d, %+v", rounds, sessionPorts(have))
+	}
+}
+
+// Puertos multigigabit de un Cat9k (Tw, Fi) y los largos: se aceptan como puerto físico y se abrevian sin chocar con Twe.
+func TestValidInterfaceMultigig(t *testing.T) {
+	for _, n := range []string{"Tw1/0/1", "Fi1/0/1", "TwoGigabitEthernet1/0/1", "FiveGigabitEthernet1/0/2", "Twe1/0/1", "TwentyFiveGigE1/0/1"} {
+		if !ValidTrunkInterface(n) || !ValidInterface(n) {
+			t.Errorf("%s no es válido", n)
+		}
+	}
+	for _, n := range []string{"Tw", "Twx1/0/1", "Fi", "Tunnel0"} {
+		if ValidInterface(n) {
+			t.Errorf("%s no debe ser válido", n)
+		}
+	}
+	for in, want := range map[string]string{"TwoGigabitEthernet1/0/1": "Tw1/0/1", "FiveGigabitEthernet1/0/1": "Fi1/0/1", "TwentyFiveGigE1/0/1": "Twe1/0/1", "Twe1/0/1": "Twe1/0/1", "Tw1/0/1": "Tw1/0/1", "Fi1/0/1": "Fi1/0/1"} {
+		if got := iosxe.ShortIf(in); got != want {
+			t.Errorf("ShortIf(%s) = %s, quería %s", in, got, want)
+		}
 	}
 }

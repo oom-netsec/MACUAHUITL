@@ -39,9 +39,9 @@ func NormMAC(s string) (string, bool) {
 }
 
 var ifPrefixes = []struct{ long, short string }{
-	{"twentyfivegige", "Twe"}, {"hundredgige", "Hu"}, {"fortygigabitethernet", "Fo"}, {"tengigabitethernet", "Te"},
+	{"twentyfivegige", "Twe"}, {"twogigabitethernet", "Tw"}, {"fivegigabitethernet", "Fi"}, {"hundredgige", "Hu"}, {"fortygigabitethernet", "Fo"}, {"tengigabitethernet", "Te"},
 	{"gigabitethernet", "Gi"}, {"fastethernet", "Fa"}, {"ethernet", "Eth"}, {"port-channel", "Po"},
-	{"twe", "Twe"}, {"hu", "Hu"}, {"fo", "Fo"}, {"te", "Te"}, {"gi", "Gi"}, {"fa", "Fa"}, {"eth", "Eth"}, {"et", "Eth"}, {"po", "Po"},
+	{"twe", "Twe"}, {"tw", "Tw"}, {"fi", "Fi"}, {"hu", "Hu"}, {"fo", "Fo"}, {"te", "Te"}, {"gi", "Gi"}, {"fa", "Fa"}, {"eth", "Eth"}, {"et", "Eth"}, {"po", "Po"},
 }
 
 // ShortIf lleva el nombre de interfaz a la abreviatura de IOS (GigabitEthernet1/0/1 → Gi1/0/1).
