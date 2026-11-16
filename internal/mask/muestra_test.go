@@ -6,18 +6,20 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
 
 // semillaMuestra: MACUAHUITL_SEED, o la fecha (YYYYMMDD) si no está: la muestra con -race cambia cada día y se reproduce.
-func semillaMuestra() int64 {
+// Se calcula una sola vez para que la fecha no cambie a mitad de una corrida que cruza la medianoche.
+var semillaMuestra = sync.OnceValue(func() int64 {
 	if s, err := strconv.ParseInt(os.Getenv("MACUAHUITL_SEED"), 10, 64); err == nil {
 		return s
 	}
 	n, _ := strconv.ParseInt(time.Now().Format("20060102"), 10, 64)
 	return n
-}
+})
 
 func TestMain(m *testing.M) {
 	if raceOn {
