@@ -163,3 +163,29 @@ jobs:
         if: always()
         continue-on-error: true
         run: go build ./cmd/... ./internal/...
+
+  # La app en Windows (ADR 0012, «Instalador», 43b): vitest y el build de la interfaz en windows-latest, y el main de
+  # Wails sin purego (en Windows WebView2 es Go puro). continue-on-error y fuera de la protección de main hasta que lo sea
+  # el job windows; el vet es informativo hasta que ipc y sys compilen en Windows (43a2, 43a4).
+  ui-windows:
+    runs-on: windows-latest
+    continue-on-error: true
+    defaults:
+      run:
+        shell: bash
+        working-directory: ui/frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: main de Wails para Windows (informativo hasta 43a2 y 43a4)
+        working-directory: .
+        continue-on-error: true
+        run: CGO_ENABLED=0 go vet -tags wails ./ui/
