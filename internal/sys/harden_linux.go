@@ -95,8 +95,5 @@ func coreLimit() uint64 {
 	return l.Cur
 }
 
-// LockMemory no hace nada en Linux: Harden ya bloquea toda la memoria con mlockall.
-func LockMemory([]byte) error { return nil }
-
 // Privileged dice si el proceso corre como root; el núcleo se niega a arrancar así (spec §2).
 func Privileged() bool { return os.Geteuid() == 0 }

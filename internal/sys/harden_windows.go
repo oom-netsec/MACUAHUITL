@@ -22,7 +22,7 @@ const (
 
 // Harden se llama al arrancar el núcleo. Devuelve avisos como textos con clave (la auditoría los guarda en inglés con
 // Text.In(i18n.En); la consola sale en el idioma del proceso); nunca falla. En Windows no hay «bloquear todo» (ADR 0012,
-// b): se sube el mínimo del working set y la bóveda bloquea los rangos de sus llaves con LockMemory.
+// b): se sube el mínimo del working set y las llaves de la bóveda viven en buffers de memguard, que se bloquean solos con VirtualLock.
 func Harden() []i18n.Text {
 	warns := NoDump()
 	if err := windows.SetProcessWorkingSetSizeEx(windows.CurrentProcess(), workingSetMin, workingSetMax, 0); err != nil {
@@ -84,15 +84,6 @@ func readPagingFiles() ([]string, error) {
 	defer k.Close()
 	v, _, err := k.GetStringsValue("PagingFiles")
 	return v, err
-}
-
-// LockMemory bloquea b en RAM con VirtualLock (nunca va al archivo de paginación). Necesita el working set mínimo de
-// Harden. El rango debe seguir vivo y no moverse: lo cumple el heap de Go.
-func LockMemory(b []byte) error {
-	if len(b) == 0 {
-		return nil
-	}
-	return windows.VirtualLock(uintptr(unsafe.Pointer(&b[0])), uintptr(len(b)))
 }
 
 // Privileged dice si el token del proceso está elevado (UAC); el núcleo se niega a arrancar así (ADR 0012, c).

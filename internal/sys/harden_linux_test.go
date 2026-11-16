@@ -68,12 +68,6 @@ func TestMlockWarningIdiomas(t *testing.T) {
 	}
 }
 
-func TestLockMemoryLinuxNoHaceNada(t *testing.T) {
-	if err := LockMemory(make([]byte, 32)); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestPrivilegedLinux(t *testing.T) {
 	if Privileged() != (os.Geteuid() == 0) {
 		t.Fatal("Privileged debe ser euid == 0")
