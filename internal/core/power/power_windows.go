@@ -31,6 +31,8 @@ var (
 	pTranslateMsg  = user32.NewProc("TranslateMessage")
 	pDispatchMsg   = user32.NewProc("DispatchMessageW")
 
+	pRegSuspend    = user32.NewProc("RegisterSuspendResumeNotification")
+	pUnregSuspend  = user32.NewProc("UnregisterSuspendResumeNotification")
 	pWTSRegister   = wtsapi32.NewProc("WTSRegisterSessionNotification")
 	pWTSUnregister = wtsapi32.NewProc("WTSUnRegisterSessionNotification")
 )
@@ -45,8 +47,6 @@ const (
 )
 
 // Windows no deja bloquear la tapa ni el apagado: eso se reporta siempre como faltante.
-var notTakeable = []string{"handle-lid-switch", "shutdown"}
-
 type windowsInhibitor struct{}
 
 // NewLogind (nombre histórico, los llamadores no cambian) devuelve el inhibidor de Windows.
@@ -76,7 +76,7 @@ func (windowsInhibitor) Take(why string) (func(), []string) {
 			pClearRequest.Call(h, powerRequestSystemRequired)
 			windows.CloseHandle(windows.Handle(h))
 		})
-	}, notTakeable
+	}, nil // la tapa y el apagado no se pueden bloquear en Windows (ADR 0012 (d)): no es un fallo de toma
 }
 
 type wndClass struct {
@@ -93,7 +93,11 @@ type wndClass struct {
 	iconSm      windows.Handle
 }
 
-type handlers struct{ onSleep, onLock func() }
+type handlers struct {
+	onSleep, onLock func()
+	suspendReg      uintptr // handle de RegisterSuspendResumeNotification, 0 si no hay
+	wtsReg          bool
+}
 
 var (
 	wins      sync.Map // hwnd -> handlers
@@ -105,6 +109,16 @@ var (
 func wndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 	switch uint32(msg) {
 	case wmClose:
+		// Se desregistra aquí, en el hilo de la ventana y antes de destruirla.
+		if v, ok := wins.Load(hwnd); ok {
+			h := v.(*handlers)
+			if h.suspendReg != 0 {
+				pUnregSuspend.Call(h.suspendReg)
+			}
+			if h.wtsReg {
+				pWTSUnregister.Call(hwnd)
+			}
+		}
 		pDestroyWindow.Call(hwnd)
 		return 0
 	case wmDestroy:
@@ -112,7 +126,7 @@ func wndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 		return 0
 	}
 	if v, ok := wins.Load(hwnd); ok {
-		h := v.(handlers)
+		h := v.(*handlers)
 		dispatch(uint32(msg), wparam, h.onSleep, h.onLock)
 	}
 	r, _, _ := pDefWindowProc.Call(hwnd, msg, wparam, lparam)
@@ -150,13 +164,20 @@ func Watch(ctx context.Context, onSleep, onLock func()) {
 		log.Printf("power: no se pudo crear la ventana de suspensión: %v", e)
 		return
 	}
-	wins.Store(hwnd, handlers{onSleep, onLock})
+	h := &handlers{onSleep: onSleep, onLock: onLock}
+	wins.Store(hwnd, h)
 	defer wins.Delete(hwnd)
+	// Una ventana message-only no recibe la difusión WM_POWERBROADCAST: hay que registrarla (Windows 8+).
+	if r, _, e := pRegSuspend.Call(hwnd, 0 /* DEVICE_NOTIFY_WINDOW_HANDLE */); r == 0 {
+		log.Printf("power: sin aviso de suspensión (RegisterSuspendResumeNotification): %v", e)
+	} else {
+		h.suspendReg = r
+	}
 	// Sin WTS seguimos oyendo suspensión; solo falta el bloqueo, y se dice.
 	if r, _, e := pWTSRegister.Call(hwnd, notifyForThisSession); r == 0 {
 		log.Printf("power: sin aviso de bloqueo de pantalla (WTSRegisterSessionNotification): %v", e)
 	} else {
-		defer pWTSUnregister.Call(hwnd)
+		h.wtsReg = true
 	}
 	done := make(chan struct{})
 	defer close(done)
@@ -167,14 +188,14 @@ func Watch(ctx context.Context, onSleep, onLock func()) {
 		case <-done:
 		}
 	}()
-	var msg [48]byte // MSG
+	var msg winMsg
 	for {
-		r, _, _ := pGetMessage.Call(uintptr(unsafe.Pointer(&msg[0])), 0, 0, 0)
+		r, _, _ := pGetMessage.Call(uintptr(unsafe.Pointer(&msg)), 0, 0, 0)
 		if int32(r) <= 0 {
 			return
 		}
-		pTranslateMsg.Call(uintptr(unsafe.Pointer(&msg[0])))
-		pDispatchMsg.Call(uintptr(unsafe.Pointer(&msg[0])))
+		pTranslateMsg.Call(uintptr(unsafe.Pointer(&msg)))
+		pDispatchMsg.Call(uintptr(unsafe.Pointer(&msg)))
 	}
 }
 
@@ -182,4 +203,15 @@ func moduleHandle() (windows.Handle, error) {
 	var h windows.Handle
 	err := windows.GetModuleHandleEx(windows.GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, nil, &h)
 	return h, err
+}
+
+// winMsg es MSG de Win32 (48 bytes en amd64).
+type winMsg struct {
+	hwnd    uintptr
+	message uint32
+	wparam  uintptr
+	lparam  uintptr
+	time    uint32
+	ptX     int32
+	ptY     int32
 }

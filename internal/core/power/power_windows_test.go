@@ -20,6 +20,11 @@ func TestWatchCancela(t *testing.T) {
 	done := make(chan struct{})
 	go func() { Watch(ctx, func() {}, func() {}); close(done) }()
 	time.Sleep(200 * time.Millisecond)
+	select {
+	case <-done:
+		t.Fatal("Watch volvió antes de cancelar: la ventana no se creó")
+	default:
+	}
 	cancel()
 	select {
 	case <-done:
