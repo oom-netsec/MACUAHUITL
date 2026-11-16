@@ -163,7 +163,6 @@ func TestComandoCortadoDejaElEquipoParcial(t *testing.T) {
 func TestTresCortesFallanElEquipo(t *testing.T) {
 	e := newEnv(t, simulator.Config{})
 	e.trust(t)
-	e.spec.CustomCommands = "show version\nshow running-config\nshow ip interface brief\nshow clock" // el tercer corte no es el último
 	newCut(t, e, map[string]error{"show version": platform.ErrPromptTimeout, "show running-config": platform.ErrClosed, "show ip interface brief": platform.ErrPromptTimeout})
 	res, _ := runPartial(t, e, context.Background())
 	if res.State != "failed" || res.Reconnects != maxReconnects || !errors.Is(res.DetailErr, platform.ErrPromptTimeout) {
@@ -307,13 +306,13 @@ func TestReconexionConservaLaPrimeraLlaveCambiada(t *testing.T) {
 	}
 }
 
-func TestCorteEnElUltimoConReconexionesAgotadasEsParcial(t *testing.T) {
+func TestCorteEnElUltimoConReconexionesAgotadasYUnaSalidaCompletaEsParcial(t *testing.T) {
 	e := newEnv(t, simulator.Config{})
 	e.trust(t)
 	e.spec.CustomCommands = "show version\nshow clock\nshow users\nshow running-config"
-	newCut(t, e, map[string]error{"show version": platform.ErrPromptTimeout, "show clock": platform.ErrClosed, "show running-config": platform.ErrPromptTimeout})
+	newCut(t, e, map[string]error{"show clock": platform.ErrPromptTimeout, "show users": platform.ErrClosed, "show running-config": platform.ErrPromptTimeout})
 	res, _ := runPartial(t, e, context.Background())
-	if res.State != "partial" || res.Reconnects != maxReconnects || len(res.CutCommands) != 3 {
+	if res.State != "partial" || res.Reconnects != maxReconnects || len(res.CutCommands) != 3 { // show version salió completo
 		t.Fatalf("res = %+v", res)
 	}
 }

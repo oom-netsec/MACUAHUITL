@@ -127,6 +127,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	dev := Device{Host: res.Hostname, IP: t.Address, Port: t.Port, Platform: c.platform}
 	roundStart := d.Now()
 	var bytes int64
+	complete := 0 // comandos con salida completa
 	for i, cmd := range cmds {
 		emit(Progress{Target: hp, State: "running", Command: cmd.Text, Index: i + 1, Total: len(cmds), Bytes: bytes})
 		cctx, cancel := context.WithTimeout(ctx, maxCmd(cmd.Timeout)) // el timeout es de inactividad: esto es el tope total
@@ -144,6 +145,9 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			runErr = werr
 		}
 		res.Commands++
+		if runErr == nil {
+			complete++
+		}
 		// Una cancelación (fin de ventana o trabajo cancelado) no es un corte del equipo.
 		cut := runErr != nil && ctx.Err() == nil && (errors.Is(cutErr, platform.ErrPromptTimeout) || errors.Is(cutErr, platform.ErrClosed))
 		shown := cmd.Text // el comando cortado va a la auditoría, al detalle y al manifest: con el mismo enmascarado que la evidencia
@@ -179,8 +183,8 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			continue
 		}
 		if runErr != nil {
-			if cut && werr == nil && !errors.Is(cutErr, ErrWindowEnded) && i == len(cmds)-1 {
-				res.CutCommands = append(res.CutCommands, shown) // el último cortado: partial, sin reconectar
+			if cut && werr == nil && !errors.Is(cutErr, ErrWindowEnded) && i == len(cmds)-1 && (res.Reconnects < maxReconnects || complete > 0) {
+				res.CutCommands = append(res.CutCommands, shown) // el último cortado: partial, sin reconectar (agotadas las reconexiones, solo si hay alguna salida completa)
 				continue
 			}
 			if cut {
