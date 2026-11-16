@@ -190,9 +190,8 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: main de Wails para Windows (informativo hasta 43a2 y 43a4)
+      - name: main de Wails para Windows (sin purego; desde 43a4 la app compila en Windows)
         working-directory: .
-        continue-on-error: true
         run: CGO_ENABLED=0 go vet -tags wails ./ui/
       # Hasta que la app y el núcleo compilen en Windows (43a), el instalador se arma con binarios de prueba: lo que se
       # prueba es la plantilla (deploy/windows/macuahuitl.nsi), no los programas.
@@ -234,15 +233,10 @@ jobs:
           mkdir -p bin-win
           go build -trimpath -o bin-win/ ./cmd/macuahuitld ./cmd/mctl
           go build -trimpath -o bin-win/simserver.exe ./test/simulator/cmd/simserver
-      - name: compila la app (con binario de relleno si no compila en Windows todavía)
+      - name: compila la app (si no compila en Windows, el job falla)
         run: |
           (cd ui/frontend && npm ci && npm run build)
-          if go build -tags wails,production -ldflags -H=windowsgui -o bin-win/macuahuitl.exe ./ui; then
-            echo "app macuahuitl.exe compilada de verdad"
-          else
-            echo "::warning::la app no compila en Windows todavía: se usa un binario de relleno SOLO para macuahuitl.exe"
-            echo "binario de relleno" > bin-win/macuahuitl.exe
-          fi
+          go build -tags wails,production -ldflags -H=windowsgui -o bin-win/macuahuitl.exe ./ui
       - name: instalador NSIS
         run: |
           command -v makensis >/dev/null || export PATH="$PATH:/c/Program Files (x86)/NSIS"
