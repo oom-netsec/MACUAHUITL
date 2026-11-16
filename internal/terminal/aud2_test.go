@@ -74,3 +74,20 @@ func TestPromptRealTrasEcoPartidoNoTapaLoPosterior(t *testing.T) {
 		}
 	}
 }
+
+// Contraseñas que empiezan como un algoritmo (Shadow…, aesop…, Hmac…): el eco partido se tapa entero.
+func TestEcoPartidoDeContrasenaConPrefijoDeAlgoritmo(t *testing.T) {
+	for _, v := range []string{"Shadow2024x", "Sharepoint1", "aesop99x", "HmacKey1xy"} {
+		cmd := "cry isa key " + v + " add 1.1.1.1"
+		for k := 1; k < len(cmd); k++ {
+			r, b := newRec()
+			r.Output([]byte("R1(config)#"))
+			r.Input([]byte(cmd + "\r"))
+			r.Output([]byte(cmd[:k] + syslogAsync + cmd[k:] + "\r\nR1(config)#"))
+			r.Close()
+			if f := fuga4(b.String(), v); f != "" {
+				t.Fatalf("%q k=%d: fuga %q:\n%s", v, k, f, b.String())
+			}
+		}
+	}
+}
