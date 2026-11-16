@@ -41,12 +41,19 @@ func TestRunBorraLaCausaAlAbrirElCanal(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	_, statErr := os.Stat(file)
+	// El archivo se borra al abrir el canal, antes de que run escuche las señales (core.New va después y con -race es
+	// lento): se reenvía la interrupción hasta que run termine.
 	p, _ := os.FindProcess(os.Getpid())
-	p.Signal(os.Interrupt)
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-		t.Fatal("run no terminó")
+	stop := time.After(60 * time.Second)
+	for finished := false; !finished; {
+		p.Signal(os.Interrupt)
+		select {
+		case <-done:
+			finished = true
+		case <-time.After(200 * time.Millisecond):
+		case <-stop:
+			t.Fatal("run no terminó")
+		}
 	}
 	if statErr == nil {
 		t.Fatal("el archivo .startup sigue ahí tras abrir el canal")
