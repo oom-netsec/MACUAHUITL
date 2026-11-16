@@ -111,6 +111,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	}()
 	res.Hostname, res.Platform = c.drv.Hostname(), c.platform
 	serials := serialsOf(c.drv)
+	entryHost := res.Hostname // el de la sesión antes del changeto: una sesión nueva llega ahí, no al contexto
 	cmds, skipped, requested, err := plan(s, c.platform, d.Playbooks, d.MissingPack)
 	if err != nil {
 		res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
@@ -213,7 +214,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			}
 			other, note := false, false
 			if err == nil {
-				other, note = otherDevice(res.Hostname, res.Platform, serials, nc.drv.Hostname(), nc.platform, ns)
+				other, note = otherDevice(entryHost, res.Platform, serials, nc.drv.Hostname(), nc.platform, ns)
 			}
 			if note { // la interseccion de series dice que es el mismo equipo lógico (switchover de un stack), pero el conjunto cambió
 				d.Audit.Append(context.WithoutCancel(ctx), audit.Entry{Actor: "patrol", Action: "device.reconnect", Target: hp,
@@ -221,7 +222,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			}
 			if other {
 				// Otro equipo tras la misma IP (un par en failover con la llave replicada): no se escribe nada más en la carpeta del primero.
-				err = i18n.New("patrol.err.reconnect_other_device", i18n.A("from", identOf(res.Hostname, res.Platform, serials), "to", identOf(nc.drv.Hostname(), nc.platform, ns)))
+				err = i18n.New("patrol.err.reconnect_other_device", i18n.A("from", identOf(entryHost, res.Platform, serials), "to", identOf(nc.drv.Hostname(), nc.platform, ns)))
 				nc.close()
 			} else if err == nil { // si en la reconexión cambió la llave de host, el equipo queda failed y no skipped: ya hay evidencia escrita
 				c = nc
