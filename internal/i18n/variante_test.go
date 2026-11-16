@@ -35,7 +35,7 @@ func TestMsgVarianteWindows(t *testing.T) {
 	}
 }
 
-// Una variante «.windows» reemplaza a un código que existe y lleva sus mismos argumentos.
+// Una variante «.windows» reemplaza a un código que existe y solo usa argumentos de él.
 func TestVariantesWindowsTienenBase(t *testing.T) {
 	for code, e := range catalog {
 		base, ok := cutSuffix(code, ".windows")
@@ -47,8 +47,9 @@ func TestVariantesWindowsTienenBase(t *testing.T) {
 			t.Errorf("%s sin código base", code)
 			continue
 		}
-		if !sameArgs(b.Args, e.Args) || !sameArgs(b.Refs, e.Refs) {
-			t.Errorf("%s: argumentos o refs %v %v distintos de %s %v %v", code, e.Args, e.Refs, base, b.Args, b.Refs)
+		// El llamador pasa los argumentos de la base: la variante puede usar menos (p. ej. sin setcap en Windows), nunca otros.
+		if !subset(e.Args, b.Args) || !sameArgs(b.Refs, e.Refs) {
+			t.Errorf("%s: argumentos %v (deben estar en los de %s %v) o refs %v distintos de %v", code, e.Args, base, b.Args, e.Refs, b.Refs)
 		}
 		// Reason, Meta y Extra viajan por la base (Reason/Metadata): en la variante se ignorarían sin aviso.
 		if e.Reason != "" || len(e.Meta) > 0 || len(e.Extra) > 0 {
@@ -74,6 +75,19 @@ func sameArgs(a, b []string) bool {
 	}
 	for _, x := range b {
 		if !seen[x] {
+			return false
+		}
+	}
+	return true
+}
+
+func subset(a, b []string) bool {
+	in := map[string]bool{}
+	for _, x := range b {
+		in[x] = true
+	}
+	for _, x := range a {
+		if !in[x] {
 			return false
 		}
 	}
