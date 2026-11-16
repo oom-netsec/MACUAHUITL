@@ -152,7 +152,9 @@ func TestAdhocResultInformeEnIngles(t *testing.T) {
 	}
 }
 
-type fakePatrol struct{ v1.UnimplementedPatrolServiceServer }
+type fakePatrol struct {
+	v1.UnimplementedPatrolServiceServer
+}
 
 func (fakePatrol) CreateJob(context.Context, *v1.CreateJobRequest) (*v1.CreateJobResponse, error) {
 	return &v1.CreateJobResponse{JobId: "j1"}, nil
