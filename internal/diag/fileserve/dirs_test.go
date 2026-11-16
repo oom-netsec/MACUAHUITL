@@ -371,6 +371,8 @@ func TestHardLinkedFilesNotPublished(t *testing.T) {
 }
 
 // Un archivo que gana un segundo nombre después de publicarse se rechaza al abrirlo: decide el handle, no el listado.
+// El segundo nombre se crea después de prepare (que ya miró el FileInfo). En Linux el FileInfo del handle también trae
+// Nlink, así que aquí no se distingue; en Windows HardLinked(fi) siempre es false y solo pasa si se usa HardLinkedFile.
 func TestHardLinkedRejectedOnHandle(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "unico")

@@ -42,7 +42,9 @@ func TestHibernationWarning(t *testing.T) {
 }
 
 func TestHardenSetsNotDumpable(t *testing.T) {
-	Harden()
+	if _, err := Harden(); err != nil {
+		t.Fatal(err)
+	}
 	if dumpable() != 0 {
 		t.Fatal("process still dumpable")
 	}
@@ -71,5 +73,11 @@ func TestMlockWarningIdiomas(t *testing.T) {
 func TestPrivilegedLinux(t *testing.T) {
 	if Privileged() != (os.Geteuid() == 0) {
 		t.Fatal("Privileged debe ser euid == 0")
+	}
+}
+
+func TestEnsureLockQuotaLinuxNoHaceNada(t *testing.T) {
+	if err := EnsureLockQuota(); err != nil {
+		t.Fatal(err)
 	}
 }

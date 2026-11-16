@@ -13,6 +13,9 @@ var ErrNotRegular = i18n.New("sys.err.not_regular", nil)
 // (O_NONBLOCK en Linux; en Windows no hay FIFO) y rechaza lo que no sea un archivo regular.
 // Úsalo con toda ruta que venga de fuera.
 func OpenRegular(path string) (*os.File, error) {
+	if err := checkPath(path); err != nil {
+		return nil, err
+	}
 	f, err := os.OpenFile(path, os.O_RDONLY|nonBlock, 0)
 	if err != nil {
 		return nil, err
@@ -45,6 +48,9 @@ func regularOnly(f *os.File) (*os.File, error) {
 // OpenNew crea un archivo nuevo para leer y escribir (0600). Falla si la ruta ya existe y
 // nunca sigue un enlace simbólico en el último componente: no pisa nada que ya esté ahí.
 func OpenNew(path string) (*os.File, error) {
+	if err := checkPath(path); err != nil {
+		return nil, err
+	}
 	return os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_EXCL|ONoFollow, 0o600)
 }
 

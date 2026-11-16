@@ -34,6 +34,11 @@ func hibernateWarnings(enabled uint64, err error) []i18n.Text {
 	return nil
 }
 
+// unsafeVolume dice si el volumen de una ruta (filepath.VolumeName) es algo distinto de una letra de unidad: UNC
+// (\\host\share abre SMB, sale a la red fuera de EgressGuard y filtra el hash NTLM), \\?\ y \\.\ (dispositivos y pipes).
+// Vacío (ruta relativa) y «X:» son lo único que pasa.
+func unsafeVolume(vol string) bool { return vol != "" && len(vol) != 2 }
+
 // pagefileWarnings decide el aviso del archivo de paginación a partir de PagingFiles (REG_MULTI_SZ) ya leído.
 // Una lista vacía (o de cadenas vacías) significa que no hay pagefile.
 func pagefileWarnings(files []string, err error) []i18n.Text {

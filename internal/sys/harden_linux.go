@@ -11,8 +11,8 @@ import (
 )
 
 // Harden se llama al arrancar el núcleo. Devuelve avisos como textos con clave (la auditoría los guarda en inglés con
-// Text.In(i18n.En); la consola sale en el idioma del proceso); nunca falla.
-func Harden() []i18n.Text {
+// Text.In(i18n.En); la consola sale en el idioma del proceso); nunca falla (el error es solo de Windows).
+func Harden() ([]i18n.Text, error) {
 	warns := NoDump()
 	var lim unix.Rlimit
 	if err := unix.Getrlimit(unix.RLIMIT_MEMLOCK, &lim); err != nil {
@@ -23,7 +23,7 @@ func Harden() []i18n.Text {
 		warns = append(warns, i18n.Tx("harden.mlockall", "cause", err.Error()))
 	}
 	warns = append(warns, swapWarnings("/proc/swaps")...)
-	return append(warns, hibernationWarnings("/sys/power/resume")...)
+	return append(warns, hibernationWarnings("/sys/power/resume")...), nil
 }
 
 // NoDump marca el proceso como no volcable y sin core dumps (lo que Harden hace primero); la UI usa solo esto, porque
@@ -94,6 +94,9 @@ func coreLimit() uint64 {
 	unix.Getrlimit(unix.RLIMIT_CORE, &l)
 	return l.Cur
 }
+
+// EnsureLockQuota no hace nada en Linux: el límite de bloqueo lo gobierna RLIMIT_MEMLOCK y Harden lo revisa.
+func EnsureLockQuota() error { return nil }
 
 // Privileged dice si el proceso corre como root; el núcleo se niega a arrancar así (spec §2).
 func Privileged() bool { return os.Geteuid() == 0 }

@@ -250,7 +250,7 @@ func secretsIn(jobDir, dev string) (out []string, err error) {
 			if locs[k] == nil {
 				keys = append(keys, k)
 			}
-			locs[k] = append(locs[k], fmt.Sprintf("%s:%d", rel, n))
+			locs[k] = append(locs[k], fmt.Sprintf("%s:%d", filepath.ToSlash(rel), n)) // solo para mostrar
 		}
 		err = sc.Err()
 		f.Close()

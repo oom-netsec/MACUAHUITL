@@ -36,3 +36,14 @@ func TestPagefileWarnings(t *testing.T) {
 		t.Fatalf("si no se puede leer, debe decirlo: %v", w)
 	}
 }
+
+func TestUnsafeVolume(t *testing.T) {
+	for vol, want := range map[string]bool{
+		"": false, "C:": false, "z:": false, // sin volumen (relativa) o unidad simple
+		`\\host\share`: true, `\\?\C:`: true, `\\.\pipe`: true, `\\.\COM1`: true, `//host/share`: true,
+	} {
+		if got := unsafeVolume(vol); got != want {
+			t.Errorf("unsafeVolume(%q) = %v", vol, got)
+		}
+	}
+}

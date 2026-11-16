@@ -11,6 +11,9 @@ import (
 // nonBlock evita colgarse al abrir una FIFO sin escritor.
 const nonBlock = syscall.O_NONBLOCK
 
+// checkPath no hace nada en Linux: no hay rutas UNC ni de dispositivo.
+func checkPath(string) error { return nil }
+
 // Mkfifo crea una FIFO; existe para las pruebas de los paquetes que no pueden importar syscall (noegress).
 func Mkfifo(path string) error { return syscall.Mkfifo(path, 0o600) }
 

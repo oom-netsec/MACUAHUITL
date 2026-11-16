@@ -55,13 +55,19 @@ func resolvePathsWindows(env func(string) string) Paths {
 	return p
 }
 
-// winAbs acepta «C:\…» (o con «/») y UNC, y devuelve la ruta con «\» y sin barra final. Va a mano porque
-// filepath.IsAbs depende del sistema donde corre la prueba.
+// winAbs acepta solo la forma «X:\…» y devuelve la ruta sin barra final. Rechaza UNC, «\\?\», «\\.\», «//», barras
+// dobles y cualquier elemento «..». Va a mano porque filepath.IsAbs depende del sistema donde corre la prueba.
 func winAbs(s string) (string, bool) {
-	s = strings.ReplaceAll(s, "/", `\`)
-	drive := len(s) >= 3 && (s[0]|0x20 >= 'a' && s[0]|0x20 <= 'z') && s[1] == ':' && s[2] == '\\'
-	if !drive && !strings.HasPrefix(s, `\\`) {
+	if len(s) < 3 || !(s[0]|0x20 >= 'a' && s[0]|0x20 <= 'z') || s[1] != ':' || s[2] != '\\' {
 		return "", false
+	}
+	if strings.Contains(s, "/") || strings.Contains(s[3:], `\\`) {
+		return "", false
+	}
+	for _, e := range strings.Split(s[3:], `\`) {
+		if e == ".." {
+			return "", false
+		}
 	}
 	if s = strings.TrimRight(s, `\`); len(s) == 2 { // «C:\» sin más
 		return "", false

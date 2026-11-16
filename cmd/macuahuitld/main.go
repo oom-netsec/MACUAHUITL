@@ -43,7 +43,7 @@ func main() {
 var consoleLang = i18n.En
 
 // run recibe el endurecimiento como dependencia: en producción sys.Harden; las pruebas pasan una falsa (mlockall no va en go test).
-func run(harden func() []i18n.Text) error {
+func run(harden func() ([]i18n.Text, error)) error {
 	if sys.Privileged() {
 		key := "harden.err.root"
 		if runtime.GOOS == "windows" {
@@ -51,7 +51,10 @@ func run(harden func() []i18n.Text) error {
 		}
 		return errors.New(i18n.Msg(consoleLang, key, nil))
 	}
-	hw := harden() // antes de tocar cualquier secreto
+	hw, err := harden() // antes de tocar cualquier secreto
+	if err != nil {
+		return errors.New(i18n.In(consoleLang, err))
+	}
 	warns := make([]string, len(hw))
 	for i, w := range hw {
 		warns[i] = w.In(i18n.En) // la auditoría va siempre en inglés
@@ -60,7 +63,7 @@ func run(harden func() []i18n.Text) error {
 	if p.Config == "" || p.Data == "" || p.State == "" {
 		return errors.New(i18n.Msg(consoleLang, "harden.err.localappdata", nil)) // solo Windows: no se cae a %APPDATA%
 	}
-	if p.Runtime == "" {
+	if runtime.GOOS != "windows" && p.Runtime == "" { // en Windows no hay carpeta runtime: el named pipe llega en 43a4
 		return errors.New(i18n.Msg(consoleLang, "harden.err.runtime_dir", nil))
 	}
 	l, err := ipc.Listen(filepath.Join(p.Runtime, "core.sock"))

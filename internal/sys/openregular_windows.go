@@ -35,6 +35,15 @@ func HardLinkedFile(f *os.File) (bool, error) {
 	return info.NumberOfLinks > 1, ierr
 }
 
+// checkPath rechaza antes de abrir las rutas UNC y de dispositivo: \\host\share abre SMB (salida a la red fuera de
+// EgressGuard y hash NTLM filtrado) y \\.\pipe\x o \\.\COM1 se abren antes de que Stat los rechace.
+func checkPath(path string) error {
+	if unsafeVolume(filepath.VolumeName(path)) {
+		return fmt.Errorf("%s: %w", path, fs.ErrInvalid)
+	}
+	return nil
+}
+
 // Owner falla cerrado en Windows: (0, false). La verificación del dueño por SID va en 43a3.
 func Owner(os.FileInfo) (uid uint32, ok bool) { return 0, false }
 
@@ -47,7 +56,8 @@ const ONoFollow = 0
 // carpeta, así cambiar la carpeta por un enlace entre la apertura y el renombrado podría desviarlo; pasar a
 // NtSetInformationFile (FILE_RENAME_INFO con RootDirectory) si hace falta cerrarlo.
 func RenameNoReplaceIn(root *os.Root, old, new string) error {
-	if !filepath.IsLocal(old) || !filepath.IsLocal(new) {
+	// Base(n) != n: «sub\x», con sub una junction, saldría de la carpeta.
+	if filepath.Base(old) != old || filepath.Base(new) != new || !filepath.IsLocal(old) || !filepath.IsLocal(new) {
 		return fmt.Errorf("rename %s %s: %w", old, new, fs.ErrInvalid)
 	}
 	from, err := windows.UTF16PtrFromString(filepath.Join(root.Name(), old))

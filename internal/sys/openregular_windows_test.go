@@ -2,7 +2,9 @@ package sys
 
 import (
 	"errors"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -51,5 +53,49 @@ func TestRenameNoReplaceInNoSaleDeLaCarpeta(t *testing.T) {
 		if err := RenameNoReplaceIn(root, "a", dst); err == nil {
 			t.Fatalf("%q: salió de la carpeta", dst)
 		}
+	}
+}
+
+// UNC y rutas de dispositivo se rechazan antes de abrir nada (SMB saldría a la red y filtraría el hash NTLM).
+func TestRutasUNCYDispositivoRechazadas(t *testing.T) {
+	for _, p := range []string{`\\host\share\f`, `//host/share/f`, `\\?\C:\Windows\win.ini`, `\\.\pipe\x`, `\\.\COM1`} {
+		if _, err := OpenRegular(p); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("OpenRegular(%q): %v", p, err)
+		}
+		if _, err := OpenNew(p); !errors.Is(err, fs.ErrInvalid) {
+			t.Errorf("OpenNew(%q): %v", p, err)
+		}
+	}
+}
+
+// Un junction en la ruta hace fallar OpenNew y el destino no se crea.
+func TestOpenNewNoSigueJunction(t *testing.T) {
+	dir, fuera := t.TempDir(), t.TempDir()
+	if out, err := exec.Command("cmd", "/c", "mklink", "/J", filepath.Join(dir, "j"), fuera).CombinedOutput(); err != nil {
+		t.Skip("sin mklink /J:", err, string(out))
+	}
+	if _, err := OpenNew(filepath.Join(dir, "j")); err == nil {
+		t.Fatal("OpenNew abrió sobre un junction")
+	}
+	if ents, _ := os.ReadDir(fuera); len(ents) != 0 {
+		t.Fatalf("se creó algo a través del junction: %v", ents)
+	}
+}
+
+// «sub\x», con sub un junction, saldría de la carpeta: se rechaza todo nombre con separadores.
+func TestRenameNoReplaceInRechazaSubcarpetas(t *testing.T) {
+	dir := t.TempDir()
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	os.WriteFile(filepath.Join(dir, "a"), []byte("A"), 0o600)
+	os.Mkdir(filepath.Join(dir, "sub"), 0o700)
+	if err := RenameNoReplaceIn(root, "a", `sub\x`); err == nil {
+		t.Fatal(`aceptó sub\x`)
+	}
+	if err := RenameNoReplaceIn(root, `sub\x`, "a"); err == nil {
+		t.Fatal(`aceptó sub\x como origen`)
 	}
 }
