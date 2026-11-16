@@ -35,7 +35,7 @@ const outTail = 4096
 var maxDetect = 2 * time.Minute
 
 var (
-	anyPrompt = regexp.MustCompile(`(?:^|\n)([\w.\-@/:]{1,63})([>#]) ?$`)
+	anyPrompt = regexp.MustCompile(`(?:^|\n)([\w.\-@/:]{1,63}|[\w.\-@:]{1,63}(?:/[\w.\-@:]{1,63}){1,8})([>#]) ?$`)
 	// FTD: la CLI normal tiene el prompt «> » sin nombre de host. Una línea de salida que empiece con «>» (BGP, tablas)
 	// se confunde con él, así que solo cuenta al final del búfer y tras una pausa (ftdSettle) sin más datos.
 	ftdPrompt = regexp.MustCompile(`(?:^|\n)> ?$`)
@@ -99,6 +99,9 @@ type driver struct {
 	buf      []byte
 	hostname string
 	serials  []string // las series que mostró el show version de Detect (todas las del stack, ordenadas); vacío si no trae
+	// ASA (tras Detect): el prompt se compara por segmentos estables (host y contexto), no exacto; pr es el último visto.
+	asa bool
+	pr  platform.Prompt
 	// AireOS: aire se activa al ver su prompt; user/login son la credencial del shell (login se destruye tras usarla).
 	aire  bool
 	user  string
@@ -213,10 +216,13 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 	text, err := d.until(ctx, func(s string) bool {
 		return anyPrompt.MatchString(s) || ftdPrompt.MatchString(s) || ftdFirstLogin.MatchString(s) ||
 			airePrompt.MatchString(s) || aireConfig.MatchString(s) || d.loginCue() || iseFirstLogin.MatchString(s) ||
-			asaFirstLogin.MatchString(s)
+			asaFirstLogin.MatchString(s) || anyCfgPrompt.MatchString(s)
 	})
 	if err != nil {
 		return d.fail(err)
+	}
+	if anyCfgPrompt.MatchString(text) {
+		return d.fail(platform.ErrConfigPrompt)
 	}
 	if aireConfig.MatchString(text) {
 		return d.fail(platform.ErrConfigPrompt)
@@ -338,6 +344,9 @@ func (d *driver) atPrompt(s string) bool {
 	}
 	if d.hostname == "" { // FTD: solo «>»
 		return last == ">"
+	}
+	if d.asa {
+		return d.atASAPrompt(last)
 	}
 	return last == d.hostname+"#" || last == d.hostname+">"
 }
@@ -798,6 +807,7 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 	case ftd.MatchString(out.Text): // antes que asa: la salida de FTD puede citar la versión de lina
 		return "ftd", nil
 	case asa.MatchString(out.Text):
+		d.enterASA()
 		return "asa", nil
 	case nxos.MatchString(out.Text):
 		return "nx-os", nil
@@ -812,6 +822,15 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 }
 
 func (d *driver) atConfigPrompt(s string) bool {
+	if d.asa { // el ASA no recorta el nombre: el prompt de configuración lleva el hostname y el contexto completos
+		_, err := ParsePrompt(lastLine(s))
+		if !errors.Is(err, platform.ErrConfigPrompt) {
+			return false
+		}
+		i := strings.IndexByte(lastLine(s), '(')
+		p, err := ParsePrompt(lastLine(s)[:i] + "#")
+		return err == nil && sameSession(p, d.pr)
+	}
 	last := strings.TrimSuffix(s[strings.LastIndexByte(s, '\n')+1:], " ")
 	// IOS acorta el nombre en el prompt de configuración; se compara lo mismo que Netmiko: 16 caracteres.
 	host := d.hostname

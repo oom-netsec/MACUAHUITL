@@ -33,10 +33,12 @@ type DeviceResult struct {
 	Target             Target
 	Round              int
 	Hostname, Platform string
-	State              string // completed, partial, failed, skipped
-	Detail             string
-	DetailErr          error `json:"-"` // el error de Detail, para darlo en el idioma del cliente (i18n.In)
-	Commands, Invalid  int
+	// Context: el contexto del que salió la evidencia ("system" o el nombre) cuando el destino pidió changeto.
+	Context           string `json:",omitempty"`
+	State             string // completed, partial, failed, skipped
+	Detail            string
+	DetailErr         error `json:"-"` // el error de Detail, para darlo en el idioma del cliente (i18n.In)
+	Commands, Invalid int
 	// CutCommands: los comandos que se cortaron (timeout o sesión caída), en orden, y Reconnects las reconexiones que
 	// hizo la ronda para seguir. Van en el manifest.
 	CutCommands []string `json:",omitempty"`
@@ -109,6 +111,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	}()
 	res.Hostname, res.Platform = c.drv.Hostname(), c.platform
 	serials := serialsOf(c.drv)
+	entryHost := res.Hostname // el de la sesión antes del changeto: una sesión nueva llega ahí, no al contexto
 	cmds, skipped, requested, err := plan(s, c.platform, d.Playbooks, d.MissingPack)
 	if err != nil {
 		res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
@@ -138,6 +141,26 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 				evidence[cmd.Text] = true
 			}
 		}
+	}
+	if t.Context != "" {
+		sw, _ := c.drv.(platform.ContextSwitcher)
+		entry := ""
+		if sw != nil {
+			entry = sw.Prompt().Context
+		}
+		// Vuelta al contexto de entrada, aunque haya error o corte (c cambia al reconectar). Va después del cierre de c: corre antes.
+		defer func() {
+			if c != nil {
+				leaveContext(ctx, d, jobID, hp, round, c, entry)
+			}
+		}()
+		if err := enterContext(ctx, d, jobID, hp, round, c, t.Context); err != nil {
+			err = windowEnded(ctx, err)
+			res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
+			emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})
+			return res
+		}
+		res.Hostname, res.Context = c.drv.Hostname(), t.Context
 	}
 	dev := Device{Host: res.Hostname, IP: t.Address, Port: t.Port, Platform: c.platform}
 	roundStart := d.Now()
@@ -191,7 +214,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			}
 			other, note := false, false
 			if err == nil {
-				other, note = otherDevice(res.Hostname, res.Platform, serials, nc.drv.Hostname(), nc.platform, ns)
+				other, note = otherDevice(entryHost, res.Platform, serials, nc.drv.Hostname(), nc.platform, ns)
 			}
 			if note { // la interseccion de series dice que es el mismo equipo lógico (switchover de un stack), pero el conjunto cambió
 				d.Audit.Append(context.WithoutCancel(ctx), audit.Entry{Actor: "patrol", Action: "device.reconnect", Target: hp,
@@ -199,11 +222,14 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			}
 			if other {
 				// Otro equipo tras la misma IP (un par en failover con la llave replicada): no se escribe nada más en la carpeta del primero.
-				err = i18n.New("patrol.err.reconnect_other_device", i18n.A("from", identOf(res.Hostname, res.Platform, serials), "to", identOf(nc.drv.Hostname(), nc.platform, ns)))
+				err = i18n.New("patrol.err.reconnect_other_device", i18n.A("from", identOf(entryHost, res.Platform, serials), "to", identOf(nc.drv.Hostname(), nc.platform, ns)))
 				nc.close()
 			} else if err == nil { // si en la reconexión cambió la llave de host, el equipo queda failed y no skipped: ya hay evidencia escrita
 				c = nc
 				err = rerunPre(ctx, c, pre, cmds[:i])
+			}
+			if err == nil && t.Context != "" { // la sesión nueva entra por el contexto de siempre: se repite el changeto
+				err = enterContext(ctx, d, jobID, hp, round, c, t.Context)
 			}
 			if err != nil {
 				err = windowEnded(ctx, err)

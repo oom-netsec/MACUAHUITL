@@ -42,6 +42,9 @@ type Target struct {
 	Address  string
 	Port     uint16 // 0 = 22
 	DeviceID string
+	// Context: solo ASA multicontexto. "" = la sesión se queda donde entra; "system" o el nombre de un contexto = el
+	// ejecutor hace changeto antes de los playbooks (ADR 0011). Se valida como el dato de tipo context.
+	Context string `json:",omitempty"`
 }
 
 type Override struct {
@@ -179,6 +182,13 @@ func noPlaybook(id string, missing func(string) string) error {
 func ValidateWith(s Spec, pbs []playbook.Playbook, v *vault.Vault, missing func(string) string) error {
 	if len(s.Targets) == 0 {
 		return fieldErr("targets", "patrol.field.no_targets")
+	}
+	for _, t := range s.Targets {
+		if t.Context != "" {
+			if _, err := playbook.ValidateValue("context", t.Context); err != nil {
+				return fieldErr("targets", "patrol.field.bad_context", "context", t.Context)
+			}
+		}
 	}
 	if s.DefaultCredentialID == "" {
 		return fieldErr("credential", "patrol.field.no_credential")
