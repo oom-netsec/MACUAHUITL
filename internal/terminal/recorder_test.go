@@ -3,6 +3,7 @@ package terminal
 import (
 	"bytes"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -511,7 +512,9 @@ func TestRendimientoDeCincoMegas(t *testing.T) {
 	}
 	t1, t5 := run(1<<20), run(5<<20)
 	t.Logf("1 MB en %v, 5 MB en %v", t1, t5)
-	if t5 > 6*time.Second {
+	// El tope absoluto está medido en los runners de Linux; el de Windows (Defender, menos CPU) tarda más sin que sea
+	// regresión. La proporción de abajo, que es la que detecta el crecimiento cuadrático, vale en todos.
+	if runtime.GOOS == "linux" && t5 > 6*time.Second {
 		t.Errorf("5 MB tardó %v", t5)
 	}
 	if t5 > 12*t1+500*time.Millisecond { // lineal ≈ 5×; cuadrático ≈ 25×

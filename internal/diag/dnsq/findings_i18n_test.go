@@ -7,11 +7,14 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/miekg/dns"
 )
 
+// winRefused: el mismo «connection refused» como lo escribe Windows; el golden guarda el texto de Linux.
+var winRefused = strings.NewReplacer("connectex: No connection could be made because the target machine actively refused it.", "connect: connection refused")
 var volatileDNS = regexp.MustCompile(`"RTT":[0-9]+|127\.0\.0\.[0-9]+:[0-9]+`)
 
 // udpOnly escucha solo por UDP: TCP/53 no responde.
@@ -160,7 +163,7 @@ func escenariosDNS(t *testing.T) map[string]any {
 
 func viewDNS(r any) string {
 	b, _ := json.Marshal(r)
-	return volatileDNS.ReplaceAllString(string(b), "X")
+	return volatileDNS.ReplaceAllString(winRefused.Replace(string(b)), "X")
 }
 
 // Regresión: el JSON en español de cada revisión es el de antes del catálogo (UPDATE_GOLDEN=1 lo reescribe).

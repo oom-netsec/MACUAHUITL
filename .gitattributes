@@ -1,0 +1,2 @@
+# Todo el texto con LF también al clonar en Windows: los goldens, fixtures, transcripciones y lo embebido se comparan byte a byte (ADR 0012).
+* text=auto eol=lf

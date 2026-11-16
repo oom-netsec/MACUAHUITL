@@ -69,6 +69,10 @@ jobs:
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - name: vet
         run: go vet ./...
+      - name: vet para Windows de los paquetes ya portables (tools/ci/windows-pkgs.txt)
+        run: grep -v '^#' tools/ci/windows-pkgs.txt | awk '{print $1}' | GOOS=windows CGO_ENABLED=0 xargs go vet
+      - name: x/sys/windows solo donde lo permite el ADR 0012 (también en archivos _windows.go)
+        run: tools/ci/winsys.sh
       - name: mask sin -race (corpus completo)
         run: go test -count=1 ./internal/mask/... ./internal/terminal/...
       - name: noegress
@@ -130,3 +134,32 @@ jobs:
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
           buf generate
           git diff --exit-code -- gen/
+
+  # Windows (fase 43, ADR 0012): informativo mientras dure 43a; al cerrarla pasa a obligatorio junto con ui-windows.
+  windows:
+    runs-on: windows-latest
+    continue-on-error: true
+    env:
+      CGO_ENABLED: "0"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: pruebas de los paquetes ya portables (tools/ci/windows-pkgs.txt)
+        run: |
+          set -o pipefail
+          grep -v '#' tools/ci/windows-pkgs.txt | xargs go test -count=1
+      - name: noegress (paquetes portables)
+        if: always()
+        run: grep -v '^#' tools/ci/windows-pkgs.txt | awk '{print $1}' | xargs go run ./tools/noegress/cmd/noegress
+      - name: archcheck (paquetes portables)
+        if: always()
+        run: grep -v '^#' tools/ci/windows-pkgs.txt | awk '{print $1}' | xargs go run ./tools/archcheck/cmd/archcheck
+      - name: compila todo (informativo, lista lo que falta portar)
+        if: always()
+        continue-on-error: true
+        run: go build ./cmd/... ./internal/...
