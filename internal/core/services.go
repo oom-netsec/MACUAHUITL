@@ -405,13 +405,9 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		c.mu.Lock()
 		j.results[round] = append(j.results[round], res)
 		j.enterRound(round)
-		if res.State == "completed" {
-			j.OK++
-		} else {
-			j.Failed++
-		}
+		j.tally(res.State)
 		c.mu.Unlock()
-		if res.State != "completed" {
+		if res.State != "completed" && res.State != "partial" {
 			return errors.New(res.Detail)
 		}
 		return nil
@@ -482,9 +478,10 @@ func (c *Core) watch(j *job, events <-chan engine.Event, cancel func()) {
 		case "round.end":
 			c.mu.Lock()
 			j.rounds = e.Index
-			ok, failed := j.OK, j.Failed
+			ok, partial, failed := j.OK, j.Partial, j.Failed
 			c.mu.Unlock()
-			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_FINISHED, e.Index, "phase.ok_failed", i18n.A("ok", ok, "failed", failed))
+			key, args := roundPhase(ok, partial, failed)
+			c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ROUND_FINISHED, e.Index, key, args)
 			if zip, err := patrol.RoundDone(j.writer, j.spec, e.Index); err != nil {
 				c.audit("job.zip_failed", j.id, i18n.English(err))
 				c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, e.Index, "phase.round_zip_failed", i18n.A("error", err.Error()))
@@ -636,7 +633,8 @@ func (s *patrolSvc) GetRun(ctx context.Context, r *v1.GetRunRequest) (*v1.GetRun
 	for _, d := range j.results[int(r.Round)] {
 		detail, reason, args := detailOf(i18n.Locale(ctx), d.Detail, d.DetailErr)
 		out.Devices = append(out.Devices, &v1.RunDevice{Target: &v1.Target{Address: d.Target.Address, Port: uint32(patrol.EffectivePort(d.Target.Port)), DeviceId: d.Target.DeviceID},
-			State: deviceStates[d.State], Detail: detail, Reason: reason, Args: args})
+			State: deviceStates[d.State], Detail: detail, Reason: reason, Args: args,
+			CutCommands: cutOf(d).cut, Reconnects: cutOf(d).reconnects})
 	}
 	return out, nil
 }

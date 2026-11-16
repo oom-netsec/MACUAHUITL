@@ -8,6 +8,7 @@ package adhoc
 import (
 	"encoding/csv"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/capture"
@@ -66,9 +67,11 @@ func Build(devs []capture.Device, cmds []string) Report {
 			row := Row{Device: name, Address: d.Address, Command: c}
 			if out, ok := d.Outputs[capture.Key(c)]; ok {
 				row.OK, row.Output = true, strings.TrimRight(out, "\r\n")
-			} else if d.State != "completed" && d.Detail != "" {
+			} else if d.State == "partial" && slices.ContainsFunc(d.Cut, func(x string) bool { return capture.Key(x) == capture.Key(c) }) {
+				row.Note = d.Detail // solo el comando cortado lleva el detalle del corte
+			} else if d.State != "completed" && d.State != "partial" && d.Detail != "" {
 				row.Note = d.Detail
-			} else if d.State == "completed" {
+			} else if d.State == "completed" || d.State == "partial" {
 				row.NoteTx = i18n.Tx("adhoc.note.invalid")
 			} else if d.State == "" {
 				row.NoteTx = i18n.Tx("adhoc.note.no_round")

@@ -51,6 +51,7 @@ var deviceStates = map[string]v1.DeviceState{
 	"connecting": v1.DeviceState_DEVICE_STATE_CONNECTING, "running": v1.DeviceState_DEVICE_STATE_RUNNING,
 	"completed": v1.DeviceState_DEVICE_STATE_COMPLETED, "failed": v1.DeviceState_DEVICE_STATE_FAILED,
 	"skipped": v1.DeviceState_DEVICE_STATE_SKIPPED, "cancelled": v1.DeviceState_DEVICE_STATE_CANCELLED,
+	"partial": v1.DeviceState_DEVICE_STATE_PARTIAL,
 }
 
 var loginSteps = map[string]v1.LoginTestStep{
@@ -87,4 +88,12 @@ func detailOf(loc, es string, err error) (detail, reason string, args map[string
 		return es, "", nil
 	}
 	return i18n.In(loc, err), c.Reason(), c.Metadata()
+}
+
+// cutOf da los conteos de cortes que viajan en RunDevice: solo con partial; en el manifest quedan en cualquier estado.
+func cutOf(d patrol.DeviceResult) (c struct{ cut, reconnects uint32 }) {
+	if d.State == "partial" {
+		c.cut, c.reconnects = uint32(len(d.CutCommands)), uint32(d.Reconnects)
+	}
+	return c
 }

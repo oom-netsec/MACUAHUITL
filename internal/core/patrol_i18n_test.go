@@ -116,15 +116,25 @@ func patrolCasos(t *testing.T, lang string) map[string]string {
 }
 
 // failingRun arma un trabajo contra un equipo que corta la sesión a media salida y devuelve el detalle del evento y de GetRun.
-func failingRun(t *testing.T, lang string, reasons ...map[string]string) map[string]string {
+// Con fail corta tres comandos (más que las reconexiones permitidas) y el equipo queda failed; sin él corta uno y queda partial.
+func failingRun(t *testing.T, lang string, fail bool, reasons ...map[string]string) map[string]string {
 	t.Helper()
 	out := map[string]string{}
 	h := newHarness(t, nil)
 	cred := h.ready(t)
-	addr, _ := simulator.Start(t, simulator.Config{Hostname: "SW-LAB-02", Username: "admin", Password: "MARKER-PW", Enable: "MARKER-EN", Transcripts: transcripts(), DropDuringCommand: "show running-config"})
+	cfg := simulator.Config{Hostname: "SW-LAB-02", Username: "admin", Password: "MARKER-PW", Enable: "MARKER-EN", Transcripts: transcripts(), DropDuringCommand: "show running-config"}
+	if fail {
+		cfg.DropDuringCommand, cfg.DropDuringCommands = "", []string{"show ip interface brief", "show running-config", "show clock"}
+	}
+	addr, _ := simulator.Start(t, cfg)
 	ap := netip.MustParseAddrPort(addr)
 	h.target = &v1.Target{Address: ap.Addr().String(), Port: uint32(ap.Port()), DeviceId: "sw2"}
-	cj, err := h.patrol.CreateJob(con(t, lang), &v1.CreateJobRequest{Spec: h.spec(cred)})
+	spec := h.spec(cred)
+	spec.CustomCommands = "show running-config\nshow version\n" // el cortado no es el último: hay reconexión
+	if fail {
+		spec.CustomCommands = "show ip interface brief\nshow running-config\nshow clock\n"
+	}
+	cj, err := h.patrol.CreateJob(con(t, lang), &v1.CreateJobRequest{Spec: spec})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,17 +185,24 @@ func failingRun(t *testing.T, lang string, reasons ...map[string]string) map[str
 func TestPatrolRegresionEs(t *testing.T) {
 	base := patrolCasos(t, "es")
 	i18ntest.Golden(t, "testdata/patrol_es.golden.json", base)
-	fb := failingRun(t, "es")
-	i18ntest.Golden(t, "testdata/patrol_fallo_es.golden.json", fb)
+	fb := failingRun(t, "es", false)
+	i18ntest.Golden(t, "testdata/patrol_parcial_es.golden.json", fb)
+	ff := failingRun(t, "es", true)
+	i18ntest.Golden(t, "testdata/patrol_fallo_es.golden.json", ff)
 	for _, lang := range []string{"es"} {
 		for k, v := range patrolCasos(t, lang) {
 			if base[k] != v {
 				t.Errorf("%s con %q difiere de es: %q vs %q", k, lang, v, base[k])
 			}
 		}
-		for k, v := range failingRun(t, lang) {
+		for k, v := range failingRun(t, lang, false) {
 			if fb[k] != v {
 				t.Errorf("%s con %q difiere de es: %q vs %q", k, lang, v, fb[k])
+			}
+		}
+		for k, v := range failingRun(t, lang, true) {
+			if ff[k] != v {
+				t.Errorf("%s con %q difiere de es (fallo): %q vs %q", k, lang, v, ff[k])
 			}
 		}
 	}
@@ -231,7 +248,7 @@ var spanishRe = regexp.MustCompile(`[áéíóúñ¿]|\b(bóveda|equipos?|trabajo
 // Con en, lo que traduce Patrol sale sin español; los textos de otros dominios (playbook, Ajustes) quedan fuera.
 func TestPatrolEnSinEspanol(t *testing.T) {
 	skip := map[string]bool{"crear_comando_malo": true, "crear_salida_no_dir": true}
-	for _, set := range []map[string]string{patrolCasos(t, "en"), failingRun(t, "en"), bovedaCasos(t, "en")} {
+	for _, set := range []map[string]string{patrolCasos(t, "en"), failingRun(t, "en", false), failingRun(t, "en", true), bovedaCasos(t, "en")} {
 		for k, v := range set {
 			if m := spanishRe.FindString(v); m != "" && !skip[k] {
 				t.Errorf("%s: queda español (%q): %s", k, m, v)
@@ -273,13 +290,24 @@ func TestPatrolCodigosYArgumentos(t *testing.T) {
 	}
 }
 
-// El equipo que corta la sesión: el detalle del evento y de GetRun sale en el idioma pedido y trae su código.
+// El equipo que corta la sesión en un comando: se reconecta y termina partial. El detalle del evento y de GetRun sale en el idioma pedido y trae su código.
 func TestPatrolDetalleDeEquipoEnYCodigo(t *testing.T) {
 	reasons := map[string]string{}
-	got := failingRun(t, "en", reasons)
-	if a := reasons["auditoria"]; !strings.Contains(a, `error=\"platform: the device closed the session`) || strings.Contains(a, "cerró la sesión") {
+	got := failingRun(t, "en", false, reasons)
+	if a := reasons["auditoria"]; !strings.Contains(a, `cause=\"platform: the device closed the session`) || strings.Contains(a, "cerró la sesión") || !strings.Contains(a, "device.reconnect") {
 		t.Errorf("la auditoría del equipo debe ir en inglés:\n%s", a)
 	}
+	for _, k := range []string{"evento", "getrun"} {
+		if reasons[k] != "patrol.dev.partial" || !strings.Contains(got[k], "1 command cut and 1 reconnect; first: show running-config") {
+			t.Errorf("%s: reason %q detalle %q", k, reasons[k], got[k])
+		}
+	}
+}
+
+// Con más cortes que reconexiones el equipo queda failed: el detalle y la reason son los del cierre de sesión, en el idioma pedido.
+func TestPatrolDetalleDeEquipoFallidoEnYCodigo(t *testing.T) {
+	reasons := map[string]string{}
+	got := failingRun(t, "en", true, reasons)
 	for _, k := range []string{"evento", "getrun"} {
 		if reasons[k] != "platform.err.closed" || !strings.Contains(got[k], "platform: the device closed the session: EOF") {
 			t.Errorf("%s: reason %q detalle %q", k, reasons[k], got[k])

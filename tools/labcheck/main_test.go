@@ -594,3 +594,21 @@ func TestSecretAtVeFormasNegadas(t *testing.T) {
 		}
 	}
 }
+
+// Un equipo partial no es «falló»: el reporte lo dice y lista los comandos cortados y las reconexiones.
+func TestEquipoParcialListaLosCortados(t *testing.T) {
+	job, pack := fixture(t)
+	m := patrol.Manifest{Playbooks: []patrol.PlaybookRef{{ID: "ios/a"}}, Devices: []patrol.DeviceResult{{Target: patrol.Target{Address: "10.0.0.1"},
+		Round: 1, Hostname: "sw1", State: "partial", Detail: "1 comando cortado y 1 reconexión; el primero: show perm",
+		CutCommands: []string{"show perm"}, Reconnects: 1}}}
+	b, _ := json.Marshal(m)
+	write(t, filepath.Join(job, "manifest.json"), string(b))
+	var out strings.Builder
+	if err := report(&out, job, []string{pack}, 30*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	if !strings.Contains(got, "partial") || strings.Contains(got, "failed") || !strings.Contains(got, `comandos cortados: "show perm"`) || !strings.Contains(got, "1 reconexiones") {
+		t.Fatalf("reporte:\n%s", got)
+	}
+}

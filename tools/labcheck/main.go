@@ -376,6 +376,13 @@ func report(w io.Writer, jobDir string, packDirs []string, slow time.Duration) e
 		} else if r.Detail != "" {
 			fmt.Fprintf(w, " · %s", r.Detail)
 		}
+		if len(r.CutCommands) > 0 { // los comandos cortados no tienen salida: se listan para repetirlos a mano
+			q := make([]string, len(r.CutCommands))
+			for i, c := range r.CutCommands {
+				q[i] = fmt.Sprintf("%q", c)
+			}
+			fmt.Fprintf(w, " · comandos cortados: %s · %d reconexiones", strings.Join(q, ", "), r.Reconnects)
+		}
 		fmt.Fprintln(w)
 	}
 	fmt.Fprintf(w, "- enmascarado: %v · conteos: %v\n", m.Masked, m.MaskCounts)

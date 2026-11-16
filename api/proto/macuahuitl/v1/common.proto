@@ -17,6 +17,9 @@ enum DeviceState {
   DEVICE_STATE_CANCELLED = 8;
   // Omitido en la ronda: falló el Login Test silencioso o cambió la llave de host (spec §12.2).
   DEVICE_STATE_SKIPPED = 9;
+  // Terminó la ronda con comandos cortados (timeout o sesión caída) y siguió tras reconectar: la evidencia sirve
+  // pero tiene huecos. Los cortados quedan marcados «incomplete» en la evidencia y no se reintentan.
+  DEVICE_STATE_PARTIAL = 10;
 }
 
 // Destino escrito por el ingeniero. address acepta IP, nombre DNS o CIDR (spec §6.1).

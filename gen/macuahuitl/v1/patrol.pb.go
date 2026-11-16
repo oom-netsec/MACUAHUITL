@@ -1010,9 +1010,11 @@ type JobSummary struct {
 	// Historial de fases, de la más antigua a la más reciente (se guardan las últimas 200).
 	Phases []*JobPhase `protobuf:"bytes,13,rep,name=phases,proto3" json:"phases,omitempty"`
 	// patrol, adhoc, backup o change (un trabajo guardado antes de existir el campo sale como patrol).
-	Kind          string `protobuf:"bytes,14,opt,name=kind,proto3" json:"kind,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Kind string `protobuf:"bytes,14,opt,name=kind,proto3" json:"kind,omitempty"`
+	// Equipos de la ronda que terminaron en PARTIAL; no cuentan en devices_ok ni en devices_failed.
+	DevicesPartial uint32 `protobuf:"varint,15,opt,name=devices_partial,json=devicesPartial,proto3" json:"devices_partial,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *JobSummary) Reset() {
@@ -1141,6 +1143,13 @@ func (x *JobSummary) GetKind() string {
 		return x.Kind
 	}
 	return ""
+}
+
+func (x *JobSummary) GetDevicesPartial() uint32 {
+	if x != nil {
+		return x.DevicesPartial
+	}
+	return 0
 }
 
 type JobPhase struct {
@@ -1316,8 +1325,11 @@ type RunDevice struct {
 	State  DeviceState            `protobuf:"varint,2,opt,name=state,proto3,enum=macuahuitl.v1.DeviceState" json:"state,omitempty"`
 	Detail string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
 	// Código estable del catálogo del error de detail y sus argumentos; vacío si el detalle es texto de sistema.
-	Reason        string            `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
-	Args          map[string]string `protobuf:"bytes,5,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Reason string            `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Args   map[string]string `protobuf:"bytes,5,rep,name=args,proto3" json:"args,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Con state PARTIAL: comandos cortados y reconexiones de la ronda (0 en los demás estados).
+	CutCommands   uint32 `protobuf:"varint,6,opt,name=cut_commands,json=cutCommands,proto3" json:"cut_commands,omitempty"`
+	Reconnects    uint32 `protobuf:"varint,7,opt,name=reconnects,proto3" json:"reconnects,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1385,6 +1397,20 @@ func (x *RunDevice) GetArgs() map[string]string {
 		return x.Args
 	}
 	return nil
+}
+
+func (x *RunDevice) GetCutCommands() uint32 {
+	if x != nil {
+		return x.CutCommands
+	}
+	return 0
+}
+
+func (x *RunDevice) GetReconnects() uint32 {
+	if x != nil {
+		return x.Reconnects
+	}
+	return 0
 }
 
 type GetRunRequest struct {
@@ -1779,7 +1805,7 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x12missing_inhibitors\x18\x02 \x03(\tR\x11missingInhibitors\")\n" +
 	"\x10CancelJobRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\"\x13\n" +
-	"\x11CancelJobResponse\"\x83\x04\n" +
+	"\x11CancelJobResponse\"\xac\x04\n" +
 	"\n" +
 	"JobSummary\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x12\n" +
@@ -1798,7 +1824,8 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\n" +
 	"output_dir\x18\f \x01(\tR\toutputDir\x12/\n" +
 	"\x06phases\x18\r \x03(\v2\x17.macuahuitl.v1.JobPhaseR\x06phases\x12\x12\n" +
-	"\x04kind\x18\x0e \x01(\tR\x04kind\"\x9d\x02\n" +
+	"\x04kind\x18\x0e \x01(\tR\x04kind\x12'\n" +
+	"\x0fdevices_partial\x18\x0f \x01(\rR\x0edevicesPartial\"\x9d\x02\n" +
 	"\bJobPhase\x12*\n" +
 	"\x02at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12/\n" +
 	"\x04kind\x18\x02 \x01(\x0e2\x1b.macuahuitl.v1.JobPhaseKindR\x04kind\x12\x14\n" +
@@ -1811,13 +1838,17 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x11\n" +
 	"\x0fListJobsRequest\"A\n" +
 	"\x10ListJobsResponse\x12-\n" +
-	"\x04jobs\x18\x01 \x03(\v2\x19.macuahuitl.v1.JobSummaryR\x04jobs\"\x8d\x02\n" +
+	"\x04jobs\x18\x01 \x03(\v2\x19.macuahuitl.v1.JobSummaryR\x04jobs\"\xd0\x02\n" +
 	"\tRunDevice\x12-\n" +
 	"\x06target\x18\x01 \x01(\v2\x15.macuahuitl.v1.TargetR\x06target\x120\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1a.macuahuitl.v1.DeviceStateR\x05state\x12\x16\n" +
 	"\x06detail\x18\x03 \x01(\tR\x06detail\x12\x16\n" +
 	"\x06reason\x18\x04 \x01(\tR\x06reason\x126\n" +
-	"\x04args\x18\x05 \x03(\v2\".macuahuitl.v1.RunDevice.ArgsEntryR\x04args\x1a7\n" +
+	"\x04args\x18\x05 \x03(\v2\".macuahuitl.v1.RunDevice.ArgsEntryR\x04args\x12!\n" +
+	"\fcut_commands\x18\x06 \x01(\rR\vcutCommands\x12\x1e\n" +
+	"\n" +
+	"reconnects\x18\a \x01(\rR\n" +
+	"reconnects\x1a7\n" +
 	"\tArgsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"<\n" +

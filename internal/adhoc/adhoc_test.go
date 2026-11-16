@@ -152,3 +152,13 @@ func TestInformeEnIngles(t *testing.T) {
 		t.Fatalf("md en = %q", md)
 	}
 }
+
+// Un equipo partial muestra lo que sí salió y, en el comando cortado, el detalle del corte (no «inválido»).
+func TestBuildEquipoParcial(t *testing.T) {
+	d := capture.Device{Address: "a", Hostname: "h", State: "partial", Detail: "1 comando cortado", Cut: []string{"show tcp brief"}, Outputs: map[string]string{"show clock": "10:00"}}
+	r := Build([]capture.Device{d}, []string{"show clock", "show tcp brief", "show nada"})
+	// solo el cortado lleva el detalle del corte; un comando inválido que no se cortó conserva su nota
+	if !r.Rows[0].OK || r.Rows[1].OK || r.Rows[1].Note != "1 comando cortado" || r.Rows[2].Note != "comando inválido en el equipo" {
+		t.Fatalf("rows = %+v", r.Rows)
+	}
+}

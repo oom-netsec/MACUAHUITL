@@ -94,6 +94,9 @@ func changeCapture(phase v1.ChangePhase) func(*cli.Env, []string) error {
 		if err := checkDevices(name, run.Devices); err != nil {
 			return err
 		}
+		if p := partialDevices(run.Devices); p != "" { // la evidencia parcial sirve, pero con huecos
+			fmt.Fprintln(c.Out, cli.T("mctl.change.device_partial", "name", name, "list", p))
+		}
 		fmt.Fprintln(c.Out, cli.T("mctl.change.done_"+name, "id", fs.Arg(0)))
 		return nil
 	}
@@ -133,12 +136,23 @@ func waitCapture(ctx context.Context, list func(context.Context) (*v1.ListChange
 	}
 }
 
+// partialDevices nombra por dirección los equipos de la captura que quedaron partial (con comandos cortados).
+func partialDevices(devs []*v1.RunDevice) string {
+	var out []string
+	for _, d := range devs {
+		if d.State == v1.DeviceState_DEVICE_STATE_PARTIAL {
+			out = append(out, d.Target.GetAddress())
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
 // checkDevices falla nombrando los equipos de la captura que no quedaron completed (los excluidos a propósito no cuentan).
 // El estado por equipo no trae el hostname: se nombra por dirección.
 func checkDevices(name string, devs []*v1.RunDevice) error {
 	var bad []string
 	for _, d := range devs {
-		if d.State == v1.DeviceState_DEVICE_STATE_COMPLETED || d.State == v1.DeviceState_DEVICE_STATE_SKIPPED {
+		if d.State == v1.DeviceState_DEVICE_STATE_COMPLETED || d.State == v1.DeviceState_DEVICE_STATE_SKIPPED || d.State == v1.DeviceState_DEVICE_STATE_PARTIAL {
 			continue
 		}
 		who := d.Target.GetAddress()

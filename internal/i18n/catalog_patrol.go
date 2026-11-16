@@ -49,5 +49,6 @@ func init() {
 		"patrol.svc.job_state":            e("el trabajo está {state}", "the job is {state}", "state"),
 		"patrol.svc.no_devices_left":      e("no quedan equipos", "no devices are left"),
 		"patrol.svc.login_failed":         e("Login Test falló; excluye o corrige: {failed}", "the Login Test failed; exclude or fix: {failed}", "failed"),
+		"patrol.dev.partial":              e("{cut} {cut|comando cortado|comandos cortados} y {reconnects} {reconnects|reconexión|reconexiones}; el primero: {first}", "{cut} {cut|command|commands} cut and {reconnects} {reconnects|reconnect|reconnects}; first: {first}", "cut", "reconnects", "first"),
 	})
 }
