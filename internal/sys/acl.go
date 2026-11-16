@@ -17,6 +17,9 @@ const (
 	sidTrustedInstaller = "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"
 )
 
+// ancestorIgnore son los SID que no cuentan como «otro» en un ancestro de la carpeta de salidas.
+var ancestorIgnore = []string{sidCreatorOwner, sidTrustedInstaller}
+
 // Derechos de archivo y carpeta (winnt.h).
 const (
 	fileAddFile     = 0x2

@@ -212,7 +212,7 @@ func PrivateDir(path string) error {
 		if err != nil {
 			return &PrivateDirError{Reason: PrivateDirRead, Path: a, Err: err}
 		}
-		if sid := foreignSID(aces, user.String(), writeMask, true, sidCreatorOwner, sidTrustedInstaller); sid != "" {
+		if sid := foreignSID(aces, user.String(), writeMask, true, ancestorIgnore...); sid != "" {
 			return &PrivateDirError{Reason: PrivateDirAncestor, Path: a, SID: sid}
 		}
 		if a == filepath.Dir(a) {

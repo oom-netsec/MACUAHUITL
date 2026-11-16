@@ -31,6 +31,7 @@ func TestForeignSID(t *testing.T) {
 		{"Everyone con Write (agrega archivos)", []ace{{sid: sidEvery, mask: 0x100116}}, writeMask, true, nil, sidEvery},
 		{"Everyone solo lee", []ace{{sid: sidEvery, mask: 0x1200A9}}, writeMask, true, nil, ""},
 		{"Autenticados solo agregan subcarpeta (raíz de C:)", []ace{{sid: sidAuthed, mask: fileAddSubdir}}, writeMask, true, nil, ""},
+		{"TrustedInstaller en C:\\Windows", []ace{{sid: sidTrustedInstaller, mask: fileAllAccess}}, writeMask, true, ancestorIgnore, ""},
 		{"ignorado", []ace{{sid: sidCreatorOwner, mask: fileAllAccess}}, writeMask, true, []string{sidCreatorOwner}, ""},
 	}
 	for _, c := range casos {
