@@ -12,7 +12,7 @@ analyze it, change the network safely and keep a verifiable record of everything
   <img alt="Platform: Linux" src="https://img.shields.io/badge/platform-Linux-0b0c0e?style=flat-square&logo=linux&logoColor=white">
   <img alt="Go 1.27+" src="https://img.shields.io/badge/Go-1.27%2B-00ADD8?style=flat-square&logo=go&logoColor=white">
   <img alt="Zero cloud" src="https://img.shields.io/badge/cloud-zero-4fd1b5?style=flat-square">
-  <img alt="Status: pre-1.0" src="https://img.shields.io/badge/status-pre--1.0-f5a524?style=flat-square">
+  <img alt="Status: stable 1.0" src="https://img.shields.io/badge/status-stable%201.0-4fd1b5?style=flat-square">
 </p>
 
 <p align="center">
@@ -69,7 +69,7 @@ Each of these is in the release notes, with what was checked on a real device:
 - **Rollback means the configuration as it was.** The write templates were applied, verified and rolled back in the lab runs of [v0.5.4](../../releases/tag/v0.5.4) (Cisco Modeling Labs and a Catalyst 3560-CX) and [v0.6.4](../../releases/tag/v0.6.4) (Catalyst 3560-CX). The configuration was identical after every rollback.
 - **An unknown error stops the change.** Any unrecognized IOS `% …` reply in configuration mode stops the apply and offers the rollback. On the 3560-CX, five templates were applied and rolled back with no false stop ([v0.6.5](../../releases/tag/v0.6.5)).
 - **Recorded before it is sent.** The lines of a change are written to the audit log before they reach the device, and a core restart in the middle of an apply leaves a state the saved rollback can still check ([v0.6.5](../../releases/tag/v0.6.5)).
-- **Secrets are masked** in evidence, terminal recordings, logs and syslog, including abbreviated IOS forms typed at the terminal (`ena sec lev 15 …`, `snmp-s ho … ver 2c …`, `tacacs-ser k …`). Masking was checked on the [v0.5.0](../../releases/tag/v0.5.0) lab runs, covers syslog since [v0.6.5](../../releases/tag/v0.6.5), and permanent tests compare it against a frozen copy of the v0.6.5 masking: nothing masked before is shown now ([v0.6.6](../../releases/tag/v0.6.6)). Known limitations, such as `tac k …` and a multi-word secret repeated later in the output, are listed in the [v0.6.6 notes](../../releases/tag/v0.6.6).
+- **Secrets are masked** in evidence, terminal recordings, logs and syslog, including abbreviated IOS forms typed at the terminal (`ena sec lev 15 …`, `snmp-s ho … ver 2c …`, `tacacs-ser k …`). Masking was checked on the [v0.5.0](../../releases/tag/v0.5.0) lab runs, covers syslog since [v0.6.5](../../releases/tag/v0.6.5), and permanent tests compare it against a frozen copy of the v0.6.5 masking: nothing masked before is shown now ([v0.6.6](../../releases/tag/v0.6.6)). The open masking findings of the second audit, such as `tac k …` and a multi-word secret repeated later in the output, were closed in [v0.7.0](../../releases/tag/v0.7.0).
 
 <p align="center"><img src="docs/assets/pro/bento.jpg" alt="One app, the whole job: zero cloud, 96 h armed windows, 44 analysis rules, ACL translation between IOS-XE, NX-OS and ASA, TFTP/FTP/SCP/SFTP/HTTP transfers, hash-chained audit, no privileged code, ping/traceroute/nmap/iperf3/PCAP, English and Spanish, dark and light."></p>
 
@@ -229,7 +229,7 @@ sudo apt install ./macuahuitl_*.deb           # or: sudo dnf install ./macuahuit
 systemctl --user enable --now macuahuitld     # as the user who will use it
 ```
 
-`SHA256SUMS` catches a broken download. To check that a file was built by this repository's release workflow (from v1.0.0 on), verify its signed provenance with the [GitHub CLI](https://cli.github.com/): `gh attestation verify macuahuitl_*.deb --repo oom-netsec/MACUAHUITL --signer-workflow oom-netsec/MACUAHUITL/.github/workflows/release.yml`. It works the same for the `.rpm`, the binaries and the packs published with each core release (packs-only releases rely on the pack signature).
+`SHA256SUMS` catches a broken download. To check that a file was built by this repository's release workflow (from v0.7.0 on), verify its signed provenance with the [GitHub CLI](https://cli.github.com/): `gh attestation verify macuahuitl_*.deb --repo oom-netsec/MACUAHUITL --signer-workflow oom-netsec/MACUAHUITL/.github/workflows/release.yml`. It works the same for the `.rpm`, the binaries and the packs published with each core release (packs-only releases rely on the pack signature).
 
 Use `apt` or `dnf` rather than `dpkg -i` or `rpm -i`: they install the dependencies too. apt may print a harmless note that the download is performed unsandboxed as root; that is expected for a local file. Packs need no extra step: the core checks the Ed25519 signature of every official pack against the key built into it, refuses an `oom/*` pack that fails it, and `mctl pack inspect` or the install preview shows `official` or `third-party`.
 
@@ -328,7 +328,7 @@ task ui-build   # desktop app
 
 ## Docs
 
-- [Roadmap](docs/roadmap.md): what is built so far, what is left for 1.0.0 (lab validation and stability) and the phases after it (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging, Windows and macOS)
+- [Roadmap](docs/roadmap.md): what is built so far, what is open after 1.0.0 (lab validation) and the phases after it (L2/L3 maps, optics, MOP generator, upgrades, advanced routing, MPLS/SR/EVPN, TAC report packaging, Windows and macOS)
 - [Architecture design](docs/architecture/2026-11-02-macuahuitl-architecture-design.md) · [Decision records](docs/adr/)
 - [Threat model](docs/security/THREAT_MODEL.md) · [Cryptography](docs/security/CRYPTO.md) · [Auditor's guide](docs/security/AUDIT_GUIDE.md)
 
@@ -337,6 +337,8 @@ Design records (ADRs and plans) are written in Spanish.
 ## Contributing
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+**Wanted: ASA lab help.** Deeper ASA support (multiple context, Active/Active failover, clustering) is being built, and no physical ASA is available to test it. If you run ASA or Firepower in ASA mode and can share sanitized `show` outputs or try a build in a lab, please open an issue.
 
 ## License
 

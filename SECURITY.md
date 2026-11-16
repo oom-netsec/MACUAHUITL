@@ -23,7 +23,7 @@ Every release ships a `SHA256SUMS` file. In the folder you downloaded to:
 sha256sum -c --ignore-missing SHA256SUMS
 ```
 
-`SHA256SUMS` catches a broken download. To check that a file was built by this repository's release workflow (from v1.0.0 on), verify its signed provenance with the [GitHub CLI](https://cli.github.com/):
+`SHA256SUMS` catches a broken download. To check that a file was built by this repository's release workflow (from v0.7.0 on), verify its signed provenance with the [GitHub CLI](https://cli.github.com/):
 
 ```sh
 gh attestation verify macuahuitl_*.deb --repo oom-netsec/MACUAHUITL \
