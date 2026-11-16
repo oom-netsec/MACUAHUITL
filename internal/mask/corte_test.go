@@ -13,7 +13,7 @@ import (
 // nunca muestra algo que s1 no mostraba.
 func TestCortePropiedad(t *testing.T) {
 	r := rand.New(rand.NewSource(11))
-	piezas := []string{"word", "x", " ", " ", "enable secret", "5", " ; ", "<MASKED:secret>", "<MASKED:type7>", "a>", "<", ">", "ñandú", "'", "Zq00001"}
+	piezas := []string{"word", "x", " ", " ", "enable secret", "5", " ; ", "<MASKED:secret>", "<MASKED:type7>", "a>", "<", ">", "ñandú", "'", "Zq00001", "\x80", "\xa9\x80"} // los dos últimos: bytes de continuación UTF-8 sueltos (pegados a un marcador)
 	malos := 0
 	for n := 0; n < 20000; n++ {
 		var o, s strings.Builder

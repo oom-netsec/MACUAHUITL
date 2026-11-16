@@ -84,6 +84,14 @@ func cutOne(o, s string, a, b int) (string, int) {
 	c := min(a, lcp(o, s))
 	e := min(len(s), max(len(s)-(len(o)-b), len(s)-lcs(o, s)))
 	e = max(e, c)
+	// Primero UTF-8 y después marcadores: el ajuste de marcadores solo mueve a bordes ASCII («<», «>»), que ya son inicio de runa;
+	// al revés, un byte de continuación pegado a un marcador devolvía c al «>» y lo partía.
+	for c > 0 && c < len(s) && !utf8.RuneStart(s[c]) {
+		c--
+	}
+	for e < len(s) && !utf8.RuneStart(s[e]) {
+		e++
+	}
 	for _, m := range maskedMarker.FindAllStringIndex(s, -1) { // no se parte un <MASKED:…>
 		if m[0] < c && c < m[1] {
 			c = m[0]
@@ -91,12 +99,6 @@ func cutOne(o, s string, a, b int) (string, int) {
 		if m[0] < e && e < m[1] {
 			e = m[1]
 		}
-	}
-	for c > 0 && c < len(s) && !utf8.RuneStart(s[c]) {
-		c--
-	}
-	for e < len(s) && !utf8.RuneStart(s[e]) {
-		e++
 	}
 	if tapado(s[c:e]) {
 		return s, 0
