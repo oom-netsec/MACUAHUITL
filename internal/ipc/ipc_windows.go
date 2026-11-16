@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
@@ -146,4 +147,29 @@ func DialPath(name string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 		return c, err
 	}
 	return grpc.NewClient("passthrough:///core", baseDial(append([]grpc.DialOption{grpc.WithContextDialer(dialer)}, opts...))...)
+}
+
+// CoreRunning dice si el pipe del usuario existe y lo atiende un proceso suyo: abre y cierra, sin sesión gRPC.
+func CoreRunning() (bool, error) {
+	p, err := SocketPath()
+	if err != nil {
+		return false, err
+	}
+	return coreRunning(p)
+}
+
+func coreRunning(name string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	c, _, err := dialPipe(ctx, name)
+	switch {
+	case errors.Is(err, windows.ERROR_FILE_NOT_FOUND):
+		return false, nil
+	case errors.Is(err, context.DeadlineExceeded): // todas las instancias ocupadas: el pipe existe
+		return true, nil
+	case err != nil:
+		return false, err
+	}
+	c.Close()
+	return true, nil
 }
