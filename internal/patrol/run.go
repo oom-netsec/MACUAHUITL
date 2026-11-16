@@ -226,10 +226,12 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 				nc.close()
 			} else if err == nil { // si en la reconexión cambió la llave de host, el equipo queda failed y no skipped: ya hay evidencia escrita
 				c = nc
-				err = rerunPre(ctx, c, pre, cmds[:i])
-			}
-			if err == nil && t.Context != "" { // la sesión nueva entra por el contexto de siempre: se repite el changeto
-				err = enterContext(ctx, d, jobID, hp, round, c, t.Context)
+				if t.Context != "" { // la sesión nueva entra por el contexto de siempre: primero el changeto, como en la ronda normal
+					err = enterContext(ctx, d, jobID, hp, round, c, t.Context)
+				}
+				if err == nil {
+					err = rerunPre(ctx, c, pre, cmds[:i])
+				}
 			}
 			if err != nil {
 				err = windowEnded(ctx, err)
