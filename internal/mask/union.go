@@ -184,8 +184,13 @@ func loggedSpans(line, platform string) [][2]int {
 // un total impar de comillas, todo lo que sigue a la primera.
 func quotedSpans(line string) [][2]int { return quotedSpansQ(line, '"') }
 
+var apostrophe = regexp.MustCompile(`[A-Za-z0-9]'[A-Za-z0-9]`)
+
 // quotedSpansQ es quotedSpans con la comilla q (la simple también cita: «% Ambiguous command: 'tac k X'»).
 func quotedSpansQ(line string, q byte) (spans [][2]int) {
+	if q == '\'' { // un apóstrofo entre dos letras («Don't», «user's») es parte de la palabra, no una comilla
+		line = apostrophe.ReplaceAllStringFunc(line, func(m string) string { return m[:1] + "_" + m[2:] })
+	}
 	first := strings.IndexByte(line, q)
 	if first < 0 || notQuotedCfg.MatchString(line) {
 		return nil
@@ -345,9 +350,9 @@ var cmdSyslogOpen = []*regexp.Regexp{
 	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111010: User '.*?', running '.*?' from IP \S+, executed ')(.*)()$`),
 }
 
-// diffLineM2: el diff de show archive config differences, como diffLine pero sin exigir minúscula tras el signo
-// («+NO snmp-server…», «+ENABLE SECRET…», que IOS acepta) y con un BOM delante. Solo lo usa M₂: diffLine es de la v0.6.5.
-var diffLineM2 = regexp.MustCompile(`^(\x{FEFF}? ?[+-])((?i:\s+(?:no|default)\s+)?[A-Za-z].*)$`)
+// diffLineM2: el diff de show archive config differences, como diffLine pero sin exigir minúscula tras el signo: acepta
+// la palabra clave entera en mayúsculas («+NO snmp-server…», «+ENABLE SECRET…», que IOS acepta; no «+Password aging…») y con un BOM delante. Solo lo usa M₂: diffLine es de la v0.6.5.
+var diffLineM2 = regexp.MustCompile(`^(\x{FEFF}? ?[+-])((?:\s*(?i:no|default)\s+)*(?:[a-z]|[A-Z][A-Z0-9-]*(?:\s|$)).*)$`)
 
 func hasHigh(s string) bool {
 	for i := 0; i < len(s); i++ {

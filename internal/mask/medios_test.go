@@ -290,3 +290,26 @@ func TestEspaciosUnicodeEnConfiguracionImpresa(t *testing.T) {
 		informar(t, malos)
 	}
 }
+
+// Hallazgo 3: un apóstrofo entre letras («Don't», «user's») no es una comilla, y el diff exige minúscula, la palabra clave
+// entera en mayúsculas o un BOM: la prosa y las líneas con mayúscula inicial quedan como en la v0.6.5.
+func TestApostrofosYDiffConMayusculaInicialIgualAV065(t *testing.T) {
+	lineas := []string{
+		"Warning: Don't use the password reset feature", "info: user's password expires soon", `ERROR: "description it's the key holder's box"`,
+		"error: can't read key file", "Info: the admin's secret rotation is due",
+		"+Password aging enabled for local users", "-Server key status: ok", "+Key rotation done", "-Community strings audited", "+Secret store ready",
+	}
+	for _, l := range lineas {
+		for _, p := range []string{"ios-xe", "asa"} {
+			for nom, f := range map[string]func(impl) string{
+				"Apply":  func(im impl) string { return im.apply(p, l+"\n") },
+				"Stream": func(im impl) string { return im.stream(p, l+"\n") },
+				"syslog": func(im impl) string { return im.raw(l) },
+			} {
+				if n, o := f(nuevo), f(viejo); n != o {
+					t.Errorf("[%s] (%s) %q\n  nueva:  %q\n  v0.6.5: %q", nom, p, l, n, o)
+				}
+			}
+		}
+	}
+}
