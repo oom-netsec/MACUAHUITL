@@ -123,7 +123,7 @@ try {
   $sids = $acl.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique
   $allowed = @($u1.Sid, 'S-1-5-18', 'S-1-5-32-544')
   $extra = @($sids | Where-Object { $_ -notin $allowed })
-  Must ($extra.Count -eq 0 -and $acl.AreAccessRulesProtected -and $u1.Sid -in $sids) "ACL de $data: solo el usuario, SYSTEM y Administradores, protegida ($($sids -join ', '))"
+  Must ($extra.Count -eq 0 -and $acl.AreAccessRulesProtected -and $u1.Sid -in $sids) "ACL de ${data}: solo el usuario, SYSTEM y Administradores, protegida ($($sids -join ', '))"
 
   # 6) Patrol contra el simulador SSH (127.0.0.1, puerto alto que elige el sistema).
   $addrFile = "$work\sim.addr"
