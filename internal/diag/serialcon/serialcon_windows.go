@@ -118,6 +118,10 @@ func (p *Port) io(ev windows.Handle, start func(ov *windows.Overlapped) error) (
 	if err := start(&ov); err != nil && err != windows.ERROR_IO_PENDING {
 		return 0, err
 	}
+	// Close marca closed antes de su CancelIoEx: una E/S lanzada justo después no quedó cancelada y se cancela aquí.
+	if p.closed.Load() {
+		windows.CancelIoEx(p.h, &ov)
+	}
 	var n uint32
 	err := windows.GetOverlappedResult(p.h, &ov, &n, true)
 	if err == windows.ERROR_OPERATION_ABORTED && p.closed.Load() {
@@ -138,7 +142,10 @@ func (p *Port) Read(b []byte) (int, error) {
 			return 0, os.ErrClosed
 		}
 		t0 := time.Now()
-		n, err := p.io(p.rev, func(ov *windows.Overlapped) error { return windows.ReadFile(p.h, b, nil, ov) })
+		n, err := p.io(p.rev, func(ov *windows.Overlapped) error {
+			var d uint32 // con -race x/sys/windows desreferencia done: nil revienta; n sale de GetOverlappedResult
+			return windows.ReadFile(p.h, b, &d, ov)
+		})
 		took := time.Since(t0)
 		p.mu.RUnlock()
 		if err != nil || n > 0 {
@@ -150,13 +157,17 @@ func (p *Port) Read(b []byte) (int, error) {
 	}
 }
 
+// Write admite un solo escritor a la vez (comparte el evento wev).
 func (p *Port) Write(b []byte) (int, error) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	if p.closed.Load() {
 		return 0, os.ErrClosed
 	}
-	n, err := p.io(p.wev, func(ov *windows.Overlapped) error { return windows.WriteFile(p.h, b, nil, ov) })
+	n, err := p.io(p.wev, func(ov *windows.Overlapped) error {
+		var d uint32 // ver Read
+		return windows.WriteFile(p.h, b, &d, ov)
+	})
 	if err == nil && int(n) < len(b) { // venció WriteTotalTimeoutConstant: éxito con menos bytes
 		err = windows.ERROR_TIMEOUT
 	}
