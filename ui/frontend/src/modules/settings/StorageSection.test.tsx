@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { setOSForTests } from "../../lib/platform";
 import { StorageSection, parseOutputsError } from "./StorageSection";
 import { I18nProvider } from "../../lib/i18n";
 import { CoreContext, NavContext } from "../../app/activity";
@@ -18,6 +19,7 @@ const folder = () => screen.findByRole("textbox", { name: /Carpeta de salidas|Ou
 const typeIn = async (el: HTMLElement, v: string) => { await userEvent.clear(el); if (v) await userEvent.type(el, v); };
 
 beforeEach(() => localStorage.clear());
+afterEach(() => setOSForTests(undefined));
 
 test("muestra la carpeta en uso y la de fábrica", async () => {
   view(fakeCore({ getCorePrefs: vi.fn(async () => ({ ...base, outputsDir: "/home/u/s", outputsDirEffective: "/home/u/s" })) }));
@@ -205,4 +207,63 @@ test("en inglés, un error con reason que no es de carpeta se muestra tal cual",
   await folder();
   await userEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByText("rotate size out of range")).toBeVisible();
+});
+
+describe("Windows", () => {
+  const ic = 'icacls "C:\\Users\\ana\\mi salidas" /inheritance:r /remove "*S-1-5-32-545" /grant:r "*S-1-5-21-1-2-3-1001:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F"';
+  const winErr = (reason: string, text: string) => Object.assign(new Error(text), { cause: { code: "FailedPrecondition", reason: `prefs.outputs.${reason}`, metadata: { code: reason, path: "C:\\Users\\ana\\mi salidas" } } });
+
+  test("reglas y permisos: texto de ACL, orden icacls y su copia", async () => {
+    setOSForTests("windows");
+    const core = fakeCore({ setCorePrefs: vi.fn(async () => { throw winErr("permisos", `prefs.outputs.permisos: x; fix it in cmd with: ${ic}`); }) });
+    core.copyText = vi.fn(async () => {});
+    view(core, "en");
+    expect(await screen.findByText(/only your user, SYSTEM and Administrators/)).toBeVisible();
+    expect(screen.queryByText(/0700/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText(ic)).toBeVisible();
+    expect(screen.getByText(/remove that access/)).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: /Copy/ }));
+    expect(core.copyText).toHaveBeenCalledWith(ic);
+  });
+
+  test("sin orden: muestra el detalle del núcleo y no promete una orden", async () => {
+    setOSForTests("windows");
+    view(fakeCore({ setCorePrefs: vi.fn(async () => { throw winErr("permisos", "prefs.outputs.permisos: la carpeta C:\\x da acceso a enlace"); }) }));
+    await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));
+    expect(await screen.findByText(/da acceso a enlace/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Copiar/ })).toBeNull();
+  });
+
+  test("reservada: texto de Windows", async () => {
+    setOSForTests("windows");
+    view(fakeCore({ setCorePrefs: vi.fn(async () => { throw rpc("prefs.outputs.reservada: texto del núcleo"); }) }), "en");
+    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    expect(await screen.findByText(/your user profile or \.ssh/)).toBeVisible();
+    expect(screen.queryByText(/~\/\.ssh/)).toBeNull();
+  });
+
+  test("una orden con % no se muestra", async () => {
+    setOSForTests("windows");
+    view(fakeCore({ setCorePrefs: vi.fn(async () => { throw winErr("permisos", 'x; corrígelo en cmd con: icacls "C:\\a" /grant:r "%USERNAME%:(OI)(CI)F"'); }) }));
+    await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));
+    await screen.findByText(/da acceso a otros usuarios/);
+    expect(screen.queryByRole("button", { name: /Copiar/ })).toBeNull(); // sin orden segura: solo el detalle del núcleo
+  });
+
+  test("ancestro y reservada tienen su texto de Windows", async () => {
+    setOSForTests("windows");
+    view(fakeCore({ setCorePrefs: vi.fn(async () => { throw rpc("prefs.outputs.ancestro_inseguro: texto del núcleo"); }) }));
+    await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));
+    expect(await screen.findByText(/C:\\Users\\Public/, { selector: '[role="alert"]' })).toBeVisible();
+  });
+
+  test("en Linux sigue el chmod y el texto de 0700", async () => {
+    setOSForTests("linux");
+    view(fakeCore({ setCorePrefs: vi.fn(async () => { throw rpc("prefs.outputs.permisos: x; corrígelo con: chmod 700 /home/u/s"); }) }), "en");
+    expect(await screen.findByText(/mode exactly 0700/)).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("chmod 700 /home/u/s")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Copy the chmod command/ })).toBeVisible();
+  });
 });

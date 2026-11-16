@@ -3,8 +3,9 @@ import type { CoreAPI } from "../../lib/core";
 import { Field, Notice, PathField, Select, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
 import { RANGES, emptyForm, validateOpts, type NumKey, type SyslogFormat } from "../../components/ingest/ingestOpts";
+import { isWindows } from "../../lib/platform";
 import { useT } from "../../lib/i18n";
-import { chmodCommand, outputsReasonKey, parseOutputsError } from "../../lib/outputsError";
+import { chmodCommand, icaclsCommand, outputsReasonKey, parseOutputsError } from "../../lib/outputsError";
 import type { Key } from "../../lib/i18n/es";
 import type { CorePrefs, CorePrefsState } from "./api";
 
@@ -53,13 +54,14 @@ export function StorageSection({ core }: { core: CoreAPI }) {
   // La carpeta guardada ya no cumple y rige la de fábrica (el núcleo lo dice en `note`, en español).
   const fellBack = !!state.outputsDir && state.outputsDirEffective !== state.outputsDir;
   const noteText = state.note ? state.note : fellBack ? t("settings.storage.noteFallback", { path: state.outputsDir }) : t("settings.storage.noteMoved");
-  const chmod = saveErr?.parsed?.code === "permisos" ? chmodCommand(saveErr.parsed.path) : "";
+  const chmod = saveErr?.parsed?.code === "permisos" ? (isWindows() ? icaclsCommand(saveErr.msg, saveErr.parsed.path) : chmodCommand(saveErr.parsed.path)) : "";
 
   // Los rechazos del núcleo por la carpeta van bajo su campo; el resto (p. ej. fallo al guardar) junto a Guardar.
   const parsedErr = saveErr?.parsed;
   const dirErr = parsedErr && (
     <div role="alert">
       {t(outputsReasonKey(parsedErr.code))}
+      {!chmod && isWindows() && parsedErr.code === "permisos" && <> {saveErr.msg}</>}
       {chmod && <div className="storage-cmd"><code>{chmod}</code><CopyButton value={chmod} label={t("settings.storage.chmod")} /></div>}
     </div>
   );

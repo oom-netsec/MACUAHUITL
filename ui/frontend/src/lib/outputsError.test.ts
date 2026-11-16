@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
-import { chmodCommand, outputsErrorText, parseOutputsError } from "./outputsError";
+import { chmodCommand, icaclsCommand, outputsErrorText, parseOutputsError } from "./outputsError";
+import { setOSForTests } from "./platform";
 
 const t = (k: string) => `[${k}]`;
 const text = (p: string) => `prefs.outputs.permisos: la carpeta ${p} tiene modo 0755 y debe ser 0700; corrígelo con: chmod 700 ${p}`;
@@ -55,4 +56,53 @@ test("los textos sirven en Ajustes, Job, Cambio y Diagnóstico", async () => {
   expect(en["settings.storage.err.permisos"]).not.toMatch(/this command/);
   expect(es["change.outDir"]).toMatch(/subcarpeta/);
   expect(en["change.outDir"]).toMatch(/subfolder/);
+});
+
+const D = "C:\\Users\\ana\\salidas";
+const IC_OK = 'icacls "C:\\Users\\ana\\salidas" /inheritance:r /remove "*S-1-1-0" /grant:r "*S-1-5-21-1-2-3-1001:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F"';
+
+test("icaclsCommand: toma lo que sigue a la frase, en español o inglés", () => {
+  const cmd = IC_OK;
+  expect(icaclsCommand(`prefs.outputs.permisos: x; corrígelo en cmd con: ${cmd}`, D)).toBe(cmd);
+  expect(icaclsCommand(`prefs.outputs.permisos: x; fix it in cmd with: ${cmd}`, D)).toBe(cmd);
+  expect(icaclsCommand("prefs.outputs.permisos: sin orden", D)).toBe("");
+  expect(icaclsCommand("x; fix it in cmd with: del /q C:\\*", D)).toBe(""); // no empieza con icacls "
+  expect(icaclsCommand(`x; fix it in cmd with: ${IC_OK}`, D)).toBe(IC_OK);
+});
+
+const mk = (d: string) => `icacls "${d}" /inheritance:r /remove "*S-1-1-0" /grant:r "*S-1-5-21-1-2-3-1001:(OI)(CI)F" "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F"`;
+
+test("icaclsCommand: descarta la carpeta con %, !, saltos, controles o invisibles", () => {
+  for (const bad of ["%USERNAME%", "!x!", "\n", "\x07", "\u202e", "\u200b", "\u2028", "\ufeff", "\u0085"]) {
+    const d = `C:\\a${bad}b`;
+    expect(icaclsCommand(`x; fix it in cmd with: ${mk(d)}`, d)).toBe("");
+  }
+  expect(icaclsCommand(`x; fix it in cmd with: ${mk("C:\\a b")}`, "C:\\a b")).toBe(mk("C:\\a b"));
+});
+
+test("icaclsCommand: solo el formato exacto y con la carpeta del error", () => {
+  const ok = `x; fix it in cmd with: ${IC_OK}`;
+  expect(icaclsCommand(ok, "C:\\otra")).toBe(""); // la carpeta de la orden no es la del error
+  expect(icaclsCommand(ok, "")).toBe("");
+  expect(icaclsCommand(ok + " & calc", D)).toBe(""); // algo después del final
+  expect(icaclsCommand(`x; fix it in cmd with: ${IC_OK.replace(" /remove", " & calc /remove")}`, D)).toBe("");
+  expect(icaclsCommand(`x; fix it in cmd with: ${IC_OK.replace(' /remove "*S-1-1-0"', "")}`, D)).toBe(""); // sin /remove
+  // Una ruta que trae la frase y un falso icacls: no se muestra esa orden.
+  const d = `C:\\x; fix it in cmd with: icacls "C:\\evil" /inheritance:r`;
+  expect(icaclsCommand(`prefs.outputs.permisos: la carpeta ${d} da acceso; corrígelo en cmd con: ${mk(d)}`, d)).toBe("");
+});
+
+test("Windows: el texto de permisos lleva la orden icacls; sin orden, el detalle del núcleo; en Linux sigue el chmod", () => {
+  const cause = { code: "FailedPrecondition", reason: "prefs.outputs.permisos", metadata: { code: "permisos", path: D } };
+  const win = Object.assign(new Error(`prefs.outputs.permisos: la carpeta ${D} da acceso a S-1-1-0; corrígelo en cmd con: ${IC_OK}`), { cause });
+  const sinOrden = Object.assign(new Error(`prefs.outputs.permisos: la carpeta ${D} da acceso a enlace`), { cause });
+  try {
+    setOSForTests("windows");
+    expect(outputsErrorText(win, t as never)).toBe(`[settings.storage.err.permisos] ${IC_OK}`);
+    expect(outputsErrorText(sinOrden, t as never)).toBe(`[settings.storage.err.permisos] prefs.outputs.permisos: la carpeta ${D} da acceso a enlace`);
+    expect(outputsErrorText(Object.assign(new Error(`x; corrígelo en cmd con: ${IC_OK} %PATH%`), { cause }), t as never)).toContain("%PATH%"); // sin orden: detalle
+    setOSForTests("linux");
+    expect(outputsErrorText(msg("/home/u/salidas"), t as never)).toBe("[settings.storage.err.permisos] chmod 700 /home/u/salidas");
+    expect(outputsErrorText(win, t as never)).toBe("[settings.storage.err.permisos]"); // ruta de Windows en Linux: sin chmod (lleva \\)
+  } finally { setOSForTests(undefined); }
 });

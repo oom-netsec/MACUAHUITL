@@ -2797,6 +2797,14 @@ export const es = {
   "backup.secretsWarn.windows": "El archivo tendrá contraseñas y llaves en claro (acceso solo para tu usuario y los administradores del equipo). Protege la carpeta outputs/respaldos/.",
   "ssh.note.windows": "Terminal manual: lo que se teclea va directo al equipo, sin modo asistido ni lista cerrada de comandos. Se graba lo que devuelve el equipo y lo tecleado, salvo lo que se escriba en un prompt de contraseña o secreto, en outputs/terminal/ (acceso solo para tu usuario y los administradores del equipo).",
   "vault.backup.noPerms.windows": "El sistema de archivos no admite permisos por usuario (p. ej. una memoria FAT32 o exFAT): el contenido va cifrado, pero cuida quién puede leer el archivo.",
+  // Almacenamiento en Windows (fase 43b2): ACL en lugar de 0700 (ADR 0012).
+  "settings.storage.rules.windows": "Debe ser una carpeta absoluta que ya exista, tuya, sin acceso para otros usuarios (solo tu usuario, SYSTEM y Administradores), fuera de las carpetas de datos y configuración de %LOCALAPPDATA%\\MACUAHUITL y de %USERPROFILE%\\.ssh, y que no cuelgue de una carpeta donde otros usuarios puedan escribir (p. ej. C:\\Users\\Public).",
+  "settings.storage.chmod.windows": "la orden icacls",
+  "settings.storage.err.relativa.windows": "La ruta debe ser absoluta (p. ej. C:\\Users\\tu-usuario\\salidas).",
+  "settings.storage.err.no_existe.windows": "La carpeta no existe. Créala y vuelve a intentar.",
+  "settings.storage.err.reservada.windows": "Esa carpeta está reservada (datos, configuración, tu perfil de usuario o .ssh) o contiene a una de ellas. Elige una subcarpeta propia, por ejemplo dentro de tu perfil de usuario.",
+  "settings.storage.err.permisos.windows": "La carpeta da acceso a otros usuarios. La aplicación no lo cambia: quita ese acceso (Propiedades → Seguridad, o con icacls en cmd) y vuelve a intentarlo.",
+  "settings.storage.err.ancestro_inseguro.windows": "La carpeta cuelga de otra donde otros usuarios pueden escribir (p. ej. C:\\Users\\Public), y podrían reemplazar la ruta. Elige una carpeta bajo tu perfil de usuario.",
 };
 
 export type Key = keyof typeof es;
