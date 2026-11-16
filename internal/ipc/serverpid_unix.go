@@ -13,14 +13,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// ErrNotRunning: no hay un núcleo escuchando (sin socket, o el socket quedó de un núcleo muerto).
-var ErrNotRunning = errors.New("ipc: el núcleo no está corriendo")
-
 // ServerPID es el PID del proceso que escucha en el socket path: SO_PEERCRED leído del lado del cliente.
 // ErrNotRunning si el socket no existe o rechaza la conexión.
 // shortcut: el PID puede reutilizarse entre esta lectura y WaitExit (ventana de milisegundos); en el peor caso core stop
 // espera de más y sale con 1.
-// En Windows el equivalente (GetNamedPipeServerProcessId sobre el pipe) llega con 43a4.
+// En Windows es serverpid_windows.go: GetNamedPipeServerProcessId sobre el pipe.
 func ServerPID(path string) (int, error) { return serverPID(path, os.Getuid()) }
 
 func serverPID(path string, uid int) (int, error) {

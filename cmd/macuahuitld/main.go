@@ -1,5 +1,5 @@
 // Command macuahuitld es el núcleo de MACUAHUITL: corre como servicio de usuario
-// de systemd y atiende a la UI y a mctl por un socket Unix (spec §5).
+// de systemd (en Windows, lanzado por el usuario) y atiende a la UI y a mctl por un socket Unix o un named pipe (spec §5).
 package main
 
 import (
@@ -34,10 +34,18 @@ func main() {
 		return
 	}
 	if err := run(sys.Harden); err != nil {
-		fmt.Fprintln(os.Stderr, "macuahuitld:", err)
+		msg := i18n.In(consoleLang, err)
+		fmt.Fprintln(os.Stderr, "macuahuitld:", msg)
+		// Sin consola el error se perdería: va al registro, salvo si otro núcleo ya tiene el canal (no se toca su registro).
+		if st := core.ResolvePaths(os.Getenv).State; st != "" && !errors.Is(err, ipc.ErrAlreadyRunning) && !sys.Privileged() { // elevado no se escribe en disco
+			sys.LogFailure(filepath.Join(st, logName), "macuahuitld: "+msg)
+		}
 		os.Exit(1)
 	}
 }
+
+// logName es el registro del núcleo dentro de State (Windows, ADR 0012 g).
+const logName = "macuahuitld.log"
 
 // consoleLang es el idioma de lo que el daemon imprime en su consola; sin --lang, el canónico (inglés).
 var consoleLang = i18n.En
@@ -63,11 +71,21 @@ func run(harden func() ([]i18n.Text, error)) error {
 	if p.Config == "" || p.Data == "" || p.State == "" {
 		return errors.New(i18n.Msg(consoleLang, "harden.err.localappdata", nil)) // solo Windows: no se cae a %APPDATA%
 	}
-	if runtime.GOOS != "windows" && p.Runtime == "" { // en Windows no hay carpeta runtime: el named pipe llega en 43a4
+	if runtime.GOOS != "windows" && p.Runtime == "" { // en Windows no hay carpeta runtime: el canal es un named pipe
 		return errors.New(i18n.Msg(consoleLang, "harden.err.runtime_dir", nil))
 	}
-	l, err := ipc.Listen(filepath.Join(p.Runtime, "core.sock"))
+	// El canal primero: un segundo núcleo que pierde el pipe (o el socket) sale sin tocar nada del primero, ni su registro.
+	addr, err := ipc.CoreAddr(p.Runtime)
 	if err != nil {
+		return err
+	}
+	l, err := ipc.Listen(addr)
+	if err != nil {
+		return err
+	}
+	// Sin consola (-H windowsgui) la salida va a <State>\macuahuitld.log; en Linux no hace nada (stderr, journal).
+	if err := sys.RedirectStderr(filepath.Join(p.State, logName)); err != nil {
+		l.Close()
 		return err
 	}
 	c, err := core.New(p, core.Options{Inhibitor: power.NewLogind(), HardenWarnings: warns})
