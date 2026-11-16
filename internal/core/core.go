@@ -586,9 +586,13 @@ func (c *Core) persistJob(j *job) {
 	h, _ := json.Marshal(j.jobHistory)
 	name, state := j.spec.Name, j.state
 	c.mu.Unlock()
-	c.db.Exec(`INSERT INTO jobs(id,name,spec_json,state,created_at,history_json) VALUES(?,?,?,?,?,?)
+	if _, err := c.db.Exec(`INSERT INTO jobs(id,name,spec_json,state,created_at,history_json) VALUES(?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET state=excluded.state, history_json=excluded.history_json`,
-		j.id, name, string(b), state, c.o.Now().UTC().Format(time.RFC3339), string(h))
+		j.id, name, string(b), state, c.o.Now().UTC().Format(time.RFC3339), string(h)); err != nil {
+		// Sin reintento propio (con la base ocupada ya se esperó busy_timeout y la siguiente fase vuelve a guardar),
+		// pero nunca en silencio: al recargar, este trabajo podría verse con un estado viejo.
+		c.audit("job.persist_failed", j.id, fmt.Sprintf("state=%s error=%q", state, i18n.English(err)))
+	}
 }
 
 // loadJobs recupera los trabajos guardados. Uno que quedó armado o armándose es de un núcleo
