@@ -43,7 +43,10 @@ Detalle en el ADR 0012, «La app (Wails v3) en Windows» e «Instalador». Bloqu
 - Helper `baseName`/`dirName` para `transfer/client.ts` y `Files.tsx`.
 - Textos por sistema (`….windows`) en la UI.
 - Instalador NSIS por usuario: bootstrapper de Evergreen, entrada de `Run`, y desinstalación que pregunta por los datos con «No» por omisión y nunca los borra con `/S`.
-- Job `ui-windows`.
+- El núcleo bajo demanda se lanza desde la carpeta del exe, nunca por el `PATH`.
+- Paso de firma opcional en el armado del instalador, que se salta sin secret.
+- Job `ui-windows`, con `makensis`.
+- README de Windows en es/en: SmartScreen, Smart App Control y verificación con `SHA256SUMS` y `gh attestation verify`.
 
 Front empieza cuando el ADR esté en `main`.
 

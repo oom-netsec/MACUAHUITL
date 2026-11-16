@@ -109,6 +109,7 @@ Hoy el ADR 0003 exige tres cosas: que solo el usuario pueda conectarse, que el n
 - **Arranque**: una entrada en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` lanza el núcleo al iniciar sesión. Además, la app y mctl lo lanzan bajo demanda si no encuentran el pipe.
   - El núcleo lanzado bajo demanda corre **separado** de quien lo lanzó (`DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW`, fuera de cualquier Job Object de la app). Si no, moriría al cerrar la UI y cortaría un trabajo de Patrol a medias.
   - El instalador da de alta la entrada de `Run` y la desinstalación la quita.
+  - La app y la entrada de `Run` usan la ruta absoluta de `macuahuitld.exe`, en la misma carpeta que `macuahuitl.exe`; nunca lo buscan por el `PATH` (secuestro de `PATH`, como en f).
 - **Por qué no una tarea programada.** Release y Front propusieron una tarea «al iniciar sesión». Crear una tarea propia no pide admin, pero el disparador *ONLOGON* sí puede pedir elevación, según la versión y la política del equipo. La clave `Run` de HKCU nunca la pide y es el equivalente de `systemctl --user enable`.
 - Nada de servicio de Windows: correría como SYSTEM o con otra cuenta, y eso choca con el ADR 0004.
 - **Sin consola.** El núcleo es un binario `-H windowsgui`, así que no tiene stdout ni stderr. Su registro va a `%LOCALAPPDATA%\MACUAHUITL\state\macuahuitld.log`, con la misma rotación que en Linux. La app lo enlaza para soporte.
@@ -186,6 +187,7 @@ Propuesta de Front, verificada sobre el código de wails/v3 v3.1.0 (la versión 
   - Los datos (bóveda, auditoría, configuración) se borran solo si el usuario dice que sí en una pregunta aparte, con **«No» por omisión**. Con `/S` **nunca** se borran.
   - Antes de borrar, se cierran la app y el núcleo. Si siguen abiertos, la desinstalación falla con un mensaje.
   - Se quita de la plantilla de Wails el `RMDir /r "$AppData\<exe>"`.
+- **Firma, lista pero apagada.** El armado del instalador tiene un paso de firma opcional que se salta si no hay secret. Firmar más adelante no obliga a rehacer nada.
 - **Contenido del instalador:**
   - `macuahuitl.exe`, `macuahuitld.exe` y `mctl.exe`;
   - `LICENSE`, `NOTICE`, `THIRD_PARTY_LICENSES` y `TRADEMARK.md`;
@@ -195,7 +197,8 @@ Propuesta de Front, verificada sobre el código de wails/v3 v3.1.0 (la versión 
 - **CI de la app.** Un job `ui-windows` en `windows-latest` corre:
   - `npm ci`, `npm test` y `npm run build`;
   - `go test ./ui/bridge/...`;
-  - `CGO_ENABLED=0 go vet -tags wails ./ui/`.
+  - `CGO_ENABLED=0 go vet -tags wails ./ui/`;
+  - `makensis`, para comprobar que el instalador se arma.
 
   Corre en paralelo con el resto, así que se estima que agrega de 0 a 2 minutos al reloj del CI. Pasa a obligatorio cuando esté estable.
 
