@@ -1,5 +1,5 @@
 // Command macuahuitld es el núcleo de MACUAHUITL: corre como servicio de usuario
-// de systemd y atiende a la UI y a mctl por un socket Unix (spec §5).
+// de systemd (en Windows, lanzado por el usuario) y atiende a la UI y a mctl por un socket Unix o un named pipe (spec §5).
 package main
 
 import (
@@ -63,10 +63,18 @@ func run(harden func() ([]i18n.Text, error)) error {
 	if p.Config == "" || p.Data == "" || p.State == "" {
 		return errors.New(i18n.Msg(consoleLang, "harden.err.localappdata", nil)) // solo Windows: no se cae a %APPDATA%
 	}
-	if runtime.GOOS != "windows" && p.Runtime == "" { // en Windows no hay carpeta runtime: el named pipe llega en 43a4
+	if runtime.GOOS != "windows" && p.Runtime == "" { // en Windows no hay carpeta runtime: el canal es un named pipe
 		return errors.New(i18n.Msg(consoleLang, "harden.err.runtime_dir", nil))
 	}
-	l, err := ipc.Listen(filepath.Join(p.Runtime, "core.sock"))
+	// Sin consola (-H windowsgui) la salida va a <State>\macuahuitld.log; en Linux no hace nada (stderr, journal).
+	if err := sys.RedirectStderr(filepath.Join(p.State, "macuahuitld.log")); err != nil {
+		return err
+	}
+	addr, err := ipc.CoreAddr(p.Runtime)
+	if err != nil {
+		return err
+	}
+	l, err := ipc.Listen(addr)
 	if err != nil {
 		return err
 	}
