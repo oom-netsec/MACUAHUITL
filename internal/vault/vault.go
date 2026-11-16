@@ -605,10 +605,8 @@ func writeAtomicOpt(path string, data []byte, noPerms *bool) error {
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return fmt.Errorf("vault: %w", err)
 	}
-	d, err := os.Open(dir)
-	if err != nil {
+	if err := sys.SyncDir(dir); err != nil { // en Windows no hace nada: ver sys.SyncDir
 		return fmt.Errorf("vault: %w", err)
 	}
-	defer d.Close()
-	return d.Sync()
+	return nil
 }
