@@ -30,7 +30,7 @@ Además, hay supuestos que compilan pero fallan en ejecución. Son los más peli
 ### Forma del código
 
 - Lo que cambia por sistema vive en archivos `_linux.go` y `_windows.go`, dentro de los mismos paquetes de hoy: `internal/sys`, `internal/ipc`, `internal/diag`, `internal/diag/serialcon` y `internal/core/power`. La API de cada paquete no cambia; los llamadores no llevan build tags.
-- `golang.org/x/sys/windows` (BSD, el módulo ya es dependencia) solo se importa en esos paquetes. Un caso nuevo en archcheck lo hace cumplir, igual que noegress con `net`.
+- `golang.org/x/sys/windows` (BSD, el módulo ya es dependencia) solo se importa en esos paquetes y en `ui` (el aviso de WebView2 faltante). Un caso nuevo en archcheck lo hace cumplir, igual que noegress con `net`; mientras dure 43a, `tools/ci/winsys.sh` lo revisa también en los archivos `_windows.go`, que archcheck no carga en Linux.
 - Dependencia nueva: `github.com/Microsoft/go-winio` (MIT, la usa Docker), solo para el named pipe; antes de agregarla se lee su LICENSE. El resto de las llamadas sale de `x/sys/windows`.
 - Rutas en Windows (el spec §14 hoy es XDG):
 

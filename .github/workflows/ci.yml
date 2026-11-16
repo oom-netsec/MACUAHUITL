@@ -70,7 +70,9 @@ jobs:
       - name: vet
         run: go vet ./...
       - name: vet para Windows de los paquetes ya portables (tools/ci/windows-pkgs.txt)
-        run: grep -v '^#' tools/ci/windows-pkgs.txt | GOOS=windows CGO_ENABLED=0 xargs go vet
+        run: grep -v '^#' tools/ci/windows-pkgs.txt | awk '{print $1}' | GOOS=windows CGO_ENABLED=0 xargs go vet
+      - name: x/sys/windows solo donde lo permite el ADR 0012 (también en archivos _windows.go)
+        run: tools/ci/winsys.sh
       - name: mask sin -race (corpus completo)
         run: go test -count=1 ./internal/mask/... ./internal/terminal/...
       - name: noegress
@@ -150,13 +152,13 @@ jobs:
       - name: pruebas de los paquetes ya portables (tools/ci/windows-pkgs.txt)
         run: |
           set -o pipefail
-          grep -v '^#' tools/ci/windows-pkgs.txt | xargs go test -count=1
+          grep -v '#' tools/ci/windows-pkgs.txt | xargs go test -count=1
       - name: noegress (paquetes portables)
         if: always()
-        run: grep -v '^#' tools/ci/windows-pkgs.txt | xargs go run ./tools/noegress/cmd/noegress
+        run: grep -v '^#' tools/ci/windows-pkgs.txt | awk '{print $1}' | xargs go run ./tools/noegress/cmd/noegress
       - name: archcheck (paquetes portables)
         if: always()
-        run: grep -v '^#' tools/ci/windows-pkgs.txt | xargs go run ./tools/archcheck/cmd/archcheck
+        run: grep -v '^#' tools/ci/windows-pkgs.txt | awk '{print $1}' | xargs go run ./tools/archcheck/cmd/archcheck
       - name: compila todo (informativo, lista lo que falta portar)
         if: always()
         continue-on-error: true

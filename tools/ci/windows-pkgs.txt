@@ -1,5 +1,6 @@
 # Paquetes que compilan y pasan sus pruebas en Windows (fase 43, ADR 0012). Crece PR a PR; al cerrar 43a se reemplaza por ./...
-# Lo usan el job windows (go test, noegress, archcheck) y go-checks (GOOS=windows go vet).
+# Todos compilan en Windows: go-checks les corre GOOS=windows go vet y el job windows noegress y archcheck.
+# Los que llevan « # motivo» compilan pero sus pruebas esperan esa fase: el job windows no les corre go test.
 ./gen/macuahuitl/v1
 ./internal/acl
 ./internal/assist
@@ -10,13 +11,13 @@
 ./internal/core/power
 ./internal/crashinfo
 ./internal/diag/dnsq
-# ./internal/diag/flows  (43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL)
+./internal/diag/flows  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
 ./internal/diag/gnmic
 ./internal/diag/ifaces
-# ./internal/diag/ingest  (43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL)
+./internal/diag/ingest  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
 ./internal/diag/listen
 ./internal/diag/radiustest
-# ./internal/diag/snmp  (43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL)
+./internal/diag/snmp  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
 ./internal/diag/snmp/snmptest
 ./internal/diag/syslogd
 ./internal/diag/syslogd/syslogdtest
@@ -39,7 +40,7 @@
 ./internal/playbook
 ./internal/scripts
 ./internal/secret
-# ./internal/store  (43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL)
+./internal/store  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
 ./internal/termcolor
 ./internal/terminal
 ./internal/version
@@ -49,4 +50,4 @@
 ./tools/archcheck/cmd/archcheck
 ./tools/noegress
 ./tools/noegress/cmd/noegress
-# ./tools/packaging/mpack-keygen  (43a3: su prueba exige modo 0600 en la llave privada; en Windows va por ACL)
+./tools/packaging/mpack-keygen  # 43a3: su prueba exige modo 0600 en la llave privada; en Windows va por ACL
