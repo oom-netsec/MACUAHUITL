@@ -372,7 +372,7 @@ func TestPersistJobFallidoQuedaAuditado(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.core.persistJob(j)
-	if a := h.auditText(t); !strings.Contains(a, "job.persist_failed") || !strings.Contains(a, job) {
+	if a := h.auditText(t); !strings.Contains(a, `"action":"job.persist_failed","target":"`+job+`"`) {
 		t.Fatalf("sin job.persist_failed para %s en la auditoría:\n%s", job, a)
 	}
 }
