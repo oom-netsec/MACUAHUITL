@@ -1,6 +1,8 @@
 // Capturas del cambio asistido para el README, tomadas de la vista previa de la UI (datos de ejemplo, IP de documentación):
 // ../../screens/assist-plan-dark.png (plan con las líneas y su reversa) y ../../screens/assist-confirm-dark.png (el paso espera
-// confirmación). Hace falta la vista previa corriendo (ver README.md aquí).
+// confirmación). Hace falta la vista previa corriendo en el puerto 5199 y playwright-core (ver README.md aquí):
+//   (cd ui/frontend && npx vite --config vite.preview.config.ts --port 5199 --strictPort --host 127.0.0.1) &
+//   PLAYWRIGHT_CORE=/tmp/pw/node_modules/playwright-core node docs/assets/pro/src/capture-assist.cjs
 const path = require("path");
 const { chromium } = require(process.env.PLAYWRIGHT_CORE || "playwright-core");
 
@@ -28,6 +30,7 @@ async function band(page, from, to, file) {
     await page.getByRole("button", { name: "Plan (read-only)" }).click();
     await page.getByText("Plan for SW1").waitFor();
     await page.evaluate(() => document.fonts.ready);
+    if (!(await page.evaluate(() => document.fonts.check('16px "JetBrains Mono"')))) throw new Error("no cargó la fuente monoespaciada");
     await band(page, page.getByText("Plan for SW1"), page.getByRole("button", { name: /Start change on/ }), "assist-plan-dark.png");
 
     await page.getByLabel("Enable assisted mode for this run").check();
