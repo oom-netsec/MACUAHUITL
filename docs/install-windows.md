@@ -1,0 +1,91 @@
+# Install on Windows (beta)
+
+The Windows version is a **beta**. It does not promise parity with Linux, and it ships **unsigned** (see [Unsigned beta](#unsigned-beta-what-windows-will-say)). Read this page before you run the installer.
+
+## Requirements
+
+- Windows 10 or 11, 64-bit (amd64). ARM64 is not supported yet.
+- The Microsoft WebView2 Runtime. Windows 11 includes it. If it is missing, the installer and the app tell you and give the official link: <https://developer.microsoft.com/microsoft-edge/webview2/consumer/>. MACUAHUITL does not bundle or download anything from Microsoft.
+- No administrator rights. It installs for your user only.
+
+## Download and verify before you run it
+
+From the [latest release](../../../releases/latest), download the installer and `SHA256SUMS`. The installer is named `MACUAHUITL-<version>-setup.exe`; the exact name is on the release page.
+
+Check the hash in PowerShell, in the folder you downloaded to, and compare it with the line for your file in `SHA256SUMS`:
+
+```powershell
+Get-FileHash -Algorithm SHA256 .\MACUAHUITL-<version>-setup.exe
+```
+
+With Git Bash you can use `sha256sum -c --ignore-missing SHA256SUMS` instead.
+
+The hash catches a broken download. To check that the file was built by this repository's release workflow, verify its signed provenance with the [GitHub CLI](https://cli.github.com/):
+
+```powershell
+gh attestation verify .\MACUAHUITL-<version>-setup.exe --repo oom-netsec/MACUAHUITL `
+  --signer-workflow oom-netsec/MACUAHUITL/.github/workflows/release.yml
+```
+
+Do not run an installer that fails either check.
+
+## Unsigned beta: what Windows will say
+
+The beta has no code signature. Verification relies on `SHA256SUMS`, the attestation above and the open source code. This has consequences:
+
+- **SmartScreen** shows "Windows protected your PC". Choose **More info**, then **Run anyway**. It comes back with every new version.
+- **Smart App Control** (Windows 11), if it is on, blocks an unsigned executable completely, with no option to run it. Turning it off cannot be undone without reinstalling Windows. That decision is yours; the project does not recommend it.
+- **Microsoft Defender** may flag an unsigned Go binary as a false positive. If it does, report it to Microsoft as a false positive.
+
+## What it installs and where
+
+- **Program:** `%LOCALAPPDATA%\Programs\MACUAHUITL` (the app, the core `macuahuitld.exe`, `mctl.exe` and the license files).
+- **Shortcuts:** one in the Start menu. A desktop shortcut is optional and off by default.
+- **Startup:** the core starts when you log in, through a `Run` entry in `HKCU`. Nothing is written to `HKLM` and there is no Windows service.
+- **Data** (vault, audit log, settings): `%LOCALAPPDATA%\MACUAHUITL`.
+- **Outputs** (evidence, captures): `%USERPROFILE%\MACUAHUITL\outputs`.
+
+If the installer is started as administrator, it warns you: run it again without "Run as administrator".
+
+## Firewall and ports
+
+Windows has no privileged ports, so the TFTP, FTP, SCP/SFTP, syslog and trap servers listen on their standard ports. What stands in the way is Windows Firewall.
+
+The app shows the exact `New-NetFirewallRule` command for the server you start, limited to the core program, the IP, the protocol and the port. Run it once in an administrator PowerShell. The app never applies it for you. For example:
+
+```powershell
+New-NetFirewallRule -DisplayName MACUAHUITL-TFTP -Direction Inbound `
+  -Program "<folder>\macuahuitld.exe" -LocalAddress <IP> -Protocol UDP -LocalPort 69 -Action Allow
+```
+
+If you cancel the Windows Firewall dialog the first time a server listens, Windows creates **block** rules for the program, and block rules win over allow rules. Remove them in *Windows Defender Firewall with Advanced Security → Inbound Rules* (look for `macuahuitld.exe`), then add the allow rule.
+
+## Optional tools you install yourself
+
+These are never part of the installer:
+
+- **nmap** and **Wireshark with Npcap** (packet capture), and **iperf3**. Without them each tool shows an install message with the download link.
+- The SYN scan option of nmap is hidden on Windows; scans use a normal connection.
+- For serial console you need the USB driver of your adapter.
+
+## What may be missing in the beta
+
+- Packet capture, until you install Wireshark with Npcap (nmap and iperf3 likewise).
+- Locking all of the process memory: only the ranges that hold key material are locked.
+- Protection against other processes of the same user, which does not exist on Windows without administrator rights.
+- The serial console, if its validation on real hardware is not ready: it is marked "not validated".
+- ARM64: amd64 only at first.
+- The nmap SYN scan.
+
+Everything else is meant to work as on Linux, including the vault, Patrol, assisted change, `.mpack` packs, masking, the audit log and the SSH terminal. That is the bar the Windows tests hold, not a guarantee.
+
+## Update
+
+Run the new installer over the old one. It asks the core to stop first. If work is in progress (a Patrol job, a transfer or a capture), it tells you and changes nothing: finish or cancel the work and try again. If the app is open, close it first.
+
+## Uninstall
+
+Use *Settings → Apps* and remove MACUAHUITL. The uninstaller removes only what the installer put there.
+
+- Your data in `%LOCALAPPDATA%\MACUAHUITL` is deleted only if you answer **Yes** to a separate question. The default is **No**, and a silent uninstall (`/S`) never deletes it.
+- The outputs folder is never deleted.
