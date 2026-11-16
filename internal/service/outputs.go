@@ -28,6 +28,11 @@ var (
 // números y unos pocos signos; nada de espacios, comillas, $ ni caracteres de formato (bidi).
 var safeShellPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N}/._+,@%=:-]+$`)
 
+// driveRoot: la raíz de una unidad de Windows (D:\), el equivalente de «/» (en Linux ninguna ruta tiene esa forma).
+func driveRoot(p string) bool {
+	return len(p) == 3 && p[1] == ':' && (p[2] == '\\' || p[2] == '/') && ('a' <= p[0]|0x20 && p[0]|0x20 <= 'z')
+}
+
 // safeCmdPath son las rutas de Windows que van entre comillas en una orden de cmd sin que nada se expanda: sin %, !, ^,
 // $ ni comillas invertidas ni caracteres de formato (bidi).
 var safeCmdPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N} :\\/._+,@=()-]+$`)
@@ -75,7 +80,7 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 	if !fi.IsDir() {
 		return "", outputsErr("prefs.outputs.no_directorio", "dir", real)
 	}
-	if real == "/" || (st.Home != "" && real == resolve(st.Home)) || real == resolve("/tmp") {
+	if real == "/" || driveRoot(real) || (st.Home != "" && real == resolve(st.Home)) || real == resolve("/tmp") {
 		return "", outputsErr("prefs.outputs.reservada", "dir", real)
 	}
 	reserved := slices.Clone(st.Inside)
@@ -153,6 +158,8 @@ func windowsOutputsErr(real string, err error) error {
 		return outputsErr("prefs.outputs.ilegible", "dir", real, "err", err)
 	}
 	switch pe.Reason {
+	case sys.PrivateDirLink:
+		return outputsErr("prefs.outputs.no_directorio", "dir", real)
 	case sys.PrivateDirOwner:
 		return outputsErr("prefs.outputs.otro_dueno", "dir", real)
 	case sys.PrivateDirACL:

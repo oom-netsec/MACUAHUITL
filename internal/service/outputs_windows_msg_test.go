@@ -81,3 +81,21 @@ func TestWindowsOutputsErrOrdenConSIDDelUsuario(t *testing.T) {
 		}
 	}
 }
+
+// Una junction o un enlace como carpeta de salidas no es un problema de ACL: sale como no_directorio, sin orden icacls.
+func TestWindowsOutputsErrEnlaceEsNoDirectorio(t *testing.T) {
+	err := windowsOutputsErr(`C:\out`, &sys.PrivateDirError{Reason: sys.PrivateDirLink, Path: `C:\out`})
+	var e *i18n.Error
+	if !errors.As(err, &e) || e.Code != "prefs.outputs.no_directorio" {
+		t.Fatalf("%v", err)
+	}
+}
+
+// La raíz de una unidad (D:\) se reserva como «/» en Linux: icacls "D:\" ni siquiera se puede pegar bien.
+func TestRaizDeUnidadEsReservada(t *testing.T) {
+	for p, want := range map[string]bool{`D:\`: true, `c:\`: true, `C:/`: true, `C:\x`: false, `/`: false, `C:`: false, `\\srv\c$\`: false} {
+		if got := driveRoot(p); got != want {
+			t.Errorf("driveRoot(%q) = %v", p, got)
+		}
+	}
+}

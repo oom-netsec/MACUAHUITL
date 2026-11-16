@@ -270,10 +270,10 @@ func TestPrivateDirYMkdirPrivateRechazanJunction(t *testing.T) {
 	}
 	junction := filepath.Join(base, "j")
 	mklinkJunction(t, junction, destino)
-	if pe := privateDirReason(t, PrivateDir(junction)); pe.Reason != PrivateDirACL || pe.Path != junction {
+	if pe := privateDirReason(t, PrivateDir(junction)); pe.Reason != PrivateDirLink || pe.Path != junction {
 		t.Fatalf("PrivateDir = %+v", pe)
 	}
-	if pe := privateDirReason(t, MkdirPrivate(junction)); pe.Reason != PrivateDirACL {
+	if pe := privateDirReason(t, MkdirPrivate(junction)); pe.Reason != PrivateDirLink {
 		t.Fatalf("MkdirPrivate = %+v", pe)
 	}
 }

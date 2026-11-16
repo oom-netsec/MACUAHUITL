@@ -133,7 +133,7 @@ func MkdirPrivate(path string) error {
 			return err
 		}
 		if !fi.IsDir() { // junction (ModeIrregular) o enlace simbólico (ModeSymlink)
-			return &PrivateDirError{Reason: PrivateDirACL, Path: path, SID: "enlace", SIDs: []string{"enlace"}}
+			return &PrivateDirError{Reason: PrivateDirLink, Path: path}
 		}
 		owner, protected, aces, err := readACL(path)
 		if err != nil {
@@ -297,7 +297,7 @@ func PrivateDir(path string) error {
 		return &PrivateDirError{Reason: PrivateDirRead, Path: path, Err: err}
 	}
 	if !fi.IsDir() {
-		return &PrivateDirError{Reason: PrivateDirACL, Path: path, SID: "enlace", SIDs: []string{"enlace"}}
+		return &PrivateDirError{Reason: PrivateDirLink, Path: path}
 	}
 	owner, _, aces, err := readACL(path)
 	if err != nil {

@@ -134,6 +134,7 @@ const (
 	PrivateDirACL                                  // otro SID (o, en Linux, el modo) da acceso a la carpeta
 	PrivateDirAncestor                             // un ancestro deja escribir a otro SID
 	PrivateDirRead                                 // no se pudo leer la protección
+	PrivateDirLink                                 // es una junction o un enlace, no una carpeta (Windows)
 )
 
 // PrivateDirError dice por qué PrivateDir rechazó la carpeta: Path es la carpeta o el ancestro culpable; SID el SID
