@@ -11,8 +11,8 @@ import (
 // \s de RE2 solo conoce el espacio ASCII: sin normalizar los tramos de M₂, el valor se ve en todas las vías.
 // Cada plantilla de canales_test.go, con uno, todos o el primero junto a un espacio de los separadores cambiados.
 func TestEspaciosUnicodeNingunSecretoSeVe(t *testing.T) {
-	espacios := map[string]string{"NBSP U+00A0": " ", "U+2009": " ", "U+202F": " ", "U+3000": "　", "tab": "\t",
-		"U+2003": " ", "U+0085": "\u0085", "U+1680": " ", "ZWSP": "​"}
+	espacios := map[string]string{"NBSP U+00A0": "\u00a0", "U+2009": "\u2009", "U+202F": "\u202f", "U+3000": "\u3000", "tab": "\t",
+		"U+2003": "\u2003", "U+0085": "\u0085", "U+1680": "\u1680", "ZWSP": "\u200b"}
 	cmds, plats := canalCasos(len(canalPlantillas))
 	formas := map[string]func(c, sp string) string{
 		"uno":         func(c, sp string) string { return strings.Replace(c, " ", sp, 1) },
