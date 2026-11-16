@@ -24,6 +24,8 @@ var (
 	ErrLoginFailed     error = i18n.New("platform.err.login_failed", nil)
 	ErrConfirmPrompt   error = i18n.New("platform.err.confirm_prompt", nil)
 	ErrConfigPrompt    error = i18n.New("platform.err.config_prompt", nil)
+	// ErrChangetoUnsupported: se pidió un cambio de contexto a un driver o plataforma que no lo tiene (solo ASA).
+	ErrChangetoUnsupported error = i18n.New("platform.err.changeto_unsupported", nil)
 	// ErrUnexpectedPrompt: un «User:» o «Password:» llegó fuera del login (a mitad de un comando); no se contesta.
 	ErrUnexpectedPrompt error = i18n.New("platform.err.unexpected_prompt", nil)
 )
@@ -84,4 +86,26 @@ type Driver interface {
 // clave (pw sigue siendo de quien llama), la destruye tras usarla y en Close, y nunca la deja en errores, logs ni evidencia.
 type ShellLogin interface {
 	SetLogin(user string, pw *secret.Secret)
+}
+
+// Prompt son los segmentos de un prompt de ASA (host/ctx/pri/act...). Host y Context son los estables; el rol
+// (Priority, State, Cluster) cambia en un failover o un cambio de unidad de control y se informa aparte.
+type Prompt struct {
+	Host     string // hostname
+	Context  string // contexto; vacío en el espacio del sistema o con un solo contexto
+	Domain   string // dominio (lleva puntos)
+	Unit     string // unidad de cluster
+	Priority string // pri o sec
+	State    string // act, stby, actNoFailover o stbyNoFailover
+	Cluster  string // control, data (9.19 en adelante), master o slave
+}
+
+// ContextSwitcher es la interfaz opcional de los drivers que cambian de contexto con changeto (ASA multicontexto).
+// Solo el ejecutor de Patrol la llama, nunca un texto de playbook (ADR 0011).
+type ContextSwitcher interface {
+	// Prompt es el último prompt visto, ya separado en segmentos; vacío si el driver no lo reconoce.
+	Prompt() Prompt
+	// ChangeTo manda «changeto system» (target "system") o «changeto context <target>» y verifica el prompt nuevo:
+	// mismo hostname y el contexto pedido. Si no coincide, la sesión queda inservible y devuelve el error.
+	ChangeTo(ctx context.Context, target string, timeout time.Duration) error
 }
