@@ -74,15 +74,17 @@ type Recorder struct {
 	win      int         // líneas de salida que le quedan a la ventana
 	secrets2 []string    // lo mismo para los valores que tapa mask.CutCommand (lista y ventana aparte: no tocan el estado de las reglas)
 	win2     int
-	blk2     string // bloque del prompt para mask.CutCommand («keychain» además de los de lastBlk)
-	acc      string // lo recibido del eco partido hasta ahora
-	part     bool   // el último prompt traía el comienzo (acc) de una línea enviada (sent[pi]) cuyo eco sigue pendiente
-	partLine bool   // lo mismo respecto de la línea que aún se está tecleando (line)
-	cont     bool   // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
-	cfg      bool   // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
-	cfgOK    bool   // hay prompt conocido para lo que se teclea; si no, se tapa como en config
-	hidden   bool   // lo tecleado es una contraseña: no se graba
-	line     []byte // lo tecleado en la línea actual
+	blk2     string   // bloque del prompt para mask.CutCommand («keychain» además de los de lastBlk)
+	acc      string   // lo recibido del eco partido hasta ahora
+	esent    []string // copia aparte de las líneas enviadas, solo para reconocer el resto de un eco (no la leen ni escriben las decisiones de la v0.6.5)
+	eacc     string   // lo recibido del eco pendiente hasta ahora (estado aparte de acc)
+	epart    bool     // hay un eco pendiente: lo que lo continúe, aunque parezca un prompt, es su resto
+	eshift   bool     // el eco empezó con «$» (IOS lo desplaza): su texto es un trozo de la línea, no su comienzo
+	cont     bool     // el eco enmascarado quedó partido (se sigue tecleando): lo que siga hasta el prompt es su resto
+	cfg      bool     // el último prompt visto es de modo config (lo tecleado ahí lleva abreviaturas: mask.Command)
+	cfgOK    bool     // hay prompt conocido para lo que se teclea; si no, se tapa como en config
+	hidden   bool     // lo tecleado es una contraseña: no se graba
+	line     []byte   // lo tecleado en la línea actual
 	lastCR   bool
 	max      int64 // tope de la grabación en bytes
 	written  int64
@@ -152,14 +154,18 @@ func (r *Recorder) outLine(l string) {
 		}
 	}
 	out, keep := "", true
-	// Si hay un eco partido pendiente y esta línea lo continúa, no es un prompt aunque traiga «#» o «>» (parte del secreto
-	// «Pa55#Xq7»): va por la rama del resto del eco y se tapa entera. Solo cambia lo que la v0.6.5 leía como prompt y solo
-	// puede tapar más.
-	rest := promptRe.MatchString(l) && r.echoRest(l)
-	pr := ""
-	if !rest {
-		pr = promptRe.FindString(l)
+	// Un eco partido por un syslog sigue en la línea siguiente aunque esta lleve «#» o «>» del secreto («Pa55#Xq7») y parezca
+	// un prompt. Estado aparte (eacc/epart/esent): las decisiones de la v0.6.5 no cambian y lo único que se agrega es tapar
+	// la línea emitida. La línea sigue su camino normal.
+	rest := false
+	if r.epart && l != "" && !equipoMsg(l) {
+		if match, done := r.echoMatch(r.eacc + l); match {
+			rest, r.eacc, r.epart = promptRe.MatchString(l), r.eacc+l, !done
+		} else {
+			r.epart = false
+		}
 	}
+	pr := promptRe.FindString(l)
 	weak := ""
 	if pr != "" && weakPrompt(pr) && !r.echoOf(strings.TrimLeft(l[len(pr):], " \t")) {
 		weak, pr = pr, "" // «> x», «*> 10.0.0.0/8»: parece prompt, pero lo que sigue no es el eco de nada tecleado
@@ -199,24 +205,27 @@ func (r *Recorder) outLine(l string) {
 		}
 		r.cont = echo != l[len(pr):] && (len(r.line) > 0 || partial)
 		r.acc = text
-		r.part = partial
-		r.partLine = text != "" && !partial && strings.HasPrefix(string(r.line), text)
+		if !rest {
+			r.eshift = strings.HasPrefix(text, "$")
+			r.eacc = strings.TrimPrefix(text, "$")
+			match, done := false, false
+			if r.eacc != "" {
+				match, done = r.echoMatch(r.eacc)
+			}
+			r.epart = match && !done
+		}
 		out = vis + shown
-	} else if (r.cont || rest) && !equipoMsg(l) {
+	} else if r.cont && !equipoMsg(l) {
 		// Desde un eco enmascarado hasta el siguiente prompt, lo que no es syslog ni aviso del equipo
 		// es el resto del eco (partido por logs asíncronos): se tapa entero.
 		out = "<MASKED:secret>"
-		r.acc += l
 		if r.pi < len(r.sent) {
 			// El eco ya completó la línea enviada: lo que siga es salida normal.
-			if r.acc == r.sent[r.pi] {
-				r.cont, r.part, r.sent = false, false, r.sent[r.pi+1:]
+			if r.acc += l; r.acc == r.sent[r.pi] {
+				r.cont, r.sent = false, r.sent[r.pi+1:]
 			} else if !strings.HasPrefix(r.sent[r.pi], r.acc) {
-				r.cont, r.part = false, false
+				r.cont = false
 			}
-		}
-		if rest && !r.part && !strings.HasPrefix(string(r.line), r.acc) {
-			r.partLine = false
 		}
 	} else {
 		if weak != "" {
@@ -242,21 +251,26 @@ func (r *Recorder) outLine(l string) {
 			}
 		}
 	}
+	if rest {
+		out = "<MASKED:secret>"
+	}
 	if keep {
 		r.emit(r.pendAt.Format(stamp) + " " + out + "\n")
 	}
 }
 
-// echoRest dice si l continúa un eco partido pendiente: acc + l es comienzo (o todo) de la línea enviada que espera su
-// eco o de la que se está tecleando.
-func (r *Recorder) echoRest(l string) bool {
-	if l == "" || equipoMsg(l) {
-		return false
+// echoMatch: x es (el comienzo de) alguna línea enviada o de la que se teclea, o, con el eco desplazado, un trozo de ella;
+// done: x es la línea entera.
+func (r *Recorder) echoMatch(x string) (match, done bool) {
+	for _, s := range append(r.esent[:len(r.esent):len(r.esent)], string(r.line)) {
+		if s == x {
+			return true, true
+		}
+		if r.eshift && strings.Contains(s, x) || !r.eshift && strings.HasPrefix(s, x) {
+			match = true
+		}
 	}
-	if r.part && r.pi < len(r.sent) && strings.HasPrefix(r.sent[r.pi], r.acc+l) {
-		return true
-	}
-	return r.partLine && strings.HasPrefix(string(r.line), r.acc+l)
+	return match, false
 }
 
 // weakPrompt: el «prompt» no tiene letras ni dígitos («>», «*>»): lo mismo es una fila de salida que el de FTD.
@@ -601,11 +615,11 @@ func (r *Recorder) flush() {
 	// Un nuevo prompt de contraseña tiene que llegar en la salida: lo ya visto no vale para la línea siguiente.
 	r.hidden, r.line, r.tail, r.fresh = false, r.line[:0], nil, false
 	if !hidden && line != "" {
+		if r.esent = append(r.esent, line); len(r.esent) > sentMax {
+			r.esent = r.esent[1:]
+		}
 		if r.sent = append(r.sent, line); len(r.sent) > sentMax {
 			r.sent = r.sent[1:]
-		}
-		if r.partLine && strings.HasPrefix(line, r.acc) { // el Enter llegó con el eco a medias: ahora es una línea enviada
-			r.part, r.partLine, r.pi = true, false, len(r.sent)-1
 		}
 	}
 	switch {
