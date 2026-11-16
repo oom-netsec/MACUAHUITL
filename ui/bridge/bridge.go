@@ -113,7 +113,7 @@ func (b *Bridge) setStatus(s string) (changed bool) {
 	return changed
 }
 
-// Start lanza la vigilancia de la conexión. Es una función y no un método para
+// Start lanza la vigilancia de la conexión, una sola vez por puente. Es una función y no un método para
 // que Wails no la exponga al frontend.
 func Start(ctx context.Context, b *Bridge) {
 	b.mu.Lock()
@@ -136,8 +136,8 @@ func (b *Bridge) run(ctx context.Context) {
 		}
 		if err != nil {
 			b.setStatus("disconnected")
-			if b.Launcher != nil {
-				b.Launcher.check()
+			if b.Launcher != nil && b.Launcher.check() && c != nil {
+				c.ResetConnectBackoff() // gRPC esperaría su backoff (hasta 2 min) aunque el núcleo nuevo ya escuche
 			}
 		} else if b.setStatus("connected") {
 			b.resubscribe()

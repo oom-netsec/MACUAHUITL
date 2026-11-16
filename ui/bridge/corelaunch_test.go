@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -61,10 +62,42 @@ func TestCoreLauncherErrores(t *testing.T) {
 	if *starts != 0 || len(*logs) != 1 {
 		t.Fatalf("sonda con error: %d arranques, %v", *starts, *logs)
 	}
+	l.check() // el freno también vale para el registro: un error que sigue igual no se repite cada tic
+	if len(*logs) != 1 {
+		t.Fatalf("la sonda fallando se registró %d veces", len(*logs))
+	}
 	l, starts, logs, _ = lanzador(&corre, nil, errors.New("no existe macuahuitld.exe"))
-	l.check()
-	if *starts != 1 || len(*logs) != 1 {
+	if l.check() || *starts != 1 || len(*logs) != 1 {
 		t.Fatalf("arranque con error: %d arranques, %v", *starts, *logs)
+	}
+	l, _, _, _ = lanzador(&corre, nil, errors.New("x"))
+	l.Log = nil // opcional: sin Log los errores se descartan
+	l.check()
+}
+
+// Con el núcleo respondiendo no se consulta al lanzador.
+func TestRunNoConsultaConNucleo(t *testing.T) {
+	sock := filepath.Join(t.TempDir(), "core.sock")
+	defer startFake(t, sock)()
+	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, func(string, any) {})
+	b.Interval = 10 * time.Millisecond
+	var sondas atomic.Int32
+	b.Launcher = &CoreLauncher{Running: func() (bool, error) { sondas.Add(1); return false, nil }, Start: func() error { return nil }}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { b.run(ctx); close(done) }()
+	for deadline := time.Now().Add(2 * time.Second); b.Status() != "connected" && time.Now().Before(deadline); {
+		time.Sleep(5 * time.Millisecond)
+	}
+	sondas.Store(0) // antes de conectar el núcleo falso aún no atendía: ahí sí se consulta, y está bien
+	time.Sleep(80 * time.Millisecond)
+	cancel()
+	<-done
+	if b.Status() != "connected" {
+		t.Fatal("no conectó con el núcleo falso")
+	}
+	if n := sondas.Load(); n != 0 {
+		t.Fatalf("con el núcleo conectado se consultó al lanzador %d veces", n)
 	}
 }
 
