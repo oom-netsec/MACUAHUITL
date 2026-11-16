@@ -49,6 +49,7 @@
 ./internal/pack/packtest
 ./internal/parse/asa
 ./internal/parse/iosxe
+./internal/paths
 ./internal/patrol  # 43a3: sus pruebas dependen de chmod; en Windows va por ACL
 ./internal/pcapan
 ./internal/pki

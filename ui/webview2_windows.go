@@ -4,10 +4,12 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/paths"
 	"github.com/oom-netsec/MACUAHUITL/ui/bridge"
 )
 
@@ -28,6 +30,17 @@ func checkWebView2() {
 	msg, _ := windows.UTF16PtrFromString(bridge.WebView2MissingText())
 	_, _ = windows.MessageBox(0, msg, title, windows.MB_OK|windows.MB_ICONERROR|windows.MB_SETFOREGROUND)
 	os.Exit(1)
+}
+
+// webviewUserDataPath es donde WebView2 guarda su perfil y su caché: dentro de State (ADR 0012), local y no roaming.
+// Por omisión Wails usaría %APPDATA%\macuahuitl.exe, que en un dominio viaja con el perfil.
+// La misma regla de rutas que el núcleo (internal/paths): si State sale vacía, el núcleo tampoco arranca y no se fija
+// nada (queda el valor de Wails; la app ya muestra el error de conexión).
+func webviewUserDataPath() string {
+	if st := paths.Resolve(os.Getenv).State; st != "" {
+		return filepath.Join(st, "webview2")
+	}
+	return ""
 }
 
 // registryPV lee el valor «pv» de la clave; vacío si la clave o el valor no existen.

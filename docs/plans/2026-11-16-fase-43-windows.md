@@ -39,7 +39,7 @@ Reparto:
 Detalle en el ADR 0012, «La app (Wails v3) en Windows» e «Instalador». Bloques:
 
 - MessageBox si falta WebView2, con prueba.
-- `NonClientRegionSupport` y `WebviewUserDataPath` en State.
+- `WebviewUserDataPath` en State. El menú de Snap Layouts (`WebView2CompositionHosting`) se evalúa en la validación.
 - Helper `baseName`/`dirName` para `transfer/client.ts` y `Files.tsx`.
 - Textos por sistema (`….windows`) en la UI.
 - Instalador NSIS por usuario: aviso con el enlace oficial si falta WebView2 (no se redistribuye, ADR 0012), entrada de `Run`, y desinstalación que pregunta por los datos con «No» por omisión y nunca los borra con `/S`.
