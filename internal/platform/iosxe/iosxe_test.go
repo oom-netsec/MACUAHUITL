@@ -502,8 +502,8 @@ func TestSalidaRecortadaTraeSeparador(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := fmt.Sprintf("\n[… salida recortada: %d bytes omitidos …]\n", n+len("\r\nSW#")-maxOutput)
-	if strings.Count(text, "[… salida recortada:") != 1 || !strings.Contains(text, want) {
+	want := fmt.Sprintf("\n[… output truncated: %d bytes omitted …]\n", n+len("\r\nSW#")-maxOutput)
+	if strings.Count(text, "[… output truncated:") != 1 || !strings.Contains(text, want) {
 		i := strings.Index(text, "[…")
 		t.Fatalf("falta el separador %q (en %d: %.80q)", want, i, text[max(i, 0):])
 	}
@@ -536,5 +536,34 @@ func TestSalidaConTopeDeMemoria(t *testing.T) {
 	}
 	if !d.dropped || len(text) > maxOutput+1024 || !strings.HasSuffix(text, "SW#") || peak > 4*maxOutput {
 		t.Fatalf("dropped=%v len=%d peak=%d", d.dropped, len(text), peak)
+	}
+}
+
+// Dos comandos seguidos que pasan el tope: cada uno trae su propio N exacto (el estado del recorte no se arrastra al siguiente comando).
+func TestSalidaRecortadaSeReiniciaEntreComandos(t *testing.T) {
+	old := maxOutput
+	maxOutput = 100 << 10
+	defer func() { maxOutput = old }()
+	n := 512 << 10
+	d := feed(n, "SW#")
+	for i := range 2 {
+		if i > 0 {
+			for range n / 4096 {
+				d.chunks <- []byte(strings.Repeat("y", 4096))
+			}
+			d.chunks <- []byte("\r\nSW#")
+		}
+		text, err := d.untilIdle(context.Background(), time.Second, d.atPrompt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := fmt.Sprintf("\n[… output truncated: %d bytes omitted …]\n", n+len("\r\nSW#")-maxOutput)
+		if !strings.Contains(text, want) {
+			j := strings.Index(text, "[…")
+			t.Fatalf("comando %d: falta %q (hay %.60q)", i+1, want, text[max(j, 0):])
+		}
+		if !strings.HasSuffix(text, "SW#") {
+			t.Errorf("comando %d: sin prompt", i+1)
+		}
 	}
 }

@@ -222,7 +222,7 @@ func (d *driver) Open(ctx context.Context, r io.Reader, w io.Writer, enable *sec
 	if aireCue.MatchString(text) {
 		var err error
 		if text, err = d.aireLogin(ctx); err != nil {
-			d.buf = nil // el equipo pudo repetir la clave con eco
+			d.clearBuf() // el equipo pudo repetir la clave con eco
 			return d.fail(err)
 		}
 	}
@@ -386,7 +386,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				}
 				d.confirmed = true
 				text := clean(string(d.buf))
-				d.buf = nil
+				d.clearBuf()
 				return text, nil
 			}
 			if ftdPrompt.MatchString(clean(tail)) {
@@ -395,7 +395,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				}
 				d.incomplete = true // un solo «> » y nada más en ~1,2 s: se acepta, pero incompleto
 				text := clean(string(d.buf))
-				d.buf = nil
+				d.clearBuf()
 				return text, nil
 			}
 		} else if ct := clean(tail); done(ct) {
@@ -403,7 +403,7 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 				continue
 			}
 			text := clean(string(d.buf))
-			d.buf = nil
+			d.clearBuf()
 			return text, nil
 		}
 		select {
@@ -433,6 +433,9 @@ func (d *driver) untilIdle(ctx context.Context, idle time.Duration, done func(st
 	}
 }
 
+// clearBuf vacía el búfer al terminar de leer un comando y reinicia el estado del recorte: el siguiente comando cuenta sus propios bytes omitidos.
+func (d *driver) clearBuf() { d.buf, d.headLen, d.markLen, d.omitted = nil, 0, 0, 0 }
+
 // add agrega un pedazo al búfer respetando maxOutput: pasado el tope se conserva el inicio y se reemplaza la cola
 // por los últimos outTail bytes, de modo que el prompt final se siga reconociendo y la memoria no crezca.
 func (d *driver) add(c []byte) {
@@ -451,7 +454,7 @@ func (d *driver) add(c []byte) {
 	win := append(append([]byte(nil), tail...), c...)
 	cut := max(len(win)-outTail, 0)
 	d.omitted += cut
-	mark := fmt.Appendf(nil, "\n[… salida recortada: %d bytes omitidos …]\n", d.omitted)
+	mark := fmt.Appendf(nil, "\n[… output truncated: %d bytes omitted …]\n", d.omitted)
 	d.headLen, d.markLen = head, len(mark)
 	d.buf = append(append(d.buf[:head], mark...), win[cut:]...)
 }
@@ -622,6 +625,7 @@ func (d *driver) Run(ctx context.Context, cmd string, timeout time.Duration) (pl
 		return out, fmt.Errorf("%w: %v", platform.ErrClosed, err)
 	}
 	d.confirmed, d.incomplete, d.dropped = false, false, false
+	d.headLen, d.markLen, d.omitted = 0, 0, 0
 	if d.sentinel = d.hostname == ""; d.sentinel { // FTD: un Enter vacío en cola da el segundo prompt cuando el comando termina
 		defer func() { d.sentinel = false }()
 		if _, err := io.WriteString(d.w, "\n"); err != nil {
