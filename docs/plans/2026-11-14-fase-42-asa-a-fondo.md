@@ -54,7 +54,21 @@ Fuera de alcance:
 - el modo transparente como función aparte (los mismos playbooks sirven, con las notas del caso);
 - FTD, que tiene su propio paquete.
 
-## 3. Decisiones abiertas (Release y el dueño)
+## 3. Decisiones (aprobadas por el dueño el 2026-11-16)
+
+Resumen de lo aprobado:
+- **D1:** el `changeto` lo hace el ejecutor, con verificación del prompt, lista blanca contra `show context` de la
+  misma ronda, auditoría `patrol.changeto` y vuelta con `defer`. Lleva su ADR.
+- **D2:** opción A, el tipo `flows`, con un tope de **256 flujos por trabajo** («no sabemos en qué ambientes lo van a
+  probar»), carga desde CSV y un **aviso de impacto antes de armar**: cuántos `packet-tracer`, el tiempo estimado, y
+  que suben los hitcnt y pueden iniciar IKE.
+- **D3:** opción A, una herramienta aparte con su propia tabla de diferencias.
+- **D4:** el par se detecta por **(serie, contexto)**.
+- **No hay ASA físico.** Multicontexto, A/A y cluster salen con fixtures reconstruidas y la marca «not yet tested in
+  a lab». Contexto único y failover A/S se validan en el ASAv de CML. El anuncio de la v1.0.0 lleva una convocatoria
+  abierta a quien tenga un ASA físico.
+
+Lo que sigue es el razonamiento de cada decisión.
 
 ### D1. Multicontexto: ¿cómo se llega al sistema y a cada contexto?
 
@@ -91,7 +105,8 @@ sin cubrir el espacio del sistema.
 
 Hoy cada dato es un solo valor.
 
-- **Opción A: un tipo de dato nuevo `flows`.** Lista de flujos, hasta 20, separados por `;`. Cada flujo es
+- **Opción A: un tipo de dato nuevo `flows`.** Lista de flujos, hasta **256** por trabajo, separados por `;` o
+  cargados desde un **CSV** (una fila por flujo, mismas columnas). Cada flujo es
   `IF PROTO SRC SPORT DST DPORT` para tcp/udp, y **admite la forma icmp** (`IF icmp SRC TYPE CODE DST`; a verificar en
   la Command Reference 9.x). `Expand` genera un `packet-tracer` por flujo, y cada uno pasa CheckDenied como hoy.
   Un playbook `tac-matriz-packet-tracer`; el análisis arma la tabla flujo × fase (ACCESS-LIST, NAT, ROUTE-LOOKUP, VPN,
@@ -99,8 +114,9 @@ Hoy cada dato es un solo valor.
 - **Opción B: un trabajo por flujo** (ya funciona hoy) y una vista que junta los trabajos. Sin tipo nuevo, pero la matriz
   queda fuera de una sola evidencia.
 
-**Propuesta:** A. Ojo: packet-tracer sube los hitcnt de las ACL y puede iniciar IKE si el flujo es de un crypto map. La
-nota va en el playbook y el plan muestra cuántos flujos va a simular.
+**Aprobada:** A, con un tope de 256. Ojo: packet-tracer sube los hitcnt de las ACL y puede iniciar IKE si el flujo es
+de un crypto map. Antes de armar el trabajo, la app muestra un **aviso de impacto**: cuántos `packet-tracer` va a correr,
+el tiempo estimado, y que suben los hitcnt y pueden iniciar IKE. El playbook lleva la misma nota.
 
 **Lista blanca de opciones: se mantiene en `detailed|xml`.** Las versiones nuevas traen `transmit` (manda el paquete de
 verdad) y `persist`; no se permiten. La matriz usa solo `xml` para el parser.
@@ -114,9 +130,8 @@ ADR 0008: un dominio no importa otro; los parsers son *Shared*.
 - **Opción B, regla de `internal/analyze`** con un check nuevo que mira dos equipos. Hoy `analyze` trabaja por equipo:
   habría que extender el motor.
 
-**Propuesta:** A. Es una herramienta con salida propia (tabla de diferencias), no una alerta. Nombre: si cubre cluster,
-`hapair` le queda chico; proponer **`internal/fwha`** (alta disponibilidad de firewalls: par y cluster). A decidir con
-Release.
+**Aprobada:** A. Es una herramienta con salida propia (tabla de diferencias), no una alerta. Nombre: si cubre cluster,
+`hapair` le queda chico, así que va como **`internal/fwha`** (alta disponibilidad de firewalls: par y cluster).
 
 ### D4. ¿Cómo se marca un par en el trabajo?
 
@@ -124,7 +139,7 @@ Release.
   la Command Reference 9.x). **Con una sola sesión ya se ven la serie y la versión de la otra unidad.**
 - O un dato explícito del trabajo.
 
-**Propuesta:** detección, agrupando por **(serie, contexto)** y no por IP: en un failover la IP activa pasa a la otra
+**Aprobada:** detección, agrupando por **(serie, contexto)** y no por IP: en un failover la IP activa pasa a la otra
 unidad, así que la IP no identifica a la unidad.
 
 - El aviso de «más de dos ASA en failover» **se rediseña**: con un destino por contexto, la misma pareja aparece varias
@@ -230,6 +245,19 @@ historial; contadores de *Stateful Failover Logical Update Statistics*), `show f
 Cada parser lleva fixture de la documentación de Cisco, marcada «sin validar en laboratorio», y su fuzz como los de
 iosxe.
 
+**Cotejo del `show failover` real (Release, 2026-11-16).** Se comparó un par A/S de ASAv 9.22(1)1 en CML, con un
+failover forzado, contra la fixture reconstruida `aa_show-failover.txt`. La evidencia queda local y no se sube.
+- Las líneas de cabecera coinciden (Reconnect timeout, Unit Poll, Interface Policy, Monitored Interfaces, MAC Address
+  Move…, Version Ours/Mate, Serial Number Ours/Mate).
+- El equipo real **sangra con tabulaciones**, no con espacios. La línea de la unidad es `This host: Primary - Active`
+  con un espacio al final.
+- La tabla de estadísticas trae, justo después del título, una línea `Link : <nombre> <interfaz> (up)`. En 9.22 trae
+  además muchas filas que la fixture no tiene: sys cmd, IPv6 ND tbl, VPN IKEv1/IKEv2 SA/P2, SIP, Router ID,
+  User-Identity, CTS SGTNAME/PAC, TrustSec-SXP, IPv6 Route, STS Table y Umbrella Device-ID.
+- En «Logical Update Queue Information», las columnas Cur/Max/Total van separadas por tabulaciones.
+- **Para el parser:** tolerar tabulaciones y espacios por igual, aceptar filas desconocidas en la tabla de estadísticas
+  y aceptar la línea `Link :`. La fixture reconstruida se ajusta con estos rasgos, **sin copiar la salida real**.
+
 ### 4.4 Comparación del par (42d)
 
 Entrada: un trabajo con las dos unidades (o una sola, si el standby no tiene IP: D4). Salida: un informe con estas
@@ -292,8 +320,9 @@ Todo marcado «sin validar» hasta tener rondas reales.
 
 ## 6. Validación
 
-- **CML (Release, esta noche):** dos ASAv en failover A/S, incluido un failover provocado por Release (la app solo
-  observa). Es lo realista. Con eso se validan 42a (prompts de failover y cambio de rol), 42b (A/S), 42c (failover,
+- **CML (Release):** dos ASAv en failover A/S, incluido un failover provocado por Release (la app solo observa). Ya hay
+  una primera corrida (68 playbooks en 2 rondas, con failover forzado entre ellas), y su evidencia está en local.
+  Release valida contexto único y A/S en el ASAv con la primera build de cada bloque. Es lo realista. Con eso se validan 42a (prompts de failover y cambio de rol), 42b (A/S), 42c (failover,
   version, conn, xlate, asp) y 42d (par A/S).
 - **Multicontexto y A/A:** el ASAv no admitiría `mode multiple` (a verificar en las notas de la versión de la imagen
   del CML). A/A necesita multicontexto, así que queda con **fixtures** de la documentación y la marca «sin validar»,
@@ -309,7 +338,11 @@ Todo marcado «sin validar» hasta tener rondas reales.
    (parsers con fixtures). Son la base.
 2. 42b (playbooks, incluido el movimiento a `sys-*`), validados en CML A/S.
 3. 42d (par) y 42e (deltas).
-4. 42f (matriz, si se aprueba D2-A) y 42g (proto, mctl, puente y contrato).
+4. 42f (matriz con `flows`, D2-A) y 42g (proto, mctl, puente y contrato).
 5. Laboratorio otra vez, ajustes y release.
 
 Cada bloque es un PR con su revisión independiente, CI verde y, cuando toque, validación en CML.
+
+**Ventana antes de la v1.0.0 (pedido de Release, 2026-11-16):** el código de la fase 42 se implementa en ramas
+(42a…), cada una con su revisión y su verificación, pero **no se mergea a main hasta que salga la v1.0.0**. Durante la
+ventana de 2 a 3 días sin hallazgos solo entran a main los arreglos de hallazgos.
