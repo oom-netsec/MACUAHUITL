@@ -225,9 +225,17 @@ func TestReadOnlyDirNiegaCrearYSeRestaura(t *testing.T) {
 		f.Close()
 		t.Fatal("se pudo crear un archivo en la carpeta de solo lectura")
 	}
-	if p, err := os.MkdirTemp(d, ".t-"); err == nil { // lo que hace pack.Install
+	// En windows-latest el token del runner crea subcarpetas aunque la DACL no dé ADD_SUBDIRECTORY (los archivos sí se
+	// niegan). Lo que importa a pack.Install es que nada se escriba dentro: la subcarpeta hereda la solo lectura (OI|CI).
+	if p, err := os.MkdirTemp(d, ".t-"); err == nil {
+		t.Logf("el token crea subcarpetas sin ADD_SUBDIRECTORY: se comprueba que dentro no se escribe")
+		if f, err := os.Create(filepath.Join(p, "x")); err == nil {
+			f.Close()
+			t.Fatal("se pudo escribir dentro de una subcarpeta de la carpeta de solo lectura")
+		}
+		restore()
 		os.Remove(p)
-		t.Fatal("se pudo crear una subcarpeta en la carpeta de solo lectura")
+		restore, _ = ReadOnlyDir(d)
 	}
 	restore()
 	f, err := os.Create(filepath.Join(d, "x"))
