@@ -33,7 +33,9 @@ type Bridge struct {
 	Interval time.Duration // reintento de conexión; 1 s por defecto
 	// Localize enciende el idioma del núcleo (core.localize): con true, las llamadas llevan accept-language con la
 	// preferencia ui.language. Apagado por omisión: el núcleo contesta en español, como antes.
-	Localize  bool
+	Localize bool
+	// Launcher arranca el núcleo si no corre (solo Windows; nil en Linux, donde lo arranca systemd).
+	Launcher  *CoreLauncher
 	lang      langCache
 	dial      func() (*ipc.ClientConn, error)
 	emit      Emitter
@@ -134,6 +136,9 @@ func (b *Bridge) run(ctx context.Context) {
 		}
 		if err != nil {
 			b.setStatus("disconnected")
+			if b.Launcher != nil {
+				b.Launcher.check()
+			}
 		} else if b.setStatus("connected") {
 			b.resubscribe()
 		}
