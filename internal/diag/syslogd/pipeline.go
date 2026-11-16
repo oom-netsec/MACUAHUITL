@@ -17,14 +17,20 @@ func maskRaw(raw []byte) []byte {
 	if bytes.Contains(raw, []byte("%ASA-")) || bytes.Contains(raw, []byte("%FTD-")) {
 		platform = "asa"
 	}
-	out, _ := mask.Apply(platform, string(raw))
+	out, _ := mask.ApplyPlain(platform, string(raw)) // S1: la cadena de la v0.6.5 intacta; el corte va al final
 	// Línea por línea no basta: sanitize junta las líneas y la continuación de un comando citado («…command:key\nX»)
 	// solo se reconoce unida; se vuelve a enmascarar con los saltos como espacios (lo ya tapado no cambia).
+	orig := string(raw)
 	if strings.ContainsAny(out, "\r\n") {
-		out = strings.Join(strings.Fields(strings.NewReplacer("\r", " ", "\n", " ").Replace(out)), " ")
-		out, _ = mask.Apply(platform, out)
+		out, orig = norm(out), norm(orig)
+		out, _ = mask.ApplyPlain(platform, out)
 	}
-	return []byte(out)
+	return []byte(mask.CutText(platform, orig, out)) // Command corre sobre el original; el corte, sobre S1
+}
+
+// norm junta las líneas de un mensaje en una sola, con espacios simples.
+func norm(s string) string {
+	return strings.Join(strings.Fields(strings.NewReplacer("\r", " ", "\n", " ").Replace(s)), " ")
 }
 
 // API que syslogd ha tenido siempre; el código vive en ingest y lo comparten
@@ -78,3 +84,6 @@ func (p *pipeline) submit(from string, raw []byte, truncated bool) {
 		p.Enqueue(key, item{p.Now(), from, append([]byte(nil), raw...), truncated})
 	}
 }
+
+// MaskRaw es el enmascarado que recibe cada mensaje antes de parsearlo; se expone para las pruebas de canales de mask.
+func MaskRaw(raw []byte) []byte { return maskRaw(raw) }

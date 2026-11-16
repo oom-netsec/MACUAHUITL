@@ -214,7 +214,7 @@ var huecoCases = []huecoCase{
 	{"PSK : Enabled", "PSK : Enabled"},
 	// show archive log config: tras «|» va una línea de configuración.
 	{"  1  1  admin@vty0  |username bob privilege 15 secret Cl4ve", "  1  1  admin@vty0  |username bob privilege 15 secret <MASKED:user-secret>"},
-	{"  2  1  admin@vty0  |snmp-server community Cl4ve RO", "  2  1  admin@vty0  |snmp-server community <MASKED:snmp-community> RO"},
+	{"  2  1  admin@vty0  |snmp-server community Cl4ve RO", "  2  1  admin@vty0  |snmp-server community <MASKED:secret>"},
 	{"  3  1  admin@vty0  |interface Gi1", "  3  1  admin@vty0  |interface Gi1"},
 	{"  3  1  admin@vty0  |description password 0 x", "  3  1  admin@vty0  |description password 0 x"},
 	// Forma genérica: tipos 3 y 4, y palabras clave que no son valor.
@@ -238,7 +238,7 @@ var huecoCases = []huecoCase{
 	{" 10 remark key 7 0822", " 10 remark key 7 0822"},
 	// Segunda pasada: syslog, palabras con guion, EzVPN cliente, OSPFv3 por área, l2tp, URL con «/» y pares tras tipo 0.
 	{"%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:username bob secret Cl4ve", "%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:username bob secret <MASKED:user-secret>"},
-	{"%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:snmp-server community Cl4ve RO", "%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:snmp-server community <MASKED:snmp-community> RO"},
+	{"%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:snmp-server community Cl4ve RO", "%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:snmp-server community <MASKED:secret>"},
 	{"%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:tacacs-server key Cl4ve", "%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:tacacs-server key <MASKED:tacacs-key>"},
 	{"%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:interface Gi1", "%PARSER-5-CFGLOG_LOGGEDCMD: User:admin  logged command:interface Gi1"},
 	{" local-key 0 Cl4ve", " local-key 0 <MASKED:secret>"},
