@@ -52,7 +52,9 @@ jobs:
         with:
           go-version-file: go.mod
       - name: mask con -race (muestra con semilla del día; MACUAHUITL_SEED la fija)
-        run: tools/ci/pkgs.sh mask | xargs go test -race -count=1
+        run: |
+          set -o pipefail
+          tools/ci/pkgs.sh mask | xargs go test -race -count=1
 
   go-checks:
     runs-on: ubuntu-latest

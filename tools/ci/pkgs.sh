@@ -15,7 +15,7 @@ grupo() { # imprime «grupo<TAB>paquete» por cada paquete
 case "${1:-}" in
   core|rest|mask) grupo | awk -F'\t' -v g="$1" '$1==g{print $2}' ;;
   check) # cada paquete en un solo grupo y ningún grupo vacío
-    [[ $(grupo | wc -l) -eq $(go list ./... | wc -l) ]] || { echo "paquetes sin grupo o repetidos" >&2; exit 1; }
+    diff <(grupo | cut -f2 | sort) <(go list ./... | sort -u) >&2 || { echo "paquetes sin grupo o repetidos" >&2; exit 1; }
     for g in core rest mask; do [[ -n $("$0" "$g") ]] || { echo "grupo vacío: $g" >&2; exit 1; }; done ;;
   *) echo "uso: $0 core|rest|mask|check" >&2; exit 2 ;;
 esac
