@@ -38,6 +38,8 @@ func TestBuildWindowsArgv(t *testing.T) {
 		{req(Traceroute, "192.0.2.1", nil, ""), "tracert", "-d -w 2000 192.0.2.1"},
 		{req(Nmap, "192.0.2.0/24", map[string]string{"ports": "22,80", "scan": "connect", "timing": "3"}, ""), "nmap", "-sT -p 22,80 -T3 -n -oG - 192.0.2.0/24"},
 		{req(Iperf3, "192.0.2.1", map[string]string{"seconds": "10", "reverse": "true"}, ""), "iperf3", "-c 192.0.2.1 -t 10 -R"},
+		// En Windows no hay puertos privilegiados (ADR 0012 h): el servidor iperf3 puede escuchar en el 80.
+		{req(Iperf3, "", map[string]string{"mode": "server", "bind": "192.0.2.9", "port": "80"}, ""), "iperf3", "-s -B 192.0.2.9 -p 80 -1"},
 		{req(Pcap, "", map[string]string{"interface": "3", "seconds": "30"}, `C:\o`), "dumpcap", "-i 3 -a duration:30"},
 		// sin seconds la captura igual lleva condición de parada: cancelar en Windows es terminar el job
 		{req(Pcap, "", map[string]string{"interface": `\Device\NPF_{1A2B3C4D-0000-4abc-9DEF-0123456789AB}`}, `C:\o`), "dumpcap", `-i \Device\NPF_{1A2B3C4D-0000-4abc-9DEF-0123456789AB} -a duration:60`},

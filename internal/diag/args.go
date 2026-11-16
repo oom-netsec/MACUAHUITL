@@ -241,7 +241,7 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 			}
 			argv = []string{"-c", host}
 		case "server":
-			// Nunca en todas las interfaces: -B con una IP de esta máquina; puerto no privilegiado.
+			// Nunca en todas las interfaces: -B con una IP de esta máquina; puerto no privilegiado en Linux.
 			b, _ := o.str("bind")
 			if a, err := netip.ParseAddr(b); err != nil || !isLocalIP(a) || a.IsLinkLocalUnicast() { // -B sin zona falla con link-local
 				return "", nil, i18n.New("diag.err.iperf_bind", i18n.A("value", b))
@@ -249,7 +249,7 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 			argv = []string{"-s", "-B", b}
 		}
 		lo := 1.0
-		if mode == "server" {
+		if mode == "server" && !win { // en Windows no hay puertos privilegiados (ADR 0012 h)
 			lo = 1024
 		}
 		if v, ok := o.num("port", lo, 65535); ok {
