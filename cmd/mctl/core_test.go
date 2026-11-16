@@ -114,3 +114,27 @@ func TestCoreStopUso(t *testing.T) {
 		}
 	}
 }
+
+// Unavailable con el PID ya conocido: el núcleo se está apagando (otro core stop o SIGTERM); se espera a ese proceso.
+func TestCoreStopUnavailableEsperaAlPID(t *testing.T) {
+	coreStopEnv(t, func() error { return status.Error(codes.Unavailable, "cerrando") })
+	corecmd.ServerPID = func(string) (int, error) { return 4242, nil }
+	var waited int
+	corecmd.WaitExit = func(pid int, _ time.Duration) error { waited = pid; return sys.ErrWaitTimeout }
+	_, err := mctlRaw(t, "", "core", "stop", "--timeout", "1s")
+	if waited != 4242 || err == nil || !strings.Contains(err.Error(), "did not exit in time") {
+		t.Fatalf("waited %d err %v", waited, err)
+	}
+	corecmd.WaitExit = func(int, time.Duration) error { return nil }
+	if out, err := mctlRaw(t, "", "core", "stop"); err != nil || !strings.Contains(out, "core stopped") {
+		t.Fatalf("out %q err %v", out, err)
+	}
+}
+
+func TestCoreStopPIDInvalidoSale1(t *testing.T) {
+	coreStopEnv(t, func() error { return nil })
+	corecmd.ServerPID = func(string) (int, error) { return 0, nil }
+	if _, err := mctlRaw(t, "", "core", "stop"); err == nil || cli.ExitCode(err) != 1 {
+		t.Fatalf("err = %v", err)
+	}
+}

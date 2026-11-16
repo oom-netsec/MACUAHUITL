@@ -34,7 +34,7 @@ var (
 	WaitExit            = sys.WaitExit
 )
 
-// stop apaga el núcleo. Nunca lo lanza: con el arranque bajo demanda de 43a4 (ADR 0012 g) mctl lo lanzará si no
+// stop apaga el núcleo. Sin PID (no hay socket o nadie escucha) avisa y sale 0: no hay proceso que esperar. Nunca lo lanza: con el arranque bajo demanda de 43a4 (ADR 0012 g) mctl lo lanzará si no
 // encuentra el pipe, y core stop quedará exento de eso.
 func stop(c *cli.Env, args []string) error {
 	var timeout time.Duration
@@ -55,6 +55,9 @@ func stop(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	if pid <= 0 {
+		return cli.Err("mctl.core.bad_pid")
+	}
 	deadline := time.Now().Add(timeout)
 	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
@@ -63,8 +66,7 @@ func stop(c *cli.Env, args []string) error {
 	case codes.OK:
 	case codes.FailedPrecondition:
 		return cli.ExitError{Code: exitBusy, Err: errors.New(status.Convert(err).Message())}
-	case codes.Unavailable: // se fue entre el PID y la llamada
-		return notRunning()
+	case codes.Unavailable: // ya se está apagando (otro core stop, SIGTERM): se espera a ese mismo proceso
 	case codes.DeadlineExceeded:
 		return cli.Err("mctl.core.timeout", "pid", pid)
 	default:

@@ -18,6 +18,8 @@ var ErrNotRunning = errors.New("ipc: el núcleo no está corriendo")
 
 // ServerPID es el PID del proceso que escucha en el socket path: SO_PEERCRED leído del lado del cliente.
 // ErrNotRunning si el socket no existe o rechaza la conexión.
+// shortcut: el PID puede reutilizarse entre esta lectura y WaitExit (ventana de milisegundos); en el peor caso core stop
+// espera de más y sale con 1.
 // En Windows el equivalente (GetNamedPipeServerProcessId sobre el pipe) llega con 43a4.
 func ServerPID(path string) (int, error) {
 	c, err := net.DialTimeout("unix", path, 2*time.Second)
@@ -39,6 +41,9 @@ func ServerPID(path string) (int, error) {
 	}
 	if cerr != nil {
 		return 0, fmt.Errorf("ipc: %w", cerr)
+	}
+	if int(cred.Uid) != os.Getuid() || cred.Pid <= 0 { // el socket lo escucha otro usuario: no es nuestro núcleo
+		return 0, fmt.Errorf("ipc: el socket %s lo atiende otro usuario o un PID inválido", path)
 	}
 	return int(cred.Pid), nil
 }

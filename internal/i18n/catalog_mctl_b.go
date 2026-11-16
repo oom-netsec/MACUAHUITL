@@ -155,6 +155,7 @@ func init() {
 
 		// core
 		"mctl.core.not_running": e("el núcleo no estaba corriendo", "the core was not running"),
+		"mctl.core.bad_pid":     e("el socket no dio un PID válido para el núcleo", "the socket did not give a valid PID for the core"),
 		"mctl.core.stopped":     e("núcleo detenido (PID {pid})", "core stopped (PID {pid})"),
 		"mctl.core.timeout":     e("el núcleo (PID {pid}) no terminó en el plazo", "the core (PID {pid}) did not exit in time"),
 

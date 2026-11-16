@@ -18,7 +18,7 @@ func WaitExit(pid int, timeout time.Duration) error {
 		return err
 	}
 	defer windows.CloseHandle(h)
-	ms := timeout.Milliseconds()
+	ms := max(timeout.Milliseconds(), 0) // un plazo negativo daría la vuelta en uint32 (~49 días)
 	if ms >= int64(windows.INFINITE) {
 		ms = int64(windows.INFINITE) - 1
 	}
