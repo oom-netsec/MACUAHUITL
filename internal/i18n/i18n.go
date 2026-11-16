@@ -337,7 +337,9 @@ func causeIn(err error, loc string) string { return In(loc, err) }
 func Codes() []string {
 	out := make([]string, 0, len(catalog))
 	for k := range catalog {
-		out = append(out, k)
+		if !strings.HasSuffix(k, ".windows") { // las variantes de Windows no son códigos: Msg las elige por la base
+			out = append(out, k)
+		}
 	}
 	sort.Strings(out)
 	return out

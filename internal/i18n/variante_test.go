@@ -28,6 +28,11 @@ func TestMsgVarianteWindows(t *testing.T) {
 	if got := Msg(En, "prueba.sola", nil); got != "same" {
 		t.Fatalf("sin variante: %q", got)
 	}
+	for _, c := range Codes() {
+		if c == "prueba.variante.windows" {
+			t.Fatal("Codes no debe listar las variantes .windows")
+		}
+	}
 }
 
 // Una variante «.windows» reemplaza a un código que existe y lleva sus mismos argumentos.
@@ -42,8 +47,12 @@ func TestVariantesWindowsTienenBase(t *testing.T) {
 			t.Errorf("%s sin código base", code)
 			continue
 		}
-		if !sameArgs(b.Args, e.Args) {
-			t.Errorf("%s: argumentos %v distintos de %s %v", code, e.Args, base, b.Args)
+		if !sameArgs(b.Args, e.Args) || !sameArgs(b.Refs, e.Refs) {
+			t.Errorf("%s: argumentos o refs %v %v distintos de %s %v %v", code, e.Args, e.Refs, base, b.Args, b.Refs)
+		}
+		// Reason, Meta y Extra viajan por la base (Reason/Metadata): en la variante se ignorarían sin aviso.
+		if e.Reason != "" || len(e.Meta) > 0 || len(e.Extra) > 0 {
+			t.Errorf("%s: una variante solo cambia el texto (sin Reason, Meta ni Extra)", code)
 		}
 	}
 }
