@@ -202,7 +202,7 @@ func New(p Paths, o Options) (*Core, error) {
 	// Se revalida la carpeta de salidas guardada (dueño, 0700, ancestros): si ya no vale rige la de fábrica y queda en la auditoría.
 	if err := c.settings.Load(db, func(dir string) error { _, err := service.CheckOutputs(dir, c.settings, false); return err }); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("core: preferencias: %w", err)
+		return nil, i18n.Wrap("core.err.prefs", err, nil)
 	}
 	if c.settings.Issue() != "" {
 		c.audit("prefs.core", "core", c.settings.IssueAudit())
@@ -276,7 +276,7 @@ func (c *Core) openPacks() (err error) {
 	}
 	st, rejected, err := pack.Open(filepath.Join(c.p.Data, "packs"), coreVersion, keys, base)
 	if err != nil {
-		return fmt.Errorf("core: paquetes: %w", err)
+		return i18n.Wrap("core.err.packs", err, nil)
 	}
 	c.packs = st
 	st.OnChange = c.rebuildCatalog

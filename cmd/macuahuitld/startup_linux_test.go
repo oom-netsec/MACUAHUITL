@@ -28,7 +28,7 @@ func TestRunBorraLaCausaAlAbrirElCanal(t *testing.T) {
 	if _, err := os.Stat(file); err != nil {
 		t.Fatalf("la prueba no armó el archivo: %v", err)
 	}
-	sig := make(chan os.Signal, 1) // absorbe el SIGTERM si llega antes de que run lo escuche
+	sig := make(chan os.Signal, 1) // absorbe la interrupción si llega antes de que run lo escuche
 	signal.Notify(sig, os.Interrupt)
 	defer signal.Stop(sig)
 	done := make(chan error, 1)

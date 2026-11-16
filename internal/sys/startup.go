@@ -3,10 +3,8 @@ package sys
 import (
 	"encoding/json"
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
@@ -37,32 +35,16 @@ func StartupJSON(at time.Time, err error) []byte {
 	return append(b, '\n')
 }
 
-// startupDirOK decide si un proceso elevado puede escribir en State: ya existe como carpeta de verdad (el Lstat no la
-// ve como enlace ni junction) y su dueño es exactamente el usuario (no Administradores): State cuelga de una variable de
-// entorno que controla el usuario, y un proceso elevado que escribiera donde él diga le daría un medio de escribir como
-// administrador. Los datos van inyectados para probarlo sin Windows.
-func startupDirOK(fi fs.FileInfo, owner, user string) bool {
-	return fi != nil && fi.Mode().IsDir() && fi.Mode()&(fs.ModeSymlink|fs.ModeIrregular) == 0 &&
-		owner != "" && strings.EqualFold(owner, user)
-}
+// isPrivileged es variable para probar la rama elevada, que en Linux sería root.
+var isPrivileged = Privileged
 
 // WriteStartup deja en dir/macuahuitld.startup la causa err de un arranque fallido, sobrescribiendo la anterior. Mejor
-// esfuerzo: un fallo se ignora. Sin elevar crea dir con MkdirPrivate si falta; elevado (sys.Privileged) NO crea nada ni le
-// cambia la ACL, y solo escribe si startupDirOK. En los dos casos, si el archivo ya existe y no es regular (un enlace) no
-// se toca, y se crea nuevo con OpenNewPrivate después de borrar el anterior, sin seguir enlaces.
-func WriteStartup(dir string, err error) { writeStartup(dir, err, Privileged()) }
-
-func writeStartup(dir string, cause error, elevated bool) {
-	if elevated {
-		fi, err := os.Lstat(dir)
-		if err != nil {
-			return
-		}
-		owner, user, err := startupOwners(dir, fi)
-		if err != nil || !startupDirOK(fi, owner, user) {
-			return
-		}
-	} else if MkdirPrivate(dir) != nil {
+// esfuerzo: un fallo se ignora. Un proceso elevado (sys.Privileged) NO escribe nada, igual que LogFailure: dir sale de una
+// variable de entorno que controla el usuario y validar la ruta y luego abrirla por ruta deja una carrera (una junction
+// puesta en medio redirigiría la escritura elevada). Sin elevar crea dir con MkdirPrivate si falta. Si el archivo ya existe
+// y no es regular (un enlace) no se toca; si lo es, se borra y se crea de nuevo con OpenNewPrivate, sin seguir enlaces.
+func WriteStartup(dir string, cause error) {
+	if isPrivileged() || MkdirPrivate(dir) != nil {
 		return
 	}
 	path := filepath.Join(dir, StartupName)

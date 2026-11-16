@@ -42,9 +42,7 @@ func main() {
 			if !errors.Is(err, ipc.ErrAlreadyRunning) && !sys.Privileged() { // elevado no se escribe en el registro
 				sys.LogFailure(filepath.Join(st, logName), "macuahuitld: "+msg)
 			}
-			if startupWanted(err) {
-				sys.WriteStartup(st, err) // la UI lo lee; elevado solo escribe en un State propia y real (sys.WriteStartup)
-			}
+			writeStartup(st, err, ipc.CoreRunning) // la UI lo lee; un proceso elevado no escribe (sys.WriteStartup)
 		}
 		os.Exit(1)
 	}
@@ -55,6 +53,18 @@ func main() {
 func startupWanted(err error) bool {
 	var ie *i18n.Error
 	return err != nil && (!errors.Is(err, ipc.ErrAlreadyRunning) || (errors.As(err, &ie) && ie.Code == "ipc.err.pipe_other_user"))
+}
+
+// writeStartup deja la causa en macuahuitld.startup si startupWanted y no corre ya un núcleo sano del mismo usuario (una
+// causa vieja sobre un núcleo que sirve sería falsa). running es la sonda, inyectable para probarla; si falla se escribe.
+func writeStartup(state string, err error, running func() (bool, error)) {
+	if !startupWanted(err) {
+		return
+	}
+	if up, rerr := running(); rerr == nil && up {
+		return
+	}
+	sys.WriteStartup(state, err)
 }
 
 // consoleErr es un error con código que se escribe en el idioma de la consola; conserva el código (Unwrap) para macuahuitld.startup.
