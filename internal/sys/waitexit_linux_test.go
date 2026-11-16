@@ -20,8 +20,12 @@ func startSleep(t *testing.T, secs string) *exec.Cmd {
 func TestWaitExitTermina(t *testing.T) {
 	cmd := startSleep(t, "30")
 	go func() { time.Sleep(100 * time.Millisecond); cmd.Process.Kill(); cmd.Wait() }()
+	t0 := time.Now()
 	if err := WaitExit(cmd.Process.Pid, 5*time.Second); err != nil {
 		t.Fatalf("WaitExit = %v", err)
+	}
+	if time.Since(t0) < 80*time.Millisecond {
+		t.Fatal("volvió antes de que el proceso terminara")
 	}
 }
 
@@ -49,10 +53,21 @@ func TestWaitExitYaTerminado(t *testing.T) {
 func TestWaitExitSondeo(t *testing.T) {
 	cmd := startSleep(t, "30")
 	go func() { time.Sleep(100 * time.Millisecond); cmd.Process.Kill(); cmd.Wait() }()
+	t0 := time.Now()
 	if err := waitExitPoll(cmd.Process.Pid, 5*time.Second); err != nil {
 		t.Fatalf("sondeo = %v", err)
 	}
+	if time.Since(t0) < 80*time.Millisecond {
+		t.Fatal("el sondeo volvió antes de que el proceso terminara")
+	}
 	if err := waitExitPoll(cmd.Process.Pid, time.Second); err != nil {
 		t.Fatalf("sondeo ya terminado = %v", err)
+	}
+}
+
+func TestWaitExitSondeoVencePlazo(t *testing.T) {
+	cmd := startSleep(t, "30")
+	if err := waitExitPoll(cmd.Process.Pid, 100*time.Millisecond); err != ErrWaitTimeout {
+		t.Fatalf("sondeo = %v, quería ErrWaitTimeout", err)
 	}
 }
