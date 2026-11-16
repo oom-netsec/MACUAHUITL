@@ -41,3 +41,14 @@ func check(t testing.TB, path string, want os.FileMode, win func(string) (bool, 
 		t.Errorf("%s: modo %v, quería %v", path, fi.Mode().Perm(), want)
 	}
 }
+
+// TempDir es t.TempDir() ya con la DACL protegida de MkdirPrivate (en Linux no cambia nada): lo que la prueba cree
+// adentro la hereda, como bajo las carpetas propias del núcleo, y se comprueba con Inherited.
+func TempDir(t testing.TB) string {
+	t.Helper()
+	d := t.TempDir()
+	if err := sys.MkdirPrivate(d); err != nil {
+		t.Fatal(err)
+	}
+	return d
+}

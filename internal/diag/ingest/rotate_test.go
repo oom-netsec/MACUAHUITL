@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 // testMsg es un evento mínimo con las tres formas de línea del archivo.
@@ -36,7 +38,7 @@ func msg(from, raw string) testMsg {
 func newSink(t *testing.T, r *reloj, edit func(*Sink)) (*Writer, *[]string, *[]string) {
 	t.Helper()
 	var abiertos, borrados []string
-	s := Sink{Dir: filepath.Join(t.TempDir(), "syslog"), Template: "syslog_{fecha}_{hora}", MaxFiles: 100,
+	s := Sink{Dir: filepath.Join(systest.TempDir(t), "syslog"), Template: "syslog_{fecha}_{hora}", MaxFiles: 100,
 		OnOpen: func(p string) { abiertos = append(abiertos, p) }, OnRemove: func(p string) { borrados = append(borrados, p) }}
 	if edit != nil {
 		edit(&s)
@@ -120,11 +122,8 @@ func TestFileNameAndPermissions(t *testing.T) {
 	if len(*abiertos) != 1 || filepath.Base((*abiertos)[0]) != "syslog_20261107_120000.log" {
 		t.Fatalf("abiertos = %v", *abiertos)
 	}
-	st, _ := os.Stat((*abiertos)[0])
-	ds, _ := os.Stat(w.s.Dir)
-	if st.Mode().Perm() != 0o600 || ds.Mode().Perm() != 0o700 {
-		t.Errorf("permisos archivo %v carpeta %v", st.Mode().Perm(), ds.Mode().Perm())
-	}
+	systest.Inherited(t, (*abiertos)[0], 0o600)
+	systest.Inherited(t, w.s.Dir, 0o700)
 	// el mismo segundo y el mismo nombre: se agrega _N, sin pisar
 	w.s.RotateBytes = 1
 	w.Write(msg("192.0.2.1:1", "bb"))

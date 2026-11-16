@@ -2,26 +2,21 @@ package store
 
 import (
 	"database/sql"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 func TestOpenCreates0600(t *testing.T) {
-	p := filepath.Join(t.TempDir(), "m.db")
+	p := filepath.Join(systest.TempDir(t), "m.db")
 	db, err := Open(p)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	fi, err := os.Stat(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fi.Mode().Perm() != 0o600 {
-		t.Fatalf("perm = %o, want 600", fi.Mode().Perm())
-	}
+	systest.Inherited(t, p, 0o600) // en Windows hereda la DACL de la carpeta privada
 }
 
 func TestMigrateIdempotent(t *testing.T) {
