@@ -203,3 +203,7 @@
         (copies a .mpack without an official signature into «My scripts» and <config>/playbooks, editable, without installing it. Shows each item's state:
          new, same, id_conflict or name_conflict; every conflict needs a decision and nothing is ever overwritten. An imported playbook keeps its
          editor-prefixed ID and joins the catalog without a restart)
+  core stop [--timeout 10s]
+        (shuts the core down in an orderly way and waits for its process to exit. With work running (assisted runs, listeners, captures,
+         servers, terminals or armed Patrol jobs) it refuses, lists it and exits 3 without cutting anything. If the core is not running, it says so and
+         exits 0; core stop never starts it. It exits 1 if the time runs out)

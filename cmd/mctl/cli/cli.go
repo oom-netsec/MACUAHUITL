@@ -236,3 +236,22 @@ func (l *List) Set(v string) error { *l = append(*l, v); return nil }
 // Common es la nota de las banderas comunes: no tiene comandos, solo su línea en la ayuda.
 var Common = Area{Usage: `  (cualquier comando: --no-color o NO_COLOR desactivan el color; con --json o sin TTY no hay color)
   (antes del comando: --lang es|en pide los mensajes del núcleo en ese idioma; sin ella, inglés. mctl no lee LC_ALL, LC_MESSAGES ni LANG)`}
+
+// ExitError lleva el código de salida de mctl cuando no es el 1 de siempre (core stop: 3 = el núcleo se negó por
+// trabajo vivo).
+type ExitError struct {
+	Code int
+	Err  error
+}
+
+func (e ExitError) Error() string { return e.Err.Error() }
+func (e ExitError) Unwrap() error { return e.Err }
+
+// ExitCode es el código con que sale mctl ante err: el de un ExitError, o 1.
+func ExitCode(err error) int {
+	var x ExitError
+	if errors.As(err, &x) {
+		return x.Code
+	}
+	return 1
+}

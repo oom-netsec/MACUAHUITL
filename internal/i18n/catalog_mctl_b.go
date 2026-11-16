@@ -153,6 +153,11 @@ func init() {
 		"mctl.forensic.stdin_max": e("la entrada excede {n} MiB", "the input exceeds {n} MiB"),
 		"mctl.forensic.no_source": e("elige una fuente: ARCHIVO (o - para la entrada estándar), --capture o --job TRABAJO", "choose a source: FILE (or - for standard input), --capture or --job JOB"),
 
+		// core
+		"mctl.core.not_running": e("el núcleo no estaba corriendo", "the core was not running"),
+		"mctl.core.stopped":     e("núcleo detenido (PID {pid})", "core stopped (PID {pid})"),
+		"mctl.core.timeout":     e("el núcleo (PID {pid}) no terminó en el plazo", "the core (PID {pid}) did not exit in time"),
+
 		// prefs
 		"mctl.prefs.default": e("de fábrica", "factory default"),
 		"mctl.prefs.show": e("carpeta de salidas: {dir}{suffix}\nrotar_mb: {mb}\nrotar_min: {min}\nmax_archivos: {max}\nformato: {format}",

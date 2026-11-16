@@ -25,6 +25,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/change"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cleaner"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
+	corecmd "github.com/oom-netsec/MACUAHUITL/cmd/mctl/core"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/credrotate"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/devices"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/diag"
@@ -68,12 +69,13 @@ var areas = []cli.Area{
 	scripts.Area(),
 	prefs.Area(),
 	pack.Area(),
+	corecmd.Area(),
 }
 
 func main() {
 	if err := run(os.Args[1:], os.Stdin, os.Stdout); err != nil {
 		printErr(os.Stderr, err)
-		os.Exit(1)
+		os.Exit(cli.ExitCode(err))
 	}
 }
 
