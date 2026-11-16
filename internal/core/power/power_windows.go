@@ -46,7 +46,7 @@ const (
 	hwndMessage                = ^uintptr(2) // (HWND)-3
 )
 
-// Windows no deja bloquear la tapa ni el apagado: eso se reporta siempre como faltante.
+// Windows no deja bloquear la tapa ni el apagado; no se reporta como faltante (ADR 0012 (d)): solo lo que falla.
 type windowsInhibitor struct{}
 
 // NewLogind (nombre histórico, los llamadores no cambian) devuelve el inhibidor de Windows.
@@ -100,7 +100,7 @@ type handlers struct {
 }
 
 var (
-	wins      sync.Map // hwnd -> handlers
+	wins      sync.Map // hwnd -> *handlers
 	classOne  sync.Once
 	classErr  error
 	className = windows.StringToUTF16Ptr("MACUAHUITLPowerWatch")
