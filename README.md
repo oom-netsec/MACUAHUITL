@@ -3,8 +3,8 @@
 <h3 align="center">A TAC in every network engineer's laptop.</h3>
 
 <p align="center">
-Collect evidence from Cisco devices on a schedule, analyze it, change the network safely<br>
-and keep a verifiable record of everything. On your machine. Nowhere else.
+A Linux desktop app for network and TAC engineers. Collect evidence from Cisco devices on a schedule,<br>
+analyze it, change the network safely and keep a verifiable record of everything. On your machine. Nowhere else.
 </p>
 
 <p align="center">
@@ -18,6 +18,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 <p align="center">
   <a href="#install"><b>Install</b></a> &nbsp;·&nbsp;
   <a href="#quick-start"><b>Quick start</b></a> &nbsp;·&nbsp;
+  <a href="#safe-by-design">Safe by design</a> &nbsp;·&nbsp;
   <a href="#everything-inside">Everything inside</a> &nbsp;·&nbsp;
   <a href="#content-packs">Content packs</a> &nbsp;·&nbsp;
   <a href="#supported-platforms-and-packs">Platforms</a> &nbsp;·&nbsp;
@@ -25,6 +26,15 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
   <a href="#what-it-does-not-do">What it does not do</a> &nbsp;·&nbsp;
   <a href="docs/roadmap.md">Roadmap</a>
 </p>
+
+### Why not a folder of scripts?
+
+Scripts collect. MACUAHUITL also runs the collection for you, analyzes it, packages it for TAC and changes the network with guard rails:
+
+- **Collection that runs itself.** Login Test first, explicit arming, rounds on a schedule, and a `.zip` with a `manifest.json` anchored to the audit log.
+- **Analysis included.** 44 analysis rules, round-to-round differences and a correlated timeline over the evidence you collected.
+- **Every change is planned first.** Each line and its exact rollback are shown before anything is sent, and you confirm one step at a time. [How it stays safe](#safe-by-design).
+- **Local and accountable.** Credentials in an encrypted vault, secrets masked in the evidence, every action in a hash-chained audit log.
 
 <br>
 
@@ -44,7 +54,22 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 
 **Changes** come with proof. Capture the same commands before and after a window and get a verdict per device, plus upgrade pre-flight and compliance against golden templates. Anything that touches configuration runs in **assisted change mode**: every command shown first, every step confirmed, the rollback ready.
 
-<br>
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/screens/assist-plan-dark.png" alt="Assisted change plan: the lines to apply next to their exact rollback, and the line that must appear afterwards"><br><sub><b>The plan.</b> The lines to send, next to the rollback that restores the captured configuration, and what the post-check expects.</sub></td>
+    <td width="50%"><img src="docs/assets/screens/assist-confirm-dark.png" alt="Assisted change step waiting for confirmation, with the exact lines that will be sent"><br><sub><b>One step at a time.</b> Each step waits for you with exactly the lines it will send. Roll back or abort at any point.</sub></td>
+  </tr>
+</table>
+
+### Safe by design
+
+Each of these is in the release notes, with what was checked on a real device:
+
+- **Your own session is off limits.** Port templates refuse the port your SSH session arrives on. The SVI, static route and loopback templates refuse a prefix that holds your address, and the vty ACL template refuses a list that would lock you out. On a Catalyst 3560-CX, `shutdown` on the session's port was refused with *"Gi0/3 is the port this session arrives on"* ([v0.6.5](../../releases/tag/v0.6.5)).
+- **Rollback means the configuration as it was.** The write templates were applied, verified and rolled back in the lab runs of [v0.5.4](../../releases/tag/v0.5.4) (Cisco Modeling Labs and a Catalyst 3560-CX) and [v0.6.4](../../releases/tag/v0.6.4) (Catalyst 3560-CX). The configuration was identical after every rollback.
+- **An unknown error stops the change.** Any unrecognized IOS `% …` reply in configuration mode stops the apply and offers the rollback. On the 3560-CX, five templates were applied and rolled back with no false stop ([v0.6.5](../../releases/tag/v0.6.5)).
+- **Recorded before it is sent.** The lines of a change are written to the audit log before they reach the device, and a core restart in the middle of an apply leaves a state the saved rollback can still check ([v0.6.5](../../releases/tag/v0.6.5)).
+- **Secrets are masked** in evidence, terminal recordings, logs and syslog, including most abbreviated IOS forms typed at the terminal. Masking is fuzz-tested and was checked on the [v0.5.0](../../releases/tag/v0.5.0) lab runs. A few rare abbreviated forms are still open; they are listed in the [v0.6.5 notes](../../releases/tag/v0.6.5).
 
 <p align="center"><img src="docs/assets/pro/bento.jpg" alt="One app, the whole job: zero cloud, 96 h armed windows, 44 analysis rules, ACL translation between IOS-XE, NX-OS and ASA, TFTP/FTP/SCP/SFTP/HTTP transfers, hash-chained audit, no privileged code, ping/traceroute/nmap/iperf3/PCAP, English and Spanish, dark and light."></p>
 
