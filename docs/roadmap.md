@@ -130,7 +130,7 @@ The playbooks and scripts for each technology are published as signed `.mpack` p
 
 Starts after 1.0.0 (owner's decision: Linux first, without bugs or vulnerabilities). Today MACUAHUITL is Linux only. The core and `mctl` (Go) and the app (Wails + React) are mostly portable; what is specific to Linux has to be adapted. Windows first, then macOS.
 
-1. **Cross-platform ADR, before touching code**: which features may be missing at first, how it is installed and signed on each system and which code stays per platform (like `internal/sys`).
+1. **Cross-platform ADR, before touching code** (ADR 0012, phase 43): which features may be missing at first, how it is installed and signed on each system and which code stays per platform (like `internal/sys`).
 2. **Linux pieces to adapt**:
    - the local channel between core and clients (today a Unix socket with `SO_PEERCRED`);
    - the memory hardening in `internal/sys` (`mlock`, no core dumps);
