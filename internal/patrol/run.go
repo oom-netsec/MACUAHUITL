@@ -117,13 +117,26 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	}
 	res.Skipped, res.Requested = skipped, requested
 	var pre []string
+	evidence := map[string]bool{} // textos que algún playbook o los comandos propios piden como evidencia (no solo como Pre)
 	if ran, _ := resolve(s, c.platform, d.Playbooks, d.MissingPack); len(ran) > 0 {
 		for _, p := range ran {
 			pre = append(pre, p.Pre...)
 			res.Ran = append(res.Ran, p.ID)
+			if cs, err := p.Expand(paramsOf(p, s.Params)); err == nil {
+				for _, c := range cs {
+					evidence[c.Text] = true
+				}
+			}
 		}
 		if slices.Equal(res.Ran, s.PlaybookIDs) {
 			res.Ran = nil
+		}
+	}
+	if s.CustomCommands != "" {
+		if p, err := playbook.Ephemeral(c.platform, s.CustomCommands); err == nil {
+			for _, cmd := range p.Commands {
+				evidence[cmd.Text] = true
+			}
 		}
 	}
 	dev := Device{Host: res.Hostname, IP: t.Address, Port: t.Port, Platform: c.platform}
@@ -148,7 +161,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			runErr = werr
 		}
 		res.Commands++
-		if runErr == nil && !out.Invalid && !slices.Contains(pre, cmd.Text) { // los Pre son ajustes de sesión, no evidencia
+		if runErr == nil && !out.Invalid && (evidence[cmd.Text] || !slices.Contains(pre, cmd.Text)) { // los Pre son ajustes de sesión, no evidencia
 			complete++
 		}
 		// Una cancelación (fin de ventana o trabajo cancelado) no es un corte del equipo.

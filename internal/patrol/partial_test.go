@@ -472,3 +472,17 @@ func TestSoloPreCompletoFalla(t *testing.T) {
 		t.Fatalf("res = %+v", res)
 	}
 }
+
+// Un texto que es Pre de un playbook y también comando de evidencia (de otro o de los propios) cuenta como salida completa.
+func TestPreQueTambienEsEvidenciaCuenta(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.d.Playbooks = append(e.d.Playbooks, playbook.Playbook{ID: "ios-xe/pre-prueba", Platform: "ios-xe", Name: "pre", Pre: []string{"show ip interface brief"},
+		Commands: []playbook.Command{{Text: "show version", Timeout: time.Minute}, {Text: "show users", Timeout: time.Minute}}})
+	e.spec.PlaybookIDs, e.spec.CustomCommands = []string{"ios-xe/pre-prueba"}, "show ip interface brief\n"
+	newCut(t, e, map[string]error{"show version": platform.ErrPromptTimeout, "show users": platform.ErrPromptTimeout})
+	res, _ := runPartial(t, e, context.Background())
+	if res.State != "partial" {
+		t.Fatalf("res = %+v", res)
+	}
+}

@@ -764,10 +764,10 @@ func parseSerials(text string) []string {
 // Unknown, "-" y los ceros puros, sin distinguir mayúsculas.
 func serialFiller(v string) bool {
 	switch strings.ToLower(v) {
-	case "none", "n/a", "na", "unknown", "-", "null":
+	case "none", "n/a", "na", "unknown", "-", "null", "not": // «Not Available» llega como «Not» (la regex toma \S+)
 		return true
 	}
-	return strings.Trim(v, "0") == ""
+	return strings.Trim(v, "0-") == "" // ceros puros, también un UUID todo en ceros
 }
 
 // Serials son las series que vio Detect (vacío si no trae ninguna): la identidad del equipo, a diferencia del prompt, que
