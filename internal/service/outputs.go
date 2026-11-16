@@ -176,9 +176,9 @@ func windowsOutputsErr(real string, err error) error {
 		if len(rm) == 0 || !strings.HasPrefix(pe.User, "S-1-") {
 			code = "prefs.outputs.permisos" // sin orden: una junction o un tipo de ACE raro no se arreglan con icacls
 		}
-		return outputsErr(code+".windows", "dir", real, "sid", pe.SID, "remove", strings.Join(rm, " "), "user", pe.User)
+		return outputsErr(code+"_win", "dir", real, "sid", pe.SID, "remove", strings.Join(rm, " "), "user", pe.User)
 	case sys.PrivateDirAncestor:
-		return outputsErr("prefs.outputs.ancestro_inseguro.windows", "dir", real, "anc", pe.Path, "sid", pe.SID)
+		return outputsErr("prefs.outputs.ancestro_inseguro_win", "dir", real, "anc", pe.Path, "sid", pe.SID)
 	}
 	return outputsErr("prefs.outputs.ilegible_ruta", "dir", pe.Path, "err", pe.Err)
 }
