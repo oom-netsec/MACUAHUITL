@@ -31,8 +31,26 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  # Corpus completo de mask con -race (en los PR solo corre una muestra) y iosxe sin -race (tamaños grandes): frenan el release.
+  corpus-race:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      MACUAHUITL_CORPUS: full
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: corpus completo con -race
+        run: go test -race -count=1 -timeout 60m ./internal/mask/... ./internal/terminal/...
+      - name: iosxe sin -race
+        run: go test -count=1 ./internal/platform/iosxe/...
+
   release:
-    needs: ui
+    needs: [ui, corpus-race]
     runs-on: ubuntu-latest
     permissions:
       contents: write

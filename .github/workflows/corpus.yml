@@ -1,0 +1,74 @@
+name: corpus
+
+# Corpus completo de mask bajo -race y fuzz largos: lo que el CI de los PR ya no corre
+# con -race (ahí mask usa una muestra con semilla). Diario y a mano; en cada tag lo corre release.yml (frena el release).
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  corpus-race:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      MACUAHUITL_CORPUS: full
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: corpus completo con -race
+        run: go test -race -count=1 -timeout 60m ./internal/mask/... ./internal/terminal/...
+      - name: iosxe sin -race (tamaños grandes, que con -race se saltan)
+        run: go test -count=1 ./internal/platform/iosxe/...
+      - name: abrir issue si falla
+        if: failure() || cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "corpus: falló el corpus completo con -race ($(date -u +%F))" \
+            --body "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Corpus completo (MACUAHUITL_CORPUS=full), sin semilla (no hay muestra)."
+
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: fuzz largos (3 min por función)
+        timeout-minutes: 110
+        run: |
+          set -o pipefail
+          fail=0
+          while IFS=: read -r file name; do
+            pkg="./$(dirname "$file")"
+            echo "::group::$pkg $name"
+            go test -run='^$' -fuzz="^${name}\$" -fuzztime=3m "$pkg" 2>&1 | tee /tmp/fuzz.out || fail=1
+            # un patrón que no coincide sale en verde: se trata como fallo
+            if grep -q 'no fuzz tests to fuzz' /tmp/fuzz.out; then echo "::error::sin fuzz: $pkg $name"; fail=1; fi
+            echo "::endgroup::"
+          done < <(grep -rEo --include='*_test.go' '^func Fuzz[A-Za-z0-9_]+' . | sed -E 's|^\./||; s|:func |:|')
+          exit $fail
+      - name: entradas nuevas del fuzz (el runner se descarta)
+        if: failure()
+        run: git ls-files -o --exclude-standard -z -- '*testdata/fuzz/*' | xargs -0r tail -n +1
+      - name: abrir issue si falla o se vence el tiempo
+        if: failure() || cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "fuzz: falló un fuzz largo ($(date -u +%F))" \
+            --body "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+          Commit: $GITHUB_SHA
+          Revisa el grupo que falló en el log. La entrada que lo rompió se imprime en el paso «entradas nuevas del fuzz»: copiala a testdata/fuzz del paquete."

@@ -9,20 +9,67 @@ permissions:
   contents: read
 
 jobs:
+  # Agregador: conserva el nombre «go» (check requerido de la protección de main).
+  # if: always() + comprobación explícita, porque un job saltado cuenta como éxito.
   go:
+    needs: [go-race-core, go-race-rest, go-race-mask, go-checks]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: todos los jobs de Go en verde
+        run: |
+          [[ "${{ needs.go-race-core.result }}" == success && "${{ needs.go-race-rest.result }}" == success && "${{ needs.go-race-mask.result }}" == success && "${{ needs.go-checks.result }}" == success ]]
+
+  go-race-core:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
+      - name: test -race (core, platform, cmd, service)
+        run: |
+          set -o pipefail
+          tools/ci/pkgs.sh core | xargs go test -race
+
+  go-race-rest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: test -race (todo lo demás menos mask)
+        run: |
+          set -o pipefail
+          tools/ci/pkgs.sh rest | xargs go test -race
+
+  go-race-mask:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: mask con -race (muestra con semilla del día; MACUAHUITL_SEED la fija)
+        run: |
+          set -o pipefail
+          tools/ci/pkgs.sh mask | xargs go test -race -count=1
+
+  go-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: reparto de paquetes entre jobs (core, rest, mask)
+        run: tools/ci/pkgs.sh check
       - name: gofmt
         run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       - name: vet
         run: go vet ./...
-      - name: test
-        run: go test -race ./...
-      - name: mask sin -race
+      - name: mask sin -race (corpus completo)
         run: go test -count=1 ./internal/mask/... ./internal/terminal/...
       - name: noegress
         run: go run ./tools/noegress/cmd/noegress ./...
