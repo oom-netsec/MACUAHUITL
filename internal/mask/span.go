@@ -74,35 +74,46 @@ var spProse = map[string]bool{"mismatch": true, "failed": true, "expired": true,
 // commandSpans devuelve, para un comando tecleado o citado, los tramos [s, t) del original que Command tapa: uno por
 // segmento « ; » (NX-OS), desde el valor (el token que sigue a la palabra de secreto) hasta el fin del segmento. No
 // combina nada con las reglas: de eso se encarga cut.
-func commandSpans(block, cmd string) [][2]int {
-	sp := spansIn(block, cmd, false)
+func commandSpans(block, cmd string, split bool) [][2]int {
+	sp := spansIn(block, cmd, false, split)
 	if n := normSpaces(cmd); n != cmd { // IOS toma el NBSP como parte del token: se prueba el original y la copia, y se juntan
-		sp = mergeSpans(append(sp, spansIn(block, n, false)...))
+		sp = mergeSpans(append(sp, spansIn(block, n, false, split)...))
 	}
 	return sp
 }
 
 // spansIn es commandSpans; quoted: cmd es un texto citado entre comillas («token X» es una palabra más y la prosa de la
 // lista spProse no es un comando).
-func spansIn(block, cmd string, quoted bool) (spans [][2]int) {
+//
+// split: la plataforma separa comandos con « ; » (NX-OS, ISE). Sin ella (IOS, o plataforma desconocida) un « ; » puede ser
+// parte del valor: el tramo llega hasta el fin de la línea y se tapa de más, nunca de menos.
+func spansIn(block, cmd string, quoted, split bool) (spans [][2]int) {
 	pos := 0
 	for _, seg := range strings.Split(cmd, spSep) { // cada comando de NX-OS por separado: el primero de cada uno decide
 		spans = append(spans, shiftSpans(spansSeg(block, seg, quoted), pos)...)
 		pos += len(seg) + len(spSep)
 	}
+	if !split { // un « ; » puede ser del valor: el primer tramo se alarga hasta el fin de la línea
+		if len(spans) > 0 {
+			spans = [][2]int{{spans[0][0], len(cmd)}}
+		}
+	}
 	return spans
 }
 
+// splitsSemi: la plataforma usa « ; » como separador de comandos.
+func splitsSemi(platform string) bool { return platform == "nx-os" || platform == "ise" }
+
 func spansSeg(block, cmd string, quoted bool) (spans [][2]int) {
 	toks := spToken.FindAllStringIndex(cmd, -1)
+	n := len(toks) // las palabras de secreto se buscan hasta la barra; el valor, una vez hallada la palabra, llega al fin
 	for i, t := range toks {
-		if cmd[t[0]:t[1]] == "|" { // lo que sigue a la barra es un filtro, no un secreto
-			toks = toks[:i]
+		if cmd[t[0]:t[1]] == "|" { // lo que sigue a la barra es un filtro de un show, no un secreto; en un comando con secreto no hay filtro
+			n = i
 			break
 		}
 	}
-	n := len(toks)
-	if t := toks[max(n-1, 0):]; quoted && len(t) == 1 && t[0][1]-t[0][0] > 1 && cmd[t[0][1]-1] == '"' && cmd[t[0][0]] != '"' { // la comilla que cierra la cita no es del último token
+	if t := toks[max(len(toks)-1, 0):]; quoted && len(t) == 1 && t[0][1]-t[0][0] > 1 && cmd[t[0][1]-1] == '"' && cmd[t[0][0]] != '"' { // la comilla que cierra la cita no es del último token
 		t[0][1]--
 	}
 	tok := func(i int) string { return cmd[toks[i][0]:toks[i][1]] }
@@ -136,19 +147,18 @@ func spansSeg(block, cmd string, quoted bool) (spans [][2]int) {
 		// «snmp-server host IP …»: la community va por posición (tras vrf, informs, version…): se tapa todo lo que sigue a la IP.
 		// «tacacs-server k X»: IOS acepta «k» por key justo tras tacacs-server o radius-server.
 		// «ip nhrp authentication X»: ahí «authentication» sí lleva el secreto.
-		nhrp := i == first+2 && spPrefix("nhrp", low(first+1), 2) && spPrefix("authentication", low(i), 4)
+		// «standby 1 authentication X» / «glbp 1 authentication X»: igual, tras el número de grupo.
+		nhrp := i == first+2 && spPrefix("authentication", low(i), 4) && (spPrefix("nhrp", low(first+1), 2) ||
+			(spPrefix("standby", low(first), 3) || spPrefix("glbp", low(first), 2)) && spDigits.MatchString(tok(first+1)))
 		short := i == first+1 && low(i) == "k" && (spPrefix("tacacs-server", low(first), 5) || spPrefix("radius-server", low(first), 5))
 		if !(host && i == first+2) && !short && !nhrp && (!spKeyword(tok(i), quoted && !spPrefix("license", low(first), 3), block, i == first) || notKeyword(low, tok, i, first, n, block)) {
 			continue
 		}
 		j := i + 1
-		if j >= n || tok(j) == ";" || notSecretValue(low, i, j, first, n) || quoted && spProse[low(j)] {
+		if j >= n || notSecretValue(low, i, j, first, n) || quoted && spProse[low(j)] {
 			continue
 		}
-		e := j
-		for e < n && tok(e) != ";" { // « ; » separa comandos en NX-OS
-			e++
-		}
+		e := len(toks) // hasta el fin del segmento, también pasada una barra o un « ; » (con split, el segmento ya no los trae)
 		if onlyMasked(cmd, toks[j:e]) { // el único valor ya está tapado (con su tipo)
 			i = e - 1
 			continue
@@ -195,8 +205,8 @@ func structWord(w string, m map[string]bool) bool {
 // spAlgoExacto: algoritmos de verdad (no cualquier palabra que empiece con sha, aes o hmac: «Shadow2024x» es una contraseña).
 var spAlgoExacto = regexp.MustCompile(`(?i)^(?:sha(?:-?(?:1|2|224|256|384|512))?|hmac-?(?:md5|sha(?:-?(?:1|2|224|256|384|512))?(?:-(?:256|384|512))?)(?:-96)?|aes-?(?:128|192|256)(?:-cmac)?|cmac(?:-aes-128)?)$`)
 
-// SecretValues devuelve los valores que Command tapó en un tramo (lo que sigue a una palabra de secreto): el primer
-// token tras cada palabra de secreto del tramo que no sea un tipo (0-9), un algoritmo, otra palabra de secreto ni
+// SecretValues devuelve los valores que Command tapó en un tramo (lo que sigue a una palabra de secreto): cada
+// token del tramo que no sea un tipo (0-9), un algoritmo, otra palabra de secreto ni
 // estructura del comando, y que sirva para tapar su repetición por contenido (spValue). Un tramo de un solo token es
 // ese valor. Sirve para que la terminal tape el valor, y no «RO» o «level», si luego lo ve repetido en un eco.
 func SecretValues(span string) []string {
@@ -227,9 +237,7 @@ func SecretValues(span string) []string {
 			continue
 		}
 		vals = append(vals, v)
-		// el resto del valor (tipo 0 con espacios) y lo que sigue hasta la próxima palabra de secreto no se mira
-		for i++; i < len(toks) && !spKeyword(toks[i], false, spLogBlock, false) && !localRemote(strings.ToLower(toks[i])); i++ {
-		}
+		i++ // un secreto de varias palabras («Pa55w0rd Xq7z9»): cada palabra que pase los mismos filtros también se recuerda
 	}
 	return vals
 }

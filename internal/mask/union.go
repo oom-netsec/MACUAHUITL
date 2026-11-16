@@ -147,7 +147,7 @@ func loggedSpans(line, platform string) [][2]int {
 		ind = ind[:len(ind)-len(strings.TrimLeft(ind, " \t"))]
 		return shiftSpans(loggedSpans(ind+line[m[4]:], platform), m[4]-len(ind))
 	}
-	at := func(m []int) [][2]int { return shiftSpans(spansIn(spLogBlock, line[m[4]:m[5]], false), m[4]) }
+	at := func(m []int) [][2]int { return shiftSpans(spansIn(spLogBlock, line[m[4]:m[5]], false, splitsSemi(platform)), m[4]) }
 	if m := loggedCmd.FindStringSubmatchIndex(line); m != nil {
 		return at(m)
 	}
@@ -180,7 +180,7 @@ func quotedSpans(line string) (spans [][2]int) {
 		return nil
 	}
 	if strings.Count(line, `"`)%2 == 1 {
-		return shiftSpans(spansIn("", line[first+1:], true), first+1)
+		return shiftSpans(spansIn("", line[first+1:], true, false), first+1)
 	}
 	pos := first + 1
 	for k := 0; pos <= len(line); k++ {
@@ -189,7 +189,7 @@ func quotedSpans(line string) (spans [][2]int) {
 			end = pos + j
 		}
 		if seg := line[pos:end]; k%2 == 0 {
-			sp := spansIn("", seg, true)
+			sp := spansIn("", seg, true, false)
 			reach := len(sp) > 0 && sp[len(sp)-1][1] == len(seg) // antes de mover los tramos
 			spans = append(spans, shiftSpans(sp, pos)...)
 			// El valor trae comillas propias («enable secret "x y"», «secret x"y»): la comilla que cierra el tramo lo abre.
@@ -237,7 +237,7 @@ func CutCommand(block, orig, s1 string) (string, []string) {
 		orig = strings.ReplaceAll(orig, `\"`, `"`)
 	}
 	n := normSpaces(orig) // mismos índices que orig: los tramos y los valores salen de los dos textos
-	spans := append(commandSpans(block, orig), quotedSpans(orig)...)
+	spans := append(commandSpans(block, orig, false), quotedSpans(orig)...)
 	if n != orig {
 		spans = append(spans, quotedSpans(n)...) // commandSpans ya probó la copia
 	}
@@ -255,7 +255,15 @@ func CutCommand(block, orig, s1 string) (string, []string) {
 		}
 	}
 	out, _ := cut(orig, s1, spans)
-	return out, vals
+	seen := map[string]bool{}
+	uniq := vals[:0]
+	for _, v := range vals {
+		if !seen[v] {
+			seen[v] = true
+			uniq = append(uniq, v)
+		}
+	}
+	return out, uniq
 }
 
 // CutText es el corte para un texto de log (varias líneas ya unidas en una): s1 es la salida de la cadena de reglas
@@ -268,6 +276,26 @@ func CutText(platform, orig, s1 string) string {
 
 // endsInKeyword: el tramo termina en una palabra de secreto que aún no tiene valor.
 func endsInKeyword(seg string) bool {
-	d := spansIn("", seg+" X", true)
+	d := spansIn("", seg+" X", true, false)
 	return len(d) > 0 && d[len(d)-1][0] == len(seg)+1
+}
+
+// SecretStart devuelve dónde empieza, en cmd (tecleado, con el bloque del prompt), lo que Command tapa; -1 si no tapa nada.
+// Sirve para saber qué parte de un eco partido por un syslog cae dentro del secreto.
+func SecretStart(block, cmd string) int {
+	cmd = strings.ReplaceAll(cmd, `\"`, `"`)
+	spans := append(commandSpans(block, cmd, false), quotedSpans(cmd)...)
+	if n := normSpaces(cmd); n != cmd {
+		spans = append(spans, quotedSpans(n)...)
+	}
+	if len(spans) == 0 {
+		return -1
+	}
+	return mergeSpans(spans)[0][0]
+}
+
+// CutFrom es el corte de s1 (la salida de la cadena de reglas sobre orig) de orig[from:] hasta el fin de la línea.
+func CutFrom(orig, s1 string, from int) string {
+	out, _ := cut(orig, s1, [][2]int{{min(from, len(orig)), len(orig)}})
+	return out
 }

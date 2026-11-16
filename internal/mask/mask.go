@@ -688,7 +688,7 @@ func Cmd(platform, cmd string) string {
 	counts := map[string]int{}
 	lines := strings.Split(cmd, "\n")
 	for i, l := range lines {
-		lines[i], _ = cut(l, maskLogged(l, platform, counts), commandSpans(spLogBlock, l))
+		lines[i], _ = cut(l, maskLogged(l, platform, counts), commandSpans(spLogBlock, l, splitsSemi(platform)))
 	}
 	return strings.Join(lines, "\n")
 }
