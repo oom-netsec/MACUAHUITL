@@ -11,7 +11,7 @@ fmt='{{with .Module}}{{if not .Main}}{{.Path}} {{.Dir}}{{end}}{{end}}'
 mods=$( { go list -deps -f "$fmt" ./cmd/...; go list -e -tags 'wails gtk3' -deps -f "$fmt" ./ui; } | sort -u)
 seccion() { # nombre carpeta
   local files=("$2"/{LICEN[CS]E,COPYING,NOTICE}*)
-  ((${#files[@]})) || { echo "sin archivo de licencia: $1 ($2)" >&2; exit 1; }
+  ((${#files[@]})) || { echo "no license file: $1 ($2)" >&2; exit 1; }
   printf '\n\n======== %s ========\n' "$1"
   for p in "${files[@]}"; do
     printf '\n--- %s ---\n\n' "${p##*/}"
