@@ -130,3 +130,35 @@ func TestMarcaRecorteNuncaMuestraMas(t *testing.T) {
 		t.Errorf("%d violaciones en total", malos)
 	}
 }
+
+// Cuando la sombra de la marca tapa lo mismo que S1, no se corta nada de más: la salida y los conteos son los de sin marca.
+func TestMarcaRecorteNoTapaDeMasSiCoinciden(t *testing.T) {
+	for _, l := range []string{
+		"snmp-server user U G v3 auth sha Zq00001 priv aes 128 Zq00002",
+		`description "a\"b" ok`,
+		"enable secret 9 Zq00003",
+	} {
+		con, cc := mask.Apply("ios-xe", marcaRecorte+"\n"+l+"\n")
+		sin, cs := mask.Apply("ios-xe", l+"\n")
+		if con != marcaRecorte+"\n"+sin || cc["secret"] != cs["secret"] || len(cc) != len(cs) {
+			t.Errorf("%q:\n con %q %v\n sin %q %v", l, con, cc, sin, cs)
+		}
+	}
+}
+
+// El equipo imprime la marca dentro de una tabla isakmp y después viene un prompt: la sombra de la marca no sigue en la
+// tabla ni tapa lo que sigue (la salida normal de un comando posterior).
+func TestMarcaRecorteNoSobreviveAlPrompt(t *testing.T) {
+	f := func(r sesionRec) {
+		r.Output([]byte("R1#"))
+		r.Input([]byte("show crypto isakmp key\r"))
+		r.Output([]byte("show crypto isakmp key\r\nKeyring      Hostname/Address      Preshared Key\r\n\r\ndefault      10.1.1.1              Zq00005\r\n" + marcaRecorte + "\r\nR1#"))
+		r.Input([]byte("show clock\r"))
+		r.Output([]byte("show clock\r\n10:00:00.000 UTC Mon Nov 16 2026\r\nR1#"))
+		r.Close()
+	}
+	got := grabar(nuevo, f)
+	if !strings.Contains(got, "10:00:00.000 UTC Mon Nov 16 2026") {
+		t.Fatalf("la salida normal quedó tapada:\n%s", got)
+	}
+}

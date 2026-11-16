@@ -365,21 +365,22 @@ func (s *Stream) LineS1(raw string) (string, bool) {
 	}
 	out, ok := s.line1(raw)
 	if s.shadow != nil {
-		s.shadowSpans(raw, ok)
+		s.shadowSpans(raw, out, ok)
 	}
 	return out, ok
 }
 
-// shadowSpans corre la sombra b (la v0.6.5 con la marca como una línea más) sobre raw y suma a s.twin lo que ella tapa y S1
-// (a) no: CutLine lo corta sobre la salida de a. La salida es la unión de a y b; nunca muestra más que ref065 con la marca
-// ni sin ella. La sombra solo existe tras una marca (salidas de más de 64 MiB) y dura hasta el fin del flujo.
-func (s *Stream) shadowSpans(raw string, okA bool) {
+// shadowSpans corre la sombra b (la v0.6.5 con la marca como una línea más) sobre raw y, si su salida difiere de la de a
+// (outA), suma a s.twin lo que b tapa y a no: CutLine lo corta sobre la salida de a. La salida es la unión de a y b; nunca
+// muestra más que ref065 con la marca ni sin ella. La sombra solo existe tras una marca (salidas de más de 64 MiB) y dura
+// hasta el fin del flujo o el siguiente prompt (Prompted).
+func (s *Stream) shadowSpans(raw, outA string, okA bool) {
 	line, eol := splitEOL(raw)
 	t, okB := s.shadow.line1(raw)
 	switch {
 	case !okB && okA: // b descarta la línea (cuerpo de una llave): a la deja entera, se tapa entera
 		s.twin = append(s.twin, [2]int{0, len(line)})
-	case okB:
+	case okB && t != outA: // si b tapa lo mismo que a no se suma nada: no se pierde el tipo del marcador ni sube el conteo
 		s.twin = append(s.twin, diffSpans(line, strings.TrimSuffix(t, eol))...)
 	}
 }
@@ -630,8 +631,9 @@ func (s *Stream) Prompted(line, block string) string {
 	if s.counts == nil {
 		s.counts = map[string]int{}
 	}
-	s.table = "" // ni una tabla de show sigue abierta tras un prompt
-	s.skip = ""  // un prompt no es cuerpo de llave ni de certificado: lo que esté abierto termina aquí
+	s.table = ""   // ni una tabla de show sigue abierta tras un prompt
+	s.shadow = nil // ni la sombra de una marca de recorte: su tabla tampoco sigue abierta
+	s.skip = ""    // un prompt no es cuerpo de llave ni de certificado: lo que esté abierto termina aquí
 	if line != "" {
 		s.block = blockOf(line)
 	}
