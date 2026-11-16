@@ -143,6 +143,7 @@ type PrivateDirError struct {
 	Path   string
 	SID    string   // los SID ajenos separados por coma
 	SIDs   []string // los mismos, uno por elemento
+	User   string   // el SID del usuario que corre el núcleo (para la orden icacls); vacío si no se pudo leer
 	Err    error
 }
 

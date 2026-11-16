@@ -307,7 +307,11 @@ func PrivateDir(path string) error {
 		return &PrivateDirError{Reason: PrivateDirOwner, Path: path, SID: owner, SIDs: []string{owner}}
 	}
 	if sids := foreignSIDs(aces, user.String(), anyAccess, false); len(sids) > 0 {
-		return &PrivateDirError{Reason: PrivateDirACL, Path: path, SID: strings.Join(sids, ", "), SIDs: sids}
+		pe := &PrivateDirError{Reason: PrivateDirACL, Path: path, SID: strings.Join(sids, ", "), SIDs: sids}
+		if u, err := currentSID(); err == nil {
+			pe.User = u.String()
+		}
+		return pe
 	}
 	for a := filepath.Dir(path); ; a = filepath.Dir(a) {
 		_, _, aces, err := readACL(a)
