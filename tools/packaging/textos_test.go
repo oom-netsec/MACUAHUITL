@@ -1,12 +1,15 @@
 package packaging
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
 )
 
 func leer(t *testing.T, partes ...string) string {
@@ -76,6 +79,21 @@ func TestReadmeCuentaPlaybooksDePacks(t *testing.T) {
 		pbs, _ := filepath.Glob(filepath.Join(repoRoot(), "packs", f[1], "playbooks", "*.yaml"))
 		if n, _ := strconv.Atoi(f[2]); n != len(pbs) {
 			t.Errorf("README dice %d playbooks en oom/%s; packs/%s/playbooks trae %d", n, f[1], f[1], len(pbs))
+		}
+	}
+}
+
+// El README (tabla y texto alternativo de bento.jpg) dice cuántas reglas de análisis trae el núcleo; render.cjs dibuja el mismo
+// número en la imagen.
+func TestReadmeCuentaReglas(t *testing.T) {
+	rules, err := analyze.DefaultRules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	readme := leer(t, "README.md")
+	for _, want := range []string{fmt.Sprintf("%d analysis rules", len(rules)), fmt.Sprintf("%d rules over", len(rules))} {
+		if !strings.Contains(readme, want) {
+			t.Errorf("README sin %q (el núcleo trae %d reglas; regenera bento.jpg con docs/assets/pro/src/render.cjs)", want, len(rules))
 		}
 	}
 }

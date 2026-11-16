@@ -46,7 +46,7 @@ and keep a verifiable record of everything. On your machine. Nowhere else.
 
 <br>
 
-<p align="center"><img src="docs/assets/pro/bento.jpg" alt="One app, the whole job: zero cloud, 96 h armed windows, 27 analysis rules, ACL translation between IOS-XE, NX-OS and ASA, TFTP/FTP/SCP/SFTP/HTTP transfers, hash-chained audit, no privileged code, ping/traceroute/nmap/iperf3/PCAP, English and Spanish, dark and light."></p>
+<p align="center"><img src="docs/assets/pro/bento.jpg" alt="One app, the whole job: zero cloud, 96 h armed windows, 44 analysis rules, ACL translation between IOS-XE, NX-OS and ASA, TFTP/FTP/SCP/SFTP/HTTP transfers, hash-chained audit, no privileged code, ping/traceroute/nmap/iperf3/PCAP, English and Spanish, dark and light."></p>
 
 <br>
 
