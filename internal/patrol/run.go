@@ -128,7 +128,8 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 	dev := Device{Host: res.Hostname, IP: t.Address, Port: t.Port, Platform: c.platform}
 	roundStart := d.Now()
 	var bytes int64
-	complete := 0 // comandos con salida completa
+	complete := 0 // comandos con salida completa y que no es inválida
+	var firstCut error
 	for i, cmd := range cmds {
 		emit(Progress{Target: hp, State: "running", Command: cmd.Text, Index: i + 1, Total: len(cmds), Bytes: bytes})
 		cctx, cancel := context.WithTimeout(ctx, maxCmd(cmd.Timeout)) // el timeout es de inactividad: esto es el tope total
@@ -146,11 +147,14 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			runErr = werr
 		}
 		res.Commands++
-		if runErr == nil {
+		if runErr == nil && !out.Invalid {
 			complete++
 		}
 		// Una cancelación (fin de ventana o trabajo cancelado) no es un corte del equipo.
 		cut := runErr != nil && ctx.Err() == nil && (errors.Is(cutErr, platform.ErrPromptTimeout) || errors.Is(cutErr, platform.ErrClosed))
+		if cut && firstCut == nil {
+			firstCut = cutErr
+		}
 		shown := cmd.Text // el comando cortado va a la auditoría, al detalle y al manifest: con el mismo enmascarado que la evidencia
 		if !s.DisableMasking {
 			shown = mask.Cmd(c.platform, cmd.Text)
@@ -188,8 +192,8 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			continue
 		}
 		if runErr != nil {
-			if cut && werr == nil && !errors.Is(cutErr, ErrWindowEnded) && i == len(cmds)-1 && (res.Reconnects < maxReconnects || complete > 0) {
-				res.CutCommands = append(res.CutCommands, shown) // el último cortado: partial, sin reconectar (agotadas las reconexiones, solo si hay alguna salida completa)
+			if cut && werr == nil && !errors.Is(cutErr, ErrWindowEnded) && i == len(cmds)-1 {
+				res.CutCommands = append(res.CutCommands, shown) // el último cortado: partial, sin reconectar (partial o failed lo decide el cierre)
 				continue
 			}
 			if cut {
@@ -201,6 +205,11 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		}
 	}
 	res.State = "completed"
+	if len(res.CutCommands) > 0 && complete == 0 { // sin una sola salida completa y válida no hay nada que conservar: failed
+		res.State, res.Detail, res.DetailErr = "failed", firstCut.Error(), firstCut
+		emit(Progress{Target: hp, State: res.State, Detail: res.Detail, Err: res.DetailErr})
+		return res
+	}
 	if len(res.CutCommands) > 0 {
 		res.State = "partial"
 		res.DetailErr = i18n.New("patrol.dev.partial", i18n.A("cut", len(res.CutCommands), "reconnects", res.Reconnects, "first", res.CutCommands[0]))

@@ -381,3 +381,38 @@ func fp(b []byte) string {
 	h := sha256.Sum256(b)
 	return "SHA256:" + base64.RawStdEncoding.EncodeToString(h[:])
 }
+
+// Partial solo con al menos una salida completa que no sea inválida: si todo se cortó (o lo demás fue inválido) el equipo
+// queda failed, con 1, 2 o 3 comandos y sin importar las reconexiones.
+func TestTodoCortadoOSoloInvalidoFalla(t *testing.T) {
+	cortes := func(cs ...string) map[string]error {
+		m := map[string]error{}
+		for _, c := range cs {
+			m[c] = platform.ErrPromptTimeout
+		}
+		return m
+	}
+	for name, c := range map[string]struct {
+		cmds string
+		cut  map[string]error
+	}{
+		"uno":                     {"show version", cortes("show version")},
+		"dos":                     {"show version\nshow users", cortes("show version", "show users")},
+		"tres":                    {"show version\nshow users\nshow running-config", cortes("show version", "show users", "show running-config")},
+		"un invalido y dos":       {"show clock\nshow version\nshow users", cortes("show version", "show users")},
+		"uno completo y un corte": {"show version\nshow users", cortes("show users")}, // este sí es partial
+	} {
+		e := newEnv(t, simulator.Config{})
+		e.trust(t)
+		e.spec.CustomCommands = c.cmds
+		newCut(t, e, c.cut)
+		res, _ := runPartial(t, e, context.Background())
+		want := "failed"
+		if strings.HasPrefix(name, "uno completo") {
+			want = "partial"
+		}
+		if res.State != want || (want == "failed" && res.DetailErr == nil) {
+			t.Errorf("%s: res = %+v", name, res)
+		}
+	}
+}
