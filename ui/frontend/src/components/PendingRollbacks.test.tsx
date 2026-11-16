@@ -376,3 +376,30 @@ test("secreto generado con usuario rotado: sin «si no la actualizaste a mano» 
   expect(screen.queryByText(/si no la actualizaste a mano/)).toBeNull();
   expect(screen.getByText(/nadie la conoce/)).toBeInTheDocument();
 });
+
+// Auditoría 2: si la rotación guardó (write memory) y la reversa no guarda, un reinicio vuelve a cargar la contraseña nueva.
+test("rotación con write memory y secreto generado: aplicar la reversa pide guardar después", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", generatedSecret: true, writeMemory: true })])} />);
+  const n = await screen.findByText(/nadie la conoce/);
+  expect(n).toHaveTextContent(/apliques esta reversa y después guardes la configuración \(write memory\)/);
+  expect(n).toHaveTextContent(/tras un reinicio el equipo volvería a cargar la contraseña nueva/);
+  expect(n).not.toHaveTextContent(/Para volver a la contraseña anterior/); // una sola frase, no las dos
+});
+
+test("rotación con write memory sin secreto generado: una frase pide guardar después de la reversa", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", rotatedUser: "netops", updateCredentialId: "c1", writeMemory: true })])} />);
+  expect(await screen.findByText(/Para volver a la contraseña anterior, aplica la reversa y después guarda la configuración \(write memory\)\. La reversa no la guarda/)).toBeInTheDocument();
+  expect(screen.queryByText(/nadie la conoce/)).toBeNull();
+});
+
+test("rotación sin write memory: el aviso no pide guardar", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", generatedSecret: true })])} />);
+  expect(await screen.findByText(/nadie la conoce/)).not.toHaveTextContent(/write memory/);
+  expect(screen.queryByText(/La reversa no la guarda/)).toBeNull();
+});
+
+test("rotación sin write memory ni secreto generado: tampoco pide guardar", async () => {
+  render(<PendingRollbacks core={coreWith([rb({ kind: "credrotate", rotatedUser: "netops", updateCredentialId: "c1" })])} />);
+  expect(await screen.findByText(/contraseña nueva de netops/)).toBeInTheDocument();
+  expect(screen.queryByText(/La reversa no la guarda/)).toBeNull();
+});
