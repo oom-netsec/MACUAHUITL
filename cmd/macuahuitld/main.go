@@ -34,10 +34,18 @@ func main() {
 		return
 	}
 	if err := run(sys.Harden); err != nil {
-		fmt.Fprintln(os.Stderr, "macuahuitld:", err)
+		msg := i18n.In(consoleLang, err)
+		fmt.Fprintln(os.Stderr, "macuahuitld:", msg)
+		// Sin consola el error se perdería: va al registro, salvo si otro núcleo ya tiene el canal (no se toca su registro).
+		if st := core.ResolvePaths(os.Getenv).State; st != "" && !errors.Is(err, ipc.ErrAlreadyRunning) {
+			sys.LogFailure(filepath.Join(st, logName), "macuahuitld: "+msg)
+		}
 		os.Exit(1)
 	}
 }
+
+// logName es el registro del núcleo dentro de State (Windows, ADR 0012 g).
+const logName = "macuahuitld.log"
 
 // consoleLang es el idioma de lo que el daemon imprime en su consola; sin --lang, el canónico (inglés).
 var consoleLang = i18n.En
@@ -76,7 +84,7 @@ func run(harden func() ([]i18n.Text, error)) error {
 		return err
 	}
 	// Sin consola (-H windowsgui) la salida va a <State>\macuahuitld.log; en Linux no hace nada (stderr, journal).
-	if err := sys.RedirectStderr(filepath.Join(p.State, "macuahuitld.log")); err != nil {
+	if err := sys.RedirectStderr(filepath.Join(p.State, logName)); err != nil {
 		l.Close()
 		return err
 	}

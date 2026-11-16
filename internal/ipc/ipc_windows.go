@@ -11,6 +11,8 @@ import (
 	"github.com/Microsoft/go-winio"
 	"golang.org/x/sys/windows"
 	"google.golang.org/grpc"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // Pipe de Windows (ADR 0012 a). go-winio (MIT) crea el pipe con NtCreateNamedPipeFile: la primera instancia con
@@ -37,8 +39,9 @@ func SocketPath() (string, error) {
 	return `\\.\pipe\macuahuitl-` + sid, nil
 }
 
-// pipeSDDL es la DACL protegida con un solo acceso: el SID del usuario. Sin Everyone, sin Usuarios, sin herencia.
-func pipeSDDL(sid string) string { return "D:P(A;;GA;;;" + sid + ")" }
+// pipeSDDL fija el dueño del pipe (con un token elevado el dueño por omisión sería Administradores) y una DACL protegida
+// con un solo acceso: el SID del usuario. Sin Everyone, sin Usuarios, sin herencia. El dueño lo lee dialPipe.
+func pipeSDDL(sid string) string { return "O:" + sid + "D:P(A;;GA;;;" + sid + ")" }
 
 // Listen crea el pipe name solo para el usuario actual y solo acepta clientes cuyo proceso tenga su mismo SID.
 // ErrAlreadyRunning si el nombre ya existe.
@@ -48,7 +51,10 @@ func Listen(name string) (net.Listener, error) {
 		return nil, fmt.Errorf("ipc: %w", err)
 	}
 	l, err := winio.ListenPipe(name, &winio.PipeConfig{SecurityDescriptor: pipeSDDL(sid), InputBufferSize: 64 << 10, OutputBufferSize: 64 << 10})
-	if errors.Is(err, windows.ERROR_ALREADY_EXISTS) || errors.Is(err, windows.ERROR_ACCESS_DENIED) || errors.Is(err, windows.ERROR_PIPE_BUSY) {
+	if errors.Is(err, windows.ERROR_ACCESS_DENIED) { // el nombre existe y su DACL no nos deja ni crear otra instancia: lo tiene otro usuario
+		return nil, i18n.Wrap("ipc.err.pipe_other_user", ErrAlreadyRunning, nil)
+	}
+	if errors.Is(err, windows.ERROR_ALREADY_EXISTS) || errors.Is(err, windows.ERROR_PIPE_BUSY) {
 		return nil, fmt.Errorf("%w (%v)", ErrAlreadyRunning, err)
 	}
 	if err != nil {
@@ -98,6 +104,23 @@ func pipeSID(c net.Conn, get func(windows.Handle, *uint32) error) (string, error
 	return pidSID(pid)
 }
 
+// pipeOwner es el SID del dueño del objeto pipe al que c está conectado.
+func pipeOwner(c net.Conn) (string, error) {
+	f, ok := c.(interface{ Fd() uintptr })
+	if !ok {
+		return "", errors.New("ipc: la conexión no es un pipe")
+	}
+	sd, err := windows.GetSecurityInfo(windows.Handle(f.Fd()), windows.SE_KERNEL_OBJECT, windows.OWNER_SECURITY_INFORMATION)
+	if err != nil {
+		return "", err
+	}
+	o, _, err := sd.Owner()
+	if err != nil || o == nil {
+		return "", errors.New("ipc: el pipe no tiene dueño")
+	}
+	return o.String(), nil
+}
+
 func pidSID(pid uint32) (string, error) {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
@@ -128,8 +151,18 @@ func dialPipe(ctx context.Context, name string) (net.Conn, uint32, error) {
 		c.Close()
 		return nil, 0, fmt.Errorf("ipc: %w", err)
 	}
-	pid, err := pidOf(c, windows.GetNamedPipeServerProcessId)
+	// El PID solo no basta: GetNamedPipeServerProcessId da el de quien creó la instancia aunque ya haya muerto, y otro
+	// proceso pudo heredar ese PID. El dueño del objeto pipe (fijado en pipeSDDL) no se puede reutilizar así: se
+	// comprueba además. Con el handle del cliente, que ya tiene READ_CONTROL.
+	owner, err := pipeOwner(c)
+	if err == nil && !sameSID(owner, own) {
+		err = errors.New("dueño distinto")
+	}
+	var pid uint32
 	var sid string
+	if err == nil {
+		pid, err = pidOf(c, windows.GetNamedPipeServerProcessId)
+	}
 	if err == nil {
 		sid, err = pidSID(pid)
 	}
@@ -150,6 +183,8 @@ func DialPath(name string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 }
 
 // CoreRunning dice si el pipe del usuario existe y lo atiende un proceso suyo: abre y cierra, sin sesión gRPC.
+// Límite: con todas las instancias ocupadas da true sin verificar el SID del servidor. Es un DoS posible (otro usuario que
+// ocupe las instancias), el mismo que ya permite el squatting del nombre; nunca entrega datos, y Dial sí verifica.
 func CoreRunning() (bool, error) {
 	p, err := SocketPath()
 	if err != nil {
@@ -168,7 +203,7 @@ func coreRunning(name string) (bool, error) {
 	switch {
 	case errors.Is(err, windows.ERROR_FILE_NOT_FOUND):
 		return false, nil
-	case errors.Is(err, context.DeadlineExceeded): // todas las instancias ocupadas: el pipe existe
+	case errors.Is(err, context.DeadlineExceeded): // todas las instancias ocupadas: el pipe existe, sin comprobar su dueño
 		return true, nil
 	case err != nil:
 		return false, err

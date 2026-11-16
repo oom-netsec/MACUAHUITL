@@ -20,6 +20,7 @@ import (
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
@@ -179,9 +180,7 @@ func TestElClienteCierraLaPestana(t *testing.T) {
 	if err != nil || !strings.Contains(string(b), ">>> show version") || !strings.Contains(string(b), "Cisco") || !strings.Contains(string(b), "### cerrado") {
 		t.Fatalf("grabación %v:\n%s", err, b)
 	}
-	if fi, _ := os.Stat(rec); fi.Mode().Perm() != 0o600 {
-		t.Errorf("grabación = %v", fi.Mode().Perm())
-	}
+	systest.Inherited(t, rec, 0o600) // en Windows no hay modo: la ACL heredada no da acceso a nadie más
 	a := r.d.AuditText()
 	if !strings.Contains(a, `"action":"terminal.open"`) || !strings.Contains(a, "manual=true") || strings.Contains(a, "show version") {
 		t.Errorf("auditoría de apertura:\n%s", a)

@@ -7,6 +7,19 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+var redirected bool
+
+// LogFailure agrega msg al registro path cuando el núcleo falló antes de RedirectStderr (sin consola no habría dónde
+// leerlo). Mejor esfuerzo y sin rotar; si ya se redirigió, stderr es el registro y no hace nada.
+func LogFailure(path, msg string) {
+	if redirected {
+		return
+	}
+	if MkdirPrivate(filepath.Dir(path)) == nil {
+		appendLog(path, msg)
+	}
+}
+
 // RedirectStderr manda stderr y stdout al registro path (ADR 0012 g): el núcleo es un binario -H windowsgui, sin consola.
 // Cambia también el handle estándar, para que un pánico del runtime de Go caiga en el archivo. Crea la carpeta privada
 // si falta y rota el registro con OpenLog.
@@ -25,5 +38,6 @@ func RedirectStderr(path string) error {
 	}
 	windows.SetStdHandle(windows.STD_OUTPUT_HANDLE, h)
 	os.Stderr, os.Stdout = f, f
+	redirected = true
 	return nil
 }
