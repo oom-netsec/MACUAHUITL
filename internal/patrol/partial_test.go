@@ -161,6 +161,7 @@ func TestComandoCortadoDejaElEquipoParcial(t *testing.T) {
 func TestTresCortesFallanElEquipo(t *testing.T) {
 	e := newEnv(t, simulator.Config{})
 	e.trust(t)
+	e.spec.CustomCommands = "show version\nshow running-config\nshow ip interface brief\nshow clock" // el tercer corte no es el último
 	newCut(t, e, map[string]error{"show version": platform.ErrPromptTimeout, "show running-config": platform.ErrClosed, "show ip interface brief": platform.ErrPromptTimeout})
 	res, _ := runPartial(t, e, context.Background())
 	if res.State != "failed" || res.Reconnects != maxReconnects || !errors.Is(res.DetailErr, platform.ErrPromptTimeout) {
@@ -301,5 +302,16 @@ func TestReconexionConservaLaPrimeraLlaveCambiada(t *testing.T) {
 	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
 	if res.State != "partial" || res.ChangedHostKey == nil || res.ChangedHostKey.Old != ssh.FingerprintSHA256(k1) {
 		t.Fatalf("la primera llave cambiada se perdió: %+v", res.ChangedHostKey)
+	}
+}
+
+func TestCorteEnElUltimoConReconexionesAgotadasEsParcial(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.spec.CustomCommands = "show version\nshow clock\nshow users\nshow running-config"
+	newCut(t, e, map[string]error{"show version": platform.ErrPromptTimeout, "show clock": platform.ErrClosed, "show running-config": platform.ErrPromptTimeout})
+	res, _ := runPartial(t, e, context.Background())
+	if res.State != "partial" || res.Reconnects != maxReconnects || len(res.CutCommands) != 3 {
+		t.Fatalf("res = %+v", res)
 	}
 }

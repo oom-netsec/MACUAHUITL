@@ -174,7 +174,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			continue
 		}
 		if runErr != nil {
-			if cut && werr == nil && !errors.Is(cutErr, ErrWindowEnded) && i == len(cmds)-1 && res.Reconnects < maxReconnects {
+			if cut && werr == nil && !errors.Is(cutErr, ErrWindowEnded) && i == len(cmds)-1 {
 				res.CutCommands = append(res.CutCommands, cmd.Text) // el último cortado: partial, sin reconectar
 				continue
 			}
