@@ -229,6 +229,8 @@ sudo apt install ./macuahuitl_*.deb           # or: sudo dnf install ./macuahuit
 systemctl --user enable --now macuahuitld     # as the user who will use it
 ```
 
+`SHA256SUMS` catches a broken download. To check that a file was built by this repository's release workflow (from v1.0.0 on), verify its signed provenance with the [GitHub CLI](https://cli.github.com/): `gh attestation verify macuahuitl_*.deb --repo oom-netsec/MACUAHUITL`. It works the same for the `.rpm`, the binaries and the packs.
+
 Use `apt` or `dnf` rather than `dpkg -i` or `rpm -i`: they install the dependencies too. apt may print a harmless note that the download is performed unsandboxed as root; that is expected for a local file. Packs need no extra step: the core checks the Ed25519 signature of every official pack against the key built into it, refuses an `oom/*` pack that fails it, and `mctl pack inspect` or the install preview shows `official` or `third-party`.
 
 A few one-time settings, all optional:
