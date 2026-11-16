@@ -27,7 +27,7 @@ func TestNoticeTraeDependenciasDeLaUI(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Solo la lista de bibliotecas: en los textos de licencia salen palabras como "merge" o "copy".
-	notice, _, ok := strings.Cut(string(raw), "Texto de la licencia MIT")
+	notice, _, ok := strings.Cut(string(raw), "MIT license text")
 	if !ok {
 		t.Fatal("NOTICE sin el texto de la licencia MIT")
 	}
@@ -71,7 +71,7 @@ func TestThirdPartyTraeModulosGo(t *testing.T) {
 		seccion, _, _ := strings.Cut(resto, "\n======== ")
 		return ok && strings.Contains(seccion, "\n--- ")
 	}
-	if !trae("Go (runtime y biblioteca estándar)") {
+	if !trae("Go (runtime and standard library)") {
 		t.Error("THIRD_PARTY_LICENSES no trae la licencia de Go")
 	}
 	visto := map[string]bool{}

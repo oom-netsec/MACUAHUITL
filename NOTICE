@@ -1,22 +1,22 @@
 MACUAHUITL
 Copyright 2026 Os Ordonez
 
-Licenciado bajo la Licencia Apache, versión 2.0 (archivo LICENSE).
-"MACUAHUITL" y su ícono son marcas de Os Ordonez (archivo TRADEMARK.md).
+Licensed under the Apache License, Version 2.0 (file LICENSE).
+"MACUAHUITL" and its icon are trademarks of Os Ordonez (file TRADEMARK.md).
 
-Los módulos Go compilados en los binarios (Wails, gRPC, protobuf, golang.org/x, gopacket, miekg/dns,
-SQLite de modernc y demás) traen su licencia y sus avisos completos en THIRD_PARTY_LICENSES.
+The Go modules compiled into the binaries (Wails, gRPC, protobuf, golang.org/x, gopacket, miekg/dns,
+modernc SQLite and others) ship their full license and notices in THIRD_PARTY_LICENSES.
 
-Incluye la fuente Inter (subconjunto latino, ui/frontend/src/assets/fonts/InterVariable-latin.woff2),
-Copyright (c) 2016 The Inter Project Authors, bajo la SIL Open Font License 1.1
+Includes the Inter font (Latin subset, ui/frontend/src/assets/fonts/InterVariable-latin.woff2),
+Copyright (c) 2016 The Inter Project Authors, under the SIL Open Font License 1.1
 (ui/frontend/src/assets/fonts/Inter-OFL.txt).
 
-Incluye la fuente JetBrains Mono (subconjunto latino, ui/frontend/src/assets/fonts/JetBrainsMono-latin.woff2),
-Copyright 2020 The JetBrains Mono Project Authors, bajo la SIL Open Font License 1.1
-(ui/frontend/src/assets/fonts/JetBrainsMono-OFL.txt). Las fuentes OFL son una excepción
-autorizada a la lista de licencias permisivas (ADR 0009).
+Includes the JetBrains Mono font (Latin subset, ui/frontend/src/assets/fonts/JetBrainsMono-latin.woff2),
+Copyright 2020 The JetBrains Mono Project Authors, under the SIL Open Font License 1.1
+(ui/frontend/src/assets/fonts/JetBrainsMono-OFL.txt). The OFL fonts are an authorized
+exception to the list of permissive licenses (ADR 0009).
 
-La interfaz de escritorio incluye estas bibliotecas de JavaScript (ui/frontend, dependencias de producción):
+The desktop interface includes these JavaScript libraries (ui/frontend, production dependencies):
 
   react, react-dom, scheduler          MIT    Copyright (c) Meta Platforms, Inc. and affiliates.
   @tanstack/react-virtual,
@@ -30,9 +30,9 @@ La interfaz de escritorio incluye estas bibliotecas de JavaScript (ui/frontend, 
   @xterm/addon-webgl                   MIT    Copyright (c) 2018, The xterm.js authors (https://github.com/xtermjs/xterm.js)
   uplot                                MIT    Copyright (c) 2022 Leon Sorokin
   lucide-react                         ISC    Copyright (c) 2026 Lucide Icons and Contributors
-                                       MIT    Copyright (c) 2013-present Cole Bemis (íconos derivados de Feather)
+                                       MIT    Copyright (c) 2013-present Cole Bemis (icons derived from Feather)
 
-Texto de la licencia MIT (aplica a cada aviso MIT de arriba, también a los íconos de lucide-react derivados de Feather):
+MIT license text (applies to every MIT notice above, including the lucide-react icons derived from Feather):
 
   Permission is hereby granted, free of charge, to any person obtaining a copy
   of this software and associated documentation files (the "Software"), to deal
@@ -52,7 +52,7 @@ Texto de la licencia MIT (aplica a cada aviso MIT de arriba, también a los íco
   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   SOFTWARE.
 
-Texto de la licencia ISC (lucide-react):
+ISC license text (lucide-react):
 
   Permission to use, copy, modify, and/or distribute this software for any
   purpose with or without fee is hereby granted, provided that the above

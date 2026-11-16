@@ -124,11 +124,11 @@ func TestPostinstallSinDaemonReloadGlobal(t *testing.T) {
 	}
 }
 
-// Los documentos públicos que ve quien llega al repo van en inglés (lengua canónica); lo interno (docs/adr, docs/plans,
+// Los documentos públicos que ve quien llega al repo o instala el paquete van en inglés (lengua canónica); lo interno (docs/adr, docs/plans,
 // docs/architecture, docs/backlog) sigue en español.
 // shortcut: busca letras del español, así que una frase sin tildes pasa; basta para que no vuelva un documento entero.
 func TestDocsPublicosEnIngles(t *testing.T) {
-	docs := []string{"README.md", "SECURITY.md", "CONTRIBUTING.md", "TRADEMARK.md", filepath.Join("docs", "roadmap.md")}
+	docs := []string{"README.md", "SECURITY.md", "CONTRIBUTING.md", "TRADEMARK.md", "NOTICE", filepath.Join("docs", "roadmap.md")}
 	sec, _ := filepath.Glob(filepath.Join(repoRoot(), "docs", "security", "*.md"))
 	if len(sec) == 0 {
 		t.Fatal("no encontré docs/security/*.md")
