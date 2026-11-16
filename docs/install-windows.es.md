@@ -6,7 +6,8 @@ La versión para Windows es una **beta**. No promete paridad con Linux y sale **
 
 - Windows 10 u 11 de 64 bits (amd64). ARM64 todavía no.
 - El runtime WebView2 de Microsoft. Windows 11 lo trae. Si falta, el instalador y la app te lo avisan y dan el enlace oficial: <https://developer.microsoft.com/microsoft-edge/webview2/consumer/>. MACUAHUITL no incluye ni descarga nada de Microsoft.
-- Sin permisos de administrador. Se instala solo para tu usuario.
+- Instalar no pide permisos de administrador; solo la regla de firewall de los servidores lo pide (una vez). Se instala solo para tu usuario.
+- Usa una cuenta estándar, o una de administrador con UAC activo; con UAC desactivado o con el Administrador integrado el núcleo se niega a arrancar.
 
 ## Descargar y verificar antes de ejecutar
 
@@ -15,8 +16,10 @@ En el [último release](../../../releases/latest) descarga el instalador y `SHA2
 Calcula el hash en PowerShell, en la carpeta de la descarga, y compáralo con la línea de tu archivo en `SHA256SUMS`:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\MACUAHUITL-<versión>-setup.exe
+(Get-FileHash -Algorithm SHA256 .\MACUAHUITL-<versión>-setup.exe).Hash.ToLower()
 ```
+
+`Get-FileHash` imprime mayúsculas y `SHA256SUMS` minúsculas; `.ToLower()` hace que coincidan.
 
 Con Git Bash puedes usar `sha256sum -c --ignore-missing SHA256SUMS`.
 
@@ -34,7 +37,7 @@ No ejecutes un instalador que falle cualquiera de las dos comprobaciones.
 La beta no lleva firma de código. La verificación se apoya en `SHA256SUMS`, la atestación de arriba y el código abierto. Eso trae consecuencias:
 
 - **SmartScreen** muestra «Windows protegió su PC». Elige **Más información** y luego **Ejecutar de todas formas**. Vuelve a aparecer con cada versión nueva.
-- **Smart App Control** (Windows 11), si está activo, bloquea por completo un ejecutable sin firma, sin opción de ejecutarlo. Desactivarlo no tiene vuelta atrás sin reinstalar Windows. Esa decisión es tuya; el proyecto no la recomienda.
+- **Smart App Control** (Windows 11; en español, «Control inteligente de aplicaciones, si está activo, bloquea por completo un ejecutable sin firma, sin opción de ejecutarlo. En muchas versiones de Windows 11, volver a activarlo requiere reinstalar Windows. Esa decisión es tuya; el proyecto no la recomienda.
 - **Microsoft Defender** puede marcar un binario Go sin firma como falso positivo. Si pasa, repórtalo a Microsoft como falso positivo.
 
 ## Qué instala y dónde
@@ -42,6 +45,7 @@ La beta no lleva firma de código. La verificación se apoya en `SHA256SUMS`, la
 - **Programa:** `%LOCALAPPDATA%\Programs\MACUAHUITL` (la app, el núcleo `macuahuitld.exe`, `mctl.exe` y los archivos de licencia).
 - **Accesos directos:** uno en el menú Inicio. El del escritorio es opcional y viene apagado.
 - **Arranque:** el núcleo se inicia al iniciar sesión, con una entrada `Run` en `HKCU`. No se escribe nada en `HKLM` ni hay servicio de Windows.
+- **Registro del núcleo:** `%LOCALAPPDATA%\MACUAHUITL\state\macuahuitld.log`, útil para soporte.
 - **Datos** (bóveda, auditoría, configuración): `%LOCALAPPDATA%\MACUAHUITL`.
 - **Salidas** (evidencia, capturas): `%USERPROFILE%\MACUAHUITL\outputs`.
 
@@ -51,13 +55,15 @@ Si el instalador se abre como administrador, te avisa: ábrelo de nuevo sin «Ej
 
 Windows no tiene puertos privilegiados, así que los servidores TFTP, FTP, SCP/SFTP, syslog y traps escuchan en su puerto estándar. Lo que estorba es el Firewall de Windows.
 
-La app muestra la orden `New-NetFirewallRule` exacta del servidor que inicias, limitada al programa del núcleo, la IP, el protocolo y el puerto. Córrela una vez en un PowerShell de administrador. La app nunca la aplica por ti. Copia la que muestra la app, que lleva tu ruta y tu IP. Se ve así, para un TFTP en 10.0.0.5:
+Para TFTP, FTP y SCP/SFTP la app muestra la orden `New-NetFirewallRule` exacta del servidor que inicias, limitada al programa del núcleo, la IP, el protocolo y el puerto. Córrela una vez en un PowerShell de administrador. La app nunca la aplica por ti. Copia la que muestra la app, que lleva tu ruta y tu IP. Se ve así, para un TFTP en 10.0.0.5:
 
 ```powershell
 New-NetFirewallRule -DisplayName 'MACUAHUITL tftp 10.0.0.5 69' -Direction Inbound -Program 'C:\Users\<tú>\AppData\Local\Programs\MACUAHUITL\macuahuitld.exe' -LocalAddress 10.0.0.5 -Protocol UDP -LocalPort 69 -Action Allow
 ```
 
-La app también muestra la orden `Remove-NetFirewallRule` para quitarla al terminar. En lugar de la regla, también sirve aceptar el diálogo del Firewall que aparece la primera vez que un servidor escucha.
+La app también muestra la orden `Remove-NetFirewallRule` para quitarla al terminar. En FTP la regla también abre el rango de puertos pasivos. En lugar de la regla, también sirve aceptar el diálogo del Firewall que aparece la primera vez que un servidor escucha, pero también pide credenciales de administrador.
+
+Para syslog (UDP 514) y traps (UDP 162) la app no muestra una orden: crea tú una regla equivalente o acepta el diálogo del Firewall.
 
 Si cancelas el diálogo del Firewall la primera vez que un servidor escucha, Windows crea reglas de **bloqueo** para el programa, y el bloqueo gana a las reglas de permiso. Quítalas en *Firewall de Windows Defender con seguridad avanzada → Reglas de entrada* (busca `macuahuitld.exe`) y luego agrega la regla de permiso.
 
@@ -86,7 +92,7 @@ Ejecuta el instalador nuevo encima del anterior. Primero pide al núcleo que se 
 
 ## Desinstalar
 
-Usa *Configuración → Aplicaciones* y quita MACUAHUITL. El desinstalador borra solo lo que puso el instalador.
+Cierra la app primero y usa *Configuración → Aplicaciones* para quitar MACUAHUITL. Si hay trabajo en curso, la desinstalación se detiene y no cambia nada, igual que al actualizar. El desinstalador borra solo lo que puso el instalador.
 
 - Tus datos en `%LOCALAPPDATA%\MACUAHUITL` se borran solo si contestas **Sí** a una pregunta aparte. La respuesta por omisión es **No**, y una desinstalación silenciosa (`/S`) nunca los borra.
 - La carpeta de salidas nunca se borra.
