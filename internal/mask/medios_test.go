@@ -506,3 +506,18 @@ func TestValoresRecordadosSonSoloElSecreto(t *testing.T) {
 		}
 	}
 }
+
+// Las partes de un valor con forma de URL («Abcd1:Efgh2», «scp://usr:CLAVE@srv/f») las recordaba main: no se desalojan antes
+// que las palabras extra de frases posteriores.
+func TestPartesDeURLNoSeDesalojanAntesQueLasPalabrasExtra(t *testing.T) {
+	for _, primero := range []string{"enable secret Abcd1:Efgh2", "enable secret scp://usr:Efgh2@srv/f", "enable secret Abcd1/Efgh2"} {
+		cmds := []string{primero}
+		for i := 0; i < 14; i++ {
+			cmds = append(cmds, fmt.Sprintf("username u%d password 0 Pa%dsw Xq%dz9 Mn%dp4 Rt%dk2", i, i, i, i, i))
+		}
+		out := sesionPegada(nuevo, cmds, "Note: Efgh2 is weak")
+		if strings.Contains(marcado.ReplaceAllString(out, "\x00"), "Efgh2") {
+			t.Errorf("%q: Efgh2 visible\n%s", primero, out)
+		}
+	}
+}

@@ -283,7 +283,7 @@ func CutCommandV(block, orig, s1 string) (string, []SecretValue) {
 			// un valor con forma de URL («ftp://u:CLAVE@host/f»): también sus partes, que un eco partido deja sueltas
 			for _, p := range strings.FieldsFunc(v.Text, func(r rune) bool { return r == '/' || r == '@' || r == ':' }) {
 				if p != v.Text && spValue(p) {
-					vals = append(vals, SecretValue{Text: p})
+					vals = append(vals, SecretValue{Text: p, Primary: true}) // main las recordaba: se desalojan como un valor primario
 				}
 			}
 		}
