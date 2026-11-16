@@ -148,7 +148,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			runErr = werr
 		}
 		res.Commands++
-		if runErr == nil && !out.Invalid {
+		if runErr == nil && !out.Invalid && !slices.Contains(pre, cmd.Text) { // los Pre son ajustes de sesión, no evidencia
 			complete++
 		}
 		// Una cancelación (fin de ventana o trabajo cancelado) no es un corte del equipo.
