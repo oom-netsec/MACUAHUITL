@@ -148,7 +148,8 @@ func (d *driver) ChangeTo(ctx context.Context, target string, timeout time.Durat
 	}
 	cmd, want := "changeto system", ""
 	if target != "system" {
-		if !ctxNameRe.MatchString(target) {
+		// un contexto con nombre de rol («act», «control»…) se leería como el rol en el prompt: no se manda
+		if !ctxNameRe.MatchString(target) || roleWord(target) {
 			return i18n.New("platform.err.changeto_name", i18n.A("name", target))
 		}
 		cmd, want = "changeto context "+target, target
@@ -179,4 +180,13 @@ func (d *driver) ChangeTo(ctx context.Context, target string, timeout time.Durat
 	}
 	d.pr, d.hostname = got, stableName(got)
 	return nil
+}
+
+// roleWord: un segmento del prompt que es rol de failover o de cluster, no un contexto.
+func roleWord(g string) bool {
+	switch g {
+	case "pri", "sec", "act", "stby", "actNoFailover", "stbyNoFailover", "control", "data", "master", "slave":
+		return true
+	}
+	return false
 }

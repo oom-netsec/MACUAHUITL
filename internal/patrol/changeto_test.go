@@ -285,7 +285,7 @@ func TestChangetoSinAuditoriaNoSeManda(t *testing.T) {
 
 // Un contexto con nombre de rol (act, pri...) se leería como parte del prompt: el destino falla del lado seguro.
 func TestChangetoContextoConNombreDeRol(t *testing.T) {
-	for _, name := range []string{"act", "pri", "stby", "sec", "control", "data", "master", "slave"} {
+	for _, name := range []string{"act", "pri", "stby", "sec", "control", "data", "master", "slave", "actNoFailover", "stbyNoFailover"} {
 		rec := &simulator.Recorder{}
 		e := newEnv(t, simulator.Config{Hostname: "asa", Transcripts: transcripts("asa-asav"), Contexts: []string{"admin", name}, Recorder: rec,
 			Commands: map[string]string{"show clock": "10:00:00.000 UTC Mon Nov 3 2026\n"}})
@@ -294,6 +294,9 @@ func TestChangetoContextoConNombreDeRol(t *testing.T) {
 		res, w := runCtx(t, e, name)
 		if res.State != "failed" || len(w.Files()) != 0 {
 			t.Errorf("%s: res = %+v, files = %v", name, res, w.Files())
+		}
+		if slices.Contains(rec.Lines(), "!changeto context "+name) { // se rechaza antes de mandarlo al equipo
+			t.Errorf("%s: se mandó changeto a un contexto con nombre de rol: %v", name, rec.Lines())
 		}
 	}
 }
