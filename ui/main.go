@@ -38,6 +38,7 @@ const coreLocalize = true
 
 func main() {
 	checkWebView2() // Windows: sin WebView2, aviso y salida antes de que Wails cierre la app sin decir nada
+	checkElevated() // Windows: elevada, el núcleo se negaría; aviso y salida en vez de «desconectado» sin causa
 	// La contraseña maestra y las credenciales pasan por el puente: sin volcados de memoria si la UI se cae.
 	for _, w := range sys.NoDump() {
 		log.Println("macuahuitl:", w.In(i18n.En))
