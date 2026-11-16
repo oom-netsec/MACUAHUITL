@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
@@ -107,7 +108,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		}
 	}()
 	res.Hostname, res.Platform = c.drv.Hostname(), c.platform
-	serial := serialOf(c.drv)
+	serials := serialsOf(c.drv)
 	cmds, skipped, requested, err := plan(s, c.platform, d.Playbooks, d.MissingPack)
 	if err != nil {
 		res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
@@ -171,13 +172,21 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			c.close()
 			c = nil
 			nc, err := connect(ctx, d, jobID, s, t, transport.HostKeyPolicy{AcceptChanged: s.AcceptChangedHostKeys}, onEvent, d.PrimaryVerified[hp], d.backoff())
-			ns := ""
+			var ns []string
 			if err == nil {
-				ns = serialOf(nc.drv)
+				ns = serialsOf(nc.drv)
 			}
-			if err == nil && otherDevice(serial, res.Platform, ns, nc.platform) {
+			other, note := false, false
+			if err == nil {
+				other, note = otherDevice(res.Hostname, res.Platform, serials, nc.drv.Hostname(), nc.platform, ns)
+			}
+			if note { // la interseccion de series dice que es el mismo equipo lógico (switchover de un stack), pero el conjunto cambió
+				d.Audit.Append(context.WithoutCancel(ctx), audit.Entry{Actor: "patrol", Action: "device.reconnect", Target: hp,
+					Detail: fmt.Sprintf("job=%s round=%d serial set changed: %v -> %v", jobID, round, serials, ns)})
+			}
+			if other {
 				// Otro equipo tras la misma IP (un par en failover con la llave replicada): no se escribe nada más en la carpeta del primero.
-				err = i18n.New("patrol.err.reconnect_other_device", i18n.A("from", res.Hostname+" ("+res.Platform+" "+serial+")", "to", nc.drv.Hostname()+" ("+nc.platform+" "+ns+")"))
+				err = i18n.New("patrol.err.reconnect_other_device", i18n.A("from", identOf(res.Hostname, res.Platform, serials), "to", identOf(nc.drv.Hostname(), nc.platform, ns)))
 				nc.close()
 			} else if err == nil { // si en la reconexión cambió la llave de host, el equipo queda failed y no skipped: ya hay evidencia escrita
 				c = nc
@@ -242,20 +251,36 @@ func rerunPre(ctx context.Context, c *connected, pre []string, done []playbook.C
 // maxCmd es el tope total de un comando: 5 veces su timeout de inactividad, y no menos de 5 minutos.
 func maxCmd(timeout time.Duration) time.Duration { return max(5*timeout, 5*time.Minute) }
 
-// serialOf es la serie que vio Detect, si el driver la expone.
-func serialOf(d platform.Driver) string {
-	if s, ok := d.(interface{ Serial() string }); ok {
-		return s.Serial()
+// serialsOf son las series que vio Detect, si el driver las expone.
+func serialsOf(d platform.Driver) []string {
+	if s, ok := d.(interface{ Serials() []string }); ok {
+		return s.Serials()
 	}
-	return ""
+	return nil
 }
 
-// otherDevice dice si la sesión nueva es de otro equipo. El prompt no sirve (un par en failover lo repite y un clúster
-// con «prompt hostname state» lo cambia): se compara la serie. shortcut: si a alguna sesión le falta la serie solo se compara la
-// plataforma; subir a más señales (show inventory) si aparece un equipo sin serie en el show version.
-func otherDevice(oldSerial, oldPlatform, newSerial, newPlatform string) bool {
+func identOf(host, platform string, serials []string) string {
+	return host + " (" + strings.TrimSpace(platform+" "+strings.Join(serials, " ")) + ")"
+}
+
+// otherDevice dice si la sesión nueva es de otro equipo, y si el conjunto de series cambió dentro del mismo equipo (note).
+// El prompt no sirve para decidirlo (un par en failover lo repite; un clúster con «prompt hostname state» lo cambia), así
+// que se comparan los CONJUNTOS de series: con intersección es el mismo equipo lógico (un stack tras un switchover cambia la
+// activa y quizá un miembro); disjuntos son dos unidades distintas (el par ASA) y el equipo falla. Si a alguna sesión le
+// falta la serie (AireOS, ISE) se compara el hostname y la plataforma. Limitación conocida: tras un switchover de VSS/SVL,
+// 9800 HA SSO o un N7K con dos supervisoras, si el show version de la activa no lista la serie de la otra, la reconexión
+// puede parar con «otro equipo»; es una falla del lado seguro (se repite el trabajo) y falta validarla en laboratorio.
+func otherDevice(oldHost, oldPlatform string, oldSerials []string, newHost, newPlatform string, newSerials []string) (other, note bool) {
 	if oldPlatform != newPlatform {
-		return true
+		return true, false
 	}
-	return oldSerial != "" && newSerial != "" && oldSerial != newSerial
+	if len(oldSerials) == 0 || len(newSerials) == 0 {
+		return oldHost != newHost, false
+	}
+	for _, s := range oldSerials {
+		if slices.Contains(newSerials, s) {
+			return false, !slices.Equal(oldSerials, newSerials)
+		}
+	}
+	return true, false
 }

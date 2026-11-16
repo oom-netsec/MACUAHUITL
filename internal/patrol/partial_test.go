@@ -33,10 +33,10 @@ type cutState struct {
 	cut           map[string]error // comando -> error que devuelve la primera vez que corre
 	ran           []string
 	opened, close int
-	failOpenFrom  int    // desde esta sesión (1 = la primera), Open falla
-	onCut         func() // se llama al cortar un comando
-	hostFrom2     string // desde la segunda sesión el prompt dice este nombre (el mismo equipo con otro prompt, p. ej. prompt hostname state)
-	serialFrom2   string // desde la segunda sesión el driver dice esta serie (otro equipo tras la misma IP)
+	failOpenFrom  int      // desde esta sesión (1 = la primera), Open falla
+	onCut         func()   // se llama al cortar un comando
+	hostFrom2     string   // desde la segunda sesión el prompt dice este nombre (el mismo equipo con otro prompt, p. ej. prompt hostname state)
+	serialsFrom2  []string // desde la segunda sesión el driver dice estas series (otro equipo tras la misma IP)
 }
 
 type cutDrv struct {
@@ -77,13 +77,13 @@ func (p *cutDrv) Hostname() string {
 	return p.Driver.Hostname()
 }
 
-func (p *cutDrv) Serial() string {
+func (p *cutDrv) Serials() []string {
 	p.st.mu.Lock()
 	defer p.st.mu.Unlock()
-	if p.n >= 2 && p.st.serialFrom2 != "" {
-		return p.st.serialFrom2
+	if p.n >= 2 && p.st.serialsFrom2 != nil {
+		return p.st.serialsFrom2
 	}
-	return p.Driver.(interface{ Serial() string }).Serial()
+	return p.Driver.(interface{ Serials() []string }).Serials()
 }
 
 func (p *cutDrv) Close() {
@@ -284,7 +284,7 @@ func TestReconexionAOtroEquipoFalla(t *testing.T) {
 	e := newEnv(t, simulator.Config{})
 	e.trust(t)
 	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
-	st.serialFrom2 = "OTRA-SERIE" // mismo prompt, otra unidad (un par en failover con prompt por omisión)
+	st.serialsFrom2 = []string{"OTRA-SERIE"} // mismo prompt, otra unidad (un par en failover con prompt por omisión)
 	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
 	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
 	if res.State != "failed" || !strings.Contains(res.Detail, "FOC0000X0XX") || !strings.Contains(res.Detail, "OTRA-SERIE") {
@@ -414,5 +414,46 @@ func TestTodoCortadoOSoloInvalidoFalla(t *testing.T) {
 		if res.State != want || (want == "failed" && res.DetailErr == nil) {
 			t.Errorf("%s: res = %+v", name, res)
 		}
+	}
+}
+
+// Qué hace la reconexión con las series de las dos sesiones (fixtures inventadas: un stack de 3 con switchover, un par ASA
+// en failover, una sesión sin serie y un FTD con UUID).
+func TestOtroEquipoSegunLasSeries(t *testing.T) {
+	stack := []string{"FCW2233A0AA", "FCW2233A0BB", "FCW2233A0CC"}
+	for name, c := range map[string]struct {
+		hostA, platA string
+		serA         []string
+		hostB, platB string
+		serB         []string
+		other, note  bool
+	}{
+		"stack con switchover: interseccion, sigue y se audita": {"SW1", "ios-xe", stack, "SW1", "ios-xe", []string{"FCW2233A0BB", "FCW2233A0CC"}, false, true},
+		"stack igual: sigue sin nota":                           {"SW1", "ios-xe", stack, "SW1", "ios-xe", stack, false, false},
+		"par asa: disjuntos":                                    {"asa", "asa", []string{"JAD2233A0AA"}, "asa", "asa", []string{"JAD2233A0BB"}, true, false},
+		"sin serie, mismo hostname: sigue":                      {"WLC1", "wlc-aireos", nil, "WLC1", "wlc-aireos", nil, false, false},
+		"sin serie, otro hostname: otro":                        {"ISE1", "ise", nil, "ISE2", "ise", nil, true, false},
+		"a una le falta la serie, otro hostname: otro":          {"SW1", "ios-xe", stack, "SW2", "ios-xe", nil, true, false},
+		"ftd con uuid":                                          {"fw", "ftd", []string{"1b2c3d4e-0000"}, "fw", "ftd", []string{"1b2c3d4e-0000"}, false, false},
+		"otra plataforma":                                       {"fw", "asa", []string{"X"}, "fw", "ftd", []string{"X"}, true, false},
+	} {
+		other, note := otherDevice(c.hostA, c.platA, c.serA, c.hostB, c.platB, c.serB)
+		if other != c.other || note != c.note {
+			t.Errorf("%s: other=%v note=%v", name, other, note)
+		}
+	}
+}
+
+// Un switchover que cambia el conjunto de series pero conserva alguna: la ronda sigue y la auditoría deja la nota.
+func TestReconexionConInterseccionDeSeriesSeAudita(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
+	st.serialsFrom2 = []string{"FOC0000X0XX", "FOC0000X0YY"}
+	res, _ := runPartial(t, e, context.Background())
+	var buf bytes.Buffer
+	e.d.Audit.Export(context.Background(), &buf, time.Time{}, time.Now().Add(time.Hour))
+	if res.State != "partial" || !strings.Contains(buf.String(), "serial set changed") {
+		t.Fatalf("res = %+v\n%s", res, buf.String())
 	}
 }
