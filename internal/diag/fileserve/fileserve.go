@@ -278,6 +278,8 @@ func publish(files []string, extraDeny []string) (map[string]string, map[string]
 		if err := checkPathsDeny(extraDeny, filepath.Clean(f), real); err != nil {
 			return nil, nil, err
 		}
+		// Rechazo temprano con el FileInfo (en Windows no ve enlaces); al servir, source.open vuelve a decidir con
+		// HardLinkedFile sobre el archivo abierto.
 		if sys.HardLinked(st) {
 			return nil, nil, i18n.New("fileserve.err.hardlinks", i18n.A("path", f))
 		}

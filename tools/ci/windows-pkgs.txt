@@ -3,14 +3,21 @@
 # Los que llevan « # motivo» compilan pero sus pruebas esperan esa fase: el job windows no les corre go test.
 ./gen/macuahuitl/v1
 ./internal/acl
+./internal/adhoc
+./internal/analyze  # 43a3: sus pruebas dependen de chmod 0 y de Geteuid; en Windows va por ACL
 ./internal/assist
 ./internal/audit
+./internal/backup  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
 ./internal/calc
+./internal/capture
+./internal/change
 ./internal/cleaner
 ./internal/compliance
 ./internal/core/power
 ./internal/crashinfo
+./internal/devices
 ./internal/diag/dnsq
+./internal/diag/fileserve  # 43a3: sus pruebas exigen modo 0600/0700 y sockets Unix; en Windows va por ACL
 ./internal/diag/flows  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
 ./internal/diag/gnmic
 ./internal/diag/ifaces
@@ -23,9 +30,11 @@
 ./internal/diag/syslogd/syslogdtest
 ./internal/diag/tacacstest
 ./internal/diag/tlsinspect
+./internal/diag/transfer
 ./internal/diag/transfer/transfertest
 ./internal/drift
 ./internal/engine
+./internal/fleet  # 43a3: sus pruebas dependen de chmod 0 y de Geteuid; en Windows va por ACL
 ./internal/i18n
 ./internal/i18n/i18ntest
 ./internal/ikedec
@@ -34,20 +43,35 @@
 ./internal/logintel
 ./internal/mask
 ./internal/mask/internal/ref065
+./internal/metrics
 ./internal/msgkb
+./internal/pack  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
+./internal/pack/packtest
+./internal/parse/asa
 ./internal/parse/iosxe
+./internal/patrol  # 43a3: sus pruebas dependen de chmod; en Windows va por ACL
+./internal/pcapan
+./internal/pki
 ./internal/platform
+./internal/platform/iosxe
 ./internal/playbook
 ./internal/scripts
 ./internal/secret
 ./internal/store  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
+./internal/sys
 ./internal/termcolor
 ./internal/terminal
+./internal/topo
+./internal/transport  # 43a3: sus pruebas exigen modo 0600/0700 en known_hosts; en Windows va por ACL
+./internal/upgrade
+./internal/vault  # 43a3: sus pruebas exigen modo 0600/0700; en Windows va por ACL
 ./internal/version
 ./playbooks
 ./test/simulator
 ./tools/archcheck
 ./tools/archcheck/cmd/archcheck
+./tools/labcheck
 ./tools/noegress
 ./tools/noegress/cmd/noegress
+./tools/packaging  # 43a3: su prueba usa un script /bin/sh y modos Unix
 ./tools/packaging/mpack-keygen  # 43a3: su prueba exige modo 0600 en la llave privada; en Windows va por ACL

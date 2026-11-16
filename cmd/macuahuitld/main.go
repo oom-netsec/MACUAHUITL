@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/core"
@@ -43,8 +44,12 @@ var consoleLang = i18n.En
 
 // run recibe el endurecimiento como dependencia: en producción sys.Harden; las pruebas pasan una falsa (mlockall no va en go test).
 func run(harden func() []i18n.Text) error {
-	if os.Geteuid() == 0 {
-		return errors.New(i18n.Msg(consoleLang, "harden.err.root", nil))
+	if sys.Privileged() {
+		key := "harden.err.root"
+		if runtime.GOOS == "windows" {
+			key = "harden.err.elevated"
+		}
+		return errors.New(i18n.Msg(consoleLang, key, nil))
 	}
 	hw := harden() // antes de tocar cualquier secreto
 	warns := make([]string, len(hw))
@@ -52,6 +57,9 @@ func run(harden func() []i18n.Text) error {
 		warns[i] = w.In(i18n.En) // la auditoría va siempre en inglés
 	}
 	p := core.ResolvePaths(os.Getenv)
+	if p.Config == "" || p.Data == "" || p.State == "" {
+		return errors.New(i18n.Msg(consoleLang, "harden.err.localappdata", nil)) // solo Windows: no se cae a %APPDATA%
+	}
 	if p.Runtime == "" {
 		return errors.New(i18n.Msg(consoleLang, "harden.err.runtime_dir", nil))
 	}

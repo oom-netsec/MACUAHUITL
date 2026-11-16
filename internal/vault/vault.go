@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 var (
@@ -266,6 +268,10 @@ func (v *Vault) setDEK(dek *secret.Secret) error {
 		return fmt.Errorf("vault: %w", err)
 	}
 	v.dek, v.aead = dek, g
+	// En Windows no hay mlockall: se bloquea el rango de la DEK. Si falla solo se avisa; nunca impide desbloquear.
+	if err := sys.LockMemory(dek.Bytes()); err != nil {
+		log.Printf("vault: aviso: no se pudo bloquear la llave en memoria: %v", err)
+	}
 	return nil
 }
 
