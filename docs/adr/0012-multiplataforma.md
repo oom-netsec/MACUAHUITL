@@ -159,7 +159,12 @@ Propuesta de Front, verificada sobre el código de wails/v3 v3.1.0 (la versión 
   - Fixed Version pesa más de 250 MB.
   - No se actualiza sola, así que los parches de Chromium dependerían de nuestros releases.
   - En Windows 10 pide un `icacls` a mano.
-- **Instalación del runtime.** El instalador busca la clave `pv` (HKLM y HKCU). Solo si falta, corre el Evergreen Bootstrapper empaquetado (unos 2 MB) con `/silent /install`. Sin elevar, el bootstrapper instala por usuario (ADR 0004). Para equipos sin internet, el Standalone Installer de Microsoft no se empaqueta (pesa más de 100 MB): se enlaza en el mensaje de error y en la documentación.
+- **Instalación del runtime: no se redistribuye nada de Microsoft.** Ni el bootstrapper ni el Standalone Installer van dentro del instalador, y tampoco se descargan durante la instalación.
+  - Motivo: la licencia del runtime («Microsoft Software License Terms – Microsoft Edge WebView2 Runtime», sección 2) exige a quien lo distribuye dos cosas: que los usuarios acepten términos que protejan a Microsoft (2(b)(ii)) e indemnizar y defender a Microsoft ante reclamos sobre la app (2(b)(iv)).
+  - En su lugar, el instalador revisa la clave `pv` (HKLM y HKCU). Si falta, avisa al final con el enlace oficial de descarga. Es la vía que documenta Microsoft («Redirect your end users to the Microsoft site»).
+  - La app avisa lo mismo al abrirse (`ui/webview2_windows.go`).
+  - Windows 11 ya trae el runtime, y según Microsoft la gran mayoría de los Windows 10 también.
+  - Decisión del dueño (2026-11-16), vía Release.
 - **Sin WebView2, hoy la app se cerraría muda.** Wails llama a `os.Exit(1)` y escribe en stderr, y una app GUI no tiene consola. En `ui/main.go`, solo en Windows, antes de `application.New` se consulta `GetAvailableCoreWebView2BrowserVersionString`. Si falla, sale un MessageBox nativo en es/en con el enlace de descarga, y la app termina. Lleva prueba.
 - **Puente.** Solo usa `ipc.Dial` e `ipc.ClientConn`. El `ipc_windows.go` del canal (a) da el mismo `Dial`, así que ni `bridge.go` ni sus módulos cambian. `sys.NoDump`, `sys.RenameNoReplaceIn` y `NoAtomicRename` conservan su firma en Windows (ver b y c).
 - **Ventana.**
@@ -191,9 +196,8 @@ Propuesta de Front, verificada sobre el código de wails/v3 v3.1.0 (la versión 
 - **Contenido del instalador:**
   - `macuahuitl.exe`, `macuahuitld.exe` y `mctl.exe`;
   - `LICENSE`, `NOTICE`, `THIRD_PARTY_LICENSES` y `TRADEMARK.md`;
-  - el `.ico`, generado del SVG;
-  - el bootstrapper de WebView2.
-  - Nada de nmap, Npcap, Wireshark ni iperf3 (ver f).
+  - el `.ico`, generado de los PNG del ícono.
+  - Nada de Microsoft (ver «Instalación del runtime») ni de nmap, Npcap, Wireshark o iperf3 (ver f).
 - **CI de la app.** Un job `ui-windows` en `windows-latest` corre:
   - `npm ci`, `npm test` y `npm run build`;
   - `go test ./ui/bridge/...`;

@@ -42,7 +42,7 @@ Detalle en el ADR 0012, «La app (Wails v3) en Windows» e «Instalador». Bloqu
 - `NonClientRegionSupport` y `WebviewUserDataPath` en State.
 - Helper `baseName`/`dirName` para `transfer/client.ts` y `Files.tsx`.
 - Textos por sistema (`….windows`) en la UI.
-- Instalador NSIS por usuario: bootstrapper de Evergreen, entrada de `Run`, y desinstalación que pregunta por los datos con «No» por omisión y nunca los borra con `/S`.
+- Instalador NSIS por usuario: aviso con el enlace oficial si falta WebView2 (no se redistribuye, ADR 0012), entrada de `Run`, y desinstalación que pregunta por los datos con «No» por omisión y nunca los borra con `/S`.
 - El núcleo bajo demanda se lanza desde la carpeta del exe, nunca por el `PATH`.
 - Paso de firma opcional en el armado del instalador, que se salta sin secret.
 - Job `ui-windows`, con `makensis`.
