@@ -1,0 +1,85 @@
+<!doctype html>
+<!-- Fuente de docs/assets/pro/bento.jpg. No se edita el JPG: se cambia este archivo y se corre render.cjs (ver README.md aquí). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bento</title>
+<style>
+  @font-face { font-family: "Inter"; src: url("../../../../ui/frontend/src/assets/fonts/InterVariable-latin.woff2") format("woff2"); font-weight: 100 900; }
+  :root { --bg: #000; --card: #0c0d0f; --line: #1d1f23; --ink: #f4f4f5; --dim: #8b8b90; --mute: #9b9ea4; --teal: #4fd1b5; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 1042px; background: var(--bg); color: var(--ink); font-family: "Inter", sans-serif; -webkit-font-smoothing: antialiased; }
+  header { text-align: center; padding-top: 74px; }
+  .eyebrow { color: var(--teal); font-size: 13px; font-weight: 600; letter-spacing: 0.2em; }
+  h1 { margin-top: 18px; font-size: 58px; font-weight: 750; letter-spacing: -0.045em; line-height: 1; }
+  h1 span { color: var(--dim); }
+  .grid { position: absolute; left: 65px; top: 250px; width: 1150px; display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(4, 169px); gap: 17px; }
+  .card { position: relative; overflow: hidden; background: var(--card); border: 1px solid var(--line); border-radius: 24px; padding: 26px 28px 28px; display: flex; flex-direction: column; }
+  .s2 { grid-column: span 2; } .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .tall { grid-row: span 2; }
+  .glow::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 0 0, rgba(79, 209, 181, 0.16), transparent 60%); pointer-events: none; }
+  .label { position: relative; color: var(--mute); font-size: 12.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+  .big { position: relative; margin-top: 18px; font-size: 56px; font-weight: 750; letter-spacing: -0.05em; line-height: 1; }
+  .huge { position: relative; margin-top: auto; color: var(--teal); font-size: 118px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+  .mid { position: relative; margin-top: auto; font-size: 32px; font-weight: 750; letter-spacing: -0.035em; line-height: 1.12; }
+  .mid .dim { color: var(--dim); }
+  .teal { color: var(--teal); }
+  .sub { position: relative; margin-top: auto; color: var(--mute); font-size: 14.5px; line-height: 1.45; }
+  .mid + .sub { margin-top: 10px; }
+  .huge + .sub { margin-top: 4px; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">BUILT FOR THE FIELD</div>
+    <h1>One app. <span>The whole job.</span></h1>
+  </header>
+  <main class="grid">
+    <section class="card s2 tall glow">
+      <div class="label">Cloud</div>
+      <div class="huge">0</div>
+      <p class="sub">No account, no telemetry, no update<br>checks. It only talks to devices you typed.</p>
+    </section>
+    <section class="card s2">
+      <div class="label">Armed window</div>
+      <div class="big">96 h</div>
+      <p class="sub">Unattended rounds, laptop kept awake.</p>
+    </section>
+    <section class="card s2">
+      <div class="label">Analysis rules</div>
+      <!-- render.cjs pasa el número contado en internal/analyze/rules como ?rules=N -->
+      <div class="big" id="rules">—</div>
+      <p class="sub">Plus diffs between rounds and drift.</p>
+    </section>
+    <section class="card s4">
+      <div class="label">ACL translation</div>
+      <div class="mid">IOS-XE ⇄ NX-OS ⇄ ASA</div>
+      <p class="sub">Import, translate, and flag shadowed, redundant and impossible rules.</p>
+    </section>
+    <section class="card s3">
+      <div class="label">Transfers · Server and client</div>
+      <div class="mid">TFTP · FTP · SCP · SFTP · HTTP</div>
+    </section>
+    <section class="card s3">
+      <div class="label">Audit</div>
+      <div class="mid">Hash-chained.<br><span class="dim">Verifiable.</span></div>
+    </section>
+    <section class="card s2">
+      <div class="label">Privileged code</div>
+      <div class="big">None</div>
+      <p class="sub">No setuid, no raw sockets of its own.</p>
+    </section>
+    <section class="card s2">
+      <div class="label">Diagnostics</div>
+      <div class="mid">ping · traceroute<br>nmap · iperf3 · PCAP</div>
+    </section>
+    <section class="card s2 glow">
+      <div class="label">Interface</div>
+      <div class="mid teal">EN · ES<br>Dark · Light</div>
+    </section>
+  </main>
+  <script>
+    const n = new URLSearchParams(location.search).get("rules");
+    if (n && /^\d+$/.test(n)) document.getElementById("rules").textContent = n;
+  </script>
+</body>
+</html>

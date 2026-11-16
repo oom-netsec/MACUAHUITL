@@ -1,12 +1,15 @@
 package packaging
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/analyze"
 )
 
 func leer(t *testing.T, partes ...string) string {
@@ -76,6 +79,39 @@ func TestReadmeCuentaPlaybooksDePacks(t *testing.T) {
 		pbs, _ := filepath.Glob(filepath.Join(repoRoot(), "packs", f[1], "playbooks", "*.yaml"))
 		if n, _ := strconv.Atoi(f[2]); n != len(pbs) {
 			t.Errorf("README dice %d playbooks en oom/%s; packs/%s/playbooks trae %d", n, f[1], f[1], len(pbs))
+		}
+	}
+}
+
+// El README (tabla y texto alternativo de bento.jpg) y el roadmap dicen cuántas reglas de análisis trae el núcleo; render.cjs
+// dibuja en la imagen las que cuenta con «^- id:», así que ese conteo también tiene que dar lo mismo.
+func TestReadmeCuentaReglas(t *testing.T) {
+	rules, err := analyze.DefaultRules()
+	if err != nil {
+		t.Fatal(err)
+	}
+	yamls, _ := filepath.Glob(filepath.Join(repoRoot(), "internal", "analyze", "rules", "*.yaml"))
+	ids := 0
+	for _, y := range yamls {
+		raw, _ := os.ReadFile(y)
+		ids += len(regexp.MustCompile(`(?m)^- id:`).FindAll(raw, -1))
+	}
+	if ids != len(rules) {
+		t.Errorf("render.cjs contaría %d reglas con «^- id:» y el núcleo trae %d: ajusta su conteo", ids, len(rules))
+	}
+	for _, c := range []struct{ file, re string }{
+		{"README.md", `\b(\d+) analysis rules\b`},
+		{"README.md", `\b(\d+) rules over\b`},
+		{filepath.Join("docs", "roadmap.md"), `\b(\d+) reglas\b`},
+	} {
+		ms := regexp.MustCompile(c.re).FindAllStringSubmatch(leer(t, c.file), -1)
+		if len(ms) == 0 {
+			t.Errorf("%s: no encontré %s", c.file, c.re)
+		}
+		for _, m := range ms {
+			if m[1] != fmt.Sprint(len(rules)) {
+				t.Errorf("%s dice %q y el núcleo trae %d reglas (regenera bento.jpg con docs/assets/pro/src/render.cjs)", c.file, m[0], len(rules))
+			}
 		}
 	}
 }
