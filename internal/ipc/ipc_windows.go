@@ -97,7 +97,7 @@ func (l *peerListener) Accept() (net.Conn, error) {
 func pidOf(c net.Conn, get func(windows.Handle, *uint32) error) (uint32, error) {
 	f, ok := c.(interface{ Fd() uintptr })
 	if !ok {
-		return 0, errors.New("ipc: la conexión no es un pipe")
+		return 0, i18n.New("ipc.err.not_pipe", nil)
 	}
 	var pid uint32
 	if err := get(windows.Handle(f.Fd()), &pid); err != nil {
@@ -119,7 +119,7 @@ func pipeSID(c net.Conn, get func(windows.Handle, *uint32) error) (string, error
 func pipeOwner(c net.Conn) (string, error) {
 	f, ok := c.(interface{ Fd() uintptr })
 	if !ok {
-		return "", errors.New("ipc: la conexión no es un pipe")
+		return "", i18n.New("ipc.err.not_pipe", nil)
 	}
 	sd, err := windows.GetSecurityInfo(windows.Handle(f.Fd()), windows.SE_KERNEL_OBJECT, windows.OWNER_SECURITY_INFORMATION)
 	if err != nil {
@@ -127,7 +127,7 @@ func pipeOwner(c net.Conn) (string, error) {
 	}
 	o, _, err := sd.Owner()
 	if err != nil || o == nil {
-		return "", errors.New("ipc: el pipe no tiene dueño")
+		return "", i18n.New("ipc.err.pipe_no_owner", nil)
 	}
 	return o.String(), nil
 }
@@ -174,7 +174,7 @@ func dialPipe(ctx context.Context, name string) (net.Conn, uint32, error) {
 	}
 	if err := errors.Join(oerr, perr, serr); err != nil || checkServer(owner, sid, own) != nil {
 		c.Close()
-		return nil, 0, fmt.Errorf("ipc: el pipe %s no lo atiende un proceso de este usuario", name)
+		return nil, 0, i18n.New("ipc.err.pipe_not_user", i18n.A("name", name))
 	}
 	return c, pid, nil
 }

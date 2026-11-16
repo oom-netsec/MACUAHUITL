@@ -1,8 +1,9 @@
 package ipc
 
 import (
-	"errors"
 	"strings"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // sameSID decide si el SID del otro extremo del pipe (servidor o cliente) es el del usuario que corre este proceso.
@@ -16,7 +17,7 @@ func sameSID(peer, own string) bool {
 // (por su PID) deben ser los propios. Las dos comprobaciones juntas cierran el PID reutilizado (B1). Vacíos fallan.
 func checkServer(owner, sid, own string) error {
 	if !sameSID(owner, own) || !sameSID(sid, own) {
-		return errors.New("el servidor del pipe no es de este usuario")
+		return i18n.New("ipc.err.server_not_user", nil)
 	}
 	return nil
 }

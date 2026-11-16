@@ -46,6 +46,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/transfer"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/vault"
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/visibility"
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/termcolor"
 	"github.com/oom-netsec/MACUAHUITL/internal/version"
@@ -80,7 +81,9 @@ func main() {
 }
 
 // printErr escribe el error saneado: puede traer texto de un paquete de terceros o de un equipo.
-func printErr(w io.Writer, err error) { fmt.Fprintln(w, "mctl:", cli.Sanitize(err.Error())) }
+func printErr(w io.Writer, err error) {
+	fmt.Fprintln(w, "mctl:", cli.Sanitize(i18n.In(cli.Lang(), err))) // los errores del catálogo salen en el idioma de mctl
+}
 
 // outIsTTY es variable para que las pruebas simulen una terminal.
 var outIsTTY = func(w io.Writer) bool {

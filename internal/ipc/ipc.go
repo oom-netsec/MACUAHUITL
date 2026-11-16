@@ -7,19 +7,21 @@ package ipc
 
 import (
 	"context"
-	"errors"
 	"net"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-var ErrAlreadyRunning = errors.New("ipc: ya hay un núcleo escuchando en el socket")
+// ErrAlreadyRunning es un error del catálogo (ipc.err.already_running): se compara con errors.Is, también envuelto.
+var ErrAlreadyRunning = i18n.New("ipc.err.already_running", nil)
 
 // ErrNotRunning: no hay un núcleo escuchando (sin socket o pipe, o el socket quedó de un núcleo muerto).
-var ErrNotRunning = errors.New("ipc: el núcleo no está corriendo")
+var ErrNotRunning = i18n.New("ipc.err.not_running", nil)
 
 // MaxMsg es el tamaño máximo de un mensaje gRPC en los dos sentidos. El límite por omisión (4 MiB)
 // no alcanza para el texto que pega la UI (hasta 8 MiB en Forense) ni para sus informes; los

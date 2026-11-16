@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
 // ServerPID es el PID del proceso que escucha en el socket path: SO_PEERCRED leído del lado del cliente.
@@ -42,7 +44,7 @@ func serverPID(path string, uid int) (int, error) {
 		return 0, fmt.Errorf("ipc: %w", cerr)
 	}
 	if int(cred.Uid) != uid || cred.Pid <= 0 { // el socket lo escucha otro usuario: no es nuestro núcleo
-		return 0, fmt.Errorf("ipc: el socket %s lo atiende otro usuario o un PID inválido", path)
+		return 0, i18n.New("ipc.err.socket_other_user", i18n.A("path", path))
 	}
 	return int(cred.Pid), nil
 }

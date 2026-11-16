@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"google.golang.org/grpc"
 )
 
@@ -23,7 +25,7 @@ func CoreAddr(runtime string) (string, error) { return filepath.Join(runtime, "c
 func SocketPath() (string, error) {
 	rt := os.Getenv("XDG_RUNTIME_DIR")
 	if !filepath.IsAbs(rt) {
-		return "", errors.New("ipc: XDG_RUNTIME_DIR no está definido; el núcleo corre como servicio de usuario de systemd")
+		return "", i18n.New("ipc.err.runtime_dir", nil)
 	}
 	return filepath.Join(rt, "macuahuitl", "core.sock"), nil
 }
