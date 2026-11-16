@@ -29,12 +29,12 @@ analyze it, change the network safely and keep a verifiable record of everything
 
 ### Why not a folder of scripts?
 
-Scripts collect. MACUAHUITL also analyzes what it collected and changes the network with guard rails:
+Scripts collect. MACUAHUITL also runs the collection for you, analyzes it, packages it for TAC and changes the network with guard rails:
 
-- **Every change is planned first.** You see each line and its exact rollback before anything is sent, and confirm one step at a time.
-- **It never cuts the branch you sit on.** Port templates refuse the port your own SSH session arrives on, and an SVI whose subnet holds your address.
-- **Secrets stay masked** in evidence, terminal recordings, logs and syslog, and credentials live in an encrypted local vault.
-- **Everything is audited** in a hash-chained log you can verify with one command.
+- **Collection that runs itself.** Login Test first, explicit arming, rounds on a schedule, and a `.zip` with a `manifest.json` anchored to the audit log.
+- **Analysis included.** 44 analysis rules, round-to-round differences and a correlated timeline over the evidence you collected.
+- **Every change is planned first.** Each line and its exact rollback are shown before anything is sent, and you confirm one step at a time. [How it stays safe](#safe-by-design).
+- **Local and accountable.** Credentials in an encrypted vault, secrets masked in the evidence, every action in a hash-chained audit log.
 
 <br>
 
@@ -63,15 +63,13 @@ Scripts collect. MACUAHUITL also analyzes what it collected and changes the netw
 
 ### Safe by design
 
-Each of these was checked on lab devices or a real desktop, and is in the release notes:
+Each of these is in the release notes, with what was checked on a real device:
 
-- **Your own session is off limits.** Port templates refuse the port your SSH session arrives on, and an SVI whose subnet holds your address. On a Catalyst 3560-CX, `shutdown` on the session's port was refused with *"Gi0/3 is the port this session arrives on"* ([v0.6.5](../../releases/tag/v0.6.5)).
-- **Rollback means the configuration as it was.** All 21 write templates were applied, verified and rolled back on lab devices (Cisco Modeling Labs and a Catalyst 3560-CX); the configuration was identical after every rollback ([v0.5.4](../../releases/tag/v0.5.4), [v0.6.4](../../releases/tag/v0.6.4)).
-- **An unknown error stops the change.** Any unrecognized `% …` reply in configuration mode stops the apply and offers the rollback ([v0.6.5](../../releases/tag/v0.6.5)).
-- **Secrets are masked everywhere they can show up**, including abbreviated IOS forms typed at the terminal. Masking is fuzz-tested and was checked on every lab run; known gaps are listed in the release notes, never hidden ([v0.5.0](../../releases/tag/v0.5.0), [v0.6.5](../../releases/tag/v0.6.5)).
-- **The published app is a production build**, without the web inspector that could call the app's internal functions ([v0.6.5](../../releases/tag/v0.6.5)).
-
-<br>
+- **Your own session is off limits.** Port templates refuse the port your SSH session arrives on. The SVI, static route and loopback templates refuse a prefix that holds your address, and the vty ACL template refuses a list that would lock you out. On a Catalyst 3560-CX, `shutdown` on the session's port was refused with *"Gi0/3 is the port this session arrives on"* ([v0.6.5](../../releases/tag/v0.6.5)).
+- **Rollback means the configuration as it was.** The write templates were applied, verified and rolled back in the lab runs of [v0.5.4](../../releases/tag/v0.5.4) (Cisco Modeling Labs and a Catalyst 3560-CX) and [v0.6.4](../../releases/tag/v0.6.4) (Catalyst 3560-CX). The configuration was identical after every rollback.
+- **An unknown error stops the change.** Any unrecognized IOS `% …` reply in configuration mode stops the apply and offers the rollback. On the 3560-CX, five templates were applied and rolled back with no false stop ([v0.6.5](../../releases/tag/v0.6.5)).
+- **Recorded before it is sent.** The lines of a change are written to the audit log before they reach the device, and a core restart in the middle of an apply leaves a state the saved rollback can still check ([v0.6.5](../../releases/tag/v0.6.5)).
+- **Secrets are masked** in evidence, terminal recordings, logs and syslog, including most abbreviated IOS forms typed at the terminal. Masking is fuzz-tested and was checked on the [v0.5.0](../../releases/tag/v0.5.0) lab runs. A few rare abbreviated forms are still open; they are listed in the [v0.6.5 notes](../../releases/tag/v0.6.5).
 
 <p align="center"><img src="docs/assets/pro/bento.jpg" alt="One app, the whole job: zero cloud, 96 h armed windows, 44 analysis rules, ACL translation between IOS-XE, NX-OS and ASA, TFTP/FTP/SCP/SFTP/HTTP transfers, hash-chained audit, no privileged code, ping/traceroute/nmap/iperf3/PCAP, English and Spanish, dark and light."></p>
 
