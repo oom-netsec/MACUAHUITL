@@ -1,4 +1,5 @@
-// Renderiza bento.html a ../bento.jpg (2560×2084) con el número de reglas que hay en internal/analyze/rules.
+// Renderiza bento.html a ../bento.jpg (2560×2084, con el número de reglas que hay en internal/analyze/rules) y social.html a
+// ../../portada.png (2560×1280: portada del README y vista social de GitHub, que pide menos de 1 MB).
 // Uso (ver README.md aquí): PLAYWRIGHT_CORE=/ruta/a/node_modules/playwright-core node docs/assets/pro/src/render.cjs
 const fs = require("fs");
 const path = require("path");
@@ -22,6 +23,17 @@ if (!rules) throw new Error("no se encontraron reglas en " + dir);
     if ((await page.textContent("#rules")) !== String(rules)) throw new Error("la página no recibió el número de reglas");
     await page.screenshot({ path: path.join(__dirname, "..", "bento.jpg"), type: "jpeg", quality: 90 });
     console.log(`bento.jpg: ${rules} reglas`);
+
+    await page.setViewportSize({ width: 1280, height: 640 });
+    await page.goto(pathToFileURL(path.join(__dirname, "social.html")).href);
+    await page.evaluate(() => document.fonts.ready);
+    if (!(await page.evaluate(() => document.fonts.check('750 64px "Inter"')))) throw new Error("no cargó la fuente Inter");
+    if (await page.evaluate(() => [...document.images].some((i) => !i.complete || !i.naturalWidth))) throw new Error("falta una imagen (¿corriste capture.cjs?)");
+    const out = path.join(__dirname, "..", "..", "portada.png");
+    await page.screenshot({ path: out });
+    const bytes = fs.statSync(out).size;
+    if (bytes >= 1_000_000) throw new Error(`portada.png pesa ${bytes} bytes; GitHub pide menos de 1 MB`);
+    console.log(`portada.png: ${bytes} bytes`);
   } finally {
     await browser.close();
   }
