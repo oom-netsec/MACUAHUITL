@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/netip"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -33,8 +34,10 @@ var (
 	hostRe  = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9.\-]{0,252}[A-Za-z0-9])?$`)
 	portsRe = regexp.MustCompile(`^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$`)
 	ifaceRe = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.:\-]{0,31}$`)
-	intRe   = regexp.MustCompile(`^[0-9]{1,6}$`)
-	decRe   = regexp.MustCompile(`^[0-9]{1,4}(\.[0-9]{1,3})?$`)
+	// winIfaceRe: lo que dumpcap -D da en Windows: índice o \Device\NPF_{GUID} (y el loopback de Npcap). Nunca empieza con «-».
+	winIfaceRe = regexp.MustCompile(`^([0-9]{1,3}|\\Device\\NPF_(\{[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}|Loopback))$`)
+	intRe      = regexp.MustCompile(`^[0-9]{1,6}$`)
+	decRe      = regexp.MustCompile(`^[0-9]{1,4}(\.[0-9]{1,3})?$`)
 )
 
 // target valida un destino: IP, nombre DNS o (si cidr) un prefijo. Nunca empieza con "-".
@@ -139,8 +142,18 @@ func one(r Request, cidr bool) (string, error) {
 	return r.Targets[0], target(r.Targets[0], cidr)
 }
 
-// Build arma binario y argv. El archivo de salida de pcap lo agrega Run (-w).
+// winWaitMs es la espera por respuesta de ping y tracert en Windows (-w, en milisegundos).
+const winWaitMs = "2000"
+
+// Build arma binario y argv para el sistema donde corre. El archivo de salida de pcap lo agrega Run (-w).
 func Build(r Request) (bin string, argv []string, err error) {
+	return build(r, runtime.GOOS == "windows")
+}
+
+// buildWindows es Build para Windows; existe aparte para que las pruebas lo corran en cualquier sistema.
+func buildWindows(r Request) (string, []string, error) { return build(r, true) }
+
+func build(r Request, win bool) (bin string, argv []string, err error) {
 	o := &opts{m: r.Options, used: map[string]bool{}}
 	switch r.Tool {
 	case Ping:
@@ -152,6 +165,18 @@ func Build(r Request) (bin string, argv []string, err error) {
 		count, ok := o.num("count", 1, 100)
 		if !ok {
 			count = "4"
+		}
+		if win { // Windows: -n es la cuenta, -l el tamaño, -w la espera; ping.exe no tiene intervalo
+			argv = []string{"-n", count}
+			if _, ok := o.m["interval"]; ok {
+				o.used["interval"] = true
+				o.fail(i18n.New("diag.err.opt_windows", i18n.A("key", "interval")))
+			}
+			if v, ok := o.num("size", 0, 65500); ok {
+				argv = append(argv, "-l", v)
+			}
+			bin, argv = "ping", append(argv, "-w", winWaitMs, host)
+			break
 		}
 		argv = append(argv, "-c", count)
 		if v, ok := o.num("interval", 0.2, 60); ok {
@@ -166,6 +191,14 @@ func Build(r Request) (bin string, argv []string, err error) {
 		if err != nil {
 			return "", nil, err
 		}
+		if win { // tracert: -d sin DNS, -h saltos, -w espera
+			argv = []string{"-d"}
+			if v, ok := o.num("max_hops", 1, 64); ok {
+				argv = append(argv, "-h", v)
+			}
+			bin, argv = "tracert", append(argv, "-w", winWaitMs, host)
+			break
+		}
 		argv = []string{"-n"}
 		if v, ok := o.num("max_hops", 1, 64); ok {
 			argv = append(argv, "-m", v)
@@ -177,6 +210,9 @@ func Build(r Request) (bin string, argv []string, err error) {
 			return "", nil, err
 		}
 		scan, _ := o.str("scan", "connect", "syn", "udp", "ping")
+		if win && scan == "syn" { // necesita Npcap y sus privilegios; la beta de Windows no lo ofrece (ADR 0012, i)
+			return "", nil, i18n.New("diag.err.syn_windows", nil)
+		}
 		argv = append(argv, map[string]string{"": "-sT", "connect": "-sT", "syn": "-sS", "udp": "-sU", "ping": "-sn"}[scan])
 		if v, ok := o.str("ports"); ok {
 			if !portsRe.MatchString(v) {
@@ -245,11 +281,19 @@ func Build(r Request) (bin string, argv []string, err error) {
 			return "", nil, i18n.New("diag.err.pcap_dir", nil)
 		}
 		iface, ok := o.str("interface")
-		if !ok || !ifaceRe.MatchString(iface) {
+		re := ifaceRe
+		if win {
+			re = winIfaceRe
+		}
+		if !ok || !re.MatchString(iface) {
 			return "", nil, i18n.New("diag.err.pcap_iface", nil)
 		}
 		argv = []string{"-i", iface}
-		if v, ok := o.num("seconds", 1, 3600); ok {
+		v, ok := o.num("seconds", 1, 3600)
+		if !ok && win { // cancelar es terminar el job y dejaría el pcapng truncado: siempre hay tope de tiempo
+			v, ok = "60", true
+		}
+		if ok {
 			argv = append(argv, "-a", "duration:"+v)
 		}
 		if v, ok := o.num("packets", 1, 1000000); ok {
@@ -303,4 +347,5 @@ func isLocalIP(a netip.Addr) bool {
 
 var literalFlags = map[string]bool{"-B": true, "-n": true, "-c": true, "-i": true, "-s": true, "-m": true, "-sT": true, "-sS": true, "-sU": true, "-sn": true,
 	"-p": true, "-T0": true, "-T1": true, "-T2": true, "-T3": true, "-T4": true, "-T5": true, "-sV": true, "-6": true, "-oG": true, "-": true,
-	"-P": true, "-R": true, "-u": true, "-t": true, "-1": true, "-a": true, "-f": true, "-w": true}
+	"-P": true, "-R": true, "-u": true, "-t": true, "-1": true, "-a": true, "-f": true, "-w": true,
+	"-l": true, "-h": true, "-d": true}

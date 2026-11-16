@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -33,12 +34,12 @@ func erroresEs(t *testing.T) map[string]string {
 	r := Request{Timeout: 99 * time.Hour}
 	_, err := r.limits()
 	put("tiempo", err)
-	dest := t.TempDir()
+	dest := realDir(t)
 	_, err = Download(context.Background(), Request{})
 	put("descargar_sin_url", err)
 	_, err = Download(context.Background(), Request{URL: u("gopher://h/a"), DestDir: dest})
 	put("descargar_esquema", err)
-	os.WriteFile(dest+"/a.cfg", []byte("x"), 0o600)
+	os.WriteFile(filepath.Join(dest, "a.cfg"), []byte("x"), 0o600)
 	_, err = Download(context.Background(), Request{URL: u("tftp://127.0.0.1:1/a.cfg"), DestDir: dest})
 	put("descargar_existe", err)
 	_, err = Upload(context.Background(), Request{})
@@ -54,7 +55,8 @@ func erroresEs(t *testing.T) map[string]string {
 	_, err = Browse(context.Background(), Request{URL: u("gopher://h/")}, "", 0)
 	put("listar_esquema", err)
 	for k, v := range out {
-		out[k] = strings.ReplaceAll(v, dest, "<dir>")
+		// El golden se escribió con «/»: la carpeta se reemplaza y su separador se normaliza.
+		out[k] = strings.ReplaceAll(strings.ReplaceAll(v, dest, "<dir>"), "<dir>"+string(filepath.Separator), "<dir>/")
 	}
 	return out
 }

@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -73,11 +74,21 @@ func reqFor(t *testing.T, scheme string, r fileserve.Ready, file string) Request
 	return req
 }
 
+// realDir da una carpeta temporal con la ruta que devuelve el núcleo (sin enlaces ni nombres cortos 8.3 de Windows).
+func realDir(t *testing.T) string {
+	t.Helper()
+	d, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
 func TestRoundTripAllProtocols(t *testing.T) {
 	data := bytes.Repeat([]byte("interface Gi0/1\n shutdown\n"), 700) // varios bloques
 	for _, proto := range []string{"tftp", "ftp", "scp", "sftp"} {
 		t.Run(proto, func(t *testing.T) {
-			pub, recv, dest := t.TempDir(), t.TempDir(), t.TempDir()
+			pub, recv, dest := t.TempDir(), t.TempDir(), realDir(t)
 			os.WriteFile(filepath.Join(pub, "r1.cfg"), data, 0o600)
 			r := startSrv(t, fileserve.Config{Proto: proto, FromDir: pub, Write: true, RecvDir: recv})
 			// Put: del cliente al servidor (copy running-config <proto>:).
@@ -101,7 +112,7 @@ func TestRoundTripAllProtocols(t *testing.T) {
 				t.Fatal(err)
 			}
 			st, _ := os.Stat(res.Path)
-			if res.Path != filepath.Join(dest, "r1.cfg") || res.Bytes != int64(len(data)) || res.SHA256 != sum(data) || res.Verified != "ok" || len(res.MD5) != 32 || st.Mode().Perm() != 0o600 {
+			if res.Path != filepath.Join(dest, "r1.cfg") || res.Bytes != int64(len(data)) || res.SHA256 != sum(data) || res.Verified != "ok" || len(res.MD5) != 32 || (runtime.GOOS != "windows" && st.Mode().Perm() != 0o600) { // en Windows el acceso lo da la ACL
 				t.Fatalf("get: %+v (%v)", res, st.Mode())
 			}
 			// Nunca sobrescribe.
@@ -191,7 +202,7 @@ func TestLimitsAndDestination(t *testing.T) {
 	}
 	// Carpeta de destino: enlace, sensible o inexistente.
 	r := startSrv(t, fileserve.Config{Proto: "http", FromDir: pub})
-	real := t.TempDir()
+	real := realDir(t)
 	link := filepath.Join(t.TempDir(), "l")
 	os.Symlink(real, link)
 	for _, d := range []string{link, "/etc", "/usr/share", "relativa", filepath.Join(real, "no-existe")} {
@@ -414,7 +425,7 @@ func TestTransferCuentaActividadDeSesion(t *testing.T) {
 	data := bytes.Repeat([]byte("x"), 50000)
 	for _, proto := range []string{"scp", "sftp"} {
 		t.Run(proto, func(t *testing.T) {
-			pub, recv, dest := t.TempDir(), t.TempDir(), t.TempDir()
+			pub, recv, dest := t.TempDir(), t.TempDir(), realDir(t)
 			os.WriteFile(filepath.Join(pub, "r1.cfg"), data, 0o600)
 			r := startSrv(t, fileserve.Config{Proto: proto, FromDir: pub, Write: true, RecvDir: recv})
 			var n atomic.Int64

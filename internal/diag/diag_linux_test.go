@@ -34,14 +34,6 @@ func runner(t *testing.T, missing ...string) Runner {
 	}}
 }
 
-func req(tool Tool, target string, opts map[string]string, dir string) Request {
-	r := Request{Tool: tool, Options: opts, OutputDir: dir}
-	if target != "" {
-		r.Targets = []string{target}
-	}
-	return r
-}
-
 func TestBuildArgv(t *testing.T) {
 	localTest(t)
 	cases := []struct {

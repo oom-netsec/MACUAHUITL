@@ -49,7 +49,7 @@
 ./internal/core/power
 ./internal/crashinfo
 ./internal/devices
-./internal/diag  # sus pruebas usan socket Unix, XDG_RUNTIME_DIR o rutas y permisos de Linux; sin validar en Windows (43a5+)
+./internal/diag
 ./internal/diag/dnsq
 ./internal/diag/fileserve  # sus pruebas de enlaces simbólicos y de carpetas sensibles (HOME) sin validar en Windows
 ./internal/diag/flows
@@ -65,7 +65,7 @@
 ./internal/diag/syslogd/syslogdtest
 ./internal/diag/tacacstest
 ./internal/diag/tlsinspect
-./internal/diag/transfer  # 43a5: las pruebas comparan rutas con «/» en mensajes y destinos
+./internal/diag/transfer
 ./internal/diag/transfer/transfertest
 ./internal/drift
 ./internal/engine
@@ -133,8 +133,7 @@
 ./test/simulator
 ./tools/archcheck
 ./tools/archcheck/cmd/archcheck
-./tools/ci
-./tools/icowin
+./tools/icowin  # 43b4: compila, pero sus pruebas no se han corrido en Windows
 ./tools/labcheck
 ./tools/noegress
 ./tools/noegress/cmd/noegress
