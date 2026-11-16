@@ -44,8 +44,8 @@ func TestConsoleErrConservaElCodigo(t *testing.T) {
 
 // Con un núcleo sano del mismo usuario corriendo no se escribe la causa (sería una causa vieja y falsa); sin núcleo, sí.
 func TestWriteStartupSegunElNucleo(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root")
+	if sys.Privileged() { // root, o el token elevado del runner de Windows: el elevado nunca escribe .startup
+		t.Skip("elevado")
 	}
 	file := func(d string) string { return filepath.Join(d, sys.StartupName) }
 	for _, c := range []struct {

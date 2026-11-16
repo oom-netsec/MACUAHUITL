@@ -53,6 +53,8 @@ func TestStartupJSON(t *testing.T) {
 }
 
 func TestWriteYClearStartup(t *testing.T) {
+	defer func(f func() bool) { isPrivileged = f }(isPrivileged)
+	isPrivileged = func() bool { return false } // el runner de Windows corre elevado: aquí se prueba el caso normal
 	dir := filepath.Join(t.TempDir(), "state")
 	WriteStartup(dir, errors.New("uno")) // crea State
 	if leer(t, dir)["text"] != "uno" {

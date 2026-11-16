@@ -229,37 +229,33 @@ func (z *zone) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 // lab es una red DNS de juguete en 127.0.0.x con un mapa IP→puerto real.
 type lab struct {
 	mu    sync.Mutex
-	ports map[string]uint16
+	ports map[string]uint16 // puerto UDP de cada IP del laboratorio
+	tcp   map[string]uint16 // puerto TCP (puede ser otro: ver serve)
 }
 
 func (l *lab) serve(t *testing.T, ip string, h dns.Handler) {
 	t.Helper()
-	// El mismo puerto en TCP y UDP. Se pide primero TCP en :0: el sistema nunca da un puerto TCP de un rango excluido
-	// (en Windows, Hyper-V reserva rangos enteros y un bind a uno de ellos da WSAEACCES); luego UDP en ese puerto, y si
-	// está ocupado se reintenta con otro.
-	var pc net.PacketConn
-	var ln net.Listener
-	var port int
-	for try := 0; ; try++ {
-		var err error
-		if ln, err = net.Listen("tcp", ip+":0"); err != nil {
-			t.Fatal(err)
-		}
-		port = ln.Addr().(*net.TCPAddr).Port
-		if pc, err = net.ListenPacket("udp", fmt.Sprintf("%s:%d", ip, port)); err == nil {
-			break
-		}
-		ln.Close()
-		if try == 50 {
-			t.Fatal(err)
-		}
+	// UDP y TCP con puertos propios, cada uno elegido por el sistema: en Windows, Hyper-V reserva rangos enteros por
+	// protocolo y exigir el mismo número en los dos fallaba con WSAEACCES. dial elige el puerto según la red.
+	pc, err := net.ListenPacket("udp", ip+":0")
+	if err != nil {
+		t.Fatal(err)
 	}
+	ln, err := net.Listen("tcp", ip+":0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, tport := pc.LocalAddr().(*net.UDPAddr).Port, ln.Addr().(*net.TCPAddr).Port
 	for _, s := range []*dns.Server{{PacketConn: pc, Handler: h}, {Listener: ln, Handler: h}} {
 		go s.ActivateAndServe()
 		t.Cleanup(func() { s.Shutdown() })
 	}
 	l.mu.Lock()
 	l.ports[ip] = uint16(port)
+	if l.tcp == nil {
+		l.tcp = map[string]uint16{}
+	}
+	l.tcp[ip] = uint16(tport)
 	l.mu.Unlock()
 }
 
@@ -267,6 +263,9 @@ func (l *lab) serve(t *testing.T, ip string, h dns.Handler) {
 func (l *lab) dial(ctx context.Context, network, host string, port uint16) (net.Conn, error) {
 	l.mu.Lock()
 	p, ok := l.ports[host]
+	if tp, okt := l.tcp[host]; okt && strings.HasPrefix(network, "tcp") {
+		p = tp
+	}
 	l.mu.Unlock()
 	if !ok {
 		return nil, fmt.Errorf("lab: %s no existe", host)
