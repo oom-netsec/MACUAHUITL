@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { CoreContext } from "../app/activity";
 import { fakeCore } from "../lib/fake";
 import type { CoreAPI } from "../lib/core";
+import { setOSForTests } from "../lib/platform";
 import { DownloadButton, DropZone, ExportMenu, TransferProgress, formatBytes } from "./Files";
 
 const withCore = (core: ReturnType<typeof fakeCore>, ui: React.ReactNode) => render(<CoreContext.Provider value={core as unknown as CoreAPI}>{ui}</CoreContext.Provider>);
@@ -55,4 +56,15 @@ test("TransferProgress muestra bytes, porcentaje, velocidad y tiempo restante, y
   expect(screen.getByText("Hash verificado")).toBeInTheDocument();
   rerender(<TransferProgress file="cat9k.bin" bytes={1} total={2} rateBps={0} etaSeconds={-1} done error="conexión cerrada" />);
   expect(screen.getByRole("alert")).toHaveTextContent("conexión cerrada");
+});
+
+test("DropZone en Windows muestra solo el nombre del archivo rechazado", () => {
+  setOSForTests("windows");
+  try {
+    const core = fakeCore();
+    withCore(core, <DropZone label="Captura" accept={["pcap"]} onPaths={vi.fn()} />);
+    act(() => core.emitFilesDropped({ target: screen.getByRole("group", { name: "Captura" }).id, paths: ["C:\\Users\\u\\notas.txt"] }));
+    expect(screen.getByRole("alert")).toHaveTextContent("notas.txt");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Users");
+  } finally { setOSForTests(undefined); }
 });

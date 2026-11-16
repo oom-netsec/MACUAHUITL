@@ -2789,4 +2789,13 @@ export const en: Record<Key, string> = {
   "patrol.devices.partial": "{ok} succeeded · {partial} partial · {failed} failed · {total} devices",
   "patrol.devices.partial.one": "{ok} succeeded · {partial} partial · {failed} failed · 1 device",
   "patrol.phaseReason.phase.ok_partial_failed": "{ok}, {partial}, {failed} failed",
+  "shell.coreDown.cmd": "systemctl --user status macuahuitld",
+  "shell.coreDown.windows": "Core disconnected. Retrying the connection. If the problem persists, check the core log:",
+  "shell.coreDown.cmd.windows": "%LOCALAPPDATA%\\MACUAHUITL\\state\\macuahuitld.log",
+  "console.none.windows": "No USB-serial adapters detected (COM ports). Check Device Manager → Ports (COM & LPT): if the adapter is not listed, its driver is missing.",
+  "console.defaults.windows": "Cisco: 9600 8N1, no flow control. If the port is in use, another application has it open: close it.",
+  "backup.intro.b.windows": " with access only for your user and the computer's administrators, and with retention. Backing up only reads the devices; restoring changes the configuration and goes through assisted mode.",
+  "backup.secretsWarn.windows": "The file will contain passwords and keys in clear text (access only for your user and the computer's administrators). Protect the outputs/respaldos/ folder.",
+  "ssh.note.windows": "Manual terminal: whatever is typed goes straight to the device, with no assisted mode and no command allowlist. The device output and the typed input are recorded in outputs/terminal/ (access only for your user and the computer's administrators), except what is typed at a password or secret prompt.",
+  "vault.backup.noPerms.windows": "The file system does not support per-user permissions (e.g. a FAT32 or exFAT drive): the content is encrypted, but be careful who can read the file.",
 };
