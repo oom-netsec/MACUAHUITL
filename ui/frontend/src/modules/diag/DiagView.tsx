@@ -54,7 +54,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadIfaces solo usa core
   }, [core, tool, mode]);
 
-  // El servidor iperf3 escucha en una IP de esta máquina (nunca en todas; link-local no sirve con -B) y en un puerto ≥ 1024.
+  // El servidor iperf3 escucha en una IP de esta máquina (nunca en todas; link-local no sirve con -B) y en un puerto alto (≥ 1024; en Windows, 1-65535: no hay puertos privilegiados, ADR 0012 (h)).
   const server = tool === "iperf3" && mode === "server";
   const binds = localIPs(ifaces);
   const bindIP = binds.includes(bind) ? bind : binds[0] ?? "";
