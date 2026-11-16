@@ -1,6 +1,8 @@
 package mask_test
 
 import (
+	"github.com/oom-netsec/MACUAHUITL/internal/mask/internal/ref065"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -56,5 +58,44 @@ func TestMarcaRecorteImitadaNoEsTransparente(t *testing.T) {
 	want, _ := mask.ApplyPlain("ios-xe", in)
 	if got, _ := mask.Apply("ios-xe", in); got != want {
 		t.Fatalf("%q != %q", got, want)
+	}
+}
+
+var semilla = regexp.MustCompile(`Zq\d{5}`)
+
+// visibles: cuántas semillas (Zq00000) se ven en out.
+func visibles(out string) int { return len(semilla.FindAllString(out, -1)) }
+
+// La marca cierra la tabla de communities, como en la v0.6.5 (ref065 la ve como una línea sin forma de fila): lo que
+// sigue a la marca se enmascara por sus reglas y nunca se ve más que con ref065 sobre el mismo texto.
+func TestMarcaRecorteCierraLaTablaSNMP(t *testing.T) {
+	head := "Community            Group / Access      context    acl_filter\n---------            --------------      -------    ----------\nSecretComm           network-admin\n"
+	for _, plat := range []string{"nx-os", "ios-xe"} {
+		for _, cola := range []string{"enable password Zq00001\n", "tacacs server T\n key Zq00002\n"} {
+			in := head + marcaRecorte + "\n" + cola
+			n, _ := mask.Apply(plat, in)
+			o, _ := ref065.Apply(plat, in)
+			if visibles(n) > visibles(o) || visibles(n) != 0 {
+				t.Errorf("%s:\n nueva %q\n ref   %q", plat, n, o)
+			}
+		}
+	}
+}
+
+// Con la marca entre cada par de entradas de la propiedad diferencial, la salida nueva nunca muestra más semillas que
+// ref065 con la marca ni que la nueva sin ella.
+func TestMarcaRecorteEntreParesNuncaMuestraMas(t *testing.T) {
+	cmds, plats := casosDif()
+	malos := 0
+	for i := 0; i+1 < len(cmds); i++ {
+		con, sin := cmds[i]+"\n"+marcaRecorte+"\n"+cmds[i+1]+"\n", cmds[i]+"\n"+cmds[i+1]+"\n"
+		n, _ := mask.Apply(plats[i], con)
+		o, _ := ref065.Apply(plats[i], con)
+		s, _ := mask.Apply(plats[i], sin)
+		if visibles(n) > visibles(o) || visibles(n) > visibles(s) {
+			if malos++; malos <= 10 {
+				t.Errorf("(%s) %q\n nueva %q\n ref   %q\n sin   %q", plats[i], con, n, o, s)
+			}
+		}
 	}
 }

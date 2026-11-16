@@ -342,6 +342,7 @@ func (s *Stream) Line(raw string) (string, bool) {
 func (s *Stream) LineS1(raw string) (string, bool) {
 	s.twin = nil
 	if isTruncMark(raw) {
+		s.table = "" // como en la v0.6.5, que ve la marca como una línea sin forma de fila: cierra la tabla SNMP/isakmp en curso
 		return raw, true
 	}
 	if line, eol := splitEOL(raw); hasHigh(line) {
@@ -358,7 +359,7 @@ func (s *Stream) LineS1(raw string) (string, bool) {
 }
 
 // truncMark es la línea fija que el driver inserta al recortar una salida enorme (iosxe.add). No lleva ningún valor, así
-// que es transparente: se emite tal cual y no toca el estado (bloque, llave, cadena), y S1 ve el texto como si no existiera.
+// que es transparente: se emite tal cual y no toca el estado (bloque, llave, cadena); solo cierra la tabla en curso, y S1 ve el texto como si no existiera.
 var truncMark = regexp.MustCompile(`^\[\x{2026} output truncated: \d+ bytes omitted \x{2026}\]$`)
 
 func isTruncMark(raw string) bool {
