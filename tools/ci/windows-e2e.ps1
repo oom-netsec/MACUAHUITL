@@ -128,8 +128,9 @@ try {
 
   # 3) un segundo núcleo del mismo usuario se niega y el primero sigue vivo.
   $r = Invoke-As $u1 "$bin\macuahuitld.exe"
-  # Ambos textos envuelven ipc.ErrAlreadyRunning (el segundo es ipc.err.pipe_other_user, que Listen da si no puede abrir el pipe).
-  Must ($r.Code -ne 0 -and $r.Err -match 'ya hay un núcleo escuchando|core channel is held by another user') "un segundo macuahuitld del mismo usuario se niega con ErrAlreadyRunning (salida $($r.Code): $($r.Err.Trim()))"
+  # Todos envuelven ipc.ErrAlreadyRunning (ipc.err.already_running, o ipc.err.pipe_other_user si Listen no puede abrir el
+  # pipe); se aceptan en inglés y en español para no depender del idioma del núcleo.
+  Must ($r.Code -ne 0 -and $r.Err -match 'already listening|ya hay un núcleo escuchando|held by another user|lo tiene otro usuario') "un segundo macuahuitld del mismo usuario se niega con ErrAlreadyRunning (salida $($r.Code): $($r.Err.Trim()))"
   Must ((MctlOk $u1 @('vault', 'status')) -match 'unlocked') 'el primer núcleo sigue respondiendo'
 
   # 4) otro usuario no conecta al pipe ajeno.
