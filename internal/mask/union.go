@@ -147,12 +147,20 @@ func loggedSpans(line, platform string) [][2]int {
 		ind = ind[:len(ind)-len(strings.TrimLeft(ind, " \t"))]
 		return shiftSpans(loggedSpans(ind+line[m[4]:], platform), m[4]-len(ind))
 	}
-	at := func(m []int) [][2]int { return shiftSpans(spansIn(spLogBlock, line[m[4]:m[5]], false, splitsSemi(platform)), m[4]) }
+	at := func(m []int) [][2]int {
+		return shiftSpans(spansIn(spLogBlock, line[m[4]:m[5]], false, splitsSemi(platform)), m[4])
+	}
 	if m := loggedCmd.FindStringSubmatchIndex(line); m != nil {
 		return at(m)
 	}
 	if strings.Contains(line, "-1110") {
 		for _, re := range cmdSyslog {
+			if m := re.FindStringSubmatchIndex(line); m != nil {
+				return at(m)
+			}
+		}
+		// Sin el cierre «' command.» (mensaje truncado o mal formado) el comando citado llega hasta el fin de la línea.
+		for _, re := range cmdSyslogOpen {
 			if m := re.FindStringSubmatchIndex(line); m != nil {
 				return at(m)
 			}
@@ -164,7 +172,7 @@ func loggedSpans(line, platform string) [][2]int {
 	if m := cliHistory.FindStringSubmatchIndex(line); m != nil && platform == "nx-os" {
 		return at(m)
 	}
-	for _, re := range []*regexp.Regexp{histCmd, acctCmd, diffLine} {
+	for _, re := range []*regexp.Regexp{histCmd, acctCmd, diffLine, diffLineM2} {
 		if m := re.FindStringSubmatchIndex(line); m != nil {
 			return at(m)
 		}
@@ -322,3 +330,13 @@ func quoteTail(orig, s1 string) [][2]int {
 	}
 	return nil // una sola comilla tras el cambio, que cierra la cita: lo normal
 }
+
+// cmdSyslogOpen: los syslog de ASA/FTD 111008 y 111010 sin el cierre del comando citado.
+var cmdSyslogOpen = []*regexp.Regexp{
+	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111008: User '.*?' executed the ')(.*)()$`),
+	regexp.MustCompile(`^(.*%(?:ASA|FTD)-\d-111010: User '.*?', running '.*?' from IP \S+, executed ')(.*)()$`),
+}
+
+// diffLineM2: el diff de show archive config differences, como diffLine pero sin exigir minúscula tras el signo
+// («+NO snmp-server…», «+ENABLE SECRET…», que IOS acepta) y con un BOM delante. Solo lo usa M₂: diffLine es de la v0.6.5.
+var diffLineM2 = regexp.MustCompile(`^(\x{FEFF}? ?[+-])((?i:\s+(?:no|default)\s+)?[A-Za-z].*)$`)

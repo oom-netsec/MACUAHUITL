@@ -158,7 +158,7 @@ func spansSeg(block, cmd string, quoted bool) (spans [][2]int) {
 		if j >= n || notSecretValue(low, i, j, first, n) || quoted && spProse[low(j)] {
 			continue
 		}
-		e := len(toks) // hasta el fin del segmento, también pasada una barra o un « ; » (con split, el segmento ya no los trae)
+		e := len(toks)                  // hasta el fin del segmento, también pasada una barra o un « ; » (con split, el segmento ya no los trae)
 		if onlyMasked(cmd, toks[j:e]) { // el único valor ya está tapado (con su tipo)
 			i = e - 1
 			continue

@@ -211,3 +211,39 @@ func TestComillaDentroDelValorEnLineaCitada(t *testing.T) {
 		informar(t, fugasEnVias(p, cmds, solo))
 	}
 }
+
+// Punto c: ASA 111008/111010 sin el cierre «' command.» (truncado o mal formado): el comando citado llega al fin de la línea.
+func TestSyslogASASinCierreDelComando(t *testing.T) {
+	cmds := []string{"enable password Zq04206 Zq04207", "snmp-server community Zq04206 RO", "username u secret 0 Zq04206 Zq04207", "crypto ca export TP pkcs12 Zq04206"}
+	pre := []string{"%ASA-5-111008: User 'enable_15' executed the '", "%ASA-5-111010: User 'bob', running 'CLI' from IP 10.1.1.1, executed '"}
+	var malos []string
+	for _, c := range cmds {
+		for _, p := range pre {
+			for _, cola := range []string{"", " comm", " command"} {
+				l := p + c + cola
+				for nom, n := range map[string]string{"Apply": nuevo.apply("asa", l+"\n"), "syslog": nuevo.raw(l), "Stream": nuevo.stream("asa", l+"\n")} {
+					if len(marcas(n)) > 0 {
+						malos = append(malos, fmt.Sprintf("[%s] %q\n  salida: %q", nom, l, n))
+					}
+				}
+			}
+		}
+	}
+	informar(t, malos)
+}
+
+// Punto d: «+NO …», «+ENABLE …» y un BOM delante en una línea de diff.
+func TestDiffConMayusculasYBOM(t *testing.T) {
+	var malos []string
+	for _, c := range []string{"+NO snmp-server community Zq04206 RO", "+No enable secret Zq04206", "-ENABLE SECRET 0 Zq04206 Zq04207", "+SNMP-SERVER COMMUNITY Zq04206 RO",
+		"\xef\xbb\xbf+snmp-server community Zq04206 RO", "\xef\xbb\xbf+NO tacacs-server key Zq04206", "\xef\xbb\xbf-ENABLE PASSWORD Zq04206", " +USERNAME U SECRET 0 Zq04206 Zq04207"} {
+		for _, p := range []string{"ios-xe", ""} {
+			for nom, n := range map[string]string{"Apply": nuevo.apply(p, c+"\n"), "Stream": nuevo.stream(p, c+"\n"), "syslog": nuevo.raw(c)} {
+				if len(marcas(n)) > 0 {
+					malos = append(malos, fmt.Sprintf("[%s] %q\n  salida: %q", nom, c, n))
+				}
+			}
+		}
+	}
+	informar(t, malos)
+}
