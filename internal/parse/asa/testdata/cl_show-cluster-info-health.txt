@@ -1,0 +1,10 @@
+asa# show cluster info health
+
+Member ID to name mapping:
+  0 - unit-1-1(LOCAL)  1 - unit-1-2  2 - unit-1-3
+
+                  0(LOCAL)   1     2
+Heartbeat count      ok      ok    ok
+Port-channel1        up      up    down
+Ethernet1/8          up      up    up
+Unit state          CONTROL_NODE  DATA_NODE  DATA_NODE

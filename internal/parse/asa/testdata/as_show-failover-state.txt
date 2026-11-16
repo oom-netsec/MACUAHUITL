@@ -1,0 +1,11 @@
+asa# show failover state
+		State		Last Failure Reason	Date/Time
+This host  -	Primary
+		Active		None
+Other host -	Secondary
+		Standby Ready	Comm Failure		10:21:44 UTC Nov 9 2026
+
+====Configuration State===
+	Sync Done
+====Communication State===
+	Mac set

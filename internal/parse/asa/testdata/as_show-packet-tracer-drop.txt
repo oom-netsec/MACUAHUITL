@@ -1,0 +1,20 @@
+asa# packet-tracer input inside tcp 10.0.0.10 12345 198.51.100.7 23
+
+Phase: 1
+Type: ACCESS-LIST
+Subtype: log
+Result: DROP
+Config:
+access-group inside_in in interface inside
+access-list inside_in extended deny ip any any
+Additional Information:
+ Forward Flow based lookup yields rule:
+ in  id=0x1234abce, priority=13, domain=permit, deny=true
+
+Result:
+input-interface: inside
+input-status: up
+input-line-status: up
+output-interface: NP Identity Ifc
+Action: drop
+Drop-reason: (acl-drop) Flow is denied by configured rule, Drop-location: frame 0x00005555aaaa flow (NA)/NA
