@@ -115,3 +115,11 @@ func TestReadmeCuentaReglas(t *testing.T) {
 		}
 	}
 }
+
+// `systemctl --global daemon-reload` no existe («--global is not supported») y el `|| true` lo escondía: las unidades de usuario se
+// recargan solas al iniciar sesión, así que el script no debe llamarlo.
+func TestPostinstallSinDaemonReloadGlobal(t *testing.T) {
+	if strings.Contains(leer(t, "deploy", "packaging", "postinstall.sh"), "daemon-reload") {
+		t.Error("postinstall.sh llama a daemon-reload: no es válido con --global")
+	}
+}

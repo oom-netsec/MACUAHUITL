@@ -1,7 +1,6 @@
 #!/bin/sh
 # Solo informa: el servicio es de usuario y lo activa cada ingeniero en su sesión. El texto va en inglés (lengua canónica).
 set -e
-command -v systemctl >/dev/null 2>&1 && systemctl --global daemon-reload >/dev/null 2>&1 || true
 cat <<'MSG'
 MACUAHUITL installed. For each user who will use it:
   systemctl --user enable --now macuahuitld
