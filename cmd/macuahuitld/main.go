@@ -66,16 +66,18 @@ func run(harden func() ([]i18n.Text, error)) error {
 	if runtime.GOOS != "windows" && p.Runtime == "" { // en Windows no hay carpeta runtime: el canal es un named pipe
 		return errors.New(i18n.Msg(consoleLang, "harden.err.runtime_dir", nil))
 	}
-	// Sin consola (-H windowsgui) la salida va a <State>\macuahuitld.log; en Linux no hace nada (stderr, journal).
-	if err := sys.RedirectStderr(filepath.Join(p.State, "macuahuitld.log")); err != nil {
-		return err
-	}
+	// El canal primero: un segundo núcleo que pierde el pipe (o el socket) sale sin tocar nada del primero, ni su registro.
 	addr, err := ipc.CoreAddr(p.Runtime)
 	if err != nil {
 		return err
 	}
 	l, err := ipc.Listen(addr)
 	if err != nil {
+		return err
+	}
+	// Sin consola (-H windowsgui) la salida va a <State>\macuahuitld.log; en Linux no hace nada (stderr, journal).
+	if err := sys.RedirectStderr(filepath.Join(p.State, "macuahuitld.log")); err != nil {
+		l.Close()
 		return err
 	}
 	c, err := core.New(p, core.Options{Inhibitor: power.NewLogind(), HardenWarnings: warns})
