@@ -435,6 +435,7 @@ func TestOtroEquipoSegunLasSeries(t *testing.T) {
 		"sin serie, otro hostname: otro":                        {"ISE1", "ise", nil, "ISE2", "ise", nil, true, false},
 		"a una le falta la serie, otro hostname: otro":          {"SW1", "ios-xe", stack, "SW2", "ios-xe", nil, true, false},
 		"ftd con uuid":                                          {"fw", "ftd", []string{"1b2c3d4e-0000"}, "fw", "ftd", []string{"1b2c3d4e-0000"}, false, false},
+		"dos virtuales con serie de relleno y UUID distinto":    {"fw", "ftd", []string{"1b2c3d4e-0001"}, "fw", "ftd", []string{"1b2c3d4e-0002"}, true, false},
 		"otra plataforma":                                       {"fw", "asa", []string{"X"}, "fw", "ftd", []string{"X"}, true, false},
 	} {
 		other, note := otherDevice(c.hostA, c.platA, c.serA, c.hostB, c.platB, c.serB)
@@ -455,5 +456,19 @@ func TestReconexionConInterseccionDeSeriesSeAudita(t *testing.T) {
 	e.d.Audit.Export(context.Background(), &buf, time.Time{}, time.Now().Add(time.Hour))
 	if res.State != "partial" || !strings.Contains(buf.String(), "serial set changed") {
 		t.Fatalf("res = %+v\n%s", res, buf.String())
+	}
+}
+
+// Los Pre de un playbook (ajustes de sesión) no son una salida completa: si todo lo demás se corta, el equipo queda failed.
+func TestSoloPreCompletoFalla(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	e.d.Playbooks = append(e.d.Playbooks, playbook.Playbook{ID: "ios-xe/pre-prueba", Platform: "ios-xe", Name: "pre", Pre: []string{"show ip interface brief"},
+		Commands: []playbook.Command{{Text: "show version", Timeout: time.Minute}, {Text: "show users", Timeout: time.Minute}}})
+	e.spec.PlaybookIDs, e.spec.CustomCommands = []string{"ios-xe/pre-prueba"}, ""
+	newCut(t, e, map[string]error{"show version": platform.ErrPromptTimeout, "show users": platform.ErrPromptTimeout})
+	res, _ := runPartial(t, e, context.Background())
+	if res.State != "failed" {
+		t.Fatalf("res = %+v", res)
 	}
 }

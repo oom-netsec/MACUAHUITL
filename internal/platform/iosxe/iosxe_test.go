@@ -120,6 +120,7 @@ func TestParseSerials(t *testing.T) {
 		"nx-os":    {"  Processor Board ID FOC1234ABCD\n", []string{"FOC1234ABCD"}},
 		"ftd":      {"---[ Cisco Firepower Threat Defense ]---\nUUID      : 1b2c3d4e-0000-1111-2222-333344445555\n", []string{"1b2c3d4e-0000-1111-2222-333344445555"}},
 		"sin":      {"Cisco IOS XE Software, Version 17.9.4a\n", nil},
+		"relleno":  {"Serial Number: None\nProcessor board ID N/A\nSystem serial number : 000000\nSerial Number: -\nSerial Number: UNKNOWN\nUUID : 1b2c3d4e-0000\n", []string{"1b2c3d4e-0000"}},
 		"repetida": {"Processor board ID FCW1\nSystem serial number : FCW1\n", []string{"FCW1"}},
 	} {
 		if got := parseSerials(c.text); !slices.Equal(got, c.want) {

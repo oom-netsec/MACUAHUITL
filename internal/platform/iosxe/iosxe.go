@@ -752,10 +752,22 @@ var serialRe = regexp.MustCompile(`(?im)^\s*(?:System serial number\s*:|Processo
 func parseSerials(text string) []string {
 	var out []string
 	for _, m := range serialRe.FindAllStringSubmatch(text, -1) {
-		out = append(out, m[1])
+		if !serialFiller(m[1]) {
+			out = append(out, m[1])
+		}
 	}
 	slices.Sort(out)
 	return slices.Compact(out)
+}
+
+// serialFiller: valores de relleno que dos unidades distintas (virtuales) comparten y no identifican nada: None, N/A, NA,
+// Unknown, "-" y los ceros puros, sin distinguir mayúsculas.
+func serialFiller(v string) bool {
+	switch strings.ToLower(v) {
+	case "none", "n/a", "na", "unknown", "-", "null":
+		return true
+	}
+	return strings.Trim(v, "0") == ""
 }
 
 // Serials son las series que vio Detect (vacío si no trae ninguna): la identidad del equipo, a diferencia del prompt, que
