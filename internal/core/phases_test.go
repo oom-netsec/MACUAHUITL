@@ -360,3 +360,19 @@ func TestCompletedSoloSeVeConElManifestEscrito(t *testing.T) {
 		t.Errorf("segundo finish cambió el estado a %q", j.state)
 	}
 }
+
+// Un estado de trabajo que no se pudo guardar no se pierde en silencio: queda job.persist_failed en la auditoría
+// (antes el error de db.Exec se descartaba y el trabajo podía reaparecer como caído o sin cerrar al recargar).
+func TestPersistJobFallidoQuedaAuditado(t *testing.T) {
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	job, _ := h.created(t, cred, nil)
+	j, _ := h.core.getJob(job)
+	if _, err := h.core.db.Exec(`ALTER TABLE jobs RENAME TO jobs_fuera`); err != nil {
+		t.Fatal(err)
+	}
+	h.core.persistJob(j)
+	if a := h.auditText(t); !strings.Contains(a, `"action":"job.persist_failed","target":"`+job+`"`) {
+		t.Fatalf("sin job.persist_failed para %s en la auditoría:\n%s", job, a)
+	}
+}

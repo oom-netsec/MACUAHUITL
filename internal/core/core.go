@@ -579,6 +579,12 @@ func (c *Core) getJob(id string) (*job, error) {
 }
 
 func (c *Core) persistJob(j *job) {
+	var lost string // detalle de la auditoría si no se pudo guardar; se audita ya sin persistMu (Append puede tardar)
+	defer func() {
+		if lost != "" {
+			c.audit("job.persist_failed", j.id, lost)
+		}
+	}()
 	j.persistMu.Lock() // antes de c.mu; nadie toma persistMu con c.mu en la mano
 	defer j.persistMu.Unlock()
 	c.mu.Lock()
@@ -586,9 +592,13 @@ func (c *Core) persistJob(j *job) {
 	h, _ := json.Marshal(j.jobHistory)
 	name, state := j.spec.Name, j.state
 	c.mu.Unlock()
-	c.db.Exec(`INSERT INTO jobs(id,name,spec_json,state,created_at,history_json) VALUES(?,?,?,?,?,?)
+	if _, err := c.db.Exec(`INSERT INTO jobs(id,name,spec_json,state,created_at,history_json) VALUES(?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET state=excluded.state, history_json=excluded.history_json`,
-		j.id, name, string(b), state, c.o.Now().UTC().Format(time.RFC3339), string(h))
+		j.id, name, string(b), state, c.o.Now().UTC().Format(time.RFC3339), string(h)); err != nil {
+		// Sin reintento propio (con la base ocupada ya se esperó busy_timeout y la siguiente fase vuelve a guardar),
+		// pero nunca en silencio: al recargar, este trabajo podría verse con un estado viejo.
+		lost = fmt.Sprintf("state=%s error=%q", state, i18n.English(err))
+	}
 }
 
 // loadJobs recupera los trabajos guardados. Uno que quedó armado o armándose es de un núcleo
@@ -618,6 +628,9 @@ func (c *Core) loadJobs() {
 		}
 		j.closed = j.state == "completed" || j.state == "cancelled" || j.state == "failed" // de una corrida anterior: no hay finish pendiente
 		c.jobs[id] = j
+	}
+	if err := rows.Err(); err != nil { // una lectura cortada a medias dejaría trabajos fuera en silencio
+		c.audit("job.load_failed", "", i18n.English(err))
 	}
 	rows.Close()
 	for _, j := range dead {
