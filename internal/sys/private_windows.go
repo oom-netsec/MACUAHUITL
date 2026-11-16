@@ -15,6 +15,9 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
+// fileReadExec es FILE_GENERIC_READ|FILE_GENERIC_EXECUTE.
+const fileReadExec = 0x1200A9
+
 func currentSID() (*windows.SID, error) {
 	u, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {
@@ -218,24 +221,19 @@ func ProtectFile(path string) error { return protect(path, false) }
 // (FAT, exFAT) devuelve un error que cumple errors.Is(err, errors.ErrUnsupported).
 func ProtectNewStrict(path string) error { return protect(path, false) }
 
-// ReadOnlyDir pone en la carpeta una ACE de «negar» crear archivos, subcarpetas y borrar hijos a todos (también al
-// usuario: las de negar van primero) y devuelve cómo restaurar la DACL privada. Es para pruebas: chmod no cierra una
-// carpeta en Windows.
+// ReadOnlyDir deja la DACL de la carpeta con solo lectura y ejecución para el usuario, heredable (OI|CI), y devuelve
+// cómo restaurar la DACL privada. Es para pruebas: chmod no cierra una carpeta en Windows. No usa una ACE de «negar»
+// (una prueba de pack con ella no negó mkdir en el runner) sino la falta de permiso: sin ACE de escritura nadie escribe,
+// ni en la carpeta ni en lo que ya hay dentro, y el dueño conserva WRITE_DAC para restaurarla.
 func ReadOnlyDir(path string) (restore func(), err error) {
 	user, err := currentSID()
 	if err != nil {
 		return nil, err
 	}
-	todos, err := windows.StringToSid("S-1-1-0")
-	if err != nil {
-		return nil, err
-	}
-	acl, err := windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{
-		{AccessPermissions: fileAddFile | fileAddSubdir | fileDeleteChild, AccessMode: windows.DENY_ACCESS,
-			Trustee: windows.TRUSTEE{TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeValue: windows.TrusteeValueFromSID(todos)}},
-		{AccessPermissions: fileAllAccess, AccessMode: windows.GRANT_ACCESS,
-			Trustee: windows.TRUSTEE{TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeValue: windows.TrusteeValueFromSID(user)}},
-	}, nil)
+	acl, err := windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{{
+		AccessPermissions: fileReadExec, AccessMode: windows.GRANT_ACCESS, Inheritance: windows.SUB_CONTAINERS_AND_OBJECTS_INHERIT,
+		Trustee: windows.TRUSTEE{TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeValue: windows.TrusteeValueFromSID(user)},
+	}}, nil)
 	if err != nil {
 		return nil, err
 	}

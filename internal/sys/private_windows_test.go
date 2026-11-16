@@ -225,6 +225,10 @@ func TestReadOnlyDirNiegaCrearYSeRestaura(t *testing.T) {
 		f.Close()
 		t.Fatal("se pudo crear un archivo en la carpeta de solo lectura")
 	}
+	if p, err := os.MkdirTemp(d, ".t-"); err == nil { // lo que hace pack.Install
+		os.Remove(p)
+		t.Fatal("se pudo crear una subcarpeta en la carpeta de solo lectura")
+	}
 	restore()
 	f, err := os.Create(filepath.Join(d, "x"))
 	if err != nil {
