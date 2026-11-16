@@ -81,7 +81,9 @@ Hoy el ADR 0003 exige tres cosas: que solo el usuario pueda conectarse, que el n
 ### (d) Inhibir la suspensión y enterarse de suspensión y bloqueo
 
 - **Inhibir**: `PowerCreateRequest` + `PowerSetRequest(PowerRequestSystemRequired)`. Va mientras corre un trabajo de Patrol o una transferencia, igual que el bloqueo de logind. Se prefiere a `SetThreadExecutionState` porque se ata a un handle y no al hilo; en Go un goroutine cambia de hilo.
-- **Enterarse**: hoy `power.Watch` llama `onSleep` y `onLock` (el bloqueo de pantalla cierra la bóveda). En Windows, una ventana *message-only* (`HWND_MESSAGE`, invisible) en un hilo fijo recibe `WM_POWERBROADCAST`/`PBT_APMSUSPEND` y, tras `WTSRegisterSessionNotification`, `WM_WTSSESSION_CHANGE`/`WTS_SESSION_LOCK`. No necesita admin.
+- **Enterarse**: hoy `power.Watch` llama `onSleep` y `onLock` (el bloqueo de pantalla cierra la bóveda). En Windows, una ventana *message-only* (`HWND_MESSAGE`, invisible) en un hilo fijo recibe, tras `RegisterSuspendResumeNotification`, `WM_POWERBROADCAST`/`PBT_APMSUSPEND` y, tras `WTSRegisterSessionNotification`, `WM_WTSSESSION_CHANGE`/`WTS_SESSION_LOCK`. No necesita admin.
+- Una ventana message-only no recibe la difusión `WM_POWERBROADCAST`: se le llama `RegisterSuspendResumeNotification(hwnd, DEVICE_NOTIFY_WINDOW_HANDLE)` (Windows 8+), que además funciona con Modern Standby. Con Modern Standby, `PBT_APMSUSPEND` llega al entrar al estado de bajo consumo, que puede ser minutos después de apagarse la pantalla. Antes suele llegar `WTS_SESSION_LOCK`, que ya cierra la bóveda. Al cerrar, en `WM_CLOSE` y antes de `DestroyWindow`, se desregistran esa y la de WTS.
+- Límites en Windows: no se puede bloquear la tapa ni la suspensión que pide el usuario (por eso el inhibidor devuelve `missing` vacío si `PowerSetRequest` funciona; al suspenderse por la tapa, `onSleep` ya pausa el trabajo). Una ventana message-only tampoco recibe `WM_QUERYENDSESSION`/`WM_ENDSESSION`, así que el apagado no llama a `onSleep`; se acepta, sin otra ventana.
 - Si algo de esto no se puede tomar, se avisa como faltante, igual que `Noop`. No se queda callado.
 
 ### (e) Consola serie COMx
