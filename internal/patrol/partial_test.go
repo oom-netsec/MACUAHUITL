@@ -35,7 +35,8 @@ type cutState struct {
 	opened, close int
 	failOpenFrom  int    // desde esta sesión (1 = la primera), Open falla
 	onCut         func() // se llama al cortar un comando
-	hostFrom2     string // desde la segunda sesión el driver dice llamarse así (otro equipo tras la misma IP)
+	hostFrom2     string // desde la segunda sesión el prompt dice este nombre (el mismo equipo con otro prompt, p. ej. prompt hostname state)
+	serialFrom2   string // desde la segunda sesión el driver dice esta serie (otro equipo tras la misma IP)
 }
 
 type cutDrv struct {
@@ -74,6 +75,15 @@ func (p *cutDrv) Hostname() string {
 		return p.st.hostFrom2
 	}
 	return p.Driver.Hostname()
+}
+
+func (p *cutDrv) Serial() string {
+	p.st.mu.Lock()
+	defer p.st.mu.Unlock()
+	if p.n >= 2 && p.st.serialFrom2 != "" {
+		return p.st.serialFrom2
+	}
+	return p.Driver.(interface{ Serial() string }).Serial()
 }
 
 func (p *cutDrv) Close() {
@@ -274,10 +284,10 @@ func TestReconexionAOtroEquipoFalla(t *testing.T) {
 	e := newEnv(t, simulator.Config{})
 	e.trust(t)
 	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
-	st.hostFrom2 = "OTRO-FW"
+	st.serialFrom2 = "OTRA-SERIE" // mismo prompt, otra unidad (un par en failover con prompt por omisión)
 	w, _ := NewWriter(e.spec.OutputDir, e.spec, time.Now())
 	res := RunDevice(context.Background(), e.d, "j", e.spec, w, 1, e.spec.Targets[0], func(Progress) {})
-	if res.State != "failed" || !strings.Contains(res.Detail, "SW-LAB-01") || !strings.Contains(res.Detail, "OTRO-FW") {
+	if res.State != "failed" || !strings.Contains(res.Detail, "FOC0000X0XX") || !strings.Contains(res.Detail, "OTRA-SERIE") {
 		t.Fatalf("res = %+v", res)
 	}
 	var c interface{ Reason() string }
@@ -286,6 +296,18 @@ func TestReconexionAOtroEquipoFalla(t *testing.T) {
 	}
 	if st.count("show ip interface brief") != 0 || st.opened != 2 || st.close != 2 {
 		t.Fatalf("no debe correr nada en el otro equipo: ran=%v opened=%d closed=%d", st.ran, st.opened, st.close)
+	}
+}
+
+// El mismo equipo con otro prompt (prompt hostname state, %n de la línea vty) no es otro equipo: sigue.
+func TestReconexionMismaSerieConOtroPromptSigue(t *testing.T) {
+	e := newEnv(t, simulator.Config{})
+	e.trust(t)
+	st := newCut(t, e, map[string]error{"show running-config": platform.ErrPromptTimeout})
+	st.hostFrom2 = "OTRO-PROMPT"
+	res, _ := runPartial(t, e, context.Background())
+	if res.State != "partial" || res.Reconnects != 1 {
+		t.Fatalf("res = %+v", res)
 	}
 }
 

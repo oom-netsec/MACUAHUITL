@@ -97,6 +97,7 @@ type driver struct {
 	err      error // primer error; desde ahí el driver no se reutiliza
 	buf      []byte
 	hostname string
+	serial   string // la serie que mostró el show version de Detect; vacía si no la trae
 	// AireOS: aire se activa al ver su prompt; user/login son la credencial del shell (login se destruye tras usarla).
 	aire  bool
 	user  string
@@ -742,6 +743,13 @@ var (
 
 var asa = regexp.MustCompile(`(?m)^Cisco Adaptive Security Appliance Software Version`)
 
+// serialRe: «Processor board ID X» (IOS, IOS-XE, NX-OS) o «Serial Number: X» (ASA, FTD).
+var serialRe = regexp.MustCompile(`(?im)^\s*(?:Processor board ID|Serial Number:?)\s+(\S+)`)
+
+// Serial es la serie que vio Detect (vacía si no la trae): la identidad del equipo, a diferencia del prompt, que un par en
+// failover repite y un clúster cambia de unidad a unidad.
+func (d *driver) Serial() string { return d.serial }
+
 func (d *driver) Detect(ctx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, maxDetect)
 	defer cancel()
@@ -758,6 +766,9 @@ func (d *driver) Detect(ctx context.Context) (string, error) {
 	out, err := d.Run(ctx, "show version", 60*time.Second)
 	if err != nil {
 		return "", err
+	}
+	if m := serialRe.FindStringSubmatch(out.Text); m != nil {
+		d.serial = m[1]
 	}
 	switch {
 	case adeOS.MatchString(out.Text) && iseApp.MatchString(out.Text): // ADE-OS de otro producto no es ISE

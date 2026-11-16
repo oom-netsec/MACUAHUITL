@@ -107,6 +107,7 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 		}
 	}()
 	res.Hostname, res.Platform = c.drv.Hostname(), c.platform
+	serial := serialOf(c.drv)
 	cmds, skipped, requested, err := plan(s, c.platform, d.Playbooks, d.MissingPack)
 	if err != nil {
 		res.State, res.Detail, res.DetailErr = "failed", err.Error(), err
@@ -166,9 +167,13 @@ func RunDevice(ctx context.Context, d Deps, jobID string, s Spec, w *Writer, rou
 			c.close()
 			c = nil
 			nc, err := connect(ctx, d, jobID, s, t, transport.HostKeyPolicy{AcceptChanged: s.AcceptChangedHostKeys}, onEvent, d.PrimaryVerified[hp], d.backoff())
-			if err == nil && (nc.drv.Hostname() != res.Hostname || nc.platform != res.Platform) {
+			ns := ""
+			if err == nil {
+				ns = serialOf(nc.drv)
+			}
+			if err == nil && otherDevice(serial, res.Platform, ns, nc.platform) {
 				// Otro equipo tras la misma IP (un par en failover con la llave replicada): no se escribe nada más en la carpeta del primero.
-				err = i18n.New("patrol.err.reconnect_other_device", i18n.A("from", res.Hostname+" ("+res.Platform+")", "to", nc.drv.Hostname()+" ("+nc.platform+")"))
+				err = i18n.New("patrol.err.reconnect_other_device", i18n.A("from", res.Hostname+" ("+res.Platform+" "+serial+")", "to", nc.drv.Hostname()+" ("+nc.platform+" "+ns+")"))
 				nc.close()
 			} else if err == nil { // si en la reconexión cambió la llave de host, el equipo queda failed y no skipped: ya hay evidencia escrita
 				c = nc
@@ -227,3 +232,21 @@ func rerunPre(ctx context.Context, c *connected, pre []string, done []playbook.C
 
 // maxCmd es el tope total de un comando: 5 veces su timeout de inactividad, y no menos de 5 minutos.
 func maxCmd(timeout time.Duration) time.Duration { return max(5*timeout, 5*time.Minute) }
+
+// serialOf es la serie que vio Detect, si el driver la expone.
+func serialOf(d platform.Driver) string {
+	if s, ok := d.(interface{ Serial() string }); ok {
+		return s.Serial()
+	}
+	return ""
+}
+
+// otherDevice dice si la sesión nueva es de otro equipo. El prompt no sirve (un par en failover lo repite y un clúster
+// con «prompt hostname state» lo cambia): se compara la serie. shortcut: si a alguna sesión le falta la serie solo se compara la
+// plataforma; subir a más señales (show inventory) si aparece un equipo sin serie en el show version.
+func otherDevice(oldSerial, oldPlatform, newSerial, newPlatform string) bool {
+	if oldPlatform != newPlatform {
+		return true
+	}
+	return oldSerial != "" && newSerial != "" && oldSerial != newSerial
+}

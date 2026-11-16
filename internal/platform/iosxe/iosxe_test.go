@@ -94,6 +94,20 @@ func TestDetectIOSXE(t *testing.T) {
 	}
 }
 
+// Detect guarda la serie del show version para que Patrol distinga dos equipos con el mismo prompt.
+func TestDetectGuardaLaSerie(t *testing.T) {
+	d, err := open(t, simulator.Config{}, "en", context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Detect(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if s := d.(interface{ Serial() string }).Serial(); s != "FOC0000X0XX" {
+		t.Fatalf("Serial = %q", s)
+	}
+}
+
 func TestDetectIOS(t *testing.T) {
 	d, err := open(t, simulator.Config{Transcripts: dir("ios")}, "en", context.Background())
 	if err != nil {
