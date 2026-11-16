@@ -339,23 +339,6 @@ func TestQuoteTailConVariasCitasConservaLaProsa(t *testing.T) {
 	}
 }
 
-// sesionConfig: el prompt, cada comando tecleado con su eco, y después las líneas de salida que se den.
-func sesionConfig(im impl, prompt string, cmds []string, salida []string) string {
-	return grabar(im, func(r sesionRec) {
-		r.Output([]byte(prompt))
-		for _, c := range cmds {
-			r.Input([]byte(c + "\r"))
-			r.Output([]byte(c + "\r\n" + prompt))
-		}
-		r.Output([]byte("\r\n"))
-		for _, l := range salida {
-			r.Output([]byte(l + "\r\n"))
-		}
-		r.Output([]byte(prompt))
-		r.Close()
-	})
-}
-
 // sesionPegada: se pegan todos los comandos; llega la línea nota y después los ecos (los pendientes mantienen viva la red por
 // contenido).
 func sesionPegada(im impl, cmds []string, nota string) string {
