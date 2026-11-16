@@ -132,7 +132,7 @@ func failingRun(t *testing.T, lang string, fail bool, reasons ...map[string]stri
 	spec := h.spec(cred)
 	spec.CustomCommands = "show running-config\nshow version\n" // el cortado no es el último: hay reconexión
 	if fail {
-		spec.CustomCommands = "show ip interface brief\nshow running-config\nshow clock\n"
+		spec.CustomCommands = "show ip interface brief\nshow running-config\nshow clock\nshow version\n"
 	}
 	cj, err := h.patrol.CreateJob(con(t, lang), &v1.CreateJobRequest{Spec: spec})
 	if err != nil {
