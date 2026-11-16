@@ -232,7 +232,7 @@ func sessionVRF(origin netip.Addr, outs map[string]string) (vrf string, ok bool)
 		}
 	}
 	switch {
-	case nVRF == 0 && nBrief == 1, nVRF > 0 && nVRF == 1 && nBrief <= nVRF:
+	case nBrief == 1 && nVRF <= 1: // la brief lista también las interfaces de VRF: sin ella no se descarta la global
 		return vrf, true
 	}
 	return "", false

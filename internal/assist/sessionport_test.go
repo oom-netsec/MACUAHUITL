@@ -572,3 +572,14 @@ func TestSessionPortWithoutVRFRowsNeedsTheLocalIPInBrief(t *testing.T) {
 		}
 	}
 }
+
+// Con la IP local en una fila de VRF pero sin una brief legible no se descarta que también esté en la global: sin certeza.
+func TestSessionPortVRFRowWithoutBriefIsUnknown(t *testing.T) {
+	for name, brief := range map[string]string{"vacía": "", "sin comando": "                 ^\n% Invalid input detected at '^' marker.\n"} {
+		o := sess{vrf: "MGMT", port: "Gi1/0/47"}.outs()
+		o[showIPBrief] = brief
+		if sp := sessionPorts(o); sp.known {
+			t.Errorf("brief %s con fila de VRF: %+v", name, sp)
+		}
+	}
+}
