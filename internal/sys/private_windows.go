@@ -147,6 +147,19 @@ func IsPrivate(path string) (bool, error) {
 	return isPrivateACL(owner, user.String(), protected, aces), nil
 }
 
+// OnlyOwnAccess: ver la versión de Linux.
+func OnlyOwnAccess(path string) (bool, error) {
+	user, err := currentSID()
+	if err != nil {
+		return false, err
+	}
+	_, _, aces, err := readACL(path)
+	if err != nil {
+		return false, err
+	}
+	return foreignSID(aces, user.String(), anyAccess, false) == "", nil
+}
+
 // PrivateDir comprueba una carpeta de salidas ya resuelta (ADR 0012, c): dueño el usuario, ninguna ACE que dé acceso
 // a otro SID (cuentan también las solo-herencia: lo que se cree adentro las hereda) y ningún ancestro que deje
 // escribir a otro SID. shortcut: el ancestro se juzga por su ACL explícita y heredada tal como la lee el sistema, sin

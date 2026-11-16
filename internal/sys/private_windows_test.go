@@ -196,3 +196,19 @@ func TestProtectNewDejaElArchivoPrivadoAntesDeEscribir(t *testing.T) {
 		t.Fatalf("IsPrivate = %v, %v", ok, err)
 	}
 }
+
+// OnlyOwnAccess acepta una DACL heredada (sin proteger) con solo los tres SID y rechaza la que trae a un tercero.
+func TestOnlyOwnAccess(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "x")
+	if err := os.WriteFile(f, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	setDACL(t, f, false, userString(t), sidSystem, sidAdmins)
+	if ok, err := OnlyOwnAccess(f); !ok || err != nil {
+		t.Fatalf("propias: %v, %v", ok, err)
+	}
+	setDACL(t, f, false, userString(t), sidSystem, sidAdmins, sidUsuarios)
+	if ok, err := OnlyOwnAccess(f); ok || err != nil {
+		t.Fatalf("con Usuarios: %v, %v", ok, err)
+	}
+}
