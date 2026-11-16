@@ -73,7 +73,7 @@ jobs:
         run: grep -v '^#' tools/ci/windows-pkgs.txt | awk '{print $1}' | GOOS=windows CGO_ENABLED=0 xargs go vet
       - name: x/sys/windows solo donde lo permite el ADR 0012 (también en archivos _windows.go)
         run: tools/ci/winsys.sh
-      - name: la UI no depende de internal/secret (sin caché: go test no ve los cambios que lee go list)
+      - name: la UI no depende de internal/secret (sin caché, go test no ve los cambios que lee go list)
         run: go test -count=1 ./tools/ci
       - name: mask sin -race (corpus completo)
         run: go test -count=1 ./internal/mask/... ./internal/terminal/...
