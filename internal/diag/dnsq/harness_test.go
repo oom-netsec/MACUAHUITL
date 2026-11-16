@@ -234,14 +234,24 @@ type lab struct {
 
 func (l *lab) serve(t *testing.T, ip string, h dns.Handler) {
 	t.Helper()
-	pc, err := net.ListenPacket("udp", ip+":0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	port := pc.LocalAddr().(*net.UDPAddr).Port
-	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", ip, port))
-	if err != nil {
-		t.Fatal(err)
+	// El mismo puerto en UDP y TCP: el que da el sistema para UDP puede estar ocupado o reservado en TCP (en Windows,
+	// los rangos excluidos de Hyper-V dan WSAEACCES), así que se reintenta con otro.
+	var pc net.PacketConn
+	var ln net.Listener
+	var port int
+	for try := 0; ; try++ {
+		var err error
+		if pc, err = net.ListenPacket("udp", ip+":0"); err != nil {
+			t.Fatal(err)
+		}
+		port = pc.LocalAddr().(*net.UDPAddr).Port
+		if ln, err = net.Listen("tcp", fmt.Sprintf("%s:%d", ip, port)); err == nil {
+			break
+		}
+		pc.Close()
+		if try == 20 {
+			t.Fatal(err)
+		}
 	}
 	for _, s := range []*dns.Server{{PacketConn: pc, Handler: h}, {Listener: ln, Handler: h}} {
 		go s.ActivateAndServe()
