@@ -222,9 +222,25 @@ describe("Windows", () => {
     expect(screen.queryByText(/0700/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText(ic)).toBeVisible();
-    expect(screen.getByText(/fix it with the icacls command in cmd/)).toBeVisible();
+    expect(screen.getByText(/remove that access/)).toBeVisible();
     await userEvent.click(screen.getByRole("button", { name: /Copy/ }));
     expect(core.copyText).toHaveBeenCalledWith(ic);
+  });
+
+  test("sin orden: muestra el detalle del núcleo y no promete una orden", async () => {
+    setOSForTests("windows");
+    view(fakeCore({ setCorePrefs: vi.fn(async () => { throw winErr("permisos", "prefs.outputs.permisos: la carpeta C:\\x da acceso a enlace"); }) }));
+    await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));
+    expect(await screen.findByText(/da acceso a enlace/)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Copiar/ })).toBeNull();
+  });
+
+  test("reservada: texto de Windows", async () => {
+    setOSForTests("windows");
+    view(fakeCore({ setCorePrefs: vi.fn(async () => { throw rpc("prefs.outputs.reservada: texto del núcleo"); }) }), "en");
+    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    expect(await screen.findByText(/your user profile or \.ssh/)).toBeVisible();
+    expect(screen.queryByText(/~\/\.ssh/)).toBeNull();
   });
 
   test("una orden con % no se muestra", async () => {
@@ -232,7 +248,7 @@ describe("Windows", () => {
     view(fakeCore({ setCorePrefs: vi.fn(async () => { throw winErr("permisos", 'x; corrígelo en cmd con: icacls "C:\\a" /grant:r "%USERNAME%:(OI)(CI)F"'); }) }));
     await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));
     await screen.findByText(/da acceso a otros usuarios/);
-    expect(screen.queryByText(/icacls "/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Copiar/ })).toBeNull(); // sin orden segura: solo el detalle del núcleo
   });
 
   test("ancestro y reservada tienen su texto de Windows", async () => {

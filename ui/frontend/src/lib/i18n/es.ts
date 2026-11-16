@@ -2803,7 +2803,7 @@ export const es = {
   "settings.storage.err.relativa.windows": "La ruta debe ser absoluta (p. ej. C:\\Users\\tu-usuario\\salidas).",
   "settings.storage.err.no_existe.windows": "La carpeta no existe. Créala y vuelve a intentar.",
   "settings.storage.err.reservada.windows": "Esa carpeta está reservada (datos, configuración, tu perfil de usuario o .ssh) o contiene a una de ellas. Elige una subcarpeta propia, por ejemplo dentro de tu perfil de usuario.",
-  "settings.storage.err.permisos.windows": "La carpeta da acceso a otros usuarios. La aplicación no lo cambia: corrígelo con la orden icacls en cmd y vuelve a intentarlo.",
+  "settings.storage.err.permisos.windows": "La carpeta da acceso a otros usuarios. La aplicación no lo cambia: quita ese acceso (Propiedades → Seguridad, o con icacls en cmd) y vuelve a intentarlo.",
   "settings.storage.err.ancestro_inseguro.windows": "La carpeta cuelga de otra donde otros usuarios pueden escribir (p. ej. C:\\Users\\Public), y podrían reemplazar la ruta. Elige una carpeta bajo tu perfil de usuario.",
 };
 

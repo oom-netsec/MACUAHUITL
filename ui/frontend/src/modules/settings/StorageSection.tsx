@@ -54,13 +54,14 @@ export function StorageSection({ core }: { core: CoreAPI }) {
   // La carpeta guardada ya no cumple y rige la de fábrica (el núcleo lo dice en `note`, en español).
   const fellBack = !!state.outputsDir && state.outputsDirEffective !== state.outputsDir;
   const noteText = state.note ? state.note : fellBack ? t("settings.storage.noteFallback", { path: state.outputsDir }) : t("settings.storage.noteMoved");
-  const chmod = saveErr?.parsed?.code === "permisos" ? (isWindows() ? icaclsCommand(saveErr.msg) : chmodCommand(saveErr.parsed.path)) : "";
+  const chmod = saveErr?.parsed?.code === "permisos" ? (isWindows() ? icaclsCommand(saveErr.msg, saveErr.parsed.path) : chmodCommand(saveErr.parsed.path)) : "";
 
   // Los rechazos del núcleo por la carpeta van bajo su campo; el resto (p. ej. fallo al guardar) junto a Guardar.
   const parsedErr = saveErr?.parsed;
   const dirErr = parsedErr && (
     <div role="alert">
       {t(outputsReasonKey(parsedErr.code))}
+      {!chmod && isWindows() && parsedErr.code === "permisos" && <> {saveErr.msg}</>}
       {chmod && <div className="storage-cmd"><code>{chmod}</code><CopyButton value={chmod} label={t("settings.storage.chmod")} /></div>}
     </div>
   );

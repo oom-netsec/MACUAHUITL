@@ -2804,6 +2804,6 @@ export const en: Record<Key, string> = {
   "settings.storage.err.relativa.windows": "The path must be absolute (e.g. C:\\Users\\your-user\\outputs).",
   "settings.storage.err.no_existe.windows": "The folder does not exist. Create it and try again.",
   "settings.storage.err.reservada.windows": "That folder is reserved (data, configuration, your user profile or .ssh) or contains one of them. Pick a subfolder of your own, for example inside your user profile.",
-  "settings.storage.err.permisos.windows": "The folder gives access to other users. The application does not change it: fix it with the icacls command in cmd and try again.",
+  "settings.storage.err.permisos.windows": "The folder gives access to other users. The application does not change it: remove that access (Properties → Security, or with icacls in cmd) and try again.",
   "settings.storage.err.ancestro_inseguro.windows": "The folder is inside a directory that other users can write to (e.g. C:\\Users\\Public), so they could replace the path. Pick a folder under your user profile.",
 };

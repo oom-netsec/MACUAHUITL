@@ -28,12 +28,12 @@ export function chmodCommand(path: string): string {
   return `chmod 700 ${shellQuote(path)}`;
 }
 
-/** La orden `icacls` que el núcleo agrega al error de permisos en Windows (tras «corrígelo en cmd con: » o «fix it in cmd with: »); vacía si no empieza con `icacls "` o trae `%` o `!` (cmd los expande aun entre comillas), saltos de línea, controles o invisibles. */
-export function icaclsCommand(msg: string): string {
-  const cmd = /(?:corrígelo en cmd con|fix it in cmd with): ([\s\S]*)$/.exec(msg)?.[1] ?? "";
+/** La orden `icacls` que el núcleo agrega al error de permisos en Windows (tras «corrígelo en cmd con: » o «fix it in cmd with: »). Solo con el formato exacto del núcleo y con la carpeta igual a `dir` (la ruta del error): así nada fuera de las comillas viene del nombre de la carpeta. Vacía si no cuadra o trae `%`, `!`, saltos, controles o invisibles. */
+export function icaclsCommand(msg: string, dir: string): string {
+  const m = /(?:corrígelo en cmd con|fix it in cmd with): (icacls "([^"]+)" \/inheritance:r(?: \/remove "\*S-[\d-]+")+ \/grant:r "\*S-[\d-]+:\(OI\)\(CI\)F" "\*S-1-5-18:\(OI\)\(CI\)F" "\*S-1-5-32-544:\(OI\)\(CI\)F")$/.exec(msg);
   // eslint-disable-next-line no-control-regex
-  if (!cmd.startsWith('icacls "') || /[%!\x00-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/.test(cmd)) return "";
-  return cmd;
+  if (!m || !dir || m[2] !== dir || /[%!\x00-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/.test(m[1])) return "";
+  return m[1];
 }
 
 /** La clave traducida de un motivo del núcleo. */
@@ -43,6 +43,8 @@ export const outputsReasonKey = (code: string): Key => (OUTPUTS_REASONS.includes
 export function outputsErrorText(e: unknown, t: (k: Key) => string): string {
   const p = parseOutputsError(e);
   if (!p) return errorText(e);
-  const cmd = p.code !== "permisos" ? "" : isWindows() ? icaclsCommand(errorText(e)) : chmodCommand(p.path);
-  return t(outputsReasonKey(p.code)) + (cmd ? ` ${cmd}` : "");
+  const win = isWindows() && p.code === "permisos";
+  const cmd = p.code !== "permisos" ? "" : win ? icaclsCommand(errorText(e), p.path) : chmodCommand(p.path);
+  // Windows sin orden (junction, ACE rara, ruta con %…): el detalle del núcleo trae el SID y la causa.
+  return t(outputsReasonKey(p.code)) + (cmd ? ` ${cmd}` : win ? ` ${errorText(e)}` : "");
 }
