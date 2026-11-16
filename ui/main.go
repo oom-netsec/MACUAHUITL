@@ -59,6 +59,7 @@ func main() {
 		// Wayland toma el app_id de este nombre y GNOME busca macuahuitl.desktop con él para el ícono del dock;
 		// fijo para que no dependa del nombre del ejecutable.
 		Linux:    application.LinuxOptions{ProgramName: "macuahuitl"},
+		Windows:  application.WindowsOptions{WebviewUserDataPath: webviewUserDataPath()},
 		Services: []application.Service{application.NewService(b)},
 		Assets:   application.AssetOptions{Handler: application.AssetFileServerFS(dist)},
 	})

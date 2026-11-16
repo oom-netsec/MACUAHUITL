@@ -169,7 +169,10 @@ Propuesta de Front, verificada sobre el código de wails/v3 v3.1.0 (la versión 
 - **Puente.** Solo usa `ipc.Dial` e `ipc.ClientConn`. El `ipc_windows.go` del canal (a) da el mismo `Dial`, así que ni `bridge.go` ni sus módulos cambian. `sys.NoDump`, `sys.RenameNoReplaceIn` y `NoAtomicRename` conservan su firma en Windows (ver b y c).
 - **Ventana.**
   - Los controles propios ya están en el orden de Windows.
-  - Se enciende `Windows.NonClientRegionSupport`, para que Windows 11 conserve Snap Layouts con la ventana `Frameless`.
+  - Snap Layouts:
+    - Arrastrar la ventana a un borde y Win+Z deberían funcionar con las zonas de arrastre de hoy: `--wails-draggable` arrastra con `HTCAPTION`, y la ventana sin marco conserva `WS_MAXIMIZEBOX` y `WS_THICKFRAME`. Se confirma en la validación.
+    - El menú de Snap Layouts al pasar el mouse por maximizar necesita marcar el botón con `--wails-non-client-region: maximize`. En Wails 3.1 eso solo funciona con `WebView2CompositionHosting`, otro modo de alojar WebView2, así que se evalúa en la validación en Windows real antes de encenderlo.
+    - `NonClientRegionSupport` no hace falta: solo activa el `app-region` de CSS, que la UI no usa.
   - `WebviewUserDataPath` va dentro de State, no en `%APPDATA%\macuahuitl.exe`, que es lo que pone Wails por omisión.
 - **Rutas con «/» en la UI.** Se corrigen con un helper `baseName`/`dirName` que acepta los dos separadores, y con pruebas. Los casos:
   - `modules/transfer/client.ts` (origen local de «put»);
