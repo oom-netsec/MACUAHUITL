@@ -316,10 +316,19 @@ func TestAppendReintentaConLaBaseOcupada(t *testing.T) {
 	}
 	released := make(chan error, 1)
 	time.AfterFunc(150*time.Millisecond, func() { _, err := conn.ExecContext(ctx, "COMMIT"); released <- err })
-	if _, err := New(db, time.Now).Append(ctx, Entry{Actor: "t", Action: "prueba"}); err != nil {
+	l := New(db, time.Now)
+	if _, err := l.Append(ctx, Entry{Actor: "t", Action: "prueba"}); err != nil {
 		t.Fatalf("Append con la base ocupada 150 ms (busy_timeout 20 ms): %v", err)
 	}
 	if err := <-released; err != nil {
 		t.Fatal(err)
+	}
+	// Los intentos fallidos no dejan rastro: una sola fila y la cadena íntegra.
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM audit_log`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("filas = %d (%v), quiero 1", n, err)
+	}
+	if v, err := l.Verify(ctx); err != nil || !v.Intact {
+		t.Fatalf("Verify = %+v, %v", v, err)
 	}
 }
