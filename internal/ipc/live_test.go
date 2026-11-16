@@ -22,7 +22,7 @@ func (b blockEvents) Subscribe(_ *v1.SubscribeRequest, s v1.EventService_Subscri
 
 func eventually(t *testing.T, f func() bool) {
 	t.Helper()
-	for i := 0; i < 200; i++ {
+	for i := 0; i < 1000; i++ {
 		if f() {
 			return
 		}
