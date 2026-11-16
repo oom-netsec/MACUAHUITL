@@ -202,41 +202,38 @@ func parseVRFInterfaces(text string) (rows []vrfRow, ok bool) {
 }
 
 // sessionVRF da la VRF de la interfaz que lleva la sesión ("" = la global). ok es false si no se puede saber con certeza: no se leyó la tabla
-// de VRF, no se sabe la IP local de la sesión (show users + show tcp brief), o hay interfaces en VRF y la IP local no está en ninguna ni se
-// ve en la tabla global (show ip interface brief). Un equipo sin interfaces en VRF no pregunta nada más: la sesión es global.
+// de VRF, no se sabe la IP local de la sesión (show users + show tcp brief), la IP local no se ve en show ip interface brief, o se ve en más
+// interfaces que las de VRF que la tienen (también en la global o en dos VRF).
 func sessionVRF(origin netip.Addr, outs map[string]string) (vrf string, ok bool) {
 	rows, readable := parseVRFInterfaces(outs[showVRFCmd])
-	if !readable {
-		return "", false
-	}
-	if len(rows) == 0 {
-		return "", true
-	}
 	locals := sessionLocals(outs[showUsersCmd], outs[showTCPCmd])
-	if len(locals) != 1 || !origin.Is4() {
+	if !readable || len(locals) != 1 || !origin.Is4() {
 		return "", false
 	}
 	local := locals[0].String()
+	nVRF := 0
 	for _, r := range rows {
 		if r.ip == local {
-			if !nameRe.MatchString(r.vrf) {
-				return "", false
-			}
-			if vrf != "" && vrf != r.vrf {
+			if !nameRe.MatchString(r.vrf) || vrf != "" && vrf != r.vrf {
 				return "", false
 			}
 			vrf = r.vrf
+			nVRF++
 		}
 	}
-	if vrf != "" {
-		return vrf, true
-	}
-	// Fuera de toda VRF: tiene que ser una IP de una interfaz de la tabla global para darla por tal.
+	// La IP local tiene que verse en show ip interface brief: sin filas de VRF (tabla vacía o un equipo que no conoce el comando) eso es lo único que
+	// la ubica en la tabla global; con ellas, si la brief la trae en más interfaces que las filas de VRF, también está en la global o en otra VRF y
+	// no se sabe por cuál entra la sesión.
+	nBrief := 0
 	brief, _ := iosxe.ParseIPBrief(outs[showIPBrief])
 	for _, b := range brief {
 		if b.IP == local {
-			return "", true
+			nBrief++
 		}
+	}
+	switch {
+	case nVRF == 0 && nBrief == 1, nVRF > 0 && nVRF == 1 && nBrief <= nVRF:
+		return vrf, true
 	}
 	return "", false
 }

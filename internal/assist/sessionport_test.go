@@ -536,3 +536,39 @@ func TestValidInterfaceMultigig(t *testing.T) {
 		}
 	}
 }
+
+// La misma IP local en una VRF y en la tabla global: no se sabe cuál lleva la sesión, y el puerto de una VRF no se da por el de la sesión.
+func TestSessionPortSameLocalIPInGlobalAndVRFIsUnknown(t *testing.T) {
+	const gi48 = "GigabitEthernet1/0/48"
+	o := sess{vrf: "TENANT", port: "Gi1/0/47"}.outs()
+	o[showIPBrief] += "Vlan1                  10.20.0.1       YES manual up                    up\n"
+	if sp := sessionPorts(o); sp.known {
+		t.Errorf("IP repetida en la global y en una VRF: %+v", sp)
+	}
+	up := with(trunkOuts(gi48, trunkCfg(gi48, "switchport mode trunk", "switchport trunk allowed vlan 10,20,30"), swTrunk), sess{})
+	maps.Copy(up, o)
+	if _, err := TrunkPlan("SW1", TrunkChange{Interface: gi48, Op: "remove", Vlan: 20}, up); !errors.Is(err, ErrSnippetRefused) {
+		t.Errorf("trunk remove con IP repetida: %v", err)
+	}
+	// Dos VRF con esa IP: tampoco.
+	o2 := sess{vrf: "TENANT", port: "Gi1/0/47", vrfRows: "Vl30                   10.20.0.1       OTRA                             up\n"}.outs()
+	if sp := sessionPorts(o2); sp.known {
+		t.Errorf("dos VRF con la IP: %+v", sp)
+	}
+}
+
+// Sin filas de VRF (tabla vacía o el equipo no conoce el comando) la sesión solo es global si la IP local está en show ip interface brief.
+func TestSessionPortWithoutVRFRowsNeedsTheLocalIPInBrief(t *testing.T) {
+	invalid := "                 ^\n% Invalid input detected at '^' marker.\n"
+	for name, vrfOut := range map[string]string{"sin comando": invalid, "tabla vacía": "Interface              IP-Address      VRF                              Protocol\n"} {
+		// 3560CX con la gestión por una SVI global: sigue con certeza.
+		if sp := sessionPorts(sess{port: "Gi1/0/48", vrfOut: vrfOut}.outs()); !sp.known || !sp.isSession("Gi1/0/48") {
+			t.Errorf("%s, IP local en la brief: %+v", name, sp)
+		}
+		o := sess{port: "Gi1/0/48", vrfOut: vrfOut}.outs()
+		o[showIPBrief] = "Interface              IP-Address      OK? Method Status                Protocol\nVlan1                  10.77.7.7       YES manual up                    up\n"
+		if sp := sessionPorts(o); sp.known {
+			t.Errorf("%s, IP local fuera de la brief: %+v", name, sp)
+		}
+	}
+}
