@@ -44,14 +44,15 @@ var (
 )
 
 const (
-	tailMax    = 256
-	lineMax    = 64 << 10 // una línea (de salida o tecleada) más larga se recorta
-	heldMax    = 32       // líneas tecleadas retenidas a la espera de saber si eran una contraseña
-	secretsMax = 16
-	secretsWin = 50   // líneas de salida que dura la red por contenido
-	sentMax    = 32   // líneas enviadas que esperan su eco
-	skipMax    = 4096 // líneas que se descartan dentro de una llave privada sin cierre
-	totalMax   = 256 << 20
+	tailMax     = 256
+	lineMax     = 64 << 10 // una línea (de salida o tecleada) más larga se recorta
+	heldMax     = 32       // líneas tecleadas retenidas a la espera de saber si eran una contraseña
+	secretsMax  = 16
+	secrets2Max = 64   // tope de la lista M₂ (secretsMax sigue siendo el de la v0.6.5)
+	secretsWin  = 50   // líneas de salida que dura la red por contenido
+	sentMax     = 32   // líneas enviadas que esperan su eco
+	skipMax     = 4096 // líneas que se descartan dentro de una llave privada sin cierre
+	totalMax    = 256 << 20
 )
 
 // Recorder es seguro entre goroutines: la salida y el teclado llegan por separado.
@@ -74,6 +75,7 @@ type Recorder struct {
 	win      int         // líneas de salida que le quedan a la ventana
 	secrets2 []string    // lo mismo para los valores que tapa mask.CutCommand (lista y ventana aparte: no tocan el estado de las reglas)
 	win2     int
+	prim2    map[string]bool // valores de secrets2 que son el primer valor de un secreto (se desalojan al final)
 	multi2   map[string]bool // valores de secrets2 que vienen de un secreto de varias palabras: pasan el prompt sin pendientes
 	blk2     string          // bloque del prompt para mask.CutCommand («keychain» además de los de lastBlk)
 	acc      string          // lo recibido del eco partido hasta ahora
@@ -151,7 +153,7 @@ func (r *Recorder) outLine(l string) {
 	}
 	if r.win2 > 0 {
 		if r.win2--; r.win2 == 0 {
-			r.secrets2, r.multi2 = nil, nil
+			r.secrets2, r.multi2, r.prim2 = nil, nil, nil
 		}
 	}
 	out, keep := "", true
@@ -381,7 +383,7 @@ var maskedTok = regexp.MustCompile(`<MASKED:[^>]*>`)
 func (r *Recorder) peekSecrets(line string) {
 	line, m := maskTyped(line, r.typed.Peek, true) // sin prompt que lo confirme: se tapa como en config
 	r.noteSecrets(line, m)
-	_, vals := mask.CutCommand(r.blk2, line, m)
+	_, vals := mask.CutCommandV(r.blk2, line, m)
 	r.note2(vals)
 }
 
@@ -399,8 +401,8 @@ func (r *Recorder) typedLine(line string, loose bool) string {
 	}
 	r.noteSecrets(line, m)
 	if cfg { // el corte: S1 (m) con lo que Command tapa; no cambia ningún estado
-		var vals []string
-		m, vals = mask.CutCommand(r.blk2, line, m)
+		var vals []mask.SecretValue
+		m, vals = mask.CutCommandV(r.blk2, line, m)
 		r.note2(vals)
 	}
 	return m
@@ -412,29 +414,48 @@ func (r *Recorder) hide(src, s1 string) string {
 	if strings.HasPrefix(src, "$") && strings.HasPrefix(s1, "$") { // eco desplazado de IOS («R1(config)#$cola…»): el «$» no es del comando
 		pre, src, s1 = "$", src[1:], s1[1:]
 	}
-	out, vals := mask.CutCommand(r.blk2, src, s1)
+	out, vals := mask.CutCommandV(r.blk2, src, s1)
 	r.note2(vals)
 	frag := len(r.sent) > 0
 	return pre + r.scrub2(r.scrub(out, frag), frag)
 }
 
-// note2 guarda en memoria los valores que tapó mask.CutCommand (con su propio tope y ventana).
-func (r *Recorder) note2(vals []string) {
+// note2 guarda en memoria los valores que tapó mask.CutCommandV (con su propio tope y ventana). Al pasar secrets2Max se
+// desaloja la más antigua de las palabras que no son el primer valor de un secreto: un comando largo no saca de la lista
+// el valor de otro anterior.
+func (r *Recorder) note2(vals []mask.SecretValue) {
 	for _, v := range vals {
-		if len(v) >= 4 && !strings.HasPrefix(v, "<MASKED:") {
-			if len(vals) > 1 {
-				if r.multi2 == nil {
-					r.multi2 = map[string]bool{}
-				}
-				r.multi2[v] = true
-			}
-			if indexOf(r.secrets2, v) < 0 {
-				if r.secrets2 = append(r.secrets2, v); len(r.secrets2) > secretsMax {
-					r.secrets2 = r.secrets2[1:]
-				}
-			}
-			r.win2 = secretsWin
+		if len(v.Text) < 4 || strings.HasPrefix(v.Text, "<MASKED:") {
+			continue
 		}
+		if v.Persist {
+			if r.multi2 == nil {
+				r.multi2 = map[string]bool{}
+			}
+			r.multi2[v.Text] = true
+		}
+		if v.Primary {
+			if r.prim2 == nil {
+				r.prim2 = map[string]bool{}
+			}
+			r.prim2[v.Text] = true
+		}
+		if indexOf(r.secrets2, v.Text) < 0 {
+			r.secrets2 = append(r.secrets2, v.Text)
+			if len(r.secrets2) > secrets2Max {
+				k := 0
+				for i, x := range r.secrets2 {
+					if !r.prim2[x] {
+						k = i
+						break
+					}
+				}
+				delete(r.multi2, r.secrets2[k])
+				delete(r.prim2, r.secrets2[k])
+				r.secrets2 = append(r.secrets2[:k], r.secrets2[k+1:]...)
+			}
+		}
+		r.win2 = secretsWin
 	}
 }
 

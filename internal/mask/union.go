@@ -251,6 +251,19 @@ var quotedCmdLine = regexp.MustCompile(`Output from config line|(?i:\b(?:error|w
 // CutCommand es el corte para un comando tecleado (con el bloque del prompt): s1 es lo que la cadena de reglas dejó de
 // orig; devuelve s1 con lo que Command tapa y los valores tapados (para tapar su repetición por contenido).
 func CutCommand(block, orig, s1 string) (string, []string) {
+	out, vs := CutCommandV(block, orig, s1)
+	vals := make([]string, len(vs))
+	for i, v := range vs {
+		vals[i] = v.Text
+	}
+	return out, vals
+}
+
+// hostCmd: «snmp-server host IP …»: tras la community van opciones, no más secretos.
+var hostCmd = regexp.MustCompile(`(?i)^\s*(?:do\s+)?(?:(?:no|default)\s+)*snmp-s\S*\s+ho`)
+
+// CutCommandV es CutCommand con las marcas de cada valor (SecretValue).
+func CutCommandV(block, orig, s1 string) (string, []SecretValue) {
 	if strings.Contains(orig, `\"`) {
 		orig = strings.ReplaceAll(orig, `\"`, `"`)
 	}
@@ -262,26 +275,29 @@ func CutCommand(block, orig, s1 string) (string, []string) {
 	// las reglas solo ven el espacio ASCII (api-key NBSP X): lo que tapan sobre la copia normalizada se corta aquí
 	spans = append(spans, twinSpans(orig, func(n string) string { var st Stream; return st.Prompted(n, block) })...)
 	spans = mergeSpans(spans)
-	var vals []string
+	var vals []SecretValue
 	for _, sp := range spans {
-		for _, v := range append(SecretValues(orig[sp[0]:sp[1]]), SecretValues(n[sp[0]:sp[1]])...) {
+		host := hostCmd.MatchString(orig[:sp[0]])
+		for _, v := range append(SecretValuesV(orig[sp[0]:sp[1]], host), SecretValuesV(n[sp[0]:sp[1]], host)...) {
 			vals = append(vals, v)
 			// un valor con forma de URL («ftp://u:CLAVE@host/f»): también sus partes, que un eco partido deja sueltas
-			for _, p := range strings.FieldsFunc(v, func(r rune) bool { return r == '/' || r == '@' || r == ':' }) {
-				if p != v && spValue(p) {
-					vals = append(vals, p)
+			for _, p := range strings.FieldsFunc(v.Text, func(r rune) bool { return r == '/' || r == '@' || r == ':' }) {
+				if p != v.Text && spValue(p) {
+					vals = append(vals, SecretValue{Text: p})
 				}
 			}
 		}
 	}
 	out, _ := cut(orig, s1, spans)
-	seen := map[string]bool{}
-	uniq := vals[:0]
+	var uniq []SecretValue
+	at := map[string]int{}
 	for _, v := range vals {
-		if !seen[v] {
-			seen[v] = true
-			uniq = append(uniq, v)
+		if k, ok := at[v.Text]; ok {
+			uniq[k].Primary, uniq[k].Persist = uniq[k].Primary || v.Primary, uniq[k].Persist || v.Persist
+			continue
 		}
+		at[v.Text] = len(uniq)
+		uniq = append(uniq, v)
 	}
 	return out, uniq
 }

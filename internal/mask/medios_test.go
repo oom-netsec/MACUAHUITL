@@ -2,8 +2,11 @@ package mask_test
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/mask"
 )
 
 // Prueba de aceptación del punto h: un secreto de varias palabras que el equipo repite más tarde en una línea «Note "…"».
@@ -333,5 +336,190 @@ func TestQuoteTailConVariasCitasConservaLaProsa(t *testing.T) {
 	// una comilla del valor pegada a texto sigue extendiendo hasta la que cierra
 	if got := nuevo.apply("ios-xe", `ERROR: "crypto pki export TP pem terminal 3des Zq04206"Zq04207" see "x"`+"\n"); strings.Contains(got, "Zq0420") {
 		t.Errorf("fuga: %q", got)
+	}
+}
+
+// sesionConfig: el prompt, cada comando tecleado con su eco, y después las líneas de salida que se den.
+func sesionConfig(im impl, prompt string, cmds []string, salida []string) string {
+	return grabar(im, func(r sesionRec) {
+		r.Output([]byte(prompt))
+		for _, c := range cmds {
+			r.Input([]byte(c + "\r"))
+			r.Output([]byte(c + "\r\n" + prompt))
+		}
+		r.Output([]byte("\r\n"))
+		for _, l := range salida {
+			r.Output([]byte(l + "\r\n"))
+		}
+		r.Output([]byte(prompt))
+		r.Close()
+	})
+}
+
+// sesionPegada: se pegan todos los comandos; llega la línea nota y después los ecos (los pendientes mantienen viva la red por
+// contenido).
+func sesionPegada(im impl, cmds []string, nota string) string {
+	const p = "R1(config)#"
+	return grabar(im, func(r sesionRec) {
+		r.Output([]byte(p))
+		r.Input([]byte(strings.Join(cmds, "\r") + "\r"))
+		r.Output([]byte("\r\n" + nota + "\r\n")) // la línea llega antes de que vuelvan los ecos
+		for _, c := range cmds {
+			r.Output([]byte(c + "\r\n" + p))
+		}
+		r.Close()
+	})
+}
+
+// Hallazgo 1: un comando con muchas palabras no desaloja de la lista M₂ el valor de un comando anterior.
+func TestComandoLargoNoDesalojaElValorAnterior(t *testing.T) {
+	const val = "ZqVal1x"
+	largos := []string{
+		"snmp-server host 10.1.1.1 version 2c Zcomm00 config syslog snmp envmon entity memory ospf eigrp hsrp vrrp isis flash license cluster stpx ipsla bridge fru-ctrl",
+		"key-string 0 " + strings.Join(strings.Fields(strings.Repeat("Aa1x ", 70)), " "),
+		"enable password " + func() string {
+			var p []string
+			for i := 0; i < 80; i++ {
+				p = append(p, fmt.Sprintf("Wd%03dxy", i))
+			}
+			return strings.Join(p, " ")
+		}(),
+	}
+	for _, l := range largos {
+		out := sesionPegada(nuevo, []string{"tacacs-server k " + val, l}, "Note: value "+val+" applied")
+		for g, n := range visibles4(out, val) {
+			if n > 0 {
+				t.Errorf("%.40q: %q visible\n%s", l, g, out)
+				break
+			}
+		}
+	}
+	// fuzz: el valor de un comando y, en medio, comandos largos al azar; el valor repetido después sigue tapado
+	r := rand.New(rand.NewSource(11))
+	pool := append([]string{"snmp-server community Cm%05d RO", "enable secret Es%05d", "username u secret 0 Pa%05d Xy%05d", "tacacs-server host 10.1.1.2 key 0 Tk%05d"}, largos...)
+	malos := 0
+	for n := 0; n < 200; n++ {
+		v := fmt.Sprintf("ZqF%05dx", n)
+		cmds := []string{"tacacs-server k " + v}
+		for k := r.Intn(5) + 1; k > 0; k-- {
+			c := pool[r.Intn(len(pool))]
+			if strings.Contains(c, "%05d") {
+				c = strings.NewReplacer("%05d", fmt.Sprintf("%05d", r.Intn(99999))).Replace(c)
+			}
+			cmds = append(cmds, c)
+		}
+		out := sesionPegada(nuevo, cmds, "Note: value "+v+" applied")
+		if strings.Contains(marcado.ReplaceAllString(out, "\x00"), v) {
+			if malos++; malos <= 3 {
+				t.Errorf("%q: %s visible\n%s", cmds, v, out)
+			}
+		}
+	}
+}
+
+// Hallazgo 2: lo que sigue al valor (opciones, vistas, ACL, nombres) no se recuerda: la salida normal tras el prompt queda
+// igual que en la v0.6.5. Y la frase completa de un secreto de varias palabras sí se tapa si se repite.
+func TestPalabrasQueNoSonElSecretoNoSeTapanDespues(t *testing.T) {
+	cmds := []string{
+		"snmp-server host 10.1.1.1 version 2c Zcomm123 config syslog snmp envmon",
+		"snmp-server community Zcomm124 view VIEWALL RO ACL_SNMP",
+		"key-string 0 this is my long phrase with many words", "key-string 0 this is my long passphrase with many words",
+		"crypto isakmp key Zk125x hostname peer.example.com",
+		"tacacs-server host 10.1.1.2 key 0 Zk126x timeout 5 single-connection",
+	}
+	show := []string{"Building configuration...", "snmp-server enable traps config", "snmp-server enable traps syslog envmon", "logging host 10.1.1.1",
+		"logging buffered 8192 level 5", "ip access-list standard ACL_SNMP", "snmp-server view VIEWALL iso included", "ip name-server peer.example.com",
+		"tacacs-server host 10.1.1.2 single-connection", "these are here with many words and a long list", "this is fine", "show running-config", "end"}
+	ses := func(im impl) string {
+		return grabar(im, func(r sesionRec) {
+			r.Output([]byte("R1(config)#"))
+			for _, c := range cmds {
+				r.Input([]byte(c + "\r"))
+				r.Output([]byte(c + "\r\nR1(config)#"))
+			}
+			r.Input([]byte("\r")) // un Enter vacío: el prompt sin pendientes cierra la ventana corta de la v0.6.5
+			r.Output([]byte("\r\nR1(config)#\r\n"))
+			r.Input([]byte("end\r"))
+			r.Output([]byte("end\r\nR1#"))
+			r.Input([]byte("show running-config\r"))
+			r.Output([]byte("show running-config\r\n"))
+			for _, l := range show {
+				r.Output([]byte(l + "\r\n"))
+			}
+			r.Output([]byte("R1#"))
+			r.Close()
+		})
+	}
+	desde := func(s string) string { return s[strings.Index(s, "R1#show running-config"):] }
+	n, o := desde(ses(nuevo)), desde(ses(viejo))
+	if n != o {
+		t.Errorf("la salida tras el prompt difiere de la v0.6.5:\n nueva:\n%s\n v0.6.5:\n%s", n, o)
+	}
+	// la frase repetida más tarde se tapa entera; las palabras sueltas de una frase en minúsculas, no
+	frase := grabar(nuevo, func(r sesionRec) {
+		r.Output([]byte("R1(config)#"))
+		r.Input([]byte("key-string 0 this is my long phrase with many words\r"))
+		r.Output([]byte("key-string 0 this is my long phrase with many words\r\nR1(config)#"))
+		r.Output([]byte("\r\nNote \"this is my long phrase with many words\"\r\nthese words are with many things\r\nR1(config)#"))
+		r.Close()
+	})
+	if strings.Contains(frase, "phrase") && strings.Contains(frase, "Note \"this") || !strings.Contains(frase, "these words are with many things") {
+		t.Errorf("la frase debía taparse y la prosa no:\n%s", frase)
+	}
+}
+
+// Hallazgo 2, cobertura de (e): un valor de varias palabras todo en minúsculas se cubre por posición en cada corte del eco.
+func TestEcoPartidoValorEnMinusculasSeCubrePorPosicion(t *testing.T) {
+	for _, cmd := range []string{"enable secret my long passphrase", "key-string 0 this is my long passphrase"} {
+		for k := 1; k < len(cmd); k++ {
+			for _, desp := range []bool{false, true} {
+				out := grabar(nuevo, func(r sesionRec) {
+					r.Output([]byte("R1(config)#"))
+					r.Input([]byte(cmd + "\r"))
+					echo := cmd[:k] + syslogPost + cmd[k:]
+					if desp {
+						echo = "$" + echo
+					}
+					r.Output([]byte(echo + "\r\nR1(config)#"))
+					r.Close()
+				})
+				eco := strings.Join(strings.Split(marcado.ReplaceAllString(out, "\x00"), "\n")[1:], "\n")
+				for _, w := range []string{"long", "phrase"} {
+					if strings.Contains(eco, w) {
+						t.Errorf("%q k=%d desp=%v: %s visible\n%s", cmd, k, desp, w, out)
+					}
+				}
+			}
+		}
+	}
+}
+
+// Hallazgo 2, los valores que se recuerdan: solo el secreto, no las opciones, vistas, ACL ni nombres que le siguen.
+func TestValoresRecordadosSonSoloElSecreto(t *testing.T) {
+	casos := []struct {
+		cmd     string
+		textos  []string // en orden
+		persist []string
+	}{
+		{"snmp-server host 10.1.1.1 version 2c Zcomm123 config syslog snmp envmon", []string{"Zcomm123"}, nil},
+		{"snmp-server community Zcomm124 view VIEWALL RO ACL_SNMP", []string{"Zcomm124"}, nil},
+		{"crypto isakmp key Zk125x hostname peer.example.com", []string{"Zk125x"}, nil},
+		{"tacacs-server host 10.1.1.2 key 0 Zk126x timeout 5 single-connection", []string{"Zk126x"}, nil},
+		{"key-string 0 this is my long phrase with many words", []string{"this is my long phrase with many words", "this", "long", "phrase", "with", "many", "words"}, []string{"this is my long phrase with many words"}},
+		{"enable secret Pa55w0rd Xq7z9mK", []string{"Pa55w0rd Xq7z9mK", "Pa55w0rd", "Xq7z9mK"}, []string{"Pa55w0rd Xq7z9mK", "Pa55w0rd", "Xq7z9mK"}},
+		{"snmp-server user u g v3 auth sha Xa1b2c3d priv aes 128 Yb2c3d4e access 10", []string{"Xa1b2c3d", "Yb2c3d4e"}, nil},
+	}
+	for _, c := range casos {
+		_, vs := mask.CutCommandV("", c.cmd, c.cmd)
+		var textos, persist []string
+		for _, v := range vs {
+			textos = append(textos, v.Text)
+			if v.Persist {
+				persist = append(persist, v.Text)
+			}
+		}
+		if strings.Join(textos, "|") != strings.Join(c.textos, "|") || strings.Join(persist, "|") != strings.Join(c.persist, "|") {
+			t.Errorf("%q\n  valores:  %q (esperaba %q)\n  persisten: %q (esperaba %q)", c.cmd, textos, c.textos, persist, c.persist)
+		}
 	}
 }
