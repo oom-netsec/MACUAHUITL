@@ -333,14 +333,26 @@ func (s *Stream) Line(raw string) (string, bool) {
 	if !ok {
 		return out, ok
 	}
+	return s.CutLine(raw, out), ok
+}
+
+// LineS1 es Line sin el corte: la salida de la v0.6.5 (S1) y el estado del flujo. Quien aplica sobre S1 una red por
+// contenido propia (la terminal) la corre antes de CutLine: S1 → red M₁ → corte M₂.
+func (s *Stream) LineS1(raw string) (string, bool) { return s.line1(raw) }
+
+// CutLine es el corte de Line sobre s1, la salida (de LineS1, quizá con la red por contenido ya aplicada) de raw.
+func (s *Stream) CutLine(raw, s1 string) string {
 	line, eol := splitEOL(raw)
 	orig, spans := lineSpans(line, s.Platform)
-	if len(spans) == 0 || !strings.HasSuffix(out, eol) || strings.Contains(out[:len(out)-len(eol)], "\n") {
-		return out, ok
+	if len(spans) == 0 || !strings.HasSuffix(s1, eol) || strings.Contains(s1[:len(s1)-len(eol)], "\n") {
+		return s1
 	}
-	cutOut, n := cut(orig, out[:len(out)-len(eol)], spans)
+	cutOut, n := cut(orig, s1[:len(s1)-len(eol)], spans)
+	if s.counts == nil {
+		s.counts = map[string]int{}
+	}
 	s.counts["secret"] += n
-	return cutOut + eol, ok
+	return cutOut + eol
 }
 
 func (s *Stream) line1(raw string) (out string, ok bool) {

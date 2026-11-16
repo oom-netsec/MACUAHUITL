@@ -253,6 +253,13 @@ func fuzzCmd(r *rand.Rand, n int) string {
 	}
 	// un secreto sembrado en una posición cualquiera, con símbolos
 	v := fmt.Sprintf("%sZq%05d%s", canalSimbolos[r.Intn(len(canalSimbolos))], n, canalSimbolos[r.Intn(len(canalSimbolos))])
+	if r.Intn(4) == 0 { // una parte de los valores es una frase de varias palabras con palabras clave adentro
+		kw := []string{"key", "password", "secret", "community", "text", "pass", "comm", "k"}
+		v += fmt.Sprintf(" %s Zq%05d", kw[r.Intn(len(kw))], 50000+n)
+		if r.Intn(2) == 0 {
+			v += fmt.Sprintf(" %s Zq%05d", kw[r.Intn(len(kw))], 60000+n)
+		}
+	}
 	pos := r.Intn(len(parts) + 1)
 	parts = append(parts[:pos], append([]string{v}, parts[pos:]...)...)
 	c := strings.Join(parts, " ")

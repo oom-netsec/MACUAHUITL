@@ -213,10 +213,18 @@ func (r *Recorder) outLine(l string) {
 			}
 		}
 		// Primero las reglas (reconocen el comando completo) y después la red por contenido, que no entra en lo ya tapado.
-		out, keep = r.stream.Line(l)
-		if keep && !equipoMsg(l) {
-			out = r.scrub(out, len(r.sent) > 0)
-			out = r.scrub2(out, len(r.sent) > 0)
+		// El orden es el de siempre: S1 → red por contenido M₁ (sobre S1 entero, para que la frase secreta se tape completa)
+		// → corte M₂ → red M₂.
+		out, keep = r.stream.LineS1(l)
+		if keep {
+			frag := len(r.sent) > 0
+			if !equipoMsg(l) {
+				out = r.scrub(out, frag)
+			}
+			out = r.stream.CutLine(l, out)
+			if !equipoMsg(l) {
+				out = r.scrub2(out, frag)
+			}
 		}
 	}
 	if keep {
