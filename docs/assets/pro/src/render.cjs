@@ -31,9 +31,9 @@ if (!rules) throw new Error("no se encontraron reglas en " + dir);
     if (await page.evaluate(() => [...document.images].some((i) => !i.complete || !i.naturalWidth))) throw new Error("falta una imagen (¿corriste capture.cjs?)");
     const out = path.join(__dirname, "..", "..", "portada.png");
     await page.screenshot({ path: out });
-    const kb = Math.round(fs.statSync(out).size / 1024);
-    if (kb >= 1000) throw new Error(`portada.png pesa ${kb} KB; GitHub pide menos de 1 MB`);
-    console.log(`portada.png: ${kb} KB`);
+    const bytes = fs.statSync(out).size;
+    if (bytes >= 1_000_000) throw new Error(`portada.png pesa ${bytes} bytes; GitHub pide menos de 1 MB`);
+    console.log(`portada.png: ${bytes} bytes`);
   } finally {
     await browser.close();
   }

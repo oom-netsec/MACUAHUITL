@@ -20,6 +20,7 @@ export PLAYWRIGHT_CORE=/tmp/pw/node_modules/playwright-core
 
 # Solo si cambió la UI: capturas nuevas desde la vista previa.
 (cd ui/frontend && npx vite --config vite.preview.config.ts --port 5199 --strictPort --host 127.0.0.1) &
+until curl -sf http://127.0.0.1:5199/preview.html >/dev/null; do sleep 0.2; done
 node docs/assets/pro/src/capture.cjs                         # shots/patrol-dark.png y shots/patrol-light.png
 kill %1
 

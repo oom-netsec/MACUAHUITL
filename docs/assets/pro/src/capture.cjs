@@ -5,13 +5,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE || "playwright-core");
 
 const base = process.env.PREVIEW_URL || "http://127.0.0.1:5199/preview.html";
 // Hora fija: las fases de Patrol muestran la hora, y la imagen tiene que salir igual en cada corrida.
-const now = new Date("2026-11-14T22:40:00");
+const now = new Date("2026-11-14T22:40:00Z");
 
 (async () => {
   const browser = await chromium.launch();
   try {
     for (const theme of ["dark", "light"]) {
-      const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+      const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, timezoneId: "UTC" });
       await page.clock.setFixedTime(now);
       await page.goto(`${base}?m=patrol&theme=${theme}&lang=en`);
       await page.getByText("Summary of SW1").waitFor();
