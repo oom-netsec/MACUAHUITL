@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HostsView } from "./HostsView";
 import { fakeInventory } from "./fake";
@@ -19,7 +19,7 @@ test("lista los hosts de la libreta agrupados por carpeta, con plataforma y cred
   const table = await screen.findByRole("table", { name: "Hosts de la libreta" });
   expect(inv.listHosts).toHaveBeenCalled();
   const groups = within(table).getAllByRole("rowgroup").slice(1); // el primero es el encabezado
-  expect(groups.map((g) => within(g).getAllByRole("row")[0].textContent)).toEqual(["Lab (2)", "Oficina (1)"]);
+  expect(groups.map((g) => g.querySelector("th")?.textContent)).toEqual(["Lab (2)", "Oficina (1)", "Sin carpeta (0)"]);
   expect(within(table).getByText("10.9.0.1:22")).toBeVisible();
   expect(within(table).getByText("admin lab")).toBeVisible();
   expect(within(table).getByText("WLC")).toBeVisible();
@@ -53,7 +53,7 @@ test("crear: valida en línea sin llamar al núcleo y luego guarda con puerto 22
   await userEvent.type(screen.getByLabelText("Etiquetas"), "core, dc-1");
   await userEvent.selectOptions(screen.getByLabelText("Credencial de la bóveda"), cred.id);
   await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
-  expect(inv.saveHost).toHaveBeenCalledWith({ name: "NUEVO", address: "10.0.0.9", port: 22, platform: "", folder: "", tags: ["core", "dc-1"], credentialId: cred.id, notes: "" });
+  expect(inv.saveHost).toHaveBeenCalledWith({ name: "NUEVO", address: "10.0.0.9", port: 22, platform: "", folder: "", tags: ["core", "dc-1"], credentialId: cred.id, notes: "", startCommand: "" });
   expect(await screen.findByText("Host «NUEVO» guardado.")).toBeVisible();
   expect(await screen.findByText("10.0.0.9:22")).toBeVisible(); // la lista se pone al día
 });
@@ -62,11 +62,10 @@ test("editar manda el id del host y conserva lo que no se tocó", async () => {
   const { inv } = setup();
   await userEvent.click(await screen.findByRole("button", { name: "Editar LAB-AP" }));
   expect(screen.getByLabelText("Puerto")).toHaveValue("2222");
-  await userEvent.clear(screen.getByRole("textbox", { name: "Carpeta" }));
-  await userEvent.type(screen.getByRole("textbox", { name: "Carpeta" }), "Campus");
+  await userEvent.selectOptions(screen.getAllByRole("combobox", { name: "Carpeta" })[0], "Oficina"); // el primero es el del formulario
   await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
-  expect(inv.saveHost).toHaveBeenCalledWith({ id: "b".repeat(32), name: "LAB-AP", address: "ap1.lab", port: 2222, platform: "wlc", folder: "Campus", tags: [], credentialId: "", notes: "" });
-  expect(await within(screen.getByRole("table", { name: "Hosts de la libreta" })).findByText("Campus")).toBeVisible();
+  expect(inv.saveHost).toHaveBeenCalledWith({ id: "b".repeat(32), name: "LAB-AP", address: "ap1.lab", port: 2222, platform: "wlc", folder: "Oficina", tags: [], credentialId: "", notes: "", startCommand: "" });
+  expect(await screen.findByText("Oficina (2)")).toBeVisible();
 });
 
 test("el error del núcleo se marca en el campo y su texto va aparte, como detalle del núcleo", async () => {
@@ -214,4 +213,112 @@ test("con reason el campo sale de metadata.field y el texto del núcleo se muest
   expect(await screen.findByText("the credential is not in the vault")).toBeVisible();
   expect(screen.getByLabelText("Name")).not.toBeInvalid();
   expect(screen.getByLabelText("Vault credential")).toBeInvalid(); // el error va al campo que dice metadata.field
+});
+
+// ---- Fase 44: carpetas, mover y orden de inicio ----
+const dt = () => { const d: Record<string, string> = {}; return { setData: (k: string, v: string) => { d[k] = v; }, getData: (k: string) => d[k] ?? "", effectAllowed: "", dropEffect: "" }; };
+const rowOf = (name: string) => screen.getByText(name).closest("tr") as HTMLElement;
+const groupOf = (name: string) => screen.getByRole("rowgroup", { name: new RegExp(`^${name}\\b`) });
+
+test("orden de inicio: solo con linux o windows, con aviso, y viaja en el borrador", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
+  expect(screen.queryByLabelText("Orden de inicio")).toBeNull();
+  await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "linux");
+  expect(screen.getByLabelText("Orden de inicio")).toBeVisible();
+  expect(screen.getByText(/se ejecuta en el equipo al conectar/)).toBeVisible();
+  await userEvent.type(screen.getByLabelText("Nombre"), "SRV");
+  await userEvent.type(screen.getByLabelText("Dirección (IP o nombre DNS)"), "10.5.5.5");
+  await userEvent.type(screen.getByLabelText("Orden de inicio"), "x".repeat(257));
+  await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
+  expect(inv.saveHost).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("Orden de inicio")).toBeInvalid();
+  await userEvent.clear(screen.getByLabelText("Orden de inicio"));
+  await userEvent.type(screen.getByLabelText("Orden de inicio"), "tmux attach");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
+  expect(inv.saveHost).toHaveBeenCalledWith(expect.objectContaining({ platform: "linux", startCommand: "tmux attach" }));
+});
+
+test("crear una carpeta sin registrar un host; las vacías se ven y valida el nombre", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: "Nueva carpeta" }));
+  await userEvent.type(screen.getByLabelText("Nombre de la carpeta"), "a/b");
+  await userEvent.click(screen.getByRole("button", { name: "Crear carpeta" }));
+  expect(inv.createFolder).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("Nombre de la carpeta")).toBeInvalid();
+  await userEvent.clear(screen.getByLabelText("Nombre de la carpeta"));
+  await userEvent.type(screen.getByLabelText("Nombre de la carpeta"), "Nueva");
+  await userEvent.click(screen.getByRole("button", { name: "Crear carpeta" }));
+  expect(inv.createFolder).toHaveBeenCalledWith("Nueva");
+  expect(await screen.findByText("Nueva (0)")).toBeVisible();
+  expect(inv.saveHost).not.toHaveBeenCalled();
+});
+
+test("renombrar una carpeta mueve a sus hosts", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: "Renombrar carpeta Oficina" }));
+  const f = screen.getByLabelText("Nombre de la carpeta");
+  expect(f).toHaveValue("Oficina");
+  await userEvent.clear(f);
+  await userEvent.type(f, "Matriz");
+  await userEvent.click(screen.getByRole("button", { name: "Renombrar" }));
+  expect(inv.renameFolder).toHaveBeenCalledWith("Oficina", "Matriz");
+  expect(await screen.findByText("Matriz (1)")).toBeVisible();
+  expect(screen.queryByText("Oficina (1)")).toBeNull();
+});
+
+test("borrar una carpeta con hosts pide confirmar diciendo cuántos pasan a «Sin carpeta» y no borra hosts", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: "Eliminar carpeta Lab" }));
+  expect(inv.deleteFolder).not.toHaveBeenCalled();
+  const ok = screen.getByRole("button", { name: "Confirmar: 2 hosts pasan a «Sin carpeta»" });
+  await userEvent.click(ok);
+  expect(inv.deleteFolder).toHaveBeenCalledWith("Lab");
+  expect(await screen.findByText("Sin carpeta (2)")).toBeVisible();
+  expect(inv.deleteHost).not.toHaveBeenCalled();
+  expect(screen.getByText("LAB-CORE")).toBeVisible();
+});
+
+test("«Mover a…» alcanzable por teclado mueve el host a otra carpeta o a «Sin carpeta»", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  const btn = screen.getByRole("button", { name: "Mover LAB-CORE a…" });
+  btn.focus();
+  await userEvent.keyboard("{Enter}");
+  const sel = screen.getByLabelText("Mover LAB-CORE a");
+  expect(sel).toHaveFocus();
+  await userEvent.selectOptions(sel, "Oficina");
+  expect(inv.moveHosts).toHaveBeenCalledWith(["a".repeat(32)], "Oficina");
+  expect(await screen.findByText("Oficina (2)")).toBeVisible();
+  expect(await screen.findByText(/LAB-CORE.*Oficina/)).toBeVisible(); // anuncio en la región aria-live
+  await userEvent.click(screen.getByRole("button", { name: "Mover LAB-CORE a…" }));
+  await userEvent.selectOptions(screen.getByLabelText("Mover LAB-CORE a"), "");
+  expect(inv.moveHosts).toHaveBeenLastCalledWith(["a".repeat(32)], "");
+});
+
+test("arrastrar un host sobre una carpeta (y sobre «Sin carpeta») lo mueve", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  const data = dt();
+  fireEvent.dragStart(rowOf("LAB-AP"), { dataTransfer: data });
+  const target = groupOf("Oficina").querySelector("tr.hosts-folder") as HTMLElement;
+  expect(fireEvent.dragOver(target, { dataTransfer: data })).toBe(false); // preventDefault: acepta el soltar
+  fireEvent.drop(target, { dataTransfer: data });
+  await waitFor(() => expect(inv.moveHosts).toHaveBeenCalledWith(["b".repeat(32)], "Oficina"));
+  expect(await screen.findByText("Oficina (2)")).toBeVisible();
+  const d2 = dt();
+  fireEvent.dragStart(rowOf("LAB-CORE"), { dataTransfer: d2 });
+  fireEvent.drop(screen.getByText(/^Sin carpeta/).closest("tr")!, { dataTransfer: d2 }); // aún no hay hosts sin carpeta: el destino existe igual
+  await waitFor(() => expect(inv.moveHosts).toHaveBeenLastCalledWith(["a".repeat(32)], ""));
+});
+
+test("soltar algo que no es un host de la libreta no hace nada", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  fireEvent.drop(groupOf("Oficina").querySelector("tr.hosts-folder")!, { dataTransfer: dt() });
+  expect(inv.moveHosts).not.toHaveBeenCalled();
 });

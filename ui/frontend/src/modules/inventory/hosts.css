@@ -19,3 +19,8 @@
 .hosts-core-cell { color: var(--text-2); }
 .hosts-data h5 { font-size: var(--fs-body); font-weight: 600; display: flex; align-items: center; gap: var(--s-2); }
 .hosts-data h6 { font-size: var(--fs-body); font-weight: 600; margin-top: var(--s-2); }
+.hosts-table tbody.hosts-over .hosts-folder th, .hosts-table tbody.hosts-over .hosts-folder td { background: var(--surface-3, var(--hairline)); outline: 2px dashed var(--accent, currentColor); outline-offset: -2px; }
+.hosts-table tbody tr[draggable="true"] { cursor: grab; }
+.hosts-table .hosts-folder td { background: var(--surface-2); }
+.hosts-folder-form { margin-bottom: var(--s-2); }
+.hosts-actions select { max-width: 12em; }

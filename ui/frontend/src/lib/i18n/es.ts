@@ -2841,6 +2841,23 @@ export const es = {
   "transfer.live.rej.from": "llegó desde",
   "transfer.live.rej.tftpNote": "En TFTP el origen es UDP y puede estar falsificado: confirma la IP en el equipo.",
   "transfer.live.rej.announce": "Rechazos nuevos: {n}",
+  "hosts.f.start": "Orden de inicio",
+  "hosts.f.start.hint": "Una línea, hasta 256 caracteres. Lo que escribas se ejecuta en el equipo al conectar, tal cual y sin modo asistido.",
+  "hosts.v.startCommand": "La orden de inicio es una sola línea, sin caracteres de control, de hasta 256 caracteres.",
+  "hosts.move": "Mover a…",
+  "hosts.move.aria": "Mover {name} a…",
+  "hosts.move.select": "Mover {name} a",
+  "hosts.moved": "Host «{name}» movido a «{folder}».",
+  "hosts.folder.new": "Nueva carpeta",
+  "hosts.folder.name": "Nombre de la carpeta",
+  "hosts.folder.create": "Crear carpeta",
+  "hosts.folder.rename": "Renombrar",
+  "hosts.folder.rename.aria": "Renombrar carpeta {name}",
+  "hosts.folder.delete.aria": "Eliminar carpeta {name}",
+  "hosts.folder.delete.confirm": "Confirmar: {n} hosts pasan a «Sin carpeta»",
+  "hosts.folder.created": "Carpeta «{name}» creada.",
+  "hosts.folder.renamed": "Carpeta «{old}» renombrada a «{name}».",
+  "hosts.folder.deleted": "Carpeta «{name}» eliminada; sus hosts pasan a «Sin carpeta».",
 };
 
 export type Key = keyof typeof es;

@@ -1,6 +1,6 @@
-import { PLATFORMS, coreErrorField, hostPlatformOf, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
+import { PLATFORMS, draftOf, formOf, coreErrorField, hostPlatformOf, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
 
-const ok: HostForm = { name: "SW1", address: "10.0.0.1", port: "22", platform: "ios-xe", folder: "Lab", tags: "core dc-1", credentialId: "", notes: "" };
+const ok: HostForm = { name: "SW1", address: "10.0.0.1", port: "22", platform: "ios-xe", folder: "Lab", tags: "core dc-1", credentialId: "", notes: "", startCommand: "" };
 
 test("un formulario correcto no tiene errores", () => {
   expect(validateHost(ok)).toEqual({});
@@ -85,4 +85,24 @@ test("la plataforma detectada pasa a la del inventario: variantes de WLC son wlc
   expect(hostPlatformOf("asa")).toBe("asa");
   expect(hostPlatformOf("cat9k")).toBe("");
   expect(hostPlatformOf("")).toBe("");
+});
+
+test("las plataformas linux y windows existen", () => {
+  expect(PLATFORMS).toContainEqual(["linux", "Linux"]);
+  expect(PLATFORMS).toContainEqual(["windows", "Windows"]);
+  expect(hostPlatformOf("linux")).toBe("linux");
+});
+
+test("la orden de inicio: una línea, sin caracteres de control, hasta 256", () => {
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "tmux attach || tmux new" })).toEqual({});
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "x".repeat(256) })).toEqual({});
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "x".repeat(257) })).toEqual({ startCommand: "hosts.v.startCommand" });
+  expect(validateHost({ ...ok, platform: "windows", startCommand: "a\nb" })).toEqual({ startCommand: "hosts.v.startCommand" });
+  expect(validateHost({ ...ok, platform: "windows", startCommand: "a\u0007b" })).toEqual({ startCommand: "hosts.v.startCommand" });
+});
+
+test("la orden de inicio solo viaja con linux o windows", () => {
+  expect(draftOf({ ...ok, platform: "linux", startCommand: "ls" }).startCommand).toBe("ls");
+  expect(draftOf({ ...ok, platform: "ios-xe", startCommand: "ls" }).startCommand).toBe("");
+  expect(formOf({ ...ok, port: 22, tags: [], startCommand: "ls" }).startCommand).toBe("ls");
 });

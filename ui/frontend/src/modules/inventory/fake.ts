@@ -19,7 +19,7 @@ export const sampleDevices: KnownDevices = {
 };
 
 const host = (h: Partial<Host> & Pick<Host, "id" | "name" | "address">): Host => ({
-  port: 22, platform: "ios-xe", folder: "", tags: [], credentialId: "", credentialLabel: "", notes: "", ...h,
+  port: 22, platform: "ios-xe", folder: "", tags: [], credentialId: "", credentialLabel: "", notes: "", startCommand: "", ...h,
 });
 
 export const sampleHosts: Host[] = [
@@ -69,11 +69,15 @@ const sampleTemplate = (format: HostFileFormat) => ({
     : JSON.stringify({ formato: "macuahuitl-hosts", version: 1, exportado: new Date(t).toISOString(), hosts: templateRows.map((r) => Object.fromEntries(sampleHostFields.map((f, i) => [f.name, f.name === "port" ? Number(r[i]) : f.name === "tags" ? r[i].split(";") : r[i]]))) }),
 });
 
+const FOLDER = /^[A-Za-z0-9 _.-]{1,48}$/;
 const key = (h: Pick<Host, "address" | "port">) => `${h.address.toLowerCase()}:${h.port || 22}`;
 
 export function fakeInventory(initial: Host[] = sampleHosts) {
   let hosts = initial.map((h) => ({ ...h }));
   let n = 0;
+  let folderNames = [...new Set(hosts.map((h) => h.folder).filter(Boolean))]; // las carpetas vacías viven aquí
+  const hasFolder = (x: string) => folderNames.some((f) => f.toLowerCase() === x.toLowerCase());
+  const okName = (x: string) => { if (!FOLDER.test(x)) throw new Error(`carpeta "${x}" inválida`); if (hasFolder(x)) throw new Error(`ya hay una carpeta llamada "${x}"`); };
   const find = (id: string) => {
     const h = hosts.find((x) => x.id === id);
     if (!h) throw new Error(`no hay un host de la libreta con id "${id}"`);
@@ -98,12 +102,31 @@ export function fakeInventory(initial: Host[] = sampleHosts) {
       if (hosts.some((h) => h.id !== d.id && key(h) === key(d))) throw new Error(`${key(d)} ya está en la libreta`);
       const { credentialLabel = "" } = hosts.find((h) => h.credentialId === d.credentialId) ?? {};
       const h = host({ ...d, id: d.id || String(++n).padStart(32, "0"), address: d.address.toLowerCase(), port: d.port || 22, credentialLabel });
+      if (d.folder && !hasFolder(d.folder)) { okName(d.folder); folderNames.push(d.folder); }
       hosts = d.id ? hosts.map((x) => (x.id === h.id ? h : x)) : [...hosts, h];
       return { id: h.id, warnings: [] as string[] };
     }),
     deleteHost: vi.fn(async (id: string) => {
       find(id);
       hosts = hosts.filter((h) => h.id !== id);
+    }),
+    listFolders: vi.fn(async () => folderNames.map((name) => ({ name, count: hosts.filter((h) => h.folder === name).length })).sort((a, b) => a.name.localeCompare(b.name))),
+    createFolder: vi.fn(async (name: string) => { okName(name); folderNames.push(name); }),
+    renameFolder: vi.fn(async (o: string, nn: string) => {
+      if (!hasFolder(o)) throw new Error(`no hay una carpeta "${o}"`);
+      if (o.toLowerCase() !== nn.toLowerCase()) okName(nn); else if (!FOLDER.test(nn)) throw new Error(`carpeta "${nn}" inválida`);
+      folderNames = folderNames.map((f) => (f === o ? nn : f));
+      hosts = hosts.map((h) => (h.folder === o ? { ...h, folder: nn } : h));
+    }),
+    deleteFolder: vi.fn(async (name: string) => {
+      if (!hasFolder(name)) throw new Error(`no hay una carpeta "${name}"`);
+      folderNames = folderNames.filter((f) => f !== name);
+      hosts = hosts.map((h) => (h.folder === name ? { ...h, folder: "" } : h));
+    }),
+    moveHosts: vi.fn(async (ids: string[], folder: string) => {
+      if (folder && !folderNames.includes(folder)) throw new Error(`no hay una carpeta "${folder}"`);
+      ids.forEach(find);
+      hosts = hosts.map((h) => (ids.includes(h.id) ? { ...h, folder } : h));
     }),
     exportHosts: vi.fn(async (ids: string[], _path: string, _overwrite: boolean, _format?: HostFileFormat | "") => {
       ids.forEach(find);
