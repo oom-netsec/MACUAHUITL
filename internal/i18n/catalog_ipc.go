@@ -15,5 +15,6 @@ func init() {
 		"ipc.err.pipe_not_user":           e("ipc: el pipe {name} no lo atiende un proceso de este usuario", "ipc: the pipe {name} is not served by a process of this user", "name"),
 		"ipc.err.pipe_bad_pid":            e("ipc: el pipe {name} devolvió un PID inválido", "ipc: the pipe {name} returned an invalid PID", "name"),
 		"ipc.err.server_not_user":         e("el servidor del pipe no es de este usuario", "the pipe server does not belong to this user"),
+		"mctl.err.elevated":               e("mctl no habla con el núcleo desde una terminal elevada (el núcleo corre sin elevar); abre una terminal normal", "mctl does not talk to the core from an elevated terminal (the core runs unelevated); open a normal terminal"),
 	})
 }
