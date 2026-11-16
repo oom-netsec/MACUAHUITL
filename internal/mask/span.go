@@ -91,8 +91,17 @@ func commandSpans(block, cmd string) [][2]int {
 // termina falla hacia el lado de mostrar. Costo aceptado: no se ven los comandos posteriores al secreto.
 func spansIn(block, cmd string, quoted bool) (spans [][2]int) {
 	pos := 0
-	for _, seg := range strings.Split(cmd, spSep) {
-		spans = append(spans, shiftSpans(spansSeg(block, seg, quoted), pos)...)
+	segs := strings.Split(cmd, spSep)
+	for i, seg := range segs {
+		sp := spansSeg(block, seg, quoted)
+		if len(sp) == 0 && i < len(segs)-1 && !(quoted && spProse[strings.ToLower(firstField(segs[i+1]))]) {
+			// el segmento termina en una palabra de secreto sin valor («password ; X»): lo que sigue al « ; » es el valor;
+			// en una cita, «password ; is wrong» es prosa
+			if d := spansSeg(block, seg+" X", quoted); len(d) > 0 && d[len(d)-1][0] == len(seg)+1 {
+				sp = [][2]int{{len(seg), len(seg)}}
+			}
+		}
+		spans = append(spans, shiftSpans(sp, pos)...)
 		pos += len(seg) + len(spSep)
 	}
 	if len(spans) > 0 {
@@ -425,4 +434,11 @@ func twinSpans(orig string, chain func(string) string) [][2]int {
 		sp[i] = [2]int{idx[sp[i][0]], idx[sp[i][1]]}
 	}
 	return sp
+}
+
+func firstField(s string) string {
+	if f := strings.Fields(s); len(f) > 0 {
+		return strings.Trim(f[0], `"'`)
+	}
+	return ""
 }
