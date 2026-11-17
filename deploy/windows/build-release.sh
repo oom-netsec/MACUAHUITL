@@ -14,14 +14,15 @@ v=${tag#v}
 
 ld="-s -w -buildid= -X github.com/oom-netsec/MACUAHUITL/internal/version.Version=$tag"
 # Sin consola: el núcleo y la app son -H windowsgui (el núcleo escribe su registro en State); mctl es de consola.
-build() {
+# Subshell ( ): el GOOS=windows no debe quedar para el resto del script (go run ./tools/icowin corre en Linux).
+build() (
   rm -rf "$1" && mkdir -p "$1"
   export GOOS=windows GOARCH=amd64 CGO_ENABLED=0
   go build -trimpath -ldflags "$ld" -o "$1/mctl.exe" ./cmd/mctl
   go build -trimpath -ldflags "$ld -H windowsgui" -o "$1/macuahuitld.exe" ./cmd/macuahuitld
   go build -tags 'wails production' -trimpath -ldflags "$ld -H windowsgui" -o "$1/macuahuitl.exe" ./ui
-  (cd "$1" && sha256sum macuahuitl.exe macuahuitld.exe mctl.exe)
-}
+  cd "$1" && sha256sum macuahuitl.exe macuahuitld.exe mctl.exe
+)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 # Los tres son Go puro: dos compilaciones deben dar los mismos bytes, como macuahuitld y mctl en Linux.
