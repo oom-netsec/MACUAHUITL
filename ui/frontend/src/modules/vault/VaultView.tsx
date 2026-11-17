@@ -163,8 +163,9 @@ function CredentialList({ creds, onDelete, onViewKey, onRegenerate }: { creds: C
     { id: "user", header: t("vault.col.user"), value: (c) => c.username, mono: true },
     { id: "details", header: t("vault.col.details"), value: (c) => [c.kind === "key" && t("vault.kind.key"), c.hasEnable && t("vault.hasEnable"), c.hasSshKey && c.kind !== "key" && t("vault.hasSshKey")].filter(Boolean).join(" "),
       render: (c) => <>{c.kind === "key" && <Badge>{t("vault.kind.key")}</Badge>}{c.hasEnable && <Badge>{t("vault.hasEnable")}</Badge>}{c.hasSshKey && c.kind !== "key" && <Badge>{t("vault.hasSshKey")}</Badge>}</> },
-    { id: "actions", header: t("vault.col.actions"), value: () => "", width: 380,
-      render: (c) => <>{c.kind === "key" && <button type="button" className="sm" aria-label={t("vault.key.view", { label: c.label })} onClick={() => onViewKey(c)}>{t("vault.key.viewBtn")}</button>} {c.kind === "key" && <ConfirmButton label={t("vault.key.regen.aria", { label: c.label })} confirmLabel={t("vault.key.regen.confirm", { label: c.label })} onConfirm={() => onRegenerate(c)}>{t("vault.key.regen")}</ConfirmButton>} <ConfirmButton label={t("vault.deleteCred", { label: c.label })} confirmLabel={t("vault.confirmCred", { label: c.label })} onConfirm={() => onDelete(c.id)}>{t("common.delete")}</ConfirmButton></> },
+    // 480: caben «Ver llave pública», «Confirmar regenerar» y «Confirmar eliminación» armados a la vez (medido en WebKitGTK, ~472 px en español).
+    { id: "actions", header: t("vault.col.actions"), value: () => "", width: 480,
+      render: (c) => <>{c.kind === "key" && <button type="button" className="sm" aria-label={t("vault.key.view", { label: c.label })} onClick={() => onViewKey(c)}>{t("vault.key.viewBtn")}</button>} {c.kind === "key" && <ConfirmButton label={t("vault.key.regen.aria", { label: c.label })} confirmLabel={t("vault.key.regen.confirm", { label: c.label })} confirmText={t("vault.key.regen.confirmShort")} onConfirm={() => onRegenerate(c)}>{t("vault.key.regen")}</ConfirmButton>} <ConfirmButton label={t("vault.deleteCred", { label: c.label })} confirmLabel={t("vault.confirmCred", { label: c.label })} confirmText={t("common.confirmDelete")} onConfirm={() => onDelete(c.id)}>{t("common.delete")}</ConfirmButton></> },
   ];
   return (
     <Section title={t("vault.creds")}>

@@ -97,7 +97,9 @@ export function Notice({ kind, children }: { kind: "error" | "warn" | "ok" | "in
 }
 
 // Acción destructiva en dos pasos, sin ventana modal; si no se confirma en 4 s vuelve a su estado.
-export function ConfirmButton({ label, confirmLabel, onConfirm, children }: { label: string; confirmLabel: string; onConfirm: () => void; children?: ReactNode }) {
+// confirmText: texto visible corto al armar (en una celda de tabla un texto largo se recorta con «…» y el segundo clic no llega al
+// botón); el nombre accesible sigue siendo confirmLabel, con el detalle completo.
+export function ConfirmButton({ label, confirmLabel, confirmText, onConfirm, children }: { label: string; confirmLabel: string; confirmText?: string; onConfirm: () => void; children?: ReactNode }) {
   const [armed, setArmed] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(timer.current), []);
@@ -109,7 +111,7 @@ export function ConfirmButton({ label, confirmLabel, onConfirm, children }: { la
   };
   return (
     <button type="button" className={armed ? "danger" : "quiet danger-text"} aria-label={armed ? confirmLabel : label} onClick={click}>
-      {armed ? confirmLabel : children ?? label}
+      {armed ? confirmText ?? confirmLabel : children ?? label}
     </button>
   );
 }

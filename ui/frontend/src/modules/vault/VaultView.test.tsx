@@ -451,3 +451,25 @@ test("sin credenciales con llave no hay aviso de llaves privadas en el respaldo"
   await screen.findByText("core");
   expect(screen.queryByText(/llave privada/)).not.toBeInTheDocument();
 });
+
+// Bug de la v1.2.0: en una fila de llave (tres botones) «Confirmar eliminación de <etiqueta>» no cabía en la celda y se recortaba
+// con «…»; el segundo clic no llegaba al botón. Armado, el texto visible es corto y el nombre accesible conserva la etiqueta.
+test.each([
+  ["llave", { id: "k1", label: "Raspberry", username: "pi", kind: "key" as const, hasEnable: false, hasSshKey: true }],
+  ["contraseña", { id: "p1", label: "core", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false }],
+])("eliminar una credencial de %s: armado muestra un texto corto y el segundo clic la elimina", async (_k, c) => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [c]) });
+  render(<VaultView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: `Eliminar ${c.label}` }));
+  const armed = screen.getByRole("button", { name: `Confirmar eliminación de ${c.label}` });
+  expect(armed).toHaveTextContent(/^Confirmar eliminación$/);
+  await userEvent.click(armed);
+  await waitFor(() => expect(core.deleteCredential).toHaveBeenCalledWith(c.id));
+});
+
+test("regenerar una llave: armado muestra un texto corto y conserva la etiqueta en el nombre accesible", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [{ id: "k1", label: "Raspberry", username: "pi", kind: "key" as const, hasEnable: false, hasSshKey: true }]) });
+  render(<VaultView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /^Regenerar la llave de Raspberry|^Regenerar llave/ }));
+  expect(screen.getByRole("button", { name: "Confirmar: regenerar la llave de Raspberry" })).toHaveTextContent(/^Confirmar regenerar$/);
+});
