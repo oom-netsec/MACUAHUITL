@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-const hostil = "x\x1b]0;pwn\a‮"
+const hostil = "x\x1b]0;pwn\a\u202e"
 
 func errPkt(msg string) []byte {
 	return append(append(binary.BigEndian.AppendUint16(binary.BigEndian.AppendUint16(nil, 5), 0), msg...), 0)
@@ -16,11 +16,11 @@ func errPkt(msg string) []byte {
 func limpio(t *testing.T, donde string, x Transfer) {
 	t.Helper()
 	for k, v := range x.ReasonT.Args {
-		if strings.ContainsAny(v, "\x1b\a‮") || len([]rune(v)) > 128 {
+		if strings.ContainsAny(v, "\x1b\a\u202e") || len([]rune(v)) > 128 {
 			t.Fatalf("%s: arg %s sin sanear o largo (%d runas): %q", donde, k, len([]rune(v)), v)
 		}
 	}
-	if strings.ContainsAny(x.Error, "\x1b\a‮") || len([]rune(x.Error)) > 256 {
+	if strings.ContainsAny(x.Error, "\x1b\a\u202e") || len([]rune(x.Error)) > 256 {
 		t.Fatalf("%s: Error sin sanear o largo (%d runas): %q", donde, len([]rune(x.Error)), x.Error)
 	}
 }

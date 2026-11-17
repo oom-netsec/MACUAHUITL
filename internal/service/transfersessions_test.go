@@ -153,7 +153,7 @@ func TestSessionsNameSanitized(t *testing.T) {
 	r, _ := newSess()
 	s := r.Open("S1")
 	m := meta
-	m.name = "a‮b\x1b[2Jc"
+	m.name = "a\u202eb\x1b[2Jc"
 	s.start(m, &fakeProg{})
 	g, _, _ := r.List("", "es")
 	if g[0].Name != "a?b?[2Jc" {
@@ -215,10 +215,10 @@ func TestSessionsRejection33rdEvictsOldest(t *testing.T) {
 func TestSessionsRejectionNameSanitizedAndCut(t *testing.T) {
 	r, _ := newSess()
 	s := r.Open("S1")
-	s.Reject(rej("10.0.0.9:1", "not_found", "\x1b[2J‮"+strings.Repeat("ñ", 300)))
+	s.Reject(rej("10.0.0.9:1", "not_found", "\x1b[2J\u202e"+strings.Repeat("ñ", 300)))
 	_, rs, _ := r.List("S1", "es")
 	n := []rune(rs[0].Name)
-	if len(n) != 128 || strings.ContainsAny(rs[0].Name, "\x1b‮") || !strings.HasPrefix(rs[0].Name, "?[2J?ñ") {
+	if len(n) != 128 || strings.ContainsAny(rs[0].Name, "\x1b\u202e") || !strings.HasPrefix(rs[0].Name, "?[2J?ñ") {
 		t.Fatalf("name = %q (%d)", rs[0].Name, len(n))
 	}
 }

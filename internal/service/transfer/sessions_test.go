@@ -179,13 +179,13 @@ func TestListTransferSessionsNameSanitized(t *testing.T) {
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "http", Listen: "127.0.0.1:0", FromDir: pub})
 	_, gerr := s.Get(context.Background(), &v1.GetRequest{Url: "http://" + run.ready.Listening + "/a%E2%80%AEb.cfg", DestDir: t.TempDir(), Name: "local.cfg", TimeoutSeconds: 2})
 	run.transfers(t, 1)
-	for _, x := range listSessions(t, s, "").Sessions {
-		if x.Name != "a?b.cfg" {
-			t.Fatalf("name = %q", x.Name)
-		}
-		return
+	ss := listSessions(t, s, "").Sessions
+	if len(ss) == 0 {
+		t.Fatal("no hubo sesión para el nombre con U+202E: ", gerr)
 	}
-	t.Fatal("no hubo sesión para el nombre con U+202E: ", gerr)
+	if ss[0].Name != "a?b.cfg" {
+		t.Fatalf("name = %q", ss[0].Name)
+	}
 }
 
 // Auditoría con session= y total=, igual que la lista.
