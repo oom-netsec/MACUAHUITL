@@ -80,3 +80,16 @@ func TestPingStopWindowsSale0o1(t *testing.T) {
 		}
 	}
 }
+
+// 200-2: la duración pedida (duration=1, del PingPlan) detiene el ping a ~1 s con salida 0 y resumen.
+func TestPingDuracionDelPlan(t *testing.T) {
+	r := Runner{LookPath: fakeScript(t, linuxLoop)}
+	t0 := time.Now()
+	res, err := r.Run(context.Background(), req(Ping, "192.0.2.1", map[string]string{"continuous": "true", "duration": "1"}, ""), func(string) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(t0); res.ExitCode != 0 || d < 900*time.Millisecond || d > 5*time.Second || res.Ping == nil || res.Ping.Sent < 2 {
+		t.Errorf("exit=%d dur=%v %+v", res.ExitCode, d, res.Ping)
+	}
+}

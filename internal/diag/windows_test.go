@@ -26,6 +26,20 @@ func localTest(t *testing.T) {
 
 // Estas pruebas corren en Linux: llaman directo a la variante de Windows (como resolvePathsWindows en internal/paths).
 
+// La excepción de «-f» (filtro de dumpcap) no vale para otras herramientas.
+func TestCheckFlagLikeFiltroSoloDumpcap(t *testing.T) {
+	a := []string{"-f", "-evil"}
+	if checkFlagLike("dumpcap", a, false) != nil {
+		t.Error("dumpcap acepta su filtro")
+	}
+	if checkFlagLike("ping", a, false) == nil {
+		t.Error("ping no debe heredar la excepción")
+	}
+	if _, argv, err := build(req(Pcap, "", map[string]string{"interface": "eth0", "filter": "-not a flag"}, "/tmp/o"), false); err != nil || strings.Join(argv, "|") != "-i|eth0|-f|-not a flag" {
+		t.Errorf("dumpcap con filtro: %v %v", argv, err)
+	}
+}
+
 func TestBuildWindowsArgv(t *testing.T) {
 	localTest(t)
 	cases := []struct {
@@ -83,10 +97,10 @@ func TestBuildWindowsRechaza(t *testing.T) {
 	if _, _, err := buildWindows(req(Pcap, "", map[string]string{"interface": "3", "filter": "/?"}, `C:\o`)); err != nil {
 		t.Errorf("filtro tras -f no es una opción: %v", err)
 	}
-	if err := checkFlagLike([]string{"-i", "3", "/?"}, true); err == nil {
+	if err := checkFlagLike("ping", []string{"-i", "3", "/?"}, true); err == nil {
 		t.Error("«/?» debe rechazarse en Windows")
 	}
-	if err := checkFlagLike([]string{"-i", "3", "/?"}, false); err != nil {
+	if err := checkFlagLike("ping", []string{"-i", "3", "/?"}, false); err != nil {
 		t.Error("en Linux «/?» no es una bandera")
 	}
 	if _, _, err := Build(req(Ping, "192.0.2.1", map[string]string{"interval": "1"}, "")); err != nil && runtime.GOOS == "linux" {
