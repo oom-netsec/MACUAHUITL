@@ -1,4 +1,4 @@
-import { PLATFORMS, draftOf, formOf, coreErrorField, hostPlatformOf, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
+import { PLATFORMS, draftOf, formOf, coreErrorField, folderNotEmpty, hostPlatformOf, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
 
 const ok: HostForm = { name: "SW1", address: "10.0.0.1", port: "22", platform: "ios-xe", folder: "Lab", tags: "core dc-1", credentialId: "", notes: "", startCommand: "" };
 
@@ -116,4 +116,12 @@ test("la orden de inicio solo viaja con linux o windows", () => {
   expect(draftOf({ ...ok, platform: "linux", startCommand: "ls" }).startCommand).toBe("ls");
   expect(draftOf({ ...ok, platform: "ios-xe", startCommand: "ls" }).startCommand).toBe("");
   expect(formOf({ ...ok, port: 22, tags: [], startCommand: "ls" }).startCommand).toBe("ls");
+});
+
+test("errores con nombre fijo del núcleo (fase 44): credencial de llave fuera de linux/windows y carpeta con hosts", () => {
+  const err = (code: string, reason: string, metadata: Record<string, string>) => Object.assign(new Error("x"), { cause: { code, reason, metadata } });
+  expect(coreErrorField(err("InvalidArgument", "hosts.err.key_credential_platform", { field: "credential_id" }))).toBe("credentialId");
+  expect(coreErrorField(err("InvalidArgument", "hosts.err.x", { field: "startup_command" }))).toBe("startCommand");
+  expect(folderNotEmpty(err("FailedPrecondition", "hosts.err.folder_not_empty", { host_count: "3", name: "Lab" }))).toEqual({ n: "3" });
+  expect(folderNotEmpty(err("FailedPrecondition", "hosts.err.otra_cosa", { host_count: "3" }))).toBeNull(); // otro FailedPrecondition no pide confirmar
 });

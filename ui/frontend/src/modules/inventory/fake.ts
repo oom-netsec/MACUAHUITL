@@ -122,7 +122,7 @@ export function fakeInventory(initial: Host[] = sampleHosts) {
     deleteFolder: vi.fn(async (name: string, confirm = true) => {
       if (!hasFolder(name)) throw new Error(`no hay una carpeta "${name}"`);
       const n = hosts.filter((h) => h.folder === name).length;
-      if (n > 0 && !confirm) throw Object.assign(new Error(`la carpeta tiene ${n} hosts`), { cause: { code: "FailedPrecondition", reason: "hosts.folder_not_empty", metadata: { count: String(n) } } });
+      if (n > 0 && !confirm) throw Object.assign(new Error(`la carpeta tiene ${n} hosts`), { cause: { code: "FailedPrecondition", reason: "hosts.err.folder_not_empty", metadata: { host_count: String(n), name } } });
       folderNames = folderNames.filter((f) => f !== name);
       hosts = hosts.map((h) => (h.folder === name ? { ...h, folder: "" } : h));
       return n;

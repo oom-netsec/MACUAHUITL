@@ -70,10 +70,12 @@ export function coreErrorKey(e: unknown): "hosts.err.nameDup" | "hosts.err.addrD
   return "";
 }
 
+const wireField: Record<string, string> = { startup_command: "startCommand", credential_id: "credentialId" };
+
 export function coreErrorField(e: unknown): HostField | "" {
   const i = errInfo(e);
-  // El cable llama al campo de la orden «startup_command»; en la UI es startCommand.
-  if (i) return i.reason.startsWith("hosts.") ? FIELDS.find((f) => f === (i.metadata.field === "startup_command" ? "startCommand" : i.metadata.field)) ?? "" : "";
+  // El cable nombra los campos como el proto (snake_case); en la UI son camelCase.
+  if (i) return i.reason.startsWith("hosts.") ? FIELDS.find((f) => f === (wireField[i.metadata.field] ?? i.metadata.field)) ?? "" : "";
   const msg = errorText(e);
   const dup = coreErrorKey(e);
   if (dup) return dup === "hosts.err.nameDup" ? "name" : "address";
@@ -92,7 +94,5 @@ export function coreErrorField(e: unknown): HostField | "" {
 // Borrar una carpeta con hosts sin confirm: el núcleo responde FailedPrecondition con la cuenta. n = "" si el error no la trae.
 export function folderNotEmpty(e: unknown): { n: string } | null {
   const i = errInfo(e);
-  if (i?.code !== "FailedPrecondition") return null;
-  const m = i.metadata;
-  return { n: m.count ?? m.host_count ?? m.hosts ?? "" };
+  return i?.reason === "hosts.err.folder_not_empty" ? { n: i.metadata.host_count ?? "" } : null;
 }
