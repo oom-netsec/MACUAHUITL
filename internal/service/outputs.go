@@ -23,6 +23,8 @@ var (
 	CreateTemp   = os.CreateTemp
 	// OutputsGOOS es el sistema para la regla «solo X:\» (en Linux una ruta con \ es solo un nombre raro): las pruebas simulan Windows.
 	OutputsGOOS = runtime.GOOS
+	// RemoteDrive dice si la unidad de la ruta es una de red mapeada (Windows, DRIVE_REMOTE); las pruebas la simulan.
+	RemoteDrive = sys.IsRemoteDrive
 )
 
 // safeShellPath y safeCmdPath: ver sys.SafeShellPath y sys.SafeCmdPath (la misma regla para fileserve).
@@ -31,6 +33,12 @@ var (
 	safeCmdPath   = sys.SafeCmdPath
 	sidRe         = sys.SIDRe
 )
+
+// noLocalDrive: en Windows, la ruta no empieza con letra de unidad (UNC, \\?\, \\.\) o esa unidad es de red (la ACL y el dueño de un
+// recurso remoto no son los de este equipo).
+func noLocalDrive(p string) bool {
+	return OutputsGOOS == "windows" && (sys.NoDriveLetter(p) || RemoteDrive(p))
+}
 
 // driveRoot: la raíz de una unidad de Windows (D:\), el equivalente de «/» (en Linux ninguna ruta tiene esa forma).
 func driveRoot(p string) bool {
@@ -61,7 +69,7 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 		return "", nil
 	}
 	// Antes de IsAbs, EvalSymlinks o Stat: una UNC (\\host\share) es absoluta para Windows y tocarla abre SMB y filtra el hash NTLM.
-	if OutputsGOOS == "windows" && sys.NoDriveLetter(dir) {
+	if noLocalDrive(dir) {
 		return "", outputsErr("prefs.outputs.sin_unidad", "dir", dir)
 	}
 	if !filepath.IsAbs(dir) {
@@ -76,6 +84,9 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 			return "", outputsErr("prefs.outputs.no_existe", "dir", dir)
 		}
 		return "", outputsErr("prefs.outputs.ilegible", "dir", dir, "err", err)
+	}
+	if noLocalDrive(real) { // un enlace o junction puede llevar a una UNC o a una unidad de red aunque dir parezca local
+		return "", outputsErr("prefs.outputs.sin_unidad", "dir", real)
 	}
 	fi, err := os.Stat(real)
 	if err != nil {

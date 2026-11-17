@@ -112,3 +112,20 @@ func TestChmodSoloConRutaSeguraTabla(t *testing.T) {
 		}
 	}
 }
+
+// 43d-2 bajo 4: una unidad de red mapeada (DRIVE_REMOTE) se rechaza con el mismo código que una UNC, antes de tocar la ruta.
+func TestCheckOutputsWindowsUnidadDeRedMapeadaSeRechaza(t *testing.T) {
+	simulaWindows(t)
+	old := RemoteDrive
+	RemoteDrive = func(p string) bool { return strings.HasPrefix(p, "Z:") }
+	t.Cleanup(func() { RemoteDrive = old })
+	_, err := CheckOutputs(`Z:\salidas`, NewCoreSettings("fabrica", t.TempDir()), true)
+	var e *i18n.Error
+	if !errors.As(err, &e) || e.Code != "prefs.outputs.sin_unidad" {
+		t.Fatalf("%v", err)
+	}
+	_, err = CheckOutputs(`C:\no-existe-43d`, NewCoreSettings("fabrica", t.TempDir()), false)
+	if !errors.As(err, &e) || e.Code == "prefs.outputs.sin_unidad" {
+		t.Fatalf("una unidad local sigue su camino: %v", err)
+	}
+}

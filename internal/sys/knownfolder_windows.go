@@ -11,3 +11,12 @@ func DocumentsDir() string {
 	}
 	return p
 }
+
+// IsRemoteDrive dice si la unidad de path (X:) es una unidad de red mapeada (DRIVE_REMOTE): su ACL no es la de este equipo.
+func IsRemoteDrive(path string) bool {
+	if len(path) < 2 || path[1] != ':' {
+		return false
+	}
+	p, err := windows.UTF16PtrFromString(path[:2] + `\`)
+	return err == nil && windows.GetDriveType(p) == windows.DRIVE_REMOTE
+}
