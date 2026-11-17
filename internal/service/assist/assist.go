@@ -514,9 +514,12 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 		return nil, err
 	}
 	if r.UpdateCredentialId != "" {
-		u, err := s.credUser(ctx, r.UpdateCredentialId)
+		u, isKey, err := s.credUserKey(ctx, r.UpdateCredentialId)
 		if err != nil {
 			return nil, err
+		}
+		if isKey { // la rotación pondría una contraseña a una llave: eso la dejaría de ser (fase 44); para cambiarla está regenerar llave
+			return nil, service.Err(ctx, codes.FailedPrecondition, "vault.err.key_credential", nil)
 		}
 		if u != r.User {
 			return nil, service.Err(ctx, codes.InvalidArgument, "assist.svc.la_credencial_es_del_usuario", i18n.A("credential", r.UpdateCredentialId, "actual", u, "wanted", r.User))
@@ -535,14 +538,20 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 
 // credUser devuelve el usuario de una credencial de la bóveda, sin conservar sus secretos.
 func (s *assistSvc) credUser(ctx context.Context, id string) (string, error) {
+	u, _, err := s.credUserKey(ctx, id)
+	return u, err
+}
+
+// credUserKey además dice si la credencial es de tipo key (solo llave).
+func (s *assistSvc) credUserKey(ctx context.Context, id string) (string, bool, error) {
 	c, err := s.d.Vault().Get(id)
 	if err != nil {
-		return "", service.VaultErr(ctx, err)
+		return "", false, service.VaultErr(ctx, err)
 	}
 	defer c.Password.Destroy()
 	defer c.Enable.Destroy()
 	defer c.SSHKey.Destroy()
-	return c.Username, nil
+	return c.Username, c.IsKey(), nil
 }
 
 func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.StartRunResponse, error) {
