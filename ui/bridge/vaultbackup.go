@@ -43,8 +43,7 @@ type VaultBackupResultDTO struct {
 type VaultBackupExportDTO struct {
 	Count         int  `json:"count"`
 	NoPermissions bool `json:"noPermissions"` // el sistema de archivos (p. ej. vfat) no admitió los permisos 0600
-	// SSHKeysIncluded: llaves privadas que el respaldo lleva cifradas (la UI lo avisa).
-	// TODO(fase 44): el núcleo aún no tiene su contador en el proto (Backend lo agrega en #194); hasta entonces va en 0.
+	// SSHKeysIncluded: credenciales del respaldo que llevan llave privada (cifrada); la UI lo avisa.
 	SSHKeysIncluded int `json:"sshKeysIncluded"`
 }
 
@@ -52,7 +51,7 @@ type VaultBackupExportDTO struct {
 func (b *Bridge) ExportVaultBackup(path, passphrase string, overwrite, confirm bool) (VaultBackupExportDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (VaultBackupExportDTO, error) {
 		r, err := v1.NewVaultServiceClient(c).ExportBackup(ctx, &v1.ExportBackupRequest{Path: path, Passphrase: []byte(passphrase), Overwrite: overwrite, Confirm: confirm})
-		return VaultBackupExportDTO{Count: int(r.GetCount()), NoPermissions: r.GetNoPermissions(), SSHKeysIncluded: 0}, err
+		return VaultBackupExportDTO{Count: int(r.GetCount()), NoPermissions: r.GetNoPermissions(), SSHKeysIncluded: int(r.GetSshKeysIncluded())}, err
 	})
 }
 

@@ -262,9 +262,12 @@ func (b *Bridge) CreateKeyCredential(label, username string) (KeyCredentialDTO, 
 }
 
 // RegenerateKeyCredential genera otra llave para la misma credencial (conserva el id) y devuelve la pública nueva.
-// TODO(fase 44): falta la RPC en el proto (Backend la agrega en #194); hasta entonces responde que no está disponible.
-func (b *Bridge) RegenerateKeyCredential(id string) (KeyCredentialDTO, error) {
-	return KeyCredentialDTO{}, wrapErr(errors.New("regenerar llave: el núcleo aún no la ofrece"))
+// confirm es obligatorio: la pública vieja deja de servir en cada authorized_keys. Solo credenciales de tipo llave.
+func (b *Bridge) RegenerateKeyCredential(id string, confirm bool) (string, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
+		r, err := v1.NewVaultServiceClient(c).RegenerateKeyCredential(ctx, &v1.RegenerateKeyCredentialRequest{Id: id, Confirm: confirm})
+		return r.GetPublicKey(), err
+	})
 }
 
 // CredentialPublicKey devuelve la línea authorized_keys de una credencial con llave.

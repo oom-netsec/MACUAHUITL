@@ -18,6 +18,7 @@ type fake44 struct {
 	gen  *v1.GenerateKeyCredentialRequest
 	pub  *v1.GetCredentialPublicKeyRequest
 	put  *v1.PutCredentialRequest
+	reg  *v1.RegenerateKeyCredentialRequest
 	dev  *v1.PutDeviceRequest
 	del  *v1.DeleteHostFolderRequest
 	mov  *v1.MoveHostsRequest
@@ -37,12 +38,16 @@ func (f *fake44) GetCredentialPublicKey(_ context.Context, r *v1.GetCredentialPu
 func (f *fake44) ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error) {
 	return &v1.ListCredentialsResponse{Credentials: []*v1.CredentialInfo{{Id: "k1", Label: "pi", HasSshKey: true, Kind: "key"}}}, nil
 }
+func (f *fake44) RegenerateKeyCredential(_ context.Context, r *v1.RegenerateKeyCredentialRequest) (*v1.RegenerateKeyCredentialResponse, error) {
+	f.reg = r
+	return &v1.RegenerateKeyCredentialResponse{PublicKey: "ssh-ed25519 NEW"}, nil
+}
 func (f *fake44) PutCredential(_ context.Context, r *v1.PutCredentialRequest) (*v1.PutCredentialResponse, error) {
 	f.put = r
 	return &v1.PutCredentialResponse{Id: "p1"}, nil
 }
 func (f *fake44) ExportBackup(context.Context, *v1.ExportBackupRequest) (*v1.ExportBackupResponse, error) {
-	return &v1.ExportBackupResponse{Count: 2}, nil
+	return &v1.ExportBackupResponse{Count: 2, SshKeysIncluded: 1}, nil
 }
 func (f *fake44) PreviewBackupImport(context.Context, *v1.PreviewBackupImportRequest) (*v1.PreviewBackupImportResponse, error) {
 	return &v1.PreviewBackupImportResponse{Items: []*v1.VaultBackupItem{{Id: "a", State: "nueva"}, {Id: "b", State: "nueva"}}}, nil
@@ -121,8 +126,14 @@ func TestVault44(t *testing.T) {
 		t.Fatalf("put %+v %v", f.put, err)
 	}
 	e, _ := b.ExportVaultBackup("/x", "frase-larga-123", true, true)
-	if e.Count != 2 {
+	if e.Count != 2 || e.SSHKeysIncluded != 1 {
 		t.Fatalf("%+v", e)
+	}
+	if pk, err := b.RegenerateKeyCredential("k1", true); err != nil || pk != "ssh-ed25519 NEW" || f.reg.Id != "k1" || !f.reg.Confirm {
+		t.Fatalf("regen %q %v %+v", pk, err, f.reg)
+	}
+	if _, err := b.RegenerateKeyCredential("k1", false); err != nil || f.reg.Confirm {
+		t.Fatal("confirm debe viajar tal cual")
 	}
 	p, _ := b.PreviewVaultBackupImport("/x", "f")
 	if len(p.Items) != 2 {
