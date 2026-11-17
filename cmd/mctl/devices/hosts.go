@@ -68,20 +68,21 @@ func hostsList(c *cli.Env, args []string) error {
 }
 
 type hostFields struct {
-	name, address, platform, folder, cred, notes string
-	port                                         int
-	tags                                         cli.List
+	name, address, platform, folder, cred, notes, startup string
+	port                                                  int
+	tags                                                  cli.List
 }
 
 func (f *hostFields) flags(fs *flag.FlagSet) {
 	fs.StringVar(&f.name, "name", "", "nombre")
 	fs.StringVar(&f.address, "address", "", "IP o nombre DNS")
 	fs.IntVar(&f.port, "port", 0, "puerto SSH (22 por defecto)")
-	fs.StringVar(&f.platform, "platform", "", "plataforma: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc")
+	fs.StringVar(&f.platform, "platform", "", "plataforma: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows")
 	fs.StringVar(&f.folder, "folder", "", "carpeta (un solo nivel)")
 	fs.Var(&f.tags, "tag", "etiqueta (repetible)")
 	fs.StringVar(&f.cred, "cred", "", "id de la credencial en la bóveda")
 	fs.StringVar(&f.notes, "notes", "", "notas")
+	fs.StringVar(&f.startup, "startup-command", "", "orden que corre el terminal al conectar (linux y windows); vacío la borra")
 }
 
 func saved(c *cli.Env, verb, id, name string, warnings []string) {
@@ -91,7 +92,7 @@ func saved(c *cli.Env, verb, id, name string, warnings []string) {
 	}
 }
 
-// hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
+// hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
 func hostsAdd(c *cli.Env, args []string) error {
 	var f hostFields
 	fs, err := cli.Flags("hosts add", args, f.flags)
@@ -99,10 +100,10 @@ func hostsAdd(c *cli.Env, args []string) error {
 		return err
 	}
 	if fs.NArg() != 1 || f.name != "" || f.address == "" {
-		return errors.New("uso: mctl hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]")
+		return errors.New("uso: mctl hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]")
 	}
 	r, err := client(c).PutDevice(context.Background(), &v1.PutDeviceRequest{Device: &v1.Device{Name: fs.Arg(0), Target: &v1.Target{Address: f.address},
-		Profile: &v1.DeviceProfile{Port: uint32(f.port)}, Platform: f.platform, Folder: f.folder, Tags: f.tags, CredentialId: f.cred, Notes: f.notes}})
+		Profile: &v1.DeviceProfile{Port: uint32(f.port)}, Platform: f.platform, Folder: f.folder, Tags: f.tags, CredentialId: f.cred, Notes: f.notes, StartupCommand: f.startup}})
 	if err != nil {
 		return err
 	}
@@ -110,7 +111,7 @@ func hostsAdd(c *cli.Env, args []string) error {
 	return nil
 }
 
-// hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
+// hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
 // Solo cambia lo que se pasa; --tag reemplaza todas las etiquetas y un valor vacío (--folder "", --cred "") quita el campo.
 func hostsEdit(c *cli.Env, args []string) error {
 	var f hostFields
@@ -119,7 +120,7 @@ func hostsEdit(c *cli.Env, args []string) error {
 		return err
 	}
 	if fs.NArg() != 1 {
-		return errors.New("uso: mctl hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]")
+		return errors.New("uso: mctl hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]")
 	}
 	set := map[string]bool{}
 	fs.Visit(func(fl *flag.Flag) { set[fl.Name] = true })
@@ -160,11 +161,113 @@ func hostsEdit(c *cli.Env, args []string) error {
 	if set["notes"] {
 		cur.Notes = f.notes
 	}
+	if set["startup-command"] {
+		cur.StartupCommand = f.startup
+	}
 	r, err := client(c).PutDevice(context.Background(), &v1.PutDeviceRequest{Device: cur})
 	if err != nil {
 		return err
 	}
 	saved(c, cli.T("mctl.hosts.saved"), r.Id, cur.Name, r.Warnings)
+	return nil
+}
+
+// hosts folder list | add NOMBRE | rename VIEJO NUEVO | rm NOMBRE [--yes]
+func folderList(c *cli.Env, args []string) error {
+	if _, err := cli.Flags("hosts folder list", args, nil); err != nil {
+		return err
+	}
+	r, err := client(c).ListHostFolders(context.Background(), &v1.ListHostFoldersRequest{})
+	if err != nil {
+		return err
+	}
+	tw := tabwriter.NewWriter(c.Out, 2, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, cli.T("mctl.hosts.head_folders"))
+	for _, f := range r.Folders {
+		fmt.Fprintf(tw, "%s\t%d\n", f.Name, f.HostCount)
+	}
+	return tw.Flush()
+}
+
+func folderAdd(c *cli.Env, args []string) error {
+	name, err := cli.OneArg("hosts folder add", args)
+	if err != nil {
+		return err
+	}
+	r, err := client(c).CreateHostFolder(context.Background(), &v1.CreateHostFolderRequest{Name: name})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(c.Out, cli.T("mctl.hosts.folder_created", "name", r.Folder.GetName()))
+	return nil
+}
+
+func folderRename(c *cli.Env, args []string) error {
+	fs, err := cli.Flags("hosts folder rename", args, nil)
+	if err != nil {
+		return err
+	}
+	if fs.NArg() != 2 {
+		return cli.Err("mctl.hosts.folder_rename_use")
+	}
+	r, err := client(c).RenameHostFolder(context.Background(), &v1.RenameHostFolderRequest{Name: fs.Arg(0), NewName: fs.Arg(1)})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(c.Out, cli.T("mctl.hosts.folder_renamed", "old", fs.Arg(0), "name", r.Folder.GetName()))
+	return nil
+}
+
+func folderRm(c *cli.Env, args []string) error {
+	var yes bool
+	fs, err := cli.Flags("hosts folder rm", args, func(fs *flag.FlagSet) {
+		fs.BoolVar(&yes, "yes", false, "confirmar que los hosts de la carpeta quedan sin carpeta")
+	})
+	if err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return cli.Err("mctl.cli.needs_id", "name", "hosts folder rm")
+	}
+	cl := client(c)
+	if !yes { // sin --yes y con hosts: no se borra nada
+		l, err := cl.ListHostFolders(context.Background(), &v1.ListHostFoldersRequest{})
+		if err != nil {
+			return err
+		}
+		for _, f := range l.Folders {
+			if f.Name == fs.Arg(0) && f.HostCount > 0 {
+				return cli.Err("mctl.hosts.folder_rm_yes", "name", f.Name, "n", f.HostCount)
+			}
+		}
+	}
+	r, err := cl.DeleteHostFolder(context.Background(), &v1.DeleteHostFolderRequest{Name: fs.Arg(0), Confirm: yes})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(c.Out, cli.T("mctl.hosts.folder_deleted", "name", fs.Arg(0), "n", r.HostsUnfiled))
+	return nil
+}
+
+// hosts mv --folder F ID...  (--folder "" deja los hosts sin carpeta)
+func hostsMv(c *cli.Env, args []string) error {
+	var folder string
+	fs, err := cli.Flags("hosts mv", args, func(fs *flag.FlagSet) {
+		fs.StringVar(&folder, "folder", "", "carpeta de destino (vacía: sin carpeta)")
+	})
+	if err != nil {
+		return err
+	}
+	set := false
+	fs.Visit(func(f *flag.Flag) { set = set || f.Name == "folder" })
+	if !set || fs.NArg() == 0 {
+		return cli.Err("mctl.hosts.mv_use")
+	}
+	r, err := client(c).MoveHosts(context.Background(), &v1.MoveHostsRequest{Ids: fs.Args(), Folder: folder})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(c.Out, cli.T("mctl.hosts.moved", "n", r.Moved))
 	return nil
 }
 
@@ -349,10 +452,13 @@ func hostsTemplate(c *cli.Env, args []string) error {
 
 const hostsHelp = `  hosts list [TEXTO] [--folder F] [--tag X] [--json]  |  hosts rm ID
         (libreta de hosts: los equipos que agregas a mano, la fuente «manual» de «devices»; se fusionan por dirección con lo descubierto. rm no borra la evidencia)
-  hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
-  hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
-        (A: IP o nombre DNS, sin usuario, esquema ni puerto; puerto 22 por defecto; platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc; carpeta de un solo nivel; hasta 10 etiquetas.
+  hosts add NOMBRE --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+  hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+        (A: IP o nombre DNS, sin usuario, esquema ni puerto; puerto 22 por defecto; platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows; --startup-command es la orden que corre el terminal al conectar a un host linux o windows (vacía la borra); carpeta de un solo nivel; hasta 10 etiquetas.
          --cred es el id de una credencial de la bóveda (cred list): nunca un secreto. edit solo cambia lo que se pasa; --tag reemplaza todas y un valor vacío quita el campo)
+  hosts folder list | add NOMBRE | rename VIEJO NUEVO | rm NOMBRE [--yes]  |  hosts mv --folder F ID...
+        (carpetas de un solo nivel; list las muestra con su número de hosts, también las vacías. rm de una carpeta con hosts exige --yes: los hosts no se borran, quedan sin carpeta.
+         mv mueve hosts a la carpeta F, que se crea si no existe; --folder "" los deja sin carpeta)
   hosts export --out RUTA [--format csv|json] [--overwrite] [ID...]
         (archivo 0600; el formato sale de la extensión (.csv / .json) o de --format. JSON versionado con suma SHA-256 (integridad, no autenticidad);
          CSV para Excel (UTF-8, encabezado fijo, etiquetas separadas por «;», celdas que empiezan con = + - @ llevan un apóstrofo delante). La credencial viaja solo como su etiqueta; sin ID exporta todos, hasta 1000)

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/cmd/mctl/cli"
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -105,10 +106,13 @@ func credList(c *cli.Env, args []string) error {
 		if i.HasEnableSecret {
 			extra += " +enable"
 		}
-		if i.HasSshKey {
+		kind := cli.T("mctl.vault.kind_password")
+		if i.Kind == "key" {
+			kind = cli.T("mctl.vault.kind_key")
+		} else if i.HasSshKey {
 			extra += cli.T("mctl.vault.cred_key")
 		}
-		fmt.Fprintf(c.Out, "%s  %s  %s%s\n", i.Id, i.Label, i.Username, extra)
+		fmt.Fprintf(c.Out, "%s  %s  %s  %s%s\n", i.Id, i.Label, i.Username, kind, extra)
 	}
 	return nil
 }
@@ -150,6 +154,65 @@ func credAdd(c *cli.Env, args []string) error {
 	return nil
 }
 
+// cred keygen --label L --user U: el id y la pública (la privada nunca sale del núcleo).
+func credKeygen(c *cli.Env, args []string) error {
+	var label, user string
+	if _, err := cli.Flags("cred keygen", args, func(fs *flag.FlagSet) {
+		fs.StringVar(&label, "label", "", "etiqueta")
+		fs.StringVar(&user, "user", "", "usuario")
+	}); err != nil {
+		return err
+	}
+	if user == "" {
+		return cli.Err("mctl.vault.missing_user")
+	}
+	r, err := v1.NewVaultServiceClient(c.Conn).GenerateKeyCredential(context.Background(), &v1.GenerateKeyCredentialRequest{Label: label, Username: user})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(c.Out, r.Id)
+	fmt.Fprintln(c.Out, r.PublicKey)
+	return nil
+}
+
+// cred pubkey ID: SOLO la línea authorized_keys, para redirigirla con >>.
+func credPubkey(c *cli.Env, args []string) error {
+	id, err := cli.OneArg("cred pubkey", args)
+	if err != nil {
+		return err
+	}
+	r, err := v1.NewVaultServiceClient(c.Conn).GetCredentialPublicKey(context.Background(), &v1.GetCredentialPublicKeyRequest{Id: id})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(c.Out, strings.TrimSpace(r.PublicKey))
+	return nil
+}
+
+// cred rekey ID --yes: llave nueva con el mismo id; sin --yes no toca nada.
+func credRekey(c *cli.Env, args []string) error {
+	var yes bool
+	fs, err := cli.Flags("cred rekey", args, func(fs *flag.FlagSet) {
+		fs.BoolVar(&yes, "yes", false, "confirmar el reemplazo de la llave")
+	})
+	if err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return cli.Err("mctl.cli.needs_id", "name", "cred rekey")
+	}
+	if !yes {
+		return cli.Err("mctl.vault.rekey_confirm_yes")
+	}
+	r, err := v1.NewVaultServiceClient(c.Conn).RegenerateKeyCredential(context.Background(), &v1.RegenerateKeyCredentialRequest{Id: fs.Arg(0), Confirm: true})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(c.Out, strings.TrimSpace(r.PublicKey))
+	fmt.Fprintln(c.Out, cli.T("mctl.vault.rekey_done"))
+	return nil
+}
+
 func credRm(c *cli.Env, args []string) error {
 	id, err := cli.OneArg("cred rm", args)
 	if err != nil {
@@ -162,6 +225,9 @@ func credRm(c *cli.Env, args []string) error {
 // help son las líneas de este área en mctl --help.
 const help = `  vault status | create | unlock | lock | passwd
   cred  list | add --label L --user U [--no-enable] | rm ID
+  cred  keygen --label L --user U | pubkey ID | rekey ID --yes
+        (llave SSH ed25519 generada en el núcleo: la privada nunca sale. keygen imprime el id y la pública; pubkey imprime SOLO la línea authorized_keys, para «>> authorized_keys»;
+         rekey cambia la llave conservando el id: autoriza la nueva en cada equipo, la anterior deja de servir. No confundir con «cred rotate», que rota una contraseña en un equipo)
   cred  backup export RUTA [--overwrite] [--yes]  |  backup import RUTA [--decision ID=renombrar|reemplazar|omitir]... [--all=renombrar|reemplazar|omitir] [--preview]
         (respaldo cifrado de la bóveda con una frase propia, distinta de la maestra y de al menos 12 caracteres; la frase se lee de la terminal o de stdin, nunca como argumento.
          export exige --yes: el archivo trae todas tus credenciales. import muestra el estado de cada una: new, same, label_conflict o reserved (se omite);
@@ -177,6 +243,9 @@ func Area() cli.Area {
 		{Name: "vault passwd", Run: vaultPasswd},
 		{Name: "cred list", Run: credList},
 		{Name: "cred add", Run: credAdd},
+		{Name: "cred keygen", Run: credKeygen},
+		{Name: "cred pubkey", Run: credPubkey},
+		{Name: "cred rekey", Run: credRekey},
 		{Name: "cred rm", Run: credRm},
 		{Name: "cred backup export", Run: backupExport},
 		{Name: "cred backup import", Run: backupImport},

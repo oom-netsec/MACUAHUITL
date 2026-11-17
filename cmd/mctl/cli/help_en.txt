@@ -1,5 +1,8 @@
   vault status | create | unlock | lock | passwd
   cred  list | add --label L --user U [--no-enable] | rm ID
+  cred  keygen --label L --user U | pubkey ID | rekey ID --yes
+        (ed25519 SSH key generated in the core: the private key never leaves it. keygen prints the id and the public key; pubkey prints ONLY the authorized_keys line, for «>> authorized_keys»;
+         rekey replaces the key keeping the id: authorize the new one on every host, the old one stops working. Not to be confused with «cred rotate», which rotates a password on a device)
   cred  backup export PATH [--overwrite] [--yes]  |  backup import PATH [--decision ID=rename|replace|skip]... [--all=rename|replace|skip] [--preview]
         (encrypted vault backup with its own passphrase, different from the master one and at least 12 characters; the passphrase is read from the terminal or stdin, never as an argument.
          export requires --yes: the file holds all your credentials. import shows the state of each one: new, same, label_conflict or reserved (skipped);
@@ -142,10 +145,13 @@
         (devices known from Patrol jobs, the fleet, the backups and the saved hosts, without duplicates per address; TEXT filters by address, name, platform, folder or tag)
   hosts list [TEXT] [--folder F] [--tag X] [--json]  |  hosts rm ID
         (saved hosts: the devices you add by hand, the «manual» source of «devices»; merged by address with what was discovered. rm does not delete the evidence)
-  hosts add NAME --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
-  hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N]
-        (A: IP or DNS name, without user, scheme or port; port 22 by default; platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc; single-level folder; up to 10 tags.
+  hosts add NAME --address A [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+  hosts edit ID [--name N] [--address A] [--port N] [--platform P] [--folder F] [--tag X]... [--cred ID] [--notes N] [--startup-command C]
+        (A: IP or DNS name, without user, scheme or port; port 22 by default; platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows; --startup-command is the command the terminal runs on connect to a linux or windows host (empty clears it); single-level folder; up to 10 tags.
          --cred is the id of a vault credential (cred list): never a secret. edit only changes what is passed; --tag replaces all of them and an empty value clears the field)
+  hosts folder list | add NAME | rename OLD NEW | rm NAME [--yes]  |  hosts mv --folder F ID...
+        (single-level folders; list shows them with their host count, empty ones too. rm of a folder with hosts requires --yes: the hosts are not deleted, they are left without a folder.
+         mv moves hosts to folder F, created if missing; --folder "" leaves them without a folder)
   hosts export --out PATH [--format csv|json] [--overwrite] [ID...]
         (0600 file; the format comes from the extension (.csv / .json) or from --format. Versioned JSON with a SHA-256 sum (integrity, not authenticity);
          CSV for Excel (UTF-8, fixed header, tags separated by «;», cells starting with = + - @ get a leading apostrophe). The credential travels only as its label; without an ID it exports all, up to 1000)
