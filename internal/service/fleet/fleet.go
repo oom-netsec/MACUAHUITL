@@ -3,7 +3,6 @@ package fleet
 import (
 	"context"
 	"path/filepath"
-	"time"
 
 	"google.golang.org/grpc/codes"
 
@@ -30,7 +29,7 @@ func (s *fleetSvc) load(ctx context.Context, action, dir, detail string) (*fleet
 	if !filepath.IsAbs(dir) {
 		return nil, service.Err(ctx, codes.InvalidArgument, "fleet.err.relative_path", i18n.A("path", dir))
 	}
-	f, err := fleet.Load(dir, time.Now().UTC(), extra...)
+	f, err := fleet.Load(dir, s.d.Now().UTC(), extra...)
 	if err != nil {
 		return nil, service.ErrFrom(ctx, codes.FailedPrecondition, err)
 	}
