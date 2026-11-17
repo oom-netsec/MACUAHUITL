@@ -6,6 +6,7 @@ import { Badge } from "../../components/Page";
 import { Icon } from "../../components/Icon";
 import { DetailsButton } from "../../components/Dialog";
 import { useLang, useT } from "../../lib/i18n";
+import { useAction } from "../../lib/useAction";
 import type { Key } from "../../lib/i18n/es";
 import type { Host, HostFileFormat, HostImportAction, HostImportItem, HostsFormat, HostsImportPreview, HostsImportResult } from "../inventory/api";
 import { hostsChanged, useHostsVersion } from "../inventory/signal";
@@ -30,7 +31,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
   const uid = useId();
   const hv = useHostsVersion();
   const [fmt, setFmt] = useState<HostsFormat | null>(null);
-  const [err, setErr] = useState("");
+  const [loadErr, setLoadErr] = useState(""); // fallos de lectura; los de las acciones los lleva useAction
   const [msg, setMsg] = useState("");
   const [warn, setWarn] = useState("");
   const [format, setFormat] = useState<HostFileFormat>("csv");
@@ -40,21 +41,23 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
   const [prev, setPrev] = useState<HostsImportPreview | null>(null);
   const [acts, setActs] = useState<Record<string, HostImportAction>>({});
   const [result, setResult] = useState<HostsImportResult | null>(null);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let live = true;
-    core.hostsImportFormat().then((f) => { if (live) setFmt(f); }, (e) => { if (live) setErr(errorText(e)); });
+    core.hostsImportFormat().then((f) => { if (live) setFmt(f); }, (e) => { if (live) setLoadErr(errorText(e)); });
     return () => { live = false; };
   }, [core]);
   useEffect(() => {
     if (scope !== "some") return;
     let live = true;
-    core.listHosts().then((l) => { if (live) { setBook(l); setPicked((p) => new Set([...p].filter((id) => l.some((h) => h.id === id)))); } }, (e) => { if (live) setErr(errorText(e)); });
+    core.listHosts().then((l) => { if (live) { setBook(l); setPicked((p) => new Set([...p].filter((id) => l.some((h) => h.id === id)))); } }, (e) => { if (live) setLoadErr(errorText(e)); });
     return () => { live = false; };
   }, [core, scope, hv]);
 
-  const run = async (f: () => Promise<void>) => { setErr(""); setMsg(""); setWarn(""); setBusy(true); try { await f(); } catch (e) { setErr(errorText(e)); } finally { setBusy(false); } };
+  const action = useAction((f: () => Promise<void>) => f());
+  const { busy } = action;
+  const err = action.error || loadErr;
+  const run = (f: () => Promise<void>) => { setLoadErr(""); setMsg(""); setWarn(""); return action.run(f); };
 
   const template = (format: HostFileFormat) => run(async () => {
     const tpl = await core.hostsImportTemplate(format);
@@ -91,7 +94,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
       setResult(r); setPrev(null); hostsChanged();
     } catch (e) {
       if (!/NotFound|FailedPrecondition/.test(String(e instanceof Error ? e.message : e))) throw e; // errorText quita el código: se mira el mensaje crudo
-      setPrev(null); setErr(t("hosts.data.import.expired")); // el token vale 10 minutos y un solo uso: hay que volver a abrir el archivo
+      setPrev(null); throw new Error(t("hosts.data.import.expired")); // el token vale 10 minutos y un solo uso: hay que volver a abrir el archivo
     }
   });
 

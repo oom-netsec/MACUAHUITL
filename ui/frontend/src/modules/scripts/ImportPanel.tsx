@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Notice, errorText } from "../../components/Field";
+import { useAction } from "../../lib/useAction";
+import { Notice } from "../../components/Field";
 import { Badge, ResultPanel, type Tone } from "../../components/Page";
 import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
@@ -60,22 +61,19 @@ export function ImportPanel({ preview, nameOf, onApply, onClose, onExpired }: {
 }) {
   const t = useT();
   const [picks, setPicks] = useState<Record<string, ImportAction>>({});
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
   const conflicts = preview.items.filter((i) => isConflict(i.state));
   const ready = conflicts.every((i) => picks[i.script.id]);
-  const apply = async () => {
-    setErr(""); setBusy(true);
+  const { run: apply, busy, error: err } = useAction(async () => {
     try {
       onClose(await onApply(preview.token, conflicts.map((i) => ({ scriptId: i.script.id, action: picks[i.script.id] }))));
     } catch (e) {
-      if (tokenGone(e)) { onExpired(); return; }
-      setErr(errorText(e)); setBusy(false);
+      if (!tokenGone(e)) throw e;
+      onExpired();
     }
-  };
+  });
   return (
     <ResultPanel title={t("scripts.import.preview")} pad
-      actions={<><button type="button" className="primary" disabled={!ready || busy} aria-busy={busy} onClick={apply}>{t("scripts.import.apply")}</button><button type="button" onClick={() => onClose()}>{t("scripts.f.cancel")}</button></>}>
+      actions={<><button type="button" className="primary" disabled={!ready || busy} aria-busy={busy} onClick={() => void apply()}>{t("scripts.import.apply")}</button><button type="button" onClick={() => onClose()}>{t("scripts.f.cancel")}</button></>}>
       <Warnings list={preview.warnings} />
       <ScriptRows items={preview.items} picks={picks} onPick={(id, a) => setPicks({ ...picks, [id]: a })} nameOf={nameOf} />
       {err && <Notice kind="error">{err}</Notice>}
