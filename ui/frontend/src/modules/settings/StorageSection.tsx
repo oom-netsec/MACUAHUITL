@@ -1,3 +1,4 @@
+import { pathProblem } from "../../lib/paths";
 import { useCallback, useEffect, useState } from "react";
 import type { CoreAPI } from "../../lib/core";
 import { Field, Notice, PathField, Select, errorText } from "../../components/Field";
@@ -36,8 +37,9 @@ export function StorageSection({ core }: { core: CoreAPI }) {
   const errs = validateOpts({ ...emptyForm, rotateMb: form.rotateMb, rotateMinutes: form.rotateMinutes, maxFiles: form.maxFiles }, true);
   const errText = (k: NumKey) => (errs[k] ? t(errs[k] === "int" ? "syslog.err.int" : "syslog.err.range", { lo: RANGES[k].lo, hi: RANGES[k].hi }) : undefined);
 
+  const dirBad = pathProblem(form.outputsDir.trim()); // el campo ya muestra el motivo; con él no se guarda
   const save = async () => {
-    if (Object.keys(errs).length) return;
+    if (Object.keys(errs).length || dirBad) return;
     setBusy(true); setSaveErr(null); setSaved(false);
     try {
       const s = await core.setCorePrefs({ outputsDir: form.outputsDir.trim(), rotateMb: num(form.rotateMb), rotateMin: num(form.rotateMinutes), maxFiles: num(form.maxFiles), format: form.format });
@@ -102,7 +104,7 @@ export function StorageSection({ core }: { core: CoreAPI }) {
       {saveErr && !parsedErr && <Notice kind="error">{saveErr.msg}</Notice>}
       {saved && !saveErr && <Notice kind="ok">{t("settings.storage.saved")}</Notice>}
       <div className="actions">
-        <button type="button" className="primary" disabled={busy || Object.keys(errs).length > 0} onClick={() => void save()}>{t("settings.storage.save")}</button>
+        <button type="button" className="primary" disabled={busy || Object.keys(errs).length > 0 || !!dirBad} onClick={() => void save()}>{t("settings.storage.save")}</button>
       </div>
     </div>
   );

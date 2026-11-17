@@ -56,6 +56,7 @@ test("serveProblem: 1-65535 y puertos por omisión del estándar en Linux y en W
   for (const os of [undefined, "windows"] as const) {
     setOSForTests(os);
     try {
+      f.fromDir = os ? "C:\\x" : "/x"; // en Windows una carpeta es «C:\…» (pathProblem)
       expect(serveProblem(f)).toBeNull();
       expect(serveProblem({ ...f, port: "0" })).toBe("transfer.err.port");
       expect(serveProblem({ ...f, port: "65536" })).toBe("transfer.err.port");

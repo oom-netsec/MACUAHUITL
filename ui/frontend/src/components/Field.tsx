@@ -51,7 +51,7 @@ export function TextArea({ label, hint, error, value, onChange, rows = 5, readOn
 // Ruta escrita a mano o elegida con el diálogo nativo; cancelar el diálogo conserva lo que había.
 export function PathField({ label, hint, error, value, onChange, pick }: { label: string; hint?: string; error?: ReactNode; value: string; onChange: (v: string) => void; pick: () => Promise<string> }) {
   const t = useT();
-  const bad = pathProblem(value); // el error de la pantalla manda; si no hay, el de la validación compartida va junto al campo
+  const bad = pathProblem(value.trim()); // el error de la pantalla manda; si no hay, el de la validación compartida va junto al campo
   const shown = error ?? (bad && t(bad));
   return (
     <Labeled label={label} hint={hint} error={shown}>

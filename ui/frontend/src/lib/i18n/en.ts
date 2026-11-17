@@ -3004,4 +3004,7 @@ export const en: Record<Key, string> = {
   "vault.key.regen.confirmImportedShort": "Confirm: replace",
   "paths.err.unc": "On Windows, network paths (\\\\server\\share) and device paths (\\\\?\\, \\\\.\\) are not accepted: use a local folder with a drive letter, like C:\\data.",
   "paths.err.ads": "The path has a \":\" after the drive: it points to an alternate data stream (file:stream), which directory listings do not show. Remove that part.",
+  "paths.err.nt": "That path uses the internal Windows namespace (\\??\\, \\GLOBALROOT): it is not accepted. Use a folder with a drive letter, like C:\\data.",
+  "paths.err.rel": "Enter the full path with a drive letter, like C:\\data. A relative path (folder\\a, \\a or C:a) depends on the current folder.",
+  "paths.err.reserved": "That name is reserved by Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9, CONIN$, CONOUT$), with or without an extension: pick another."
 };

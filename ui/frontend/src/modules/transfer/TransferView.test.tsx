@@ -16,10 +16,10 @@ const ready = (o: Partial<TransferReady> = {}): TransferReady => ({
   serverId: "s1", protocol: "tftp", listening: "192.0.2.10:6969", hint: "", user: "", password: "", fingerprints: null, recvDir: "", fromDir: "/srv/img", files: ["c4.bin"], ...o,
 });
 
-async function openServer(core: ReturnType<typeof setup>) {
+async function openServer(core: ReturnType<typeof setup>, dir = "/srv/img") {
   await screen.findByRole("option", { name: /192.0.2.10/ });
   await userEvent.selectOptions(screen.getByLabelText("IP de escucha"), "192.0.2.10");
-  await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), "/srv/img");
+  await userEvent.type(screen.getByLabelText(/Carpeta de envío/, { selector: "input" }), dir);
   await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
   return core;
 }
@@ -376,7 +376,7 @@ test("Windows: TFTP por omisión en el 69, puerto 1-65535 y la regla de firewall
     const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: rule, remove: 'Remove-NetFirewallRule -DisplayName "MACUAHUITL UDP 69"' })) });
     expect(screen.getByLabelText("Puerto")).toHaveValue(69);
     expect(screen.getByLabelText("Puerto")).toHaveAccessibleDescription(/De 1 a 65535/);
-    await openServer(core);
+    await openServer(core, "C:\\srv\\img");
     expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ listen: "192.0.2.10:69" }));
     act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:69" }) }));
     const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:69" });

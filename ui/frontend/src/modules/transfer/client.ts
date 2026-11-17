@@ -54,7 +54,7 @@ export function parseClientURL(text: string, dir: "get" | "put"): ParsedClientUR
   return { proto, host, port: u.port, path: path + u.search };
 }
 
-export type ClientErrors = Partial<Record<"host" | "port" | "path" | "cred" | "hash" | "src" | "minutes" | "maxMB", Key>>;
+export type ClientErrors = Partial<Record<"host" | "port" | "path" | "cred" | "hash" | "src" | "minutes" | "maxMB" | "destDir", Key>>;
 
 export function clientErrors(f: ClientForm): ClientErrors {
   const e: ClientErrors = {};
@@ -69,8 +69,9 @@ export function clientErrors(f: ClientForm): ClientErrors {
   if (usesSsh(f.proto) && !f.cred) e.cred = "transfer.err.cred";
   if (f.dir === "get" && expectedHash(f.hash) === null) e.hash = "transfer.err.hash";
   if (f.dir === "put" && !f.src) e.src = "transfer.err.src";
+  else if (f.dir === "put" && pathProblem(f.src) && pathProblem(f.src) !== "paths.err.rel") e.src = pathProblem(f.src)!; // «relativa» ya la explica srcPath
   else if (f.dir === "put" && (!dirName(f.src) || !baseName(f.src) || (isWindows() && !isAbsWindows(f.src)))) e.src = "transfer.err.srcPath";
-  else if (f.dir === "put" && pathProblem(f.src)) e.src = pathProblem(f.src)!;
+  if (f.dir === "get" && f.destDir.trim() && pathProblem(f.destDir.trim())) e.destDir = pathProblem(f.destDir.trim())!;
   const m = f.minutes.trim();
   if (m && !(/^\d+$/.test(m) && Number(m) >= 1 && Number(m) <= 240)) e.minutes = "transfer.err.cminutes";
   const mb = f.maxMB.trim();
