@@ -1015,7 +1015,7 @@ type JobSummary struct {
 	DevicesPartial uint32 `protobuf:"varint,15,opt,name=devices_partial,json=devicesPartial,proto3" json:"devices_partial,omitempty"`
 	// Cuándo terminó (completed, cancelled o failed); sin valor mientras está activo.
 	FinishedAt *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
-	// Terminó en un día local anterior al de hoy (hora local del núcleo): la UI lo muestra en «Past jobs».
+	// Terminó en un día local anterior al de hoy (zona del sistema del núcleo): la UI lo muestra en «Past jobs».
 	Past          bool `protobuf:"varint,17,opt,name=past,proto3" json:"past,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1259,7 +1259,7 @@ func (x *JobPhase) GetArgs() map[string]string {
 
 type ListJobsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// false: activos y terminados de hoy. true: también los de días anteriores que aún no se podan (7 días).
+	// false: activos, creados sin armar y terminados de hoy. true: también los de días anteriores que aún no se podan (7 días).
 	IncludePast   bool `protobuf:"varint,1,opt,name=include_past,json=includePast,proto3" json:"include_past,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1402,8 +1402,10 @@ func (x *RemoveJobsRequest) GetAllFinished() bool {
 type RemoveJobsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Cuántos se quitaron; los ids que no existen se ignoran y no cuentan.
-	Removed       int32    `protobuf:"varint,1,opt,name=removed,proto3" json:"removed,omitempty"`
-	RemovedIds    []string `protobuf:"bytes,2,rep,name=removed_ids,json=removedIds,proto3" json:"removed_ids,omitempty"`
+	Removed    int32    `protobuf:"varint,1,opt,name=removed,proto3" json:"removed,omitempty"`
+	RemovedIds []string `protobuf:"bytes,2,rep,name=removed_ids,json=removedIds,proto3" json:"removed_ids,omitempty"`
+	// Con all_finished: terminados que se saltaron por estar en uso (otro flujo los necesita todavía).
+	SkippedIds    []string `protobuf:"bytes,3,rep,name=skipped_ids,json=skippedIds,proto3" json:"skipped_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1448,6 +1450,13 @@ func (x *RemoveJobsResponse) GetRemoved() int32 {
 func (x *RemoveJobsResponse) GetRemovedIds() []string {
 	if x != nil {
 		return x.RemovedIds
+	}
+	return nil
+}
+
+func (x *RemoveJobsResponse) GetSkippedIds() []string {
+	if x != nil {
+		return x.SkippedIds
 	}
 	return nil
 }
@@ -1978,11 +1987,13 @@ const file_macuahuitl_v1_patrol_proto_rawDesc = "" +
 	"\x04jobs\x18\x01 \x03(\v2\x19.macuahuitl.v1.JobSummaryR\x04jobs\"O\n" +
 	"\x11RemoveJobsRequest\x12\x17\n" +
 	"\ajob_ids\x18\x01 \x03(\tR\x06jobIds\x12!\n" +
-	"\fall_finished\x18\x02 \x01(\bR\vallFinished\"O\n" +
+	"\fall_finished\x18\x02 \x01(\bR\vallFinished\"p\n" +
 	"\x12RemoveJobsResponse\x12\x18\n" +
 	"\aremoved\x18\x01 \x01(\x05R\aremoved\x12\x1f\n" +
 	"\vremoved_ids\x18\x02 \x03(\tR\n" +
-	"removedIds\"\xd0\x02\n" +
+	"removedIds\x12\x1f\n" +
+	"\vskipped_ids\x18\x03 \x03(\tR\n" +
+	"skippedIds\"\xd0\x02\n" +
 	"\tRunDevice\x12-\n" +
 	"\x06target\x18\x01 \x01(\v2\x15.macuahuitl.v1.TargetR\x06target\x120\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1a.macuahuitl.v1.DeviceStateR\x05state\x12\x16\n" +

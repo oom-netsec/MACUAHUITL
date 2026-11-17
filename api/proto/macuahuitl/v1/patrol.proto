@@ -17,7 +17,8 @@ service PatrolService {
   rpc CancelJob(CancelJobRequest) returns (CancelJobResponse);
   rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
   // Quita trabajos terminados del historial (solo la fila de la base; la evidencia en disco no se toca).
-  // Con algún id activo falla entera (FAILED_PRECONDITION, reason patrol.job_active, metadata job_ids) y no quita ninguno.
+  // Con algún id activo falla entera (FAILED_PRECONDITION, reason patrol.job_active, metadata job_ids; in_use_ids si además hay en uso)
+  // y no quita ninguno; con solo ids en uso, reason patrol.job_in_use y metadata job_ids. Un id inexistente se ignora.
   rpc RemoveJobs(RemoveJobsRequest) returns (RemoveJobsResponse);
   rpc GetRun(GetRunRequest) returns (GetRunResponse);
   // Catálogo de playbooks cargados (embebidos y de la carpeta de configuración); id es el que acepta CreateJob en playbook_ids.
@@ -153,7 +154,7 @@ message JobSummary {
   uint32 devices_partial = 15;
   // Cuándo terminó (completed, cancelled o failed); sin valor mientras está activo.
   google.protobuf.Timestamp finished_at = 16;
-  // Terminó en un día local anterior al de hoy (hora local del núcleo): la UI lo muestra en «Past jobs».
+  // Terminó en un día local anterior al de hoy (zona del sistema del núcleo): la UI lo muestra en «Past jobs».
   bool past = 17;
 }
 
@@ -186,7 +187,7 @@ message JobPhase {
 }
 
 message ListJobsRequest {
-  // false: activos y terminados de hoy. true: también los de días anteriores que aún no se podan (7 días).
+  // false: activos, creados sin armar y terminados de hoy. true: también los de días anteriores que aún no se podan (7 días).
   bool include_past = 1;
 }
 message ListJobsResponse {
@@ -202,6 +203,8 @@ message RemoveJobsResponse {
   // Cuántos se quitaron; los ids que no existen se ignoran y no cuentan.
   int32 removed = 1;
   repeated string removed_ids = 2;
+  // Con all_finished: terminados que se saltaron por estar en uso (otro flujo los necesita todavía).
+  repeated string skipped_ids = 3;
 }
 
 message RunDevice {
