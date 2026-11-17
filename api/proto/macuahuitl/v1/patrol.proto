@@ -16,6 +16,9 @@ service PatrolService {
   rpc ArmJob(ArmJobRequest) returns (ArmJobResponse);
   rpc CancelJob(CancelJobRequest) returns (CancelJobResponse);
   rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
+  // Quita trabajos del historial (solo la fila de la base; la evidencia en disco no se toca). Nunca falla por activos ni
+  // por «en uso»: quita los que se pueden y devuelve los demás en skipped. Un id inexistente se ignora.
+  rpc RemoveJobs(RemoveJobsRequest) returns (RemoveJobsResponse);
   rpc GetRun(GetRunRequest) returns (GetRunResponse);
   // Catálogo de playbooks cargados (embebidos y de la carpeta de configuración); id es el que acepta CreateJob en playbook_ids.
   rpc ListPlaybooks(ListPlaybooksRequest) returns (ListPlaybooksResponse);
@@ -148,6 +151,10 @@ message JobSummary {
   string kind = 14;
   // Equipos de la ronda que terminaron en PARTIAL; no cuentan en devices_ok ni en devices_failed.
   uint32 devices_partial = 15;
+  // Cuándo terminó (completed, cancelled o failed); sin valor mientras está activo.
+  google.protobuf.Timestamp finished_at = 16;
+  // Terminó en un día local anterior al de hoy (zona del sistema del núcleo): la UI lo muestra en «Past jobs».
+  bool past = 17;
 }
 
 enum JobPhaseKind {
@@ -178,9 +185,31 @@ message JobPhase {
   map<string, string> args = 6;
 }
 
-message ListJobsRequest {}
+message ListJobsRequest {
+  // false: activos, creados sin armar y terminados de hoy. true: también los de días anteriores que aún no se podan (7 días).
+  bool include_past = 1;
+}
 message ListJobsResponse {
   repeated JobSummary jobs = 1;
+}
+
+message RemoveJobsRequest {
+  // Una de las dos, no ambas: ids concretos o todos los terminados (nunca toca los activos).
+  repeated string job_ids = 1;
+  bool all_finished = 2;
+}
+message RemoveJobsResponse {
+  // Cuántos se quitaron; los ids que no existen se ignoran y no cuentan.
+  int32 removed = 1;
+  repeated string removed_ids = 2;
+  // Los que no se quitaron, con su motivo; los ids inexistentes no aparecen.
+  repeated SkippedJob skipped = 3;
+}
+message SkippedJob {
+  string job_id = 1;
+  // Código estable: active (armed, arming o cerrándose), change_pre (PRE de un cambio sin POST), backup_import
+  // (respaldo todavía importándose) o adhoc_unread (resultado ad-hoc sin leer).
+  string reason = 2;
 }
 
 message RunDevice {

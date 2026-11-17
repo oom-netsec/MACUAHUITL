@@ -199,9 +199,11 @@ func (x *StartBackupResponse) GetWindowEndsAt() *timestamppb.Timestamp {
 }
 
 type CollectBackupsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	JobId         string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
-	Keep          uint32                 `protobuf:"varint,2,opt,name=keep,proto3" json:"keep,omitempty"` // 0 = 30
+	state protoimpl.MessageState `protogen:"open.v1"`
+	JobId string                 `protobuf:"bytes,1,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	Keep  uint32                 `protobuf:"varint,2,opt,name=keep,proto3" json:"keep,omitempty"` // 0 = 30
+	// Carpeta absoluta de la corrida, en vez de job_id (el trabajo ya se quitó del historial); se toma como terminada.
+	Dir           string `protobuf:"bytes,3,opt,name=dir,proto3" json:"dir,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -248,6 +250,13 @@ func (x *CollectBackupsRequest) GetKeep() uint32 {
 		return x.Keep
 	}
 	return 0
+}
+
+func (x *CollectBackupsRequest) GetDir() string {
+	if x != nil {
+		return x.Dir
+	}
+	return ""
 }
 
 type CollectBackupsResponse struct {
@@ -617,10 +626,11 @@ const file_macuahuitl_v1_backup_proto_rawDesc = "" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x14\n" +
 	"\x05armed\x18\x02 \x01(\bR\x05armed\x12\x16\n" +
 	"\x06detail\x18\x03 \x01(\tR\x06detail\x12@\n" +
-	"\x0ewindow_ends_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\fwindowEndsAt\"B\n" +
+	"\x0ewindow_ends_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\fwindowEndsAt\"T\n" +
 	"\x15CollectBackupsRequest\x12\x15\n" +
 	"\x06job_id\x18\x01 \x01(\tR\x05jobId\x12\x12\n" +
-	"\x04keep\x18\x02 \x01(\rR\x04keep\"\x8b\x01\n" +
+	"\x04keep\x18\x02 \x01(\rR\x04keep\x12\x10\n" +
+	"\x03dir\x18\x03 \x01(\tR\x03dir\"\x8b\x01\n" +
 	"\x16CollectBackupsResponse\x12\x14\n" +
 	"\x05state\x18\x01 \x01(\tR\x05state\x12\x12\n" +
 	"\x04done\x18\x02 \x01(\bR\x04done\x12\x14\n" +

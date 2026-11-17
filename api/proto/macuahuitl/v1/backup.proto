@@ -44,6 +44,8 @@ message StartBackupResponse {
 message CollectBackupsRequest {
   string job_id = 1;
   uint32 keep = 2; // 0 = 30
+  // Carpeta absoluta de la corrida, en vez de job_id (el trabajo ya se quitó del historial); se toma como terminada.
+  string dir = 3;
 }
 
 message CollectBackupsResponse {
