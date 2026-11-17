@@ -1,10 +1,13 @@
 import { act, render, screen } from "@testing-library/react";
 import { LivePanel } from "./LivePanel";
-import { sampleSessions } from "./fake";
-import type { TransferSession } from "./api";
+import { sampleRejections, sampleSessions } from "./fake";
+import type { TransferRejection, TransferSession } from "./api";
 
-const mount = (fn: () => Promise<TransferSession[]>, open = true) =>
-  render(<LivePanel serverId="s1" open={open} fetchSessions={fn} />);
+type Fn = () => Promise<{ sessions: TransferSession[]; rejections: TransferRejection[] }>;
+// Las pruebas viejas pasan solo la lista de sesiones; las nuevas pasan el objeto completo.
+const wrap = (fn: () => Promise<TransferSession[]>): Fn => async () => ({ sessions: await fn(), rejections: [] });
+const mount = (fn: () => Promise<TransferSession[]>, open = true) => render(<LivePanel serverId="s1" open={open} fetchSessions={wrap(fn)} />);
+const mountFull = (fn: Fn) => render(<LivePanel serverId="s1" open fetchSessions={fn} />);
 const tick = async (ms = 1000) => { await act(async () => { await vi.advanceTimersByTimeAsync(ms); }); };
 
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-16T12:00:00Z")); });
@@ -110,4 +113,46 @@ test("la causa de una fallida no es una alerta, la barra no pasa de 100 y un cli
   const line = screen.getByText((_, el) => el?.tagName === "P" && /^Clientes/.test(el.textContent ?? "")).textContent ?? "";
   expect(line).toContain("192.0.2.21");
   expect(line).not.toMatch(/, ,|, $|: ,/); // el cliente vacío no deja un hueco
+});
+
+test("los rechazos se muestran agrupados con causa traducida, nombre, conteo y sin alerta", async () => {
+  mountFull(async () => ({ sessions: [], rejections: sampleRejections(Date.now()) }));
+  await tick();
+  expect(screen.getByRole("heading", { name: "Rechazos" })).toBeInTheDocument();
+  expect(screen.getByText("192.0.2.50")).toBeInTheDocument();
+  expect(screen.getByText("r2-confg")).toBeInTheDocument();
+  expect(screen.getByText("×4")).toBeInTheDocument();
+  expect(screen.getByText(/Archivo no publicado o inexistente/)).toBeInTheDocument();
+  expect(screen.getByText(/Origen fuera de los permitidos/)).toBeInTheDocument();
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+test("TFTP muestra la IP como «llegó desde» con la nota de origen no verificado; otros protocolos no", async () => {
+  mountFull(async () => ({ sessions: [], rejections: sampleRejections(Date.now()) }));
+  await tick();
+  expect(screen.getAllByText(/llegó desde/)).toHaveLength(1);
+  expect(screen.getByText(/puede estar falsificado/)).toBeInTheDocument();
+});
+
+test("causa other o desconocida muestra el reason del núcleo", async () => {
+  const [a] = sampleRejections(Date.now());
+  mountFull(async () => ({ sessions: [], rejections: [{ ...a, cause: "other", reason: "motivo del núcleo" }, { ...a, ip: "192.0.2.51", cause: "nueva", reason: "causa nueva" }] }));
+  await tick();
+  expect(screen.getByText(/motivo del núcleo/)).toBeInTheDocument();
+  expect(screen.getByText(/causa nueva/)).toBeInTheDocument();
+});
+
+test("sin rechazos no hay sección y el anuncio solo cambia cuando cambia el total", async () => {
+  let rej: TransferRejection[] = [];
+  mountFull(async () => ({ sessions: [], rejections: rej }));
+  await tick();
+  expect(screen.queryByRole("heading", { name: "Rechazos" })).toBeNull();
+  const live = screen.getByRole("status");
+  rej = sampleRejections(Date.now());
+  await tick();
+  const first = live.textContent;
+  expect(first).toMatch(/5/);
+  rej = rej.map((r) => ({ ...r, last: r.last + 1000 })); // mismo total, otra hora
+  await tick();
+  expect(live.textContent).toBe(first);
 });

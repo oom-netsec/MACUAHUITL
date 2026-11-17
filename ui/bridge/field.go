@@ -163,7 +163,7 @@ func (b *Bridge) ServeStart(d ServeDTO) (string, error) {
 				b.emit("serve:done", ev)
 				return
 			}
-			b.emit("serve:msg", map[string]any{"runId": id, "listening": r.Listening, "hint": r.Hint, "transfer": r.TransferJson})
+			b.emit("serve:msg", map[string]any{"runId": id, "listening": r.Listening, "hint": r.Hint, "transfer": r.TransferJson, "serverId": r.ServerId})
 		}
 	}()
 	return id, nil

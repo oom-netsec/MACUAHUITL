@@ -4,17 +4,20 @@ import { TransferProgress } from "../../components/Files";
 import { StatusPill } from "../../components/Data";
 import { useT } from "../../lib/i18n";
 import { es, type Key } from "../../lib/i18n/es";
-import type { TransferSession } from "./api";
+import type { TransferRejection, TransferSession, TransferSessions } from "./api";
 
 const MAX_RECENT = 20;
 const unimplemented = (e: unknown) => (e as { cause?: { code?: string } } | null)?.cause?.code === "Unimplemented" || /code = Unimplemented/.test(String(e));
 // «IP:puerto» o «[v6]:puerto» → solo la IP (v6 entre corchetes).
 export const clientIP = (c: string) => (c.startsWith("[") && c.includes("]") ? c.slice(0, c.indexOf("]") + 1) : /^[^:]*:\d+$/.test(c) ? c.slice(0, c.lastIndexOf(":")) : c);
 
-export function LivePanel({ serverId, open, fetchSessions }: { serverId: string; open: boolean; fetchSessions: (id: string) => Promise<TransferSession[]> }) {
+export function LivePanel({ serverId, open, fetchSessions }: { serverId: string; open: boolean; fetchSessions: (id: string) => Promise<TransferSessions> }) {
   const t = useT();
-  const [list, setList] = useState<TransferSession[] | null>(null);
+  const [data, setData] = useState<TransferSessions | null>(null);
+  const list = data?.sessions ?? null;
+  const rejections: TransferRejection[] = data?.rejections ?? [];
   const [msg, setMsg] = useState("");
+  const prevRej = useRef<number | null>(null); // total de rechazos de la lectura anterior
   const prev = useRef<Map<string, string> | null>(null); // null: aún no hay primera lectura (no se anuncia lo que ya estaba)
   useEffect(() => {
     if (!open) return;
@@ -23,9 +26,9 @@ export function LivePanel({ serverId, open, fetchSessions }: { serverId: string;
     const poll = () => {
       if (busy || document.visibilityState === "hidden") return;
       busy = true;
-      fetchSessions(serverId).then((l) => alive && setList(l ?? []), (e) => {
+      fetchSessions(serverId).then((r) => alive && setData({ sessions: r?.sessions ?? [], rejections: r?.rejections ?? [] }), (e) => {
         if (!alive) return;
-        setList(null); // fallo: el panel se oculta sin ruido
+        setData(null); // fallo: el panel se oculta sin ruido
         if (unimplemented(e)) clearInterval(h); // el núcleo no lo tiene: no insistir cada segundo
       }).finally(() => { busy = false; });
     };
@@ -40,6 +43,12 @@ export function LivePanel({ serverId, open, fetchSessions }: { serverId: string;
     const changes = known ? list.filter((s) => known.get(s.id) !== s.state) : [];
     if (changes.length) setMsg(changes.map((s) => `${s.name}: ${t(`transfer.live.state.${s.state}` as Key)}`).join(". "));
   }, [list, t]);
+  const rejTotal = rejections.reduce((n, r) => n + r.count, 0);
+  useEffect(() => {
+    if (!data) return;
+    if (prevRej.current !== null && rejTotal !== prevRej.current) setMsg(t("transfer.live.rej.announce", { n: rejTotal }));
+    prevRej.current = rejTotal;
+  }, [data, rejTotal, t]);
   if (!open || !list) return null;
   const active = list.filter((s) => s.state === "active");
   const recent = list.filter((s) => s.state !== "active").sort((a, b) => b.ended - a.ended).slice(0, MAX_RECENT);
@@ -64,6 +73,27 @@ export function LivePanel({ serverId, open, fetchSessions }: { serverId: string;
       <p className="meta">{t("transfer.live.clients")}: {clients.length ? <span className="mono">{clients.join(", ")}</span> : t("transfer.live.noClients")}</p>
       {active.length > 0 && <ul style={{ listStyle: "none", padding: 0 }}>{active.map(row)}</ul>}
       {recent.length > 0 && <><h5>{t("transfer.live.recent")}</h5><ul style={{ listStyle: "none", padding: 0 }}>{recent.map(row)}</ul></>}
+      {rejections.length > 0 && (
+        <>
+          <h5>{t("transfer.live.rej.title")}</h5>
+          <ul style={{ listStyle: "none", padding: 0 }}>
+            {rejections.map((r) => {
+              const key = `transfer.live.rej.${r.cause}` as Key;
+              const cause = r.cause !== "other" && key in es ? t(key) : r.reason || t("transfer.live.err.unknown");
+              const tftp = r.protocol === "tftp"; // el origen UDP puede falsificarse
+              return (
+                <li key={`${r.ip}|${r.protocol}|${r.cause}`} className="live-session">
+                  <div className="meta">
+                    {r.protocol.toUpperCase()} · {tftp && <>{t("transfer.live.rej.from")} </>}<span className="mono">{r.ip}</span> · {cause}
+                    {r.name && <> · <span className="mono">{r.name}</span></>} · <span>×{r.count}</span> · {new Date(r.last).toLocaleTimeString()}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {rejections.some((r) => r.protocol === "tftp") && <p className="meta">{t("transfer.live.rej.tftpNote")}</p>}
+        </>
+      )}
       <div role="status" aria-live="polite" className="sr">{msg}</div>
     </section>
   );

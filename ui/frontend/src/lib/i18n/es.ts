@@ -2832,6 +2832,16 @@ export const es = {
   "transfer.live.state.failed": "Fallida",
   "transfer.live.err.unknown": "Causa desconocida",
   "transfer.live.err.timeout": "Se agotó el tiempo de espera",
+  "transfer.live.rej.title": "Rechazos",
+  "transfer.live.rej.not_found": "Archivo no publicado o inexistente",
+  "transfer.live.rej.origin_denied": "Origen fuera de los permitidos",
+  "transfer.live.rej.write_disabled": "Escritura deshabilitada",
+  "transfer.live.rej.read_disabled": "Lectura deshabilitada",
+  "transfer.live.rej.method": "Método no permitido",
+  "transfer.live.rej.busy": "Servidor ocupado",
+  "transfer.live.rej.from": "llegó desde",
+  "transfer.live.rej.tftpNote": "En TFTP el origen es UDP y puede estar falsificado: confirma la IP en el equipo.",
+  "transfer.live.rej.announce": "Rechazos: {n} en total",
 };
 
 export type Key = keyof typeof es;

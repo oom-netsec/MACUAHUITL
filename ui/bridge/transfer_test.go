@@ -41,7 +41,8 @@ func (fakeTransfer) ListTransferSessions(_ context.Context, r *v1.ListTransferSe
 		return &v1.ListTransferSessionsResponse{}, nil
 	}
 	return &v1.ListTransferSessionsResponse{Sessions: []*v1.TransferSession{{Id: "t1", ServerId: "s1", Client: "192.0.2.9:50123", Name: "c9300.bin", Direction: "out",
-		Protocol: "tftp", Bytes: 10, Total: 100, BytesPerSec: 5, Started: 1000, Ended: 0, State: "failed", Error: "tiempo agotado", ErrorCode: "fileserve.err.timeout"}}}, nil
+		Protocol: "tftp", Bytes: 10, Total: 100, BytesPerSec: 5, Started: 1000, Ended: 0, State: "failed", Error: "tiempo agotado", ErrorCode: "fileserve.err.timeout"}},
+		Rejections: []*v1.TransferRejection{{ServerId: "s1", Ip: "192.0.2.50", Protocol: "tftp", Cause: "not_found", Name: "x.cfg", Count: 3, First: 1, Last: 2, Reason: "no existe", ReasonCode: "fileserve.rej.not_found"}}}, nil
 }
 func (fakeTransfer) Get(_ context.Context, r *v1.GetRequest) (*v1.GetResponse, error) {
 	// Report devuelve lo que llegó al núcleo: la prueba verifica que el puente no pierde campos.
@@ -81,11 +82,12 @@ func TestTransferBridge(t *testing.T) {
 	if s, err := b.TransferServers(); err != nil || len(s) != 1 || s[0].Transfers != 2 || !s[0].Write {
 		t.Fatalf("%+v %v", s, err)
 	}
-	if l, err := b.ListTransferSessions("s1"); err != nil || len(l) != 1 || l[0] != (TransferSessionDTO{ID: "t1", ServerID: "s1", Client: "192.0.2.9:50123", Name: "c9300.bin",
-		Direction: "out", Protocol: "tftp", Bytes: 10, Total: 100, BytesPerSec: 5, Started: 1000, State: "failed", Error: "tiempo agotado", ErrorCode: "fileserve.err.timeout"}) {
+	if l, err := b.TransferSessions("s1"); err != nil || len(l.Sessions) != 1 || l.Sessions[0] != (TransferSessionDTO{ID: "t1", ServerID: "s1", Client: "192.0.2.9:50123", Name: "c9300.bin",
+		Direction: "out", Protocol: "tftp", Bytes: 10, Total: 100, BytesPerSec: 5, Started: 1000, State: "failed", Error: "tiempo agotado", ErrorCode: "fileserve.err.timeout"}) ||
+		len(l.Rejections) != 1 || l.Rejections[0] != (TransferRejectionDTO{ServerID: "s1", IP: "192.0.2.50", Protocol: "tftp", Cause: "not_found", Name: "x.cfg", Count: 3, First: 1, Last: 2, Reason: "no existe", ReasonCode: "fileserve.rej.not_found"}) {
 		t.Fatalf("%+v %v", l, err)
 	}
-	if l, err := b.ListTransferSessions("otro"); err != nil || l == nil || len(l) != 0 { // vacío como [] (no null) para la UI
+	if l, err := b.TransferSessions("otro"); err != nil || l.Sessions == nil || l.Rejections == nil || len(l.Sessions)+len(l.Rejections) != 0 { // vacías como [] (no null) para la UI
 		t.Fatalf("%+v %v", l, err)
 	}
 	g, err := b.TransferGet(TransferGetDTO{URL: "tftp://h/x", DestDir: "/d", Name: "x"})

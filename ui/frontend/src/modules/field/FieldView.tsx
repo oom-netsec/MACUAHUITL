@@ -7,6 +7,7 @@ import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import { useStream } from "../../lib/stream";
 import { useNav } from "../../app/activity";
+import { LivePanel } from "../transfer/LivePanel";
 import "./field.css";
 
 type Sub = "serve" | "hash";
@@ -26,9 +27,12 @@ function ServePanel({ core }: { core: CoreAPI }) {
   const [status, setStatus] = useState<{ k: Key; v?: Record<string, string> } | null>(null);
   const [hint, setHint] = useState("");
   const [err, setErr] = useState("");
+  const [serverId, setServerId] = useState(""); // llega en el primer evento; sin él no hay panel en vivo
   const [xfers, setXfers] = useState<Xfer[]>([]);
   const s = useStream<ServeEvent>(core.onServe, (e) => {
+    if (e.serverId) setServerId(e.serverId);
     if (e.done) {
+      setServerId("");
       if (e.error) setErr(errorText(new Error(e.error)));
       setStatus({ k: "field.stopped" });
       setRunId("");
@@ -45,7 +49,7 @@ function ServePanel({ core }: { core: CoreAPI }) {
   });
   s.onUnmount(core.diagCancel);
   const start = async () => {
-    setErr(""); setXfers([]); setStatus(null); setHint("");
+    setErr(""); setServerId(""); setXfers([]); setStatus(null); setHint("");
     try {
       setRunId(await s.start(() => core.serveStart({ protocol: proto, addr, files: files.split(/[\n,;]+/).map((f) => f.trim()).filter(Boolean), allowAny: any, seconds: (Number(minutes) || 60) * 60 })));
     } catch (e) {
@@ -75,6 +79,7 @@ function ServePanel({ core }: { core: CoreAPI }) {
       {!badge && !xfers.length && <EmptyState icon="tools" title={t("field.empty.title")}>{t("field.empty")}</EmptyState>}
       {(badge || xfers.length > 0) && (
         <div className="field-out"><ResultPanel title={t("field.transfers")} status={badge}>
+          {serverId && <LivePanel serverId={serverId} open={!!runId} fetchSessions={core.transferSessions} />}
           {hint && <Terminal text={hint} aria-label={t("field.hint")} />}
           <Terminal as="ul" aria-live="polite" aria-label={t("field.transfers")}>
             {xfers.map((x, i) => (
