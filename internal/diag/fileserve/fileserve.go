@@ -318,14 +318,16 @@ func publish(files []string, extraDeny []string) (map[string]string, map[string]
 		if err := checkPathsDeny(extraDeny, filepath.Clean(f), real); err != nil {
 			return nil, nil, err
 		}
-		h, err := sys.OpenRegular(real) // la ruta real del handle: una junction intermedia no la ve EvalSymlinks
-		if err != nil {
-			return nil, nil, fmt.Errorf("fileserve: %w", err)
-		}
-		err = checkFinal(h, extraDeny)
-		h.Close()
-		if err != nil {
-			return nil, nil, err
+		if goos == "windows" { // en otros sistemas finalPath no devuelve nada: abrir de más no sirve
+			h, err := sys.OpenRegular(real) // la ruta real del handle: una junction intermedia no la ve EvalSymlinks
+			if err != nil {
+				return nil, nil, fmt.Errorf("fileserve: %w", err)
+			}
+			err = checkFinal(h, extraDeny)
+			h.Close()
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		// Rechazo temprano con el FileInfo (en Windows no ve enlaces); al servir, source.open vuelve a decidir con
 		// HardLinkedFile sobre el archivo abierto.

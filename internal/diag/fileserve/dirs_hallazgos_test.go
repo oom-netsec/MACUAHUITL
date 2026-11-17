@@ -17,6 +17,7 @@ func fijaFinalPath(t *testing.T, f func(*os.File) (string, error)) {
 // Una junction en un tramo intermedio no la resuelve EvalSymlinks: la ruta final del handle abierto es la que manda,
 // tanto para la carpeta (OpenDir) como para el archivo publicado y el abierto con OpenFrom.
 func TestRutaFinalDelHandleEntraEnLaListaNegada(t *testing.T) {
+	fijaGOOS(t, "windows") // publish solo abre el handle extra donde finalPath devuelve algo
 	base := realTemp(t)
 	t.Setenv("HOME", realTemp(t))
 	t.Setenv("XDG_CONFIG_HOME", "")
@@ -110,5 +111,50 @@ func TestPublishUNCNoTocaLaRuta(t *testing.T) {
 	}
 	if _, _, err := publish([]string{unc}, nil); err == nil {
 		t.Error("debió rechazarse")
+	}
+}
+
+// source.open aplica la ruta final del handle: cierra la carrera entre publicar y servir (un archivo que pasa a
+// resolverse dentro de una carpeta negada, p. ej. por una junction creada después).
+func TestSourceOpenAplicaRutaFinal(t *testing.T) {
+	base := realTemp(t)
+	t.Setenv("HOME", realTemp(t))
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+	prohibida := filepath.Join(base, "prohibida")
+	os.MkdirAll(prohibida, 0o700)
+	file := filepath.Join(base, "a.bin")
+	os.WriteFile(file, []byte("x"), 0o600)
+
+	fijaFinalPath(t, func(f *os.File) (string, error) { return f.Name(), nil })
+	files, infos, err := publish([]string{file}, []string{prohibida})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &source{files: files, infos: infos, deny: []string{prohibida}}
+	if f, _, err := s.open("a.bin"); err != nil {
+		t.Fatalf("control: %v", err)
+	} else {
+		f.Close()
+	}
+	fijaFinalPath(t, func(*os.File) (string, error) { return filepath.Join(prohibida, "a.bin"), nil })
+	if f, _, err := s.open("a.bin"); err == nil {
+		f.Close()
+		t.Error("open debió rechazar: el handle cae en la lista negada")
+	}
+}
+
+// ValidateDir también aplica la ruta final del handle: el rechazo llega antes de tocar la red.
+func TestValidateDirAplicaRutaFinal(t *testing.T) {
+	base := realTemp(t)
+	t.Setenv("HOME", realTemp(t))
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+	dir, prohibida := filepath.Join(base, "ok"), filepath.Join(base, "prohibida")
+	os.MkdirAll(dir, 0o700)
+	os.MkdirAll(prohibida, 0o700)
+	fijaFinalPath(t, func(*os.File) (string, error) { return filepath.Join(prohibida, "sub"), nil })
+	if _, err := ValidateDir(dir, prohibida); err == nil {
+		t.Error("ValidateDir debió rechazar: el handle cae en la lista negada")
 	}
 }

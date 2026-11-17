@@ -75,3 +75,25 @@ func TestSinLetraDeUnidad(t *testing.T) {
 		}
 	}
 }
+
+// El perfil real de la cuenta cuenta como HOME exacto y como base de la regla de ocultos, no solo para la lista
+// negada: con HOME=D:\home (Git for Windows) C:\Users\yo no puede ser FromDir/RecvDir ni sus carpetas con punto.
+func TestWindowsPerfilRealEsHomeExactoYOcultos(t *testing.T) {
+	fijaGOOS(t, "windows")
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("HOME", realTemp(t))
+	perfil := realTemp(t)
+	old := accountHome
+	accountHome = func() string { return perfil }
+	t.Cleanup(func() { accountHome = old })
+	oculta := filepath.Join(perfil, ".oculta")
+	pass := filepath.Join(perfil, ".password-store")
+	os.MkdirAll(oculta, 0o700)
+	os.MkdirAll(pass, 0o700)
+	for _, d := range []string{perfil, oculta, pass} {
+		if _, err := ValidateDir(d); err == nil {
+			t.Errorf("%s debió rechazarse (perfil real con HOME en otra carpeta)", d)
+		}
+	}
+}

@@ -120,8 +120,12 @@ func denyList(extra []string) []string {
 // así lo que se muestra y se audita es lo que se usa). Los enlaces en los componentes
 // anteriores se resuelven antes de compararla con las carpetas sensibles y extra.
 func ValidateDir(dir string, extraDeny ...string) (string, error) {
-	real, _, err := validateDir(dir, extraDeny)
-	return real, err
+	r, real, err := OpenDir(dir, extraDeny...) // abre y cierra: así también aplica la ruta final del handle
+	if err != nil {
+		return "", err
+	}
+	r.Close()
+	return real, nil
 }
 
 // OpenDir valida la carpeta (ValidateDir) y la abre una sola vez con os.Root; toda la E/S
@@ -198,12 +202,15 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	if filepath.Dir(real) == real || filepath.Dir(clean) == clean { // «/» o la raíz de una unidad (C:\)
 		return "", nil, i18n.New("fileserve.err.dir_root", nil)
 	}
-	hr, err := evalSymlinks(home)
-	if err != nil { // sin $HOME real no se puede descartar que la carpeta pedida sea $HOME por otro camino: se rechaza
+	if _, err := evalSymlinks(home); err != nil { // sin $HOME real no se puede descartar que la carpeta pedida sea $HOME por otro camino: se rechaza
 		return "", nil, fmt.Errorf("fileserve: %w", err)
 	}
-	if clean == filepath.Clean(home) || real == hr {
-		return "", nil, i18n.New("fileserve.err.dir_home", nil)
+	for _, h := range homesOf() { // $HOME y, en Windows, el perfil real, tal cual y resuelto
+		for _, p := range []string{clean, real} {
+			if p == h || goos == "windows" && strings.EqualFold(p, h) {
+				return "", nil, i18n.New("fileserve.err.dir_home", nil)
+			}
+		}
 	}
 	return real, st, nil
 }
@@ -309,15 +316,7 @@ func checkPathsDeny(extra []string, paths ...string) error {
 // hiddenUnderHome devuelve la ruta oculta (~/.password-store, ~/.cache/x…) si algún componente de p bajo $HOME
 // empieza con «.»; ~/c9300.bin y ~/Descargas/x no lo son. Se prueba con $HOME tal cual y resuelto.
 func hiddenUnderHome(p string) string {
-	home, err := homeDir()
-	if err != nil {
-		return ""
-	}
-	homes := []string{filepath.Clean(home)}
-	if hr, err := evalSymlinks(home); err == nil {
-		homes = append(homes, hr)
-	}
-	for _, h := range homes {
+	for _, h := range homesOf() {
 		rel, err := filepath.Rel(h, p)
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			continue
