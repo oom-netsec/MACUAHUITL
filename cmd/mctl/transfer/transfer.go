@@ -104,7 +104,7 @@ func serve(c *cli.Env, args []string) error {
 	var maxFile, maxTotal int64
 	fs, err := cli.Flags("transfer serve", args, func(fs *flag.FlagSet) {
 		fs.StringVar(&proto, "proto", "", "tftp, ftp, scp, sftp o http")
-		fs.StringVar(&listen, "listen", "", "IP[:PUERTO] de escucha (puerto alto por omisión)")
+		fs.StringVar(&listen, "listen", "", "IP[:PUERTO] de escucha (puerto estándar del protocolo por omisión)")
 		fs.BoolVar(&write, "write", false, "acepta subidas (no en http)")
 		fs.Var(&allow, "allow", "IP de origen permitida (repetible; obligatoria al recibir por TFTP, donde en UDP la IP de origen se falsifica y la lista solo filtra)")
 		fs.StringVar(&dir, "dir", "", "carpeta donde caen los archivos recibidos (por omisión outputs/recibidos/<sello>/)")
@@ -413,16 +413,20 @@ func hint(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(c.Out, cli.T("mctl.transfer.hint", "std", r.StandardPort, "port", port, "nft", r.Nftables, "remove", r.Remove, "setcap", r.Setcap))
+	if r.Nftables == "" { // ya es el puerto estándar: no hay regla que copiar ni limpiar
+		fmt.Fprintln(c.Out, cli.T("fileserve.hint.std_port_ok", "std", r.StandardPort, "proto", fs.Arg(0)))
+		return nil
+	}
+	fmt.Fprintln(c.Out, cli.T("mctl.transfer.hint", "std", r.StandardPort, "port", port, "nft", r.Nftables, "remove", r.Remove))
 	return nil
 }
 
-// helpFor y usageHint dan el texto del sistema (ADR 0012 h): en Windows los puertos por omisión son los estándar y no hay «puerto alto».
+// helpFor y usageHint dan el texto del sistema (ADR 0012 h): en Windows no hay sysctl: el firewall es lo que puede impedir el puerto.
 func helpFor(goos string) string {
 	if goos != "windows" {
 		return helpText
 	}
-	return strings.Replace(helpText, "puerto alto: tftp 6969, ftp 2121, scp/sftp 2222, http 8080", "sin puertos privilegiados: tftp 69, ftp 21, scp/sftp 22, http 8080 (la regla del firewall la corres tú)", 1)
+	return strings.Replace(helpText, " (si el kernel no deja abrirlos, el error trae la orden de sysctl)", " (sin puertos privilegiados; la regla del firewall la corres tú)", 1)
 }
 
 func usageHint(goos string) string {
@@ -435,7 +439,7 @@ func usageHint(goos string) string {
 var help = helpFor(runtime.GOOS)
 
 const helpText = `  transfer serve --proto tftp|ftp|scp|sftp|http --listen IP[:PUERTO] [--write] [--allow IP]... [--dir CARPETA] [--from CARPETA] [--files A,B] [--duration 30m] [--legacy-ssh] [--pasv-ports MIN-MAX]
-        (servidor temporal, puerto alto: tftp 6969, ftp 2121, scp/sftp 2222, http 8080; --dir recibe, --from publica; ftp/scp/sftp muestran usuario y contraseña de la sesión (FTP las manda en claro); recibir por tftp exige --allow; --legacy-ssh activa los algoritmos de IOS 15.x; Ctrl-C lo detiene)
+        (servidor temporal, puertos estándar: tftp 69, ftp 21, scp/sftp 22, http 80 (si el kernel no deja abrirlos, el error trae la orden de sysctl); --dir recibe, --from publica; ftp/scp/sftp muestran usuario y contraseña de la sesión (FTP las manda en claro); recibir por tftp exige --allow; --legacy-ssh activa los algoritmos de IOS 15.x; Ctrl-C lo detiene)
   transfer get URL [LOCAL] [--dir CARPETA] [--cred ID] [--sha256 H] [--md5 H] [--sha512 H] [--insecure] [--legacy-ssh] [--accept-host-key SHA256:...]
         (tftp://, ftp://, scp://, sftp://, http://, https://; archivo nuevo en la carpeta, con MD5 y SHA-256)
   transfer put URL LOCAL [--from CARPETA] [--cred ID] [--legacy-ssh] [--accept-host-key SHA256:...]

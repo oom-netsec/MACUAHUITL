@@ -36,8 +36,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // Transferencias (Fase 22a): servidores temporales de archivos (TFTP, FTP, SCP, SFTP y HTTP) y
-// clientes (TFTP, FTP, SCP, SFTP, HTTP/HTTPS). Los servidores escuchan en IP explícita y puerto
-// alto, con duración acotada; la app nunca abre puertos privilegiados (ADR 0004).
+// clientes (TFTP, FTP, SCP, SFTP, HTTP/HTTPS). Los servidores escuchan en IP explícita y en el puerto
+// estándar por omisión (tftp 69, ftp 21, scp/sftp 22, http 80), con duración acotada; la app no tiene privilegios y
+// el kernel decide el bind (ADR 0004, enmienda 2026-11-16).
 type TransferServiceClient interface {
 	// Abre un servidor y emite sus eventos hasta que el cliente cancele, venza la duración
 	// o se llame a StopServer. El primer evento es `ready`.
@@ -48,7 +49,8 @@ type TransferServiceClient interface {
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	// Envía un archivo de una carpeta elegida a una URL.
 	Put(ctx context.Context, in *PutRequest, opts ...grpc.CallOption) (*PutResponse, error)
-	// Comandos para llegar a los puertos estándar (69, 21, 22) sin privilegios. Solo texto: la app no los ejecuta.
+	// Redirección con nftables desde el puerto estándar (69, 21, 22) a un puerto alto, para quien no baja el sysctl. Solo
+	// texto: la app no lo ejecuta. Si el puerto ya es el estándar, nftables y remove llegan vacíos.
 	RedirectHint(ctx context.Context, in *RedirectHintRequest, opts ...grpc.CallOption) (*RedirectHintResponse, error)
 	// Lista una carpeta remota: FTP (MLSD o LIST), SFTP, SCP (por el subsistema SFTP, si lo hay) y
 	// HTTP(S) (índice HTML). TFTP y un SCP sin SFTP no listan: la respuesta es UNIMPLEMENTED con
@@ -212,8 +214,9 @@ type TransferService_GetManyClient = grpc.ServerStreamingClient[GetManyResponse]
 // for forward compatibility.
 //
 // Transferencias (Fase 22a): servidores temporales de archivos (TFTP, FTP, SCP, SFTP y HTTP) y
-// clientes (TFTP, FTP, SCP, SFTP, HTTP/HTTPS). Los servidores escuchan en IP explícita y puerto
-// alto, con duración acotada; la app nunca abre puertos privilegiados (ADR 0004).
+// clientes (TFTP, FTP, SCP, SFTP, HTTP/HTTPS). Los servidores escuchan en IP explícita y en el puerto
+// estándar por omisión (tftp 69, ftp 21, scp/sftp 22, http 80), con duración acotada; la app no tiene privilegios y
+// el kernel decide el bind (ADR 0004, enmienda 2026-11-16).
 type TransferServiceServer interface {
 	// Abre un servidor y emite sus eventos hasta que el cliente cancele, venza la duración
 	// o se llame a StopServer. El primer evento es `ready`.
@@ -224,7 +227,8 @@ type TransferServiceServer interface {
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	// Envía un archivo de una carpeta elegida a una URL.
 	Put(context.Context, *PutRequest) (*PutResponse, error)
-	// Comandos para llegar a los puertos estándar (69, 21, 22) sin privilegios. Solo texto: la app no los ejecuta.
+	// Redirección con nftables desde el puerto estándar (69, 21, 22) a un puerto alto, para quien no baja el sysctl. Solo
+	// texto: la app no lo ejecuta. Si el puerto ya es el estándar, nftables y remove llegan vacíos.
 	RedirectHint(context.Context, *RedirectHintRequest) (*RedirectHintResponse, error)
 	// Lista una carpeta remota: FTP (MLSD o LIST), SFTP, SCP (por el subsistema SFTP, si lo hay) y
 	// HTTP(S) (índice HTML). TFTP y un SCP sin SFTP no listan: la respuesta es UNIMPLEMENTED con

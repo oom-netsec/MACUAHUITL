@@ -1,10 +1,10 @@
 // Package transfer es el servicio de transferencias (fase 22a): servidores temporales de
 // archivos (TFTP, FTP, SCP, SFTP y HTTP) y clientes (get y put) con la credencial de la
-// bóveda. Toda escucha es temporal, en IP explícita y puerto alto; toda salida pasa por el
+// bóveda. Toda escucha es temporal, en IP explícita y, por omisión, en el puerto estándar (tftp 69, ftp 21, scp/sftp 22, http 80); toda salida pasa por el
 // EgressGuard con Revoke al terminar; todo queda auditado.
 //
-// No hace: abrir puertos privilegiados ni ejecutar nada con privilegios (solo explica los
-// comandos) ni escribir fuera de la carpeta que el usuario eligió.
+// No hace: ejecutar nada con privilegios (si el kernel niega un puerto bajo, el error
+// explica el sysctl que corre el usuario) ni escribir fuera de la carpeta que el usuario eligió.
 package transfer
 
 import (
@@ -40,16 +40,9 @@ const (
 	closeWait       = 10 * time.Second
 )
 
-// Puertos altos por omisión: ninguno privilegiado (ADR 0004). En Windows, los estándar: allí no hay puertos
-// privilegiados ni redirección, e IOS no deja elegir el de TFTP (ADR 0012 h).
-var defaultPort = defaultPorts(runtime.GOOS)
-
-func defaultPorts(goos string) map[string]uint16 {
-	if goos == "windows" {
-		return map[string]uint16{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22, "http": 8080}
-	}
-	return map[string]uint16{"tftp": 6969, "ftp": 2121, "scp": 2222, "sftp": 2222, "http": 8080}
-}
+// Puertos estándar por omisión (ADR 0004, enmienda 2026-11-16): un upgrade de IOS no usa puertos propios. Si el
+// kernel no deja abrirlos, el error del bind dice la orden de sysctl.
+var defaultPort = map[string]uint16{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22, "http": 80}
 
 type server struct {
 	id, proto, listening string
@@ -101,7 +94,7 @@ func bad(ctx context.Context, key string, kv ...any) error {
 	return service.Err(ctx, codes.InvalidArgument, key, i18n.A(kv...))
 }
 
-// listenAddr completa el puerto alto por omisión cuando solo llega la IP.
+// listenAddr completa el puerto estándar por omisión cuando solo llega la IP.
 func listenAddr(ctx context.Context, proto, listen string) (string, error) {
 	port, ok := defaultPort[proto]
 	if !ok {
@@ -242,12 +235,15 @@ func (s *svc) RedirectHint(ctx context.Context, r *v1.RedirectHintRequest) (*v1.
 		}
 	}
 	loc := i18n.Locale(ctx)
+	std := map[string]int32{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22}[r.Protocol]
+	if std != 0 && r.Port == std && runtime.GOOS != "windows" {
+		return &v1.RedirectHintResponse{StandardPort: std}, nil // ya escucha en el estándar: sin regla ni limpieza
+	}
 	h := fileserve.RedirectCommandIn(loc, r.Protocol, r.Ip, int(r.Port)) // sin la nota: se copia tal cual; Remove va aparte
 	if h == "" || r.Port <= 0 || r.Port > 65535 {
 		return nil, bad(ctx, "transfer.svc.no_redirect", "proto", r.Protocol)
 	}
-	std := map[string]int32{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22}[r.Protocol]
-	return &v1.RedirectHintResponse{StandardPort: std, Nftables: h, Setcap: fileserve.SetcapHintIn(loc, i18n.Msg(loc, "fileserve.hint.server_path", nil)), Remove: fileserve.RedirectCleanup(r.Protocol, r.Ip, int(r.Port))}, nil
+	return &v1.RedirectHintResponse{StandardPort: std, Nftables: h, Remove: fileserve.RedirectCleanup(r.Protocol, r.Ip, int(r.Port))}, nil
 }
 
 // sink: las transferencias reales se auditan; los rechazos (escáneres, nombres equivocados)

@@ -40,12 +40,12 @@ func TestFilesRelativosAFrom(t *testing.T) {
 	}
 }
 
-// ADR 0012 h: en Windows la ayuda no habla de «puerto alto» ni de 6969.
+// ADR 0004 (enmienda 2026-11-16): los puertos por omisión son los estándar; en Windows no hay sysctl.
 func TestAyudaPorSistema(t *testing.T) {
-	if !strings.Contains(helpFor("linux"), "tftp 6969") || !strings.Contains(usageHint("linux"), "PUERTO-ALTO") {
+	if !strings.Contains(helpFor("linux"), "tftp 69") || !strings.Contains(helpFor("linux"), "sysctl") || !strings.Contains(usageHint("linux"), "PUERTO-ALTO") {
 		t.Error("linux cambió")
 	}
-	if h := helpFor("windows"); strings.Contains(h, "6969") || !strings.Contains(h, "tftp 69") || strings.Contains(usageHint("windows"), "ALTO") {
+	if h := helpFor("windows"); strings.Contains(h, "sysctl") || !strings.Contains(h, "tftp 69") || strings.Contains(usageHint("windows"), "ALTO") {
 		t.Error(h)
 	}
 }

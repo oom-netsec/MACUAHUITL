@@ -23,7 +23,6 @@ func hintsEs() map[string]string {
 	out["hint-tftp"] = Hint("tftp", "10.0.0.5:6969", []string{"/x/a.bin"})
 	out["hint-http"] = Hint("http", "0.0.0.0:8080", []string{"/x/a.bin", "/x/b.bin"})
 	out["hint-tftp6"] = Hint("tftp", "[fe80::1]:6969", []string{"/x/a.bin"})
-	out["setcap"] = SetcapHint("RUTA")
 	return out
 }
 
@@ -70,15 +69,23 @@ func TestHintsEnIngles(t *testing.T) {
 	if h := HintIn("en", "tftp", "10.0.0.5:6969", []string{"/x/a.bin"}); !strings.Contains(h, "IOS always uses port 69") || strings.Contains(h, "quitar") || !strings.Contains(h, "copy tftp://10.0.0.5/a.bin flash:") {
 		t.Error(h)
 	}
-	if h := SetcapHintIn("en", "RUTA"); !strings.Contains(h, "sudo setcap cap_net_bind_service=+ep RUTA") || !strings.Contains(h, "WARNING") {
-		t.Error(h)
-	}
 }
 
-// El marcador de la ruta del servidor también se traduce en el hint de setcap.
-func TestHintSetcapMarcadorRutaEn(t *testing.T) {
-	r := Ready{Addr: "0.0.0.0:2121", User: "mac", Pass: "pw123"}
-	if en := ServerHintIn("en", Config{Proto: "tftp"}, r, []string{"a.bin"}); strings.Contains(en, "RUTA-DEL-SERVIDOR") || !strings.Contains(en, "SERVER-PATH") {
-		t.Error(en)
+// ADR 0004 (enmienda 2026-11-16): en el puerto estándar no hace falta redirigir nada, y ninguna pista habla de setcap.
+func TestHintPuertoEstandarSinRedireccion(t *testing.T) {
+	fijaWindows(t, "linux")
+	for proto, addr := range map[string]string{"tftp": "10.0.0.5:69", "ftp": "10.0.0.5:21", "scp": "10.0.0.5:22", "sftp": "10.0.0.5:22"} {
+		for _, loc := range []string{"es", "en"} {
+			h := ServerHintIn(loc, Config{Proto: proto}, Ready{Addr: addr}, []string{"a.bin"})
+			if strings.Contains(h, "nft") || strings.Contains(h, "setcap") {
+				t.Errorf("%s %s:\n%s", proto, loc, h)
+			}
+		}
+	}
+	if h := Hint("tftp", "10.0.0.5:69", []string{"/x/a.bin"}); strings.Contains(h, "nft") {
+		t.Error(h)
+	}
+	if h := ServerHintIn("es", Config{Proto: "tftp"}, Ready{Addr: "10.0.0.5:6969"}, []string{"a.bin"}); !strings.Contains(h, "nft add table") || strings.Contains(h, "setcap") {
+		t.Error(h)
 	}
 }

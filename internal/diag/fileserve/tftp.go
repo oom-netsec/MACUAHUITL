@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
@@ -65,7 +66,7 @@ func errPacket(code uint16, msg string) []byte {
 func serveTFTP(ctx context.Context, c Config, src *source, rcv *receiver) error {
 	pc, err := (&net.ListenConfig{}).ListenPacket(ctx, "udp", c.Addr)
 	if err != nil {
-		return fmt.Errorf("fileserve: %w", err)
+		return listen.Bind("fileserve", err, listen.PortOf(c.Addr))
 	}
 	defer pc.Close()
 	stop := context.AfterFunc(ctx, func() { pc.Close() })

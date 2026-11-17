@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -131,9 +130,7 @@ func TestStopsOnContext(t *testing.T) {
 }
 
 func TestValidateAddr(t *testing.T) {
-	privilegedPorts = true
-	t.Cleanup(func() { privilegedPorts = runtime.GOOS != "windows" })
-	for addr, ok := range map[string]bool{"127.0.0.1:5514": true, "192.0.2.10:5514": true, "0.0.0.0:5514": false, "[::]:5514": false, ":5514": false, "127.0.0.1:514": false, "127.0.0.1:x": false} {
+	for addr, ok := range map[string]bool{"127.0.0.1:5514": true, "192.0.2.10:5514": true, "0.0.0.0:5514": false, "[::]:5514": false, ":5514": false, "127.0.0.1:514": true, "127.0.0.1:x": false} {
 		if err := ValidateAddr(addr, false); (err == nil) != ok {
 			t.Errorf("ValidateAddr(%q) = %v", addr, err)
 		}
@@ -216,17 +213,5 @@ func TestSourceKeysIPv6PorIPYPor64(t *testing.T) {
 	}
 	if x, y := sourceKeys("[fe80::1%eth0]:514"), sourceKeys("[fe80::1%eth1]:514"); x[1] == y[1] {
 		t.Fatalf("link-local de enlaces distintos en el mismo /64: %v %v", x, y)
-	}
-}
-
-// ADR 0012 h: sin puertos privilegiados (Windows) el 514 se acepta.
-func TestValidateAddrSinPrivilegiados(t *testing.T) {
-	privilegedPorts = false
-	t.Cleanup(func() { privilegedPorts = runtime.GOOS != "windows" })
-	if err := ValidateAddr("127.0.0.1:514", false); err != nil {
-		t.Error(err)
-	}
-	if err := ValidateAddr("0.0.0.0:514", false); err == nil {
-		t.Error("sin IP explícita aceptado")
 	}
 }

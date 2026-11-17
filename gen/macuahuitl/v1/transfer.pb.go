@@ -24,7 +24,7 @@ const (
 type StartServerRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Protocol        string                 `protobuf:"bytes,1,opt,name=protocol,proto3" json:"protocol,omitempty"`                                        // tftp, ftp, scp, sftp o http
-	Listen          string                 `protobuf:"bytes,2,opt,name=listen,proto3" json:"listen,omitempty"`                                            // IP o IP:PUERTO; sin puerto: tftp 6969, ftp 2121, scp y sftp 2222, http 8080
+	Listen          string                 `protobuf:"bytes,2,opt,name=listen,proto3" json:"listen,omitempty"`                                            // IP o IP:PUERTO; sin puerto: tftp 69, ftp 21, scp y sftp 22, http 80
 	AllowAny        bool                   `protobuf:"varint,3,opt,name=allow_any,json=allowAny,proto3" json:"allow_any,omitempty"`                       // escuchar en 0.0.0.0 / :: (con escritura exige allow)
 	Files           []string               `protobuf:"bytes,4,rep,name=files,proto3" json:"files,omitempty"`                                              // archivos sueltos para leer (rutas absolutas, por nombre base)
 	FromDir         string                 `protobuf:"bytes,5,opt,name=from_dir,json=fromDir,proto3" json:"from_dir,omitempty"`                           // carpeta publicada para leer (archivos regulares de primer nivel)
@@ -1118,7 +1118,7 @@ func (x *PutResponse) GetResult() *TransferResult {
 type RedirectHintRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Protocol      string                 `protobuf:"bytes,1,opt,name=protocol,proto3" json:"protocol,omitempty"` // tftp, ftp, scp o sftp
-	Port          int32                  `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`        // el puerto alto en que escucha el servidor
+	Port          int32                  `protobuf:"varint,2,opt,name=port,proto3" json:"port,omitempty"`        // el puerto en que escucha el servidor
 	Ip            string                 `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`             // IP de escucha: la regla solo redirige lo dirigido a ella
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1178,9 +1178,9 @@ func (x *RedirectHintRequest) GetIp() string {
 type RedirectHintResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StandardPort  int32                  `protobuf:"varint,1,opt,name=standard_port,json=standardPort,proto3" json:"standard_port,omitempty"`
-	Nftables      string                 `protobuf:"bytes,2,opt,name=nftables,proto3" json:"nftables,omitempty"` // regla de redirección (recomendada)
-	Setcap        string                 `protobuf:"bytes,3,opt,name=setcap,proto3" json:"setcap,omitempty"`     // alternativa más amplia, con su advertencia
-	Remove        string                 `protobuf:"bytes,4,opt,name=remove,proto3" json:"remove,omitempty"`     // comando para quitar la regla al terminar
+	Nftables      string                 `protobuf:"bytes,2,opt,name=nftables,proto3" json:"nftables,omitempty"` // regla de redirección; vacía si port ya es el estándar (standard_port lo dice)
+	Setcap        string                 `protobuf:"bytes,3,opt,name=setcap,proto3" json:"setcap,omitempty"`     // obsoleto: siempre vacío desde 45a
+	Remove        string                 `protobuf:"bytes,4,opt,name=remove,proto3" json:"remove,omitempty"`     // comando para quitar la regla al terminar; vacío si no hay regla
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

@@ -112,12 +112,13 @@ func TestVisibilitySnmpV3(t *testing.T) {
 func TestVisibilityListeners(t *testing.T) {
 	h := newHarness(t, nil)
 	vc := v1.NewVisibilityServiceClient(h.conn)
-	tr, err := vc.SnmpTraps(ctx(t), &v1.SnmpTrapsRequest{Addr: "127.0.0.1:162"})
+	// Una petición inválida (todas las interfaces sin pedirlo) se rechaza; un puerto bajo ya no (lo decide el bind, ADR 0004).
+	tr, err := vc.SnmpTraps(ctx(t), &v1.SnmpTrapsRequest{Addr: "0.0.0.0:1162"})
 	if err == nil {
 		_, err = tr.Recv()
 	}
 	if status.Code(err) != codes.InvalidArgument {
-		t.Fatalf("162: %v", err)
+		t.Fatalf("0.0.0.0 sin pedirlo: %v", err)
 	}
 	tr, err = vc.SnmpTraps(ctx(t), &v1.SnmpTrapsRequest{Addr: "127.0.0.1:0", DurationSeconds: 1, Save: true})
 	if err != nil {

@@ -2,6 +2,8 @@ package fileserve
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -15,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
@@ -355,7 +358,7 @@ func TestHints(t *testing.T) {
 		write bool
 		want  []string
 	}{
-		{"ftp", true, []string{"ip ftp username mac", "ip ftp passive", "copy ftp://10.0.0.5/a.bin flash:", "copy running-config ftp://10.0.0.5/", "tcp dport 21 redirect to :2121", "setcap cap_net_bind_service"}},
+		{"ftp", true, []string{"ip ftp username mac", "ip ftp passive", "copy ftp://10.0.0.5/a.bin flash:", "copy running-config ftp://10.0.0.5/", "tcp dport 21 redirect to :2121"}},
 		{"scp", true, []string{"copy scp://mac@10.0.0.5/a.bin flash:", "copy running-config scp://mac@10.0.0.5/", "SHA256:aa", "tcp dport 22 redirect to :2121"}},
 		{"sftp", false, []string{"copy sftp://mac@10.0.0.5/a.bin flash:", "tcp dport 22 redirect to :2121"}},
 		{"tftp", true, []string{"copy running-config tftp://10.0.0.5/", "udp dport 69 redirect to :2121"}},
@@ -451,3 +454,19 @@ func TestFTPAuthWindowIsAbsolute(t *testing.T) {
 }
 
 func mustImage(t *testing.T) string { p, _ := image(t, "a.bin", 10); return p }
+
+// Un rango pasivo que no se puede abrir falla al arrancar (no con «425» en cada PASV).
+func TestFTPRangoPasivoOcupadoFallaAlArrancar(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Skip(err)
+	}
+	defer ln.Close()
+	p := uint16(ln.Addr().(*net.TCPAddr).Port)
+	f, _ := image(t, "a.bin", 10)
+	err = Serve(context.Background(), Config{Addr: "127.0.0.1:0", Proto: "ftp", Files: []string{f}, PassivePorts: [2]uint16{p, p}})
+	var c i18n.Coded
+	if !errors.As(err, &c) || c.Reason() != "fileserve.err.port_in_use" {
+		t.Fatalf("%v", err)
+	}
+}

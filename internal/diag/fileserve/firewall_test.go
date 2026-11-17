@@ -5,13 +5,6 @@ import (
 	"testing"
 )
 
-func fijaPrivilegiados(t *testing.T, v bool) {
-	t.Helper()
-	old := privilegedPorts
-	privilegedPorts = v
-	t.Cleanup(func() { privilegedPorts = old })
-}
-
 func fijaWindows(t *testing.T, os string) {
 	t.Helper()
 	old, oldExe := hintOS, exePath
@@ -19,9 +12,8 @@ func fijaWindows(t *testing.T, os string) {
 	t.Cleanup(func() { hintOS, exePath = old, oldExe })
 }
 
-// ADR 0012 h: sin puertos privilegiados se acepta 69 y 21 y un rango pasivo bajo; el 0 y hi<lo siguen rechazados.
-func TestSinPrivilegiadosAceptaPuertosBajos(t *testing.T) {
-	fijaPrivilegiados(t, false)
+// ADR 0004 (enmienda 2026-11-16): la validación acepta 69 y 21 y un rango pasivo bajo; el 0 y hi<lo siguen rechazados.
+func TestAceptaPuertosBajos(t *testing.T) {
 	dir := t.TempDir()
 	for _, a := range []string{"127.0.0.1:69", "127.0.0.1:21"} {
 		if err := Check(Config{Addr: a, Proto: "tftp", FromDir: dir}); err != nil {
@@ -50,9 +42,6 @@ func TestReglaFirewallWindows(t *testing.T) {
 	}
 	if RedirectCleanupAddr("ftp", "10.0.0.5:21") != `Remove-NetFirewallRule -DisplayName 'MACUAHUITL ftp 10.0.0.5 21'` || RedirectCleanup("http", "10.0.0.5", 80) != "" || RedirectHintIn("es", "http", "10.0.0.5", 80) != "" {
 		t.Error("cleanup addr/http")
-	}
-	if SetcapHintIn("es", "X") != "" {
-		t.Error("setcap en Windows")
 	}
 	sh := ServerHintIn("es", Config{Proto: "tftp"}, Ready{Addr: "10.0.0.5:69"}, []string{"a.bin"})
 	if !strings.Contains(sh, "New-NetFirewallRule") || strings.Contains(sh, "nft") || strings.Contains(sh, "setcap") || !strings.Contains(sh, "CANCELAS") {
@@ -155,13 +144,13 @@ func TestIPv6ConZonaFamiliaIP6(t *testing.T) {
 	}
 }
 
-// En Linux todo sigue igual: nftables y setcap, sin PowerShell.
+// En Linux todo sigue igual: nftables, sin PowerShell.
 func TestLinuxSinReglaFirewall(t *testing.T) {
 	fijaWindows(t, "linux")
 	if h := RedirectHintIn("es", "tftp", "10.0.0.5", 6969); strings.Contains(h, "NetFirewall") || !strings.Contains(h, "nft add table") {
 		t.Error(h)
 	}
-	if SetcapHintIn("es", "X") == "" || strings.Contains(RedirectCleanup("tftp", "10.0.0.5", 6969), "NetFirewall") {
-		t.Error("setcap/cleanup")
+	if strings.Contains(RedirectCleanup("tftp", "10.0.0.5", 6969), "NetFirewall") {
+		t.Error("cleanup")
 	}
 }

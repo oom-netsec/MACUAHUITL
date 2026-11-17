@@ -21,6 +21,7 @@ import (
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
@@ -65,7 +66,7 @@ func hostSigners(legacy bool) ([]ssh.Signer, []string, error) {
 func serveSSH(ctx context.Context, c Config, src *source, rcv *receiver) error {
 	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", c.Addr)
 	if err != nil {
-		return fmt.Errorf("fileserve: %w", err)
+		return listen.Bind("fileserve", err, listen.PortOf(c.Addr))
 	}
 	defer ln.Close()
 	signers, fps, err := hostSigners(c.Legacy)

@@ -254,7 +254,7 @@ func helpFor(goos string) string {
 	if goos != "windows" {
 		return helpText
 	}
-	return strings.Replace(helpText, "(TFTP en 6969: IOS usa el 69, redirige con nftables; HTTP en 8080)", "(TFTP en el 69: Windows no tiene puertos privilegiados, falta la regla del firewall; HTTP en 8080)", 1)
+	return strings.Replace(helpText, "(TFTP en el 69 y HTTP en el 80; si el kernel no deja abrirlos, el error trae la orden de sysctl)", "(TFTP en el 69 y HTTP en el 80: Windows no tiene puertos privilegiados, falta la regla del firewall)", 1)
 }
 
 var help = helpFor(runtime.GOOS)
@@ -262,7 +262,7 @@ var help = helpFor(runtime.GOOS)
 const helpText = `  console [PUERTO] [--baud N] [--parity none|even|odd] [--flow none|rtscts|xonxoff] [--list]
         (Ctrl-] q sale, Ctrl-] b envía BREAK; se graba en outputs/console)
   serve tftp|http --addr IP[:PUERTO] --file RUTA... [--for SEGUNDOS] [--any]
-        (TFTP en 6969: IOS usa el 69, redirige con nftables; HTTP en 8080)
+        (TFTP en el 69 y HTTP en el 80; si el kernel no deja abrirlos, el error trae la orden de sysctl)
   hash  ARCHIVO [--md5 VALOR] [--sha512 VALOR]`
 
 // Area registra console (sesión cruda), serve y hash.

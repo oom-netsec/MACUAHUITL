@@ -346,7 +346,7 @@ func (x *ConsoleResponse) GetData() []byte {
 type ServeFilesRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Protocol        string                 `protobuf:"bytes,1,opt,name=protocol,proto3" json:"protocol,omitempty"`                                       // tftp o http
-	Addr            string                 `protobuf:"bytes,2,opt,name=addr,proto3" json:"addr,omitempty"`                                               // IP:puerto (o solo IP: 6969 para TFTP, 8080 para HTTP)
+	Addr            string                 `protobuf:"bytes,2,opt,name=addr,proto3" json:"addr,omitempty"`                                               // IP:puerto (o solo IP: 69 para TFTP, 80 para HTTP)
 	AllowAny        bool                   `protobuf:"varint,3,opt,name=allow_any,json=allowAny,proto3" json:"allow_any,omitempty"`                      // escuchar en 0.0.0.0 / ::
 	Files           []string               `protobuf:"bytes,4,rep,name=files,proto3" json:"files,omitempty"`                                             // rutas absolutas; se publican por nombre base
 	DurationSeconds int32                  `protobuf:"varint,5,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"` // 0 = 1 h; máximo 24 h

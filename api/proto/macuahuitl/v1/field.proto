@@ -49,7 +49,7 @@ message ConsoleResponse {
 
 message ServeFilesRequest {
   string protocol = 1;        // tftp o http
-  string addr = 2;            // IP:puerto (o solo IP: 6969 para TFTP, 8080 para HTTP)
+  string addr = 2;            // IP:puerto (o solo IP: 69 para TFTP, 80 para HTTP)
   bool allow_any = 3;         // escuchar en 0.0.0.0 / ::
   repeated string files = 4;  // rutas absolutas; se publican por nombre base
   int32 duration_seconds = 5; // 0 = 1 h; máximo 24 h

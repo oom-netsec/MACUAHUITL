@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -187,13 +186,7 @@ func TestTrapBasuraNoTumbaElReceptor(t *testing.T) {
 	}
 }
 
-func TestTrapAddrPrivilegiado(t *testing.T) {
-	// En Windows no hay puertos privilegiados (ADR 0012 h): ahí el bind abriría y ListenTraps esperaría para siempre.
-	if runtime.GOOS != "windows" {
-		if err := ListenTraps(context.Background(), TrapConfig{Addr: "127.0.0.1:162"}); err == nil || !strings.Contains(err.Error(), "privilegiado") {
-			t.Fatalf("err = %v", err)
-		}
-	}
+func TestTrapAddrTodasSinPedirlo(t *testing.T) {
 	if err := ListenTraps(context.Background(), TrapConfig{Addr: "0.0.0.0:1162"}); err == nil {
 		t.Fatal("0.0.0.0 sin pedirlo")
 	}

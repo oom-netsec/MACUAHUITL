@@ -170,7 +170,7 @@ func init() {
 		"mctl.transfer.stopped":        e("detenido", "stopped"),
 		"mctl.transfer.none_open":      e("no hay servidores abiertos", "no servers are open"),
 		"mctl.transfer.server_line":    e("{id}  {proto}  {addr}  escritura={write}  transferencias={transfers}  rechazos={rejected}", "{id}  {proto}  {addr}  write={write}  transfers={transfers}  rejections={rejected}"),
-		"mctl.transfer.hint": e("El equipo usa el puerto {std}; la app escucha en el {port} y nunca abre puertos privilegiados.\nRedirección (la ejecutas tú):\n  {nft}\nPara quitarla al terminar:\n  {remove}\nAlternativa más amplia:\n  {setcap}",
-			"The device uses port {std}; the app listens on {port} and never opens privileged ports.\nRedirect (you run it):\n  {nft}\nTo remove it when done:\n  {remove}\nBroader alternative:\n  {setcap}"),
+		"mctl.transfer.hint": e("El equipo usa el puerto {std}; la app escucha en el {port}.\nRedirección (la ejecutas tú):\n  {nft}\nPara quitarla al terminar:\n  {remove}",
+			"The device uses port {std}; the app listens on {port}.\nRedirect (you run it):\n  {nft}\nTo remove it when done:\n  {remove}"),
 	})
 }
