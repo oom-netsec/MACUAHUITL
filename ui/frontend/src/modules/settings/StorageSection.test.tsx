@@ -114,6 +114,7 @@ test("muestra el valor de fábrica como marcador", async () => {
 describe("motivos de rechazo", () => {
   const REASONS: Record<string, [RegExp, RegExp]> = {
     relativa: [/debe ser absoluta/, /must be absolute/],
+    sin_unidad: [/letra de unidad/, /drive letter/],
     punto_punto: [/no puede llevar «\.\.»/, /cannot contain/],
     no_existe: [/no existe/, /does not exist/],
     ilegible: [/No se pudo leer/, /could not be read/],

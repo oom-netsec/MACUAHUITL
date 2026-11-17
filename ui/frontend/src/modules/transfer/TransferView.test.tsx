@@ -153,6 +153,25 @@ test("el bind negado llega por el evento de cierre (StartServer es un stream) y 
   expect(screen.queryByText(cmd)).toBeNull();
 });
 
+test("la carpeta de recepción abierta a otros muestra la orden exacta para copiar, sin aplicarla", async () => {
+  const cmd = "chmod o-w /srv/recibidos";
+  const open = Object.assign(new Error("fileserve: la carpeta de recepción /srv/recibidos la pueden escribir otros (escritura para otros usuarios); quítales la escritura con: chmod o-w /srv/recibidos"), {
+    cause: { code: "FailedPrecondition", reason: "fileserve.err.recv_dir_open", metadata: { dir: "/srv/recibidos", who: "sys.who.others", cmd } },
+  });
+  const core = await openServer(setup({ transferServe: vi.fn(async () => { throw open; }) }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("la pueden escribir otros");
+  expect(screen.getByText(cmd)).toBeInTheDocument();
+  expect(screen.getByText(/Orden para quitar la escritura ajena/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: /Copiar/ }));
+  expect(core.copyText).toHaveBeenCalledWith(cmd);
+  // La variante sin orden (Windows sin icacls seguro) no muestra consola.
+  const bare = Object.assign(new Error("fileserve: la carpeta de recepción X la pueden escribir otros"), { cause: { code: "FailedPrecondition", reason: "fileserve.err.recv_dir_open", metadata: { dir: "X", who: "sys.who.others" } } });
+  vi.mocked(core.transferServe).mockRejectedValueOnce(bare);
+  await userEvent.click(screen.getByRole("button", { name: "Abrir servidor" }));
+  await waitFor(() => expect(screen.queryByText(cmd)).toBeNull());
+  expect(screen.queryByRole("button", { name: /Copiar/ })).toBeNull();
+});
+
 test("en Linux, con el puerto estándar no hay regla de redirección que mostrar", async () => {
   const core = await openServer(setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "", remove: "" })) }));
   act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:69" }) }));

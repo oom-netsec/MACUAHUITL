@@ -4,7 +4,7 @@ import type { Key } from "./i18n/es";
 import { isWindows } from "./platform";
 
 // Motivos estables del núcleo (internal/service/outputs.go): cada uno tiene su explicación traducida.
-export const OUTPUTS_REASONS = ["relativa", "punto_punto", "no_existe", "ilegible", "no_directorio", "otro_dueno", "reservada", "permisos", "ancestro_inseguro", "no_escribible"];
+export const OUTPUTS_REASONS = ["relativa", "sin_unidad", "punto_punto", "no_existe", "ilegible", "no_directorio", "otro_dueno", "reservada", "permisos", "ancestro_inseguro", "no_escribible"];
 
 /** Código del rechazo y la ruta (vacía si no viene): de reason/metadata; el texto en español solo sirve si el error no trae reason. */
 export function parseOutputsError(e: unknown): { code: string; path: string } | null {
