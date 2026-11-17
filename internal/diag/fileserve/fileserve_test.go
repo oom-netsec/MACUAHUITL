@@ -77,6 +77,7 @@ func image(t *testing.T, name string, size int) (string, []byte) {
 }
 
 func TestValidate(t *testing.T) {
+	fijaPrivilegiados(t, true)
 	for _, c := range []Config{
 		{Addr: "0.0.0.0:6969", Proto: "tftp"},
 		{Addr: ":6969", Proto: "tftp"},
@@ -440,6 +441,7 @@ func TestFTPHintWarnsCleartext(t *testing.T) {
 
 // El rango de datos pasivos no baja de 1024.
 func TestFTPPassiveRangeMin(t *testing.T) {
+	fijaPrivilegiados(t, true)
 	dir := t.TempDir()
 	for _, r := range [][2]uint16{{80, 90}, {1023, 1100}, {0, 5000}, {2000, 1500}} {
 		if err := Check(Config{Addr: "127.0.0.1:2121", Proto: "ftp", FromDir: dir, PassivePorts: r}); err == nil {

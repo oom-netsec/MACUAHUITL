@@ -6,12 +6,17 @@ package listen
 import (
 	"net"
 	"net/netip"
+	"runtime"
 	"strconv"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-// ValidateAddr exige host:puerto con IP local explícita y puerto ≥ 1024 (0 = el que asigne el sistema).
+// privilegedPorts: en Linux y macOS los puertos < 1024 son privilegiados y no se abren (ADR 0004); Windows no los
+// tiene (ADR 0012 h: el impedimento es el firewall). Variable para que las pruebas fijen los dos valores.
+var privilegedPorts = runtime.GOOS != "windows"
+
+// ValidateAddr exige host:puerto con IP local explícita y, donde hay puertos privilegiados, puerto ≥ 1024 (0 = el que asigne el sistema).
 func ValidateAddr(addr string, allowAny bool) error {
 	h, p, err := net.SplitHostPort(addr)
 	if err != nil {
@@ -21,7 +26,7 @@ func ValidateAddr(addr string, allowAny bool) error {
 	if err != nil {
 		return i18n.New("ingest.invalid.listen.port", i18n.A("port", p))
 	}
-	if port != 0 && port < 1024 {
+	if privilegedPorts && port != 0 && port < 1024 {
 		return i18n.New("ingest.invalid.listen.privileged", i18n.A("port", port))
 	}
 	ip, err := netip.ParseAddr(h)

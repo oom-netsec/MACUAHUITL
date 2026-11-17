@@ -7,7 +7,7 @@ import { CopyButton } from "../../components/Data";
 import { useT } from "../../lib/i18n";
 import type { TransferHintInfo, TransferLine, TransferProto, TransferReady } from "./api";
 import { iosCommands, splitListen } from "./ios";
-import { defaultPort, serveProblem, splitList } from "./validate";
+import { portFor, serveProblem, splitList } from "./validate";
 
 interface Srv { runId: string; ready: TransferReady; lines: TransferLine[]; done: boolean; error?: string; legacy: boolean; cleanup?: string }
 
@@ -67,7 +67,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
       {!s.done && <Console label={t("transfer.ios")} text={cmds} copy={core.copyText} />/* cerrado: la contraseña efímera ya no sirve y no se deja a la vista (va dentro de la URL ftp://) */}
       {hint && (
         <>
-          <Notice kind="warn">{t("transfer.privileged", { std: hint.standardPort, port })}</Notice>
+          <Notice kind="warn">{t(hint.standardPort === port ? "transfer.privilegedSame" : "transfer.privileged", { std: hint.standardPort, port })}</Notice>
           <Console label={t("transfer.redirect")} text={hint.nftables} copy={core.copyText} />
           <p className="hint">{t("transfer.redirect.narrow", { ip: host })}</p>
           {hint.remove && <Console label={t("transfer.redirect.remove")} text={hint.remove} copy={core.copyText} />}
@@ -90,7 +90,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const [proto, setProto] = useState<TransferProto>("tftp");
   const [ifaces, setIfaces] = useState<NetInterface[]>([]);
   const [listen, setListen] = useState("");
-  const [port, setPort] = useState(defaultPort.tftp);
+  const [port, setPort] = useState(portFor("tftp"));
   const [write, setWrite] = useState(false);
   const [recvDir, setRecvDir] = useState("");
   const [fromDir, setFromDir] = useState("");
@@ -151,7 +151,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
     <>
       <Section title={t("transfer.form.server")}>
         <div className="field-row">
-          <Select label={t("transfer.proto")} value={proto} onChange={(p) => { setProto(p); setPort(defaultPort[p]); }} options={protos} w="sm" />
+          <Select label={t("transfer.proto")} value={proto} onChange={(p) => { setProto(p); setPort(portFor(p)); }} options={protos} w="sm" />
           <Select label={t("transfer.listen")} hint={t("transfer.listen.hint")} value={any ? "" : listen} onChange={setListen} w="md"
             options={[["", t("common.select")], ...ips.map(([ip, n]) => [ip, `${ip} · ${n}`] as [string, string])]} />
           <Field label={t("transfer.port")} hint={t("transfer.port.hint")} type="number" value={port} onChange={setPort} w="sm" />

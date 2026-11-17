@@ -444,14 +444,34 @@ func TestRedirectHintRPCEn(t *testing.T) {
 	s, _ := newTest(t)
 	req := &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"}
 	en, err := s.RedirectHint(i18n.WithLocale(context.Background(), "en"), req)
-	if err != nil || !strings.Contains(en.Setcap, "WARNING") || !strings.Contains(en.Nftables, "(remove when done: sudo nft delete table ip macuahuitl_ftp_2121)") || !strings.Contains(en.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") {
+	// Nftables es solo el comando (se copia tal cual); el de quitar va en Remove.
+	if err != nil || !strings.Contains(en.Setcap, "WARNING") || strings.Contains(en.Nftables, "remove when done") || !strings.HasSuffix(en.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") || en.Remove != "sudo nft delete table ip macuahuitl_ftp_2121" {
 		t.Fatalf("%+v %v", en, err)
 	}
 	es, _ := s.RedirectHint(context.Background(), req)
-	if !strings.Contains(es.Nftables, "(quitar al terminar: sudo nft delete table ip macuahuitl_ftp_2121)") {
-		t.Errorf("es cambió: %s", es.Nftables)
+	if es.Nftables != en.Nftables {
+		t.Errorf("el comando no depende del idioma: %s", es.Nftables)
 	}
 }
 
 // Un renombre de Session.Activity rompe la compilación en vez de apagar en silencio el keepalive de scp/sftp.
 var _ interface{ Activity(int) } = (*transport.Session)(nil)
+
+func TestPuertosPorOmisionPorSistema(t *testing.T) {
+	if p := defaultPorts("linux"); p["tftp"] != 6969 || p["ftp"] != 2121 || p["scp"] != 2222 {
+		t.Errorf("linux: %v", p)
+	}
+	if p := defaultPorts("windows"); p["tftp"] != 69 || p["ftp"] != 21 || p["scp"] != 22 || p["sftp"] != 22 || p["http"] != 8080 {
+		t.Errorf("windows: %v", p)
+	}
+}
+
+// La zona de una IP link-local acabaría dentro de un comando (nft o PowerShell): se rechaza.
+func TestRedirectHintRechazaZona(t *testing.T) {
+	s, _ := newTest(t)
+	for _, ip := range []string{"fe80::1%a;calc", "fe80::1%$(calc)", "fe80::1%eth0"} {
+		if _, err := s.RedirectHint(context.Background(), &v1.RedirectHintRequest{Protocol: "tftp", Port: 6969, Ip: ip}); err == nil {
+			t.Errorf("%q aceptada", ip)
+		}
+	}
+}

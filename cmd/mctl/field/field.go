@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -249,7 +250,16 @@ func hash(c *cli.Env, args []string) error {
 }
 
 // help son las líneas de este área en mctl --help.
-const help = `  console [PUERTO] [--baud N] [--parity none|even|odd] [--flow none|rtscts|xonxoff] [--list]
+func helpFor(goos string) string {
+	if goos != "windows" {
+		return helpText
+	}
+	return strings.Replace(helpText, "(TFTP en 6969: IOS usa el 69, redirige con nftables; HTTP en 8080)", "(TFTP en el 69: Windows no tiene puertos privilegiados, falta la regla del firewall; HTTP en 8080)", 1)
+}
+
+var help = helpFor(runtime.GOOS)
+
+const helpText = `  console [PUERTO] [--baud N] [--parity none|even|odd] [--flow none|rtscts|xonxoff] [--list]
         (Ctrl-] q sale, Ctrl-] b envía BREAK; se graba en outputs/console)
   serve tftp|http --addr IP[:PUERTO] --file RUTA... [--for SEGUNDOS] [--any]
         (TFTP en 6969: IOS usa el 69, redirige con nftables; HTTP en 8080)

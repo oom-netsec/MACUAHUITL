@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 
@@ -157,7 +158,15 @@ func (s *fieldSvc) Console(st v1.FieldService_ConsoleServer) error {
 	return nil
 }
 
-var defaultServePort = map[string]uint16{"tftp": 6969, "http": 8080}
+// En Windows TFTP va en el 69 (sin puertos privilegiados ni redirección, ADR 0012 h).
+var defaultServePort = defaultServePorts(runtime.GOOS)
+
+func defaultServePorts(goos string) map[string]uint16 {
+	if goos == "windows" {
+		return map[string]uint16{"tftp": 69, "http": 8080}
+	}
+	return map[string]uint16{"tftp": 6969, "http": 8080}
+}
 
 // serveAddr: una IP sola toma el puerto por omisión del protocolo; ok=false si el protocolo no se publica.
 func serveAddr(proto, addr string) (string, bool) {

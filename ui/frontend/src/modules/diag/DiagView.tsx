@@ -8,6 +8,7 @@ import { ModuleIdContext, useBusy, useInbox, useNav } from "../../app/activity";
 import { useT } from "../../lib/i18n";
 import { outputsErrorText } from "../../lib/outputsError";
 import { DiagViz } from "./DiagViz";
+import { isWindows } from "../../lib/platform"; // ADR 0012 (i): en Windows el SYN necesita Npcap, fuera del producto
 import "./diag.css";
 
 export type ToolName = "ping" | "traceroute" | "nmap" | "iperf3" | "pcap";
@@ -53,11 +54,11 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- loadIfaces solo usa core
   }, [core, tool, mode]);
 
-  // El servidor iperf3 escucha en una IP de esta máquina (nunca en todas; link-local no sirve con -B) y en un puerto ≥ 1024.
+  // El servidor iperf3 escucha en una IP de esta máquina (nunca en todas; link-local no sirve con -B) y en un puerto alto (≥ 1024; en Windows, 1-65535: no hay puertos privilegiados, ADR 0012 (h)).
   const server = tool === "iperf3" && mode === "server";
   const binds = localIPs(ifaces);
   const bindIP = binds.includes(bind) ? bind : binds[0] ?? "";
-  const portOk = /^[1-9]\d{3,4}$/.test(port) && Number(port) <= 65535; // sin ceros a la izquierda: el núcleo los rechaza
+  const portOk = (isWindows() ? /^[1-9]\d{0,4}$/ : /^[1-9]\d{3,4}$/).test(port) && Number(port) <= 65535; // sin ceros a la izquierda: el núcleo los rechaza
   const apply = (e: DiagEvent) => {
     if (e.done) {
       setResult(e.canceled ? { ok: false, canceled: true, text: t("diag.canceled") } : e.error
@@ -137,7 +138,8 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       {server && ifState !== "loading" && binds.length === 0 && <Notice kind="warn">{t(ifState === "error" ? "diag.bind.error" : "diag.bind.none")}</Notice>}
       {tool === "nmap" && (
         <Select label={t("diag.scan")} value={scan} onChange={setScan} w="lg"
-          options={[["connect", t("diag.scan.connect")], ["syn", t("diag.scan.syn")], ["udp", t("diag.scan.udp")], ["ping", t("diag.scan.ping")]]} />
+          options={([["connect", t("diag.scan.connect")], ["syn", t("diag.scan.syn")], ["udp", t("diag.scan.udp")], ["ping", t("diag.scan.ping")]] as [typeof scan, string][])
+            .filter(([v]) => v !== "syn" || !isWindows())} />
       )}
       {tool === "pcap" && (
         <>

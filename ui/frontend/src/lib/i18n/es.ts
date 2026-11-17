@@ -2805,6 +2805,17 @@ export const es = {
   "settings.storage.err.reservada.windows": "Esa carpeta está reservada (datos, configuración, tu perfil de usuario o .ssh) o contiene a una de ellas. Elige una subcarpeta propia, por ejemplo dentro de tu perfil de usuario.",
   "settings.storage.err.permisos.windows": "La carpeta da acceso a otros usuarios. La aplicación no lo cambia: quita ese acceso (Propiedades → Seguridad, o con icacls en cmd) y vuelve a intentarlo.",
   "settings.storage.err.ancestro_inseguro.windows": "La carpeta cuelga de otra donde otros usuarios pueden escribir (p. ej. C:\\Users\\Public), y podrían reemplazar la ruta. Elige una carpeta bajo tu perfil de usuario.",
+  // Puertos en Windows (ADR 0012 h): sin puertos privilegiados; lo que hace falta es la regla de entrada del firewall.
+  "transfer.port.hint.windows": "De 1 a 65535: Windows no tiene puertos privilegiados. Por omisión, el estándar del protocolo.",
+  "transfer.err.port.windows": "El puerto debe estar entre 1 y 65535.",
+  "transfer.privileged.windows": "IOS usa el puerto estándar {std} y en Windows no hay redirección: este servidor escucha en el {port}, así que ábrelo en el estándar para que IOS llegue. La regla es para el puerto en que escucha ahora: córrela una vez, como administrador, en PowerShell (o acepta el diálogo del firewall al abrir el servidor; si lo CANCELAS, Windows crea reglas de bloqueo que ganan a las de permiso: revísalas en Firewall de Windows → Configuración avanzada → Reglas de entrada). La app nunca la aplica.",
+  "transfer.privilegedSame": "IOS usa el puerto estándar {std} y este servidor escucha ahí. Para que el tráfico entre, corre una vez, como administrador, esta regla de entrada del Firewall de Windows (o acepta el diálogo del firewall al abrir el servidor; si lo CANCELAS, Windows crea reglas de bloqueo que ganan a las de permiso: revísalas en Firewall de Windows → Configuración avanzada → Reglas de entrada). La app nunca la aplica.",
+  "transfer.redirect.windows": "Regla de firewall (PowerShell, como administrador)",
+  "transfer.redirect.narrow.windows": "La regla solo deja entrar lo dirigido a la IP de escucha {ip}, a este programa y a este puerto. En FTP la regla deja el puerto local en Any (los datos pasivos usan otros), acotada por el programa y la IP.",
+  "transfer.closed.cleanup.windows": "Servidor cerrado. Si aplicaste la regla de firewall, quítala con este comando.",
+  "diag.port.hint.windows": "De 1 a 65535; 5201 es el de iperf3.",
+  "diag.port.invalid.windows": "Un entero de 1 a 65535.",
+  "visibility.traps.note.windows": "En Windows no hay puertos privilegiados: puedes escuchar directo en el 162 (o usar 1162). Hace falta una regla de entrada del Firewall de Windows para UDP en ese puerto: córrela una vez como administrador o acepta el diálogo del firewall; la app nunca la aplica.",
 };
 
 export type Key = keyof typeof es;
