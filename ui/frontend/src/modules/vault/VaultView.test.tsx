@@ -43,7 +43,7 @@ test("desbloquear envía la contraseña y vacía el campo", async () => {
 
 test("alta de credencial y lista sin secretos", async () => {
   const core = fakeCore({
-    listCredentials: vi.fn(async () => [{ id: "c1", label: "core", username: "admin", hasEnable: true, hasSshKey: false }]),
+    listCredentials: vi.fn(async () => [{ id: "c1", label: "core", username: "admin", kind: "password" as const, hasEnable: true, hasSshKey: false }]),
   });
   render(<VaultView core={core} />);
   expect(await screen.findByText("core")).toBeInTheDocument();
@@ -74,7 +74,7 @@ test("una contraseña maestra incorrecta se anuncia como error", async () => {
 });
 
 test("eliminar una credencial pide confirmación", async () => {
-  const core = fakeCore({ listCredentials: vi.fn(async () => [{ id: "c1", label: "core", username: "admin", hasEnable: false, hasSshKey: false }]) });
+  const core = fakeCore({ listCredentials: vi.fn(async () => [{ id: "c1", label: "core", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false }]) });
   render(<VaultView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: "Eliminar core" }));
   expect(core.deleteCredential).not.toHaveBeenCalled();
@@ -85,7 +85,7 @@ test("eliminar una credencial pide confirmación", async () => {
 
 test("si cerrar la bóveda o eliminar falla, el error se muestra", async () => {
   const core = fakeCore({
-    listCredentials: vi.fn(async () => [{ id: "c1", label: "core", username: "admin", hasEnable: false, hasSshKey: false }]),
+    listCredentials: vi.fn(async () => [{ id: "c1", label: "core", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false }]),
     vaultLock: vi.fn(async () => { throw new Error("rpc error: code = FailedPrecondition desc = hay trabajos armados"); }),
     deleteCredential: vi.fn(async () => { throw new Error("rpc error: code = FailedPrecondition desc = credencial en uso"); }),
   });
@@ -100,9 +100,9 @@ test("si cerrar la bóveda o eliminar falla, el error se muestra", async () => {
 test("las credenciales van en una tabla con búsqueda por etiqueta, usuario o detalle", async () => {
   const core = fakeCore({
     listCredentials: vi.fn(async () => [
-      { id: "c1", label: "Core DC", username: "netops", hasEnable: true, hasSshKey: false },
-      { id: "c2", label: "Sucursales", username: "tac", hasEnable: false, hasSshKey: true },
-      { id: "c3", label: "Laboratorio", username: "lab", hasEnable: false, hasSshKey: false },
+      { id: "c1", label: "Core DC", username: "netops", kind: "password" as const, hasEnable: true, hasSshKey: false },
+      { id: "c2", label: "Sucursales", username: "tac", kind: "password" as const, hasEnable: false, hasSshKey: true },
+      { id: "c3", label: "Laboratorio", username: "lab", kind: "password" as const, hasEnable: false, hasSshKey: false },
     ]),
   });
   render(<VaultView core={core} />);
@@ -177,7 +177,7 @@ describe("respaldo cifrado", () => {
   });
 
   test("si el sistema de archivos no admitió los permisos, se avisa aunque el export sirvió", async () => {
-    const core = fakeCore({ exportVaultBackup: vi.fn(async () => ({ count: 2, noPermissions: true })) });
+    const core = fakeCore({ exportVaultBackup: vi.fn(async () => ({ count: 2, noPermissions: true, sshKeysIncluded: 0 })) });
     render(<VaultView core={core} />);
     await userEvent.type(await screen.findByLabelText("Frase del respaldo"), frase);
     await userEvent.type(screen.getByLabelText("Repite la frase del respaldo"), frase);
@@ -303,4 +303,151 @@ describe("respaldo cifrado", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("falta decidir");
     expect(screen.getByText("Vista previa de la importación")).toBeInTheDocument();
   });
+});
+
+// Fase 44: credenciales con llave SSH (la privada nunca sale del núcleo).
+const PUB = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIfake lab-key";
+const keyCred = { id: "k1", label: "llave lab", username: "netops", kind: "key" as const, hasEnable: false, hasSshKey: true };
+const pwCred = { id: "c1", label: "core", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false };
+
+test("crear credencial con llave pide solo etiqueta y usuario, y muestra la pública con Copiar e instrucciones Linux y Windows", async () => {
+  const user = userEvent.setup();
+  const core = fakeCore({ createKeyCredential: vi.fn(async () => ({ id: "k1", publicKey: PUB })) });
+  render(<VaultView core={core} />);
+  const form = (await screen.findByRole("button", { name: "Crear credencial con llave SSH" })).closest("form")!;
+  expect(within(form).queryByLabelText(/Contraseña/)).not.toBeInTheDocument();
+  await user.type(within(form).getByLabelText("Etiqueta de la llave"), "llave lab");
+  await user.type(within(form).getByLabelText("Usuario de la llave"), "netops");
+  await user.click(within(form).getByRole("button", { name: "Crear credencial con llave SSH" }));
+  await waitFor(() => expect(core.createKeyCredential).toHaveBeenCalledWith("llave lab", "netops"));
+  const shown = await screen.findByText(PUB);
+  expect(shown).toHaveClass("mono");
+  expect(screen.getByRole("region", { name: "Llave pública de llave lab" })).toHaveFocus();
+  await user.click(screen.getByRole("button", { name: /Copiar/ }));
+  expect(await navigator.clipboard.readText()).toBe(PUB);
+  expect(screen.getByText(/~\/\.ssh\/authorized_keys/)).toBeInTheDocument();
+  expect(screen.getByText(/si el usuario es administrador: C:\\ProgramData\\ssh\\administrators_authorized_keys/)).toBeInTheDocument();
+  expect(screen.getByText(/icacls C:\\ProgramData\\ssh\\administrators_authorized_keys \/inheritance:r \/grant "\*S-1-5-32-544:F" \/grant "\*S-1-5-18:F"/)).toBeInTheDocument();
+  expect(screen.getByText(/%USERPROFILE%\\\.ssh\\authorized_keys \(normalmente C:\\Users/)).toBeInTheDocument();
+  expect(screen.getByText(/700.*600.*StrictModes/)).toBeInTheDocument();
+  // El foco pasa a la pública recién creada y su título dice de qué credencial es.
+  expect(screen.getByRole("heading", { name: "Llave pública de llave lab" })).toBeInTheDocument();
+  expect(screen.getByText(/solo para Administradores y SYSTEM/)).toBeInTheDocument();
+});
+
+test("la lista distingue las de llave con una insignia y «Ver llave pública» la muestra con Copiar", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [pwCred, keyCred]), credentialPublicKey: vi.fn(async () => PUB) });
+  render(<VaultView core={core} />);
+  expect(await screen.findByText("llave lab")).toBeInTheDocument();
+  expect(screen.getAllByText("Llave")).toHaveLength(1); // solo la de llave
+  expect(screen.getAllByRole("button", { name: /Ver llave pública/ })).toHaveLength(1);
+  await userEvent.click(screen.getByRole("button", { name: /Ver llave pública/ }));
+  await waitFor(() => expect(core.credentialPublicKey).toHaveBeenCalledWith("k1"));
+  expect(await screen.findByText(PUB)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Copiar/ })).toBeInTheDocument();
+});
+
+test("no hay forma de importar una llave privada", async () => {
+  render(<VaultView core={fakeCore({ listCredentials: vi.fn(async () => [keyCred]) })} />);
+  await screen.findByText("llave lab");
+  expect(screen.queryByRole("button", { name: /importar.*(llave|privada)/i })).not.toBeInTheDocument();
+  expect(document.querySelector("textarea")).toBeNull();
+  expect(screen.queryByText(/importar llave|pegar llave/i)).not.toBeInTheDocument();
+  expect(document.querySelector('input[type="file"]')).toBeNull();
+});
+
+test("la pública se muestra como texto inerte aunque traiga HTML", async () => {
+  const evil = "<b>x</b><img src=x onerror=alert(1)>";
+  const core = fakeCore({ listCredentials: vi.fn(async () => [keyCred]), credentialPublicKey: vi.fn(async () => evil) });
+  render(<VaultView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /Ver llave pública/ }));
+  expect(await screen.findByText(evil)).toBeInTheDocument();
+  expect(document.querySelector("img, .vault-pub b")).toBeNull();
+});
+
+test("ver la pública de A y luego la de B deja B aunque la respuesta de A llegue tarde", async () => {
+  const a = { ...keyCred, id: "ka", label: "llave A" }, b = { ...keyCred, id: "kb", label: "llave B" };
+  let resA!: (v: string) => void;
+  const credentialPublicKey = vi.fn((id: string) => (id === "ka" ? new Promise<string>((r) => { resA = r; }) : Promise.resolve("ssh-ed25519 BBBB b")));
+  render(<VaultView core={fakeCore({ listCredentials: vi.fn(async () => [a, b]), credentialPublicKey })} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Ver llave pública de llave A" }));
+  await userEvent.click(screen.getByRole("button", { name: "Ver llave pública de llave B" }));
+  expect(await screen.findByText("ssh-ed25519 BBBB b")).toBeInTheDocument();
+  await act(async () => { resA("ssh-ed25519 AAAA a"); });
+  expect(screen.queryByText("ssh-ed25519 AAAA a")).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Llave pública de llave B" })).toBeInTheDocument();
+});
+
+test("borrar la credencial cuya pública está a la vista la quita de la pantalla", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [keyCred]), credentialPublicKey: vi.fn(async () => PUB) });
+  render(<VaultView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /Ver llave pública/ }));
+  expect(await screen.findByText(PUB)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Eliminar llave lab" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar eliminación de llave lab" }));
+  await waitFor(() => expect(screen.queryByText(PUB)).not.toBeInTheDocument());
+});
+
+test("regenerar la llave pide confirmar, manda confirm=true y muestra la pública nueva con el aviso de autorizarla otra vez", async () => {
+  const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
+  const core = fakeCore({ listCredentials: vi.fn(async () => [pwCred, keyCred]), regenerateKeyCredential: vi.fn(async () => NEW) });
+  render(<VaultView core={core} />);
+  await screen.findByText("llave lab");
+  expect(screen.getAllByRole("button", { name: /Regenerar la llave de/ })).toHaveLength(1); // solo la de llave
+  await userEvent.click(screen.getByRole("button", { name: "Regenerar la llave de llave lab" }));
+  expect(core.regenerateKeyCredential).not.toHaveBeenCalled(); // primer clic: solo arma
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar: regenerar la llave de llave lab" }));
+  await waitFor(() => expect(core.regenerateKeyCredential).toHaveBeenCalledWith("k1", true));
+  expect(await screen.findByText(NEW)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Copiar/ })).toBeInTheDocument();
+  expect(screen.getByText(/La pública anterior ya no sirve/)).toBeInTheDocument();
+});
+
+test("si mientras regenera se abre la pública de otra credencial, la respuesta tardía no la pisa y queda el aviso de éxito", async () => {
+  const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
+  const key2 = { ...keyCred, id: "k2", label: "llave dos" };
+  let done: (v: string) => void = () => {};
+  const core = fakeCore({
+    listCredentials: vi.fn(async () => [keyCred, key2]), credentialPublicKey: vi.fn(async () => PUB),
+    regenerateKeyCredential: vi.fn(() => new Promise<string>((r) => { done = r; })),
+  });
+  render(<VaultView core={core} />);
+  await screen.findByText("llave lab");
+  await userEvent.click(screen.getByRole("button", { name: "Regenerar la llave de llave lab" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar: regenerar la llave de llave lab" }));
+  await userEvent.click(screen.getByRole("button", { name: /Ver llave pública.*llave dos/ }));
+  expect(await screen.findByText(PUB)).toBeInTheDocument();
+  await act(async () => { done(NEW); });
+  expect(screen.getByText(PUB)).toBeInTheDocument();
+  expect(screen.queryByText(NEW)).not.toBeInTheDocument();
+  expect(screen.getByText(/La pública anterior ya no sirve/)).toBeInTheDocument();
+});
+
+test("regenerar la misma credencial con la pública a la vista remonta el cuadro y le devuelve el foco", async () => {
+  const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
+  const core = fakeCore({ listCredentials: vi.fn(async () => [keyCred]), credentialPublicKey: vi.fn(async () => PUB), regenerateKeyCredential: vi.fn(async () => NEW) });
+  render(<VaultView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: /Ver llave pública/ }));
+  await screen.findByText(PUB);
+  await userEvent.click(screen.getByRole("button", { name: "Regenerar la llave de llave lab" }));
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar: regenerar la llave de llave lab" }));
+  await screen.findByText(NEW);
+  expect(screen.getByRole("region", { name: "Llave pública de llave lab" })).toHaveFocus();
+});
+
+test("exportar avisa antes cuántas credenciales llevan llave privada y después cuántas entraron al archivo", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [pwCred, keyCred]), pickSavePath: vi.fn(async () => "/tmp/r.mcvault"), exportVaultBackup: vi.fn(async () => ({ count: 2, noPermissions: false, sshKeysIncluded: 1 })) });
+  render(<VaultView core={core} />);
+  expect(await screen.findByText(/el archivo llevará la llave privada de 1 credenciales/)).toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Frase del respaldo"), "una-frase-larga-1");
+  await userEvent.type(screen.getByLabelText("Repite la frase del respaldo"), "una-frase-larga-1");
+  await userEvent.click(screen.getByRole("checkbox", { name: /contiene todas mis credenciales/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Exportar respaldo…" }));
+  expect(await screen.findByText(/El archivo lleva la llave privada de 1 credenciales\./)).toBeInTheDocument();
+});
+
+test("sin credenciales con llave no hay aviso de llaves privadas en el respaldo", async () => {
+  render(<VaultView core={fakeCore({ listCredentials: vi.fn(async () => [pwCred]) })} />);
+  await screen.findByText("core");
+  expect(screen.queryByText(/llave privada/)).not.toBeInTheDocument();
 });

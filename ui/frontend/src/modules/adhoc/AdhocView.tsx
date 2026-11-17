@@ -1,4 +1,5 @@
 import { plural } from "../../lib/plural";
+import { passwordCreds } from "../vault/api";
 import { useEffect, useRef, useState } from "react";
 import type { AdhocResult, CoreAPI, Credential } from "../../lib/core";
 import { Field, Notice, Select, TextArea } from "../../components/Field";
@@ -43,7 +44,7 @@ export function AdhocView({ core, pollMs = 700, maxWaitMs = 15 * 60_000 }: { cor
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
-  useEffect(() => { core.listCredentials().then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : l[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
+  useEffect(() => { core.listCredentials().then(passwordCreds).then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : l[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
 
   const run = () => {
     setNote(""); setPicked("");

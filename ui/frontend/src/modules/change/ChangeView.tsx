@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { passwordCreds } from "../vault/api";
 import type { ChangeSummary, CoreAPI, Credential, LoginResult } from "../../lib/core";
 import { Check, Field, Notice, Select, TextArea, errorText } from "../../components/Field";
 import { Badge, EmptyState, Page, ResultPanel, Section, Tabs, useResult, type Tone } from "../../components/Page";
@@ -52,7 +53,7 @@ function PrePost({ core }: { core: CoreAPI }) {
   const refresh = () => core.listChanges().then(setChanges).catch((e) => setErr(errorText(e)));
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
   useEffect(() => {
-    core.listCredentials().then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : "")); }).catch(() => setCreds([]));
+    core.listCredentials().then(passwordCreds).then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : "")); }).catch(() => setCreds([]));
     refresh();
   }, [core, vv]);
 
