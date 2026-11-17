@@ -119,3 +119,22 @@ test("la huella de la primera vez muestra host:puerto, tipo de llave y la orden 
   expect(screen.getByText("ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub")).toBeVisible();
   expect(screen.getByText("ssh-keygen -lf C:\\ProgramData\\ssh\\ssh_host_ecdsa_key.pub")).toBeVisible();
 });
+
+// Defensa: si la apertura misma se rechaza por la llave de host (sin pestaña ni stream), el aviso igual ofrece aceptarla.
+// El núcleo de hoy lo manda por el stream (terminal:done, cubierto arriba); esto cubre un puente o núcleo que lo rechace antes.
+test.each([
+  ["nueva", "unknown", "Aceptar esta huella y reintentar"],
+  ["cambiada", "changed", "Aceptar esta huella y reintentar"],
+])("si la apertura por hostId se rechaza por llave de host %s, se ofrece aceptarla y reintenta con hostId y la huella", async (_n, kind, accept) => {
+  const fp = "pNHDf6UtoRxP6cpwKx8lTIgynz79VhQDMyc6PwSU8OU";
+  const open = vi.fn().mockRejectedValueOnce(new Error(`rpc error: code = FailedPrecondition desc = transport: ${kind} host key from 192.168.3.61:22: SHA256:${fp}`)).mockResolvedValue("t2");
+  const core = fakeCore({ listCredentials: vi.fn(async () => [cred]), terminalOpen: open });
+  render(<TerminalView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Conectar a LAB-CORE" }));
+  expect(await screen.findByText(`SHA256:${fp}`)).toBeInTheDocument();
+  if (kind === "changed") expect(screen.getByText(/cambi/i)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: accept }));
+  await waitFor(() => expect(open).toHaveBeenCalledTimes(2));
+  expect(open.mock.calls[1][0]).toEqual({ name: "LAB-CORE", hostId: sampleHosts[0].id, expectedStartupCommand: "", accept: [`SHA256:${fp}`], rows: expect.any(Number), cols: expect.any(Number) });
+  await waitFor(() => expect(screen.queryByText(`SHA256:${fp}`)).toBeNull()); // el aviso se va al reintentar
+});

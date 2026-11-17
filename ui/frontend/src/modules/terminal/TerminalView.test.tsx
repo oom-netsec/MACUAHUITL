@@ -183,7 +183,9 @@ test("Ctrl+Mayús+K saca el foco de la terminal hacia la pestaña", async () => 
 test("una llave de host nueva muestra la huella para aceptarla", async () => {
   setup({ terminalOpen: vi.fn().mockRejectedValue(new Error("rpc error: code = FailedPrecondition desc = llave de host desconocida: SHA256:abc")) });
   await abrir("sw1");
-  expect(await screen.findByRole("alert")).toHaveTextContent("SHA256:abc");
+  // Rechazo en la apertura (sin pestaña): la huella se muestra arriba con su botón para aceptarla, no solo como error.
+  expect(await screen.findByText("SHA256:abc")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeEnabled();
   expect(screen.queryByRole("tab")).not.toBeInTheDocument();
 });
 

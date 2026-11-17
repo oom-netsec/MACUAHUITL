@@ -2963,6 +2963,7 @@ export const es = {
   "packs.none.link": "enlace de la página de versiones",
   "packs.none.settings": "No hay paquetes instalados: descarga los archivos .mpack oficiales de la página de versiones (releases) e instálalos con «Instalar paquete…».",
   "packs.none.open": "Abrir Ajustes → Paquetes",
+  "vault.key.regen.confirmShort": "Confirmar: regenerar",
 };
 
 export type Key = keyof typeof es;

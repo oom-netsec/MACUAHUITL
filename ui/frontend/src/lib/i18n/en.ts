@@ -2964,4 +2964,5 @@ export const en: Record<Key, string> = {
   "packs.none.link": "releases page link",
   "packs.none.settings": "No packs installed: download the official .mpack files from the releases page and install them with «Install pack…».",
   "packs.none.open": "Open Settings → Packs",
+  "vault.key.regen.confirmShort": "Confirm: regenerate",
 };
