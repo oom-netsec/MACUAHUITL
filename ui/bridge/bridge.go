@@ -497,6 +497,8 @@ type JobDTO struct {
 	OutputDir      string     `json:"outputDir"`
 	Kind           string     `json:"kind"` // patrol, adhoc, backup o change
 	Phases         []PhaseDTO `json:"phases"`
+	FinishedAt     string     `json:"finishedAt"` // vacío mientras no termina
+	Past           bool       `json:"past"`       // terminado un día anterior (lo calcula el núcleo con su hora local)
 }
 
 type PhaseDTO struct {
@@ -516,9 +518,14 @@ func rfc3339(t *timestamppb.Timestamp) string {
 	return t.AsTime().UTC().Format(time.RFC3339)
 }
 
-func (b *Bridge) ListJobs() ([]JobDTO, error) {
+// ListJobsOpts: lo que la UI elige al listar. IncludePast suma los terminados de días anteriores (fase 46).
+type ListJobsOpts struct {
+	IncludePast bool `json:"includePast"`
+}
+
+func (b *Bridge) ListJobs(o ListJobsOpts) ([]JobDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) ([]JobDTO, error) {
-		r, err := v1.NewPatrolServiceClient(c).ListJobs(ctx, &v1.ListJobsRequest{IncludePast: true}) // hasta 46f: la UI aún no separa «Past jobs»
+		r, err := v1.NewPatrolServiceClient(c).ListJobs(ctx, &v1.ListJobsRequest{IncludePast: o.IncludePast})
 		if err != nil {
 			return nil, err
 		}
@@ -526,11 +533,43 @@ func (b *Bridge) ListJobs() ([]JobDTO, error) {
 		for _, j := range r.Jobs {
 			d := JobDTO{ID: j.JobId, Name: j.Name, State: j.State, NextRoundAt: rfc3339(j.NextRoundAt), ArmedAt: rfc3339(j.ArmedAt),
 				WindowEndsAt: rfc3339(j.WindowEndsAt), Round: j.Round, Rounds: j.Rounds, DevicesTotal: j.DevicesTotal, DevicesOK: j.DevicesOk,
-				DevicesFailed: j.DevicesFailed, DevicesPartial: j.DevicesPartial, OutputDir: j.OutputDir, Kind: j.Kind, Phases: []PhaseDTO{}}
+				DevicesFailed: j.DevicesFailed, DevicesPartial: j.DevicesPartial, OutputDir: j.OutputDir, Kind: j.Kind, Phases: []PhaseDTO{},
+				FinishedAt: rfc3339(j.FinishedAt), Past: j.Past}
 			for _, p := range j.Phases {
 				d.Phases = append(d.Phases, PhaseDTO{At: rfc3339(p.At), Kind: p.Kind.String(), Round: p.Round, Detail: p.Detail, Reason: p.Reason, Args: p.Args})
 			}
 			out = append(out, d)
+		}
+		return out, nil
+	})
+}
+
+// RemoveJobsSel: qué quitar del historial. Solo ids: la UI quita exactamente lo que el usuario confirmó (all_finished no se expone).
+type RemoveJobsSel struct {
+	JobIDs []string `json:"jobIds"`
+}
+
+type SkippedJobDTO struct {
+	JobID  string `json:"jobId"`
+	Reason string `json:"reason"` // active | change_pre | backup_import | adhoc_unread
+}
+
+type RemoveJobsDTO struct {
+	Removed    int32           `json:"removed"`
+	RemovedIDs []string        `json:"removedIds"`
+	Skipped    []SkippedJobDTO `json:"skipped"`
+}
+
+// RemoveJobs quita trabajos del historial (la evidencia en disco no se toca); lo que no puede quitar vuelve en skipped.
+func (b *Bridge) RemoveJobs(s RemoveJobsSel) (RemoveJobsDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (RemoveJobsDTO, error) {
+		r, err := v1.NewPatrolServiceClient(c).RemoveJobs(ctx, &v1.RemoveJobsRequest{JobIds: s.JobIDs})
+		if err != nil {
+			return RemoveJobsDTO{}, err
+		}
+		out := RemoveJobsDTO{Removed: r.Removed, RemovedIDs: append([]string{}, r.RemovedIds...), Skipped: []SkippedJobDTO{}}
+		for _, k := range r.Skipped {
+			out.Skipped = append(out.Skipped, SkippedJobDTO{JobID: k.JobId, Reason: k.Reason})
 		}
 		return out, nil
 	})

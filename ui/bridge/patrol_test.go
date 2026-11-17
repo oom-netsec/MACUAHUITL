@@ -120,7 +120,7 @@ func TestJobDTOAndPhaseEvent(t *testing.T) {
 		v1.RegisterPatrolServiceServer(r, fakePatrol{})
 		v1.RegisterEventServiceServer(r, fakePhaseEvents{})
 	})
-	jobs, err := b.ListJobs()
+	jobs, err := b.ListJobs(ListJobsOpts{})
 	if err != nil {
 		t.Fatal(err)
 	}

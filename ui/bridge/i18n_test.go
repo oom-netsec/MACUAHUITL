@@ -141,7 +141,7 @@ func TestPuenteConLocalizeMandaLaPreferencia(t *testing.T) {
 
 func TestPuenteListJobsExponeReasonYArgs(t *testing.T) {
 	b, _ := i18nBridge(t, "", false)
-	jobs, err := b.ListJobs()
+	jobs, err := b.ListJobs(ListJobsOpts{})
 	if err != nil || len(jobs) != 1 {
 		t.Fatal(jobs, err)
 	}
