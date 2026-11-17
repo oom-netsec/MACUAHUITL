@@ -81,17 +81,17 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	if err != nil {
 		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	}
-	// Hasta el bloque 200-4 un barrido correría un solo ping y saldría como éxito.
-	if p, _ := diag.Plan(req); tool == diag.Ping && p.Sweep != nil {
-		return service.Err(st.Context(), codes.InvalidArgument, "diag.err.sweep_pending", nil)
-	}
 	if factory { // la de fábrica la crea el núcleo (0700), ya con la petición válida
 		if err := os.MkdirAll(req.OutputDir, 0o700); err != nil {
 			return service.ErrFrom(st.Context(), codes.InvalidArgument, i18n.Wrap("ingest.err.out_dir", err, nil))
 		}
 	}
+	sweep := ""
+	if p, err := diag.Plan(req); err == nil && p.Sweep != nil {
+		sweep = fmt.Sprintf(" sweep=%d-%d/%d", p.Sweep.Start, p.Sweep.End, p.Sweep.Step)
+	}
 	id, live := service.NewID(), &liveRun{stop: make(chan struct{})}
-	s.d.Audit("diag.run", string(tool), fmt.Sprintf("run=%s %s %q", id, bin, argv))
+	s.d.Audit("diag.run", string(tool), fmt.Sprintf("run=%s %s %q%s", id, bin, argv, sweep))
 	s.mu.Lock()
 	if s.runs == nil {
 		s.runs = map[string]*liveRun{}
@@ -106,7 +106,10 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 	if err := st.Send(&v1.RunResponse{RunId: id}); err != nil {
 		return err
 	}
-	res, err := diag.Runner{LookPath: s.d.DiagLookPath(), Stop: live.stop}.Run(st.Context(), req, func(line string) {
+	run := diag.Runner{LookPath: s.d.DiagLookPath(), Stop: live.stop, OnSweep: func(p diag.SweepPoint) {
+		st.Send(&v1.RunResponse{SweepPoint: &v1.SweepPoint{Size: int32(p.Size), Sent: p.Sent, Received: p.Received, Result: p.Result}})
+	}}
+	res, err := run.Run(st.Context(), req, func(line string) {
 		st.Send(&v1.RunResponse{OutputLine: line})
 	})
 	code := res.ExitCode
@@ -114,7 +117,7 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 		code = -1
 	}
 	// Lo que corrió de verdad: binario resuelto (tracepath por traceroute) y argv completo, entrecomillado.
-	s.d.Audit("diag.done", string(tool), fmt.Sprintf("run=%s exit=%d bin=%s argv=%q output=%s", id, code, res.Bin, res.Argv, res.OutputPath))
+	s.d.Audit("diag.done", string(tool), fmt.Sprintf("run=%s exit=%d bin=%s argv=%q output=%s%s", id, code, res.Bin, res.Argv, res.OutputPath, sweep))
 	if errors.Is(err, diag.ErrNotInstalled) {
 		return service.ErrFrom(st.Context(), codes.FailedPrecondition, err)
 	}

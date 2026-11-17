@@ -26,6 +26,7 @@ type PingStats struct {
 	lastRaw, epoch int64
 	times          []float64 // en iputils incluye los DUP, como tsum de iputils
 	rtt            *[4]float64
+	frag           bool // el sistema avisó que hacía falta fragmentar con DF
 }
 
 func NewPingStats(win bool) *PingStats { return &PingStats{win: win} }
@@ -42,7 +43,8 @@ var (
 	reLinuxFinal = regexp.MustCompile(`^(\d+) packets transmitted`)
 	reLinuxRTT   = regexp.MustCompile(`^(?:rtt|round-trip) min/avg/max/(?:mdev|stddev) = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+) ms`)
 	reWinEcho    = regexp.MustCompile(`(?i)^(?:Reply from|Respuesta desde) \S+: (?:bytes=\d+ )?(?:time|tiempo)([=<])(\d+)ms?`)
-	reWinNoEcho  = regexp.MustCompile(`(?i)^(?:Request timed out|Tiempo de espera agotado|(?:Reply from|Respuesta desde) \S+: |PING: transmit failed|General failure|Error general)`)
+	reFrag       = regexp.MustCompile(`(?i)message too long|frag needed|packet too big|needs to be fragmented|es necesario fragmentar`)
+	reWinNoEcho  = regexp.MustCompile(`(?i)^(?:Request timed out|Packet needs to be fragmented|Es necesario fragmentar|Tiempo de espera agotado|(?:Reply from|Respuesta desde) \S+: |PING: transmit failed|General failure|Error general)`)
 )
 
 // num convierte un número del texto; falla si no es finito o pasa de max.
@@ -54,7 +56,19 @@ func num(s string, max float64) (float64, bool) {
 // Feed cuenta una línea de salida y devuelve cuántos envíos lleva (para el tope).
 // Linux: enviados = el icmp_seq más alto visto (o el «transmitted» final si es mayor), porque iputils no
 // imprime los timeouts; Windows: cada eco con respuesta y cada «sin respuesta» o error.
+// maxPingLine es el largo máximo de una línea de ping que se analiza.
+const maxPingLine = 1024
+
 func (p *PingStats) Feed(line string) int64 {
+	if len(line) > maxPingLine { // ninguna línea de ping mide tanto: no se pasa por las regex (una salida rara de varios MB no frena la copia)
+		if p.win {
+			return p.sent
+		}
+		return max(p.maxSeq, p.final)
+	}
+	if reFrag.MatchString(line) {
+		p.frag = true
+	}
 	if p.win {
 		if m := reWinEcho.FindStringSubmatch(line); m != nil {
 			ms, ok := num(m[2], maxMsSane)
@@ -107,6 +121,20 @@ func (p *PingStats) Feed(line string) int64 {
 		p.seq(m[1])
 	}
 	return max(p.maxSeq, p.final)
+}
+
+// Frag dice si se vio el aviso de fragmentación con DF (iputils «Message too long»/«Frag needed», ping.exe «needs to be fragmented»).
+func (p *PingStats) Frag() bool { return p.frag }
+
+// Add suma el resultado de otra corrida (el barrido): enviados, recibidos y tiempos. Los icmp_seq de cada corrida
+// empiezan en 1, por eso se acumulan los enviados ya resumidos y no el máximo.
+func (p *PingStats) Add(o *PingStats) {
+	s := o.Summary()
+	p.sent += s.Sent
+	p.final += s.Sent
+	p.received += s.Received
+	p.times = append(p.times, o.times...)
+	p.frag = p.frag || o.frag
 }
 
 // seq registra un icmp_seq (16 bits: da la vuelta en 65535) y dice si el número es creíble.

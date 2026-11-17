@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -73,6 +74,12 @@ type Runner struct {
 	// Stop, al cerrarse, detiene la herramienta de forma ordenada (SIGINT en Linux: ping imprime su resumen y
 	// sale) y Run vuelve con el resultado; cancelar ctx, en cambio, la mata sin más.
 	Stop <-chan struct{}
+	// OnSweep recibe el resultado de cada tamaño del barrido de ping.
+	OnSweep func(SweepPoint)
+
+	// Solo sweep: la duración y el tope de envíos son del barrido entero, no de cada ping.
+	sweepHalt func()
+	sentBase  int64
 }
 
 func (r Runner) look(name string) (string, error) {
@@ -86,7 +93,7 @@ func (r Runner) look(name string) (string, error) {
 // Run ejecuta la petición, manda cada línea de salida a onLine y guarda el resultado en
 // OutputDir (texto, o .pcapng para la captura). Cancelar ctx termina el proceso.
 func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Result, error) {
-	bin, argv, err := Build(req)
+	bin, argv, plan, err := buildPlan(req, runtime.GOOS == "windows")
 	if err != nil {
 		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 	}
@@ -131,28 +138,146 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 		defer stop()
 	}
 
+	if req.Tool == Ping {
+		if plan.Sweep != nil {
+			return r.sweep(ctx, req, path, argv, *plan.Sweep, out, res, onLine)
+		}
+		stats := NewPingStats(goos == "windows")
+		code, err := r.exec(ctx, req, path, argv, out, res.OutputPath, stats, onLine)
+		sum := stats.Summary()
+		res.ExitCode, res.Ping = code, &sum
+		return res, err
+	}
+	code, err := r.exec(ctx, req, path, argv, out, res.OutputPath, nil, onLine)
+	res.ExitCode = code
+	return res, err
+}
+
+// SweepPoint es el resultado de un tamaño del barrido: ok (volvieron todas), frag (el sistema pidió fragmentar con DF) o loss.
+type SweepPoint struct {
+	Size           int
+	Sent, Received int64
+	Result         string
+}
+
+// sweepArgv inserta el tamaño antes del host (último argumento) y vuelve a pasar el argv por checkFlagLike.
+func sweepArgv(argv []string, size int, win bool) ([]string, error) {
+	flag := "-s"
+	if win {
+		flag = "-l"
+	}
+	n := len(argv) - 1
+	a := append(append(append([]string{}, argv[:n]...), flag, strconv.Itoa(size)), argv[n])
+	if err := checkFlagLike("ping", a, win); err != nil {
+		return nil, i18n.Wrap("diag.err.wrap", err, nil)
+	}
+	return a, nil
+}
+
+func (r Runner) stopped() bool {
+	select {
+	case <-r.Stop:
+		return true
+	default:
+		return false
+	}
+}
+
+// sweep corre un ping por tamaño y manda un SweepPoint por cada uno; el resumen es el total. Stop interrumpe el ping
+// en curso (cuyo punto no se manda, quedó incompleto) y el resumen cubre lo alcanzado.
+func (r Runner) sweep(ctx context.Context, req Request, path string, argv []string, sw Sweep, out *os.File, res Result, onLine func(string)) (Result, error) {
+	stop := make(chan struct{})
+	var once sync.Once
+	halt := func() { once.Do(func() { close(stop) }) }
+	defer halt()
+	d := pingMaxRun
+	if want := pingLimits(req); want > 0 {
+		d = min(d, want)
+	}
+	defer time.AfterFunc(d, halt).Stop()
+	go func(user <-chan struct{}) {
+		select {
+		case <-user:
+			halt()
+		case <-stop:
+		}
+	}(r.Stop)
+	if r.stopped() { // un Stop ya cerrado se ve de inmediato, sin esperar a la goroutine
+		halt()
+	}
+	r.Stop, r.sweepHalt = stop, halt
+	win := runtime.GOOS == "windows"
+	total := NewPingStats(goos == "windows")
+	for i, size := range sw.Sizes() {
+		if r.stopped() || ctx.Err() != nil {
+			break
+		}
+		// Un tamaño que no arranca borra el .txt solo si todavía no tiene nada.
+		outPath := res.OutputPath
+		if i > 0 {
+			outPath = ""
+		}
+		a, err := sweepArgv(argv, size, win)
+		if err != nil {
+			discard(out, outPath)
+			return res, err
+		}
+		stats := NewPingStats(goos == "windows")
+		r.sentBase = total.Summary().Sent
+		if _, err := r.exec(ctx, req, path, a, out, outPath, stats, onLine); err != nil {
+			return res, err
+		}
+		if r.stopped() || ctx.Err() != nil { // el ping interrumpido no entra al resumen ni manda punto
+			break
+		}
+		s := stats.Summary()
+		total.Add(stats)
+		pt := SweepPoint{Size: size, Sent: s.Sent, Received: s.Received, Result: "loss"}
+		switch {
+		case s.Sent > 0 && s.Received >= s.Sent:
+			pt.Result = "ok"
+		case stats.Frag():
+			pt.Result = "frag"
+		}
+		if r.OnSweep != nil {
+			r.OnSweep(pt)
+		}
+	}
+	sum := total.Summary()
+	res.Ping = &sum
+	switch {
+	case ctx.Err() != nil:
+		res.ExitCode = 143 // cancelado: como un ping suelto terminado por señal
+	case sum.Received == 0:
+		res.ExitCode = 1
+	}
+	return res, nil
+}
+
+// exec corre un proceso y manda sus líneas a onLine y a out; cuenta las respuestas en stats (nil si no es ping).
+// Devuelve el código de salida. Si no arranca, borra el archivo de salida.
+func (r Runner) exec(ctx context.Context, req Request, path string, argv []string, out *os.File, outPath string, stats *PingStats, onLine func(string)) (int, error) {
 	cmd := exec.CommandContext(ctx, path, argv...)
 	cmd.Env = append(childEnv(path), r.extraEnv...)
 	// El hijo y sus nietos se cancelan juntos (grupo de procesos en Linux, Job Object en Windows).
 	started, done, err := confine(cmd)
 	if err != nil {
-		discard(out, res.OutputPath)
-		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
+		discard(out, outPath)
+		return 0, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	defer done()
 	var mu sync.Mutex
 	stopc := make(chan struct{}) // lo cierran Stop, la duración o el tope de envíos
 	var stopOnce sync.Once
 	stopNow := func() { stopOnce.Do(func() { close(stopc) }) }
-	var stats *PingStats
-	if req.Tool == Ping {
-		stats = NewPingStats(goos == "windows")
-	}
 	emit := func(line string) {
 		mu.Lock()
 		defer mu.Unlock()
-		if stats != nil && stats.Feed(line) >= pingMaxSent {
+		if stats != nil && r.sentBase+stats.Feed(line) >= pingMaxSent {
 			stopNow()
+			if r.sweepHalt != nil {
+				r.sweepHalt()
+			}
 		}
 		onLine(line)
 		if out != nil {
@@ -165,16 +290,16 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	so, se := &lineWriter{emit: emit}, &lineWriter{emit: emit}
 	cmd.Stdout, cmd.Stderr = so, se
 	if err := cmd.Start(); err != nil {
-		discard(out, res.OutputPath)
-		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
+		discard(out, outPath)
+		return 0, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	if err := started(); err != nil {
 		cmd.Wait()
-		discard(out, res.OutputPath)
-		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
+		discard(out, outPath)
+		return 0, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	finished := make(chan struct{})
-	if stats != nil {
+	if stats != nil && r.sweepHalt == nil {
 		d := pingMaxRun
 		if want := pingLimits(req); want > 0 {
 			d = min(d, want)
@@ -205,35 +330,32 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	close(finished)
 	so.flush()
 	se.flush()
-	if stats != nil {
-		mu.Lock()
-		sum := stats.Summary()
-		mu.Unlock()
-		res.Ping = &sum
-	}
 	var ee *exec.ExitError
+	code := 0
 	select {
 	case <-stopc:
 		if stats != nil && goos == "windows" { // el Job Object sale con 143: tras una parada pedida es éxito, como iputils
-			res.ExitCode = 1
-			if res.Ping.Received > 0 {
-				res.ExitCode = 0
+			mu.Lock()
+			rcv := stats.Summary().Received
+			mu.Unlock()
+			if rcv > 0 {
+				return 0, nil
 			}
-			return res, nil
+			return 1, nil
 		}
 	default:
 	}
 	switch {
 	case err == nil:
 	case errors.As(err, &ee):
-		res.ExitCode = ee.ExitCode()
-		if res.ExitCode < 0 {
-			res.ExitCode = 143 // terminado por señal
+		code = ee.ExitCode()
+		if code < 0 {
+			code = 143 // terminado por señal
 		}
 	default:
-		return res, i18n.Wrap("diag.err.wrap", err, nil)
+		return 0, i18n.Wrap("diag.err.wrap", err, nil)
 	}
-	return res, nil
+	return code, nil
 }
 
 // lineWriter parte lo que escribe el proceso en líneas completas; sin límite de largo

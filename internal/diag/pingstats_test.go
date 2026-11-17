@@ -159,3 +159,61 @@ func TestPingStatsBadChecksum(t *testing.T) {
 		t.Errorf("%+v", s)
 	}
 }
+
+// Frag: el aviso de fragmentar con DF, en iputils y en ping.exe (en/es); y una salida normal no lo activa.
+func TestPingStatsFrag(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		win  bool
+		out  []string
+		frag bool
+		sent int64
+	}{
+		{"linux local", false, []string{"ping: local error: message too long, mtu=1500", "1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms"}, true, 1},
+		{"linux message too long", false, []string{"ping: sendmsg: Message too long"}, true, 0},
+		{"linux frag needed", false, []string{"From 192.0.2.254 icmp_seq=1 Frag needed and DF set (mtu = 1400)", "1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms"}, true, 1},
+		{"linux packet too big v6", false, []string{"From 2001:db8::1 icmp_seq=1 Packet too big: mtu=1400", "1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms"}, true, 1},
+		{"linux normal", false, []string{"64 bytes from 192.0.2.1: icmp_seq=1 ttl=64 time=2.00 ms", "1 packets transmitted, 1 received, 0% packet loss, time 0ms"}, false, 1},
+		{"win en", true, []string{"Packet needs to be fragmented but DF set."}, true, 1},
+		{"win en remoto", true, []string{"Reply from 192.0.2.254: Packet needs to be fragmented but DF set."}, true, 1},
+		{"win es", true, []string{"Es necesario fragmentar el paquete pero se especificó DF."}, true, 1},
+		{"win normal", true, []string{"Reply from 192.0.2.1: bytes=32 time=1ms TTL=64"}, false, 1},
+		{"win timeout", true, []string{"Request timed out."}, false, 1},
+	} {
+		p := NewPingStats(c.win)
+		for _, l := range c.out {
+			p.Feed(l)
+		}
+		if p.Frag() != c.frag || p.Summary().Sent != c.sent {
+			t.Errorf("%s: frag=%v sent=%d, quería %v y %d", c.name, p.Frag(), p.Summary().Sent, c.frag, c.sent)
+		}
+	}
+}
+
+// Add en Windows suma enviados, recibidos y tiempos de varias corridas (barrido).
+func TestPingStatsAddWindows(t *testing.T) {
+	a, b, total := NewPingStats(true), NewPingStats(true), NewPingStats(true)
+	for _, l := range []string{"Reply from 192.0.2.1: bytes=32 time=1ms TTL=64", "Request timed out."} {
+		a.Feed(l)
+	}
+	for _, l := range []string{"Respuesta desde 192.0.2.1: bytes=32 tiempo=3ms TTL=64", "Packet needs to be fragmented but DF set."} {
+		b.Feed(l)
+	}
+	total.Add(a)
+	total.Add(b)
+	s := total.Summary()
+	if s.Sent != 4 || s.Received != 2 || s.LossPct != 50 || s.MinMs != 1 || s.MaxMs != 3 || s.AvgMs != 2 || !total.Frag() {
+		t.Errorf("%+v", s)
+	}
+}
+
+// Una línea enorme (salida rara de varios MB) no pasa por las regex: no cuenta nada y no frena la copia.
+func TestPingStatsIgnoraLineasLargas(t *testing.T) {
+	for _, win := range []bool{false, true} {
+		p := NewPingStats(win)
+		big := strings.Repeat("x", 2<<20) + " icmp_seq=1 time=1 ms Reply from 192.0.2.1: bytes=32 time=1ms TTL=64 Message too long"
+		if n := p.Feed(big); n != 0 || p.Frag() || p.Summary().Received != 0 {
+			t.Fatalf("win=%v: la línea larga contó (%d, frag=%v)", win, n, p.Frag())
+		}
+	}
+}
