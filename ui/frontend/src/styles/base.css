@@ -10,6 +10,8 @@
   background: var(--canvas);
 }
 body { margin: 0; background: var(--canvas); }
+/* El documento nunca se desplaza: la app (.app, 100vh) es la ventana y cada zona hace su propio scroll (#197). */
+html, body { height: 100%; overflow: hidden; }
 ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 
 h1, h2, h3, h4 { margin: 0; color: var(--text); }
