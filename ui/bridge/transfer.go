@@ -112,6 +112,36 @@ func (b *Bridge) TransferServers() ([]TransferServerDTO, error) {
 	})
 }
 
+// TransferSessionDTO es una transferencia de un servidor abierto o reciente (fase 45b): la UI la encuesta cada segundo.
+type TransferSessionDTO struct {
+	ID          string  `json:"id"`
+	ServerID    string  `json:"serverId"`
+	Client      string  `json:"client"` // IP:puerto
+	Name        string  `json:"name"`
+	Direction   string  `json:"direction"` // "in" si el equipo sube, "out" si descarga
+	Protocol    string  `json:"protocol"`
+	Bytes       int64   `json:"bytes"`
+	Total       int64   `json:"total"` // 0 = desconocido
+	BytesPerSec float64 `json:"bytesPerSec"`
+	Started     int64   `json:"started"` // unix ms
+	Ended       int64   `json:"ended"`   // unix ms; 0 = sigue activa
+	State       string  `json:"state"`   // active | done | failed
+	Error       string  `json:"error,omitempty"`
+	ErrorCode   string  `json:"errorCode,omitempty"`
+}
+
+func (b *Bridge) ListTransferSessions(serverID string) ([]TransferSessionDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) ([]TransferSessionDTO, error) {
+		r, err := v1.NewTransferServiceClient(c).ListTransferSessions(ctx, &v1.ListTransferSessionsRequest{ServerId: serverID})
+		out := []TransferSessionDTO{}
+		for _, s := range r.GetSessions() {
+			out = append(out, TransferSessionDTO{ID: s.Id, ServerID: s.ServerId, Client: s.Client, Name: s.Name, Direction: s.Direction, Protocol: s.Protocol,
+				Bytes: s.Bytes, Total: s.Total, BytesPerSec: s.BytesPerSec, Started: s.Started, Ended: s.Ended, State: s.State, Error: s.Error, ErrorCode: s.ErrorCode})
+		}
+		return out, err
+	})
+}
+
 type TransferResultDTO struct {
 	Path     string  `json:"path"`
 	Bytes    int64   `json:"bytes"`

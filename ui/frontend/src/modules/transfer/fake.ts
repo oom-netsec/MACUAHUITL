@@ -18,7 +18,7 @@ export const sampleListing: TransferListing = {
 };
 export const noListing: TransferListing = { listable: false, reason: "este servidor no permite listar: TFTP no tiene comando para listar carpetas", path: "", entries: [], truncated: false, method: "" };
 
-// Una activa, una completa y una fallida (contrato provisional, fase 45).
+// Una activa, una completa y una fallida (fase 45b).
 export const sampleSessions = (now = Date.now()): TransferSession[] => [
   { id: "t1", serverId: "s1", client: "192.0.2.21:50123", ended: 0, name: "c9300-universalk9.17.09.04a.SPA.bin", direction: "out", protocol: "tftp", bytes: 412_000_000, total: 1_180_000_000, bytesPerSec: 9_800_000, started: now - 40_000, state: "active" },
   { id: "t2", serverId: "s1", client: "[2001:db8::22]:50124", name: "running-SW1.cfg", direction: "in", protocol: "tftp", bytes: 18_204, total: 18_204, bytesPerSec: 0, started: now - 90_000, ended: now - 89_000, state: "done" },

@@ -64,7 +64,7 @@ export type TransferRunEvent =
   | ({ kind: "file" } & TransferFileDone)
   | ({ kind: "finished" } & TransferFinished);
 
-// contrato provisional, fase 45: Backend lo confirmará.
+// Fase 45b (#196): una transferencia de un servidor abierto o cerrado hace menos de 10 min.
 export interface TransferSession { id: string; serverId: string; client: string; name: string; direction: "in" | "out"; protocol: string; bytes: number; total: number; bytesPerSec: number; started: number; ended: number; state: "active" | "done" | "failed"; error?: string; errorCode?: string } // total 0 = desconocido; client llega como IP:puerto; started/ended en unix ms, ended 0 = sigue activa
 
 export interface TransferAPI {
@@ -82,7 +82,7 @@ export interface TransferAPI {
   transferGetMany(p: TransferGetManyParams): Promise<string>;
   transferCancel(runId: string): Promise<void>;
   onTransferRun(cb: (e: TransferRunEvent) => void): () => void;
-  listTransferSessions(serverId: string): Promise<TransferSession[]>; // contrato provisional, fase 45
+  listTransferSessions(serverId: string): Promise<TransferSession[]>; // fase 45b; Unimplemented hasta el bloque 45b-3 del núcleo
 }
 
 type Call = <T>(method: string, ...args: unknown[]) => Promise<T>;
@@ -108,7 +108,7 @@ export const transferWails = (call: Call): TransferAPI => ({
   transferPutAsync: (p) => call("TransferPutAsync", { legacySsh: false, maxBytes: 0, seconds: 0, ...p }),
   transferGetMany: (p) => call("TransferGetMany", { credentialId: "", acceptedHostKeys: [], insecure: false, legacySsh: false, maxBytes: 0, seconds: 0, ...p }),
   transferCancel: (id) => call("TransferCancel", id),
-  listTransferSessions: async (id) => (await call<{ sessions: TransferSession[] | null }>("ListTransferSessions", id))?.sessions ?? [], // contrato provisional, fase 45
+  listTransferSessions: async (id) => (await call<TransferSession[] | null>("ListTransferSessions", id)) ?? [],
   onTransferRun: (cb) => {
     const a = Events.On("transfer:progress", (e) => cb({ kind: "progress", ...(e.data as TransferProgress) }));
     const b = Events.On("transfer:file", (e) => cb({ kind: "file", ...(e.data as TransferFileDone) }));
