@@ -58,9 +58,11 @@ message Device {
   string credential_id = 11;          // referencia a la bóveda; jamás un secreto. Vacío = sin credencial
   string credential_label = 12;       // solo lectura: la etiqueta de credential_id; vacía si la bóveda está cerrada o ya no existe
   string notes = 13;
-  // Fase 44: orden de inicio del terminal SSH (solo plataformas linux y windows). Una línea de 1 a 256 caracteres, sin
-  // espacios en los extremos ni caracteres de control o de formato (U+202E y similares); vacía = el shell de siempre.
-  // El terminal la manda como exec con PTY en vez de abrir el shell. No viaja en el export/import de hosts.
+  // Fase 44: orden de inicio del terminal SSH (solo plataformas linux y windows). Una línea de 1 a 256 puntos de código,
+  // sin espacios en los extremos, sin controles \p{Cc} (tab y saltos incluidos) ni caracteres de formato \p{Cf} (bidi
+  // U+202A–202E y U+2066–2069, U+200B–200F, U+FEFF); vacía = el shell de siempre. El terminal la manda como exec con PTY
+  // en vez de abrir el shell. Viaja en el export/import de hosts (columna y clave startup_command). Un error de validación
+  // llega con metadata.field = "startup_command", como los demás campos del host.
   string startup_command = 14;
 }
 
@@ -119,6 +121,7 @@ message ImportHostItem {
   string reason = 4;                  // solo en conflicto: direccion (reemplazar u omitir) o nombre (también renombrar)
   string conflicts_with = 5;          // id del host guardado con el que choca o coincide
   bool credential_missing = 6;        // trae etiqueta pero no hay (o hay varias) credencial con esa etiqueta: quedaría sin credencial
+  bool has_startup_command = 7;       // fase 44: el host del archivo trae orden de inicio (va en host.startup_command); la UI la muestra antes de aplicar
 }
 message PreviewImportHostsResponse {
   string token = 1;                   // vale 10 minutos y un solo uso

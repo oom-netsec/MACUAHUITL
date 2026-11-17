@@ -99,9 +99,11 @@ type Device struct {
 	CredentialId    string   `protobuf:"bytes,11,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`          // referencia a la bóveda; jamás un secreto. Vacío = sin credencial
 	CredentialLabel string   `protobuf:"bytes,12,opt,name=credential_label,json=credentialLabel,proto3" json:"credential_label,omitempty"` // solo lectura: la etiqueta de credential_id; vacía si la bóveda está cerrada o ya no existe
 	Notes           string   `protobuf:"bytes,13,opt,name=notes,proto3" json:"notes,omitempty"`
-	// Fase 44: orden de inicio del terminal SSH (solo plataformas linux y windows). Una línea de 1 a 256 caracteres, sin
-	// espacios en los extremos ni caracteres de control o de formato (U+202E y similares); vacía = el shell de siempre.
-	// El terminal la manda como exec con PTY en vez de abrir el shell. No viaja en el export/import de hosts.
+	// Fase 44: orden de inicio del terminal SSH (solo plataformas linux y windows). Una línea de 1 a 256 puntos de código,
+	// sin espacios en los extremos, sin controles \p{Cc} (tab y saltos incluidos) ni caracteres de formato \p{Cf} (bidi
+	// U+202A–202E y U+2066–2069, U+200B–200F, U+FEFF); vacía = el shell de siempre. El terminal la manda como exec con PTY
+	// en vez de abrir el shell. Viaja en el export/import de hosts (columna y clave startup_command). Un error de validación
+	// llega con metadata.field = "startup_command", como los demás campos del host.
 	StartupCommand string `protobuf:"bytes,14,opt,name=startup_command,json=startupCommand,proto3" json:"startup_command,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
@@ -769,12 +771,13 @@ func (x *ImportHostError) GetReason() string {
 
 type ImportHostItem struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	Host              *Device                `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`                                                     // el del archivo; credential_id vacío y credential_label la del archivo
-	Key               string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`                                                       // «dirección:puerto»: identifica al host en las decisiones
-	State             string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`                                                   // nuevo, igual o conflicto
-	Reason            string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`                                                 // solo en conflicto: direccion (reemplazar u omitir) o nombre (también renombrar)
-	ConflictsWith     string                 `protobuf:"bytes,5,opt,name=conflicts_with,json=conflictsWith,proto3" json:"conflicts_with,omitempty"`              // id del host guardado con el que choca o coincide
-	CredentialMissing bool                   `protobuf:"varint,6,opt,name=credential_missing,json=credentialMissing,proto3" json:"credential_missing,omitempty"` // trae etiqueta pero no hay (o hay varias) credencial con esa etiqueta: quedaría sin credencial
+	Host              *Device                `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`                                                       // el del archivo; credential_id vacío y credential_label la del archivo
+	Key               string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`                                                         // «dirección:puerto»: identifica al host en las decisiones
+	State             string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`                                                     // nuevo, igual o conflicto
+	Reason            string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`                                                   // solo en conflicto: direccion (reemplazar u omitir) o nombre (también renombrar)
+	ConflictsWith     string                 `protobuf:"bytes,5,opt,name=conflicts_with,json=conflictsWith,proto3" json:"conflicts_with,omitempty"`                // id del host guardado con el que choca o coincide
+	CredentialMissing bool                   `protobuf:"varint,6,opt,name=credential_missing,json=credentialMissing,proto3" json:"credential_missing,omitempty"`   // trae etiqueta pero no hay (o hay varias) credencial con esa etiqueta: quedaría sin credencial
+	HasStartupCommand bool                   `protobuf:"varint,7,opt,name=has_startup_command,json=hasStartupCommand,proto3" json:"has_startup_command,omitempty"` // fase 44: el host del archivo trae orden de inicio (va en host.startup_command); la UI la muestra antes de aplicar
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -847,6 +850,13 @@ func (x *ImportHostItem) GetConflictsWith() string {
 func (x *ImportHostItem) GetCredentialMissing() bool {
 	if x != nil {
 		return x.CredentialMissing
+	}
+	return false
+}
+
+func (x *ImportHostItem) GetHasStartupCommand() bool {
+	if x != nil {
+		return x.HasStartupCommand
 	}
 	return false
 }
@@ -1975,14 +1985,15 @@ const file_macuahuitl_v1_inventory_proto_rawDesc = "" +
 	"\x0fImportHostError\x12\x12\n" +
 	"\x04line\x18\x01 \x01(\x05R\x04line\x12\x14\n" +
 	"\x05field\x18\x02 \x01(\tR\x05field\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"\xd1\x01\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"\x81\x02\n" +
 	"\x0eImportHostItem\x12)\n" +
 	"\x04host\x18\x01 \x01(\v2\x15.macuahuitl.v1.DeviceR\x04host\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x14\n" +
 	"\x05state\x18\x03 \x01(\tR\x05state\x12\x16\n" +
 	"\x06reason\x18\x04 \x01(\tR\x06reason\x12%\n" +
 	"\x0econflicts_with\x18\x05 \x01(\tR\rconflictsWith\x12-\n" +
-	"\x12credential_missing\x18\x06 \x01(\bR\x11credentialMissing\"\xf2\x01\n" +
+	"\x12credential_missing\x18\x06 \x01(\bR\x11credentialMissing\x12.\n" +
+	"\x13has_startup_command\x18\a \x01(\bR\x11hasStartupCommand\"\xf2\x01\n" +
 	"\x1aPreviewImportHostsResponse\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x1d\n" +
 	"\n" +

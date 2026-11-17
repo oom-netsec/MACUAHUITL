@@ -30,8 +30,10 @@ type TerminalOpen struct {
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,5,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
 	Rows                        uint32                 `protobuf:"varint,6,opt,name=rows,proto3" json:"rows,omitempty"` // 0 = 24
 	Cols                        uint32                 `protobuf:"varint,7,opt,name=cols,proto3" json:"cols,omitempty"` // 0 = 200
-	// Fase 44: abrir un host guardado de la libreta. Con host_id, el núcleo toma la dirección, el puerto, la credencial
-	// y la orden de inicio del host; address, port y credential_id deben ir vacíos (InvalidArgument si no). Si el host
+	// Fase 44: abrir un host guardado de la libreta. host_id es EXCLUSIVO: el núcleo toma la dirección, el puerto, la
+	// credencial y la orden de inicio del host, y si el pedido trae además address, port o credential_id lo rechaza con
+	// InvalidArgument (terminal.err.host_and_address), sin conectar: no se combina un host guardado con otra dirección u
+	// otra credencial. Si el host
 	// tiene orden de inicio, se manda como exec con PTY en vez del shell y la sesión termina cuando esa orden termina.
 	// CheckDenied no aplica: es el terminal manual.
 	HostId string `protobuf:"bytes,8,opt,name=host_id,json=hostId,proto3" json:"host_id,omitempty"`
