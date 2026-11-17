@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"log"
 	"net"
 	"net/url"
 	"os"
@@ -101,6 +102,16 @@ type Result struct {
 	SHA256   string
 	Verified string // "", "ok" o "distinto"
 	Duration time.Duration
+}
+
+// URLName es el nombre local por omisión de una ruta de URL: el último tramo sin el prefijo de
+// dispositivo de Cisco (flash:c3560cx.bin, bootflash:/x), que no es un nombre válido en Windows.
+func URLName(p string) string {
+	b := path.Base(p)
+	if i := strings.LastIndexByte(b, ':'); i >= 0 {
+		b = b[i+1:]
+	}
+	return b
 }
 
 // Port da el puerto de la URL, o el estándar del esquema.
@@ -196,7 +207,7 @@ func Download(ctx context.Context, r Request) (Result, error) {
 	defer root.Close()
 	raw := r.Name
 	if raw == "" {
-		raw = path.Base(r.URL.Path)
+		raw = URLName(r.URL.Path)
 	}
 	name, err := fileserve.SafeName(raw)
 	if err != nil {
@@ -223,6 +234,7 @@ func Download(ctx context.Context, r Request) (Result, error) {
 	if err == nil {
 		r.track.finish()
 	}
+	fi, serr := f.Stat() // la identidad del archivo recibido, antes de cerrarlo
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
@@ -232,6 +244,11 @@ func Download(ctx context.Context, r Request) (Result, error) {
 			err = fmt.Errorf("%w (%v)", ctx.Err(), err)
 		}
 		return res, err
+	}
+	if serr == nil { // Windows: Zone.Identifier sobre la ruta interna, solo si sigue siendo este archivo; un fallo se anota
+		if merr := sys.MarkOfTheWebIfSame(dst, fi); merr != nil {
+			log.Printf("transfer: Mark of the Web not written for %s: %v", dst, merr)
+		}
 	}
 	res = Result{Path: dst, Bytes: sk.n, MD5: hex.EncodeToString(sk.md5.Sum(nil)), SHA256: hex.EncodeToString(sk.sha.Sum(nil)), Duration: time.Since(start)}
 	if r.WantSHA256 != "" || r.WantMD5 != "" {
