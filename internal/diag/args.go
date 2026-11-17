@@ -154,42 +154,29 @@ func Build(r Request) (bin string, argv []string, err error) {
 func buildWindows(r Request) (string, []string, error) { return build(r, true) }
 
 func build(r Request, win bool) (bin string, argv []string, err error) {
+	bin, argv, _, err = buildPlan(r, win)
+	return bin, argv, err
+}
+
+func buildPlan(r Request, win bool) (bin string, argv []string, plan PingPlan, err error) {
+	planOut := &plan
 	o := &opts{m: r.Options, used: map[string]bool{}}
 	switch r.Tool {
 	case Ping:
 		host, err := one(r, false)
 		if err != nil {
-			return "", nil, err
+			return "", nil, PingPlan{}, err
 		}
-		argv = []string{"-n"}
-		count, ok := o.num("count", 1, 100)
-		if !ok {
-			count = "4"
+		plan, pargv, err := pingArgs(o, host, win)
+		if err != nil {
+			return "", nil, PingPlan{}, err
 		}
-		if win { // Windows: -n es la cuenta, -l el tamaño, -w la espera; ping.exe no tiene intervalo
-			argv = []string{"-n", count}
-			if _, ok := o.m["interval"]; ok {
-				o.used["interval"] = true
-				o.fail(i18n.New("diag.err.opt_windows", i18n.A("key", "interval")))
-			}
-			if v, ok := o.num("size", 0, 65500); ok {
-				argv = append(argv, "-l", v)
-			}
-			bin, argv = "ping", append(argv, "-w", winWaitMs, host)
-			break
-		}
-		argv = append(argv, "-c", count)
-		if v, ok := o.num("interval", 0.2, 60); ok {
-			argv = append(argv, "-i", v)
-		}
-		if v, ok := o.num("size", 0, 65500); ok {
-			argv = append(argv, "-s", v)
-		}
-		bin, argv = "ping", append(argv, host)
+		bin, argv = "ping", pargv
+		*planOut = plan
 	case Traceroute:
 		host, err := one(r, false)
 		if err != nil {
-			return "", nil, err
+			return "", nil, PingPlan{}, err
 		}
 		if win { // tracert: -d sin DNS, -h saltos, -w espera
 			argv = []string{"-d"}
@@ -207,16 +194,16 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 	case Nmap:
 		host, err := one(r, true)
 		if err != nil {
-			return "", nil, err
+			return "", nil, PingPlan{}, err
 		}
 		scan, _ := o.str("scan", "connect", "syn", "udp", "ping")
 		if win && scan == "syn" { // necesita Npcap y sus privilegios; la beta de Windows no lo ofrece (ADR 0012, i)
-			return "", nil, i18n.New("diag.err.syn_windows", nil)
+			return "", nil, PingPlan{}, i18n.New("diag.err.syn_windows", nil)
 		}
 		argv = append(argv, map[string]string{"": "-sT", "connect": "-sT", "syn": "-sS", "udp": "-sU", "ping": "-sn"}[scan])
 		if v, ok := o.str("ports"); ok {
 			if !portsRe.MatchString(v) {
-				return "", nil, i18n.New("diag.err.ports", i18n.A("value", v))
+				return "", nil, PingPlan{}, i18n.New("diag.err.ports", i18n.A("value", v))
 			}
 			argv = append(argv, "-p", v)
 		}
@@ -237,14 +224,14 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 		case "client", "":
 			host, err := one(r, false)
 			if err != nil {
-				return "", nil, i18n.Wrap("diag.err.iperf_client", err, nil)
+				return "", nil, PingPlan{}, i18n.Wrap("diag.err.iperf_client", err, nil)
 			}
 			argv = []string{"-c", host}
 		case "server":
 			// Nunca en todas las interfaces: -B con una IP de esta máquina; puerto no privilegiado en Linux.
 			b, _ := o.str("bind")
 			if a, err := netip.ParseAddr(b); err != nil || !isLocalIP(a) || a.IsLinkLocalUnicast() { // -B sin zona falla con link-local
-				return "", nil, i18n.New("diag.err.iperf_bind", i18n.A("value", b))
+				return "", nil, PingPlan{}, i18n.New("diag.err.iperf_bind", i18n.A("value", b))
 			}
 			argv = []string{"-s", "-B", b}
 		}
@@ -275,10 +262,10 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 		bin = "iperf3"
 	case Pcap:
 		if len(r.Targets) != 0 {
-			return "", nil, i18n.New("diag.err.pcap_target", nil)
+			return "", nil, PingPlan{}, i18n.New("diag.err.pcap_target", nil)
 		}
 		if r.OutputDir == "" {
-			return "", nil, i18n.New("diag.err.pcap_dir", nil)
+			return "", nil, PingPlan{}, i18n.New("diag.err.pcap_dir", nil)
 		}
 		iface, ok := o.str("interface")
 		re := ifaceRe
@@ -287,7 +274,7 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 			iface = winIfaceName(iface, winAdapters()) // nombre amistoso -> NPF; el resultado también se valida
 		}
 		if !ok || !re.MatchString(iface) {
-			return "", nil, i18n.New("diag.err.pcap_iface", nil)
+			return "", nil, PingPlan{}, i18n.New("diag.err.pcap_iface", nil)
 		}
 		argv = []string{"-i", iface}
 		v, ok := o.num("seconds", 1, 3600)
@@ -305,15 +292,15 @@ func build(r Request, win bool) (bin string, argv []string, err error) {
 		}
 		bin = "dumpcap"
 	default:
-		return "", nil, i18n.New("diag.err.tool_unknown", i18n.A("tool", string(r.Tool)))
+		return "", nil, PingPlan{}, i18n.New("diag.err.tool_unknown", i18n.A("tool", string(r.Tool)))
 	}
 	if err := o.done(); err != nil {
-		return "", nil, err
+		return "", nil, PingPlan{}, err
 	}
 	if err := checkFlagLike(argv, win); err != nil {
-		return "", nil, err
+		return "", nil, PingPlan{}, err
 	}
-	return bin, argv, nil
+	return bin, argv, plan, nil
 }
 
 // checkFlagLike es la defensa final: ningún valor que venga del usuario puede parecer una bandera (en Windows, tampoco «/x»).
@@ -356,4 +343,5 @@ func isLocalIP(a netip.Addr) bool {
 var literalFlags = map[string]bool{"-B": true, "-n": true, "-c": true, "-i": true, "-s": true, "-m": true, "-sT": true, "-sS": true, "-sU": true, "-sn": true,
 	"-p": true, "-T0": true, "-T1": true, "-T2": true, "-T3": true, "-T4": true, "-T5": true, "-sV": true, "-6": true, "-oG": true, "-": true,
 	"-P": true, "-R": true, "-u": true, "-t": true, "-1": true, "-a": true, "-f": true, "-w": true,
-	"-l": true, "-h": true, "-d": true}
+	"-l": true, "-h": true, "-d": true,
+	"-I": true, "-M": true, "-W": true, "-Q": true, "-4": true, "-S": true}
