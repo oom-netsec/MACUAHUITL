@@ -56,3 +56,20 @@ func TestFormats(t *testing.T) {
 		t.Fatalf("jsonl = %q (%v)", b, err)
 	}
 }
+
+// M2: sanitize quita lo mismo que fileserve/reason.go: controles (C0, DEL, C1), formato Unicode (bidi, ancho cero, BOM) y los
+// separadores de línea y de párrafo; el Unicode normal (ñ, CJK, emoji) y el tab se quedan. El formato va ESCAPADO.
+func TestSanitizeQuitaFormatoUnicodeYSeparadores(t *testing.T) {
+	for nombre, in := range map[string]string{
+		"RLO": "a\u202eb", "LRI": "a\u2066b", "PDI": "a\u2069b", "ancho cero": "a\u200bb", "ZWNJ": "a\u200cb", "LRM": "a\u200eb", "ALM": "a\u061cb",
+		"BOM": "a\ufeffb", "soft hyphen": "a\u00adb", "Zl": "a\u2028b", "Zp": "a\u2029b", "NEL": "a\u0085b", "C1": "a\u009bb", "ESC": "a\x1bb", "NUL": "a\x00b",
+		"DEL": "a\x7fb", "tag": "a\U000e0041b",
+	} {
+		if got := sanitize([]byte(in)); got != "a.b" {
+			t.Errorf("%s: %q", nombre, got)
+		}
+	}
+	if got := sanitize([]byte("mañana\t日本 \U0001F600")); got != "mañana\t日本 \U0001F600" {
+		t.Errorf("Unicode normal: %q", got)
+	}
+}

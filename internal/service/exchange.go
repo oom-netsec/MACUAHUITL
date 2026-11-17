@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 
@@ -19,10 +20,31 @@ func AbsPath(ctx context.Context, p string) (string, error) {
 	return AbsPathReason(ctx, p, "file.err.path_abs")
 }
 
+// ClientPathOK dice si p sirve como ruta que manda el cliente: absoluta y, en Windows (OutputsGOOS), con letra de unidad: las UNC
+// (\\host\share, que abren SMB y filtran el hash NTLM), \\?\ y \\.\ no pasan. Úsala en vez de filepath.IsAbs con toda ruta del cliente.
+func ClientPathOK(p string) bool {
+	return filepath.IsAbs(p) && !(OutputsGOOS == "windows" && sys.NoDriveLetter(p))
+}
+
+// NoDrive dice si ClientPathOK rechazó p por faltarle la letra de unidad en Windows (UNC, \\?\, \\.\, \ suelta): no es una ruta
+// relativa, y decirlo así despistaría.
+func NoDrive(p string) bool {
+	return OutputsGOOS == "windows" && sys.NoDriveLetter(p) && (strings.HasPrefix(p, `\`) || strings.HasPrefix(p, "/"))
+}
+
+// ClientPathErr es el error de una ruta del cliente que ClientPathOK rechazó: file.err.no_drive si falta la letra de unidad en
+// Windows, y si no el código dado (ruta relativa).
+func ClientPathErr(ctx context.Context, p, code string, args i18n.Args) error {
+	if NoDrive(p) {
+		return Err(ctx, codes.InvalidArgument, "file.err.no_drive", i18n.A("path", p))
+	}
+	return Err(ctx, codes.InvalidArgument, code, args)
+}
+
 // AbsPathReason es AbsPath con el código del error de ruta relativa (el respaldo cifrado conserva el suyo).
 func AbsPathReason(ctx context.Context, p, reason string) (string, error) {
-	if !filepath.IsAbs(p) {
-		return "", Err(ctx, codes.InvalidArgument, reason, nil)
+	if !ClientPathOK(p) {
+		return "", ClientPathErr(ctx, p, reason, nil)
 	}
 	return filepath.Clean(p), nil
 }

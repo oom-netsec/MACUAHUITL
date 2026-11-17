@@ -66,8 +66,8 @@ func readSource(ctx context.Context, text, path string, max int) (string, error)
 		return text, nil
 	case path == "":
 		return "", service.Err(ctx, codes.InvalidArgument, "forensic.err.neither", nil)
-	case !filepath.IsAbs(path):
-		return "", service.Err(ctx, codes.InvalidArgument, "forensic.err.relative", nil)
+	case !service.ClientPathOK(path):
+		return "", service.ClientPathErr(ctx, path, "forensic.err.relative", nil)
 	}
 	f, err := sys.OpenRegular(filepath.Clean(path))
 	if errors.Is(err, sys.ErrNotRegular) {

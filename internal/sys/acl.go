@@ -7,8 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strings"
 )
 
 // SID conocidos (ADR 0012, c). El usuario no es fijo: es el SID del token del proceso.
@@ -169,4 +172,101 @@ func ignoreUnsupported(err error) error {
 		return nil
 	}
 	return err
+}
+
+// Quién puede escribir la carpeta además de su dueño (carpetas de transferencia de fileserve). En Windows Who son SID y User el SID
+// del usuario del proceso; en Linux Who son «g+w» y «o+w» (bits de grupo y otros) y User va vacío.
+type Writers struct {
+	Who          []string
+	User         string
+	ForeignOwner bool // el dueño de la carpeta es otro (Who lo incluye): cambiarlo exige privilegios, ninguna orden lo arregla
+	NoChmod      bool // Linux: los modos salen de las opciones de montaje (vfat, exfat): chmod no cambia nada, solo remontar
+}
+
+// FixCmd es la orden que quita a los escritores ajenos de dir ("" si no hay, si el dueño es otro (cambiarlo exige privilegios), si
+// el volumen no admite chmod o si la ruta o el SID no son seguros de pegar en una terminal). goos es el sistema (Windows: icacls).
+func FixCmd(goos, dir string, w Writers) string {
+	if len(w.Who) == 0 || w.ForeignOwner || w.NoChmod {
+		return ""
+	}
+	if goos == "windows" {
+		return IcaclsFix(dir, w.User, w.Who)
+	}
+	return ChmodFix(dir, w.Who)
+}
+
+// ForeignWriters abre la carpeta path y dice quién más escribe en ella (ver ForeignWritersFile). Un volumen sin permisos por
+// usuario (FAT, exFAT, ntfs-3g sin permissions) devuelve errors.ErrUnsupported.
+func ForeignWriters(path string) (Writers, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return Writers{}, err
+	}
+	defer f.Close()
+	return ForeignWritersFile(f)
+}
+
+// ForeignWritersRoot es ForeignWriters sobre una carpeta ya abierta (os.Root): lo que se mira es el handle, no la ruta.
+func ForeignWritersRoot(root *os.Root) (Writers, error) {
+	f, err := root.Open(".")
+	if err != nil {
+		return Writers{}, err
+	}
+	defer f.Close()
+	return ForeignWritersFile(f)
+}
+
+// foreignOwner: el dueño no es el usuario, SYSTEM ni Administradores (que el dueño sea Administradores es lo normal con un token elevado).
+func foreignOwner(owner, user string) bool {
+	return owner != user && owner != sidSystem && owner != sidAdmins
+}
+
+// foreignWriters: los SID ajenos (no el usuario, SYSTEM ni Administradores) con derecho de escritura sobre la carpeta misma o
+// sobre lo que se cree dentro (cuentan las ACE solo-herencia). Pura: se prueba en cualquier sistema.
+func foreignWriters(aces []ace, user string) []string {
+	return foreignSIDs(aces, user, writeMask, false, ancestorIgnore...)
+}
+
+// SafeShellPath son las rutas que se pueden poner en una orden de terminal sin citar: letras (también con acento), números y unos pocos
+// signos; nada de espacios, comillas, $ ni caracteres de formato (bidi).
+var SafeShellPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N}/._+,@%=:-]+$`)
+
+// SafeCmdPath son las rutas de Windows que van entre comillas en una orden de cmd sin que nada se expanda: sin %, !, ^, $ ni
+// comillas invertidas ni caracteres de formato (bidi).
+var SafeCmdPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N} :\\/._+,@=()-]+$`)
+
+// SIDRe es la forma de un SID en texto: lo único que puede ir dentro de las comillas de una orden icacls.
+var SIDRe = regexp.MustCompile(`^S-1-\d+(-\d+)*$`)
+
+// IcaclsFix arma la orden icacls (para cmd) que quita de path a los SID dados y deja el control solo al usuario, SYSTEM y
+// Administradores. Vacía si la ruta no es segura de pegar en cmd, si el usuario o algún SID no tiene forma de SID, o si no hay nada que quitar.
+func IcaclsFix(path, user string, sids []string) string {
+	if !SafeCmdPath.MatchString(path) || !SIDRe.MatchString(user) || len(sids) == 0 {
+		return ""
+	}
+	var rm []string
+	for _, sid := range sids {
+		if !SIDRe.MatchString(sid) {
+			return ""
+		}
+		rm = append(rm, `/remove "*`+sid+`"`)
+	}
+	return `icacls "` + path + `" /inheritance:r ` + strings.Join(rm, " ") + ` /grant:r "*` + user + `:(OI)(CI)F" "*` + sidSystem + `:(OI)(CI)F" "*` + sidAdmins + `:(OI)(CI)F"`
+}
+
+// ChmodFix arma «chmod go-w <ruta>» (o solo g-w u o-w); vacía si la ruta no es segura de pegar en una terminal.
+func ChmodFix(path string, who []string) string {
+	var bits []string
+	for _, w := range who {
+		switch w {
+		case "g+w":
+			bits = append(bits, "g-w")
+		case "o+w":
+			bits = append(bits, "o-w")
+		}
+	}
+	if !SafeShellPath.MatchString(path) || len(bits) == 0 {
+		return ""
+	}
+	return "chmod " + strings.Join(bits, ",") + " " + path
 }

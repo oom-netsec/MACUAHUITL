@@ -34,6 +34,12 @@ func hibernateWarnings(enabled uint64, err error) []i18n.Text {
 	return nil
 }
 
+// NoDriveLetter dice si p no empieza con «X:» (letra de unidad): \\?\C:\, \\.\, \??\ y las UNC (que abren SMB y filtran el hash
+// NTLM) saltarían las listas de rutas porque ni Clean ni EvalSymlinks les quitan el prefijo. Pura: se prueba en cualquier sistema.
+func NoDriveLetter(p string) bool {
+	return len(p) < 2 || p[1] != ':' || !(p[0] >= 'a' && p[0] <= 'z' || p[0] >= 'A' && p[0] <= 'Z')
+}
+
 // unsafeVolume dice si el volumen de una ruta (filepath.VolumeName) es algo distinto de una letra de unidad: UNC
 // (\\host\share abre SMB, sale a la red fuera de EgressGuard y filtra el hash NTLM), \\?\ y \\.\ (dispositivos y pipes).
 // Vacío (ruta relativa) y «X:» son lo único que pasa.

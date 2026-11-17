@@ -10,6 +10,7 @@ func init() {
 	e := func(es, en string, args ...string) entry { return entry{Es: es, En: en, Args: args} }
 	add(map[string]entry{
 		"prefs.outputs.relativa":              e("prefs.outputs.relativa: la ruta debe ser absoluta: {dir:q}", "prefs.outputs.relativa: the path must be absolute: {dir:q}", "dir"),
+		"prefs.outputs.sin_unidad":            e("prefs.outputs.sin_unidad: en Windows la carpeta debe empezar con una letra de unidad (C:\\...); no se aceptan rutas de red (\\\\servidor\\recurso) ni de dispositivo: {dir:q}", "prefs.outputs.sin_unidad: on Windows the folder must start with a drive letter (C:\\...); network (\\\\server\\share) and device paths are not accepted: {dir:q}", "dir"),
 		"prefs.outputs.punto_punto":           e("prefs.outputs.punto_punto: la ruta no puede llevar \"..\": {dir:q}", "prefs.outputs.punto_punto: the path cannot contain \"..\": {dir:q}", "dir"),
 		"prefs.outputs.no_existe":             e("prefs.outputs.no_existe: la carpeta no existe: {dir} (créala con permisos 0700)", "prefs.outputs.no_existe: the folder does not exist: {dir} (create it with 0700 permissions)", "dir"),
 		"prefs.outputs.ilegible":              e("prefs.outputs.ilegible: no se pudo leer la carpeta {dir}: {err}", "prefs.outputs.ilegible: could not read the folder {dir}: {err}", "dir", "err"),

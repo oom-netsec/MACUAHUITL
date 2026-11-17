@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
 // El output_dir de un trabajo pasa por la misma validación que la carpeta de salidas de Ajustes (fase 29e).
@@ -122,5 +123,22 @@ func TestCreateJobTipoDeTrabajo(t *testing.T) {
 	}
 	if got[adhoc] != "adhoc" || got["previo"] != "patrol" {
 		t.Fatalf("kinds recargados = %v (adhoc=%s)", got, adhoc)
+	}
+}
+
+// JobSpec.output_dir con UNC o ruta de dispositivo en Windows: rechazo antes de tocar la ruta (2.4).
+func TestCreateJobOutputDirUNCSeRechazaEnWindows(t *testing.T) {
+	old := service.OutputsGOOS
+	service.OutputsGOOS = "windows"
+	t.Cleanup(func() { service.OutputsGOOS = old })
+	h := newHarness(t, nil)
+	cred := h.ready(t)
+	for _, dir := range []string{`\\10.0.0.9\x\out`, `\\?\C:\x`} {
+		sp := h.spec(cred)
+		sp.OutputDir = dir
+		_, err := h.patrol.CreateJob(ctx(t), &v1.CreateJobRequest{Spec: sp})
+		if status.Code(err) != codes.InvalidArgument || !strings.HasPrefix(status.Convert(err).Message(), "prefs.outputs.sin_unidad:") {
+			t.Fatalf("%q: %v", dir, err)
+		}
 	}
 }

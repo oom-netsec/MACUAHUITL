@@ -6,7 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // Los prefijos de dispositivo y las UNC no pasan por la lista de carpetas sensibles: se rechazan.
@@ -45,5 +48,35 @@ func TestWindowsJunctionIntermediaHaciaCarpetaNegada(t *testing.T) {
 	if f, _, err := OpenFrom(filepath.Join(j, "sub"), "a.bin", prohibida); err == nil {
 		f.Close()
 		t.Error("OpenFrom por la junction debió rechazarse")
+	}
+}
+
+// 2.6: la carpeta negada pedida por su nombre corto 8.3 (PROGRA~1) se rechaza igual: la ruta final del handle es la larga.
+func TestWindowsNombreCortoDeCarpetaNegadaSeRechaza(t *testing.T) {
+	pf := os.Getenv("ProgramFiles")
+	if pf == "" {
+		t.Skip("sin ProgramFiles")
+	}
+	short := sys.ShortPath(pf)
+	if short == "" {
+		t.Skip("sin nombres cortos en este volumen")
+	}
+	if strings.EqualFold(short, pf) {
+		t.Skip("ProgramFiles no tiene nombre corto distinto")
+	}
+	for _, p := range []string{short, filepath.Join(short, "Common Files")} {
+		if r, _, err := OpenDir(p); err == nil {
+			r.Close()
+			t.Errorf("%s (8.3) debió rechazarse", p)
+		}
+	}
+}
+
+// 2.7: volumen por GUID (\\?\Volume{...}\) se rechaza antes de tocar la ruta.
+func TestWindowsVolumenPorGUIDSeRechaza(t *testing.T) {
+	for _, p := range []string{`\\?\Volume{12345678-1234-1234-1234-123456789abc}\x`, `\\?\GLOBALROOT\Device\HarddiskVolume1\x`, `\\.\PhysicalDrive0`} {
+		if _, err := ValidateDir(p); err == nil {
+			t.Errorf("%s debió rechazarse", p)
+		}
 	}
 }

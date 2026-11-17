@@ -4,7 +4,6 @@ package metrics
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 
 	"google.golang.org/grpc/codes"
@@ -43,8 +42,8 @@ func (s *svc) jobDir(ctx context.Context, jobID, dir string) (string, error) {
 	if dir == "" {
 		return "", service.Err(ctx, codes.InvalidArgument, "metrics.svc.no_source", nil)
 	}
-	if !filepath.IsAbs(dir) {
-		return "", service.Err(ctx, codes.InvalidArgument, "metrics.svc.relative", i18n.A("path", dir))
+	if !service.ClientPathOK(dir) {
+		return "", service.ClientPathErr(ctx, dir, "metrics.svc.relative", i18n.A("path", dir))
 	}
 	return dir, nil
 }

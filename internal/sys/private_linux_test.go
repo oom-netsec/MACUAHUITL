@@ -2,10 +2,17 @@ package sys
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"syscall"
 	"testing"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestPrivadasEnLinux(t *testing.T) {
@@ -124,5 +131,196 @@ func TestOpenNewPrivateYCreateTempPrivateEnLinux(t *testing.T) {
 	tmp.Close()
 	if ok, _ := IsPrivate(tmp.Name()); !ok {
 		t.Fatal("CreateTempPrivate no dejó 0600")
+	}
+}
+
+// fijaGrupo apunta /etc/group y /etc/passwd a archivos de prueba y hace que el usuario sea el gid de la carpeta d (uid = gid = el de d).
+func fijaGrupo(t *testing.T, d, group, passwd string) {
+	t.Helper()
+	gid := mustStat(t, d).Gid
+	dir := t.TempDir()
+	oldG, oldP, oldE, oldGid, oldACL := groupFile, passwdFile, geteuid, getegid, hasPosixACL
+	groupFile, passwdFile = filepath.Join(dir, "group"), filepath.Join(dir, "passwd")
+	if group != "-" {
+		os.WriteFile(groupFile, []byte(strings.ReplaceAll(group, "GID", strconv.Itoa(int(gid)))), 0o600)
+	}
+	if passwd != "-" {
+		os.WriteFile(passwdFile, []byte(strings.ReplaceAll(passwd, "GID", strconv.Itoa(int(gid)))), 0o600)
+	}
+	geteuid, getegid = func() uint32 { return gid }, func() uint32 { return gid }
+	hasPosixACL = func(*os.File) bool { return false }
+	t.Cleanup(func() { groupFile, passwdFile, geteuid, getegid, hasPosixACL = oldG, oldP, oldE, oldGid, oldACL })
+}
+
+func mustStat(t *testing.T, d string) *syscall.Stat_t {
+	t.Helper()
+	fi, err := os.Stat(d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return fi.Sys().(*syscall.Stat_t)
+}
+
+// R1: g+w se ignora solo si el grupo es el privado del usuario Y no tiene otros miembros; el bit de otros siempre cuenta.
+// Prueba la función REAL con /etc/group y /etc/passwd de prueba.
+func TestForeignWritersBitsDeGrupoYOtros(t *testing.T) {
+	gid := int(mustStat(t, t.TempDir()).Gid)
+	uid := gid
+	for _, c := range []struct {
+		nombre        string
+		modo          os.FileMode
+		group, passwd string
+		acl           bool
+		want          []string
+	}{
+		{"privado", 0o770, "yo:x:GID:\n", "yo:x:UID:GID::/:/bin/sh\n", false, nil},
+		{"0700", 0o700, "yo:x:GID:\n", "yo:x:UID:GID::/:/bin/sh\n", false, nil},
+		{"miembro suplementario", 0o770, "yo:x:GID:otro\n", "yo:x:UID:GID::/:/bin/sh\n", false, []string{"g+w"}},
+		{"otro con ese grupo primario", 0o770, "yo:x:GID:\n", "yo:x:UID:GID::/:/bin/sh\notro:x:9999:GID::/:/bin/sh\n", false, []string{"g+w"}},
+		{"grupo no listado (NSS)", 0o770, "x:x:5555:\n", "yo:x:UID:GID::/:/bin/sh\n", false, []string{"g+w"}},
+		{"sin /etc/group", 0o770, "-", "yo:x:UID:GID::/:/bin/sh\n", false, []string{"g+w"}},
+		{"sin /etc/passwd", 0o770, "yo:x:GID:\n", "-", false, []string{"g+w"}},
+		{"con ACL POSIX", 0o770, "yo:x:GID:\n", "yo:x:UID:GID::/:/bin/sh\n", true, []string{"g+w"}},
+		{"otros siempre", 0o707, "yo:x:GID:\n", "yo:x:UID:GID::/:/bin/sh\n", false, []string{"o+w"}},
+		{"compartido y otros", 0o777, "yo:x:GID:otro\n", "yo:x:UID:GID::/:/bin/sh\n", false, []string{"g+w", "o+w"}},
+	} {
+		d := t.TempDir()
+		os.Chmod(d, c.modo)
+		fijaGrupo(t, d, c.group, strings.ReplaceAll(c.passwd, "UID", strconv.Itoa(uid)))
+		if c.acl {
+			hasPosixACL = func(*os.File) bool { return true }
+		}
+		w, err := ForeignWriters(d)
+		who := slices.DeleteFunc(w.Who, func(x string) bool { return x == "owner" }) // el uid simulado no es el dueño real
+		if err != nil || !slices.Equal(who, c.want) {
+			t.Errorf("%s: %v %v, quería %v", c.nombre, w.Who, err, c.want)
+		}
+	}
+}
+
+// El grupo de la carpeta distinto del gid del usuario nunca es privado.
+func TestForeignWritersGrupoAjeno(t *testing.T) {
+	d := t.TempDir()
+	os.Chmod(d, 0o770)
+	fijaGrupo(t, d, "yo:x:GID:\n", "-")
+	getegid = func() uint32 { return mustStat(t, d).Gid + 1 }
+	if w, _ := ForeignWriters(d); !slices.Equal(w.Who, []string{"g+w"}) {
+		t.Errorf("%v", w.Who)
+	}
+}
+
+// M3: un dueño que no es el usuario se cuenta («owner», sin orden posible).
+func TestForeignWritersDuenoAjeno(t *testing.T) {
+	d := t.TempDir()
+	fijaGrupo(t, d, "yo:x:GID:\n", "-")
+	geteuid = func() uint32 { return mustStat(t, d).Uid + 1 }
+	w, err := ForeignWriters(d)
+	if err != nil || !w.ForeignOwner || !slices.Contains(w.Who, "owner") {
+		t.Errorf("%+v %v", w, err)
+	}
+}
+
+// En un volumen común el xattr del ACL POSIX no existe (o no hay soporte): no cuenta como ACL.
+func TestHasPosixACLRealSinACL(t *testing.T) {
+	f, err := os.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if hasPosixACL(f) {
+		t.Error("una carpeta nueva no lleva ACL POSIX")
+	}
+}
+
+// R2: ntfs-3g sin «permissions» (fuseblk sin default_permissions) no tiene permisos por usuario; con ellas, sí; otros sistemas, sí.
+func TestNoPermsFuse(t *testing.T) {
+	const dev = 8<<8 | 1 // 8:1
+	for _, c := range []struct {
+		linea string
+		want  bool
+	}{
+		{"40 25 8:1 / /mnt rw - fuseblk /dev/sda1 rw,user_id=0,group_id=0,allow_other,blksize=4096", true},
+		{"40 25 8:1 / /mnt rw - fuseblk /dev/sda1 rw,user_id=0,group_id=0,default_permissions,allow_other", false},
+		{"40 25 8:1 / /mnt rw - fuse.ntfs-3g /dev/sda1 rw,user_id=0", true},
+		{"40 25 8:1 / /mnt rw - fuse.sshfs u@h:/ rw,user_id=0", true},
+		{"40 25 8:1 / /mnt rw - fuse.sshfs u@h:/ rw,user_id=0,default_permissions", false},
+		{"40 25 8:1 / /mnt rw - ext4 /dev/sda1 rw", false},
+		{"40 25 8:2 / /mnt rw - fuseblk /dev/sda2 rw", false}, // otro dispositivo
+	} {
+		if got := noPermsFuse(c.linea+"\n", dev); got != c.want {
+			t.Errorf("%q: %v", c.linea, got)
+		}
+	}
+}
+
+// Un FUSE montado por otro usuario (user_id= distinto del euid y de 0) es de ese usuario; el propio, root o sin user_id, no.
+func TestFuseForeignOwner(t *testing.T) {
+	const dev = 8<<8 | 1
+	old := geteuid
+	geteuid = func() uint32 { return 1000 }
+	t.Cleanup(func() { geteuid = old })
+	for _, c := range []struct {
+		linea string
+		want  bool
+	}{
+		{"40 25 8:1 / /mnt rw - fuseblk /dev/sda1 rw,user_id=1001,group_id=1001,default_permissions", true},
+		{"40 25 8:1 / /mnt rw - fuse.sshfs u@h:/ rw,user_id=1000,group_id=1000", false},
+		{"40 25 8:1 / /mnt rw - fuseblk /dev/sda1 rw,user_id=0,group_id=0", false},
+		{"40 25 8:1 / /mnt rw - fuse.sshfs u@h:/ rw", false},
+		{"40 25 8:1 / /mnt rw - ext4 /dev/sda1 rw,user_id=1001", false},
+	} {
+		if got := fuseForeignOwner(c.linea+"\n", dev); got != c.want {
+			t.Errorf("%q: %v", c.linea, got)
+		}
+	}
+}
+
+// fijaVolumen simula el tipo de volumen de la carpeta abierta.
+func fijaVolumen(t *testing.T, fuse, fat bool, info string) {
+	t.Helper()
+	old := volumeKind
+	volumeKind = func(*os.File, *syscall.Stat_t) (bool, bool, string) { return fuse, fat, info }
+	t.Cleanup(func() { volumeKind = old })
+}
+
+// vfat/exfat: los bits de modo del montaje se evalúan (con NoChmod); FUSE sin default_permissions no se sabe; FUSE de otro usuario es ajeno.
+func TestForeignWritersVolumenesSinChmod(t *testing.T) {
+	d := t.TempDir()
+	fijaGrupo(t, d, "yo:x:GID:\n", "-")
+	st := mustStat(t, d)
+	geteuid = func() uint32 { return st.Uid }
+	fijaVolumen(t, false, true, "")
+	os.Chmod(d, 0o700)
+	if w, err := ForeignWriters(d); err != nil || len(w.Who) != 0 || !w.NoChmod {
+		t.Errorf("fat privado: %+v %v", w, err)
+	}
+	os.Chmod(d, 0o707)
+	if w, err := ForeignWriters(d); err != nil || !slices.Equal(w.Who, []string{"o+w"}) || !w.NoChmod {
+		t.Errorf("fat o+w: %+v %v", w, err)
+	}
+	info := fmt.Sprintf("40 25 %d:%d / /mnt rw - fuseblk /dev/sda1 rw,user_id=%%d\n", unix.Major(st.Dev), unix.Minor(st.Dev))
+	fijaVolumen(t, true, false, fmt.Sprintf(info, st.Uid))
+	if _, err := ForeignWriters(d); !errors.Is(err, errors.ErrUnsupported) {
+		t.Errorf("fuse sin default_permissions: %v", err)
+	}
+	fijaVolumen(t, true, false, fmt.Sprintf(info, st.Uid+1))
+	if w, err := ForeignWriters(d); err != nil || !w.ForeignOwner {
+		t.Errorf("fuse de otro usuario: %+v %v", w, err)
+	}
+}
+
+// Una línea NIS («+», «-») en /etc/group o /etc/passwd trae miembros que el archivo no lista: el grupo cuenta como compartido.
+func TestGroupSharedLineasNIS(t *testing.T) {
+	d := t.TempDir()
+	os.Chmod(d, 0o770)
+	for _, c := range []struct{ group, passwd string }{
+		{"yo:x:GID:\n+::0:\n", "yo:x:UID:GID::/:/bin/sh\n"},
+		{"yo:x:GID:\n", "yo:x:UID:GID::/:/bin/sh\n+::::::\n"},
+		{"yo:x:GID:\n-@x:::\n", "yo:x:UID:GID::/:/bin/sh\n"},
+	} {
+		fijaGrupo(t, d, c.group, strings.ReplaceAll(c.passwd, "UID", strconv.Itoa(int(mustStat(t, d).Gid))))
+		if !groupShared(mustStat(t, d).Gid, mustStat(t, d).Gid) {
+			t.Errorf("debía contar como compartido: %q %q", c.group, c.passwd)
+		}
 	}
 }

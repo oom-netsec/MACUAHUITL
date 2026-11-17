@@ -78,3 +78,37 @@ func TestElevadoNoArranca(t *testing.T) {
 		t.Fatalf("err = %v, quería %s", err, want)
 	}
 }
+
+// HOME vacío o relativo (3.1/3.2): el núcleo no arranca, con un error claro y sin crear nada relativo al directorio actual.
+func TestHomeInvalidoNoArranca(t *testing.T) {
+	defer func(l string) { consoleLang = l }(consoleLang)
+	if os.Geteuid() == 0 {
+		t.Skip("root")
+	}
+	d := t.TempDir()
+	t.Chdir(d)
+	t.Setenv("XDG_RUNTIME_DIR", d)
+	for _, v := range []string{"HOME", "USERPROFILE"} {
+		t.Setenv(v, "")
+	}
+	if runtime.GOOS == "windows" {
+		t.Setenv("LOCALAPPDATA", d)
+	}
+	for lang, want := range map[string]string{"en": "is not set or is not an absolute path", "es": "no es una ruta absoluta"} {
+		consoleLang = lang
+		for _, home := range []string{"", "rel"} {
+			t.Setenv("HOME", home)
+			if runtime.GOOS == "windows" {
+				t.Setenv("USERPROFILE", home)
+			}
+			err := run(func() ([]i18n.Text, error) { return nil, nil })
+			var ie *i18n.Error
+			if err == nil || !strings.Contains(err.Error(), want) || !errors.As(err, &ie) || ie.Code != "harden.err.home" {
+				t.Errorf("%s HOME=%q: %v", lang, home, err)
+			}
+		}
+	}
+	if es, _ := os.ReadDir(d); len(es) != 0 {
+		t.Fatalf("creó cosas en el directorio actual: %v", es)
+	}
+}

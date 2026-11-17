@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -32,6 +33,19 @@ func readACL(path string) (owner string, protected bool, aces []ace, err error) 
 	if err != nil {
 		return "", false, nil, err
 	}
+	return parseSD(sd)
+}
+
+// readACLHandle es readACL sobre un handle abierto: lo que se lee es lo que se abrió, no lo que la ruta nombra ahora.
+func readACLHandle(h windows.Handle) (owner string, protected bool, aces []ace, err error) {
+	sd, err := windows.GetSecurityInfo(h, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION)
+	if err != nil {
+		return "", false, nil, err
+	}
+	return parseSD(sd)
+}
+
+func parseSD(sd *windows.SECURITY_DESCRIPTOR) (owner string, protected bool, aces []ace, err error) {
 	o, _, err := sd.Owner()
 	if err != nil {
 		return "", false, nil, err
@@ -325,4 +339,39 @@ func PrivateDir(path string) error {
 			return nil
 		}
 	}
+}
+
+// FILE_PERSISTENT_ACLS (fileapi.h): el volumen guarda ACL (NTFS, ReFS); FAT y exFAT no.
+const filePersistentACLs = 0x8
+
+// ForeignWritersFile dice qué SID, además del usuario, SYSTEM y Administradores, tienen en la DACL derecho de escribir en la
+// carpeta abierta f o en lo que se cree dentro, y cuenta al dueño si no es el usuario, SYSTEM ni Administradores (ForeignOwner:
+// cambiarlo exige privilegios). User es el SID del usuario (para la orden icacls). Un volumen sin ACL persistentes (FAT, exFAT)
+// devuelve errors.ErrUnsupported; en NTFS una DACL nula es Everyone con todo y cuenta. shortcut: no mira la pertenencia a grupos ni
+// los derechos efectivos (AccessCheck), igual que PrivateDir.
+func ForeignWritersFile(f *os.File) (Writers, error) {
+	h := windows.Handle(f.Fd())
+	var flags uint32
+	if err := windows.GetVolumeInformationByHandle(h, nil, 0, nil, nil, &flags, nil, 0); err != nil {
+		return Writers{}, err
+	}
+	if flags&filePersistentACLs == 0 {
+		return Writers{}, errors.ErrUnsupported
+	}
+	user, err := currentSID()
+	if err != nil {
+		return Writers{}, err
+	}
+	owner, _, aces, err := readACLHandle(h)
+	if err != nil {
+		return Writers{}, err
+	}
+	w := Writers{Who: foreignWriters(aces, user.String()), User: user.String()}
+	if foreignOwner(owner, user.String()) {
+		w.ForeignOwner = true
+		if !slices.Contains(w.Who, owner) {
+			w.Who = append(w.Who, owner)
+		}
+	}
+	return w, nil
 }

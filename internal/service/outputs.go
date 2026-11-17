@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -22,20 +21,29 @@ var (
 	// AncestorInfo da el modo y el dueño de un ancestro de la carpeta (sin seguir enlaces).
 	AncestorInfo = RealAncestorInfo
 	CreateTemp   = os.CreateTemp
+	// OutputsGOOS es el sistema para la regla «solo X:\» (en Linux una ruta con \ es solo un nombre raro): las pruebas simulan Windows.
+	OutputsGOOS = runtime.GOOS
+	// RemoteDrive dice si la unidad de la ruta es una de red mapeada (Windows, DRIVE_REMOTE); las pruebas la simulan.
+	RemoteDrive = sys.IsRemoteDrive
 )
 
-// safeShellPath son las rutas que se pueden poner en una orden de terminal sin citar: letras (también con acento),
-// números y unos pocos signos; nada de espacios, comillas, $ ni caracteres de formato (bidi).
-var safeShellPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N}/._+,@%=:-]+$`)
+// safeShellPath y safeCmdPath: ver sys.SafeShellPath y sys.SafeCmdPath (la misma regla para fileserve).
+var (
+	safeShellPath = sys.SafeShellPath
+	safeCmdPath   = sys.SafeCmdPath
+	sidRe         = sys.SIDRe
+)
+
+// noLocalDrive: en Windows, la ruta no empieza con letra de unidad (UNC, \\?\, \\.\) o esa unidad es de red (la ACL y el dueño de un
+// recurso remoto no son los de este equipo).
+func noLocalDrive(p string) bool {
+	return OutputsGOOS == "windows" && (sys.NoDriveLetter(p) || RemoteDrive(p))
+}
 
 // driveRoot: la raíz de una unidad de Windows (D:\), el equivalente de «/» (en Linux ninguna ruta tiene esa forma).
 func driveRoot(p string) bool {
 	return len(p) == 3 && p[1] == ':' && (p[2] == '\\' || p[2] == '/') && ('a' <= p[0]|0x20 && p[0]|0x20 <= 'z')
 }
-
-// safeCmdPath son las rutas de Windows que van entre comillas en una orden de cmd sin que nada se expanda: sin %, !, ^,
-// $ ni comillas invertidas ni caracteres de formato (bidi).
-var safeCmdPath = regexp.MustCompile(`^[\p{L}\p{M}\p{N} :\\/._+,@=()-]+$`)
 
 // outputsErr arma el error del código prefs.outputs.<motivo> (el prefijo va dentro del texto de es y de en).
 func outputsErr(code string, kv ...any) error {
@@ -60,18 +68,31 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 	if dir == "" {
 		return "", nil
 	}
+	// Una relativa simple (sin barra inicial ni «X:») conserva su motivo propio.
+	if !strings.ContainsAny(dir[:1], `\/`) && !(len(dir) > 1 && dir[1] == ':') && !filepath.IsAbs(dir) {
+		return "", outputsErr("prefs.outputs.relativa", "dir", dir)
+	}
+	// Antes de IsAbs, EvalSymlinks o Stat: una UNC (\\host\share) es absoluta para Windows y tocarla abre SMB y filtra el hash NTLM.
+	if noLocalDrive(dir) {
+		return "", outputsErr("prefs.outputs.sin_unidad", "dir", dir)
+	}
 	if !filepath.IsAbs(dir) {
 		return "", outputsErr("prefs.outputs.relativa", "dir", dir)
 	}
 	if slices.Contains(strings.Split(dir, string(filepath.Separator)), "..") {
 		return "", outputsErr("prefs.outputs.punto_punto", "dir", dir)
 	}
+	// shortcut: EvalSymlinks ya resolvió (y abrió SMB si el enlace apuntaba a una UNC) antes de poder comprobar el destino. Solo el propio
+	// usuario crea enlaces en sus carpetas; el hash NTLM que se filtra es el suyo (docs/security/THREAT_MODEL.md). Subir de nivel: resolver a mano, componente a componente.
 	real, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return "", outputsErr("prefs.outputs.no_existe", "dir", dir)
 		}
 		return "", outputsErr("prefs.outputs.ilegible", "dir", dir, "err", err)
+	}
+	if noLocalDrive(real) { // un enlace o junction puede llevar a una UNC o a una unidad de red aunque dir parezca local
+		return "", outputsErr("prefs.outputs.sin_unidad", "dir", real)
 	}
 	fi, err := os.Stat(real)
 	if err != nil {
@@ -169,11 +190,11 @@ func windowsOutputsErr(real string, err error) error {
 		}
 		var rm []string
 		for _, sid := range pe.SIDs {
-			if strings.HasPrefix(sid, "S-1-") { // «enlace» o «tipo-ace-N» no son SID: no hay nada que quitar con icacls
+			if sidRe.MatchString(sid) { // «enlace» o «tipo-ace-N» no son SID: no hay nada que quitar con icacls
 				rm = append(rm, `/remove "*`+sid+`"`)
 			}
 		}
-		if len(rm) == 0 || !strings.HasPrefix(pe.User, "S-1-") {
+		if len(rm) == 0 || !sidRe.MatchString(pe.User) {
 			code = "prefs.outputs.permisos" // sin orden: una junction o un tipo de ACE raro no se arreglan con icacls
 		}
 		return outputsErr(code+"_win", "dir", real, "sid", pe.SID, "remove", strings.Join(rm, " "), "user", pe.User)

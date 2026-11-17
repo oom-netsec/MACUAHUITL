@@ -1,6 +1,7 @@
 package fileserve
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/user"
@@ -33,9 +34,7 @@ var exigeUnidad = runtime.GOOS == "windows"
 
 // sinLetraDeUnidad dice si p no empieza con «X:» (letra de unidad): \\?\C:\, \\.\, \??\ y las UNC saltarían la
 // lista de Windows porque ni Clean ni EvalSymlinks les quitan el prefijo. Pura: se prueba en cualquier sistema.
-func sinLetraDeUnidad(p string) bool {
-	return len(p) < 2 || p[1] != ':' || !(p[0] >= 'a' && p[0] <= 'z' || p[0] >= 'A' && p[0] <= 'Z')
-}
+func sinLetraDeUnidad(p string) bool { return sys.NoDriveLetter(p) }
 
 // finalPath es la ruta real de un handle abierto (sys.FinalPath); variable para simularla en pruebas.
 var finalPath = sys.FinalPath
@@ -77,6 +76,27 @@ func windowsSensitiveDirs() []string {
 	return out
 }
 
+// documentsDir es la carpeta Documentos que dice el shell (sys.DocumentsDir); variable para simularla en pruebas.
+var documentsDir = sys.DocumentsDir
+
+// powerShellProfiles son las carpetas de perfil de PowerShell que Windows ejecuta al abrir una consola, bajo cada Documents (la del
+// perfil, la de OneDrive y las de las variables OneDrive*: con la redirección de carpetas Documents vive en OneDrive).
+func powerShellProfiles(docs ...string) []string {
+	for _, env := range []string{"OneDrive", "OneDriveConsumer", "OneDriveCommercial"} {
+		if v := os.Getenv(env); filepath.IsAbs(v) {
+			docs = append(docs, filepath.Join(v, "Documents"))
+		}
+	}
+	if d := documentsDir(); filepath.IsAbs(d) { // localizada («Documentos») o movida a otra unidad
+		docs = append(docs, d)
+	}
+	var out []string
+	for _, d := range docs {
+		out = append(out, filepath.Join(d, "WindowsPowerShell"), filepath.Join(d, "PowerShell"))
+	}
+	return out
+}
+
 func denyList(extra []string) []string {
 	out := append([]string(nil), sensitiveDirs...)
 	if goos == "windows" {
@@ -89,6 +109,7 @@ func denyList(extra []string) []string {
 			}
 			if goos == "windows" { // AppData guarda credenciales y la carpeta Inicio (Startup) ejecuta lo que haya
 				out = append(out, filepath.Join(hm, "AppData"))
+				out = append(out, powerShellProfiles(filepath.Join(hm, "Documents"), filepath.Join(hm, "OneDrive", "Documents"))...)
 			}
 		}
 	}
@@ -329,4 +350,86 @@ func hiddenUnderHome(p string) string {
 		}
 	}
 	return ""
+}
+
+// foreignWriters es variable para simular los escritores ajenos en las pruebas. Con root mira la carpeta ya abierta (el handle), sin root la ruta.
+var foreignWriters = func(dir string, root *os.Root) (sys.Writers, error) {
+	if root != nil {
+		return sys.ForeignWritersRoot(root)
+	}
+	return sys.ForeignWriters(dir)
+}
+
+// ajenos dice quién más escribe en dir (Linux: «g+w», «o+w», «owner»; Windows: SID) y la orden que lo arregla (sys.FixCmd: "" si no es
+// segura de pegar o si el dueño es otro). Un volumen sin permisos por usuario (FUSE sin default_permissions, FAT sin ACL en Windows)
+// devuelve errors.ErrUnsupported y no se sabe nada más; cualquier otro error es de quien llama.
+func ajenos(dir string, root *os.Root) (w sys.Writers, fix string, err error) {
+	w, err = foreignWriters(dir, root)
+	if err != nil || len(w.Who) == 0 {
+		return sys.Writers{}, "", err
+	}
+	return w, sys.FixCmd(goos, dir, w), nil
+}
+
+// checkRecvOwn rechaza la carpeta de RECEPCIÓN (abierta como root) si otro usuario puede escribir en ella: podría plantar o cambiar lo
+// recibido. Falla cerrado: solo un volumen sin permisos por usuario pasa (con el aviso de ServerHintIn); cualquier otro error rechaza.
+func checkRecvOwn(dir string, root *os.Root) error {
+	w, fix, err := ajenos(dir, root)
+	who := w.Who
+	if errors.Is(err, errors.ErrUnsupported) {
+		return nil
+	}
+	if err != nil {
+		return i18n.New("fileserve.err.recv_dir_perm", i18n.A("dir", dir, "err", err.Error()))
+	}
+	if len(who) == 0 || w.NoChmod && !w.ForeignOwner { // vfat/exfat: chmod no sirve; el aviso (dirWarnings) dice que el volumen no tiene permisos por usuario
+		return nil
+	}
+	if fix != "" {
+		return i18n.New("fileserve.err.recv_dir_open_cmd", i18n.A("dir", dir, "who", sys.WhoCodes(who), "cmd", fix))
+	}
+	return i18n.New("fileserve.err.recv_dir_open", i18n.A("dir", dir, "who", sys.WhoCodes(who)))
+}
+
+// dirWarnings son los avisos (sin rechazo) de las carpetas de PUBLICACIÓN (FromDir y la carpeta de cada archivo suelto) y de
+// RECEPCIÓN, en el idioma loc: escritores ajenos, volumen sin permisos por usuario o permisos que no se pudieron leer.
+func dirWarnings(loc string, c Config) []string {
+	type d struct{ dir, kind string }
+	var dirs []d
+	if c.FromDir != "" {
+		dirs = append(dirs, d{c.FromDir, "from"})
+	}
+	for _, f := range c.Files {
+		dirs = append(dirs, d{filepath.Dir(f), "from"})
+	}
+	if c.Write && c.RecvDir != "" {
+		dirs = append(dirs, d{c.RecvDir, "recv"})
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, e := range dirs {
+		dir := e.dir
+		if r, err := evalSymlinks(dir); err == nil {
+			dir = r
+		}
+		if seen[dir+"|"+e.kind] {
+			continue
+		}
+		seen[dir+"|"+e.kind] = true
+		w, fix, err := ajenos(dir, nil)
+		who := w.Who
+		switch {
+		case errors.Is(err, errors.ErrUnsupported), len(who) > 0 && w.NoChmod && !w.ForeignOwner && e.kind == "recv":
+			out = append(out, i18n.Msg(loc, "fileserve.hint.warn_noperms_"+e.kind, i18n.A("dir", dir)))
+		case err != nil:
+			out = append(out, i18n.Msg(loc, "fileserve.hint.warn_unverified", i18n.A("dir", dir, "err", err.Error())))
+		case len(who) > 0 && e.kind == "from": // en recepción esto ya se rechazó
+			code := "fileserve.hint.warn_from_writable"
+			if fix != "" {
+				code += "_cmd"
+			}
+			out = append(out, i18n.Msg(loc, code, i18n.A("dir", dir, "who", strings.Join(who, ", "), "cmd", fix)))
+		}
+	}
+	return out
 }

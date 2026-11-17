@@ -48,8 +48,8 @@ func (s *visibilitySvc) BuildTopology(ctx context.Context, r *v1.BuildTopologyRe
 		return nil, service.Err(ctx, codes.InvalidArgument, "visibility.err.no_source", nil)
 	}
 	for _, p := range []string{dir, r.PcapPath} {
-		if p != "" && !filepath.IsAbs(p) {
-			return nil, service.Err(ctx, codes.InvalidArgument, "visibility.err.relative", i18n.A("path", p))
+		if p != "" && !service.ClientPathOK(p) {
+			return nil, service.ClientPathErr(ctx, p, "visibility.err.relative", i18n.A("path", p))
 		}
 	}
 	s.d.Audit("visibility.topo", strings.TrimSpace(dir+" "+r.PcapPath), r.JobId)
@@ -348,8 +348,8 @@ func (s *visibilitySvc) gnmiTarget(ctx context.Context, t *v1.GnmiTarget, id str
 	}
 	gt := gnmic.Target{Host: t.Host, Port: uint16(t.Port), ServerName: t.ServerName, Timeout: service.MS(t.TimeoutMs, 0)}
 	if t.CaPath != "" {
-		if !filepath.IsAbs(t.CaPath) {
-			return gnmic.Target{}, service.Err(ctx, codes.InvalidArgument, "visibility.err.ca_relative", nil)
+		if !service.ClientPathOK(t.CaPath) {
+			return gnmic.Target{}, service.ClientPathErr(ctx, t.CaPath, "visibility.err.ca_relative", nil)
 		}
 		b, err := os.ReadFile(t.CaPath)
 		if err != nil {

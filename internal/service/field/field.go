@@ -35,19 +35,27 @@ func (s *fieldSvc) ListSerialPorts(context.Context, *v1.ListSerialPortsRequest) 
 }
 
 // outFile crea outputs/<sub>/<prefijo>_<hora>.log con 0600. Nunca abre un archivo que ya existe ni sigue un
-// enlace (O_EXCL|O_NOFOLLOW): si el nombre está ocupado, prueba con un sufijo.
+// enlace (O_EXCL|O_NOFOLLOW): si el nombre está ocupado, prueba con un sufijo. La carpeta de salidas se abre UNA vez
+// (os.Root) y la subcarpeta y el archivo van por ese handle: cambiar una carpeta por un enlace o una junction después
+// no desvía la escritura (solo se evita lo que sale del handle: el resto de la ruta se resolvió al abrirlo).
 func (s *fieldSvc) outFile(sub, prefix string) (*os.File, error) {
-	dir := filepath.Join(s.d.Outputs(), sub)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	root, err := sys.OpenOutDir(s.d.Outputs())
+	if err != nil {
 		return nil, i18n.Wrap("ingest.err.out_dir", err, nil)
 	}
+	defer root.Close()
+	dir, err := sys.MkdirOpenIn(root, sub)
+	if err != nil {
+		return nil, i18n.Wrap("ingest.err.out_dir", err, nil)
+	}
+	defer dir.Close()
 	base := prefix + "_" + s.d.Now().Format("20060102-150405")
 	for n := 0; n < 100; n++ {
 		name := base + ".log"
 		if n > 0 {
 			name = fmt.Sprintf("%s_%d.log", base, n)
 		}
-		f, err := os.OpenFile(filepath.Join(dir, name), os.O_CREATE|os.O_EXCL|os.O_WRONLY|os.O_APPEND|sys.ONoFollow, 0o600)
+		f, err := sys.OpenNewPrivateIn(dir, name)
 		if errors.Is(err, fs.ErrExist) {
 			continue
 		}

@@ -101,7 +101,13 @@ func run(harden func() ([]i18n.Text, error)) error {
 	}
 	p := core.ResolvePaths(os.Getenv)
 	if p.Config == "" || p.Data == "" || p.State == "" {
-		return consoleErr{i18n.New("harden.err.localappdata", nil)} // solo Windows: no se cae a %APPDATA%
+		if runtime.GOOS != "windows" { // en Linux Config, Data y State salen vacías solo si HOME no es absoluto y no hay XDG
+			return consoleErr{i18n.New("harden.err.home", nil)}
+		}
+		return consoleErr{i18n.New("harden.err.localappdata", nil)} // no se cae a %APPDATA%
+	}
+	if p.Home == "" || p.Outputs == "" { // HOME (USERPROFILE en Windows) vacío, relativo o inválido: las carpetas de salida serían relativas o no existirían
+		return consoleErr{i18n.New("harden.err.home", nil)}
 	}
 	if runtime.GOOS != "windows" && p.Runtime == "" { // en Windows no hay carpeta runtime: el canal es un named pipe
 		return consoleErr{i18n.New("harden.err.runtime_dir", nil)}

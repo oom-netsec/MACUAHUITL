@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
 )
 
 func fakeDiagBin() string {
@@ -199,5 +200,24 @@ func TestDiagValidaOutputDirComoAjustes(t *testing.T) {
 	os.Mkdir(propia, 0o700)
 	if err := correr(propia); err != nil {
 		t.Fatalf("0700 propia debía aceptarse: %v", err)
+	}
+}
+
+// diag OutputDir con UNC o ruta de dispositivo en Windows: rechazo antes de tocar la ruta (2.4).
+func TestDiagOutputDirUNCSeRechazaEnWindows(t *testing.T) {
+	soloLinuxDiag(t)
+	old := service.OutputsGOOS
+	service.OutputsGOOS = "windows"
+	t.Cleanup(func() { service.OutputsGOOS = old })
+	h := newHarness(t, withFakeTools)
+	d := v1.NewDiagServiceClient(h.conn)
+	for _, dir := range []string{`\\10.0.0.9\x\out`, `\\.\pipe\x`} {
+		st, err := d.Run(ctx(t), &v1.RunRequest{Tool: v1.DiagTool_DIAG_TOOL_PING, Targets: []*v1.Target{{Address: "192.0.2.1"}}, OutputDir: dir})
+		if err == nil {
+			_, err = st.Recv()
+		}
+		if status.Code(err) != codes.InvalidArgument || !strings.Contains(err.Error(), "prefs.outputs.sin_unidad:") {
+			t.Fatalf("%q: %v", dir, err)
+		}
 	}
 }

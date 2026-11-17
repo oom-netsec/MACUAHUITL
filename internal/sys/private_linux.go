@@ -1,8 +1,16 @@
 package sys
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 // MkdirPrivate crea la carpeta y sus padres con 0700 (ADR 0012, c); la ruta debe ser absoluta. En Windows la deja con
@@ -84,4 +92,151 @@ func PrivateDir(path string) error {
 			return nil
 		}
 	}
+}
+
+// Ganchos de las pruebas de ForeignWriters.
+var (
+	geteuid, getegid = func() uint32 { return uint32(os.Geteuid()) }, func() uint32 { return uint32(os.Getegid()) }
+	groupFile        = "/etc/group"
+	passwdFile       = "/etc/passwd"
+	mountInfoFile    = "/proc/self/mountinfo"
+	// hasPosixACL: la carpeta lleva un ACL POSIX de acceso (system.posix_acl_access): los bits de grupo ya no dicen quién escribe.
+	// Sin xattr o sin soporte, no; cualquier otro error (no se sabe) cuenta como que sí.
+	hasPosixACL = func(f *os.File) bool {
+		_, err := unix.Fgetxattr(int(f.Fd()), "system.posix_acl_access", nil)
+		return err == nil || !(errors.Is(err, unix.ENODATA) || errors.Is(err, unix.ENOTSUP))
+	}
+)
+
+// nisLine: una línea «+» o «-» de /etc/group o /etc/passwd (NIS/compat) trae miembros que el archivo no lista.
+func nisLine(l string) bool { return strings.HasPrefix(l, "+") || strings.HasPrefix(l, "-") }
+
+// groupShared: el gid tiene algún miembro suplementario en /etc/group, o es el grupo primario de otro uid en /etc/passwd. Si
+// no se pueden leer los archivos o el grupo no está en /etc/group (NSS: LDAP, sssd) no se sabe: cuenta como compartido.
+func groupShared(gid, uid uint32) bool {
+	g, err := os.ReadFile(groupFile)
+	if err != nil {
+		return true
+	}
+	found := false
+	for _, l := range strings.Split(string(g), "\n") {
+		if nisLine(l) {
+			return true
+		}
+		f := strings.Split(l, ":")
+		if len(f) >= 4 && f[2] == strconv.FormatUint(uint64(gid), 10) {
+			found = true
+			if strings.TrimSpace(f[3]) != "" {
+				return true
+			}
+		}
+	}
+	p, err := os.ReadFile(passwdFile)
+	if err != nil || !found {
+		return true
+	}
+	for _, l := range strings.Split(string(p), "\n") {
+		if nisLine(l) {
+			return true
+		}
+		f := strings.Split(l, ":")
+		if len(f) >= 4 && f[3] == strconv.FormatUint(uint64(gid), 10) && f[2] != strconv.FormatUint(uint64(uid), 10) {
+			return true
+		}
+	}
+	return false
+}
+
+// groupIsPrivate dice si g+w de la carpeta no da escritura a nadie más: el grupo es el privado del usuario (UPG: Debian, Ubuntu y
+// Fedora crean un grupo con su mismo gid y uid, y con el umask 002 toda carpeta nueva sale 0775), no tiene otros miembros
+// (groupShared) y la carpeta no lleva un ACL POSIX.
+func groupIsPrivate(f *os.File, st *syscall.Stat_t) bool {
+	uid, gid := geteuid(), getegid()
+	return st.Gid == gid && gid == uid && !hasPosixACL(f) && !groupShared(gid, uid)
+}
+
+// fuseOpts es lo que importa de la línea de mountinfo del dispositivo dev: si es FUSE, si el núcleo aplica los permisos
+// (default_permissions) y el user_id= de las super options (quien montó; "" si no lo trae).
+func fuseOpts(info string, dev uint64) (fuse, defaultPerms bool, userID string) {
+	want := fmt.Sprintf("%d:%d", unix.Major(dev), unix.Minor(dev))
+	for _, l := range strings.Split(info, "\n") {
+		pre, post, ok := strings.Cut(l, " - ")
+		if f := strings.Fields(pre); ok && len(f) > 2 && f[2] == want {
+			g := strings.Fields(post)
+			if len(g) < 3 || !(g[0] == "fuseblk" || strings.HasPrefix(g[0], "fuse.") || g[0] == "fuse" || g[0] == "ntfs-3g") {
+				return false, false, ""
+			}
+			opts := strings.Split(g[2], ",")
+			for _, o := range opts {
+				if v, ok := strings.CutPrefix(o, "user_id="); ok {
+					userID = v
+				}
+			}
+			return true, slices.Contains(opts, "default_permissions"), userID
+		}
+	}
+	return false, false, ""
+}
+
+// noPermsFuse: la línea de mountinfo del dispositivo dev es FUSE sin default_permissions (ntfs-3g sin «permissions», sshfs…): el núcleo
+// no aplica los modos, son inventados y cualquier usuario del equipo accede.
+func noPermsFuse(info string, dev uint64) bool {
+	fuse, dp, _ := fuseOpts(info, dev)
+	return fuse && !dp
+}
+
+// fuseForeignOwner: el volumen FUSE lo montó otro usuario (user_id= que no es el euid ni 0): sus archivos son de él.
+func fuseForeignOwner(info string, dev uint64) bool {
+	_, _, u := fuseOpts(info, dev)
+	return u != "" && u != "0" && u != strconv.FormatUint(uint64(geteuid()), 10)
+}
+
+// volumeKind (variable: las pruebas simulan el volumen) clasifica el volumen de f: FUSE (los modos los pone el montaje; lee mountinfo), FAT/exFAT (los modos salen de uid, gid y
+// umask del montaje: se evalúan, pero chmod no sirve) o común.
+var volumeKind = func(f *os.File, st *syscall.Stat_t) (fuse, fat bool, info string) {
+	var s syscall.Statfs_t
+	if syscall.Fstatfs(int(f.Fd()), &s) != nil {
+		return false, false, ""
+	}
+	switch int64(s.Type) {
+	case 0x4d44, 0x2011BAB0: // MSDOS_SUPER_MAGIC (vfat y msdos), EXFAT_SUPER_MAGIC
+		return false, true, ""
+	case 0x65735546: // FUSE_SUPER_MAGIC (ntfs-3g es fuseblk)
+		b, _ := os.ReadFile(mountInfoFile)
+		return true, false, string(b)
+	}
+	return false, false, ""
+}
+
+// ForeignWritersFile dice quién más que el usuario puede escribir en la carpeta abierta f: su dueño si no es el usuario («owner»; cambiarlo exige
+// privilegios), los bits de grupo (salvo grupo privado sin otros miembros ni ACL) y los de otros («g+w», «o+w»). FUSE sin default_permissions devuelve errors.ErrUnsupported; FUSE de otro usuario (user_id=) cuenta como dueño ajeno; vfat/exfat se evalúan por
+// sus bits de modo (NoChmod: chmod no los cambia).
+func ForeignWritersFile(f *os.File) (Writers, error) {
+	fi, err := f.Stat()
+	if err != nil {
+		return Writers{}, err
+	}
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		return Writers{}, errors.New("sys: sin datos de dueño")
+	}
+	fuse, fat, info := volumeKind(f, st)
+	var w Writers
+	w.NoChmod = fat
+	if fuse && fuseForeignOwner(info, uint64(st.Dev)) {
+		return Writers{Who: []string{"owner"}, ForeignOwner: true}, nil
+	}
+	if fuse && noPermsFuse(info, uint64(st.Dev)) {
+		return Writers{}, errors.ErrUnsupported
+	}
+	if st.Uid != geteuid() {
+		w.Who, w.ForeignOwner = append(w.Who, "owner"), true
+	}
+	if fi.Mode().Perm()&0o020 != 0 && !groupIsPrivate(f, st) {
+		w.Who = append(w.Who, "g+w")
+	}
+	if fi.Mode().Perm()&0o002 != 0 {
+		w.Who = append(w.Who, "o+w")
+	}
+	return w, nil
 }
