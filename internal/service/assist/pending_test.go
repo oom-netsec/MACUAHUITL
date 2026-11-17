@@ -389,7 +389,7 @@ func TestFailedAndAbandonedRunsLeavePendingRollbacks(t *testing.T) {
 	}
 
 	r2 := newRig(t, simulator.Config{})
-	r2.svc.decisionTimeout = 200 * time.Millisecond
+	r2.svc.decisionTimeout = decision(200 * time.Millisecond)
 	run2 := r2.changedAtClose()
 	r2.waitState(run2, "abandoned")
 	r2.waitDone(run2)
@@ -622,7 +622,7 @@ func TestListHidesTheEntryWhileItsRollbackRunIsAlive(t *testing.T) {
 	if _, err := r.svc.Abort(context.Background(), &v1.AbortRequest{RunId: nrun}); err != nil {
 		t.Fatal(err)
 	}
-	for deadline := time.Now().Add(5 * time.Second); !listed(); time.Sleep(20 * time.Millisecond) {
+	for deadline := time.Now().Add(espera()); !listed(); time.Sleep(20 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			t.Fatal("la entrada no reaparece tras abortar su reversa")
 		}
