@@ -24,6 +24,12 @@ func init() {
 		"terminal.err.device_closed": e("el equipo cerró la sesión", "the device closed the session"),
 		"terminal.err.lost":          e("conexión perdida: {error}", "connection lost: {error}", "error"),
 
+		"terminal.err.host_and_address":   e("con host_id no se indican dirección, puerto ni credencial: el host guardado ya los trae", "with host_id do not send address, port or credential: the saved host already has them"),
+		"terminal.err.host_not_found":     e("el host guardado no existe", "the saved host does not exist"),
+		"terminal.err.host_no_credential": e("el host guardado no tiene credencial: asígnale una para abrir el terminal", "the saved host has no credential: assign one to open the terminal"),
+		"terminal.err.startup_changed":    e("la orden de inicio del host cambió desde que la viste: vuelve a abrir el host para revisarla", "the host's startup command changed since you saw it: reopen the host to review it"),
+		"terminal.err.key_credential":     e("la credencial es de solo llave: solo sirve al abrir un host linux o windows guardado", "the credential is key-only: it only works when opening a saved linux or windows host"),
+
 		"visibility.err.job_empty":   e("el trabajo aún no tiene salidas", "the job has no outputs yet"),
 		"visibility.err.no_source":   e("indica un trabajo, una carpeta de salida o una captura", "specify a job, an output folder or a capture"),
 		"visibility.err.relative":    e("la ruta {path:q} debe ser absoluta", "the path {path:q} must be absolute", "path"),

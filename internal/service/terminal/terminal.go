@@ -6,6 +6,7 @@ package terminal
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -22,6 +23,7 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/audit"
+	"github.com/oom-netsec/MACUAHUITL/internal/devices"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
 	"github.com/oom-netsec/MACUAHUITL/internal/service"
@@ -129,23 +131,68 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	if o == nil {
 		return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.first_open", nil)
 	}
-	if o.Address == "" || o.CredentialId == "" {
-		return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.no_address", nil)
+	var (
+		address, credID, startup string
+		port                     uint16
+		label                    = o.Name
+		generic                  bool // host guardado linux o windows: PTY xterm, orden de inicio y credencial de llave
+	)
+	if o.HostId != "" {
+		// host_id es exclusivo: ni otra dirección ni otra credencial sobre un host guardado.
+		if label == "" {
+			label = o.HostId
+		}
+		if o.Address != "" || o.Port != 0 || o.CredentialId != "" {
+			return s.refuse(label, service.Err(st.Context(), codes.InvalidArgument, "terminal.err.host_and_address", nil), "host and address")
+		}
+		h, err := service.SavedHost(s.d.DB(), o.HostId)
+		if errors.Is(err, sql.ErrNoRows) {
+			return s.refuse(label, service.Err(st.Context(), codes.NotFound, "terminal.err.host_not_found", nil), "saved host not found")
+		}
+		if err != nil {
+			return s.refuse(label, service.ErrFrom(st.Context(), codes.Internal, err), i18n.English(err))
+		}
+		label = h.Name                                                // el nombre de la libreta, no el que mande el cliente
+		if h.StartupCommand != "" && !devices.IsGeneric(h.Platform) { // Clean no lo permite: datos alterados o viejos
+			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.startup_changed", nil), "startup on a non-generic host")
+		}
+		if h.CredentialID == "" {
+			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.host_no_credential", nil), "saved host has no credential")
+		}
+		if o.ExpectedStartupCommand != h.StartupCommand { // lo que corre es lo que el usuario vio
+			return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.startup_changed", nil), "startup changed")
+		}
+		address, port, credID, startup, generic = h.Address, uint16(h.Port), h.CredentialID, h.StartupCommand, devices.IsGeneric(h.Platform)
+	} else {
+		if o.Address == "" || o.CredentialId == "" {
+			return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.no_address", nil)
+		}
+		if o.Port > 65535 {
+			return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.port", nil)
+		}
+		address, credID, port = o.Address, o.CredentialId, uint16(o.Port)
 	}
-	if o.Port > 65535 {
-		return service.Err(st.Context(), codes.InvalidArgument, "terminal.err.port", nil)
-	}
-	port := uint16(o.Port)
 	if port == 0 {
 		port = 22
 	}
-	label := o.Name
 	if label == "" {
-		label = o.Address + ":" + strconv.Itoa(int(port))
+		label = address + ":" + strconv.Itoa(int(port))
 	}
 	v := s.d.Vault()
 	if v == nil || !v.Unlocked() {
 		return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.vault_closed", nil), "vault is closed: the terminal needs the device credentials")
+	}
+	// Una credencial de solo llave solo se usa por host_id de un host linux o windows; se rechaza antes de Guard.Allow (sin DNS) y de conectar.
+	infos, err := v.List()
+	if err != nil { // la bóveda se cerró entre medio: sin saber el tipo no se sigue
+		return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.vault_closed", nil), "vault is closed: the terminal needs the device credentials")
+	}
+	{
+		for _, i := range infos {
+			if i.ID == credID && i.IsKey() && !generic {
+				return s.refuse(label, service.Err(st.Context(), codes.FailedPrecondition, "terminal.err.key_credential", nil), "key credential")
+			}
+		}
 	}
 	if s.live.Add(1) > maxSessions {
 		s.live.Add(-1)
@@ -169,7 +216,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	}()
 
 	id := "term-" + service.NewID()
-	if err := s.d.Guard().Allow(ctx, id, []string{o.Address}); err != nil {
+	if err := s.d.Guard().Allow(ctx, id, []string{address}); err != nil {
 		return s.refuse(label, service.ErrFrom(st.Context(), codes.PermissionDenied, err), i18n.English(err))
 	}
 	// A partir de aquí, todo camino de salida pasa por este defer: cierra SSH y grabación,
@@ -203,7 +250,7 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		s.d.Audit(action, label, fmt.Sprintf("session=%s reason=%q received=%d sent=%d guard=revoked recording=%s", id, reasonEN, rx.Load(), tx.Load(), recordPath))
 	}()
 
-	cred, err := v.Get(o.CredentialId)
+	cred, err := v.Get(credID)
 	if err != nil {
 		reason, reasonEN = err.Error(), i18n.English(err)
 		return service.VaultErr(ctx, err)
@@ -214,13 +261,23 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 		accepted[fp] = true
 	}
 	hk := s.d.Hosts().Callback(transport.HostKeyPolicy{Accepted: accepted}, func(en audit.Entry) { s.d.Audit(en.Action, en.Target, en.Detail) })
-	sess, err = transport.OpenSSH(ctx, s.d.Guard(), id, o.Address, port, cred, hk, transport.SSHOptions{})
+	sess, err = transport.OpenSSH(ctx, s.d.Guard(), id, address, port, cred, hk, transport.SSHOptions{GenericHost: generic})
 	cred.Enable.Destroy() // la terminal es manual: el usuario escribe enable por su cuenta
 	if err != nil {
 		reason, reasonEN = err.Error(), i18n.English(err)
 		return connErr(st.Context(), err)
 	}
-	r, w, err := sess.ShellSize(clamp(o.Rows, 24, 1, 200), clamp(o.Cols, 200, 20, 500))
+	term, rows, cols := "vt100", clamp(o.Rows, 24, 1, 200), clamp(o.Cols, 200, 20, 500)
+	if generic {
+		term = "xterm-256color"
+	}
+	var r io.Reader
+	var w io.Writer
+	if generic && startup != "" { // exec con PTY, como `ssh -t host orden`: no se teclea en el shell
+		r, w, err = sess.CommandSize(term, rows, cols, startup)
+	} else {
+		r, w, err = sess.ShellSize(term, rows, cols)
+	}
 	if err != nil {
 		reason, reasonEN = err.Error(), i18n.English(err)
 		return connErr(st.Context(), err)
@@ -231,10 +288,19 @@ func (s *termSvc) OpenTerminal(st v1.TerminalService_OpenTerminalServer) error {
 	}
 	recordPath = f.Name()
 	rec = terminal.NewRecorder(f, s.d.Now)
-	summary := fmt.Sprintf("%s@%s:%d", user, o.Address, port)
+	summary := fmt.Sprintf("%s@%s:%d", user, address, port)
 	rec.Mark("abierto " + summary)
+	detail := fmt.Sprintf("session=%s user=%s recording=%s manual=true", id, user, recordPath)
+	if o.HostId != "" {
+		start := "none"
+		if startup != "" {
+			rec.Mark("orden de inicio: " + strconv.Quote(startup))
+			start = strconv.Quote(startup)
+		}
+		detail += " host=" + o.HostId + " startup=" + start
+	}
 	opened, reason, reasonEN = true, "cerrada por el usuario", "closed by the user"
-	s.d.Audit("terminal.open", label, fmt.Sprintf("session=%s user=%s recording=%s manual=true", id, user, recordPath))
+	s.d.Audit("terminal.open", label, detail)
 	if err := st.Send(&v1.OpenTerminalResponse{Opened: summary, Recording: recordPath}); err != nil {
 		reason, reasonEN = err.Error(), i18n.English(err)
 		return err
