@@ -2819,6 +2819,19 @@ export const es = {
   // Redirección nft vieja (fase 45): no se puede detectar sin privilegios.
   "transfer.nftLeftover": "Si dejaste una redirección nft de antes (tabla macuahuitl_<protocolo>_<puerto>), el tráfico del puerto estándar se va a ese puerto y no llega a este servidor. Quítala con esta orden (cambia protocolo y puerto si usaste otros):",
   "transfer.nftLeftover.cmd": "Quitar una redirección nft vieja",
+  "transfer.live.title": "En vivo",
+  "transfer.live.busy": "Transfiriendo",
+  "transfer.live.idle": "En espera",
+  "transfer.live.clients": "Clientes conectados",
+  "transfer.live.noClients": "ninguno",
+  "transfer.live.recent": "Recientes",
+  "transfer.live.in": "Recibe",
+  "transfer.live.out": "Envía",
+  "transfer.live.state.active": "Activa",
+  "transfer.live.state.done": "Completa",
+  "transfer.live.state.failed": "Fallida",
+  "transfer.live.err.unknown": "Causa desconocida",
+  "transfer.live.err.timeout": "Se agotó el tiempo de espera",
 };
 
 export type Key = keyof typeof es;

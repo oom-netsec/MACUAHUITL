@@ -2820,4 +2820,17 @@ export const en: Record<Key, string> = {
   // Leftover nft redirect (phase 45): cannot be detected without privileges.
   "transfer.nftLeftover": "If you left an nft redirect from before (table macuahuitl_<protocol>_<port>), traffic to the standard port goes to that port and never reaches this server. Remove it with this command (change protocol and port if you used others):",
   "transfer.nftLeftover.cmd": "Remove an old nft redirect",
+  "transfer.live.title": "Live",
+  "transfer.live.busy": "Transferring",
+  "transfer.live.idle": "Waiting",
+  "transfer.live.clients": "Connected clients",
+  "transfer.live.noClients": "none",
+  "transfer.live.recent": "Recent",
+  "transfer.live.in": "Receiving",
+  "transfer.live.out": "Sending",
+  "transfer.live.state.active": "Active",
+  "transfer.live.state.done": "Complete",
+  "transfer.live.state.failed": "Failed",
+  "transfer.live.err.unknown": "Unknown cause",
+  "transfer.live.err.timeout": "Timed out",
 };

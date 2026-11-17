@@ -1,6 +1,6 @@
 // Doble del módulo para pruebas: registra llamadas y permite emitir eventos.
 import { vi } from "vitest";
-import type { TransferEvent, TransferListing, TransferResult, TransferRunEvent } from "./api";
+import type { TransferSession, TransferEvent, TransferListing, TransferResult, TransferRunEvent } from "./api";
 
 export const okResult: TransferResult = { path: "/o/recibidos/c4.bin", bytes: 1024, md5: "a".repeat(32), sha256: "b".repeat(64), verified: "", seconds: 1.5, report: "guardado" };
 
@@ -17,6 +17,13 @@ export const sampleListing: TransferListing = {
   ],
 };
 export const noListing: TransferListing = { listable: false, reason: "este servidor no permite listar: TFTP no tiene comando para listar carpetas", path: "", entries: [], truncated: false, method: "" };
+
+// Una activa, una completa y una fallida (contrato provisional, fase 45).
+export const sampleSessions = (now = Date.now()): TransferSession[] => [
+  { id: "t1", serverId: "s1", client: "192.0.2.21:50123", ended: 0, name: "c9300-universalk9.17.09.04a.SPA.bin", direction: "out", protocol: "tftp", bytes: 412_000_000, total: 1_180_000_000, bytesPerSec: 9_800_000, started: now - 40_000, state: "active" },
+  { id: "t2", serverId: "s1", client: "[2001:db8::22]:50124", name: "running-SW1.cfg", direction: "in", protocol: "tftp", bytes: 18_204, total: 18_204, bytesPerSec: 0, started: now - 90_000, ended: now - 89_000, state: "done" },
+  { id: "t3", serverId: "s1", client: "192.0.2.23:50125", name: "backup.cfg", direction: "in", protocol: "tftp", bytes: 512, total: 0, bytesPerSec: 0, started: now - 60_000, ended: now - 59_000, state: "failed", error: "tiempo agotado" },
+];
 
 export function fakeTransfer() {
   const evs = new Set<(e: TransferEvent) => void>();
@@ -37,6 +44,7 @@ export function fakeTransfer() {
     transferPutAsync: vi.fn(async () => "run-1"),
     transferGetMany: vi.fn(async () => "run-1"),
     transferCancel: vi.fn(async () => {}),
+    listTransferSessions: vi.fn(async (_id: string): Promise<TransferSession[]> => []),
     onTransferRun: (cb: (e: TransferRunEvent) => void) => (runs.add(cb), () => runs.delete(cb)),
     emitTransferRun: (e: TransferRunEvent) => runs.forEach((cb) => cb(e)),
   };

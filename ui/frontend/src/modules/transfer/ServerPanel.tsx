@@ -6,6 +6,7 @@ import { Badge, EmptyState, ResultPanel, Section } from "../../components/Page";
 import { CopyButton } from "../../components/Data";
 import { useT } from "../../lib/i18n";
 import type { TransferHintInfo, TransferLine, TransferProto, TransferReady } from "./api";
+import { LivePanel } from "./LivePanel";
 import { iosCommands, splitListen } from "./ios";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import { isWindows } from "../../lib/platform";
@@ -91,6 +92,7 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
           <Console label={t("transfer.redirect.remove")} text={s.cleanup} copy={core.copyText} />
         </>
       )}
+      <LivePanel serverId={r.serverId} open={!s.done} fetchSessions={core.listTransferSessions} />
       <Log lines={s.lines} />
     </ResultPanel>
     </div>
