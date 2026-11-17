@@ -23,6 +23,7 @@ func TestStartupWanted(t *testing.T) {
 		{"ya corre uno propio", ipc.ErrAlreadyRunning, false},
 		{"ya corre uno propio, con detalle", fmt.Errorf("%w (detalle)", ipc.ErrAlreadyRunning), false},
 		{"canal de otro usuario", otro, true},
+		{"canal de menor integridad", i18n.Wrap("ipc.err.pipe_low_integrity", ipc.ErrAlreadyRunning, i18n.A("name", "x")), true},
 		{"canal de otro usuario envuelto", fmt.Errorf("x: %w", otro), true},
 		{"harden", consoleErr{i18n.New("harden.err.lockquota", i18n.A("cause", "x"))}, true},
 		{"error común", errors.New("x"), true},

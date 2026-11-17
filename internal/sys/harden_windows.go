@@ -47,11 +47,13 @@ func Harden() ([]i18n.Text, error) {
 		return warns, i18n.New("harden.err.lockquota", i18n.A("cause", err.Error()))
 	}
 	warns = append(warns, hibernateWarnings(readHibernate())...)
-	return append(warns, pagefileWarnings(readPagingFiles())...), nil
+	files, perr := readPagingFiles()
+	return append(warns, pagefileWarnings(files, readPagingEncrypted(), perr)...), nil
 }
 
-// NoDump excluye al proceso de los reportes de error de Windows (sin volcados de WER); la
-// UI usa solo esto. Devuelve avisos; nunca falla.
+// NoDump excluye al proceso de los reportes de error de Windows (sin volcados de WER); la UI usa solo esto. Devuelve
+// avisos; nunca falla. SetErrorMode no se llama: el runtime de Go ya pone SEM_FAILCRITICALERRORS, SEM_NOGPFAULTERRORBOX
+// y SEM_NOOPENFILEERRORBOX con OR (preventErrorDialogs), y un valor fijo quitaría bits.
 func NoDump() []i18n.Text {
 	var warns []i18n.Text
 	if err := werExclude(); err != nil {
@@ -93,6 +95,24 @@ func readHibernate() (uint64, error) {
 		v, _, err = k.GetIntegerValue("HibernateEnabledDefault")
 	}
 	return v, err
+}
+
+// readPagingEncrypted dice si NtfsEncryptPagingFile vale 1, como lo deja `fsutil behavior set encryptpagingfile 1`
+// (Control\FileSystem) o la directiva (SYSTEM\CurrentControlSet\Policies). Si la directiva existe manda ella, aunque
+// valga 0; si no, Control\FileSystem. El valor aplica tras reiniciar. No se pudo leer = false: se avisa.
+func readPagingEncrypted() bool {
+	for _, path := range []string{`SYSTEM\CurrentControlSet\Policies`, `SYSTEM\CurrentControlSet\Control\FileSystem`} {
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.QUERY_VALUE)
+		if err != nil {
+			continue
+		}
+		v, _, err := k.GetIntegerValue("NtfsEncryptPagingFile")
+		k.Close()
+		if err == nil {
+			return v == 1
+		}
+	}
+	return false
 }
 
 func readPagingFiles() ([]string, error) {

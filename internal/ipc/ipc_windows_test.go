@@ -107,13 +107,13 @@ func TestPipeNombreLlevaElSID(t *testing.T) {
 	if err != nil || !strings.HasPrefix(p, `\\.\pipe\macuahuitl-S-1-5-`) {
 		t.Fatalf("SocketPath = %q, %v", p, err)
 	}
-	if got, err := pidSID(windows.GetCurrentProcessId()); err != nil || !sameSID(got, p[len(`\\.\pipe\macuahuitl-`):]) {
-		t.Fatalf("pidSID(propio) = %q, %v", got, err)
+	if got, f := pidInfo(windows.GetCurrentProcessId()); f.Err != nil || !sameSID(got, p[len(`\\.\pipe\macuahuitl-`):]) {
+		t.Fatalf("pidInfo(propio) = %q, %+v", got, f)
 	}
 }
 
 func TestPipeSDDLSoloElUsuario(t *testing.T) {
-	if got := pipeSDDL("S-1-5-21-1-2-3-1001"); got != "O:S-1-5-21-1-2-3-1001D:P(A;;GA;;;S-1-5-21-1-2-3-1001)" {
+	if got := pipeSDDL("S-1-5-21-1-2-3-1001"); got != "O:S-1-5-21-1-2-3-1001D:P(A;;GA;;;S-1-5-21-1-2-3-1001)S:(ML;;NW;;;ME)" { // etiqueta Medium explícita (M1)
 		t.Fatalf("pipeSDDL = %q", got)
 	}
 }
@@ -160,9 +160,43 @@ func TestDialPipeRechazaDuenoAjeno(t *testing.T) {
 	if err != nil {
 		t.Skipf("este token no puede fijar a Administradores como dueño: %v", err) // ERROR_INVALID_OWNER sin elevar
 	}
-	serve(t, l)
+	serve(t, closeWait{Listener: l, max: 2 * time.Second})
 	if c, _, err := dialPipe(context.Background(), name); err == nil {
 		c.Close()
 		t.Fatal("dialPipe aceptó un pipe de otro dueño")
+	}
+}
+
+// El token real de este proceso (mismo que tendría el núcleo) se acepta como servidor, y sus datos son plausibles. El
+// servidor Low IL real se prueba en TestDialPipeRechazaServidorLow.
+func TestServerTrustedConTokenPropio(t *testing.T) {
+	own := factsOf(windows.GetCurrentProcessToken())
+	if own.Err != nil || own.IL < 0x1000 || own.AppContainer || own.Restricted {
+		t.Fatalf("token propio inesperado: %+v", own)
+	}
+	_, f := pidInfo(uint32(os.Getpid()))
+	if err := serverTrusted(ilMedium, f, own); err != nil {
+		t.Fatalf("el propio proceso debe aceptarse: %v", err)
+	}
+	if _, f := pidInfo(0xFFFFFFF0); serverTrusted(ilMedium, f, own) == nil {
+		t.Fatal("un PID que no se puede abrir debe rechazarse")
+	}
+}
+
+// El pipe que crea Listen lleva la etiqueta Medium explícita (pipeSDDL): pipeLabel la lee.
+func TestPipeLabelDelPipePropio(t *testing.T) {
+	name := sockPath(t)
+	l, err := Listen(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serve(t, l)
+	c, _, err := dialPipe(context.Background(), name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if lab, err := pipeLabel(c); err != nil || lab != ilMedium {
+		t.Fatalf("pipeLabel = %#x, %v", lab, err)
 	}
 }

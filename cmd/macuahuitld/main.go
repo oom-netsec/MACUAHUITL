@@ -49,10 +49,10 @@ func main() {
 }
 
 // startupWanted dice si el fallo va a macuahuitld.startup (ADR 0012 g). No cuando ya corre un núcleo del mismo usuario (la
-// app se conecta a ese), pero sí cuando el canal lo tiene otro usuario: eso lo envuelve en ErrAlreadyRunning.
+// app se conecta a ese), pero sí cuando el canal lo tiene otro usuario o un proceso de menor integridad: eso lo envuelve en ErrAlreadyRunning.
 func startupWanted(err error) bool {
 	var ie *i18n.Error
-	return err != nil && (!errors.Is(err, ipc.ErrAlreadyRunning) || (errors.As(err, &ie) && ie.Code == "ipc.err.pipe_other_user"))
+	return err != nil && (!errors.Is(err, ipc.ErrAlreadyRunning) || (errors.As(err, &ie) && (ie.Code == "ipc.err.pipe_other_user" || ie.Code == "ipc.err.pipe_low_integrity")))
 }
 
 // writeStartup deja la causa en macuahuitld.startup si startupWanted y no corre ya un núcleo sano del mismo usuario (una
