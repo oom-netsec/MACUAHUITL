@@ -133,3 +133,20 @@ func TestWindowsPerfilesDePowerShellYStartupRechazados(t *testing.T) {
 		}
 	}
 }
+
+// 43d-2 bajo 1: Documents localizada o movida (FOLDERID_Documents, en otra unidad) también guarda los perfiles de PowerShell.
+func TestWindowsPerfilesDePowerShellEnDocumentosMovida(t *testing.T) {
+	fijaGOOS(t, "windows")
+	home, movida := realTemp(t), realTemp(t)
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("OneDrive", "")
+	old := documentsDir
+	documentsDir = func() string { return movida }
+	t.Cleanup(func() { documentsDir = old })
+	mala := filepath.Join(movida, "WindowsPowerShell", "Modules")
+	os.MkdirAll(mala, 0o700)
+	if _, err := ValidateDir(mala); err == nil {
+		t.Errorf("%s debió rechazarse", mala)
+	}
+}

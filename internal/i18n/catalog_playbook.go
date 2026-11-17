@@ -53,6 +53,7 @@ func init() {
 		"core.svc.shutdown_audit":       e("no se pudo auditar core.shutdown, el núcleo no se apaga: {err}", "core.shutdown could not be audited, the core is not shutting down: {err}", "err"),
 		"sys.err.not_regular":           e("la ruta no es un archivo regular", "the path is not a regular file"),
 		"sys.err.not_owner":             e("la carpeta {path} existe y no es del usuario que corre el núcleo", "the folder {path} exists and does not belong to the user running the core", "path"),
+		"sys.err.outdir_shared":         e("la carpeta de salidas {dir} no es solo del usuario: su dueño o quienes la pueden escribir son otros ({who}); no se escribe ahí", "the outputs folder {dir} is not the user's alone: its owner or those who can write to it are others ({who}); nothing is written there", "dir", "who"),
 		"sys.err.wait_timeout":          e("el proceso no terminó en el plazo", "the process did not exit in time"),
 		"adhoc.err.no_targets":          e("indica al menos un equipo", "specify at least one device"),
 		"adhoc.err.max":                 e("adhoc: {n} comandos; el máximo es {max}. El tope es de diseño: cada comando es una ida y vuelta por equipo y un lote largo acapara la sesión del equipo; divide el lote en tandas de {max} comandos o menos y ejecútalas una tras otra", "adhoc: {n} commands; the maximum is {max}. The cap is by design: every command is a round trip per device and a long batch ties up the device session; split the batch into runs of {max} commands or fewer and run them one after another", "n", "max"),

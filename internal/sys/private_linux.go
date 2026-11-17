@@ -1,9 +1,16 @@
 package sys
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 // MkdirPrivate crea la carpeta y sus padres con 0700 (ADR 0012, c); la ruta debe ser absoluta. En Windows la deja con
@@ -87,23 +94,111 @@ func PrivateDir(path string) error {
 	}
 }
 
-// groupIsPrivate dice si el grupo de la carpeta es el grupo privado del usuario (UPG: Debian, Ubuntu y Fedora crean un grupo con
-// su mismo gid y uid): ahí g+w no da escritura a nadie más, y con el umask 002 de esas distribuciones toda carpeta nueva sale 0775.
-// Variable para las pruebas. shortcut: no mira los miembros del grupo; un grupo compartido con el mismo número que el uid es raro.
-var groupIsPrivate = func(fi os.FileInfo) bool {
-	st, ok := fi.Sys().(*syscall.Stat_t)
-	return ok && st.Gid == uint32(os.Getegid()) && st.Gid == uint32(os.Geteuid())
+// Ganchos de las pruebas de ForeignWriters.
+var (
+	geteuid, getegid = func() uint32 { return uint32(os.Geteuid()) }, func() uint32 { return uint32(os.Getegid()) }
+	groupFile        = "/etc/group"
+	passwdFile       = "/etc/passwd"
+	mountInfoFile    = "/proc/self/mountinfo"
+	// hasPosixACL: la carpeta lleva un ACL POSIX de acceso (system.posix_acl_access): los bits de grupo ya no dicen quién escribe.
+	// Sin xattr o sin soporte, no; cualquier otro error (no se sabe) cuenta como que sí.
+	hasPosixACL = func(f *os.File) bool {
+		_, err := unix.Fgetxattr(int(f.Fd()), "system.posix_acl_access", nil)
+		return err == nil || !(errors.Is(err, unix.ENODATA) || errors.Is(err, unix.ENOTSUP))
+	}
+)
+
+// groupShared: el gid tiene algún miembro suplementario en /etc/group, o es el grupo primario de otro uid en /etc/passwd. Si
+// no se pueden leer los archivos o el grupo no está en /etc/group (NSS: LDAP, sssd) no se sabe: cuenta como compartido.
+func groupShared(gid, uid uint32) bool {
+	g, err := os.ReadFile(groupFile)
+	if err != nil {
+		return true
+	}
+	found := false
+	for _, l := range strings.Split(string(g), "\n") {
+		f := strings.Split(l, ":")
+		if len(f) >= 4 && f[2] == strconv.FormatUint(uint64(gid), 10) {
+			found = true
+			if strings.TrimSpace(f[3]) != "" {
+				return true
+			}
+		}
+	}
+	p, err := os.ReadFile(passwdFile)
+	if err != nil || !found {
+		return true
+	}
+	for _, l := range strings.Split(string(p), "\n") {
+		f := strings.Split(l, ":")
+		if len(f) >= 4 && f[3] == strconv.FormatUint(uint64(gid), 10) && f[2] != strconv.FormatUint(uint64(uid), 10) {
+			return true
+		}
+	}
+	return false
 }
 
-// ForeignWriters dice quién más que el usuario puede escribir en la carpeta: los bits de grupo (salvo que el grupo sea el privado
-// del usuario) y de otros («g+w», «o+w»).
-func ForeignWriters(path string) (Writers, error) {
-	fi, err := os.Stat(path)
+// groupIsPrivate dice si g+w de la carpeta no da escritura a nadie más: el grupo es el privado del usuario (UPG: Debian, Ubuntu y
+// Fedora crean un grupo con su mismo gid y uid, y con el umask 002 toda carpeta nueva sale 0775), no tiene otros miembros
+// (groupShared) y la carpeta no lleva un ACL POSIX.
+func groupIsPrivate(f *os.File, st *syscall.Stat_t) bool {
+	uid, gid := geteuid(), getegid()
+	return st.Gid == gid && gid == uid && !hasPosixACL(f) && !groupShared(gid, uid)
+}
+
+// noPermsFuse: la línea de mountinfo del dispositivo dev es un ntfs-3g sin «permissions» (el núcleo FUSE no aplica
+// default_permissions): los modos son inventados y cualquier usuario del equipo accede.
+func noPermsFuse(info string, dev uint64) bool {
+	want := fmt.Sprintf("%d:%d", unix.Major(dev), unix.Minor(dev))
+	for _, l := range strings.Split(info, "\n") {
+		pre, post, ok := strings.Cut(l, " - ")
+		if f := strings.Fields(pre); ok && len(f) > 2 && f[2] == want {
+			g := strings.Fields(post)
+			if len(g) < 3 || !(g[0] == "fuseblk" || strings.HasPrefix(g[0], "fuse.ntfs") || g[0] == "ntfs-3g") {
+				return false
+			}
+			return !slices.Contains(strings.Split(g[2], ","), "default_permissions")
+		}
+	}
+	return false
+}
+
+// noPermsVolume dice si el volumen de f no tiene permisos por usuario: FAT (vfat, msdos), exFAT y ntfs-3g sin «permissions».
+func noPermsVolume(f *os.File, st *syscall.Stat_t) bool {
+	var s syscall.Statfs_t
+	if syscall.Fstatfs(int(f.Fd()), &s) != nil {
+		return false
+	}
+	switch int64(s.Type) {
+	case 0x4d44, 0x2011BAB0: // MSDOS_SUPER_MAGIC (vfat y msdos), EXFAT_SUPER_MAGIC
+		return true
+	case 0x65735546: // FUSE_SUPER_MAGIC (ntfs-3g es fuseblk)
+		b, _ := os.ReadFile(mountInfoFile)
+		return noPermsFuse(string(b), uint64(st.Dev))
+	}
+	return false
+}
+
+// ForeignWritersFile dice quién más que el usuario puede escribir en la carpeta abierta f: su dueño si no es el usuario («owner»; cambiarlo exige
+// privilegios), los bits de grupo (salvo grupo privado sin otros miembros ni ACL) y los de otros («g+w», «o+w»). Un volumen sin
+// permisos por usuario devuelve errors.ErrUnsupported.
+func ForeignWritersFile(f *os.File) (Writers, error) {
+	fi, err := f.Stat()
 	if err != nil {
 		return Writers{}, err
 	}
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		return Writers{}, errors.New("sys: sin datos de dueño")
+	}
+	if noPermsVolume(f, st) {
+		return Writers{}, errors.ErrUnsupported
+	}
 	var w Writers
-	if fi.Mode().Perm()&0o020 != 0 && !groupIsPrivate(fi) {
+	if st.Uid != geteuid() {
+		w.Who, w.ForeignOwner = append(w.Who, "owner"), true
+	}
+	if fi.Mode().Perm()&0o020 != 0 && !groupIsPrivate(f, st) {
 		w.Who = append(w.Who, "g+w")
 	}
 	if fi.Mode().Perm()&0o002 != 0 {

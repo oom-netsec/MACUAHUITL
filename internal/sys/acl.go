@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -176,8 +177,35 @@ func ignoreUnsupported(err error) error {
 // Quién puede escribir la carpeta además de su dueño (carpetas de transferencia de fileserve). En Windows Who son SID y User el SID
 // del usuario del proceso; en Linux Who son «g+w» y «o+w» (bits de grupo y otros) y User va vacío.
 type Writers struct {
-	Who  []string
-	User string
+	Who          []string
+	User         string
+	ForeignOwner bool // el dueño de la carpeta es otro (Who lo incluye): cambiarlo exige privilegios, ninguna orden lo arregla
+}
+
+// ForeignWriters abre la carpeta path y dice quién más escribe en ella (ver ForeignWritersFile). Un volumen sin permisos por
+// usuario (FAT, exFAT, ntfs-3g sin permissions) devuelve errors.ErrUnsupported.
+func ForeignWriters(path string) (Writers, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return Writers{}, err
+	}
+	defer f.Close()
+	return ForeignWritersFile(f)
+}
+
+// ForeignWritersRoot es ForeignWriters sobre una carpeta ya abierta (os.Root): lo que se mira es el handle, no la ruta.
+func ForeignWritersRoot(root *os.Root) (Writers, error) {
+	f, err := root.Open(".")
+	if err != nil {
+		return Writers{}, err
+	}
+	defer f.Close()
+	return ForeignWritersFile(f)
+}
+
+// foreignOwner: el dueño no es el usuario, SYSTEM ni Administradores (que el dueño sea Administradores es lo normal con un token elevado).
+func foreignOwner(owner, user string) bool {
+	return owner != user && owner != sidSystem && owner != sidAdmins
 }
 
 // foreignWriters: los SID ajenos (no el usuario, SYSTEM ni Administradores) con derecho de escritura sobre la carpeta misma o

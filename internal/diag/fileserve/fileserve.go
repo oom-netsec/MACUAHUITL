@@ -392,7 +392,7 @@ func prepare(c Config) (src *source, rcv *receiver, err error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		if err := checkRecvOwn(dir); err != nil {
+		if err := checkRecvOwn(dir, root); err != nil {
 			root.Close()
 			return nil, nil, err
 		}

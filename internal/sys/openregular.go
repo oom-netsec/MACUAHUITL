@@ -71,8 +71,10 @@ var ErrWaitTimeout = i18n.New("sys.err.wait_timeout", nil)
 
 // OpenOutDir crea (0700) y abre una carpeta de salidas UNA vez (os.Root): lo que se cree después va por ese handle, así que
 // cambiar la carpeta por un enlace simbólico o una junction tras abrirla no desvía la escritura. Resuelve los enlaces de la
-// ruta (la carpeta de fábrica puede ser un enlace del usuario) y comprueba que lo abierto es lo que la ruta resuelta nombra
-// ahora: un cambio entre resolver y abrir se rechaza. Quien la llama cierra el Root.
+// ruta (la carpeta de fábrica puede ser un enlace del usuario) y valida lo ABIERTO, no la ruta: el dueño es el usuario y nadie
+// más escribe en ella (ForeignWritersRoot: la misma regla de fileserve). Así un enlace cambiado entre la validación de ajustes y
+// el uso se rechaza si apunta a una carpeta ajena o compartida; si el destino es propio y privado se acepta. Un volumen sin permisos
+// por usuario (FAT, exFAT) se acepta: no hay nada que validar. Quien la llama cierra el Root.
 func OpenOutDir(dir string) (*os.Root, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
@@ -85,11 +87,14 @@ func OpenOutDir(dir string) (*os.Root, error) {
 	if err != nil {
 		return nil, err
 	}
-	lst, err1 := os.Lstat(real)
-	rst, err2 := root.Stat(".")
-	if err1 != nil || err2 != nil || !lst.IsDir() || !os.SameFile(lst, rst) {
+	w, err := ForeignWritersRoot(root)
+	if err != nil && !errors.Is(err, errors.ErrUnsupported) {
 		root.Close()
-		return nil, &fs.PathError{Op: "open", Path: dir, Err: fs.ErrInvalid}
+		return nil, err
+	}
+	if len(w.Who) > 0 {
+		root.Close()
+		return nil, i18n.New("sys.err.outdir_shared", i18n.A("dir", real, "who", strings.Join(w.Who, ", ")))
 	}
 	return root, nil
 }

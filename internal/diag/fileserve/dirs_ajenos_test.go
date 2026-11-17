@@ -16,7 +16,7 @@ import (
 func fijaEscritores(t *testing.T, w sys.Writers, err error) {
 	t.Helper()
 	old, oldOS := foreignWriters, goos
-	foreignWriters = func(string) (sys.Writers, error) { return w, err }
+	foreignWriters = func(string, *os.Root) (sys.Writers, error) { return w, err }
 	goos = "windows"
 	t.Cleanup(func() { foreignWriters, goos = old, oldOS })
 }
@@ -83,9 +83,53 @@ func TestRecepcionSinEscritoresAjenosAbre(t *testing.T) {
 	if err := Check(cfgRecv(dir)); err != nil {
 		t.Fatal(err)
 	}
-	fijaEscritores(t, sys.Writers{}, errors.New("sin ACL (FAT)"))
-	if err := Check(cfgRecv(dir)); err != nil {
-		t.Fatalf("sin poder leer la ACL no se bloquea: %v", err)
+}
+
+// Falla cerrado: un error al leer los permisos RECHAZA la recepción; solo «volumen sin permisos» (ErrUnsupported) pasa, con aviso.
+func TestRecepcionFallaCerradoSalvoVolumenSinPermisos(t *testing.T) {
+	dir := realTemp(t)
+	fijaEscritores(t, sys.Writers{}, errors.New("acceso denegado"))
+	err := Check(cfgRecv(dir))
+	var e *i18n.Error
+	if !errors.As(err, &e) || e.Code != "fileserve.err.recv_dir_perm" {
+		t.Fatalf("un error de lectura debía rechazar: %v", err)
+	}
+	fijaEscritores(t, sys.Writers{}, errors.ErrUnsupported)
+	c := cfgRecv(dir)
+	if err := Check(c); err != nil {
+		t.Fatalf("volumen sin permisos no se bloquea: %v", err)
+	}
+	en := ServerHintIn(i18n.En, c, Ready{Addr: c.Addr}, nil)
+	es := ServerHintIn(i18n.Es, c, Ready{Addr: c.Addr}, nil)
+	if !strings.Contains(en, "volume without per-user permissions: any user on this computer can read or change what you receive") ||
+		!strings.Contains(es, "volumen sin permisos por usuario: cualquier usuario del equipo puede leer o cambiar lo recibido") {
+		t.Errorf("aviso:\n%s\n%s", en, es)
+	}
+	if strings.Contains(en, "chmod") || strings.Contains(en, "icacls") {
+		t.Errorf("sin orden en un volumen sin permisos: %s", en)
+	}
+}
+
+// Un dueño ajeno se rechaza y no lleva orden: cambiar el dueño exige privilegios.
+func TestRecepcionConDuenoAjenoSinOrden(t *testing.T) {
+	dir := realTemp(t)
+	fijaEscritores(t, sys.Writers{Who: []string{"S-1-5-21-9-9-9-500"}, User: "S-1-5-21-1-2-3-1001", ForeignOwner: true}, nil)
+	err := Check(cfgRecv(dir))
+	var e *i18n.Error
+	if !errors.As(err, &e) || e.Code != "fileserve.err.recv_dir_open" || strings.Contains(e.Localize(i18n.En), "icacls") {
+		t.Fatalf("%v", err)
+	}
+}
+
+// El aviso de publicación mira también la carpeta de cada archivo suelto (Files).
+func TestPublicacionDeArchivoSueltoAvisaPorSuCarpeta(t *testing.T) {
+	dir := realTemp(t)
+	f := filepath.Join(dir, "a.bin")
+	os.WriteFile(f, []byte("x"), 0o600)
+	fijaEscritores(t, sys.Writers{Who: []string{"S-1-1-0"}, User: "S-1-5-21-1-2-3-1001"}, nil)
+	c := Config{Addr: "127.0.0.1:6969", Proto: "tftp", Files: []string{f}}
+	if h := ServerHintIn(i18n.En, c, Ready{Addr: c.Addr}, []string{"a.bin"}); !strings.Contains(h, "firmware image") || !strings.Contains(h, dir) {
+		t.Errorf("sin aviso por la carpeta del archivo suelto: %s", h)
 	}
 }
 

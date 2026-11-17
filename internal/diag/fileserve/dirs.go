@@ -1,6 +1,7 @@
 package fileserve
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/user"
@@ -75,6 +76,9 @@ func windowsSensitiveDirs() []string {
 	return out
 }
 
+// documentsDir es la carpeta Documentos que dice el shell (sys.DocumentsDir); variable para simularla en pruebas.
+var documentsDir = sys.DocumentsDir
+
 // powerShellProfiles son las carpetas de perfil de PowerShell que Windows ejecuta al abrir una consola, bajo cada Documents (la del
 // perfil, la de OneDrive y las de las variables OneDrive*: con la redirección de carpetas Documents vive en OneDrive).
 func powerShellProfiles(docs ...string) []string {
@@ -82,6 +86,9 @@ func powerShellProfiles(docs ...string) []string {
 		if v := os.Getenv(env); filepath.IsAbs(v) {
 			docs = append(docs, filepath.Join(v, "Documents"))
 		}
+	}
+	if d := documentsDir(); filepath.IsAbs(d) { // localizada («Documentos») o movida a otra unidad
+		docs = append(docs, d)
 	}
 	var out []string
 	for _, d := range docs {
@@ -345,24 +352,41 @@ func hiddenUnderHome(p string) string {
 	return ""
 }
 
-// foreignWriters es variable para simular los escritores ajenos en las pruebas.
-var foreignWriters = sys.ForeignWriters
-
-// ajenos dice quién más escribe en dir (Linux: «g+w», «o+w»; Windows: SID) y la orden que lo arregla ("" si no es segura de pegar).
-func ajenos(dir string) (who []string, fix string) {
-	w, err := foreignWriters(dir)
-	if err != nil || len(w.Who) == 0 { // sin poder leer la ACL (FAT, exFAT) no se sabe: no se bloquea
-		return nil, ""
+// foreignWriters es variable para simular los escritores ajenos en las pruebas. Con root mira la carpeta ya abierta (el handle), sin root la ruta.
+var foreignWriters = func(dir string, root *os.Root) (sys.Writers, error) {
+	if root != nil {
+		return sys.ForeignWritersRoot(root)
 	}
-	if goos == "windows" {
-		return w.Who, sys.IcaclsFix(dir, w.User, w.Who)
-	}
-	return w.Who, sys.ChmodFix(dir, w.Who)
+	return sys.ForeignWriters(dir)
 }
 
-// checkRecvOwn rechaza la carpeta de RECEPCIÓN si otro usuario puede escribir en ella: podría plantar o cambiar lo recibido.
-func checkRecvOwn(dir string) error {
-	who, fix := ajenos(dir)
+// ajenos dice quién más escribe en dir (Linux: «g+w», «o+w», «owner»; Windows: SID) y la orden que lo arregla ("" si no es segura
+// de pegar o si el dueño es otro: cambiarlo exige privilegios). Un volumen sin permisos por usuario (FAT, exFAT, ntfs-3g sin
+// permissions) devuelve errors.ErrUnsupported y no se sabe nada más; cualquier otro error es de quien llama.
+func ajenos(dir string, root *os.Root) (who []string, fix string, err error) {
+	w, err := foreignWriters(dir, root)
+	if err != nil || len(w.Who) == 0 {
+		return nil, "", err
+	}
+	if w.ForeignOwner {
+		return w.Who, "", nil
+	}
+	if goos == "windows" {
+		return w.Who, sys.IcaclsFix(dir, w.User, w.Who), nil
+	}
+	return w.Who, sys.ChmodFix(dir, w.Who), nil
+}
+
+// checkRecvOwn rechaza la carpeta de RECEPCIÓN (abierta como root) si otro usuario puede escribir en ella: podría plantar o cambiar lo
+// recibido. Falla cerrado: solo un volumen sin permisos por usuario pasa (con el aviso de ServerHintIn); cualquier otro error rechaza.
+func checkRecvOwn(dir string, root *os.Root) error {
+	who, fix, err := ajenos(dir, root)
+	if errors.Is(err, errors.ErrUnsupported) {
+		return nil
+	}
+	if err != nil {
+		return i18n.New("fileserve.err.recv_dir_perm", i18n.A("dir", dir, "err", err.Error()))
+	}
 	if len(who) == 0 {
 		return nil
 	}
@@ -372,22 +396,44 @@ func checkRecvOwn(dir string) error {
 	return i18n.New("fileserve.err.recv_dir_open", i18n.A("dir", dir, "who", strings.Join(who, ", ")))
 }
 
-// fromDirWarning es el aviso (sin rechazo) de la carpeta de PUBLICACIÓN con escritores ajenos, en el idioma loc; "" si no hay.
-func fromDirWarning(loc string, c Config) string {
-	if c.FromDir == "" {
-		return ""
+// dirWarnings son los avisos (sin rechazo) de las carpetas de PUBLICACIÓN (FromDir y la carpeta de cada archivo suelto) y de
+// RECEPCIÓN, en el idioma loc: escritores ajenos, volumen sin permisos por usuario o permisos que no se pudieron leer.
+func dirWarnings(loc string, c Config) []string {
+	type d struct{ dir, kind string }
+	var dirs []d
+	if c.FromDir != "" {
+		dirs = append(dirs, d{c.FromDir, "from"})
 	}
-	dir := c.FromDir
-	if r, err := evalSymlinks(dir); err == nil {
-		dir = r
+	for _, f := range c.Files {
+		dirs = append(dirs, d{filepath.Dir(f), "from"})
 	}
-	who, fix := ajenos(dir)
-	if len(who) == 0 {
-		return ""
+	if c.Write && c.RecvDir != "" {
+		dirs = append(dirs, d{c.RecvDir, "recv"})
 	}
-	code := "fileserve.hint.warn_from_writable"
-	if fix != "" {
-		code += "_cmd"
+	var out []string
+	seen := map[string]bool{}
+	for _, e := range dirs {
+		dir := e.dir
+		if r, err := evalSymlinks(dir); err == nil {
+			dir = r
+		}
+		if seen[dir+"|"+e.kind] {
+			continue
+		}
+		seen[dir+"|"+e.kind] = true
+		who, fix, err := ajenos(dir, nil)
+		switch {
+		case errors.Is(err, errors.ErrUnsupported):
+			out = append(out, i18n.Msg(loc, "fileserve.hint.warn_noperms_"+e.kind, i18n.A("dir", dir)))
+		case err != nil:
+			out = append(out, i18n.Msg(loc, "fileserve.hint.warn_unverified", i18n.A("dir", dir, "err", err.Error())))
+		case len(who) > 0 && e.kind == "from": // en recepción esto ya se rechazó
+			code := "fileserve.hint.warn_from_writable"
+			if fix != "" {
+				code += "_cmd"
+			}
+			out = append(out, i18n.Msg(loc, code, i18n.A("dir", dir, "who", strings.Join(who, ", "), "cmd", fix)))
+		}
 	}
-	return i18n.Msg(loc, code, i18n.A("dir", dir, "who", strings.Join(who, ", "), "cmd", fix))
+	return out
 }
