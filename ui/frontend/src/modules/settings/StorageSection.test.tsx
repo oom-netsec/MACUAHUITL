@@ -177,6 +177,20 @@ describe("motivos de rechazo", () => {
     expect(err).toHaveTextContent(/permisos/i);
   });
 
+  test("rechazo del núcleo para una ruta hostil (UNC, ADS, HTML): reason + metadata.path, bajo su campo y sin interpretar la ruta", async () => {
+    const path = '\\\\?\\C:\\x:ads<img src=x onerror="window.__pwn=1">';
+    const core = fakeCore({ setCorePrefs: vi.fn(async () => { throw Object.assign(new Error("texto del núcleo"), { cause: { code: "FailedPrecondition", reason: "prefs.outputs.reservada", metadata: { code: "reservada", path } } }); }) });
+    view(core);
+    await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));
+    const input = await screen.findByRole("textbox", { name: "Carpeta de salidas" });
+    await waitFor(() => expect(input).toHaveAttribute("aria-invalid", "true"));
+    const err = document.getElementById(input.getAttribute("aria-describedby")!.split(" ").pop()!)!;
+    expect(err).toHaveTextContent(/está reservada/);
+    expect(err.querySelector("img")).toBeNull();
+    expect(err.textContent).not.toContain("<img"); // la ruta del núcleo no se interpola en el texto del rechazo
+    expect(err.querySelector("code")).toBeNull(); // ni hay orden de chmod con una ruta así
+  });
+
   test("otros motivos no muestran chmod", async () => {
     view(failing("no_existe"));
     await userEvent.click(await screen.findByRole("button", { name: "Guardar" }));

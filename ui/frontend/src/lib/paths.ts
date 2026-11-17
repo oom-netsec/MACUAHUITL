@@ -16,3 +16,11 @@ export function dirName(p: string): string {
   const d = p.slice(0, i);
   return d === "" || (isWindows() && /^[A-Za-z]:$/.test(d)) ? p.slice(0, i + 1) : d;
 }
+
+/** Ruta que la app no acepta en Windows (clave de i18n) o null. Solo Windows: en Linux «\\» y «:» son caracteres de un nombre y «//» es una ruta común.
+ *  UNC y \\?\ \\.\ (con «/» también) abren recursos de red o dispositivos que el usuario no ve; «archivo:flujo» escribe en un flujo de datos alterno (ADS) que ningún listado muestra. */
+export function pathProblem(p: string): "paths.err.unc" | "paths.err.ads" | null {
+  if (!isWindows()) return null;
+  if (/^[\\/]{2}/.test(p)) return "paths.err.unc";
+  return (/^[A-Za-z]:/.test(p) ? p.slice(2) : p).includes(":") ? "paths.err.ads" : null;
+}

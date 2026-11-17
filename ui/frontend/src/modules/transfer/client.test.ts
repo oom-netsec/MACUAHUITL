@@ -158,3 +158,13 @@ test("en Windows el origen local acepta «\\» y la raíz de la unidad; en Linux
   } finally { setOSForTests(undefined); }
   expect(clientErrors(f({ dir: "put", src: "C:\\x\\f.bin" })).src).toBe("transfer.err.srcPath");
 });
+
+test("en Windows el origen de envío rechaza UNC, \\?\\ y ADS con su mensaje; en Linux los deja pasar", () => {
+  setOSForTests("windows");
+  try {
+    expect(clientErrors(f({ dir: "put", src: "\\\\srv\\share\\f.bin" })).src).toBe("paths.err.unc");
+    expect(clientErrors(f({ dir: "put", src: "\\\\?\\C:\\x\\f.bin" })).src).toBe("paths.err.unc");
+    expect(clientErrors(f({ dir: "put", src: "C:\\x\\f.bin:flujo" })).src).toBe("paths.err.ads");
+  } finally { setOSForTests(undefined); }
+  expect(clientErrors(f({ dir: "put", src: "/home/u/f.bin:flujo" })).src).toBeUndefined();
+});

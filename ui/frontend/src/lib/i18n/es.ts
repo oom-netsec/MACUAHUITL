@@ -3001,6 +3001,8 @@ export const es = {
   "vault.import.label": "Etiqueta de la llave importada",
   "vault.import.user": "Usuario de la llave importada",
   "vault.key.regen.confirmImportedShort": "Confirmar: reemplazar",
+  "paths.err.unc": "En Windows no se aceptan rutas de red (\\\\servidor\\recurso) ni de dispositivo (\\\\?\\, \\\\.\\): usa una carpeta local con unidad, como C:\\datos.",
+  "paths.err.ads": "La ruta trae «:» después de la unidad: apunta a un flujo de datos alterno (archivo:flujo), que no se ve en los listados. Quita ese tramo.",
 };
 
 export type Key = keyof typeof es;

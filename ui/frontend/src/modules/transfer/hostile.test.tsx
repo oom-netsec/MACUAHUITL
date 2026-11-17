@@ -63,3 +63,17 @@ test("nftLeftoverCmd: la orden sale solo con protocolo y puerto limpios; un nomb
   // El host solo decide la familia: lo que traiga no se interpola.
   expect(nftLeftoverCmd("tftp", "::1; reboot", 69)).toBe("sudo nft delete table ip6 macuahuitl_tftp_6969");
 });
+
+test("serveProblem: las carpetas del servidor rechazan rutas de Windows peligrosas (solo en Windows)", async () => {
+  const { serveProblem } = await import("./validate");
+  const { setOSForTests } = await import("../../lib/platform");
+  const form = { proto: "tftp" as const, any: false, listen: "192.0.2.10", port: "69", write: true, recvDir: "/r", fromDir: "/s", files: "", allow: "192.0.2.1", minutes: "30" };
+  setOSForTests("windows");
+  try {
+    expect(serveProblem({ ...form, fromDir: "C:\\s", recvDir: "C:\\r" })).toBeNull();
+    expect(serveProblem({ ...form, fromDir: "\\\\srv\\share\\s", recvDir: "C:\\r" })).toBe("paths.err.unc");
+    expect(serveProblem({ ...form, fromDir: "C:\\s", recvDir: "C:\\r:ads" })).toBe("paths.err.ads");
+    expect(serveProblem({ ...form, write: false, fromDir: "C:\\s", recvDir: "\\\\?\\C:\\r" })).toBeNull(); // sin escritura, recvDir no se usa
+  } finally { setOSForTests(undefined); }
+  expect(serveProblem({ ...form, fromDir: "\\\\srv\\share\\s", recvDir: "/r:x" })).toBeNull(); // Linux: nombres comunes
+});

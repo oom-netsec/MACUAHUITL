@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useT } from "../lib/i18n";
 import { Terminal } from "./Terminal";
 import { Icon } from "./Icon";
+import { pathProblem } from "../lib/paths";
 
 // Ancho del campo según lo que se escribe (ADR 0009): xs puerto, sm número, md nombre, lg host o ruta, full texto largo.
 export type Width = "xs" | "sm" | "md" | "lg" | "full";
@@ -50,11 +51,13 @@ export function TextArea({ label, hint, error, value, onChange, rows = 5, readOn
 // Ruta escrita a mano o elegida con el diálogo nativo; cancelar el diálogo conserva lo que había.
 export function PathField({ label, hint, error, value, onChange, pick }: { label: string; hint?: string; error?: ReactNode; value: string; onChange: (v: string) => void; pick: () => Promise<string> }) {
   const t = useT();
+  const bad = pathProblem(value); // el error de la pantalla manda; si no hay, el de la validación compartida va junto al campo
+  const shown = error ?? (bad && t(bad));
   return (
-    <Labeled label={label} hint={hint} error={error}>
+    <Labeled label={label} hint={hint} error={shown}>
       {(id, hintId) => (
         <div className="path">
-          <input id={id} value={value} spellCheck={false} autoComplete="off" aria-describedby={hintId} aria-invalid={error ? true : undefined} onChange={(e) => onChange(e.target.value)} />
+          <input id={id} value={value} spellCheck={false} autoComplete="off" aria-describedby={hintId} aria-invalid={shown ? true : undefined} onChange={(e) => onChange(e.target.value)} />
           <button type="button" aria-label={`${t("common.browse")} ${label}`} onClick={async () => { const p = await pick(); if (p) onChange(p); }}>
             {t("common.browse")}
           </button>

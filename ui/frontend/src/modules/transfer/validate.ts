@@ -1,5 +1,6 @@
 import type { Key } from "../../lib/i18n/es";
 import type { TransferProto } from "./api";
+import { pathProblem } from "../../lib/paths";
 
 // Puerto estándar del protocolo por omisión (IOS no deja elegir otro). Si el sistema niega el bind, el núcleo explica cómo permitirlo.
 const defaultPort: Record<TransferProto, string> = { tftp: "69", ftp: "21", scp: "22", sftp: "22", http: "80" };
@@ -25,6 +26,8 @@ export interface ServeForm { proto: TransferProto; any: boolean; listen: string;
 
 // Primer problema del formulario (clave de i18n) o null. El puerto bajo lo decide el bind del núcleo, no la UI.
 export function serveProblem(f: ServeForm): Key | null {
+  const pp = (f.fromDir && pathProblem(f.fromDir)) || (f.write && f.recvDir && pathProblem(f.recvDir));
+  if (pp) return pp;
   if (!f.any && !f.listen) return "transfer.err.listen";
   const port = Number(f.port);
   if (!Number.isInteger(port) || port < 1 || port > 65535) return "transfer.err.port";
