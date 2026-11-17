@@ -113,7 +113,7 @@ func TestPipeNombreLlevaElSID(t *testing.T) {
 }
 
 func TestPipeSDDLSoloElUsuario(t *testing.T) {
-	if got := pipeSDDL("S-1-5-21-1-2-3-1001"); got != "O:S-1-5-21-1-2-3-1001D:P(A;;GA;;;S-1-5-21-1-2-3-1001)" {
+	if got := pipeSDDL("S-1-5-21-1-2-3-1001"); got != "O:S-1-5-21-1-2-3-1001D:P(A;;GA;;;S-1-5-21-1-2-3-1001)S:(ML;;NW;;;ME)" { // etiqueta Medium explícita (M1)
 		t.Fatalf("pipeSDDL = %q", got)
 	}
 }
