@@ -78,7 +78,7 @@ func serveTFTP(ctx context.Context, c Config, src *source, rcv *receiver) error 
 	perIP := map[string]int{} // el origen de un RRQ es falsificable: nadie acapara los cupos
 	var wg sync.WaitGroup
 	defer wg.Wait()
-	buf := make([]byte, 2048)
+	buf := make([]byte, maxDatagram)
 	for {
 		n, from, err := pc.ReadFrom(buf)
 		if err != nil {
@@ -87,7 +87,7 @@ func serveTFTP(ctx context.Context, c Config, src *source, rcv *receiver) error 
 			}
 			return fmt.Errorf("fileserve: %w", err)
 		}
-		req, err := parseRequest(buf[:n])
+		req, err := parseRequest(buf[:min(n, 2048)])
 		if err != nil {
 			continue // basura: ni respuesta ni registro, para no amplificar
 		}
@@ -171,10 +171,14 @@ type xfer struct {
 	tries   int
 }
 
+// maxDatagram es el máximo de un datagrama UDP: con un búfer menor Linux trunca en silencio pero Windows falla la
+// lectura (WSAEMSGSIZE) y un par hostil tumbaría el servidor o la transferencia.
+const maxDatagram = 65535
+
 // exchange envía pkt y espera el ACK del bloque indicado; reenvía al vencer el plazo.
 // Los ACK duplicados se ignoran sin reenviar (síndrome del aprendiz de brujo, RFC 1123).
 func (x *xfer) exchange(pkt []byte, block uint16) error {
-	buf := make([]byte, 1024)
+	buf := make([]byte, maxDatagram)
 	for try := 0; try < x.tries; try++ {
 		if _, err := x.conn.WriteTo(pkt, x.peer); err != nil {
 			return err
@@ -302,7 +306,7 @@ func ackPacket(block uint16) []byte { return binary.BigEndian.AppendUint16([]byt
 // awaitData envía pkt (ACK u OACK) y espera el DATA del bloque indicado; reenvía pkt al
 // vencer el plazo. Un DATA más largo que blk viola el acuerdo y aborta.
 func (x *xfer) awaitData(pkt []byte, block uint16, blk int) ([]byte, error) {
-	buf := make([]byte, 4+blk+1)
+	buf := make([]byte, maxDatagram) // un DATA mayor que 4+blk se detecta por n
 	for try := 0; try < x.tries; try++ {
 		if _, err := x.conn.WriteTo(pkt, x.peer); err != nil {
 			return nil, err
