@@ -191,7 +191,7 @@ func (s *svc) GetMany(r *v1.GetManyRequest, st v1.TransferService_GetManyServer)
 			return err
 		}
 	}
-	if _, err := fileserve.ValidateDir(dest); err != nil {
+	if _, err := fileserve.ValidateDir(dest, s.d.DenyDirs()...); err != nil {
 		return service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	if _, _, err := s.limits(ctx, r.MaxBytes, r.TimeoutSeconds); err != nil {

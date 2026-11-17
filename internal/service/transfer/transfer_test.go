@@ -492,3 +492,25 @@ func TestRedirectHintRechazaZona(t *testing.T) {
 		}
 	}
 }
+
+// Las carpetas de datos y configuración de la app (bóveda, base) no se publican ni se reciben en ellas, en ningún sistema.
+func TestCarpetasDeLaAppSeRechazan(t *testing.T) {
+	s, d := newTest(t)
+	datos := t.TempDir()
+	d.Deny = []string{datos}
+	st := &fakeStream{ctx: context.Background(), out: make(chan *v1.StartServerResponse, 4)}
+	for name, req := range map[string]*v1.StartServerRequest{
+		"publica": {Protocol: "tftp", Listen: "127.0.0.1", FromDir: datos},
+		"recibe":  {Protocol: "ftp", Listen: "127.0.0.1", Write: true, RecvDir: datos},
+	} {
+		if err := s.StartServer(req, st); code(err) != codes.InvalidArgument {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if _, err := s.Get(context.Background(), &v1.GetRequest{Url: "http://127.0.0.1/a", DestDir: datos}); code(err) != codes.InvalidArgument {
+		t.Errorf("get: %v", err)
+	}
+	if _, err := s.Put(context.Background(), &v1.PutRequest{Url: "http://127.0.0.1/a", FromDir: datos, Name: "x"}); code(err) != codes.InvalidArgument {
+		t.Errorf("put: %v", err)
+	}
+}

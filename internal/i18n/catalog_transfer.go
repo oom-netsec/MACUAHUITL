@@ -64,6 +64,7 @@ func init() {
 		"fileserve.err.dir_symlink":       e("fileserve: {dir} es un enlace simbólico; indica la ruta real de la carpeta", "fileserve: {dir} is a symbolic link; give the real path of the folder", "dir"),
 		"fileserve.err.dir_not_dir":       e("fileserve: {dir} no es una carpeta", "fileserve: {dir} is not a folder", "dir"),
 		"fileserve.err.dir_sensitive":     e("fileserve: la carpeta {dir} es sensible ({deny}): elige otra", "fileserve: the folder {dir} is sensitive ({deny}): choose another", "dir", "deny"),
+		"fileserve.err.dir_no_drive":      e("fileserve: la ruta {dir} no empieza con una letra de unidad (se rechazan \\\\?\\, \\\\.\\ y las rutas de red): usa una ruta como C:\\carpeta", "fileserve: the path {dir} does not start with a drive letter (\\\\?\\, \\\\.\\ and network paths are rejected): use a path like C:\\folder", "dir"),
 		"fileserve.err.dir_root":          e("fileserve: la carpeta raíz no se puede usar: elige otra", "fileserve: the root folder cannot be used: choose another"),
 		"fileserve.err.no_home":           e("fileserve: no se pudo saber la carpeta personal; no se publica ni se recibe nada sin saberla", "fileserve: the home folder could not be determined; nothing is published or received without it"),
 		"fileserve.err.dir_home":          e("fileserve: tu carpeta personal completa no se puede usar (tiene los archivos que el shell y el escritorio cargan solos): elige una subcarpeta", "fileserve: your whole home folder cannot be used (it holds the files the shell and the desktop load on their own): choose a subfolder"),

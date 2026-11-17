@@ -295,15 +295,6 @@ func TestServeRejectsSensitiveFolders(t *testing.T) {
 	}
 }
 
-// skipEnWindowsPorHandle: en Windows la carpeta abierta (os.Root) no se puede renombrar ni reemplazar mientras está
-// abierta, así que el intercambio por un enlace que esta prueba intenta no es posible: el handle ya da esa protección.
-func skipEnWindowsPorHandle(t *testing.T) {
-	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows no deja renombrar una carpeta abierta: el intercambio por un enlace no puede ocurrir")
-	}
-}
-
 // swapForLink reemplaza dir por un enlace simbólico a other (la carpeta original se muda a dir+".orig").
 func swapForLink(t *testing.T, dir, other string) string {
 	t.Helper()
@@ -319,7 +310,6 @@ func swapForLink(t *testing.T, dir, other string) string {
 
 // Cambiar la carpeta de recepción por un enlace simbólico después de validarla no desvía lo que se escribe.
 func TestReceiverPinnedAgainstSymlinkSwap(t *testing.T) {
-	skipEnWindowsPorHandle(t)
 	recv, elsewhere := filepath.Join(realTemp(t), "recv"), realTemp(t)
 	os.Mkdir(recv, 0o700)
 	src, rcv, err := prepare(Config{Addr: "127.0.0.1:6969", Proto: "tftp", Write: true, RecvDir: recv, Allow: []netip.Addr{netip.MustParseAddr("127.0.0.1")}})
@@ -350,7 +340,6 @@ func TestReceiverPinnedAgainstSymlinkSwap(t *testing.T) {
 
 // Lo mismo con la carpeta publicada: se sigue sirviendo la validada, no el enlace.
 func TestSourcePinnedAgainstSymlinkSwap(t *testing.T) {
-	skipEnWindowsPorHandle(t)
 	pub, elsewhere := filepath.Join(realTemp(t), "pub"), realTemp(t)
 	os.Mkdir(pub, 0o700)
 	os.WriteFile(filepath.Join(pub, "a.bin"), []byte("original"), 0o600)

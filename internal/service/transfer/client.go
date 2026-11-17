@@ -176,7 +176,7 @@ func (s *svc) get(ctx context.Context, r *v1.GetRequest, onProgress func(xfer.Pr
 			return nil, err
 		}
 	}
-	if _, err := fileserve.ValidateDir(dest); err != nil { // errores de uso antes de tocar la red
+	if _, err := fileserve.ValidateDir(dest, s.d.DenyDirs()...); err != nil { // errores de uso antes de tocar la red
 		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	}
 	j, err := s.open(ctx, r.Url, r.CredentialId, r.AcceptedHostKeyFingerprints, r.LegacySsh)
@@ -187,6 +187,7 @@ func (s *svc) get(ctx context.Context, r *v1.GetRequest, onProgress func(xfer.Pr
 	if r.Insecure && j.u.Scheme != "https" {
 		return nil, bad(ctx, "transfer.svc.insecure")
 	}
+	j.req.DenyDirs = s.d.DenyDirs()
 	j.req.DestDir, j.req.Name, j.req.WantSHA256, j.req.WantMD5 = dest, r.Name, r.Sha256, r.Md5
 	j.req.MaxBytes, j.req.Timeout, j.req.Insecure, j.req.OnProgress = max, to, r.Insecure, onProgress
 	s.d.Audit("transfer.get.start", j.label, fmt.Sprintf("job=%s destination=%q credential=%q insecure=%t legacy_ssh=%t", j.id, dest, r.CredentialId, r.Insecure, r.LegacySsh))
@@ -221,7 +222,7 @@ func (s *svc) put(ctx context.Context, r *v1.PutRequest, onProgress func(xfer.Pr
 	if err != nil {
 		return nil, err
 	}
-	if f, _, err := fileserve.OpenFrom(r.FromDir, r.Name); err != nil { // errores de uso antes de tocar la red
+	if f, _, err := fileserve.OpenFrom(r.FromDir, r.Name, s.d.DenyDirs()...); err != nil { // errores de uso antes de tocar la red
 		return nil, service.ErrFrom(ctx, codes.InvalidArgument, err)
 	} else {
 		f.Close()
@@ -231,6 +232,7 @@ func (s *svc) put(ctx context.Context, r *v1.PutRequest, onProgress func(xfer.Pr
 		return nil, err
 	}
 	defer j.done()
+	j.req.DenyDirs = s.d.DenyDirs()
 	j.req.FromDir, j.req.Name, j.req.MaxBytes, j.req.Timeout, j.req.OnProgress = r.FromDir, r.Name, max, to, onProgress
 	s.d.Audit("transfer.put.start", j.label, fmt.Sprintf("job=%s folder=%q file=%q credential=%q legacy_ssh=%t", j.id, r.FromDir, r.Name, r.CredentialId, r.LegacySsh))
 	res, err := xfer.Upload(ctx, j.req)

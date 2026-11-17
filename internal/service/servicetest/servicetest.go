@@ -34,6 +34,7 @@ type Deps struct {
 	Look    func(string) (string, error)
 	H       *transport.KnownHosts
 	S       *service.CoreSettings
+	Deny    []string // lo que devuelve DenyDirs (carpetas de datos y configuración de la app)
 	db      *sql.DB
 	clock   func() time.Time
 	closers []func()
@@ -109,6 +110,7 @@ func (d *Deps) DB() *sql.DB                                { return d.db }
 func (d *Deps) Outputs() string                            { return d.S.Outputs() }
 func (d *Deps) Settings() *service.CoreSettings            { return d.S }
 func (d *Deps) DiagLookPath() func(string) (string, error) { return d.Look }
+func (d *Deps) DenyDirs() []string                         { return d.Deny }
 func (d *Deps) Hosts() *transport.KnownHosts               { return d.H }
 func (d *Deps) OnClose(f func())                           { d.closers = append(d.closers, f) }
 

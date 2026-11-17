@@ -24,6 +24,18 @@ var sensitiveHome = []string{".ssh", ".gnupg", ".aws", ".kube", ".docker", ".con
 	".cargo", ".rustup", "go/bin", ".nvm", ".pyenv", ".rbenv", ".npm-global",
 	".bashrc.d", ".profile.d", ".bash_completion.d", ".zshrc.d", ".mozilla", ".pki"}
 
+// goos es variable para que las pruebas simulen la rama de Windows en cualquier sistema.
+var goos = runtime.GOOS
+
+// exigeUnidad: en Windows de verdad (no en la simulación, que usa rutas del anfitrión) la ruta debe empezar con letra de unidad.
+var exigeUnidad = runtime.GOOS == "windows"
+
+// sinLetraDeUnidad dice si p no empieza con «X:» (letra de unidad): \\?\C:\, \\.\, \??\ y las UNC saltarían la
+// lista de Windows porque ni Clean ni EvalSymlinks les quitan el prefijo. Pura: se prueba en cualquier sistema.
+func sinLetraDeUnidad(p string) bool {
+	return len(p) < 2 || p[1] != ':' || !(p[0] >= 'a' && p[0] <= 'z' || p[0] >= 'A' && p[0] <= 'Z')
+}
+
 // evalSymlinks y homeDir son variables para que las pruebas simulen su fallo.
 var evalSymlinks = filepath.EvalSymlinks
 
@@ -45,6 +57,9 @@ func windowsSensitiveDirs() []string {
 	for _, env := range []string{"SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData"} {
 		if v := os.Getenv(env); filepath.IsAbs(v) {
 			out = append(out, v)
+			if r, err := evalSymlinks(v); err == nil && r != v { // la ruta real también (C:\WINDOWS, enlaces, nombres cortos)
+				out = append(out, r)
+			}
 		}
 	}
 	return out
@@ -52,7 +67,7 @@ func windowsSensitiveDirs() []string {
 
 func denyList(extra []string) []string {
 	out := append([]string(nil), sensitiveDirs...)
-	if runtime.GOOS == "windows" {
+	if goos == "windows" {
 		out = append(out, windowsSensitiveDirs()...)
 	}
 	if home, err := homeDir(); err == nil {
@@ -64,7 +79,7 @@ func denyList(extra []string) []string {
 			for _, h := range sensitiveHome {
 				out = append(out, filepath.Join(hm, h))
 			}
-			if runtime.GOOS == "windows" { // AppData guarda credenciales y la carpeta Inicio (Startup) ejecuta lo que haya
+			if goos == "windows" { // AppData guarda credenciales y la carpeta Inicio (Startup) ejecuta lo que haya
 				out = append(out, filepath.Join(hm, "AppData"))
 			}
 		}
@@ -121,6 +136,9 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 		return "", nil, i18n.New("fileserve.err.dir_relative", i18n.A("dir", dir))
 	}
 	clean := filepath.Clean(dir)
+	if exigeUnidad && sinLetraDeUnidad(clean) {
+		return "", nil, i18n.New("fileserve.err.dir_no_drive", i18n.A("dir", clean))
+	}
 	st, err := os.Lstat(clean)
 	if err != nil {
 		return "", nil, i18n.Wrap("fileserve.err.dir_unreadable", err, nil)
@@ -134,6 +152,9 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	real, err := evalSymlinks(clean)
 	if err != nil {
 		return "", nil, fmt.Errorf("fileserve: %w", err)
+	}
+	if exigeUnidad && sinLetraDeUnidad(real) {
+		return "", nil, i18n.New("fileserve.err.dir_no_drive", i18n.A("dir", real))
 	}
 	home, err := homeDir()
 	if err != nil {
@@ -164,18 +185,17 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	return real, st, nil
 }
 
-// denied dice si p cae en la carpeta sensible d. Excepción: la carpeta temporal del usuario, que en Windows
-// vive en AppData\Local\Temp, es el equivalente de /tmp (permitido); el resto de AppData sigue bloqueado.
-// Se compara con la ruta tal cual llega: quien pasa un enlace desde Temp hacia AppData\Roaming también
+// denied dice si p cae en la carpeta sensible d. Excepción: <home>\AppData\Local\Temp (la carpeta temporal del
+// usuario en Windows, equivalente de /tmp) y lo que cuelga de ella; no depende de TMP/TEMP, que el usuario puede
+// apuntar a AppData. El resto de AppData sigue bloqueado: quien pasa un enlace desde Temp hacia Roaming también
 // entrega su ruta real (validateDir/checkPathsDeny prueban ambas), y esa sí cae en Roaming.
 func denied(p, d string) bool {
 	if !inside(p, d) {
 		return false
 	}
-	if runtime.GOOS == "windows" { // solo si la carpeta temporal está dentro de d (AppData real, no un HOME de prueba)
-		for _, t := range []string{os.TempDir(), tempReal()} {
-			t = strings.ToLower(filepath.Clean(t))
-			if t != "" && inside(t, strings.ToLower(d)) && inside(strings.ToLower(p), t) {
+	if goos == "windows" {
+		for _, hm := range homesOf() {
+			if t := filepath.Join(hm, "AppData", "Local", "Temp"); inside(t, d) && inside(p, t) {
 				return false
 			}
 		}
@@ -183,17 +203,25 @@ func denied(p, d string) bool {
 	return true
 }
 
-func tempReal() string {
-	r, err := evalSymlinks(os.TempDir())
+// homesOf es $HOME tal cual y resuelto.
+func homesOf() []string {
+	home, err := homeDir()
 	if err != nil {
-		return ""
+		return nil
 	}
-	return r
+	out := []string{filepath.Clean(home)}
+	if r, err := evalSymlinks(home); err == nil && r != out[0] {
+		out = append(out, r)
+	}
+	return out
 }
 
-// inside dice si p es d o cuelga de d.
+// inside dice si p es d o cuelga de d (en Windows sin distinguir mayúsculas).
 func inside(p, d string) bool {
 	d = filepath.Clean(d)
+	if goos == "windows" {
+		return len(p) >= len(d) && strings.EqualFold(p[:len(d)], d) && (len(p) == len(d) || p[len(d)] == filepath.Separator)
+	}
 	return p == d || strings.HasPrefix(p, d+string(filepath.Separator))
 }
 
@@ -202,6 +230,11 @@ func inside(p, d string) bool {
 func checkPathsDeny(extra []string, paths ...string) error {
 	if _, err := homeDir(); err != nil {
 		return err
+	}
+	for _, p := range paths {
+		if exigeUnidad && sinLetraDeUnidad(p) {
+			return i18n.New("fileserve.err.dir_no_drive", i18n.A("dir", p))
+		}
 	}
 	for _, d := range denyList(extra) {
 		for _, p := range paths {

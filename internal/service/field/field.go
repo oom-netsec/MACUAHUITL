@@ -185,13 +185,13 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	if err := fileserve.ValidateAddr(addr, r.AllowAny); err != nil {
 		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	}
-	if _, err := fileserve.Publish(r.Files); err != nil {
+	if _, err := fileserve.Publish(r.Files, s.d.DenyDirs()...); err != nil {
 		return service.ErrFrom(st.Context(), codes.InvalidArgument, err)
 	}
 	ctx, cancel := context.WithTimeout(st.Context(), service.SyslogDuration(r.DurationSeconds))
 	defer cancel()
 	k := newServeSink(i18n.Locale(st.Context()), s.d.Audit, st.Send)
-	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, OnTransfer: k.onTransfer}
+	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, DenyDirs: s.d.DenyDirs(), OnTransfer: k.onTransfer}
 	cfg.OnListening = func(a string) {
 		s.d.Audit("field.serve", a, fmt.Sprintf("proto=%s all=%t files=%q duration=%s", r.Protocol, r.AllowAny, r.Files, service.SyslogDuration(r.DurationSeconds)))
 		k.events <- &v1.ServeFilesResponse{Listening: a, Hint: fileserve.HintIn(i18n.Locale(st.Context()), r.Protocol, a, r.Files)}
