@@ -19,8 +19,12 @@ func TestHerramientasWindowsNoSeResuelvenPorCwdNiPath(t *testing.T) {
 	}
 	want := sys + `\System32\PING.EXE`
 	evil := t.TempDir()
-	for _, n := range []string{"ping.exe", "tracert.exe", "nmap.exe", "dumpcap.exe"} {
-		if err := os.WriteFile(filepath.Join(evil, n), []byte("MZ"), 0o700); err != nil {
+	for _, n := range []string{`Nmap\nmap.exe`, `Wireshark\dumpcap.exe`, `iperf3\iperf3.exe`, `System32\PING.EXE`, `System32\TRACERT.EXE`} {
+		p := filepath.Join(evil, n)
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("MZ"), 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -39,7 +43,7 @@ func TestHerramientasWindowsNoSeResuelvenPorCwdNiPath(t *testing.T) {
 	if got, _ := lookPath("ping"); !strings.EqualFold(got, want) {
 		t.Errorf("ping = %q", got)
 	}
-	for _, bin := range []string{"nmap", "dumpcap"} {
+	for _, bin := range []string{"nmap", "dumpcap", "iperf3"} {
 		if got, err := lookPath(bin); err == nil && strings.HasPrefix(strings.ToLower(got), strings.ToLower(evil)) {
 			t.Errorf("%s salió de la carpeta falsa: %q", bin, got)
 		}
@@ -49,9 +53,11 @@ func TestHerramientasWindowsNoSeResuelvenPorCwdNiPath(t *testing.T) {
 	}
 	// Y el comando del hijo corre desde la carpeta de la herramienta, no desde el cwd heredado.
 	cmd := exec.Command(want)
-	if _, _, err := confine(cmd); err != nil {
+	_, done, err := confine(cmd)
+	if err != nil {
 		t.Fatal(err)
 	}
+	defer done()
 	if !strings.EqualFold(cmd.Dir, sys+`\System32`) {
 		t.Errorf("cmd.Dir = %q", cmd.Dir)
 	}

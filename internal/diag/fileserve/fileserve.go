@@ -197,7 +197,7 @@ func RedirectCommandIn(loc, proto, ip string, port int) string {
 // tiene puerto privilegiado). Se muestra al cerrar el servidor.
 func RedirectCleanup(proto, ip string, port int) string {
 	if isWindows() {
-		return firewallRemove(proto, ip, port)
+		return firewallRemove(proto, ip, port, exePath())
 	}
 	if _, ok := standard[proto]; !ok {
 		return ""

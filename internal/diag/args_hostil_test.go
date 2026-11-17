@@ -10,7 +10,7 @@ import (
 func TestArgsHostilesDestino(t *testing.T) {
 	hostiles := []string{
 		"-oN", "-oN/tmp/x", "-iL", "-iL/etc/passwd", "--script", "--script=x", "--iflist", "-", "--",
-		"a -oN x", "a\n-oN x", "a\r-oN", "a\x00-oN", "a\u0085b", "a b", "a‮b", "a b", " a", "a ", "a\tb",
+		"a -oN x", "a\n-oN x", "a\r-oN", "a\x00-oN", "a\u0085b", "a\u2028b", "a\u202eb", "a b", " a", "a ", "a\tb",
 		"a;b", "a&b", "a|b", "a`b", "a$(b)", "a'b", `a"b`, "a=b", "a@b", "/x", "/?", "\\\\srv\\x", "a/24x", "10.0.0.1 -oN", "10.0.0.0/24 -oN",
 		"@file", "host\n", "\nhost", "\x00",
 	}
@@ -28,14 +28,14 @@ func TestArgsHostilesDestino(t *testing.T) {
 
 func TestArgsHostilesInterfazYFiltro(t *testing.T) {
 	for _, win := range []bool{false, true} {
-		for _, iface := range []string{"-oN", "-w", "--iflist", "-i", "/x", "eth0;reboot", "eth0 -w /x", "eth0\n-w", "eth0\x00", "eth0\u0085", "eth0 ", "eth0‮", "", " ", "$(x)", "eth0`x`", "\\Device\\NPF_{x}", "\\Device\\NPF_{00000000-0000-0000-0000-000000000000}\n"} {
+		for _, iface := range []string{"-oN", "-w", "--iflist", "-i", "/x", "eth0;reboot", "eth0 -w /x", "eth0\n-w", "eth0\x00", "eth0\u0085", "eth0\u2028", "eth0\u202e", "", " ", "$(x)", "eth0`x`", "\\Device\\NPF_{x}", "\\Device\\NPF_{00000000-0000-0000-0000-000000000000}\n"} {
 			if _, argv, err := build(req(Pcap, "", map[string]string{"interface": iface}, "/tmp/o"), win); err == nil && !(win && strings.HasPrefix(iface, "\\Device\\NPF_{0")) {
 				t.Errorf("win=%v iface %q aceptada: %q", win, iface, argv)
 			}
 		}
 	}
 	// El filtro BPF viaja como UN argumento tras -f aunque lleve saltos, comillas o «-w».
-	for _, f := range []string{"-w /tmp/x", "host 1.1.1.1\n-w /tmp/x", `host "a"`, "a'b", "$(x)", "tcp port 22", "tcp‮port 22", "a\x00b"} {
+	for _, f := range []string{"-w /tmp/x", "host 1.1.1.1\n-w /tmp/x", `host "a"`, "a'b", "$(x)", "tcp\u2028port 22", "tcp\u202eport 22", "a\x00b"} {
 		_, argv, err := build(req(Pcap, "", map[string]string{"interface": "eth0", "filter": f}, "/tmp/o"), false)
 		if err != nil {
 			continue // rechazar también es correcto
@@ -58,7 +58,7 @@ func TestArgsHostilesInterfazYFiltro(t *testing.T) {
 // Las opciones de texto libre (ports, bind) tampoco admiten flags ni saltos.
 func TestArgsHostilesOpcionesNmapIperf(t *testing.T) {
 	localTest(t)
-	for _, p := range []string{"-oN x", "80\n-oN", "80,", "80 -oN", "--script", "80\x00", "80;81", "-p", "", "80 "} {
+	for _, p := range []string{"-oN x", "80\n-oN", "80,", "80 -oN", "--script", "80\x00", "80;81", "-p", "", "80\u2028"} {
 		if _, _, err := build(req(Nmap, "10.0.0.1", map[string]string{"ports": p}, ""), false); err == nil {
 			t.Errorf("ports %q aceptado", p)
 		}

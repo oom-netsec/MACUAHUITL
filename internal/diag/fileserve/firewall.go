@@ -24,13 +24,13 @@ var (
 )
 
 // exeSeguro dice si la ruta se puede citar sin engañar al que la lee: unidad X:\ y nada de caracteres de control,
-// saltos de línea (U+0085, U+2028/9), formato/bidi (Cf) ni NUL. Si no, no se emite la regla (no se intenta escapar).
+// saltos de línea (U+0085, U+2028/9), formato/bidi (Cf, salvo ZWNJ/ZWJ de los nombres persas e índicos) ni NUL. Si no, no se emite la regla (no se intenta escapar).
 func exeSeguro(p string) bool {
 	if len(p) < 3 || p[1] != ':' || p[2] != '\\' || !(p[0]|0x20 >= 'a' && p[0]|0x20 <= 'z') {
 		return false
 	}
 	for _, r := range p {
-		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || unicode.In(r, unicode.Zl, unicode.Zp) || r == unicode.ReplacementChar {
+		if unicode.IsControl(r) || (unicode.Is(unicode.Cf, r) && r != '\u200c' && r != '\u200d') || unicode.In(r, unicode.Zl, unicode.Zp) || r == unicode.ReplacementChar {
 			return false
 		}
 	}
@@ -42,6 +42,12 @@ func esLoopback(ip string) bool {
 	a, err := netip.ParseAddr(strings.Trim(ip, "[]"))
 	return err == nil && a.Unmap().IsLoopback()
 }
+
+// ruleOK: un solo criterio para emitir la regla y su limpieza: ni loopback ni ruta insegura.
+func ruleOK(ip, exe string) bool { return !esLoopback(ip) && exeSeguro(exe) }
+
+// NeedsRule dice si en Windows la IP necesita regla de firewall (loopback no).
+func NeedsRule(ip string) bool { return !esLoopback(ip) }
 
 func isWindows() bool { return hintOS == "windows" }
 
@@ -72,10 +78,13 @@ func fwName(proto, ip string, port int) string {
 // y se dice. firewallRule le agrega cómo quitarla; firewallCommand es solo el comando (lo que se copia).
 func firewallRule(loc, proto, ip string, port int, exe string, pasv [2]uint16) string {
 	c := firewallCommand(loc, proto, ip, port, exe, pasv)
-	if c == "" || !exeSeguro(exe) {
-		return c
+	if c == "" {
+		if _, ok := standard[proto]; ok && NeedsRule(ip) { // solo aquí viaja la nota: esta pista es prosa, no se copia
+			return i18n.Msg(loc, "fileserve.hint.win_no_exe", nil)
+		}
+		return ""
 	}
-	return c + "   " + i18n.Msg(loc, "fileserve.hint.nft_remove", i18n.A("cmd", firewallRemove(proto, ip, port)))
+	return c + "   " + i18n.Msg(loc, "fileserve.hint.nft_remove", i18n.A("cmd", firewallRemove(proto, ip, port, exe)))
 }
 
 func firewallCommand(loc, proto, ip string, port int, exe string, pasv [2]uint16) string {
@@ -83,11 +92,8 @@ func firewallCommand(loc, proto, ip string, port int, exe string, pasv [2]uint16
 	if !ok {
 		return ""
 	}
-	if esLoopback(ip) {
+	if !ruleOK(ip, exe) {
 		return ""
-	}
-	if !exeSeguro(exe) {
-		return i18n.Msg(loc, "fileserve.hint.win_no_exe", nil)
 	}
 	_, addr := redirTarget(loc, ip)
 	lp := strconv.Itoa(port)
@@ -106,8 +112,8 @@ func firewallCommand(loc, proto, ip string, port int, exe string, pasv [2]uint16
 }
 
 // firewallRemove quita la regla de firewallRule ("" si el protocolo no tiene puerto estándar).
-func firewallRemove(proto, ip string, port int) string {
-	if _, ok := standard[proto]; !ok || esLoopback(ip) {
+func firewallRemove(proto, ip string, port int, exe string) string {
+	if _, ok := standard[proto]; !ok || !ruleOK(ip, exe) {
 		return ""
 	}
 	return "Remove-NetFirewallRule -DisplayName " + psq(fwName(proto, ip, port))

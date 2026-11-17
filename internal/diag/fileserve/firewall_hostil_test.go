@@ -28,13 +28,27 @@ func TestReglaFirewallRutaHostilNoEmiteRegla(t *testing.T) {
 		exePath = func() string { return exe }
 		for _, h := range []string{
 			RedirectHintIn("es", "tftp", "10.0.0.5", 69),
-			RedirectCommandIn("en", "tftp", "10.0.0.5", 69),
 			ServerHintIn("es", Config{Proto: "tftp"}, Ready{Addr: "10.0.0.5:69"}, nil),
 		} {
 			if strings.Contains(h, "New-NetFirewallRule") || strings.Contains(h, "Remove-NetFirewallRule") || !strings.Contains(h, "macuahuitld.exe") {
 				t.Errorf("%s: se emitió regla o falta el aviso:\n%q", name, h)
 			}
 		}
+		if c := RedirectCommandIn("en", "tftp", "10.0.0.5", 69) + RedirectCleanup("tftp", "10.0.0.5", 69) + RedirectCleanupAddr("tftp", "10.0.0.5:69"); c != "" {
+			t.Errorf("%s: orden con ruta insegura (la nota no va en la orden ni se quita lo que no se puso): %q", name, c)
+		}
+	}
+}
+
+// ZWNJ y ZWJ no invierten texto y salen en nombres persas e índicos: la ruta sigue siendo citable.
+func TestExeSeguroPermiteZWNJyZWJ(t *testing.T) {
+	for _, p := range []string{"C:\\Apps\\\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645\\x.exe", "C:\\Apps\\\u0915\u094d\u200d\u0937\\x.exe"} {
+		if !exeSeguro(p) {
+			t.Errorf("rechazada: %q", p)
+		}
+	}
+	if exeSeguro("C:\\Apps\\a\u200bb.exe") || exeSeguro("C:\\Apps\\a\u200eb.exe") {
+		t.Error("ZWSP/LRM deben seguir rechazados")
 	}
 }
 
