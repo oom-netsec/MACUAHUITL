@@ -171,9 +171,13 @@ test("en Linux, en el puerto estándar avisa de una redirección nft vieja con l
   try {
     act(() => core.emitTransfer({ runId: "r2", ready: ready({ serverId: "s2", listening: "192.0.2.10:69" }) }));
     const win = (await screen.findAllByRole("group", { name: "TFTP 192.0.2.10:69" }))[1];
+    await waitFor(() => expect(core.transferHint).toHaveBeenCalledTimes(2)); // la pista de r2 ya llegó
     await act(async () => {});
     expect(within(win).queryByRole("log", { name: /redirección nft/i })).toBeNull();
   } finally { setOSForTests(undefined); }
+  // Con el servidor cerrado ya no hay tráfico que perder: la ayuda se va.
+  act(() => core.emitTransfer({ runId: "r1", done: true }));
+  await waitFor(() => expect(within(card).queryByRole("log", { name: /redirección nft/i })).toBeNull());
 });
 
 const client = async (core: ReturnType<typeof setup>, url: string) => {

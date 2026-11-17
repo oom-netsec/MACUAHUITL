@@ -1045,7 +1045,7 @@ export const es = {
   "field.files": "Archivos (rutas absolutas, separadas por coma)",
   "field.minutes": "Duración (minutos)",
   "field.any": "Escuchar en todas las interfaces (0.0.0.0)",
-  "field.serveNote": "Solo se sirven los archivos elegidos, por su nombre; sin listados ni escritura. Escucha en el puerto estándar (TFTP 69, HTTP 80), el que usa IOS; si el sistema no deja abrirlo, el error explica cómo permitirlo.",
+  "field.serveNote": "Solo se sirven los archivos elegidos, por su nombre; sin listados ni escritura. Escucha en el puerto estándar (TFTP 69, HTTP 80), el que usa IOS; si el sistema no deja abrirlo, el error explica cómo permitirlo. Si dejaste una redirección nft de antes, quítala (p. ej. sudo nft delete table ip macuahuitl_tftp_6969): se lleva el tráfico del 69.",
   "field.serve": "Servir",
   "field.serving": "sirviendo en {addr}/{proto}",
   "field.stopped": "detenido",
@@ -2815,10 +2815,10 @@ export const es = {
   "diag.port.invalid.windows": "Un entero de 1 a 65535.",
   "visibility.traps.note.windows": "En Windows no hay puertos privilegiados: puedes escuchar directo en el 162 (o usar 1162). Hace falta una regla de entrada del Firewall de Windows para UDP en ese puerto: córrela una vez como administrador o acepta el diálogo del firewall; la app nunca la aplica.",
   // Puerto estándar negado por el sistema (fase 45): la orden viene en la metadata del error.
+  "transfer.portDenied.cmd": "Orden para permitirlo (cópiala y córrela tú si estás de acuerdo; la app nunca la aplica)",
   // Redirección nft vieja (fase 45): no se puede detectar sin privilegios.
   "transfer.nftLeftover": "Si dejaste una redirección nft de antes (tabla macuahuitl_<protocolo>_<puerto>), el tráfico del puerto estándar se va a ese puerto y no llega a este servidor. Quítala con esta orden (cambia protocolo y puerto si usaste otros):",
   "transfer.nftLeftover.cmd": "Quitar una redirección nft vieja",
-  "transfer.portDenied.cmd": "Orden para permitirlo (cópiala y córrela tú si estás de acuerdo; la app nunca la aplica)",
 };
 
 export type Key = keyof typeof es;

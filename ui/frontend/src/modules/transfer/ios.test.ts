@@ -66,6 +66,11 @@ test("serveProblem: 1-65535 y puertos por omisión del estándar en Linux y en W
 
 test("nftLeftoverCmd: tabla del puerto alto de antes, ip6 con IPv6", () => {
   expect(nftLeftoverCmd("tftp", "192.0.2.10", 69)).toBe("sudo nft delete table ip macuahuitl_tftp_6969");
-  expect(nftLeftoverCmd("sftp", "2001:db8::1", 22)).toBe("sudo nft delete table ip6 macuahuitl_sftp_2222");
+  expect(nftLeftoverCmd("ftp", "2001:db8::1", 21)).toBe("sudo nft delete table ip6 macuahuitl_ftp_2121");
+  expect(nftLeftoverCmd("tftp", "fe80::1%eth0", 69)).toBe("sudo nft delete table ip6 macuahuitl_tftp_6969");
+  expect(nftLeftoverCmd("tftp", "::ffff:192.0.2.10", 69)).toBe("sudo nft delete table ip macuahuitl_tftp_6969"); // el núcleo la desmapea a IPv4
+  // SCP y SFTP comparten el 22: la tabla vieja pudo ser de cualquiera de los dos.
+  expect(nftLeftoverCmd("sftp", "192.0.2.10", 22)).toBe("sudo nft delete table ip macuahuitl_scp_2222\nsudo nft delete table ip macuahuitl_sftp_2222");
+  expect(nftLeftoverCmd("scp", "192.0.2.10", 22)).toBe("sudo nft delete table ip macuahuitl_scp_2222\nsudo nft delete table ip macuahuitl_sftp_2222");
   expect(nftLeftoverCmd("raro", "192.0.2.10", 99)).toBe("sudo nft delete table ip macuahuitl_raro_99");
 });

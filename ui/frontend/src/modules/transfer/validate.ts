@@ -5,10 +5,14 @@ import type { TransferProto } from "./api";
 const defaultPort: Record<TransferProto, string> = { tftp: "69", ftp: "21", scp: "22", sftp: "22", http: "80" };
 export const portFor = (p: TransferProto) => defaultPort[p];
 
-// Puerto alto que se usaba antes de los puertos estándar: una tabla nft que el usuario haya dejado redirige a él.
-const oldHighPort: Record<string, number> = { tftp: 6969, ftp: 2121, scp: 2222, sftp: 2222, http: 8080 };
-export const nftLeftoverCmd = (proto: string, host: string, port: number) =>
-  `sudo nft delete table ${host.includes(":") ? "ip6" : "ip"} macuahuitl_${proto}_${oldHighPort[proto] ?? port}`;
+// Puerto alto que se usaba antes de los puertos estándar: una tabla nft que el usuario haya dejado redirige a él (HTTP nunca tuvo redirección).
+const oldHighPort: Record<string, number> = { tftp: 6969, ftp: 2121, scp: 2222, sftp: 2222 };
+// Orden para quitar esa tabla, con el formato del núcleo; ::ffff:a.b.c.d el núcleo la trata como IPv4. SCP y SFTP comparten el 22: van las dos.
+export function nftLeftoverCmd(proto: string, host: string, port: number): string {
+  const fam = host.includes(":") && !/^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(host) ? "ip6" : "ip";
+  const protos = proto === "scp" || proto === "sftp" ? ["scp", "sftp"] : [proto];
+  return protos.map((p) => `sudo nft delete table ${fam} macuahuitl_${p}_${oldHighPort[p] ?? port}`).join("\n");
+}
 
 export const isIP = (s: string) =>
   (/^\d{1,3}(\.\d{1,3}){3}$/.test(s) && s.split(".").every((n) => Number(n) <= 255)) || (s.includes(":") && /^[0-9a-f:.]+$/i.test(s) && (s.match(/:/g) ?? []).length >= 2);

@@ -1047,7 +1047,7 @@ export const en: Record<Key, string> = {
   "field.files": "Files (absolute paths, comma-separated)",
   "field.minutes": "Duration (minutes)",
   "field.any": "Listen on all interfaces (0.0.0.0)",
-  "field.serveNote": "Only the chosen files are served, by name; no listings and no uploads. It listens on the standard port (TFTP 69, HTTP 80), the one IOS uses; if the system does not allow opening it, the error explains how to allow it.",
+  "field.serveNote": "Only the chosen files are served, by name; no listings and no uploads. It listens on the standard port (TFTP 69, HTTP 80), the one IOS uses; if the system does not allow opening it, the error explains how to allow it. If you left an nft redirect from before, remove it (e.g. sudo nft delete table ip macuahuitl_tftp_6969): it takes the traffic to 69.",
   "field.serve": "Serve",
   "field.serving": "serving on {addr}/{proto}",
   "field.stopped": "stopped",
@@ -2816,8 +2816,8 @@ export const en: Record<Key, string> = {
   "diag.port.invalid.windows": "A whole number from 1 to 65535.",
   "visibility.traps.note.windows": "Windows has no privileged ports: you can listen on 162 directly (or use 1162). An inbound Windows Firewall rule for UDP on that port is needed: run it once as administrator or accept the firewall dialog; the app never applies it.",
   // Standard port denied by the system (phase 45): the command comes in the error metadata.
+  "transfer.portDenied.cmd": "Command to allow it (copy it and run it yourself if you agree; the app never applies it)",
   // Leftover nft redirect (phase 45): cannot be detected without privileges.
   "transfer.nftLeftover": "If you left an nft redirect from before (table macuahuitl_<protocol>_<port>), traffic to the standard port goes to that port and never reaches this server. Remove it with this command (change protocol and port if you used others):",
   "transfer.nftLeftover.cmd": "Remove an old nft redirect",
-  "transfer.portDenied.cmd": "Command to allow it (copy it and run it yourself if you agree; the app never applies it)",
 };
