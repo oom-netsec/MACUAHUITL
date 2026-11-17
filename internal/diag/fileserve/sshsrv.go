@@ -529,18 +529,25 @@ func (h *sftpHandler) Fileread(r *sftp.Request) (io.ReaderAt, error) {
 	return rd, nil
 }
 
-// sftpReader cuenta lo leído y registra la transferencia al cerrarse.
+// sftpReader cuenta lo leído y registra la transferencia al cerrarse. `sent` son los bytes entregados
+// (lo que se audita); `max` es hasta dónde llegó la lectura, para saber si terminó. Una lectura más allá
+// del final (n == 0, la encola `sftp get` de OpenSSH) no mueve ninguno de los dos.
 type sftpReader struct {
 	*os.File
 	h     *sftpHandler
 	t     Transfer
 	start time.Time
+	sent  atomic.Int64
 	max   atomic.Int64
 	once  sync.Once
 }
 
 func (r *sftpReader) ReadAt(p []byte, off int64) (int, error) {
 	n, err := r.File.ReadAt(p, off)
+	if n <= 0 {
+		return n, err
+	}
+	r.sent.Add(int64(n))
 	for end := off + int64(n); ; {
 		cur := r.max.Load()
 		if end <= cur || r.max.CompareAndSwap(cur, end) {
@@ -553,8 +560,8 @@ func (r *sftpReader) ReadAt(p []byte, off int64) (int, error) {
 func (r *sftpReader) Close() error {
 	r.once.Do(func() {
 		r.h.untrack(r)
-		r.t.Bytes, r.t.Duration = r.max.Load(), time.Since(r.start)
-		if st, err := r.File.Stat(); err == nil && r.t.Bytes >= st.Size() {
+		r.t.Bytes, r.t.Duration = r.sent.Load(), time.Since(r.start)
+		if st, err := r.File.Stat(); err == nil && r.max.Load() >= st.Size() {
 			r.t.Result = "ok"
 		} else {
 			r.t.Error, r.t.ReasonT = "lectura incompleta", lit("lectura incompleta")
