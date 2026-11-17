@@ -1,7 +1,13 @@
 package sys
 
 import (
+	"errors"
+	"io/fs"
+	"math/rand/v2"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
@@ -62,3 +68,51 @@ func OpenNewIn(root *os.Root, name string) (*os.File, error) {
 
 // ErrWaitTimeout: WaitExit venció el plazo con el proceso aún vivo.
 var ErrWaitTimeout = i18n.New("sys.err.wait_timeout", nil)
+
+// OpenOutDir crea (0700) y abre una carpeta de salidas UNA vez (os.Root): lo que se cree después va por ese handle, así que
+// cambiar la carpeta por un enlace simbólico o una junction tras abrirla no desvía la escritura. Resuelve los enlaces de la
+// ruta (la carpeta de fábrica puede ser un enlace del usuario) y comprueba que lo abierto es lo que la ruta resuelta nombra
+// ahora: un cambio entre resolver y abrir se rechaza. Quien la llama cierra el Root.
+func OpenOutDir(dir string) (*os.Root, error) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, err
+	}
+	real, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil, err
+	}
+	root, err := os.OpenRoot(real)
+	if err != nil {
+		return nil, err
+	}
+	lst, err1 := os.Lstat(real)
+	rst, err2 := root.Stat(".")
+	if err1 != nil || err2 != nil || !lst.IsDir() || !os.SameFile(lst, rst) {
+		root.Close()
+		return nil, &fs.PathError{Op: "open", Path: dir, Err: fs.ErrInvalid}
+	}
+	return root, nil
+}
+
+// MkdirOpenIn crea la subcarpeta name (0700) dentro de root si falta y la abre como Root; un enlace en su lugar que salga de
+// root se rechaza (os.Root no lo sigue).
+func MkdirOpenIn(root *os.Root, name string) (*os.Root, error) {
+	if err := root.Mkdir(name, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
+		return nil, err
+	}
+	return root.OpenRoot(name)
+}
+
+// CreateTempIn es os.CreateTemp dentro de una carpeta ya abierta: nombre único (pattern con «*»), archivo nuevo y privado
+// (OpenNewPrivateIn: O_EXCL, sin seguir enlaces; en Windows nace con la DACL protegida).
+func CreateTempIn(root *os.Root, pattern string) (*os.File, error) {
+	pre, suf, _ := strings.Cut(pattern, "*")
+	for i := 0; i < 10000; i++ {
+		f, err := OpenNewPrivateIn(root, pre+strconv.FormatUint(uint64(rand.Uint32()), 10)+suf)
+		if errors.Is(err, fs.ErrExist) {
+			continue
+		}
+		return f, err
+	}
+	return nil, &fs.PathError{Op: "createtemp", Path: pattern, Err: fs.ErrExist}
+}

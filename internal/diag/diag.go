@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 var ErrNotInstalled error = i18n.New("diag.err.not_installed", nil)
@@ -67,6 +69,9 @@ func discard(out *os.File, path string) {
 	}
 }
 
+// afterOutDirOpen es un gancho solo de pruebas: corre entre abrir la carpeta de salidas y crear el archivo.
+var afterOutDirOpen = func() {}
+
 // Runner ejecuta herramientas. LookPath nil usa exec.LookPath en Linux y winLook (rutas absolutas conocidas) en Windows.
 type Runner struct {
 	LookPath func(string) (string, error)
@@ -110,19 +115,24 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	var out *os.File
 	res := Result{Bin: bin}
 	if req.OutputDir != "" {
-		if err := os.MkdirAll(req.OutputDir, 0o700); err != nil {
+		// La carpeta se abre una vez (os.Root) y el archivo nace dentro de ese handle: una junction o un enlace puesto
+		// después de validar la carpeta no desvía la escritura.
+		root, err := sys.OpenOutDir(req.OutputDir)
+		if err != nil {
 			return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 		}
+		defer root.Close()
+		afterOutDirOpen()
 		ext := ".txt"
 		if req.Tool == Pcap {
 			ext = ".pcapng"
 		}
-		// Nombre único aunque dos ejecuciones caigan en el mismo segundo; el archivo lo crea
-		// el núcleo con 0600 (también el pcap: dumpcap solo lo trunca y no sigue symlinks).
-		if out, err = os.CreateTemp(req.OutputDir, fmt.Sprintf("diag_%s_%s_*%s", req.Tool, stamp, ext)); err != nil {
+		// Nombre único aunque dos ejecuciones caigan en el mismo segundo; el archivo lo crea el núcleo con 0600 (también el
+		// pcap: dumpcap solo lo trunca y no sigue symlinks).
+		if out, err = sys.CreateTempIn(root, fmt.Sprintf("diag_%s_%s_*%s", req.Tool, stamp, ext)); err != nil {
 			return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 		}
-		res.OutputPath = out.Name()
+		res.OutputPath = filepath.Join(root.Name(), filepath.Base(out.Name()))
 		if req.Tool == Pcap {
 			out.Close()
 			out = nil
