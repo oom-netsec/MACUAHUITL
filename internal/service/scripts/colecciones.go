@@ -21,7 +21,7 @@ import (
 
 // Colecciones y fijados de la bóveda de scripts (fase 29c). Las colecciones guardan IDs, nunca copias.
 
-func (s *svc) libSet(ctx context.Context) (map[string]bool, error) {
+func (s *svc) libSet(ctx context.Context, q querier) (map[string]bool, error) {
 	lib, err := s.library()
 	if err != nil {
 		return nil, err
@@ -30,7 +30,7 @@ func (s *svc) libSet(ctx context.Context) (map[string]bool, error) {
 	for _, x := range lib {
 		out[x.ID] = true
 	}
-	for id := range s.retained() { // no se podan ni se ocultan: vuelven a verse al instalar el paquete
+	for id := range s.retained(q) { // no se podan ni se ocultan: vuelven a verse al instalar el paquete
 		out[id] = true
 	}
 	return out, nil
@@ -48,12 +48,12 @@ func libID(pbID string) string {
 // retained son los scripts «lib-*» que hoy no están en la biblioteca pero vienen en un paquete que no está instalado:
 // los movidos a oom/ios-xe y los de playbooks de un paquete quitado (pack_removed). Quien los fijó o los puso en una
 // colección no debe perderlos por no tener el paquete todavía.
-func (s *svc) retained() map[string]bool {
+func (s *svc) retained(q querier) map[string]bool {
 	out := map[string]bool{}
 	for _, id := range playbooks.MovedToIOSXE {
 		out[libID(id)] = true
 	}
-	rows, err := s.d.DB().Query(`SELECT playbook_id FROM pack_removed`)
+	rows, err := q.Query(`SELECT playbook_id FROM pack_removed`)
 	if err != nil {
 		return out
 	}
@@ -122,7 +122,7 @@ func corta(ids []string) string {
 
 func (s *svc) ListCollections(ctx context.Context, _ *v1.ListCollectionsRequest) (*v1.ListCollectionsResponse, error) {
 	s.d.MarkActive()
-	lib, err := s.libSet(ctx)
+	lib, err := s.libSet(ctx, s.d.DB())
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (s *svc) ListCollections(ctx context.Context, _ *v1.ListCollectionsRequest)
 	if err != nil {
 		return nil, internal(err)
 	}
-	_, hidden, err := s.hiddenSets()
+	_, hidden, err := s.hiddenSets(s.d.DB())
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -143,7 +143,7 @@ func (s *svc) ListCollections(ctx context.Context, _ *v1.ListCollectionsRequest)
 
 func (s *svc) GetCollection(ctx context.Context, r *v1.GetCollectionRequest) (*v1.GetCollectionResponse, error) {
 	s.d.MarkActive()
-	lib, err := s.libSet(ctx)
+	lib, err := s.libSet(ctx, s.d.DB())
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (s *svc) GetCollection(ctx context.Context, r *v1.GetCollectionRequest) (*v
 	if err != nil {
 		return nil, internal(err)
 	}
-	_, hidden, err := s.hiddenSets()
+	_, hidden, err := s.hiddenSets(s.d.DB())
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -216,7 +216,7 @@ func (s *svc) SaveCollection(ctx context.Context, r *v1.SaveCollectionRequest) (
 		return nil, err
 	}
 	s.d.Audit(action, out.ID, out.Name)
-	_, hidden, err := s.hiddenSets()
+	_, hidden, err := s.hiddenSets(s.d.DB())
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -302,7 +302,7 @@ func (s *svc) SetCollectionScripts(ctx context.Context, r *v1.SetCollectionScrip
 			return internal(err)
 		}
 		seen := map[string]bool{}
-		keep := s.retained() // un script de un paquete ausente que ya estaba en la colección se conserva
+		keep := s.retained(tx) // un script de un paquete ausente que ya estaba en la colección se conserva
 		for _, id := range r.ScriptIds {
 			if seen[id] {
 				return service.Err(ctx, codes.InvalidArgument, "scripts.svc.script_dup", i18n.A("id", id))
@@ -336,7 +336,7 @@ func (s *svc) SetCollectionScripts(ctx context.Context, r *v1.SetCollectionScrip
 		return nil, err
 	}
 	s.d.Audit("scripts.coleccion.scripts", c.ID, fmt.Sprintf("%s: added [%s], removed [%s], %d in total", c.Name, corta(added), corta(removed), len(c.ScriptIDs)))
-	_, hidden, err := s.hiddenSets()
+	_, hidden, err := s.hiddenSets(s.d.DB())
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -346,7 +346,7 @@ func (s *svc) SetCollectionScripts(ctx context.Context, r *v1.SetCollectionScrip
 // prunePins quita de los fijados los «lib-*» que esta biblioteca ya no trae (salvo los retenidos de paquetes): no se ven, pero contarían para el tope
 // y harían fallar el reorden.
 func (s *svc) prunePins(ctx context.Context, tx *sql.Tx) error {
-	lib, err := s.libSet(ctx)
+	lib, err := s.libSet(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -367,7 +367,7 @@ func (s *svc) prunePins(ctx context.Context, tx *sql.Tx) error {
 // splitPins separa los fijados guardados en visibles y ocultos: un «lib-*» retenido de un paquete que no está instalado
 // no resuelve a ningún script y uno oculto por el usuario no se muestra (ListPinned no los muestra). Los ocultos no cuentan para el tope ni para reordenar, y se
 // conservan en la base, al final, hasta que se instale el paquete.
-func (s *svc) splitPins(pins []string) (visible, hidden []string, err error) {
+func (s *svc) splitPins(q querier, pins []string) (visible, hidden []string, err error) {
 	lib, err := s.library()
 	if err != nil {
 		return nil, nil, err
@@ -376,7 +376,7 @@ func (s *svc) splitPins(pins []string) (visible, hidden []string, err error) {
 	for _, x := range lib {
 		have[x.ID] = true
 	}
-	_, ocultos, err := s.hiddenSets() // los que un paquete tiene oculto tampoco cuentan: no se ven ni se pueden reordenar
+	_, ocultos, err := s.hiddenSets(q) // los que un paquete tiene oculto tampoco cuentan: no se ven ni se pueden reordenar
 	if err != nil {
 		return nil, nil, err
 	}
@@ -407,7 +407,7 @@ func (s *svc) SetPinned(ctx context.Context, r *v1.SetPinnedRequest) (*v1.SetPin
 			return internal(err)
 		}
 		had := slices.Contains(pins, r.Id)
-		visible, _, err := s.splitPins(pins)
+		visible, _, err := s.splitPins(tx, pins)
 		if err != nil {
 			return err
 		}
@@ -446,7 +446,7 @@ func (s *svc) ListPinned(ctx context.Context, _ *v1.ListPinnedRequest) (*v1.List
 	if err != nil {
 		return nil, internal(err)
 	}
-	_, hidden, err := s.hiddenSets()
+	_, hidden, err := s.hiddenSets(s.d.DB())
 	if err != nil {
 		return nil, internal(err)
 	}
@@ -477,7 +477,7 @@ func (s *svc) ReorderPinned(ctx context.Context, r *v1.ReorderPinnedRequest) (*v
 		if err != nil {
 			return internal(err)
 		}
-		visible, hidden, err := s.splitPins(pins)
+		visible, hidden, err := s.splitPins(tx, pins)
 		if err != nil {
 			return err
 		}
@@ -509,7 +509,7 @@ func (s *svc) ExportCollections(ctx context.Context, r *v1.ExportCollectionsRequ
 	if len(r.Ids) < 1 || len(r.Ids) > dom.MaxColecciones {
 		return nil, service.Err(ctx, codes.InvalidArgument, "scripts.svc.col_export_range", i18n.A("max", dom.MaxColecciones))
 	}
-	lib, err := s.libSet(ctx)
+	lib, err := s.libSet(ctx, s.d.DB())
 	if err != nil {
 		return nil, err
 	}
@@ -597,7 +597,7 @@ func (s *svc) PreviewImportCollections(ctx context.Context, r *v1.PreviewImportC
 	if err != nil {
 		return nil, err
 	}
-	libIDs, err := s.libSet(ctx)
+	libIDs, err := s.libSet(ctx, s.d.DB())
 	if err != nil {
 		return nil, err
 	}
@@ -634,7 +634,7 @@ func (s *svc) ApplyImportCollections(ctx context.Context, r *v1.ApplyImportColle
 	if err != nil {
 		return nil, err
 	}
-	libIDs, err := s.libSet(ctx)
+	libIDs, err := s.libSet(ctx, s.d.DB())
 	if err != nil {
 		return nil, err
 	}

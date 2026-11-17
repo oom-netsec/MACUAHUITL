@@ -97,11 +97,11 @@ export function ExportMenu({ name, formats }: { name: string; formats: { fmt: Fm
   );
 }
 
-export function TransferProgress({ file, bytes, total, rateBps, etaSeconds, done, verified, error, onCancel }: {
-  file: string; bytes: number; total: number; rateBps: number; etaSeconds: number; done?: boolean; verified?: boolean; error?: string; onCancel?: () => void;
+export function TransferProgress({ file, bytes, total, rateBps, etaSeconds, done, verified, error, quietError, onCancel }: {
+  file: string; bytes: number; total: number; rateBps: number; etaSeconds: number; done?: boolean; verified?: boolean; error?: string; quietError?: boolean; onCancel?: () => void;
 }) {
   const t = useT();
-  const pct = total > 0 ? Math.round((bytes / total) * 100) : undefined;
+  const pct = total > 0 ? Math.min(100, Math.round((bytes / total) * 100)) : undefined;
   const parts = [total > 0 ? t("files.of", { a: formatBytes(bytes), b: formatBytes(total) }) : formatBytes(bytes)];
   if (pct !== undefined) parts.push(`${pct} %`);
   if (!done && rateBps > 0) parts.push(`${formatBytes(rateBps)}/s`);
@@ -117,7 +117,7 @@ export function TransferProgress({ file, bytes, total, rateBps, etaSeconds, done
         <span style={{ width: `${pct ?? 100}%` }} />
       </div>
       <span className="meta mono">{parts.join(" · ")}</span>
-      {error && <Notice kind="error">{error}</Notice>}
+      {error && (quietError ? <p className="meta">{error}</p> /* en una lista que se refresca: sin role="alert" */ : <Notice kind="error">{error}</Notice>)}
     </div>
   );
 }

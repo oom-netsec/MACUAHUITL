@@ -43,7 +43,7 @@ func (f fakeField) Console(st v1.FieldService_ConsoleServer) error {
 
 func (fakeField) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeFilesServer) error {
 	st.Send(&v1.ServeFilesResponse{Listening: r.Addr, Hint: "copy"})
-	st.Send(&v1.ServeFilesResponse{TransferJson: `{"File":"a.bin"}`})
+	st.Send(&v1.ServeFilesResponse{ServerId: "sv9", TransferJson: `{"File":"a.bin"}`})
 	<-st.Context().Done()
 	return nil
 }
@@ -91,7 +91,7 @@ func TestFieldBridge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec.waitFor(t, `serve:msg {"hint":"","listening":"","runId":"`+sid+`","transfer":"{\"File\":\"a.bin\"}"}`)
+	rec.waitFor(t, `serve:msg {"hint":"","listening":"","runId":"`+sid+`","serverId":"sv9","transfer":"{\"File\":\"a.bin\"}"}`)
 	b.DiagCancel(sid)
 	rec.waitFor(t, `serve:done {"runId":"`+sid+`"}`)
 

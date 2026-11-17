@@ -617,15 +617,17 @@ func (c *Core) loadJobs() {
 		return
 	}
 	var dead []*job
+	// Con una sola conexión no se audita con rows abiertas: los fallos se anotan y se auditan tras rows.Close.
+	var fails [][2]string
 	for rows.Next() {
 		var id, spec, state, hist string
 		if err := rows.Scan(&id, &spec, &state, &hist); err != nil {
-			c.audit("job.load_failed", "", i18n.English(err))
+			fails = append(fails, [2]string{"", i18n.English(err)})
 			continue
 		}
 		j := &job{id: id, state: state, pbs: c.catalog(), results: map[int][]patrol.DeviceResult{}}
 		if err := json.Unmarshal([]byte(spec), &j.spec); err != nil {
-			c.audit("job.load_failed", id, i18n.English(err))
+			fails = append(fails, [2]string{id, i18n.English(err)})
 			continue
 		}
 		json.Unmarshal([]byte(hist), &j.jobHistory) // '{}' en trabajos guardados antes del historial
@@ -637,9 +639,12 @@ func (c *Core) loadJobs() {
 		c.jobs[id] = j
 	}
 	if err := rows.Err(); err != nil { // una lectura cortada a medias dejaría trabajos fuera en silencio
-		c.audit("job.load_failed", "", i18n.English(err))
+		fails = append(fails, [2]string{"", i18n.English(err)})
 	}
 	rows.Close()
+	for _, f := range fails {
+		c.audit("job.load_failed", f[0], f[1])
+	}
 	for _, j := range dead {
 		c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_FAILED, j.Round, "phase.core_stopped", nil)
 	}

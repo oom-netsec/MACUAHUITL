@@ -112,6 +112,59 @@ func (b *Bridge) TransferServers() ([]TransferServerDTO, error) {
 	})
 }
 
+// TransferSessionDTO es una transferencia de un servidor abierto o reciente (fase 45b): la UI la encuesta cada segundo.
+type TransferSessionDTO struct {
+	ID          string  `json:"id"`
+	ServerID    string  `json:"serverId"`
+	Client      string  `json:"client"` // IP:puerto
+	Name        string  `json:"name"`
+	Direction   string  `json:"direction"` // "in" si el equipo sube, "out" si descarga
+	Protocol    string  `json:"protocol"`
+	Bytes       int64   `json:"bytes"`
+	Total       int64   `json:"total"` // 0 = desconocido
+	BytesPerSec float64 `json:"bytesPerSec"`
+	Started     int64   `json:"started"` // unix ms
+	Ended       int64   `json:"ended"`   // unix ms; 0 = sigue activa
+	State       string  `json:"state"`   // active | done | failed
+	Error       string  `json:"error,omitempty"`
+	ErrorCode   string  `json:"errorCode,omitempty"`
+}
+
+// TransferRejectionDTO agrupa los rechazos de un servidor (misma IP, protocolo y causa); ip va sin puerto.
+type TransferRejectionDTO struct {
+	ServerID   string `json:"serverId"`
+	IP         string `json:"ip"`
+	Protocol   string `json:"protocol"`
+	Cause      string `json:"cause"`
+	Name       string `json:"name"`
+	Count      int64  `json:"count"`
+	First      int64  `json:"first"` // unix ms
+	Last       int64  `json:"last"`  // unix ms
+	Reason     string `json:"reason"`
+	ReasonCode string `json:"reasonCode"`
+}
+
+type TransferSessionsDTO struct {
+	Sessions   []TransferSessionDTO   `json:"sessions"`
+	Rejections []TransferRejectionDTO `json:"rejections"`
+}
+
+func (b *Bridge) TransferSessions(serverID string) (TransferSessionsDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (TransferSessionsDTO, error) {
+		r, err := v1.NewTransferServiceClient(c).ListTransferSessions(ctx, &v1.ListTransferSessionsRequest{ServerId: serverID})
+		out := TransferSessionsDTO{Sessions: []TransferSessionDTO{}, Rejections: []TransferRejectionDTO{}}
+		for _, s := range r.GetSessions() {
+			out.Sessions = append(out.Sessions, TransferSessionDTO{ID: s.Id, ServerID: s.ServerId, Client: s.Client, Name: s.Name, Direction: s.Direction, Protocol: s.Protocol,
+				Bytes: s.Bytes, Total: s.Total, BytesPerSec: s.BytesPerSec, Started: s.Started, Ended: s.Ended, State: s.State, Error: s.Error, ErrorCode: s.ErrorCode})
+		}
+		for _, x := range r.GetRejections() {
+			out.Rejections = append(out.Rejections, TransferRejectionDTO{ServerID: x.ServerId, IP: x.Ip, Protocol: x.Protocol, Cause: x.Cause, Name: x.Name,
+				Count: x.Count, First: x.First, Last: x.Last, Reason: x.Reason, ReasonCode: x.ReasonCode})
+		}
+		return out, err
+	})
+}
+
 type TransferResultDTO struct {
 	Path     string  `json:"path"`
 	Bytes    int64   `json:"bytes"`

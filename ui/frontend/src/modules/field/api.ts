@@ -2,7 +2,7 @@
 import { Events } from "@wailsio/runtime";
 
 export interface ServeRequest { protocol: string; addr: string; files: string[]; allowAny: boolean; seconds: number }
-export interface ServeEvent { runId: string; listening?: string; hint?: string; transfer?: string; done?: boolean; error?: string }
+export interface ServeEvent { runId: string; serverId?: string; listening?: string; hint?: string; transfer?: string; done?: boolean; error?: string }
 
 export interface FieldAPI {
   serveStart(r: ServeRequest): Promise<string>;

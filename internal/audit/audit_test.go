@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -199,7 +200,7 @@ func TestVerifyRequiresContiguousSeq(t *testing.T) {
 	}
 }
 
-// Otra conexión escribe en otra tabla mientras varias goroutines auditan:
+// Un escritor insistente (mismo *sql.DB) escribe en otra tabla mientras varias goroutines auditan:
 // ningún Append puede fallar con SQLITE_BUSY ni perder su entrada.
 func TestAppendConEscritorConcurrente(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "m.db")
@@ -208,11 +209,7 @@ func TestAppendConEscritorConcurrente(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close() })
-	other, err := store.Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { other.Close() })
+	other := db // el mismo *sql.DB que usa la bitácora, como en el núcleo
 	l := New(db, time.Now)
 
 	stop := make(chan struct{})
@@ -331,4 +328,60 @@ func TestAppendReintentaConLaBaseOcupada(t *testing.T) {
 	if v, err := l.Verify(ctx); err != nil || !v.Intact {
 		t.Fatalf("Verify = %+v, %v", v, err)
 	}
+}
+
+type slowWriter struct{ n atomic.Int64 }
+
+func (w *slowWriter) Write(p []byte) (int, error) {
+	time.Sleep(time.Millisecond)
+	w.n.Add(int64(bytes.Count(p, []byte("\n"))))
+	return len(p), nil
+}
+
+// Un Export lento (lector de gRPC lento) no debe retener la única conexión: un Append termina rápido.
+func TestExportLentoNoBloqueaAppend(t *testing.T) {
+	if testing.Short() {
+		t.Skip("llena 100000 entradas")
+	}
+	l, _ := newLog(t)
+	const total = 100000
+	tx, err := l.db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	prev, at := Genesis, time.Now().UTC()
+	for i := 1; i <= total; i++ {
+		e := Entry{Actor: "u", Action: "a", Target: "t", Detail: "d"}
+		atS := at.Add(time.Duration(i) * time.Microsecond).Format(tsFormat)
+		h := hashOf(prev, uint64(i), atS, e)
+		if _, err := tx.Exec(`INSERT INTO audit_log(seq,at,actor,action,target,detail,prev,hash) VALUES(?,?,?,?,?,?,?,?)`, i, atS, e.Actor, e.Action, e.Target, e.Detail, prev, h); err != nil {
+			t.Fatal(err)
+		}
+		prev = h
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	w := &slowWriter{}
+	ectx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- l.Export(ectx, w, at.Add(-time.Hour), at.Add(time.Hour)) }()
+	for w.n.Load() == 0 { // que el Export ya esté escribiendo
+		time.Sleep(time.Millisecond)
+	}
+	start := time.Now()
+	if _, err := l.Append(context.Background(), Entry{Actor: "u", Action: "a"}); err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Fatalf("Append tardó %v durante el Export", d)
+	}
+	select {
+	case <-done:
+		t.Fatal("el Export terminó antes que el Append: la prueba no mide nada")
+	default:
+	}
+	cancel()
+	<-done
 }
