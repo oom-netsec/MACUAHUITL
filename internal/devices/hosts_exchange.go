@@ -30,16 +30,17 @@ type FileHost struct {
 	Tags            []string `json:"tags"`
 	CredentialLabel string   `json:"credential_label"`
 	Notes           string   `json:"notes"`
+	StartupCommand  string   `json:"startup_command,omitempty"` // omitempty: los archivos de antes conservan su suma
 }
 
 // Host es el host del archivo sin credencial resuelta (CredentialID vacío).
 func (f FileHost) Host() Host {
-	return Host{Name: f.Name, Address: f.Address, Port: f.Port, Platform: f.Platform, Folder: f.Folder, Tags: f.Tags, Notes: f.Notes}
+	return Host{Name: f.Name, Address: f.Address, Port: f.Port, Platform: f.Platform, Folder: f.Folder, Tags: f.Tags, Notes: f.Notes, StartupCommand: f.StartupCommand}
 }
 
 // ToFile es el host listo para el archivo, con la etiqueta de su credencial (vacía si no tiene o no se resolvió).
 func ToFile(h Host, label string) FileHost {
-	return FileHost{Name: h.Name, Address: h.Address, Port: h.Port, Platform: h.Platform, Folder: h.Folder, Tags: h.Tags, CredentialLabel: label, Notes: h.Notes}
+	return FileHost{Name: h.Name, Address: h.Address, Port: h.Port, Platform: h.Platform, Folder: h.Folder, Tags: h.Tags, CredentialLabel: label, Notes: h.Notes, StartupCommand: h.StartupCommand}
 }
 
 // archivoHosts: sha256 es la suma del JSON canónico del arreglo hosts; protege contra un archivo corrupto, no

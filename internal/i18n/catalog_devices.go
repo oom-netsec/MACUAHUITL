@@ -26,22 +26,24 @@ func init() {
 	e := func(es, en string) entry { return entry{Es: es, En: en, Args: tplArgs(es, en)} }
 	add(map[string]entry{
 		// Campos de un host
-		"hostfield.addr_len":      e("la dirección va de 1 a 253 caracteres", "the address must be 1 to 253 characters long"),
-		"hostfield.addr_zone":     e("la dirección no admite zona (%)", "the address does not accept a zone (%)"),
-		"hostfield.addr_dns":      e("dirección {addr:q}: use una IP o un nombre DNS (letras, números y guiones), sin espacios, @, esquema, puerto ni ruta", "address {addr:q}: use an IP or a DNS name (letters, digits and hyphens), without spaces, @, scheme, port or path"),
-		"hostfield.addr_ip":       e("dirección {addr:q}: parece una IP inválida", "address {addr:q}: looks like an invalid IP"),
-		"hostfield.name":          e("el nombre va de 1 a 64 caracteres, sin espacios en los extremos ni caracteres de control", "the name must be 1 to 64 characters, with no leading or trailing spaces and no control characters"),
-		"hostfield.port":          e("el puerto va de 1 a 65535", "the port must be between 1 and 65535"),
-		"hostfield.platform":      e("plataforma {platform:q} fuera de la lista ({list})", "platform {platform:q} is not in the list ({list})"),
-		"hostfield.folder":        e("la carpeta es de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -", "the folder is a single level: 1 to 48 characters among letters, digits, space, _, . and -"),
-		"hostfield.tags_max":      e("máximo {max} etiquetas", "at most {max} tags"),
-		"hostfield.tag_bad":       e("etiqueta {tag:q} inválida o repetida: 1 a 24 caracteres entre a-z, 0-9 y -", "tag {tag:q} is invalid or repeated: 1 to 24 characters among a-z, 0-9 and -"),
-		"hostfield.notes":         e("las notas pasan de {max} caracteres o traen caracteres de control", "the notes exceed {max} characters or contain control characters"),
-		"hostfield.credential_id": e("no es un id de la bóveda", "not a vault id"),
-		"hostfield.not_int":       e("{value:q} no es un número entero", "{value:q} is not an integer"),
-		"hostfield.label":         e("la etiqueta de credencial pasa de {max} caracteres o trae caracteres de control", "the credential label exceeds {max} characters or contains control characters"),
-		"hostfield.name_dup_row":  e("el nombre ya está en la fila {row}", "the name is already in row {row}"),
-		"hostfield.addr_dup_row":  e("{key} ya está en la fila {row}", "{key} is already in row {row}"),
+		"hostfield.addr_len":         e("la dirección va de 1 a 253 caracteres", "the address must be 1 to 253 characters long"),
+		"hostfield.addr_zone":        e("la dirección no admite zona (%)", "the address does not accept a zone (%)"),
+		"hostfield.addr_dns":         e("dirección {addr:q}: use una IP o un nombre DNS (letras, números y guiones), sin espacios, @, esquema, puerto ni ruta", "address {addr:q}: use an IP or a DNS name (letters, digits and hyphens), without spaces, @, scheme, port or path"),
+		"hostfield.addr_ip":          e("dirección {addr:q}: parece una IP inválida", "address {addr:q}: looks like an invalid IP"),
+		"hostfield.name":             e("el nombre va de 1 a 64 caracteres, sin espacios en los extremos ni caracteres de control", "the name must be 1 to 64 characters, with no leading or trailing spaces and no control characters"),
+		"hostfield.port":             e("el puerto va de 1 a 65535", "the port must be between 1 and 65535"),
+		"hostfield.platform":         e("plataforma {platform:q} fuera de la lista ({list})", "platform {platform:q} is not in the list ({list})"),
+		"hostfield.folder":           e("la carpeta es de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -", "the folder is a single level: 1 to 48 characters among letters, digits, space, _, . and -"),
+		"hostfield.tags_max":         e("máximo {max} etiquetas", "at most {max} tags"),
+		"hostfield.tag_bad":          e("etiqueta {tag:q} inválida o repetida: 1 a 24 caracteres entre a-z, 0-9 y -", "tag {tag:q} is invalid or repeated: 1 to 24 characters among a-z, 0-9 and -"),
+		"hostfield.notes":            e("las notas pasan de {max} caracteres o traen caracteres de control", "the notes exceed {max} characters or contain control characters"),
+		"hostfield.credential_id":    e("no es un id de la bóveda", "not a vault id"),
+		"hostfield.not_int":          e("{value:q} no es un número entero", "{value:q} is not an integer"),
+		"hostfield.label":            e("la etiqueta de credencial pasa de {max} caracteres o trae caracteres de control", "the credential label exceeds {max} characters or contains control characters"),
+		"hostfield.name_dup_row":     e("el nombre ya está en la fila {row}", "the name is already in row {row}"),
+		"hostfield.startup_command":  e("la orden de inicio va de 1 a {max} caracteres, en una sola línea, sin espacios en los extremos ni caracteres de control o de formato (como los bidireccionales)", "the startup command must be 1 to {max} characters on a single line, with no leading or trailing spaces and no control or format characters (such as bidirectional ones)"),
+		"hostfield.startup_platform": e("la orden de inicio solo se admite en hosts linux y windows", "a startup command is only allowed on linux and windows hosts"),
+		"hostfield.addr_dup_row":     e("{key} ya está en la fila {row}", "{key} is already in row {row}"),
 
 		// Archivos de import (CSV y JSON)
 		"hostfile.too_big":        e("el archivo pasa de 5 MB", "the file exceeds 5 MB"),
@@ -112,7 +114,7 @@ func init() {
 		"hostfield.addr_len": {"address", ""}, "hostfield.addr_zone": {"address", ""}, "hostfield.addr_dns": {"address", ""},
 		"hostfield.addr_ip": {"address", ""}, "hostfield.name": {"name", ""}, "hostfield.port": {"port", ""},
 		"hostfield.platform": {"platform", ""}, "hostfield.folder": {"folder", ""}, "hostfield.tags_max": {"tags", ""},
-		"hostfield.tag_bad": {"tags", ""}, "hostfield.notes": {"notes", ""}, "hostfield.credential_id": {"credentialId", "credential_id"},
+		"hostfield.tag_bad": {"tags", ""}, "hostfield.notes": {"notes", ""}, "hostfield.startup_command": {"startup_command", ""}, "hostfield.startup_platform": {"startup_command", "startup_command"}, "hostfield.credential_id": {"credential_id", ""},
 	} {
 		name := rf[1]
 		if name == "" {
@@ -187,10 +189,11 @@ func init() {
 		"hostfield.desc.name":             e("Nombre del host: 1 a 64 caracteres, sin espacios en los extremos. No se repite (sin importar mayúsculas).", "Host name: 1 to 64 characters, no leading or trailing spaces. Not repeated (case-insensitive)."),
 		"hostfield.desc.address":          e("IP o nombre DNS, sin usuario, esquema, puerto ni ruta. La dirección con el puerto no se repite.", "IP or DNS name, without user, scheme, port or path. The address with the port is not repeated."),
 		"hostfield.desc.port":             e("Puerto SSH, de 1 a 65535. Vacío = 22.", "SSH port, from 1 to 65535. Empty = 22."),
-		"hostfield.desc.platform":         e("Plataforma: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc. Vacío = sin definir.", "Platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc. Empty = not set."),
+		"hostfield.desc.platform":         e("Plataforma: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows. Vacío = sin definir.", "Platform: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows. Empty = not set."),
 		"hostfield.desc.folder":           e("Carpeta de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -. Vacío = sin carpeta.", "Single-level folder: 1 to 48 characters among letters, digits, space, _, . and -. Empty = no folder."),
 		"hostfield.desc.tags":             e("Hasta 10 etiquetas de 1 a 24 caracteres entre a-z, 0-9 y -. En CSV separadas por «;»; en JSON, un arreglo.", "Up to 10 tags of 1 to 24 characters among a-z, 0-9 and -. In CSV separated by \";\"; in JSON, an array."),
 		"hostfield.desc.credential_label": e("Etiqueta de una credencial de la bóveda local (nunca el usuario ni la contraseña). Si al importar no existe una con esa etiqueta, el host queda sin credencial.", "Label of a credential in the local vault (never the user or the password). If none with that label exists on import, the host is left without a credential."),
+		"hostfield.desc.startup_command":  e("Solo hosts linux y windows: orden que el terminal manda al conectar, de 1 a 256 caracteres en una línea. No pongas secretos: queda en la auditoría y en la grabación. Vacío = shell normal.", "Linux and windows hosts only: command the terminal sends on connect, 1 to 256 characters on one line. Do not put secrets in it: it goes to the audit log and the recording. Empty = normal shell."),
 		"hostfield.desc.notes":            e("Notas libres, hasta 2000 caracteres.", "Free notes, up to 2000 characters."),
 	})
 }

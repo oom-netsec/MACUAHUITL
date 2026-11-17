@@ -12,8 +12,12 @@ type Entry struct {
 	Host *Host // nil si no hay host manual
 }
 
+// AddrKey es addrKey para quien busca un host por dirección fuera del paquete.
+func AddrKey(a string) string { return addrKey(a) }
+
 // addrKey pone una dirección descubierta en la misma forma canónica que Clean deja la de un host.
 func addrKey(a string) string {
+	a = strings.TrimSuffix(strings.TrimSuffix(strings.TrimPrefix(a, "["), "]"), ".") // Clean nunca guarda corchetes ni el punto final de DNS
 	if ip, err := netip.ParseAddr(a); err == nil && ip.Zone() == "" {
 		return ip.Unmap().String()
 	}

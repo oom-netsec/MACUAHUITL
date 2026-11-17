@@ -49,7 +49,7 @@ func TestPutDeviceRechazosConReasonYCampo(t *testing.T) {
 		{"port", bad(dev("a", "10.0.0.3"), func(d *v1.Device) { d.Profile = &v1.DeviceProfile{Port: 70000} }), "hosts.invalid_port", "port", ""},
 		{"tags", bad(dev("a", "10.0.0.3"), func(d *v1.Device) { d.Tags = []string{"A B"} }), "hosts.invalid_tags", "tags", ""},
 		{"notes", long, "hosts.invalid_notes", "notes", ""},
-		{"cred", bad(dev("a", "10.0.0.3"), func(d *v1.Device) { d.CredentialId = "../x" }), "hosts.invalid_credential_id", "credentialId", ""},
+		{"cred", bad(dev("a", "10.0.0.3"), func(d *v1.Device) { d.CredentialId = "../x" }), "hosts.invalid_credential_id", "credential_id", ""},
 	}
 	for _, c := range cases {
 		_, err := s.PutDevice(ctx, &v1.PutDeviceRequest{Device: c.d})

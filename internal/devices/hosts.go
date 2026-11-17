@@ -3,6 +3,7 @@ package devices
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"net/netip"
 	"regexp"
 	"slices"
@@ -42,7 +43,13 @@ var (
 )
 
 // HostPlatforms es la lista cerrada de plataformas; vacía = sin definir.
-var HostPlatforms = []string{"ios", "ios-xe", "nx-os", "asa", "ftd", "ise", "iosxr", "wlc"}
+var HostPlatforms = []string{"ios", "ios-xe", "nx-os", "asa", "ftd", "ise", "iosxr", "wlc", "linux", "windows"}
+
+// MaxStartup es el tope de la orden de inicio, en puntos de código.
+const MaxStartup = 256
+
+// IsGeneric dice si la plataforma es de un host que no es de red (linux, windows): solo se abre en el terminal SSH.
+func IsGeneric(platform string) bool { return platform == "linux" || platform == "windows" }
 
 // Host es un host de la libreta. CredentialID es el id de la bóveda, vacío si no tiene.
 type Host struct {
@@ -52,6 +59,7 @@ type Host struct {
 	Tags              []string
 	CredentialID      string
 	Notes             string
+	StartupCommand    string // orden que el terminal manda al conectar (fase 44); solo linux y windows
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
@@ -80,18 +88,49 @@ func hasControl(s string, allowNL bool) bool {
 }
 
 // FieldError es un campo inválido de un host: Field es el nombre del campo en el archivo de import (name, address…).
-// Reason es el texto en es; Err es el mismo con código del catálogo, para darlo en el idioma pedido.
+// Msg es el texto en es; Err es el mismo con código del catálogo. Es un i18n.Coded: reason y metadata son los de Err,
+// más metadata.field con el campo (regla 9b).
 type FieldError struct {
-	Field, Reason string
-	Err           error
+	Field, Msg string
+	Err        error
 }
 
-func (e *FieldError) Error() string { return e.Reason }
+func (e *FieldError) Error() string { return e.Msg }
 func (e *FieldError) Unwrap() error { return e.Err }
+
+func (e *FieldError) coded() (i18n.Coded, bool) {
+	var c i18n.Coded
+	return c, e.Err != nil && errors.As(e.Err, &c)
+}
+
+func (e *FieldError) Reason() string {
+	if c, ok := e.coded(); ok {
+		return c.Reason()
+	}
+	return ""
+}
+
+func (e *FieldError) Metadata() map[string]string {
+	m := map[string]string{}
+	if c, ok := e.coded(); ok {
+		for k, v := range c.Metadata() {
+			m[k] = v
+		}
+	}
+	m["field"] = e.Field
+	return m
+}
+
+func (e *FieldError) Localize(loc string) string {
+	if c, ok := e.coded(); ok {
+		return c.Localize(loc)
+	}
+	return e.Msg
+}
 
 func fe(field, code string, args ...any) *FieldError {
 	err := i18n.New(code, i18n.A(args...))
-	return &FieldError{Field: field, Reason: err.Error(), Err: err}
+	return &FieldError{Field: field, Msg: err.Error(), Err: err}
 }
 
 // canonAddr valida una dirección (IP o nombre DNS, sin esquema, usuario, puerto ni ruta) y la deja canónica.
@@ -125,7 +164,7 @@ func Clean(h Host) (Host, error) {
 	}
 	var err error
 	if h.Address, err = canonAddr(h.Address); err != nil {
-		return h, &FieldError{Field: "address", Reason: err.Error(), Err: err}
+		return h, &FieldError{Field: "address", Msg: err.Error(), Err: err}
 	}
 	if h.Port == 0 {
 		h.Port = DefaultPort
@@ -155,5 +194,25 @@ func Clean(h Host) (Host, error) {
 	if h.CredentialID != "" && !credIDRe.MatchString(h.CredentialID) {
 		return h, fe("credential_id", "hostfield.credential_id")
 	}
+	if h.StartupCommand != "" {
+		if n := utf8.RuneCountInString(h.StartupCommand); n > MaxStartup || h.StartupCommand != strings.TrimSpace(h.StartupCommand) || badStartupRune(h.StartupCommand) {
+			return h, fe("startup_command", "hostfield.startup_command", "max", MaxStartup)
+		}
+		if !IsGeneric(h.Platform) {
+			return h, fe("startup_command", "hostfield.startup_platform")
+		}
+	}
 	return h, nil
+}
+
+// badStartupRune: control (\p{Cc}: tab, saltos, NUL, DEL, C1), formato (\p{Cf}: bidi, U+200B-200F, U+FEFF) o separador de
+// línea y de párrafo (\p{Zl}, \p{Zp}: U+2028/U+2029), que un textarea muestra como salto: la orden es una sola línea.
+// Con un U+202E la orden se vería distinta de la que corre.
+func badStartupRune(s string) bool {
+	for _, r := range s {
+		if unicode.IsControl(r) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp) {
+			return true
+		}
+	}
+	return false
 }
