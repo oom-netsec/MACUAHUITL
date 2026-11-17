@@ -166,6 +166,7 @@ func init() {
 		"bridge.err.save_encoding":    e("guardar: codificación {encoding:q} desconocida", "save: unknown encoding {encoding:q}"),
 		"bridge.err.save_big":         e("guardar: el archivo pasa de 64 MiB", "save: the file exceeds 64 MiB"),
 		"bridge.err.save_not_regular": e("guardar: ya hay algo en esa ruta que no es un archivo; elige otra", "save: something that is not a file is already at that path; choose another"),
+		"bridge.err.import_source":    e("importar llave: da el contenido o una ruta, no los dos ni ninguno", "import key: give the content or a path, not both nor neither"),
 		"bridge.err.tool":             e("herramienta {tool:q} desconocida", "unknown tool {tool:q}"),
 		"bridge.err.run_gone":         e("ejecución {id:q} no existe o ya terminó", "run {id:q} does not exist or has already finished"),
 		"bridge.err.dns_mode":         e("modo DNS {mode:q} desconocido", "unknown DNS mode {mode:q}"),

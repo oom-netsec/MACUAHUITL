@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/netip"
+	"os"
 	"sync"
 	"time"
 
@@ -245,7 +246,8 @@ type CredentialDTO struct {
 	Username  string `json:"username"`
 	HasEnable bool   `json:"hasEnable"`
 	HasSSHKey bool   `json:"hasSshKey"`
-	Kind      string `json:"kind"` // password | key: lo calcula el núcleo al listar
+	Kind      string `json:"kind"`   // password | key: lo calcula el núcleo al listar
+	Origin    string `json:"origin"` // generated | imported; vacío en las de contraseña
 }
 
 // KeyCredentialDTO es la llave recién generada: solo la pública sale del núcleo (ADR 0013).
@@ -259,6 +261,51 @@ func (b *Bridge) CreateKeyCredential(label, username string) (KeyCredentialDTO, 
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (KeyCredentialDTO, error) {
 		r, err := v1.NewVaultServiceClient(c).GenerateKeyCredential(ctx, &v1.GenerateKeyCredentialRequest{Label: label, Username: username})
 		return KeyCredentialDTO{ID: r.GetId(), PublicKey: r.GetPublicKey()}, err
+	})
+}
+
+// ImportKeyDTO es la llave a importar: o PrivateKey (el contenido pegado) o Path (el puente lee el archivo); nunca los dos.
+type ImportKeyDTO struct {
+	Label      string `json:"label"`
+	Username   string `json:"username"`
+	PrivateKey string `json:"privateKey"`
+	Path       string `json:"path"`
+	Passphrase string `json:"passphrase"`
+}
+
+type ImportKeyResultDTO struct {
+	ID          string `json:"id"`
+	PublicKey   string `json:"publicKey"`
+	Fingerprint string `json:"fingerprint"`
+	Algorithm   string `json:"algorithm"`
+	Bits        uint32 `json:"bits"`
+	Weak        bool   `json:"weak"`
+}
+
+const maxKeyBytes = 64 << 10
+
+// ImportKeyCredential importa una privada existente. El núcleo solo recibe el contenido, nunca la ruta. Un archivo de
+// más de 64 KiB se manda recortado a 64 KiB + 1 para que el núcleo lo rechace con su propio error (field_too_long).
+func (b *Bridge) ImportKeyCredential(d ImportKeyDTO) (ImportKeyResultDTO, error) {
+	if (d.Path == "") == (d.PrivateKey == "") {
+		return ImportKeyResultDTO{}, wrapErr(status.Error(codes.InvalidArgument, i18n.In(b.locale(), i18n.New("bridge.err.import_source", nil))))
+	}
+	key := []byte(d.PrivateKey)
+	if d.Path != "" {
+		f, err := os.Open(d.Path)
+		if err != nil {
+			return ImportKeyResultDTO{}, b.bridgeErr(err)
+		}
+		key, err = io.ReadAll(io.LimitReader(f, maxKeyBytes+1))
+		f.Close()
+		if err != nil {
+			return ImportKeyResultDTO{}, b.bridgeErr(err)
+		}
+	}
+	defer clear(key) // best effort: el string pegado no se puede borrar
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (ImportKeyResultDTO, error) {
+		r, err := v1.NewVaultServiceClient(c).ImportKeyCredential(ctx, &v1.ImportKeyCredentialRequest{Label: d.Label, Username: d.Username, PrivateKey: key, Passphrase: []byte(d.Passphrase)})
+		return ImportKeyResultDTO{ID: r.GetId(), PublicKey: r.GetPublicKey(), Fingerprint: r.GetFingerprint(), Algorithm: r.GetAlgorithm(), Bits: r.GetBits(), Weak: r.GetWeak()}, err
 	})
 }
 
@@ -287,7 +334,7 @@ func (b *Bridge) ListCredentials() ([]CredentialDTO, error) {
 		}
 		out := []CredentialDTO{}
 		for _, i := range r.Credentials {
-			out = append(out, CredentialDTO{ID: i.Id, Label: i.Label, Username: i.Username, HasEnable: i.HasEnableSecret, HasSSHKey: i.HasSshKey, Kind: i.Kind})
+			out = append(out, CredentialDTO{ID: i.Id, Label: i.Label, Username: i.Username, HasEnable: i.HasEnableSecret, HasSSHKey: i.HasSshKey, Kind: i.Kind, Origin: i.Origin})
 		}
 		return out, nil
 	})
