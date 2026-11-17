@@ -74,6 +74,10 @@ func (e *rotExec) Saved(_ context.Context, _ string) (i18n.Text, error) {
 	if err != nil {
 		return i18n.Text{}, i18n.Wrap("assist.svc.vault_read_failed", err, nil)
 	}
+	if cur.IsKey() { // cambió desde el plan (p. ej. un import de respaldo): una key no recibe contraseña ni se copia
+		cur.SSHKey.Destroy()
+		return i18n.Text{}, vault.ErrKeyCredential
+	}
 	prevLabel := cur.Label + " (previous)"
 	// Primero la copia: si falla, la credencial vigente no se toca.
 	if _, err = v.Put(vault.Credential{Label: prevLabel, Username: cur.Username, Password: cur.Password, Enable: cur.Enable, SSHKey: cur.SSHKey}); err != nil {

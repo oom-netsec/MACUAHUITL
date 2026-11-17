@@ -2,6 +2,7 @@ package assist
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -487,8 +488,12 @@ func TestCredRotateRefusesTheConnectedUserAndOtherBadRequests(t *testing.T) {
 		"credencial que no existe":   {&v1.PlanCredRotateRequest{User: "tech", NewSecret: newSec, UpdateCredentialId: "00"}, 5},
 	}
 	for name, c := range cases {
-		if _, err := r.rotate(c.req); int(code(err)) != c.code {
+		_, err := r.rotate(c.req)
+		if int(code(err)) != c.code {
 			t.Errorf("%s: %v (código %d)", name, err, code(err))
+		}
+		if m := info(err); name == "credencial de tipo key" && (m == nil || m["reason"] != "vault.err.key_credential") {
+			t.Errorf("%s: motivo = %v", name, m)
 		}
 	}
 	if len(r.rec.Lines()) != 0 {
@@ -535,5 +540,28 @@ func TestCredRotateOneRunPerUser(t *testing.T) {
 	r.waitState(run, "waiting-confirm")
 	if _, err := r.svc.StartRun(context.Background(), &v1.StartRunRequest{PlanId: b.PlanId, Assisted: true}); code(err) != 9 {
 		t.Fatalf("el usuario ya tiene una ejecución viva: %v", err)
+	}
+}
+
+// Entre el plan y write memory la credencial puede cambiar (p. ej. un import de respaldo la vuelve key): Saved no le pone
+// contraseña ni copia la privada a una entrada «(previous)».
+func TestSavedNoTocaUnaCredencialKey(t *testing.T) {
+	r := newRotRig(t, simulator.Config{})
+	keyID, _, err := r.d.V.GenerateKey("llave", "tech")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := r.d.V.List()
+	e := &rotExec{devExec: &devExec{d: r.d}, rot: rotation{user: "tech", secret: newSec, updateCred: keyID}}
+	if _, err := e.Saved(context.Background(), "SW1"); !errors.Is(err, vault.ErrKeyCredential) {
+		t.Fatalf("err = %v", err)
+	}
+	after, _ := r.d.V.List()
+	if len(after) != len(before) {
+		t.Fatalf("la bóveda cambió: %d → %d entradas", len(before), len(after))
+	}
+	c, err := r.d.V.Get(keyID)
+	if err != nil || !c.IsKey() {
+		t.Fatalf("la credencial dejó de ser key: %v", err)
 	}
 }

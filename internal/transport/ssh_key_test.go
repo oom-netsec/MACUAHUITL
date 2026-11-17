@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
+	"github.com/oom-netsec/MACUAHUITL/internal/audit"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 	"github.com/oom-netsec/MACUAHUITL/test/simulator"
@@ -75,7 +76,8 @@ func TestOpenSSHKeyGenericHost(t *testing.T) {
 
 func TestOpenSSHKeyWithoutGenericHost(t *testing.T) {
 	k := newKeySim(t, false)
-	_, err := OpenSSH(context.Background(), k.g, "j", k.host, k.port, k.cred(), ssh.FixedHostKey(k.hk), SSHOptions{})
+	g := NewGuard(nil, func(audit.Entry) { t.Error("intentó conectar") }) // sin Allow: cualquier Dial queda negado y avisa
+	_, err := OpenSSH(context.Background(), g, "j", k.host, k.port, k.cred(), ssh.FixedHostKey(k.hk), SSHOptions{})
 	if !errors.Is(err, ErrKeyCredential) {
 		t.Fatalf("err = %v", err)
 	}
