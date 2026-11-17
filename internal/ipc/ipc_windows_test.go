@@ -175,15 +175,15 @@ func TestServerTrustedConTokenPropio(t *testing.T) {
 		t.Fatalf("token propio inesperado: %+v", own)
 	}
 	_, f := pidInfo(uint32(os.Getpid()))
-	if err := serverTrusted(0, f, own); err != nil {
+	if err := serverTrusted(ilMedium, f, own); err != nil {
 		t.Fatalf("el propio proceso debe aceptarse: %v", err)
 	}
-	if _, f := pidInfo(0xFFFFFFF0); serverTrusted(0, f, own) == nil {
+	if _, f := pidInfo(0xFFFFFFF0); serverTrusted(ilMedium, f, own) == nil {
 		t.Fatal("un PID que no se puede abrir debe rechazarse")
 	}
 }
 
-// Un pipe de Listen (sin etiqueta) se lee como sin etiqueta o medio, nunca bajo.
+// El pipe que crea Listen lleva la etiqueta Medium explícita (pipeSDDL): pipeLabel la lee.
 func TestPipeLabelDelPipePropio(t *testing.T) {
 	name := sockPath(t)
 	l, err := Listen(name)
@@ -196,7 +196,7 @@ func TestPipeLabelDelPipePropio(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer c.Close()
-	if lab, err := pipeLabel(c); err != nil || (lab != 0 && lab < ilMedium) {
+	if lab, err := pipeLabel(c); err != nil || lab != ilMedium {
 		t.Fatalf("pipeLabel = %#x, %v", lab, err)
 	}
 }

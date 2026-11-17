@@ -65,7 +65,7 @@ func TestServerTrusted(t *testing.T) {
 	ok := tokenFacts{IL: medio}
 	for _, c := range []struct {
 		name   string
-		label  uint32 // 0 = el pipe no tiene etiqueta (cuenta como medio)
+		label  uint32 // 0 = el pipe no tiene etiqueta (se rechaza)
 		server tokenFacts
 		client tokenFacts
 		want   bool
@@ -73,9 +73,10 @@ func TestServerTrusted(t *testing.T) {
 		{"etiqueta igual", medio, ok, tokenFacts{IL: medio}, true},
 		{"etiqueta mayor", alto, ok, tokenFacts{IL: medio}, true},
 		{"etiqueta menor", bajo, ok, tokenFacts{IL: medio}, false},
-		{"sin etiqueta = medio, cliente medio", 0, ok, tokenFacts{IL: medio}, true},
-		{"sin etiqueta = medio, cliente bajo", 0, ok, tokenFacts{IL: bajo}, true},
-		{"sin etiqueta = medio, cliente alto", 0, ok, tokenFacts{IL: alto}, true}, // el tope es medio: el servidor normal no se rechaza
+		{"sin etiqueta, cliente medio", 0, ok, tokenFacts{IL: medio}, false},
+		{"sin etiqueta, cliente bajo", 0, ok, tokenFacts{IL: bajo}, false},
+		{"sin etiqueta, cliente alto", 0, ok, tokenFacts{IL: alto}, false},
+		{"cliente alto, etiqueta media (tope medio)", medio, ok, tokenFacts{IL: alto}, true},
 		{"cliente alto, etiqueta baja", bajo, ok, tokenFacts{IL: alto}, false},
 		{"cliente alto, etiqueta media", medio, ok, tokenFacts{IL: alto}, true},
 		{"cliente sistema, etiqueta media", medio, ok, tokenFacts{IL: sistema}, true},

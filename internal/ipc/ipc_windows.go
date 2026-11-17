@@ -41,8 +41,10 @@ func SocketPath() (string, error) {
 }
 
 // pipeSDDL fija el dueño del pipe (con un token elevado el dueño por omisión sería Administradores) y una DACL protegida
-// con un solo acceso: el SID del usuario. Sin Everyone, sin Usuarios, sin herencia. El dueño lo lee dialPipe.
-func pipeSDDL(sid string) string { return "O:" + sid + "D:P(A;;GA;;;" + sid + ")" }
+// con un solo acceso: el SID del usuario. Sin Everyone, sin Usuarios, sin herencia. El dueño lo lee dialPipe. La etiqueta
+// Medium explícita (S:(ML;;NW;;;ME)) hace que «sin etiqueta» no pueda pasar por Medium: un proceso Medium puede fijar una
+// etiqueta menor o igual a la suya sin privilegios, y uno Low no puede fijar Medium.
+func pipeSDDL(sid string) string { return "O:" + sid + "D:P(A;;GA;;;" + sid + ")S:(ML;;NW;;;ME)" }
 
 // Listen crea el pipe name solo para el usuario actual y solo acepta clientes cuyo proceso tenga su mismo SID.
 // ErrAlreadyRunning si el nombre ya existe.
@@ -141,8 +143,9 @@ func pipeOwner(c net.Conn) (string, error) {
 	return o.String(), nil
 }
 
-// pipeLabel es el RID de la etiqueta de integridad (SYSTEM_MANDATORY_LABEL_ACE de la SACL) del objeto pipe al que c está
-// conectado; 0 si no tiene etiqueta. Con el handle del cliente basta READ_CONTROL.
+// pipeLabel es el RID MÍNIMO de las etiquetas de integridad (SYSTEM_MANDATORY_LABEL_ACE de la SACL, todas, también las
+// INHERIT_ONLY) del objeto pipe al que c está conectado; 0 si no tiene ninguna (serverTrusted lo rechaza). Con el handle
+// del cliente basta READ_CONTROL. Cualquier error de lectura se propaga (falla cerrado).
 func pipeLabel(c net.Conn) (uint32, error) {
 	f, ok := c.(interface{ Fd() uintptr })
 	if !ok {
@@ -153,23 +156,31 @@ func pipeLabel(c net.Conn) (uint32, error) {
 		return 0, err
 	}
 	acl, _, err := sd.SACL()
-	if err != nil || acl == nil {
-		return 0, nil // sin SACL: sin etiqueta
+	if err != nil {
+		return 0, err
 	}
+	if acl == nil {
+		return 0, nil
+	}
+	var menor uint32
 	for i := uint32(0); i < uint32(acl.AceCount); i++ {
 		var a *windows.ACCESS_ALLOWED_ACE
 		if err := windows.GetAce(acl, i, &a); err != nil {
 			return 0, err
 		}
-		if a.Header.AceType == aceMandatoryLabel {
-			sid := (*windows.SID)(unsafe.Pointer(&a.SidStart))
-			if n := sid.SubAuthorityCount(); n > 0 {
-				return sid.SubAuthority(uint32(n) - 1), nil
-			}
+		if a.Header.AceType != aceMandatoryLabel {
+			continue
+		}
+		sid := (*windows.SID)(unsafe.Pointer(&a.SidStart))
+		n := sid.SubAuthorityCount()
+		if n == 0 {
 			return 0, errors.New("etiqueta de integridad sin RID")
 		}
+		if rid := sid.SubAuthority(uint32(n) - 1); menor == 0 || rid < menor {
+			menor = rid
+		}
 	}
-	return 0, nil
+	return menor, nil
 }
 
 const aceMandatoryLabel = 0x11 // SYSTEM_MANDATORY_LABEL_ACE_TYPE; x/sys no la define

@@ -98,17 +98,18 @@ func readHibernate() (uint64, error) {
 }
 
 // readPagingEncrypted dice si NtfsEncryptPagingFile vale 1, como lo deja `fsutil behavior set encryptpagingfile 1`
-// (Control\FileSystem) o la directiva (SYSTEM\CurrentControlSet\Policies). No se pudo leer = false: se avisa.
+// (Control\FileSystem) o la directiva (SYSTEM\CurrentControlSet\Policies). Si la directiva existe manda ella, aunque
+// valga 0; si no, Control\FileSystem. El valor aplica tras reiniciar. No se pudo leer = false: se avisa.
 func readPagingEncrypted() bool {
-	for _, path := range []string{`SYSTEM\CurrentControlSet\Control\FileSystem`, `SYSTEM\CurrentControlSet\Policies`} {
+	for _, path := range []string{`SYSTEM\CurrentControlSet\Policies`, `SYSTEM\CurrentControlSet\Control\FileSystem`} {
 		k, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.QUERY_VALUE)
 		if err != nil {
 			continue
 		}
 		v, _, err := k.GetIntegerValue("NtfsEncryptPagingFile")
 		k.Close()
-		if err == nil && v == 1 {
-			return true
+		if err == nil {
+			return v == 1
 		}
 	}
 	return false
