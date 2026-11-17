@@ -177,7 +177,7 @@ describe("respaldo cifrado", () => {
   });
 
   test("si el sistema de archivos no admitió los permisos, se avisa aunque el export sirvió", async () => {
-    const core = fakeCore({ exportVaultBackup: vi.fn(async () => ({ count: 2, noPermissions: true })) });
+    const core = fakeCore({ exportVaultBackup: vi.fn(async () => ({ count: 2, noPermissions: true, sshKeysIncluded: 0 })) });
     render(<VaultView core={core} />);
     await userEvent.type(await screen.findByLabelText("Frase del respaldo"), frase);
     await userEvent.type(screen.getByLabelText("Repite la frase del respaldo"), frase);
@@ -326,7 +326,8 @@ test("crear credencial con llave pide solo etiqueta y usuario, y muestra la púb
   await user.click(screen.getByRole("button", { name: /Copiar/ }));
   expect(await navigator.clipboard.readText()).toBe(PUB);
   expect(screen.getByText(/~\/\.ssh\/authorized_keys/)).toBeInTheDocument();
-  expect(screen.getByText(/C:\\ProgramData\\ssh\\administrators_authorized_keys/)).toBeInTheDocument();
+  expect(screen.getByText(/si el usuario es administrador: C:\\ProgramData\\ssh\\administrators_authorized_keys/)).toBeInTheDocument();
+  expect(screen.getByText(/icacls C:\\ProgramData\\ssh\\administrators_authorized_keys \/inheritance:r \/grant "Administrators:F" \/grant "SYSTEM:F"/)).toBeInTheDocument();
   expect(screen.getByText(/%USERPROFILE%\\\.ssh\\authorized_keys \(normalmente C:\\Users/)).toBeInTheDocument();
   expect(screen.getByText(/700.*600.*StrictModes/)).toBeInTheDocument();
   // El foco pasa a la pública recién creada y su título dice de qué credencial es.
@@ -385,4 +386,36 @@ test("borrar la credencial cuya pública está a la vista la quita de la pantall
   await userEvent.click(screen.getByRole("button", { name: "Eliminar llave lab" }));
   await userEvent.click(screen.getByRole("button", { name: "Confirmar eliminación de llave lab" }));
   await waitFor(() => expect(screen.queryByText(PUB)).not.toBeInTheDocument());
+});
+
+test("regenerar la llave pide confirmar, manda confirm=true y muestra la pública nueva con el aviso de autorizarla otra vez", async () => {
+  const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAInew lab-key";
+  const core = fakeCore({ listCredentials: vi.fn(async () => [pwCred, keyCred]), regenerateKeyCredential: vi.fn(async () => NEW) });
+  render(<VaultView core={core} />);
+  await screen.findByText("llave lab");
+  expect(screen.getAllByRole("button", { name: /Regenerar la llave de/ })).toHaveLength(1); // solo la de llave
+  await userEvent.click(screen.getByRole("button", { name: "Regenerar la llave de llave lab" }));
+  expect(core.regenerateKeyCredential).not.toHaveBeenCalled(); // primer clic: solo arma
+  await userEvent.click(screen.getByRole("button", { name: "Confirmar: regenerar la llave de llave lab" }));
+  await waitFor(() => expect(core.regenerateKeyCredential).toHaveBeenCalledWith("k1", true));
+  expect(await screen.findByText(NEW)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /Copiar/ })).toBeInTheDocument();
+  expect(screen.getByText(/La pública anterior ya no sirve/)).toBeInTheDocument();
+});
+
+test("exportar avisa antes cuántas credenciales llevan llave privada y después cuántas entraron al archivo", async () => {
+  const core = fakeCore({ listCredentials: vi.fn(async () => [pwCred, keyCred]), pickSavePath: vi.fn(async () => "/tmp/r.mcvault"), exportVaultBackup: vi.fn(async () => ({ count: 2, noPermissions: false, sshKeysIncluded: 1 })) });
+  render(<VaultView core={core} />);
+  expect(await screen.findByText(/el archivo llevará la llave privada de 1 credenciales/)).toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Frase del respaldo"), "una-frase-larga-1");
+  await userEvent.type(screen.getByLabelText("Repite la frase del respaldo"), "una-frase-larga-1");
+  await userEvent.click(screen.getByRole("checkbox", { name: /contiene todas mis credenciales/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Exportar respaldo…" }));
+  expect(await screen.findByText(/El archivo lleva la llave privada de 1 credenciales\./)).toBeInTheDocument();
+});
+
+test("sin credenciales con llave no hay aviso de llaves privadas en el respaldo", async () => {
+  render(<VaultView core={fakeCore({ listCredentials: vi.fn(async () => [pwCred]) })} />);
+  await screen.findByText("core");
+  expect(screen.queryByText(/llave privada/)).not.toBeInTheDocument();
 });

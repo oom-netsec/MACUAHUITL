@@ -2,8 +2,9 @@
 // terminal:data y terminal:done, todos con el runId de la pestaña.
 import { Events } from "@wailsio/runtime";
 
-// Con hostId el núcleo usa dirección, puerto, credencial y orden de inicio del host guardado (contrato provisional, fase 44): la UI no manda address, port ni credentialId.
-export interface TerminalOpenRequest { name: string; hostId?: string; address?: string; port?: number; credentialId?: string; accept: string[]; rows: number; cols: number }
+// expectedStartupCommand: la orden de inicio que la UI le mostró a la persona (vacía = el host no debe tener); si no es la guardada el núcleo no conecta.
+// Con hostId el núcleo usa dirección, puerto, credencial y orden de inicio del host guardado; la UI no manda address, port ni credentialId.
+export interface TerminalOpenRequest { name: string; hostId?: string; address?: string; port?: number; credentialId?: string; expectedStartupCommand?: string; accept: string[]; rows: number; cols: number }
 export interface TerminalEvent { runId: string; opened?: string; recording?: string; data?: string; error?: string; errorInfo?: { code?: string; reason?: string; metadata?: Record<string, string> }; done?: boolean }
 
 export interface TerminalAPI {

@@ -74,13 +74,20 @@ export function VaultView({ core }: { core: CoreAPI }) {
               const publicKey = await core.credentialPublicKey(c.id);
               if (lastView.current === c.id) setKeyShown({ id: c.id, label: c.label, username: c.username, publicKey });
             } catch (e) { if (lastView.current === c.id) fail(e); }
+          }} onRegenerate={async (c) => {
+            lastView.current = c.id;
+            try {
+              const publicKey = await core.regenerateKeyCredential(c.id, true); // la confirmación la dio la persona en el botón
+              setKeyShown({ id: c.id, label: c.label, username: c.username, publicKey, regenerated: true });
+              setMsg(null);
+            } catch (e) { fail(e); }
           }} onDelete={async (id) => {
             try { await core.deleteCredential(id); setKeyShown((k) => (k?.id === id ? null : k)); setMsg({ kind: "ok", text: t("vault.deleted") }); changed(); } catch (e) { fail(e); }
           }} />
           {keyShown && <PublicKey key={keyShown.id} k={keyShown} onClose={() => setKeyShown(null)} />}
           <CredentialForm core={core} onDone={changed} setMsg={setMsg} />
           <KeyForm core={core} onDone={changed} setMsg={setMsg} onCreated={(k) => { lastView.current = k.id; setKeyShown(k); }} />
-          <BackupSection core={core} setMsg={setMsg} onImported={changed} onPreview={onPreview} onClosed={() => { previewOpen.current = false; setMsg({ kind: "error", text: t("vault.backup.discarded") }); changed(); }} />
+          <BackupSection core={core} sshKeys={creds.filter((c) => c.hasSshKey).length} setMsg={setMsg} onImported={changed} onPreview={onPreview} onClosed={() => { previewOpen.current = false; setMsg({ kind: "error", text: t("vault.backup.discarded") }); changed(); }} />
         </>
       )}
     </Page>
@@ -145,7 +152,7 @@ function UnlockForm({ core, onDone, setMsg }: FormProps) {
   );
 }
 
-function CredentialList({ creds, onDelete, onViewKey }: { creds: Credential[]; onDelete: (id: string) => void; onViewKey: (c: Credential) => void }) {
+function CredentialList({ creds, onDelete, onViewKey, onRegenerate }: { creds: Credential[]; onDelete: (id: string) => void; onViewKey: (c: Credential) => void; onRegenerate: (c: Credential) => void }) {
   const t = useT();
   if (!creds.length) return <EmptyState icon="lock" title={t("vault.creds.empty")}>{t("vault.creds.empty.hint")}</EmptyState>;
   const cols: Column<Credential>[] = [
@@ -153,8 +160,8 @@ function CredentialList({ creds, onDelete, onViewKey }: { creds: Credential[]; o
     { id: "user", header: t("vault.col.user"), value: (c) => c.username, mono: true },
     { id: "details", header: t("vault.col.details"), value: (c) => [c.kind === "key" && t("vault.kind.key"), c.hasEnable && t("vault.hasEnable"), c.hasSshKey && c.kind !== "key" && t("vault.hasSshKey")].filter(Boolean).join(" "),
       render: (c) => <>{c.kind === "key" && <Badge>{t("vault.kind.key")}</Badge>}{c.hasEnable && <Badge>{t("vault.hasEnable")}</Badge>}{c.hasSshKey && c.kind !== "key" && <Badge>{t("vault.hasSshKey")}</Badge>}</> },
-    { id: "actions", header: t("vault.col.actions"), value: () => "", width: 260,
-      render: (c) => <>{c.kind === "key" && <button type="button" className="sm" aria-label={t("vault.key.view", { label: c.label })} onClick={() => onViewKey(c)}>{t("vault.key.viewBtn")}</button>} <ConfirmButton label={t("vault.deleteCred", { label: c.label })} confirmLabel={t("vault.confirmCred", { label: c.label })} onConfirm={() => onDelete(c.id)}>{t("common.delete")}</ConfirmButton></> },
+    { id: "actions", header: t("vault.col.actions"), value: () => "", width: 380,
+      render: (c) => <>{c.kind === "key" && <button type="button" className="sm" aria-label={t("vault.key.view", { label: c.label })} onClick={() => onViewKey(c)}>{t("vault.key.viewBtn")}</button>} {c.kind === "key" && <ConfirmButton label={t("vault.key.regen.aria", { label: c.label })} confirmLabel={t("vault.key.regen.confirm", { label: c.label })} onConfirm={() => onRegenerate(c)}>{t("vault.key.regen")}</ConfirmButton>} <ConfirmButton label={t("vault.deleteCred", { label: c.label })} confirmLabel={t("vault.confirmCred", { label: c.label })} onConfirm={() => onDelete(c.id)}>{t("common.delete")}</ConfirmButton></> },
   ];
   return (
     <Section title={t("vault.creds")}>
@@ -205,7 +212,7 @@ function CredentialForm({ core, onDone, setMsg }: FormProps) {
   );
 }
 
-type ShownKey = { id: string; label: string; username: string; publicKey: string };
+type ShownKey = { id: string; label: string; username: string; publicKey: string; regenerated?: boolean };
 
 // Llave pública: texto de solo lectura, monoespaciado y seleccionable, con Copiar y dónde pegarla en el equipo.
 // Al aparecer toma el foco (el lector de pantalla anuncia el título y quien la abrió la ve sin buscarla).
@@ -217,6 +224,7 @@ function PublicKey({ k, onClose }: { k: ShownKey; onClose: () => void }) {
   return (
     <section ref={ref} tabIndex={-1} className="section vault-pubbox" aria-labelledby={h} aria-describedby={`${h}-d`}>
       <h3 id={h}>{t("vault.key.titleOf", { label: k.label })}</h3>
+      {k.regenerated && <Notice kind="warn">{t("vault.key.regenerated")}</Notice>}
       <p id={`${h}-d`} className="meta">{t("vault.key.hint")}</p>
       <p><code className="mono vault-pub">{k.publicKey}</code> <CopyButton value={k.publicKey} label={t("vault.key.copyLabel")} /></p>
       <h4>{t("vault.key.where")}</h4>

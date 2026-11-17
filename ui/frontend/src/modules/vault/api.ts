@@ -10,7 +10,7 @@ export type VaultBackupAction = "renombrar" | "reemplazar" | "omitir";
 export interface VaultBackupItem { id: string; label: string; username: string; state: VaultBackupState } // id: el de la credencial dentro del respaldo
 export interface VaultBackupPreview { token: string; expiresMs: number; items: VaultBackupItem[] }
 export interface VaultBackupDecision { id: string; action: VaultBackupAction }
-export interface VaultBackupExport { count: number; noPermissions: boolean } // noPermissions: el sistema de archivos (p. ej. vfat) no admitió 0600; el archivo va cifrado igual
+export interface VaultBackupExport { count: number; noPermissions: boolean; sshKeysIncluded: number } // noPermissions: el sistema de archivos (p. ej. vfat) no admitió 0600; el archivo va cifrado igual
 export interface VaultBackupResult { created: number; replaced: number; renamed: number; skipped: number; same: number }
 
 export interface VaultAPI {
@@ -24,6 +24,9 @@ export interface VaultAPI {
   // Fase 44: ed25519 generada en el núcleo; la privada nunca sale. publicKey es una línea de authorized_keys. No hay import de privadas.
   createKeyCredential(label: string, username: string): Promise<{ id: string; publicKey: string }>;
   credentialPublicKey(id: string): Promise<string>;
+  // Otra llave para la misma credencial (conserva el id) y su pública nueva. confirm es obligatorio: la pública vieja deja de servir en cada
+  // authorized_keys, así que va en true solo tras preguntar. Solo credenciales de tipo llave.
+  regenerateKeyCredential(id: string, confirm: boolean): Promise<string>;
   // Devuelve cuántas credenciales guardó. La frase tiene 12 caracteres o más y es distinta de la maestra; confirm es la confirmación explícita.
   exportVaultBackup(path: string, passphrase: string, overwrite: boolean, confirm: boolean): Promise<VaultBackupExport>;
   // Borra el archivo vacío que dejó pickSavePath si el export falló: solo un archivo regular de 0 bytes en esa ruta exacta.
@@ -42,9 +45,9 @@ export const vaultWails = (call: Call): VaultAPI => ({
   listCredentials: () => call("ListCredentials"),
   putCredential: (l, u, p, e) => call("PutCredential", l, u, p, e),
   deleteCredential: (id) => call("DeleteCredential", id),
-  // contrato provisional, fase 44
   createKeyCredential: (l, u) => call("CreateKeyCredential", l, u),
   credentialPublicKey: (id) => call("CredentialPublicKey", id),
+  regenerateKeyCredential: (id, confirm) => call("RegenerateKeyCredential", id, confirm),
   exportVaultBackup: (p, f, o, c) => call("ExportVaultBackup", p, f, o, c),
   removeEmptyFile: (p) => call("RemoveEmptyFile", p),
   previewVaultBackupImport: (p, f) => call("PreviewVaultBackupImport", p, f),

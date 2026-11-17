@@ -225,4 +225,5 @@ test("la vista previa del import muestra la orden de inicio de cada host", async
   await userEvent.click(screen.getByRole("button", { name: "Importar…" }));
   const t = await screen.findByRole("table", { name: "Filas válidas del archivo" });
   expect(within(t).getByText("tmux attach")).toBeVisible();
+  expect(within(t).getAllByText("Se ejecutará al conectar")).toHaveLength(1); // solo el host que trae orden lleva la marca
 });

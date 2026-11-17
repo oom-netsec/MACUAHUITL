@@ -12,8 +12,8 @@ const tone: Record<VaultBackupState, Tone> = { nueva: "ok", igual: "", conflicto
 
 // Respaldo cifrado de la bóveda: exportar con una frase propia e importar en dos pasos. Las frases no se guardan: se vacían los campos al enviarlas.
 // onPreview avisa a la vista si hay una vista previa abierta; onClosed, que la bóveda se cerró y la vista previa se descartó.
-export function BackupSection({ core, setMsg, onImported, onPreview, onClosed }: {
-  core: CoreAPI; setMsg: (m: Msg) => void; onImported: () => void; onPreview: (open: boolean) => void; onClosed: () => void;
+export function BackupSection({ core, sshKeys, setMsg, onImported, onPreview, onClosed }: {
+  core: CoreAPI; sshKeys: number; setMsg: (m: Msg) => void; onImported: () => void; onPreview: (open: boolean) => void; onClosed: () => void;
 }) {
   const t = useT();
   const [f1, setF1] = useState("");
@@ -35,7 +35,7 @@ export function BackupSection({ core, setMsg, onImported, onPreview, onClosed }:
       path = await core.pickSavePath(t("vault.backup.fileName")); // confirma el reemplazo y deja el archivo vacío
       if (!path) return;
       const r = await core.exportVaultBackup(path, phrase, true, sure);
-      setMsg({ kind: "ok", text: t("vault.backup.exported", { n: r.count, path }) + (r.noPermissions ? ` ${t("vault.backup.noPerms")}` : "") });
+      setMsg({ kind: "ok", text: t("vault.backup.exported", { n: r.count, path }) + (r.noPermissions ? ` ${t("vault.backup.noPerms")}` : "") + (r.sshKeysIncluded > 0 ? ` ${t("vault.backup.keys.after", { n: String(r.sshKeysIncluded) })}` : "") });
       setSure(false);
     } catch (e) {
       if (path) await core.removeEmptyFile(path).catch(() => {}); // el diálogo dejó un archivo vacío que no sirve
@@ -75,6 +75,7 @@ export function BackupSection({ core, setMsg, onImported, onPreview, onClosed }:
         <Field label={t("vault.backup.phrase")} hint={t("vault.backup.phraseHint")} type="password" value={f1} onChange={setF1} autoComplete="new-password" w="md" />
         <Field label={t("vault.backup.phrase2")} type="password" value={f2} onChange={setF2} autoComplete="new-password" w="md" />
       </div>
+      {sshKeys > 0 && <Notice kind="warn">{t("vault.backup.keys.before", { n: String(sshKeys) })}</Notice>}
       <Check label={t("vault.backup.confirm")} checked={sure} onChange={setSure} />
       <div className="actions">
         <button type="button" disabled={!sure || busy} aria-busy={busy} onClick={exportBackup}><Icon name="download" />{t("vault.backup.export")}</button>

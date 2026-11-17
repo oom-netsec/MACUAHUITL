@@ -420,3 +420,32 @@ test("el host con orden de inicio lo muestra con una marca y su orden en el titl
   expect(mark).toHaveAccessibleName("Orden de inicio: tmux attach");
   expect(screen.getAllByText("Orden de inicio")).toHaveLength(1);
 });
+
+test("la credencial de solo llave se ofrece solo con linux o windows, y la orden de inicio avisa que queda en la auditoría", async () => {
+  const key = { ...cred, id: "k".repeat(32), label: "llave pi", kind: "key" as const, hasSshKey: true };
+  setup({ listCredentials: vi.fn(async () => [cred, key]) });
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
+  const sel = screen.getByLabelText("Credencial de la bóveda");
+  const names = () => within(sel).getAllByRole("option").map((o) => o.textContent);
+  expect(names().some((n) => /llave pi/.test(n ?? ""))).toBe(false); // sin plataforma
+  await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "ios-xe");
+  expect(names().some((n) => /llave pi/.test(n ?? ""))).toBe(false);
+  expect(screen.queryByText(/queda en la auditoría y en la grabación/)).toBeNull();
+  await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "linux");
+  expect(names().some((n) => /llave pi/.test(n ?? ""))).toBe(true);
+  expect(screen.getByText(/queda en la auditoría y en la grabación/)).toBeVisible();
+});
+
+test("un error del núcleo con metadata.field startup_command marca el campo de la orden", async () => {
+  const err = Object.assign(new Error("orden inválida"), { cause: { code: "InvalidArgument", reason: "hosts.invalid_startup_command", metadata: { field: "startup_command" } } });
+  setup({ saveHost: vi.fn(async () => { throw err; }) });
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
+  await userEvent.type(screen.getByLabelText("Nombre"), "PI");
+  await userEvent.type(screen.getByLabelText("Dirección (IP o nombre DNS)"), "10.0.0.5");
+  await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "linux");
+  await userEvent.type(screen.getByLabelText(/Orden de inicio/), "ls");
+  await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
+  await waitFor(() => expect(screen.getByLabelText(/Orden de inicio/)).toBeInvalid());
+});

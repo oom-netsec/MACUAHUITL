@@ -27,6 +27,7 @@ export function SavedHosts({ core, creds, busy, onConnect }: { core: CoreAPI; cr
             <li key={h.id}>
               <button type="button" disabled={busy || !ok} aria-describedby={ok ? undefined : `${id}-${h.id}`} aria-label={t("ssh.connectHost", { name: h.name })} onClick={() => onConnect(h)}>{h.name}</button>
               <span className="meta mono"> {h.address}</span>
+              {h.startCommand && <span className="meta"> {t("ssh.saved.runs")} <code className="mono">{h.startCommand}</code></span>}
               {!ok && <span id={`${id}-${h.id}`} className="hint"> {t("ssh.saved.noCred")}</span>}
             </li>
           );

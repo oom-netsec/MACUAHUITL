@@ -171,7 +171,7 @@ export function HostsView({ core }: { core: CoreAPI }) {
   };
   const f = editing?.form;
   // Con la bóveda cerrada la credencial guardada no está en la lista: se conserva como opción para no perderla al guardar.
-  const credOptions: [string, string][] = [["", t("hosts.cred.none")], ...creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])];
+  const credOptions: [string, string][] = [["", t("hosts.cred.none")], ...creds.filter((c) => c.kind !== "key" || hasStartCommand(f?.platform ?? "") || c.id === f?.credentialId).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])];
   const missing = () => t(vaultOpen ? "hosts.cred.gone" : "hosts.cred.hidden"); // abierta y sin esa credencial = borrada; cerrada = solo no se puede ver
   if (f && f.credentialId && !creds.some((c) => c.id === f.credentialId)) credOptions.push([f.credentialId, missing()]);
 
@@ -197,6 +197,8 @@ export function HostsView({ core }: { core: CoreAPI }) {
         {hasStartCommand(f.platform) && (
           <Field label={t("hosts.f.start")} hint={t("hosts.f.start.hint")} error={errs.startCommand} value={f.startCommand} onChange={(v) => set("startCommand", v)} w="full" mono />
         )}
+        {hasStartCommand(f.platform) && <Notice kind="info">{t("hosts.f.start.audit")}</Notice>}
+        {!hasStartCommand(f.platform) && creds.some((c) => c.kind === "key") && <p className="hint">{t("hosts.cred.keyOnlyGeneric")}</p>}
         <TextArea label={t("hosts.f.notes")} value={f.notes} onChange={(v) => set("notes", v)} rows={3} error={errs.notes} />
         {coreDetail && <p className="hosts-core"><strong>{t("hosts.coreDetail")}:</strong> <span>{coreDetail}</span></p>}
         <div className="actions">
