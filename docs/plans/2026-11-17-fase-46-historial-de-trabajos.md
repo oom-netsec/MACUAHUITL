@@ -38,11 +38,12 @@ Pedidos de Release: `past` en ListJobs, RPC `RemoveJobs(ids | all_finished)`, po
 - **Activo** (nunca se quita): `armed`, `arming` (con `paused` o sin él) y cualquier job terminal que aún no cerró (`isFinal(state) && !closed`, es decir en `finish`). Criterio único: `state in (armed, arming) || (isFinal(state) && !closed)`. Se descarta `closing` como criterio (B1: nunca vuelve a false).
 - **`created` NO es activo** (decisión de Release/dueño). Nunca se armó, o `ArmJob` falló y lo devolvió a `created` (`services.go:377`): se puede quitar a mano y se poda a los 7 días contados desde `created_at`. `all_finished` no lo toca (solo terminales); `job_ids` sí.
 - **Quitable** = no activo y no «en uso».
-- **En uso** (decisión del coordinador): un job que otro flujo todavía necesita aunque ya no corra. Gancho `c.addPinned(func() []string)`, como `addBusy` (`shutdown.go:28`), que devuelve ids. Lo alimentan:
-  - backup: los jobs que vigila (`s.jobs`, `backup.go:152`);
-  - change: los PRE sin POST (`rec.jobs`);
-  - adhoc: los resultados sin leer (`s.cmds`, `adhoc.go:62`; se borra al entregarse en `adhoc.go:114`).
-  Los jobs entran en el conjunto cuando están activos, así que ya están fijados antes de terminar. El conjunto se calcula **antes** de tomar `c.mu` (los servicios toman sus propios mutex), y se revalida bajo `c.mu` solo lo del núcleo. Un en uso no se quita a mano, ni con `all_finished`, ni en la poda.
+- **En uso** (decisión del coordinador): un job que otro flujo todavía necesita aunque ya no corra. Gancho `c.addPinned(func() []PinnedJob)` (`PinnedJob{ID, Reason}`), como `addBusy` (`shutdown.go:28`). Lo alimentan, con su motivo:
+  - backup: los jobs que vigila (`s.jobs`, `backup.go:152`), motivo `backup_import`;
+  - change: los PRE sin POST (`rec.jobs`), motivo `change_pre`;
+  - adhoc: los resultados sin leer (`s.cmds`, `adhoc.go:62`; se borra al entregarse en `adhoc.go:114`), motivo `adhoc_unread`.
+  Los activos salen con motivo `active`.
+  Los jobs entran en el conjunto cuando están activos, así que ya están fijados antes de terminar. El conjunto se calcula **antes** de tomar `c.mu` (los servicios toman sus propios mutex), y se revalida bajo `c.mu` solo lo del núcleo. Un en uso no se quita a mano, ni con `all_finished`, ni en la poda: se salta.
 
 ### Fin del trabajo y `past`
 
@@ -82,16 +83,14 @@ No se toca disco: sin `os.Remove` en el núcleo ni en el servicio. Una prueba lo
 
 ### `RemoveJobs`
 
-- Request: `job_ids` o `all_finished`; ambos o ninguno → `InvalidArgument` `patrol.err.remove_args`.
-- `job_ids`: duplicados e inexistentes se ignoran (idempotente, no cuentan). Si alguno **no es quitable**, falla entera y no se quita ninguno:
-  - activo → `FailedPrecondition`, reason `patrol.job_active`, metadata `job_ids` = ids activos, ordenados y separados por comas;
-  - en uso, sin activos → `FailedPrecondition`, reason `patrol.job_in_use`, metadata `job_ids` = ids en uso;
-  - ambos → `patrol.job_active`, con `job_ids` (activos) y `in_use_ids` (en uso).
-- `all_finished`: quita los terminales cerrados que no están en uso (de hoy y pasados); salta activos, en uso y `created`, sin fallar. Los ids saltados por estar en uso vuelven en `skipped_ids` de la respuesta.
-- Respuesta: `removed` (int32), `removed_ids` (orden estable), `skipped_ids`.
-- Auditoría manual: `job.removed`, target = id, detalle `name=%q dir=%q state=%s finished=%s reason=manual` (con `all_finished`, `reason=clear_finished`; `finished=` va vacío en un `created`). La poda: `job.pruned`, mismo detalle con `reason=age_7d`. `dir` = `OutputDir` del historial o, si falta, el del spec (como `summary`).
-- Catálogo i18n es/en: `patrol.job_active`, `patrol.job_in_use`, `patrol.err.remove_args`. Glosario de acciones de auditoría (`service/auditen.go`) para `job.removed`, `job.pruned`, `job.remove_failed`.
-- Sin política propia de permisos: las RPC unarias pasan por los mismos interceptores; no entra en `liveUnary` ni en `liveIgnore` (`core.go`, lista de unarios largos).
+- Request: `job_ids` o `all_finished`; ambos o ninguno → `InvalidArgument` `patrol.err.remove_args`. Es, junto con `Internal` (fallo del DELETE), el único error.
+- **Nunca falla por activos ni por «en uso»** (decisión final): quita los que se pueden y devuelve los demás en `skipped`, tanto con `job_ids` como con `all_finished`. No hay `FailedPrecondition patrol.job_active`; el código no entra al catálogo.
+- `job_ids`: duplicados se ignoran; inexistentes se ignoran y no aparecen ni en `removed_ids` ni en `skipped`. Un `created` se quita por id.
+- `all_finished`: considera los terminales cerrados (de hoy y pasados); los activos y los en uso entran a `skipped` con su motivo; un `created` no se considera (no es «terminado»).
+- Respuesta: `removed` (int32), `removed_ids` (orden estable) y `skipped` (`SkippedJob{job_id, reason}`), con `reason` ∈ `active` (armed, arming, paused o cerrándose), `change_pre`, `backup_import`, `adhoc_unread`. Si un id es activo y a la vez está fijado, sale `active`.
+- Auditoría manual: `job.removed`, target = id, detalle `name=%q dir=%q state=%s finished=%s reason=manual` (con `all_finished`, `reason=clear_finished`; `finished=` vacío en un `created`). La poda: `job.pruned`, mismo detalle con `reason=age_7d`. `dir` = `OutputDir` del historial o, si falta, el del spec. **Los saltados no se auditan.**
+- Catálogo i18n: `patrol.err.remove_args`. Glosario de acciones (`service/auditen.go`): `job.removed`, `job.pruned`, `job.remove_failed`.
+- Sin política propia de permisos: pasa por los mismos interceptores; no entra en `liveUnary` ni en `liveIgnore`.
 
 ### Referencias por job id
 
@@ -118,7 +117,7 @@ Revisado en el código. «Carpeta» = acepta ruta absoluta hoy.
 
 ### mctl
 
-- `mctl job rm ID...`: `RemoveJobs{job_ids}`; imprime los quitados. Con activos o en uso imprime el error con los ids y sale con código distinto de cero.
+- `mctl job rm ID...`: `RemoveJobs{job_ids}`; imprime los quitados. Imprime los quitados y, aparte, los saltados con su motivo; sale con 0 aunque haya saltados (no es un error) y con distinto de cero solo ante `InvalidArgument`/`Internal`.
 - `mctl job clear --finished`: `RemoveJobs{all_finished}` (`--finished` obligatorio).
 - `mctl job list` (`cmd/mctl/patrol/patrol.go:153`): muestra `finished_at`; `--all` pide `include_past`.
 - Cadenas nuevas del catálogo de mctl; `noegress`: sin `net` ni `grpc` directos.
@@ -128,11 +127,11 @@ Revisado en el código. «Carpeta» = acepta ruta absoluta hoy.
 - `JobSummary.finished_at` (Timestamp): vacío mientras el job no terminó (activos y `created`).
 - `JobSummary.past` (bool): lo calcula el núcleo en la zona del sistema; la UI no hace la cuenta.
 - `ListJobsRequest.include_past` (bool): sin él, activos, `created` y terminados de hoy. Con él, también los pasados no podados («Past jobs»). Hasta 46f el puente pide `includePast: true`.
-- `RemoveJobs`: `job_ids` o `all_finished`, nunca ambos. Respuesta `removed` (int32), `removed_ids`, `skipped_ids`.
-  - Con algún activo: `FailedPrecondition`, reason `patrol.job_active`, metadata `job_ids` (activos separados por comas; si además hay en uso, `in_use_ids`). No se quita ninguno.
-  - Solo en uso: `FailedPrecondition`, reason `patrol.job_in_use`, metadata `job_ids`.
-  - Ids inexistentes se ignoran y no cuentan.
-  - `all_finished` nunca toca activos ni en uso, ni falla por ellos.
+- `RemoveJobs`: `job_ids` o `all_finished`, nunca ambos (`InvalidArgument`). Respuesta `removed` (int32), `removed_ids` y `skipped` (`SkippedJob{job_id, reason}`).
+  - **Nunca falla por activos ni por «en uso»**: quita los que se pueden y el resto vuelve en `skipped`; la UI muestra el motivo de cada uno.
+  - `reason` es un código estable: `active` (armed/arming/paused o cerrándose), `change_pre` (PRE de un cambio sin POST), `backup_import` (respaldo todavía importándose), `adhoc_unread` (resultado ad-hoc sin leer). Front debe tolerar códigos nuevos (mostrar el código tal cual).
+  - Ids inexistentes se ignoran: no van en `removed_ids` ni en `skipped`.
+  - Errores solo `InvalidArgument` e `Internal`.
 - Firma del puente (acordada con Front): `RemoveJobs({jobIds} | {allFinished})`. No hay `ClearFinishedJobs`. `JobDTO` gana `finishedAt` (RFC3339) y `past`; `ListJobs(includePast)`.
 - La fila desaparece al siguiente `ListJobs` si el núcleo la podó: refrescar al abrir la vista y al cambiar de día local. No hay evento de poda.
 - Para abrir la evidencia de un job pasado, usar la carpeta de la fila (`outputDir`).
@@ -155,8 +154,8 @@ Orden: 46a, 46b, 46c, 46d, 46e, 46f. Cada uno con sus pruebas escritas primero.
 - Riesgos: crece una fila por carpeta distinta (aceptable).
 
 ### 46c. Quitar, `RemoveJobs`, «en uso» y auditoría
-- `removeJobs`, `j.removed` en `persistJob` y `ArmJob`, `addPinned` con backup, change y adhoc, RPC, i18n, glosario.
-- Pruebas: ids (uno, varios, duplicados, inexistentes); activo → falla entera con `patrol.job_active` y `job_ids`; en uso → `patrol.job_in_use`; ambos con `in_use_ids`; `all_finished` salta activos, en uso y `created`; `created` se quita por id; `InvalidArgument`; auditoría exacta una por job y tras la tx (una sola conexión, sin bloqueo); evidencia en disco intacta; `persistJob` tardío no resucita la fila; **`ArmJob` vs. quita con `-race`**; DELETE que falla vuelve el job a memoria; un job en `finish` (`!closed`) es activo (B1); el adhoc sin leer se fija y se libera al leerlo.
+- `removeJobs`, `j.removed` en `persistJob` y `ArmJob`, `addPinned` (id + motivo) con backup, change y adhoc, RPC, i18n, glosario.
+- Pruebas: ids (uno, varios, duplicados, inexistentes); un activo y un en uso van a `skipped` con su `reason` y los demás se quitan en la misma llamada (sin error); cada motivo (`active`, `change_pre`, `backup_import`, `adhoc_unread`); inexistentes no aparecen en ninguna lista; los saltados no se auditan; `all_finished` salta activos, en uso y `created`; `created` se quita por id; `InvalidArgument` con ambos o ninguno; auditoría exacta una por job y tras la tx (una sola conexión, sin bloqueo); evidencia en disco intacta; `persistJob` tardío no resucita la fila; **`ArmJob` vs. quita con `-race`**; DELETE que falla vuelve el job a memoria; un job en `finish` (`!closed`) es activo (B1); el adhoc sin leer se fija y se libera al leerlo.
 - Review Focus: **B1** (`!closed`, no `closing`); orden de locks `persistMu` → `c.mu` y el conjunto «en uso» calculado antes; **M2**; sin tx ni rows abiertas al auditar; que nada llama a `os.Remove`.
 - Riesgos: carrera con `ArmJob`; un servicio que olvide registrarse en `addPinned`.
 
@@ -168,7 +167,7 @@ Orden: 46a, 46b, 46c, 46d, 46e, 46f. Cada uno con sus pruebas escritas primero.
 
 ### 46e. mctl y respaldo por carpeta
 - `job rm`, `job clear --finished`, `job list --all`; `CollectBackupsRequest.dir`; `mctl backup collect --dir`.
-- Pruebas: salida y código de salida con activos y en uso; `CollectBackups` por `dir` tras quitar; `dir` fuera de las raíces, con symlink que escapa, reservada o sin `manifest.json` → rechazo; `Entry.Job` y la auditoría llevan el id del manifest; `AnalyzeJob`, `Drift`, `Timeline` y `GetChangeReport` por carpeta tras quitar.
+- Pruebas: salida de quitados y saltados con su motivo y código de salida 0 con saltados; `CollectBackups` por `dir` tras quitar; `dir` fuera de las raíces, con symlink que escapa, reservada o sin `manifest.json` → rechazo; `Entry.Job` y la auditoría llevan el id del manifest; `AnalyzeJob`, `Drift`, `Timeline` y `GetChangeReport` por carpeta tras quitar.
 - Review Focus: **la validación de `dir`** (aceptar una ruta arbitraria es el riesgo del bloque).
 - Riesgos: el id del manifest ausente en corridas muy viejas.
 

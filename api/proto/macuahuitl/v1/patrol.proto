@@ -16,9 +16,8 @@ service PatrolService {
   rpc ArmJob(ArmJobRequest) returns (ArmJobResponse);
   rpc CancelJob(CancelJobRequest) returns (CancelJobResponse);
   rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
-  // Quita trabajos terminados del historial (solo la fila de la base; la evidencia en disco no se toca).
-  // Con algún id activo falla entera (FAILED_PRECONDITION, reason patrol.job_active, metadata job_ids; in_use_ids si además hay en uso)
-  // y no quita ninguno; con solo ids en uso, reason patrol.job_in_use y metadata job_ids. Un id inexistente se ignora.
+  // Quita trabajos del historial (solo la fila de la base; la evidencia en disco no se toca). Nunca falla por activos ni
+  // por «en uso»: quita los que se pueden y devuelve los demás en skipped. Un id inexistente se ignora.
   rpc RemoveJobs(RemoveJobsRequest) returns (RemoveJobsResponse);
   rpc GetRun(GetRunRequest) returns (GetRunResponse);
   // Catálogo de playbooks cargados (embebidos y de la carpeta de configuración); id es el que acepta CreateJob en playbook_ids.
@@ -203,8 +202,14 @@ message RemoveJobsResponse {
   // Cuántos se quitaron; los ids que no existen se ignoran y no cuentan.
   int32 removed = 1;
   repeated string removed_ids = 2;
-  // Con all_finished: terminados que se saltaron por estar en uso (otro flujo los necesita todavía).
-  repeated string skipped_ids = 3;
+  // Los que no se quitaron, con su motivo; los ids inexistentes no aparecen.
+  repeated SkippedJob skipped = 3;
+}
+message SkippedJob {
+  string job_id = 1;
+  // Código estable: active (armed, arming o cerrándose), change_pre (PRE de un cambio sin POST), backup_import
+  // (respaldo todavía importándose) o adhoc_unread (resultado ad-hoc sin leer).
+  string reason = 2;
 }
 
 message RunDevice {

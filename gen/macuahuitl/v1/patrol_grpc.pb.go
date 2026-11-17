@@ -42,9 +42,8 @@ type PatrolServiceClient interface {
 	ArmJob(ctx context.Context, in *ArmJobRequest, opts ...grpc.CallOption) (*ArmJobResponse, error)
 	CancelJob(ctx context.Context, in *CancelJobRequest, opts ...grpc.CallOption) (*CancelJobResponse, error)
 	ListJobs(ctx context.Context, in *ListJobsRequest, opts ...grpc.CallOption) (*ListJobsResponse, error)
-	// Quita trabajos terminados del historial (solo la fila de la base; la evidencia en disco no se toca).
-	// Con algún id activo falla entera (FAILED_PRECONDITION, reason patrol.job_active, metadata job_ids; in_use_ids si además hay en uso)
-	// y no quita ninguno; con solo ids en uso, reason patrol.job_in_use y metadata job_ids. Un id inexistente se ignora.
+	// Quita trabajos del historial (solo la fila de la base; la evidencia en disco no se toca). Nunca falla por activos ni
+	// por «en uso»: quita los que se pueden y devuelve los demás en skipped. Un id inexistente se ignora.
 	RemoveJobs(ctx context.Context, in *RemoveJobsRequest, opts ...grpc.CallOption) (*RemoveJobsResponse, error)
 	GetRun(ctx context.Context, in *GetRunRequest, opts ...grpc.CallOption) (*GetRunResponse, error)
 	// Catálogo de playbooks cargados (embebidos y de la carpeta de configuración); id es el que acepta CreateJob en playbook_ids.
@@ -161,9 +160,8 @@ type PatrolServiceServer interface {
 	ArmJob(context.Context, *ArmJobRequest) (*ArmJobResponse, error)
 	CancelJob(context.Context, *CancelJobRequest) (*CancelJobResponse, error)
 	ListJobs(context.Context, *ListJobsRequest) (*ListJobsResponse, error)
-	// Quita trabajos terminados del historial (solo la fila de la base; la evidencia en disco no se toca).
-	// Con algún id activo falla entera (FAILED_PRECONDITION, reason patrol.job_active, metadata job_ids; in_use_ids si además hay en uso)
-	// y no quita ninguno; con solo ids en uso, reason patrol.job_in_use y metadata job_ids. Un id inexistente se ignora.
+	// Quita trabajos del historial (solo la fila de la base; la evidencia en disco no se toca). Nunca falla por activos ni
+	// por «en uso»: quita los que se pueden y devuelve los demás en skipped. Un id inexistente se ignora.
 	RemoveJobs(context.Context, *RemoveJobsRequest) (*RemoveJobsResponse, error)
 	GetRun(context.Context, *GetRunRequest) (*GetRunResponse, error)
 	// Catálogo de playbooks cargados (embebidos y de la carpeta de configuración); id es el que acepta CreateJob en playbook_ids.
