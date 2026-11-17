@@ -1,4 +1,4 @@
-// Opciones extendidas del ping y su resultado (resumen, barrido y MTU estimada). Contrato provisional, #200.
+// Opciones extendidas del ping y su resultado (resumen, barrido y MTU estimada). (#200, contrato en #218).
 import { Check, Field, Select } from "../../components/Field";
 import { StatusPill } from "../../components/Data";
 import { useT } from "../../lib/i18n";

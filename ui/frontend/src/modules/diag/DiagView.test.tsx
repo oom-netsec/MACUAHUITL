@@ -219,7 +219,7 @@ test("nmap en Windows no ofrece el escaneo SYN; en Linux sí", () => {
   expect(screen.getAllByRole("option").map((o) => o.getAttribute("value"))).toContain("syn");
 });
 
-// Ping extendido (#200, contrato provisional)
+// Ping extendido (#200, contrato en #218)
 const openExt = async () => userEvent.click(screen.getByText("Opciones extendidas"));
 const pingView = async (over = {}) => {
   const core = fakeCore({ diagRun: vi.fn(async () => "r1"), ...over });
