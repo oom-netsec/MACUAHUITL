@@ -171,7 +171,7 @@ func credKeygen(c *cli.Env, args []string) error {
 		return err
 	}
 	fmt.Fprintln(c.Out, r.Id)
-	fmt.Fprintln(c.Out, r.PublicKey)
+	fmt.Fprintln(c.Out, strings.TrimSpace(r.PublicKey))
 	return nil
 }
 

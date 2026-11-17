@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -77,7 +78,7 @@ func TestHostsCarpetasYMover(t *testing.T) {
 	}
 	id := addHost(t, "SW1", "10.0.0.1")
 	must(t, "", "hosts", "mv", "--folder", "Lab", id)
-	if out := must(t, "", "hosts", "folder", "list"); !strings.Contains(out, "Lab") || !strings.Contains(out, "1") {
+	if out := must(t, "", "hosts", "folder", "list"); !regexp.MustCompile(`(?m)^Lab\s+1\b`).MatchString(out) {
 		t.Fatalf("folder list:\n%s", out)
 	}
 	must(t, "", "hosts", "folder", "rename", "Lab", "Piso2")
@@ -85,7 +86,7 @@ func TestHostsCarpetasYMover(t *testing.T) {
 		t.Fatalf("rename:\n%s", out)
 	}
 	// Sin --yes y con hosts: dice cuántos, sale con error y no borra.
-	if _, err := mctl(t, "", "hosts", "folder", "rm", "Piso2"); err == nil || !strings.Contains(err.Error(), "1 host") {
+	if _, err := mctl(t, "", "hosts", "folder", "rm", "Piso2"); err == nil || !strings.Contains(err.Error(), "1 host") || !strings.Contains(err.Error(), "--yes") {
 		t.Fatalf("rm sin --yes: %v", err)
 	}
 	if out := must(t, "", "hosts", "folder", "list"); !strings.Contains(out, "Piso2") {
@@ -120,6 +121,11 @@ func TestHostsPlataformaYOrdenDeInicio(t *testing.T) {
 	must(t, "", "hosts", "edit", m[1], "--platform", "windows", "--startup-command", "cmd /c echo ok")
 	if j := must(t, "", "hosts", "list", "--json"); !strings.Contains(j, "cmd /c echo ok") || !strings.Contains(j, "windows") {
 		t.Fatalf("json tras edit:\n%s", j)
+	}
+	// Editar otro campo no toca la orden ni la plataforma.
+	must(t, "", "hosts", "edit", m[1], "--notes", "x")
+	if j := must(t, "", "hosts", "list", "--json"); !strings.Contains(j, "cmd /c echo ok") || !strings.Contains(j, "windows") {
+		t.Fatalf("edit sin --startup-command perdió la orden o la plataforma:\n%s", j)
 	}
 	must(t, "", "hosts", "edit", m[1], "--startup-command", "")
 	if j := must(t, "", "hosts", "list", "--json"); strings.Contains(j, "cmd /c echo ok") {
