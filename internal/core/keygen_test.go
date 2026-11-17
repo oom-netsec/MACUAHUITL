@@ -1,13 +1,16 @@
 package core
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
-	"crypto/sha256"
-	"encoding/base64"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -85,26 +88,96 @@ func TestKeygenServicio(t *testing.T) {
 	}
 }
 
+type lockedBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuf) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuf) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+// diskText concatena todos los archivos bajo las carpetas de datos y estado (bóveda, .bak, auditoría en disco).
+func diskText(t *testing.T, dirs ...string) string {
+	t.Helper()
+	var b strings.Builder
+	for _, d := range dirs {
+		filepath.WalkDir(d, func(p string, e os.DirEntry, err error) error {
+			if err == nil && !e.IsDir() {
+				if raw, err := os.ReadFile(p); err == nil {
+					b.Write(raw)
+				}
+			}
+			return nil
+		})
+	}
+	return b.String()
+}
+
+// needles saca de la privada guardada la semilla (cruda, hex, base64 std y raw) y cada línea del cuerpo del PEM salvo la primera.
+func needles(t *testing.T, pemBytes []byte) []string {
+	t.Helper()
+	lines := strings.Split(strings.TrimSpace(string(pemBytes)), "\n")
+	body := lines[1 : len(lines)-1]
+	der, err := base64.StdEncoding.DecodeString(strings.Join(body, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// La semilla va tras la segunda aparición de la pública (sección privada: pública, luego string de 64 B = semilla ‖ pública).
+	pub := der[bytes.Index(der, []byte("ssh-ed25519"))+len("ssh-ed25519")+4:][:32]
+	first := bytes.Index(der, pub)
+	i := first + 32 + bytes.Index(der[first+32:], pub) + 32 + 4
+	seed := der[i : i+32]
+	if bytes.Equal(seed, pub) {
+		t.Fatal("la prueba no halló la semilla")
+	}
+	n := []string{string(seed), hex.EncodeToString(seed), base64.StdEncoding.EncodeToString(seed), base64.RawStdEncoding.EncodeToString(seed)}
+	return append(n, body[1:]...)
+}
+
 func TestKeygenNoDejaLaPrivadaEnClaro(t *testing.T) {
-	h := newHarness(t, nil)
+	var errOut lockedBuf
+	h := newHarness(t, func(o *Options) { o.ErrOut = &errOut })
 	h.ready(t)
 	r := h.keygen(t, "pi")
-	c, err := h.core.vault.Get(r.Id)
-	if err != nil {
+	cur := func() []string { // la privada guardada ahora; se toma antes de cada paso porque la regeneración destruye la vieja
+		c, err := h.core.vault.Get(r.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer c.SSHKey.Destroy()
+		return needles(t, c.SSHKey.Bytes())
+	}
+	ns := cur()
+	if _, err := h.vault.GetCredentialPublicKey(ctx(t), &v1.GetCredentialPublicKeyRequest{Id: r.Id}); err != nil {
 		t.Fatal(err)
 	}
-	pem := string(c.SSHKey.Bytes())
-	c.Password.Destroy()
-	c.Enable.Destroy()
-	c.SSHKey.Destroy()
-	raw, err := os.ReadFile(filepath.Join(h.p.Data, "vault.mcv"))
-	if err != nil {
+	if _, err := h.vault.RegenerateKeyCredential(ctx(t), &v1.RegenerateKeyCredentialRequest{Id: r.Id, Confirm: true}); err != nil {
 		t.Fatal(err)
 	}
-	body := strings.Split(strings.Trim(strings.SplitN(pem, "-----\n", 2)[1], "\n"), "\n-----END")[0]
-	for name, text := range map[string]string{"bóveda": string(raw), "auditoría": h.auditText(t)} {
-		if strings.Contains(text, "PRIVATE KEY") || strings.Contains(text, strings.SplitN(body, "\n", 2)[0]) {
-			t.Fatalf("la privada aparece en %s", name)
+	ns = append(ns, cur()...)
+	if len(ns) < 12 {
+		t.Fatalf("pocas agujas: %d", len(ns))
+	}
+	for name, text := range map[string]string{"bóveda en disco": diskText(t, h.p.Data, h.p.State, h.p.Config), "auditoría": h.auditText(t), "ErrOut": errOut.String()} {
+		if text == "" && name != "ErrOut" { // ErrOut solo escribe si se pierde una entrada de auditoría
+			t.Fatalf("%s vacío: la prueba no mira nada", name)
+		}
+		if strings.Contains(text, "PRIVATE KEY") {
+			t.Fatalf("PEM en %s", name)
+		}
+		for _, n := range ns {
+			if strings.Contains(text, n) {
+				t.Fatalf("la privada (%.8q…) aparece en %s", n, name)
+			}
 		}
 	}
 }
