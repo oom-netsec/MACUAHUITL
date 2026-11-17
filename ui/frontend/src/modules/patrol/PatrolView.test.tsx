@@ -553,3 +553,13 @@ test("PARTIAL es terminal: el reabrir con GetRun lo muestra sin volver a Ejecuta
   expect(within(row).getByText("Parcial")).toBeInTheDocument();
   expect(within(row).getByText("1 comando cortado · 2 reconexiones · primero: show log")).toBeInTheDocument();
 });
+
+// La app pudo abrir antes que el núcleo: el error del primer intento se va cuando la recarga (al reconectar) sale bien.
+test("el error de la primera carga desaparece cuando la recarga sale bien", async () => {
+  const core = fakeCore();
+  vi.mocked(core.vaultStatus).mockRejectedValueOnce(new Error("connection error: open \\\\.\\pipe\\macuahuitl: The system cannot find the file specified."));
+  render(<PatrolView core={core} />);
+  expect(await screen.findByText(/cannot find the file/)).toBeVisible();
+  act(() => vaultChanged());
+  await waitFor(() => expect(screen.queryByText(/cannot find the file/)).toBeNull());
+});

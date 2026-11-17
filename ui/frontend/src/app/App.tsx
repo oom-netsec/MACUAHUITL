@@ -62,7 +62,8 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
   const down = useRef(false);
   useEffect(() => {
     if (status !== "connected") down.current = true;
-    else if (down.current) { down.current = false; void resync(lang); }
+    // Además las vistas recargan: un núcleo que vuelve puede traer la bóveda en otro estado, y lo que falló al abrir se reintenta.
+    else if (down.current) { down.current = false; void resync(lang); vaultChanged(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando cambia el estado del núcleo
   }, [status]);
 
