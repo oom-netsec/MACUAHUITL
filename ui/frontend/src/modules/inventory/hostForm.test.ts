@@ -101,6 +101,17 @@ test("la orden de inicio: una línea, sin caracteres de control, hasta 256", () 
   expect(validateHost({ ...ok, platform: "windows", startCommand: "a\u0007b" })).toEqual({ startCommand: "hosts.v.startCommand" });
 });
 
+test("la orden de inicio rechaza tab, U+2028 y caracteres invisibles (Trojan Source) y cuenta caracteres astrales como uno", () => {
+  for (const bad of ["a\tb", "a\u2028b", "a\u202Eb", "a\u2066b", "a\u200Bb", "\uFEFFa"]) expect(validateHost({ ...ok, platform: "linux", startCommand: bad })).toEqual({ startCommand: "hosts.v.startCommand" });
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "🙂".repeat(256) })).toEqual({}); // 256 caracteres, 512 unidades UTF-16
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "🙂".repeat(257) })).toEqual({ startCommand: "hosts.v.startCommand" });
+});
+
+test("un error del núcleo de la orden de inicio cae en su campo", () => {
+  expect(coreErrorField(bridge("hosts.invalid_start_command", { field: "startCommand" }))).toBe("startCommand");
+  expect(coreErrorField(new Error("orden de inicio inválida: lleva un salto de línea"))).toBe("startCommand");
+});
+
 test("la orden de inicio solo viaja con linux o windows", () => {
   expect(draftOf({ ...ok, platform: "linux", startCommand: "ls" }).startCommand).toBe("ls");
   expect(draftOf({ ...ok, platform: "ios-xe", startCommand: "ls" }).startCommand).toBe("");

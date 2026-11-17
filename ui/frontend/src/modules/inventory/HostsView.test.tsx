@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HostsView } from "./HostsView";
-import { fakeInventory } from "./fake";
+import { fakeInventory, sampleHosts } from "./fake";
 import { fakeCore } from "../../lib/fake";
 import { I18nProvider } from "../../lib/i18n";
 
@@ -283,42 +283,126 @@ test("borrar una carpeta con hosts pide confirmar diciendo cuántos pasan a «Si
   expect(screen.getByText("LAB-CORE")).toBeVisible();
 });
 
-test("«Mover a…» alcanzable por teclado mueve el host a otra carpeta o a «Sin carpeta»", async () => {
+const grip = (name: string) => screen.getByRole("button", { name: new RegExp(`^Arrastrar ${name} `) });
+
+test("«Mover a…» por teclado: Enter lo abre, las flechas no mueven nada, Tab + Enter elige; el foco vuelve a su botón", async () => {
   const { inv } = setup();
   await screen.findByRole("table", { name: "Hosts de la libreta" });
-  const btn = screen.getByRole("button", { name: "Mover LAB-CORE a…" });
-  btn.focus();
+  screen.getByRole("button", { name: "Mover LAB-CORE a…" }).focus();
   await userEvent.keyboard("{Enter}");
-  const sel = screen.getByLabelText("Mover LAB-CORE a");
-  expect(sel).toHaveFocus();
-  await userEvent.selectOptions(sel, "Oficina");
+  const panel = screen.getByRole("group", { name: "Mover LAB-CORE a" });
+  expect(within(panel).getAllByRole("button")[0]).toHaveFocus();
+  await userEvent.keyboard("{ArrowDown}{ArrowUp}{ArrowDown}");
+  expect(inv.moveHosts).not.toHaveBeenCalled(); // una flecha jamás mueve (en un select cerrado dispararía change)
+  expect(panel).toBeVisible();
+  expect(within(panel).queryByRole("button", { name: "Lab" })).toBeNull(); // su carpeta actual no es destino
+  await userEvent.keyboard("{Tab}{Enter}"); // «Sin carpeta» → Oficina
   expect(inv.moveHosts).toHaveBeenCalledWith(["a".repeat(32)], "Oficina");
   expect(await screen.findByText("Oficina (2)")).toBeVisible();
   expect(await screen.findByText(/LAB-CORE.*Oficina/)).toBeVisible(); // anuncio en la región aria-live
-  await userEvent.click(screen.getByRole("button", { name: "Mover LAB-CORE a…" }));
-  await userEvent.selectOptions(screen.getByLabelText("Mover LAB-CORE a"), "");
-  expect(inv.moveHosts).toHaveBeenLastCalledWith(["a".repeat(32)], "");
+  await waitFor(() => expect(screen.getByRole("button", { name: "Mover LAB-CORE a…" })).toHaveFocus()); // el nodo cambió de grupo: se ubica por id
 });
 
-test("arrastrar un host sobre una carpeta (y sobre «Sin carpeta») lo mueve", async () => {
+test("«Mover a…»: «Sin carpeta» como destino; Esc y Cancelar no mueven y devuelven el foco", async () => {
   const { inv } = setup();
   await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: "Mover LAB-CORE a…" }));
+  await userEvent.keyboard("{Escape}");
+  expect(screen.queryByRole("group", { name: "Mover LAB-CORE a" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Mover LAB-CORE a…" })).toHaveFocus();
+  await userEvent.click(screen.getByRole("button", { name: "Mover LAB-CORE a…" }));
+  await userEvent.click(within(screen.getByRole("group", { name: "Mover LAB-CORE a" })).getByRole("button", { name: "Cancelar" }));
+  expect(screen.getByRole("button", { name: "Mover LAB-CORE a…" })).toHaveFocus();
+  expect(inv.moveHosts).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole("button", { name: "Mover LAB-CORE a…" }));
+  await userEvent.click(within(screen.getByRole("group", { name: "Mover LAB-CORE a" })).getByRole("button", { name: "Sin carpeta" }));
+  expect(inv.moveHosts).toHaveBeenCalledWith(["a".repeat(32)], "");
+});
+
+test("arrastrar el asa de un host sobre una carpeta (y sobre «Sin carpeta») lo mueve; solo el asa es arrastrable", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  expect(rowOf("LAB-AP")).not.toHaveAttribute("draggable"); // el nombre y la IP se pueden seleccionar y copiar
+  expect(grip("LAB-AP")).toHaveAttribute("draggable", "true");
   const data = dt();
-  fireEvent.dragStart(rowOf("LAB-AP"), { dataTransfer: data });
+  fireEvent.dragStart(grip("LAB-AP"), { dataTransfer: data });
   const target = groupOf("Oficina").querySelector("tr.hosts-folder") as HTMLElement;
   expect(fireEvent.dragOver(target, { dataTransfer: data })).toBe(false); // preventDefault: acepta el soltar
   fireEvent.drop(target, { dataTransfer: data });
   await waitFor(() => expect(inv.moveHosts).toHaveBeenCalledWith(["b".repeat(32)], "Oficina"));
   expect(await screen.findByText("Oficina (2)")).toBeVisible();
   const d2 = dt();
-  fireEvent.dragStart(rowOf("LAB-CORE"), { dataTransfer: d2 });
+  fireEvent.dragStart(grip("LAB-CORE"), { dataTransfer: d2 });
   fireEvent.drop(screen.getByText(/^Sin carpeta/).closest("tr")!, { dataTransfer: d2 }); // aún no hay hosts sin carpeta: el destino existe igual
   await waitFor(() => expect(inv.moveHosts).toHaveBeenLastCalledWith(["a".repeat(32)], ""));
 });
 
-test("soltar algo que no es un host de la libreta no hace nada", async () => {
+test("un drop con un id real en text/plain pero sin dragstart propio no mueve nada", async () => {
   const { inv } = setup();
   await screen.findByRole("table", { name: "Hosts de la libreta" });
-  fireEvent.drop(groupOf("Oficina").querySelector("tr.hosts-folder")!, { dataTransfer: dt() });
+  const d = dt();
+  d.setData("text/plain", "a".repeat(32));
+  fireEvent.drop(groupOf("Oficina").querySelector("tr.hosts-folder")!, { dataTransfer: d });
   expect(inv.moveHosts).not.toHaveBeenCalled();
+});
+
+test("un dragOver de archivos del sistema no se acepta (sin preventDefault)", async () => {
+  setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  expect(fireEvent.dragOver(groupOf("Oficina").querySelector("tr.hosts-folder")!, { dataTransfer: { ...dt(), types: ["Files"] } })).toBe(true);
+});
+
+test("«Nueva carpeta» y «Renombrar» llevan el foco a su campo y lo devuelven al cerrar o guardar", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  const nueva = screen.getByRole("button", { name: "Nueva carpeta" });
+  await userEvent.click(nueva);
+  expect(screen.getByLabelText("Nombre de la carpeta")).toHaveFocus();
+  await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(nueva).toHaveFocus();
+  await userEvent.click(screen.getByRole("button", { name: "Renombrar carpeta Oficina" }));
+  expect(screen.getByLabelText("Nombre de la carpeta")).toHaveFocus();
+  await userEvent.click(screen.getByRole("button", { name: "Renombrar" })); // mismo nombre: no llama al núcleo
+  expect(inv.renameFolder).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.getByRole("button", { name: "Renombrar carpeta Oficina" })).toHaveFocus());
+  await userEvent.click(screen.getByRole("button", { name: "Renombrar carpeta Oficina" }));
+  await userEvent.type(screen.getByLabelText("Nombre de la carpeta"), "2");
+  await userEvent.click(screen.getByRole("button", { name: "Renombrar" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Renombrar carpeta Oficina2" })).toHaveFocus()); // el grupo renombrado es otro nodo
+});
+
+test("un error al renombrar no pisa lo que se tecleó mientras esperaba", async () => {
+  let rej: (e: Error) => void = () => {};
+  const { inv } = setup();
+  inv.renameFolder.mockImplementationOnce(() => new Promise<void>((_, r) => { rej = r; }));
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: "Renombrar carpeta Oficina" }));
+  await userEvent.type(screen.getByLabelText("Nombre de la carpeta"), "X");
+  await userEvent.click(screen.getByRole("button", { name: "Renombrar" }));
+  await userEvent.type(screen.getByLabelText("Nombre de la carpeta"), "Y");
+  await act(async () => rej(new Error("carpeta repetida")));
+  expect(screen.getByLabelText("Nombre de la carpeta")).toHaveValue("OficinaXY");
+  expect(screen.getByText("carpeta repetida")).toBeVisible();
+});
+
+test("con una carpeta vacía en el filtro se ve su grupo vacío, no «Ningún host coincide»", async () => {
+  const { inv } = setup();
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await inv.createFolder("Vacia");
+  await userEvent.click(screen.getByRole("button", { name: "Nueva carpeta" })); // fuerza recarga con otra carpeta nueva
+  await userEvent.type(screen.getByLabelText("Nombre de la carpeta"), "Otra");
+  await userEvent.click(screen.getByRole("button", { name: "Crear carpeta" }));
+  await screen.findByText("Otra (0)");
+  await userEvent.selectOptions(screen.getAllByLabelText("Carpeta")[0], "Otra");
+  expect(screen.getByText("Otra (0)")).toBeVisible();
+  expect(screen.queryByText("Ningún host coincide con la búsqueda.")).toBeNull();
+});
+
+test("el host con orden de inicio lo muestra con una marca y su orden en el title", async () => {
+  const hosts = [{ ...sampleHosts[0], platform: "linux" as const, startCommand: "tmux attach" }, sampleHosts[1]];
+  const inv = fakeInventory(hosts);
+  render(<I18nProvider><HostsView core={fakeCore({ ...inv, listCredentials: vi.fn(async () => [cred]) })} /></I18nProvider>);
+  const mark = await screen.findByTitle("tmux attach");
+  expect(mark).toHaveAccessibleName("Orden de inicio: tmux attach");
+  expect(screen.getAllByText("Orden de inicio")).toHaveLength(1);
 });

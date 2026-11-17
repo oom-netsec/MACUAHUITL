@@ -101,7 +101,7 @@ describe("libreta de hosts", () => {
   it("la plantilla y la descripción del doble salen de la misma tabla de campos", async () => {
     const f = fakeInventory();
     const fmt = await f.hostsImportFormat();
-    expect(fmt.fields.map((x) => x.name)).toEqual(["name", "address", "port", "platform", "folder", "tags", "credential_label", "notes"]);
+    expect(fmt.fields.map((x) => x.name)).toEqual(["name", "address", "port", "platform", "folder", "tags", "credential_label", "notes", "start_command"]);
     expect(fmt.fields.filter((x) => x.required).map((x) => x.name)).toEqual(["name", "address"]);
     const csv = await f.hostsImportTemplate("csv");
     expect(csv.content.startsWith("\ufeff")).toBe(true); // el CSV lleva BOM para Excel

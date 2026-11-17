@@ -30,6 +30,14 @@ export function HostsView({ core }: { core: CoreAPI }) {
   const [moving, setMoving] = useState(""); // id del host cuyo «Mover a…» está abierto
   const [over, setOver] = useState<string | null>(null); // carpeta bajo el arrastre ("" = sin carpeta)
   const drag = useRef("");
+  // Foco de «Mover a…»: al cerrar vuelve al botón de ese host (por id: tras recargar es otro nodo). wait = esperar a que la lista recargue.
+  const focusMove = useRef<{ id: string; wait: boolean; hosts: Host[] | null } | null>(null);
+  const [fseq, setFseq] = useState(0);
+  // Foco del formulario de carpeta: al abrir va al campo; al cerrar, al botón de origen (patrón seq/origin del formulario de host).
+  const folderForm = useRef<HTMLFormElement>(null);
+  const newFolderBtn = useRef<HTMLButtonElement>(null);
+  const forigin = useRef<HTMLElement | null>(null);
+  const [fs, setFs] = useState({ open: 0, close: 0, target: "" });
   const [q, setQ] = useState("");
   const [folder, setFolder] = useState("");
   const [editing, setEditing] = useState<{ id?: string; title: string; form: HostForm; hiddenCred?: string } | null>(null);
@@ -112,13 +120,31 @@ export function HostsView({ core }: { core: CoreAPI }) {
     try { await core.deleteHost(h.id); setMsg(t("hosts.deleted", { name: h.name })); if (editing?.id === h.id) closeForm(); hostsChanged(); } catch (e) { setErr(errorText(e)); }
   };
 
+  useEffect(() => {
+    const m = focusMove.current;
+    if (!m || moving || (m.wait && m.hosts === hosts)) return;
+    focusMove.current = null;
+    document.querySelector<HTMLElement>(`[data-move-id="${m.id}"]`)?.focus();
+  }, [moving, hosts, fseq]);
+  useEffect(() => { if (fs.open) folderForm.current?.querySelector<HTMLElement>("input")?.focus(); }, [fs.open]);
+  const fwait = useRef<Host[] | null | undefined>(undefined); // hosts al guardar: se espera a que la lista recargue (el grupo renombrado es otro nodo)
+  useEffect(() => {
+    if (!fs.close || (fwait.current !== undefined && fwait.current === hosts)) return;
+    fwait.current = undefined;
+    const o = forigin.current;
+    const el = o?.isConnected ? o : fs.target ? document.querySelector<HTMLElement>(`[data-rename-folder="${CSS.escape(fs.target)}"]`) : null; // el grupo renombrado es otro nodo
+    (el ?? newFolderBtn.current)?.focus();
+  }, [fs.close, fs.target, hosts]);
+  const openFolder = (v: { old?: string; name: string }) => { forigin.current = document.activeElement as HTMLElement | null; setFedit({ ...v, err: "" }); setFs((x) => ({ ...x, open: x.open + 1 })); };
+  const closeFolder = (target = "", wait = false) => { fwait.current = wait ? hosts : undefined; setFedit(null); setFs((x) => ({ ...x, close: x.close + 1, target })); };
+  const closeMove = (id: string, wait = false) => { focusMove.current = { id, wait, hosts }; setMoving(""); setFseq((n) => n + 1); };
   const moveTo = async (h: Host, to: string) => {
-    setErr(""); setMsg(""); setMoving("");
-    try { await core.moveHosts([h.id], to); setMsg(t("hosts.moved", { name: h.name, folder: to || t("hosts.folder.none") })); hostsChanged(); } catch (e) { setErr(errorText(e)); }
+    setErr(""); setMsg(""); closeMove(h.id, true);
+    try { await core.moveHosts([h.id], to); setMsg(t("hosts.moved", { name: h.name, folder: to || t("hosts.folder.none") })); hostsChanged(); } catch (e) { setErr(errorText(e)); closeMove(h.id); }
   };
-  const dropOn = (to: string, dtId: string) => {
+  const dropOn = (to: string) => {
     setOver(null);
-    const id = drag.current || dtId; // WebView2 y WebKitGTK exigen setData en dragstart; la referencia propia evita depender de getData
+    const id = drag.current; // solo lo que arrancó en un asa de esta vista; un id en text/plain sin dragstart no cuenta
     drag.current = "";
     const h = (hosts ?? []).find((x) => x.id === id);
     if (h && h.folder !== to) void moveTo(h, to);
@@ -127,12 +153,13 @@ export function HostsView({ core }: { core: CoreAPI }) {
     if (!fedit) return;
     const name = fedit.name;
     if (!validFolderName(name)) { setFedit({ ...fedit, err: t("hosts.v.folder") }); return; }
+    if (fedit.old === name) { closeFolder(name); return; } // mismo nombre: nada que decirle al núcleo
     setErr(""); setMsg("");
     try {
       if (fedit.old === undefined) { await core.createFolder(name); setMsg(t("hosts.folder.created", { name })); }
       else { await core.renameFolder(fedit.old, name); if (folder === fedit.old) setFolder(name); setMsg(t("hosts.folder.renamed", { old: fedit.old, name })); }
-      setFedit(null); hostsChanged();
-    } catch (e) { setFedit({ ...fedit, err: errorText(e) }); }
+      closeFolder(name, true); hostsChanged();
+    } catch (e) { setFedit((cur) => (cur ? { ...cur, err: errorText(e) } : cur)); } // sin pisar lo que se tecleó mientras esperaba
   };
   const delFolder = async (name: string) => {
     setErr(""); setMsg("");
@@ -177,18 +204,23 @@ export function HostsView({ core }: { core: CoreAPI }) {
   );
 
   const row = (h: Host) => (
-    <tr key={h.id} draggable
-      onDragStart={(e) => { drag.current = h.id; e.dataTransfer.setData("text/plain", h.id); e.dataTransfer.effectAllowed = "move"; }}
-      onDragEnd={() => { drag.current = ""; setOver(null); }}>
-      <td>{h.name}</td>
+    <tr key={h.id}>
+      <td>
+        {/* Solo el asa arrastra: así el nombre y la IP de la fila se pueden seleccionar y copiar. Pulsarla abre «Mover a…». */}
+        <button type="button" draggable className="quiet icon sm hosts-grip" aria-label={t("hosts.drag.aria", { name: h.name })} onClick={() => setMoving(h.id)}
+          onDragStart={(e) => { drag.current = h.id; e.dataTransfer.setData("text/plain", h.id); e.dataTransfer.effectAllowed = "move"; const tr = e.currentTarget.closest("tr"); if (tr) e.dataTransfer.setDragImage?.(tr, 0, 0); }}
+          onDragEnd={() => { drag.current = ""; setOver(null); }}>⠿</button>
+        {h.name}
+        {h.startCommand && <span className="badge hosts-start" title={h.startCommand} aria-label={t("hosts.start.aria", { cmd: h.startCommand })}>{t("hosts.start.badge")}</span>}
+      </td>
       <td className="mono">{addrPort(h)}</td>
       <td>{h.platform ? <Badge>{platformName(h.platform)}</Badge> : <span className="hint">{t("hosts.platform.none")}</span>}</td>
       <td>{h.credentialLabel || creds.find((c) => c.id === h.credentialId)?.label || <span className="hint">{h.credentialId ? missing() : t("hosts.cred.none")}</span>}</td>
       <td>{h.tags.map((x) => <Badge key={x}>{x}</Badge>)}</td>
       <td className="hosts-actions">
         {moving === h.id ? (
-          <MoveSelect label={t("hosts.move.select", { name: h.name })} value={h.folder} none={t("hosts.folder.none")} folders={folders} onPick={(v) => void moveTo(h, v)} onCancel={() => setMoving("")} />
-        ) : <button type="button" className="quiet" aria-label={t("hosts.move.aria", { name: h.name })} onClick={() => setMoving(h.id)}>{t("hosts.move")}</button>}
+          <MovePanel label={t("hosts.move.select", { name: h.name })} current={h.folder} none={t("hosts.folder.none")} cancel={t("hosts.cancel")} folders={folders} onPick={(v) => void moveTo(h, v)} onCancel={() => closeMove(h.id)} />
+        ) : <button type="button" className="quiet" data-move-id={h.id} aria-label={t("hosts.move.aria", { name: h.name })} onClick={() => setMoving(h.id)}>{t("hosts.move")}</button>}
         <button type="button" className="quiet" aria-label={t("hosts.edit.aria", { name: h.name })} onClick={() => edit(h)}>{t("hosts.edit")}</button>
         <ConfirmButton label={t("hosts.delete.aria", { name: h.name })} confirmLabel={t("common.confirmDelete")} onConfirm={() => void del(h)}>{t("hosts.delete")}</ConfirmButton>
       </td>
@@ -206,19 +238,19 @@ export function HostsView({ core }: { core: CoreAPI }) {
         <div className="field-row hosts-filters">
           <Field label={t("hosts.search")} value={q} onChange={setQ} w="lg" />
           <Select label={t("hosts.folder.filter")} value={folder} onChange={setFolder} w="md" options={[["", t("hosts.folder.all")], ...folders.map((x) => [x, x] as [string, string])]} />
-          <button type="button" onClick={() => setFedit({ name: "", err: "" })}><Icon name="plus" />{t("hosts.folder.new")}</button>
+          <button type="button" ref={newFolderBtn} onClick={() => openFolder({ name: "" })}><Icon name="plus" />{t("hosts.folder.new")}</button>
         </div>
         {fedit && (
-          <form className="hosts-folder-form" onSubmit={(e) => { e.preventDefault(); void saveFolder(); }} noValidate>
+          <form ref={folderForm} className="hosts-folder-form" onSubmit={(e) => { e.preventDefault(); void saveFolder(); }} noValidate>
             <Field label={t("hosts.folder.name")} hint={t("hosts.f.folder.hint")} error={fedit.err} value={fedit.name} onChange={(v) => setFedit({ ...fedit, name: v, err: "" })} w="md" />
             <div className="actions">
               <button type="submit" className="primary">{t(fedit.old === undefined ? "hosts.folder.create" : "hosts.folder.rename")}</button>
-              <button type="button" onClick={() => setFedit(null)}>{t("hosts.cancel")}</button>
+              <button type="button" onClick={() => closeFolder(fedit.old ?? "")}>{t("hosts.cancel")}</button>
             </div>
           </form>
         )}
         {hosts && hosts.length === 0 && folderList.length === 0 ? <EmptyState icon="list" title={t("hosts.empty.title")}>{t("hosts.empty.body")}</EmptyState>
-          : hosts && shown.length === 0 ? <p className="hint">{t("hosts.noMatch")}</p>
+          : hosts && shown.length === 0 && groups.length === 0 ? <p className="hint">{t("hosts.noMatch")}</p>
           : (
             // shortcut: sin virtualizar; la libreta admite 5000 hosts y una tabla de ese tamaño aún se desplaza bien. Virtualizar si se nota lenta.
             <div className="hosts-table">
@@ -230,12 +262,12 @@ export function HostsView({ core }: { core: CoreAPI }) {
                   <tbody key={name || "\0"} aria-label={name || t("hosts.folder.none")} className={over === name ? "hosts-over" : undefined}
                     onDragOver={(e) => { if (!drag.current) return; e.preventDefault(); e.dataTransfer.dropEffect = "move"; setOver(name); }}
                     onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver((o) => (o === name ? null : o)); }}
-                    onDrop={(e) => { e.preventDefault(); dropOn(name, e.dataTransfer.getData("text/plain")); }}>
+                    onDrop={(e) => { e.preventDefault(); dropOn(name); }}>
                     <tr className="hosts-folder">
                       <th scope="rowgroup" colSpan={4}>{`${name || t("hosts.folder.none")} (${list.length})`}</th>
                       <td colSpan={2} className="hosts-actions">
                         {name && <>
-                          <button type="button" className="quiet" aria-label={t("hosts.folder.rename.aria", { name })} onClick={() => setFedit({ old: name, name, err: "" })}>{t("hosts.folder.rename")}</button>
+                          <button type="button" className="quiet" aria-label={t("hosts.folder.rename.aria", { name })} data-rename-folder={name} onClick={() => openFolder({ old: name, name })}>{t("hosts.folder.rename")}</button>
                           <ConfirmButton label={t("hosts.folder.delete.aria", { name })} confirmLabel={list.length ? t("hosts.folder.delete.confirm", { n: folderList.find((x) => x.name === name)?.count ?? list.length }) : t("common.confirmDelete")} onConfirm={() => void delFolder(name)}>{t("hosts.delete")}</ConfirmButton>
                         </>}
                       </td>
@@ -274,13 +306,16 @@ export function HostsView({ core }: { core: CoreAPI }) {
   );
 }
 
-// «Mover a…» sin ratón: un select nativo (teclado y lectores de pantalla) que toma el foco al abrirse; Esc lo cierra.
-function MoveSelect({ label, value, none, folders, onPick, onCancel }: { label: string; value: string; none: string; folders: string[]; onPick: (v: string) => void; onCancel: () => void }) {
-  const ref = useCallback((el: HTMLSelectElement | null) => el?.focus(), []);
+// «Mover a…» sin ratón: un grupo de botones (uno por carpeta y «Sin carpeta»); ninguna flecha ni cambio de foco mueve nada, solo pulsar.
+// (Un select actuaría en «change»: en WebKitGTK y WebView2 la flecha con el select cerrado ya lo dispara.) Esc cancela.
+function MovePanel({ label, current, none, cancel, folders, onPick, onCancel }: { label: string; current: string; none: string; cancel: string; folders: string[]; onPick: (v: string) => void; onCancel: () => void }) {
+  const ref = useCallback((el: HTMLDivElement | null) => el?.querySelector<HTMLElement>("button")?.focus(), []);
   return (
-    <select ref={ref} aria-label={label} value={value} onChange={(e) => onPick(e.target.value)} onBlur={onCancel} onKeyDown={(e) => { if (e.key === "Escape") onCancel(); }}>
-      <option value="">{none}</option>
-      {folders.map((x) => <option key={x} value={x}>{x}</option>)}
-    </select>
+    <div ref={ref} role="group" aria-label={label} className="hosts-move" onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); onCancel(); } }}>
+      {[["", none] as [string, string], ...folders.map((x) => [x, x] as [string, string])].filter(([v]) => v !== current).map(([v, n]) => (
+        <button key={v} type="button" className="quiet" onClick={() => onPick(v)}>{n}</button>
+      ))}
+      <button type="button" onClick={onCancel}>{cancel}</button>
+    </div>
   );
 }

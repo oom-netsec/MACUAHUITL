@@ -36,7 +36,7 @@ export const sampleHostsImport: HostsImportPreview = {
   warnings: ["1 host(s) traen una etiqueta de credencial que no está en la bóveda (o está repetida) y quedarían sin credencial"],
   errors: [{ line: 14, field: "address", reason: "dirección \"admin@10.0.0.9\": use una IP o un nombre DNS" }, { line: 15, field: "", reason: "tiene 3 columnas; se esperaban 8" }],
   items: [
-    { host: host({ id: "", name: "NUEVO", address: "10.7.0.1" }), key: "10.7.0.1:22", state: "nuevo", reason: "", conflictsWith: "", credentialMissing: false },
+    { host: host({ id: "", name: "NUEVO", address: "10.7.0.1", platform: "linux", startCommand: "tmux attach" }), key: "10.7.0.1:22", state: "nuevo", reason: "", conflictsWith: "", credentialMissing: false },
     { host: host({ id: "", name: "OFI-SW", address: "10.8.0.1", platform: "", folder: "Oficina", tags: ["acceso", "dc-1"] }), key: "10.8.0.1:22", state: "igual", reason: "", conflictsWith: "d".repeat(32), credentialMissing: false },
     { host: host({ id: "", name: "OTRO-NOMBRE", address: "10.9.0.1", credentialLabel: "admin lab" }), key: "10.9.0.1:22", state: "conflicto", reason: "direccion", conflictsWith: "a".repeat(32), credentialMissing: false },
     { host: host({ id: "", name: "LAB-AP", address: "ap2.lab", credentialLabel: "no existe" }), key: "ap2.lab:22", state: "conflicto", reason: "nombre", conflictsWith: "b".repeat(32), credentialMissing: true },
@@ -48,18 +48,19 @@ export const sampleHostFields: HostField[] = [
   { name: "name", type: "texto", required: true, example: "SW-CORE", description: "Nombre del host: 1 a 64 caracteres, sin espacios en los extremos. No se repite (sin importar mayúsculas)." },
   { name: "address", type: "texto", required: true, example: "10.0.0.1", description: "IP o nombre DNS, sin usuario, esquema, puerto ni ruta. La dirección con el puerto no se repite." },
   { name: "port", type: "entero", required: false, example: "22", description: "Puerto SSH, de 1 a 65535. Vacío = 22." },
-  { name: "platform", type: "texto", required: false, example: "ios-xe", description: "Plataforma: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc. Vacío = sin definir." },
+  { name: "platform", type: "texto", required: false, example: "ios-xe", description: "Plataforma: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc, linux, windows. Vacío = sin definir." },
   { name: "folder", type: "texto", required: false, example: "Lab", description: "Carpeta de un solo nivel: 1 a 48 caracteres entre letras, números, espacio, _, . y -. Vacío = sin carpeta." },
   { name: "tags", type: "lista", required: false, example: "core;dc-1", description: "Hasta 10 etiquetas de 1 a 24 caracteres entre a-z, 0-9 y -. En CSV separadas por «;»; en JSON, un arreglo." },
   { name: "credential_label", type: "texto", required: false, example: "admin lab", description: "Etiqueta de una credencial de la bóveda local (nunca el usuario ni la contraseña)." },
   { name: "notes", type: "texto", required: false, example: "Piso 2", description: "Notas libres, hasta 2000 caracteres." },
+  { name: "start_command", type: "texto", required: false, example: "tmux attach", description: "Orden de inicio, solo con linux o windows: una línea de hasta 256 caracteres, sin caracteres de control ni invisibles. Se ejecuta en el equipo al conectar." },
 ];
 export const sampleHostsFormat: HostsFormat = { fields: sampleHostFields, maxRows: 1000, maxBytes: 5 << 20 };
 
 const templateRows = [
-  ["SW-CORE", "10.0.0.1", "22", "ios-xe", "Lab", "core;dc-1", "admin lab", "Piso 2"],
-  ["SW-ACC1", "10.0.0.2", "22", "nx-os", "Lab", "acceso", "", ""],
-  ["AP-1", "ap1.lab.example.com", "2222", "wlc", "Oficina", "wifi", "", ""],
+  ["SW-CORE", "10.0.0.1", "22", "ios-xe", "Lab", "core;dc-1", "admin lab", "Piso 2", ""],
+  ["SW-ACC1", "10.0.0.2", "22", "nx-os", "Lab", "acceso", "", "", ""],
+  ["AP-1", "ap1.lab.example.com", "2222", "wlc", "Oficina", "wifi", "", "", ""],
 ];
 const sampleTemplate = (format: HostFileFormat) => ({
   format,

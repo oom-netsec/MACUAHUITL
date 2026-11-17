@@ -32,7 +32,7 @@ test("«Ver detalles» abre el diálogo con la tabla de campos del núcleo, las 
   await userEvent.click(open);
   const d = await screen.findByRole("dialog", { name: "Detalles · Hosts" });
   const fields = await within(d).findByRole("table", { name: "Campos del archivo" });
-  expect(within(fields).getAllByRole("row")).toHaveLength(9); // encabezado + 8 campos
+  expect(within(fields).getAllByRole("row")).toHaveLength(10); // encabezado + 9 campos
   expect(within(fields).getByText("credential_label")).toBeVisible();
   expect(within(d).getByText(/CSV sirve para Excel/)).toBeVisible();
   expect(within(d).getByText("Hasta 1000 hosts y 5 MB por archivo.")).toBeVisible();
@@ -218,4 +218,11 @@ test("si escribir la plantilla de hosts falla, se borra el archivo vacío que de
   const core = setup({ writeFile: vi.fn(async () => { throw new Error("disco lleno"); }), removeEmptyFile: vi.fn(async () => {}) });
   await userEvent.click(screen.getByRole("button", { name: "Descargar plantilla CSV" }));
   await waitFor(() => expect(core.removeEmptyFile).toHaveBeenCalledWith("/home/u/Descargas/hosts-plantilla.csv"));
+});
+
+test("la vista previa del import muestra la orden de inicio de cada host", async () => {
+  setup();
+  await userEvent.click(screen.getByRole("button", { name: "Importar…" }));
+  const t = await screen.findByRole("table", { name: "Filas válidas del archivo" });
+  expect(within(t).getByText("tmux attach")).toBeVisible();
 });

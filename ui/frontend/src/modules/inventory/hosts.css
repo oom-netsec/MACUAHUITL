@@ -24,3 +24,6 @@
 .hosts-table .hosts-folder td { background: var(--surface-2); }
 .hosts-folder-form { margin-bottom: var(--s-2); }
 .hosts-actions select { max-width: 12em; }
+.hosts-grip { cursor: grab; margin-right: var(--s-1); }
+.hosts-start { margin-left: var(--s-1); }
+.hosts-move { display: inline-flex; flex-wrap: wrap; gap: var(--s-1); justify-content: flex-end; }

@@ -19,7 +19,7 @@ export const hostPlatformOf = (p: string): HostPlatform => {
 export const emptyForm: HostForm = { name: "", address: "", port: "22", platform: "", folder: "", tags: "", credentialId: "", notes: "", startCommand: "" };
 
 export const formOf = (h: Pick<Host, "name" | "address" | "port" | "platform" | "folder" | "tags" | "credentialId" | "notes" | "startCommand">): HostForm =>
-  ({ name: h.name, address: h.address, port: String(h.port || 22), platform: h.platform, folder: h.folder, tags: h.tags.join(" "), credentialId: h.credentialId, notes: h.notes, startCommand: h.startCommand });
+  ({ name: h.name, address: h.address, port: String(h.port || 22), platform: h.platform, folder: h.folder, tags: h.tags.join(" "), credentialId: h.credentialId, notes: h.notes, startCommand: h.startCommand ?? "" });
 
 // Agrupa por carpeta (una pasada, sin copiar arreglos): por nombre de carpeta y «sin carpeta» al final.
 export function groupByFolder<T extends { folder: string }>(list: T[]): [string, T[]][] {
@@ -47,7 +47,7 @@ export function validateHost(f: HostForm): Partial<Record<HostField, Key>> {
   const tags = parseTags(f.tags);
   if (tags.length > 10 || new Set(tags).size !== tags.length || !tags.every((t) => TAG.test(t))) e.tags = "hosts.v.tags";
   if ([...f.notes].length > 2000) e.notes = "hosts.v.notes";
-  if (hasStartCommand(f.platform) && ([...f.startCommand].length > 256 || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/.test(f.startCommand))) e.startCommand = "hosts.v.startCommand";
+  if (hasStartCommand(f.platform) && ([...f.startCommand].length > 256 || /[\p{Cc}\p{Cf}\u2028\u2029]/u.test(f.startCommand))) e.startCommand = "hosts.v.startCommand";
   return e;
 }
 
@@ -76,6 +76,7 @@ export function coreErrorField(e: unknown): HostField | "" {
   const msg = errorText(e);
   const dup = coreErrorKey(e);
   if (dup) return dup === "hosts.err.nameDup" ? "name" : "address";
+  if (/orden de inicio|start ?command/i.test(msg)) return "startCommand";
   if (/credencial/i.test(msg)) return "credentialId";
   if (/direcci[oó]n/i.test(msg)) return "address";
   if (/nombre/i.test(msg)) return "name";
