@@ -55,10 +55,10 @@ Si el instalador se abre como administrador, te avisa: ábrelo de nuevo sin «Ej
 
 ## Paquetes de contenido
 
-Los playbooks vienen en paquetes de contenido (`.mpack`), publicados con cada release. Instala los que necesites en **Ajustes → Paquetes → Instalar paquete…**, o con `mctl`. El instalador no agrega `mctl` al `PATH`, así que llámalo por su ruta. `cmd.exe` no expande `*`, así que escribe el nombre completo del archivo (con la versión del que descargaste):
+Los playbooks vienen en paquetes de contenido (`.mpack`), publicados con cada release. Instala los que necesites en **Ajustes → Paquetes → Instalar paquete…**, o con `mctl`. El instalador no agrega `mctl` al `PATH`, así que llámalo por su ruta. `cmd.exe` no expande `*`, así que escribe el nombre completo del archivo (con la versión del que descargaste), desde la carpeta donde lo descargaste:
 
 ```bat
-"%LOCALAPPDATA%\Programs\MACUAHUITL\mctl.exe" pack install oom-ios-xe-1.1.0.mpack
+"%LOCALAPPDATA%\Programs\MACUAHUITL\mctl.exe" pack install oom-ios-xe-1.1.4.mpack
 ```
 
 En PowerShell, para instalar todos los paquetes oficiales de la carpeta actual:
