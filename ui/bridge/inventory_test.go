@@ -114,7 +114,7 @@ func TestInventoryBridge(t *testing.T) {
 		t.Fatalf("item = %+v", it)
 	}
 	ap, err := b.ApplyHostsImport("tok", []HostDecisionDTO{{Key: "10.0.0.1:22", Action: "omitir"}})
-	if err != nil || ap != (HostsImportResultDTO{1, 2, 3, 4, 5}) || len(f.dec) != 1 || f.dec[0].Key != "10.0.0.1:22" || f.dec[0].Action != "omitir" {
+	if err != nil || ap != (HostsImportResultDTO{1, 2, 3, 4, 5, 0}) || len(f.dec) != 1 || f.dec[0].Key != "10.0.0.1:22" || f.dec[0].Action != "omitir" {
 		t.Fatalf("apply = %+v dec = %v err = %v", ap, f.dec, err)
 	}
 	tp, err := b.HostsImportTemplate("json")

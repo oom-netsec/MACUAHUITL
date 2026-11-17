@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { passwordCreds } from "../vault/api";
 import { Hl, Terminal } from "../../components/Terminal";
 import type { CoreAPI, Credential, GnmiTarget, SnmpTarget, Topo, VisEvent, VisKind } from "../../lib/core";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
@@ -109,7 +110,7 @@ function useCredentials(core: CoreAPI) {
   const [creds, setCreds] = useState<Credential[]>([]);
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
   useEffect(() => {
-    core.listCredentials().then(setCreds).catch(() => setCreds([])); // bóveda cerrada: sin lista
+    core.listCredentials().then(passwordCreds).then(setCreds).catch(() => setCreds([])); // bóveda cerrada: sin lista
   }, [core, vv]);
   return [["", t("visibility.none")], ...creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])] as [string, string][];
 }

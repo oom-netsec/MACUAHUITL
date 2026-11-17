@@ -3,9 +3,11 @@
 package simulator
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -68,6 +70,33 @@ type Config struct {
 	// contexto donde aterriza cualquier changeto (un equipo que no obedece, para probar la verificación del prompt).
 	Contexts        []string
 	ChangetoLandsIn string
+	// Fase 44b (hosts genéricos, solo pruebas): AuthorizedKeys activa publickey; NoPassword quita password (y keyboard-interactive);
+	// AuthLog recibe el método de cada intento ("none", "publickey", "password"...); Exec contesta un `exec` sin emular un shell:
+	// anota "!exec pty=<bool> <cmd>" en Recorder, escribe la respuesta, manda exit-status 0 y cierra.
+	AuthorizedKeys []ssh.PublicKey
+	NoPassword     bool
+	AuthLog        *[]string
+	Exec           func(cmd string) string
+	// Fase 44c2: Conns cuenta cada conexión TCP aceptada (un Dial sin handshake también suma: AuthLog no lo vería);
+	// OnPty recibe el tipo de terminal de cada pty-req.
+	Conns *atomic.Int32
+	OnPty func(term string)
+}
+
+// FixedHostKey confía en la llave de equipo que devolvió Start (para quien no importa x/crypto/ssh).
+func FixedHostKey(hk ssh.PublicKey) ssh.HostKeyCallback { return ssh.FixedHostKey(hk) }
+
+// Keys arma la lista de AuthorizedKeys (para quien no importa x/crypto/ssh).
+func Keys(k ...ssh.PublicKey) []ssh.PublicKey { return k }
+
+// ParseAuthorizedKey lee una línea de authorized_keys (para quien no importa x/crypto/ssh).
+func ParseAuthorizedKey(t testing.TB, line string) ssh.PublicKey {
+	t.Helper()
+	k, _, _, _, err := ssh.ParseAuthorizedKey([]byte(line))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
 }
 
 // Recorder anota lo que el equipo simulado recibió en modo configuración.
@@ -140,8 +169,27 @@ func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
 	for u, p := range c.Users {
 		dev.setUser(u, p, "9")
 	}
-	cfg := &ssh.ServerConfig{
-		PasswordCallback: func(m ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) {
+	var logMu sync.Mutex
+	cfg := &ssh.ServerConfig{}
+	if c.AuthLog != nil {
+		cfg.AuthLogCallback = func(_ ssh.ConnMetadata, method string, _ error) {
+			logMu.Lock()
+			*c.AuthLog = append(*c.AuthLog, method)
+			logMu.Unlock()
+		}
+	}
+	if len(c.AuthorizedKeys) > 0 {
+		cfg.PublicKeyCallback = func(_ ssh.ConnMetadata, k ssh.PublicKey) (*ssh.Permissions, error) {
+			for _, a := range c.AuthorizedKeys {
+				if bytes.Equal(a.Marshal(), k.Marshal()) {
+					return nil, nil
+				}
+			}
+			return nil, errors.New("llave no autorizada")
+		}
+	}
+	if !c.NoPassword {
+		cfg.PasswordCallback = func(m ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) {
 			if c.Attempts != nil {
 				c.Attempts.Add(1)
 			}
@@ -149,9 +197,9 @@ func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
 				return nil, nil
 			}
 			return nil, errors.New("acceso denegado")
-		},
+		}
 	}
-	if c.KeyboardInteractive {
+	if c.KeyboardInteractive && !c.NoPassword {
 		cfg.KeyboardInteractiveCallback = func(m ssh.ConnMetadata, ch ssh.KeyboardInteractiveChallenge) (*ssh.Permissions, error) {
 			for i := 0; i < 3; i++ {
 				ans, err := ch("", "", []string{"Password: "}, []bool{false})
@@ -185,6 +233,9 @@ func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
 			conn, err := l.Accept()
 			if err != nil {
 				return
+			}
+			if c.Conns != nil {
+				c.Conns.Add(1)
 			}
 			go serve(conn, cfg, c, outputs, dev)
 		}
@@ -244,19 +295,41 @@ func serve(conn net.Conn, cfg *ssh.ServerConfig, c Config, outputs map[string]st
 		if err != nil {
 			return
 		}
-		shell := make(chan struct{})
+		shell, done := make(chan struct{}), make(chan struct{})
 		go func() {
+			defer close(done)
+			pty := false
 			for r := range creqs {
-				ok := r.Type == "pty-req" || r.Type == "shell"
+				ok := r.Type == "pty-req" || r.Type == "shell" || (r.Type == "exec" && c.Exec != nil)
 				if r.WantReply {
 					r.Reply(ok, nil)
 				}
-				if r.Type == "shell" {
+				switch r.Type {
+				case "pty-req":
+					pty = true
+					if c.OnPty != nil && len(r.Payload) >= 4 {
+						if n := int(binary.BigEndian.Uint32(r.Payload)); len(r.Payload) >= 4+n {
+							c.OnPty(string(r.Payload[4 : 4+n]))
+						}
+					}
+				case "shell":
 					close(shell)
+				case "exec":
+					if c.Exec != nil && len(r.Payload) >= 4 {
+						cmd := string(r.Payload[4:])
+						c.Recorder.add(fmt.Sprintf("!exec pty=%t %s", pty, cmd))
+						io.WriteString(ch, c.Exec(cmd))
+						ch.SendRequest("exit-status", false, make([]byte, 4))
+						ch.Close()
+					}
 				}
 			}
 		}()
-		<-shell
+		select {
+		case <-shell:
+		case <-done:
+			continue // un exec ya cerró su canal; la conexión sigue para otro
+		}
 		(&session{ch: ch, c: c, outputs: outputs, dev: dev, priv: c.StartPrivileged, paging: true}).run()
 		ch.Close()
 		return

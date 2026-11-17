@@ -169,7 +169,7 @@ func (s *sshConn) serve(nc net.Conn) {
 	defer wg.Wait()
 	for nch := range chans {
 		if nch.ChannelType() != "session" { // direct-tcpip, forwarded-tcpip, x11, streamlocal…
-			s.reject(client, CauseOther, why("channel_rejected", "type", nch.ChannelType())) // se registra antes de responder: el cliente ve la respuesta con la bitácora ya escrita
+			s.reject(client, CauseOther, why("channel_rejected", "type", clean(nch.ChannelType()))) // se registra antes de responder: el cliente ve la respuesta con la bitácora ya escrita
 			nch.Reject(ssh.Prohibited, "solo sesiones scp o sftp")
 			continue
 		}
@@ -225,7 +225,7 @@ func (s *sshConn) session(ch ssh.Channel, reqs <-chan *ssh.Request, client strin
 		case r.Type == "env" || r.Type == "window-change" || r.Type == "signal":
 			r.Reply(false, nil)
 		default: // shell, pty-req, exec ajeno, subsystem ajeno, x11-req, auth-agent-req…
-			s.reject(client, CauseOther, why("request_rejected", "type", r.Type))
+			s.reject(client, CauseOther, why("request_rejected", "type", clean(r.Type)))
 			r.Reply(false, nil)
 		}
 	}
@@ -274,7 +274,7 @@ func parseSCP(cmd string) (mode byte, path string, err error) {
 				mode = byte(o)
 			case 'v', 'p', 'd', 'q':
 			default:
-				return 0, "", i18n.New("fileserve.reason.option_not_allowed", i18n.A("opt", string(o)))
+				return 0, "", i18n.New("fileserve.reason.option_not_allowed", i18n.A("opt", clean(string(o))))
 			}
 		}
 	}

@@ -36,6 +36,7 @@ type HostKeyError struct {
 	Host        string
 	Status      HostKeyStatus
 	Fingerprint string
+	KeyType     string // p. ej. ssh-ed25519: la UI lo muestra junto a la huella
 }
 
 func (e *HostKeyError) Error() string {
@@ -46,7 +47,7 @@ func (e *HostKeyError) Error() string {
 func (e *HostKeyError) Reason() string { return "transport.hostkey." + e.status() }
 
 func (e *HostKeyError) Metadata() map[string]string {
-	return map[string]string{"host": e.Host, "fingerprint": e.Fingerprint}
+	return map[string]string{"host": e.Host, "fingerprint": e.Fingerprint, "key_type": e.KeyType}
 }
 
 func (e *HostKeyError) Localize(loc string) string {
@@ -198,6 +199,6 @@ func (k *KnownHosts) Callback(p HostKeyPolicy, onEvent func(audit.Entry)) ssh.Ho
 			onEvent(audit.Entry{Action: "hostkey.accepted", Target: hostport, Detail: fp})
 			return k.add(hostport, key)
 		}
-		return &HostKeyError{Host: hostport, Status: status, Fingerprint: fp}
+		return &HostKeyError{Host: hostport, Status: status, Fingerprint: fp, KeyType: key.Type()}
 	}
 }

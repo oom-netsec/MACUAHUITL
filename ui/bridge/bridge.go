@@ -244,6 +244,38 @@ type CredentialDTO struct {
 	Username  string `json:"username"`
 	HasEnable bool   `json:"hasEnable"`
 	HasSSHKey bool   `json:"hasSshKey"`
+	Kind      string `json:"kind"` // password | key: lo calcula el núcleo al listar
+}
+
+// KeyCredentialDTO es la llave recién generada: solo la pública sale del núcleo (ADR 0013).
+type KeyCredentialDTO struct {
+	ID        string `json:"id"`
+	PublicKey string `json:"publicKey"` // una línea de authorized_keys
+}
+
+// CreateKeyCredential pide al núcleo una llave ed25519 nueva; la privada queda en la bóveda y nunca viaja.
+func (b *Bridge) CreateKeyCredential(label, username string) (KeyCredentialDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (KeyCredentialDTO, error) {
+		r, err := v1.NewVaultServiceClient(c).GenerateKeyCredential(ctx, &v1.GenerateKeyCredentialRequest{Label: label, Username: username})
+		return KeyCredentialDTO{ID: r.GetId(), PublicKey: r.GetPublicKey()}, err
+	})
+}
+
+// RegenerateKeyCredential genera otra llave para la misma credencial (conserva el id) y devuelve la pública nueva.
+// confirm es obligatorio: la pública vieja deja de servir en cada authorized_keys. Solo credenciales de tipo llave.
+func (b *Bridge) RegenerateKeyCredential(id string, confirm bool) (string, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
+		r, err := v1.NewVaultServiceClient(c).RegenerateKeyCredential(ctx, &v1.RegenerateKeyCredentialRequest{Id: id, Confirm: confirm})
+		return r.GetPublicKey(), err
+	})
+}
+
+// CredentialPublicKey devuelve la línea authorized_keys de una credencial con llave.
+func (b *Bridge) CredentialPublicKey(id string) (string, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (string, error) {
+		r, err := v1.NewVaultServiceClient(c).GetCredentialPublicKey(ctx, &v1.GetCredentialPublicKeyRequest{Id: id})
+		return r.GetPublicKey(), err
+	})
 }
 
 func (b *Bridge) ListCredentials() ([]CredentialDTO, error) {
@@ -254,7 +286,7 @@ func (b *Bridge) ListCredentials() ([]CredentialDTO, error) {
 		}
 		out := []CredentialDTO{}
 		for _, i := range r.Credentials {
-			out = append(out, CredentialDTO{ID: i.Id, Label: i.Label, Username: i.Username, HasEnable: i.HasEnableSecret, HasSSHKey: i.HasSshKey})
+			out = append(out, CredentialDTO{ID: i.Id, Label: i.Label, Username: i.Username, HasEnable: i.HasEnableSecret, HasSSHKey: i.HasSshKey, Kind: i.Kind})
 		}
 		return out, nil
 	})

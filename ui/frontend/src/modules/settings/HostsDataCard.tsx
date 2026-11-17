@@ -16,7 +16,7 @@ import "../inventory/hosts.css";
 // Los ejemplos no neutros los escribe el núcleo en español siempre: en otro idioma se ocultan.
 const BASE: Record<string, Key> = { texto: "hosts.data.type.texto", entero: "hosts.data.type.entero", lista: "hosts.data.type.lista" };
 const TYPES: Record<string, Key> = { ...BASE, text: BASE.texto, integer: BASE.entero, list: BASE.lista };
-const FIELD_NAMES = new Set(["name", "address", "port", "platform", "folder", "tags", "credential_label", "notes"]);
+const FIELD_NAMES = new Set(["name", "address", "port", "platform", "folder", "tags", "credential_label", "notes", "startup_command"]);
 // Ejemplos que no dependen del idioma (IP, puerto, plataforma); los demás vienen en español del núcleo y en inglés no se muestran.
 const NEUTRAL = new Set(["address", "port", "platform"]);
 const neutral = (n: string) => NEUTRAL.has(n);
@@ -155,7 +155,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
       {err && <Notice kind="error">{err}</Notice>}
       {msg && <Notice kind="ok">{msg}</Notice>}
       {warn && <Notice kind="warn">{warn}</Notice>}
-      {result && <Notice kind="ok">{t("hosts.data.import.done", { created: String(result.created), replaced: String(result.replaced), renamed: String(result.renamed), skipped: String(result.skipped), invalid: String(result.invalid) })}</Notice>}
+      {result && <Notice kind="ok">{t("hosts.data.import.done", { created: String(result.created), replaced: String(result.replaced), renamed: String(result.renamed), skipped: String(result.skipped), invalid: String(result.invalid) })}{result.foldersCreated > 0 && ` ${t("hosts.data.import.foldersCreated", { n: String(result.foldersCreated) })}`}</Notice>}
 
       {prev && (
         <section className="hosts-preview" aria-label={t("hosts.data.import.preview")}>
@@ -191,7 +191,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
               <h6>{t("hosts.data.import.states", { n: String(prev.items.length) })}</h6>
               <div className="hosts-table">
                 <table aria-label={t("hosts.data.import.states.table")}>
-                  <thead><tr>{(["host", "dest", "state", "cred", "action"] as const).map((c) => <th key={c} scope="col">{t(`hosts.data.import.col.${c}`)}</th>)}</tr></thead>
+                  <thead><tr>{(["host", "dest", "state", "cred", "start", "action"] as const).map((c) => <th key={c} scope="col">{t(`hosts.data.import.col.${c}`)}</th>)}</tr></thead>
                   <tbody>
                     {prev.items.map((i) => (
                       <tr key={i.key}>
@@ -199,6 +199,7 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
                         <td className="mono">{i.key}</td>
                         <td><Badge tone={i.state === "conflicto" ? "warn" : i.state === "nuevo" ? "ok" : ""}>{stateOf(i)}</Badge></td>
                         <td>{i.host.credentialLabel || "—"}{i.credentialMissing && <div className="hint">{t("hosts.data.import.credMissing")}</div>}</td>
+                        <td>{i.hasStartCommand ? <><Badge tone="warn">{t("hosts.data.import.startMark")}</Badge> <code>{i.host.startCommand}</code></> : "—"}</td>
                         <td>
                           {i.state === "conflicto" ? (
                             <Select label={t("hosts.data.import.action.aria", { name: i.host.name })} value={acts[i.key] ?? "omitir"} onChange={(v) => setActs((a) => ({ ...a, [i.key]: v }))}

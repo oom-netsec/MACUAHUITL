@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
@@ -53,4 +54,27 @@ func ReasonIn(loc string, t Transfer) string {
 		return t.Error
 	}
 	return t.ReasonT.In(loc)
+}
+
+// peerMax son las runas que se conservan de un texto que mandó el par.
+const peerMax = 128
+
+// clean deja un texto del par (mensaje de ERROR de TFTP, tipo de canal o de petición SSH, opción de scp) listo para
+// guardar, auditar y mostrar: control, formato Unicode (U+202E…) y UTF-8 inválido pasan a «?», y se corta a peerMax
+// runas. Es la misma regla que transfer.SanitizeName, que fileserve no puede importar (ese paquete ya lo importa a él).
+func clean(s string) string {
+	if len(s) > 4*peerMax {
+		s = s[:4*peerMax] // el corte previo evita recorrer 64 KiB; el final puede partir una runa y pasa a «?»
+	}
+	out := make([]rune, 0, peerMax)
+	for _, r := range strings.ToValidUTF8(s, "?") {
+		if len(out) == peerMax {
+			break
+		}
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			r = '?'
+		}
+		out = append(out, r)
+	}
+	return string(out)
 }

@@ -136,6 +136,7 @@ type Core struct {
 	log      *audit.Log
 	guard    *transport.Guard
 	hosts    *transport.KnownHosts
+	xfer     *service.TransferSessions           // sesiones de transferencia en vivo (fase 45b); una sola instancia
 	settings *service.CoreSettings               // preferencias del núcleo; viven en preferences (core.*)
 	basePbs  []playbook.Playbook                 // playbooks embebidos
 	userPbs  atomic.Pointer[[]playbook.Playbook] // los de <config>/playbooks; se vuelven a leer al importar un paquete (fase 32c)
@@ -198,6 +199,7 @@ func New(p Paths, o Options) (*Core, error) {
 	}
 	c := &Core{p: p, o: o, db: db, jobs: map[string]*job{}, activity: o.Now(), stop: make(chan struct{}), live: ipc.NewLive(liveIgnore...).CountUnary(liveUnary...)}
 	c.settings = service.NewCoreSettings(p.Outputs, p.Home, p.Config, p.Data, p.State, p.Runtime)
+	c.xfer = service.NewTransferSessions(o.Now)
 	c.log = audit.New(db, o.Now)
 	// Se revalida la carpeta de salidas guardada (dueño, 0700, ancestros): si ya no vale rige la de fábrica y queda en la auditoría.
 	if err := c.settings.Load(db, func(dir string) error { _, err := service.CheckOutputs(dir, c.settings, false); return err }); err != nil {

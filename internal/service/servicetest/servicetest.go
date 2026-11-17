@@ -38,6 +38,7 @@ type Deps struct {
 	db      *sql.DB
 	clock   func() time.Time
 	closers []func()
+	xfer    *service.TransferSessions
 }
 
 // New arma las dependencias sobre carpetas temporales de t.
@@ -54,6 +55,7 @@ func New(t *testing.T) *Deps {
 	}
 	t.Cleanup(func() { db.Close() })
 	d := &Deps{T: t, db: db, Out: filepath.Join(root, "o"), clock: time.Now}
+	d.xfer = service.NewTransferSessions(func() time.Time { return d.clock() })
 	d.S = service.NewCoreSettings(d.Out, root, filepath.Join(root, "data"))
 	if d.H, err = transport.OpenKnownHosts(filepath.Join(root, "known_hosts")); err != nil {
 		t.Fatal(err)
@@ -113,6 +115,9 @@ func (d *Deps) DiagLookPath() func(string) (string, error) { return d.Look }
 func (d *Deps) DenyDirs() []string                         { return d.Deny }
 func (d *Deps) Hosts() *transport.KnownHosts               { return d.H }
 func (d *Deps) OnClose(f func())                           { d.closers = append(d.closers, f) }
+
+// TransferSessions es el registro de sesiones en vivo, con la hora de SetClock.
+func (d *Deps) TransferSessions() *service.TransferSessions { return d.xfer }
 
 // CloseAll corre lo registrado con OnClose, en orden inverso, como el núcleo al cerrarse.
 func (d *Deps) CloseAll() {

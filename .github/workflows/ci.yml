@@ -30,7 +30,7 @@ jobs:
       - name: test -race (core, platform, cmd, service)
         run: |
           set -o pipefail
-          tools/ci/pkgs.sh core | xargs go test -race
+          tools/ci/pkgs.sh core | xargs go test -race -tags=storewatch
 
   go-race-rest:
     runs-on: ubuntu-latest
@@ -42,7 +42,7 @@ jobs:
       - name: test -race (todo lo demás menos mask)
         run: |
           set -o pipefail
-          tools/ci/pkgs.sh rest | xargs go test -race
+          tools/ci/pkgs.sh rest | xargs go test -race -tags=storewatch
 
   go-race-mask:
     runs-on: ubuntu-latest
@@ -54,7 +54,7 @@ jobs:
       - name: mask con -race (muestra con semilla del día; MACUAHUITL_SEED la fija)
         run: |
           set -o pipefail
-          tools/ci/pkgs.sh mask | xargs go test -race -count=1
+          tools/ci/pkgs.sh mask | xargs go test -race -tags=storewatch -count=1
 
   go-checks:
     runs-on: ubuntu-latest
@@ -158,7 +158,7 @@ jobs:
       - name: pruebas de los paquetes ya portables (tools/ci/windows-pkgs.txt)
         run: |
           set -o pipefail
-          grep -v '#' tools/ci/windows-pkgs.txt | xargs go test -count=1
+          grep -v '#' tools/ci/windows-pkgs.txt | xargs go test -tags=storewatch -count=1
       - name: noegress
         if: always()
         run: go run ./tools/noegress/cmd/noegress ./...

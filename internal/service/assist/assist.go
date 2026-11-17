@@ -248,6 +248,14 @@ func (s *assistSvc) vault(ctx context.Context) error {
 	return nil
 }
 
+// rejectGeneric: un host linux/windows de la libreta o una credencial de solo llave no entran al cambio asistido.
+func (s *assistSvc) rejectGeneric(ctx context.Context, host string, port uint16, cred string) error {
+	if err := service.CheckNotGenericHost(ctx, s.d.DB(), host, int(port)); err != nil {
+		return err
+	}
+	return service.CheckNoKeyCredential(ctx, s.d.Vault(), cred)
+}
+
 func checkTarget(ctx context.Context, t *v1.AssistTarget) error {
 	if t == nil || t.Address == "" || t.CredentialId == "" {
 		return service.Err(ctx, codes.InvalidArgument, "assist.svc.indica_el_equipo_direccion_y", nil)
@@ -298,6 +306,9 @@ func (s *assistSvc) planWith(ctx context.Context, t *v1.AssistTarget, accepted [
 	port := uint16(t.Port)
 	if port == 0 {
 		port = 22
+	}
+	if err := s.rejectGeneric(ctx, t.Address, port, t.CredentialId); err != nil {
+		return "", assist.Plan{}, err
 	}
 	label := t.Name
 	if label == "" {
@@ -514,9 +525,12 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 		return nil, err
 	}
 	if r.UpdateCredentialId != "" {
-		u, err := s.credUser(ctx, r.UpdateCredentialId)
+		u, isKey, err := s.credUserKey(ctx, r.UpdateCredentialId)
 		if err != nil {
 			return nil, err
+		}
+		if isKey { // la rotación pondría una contraseña a una llave: eso la dejaría de ser (fase 44); para cambiarla está regenerar llave
+			return nil, service.Err(ctx, codes.FailedPrecondition, "vault.err.key_credential", nil)
 		}
 		if u != r.User {
 			return nil, service.Err(ctx, codes.InvalidArgument, "assist.svc.la_credencial_es_del_usuario", i18n.A("credential", r.UpdateCredentialId, "actual", u, "wanted", r.User))
@@ -535,14 +549,20 @@ func (s *assistSvc) PlanCredRotate(ctx context.Context, r *v1.PlanCredRotateRequ
 
 // credUser devuelve el usuario de una credencial de la bóveda, sin conservar sus secretos.
 func (s *assistSvc) credUser(ctx context.Context, id string) (string, error) {
+	u, _, err := s.credUserKey(ctx, id)
+	return u, err
+}
+
+// credUserKey además dice si la credencial es de tipo key (solo llave).
+func (s *assistSvc) credUserKey(ctx context.Context, id string) (string, bool, error) {
 	c, err := s.d.Vault().Get(id)
 	if err != nil {
-		return "", service.VaultErr(ctx, err)
+		return "", false, service.VaultErr(ctx, err)
 	}
 	defer c.Password.Destroy()
 	defer c.Enable.Destroy()
 	defer c.SSHKey.Destroy()
-	return c.Username, nil
+	return c.Username, c.IsKey(), nil
 }
 
 func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.StartRunResponse, error) {
@@ -575,6 +595,9 @@ func (s *assistSvc) StartRun(ctx context.Context, r *v1.StartRunRequest) (*v1.St
 // (una reversa pendiente); origin es la ejecución original cuya reversa se aplica.
 func (s *assistSvc) launch(ctx context.Context, rec *planRec, planID string, keys []string, origin string) (string, error) {
 	if err := s.vault(ctx); err != nil {
+		return "", err
+	}
+	if err := s.rejectGeneric(ctx, rec.t.host, rec.t.port, rec.t.cred); err != nil {
 		return "", err
 	}
 	runID := service.NewID()

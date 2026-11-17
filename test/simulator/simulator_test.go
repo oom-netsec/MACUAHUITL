@@ -2,6 +2,8 @@ package simulator
 
 import (
 	"bufio"
+	"crypto/ed25519"
+	"crypto/rand"
 	"io"
 	"os"
 	"path/filepath"
@@ -144,5 +146,47 @@ func TestSimulatorSwitchportModeChanges(t *testing.T) {
 	got := run("show interfaces "+gi+" switchport | include Mode:", "SW1#")
 	if !strings.Contains(got, "Administrative Mode: static access\r\nOperational Mode: static access\r\n") || strings.Contains(got, "Name:") {
 		t.Errorf("include Mode: = %q", got)
+	}
+}
+
+func TestExecYSoloPublickey(t *testing.T) {
+	_, priv, _ := ed25519.GenerateKey(rand.Reader)
+	signer, _ := ssh.NewSignerFromKey(priv)
+	var log []string
+	rec := &Recorder{}
+	addr, hk := Start(t, Config{Hostname: "pi", Username: "pi", Transcripts: transcripts(t, "ios-xe"), NoPassword: true,
+		AuthorizedKeys: []ssh.PublicKey{signer.PublicKey()}, AuthLog: &log, Recorder: rec,
+		Exec: func(cmd string) string { return "ok:" + cmd + "\n" }})
+	cc := func(auth ssh.AuthMethod) (*ssh.Client, error) {
+		return ssh.Dial("tcp", addr, &ssh.ClientConfig{User: "pi", Auth: []ssh.AuthMethod{auth}, HostKeyCallback: ssh.FixedHostKey(hk), Timeout: 3 * time.Second})
+	}
+	if _, err := cc(ssh.Password("x")); err == nil {
+		t.Fatal("password aceptada con NoPassword")
+	}
+	c, err := cc(ssh.PublicKeys(signer))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	for _, pty := range []bool{false, true} {
+		s, err := c.NewSession()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pty {
+			if err := s.RequestPty("xterm", 24, 80, ssh.TerminalModes{}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		out, err := s.Output("echo hola")
+		if err != nil || string(out) != "ok:echo hola\n" {
+			t.Fatalf("exec pty=%v: %q %v", pty, out, err)
+		}
+	}
+	if l := rec.Lines(); len(l) != 2 || l[0] != "!exec pty=false echo hola" || l[1] != "!exec pty=true echo hola" {
+		t.Fatalf("recorder: %v", l)
+	}
+	if len(log) == 0 {
+		t.Fatal("AuthLog vacío")
 	}
 }

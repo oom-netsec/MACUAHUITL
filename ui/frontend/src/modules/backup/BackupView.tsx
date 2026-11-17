@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { passwordCreds } from "../vault/api";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { Check, Field, Notice, Select, TextArea, errorText } from "../../components/Field";
 import { EmptyState, Page, ResultPanel, Section } from "../../components/Page";
@@ -54,7 +55,7 @@ export function BackupView({ core, pollMs = 700, maxWaitMs = 10 * 60_000 }: { co
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
-  useEffect(() => { core.listCredentials().then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : l[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
+  useEffect(() => { core.listCredentials().then(passwordCreds).then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : l[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
 
   const reload = useCallback(async () => {
     try { const l = await core.backupList(""); if (alive.current) { setList(l); setSel((s) => s.filter((id) => l.backups.some((b) => b.id === id))); } } catch (e) { if (alive.current) setErr(errorText(e)); }

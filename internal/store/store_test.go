@@ -110,15 +110,16 @@ func TestMigrateFromEitherBranch(t *testing.T) {
 			if _, err := db.Exec(`INSERT INTO pack_removed VALUES('ios-xe/x','oom/ios-xe')`); err != nil {
 				t.Fatalf("sin pack_removed: %v", err)
 			}
-			if _, err := db.Exec(`INSERT INTO hosts VALUES('h','n','10.0.0.1',22,'','','[]','','','t','t')`); err != nil {
+			if _, err := db.Exec(`INSERT INTO hosts VALUES('h','n','10.0.0.1',22,'','','[]','','','t','t','')`); err != nil {
 				t.Fatalf("sin hosts: %v", err)
 			}
-			if _, err := db.Exec(`INSERT INTO hosts VALUES('h2','N','10.0.0.2',22,'','','[]','','','t','t')`); err == nil {
+			if _, err := db.Exec(`INSERT INTO hosts VALUES('h2','N','10.0.0.2',22,'','','[]','','','t','t','')`); err == nil {
 				t.Fatal("el nombre de un host no se repite aunque cambien las mayúsculas")
 			}
-			want := 8 // 0001, preferences, historial, scripts, colecciones, hosts, paquetes quitados, ocultos de paquetes
+			files, _ := migrations.ReadDir("migrations")
+			want := len(files) // una por archivo: no se cuenta a mano para que una migración nueva no obligue a tocar esto
 			if applied != nil && applied[1] == "0002_job_history.sql" {
-				want = 9 // además queda la fila con el nombre viejo
+				want++ // además queda la fila con el nombre viejo
 			}
 			if n != want {
 				t.Fatalf("migraciones registradas = %d, want %d", n, want)
@@ -283,5 +284,99 @@ func TestEscrituraConcurrenteSinBusy(t *testing.T) {
 	close(errs)
 	for err := range errs {
 		t.Errorf("%v", err)
+	}
+}
+
+func abrirVigia(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := Open(filepath.Join(t.TempDir(), "m.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
+func TestIndiceAuditAt(t *testing.T) {
+	db := abrirVigia(t)
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_index_list('audit_log') WHERE name='idx_audit_log_at'`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("falta idx_audit_log_at: n=%d err=%v", n, err)
+	}
+}
+
+// Fase 44c1: la columna startup_command nace vacía para los hosts que ya existían.
+func TestMigracionOrdenDeInicio(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "m.db")
+	seed(t, p, []string{"0001_init.sql", "0002_preferences.sql", "0003_job_history.sql", "0004_scripts.sql",
+		"0005_script_collections.sql", "0006_hosts.sql", "0007_pack_removed.sql", "0008_pack_hidden.sql"})
+	old, err := sql.Open("sqlite", "file:"+p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Exec(`INSERT INTO hosts(id,name,address,port,platform,folder,tags_json,credential_id,notes,created_at,updated_at)
+		VALUES('a','n','10.0.0.1',22,'ios','','[]','','','t','t')`); err != nil {
+		t.Fatal(err)
+	}
+	old.Close()
+	db, err := Open(p) // aplica 0010 sobre el host que ya existía
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var s string
+	if err := db.QueryRow(`SELECT startup_command FROM hosts WHERE id='a'`).Scan(&s); err != nil || s != "" {
+		t.Fatalf("startup_command = %q %v", s, err)
+	}
+}
+
+// 44d: la migración siembra host_folders con las carpetas que ya usan los hosts («Lab» y «lab» son una; gana la
+// primera en orden binario) y deja a los hosts con el nombre guardado.
+func TestMigracionHostFolders(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "m.db")
+	seed(t, p, []string{"0001_init.sql", "0002_preferences.sql", "0003_job_history.sql", "0004_scripts.sql", "0005_script_collections.sql", "0006_hosts.sql", "0007_pack_removed.sql", "0008_pack_hidden.sql"})
+	raw, err := sql.Open("sqlite", "file:"+p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, f := range []string{"lab", "Lab", "Oficina", "", "lab"} {
+		if _, err := raw.Exec(`INSERT INTO hosts VALUES(?,?,?,22,'',?,'[]','','',?,'t')`, fmt.Sprint("id", i), fmt.Sprint("h", i), fmt.Sprint("10.0.0.", i), f, fmt.Sprint("2026-11-0", i+1)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw.Close()
+	db, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var got []string
+	rows, err := db.Query(`SELECT name FROM host_folders ORDER BY name`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var n string
+		rows.Scan(&n)
+		got = append(got, n)
+	}
+	rows.Close()
+	if strings.Join(got, ",") != "Lab,Oficina" {
+		t.Fatalf("carpetas = %v", got)
+	}
+	var folders string
+	db.QueryRow(`SELECT group_concat(folder, ',') FROM (SELECT folder FROM hosts ORDER BY id)`).Scan(&folders)
+	if folders != "Lab,Lab,Oficina,,Lab" {
+		t.Fatalf("hosts.folder = %q", folders)
+	}
+	// base nueva: tabla vacía
+	db2, err := Open(filepath.Join(t.TempDir(), "n.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db2.Close()
+	var n int
+	if err := db2.QueryRow(`SELECT count(*) FROM host_folders`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("base nueva: %d %v", n, err)
 	}
 }

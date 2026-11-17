@@ -88,6 +88,9 @@ var HostFields = []FieldSpec{
 		func(h *FileHost) *string { return &h.CredentialLabel }),
 	campo("notes", "texto", false, [3]string{"Piso 2", "", ""}, "Notas libres, hasta 2000 caracteres.",
 		func(h *FileHost) *string { return &h.Notes }),
+	campo("startup_command", "texto", false, [3]string{"", "", ""},
+		"Solo hosts linux y windows: orden que el terminal manda al conectar, de 1 a 256 caracteres en una línea. No pongas secretos: queda en la auditoría y en la grabación. Vacío = shell normal.",
+		func(h *FileHost) *string { return &h.StartupCommand }),
 }
 
 // HostsHeader es el encabezado fijo del CSV.
@@ -109,7 +112,7 @@ func exampleHosts() ([]FileHost, error) {
 		}
 		h, ferr := rowToHost(cells)
 		if ferr != nil {
-			return nil, fmt.Errorf("plantilla: fila %d: %s: %s", i+1, ferr.Field, ferr.Reason)
+			return nil, fmt.Errorf("plantilla: fila %d: %s: %s", i+1, ferr.Field, ferr.Msg)
 		}
 		out = append(out, h)
 	}
@@ -121,7 +124,7 @@ func rowToHost(cells []string) (FileHost, *FieldError) {
 	var h FileHost
 	for i, f := range HostFields {
 		if err := f.set(&h, cells[i]); err != nil {
-			return h, &FieldError{Field: f.Name, Reason: err.Error(), Err: err}
+			return h, &FieldError{Field: f.Name, Msg: err.Error(), Err: err}
 		}
 	}
 	return h, nil

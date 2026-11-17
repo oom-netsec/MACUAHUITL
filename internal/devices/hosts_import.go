@@ -36,8 +36,8 @@ type Item struct {
 
 // Same dice si dos hosts tienen el mismo contenido (ignora ID y fechas).
 func Same(a, b Host) bool {
-	return a.Name == b.Name && Key(a) == Key(b) && a.Platform == b.Platform && a.Folder == b.Folder &&
-		strings.Join(a.Tags, ",") == strings.Join(b.Tags, ",") && a.CredentialID == b.CredentialID && a.Notes == b.Notes
+	return a.Name == b.Name && Key(a) == Key(b) && a.Platform == b.Platform && strings.EqualFold(a.Folder, b.Folder) &&
+		strings.Join(a.Tags, ",") == strings.Join(b.Tags, ",") && a.CredentialID == b.CredentialID && a.Notes == b.Notes && a.StartupCommand == b.StartupCommand
 }
 
 // Plan compara los hosts del archivo con los guardados. La dirección y el puerto mandan: si chocan es «igual» o

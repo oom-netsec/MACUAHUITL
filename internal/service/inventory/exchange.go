@@ -131,7 +131,7 @@ func lineReason(ctx context.Context, e devices.LineError) string {
 
 func devicePB(h devices.Host, label string) *v1.Device {
 	return &v1.Device{Name: h.Name, Hostname: h.Name, Target: &v1.Target{Address: h.Address}, Profile: portPB(h), Platform: h.Platform,
-		Folder: h.Folder, Tags: h.Tags, CredentialLabel: label, Notes: h.Notes}
+		Folder: h.Folder, Tags: h.Tags, CredentialLabel: label, Notes: h.Notes, StartupCommand: h.StartupCommand}
 }
 
 // PreviewImportHosts lee y valida el archivo entero sin tocar la libreta y deja un token de un solo uso.
@@ -173,7 +173,7 @@ func (s *svc) PreviewImportHosts(ctx context.Context, r *v1.PreviewImportHostsRe
 			faltan++
 		}
 		out.Items = append(out.Items, &v1.ImportHostItem{Host: devicePB(it.Host, files[i].CredentialLabel), Key: devices.Key(it.Host), State: it.Estado,
-			Reason: it.Motivo, ConflictsWith: it.Con, CredentialMissing: missing[i]})
+			Reason: it.Motivo, ConflictsWith: it.Con, CredentialMissing: missing[i], HasStartupCommand: it.Host.StartupCommand != ""})
 	}
 	switch {
 	case faltan > 0 && !vaultOK:
@@ -199,6 +199,8 @@ func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsReques
 	dec := map[string]string{}
 	invalid := false
 	var res devices.Resultado
+	withStartup := 0
+	var newFolders []string
 	var err error
 	for _, d := range r.Decisions {
 		if _, dup := dec[d.Key]; dup {
@@ -207,6 +209,7 @@ func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsReques
 		}
 		dec[d.Key] = i18n.Decision(d.Action)
 	}
+	infos, _ := s.creds() // fuera de la tx: la base y la bóveda no se mezclan
 	if err == nil {
 		err = s.tx(func(tx *sql.Tx) error {
 			// Se vuelve a comparar contra lo guardado ahora: entre la vista previa y aquí pudo cambiar.
@@ -218,7 +221,18 @@ func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsReques
 				invalid = true
 				return service.ErrFrom(ctx, codes.InvalidArgument, err)
 			}
+			if newFolders, err = ensureHostFolders(ctx, tx, res.Writes, now.UTC().Truncate(time.Second)); err != nil {
+				invalid = true // tope de carpetas: el mismo archivo sirve tras borrar carpetas
+				return err
+			}
 			for _, h := range res.Writes {
+				if keyOnNonGeneric(infos, h) {
+					invalid = true
+					return service.Err(ctx, codes.InvalidArgument, "hosts.err.key_credential_platform", nil)
+				}
+				if h.StartupCommand != "" {
+					withStartup++
+				}
 				if err := putHost(tx, h); err != nil {
 					return internal(err)
 				}
@@ -232,9 +246,10 @@ func (s *svc) ApplyImportHosts(ctx context.Context, r *v1.ApplyImportHostsReques
 		}
 		return nil, err
 	}
-	s.d.Audit("hosts.importar", pv.path, fmt.Sprintf("%d new, %d replaced, %d renamed, %d skipped, %d invalid",
-		res.Created, res.Replaced, res.Renamed, res.Skipped, pv.invalid))
-	return &v1.ApplyImportHostsResponse{Created: int32(res.Created), Replaced: int32(res.Replaced), Renamed: int32(res.Renamed), Skipped: int32(res.Skipped + pv.invalid), Invalid: int32(pv.invalid)}, nil
+	s.auditNewFolders("import", newFolders...)
+	s.d.Audit("hosts.importar", pv.path, fmt.Sprintf("%d new, %d replaced, %d renamed, %d skipped, %d invalid, with_startup=%d",
+		res.Created, res.Replaced, res.Renamed, res.Skipped, pv.invalid, withStartup))
+	return &v1.ApplyImportHostsResponse{Created: int32(res.Created), Replaced: int32(res.Replaced), Renamed: int32(res.Renamed), Skipped: int32(res.Skipped + pv.invalid), Invalid: int32(pv.invalid), FoldersCreated: int32(len(newFolders))}, nil
 }
 
 // HostsImportTemplate da el archivo de ejemplo (encabezado y 3 filas válidas) generado de la tabla de campos del import.

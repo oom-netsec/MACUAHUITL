@@ -65,6 +65,8 @@ type Deps interface {
 	// OnClose registra f para que el núcleo la corra al cerrarse, antes de cerrar la base de datos
 	// (los servicios con trabajo en vuelo lo cancelan y lo esperan ahí).
 	OnClose(f func())
+	// TransferSessions es el registro único de sesiones de transferencia en vivo (fase 45b): lo comparten Transfer y Field.
+	TransferSessions() *TransferSessions
 }
 
 // Module es un servicio de área: se registra en el servidor con las dependencias del núcleo.

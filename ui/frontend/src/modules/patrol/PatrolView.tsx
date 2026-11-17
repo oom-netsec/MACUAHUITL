@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { passwordCreds } from "../vault/api";
 import type { CoreAPI, Credential, Job, JobPhase, VaultState } from "../../lib/core";
 import { Notice, errorText } from "../../components/Field";
 import { Page } from "../../components/Page";
@@ -80,7 +81,7 @@ export function PatrolView({ core }: { core: CoreAPI }) {
       if (!live) return;
       setVault(s.state);
       if (s.state !== "unlocked") return setCreds([]); // bóveda cerrada: no quedan credenciales a la vista
-      const l = await core.listCredentials();
+      const l = passwordCreds(await core.listCredentials());
       if (live) setCreds(l);
     }).catch((e) => { if (live) setErr(errorText(e)); });
     refreshJobs();

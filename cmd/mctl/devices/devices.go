@@ -62,6 +62,7 @@ func Area() cli.Area {
 	return cli.Area{Usage: help + "\n" + hostsHelp, Commands: []cli.Command{
 		{Name: "devices", Run: list},
 		{Name: "hosts list", Run: hostsList}, {Name: "hosts add", Run: hostsAdd}, {Name: "hosts edit", Run: hostsEdit},
-		{Name: "hosts rm", Run: hostsRm}, {Name: "hosts export", Run: hostsExport}, {Name: "hosts import", Run: hostsImport}, {Name: "hosts template", Run: hostsTemplate},
+		{Name: "hosts rm", Run: hostsRm}, {Name: "hosts mv", Run: hostsMv},
+		{Name: "hosts folder list", Run: folderList}, {Name: "hosts folder add", Run: folderAdd}, {Name: "hosts folder rename", Run: folderRename}, {Name: "hosts folder rm", Run: folderRm}, {Name: "hosts export", Run: hostsExport}, {Name: "hosts import", Run: hostsImport}, {Name: "hosts template", Run: hostsTemplate},
 	}}
 }
