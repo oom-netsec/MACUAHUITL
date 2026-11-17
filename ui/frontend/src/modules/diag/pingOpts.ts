@@ -1,4 +1,4 @@
-// Opciones extendidas del ping (contrato provisional, #200): validación y armado del map `options` sin claves vacías.
+// Opciones extendidas del ping (#200, contrato en #218): validación y armado del map `options` sin claves vacías.
 import type { Key } from "../../lib/i18n/es";
 import type { SweepPoint } from "./api";
 

@@ -45,6 +45,7 @@ type Bridge struct {
 	ctx       context.Context               // vida del puente; los streams cuelgan de aquí, no de la llamada
 	streams   map[string]*stream            // un stream de eventos por trabajo
 	runs      map[string]context.CancelFunc // ejecuciones de diagnóstico en curso
+	coreRun   map[string]string             // runId del puente → run_id del núcleo (primer evento), para StopRun (#200)
 	assists   map[string]*stream            // un watch de asistente por ejecución (assist.go)
 	runSeq    int
 	consoles  map[string]*consoleSess // consolas serie abiertas (field.go)
@@ -52,7 +53,7 @@ type Bridge struct {
 }
 
 func New(dial func() (*ipc.ClientConn, error), emit Emitter) *Bridge {
-	return &Bridge{Interval: time.Second, dial: dial, emit: emit, ctx: context.Background(), streams: map[string]*stream{}, runs: map[string]context.CancelFunc{}, assists: map[string]*stream{}}
+	return &Bridge{Interval: time.Second, dial: dial, emit: emit, ctx: context.Background(), streams: map[string]*stream{}, runs: map[string]context.CancelFunc{}, coreRun: map[string]string{}, assists: map[string]*stream{}}
 }
 
 // stream es el stream de eventos de un trabajo. Su dirección es el token de generación:
@@ -744,6 +745,7 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 		defer func() {
 			b.mu.Lock()
 			delete(b.runs, id)
+			delete(b.coreRun, id)
 			b.mu.Unlock()
 			cancel()
 		}()
@@ -757,11 +759,30 @@ func (b *Bridge) DiagRun(tool string, targets []string, options map[string]strin
 				b.emit("diag:done", map[string]any{"runId": id, "exitCode": -1, "outputPath": "", "error": err.Error(), "errorInfo": errorInfo(err)})
 				return
 			}
+			if r.RunId != "" { // el id del núcleo no sale a la UI: solo sirve para DiagStop
+				b.mu.Lock()
+				b.coreRun[id] = r.RunId
+				b.mu.Unlock()
+			}
 			if r.Done {
-				b.emit("diag:done", map[string]any{"runId": id, "exitCode": r.ExitCode, "outputPath": r.OutputPath})
+				ev := map[string]any{"runId": id, "exitCode": r.ExitCode, "outputPath": r.OutputPath}
+				if s := r.GetPingSummary(); s != nil {
+					ev["pingSummary"] = map[string]any{"sent": s.Sent, "received": s.Received, "lossPct": s.LossPct, "minMs": s.MinMs, "avgMs": s.AvgMs, "maxMs": s.MaxMs, "mdevMs": s.MdevMs}
+				}
+				b.emit("diag:done", ev)
 				return
 			}
-			b.emit("diag:line", map[string]any{"runId": id, "line": r.OutputLine})
+			ev := map[string]any{"runId": id}
+			sp := r.GetSweepPoint()
+			if r.OutputLine != "" || (sp == nil && r.RunId == "") { // una línea vacía de la salida también cuenta
+				ev["line"] = r.OutputLine
+			}
+			if sp != nil {
+				ev["sweepPoint"] = map[string]any{"size": sp.Size, "sent": sp.Sent, "received": sp.Received, "result": sp.Result}
+			}
+			if len(ev) > 1 {
+				b.emit("diag:line", ev)
+			}
 		}
 	}()
 	return id, nil
@@ -800,6 +821,22 @@ func (b *Bridge) DiagCancel(runID string) error {
 	}
 	cancel()
 	return nil
+}
+
+// DiagStop termina un ping continuo o con duración y deja que el núcleo mande el resumen (#200); DiagCancel corta sin él.
+// Si la ejecución ya terminó responde NotFound, igual que StopRun del núcleo: la UI lo ignora.
+func (b *Bridge) DiagStop(runID string) error {
+	b.mu.Lock()
+	core, ok := b.coreRun[runID]
+	b.mu.Unlock()
+	if !ok {
+		return wrapErr(status.Error(codes.NotFound, i18n.In(b.locale(), i18n.New("bridge.err.run_gone", i18n.A("id", runID)))))
+	}
+	_, err := call(b, func(ctx context.Context, c *ipc.ClientConn) (struct{}, error) {
+		_, err := v1.NewDiagServiceClient(c).StopRun(ctx, &v1.StopRunRequest{RunId: core})
+		return struct{}{}, err
+	})
+	return err
 }
 
 // ---- Herramientas (pcap, DNS, TLS, syslog) ----
