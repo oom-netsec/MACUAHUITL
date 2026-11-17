@@ -226,12 +226,14 @@ type TransferHintDTO struct {
 	StandardPort int    `json:"standardPort"`
 	Nftables     string `json:"nftables"`
 	Remove       string `json:"remove"`
+	Note         string `json:"note"`
+	NoteCode     string `json:"noteCode"`
 }
 
 func (b *Bridge) TransferHint(protocol, ip string, port int) (TransferHintDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (TransferHintDTO, error) {
 		r, err := v1.NewTransferServiceClient(c).RedirectHint(ctx, &v1.RedirectHintRequest{Protocol: protocol, Ip: ip, Port: int32(port)})
-		return TransferHintDTO{StandardPort: int(r.GetStandardPort()), Nftables: r.GetNftables(), Remove: r.GetRemove()}, err
+		return TransferHintDTO{StandardPort: int(r.GetStandardPort()), Nftables: r.GetNftables(), Remove: r.GetRemove(), Note: r.GetNote(), NoteCode: r.GetNoteCode()}, err
 	})
 }
 

@@ -54,6 +54,9 @@ func (fakeTransfer) Put(_ context.Context, r *v1.PutRequest) (*v1.PutResponse, e
 	return &v1.PutResponse{Result: &v1.TransferResult{Path: r.FromDir + "/" + r.Name, Bytes: 7, Report: rep}}, nil
 }
 func (fakeTransfer) RedirectHint(_ context.Context, r *v1.RedirectHintRequest) (*v1.RedirectHintResponse, error) {
+	if r.Port == 3333 { // ruta del programa sin cita segura: sin regla, con nota
+		return &v1.RedirectHintResponse{StandardPort: 22, Note: "crea la regla a mano", NoteCode: "fileserve.hint.win_rule_manual"}, nil
+	}
 	return &v1.RedirectHintResponse{StandardPort: 22, Nftables: "nft", Remove: "rm"}, nil
 }
 
@@ -107,7 +110,10 @@ func TestTransferBridge(t *testing.T) {
 	if err != nil || p.Report != "c1|[SHA256:a]|1048576|60|true" {
 		t.Fatalf("%+v %v", p, err)
 	}
-	if h, err := b.TransferHint("scp", "10.0.0.5", 2222); err != nil || h.StandardPort != 22 || h.Remove != "rm" {
+	if h, err := b.TransferHint("scp", "10.0.0.5", 2222); err != nil || h.StandardPort != 22 || h.Remove != "rm" || h.Note != "" || h.NoteCode != "" {
+		t.Fatalf("%+v %v", h, err)
+	}
+	if h, err := b.TransferHint("scp", "10.0.0.5", 3333); err != nil || h.Nftables != "" || h.Note != "crea la regla a mano" || h.NoteCode != "fileserve.hint.win_rule_manual" {
 		t.Fatalf("%+v %v", h, err)
 	}
 }
