@@ -91,7 +91,7 @@ func VaultErr(ctx context.Context, err error) error {
 	case errors.Is(err, vault.ErrEmptyPassword), errors.Is(err, vault.ErrWindowTooLong), errors.Is(err, vault.ErrReserved),
 		errors.Is(err, vault.ErrNotBackup), errors.Is(err, vault.ErrShortPhrase), errors.Is(err, vault.ErrSamePhrase), errors.Is(err, vault.ErrTooManyEntries):
 		return ErrFrom(ctx, codes.InvalidArgument, err)
-	case errors.Is(err, vault.ErrNotRegular), errors.Is(err, vault.ErrBackupParams):
+	case errors.Is(err, vault.ErrNotRegular), errors.Is(err, vault.ErrBackupParams), errors.Is(err, vault.ErrNoKey), errors.Is(err, vault.ErrNotKey), errors.Is(err, vault.ErrKeyUnsupported), errors.Is(err, vault.ErrKeyCredential):
 		return ErrFrom(ctx, codes.FailedPrecondition, err)
 	case errors.Is(err, vault.ErrExists), errors.Is(err, vault.ErrBackupExists):
 		return ErrFrom(ctx, codes.AlreadyExists, err)

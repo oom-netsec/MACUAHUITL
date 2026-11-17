@@ -181,19 +181,19 @@ func (s *vaultSvc) ExportBackup(ctx context.Context, r *v1.ExportBackupRequest) 
 	if s.c.inDataDir(path) {
 		return nil, service.Err(ctx, codes.InvalidArgument, "respaldo.err.in_data_dir", nil)
 	}
-	n, noPerms, err := vault.WriteBackupWarn(v, path, r.Passphrase, r.Overwrite)
+	n, keys, noPerms, err := vault.WriteBackupKeys(v, path, r.Passphrase, r.Overwrite)
 	if errors.Is(err, vault.ErrBackupExists) {
 		return nil, service.Err(ctx, codes.AlreadyExists, "file.exists.vault", i18n.A("path", path))
 	}
 	if err != nil {
 		return nil, respaldoErr(ctx, err)
 	}
-	detail := fmt.Sprintf("%d credentials", n)
+	detail := fmt.Sprintf("%d credentials; ssh_keys_included=%d", n, keys)
 	if noPerms {
 		detail += "; the file system did not support 0600 permissions"
 	}
 	s.c.audit("vault.respaldo.exportar", path, detail)
-	return &v1.ExportBackupResponse{Count: int32(n), NoPermissions: noPerms}, nil
+	return &v1.ExportBackupResponse{Count: int32(n), NoPermissions: noPerms, SshKeysIncluded: int32(keys)}, nil
 }
 
 // inDataDir dice si path cae en la carpeta de datos del núcleo (o es ella), resolviendo enlaces simbólicos del archivo y de su carpeta.
