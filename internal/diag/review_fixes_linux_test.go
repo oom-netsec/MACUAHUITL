@@ -95,8 +95,11 @@ func TestResultReportsRealBinary(t *testing.T) {
 		t.Fatalf("res=%+v err=%v", res, err)
 	}
 	res, _ = runner(t).Run(context.Background(), req(Pcap, "", map[string]string{"interface": "eth0"}, t.TempDir()), func(string) {})
-	if res.Bin != "dumpcap" || !strings.Contains(strings.Join(res.Argv, " "), "-w "+res.OutputPath) {
-		t.Fatalf("pcap argv must include the real -w path: %+v", res)
+	if res.Bin != "dumpcap" || !strings.Contains(strings.Join(res.Argv, " "), "-w -") {
+		t.Fatalf("pcap argv must write to stdout (-w -): %+v", res)
+	}
+	if b, _ := os.ReadFile(res.OutputPath); len(b) != 8 || strings.Contains(string(b), "Packets") { // solo lo de stdout; el progreso (stderr) no se mezcla
+		t.Fatalf("pcap file content: %q", b)
 	}
 }
 

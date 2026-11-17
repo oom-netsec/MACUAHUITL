@@ -3,6 +3,7 @@ package field
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
@@ -40,5 +41,28 @@ func TestOutFileCreaLaSubcarpetaYElArchivoQuedaDentro(t *testing.T) {
 	defer f.Close()
 	if want := filepath.Join(d.Outputs(), "console"); filepath.Dir(f.Name()) != want {
 		t.Fatalf("Name = %s, quería dentro de %s", f.Name(), want)
+	}
+}
+
+// M1: la carpeta de salidas (ya validada por CheckOutputs) se cambia por un enlace a una carpeta compartida antes de abrir el archivo:
+// outFile valida lo abierto y se niega.
+func TestOutFileSalidasCambiadasPorEnlaceACarpetaCompartida(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod 0777: bits POSIX (la versión de Windows está en outfile_toctou_windows_test.go)")
+	}
+	d := servicetest.New(t)
+	s := &fieldSvc{d: d}
+	compartida := t.TempDir()
+	os.Chmod(compartida, 0o777)
+	os.RemoveAll(d.Outputs())
+	if err := os.Symlink(compartida, d.Outputs()); err != nil {
+		t.Skipf("sin enlaces simbólicos: %v", err)
+	}
+	if f, err := s.outFile("console", "console_x"); err == nil {
+		f.Close()
+		t.Fatalf("debía rechazar la carpeta compartida, creó %s", f.Name())
+	}
+	if es, _ := os.ReadDir(compartida); len(es) != 0 {
+		t.Fatalf("escribió en la carpeta compartida: %v", es)
 	}
 }

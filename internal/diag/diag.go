@@ -127,19 +127,16 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 		if req.Tool == Pcap {
 			ext = ".pcapng"
 		}
-		// Nombre único aunque dos ejecuciones caigan en el mismo segundo; el archivo lo crea el núcleo con 0600 (también el
-		// pcap: dumpcap solo lo trunca y no sigue symlinks).
+		// Nombre único aunque dos ejecuciones caigan en el mismo segundo; el archivo lo crea el núcleo con 0600. El pcap también:
+		// dumpcap escribe a su stdout (-w -), que es este handle, y nunca abre una ruta.
 		if out, err = sys.CreateTempIn(root, fmt.Sprintf("diag_%s_%s_*%s", req.Tool, stamp, ext)); err != nil {
 			return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 		}
 		res.OutputPath = filepath.Join(root.Name(), filepath.Base(out.Name()))
 		if req.Tool == Pcap {
-			out.Close()
-			out = nil
-			argv = append(argv, "-w", res.OutputPath)
-		} else {
-			defer out.Close()
+			argv = append(argv, "-w", "-")
 		}
+		defer out.Close()
 	}
 	res.Argv = argv
 	if req.Tool == Iperf3 && argv[0] == "-s" { // un servidor olvidado no debe quedar escuchando
@@ -299,13 +296,17 @@ func (r Runner) exec(ctx context.Context, req Request, path string, argv []strin
 	// pcap en el archivo (-w) y el progreso en stderr; stdout queda vacío.
 	so, se := &lineWriter{emit: emit}, &lineWriter{emit: emit}
 	cmd.Stdout, cmd.Stderr = so, se
+	sink := out // el que discard cierra y borra si el hijo no arranca
+	if req.Tool == Pcap && out != nil { // el pcap sale por stdout directo al archivo; el progreso (stderr) no se le mezcla
+		cmd.Stdout, out = out, nil
+	}
 	if err := cmd.Start(); err != nil {
-		discard(out, outPath)
+		discard(sink, outPath)
 		return 0, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	if err := started(); err != nil {
 		cmd.Wait()
-		discard(out, outPath)
+		discard(sink, outPath)
 		return 0, i18n.Wrap("diag.err.wrap", err, nil)
 	}
 	finished := make(chan struct{})

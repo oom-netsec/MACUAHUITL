@@ -49,3 +49,22 @@ func TestRunSalidaNaceRegularYPrivada(t *testing.T) {
 		t.Fatalf("%v %v", fi, err)
 	}
 }
+
+// M1: la carpeta de salidas se cambia por un enlace a una carpeta compartida (0777) DESPUÉS de validar los ajustes y ANTES de Run:
+// Run valida lo abierto y se niega a escribir ahí.
+func TestRunSalidaCambiadaPorEnlaceACarpetaCompartidaSeRechaza(t *testing.T) {
+	localTest(t)
+	base := t.TempDir()
+	salidas, compartida := filepath.Join(base, "salidas"), filepath.Join(base, "compartida")
+	os.Mkdir(compartida, 0o700)
+	os.Chmod(compartida, 0o777)
+	if err := os.Symlink(compartida, salidas); err != nil {
+		t.Skipf("sin enlaces simbólicos: %v", err)
+	}
+	if _, err := runner(t).Run(context.Background(), Request{Tool: Ping, Targets: []string{"192.0.2.1"}, OutputDir: salidas}, func(string) {}); err == nil {
+		t.Fatal("debía rechazar la carpeta compartida")
+	}
+	if es, _ := os.ReadDir(compartida); len(es) != 0 {
+		t.Fatalf("escribió en la carpeta compartida: %v", es)
+	}
+}
