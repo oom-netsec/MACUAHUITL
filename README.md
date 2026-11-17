@@ -122,9 +122,9 @@ Each of these is in the release notes, with what was checked on a real device:
 | Area | What you get |
 |---|---|
 | **Patrol** | Scheduled, unattended collection across many devices. Mandatory Login Test, explicit arming, live progress, output per round or consolidated, `.zip` package with `manifest.json`. |
-| **Vault** | Local credential store. Argon2id + AES-256-GCM, data key in locked memory. |
+| **Vault** | Local credential store. Argon2id + AES-256-GCM, data key in locked memory. Generates ed25519 SSH keys whose private half never leaves it; you copy only the public key. |
 | **Audit** | Hash-chained log of every action. `mctl audit verify` proves it is intact; each package carries an anchor of the chain. |
-| **Access** | Multi-tab SSH terminal with session recording, saved hosts, and a paste confirmation that shows control and hidden characters. Serial console for first boot, recovery and ROMMON. |
+| **Access** | Multi-tab SSH terminal with session recording, saved hosts in folders (Cisco, Linux and Windows), key-only login and an optional startup command per host, and a paste confirmation that shows control and hidden characters. Serial console for first boot, recovery and ROMMON. |
 | **Diagnostics** | ping, traceroute, nmap, iperf3 and local packet capture, all audited. |
 | **Analysis** | Job analysis: 44 rules over collected evidence, diff between rounds, configuration drift, correlated timeline, PCAP summary (TCP, DNS, TLS, ICMP, CDP/LLDP, ARP), DNS and TLS inspection. |
 | **Fleet** | Find any IP, MAC or hostname, trace a MAC to its access port, L3/L2 path between two hosts, interface health, morning dashboard, flash/DRAM headroom, exportable inventory. |
@@ -133,7 +133,7 @@ Each of these is in the release notes, with what was checked on a real device:
 | **Forensics** | Crashinfo analysis, Cisco message knowledge base, silent flapping detection, debug filtering, per-process memory leaks between rounds. |
 | **Visibility** | CDP/LLDP topology (SVG), SNMP polling and traps, NetFlow/IPFIX/sFlow, gNMI. |
 | **Security** | RADIUS and TACACS+ testers, lab PKI (keys, CSR, CA, PKCS#12), IKE/IPsec debug decoder. |
-| **Field tools** | Temporary TFTP/HTTP/FTP/SCP/SFTP servers and clients, MD5/SHA-512 verification. |
+| **Field tools** | Temporary TFTP/HTTP/FTP/SCP/SFTP servers on the standard ports, with live sessions per client (IP, progress, rejections) and clients; MD5/SHA-512 verification. |
 | **Calculators** | Subnets, VLSM, summarization, wildcards, IPv6, MTU/MSS, TCP throughput, DSCP/QoS, optical budget, BGP best path. |
 | **Syslog** | Local receiver that feeds the timeline. |
 | **Content packs** | Eleven official packs, about 600 read-only playbooks across eleven Cisco platforms, in signed `.mpack` bundles. Install only what you use; every playbook is checked on install and at every start. |
