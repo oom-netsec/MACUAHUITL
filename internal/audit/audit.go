@@ -71,9 +71,9 @@ func hashOf(prev string, seq uint64, at string, e Entry) string {
 func (l *Log) Append(ctx context.Context, e Entry) (Record, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	// Otra conexión que retiene el bloqueo de escritura más que busy_timeout da SQLITE_BUSY; una entrada de auditoría
-	// no se pierde por eso: se reintenta (cada intento rehace la transacción completa, seq y hash incluidos). En Windows
-	// los bloqueos de archivo son mucho más lentos y basta un escritor insistente para agotar busy_timeout.
+	// store.Open usa una sola conexión: dentro del proceso no hay BUSY. Solo un proceso externo (p. ej. alguien con
+	// sqlite3 abierto) que retenga el bloqueo más que busy_timeout lo da; una entrada de auditoría no se pierde por eso:
+	// se reintenta (cada intento rehace la transacción completa, seq y hash incluidos).
 	for try := 1; ; try++ {
 		r, err := l.appendOnce(ctx, e)
 		if err == nil || !busy(err) || try == appendTries {
@@ -125,24 +125,55 @@ func (l *Log) appendOnce(ctx context.Context, e Entry) (Record, error) {
 	return r, nil
 }
 
-func (l *Log) scan(ctx context.Context, where string, args []any, fn func(Record, string) bool) error {
-	rows, err := l.db.QueryContext(ctx, `SELECT seq,at,actor,action,target,detail,prev,hash FROM audit_log `+where+` ORDER BY seq`, args...)
+// scanPage son las filas por consulta: la base tiene una sola conexión, así que cada página se lee entera y se
+// cierra antes de llamar a fn (que puede ser lento, p. ej. escribir a un stream); la conexión queda libre entre páginas.
+const scanPage = 1000
+
+type scanned struct {
+	r  Record
+	at string
+}
+
+// scan recorre en orden de seq los registros que cumplen cond (un AND extra, sin WHERE) hasta que fn devuelva false.
+func (l *Log) scan(ctx context.Context, cond string, args []any, fn func(Record, string) bool) error {
+	var after uint64
+	for {
+		page, err := l.page(ctx, after, cond, args)
+		if err != nil {
+			return err
+		}
+		for _, x := range page {
+			if !fn(x.r, x.at) {
+				return nil
+			}
+		}
+		if len(page) < scanPage {
+			return nil
+		}
+		after = page[len(page)-1].r.Seq
+	}
+}
+
+func (l *Log) page(ctx context.Context, after uint64, cond string, args []any) ([]scanned, error) {
+	q := `SELECT seq,at,actor,action,target,detail,prev,hash FROM audit_log WHERE seq > ?`
+	if cond != "" {
+		q += " AND " + cond
+	}
+	rows, err := l.db.QueryContext(ctx, q+` ORDER BY seq LIMIT `+fmt.Sprint(scanPage), append([]any{after}, args...)...)
 	if err != nil {
-		return fmt.Errorf("audit: %w", err)
+		return nil, fmt.Errorf("audit: %w", err)
 	}
 	defer rows.Close()
+	var out []scanned
 	for rows.Next() {
-		var r Record
-		var at string
-		if err := rows.Scan(&r.Seq, &at, &r.Actor, &r.Action, &r.Target, &r.Detail, &r.Prev, &r.Hash); err != nil {
-			return fmt.Errorf("audit: %w", err)
+		var x scanned
+		if err := rows.Scan(&x.r.Seq, &x.at, &x.r.Actor, &x.r.Action, &x.r.Target, &x.r.Detail, &x.r.Prev, &x.r.Hash); err != nil {
+			return nil, fmt.Errorf("audit: %w", err)
 		}
-		r.At, _ = time.Parse(tsFormat, at)
-		if !fn(r, at) {
-			break
-		}
+		x.r.At, _ = time.Parse(tsFormat, x.at)
+		out = append(out, x)
 	}
-	return rows.Err()
+	return out, rows.Err()
 }
 
 // Verify recorre la cadena completa y reporta el primer registro roto.
@@ -179,7 +210,7 @@ func (l *Log) Head(ctx context.Context) (string, error) {
 func (l *Log) Export(ctx context.Context, w io.Writer, from, to time.Time) error {
 	enc := json.NewEncoder(w)
 	var werr error
-	err := l.scan(ctx, "WHERE at >= ? AND at < ?", []any{from.UTC().Format(tsFormat), to.UTC().Format(tsFormat)}, func(r Record, _ string) bool {
+	err := l.scan(ctx, "at >= ? AND at < ?", []any{from.UTC().Format(tsFormat), to.UTC().Format(tsFormat)}, func(r Record, _ string) bool {
 		werr = enc.Encode(r)
 		return werr == nil
 	})
