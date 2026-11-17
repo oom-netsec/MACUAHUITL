@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useCoreLoad } from "../../lib/useCoreLoad";
 import { useBusy } from "../../app/activity";
 import { Check, Console, Field, Notice, PathField, Select, errorText } from "../../components/Field";
 import type { CoreAPI, NetInterface } from "../../lib/core";
@@ -121,7 +122,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const [servers, setServers] = useState<Srv[]>([]);
   const seen = useRef(new Set<string>());
 
-  useEffect(() => { core.listInterfaces().then((l) => setIfaces(l ?? [])).catch((e) => setErr(errorText(e))); }, [core]);
+  const [loadErr, clearLoadErr] = useCoreLoad((live) => core.listInterfaces().then((l) => { if (live()) setIfaces(l ?? []); }), [core]);
   const ips = ifaces.filter((i) => i.up).flatMap((i) => i.addresses.map((a) => [a.replace(/\/\d+$/, ""), i.name] as const));
 
   // Las líneas de todos los servidores pasan a pantalla una vez cada FLUSH_MS, en orden y con tope de 500 por servidor.
@@ -153,7 +154,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   const start = async () => {
     const p = serveProblem(form);
     if (p) { setErr(t(p)); return; }
-    setErr("");
+    setErr(""); clearLoadErr();
     const host = any ? "0.0.0.0" : listen;
     legacyNext.current = ssh && legacy;
     setStarting(true);
@@ -193,7 +194,7 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
         {ssh && <Check label={t("transfer.legacy.server")} checked={legacy} onChange={setLegacy} />}
         {ssh && <p className="hint">{t("transfer.legacy.server.hint")}</p>}
         <div className="actions"><button className="primary" disabled={missing || starting} onClick={start}>{t("transfer.open")}<kbd aria-hidden="true">Ctrl ↵</kbd></button></div>
-        {err.text && <Notice kind="error">{err.text}</Notice>}
+        {(err.text || loadErr) && <Notice kind="error">{err.text || loadErr}</Notice>}
         {err.text && err.cmd && <Console label={t("transfer.portDenied.cmd")} text={err.cmd} copy={core.copyText} />}
       </Section>
       {servers.length === 0 && <EmptyState icon="upload" title={t("transfer.servers.none")} />}

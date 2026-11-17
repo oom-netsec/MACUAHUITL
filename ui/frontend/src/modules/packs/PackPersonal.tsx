@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useCoreLoad } from "../../lib/useCoreLoad";
 import { scriptsChanged } from "../scripts/signal";
 import type { CoreAPI } from "../../lib/core";
 import { cleanOnFail } from "../../lib/cleanOnFail";
@@ -28,7 +29,7 @@ export function ExportDialog({ core, onClose }: { core: CoreAPI; onClose: () => 
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<PackExportResult | null>(null);
-  useEffect(() => { core.listScripts().then((l) => setScripts(l.filter((s) => s.origin === "usuario")), (e) => setErr(errorText(e))); }, [core]);
+  const [loadErr] = useCoreLoad((live) => core.listScripts().then((l) => { if (live()) setScripts(l.filter((s) => s.origin === "usuario")); }), [core]);
   const go = async () => {
     setBusy(true); setErr(""); setRes(null);
     try {
@@ -50,7 +51,7 @@ export function ExportDialog({ core, onClose }: { core: CoreAPI; onClose: () => 
       <Field label={t("packs.export.author")} value={author} onChange={setAuthor} />
       <Field label={t("packs.export.license")} hint={t("packs.export.licenseHint")} value={license} onChange={setLicense} />
       {!picked.length && !playbooks && <p className="hint">{t("packs.export.nothing")}</p>}
-      {err && <Notice kind="error">{err}</Notice>}
+      {(err || loadErr) && <Notice kind="error">{err || loadErr}</Notice>}
       {res && <Notice kind="ok">{t("packs.export.done", { id: res.id, version: res.version, sha: res.sha256, scripts: res.scripts, playbooks: res.playbooks })}</Notice>}
       {res && res.omittedPlaybooks.length > 0 && <Notice kind="warn">{t("packs.export.omitted", { ids: res.omittedPlaybooks.join(", ") })}</Notice>}
       <div className="actions"><button type="button" className="primary" disabled={busy || !EDITOR_RE.test(editor) || (!picked.length && !playbooks)} onClick={go}>{t("packs.export.go")}</button></div>
