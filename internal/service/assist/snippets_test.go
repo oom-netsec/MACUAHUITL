@@ -469,6 +469,10 @@ func TestCredRotateRejectedSaveProposesRollbackAndLeavesVaultAlone(t *testing.T)
 func TestCredRotateRefusesTheConnectedUserAndOtherBadRequests(t *testing.T) {
 	r := newRotRig(t, simulator.Config{})
 	admin := r.target.CredentialId
+	keyID, _, err := r.d.V.GenerateKey("llave", "tech")
+	if err != nil {
+		t.Fatal(err)
+	}
 	cases := map[string]struct {
 		req  *v1.PlanCredRotateRequest
 		code int
@@ -478,6 +482,7 @@ func TestCredRotateRefusesTheConnectedUserAndOtherBadRequests(t *testing.T) {
 		"secreto corto":              {&v1.PlanCredRotateRequest{User: "tech", NewSecret: "corto"}, 3},
 		"generado sin credencial":    {&v1.PlanCredRotateRequest{User: "tech"}, 3},
 		"credencial de otro usuario": {&v1.PlanCredRotateRequest{User: "tech", NewSecret: newSec, UpdateCredentialId: admin}, 3},
+		"credencial de tipo key":     {&v1.PlanCredRotateRequest{User: "tech", NewSecret: newSec, UpdateCredentialId: keyID}, 9},
 		"usuario con espacio":        {&v1.PlanCredRotateRequest{User: "te ch", NewSecret: newSec}, 3},
 		"credencial que no existe":   {&v1.PlanCredRotateRequest{User: "tech", NewSecret: newSec, UpdateCredentialId: "00"}, 5},
 	}

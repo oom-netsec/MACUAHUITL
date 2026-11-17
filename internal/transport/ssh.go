@@ -19,7 +19,7 @@ import (
 
 var ErrAuth error = i18n.New("transport.err.auth", nil)
 
-// ErrKeyCredential: la credencial es una llave generada por la app (tipo key). shortcut: rechazo total hasta que 44b/44c lo cambien por el de plataforma.
+// ErrKeyCredential: la credencial es una llave generada por la app (tipo key) y no se abre un host genérico.
 var ErrKeyCredential error = i18n.New("transport.err.key_credential", nil)
 
 var errAlreadySent = errors.New("transport: contraseña ya enviada; no se reintenta")
@@ -31,6 +31,8 @@ type SSHOptions struct {
 	HandshakeTimeout time.Duration // 15 s
 	// OnLegacy recibe los algoritmos negociados cuando AllowLegacy está activo, para auditoría (spec §3).
 	OnLegacy func(negotiated string)
+	// GenericHost: la conexión es del terminal a un host linux o windows. Solo así se acepta una credencial de solo llave (fase 44, regla 7b).
+	GenericHost bool
 }
 
 // Algoritmos que solo negocian equipos viejos; se activan por perfil (spec §3).
@@ -53,7 +55,7 @@ type Session struct {
 func OpenSSH(ctx context.Context, g *Guard, jobID, host string, port uint16, cred vault.Credential, hk ssh.HostKeyCallback, o SSHOptions) (*Session, error) {
 	defer cred.Password.Destroy()
 	defer cred.SSHKey.Destroy()
-	if cred.IsKey() { // punto único: Patrol, terminal, métricas, transferencias y asistente pasan por aquí
+	if cred.IsKey() && !o.GenericHost { // punto único: Patrol, terminal, métricas, transferencias y asistente pasan por aquí
 		return nil, ErrKeyCredential
 	}
 	if o.Keepalive == 0 {
@@ -70,7 +72,7 @@ func OpenSSH(ctx context.Context, g *Guard, jobID, host string, port uint16, cre
 		}
 		cfg.Auth = append(cfg.Auth, ssh.PublicKeys(signer))
 	}
-	if !cred.Password.Empty() {
+	if !cred.Password.Empty() { // una credencial key (sin contraseña) ofrece solo publickey: nunca password ni keyboard-interactive
 		// La contraseña se manda una sola vez por conexión, por password o por keyboard-interactive:
 		// nunca se reintenta un rechazo (spec §6, bloqueo de cuentas TACACS).
 		// Límite declarado (THREAT_MODEL §Declared limits 1): x/crypto/ssh exige string, que no se puede borrar;
