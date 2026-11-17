@@ -99,7 +99,7 @@ type receiver struct {
 	mu                sync.Mutex
 	total             int64
 	files, maxFiles   int
-	inFlight          map[string]bool // archivos aún en escritura
+	inFlight          map[string]os.FileInfo // archivos aún en escritura (identidad, para reconocerlos con otro nombre)
 }
 
 // newReceiver abre dir (ya validada) como Root; prepare usa newReceiverIn con la que abrió OpenDir.
@@ -121,7 +121,7 @@ func newReceiverIn(root *os.Root, dir string, maxFile, maxTotal int64) *receiver
 	if maxTotal <= 0 {
 		maxTotal = DefaultMaxTotal
 	}
-	return &receiver{dir: dir, root: root, maxFile: maxFile, maxTotal: maxTotal, inFlight: map[string]bool{}, maxFiles: maxRecvFiles}
+	return &receiver{dir: dir, root: root, maxFile: maxFile, maxTotal: maxTotal, inFlight: map[string]os.FileInfo{}, maxFiles: maxRecvFiles}
 }
 
 // close suelta la carpeta abierta; los archivos ya abiertos siguen siendo válidos.
@@ -136,7 +136,23 @@ func (r *receiver) exists(name string) bool {
 func (r *receiver) writing(name string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.inFlight[name]
+	if len(r.inFlight) == 0 {
+		return false
+	}
+	if _, ok := r.inFlight[name]; ok {
+		return true
+	}
+	// Otro nombre del mismo archivo (mayúsculas, 8.3 como FW~1.BIN, enlace duro): se compara la identidad.
+	li, err := r.root.Lstat(name)
+	if err != nil {
+		return false
+	}
+	for _, fi := range r.inFlight {
+		if os.SameFile(li, fi) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *receiver) grow(n int64) error {
@@ -175,8 +191,15 @@ func (r *receiver) create(raw string, announced int64) (*recvFile, error) {
 		err = errTooMany
 	default:
 		if f, err = sys.OpenNewPrivateIn(r.root, name); err == nil { // 0600; en Windows nace con la DACL protegida
-			r.inFlight[name] = true
-			r.files++
+			fi, serr := f.Stat()
+			if serr != nil { // sin identidad no se puede marcar: mejor no recibir
+				f.Close()
+				r.root.Remove(name)
+				err = serr
+			} else {
+				r.inFlight[name] = fi
+				r.files++
+			}
 		}
 	}
 	r.mu.Unlock()
@@ -255,6 +278,9 @@ func (w *recvFile) commit() (sum string, size int64, err error) {
 	h := sha256.New()
 	if _, err = w.f.Seek(0, io.SeekStart); err == nil {
 		_, err = io.Copy(h, w.f)
+	}
+	if err == nil {
+		sys.MarkOfTheWeb(w.path) // ruta interna; si falla (FAT) el archivo ya está bien guardado
 	}
 	return hex.EncodeToString(h.Sum(nil)), w.size, err
 }
