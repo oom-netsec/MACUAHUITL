@@ -167,7 +167,7 @@ func RedirectCommandIn(loc, proto, ip string, port int) string {
 		return firewallCommand(loc, proto, ip, port, exePath(), [2]uint16{})
 	}
 	s, ok := standard[proto]
-	if !ok {
+	if !ok || port == s.port { // ya en el puerto estándar: no hay nada que redirigir
 		return ""
 	}
 	fam, addr := redirTarget(loc, ip)

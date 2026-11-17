@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -415,6 +416,18 @@ func TestRedirectHintRPC(t *testing.T) {
 }
 
 var _ = io.EOF
+
+// Con el puerto estándar no hay redirección: la respuesta trae el puerto estándar y ni regla ni cómo quitarla (no es error).
+func TestRedirectHintPuertoEstandarSinRegla(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("en Windows la pista es la regla del firewall, que sí aplica al puerto estándar")
+	}
+	s, _ := newTest(t)
+	r, err := s.RedirectHint(context.Background(), &v1.RedirectHintRequest{Protocol: "tftp", Port: 69, Ip: "10.0.0.5"})
+	if err != nil || r.StandardPort != 69 || r.Nftables != "" || r.Remove != "" {
+		t.Fatalf("%+v %v", r, err)
+	}
+}
 
 // La bitácora no guarda la query string de la URL (suele llevar tokens): ni en el objetivo ni en los errores.
 func TestAuditDropsURLQuery(t *testing.T) {

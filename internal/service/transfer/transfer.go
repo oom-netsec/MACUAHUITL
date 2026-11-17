@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -234,11 +235,14 @@ func (s *svc) RedirectHint(ctx context.Context, r *v1.RedirectHintRequest) (*v1.
 		}
 	}
 	loc := i18n.Locale(ctx)
+	std := map[string]int32{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22}[r.Protocol]
+	if std != 0 && r.Port == std && runtime.GOOS != "windows" {
+		return &v1.RedirectHintResponse{StandardPort: std}, nil // ya escucha en el estándar: sin regla ni limpieza
+	}
 	h := fileserve.RedirectCommandIn(loc, r.Protocol, r.Ip, int(r.Port)) // sin la nota: se copia tal cual; Remove va aparte
 	if h == "" || r.Port <= 0 || r.Port > 65535 {
 		return nil, bad(ctx, "transfer.svc.no_redirect", "proto", r.Protocol)
 	}
-	std := map[string]int32{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22}[r.Protocol]
 	return &v1.RedirectHintResponse{StandardPort: std, Nftables: h, Remove: fileserve.RedirectCleanup(r.Protocol, r.Ip, int(r.Port))}, nil
 }
 
