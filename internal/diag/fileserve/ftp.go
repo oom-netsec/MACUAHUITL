@@ -115,6 +115,7 @@ func serveFTP(ctx context.Context, c Config, src *source, rcv *receiver) error {
 			return fmt.Errorf("fileserve: %w", err)
 		}
 		ip := hostOf(nc.RemoteAddr())
+		// busy también cubre el bloqueo del origen por contraseñas erróneas (limiter.acquire).
 		reject := func(cause, why string) {
 			nc.Close()
 			c.OnTransfer(Transfer{Proto: "ftp", Client: nc.RemoteAddr().String(), Result: "error", Error: why, ReasonT: lit(why), Rejected: true, Cause: cause})
@@ -156,7 +157,7 @@ func (s *ftpSession) reply(code int, msg string) {
 }
 
 func (s *ftpSession) rejected(x i18n.Text) {
-	s.c.OnTransfer(Transfer{Proto: "ftp", Client: s.client, Result: "error", Error: x.In(i18n.Es), ReasonT: x, Rejected: true, Cause: CauseOther})
+	s.c.OnTransfer(Transfer{Proto: "ftp", Client: s.client, Result: "error", Error: x.In(i18n.Es), ReasonT: x, Rejected: true, Cause: CauseMethod})
 }
 
 func (s *ftpSession) run() {

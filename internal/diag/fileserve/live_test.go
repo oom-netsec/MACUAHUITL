@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -318,17 +319,37 @@ func TestLiveHTTP(t *testing.T) {
 	}
 }
 
-func TestLiveHTTPHalfway(t *testing.T) {
-	const size = 64 << 20
+// bigFile crea un archivo disperso (Truncate): en Linux no ocupa disco; en Windows (NTFS) sí reserva el tamaño.
+func bigFile(t *testing.T, size int64) string {
+	t.Helper()
 	p := filepath.Join(t.TempDir(), "big.bin")
 	f, err := os.Create(p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.Truncate(size) // disperso: no ocupa disco
+	f.Truncate(size)
 	f.Close()
+	return p
+}
+
+// smallRecvClient es un cliente HTTP con búfer de lectura chico: el servidor no puede
+// vaciar un archivo grande en los búferes del socket mientras el cliente no lee.
+func smallRecvClient() *http.Client {
+	d := &net.Dialer{}
+	return &http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, n, a string) (net.Conn, error) {
+		c, err := d.DialContext(ctx, n, a)
+		if err == nil {
+			c.(*net.TCPConn).SetReadBuffer(64 << 10)
+		}
+		return c, err
+	}}}
+}
+
+func TestLiveHTTPHalfway(t *testing.T) {
+	const size = 64 << 20
+	p := bigFile(t, size)
 	rec, r := liveStart(t, Config{Proto: "http", Files: []string{p}})
-	resp, err := http.Get("http://" + r.Addr + "/big.bin")
+	resp, err := smallRecvClient().Get("http://" + r.Addr + "/big.bin")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,6 +367,206 @@ func TestLiveHTTPHalfway(t *testing.T) {
 	x := rec.waitEnds(t, 1)[0]
 	if x.Live != starts[0] || x.Live.Bytes() != x.Bytes || x.Result != "error" {
 		t.Fatalf("transferencia = %+v", x)
+	}
+}
+
+// HEAD y respuestas que no son 2xx no crean sesión.
+func TestLiveHTTPNon2xxHasNoSession(t *testing.T) {
+	p, _ := image(t, "img.bin", 1000)
+	rec, r := liveStart(t, Config{Proto: "http", Files: []string{p}})
+	req, _ := http.NewRequest("HEAD", "http://"+r.Addr+"/img.bin", nil)
+	if resp, err := http.DefaultClient.Do(req); err == nil {
+		resp.Body.Close()
+	}
+	req, _ = http.NewRequest("GET", "http://"+r.Addr+"/img.bin", nil)
+	req.Header.Set("Range", "bytes=5000-6000") // 416
+	if resp, err := http.DefaultClient.Do(req); err == nil {
+		resp.Body.Close()
+	}
+	ends := rec.waitEnds(t, 2)
+	if starts, _, _ := rec.snap(); len(starts) != 0 || ends[0].Live != nil || ends[1].Live != nil {
+		t.Fatalf("starts=%d ends=%+v", len(starts), ends)
+	}
+}
+
+// TFTP WRQ cuyo par no manda DATA: sin sesión.
+func TestLiveTFTPWRQUnverifiedPeerHasNoSession(t *testing.T) {
+	rec, r := liveStart(t, Config{Proto: "tftp", Write: true, RecvDir: t.TempDir()})
+	c := dialTFTP(t, r.Addr)
+	c.send(c.srv, wrq("cfg"))
+	p, _ := c.recv() // ACK 0; no sigue ningún DATA
+	if binary.BigEndian.Uint16(p) != 4 {
+		t.Fatalf("respuesta %v", p)
+	}
+	x := rec.waitEnds(t, 1)[0]
+	if starts, _, _ := rec.snap(); len(starts) != 0 || x.Live != nil || x.Result != "error" {
+		t.Fatalf("starts=%d %+v", len(starts), x)
+	}
+}
+
+// Si el equipo manda más que su tsize, el total pasa a desconocido: la barra no pasa de 100 %.
+func TestLiveTFTPWriteBeyondTsize(t *testing.T) {
+	rec, r := liveStart(t, Config{Proto: "tftp", Write: true, RecvDir: t.TempDir()})
+	if code := dialTFTP(t, r.Addr).put("cfg", make([]byte, 1000), 512, "tsize", "100"); code != 0 {
+		t.Fatalf("error %d", code)
+	}
+	l, x := rec.one(t)
+	if x.Bytes != 1000 || l.Total() != 0 {
+		t.Fatalf("bytes=%d total=%d", x.Bytes, l.Total())
+	}
+}
+
+// Corte a medias: start, luego end con el mismo Live y Result=error.
+func (r *liveRec) aborted(t *testing.T) {
+	t.Helper()
+	x := r.waitEnds(t, 1)[0]
+	starts, _, ev := r.snap()
+	if len(starts) != 1 || x.Live != starts[0] || x.Result != "error" || len(ev) != 2 || ev[0] != "start" {
+		t.Fatalf("eventos=%v %+v", ev, x)
+	}
+}
+
+func rst(c net.Conn) { c.(*net.TCPConn).SetLinger(0); c.Close() }
+
+func TestLiveAbortFTP(t *testing.T) {
+	pub := filepath.Dir(bigFile(t, 64<<20))
+	rec, r := liveStart(t, Config{Proto: "ftp", FromDir: pub})
+	f := ftpDial(t, r.Addr)
+	f.login(r)
+	dc := f.pasv()
+	f.cmd(150, "RETR big.bin")
+	io.CopyN(io.Discard, dc, 64<<10)
+	rst(dc)
+	rec.aborted(t)
+	rec, r = liveStart(t, Config{Proto: "ftp", Write: true, RecvDir: t.TempDir()})
+	f = ftpDial(t, r.Addr)
+	f.login(r)
+	dc = f.pasv()
+	f.cmd(150, "STOR up")
+	dc.Write(make([]byte, 5000))
+	time.Sleep(50 * time.Millisecond)
+	rst(dc)
+	rec.aborted(t)
+}
+
+func TestLiveAbortSCP(t *testing.T) {
+	pub := filepath.Dir(bigFile(t, 64<<20))
+	rec, r := liveStart(t, Config{Proto: "scp", FromDir: pub})
+	c := mustDial(t, r.Addr, r)
+	sess, _ := c.NewSession()
+	in, _ := sess.StdinPipe()
+	out, _ := sess.StdoutPipe()
+	sess.Start("scp -f big.bin")
+	in.Write([]byte{0})
+	one := make([]byte, 1)
+	for one[0] != '\n' {
+		io.ReadFull(out, one)
+	}
+	in.Write([]byte{0})
+	io.CopyN(io.Discard, out, 64<<10)
+	c.Close()
+	rec.aborted(t)
+
+	rec, r = liveStart(t, Config{Proto: "scp", Write: true, RecvDir: t.TempDir()})
+	c = mustDial(t, r.Addr, r)
+	sess, _ = c.NewSession()
+	in, _ = sess.StdinPipe()
+	out, _ = sess.StdoutPipe()
+	sess.Start("scp -t up")
+	io.ReadFull(out, one)
+	fmt.Fprintf(in, "C0644 100000 up\n")
+	io.ReadFull(out, one)
+	in.Write(make([]byte, 1000))
+	time.Sleep(50 * time.Millisecond)
+	c.Close()
+	rec.aborted(t)
+}
+
+func TestLiveAbortSFTP(t *testing.T) {
+	pub := filepath.Dir(bigFile(t, 64<<20))
+	rec, r := liveStart(t, Config{Proto: "sftp", FromDir: pub, Write: true, RecvDir: t.TempDir()})
+	c := mustDial(t, r.Addr, r)
+	cl, err := sftp.NewClient(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := cl.Open("/big.bin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Read(make([]byte, 1000))
+	c.Close()
+	rec.aborted(t)
+
+	rec, r = liveStart(t, Config{Proto: "sftp", Write: true, RecvDir: t.TempDir()})
+	c = mustDial(t, r.Addr, r)
+	cl, _ = sftp.NewClient(c)
+	w, err := cl.Create("/up")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Write(make([]byte, 5000))
+	c.Close()
+	rec.aborted(t)
+}
+
+func TestLiveBusyAndOtherCauses(t *testing.T) {
+	// TFTP: tercer RRQ de la misma IP con dos pares aún sin verificar.
+	p, _ := image(t, "img.bin", 2000)
+	rec, r := liveStart(t, Config{Proto: "tftp", Files: []string{p}})
+	c := dialTFTP(t, r.Addr)
+	for range perClient + 1 {
+		c.send(c.srv, rrq("img.bin"))
+	}
+	if x := rec.waitEnds(t, 1)[0]; x.Cause != CauseBusy || !x.Rejected {
+		t.Fatalf("TFTP: %+v", x)
+	}
+	// HTTP: cupo lleno (maxTransfers GET sin leer).
+	big := bigFile(t, 64<<20)
+	rec, r = liveStart(t, Config{Proto: "http", Files: []string{big}})
+	cl := smallRecvClient()
+	for range maxTransfers {
+		resp, err := cl.Get("http://" + r.Addr + "/big.bin")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+	}
+	if resp, err := http.Get("http://" + r.Addr + "/big.bin"); err == nil {
+		resp.Body.Close()
+	}
+	if x := rec.waitEnds(t, 1)[0]; x.Cause != CauseBusy || !x.Rejected {
+		t.Fatalf("HTTP: %+v", x)
+	}
+	// FTP: cupo por IP del limitador (también cubre el bloqueo por contraseñas erróneas).
+	rec, r = liveStart(t, Config{Proto: "ftp", Files: []string{p}})
+	for range perClientTCP {
+		ftpDial(t, r.Addr)
+	}
+	if cn, err := net.Dial("tcp", r.Addr); err == nil {
+		defer cn.Close()
+	}
+	if x := rec.waitEnds(t, 1)[0]; x.Cause != CauseBusy {
+		t.Fatalf("FTP: %+v", x)
+	}
+	// other: STOR de un archivo que ya existe.
+	rec, r = liveStart(t, Config{Proto: "ftp", Write: true, RecvDir: t.TempDir()})
+	f := ftpDial(t, r.Addr)
+	f.login(r)
+	dc := f.pasv()
+	f.cmd(150, "STOR x")
+	dc.Close()
+	f.expect(226)
+	rec.waitEnds(t, 1)
+	f.pasv()
+	f.cmd(550, "STOR x")
+	if x := rec.waitEnds(t, 2)[1]; x.Cause != CauseOther || !x.Rejected {
+		t.Fatalf("other: %+v", x)
+	}
+	// method: órdenes FTP que modifican.
+	f.cmd(550, "DELE x")
+	if x := rec.waitEnds(t, 3)[2]; x.Cause != CauseMethod {
+		t.Fatalf("method: %+v", x)
 	}
 }
 

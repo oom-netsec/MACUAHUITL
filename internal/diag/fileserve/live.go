@@ -27,8 +27,12 @@ func (l *Live) atLeast(n int64) {
 	for {
 		cur := l.bytes.Load()
 		if n <= cur || l.bytes.CompareAndSwap(cur, n) {
-			return
+			break
 		}
+	}
+	// Si se escribe más de lo anunciado, el total pasa a desconocido: la barra no pasa de 100 %.
+	if t := l.total.Load(); t > 0 && n > t {
+		l.total.CompareAndSwap(t, 0)
 	}
 }
 

@@ -22,12 +22,15 @@ type countingWriter struct {
 	status int
 	err    error
 	live   *Live
+	begin  func(total int64) *Live // arranca la sesión en la primera cabecera 2xx de un GET
 }
 
 func (w *countingWriter) WriteHeader(s int) {
 	w.status = s
-	if cl, err := strconv.ParseInt(w.Header().Get("Content-Length"), 10, 64); err == nil && s < 300 {
-		w.live.setTotal(cl) // ServeContent ya fijó el tamaño del tramo (o del archivo)
+	if s >= 200 && s < 300 && w.live == nil && w.begin != nil {
+		// ServeContent ya fijó Content-Length: el tamaño del tramo (o del archivo).
+		cl, _ := strconv.ParseInt(w.Header().Get("Content-Length"), 10, 64)
+		w.live = w.begin(cl)
 	}
 	w.ResponseWriter.WriteHeader(s)
 }
@@ -99,10 +102,14 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		}
 		defer f.Close()
 		t.Path = f.Name()
-		t.Live = c.start(t, 0) // el total lo fija WriteHeader
-		cw := &countingWriter{ResponseWriter: w, status: http.StatusOK, live: t.Live}
+		// Sesión solo con un GET que responde 2xx (HEAD, 304, 412 y 416 no la crean: un escáner
+		// con Range inválidos no desplaza la historia). El arranque es perezoso, en WriteHeader.
+		cw := &countingWriter{ResponseWriter: w, status: http.StatusOK}
+		if r.Method == http.MethodGet {
+			cw.begin = func(total int64) *Live { return c.start(t, total) }
+		}
 		http.ServeContent(cw, r, name, st.ModTime(), f) // atiende Range e If-Modified-Since
-		t.Bytes = cw.n
+		t.Bytes, t.Live = cw.n, cw.live
 		switch {
 		case cw.err != nil:
 			t.Error, t.ReasonT = "interrumpida: "+cw.err.Error(), why("interrupted", "error", cw.err.Error())

@@ -103,6 +103,7 @@ func serveSSH(ctx context.Context, c Config, src *source, rcv *receiver) error {
 			return fmt.Errorf("fileserve: %w", err)
 		}
 		ip := hostOf(nc.RemoteAddr())
+		// busy también cubre el bloqueo del origen por contraseñas erróneas (limiter.acquire).
 		reject := func(cause, why string) {
 			nc.Close()
 			c.OnTransfer(Transfer{Proto: c.Proto, Client: nc.RemoteAddr().String(), Result: "error", Error: why, ReasonT: lit(why), Rejected: true, Cause: cause})
@@ -663,7 +664,7 @@ func (h *sftpHandler) Filecmd(r *sftp.Request) error {
 	if r.Method == "Setstat" {
 		return nil
 	}
-	h.s.reject(h.client, CauseOther, why("sftp_rejected", "method", r.Method))
+	h.s.reject(h.client, CauseMethod, why("sftp_rejected", "method", r.Method))
 	return sftp.ErrSSHFxPermissionDenied
 }
 
