@@ -23,7 +23,7 @@ func (fakeVault) Status(context.Context, *v1.StatusRequest) (*v1.StatusResponse,
 }
 
 func (fakeVault) ListCredentials(context.Context, *v1.ListCredentialsRequest) (*v1.ListCredentialsResponse, error) {
-	return &v1.ListCredentialsResponse{Credentials: []*v1.CredentialInfo{{Id: "c1", Label: "lab", Username: "admin", HasEnableSecret: true}}}, nil
+	return &v1.ListCredentialsResponse{Credentials: []*v1.CredentialInfo{{Id: "c1", Label: "lab", Username: "admin", HasEnableSecret: true}, {Id: "c2", Label: "rpi", Username: "pi", HasSshKey: true, Kind: "key"}}}, nil
 }
 
 func startFake(t *testing.T, path string) context.CancelFunc {
@@ -110,5 +110,9 @@ func TestBridgeNeverReturnsSecrets(t *testing.T) {
 	}
 	if !strings.Contains(string(j), `"hasEnable":true`) {
 		t.Fatalf("dto = %s", j)
+	}
+	// Fase 44a: el tipo que calcula el núcleo llega a la UI para sacar las de llave de los selectores manuales.
+	if len(creds) != 2 || creds[1].Kind != "key" || !strings.Contains(string(j), `"kind":"key"`) {
+		t.Fatalf("kind = %s", j)
 	}
 }

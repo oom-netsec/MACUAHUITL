@@ -384,3 +384,12 @@ test("una llave de host cambiada llega por errorInfo y ofrece aceptarla aunque e
   expect(await screen.findByText(`SHA256:${fp}`)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" })).toBeInTheDocument();
 });
+
+test("la conexión manual no ofrece credenciales de llave ni las deja por omisión (fase 44a)", async () => {
+  const keyCred = { id: "k".repeat(32), label: "llave lab", username: "netops", kind: "key" as const, hasEnable: false, hasSshKey: true };
+  const pwCred = { id: "p".repeat(32), label: "lab", username: "admin", kind: "password" as const, hasEnable: true, hasSshKey: false };
+  render(<TerminalView core={fakeCore({ listCredentials: vi.fn(async () => [keyCred, pwCred]) })} />);
+  const sel = await screen.findByLabelText("Credencial");
+  await waitFor(() => expect(sel).toHaveValue(pwCred.id));
+  expect(screen.queryByRole("option", { name: /llave lab/ })).toBeNull();
+});

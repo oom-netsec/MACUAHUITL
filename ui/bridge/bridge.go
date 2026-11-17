@@ -244,6 +244,7 @@ type CredentialDTO struct {
 	Username  string `json:"username"`
 	HasEnable bool   `json:"hasEnable"`
 	HasSSHKey bool   `json:"hasSshKey"`
+	Kind      string `json:"kind"` // password | key: lo calcula el núcleo al listar
 }
 
 func (b *Bridge) ListCredentials() ([]CredentialDTO, error) {
@@ -254,7 +255,7 @@ func (b *Bridge) ListCredentials() ([]CredentialDTO, error) {
 		}
 		out := []CredentialDTO{}
 		for _, i := range r.Credentials {
-			out = append(out, CredentialDTO{ID: i.Id, Label: i.Label, Username: i.Username, HasEnable: i.HasEnableSecret, HasSSHKey: i.HasSshKey})
+			out = append(out, CredentialDTO{ID: i.Id, Label: i.Label, Username: i.Username, HasEnable: i.HasEnableSecret, HasSSHKey: i.HasSshKey, Kind: i.Kind})
 		}
 		return out, nil
 	})

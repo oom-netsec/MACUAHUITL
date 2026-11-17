@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { passwordCreds } from "../vault/api";
 import { useBusy } from "../../app/activity";
 import { Check, Console, Field, Notice, PathField, Select, TextArea, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
@@ -41,7 +42,7 @@ export function ClientPanel({ core }: { core: CoreAPI }) {
   const [res, setRes] = useState<TransferResult | null>(null);
   useBusy(busy);
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
-  useEffect(() => { core.listCredentials().then((l) => { setCreds(l ?? []); setF((x) => ((l ?? []).some((c) => c.id === x.cred) ? x : { ...x, cred: "" })); }).catch(() => setCreds([])); }, [core, vv]);
+  useEffect(() => { core.listCredentials().then(passwordCreds).then((l) => { setCreds(l ?? []); setF((x) => ((l ?? []).some((c) => c.id === x.cred) ? x : { ...x, cred: "" })); }).catch(() => setCreds([])); }, [core, vv]);
 
   useEffect(() => { if (failed) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(); }, [failed]);
 
