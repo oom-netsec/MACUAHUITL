@@ -42,7 +42,7 @@ Además, hay supuestos que compilan pero fallan en ejecución. Son los más peli
   | Outputs | `%USERPROFILE%\MACUAHUITL\outputs`, como `~/MACUAHUITL/outputs` en Linux |
 
   - **Nada va en `%APPDATA%`**, que es *roaming*: en un dominio subiría la bóveda a un servidor. Config tampoco va ahí, aunque Front lo propuso por ser chica: guarda los paquetes `.mpack` y los playbooks del usuario, que son contenido que se ejecuta, y un perfil roaming dejaría que otro equipo del dominio los cambie.
-  - **No hay carpeta runtime**: el named pipe no la necesita, y `FILE_FLAG_FIRST_PIPE_INSTANCE` hace de candado de instancia única.
+  - **No hay carpeta runtime**: el named pipe no la necesita, y la primera instancia del pipe hace de candado de instancia única (`FILE_FLAG_FIRST_PIPE_INSTANCE` en `CreateNamedPipe`; el código usa su equivalente en go-winio, `NtCreateNamedPipeFile` con `FILE_CREATE`, ver `internal/ipc/ipc_windows.go`).
 
 ### (a) Canal local: named pipe con ACL y verificación del cliente
 
@@ -52,10 +52,10 @@ Hoy el ADR 0003 exige tres cosas: que solo el usuario pueda conectarse, que el n
 
 - **DACL protegida.** Solo el SID del usuario tiene acceso (`D:P(A;;GA;;;<SID>)`). Ni Everyone, ni Usuarios, ni herencia.
 - **Clientes remotos rechazados** con `PIPE_REJECT_REMOTE_CLIENTS`. Un named pipe es alcanzable por SMB si no se rechaza.
-- **Contra la suplantación del pipe.** La primera instancia se crea con `FILE_FLAG_FIRST_PIPE_INSTANCE`. Si el nombre ya existe, otro proceso lo tomó: el núcleo no arranca y lo dice. Esto también reemplaza al `flock` de instancia única.
+- **Contra la suplantación del pipe.** La primera instancia se crea con `FILE_CREATE` vía `NtCreateNamedPipeFile` (go-winio), equivalente a `FILE_FLAG_FIRST_PIPE_INSTANCE`: falla si el nombre ya existe. Si el nombre ya existe, otro proceso lo tomó: el núcleo no arranca y lo dice. Esto también reemplaza al `flock` de instancia única.
 - **El núcleo verifica al cliente.** Por cada conexión llama a `GetNamedPipeClientProcessId` y luego a `OpenProcess` y `OpenProcessToken`. Si el SID del token no es el del núcleo, la conexión se cierra antes de hablar gRPC. Es el equivalente directo de `SO_PEERCRED` con comparación de UID.
-- **Los clientes verifican al servidor** (mctl y la app). El espacio de nombres de los pipes es global a la máquina, así que los clientes también hacen la verificación inversa con `GetNamedPipeServerProcessId` y el SID del token, para no hablarle a un pipe que otro usuario creó primero. En Linux esto lo cubre la carpeta `$XDG_RUNTIME_DIR` (0700); en Windows no hay carpeta, por eso la verificación es explícita.
-- **Detalles por confirmar en 43a.** Que go-winio ponga `FILE_FLAG_FIRST_PIPE_INSTANCE` y `PIPE_REJECT_REMOTE_CLIENTS` por omisión se comprueba con una prueba, no se da por hecho. Si alguno falta, se crea el pipe con `x/sys/windows` en vez de go-winio.
+- **Los clientes verifican al servidor** (mctl y la app). El espacio de nombres de los pipes es global a la máquina, así que los clientes también hacen la verificación inversa con `GetNamedPipeServerProcessId` y el SID del token, para no hablarle a un pipe que otro usuario creó primero. También exigen que el servidor tenga nivel de integridad >= al propio y no sea AppContainer ni token restringido (si no se puede leer el token, se rechaza). En Linux esto lo cubre la carpeta `$XDG_RUNTIME_DIR` (0700); en Windows no hay carpeta, por eso la verificación es explícita.
+- **Detalles por confirmar en 43a.** Que go-winio cree la primera instancia con `FILE_CREATE` (equivalente a `FILE_FLAG_FIRST_PIPE_INSTANCE`) y `PIPE_REJECT_REMOTE_CLIENTS` por omisión se comprueba con una prueba, no se da por hecho. Si alguno falta, se crea el pipe con `x/sys/windows` en vez de go-winio.
 
 **AF_UNIX de Windows 10+ no se elige.** Go lo soporta (`net.Listen("unix", …)`), pero Windows no tiene `SO_PEERCRED`. Lo único parecido es el ioctl `SIO_AF_UNIX_GETPEERPID`: está poco documentado y Go no lo expone. Además, que la ACL del archivo del socket se aplique en `connect` no está documentado con la claridad que exige un canal que da acceso a la bóveda. El named pipe es el mecanismo de IPC de Windows con ACL y API de identidad documentadas.
 
@@ -66,7 +66,7 @@ Hoy el ADR 0003 exige tres cosas: que solo el usuario pueda conectarse, que el n
 | `mlockall(MCL_CURRENT\|MCL_FUTURE)` | No existe «bloquear todo». `VirtualLock` bloquea rangos, con tope en el *working set* mínimo, que se sube con `SetProcessWorkingSetSizeEx` sin privilegios. | Parcial. Se sube el mínimo del working set. Las llaves de la bóveda ya viven en buffers de memguard (`internal/secret`), que en Windows se bloquean con `VirtualLock` igual que con `mlock` en Linux. El resto del heap no queda bloqueado. Si no se puede subir el mínimo del working set, el fallo es fatal: memguard hace `panic` cuando `VirtualLock` falla, así que `Harden` devuelve error y el núcleo no arranca (`internal/secret` lo sube en `init()`, para que lo tengan también la UI y las pruebas). |
 | `PR_SET_DUMPABLE=0` y `RLIMIT_CORE=0` | `WerAddExcludedApplication(…, FALSE)` (HKCU, sin admin) excluye al núcleo de los reportes de error de Windows. `SetErrorMode(SEM_NOGPFAULTERRORBOX)` evita el diálogo. | Parcial: sin volcados de WER. |
 | Otro proceso del mismo usuario no puede leer la memoria (Yama, no dumpable) | **No hay equivalente sin admin ni firma especial.** Cualquier proceso del mismo usuario puede hacer `OpenProcess` + `ReadProcessMemory`. | **Ninguna.** Se dice tal cual en el modelo de amenazas: en Windows, un malware con la sesión del usuario lee la bóveda abierta. |
-| Avisos de swap e hibernación | Avisos de *pagefile* sin cifrar (`EncryptPagingFile`, BitLocker) y de `hiberfil.sys`, leídos sin admin donde se pueda; si no se puede leer, se avisa que no se pudo comprobar. | Equivalente en avisos. |
+| Avisos de swap e hibernación | Aviso de *pagefile* si `EncryptPagingFile`/`NtfsEncryptPagingFile` no vale 1 (el aviso no considera BitLocker: leerlo pide admin) y de `hiberfil.sys`, leídos sin admin donde se pueda; si no se puede leer, se avisa que no se pudo comprobar. | Equivalente en avisos. |
 
 ### (c) Permisos: ACL en lugar de 0700/0600
 
@@ -118,7 +118,7 @@ Hoy el ADR 0003 exige tres cosas: que solo el usuario pueda conectarse, que el n
 
 ### (g) Arranque del núcleo sin servicio ni admin
 
-- **Arranque**: una entrada en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` lanza el núcleo al iniciar sesión. Además, la app y mctl lo lanzan bajo demanda si no encuentran el pipe.
+- **Arranque**: una entrada en `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` lanza el núcleo al iniciar sesión. Además, la app lo lanza bajo demanda si no encuentra el pipe; mctl no lo lanza (es de scripts): avisa que el núcleo no corre y cómo iniciarlo.
   - El núcleo lanzado bajo demanda corre **separado** de quien lo lanzó (`sys.StartDetached`: `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB`, fuera de cualquier Job Object de la app; si el job niega el breakaway con `ERROR_ACCESS_DENIED` se reintenta una vez sin él. Sin `CREATE_NO_WINDOW`: con `-H windowsgui` el núcleo no abre consola y `DETACHED_PROCESS` basta. Solo rutas absolutas y archivos regulares, sin UNC ni de dispositivo). Si no, moriría al cerrar la UI y cortaría un trabajo de Patrol a medias.
   - El instalador da de alta la entrada de `Run` y la desinstalación la quita.
   - La app y la entrada de `Run` usan la ruta absoluta de `macuahuitld.exe`, en la misma carpeta que `macuahuitl.exe`; nunca lo buscan por el `PATH` (secuestro de `PATH`, como en f).
