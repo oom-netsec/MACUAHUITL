@@ -34,7 +34,8 @@ func (d coreDeps) OnClose(f func()) {
 	d.c.closers = append(d.c.closers, f)
 	d.c.mu.Unlock()
 }
-func (d coreDeps) Patrol() v1.PatrolServiceServer { return &patrolSvc{c: d.c} }
+func (d coreDeps) TransferSessions() *service.TransferSessions { return d.c.xfer }
+func (d coreDeps) Patrol() v1.PatrolServiceServer              { return &patrolSvc{c: d.c} }
 func (d coreDeps) ValidateJob(ctx context.Context, p *v1.JobSpec) error {
 	_, err := (&patrolSvc{c: d.c}).validate(ctx, p)
 	return err

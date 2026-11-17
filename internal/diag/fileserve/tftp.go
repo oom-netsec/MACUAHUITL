@@ -201,7 +201,7 @@ func (x *xfer) exchange(pkt []byte, block uint16) error {
 					return nil
 				}
 			case opERROR:
-				return i18n.New("fileserve.reason.client_abort_msg", i18n.A("msg", strings.TrimRight(string(buf[4:n]), "\x00")))
+				return i18n.New("fileserve.reason.client_abort_msg", i18n.A("msg", clean(strings.TrimRight(string(buf[4:n]), "\x00"))))
 			}
 		}
 	}
@@ -334,7 +334,7 @@ func (x *xfer) awaitData(pkt []byte, block uint16, blk int) ([]byte, error) {
 				}
 				return append([]byte(nil), buf[4:n]...), nil
 			case opERROR:
-				return nil, i18n.New("fileserve.reason.client_abort_msg", i18n.A("msg", strings.TrimRight(string(buf[4:n]), "\x00")))
+				return nil, i18n.New("fileserve.reason.client_abort_msg", i18n.A("msg", clean(strings.TrimRight(string(buf[4:n]), "\x00"))))
 			}
 		}
 	}

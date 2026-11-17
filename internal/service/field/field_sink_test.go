@@ -8,6 +8,8 @@ import (
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/fileserve"
+	"github.com/oom-netsec/MACUAHUITL/internal/service"
+	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
 )
 
 // Revisión: un escáner no llena la auditoría ni bloquea la recepción aunque el
@@ -47,5 +49,23 @@ func TestServeSinkRejectionsAreCountedNotAudited(t *testing.T) {
 	}
 	if sent < 2 { // la transferencia real siempre llega; de los rechazos, los que quepan
 		t.Fatalf("enviados %d", sent)
+	}
+}
+
+// Cierre de seguridad de Campo: una sesión que nadie cerró pasa a failed «stopped» y se audita con session=.
+func TestServeSinkShutdownAuditsStranded(t *testing.T) {
+	d := servicetest.New(t)
+	var audits []string
+	k := newServeSink("es", func(a, _, det string) { audits = append(audits, a+" "+det) }, func(*v1.ServeFilesResponse) error { return nil })
+	k.reg = d.TransferSessions().Open("F1")
+	k.reg.Start(&fileserve.Live{Proto: "tftp", Client: "10.0.0.5:7", File: "x.bin", Dir: "lectura"})
+	k.reg.Shutdown(func(x service.Stranded) { k.finished(x.T, x.ID, x.Total) })
+	n, _ := k.stop()
+	g, _, _ := d.TransferSessions().List("F1", "en")
+	if n != 1 || len(g) != 1 || g[0].State != "failed" || g[0].ErrorCode != "fileserve.reason.stopped" {
+		t.Fatalf("n=%d %+v", n, g)
+	}
+	if len(audits) != 1 || !strings.Contains(audits[0], "session="+g[0].Id) || !strings.Contains(audits[0], "result=error") {
+		t.Fatalf("auditoría: %v", audits)
 	}
 }
