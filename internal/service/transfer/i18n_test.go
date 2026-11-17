@@ -57,12 +57,12 @@ func transferenciaCasos(t *testing.T, ctx context.Context) map[string]string {
 
 	for n, req := range map[string]*v1.StartServerRequest{
 		"servidor_protocolo": {Protocol: "gopher", Listen: "127.0.0.1"}, "servidor_sin_nada": {Protocol: "tftp", Listen: "127.0.0.1"},
-		"servidor_puerto_privilegiado": {Protocol: "tftp", Listen: "127.0.0.1:69", FromDir: pub}, "servidor_host": {Protocol: "tftp", Listen: "localhost:6969", FromDir: pub},
+		"servidor_host":  {Protocol: "tftp", Listen: "localhost:6969", FromDir: pub},
 		"servidor_todas": {Protocol: "tftp", Listen: "0.0.0.0", FromDir: pub}, "servidor_escribir_sin_lista": {Protocol: "tftp", Listen: "0.0.0.0", AllowAny: true, Write: true},
 		"servidor_ip_origen": {Protocol: "tftp", Listen: "127.0.0.1", FromDir: pub, Allow: []string{"no-es-ip"}}, "servidor_carpeta_sensible": {Protocol: "tftp", Listen: "127.0.0.1", FromDir: "/etc"},
 		"servidor_recepcion_sensible": {Protocol: "ftp", Listen: "127.0.0.1", Write: true, RecvDir: "/usr/lib"}, "servidor_recepcion_relativa": {Protocol: "ftp", Listen: "127.0.0.1", Write: true, RecvDir: "rel"},
 		"servidor_http_escritura": {Protocol: "http", Listen: "127.0.0.1", FromDir: pub, Write: true}, "servidor_pasivo": {Protocol: "ftp", Listen: "127.0.0.1", FromDir: pub, PassivePortMin: 5000, PassivePortMax: 4000},
-		"servidor_pasivo_priv": {Protocol: "ftp", Listen: "127.0.0.1", FromDir: pub, PassivePortMin: 80, PassivePortMax: 90}, "servidor_archivo_relativo": {Protocol: "tftp", Listen: "127.0.0.1", Files: []string{"rel.txt"}},
+		"servidor_archivo_relativo":  {Protocol: "tftp", Listen: "127.0.0.1", Files: []string{"rel.txt"}},
 		"servidor_archivo_no_existe": {Protocol: "tftp", Listen: "127.0.0.1", Files: []string{"/no/existe.txt"}},
 		"servidor_tftp_sin_lista":    {Protocol: "tftp", Listen: "127.0.0.1", Write: true, RecvDir: dest},
 		"servidor_ftp_todas":         {Protocol: "ftp", Listen: "0.0.0.0", AllowAny: true, Write: true, RecvDir: dest},
@@ -278,7 +278,7 @@ func TestAuditoriaDeTransferenciaVaEnIngles(t *testing.T) {
 func TestRedirectHintMarcadorRutaEn(t *testing.T) {
 	s, _ := newTest(t)
 	r, err := s.RedirectHint(i18n.WithLocale(context.Background(), "en"), &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"})
-	if err != nil || strings.Contains(r.Setcap, "RUTA-DEL-SERVIDOR") || !strings.Contains(r.Setcap, "SERVER-PATH") {
+	if err != nil || r.Setcap != "" {
 		t.Fatalf("%+v %v", r, err)
 	}
 }

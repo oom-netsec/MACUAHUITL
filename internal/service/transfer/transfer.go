@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -40,16 +39,9 @@ const (
 	closeWait       = 10 * time.Second
 )
 
-// Puertos altos por omisión: ninguno privilegiado (ADR 0004). En Windows, los estándar: allí no hay puertos
-// privilegiados ni redirección, e IOS no deja elegir el de TFTP (ADR 0012 h).
-var defaultPort = defaultPorts(runtime.GOOS)
-
-func defaultPorts(goos string) map[string]uint16 {
-	if goos == "windows" {
-		return map[string]uint16{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22, "http": 8080}
-	}
-	return map[string]uint16{"tftp": 6969, "ftp": 2121, "scp": 2222, "sftp": 2222, "http": 8080}
-}
+// Puertos estándar por omisión (ADR 0004, enmienda 2026-11-16): un upgrade de IOS no usa puertos propios. Si el
+// kernel no deja abrirlos, el error del bind dice la orden de sysctl.
+var defaultPort = map[string]uint16{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22, "http": 80}
 
 type server struct {
 	id, proto, listening string
@@ -247,7 +239,7 @@ func (s *svc) RedirectHint(ctx context.Context, r *v1.RedirectHintRequest) (*v1.
 		return nil, bad(ctx, "transfer.svc.no_redirect", "proto", r.Protocol)
 	}
 	std := map[string]int32{"tftp": 69, "ftp": 21, "scp": 22, "sftp": 22}[r.Protocol]
-	return &v1.RedirectHintResponse{StandardPort: std, Nftables: h, Setcap: fileserve.SetcapHintIn(loc, i18n.Msg(loc, "fileserve.hint.server_path", nil)), Remove: fileserve.RedirectCleanup(r.Protocol, r.Ip, int(r.Port))}, nil
+	return &v1.RedirectHintResponse{StandardPort: std, Nftables: h, Remove: fileserve.RedirectCleanup(r.Protocol, r.Ip, int(r.Port))}, nil
 }
 
 // sink: las transferencias reales se auditan; los rechazos (escáneres, nombres equivocados)

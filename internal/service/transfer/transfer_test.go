@@ -194,7 +194,6 @@ func TestStartServerValidation(t *testing.T) {
 	for name, req := range map[string]*v1.StartServerRequest{
 		"protocolo":            {Protocol: "gopher", Listen: "127.0.0.1"},
 		"sin nada":             {Protocol: "tftp", Listen: "127.0.0.1"},
-		"puerto privilegiado":  {Protocol: "tftp", Listen: "127.0.0.1:69", FromDir: pub},
 		"host no es IP":        {Protocol: "tftp", Listen: "localhost:6969", FromDir: pub},
 		"todas sin permiso":    {Protocol: "tftp", Listen: "0.0.0.0", FromDir: pub},
 		"escribir sin lista":   {Protocol: "tftp", Listen: "0.0.0.0", AllowAny: true, Write: true},
@@ -204,7 +203,6 @@ func TestStartServerValidation(t *testing.T) {
 		"recepcion relativa":   {Protocol: "ftp", Listen: "127.0.0.1", Write: true, RecvDir: "rel"},
 		"escritura por http":   {Protocol: "http", Listen: "127.0.0.1", FromDir: pub, Write: true},
 		"rango pasivo":         {Protocol: "ftp", Listen: "127.0.0.1", FromDir: pub, PassivePortMin: 5000, PassivePortMax: 4000},
-		"pasivo privilegiado":  {Protocol: "ftp", Listen: "127.0.0.1", FromDir: pub, PassivePortMin: 80, PassivePortMax: 90},
 		"carpeta es un enlace": {Protocol: "tftp", Listen: "127.0.0.1", FromDir: linkTo(t, pub)},
 	} {
 		st := &fakeStream{ctx: context.Background(), out: make(chan *v1.StartServerResponse, 4)}
@@ -224,16 +222,13 @@ func linkTo(t *testing.T, dir string) string {
 	return l
 }
 
-func TestDefaultPortsAreHigh(t *testing.T) {
-	for p, want := range map[string]string{"tftp": "127.0.0.1:6969", "ftp": "127.0.0.1:2121", "scp": "127.0.0.1:2222", "sftp": "127.0.0.1:2222", "http": "127.0.0.1:8080"} {
+func TestDefaultPortsAreStandard(t *testing.T) {
+	for p, want := range map[string]string{"tftp": "127.0.0.1:69", "ftp": "127.0.0.1:21", "scp": "127.0.0.1:22", "sftp": "127.0.0.1:22", "http": "127.0.0.1:80"} {
 		if got, err := listenAddr(context.Background(), p, "127.0.0.1"); err != nil || got != want {
 			t.Errorf("%s: %q %v", p, got, err)
 		}
-		if got, _ := listenAddr(context.Background(), p, "127.0.0.1"); strings.HasSuffix(got, ":69") || strings.HasSuffix(got, ":21") || strings.HasSuffix(got, ":22") {
-			t.Errorf("%s: puerto privilegiado por omisión", p)
-		}
 	}
-	if got, _ := listenAddr(context.Background(), "tftp", "::1"); got != "[::1]:6969" {
+	if got, _ := listenAddr(context.Background(), "tftp", "::1"); got != "[::1]:69" {
 		t.Errorf("IPv6: %q", got)
 	}
 }
@@ -405,7 +400,7 @@ func TestGetDefaultsToReceiveFolderAndSha512(t *testing.T) {
 func TestRedirectHintRPC(t *testing.T) {
 	s, _ := newTest(t)
 	r, err := s.RedirectHint(context.Background(), &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"})
-	if err != nil || r.StandardPort != 21 || !strings.Contains(r.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") || !strings.Contains(r.Setcap, "ADVERTENCIA") ||
+	if err != nil || r.StandardPort != 21 || !strings.Contains(r.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") ||
 		r.Remove != "sudo nft delete table ip macuahuitl_ftp_2121" {
 		t.Fatalf("%+v %v", r, err)
 	}
@@ -445,7 +440,7 @@ func TestRedirectHintRPCEn(t *testing.T) {
 	req := &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"}
 	en, err := s.RedirectHint(i18n.WithLocale(context.Background(), "en"), req)
 	// Nftables es solo el comando (se copia tal cual); el de quitar va en Remove.
-	if err != nil || !strings.Contains(en.Setcap, "WARNING") || strings.Contains(en.Nftables, "remove when done") || !strings.HasSuffix(en.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") || en.Remove != "sudo nft delete table ip macuahuitl_ftp_2121" {
+	if err != nil || en.Setcap != "" || strings.Contains(en.Nftables, "remove when done") || !strings.HasSuffix(en.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") || en.Remove != "sudo nft delete table ip macuahuitl_ftp_2121" {
 		t.Fatalf("%+v %v", en, err)
 	}
 	es, _ := s.RedirectHint(context.Background(), req)
@@ -457,12 +452,10 @@ func TestRedirectHintRPCEn(t *testing.T) {
 // Un renombre de Session.Activity rompe la compilación en vez de apagar en silencio el keepalive de scp/sftp.
 var _ interface{ Activity(int) } = (*transport.Session)(nil)
 
-func TestPuertosPorOmisionPorSistema(t *testing.T) {
-	if p := defaultPorts("linux"); p["tftp"] != 6969 || p["ftp"] != 2121 || p["scp"] != 2222 {
-		t.Errorf("linux: %v", p)
-	}
-	if p := defaultPorts("windows"); p["tftp"] != 69 || p["ftp"] != 21 || p["scp"] != 22 || p["sftp"] != 22 || p["http"] != 8080 {
-		t.Errorf("windows: %v", p)
+func TestPuertosPorOmision(t *testing.T) {
+	p := defaultPort
+	if p["tftp"] != 69 || p["ftp"] != 21 || p["scp"] != 22 || p["sftp"] != 22 || p["http"] != 80 {
+		t.Errorf("%v", p)
 	}
 }
 

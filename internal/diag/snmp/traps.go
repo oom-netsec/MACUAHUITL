@@ -287,7 +287,7 @@ func ListenTraps(ctx context.Context, c TrapConfig) error {
 	defer cancel()
 	pc, err := (&net.ListenConfig{}).ListenPacket(ctx, "udp", c.Addr)
 	if err != nil {
-		return fmt.Errorf("snmp traps: %w", err)
+		return listen.Bind("snmp traps", err, listen.PortOf(c.Addr))
 	}
 	defer pc.Close()
 	stop := context.AfterFunc(ctx, func() { pc.Close() })

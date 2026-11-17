@@ -212,7 +212,7 @@ func init() {
 		"mctl.flag.license":                      {Es: "licencia SPDX (por omisión NOASSERTION)", En: "SPDX license (defaults to NOASSERTION)"},
 		"mctl.flag.limit":                        {Es: "máximo de valores (50000 por defecto)", En: "maximum number of values (default 50000)"},
 		"mctl.flag.list":                         {Es: "solo listar los puertos", En: "only list the ports"},
-		"mctl.flag.listen":                       {Es: "IP[:PUERTO] de escucha (puerto alto por omisión)", En: "listen IP[:PORT] (high port by default)"},
+		"mctl.flag.listen":                       {Es: "IP[:PUERTO] de escucha (puerto estándar del protocolo por omisión)", En: "listen IP[:PORT] (standard port of the protocol by default)"},
 		"mctl.flag.logs.debugs.hide":             {Es: "oculta las líneas que contienen este texto (repetible)", En: "hide the lines that contain this text (repeatable)"},
 		"mctl.flag.logs.debugs.json":             {Es: "salida JSON", En: "JSON output"},
 		"mctl.flag.logs.debugs.top":              {Es: "patrones frecuentes a listar (0 = 50)", En: "frequent patterns to list (0 = 50)"},

@@ -96,7 +96,7 @@ func TestTransferUsageAndHint(t *testing.T) {
 		}
 	}
 	out := must(t, "", "transfer", "hint", "scp", "2222")
-	if !strings.Contains(out, "tcp dport 22 redirect to :2222") || !strings.Contains(out, "setcap") {
+	if !strings.Contains(out, "tcp dport 22 redirect to :2222") || strings.Contains(out, "setcap") {
 		t.Fatal(out)
 	}
 	if out := must(t, "", "transfer", "list"); !strings.Contains(out, "no hay servidores") {

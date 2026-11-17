@@ -10,6 +10,8 @@ import (
 	"net/netip"
 	"strings"
 	"time"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
 )
 
 type countingWriter struct {
@@ -32,7 +34,7 @@ func (w *countingWriter) Write(b []byte) (int, error) {
 func serveHTTP(ctx context.Context, c Config, src *source) error {
 	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", c.Addr)
 	if err != nil {
-		return fmt.Errorf("fileserve: %w", err)
+		return listen.Bind("fileserve", err, listen.PortOf(c.Addr))
 	}
 	sem := make(chan struct{}, maxTransfers)
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

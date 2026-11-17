@@ -29,7 +29,7 @@ func TestEscaper(t *testing.T) {
 }
 
 func TestAyudaPorSistema(t *testing.T) {
-	if !strings.Contains(helpFor("linux"), "nftables") {
+	if !strings.Contains(helpFor("linux"), "sysctl") {
 		t.Error("linux cambió")
 	}
 	if h := helpFor("windows"); strings.Contains(h, "nftables") || !strings.Contains(h, "firewall") {

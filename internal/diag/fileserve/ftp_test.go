@@ -355,7 +355,7 @@ func TestHints(t *testing.T) {
 		write bool
 		want  []string
 	}{
-		{"ftp", true, []string{"ip ftp username mac", "ip ftp passive", "copy ftp://10.0.0.5/a.bin flash:", "copy running-config ftp://10.0.0.5/", "tcp dport 21 redirect to :2121", "setcap cap_net_bind_service"}},
+		{"ftp", true, []string{"ip ftp username mac", "ip ftp passive", "copy ftp://10.0.0.5/a.bin flash:", "copy running-config ftp://10.0.0.5/", "tcp dport 21 redirect to :2121"}},
 		{"scp", true, []string{"copy scp://mac@10.0.0.5/a.bin flash:", "copy running-config scp://mac@10.0.0.5/", "SHA256:aa", "tcp dport 22 redirect to :2121"}},
 		{"sftp", false, []string{"copy sftp://mac@10.0.0.5/a.bin flash:", "tcp dport 22 redirect to :2121"}},
 		{"tftp", true, []string{"copy running-config tftp://10.0.0.5/", "udp dport 69 redirect to :2121"}},
