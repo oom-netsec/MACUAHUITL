@@ -79,8 +79,9 @@ func TestBind69ConSysctlEnNamespace(t *testing.T) {
 			t.Skip("falta ", bin)
 		}
 	}
-	if out, err := exec.Command("unshare", "-rn", "true").CombinedOutput(); err != nil {
-		t.Skipf("unshare -rn no disponible sin privilegios: %v %s", err, out)
+	probe := "ip link set lo up && echo 1024 > /proc/sys/net/ipv4/ip_unprivileged_port_start"
+	if out, err := exec.Command("unshare", "-rn", "sh", "-c", probe).CombinedOutput(); err != nil {
+		t.Skipf("unshare -rn (lo up + sysctl) no disponible sin privilegios: %v %s", err, out)
 	}
 	self, err := os.Executable()
 	if err != nil {

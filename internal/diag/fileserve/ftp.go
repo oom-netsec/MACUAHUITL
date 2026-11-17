@@ -70,6 +70,19 @@ func readFTPLine(br *bufio.Reader) (string, error) {
 	return "", i18n.New("fileserve.reason.line_long", nil)
 }
 
+// probePassive abre y cierra un puerto del rango pasivo para que un rango bajo sin permiso falle al arrancar (con el
+// error de listen.Bind) y no en cada PASV con «425». Basta con que uno del rango abra.
+func probePassive(ip net.IP, lo, hi uint16) error {
+	var err error
+	for p := int(lo); p <= int(hi); p++ {
+		var ln net.Listener
+		if ln, err = net.Listen("tcp", net.JoinHostPort(ip.String(), fmt.Sprint(p))); err == nil {
+			return ln.Close()
+		}
+	}
+	return listen.Bind("fileserve", err, int(lo))
+}
+
 func serveFTP(ctx context.Context, c Config, src *source, rcv *receiver) error {
 	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", c.Addr)
 	if err != nil {
@@ -82,6 +95,11 @@ func serveFTP(ctx context.Context, c Config, src *source, rcv *receiver) error {
 	if lo == 0 && hi == 0 {
 		if p := ln.Addr().(*net.TCPAddr).Port; p > 0 && p+ftpPassive < 65536 {
 			lo, hi = uint16(p+1), uint16(p+ftpPassive)
+		}
+	}
+	if lo != 0 {
+		if err := probePassive(ln.Addr().(*net.TCPAddr).IP, lo, hi); err != nil {
+			return err
 		}
 	}
 	lim := newLimiter()

@@ -1,10 +1,10 @@
 // Package transfer es el servicio de transferencias (fase 22a): servidores temporales de
 // archivos (TFTP, FTP, SCP, SFTP y HTTP) y clientes (get y put) con la credencial de la
-// bóveda. Toda escucha es temporal, en IP explícita y puerto alto; toda salida pasa por el
+// bóveda. Toda escucha es temporal, en IP explícita y, por omisión, en el puerto estándar (tftp 69, ftp 21, scp/sftp 22, http 80); toda salida pasa por el
 // EgressGuard con Revoke al terminar; todo queda auditado.
 //
-// No hace: abrir puertos privilegiados ni ejecutar nada con privilegios (solo explica los
-// comandos) ni escribir fuera de la carpeta que el usuario eligió.
+// No hace: ejecutar nada con privilegios (si el kernel niega un puerto bajo, el error
+// explica el sysctl que corre el usuario) ni escribir fuera de la carpeta que el usuario eligió.
 package transfer
 
 import (
@@ -94,7 +94,7 @@ func bad(ctx context.Context, key string, kv ...any) error {
 	return service.Err(ctx, codes.InvalidArgument, key, i18n.A(kv...))
 }
 
-// listenAddr completa el puerto alto por omisión cuando solo llega la IP.
+// listenAddr completa el puerto estándar por omisión cuando solo llega la IP.
 func listenAddr(ctx context.Context, proto, listen string) (string, error) {
 	port, ok := defaultPort[proto]
 	if !ok {

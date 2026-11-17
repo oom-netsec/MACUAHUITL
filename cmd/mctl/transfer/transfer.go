@@ -413,6 +413,10 @@ func hint(c *cli.Env, args []string) error {
 	if err != nil {
 		return err
 	}
+	if r.Nftables == "" { // ya es el puerto estándar: no hay regla que copiar ni limpiar
+		fmt.Fprintln(c.Out, cli.T("fileserve.hint.std_port_ok", "std", r.StandardPort, "proto", fs.Arg(0)))
+		return nil
+	}
 	fmt.Fprintln(c.Out, cli.T("mctl.transfer.hint", "std", r.StandardPort, "port", port, "nft", r.Nftables, "remove", r.Remove))
 	return nil
 }

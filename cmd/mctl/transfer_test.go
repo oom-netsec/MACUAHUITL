@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -98,6 +99,11 @@ func TestTransferUsageAndHint(t *testing.T) {
 	out := must(t, "", "transfer", "hint", "scp", "2222")
 	if !strings.Contains(out, "tcp dport 22 redirect to :2222") || strings.Contains(out, "setcap") {
 		t.Fatal(out)
+	}
+	if runtime.GOOS != "windows" {
+		if out := must(t, "", "transfer", "hint", "tftp", "69"); strings.Contains(out, "dport") || !strings.Contains(out, "puerto 69 de tftp") {
+			t.Fatal(out)
+		}
 	}
 	if out := must(t, "", "transfer", "list"); !strings.Contains(out, "no hay servidores") {
 		t.Fatal(out)

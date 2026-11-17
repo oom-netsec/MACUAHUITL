@@ -136,7 +136,7 @@ Starts after 1.0.0 (owner's decision: Linux first, without bugs or vulnerabiliti
    - the memory hardening in `internal/sys` (`mlock`, no core dumps);
    - inhibiting suspend (systemd-logind → `SetThreadExecutionState` / `IOPMAssertion`);
    - serial console (`/dev/ttyUSB*` → `COMx` / `/dev/cu.*`);
-   - redirection of ports 21/69 (today `nft`): the server stays on a high port and the equivalent for each system is explained (ADR 0004);
+   - redirection of ports 21/69 (today `nft`): the server listens on the standard port and the kernel decides the bind; if it denies it, the error gives the sysctl command, and nft redirection is the alternative (ADR 0004, 2026-11-16 amendment);
    - external tools (`dumpcap`, `nmap`, `iperf3`, `tracepath`) and their equivalents;
    - core startup (systemd user service → logon task / LaunchAgent).
 3. **Installers and signing**: on Windows, an installer signed with a code-signing certificate (SmartScreen also depends on the certificate's reputation); on macOS, a `.dmg` signed with Developer ID and notarized (Gatekeeper, Apple Developer account).
