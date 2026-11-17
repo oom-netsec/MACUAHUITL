@@ -35,7 +35,7 @@ func serverID(t *testing.T, s *svc) string {
 
 // Activa (con client, name y total) y después done; "" lista todo.
 func TestListTransferSessionsActiveThenDone(t *testing.T) {
-	s, _ := newTest(t)
+	s, d := newTest(t)
 	pub := t.TempDir()
 	big := filepath.Join(pub, "big.bin")
 	f, _ := os.Create(big)
@@ -66,6 +66,7 @@ func TestListTransferSessionsActiveThenDone(t *testing.T) {
 	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
+	run.transfers(t, 1) // el cliente vuelve antes de que el servidor procese el último ACK: se espera su OnTransfer
 	for _, id := range []string{id, ""} {
 		g := listSessions(t, s, id).Sessions
 		if len(g) != 1 || g[0].State != "done" || g[0].Bytes != 4<<20 || g[0].Ended == 0 || g[0].Id != seen.Id || g[0].BytesPerSec <= 0 {
@@ -76,6 +77,11 @@ func TestListTransferSessionsActiveThenDone(t *testing.T) {
 	// Cerrado hace menos de 10 min: sigue, y ya no sale en ListServers.
 	if g := listSessions(t, s, id).Sessions; len(g) != 1 || g[0].State != "done" {
 		t.Fatalf("tras cerrar: %+v", g)
+	}
+	// Pasados 10 minutos del cierre, el servidor sale del registro.
+	d.SetClock(func() time.Time { return time.Now().Add(10*time.Minute + time.Second) })
+	if _, err := s.ListTransferSessions(context.Background(), &v1.ListTransferSessionsRequest{ServerId: id}); code(err) != codes.NotFound {
+		t.Fatalf("a los 10 min: %v", err)
 	}
 }
 
@@ -125,6 +131,7 @@ func TestListTransferSessionsRejectionsNotSessions(t *testing.T) {
 		s.Get(context.Background(), &v1.GetRequest{Url: "tftp://" + run.ready.Listening + "/falta.cfg", DestDir: t.TempDir()})
 	}
 	s.Put(context.Background(), &v1.PutRequest{Url: "tftp://" + run.ready.Listening + "/s.cfg", FromDir: pub, Name: "ok.cfg"}) // sin --write
+	run.transfers(t, 3)                                                                                                        // fail() responde antes de llamar a OnTransfer
 	r := listSessions(t, s, id)
 	if len(r.Sessions) != 0 {
 		t.Fatalf("sesiones = %+v", r.Sessions)
@@ -154,6 +161,7 @@ func TestListTransferSessionsOriginDenied(t *testing.T) {
 	os.WriteFile(filepath.Join(pub, "ok.cfg"), []byte("x"), 0o600)
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "tftp", Listen: "127.0.0.1:0", FromDir: pub, Allow: []string{"10.9.9.9"}})
 	s.Get(context.Background(), &v1.GetRequest{Url: "tftp://" + run.ready.Listening + "/ok.cfg", DestDir: t.TempDir(), TimeoutSeconds: 2})
+	run.transfers(t, 1)
 	r := listSessions(t, s, "")
 	if len(r.Sessions) != 0 || len(r.Rejections) != 1 || r.Rejections[0].Cause != "origin_denied" || r.Rejections[0].Ip != "127.0.0.1" {
 		t.Fatalf("%+v", r)
@@ -170,6 +178,7 @@ func TestListTransferSessionsNameSanitized(t *testing.T) {
 	}
 	run := startServer(t, s, &v1.StartServerRequest{Protocol: "http", Listen: "127.0.0.1:0", FromDir: pub})
 	_, gerr := s.Get(context.Background(), &v1.GetRequest{Url: "http://" + run.ready.Listening + "/a%E2%80%AEb.cfg", DestDir: t.TempDir(), Name: "local.cfg", TimeoutSeconds: 2})
+	run.transfers(t, 1)
 	for _, x := range listSessions(t, s, "").Sessions {
 		if x.Name != "a?b.cfg" {
 			t.Fatalf("name = %q", x.Name)
@@ -212,6 +221,7 @@ func TestListTransferSessionsRace(t *testing.T) {
 					return
 				default:
 					s.ListTransferSessions(context.Background(), &v1.ListTransferSessionsRequest{})
+					time.Sleep(200 * time.Microsecond) // sin esto, con un solo hilo los lectores le quitan el turno a la transferencia
 				}
 			}
 		}()
@@ -219,6 +229,7 @@ func TestListTransferSessionsRace(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		s.Get(context.Background(), &v1.GetRequest{Url: "tftp://" + run.ready.Listening + "/r.bin", DestDir: t.TempDir()})
 	}
+	run.transfers(t, 3)
 	close(stop)
 	wg.Wait()
 	if g := listSessions(t, s, "").Sessions; len(g) != 3 {

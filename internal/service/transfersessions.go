@@ -16,7 +16,8 @@ import (
 // FieldService.ServeFiles, y por eso vive aquí: archcheck no deja que un servicio importe el de otra área, y
 // service es lo único que ambos pueden importar. Hay una sola instancia, armada en core y entregada por Deps.
 //
-// Candados: reg.mu y srv.mu nunca se toman a la vez. El bucle de datos no pasa por aquí (solo atómicos de Live).
+// Candados: reg.mu y srv.mu nunca se toman a la vez, y reg.mu es hoja (no se toma nada con él tomado). Open corre con
+// el candado del servicio (svc.mu) tomado: por eso solo toma reg.mu. El bucle de datos no pasa por aquí (solo atómicos de Live).
 const (
 	sessionRing   = 100              // terminadas que se conservan por servidor
 	closedKeep    = 10 * time.Minute // vida de un servidor cerrado
@@ -101,18 +102,19 @@ func (r *TransferSessions) purge(now time.Time) {
 	}
 }
 
-// Close marca el servidor como cerrado. Llamarlo después de cerrar las sesiones que sigan activas.
-func (s *SessionServer) Close() {
-	if s == nil {
-		return
-	}
+// close marca el servidor como cerrado. Uno sin sesiones ni rechazos (p. ej. un bind fallido) no se conserva:
+// no debe ocupar uno de los cupos de cerrados.
+func (s *SessionServer) close() {
 	now := s.reg.now()
 	s.mu.Lock()
 	s.closedAt = now
+	empty := len(s.active) == 0 && len(s.recent) == 0 && len(s.rej) == 0
 	s.mu.Unlock()
 	s.reg.mu.Lock()
 	delete(s.reg.open, s)
-	s.reg.closed = append(s.reg.closed, s)
+	if !empty {
+		s.reg.closed = append(s.reg.closed, s)
+	}
 	s.reg.purge(now)
 	s.reg.mu.Unlock()
 }
@@ -154,35 +156,58 @@ func (s *SessionServer) finish(p progress, t fileserve.Transfer) (string, int64)
 	x.ended, x.bytes, x.total = now, p.Bytes(), p.Total()
 	x.state = "done"
 	if t.Result != "ok" {
-		x.state, x.err, x.reason = "failed", t.Error, t.ReasonT
+		x.state, x.err, x.reason = "failed", shown(t.Error), shownText(t.ReasonT)
 	}
 	x.p = nil
-	s.recent = append(s.recent, x)
-	if len(s.recent) > sessionRing {
-		s.recent = s.recent[len(s.recent)-sessionRing:]
-	}
+	s.addRecent(x)
 	return x.id, x.total
 }
 
-// Stranded da, para cada sesión que sigue activa, la Transfer fallida «stopped» que debe pasar por Finish:
-// el cierre de seguridad cuando fileserve.Serve ya volvió.
-func (s *SessionServer) Stranded() []fileserve.Transfer {
+// Stranded es una sesión cerrada por el cierre de seguridad, con lo necesario para auditarla.
+type Stranded struct {
+	ID    string
+	Total int64
+	T     fileserve.Transfer // fallida «stopped», con su Live
+}
+
+// Shutdown es el cierre de seguridad cuando fileserve.Serve ya volvió: pasa a failed «stopped» (de una vez, bajo el
+// candado: un OnTransfer tardío ya no las encuentra y no se auditan dos veces) toda sesión que siga activa, llama a
+// each con cada una (para auditarla) y cierra el servidor en el registro.
+func (s *SessionServer) Shutdown(each func(Stranded)) {
 	if s == nil {
-		return nil
+		return
 	}
+	for _, x := range s.stranded() {
+		each(x)
+	}
+	s.close()
+}
+
+func (s *SessionServer) stranded() []Stranded {
 	now := s.reg.now()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var out []fileserve.Transfer
+	var out []Stranded
 	for p, x := range s.active {
 		t := fileserve.Transfer{Proto: x.proto, Client: x.client, File: x.name, Dir: x.dir, Bytes: p.Bytes(), Duration: now.Sub(x.started),
 			Result: "error", Error: i18n.Msg(i18n.Es, "fileserve.reason.stopped", nil), ReasonT: i18n.Tx("fileserve.reason.stopped")}
 		if l, ok := p.(*fileserve.Live); ok {
 			t.Live = l
 		}
-		out = append(out, t)
+		delete(s.active, p)
+		x.ended, x.bytes, x.total = now, p.Bytes(), p.Total()
+		x.state, x.err, x.reason, x.p = "failed", t.Error, t.ReasonT, nil
+		s.addRecent(x)
+		out = append(out, Stranded{ID: x.id, Total: x.total, T: t})
 	}
 	return out
+}
+
+func (s *SessionServer) addRecent(x *session) {
+	s.recent = append(s.recent, x)
+	if len(s.recent) > sessionRing {
+		s.recent = s.recent[len(s.recent)-sessionRing:]
+	}
 }
 
 // Reject cuenta un rechazo en su grupo (IP sin puerto, causa).
@@ -192,14 +217,11 @@ func (s *SessionServer) Reject(t fileserve.Transfer) {
 	}
 	ip := t.Client
 	if ap, err := netip.ParseAddrPort(t.Client); err == nil {
-		ip = ap.Addr().String()
+		ip = ap.Addr().Unmap().String()
 	} else if a, err := netip.ParseAddr(t.Client); err == nil {
-		ip = a.String()
+		ip = a.Unmap().String()
 	}
-	name, _ := transfer.SanitizeName(t.File)
-	if r := []rune(name); len(r) > rejectionName {
-		name = string(r[:rejectionName])
-	}
+	name := shown(t.File)
 	now := s.reg.now()
 	k := rejKey{ip, t.Cause}
 	s.mu.Lock()
@@ -220,7 +242,7 @@ func (s *SessionServer) Reject(t fileserve.Transfer) {
 		s.rej[k] = g
 	}
 	g.count++
-	g.last, g.proto, g.name, g.err, g.reason = now, t.Proto, name, t.Error, t.ReasonT
+	g.last, g.proto, g.name, g.err, g.reason = now, t.Proto, name, shown(t.Error), shownText(t.ReasonT)
 }
 
 // List arma la respuesta para serverID ("" = todos) en el idioma loc. found=false: id desconocido o vencido.
@@ -308,6 +330,31 @@ func (s *SessionServer) view(x *session, now time.Time, loc string) *v1.Transfer
 		v.Error, v.ErrorCode = fileserve.ReasonIn(loc, fileserve.Transfer{Error: x.err, ReasonT: x.reason}), x.reason.Key
 	}
 	return v
+}
+
+// shown deja un texto que pudo venir del par listo para guardar y mostrar: saneado y de a lo más 128 runas.
+func shown(s string) string {
+	if len(s) > 4*rejectionName {
+		s = s[:4*rejectionName]
+	}
+	s, _ = transfer.SanitizeName(s)
+	if r := []rune(s); len(r) > rejectionName {
+		s = string(r[:rejectionName])
+	}
+	return s
+}
+
+// shownText es t con los argumentos saneados y cortos (copia: el mapa original no se toca).
+func shownText(t i18n.Text) i18n.Text {
+	if len(t.Args) == 0 {
+		return t
+	}
+	a := make(i18n.Args, len(t.Args))
+	for k, v := range t.Args {
+		a[k] = shown(v)
+	}
+	t.Args = a
+	return t
 }
 
 func perSec(n int64, d time.Duration) float64 {

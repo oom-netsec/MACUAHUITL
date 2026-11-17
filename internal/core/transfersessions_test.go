@@ -33,6 +33,11 @@ func TestFieldServeSessionsShareRegistry(t *testing.T) {
 	if _, err := tc.Get(ctx(t), &v1.GetRequest{Url: "tftp://" + first.Listening + "/c9300.bin", DestDir: t.TempDir()}); err != nil {
 		t.Fatal(err)
 	}
+	for ev, err := st.Recv(); ev.GetTransferJson() == ""; ev, err = st.Recv() { // el cliente vuelve antes de que el servidor cierre la sesión
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	for _, id := range []string{first.ServerId, ""} {
 		r, err := tc.ListTransferSessions(ctx(t), &v1.ListTransferSessionsRequest{ServerId: id})
 		if err != nil || len(r.Sessions) != 1 || r.Sessions[0].State != "done" || r.Sessions[0].Name != "c9300.bin" ||

@@ -199,10 +199,7 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 		k.events <- &v1.ServeFilesResponse{ServerId: serverID, Listening: a, Hint: fileserve.HintIn(i18n.Locale(st.Context()), r.Protocol, a, r.Files)}
 	}
 	err := fileserve.Serve(ctx, cfg)
-	for _, t := range k.reg.Stranded() { // cierre de seguridad: sesiones que siguen activas
-		k.onTransfer(t)
-	}
-	k.reg.Close()
+	k.reg.Shutdown(func(x service.Stranded) { k.finished(x.T, x.ID, x.Total) }) // cierre de seguridad
 	n, rejected := k.stop()
 	s.d.Audit("field.serve.done", addr, fmt.Sprintf("transfers=%d rejected=%d", n, rejected))
 	if err != nil {
@@ -249,9 +246,20 @@ func (k *serveSink) onTransfer(t fileserve.Transfer) {
 		}
 		return
 	}
+	id, total := k.reg.Finish(t)
+	k.finished(t, id, total)
+}
+
+// finished cuenta, audita y reenvía una transferencia no rechazada; id y total son los de su sesión ("" si no tuvo).
+func (k *serveSink) finished(t fileserve.Transfer, id string, total int64) {
+	shown := t
+	shown.Error = fileserve.ReasonIn(k.loc, t)
+	shown.DirCode = service.DirEN(t.Dir)
+	body, _ := json.Marshal(shown)
+	ev := &v1.ServeFilesResponse{TransferJson: string(body)}
 	k.n.Add(1)
 	session := ""
-	if id, total := k.reg.Finish(t); id != "" {
+	if id != "" {
 		session = fmt.Sprintf(" session=%s total=%d", id, total)
 	}
 	k.audit("field.serve.transfer", t.Client, fmt.Sprintf("proto=%s file=%q bytes=%d duration=%s result=%s error=%q%s", t.Proto, t.File, t.Bytes, t.Duration.Round(1e6), t.Result, fileserve.ReasonIn(i18n.En, t), session))

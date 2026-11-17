@@ -234,10 +234,7 @@ func (s *svc) ListServers(context.Context, *v1.ListServersRequest) (*v1.ListServ
 
 // closeSessions es el cierre de seguridad: pasa a failed (y audita) lo que siga activo y cierra el registro del servidor.
 func (s *svc) closeSessions(k *sink, srv *server, loc string) {
-	for _, t := range srv.reg.Stranded() {
-		k.onTransfer(s.d.Audit, srv, t, loc)
-	}
-	srv.reg.Close()
+	srv.reg.Shutdown(func(x service.Stranded) { k.finished(s.d.Audit, srv, x.T, loc, x.ID, x.Total) })
 }
 
 // ListTransferSessions da las sesiones y los rechazos de un servidor ("" = todos, Campo incluido).
@@ -303,10 +300,21 @@ func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.T
 		}
 		return
 	}
+	id, total := srv.reg.Finish(t)
+	k.finished(audit, srv, t, loc, id, total)
+}
+
+// finished cuenta, audita y reenvía una transferencia no rechazada; id y total son los de su sesión ("" si no tuvo).
+func (k *sink) finished(audit func(a, t, d string), srv *server, t fileserve.Transfer, loc, id string, total int64) {
+	shown := t
+	shown.Error = fileserve.ReasonIn(loc, t)
+	shown.DirCode = service.DirEN(t.Dir)
+	b, _ := json.Marshal(shown)
+	ev := &v1.StartServerResponse{Event: &v1.StartServerResponse_TransferJson{TransferJson: string(b)}}
 	k.n.Add(1)
 	srv.transfers.Add(1)
 	session := ""
-	if id, total := srv.reg.Finish(t); id != "" {
+	if id != "" {
 		session = fmt.Sprintf(" session=%s total=%d", id, total)
 	}
 	audit("transfer.serve.transfer", t.Client, fmt.Sprintf("server=%s proto=%s direction=%s file=%q path=%q bytes=%d sha256=%s duration=%s result=%s error=%q%s",

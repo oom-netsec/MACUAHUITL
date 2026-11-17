@@ -79,7 +79,8 @@ func TestSessionsOrderActiveFirstOldestFirst(t *testing.T) {
 func TestSessionsClosedServerKeep10MinAndMax8(t *testing.T) {
 	r, c := newSess()
 	s := r.Open("S0")
-	s.Close()
+	s.Reject(rej("10.0.0.9:1", "not_found", "x"))
+	s.close()
 	c.add(10*time.Minute - time.Second)
 	if _, _, ok := r.List("S0", "es"); !ok {
 		t.Fatal("a los 9:59 debe seguir")
@@ -89,7 +90,9 @@ func TestSessionsClosedServerKeep10MinAndMax8(t *testing.T) {
 		t.Fatal("a los 10:00 debe haber salido")
 	}
 	for i := 0; i < 10; i++ {
-		r.Open(fmt.Sprintf("C%d", i)).Close()
+		cs := r.Open(fmt.Sprintf("C%d", i))
+		cs.Reject(rej("10.0.0.9:1", "not_found", "x"))
+		cs.close()
 		c.add(time.Second)
 	}
 	for i := 0; i < 10; i++ {
@@ -220,21 +223,74 @@ func TestSessionsRejectionNameSanitizedAndCut(t *testing.T) {
 	}
 }
 
-func TestSessionsStrandedClosesAsStopped(t *testing.T) {
+func TestSessionsShutdownClosesAsStoppedOnce(t *testing.T) {
 	r, c := newSess()
 	s := r.Open("S1")
 	l := &fileserve.Live{Proto: "tftp", Client: "10.0.0.5:1", File: "r1.cfg", Dir: "lectura"}
 	s.Start(l)
 	c.add(time.Second)
-	st := s.Stranded()
-	if len(st) != 1 || st[0].Live != l || st[0].Result != "error" || st[0].ReasonT.Key != "fileserve.reason.stopped" {
-		t.Fatalf("%+v", st)
+	var got []Stranded
+	s.Shutdown(func(x Stranded) { got = append(got, x) })
+	if len(got) != 1 || got[0].ID == "" || got[0].T.Live != l || got[0].T.Result != "error" || got[0].T.ReasonT.Key != "fileserve.reason.stopped" {
+		t.Fatalf("%+v", got)
 	}
-	if id, _ := s.Finish(st[0]); id == "" {
-		t.Fatal("sin id")
+	// Un OnTransfer tardío de la misma Live ya no encuentra la sesión: no se cierra ni se audita dos veces.
+	if id, _ := s.Finish(got[0].T); id != "" {
+		t.Fatalf("Finish dio id %q", id)
 	}
 	g, _, _ := r.List("S1", "en")
-	if g[0].State != "failed" || g[0].Error != "server stopped" || len(s.Stranded()) != 0 {
-		t.Fatalf("%+v", g[0])
+	if len(g) != 1 || g[0].Id != got[0].ID || g[0].State != "failed" || g[0].Error != "server stopped" || g[0].Ended == 0 {
+		t.Fatalf("%+v", g)
+	}
+}
+
+// Un servidor sin sesiones ni rechazos (un bind fallido) no ocupa uno de los 8 cupos de cerrados.
+func TestSessionsEmptyServerNotKept(t *testing.T) {
+	r, c := newSess()
+	keep := r.Open("K")
+	keep.Reject(rej("10.0.0.9:1", "not_found", "x"))
+	keep.close()
+	for i := 0; i < 20; i++ {
+		c.add(time.Second)
+		r.Open(fmt.Sprintf("vacio%d", i)).Shutdown(func(Stranded) {})
+	}
+	if _, _, ok := r.List("K", "es"); !ok {
+		t.Fatal("el servidor con rechazos debía quedarse")
+	}
+	if _, _, ok := r.List("vacio19", "es"); ok {
+		t.Fatal("un servidor vacío no se conserva")
+	}
+}
+
+// Lo que mandó el par (mensaje de ERROR, tipo de canal) no llega crudo ni largo a la lista.
+func TestSessionsPeerTextSanitizedAndCut(t *testing.T) {
+	r, _ := newSess()
+	s := r.Open("S1")
+	raw := "x\x1b]0;pwn\a\u202e" + strings.Repeat("A", 60000)
+	bad := fileserve.Transfer{Error: "el equipo canceló: " + raw, ReasonT: i18n.Tx("fileserve.reason.client_abort_msg", "msg", raw), Result: "error"}
+	p := &fakeProg{}
+	s.start(meta, p)
+	s.finish(p, bad)
+	rb := bad
+	rb.Rejected, rb.Cause, rb.Client, rb.Proto = true, "other", "10.0.0.9:1", "tftp"
+	s.Reject(rb)
+	for _, loc := range []string{"es", "en"} {
+		g, rs, _ := r.List("S1", loc)
+		for _, v := range []string{g[0].Error, rs[0].Reason} {
+			if strings.ContainsAny(v, "\x1b\a\u202e") || len([]rune(v)) > 160 {
+				t.Fatalf("%s: sin sanear o largo (%d): %q", loc, len([]rune(v)), v)
+			}
+		}
+	}
+}
+
+func TestSessionsRejectionIPv4MappedGroupsWithIPv4(t *testing.T) {
+	r, _ := newSess()
+	s := r.Open("S1")
+	s.Reject(rej("10.0.0.9:1", "not_found", "a"))
+	s.Reject(rej("[::ffff:10.0.0.9]:2", "not_found", "a"))
+	_, rs, _ := r.List("S1", "es")
+	if len(rs) != 1 || rs[0].Count != 2 || rs[0].Ip != "10.0.0.9" {
+		t.Fatalf("%+v", rs)
 	}
 }
