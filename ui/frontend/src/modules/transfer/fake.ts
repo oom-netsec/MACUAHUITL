@@ -28,7 +28,7 @@ export function fakeTransfer() {
     transferGet: vi.fn(async () => okResult),
     transferPut: vi.fn(async () => okResult),
     transferHint: vi.fn(async (p: string, ip: string, port: number) => ({
-      standardPort: 69, nftables: `nft add rule ip macuahuitl_${p}_${port} pre ip daddr ${ip} udp dport 69 redirect to :${port}`, setcap: "", remove: `sudo nft delete table ip macuahuitl_${p}_${port}`,
+      standardPort: 69, nftables: `nft add rule ip macuahuitl_${p}_${port} pre ip daddr ${ip} udp dport 69 redirect to :${port}`, remove: `sudo nft delete table ip macuahuitl_${p}_${port}`,
     })),
     onTransfer: (cb: (e: TransferEvent) => void) => (evs.add(cb), () => evs.delete(cb)),
     emitTransfer: (e: TransferEvent) => evs.forEach((cb) => cb(e)),

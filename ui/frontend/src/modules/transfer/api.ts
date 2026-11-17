@@ -1,3 +1,4 @@
+import type { ErrInfo } from "../../lib/coreError";
 // Contrato del módulo con el puente (ui/bridge/transfer.go) y su implementación de Wails.
 import { Events } from "@wailsio/runtime";
 
@@ -18,7 +19,7 @@ export interface TransferLine {
   Proto: string; Client: string; File: string; Bytes: number; Duration: number; Result: string;
   Dir?: string; dirCode?: "read" | "write"; Path?: string; SHA256?: string; Error?: string; Rejected?: boolean;
 }
-export interface TransferEvent { runId: string; ready?: TransferReady; line?: TransferLine; done?: boolean; error?: string; cleanup?: string }
+export interface TransferEvent { runId: string; ready?: TransferReady; line?: TransferLine; done?: boolean; error?: string; errorInfo?: ErrInfo; cleanup?: string }
 export interface TransferServer { serverId: string; protocol: string; listening: string; started: number; write: boolean; recvDir: string; fromDir: string; transfers: number; rejected: number }
 export interface TransferResult { path: string; bytes: number; md5: string; sha256: string; verified: string; seconds: number; report: string }
 export interface TransferGetParams {
@@ -26,7 +27,7 @@ export interface TransferGetParams {
   acceptedHostKeys: string[]; name?: string; insecure?: boolean; legacySsh?: boolean; maxBytes?: number; seconds?: number;
 }
 export interface TransferPutParams { url: string; fromDir: string; name: string; credentialId: string; acceptedHostKeys: string[]; legacySsh?: boolean; maxBytes?: number; seconds?: number }
-export interface TransferHintInfo { standardPort: number; nftables: string; setcap: string; remove: string }
+export interface TransferHintInfo { standardPort: number; nftables: string; remove: string }
 
 
 // ---- Explorador remoto, avance y descarga múltiple (Fase 19) ----
