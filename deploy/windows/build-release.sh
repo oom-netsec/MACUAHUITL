@@ -4,6 +4,7 @@
 #   deploy/windows/build-release.sh vX.Y.Z <carpeta de salida>
 # Necesita ui/frontend/dist ya armado (go:embed de la app), makensis (paquete nsis) y zip.
 set -euo pipefail
+export TZ=UTC # zip guarda la hora local: en UTC el zip da los mismos bytes en cualquier huso
 tag=${1:?uso: $0 vX.Y.Z OUT}
 out=$(realpath -m "${2:?uso: $0 vX.Y.Z OUT}")
 cd "$(dirname "$0")/../.."
@@ -24,12 +25,15 @@ build() {
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 # Los tres son Go puro: dos compilaciones deben dar los mismos bytes, como macuahuitld y mctl en Linux.
-diff <(build "$tmp/a") <(build "$tmp/b")
+build "$tmp/a" >"$tmp/a.sum" # una tras otra: si go build falla, set -e corta aquí y no en un cp confuso
+build "$tmp/b" >"$tmp/b.sum"
+diff "$tmp/a.sum" "$tmp/b.sum"
 bin=$tmp/a
 
 mkdir -p "$out"
 zipdir=$tmp/macuahuitl_${v}_windows_amd64
 mkdir "$zipdir"
+umask 022 # permisos del zip que no dependen del umask de quien lo arma
 cp "$bin"/{macuahuitl,macuahuitld,mctl}.exe "$zipdir/"
 cp LICENSE NOTICE THIRD_PARTY_LICENSES TRADEMARK.md "$zipdir/"
 # Fecha del commit y sin atributos extra: el zip sale igual en cada armado del mismo commit.
