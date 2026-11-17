@@ -248,3 +248,26 @@ jobs:
       - name: windows-e2e (usuarios estándar, pipe, bóveda, Patrol, instalador)
         shell: pwsh
         run: tools/ci/windows-e2e.ps1 -BinDir bin-win -Installer dist-win/MACUAHUITL-setup.exe -Transcripts "$PWD/test/transcripts/ios-xe" -Version 0.0.0
+
+  # Ensayo del paso «Windows (beta)» de release.yml, igual que en el runner del release (ubuntu, nsis, zip): un cambio que
+  # rompa build-release.sh se ve en el PR y no al subir el tag (pasó con la v1.2.0).
+  release-windows-dryrun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: UI (dist para el go:embed de la app)
+        working-directory: ui/frontend
+        run: npm ci && npm run build
+      - name: herramientas del release
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nsis zip
+      - name: build-release.sh como en release.yml
+        run: SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) deploy/windows/build-release.sh v0.0.0 "$RUNNER_TEMP/dist" && ls -l "$RUNNER_TEMP/dist"
