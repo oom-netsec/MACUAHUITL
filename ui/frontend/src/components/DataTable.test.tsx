@@ -104,3 +104,11 @@ test("sin búsqueda ni filtros no se normalizan todas las filas", () => {
   render(<DataTable label="Equipos" columns={[{ id: "name", header: "Equipo", value }]} rows={muchas} rowKey={(d) => d.name} />);
   expect(value.mock.calls.length).toBeLessThan(500); // solo las filas dibujadas, no las 2000
 });
+
+test("el CSV exportado neutraliza fórmulas en celdas y encabezados (los nombres vienen del equipo)", async () => {
+  const core = fakeCore();
+  const hostile: Column<Dev>[] = [{ id: "name", header: "@Equipo", value: (d) => d.name }, { id: "ip", header: "IP", value: (d) => d.ip }];
+  render(<CoreContext.Provider value={core}><DataTable label="Equipos" columns={hostile} rows={[{ name: "=cmd|' /C calc'!A0", ip: "-2+3", state: "", cpu: 0 }]} rowKey={(d) => d.name} exportName="equipos" /></CoreContext.Provider>);
+  await userEvent.click(screen.getByRole("button", { name: "Exportar CSV" }));
+  expect(core.saveFile).toHaveBeenCalledWith("equipos.csv", "'@Equipo,IP\n'=cmd|' /C calc'!A0,'-2+3", "utf8");
+});
