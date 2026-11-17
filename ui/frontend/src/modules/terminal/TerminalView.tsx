@@ -21,8 +21,11 @@ import type { FindReq } from "./XTermPane";
 import { xtermTheme } from "./termTheme";
 import "./terminal.css";
 import { useVaultVersion } from "../../lib/vaultSignal";
+import { hostsChanged } from "../inventory/signal";
+import { passwordCreds } from "../vault/api";
 import { HostPicker, targetOf } from "../inventory/HostPicker";
-import { hostKeyFromError, parseFingerprints } from "../../lib/hostkeys";
+import { SavedHosts } from "./SavedHosts";
+import { hostKeyFromError, keygenCommands, parseFingerprints } from "../../lib/hostkeys";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import type { ScriptItem } from "../scripts/api";
 import { useScriptsVersion } from "../scripts/signal";
@@ -37,7 +40,7 @@ const XTermPane = lazy(() => import("./XTermPane"));
 // La salida viva se resalta con las reglas de la app (lib/termAnsi): solo líneas completas y sin ESC; el texto limpio (búsqueda, descarga y registro) no lleva códigos.
 
 interface Tab {
-  key: number; label: string; device: string; cred: string; runId: string; status: { k: Key; v?: Record<string, string> }; err: string; errInfo?: ErrInfo; done: boolean;
+  key: number; label: string; device: string; cred: string; hostId?: string; startup?: string; runId: string; status: { k: Key; v?: Record<string, string> }; err: string; errInfo?: ErrInfo; done: boolean;
   logPath: string; logAt: Date | null; logErr: string; // registro opcional en el archivo que eligió la persona
 }
 interface LogState { path: string; last: string; chain: Promise<void> }
@@ -102,13 +105,14 @@ export function TerminalView({ core }: { core: CoreAPI }) {
     core.listPinnedScripts().then((l) => { if (live) setPins(l.filter((x) => scriptText(x.commands))); }, () => { if (live) setPins([]); });
     return () => { live = false; };
   }, [core, sv]);
-  useEffect(() => { core.listCredentials().then((l) => { setCreds(l); setCred((c) => (l.some((x) => x.id === c) ? c : l[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
+  useEffect(() => { core.listCredentials().then((l) => { setCreds(l); const pw = passwordCreds(l); setCred((c) => (pw.some((x) => x.id === c) ? c : pw[0]?.id ?? "")); }).catch(() => setCreds([])); }, [core, vv]); // bóveda cerrada: sin lista
 
   const patch = (runId: string, f: (t: Tab) => Tab) => setTabs((ts) => ts.map((t) => (t.runId === runId ? f(t) : t)));
   const apply = (e: TerminalEvent) => {
     if (e.done) {
       writers.current.get(e.runId)?.flush();
       saveLog(e.runId);
+      if (e.errorInfo?.reason === "terminal.err.startup_changed") hostsChanged(); // volver a leer los hosts: reintentar usa la orden nueva
       patch(e.runId, (t) => ({ ...t, done: true, status: { k: "ssh.closed" }, err: e.error ? errorText(new Error(e.error)) : t.err, errInfo: e.error ? errInfo({ cause: e.errorInfo }) : t.errInfo }));
     } else if (e.opened) {
       patch(e.runId, (t) => ({ ...t, status: { k: "ssh.connected", v: { port: e.opened ?? "", path: e.recording ?? "" } } }));
@@ -169,16 +173,18 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   // Reintentar tras aceptar una huella usa el equipo y la credencial de la pestaña que falló, no lo que hay hoy en los campos.
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  const open = async (accepted = accept, dev = device, credId = cred) => {
+  // hostId: conexión de un clic a un host guardado; el núcleo pone dirección, puerto, credencial y orden de inicio (la UI no los manda).
+  const open = async (accepted = accept, dev = device, credId = cred, hostId?: string, startup = "") => {
     // Dos sesiones vivas en el mismo archivo se pisarían cada 30 s.
     if (logPick && tabsRef.current.some((x) => !x.done && x.logPath === logPick)) { setErr(t("ssh.logInUse")); return; }
     setErr(""); setBusy(true);
     try {
-      const t = parseTarget(parseTargets(dev)[0] ?? "");
       const label = dev.trim();
-      const runId = await core.terminalOpen({ name: label, address: t.address, port: t.port, credentialId: credId, accept: parseFingerprints(accepted), rows: size.current.rows, cols: size.current.cols });
+      const tg = parseTarget(parseTargets(dev)[0] ?? "");
+      const base = { name: label, accept: parseFingerprints(accepted), rows: size.current.rows, cols: size.current.cols };
+      const runId = await core.terminalOpen(hostId ? { ...base, hostId, expectedStartupCommand: startup } : { ...base, address: tg.address, port: tg.port, credentialId: credId });
       if (!alive.current) { core.terminalClose(runId).catch(() => {}); return; } // la vista se fue con la apertura en vuelo: no queda huérfana
-      const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
+      const tab: Tab = { key: ++keySeq.current, label, device: dev, cred: credId, hostId, startup, runId, status: { k: "ssh.connecting" }, err: "", done: false, logPath: logPick, logAt: null, logErr: "" };
       if (logPick) { logs.current.set(runId, { path: logPick, last: "", chain: Promise.resolve() }); setLogPick(""); } // el archivo es de esta sesión, no de las siguientes
       // La pestaña se registra ya (no al renderizar) para que ningún evento se quede sin dueño.
       tabsRef.current = [...tabsRef.current, tab];
@@ -275,16 +281,27 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   // Estado de una sesión: conexión, registro en archivo y avisos. Solo, arriba; dividida, en la cabecera de cada panel.
   const head = (tab: Tab) => {
     const hk = tab.err ? hostKeyFromError(tab.err, tab.errInfo) : null;
+    const kg = hk?.keyType ? keygenCommands(hk.keyType) : null;
+    const changedStartup = tab.errInfo?.reason === "terminal.err.startup_changed"; // el host se editó (o un import cambió la orden) tras mostrarla
     return (
       <>
         {tab.logErr && <Notice kind="error">{t("ssh.logError", { path: tab.logPath, error: tab.logErr })}</Notice>}
         {tab.err && <Notice kind="error">{tab.err}</Notice>}
+        {changedStartup && <Notice kind="warn">{t("ssh.startupChanged")}</Notice>}
         {hk && (
           <Notice kind="warn">
             <p>{t(hk.changed ? "transfer.hostKey.changed" : "transfer.hostKey.new")}</p>
+            <p><span className="mono">{hk.host ?? tab.device}</span>{hk.keyType && <> · <span className="mono">{hk.keyType}</span></>}</p>
             <p><code>{hk.fp}</code></p>
+            {kg && (
+              <>
+                <p>{t("ssh.hostKey.compare")}</p>
+                <p>{t("ssh.hostKey.onLinux")} <code className="mono">{kg.linux}</code></p>
+                <p>{t("ssh.hostKey.onWin")} <code className="mono">{kg.windows}</code></p>
+              </>
+            )}
             {/* Aceptar es explícito: agrega la huella al campo del formulario y abre otra pestaña con ella. */}
-            <button type="button" disabled={busy} onClick={() => { const next = `${accept} ${hk.fp}`.trim(); setAccept(next); void open(next, tab.device, tab.cred); }}>{t("transfer.hostKey.accept")}</button>
+            <button type="button" disabled={busy} onClick={() => { const next = `${accept} ${hk.fp}`.trim(); setAccept(next); void open(next, tab.device, tab.cred, tab.hostId, tab.startup); }}>{t("transfer.hostKey.accept")}</button>
           </Notice>
         )}
       </>
@@ -302,9 +319,10 @@ export function TerminalView({ core }: { core: CoreAPI }) {
   );
   const form = (
     <>
-      <HostPicker core={core} onPick={(h) => { const ok = creds.some((c) => c.id === h.credentialId); setDevice(targetOf(h)); setCred(ok ? h.credentialId : ""); setNoCred(!ok); }} />
+      <SavedHosts core={core} creds={creds} busy={busy} onConnect={(h) => { void open("", h.name, "", h.id, h.startCommand); }} />
+      <HostPicker core={core} onPick={(h) => { if (creds.find((c) => c.id === h.credentialId)?.kind === "key") { setNoCred(false); void open("", h.name, "", h.id, h.startCommand); return; } const ok = passwordCreds(creds).some((c) => c.id === h.credentialId); setDevice(targetOf(h)); setCred(ok ? h.credentialId : ""); setNoCred(!ok); }} />
       <div className="field-row">
-        <Select label={t("ssh.cred")} value={cred} onChange={(v) => { setCred(v); setNoCred(false); }} w="md" placeholder={noCred ? t("ssh.credPick") : undefined} hint={noCred ? t("hosts.pick.noCred") : undefined} options={creds.map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])} />
+        <Select label={t("ssh.cred")} value={cred} onChange={(v) => { setCred(v); setNoCred(false); }} w="md" placeholder={noCred ? t("ssh.credPick") : undefined} hint={noCred ? t("hosts.pick.noCred") : undefined} options={passwordCreds(creds).map((c) => [c.id, `${c.label} (${c.username})`] as [string, string])} />
         <Field label={t("ssh.device")} value={device} onChange={setDevice} w="lg" mono />
         <Field label={t("fps.accepted.short")} hint={t("fps.accepted.hint")} value={accept} onChange={setAccept} w="md" mono />
       </div>

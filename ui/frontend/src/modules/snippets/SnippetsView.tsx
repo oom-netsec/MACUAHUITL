@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { passwordCreds } from "../vault/api";
 import type { CoreAPI, Credential } from "../../lib/core";
 import { AssistBanner, AssistExecution, targetOf } from "../../components/AssistRun";
 import { Check, Field, Notice, Select, errorText } from "../../components/Field";
@@ -43,7 +44,7 @@ export function SnippetsView({ core }: { core: CoreAPI }) {
   const vv = useVaultVersion(); // la bóveda cambió: volver a listar credenciales
   useEffect(() => {
     // Con la bóveda cerrada la lista se vacía y el error queda a la vista; al reabrirla se limpia.
-    core.listCredentials().then((c) => { setCreds(c); setErr(""); setCredId((cur) => (c.some((x) => x.id === cur) ? cur : c[0]?.id ?? "")); }).catch((e) => { setCreds([]); setErr(errorText(e)); });
+    core.listCredentials().then(passwordCreds).then((c) => { setCreds(c); setErr(""); setCredId((cur) => (c.some((x) => x.id === cur) ? cur : c[0]?.id ?? "")); }).catch((e) => { setCreds([]); setErr(errorText(e)); });
   }, [core, vv]);
 
   useEffect(() => {

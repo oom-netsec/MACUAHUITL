@@ -26,8 +26,8 @@ describe("libreta de hosts", () => {
     const api = inventoryWails(call as never);
     await api.listHosts();
     await api.listHosts({ query: "co", folder: "Lab", tag: "core" });
-    await api.saveHost({ name: "N", address: "10.0.0.1", port: 0, platform: "", folder: "", tags: [], credentialId: "", notes: "" });
-    await api.saveHost({ id: "x", name: "N", address: "10.0.0.1", port: 22, platform: "ios", folder: "", tags: ["a"], credentialId: "", notes: "" });
+    await api.saveHost({ name: "N", address: "10.0.0.1", port: 0, platform: "", folder: "", tags: [], credentialId: "", notes: "", startCommand: "" });
+    await api.saveHost({ id: "x", name: "N", address: "10.0.0.1", port: 22, platform: "ios", folder: "", tags: ["a"], credentialId: "", notes: "", startCommand: "" });
     await api.deleteHost("x");
     await api.exportHosts(["a"], "/tmp/h.json", true);
     await api.exportHosts([], "/tmp/h.txt", true, "csv");
@@ -48,12 +48,37 @@ describe("libreta de hosts", () => {
       ["ApplyHostsImport", "tok", [{ key: "10.0.0.1:22", action: "omitir" }]], ["HostsImportTemplate", "csv"], ["HostsImportFormat"],
     ]);
   });
+  it("las carpetas llaman al puente", async () => {
+    const call = vi.fn(async () => ({}));
+    const api = inventoryWails(call as never);
+    await api.listFolders(); await api.createFolder("A"); await api.renameFolder("A", "B"); await api.deleteFolder("B", true); await api.moveHosts(["x"], "Lab");
+    expect(call.mock.calls).toEqual([["ListFolders"], ["CreateFolder", "A"], ["RenameFolder", "A", "B"], ["DeleteFolder", "B", true], ["MoveHosts", ["x"], "Lab"]]);
+  });
+  it("el doble de carpetas: incluye vacías, valida, renombra moviendo hosts y borra sin borrar hosts", async () => {
+    const f = fakeInventory();
+    expect(await f.listFolders()).toEqual([{ name: "Lab", count: 2 }, { name: "Oficina", count: 1 }]);
+    await f.createFolder("Vacia");
+    expect(await f.listFolders()).toContainEqual({ name: "Vacia", count: 0 });
+    await expect(f.createFolder("lab")).rejects.toThrow("carpeta");
+    await expect(f.createFolder("a/b")).rejects.toThrow("carpeta");
+    await expect(f.renameFolder("Vacia", "OFICINA")).rejects.toThrow("carpeta");
+    await f.renameFolder("Lab", "Lab2");
+    expect((await f.listHosts({ folder: "Lab2" })).length).toBe(2);
+    const ids = (await f.listHosts({ folder: "Lab2" })).map((h) => h.id);
+    await f.moveHosts(ids, "Vacia");
+    expect((await f.listFolders()).find((x) => x.name === "Vacia")?.count).toBe(2);
+    await f.deleteFolder("Vacia", true);
+    expect((await f.listHosts()).length).toBe(3);
+    expect((await f.listHosts()).filter((h) => h.folder === "").length).toBe(2);
+    await f.moveHosts(ids, "");
+    await expect(f.moveHosts(ids, "NoExiste")).rejects.toThrow("carpeta");
+  });
   it("el doble de hosts valida, no repite y filtra por carpeta y etiqueta", async () => {
     const f = fakeInventory();
     expect((await f.listHosts({ folder: "lab" })).map((h) => h.name)).toEqual(["LAB-AP", "LAB-CORE"]);
     expect((await f.listHosts({ tag: "core" })).map((h) => h.name)).toEqual(["LAB-CORE"]);
     expect((await f.listHosts({ query: "oficina" })).map((h) => h.name)).toEqual(["OFI-SW"]);
-    const nuevo = { name: "NUEVO", address: "10.1.1.1", port: 0, platform: "ios" as const, folder: "", tags: [], credentialId: "", notes: "" };
+    const nuevo = { name: "NUEVO", address: "10.1.1.1", port: 0, platform: "ios" as const, folder: "", tags: [], credentialId: "", notes: "", startCommand: "" };
     const { id } = await f.saveHost(nuevo);
     expect((await f.listHosts()).find((h) => h.id === id)?.port).toBe(22);
     await expect(f.saveHost({ ...nuevo, name: "nuevo" })).rejects.toThrow("ya hay un host");
@@ -71,12 +96,12 @@ describe("libreta de hosts", () => {
     await expect(f.applyHostsImport(p.token, [])).rejects.toThrow("falta la decisión");
     await expect(f.applyHostsImport(p.token, [{ key: "10.9.0.1:22", action: "renombrar" }, { key: "ap2.lab:22", action: "omitir" }])).rejects.toThrow("solo se puede reemplazar");
     expect(p.errors.map((e) => e.line)).toEqual([14, 15]);
-    expect(await f.applyHostsImport(p.token, [{ key: "10.9.0.1:22", action: "reemplazar" }, { key: "ap2.lab:22", action: "renombrar" }])).toEqual({ created: 1, replaced: 1, renamed: 1, skipped: 3, invalid: 2 });
+    expect(await f.applyHostsImport(p.token, [{ key: "10.9.0.1:22", action: "reemplazar" }, { key: "ap2.lab:22", action: "renombrar" }])).toEqual({ created: 1, replaced: 1, renamed: 1, skipped: 3, invalid: 2, foldersCreated: 0 });
   });
   it("la plantilla y la descripción del doble salen de la misma tabla de campos", async () => {
     const f = fakeInventory();
     const fmt = await f.hostsImportFormat();
-    expect(fmt.fields.map((x) => x.name)).toEqual(["name", "address", "port", "platform", "folder", "tags", "credential_label", "notes"]);
+    expect(fmt.fields.map((x) => x.name)).toEqual(["name", "address", "port", "platform", "folder", "tags", "credential_label", "notes", "startup_command"]);
     expect(fmt.fields.filter((x) => x.required).map((x) => x.name)).toEqual(["name", "address"]);
     const csv = await f.hostsImportTemplate("csv");
     expect(csv.content.startsWith("\ufeff")).toBe(true); // el CSV lleva BOM para Excel

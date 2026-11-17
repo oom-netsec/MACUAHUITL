@@ -70,6 +70,7 @@ type HostDTO struct {
 	CredentialID    string   `json:"credentialId"`
 	CredentialLabel string   `json:"credentialLabel"`
 	Notes           string   `json:"notes"`
+	StartupCommand  string   `json:"startCommand"` // solo linux y windows; vacío = el shell de siempre
 }
 
 type SaveHostResultDTO struct {
@@ -89,6 +90,7 @@ type HostImportItemDTO struct {
 	Reason            string  `json:"reason"` // solo en conflicto: direccion (reemplazar u omitir) | nombre (también renombrar)
 	ConflictsWith     string  `json:"conflictsWith"`
 	CredentialMissing bool    `json:"credentialMissing"` // trae etiqueta pero no hay credencial con ella: quedaría sin credencial
+	HasStartupCommand bool    `json:"hasStartCommand"`   // el host del archivo trae orden de inicio (en host.startCommand)
 }
 
 // HostImportErrorDTO es una fila (CSV) o entrada (JSON) inválida; no bloquea las demás.
@@ -108,11 +110,12 @@ type HostsImportPreviewDTO struct {
 }
 
 type HostsImportResultDTO struct {
-	Created  int `json:"created"`
-	Replaced int `json:"replaced"`
-	Renamed  int `json:"renamed"`
-	Skipped  int `json:"skipped"` // incluye los igual y las filas inválidas
-	Invalid  int `json:"invalid"` // de skipped, las filas inválidas de la vista previa
+	Created        int `json:"created"`
+	Replaced       int `json:"replaced"`
+	Renamed        int `json:"renamed"`
+	Skipped        int `json:"skipped"`        // incluye los igual y las filas inválidas
+	Invalid        int `json:"invalid"`        // de skipped, las filas inválidas de la vista previa
+	FoldersCreated int `json:"foldersCreated"` // carpetas del archivo que no existían
 }
 
 type HostsTemplateDTO struct {
@@ -142,7 +145,7 @@ type HostDecisionDTO struct {
 
 func hostDTO(d *v1.Device) HostDTO {
 	return HostDTO{ID: d.GetId(), Name: d.GetName(), Address: d.GetTarget().GetAddress(), Port: int(d.GetProfile().GetPort()), Platform: d.GetPlatform(), Folder: d.GetFolder(),
-		Tags: strs(d.GetTags()), CredentialID: d.GetCredentialId(), CredentialLabel: d.GetCredentialLabel(), Notes: d.GetNotes()}
+		Tags: strs(d.GetTags()), CredentialID: d.GetCredentialId(), CredentialLabel: d.GetCredentialLabel(), Notes: d.GetNotes(), StartupCommand: d.GetStartupCommand()}
 }
 
 // ListHosts devuelve solo los hosts de la libreta con SUS valores (sin fusionar con lo descubierto: es lo que se edita),
@@ -162,7 +165,7 @@ func (b *Bridge) ListHosts(query, folder, tag string) ([]HostDTO, error) {
 func (b *Bridge) SaveHost(h HostDTO) (SaveHostResultDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) (SaveHostResultDTO, error) {
 		r, err := inventoryClient(c).PutDevice(ctx, &v1.PutDeviceRequest{Device: &v1.Device{Id: h.ID, Name: h.Name, Target: &v1.Target{Address: h.Address},
-			Profile: &v1.DeviceProfile{Port: uint32(h.Port)}, Platform: h.Platform, Folder: h.Folder, Tags: h.Tags, CredentialId: h.CredentialID, Notes: h.Notes}})
+			Profile: &v1.DeviceProfile{Port: uint32(h.Port)}, Platform: h.Platform, Folder: h.Folder, Tags: h.Tags, CredentialId: h.CredentialID, Notes: h.Notes, StartupCommand: h.StartupCommand}})
 		return SaveHostResultDTO{ID: r.GetId(), Warnings: strs(r.GetWarnings())}, err
 	})
 }
@@ -196,7 +199,7 @@ func (b *Bridge) PreviewHostsImport(path, format string) (HostsImportPreviewDTO,
 		}
 		for _, it := range r.GetItems() {
 			out.Items = append(out.Items, HostImportItemDTO{Host: hostDTO(it.GetHost()), Key: it.GetKey(), State: it.GetState(), Reason: it.GetReason(),
-				ConflictsWith: it.GetConflictsWith(), CredentialMissing: it.GetCredentialMissing()})
+				ConflictsWith: it.GetConflictsWith(), CredentialMissing: it.GetCredentialMissing(), HasStartupCommand: it.GetHasStartupCommand()})
 		}
 		return out, err
 	})
@@ -210,7 +213,7 @@ func (b *Bridge) ApplyHostsImport(token string, decisions []HostDecisionDTO) (Ho
 			ds = append(ds, &v1.ImportHostDecision{Key: d.Key, Action: d.Action})
 		}
 		r, err := inventoryClient(c).ApplyImportHosts(ctx, &v1.ApplyImportHostsRequest{Token: token, Decisions: ds})
-		return HostsImportResultDTO{Created: int(r.GetCreated()), Replaced: int(r.GetReplaced()), Renamed: int(r.GetRenamed()), Skipped: int(r.GetSkipped()), Invalid: int(r.GetInvalid())}, err
+		return HostsImportResultDTO{Created: int(r.GetCreated()), Replaced: int(r.GetReplaced()), Renamed: int(r.GetRenamed()), Skipped: int(r.GetSkipped()), Invalid: int(r.GetInvalid()), FoldersCreated: int(r.GetFoldersCreated())}, err
 	})
 }
 
@@ -231,5 +234,61 @@ func (b *Bridge) HostsImportFormat() (HostsFormatDTO, error) {
 			out.Fields = append(out.Fields, HostFieldDTO{Name: f.GetName(), Type: f.GetType(), Required: f.GetRequired(), Example: f.GetExample(), Description: f.GetDescription()})
 		}
 		return out, err
+	})
+}
+
+// ---- Carpetas de hosts (fase 44): se identifican por nombre ----
+
+type FolderDTO struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+type MoveHostsResultDTO struct {
+	Moved         int  `json:"moved"`
+	FolderCreated bool `json:"folderCreated"`
+}
+
+// ListFolders trae todas las carpetas, también las vacías; «sin carpeta» no se lista.
+func (b *Bridge) ListFolders() ([]FolderDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) ([]FolderDTO, error) {
+		r, err := inventoryClient(c).ListHostFolders(ctx, &v1.ListHostFoldersRequest{})
+		out := []FolderDTO{}
+		for _, f := range r.GetFolders() {
+			out = append(out, FolderDTO{Name: f.GetName(), Count: int(f.GetHostCount())})
+		}
+		return out, err
+	})
+}
+
+func (b *Bridge) CreateFolder(name string) error {
+	_, err := call(b, func(ctx context.Context, c *ipc.ClientConn) (struct{}, error) {
+		_, err := inventoryClient(c).CreateHostFolder(ctx, &v1.CreateHostFolderRequest{Name: name})
+		return struct{}{}, err
+	})
+	return err
+}
+
+func (b *Bridge) RenameFolder(name, newName string) error {
+	_, err := call(b, func(ctx context.Context, c *ipc.ClientConn) (struct{}, error) {
+		_, err := inventoryClient(c).RenameHostFolder(ctx, &v1.RenameHostFolderRequest{Name: name, NewName: newName})
+		return struct{}{}, err
+	})
+	return err
+}
+
+// DeleteFolder deja sus hosts sin carpeta y devuelve cuántos fueron. Con hosts y sin confirm el núcleo responde FailedPrecondition con la cuenta.
+func (b *Bridge) DeleteFolder(name string, confirm bool) (int, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (int, error) {
+		r, err := inventoryClient(c).DeleteHostFolder(ctx, &v1.DeleteHostFolderRequest{Name: name, Confirm: confirm})
+		return int(r.GetHostsUnfiled()), err
+	})
+}
+
+// MoveHosts mueve hosts a una carpeta (vacío = sin carpeta); todo o nada.
+func (b *Bridge) MoveHosts(ids []string, folder string) (MoveHostsResultDTO, error) {
+	return call(b, func(ctx context.Context, c *ipc.ClientConn) (MoveHostsResultDTO, error) {
+		r, err := inventoryClient(c).MoveHosts(ctx, &v1.MoveHostsRequest{Ids: ids, Folder: folder})
+		return MoveHostsResultDTO{Moved: int(r.GetMoved()), FolderCreated: r.GetFolderCreated()}, err
 	})
 }

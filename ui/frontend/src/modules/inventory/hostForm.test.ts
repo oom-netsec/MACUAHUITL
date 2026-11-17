@@ -1,6 +1,6 @@
-import { PLATFORMS, coreErrorField, hostPlatformOf, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
+import { PLATFORMS, draftOf, formOf, coreErrorField, folderNotEmpty, hostPlatformOf, coreErrorKey, parseTags, validateHost, type HostForm } from "./hostForm";
 
-const ok: HostForm = { name: "SW1", address: "10.0.0.1", port: "22", platform: "ios-xe", folder: "Lab", tags: "core dc-1", credentialId: "", notes: "" };
+const ok: HostForm = { name: "SW1", address: "10.0.0.1", port: "22", platform: "ios-xe", folder: "Lab", tags: "core dc-1", credentialId: "", notes: "", startCommand: "" };
 
 test("un formulario correcto no tiene errores", () => {
   expect(validateHost(ok)).toEqual({});
@@ -85,4 +85,45 @@ test("la plataforma detectada pasa a la del inventario: variantes de WLC son wlc
   expect(hostPlatformOf("asa")).toBe("asa");
   expect(hostPlatformOf("cat9k")).toBe("");
   expect(hostPlatformOf("")).toBe("");
+});
+
+test("las plataformas linux y windows existen", () => {
+  expect(PLATFORMS).toContainEqual(["linux", "Linux"]);
+  expect(PLATFORMS).toContainEqual(["windows", "Windows"]);
+  expect(hostPlatformOf("linux")).toBe("linux");
+});
+
+test("la orden de inicio: una línea, sin caracteres de control, hasta 256", () => {
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "tmux attach || tmux new" })).toEqual({});
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "x".repeat(256) })).toEqual({});
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "x".repeat(257) })).toEqual({ startCommand: "hosts.v.startCommand" });
+  expect(validateHost({ ...ok, platform: "windows", startCommand: "a\nb" })).toEqual({ startCommand: "hosts.v.startCommand" });
+  expect(validateHost({ ...ok, platform: "linux", startCommand: " tmux" })).toEqual({ startCommand: "hosts.v.startCommand" }); // espacios en los extremos
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "tmux " })).toEqual({ startCommand: "hosts.v.startCommand" });
+  expect(validateHost({ ...ok, platform: "windows", startCommand: "a\u0007b" })).toEqual({ startCommand: "hosts.v.startCommand" });
+});
+
+test("la orden de inicio rechaza tab, U+2028 y caracteres invisibles (Trojan Source) y cuenta caracteres astrales como uno", () => {
+  for (const bad of ["a\tb", "a\u2028b", "a\u2029b", "a\u202Eb", "a\u2066b", "a\u200Bb", "\uFEFFa"]) expect(validateHost({ ...ok, platform: "linux", startCommand: bad })).toEqual({ startCommand: "hosts.v.startCommand" });
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "🙂".repeat(256) })).toEqual({}); // 256 caracteres, 512 unidades UTF-16
+  expect(validateHost({ ...ok, platform: "linux", startCommand: "🙂".repeat(257) })).toEqual({ startCommand: "hosts.v.startCommand" });
+});
+
+test("un error del núcleo de la orden de inicio cae en su campo", () => {
+  expect(coreErrorField(bridge("hosts.invalid_startup_command", { field: "startup_command" }, "texto con nombre y credencial"))).toBe("startCommand");
+  expect(coreErrorField(new Error("orden de inicio inválida: lleva un salto de línea"))).toBe("startCommand");
+});
+
+test("la orden de inicio solo viaja con linux o windows", () => {
+  expect(draftOf({ ...ok, platform: "linux", startCommand: "ls" }).startCommand).toBe("ls");
+  expect(draftOf({ ...ok, platform: "ios-xe", startCommand: "ls" }).startCommand).toBe("");
+  expect(formOf({ ...ok, port: 22, tags: [], startCommand: "ls" }).startCommand).toBe("ls");
+});
+
+test("errores con nombre fijo del núcleo (fase 44): credencial de llave fuera de linux/windows y carpeta con hosts", () => {
+  const err = (code: string, reason: string, metadata: Record<string, string>) => Object.assign(new Error("x"), { cause: { code, reason, metadata } });
+  expect(coreErrorField(err("InvalidArgument", "hosts.err.key_credential_platform", { field: "credential_id" }))).toBe("credentialId");
+  expect(coreErrorField(err("InvalidArgument", "hosts.err.x", { field: "startup_command" }))).toBe("startCommand");
+  expect(folderNotEmpty(err("FailedPrecondition", "hosts.err.folder_not_empty", { host_count: "3", name: "Lab" }))).toEqual({ n: "3" });
+  expect(folderNotEmpty(err("FailedPrecondition", "hosts.err.otra_cosa", { host_count: "3" }))).toBeNull(); // otro FailedPrecondition no pide confirmar
 });

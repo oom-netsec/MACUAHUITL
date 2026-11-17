@@ -18,6 +18,20 @@ type TerminalDTO struct {
 	Accept       []string `json:"accept"`
 	Rows         uint32   `json:"rows"`
 	Cols         uint32   `json:"cols"`
+	// HostID abre un host guardado y es exclusivo: con él no viajan dirección, puerto ni credencial.
+	HostID string `json:"hostId"`
+	// ExpectedStartupCommand es la orden de inicio que la UI mostró; si no coincide con la guardada el núcleo no conecta.
+	ExpectedStartupCommand string `json:"expectedStartupCommand"`
+}
+
+func (d TerminalDTO) open() *v1.TerminalOpen {
+	o := &v1.TerminalOpen{Name: d.Name, AcceptedHostKeyFingerprints: d.Accept, Rows: d.Rows, Cols: d.Cols, ExpectedStartupCommand: d.ExpectedStartupCommand}
+	if d.HostID != "" {
+		o.HostId = d.HostID
+	} else {
+		o.Address, o.Port, o.CredentialId = d.Address, d.Port, d.CredentialID
+	}
+	return o
 }
 
 type termSess struct {
@@ -35,8 +49,7 @@ func (b *Bridge) TerminalOpen(d TerminalDTO) (string, error) {
 	id, ctx, cancel := b.next()
 	st, err := v1.NewTerminalServiceClient(c).OpenTerminal(ctx)
 	if err == nil {
-		err = st.Send(&v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Open{Open: &v1.TerminalOpen{Name: d.Name, Address: d.Address, Port: d.Port,
-			CredentialId: d.CredentialID, AcceptedHostKeyFingerprints: d.Accept, Rows: d.Rows, Cols: d.Cols}}})
+		err = st.Send(&v1.OpenTerminalRequest{Msg: &v1.OpenTerminalRequest_Open{Open: d.open()}})
 	}
 	if err != nil {
 		b.finish(id, cancel)

@@ -35,8 +35,8 @@ export function sample(): Partial<CoreAPI> {
     ...previewScriptsApi(),
     listCredentials: async () => [
       { id: "c1", label: "Core DC", username: "netops", hasEnable: true, hasSshKey: false },
-      { id: "c2", label: "Branch access", username: "tac", hasEnable: false, hasSshKey: true },
-      { id: "c3", label: "lab-admin", username: "lab", hasEnable: true, hasSshKey: true },
+      { id: "c2", label: "Branch access", username: "tac", kind: "key", hasEnable: false, hasSshKey: true },
+      { id: "c3", label: "lab-admin", username: "lab", kind: "key", hasEnable: true, hasSshKey: true },
       { id: "c4", label: "ISE (RADIUS secret)", username: "-", hasEnable: false, hasSshKey: false },
       { id: "c5", label: "WAN edge", username: "wanops", hasEnable: true, hasSshKey: false },
     ],
@@ -207,14 +207,14 @@ const swap = <T,>(v: T, pairs: [string, string][]): T => {
   return m(v) as T;
 };
 const hostsEn: Host[] = [
-  { id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", name: "LAB-CORE", address: "10.9.0.1", port: 22, platform: "ios-xe", folder: "Lab", tags: ["core"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "lab-admin", notes: "" },
-  { id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", name: "LAB-NXOS-LEAF1", address: "10.9.1.11", port: 22, platform: "nx-os", folder: "Lab", tags: ["leaf", "dc-1"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "lab-admin", notes: "" },
-  { id: "cccccccccccccccccccccccccccccccc", name: "DC-ASA-01", address: "10.20.0.5", port: 22, platform: "asa", folder: "Datacenter", tags: ["firewall"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "Core DC", notes: "" },
-  { id: "dddddddddddddddddddddddddddddddd", name: "DC-FTD-01", address: "10.20.0.6", port: 22, platform: "ftd", folder: "Datacenter", tags: ["firewall", "ha"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "Core DC", notes: "" },
-  { id: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", name: "ISE-PAN-01", address: "10.20.0.30", port: 22, platform: "ise", folder: "Datacenter", tags: ["aaa"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "ISE (RADIUS secret)", notes: "" },
-  { id: "ffffffffffffffffffffffffffffffff", name: "WLC-9800-HQ", address: "10.30.0.10", port: 22, platform: "wlc", folder: "Campus", tags: ["wifi"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "Branch access", notes: "" },
-  { id: "00000000000000000000000000000000", name: "OFFICE-SW", address: "10.8.0.1", port: 22, platform: "", folder: "Office", tags: ["access", "dc-1"], credentialId: "", credentialLabel: "", notes: "" },
-  { id: "11111111111111111111111111111111", name: "LAB-AP", address: "192.0.2.40", port: 22, platform: "wlc", folder: "Lab", tags: [], credentialId: "", credentialLabel: "", notes: "" },
+  { id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", name: "LAB-CORE", address: "10.9.0.1", port: 22, platform: "ios-xe", folder: "Lab", startCommand: "", tags: ["core"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "lab-admin", notes: "" },
+  { id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", name: "LAB-NXOS-LEAF1", address: "10.9.1.11", port: 22, platform: "nx-os", folder: "Lab", startCommand: "", tags: ["leaf", "dc-1"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "lab-admin", notes: "" },
+  { id: "cccccccccccccccccccccccccccccccc", name: "DC-ASA-01", address: "10.20.0.5", port: 22, platform: "asa", folder: "Datacenter", startCommand: "", tags: ["firewall"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "Core DC", notes: "" },
+  { id: "dddddddddddddddddddddddddddddddd", name: "DC-FTD-01", address: "10.20.0.6", port: 22, platform: "ftd", folder: "Datacenter", startCommand: "", tags: ["firewall", "ha"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "Core DC", notes: "" },
+  { id: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", name: "ISE-PAN-01", address: "10.20.0.30", port: 22, platform: "ise", folder: "Datacenter", startCommand: "", tags: ["aaa"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "ISE (RADIUS secret)", notes: "" },
+  { id: "ffffffffffffffffffffffffffffffff", name: "WLC-9800-HQ", address: "10.30.0.10", port: 22, platform: "wlc", folder: "Campus", startCommand: "", tags: ["wifi"], credentialId: "cccccccccccccccccccccccccccccccc", credentialLabel: "Branch access", notes: "" },
+  { id: "00000000000000000000000000000000", name: "OFFICE-SW", address: "10.8.0.1", port: 22, platform: "", folder: "Office", startCommand: "", tags: ["access", "dc-1"], credentialId: "", credentialLabel: "", notes: "" },
+  { id: "11111111111111111111111111111111", name: "LAB-AP", address: "192.0.2.40", port: 22, platform: "wlc", folder: "Lab", startCommand: "", tags: [], credentialId: "", credentialLabel: "", notes: "" },
 ];
 const devicesEn = swap(sampleDevices, [["CAIDO", "DOWN-SW"], ["SOLO-RESP", "BACKUP-ONLY"]]);
 const importEn = swap(sampleHostsImport, [
@@ -364,7 +364,7 @@ function previewTerminal(): Partial<CoreAPI> {
       const host = r.name.replace(/[^\w]/g, "").slice(0, 8).toUpperCase() || "SW1";
       hosts.set(id, host); lines.set(id, "");
       setTimeout(() => {
-        core().emitTerminal({ runId: id, opened: `netops@${r.address}:22`, recording: `outputs/terminal/${r.address}.log` });
+        core().emitTerminal({ runId: id, opened: `netops@${r.address ?? r.name}:22`, recording: `outputs/terminal/${r.address ?? r.name}.log` });
         core().emitTerminal({ runId: id, data: `\r\nUnauthorized access is prohibited.\r\n\r\n${host}#show ip interface brief\r\n${brief}${host}#show logging\r\n${out["show logging"]}${host}#` });
       }, 50);
       return id;

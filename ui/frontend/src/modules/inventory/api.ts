@@ -26,7 +26,7 @@ export interface KnownDevices { devices: KnownDevice[]; warnings: string[] }
 
 // ---- Libreta de hosts ----
 
-export type HostPlatform = "" | "ios" | "ios-xe" | "nx-os" | "asa" | "ftd" | "ise" | "iosxr" | "wlc"; // vacío = sin definir
+export type HostPlatform = "" | "ios" | "ios-xe" | "nx-os" | "asa" | "ftd" | "ise" | "iosxr" | "wlc" | "linux" | "windows"; // vacío = sin definir
 
 export interface Host {
   id: string; // 32 hex; vacío al crear
@@ -39,6 +39,9 @@ export interface Host {
   credentialId: string; // id de la bóveda; vacío = sin credencial
   credentialLabel: string; // solo lectura: al guardar se ignora
   notes: string; // hasta 2000
+  // Una línea (sin saltos ni caracteres de control, hasta 256) que la terminal ejecuta en el equipo al conectar; sin modo asistido.
+  // Solo tiene sentido con linux o windows; vacío = ninguna.
+  startCommand: string;
 }
 // Lo que se envía al guardar: sin id se crea; con el id de un host de la libreta se edita.
 export type HostDraft = Omit<Host, "id" | "credentialLabel"> & { id?: string };
@@ -59,6 +62,7 @@ export interface HostImportItem {
   reason: HostImportReason;
   conflictsWith: string; // id del host guardado con el que choca o coincide; vacío si es nuevo
   credentialMissing: boolean; // trae etiqueta pero no hay (o hay varias) credencial con ella: quedaría sin credencial
+  hasStartCommand: boolean; // el host del archivo trae orden de inicio (va en host.startCommand): la vista previa la muestra antes de aplicar
 }
 // Una fila (CSV) o entrada (JSON) inválida. No bloquea las demás: al aplicar cuenta como omitida.
 export interface HostImportError {
@@ -76,7 +80,7 @@ export interface HostsImportPreview {
   warnings: string[]; // p. ej. «archivo sin suma de verificación» (JSON sin sha256)
 }
 export interface HostImportDecision { key: string; action: HostImportAction }
-export interface HostsImportResult { created: number; replaced: number; renamed: number; skipped: number; invalid: number } // skipped incluye los igual y las inválidas; invalid es el subconjunto inválido
+export interface HostsImportResult { created: number; replaced: number; renamed: number; skipped: number; invalid: number; foldersCreated: number } // skipped incluye los igual y las inválidas; invalid es el subconjunto inválido
 
 export interface HostsTemplate { format: HostFileFormat; filename: string; content: string } // el JSON va sin sha256
 export interface HostField {
@@ -96,6 +100,15 @@ export interface InventoryAPI {
   // de Unicode. query busca solo en los valores del host (dirección, nombre, plataforma, carpeta, etiquetas); folder se compara sin importar mayúsculas; tag es exacta.
   listHosts(filter?: HostFilter): Promise<Host[]>;
   saveHost(draft: HostDraft): Promise<SaveHostResult>;
+  // Carpetas (se identifican por nombre). Incluye las vacías y no lista «Sin carpeta».
+  listFolders(): Promise<{ name: string; count: number }[]>;
+  // Mismas reglas que Host.folder ([A-Za-z0-9 _.-]{1,48}, un nivel); nombres repetidos sin importar mayúsculas fallan.
+  createFolder(name: string): Promise<void>;
+  renameFolder(oldName: string, newName: string): Promise<void>; // los hosts de la carpeta se mueven con ella
+  // Sus hosts pasan a sin carpeta; nunca se borran. confirm solo va en true tras confirmar con la persona: con hosts y sin confirm el núcleo
+  // responde FailedPrecondition con la cuenta. Devuelve cuántos hosts quedaron sin carpeta.
+  deleteFolder(name: string, confirm: boolean): Promise<number>;
+  moveHosts(ids: string[], folder: string): Promise<void>; // folder "" = sin carpeta
   // No borra la evidencia de las otras fuentes (patrol, flota, respaldos).
   deleteHost(id: string): Promise<void>;
   // Escribe los hosts (ninguno = todos, hasta 1000) en una ruta absoluta (el núcleo la crea 0600). La credencial viaja solo como su etiqueta.
@@ -121,6 +134,11 @@ export const inventoryWails = (call: Call): InventoryAPI => ({
   listHosts: (f = {}) => call("ListHosts", f.query ?? "", f.folder ?? "", f.tag ?? ""),
   saveHost: (d) => call("SaveHost", { id: "", credentialLabel: "", ...d }),
   deleteHost: (id) => call("DeleteHost", id),
+  listFolders: () => call("ListFolders"),
+  createFolder: (name) => call("CreateFolder", name),
+  renameFolder: (o, n) => call("RenameFolder", o, n),
+  deleteFolder: (name, confirm) => call("DeleteFolder", name, confirm),
+  moveHosts: (ids, folder) => call("MoveHosts", ids, folder),
   exportHosts: (ids, path, overwrite, format = "") => call("ExportHosts", ids, path, overwrite, format),
   previewHostsImport: (path, format = "") => call("PreviewHostsImport", path, format),
   applyHostsImport: (token, decisions) => call("ApplyHostsImport", token, decisions),

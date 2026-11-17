@@ -7,3 +7,4 @@
 .lock-card button[type="submit"] { width: 100%; }
 .lock-glyph { display: inline-grid; place-items: center; width: 72px; height: 72px; border-radius: 18px; background: var(--accent-soft); color: var(--accent); }
 .vault-table td { vertical-align: middle; }
+.vault-pub { display: block; overflow-wrap: anywhere; user-select: all; }
