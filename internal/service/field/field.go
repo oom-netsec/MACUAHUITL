@@ -191,12 +191,18 @@ func (s *fieldSvc) ServeFiles(r *v1.ServeFilesRequest, st v1.FieldService_ServeF
 	ctx, cancel := context.WithTimeout(st.Context(), service.SyslogDuration(r.DurationSeconds))
 	defer cancel()
 	k := newServeSink(i18n.Locale(st.Context()), s.d.Audit, st.Send)
-	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, OnTransfer: k.onTransfer}
+	serverID := service.NewID()
+	k.reg = s.d.TransferSessions().Open(serverID)
+	cfg := fileserve.Config{Addr: addr, Proto: r.Protocol, AllowAny: r.AllowAny, Files: r.Files, OnTransfer: k.onTransfer, OnStart: k.reg.Start}
 	cfg.OnListening = func(a string) {
 		s.d.Audit("field.serve", a, fmt.Sprintf("proto=%s all=%t files=%q duration=%s", r.Protocol, r.AllowAny, r.Files, service.SyslogDuration(r.DurationSeconds)))
-		k.events <- &v1.ServeFilesResponse{Listening: a, Hint: fileserve.HintIn(i18n.Locale(st.Context()), r.Protocol, a, r.Files)}
+		k.events <- &v1.ServeFilesResponse{ServerId: serverID, Listening: a, Hint: fileserve.HintIn(i18n.Locale(st.Context()), r.Protocol, a, r.Files)}
 	}
 	err := fileserve.Serve(ctx, cfg)
+	for _, t := range k.reg.Stranded() { // cierre de seguridad: sesiones que siguen activas
+		k.onTransfer(t)
+	}
+	k.reg.Close()
 	n, rejected := k.stop()
 	s.d.Audit("field.serve.done", addr, fmt.Sprintf("transfers=%d rejected=%d", n, rejected))
 	if err != nil {
@@ -214,6 +220,7 @@ type serveSink struct {
 	events      chan *v1.ServeFilesResponse
 	drained     chan struct{}
 	n, rejected atomic.Int64
+	reg         *service.SessionServer // sesiones en vivo; nil-safe
 }
 
 func newServeSink(loc string, audit func(action, target, detail string), send func(*v1.ServeFilesResponse) error) *serveSink {
@@ -235,6 +242,7 @@ func (k *serveSink) onTransfer(t fileserve.Transfer) {
 	ev := &v1.ServeFilesResponse{TransferJson: string(b)}
 	if t.Rejected {
 		k.rejected.Add(1)
+		k.reg.Reject(t)
 		select {
 		case k.events <- ev:
 		default:
@@ -242,7 +250,11 @@ func (k *serveSink) onTransfer(t fileserve.Transfer) {
 		return
 	}
 	k.n.Add(1)
-	k.audit("field.serve.transfer", t.Client, fmt.Sprintf("proto=%s file=%q bytes=%d duration=%s result=%s error=%q", t.Proto, t.File, t.Bytes, t.Duration.Round(1e6), t.Result, fileserve.ReasonIn(i18n.En, t)))
+	session := ""
+	if id, total := k.reg.Finish(t); id != "" {
+		session = fmt.Sprintf(" session=%s total=%d", id, total)
+	}
+	k.audit("field.serve.transfer", t.Client, fmt.Sprintf("proto=%s file=%q bytes=%d duration=%s result=%s error=%q%s", t.Proto, t.File, t.Bytes, t.Duration.Round(1e6), t.Result, fileserve.ReasonIn(i18n.En, t), session))
 	k.events <- ev // viene del goroutine de la transferencia, no del de recepción
 }
 

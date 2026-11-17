@@ -130,6 +130,7 @@ func init() {
 		"transfer.svc.closing":       e("el núcleo se está cerrando", "the core is shutting down"),
 		"transfer.svc.max_servers":   e("máximo {max} servidores abiertos", "at most {max} servers open", "max"),
 		"transfer.svc.bad_listen":    e("IP de escucha inválida {ip:q}", "invalid listen IP {ip:q}", "ip"),
+		"transfer.svc.no_server":     e("no hay un servidor de transferencias {id:q} (o cerró hace más de 10 minutos)", "there is no transfer server {id:q} (or it closed more than 10 minutes ago)", "id"),
 		"transfer.svc.no_redirect":   e("protocolo {proto:q} sin puerto privilegiado o puerto inválido", "protocol {proto:q} has no privileged port, or the port is invalid", "proto"),
 		"transfer.svc.bad_url":       e("URL inválida {url:q}", "invalid URL {url:q}", "url"),
 		"transfer.svc.url_password":  e("no pongas la contraseña en la URL: usa una credencial de la bóveda (--cred)", "do not put the password in the URL: use a vault credential (--cred)"),

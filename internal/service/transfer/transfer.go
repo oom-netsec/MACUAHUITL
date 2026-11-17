@@ -51,6 +51,7 @@ type server struct {
 	recvDir, fromDir     string
 	transfers, rejected  atomic.Int64
 	cancel               context.CancelFunc
+	reg                  *service.SessionServer // sesiones y rechazos en vivo (fase 45b); nil-safe
 }
 
 type svc struct {
@@ -150,7 +151,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 	}
 	sctx, cancel := context.WithTimeout(ctx, dur)
 	defer cancel()
-	srv := &server{id: id, proto: r.Protocol, started: s.d.Now(), write: r.Write, cancel: cancel}
+	srv := &server{id: id, proto: r.Protocol, started: s.d.Now(), write: r.Write, cancel: cancel, reg: s.d.TransferSessions().Open(id)}
 	s.servers[id] = srv
 	s.mu.Unlock()
 	s.wg.Add(1)
@@ -166,6 +167,7 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 
 	k := newSink(st.Send)
 	loc := i18n.Locale(ctx)
+	cfg.OnStart = srv.reg.Start
 	cfg.OnTransfer = func(t fileserve.Transfer) { k.onTransfer(s.d.Audit, srv, t, loc) }
 	cfg.OnReady = func(rd fileserve.Ready) {
 		from, recv := fileserve.Folders(cfg)
@@ -184,6 +186,8 @@ func (s *svc) StartServer(r *v1.StartServerRequest, st v1.TransferService_StartS
 			User: rd.User, Password: rd.Pass, Fingerprints: rd.Fingerprints, RecvDir: recv, FromDir: from, Files: names}}}
 	}
 	err = fileserve.Serve(sctx, cfg)
+	// Cierre de seguridad: lo que siga activo al volver Serve falló por el cierre; se audita como cualquier otra.
+	s.closeSessions(k, srv, loc)
 	s.mu.Lock()
 	listening := srv.listening
 	s.mu.Unlock()
@@ -226,6 +230,23 @@ func (s *svc) ListServers(context.Context, *v1.ListServersRequest) (*v1.ListServ
 			Write: x.write, RecvDir: x.recvDir, FromDir: x.fromDir, Transfers: x.transfers.Load(), Rejected: x.rejected.Load()})
 	}
 	return out, nil
+}
+
+// closeSessions es el cierre de seguridad: pasa a failed (y audita) lo que siga activo y cierra el registro del servidor.
+func (s *svc) closeSessions(k *sink, srv *server, loc string) {
+	for _, t := range srv.reg.Stranded() {
+		k.onTransfer(s.d.Audit, srv, t, loc)
+	}
+	srv.reg.Close()
+}
+
+// ListTransferSessions da las sesiones y los rechazos de un servidor ("" = todos, Campo incluido).
+func (s *svc) ListTransferSessions(ctx context.Context, r *v1.ListTransferSessionsRequest) (*v1.ListTransferSessionsResponse, error) {
+	sess, rej, ok := s.d.TransferSessions().List(r.ServerId, i18n.Locale(ctx))
+	if !ok {
+		return nil, service.Err(ctx, codes.NotFound, "transfer.svc.no_server", i18n.A("id", r.ServerId))
+	}
+	return &v1.ListTransferSessionsResponse{Sessions: sess, Rejections: rej}, nil
 }
 
 func (s *svc) RedirectHint(ctx context.Context, r *v1.RedirectHintRequest) (*v1.RedirectHintResponse, error) {
@@ -275,6 +296,7 @@ func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.T
 	if t.Rejected {
 		k.rejected.Add(1)
 		srv.rejected.Add(1)
+		srv.reg.Reject(t)
 		select {
 		case k.events <- ev:
 		default:
@@ -283,8 +305,12 @@ func (k *sink) onTransfer(audit func(a, t, d string), srv *server, t fileserve.T
 	}
 	k.n.Add(1)
 	srv.transfers.Add(1)
-	audit("transfer.serve.transfer", t.Client, fmt.Sprintf("server=%s proto=%s direction=%s file=%q path=%q bytes=%d sha256=%s duration=%s result=%s error=%q",
-		srv.id, t.Proto, service.DirEN(t.Dir), t.File, t.Path, t.Bytes, t.SHA256, t.Duration.Round(time.Millisecond), t.Result, fileserve.ReasonIn(i18n.En, t)))
+	session := ""
+	if id, total := srv.reg.Finish(t); id != "" {
+		session = fmt.Sprintf(" session=%s total=%d", id, total)
+	}
+	audit("transfer.serve.transfer", t.Client, fmt.Sprintf("server=%s proto=%s direction=%s file=%q path=%q bytes=%d sha256=%s duration=%s result=%s error=%q%s",
+		srv.id, t.Proto, service.DirEN(t.Dir), t.File, t.Path, t.Bytes, t.SHA256, t.Duration.Round(time.Millisecond), t.Result, fileserve.ReasonIn(i18n.En, t), session))
 	k.events <- ev
 }
 
