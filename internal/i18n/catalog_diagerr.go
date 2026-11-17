@@ -26,6 +26,7 @@ func init() {
 		"diag.err.install_win":       e("{cause}: {bin} (descárgalo de {url})", "{cause}: {bin} (download it from {url})", "cause", "bin", "url"),
 		"diag.err.install_iperf_win": e(`{cause}: iperf3 no tiene versión oficial para Windows; descarga una compilación de confianza y ponla en %ProgramFiles%\iperf3\iperf3.exe o en tools\iperf3.exe junto a macuahuitld.exe`, `{cause}: iperf3 has no official Windows build; download a build you trust and put it in %ProgramFiles%\iperf3\iperf3.exe or in tools\iperf3.exe next to macuahuitld.exe`, "cause"),
 		"diag.err.install_sys_win":   e(`{cause}: {bin} (debería estar en %SystemRoot%\System32)`, `{cause}: {bin} (it should be in %SystemRoot%\System32)`, "cause", "bin"),
+		"diag.err.no_run":            e("no existe esa ejecución o ya terminó", "no such run, or it already finished"),
 		"diag.err.opt_windows":       e("la opción {key:q} no existe en Windows para esta herramienta", "option {key:q} does not exist on Windows for this tool", "key"),
 		"diag.err.syn_windows":       e("el escaneo SYN de nmap no está disponible en Windows (necesita Npcap); usa connect", "the nmap SYN scan is not available on Windows (it needs Npcap); use connect"),
 		"diag.err.wrap":              e("diag: {cause}", "diag: {cause}", "cause"),
