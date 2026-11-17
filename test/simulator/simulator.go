@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -76,6 +77,10 @@ type Config struct {
 	NoPassword     bool
 	AuthLog        *[]string
 	Exec           func(cmd string) string
+	// Fase 44c2: Conns cuenta cada conexión TCP aceptada (un Dial sin handshake también suma: AuthLog no lo vería);
+	// OnPty recibe el tipo de terminal de cada pty-req.
+	Conns *atomic.Int32
+	OnPty func(term string)
 }
 
 // FixedHostKey confía en la llave de equipo que devolvió Start (para quien no importa x/crypto/ssh).
@@ -229,6 +234,9 @@ func Start(t testing.TB, c Config) (addr string, hostKey ssh.PublicKey) {
 			if err != nil {
 				return
 			}
+			if c.Conns != nil {
+				c.Conns.Add(1)
+			}
 			go serve(conn, cfg, c, outputs, dev)
 		}
 	}()
@@ -299,6 +307,11 @@ func serve(conn net.Conn, cfg *ssh.ServerConfig, c Config, outputs map[string]st
 				switch r.Type {
 				case "pty-req":
 					pty = true
+					if c.OnPty != nil && len(r.Payload) >= 4 {
+						if n := int(binary.BigEndian.Uint32(r.Payload)); len(r.Payload) >= 4+n {
+							c.OnPty(string(r.Payload[4 : 4+n]))
+						}
+					}
 				case "shell":
 					close(shell)
 				case "exec":

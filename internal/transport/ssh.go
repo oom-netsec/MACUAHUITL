@@ -195,15 +195,25 @@ func (s *Session) Client() *ssh.Client { return s.client }
 func (s *Session) Activity(n int) { s.rx.Add(int64(n)) }
 
 // Shell abre un shell interactivo con PTY vt100 de 200×24.
-func (s *Session) Shell() (io.Reader, io.Writer, error) { return s.ShellSize(24, 200) }
+func (s *Session) Shell() (io.Reader, io.Writer, error) { return s.ShellSize("vt100", 24, 200) }
 
-// ShellSize abre el shell con un PTY vt100 del tamaño dado (la terminal manual usa el de su ventana).
-func (s *Session) ShellSize(rows, cols int) (io.Reader, io.Writer, error) {
+// ShellSize abre el shell con un PTY del tipo term (vt100 en Cisco, xterm-256color en hosts genéricos) y el tamaño dado
+// (la terminal manual usa el de su ventana).
+func (s *Session) ShellSize(term string, rows, cols int) (io.Reader, io.Writer, error) {
+	return s.start(term, rows, cols, "shell", func(sess *ssh.Session) error { return sess.Shell() })
+}
+
+// CommandSize corre cmd con un PTY, como `ssh -t host cmd`: no se teclea en el shell, y la sesión termina con la orden.
+func (s *Session) CommandSize(term string, rows, cols int, cmd string) (io.Reader, io.Writer, error) {
+	return s.start(term, rows, cols, "exec", func(sess *ssh.Session) error { return sess.Start(cmd) })
+}
+
+func (s *Session) start(term string, rows, cols int, what string, run func(*ssh.Session) error) (io.Reader, io.Writer, error) {
 	sess, err := s.client.NewSession()
 	if err != nil {
 		return nil, nil, fmt.Errorf("transport: %w", err)
 	}
-	if err := sess.RequestPty("vt100", rows, cols, ssh.TerminalModes{ssh.ECHO: 1}); err != nil {
+	if err := sess.RequestPty(term, rows, cols, ssh.TerminalModes{ssh.ECHO: 1}); err != nil {
 		sess.Close()
 		return nil, nil, fmt.Errorf("transport: pty: %w", err)
 	}
@@ -218,9 +228,9 @@ func (s *Session) ShellSize(rows, cols int) (io.Reader, io.Writer, error) {
 		return nil, nil, err
 	}
 	r := countingReader{out, &s.rx}
-	if err := sess.Shell(); err != nil {
+	if err := run(sess); err != nil {
 		sess.Close()
-		return nil, nil, fmt.Errorf("transport: shell: %w", err)
+		return nil, nil, fmt.Errorf("transport: %s: %w", what, err)
 	}
 	s.sess = sess
 	return r, w, nil
