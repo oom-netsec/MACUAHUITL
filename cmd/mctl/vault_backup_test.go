@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 )
 
 // Respaldo cifrado de la bóveda de punta a punta: las frases entran por stdin (nunca por argumentos) y ni la salida ni la auditoría traen
@@ -38,7 +40,7 @@ func TestCredBackupExportImportPuntaAPunta(t *testing.T) {
 	if !strings.Contains(out, "2 credenciales") || !strings.Contains(out, ruta) {
 		t.Fatalf("export: %q", out)
 	}
-	if fi, err := os.Stat(ruta); err != nil || fi.Mode().Perm() != 0o600 {
+	if fi, err := os.Stat(ruta); err != nil || !testperm.Private(fi, 0o600) {
 		t.Fatalf("archivo: %v %v", fi, err)
 	}
 	if _, err := mctl(t, "frase-respaldo-1\nfrase-respaldo-1\n", "cred", "backup", "export", ruta, "--yes"); err == nil {

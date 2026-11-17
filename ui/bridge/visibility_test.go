@@ -52,11 +52,11 @@ func TestVisibilityBridge(t *testing.T) {
 	b := New(func() (*ipc.ClientConn, error) { return ipc.DialPath(sock) }, rec.emit)
 	Start(ctx, b)
 
-	r, err := b.TopoBuild("/tmp/trabajo", "")
+	r, err := b.TopoBuild(trabajoAbs, "")
 	if err != nil || r.Svg != "<svg/>" || r.Text != "topo" || r.Json == "" {
 		t.Fatalf("%+v %v", r, err)
 	}
-	if q := <-fv.topo; q.Dir != "/tmp/trabajo" || q.JobId != "" {
+	if q := <-fv.topo; q.Dir != trabajoAbs || q.JobId != "" {
 		t.Fatalf("request = %+v", q)
 	}
 	b.TopoBuild("abc123", "/tmp/c.pcap")

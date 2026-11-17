@@ -185,7 +185,7 @@ func flotaCases(t *testing.T, h *harness, lang string, fx flotaFx) map[string]fl
 	// las rutas de carpetas temporales cambian en cada corrida
 	dirs := []string{fx.driftMasked, "<DRIFTM>", fx.diffJob, "<DIFFJOB>", fx.pcap, "<PCAP>", fx.pcapTrunc, "<PCAPT>", fx.pre, "<PRE>", fx.post, "<POST>", fx.empty, "<EMPTY>", fx.drift, "<DRIFT>", labDir(t), "<LAB>", fdir, "<FLEET>"}
 	if runtime.GOOS == "windows" { // la ruta también sale dentro de un JSON (barras invertidas duplicadas)
-		for i := 0; i < len(dirs); i += 2 {
+		for i, n := 0, len(dirs); i < n; i += 2 {
 			dirs = append(dirs, strings.ReplaceAll(dirs[i], `\`, `\\`), dirs[i+1])
 		}
 	}

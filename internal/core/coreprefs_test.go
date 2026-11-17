@@ -5,6 +5,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -55,7 +56,11 @@ func TestPreferenciasDelNucleoPersistenYRigen(t *testing.T) {
 // carpetaSegura crea una carpeta 0700 junto a las pruebas: /tmp es de todos y la validación no la acepta como ancestro.
 func carpetaSegura(t *testing.T) string {
 	t.Helper()
-	d, err := os.MkdirTemp(".", "salidas-")
+	base := "." // en Windows el checkout lo escribe Users (ancestro inseguro): se usa el temporal del usuario
+	if runtime.GOOS == "windows" {
+		base = t.TempDir()
+	}
+	d, err := os.MkdirTemp(base, "salidas-")
 	if err != nil {
 		t.Fatal(err)
 	}

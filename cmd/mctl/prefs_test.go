@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -17,13 +18,17 @@ func TestPrefsShowYSet(t *testing.T) {
 	}
 	// el núcleo de la prueba tiene HOME y carpetas reales: la carpeta nueva va en un temporal 0700
 	// junto a las pruebas: /tmp es de todos y la validación no lo acepta como ancestro
-	nueva, err := os.MkdirTemp(".", "salidas-")
+	base := "." // en Windows el checkout lo escribe Users (ancestro inseguro): se usa el temporal del usuario
+	if runtime.GOOS == "windows" {
+		base = t.TempDir()
+	}
+	nueva, err := os.MkdirTemp(base, "salidas-")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(nueva) })
 	nueva, _ = filepath.Abs(nueva)
-	if err := sys.MkdirPrivate(nueva); err != nil { // en Windows la carpeta hereda la ACL del checkout (CREATOR OWNER, Users): se le da la privada
+	if err := sys.MkdirPrivate(nueva); err != nil { // la carpeta hereda ACL de más (CREATOR OWNER, Users): se le da la privada
 		t.Fatal(err)
 	}
 	out, err = mctl(t, "", "prefs", "set", "--outputs", nueva, "--rotate-mb", "10", "--format", "jsonl")

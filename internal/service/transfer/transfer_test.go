@@ -23,6 +23,7 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 	"github.com/oom-netsec/MACUAHUITL/internal/transport"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
@@ -109,10 +110,10 @@ func TestServerLifecycleAndAudit(t *testing.T) {
 	if !strings.HasPrefix(rd.RecvDir, filepath.Join(d.Out, "recibidos")) {
 		t.Fatalf("recv_dir = %q", rd.RecvDir)
 	}
-	if st, err := os.Stat(rd.RecvDir); err != nil || st.Mode().Perm() != 0o700 {
+	if st, err := os.Stat(rd.RecvDir); err != nil || !testperm.Private(st, 0o700) {
 		t.Fatalf("carpeta de recepción: %v %v", st, err)
 	}
-	if !strings.Contains(rd.Hint, "copy running-config tftp://127.0.0.1/") || !strings.Contains(rd.Hint, "udp dport 69 redirect to :") {
+	if !strings.Contains(rd.Hint, "copy running-config tftp://127.0.0.1/") || (runtime.GOOS != "windows" && !strings.Contains(rd.Hint, "udp dport 69 redirect to :")) { // en Windows la pista es la regla del firewall
 		t.Fatalf("hint = %s", rd.Hint)
 	}
 	// Con el cliente propio: subir y bajar.
@@ -399,6 +400,9 @@ func TestGetDefaultsToReceiveFolderAndSha512(t *testing.T) {
 }
 
 func TestRedirectHintRPC(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("la pista es la regla nft de Linux; en Windows es New-NetFirewallRule (firewall_test.go)")
+	}
 	s, _ := newTest(t)
 	r, err := s.RedirectHint(context.Background(), &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"})
 	if err != nil || r.StandardPort != 21 || !strings.Contains(r.Nftables, "ip daddr 10.0.0.5 tcp dport 21 redirect to :2121") ||
@@ -449,6 +453,9 @@ func TestAuditDropsURLQuery(t *testing.T) {
 
 // Fase 30d: RedirectHint sale en el idioma pedido; los comandos no cambian y con es el texto es el de siempre.
 func TestRedirectHintRPCEn(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("la pista es la regla nft de Linux; en Windows es New-NetFirewallRule (firewall_test.go)")
+	}
 	s, _ := newTest(t)
 	req := &v1.RedirectHintRequest{Protocol: "ftp", Port: 2121, Ip: "10.0.0.5"}
 	en, err := s.RedirectHint(i18n.WithLocale(context.Background(), "en"), req)

@@ -379,6 +379,7 @@ func TestHTTPServesOnlyPublishedWithRange(t *testing.T) {
 }
 
 func TestRedirectHint(t *testing.T) {
+	fijaWindows(t, "linux") // el texto de nft es el de Linux; la pista de Windows la cubre firewall_test.go
 	h := TFTPRedirectHint("10.0.0.5", 6969)
 	if !strings.Contains(h, "udp dport 69 redirect to :6969") {
 		t.Fatal(h)
@@ -400,6 +401,7 @@ func TestRedirectHint(t *testing.T) {
 // La regla de nftables es estrecha (solo la IP de escucha), vive en una tabla propia de ese
 // servidor y trae el comando exacto para quitarla.
 func TestRedirectHintIsNarrow(t *testing.T) {
+	fijaWindows(t, "linux") // el texto de nft es el de Linux; la pista de Windows la cubre firewall_test.go
 	h := RedirectHint("tftp", "10.0.0.5", 6969)
 	for _, w := range []string{"nft add table ip macuahuitl_tftp_6969", "ip daddr 10.0.0.5 udp dport 69 redirect to :6969"} {
 		if !strings.Contains(h, w) {

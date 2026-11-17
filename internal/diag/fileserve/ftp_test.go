@@ -363,6 +363,7 @@ func FuzzParseFTP(f *testing.F) {
 }
 
 func TestHints(t *testing.T) {
+	fijaWindows(t, "linux") // el texto de nft es el de Linux; la pista de Windows la cubre firewall_test.go
 	r := Ready{Addr: "10.0.0.5:2121", User: "mac", Pass: "pw123", Fingerprints: []string{"SHA256:aa", "SHA256:bb"}}
 	for _, tc := range []struct {
 		proto string

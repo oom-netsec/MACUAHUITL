@@ -37,6 +37,11 @@ func (fakeEvents) Subscribe(r *v1.SubscribeRequest, st v1.EventService_Subscribe
 func startFull(t *testing.T, path string) context.CancelFunc {
 	t.Helper()
 	l, err := ipc.Listen(path)
+	// En Windows el pipe sigue ocupado hasta que el cliente suelta su conexión al servidor anterior: se reintenta un momento.
+	for end := time.Now().Add(5 * time.Second); err != nil && time.Now().Before(end); {
+		time.Sleep(50 * time.Millisecond)
+		l, err = ipc.Listen(path)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

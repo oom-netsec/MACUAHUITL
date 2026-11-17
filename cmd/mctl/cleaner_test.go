@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 )
 
 func TestConfigClean(t *testing.T) {
@@ -22,7 +24,7 @@ func TestConfigClean(t *testing.T) {
 	if err != nil || strings.Contains(string(b), "SW1   ") || !strings.Contains(string(b), "! HUERFANA: ACL IN-FALTA") {
 		t.Fatalf("salida %v:\n%s", err, b)
 	}
-	if st, _ := os.Stat(dst); st.Mode().Perm() != 0o600 {
+	if st, _ := os.Stat(dst); !testperm.Private(st, 0o600) {
 		t.Errorf("permisos %v", st.Mode())
 	}
 	if out, err = mctl(t, "", "config", "clean", src, "--json"); err != nil || !strings.HasPrefix(out, "{") {

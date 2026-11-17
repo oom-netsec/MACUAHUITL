@@ -97,7 +97,11 @@ func TestTransferUsageAndHint(t *testing.T) {
 		}
 	}
 	out := must(t, "", "transfer", "hint", "scp", "2222")
-	if !strings.Contains(out, "tcp dport 22 redirect to :2222") || strings.Contains(out, "setcap") {
+	if runtime.GOOS == "windows" { // la pista es la regla del firewall, no nft
+		if !strings.Contains(out, "New-NetFirewallRule") || !strings.Contains(out, "-LocalPort 2222") {
+			t.Fatal(out)
+		}
+	} else if !strings.Contains(out, "tcp dport 22 redirect to :2222") || strings.Contains(out, "setcap") {
 		t.Fatal(out)
 	}
 	if runtime.GOOS != "windows" {

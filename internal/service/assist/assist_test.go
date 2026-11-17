@@ -96,9 +96,12 @@ func (r *rig) state(run string) *v1.AssistRunState {
 	return snapshot("es", rec)
 }
 
+// esperaMax es el plazo de las esperas por el equipo simulado: el handshake SSH en el runner de Windows tarda varios segundos.
+var esperaMax = map[bool]time.Duration{false: 5 * time.Second, true: 40 * time.Second}[runtime.GOOS == "windows"]
+
 func (r *rig) waitState(run, want string) *v1.AssistRunState {
 	r.t.Helper()
-	for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
+	for end := time.Now().Add(esperaMax); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
 		if s := r.state(run); s.State == want {
 			return s
 		}
@@ -129,7 +132,7 @@ func (r *rig) waitDone(run string) {
 	rec, _ := r.svc.get(context.Background(), run)
 	select {
 	case <-rec.finished:
-	case <-time.After(5 * time.Second):
+	case <-time.After(esperaMax):
 		r.t.Fatal("la ejecución no terminó")
 	}
 }
