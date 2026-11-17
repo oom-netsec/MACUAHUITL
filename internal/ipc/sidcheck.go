@@ -31,12 +31,21 @@ type tokenFacts struct {
 	Err          error
 }
 
+// integridad media (RID 0x2000): la de un objeto sin etiqueta obligatoria.
+const ilMedium = 0x2000
+
 // serverTrusted decide si el servidor del pipe es tan confiable como el cliente: mismo usuario no basta, un proceso del
 // mismo usuario con integridad baja, en AppContainer o con token restringido no debe recibir la contraseña maestra.
-// Exige integridad del servidor >= la del cliente. Decisión pura; Windows la alimenta con los tokens reales.
-func serverTrusted(server, client tokenFacts) error {
-	if server.Err != nil || client.Err != nil || server.IL == 0 || client.IL == 0 ||
-		server.AppContainer || server.Restricted || server.IL < client.IL {
+// label es el RID de la etiqueta de integridad del OBJETO pipe (0 = sin etiqueta, cuenta como medio): al ser del objeto
+// no se puede reutilizar como el PID del creador (un proceso Low crea el pipe y muere, otro toma su PID). Exige
+// label >= min(IL del cliente, medio): un cliente alto no rechaza al servidor normal, que crea el pipe sin etiqueta.
+// server (token por PID) solo aporta AppContainer y token restringido. Decisión pura; Windows la alimenta con datos reales.
+func serverTrusted(label uint32, server, client tokenFacts) error {
+	if label == 0 {
+		label = ilMedium
+	}
+	if server.Err != nil || client.Err != nil || client.IL == 0 ||
+		server.AppContainer || server.Restricted || label < min(client.IL, ilMedium) {
 		return i18n.New("ipc.err.server_low_integrity", nil)
 	}
 	return nil

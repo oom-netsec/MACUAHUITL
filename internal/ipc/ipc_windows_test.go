@@ -107,8 +107,8 @@ func TestPipeNombreLlevaElSID(t *testing.T) {
 	if err != nil || !strings.HasPrefix(p, `\\.\pipe\macuahuitl-S-1-5-`) {
 		t.Fatalf("SocketPath = %q, %v", p, err)
 	}
-	if got, err := pidSID(windows.GetCurrentProcessId()); err != nil || !sameSID(got, p[len(`\\.\pipe\macuahuitl-`):]) {
-		t.Fatalf("pidSID(propio) = %q, %v", got, err)
+	if got, f := pidInfo(windows.GetCurrentProcessId()); f.Err != nil || !sameSID(got, p[len(`\\.\pipe\macuahuitl-`):]) {
+		t.Fatalf("pidInfo(propio) = %q, %+v", got, f)
 	}
 }
 
@@ -167,17 +167,36 @@ func TestDialPipeRechazaDuenoAjeno(t *testing.T) {
 	}
 }
 
-// El token real de este proceso (mismo que tendría el núcleo) se acepta como servidor, y sus datos son plausibles.
-// Un servidor Low IL no se prueba aquí (sin hijo de token rebajado en CI): paso manual en la VM, ver el PR.
+// El token real de este proceso (mismo que tendría el núcleo) se acepta como servidor, y sus datos son plausibles. El
+// servidor Low IL real se prueba en TestDialPipeRechazaServidorLow.
 func TestServerTrustedConTokenPropio(t *testing.T) {
 	own := factsOf(windows.GetCurrentProcessToken())
 	if own.Err != nil || own.IL < 0x1000 || own.AppContainer || own.Restricted {
 		t.Fatalf("token propio inesperado: %+v", own)
 	}
-	if err := serverTrusted(pidFacts(uint32(os.Getpid())), own); err != nil {
+	_, f := pidInfo(uint32(os.Getpid()))
+	if err := serverTrusted(0, f, own); err != nil {
 		t.Fatalf("el propio proceso debe aceptarse: %v", err)
 	}
-	if err := serverTrusted(pidFacts(0xFFFFFFF0), own); err == nil {
+	if _, f := pidInfo(0xFFFFFFF0); serverTrusted(0, f, own) == nil {
 		t.Fatal("un PID que no se puede abrir debe rechazarse")
+	}
+}
+
+// Un pipe de Listen (sin etiqueta) se lee como sin etiqueta o medio, nunca bajo.
+func TestPipeLabelDelPipePropio(t *testing.T) {
+	name := sockPath(t)
+	l, err := Listen(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serve(t, l)
+	c, _, err := dialPipe(context.Background(), name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if lab, err := pipeLabel(c); err != nil || (lab != 0 && lab < ilMedium) {
+		t.Fatalf("pipeLabel = %#x, %v", lab, err)
 	}
 }

@@ -64,6 +64,10 @@ func Listen(name string) (net.Listener, error) {
 		if perr == nil || errors.Is(perr, context.DeadlineExceeded) { // ocupado: existe y no se sabe de quién; no se acusa
 			return nil, fmt.Errorf("%w (%v)", ErrAlreadyRunning, err)
 		}
+		var ie *i18n.Error
+		if errors.As(perr, &ie) && ie.Code == "ipc.err.pipe_low_integrity" { // existe y es nuestro, pero de menor integridad
+			return nil, i18n.Wrap(ie.Code, ErrAlreadyRunning, ie.Args)
+		}
 		return nil, i18n.Wrap("ipc.err.pipe_other_user", ErrAlreadyRunning, nil)
 	}
 	if errors.Is(err, windows.ERROR_ALREADY_EXISTS) || errors.Is(err, windows.ERROR_PIPE_BUSY) {
@@ -113,7 +117,11 @@ func pipeSID(c net.Conn, get func(windows.Handle, *uint32) error) (string, error
 	if err != nil {
 		return "", err
 	}
-	return pidSID(pid)
+	sid, f := pidInfo(pid)
+	if sid == "" {
+		return "", f.Err
+	}
+	return sid, nil
 }
 
 // pipeOwner es el SID del dueño del objeto pipe al que c está conectado.
@@ -133,14 +141,53 @@ func pipeOwner(c net.Conn) (string, error) {
 	return o.String(), nil
 }
 
+// pipeLabel es el RID de la etiqueta de integridad (SYSTEM_MANDATORY_LABEL_ACE de la SACL) del objeto pipe al que c está
+// conectado; 0 si no tiene etiqueta. Con el handle del cliente basta READ_CONTROL.
+func pipeLabel(c net.Conn) (uint32, error) {
+	f, ok := c.(interface{ Fd() uintptr })
+	if !ok {
+		return 0, i18n.New("ipc.err.not_pipe", nil)
+	}
+	sd, err := windows.GetSecurityInfo(windows.Handle(f.Fd()), windows.SE_KERNEL_OBJECT, windows.LABEL_SECURITY_INFORMATION)
+	if err != nil {
+		return 0, err
+	}
+	acl, _, err := sd.SACL()
+	if err != nil || acl == nil {
+		return 0, nil // sin SACL: sin etiqueta
+	}
+	for i := uint32(0); i < uint32(acl.AceCount); i++ {
+		var a *windows.ACCESS_ALLOWED_ACE
+		if err := windows.GetAce(acl, i, &a); err != nil {
+			return 0, err
+		}
+		if a.Header.AceType == aceMandatoryLabel {
+			sid := (*windows.SID)(unsafe.Pointer(&a.SidStart))
+			if n := sid.SubAuthorityCount(); n > 0 {
+				return sid.SubAuthority(uint32(n) - 1), nil
+			}
+			return 0, errors.New("etiqueta de integridad sin RID")
+		}
+	}
+	return 0, nil
+}
+
+const aceMandatoryLabel = 0x11 // SYSTEM_MANDATORY_LABEL_ACE_TYPE; x/sys no la define
+
 const tokenIsAppContainer = 29 // TOKEN_INFORMATION_CLASS::TokenIsAppContainer; x/sys no la define
 
 // factsOf lee integridad, AppContainer y restricción de un token abierto con TOKEN_QUERY. Cualquier fallo va en Err.
 func factsOf(tok windows.Token) tokenFacts {
 	var f tokenFacts
 	var n uint32
-	var buf [256]byte
-	if err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, &buf[0], uint32(len(buf)), &n); err != nil {
+	// Búfer en el heap (patrón de Token.getInfo de x/sys): Label.Sid apunta dentro del propio búfer.
+	err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, nil, 0, &n)
+	if err != windows.ERROR_INSUFFICIENT_BUFFER {
+		f.Err = err
+		return f
+	}
+	buf := make([]byte, n)
+	if err := windows.GetTokenInformation(tok, windows.TokenIntegrityLevel, &buf[0], n, &n); err != nil {
 		f.Err = err
 		return f
 	}
@@ -161,37 +208,25 @@ func factsOf(tok windows.Token) tokenFacts {
 	return f
 }
 
-// pidFacts abre el token del proceso pid (PROCESS_QUERY_LIMITED_INFORMATION + TOKEN_QUERY) y lo resume.
-func pidFacts(pid uint32) tokenFacts {
+// pidInfo abre una sola vez el proceso pid (PROCESS_QUERY_LIMITED_INFORMATION) y su token (TOKEN_QUERY) y devuelve el SID
+// del usuario y los datos del token. sid vacío = no se pudo leer (la causa va en facts.Err).
+func pidInfo(pid uint32) (sid string, facts tokenFacts) {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
 	if err != nil {
-		return tokenFacts{Err: err}
+		return "", tokenFacts{Err: err}
 	}
 	defer windows.CloseHandle(h)
 	var tok windows.Token
 	if err := windows.OpenProcessToken(h, windows.TOKEN_QUERY, &tok); err != nil {
-		return tokenFacts{Err: err}
+		return "", tokenFacts{Err: err}
 	}
 	defer tok.Close()
-	return factsOf(tok)
-}
-
-func pidSID(pid uint32) (string, error) {
-	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
-	if err != nil {
-		return "", err
-	}
-	defer windows.CloseHandle(h)
-	var tok windows.Token
-	if err := windows.OpenProcessToken(h, windows.TOKEN_QUERY, &tok); err != nil {
-		return "", err
-	}
-	defer tok.Close()
+	facts = factsOf(tok)
 	u, err := tok.GetTokenUser()
 	if err != nil {
-		return "", err
+		return "", tokenFacts{Err: err}
 	}
-	return u.User.Sid.String(), nil
+	return u.User.Sid.String(), facts
 }
 
 // dialPipe conecta al pipe y comprueba que su servidor corra con el SID del usuario: sin esto otro usuario podría
@@ -207,20 +242,22 @@ func dialPipe(ctx context.Context, name string) (net.Conn, uint32, error) {
 		return nil, 0, fmt.Errorf("ipc: %w", err)
 	}
 	// El PID solo no basta: GetNamedPipeServerProcessId da el de quien creó la instancia aunque ya haya muerto, y otro
-	// proceso pudo heredar ese PID. El dueño del objeto pipe (fijado en pipeSDDL) no se puede reutilizar así: se
-	// comprueba además. Con el handle del cliente, que ya tiene READ_CONTROL.
+	// proceso pudo heredar ese PID (o el creador, de integridad baja, pasó el handle a un hijo y murió). El dueño y la
+	// etiqueta de integridad del objeto pipe no se pueden reutilizar así: se comprueban además, con el handle del
+	// cliente (basta READ_CONTROL). El token por PID solo aporta AppContainer y token restringido.
 	owner, oerr := pipeOwner(c)
 	pid, perr := pidOf(c, windows.GetNamedPipeServerProcessId)
 	var sid string
-	var serr error
+	var facts tokenFacts
 	if perr == nil {
-		sid, serr = pidSID(pid)
+		sid, facts = pidInfo(pid)
 	}
-	if err := errors.Join(oerr, perr, serr); err != nil || checkServer(owner, sid, own) != nil {
+	if err := errors.Join(oerr, perr); err != nil || checkServer(owner, sid, own) != nil {
 		c.Close()
 		return nil, 0, i18n.New("ipc.err.pipe_not_user", i18n.A("name", name))
 	}
-	if serverTrusted(pidFacts(pid), factsOf(windows.GetCurrentProcessToken())) != nil {
+	label, lerr := pipeLabel(c)
+	if lerr != nil || serverTrusted(label, facts, factsOf(windows.GetCurrentProcessToken())) != nil {
 		c.Close()
 		return nil, 0, i18n.New("ipc.err.pipe_low_integrity", i18n.A("name", name))
 	}

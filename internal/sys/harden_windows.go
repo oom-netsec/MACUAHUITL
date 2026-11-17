@@ -51,10 +51,10 @@ func Harden() ([]i18n.Text, error) {
 	return append(warns, pagefileWarnings(files, readPagingEncrypted(), perr)...), nil
 }
 
-// NoDump excluye al proceso de los reportes de error de Windows (sin volcados de WER); la
-// UI usa solo esto. Devuelve avisos; nunca falla.
+// NoDump excluye al proceso de los reportes de error de Windows (sin volcados de WER); la UI usa solo esto. Devuelve
+// avisos; nunca falla. SetErrorMode no se llama: el runtime de Go ya pone SEM_FAILCRITICALERRORS, SEM_NOGPFAULTERRORBOX
+// y SEM_NOOPENFILEERRORBOX con OR (preventErrorDialogs), y un valor fijo quitaría bits.
 func NoDump() []i18n.Text {
-	windows.SetErrorMode(errorMode) // sin diálogos de error crítico ni de fallo de protección (ADR 0012)
 	var warns []i18n.Text
 	if err := werExclude(); err != nil {
 		warns = append(warns, i18n.Tx("harden.wer", "cause", err.Error()))
@@ -97,18 +97,17 @@ func readHibernate() (uint64, error) {
 	return v, err
 }
 
-// errorMode es lo que Harden pone con SetErrorMode.
-const errorMode = windows.SEM_FAILCRITICALERRORS | windows.SEM_NOGPFAULTERRORBOX
-
-// readPagingEncrypted dice si NtfsEncryptPagingFile (o la política EncryptPagingFile) vale 1. No se pudo leer = false: se avisa.
+// readPagingEncrypted dice si NtfsEncryptPagingFile vale 1, como lo deja `fsutil behavior set encryptpagingfile 1`
+// (Control\FileSystem) o la directiva (SYSTEM\CurrentControlSet\Policies). No se pudo leer = false: se avisa.
 func readPagingEncrypted() bool {
-	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Control\FileSystem`, registry.QUERY_VALUE)
-	if err != nil {
-		return false
-	}
-	defer k.Close()
-	for _, n := range []string{"NtfsEncryptPagingFile", "EncryptPagingFile"} {
-		if v, _, err := k.GetIntegerValue(n); err == nil && v == 1 {
+	for _, path := range []string{`SYSTEM\CurrentControlSet\Control\FileSystem`, `SYSTEM\CurrentControlSet\Policies`} {
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.QUERY_VALUE)
+		if err != nil {
+			continue
+		}
+		v, _, err := k.GetIntegerValue("NtfsEncryptPagingFile")
+		k.Close()
+		if err == nil && v == 1 {
 			return true
 		}
 	}

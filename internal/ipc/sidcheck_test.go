@@ -61,33 +61,44 @@ func TestCheckServer(t *testing.T) {
 }
 
 func TestServerTrusted(t *testing.T) {
-	const medio, bajo, alto = 0x2000, 0x1000, 0x3000
-	cliente := tokenFacts{IL: medio}
+	const bajo, medio, alto, sistema = 0x1000, 0x2000, 0x3000, 0x4000
+	ok := tokenFacts{IL: medio}
 	for _, c := range []struct {
 		name   string
+		label  uint32 // 0 = el pipe no tiene etiqueta (cuenta como medio)
 		server tokenFacts
 		client tokenFacts
-		ok     bool
+		want   bool
 	}{
-		{"igual", tokenFacts{IL: medio}, cliente, true},
-		{"mayor", tokenFacts{IL: alto}, cliente, true},
-		{"menor", tokenFacts{IL: bajo}, cliente, false},
-		{"AppContainer", tokenFacts{IL: medio, AppContainer: true}, cliente, false},
-		{"restringido", tokenFacts{IL: medio, Restricted: true}, cliente, false},
-		{"error leyendo el servidor", tokenFacts{IL: alto, Err: errors.New("acceso denegado")}, cliente, false},
-		{"error leyendo el cliente", tokenFacts{IL: alto}, tokenFacts{Err: errors.New("x")}, false},
-		{"integridad 0 del servidor", tokenFacts{}, cliente, false},
+		{"etiqueta igual", medio, ok, tokenFacts{IL: medio}, true},
+		{"etiqueta mayor", alto, ok, tokenFacts{IL: medio}, true},
+		{"etiqueta menor", bajo, ok, tokenFacts{IL: medio}, false},
+		{"sin etiqueta = medio, cliente medio", 0, ok, tokenFacts{IL: medio}, true},
+		{"sin etiqueta = medio, cliente bajo", 0, ok, tokenFacts{IL: bajo}, true},
+		{"sin etiqueta = medio, cliente alto", 0, ok, tokenFacts{IL: alto}, true}, // el tope es medio: el servidor normal no se rechaza
+		{"cliente alto, etiqueta baja", bajo, ok, tokenFacts{IL: alto}, false},
+		{"cliente alto, etiqueta media", medio, ok, tokenFacts{IL: alto}, true},
+		{"cliente sistema, etiqueta media", medio, ok, tokenFacts{IL: sistema}, true},
+		{"cliente bajo, etiqueta baja", bajo, ok, tokenFacts{IL: bajo}, true},
+		{"cliente bajo, etiqueta media", medio, ok, tokenFacts{IL: bajo}, true},
+		{"cliente con integridad 0", alto, ok, tokenFacts{}, false},
+		{"error leyendo el cliente", alto, ok, tokenFacts{IL: medio, Err: errors.New("x")}, false},
+		{"AppContainer", alto, tokenFacts{IL: medio, AppContainer: true}, ok, false},
+		{"restringido", alto, tokenFacts{IL: medio, Restricted: true}, ok, false},
+		{"error leyendo el servidor", alto, tokenFacts{Err: errors.New("acceso denegado")}, ok, false},
 	} {
-		if err := serverTrusted(c.server, c.client); (err == nil) != c.ok {
-			t.Errorf("%s: serverTrusted = %v, quería ok=%v", c.name, err, c.ok)
+		if err := serverTrusted(c.label, c.server, c.client); (err == nil) != c.want {
+			t.Errorf("%s: serverTrusted = %v, quería ok=%v", c.name, err, c.want)
 		}
 	}
 }
 
 func TestMensajePipeIntegridad(t *testing.T) {
 	for _, loc := range []string{"es", "en"} {
-		if m := i18n.Msg(loc, "ipc.err.pipe_low_integrity", i18n.A("name", "x")); m == "" || strings.HasPrefix(m, "ipc.err") {
-			t.Errorf("%s: sin texto (%q)", loc, m)
+		for _, code := range []string{"ipc.err.pipe_low_integrity", "ipc.err.server_low_integrity"} {
+			if m := i18n.Msg(loc, code, i18n.A("name", "x")); m == "" || strings.HasPrefix(m, "ipc.err") {
+				t.Errorf("%s %s: sin texto (%q)", loc, code, m)
+			}
 		}
 	}
 }

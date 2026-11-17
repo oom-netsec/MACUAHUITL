@@ -40,7 +40,7 @@ func hibernateWarnings(enabled uint64, err error) []i18n.Text {
 func unsafeVolume(vol string) bool { return vol != "" && len(vol) != 2 }
 
 // pagefileWarnings decide el aviso del archivo de paginación a partir de PagingFiles (REG_MULTI_SZ) ya leído.
-// Una lista vacía (o de cadenas vacías) significa que no hay pagefile. encrypted es EncryptPagingFile=1: sin aviso.
+// Una lista vacía (o de cadenas vacías) significa que no hay pagefile. encrypted es NtfsEncryptPagingFile=1: sin aviso.
 // BitLocker no se considera (leerlo pide admin).
 func pagefileWarnings(files []string, encrypted bool, err error) []i18n.Text {
 	if err != nil {

@@ -40,7 +40,7 @@ func TestPagefileWarnings(t *testing.T) {
 		t.Fatalf("solo la ruta, sin tamaños: %q", w[0].In("en"))
 	}
 	if w := pagefileWarnings([]string{`?:\pagefile.sys`}, true, nil); len(w) != 0 {
-		t.Fatalf("EncryptPagingFile=1: sin aviso: %v", w)
+		t.Fatalf("NtfsEncryptPagingFile=1: sin aviso: %v", w)
 	}
 	w = pagefileWarnings(nil, false, errors.New("sin clave"))
 	if len(w) != 1 || !strings.Contains(w[0].In("es"), "no se pudo comprobar") {
