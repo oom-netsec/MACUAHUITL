@@ -380,3 +380,33 @@ func TestMigracionHostFolders(t *testing.T) {
 		t.Fatalf("base nueva: %d %v", n, err)
 	}
 }
+
+// 0012 solo agrega job_roots: una base con datos de la versión anterior conserva todo.
+func TestMigracionJobRootsNoRompeUnaBaseConDatos(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "m.db")
+	files, _ := migrations.ReadDir("migrations")
+	var previas []string
+	for _, f := range files {
+		if f.Name() != "0012_job_roots.sql" {
+			previas = append(previas, f.Name())
+		}
+	}
+	seed(t, path, previas)
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO jobs(id,name,spec_json,state,created_at) VALUES('j','n','{}','created','t')`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	db, err = Open(path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer db.Close()
+	var n, r int
+	if err := db.QueryRow(`SELECT (SELECT count(*) FROM jobs), (SELECT count(*) FROM job_roots)`).Scan(&n, &r); err != nil || n != 1 || r != 0 {
+		t.Fatalf("jobs = %d job_roots = %d err = %v", n, r, err)
+	}
+}
