@@ -30,8 +30,19 @@ type TerminalOpen struct {
 	AcceptedHostKeyFingerprints []string               `protobuf:"bytes,5,rep,name=accepted_host_key_fingerprints,json=acceptedHostKeyFingerprints,proto3" json:"accepted_host_key_fingerprints,omitempty"`
 	Rows                        uint32                 `protobuf:"varint,6,opt,name=rows,proto3" json:"rows,omitempty"` // 0 = 24
 	Cols                        uint32                 `protobuf:"varint,7,opt,name=cols,proto3" json:"cols,omitempty"` // 0 = 200
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// Fase 44: abrir un host guardado de la libreta. host_id es EXCLUSIVO: el núcleo toma la dirección, el puerto, la
+	// credencial y la orden de inicio del host, y si el pedido trae además address, port o credential_id lo rechaza con
+	// InvalidArgument (terminal.err.host_and_address), sin conectar: no se combina un host guardado con otra dirección u
+	// otra credencial. Si el host
+	// tiene orden de inicio, se manda como exec con PTY en vez del shell y la sesión termina cuando esa orden termina.
+	// CheckDenied no aplica: es el terminal manual. Una credencial "key" solo se usa por host_id de un host linux o windows:
+	// con dirección a mano o con un host Cisco se rechaza (FailedPrecondition, terminal.err.key_credential).
+	HostId string `protobuf:"bytes,8,opt,name=host_id,json=hostId,proto3" json:"host_id,omitempty"`
+	// La orden de inicio que la UI le mostró al usuario antes de conectar. Si no es igual a la guardada, el núcleo no
+	// conecta (FailedPrecondition): lo que corre es lo que se vio. Vacío = el host no debe tener orden de inicio.
+	ExpectedStartupCommand string `protobuf:"bytes,9,opt,name=expected_startup_command,json=expectedStartupCommand,proto3" json:"expected_startup_command,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *TerminalOpen) Reset() {
@@ -111,6 +122,20 @@ func (x *TerminalOpen) GetCols() uint32 {
 		return x.Cols
 	}
 	return 0
+}
+
+func (x *TerminalOpen) GetHostId() string {
+	if x != nil {
+		return x.HostId
+	}
+	return ""
+}
+
+func (x *TerminalOpen) GetExpectedStartupCommand() string {
+	if x != nil {
+		return x.ExpectedStartupCommand
+	}
+	return ""
 }
 
 type TerminalSize struct {
@@ -327,7 +352,7 @@ var File_macuahuitl_v1_terminal_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_terminal_proto_rawDesc = "" +
 	"\n" +
-	"\x1cmacuahuitl/v1/terminal.proto\x12\rmacuahuitl.v1\"\xe2\x01\n" +
+	"\x1cmacuahuitl/v1/terminal.proto\x12\rmacuahuitl.v1\"\xb5\x02\n" +
 	"\fTerminalOpen\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
 	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x12\n" +
@@ -335,7 +360,9 @@ const file_macuahuitl_v1_terminal_proto_rawDesc = "" +
 	"\rcredential_id\x18\x04 \x01(\tR\fcredentialId\x12C\n" +
 	"\x1eaccepted_host_key_fingerprints\x18\x05 \x03(\tR\x1bacceptedHostKeyFingerprints\x12\x12\n" +
 	"\x04rows\x18\x06 \x01(\rR\x04rows\x12\x12\n" +
-	"\x04cols\x18\a \x01(\rR\x04cols\"6\n" +
+	"\x04cols\x18\a \x01(\rR\x04cols\x12\x17\n" +
+	"\ahost_id\x18\b \x01(\tR\x06hostId\x128\n" +
+	"\x18expected_startup_command\x18\t \x01(\tR\x16expectedStartupCommand\"6\n" +
 	"\fTerminalSize\x12\x12\n" +
 	"\x04rows\x18\x01 \x01(\rR\x04rows\x12\x12\n" +
 	"\x04cols\x18\x02 \x01(\rR\x04cols\"\x9c\x01\n" +

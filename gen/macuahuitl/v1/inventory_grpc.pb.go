@@ -27,6 +27,11 @@ const (
 	InventoryService_ApplyImportHosts_FullMethodName    = "/macuahuitl.v1.InventoryService/ApplyImportHosts"
 	InventoryService_HostsImportTemplate_FullMethodName = "/macuahuitl.v1.InventoryService/HostsImportTemplate"
 	InventoryService_HostsImportFormat_FullMethodName   = "/macuahuitl.v1.InventoryService/HostsImportFormat"
+	InventoryService_ListHostFolders_FullMethodName     = "/macuahuitl.v1.InventoryService/ListHostFolders"
+	InventoryService_CreateHostFolder_FullMethodName    = "/macuahuitl.v1.InventoryService/CreateHostFolder"
+	InventoryService_RenameHostFolder_FullMethodName    = "/macuahuitl.v1.InventoryService/RenameHostFolder"
+	InventoryService_DeleteHostFolder_FullMethodName    = "/macuahuitl.v1.InventoryService/DeleteHostFolder"
+	InventoryService_MoveHosts_FullMethodName           = "/macuahuitl.v1.InventoryService/MoveHosts"
 )
 
 // InventoryServiceClient is the client API for InventoryService service.
@@ -49,6 +54,16 @@ type InventoryServiceClient interface {
 	// Plantilla (encabezado y 3 filas válidas) y descripción de los campos, generadas de la misma tabla que valida el import.
 	HostsImportTemplate(ctx context.Context, in *HostsImportTemplateRequest, opts ...grpc.CallOption) (*HostsImportTemplateResponse, error)
 	HostsImportFormat(ctx context.Context, in *HostsImportFormatRequest, opts ...grpc.CallOption) (*HostsImportFormatResponse, error)
+	// Fase 44: carpetas de hosts como entidad propia (un solo nivel; se identifican por su nombre, sin distinguir
+	// mayúsculas). Una carpeta puede estar vacía. PutDevice, MoveHosts y el import crean la carpeta que falte.
+	ListHostFolders(ctx context.Context, in *ListHostFoldersRequest, opts ...grpc.CallOption) (*ListHostFoldersResponse, error)
+	CreateHostFolder(ctx context.Context, in *CreateHostFolderRequest, opts ...grpc.CallOption) (*CreateHostFolderResponse, error)
+	// Renombrar lleva consigo sus hosts.
+	RenameHostFolder(ctx context.Context, in *RenameHostFolderRequest, opts ...grpc.CallOption) (*RenameHostFolderResponse, error)
+	// Borrar deja sus hosts sin carpeta; nunca borra un host.
+	DeleteHostFolder(ctx context.Context, in *DeleteHostFolderRequest, opts ...grpc.CallOption) (*DeleteHostFolderResponse, error)
+	// Mueve varios hosts a una carpeta en una sola transacción: o se mueven todos o ninguno.
+	MoveHosts(ctx context.Context, in *MoveHostsRequest, opts ...grpc.CallOption) (*MoveHostsResponse, error)
 }
 
 type inventoryServiceClient struct {
@@ -139,6 +154,56 @@ func (c *inventoryServiceClient) HostsImportFormat(ctx context.Context, in *Host
 	return out, nil
 }
 
+func (c *inventoryServiceClient) ListHostFolders(ctx context.Context, in *ListHostFoldersRequest, opts ...grpc.CallOption) (*ListHostFoldersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListHostFoldersResponse)
+	err := c.cc.Invoke(ctx, InventoryService_ListHostFolders_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *inventoryServiceClient) CreateHostFolder(ctx context.Context, in *CreateHostFolderRequest, opts ...grpc.CallOption) (*CreateHostFolderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateHostFolderResponse)
+	err := c.cc.Invoke(ctx, InventoryService_CreateHostFolder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *inventoryServiceClient) RenameHostFolder(ctx context.Context, in *RenameHostFolderRequest, opts ...grpc.CallOption) (*RenameHostFolderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RenameHostFolderResponse)
+	err := c.cc.Invoke(ctx, InventoryService_RenameHostFolder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *inventoryServiceClient) DeleteHostFolder(ctx context.Context, in *DeleteHostFolderRequest, opts ...grpc.CallOption) (*DeleteHostFolderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteHostFolderResponse)
+	err := c.cc.Invoke(ctx, InventoryService_DeleteHostFolder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *inventoryServiceClient) MoveHosts(ctx context.Context, in *MoveHostsRequest, opts ...grpc.CallOption) (*MoveHostsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MoveHostsResponse)
+	err := c.cc.Invoke(ctx, InventoryService_MoveHosts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InventoryServiceServer is the server API for InventoryService service.
 // All implementations must embed UnimplementedInventoryServiceServer
 // for forward compatibility.
@@ -159,6 +224,16 @@ type InventoryServiceServer interface {
 	// Plantilla (encabezado y 3 filas válidas) y descripción de los campos, generadas de la misma tabla que valida el import.
 	HostsImportTemplate(context.Context, *HostsImportTemplateRequest) (*HostsImportTemplateResponse, error)
 	HostsImportFormat(context.Context, *HostsImportFormatRequest) (*HostsImportFormatResponse, error)
+	// Fase 44: carpetas de hosts como entidad propia (un solo nivel; se identifican por su nombre, sin distinguir
+	// mayúsculas). Una carpeta puede estar vacía. PutDevice, MoveHosts y el import crean la carpeta que falte.
+	ListHostFolders(context.Context, *ListHostFoldersRequest) (*ListHostFoldersResponse, error)
+	CreateHostFolder(context.Context, *CreateHostFolderRequest) (*CreateHostFolderResponse, error)
+	// Renombrar lleva consigo sus hosts.
+	RenameHostFolder(context.Context, *RenameHostFolderRequest) (*RenameHostFolderResponse, error)
+	// Borrar deja sus hosts sin carpeta; nunca borra un host.
+	DeleteHostFolder(context.Context, *DeleteHostFolderRequest) (*DeleteHostFolderResponse, error)
+	// Mueve varios hosts a una carpeta en una sola transacción: o se mueven todos o ninguno.
+	MoveHosts(context.Context, *MoveHostsRequest) (*MoveHostsResponse, error)
 	mustEmbedUnimplementedInventoryServiceServer()
 }
 
@@ -192,6 +267,21 @@ func (UnimplementedInventoryServiceServer) HostsImportTemplate(context.Context, 
 }
 func (UnimplementedInventoryServiceServer) HostsImportFormat(context.Context, *HostsImportFormatRequest) (*HostsImportFormatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method HostsImportFormat not implemented")
+}
+func (UnimplementedInventoryServiceServer) ListHostFolders(context.Context, *ListHostFoldersRequest) (*ListHostFoldersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListHostFolders not implemented")
+}
+func (UnimplementedInventoryServiceServer) CreateHostFolder(context.Context, *CreateHostFolderRequest) (*CreateHostFolderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateHostFolder not implemented")
+}
+func (UnimplementedInventoryServiceServer) RenameHostFolder(context.Context, *RenameHostFolderRequest) (*RenameHostFolderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RenameHostFolder not implemented")
+}
+func (UnimplementedInventoryServiceServer) DeleteHostFolder(context.Context, *DeleteHostFolderRequest) (*DeleteHostFolderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteHostFolder not implemented")
+}
+func (UnimplementedInventoryServiceServer) MoveHosts(context.Context, *MoveHostsRequest) (*MoveHostsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MoveHosts not implemented")
 }
 func (UnimplementedInventoryServiceServer) mustEmbedUnimplementedInventoryServiceServer() {}
 func (UnimplementedInventoryServiceServer) testEmbeddedByValue()                          {}
@@ -358,6 +448,96 @@ func _InventoryService_HostsImportFormat_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InventoryService_ListHostFolders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListHostFoldersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InventoryServiceServer).ListHostFolders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InventoryService_ListHostFolders_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InventoryServiceServer).ListHostFolders(ctx, req.(*ListHostFoldersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InventoryService_CreateHostFolder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateHostFolderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InventoryServiceServer).CreateHostFolder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InventoryService_CreateHostFolder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InventoryServiceServer).CreateHostFolder(ctx, req.(*CreateHostFolderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InventoryService_RenameHostFolder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenameHostFolderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InventoryServiceServer).RenameHostFolder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InventoryService_RenameHostFolder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InventoryServiceServer).RenameHostFolder(ctx, req.(*RenameHostFolderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InventoryService_DeleteHostFolder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteHostFolderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InventoryServiceServer).DeleteHostFolder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InventoryService_DeleteHostFolder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InventoryServiceServer).DeleteHostFolder(ctx, req.(*DeleteHostFolderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InventoryService_MoveHosts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MoveHostsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InventoryServiceServer).MoveHosts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InventoryService_MoveHosts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InventoryServiceServer).MoveHosts(ctx, req.(*MoveHostsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InventoryService_ServiceDesc is the grpc.ServiceDesc for InventoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -396,6 +576,26 @@ var InventoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HostsImportFormat",
 			Handler:    _InventoryService_HostsImportFormat_Handler,
+		},
+		{
+			MethodName: "ListHostFolders",
+			Handler:    _InventoryService_ListHostFolders_Handler,
+		},
+		{
+			MethodName: "CreateHostFolder",
+			Handler:    _InventoryService_CreateHostFolder_Handler,
+		},
+		{
+			MethodName: "RenameHostFolder",
+			Handler:    _InventoryService_RenameHostFolder_Handler,
+		},
+		{
+			MethodName: "DeleteHostFolder",
+			Handler:    _InventoryService_DeleteHostFolder_Handler,
+		},
+		{
+			MethodName: "MoveHosts",
+			Handler:    _InventoryService_MoveHosts_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

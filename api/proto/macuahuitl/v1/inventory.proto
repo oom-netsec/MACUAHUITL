@@ -22,6 +22,16 @@ service InventoryService {
   // Plantilla (encabezado y 3 filas válidas) y descripción de los campos, generadas de la misma tabla que valida el import.
   rpc HostsImportTemplate(HostsImportTemplateRequest) returns (HostsImportTemplateResponse);
   rpc HostsImportFormat(HostsImportFormatRequest) returns (HostsImportFormatResponse);
+  // Fase 44: carpetas de hosts como entidad propia (un solo nivel; se identifican por su nombre, sin distinguir
+  // mayúsculas). Una carpeta puede estar vacía. PutDevice, MoveHosts y el import crean la carpeta que falte.
+  rpc ListHostFolders(ListHostFoldersRequest) returns (ListHostFoldersResponse);
+  rpc CreateHostFolder(CreateHostFolderRequest) returns (CreateHostFolderResponse);
+  // Renombrar lleva consigo sus hosts.
+  rpc RenameHostFolder(RenameHostFolderRequest) returns (RenameHostFolderResponse);
+  // Borrar deja sus hosts sin carpeta; nunca borra un host.
+  rpc DeleteHostFolder(DeleteHostFolderRequest) returns (DeleteHostFolderResponse);
+  // Mueve varios hosts a una carpeta en una sola transacción: o se mueven todos o ninguno.
+  rpc MoveHosts(MoveHostsRequest) returns (MoveHostsResponse);
 }
 
 message DeviceProfile {
@@ -34,7 +44,8 @@ message Device {
   string id = 1;
   string hostname = 2;
   Target target = 3;
-  string platform = 4;
+  string platform = 4;                // hosts de la libreta: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc y, desde la fase 44,
+                                      // linux y windows (solo terminal: Patrol y el cambio asistido los rechazan); vacío = sin definir
   DeviceProfile profile = 5;
   int64 last_seen_ms = 6;             // ListDevices: unix ms de la evidencia más reciente; 0 si nunca se alcanzó
   repeated string sources = 7;        // ListDevices: patrol (objetivo de un trabajo), flota (tiene evidencia), respaldos y/o manual (libreta)
@@ -44,9 +55,16 @@ message Device {
   string name = 8;
   string folder = 9;                  // un solo nivel; vacío = sin carpeta
   repeated string tags = 10;
-  string credential_id = 11;          // referencia a la bóveda; jamás un secreto. Vacío = sin credencial
+  string credential_id = 11;          // referencia a la bóveda; jamás un secreto. Vacío = sin credencial. Fase 44: una credencial
+                                      // "key" solo en hosts linux o windows (InvalidArgument, metadata.field = "credential_id")
   string credential_label = 12;       // solo lectura: la etiqueta de credential_id; vacía si la bóveda está cerrada o ya no existe
   string notes = 13;
+  // Fase 44: orden de inicio del terminal SSH (solo plataformas linux y windows). Una línea de 1 a 256 puntos de código,
+  // sin espacios en los extremos, sin controles \p{Cc} (tab y saltos incluidos) ni caracteres de formato \p{Cf} (bidi
+  // U+202A–202E y U+2066–2069, U+200B–200F, U+FEFF); vacía = el shell de siempre. El terminal la manda como exec con PTY
+  // en vez de abrir el shell. Viaja en el export/import de hosts (columna y clave startup_command). Un error de validación
+  // llega con metadata.field = "startup_command", como los demás campos del host.
+  string startup_command = 14;
 }
 
 message ListDevicesRequest {
@@ -104,6 +122,7 @@ message ImportHostItem {
   string reason = 4;                  // solo en conflicto: direccion (reemplazar u omitir) o nombre (también renombrar)
   string conflicts_with = 5;          // id del host guardado con el que choca o coincide
   bool credential_missing = 6;        // trae etiqueta pero no hay (o hay varias) credencial con esa etiqueta: quedaría sin credencial
+  bool has_startup_command = 7;       // fase 44: el host del archivo trae orden de inicio (va en host.startup_command); la UI la muestra antes de aplicar
 }
 message PreviewImportHostsResponse {
   string token = 1;                   // vale 10 minutos y un solo uso
@@ -127,6 +146,7 @@ message ApplyImportHostsResponse {
   int32 renamed = 3;
   int32 skipped = 4;                  // incluye los igual y las filas inválidas
   int32 invalid = 5;                  // de skipped, las filas inválidas de la vista previa
+  int32 folders_created = 6;          // fase 44: carpetas que llegaron en el archivo y no existían
 }
 
 message HostsImportTemplateRequest {
@@ -150,4 +170,50 @@ message HostsImportFormatResponse {
   repeated HostField fields = 1;      // en el orden del encabezado del CSV
   int32 max_rows = 2;                 // hosts por archivo
   int64 max_bytes = 3;
+}
+
+// ---- Carpetas de hosts (fase 44) ----
+
+// Nombre: 1 a 48 caracteres entre letras ASCII, números, espacio, _, . y -, sin espacios en los extremos (las reglas del
+// folder del host de siempre). Único sin distinguir mayúsculas; «sin carpeta» no es una carpeta (folder vacío).
+message HostFolder {
+  string name = 1;
+  int32 host_count = 2;
+}
+
+message ListHostFoldersRequest {}
+message ListHostFoldersResponse {
+  repeated HostFolder folders = 1;    // todas, también las vacías, ordenadas por nombre sin distinguir mayúsculas
+}
+
+message CreateHostFolderRequest {
+  string name = 1;                    // AlreadyExists si ya hay una con ese nombre sin distinguir mayúsculas
+}
+message CreateHostFolderResponse {
+  HostFolder folder = 1;
+}
+
+message RenameHostFolderRequest {
+  string name = 1;                    // la carpeta actual (sin distinguir mayúsculas); NotFound si no existe
+  string new_name = 2;                // AlreadyExists si es otra carpeta; cambiar solo mayúsculas está permitido
+}
+message RenameHostFolderResponse {
+  HostFolder folder = 1;              // con el nombre nuevo y sus hosts
+}
+
+message DeleteHostFolderRequest {
+  string name = 1;
+  bool confirm = 2;                   // obligatoria si la carpeta tiene hosts (FailedPrecondition con la cuenta si falta)
+}
+message DeleteHostFolderResponse {
+  int32 hosts_unfiled = 1;            // hosts que quedaron sin carpeta
+}
+
+message MoveHostsRequest {
+  repeated string ids = 1;            // ids de hosts manuales, de 1 a 5000; un id que no existe da NotFound y no mueve nada
+  string folder = 2;                  // destino; vacío = sin carpeta. Si no existe, se crea
+}
+message MoveHostsResponse {
+  int32 moved = 1;                    // los que cambiaron de carpeta (los que ya estaban ahí no cuentan)
+  bool folder_created = 2;
 }

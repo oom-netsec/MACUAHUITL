@@ -18,6 +18,13 @@ service VaultService {
   rpc ExportBackup(ExportBackupRequest) returns (ExportBackupResponse);
   rpc PreviewBackupImport(PreviewBackupImportRequest) returns (PreviewBackupImportResponse);
   rpc ApplyBackupImport(ApplyBackupImportRequest) returns (ApplyBackupImportResponse);
+  // Fase 44 (ADR 0013): llave SSH ed25519 generada en el núcleo con crypto/rand. La privada vive en la bóveda y solo
+  // viaja dentro del respaldo cifrado (.mcvault); ninguna RPC la devuelve y no se importa una de fuera. Solo sale la
+  // pública. Una credencial "key" vale solo para el terminal de hosts linux y windows.
+  rpc GenerateKeyCredential(GenerateKeyCredentialRequest) returns (GenerateKeyCredentialResponse);
+  rpc GetCredentialPublicKey(GetCredentialPublicKeyRequest) returns (GetCredentialPublicKeyResponse);
+  // Genera una llave nueva para una credencial "key" conservando su id; la vieja se destruye.
+  rpc RegenerateKeyCredential(RegenerateKeyCredentialRequest) returns (RegenerateKeyCredentialResponse);
 }
 
 enum VaultState {
@@ -60,6 +67,9 @@ message CredentialInfo {
   string username = 3;
   bool has_enable_secret = 4;
   bool has_ssh_key = 5;
+  // Fase 44: "key" = solo llave SSH (sin contraseña ni enable; autentica solo por publickey y solo sirve para el terminal
+  // de hosts linux y windows: Patrol, el cambio asistido y las demás herramientas la rechazan); "password" = el resto.
+  string kind = 6;
 }
 
 message ListCredentialsRequest {}
@@ -74,10 +84,36 @@ message PutCredentialRequest {
   string username = 3;
   bytes password = 4;
   bytes enable_secret = 5;
+  // Obsoleto desde la fase 44 (ADR 0013): el núcleo rechaza una llave privada con InvalidArgument. Una llave se genera
+  // con GenerateKeyCredential. Tampoco se puede reemplazar por aquí una credencial de tipo "key" (FailedPrecondition).
   bytes ssh_private_key = 6;
 }
 message PutCredentialResponse {
   string id = 1;
+}
+
+message GenerateKeyCredentialRequest {
+  string label = 1;                    // mismas reglas que PutCredential; no puede ser reservada
+  string username = 2;
+}
+message GenerateKeyCredentialResponse {
+  string id = 1;
+  string public_key = 2;               // una línea authorized_keys: "ssh-ed25519 AAAA… macuahuitl@<hostname local>"
+}
+
+message GetCredentialPublicKeyRequest {
+  string id = 1;                       // credencial con llave SSH (has_ssh_key); si no tiene, FailedPrecondition
+}
+message GetCredentialPublicKeyResponse {
+  string public_key = 1;               // igual que en GenerateKeyCredentialResponse; el comentario lleva el hostname de hoy
+}
+
+message RegenerateKeyCredentialRequest {
+  string id = 1;                       // credencial de tipo "key"; de otro tipo, FailedPrecondition
+  bool confirm = 2;                    // obligatoria: la pública vieja deja de servir en cada authorized_keys donde esté
+}
+message RegenerateKeyCredentialResponse {
+  string public_key = 1;               // la nueva, en el mismo formato que GenerateKeyCredentialResponse
 }
 
 message DeleteCredentialRequest {
@@ -96,6 +132,9 @@ message ExportBackupRequest {
 message ExportBackupResponse {
   int32 count = 1;                     // credenciales guardadas (las reservadas del sistema no viajan)
   bool no_permissions = 2;             // el sistema de archivos (p. ej. vfat) no admitió los permisos 0600: el archivo va cifrado igual
+  // Fase 44: de count, cuántas llevan llave privada SSH (viajan cifradas en el respaldo, ADR 0013). La UI lo avisa antes
+  // (con has_ssh_key de ListCredentials) y después de exportar.
+  int32 ssh_keys_included = 3;
 }
 
 message PreviewBackupImportRequest {

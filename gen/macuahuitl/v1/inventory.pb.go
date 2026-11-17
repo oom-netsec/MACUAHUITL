@@ -82,24 +82,32 @@ func (x *DeviceProfile) GetUsesEnable() bool {
 }
 
 type Device struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	Id         string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Hostname   string                 `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
-	Target     *Target                `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"`
-	Platform   string                 `protobuf:"bytes,4,opt,name=platform,proto3" json:"platform,omitempty"`
-	Profile    *DeviceProfile         `protobuf:"bytes,5,opt,name=profile,proto3" json:"profile,omitempty"`
-	LastSeenMs int64                  `protobuf:"varint,6,opt,name=last_seen_ms,json=lastSeenMs,proto3" json:"last_seen_ms,omitempty"` // ListDevices: unix ms de la evidencia más reciente; 0 si nunca se alcanzó
-	Sources    []string               `protobuf:"bytes,7,rep,name=sources,proto3" json:"sources,omitempty"`                            // ListDevices: patrol (objetivo de un trabajo), flota (tiene evidencia), respaldos y/o manual (libreta)
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Id       string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Hostname string                 `protobuf:"bytes,2,opt,name=hostname,proto3" json:"hostname,omitempty"`
+	Target   *Target                `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"`
+	Platform string                 `protobuf:"bytes,4,opt,name=platform,proto3" json:"platform,omitempty"` // hosts de la libreta: ios, ios-xe, nx-os, asa, ftd, ise, iosxr, wlc y, desde la fase 44,
+	// linux y windows (solo terminal: Patrol y el cambio asistido los rechazan); vacío = sin definir
+	Profile    *DeviceProfile `protobuf:"bytes,5,opt,name=profile,proto3" json:"profile,omitempty"`
+	LastSeenMs int64          `protobuf:"varint,6,opt,name=last_seen_ms,json=lastSeenMs,proto3" json:"last_seen_ms,omitempty"` // ListDevices: unix ms de la evidencia más reciente; 0 si nunca se alcanzó
+	Sources    []string       `protobuf:"bytes,7,rep,name=sources,proto3" json:"sources,omitempty"`                            // ListDevices: patrol (objetivo de un trabajo), flota (tiene evidencia), respaldos y/o manual (libreta)
 	// Fase 29b, libreta de hosts. Solo los hosts manuales los traen (en ListDevices, id = el id del host manual
 	// en vez de la dirección; el puerto va en profile.port y el nombre también en hostname).
-	Name            string   `protobuf:"bytes,8,opt,name=name,proto3" json:"name,omitempty"`
-	Folder          string   `protobuf:"bytes,9,opt,name=folder,proto3" json:"folder,omitempty"` // un solo nivel; vacío = sin carpeta
-	Tags            []string `protobuf:"bytes,10,rep,name=tags,proto3" json:"tags,omitempty"`
-	CredentialId    string   `protobuf:"bytes,11,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`          // referencia a la bóveda; jamás un secreto. Vacío = sin credencial
-	CredentialLabel string   `protobuf:"bytes,12,opt,name=credential_label,json=credentialLabel,proto3" json:"credential_label,omitempty"` // solo lectura: la etiqueta de credential_id; vacía si la bóveda está cerrada o ya no existe
-	Notes           string   `protobuf:"bytes,13,opt,name=notes,proto3" json:"notes,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	Name         string   `protobuf:"bytes,8,opt,name=name,proto3" json:"name,omitempty"`
+	Folder       string   `protobuf:"bytes,9,opt,name=folder,proto3" json:"folder,omitempty"` // un solo nivel; vacío = sin carpeta
+	Tags         []string `protobuf:"bytes,10,rep,name=tags,proto3" json:"tags,omitempty"`
+	CredentialId string   `protobuf:"bytes,11,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"` // referencia a la bóveda; jamás un secreto. Vacío = sin credencial. Fase 44: una credencial
+	// "key" solo en hosts linux o windows (InvalidArgument, metadata.field = "credential_id")
+	CredentialLabel string `protobuf:"bytes,12,opt,name=credential_label,json=credentialLabel,proto3" json:"credential_label,omitempty"` // solo lectura: la etiqueta de credential_id; vacía si la bóveda está cerrada o ya no existe
+	Notes           string `protobuf:"bytes,13,opt,name=notes,proto3" json:"notes,omitempty"`
+	// Fase 44: orden de inicio del terminal SSH (solo plataformas linux y windows). Una línea de 1 a 256 puntos de código,
+	// sin espacios en los extremos, sin controles \p{Cc} (tab y saltos incluidos) ni caracteres de formato \p{Cf} (bidi
+	// U+202A–202E y U+2066–2069, U+200B–200F, U+FEFF); vacía = el shell de siempre. El terminal la manda como exec con PTY
+	// en vez de abrir el shell. Viaja en el export/import de hosts (columna y clave startup_command). Un error de validación
+	// llega con metadata.field = "startup_command", como los demás campos del host.
+	StartupCommand string `protobuf:"bytes,14,opt,name=startup_command,json=startupCommand,proto3" json:"startup_command,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Device) Reset() {
@@ -219,6 +227,13 @@ func (x *Device) GetCredentialLabel() string {
 func (x *Device) GetNotes() string {
 	if x != nil {
 		return x.Notes
+	}
+	return ""
+}
+
+func (x *Device) GetStartupCommand() string {
+	if x != nil {
+		return x.StartupCommand
 	}
 	return ""
 }
@@ -757,12 +772,13 @@ func (x *ImportHostError) GetReason() string {
 
 type ImportHostItem struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	Host              *Device                `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`                                                     // el del archivo; credential_id vacío y credential_label la del archivo
-	Key               string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`                                                       // «dirección:puerto»: identifica al host en las decisiones
-	State             string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`                                                   // nuevo, igual o conflicto
-	Reason            string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`                                                 // solo en conflicto: direccion (reemplazar u omitir) o nombre (también renombrar)
-	ConflictsWith     string                 `protobuf:"bytes,5,opt,name=conflicts_with,json=conflictsWith,proto3" json:"conflicts_with,omitempty"`              // id del host guardado con el que choca o coincide
-	CredentialMissing bool                   `protobuf:"varint,6,opt,name=credential_missing,json=credentialMissing,proto3" json:"credential_missing,omitempty"` // trae etiqueta pero no hay (o hay varias) credencial con esa etiqueta: quedaría sin credencial
+	Host              *Device                `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`                                                       // el del archivo; credential_id vacío y credential_label la del archivo
+	Key               string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`                                                         // «dirección:puerto»: identifica al host en las decisiones
+	State             string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`                                                     // nuevo, igual o conflicto
+	Reason            string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`                                                   // solo en conflicto: direccion (reemplazar u omitir) o nombre (también renombrar)
+	ConflictsWith     string                 `protobuf:"bytes,5,opt,name=conflicts_with,json=conflictsWith,proto3" json:"conflicts_with,omitempty"`                // id del host guardado con el que choca o coincide
+	CredentialMissing bool                   `protobuf:"varint,6,opt,name=credential_missing,json=credentialMissing,proto3" json:"credential_missing,omitempty"`   // trae etiqueta pero no hay (o hay varias) credencial con esa etiqueta: quedaría sin credencial
+	HasStartupCommand bool                   `protobuf:"varint,7,opt,name=has_startup_command,json=hasStartupCommand,proto3" json:"has_startup_command,omitempty"` // fase 44: el host del archivo trae orden de inicio (va en host.startup_command); la UI la muestra antes de aplicar
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -835,6 +851,13 @@ func (x *ImportHostItem) GetConflictsWith() string {
 func (x *ImportHostItem) GetCredentialMissing() bool {
 	if x != nil {
 		return x.CredentialMissing
+	}
+	return false
+}
+
+func (x *ImportHostItem) GetHasStartupCommand() bool {
+	if x != nil {
+		return x.HasStartupCommand
 	}
 	return false
 }
@@ -1028,14 +1051,15 @@ func (x *ApplyImportHostsRequest) GetDecisions() []*ImportHostDecision {
 }
 
 type ApplyImportHostsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Created       int32                  `protobuf:"varint,1,opt,name=created,proto3" json:"created,omitempty"`
-	Replaced      int32                  `protobuf:"varint,2,opt,name=replaced,proto3" json:"replaced,omitempty"`
-	Renamed       int32                  `protobuf:"varint,3,opt,name=renamed,proto3" json:"renamed,omitempty"`
-	Skipped       int32                  `protobuf:"varint,4,opt,name=skipped,proto3" json:"skipped,omitempty"` // incluye los igual y las filas inválidas
-	Invalid       int32                  `protobuf:"varint,5,opt,name=invalid,proto3" json:"invalid,omitempty"` // de skipped, las filas inválidas de la vista previa
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Created        int32                  `protobuf:"varint,1,opt,name=created,proto3" json:"created,omitempty"`
+	Replaced       int32                  `protobuf:"varint,2,opt,name=replaced,proto3" json:"replaced,omitempty"`
+	Renamed        int32                  `protobuf:"varint,3,opt,name=renamed,proto3" json:"renamed,omitempty"`
+	Skipped        int32                  `protobuf:"varint,4,opt,name=skipped,proto3" json:"skipped,omitempty"`                                     // incluye los igual y las filas inválidas
+	Invalid        int32                  `protobuf:"varint,5,opt,name=invalid,proto3" json:"invalid,omitempty"`                                     // de skipped, las filas inválidas de la vista previa
+	FoldersCreated int32                  `protobuf:"varint,6,opt,name=folders_created,json=foldersCreated,proto3" json:"folders_created,omitempty"` // fase 44: carpetas que llegaron en el archivo y no existían
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ApplyImportHostsResponse) Reset() {
@@ -1099,6 +1123,13 @@ func (x *ApplyImportHostsResponse) GetSkipped() int32 {
 func (x *ApplyImportHostsResponse) GetInvalid() int32 {
 	if x != nil {
 		return x.Invalid
+	}
+	return 0
+}
+
+func (x *ApplyImportHostsResponse) GetFoldersCreated() int32 {
+	if x != nil {
+		return x.FoldersCreated
 	}
 	return 0
 }
@@ -1379,6 +1410,524 @@ func (x *HostsImportFormatResponse) GetMaxBytes() int64 {
 	return 0
 }
 
+// Nombre: 1 a 48 caracteres entre letras ASCII, números, espacio, _, . y -, sin espacios en los extremos (las reglas del
+// folder del host de siempre). Único sin distinguir mayúsculas; «sin carpeta» no es una carpeta (folder vacío).
+type HostFolder struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	HostCount     int32                  `protobuf:"varint,2,opt,name=host_count,json=hostCount,proto3" json:"host_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HostFolder) Reset() {
+	*x = HostFolder{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HostFolder) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HostFolder) ProtoMessage() {}
+
+func (x *HostFolder) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HostFolder.ProtoReflect.Descriptor instead.
+func (*HostFolder) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *HostFolder) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *HostFolder) GetHostCount() int32 {
+	if x != nil {
+		return x.HostCount
+	}
+	return 0
+}
+
+type ListHostFoldersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListHostFoldersRequest) Reset() {
+	*x = ListHostFoldersRequest{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListHostFoldersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListHostFoldersRequest) ProtoMessage() {}
+
+func (x *ListHostFoldersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListHostFoldersRequest.ProtoReflect.Descriptor instead.
+func (*ListHostFoldersRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{23}
+}
+
+type ListHostFoldersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Folders       []*HostFolder          `protobuf:"bytes,1,rep,name=folders,proto3" json:"folders,omitempty"` // todas, también las vacías, ordenadas por nombre sin distinguir mayúsculas
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListHostFoldersResponse) Reset() {
+	*x = ListHostFoldersResponse{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListHostFoldersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListHostFoldersResponse) ProtoMessage() {}
+
+func (x *ListHostFoldersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListHostFoldersResponse.ProtoReflect.Descriptor instead.
+func (*ListHostFoldersResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ListHostFoldersResponse) GetFolders() []*HostFolder {
+	if x != nil {
+		return x.Folders
+	}
+	return nil
+}
+
+type CreateHostFolderRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // AlreadyExists si ya hay una con ese nombre sin distinguir mayúsculas
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateHostFolderRequest) Reset() {
+	*x = CreateHostFolderRequest{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateHostFolderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateHostFolderRequest) ProtoMessage() {}
+
+func (x *CreateHostFolderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateHostFolderRequest.ProtoReflect.Descriptor instead.
+func (*CreateHostFolderRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *CreateHostFolderRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type CreateHostFolderResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Folder        *HostFolder            `protobuf:"bytes,1,opt,name=folder,proto3" json:"folder,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateHostFolderResponse) Reset() {
+	*x = CreateHostFolderResponse{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateHostFolderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateHostFolderResponse) ProtoMessage() {}
+
+func (x *CreateHostFolderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateHostFolderResponse.ProtoReflect.Descriptor instead.
+func (*CreateHostFolderResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *CreateHostFolderResponse) GetFolder() *HostFolder {
+	if x != nil {
+		return x.Folder
+	}
+	return nil
+}
+
+type RenameHostFolderRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`                      // la carpeta actual (sin distinguir mayúsculas); NotFound si no existe
+	NewName       string                 `protobuf:"bytes,2,opt,name=new_name,json=newName,proto3" json:"new_name,omitempty"` // AlreadyExists si es otra carpeta; cambiar solo mayúsculas está permitido
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RenameHostFolderRequest) Reset() {
+	*x = RenameHostFolderRequest{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenameHostFolderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenameHostFolderRequest) ProtoMessage() {}
+
+func (x *RenameHostFolderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenameHostFolderRequest.ProtoReflect.Descriptor instead.
+func (*RenameHostFolderRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *RenameHostFolderRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *RenameHostFolderRequest) GetNewName() string {
+	if x != nil {
+		return x.NewName
+	}
+	return ""
+}
+
+type RenameHostFolderResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Folder        *HostFolder            `protobuf:"bytes,1,opt,name=folder,proto3" json:"folder,omitempty"` // con el nombre nuevo y sus hosts
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RenameHostFolderResponse) Reset() {
+	*x = RenameHostFolderResponse{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenameHostFolderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenameHostFolderResponse) ProtoMessage() {}
+
+func (x *RenameHostFolderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenameHostFolderResponse.ProtoReflect.Descriptor instead.
+func (*RenameHostFolderResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *RenameHostFolderResponse) GetFolder() *HostFolder {
+	if x != nil {
+		return x.Folder
+	}
+	return nil
+}
+
+type DeleteHostFolderRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Confirm       bool                   `protobuf:"varint,2,opt,name=confirm,proto3" json:"confirm,omitempty"` // obligatoria si la carpeta tiene hosts (FailedPrecondition con la cuenta si falta)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteHostFolderRequest) Reset() {
+	*x = DeleteHostFolderRequest{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteHostFolderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteHostFolderRequest) ProtoMessage() {}
+
+func (x *DeleteHostFolderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteHostFolderRequest.ProtoReflect.Descriptor instead.
+func (*DeleteHostFolderRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *DeleteHostFolderRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DeleteHostFolderRequest) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+type DeleteHostFolderResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HostsUnfiled  int32                  `protobuf:"varint,1,opt,name=hosts_unfiled,json=hostsUnfiled,proto3" json:"hosts_unfiled,omitempty"` // hosts que quedaron sin carpeta
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteHostFolderResponse) Reset() {
+	*x = DeleteHostFolderResponse{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteHostFolderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteHostFolderResponse) ProtoMessage() {}
+
+func (x *DeleteHostFolderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteHostFolderResponse.ProtoReflect.Descriptor instead.
+func (*DeleteHostFolderResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *DeleteHostFolderResponse) GetHostsUnfiled() int32 {
+	if x != nil {
+		return x.HostsUnfiled
+	}
+	return 0
+}
+
+type MoveHostsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ids           []string               `protobuf:"bytes,1,rep,name=ids,proto3" json:"ids,omitempty"`       // ids de hosts manuales, de 1 a 5000; un id que no existe da NotFound y no mueve nada
+	Folder        string                 `protobuf:"bytes,2,opt,name=folder,proto3" json:"folder,omitempty"` // destino; vacío = sin carpeta. Si no existe, se crea
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MoveHostsRequest) Reset() {
+	*x = MoveHostsRequest{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MoveHostsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MoveHostsRequest) ProtoMessage() {}
+
+func (x *MoveHostsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MoveHostsRequest.ProtoReflect.Descriptor instead.
+func (*MoveHostsRequest) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *MoveHostsRequest) GetIds() []string {
+	if x != nil {
+		return x.Ids
+	}
+	return nil
+}
+
+func (x *MoveHostsRequest) GetFolder() string {
+	if x != nil {
+		return x.Folder
+	}
+	return ""
+}
+
+type MoveHostsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Moved         int32                  `protobuf:"varint,1,opt,name=moved,proto3" json:"moved,omitempty"` // los que cambiaron de carpeta (los que ya estaban ahí no cuentan)
+	FolderCreated bool                   `protobuf:"varint,2,opt,name=folder_created,json=folderCreated,proto3" json:"folder_created,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MoveHostsResponse) Reset() {
+	*x = MoveHostsResponse{}
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MoveHostsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MoveHostsResponse) ProtoMessage() {}
+
+func (x *MoveHostsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_macuahuitl_v1_inventory_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MoveHostsResponse.ProtoReflect.Descriptor instead.
+func (*MoveHostsResponse) Descriptor() ([]byte, []int) {
+	return file_macuahuitl_v1_inventory_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *MoveHostsResponse) GetMoved() int32 {
+	if x != nil {
+		return x.Moved
+	}
+	return 0
+}
+
+func (x *MoveHostsResponse) GetFolderCreated() bool {
+	if x != nil {
+		return x.FolderCreated
+	}
+	return false
+}
+
 var File_macuahuitl_v1_inventory_proto protoreflect.FileDescriptor
 
 const file_macuahuitl_v1_inventory_proto_rawDesc = "" +
@@ -1388,7 +1937,7 @@ const file_macuahuitl_v1_inventory_proto_rawDesc = "" +
 	"\x04port\x18\x01 \x01(\rR\x04port\x126\n" +
 	"\x17allow_legacy_algorithms\x18\x02 \x01(\bR\x15allowLegacyAlgorithms\x12\x1f\n" +
 	"\vuses_enable\x18\x03 \x01(\bR\n" +
-	"usesEnable\"\x99\x03\n" +
+	"usesEnable\"\xc2\x03\n" +
 	"\x06Device\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1a\n" +
 	"\bhostname\x18\x02 \x01(\tR\bhostname\x12-\n" +
@@ -1404,7 +1953,8 @@ const file_macuahuitl_v1_inventory_proto_rawDesc = "" +
 	" \x03(\tR\x04tags\x12#\n" +
 	"\rcredential_id\x18\v \x01(\tR\fcredentialId\x12)\n" +
 	"\x10credential_label\x18\f \x01(\tR\x0fcredentialLabel\x12\x14\n" +
-	"\x05notes\x18\r \x01(\tR\x05notes\"u\n" +
+	"\x05notes\x18\r \x01(\tR\x05notes\x12'\n" +
+	"\x0fstartup_command\x18\x0e \x01(\tR\x0estartupCommand\"u\n" +
 	"\x12ListDevicesRequest\x12\x14\n" +
 	"\x05query\x18\x01 \x01(\tR\x05query\x12\x16\n" +
 	"\x06folder\x18\x02 \x01(\tR\x06folder\x12\x10\n" +
@@ -1436,14 +1986,15 @@ const file_macuahuitl_v1_inventory_proto_rawDesc = "" +
 	"\x0fImportHostError\x12\x12\n" +
 	"\x04line\x18\x01 \x01(\x05R\x04line\x12\x14\n" +
 	"\x05field\x18\x02 \x01(\tR\x05field\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"\xd1\x01\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"\x81\x02\n" +
 	"\x0eImportHostItem\x12)\n" +
 	"\x04host\x18\x01 \x01(\v2\x15.macuahuitl.v1.DeviceR\x04host\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x14\n" +
 	"\x05state\x18\x03 \x01(\tR\x05state\x12\x16\n" +
 	"\x06reason\x18\x04 \x01(\tR\x06reason\x12%\n" +
 	"\x0econflicts_with\x18\x05 \x01(\tR\rconflictsWith\x12-\n" +
-	"\x12credential_missing\x18\x06 \x01(\bR\x11credentialMissing\"\xf2\x01\n" +
+	"\x12credential_missing\x18\x06 \x01(\bR\x11credentialMissing\x12.\n" +
+	"\x13has_startup_command\x18\a \x01(\bR\x11hasStartupCommand\"\xf2\x01\n" +
 	"\x1aPreviewImportHostsResponse\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x1d\n" +
 	"\n" +
@@ -1457,13 +2008,14 @@ const file_macuahuitl_v1_inventory_proto_rawDesc = "" +
 	"\x06action\x18\x02 \x01(\tR\x06action\"p\n" +
 	"\x17ApplyImportHostsRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12?\n" +
-	"\tdecisions\x18\x02 \x03(\v2!.macuahuitl.v1.ImportHostDecisionR\tdecisions\"\x9e\x01\n" +
+	"\tdecisions\x18\x02 \x03(\v2!.macuahuitl.v1.ImportHostDecisionR\tdecisions\"\xc7\x01\n" +
 	"\x18ApplyImportHostsResponse\x12\x18\n" +
 	"\acreated\x18\x01 \x01(\x05R\acreated\x12\x1a\n" +
 	"\breplaced\x18\x02 \x01(\x05R\breplaced\x12\x18\n" +
 	"\arenamed\x18\x03 \x01(\x05R\arenamed\x12\x18\n" +
 	"\askipped\x18\x04 \x01(\x05R\askipped\x12\x18\n" +
-	"\ainvalid\x18\x05 \x01(\x05R\ainvalid\"4\n" +
+	"\ainvalid\x18\x05 \x01(\x05R\ainvalid\x12'\n" +
+	"\x0ffolders_created\x18\x06 \x01(\x05R\x0efoldersCreated\"4\n" +
 	"\x1aHostsImportTemplateRequest\x12\x16\n" +
 	"\x06format\x18\x01 \x01(\tR\x06format\"k\n" +
 	"\x1bHostsImportTemplateResponse\x12\x16\n" +
@@ -1480,7 +2032,35 @@ const file_macuahuitl_v1_inventory_proto_rawDesc = "" +
 	"\x19HostsImportFormatResponse\x120\n" +
 	"\x06fields\x18\x01 \x03(\v2\x18.macuahuitl.v1.HostFieldR\x06fields\x12\x19\n" +
 	"\bmax_rows\x18\x02 \x01(\x05R\amaxRows\x12\x1b\n" +
-	"\tmax_bytes\x18\x03 \x01(\x03R\bmaxBytes2\x8d\x06\n" +
+	"\tmax_bytes\x18\x03 \x01(\x03R\bmaxBytes\"?\n" +
+	"\n" +
+	"HostFolder\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1d\n" +
+	"\n" +
+	"host_count\x18\x02 \x01(\x05R\thostCount\"\x18\n" +
+	"\x16ListHostFoldersRequest\"N\n" +
+	"\x17ListHostFoldersResponse\x123\n" +
+	"\afolders\x18\x01 \x03(\v2\x19.macuahuitl.v1.HostFolderR\afolders\"-\n" +
+	"\x17CreateHostFolderRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"M\n" +
+	"\x18CreateHostFolderResponse\x121\n" +
+	"\x06folder\x18\x01 \x01(\v2\x19.macuahuitl.v1.HostFolderR\x06folder\"H\n" +
+	"\x17RenameHostFolderRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x19\n" +
+	"\bnew_name\x18\x02 \x01(\tR\anewName\"M\n" +
+	"\x18RenameHostFolderResponse\x121\n" +
+	"\x06folder\x18\x01 \x01(\v2\x19.macuahuitl.v1.HostFolderR\x06folder\"G\n" +
+	"\x17DeleteHostFolderRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\aconfirm\x18\x02 \x01(\bR\aconfirm\"?\n" +
+	"\x18DeleteHostFolderResponse\x12#\n" +
+	"\rhosts_unfiled\x18\x01 \x01(\x05R\fhostsUnfiled\"<\n" +
+	"\x10MoveHostsRequest\x12\x10\n" +
+	"\x03ids\x18\x01 \x03(\tR\x03ids\x12\x16\n" +
+	"\x06folder\x18\x02 \x01(\tR\x06folder\"P\n" +
+	"\x11MoveHostsResponse\x12\x14\n" +
+	"\x05moved\x18\x01 \x01(\x05R\x05moved\x12%\n" +
+	"\x0efolder_created\x18\x02 \x01(\bR\rfolderCreated2\xee\t\n" +
 	"\x10InventoryService\x12T\n" +
 	"\vListDevices\x12!.macuahuitl.v1.ListDevicesRequest\x1a\".macuahuitl.v1.ListDevicesResponse\x12N\n" +
 	"\tPutDevice\x12\x1f.macuahuitl.v1.PutDeviceRequest\x1a .macuahuitl.v1.PutDeviceResponse\x12W\n" +
@@ -1489,7 +2069,12 @@ const file_macuahuitl_v1_inventory_proto_rawDesc = "" +
 	"\x12PreviewImportHosts\x12(.macuahuitl.v1.PreviewImportHostsRequest\x1a).macuahuitl.v1.PreviewImportHostsResponse\x12c\n" +
 	"\x10ApplyImportHosts\x12&.macuahuitl.v1.ApplyImportHostsRequest\x1a'.macuahuitl.v1.ApplyImportHostsResponse\x12l\n" +
 	"\x13HostsImportTemplate\x12).macuahuitl.v1.HostsImportTemplateRequest\x1a*.macuahuitl.v1.HostsImportTemplateResponse\x12f\n" +
-	"\x11HostsImportFormat\x12'.macuahuitl.v1.HostsImportFormatRequest\x1a(.macuahuitl.v1.HostsImportFormatResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
+	"\x11HostsImportFormat\x12'.macuahuitl.v1.HostsImportFormatRequest\x1a(.macuahuitl.v1.HostsImportFormatResponse\x12`\n" +
+	"\x0fListHostFolders\x12%.macuahuitl.v1.ListHostFoldersRequest\x1a&.macuahuitl.v1.ListHostFoldersResponse\x12c\n" +
+	"\x10CreateHostFolder\x12&.macuahuitl.v1.CreateHostFolderRequest\x1a'.macuahuitl.v1.CreateHostFolderResponse\x12c\n" +
+	"\x10RenameHostFolder\x12&.macuahuitl.v1.RenameHostFolderRequest\x1a'.macuahuitl.v1.RenameHostFolderResponse\x12c\n" +
+	"\x10DeleteHostFolder\x12&.macuahuitl.v1.DeleteHostFolderRequest\x1a'.macuahuitl.v1.DeleteHostFolderResponse\x12N\n" +
+	"\tMoveHosts\x12\x1f.macuahuitl.v1.MoveHostsRequest\x1a .macuahuitl.v1.MoveHostsResponseBAZ?github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1b\x06proto3"
 
 var (
 	file_macuahuitl_v1_inventory_proto_rawDescOnce sync.Once
@@ -1503,7 +2088,7 @@ func file_macuahuitl_v1_inventory_proto_rawDescGZIP() []byte {
 	return file_macuahuitl_v1_inventory_proto_rawDescData
 }
 
-var file_macuahuitl_v1_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_macuahuitl_v1_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_macuahuitl_v1_inventory_proto_goTypes = []any{
 	(*DeviceProfile)(nil),               // 0: macuahuitl.v1.DeviceProfile
 	(*Device)(nil),                      // 1: macuahuitl.v1.Device
@@ -1527,10 +2112,21 @@ var file_macuahuitl_v1_inventory_proto_goTypes = []any{
 	(*HostsImportFormatRequest)(nil),    // 19: macuahuitl.v1.HostsImportFormatRequest
 	(*HostField)(nil),                   // 20: macuahuitl.v1.HostField
 	(*HostsImportFormatResponse)(nil),   // 21: macuahuitl.v1.HostsImportFormatResponse
-	(*Target)(nil),                      // 22: macuahuitl.v1.Target
+	(*HostFolder)(nil),                  // 22: macuahuitl.v1.HostFolder
+	(*ListHostFoldersRequest)(nil),      // 23: macuahuitl.v1.ListHostFoldersRequest
+	(*ListHostFoldersResponse)(nil),     // 24: macuahuitl.v1.ListHostFoldersResponse
+	(*CreateHostFolderRequest)(nil),     // 25: macuahuitl.v1.CreateHostFolderRequest
+	(*CreateHostFolderResponse)(nil),    // 26: macuahuitl.v1.CreateHostFolderResponse
+	(*RenameHostFolderRequest)(nil),     // 27: macuahuitl.v1.RenameHostFolderRequest
+	(*RenameHostFolderResponse)(nil),    // 28: macuahuitl.v1.RenameHostFolderResponse
+	(*DeleteHostFolderRequest)(nil),     // 29: macuahuitl.v1.DeleteHostFolderRequest
+	(*DeleteHostFolderResponse)(nil),    // 30: macuahuitl.v1.DeleteHostFolderResponse
+	(*MoveHostsRequest)(nil),            // 31: macuahuitl.v1.MoveHostsRequest
+	(*MoveHostsResponse)(nil),           // 32: macuahuitl.v1.MoveHostsResponse
+	(*Target)(nil),                      // 33: macuahuitl.v1.Target
 }
 var file_macuahuitl_v1_inventory_proto_depIdxs = []int32{
-	22, // 0: macuahuitl.v1.Device.target:type_name -> macuahuitl.v1.Target
+	33, // 0: macuahuitl.v1.Device.target:type_name -> macuahuitl.v1.Target
 	0,  // 1: macuahuitl.v1.Device.profile:type_name -> macuahuitl.v1.DeviceProfile
 	1,  // 2: macuahuitl.v1.ListDevicesResponse.devices:type_name -> macuahuitl.v1.Device
 	1,  // 3: macuahuitl.v1.PutDeviceRequest.device:type_name -> macuahuitl.v1.Device
@@ -1539,27 +2135,40 @@ var file_macuahuitl_v1_inventory_proto_depIdxs = []int32{
 	11, // 6: macuahuitl.v1.PreviewImportHostsResponse.errors:type_name -> macuahuitl.v1.ImportHostError
 	14, // 7: macuahuitl.v1.ApplyImportHostsRequest.decisions:type_name -> macuahuitl.v1.ImportHostDecision
 	20, // 8: macuahuitl.v1.HostsImportFormatResponse.fields:type_name -> macuahuitl.v1.HostField
-	2,  // 9: macuahuitl.v1.InventoryService.ListDevices:input_type -> macuahuitl.v1.ListDevicesRequest
-	4,  // 10: macuahuitl.v1.InventoryService.PutDevice:input_type -> macuahuitl.v1.PutDeviceRequest
-	6,  // 11: macuahuitl.v1.InventoryService.DeleteDevice:input_type -> macuahuitl.v1.DeleteDeviceRequest
-	8,  // 12: macuahuitl.v1.InventoryService.ExportHosts:input_type -> macuahuitl.v1.ExportHostsRequest
-	10, // 13: macuahuitl.v1.InventoryService.PreviewImportHosts:input_type -> macuahuitl.v1.PreviewImportHostsRequest
-	15, // 14: macuahuitl.v1.InventoryService.ApplyImportHosts:input_type -> macuahuitl.v1.ApplyImportHostsRequest
-	17, // 15: macuahuitl.v1.InventoryService.HostsImportTemplate:input_type -> macuahuitl.v1.HostsImportTemplateRequest
-	19, // 16: macuahuitl.v1.InventoryService.HostsImportFormat:input_type -> macuahuitl.v1.HostsImportFormatRequest
-	3,  // 17: macuahuitl.v1.InventoryService.ListDevices:output_type -> macuahuitl.v1.ListDevicesResponse
-	5,  // 18: macuahuitl.v1.InventoryService.PutDevice:output_type -> macuahuitl.v1.PutDeviceResponse
-	7,  // 19: macuahuitl.v1.InventoryService.DeleteDevice:output_type -> macuahuitl.v1.DeleteDeviceResponse
-	9,  // 20: macuahuitl.v1.InventoryService.ExportHosts:output_type -> macuahuitl.v1.ExportHostsResponse
-	13, // 21: macuahuitl.v1.InventoryService.PreviewImportHosts:output_type -> macuahuitl.v1.PreviewImportHostsResponse
-	16, // 22: macuahuitl.v1.InventoryService.ApplyImportHosts:output_type -> macuahuitl.v1.ApplyImportHostsResponse
-	18, // 23: macuahuitl.v1.InventoryService.HostsImportTemplate:output_type -> macuahuitl.v1.HostsImportTemplateResponse
-	21, // 24: macuahuitl.v1.InventoryService.HostsImportFormat:output_type -> macuahuitl.v1.HostsImportFormatResponse
-	17, // [17:25] is the sub-list for method output_type
-	9,  // [9:17] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	22, // 9: macuahuitl.v1.ListHostFoldersResponse.folders:type_name -> macuahuitl.v1.HostFolder
+	22, // 10: macuahuitl.v1.CreateHostFolderResponse.folder:type_name -> macuahuitl.v1.HostFolder
+	22, // 11: macuahuitl.v1.RenameHostFolderResponse.folder:type_name -> macuahuitl.v1.HostFolder
+	2,  // 12: macuahuitl.v1.InventoryService.ListDevices:input_type -> macuahuitl.v1.ListDevicesRequest
+	4,  // 13: macuahuitl.v1.InventoryService.PutDevice:input_type -> macuahuitl.v1.PutDeviceRequest
+	6,  // 14: macuahuitl.v1.InventoryService.DeleteDevice:input_type -> macuahuitl.v1.DeleteDeviceRequest
+	8,  // 15: macuahuitl.v1.InventoryService.ExportHosts:input_type -> macuahuitl.v1.ExportHostsRequest
+	10, // 16: macuahuitl.v1.InventoryService.PreviewImportHosts:input_type -> macuahuitl.v1.PreviewImportHostsRequest
+	15, // 17: macuahuitl.v1.InventoryService.ApplyImportHosts:input_type -> macuahuitl.v1.ApplyImportHostsRequest
+	17, // 18: macuahuitl.v1.InventoryService.HostsImportTemplate:input_type -> macuahuitl.v1.HostsImportTemplateRequest
+	19, // 19: macuahuitl.v1.InventoryService.HostsImportFormat:input_type -> macuahuitl.v1.HostsImportFormatRequest
+	23, // 20: macuahuitl.v1.InventoryService.ListHostFolders:input_type -> macuahuitl.v1.ListHostFoldersRequest
+	25, // 21: macuahuitl.v1.InventoryService.CreateHostFolder:input_type -> macuahuitl.v1.CreateHostFolderRequest
+	27, // 22: macuahuitl.v1.InventoryService.RenameHostFolder:input_type -> macuahuitl.v1.RenameHostFolderRequest
+	29, // 23: macuahuitl.v1.InventoryService.DeleteHostFolder:input_type -> macuahuitl.v1.DeleteHostFolderRequest
+	31, // 24: macuahuitl.v1.InventoryService.MoveHosts:input_type -> macuahuitl.v1.MoveHostsRequest
+	3,  // 25: macuahuitl.v1.InventoryService.ListDevices:output_type -> macuahuitl.v1.ListDevicesResponse
+	5,  // 26: macuahuitl.v1.InventoryService.PutDevice:output_type -> macuahuitl.v1.PutDeviceResponse
+	7,  // 27: macuahuitl.v1.InventoryService.DeleteDevice:output_type -> macuahuitl.v1.DeleteDeviceResponse
+	9,  // 28: macuahuitl.v1.InventoryService.ExportHosts:output_type -> macuahuitl.v1.ExportHostsResponse
+	13, // 29: macuahuitl.v1.InventoryService.PreviewImportHosts:output_type -> macuahuitl.v1.PreviewImportHostsResponse
+	16, // 30: macuahuitl.v1.InventoryService.ApplyImportHosts:output_type -> macuahuitl.v1.ApplyImportHostsResponse
+	18, // 31: macuahuitl.v1.InventoryService.HostsImportTemplate:output_type -> macuahuitl.v1.HostsImportTemplateResponse
+	21, // 32: macuahuitl.v1.InventoryService.HostsImportFormat:output_type -> macuahuitl.v1.HostsImportFormatResponse
+	24, // 33: macuahuitl.v1.InventoryService.ListHostFolders:output_type -> macuahuitl.v1.ListHostFoldersResponse
+	26, // 34: macuahuitl.v1.InventoryService.CreateHostFolder:output_type -> macuahuitl.v1.CreateHostFolderResponse
+	28, // 35: macuahuitl.v1.InventoryService.RenameHostFolder:output_type -> macuahuitl.v1.RenameHostFolderResponse
+	30, // 36: macuahuitl.v1.InventoryService.DeleteHostFolder:output_type -> macuahuitl.v1.DeleteHostFolderResponse
+	32, // 37: macuahuitl.v1.InventoryService.MoveHosts:output_type -> macuahuitl.v1.MoveHostsResponse
+	25, // [25:38] is the sub-list for method output_type
+	12, // [12:25] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_macuahuitl_v1_inventory_proto_init() }
@@ -1574,7 +2183,7 @@ func file_macuahuitl_v1_inventory_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_macuahuitl_v1_inventory_proto_rawDesc), len(file_macuahuitl_v1_inventory_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   22,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
