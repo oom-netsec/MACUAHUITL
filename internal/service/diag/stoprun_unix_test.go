@@ -213,4 +213,7 @@ echo "1 packets transmitted, 1 received, 0% packet loss, time 0ms"
 	if n := strings.Count(d.AuditText(), "run="+ev[0].RunId); n != 2 {
 		t.Errorf("run= en %d entradas: %s", n, d.AuditText())
 	}
+	if n := strings.Count(d.AuditText(), "sweep=0-1000/500"); n != 2 { // diag.run y diag.done
+		t.Errorf("sweep= en %d entradas: %s", n, d.AuditText())
+	}
 }

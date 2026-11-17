@@ -43,7 +43,7 @@ var (
 	reLinuxFinal = regexp.MustCompile(`^(\d+) packets transmitted`)
 	reLinuxRTT   = regexp.MustCompile(`^(?:rtt|round-trip) min/avg/max/(?:mdev|stddev) = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+) ms`)
 	reWinEcho    = regexp.MustCompile(`(?i)^(?:Reply from|Respuesta desde) \S+: (?:bytes=\d+ )?(?:time|tiempo)([=<])(\d+)ms?`)
-	reFrag       = regexp.MustCompile(`(?i)message too long|frag needed|needs to be fragmented|es necesario fragmentar`)
+	reFrag       = regexp.MustCompile(`(?i)message too long|frag needed|packet too big|needs to be fragmented|es necesario fragmentar`)
 	reWinNoEcho  = regexp.MustCompile(`(?i)^(?:Request timed out|Packet needs to be fragmented|Es necesario fragmentar|Tiempo de espera agotado|(?:Reply from|Respuesta desde) \S+: |PING: transmit failed|General failure|Error general)`)
 )
 

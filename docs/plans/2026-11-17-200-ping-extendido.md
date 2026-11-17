@@ -56,7 +56,7 @@ Por cada tamaño, el núcleo corre ping con `count` y las demás opciones (DF in
 - `frag`: el sistema avisó que hace falta fragmentar con DF («Message too long» / «Frag needed» en Linux, «Packet needs to be fragmented but DF set» en Windows);
 - `loss`: lo demás.
 
-Al final, un `ping_summary` con el total. `StopRun` detiene el barrido después del tamaño en curso.
+Al final, un `ping_summary` con el total. `StopRun` interrumpe el tamaño en curso; ni su punto ni su cuenta entran al resumen. `duration` y el tope de envíos valen para el barrido entero.
 
 ## StopRun
 
