@@ -49,13 +49,16 @@ func ruleOK(ip, exe string) bool { return !esLoopback(ip) && exeSeguro(exe) }
 // NeedsRule dice si en Windows la IP necesita regla de firewall (loopback no).
 func NeedsRule(ip string) bool { return !esLoopback(ip) }
 
-// RedirectNote es la clave del catálogo que explica por qué no hay regla cuando falta solo por la ruta del programa
-// (Windows, IP que necesita regla, protocolo con puerto estándar); "" en cualquier otro caso.
-func RedirectNote(proto, ip string) string {
-	if _, ok := standard[proto]; !ok || !isWindows() || !NeedsRule(ip) || exeSeguro(exePath()) {
-		return ""
+// RedirectNoteIn explica, cuando la regla falta solo por la ruta del programa (Windows, IP que necesita regla,
+// protocolo con puerto estándar), qué regla crear a mano: devuelve la clave del catálogo y el texto; "" si no aplica.
+func RedirectNoteIn(loc, proto, ip string, port int) (code, text string) {
+	s, ok := standard[proto]
+	if !ok || !isWindows() || !NeedsRule(ip) || exeSeguro(exePath()) {
+		return "", ""
 	}
-	return "fileserve.hint.win_no_exe"
+	_, addr := redirTarget(loc, ip)
+	code = "fileserve.hint.win_rule_manual"
+	return code, i18n.Msg(loc, code, i18n.A("trans", strings.ToUpper(s.trans), "ports", fwPorts(proto, port, [2]uint16{}), "ip", addr))
 }
 
 func isWindows() bool { return hintOS == "windows" }
@@ -105,19 +108,23 @@ func firewallCommand(loc, proto, ip string, port int, exe string, pasv [2]uint16
 		return ""
 	}
 	_, addr := redirTarget(loc, ip)
-	lp := strconv.Itoa(port)
-	if proto == "ftp" {
-		switch {
-		case pasv[0] != 0 || pasv[1] != 0:
-			lp = fmt.Sprintf("%d,%d-%d", port, pasv[0], pasv[1])
-		case port+ftpPassive < 65536:
-			lp = fmt.Sprintf("%d,%d-%d", port, port+1, port+ftpPassive)
-		default:
-			lp = "Any" // ftp.go tampoco fija rango ahí: el sistema elige
-		}
-	}
 	return fmt.Sprintf(`New-NetFirewallRule -DisplayName %s -Direction Inbound -Program %s -LocalAddress %s -Protocol %s -LocalPort %s -Action Allow`,
-		psq(fwName(proto, ip, port)), psq(exe), addr, strings.ToUpper(s.trans), lp)
+		psq(fwName(proto, ip, port)), psq(exe), addr, strings.ToUpper(s.trans), fwPorts(proto, port, pasv))
+}
+
+// fwPorts son los puertos locales de la regla. FTP: con los pasivos (el rango dado o los de ftp.go).
+func fwPorts(proto string, port int, pasv [2]uint16) string {
+	if proto != "ftp" {
+		return strconv.Itoa(port)
+	}
+	switch {
+	case pasv[0] != 0 || pasv[1] != 0:
+		return fmt.Sprintf("%d,%d-%d", port, pasv[0], pasv[1])
+	case port+ftpPassive < 65536:
+		return fmt.Sprintf("%d,%d-%d", port, port+1, port+ftpPassive)
+	default:
+		return "Any" // ftp.go tampoco fija rango ahí: el sistema elige
+	}
 }
 
 // firewallRemove quita la regla de firewallRule ("" si el protocolo no tiene puerto estándar).
