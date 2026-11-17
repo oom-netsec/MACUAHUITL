@@ -419,6 +419,10 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 		return fail(service.Err(ctx, codes.FailedPrecondition, "patrol.svc.job_state", i18n.A("state", "cancelled")), "cancelled while arming")
 	}
 	events, cancelSub := c.bus.Subscribe([]string{j.id})
+	// Antes de Arm, que lanza la ronda 1 en otra goroutine: así job.arm y power.inhibit quedan antes de device.round.
+	// Si Arm falla, fail deja job.arm_failed detrás.
+	c.audit("job.arm", j.id, fmt.Sprintf("window_until=%s excluded=%v", until.UTC().Format(time.RFC3339), r.ExcludedDeviceIds))
+	c.audit("power.inhibit", j.id, fmt.Sprintf("missing=%v", missing))
 	if err := c.sched.Arm(j.id, engineSchedule(spec.Schedule), until, targets, run); err != nil {
 		cancelSub()
 		return fail(service.ErrFrom(ctx, codes.InvalidArgument, err), i18n.English(err))
@@ -447,8 +451,6 @@ func (s *patrolSvc) ArmJob(ctx context.Context, r *v1.ArmJobRequest) (*v1.ArmJob
 	c.addPhase(j, v1.JobPhaseKind_JOB_PHASE_KIND_ARMED, 0, armed, armedArgs)
 	c.watchers.Add(1)
 	go c.watch(j, events, cancelSub)
-	c.audit("job.arm", j.id, fmt.Sprintf("window_until=%s excluded=%v", until.UTC().Format(time.RFC3339), r.ExcludedDeviceIds))
-	c.audit("power.inhibit", j.id, fmt.Sprintf("missing=%v", missing))
 	return &v1.ArmJobResponse{WindowEndsAt: timestamppb.New(until), MissingInhibitors: missing}, nil
 }
 

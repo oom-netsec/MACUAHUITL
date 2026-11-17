@@ -390,9 +390,7 @@ func TestJobEndToEnd(t *testing.T) {
 	if err != nil || len(run.Devices) != 1 || run.Devices[0].State != v1.DeviceState_DEVICE_STATE_COMPLETED {
 		t.Fatalf("run = %+v %v", run, err)
 	}
-	// La ronda 1 arranca dentro de sched.Arm y job.arm se audita después: con un disco lento (Windows) la ronda 1 puede
-	// quedar antes que job.arm en la bitácora, así que solo la ronda 2 (programada) se exige después de power.inhibit.
-	actionsInOrder(t, h.auditText(t), "job.create", "job.logintest", "hostkey.accepted", "job.arm", "power.inhibit", "device.round", "job.finish", "power.release")
+	actionsInOrder(t, h.auditText(t), "job.create", "job.logintest", "hostkey.accepted", "job.arm", "power.inhibit", "device.round", "device.round", "job.finish", "power.release")
 	if n := strings.Count(h.auditText(t), `"action":"device.round"`); n != 2 {
 		t.Fatalf("rondas auditadas = %d, quería 2", n)
 	}
