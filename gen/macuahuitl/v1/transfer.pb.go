@@ -1178,9 +1178,11 @@ func (x *RedirectHintRequest) GetIp() string {
 type RedirectHintResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StandardPort  int32                  `protobuf:"varint,1,opt,name=standard_port,json=standardPort,proto3" json:"standard_port,omitempty"`
-	Nftables      string                 `protobuf:"bytes,2,opt,name=nftables,proto3" json:"nftables,omitempty"` // regla de redirección; vacía si port ya es el estándar (standard_port lo dice)
-	Setcap        string                 `protobuf:"bytes,3,opt,name=setcap,proto3" json:"setcap,omitempty"`     // obsoleto: siempre vacío desde 45a
-	Remove        string                 `protobuf:"bytes,4,opt,name=remove,proto3" json:"remove,omitempty"`     // comando para quitar la regla al terminar; vacío si no hay regla
+	Nftables      string                 `protobuf:"bytes,2,opt,name=nftables,proto3" json:"nftables,omitempty"`                 // regla de redirección; vacía si port ya es el estándar (standard_port lo dice)
+	Setcap        string                 `protobuf:"bytes,3,opt,name=setcap,proto3" json:"setcap,omitempty"`                     // obsoleto: siempre vacío desde 45a
+	Remove        string                 `protobuf:"bytes,4,opt,name=remove,proto3" json:"remove,omitempty"`                     // comando para quitar la regla al terminar; vacío si no hay regla
+	Note          string                 `protobuf:"bytes,5,opt,name=note,proto3" json:"note,omitempty"`                         // si no hay regla que dar: por qué, en el idioma pedido (prosa, no se copia)
+	NoteCode      string                 `protobuf:"bytes,6,opt,name=note_code,json=noteCode,proto3" json:"note_code,omitempty"` // clave estable del catálogo de note (p. ej. fileserve.hint.win_no_exe)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1239,6 +1241,20 @@ func (x *RedirectHintResponse) GetSetcap() string {
 func (x *RedirectHintResponse) GetRemove() string {
 	if x != nil {
 		return x.Remove
+	}
+	return ""
+}
+
+func (x *RedirectHintResponse) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+func (x *RedirectHintResponse) GetNoteCode() string {
+	if x != nil {
+		return x.NoteCode
 	}
 	return ""
 }
@@ -2609,12 +2625,14 @@ const file_macuahuitl_v1_transfer_proto_rawDesc = "" +
 	"\x13RedirectHintRequest\x12\x1a\n" +
 	"\bprotocol\x18\x01 \x01(\tR\bprotocol\x12\x12\n" +
 	"\x04port\x18\x02 \x01(\x05R\x04port\x12\x0e\n" +
-	"\x02ip\x18\x03 \x01(\tR\x02ip\"\x87\x01\n" +
+	"\x02ip\x18\x03 \x01(\tR\x02ip\"\xb8\x01\n" +
 	"\x14RedirectHintResponse\x12#\n" +
 	"\rstandard_port\x18\x01 \x01(\x05R\fstandardPort\x12\x1a\n" +
 	"\bnftables\x18\x02 \x01(\tR\bnftables\x12\x16\n" +
 	"\x06setcap\x18\x03 \x01(\tR\x06setcap\x12\x16\n" +
-	"\x06remove\x18\x04 \x01(\tR\x06remove\"\xa4\x02\n" +
+	"\x06remove\x18\x04 \x01(\tR\x06remove\x12\x12\n" +
+	"\x04note\x18\x05 \x01(\tR\x04note\x12\x1b\n" +
+	"\tnote_code\x18\x06 \x01(\tR\bnoteCode\"\xa4\x02\n" +
 	"\rBrowseRequest\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12#\n" +
 	"\rcredential_id\x18\x02 \x01(\tR\fcredentialId\x12\x12\n" +

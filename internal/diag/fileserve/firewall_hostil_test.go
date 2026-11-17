@@ -105,3 +105,29 @@ func TestReglaFirewallLoopbackNoEmiteRegla(t *testing.T) {
 		t.Errorf("no loopback sin regla:\n%s", h)
 	}
 }
+
+// RedirectNoteIn da la clave y un texto que dice qué abrir solo cuando la regla falta por la ruta del programa:
+// Windows, IP que necesita regla y protocolo con puerto estándar. Con ruta segura, loopback, sin estándar o en Linux, nada.
+func TestRedirectNoteSoloConRutaInsegura(t *testing.T) {
+	fijaWindows(t, "windows")
+	if c, n := RedirectNoteIn("es", "tftp", "10.0.0.5", 69); c+n != "" {
+		t.Errorf("ruta segura: %q %q", c, n)
+	}
+	exePath = func() string { return "C:\\Apps\\a\nb.exe" }
+	if c, n := RedirectNoteIn("es", "tftp", "10.0.0.5", 69); c != "fileserve.hint.win_rule_manual" || !strings.Contains(n, "UDP") || !strings.Contains(n, "69") || !strings.Contains(n, "10.0.0.5") {
+		t.Errorf("ruta insegura: %q %q", c, n)
+	}
+	if _, n := RedirectNoteIn("en", "ftp", "10.0.0.5", 21); !strings.Contains(n, "TCP") || !strings.Contains(n, "21,22-") {
+		t.Errorf("ftp sin los pasivos: %q", n)
+	}
+	for _, a := range [][2]string{{"tftp", "127.0.0.1"}, {"http", "10.0.0.5"}} {
+		if c, n := RedirectNoteIn("es", a[0], a[1], 69); c+n != "" {
+			t.Errorf("%v: %q %q", a, c, n)
+		}
+	}
+	fijaWindows(t, "linux")
+	exePath = func() string { return "" }
+	if c, _ := RedirectNoteIn("es", "tftp", "10.0.0.5", 69); c != "" {
+		t.Errorf("linux: %q", c)
+	}
+}
