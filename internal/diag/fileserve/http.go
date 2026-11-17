@@ -107,16 +107,22 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 	c.ready(Ready{Addr: ln.Addr().String()})
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
+	// Mismo apagado si Serve termina con error: sin srv.Close las conexiones keep-alive seguirían bajando archivos.
+	err = nil
 	select {
 	case <-ctx.Done():
-		srv.Close()
+	case err = <-done:
+	}
+	srv.Close()
+	if err == nil {
 		<-done
-		hmu.Lock()
-		stopped = true
-		hmu.Unlock()
-		active.Wait()
-		return nil
-	case err := <-done:
+	}
+	hmu.Lock()
+	stopped = true
+	hmu.Unlock()
+	active.Wait()
+	if err != nil {
 		return fmt.Errorf("fileserve: %w", err)
 	}
+	return nil
 }

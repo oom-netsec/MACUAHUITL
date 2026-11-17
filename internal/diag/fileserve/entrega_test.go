@@ -43,11 +43,11 @@ func TestHTTPServeEsperaAlHandlerAntesDeVolver(t *testing.T) {
 			t.Fatal(err)
 		}
 		mu.Lock()
-		n := len(got)
+		x := append([]Transfer(nil), got...)
 		mu.Unlock()
 		c.Close()
-		if n != 1 {
-			t.Fatalf("vuelta %d: Serve volvió con %d transferencias registradas, quiero 1", i, n)
+		if len(x) != 1 || x[0].Result == "ok" {
+			t.Fatalf("vuelta %d: Serve volvió con %+v, quiero 1 transferencia interrumpida", i, x)
 		}
 	}
 }
