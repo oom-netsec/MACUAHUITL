@@ -218,3 +218,108 @@ test("nmap en Windows no ofrece el escaneo SYN; en Linux sí", () => {
   render(<DiagView core={fakeCore()} tool="nmap" />);
   expect(screen.getAllByRole("option").map((o) => o.getAttribute("value"))).toContain("syn");
 });
+
+// Ping extendido (#200, contrato provisional)
+const openExt = async () => userEvent.click(screen.getByText("Opciones extendidas"));
+const pingView = async (over = {}) => {
+  const core = fakeCore({ diagRun: vi.fn(async () => "r1"), ...over });
+  render(<DiagView core={core} tool="ping" />);
+  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
+  return core;
+};
+
+test("ping extendido: sección cerrada con el número de opciones activas; manda solo las claves con valor", async () => {
+  const core = await pingView();
+  const sum = screen.getByText("Opciones extendidas").closest("details")!;
+  expect(sum).not.toHaveAttribute("open");
+  await openExt();
+  await userEvent.type(screen.getByLabelText("TTL (1-255)"), "5");
+  await userEvent.click(screen.getByLabelText("No fragmentar (DF)"));
+  expect(sum).toHaveTextContent("2 activas");
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("ping", ["10.0.0.1"], { count: "4", ttl: "5", df: "true" }));
+});
+
+test("ping extendido: valor fuera de rango muestra el mensaje y no deja ejecutar", async () => {
+  await pingView();
+  await openExt();
+  await userEvent.type(screen.getByLabelText("TTL (1-255)"), "300");
+  expect(screen.getByLabelText("TTL (1-255)")).toBeInvalid();
+  expect(screen.getByText("El TTL va de 1 a 255.")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Ejecutar" })).toBeDisabled();
+});
+
+test("en Windows se ocultan intervalo y DSCP", async () => {
+  setOSForTests("windows");
+  try {
+    await pingView();
+    await openExt();
+    expect(screen.queryByLabelText("Intervalo (0.2-60 s)")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("DSCP (0-63)")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("TTL (1-255)")).toBeInTheDocument();
+  } finally { setOSForTests(undefined); }
+});
+
+test("continuo: Detener usa diagStop y Cancelar sigue cortando; NotFound al detener no muestra error", async () => {
+  const diagStop = vi.fn().mockRejectedValue(Object.assign(new Error("x"), { cause: { code: "NotFound", reason: "run.notfound" } }));
+  const core = await pingView({ diagStop });
+  await openExt();
+  await userEvent.click(screen.getByLabelText("Continuo (hasta detener)"));
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("ping", ["10.0.0.1"], { continuous: "true" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Detener" }));
+  expect(diagStop).toHaveBeenCalledWith("r1");
+  await act(async () => {});
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(core.diagCancel).toHaveBeenCalledWith("r1");
+});
+
+test("otro error de diagStop sí se muestra; sin continuo ni duración no hay Detener", async () => {
+  const core = await pingView({ diagStop: vi.fn().mockRejectedValue(new Error("boom")) });
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await screen.findByRole("button", { name: "Cancelar", hidden: false });
+  expect(screen.queryByRole("button", { name: "Detener" })).not.toBeInTheDocument();
+  expect(core.diagStop).not.toHaveBeenCalled();
+});
+
+test("también se detiene con duración, y un error distinto de NotFound se muestra", async () => {
+  await pingView({ diagStop: vi.fn().mockRejectedValue(new Error("boom")) });
+  await openExt();
+  await userEvent.type(screen.getByLabelText("Duración total (1-3600 s)"), "30");
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await userEvent.click(await screen.findByRole("button", { name: "Detener" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("boom");
+});
+
+test("resumen y barrido: tarjeta, tabla ordenada y MTU estimada", async () => {
+  const core = await pingView();
+  await openExt();
+  await userEvent.type(screen.getByLabelText("Inicio"), "1400");
+  await userEvent.type(screen.getByLabelText("Fin"), "1500");
+  await userEvent.type(screen.getByLabelText("Paso"), "50");
+  expect(screen.getByText("3 puntos (máximo 100)")).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("ping", ["10.0.0.1"], { count: "4", sweep_start: "1400", sweep_end: "1500", sweep_step: "50" }));
+  act(() => {
+    core.emitDiag({ runId: "r1", sweepPoint: { size: 1500, sent: 4, received: 0, result: "frag" } });
+    core.emitDiag({ runId: "r1", sweepPoint: { size: 1400, sent: 4, received: 4, result: "ok" } });
+    core.emitDiag({ runId: "r1", sweepPoint: { size: 1450, sent: 4, received: 4, result: "ok" } });
+    core.emitDiag({ runId: "r1", done: true, exitCode: 0, pingSummary: { sent: 12, received: 8, lossPct: 33.33, minMs: 1, avgMs: 2, maxMs: 3.5, mdevMs: 0.7 } });
+  });
+  const table = await screen.findByRole("table", { name: "Barrido de tamaños" });
+  expect([...table.querySelectorAll("tbody th")].map((x) => x.textContent)).toEqual(["1400", "1450", "1500"]);
+  expect(screen.getByText(/MTU estimada de la ruta: 1478/)).toBeInTheDocument();
+  expect(screen.getByText(/Es una estimación/)).toBeInTheDocument();
+  const sum = screen.getByRole("region", { name: "Resumen del ping" });
+  expect(sum).toHaveTextContent("Enviados12");
+  expect(sum).toHaveTextContent("33.33 %");
+  expect(sum).toHaveTextContent("Desviación (mdev)0.7 ms");
+});
+
+test("si el núcleo rechaza una opción en Windows se muestra su texto con la clave", async () => {
+  const diagRun = vi.fn().mockRejectedValue(Object.assign(new Error("x"), { cause: { code: "InvalidArgument", reason: "diag.err.opt_windows", metadata: { key: "tos" } } }));
+  await pingView({ diagRun });
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Esta opción no está disponible en Windows: tos");
+});

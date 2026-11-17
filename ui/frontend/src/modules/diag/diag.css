@@ -7,3 +7,9 @@
 .diag-viz:empty { display: none; }
 .nmap-name { margin: 0; padding: var(--s-2) var(--s-3); font-weight: 600; border-bottom: 1px solid var(--hairline); }
 .nmap-host .meta { padding: var(--s-2) var(--s-3) 0; margin: 0; }
+
+.ping-ext { margin: var(--s-3) 0; }
+.ping-ext summary { cursor: pointer; font-weight: 500; }
+.ping-ext fieldset { border: 0; padding: var(--s-2) 0 0; margin: 0; min-width: 0; }
+.ping-sweep { border: 1px solid var(--hairline); padding: var(--s-3); }
+tr[data-state="best"] th, tr[data-state="best"] td { background: var(--surface-2, transparent); font-weight: 600; }
