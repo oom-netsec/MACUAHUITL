@@ -56,7 +56,16 @@ func num(s string, max float64) (float64, bool) {
 // Feed cuenta una línea de salida y devuelve cuántos envíos lleva (para el tope).
 // Linux: enviados = el icmp_seq más alto visto (o el «transmitted» final si es mayor), porque iputils no
 // imprime los timeouts; Windows: cada eco con respuesta y cada «sin respuesta» o error.
+// maxPingLine es el largo máximo de una línea de ping que se analiza.
+const maxPingLine = 1024
+
 func (p *PingStats) Feed(line string) int64 {
+	if len(line) > maxPingLine { // ninguna línea de ping mide tanto: no se pasa por las regex (una salida rara de varios MB no frena la copia)
+		if p.win {
+			return p.sent
+		}
+		return max(p.maxSeq, p.final)
+	}
 	if reFrag.MatchString(line) {
 		p.frag = true
 	}

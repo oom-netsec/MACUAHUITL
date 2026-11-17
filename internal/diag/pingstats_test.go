@@ -206,3 +206,14 @@ func TestPingStatsAddWindows(t *testing.T) {
 		t.Errorf("%+v", s)
 	}
 }
+
+// Una línea enorme (salida rara de varios MB) no pasa por las regex: no cuenta nada y no frena la copia.
+func TestPingStatsIgnoraLineasLargas(t *testing.T) {
+	for _, win := range []bool{false, true} {
+		p := NewPingStats(win)
+		big := strings.Repeat("x", 2<<20) + " icmp_seq=1 time=1 ms Reply from 192.0.2.1: bytes=32 time=1ms TTL=64 Message too long"
+		if n := p.Feed(big); n != 0 || p.Frag() || p.Summary().Received != 0 {
+			t.Fatalf("win=%v: la línea larga contó (%d, frag=%v)", win, n, p.Frag())
+		}
+	}
+}
