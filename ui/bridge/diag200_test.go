@@ -126,3 +126,27 @@ func TestDiagStopNotFoundDelNucleo(t *testing.T) {
 	}
 	b.DiagCancel(id)
 }
+
+// fakePingRunIDSolo: como el núcleo de 200-3, el primer evento trae solo run_id (sin línea); luego salida y cierre.
+type fakePingRunIDSolo struct{ v1.UnimplementedDiagServiceServer }
+
+func (fakePingRunIDSolo) Run(_ *v1.RunRequest, st v1.DiagService_RunServer) error {
+	st.Send(&v1.RunResponse{RunId: "core-7"})
+	st.Send(&v1.RunResponse{OutputLine: "64 bytes from 192.0.2.1"})
+	st.Send(&v1.RunResponse{OutputLine: ""}) // una línea vacía de la salida sí se emite
+	return st.Send(&v1.RunResponse{Done: true})
+}
+
+func TestDiagPrimerEventoSoloRunIDNoEsLinea(t *testing.T) {
+	b, rec := startServices(t, func(r ipc.Registrar) { v1.RegisterDiagServiceServer(r, fakePingRunIDSolo{}) })
+	if _, err := b.DiagRun("ping", []string{"192.0.2.1"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	waitCount(rec, "diag:done", 1)
+	rec.mu.Lock()
+	evs := strings.Join(rec.evs, "\n")
+	rec.mu.Unlock()
+	if rec.count("diag:line") != 2 || strings.Contains(evs, "core-7") || !strings.Contains(evs, `"line":"64 bytes from 192.0.2.1"`) || !strings.Contains(evs, `"line":""`) {
+		t.Fatalf("eventos: %s", evs)
+	}
+}
