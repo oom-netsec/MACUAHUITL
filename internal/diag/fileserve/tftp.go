@@ -91,38 +91,38 @@ func serveTFTP(ctx context.Context, c Config, src *source, rcv *receiver) error 
 		if err != nil {
 			continue // basura: ni respuesta ni registro, para no amplificar
 		}
-		fail := func(code uint16, msg string) {
+		fail := func(code uint16, cause, msg string) {
 			pc.WriteTo(errPacket(code, msg), from)
-			c.OnTransfer(Transfer{Proto: "tftp", Client: from.String(), File: req.file, Result: "error", Error: msg, ReasonT: lit(msg), Rejected: true})
+			c.OnTransfer(Transfer{Proto: "tftp", Client: from.String(), File: req.file, Result: "error", Error: msg, ReasonT: lit(msg), Rejected: true, Cause: cause})
 		}
 		if !c.permitsAddr(from) {
-			c.OnTransfer(Transfer{Proto: "tftp", Client: from.String(), File: req.file, Result: "error", Error: "origen no permitido", ReasonT: lit("origen no permitido"), Rejected: true})
+			c.OnTransfer(Transfer{Proto: "tftp", Client: from.String(), File: req.file, Result: "error", Error: "origen no permitido", ReasonT: lit("origen no permitido"), Rejected: true, Cause: CauseOriginDenied})
 			continue // sin respuesta: no se confirma a un origen ajeno que hay un servidor
 		}
 		var name string
 		if req.op == opWRQ {
 			if rcv == nil {
-				fail(2, "escritura deshabilitada")
+				fail(2, CauseWriteDisabled, "escritura deshabilitada")
 				continue
 			}
 			var err error
 			if name, err = SafeName(req.file); err != nil {
-				fail(2, err.Error())
+				fail(2, CauseOther, err.Error())
 				continue
 			}
 			if rcv.exists(name) {
-				fail(6, errExists.Error())
+				fail(6, CauseOther, errExists.Error())
 				continue
 			}
 		} else {
 			if !src.enabled() {
-				fail(2, "lectura deshabilitada")
+				fail(2, CauseReadDisabled, "lectura deshabilitada")
 				continue
 			}
 			// Algunos clientes anteponen "/"; nada más se normaliza: el nombre debe coincidir exacto.
 			name = strings.TrimPrefix(req.file, "/")
 			if !src.exists(name) {
-				fail(1, "archivo no publicado")
+				fail(1, CauseNotFound, "archivo no publicado")
 				continue
 			}
 		}
@@ -134,7 +134,7 @@ func serveTFTP(ctx context.Context, c Config, src *source, rcv *receiver) error 
 		}
 		mu.Unlock()
 		if busy {
-			fail(0, "demasiadas transferencias simultáneas desde este cliente")
+			fail(0, CauseBusy, "demasiadas transferencias simultáneas desde este cliente")
 			continue
 		}
 		release := func() {
@@ -148,7 +148,7 @@ func serveTFTP(ctx context.Context, c Config, src *source, rcv *receiver) error 
 		case sem <- struct{}{}:
 		default:
 			release()
-			fail(0, "demasiadas transferencias simultáneas")
+			fail(0, CauseBusy, "demasiadas transferencias simultáneas")
 			continue
 		}
 		wg.Add(1)
@@ -156,10 +156,10 @@ func serveTFTP(ctx context.Context, c Config, src *source, rcv *receiver) error 
 			defer wg.Done()
 			defer func() { <-sem; release() }()
 			if req.op == opWRQ {
-				c.OnTransfer(recvFileTFTP(ctx, host, from, name, req.opts, rcv))
+				c.OnTransfer(recvFileTFTP(ctx, c, host, from, name, req.opts, rcv))
 				return
 			}
-			c.OnTransfer(sendFile(ctx, host, from, name, src, req.opts))
+			c.OnTransfer(sendFile(ctx, c, host, from, name, src, req.opts))
 		}()
 	}
 }
@@ -208,7 +208,7 @@ func (x *xfer) exchange(pkt []byte, block uint16) error {
 	return i18n.New("fileserve.reason.no_reply", i18n.A("tries", x.tries))
 }
 
-func sendFile(ctx context.Context, host string, peer net.Addr, name string, src *source, opts [][2]string) Transfer {
+func sendFile(ctx context.Context, c Config, host string, peer net.Addr, name string, src *source, opts [][2]string) Transfer {
 	t := Transfer{Proto: "tftp", Dir: "lectura", Client: peer.String(), File: name, Result: "error"}
 	start := time.Now()
 	defer func() { t.Duration = time.Since(start) }()
@@ -265,6 +265,7 @@ func sendFile(ctx context.Context, host string, peer net.Addr, name string, src 
 			return t
 		}
 		verified()
+		t.Live = c.start(t, st.Size()) // el OACK confirmado verifica al par
 	}
 	buf := make([]byte, 4+blk)
 	buf[1] = opDATA
@@ -284,6 +285,10 @@ func sendFile(ctx context.Context, host string, peer net.Addr, name string, src 
 			return t
 		}
 		verified()
+		if t.Live == nil {
+			t.Live = c.start(t, st.Size()) // sin opciones: el ACK del bloque 1 verifica al par
+		}
+		t.Live.add(int64(n))
 		t.Bytes += int64(n)
 		if n < blk {
 			t.Result = "ok"
@@ -338,7 +343,7 @@ func (x *xfer) awaitData(pkt []byte, block uint16, blk int) ([]byte, error) {
 
 // recvFileTFTP atiende un WRQ. El archivo se crea hasta recibir el primer DATA: un WRQ con
 // origen falsificado no deja archivos vacíos ni gasta nombres.
-func recvFileTFTP(ctx context.Context, host string, peer net.Addr, name string, opts [][2]string, rcv *receiver) Transfer {
+func recvFileTFTP(ctx context.Context, c Config, host string, peer net.Addr, name string, opts [][2]string, rcv *receiver) Transfer {
 	t := Transfer{Proto: "tftp", Dir: "escritura", Client: peer.String(), File: name, Result: "error"}
 	start := time.Now()
 	defer func() { t.Duration = time.Since(start) }()
@@ -413,6 +418,8 @@ func recvFileTFTP(ctx context.Context, host string, peer net.Addr, name string, 
 				t.setErr(err)
 				return t
 			}
+			t.Live = c.start(t, announced) // el primer DATA verifica al par
+			rf.live = t.Live
 		}
 		if _, err := rf.Write(data); err != nil {
 			rf.abort() // antes de avisar: quien reciba el error ya no ve el archivo a medias

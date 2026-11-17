@@ -8,7 +8,9 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
@@ -19,12 +21,23 @@ type countingWriter struct {
 	n      int64
 	status int
 	err    error
+	live   *Live
+	begin  func(total int64) *Live // arranca la sesión en la primera cabecera 2xx de un GET
 }
 
-func (w *countingWriter) WriteHeader(s int) { w.status = s; w.ResponseWriter.WriteHeader(s) }
+func (w *countingWriter) WriteHeader(s int) {
+	w.status = s
+	if s >= 200 && s < 300 && w.live == nil && w.begin != nil {
+		// ServeContent ya fijó Content-Length: el tamaño del tramo (o del archivo).
+		cl, _ := strconv.ParseInt(w.Header().Get("Content-Length"), 10, 64)
+		w.live = w.begin(cl)
+	}
+	w.ResponseWriter.WriteHeader(s)
+}
 func (w *countingWriter) Write(b []byte) (int, error) {
 	n, err := w.ResponseWriter.Write(b)
 	w.n += int64(n)
+	w.live.add(int64(n))
 	if err != nil && w.err == nil {
 		w.err = err
 	}
@@ -37,25 +50,40 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		return listen.Bind("fileserve", err, listen.PortOf(c.Addr))
 	}
 	sem := make(chan struct{}, maxTransfers)
+	// srv.Close no espera a los handlers: Serve los espera para no volver antes de su OnTransfer (el que
+	// llama cierra su canal de eventos al volver y una transferencia tardía se perdería de la auditoría).
+	var (
+		hmu     sync.Mutex
+		stopped bool
+		active  sync.WaitGroup
+	)
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hmu.Lock()
+		if stopped {
+			hmu.Unlock()
+			return
+		}
+		active.Add(1)
+		hmu.Unlock()
+		defer active.Done()
 		start := time.Now()
 		name := strings.TrimPrefix(r.URL.Path, "/")
 		t := Transfer{Proto: "http", Client: r.RemoteAddr, File: name, Dir: "lectura", Result: "error"}
 		defer func() { t.Duration = time.Since(start); c.OnTransfer(t) }()
 		if ap, err := netip.ParseAddrPort(r.RemoteAddr); err != nil || !c.permits(ap.Addr()) {
 			http.Error(w, "origen no permitido", http.StatusForbidden)
-			t.Error, t.ReasonT, t.Rejected = "origen no permitido", lit("origen no permitido"), true
+			t.Error, t.ReasonT, t.Rejected, t.Cause = "origen no permitido", lit("origen no permitido"), true, CauseOriginDenied
 			return
 		}
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, "solo GET", http.StatusMethodNotAllowed)
-			t.Error, t.ReasonT, t.Rejected = "método "+r.Method, why("method", "method", r.Method), true
+			t.Error, t.ReasonT, t.Rejected, t.Cause = "método "+r.Method, why("method", "method", r.Method), true, CauseMethod
 			return
 		}
 		if !src.exists(name) {
 			http.NotFound(w, r) // sin listado ni pistas de qué hay publicado
-			t.Error, t.ReasonT, t.Rejected = "archivo no publicado", lit("archivo no publicado"), true
+			t.Error, t.ReasonT, t.Rejected, t.Cause = "archivo no publicado", lit("archivo no publicado"), true, CauseNotFound
 			return
 		}
 		select {
@@ -63,7 +91,7 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 			defer func() { <-sem }()
 		default:
 			http.Error(w, "ocupado", http.StatusServiceUnavailable)
-			t.Error, t.ReasonT, t.Rejected = "demasiadas transferencias simultáneas", lit("demasiadas transferencias simultáneas"), true
+			t.Error, t.ReasonT, t.Rejected, t.Cause = "demasiadas transferencias simultáneas", lit("demasiadas transferencias simultáneas"), true, CauseBusy
 			return
 		}
 		f, st, err := src.open(name)
@@ -74,9 +102,14 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 		}
 		defer f.Close()
 		t.Path = f.Name()
+		// Sesión solo con un GET que responde 2xx (HEAD, 304, 412 y 416 no la crean: un escáner
+		// con Range inválidos no desplaza la historia). El arranque es perezoso, en WriteHeader.
 		cw := &countingWriter{ResponseWriter: w, status: http.StatusOK}
+		if r.Method == http.MethodGet {
+			cw.begin = func(total int64) *Live { return c.start(t, total) }
+		}
 		http.ServeContent(cw, r, name, st.ModTime(), f) // atiende Range e If-Modified-Since
-		t.Bytes = cw.n
+		t.Bytes, t.Live = cw.n, cw.live
 		switch {
 		case cw.err != nil:
 			t.Error, t.ReasonT = "interrumpida: "+cw.err.Error(), why("interrupted", "error", cw.err.Error())
@@ -91,12 +124,22 @@ func serveHTTP(ctx context.Context, c Config, src *source) error {
 	c.ready(Ready{Addr: ln.Addr().String()})
 	done := make(chan error, 1)
 	go func() { done <- srv.Serve(ln) }()
+	// Mismo apagado si Serve termina con error: sin srv.Close las conexiones keep-alive seguirían bajando archivos.
+	err = nil
 	select {
 	case <-ctx.Done():
-		srv.Close()
+	case err = <-done:
+	}
+	srv.Close()
+	if err == nil {
 		<-done
-		return nil
-	case err := <-done:
+	}
+	hmu.Lock()
+	stopped = true
+	hmu.Unlock()
+	active.Wait()
+	if err != nil {
 		return fmt.Errorf("fileserve: %w", err)
 	}
+	return nil
 }

@@ -49,7 +49,20 @@ type Transfer struct {
 	Error    string    `json:",omitempty"`
 	ReasonT  i18n.Text `json:"-"`          // el motivo de Error como texto de catálogo, para darlo en otro idioma
 	Rejected bool      `json:",omitempty"` // rechazada antes de empezar (no publicado, método, saturación)
+	Cause    string    `json:",omitempty"` // causa estable del rechazo (Cause*); vacía si no fue rechazo
+	Live     *Live     `json:"-"`          // el avance de la sesión, el mismo que dio OnStart; nil si no empezó
 }
+
+// Causas de un rechazo (Transfer.Cause).
+const (
+	CauseNotFound      = "not_found"
+	CauseOriginDenied  = "origin_denied"
+	CauseWriteDisabled = "write_disabled"
+	CauseReadDisabled  = "read_disabled"
+	CauseMethod        = "method"
+	CauseBusy          = "busy"
+	CauseOther         = "other"
+)
 
 // Ready es lo que el usuario necesita saber al abrir el servidor.
 type Ready struct {
@@ -83,6 +96,9 @@ type Config struct {
 	OnListening  func(addr string)
 	OnReady      func(Ready)
 	OnTransfer   func(Transfer)
+	// OnStart (opcional) avisa que una transferencia empezó; su Live avanza hasta que llega
+	// OnTransfer con la misma Transfer.Live. Los rechazos no la llaman.
+	OnStart func(*Live)
 }
 
 // Topes por omisión de lo que se recibe.

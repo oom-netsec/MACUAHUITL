@@ -19,16 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TransferService_StartServer_FullMethodName  = "/macuahuitl.v1.TransferService/StartServer"
-	TransferService_StopServer_FullMethodName   = "/macuahuitl.v1.TransferService/StopServer"
-	TransferService_ListServers_FullMethodName  = "/macuahuitl.v1.TransferService/ListServers"
-	TransferService_Get_FullMethodName          = "/macuahuitl.v1.TransferService/Get"
-	TransferService_Put_FullMethodName          = "/macuahuitl.v1.TransferService/Put"
-	TransferService_RedirectHint_FullMethodName = "/macuahuitl.v1.TransferService/RedirectHint"
-	TransferService_Browse_FullMethodName       = "/macuahuitl.v1.TransferService/Browse"
-	TransferService_GetStream_FullMethodName    = "/macuahuitl.v1.TransferService/GetStream"
-	TransferService_PutStream_FullMethodName    = "/macuahuitl.v1.TransferService/PutStream"
-	TransferService_GetMany_FullMethodName      = "/macuahuitl.v1.TransferService/GetMany"
+	TransferService_StartServer_FullMethodName          = "/macuahuitl.v1.TransferService/StartServer"
+	TransferService_StopServer_FullMethodName           = "/macuahuitl.v1.TransferService/StopServer"
+	TransferService_ListServers_FullMethodName          = "/macuahuitl.v1.TransferService/ListServers"
+	TransferService_Get_FullMethodName                  = "/macuahuitl.v1.TransferService/Get"
+	TransferService_Put_FullMethodName                  = "/macuahuitl.v1.TransferService/Put"
+	TransferService_RedirectHint_FullMethodName         = "/macuahuitl.v1.TransferService/RedirectHint"
+	TransferService_Browse_FullMethodName               = "/macuahuitl.v1.TransferService/Browse"
+	TransferService_GetStream_FullMethodName            = "/macuahuitl.v1.TransferService/GetStream"
+	TransferService_PutStream_FullMethodName            = "/macuahuitl.v1.TransferService/PutStream"
+	TransferService_GetMany_FullMethodName              = "/macuahuitl.v1.TransferService/GetMany"
+	TransferService_ListTransferSessions_FullMethodName = "/macuahuitl.v1.TransferService/ListTransferSessions"
 )
 
 // TransferServiceClient is the client API for TransferService service.
@@ -63,6 +64,12 @@ type TransferServiceClient interface {
 	// Descarga varios archivos de una misma carpeta remota hacia una carpeta local, uno tras otro, con
 	// avance por archivo. Un archivo que falla no detiene a los demás. Cancelar el stream detiene el lote.
 	GetMany(ctx context.Context, in *GetManyRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetManyResponse], error)
+	// Sesiones de los servidores abiertos con StartServer y con FieldService.ServeFiles (fase 45b), para una encuesta
+	// de 1 s: las activas con su avance y las recientes con su resultado. Una sesión es una transferencia que empezó
+	// (TFTP: el par ya respondió; FTP: ya hay conexión de datos). Los rechazos previos (archivo no publicado, origen no
+	// permitido, escritura no habilitada…) no son sesiones: van aparte en `rejections`, agrupados por IP y causa, con su
+	// propio tope, para que un escáner no desplace la historia real. server_id desconocido: NOT_FOUND.
+	ListTransferSessions(ctx context.Context, in *ListTransferSessionsRequest, opts ...grpc.CallOption) (*ListTransferSessionsResponse, error)
 }
 
 type transferServiceClient struct {
@@ -209,6 +216,16 @@ func (c *transferServiceClient) GetMany(ctx context.Context, in *GetManyRequest,
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type TransferService_GetManyClient = grpc.ServerStreamingClient[GetManyResponse]
 
+func (c *transferServiceClient) ListTransferSessions(ctx context.Context, in *ListTransferSessionsRequest, opts ...grpc.CallOption) (*ListTransferSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTransferSessionsResponse)
+	err := c.cc.Invoke(ctx, TransferService_ListTransferSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TransferServiceServer is the server API for TransferService service.
 // All implementations must embed UnimplementedTransferServiceServer
 // for forward compatibility.
@@ -241,6 +258,12 @@ type TransferServiceServer interface {
 	// Descarga varios archivos de una misma carpeta remota hacia una carpeta local, uno tras otro, con
 	// avance por archivo. Un archivo que falla no detiene a los demás. Cancelar el stream detiene el lote.
 	GetMany(*GetManyRequest, grpc.ServerStreamingServer[GetManyResponse]) error
+	// Sesiones de los servidores abiertos con StartServer y con FieldService.ServeFiles (fase 45b), para una encuesta
+	// de 1 s: las activas con su avance y las recientes con su resultado. Una sesión es una transferencia que empezó
+	// (TFTP: el par ya respondió; FTP: ya hay conexión de datos). Los rechazos previos (archivo no publicado, origen no
+	// permitido, escritura no habilitada…) no son sesiones: van aparte en `rejections`, agrupados por IP y causa, con su
+	// propio tope, para que un escáner no desplace la historia real. server_id desconocido: NOT_FOUND.
+	ListTransferSessions(context.Context, *ListTransferSessionsRequest) (*ListTransferSessionsResponse, error)
 	mustEmbedUnimplementedTransferServiceServer()
 }
 
@@ -280,6 +303,9 @@ func (UnimplementedTransferServiceServer) PutStream(*PutStreamRequest, grpc.Serv
 }
 func (UnimplementedTransferServiceServer) GetMany(*GetManyRequest, grpc.ServerStreamingServer[GetManyResponse]) error {
 	return status.Error(codes.Unimplemented, "method GetMany not implemented")
+}
+func (UnimplementedTransferServiceServer) ListTransferSessions(context.Context, *ListTransferSessionsRequest) (*ListTransferSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTransferSessions not implemented")
 }
 func (UnimplementedTransferServiceServer) mustEmbedUnimplementedTransferServiceServer() {}
 func (UnimplementedTransferServiceServer) testEmbeddedByValue()                         {}
@@ -454,6 +480,24 @@ func _TransferService_GetMany_Handler(srv interface{}, stream grpc.ServerStream)
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type TransferService_GetManyServer = grpc.ServerStreamingServer[GetManyResponse]
 
+func _TransferService_ListTransferSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTransferSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TransferServiceServer).ListTransferSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TransferService_ListTransferSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TransferServiceServer).ListTransferSessions(ctx, req.(*ListTransferSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TransferService_ServiceDesc is the grpc.ServiceDesc for TransferService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -484,6 +528,10 @@ var TransferService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Browse",
 			Handler:    _TransferService_Browse_Handler,
+		},
+		{
+			MethodName: "ListTransferSessions",
+			Handler:    _TransferService_ListTransferSessions_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

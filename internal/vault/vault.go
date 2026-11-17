@@ -34,6 +34,9 @@ var (
 	ErrExists        = i18n.New("vault.err.exists", nil)
 	ErrWeakParams    = i18n.New("vault.err.weak_params", nil)
 	ErrReserved      = i18n.New("vault.err.reserved", nil)
+	ErrNoKey         = i18n.New("vault.err.no_key", nil)
+	ErrNotKey        = i18n.New("vault.err.not_key_credential", nil)
+	ErrKeyCredential = i18n.New("vault.err.key_credential", nil)
 )
 
 // ReservedPrefix marca las entradas que guarda el sistema (por ejemplo la llave de las fichas de respaldo): no salen en List, Get las rechaza
@@ -78,7 +81,14 @@ type Credential struct {
 type Info struct {
 	ID, Label, Username  string
 	HasEnable, HasSSHKey bool
+	HasPassword          bool
 }
+
+// IsKey dice si la credencial es de tipo "key" (como Info.IsKey, pero con los secretos a la vista).
+func (c Credential) IsKey() bool { return !c.SSHKey.Empty() && c.Password.Empty() && c.Enable.Empty() }
+
+// IsKey dice si la credencial es de tipo "key": llave sin contraseña ni enable. Se calcula, no se guarda.
+func (i Info) IsKey() bool { return i.HasSSHKey && !i.HasPassword && !i.HasEnable }
 
 // Vault es una bóveda abierta desde disco. Es segura para uso concurrente.
 type Vault struct {
@@ -318,6 +328,38 @@ func (v *Vault) Put(c Credential) (string, error) {
 	return ids[0], nil
 }
 
+// PutUnlessKey es Put que no reemplaza una credencial de tipo "key" (ErrKeyCredential: esas cambian con RegenerateKey). La comprobación
+// y la escritura van en la misma sección crítica.
+func (v *Vault) PutUnlessKey(c Credential) (string, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	if err := v.requireFull(); err != nil {
+		return "", err
+	}
+	if c.ID != "" {
+		i, err := v.find(c.ID)
+		if err != nil {
+			return "", err
+		}
+		old, err := v.decrypt(v.entries[i])
+		if err != nil {
+			return "", err
+		}
+		isKey := old.IsKey()
+		old.Password.Destroy()
+		old.Enable.Destroy()
+		old.SSHKey.Destroy()
+		if isKey {
+			return "", ErrKeyCredential
+		}
+	}
+	ids, err := v.putBatchLocked([]Credential{c}, false)
+	if err != nil {
+		return "", err
+	}
+	return ids[0], nil
+}
+
 // PutBatch es Put para varias credenciales con una sola escritura: o quedan todas o no queda ninguna.
 func (v *Vault) PutBatch(cs []Credential) ([]string, error) { return v.putBatch(cs, false) }
 
@@ -440,7 +482,7 @@ func (v *Vault) list(reserved bool) ([]Info, error) {
 			return nil, err
 		}
 		if reserved || !Reserved(c.Label) {
-			out = append(out, Info{ID: c.ID, Label: c.Label, Username: c.Username, HasEnable: !c.Enable.Empty(), HasSSHKey: !c.SSHKey.Empty()})
+			out = append(out, Info{ID: c.ID, Label: c.Label, Username: c.Username, HasEnable: !c.Enable.Empty(), HasSSHKey: !c.SSHKey.Empty(), HasPassword: !c.Password.Empty()})
 		}
 		c.Password.Destroy()
 		c.Enable.Destroy()
