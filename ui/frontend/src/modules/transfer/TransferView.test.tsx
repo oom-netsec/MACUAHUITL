@@ -162,6 +162,20 @@ test("en Linux, con el puerto estándar no hay regla de redirección que mostrar
   expect(within(card).queryByText(/Firewall de Windows/)).toBeNull();
 });
 
+test("en Linux, en el puerto estándar avisa de una redirección nft vieja con la orden para quitarla (no se puede detectar sin privilegios)", async () => {
+  const core = await openServer(setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "", remove: "" })) }));
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:69" }) }));
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:69" });
+  expect(await within(card).findByRole("log", { name: /redirección nft/i })).toHaveTextContent("sudo nft delete table ip macuahuitl_tftp_6969");
+  setOSForTests("windows");
+  try {
+    act(() => core.emitTransfer({ runId: "r2", ready: ready({ serverId: "s2", listening: "192.0.2.10:69" }) }));
+    const win = (await screen.findAllByRole("group", { name: "TFTP 192.0.2.10:69" }))[1];
+    await act(async () => {});
+    expect(within(win).queryByRole("log", { name: /redirección nft/i })).toBeNull();
+  } finally { setOSForTests(undefined); }
+});
+
 const client = async (core: ReturnType<typeof setup>, url: string) => {
   await userEvent.click(screen.getByRole("tab", { name: "Cliente" }));
   await userEvent.click(screen.getByLabelText("Pegar una URL"));

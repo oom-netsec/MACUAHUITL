@@ -5,6 +5,11 @@ import type { TransferProto } from "./api";
 const defaultPort: Record<TransferProto, string> = { tftp: "69", ftp: "21", scp: "22", sftp: "22", http: "80" };
 export const portFor = (p: TransferProto) => defaultPort[p];
 
+// Puerto alto que se usaba antes de los puertos estándar: una tabla nft que el usuario haya dejado redirige a él.
+const oldHighPort: Record<string, number> = { tftp: 6969, ftp: 2121, scp: 2222, sftp: 2222, http: 8080 };
+export const nftLeftoverCmd = (proto: string, host: string, port: number) =>
+  `sudo nft delete table ${host.includes(":") ? "ip6" : "ip"} macuahuitl_${proto}_${oldHighPort[proto] ?? port}`;
+
 export const isIP = (s: string) =>
   (/^\d{1,3}(\.\d{1,3}){3}$/.test(s) && s.split(".").every((n) => Number(n) <= 255)) || (s.includes(":") && /^[0-9a-f:.]+$/i.test(s) && (s.match(/:/g) ?? []).length >= 2);
 

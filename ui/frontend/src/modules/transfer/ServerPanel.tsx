@@ -8,9 +8,10 @@ import { useT } from "../../lib/i18n";
 import type { TransferHintInfo, TransferLine, TransferProto, TransferReady } from "./api";
 import { iosCommands, splitListen } from "./ios";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
+import { isWindows } from "../../lib/platform";
 
 const sysctlCmd = (i?: ErrInfo) => (i?.reason === "fileserve.err.port_denied" ? i.metadata.cmd ?? "" : "");
-import { portFor, serveProblem, splitList } from "./validate";
+import { nftLeftoverCmd, portFor, serveProblem, splitList } from "./validate";
 
 interface Srv { runId: string; ready: TransferReady; lines: TransferLine[]; done: boolean; error?: string; legacy: boolean; cleanup?: string }
 
@@ -74,6 +75,14 @@ function Card({ core, s, onStop, onRemove }: { core: CoreAPI; s: Srv; onStop: ()
           <Console label={t("transfer.redirect")} text={hint.nftables} copy={core.copyText} />
           <p className="hint">{t("transfer.redirect.narrow", { ip: host })}</p>
           {hint.remove && <Console label={t("transfer.redirect.remove")} text={hint.remove} copy={core.copyText} />}
+        </>
+      )}
+      {hint && !hint.nftables && !isWindows() && !s.done && (
+        /* Sin privilegios no se puede ver si quedó una tabla nft vieja que se lleve el tráfico del puerto estándar: se explica y se da la orden. */
+        <>
+          <p className="hint">{t("transfer.nftLeftover")}</p>
+          <Console label={t("transfer.nftLeftover.cmd")} copy={core.copyText}
+            text={nftLeftoverCmd(r.protocol, host, port)} />
         </>
       )}
       {s.done && s.cleanup && (

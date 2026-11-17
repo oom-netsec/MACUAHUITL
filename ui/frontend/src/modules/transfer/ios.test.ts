@@ -1,5 +1,5 @@
 import { iosCommands } from "./ios";
-import { expectedHash, hostKeyFromError, parseURL, portFor, serveProblem } from "./validate";
+import { expectedHash, hostKeyFromError, nftLeftoverCmd, parseURL, portFor, serveProblem } from "./validate";
 import { setOSForTests } from "../../lib/platform";
 
 const ph = { ip: "IP-X", file: "ARCH" };
@@ -62,4 +62,10 @@ test("serveProblem: 1-65535 y puertos por omisión del estándar en Linux y en W
       expect([portFor("tftp"), portFor("ftp"), portFor("scp"), portFor("sftp"), portFor("http")]).toEqual(["69", "21", "22", "22", "80"]);
     } finally { setOSForTests(undefined); }
   }
+});
+
+test("nftLeftoverCmd: tabla del puerto alto de antes, ip6 con IPv6", () => {
+  expect(nftLeftoverCmd("tftp", "192.0.2.10", 69)).toBe("sudo nft delete table ip macuahuitl_tftp_6969");
+  expect(nftLeftoverCmd("sftp", "2001:db8::1", 22)).toBe("sudo nft delete table ip6 macuahuitl_sftp_2222");
+  expect(nftLeftoverCmd("raro", "192.0.2.10", 99)).toBe("sudo nft delete table ip macuahuitl_raro_99");
 });
