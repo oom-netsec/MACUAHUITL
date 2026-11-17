@@ -19,10 +19,22 @@ func simulaWindows(t *testing.T) {
 // 2.4 (POSIBLE BUG 3): en Windows la carpeta de salidas debe empezar con letra de unidad. Una UNC abriría SMB (sale de la red
 // fuera de EgressGuard y filtra el hash NTLM) y escribiría ahí. El rechazo es ANTES de tocar la ruta; la misma función sirve a
 // Ajustes, a JobSpec.output_dir y a diag OutputDir.
+// Una relativa simple conserva su motivo «relativa» también en Windows, y tampoco toca la ruta.
+func TestCheckOutputsWindowsRelativaConservaSuMotivo(t *testing.T) {
+	simulaWindows(t)
+	for _, dir := range []string{"x", "rel/x", "\u202e" + `C:\x`} {
+		_, err := CheckOutputs(dir, NewCoreSettings("fabrica", t.TempDir()), true)
+		var e *i18n.Error
+		if !errors.As(err, &e) || e.Code != "prefs.outputs.relativa" {
+			t.Errorf("%q: %v", dir, err)
+		}
+	}
+}
+
 func TestCheckOutputsWindowsSinLetraDeUnidadSeRechazaSinTocarLaRuta(t *testing.T) {
 	simulaWindows(t)
 	for _, dir := range []string{`\\10.0.0.9\x\out`, `\\srv\share`, `//10.0.0.9/x/out`, `\\?\C:\x`, `\\?\UNC\10.0.0.9\x`, `\\.\pipe\x`, `\\.\C:\x`,
-		`\??\C:\x`, `\\?\Volume{12345678-1234-1234-1234-123456789abc}\x`, `\x`, `/x`, `x`, `\u202e` + `C:\x`} {
+		`\??\C:\x`, `\\?\Volume{12345678-1234-1234-1234-123456789abc}\x`, `\x`, `/x`} {
 		dir := strings.ReplaceAll(dir, `\u202e`, "\u202e")
 		_, err := CheckOutputs(dir, NewCoreSettings("fabrica", t.TempDir()), true)
 		var e *i18n.Error

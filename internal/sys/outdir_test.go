@@ -22,8 +22,11 @@ func TestOpenOutDirYCreateTempIn(t *testing.T) {
 	}
 	defer root.Close()
 	movida := filepath.Join(base, "movida")
-	os.Rename(real, movida)
-	os.Symlink(atacante, real) // cambiada tras abrir
+	if err := os.Rename(real, movida); err != nil {
+		movida = real // Windows no deja mover una carpeta con un handle abierto: ahí la carrera no existe
+	} else {
+		os.Symlink(atacante, real) // cambiada tras abrir
+	}
 	f, err := CreateTempIn(root, "x_*.txt")
 	if err != nil {
 		t.Fatal(err)

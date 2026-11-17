@@ -68,6 +68,10 @@ func CheckOutputs(dir string, st *CoreSettings, probe bool) (string, error) {
 	if dir == "" {
 		return "", nil
 	}
+	// Una relativa simple (sin barra inicial ni «X:») conserva su motivo propio.
+	if !strings.ContainsAny(dir[:1], `\/`) && !(len(dir) > 1 && dir[1] == ':') && !filepath.IsAbs(dir) {
+		return "", outputsErr("prefs.outputs.relativa", "dir", dir)
+	}
 	// Antes de IsAbs, EvalSymlinks o Stat: una UNC (\\host\share) es absoluta para Windows y tocarla abre SMB y filtra el hash NTLM.
 	if noLocalDrive(dir) {
 		return "", outputsErr("prefs.outputs.sin_unidad", "dir", dir)
