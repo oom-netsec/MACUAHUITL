@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 	"os"
 	"strings"
 	"testing"
@@ -33,6 +34,7 @@ func coreStopEnv(t *testing.T, shutdown func() error) *bytes.Buffer {
 	rt, _ := os.MkdirTemp("", "mctl")
 	t.Cleanup(func() { os.RemoveAll(rt) })
 	t.Setenv("XDG_RUNTIME_DIR", rt)
+	ipctest.Isolate(t)
 	var stderr bytes.Buffer
 	pid, wait, errOut := corecmd.ServerPID, corecmd.WaitExit, corecmd.Stderr
 	corecmd.Stderr = &stderr

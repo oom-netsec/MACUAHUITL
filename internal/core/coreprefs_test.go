@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,6 +62,9 @@ func carpetaSegura(t *testing.T) string {
 	t.Cleanup(func() { os.RemoveAll(d) })
 	abs, err := filepath.Abs(d)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sys.MkdirPrivate(abs); err != nil { // en Windows hereda la ACL del checkout (CREATOR OWNER, Users)
 		t.Fatal(err)
 	}
 	return abs

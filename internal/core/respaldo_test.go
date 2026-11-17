@@ -175,7 +175,7 @@ func TestRespaldoIdaYVuelta(t *testing.T) {
 		a := hh.auditText(t)
 		sinSecretos(t, a, "MARKER", "PW-CORE", "PW-BORDE", "EN-", "USR-", fraseResp, "otra-maestra", "HMAC")
 	}
-	if a := h.auditText(t); !strings.Contains(a, `"action":"vault.respaldo.exportar"`) || !strings.Contains(a, path) || !strings.Contains(a, "3 credentials") {
+	if a := h.auditText(t); !strings.Contains(a, `"action":"vault.respaldo.exportar"`) || !strings.Contains(a, strings.ReplaceAll(path, `\`, `\\`)) || !strings.Contains(a, "3 credentials") {
 		t.Fatalf("audit export:\n%s", a)
 	}
 	if a := o.auditText(t); !strings.Contains(a, `"action":"vault.respaldo.importar"`) || !strings.Contains(a, "3 new") {

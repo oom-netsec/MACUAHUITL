@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -36,6 +37,9 @@ func TestErroresFatalesPorIdioma(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", "")
 	if os.Geteuid() == 0 {
 		t.Skip("root")
+	}
+	if runtime.GOOS == "windows" { // el error es de XDG_RUNTIME_DIR; en Windows el canal es un pipe por SID y run() arrancaría un núcleo de verdad
+		t.Skip("sin XDG_RUNTIME_DIR en Windows (ADR 0012)")
 	}
 	for lang, want := range map[string]string{"en": "XDG_RUNTIME_DIR is not set", "es": "XDG_RUNTIME_DIR no está definido"} {
 		consoleLang = lang

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -769,6 +770,9 @@ func TestPackColeccionesMarcanOcultosAlGuardar(t *testing.T) {
 func TestPackInstalarQueFallaAlExtraerNoGuardaLoOculto(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root escribe donde quiere")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("fuerza el fallo con chmod 0500 de la carpeta (modelo POSIX); en Windows no hay modo de solo lectura para carpetas")
 	}
 	h := newHarness(t, nil)
 	pk := v1.NewPackServiceClient(h.conn)

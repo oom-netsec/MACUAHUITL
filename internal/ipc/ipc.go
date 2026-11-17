@@ -36,6 +36,10 @@ func NewServer(opts ...grpc.ServerOption) *grpc.Server {
 	return grpc.NewServer(append(base, opts...)...)
 }
 
+// TestPipeSuffix lo fija solo ipctest.Isolate: en Windows las pruebas de varios paquetes corren a la vez y no pueden
+// compartir el pipe real del usuario. Vacío en producción.
+var TestPipeSuffix string
+
 // Dial conecta al núcleo del usuario actual.
 func Dial(ctx context.Context, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	p, err := SocketPath()

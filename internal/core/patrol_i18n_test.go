@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +24,7 @@ import (
 
 var (
 	portRe   = regexp.MustCompile(`<ip>:\d+`)
+	rootTail = regexp.MustCompile(`<root>[^\s")]*`)
 	volatile = regexp.MustCompile(`SHA256:[A-Za-z0-9+/=]+|\b[0-9a-f]{16}\b|127\.0\.0\.1:\d+|\[::1\]:\d+|\bport \d+\b`)
 )
 
@@ -32,6 +34,9 @@ func patrolCasos(t *testing.T, lang string) map[string]string {
 	out := map[string]string{}
 	norm := func(h *harness, s string) string {
 		s = strings.ReplaceAll(s, filepath.Dir(h.out), "<root>")
+		if runtime.GOOS == "windows" { // lo que cuelga de <root> queda con «/», como en el golden de Linux
+			s = rootTail.ReplaceAllStringFunc(s, func(m string) string { return strings.ReplaceAll(m, `\`, "/") })
+		}
 		s = strings.ReplaceAll(s, h.target.Address, "<ip>")
 		return portRe.ReplaceAllString(volatile.ReplaceAllString(s, "<v>"), "<ip>:<p>")
 	}
@@ -184,7 +189,8 @@ func failingRun(t *testing.T, lang string, fail bool, reasons ...map[string]stri
 // Regresión: sin idioma, con es o con uno desconocido, los RPC de Patrol devuelven lo mismo que antes del catálogo.
 func TestPatrolRegresionEs(t *testing.T) {
 	base := patrolCasos(t, "es")
-	i18ntest.Golden(t, "testdata/patrol_es.golden.json", base)
+	// login_cerrado_0 trae el error del sistema («connectex: …» en Windows, «connect: connection refused» en Linux)
+	i18ntest.Golden(t, "testdata/patrol_es.golden.json", base, "login_cerrado_0")
 	fb := failingRun(t, "es", false)
 	i18ntest.Golden(t, "testdata/patrol_parcial_es.golden.json", fb)
 	ff := failingRun(t, "es", true)

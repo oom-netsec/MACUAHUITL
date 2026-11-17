@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 // En Windows, mctl en una terminal elevada no puede hablar con el núcleo (corre en Medium): sale con un mensaje claro
@@ -27,6 +29,7 @@ func TestMctlElevadoNoMarcaElCanal(t *testing.T) {
 		t.Fatalf("versión: %v", err)
 	}
 	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	ipctest.Isolate(t)
 	if _, err := mctlRaw(t, "", "core", "stop", "-h"); err != nil && strings.Contains(err.Error(), "elevated") {
 		t.Fatalf("-h no debe pedir el núcleo: %v", err)
 	}

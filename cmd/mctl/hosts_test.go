@@ -9,6 +9,7 @@ import (
 
 	"github.com/oom-netsec/MACUAHUITL/internal/core"
 	"github.com/oom-netsec/MACUAHUITL/internal/secret"
+	"github.com/oom-netsec/MACUAHUITL/internal/testperm"
 	"github.com/oom-netsec/MACUAHUITL/internal/vault"
 )
 
@@ -142,7 +143,7 @@ func TestHostsExportImportDePuntaAPunta(t *testing.T) {
 	if out := must(t, "", "hosts", "export", "--out", path); !strings.Contains(out, "exportados 2") {
 		t.Fatalf("export: %q", out)
 	}
-	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o600 {
+	if fi, _ := os.Stat(path); !testperm.Private(fi, 0o600) {
 		t.Fatalf("modo = %v", fi.Mode())
 	}
 	if _, err := mctl(t, "", "hosts", "export", "--out", path); err == nil {

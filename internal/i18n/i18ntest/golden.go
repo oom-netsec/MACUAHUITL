@@ -3,6 +3,7 @@ package i18ntest
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -34,6 +35,7 @@ func Golden(t *testing.T, file string, got map[string]string, skipWin ...string)
 		t.Fatal(err)
 	}
 	if runtime.GOOS == "windows" {
+		got = maps.Clone(got) // quien llama sigue usando su mapa completo (p. ej. para comparar idiomas)
 		for _, k := range skipWin {
 			delete(got, k)
 			delete(want, k)

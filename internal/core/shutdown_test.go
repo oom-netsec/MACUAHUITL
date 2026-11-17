@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 func (h *harness) shutdown(t *testing.T) error {
@@ -152,9 +153,10 @@ func TestShutdownConTransferenciaUnariaSeNiega(t *testing.T) {
 	h := newHarness(t, nil)
 	gc, cancel := context.WithCancel(ctx(t))
 	defer cancel()
+	mudo := ipctest.SilentUDP(t) // contra un puerto cerrado Windows contesta al instante (conexión rechazada) y el Get terminaría solo
 	done := make(chan struct{})
 	go func() {
-		v1.NewTransferServiceClient(h.conn).Get(gc, &v1.GetRequest{Url: "tftp://127.0.0.1:1/x.bin", DestDir: h.out, TimeoutSeconds: 20})
+		v1.NewTransferServiceClient(h.conn).Get(gc, &v1.GetRequest{Url: "tftp://" + mudo + "/x.bin", DestDir: h.out, TimeoutSeconds: 20})
 		close(done)
 	}()
 	h.esperaVivo(t, "TransferService/Get")

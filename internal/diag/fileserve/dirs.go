@@ -141,7 +141,7 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	}
 	for _, d := range denyList(extraDeny) {
 		for _, p := range []string{clean, real} {
-			if inside(p, d) {
+			if denied(p, d) {
 				return "", nil, i18n.New("fileserve.err.dir_sensitive", i18n.A("dir", p, "deny", d))
 			}
 		}
@@ -164,6 +164,33 @@ func validateDir(dir string, extraDeny []string) (string, os.FileInfo, error) {
 	return real, st, nil
 }
 
+// denied dice si p cae en la carpeta sensible d. Excepción: la carpeta temporal del usuario, que en Windows
+// vive en AppData\Local\Temp, es el equivalente de /tmp (permitido); el resto de AppData sigue bloqueado.
+// Se compara con la ruta tal cual llega: quien pasa un enlace desde Temp hacia AppData\Roaming también
+// entrega su ruta real (validateDir/checkPathsDeny prueban ambas), y esa sí cae en Roaming.
+func denied(p, d string) bool {
+	if !inside(p, d) {
+		return false
+	}
+	if runtime.GOOS == "windows" { // solo si la carpeta temporal está dentro de d (AppData real, no un HOME de prueba)
+		for _, t := range []string{os.TempDir(), tempReal()} {
+			t = strings.ToLower(filepath.Clean(t))
+			if t != "" && inside(t, strings.ToLower(d)) && inside(strings.ToLower(p), t) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func tempReal() string {
+	r, err := evalSymlinks(os.TempDir())
+	if err != nil {
+		return ""
+	}
+	return r
+}
+
 // inside dice si p es d o cuelga de d.
 func inside(p, d string) bool {
 	d = filepath.Clean(d)
@@ -178,7 +205,7 @@ func checkPathsDeny(extra []string, paths ...string) error {
 	}
 	for _, d := range denyList(extra) {
 		for _, p := range paths {
-			if inside(p, d) {
+			if denied(p, d) {
 				return i18n.New("fileserve.err.dir_sensitive", i18n.A("dir", p, "deny", d))
 			}
 		}

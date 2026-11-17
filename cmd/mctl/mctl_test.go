@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -55,6 +56,7 @@ func startCoreWith(t *testing.T, prepare func(core.Paths)) *env {
 	rt, _ := os.MkdirTemp("", "mctl")
 	t.Cleanup(func() { os.RemoveAll(rt) })
 	t.Setenv("XDG_RUNTIME_DIR", rt)
+	ipctest.Isolate(t)
 	p := core.Paths{Config: filepath.Join(root, "c"), Data: filepath.Join(root, "d"), State: filepath.Join(root, "s"), Runtime: filepath.Join(rt, "macuahuitl"), Outputs: filepath.Join(root, "o")}
 	if prepare != nil {
 		prepare(p)
@@ -262,6 +264,9 @@ func TestAclConvertAndAnalyze(t *testing.T) {
 }
 
 func TestDiagPing(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("espera el argv de ping de Linux con un doble de shell; el de Windows lo cubre internal/diag")
+	}
 	_, here, _, _ := runtime.Caller(0)
 	t.Setenv("MCTL_TEST_DIAG_BIN", filepath.Join(filepath.Dir(here), "..", "..", "internal", "diag", "testdata", "bin"))
 	startCore(t)

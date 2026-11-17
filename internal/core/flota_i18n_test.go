@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -182,9 +183,24 @@ func flotaCases(t *testing.T, h *harness, lang string, fx flotaFx) map[string]fl
 	out["cleaner.sucia"] = rec
 	extraCases(t, h, c, fx, out)
 	// las rutas de carpetas temporales cambian en cada corrida
-	rep := strings.NewReplacer(fx.driftMasked, "<DRIFTM>", fx.diffJob, "<DIFFJOB>", fx.pcap, "<PCAP>", fx.pcapTrunc, "<PCAPT>", fx.pre, "<PRE>", fx.post, "<POST>", fx.empty, "<EMPTY>", fx.drift, "<DRIFT>", labDir(t), "<LAB>", fdir, "<FLEET>")
+	dirs := []string{fx.driftMasked, "<DRIFTM>", fx.diffJob, "<DIFFJOB>", fx.pcap, "<PCAP>", fx.pcapTrunc, "<PCAPT>", fx.pre, "<PRE>", fx.post, "<POST>", fx.empty, "<EMPTY>", fx.drift, "<DRIFT>", labDir(t), "<LAB>", fdir, "<FLEET>"}
+	if runtime.GOOS == "windows" { // la ruta también sale dentro de un JSON (barras invertidas duplicadas)
+		for i := 0; i < len(dirs); i += 2 {
+			dirs = append(dirs, strings.ReplaceAll(dirs[i], `\`, `\\`), dirs[i+1])
+		}
+	}
+	rep := strings.NewReplacer(dirs...)
+	tail := func(v string) string { // lo que cuelga de una carpeta queda con «/», como en el golden de Linux
+		v = rep.Replace(v)
+		if runtime.GOOS == "windows" {
+			for i := 1; i < len(dirs); i += 2 {
+				v = strings.ReplaceAll(strings.ReplaceAll(v, dirs[i]+`\\`, dirs[i]+"/"), dirs[i]+`\`, dirs[i]+"/")
+			}
+		}
+		return v
+	}
 	for k, v := range out {
-		out[k] = flotaRec{Json: rep.Replace(v.Json), Text: rep.Replace(v.Text), Err: rep.Replace(v.Err), Extra: rep.Replace(v.Extra), Keys: v.Keys}
+		out[k] = flotaRec{Json: tail(v.Json), Text: tail(v.Text), Err: tail(v.Err), Extra: tail(v.Extra), Keys: v.Keys}
 	}
 	return out
 }

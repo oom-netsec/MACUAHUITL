@@ -45,6 +45,26 @@ func TestValidateDir(t *testing.T) {
 			t.Errorf("%s debió rechazarse", d)
 		}
 	}
+	if runtime.GOOS == "windows" { // Temp (equivalente de /tmp) permitido dentro de AppData; el resto sigue bloqueado, también vía enlace
+		t.Setenv("TEMP", filepath.Join(home, "AppData", "Local", "Temp"))
+		t.Setenv("TMP", filepath.Join(home, "AppData", "Local", "Temp"))
+		tmp := filepath.Join(home, "AppData", "Local", "Temp", "x")
+		os.MkdirAll(tmp, 0o700)
+		os.MkdirAll(filepath.Join(home, "AppData", "Local", "Otra"), 0o700)
+		if _, err := ValidateDir(tmp); err != nil {
+			t.Errorf("Temp debe permitirse: %v", err)
+		}
+		if _, err := ValidateDir(filepath.Join(home, "AppData", "Local", "Otra")); err == nil {
+			t.Errorf("AppData\\Local\\Otra debió rechazarse")
+		}
+		link := filepath.Join(tmp, "enl")
+		if err := os.Symlink(filepath.Join(home, "AppData", "Roaming"), link); err == nil {
+			os.MkdirAll(filepath.Join(home, "AppData", "Roaming", "sub"), 0o700)
+			if _, err := ValidateDir(filepath.Join(link, "sub")); err == nil {
+				t.Errorf("el enlace Temp->Roaming debió rechazarse")
+			}
+		}
+	}
 	// $HOME exacto y las carpetas desde donde algo se ejecuta o se carga solo.
 	for _, sub := range []string{".config/autostart", ".config/systemd/user", ".local/bin", ".local/share/applications", "bin", ".kube", ".cargo/bin", ".bashrc.d"} {
 		os.MkdirAll(filepath.Join(home, sub), 0o700)

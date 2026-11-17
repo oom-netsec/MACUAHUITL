@@ -160,7 +160,11 @@ func esperaServidor(t *testing.T, conn *ipc.ClientConn) {
 }
 
 func ctx(t *testing.T) context.Context {
-	c, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	d := 20 * time.Second
+	if runtime.GOOS == "windows" { // el fsync por archivo del extract de paquetes tarda mucho más en el runner de Windows
+		d = 120 * time.Second
+	}
+	c, cancel := context.WithTimeout(context.Background(), d)
 	t.Cleanup(cancel)
 	return c
 }
@@ -386,7 +390,12 @@ func TestJobEndToEnd(t *testing.T) {
 	if err != nil || len(run.Devices) != 1 || run.Devices[0].State != v1.DeviceState_DEVICE_STATE_COMPLETED {
 		t.Fatalf("run = %+v %v", run, err)
 	}
-	actionsInOrder(t, h.auditText(t), "job.create", "job.logintest", "hostkey.accepted", "job.arm", "power.inhibit", "device.round", "device.round", "job.finish", "power.release")
+	// La ronda 1 arranca dentro de sched.Arm y job.arm se audita después: con un disco lento (Windows) la ronda 1 puede
+	// quedar antes que job.arm en la bitácora, así que solo la ronda 2 (programada) se exige después de power.inhibit.
+	actionsInOrder(t, h.auditText(t), "job.create", "job.logintest", "hostkey.accepted", "job.arm", "power.inhibit", "device.round", "job.finish", "power.release")
+	if n := strings.Count(h.auditText(t), `"action":"device.round"`); n != 2 {
+		t.Fatalf("rondas auditadas = %d, quería 2", n)
+	}
 	var leaked bool
 	filepath.WalkDir(filepath.Dir(h.out), func(p string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {

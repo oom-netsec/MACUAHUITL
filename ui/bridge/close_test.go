@@ -2,13 +2,13 @@ package bridge
 
 import (
 	"context"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
 	"github.com/oom-netsec/MACUAHUITL/internal/ipc"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 )
 
 type slowAssist struct {
@@ -27,8 +27,11 @@ func (f *slowAssist) ListRuns(ctx context.Context, _ *v1.ListRunsRequest) (*v1.L
 }
 
 func busyConNucleo(t *testing.T, f *slowAssist) *Bridge {
-	sock := filepath.Join(t.TempDir(), "c.sock")
-	l, _ := ipc.Listen(sock)
+	sock := ipctest.Addr(t.TempDir())
+	l, err := ipc.Listen(sock)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	go ipc.Serve(ctx, l, func(r ipc.Registrar) { v1.RegisterAssistServiceServer(r, f) })

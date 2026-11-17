@@ -67,7 +67,7 @@ func TestSecurityCommands(t *testing.T) {
 		t.Fatal("p12 vacío")
 	}
 	// La auditoría registra la ruta absoluta del export aunque -o sea relativa: el núcleo no conoce la carpeta de mctl.
-	if abs, _ := filepath.Abs("ise01.p12"); !strings.Contains(must(t, "", "audit", "export"), abs) {
+	if abs, _ := filepath.Abs("ise01.p12"); !strings.Contains(must(t, "", "audit", "export"), strings.ReplaceAll(abs, `\`, `\\`)) { // la bitácora es JSON: \ escapado
 		t.Fatalf("la auditoría no trae la ruta absoluta %s", abs)
 	}
 	must(t, "kpw\nkpw\n", "pki", "key", "--alg", "p384", "-o", "otra.key.pem")

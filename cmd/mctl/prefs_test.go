@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 func TestPrefsShowYSet(t *testing.T) {
@@ -21,6 +23,9 @@ func TestPrefsShowYSet(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(nueva) })
 	nueva, _ = filepath.Abs(nueva)
+	if err := sys.MkdirPrivate(nueva); err != nil { // en Windows la carpeta hereda la ACL del checkout (CREATOR OWNER, Users): se le da la privada
+		t.Fatal(err)
+	}
 	out, err = mctl(t, "", "prefs", "set", "--outputs", nueva, "--rotate-mb", "10", "--format", "jsonl")
 	if err != nil || !strings.Contains(out, "carpeta de salidas: "+nueva) || !strings.Contains(out, "rotar_mb: 10") || !strings.Contains(out, "no se mueven") {
 		t.Fatalf("set = %q %v", out, err)

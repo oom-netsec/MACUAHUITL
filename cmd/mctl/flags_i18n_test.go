@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"github.com/oom-netsec/MACUAHUITL/internal/ipc/ipctest"
 	"io"
 	"os"
 	"path/filepath"
@@ -129,6 +130,7 @@ func TestAyudaDeBanderasSigueElIdioma(t *testing.T) {
 	} {
 		for _, h := range [][]string{{"-h"}, {"--help"}, {"--help=false"}, {"-h=1"}, {"x", "-h"}} {
 			t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+			ipctest.Isolate(t)
 			dir := t.TempDir()
 			t.Chdir(dir)
 			args := append(append([]string{}, c.cmd...), h...)
@@ -150,6 +152,7 @@ func TestAyudaDeBanderasSigueElIdioma(t *testing.T) {
 // «--name -- -h»: --name se come el «--» como valor y -h sigue siendo la ayuda; no se crea la carpeta de la CA.
 func TestAyudaConValorYDobleGuion(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	ipctest.Isolate(t)
 	dir := t.TempDir()
 	t.Chdir(dir)
 	out, err := mctlRaw(t, "", "pki", "ca", "init", "--name", "--", "-h")
@@ -166,6 +169,7 @@ func TestAyudaDeComandoSinBanderas(t *testing.T) {
 	for _, cmd := range [][]string{{"pack", "show"}, {"pack", "remove"}, {"pack", "list"}, {"transfer", "list"}, {"ports", "resume"}} {
 		for _, h := range []string{"-h", "--help"} {
 			t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+			ipctest.Isolate(t)
 			out, err := mctlRaw(t, "", append(append([]string{}, cmd...), h)...)
 			if err != nil || !strings.Contains(out, "usage: mctl "+strings.Join(cmd, " ")) {
 				t.Errorf("%v %s: err=%v\n%s", cmd, h, err, out)
