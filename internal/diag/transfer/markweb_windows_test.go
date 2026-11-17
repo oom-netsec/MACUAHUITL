@@ -27,7 +27,7 @@ func TestDownloadEscribeMarkOfTheWeb(t *testing.T) {
 	if probe != nil {
 		t.Skip("el volumen no admite flujos alternos:", probe)
 	}
-	res, err := Download(context.Background(), Request{URL: u, DestDir: dest})
+	res, err := Download(context.Background(), Request{Net: rawNet, URL: u, DestDir: dest})
 	if err != nil {
 		t.Fatal(err)
 	}
