@@ -6,7 +6,8 @@ import { Badge, EmptyState, Page, Section } from "../../components/Page";
 import { Glyph } from "../../components/Glyph";
 import { DataTable, type Column } from "../../components/DataTable";
 import { useT } from "../../lib/i18n";
-import { useVaultVersion, vaultChanged } from "../../lib/vaultSignal";
+import { vaultChanged } from "../../lib/vaultSignal";
+import { useCoreLoad } from "../../lib/useCoreLoad";
 import { BackupSection } from "./BackupSection";
 import "./vault.css";
 
@@ -24,27 +25,26 @@ export function VaultView({ core }: { core: CoreAPI }) {
   const lastView = useRef(""); // último «Ver» pedido: una respuesta tardía de otra credencial se descarta
   const fail = (e: unknown) => setMsg({ kind: "error", text: errorText(e) });
   const previewOpen = useRef(false); // hay una vista previa de un respaldo con credenciales descifradas en el núcleo
-  const refresh = useCallback(async () => {
-    try {
-      const s = await core.vaultStatus();
-      if (s.state !== "unlocked" && previewOpen.current) { // el núcleo la descartó al cerrarse la bóveda
-        previewOpen.current = false;
-        setMsg({ kind: "error", text: t("vault.backup.discarded") });
-      }
-      setState(s.state);
-      setCreds(s.state === "unlocked" ? await core.listCredentials() : []);
-    } catch (e) {
-      fail(e);
+  const load = useCallback(async (live: () => boolean = () => true) => {
+    const s = await core.vaultStatus();
+    if (!live()) return;
+    if (s.state !== "unlocked" && previewOpen.current) { // el núcleo la descartó al cerrarse la bóveda
+      previewOpen.current = false;
+      setMsg({ kind: "error", text: t("vault.backup.discarded") });
     }
+    setState(s.state);
+    const l = s.state === "unlocked" ? await core.listCredentials() : [];
+    if (live()) setCreds(l);
   }, [core, t]);
-  const vv = useVaultVersion(); // cerrada desde la paleta o por tiempo: la vista se pone al día
-  useEffect(() => void refresh(), [refresh, vv]);
+  const refresh = useCallback(() => load().catch(fail), [load]);
+  // Cerrada desde la paleta o por tiempo, o núcleo reconectado: la vista se pone al día y el error de carga se va al reintentar.
+  const [loadErr] = useCoreLoad(load, [load]);
   const onPreview = useCallback((open: boolean) => { previewOpen.current = open; }, []);
   const changed = useCallback(() => { vaultChanged(); return refresh(); }, [refresh]); // avisa a las demás vistas
 
-  const notice = msg && <Notice kind={msg.kind}>{msg.text}</Notice>;
+  const notice = msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : loadErr && <Notice kind="error">{loadErr}</Notice>;
   // Sin estado aún: no se dibuja ningún diseño para no saltar de "abierta" a "cerrada" al llegar la respuesta.
-  if (state === null && !msg) return <div className="skeleton" role="status" aria-label={t("shell.loading")}><i /><i /><i /></div>;
+  if (state === null && !msg && !loadErr) return <div className="skeleton" role="status" aria-label={t("shell.loading")}><i /><i /><i /></div>;
   if (state === "absent" || state === "locked") {
     return (
       <section aria-labelledby="vault-h" className="lockscreen">

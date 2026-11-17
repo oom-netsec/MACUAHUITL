@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useCoreLoad } from "../../lib/useCoreLoad";
 import { Terminal } from "../../components/Terminal";
 import type { ConsoleEvent, CoreAPI } from "../../lib/core";
 import { Field, Notice, Select, errorText } from "../../components/Field";
@@ -31,12 +32,13 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
   const [forDevice, setForDevice] = useState("");
   useInbox("console", (d) => { if (/^(\/dev\/|COM\d)/.test(d)) { setPort(d); setForDevice(""); } else setForDevice(d); });
 
-  const scan = () =>
-    core.fieldPorts().then((p) => {
-      setPorts(p ?? []);
-      setPort((cur) => cur || (p?.[0] ?? ""));
-    }).catch((e) => setErr(errorText(e)));
-  useEffect(() => { scan(); }, [core]);
+  const readPorts = (live = () => true) => core.fieldPorts().then((p) => {
+    if (!live()) return;
+    setPorts(p ?? []);
+    setPort((cur) => cur || (p?.[0] ?? ""));
+  });
+  const scan = () => readPorts().catch((e) => setErr(errorText(e)));
+  const [loadErr] = useCoreLoad(readPorts, [core]);
   useEffect(() => { out.current?.scrollTo?.(0, out.current.scrollHeight); }, [text]);
 
   const s = useStream<ConsoleEvent>(core.onConsole, (e) => {
@@ -89,7 +91,7 @@ export function ConsoleView({ core }: { core: CoreAPI }) {
           <button disabled={!runId} onClick={() => act(() => core.consoleClose(runId))}>{t("console.close")}</button>
         </div>
       </Section>
-      {err && <Notice kind="error">{err}</Notice>}
+      {(err || loadErr) && <Notice kind="error">{err || loadErr}</Notice>}
       {forDevice && <Notice kind="info">{t("console.forDevice", { address: forDevice })}</Notice>}
       <Notice kind="info">{t("console.note")}</Notice>
       {!started && <EmptyState icon="terminal" title={t("console.empty.title")}>{t("console.empty")}</EmptyState>}

@@ -1,12 +1,13 @@
 import { cleanOnFail } from "../../lib/cleanOnFail";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import type { CoreAPI } from "../../lib/core";
-import { Check, Notice, Select, errorText } from "../../components/Field";
+import { Check, Notice, Select } from "../../components/Field";
 import { Badge } from "../../components/Page";
 import { Icon } from "../../components/Icon";
 import { DetailsButton } from "../../components/Dialog";
 import { useLang, useT } from "../../lib/i18n";
 import { useAction } from "../../lib/useAction";
+import { useCoreLoad } from "../../lib/useCoreLoad";
 import type { Key } from "../../lib/i18n/es";
 import type { Host, HostFileFormat, HostImportAction, HostImportItem, HostsFormat, HostsImportPreview, HostsImportResult } from "../inventory/api";
 import { hostsChanged, useHostsVersion } from "../inventory/signal";
@@ -31,7 +32,6 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
   const uid = useId();
   const hv = useHostsVersion();
   const [fmt, setFmt] = useState<HostsFormat | null>(null);
-  const [loadErr, setLoadErr] = useState(""); // fallos de lectura; los de las acciones los lleva useAction
   const [msg, setMsg] = useState("");
   const [warn, setWarn] = useState("");
   const [format, setFormat] = useState<HostFileFormat>("csv");
@@ -42,24 +42,17 @@ export function HostsDataCard({ core }: { core: CoreAPI }) {
   const [acts, setActs] = useState<Record<string, HostImportAction>>({});
   const [result, setResult] = useState<HostsImportResult | null>(null);
   const action = useAction((f: () => Promise<void>) => f());
-  // Un fallo de lectura reemplaza al error de la acción anterior: se ve siempre el último.
-  const loadFail = (e: unknown) => { action.clearError(); setLoadErr(errorText(e)); };
-
-  useEffect(() => {
-    let live = true;
-    core.hostsImportFormat().then((f) => { if (live) setFmt(f); }, (e) => { if (live) loadFail(e); });
-    return () => { live = false; };
-  }, [core]);
-  useEffect(() => {
+  // Lecturas (al abrir, al cambiar la libreta y al reconectar el núcleo); sus errores van aparte de los de las acciones.
+  const [fmtErr, clearFmtErr] = useCoreLoad((live) => core.hostsImportFormat().then((f) => { if (live()) setFmt(f); }), [core]);
+  const [bookErr, clearBookErr] = useCoreLoad(async (live) => {
     if (scope !== "some") return;
-    let live = true;
-    core.listHosts().then((l) => { if (live) { setBook(l); setPicked((p) => new Set([...p].filter((id) => l.some((h) => h.id === id)))); } }, (e) => { if (live) loadFail(e); });
-    return () => { live = false; };
+    const l = await core.listHosts();
+    if (live()) { setBook(l); setPicked((p) => new Set([...p].filter((id) => l.some((h) => h.id === id)))); }
   }, [core, scope, hv]);
 
   const { busy } = action;
-  const err = action.error || loadErr;
-  const run = (f: () => Promise<void>) => { setLoadErr(""); setMsg(""); setWarn(""); return action.run(f); };
+  const err = fmtErr || bookErr || action.error; // una lectura que falla después tapa el error de la acción anterior; una acción nueva borra los de lectura
+  const run = (f: () => Promise<void>) => { clearFmtErr(); clearBookErr(); setMsg(""); setWarn(""); return action.run(f); };
 
   const template = (format: HostFileFormat) => run(async () => {
     const tpl = await core.hostsImportTemplate(format);
