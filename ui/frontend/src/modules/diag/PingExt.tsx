@@ -20,13 +20,14 @@ export function PingOptions({ form, set, errors, active, ifaces, disabled }: {
   const num = (label: Key, k: keyof PingForm, w: "sm" | "md" = "sm", hint?: Key) =>
     <Field label={t(label)} hint={hint && t(hint)} value={form[k] as string} onChange={(v) => set({ [k]: v })} error={e(errors, k, t)} inputMode="decimal" w={w} />;
   const pts = sweepPoints(form);
+  const hidden = Object.keys(errors).filter((k) => k !== "count").length; // los de «Paquetes» se ven fuera de la sección
   return (
     <details className="ping-ext">
-      <summary>{t("diag.ext.title")}{active > 0 && <span className="meta"> · {t("diag.ext.active", { n: active })}</span>}</summary>
+      <summary>{t("diag.ext.title")}{active > 0 && <span className="meta"> · {t("diag.ext.active", { n: active })}</span>}{hidden > 0 && <span className="field-error"> · {t("diag.ext.errors", { n: hidden })}</span>}</summary>
       <fieldset disabled={disabled}>
         <div className="field-row">
           <Check label={t("diag.ext.continuous")} checked={form.continuous} onChange={(continuous) => set({ continuous })} />
-          <Check label={t("diag.ext.df")} checked={form.df && !(form.family === "6")} disabled={form.family === "6" || (win && form.family !== "4")} onChange={(df) => set({ df })} />
+          <Check label={t("diag.ext.df")} checked={form.df && !(win && form.family === "6")} disabled={win && form.family === "6"} onChange={(df) => set({ df })} />
         </div>
         <div className="field-row">
           {num("diag.ext.ttl", "ttl")}
@@ -39,7 +40,7 @@ export function PingOptions({ form, set, errors, active, ifaces, disabled }: {
             options={[["", t("diag.ext.family.auto")], ["4", "IPv4"], ["6", "IPv6"]]} />
         </div>
         <div className="field-row">
-          <Select label={t("diag.ext.source")} value={form.sourceSel} onChange={(sourceSel) => set({ sourceSel })} options={src} w="md" keepUnknown />
+          <Select label={t("diag.ext.source")} value={form.sourceSel} onChange={(sourceSel) => set({ sourceSel })} options={src} error={e(errors, "sourceSel", t)} w="md" keepUnknown />
           <Field label={t("diag.ext.sourceIP")} value={form.sourceIP} onChange={(sourceIP) => set({ sourceIP })} error={e(errors, "sourceIP", t)} w="md" mono />
         </div>
         <fieldset className="ping-sweep">
@@ -52,7 +53,6 @@ export function PingOptions({ form, set, errors, active, ifaces, disabled }: {
           {pts > 0 && <p className="hint" role="status">{t("diag.ext.sweepPoints", { n: pts })}</p>}
           <p className="hint">{t("diag.ext.sweepHint")}</p>
         </fieldset>
-        {e(errors, "count", t) && <p role="alert" className="field-error">{e(errors, "count", t)}</p>}
       </fieldset>
     </details>
   );
@@ -79,13 +79,15 @@ export function PingSummaryCard({ s }: { s: PingSummary }) {
 
 const TONE = { ok: "ok", loss: "bad", frag: "warn" } as const;
 
-export function SweepTable({ points, v6 }: { points: SweepPoint[]; v6: boolean }) {
+export function SweepTable({ points, fam }: { points: SweepPoint[]; fam: "4" | "6" | "?" }) {
   const t = useT();
   const sorted = [...points].sort((a, b) => a.size - b.size);
-  const mtu = mtuEstimate(points, v6);
+  const mtu = fam === "?" ? null : mtuEstimate(points, fam === "6");
+  const unknown = fam === "?" && mtuEstimate(points, false) !== null; // no se sabe si suma 28 o 48
   return (
     <section aria-label={t("diag.sweep.title")}>
-      {mtu && <p role="status"><strong>{t("diag.sweep.mtu", { mtu: mtu.mtu, size: mtu.size })}</strong> <span className="meta">{t("diag.sweep.mtuNote", { n: v6 ? 48 : 28 })}</span></p>}
+      {unknown && <p role="status" className="meta">{t("diag.sweep.mtuUnknown")}</p>}
+      {mtu && <p role="status"><strong>{t("diag.sweep.mtu", { mtu: mtu.mtu, size: mtu.size })}</strong> <span className="meta">{t("diag.sweep.mtuNote", { n: fam === "6" ? 48 : 28 })}</span></p>}
       <div className="table-wrap">
         <table aria-label={t("diag.sweep.title")}>
           <thead><tr><th scope="col">{t("diag.sweep.size")}</th><th scope="col">{t("diag.sweep.recv")}</th><th scope="col">{t("diag.sweep.result")}</th></tr></thead>

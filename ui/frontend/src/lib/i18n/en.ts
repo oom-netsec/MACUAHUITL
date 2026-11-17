@@ -2956,4 +2956,9 @@ export const en: Record<Key, string> = {
   "diag.sweep.frag": "fragments",
   "diag.sweep.mtu": "Estimated path MTU: {mtu} (largest ok size: {size})",
   "diag.sweep.mtuNote": "This is an estimate: size + {n} bytes of headers.",
+  "diag.ext.active.one": "1 active",
+  "diag.ext.errors": "{n} with errors",
+  "diag.ping.err.count": "Packets are 1 to 100.",
+  "diag.ping.err.sourceFamily": "The source is not of the chosen family.",
+  "diag.sweep.mtuUnknown": "The MTU cannot be estimated: with Auto family and a host name it is unknown whether it is IPv4 (+28) or IPv6 (+48). Choose the family.",
 };

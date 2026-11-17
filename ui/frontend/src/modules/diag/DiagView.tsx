@@ -9,7 +9,7 @@ import { useT } from "../../lib/i18n";
 import { outputsErrorText } from "../../lib/outputsError";
 import { errInfo } from "../../lib/coreError";
 import { PingOptions, PingSummaryCard, SweepTable } from "./PingExt";
-import { PING_FORM0, pingOptions, type PingForm } from "./pingOpts";
+import { PING_FORM0, ipFamily, patchForm, pingOptions, type PingForm } from "./pingOpts";
 import { DiagViz } from "./DiagViz";
 import { isWindows } from "../../lib/platform"; // ADR 0012 (i): en Windows el SYN necesita Npcap, fuera del producto
 import "./diag.css";
@@ -22,13 +22,14 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
   const go = useNav();
   const [target, setTarget] = useState("");
   const [pf, setPf] = useState<PingForm>(PING_FORM0);
-  const setP = (p: Partial<PingForm>) => setPf((f) => ({ ...f, ...p }));
+  const setP = (p: Partial<PingForm>) => setPf((f) => patchForm(f, p));
   const count = pf.count;
   const ping = pingOptions(pf, isWindows());
   const [summary, setSummary] = useState<PingSummary | null>(null);
   const [sweep, setSweep] = useState<SweepPoint[]>([]);
   const [stoppable, setStoppable] = useState(false); // ping continuo o con duración: se detiene con resumen
-  const [v6, setV6] = useState(false);
+  const [fam, setFam] = useState<"4" | "6" | "?">("4"); // familia del ping en curso; «?» = Auto con un nombre de host
+  const [interval, setInterval_] = useState(1); // segundos entre paquetes: escala el eje de la gráfica
   const [hops, setHops] = useState("30");
   const [ports, setPorts] = useState("");
   const [scan, setScan] = useState<"connect" | "syn" | "udp" | "ping">("connect");
@@ -73,6 +74,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     if (e.pingSummary) setSummary(e.pingSummary);
     if (e.sweepPoint) setSweep((l) => [...l.filter((p) => p.size !== e.sweepPoint!.size), e.sweepPoint!]);
     if (e.done) {
+      setStoppable(false);
       setResult(e.canceled ? { ok: false, canceled: true, text: t("diag.canceled") } : e.error
         ? { ok: false, text: t("diag.error", { msg: errorText(new Error(e.error)) }) }
         : { ok: true, text: t("diag.done", { code: e.exitCode ?? 0, path: e.outputPath ?? "" }), code: e.exitCode ?? 0, path: e.outputPath });
@@ -104,7 +106,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     const options: Record<string, string> = {};
     let targets: string[] = [];
     switch (tool) {
-      case "ping": Object.assign(options, ping.options); targets = [target]; setStoppable(!!(ping.options.continuous || ping.options.duration)); setV6(ping.options.family === "6" || (ping.options.family !== "4" && target.includes(":"))); break;
+      case "ping": Object.assign(options, ping.options); targets = [target]; setStoppable(!!(ping.options.continuous || ping.options.duration)); setFam((ping.options.family as "4" | "6" | undefined) ?? (ipFamily(target.trim()) ? String(ipFamily(target.trim())) as "4" | "6" : "?")); setInterval_(Number(ping.options.interval) || 1); break;
       case "traceroute": options.max_hops = hops; targets = [target]; break;
       case "nmap": options.scan = scan; if (ports) options.ports = ports; targets = [target]; break;
       case "iperf3": options.mode = mode; if (mode === "client") { options.seconds = seconds; targets = [target]; } else { options.bind = bindIP; options.port = port; } break;
@@ -122,6 +124,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       early.forEach((e) => applyRef.current(e));
     } catch (e) {
       starting.current = false;
+      setStoppable(false);
       const i = errInfo(e);
       setErr(i?.reason === "diag.err.opt_windows" ? t("diag.err.opt_windows", { key: i.metadata.key ?? "" }) : outputsErrorText(e, t));
     } finally {
@@ -142,7 +145,7 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
     <Page title={t(`diag.title.${tool}`)} description={t(`diag.desc.${tool}`)}>
       <div className="field-row">
         {needsTarget && <Field label={t("diag.target")} hint={t("diag.target.hint")} value={target} onChange={setTarget} w="lg" mono />}
-        {tool === "ping" && <Field label={t("diag.count")} type="number" value={count} onChange={(count) => setP({ count })} w="sm" disabled={pf.continuous} />}
+        {tool === "ping" && <Field label={t("diag.count")} type="number" value={count} onChange={(count) => setP({ count })} w="sm" disabled={pf.continuous} error={ping.errors.count ? t(ping.errors.count) : undefined} />}
         {tool === "traceroute" && <Field label={t("diag.hops")} type="number" value={hops} onChange={setHops} w="sm" />}
         {tool === "nmap" && <Field label={t("diag.ports")} hint={t("diag.ports.hint")} value={ports} onChange={setPorts} w="md" mono />}
         {tool === "iperf3" && <Select label={t("diag.mode")} value={mode} onChange={setMode} options={[["client", t("diag.mode.client")], ["server", t("diag.mode.server")]]} w="md" />}
@@ -176,8 +179,8 @@ export function DiagView({ core, tool }: { core: CoreAPI; tool: ToolName }) {
       </div>
       {!started && <EmptyState icon="pulse" title={t("diag.empty.title")}>{t("diag.empty")}</EmptyState>}
       {tool === "ping" && summary && <PingSummaryCard s={summary} />}
-      {tool === "ping" && sweep.length > 0 && <SweepTable points={sweep} v6={v6} />}
-      {started && <DiagViz tool={tool} lines={lines} t0={t0} path={result?.ok ? result.path : undefined} />}
+      {tool === "ping" && sweep.length > 0 && <SweepTable points={sweep} fam={fam} />}
+      {started && <DiagViz tool={tool} lines={lines} t0={t0} interval={interval} path={result?.ok ? result.path : undefined} />}
       {started && (
         <ResultPanel title={t("common.output")} status={status} error={err || (result && !result.ok && !result.canceled ? result.text : "")}
           meta={result?.ok ? t("diag.done", { code: result.code ?? 0, path: result.path ?? "" }) : result?.canceled ? result.text : undefined}

@@ -8,12 +8,12 @@ import { useT } from "../../lib/i18n";
 import type { Key } from "../../lib/i18n/es";
 import { captureCount, parseIperf, parseNmap, parsePing, parseTraceroute, pingStats } from "./parse";
 
-type Props = { lines: string[]; t0: number }; // t0: inicio de la ejecución, segundos Unix
+type Props = { lines: string[]; t0: number; interval?: number }; // t0: inicio de la ejecución, segundos Unix
 const n2 = (n: number) => String(Math.round(n * 100) / 100);
 const n1 = (n: number) => Math.round(n * 10) / 10;
 
-// shortcut: supone el intervalo de 1 s de ping; si se agrega -i, usar la hora de llegada de cada línea.
-function PingViz({ lines, t0 }: Props) {
+// El eje de tiempo escala con el intervalo del ping (1 s si no se fijó).
+function PingViz({ lines, t0, interval = 1 }: Props) {
   const t = useT();
   const r = useMemo(() => parsePing(lines), [lines]);
   const s = pingStats(r);
@@ -21,11 +21,11 @@ function PingViz({ lines, t0 }: Props) {
     const max = Math.max(0, ...r.replies.map((x) => x.seq), ...r.lost);
     const seqs = Array.from({ length: max }, (_, i) => i + 1);
     return {
-      times: seqs.map((q) => t0 + q),
+      times: seqs.map((q) => t0 + q * interval),
       values: seqs.map((q) => r.replies.find((x) => x.seq === q)?.rtt ?? null),
-      marks: r.lost.map((q) => ({ at: t0 + q, label: t("diag.ping.lostMark", { seq: q }) })),
+      marks: r.lost.map((q) => ({ at: t0 + q * interval, label: t("diag.ping.lostMark", { seq: q }) })),
     };
-  }, [r, t0, t]);
+  }, [r, t0, t, interval]);
   const series = useMemo(() => [{ label: t("diag.ping.rtt"), values: chart.values }], [chart, t]);
   if (!s) return null;
   return (
@@ -141,10 +141,10 @@ function CaptureViz({ lines, path }: Props & { path?: string }) {
   );
 }
 
-export function DiagViz({ tool, lines, t0, path }: Props & { tool: string; path?: string }) {
+export function DiagViz({ tool, lines, t0, path, interval }: Props & { tool: string; path?: string }) {
   return (
     <div className="diag-viz">
-      {tool === "ping" && <PingViz lines={lines} t0={t0} />}
+      {tool === "ping" && <PingViz lines={lines} t0={t0} interval={interval} />}
       {tool === "traceroute" && <TraceViz lines={lines} t0={t0} />}
       {tool === "iperf3" && <IperfViz lines={lines} t0={t0} />}
       {tool === "nmap" && <NmapViz lines={lines} t0={t0} />}

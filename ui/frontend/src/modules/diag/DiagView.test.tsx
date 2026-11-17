@@ -275,12 +275,63 @@ test("continuo: Detener usa diagStop y Cancelar sigue cortando; NotFound al dete
   expect(core.diagCancel).toHaveBeenCalledWith("r1");
 });
 
-test("otro error de diagStop sí se muestra; sin continuo ni duración no hay Detener", async () => {
-  const core = await pingView({ diagStop: vi.fn().mockRejectedValue(new Error("boom")) });
+test("sin continuo ni duración no hay Detener", async () => {
+  const core = await pingView();
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await screen.findByRole("button", { name: "Cancelar", hidden: false });
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
+  await screen.findByRole("button", { name: "Cancelar" });
   expect(screen.queryByRole("button", { name: "Detener" })).not.toBeInTheDocument();
-  expect(core.diagStop).not.toHaveBeenCalled();
+});
+
+test("Detener desaparece al terminar y si el arranque falla", async () => {
+  const core = await pingView();
+  await openExt();
+  await userEvent.click(screen.getByLabelText("Continuo (hasta detener)"));
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await screen.findByRole("button", { name: "Detener" });
+  act(() => core.emitDiag({ runId: "r1", done: true, exitCode: 0 }));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Detener" })).not.toBeInTheDocument());
+});
+
+test("Detener desaparece si diagRun falla", async () => {
+  await pingView({ diagRun: vi.fn().mockRejectedValue(new Error("boom")) });
+  await openExt();
+  await userEvent.click(screen.getByLabelText("Continuo (hasta detener)"));
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await screen.findByRole("alert");
+  expect(screen.queryByRole("button", { name: "Detener" })).not.toBeInTheDocument();
+});
+
+test("paquetes inválido se ve con la sección cerrada; otros errores salen en el resumen", async () => {
+  await pingView();
+  await userEvent.clear(screen.getByLabelText("Paquetes"));
+  expect(screen.getByLabelText("Paquetes")).toBeInvalid();
+  expect(screen.getByText("Los paquetes van de 1 a 100.")).toBeInTheDocument();
+  await userEvent.type(screen.getByLabelText("Paquetes"), "4");
+  await openExt();
+  await userEvent.type(screen.getByLabelText("TTL (1-255)"), "300");
+  expect(screen.getByText("Opciones extendidas").closest("summary")).toHaveTextContent("1 con error");
+});
+
+test("con barrido, Paquetes pasa a 1 hasta que el usuario lo toca", async () => {
+  await pingView();
+  await openExt();
+  await userEvent.type(screen.getByLabelText("Inicio"), "0");
+  expect(screen.getByLabelText("Paquetes")).toHaveValue(1);
+});
+
+test("MTU: con familia Auto y un nombre de host no hay cifra, solo el aviso", async () => {
+  const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
+  render(<DiagView core={core} tool="ping" />);
+  await userEvent.type(screen.getByLabelText("Destino"), "router.example");
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
+  act(() => {
+    core.emitDiag({ runId: "r1", sweepPoint: { size: 1400, sent: 1, received: 1, result: "ok" } });
+    core.emitDiag({ runId: "r1", sweepPoint: { size: 1500, sent: 1, received: 0, result: "frag" } });
+  });
+  expect(await screen.findByText(/No se puede estimar la MTU/)).toBeInTheDocument();
+  expect(screen.queryByText(/MTU estimada de la ruta/)).not.toBeInTheDocument();
 });
 
 test("también se detiene con duración, y un error distinto de NotFound se muestra", async () => {
@@ -300,7 +351,7 @@ test("resumen y barrido: tarjeta, tabla ordenada y MTU estimada", async () => {
   await userEvent.type(screen.getByLabelText("Paso"), "50");
   expect(screen.getByText("3 puntos (máximo 100)")).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
-  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("ping", ["10.0.0.1"], { count: "4", sweep_start: "1400", sweep_end: "1500", sweep_step: "50" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("ping", ["10.0.0.1"], { count: "1", sweep_start: "1400", sweep_end: "1500", sweep_step: "50" }));
   act(() => {
     core.emitDiag({ runId: "r1", sweepPoint: { size: 1500, sent: 4, received: 0, result: "frag" } });
     core.emitDiag({ runId: "r1", sweepPoint: { size: 1400, sent: 4, received: 4, result: "ok" } });

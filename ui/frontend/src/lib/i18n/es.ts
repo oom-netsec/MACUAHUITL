@@ -2955,6 +2955,11 @@ export const es = {
   "diag.sweep.frag": "fragmenta",
   "diag.sweep.mtu": "MTU estimada de la ruta: {mtu} (mayor tamaño ok: {size})",
   "diag.sweep.mtuNote": "Es una estimación: tamaño + {n} de cabeceras.",
+  "diag.ext.active.one": "1 activa",
+  "diag.ext.errors": "{n} con error",
+  "diag.ping.err.count": "Los paquetes van de 1 a 100.",
+  "diag.ping.err.sourceFamily": "El origen no es de la familia elegida.",
+  "diag.sweep.mtuUnknown": "No se puede estimar la MTU: con familia Automática y un nombre de host no se sabe si son IPv4 (+28) o IPv6 (+48). Elige la familia.",
 };
 
 export type Key = keyof typeof es;
