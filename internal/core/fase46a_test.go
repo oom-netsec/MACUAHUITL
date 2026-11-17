@@ -113,7 +113,7 @@ func TestFinishedAtSeFijaUnaVezYPorEstado(t *testing.T) {
 	// persistJob lo guarda y sobrevive al reinicio.
 	h.core.persistJob(j)
 	c := reabre2(t, h)
-	if got := listar(t, c, true)[id].FinishedAt.AsTime(); !got.Equal(primero.Truncate(0).UTC()) && got.Sub(primero).Abs() > time.Microsecond {
+	if got := listar(t, c, true)[id].FinishedAt.AsTime(); got.Sub(primero).Abs() > time.Microsecond {
 		t.Fatalf("recargado %v != %v", got, primero)
 	}
 }

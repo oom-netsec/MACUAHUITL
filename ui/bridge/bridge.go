@@ -420,7 +420,7 @@ func rfc3339(t *timestamppb.Timestamp) string {
 
 func (b *Bridge) ListJobs() ([]JobDTO, error) {
 	return call(b, func(ctx context.Context, c *ipc.ClientConn) ([]JobDTO, error) {
-		r, err := v1.NewPatrolServiceClient(c).ListJobs(ctx, &v1.ListJobsRequest{})
+		r, err := v1.NewPatrolServiceClient(c).ListJobs(ctx, &v1.ListJobsRequest{IncludePast: true}) // hasta 46f: la UI aún no separa «Past jobs»
 		if err != nil {
 			return nil, err
 		}

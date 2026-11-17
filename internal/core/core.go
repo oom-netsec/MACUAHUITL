@@ -639,7 +639,7 @@ func (c *Core) loadJobs() {
 			j.state = "failed"
 			dead = append(dead, j) // su finished_at lo fija addPhase: es el instante de este arranque
 		} else if isFinal(j.state) && j.FinishedAt.IsZero() {
-			j.FinishedAt = j.endedAt(created) // guardado antes de finished_at; se persiste con el siguiente persistJob
+			j.FinishedAt = j.endedAt(created) // guardado antes de finished_at: se recalcula en cada arranque (es determinista) hasta que algo lo vuelva a persistir
 		}
 		j.closed = j.state == "completed" || j.state == "cancelled" || j.state == "failed" // de una corrida anterior: no hay finish pendiente
 		c.jobs[id] = j
@@ -686,7 +686,7 @@ func (j *job) endedAt(createdAt string) time.Time {
 			return j.Phases[i].At
 		}
 	}
-	t, _ := time.Parse(time.RFC3339, createdAt)
+	t, _ := time.Parse(time.RFC3339, createdAt) // shortcut: ilegible → cero (nunca past ni podado); solo persistJob escribe created_at y siempre en RFC 3339
 	return t
 }
 

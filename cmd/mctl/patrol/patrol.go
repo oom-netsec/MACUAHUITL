@@ -145,7 +145,7 @@ func jobList(c *cli.Env, args []string) error {
 	if _, err := cli.Flags("job list", args, nil); err != nil {
 		return err
 	}
-	r, err := v1.NewPatrolServiceClient(c.Conn).ListJobs(context.Background(), &v1.ListJobsRequest{})
+	r, err := v1.NewPatrolServiceClient(c.Conn).ListJobs(context.Background(), &v1.ListJobsRequest{IncludePast: true}) // hasta 46e (job list --all): como antes, todos
 	if err != nil {
 		return err
 	}
