@@ -31,6 +31,7 @@ var (
 	ErrLocked        = i18n.New("vault.err.locked", nil)
 	ErrNotFound      = i18n.New("vault.err.not_found", nil)
 	ErrCorrupt       = i18n.New("vault.err.corrupt", nil)
+	ErrFieldTooLong  = i18n.New("vault.err.field_too_long", nil)
 	ErrExists        = i18n.New("vault.err.exists", nil)
 	ErrWeakParams    = i18n.New("vault.err.weak_params", nil)
 	ErrReserved      = i18n.New("vault.err.reserved", nil)
@@ -402,6 +403,12 @@ func (v *Vault) putBatch(cs []Credential, reserved bool) ([]string, error) {
 func (v *Vault) putBatchLocked(cs []Credential, reserved bool) ([]string, error) {
 	if err := v.requireFull(); err != nil {
 		return nil, err
+	}
+	for _, c := range cs {
+		if len(c.Label) > MaxFieldBytes || len(c.Username) > MaxFieldBytes || len(c.Password.Bytes()) > MaxFieldBytes ||
+			len(c.Enable.Bytes()) > MaxFieldBytes || len(c.SSHKey.Bytes()) > MaxFieldBytes {
+			return nil, ErrFieldTooLong
+		}
 	}
 	next := append([]rawEntry(nil), v.entries...)
 	ids := make([]string, 0, len(cs))

@@ -16,6 +16,7 @@ func init() {
 		"vault.err.locked":             e("vault: bóveda cerrada", "vault: vault is locked"),
 		"vault.err.not_found":          e("vault: credencial no encontrada", "vault: credential not found"),
 		"vault.err.corrupt":            e("vault: archivo dañado o alterado", "vault: file damaged or tampered with"),
+		"vault.err.field_too_long":     e("vault: un campo de la credencial pasa de 64 KiB", "vault: a credential field is longer than 64 KiB"),
 		"vault.err.exists":             e("vault: la bóveda ya existe", "vault: the vault already exists"),
 		"vault.err.weak_params":        e("vault: parámetros de Argon2id por debajo del mínimo", "vault: Argon2id parameters below the minimum"),
 		"vault.err.reserved":           e("vault: entrada reservada del sistema, no es una credencial de conexión", "vault: reserved system entry, not a connection credential"),

@@ -10,6 +10,10 @@ import (
 // etiqueta, usuario, contraseña, enable, llave SSH, reservado.
 const plainFields = 6
 
+// MaxFieldBytes acota cada campo de una credencial. Cada secreto vive en memoria bloqueada (RLIMIT_MEMLOCK suele ser de pocos MiB) y
+// memguard entra en pánico si no puede bloquearla: un respaldo ajeno con un campo enorme no debe poder tumbar el proceso.
+const MaxFieldBytes = 64 << 10
+
 func encodePlain(c Credential) []byte {
 	fields := [plainFields][]byte{[]byte(c.Label), []byte(c.Username), c.Password.Bytes(), c.Enable.Bytes(), c.SSHKey.Bytes(), nil}
 	n := 0
@@ -36,8 +40,8 @@ func decodePlain(b []byte) (Credential, error) {
 		}
 		l := binary.BigEndian.Uint32(rest)
 		rest = rest[4:]
-		if uint64(l) > uint64(len(rest)) {
-			return Credential{}, corrupt("campo %d excede el texto en claro", i)
+		if uint64(l) > uint64(len(rest)) || l > MaxFieldBytes {
+			return Credential{}, corrupt("campo %d excede el texto en claro o el tope", i)
 		}
 		f[i], rest = rest[:l], rest[l:]
 	}
