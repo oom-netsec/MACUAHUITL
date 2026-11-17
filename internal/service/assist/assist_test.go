@@ -96,9 +96,27 @@ func (r *rig) state(run string) *v1.AssistRunState {
 	return snapshot("es", rec)
 }
 
+// espera es el plazo de las esperas de estado: 5 s, y el triple con -race, que en CI va hasta 2,3 veces más lento
+// (un paso aplicado contra el simulador no alcanzó 5 s en un runner cargado).
+func espera() time.Duration {
+	if raceActivo {
+		return 15 * time.Second
+	}
+	return 5 * time.Second
+}
+
+// decision acorta el plazo de decisión en las pruebas de abandono; con -race da 1 s para que el sondeo alcance a ver
+// el paso antes de que se abandone.
+func decision(d time.Duration) time.Duration {
+	if raceActivo {
+		return time.Second
+	}
+	return d
+}
+
 func (r *rig) waitState(run, want string) *v1.AssistRunState {
 	r.t.Helper()
-	for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
+	for end := time.Now().Add(espera()); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
 		if s := r.state(run); s.State == want {
 			return s
 		}
@@ -129,7 +147,7 @@ func (r *rig) waitDone(run string) {
 	rec, _ := r.svc.get(context.Background(), run)
 	select {
 	case <-rec.finished:
-	case <-time.After(5 * time.Second):
+	case <-time.After(espera()):
 		r.t.Fatal("la ejecución no terminó")
 	}
 }
@@ -484,7 +502,7 @@ func TestWriteMemoryNeedsOK(t *testing.T) {
 // cierra la sesión y revoca guard y ventana.
 func TestRunAbandonedAfterDecisionTimeout(t *testing.T) {
 	r := newRig(t, simulator.Config{})
-	r.svc.decisionTimeout = 300 * time.Millisecond
+	r.svc.decisionTimeout = decision(300 * time.Millisecond)
 	res, _ := r.plan(&v1.PlanPortsRequest{Vlan: 20, WriteMemory: true})
 	run := r.start(res.PlanId)
 	r.waitState(run, "waiting-confirm")
