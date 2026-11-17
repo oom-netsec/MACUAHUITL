@@ -39,7 +39,7 @@ func motivosEs(t *testing.T) map[string]string {
 		_, err := SafeName(raw)
 		put("nombre_"+n, err)
 	}
-	for n, a := range map[string]string{"sin_puerto": "127.0.0.1", "puerto_malo": "127.0.0.1:x", "privilegiado": "127.0.0.1:69", "host": "localhost:6969", "todas": "0.0.0.0:6969"} {
+	for n, a := range map[string]string{"sin_puerto": "127.0.0.1", "puerto_malo": "127.0.0.1:x", "host": "localhost:6969", "todas": "0.0.0.0:6969"} {
 		put("addr_"+n, ValidateAddr(a, false))
 	}
 	d := tmp()
@@ -61,7 +61,7 @@ func motivosEs(t *testing.T) map[string]string {
 		"nada":         {Addr: "127.0.0.1:6969", Proto: "tftp"},
 		"proto":        {Addr: "127.0.0.1:6969", Proto: "gopher", FromDir: d},
 		"http_escribe": {Addr: "127.0.0.1:8080", Proto: "http", FromDir: d, Write: true},
-		"pasivo":       {Addr: "127.0.0.1:2121", Proto: "ftp", FromDir: d, PassivePorts: [2]uint16{80, 90}},
+		"pasivo":       {Addr: "127.0.0.1:2121", Proto: "ftp", FromDir: d, PassivePorts: [2]uint16{2000, 1500}},
 		"tftp_allow":   {Addr: "127.0.0.1:6969", Proto: "tftp", Write: true, RecvDir: d},
 		"archivo_rel":  {Addr: "127.0.0.1:6969", Proto: "tftp", Files: []string{"rel"}},
 		"no_regular":   {Addr: "127.0.0.1:6969", Proto: "tftp", Files: []string{d}},
@@ -156,7 +156,7 @@ func TestValidacionEnIngles(t *testing.T) {
 	ctxEn := func(err error) string { return i18n.In(i18n.En, err) }
 	for n, f := range map[string]func() error{
 		"dir": func() error { _, e := ValidateDir("/etc"); return e }, "nombre": func() error { _, e := SafeName(".x"); return e },
-		"addr": func() error { return ValidateAddr("127.0.0.1:69", false) }, "check": func() error { return Check(Config{Addr: "127.0.0.1:6969", Proto: "tftp"}) },
+		"addr": func() error { return ValidateAddr("127.0.0.1:x", false) }, "check": func() error { return Check(Config{Addr: "127.0.0.1:6969", Proto: "tftp"}) },
 	} {
 		err := f()
 		var c i18n.Coded

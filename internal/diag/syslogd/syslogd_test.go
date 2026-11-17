@@ -130,7 +130,7 @@ func TestStopsOnContext(t *testing.T) {
 }
 
 func TestValidateAddr(t *testing.T) {
-	for addr, ok := range map[string]bool{"127.0.0.1:5514": true, "192.0.2.10:5514": true, "0.0.0.0:5514": false, "[::]:5514": false, ":5514": false, "127.0.0.1:514": false, "127.0.0.1:x": false} {
+	for addr, ok := range map[string]bool{"127.0.0.1:5514": true, "192.0.2.10:5514": true, "0.0.0.0:5514": false, "[::]:5514": false, ":5514": false, "127.0.0.1:514": true, "127.0.0.1:x": false} {
 		if err := ValidateAddr(addr, false); (err == nil) != ok {
 			t.Errorf("ValidateAddr(%q) = %v", addr, err)
 		}

@@ -112,7 +112,7 @@ func Listen(ctx context.Context, c Config) (Snapshot, error) {
 	defer cancel()
 	pc, err := (&net.ListenConfig{}).ListenPacket(ctx, "udp", c.Addr)
 	if err != nil {
-		return Snapshot{}, fmt.Errorf("flows: %w", err)
+		return Snapshot{}, listen.Bind("flows", err, listen.PortOf(c.Addr))
 	}
 	defer pc.Close()
 	stop := context.AfterFunc(ctx, func() { pc.Close() })

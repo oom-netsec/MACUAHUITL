@@ -80,7 +80,6 @@ func TestValidate(t *testing.T) {
 	for _, c := range []Config{
 		{Addr: "0.0.0.0:6969", Proto: "tftp"},
 		{Addr: ":6969", Proto: "tftp"},
-		{Addr: "127.0.0.1:69", Proto: "tftp"},
 		{Addr: "127.0.0.1:8080", Proto: "ftp"},
 		{Addr: "127.0.0.1:8080", Proto: "http"}, // sin archivos
 	} {
@@ -438,15 +437,15 @@ func TestFTPHintWarnsCleartext(t *testing.T) {
 	}
 }
 
-// El rango de datos pasivos no baja de 1024.
+// El rango de datos pasivos: el bind decide los puertos bajos; solo se rechaza el 0 y MIN > MAX.
 func TestFTPPassiveRangeMin(t *testing.T) {
 	dir := realTemp(t)
-	for _, r := range [][2]uint16{{80, 90}, {1023, 1100}, {0, 5000}, {2000, 1500}} {
+	for _, r := range [][2]uint16{{0, 5000}, {2000, 1500}} {
 		if err := Check(Config{Addr: "127.0.0.1:2121", Proto: "ftp", FromDir: dir, PassivePorts: r}); err == nil {
 			t.Errorf("rango %v aceptado", r)
 		}
 	}
-	for _, r := range [][2]uint16{{0, 0}, {1024, 1030}, {50000, 50031}} {
+	for _, r := range [][2]uint16{{0, 0}, {80, 90}, {1023, 1100}, {1024, 1030}, {50000, 50031}} {
 		if err := Check(Config{Addr: "127.0.0.1:2121", Proto: "ftp", FromDir: dir, PassivePorts: r}); err != nil {
 			t.Errorf("rango %v: %v", r, err)
 		}

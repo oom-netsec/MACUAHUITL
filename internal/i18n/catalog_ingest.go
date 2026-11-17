@@ -39,12 +39,10 @@ func init() {
 	// Dirección de escucha: la de syslog y la de traps y flujos (listen) tienen textos propios.
 	inv("addr.parse", "addr", entry{Es: "syslogd: dirección inválida {addr:q}: {detail}", En: "syslogd: invalid address {addr:q}: {detail}", Args: []string{"addr", "detail"}})
 	inv("addr.port", "addr", entry{Es: "syslogd: puerto inválido {port:q}", En: "syslogd: invalid port {port:q}", Args: []string{"port"}})
-	inv("addr.privileged", "addr", entry{Es: "syslogd: el puerto {port} es privilegiado; usa uno alto (p. ej. 5514) y redirige si hace falta", En: "syslogd: port {port} is privileged; use a high one (e.g. 5514) and redirect if needed", Args: []string{"port"}})
 	inv("addr.host", "addr", entry{Es: "syslogd: el host debe ser una IP local, no {host:q}", En: "syslogd: the host must be a local IP, not {host:q}", Args: []string{"host"}})
 	inv("addr.any", "addr", entry{Es: "syslogd: escuchar en todas las interfaces requiere pedirlo explícitamente", En: "syslogd: listening on all interfaces must be requested explicitly"})
 	inv("listen.parse", "addr", entry{Es: "dirección de escucha inválida {addr:q}: {detail}", En: "invalid listen address {addr:q}: {detail}", Args: []string{"addr", "detail"}})
 	inv("listen.port", "addr", entry{Es: "puerto inválido {port:q}", En: "invalid port {port:q}", Args: []string{"port"}})
-	inv("listen.privileged", "addr", entry{Es: "el puerto {port} es privilegiado; escucha en uno alto y, si el equipo no permite cambiar el destino, redirige con nftables (docs/plans/2026-11-04-fase-12-visibilidad.md)", En: "port {port} is privileged; listen on a high one and, if the device cannot change the destination, redirect with nftables (docs/plans/2026-11-04-fase-12-visibilidad.md)", Args: []string{"port"}})
 	inv("listen.host", "addr", entry{Es: "el host debe ser una IP local, no {host:q}", En: "the host must be a local IP, not {host:q}", Args: []string{"host"}})
 	inv("listen.any", "addr", entry{Es: "escuchar en todas las interfaces requiere pedirlo explícitamente", En: "listening on all interfaces must be requested explicitly"})
 	add(m)

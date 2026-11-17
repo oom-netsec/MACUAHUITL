@@ -15,11 +15,10 @@ func init() {
 		"fileserve.hint.password":    e("(contraseña: {pass})", "(password: {pass})", "pass"),
 		"fileserve.hint.fingerprint": e("huella de la llave de host {n} (ed25519, RSA): {fp}", "host key fingerprint {n} (ed25519, RSA): {fp}", "n", "fp"),
 		"fileserve.hint.sftp_note":   e("(IOS 15.2 puede no traer cliente SFTP; si copy sftp: no existe, usa scp)", "(IOS 15.2 may not have an SFTP client; if copy sftp: does not exist, use scp)"),
-		"fileserve.hint.std_port":    e("IOS usa el puerto {std} de {proto} y no deja elegir otro; escucho en el {port}. Sin privilegios para la app:", "IOS uses port {std} for {proto} and does not let you choose another; I listen on {port}. Without giving the app privileges:", "std", "proto", "port"),
+		"fileserve.hint.std_port":    e("IOS usa el puerto {std} de {proto} y no deja elegir otro; escucho en el {port}. Redirige el {std} a este servidor (la regla la corres tú):", "IOS uses port {std} for {proto} and does not let you choose another; I listen on {port}. Redirect {std} to this server (you run the rule):", "std", "proto", "port"),
+		"fileserve.hint.std_port_ok": e("IOS usa el puerto {std} de {proto} y aquí se escucha directamente en ese puerto.", "IOS uses port {std} for {proto} and this server listens directly on that port.", "std", "proto"),
 		"fileserve.hint.redirect":    e("redirección (recomendada): {cmd}", "redirect (recommended): {cmd}", "cmd"),
-		"fileserve.hint.setcap_alt":  e("alternativa más amplia, para un servidor propio que sí use el puerto bajo (esta app no): {cmd}", "broader alternative, for a server of your own that does use the low port (this app does not): {cmd}", "cmd"),
 		"fileserve.hint.nft_remove":  e("(quitar al terminar: {cmd})", "(remove when done: {cmd})", "cmd"),
-		"fileserve.hint.setcap_warn": e("(ADVERTENCIA: ese binario podrá abrir cualquier puerto menor a 1024 mientras conserve el permiso; quitar: sudo setcap -r {bin})", "(WARNING: that binary will be able to open any port below 1024 while it keeps the permission; remove: sudo setcap -r {bin})", "bin"),
-		"fileserve.hint.tftp_redir":  e("IOS siempre usa el puerto 69; redirígelo a este servidor (sin privilegios para la app):", "IOS always uses port 69; redirect it to this server (without privileges for the app):"),
+		"fileserve.hint.tftp_redir":  e("IOS siempre usa el puerto 69; redirígelo a este servidor (la regla la corres tú):", "IOS always uses port 69; redirect it to this server (you run the rule):"),
 	})
 }

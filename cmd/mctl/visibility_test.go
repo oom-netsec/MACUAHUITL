@@ -43,9 +43,6 @@ func TestVisibilityCommands(t *testing.T) {
 	if out := must(t, "", "snmp", "traps", "listen", "--addr", "127.0.0.1:0", "--for", "1"); !strings.Contains(out, "escuchando traps en 127.0.0.1:") {
 		t.Fatalf("traps = %q", out)
 	}
-	if _, err := mctl(t, "", "snmp", "traps", "listen", "--addr", "127.0.0.1:162"); err == nil || !strings.Contains(err.Error(), "privilegiado") {
-		t.Fatalf("traps 162: %v", err)
-	}
 	if out := must(t, "", "flows", "listen", "--addr", "127.0.0.1:0", "--for", "1"); !strings.Contains(out, "escuchando flujos en 127.0.0.1:") || !strings.Contains(out, "0 flujos") {
 		t.Fatalf("flows = %q", out)
 	}

@@ -21,6 +21,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/diag/ingest"
+	"github.com/oom-netsec/MACUAHUITL/internal/diag/listen"
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
@@ -81,19 +82,16 @@ type Config struct {
 // dropInterval es cada cuánto se reportan los descartes.
 var dropInterval = time.Second
 
-// ValidateAddr exige un host explícito, puerto no privilegiado y, salvo que se
+// ValidateAddr exige un host explícito y, salvo que se
 // pida, nada de escuchar en todas las interfaces.
 func ValidateAddr(addr string, allowAny bool) error {
 	h, p, err := net.SplitHostPort(addr)
 	if err != nil {
 		return i18n.New("ingest.invalid.addr.parse", i18n.A("addr", addr, "detail", err))
 	}
-	port, err := strconv.ParseUint(p, 10, 16)
+	_, err = strconv.ParseUint(p, 10, 16)
 	if err != nil {
 		return i18n.New("ingest.invalid.addr.port", i18n.A("port", p))
-	}
-	if port != 0 && port < 1024 {
-		return i18n.New("ingest.invalid.addr.privileged", i18n.A("port", port))
 	}
 	ip, err := netip.ParseAddr(h)
 	if err != nil {
@@ -156,7 +154,7 @@ type emitFunc func(from string, raw []byte, truncated bool)
 func listenUDP(ctx context.Context, c Config, emit emitFunc) error {
 	pc, err := (&net.ListenConfig{}).ListenPacket(ctx, "udp", c.Addr)
 	if err != nil {
-		return fmt.Errorf("syslogd: %w", err)
+		return listen.Bind("syslogd", err, listen.PortOf(c.Addr))
 	}
 	defer pc.Close()
 	stop := context.AfterFunc(ctx, func() { pc.Close() })
@@ -180,7 +178,7 @@ func listenUDP(ctx context.Context, c Config, emit emitFunc) error {
 func listenTCP(ctx context.Context, c Config, emit emitFunc) error {
 	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", c.Addr)
 	if err != nil {
-		return fmt.Errorf("syslogd: %w", err)
+		return listen.Bind("syslogd", err, listen.PortOf(c.Addr))
 	}
 	defer ln.Close()
 	stop := context.AfterFunc(ctx, func() { ln.Close() })

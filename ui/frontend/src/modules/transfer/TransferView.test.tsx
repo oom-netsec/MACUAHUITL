@@ -4,6 +4,7 @@ import { TransferView } from "./TransferView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
 import type { TransferReady } from "./api";
+import { setOSForTests } from "../../lib/platform";
 
 const ifaces = [{ name: "eth0", up: true, loopback: false, addresses: ["192.0.2.10/24"], hardwareAddr: "" }];
 const setup = (over = {}) => {
@@ -305,4 +306,36 @@ test("al cerrarse el servidor, la contraseña efímera y los comandos de IOS (qu
   await waitFor(() => expect(within(card).queryByText("s3cret-pass")).toBeNull());
   expect(within(card).queryByRole("log", { name: "Comandos de IOS" })).toBeNull();
   expect(card.textContent).not.toContain("s3cret-pass");
+});
+
+// ADR 0012 (h): en Windows el servidor escucha en el estándar (69) y la regla de firewall se muestra siempre.
+test("Windows: TFTP por omisión en el 69, puerto 1-65535 y la regla de firewall aunque sea el puerto estándar", async () => {
+  setOSForTests("windows");
+  try {
+    const rule = 'New-NetFirewallRule -DisplayName "MACUAHUITL UDP 69" -Direction Inbound -Program "C:\\m\\macuahuitld.exe" -LocalAddress 192.0.2.10 -Protocol UDP -LocalPort 69 -Action Allow';
+    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: rule, setcap: "", remove: 'Remove-NetFirewallRule -DisplayName "MACUAHUITL UDP 69"' })) });
+    expect(screen.getByLabelText("Puerto")).toHaveValue(69);
+    expect(screen.getByLabelText("Puerto")).toHaveAccessibleDescription(/De 1 a 65535/);
+    await openServer(core);
+    expect(core.transferServe).toHaveBeenCalledWith(expect.objectContaining({ listen: "192.0.2.10:69" }));
+    act(() => core.emitTransfer({ runId: "r1", ready: ready({ listening: "192.0.2.10:69" }) }));
+    const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:69" });
+    expect(await within(card).findByRole("log", { name: "Regla de firewall (PowerShell, como administrador)" })).toHaveTextContent(/New-NetFirewallRule/);
+    expect(within(card).getByText(/una vez, como administrador/)).toBeInTheDocument();
+    expect(within(card).getByText(/escucha ahí/)).toBeInTheDocument(); // puerto estándar: sin «IOS usa el 69; escucha en el 69»
+    expect(within(card).getByText(/CANCELAS/)).toBeInTheDocument();
+    expect(within(card).queryByText(/nftables/)).not.toBeInTheDocument();
+    expect(core.transferHint).toHaveBeenCalledWith("tftp", "192.0.2.10", 69);
+  } finally { setOSForTests(undefined); }
+});
+
+test("Windows: con un puerto distinto del estándar el texto dice que IOS necesita abrirlo en el estándar", async () => {
+  setOSForTests("windows");
+  try {
+    const core = setup({ transferHint: vi.fn(async () => ({ standardPort: 69, nftables: "New-NetFirewallRule x", setcap: "", remove: "Remove-NetFirewallRule x" })) });
+    await openServer(core);
+    act(() => core.emitTransfer({ runId: "r1", ready: ready() }));
+    const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+    expect(await within(card).findByText(/ábrelo en el estándar/)).toBeInTheDocument();
+  } finally { setOSForTests(undefined); }
 });

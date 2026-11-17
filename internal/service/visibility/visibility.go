@@ -206,6 +206,10 @@ func preListenErr(ctx context.Context, err error) error {
 	if errors.As(err, new(*ingest.OutputError)) {
 		return service.ErrFrom(ctx, codes.Internal, err)
 	}
+	var c i18n.Coded
+	if errors.As(err, &c) && strings.HasPrefix(c.Reason(), "fileserve.err.port_") && c.Reason() != "fileserve.err.port_invalid" {
+		return service.ErrFrom(ctx, codes.Unavailable, err) // el bind lo negó el sistema: como en transfer/field/syslog
+	}
 	return service.ErrFrom(ctx, codes.InvalidArgument, err)
 }
 

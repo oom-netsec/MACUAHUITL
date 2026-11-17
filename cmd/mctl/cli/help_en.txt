@@ -55,7 +55,7 @@
   console [PORT] [--baud N] [--parity none|even|odd] [--flow none|rtscts|xonxoff] [--list]
         (Ctrl-] q quits, Ctrl-] b sends BREAK; recorded in outputs/console)
   serve tftp|http --addr IP[:PORT] --file PATH... [--for SECONDS] [--any]
-        (TFTP on 6969: IOS uses 69, redirect with nftables; HTTP on 8080)
+        (TFTP on 69 and HTTP on 80; if the kernel does not let it open them, the error includes the sysctl command)
   hash  FILE [--md5 VALUE] [--sha512 VALUE]
   find  IP|MAC|NAME             (searches the evidence of the whole fleet; MAC in any notation)
   trace MAC|IP                  (follows the MAC through the CAM tables to the access port)
@@ -125,7 +125,7 @@
   logs leaks JOB|FOLDER [--device EQ] [--rounds N] [--min-growth-kib K] [--json]
         (processes whose show processes memory sorted memory grows without dropping between Patrol rounds; read-only)
   transfer serve --proto tftp|ftp|scp|sftp|http --listen IP[:PORT] [--write] [--allow IP]... [--dir FOLDER] [--from FOLDER] [--files A,B] [--duration 30m] [--legacy-ssh] [--pasv-ports MIN-MAX]
-        (temporary server, high port: tftp 6969, ftp 2121, scp/sftp 2222, http 8080; --dir receives, --from publishes; ftp/scp/sftp show the session user and password (FTP sends them in clear); receiving over tftp requires --allow; --legacy-ssh enables the IOS 15.x algorithms; Ctrl-C stops it)
+        (temporary server, standard ports: tftp 69, ftp 21, scp/sftp 22, http 80 (if the kernel does not let it open them, the error includes the sysctl command); --dir receives, --from publishes; ftp/scp/sftp show the session user and password (FTP sends them in clear); receiving over tftp requires --allow; --legacy-ssh enables the IOS 15.x algorithms; Ctrl-C stops it)
   transfer get URL [LOCAL] [--dir FOLDER] [--cred ID] [--sha256 H] [--md5 H] [--sha512 H] [--insecure] [--legacy-ssh] [--accept-host-key SHA256:...]
         (tftp://, ftp://, scp://, sftp://, http://, https://; new file in the folder, with MD5 and SHA-256)
   transfer put URL LOCAL [--from FOLDER] [--cred ID] [--legacy-ssh] [--accept-host-key SHA256:...]

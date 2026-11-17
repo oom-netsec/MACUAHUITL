@@ -134,7 +134,7 @@ Hoy el ADR 0003 exige tres cosas: que solo el usuario pueda conectarse, que el n
 - **Decisión.** En Windows el servidor escucha en el puerto que el usuario elija, 69, 21 y 162 incluidos, con la misma IP explícita, duración acotada y auditoría de siempre.
   - La regla de entrada del firewall es un paso del usuario, igual que hoy la regla de nftables: la app la muestra y nunca la aplica.
   - La orden exacta es `New-NetFirewallRule -DisplayName MACUAHUITL-TFTP -Direction Inbound -Program "…\macuahuitld.exe" -LocalAddress <IP> -Protocol UDP -LocalPort 69 -Action Allow`. Se corre una vez, como admin, o se acepta el diálogo del firewall.
-  - Los textos de puertos privilegiados, `setcap` y nftables, de la UI y del núcleo, tienen su variante para Windows.
+  - Los textos de puertos privilegiados (el sysctl; `setcap` es obsoleto desde 45a) y nftables, de la UI y del núcleo, tienen su variante para Windows.
 - **No se usa `netsh interface portproxy`.** Solo redirige TCP, así que no sirve para TFTP (UDP 69), pide admin y deja una regla persistente que sobrevive a la app.
 
 ### (i) Qué puede faltar en la primera versión de Windows

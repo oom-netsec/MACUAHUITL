@@ -127,7 +127,10 @@ var standard = map[string]struct {
 // (si es 0.0.0.0, :: o no es una IP, se pide la de la máquina: la regla no queda ancha).
 func redirTarget(loc, ip string) (family, addr string) {
 	a, err := netip.ParseAddr(strings.Trim(ip, "[]"))
-	if err != nil || a.IsUnspecified() {
+	if err != nil || a.IsUnspecified() || a.Zone() != "" { // con zona (fe80::1%x) se pide la IP de la máquina: la zona acaba en un comando
+		if err == nil && a.Unmap().Is6() {
+			return "ip6", i18n.Msg(loc, "fileserve.hint.this_host", nil)
+		}
 		return "ip", i18n.Msg(loc, "fileserve.hint.this_host", nil)
 	}
 	if a = a.Unmap(); a.Is6() {
@@ -145,23 +148,41 @@ func nftTable(proto string, port int) string { return fmt.Sprintf("macuahuitl_%s
 // cómo quitarla. La app nunca la ejecuta. En FTP solo se redirige el puerto de control.
 func RedirectHint(proto, ip string, port int) string { return RedirectHintIn(i18n.Es, proto, ip, port) }
 
-// RedirectHintIn es RedirectHint con el texto en el idioma dado.
+// RedirectHintIn es RedirectHint con el texto en el idioma dado: el comando y, al final, cómo quitarlo.
 func RedirectHintIn(loc, proto, ip string, port int) string {
+	if isWindows() {
+		return firewallRule(loc, proto, ip, port, exePath(), [2]uint16{})
+	}
+	c := RedirectCommandIn(loc, proto, ip, port)
+	if c == "" {
+		return ""
+	}
+	return c + "   " + i18n.Msg(loc, "fileserve.hint.nft_remove", i18n.A("cmd", RedirectCleanup(proto, ip, port)))
+}
+
+// RedirectCommandIn es solo el comando, sin la nota de cómo quitarlo: lo que la UI copia (la nota en medio lo
+// rompería en bash y en PowerShell) y lo que imprime mctl, que muestra el de quitar aparte.
+func RedirectCommandIn(loc, proto, ip string, port int) string {
+	if isWindows() {
+		return firewallCommand(loc, proto, ip, port, exePath(), [2]uint16{})
+	}
 	s, ok := standard[proto]
-	if !ok {
+	if !ok || port == s.port { // ya en el puerto estándar: no hay nada que redirigir
 		return ""
 	}
 	fam, addr := redirTarget(loc, ip)
 	t := nftTable(proto, port)
 	return fmt.Sprintf("sudo nft add table %[1]s %[2]s; "+
 		"sudo nft add chain %[1]s %[2]s pre '{ type nat hook prerouting priority dstnat; }'; "+
-		"sudo nft add rule %[1]s %[2]s pre %[1]s daddr %[3]s %[4]s dport %[5]d redirect to :%[6]d   "+
-		"%[7]s", fam, t, addr, s.trans, s.port, port, i18n.Msg(loc, "fileserve.hint.nft_remove", i18n.A("cmd", RedirectCleanup(proto, ip, port))))
+		"sudo nft add rule %[1]s %[2]s pre %[1]s daddr %[3]s %[4]s dport %[5]d redirect to :%[6]d", fam, t, addr, s.trans, s.port, port)
 }
 
 // RedirectCleanup es el comando que quita la regla de RedirectHint ("" si el protocolo no
 // tiene puerto privilegiado). Se muestra al cerrar el servidor.
 func RedirectCleanup(proto, ip string, port int) string {
+	if isWindows() {
+		return firewallRemove(proto, ip, port)
+	}
 	if _, ok := standard[proto]; !ok {
 		return ""
 	}
@@ -177,16 +198,6 @@ func RedirectCleanupAddr(proto, listening string) string {
 		return ""
 	}
 	return RedirectCleanup(proto, host, p)
-}
-
-// SetcapHint es la alternativa a la redirección para quien prefiera que un binario suyo
-// (otro servidor, no esta app, que siempre escucha en puerto alto por el ADR 0004) abra
-// puertos bajos. Es más amplia que la redirección: se explica, nunca se ejecuta.
-func SetcapHint(binary string) string { return SetcapHintIn(i18n.Es, binary) }
-
-// SetcapHintIn es SetcapHint con el texto en el idioma dado.
-func SetcapHintIn(loc, binary string) string {
-	return "sudo setcap cap_net_bind_service=+ep " + binary + "   " + i18n.Msg(loc, "fileserve.hint.setcap_warn", i18n.A("bin", binary))
 }
 
 // Hint explica cómo copiar desde el equipo. IOS no deja elegir el puerto TFTP:
@@ -211,24 +222,30 @@ func HintIn(loc, proto, listen string, files []string) string {
 	}
 	if proto == "tftp" {
 		port, _ := strconv.Atoi(p)
-		b.WriteString(i18n.Msg(loc, "fileserve.hint.tftp_redir", nil) + "\n  " + RedirectHintIn(loc, "tftp", h, port) + "\n")
+		code, kv := "fileserve.hint.tftp_redir", i18n.A()
+		if isWindows() { // el texto dice la verdad según el puerto real: en Windows no hay redirección al 69
+			code = "fileserve.hint.win_tftp_redir"
+			if port != 69 {
+				code, kv = "fileserve.hint.win_tftp_redir_other", i18n.A("port", port)
+			}
+		}
+		if isWindows() || port != 69 { // en el 69 no hace falta redirigir nada
+			b.WriteString(i18n.Msg(loc, code, kv) + "\n  " + RedirectHintIn(loc, "tftp", h, port) + "\n")
+		}
 	}
 	return b.String()
 }
 
-// ValidateAddr exige IP explícita, puerto no privilegiado y, salvo que se pida,
+// ValidateAddr exige IP explícita y, salvo que se pida,
 // nada de escuchar en todas las interfaces.
 func ValidateAddr(addr string, allowAny bool) error {
 	h, p, err := net.SplitHostPort(addr)
 	if err != nil {
 		return i18n.Wrap("fileserve.err.addr_invalid", err, i18n.A("addr", addr))
 	}
-	port, err := strconv.ParseUint(p, 10, 16)
+	_, err = strconv.ParseUint(p, 10, 16)
 	if err != nil {
 		return i18n.New("fileserve.err.port_invalid", i18n.A("port", p))
-	}
-	if port != 0 && port < 1024 {
-		return i18n.New("fileserve.err.port_privileged", i18n.A("port", port))
 	}
 	ip, err := netip.ParseAddr(h)
 	if err != nil {
@@ -312,7 +329,7 @@ func prepare(c Config) (src *source, rcv *receiver, err error) {
 		return nil, nil, i18n.New("fileserve.err.http_ro", nil)
 	}
 	if lo, hi := c.PassivePorts[0], c.PassivePorts[1]; lo != 0 || hi != 0 {
-		if lo < 1024 || hi < lo {
+		if lo == 0 || hi < lo {
 			return nil, nil, i18n.New("fileserve.err.passive_range", i18n.A("lo", lo, "hi", hi))
 		}
 	}

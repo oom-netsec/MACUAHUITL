@@ -5,8 +5,9 @@ package macuahuitl.v1;
 option go_package = "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1;macuahuitlv1";
 
 // Transferencias (Fase 22a): servidores temporales de archivos (TFTP, FTP, SCP, SFTP y HTTP) y
-// clientes (TFTP, FTP, SCP, SFTP, HTTP/HTTPS). Los servidores escuchan en IP explícita y puerto
-// alto, con duración acotada; la app nunca abre puertos privilegiados (ADR 0004).
+// clientes (TFTP, FTP, SCP, SFTP, HTTP/HTTPS). Los servidores escuchan en IP explícita y en el puerto
+// estándar por omisión (tftp 69, ftp 21, scp/sftp 22, http 80), con duración acotada; la app no tiene privilegios y
+// el kernel decide el bind (ADR 0004, enmienda 2026-11-16).
 service TransferService {
   // Abre un servidor y emite sus eventos hasta que el cliente cancele, venza la duración
   // o se llame a StopServer. El primer evento es `ready`.
@@ -17,7 +18,8 @@ service TransferService {
   rpc Get(GetRequest) returns (GetResponse);
   // Envía un archivo de una carpeta elegida a una URL.
   rpc Put(PutRequest) returns (PutResponse);
-  // Comandos para llegar a los puertos estándar (69, 21, 22) sin privilegios. Solo texto: la app no los ejecuta.
+  // Redirección con nftables desde el puerto estándar (69, 21, 22) a un puerto alto, para quien no baja el sysctl. Solo
+  // texto: la app no lo ejecuta. Si el puerto ya es el estándar, nftables y remove llegan vacíos.
   rpc RedirectHint(RedirectHintRequest) returns (RedirectHintResponse);
   // Lista una carpeta remota: FTP (MLSD o LIST), SFTP, SCP (por el subsistema SFTP, si lo hay) y
   // HTTP(S) (índice HTML). TFTP y un SCP sin SFTP no listan: la respuesta es UNIMPLEMENTED con
@@ -34,7 +36,7 @@ service TransferService {
 
 message StartServerRequest {
   string protocol = 1;                // tftp, ftp, scp, sftp o http
-  string listen = 2;                  // IP o IP:PUERTO; sin puerto: tftp 6969, ftp 2121, scp y sftp 2222, http 8080
+  string listen = 2;                  // IP o IP:PUERTO; sin puerto: tftp 69, ftp 21, scp y sftp 22, http 80
   bool allow_any = 3;                 // escuchar en 0.0.0.0 / :: (con escritura exige allow)
   repeated string files = 4;          // archivos sueltos para leer (rutas absolutas, por nombre base)
   string from_dir = 5;                // carpeta publicada para leer (archivos regulares de primer nivel)
@@ -146,15 +148,15 @@ message PutResponse {
 
 message RedirectHintRequest {
   string protocol = 1;                // tftp, ftp, scp o sftp
-  int32 port = 2;                     // el puerto alto en que escucha el servidor
+  int32 port = 2;                     // el puerto en que escucha el servidor
   string ip = 3;                      // IP de escucha: la regla solo redirige lo dirigido a ella
 }
 
 message RedirectHintResponse {
   int32 standard_port = 1;
-  string nftables = 2;                // regla de redirección (recomendada)
-  string setcap = 3;                  // alternativa más amplia, con su advertencia
-  string remove = 4;                  // comando para quitar la regla al terminar
+  string nftables = 2;                // regla de redirección; vacía si port ya es el estándar (standard_port lo dice)
+  string setcap = 3;                  // obsoleto: siempre vacío desde 45a
+  string remove = 4;                  // comando para quitar la regla al terminar; vacío si no hay regla
 }
 
 message BrowseRequest {

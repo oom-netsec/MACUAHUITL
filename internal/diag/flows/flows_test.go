@@ -337,9 +337,6 @@ func TestListen(t *testing.T) {
 	if len(snaps) == 0 || strings.Count(out.String(), "\n") != 4 {
 		t.Fatalf("snapshots=%d archivo=%q", len(snaps), out.String())
 	}
-	if err := (func() error { _, err := Listen(context.Background(), Config{Addr: "127.0.0.1:2"}); return err })(); err == nil {
-		t.Fatal("puerto privilegiado aceptado")
-	}
 }
 
 func FuzzDecode(f *testing.F) {

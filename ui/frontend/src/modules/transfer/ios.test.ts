@@ -1,5 +1,6 @@
 import { iosCommands } from "./ios";
-import { expectedHash, hostKeyFromError, parseURL, serveProblem } from "./validate";
+import { expectedHash, hostKeyFromError, parseURL, portFor, serveProblem } from "./validate";
+import { setOSForTests } from "../../lib/platform";
 
 const ph = { ip: "IP-X", file: "ARCH" };
 const base = { user: "mac", password: "pw", files: ["c4.bin"] };
@@ -47,4 +48,18 @@ test("URL, hash esperado y llave de host", () => {
   expect(hostKeyFromError("transport: llave de host desconocida de 10.0.0.1:22: SHA256:abc+/=")).toEqual({ fp: "SHA256:abc+/=", changed: false });
   expect(hostKeyFromError("transport: llave de host cambiada de h: SHA256:xyz")?.changed).toBe(true);
   expect(hostKeyFromError("timeout")).toBeNull();
+});
+
+// ADR 0012 (h): en Windows no hay puertos privilegiados; en Linux el 22 sigue rechazado.
+test("serveProblem: 1-65535 en Windows y de 1024 en adelante en Linux; puertos por omisión del estándar en Windows", () => {
+  const f = { proto: "tftp" as const, any: false, listen: "10.0.0.5", port: "69", write: false, recvDir: "", fromDir: "/x", files: "", allow: "", minutes: "30" };
+  expect(serveProblem(f)).toBe("transfer.err.port");
+  expect(portFor("tftp")).toBe("6969");
+  setOSForTests("windows");
+  try {
+    expect(serveProblem(f)).toBeNull();
+    expect(serveProblem({ ...f, port: "0" })).toBe("transfer.err.port");
+    expect(serveProblem({ ...f, port: "65536" })).toBe("transfer.err.port");
+    expect([portFor("tftp"), portFor("ftp"), portFor("scp"), portFor("http")]).toEqual(["69", "21", "22", "8080"]);
+  } finally { setOSForTests(undefined); }
 });

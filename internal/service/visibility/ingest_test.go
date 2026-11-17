@@ -348,12 +348,6 @@ func TestTrapsAndFlowsOutputDirFailureIsInternal(t *testing.T) {
 	if err := s.Flows(&v1.FlowsRequest{Addr: "127.0.0.1:0", DurationSeconds: 1, Save: true}, newFlowStream(false)); status.Code(err) != codes.Internal {
 		t.Errorf("flows: err = %v", err)
 	}
-	if err := s.SnmpTraps(&v1.SnmpTrapsRequest{Addr: "127.0.0.1:162", DurationSeconds: 1}, newTrapStream(false)); status.Code(err) != codes.InvalidArgument {
-		t.Errorf("traps con puerto privilegiado: err = %v", err)
-	}
-	if err := s.Flows(&v1.FlowsRequest{Addr: "127.0.0.1:162", DurationSeconds: 1}, newFlowStream(false)); status.Code(err) != codes.InvalidArgument {
-		t.Errorf("flows con puerto privilegiado: err = %v", err)
-	}
 }
 
 // Con save los defaults de flujos son 1000 datagramas/s por exportador y 5000 global; sin save no hay tope.

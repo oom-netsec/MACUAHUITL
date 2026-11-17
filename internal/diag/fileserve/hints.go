@@ -10,8 +10,8 @@ import (
 	"github.com/oom-netsec/MACUAHUITL/internal/i18n"
 )
 
-// ServerHint explica qué teclear en el equipo para usar el servidor, y cómo llegar a los
-// puertos estándar sin privilegios (la app nunca ejecuta esos comandos). names son los
+// ServerHint explica qué teclear en el equipo para usar el servidor y, si no escucha en el puerto
+// estándar, cómo llegar a él con una redirección (la app nunca ejecuta esos comandos). names son los
 // archivos que se pueden leer. Sintaxis de IOS 15.x sin validar en laboratorio.
 func ServerHint(c Config, r Ready, names []string) string { return ServerHintIn(i18n.Es, c, r, names) }
 
@@ -70,9 +70,19 @@ func ServerHintIn(loc string, c Config, r Ready, names []string) string {
 	}
 	if s, ok := standard[c.Proto]; ok {
 		p, _ := strconv.Atoi(port)
-		b.WriteString(t("fileserve.hint.std_port", "std", s.port, "proto", c.Proto, "port", p) + "\n")
-		b.WriteString("  " + t("fileserve.hint.redirect", "cmd", RedirectHintIn(loc, c.Proto, host, p)) + "\n")
-		b.WriteString("  " + t("fileserve.hint.setcap_alt", "cmd", SetcapHintIn(loc, t("fileserve.hint.server_path"))) + "\n")
+		if isWindows() {
+			code := "fileserve.hint.win_std_port"
+			if p == s.port {
+				code = "fileserve.hint.win_std_port_ok"
+			}
+			b.WriteString(t(code, "std", s.port, "proto", c.Proto, "port", p) + "\n")
+			b.WriteString("  " + t("fileserve.hint.win_redirect", "cmd", firewallRule(loc, c.Proto, host, p, exePath(), c.PassivePorts)) + "\n")
+		} else if p == s.port {
+			b.WriteString(t("fileserve.hint.std_port_ok", "std", s.port, "proto", c.Proto) + "\n")
+		} else { // puerto propio: la redirección es la alternativa a abrir el estándar
+			b.WriteString(t("fileserve.hint.std_port", "std", s.port, "proto", c.Proto, "port", p) + "\n")
+			b.WriteString("  " + t("fileserve.hint.redirect", "cmd", RedirectHintIn(loc, c.Proto, host, p)) + "\n")
+		}
 	}
 	return b.String()
 }

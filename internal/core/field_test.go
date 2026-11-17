@@ -37,7 +37,6 @@ func TestFieldServeListensHintsAndAudits(t *testing.T) {
 	fc := v1.NewFieldServiceClient(h.conn)
 	for _, r := range []*v1.ServeFilesRequest{
 		{Protocol: "tftp", Addr: "0.0.0.0:6969", Files: []string{img}},
-		{Protocol: "tftp", Addr: "127.0.0.1:69", Files: []string{img}},
 		{Protocol: "http", Addr: "127.0.0.1:0", Files: []string{"rel.bin"}},
 		{Protocol: "http", Addr: "127.0.0.1:0"},
 		{Protocol: "scp", Addr: "127.0.0.1:0", Files: []string{img}},

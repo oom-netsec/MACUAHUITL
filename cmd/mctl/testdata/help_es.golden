@@ -56,7 +56,7 @@ uso: mctl <comando>
   console [PUERTO] [--baud N] [--parity none|even|odd] [--flow none|rtscts|xonxoff] [--list]
         (Ctrl-] q sale, Ctrl-] b envía BREAK; se graba en outputs/console)
   serve tftp|http --addr IP[:PUERTO] --file RUTA... [--for SEGUNDOS] [--any]
-        (TFTP en 6969: IOS usa el 69, redirige con nftables; HTTP en 8080)
+        (TFTP en el 69 y HTTP en el 80; si el kernel no deja abrirlos, el error trae la orden de sysctl)
   hash  ARCHIVO [--md5 VALOR] [--sha512 VALOR]
   find  IP|MAC|NOMBRE           (busca en la evidencia de toda la flota; MAC en cualquier notación)
   trace MAC|IP                  (sigue la MAC por las tablas CAM hasta el puerto de acceso)
@@ -126,7 +126,7 @@ uso: mctl <comando>
   logs leaks TRABAJO|CARPETA [--device EQ] [--rounds N] [--min-growth-kib K] [--json]
         (procesos cuya memoria de show processes memory sorted crece sin bajar entre rondas de Patrol; solo lee)
   transfer serve --proto tftp|ftp|scp|sftp|http --listen IP[:PUERTO] [--write] [--allow IP]... [--dir CARPETA] [--from CARPETA] [--files A,B] [--duration 30m] [--legacy-ssh] [--pasv-ports MIN-MAX]
-        (servidor temporal, puerto alto: tftp 6969, ftp 2121, scp/sftp 2222, http 8080; --dir recibe, --from publica; ftp/scp/sftp muestran usuario y contraseña de la sesión (FTP las manda en claro); recibir por tftp exige --allow; --legacy-ssh activa los algoritmos de IOS 15.x; Ctrl-C lo detiene)
+        (servidor temporal, puertos estándar: tftp 69, ftp 21, scp/sftp 22, http 80 (si el kernel no deja abrirlos, el error trae la orden de sysctl); --dir recibe, --from publica; ftp/scp/sftp muestran usuario y contraseña de la sesión (FTP las manda en claro); recibir por tftp exige --allow; --legacy-ssh activa los algoritmos de IOS 15.x; Ctrl-C lo detiene)
   transfer get URL [LOCAL] [--dir CARPETA] [--cred ID] [--sha256 H] [--md5 H] [--sha512 H] [--insecure] [--legacy-ssh] [--accept-host-key SHA256:...]
         (tftp://, ftp://, scp://, sftp://, http://, https://; archivo nuevo en la carpeta, con MD5 y SHA-256)
   transfer put URL LOCAL [--from CARPETA] [--cred ID] [--legacy-ssh] [--accept-host-key SHA256:...]

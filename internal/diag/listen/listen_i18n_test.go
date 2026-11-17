@@ -15,7 +15,6 @@ func TestValidateAddrTextoEsYEn(t *testing.T) {
 	}{
 		{"x", `dirección de escucha inválida "x": address x: missing port in address`, `invalid listen address "x": address x: missing port in address`, false},
 		{"1.2.3.4:abc", `puerto inválido "abc"`, `invalid port "abc"`, false},
-		{"1.2.3.4:80", "el puerto 80 es privilegiado; escucha en uno alto y, si el equipo no permite cambiar el destino, redirige con nftables (docs/plans/2026-11-04-fase-12-visibilidad.md)", "", false},
 		{"host:2055", `el host debe ser una IP local, no "host"`, `the host must be a local IP, not "host"`, false},
 		{"0.0.0.0:2055", "escuchar en todas las interfaces requiere pedirlo explícitamente", "listening on all interfaces must be requested explicitly", false},
 	} {
