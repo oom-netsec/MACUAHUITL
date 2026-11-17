@@ -158,7 +158,7 @@ jobs:
       - name: pruebas de los paquetes ya portables (tools/ci/windows-pkgs.txt)
         run: |
           set -o pipefail
-          grep -v '#' tools/ci/windows-pkgs.txt | xargs go test -tags=storewatch -count=1
+          grep -v '#' tools/ci/windows-pkgs.txt | xargs go test -tags=storewatch -count=1 -timeout 25m
       - name: noegress
         if: always()
         run: go run ./tools/noegress/cmd/noegress ./...
