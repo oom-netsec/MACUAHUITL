@@ -3005,7 +3005,8 @@ export const es = {
   "paths.err.ads": "La ruta trae «:» después de la unidad: apunta a un flujo de datos alterno (archivo:flujo), que no se ve en los listados. Quita ese tramo.",
   "paths.err.nt": "Esa ruta usa el espacio de nombres interno de Windows (\\??\\, \\GLOBALROOT): no se acepta. Usa una carpeta con unidad, como C:\\datos.",
   "paths.err.rel": "Escribe la ruta completa con unidad, como C:\\datos. Una ruta relativa (carpeta\\a, \\a o C:a) depende de la carpeta actual.",
-  "paths.err.reserved": "Ese nombre está reservado por Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9, CONIN$, CONOUT$), con o sin extensión: elige otro."
+  "paths.err.reserved": "Ese nombre está reservado por Windows (CON, PRN, AUX, NUL, COM1-9, LPT1-9, CONIN$, CONOUT$), con o sin extensión: elige otro.",
+  "transfer.ios.skipped": "{n} archivo(s) tienen en su nombre saltos de línea, controles o caracteres invisibles: no se genera orden de IOS para ellos, porque pegarla cambiaría lo que corre el equipo.",
 };
 
 export type Key = keyof typeof es;

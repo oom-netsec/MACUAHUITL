@@ -76,3 +76,11 @@ test("serveProblem: las carpetas del servidor rechazan rutas de Windows peligros
   } finally { setOSForTests(undefined); }
   expect(serveProblem({ ...form, fromDir: "\\\\srv\\share\\s", recvDir: "/r:x" })).toBeNull(); // Linux: nombres comunes
 });
+
+test("la tarjeta del servidor no arma orden de IOS para un archivo con salto de línea y avisa", async () => {
+  const core = await openServer();
+  act(() => core.emitTransfer({ runId: "r1", ready: ready({ files: ["ok.bin", "x\nreload"], recvDir: "" }) }));
+  const log = await screen.findByRole("log", { name: /Órdenes de IOS|IOS/ });
+  expect(log.textContent).toBe("copy tftp://192.0.2.10/ok.bin flash:");
+  expect(screen.getByText(/1 archivo\(s\) tienen en su nombre/)).toBeVisible();
+});

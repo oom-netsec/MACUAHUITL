@@ -1,4 +1,4 @@
-import { iosCommands } from "./ios";
+import { iosCommands, unsafeName } from "./ios";
 import { expectedHash, hostKeyFromError, nftLeftoverCmd, parseURL, portFor, serveProblem } from "./validate";
 import { setOSForTests } from "../../lib/platform";
 
@@ -74,4 +74,13 @@ test("nftLeftoverCmd: tabla del puerto alto de antes, ip6 con IPv6", () => {
   expect(nftLeftoverCmd("sftp", "192.0.2.10", 22)).toBe("sudo nft delete table ip macuahuitl_scp_2222\nsudo nft delete table ip macuahuitl_sftp_2222");
   expect(nftLeftoverCmd("scp", "192.0.2.10", 22)).toBe("sudo nft delete table ip macuahuitl_scp_2222\nsudo nft delete table ip macuahuitl_sftp_2222");
   expect(nftLeftoverCmd("raro", "192.0.2.10", 99)).toBe("sudo nft delete table ip macuahuitl_raro_99");
+});
+
+test("un archivo con controles o caracteres de formato en el nombre no genera orden (no se pega una línea de más)", () => {
+  const files = ["ok.bin", "a\nreload", "b\rc", "c\u001b[2J", "d‮e.bin", "e​f", "g h", "i\u0085j", "k\tl", "m\u0000n"];
+  const r = { ...base, protocol: "tftp", listening: "192.0.2.10:69", files };
+  expect(iosCommands(r, false, ph)).toEqual(["copy tftp://192.0.2.10/ok.bin flash:"]);
+  expect(iosCommands({ ...r, files: files.slice(1) }, false, ph)).toEqual([]); // todas inseguras: ni siquiera el marcador
+  expect(unsafeName("normal con espacios y ñ.bin")).toBe(false);
+  expect(unsafeName("a\nb")).toBe(true);
 });
