@@ -162,7 +162,7 @@ func TestPhasesPersistAcrossRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer c.Close()
-	r, err := (&patrolSvc{c: c}).ListJobs(context.Background(), &v1.ListJobsRequest{})
+	r, err := (&patrolSvc{c: c}).ListJobs(context.Background(), &v1.ListJobsRequest{IncludePast: true})
 	if err != nil {
 		t.Fatal(err)
 	}

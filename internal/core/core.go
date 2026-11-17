@@ -87,6 +87,8 @@ type jobHistory struct {
 	Partial   int       `json:"partial,omitempty"` // equipos que terminaron con comandos cortados (no cuentan en OK ni en Failed)
 	Phases    []phase   `json:"phases,omitempty"`
 	FinishErr string    `json:"finishErr,omitempty"` // por qué no cerró el manifest o el zip; sobrevive al reinicio
+	// FinishedAt es cuándo el trabajo llegó a un estado terminal; cero en los activos y en los created. Se fija una sola vez.
+	FinishedAt time.Time `json:"finishedAt,omitzero"`
 }
 
 type phase struct {
@@ -613,7 +615,7 @@ func (c *Core) persistJob(j *job) {
 // loadJobs recupera los trabajos guardados. Uno que quedó armado o armándose es de un núcleo
 // que cayó: su ventana y su motor ya no existen, así que se marca como fallido.
 func (c *Core) loadJobs() {
-	rows, err := c.db.Query(`SELECT id, spec_json, state, history_json FROM jobs`)
+	rows, err := c.db.Query(`SELECT id, spec_json, state, history_json, created_at FROM jobs`)
 	if err != nil {
 		c.audit("job.load_failed", "", i18n.English(err))
 		return
@@ -622,8 +624,8 @@ func (c *Core) loadJobs() {
 	// Con una sola conexión no se audita con rows abiertas: los fallos se anotan y se auditan tras rows.Close.
 	var fails [][2]string
 	for rows.Next() {
-		var id, spec, state, hist string
-		if err := rows.Scan(&id, &spec, &state, &hist); err != nil {
+		var id, spec, state, hist, created string
+		if err := rows.Scan(&id, &spec, &state, &hist, &created); err != nil {
 			fails = append(fails, [2]string{"", i18n.English(err)})
 			continue
 		}
@@ -635,7 +637,9 @@ func (c *Core) loadJobs() {
 		json.Unmarshal([]byte(hist), &j.jobHistory) // '{}' en trabajos guardados antes del historial
 		if state == "armed" || state == "arming" {
 			j.state = "failed"
-			dead = append(dead, j)
+			dead = append(dead, j) // su finished_at lo fija addPhase: es el instante de este arranque
+		} else if isFinal(j.state) && j.FinishedAt.IsZero() {
+			j.FinishedAt = j.endedAt(created) // guardado antes de finished_at; se persiste con el siguiente persistJob
 		}
 		j.closed = j.state == "completed" || j.state == "cancelled" || j.state == "failed" // de una corrida anterior: no hay finish pendiente
 		c.jobs[id] = j
@@ -661,6 +665,10 @@ func (c *Core) addPhase(j *job, k v1.JobPhaseKind, round int, code string, args 
 		p.Detail, p.Reason, p.Args = i18n.Msg(i18n.Es, code, args), code, i18n.Metadata(code, args)
 	}
 	c.mu.Lock()
+	// Se decide por el estado del job y no por el tipo de fase: una FAILED de round_zip_failed o close_failed llega con el job en curso.
+	if isFinal(j.state) && j.FinishedAt.IsZero() {
+		j.FinishedAt = p.At
+	}
 	j.Phases = append(j.Phases, p)
 	if n := len(j.Phases); n > maxPhases {
 		j.Phases = j.Phases[n-maxPhases:]
@@ -668,6 +676,29 @@ func (c *Core) addPhase(j *job, k v1.JobPhaseKind, round int, code string, args 
 	c.mu.Unlock()
 	c.bus.Publish(engine.Event{At: p.At, JobID: j.id, Kind: engine.Phase, State: p.Kind, Index: round, Detail: p.Detail, Reason: p.Reason, Args: p.Args})
 	c.persistJob(j)
+}
+
+// endedAt da el fin de un job terminal guardado sin finished_at: la hora de su última fase terminal o, sin fases, created_at.
+func (j *job) endedAt(createdAt string) time.Time {
+	for i := len(j.Phases) - 1; i >= 0; i-- {
+		switch j.Phases[i].Kind {
+		case v1.JobPhaseKind_JOB_PHASE_KIND_COMPLETED.String(), v1.JobPhaseKind_JOB_PHASE_KIND_CANCELLED.String(), v1.JobPhaseKind_JOB_PHASE_KIND_FAILED.String():
+			return j.Phases[i].At
+		}
+	}
+	t, _ := time.Parse(time.RFC3339, createdAt)
+	return t
+}
+
+// isPast dice si finished cae en un día civil anterior al de now, en la zona de now (nunca now.Sub: un día de 23 o 25 h no cuenta).
+// Un finished posterior a now (reloj hacia atrás) no es past.
+func isPast(finished, now time.Time) bool {
+	if finished.IsZero() {
+		return false
+	}
+	fy, fm, fd := finished.In(now.Location()).Date()
+	ny, nm, nd := now.Date()
+	return fy < ny || fy == ny && (fm < nm || fm == nm && fd < nd)
 }
 
 // phaseToProto da la fase con su detalle en el idioma loc; las guardadas antes del catálogo no traen motivo y salen en es.
@@ -699,7 +730,8 @@ func (c *Core) summary(loc string, j *job) *v1.JobSummary {
 	}
 	s := &v1.JobSummary{JobId: j.id, Name: j.spec.Name, State: j.state, NextRoundAt: tsOrNil(c.sched.NextRound(j.id)),
 		ArmedAt: tsOrNil(j.ArmedAt), WindowEndsAt: tsOrNil(j.Until), Round: uint32(j.Round), Rounds: rounds,
-		DevicesTotal: uint32(len(j.spec.Targets)), DevicesOk: uint32(j.OK), DevicesFailed: uint32(j.Failed), DevicesPartial: uint32(j.Partial), OutputDir: out, Kind: cmp.Or(j.spec.Kind, "patrol")}
+		DevicesTotal: uint32(len(j.spec.Targets)), DevicesOk: uint32(j.OK), DevicesFailed: uint32(j.Failed), DevicesPartial: uint32(j.Partial), OutputDir: out, Kind: cmp.Or(j.spec.Kind, "patrol"),
+		FinishedAt: tsOrNil(j.FinishedAt), Past: isPast(j.FinishedAt, c.o.Now())}
 	for _, p := range j.Phases {
 		s.Phases = append(s.Phases, phaseToProto(loc, p))
 	}
