@@ -17,7 +17,7 @@ test("ejecuta ping, muestra la salida en vivo y la ruta al terminar", async () =
   await waitFor(() => expect(core.diagRun).toHaveBeenCalledWith("ping", ["10.0.0.1"], { count: "6" }));
   act(() => core.emitDiag({ runId: "r1", line: "64 bytes from 10.0.0.1" }));
   act(() => core.emitDiag({ runId: "otro", line: "no es mío" }));
-  expect(await screen.findByRole("log", { name: "Salida" })).toHaveTextContent(/64 bytes from 10\.0\.0\.1/);
+  await waitFor(() => expect(screen.getByRole("log", { name: "Salida" })).toHaveTextContent(/64 bytes from 10\.0\.0\.1/)); // las líneas pasan por lotes
   expect(screen.queryByText(/no es mío/)).not.toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   expect(core.diagCancel).toHaveBeenCalledWith("r1");
@@ -373,4 +373,22 @@ test("si el núcleo rechaza una opción en Windows se muestra su texto con la cl
   await pingView({ diagRun });
   await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Esta opción no está disponible en Windows: tos");
+});
+
+test("500 líneas seguidas llegan en orden y done no pierde las pendientes del lote", async () => {
+  const core = fakeCore({ diagRun: vi.fn(async () => "r1") });
+  render(<DiagView core={core} tool="ping" />);
+  await userEvent.type(screen.getByLabelText("Destino"), "10.0.0.1");
+  await userEvent.click(screen.getByRole("button", { name: "Ejecutar" }));
+  await waitFor(() => expect(core.diagRun).toHaveBeenCalled());
+  act(() => {
+    for (let i = 0; i < 500; i++) core.emitDiag({ runId: "r1", line: `fila-${i}` });
+    core.emitDiag({ runId: "r1", done: true, exitCode: 0 }); // sin esperar al temporizador
+  });
+  const log = screen.getByRole("log", { name: "Salida" });
+  const rows = (log.textContent ?? "").split("\n").filter((x) => x.startsWith("fila-"));
+  expect(rows).toHaveLength(500);
+  expect(rows[0]).toBe("fila-0");
+  expect(rows[499]).toBe("fila-499");
+  expect(await screen.findByText(/Listo|Terminó|código/i)).toBeInTheDocument();
 });

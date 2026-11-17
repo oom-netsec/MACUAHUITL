@@ -100,6 +100,16 @@ input[type="radio"]::after { content: ""; width: 8px; height: 8px; border-radius
 input[type="radio"]:checked { background: var(--accent); border-color: var(--accent); }
 input[type="radio"]:checked::after { opacity: 1; }
 input[type="radio"]:disabled { background-color: var(--surface-2); opacity: 0.6; }
+/* Alto contraste de Windows: el sistema reemplaza los fondos, así que el estado marcado se dibuja con colores del sistema. */
+@media (forced-colors: active) {
+  input[type="checkbox"], input[type="radio"] { forced-color-adjust: none; background: Canvas; border-color: ButtonText; }
+  input[type="checkbox"]:checked, input[type="radio"]:checked { background: Highlight; border-color: Highlight; }
+  input[type="checkbox"]::after { border-color: HighlightText; }
+  input[type="radio"]::after { background: HighlightText; }
+  input[type="checkbox"]:disabled, input[type="radio"]:disabled { background: Canvas; border-color: GrayText; }
+  input[type="checkbox"]:disabled:checked, input[type="radio"]:disabled:checked { background: GrayText; border-color: GrayText; }
+  input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible, :focus-visible { outline: 2px solid Highlight; }
+}
 input[type="number"], .mono { font-variant-numeric: tabular-nums; }
 fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 
@@ -115,7 +125,14 @@ tbody tr:hover td { background: var(--hover); }
 
 /* Barras de desplazamiento discretas, solo en lo que hace scroll: una regla universal con color-mix
    costaba ~90 ms de estilo en la primera pintura de WebKitGTK. */
-.content, .sidebar, .console, .table-wrap, .palette-list, .grid-scroll, textarea { scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; }
+/* Solo ::-webkit-scrollbar, que entienden Chromium (WebView2) y WebKitGTK. Medido en WebKitGTK: scrollbar-width/scrollbar-color no se aplican
+   (21 px con thin) y además anulan estas reglas, así que no se declaran. */
+.content::-webkit-scrollbar, .sidebar::-webkit-scrollbar, .console::-webkit-scrollbar, .table-wrap::-webkit-scrollbar, .palette-list::-webkit-scrollbar, .grid-scroll::-webkit-scrollbar, textarea::-webkit-scrollbar, .dialog-body::-webkit-scrollbar { width: 8px; height: 8px; }
+.content::-webkit-scrollbar-track, .sidebar::-webkit-scrollbar-track, .console::-webkit-scrollbar-track, .table-wrap::-webkit-scrollbar-track, .palette-list::-webkit-scrollbar-track, .grid-scroll::-webkit-scrollbar-track, textarea::-webkit-scrollbar-track, .dialog-body::-webkit-scrollbar-track, .content::-webkit-scrollbar-corner, .sidebar::-webkit-scrollbar-corner, .console::-webkit-scrollbar-corner, .table-wrap::-webkit-scrollbar-corner, .palette-list::-webkit-scrollbar-corner, .grid-scroll::-webkit-scrollbar-corner, textarea::-webkit-scrollbar-corner, .dialog-body::-webkit-scrollbar-corner { background: transparent; }
+.content::-webkit-scrollbar-thumb, .sidebar::-webkit-scrollbar-thumb, .console::-webkit-scrollbar-thumb, .table-wrap::-webkit-scrollbar-thumb, .palette-list::-webkit-scrollbar-thumb, .grid-scroll::-webkit-scrollbar-thumb, textarea::-webkit-scrollbar-thumb, .dialog-body::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+/* Las flechas de los input number se dibujan distinto en WebKitGTK y Chromium: se ocultan; las flechas del teclado siguen. */
+input[type="number"] { appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { appearance: none; margin: 0; }
 
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 

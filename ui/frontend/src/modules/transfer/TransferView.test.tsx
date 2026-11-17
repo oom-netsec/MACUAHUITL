@@ -94,6 +94,7 @@ test("el registro en vivo, Detener y la lista que sobrevive al cambiar de pesta�
     core.emitTransfer({ runId: "r1", line: { Proto: "tftp", Client: "192.0.2.9", File: "x", Bytes: 0, Duration: 0, Result: "error", Rejected: true, Error: "no publicado" } });
   });
   const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  await waitFor(() => expect(within(card).getByRole("table")).toBeInTheDocument()); // las líneas pasan por lotes
   const rows = within(within(card).getByRole("table")).getAllByRole("row");
   expect(rows[1]).toHaveTextContent("192.0.2.1");
   expect(rows[1]).toHaveTextContent("r1-config.txt");
@@ -397,4 +398,18 @@ test("Windows: con un puerto distinto del estándar el texto dice que IOS necesi
     const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
     expect(await within(card).findByText(/ábrelo en el estándar/)).toBeInTheDocument();
   } finally { setOSForTests(undefined); }
+});
+
+test("done vacía el lote pendiente: ninguna línea se pierde y el orden se conserva", async () => {
+  const core = await openServer(setup());
+  act(() => {
+    core.emitTransfer({ runId: "r1", ready: ready() });
+    for (let i = 0; i < 3; i++) core.emitTransfer({ runId: "r1", line: { Proto: "tftp", Client: `192.0.2.${i + 1}`, File: `f${i}`, Bytes: 1, Duration: 1, Result: "ok", Dir: "write-text", dirCode: "write", SHA256: "a".repeat(64) } });
+    core.emitTransfer({ runId: "r1", done: true });
+  });
+  const card = await screen.findByRole("group", { name: "TFTP 192.0.2.10:6969" });
+  const rows = within(within(card).getByRole("table")).getAllByRole("row");
+  expect(rows).toHaveLength(4);
+  expect(rows[1]).toHaveTextContent("f0");
+  expect(rows[3]).toHaveTextContent("f2");
 });

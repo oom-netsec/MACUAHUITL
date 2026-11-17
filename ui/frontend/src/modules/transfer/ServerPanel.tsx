@@ -10,6 +10,7 @@ import { LivePanel } from "./LivePanel";
 import { iosCommands, splitListen } from "./ios";
 import { errInfo, type ErrInfo } from "../../lib/coreError";
 import { isWindows } from "../../lib/platform";
+import { useBatch } from "../../lib/useBatch";
 
 const sysctlCmd = (i?: ErrInfo) => (i?.reason === "fileserve.err.port_denied" ? i.metadata.cmd ?? "" : "");
 import { nftLeftoverCmd, portFor, serveProblem, splitList } from "./validate";
@@ -123,19 +124,26 @@ export function ServerPanel({ core }: { core: CoreAPI }) {
   useEffect(() => { core.listInterfaces().then((l) => setIfaces(l ?? [])).catch((e) => setErr(errorText(e))); }, [core]);
   const ips = ifaces.filter((i) => i.up).flatMap((i) => i.addresses.map((a) => [a.replace(/\/\d+$/, ""), i.name] as const));
 
+  // Las líneas de todos los servidores pasan a pantalla una vez cada FLUSH_MS, en orden y con tope de 500 por servidor.
+  // shortcut: la cola es una sola; si un servidor manda más de 4000 líneas en 100 ms, se pierden las pendientes de otro. Cola por runId si llega a pasar.
+  const batch = useBatch<{ runId: string; line: TransferLine }>((b) => setServers((l) => l.map((s) => {
+    const mine = b.filter((x) => x.runId === s.runId);
+    return mine.length ? { ...s, lines: s.lines.concat(mine.map((x) => x.line)).slice(-500) } : s;
+  })), 2000);
   // Montado siempre (como Campo): cambiar de pestaña no pierde servidores ni su registro.
   useEffect(() => core.onTransfer((e) => {
     if (e.ready) {
       seen.current.add(e.runId);
       setServers((l) => [...l, { runId: e.runId, ready: e.ready!, lines: [], done: false, legacy: legacyNext.current && (e.ready!.protocol === "scp" || e.ready!.protocol === "sftp") }]);
-    } else if (e.line) setServers((l) => l.map((s) => (s.runId === e.runId ? { ...s, lines: [...s.lines.slice(-499), e.line!] } : s)));
+    } else if (e.line) batch.push({ runId: e.runId, line: e.line });
     else if (e.done) {
+      batch.flush(); // ninguna línea pendiente se pierde ni queda después del cierre
       const msg = e.error && errorText(new Error(e.error));
       // Un error sin tarjeta es que el servidor no llegó a abrir (carpeta o regla inválida).
       if (seen.current.has(e.runId)) setServers((l) => l.map((s) => (s.runId === e.runId ? { ...s, done: true, error: msg || undefined, cleanup: e.cleanup } : s)));
       else if (msg) setErr(msg, sysctlCmd(e.errorInfo)); // el bind negado llega aquí: StartServer es un stream
     }
-  }), [core]);
+  }), [core, batch.push, batch.flush]);
   useBusy(servers.some((s) => !s.done));
 
   const ssh = proto === "scp" || proto === "sftp";

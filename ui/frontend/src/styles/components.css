@@ -70,6 +70,11 @@ button.inline { margin-left: var(--s-2); height: var(--control-h-sm); }
 .segmented span { display: block; padding: 2px 10px; border-radius: var(--r-1); color: var(--text-2); font-size: var(--fs-small); font-weight: 500; }
 .segmented input:checked + span { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.1); }
 .segmented input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+@media (forced-colors: active) {
+  .segmented input:checked + span { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  .segmented input:focus-visible + span { outline-color: Highlight; }
+  .tabs [role="tab"][aria-selected="true"] { border-bottom-color: Highlight; }
+}
 
 /* Avisos: ícono + texto; role=alert solo para crítico. */
 .notice {
@@ -285,7 +290,7 @@ th.num, td.num { text-align: right; }
 /* (.scrim.dialog-scrim: shell.css carga después y su .scrim pisaba el fondo y el centrado.) Diálogo modal (components/Dialog.tsx): «Ver detalles» de Ajustes → Datos. El cuerpo se desplaza por dentro. */
 .scrim.dialog-scrim { align-items: center; padding-top: 0; background: var(--scrim-modal); }
 .dialog { width: min(760px, 92vw); max-height: min(80vh, 100%); display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-4); box-shadow: var(--shadow-2); animation: rise var(--t-in) var(--ease); }
-.dialog-body { overflow: auto; padding: var(--s-3) var(--s-4) var(--s-4); display: grid; gap: var(--s-3); align-content: start; scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; }
+.dialog-body { overflow: auto; padding: var(--s-3) var(--s-4) var(--s-4); display: grid; gap: var(--s-3); align-content: start; }
 .dialog-body p { margin: 0; }
 .dialog-body table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
 .dialog-body th, .dialog-body td { text-align: left; padding: var(--s-1) var(--s-2); border-bottom: 1px solid var(--hairline); vertical-align: top; }
@@ -293,3 +298,22 @@ th.num, td.num { text-align: right; }
 .dialog-body code { white-space: nowrap; }
 .grid-2 .field { align-content: start; } /* una pista de dos líneas no estira las filas de sus vecinos */
 code.nowrap { white-space: nowrap; } /* un comando corto no se parte entre líneas */
+
+/* Terminales (fase 15b): paleta de color solo dentro de .term */
+.term .console { background: var(--t-bg); color: var(--t-fg); border-color: var(--t-dim); }
+.term .console li[data-sev="0"], .term .console li[data-sev="1"], .term .console li[data-sev="2"], .term .console li[data-sev="3"] { color: var(--t-bad); }
+.term .console li[data-sev="4"] { color: var(--t-warn); }
+.term .t-ok { color: var(--t-ok); } .term .t-bad { color: var(--t-bad); font-weight: 600; } .term .t-warn { color: var(--t-warn); }
+.term .t-info { color: var(--t-info); } .term .t-addr { color: var(--t-addr); } .term .t-iface { color: var(--t-iface); }
+.term .t-prompt { color: var(--t-prompt); font-weight: 600; } .term .t-num { color: var(--t-num); } .term .t-dim { color: var(--t-dim); }
+.term .t-kw { color: var(--t-kw); } .term .t-str { color: var(--t-str); } .term .t-conn { color: var(--t-conn); }
+.term .t-ospf { color: var(--t-ospf); font-weight: 600; } .term .t-eigrp { color: var(--t-eigrp); font-weight: 600; } .term .t-bgp { color: var(--t-bgp); font-weight: 600; }
+.term .t-rip { color: var(--t-rip); font-weight: 600; } .term .t-static { color: var(--t-static); font-weight: 600; }
+.term .t-uprompt { color: var(--t-uprompt); font-weight: 600; } .term .t-cred { color: var(--t-cred); font-weight: 600; } .term .t-acl { color: var(--t-acl); }
+.term .t-svc { color: var(--t-svc); } .term .t-ver { color: var(--t-ver); }
+
+/* Modo de cambio asistido dentro del módulo: el aviso no se puede ocultar mientras haya una ejecución en curso. */
+.assist-banner {
+  position: sticky; top: 0; z-index: var(--z-sticky); display: flex; gap: 10px; align-items: center; margin: 0 0 var(--s-4);
+  padding: 10px var(--s-3); border-radius: var(--r-3); background: var(--critical-solid); color: #fff; font-weight: 600;
+}
