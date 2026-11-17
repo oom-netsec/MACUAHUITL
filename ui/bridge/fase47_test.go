@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	v1 "github.com/oom-netsec/MACUAHUITL/gen/macuahuitl/v1"
@@ -30,7 +31,9 @@ func TestImportKeyCredential(t *testing.T) {
 	b, _ := startServices(t, func(r ipc.Registrar) { v1.RegisterVaultServiceServer(r, f) })
 	dir := t.TempDir()
 	file := filepath.Join(dir, "id_rsa")
-	os.WriteFile(file, []byte("CONTENIDO"), 0o600)
+	if err := os.WriteFile(file, []byte("CONTENIDO"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
 	r, err := b.ImportKeyCredential(ImportKeyDTO{Label: "l", Username: "u", Path: file, Passphrase: "p"})
 	if err != nil {
@@ -51,7 +54,9 @@ func TestImportKeyCredential(t *testing.T) {
 	}
 
 	big := filepath.Join(dir, "big")
-	os.WriteFile(big, bytes.Repeat([]byte("a"), 64<<10+5000), 0o600)
+	if err := os.WriteFile(big, bytes.Repeat([]byte("a"), 64<<10+5000), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := b.ImportKeyCredential(ImportKeyDTO{Username: "u", Path: big}); err != nil || len(f.imp.PrivateKey) != 64<<10+1 {
 		t.Fatalf("grande: %v %d", err, len(f.imp.PrivateKey))
 	}
@@ -59,12 +64,26 @@ func TestImportKeyCredential(t *testing.T) {
 	for _, d := range []ImportKeyDTO{{Username: "u"}, {Username: "u", Path: file, PrivateKey: "x"}} {
 		_, err := b.ImportKeyCredential(d)
 		var be *Error
-		if !errors.As(err, &be) || be.Code != "InvalidArgument" {
+		if !errors.As(err, &be) || be.Code != "InvalidArgument" || be.Reason != "bridge.err.import_source" {
 			t.Fatalf("%+v: %v", d, err)
 		}
 	}
-	if _, err := b.ImportKeyCredential(ImportKeyDTO{Username: "u", Path: filepath.Join(dir, "nada")}); err == nil {
-		t.Fatal("archivo inexistente debe fallar")
+	// no regulares: un directorio y /dev/null
+	for _, p := range []string{dir, os.DevNull} {
+		var be *Error
+		if _, err := b.ImportKeyCredential(ImportKeyDTO{Username: "u", Path: p}); !errors.As(err, &be) || be.Reason != "bridge.err.import_not_regular" {
+			t.Fatalf("%s: %v", p, err)
+		}
+	}
+	// la ruta no aparece en el error ni en su metadata
+	miss := filepath.Join(dir, "secreto-nada")
+	_, err = b.ImportKeyCredential(ImportKeyDTO{Username: "u", Path: miss})
+	var be *Error
+	if !errors.As(err, &be) || be.Reason != "bridge.err.import_read" || be.Metadata["kind"] != "not_found" {
+		t.Fatalf("read: %v", err)
+	}
+	if j := jsonOf(t, be) + err.Error(); strings.Contains(j, "secreto-nada") || strings.Contains(j, dir) {
+		t.Fatalf("la ruta se filtró: %s", j)
 	}
 
 	l, err := b.ListCredentials()
