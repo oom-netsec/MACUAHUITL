@@ -187,7 +187,7 @@ Known limits are declared, not hidden, in the [threat model](docs/security/THREA
 - **No privileged code.** No setuid helpers, no raw sockets of its own, no embedded Wireshark or tshark.
 - **Cannot protect you from malware running as your own user** while the vault is open. No user-space app can.
 - **Cannot recover a lost master password.**
-- **Linux only**, for now. Windows and macOS come after 1.0.0 (see the [roadmap](docs/roadmap.md)).
+- **Linux first.** Windows is an unsigned beta ([install guide](docs/install-windows.md)); macOS comes later (see the [roadmap](docs/roadmap.md)).
 - **English** by default (app, core and `mctl`). Spanish is available in Settings, and with `mctl --lang es`.
 
 ## Supported platforms and packs
@@ -214,6 +214,8 @@ Counts match the packs in this repository (a test keeps them in sync). A few IOS
 > **Lab validation is in progress.** Commands and parsers come from Cisco documentation; only `oom/ios` has been checked end to end on a real device so far. The commands of `oom/wlc-9800` were checked on a 9120 EWC, those of `oom/ios-xe`, `oom/cat9k` and `oom/sda` on a Catalyst 9000v (`oom/ios-xe` also on a Catalyst 8000v), and those of `oom/asa` on ASAv. Playbooks only read, so an unvalidated one can at worst collect less than expected. Please report any output that is parsed wrong.
 
 ## Install
+
+> **Windows (beta, unsigned):** see [Install on Windows](docs/install-windows.md).
 
 Each [release](../../releases/latest) is built reproducibly and ships an SBOM. From its assets you need:
 

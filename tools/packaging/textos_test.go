@@ -128,7 +128,7 @@ func TestPostinstallSinDaemonReloadGlobal(t *testing.T) {
 // docs/architecture, docs/backlog) sigue en español.
 // shortcut: busca letras del español, así que una frase sin tildes pasa; basta para que no vuelva un documento entero.
 func TestDocsPublicosEnIngles(t *testing.T) {
-	docs := []string{"README.md", "SECURITY.md", "CONTRIBUTING.md", "TRADEMARK.md", "NOTICE", filepath.Join("docs", "roadmap.md")}
+	docs := []string{"README.md", "SECURITY.md", "CONTRIBUTING.md", "TRADEMARK.md", "NOTICE", filepath.Join("docs", "roadmap.md"), filepath.Join("docs", "install-windows.md")}
 	sec, _ := filepath.Glob(filepath.Join(repoRoot(), "docs", "security", "*.md"))
 	if len(sec) == 0 {
 		t.Fatal("no encontré docs/security/*.md")
