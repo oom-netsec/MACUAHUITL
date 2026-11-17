@@ -95,14 +95,7 @@ func OpenOutDir(dir string) (*os.Root, error) {
 	}
 	if len(w.Who) > 0 {
 		root.Close()
-		who := make([]string, len(w.Who))
-		for i, x := range w.Who { // en Linux, el código del texto traducible; en Windows el SID tal cual
-			who[i] = map[string]string{"owner": "sys.who.owner", "g+w": "sys.who.group", "o+w": "sys.who.others"}[x]
-			if who[i] == "" {
-				who[i] = x
-			}
-		}
-		a := i18n.A("dir", real, "who", strings.Join(who, ","))
+		a := i18n.A("dir", real, "who", WhoCodes(w.Who))
 		switch cmd := FixCmd(runtime.GOOS, real, w); {
 		case w.NoChmod && !w.ForeignOwner: // vfat/exfat: chmod no sirve, hay que remontar
 			return nil, i18n.New("sys.err.outdir_mount", a)
@@ -136,4 +129,17 @@ func CreateTempIn(root *os.Root, pattern string) (*os.File, error) {
 		return f, err
 	}
 	return nil, &fs.PathError{Op: "createtemp", Path: pattern, Err: fs.ErrExist}
+}
+
+// WhoCodes junta los motivos de Writers.Who para un argumento con withRefs: en Linux, el código del texto traducible
+// (sys.who.*); en Windows, el SID tal cual.
+func WhoCodes(who []string) string {
+	out := make([]string, len(who))
+	for i, x := range who {
+		out[i] = map[string]string{"owner": "sys.who.owner", "g+w": "sys.who.group", "o+w": "sys.who.others"}[x]
+		if out[i] == "" {
+			out[i] = x
+		}
+	}
+	return strings.Join(out, ",")
 }

@@ -386,9 +386,9 @@ func checkRecvOwn(dir string, root *os.Root) error {
 		return nil
 	}
 	if fix != "" {
-		return i18n.New("fileserve.err.recv_dir_open_cmd", i18n.A("dir", dir, "who", strings.Join(who, ", "), "cmd", fix))
+		return i18n.New("fileserve.err.recv_dir_open_cmd", i18n.A("dir", dir, "who", sys.WhoCodes(who), "cmd", fix))
 	}
-	return i18n.New("fileserve.err.recv_dir_open", i18n.A("dir", dir, "who", strings.Join(who, ", ")))
+	return i18n.New("fileserve.err.recv_dir_open", i18n.A("dir", dir, "who", sys.WhoCodes(who)))
 }
 
 // dirWarnings son los avisos (sin rechazo) de las carpetas de PUBLICACIÓN (FromDir y la carpeta de cada archivo suelto) y de
