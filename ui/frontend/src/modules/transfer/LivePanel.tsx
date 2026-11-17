@@ -44,7 +44,7 @@ export function LivePanel({ serverId, open, fetchSessions }: { serverId: string;
     return (
       <li key={s.id} className="live-session">
         <div className="meta">
-          <StatusPill tone={s.state === "active" ? "run" : s.state === "done" ? "ok" : "bad"} label={t(`transfer.live.state.${s.state}` as Key)} />{" "}
+          {s.state !== "done" && <><StatusPill tone={s.state === "active" ? "run" : "bad"} label={t(`transfer.live.state.${s.state}` as Key)} />{" "}</>/* la completa ya la marca TransferProgress */}
           {t(s.direction === "in" ? "transfer.live.in" : "transfer.live.out")} · {s.protocol.toUpperCase()} · <span className="mono">{clientIP(s.client)}</span>
         </div>
         <TransferProgress file={s.name} bytes={s.bytes} total={s.total} rateBps={s.bytesPerSec} etaSeconds={eta} done={s.state !== "active"} error={err} />
