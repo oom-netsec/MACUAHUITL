@@ -317,3 +317,6 @@ code.nowrap { white-space: nowrap; } /* un comando corto no se parte entre líne
   position: sticky; top: 0; z-index: var(--z-sticky); display: flex; gap: 10px; align-items: center; margin: 0 0 var(--s-4);
   padding: 10px var(--s-3); border-radius: var(--r-3); background: var(--critical-solid); color: #fff; font-weight: 600;
 }
+
+/* Una URL larga dentro de un aviso se corta donde haga falta en lugar de desbordar. */
+.url { overflow-wrap: anywhere; }

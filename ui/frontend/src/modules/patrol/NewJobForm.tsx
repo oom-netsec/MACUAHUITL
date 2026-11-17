@@ -9,6 +9,8 @@ import type { Key } from "../../lib/i18n/es";
 import type { PlaybookInfo } from "./api";
 import { PlaybookPicker } from "./PlaybookPicker";
 import { useScriptsVersion } from "../scripts/signal";
+import { NoPacks } from "../../components/NoPacks";
+import { useNav } from "../../app/activity";
 import { useVaultVersion } from "../../lib/vaultSignal";
 
 // Un tipo de dato nuevo del núcleo que el front aún no traduce: se muestra el nombre del dato, sin ayuda.
@@ -29,6 +31,7 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
   const [cred, setCred] = useState("");
   const [cmds, setCmds] = useState("");
   const [catalog, setCatalog] = useState<PlaybookInfo[] | null>(null);
+  const go = useNav();
   const [pbErr, setPbErr] = useState(false);
   const [pbs, setPbs] = useState<string[]>([]);
   const [pbTry, setPbTry] = useState(0); // el núcleo pudo estar arrancando: reintentar sin rehacer el formulario
@@ -108,6 +111,9 @@ export function NewJobForm({ core, creds, onCreated }: { core: CoreAPI; creds: C
       <Section title={`2 · ${t("patrol.step.commands")}`}>
         <h4>{t("patrol.pb.title")}</h4>
         <p className="hint">{t("patrol.pb.hint")}</p>
+        {catalog && !pbErr && !catalog.some((p) => p.pack && p.pack !== "usuario") && (
+          <NoPacks action={<button type="button" className="sm" onClick={() => go("settings", "packs")}>{t("packs.none.open")}</button>} />
+        )}
         {pbErr ? <Notice kind="warn">{t("patrol.pb.unavailable")} <button type="button" className="sm" onClick={() => setPbTry((n) => n + 1)}>{t("common.retry")}</button></Notice> : catalog && <PlaybookPicker playbooks={catalog} selected={pbs} onChange={setPbs} />}
         {asked.map(([n, k]) => (
           <Field key={n} label={known(k) ? `${t(`patrol.param.kind.${k}` as Key)} (${n})` : n} hint={known(k) ? t(`patrol.param.${k}` as Key) : undefined} value={vals[n] ?? ""} error={paramErr[n]} onChange={(v) => setVals({ ...vals, [n]: v })} w="md" mono />

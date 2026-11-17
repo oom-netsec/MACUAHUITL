@@ -9,11 +9,16 @@ import { ThemeSwitch } from "../../components/ThemeSwitch";
 import { PALETTES } from "../../lib/termHighlight";
 import { setTermPrefs, useTermPrefs } from "../../lib/termPrefs";
 import { PacksSection } from "../packs/PacksSection";
+import { useRef } from "react";
+import { useInbox } from "../../app/activity";
 import "./settings.css";
 
 // Ajustes: reúne las preferencias que ya existían (tema, idioma, terminal) con las mismas tiendas de siempre.
 export function SettingsView({ core }: { core: CoreAPI }) {
   const t = useT();
+  // «Abrir Ajustes → Paquetes» (Patrol sin paquetes) lleva directo a esa sección.
+  const packsRef = useRef<HTMLDivElement>(null);
+  useInbox("settings", (d) => { if (d === "packs") packsRef.current?.scrollIntoView?.({ block: "start" }); });
   const { palette, hl, srm } = useTermPrefs();
   return (
     <Page title={t("settings.title")} description={t("settings.desc")}>
@@ -45,9 +50,11 @@ export function SettingsView({ core }: { core: CoreAPI }) {
       <Section title={t("settings.data")} description={t("settings.data.desc")}>
         <DataSection core={core} />
       </Section>
-      <Section title={t("settings.packs")} description={t("settings.packs.desc")}>
-        <PacksSection core={core} />
-      </Section>
+      <div ref={packsRef}>
+        <Section title={t("settings.packs")} description={t("settings.packs.desc")}>
+          <PacksSection core={core} />
+        </Section>
+      </div>
     </Page>
   );
 }

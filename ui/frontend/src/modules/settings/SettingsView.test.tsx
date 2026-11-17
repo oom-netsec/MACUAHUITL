@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SettingsView } from "./SettingsView";
+import { NavContext } from "../../app/activity";
 import { I18nProvider } from "../../lib/i18n";
 import { resetTheme } from "../../lib/theme";
 import { resetTermPrefs, setTermPrefs } from "../../lib/termPrefs";
@@ -185,4 +186,13 @@ describe("Datos", () => {
     await userEvent.click(within(c).getByRole("button", { name: "Download example template" }));
     await waitFor(() => expect(core.pickSavePath).toHaveBeenCalledWith("scripts-template.json"));
   });
+});
+
+test("«Abrir Ajustes → Paquetes» desde otro módulo lleva a la sección de paquetes", async () => {
+  const scroll = vi.fn();
+  Element.prototype.scrollIntoView = scroll;
+  onTestFinished(() => { delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView; }); // jsdom no lo tiene
+  render(<NavContext.Provider value={{ go: () => {}, inbox: { settings: { data: "packs", n: 1 } } }}><I18nProvider><SettingsView core={fakeCore()} /></I18nProvider></NavContext.Provider>);
+  await waitFor(() => expect(scroll).toHaveBeenCalled());
+  expect(scroll.mock.contexts[0]).toHaveTextContent("Paquetes");
 });
