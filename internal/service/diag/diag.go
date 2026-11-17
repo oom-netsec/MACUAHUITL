@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"google.golang.org/grpc/codes"
 
@@ -19,7 +20,36 @@ import (
 
 type diagSvc struct {
 	v1.UnimplementedDiagServiceServer
-	d service.Deps
+	d    service.Deps
+	mu   sync.Mutex
+	runs map[string]*liveRun // ejecuciones vivas por run_id
+}
+
+// liveRun es lo único que StopRun puede hacer con una ejecución: pedirle que pare.
+type liveRun struct {
+	stop chan struct{}
+	once sync.Once
+}
+
+func (l *liveRun) halt() { l.once.Do(func() { close(l.stop) }) }
+
+func (s *diagSvc) liveRuns() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.runs)
+}
+
+// StopRun detiene una ejecución en curso sin cortar su stream: Run manda el resumen y done. No expone su salida.
+func (s *diagSvc) StopRun(ctx context.Context, r *v1.StopRunRequest) (*v1.StopRunResponse, error) {
+	s.mu.Lock()
+	l := s.runs[r.RunId]
+	s.mu.Unlock()
+	if l == nil {
+		return nil, service.Err(ctx, codes.NotFound, "diag.err.no_run", nil)
+	}
+	l.halt()
+	s.d.Audit("diag.stop", r.RunId, "")
+	return &v1.StopRunResponse{}, nil
 }
 
 var diagTools = map[v1.DiagTool]diag.Tool{
@@ -56,8 +86,23 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 			return service.ErrFrom(st.Context(), codes.InvalidArgument, i18n.Wrap("ingest.err.out_dir", err, nil))
 		}
 	}
-	s.d.Audit("diag.run", string(tool), fmt.Sprintf("%s %q", bin, argv))
-	res, err := diag.Runner{LookPath: s.d.DiagLookPath()}.Run(st.Context(), req, func(line string) {
+	id, live := service.NewID(), &liveRun{stop: make(chan struct{})}
+	s.d.Audit("diag.run", string(tool), fmt.Sprintf("run=%s %s %q", id, bin, argv))
+	s.mu.Lock()
+	if s.runs == nil {
+		s.runs = map[string]*liveRun{}
+	}
+	s.runs[id] = live
+	s.mu.Unlock()
+	defer func() { // por cualquier camino de salida
+		s.mu.Lock()
+		delete(s.runs, id)
+		s.mu.Unlock()
+	}()
+	if err := st.Send(&v1.RunResponse{RunId: id}); err != nil {
+		return err
+	}
+	res, err := diag.Runner{LookPath: s.d.DiagLookPath(), Stop: live.stop}.Run(st.Context(), req, func(line string) {
 		st.Send(&v1.RunResponse{OutputLine: line})
 	})
 	code := res.ExitCode
@@ -65,14 +110,18 @@ func (s *diagSvc) Run(r *v1.RunRequest, st v1.DiagService_RunServer) error {
 		code = -1
 	}
 	// Lo que corrió de verdad: binario resuelto (tracepath por traceroute) y argv completo, entrecomillado.
-	s.d.Audit("diag.done", string(tool), fmt.Sprintf("exit=%d bin=%s argv=%q output=%s", code, res.Bin, res.Argv, res.OutputPath))
+	s.d.Audit("diag.done", string(tool), fmt.Sprintf("run=%s exit=%d bin=%s argv=%q output=%s", id, code, res.Bin, res.Argv, res.OutputPath))
 	if errors.Is(err, diag.ErrNotInstalled) {
 		return service.ErrFrom(st.Context(), codes.FailedPrecondition, err)
 	}
 	if err != nil && st.Context().Err() == nil {
 		return service.ErrFrom(st.Context(), codes.Internal, err)
 	}
-	return st.Send(&v1.RunResponse{Done: true, ExitCode: int32(res.ExitCode), OutputPath: res.OutputPath})
+	final := &v1.RunResponse{Done: true, ExitCode: int32(res.ExitCode), OutputPath: res.OutputPath}
+	if p := res.Ping; p != nil {
+		final.PingSummary = &v1.PingSummary{Sent: p.Sent, Received: p.Received, LossPct: p.LossPct, MinMs: p.MinMs, AvgMs: p.AvgMs, MaxMs: p.MaxMs, MdevMs: p.MdevMs}
+	}
+	return st.Send(final)
 }
 
 // ListInterfaces lee las interfaces del sistema; no envía nada a la red.
@@ -92,5 +141,5 @@ func (s *diagSvc) ListInterfaces(ctx context.Context, _ *v1.ListInterfacesReques
 type Module struct{}
 
 func (Module) Register(s ipc.Registrar, d service.Deps) {
-	v1.RegisterDiagServiceServer(s, &diagSvc{d: d})
+	v1.RegisterDiagServiceServer(s, &diagSvc{d: d, runs: map[string]*liveRun{}})
 }

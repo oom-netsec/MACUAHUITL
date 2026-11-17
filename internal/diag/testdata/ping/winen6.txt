@@ -1,0 +1,5 @@
+Pinging ::1 with 32 bytes of data:
+Reply from ::1: time<1ms
+Reply from ::1: time=1ms
+Reply from ::1: time=1ms
+Reply from ::1: time<1ms

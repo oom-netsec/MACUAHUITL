@@ -30,9 +30,21 @@ var packages = map[string]string{
 type Result struct {
 	ExitCode   int
 	OutputPath string
-	Bin        string   // binario que se ejecutó de verdad (p. ej. tracepath en vez de traceroute)
-	Argv       []string // argv completo, incluido -w para la captura
+	Bin        string       // binario que se ejecutó de verdad (p. ej. tracepath en vez de traceroute)
+	Argv       []string     // argv completo, incluido -w para la captura
+	Ping       *PingSummary // solo ping: resumen calculado de las respuestas
 }
+
+// Límites del ping continuo (Review Focus 2). pingLimits devuelve la duración total pedida (0 = sin ella);
+// shortcut: devuelve los valores fijos hasta que 200-2 lo reemplace por el PingPlan (duration y continuous).
+var (
+	pingMaxRun  = 24 * time.Hour
+	pingMaxSent = int64(86400)
+	pingLimits  = func(Request) (duration time.Duration) { return 0 }
+)
+
+// goos es el sistema en el que corre Run; las pruebas lo cambian para ejercitar el comportamiento de Windows.
+var goos = runtime.GOOS
 
 // iperfServerMax es el tope de vida del servidor de iperf3 (-s -1 espera un cliente indefinidamente).
 var iperfServerMax = 10 * time.Minute
@@ -51,6 +63,9 @@ func discard(out *os.File, path string) {
 type Runner struct {
 	LookPath func(string) (string, error)
 	extraEnv []string // solo pruebas
+	// Stop, al cerrarse, detiene la herramienta de forma ordenada (SIGINT en Linux: ping imprime su resumen y
+	// sale) y Run vuelve con el resultado; cancelar ctx, en cambio, la mata sin más.
+	Stop <-chan struct{}
 }
 
 func (r Runner) look(name string) (string, error) {
@@ -119,9 +134,19 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 	}
 	defer done()
 	var mu sync.Mutex
+	stopc := make(chan struct{}) // lo cierran Stop, la duración o el tope de envíos
+	var stopOnce sync.Once
+	stopNow := func() { stopOnce.Do(func() { close(stopc) }) }
+	var stats *PingStats
+	if req.Tool == Ping {
+		stats = NewPingStats(goos == "windows")
+	}
 	emit := func(line string) {
 		mu.Lock()
 		defer mu.Unlock()
+		if stats != nil && stats.Feed(line) >= pingMaxSent {
+			stopNow()
+		}
 		onLine(line)
 		if out != nil {
 			out.WriteString(line + "\n")
@@ -141,10 +166,56 @@ func (r Runner) Run(ctx context.Context, req Request, onLine func(string)) (Resu
 		discard(out, res.OutputPath)
 		return Result{}, i18n.Wrap("diag.err.wrap", err, nil)
 	}
+	finished := make(chan struct{})
+	if stats != nil {
+		d := pingMaxRun
+		if want := pingLimits(req); want > 0 {
+			d = min(d, want)
+		}
+		defer time.AfterFunc(d, stopNow).Stop()
+	}
+	go func() {
+		select {
+		case <-r.Stop:
+			stopNow()
+		case <-stopc:
+		case <-finished:
+			return
+		}
+		select {
+		case <-finished:
+			return
+		default:
+		}
+		interrupt(cmd)
+		select { // si no sale sola, se cancela como siempre
+		case <-finished:
+		case <-time.After(3 * time.Second):
+			cmd.Cancel()
+		}
+	}()
 	err = cmd.Wait()
+	close(finished)
 	so.flush()
 	se.flush()
+	if stats != nil {
+		mu.Lock()
+		sum := stats.Summary()
+		mu.Unlock()
+		res.Ping = &sum
+	}
 	var ee *exec.ExitError
+	select {
+	case <-stopc:
+		if stats != nil && goos == "windows" { // el Job Object sale con 143: tras una parada pedida es éxito, como iputils
+			res.ExitCode = 1
+			if res.Ping.Received > 0 {
+				res.ExitCode = 0
+			}
+			return res, nil
+		}
+	default:
+	}
 	switch {
 	case err == nil:
 	case errors.As(err, &ee):
