@@ -2959,8 +2959,9 @@ export const es = {
   "diag.ping.err.count": "Los paquetes van de 1 a 100.",
   "diag.ping.err.sourceFamily": "El origen no es de la familia elegida.",
   "diag.sweep.mtuUnknown": "No se puede estimar la MTU: con familia Automática y un nombre de host no se sabe si son IPv4 (+28) o IPv6 (+48). Elige la familia.",
-  "packs.none": "No hay paquetes de contenido instalados: descarga los archivos .mpack oficiales del release e instálalos en Ajustes → Paquetes.",
-  "packs.none.link": "enlace del release",
+  "packs.none": "No hay playbooks de paquetes de contenido: descarga los archivos .mpack oficiales de la página de versiones (releases) e instálalos en Ajustes → Paquetes.",
+  "packs.none.link": "enlace de la página de versiones",
+  "packs.none.settings": "No hay paquetes instalados: descarga los archivos .mpack oficiales de la página de versiones (releases) e instálalos con «Instalar paquete…».",
   "packs.none.open": "Abrir Ajustes → Paquetes",
 };
 

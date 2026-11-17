@@ -224,7 +224,7 @@ test("si otro tercero se instaló tras la vista previa (would_displace), pide re
 
 test("sin paquetes: el mismo aviso con el enlace al release (solo el enlace; nada se descarga)", async () => {
   view(fakeCore({ packList: vi.fn(async () => []) }));
-  expect(await screen.findByText(/No hay paquetes de contenido instalados/)).toBeVisible();
+  expect(await screen.findByText(/No hay paquetes instalados: descarga/)).toBeVisible();
   expect(screen.getByText("https://github.com/oom-netsec/MACUAHUITL/releases/latest")).toBeVisible();
-  expect(screen.getByRole("button", { name: "Copiar enlace del release" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Copiar enlace de la página de versiones" })).toBeVisible();
 });

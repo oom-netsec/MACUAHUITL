@@ -191,6 +191,7 @@ describe("Datos", () => {
 test("«Abrir Ajustes → Paquetes» desde otro módulo lleva a la sección de paquetes", async () => {
   const scroll = vi.fn();
   Element.prototype.scrollIntoView = scroll;
+  onTestFinished(() => { delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView; }); // jsdom no lo tiene
   render(<NavContext.Provider value={{ go: () => {}, inbox: { settings: { data: "packs", n: 1 } } }}><I18nProvider><SettingsView core={fakeCore()} /></I18nProvider></NavContext.Provider>);
   await waitFor(() => expect(scroll).toHaveBeenCalled());
   expect(scroll.mock.contexts[0]).toHaveTextContent("Paquetes");

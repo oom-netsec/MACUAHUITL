@@ -579,7 +579,7 @@ test("sin paquetes de contenido instalados, Patrol lo dice con el enlace al rele
   const go = vi.fn();
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks: vi.fn(async () => [{ id: "ios-xe/tac-baseline", platform: "ios-xe", name: "TAC baseline", commands: [], params: [], pack: "" }]) });
   render(<NavContext.Provider value={{ go, inbox: {} }}><PatrolView core={core} /></NavContext.Provider>);
-  expect(await screen.findByText(/No hay paquetes de contenido instalados/)).toBeVisible();
+  expect(await screen.findByText(/No hay playbooks de paquetes de contenido/)).toBeVisible();
   expect(screen.getByText("https://github.com/oom-netsec/MACUAHUITL/releases/latest")).toBeVisible();
   await userEvent.click(screen.getByRole("button", { name: "Abrir Ajustes → Paquetes" }));
   expect(go).toHaveBeenCalledWith("settings", "packs");
@@ -589,11 +589,11 @@ test("con un paquete instalado no hay aviso de paquetes", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks: vi.fn(async () => [{ id: "ios-xe/l2-stp", platform: "ios-xe", name: "L2 · STP", commands: [], params: [], pack: "oom/ios-xe" }]) });
   render(<PatrolView core={core} />);
   expect(await findPb("STP")).toBeInTheDocument();
-  expect(screen.queryByText(/No hay paquetes de contenido instalados/)).toBeNull();
+  expect(screen.queryByText(/No hay playbooks de paquetes de contenido/)).toBeNull();
 });
 
 test("los playbooks propios no cuentan como paquete de contenido: el aviso sigue", async () => {
   const core = fakeCore({ listCredentials: vi.fn(async () => creds), listPlaybooks: vi.fn(async () => [{ id: "usuario/mio", platform: "ios-xe", name: "Mío", commands: ["show clock"], params: [], pack: "usuario" }]) });
   render(<PatrolView core={core} />);
-  expect(await screen.findByText(/No hay paquetes de contenido instalados/)).toBeVisible();
+  expect(await screen.findByText(/No hay playbooks de paquetes de contenido/)).toBeVisible();
 });

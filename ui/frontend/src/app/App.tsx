@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CoreAPI, CoreStatus } from "../lib/core";
 import { BusyContext, CoreContext, ModuleIdContext, NavContext, type Delivery } from "./activity";
 import { groups, modules } from "../modules";
@@ -49,7 +49,8 @@ function Shell({ core, chrome, initial, resync }: { core: CoreAPI; chrome?: Reac
 
 
   // Cada módulo empieza arriba: el desplazamiento del anterior no se hereda.
-  useEffect(() => { if (content.current) content.current.scrollTop = 0; }, [current]);
+  // useLayoutEffect: corre antes que los efectos de la vista, así una entrega que lleva a una sección (useInbox) no queda pisada.
+  useLayoutEffect(() => { if (content.current) content.current.scrollTop = 0; }, [current]);
 
   // Respuesta y evento llegan por canales distintos: una respuesta de coreStatus no pisa un evento que llegó después de pedirla.
   const events = useRef(0);

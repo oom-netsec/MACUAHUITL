@@ -166,7 +166,7 @@ export function PacksSection({ core }: { core: CoreAPI }) {
         <button type="button" onClick={pickImport}>{t("packs.import.open")}</button></div>
       {err && <Notice kind="error">{err}</Notice>}
       {msg && <Notice kind="info">{msg}</Notice>}
-      {packs?.length === 0 && <NoPacks />}
+      {packs?.length === 0 && <NoPacks text={t("packs.none.settings")} />}
       <ul className="pack-list">
         {packs?.map((p) => (
           <li key={p.id} className="pack-card">

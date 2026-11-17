@@ -214,3 +214,20 @@ test("Ctrl+Enter mantenido (repetición de tecla) no vuelve a ejecutar", async (
   expect(core.diagRun).not.toHaveBeenCalled();
   expect(ev.defaultPrevented).toBe(true); // la repetición tampoco llega al envío implícito del formulario
 });
+
+// El reset de scroll al cambiar de módulo corre antes que los efectos de la vista: un receptor de useInbox que lleva a una sección no se pisa.
+test("«Abrir Ajustes → Paquetes» desde Patrol llega a Paquetes aunque Ajustes ya estuviera abierto", async () => {
+  const core = fakeCore({ listPlaybooks: vi.fn(async () => [{ id: "ios-xe/tac-baseline", platform: "ios-xe", name: "TAC baseline", commands: [], params: [], pack: "" }]) });
+  // jsdom no tiene scrollIntoView: se pone para esta prueba y se quita al final.
+  const scroll = vi.fn(() => { document.querySelector<HTMLElement>(".content")!.scrollTop = 777; });
+  Element.prototype.scrollIntoView = scroll;
+  onTestFinished(() => { delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView; });
+  render(<App core={core} />);
+  const nav = () => screen.getByRole("navigation", { name: "Secciones" });
+  await userEvent.click(within(nav()).getByRole("button", { name: /^Ajustes/ }));
+  await screen.findByRole("heading", { name: "Paquetes" });
+  await userEvent.click(within(nav()).getByRole("button", { name: /^Patrol/ }));
+  await userEvent.click(await screen.findByRole("button", { name: "Abrir Ajustes → Paquetes" }));
+  await waitFor(() => expect(scroll).toHaveBeenCalled());
+  expect(document.querySelector<HTMLElement>(".content")!.scrollTop).toBe(777);
+});
