@@ -119,7 +119,7 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 		}
 	}
 	now := s.clock().UTC().Truncate(time.Second)
-	action := "hosts.crear"
+	action, fnew := "hosts.crear", ""
 	err = s.tx(func(tx *sql.Tx) error {
 		all, err := loadHosts(tx)
 		if err != nil {
@@ -150,6 +150,9 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 				return service.Err(ctx, codes.AlreadyExists, "hosts.err.dup_target", i18n.A("key", devices.Key(h), "name", o.Name, "id", o.ID))
 			}
 		}
+		if h.Folder, fnew, err = ensureFolder(ctx, tx, h.Folder, now); err != nil {
+			return err
+		}
 		if err := putHost(tx, h); err != nil {
 			return internal(err)
 		}
@@ -158,6 +161,7 @@ func (s *svc) PutDevice(ctx context.Context, r *v1.PutDeviceRequest) (*v1.PutDev
 	if err != nil {
 		return nil, err
 	}
+	s.auditNewFolders("put", fnew)
 	s.auditHost(action, h)
 	out.Id = h.ID
 	return out, nil

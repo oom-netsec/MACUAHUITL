@@ -329,3 +329,54 @@ func TestMigracionOrdenDeInicio(t *testing.T) {
 		t.Fatalf("startup_command = %q %v", s, err)
 	}
 }
+
+// 44d: la migración siembra host_folders con las carpetas que ya usan los hosts («Lab» y «lab» son una; gana la
+// primera en orden binario) y deja a los hosts con el nombre guardado.
+func TestMigracionHostFolders(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "m.db")
+	seed(t, p, []string{"0001_init.sql", "0002_preferences.sql", "0003_job_history.sql", "0004_scripts.sql", "0005_script_collections.sql", "0006_hosts.sql", "0007_pack_removed.sql", "0008_pack_hidden.sql"})
+	raw, err := sql.Open("sqlite", "file:"+p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, f := range []string{"lab", "Lab", "Oficina", "", "lab"} {
+		if _, err := raw.Exec(`INSERT INTO hosts VALUES(?,?,?,22,'',?,'[]','','',?,'t')`, fmt.Sprint("id", i), fmt.Sprint("h", i), fmt.Sprint("10.0.0.", i), f, fmt.Sprint("2026-11-0", i+1)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw.Close()
+	db, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var got []string
+	rows, err := db.Query(`SELECT name FROM host_folders ORDER BY name`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var n string
+		rows.Scan(&n)
+		got = append(got, n)
+	}
+	rows.Close()
+	if strings.Join(got, ",") != "Lab,Oficina" {
+		t.Fatalf("carpetas = %v", got)
+	}
+	var folders string
+	db.QueryRow(`SELECT group_concat(folder, ',') FROM (SELECT folder FROM hosts ORDER BY id)`).Scan(&folders)
+	if folders != "Lab,Lab,Oficina,,Lab" {
+		t.Fatalf("hosts.folder = %q", folders)
+	}
+	// base nueva: tabla vacía
+	db2, err := Open(filepath.Join(t.TempDir(), "n.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db2.Close()
+	var n int
+	if err := db2.QueryRow(`SELECT count(*) FROM host_folders`).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("base nueva: %d %v", n, err)
+	}
+}
