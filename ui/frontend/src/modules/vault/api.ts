@@ -1,7 +1,7 @@
 // Contrato del módulo con el puente (ui/bridge) y su implementación de Wails.
 export type VaultState = "absent" | "locked" | "unlocked";
 export interface VaultStatus { state: VaultState; armedJobs: string[] | null }
-export interface Credential { id: string; label: string; username: string; kind: "password" | "key"; hasEnable: boolean; hasSshKey: boolean }
+export interface Credential { id: string; label: string; username: string; kind?: "password" | "key"; hasEnable: boolean; hasSshKey: boolean }
 
 
 // Respaldo cifrado (fase 29d): archivo de bóveda con frase propia; el import va en dos pasos con un token de 10 minutos.

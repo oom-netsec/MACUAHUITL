@@ -4,7 +4,7 @@ import { SecurityView } from "./SecurityView";
 import { fakeCore } from "../../lib/fake";
 import { CoreContext } from "../../app/activity";
 
-const creds = [{ id: "c1", label: "ise-secreto", username: "-", kind: "password" as const, hasEnable: false, hasSshKey: false }];
+const creds = [{ id: "c1", label: "ise-secreto", username: "-", hasEnable: false, hasSshKey: false }];
 
 test("radius con secreto escrito y usuario de prueba", async () => {
   const core = fakeCore({ secRadius: vi.fn(async () => "Access-Accept en 3.1 ms") });

@@ -5,8 +5,8 @@ import { fakeCore } from "../../lib/fake";
 import { START, clickWhenReady, confirmStep } from "../../lib/assistTestkit";
 
 const creds = [
-  { id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: true, hasSshKey: false },
-  { id: "c2", label: "tech", username: "tech", kind: "password" as const, hasEnable: false, hasSshKey: false },
+  { id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false },
+  { id: "c2", label: "tech", username: "tech", hasEnable: false, hasSshKey: false },
 ];
 const NEW = "Nuev0-Secreto.2026";
 

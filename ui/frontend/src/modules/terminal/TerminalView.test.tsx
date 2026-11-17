@@ -12,7 +12,7 @@ vi.mock("@xterm/addon-fit", async () => ({ FitAddon: (await import("./xtermMock"
 vi.mock("@xterm/addon-search", async () => ({ SearchAddon: (await import("./xtermMock")).FakeSearch }));
 vi.mock("@xterm/addon-webgl", async () => ({ WebglAddon: (await import("./xtermMock")).FakeWebgl }));
 
-const cred = { id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false };
+const cred = { id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false };
 beforeEach(() => {
   FakeTerm.all.length = 0;
   // jsdom no mide: el contenedor de la terminal «mide» lo suficiente para que el ajuste corra.
@@ -220,7 +220,7 @@ test("bajo StrictMode una sesión abierta queda abierta", async () => {
 });
 
 test("una credencial creada después de abrir la vista aparece sin reabrirla", async () => {
-  const cred = { id: "c9", label: "Sw", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false };
+  const cred = { id: "c9", label: "Sw", username: "admin", hasEnable: false, hasSshKey: false };
   const listCredentials = vi.fn().mockResolvedValueOnce([]).mockResolvedValue([cred]);
   render(<TerminalView core={fakeCore({ listCredentials })} />);
   await waitFor(() => expect(listCredentials).toHaveBeenCalledTimes(1));
@@ -332,7 +332,7 @@ test("solo el panel a la vista tiene contexto WebGL: al ocultarse lo suelta y al
 });
 
 test("elegir un host de la libreta rellena equipo, puerto y credencial; sin credencial limpia la anterior y obliga a elegir", async () => {
-  const lab = { id: "c".repeat(32), label: "admin lab", username: "root", kind: "password" as const, hasEnable: false, hasSshKey: false };
+  const lab = { id: "c".repeat(32), label: "admin lab", username: "root", hasEnable: false, hasSshKey: false };
   const core = setup({ listCredentials: vi.fn(async () => [cred, lab]) });
   const pick = await screen.findByLabelText("Host de la libreta");
   // Agrupado por carpeta: Lab, Oficina.

@@ -7,7 +7,7 @@ import { START, clickWhenReady, confirmStep } from "../../lib/assistTestkit";
 
 const clear = sampleEntry({ id: "SW1_192.0.2.1/20261106T110000Z-running", at: "2026-11-06T11:00:00Z", masked: false });
 const masked = sampleEntry();
-const cred = { id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false };
+const cred = { id: "c1", label: "lab", username: "admin", hasEnable: false, hasSshKey: false };
 
 async function open(over = {}) {
   const core = fakeCore({

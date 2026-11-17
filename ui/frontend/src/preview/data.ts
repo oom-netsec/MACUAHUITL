@@ -34,11 +34,11 @@ export function sample(): Partial<CoreAPI> {
     ...previewTerminal(),
     ...previewScriptsApi(),
     listCredentials: async () => [
-      { id: "c1", label: "Core DC", username: "netops", kind: "password" as const, hasEnable: true, hasSshKey: false },
+      { id: "c1", label: "Core DC", username: "netops", hasEnable: true, hasSshKey: false },
       { id: "c2", label: "Branch access", username: "tac", kind: "key", hasEnable: false, hasSshKey: true },
       { id: "c3", label: "lab-admin", username: "lab", kind: "key", hasEnable: true, hasSshKey: true },
-      { id: "c4", label: "ISE (RADIUS secret)", username: "-", kind: "password" as const, hasEnable: false, hasSshKey: false },
-      { id: "c5", label: "WAN edge", username: "wanops", kind: "password" as const, hasEnable: true, hasSshKey: false },
+      { id: "c4", label: "ISE (RADIUS secret)", username: "-", hasEnable: false, hasSshKey: false },
+      { id: "c5", label: "WAN edge", username: "wanops", hasEnable: true, hasSshKey: false },
     ],
     getRun: async () => [
       { target: "192.0.2.11:22", state: "DEVICE_STATE_COMPLETED", detail: "" },
@@ -364,7 +364,7 @@ function previewTerminal(): Partial<CoreAPI> {
       const host = r.name.replace(/[^\w]/g, "").slice(0, 8).toUpperCase() || "SW1";
       hosts.set(id, host); lines.set(id, "");
       setTimeout(() => {
-        core().emitTerminal({ runId: id, opened: `netops@${r.address}:22`, recording: `outputs/terminal/${r.address}.log` });
+        core().emitTerminal({ runId: id, opened: `netops@${r.address ?? r.name}:22`, recording: `outputs/terminal/${r.address ?? r.name}.log` });
         core().emitTerminal({ runId: id, data: `\r\nUnauthorized access is prohibited.\r\n\r\n${host}#show ip interface brief\r\n${brief}${host}#show logging\r\n${out["show logging"]}${host}#` });
       }, 50);
       return id;

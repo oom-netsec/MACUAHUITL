@@ -7,7 +7,7 @@ import { samplePortSecurityPlan, sampleTemplates } from "./fake";
 import type { SnippetTemplate } from "./api";
 import { I18nProvider } from "../../lib/i18n";
 
-const creds = [{ id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: true, hasSshKey: false }];
+const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 const target = { name: "10.0.0.5", address: "10.0.0.5", credentialId: "c1" };
 
 async function open(over: Partial<ReturnType<typeof fakeCore>> = {}) {

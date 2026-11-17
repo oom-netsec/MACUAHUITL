@@ -21,7 +21,7 @@ test("elapsed resume duraciones de forma legible", () => {
   expect(t(26 * 3600)).toBe("1 d 2 h");
 });
 
-const creds = [{ id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: true, hasSshKey: false }];
+const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
 
 async function fillForm(core: ReturnType<typeof fakeCore>) {

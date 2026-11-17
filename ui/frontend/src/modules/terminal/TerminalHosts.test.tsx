@@ -47,6 +47,6 @@ test("la huella de la primera vez se confirma igual y el reintento sigue usando 
   expect(await screen.findByText(`SHA256:${fp}`)).toBeInTheDocument();
   await userEvent.click(screen.getByRole("button", { name: "Aceptar esta huella y reintentar" }));
   await waitFor(() => expect(core.terminalOpen).toHaveBeenCalledTimes(2));
-  expect(core.terminalOpen).toHaveBeenLastCalledWith(expect.objectContaining({ hostId: sampleHosts[0].id, accept: [`SHA256:${fp}`] }));
-  expect((core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[1][0]).not.toHaveProperty("address");
+  // Exacto: sin dirección, puerto ni credencial.
+  expect((core.terminalOpen as ReturnType<typeof vi.fn>).mock.calls[1][0]).toEqual({ name: "LAB-CORE", hostId: sampleHosts[0].id, accept: [`SHA256:${fp}`], rows: expect.any(Number), cols: expect.any(Number) });
 });

@@ -2870,13 +2870,11 @@ export const es = {
   "vault.key.create": "Crear credencial con llave SSH",
   "vault.key.created": "Credencial con llave creada. Copia la llave pública al equipo.",
   "vault.err.userRequired": "El usuario es obligatorio.",
-  "vault.key.title": "Llave pública",
   "vault.key.hint": "Es texto de solo lectura: cópiala y pégala como una línea en el archivo de llaves autorizadas del usuario en el equipo.",
   "vault.key.copyLabel": "la llave pública",
   "vault.key.where": "Dónde pegarla",
   "vault.key.linux": "Linux: en ~/.ssh/authorized_keys del usuario.",
   "vault.key.win.admin": "Windows (OpenSSH), si el usuario es administrador: C:\\ProgramData\\ssh\\administrators_authorized_keys",
-  "vault.key.win.user": "Windows (OpenSSH), si no es administrador: C:\\Users\\{user}\\.ssh\\authorized_keys",
   "vault.key.win.perms": "En Windows, el archivo de administradores debe tener permisos solo para Administradores y SYSTEM; si no, OpenSSH lo ignora.",
   "vault.key.viewBtn": "Ver llave pública",
   "vault.key.view": "Ver llave pública de {label}",
@@ -2885,6 +2883,9 @@ export const es = {
   "ssh.saved.noCred": "Sin credencial: este host no tiene credencial en la bóveda; asígnala en la libreta.",
   "vault.key.label": "Etiqueta de la llave",
   "vault.key.user": "Usuario de la llave",
+  "vault.key.win.user": "Windows (OpenSSH), si no es administrador: %USERPROFILE%\\.ssh\\authorized_keys (normalmente C:\\Users\\<usuario>)",
+  "vault.key.linux.perms": "Linux: ~/.ssh con permisos 700 y authorized_keys con 600; si no, sshd los ignora (StrictModes).",
+  "vault.key.titleOf": "Llave pública de {label}",
 };
 
 export type Key = keyof typeof es;

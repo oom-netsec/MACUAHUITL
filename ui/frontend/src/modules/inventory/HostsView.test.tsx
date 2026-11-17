@@ -5,7 +5,7 @@ import { fakeInventory, sampleHosts } from "./fake";
 import { fakeCore } from "../../lib/fake";
 import { I18nProvider } from "../../lib/i18n";
 
-const cred = { id: "c".repeat(32), label: "admin lab", username: "admin", kind: "password" as const, hasEnable: false, hasSshKey: false };
+const cred = { id: "c".repeat(32), label: "admin lab", username: "admin", hasEnable: false, hasSshKey: false };
 const setup = (over = {}) => {
   const inv = fakeInventory();
   const core = fakeCore({ ...inv, listCredentials: vi.fn(async () => [cred]), ...over });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { CoreAPI, Credential, VaultState } from "../../lib/core";
 import { ConfirmButton, Field, Notice, errorText } from "../../components/Field";
 import { CopyButton } from "../../components/Data";
@@ -20,7 +20,8 @@ export function VaultView({ core }: { core: CoreAPI }) {
   const [state, setState] = useState<VaultState | null>(null);
   const [creds, setCreds] = useState<Credential[]>([]);
   const [msg, setMsg] = useState<Msg>(null);
-  const [keyShown, setKeyShown] = useState<{ username: string; publicKey: string } | null>(null); // llave pública a la vista (recién creada o consultada)
+  const [keyShown, setKeyShown] = useState<ShownKey | null>(null); // llave pública a la vista (recién creada o consultada), con la credencial a la que pertenece
+  const lastView = useRef(""); // último «Ver» pedido: una respuesta tardía de otra credencial se descarta
   const fail = (e: unknown) => setMsg({ kind: "error", text: errorText(e) });
   const previewOpen = useRef(false); // hay una vista previa de un respaldo con credenciales descifradas en el núcleo
   const refresh = useCallback(async () => {
@@ -68,13 +69,17 @@ export function VaultView({ core }: { core: CoreAPI }) {
       {state === "unlocked" && (
         <>
           <CredentialList creds={creds} onViewKey={async (c) => {
-            try { setKeyShown({ username: c.username, publicKey: await core.credentialPublicKey(c.id) }); } catch (e) { fail(e); }
+            lastView.current = c.id;
+            try {
+              const publicKey = await core.credentialPublicKey(c.id);
+              if (lastView.current === c.id) setKeyShown({ id: c.id, label: c.label, username: c.username, publicKey });
+            } catch (e) { if (lastView.current === c.id) fail(e); }
           }} onDelete={async (id) => {
-            try { await core.deleteCredential(id); setMsg({ kind: "ok", text: t("vault.deleted") }); changed(); } catch (e) { fail(e); }
+            try { await core.deleteCredential(id); setKeyShown((k) => (k?.id === id ? null : k)); setMsg({ kind: "ok", text: t("vault.deleted") }); changed(); } catch (e) { fail(e); }
           }} />
-          {keyShown && <PublicKey username={keyShown.username} publicKey={keyShown.publicKey} onClose={() => setKeyShown(null)} />}
+          {keyShown && <PublicKey key={keyShown.id} k={keyShown} onClose={() => setKeyShown(null)} />}
           <CredentialForm core={core} onDone={changed} setMsg={setMsg} />
-          <KeyForm core={core} onDone={changed} setMsg={setMsg} onCreated={setKeyShown} />
+          <KeyForm core={core} onDone={changed} setMsg={setMsg} onCreated={(k) => { lastView.current = k.id; setKeyShown(k); }} />
           <BackupSection core={core} setMsg={setMsg} onImported={changed} onPreview={onPreview} onClosed={() => { previewOpen.current = false; setMsg({ kind: "error", text: t("vault.backup.discarded") }); changed(); }} />
         </>
       )}
@@ -200,27 +205,35 @@ function CredentialForm({ core, onDone, setMsg }: FormProps) {
   );
 }
 
+type ShownKey = { id: string; label: string; username: string; publicKey: string };
+
 // Llave pública: texto de solo lectura, monoespaciado y seleccionable, con Copiar y dónde pegarla en el equipo.
-function PublicKey({ username, publicKey, onClose }: { username: string; publicKey: string; onClose: () => void }) {
+// Al aparecer toma el foco (el lector de pantalla anuncia el título y quien la abrió la ve sin buscarla).
+function PublicKey({ k, onClose }: { k: ShownKey; onClose: () => void }) {
   const t = useT();
+  const h = useId();
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => { ref.current?.focus(); ref.current?.scrollIntoView?.({ block: "nearest" }); }, []);
   return (
-    <Section title={t("vault.key.title")}>
-      <p className="meta">{t("vault.key.hint")}</p>
-      <p><code className="mono vault-pub">{publicKey}</code> <CopyButton value={publicKey} label={t("vault.key.copyLabel")} /></p>
+    <section ref={ref} tabIndex={-1} className="section vault-pubbox" aria-labelledby={h} aria-describedby={`${h}-d`}>
+      <h3 id={h}>{t("vault.key.titleOf", { label: k.label })}</h3>
+      <p id={`${h}-d`} className="meta">{t("vault.key.hint")}</p>
+      <p><code className="mono vault-pub">{k.publicKey}</code> <CopyButton value={k.publicKey} label={t("vault.key.copyLabel")} /></p>
       <h4>{t("vault.key.where")}</h4>
       <ul>
         <li>{t("vault.key.linux")}</li>
+        <li>{t("vault.key.linux.perms")}</li>
         <li>{t("vault.key.win.admin")}</li>
-        <li>{t("vault.key.win.user", { user: username })}</li>
+        <li>{t("vault.key.win.user")}</li>
       </ul>
       <p className="meta">{t("vault.key.win.perms")}</p>
       <div className="actions"><button type="button" onClick={onClose}>{t("window.close")}</button></div>
-    </Section>
+    </section>
   );
 }
 
 // Alta con llave SSH: solo etiqueta y usuario. La privada se genera y se queda en el núcleo; no hay forma de importar una.
-function KeyForm({ core, onDone, setMsg, onCreated }: FormProps & { onCreated: (k: { username: string; publicKey: string }) => void }) {
+function KeyForm({ core, onDone, setMsg, onCreated }: FormProps & { onCreated: (k: ShownKey) => void }) {
   const t = useT();
   const [label, setLabel] = useState("");
   const [user, setUser] = useState("");
@@ -231,7 +244,7 @@ function KeyForm({ core, onDone, setMsg, onCreated }: FormProps & { onCreated: (
     setBusy(true);
     try {
       const k = await core.createKeyCredential(label, user);
-      onCreated({ username: user, publicKey: k.publicKey });
+      onCreated({ id: k.id, label: label || user, username: user, publicKey: k.publicKey });
       setLabel(""); setUser(""); setMsg({ kind: "ok", text: t("vault.key.created") });
       onDone();
     } catch (err) {

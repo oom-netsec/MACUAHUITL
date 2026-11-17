@@ -6,7 +6,7 @@ import { samplePlan } from "./fake";
 import { ModuleIdContext } from "../../app/activity";
 import { START, clickWhenReady, confirmStep, lineText } from "../../lib/assistTestkit";
 
-const creds = [{ id: "c1", label: "lab", username: "admin", kind: "password" as const, hasEnable: true, hasSshKey: false }];
+const creds = [{ id: "c1", label: "lab", username: "admin", hasEnable: true, hasSshKey: false }];
 
 async function plan(core: ReturnType<typeof fakeCore>) {
   render(<PortsView core={core} />);

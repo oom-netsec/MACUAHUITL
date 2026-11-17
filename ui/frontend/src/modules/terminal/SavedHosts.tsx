@@ -18,8 +18,8 @@ export function SavedHosts({ core, creds, busy, onConnect }: { core: CoreAPI; cr
   }, [core, hv]);
   if (hosts.length === 0) return null;
   return (
-    <div className="saved-hosts" role="group" aria-label={t("ssh.saved")}>
-      <h3>{t("ssh.saved")}</h3>
+    <div className="saved-hosts" role="group" aria-labelledby={`${id}-t`}>
+      <h3 id={`${id}-t`}>{t("ssh.saved")}</h3>
       <ul>
         {hosts.map((h) => {
           const ok = creds.some((c) => c.id === h.credentialId);
