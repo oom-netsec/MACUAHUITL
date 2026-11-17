@@ -4,11 +4,11 @@ package field
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/service/servicetest"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
 
 // 2.1 en Windows: la subcarpeta de salidas es una junction hacia fuera de las salidas; no se escribe afuera.
@@ -17,9 +17,7 @@ func TestOutFileJunctionHaciaFueraNoEscribeAfuera(t *testing.T) {
 	s := &fieldSvc{d: d}
 	fuera := t.TempDir()
 	os.MkdirAll(d.Outputs(), 0o700)
-	if out, err := exec.Command("cmd", "/c", "mklink", "/J", filepath.Join(d.Outputs(), "console"), fuera).CombinedOutput(); err != nil {
-		t.Skipf("mklink /J no disponible: %v %s", err, out)
-	}
+	systest.Junction(t, filepath.Join(d.Outputs(), "console"), fuera)
 	f, err := s.outFile("console", "console_COM3")
 	if err == nil {
 		f.Close()

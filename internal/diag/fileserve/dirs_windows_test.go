@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/sys/windows"
+	"github.com/oom-netsec/MACUAHUITL/internal/sys"
 )
 
 // Los prefijos de dispositivo y las UNC no pasan por la lista de carpetas sensibles: se rechazan.
@@ -57,16 +57,10 @@ func TestWindowsNombreCortoDeCarpetaNegadaSeRechaza(t *testing.T) {
 	if pf == "" {
 		t.Skip("sin ProgramFiles")
 	}
-	long, err := windows.UTF16PtrFromString(pf)
-	if err != nil {
-		t.Fatal(err)
+	short := sys.ShortPath(pf)
+	if short == "" {
+		t.Skip("sin nombres cortos en este volumen")
 	}
-	buf := make([]uint16, 512)
-	n, err := windows.GetShortPathName(long, &buf[0], uint32(len(buf)))
-	if err != nil || n == 0 || int(n) > len(buf) {
-		t.Skipf("sin nombres cortos en este volumen: %v", err)
-	}
-	short := windows.UTF16ToString(buf[:n])
 	if strings.EqualFold(short, pf) {
 		t.Skip("ProgramFiles no tiene nombre corto distinto")
 	}
