@@ -18,6 +18,9 @@ usage: mctl <command>
   diag  ping|traceroute|nmap|iperf3|pcap [TARGET] [-o key=value]... [--out FOLDER]
         --out: the folder must exist and have mode 0700, like the one in Settings → Storage
         interfaces   (local interfaces, no network traffic)
+        ping -o: count, continuous, duration, timeout, ttl, df, tos, source, family, size, sweep_start, sweep_end, sweep_step
+        (continuous runs until Ctrl-C, which stops it and shows the summary; another Ctrl-C cuts it now. Sweep with table and estimated MTU:
+         mctl diag ping 192.0.2.1 -o df=true -o sweep_start=1200 -o sweep_end=1500 -o sweep_step=50)
   pcap  analyze FILE [--top N] [--json]
   dns   query|transport|hygiene|exposure NAME [-t TYPE] [-s SERVER]... [--dnssec] [--dkim SEL]
         trace|zone|dnssec NAME --deep   (contacts roots and authoritative servers; audited)
