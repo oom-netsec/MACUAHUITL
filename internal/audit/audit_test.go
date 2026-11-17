@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -329,20 +330,20 @@ func TestAppendReintentaConLaBaseOcupada(t *testing.T) {
 	}
 }
 
-type slowWriter struct{ n int }
+type slowWriter struct{ n atomic.Int64 }
 
 func (w *slowWriter) Write(p []byte) (int, error) {
 	time.Sleep(time.Millisecond)
-	w.n += bytes.Count(p, []byte("\n"))
+	w.n.Add(int64(bytes.Count(p, []byte("\n"))))
 	return len(p), nil
 }
 
 // Un Export lento (lector de gRPC lento) no debe retener la única conexión: un Append termina rápido.
 func TestExportLentoNoBloqueaAppend(t *testing.T) {
-	l, _ := newLog(t)
 	if testing.Short() {
 		t.Skip("llena 100000 entradas")
 	}
+	l, _ := newLog(t)
 	const total = 100000
 	tx, err := l.db.Begin()
 	if err != nil {
@@ -366,7 +367,9 @@ func TestExportLentoNoBloqueaAppend(t *testing.T) {
 	defer cancel()
 	done := make(chan error, 1)
 	go func() { done <- l.Export(ectx, w, at.Add(-time.Hour), at.Add(time.Hour)) }()
-	time.Sleep(100 * time.Millisecond) // que el Export ya esté escribiendo
+	for w.n.Load() == 0 { // que el Export ya esté escribiendo
+		time.Sleep(time.Millisecond)
+	}
 	start := time.Now()
 	if _, err := l.Append(context.Background(), Entry{Actor: "u", Action: "a"}); err != nil {
 		t.Fatal(err)
