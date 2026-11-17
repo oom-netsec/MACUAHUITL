@@ -30,3 +30,18 @@ func TestResolvePathsIgnoresRelativeXDG(t *testing.T) {
 		t.Fatalf("got %+v", p)
 	}
 }
+
+// HOME vacío o relativo (3.1): las rutas por omisión saldrían RELATIVAS al directorio actual. Quedan vacías y el
+// núcleo no arranca; una XDG absoluta sigue valiendo para su carpeta.
+func TestResolvePathsHomeInvalido(t *testing.T) {
+	for _, home := range []string{"", "rel", ".", "./x", "../x", "~"} {
+		p := Resolve(env(map[string]string{"HOME": home, "XDG_RUNTIME_DIR": "/run/user/1000"}))
+		if p.Config != "" || p.Data != "" || p.State != "" || p.Outputs != "" || p.Home != "" {
+			t.Errorf("HOME=%q: %+v", home, p)
+		}
+	}
+	p := Resolve(env(map[string]string{"HOME": "rel", "XDG_CONFIG_HOME": "/c"}))
+	if p.Config != "/c/macuahuitl" || p.Data != "" || p.Home != "" {
+		t.Fatalf("got %+v", p)
+	}
+}

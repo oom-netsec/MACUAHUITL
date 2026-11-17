@@ -31,3 +31,21 @@ func TestResolvePathsWindowsSinLocalAppData(t *testing.T) {
 		}
 	}
 }
+
+// USERPROFILE inválida (3.2): Home y Outputs quedan vacíos y LOCALAPPDATA sigue valiendo (el núcleo lo rechaza en main).
+func TestResolvePathsWindowsUserProfileInvalido(t *testing.T) {
+	for _, up := range []string{"", `Users\u`, `\\host\share\u`, `\\?\C:\Users\u`, `C:\Users\..\u`, `C:`, `C:/Users/u`} {
+		p := resolvePathsWindows(env(map[string]string{"LOCALAPPDATA": `C:\Users\u\AppData\Local`, "USERPROFILE": up}))
+		if p.Home != "" || p.Outputs != "" || p.Config == "" {
+			t.Errorf("USERPROFILE=%q: %+v", up, p)
+		}
+	}
+}
+
+// LOCALAPPDATA en otra unidad (3.3): es válida y se usa tal cual.
+func TestResolvePathsWindowsOtraUnidad(t *testing.T) {
+	p := resolvePathsWindows(env(map[string]string{"LOCALAPPDATA": `D:\datos\PROGRA~1`, "USERPROFILE": `E:\u`}))
+	if p.Config != `D:\datos\PROGRA~1\MACUAHUITL\config` || p.Home != `E:\u` {
+		t.Fatalf("got %+v", p)
+	}
+}

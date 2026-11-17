@@ -16,6 +16,7 @@ func init() {
 		"harden.err.runtime_dir":     e("XDG_RUNTIME_DIR no está definido", "XDG_RUNTIME_DIR is not set"),
 		"harden.err.elevated":        e("no corre elevado (ADR 0012): una cuenta con UAC desactivado o el Administrador integrado siempre corre elevada; usa una cuenta estándar o una de administrador con UAC activo", "does not run elevated (ADR 0012): an account with UAC turned off, or the built-in Administrator, always runs elevated; use a standard account or an administrator account with UAC on"),
 		"harden.err.localappdata":    e("LOCALAPPDATA no está definido o no es una ruta absoluta", "LOCALAPPDATA is not set or is not an absolute path"),
+		"harden.err.home":            e("HOME (USERPROFILE en Windows) no está definido o no es una ruta absoluta", "HOME (USERPROFILE on Windows) is not set or is not an absolute path"),
 		"harden.wer":                 e("no se pudo excluir al núcleo de los reportes de error de Windows (WER): {cause}", "could not exclude the core from Windows Error Reporting (WER): {cause}", "cause"),
 		"harden.err.lockquota":       e("el núcleo no arranca: no se pudo subir el mínimo del working set y memguard no podría bloquear las llaves en memoria ({cause})", "the core does not start: could not raise the minimum working set, so memguard could not lock keys in memory ({cause})", "cause"),
 		"harden.hibernation_win":     e("hibernación activada (HibernateEnabled=1): hiberfil.sys guarda la memoria en disco; activa BitLocker", "hibernation is on (HibernateEnabled=1): hiberfil.sys writes memory to disk; turn on BitLocker"),

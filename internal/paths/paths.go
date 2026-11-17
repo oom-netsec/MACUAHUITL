@@ -20,21 +20,28 @@ func Resolve(env func(string) string) Paths {
 		return resolvePathsWindows(env)
 	}
 	home := env("HOME")
+	if !filepath.IsAbs(home) { // vacío o relativo: las rutas saldrían relativas al directorio actual; quedan vacías y el núcleo no arranca
+		home = ""
+	}
 	xdg := func(key, def string) string {
 		if v := env(key); filepath.IsAbs(v) {
 			return filepath.Join(v, "macuahuitl")
 		}
-		if def == "" {
+		if def == "" || home == "" {
 			return ""
 		}
 		return filepath.Join(home, def, "macuahuitl")
+	}
+	outputs := ""
+	if home != "" {
+		outputs = filepath.Join(home, "MACUAHUITL", "outputs")
 	}
 	return Paths{
 		Config:  xdg("XDG_CONFIG_HOME", ".config"),
 		Data:    xdg("XDG_DATA_HOME", ".local/share"),
 		State:   xdg("XDG_STATE_HOME", ".local/state"),
 		Runtime: xdg("XDG_RUNTIME_DIR", ""),
-		Outputs: filepath.Join(home, "MACUAHUITL", "outputs"),
+		Outputs: outputs,
 		Home:    home,
 	}
 }
