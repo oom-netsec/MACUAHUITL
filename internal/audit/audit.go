@@ -135,8 +135,7 @@ type scanned struct {
 }
 
 // scan recorre en orden de seq los registros que cumplen cond (un AND extra, sin WHERE) hasta que fn devuelva false.
-func (l *Log) scan(ctx context.Context, cond string, args []any, fn func(Record, string) bool) error {
-	var after uint64
+func (l *Log) scan(ctx context.Context, after uint64, cond string, args []any, fn func(Record, string) bool) error {
 	for {
 		page, err := l.page(ctx, after, cond, args)
 		if err != nil {
@@ -181,7 +180,7 @@ func (l *Log) Verify(ctx context.Context) (VerifyResult, error) {
 	res := VerifyResult{Intact: true, Head: Genesis}
 	expected := Genesis
 	var next uint64 = 1
-	err := l.scan(ctx, "", nil, func(r Record, at string) bool {
+	err := l.scan(ctx, 0, "", nil, func(r Record, at string) bool {
 		if r.Seq != next || r.Prev != expected || hashOf(r.Prev, r.Seq, at, r.Entry) != r.Hash {
 			res.Intact, res.FirstBroken = false, r.Seq
 			return false
@@ -210,7 +209,16 @@ func (l *Log) Head(ctx context.Context) (string, error) {
 func (l *Log) Export(ctx context.Context, w io.Writer, from, to time.Time) error {
 	enc := json.NewEncoder(w)
 	var werr error
-	err := l.scan(ctx, "at >= ? AND at < ?", []any{from.UTC().Format(tsFormat), to.UTC().Format(tsFormat)}, func(r Record, _ string) bool {
+	f, t := from.UTC().Format(tsFormat), to.UTC().Format(tsFormat)
+	// Con seq > ? el plan recorre por seq y no usa idx_audit_log_at: se arranca en el primer registro del rango (min(seq) con at acotado, que sí usa el índice; exacto aunque el reloj retroceda).
+	var first sql.NullInt64
+	if err := l.db.QueryRowContext(ctx, `SELECT min(seq) FROM audit_log WHERE at >= ? AND at < ?`, f, t).Scan(&first); err != nil {
+		return fmt.Errorf("audit: %w", err)
+	}
+	if !first.Valid {
+		return nil
+	}
+	err := l.scan(ctx, uint64(first.Int64)-1, "at >= ? AND at < ?", []any{f, t}, func(r Record, _ string) bool {
 		werr = enc.Encode(r)
 		return werr == nil
 	})

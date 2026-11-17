@@ -5,12 +5,15 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
 	"io/fs"
 	"os"
+	"runtime"
 	"sort"
+	"testing"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -39,6 +42,9 @@ func Open(path string) (*sql.DB, error) {
 	// Una sola conexión: el bloqueo de escritura de SQLite no es justo (en Windows un escritor insistente deja sin turno al que sondea) y el núcleo es el único proceso que abre la base, así que se serializa aquí en vez de competir.
 	// Con una sola conexión, no se usa db mientras una tx o unas rows abiertas la tengan tomada: se interbloquea.
 	db.SetMaxOpenConns(1)
+	if testing.Testing() {
+		go watch(db, watchLimit, watchEvery, onStuck)
+	}
 	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, err
@@ -106,4 +112,55 @@ func migrate(db *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+// Vigía solo de pruebas: con una sola conexión, un interbloqueo (usar db con una tx abierta en la misma goroutine) se cuelga mudo; aquí se vuelve un panic con todos los stacks.
+// Variables para que las pruebas usen valores chicos.
+var (
+	watchLimit = 2 * time.Second
+	watchEvery = 100 * time.Millisecond
+	onStuck    = func(stacks []byte) {
+		panic("store: espera de conexión colgada, posible interbloqueo\n\n" + string(stacks))
+	}
+)
+
+func allStacks() []byte {
+	for n := 1 << 20; ; n *= 2 {
+		buf := make([]byte, n)
+		if k := runtime.Stack(buf, true); k < n {
+			return buf[:k]
+		}
+	}
+}
+
+// watch usa WaitCount (sube al empezar una espera) y WaitDuration (sube al terminarla). Mientras WaitDuration no cambie, las esperas nuevas siguen pendientes.
+// shortcut: si en un mismo muestreo empiezan y terminan esperas no se sabe cuántas quedan, se da por ninguna; un interbloqueo así se ve en la siguiente espera nueva.
+func watch(db *sql.DB, limit, every time.Duration, stuck func([]byte)) {
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	var lastWC, lastWD, pending int64
+	var since time.Time
+	tk := time.NewTicker(every)
+	defer tk.Stop()
+	for range tk.C {
+		// Con el contexto cancelado, Ping no espera la conexión (no cuenta como espera) y solo falla distinto si el DB se cerró.
+		if err := db.PingContext(canceled); err != nil && err.Error() == "sql: database is closed" {
+			return
+		}
+		st := db.Stats()
+		wc, wd := st.WaitCount, int64(st.WaitDuration)
+		if wd != lastWD { // terminó una espera: reinicia el reloj
+			pending, since = 0, time.Time{}
+		} else {
+			pending += wc - lastWC
+			if pending > 0 && since.IsZero() {
+				since = time.Now()
+			}
+		}
+		lastWC, lastWD = wc, wd
+		if pending > 0 && time.Since(since) > limit {
+			stuck(allStacks())
+			pending, since = 0, time.Time{}
+		}
+	}
 }

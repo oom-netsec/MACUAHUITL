@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/oom-netsec/MACUAHUITL/internal/sys/systest"
 )
@@ -116,9 +117,9 @@ func TestMigrateFromEitherBranch(t *testing.T) {
 			if _, err := db.Exec(`INSERT INTO hosts VALUES('h2','N','10.0.0.2',22,'','','[]','','','t','t')`); err == nil {
 				t.Fatal("el nombre de un host no se repite aunque cambien las mayúsculas")
 			}
-			want := 8 // 0001, preferences, historial, scripts, colecciones, hosts, paquetes quitados, ocultos de paquetes
+			want := 9 // 0001, preferences, historial, scripts, colecciones, hosts, paquetes quitados, ocultos de paquetes, índice de auditoría
 			if applied != nil && applied[1] == "0002_job_history.sql" {
-				want = 9 // además queda la fila con el nombre viejo
+				want = 10 // además queda la fila con el nombre viejo
 			}
 			if n != want {
 				t.Fatalf("migraciones registradas = %d, want %d", n, want)
@@ -283,5 +284,100 @@ func TestEscrituraConcurrenteSinBusy(t *testing.T) {
 	close(errs)
 	for err := range errs {
 		t.Errorf("%v", err)
+	}
+}
+
+// vigilar baja el umbral del vigía y cambia su acción por un aviso por canal.
+func vigilar(t *testing.T) <-chan []byte {
+	t.Helper()
+	l, e, s := watchLimit, watchEvery, onStuck
+	ch := make(chan []byte, 4)
+	watchLimit, watchEvery = 300*time.Millisecond, 20*time.Millisecond
+	onStuck = func(b []byte) { ch <- b }
+	t.Cleanup(func() { watchLimit, watchEvery, onStuck = l, e, s })
+	return ch
+}
+
+func abrirVigia(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := Open(filepath.Join(t.TempDir(), "m.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
+func TestVigiaInterbloqueo(t *testing.T) {
+	ch := vigilar(t)
+	db := abrirVigia(t)
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		db.Exec(`CREATE TABLE IF NOT EXISTS x(a)`) // espera la conexión que tiene tx
+	}()
+	select {
+	case b := <-ch:
+		if !strings.Contains(string(b), "TestVigiaInterbloqueo.func1") {
+			t.Fatalf("los stacks no incluyen a la culpable:\n%s", b)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("el vigía no disparó")
+	}
+	tx.Rollback()
+	<-done
+}
+
+func TestVigiaTxLargaSinEsperaNoDispara(t *testing.T) {
+	ch := vigilar(t)
+	db := abrirVigia(t)
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(1 * time.Second) // mucho más que el umbral
+	tx.Rollback()
+	select {
+	case <-ch:
+		t.Fatal("disparó sin nadie esperando")
+	default:
+	}
+}
+
+func TestVigiaEsperasCortasNoDisparan(t *testing.T) {
+	ch := vigilar(t)
+	db := abrirVigia(t)
+	var wg sync.WaitGroup
+	for g := 0; g < 4; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 200; i++ {
+				tx, err := db.Begin()
+				if err != nil {
+					return
+				}
+				time.Sleep(5 * time.Millisecond)
+				tx.Rollback()
+			}
+		}()
+	}
+	wg.Wait() // ~1 s de esperas continuas que terminan, más que el umbral
+	select {
+	case <-ch:
+		t.Fatal("disparó con esperas que terminan")
+	default:
+	}
+}
+
+func TestIndiceAuditAt(t *testing.T) {
+	db := abrirVigia(t)
+	var n int
+	if err := db.QueryRow(`SELECT count(*) FROM pragma_index_list('audit_log') WHERE name='idx_audit_log_at'`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("falta idx_audit_log_at: n=%d err=%v", n, err)
 	}
 }
