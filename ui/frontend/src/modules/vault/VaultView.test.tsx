@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { VaultView, trimTrailingNewline } from "./VaultView";
 import { fakeCore } from "../../lib/fake";
@@ -347,12 +347,10 @@ test("la lista distingue las de llave con una insignia y «Ver llave pública» 
   expect(screen.getByRole("button", { name: /Copiar/ })).toBeInTheDocument();
 });
 
-test("no hay forma de importar una llave privada", async () => {
+test("el formulario de importar no se abre hasta pedirlo: sin textarea ni archivo", async () => {
   render(<VaultView core={fakeCore({ listCredentials: vi.fn(async () => [keyCred]) })} />);
   await screen.findByText("llave lab");
-  expect(screen.queryByRole("button", { name: /importar.*(llave|privada)/i })).not.toBeInTheDocument();
   expect(document.querySelector("textarea")).toBeNull();
-  expect(screen.queryByText(/importar llave|pegar llave/i)).not.toBeInTheDocument();
   expect(document.querySelector('input[type="file"]')).toBeNull();
 });
 
@@ -472,4 +470,93 @@ test("regenerar una llave: armado muestra un texto corto y conserva la etiqueta 
   render(<VaultView core={core} />);
   await userEvent.click(await screen.findByRole("button", { name: /^Regenerar la llave de Raspberry|^Regenerar llave/ }));
   expect(screen.getByRole("button", { name: "Confirmar: regenerar la llave de Raspberry" })).toHaveTextContent(/^Confirmar: regenerar$/);
+// Fase 47: importar llave existente.
+async function openImport(over = {}) {
+  const core = fakeCore(over);
+  render(<VaultView core={core} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Importar llave existente" }));
+  await userEvent.type(screen.getByLabelText("Etiqueta de la llave importada"), "pi");
+  await userEvent.type(screen.getByLabelText("Usuario de la llave importada"), "root");
+  return core;
+}
+const keyBox = () => screen.getByLabelText("O pega la llave privada") as HTMLTextAreaElement;
+const send = () => userEvent.click(screen.getByRole("button", { name: "Importar llave" }));
+
+test("importar con archivo manda path y no privateKey", async () => {
+  const core = await openImport({ pickPath: vi.fn(async () => "/home/u/.ssh/id_ed25519") });
+  await userEvent.click(screen.getByRole("button", { name: "Elegir archivo…" }));
+  expect(await screen.findByText(/id_ed25519/)).toBeInTheDocument();
+  await send();
+  await waitFor(() => expect(core.vaultImportKey).toHaveBeenCalledWith({ label: "pi", username: "root", path: "/home/u/.ssh/id_ed25519" }));
+});
+
+test("importar pegado manda privateKey y muestra pública, huella y avisos; limpia el texto y la frase", async () => {
+  const core = await openImport();
+  await userEvent.type(keyBox(), "PRIVADA");
+  await userEvent.type(screen.getByLabelText("Frase de la llave (si está cifrada)"), "x");
+  await send();
+  await waitFor(() => expect(core.vaultImportKey).toHaveBeenCalledWith({ label: "pi", username: "root", privateKey: "PRIVADA", passphrase: "x" }));
+  expect(await screen.findByText(/ssh-ed25519 AAAAC3/)).toBeInTheDocument();
+  expect(screen.getByText("SHA256:abcDEF123fake")).toBeInTheDocument();
+  expect(screen.getAllByText(/sigue en tu disco/).length).toBeGreaterThan(0);
+  expect(screen.queryByText(/débil/)).toBeNull();
+  expect(screen.queryByLabelText("O pega la llave privada")).toBeNull();
+});
+
+test("tras un error el textarea y la frase quedan vacíos; llave inválida muestra el formato", async () => {
+  await openImport();
+  await userEvent.type(keyBox(), "INVALID");
+  await userEvent.type(screen.getByLabelText("Frase de la llave (si está cifrada)"), "zzz");
+  await send();
+  expect(await screen.findByRole("alert")).toHaveTextContent(/formato: pem/);
+  expect(keyBox()).toHaveValue("");
+  expect(screen.getByLabelText("Frase de la llave (si está cifrada)")).toHaveValue("");
+});
+
+test("frase requerida: enfoca el campo y lo marca; frase incorrecta; no soportada", async () => {
+  await openImport();
+  await userEvent.type(keyBox(), "ENCRYPTED");
+  await send();
+  const pass = screen.getByLabelText("Frase de la llave (si está cifrada)");
+  await waitFor(() => expect(pass).toHaveFocus());
+  expect(pass).toBeInvalid();
+  expect(screen.getByText(/La llave está cifrada/)).toBeInTheDocument();
+  await userEvent.type(keyBox(), "ENCRYPTED");
+  await userEvent.type(pass, "mala");
+  await send();
+  expect(await screen.findByRole("alert")).toHaveTextContent("La frase no es correcta.");
+  await userEvent.type(keyBox(), "DSA-KEY");
+  await send();
+  expect(await screen.findByRole("alert")).toHaveTextContent("Tipo de llave no admitido: ssh-dss.");
+});
+
+test("tope de 64 KiB en el cliente: no llama al núcleo", async () => {
+  const core = await openImport();
+  fireEvent.change(keyBox(), { target: { value: "a".repeat(64 * 1024 + 1) } });
+  await send();
+  expect(screen.getAllByText("La llave pegada supera los 64 KiB.").length).toBeGreaterThan(0);
+  expect(core.vaultImportKey).not.toHaveBeenCalled();
+});
+
+test("el textarea desactiva la ayuda del navegador", async () => {
+  await openImport();
+  expect(keyBox()).toHaveAttribute("autocomplete", "off");
+  expect(keyBox()).toHaveAttribute("autocorrect", "off");
+  expect(keyBox()).toHaveAttribute("spellcheck", "false");
+});
+
+test("RSA de menos de 3072 bits avisa que es débil", async () => {
+  await openImport();
+  await userEvent.type(keyBox(), "RSA-2048");
+  await send();
+  expect(await screen.findByText(/2048 bits.*débil/)).toBeInTheDocument();
+});
+
+test("la lista marca Importada o Generada según origin y nada sin origin", async () => {
+  const base = { username: "u", kind: "key" as const, hasEnable: false, hasSshKey: true };
+  const core = fakeCore({ listCredentials: vi.fn(async () => [{ ...base, id: "a", label: "uno", origin: "imported" as const }, { ...base, id: "b", label: "dos", origin: "generated" as const }, { ...base, id: "c", label: "tres" }]) });
+  render(<VaultView core={core} />);
+  await screen.findByText("uno");
+  expect(screen.getAllByText("Importada")).toHaveLength(1);
+  expect(screen.getAllByText("Generada")).toHaveLength(1);
 });

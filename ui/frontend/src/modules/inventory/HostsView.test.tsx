@@ -449,3 +449,12 @@ test("un error del núcleo con metadata.field startup_command marca el campo de 
   await userEvent.click(screen.getByRole("button", { name: "Guardar host" }));
   await waitFor(() => expect(screen.getByLabelText(/Orden de inicio/)).toBeInvalid());
 });
+
+test("una credencial de llave importada se ofrece al registrar un host linux", async () => {
+  const imp = { ...cred, id: "i".repeat(32), label: "llave importada", kind: "key" as const, origin: "imported" as const, hasSshKey: true };
+  setup({ listCredentials: vi.fn(async () => [imp]) });
+  await screen.findByRole("table", { name: "Hosts de la libreta" });
+  await userEvent.click(screen.getByRole("button", { name: /Nuevo host/ }));
+  await userEvent.selectOptions(screen.getByLabelText("Plataforma"), "linux");
+  expect(within(screen.getByLabelText("Credencial de la bóveda")).getAllByRole("option").some((o) => /llave importada/.test(o.textContent ?? ""))).toBe(true);
+});
